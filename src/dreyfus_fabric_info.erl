@@ -23,6 +23,7 @@
 
 go(DbName, DDocId, IndexName, InfoLevel) when is_binary(DDocId) ->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", DDocId/binary>>, []),
+    dreyfus_util:maybe_deny_index(DbName, DDocId, IndexName),
     go(DbName, DDoc, IndexName, InfoLevel);
 
 go(DbName, DDoc, IndexName, InfoLevel) ->

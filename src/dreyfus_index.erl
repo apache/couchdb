@@ -120,21 +120,33 @@ init({DbName, Index}) ->
 
 handle_call({await, RequestSeq}, From,
             #state{
-                index=#index{current_seq=Seq}=Index,
+                index=#index{dbname=DbName,name=IdxName,ddoc_id=DDocId,current_seq=Seq}=Index,
                 index_pid=IndexPid,
                 updater_pid=nil,
                 waiting_list=WaitList
             }=State) when RequestSeq > Seq ->
-    UpPid = spawn_link(fun() -> dreyfus_index_updater:update(IndexPid, Index) end),
-    {noreply, State#state{
-        updater_pid=UpPid,
-        waiting_list=[{From,RequestSeq}|WaitList]
-    }};
+    DbName2 = mem3:dbname(DbName),
+    <<"_design/", GroupId/binary>> = DDocId,
+    NewState = case dreyfus_util:in_black_list(DbName2, GroupId, IdxName) of
+        false ->
+            UpPid = spawn_link(fun() ->
+                dreyfus_index_updater:update(IndexPid,Index)
+            end),
+            State#state{
+                updater_pid=UpPid,
+                waiting_list=[{From,RequestSeq}|WaitList]
+            };
+        _ ->
+            couch_log:notice("Index Blocked from Updating - db: ~p,"
+                " ddocid: ~p name: ~p", [DbName, DDocId, IdxName]),
+            State
+    end,
+    {noreply, NewState};
 handle_call({await, RequestSeq}, _From,
             #state{index=#index{current_seq=Seq}}=State) when RequestSeq =< Seq ->
     {reply, {ok, State#state.index_pid, Seq}, State};
 handle_call({await, RequestSeq}, From, #state{waiting_list=WaitList}=State) ->
-    {noreply, State#state{
+    {no_reply, State#state{
         waiting_list=[{From,RequestSeq}|WaitList]
     }};
 
@@ -162,7 +174,7 @@ handle_cast(_Msg, State) ->
 
 handle_info({'EXIT', FromPid, {updated, NewSeq}},
             #state{
-              index=Index0,
+              index=#index{dbname=DbName,name=IdxName,ddoc_id=DDocId}=Index0,
               index_pid=IndexPid,
               updater_pid=UpPid,
               waiting_list=WaitList
@@ -175,7 +187,18 @@ handle_info({'EXIT', FromPid, {updated, NewSeq}},
                               waiting_list=[]
                              }};
     StillWaiting ->
-        Pid = spawn_link(fun() -> dreyfus_index_updater:update(IndexPid, Index) end),
+        DbName2 = mem3:dbname(DbName),
+        <<"_design/", GroupId/binary>> = DDocId,
+        Pid = case dreyfus_util:in_black_list(DbName2, GroupId, IdxName) of
+            true ->
+                couch_log:notice("Index Blocked from Updating - db: ~p, ddocid: ~p"
+                    " name: ~p", [DbName, GroupId, IdxName]),
+                nil;
+            false ->
+                spawn_link(fun() ->
+                    dreyfus_index_updater:update(IndexPid, Index) 
+                end)
+        end,
         {noreply, State#state{index=Index,
                               updater_pid=Pid,
                               waiting_list=StillWaiting

@@ -12,6 +12,8 @@
     notify/3
 ]).
 
+-define(DATA_INTERVAL, 1000).
+
 app() ->
     dreyfus.
 
@@ -25,13 +27,19 @@ services() ->
     [].
 
 data_subscriptions() ->
-    [].
+    [{dreyfus, black_list}].
 
 data_providers() ->
-    [].
+    [
+        {{dreyfus, black_list}, {callback_module, dreyfus_config},
+            [{interval, ?DATA_INTERVAL}]}
+    ].
 
 processes() ->
     [].
 
 notify(_Key, _Old, _New) ->
-    ok.
+    Listeners = application:get_env(dreyfus, config_listeners, []),
+    lists:foreach(fun(L) ->
+        L ! dreyfus_config_change_finished
+    end, Listeners).
