@@ -27,7 +27,7 @@ function (doc) {
     red_doc = %{:views => %{:bar => %{:map => map, :reduce => reduce}}}
 
     assert Couch.put("/#{db_name}/_design/foo", [body: red_doc]).body["ok"]
-    docs = make_docs(1, num_docs)
+    docs = make_docs(1..num_docs)
     assert Couch.post("/#{db_name}/_bulk_docs", [body: %{:docs => docs}, query: %{w: 3}]).status_code == 201
 
     rows = Couch.get(view_url).body["rows"]

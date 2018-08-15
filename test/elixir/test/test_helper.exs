@@ -180,13 +180,18 @@ defmodule CouchTestCase do
         }
       end
 
-      def make_docs(id, count) do
-        for i <- id..count do
-          %{
-            :_id => Integer.to_string(i),
-            :integer => i,
-            :string => Integer.to_string(i)
-          }
+      # Generate range of docs with strings as keys
+      def make_docs(id_range) do
+        for id <- id_range, str_id = Integer.to_string(id) do
+          %{"_id" => str_id, "integer" => id, "string" => str_id}
+        end
+      end
+
+      # Generate range of docs with atoms as keys, which are more
+      # idiomatic, and are encoded by jiffy to binaries
+      def create_docs(id_range) do
+        for id <- id_range, str_id = Integer.to_string(id) do
+          %{_id: str_id, integer: id, string: str_id}
         end
       end
 
