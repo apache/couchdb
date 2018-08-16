@@ -146,7 +146,7 @@ handle_call({await, RequestSeq}, _From,
             #state{index=#index{current_seq=Seq}}=State) when RequestSeq =< Seq ->
     {reply, {ok, State#state.index_pid, Seq}, State};
 handle_call({await, RequestSeq}, From, #state{waiting_list=WaitList}=State) ->
-    {no_reply, State#state{
+    {noreply, State#state{
         waiting_list=[{From,RequestSeq}|WaitList]
     }};
 
