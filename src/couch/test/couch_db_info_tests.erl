@@ -53,91 +53,59 @@ db_info_sizes_test_() ->
 
 
 should_change_with_doc_insert(DbName, DocId) ->
-    {ok, PreSizes} = get_db_sizes(DbName),
-    PreActiveSize = couch_util:get_value(active, PreSizes),
-    PreExternalSize = couch_util:get_value(external, PreSizes),
+    {PreActiveSize, PreExternalSize, _} = get_db_sizes(DbName),
     {ok, _} = update_doc(DbName, DocId, ?l2b(lists:duplicate(60, $#))),
-    {ok, PostSizes} = get_db_sizes(DbName),
-    PostActiveSize = couch_util:get_value(active, PostSizes),
-    PostExternalSize = couch_util:get_value(external, PostSizes),
+    {PostActiveSize, PostExternalSize, _} = get_db_sizes(DbName),
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize > PreExternalSize).
 
 should_change_with_doc_update(DbName, DocId) ->
-    {ok, PreSizes} = get_db_sizes(DbName),
-    PreActiveSize = couch_util:get_value(active, PreSizes),
-    PreExternalSize = couch_util:get_value(external, PreSizes),
+    {PreActiveSize, PreExternalSize, _} = get_db_sizes(DbName),
     {ok, _} = update_doc(DbName, DocId, <<>>),
-    {ok, PostSizes} = get_db_sizes(DbName),
-    PostActiveSize = couch_util:get_value(active, PostSizes),
-    PostExternalSize = couch_util:get_value(external, PostSizes),
+    {PostActiveSize, PostExternalSize, _} = get_db_sizes(DbName),
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize < PreExternalSize).
 
 should_change_with_att_upload(DbName, DocId) ->
-    {ok, PreSizes} = get_db_sizes(DbName),
-    PreActiveSize = couch_util:get_value(active, PreSizes),
-    PreExternalSize = couch_util:get_value(external, PreSizes),
+    {PreActiveSize, PreExternalSize, _} = get_db_sizes(DbName),
     Atts = [new_att(<<"one">>, 1024), new_att(<<"two">>, 8192)],
     {ok, _} = update_doc(DbName, DocId, <<>>, Atts),
-    {ok, PostSizes} = get_db_sizes(DbName),
-    PostActiveSize = couch_util:get_value(active, PostSizes),
-    PostExternalSize = couch_util:get_value(external, PostSizes),
+    {PostActiveSize, PostExternalSize, _} = get_db_sizes(DbName),
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize > PreExternalSize).
 
 should_change_with_att_update(DbName, DocId) ->
-    {ok, PreSizes} = get_db_sizes(DbName),
-    PreActiveSize = couch_util:get_value(active, PreSizes),
-    PreExternalSize = couch_util:get_value(external, PreSizes),
+    {PreActiveSize, PreExternalSize, _} = get_db_sizes(DbName),
     Atts = [new_att(<<"one">>, 1024), new_att(<<"two">>, 4096)],
     {ok, _} = update_doc(DbName, DocId, <<>>, Atts),
-    {ok, PostSizes} = get_db_sizes(DbName),
-    PostActiveSize = couch_util:get_value(active, PostSizes),
-    PostExternalSize = couch_util:get_value(external, PostSizes),
+    {PostActiveSize, PostExternalSize, _} = get_db_sizes(DbName),
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize < PreExternalSize).
 
 should_change_with_att_delete(DbName, DocId) ->
-    {ok, PreSizes} = get_db_sizes(DbName),
-    PreActiveSize = couch_util:get_value(active, PreSizes),
-    PreExternalSize = couch_util:get_value(external, PreSizes),
+    {PreActiveSize, PreExternalSize, _} = get_db_sizes(DbName),
     %% we are deleting attachment <<"one">> by excluding it from upload
     Atts = [new_att(<<"two">>, 4096)],
     {ok, _} = update_doc(DbName, DocId, <<>>, Atts),
-    {ok, PostSizes} = get_db_sizes(DbName),
-    PostActiveSize = couch_util:get_value(active, PostSizes),
-    PostExternalSize = couch_util:get_value(external, PostSizes),
+    {PostActiveSize, PostExternalSize, _} = get_db_sizes(DbName),
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize < PreExternalSize).
 
 should_change_with_doc_delete(DbName, DocId) ->
-    {ok, PreSizes} = get_db_sizes(DbName),
-    PreActiveSize = couch_util:get_value(active, PreSizes),
-    PreExternalSize = couch_util:get_value(external, PreSizes),
-    PreFileSize = couch_util:get_value(file, PreSizes),
+    {PreActiveSize, PreExternalSize, PreFileSize} = get_db_sizes(DbName),
     {ok, _} = delete_doc(DbName, DocId),
-    {ok, PostSizes} = get_db_sizes(DbName),
-    PostActiveSize = couch_util:get_value(active, PostSizes),
-    PostExternalSize = couch_util:get_value(external, PostSizes),
-    PostFileSize = couch_util:get_value(file, PostSizes),
+    {PostActiveSize, PostExternalSize, PostFileSize} = get_db_sizes(DbName),
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize < PreExternalSize),
     ?assert(PostFileSize > PreFileSize).
 
 should_change_after_compact(DbName) ->
-    {ok, PreSizes} = get_db_sizes(DbName),
-    PreActiveSize = couch_util:get_value(active, PreSizes),
-    PreExternalSize = couch_util:get_value(external, PreSizes),
-    PreFileSize = couch_util:get_value(file, PreSizes),
+    {PreActiveSize, PreExternalSize, PreFileSize} = get_db_sizes(DbName),
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, _} = couch_db:start_compact(Db),
     ok = couch_db:close(Db),
     wait_compact_done(DbName, ?WAIT_DELAY_COUNT),
-    {ok, PostSizes} = get_db_sizes(DbName),
-    PostActiveSize = couch_util:get_value(active, PostSizes),
-    PostExternalSize = couch_util:get_value(external, PostSizes),
-    PostFileSize = couch_util:get_value(file, PostSizes),
+    {PostActiveSize, PostExternalSize, PostFileSize} = get_db_sizes(DbName),
     ?assert(PostActiveSize < PreActiveSize),
     ?assert(PostExternalSize == PreExternalSize),
     ?assert(PostFileSize < PreFileSize).
@@ -202,7 +170,10 @@ get_db_info(DbName) ->
 get_db_sizes(DbName) ->
     {ok, Info} = get_db_info(DbName),
     {Sizes} = couch_util:get_nested_json_value({Info}, [sizes]),
-    {ok, Sizes}.
+    ActiveSize = couch_util:get_value(active, Sizes),
+    ExternalSize = couch_util:get_value(external, Sizes),
+    FileSize = couch_util:get_value(file, Sizes),
+    {ActiveSize, ExternalSize, FileSize}.
 
 new_att(Name, Size) ->
     couch_att:new([
