@@ -85,11 +85,7 @@ def run_couchjs(test, fmt):
         if not line:
             break
         line = line.decode()
-        if line.strip() == "restart":
-            sys.stdout.write("reboot_nodes(ctx)" + os.linesep)
-            sys.stdout.flush()
-        else:
-            sys.stderr.write(line)
+        sys.stderr.write(line)
     p.wait()
     fmt(p.returncode == 0)
     return p.returncode

@@ -344,6 +344,12 @@ handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_system">>]}=Req) -
     send_json(Req, EJSON);
 handle_node_req(#httpd{path_parts=[_, _Node, <<"_system">>]}=Req) ->
     send_method_not_allowed(Req, "GET");
+% POST /_node/$node/_restart
+handle_node_req(#httpd{method='POST', path_parts=[_, Node, <<"_restart">>]}=Req) ->
+    call_node(Node, init, restart, []),
+    send_json(Req, 200, {[{ok, true}]});
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_restart">>]}=Req) ->
+    send_method_not_allowed(Req, "POST");
 handle_node_req(#httpd{path_parts=[_]}=Req) ->
     chttpd:send_error(Req, {bad_request, <<"Incomplete path to _node request">>});
 handle_node_req(#httpd{path_parts=[_, _Node]}=Req) ->
@@ -395,7 +401,7 @@ get_stats() ->
     MessageQueues0 = [{couch_file, {CF}}, {couch_db_updater, {CDU}}],
     MessageQueues = MessageQueues0 ++ message_queues(registered()),
     [
-        {uptime, element(1,statistics(wall_clock)) div 1000},
+        {uptime, couch_app:uptime() div 1000},
         {memory, {Memory}},
         {run_queue, statistics(run_queue)},
         {ets_table_count, length(ets:all())},
