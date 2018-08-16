@@ -37,23 +37,22 @@ db_info_sizes_test_() ->
         fun setup/0, fun teardown/1,
         fun({DbName, DocId, _}) ->
             {
-                with,
-                {DbName, DocId},
+                inorder,
                 [
-                    fun should_change_with_doc_insert/1,
-                    fun should_change_with_doc_update/1,
-                    fun should_change_with_att_upload/1,
-                    fun should_change_with_att_update/1,
-                    fun should_change_with_att_delete/1,
-                    fun should_change_with_doc_delete/1,
-                    fun should_change_after_compact/1
+                    ?_test(should_change_with_doc_insert(DbName, DocId)),
+                    ?_test(should_change_with_doc_update(DbName, DocId)),
+                    ?_test(should_change_with_att_upload(DbName, DocId)),
+                    ?_test(should_change_with_att_update(DbName, DocId)),
+                    ?_test(should_change_with_att_delete(DbName, DocId)),
+                    ?_test(should_change_with_doc_delete(DbName, DocId)),
+                    ?_test(should_change_after_compact(DbName))
                 ]
             }
         end
     }.
 
 
-should_change_with_doc_insert({DbName, DocId}) ->
+should_change_with_doc_insert(DbName, DocId) ->
     {ok, PreSizes} = get_db_sizes(DbName),
     PreActiveSize = couch_util:get_value(active, PreSizes),
     PreExternalSize = couch_util:get_value(external, PreSizes),
@@ -64,7 +63,7 @@ should_change_with_doc_insert({DbName, DocId}) ->
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize > PreExternalSize).
 
-should_change_with_doc_update({DbName, DocId}) ->
+should_change_with_doc_update(DbName, DocId) ->
     {ok, PreSizes} = get_db_sizes(DbName),
     PreActiveSize = couch_util:get_value(active, PreSizes),
     PreExternalSize = couch_util:get_value(external, PreSizes),
@@ -75,7 +74,7 @@ should_change_with_doc_update({DbName, DocId}) ->
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize < PreExternalSize).
 
-should_change_with_att_upload({DbName, DocId}) ->
+should_change_with_att_upload(DbName, DocId) ->
     {ok, PreSizes} = get_db_sizes(DbName),
     PreActiveSize = couch_util:get_value(active, PreSizes),
     PreExternalSize = couch_util:get_value(external, PreSizes),
@@ -87,7 +86,7 @@ should_change_with_att_upload({DbName, DocId}) ->
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize > PreExternalSize).
 
-should_change_with_att_update({DbName, DocId}) ->
+should_change_with_att_update(DbName, DocId) ->
     {ok, PreSizes} = get_db_sizes(DbName),
     PreActiveSize = couch_util:get_value(active, PreSizes),
     PreExternalSize = couch_util:get_value(external, PreSizes),
@@ -99,7 +98,7 @@ should_change_with_att_update({DbName, DocId}) ->
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize < PreExternalSize).
 
-should_change_with_att_delete({DbName, DocId}) ->
+should_change_with_att_delete(DbName, DocId) ->
     {ok, PreSizes} = get_db_sizes(DbName),
     PreActiveSize = couch_util:get_value(active, PreSizes),
     PreExternalSize = couch_util:get_value(external, PreSizes),
@@ -112,7 +111,7 @@ should_change_with_att_delete({DbName, DocId}) ->
     ?assert(PostActiveSize > PreActiveSize),
     ?assert(PostExternalSize < PreExternalSize).
 
-should_change_with_doc_delete({DbName, DocId}) ->
+should_change_with_doc_delete(DbName, DocId) ->
     {ok, PreSizes} = get_db_sizes(DbName),
     PreActiveSize = couch_util:get_value(active, PreSizes),
     PreExternalSize = couch_util:get_value(external, PreSizes),
@@ -126,7 +125,7 @@ should_change_with_doc_delete({DbName, DocId}) ->
     ?assert(PostExternalSize < PreExternalSize),
     ?assert(PostFileSize > PreFileSize).
 
-should_change_after_compact({DbName, _}) ->
+should_change_after_compact(DbName) ->
     {ok, PreSizes} = get_db_sizes(DbName),
     PreActiveSize = couch_util:get_value(active, PreSizes),
     PreExternalSize = couch_util:get_value(external, PreSizes),
