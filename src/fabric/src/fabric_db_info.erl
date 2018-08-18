@@ -12,21 +12,28 @@
 
 -module(fabric_db_info).
 
--export([go/1]).
+-export([go/1, go/2]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 go(DbName) ->
+    go(DbName, [{format, aggregate}]).
+
+go(DbName, Options) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, get_db_info, []),
     RexiMon = fabric_util:create_monitors(Shards),
-    Fun = fun handle_message/3,
+    Fun = case couch_util:get_value(format, Options, aggregate) of
+        set -> fun handle_set_message/3;
+        _ -> fun handle_aggr_message/3
+    end,
     {ok, ClusterInfo} = get_cluster_info(Shards),
-    Acc0 = {fabric_dict:init(Workers, nil), [{cluster, ClusterInfo}]},
+    Acc0 = fabric_dict:init(Workers, nil),
     try
         case fabric_util:recv(Workers, #shard.ref, Fun, Acc0) of
-            {ok, Acc} -> {ok, Acc};
+            {ok, Acc} ->
+                {ok, [{cluster, {ClusterInfo}} | Acc]};
             {timeout, {WorkersDict, _}} ->
                 DefunctWorkers = fabric_util:remove_done_workers(
                     WorkersDict,
@@ -37,51 +44,84 @@ go(DbName) ->
                     "get_db_info"
                 ),
                 {error, timeout};
-            {error, Error} -> throw(Error)
+            {error, Error} ->
+                throw(Error)
         end
     after
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc}) ->
-    case fabric_util:remove_down_workers(Counters, NodeRef) of
-    {ok, NewCounters} ->
-        {ok, {NewCounters, Acc}};
-    error ->
-        {error, {nodedown, <<"progress not possible">>}}
+
+handle_aggr_message({ok, Info}, Shard, Counters) ->
+    case fabric_dict:lookup_element(Shard, Counters) of
+        undefined ->
+            % already heard from someone else in this range
+            {ok, Counters};
+        nil ->
+            C1 = fabric_dict:store(Shard, Info, Counters),
+            C2 = fabric_view:remove_overlapping_shards(Shard, C1),
+            case fabric_dict:any(nil, C2) of
+                true ->
+                    {ok, C2};
+                false ->
+                    {stop, merge_results(C2)}
+            end
     end;
 
-handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc}) ->
+handle_aggr_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, Counters) ->
+    case fabric_util:remove_down_workers(Counters, NodeRef) of
+        {ok, NewCounters} ->
+            {ok, NewCounters};
+        error ->
+            {error, {nodedown, <<"progress not possible">>}}
+    end;
+
+handle_aggr_message({rexi_EXIT, Reason}, Shard, Counters) ->
     NewCounters = fabric_dict:erase(Shard, Counters),
     case fabric_view:is_progress_possible(NewCounters) of
-    true ->
-        {ok, {NewCounters, Acc}};
-    false ->
-        {error, Reason}
+        true ->
+            {ok, NewCounters};
+        false ->
+            {error, Reason}
     end;
 
-handle_message({ok, Info}, #shard{dbname=Name} = Shard, {Counters, Acc}) ->
-    case fabric_dict:lookup_element(Shard, Counters) of
-    undefined ->
-        % already heard from someone else in this range
-        {ok, {Counters, Acc}};
-    nil ->
-        Seq = couch_util:get_value(update_seq, Info),
-        C1 = fabric_dict:store(Shard, Seq, Counters),
-        C2 = fabric_view:remove_overlapping_shards(Shard, C1),
-        case fabric_dict:any(nil, C2) of
+handle_aggr_message(Else, _Shard, _Acc) ->
+    %% TODO: do we want this behavior change?
+    {error, Else}.
+
+
+handle_set_message({ok, Info}, Shard, Counters) ->
+    C1 = fabric_dict:store(Shard, Info, Counters),
+    case fabric_dict:any(nil, C1) of
         true ->
-            {ok, {C2, [Info|Acc]}};
+            {ok, C1};
         false ->
-            {stop, [
-                {db_name,Name},
-                {update_seq, fabric_view_changes:pack_seqs(C2)} |
-                merge_results(lists:flatten([Info|Acc]))
-            ]}
-        end
+            {stop, [{shards, {format_results(C1)}}]}
     end;
-handle_message(_, _, Acc) ->
-    {ok, Acc}.
+
+handle_set_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, Counters) ->
+    %% TODO: add error info to Counters rather than deleting
+    case fabric_util:remove_down_workers(Counters, NodeRef) of
+        {ok, NewCounters} ->
+            {ok, NewCounters};
+        error ->
+            {error, {nodedown, <<"progress not possible">>}}
+    end;
+
+handle_set_message({rexi_EXIT, Reason}, Shard, Counters) ->
+    %% TODO: add error info to Counters rather than deleting
+    NewCounters = fabric_dict:erase(Shard, Counters),
+    case fabric_view:is_progress_possible(NewCounters) of
+        true ->
+            {ok, NewCounters};
+        false ->
+            {error, Reason}
+    end;
+
+handle_set_message(Else, _Shard, _Acc) ->
+    %% TODO: do we want this behavior change?
+    {error, Else}.
+
 
 merge_results(Info) ->
     Dict = lists:foldl(fun({K,V},D0) -> orddict:append(K,V,D0) end,
@@ -110,6 +150,29 @@ merge_results(Info) ->
         (_, _, Acc) ->
             Acc
     end, [{instance_start_time, <<"0">>}], Dict).
+
+
+format_results(Counters) ->
+    dict:to_list(lists:foldl(
+        fun({S,I0}, D) ->
+            #shard{
+               range = [B, E],
+               node = Node
+            } = S,
+            I = [{node, Node} | I0],
+            HB = couch_util:to_hex(<<B:32/integer>>),
+            HE = couch_util:to_hex(<<E:32/integer>>),
+            R = list_to_binary(HB ++ "-" ++ HE),
+            case dict:find(R, D) of
+                {ok, L} ->
+                    dict:store(R, [{I} | L], D);
+                error ->
+                    dict:store(R, [{I}], D)
+            end
+        end,
+        dict:new(),
+        fabric_dict:to_list(Counters)
+    )).
 
 merge_other_results(Results) ->
     Dict = lists:foldl(fun({Props}, D) ->
