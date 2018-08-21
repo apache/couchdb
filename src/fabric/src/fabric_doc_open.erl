@@ -25,6 +25,7 @@
     r,
     state,
     replies,
+    node_revs = [],
     q_reply
 }).
 
@@ -83,7 +84,13 @@ handle_message({rexi_EXIT, _Reason}, Worker, Acc) ->
     end;
 handle_message(Reply, Worker, Acc) ->
     NewReplies = fabric_util:update_counter(Reply, 1, Acc#acc.replies),
-    NewAcc = Acc#acc{replies = NewReplies},
+    NewNodeRevs = case Reply of
+        {ok, #doc{revs = {Pos, [Rev | _]}}} ->
+            [{Worker#shard.node, [{Pos, Rev}]} | Acc#acc.node_revs];
+        _ ->
+            Acc#acc.node_revs
+    end,
+    NewAcc = Acc#acc{replies = NewReplies, node_revs = NewNodeRevs},
     case is_r_met(Acc#acc.workers, NewReplies, Acc#acc.r) of
     {true, QuorumReply} ->
         fabric_util:cleanup(lists:delete(Worker, Acc#acc.workers)),
@@ -122,14 +129,14 @@ is_r_met(Workers, Replies, R) ->
         no_more_workers
     end.
 
-read_repair(#acc{dbname=DbName, replies=Replies}) ->
+read_repair(#acc{dbname=DbName, replies=Replies, node_revs=NodeRevs}) ->
     Docs = [Doc || {_, {{ok, #doc{}=Doc}, _}} <- Replies],
     case Docs of
     % omit local docs from read repair
     [#doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} | _] ->
         choose_reply(Docs);
     [#doc{id=Id} | _] ->
-        Opts = [replicated_changes, ?ADMIN_CTX],
+        Opts = [?ADMIN_CTX, {read_repair, NodeRevs}],
         Res = fabric:update_docs(DbName, Docs, Opts),
         case Res of
             {ok, []} ->
@@ -205,6 +212,7 @@ open_doc_test_() ->
             t_handle_message_down(),
             t_handle_message_exit(),
             t_handle_message_reply(),
+            t_store_node_revs(),
             t_read_repair(),
             t_handle_response_quorum_met(),
             t_get_doc_info()
@@ -394,6 +402,65 @@ t_handle_message_reply() ->
                 replies=[{bar, {bar, 1}}, {foo, {foo, 1}}]
             })
         )
+    end).
+
+
+t_store_node_revs() ->
+    W1 = #shard{node = w1, ref = erlang:make_ref()},
+    W2 = #shard{node = w2, ref = erlang:make_ref()},
+    W3 = #shard{node = w3, ref = erlang:make_ref()},
+    Foo1 = {ok, #doc{id = <<"bar">>, revs = {1, [<<"foo">>]}}},
+    Foo2 = {ok, #doc{id = <<"bar">>, revs = {2, [<<"foo2">>, <<"foo">>]}}},
+    NFM = {not_found, missing},
+
+    InitAcc = #acc{workers = [W1, W2, W3], replies = [], r = 2},
+
+    ?_test(begin
+        meck:expect(rexi, kill, fun(_, _) -> ok end),
+
+        % Simple case
+        {ok, #acc{node_revs = NodeRevs1}} = handle_message(Foo1, W1, InitAcc),
+        ?assertEqual([{w1, [{1, <<"foo">>}]}], NodeRevs1),
+
+        % Make sure we only hold the head rev
+        {ok, #acc{node_revs = NodeRevs2}} = handle_message(Foo2, W1, InitAcc),
+        ?assertEqual([{w1, [{2, <<"foo2">>}]}], NodeRevs2),
+
+        % Make sure we don't capture anything on error
+        {ok, #acc{node_revs = NodeRevs3}} = handle_message(NFM, W1, InitAcc),
+        ?assertEqual([], NodeRevs3),
+
+        % Make sure we accumulate node revs
+        Acc1 = InitAcc#acc{node_revs = [{w1, [{1, <<"foo">>}]}]},
+        {ok, #acc{node_revs = NodeRevs4}} = handle_message(Foo2, W2, Acc1),
+        ?assertEqual(
+                [{w2, [{2, <<"foo2">>}]}, {w1, [{1, <<"foo">>}]}],
+                NodeRevs4
+            ),
+
+        % Make sure rexi_DOWN doesn't modify node_revs
+        Down = {rexi_DOWN, nil, {nil, w1}, nil},
+        {ok, #acc{node_revs = NodeRevs5}} = handle_message(Down, W2, Acc1),
+        ?assertEqual([{w1, [{1, <<"foo">>}]}], NodeRevs5),
+
+        % Make sure rexi_EXIT doesn't modify node_revs
+        Exit = {rexi_EXIT, reason},
+        {ok, #acc{node_revs = NodeRevs6}} = handle_message(Exit, W2, Acc1),
+        ?assertEqual([{w1, [{1, <<"foo">>}]}], NodeRevs6),
+
+        % Make sure an error doesn't remove any node revs
+        {ok, #acc{node_revs = NodeRevs7}} = handle_message(NFM, W2, Acc1),
+        ?assertEqual([{w1, [{1, <<"foo">>}]}], NodeRevs7),
+
+        % Make sure we have all of our node_revs when meeting
+        % quorum
+        {ok, Acc2} = handle_message(Foo1, W1, InitAcc),
+        {ok, Acc3} = handle_message(Foo2, W2, Acc2),
+        {stop, Acc4} = handle_message(NFM, W3, Acc3),
+        ?assertEqual(
+                [{w2, [{2, <<"foo2">>}]}, {w1, [{1, <<"foo">>}]}],
+                Acc4#acc.node_revs
+            )
     end).
 
 

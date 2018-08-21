@@ -10,17 +10,12 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--record(st, {
-    filepath,
-    fd,
-    fd_monitor,
-    fsync_options,
-    header,
-    needs_commit,
-    id_tree,
-    seq_tree,
-    local_tree,
-    compression,
-    purge_tree,
-    purge_seq_tree
-}).
+-module(mem3_plugin_couch_db).
+
+-export([
+    is_valid_purge_client/2
+]).
+
+
+is_valid_purge_client(DbName, Props) ->
+    mem3_rep:verify_purge_checkpoint(DbName, Props).

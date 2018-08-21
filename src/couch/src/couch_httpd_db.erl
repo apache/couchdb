@@ -376,17 +376,22 @@ db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
+    couch_stats:increment_counter([couchdb, httpd, purge_requests]),
     couch_httpd:validate_ctype(Req, "application/json"),
-    {IdsRevs} = couch_httpd:json_body_obj(Req),
-    IdsRevs2 = [{Id, couch_doc:parse_revs(Revs)} || {Id, Revs} <- IdsRevs],
+    {IdRevs} = couch_httpd:json_body_obj(Req),
+    PurgeReqs = lists:map(fun({Id, JsonRevs}) ->
+        {couch_uuids:new(), Id, couch_doc:parse_revs(JsonRevs)}
+    end, IdRevs),
 
-    case couch_db:purge_docs(Db, IdsRevs2) of
-    {ok, PurgeSeq, PurgedIdsRevs} ->
-        PurgedIdsRevs2 = [{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs} <- PurgedIdsRevs],
-        send_json(Req, 200, {[{<<"purge_seq">>, PurgeSeq}, {<<"purged">>, {PurgedIdsRevs2}}]});
-    Error ->
-        throw(Error)
-    end;
+    {ok, Replies} = couch_db:purge_docs(Db, PurgeReqs),
+
+    Results = lists:zipwith(fun({Id, _}, {ok, Reply}) ->
+        {Id, couch_doc:revs_to_strs(Reply)}
+    end, IdRevs, Replies),
+
+    {ok, Db2} = couch_db:reopen(Db),
+    PurgeSeq = couch_db:get_purge_seq(Db2),
+    send_json(Req, 200, {[{purge_seq, PurgeSeq}, {purged, {Results}}]});
 
 db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");

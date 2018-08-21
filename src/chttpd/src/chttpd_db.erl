@@ -495,23 +495,32 @@ db_req(#httpd{path_parts=[_, <<"_bulk_get">>]}=Req, _Db) ->
 
 
 db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
+    couch_stats:increment_counter([couchdb, httpd, purge_requests]),
     chttpd:validate_ctype(Req, "application/json"),
+    W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
+    Options = [{user_ctx, Req#httpd.user_ctx}, {w, W}],
     {IdsRevs} = chttpd:json_body_obj(Req),
     IdsRevs2 = [{Id, couch_doc:parse_revs(Revs)} || {Id, Revs} <- IdsRevs],
-    case fabric:purge_docs(Db, IdsRevs2) of
-    {ok, PurgeSeq, PurgedIdsRevs} ->
-        PurgedIdsRevs2 = [{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs}
-            <- PurgedIdsRevs],
-        send_json(Req, 200, {[
-            {<<"purge_seq">>, PurgeSeq},
-            {<<"purged">>, {PurgedIdsRevs2}}
-        ]});
-    Error ->
-        throw(Error)
-    end;
+    MaxIds = config:get_integer("purge", "max_document_id_number", 100),
+    case length(IdsRevs2) =< MaxIds of
+        false -> throw({bad_request, "Exceeded maximum number of documents."});
+        true -> ok
+    end,
+    RevsLen = lists:foldl(fun({_Id, Revs}, Acc) ->
+        length(Revs) + Acc
+    end, 0, IdsRevs2),
+    MaxRevs = config:get_integer("purge", "max_revisions_number", 1000),
+    case RevsLen =< MaxRevs of
+        false -> throw({bad_request, "Exceeded maximum number of revisions."});
+        true -> ok
+    end,
+    {ok, Results} = fabric:purge_docs(Db, IdsRevs2, Options),
+    {Code, Json} = purge_results_to_json(IdsRevs2, Results),
+    send_json(Req, Code, {[{<<"purge_seq">>, null}, {<<"purged">>, {Json}}]});
 
 db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
+
 
 db_req(#httpd{method='GET',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
     case chttpd:qs_json_value(Req, "keys", nil) of
@@ -621,6 +630,19 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_revs_limit">>]}=Req, Db) ->
 
 db_req(#httpd{path_parts=[_,<<"_revs_limit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
+
+db_req(#httpd{method='PUT',path_parts=[_,<<"_purged_infos_limit">>]}=Req, Db) ->
+    Options = [{user_ctx, Req#httpd.user_ctx}],
+    case chttpd:json_body(Req) of
+        Limit when is_integer(Limit), Limit > 0 ->
+            ok = fabric:set_purge_infos_limit(Db, Limit, Options),
+            send_json(Req, {[{<<"ok">>, true}]});
+        _->
+            throw({bad_request, "`purge_infos_limit` must be positive integer"})
+    end;
+
+db_req(#httpd{method='GET',path_parts=[_,<<"_purged_infos_limit">>]}=Req, Db) ->
+    send_json(Req, fabric:get_purge_infos_limit(Db));
 
 % Special case to enable using an unencoded slash in the URL of design docs,
 % as slashes in document IDs must otherwise be URL encoded.
@@ -992,6 +1014,20 @@ update_doc_result_to_json(DocId, Error) ->
     {_Code, ErrorStr, Reason} = chttpd:error_info(Error),
     {[{id, DocId}, {error, ErrorStr}, {reason, Reason}]}.
 
+purge_results_to_json([], []) ->
+    {201, []};
+purge_results_to_json([{DocId, _Revs} | RIn], [{ok, PRevs} | ROut]) ->
+    {Code, Results} = purge_results_to_json(RIn, ROut),
+    {Code, [{DocId, couch_doc:revs_to_strs(PRevs)} | Results]};
+purge_results_to_json([{DocId, _Revs} | RIn], [{accepted, PRevs} | ROut]) ->
+    {Code, Results} = purge_results_to_json(RIn, ROut),
+    NewResults = [{DocId, couch_doc:revs_to_strs(PRevs)} | Results],
+    {erlang:max(Code, 202), NewResults};
+purge_results_to_json([{DocId, _Revs} | RIn], [Error | ROut]) ->
+    {Code, Results} = purge_results_to_json(RIn, ROut),
+    {NewCode, ErrorStr, Reason} = chttpd:error_info(Error),
+    NewResults = [{DocId, {[{error, ErrorStr}, {reason, Reason}]}} | Results],
+    {erlang:max(NewCode, Code), NewResults}.
 
 send_updated_doc(Req, Db, DocId, Json) ->
     send_updated_doc(Req, Db, DocId, Json, []).

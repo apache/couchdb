@@ -49,6 +49,11 @@ make_docs(local, Count) ->
 make_docs(_, Count) ->
     [doc(I) || I <- lists:seq(1, Count)].
 
+
+make_docs(_, Since, Count) ->
+    [doc(I) || I <- lists:seq(Since, Count)].
+        
+
 ddoc({changes, Opts}) ->
     ViewOpts = case Opts of
         seq_indexed ->

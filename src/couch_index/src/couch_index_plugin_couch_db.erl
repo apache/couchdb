@@ -10,17 +10,17 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--record(st, {
-    filepath,
-    fd,
-    fd_monitor,
-    fsync_options,
-    header,
-    needs_commit,
-    id_tree,
-    seq_tree,
-    local_tree,
-    compression,
-    purge_tree,
-    purge_seq_tree
-}).
+-module(couch_index_plugin_couch_db).
+
+-export([
+    is_valid_purge_client/2,
+    on_compact/2
+]).
+
+
+is_valid_purge_client(DbName, Props) ->
+    couch_mrview_index:verify_index_exists(DbName, Props).
+
+
+on_compact(DbName, DDocs) ->
+    couch_mrview_index:ensure_local_purge_docs(DbName, DDocs).
