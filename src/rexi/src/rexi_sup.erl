@@ -20,7 +20,7 @@ start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    {ok, {{one_for_one, 3, 10}, [
+    {ok, {{rest_for_one, 3, 10}, [
         {
             rexi_server,
             {rexi_server, start_link, [rexi_server]},
