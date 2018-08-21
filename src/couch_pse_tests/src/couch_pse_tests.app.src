@@ -10,11 +10,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(couch_bt_engine_tests).
-
-
--include_lib("eunit/include/eunit.hrl").
-
-
-couch_bt_engine_test_()->
-    cpse_util:create_tests(couch, couch_bt_engine, "couch").
+{application, couch_pse_tests, [
+    {description, "Apache CouchDB Pluggable Storage Engine Test Suite"},
+    {vsn, git},
+    {applications, [
+        kernel,
+        stdlib
+    ]}
+]}.

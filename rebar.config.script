@@ -31,6 +31,7 @@ SubDirs = [
     "src/couch_mrview",
     "src/couch_replicator",
     "src/couch_plugins",
+    "src/couch_pse_tests",
     "src/couch_event",
     "src/couch_stats",
     "src/couch_peruser",
