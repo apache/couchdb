@@ -168,7 +168,7 @@
 % value would be hard to report its ok to just return the
 % result of os:timestamp/0 as this will just disable idle
 % databases from automatically closing.
--callback last_activity(DbHandle::db_handle()) -> elrang:timestamp().
+-callback last_activity(DbHandle::db_handle()) -> erlang:timestamp().
 
 
 % All of the get_* functions may be called from many
@@ -436,9 +436,9 @@
 %
 %     1. start_key - Start iteration at the provided key or
 %        or just after if the key doesn't exist
-%     2. end_key - Stop iteration prior to visiting the provided
+%     2. end_key - Stop iteration just after the provided key
+%     3. end_key_gt - Stop iteration prior to visiting the provided
 %        key
-%     3. end_key_gt - Stop iteration just after the provided key
 %     4. dir - The atom fwd or rev. This is to be able to iterate
 %        over documents in reverse order. The logic for comparing
 %        start_key, end_key, and end_key_gt are then reversed (ie,
@@ -492,12 +492,12 @@
 % This function is called to fold over the documents (not local
 % documents) in order of their most recent update. Each document
 % in the database should have exactly one entry in this sequence.
-% If a document is updated during a call to this funciton it should
+% If a document is updated during a call to this function it should
 % not be included twice as that will probably lead to Very Bad Things.
 %
 % This should behave similarly to fold_docs/4 in that the supplied
 % user function should be invoked with a #full_doc_info{} record
-% as the first arugment and the current user accumulator as the
+% as the first argument and the current user accumulator as the
 % second argument. The same semantics for the return value from the
 % user function should be handled as in fold_docs/4.
 %
