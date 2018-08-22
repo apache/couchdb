@@ -176,6 +176,16 @@ join([H|T], Sep, Acc) ->
 
 validate(DbName,  DDoc) ->
     ok = validate_ddoc_fields(DDoc#doc.body),
+    DbPartitioned = mem3:is_partitioned(DbName),
+    DDocPartitioned = get_partitioned_opt(DDoc#doc.body, DbPartitioned),
+    if
+        not DbPartitioned andalso DDocPartitioned ->
+            throw({invalid_design_doc,
+                <<"partitioned option cannot be true in a "
+                  "non-partitioned database.">>});
+        true ->
+            ok
+    end,
     GetName = fun
         (#mrview{map_names = [Name | _]}) -> Name;
         (#mrview{reduce_funs = [{Name, _} | _]}) -> Name;
@@ -194,6 +204,9 @@ validate(DbName,  DDoc) ->
                 ok;
             ({_RedName, <<"_", _/binary>> = Bad}) ->
                 Msg = ["`", Bad, "` is not a supported reduce function."],
+                throw({invalid_design_doc, Msg});
+            ({_RedName, _RedSrc}) when DDocPartitioned ->
+                Msg = <<"Javascript reduces not supported in partitioned view.">>,
                 throw({invalid_design_doc, Msg});
             ({RedName, RedSrc}) ->
                 couch_query_servers:try_compile(Proc, reduce, RedName, RedSrc)
@@ -215,6 +228,9 @@ validate(DbName,  DDoc) ->
         ok
     end.
 
+get_partitioned_opt({Props}, Default) ->
+    {Options} = couch_util:get_value(<<"options">>, Props, {[]}),
+    couch_util:get_value(<<"partitioned">>, Options, Default).
 
 query_all_docs(Db, Args) ->
     query_all_docs(Db, Args, fun default_cb/2, []).
