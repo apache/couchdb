@@ -24,7 +24,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         QueryArg = couch_mrview_http:parse_params(Query, undefined,
             Args1, [decoded]),
         QueryArg1 = couch_mrview_util:set_view_type(QueryArg, ViewName, Views),
-        couch_mrview_util:validate_args(QueryArg1)
+        couch_mrview_util:validate_args(QueryArg1, [view])
     end, Queries),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
@@ -42,6 +42,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Args = couch_mrview_http:parse_params(Req, Keys),
+    couch_mrview_util:validate_args(Args, [view]),
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
