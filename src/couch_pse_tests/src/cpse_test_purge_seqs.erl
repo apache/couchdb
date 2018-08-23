@@ -11,6 +11,8 @@
 % the License.
 
 -module(cpse_test_purge_seqs).
+-compile(export_all).
+
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -99,7 +101,7 @@ cpse_increment_purge_seq_on_partial_purge(DbName) ->
     Doc1 = {[{'_id', foo}, {vsn, 1}]},
     Doc2 = {[{'_id', foo}, {vsn, 2}]},
     {ok, Rev1} = cpse_util:save_doc(DbName, Doc1),
-    {ok, Rev2} = cpse_util:save_doc(DbName, Doc2, [replicated_changes]),
+    {ok, _Rev2} = cpse_util:save_doc(DbName, Doc2, [replicated_changes]),
 
     cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
         {doc_count, 1},
