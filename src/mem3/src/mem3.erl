@@ -190,7 +190,7 @@ choose_shards(DbName, Nodes, Options) ->
     if N =:= 0 -> erlang:error(no_nodes_in_zone);
        true -> ok
     end,
-    Q = mem3_util:to_integer(couch_util:get_value(q, Options,
+    Q = mem3_util:q_val(couch_util:get_value(q, Options,
         config:get("cluster", "q", "8"))),
     %% rotate to a random entry in the nodelist for even distribution
     {A, B} = lists:split(crypto:rand_uniform(1,length(Nodes)+1), Nodes),
