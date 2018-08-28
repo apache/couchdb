@@ -18,7 +18,8 @@
     db_req/2, couch_doc_open/4,handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
     handle_design_info_req/3, handle_view_cleanup_req/2,
-    update_doc/4, http_code_from_status/1]).
+    update_doc/4, http_code_from_status/1,
+    handle_partition_design_req/2]).
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -250,9 +251,42 @@ handle_view_cleanup_req(Req, Db) ->
     ok = fabric:cleanup_index_files_all_nodes(Db),
     send_json(Req, 202, {[{ok, true}]}).
 
+
+handle_partition_design_req(#httpd{
+        path_parts=[DbName, <<"_partition">>, Partition, _Design, Name, <<"_",_/binary>> = Action | _Rest]
+    }=Req, Db) -> 
+
+    couch_doc:validate_docid(Partition, DbName),
+    validate_no_partition_in_qs(Req),
+
+    case mem3:is_partitioned(DbName) of
+        false -> throw({bad_request, <<"Database is not partitioned">>});
+        true -> ok
+    end,
+
+    DDoc = get_design_doc(DbName, Name),
+    Partitioned = couch_mrview:get_partitioned_opt(DDoc#doc.body, true),
+
+    case Partitioned of
+        true ->
+            Handler = chttpd_handlers:partition_design_handler(Action, fun bad_action_partition_req/4),
+            Handler(Req, Db, DDoc, Partition);
+        false ->
+            throw({bad_request, <<"partition query is not supported in this design doc.">>})
+    end;
+
+handle_partition_design_req(_Req, _Db) ->
+    throw({bad_request, <<"missing partition key">>}).
+
+
+bad_action_partition_req(Req, _Db, _DDoc, _PartitionKey) ->
+    chttpd:send_error(Req, 404, <<"partition_error">>, <<"Invalid path.">>).
+
+
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) ->
+    validate_no_partition_in_qs(Req),
     DbName = mem3:dbname(couch_db:name(Db)),
     DDoc = get_design_doc(DbName, Name),
     Handler = chttpd_handlers:design_handler(Action, fun bad_action_req/3),
@@ -268,6 +302,15 @@ get_design_doc(DbName, Name) ->
             DDoc;
         Error ->
             throw(Error)
+    end.
+
+
+validate_no_partition_in_qs(Req) ->
+    case chttpd:qs_value(Req, "partition") of
+        undefined ->
+            ok;
+        _ ->
+            throw({bad_request, <<"Partition is not allowed in the query string">>})
     end.
 
 
