@@ -254,16 +254,22 @@ handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) ->
     DbName = mem3:dbname(couch_db:name(Db)),
-    case ddoc_cache:open(DbName, <<"_design/", Name/binary>>) of
-    {ok, DDoc} ->
-        Handler = chttpd_handlers:design_handler(Action, fun bad_action_req/3),
-        Handler(Req, Db, DDoc);
-    Error ->
-        throw(Error)
-    end;
+    DDoc = get_design_doc(DbName, Name),
+    Handler = chttpd_handlers:design_handler(Action, fun bad_action_req/3),
+    Handler(Req, Db, DDoc);
 
 handle_design_req(Req, Db) ->
     db_req(Req, Db).
+
+
+get_design_doc(DbName, Name) ->
+    case ddoc_cache:open(DbName, <<"_design/", Name/binary>>) of
+        {ok, DDoc} ->
+            DDoc;
+        Error ->
+            throw(Error)
+    end.
+
 
 bad_action_req(#httpd{path_parts=[_, _, Name|FileNameParts]}=Req, Db, _DDoc) ->
     db_attachment_req(Req, Db, <<"_design/",Name/binary>>, FileNameParts).
