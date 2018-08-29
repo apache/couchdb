@@ -34,6 +34,7 @@
     validate_sort/1,
     validate_fields/1,
     validate_bulk_delete/1,
+    validate_partition/1,
 
     default_limit/0
 ]).
@@ -351,3 +352,15 @@ validate_opt(Name, [{validator, Fun} | Rest], Value) ->
 
 default_limit() ->
     config:get_integer("mango", "default_limit", 25).
+
+
+validate_partition({Props}) ->
+    case lists:keyfind(<<"r">>, 1, Props) of
+        false ->
+            ok;
+        {<<"r">>, Value} when Value =:= 1 ->
+            ok;
+        {<<"r">>, _Value} ->
+            ?MANGO_ERROR(invalid_partition_read)
+
+    end.
