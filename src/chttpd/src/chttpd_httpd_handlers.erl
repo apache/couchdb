@@ -12,7 +12,7 @@
 
 -module(chttpd_httpd_handlers).
 
--export([url_handler/1, db_handler/1, design_handler/1]).
+-export([url_handler/1, db_handler/1, design_handler/1, partition_design_handler/1]).
 
 url_handler(<<>>)                  -> fun chttpd_misc:handle_welcome_req/1;
 url_handler(<<"favicon.ico">>)     -> fun chttpd_misc:handle_favicon_req/1;
@@ -32,6 +32,7 @@ url_handler(_) -> no_match.
 db_handler(<<"_view_cleanup">>) -> fun chttpd_db:handle_view_cleanup_req/2;
 db_handler(<<"_compact">>)      -> fun chttpd_db:handle_compact_req/2;
 db_handler(<<"_design">>)       -> fun chttpd_db:handle_design_req/2;
+db_handler(<<"_partition">>)    -> fun chttpd_db:handle_partition_req/2;
 db_handler(<<"_temp_view">>)    -> fun chttpd_view:handle_temp_view_req/2;
 db_handler(<<"_changes">>)      -> fun chttpd_db:handle_changes_req/2;
 db_handler(_) -> no_match.
@@ -43,3 +44,6 @@ design_handler(<<"_update">>)  -> fun chttpd_show:handle_doc_update_req/3;
 design_handler(<<"_info">>)    -> fun chttpd_db:handle_design_info_req/3;
 design_handler(<<"_rewrite">>) -> fun chttpd_rewrite:handle_rewrite_req/3;
 design_handler(_) -> no_match.
+
+partition_design_handler(<<"_view">>) -> fun chttpd_view:handle_partition_view_req/4;
+partition_design_handler(_) -> no_match.
