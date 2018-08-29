@@ -19,7 +19,7 @@
     update_doc_result_to_json/1, update_doc_result_to_json/2,
     handle_design_info_req/3, handle_view_cleanup_req/2,
     update_doc/4, http_code_from_status/1,
-    handle_partition_design_req/2]).
+    handle_partition_req/2]).
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -252,35 +252,49 @@ handle_view_cleanup_req(Req, Db) ->
     send_json(Req, 202, {[{ok, true}]}).
 
 
-handle_partition_design_req(#httpd{
+handle_partition_req(#httpd{
         path_parts=[DbName, <<"_partition">>, Partition, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) -> 
 
+    validate_partition_req(Req, Partition, DbName),
+    DDoc = get_design_doc(DbName, Name),
+    Partitioned = couch_mrview:get_partitioned_opt(DDoc#doc.body, true),
+
+    case Partitioned of
+        true ->
+            Handler = chttpd_handlers:partition_design_handler(Action, fun bad_action_partition_design_req/4),
+            Handler(Req, Db, DDoc, Partition);
+        false ->
+            throw({bad_request, <<"partition query is not supported in this design doc.">>})
+    end;
+
+handle_partition_req(#httpd{
+        path_parts=[DbName, <<"_partition">>, Partition, Action | _Rest]
+    }=Req, Db) -> 
+        validate_partition_req(Req, Partition, DbName),
+        Handler = chttpd_handlers:partition_handler(Action, fun bad_action_partition_req/3),
+        Handler(Req, Db, Partition);
+
+handle_partition_req(_Req, _Db) ->
+    throw({bad_request, <<"missing partition key">>}).
+
+
+bad_action_partition_design_req(Req, _Db, _DDoc, _PartitionKey) ->
+    chttpd:send_error(Req, 404, <<"partition_error">>, <<"Invalid path.">>).
+
+
+bad_action_partition_req(Req, _Db, _PartitionKey) ->
+    chttpd:send_error(Req, 404, <<"partition_error">>, <<"Invalid path.">>).
+
+
+validate_partition_req(Req, Partition, DbName) ->
     couch_doc:validate_docid(Partition, DbName),
     validate_no_partition_in_qs(Req),
 
     case mem3:is_partitioned(DbName) of
         false -> throw({bad_request, <<"Database is not partitioned">>});
         true -> ok
-    end,
-
-    DDoc = get_design_doc(DbName, Name),
-    Partitioned = couch_mrview:get_partitioned_opt(DDoc#doc.body, true),
-
-    case Partitioned of
-        true ->
-            Handler = chttpd_handlers:partition_design_handler(Action, fun bad_action_partition_req/4),
-            Handler(Req, Db, DDoc, Partition);
-        false ->
-            throw({bad_request, <<"partition query is not supported in this design doc.">>})
-    end;
-
-handle_partition_design_req(_Req, _Db) ->
-    throw({bad_request, <<"missing partition key">>}).
-
-
-bad_action_partition_req(Req, _Db, _DDoc, _PartitionKey) ->
-    chttpd:send_error(Req, 404, <<"partition_error">>, <<"Invalid path.">>).
+    end.
 
 
 handle_design_req(#httpd{

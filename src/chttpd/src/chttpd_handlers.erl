@@ -16,6 +16,7 @@
     url_handler/2,
     db_handler/2,
     design_handler/2,
+    partition_handler/2,
     partition_design_handler/2
 ]).
 
@@ -35,6 +36,9 @@ db_handler(HandlerKey, DefaultFun) ->
 
 design_handler(HandlerKey, DefaultFun) ->
     select(collect(design_handler, [HandlerKey]), DefaultFun).
+
+partition_handler(HandlerKey, DefaultFun) ->
+        select(collect(partition_handler, [HandlerKey]), DefaultFun).
 
 partition_design_handler(HandlerKey, DefaultFun) ->
         select(collect(partition_design_handler, [HandlerKey]), DefaultFun).

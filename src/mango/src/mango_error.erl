@@ -73,6 +73,13 @@ info(mango_fields, {invalid_field_json, BadField}) ->
         fmt("Invalid JSON for field spec: ~w", [BadField])
     };
 
+info(mango_httpd, partition_field_error) ->
+    {
+        400,
+        <<"bad request">>,
+        <<"`partition` is not a valid parameter.">>
+    };
+
 info(mango_httpd, error_saving_ddoc) ->
     {
         500,
