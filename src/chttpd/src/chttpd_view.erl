@@ -14,7 +14,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--export([handle_view_req/3, handle_temp_view_req/2]).
+-export([handle_view_req/3, handle_temp_view_req/2, handle_partition_view_req/4]).
 
 multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Args0 = couch_mrview_http:parse_params(Req, undefined),
@@ -47,6 +47,10 @@ design_doc_view(#httpd{path_parts=[DbName | _]}=Req, Db, DDoc, ViewName, Keys) -
     DbPartitioned = mem3:is_partitioned(DbName),
     Partitioned = couch_util:get_value(<<"partitioned">>, Options, DbPartitioned),
     Args = couch_mrview_util:set_extra(Args0, partitioned, Partitioned),
+    design_doc_view_int(Req, Db, DDoc, ViewName, Args).
+
+
+design_doc_view_int(Req, Db, DDoc, ViewName, Args) ->
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
@@ -105,6 +109,17 @@ handle_temp_view_req(Req, _Db) ->
     Msg = <<"Temporary views are not supported in CouchDB">>,
     chttpd:send_error(Req, 410, gone, Msg).
 
+
+handle_partition_view_req(#httpd{method='GET',
+        path_parts=[_, _, _, _, _, _, ViewName]} = Req, Db, DDoc, Partition) ->
+    Keys = chttpd:qs_json_value(Req, "keys", undefined),
+    Args = couch_mrview_http:parse_params(Req, Keys),
+    Args1 = couch_mrview_util:set_extra(Args, partition, Partition),
+    Args2 = couch_mrview_util:set_extra(Args1, partitioned, true),
+    design_doc_view_int(Req, Db, DDoc, ViewName, Args2);
+
+handle_partition_view_req(Req, _Db, _DDoc, _Pk) ->
+        chttpd:send_method_not_allowed(Req, "GET").
 
 
 -ifdef(TEST).
