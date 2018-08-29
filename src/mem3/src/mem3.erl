@@ -21,12 +21,15 @@
 -export([live_shards/2]).
 -export([belongs/2, owner/3]).
 -export([get_placement/1]).
+-export([ping/1, ping/2]).
 
 %% For mem3 use only.
 -export([name/1, node/1, range/1, engine/1]).
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
+
+-define(PING_TIMEOUT_IN_MS, 60000).
 
 start() ->
     application:start(mem3).
@@ -329,6 +332,27 @@ engine(Opts) when is_list(Opts) ->
             [{engine, Engine}];
         _ ->
             []
+    end.
+
+%% Check whether a node is up or down
+%%  side effect: set up a connection to Node if there not yet is one.
+
+-spec ping(Node :: atom()) -> pong | pang.
+
+ping(Node) ->
+    ping(Node, ?PING_TIMEOUT_IN_MS).
+
+-spec ping(Node :: atom(), Timeout :: pos_integer()) -> pong | pang.
+
+ping(Node, Timeout) when is_atom(Node) ->
+    %% The implementation of the function is copied from
+    %% lib/kernel/src/net_adm.erl with addition of a Timeout
+    case catch gen:call({net_kernel, Node},
+            '$gen_call', {is_auth, node()}, Timeout) of
+        {ok, yes} -> pong;
+        _ ->
+            erlang:disconnect_node(Node),
+            pang
     end.
 
 -ifdef(TEST).
