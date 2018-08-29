@@ -642,6 +642,20 @@ validate_args(Args) ->
             mrverror(<<"`partition` parameter is not supported in this view.">>)
     end,
 
+    case {Partitioned, Args#mrargs.conflicts} of
+        {true, true} ->
+            mrverror(<<"`conflicts=true` is not supported in this view.">>);
+        {_, _} ->
+            ok
+    end,
+
+    case {Partitioned, Args#mrargs.stable} of
+        {true, true} ->
+            mrverror(<<"`stable=true` is not supported in this view.">>);
+        {_, _} ->
+            ok
+    end,
+
     Args1 = case {Style, Partitioned, Partition} of
         {all_docs, true, undefined} ->
             Args;
