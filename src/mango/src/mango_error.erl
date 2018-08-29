@@ -264,6 +264,13 @@ info(mango_opts, {multiple_text_operator, {invalid_selector, BadSel}}) ->
             [BadSel])
     };
 
+info(mango_opts, invalid_partition_read) -> 
+    {
+        400,
+        <<"invalid_partition_read_value">>,
+        <<"`r` value can only be r = 1 for partitions">>
+    };
+
 info(mango_selector, {invalid_selector, missing_field_name}) ->
     {
         400,
