@@ -92,6 +92,19 @@ mrview_query_test_() ->
         }
     }.
 
+mrview_cleanup_index_files_test_() ->
+    {
+        "Check index files cleanup",
+        {
+            setup,
+            fun start/0, fun teardown/1,
+            [
+                make_test_case(clustered, [fun should_cleanup_index_files/2])
+            ]
+        }
+    }.
+
+
 make_test_case(Mod, Funs) ->
     {
         lists:flatten(io_lib:format("~s", [Mod])),
@@ -128,6 +141,46 @@ should_return_400_for_wrong_order_of_keys(_PortType, {Host, DbName}) ->
          ?assertEqual(400, Status),
          ok
     end).
+
+should_cleanup_index_files(_PortType, {Host, DbName}) ->
+    ?_test(begin
+        IndexWildCard = [
+            config:get("couchdb", "view_index_dir"),
+            "/.shards/*/",
+            DbName,
+            ".[0-9]*_design/mrview/*"
+        ],
+        ReqUrl = Host ++ "/" ++ DbName ++ "/_design/foo/_view/view1",
+        {ok, Status0, _Headers0, Body0} = test_request:get(ReqUrl, [?AUTH]),
+        FileList0 = filelib:wildcard(IndexWildCard),
+        ?assertNotEqual([], FileList0),
+
+        % It is hard to simulate inactive view.
+        % Since couch_mrview:cleanup is called on view definition change.
+        % That's why we just create extra files in place
+        ToDelete = lists:map(fun(FilePath) ->
+            ViewFile = filename:join([
+                filename:dirname(FilePath),
+                "11111111111111111111111111111111.view"]),
+            file:write_file(ViewFile, <<>>),
+            ViewFile
+        end, FileList0),
+        FileList1 = filelib:wildcard(IndexWildCard),
+        ?assertEqual([], lists:usort(FileList1 -- (FileList0 ++ ToDelete))),
+
+        CleanupUrl = Host ++ "/" ++ DbName ++ "/_view_cleanup",
+        {ok, Status1, _Headers1, Body1} = test_request:post(
+            CleanupUrl, [], <<>>, [?AUTH]),
+        test_util:wait(fun() ->
+                IndexFiles = filelib:wildcard(IndexWildCard),
+                case lists:usort(FileList0) == lists:usort(IndexFiles) of
+                    false -> wait;
+                    true -> ok
+                end
+        end),
+        ok
+    end).
+
 
 create_doc(backdoor, DbName, Id, Body) ->
     JsonDoc = couch_util:json_apply_field({<<"_id">>, Id}, Body),
