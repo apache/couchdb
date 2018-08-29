@@ -208,6 +208,7 @@ handle_partition_explain_req(#httpd{method='POST'}=Req, Db, Partition) ->
     chttpd:validate_ctype(Req, "application/json"),
     {ok, Body} = add_partition_to_query(Req, Partition),
     {ok, Opts0} = mango_opts:validate_find(Body),
+    ok = mango_opts:validate_partition(Body),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     Resp = mango_crud:explain(Db, Sel, Opts),
     chttpd:send_json(Req, Resp);
@@ -234,6 +235,7 @@ handle_partition_find_req(#httpd{method='POST'}=Req, Db, Partition) ->
     chttpd:validate_ctype(Req, "application/json"),
     {ok, Body} = add_partition_to_query(Req, Partition),
     {ok, Opts0} = mango_opts:validate_find(Body),
+    ok = mango_opts:validate_partition(Body),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     {ok, Resp0} = start_find_resp(Req),
     {ok, AccOut} = run_find(Resp0, Db, Sel, Opts),
