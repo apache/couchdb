@@ -21,6 +21,7 @@
 
 -export([get_shards/2, sort/2, upgrade/1, export/1, time/2]).
 -export([in_black_list/1, in_black_list/3, maybe_deny_index/3]).
+-export([get_design_docid/1]).
 
 get_shards(DbName, #index_query_args{stale=ok}) ->
     mem3:ushards(DbName);
@@ -193,6 +194,9 @@ maybe_deny_index(DbName, GroupId, IndexName) ->
         _ ->
             ok
     end.
+
+get_design_docid(#doc{id = <<"_design/", DesignName/binary>>}) ->
+  DesignName.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

@@ -36,6 +36,8 @@ go(DbName, GroupId, IndexName, QueryArgs) when is_binary(GroupId) ->
     go(DbName, DDoc, IndexName, QueryArgs);
 
 go(DbName, DDoc, IndexName, #index_query_args{}=QueryArgs) ->
+    DesignName = dreyfus_util:get_design_docid(DDoc),
+    dreyfus_util:maybe_deny_index(DbName, DesignName, IndexName),
     Shards = dreyfus_util:get_shards(DbName, QueryArgs),
     Workers = fabric_util:submit_jobs(Shards, dreyfus_rpc, group1, [DDoc,
          IndexName, dreyfus_util:export(QueryArgs)]),
