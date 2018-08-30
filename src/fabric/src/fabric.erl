@@ -485,8 +485,10 @@ cleanup_index_files(DbName) ->
         binary_to_list(couch_util:get_value(signature, Info))
     end, [couch_doc:from_json_obj(DD) || DD <- DesignDocs]),
 
-    FileList = filelib:wildcard([config:get("couchdb", "view_index_dir"),
-        "/.shards/*/", couch_util:to_list(dbname(DbName)), ".[0-9]*_design/mrview/*"]),
+    FileList = lists:flatmap(fun(#shard{name = ShardName}) ->
+        IndexDir = couch_index_util:index_dir(mrview, ShardName),
+        filelib:wildcard([IndexDir, "/*"])
+    end, mem3:local_shards(dbname(DbName))),
 
     DeleteFiles = if ActiveSigs =:= [] -> FileList; true ->
         {ok, RegExp} = re:compile([$(, string:join(ActiveSigs, "|"), $)]),
