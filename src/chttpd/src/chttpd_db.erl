@@ -375,8 +375,13 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
 db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST");
 
-db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, _Db) ->
+db_req(#httpd{method='POST', path_parts=[DbName, <<"_ensure_full_commit">>],
+        user_ctx=Ctx}=Req, _Db) ->
     chttpd:validate_ctype(Req, "application/json"),
+    %% use fabric call to trigger a database_does_not_exist exception
+    %% for missing databases that'd return error 404 from chttpd
+    %% get_security used to prefer shards on the same node over other nodes
+    fabric:get_security(DbName, [{user_ctx, Ctx}]),
     send_json(Req, 201, {[
         {ok, true},
         {instance_start_time, <<"0">>}
