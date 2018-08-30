@@ -12,6 +12,7 @@
 
 -module(dreyfus_blacklist_request_test).
 
+-include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("dreyfus/include/dreyfus.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -55,6 +56,8 @@ dreyfus_blacklist_request_test_() ->
 deny_fabric_requests() ->
     Reason = <<"Index <mydb, myddocid, myindexname>, is BlackListed">>,
     QueryArgs = #index_query_args{},
+    IndexQueryArgs = #index_query_args{},
+    DDoc = #doc{id = <<"_design/myddocid">>},
     Denied = "mydb.myddocid.myindexname",
     config:set("dreyfus_blacklist", Denied, "true"),
     dreyfus_test_util:wait_config_change(Denied, "true"),
@@ -65,7 +68,15 @@ deny_fabric_requests() ->
     ?assertThrow({bad_request, Reason}, dreyfus_fabric_group2:go(<<"mydb">>,
         <<"myddocid">>,  <<"myindexname">>, QueryArgs)),
     ?assertThrow({bad_request, Reason}, dreyfus_fabric_info:go(<<"mydb">>,
-        <<"myddocid">>,  <<"myindexname">>, QueryArgs)).
+        <<"myddocid">>,  <<"myindexname">>, QueryArgs)),
+    ?assertThrow({bad_request, Reason}, dreyfus_fabric_search:go(<<"mydb">>,
+        DDoc,  <<"myindexname">>, IndexQueryArgs)),
+    ?assertThrow({bad_request, Reason}, dreyfus_fabric_group1:go(<<"mydb">>,
+        DDoc,  <<"myindexname">>, IndexQueryArgs)),
+    ?assertThrow({bad_request, Reason}, dreyfus_fabric_group2:go(<<"mydb">>,
+        DDoc,  <<"myindexname">>, IndexQueryArgs)),
+    ?assertThrow({bad_request, Reason}, dreyfus_fabric_info:go(<<"mydb">>,
+        DDoc,  <<"myindexname">>, IndexQueryArgs)).
 
 allow_fabric_request() ->
     ok = meck:new(dreyfus_fabric_search, [passthrough]),

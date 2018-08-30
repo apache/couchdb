@@ -27,6 +27,8 @@ go(DbName, DDocId, IndexName, InfoLevel) when is_binary(DDocId) ->
     go(DbName, DDoc, IndexName, InfoLevel);
 
 go(DbName, DDoc, IndexName, InfoLevel) ->
+    DesignName = dreyfus_util:get_design_docid(DDoc),
+    dreyfus_util:maybe_deny_index(DbName, DesignName, IndexName),
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, dreyfus_rpc, InfoLevel, [DDoc, IndexName]),
     RexiMon = fabric_util:create_monitors(Shards),
