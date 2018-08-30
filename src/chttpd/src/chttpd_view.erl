@@ -110,6 +110,25 @@ handle_temp_view_req(Req, _Db) ->
     chttpd:send_error(Req, 410, gone, Msg).
 
 
+handle_partition_view_req(#httpd{method='POST',
+        path_parts=[_, _, _, _, _, _, ViewName]} = Req, Db, DDoc, Partition) ->
+    chttpd:validate_ctype(Req, "application/json"),
+    Props = couch_httpd:json_body_obj(Req),
+    Keys = couch_mrview_util:get_view_keys(Props),
+    case Keys of
+        Keys when is_list(Keys) ->
+            couch_stats:increment_counter([couchdb, httpd, view_reads]),
+            Args0 = couch_mrview_http:parse_params(Req, Keys),
+            Args1 = couch_mrview_util:set_extra(Args0, partition, Partition),
+            Args2 = couch_mrview_util:set_extra(Args1, partitioned, true),
+            design_doc_view_int(Req, Db, DDoc, ViewName, Args2);
+        _ ->
+            throw({
+                bad_request,
+                "POST body must contain `keys` field"
+            })
+    end;
+
 handle_partition_view_req(#httpd{method='GET',
         path_parts=[_, _, _, _, _, _, ViewName]} = Req, Db, DDoc, Partition) ->
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
