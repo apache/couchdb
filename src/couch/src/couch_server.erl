@@ -101,9 +101,14 @@ open(DbName, Options0) ->
     end.
 
 update_lru(DbName, Options) ->
-    case lists:member(sys_db, Options) of
-        false -> gen_server:cast(couch_server, {update_lru, DbName});
-        true -> ok
+    case config:get_boolean("couchdb", "update_lru_on_read", false) of
+        true ->
+            case lists:member(sys_db, Options) of
+                false -> gen_server:cast(couch_server, {update_lru, DbName});
+                true -> ok
+            end;
+        false ->
+            ok
     end.
 
 close_lru() ->
