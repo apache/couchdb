@@ -21,15 +21,16 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 go(DbName, Options, #mrargs{keys=undefined} = QueryArgs, Callback, Acc) ->
+    {CoordArgs, WorkerArgs} = fabric_view:fix_skip_and_limit(QueryArgs),
     Shards = shards(DbName, QueryArgs),
     Workers0 = fabric_util:submit_jobs(
-            Shards, fabric_rpc, all_docs, [Options, QueryArgs]),
+            Shards, fabric_rpc, all_docs, [Options, WorkerArgs]),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
         case fabric_util:stream_start(Workers0, #shard.ref) of
             {ok, Workers} ->
                 try
-                    go(DbName, Options, Workers, QueryArgs, Callback, Acc)
+                    go(DbName, Options, Workers, CoordArgs, Callback, Acc)
                 after
                     fabric_util:cleanup(Workers)
                 end;

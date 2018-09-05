@@ -16,6 +16,7 @@
     transform_row/1, keydict/1, extract_view/4, get_shards/2,
     check_down_shards/2, handle_worker_exit/3,
     get_shard_replacements/2, maybe_update_others/5]).
+-export([fix_skip_and_limit/1]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -387,6 +388,21 @@ get_shard_replacements(DbName, UsedShards0) ->
                 Acc
         end
     end, [], UsedShards).
+
+-spec fix_skip_and_limit(#mrargs{}) -> {CoordArgs::#mrargs{}, WorkerArgs::#mrargs{}}.
+fix_skip_and_limit(#mrargs{} = Args) ->
+    {CoordArgs, WorkerArgs} = case couch_mrview_util:get_extra(Args, partition) of
+        undefined ->
+            #mrargs{skip=Skip, limit=Limit}=Args,
+            {Args, Args#mrargs{skip=0, limit=Skip+Limit}};
+        _Partition ->
+            {Args#mrargs{skip=0}, Args}
+    end,
+    %% the coordinator needs to finalize each row, so make sure the shards don't
+    {CoordArgs, remove_finalizer(WorkerArgs)}.
+
+remove_finalizer(Args) ->
+    couch_mrview_util:set_extra(Args, finalizer, null).
 
 % unit test
 is_progress_possible_test() ->
