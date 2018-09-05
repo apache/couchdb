@@ -24,8 +24,9 @@ go(DbName, GroupId, View, Args, Callback, Acc0, VInfo) when is_binary(GroupId) -
     go(DbName, DDoc, View, Args, Callback, Acc0, VInfo);
 
 go(DbName, DDoc, VName, Args, Callback, Acc, VInfo) ->
+    {CoordArgs, WorkerArgs} = fabric_view:fix_skip_and_limit(Args),
     DocIdAndRev = fabric_util:doc_id_and_rev(DDoc),
-    RPCArgs = [DocIdAndRev, VName, Args],
+    RPCArgs = [DocIdAndRev, VName, WorkerArgs],
     Shards = fabric_view:get_shards(DbName, Args),
     fabric_view:maybe_update_others(DbName, DocIdAndRev, Shards, VName, Args),
     Repls = fabric_view:get_shard_replacements(DbName, Shards),
@@ -40,7 +41,7 @@ go(DbName, DDoc, VName, Args, Callback, Acc, VInfo) ->
                 Callback({error, ddoc_updated}, Acc);
             {ok, Workers} ->
                 try
-                    go2(DbName, Workers, VInfo, Args, Callback, Acc)
+                    go2(DbName, Workers, VInfo, CoordArgs, Callback, Acc)
                 after
                     fabric_util:cleanup(Workers)
                 end;
