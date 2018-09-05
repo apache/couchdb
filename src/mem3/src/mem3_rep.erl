@@ -173,6 +173,9 @@ find_source_seq(SrcDb, TgtNode, TgtUUIDPrefix, TgtSeq) ->
         SrcNode = atom_to_binary(node(), utf8),
         find_source_seq_int(Doc, SrcNode, TgtNode, TgtUUID, TgtSeq);
     {not_found, _} ->
+        couch_log:warning("~p find_source_seq repl doc not_found "
+            "src_db: ~p, tgt_node: ~p, tgt_uuid_prefix: ~p, tgt_seq: ~p",
+            [?MODULE, SrcDb, TgtNode, TgtUUIDPrefix, TgtSeq]),
         0
     end.
 
@@ -202,6 +205,10 @@ find_source_seq_int(#doc{body={Props}}, SrcNode0, TgtNode0, TgtUUID, TgtSeq) ->
         [{Entry} | _] ->
             couch_util:get_value(<<"source_seq">>, Entry);
         [] ->
+            couch_log:warning("~p find_source_seq_int nil useable history "
+                "src_node: ~p, tgt_node: ~p, tgt_uuid: ~p, tgt_seq: ~p, "
+                "src_history: ~p",
+                [?MODULE, SrcNode, TgtNode, TgtUUID, TgtSeq, SrcHistory]),
             0
     end.
 

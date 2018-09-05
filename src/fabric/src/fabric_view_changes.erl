@@ -456,11 +456,13 @@ do_unpack_seqs(Opaque, DbName) ->
     end.
 
 
-get_old_seq(#shard{range=R}, SinceSeqs) ->
+get_old_seq(#shard{range=R}=Shard, SinceSeqs) ->
     case lists:keyfind(R, 2, SinceSeqs) of
-        {_Node, R, Seq} when is_number(Seq) ->
+        {Node, R, Seq} when is_number(Seq) ->
             % Unfortunately we don't have access to the db
             % uuid so we can't set a replacememnt here.
+            couch_log:warning("~p get_old_seq missing uuid "
+                "node: ~p, range: ~p, seq: ~p", [?MODULE, Node, R, Seq]),
             0;
         {Node, R, {Seq, Uuid}} ->
             % This update seq is using the old format that
@@ -471,7 +473,9 @@ get_old_seq(#shard{range=R}, SinceSeqs) ->
             % This is the newest sequence format that we
             % can use for replacement.
             {Seq, Uuid, EpochNode};
-        _ ->
+        Error ->
+            couch_log:warning("~p get_old_seq error: ~p, shard: ~p, seqs: ~p",
+                [?MODULE, Error, Shard, SinceSeqs]),
             0
     end.
 

@@ -1448,9 +1448,17 @@ calculate_start_seq(Db, _Node, {Seq, Uuid, EpochNode}) ->
         true ->
             case is_owner(EpochNode, Seq, get_epochs(Db)) of
                 true -> Seq;
-                false -> 0
+                false ->
+                    couch_log:warning("~p calculate_start_seq not owner "
+                        "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p, epochs: ~p",
+                        [?MODULE, Db#db.name, Seq, Uuid, EpochNode,
+                            get_epochs(Db)]),
+                    0
             end;
         false ->
+            couch_log:warning("~p calculate_start_seq uuid prefix mismatch "
+                "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p",
+                [?MODULE, Db#db.name, Seq, Uuid, EpochNode]),
             %% The file was rebuilt, most likely in a different
             %% order, so rewind.
             0
@@ -1882,6 +1890,7 @@ calculate_start_seq_test_() ->
 setup_start_seq() ->
     meck:new(couch_db_engine, [passthrough]),
     meck:expect(couch_db_engine, get_uuid, fun(_) -> <<"foo">> end),
+    ok = meck:expect(couch_log, warning, 2, ok),
     Epochs = [
         {node2, 10},
         {node1, 1}
