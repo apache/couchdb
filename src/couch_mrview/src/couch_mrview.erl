@@ -175,16 +175,44 @@ join([H|T], Sep, Acc) ->
     join(T, Sep, [Sep, H | Acc]).
 
 
+validate_partitioned_ddoc(#doc{} = DDoc) ->
+    {DDocProps} = DDoc#doc.body,
+    Banned = [
+        <<"shows">>,
+        <<"rewrites">>,
+        <<"lists">>,
+        <<"updates">>,
+        <<"filters">>,
+        <<"validate_doc_update">>
+        ],
+    validate_partitioned_ddoc(DDocProps, Banned).
+
+
+validate_partitioned_ddoc([], _Banned) ->
+    ok;
+validate_partitioned_ddoc([{Key, _Value} | Rest], Banned) ->
+    case lists:member(Key, Banned) of
+        true ->
+            Msg = [<<"`">>, Key, <<"` cannot be used in a partitioned design doc">>],
+            throw({invalid_design_doc, ?l2b(Msg)});
+        false ->
+            validate_partitioned_ddoc(Rest, Banned)
+    end.
+
+
 validate(DbName,  DDoc) ->
     ok = validate_ddoc_fields(DDoc#doc.body),
     DbPartitioned = mem3:is_partitioned(DbName),
     DDocPartitioned = get_partitioned_opt(DDoc#doc.body, DbPartitioned),
-    if
-        not DbPartitioned andalso DDocPartitioned ->
+
+    case {DbPartitioned, DDocPartitioned} of
+        {true, true} ->
+            validate_partitioned_ddoc(DDoc);
+        {false, true} ->
             throw({invalid_design_doc,
                 <<"partitioned option cannot be true in a "
                   "non-partitioned database.">>});
-        true ->
+        {_, _} -> 
             ok
     end,
     GetName = fun
