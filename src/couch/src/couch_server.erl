@@ -244,7 +244,11 @@ terminate(Reason, Srv) ->
                     [Reason,
                      Srv#server{lru = redacted}]),
     ets:foldl(fun(#entry{db = Db}, _) ->
-        couch_util:shutdown_sync(couch_db:get_pid(Db))
+        % Filter out any entry records for open_async
+        % processes that haven't finished.
+        if Db == undefined -> ok; true ->
+            couch_util:shutdown_sync(couch_db:get_pid(Db))
+        end
     end, nil, couch_dbs),
     ok.
 
