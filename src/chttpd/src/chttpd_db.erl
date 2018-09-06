@@ -346,6 +346,9 @@ create_db_req(#httpd{}=Req, DbName) ->
         {initial_props, [{partitioned, Partitioned}]}
     ] ++ EngineOpt,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
+
+    ok = validate_partition_database_create(DbName, Partitioned),
+
     case fabric:create_db(DbName, Options) of
     ok ->
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
@@ -1666,6 +1669,18 @@ extract_header_rev(Req, ExplicitRev) ->
     _ when ExplicitRev == Etag -> Etag;
     _ ->
         throw({bad_request, "Document rev and etag have different values"})
+    end.
+
+
+% cannot partition a system database
+validate_partition_database_create(DbName, Partitioned) ->
+    SystemId = DbName =:= ?l2b(config:get("mem3", "shards_db", "_dbs")) orelse
+        lists:member(DbName, ?SYSTEM_DATABASES),
+    case {Partitioned, SystemId} of
+        {true, true} ->
+            throw({bad_request, <<"Cannot partition a system database">>});
+        {_, _} ->
+            ok
     end.
 
 
