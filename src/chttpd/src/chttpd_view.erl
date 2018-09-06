@@ -121,6 +121,7 @@ handle_partition_view_req(#httpd{method='POST',
             Args0 = couch_mrview_http:parse_params(Req, Keys),
             Args1 = couch_mrview_util:set_extra(Args0, partition, Partition),
             Args2 = couch_mrview_util:set_extra(Args1, partitioned, true),
+            ok = check_partition_restrictions(Args2),
             design_doc_view_int(Req, Db, DDoc, ViewName, Args2);
         _ ->
             throw({
@@ -135,10 +136,29 @@ handle_partition_view_req(#httpd{method='GET',
     Args = couch_mrview_http:parse_params(Req, Keys),
     Args1 = couch_mrview_util:set_extra(Args, partition, Partition),
     Args2 = couch_mrview_util:set_extra(Args1, partitioned, true),
+    ok = check_partition_restrictions(Args2),
     design_doc_view_int(Req, Db, DDoc, ViewName, Args2);
 
 handle_partition_view_req(Req, _Db, _DDoc, _Pk) ->
         chttpd:send_method_not_allowed(Req, "GET").
+
+
+check_partition_restrictions(#mrargs{} = Args) ->
+    Restrictions = [
+        {<<"include_docs">>, Args#mrargs.include_docs, true},
+        {<<"stable">>, Args#mrargs.stable, true},
+        {<<"conflicts">>, Args#mrargs.conflicts, true}
+    ],
+    lists:foreach(fun ({Param, Field, Value}) ->
+        case Field =:= Value of
+            true ->
+                Msg = [<<"`">>, Param, <<"=true` is not supported in this view.">>],
+                throw({bad_request, ?l2b(Msg)});
+            false ->
+                ok
+        end
+    end, Restrictions),
+    ok.
 
 
 -ifdef(TEST).
