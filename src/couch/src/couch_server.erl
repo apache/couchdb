@@ -390,8 +390,8 @@ handle_call(reload_engines, _From, Server) ->
     {reply, ok, Server#server{engines = get_configured_engines()}};
 handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
-handle_call({open_result, T0, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
-    true = ets:delete(couch_dbs_pid_to_name, FromPid),
+handle_call({open_result, T0, DbName, {ok, Db}}, {Opener, _}, Server) ->
+    true = ets:delete(couch_dbs_pid_to_name, Opener),
     OpenTime = timer:now_diff(os:timestamp(), T0) / 1000,
     couch_stats:update_histogram([couchdb, db_open_time], OpenTime),
     DbPid = couch_db:get_pid(Db),
@@ -400,7 +400,7 @@ handle_call({open_result, T0, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
             % db was deleted during async open
             exit(DbPid, kill),
             {reply, ok, Server};
-        [#entry{req_type = ReqType, waiters = Waiters} = Entry] ->
+        [#entry{pid = Opener, req_type = ReqType, waiters = Waiters} = Entry] ->
             link(DbPid),
             [gen_server:reply(Waiter, {ok, Db}) || Waiter <- Waiters],
             % Cancel the creation request if it exists.
@@ -425,27 +425,37 @@ handle_call({open_result, T0, DbName, {ok, Db}}, {FromPid, _Tag}, Server) ->
                 true ->
                     Server#server.lru
             end,
-            {reply, ok, Server#server{lru = Lru}}
+            {reply, ok, Server#server{lru = Lru}};
+        [#entry{}] ->
+            % A mismatched opener pid means that this open_result message
+            % was in our mailbox but is now stale. Mostly ignore
+            % it except to ensure that the db pid is super dead.
+            exit(couch_db:get_pid(Db), kill),
+            {reply, ok, Server}
     end;
 handle_call({open_result, T0, DbName, {error, eexist}}, From, Server) ->
     handle_call({open_result, T0, DbName, file_exists}, From, Server);
-handle_call({open_result, _T0, DbName, Error}, {FromPid, _Tag}, Server) ->
+handle_call({open_result, _T0, DbName, Error}, {Opener, _}, Server) ->
     case ets:lookup(couch_dbs, DbName) of
         [] ->
             % db was deleted during async open
             {reply, ok, Server};
-        [#entry{req_type = ReqType, waiters = Waiters} = Entry] ->
+        [#entry{pid = Opener, req_type = ReqType, waiters = Waiters} = Entry] ->
             [gen_server:reply(Waiter, Error) || Waiter <- Waiters],
             couch_log:info("open_result error ~p for ~s", [Error, DbName]),
             true = ets:delete(couch_dbs, DbName),
-            true = ets:delete(couch_dbs_pid_to_name, FromPid),
+            true = ets:delete(couch_dbs_pid_to_name, Opener),
             NewServer = case ReqType of
                 {create, DbName, Engine, Options, CrFrom} ->
                     open_async(Server, CrFrom, DbName, Engine, Options);
                 _ ->
                     Server
             end,
-            {reply, ok, db_closed(NewServer, Entry#entry.db_options)}
+            {reply, ok, db_closed(NewServer, Entry#entry.db_options)};
+        [#entry{}] ->
+            % A mismatched pid means that this open_result message
+            % was in our mailbox and is now stale. Ignore it.
+            {reply, ok, Server}
     end;
 handle_call({open, DbName, Options}, From, Server) ->
     case ets:lookup(couch_dbs, DbName) of
