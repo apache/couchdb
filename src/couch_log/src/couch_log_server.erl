@@ -58,7 +58,7 @@ log(Entry) ->
 
 
 init(_) ->
-    couch_util:set_mqd_off_heap(),
+    couch_util:set_mqd_off_heap(?MODULE),
     process_flag(trap_exit, true),
     {ok, #st{
         writer = couch_log_writer:init()
