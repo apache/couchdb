@@ -85,7 +85,8 @@ attachments_test_() ->
             fun start/0, fun test_util:stop_couch/1,
             [
                 attachments_md5_tests(),
-                attachments_compression_tests()
+                attachments_compression_tests(),
+                attachments_restore_tests()
             ]
         }
     }.
@@ -169,6 +170,19 @@ created_attachments_compression_tests(Mod, Funs) ->
         }
     ].
 
+
+attachments_restore_tests() ->
+    Fun = fun should_restore_deleted_doc_with_att/2,
+    Mods = [standalone, inline],
+    Atts = [binary, text],
+    {
+        "Attachment restore test",
+        {
+            foreachx,
+            fun setup/1, fun teardown/2,
+            [{{Att, Mod}, Fun} || Att <- Atts, Mod <- Mods]
+        }
+    }.
 
 
 should_upload_attachment_without_md5({Host, DbName}) ->
@@ -514,6 +528,43 @@ should_create_compressible_att_with_ctype_params({Host, DbName}) ->
         ?assertEqual(byte_size(Data),
                      couch_util:get_value(<<"length">>, AttJson))
     end)}.
+
+
+should_restore_deleted_doc_with_att({AttType, Mod},
+        {Data, {_DbName, DocUrl, AttUrl}}) ->
+    TestDesc = io_lib:format("With ~s attachment in ~p mode", [AttType, Mod]),
+    {
+        lists:flatten(TestDesc),
+        ?_test(begin
+            %% confirm successful setup
+            {ok, Code0, _, Body0} = test_request:get(DocUrl),
+            ?assertEqual(200, Code0),
+            %% delete with _deleted flag
+            {Json0} = jiffy:decode(Body0),
+            {ok, Code1, _, Body1}  = test_request:put(DocUrl,
+                jiffy:encode({[{<<"_deleted">>, true} | Json0]})),
+            ?assertEqual(200, Code1),
+            %% verify deleted
+            {ok, Code2, _, _} = test_request:get(DocUrl),
+            ?assertEqual(404, Code2),
+            %% restore doc with stub (restore requires no _rev)
+            {ok, Code3, _, _} = test_request:put(DocUrl,
+                jiffy:encode({lists:keydelete(<<"_rev">>, 1, Json0)})),
+            ?assertEqual(201, Code3),
+            %% verify restored with attachment
+            {ok, Code4, _, _} = test_request:get(DocUrl),
+            ?assertEqual(200, Code4),
+            {ok, Code5, _, Body5} = test_request:get(AttUrl,
+                [{"Accept-Encoding", "gzip"}]),
+            ?assertEqual(200, Code5),
+            case AttType of
+                binary ->
+                    ?assertEqual(Data, iolist_to_binary(Body5));
+                text ->
+                    ?assertEqual(Data, zlib:gunzip(iolist_to_binary(Body5)))
+            end
+        end)
+    }.
 
 
 compact_after_lowering_attachment_size_limit_test_() ->

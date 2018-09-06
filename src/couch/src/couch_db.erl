@@ -914,7 +914,18 @@ prep_and_validate_update(Db, #doc{id=Id,revs={RevStart, Revs}}=Doc,
         % new doc, and we have existing revs.
         % reuse existing deleted doc
         if OldFullDocInfo#full_doc_info.deleted orelse AllowConflict ->
-            {validate_doc_update(Db, Doc, fun() -> nil end), Doc};
+            case couch_doc:has_stubs(Doc) of
+                true ->
+                    #full_doc_info{rev_tree=RevTree} = OldFullDocInfo,
+                    Leafs = couch_key_tree:get_all_leafs(RevTree),
+                    [{Leaf, DiskRevs} | _] = lists:reverse(Leafs),
+                    #leaf{deleted=Deleted, ptr=DiskSp} = Leaf,
+                    DiskDoc = make_doc(Db, Id, Deleted, DiskSp, DiskRevs),
+                    Doc2 = couch_doc:merge_stubs(Doc, DiskDoc),
+                    {validate_doc_update(Db, Doc2, fun() -> DiskDoc end), Doc2};
+                false ->
+                    {validate_doc_update(Db, Doc, fun() -> nil end), Doc}
+            end;
         true ->
             {conflict, Doc}
         end
