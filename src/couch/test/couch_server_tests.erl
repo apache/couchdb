@@ -224,9 +224,9 @@ t_interleaved_create_delete_open(DbName) ->
     % Our delete request was processed normally
     ?assertEqual({DelRef, ok}, get_next_message()),
 
-    % TODO: This assertion will change after I fix the bug as
-    % its incorrectly receiving the create message's response
-    ?assertMatch({OpenRef, {ok, _}}, get_next_message()),
+    % The db was deleted thus it should be not found
+    % when we try and open it.
+    ?assertMatch({OpenRef, {not_found, no_db_file}}, get_next_message()),
 
     % And finally assert that couch_server is still
     % alive.
