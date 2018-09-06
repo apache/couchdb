@@ -415,7 +415,7 @@ check_doc_atts(Db, Doc) ->
     end.
 
 
-add_sizes(Type, #leaf{deleted=Deleted, sizes=Sizes, atts=AttSizes}, Acc) ->
+add_sizes(Type, #leaf{sizes=Sizes, atts=AttSizes}, Acc) ->
     % Maybe upgrade from disk_size only
     #size_info{
         active = ActiveSize,
@@ -423,14 +423,12 @@ add_sizes(Type, #leaf{deleted=Deleted, sizes=Sizes, atts=AttSizes}, Acc) ->
     } = upgrade_sizes(Sizes),
     {ASAcc, ESAcc, AttsAcc} = Acc,
     NewASAcc = ActiveSize + ASAcc,
-    NewESAcc = case {Type, Deleted} of
-        {leaf, false} ->
+    NewESAcc = if
+        Type == leaf ->
             SumFun = fun({_, S}, A) -> S + A end,
             TotalAttSizes = lists:foldl(SumFun, 0, AttSizes),
             ESAcc + ExternalSize + TotalAttSizes;
-        {leaf, _} ->
-            ESAcc + ExternalSize;
-        _ -> 0
+        true -> 0
     end,
     NewAttsAcc = lists:umerge(AttSizes, AttsAcc),
     {NewASAcc, NewESAcc, NewAttsAcc}.
