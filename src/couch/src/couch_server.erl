@@ -101,9 +101,14 @@ open(DbName, Options0) ->
     end.
 
 update_lru(DbName, Options) ->
-    case lists:member(sys_db, Options) of
-        false -> gen_server:cast(couch_server, {update_lru, DbName});
-        true -> ok
+    case config:get_boolean("couchdb", "update_lru_on_read", false) of
+        true ->
+            case lists:member(sys_db, Options) of
+                false -> gen_server:cast(couch_server, {update_lru, DbName});
+                true -> ok
+            end;
+        false ->
+            ok
     end.
 
 close_lru() ->
@@ -230,7 +235,13 @@ init([]) ->
     ok = config:listen_for_changes(?MODULE, nil),
     ok = couch_file:init_delete_dir(RootDir),
     hash_admin_passwords(),
-    ets:new(couch_dbs, [set, protected, named_table, {keypos, #entry.name}]),
+    ets:new(couch_dbs, [
+        set,
+        protected,
+        named_table,
+        {keypos, #entry.name},
+        {read_concurrency, true}
+    ]),
     ets:new(couch_dbs_pid_to_name, [set, protected, named_table]),
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir,
