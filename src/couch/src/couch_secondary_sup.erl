@@ -26,6 +26,17 @@ init([]) ->
             worker,
             dynamic}
     ],
+    Daemons = [
+        {"index_server", "{couch_index_server, start_link, []}"},
+        {"query_servers", "{couch_proc_manager, start_link, []}"},
+        {"vhosts", "{couch_httpd_vhost, start_link, []}"},
+        {"httpd", "{couch_httpd, start_link, []}"},
+        {"uuids", "{couch_uuids, start, []}"},
+        {"auth_cache", "{couch_auth_cache, start_link, []}"},
+        {"os_daemons", "{couch_os_daemons, start_link, []}"},
+        {"compaction_daemon", "{couch_compaction_daemon, start_link, []}"}
+    ],
+
     Children = SecondarySupervisors ++ [
         begin
             {ok, {Module, Fun, Args}} = couch_util:parse_term(SpecStr),
@@ -38,6 +49,6 @@ init([]) ->
                 [Module]}
         end
         || {Name, SpecStr}
-        <- config:get("daemons"), SpecStr /= ""],
+        <- Daemons, SpecStr /= ""],
     {ok, {{one_for_one, 50, 3600},
         couch_epi:register_service(couch_db_epi, Children)}}.
