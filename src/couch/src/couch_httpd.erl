@@ -104,10 +104,7 @@ start_link(Name, Options) ->
                       Else -> Else
                   end,
     ok = validate_bind_address(BindAddress),
-    DefaultSpec = "{couch_httpd_db, handle_request}",
-    DefaultFun = make_arity_1_fun(
-        config:get("httpd", "default_handler", DefaultSpec)
-    ),
+    DefaultFun = make_arity_1_fun("{couch_httpd_db, handle_request}"),
 
     UrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
