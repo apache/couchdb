@@ -23,6 +23,7 @@
 
     new/2,
     validate_new/2,
+    validate_design_opts/1,
     add/2,
     remove/2,
     from_ddoc/2,
@@ -59,7 +60,7 @@ list(Db) ->
 
 get_usable_indexes(Db, Selector, Opts) ->
     PQ = is_partitioned_query(Opts),
-    ExistingIndexes = filter_indexes_by_partitioned(
+    ExistingIndexes = filter_indexes_by_partitioned(mem3:is_partitioned(db_to_name(Db)),
         mango_idx:list(Db), PQ),
     GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(ExistingIndexes),
     UserSpecifiedIndex = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
@@ -76,23 +77,24 @@ get_usable_indexes(Db, Selector, Opts) ->
     end.
 
 
-filter_indexes_by_partitioned(Indexes, PQ) ->
-    filter_indexes_by_partitioned(Indexes, PQ, []).
+filter_indexes_by_partitioned(false, Indexes, _PQ) ->
+    Indexes;
+filter_indexes_by_partitioned(DbPartitioned, Indexes, PQ) ->
+    FilterFun = fun (Idx)->
+        PartitionedIdx = case lists:keyfind(partitioned, 1, Idx#idx.design_opts) of
+            {partitioned, PI} -> PI;
+            false -> DbPartitioned
+        end,
+        filter_index_by_partitioned(Idx#idx.def, PartitionedIdx, PQ)
+    end,
+    lists:filter(FilterFun, Indexes).
 
 
-filter_indexes_by_partitioned([], _PQ, Acc) ->
-    lists:reverse(Acc);
-filter_indexes_by_partitioned([Idx | Rest], PQ, Acc) ->
-    {partitioned, PI} = lists:keyfind(partitioned, 1, Idx#idx.design_opts),
-    case {Idx#idx.def, PI, PQ} of
-        {all_docs, _, _} ->
-            % all_docs works both ways.
-            filter_indexes_by_partitioned(Rest, PQ, [Idx | Acc]);
-        {_, Same, Same} ->
-            filter_indexes_by_partitioned(Rest, PQ, [Idx | Acc]);
-        {_, _, _} ->
-             filter_indexes_by_partitioned(Rest, PQ, Acc)
-    end.
+filter_index_by_partitioned(all_docs, _PartitionedIdx, _PartitionedQuery) ->
+    true;
+
+filter_index_by_partitioned(_Def, PartitionedIdx, PartitionedQuery) ->
+    PartitionedIdx =:= PartitionedQuery.
 
 
 is_partitioned_query(Opts) ->
@@ -143,6 +145,16 @@ new(Db, Opts) ->
 validate_new(Idx, Db) ->
     Mod = idx_mod(Idx),
     Mod:validate_new(Idx, Db).
+
+
+validate_design_opts(Props) ->
+    case lists:keyfind(<<"options">>, 1, Props) of
+        {<<"options">>, {[{<<"partitioned">>, P}]}}
+            when is_boolean(P) ->
+            [{partitioned, P}];
+        _ ->
+            []
+    end.
 
 
 add(DDoc, Idx) ->

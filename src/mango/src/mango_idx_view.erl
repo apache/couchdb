@@ -79,7 +79,7 @@ remove(#doc{body={Props0}}=DDoc, Idx) ->
 
 
 from_ddoc({Props}) ->
-    DesignOpts = validate_design_opts(Props),
+    DesignOpts = mango_idx:validate_design_opts(Props),
     case lists:keyfind(<<"views">>, 1, Props) of
         {<<"views">>, {Views}} when is_list(Views) ->
             lists:flatmap(fun({Name, {VProps}}) ->
@@ -249,16 +249,6 @@ validate_ddoc(VProps) ->
         couch_log:error("Invalid Index Def ~p. Error: ~p, Reason: ~p",
             [VProps, Error, Reason]),
         invalid_view
-    end.
-
-
-validate_design_opts(Props) ->
-    case lists:keyfind(<<"options">>, 1, Props) of
-        {<<"options">>, {[{<<"partitioned">>, P}]}}
-          when is_boolean(P) ->
-            [{partitioned, P}];
-        _ ->
-            []
     end.
 
 
