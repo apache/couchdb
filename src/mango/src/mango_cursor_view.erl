@@ -103,7 +103,9 @@ base_args(#cursor{index = Idx, opts = Opts} = Cursor) ->
         end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
         include_docs = true
     },
-    Partitioned = couch_util:get_value(partitioned, Idx#idx.design_opts),
+
+    DbPartitioned = mem3:is_partitioned(couch_db:name(Cursor#cursor.db)),
+    Partitioned = couch_util:get_value(partitioned, Idx#idx.design_opts, DbPartitioned),
     Args2 = couch_mrview_util:set_extra(Args1, partitioned, Partitioned),
     Args3 = case couch_util:get_value(partition, Opts) of
         <<>> ->
