@@ -106,20 +106,58 @@ start_link(Name, Options) ->
     ok = validate_bind_address(BindAddress),
     DefaultFun = make_arity_1_fun("{couch_httpd_db, handle_request}"),
 
+
+    HttpdGlobalHandlers = [
+        {"/", "{couch_httpd_misc_handlers, handle_welcome_req, <<\"Welcome\">>}"},
+        {"favicon.ico", "{couch_httpd_misc_handlers, handle_favicon_req, \"{{prefix}}/share/www\"}"},
+        {"_utils", "{couch_httpd_misc_handlers, handle_utils_dir_req, \"{{prefix}}/share/www\"}"},
+        {"_all_dbs", "{couch_httpd_misc_handlers, handle_all_dbs_req}"},
+        {"_active_tasks", "{couch_httpd_misc_handlers, handle_task_status_req}"},
+        {"_config", "{couch_httpd_misc_handlers, handle_config_req}"},
+        {"_replicate", "{couch_replicator_httpd, handle_req}"},
+        {"_uuids", "{couch_httpd_misc_handlers, handle_uuids_req}"},
+        {"_stats", "{couch_stats_httpd, handle_stats_req}"},
+        {"_session", "{couch_httpd_auth, handle_session_req}"},
+        {"_plugins", "{couch_plugins_httpd, handle_req}"},
+        {"_system", "{chttpd_misc, handle_system_req}"}
+    ],
+
     UrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_1_fun(SpecStr)}
-        end, config:get("httpd_global_handlers")),
+        end, HttpdGlobalHandlers),
+
+    HttpdDbHandlers = [
+        {"_all_docs", "{couch_mrview_http, handle_all_docs_req}"},
+        {"_local_docs", "{couch_mrview_http, handle_local_docs_req}"},
+        {"_design_docs", "{couch_mrview_http, handle_design_docs_req}"},
+        {"_changes", "{couch_httpd_db, handle_db_changes_req}"},
+        {"_compact", "{couch_httpd_db, handle_compact_req}"},
+        {"_design", "{couch_httpd_db, handle_design_req}"},
+        {"_temp_view", "{couch_mrview_http, handle_temp_view_req}"},
+        {"_view_cleanup", "{couch_mrview_http, handle_cleanup_req}"}
+    ],
 
     DbUrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
-        end, config:get("httpd_db_handlers")),
+        end, HttpdDbHandlers),
+
+    HttpdDesignHandlers = [
+        {"_compact", "{couch_mrview_http, handle_compact_req}"},
+        {"_info", "{couch_mrview_http, handle_info_req}"},
+        {"_list", "{couch_mrview_show, handle_view_list_req}"},
+        {"_rewrite", "{couch_httpd_rewrite, handle_rewrite_req}"},
+        {"_show", "{couch_mrview_show, handle_doc_show_req}"},
+        {"_update", "{couch_mrview_show, handle_doc_update_req}"},
+        {"_view", "{couch_mrview_http, handle_view_req}"},
+        {"_view_changes", "{couch_mrview_http, handle_view_changes_req}"}
+    ],
 
     DesignUrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_3_fun(SpecStr)}
-        end, config:get("httpd_design_handlers")),
+        end, HttpdDesignHandlers),
 
     UrlHandlers = dict:from_list(UrlHandlersList),
     DbUrlHandlers = dict:from_list(DbUrlHandlersList),
