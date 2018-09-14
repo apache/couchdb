@@ -372,12 +372,60 @@ new_proc(Client) ->
     end,
     exit(Resp).
 
+get_env_for_spec(Spec, Target) ->
+    % loop over os:getenv(), match SPEC_TARGET
+    lists:filtermap(fun(VarName) ->
+        SpecStr = Spec ++ Target,
+        case string:split(VarName, "=") of
+            [SpecStr, Cmd] -> {true, Cmd};
+            _Else -> false
+        end
+    end, os:getenv()).
+
+get_query_server(LangStr) ->
+    % look for COUCH_QUERY_SERVER_LANGSTR in env
+    % if exists, return value, else undefined
+    UpperLangString = string:uppercase(LangStr),
+    case get_env_for_spec("COUCHDB_QUERY_SERVER_", UpperLangString) of
+        [] -> undefined;
+        [Command] -> Command
+    end.
+
+native_query_server_enabled() ->
+    % 1. [native_query_server] enable_erlang_query_server = true | false
+    % 2. if [native_query_server] erlang == {couch_native_process, start_link, []} -> pretend true as well
+    NativeEnabled = config:get_boolean("native_query_server", "enable_erlang_query_server", false),
+    NativeLegacyConfig = config:get("native_query_server", "erlang", ""),
+    NativeLegacyEnabled = NativeLegacyConfig =:= "{couch_native_process, start_link, []}",
+
+    % there surely is a more elegant way to do this that eludes me at present
+    case {NativeEnabled, NativeLegacyEnabled} of
+        {true, true} -> true;
+        {true, _} -> true;
+        {_, true} -> true;
+        _ -> false
+    end.
+
+get_native_query_server("query") -> % mango query server
+    "{mango_native_proc, start_link, []}";
+get_native_query_server("erlang") -> % erlang query server
+    case native_query_server_enabled() of
+        true -> "{couch_native_process, start_link, []}";
+        _Else -> undefined
+    end;
+get_native_query_server(LangStr) ->
+    % same as above, but COUCH_NATIVE_QUERY_SERVER_LANGSTR
+    UpperLangString = string:uppercase(LangStr),
+    case get_env_for_spec("COUCHDB_NATIVE_QUERY_SERVER_", UpperLangString) of
+        [] -> undefined;
+        [Command] -> Command
+    end.
 
 new_proc_int(From, Lang) when is_binary(Lang) ->
     LangStr = binary_to_list(Lang),
-    case config:get("query_servers", LangStr) of
+    case get_query_server(LangStr) of
     undefined ->
-        case config:get("native_query_servers", LangStr) of
+        case get_native_query_server(LangStr) of
         undefined ->
             gen_server:reply(From, {unknown_query_language, Lang});
         SpecStr ->

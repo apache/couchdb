@@ -72,10 +72,6 @@ handle_call(Msg, From, Table) ->
 
 handle_cast({config_change, Sect, Key}, Table) ->
     restart_daemons(Table, Sect, Key),
-    case Sect of
-        "os_daemons" -> reload_daemons(Table);
-        _ -> ok
-    end,
     {noreply, Table};
 handle_cast(stop, Table) ->
     {stop, normal, Table};
@@ -288,9 +284,24 @@ handle_log_message(Name, Msg, Level) ->
 % Daemon management helpers
 %
 
+get_daemons() ->
+    % map all COUCHDB_OS_DAEMON_* vars out of os:getenv
+    lists:filtermap(fun(Var) ->
+        case string:split(Var, "=") of
+            [VarName, Cmd] ->
+                case string:find(VarName, "COUCHDB_OS_DAEMON_") of
+                    nomatch ->
+                        false;
+                    "COUCHDB_OS_DAEMON_" ++ Name ->
+                        {true, {string:lowercase(Name), Cmd}}
+                end;
+            _Else -> false
+        end
+    end, os:getenv()).
+
 reload_daemons(Table) ->
     % List of daemons we want to have running.
-    Configured = lists:sort(config:get("os_daemons")),
+    Configured = lists:sort(get_daemons()),
     
     % Remove records for daemons that were halted.
     MSpecHalted = #daemon{name='$1', cmd='$2', status=halted, _='_'},
