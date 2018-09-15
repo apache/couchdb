@@ -394,13 +394,13 @@ get_query_server(LangStr) ->
 native_query_server_enabled() ->
     % 1. [native_query_server] enable_erlang_query_server = true | false
     % 2. if [native_query_server] erlang == {couch_native_process, start_link, []} -> pretend true as well
-    NativeEnabled = config:get_boolean("native_query_server", "enable_erlang_query_server", false),
-    NativeLegacyConfig = config:get("native_query_server", "erlang", ""),
+    NativeEnabled = config:get_boolean("native_query_servers", "enable_erlang_query_server", false),
+    NativeLegacyConfig = config:get("native_query_servers", "erlang", ""),
     NativeLegacyEnabled = NativeLegacyConfig =:= "{couch_native_process, start_link, []}",
 
+    couch_log:error("~nNativeEnabled: ~p~n", [NativeEnabled]),
     % there surely is a more elegant way to do this that eludes me at present
     case {NativeEnabled, NativeLegacyEnabled} of
-        {true, true} -> true;
         {true, _} -> true;
         {_, true} -> true;
         _ -> false
