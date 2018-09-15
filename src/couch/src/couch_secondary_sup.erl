@@ -33,7 +33,6 @@ init([]) ->
         {"httpd", "{couch_httpd, start_link, []}"},
         {"uuids", "{couch_uuids, start, []}"},
         {"auth_cache", "{couch_auth_cache, start_link, []}"},
-        {"os_daemons", "{couch_os_daemons, start_link, []}"},
         {"compaction_daemon", "{couch_compaction_daemon, start_link, []}"}
     ],
 
