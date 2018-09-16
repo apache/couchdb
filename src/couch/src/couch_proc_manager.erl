@@ -376,7 +376,7 @@ get_env_for_spec(Spec, Target) ->
     % loop over os:getenv(), match SPEC_TARGET
     lists:filtermap(fun(VarName) ->
         SpecStr = Spec ++ Target,
-        case string:split(VarName, "=") of
+        case string:tokens(VarName, "=") of
             [SpecStr, Cmd] -> {true, Cmd};
             _Else -> false
         end
@@ -385,7 +385,7 @@ get_env_for_spec(Spec, Target) ->
 get_query_server(LangStr) ->
     % look for COUCH_QUERY_SERVER_LANGSTR in env
     % if exists, return value, else undefined
-    UpperLangString = string:uppercase(LangStr),
+    UpperLangString = string:to_upper(LangStr),
     case get_env_for_spec("COUCHDB_QUERY_SERVER_", UpperLangString) of
         [] -> undefined;
         [Command] -> Command
@@ -398,7 +398,6 @@ native_query_server_enabled() ->
     NativeLegacyConfig = config:get("native_query_servers", "erlang", ""),
     NativeLegacyEnabled = NativeLegacyConfig =:= "{couch_native_process, start_link, []}",
 
-    couch_log:error("~nNativeEnabled: ~p~n", [NativeEnabled]),
     % there surely is a more elegant way to do this that eludes me at present
     case {NativeEnabled, NativeLegacyEnabled} of
         {true, _} -> true;

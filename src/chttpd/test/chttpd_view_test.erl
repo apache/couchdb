@@ -31,7 +31,7 @@ setup() ->
     TmpDb = ?tempdb(),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
-    os:putenv("COUCHDB_QUERY_SERVER_JAVASCRIPT", "../../..//bin/couchjs ../../..//share/server/main.js"),
+    os:putenv("COUCHDB_QUERY_SERVER_JAVASCRIPT", "../../../bin/couchjs ../../../share/server/main.js"),
     Url = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
     create_db(Url),
     Url.
