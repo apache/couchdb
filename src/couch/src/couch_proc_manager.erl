@@ -398,12 +398,7 @@ native_query_server_enabled() ->
     NativeLegacyConfig = config:get("native_query_servers", "erlang", ""),
     NativeLegacyEnabled = NativeLegacyConfig =:= "{couch_native_process, start_link, []}",
 
-    % there surely is a more elegant way to do this that eludes me at present
-    case {NativeEnabled, NativeLegacyEnabled} of
-        {true, _} -> true;
-        {_, true} -> true;
-        _ -> false
-    end.
+    NativeEnabled orelse NativeLegacyEnabled.
 
 get_native_query_server("query") -> % mango query server
     "{mango_native_proc, start_link, []}";
