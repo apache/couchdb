@@ -391,7 +391,13 @@ open_async(Server, From, DbName, {Module, Filepath}, Options) ->
                 ok
         end,
         gen_server:call(Parent, {open_result, T0, DbName, Res}, infinity),
-        unlink(Parent)
+        unlink(Parent),
+        case Res of
+            {ok, _} ->
+                ok;
+            Error ->
+                couch_log:info("open_result error ~p for ~s", [Error, DbName])
+        end
     end),
     ReqType = case lists:member(create, Options) of
         true -> create;
@@ -477,7 +483,6 @@ handle_call({open_result, _T0, DbName, Error}, {Opener, _}, Server) ->
             {reply, ok, Server};
         [#entry{pid = Opener, req_type = ReqType, waiters = Waiters} = Entry] ->
             [gen_server:reply(Waiter, Error) || Waiter <- Waiters],
-            couch_log:info("open_result error ~p for ~s", [Error, DbName]),
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Opener),
             NewServer = case ReqType of
@@ -510,7 +515,8 @@ handle_call({open, DbName, Options}, From, Server) ->
         end;
     [#entry{waiters = Waiters} = Entry] when is_list(Waiters) ->
         true = ets:insert(couch_dbs, Entry#entry{waiters = [From | Waiters]}),
-        if length(Waiters) =< 10 -> ok; true ->
+        NumWaiters = length(Waiters),
+        if NumWaiters =< 10 orelse NumWaiters rem 10 /= 0 -> ok; true ->
             Fmt = "~b clients waiting to open db ~s",
             couch_log:info(Fmt, [length(Waiters), DbName])
         end,
@@ -650,7 +656,12 @@ handle_info({'EXIT', Pid, Reason}, Server) ->
                 "must be built with Erlang OTP R13B04 or higher.", [DbName]),
             couch_log:error(Msg, [])
         end,
-        couch_log:info("db ~s died with reason ~p", [DbName, Reason]),
+        % We kill databases on purpose so there's no reason
+        % to log that fact. So we restrict logging to "interesting"
+        % reasons.
+        if Reason == normal orelse Reason == killed -> ok; true ->
+            couch_log:info("db ~s died with reason ~p", [DbName, Reason])
+        end,
         if not is_list(Waiters) -> ok; true ->
             [gen_server:reply(Waiter, Reason) || Waiter <- Waiters]
         end,
