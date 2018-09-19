@@ -384,18 +384,25 @@ open_async(Server, From, DbName, {Module, Filepath}, Options) ->
     T0 = os:timestamp(),
     Opener = spawn_link(fun() ->
         Res = couch_db:start_link(Module, DbName, Filepath, Options),
-        case {Res, lists:member(create, Options)} of
-            {{ok, _Db}, true} ->
+        IsSuccess = case Res of
+            {ok, _} -> true;
+            _ -> false
+        end,
+        case IsSuccess andalso lists:member(create, Options) of
+            true ->
                 couch_event:notify(DbName, created);
-            _ ->
+            false ->
                 ok
         end,
-        gen_server:call(Parent, {open_result, T0, DbName, Res}, infinity),
+        gen_server:call(Parent, {open_result, DbName, Res}, infinity),
         unlink(Parent),
-        case Res of
-            {ok, _} ->
-                ok;
-            Error ->
+        case IsSuccess of
+            true ->
+                % Track latency times for successful opens
+                Diff = timer:now_diff(os:timestamp(), T0) / 1000,
+                couch_stats:update_histogram([couchdb, db_open_time], Diff);
+            false ->
+                % Log unsuccessful open results
                 couch_log:info("open_result error ~p for ~s", [Error, DbName])
         end
     end),
@@ -431,10 +438,8 @@ handle_call(reload_engines, _From, Server) ->
     {reply, ok, Server#server{engines = get_configured_engines()}};
 handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
-handle_call({open_result, T0, DbName, {ok, Db}}, {Opener, _}, Server) ->
+handle_call({open_result, DbName, {ok, Db}}, {Opener, _}, Server) ->
     true = ets:delete(couch_dbs_pid_to_name, Opener),
-    OpenTime = timer:now_diff(os:timestamp(), T0) / 1000,
-    couch_stats:update_histogram([couchdb, db_open_time], OpenTime),
     DbPid = couch_db:get_pid(Db),
     case ets:lookup(couch_dbs, DbName) of
         [] ->
@@ -474,9 +479,9 @@ handle_call({open_result, T0, DbName, {ok, Db}}, {Opener, _}, Server) ->
             exit(couch_db:get_pid(Db), kill),
             {reply, ok, Server}
     end;
-handle_call({open_result, T0, DbName, {error, eexist}}, From, Server) ->
-    handle_call({open_result, T0, DbName, file_exists}, From, Server);
-handle_call({open_result, _T0, DbName, Error}, {Opener, _}, Server) ->
+handle_call({open_result, DbName, {error, eexist}}, From, Server) ->
+    handle_call({open_result, DbName, file_exists}, From, Server);
+handle_call({open_result, DbName, Error}, {Opener, _}, Server) ->
     case ets:lookup(couch_dbs, DbName) of
         [] ->
             % db was deleted during async open
