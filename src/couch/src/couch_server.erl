@@ -79,11 +79,11 @@ sup_start_link() ->
     gen_server:start_link({local, couch_server}, couch_server, [], []).
 
 open(DbName, Options) ->
-    case ets:lookup(couch_dbs_locks, DbName) of
-        [] ->
-            open_int(DbName, Options);
-        [{DbName, Reason}] ->
-            {error, {locked, Reason}}
+    try
+        validate_open_or_create(DbName, Options),
+        open_int(DbName, Options)
+    catch throw:{?MODULE, Error} ->
+        Error
     end.
 
 open_int(DbName, Options0) ->
@@ -124,11 +124,11 @@ close_lru() ->
     gen_server:call(couch_server, close_lru).
 
 create(DbName, Options) ->
-    case ets:lookup(couch_dbs_locks, DbName) of
-        [] ->
-            create_int(DbName, Options);
-        [{DbName, Reason}] ->
-            {error, {locked, Reason}}
+    try
+        validate_open_or_create(DbName, Options),
+        create_int(DbName, Options)
+    catch throw:{?MODULE, Error} ->
+        Error
     end.
 
 create_int(DbName, Options0) ->
@@ -199,7 +199,7 @@ path_ends_with(Path, Suffix) when is_binary(Suffix) ->
 path_ends_with(Path, Suffix) when is_list(Suffix) ->
     path_ends_with(Path, ?l2b(Suffix)).
 
-check_dbname(#server{}, DbName) ->
+check_dbname(DbName) ->
     couch_db:validate_dbname(DbName).
 
 is_admin(User, ClearPwd) ->
@@ -379,11 +379,11 @@ maybe_close_lru_db(#server{lru=Lru}=Server) ->
             {error, all_dbs_active}
     end.
 
-open_async(Server, From, DbName, {Module, Filepath}, Options) ->
+open_async(Server, From, DbName, Options) ->
     Parent = self(),
     T0 = os:timestamp(),
     Opener = spawn_link(fun() ->
-        Res = couch_db:start_link(Module, DbName, Filepath, Options),
+        Res = open_async_int(Server, DbName, Options),
         IsSuccess = case Res of
             {ok, _} -> true;
             _ -> false
@@ -403,7 +403,7 @@ open_async(Server, From, DbName, {Module, Filepath}, Options) ->
                 couch_stats:update_histogram([couchdb, db_open_time], Diff);
             false ->
                 % Log unsuccessful open results
-                couch_log:info("open_result error ~p for ~s", [Error, DbName])
+                couch_log:info("open_result error ~p for ~s", [Res, DbName])
         end
     end),
     ReqType = case lists:member(create, Options) of
@@ -420,6 +420,20 @@ open_async(Server, From, DbName, {Module, Filepath}, Options) ->
     }),
     true = ets:insert(couch_dbs_pid_to_name, {Opener, DbName}),
     db_opened(Server, Options).
+
+open_async_int(Server, DbName, Options) ->
+    DbNameList = binary_to_list(DbName),
+    case check_dbname(DbNameList) of
+        ok ->
+            case get_engine(Server, DbNameList, Options) of
+                {ok, {Module, FilePath}} ->
+                    couch_db:start_link(Module, DbName, FilePath, Options);
+                Error2 ->
+                    Error2
+            end;
+        Error1 ->
+            Error1
+    end.
 
 handle_call(close_lru, _From, #server{lru=Lru} = Server) ->
     case couch_lru:close(Lru) of
@@ -451,7 +465,7 @@ handle_call({open_result, DbName, {ok, Db}}, {Opener, _}, Server) ->
             [gen_server:reply(Waiter, {ok, Db}) || Waiter <- Waiters],
             % Cancel the creation request if it exists.
             case ReqType of
-                {create, DbName, _Engine, _Options, CrFrom} ->
+                {create, DbName, _Options, CrFrom} ->
                     gen_server:reply(CrFrom, file_exists);
                 _ ->
                     ok
@@ -491,8 +505,8 @@ handle_call({open_result, DbName, Error}, {Opener, _}, Server) ->
             true = ets:delete(couch_dbs, DbName),
             true = ets:delete(couch_dbs_pid_to_name, Opener),
             NewServer = case ReqType of
-                {create, DbName, Engine, Options, CrFrom} ->
-                    open_async(Server, CrFrom, DbName, Engine, Options);
+                {create, DbName, Options, CrFrom} ->
+                    open_async(Server, CrFrom, DbName, Options);
                 _ ->
                     Server
             end,
@@ -505,18 +519,11 @@ handle_call({open_result, DbName, Error}, {Opener, _}, Server) ->
 handle_call({open, DbName, Options}, From, Server) ->
     case ets:lookup(couch_dbs, DbName) of
     [] ->
-        DbNameList = binary_to_list(DbName),
-        case check_dbname(Server, DbNameList) of
-        ok ->
-            case make_room(Server, Options) of
-            {ok, Server2} ->
-                {ok, Engine} = get_engine(Server2, DbNameList),
-                {noreply, open_async(Server2, From, DbName, Engine, Options)};
-            CloseError ->
-                {reply, CloseError, Server}
-            end;
-        Error ->
-            {reply, Error, Server}
+        case make_room(Server, Options) of
+        {ok, Server2} ->
+            {noreply, open_async(Server2, From, DbName, Options)};
+        CloseError ->
+            {reply, CloseError, Server}
         end;
     [#entry{waiters = Waiters} = Entry] when is_list(Waiters) ->
         true = ets:insert(couch_dbs, Entry#entry{waiters = [From | Waiters]}),
@@ -530,40 +537,29 @@ handle_call({open, DbName, Options}, From, Server) ->
         {reply, {ok, Db}, Server}
     end;
 handle_call({create, DbName, Options}, From, Server) ->
-    DbNameList = binary_to_list(DbName),
-    case get_engine(Server, DbNameList, Options) of
-    {ok, Engine} ->
-        case check_dbname(Server, DbNameList) of
-        ok ->
-            case ets:lookup(couch_dbs, DbName) of
-            [] ->
-                case make_room(Server, Options) of
-                {ok, Server2} ->
-                    {noreply, open_async(Server2, From, DbName, Engine,
-                            [create | Options])};
-                CloseError ->
-                    {reply, CloseError, Server}
-                end;
-            [#entry{req_type = open} = Entry] ->
-                % We're trying to create a database while someone is in
-                % the middle of trying to open it. We allow one creator
-                % to wait while we figure out if it'll succeed.
-                CrOptions = [create | Options],
-                Req = {create, DbName, Engine, CrOptions, From},
-                true = ets:insert(couch_dbs, Entry#entry{req_type = Req}),
-                {noreply, Server};
-            [_AlreadyRunningDb] ->
-                {reply, file_exists, Server}
-            end;
-        Error ->
-            {reply, Error, Server}
+    case ets:lookup(couch_dbs, DbName) of
+    [] ->
+        case make_room(Server, Options) of
+        {ok, Server2} ->
+            CrOptions = [create | Options],
+            {noreply, open_async(Server2, From, DbName, CrOptions)};
+        CloseError ->
+            {reply, CloseError, Server}
         end;
-    Error ->
-        {reply, Error, Server}
+    [#entry{req_type = open} = Entry] ->
+        % We're trying to create a database while someone is in
+        % the middle of trying to open it. We allow one creator
+        % to wait while we figure out if it'll succeed.
+        CrOptions = [create | Options],
+        Req = {create, DbName, CrOptions, From},
+        true = ets:insert(couch_dbs, Entry#entry{req_type = Req}),
+        {noreply, Server};
+    [_AlreadyRunningDb] ->
+        {reply, file_exists, Server}
     end;
 handle_call({delete, DbName, Options}, _From, Server) ->
     DbNameList = binary_to_list(DbName),
-    case check_dbname(Server, DbNameList) of
+    case check_dbname(DbNameList) of
     ok ->
         Server2 =
         case ets:lookup(couch_dbs, DbName) of
@@ -694,6 +690,27 @@ db_closed(Server, Options) ->
         true -> Server
     end.
 
+validate_open_or_create(DbName, Options) ->
+    case check_dbname(DbName) of
+        ok ->
+            ok;
+        DbNameError ->
+            throw({?MODULE, DbNameError})
+    end,
+
+    case check_engine(Options) of
+        ok ->
+            ok;
+        EngineError ->
+            throw({?MODULE, EngineError})
+    end,
+
+    case ets:lookup(couch_dbs_locks, DbName) of
+        [] ->
+            ok;
+        [{DbName, Reason}] ->
+            throw({?MODULE, {error, {locked, Reason}}})
+    end.
 
 get_configured_engines() ->
     ConfigEntries = config:get("couchdb_engines"),
@@ -800,6 +817,22 @@ get_engine_extensions() ->
             ["couch"];
         Entries ->
             [Ext || {Ext, _Mod} <- Entries]
+    end.
+
+
+check_engine(Options) ->
+    case couch_util:get_value(engine, Options) of
+        Ext when is_binary(Ext) ->
+            ExtStr = binary_to_list(Ext),
+            Extensions = get_engine_extensions(),
+            case lists:member(ExtStr, Extensions) of
+                true ->
+                    ok;
+                false ->
+                    {error, {invalid_engine_extension, Ext}}
+            end;
+        _ ->
+            ok
     end.
 
 
