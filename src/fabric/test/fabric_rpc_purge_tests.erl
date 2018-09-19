@@ -46,6 +46,7 @@ main_test_() ->
                 lists:map(fun wrap/1, [
                     ?TDEF(t_filter),
                     ?TDEF(t_filter_unknown_node),
+                    ?TDEF(t_filter_local_node),
                     ?TDEF(t_no_filter_old_node),
                     ?TDEF(t_no_filter_different_node),
                     ?TDEF(t_no_filter_after_repl)
@@ -58,6 +59,7 @@ main_test_() ->
                 lists:map(fun wrap/1, [
                     ?TDEF(t_filter),
                     ?TDEF(t_filter_unknown_node),
+                    ?TDEF(t_filter_local_node),
                     ?TDEF(t_no_filter_old_node),
                     ?TDEF(t_no_filter_different_node),
                     ?TDEF(t_no_filter_after_repl)
@@ -168,6 +170,26 @@ t_no_filter_different_node({DbName, DocId, OldDoc, PSeq}) ->
     create_purge_checkpoint(DbName, 0, TgtNode),
 
     rpc_update_doc(DbName, OldDoc),
+
+    ?assertEqual({ok, OldDoc}, open_doc(DbName, DocId)).
+
+
+t_filter_local_node({DbName, DocId, OldDoc, PSeq}) ->
+    ?assertEqual({not_found, missing}, open_doc(DbName, DocId)),
+    create_purge_checkpoint(DbName, PSeq),
+
+    % Create a valid purge for a different node
+    TgtNode = list_to_binary(atom_to_list('notfoo@127.0.0.1')),
+    create_purge_checkpoint(DbName, 0, TgtNode),
+
+    % Add a local node rev to the list of node revs. It should
+    % be filtered out
+    {Pos, [Rev | _]} = OldDoc#doc.revs,
+    RROpts = [{read_repair, [
+        {tgt_node(), [{Pos, Rev}]},
+        {node(), [{1, <<"123">>}]}
+    ]}],
+    rpc_update_doc(DbName, OldDoc, RROpts),
 
     ?assertEqual({ok, OldDoc}, open_doc(DbName, DocId)).
 
