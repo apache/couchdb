@@ -235,6 +235,7 @@ close_db_if_idle(DbName) ->
 
 init([]) ->
     couch_util:set_mqd_off_heap(?MODULE),
+    couch_util:set_process_priority(?MODULE, high),
 
     % Mark pluggable storage engines as a supported feature
     config:enable_feature('pluggable-storage-engines'),
