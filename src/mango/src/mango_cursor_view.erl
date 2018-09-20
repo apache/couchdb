@@ -456,3 +456,55 @@ update_bookmark_keys(#cursor{limit = Limit} = Cursor, Props) when Limit > 0 ->
     };
 update_bookmark_keys(Cursor, _Props) ->
     Cursor.
+
+
+%%%%%%%% module tests below %%%%%%%%
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+runs_match_on_doc_with_no_value_test() ->
+    Cursor = #cursor {
+        db = <<"db">>,
+        opts = [],
+        execution_stats = #execution_stats{},
+        selector = mango_selector:normalize({[{<<"user_id">>, <<"1234">>}]})
+    },
+    RowProps = [
+        {id,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+        {key,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+        {doc,{
+            [
+                {<<"_id">>,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+                {<<"_rev">>,<<"1-a954fe2308f14307756067b0e18c2968">>},
+                {<<"user_id">>,11}
+            ]
+        }}
+    ],
+    {Match, _, _} = doc_member(Cursor, RowProps),
+    ?assertEqual(Match, no_match).
+
+does_not_run_match_on_doc_with_value_test() ->
+    Cursor = #cursor {
+        db = <<"db">>,
+        opts = [],
+        execution_stats = #execution_stats{},
+        selector = mango_selector:normalize({[{<<"user_id">>, <<"1234">>}]})
+    },
+    RowProps = [
+        {id,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+        {key,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+        {value,1},
+        {doc,{
+            [
+                {<<"_id">>,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+                {<<"_rev">>,<<"1-a954fe2308f14307756067b0e18c2968">>},
+                {<<"user_id">>,11}
+            ]
+        }}
+    ],
+    {Match, _, _} = doc_member(Cursor, RowProps),
+    ?assertEqual(Match, ok).
+
+
+-endif.
