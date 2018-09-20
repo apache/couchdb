@@ -252,6 +252,10 @@ handle_view_cleanup_req(Req, Db) ->
     send_json(Req, 202, {[{ok, true}]}).
 
 
+handle_partition_req(#httpd{method='GET',path_parts=[DbName, <<"_partition">>, Partition]}=Req, _Db) ->
+        {ok, PartitionInfo} = fabric:get_partition_info(DbName, Partition),
+        send_json(Req, {PartitionInfo});
+
 handle_partition_req(#httpd{
         path_parts=[DbName, <<"_partition">>, Partition, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) ->

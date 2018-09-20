@@ -122,7 +122,9 @@
     validate_dbname/1,
 
     make_doc/5,
-    new_revid/1
+    new_revid/1,
+
+    get_partition_info/2
 ]).
 
 
@@ -610,6 +612,14 @@ get_db_info(Db) ->
         {uuid, Uuid}
     ],
     {ok, InfoList}.
+
+
+get_partition_info(#db{} = Db, Partition) when is_binary(Partition) ->
+    Sizes = couch_db_engine:get_partition_info(Db, Partition),
+    {ok, Sizes};
+get_partition_info(_Db, _Partition) ->
+    throw({bad_request, <<"`partition` is not valid">>}).
+
 
 get_design_docs(#db{name = <<"shards/", _:18/binary, DbFullName/binary>>}) ->
     DbName = ?l2b(filename:rootname(filename:basename(?b2l(DbFullName)))),
