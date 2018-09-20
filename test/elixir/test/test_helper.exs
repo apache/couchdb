@@ -216,10 +216,12 @@ defmodule CouchTestCase do
         div(:erlang.system_time, 100000)
       end
 
+      @spec rev(map(), map()) :: map()
       def rev(doc = %{_id: id}, %{"id" => id, "rev" => rev}) do
         Map.put(doc, :_rev, rev)
       end
 
+      @spec rev([map()], [map()]) :: [map()]
       def rev(docs, rows) when length(docs) == length(rows) do
         for {doc, row} <- Enum.zip(docs, rows), do: rev(doc, row)
       end

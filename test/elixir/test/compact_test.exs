@@ -80,18 +80,4 @@ defmodule CompactTest do
     Couch.get("/#{db}").body
   end
 
-  defp rev(doc = %{_id: id}, %{"id" => id, "rev" => rev}) do
-    Map.put(doc, :_rev, rev)
-  end
-
-  defp rev(docs, rows) do
-    for {doc, row} <- Enum.zip(docs, rows), do: rev(doc, row)
-  end
-
-  def create_docs(id_range) do
-    for id <- id_range, str_id = Integer.to_string(id) do
-      %{_id: str_id, integer: id, string: str_id}
-    end
-  end
-
 end
