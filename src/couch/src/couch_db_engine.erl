@@ -42,6 +42,12 @@
 -type purge_info() :: [{docid(), revs()}].
 -type epochs() :: [{Node::atom(), UpdateSeq::non_neg_integer()}].
 -type size_info() :: [{Name::atom(), Size::non_neg_integer()}].
+-type partition_info() :: [
+    {Partition::atom(), Partition::binary()} |
+    {DocCount::atom(), DocCount::non_neg_integer()} |
+    {DocDelCount::atom(), DocDelCount::non_neg_integer()} |
+    {Size::atom(), size_info()}
+].
 
 -type write_stream_options() :: [
         {buffer_size, Size::pos_integer()} |
@@ -252,6 +258,18 @@
 %              contents outside of the database (for capacity and backup
 %              planning)
 -callback get_size_info(DbHandle::db_handle()) -> SizeInfo::size_info().
+
+
+% This returns the information for the given partition.
+% It should just be a list of {Name::atom(), Size::non_neg_integer()}
+% It returns the partition name, doc count, deleted doc count and two sizes:
+%
+%   active   - Theoretical minimum number of bytes to store this partition on disk
+%
+%   external - Number of bytes that would be required to represent the
+%              contents of this partition outside of the database
+-callback get_partition_info(DbHandle::db_handle(), Partition::binary()) ->
+    partition_info().
 
 
 % The current update sequence of the database. The update
@@ -627,6 +645,7 @@
     get_prop/2,
     get_prop/3,
     get_size_info/1,
+    get_partition_info/2,
     get_update_seq/1,
     get_uuid/1,
 
@@ -801,6 +820,11 @@ get_prop(#db{} = Db, Prop, DefaultValue) ->
 get_size_info(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_size_info(EngineState).
+
+
+get_partition_info(#db{} = Db, Partition) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_partition_info(EngineState, Partition).
 
 
 get_update_seq(#db{} = Db) ->

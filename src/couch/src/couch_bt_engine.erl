@@ -299,8 +299,12 @@ get_partition_info(#st{} = St, Partition) ->
         {partition, Partition},
         {doc_count, DocCount},
         {doc_del_count, DocDelCount},
-        {active, SizeInfo#size_info.active},
-        {external, SizeInfo#size_info.external}
+        {size,
+            [
+                {active, SizeInfo#size_info.active},
+                {external, SizeInfo#size_info.external}
+            ]
+        }
     ].
 
 
