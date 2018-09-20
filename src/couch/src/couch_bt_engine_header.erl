@@ -26,6 +26,7 @@
 
 -export([
     disk_version/1,
+    latest_disk_version/0,
     update_seq/1,
     id_tree_state/1,
     seq_tree_state/1,
@@ -132,6 +133,10 @@ set(Header0, Fields) ->
 
 disk_version(Header) ->
     get_field(Header, disk_version).
+
+
+latest_disk_version() ->
+    ?LATEST_DISK_VERSION.
 
 
 update_seq(Header) ->
