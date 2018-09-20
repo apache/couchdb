@@ -102,13 +102,16 @@ definitions({file, FilePath}) ->
         {error, Reason} ->
             {error, {FilePath, Reason}}
     end;
-definitions({module, Module}) when is_atom(Module) ->
-    definitions({module, [Module]});
-definitions({module, Modules}) ->
+definitions({static_module, Module}) when is_atom(Module) ->
+    definitions({static_module, [Module]});
+definitions({static_module, Modules}) ->
     Data = lists:append([M:data() || M <- Modules]),
     Hash = couch_epi_functions_gen:hash(Modules),
-    {ok, Hash, Data}.
+    {ok, Hash, Data};
+definitions({callback_module, Module}) ->
+    Data = Module:data(),
+    {ok, erlang:phash2(Data), Data}.
 
 hash_of_file(FilePath) ->
     {ok, Data} = file:read_file(FilePath),
-    crypto:hash(md5, Data).
+    couch_hash:md5_hash(Data).

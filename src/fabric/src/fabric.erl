@@ -21,12 +21,13 @@
     delete_db/2, get_db_info/1, get_doc_count/1, set_revs_limit/3,
     set_security/2, set_security/3, get_revs_limit/1, get_security/1,
     get_security/2, get_all_security/1, get_all_security/2,
+    get_purge_infos_limit/1, set_purge_infos_limit/3,
     compact/1, compact/2]).
 
 % Documents
 -export([open_doc/3, open_revs/4, get_doc_info/3, get_full_doc_info/3,
     get_missing_revs/2, get_missing_revs/3, update_doc/3, update_docs/3,
-    purge_docs/2, att_receiver/2]).
+    purge_docs/3, att_receiver/2]).
 
 % Views
 -export([all_docs/4, all_docs/5, changes/4, query_view/3, query_view/4,
@@ -136,6 +137,18 @@ set_security(DbName, SecObj) ->
 -spec set_security(dbname(), SecObj::json_obj(), [option()]) -> ok.
 set_security(DbName, SecObj, Options) ->
     fabric_db_meta:set_security(dbname(DbName), SecObj, opts(Options)).
+
+%% @doc sets the upper bound for the number of stored purge requests
+-spec set_purge_infos_limit(dbname(), pos_integer(), [option()]) -> ok.
+set_purge_infos_limit(DbName, Limit, Options)
+        when is_integer(Limit), Limit > 0 ->
+    fabric_db_meta:set_purge_infos_limit(dbname(DbName), Limit, opts(Options)).
+
+%% @doc retrieves the upper bound for the number of stored purge requests
+-spec get_purge_infos_limit(dbname()) -> pos_integer() | no_return().
+get_purge_infos_limit(DbName) ->
+    {ok, Db} = fabric_util:get_db(dbname(DbName), [?ADMIN_CTX]),
+    try couch_db:get_purge_infos_limit(Db) after catch couch_db:close(Db) end.
 
 get_security(DbName) ->
     get_security(DbName, [?ADMIN_CTX]).
@@ -248,7 +261,9 @@ update_doc(DbName, Doc, Options) ->
     {ok, []} ->
         % replication success
         #doc{revs = {Pos, [RevId | _]}} = doc(Doc),
-        {ok, {Pos, RevId}}
+        {ok, {Pos, RevId}};
+    {error, [Error]} ->
+        throw(Error)
     end.
 
 %% @doc update a list of docs
@@ -261,23 +276,34 @@ update_docs(DbName, Docs, Options) ->
             {ok, Results};
         {accepted, Results} ->
             {accepted, Results};
+        {error, Error} ->
+            {error, Error};
         Error ->
             throw(Error)
     catch {aborted, PreCommitFailures} ->
         {aborted, PreCommitFailures}
     end.
 
-purge_docs(_DbName, _IdsRevs) ->
-    not_implemented.
+
+%% @doc purge revisions for a list '{Id, Revs}'
+%%      returns {ok, {PurgeSeq, Results}}
+-spec purge_docs(dbname(), [{docid(), [revision()]}], [option()]) ->
+    {ok, [{Health, [revision()]}] | {error, any()}} when
+    Health :: ok | accepted.
+purge_docs(DbName, IdsRevs, Options) when is_list(IdsRevs) ->
+    IdsRevs2 = [idrevs(IdRs) || IdRs <- IdsRevs],
+    fabric_doc_purge:go(dbname(DbName), IdsRevs2, opts(Options)).
+
 
 %% @doc spawns a process to upload attachment data and
-%%      returns a function that shards can use to communicate
-%%      with the spawned middleman process
+%%      returns a fabric attachment receiver context tuple
+%%      with the spawned middleman process, an empty binary,
+%%      or exits with an error tuple {Error, Arg}
 -spec att_receiver(#httpd{}, Length :: undefined | chunked | pos_integer() |
         {unknown_transfer_encoding, any()}) ->
-    function() | binary().
+    {fabric_attachment_receiver, pid(), chunked | pos_integer()} | binary().
 att_receiver(Req, Length) ->
-    fabric_doc_attachments:receiver(Req, Length).
+    fabric_doc_atts:receiver(Req, Length).
 
 %% @equiv all_docs(DbName, [], Callback, Acc0, QueryArgs)
 all_docs(DbName, Callback, Acc, QueryArgs) ->
@@ -459,8 +485,10 @@ cleanup_index_files(DbName) ->
         binary_to_list(couch_util:get_value(signature, Info))
     end, [couch_doc:from_json_obj(DD) || DD <- DesignDocs]),
 
-    FileList = filelib:wildcard([config:get("couchdb", "view_index_dir"),
-        "/.shards/*/", couch_util:to_list(dbname(DbName)), ".[0-9]*_design/mrview/*"]),
+    FileList = lists:flatmap(fun(#shard{name = ShardName}) ->
+        IndexDir = couch_index_util:index_dir(mrview, ShardName),
+        filelib:wildcard([IndexDir, "/*"])
+    end, mem3:local_shards(dbname(DbName))),
 
     DeleteFiles = if ActiveSigs =:= [] -> FileList; true ->
         {ok, RegExp} = re:compile([$(, string:join(ActiveSigs, "|"), $)]),
@@ -594,3 +622,55 @@ kl_to_record(KeyList,RecName) ->
 
 set_namespace(NS, #mrargs{extra = Extra} = Args) ->
     Args#mrargs{extra = [{namespace, NS} | Extra]}.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+update_doc_test_() ->
+    {
+        "Update doc tests", {
+            setup, fun setup/0, fun teardown/1,
+            fun(Ctx) -> [
+                should_throw_conflict(Ctx)
+            ] end
+        }
+    }.
+
+should_throw_conflict(Doc) ->
+    ?_test(begin
+        ?assertThrow(conflict, update_doc(<<"test-db">>, Doc, []))
+    end).
+
+
+setup() ->
+    Doc = #doc{
+        id = <<"test_doc">>,
+        revs = {3, [<<5,68,252,180,43,161,216,223,26,119,71,219,212,229,
+            159,113>>]},
+        body = {[{<<"foo">>,<<"asdf">>},{<<"author">>,<<"tom">>}]},
+        atts = [], deleted = false, meta = []
+    },
+    ok = application:ensure_started(config),
+    ok = meck:expect(mem3, shards, fun(_, _) -> [] end),
+    ok = meck:expect(mem3, quorum, fun(_) -> 1 end),
+    ok = meck:expect(rexi, cast, fun(_, _) -> ok end),
+    ok = meck:expect(rexi_utils, recv,
+        fun(_, _, _, _, _, _) ->
+            {ok, {error, [{Doc, conflict}]}}
+        end),
+    ok = meck:expect(couch_util, reorder_results,
+        fun(_, [{_, Res}]) ->
+            [Res]
+        end),
+    ok = meck:expect(fabric_util, create_monitors, fun(_) -> ok end),
+    ok = meck:expect(rexi_monitor, stop, fun(_) -> ok end),
+    Doc.
+
+
+teardown(_) ->
+    meck:unload(),
+    ok = application:stop(config).
+
+
+-endif.

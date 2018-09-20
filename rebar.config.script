@@ -31,6 +31,7 @@ SubDirs = [
     "src/couch_mrview",
     "src/couch_replicator",
     "src/couch_plugins",
+    "src/couch_pse_tests",
     "src/couch_event",
     "src/couch_stats",
     "src/couch_peruser",
@@ -47,7 +48,7 @@ SubDirs = [
 
 DepDescs = [
 %% Independent Apps
-{config,           "config",           {tag, "1.0.3"}},
+{config,           "config",           {tag, "1.0.4"}},
 {b64url,           "b64url",           {tag, "1.0.1"}},
 {ets_lru,          "ets-lru",          {tag, "1.0.0"}},
 {khash,            "khash",            {tag, "1.0.1"}},
@@ -56,19 +57,16 @@ DepDescs = [
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
-                   {tag, "2.1.0"}, [raw]},
+                   {tag, "2.2.0"}, [raw]},
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                   {tag, "v1.1.15"}, [raw]},
+                   {tag, "v1.1.18"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.2"}},
-{hyper,            "hyper",            {tag, "CouchDB-2.2.0-3"}},
+{hyper,            "hyper",            {tag, "CouchDB-2.2.0-4"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-2"}},
 {mochiweb,         "mochiweb",         {tag, "v2.17.0"}},
-{meck,             "meck",             {tag, "0.8.8"}},
-{bcrypt,           {url, "https://github.com/apache/couchdb-erlang-bcrypt"},
-                   {tag, "1.0.2"}},
-{triq,             "triq",             {tag, "v1.2.0"}}
+{meck,             "meck",             {tag, "0.8.8"}}
 ],
 
 
@@ -93,7 +91,7 @@ ErlOpts = case os:getenv("ERL_OPTS") of
 end,
 
 AddConfig = [
-    {require_otp_vsn, "R16B03|R16B03-1|17|18|19|20"},
+    {require_otp_vsn, "17|18|19|20"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, SubDirs},
@@ -105,7 +103,7 @@ AddConfig = [
         {plt_location, local},
         {plt_location, COUCHDB_ROOT},
         {plt_extra_apps, [
-            asn1, bcrypt, compiler, crypto, inets, kernel, os_mon, runtime_tools,
+            asn1, compiler, crypto, inets, kernel, os_mon, runtime_tools,
             sasl, setup, ssl, stdlib, syntax_tools, xmerl]},
         {warnings, [unmatched_returns, error_handling, race_conditions]}]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}

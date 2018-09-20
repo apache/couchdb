@@ -56,7 +56,7 @@ couchTests.erlang_views = function(debug) {
             '  {Info} = couch_util:get_value(<<"info">>, Req, {[]}), ' +
             '  Purged = couch_util:get_value(<<"purge_seq">>, Info, -1), ' +
             '  Verb = couch_util:get_value(<<"method">>, Req, <<"not_get">>), ' +
-            '  R = list_to_binary(io_lib:format("~b - ~s", [Purged, Verb])), ' +
+            '  R = list_to_binary(io_lib:format("~s - ~s", [Purged, Verb])), ' +
             '  {[{<<"code">>, 200}, {<<"headers">>, {[]}}, {<<"body">>, R}]} ' +
             'end.'
         },
@@ -85,7 +85,8 @@ couchTests.erlang_views = function(debug) {
       var url = "/" + db_name + "/_design/erlview/_show/simple/1";
       var xhr = CouchDB.request("GET", url);
       T(xhr.status == 200, "standard get should be 200");
-      T(xhr.responseText == "0 - GET");
+      T(/0-/.test(xhr.responseText));
+      T(/- GET/.test(xhr.responseText));
 
       var url = "/" + db_name + "/_design/erlview/_list/simple_list/simple_view";
       var xhr = CouchDB.request("GET", url);

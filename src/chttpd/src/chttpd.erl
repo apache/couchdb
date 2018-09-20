@@ -104,10 +104,12 @@ start_link(https) ->
     end,
     SslOpts = ServerOpts ++ ClientOpts,
 
-    Options =
+    Options0 =
         [{port, Port},
          {ssl, true},
          {ssl_opts, SslOpts}],
+    CustomServerOpts = get_server_options("httpsd"),
+    Options = merge_server_options(Options0, CustomServerOpts),
     start_link(https, Options).
 
 start_link(Name, Options) ->
@@ -124,9 +126,8 @@ start_link(Name, Options) ->
         {name, Name},
         {ip, IP}
     ],
-    ServerOptsCfg = config:get("chttpd", "server_options", "[]"),
-    {ok, ServerOpts} = couch_util:parse_term(ServerOptsCfg),
-    Options2 = lists:keymerge(1, lists:sort(Options1), lists:sort(ServerOpts)),
+    ServerOpts = get_server_options("chttpd"),
+    Options2 = merge_server_options(Options1, ServerOpts),
     case mochiweb_http:start(Options2) of
     {ok, Pid} ->
         {ok, Pid};
@@ -134,6 +135,14 @@ start_link(Name, Options) ->
         io:format("Failure to start Mochiweb: ~s~n", [Reason]),
         {error, Reason}
     end.
+
+get_server_options(Module) ->
+    ServerOptsCfg = config:get(Module, "server_options", "[]"),
+    {ok, ServerOpts} = couch_util:parse_term(ServerOptsCfg),
+    ServerOpts.
+
+merge_server_options(A, B) ->
+    lists:keymerge(1, lists:sort(A), lists:sort(B)).
 
 stop() ->
     catch mochiweb_http:stop(https),
@@ -672,7 +681,7 @@ doc_etag(#doc{id=Id, body=Body, revs={Start, [DiskRev|_]}}) ->
     couch_httpd:doc_etag(Id, Body, {Start, DiskRev}).
 
 make_etag(Term) ->
-    <<SigInt:128/integer>> = crypto:hash(md5, term_to_binary(Term)),
+    <<SigInt:128/integer>> = couch_hash:md5_hash(term_to_binary(Term)),
     list_to_binary(io_lib:format("\"~.36B\"",[SigInt])).
 
 etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->

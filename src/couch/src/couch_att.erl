@@ -308,8 +308,14 @@ size_info([]) ->
     {ok, []};
 size_info(Atts) ->
     Info = lists:map(fun(Att) ->
-        [{_, Pos}, AttLen] = fetch([data, att_len], Att),
-        {Pos, AttLen}
+        AttLen = fetch(att_len, Att),
+        case fetch(data, Att) of
+             {stream, StreamEngine} ->
+                 {ok, SPos} = couch_stream:to_disk_term(StreamEngine),
+                 {SPos, AttLen};
+             {_, SPos} ->
+                 {SPos, AttLen}
+        end
     end, Atts),
     {ok, lists:usort(Info)}.
 

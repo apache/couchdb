@@ -94,79 +94,28 @@ handle_call({set_revs_limit, Limit}, _From, Db) ->
     ok = gen_server:call(couch_server, {db_updated, Db3}, infinity),
     {reply, ok, Db3, idle_limit()};
 
-handle_call({purge_docs, _IdRevs}, _From,
-        #db{compactor_pid=Pid}=Db) when Pid /= nil ->
-    {reply, {error, purge_during_compaction}, Db, idle_limit()};
-handle_call({purge_docs, IdRevs}, _From, Db) ->
-    DocIds = [Id || {Id, _Revs} <- IdRevs],
-    OldDocInfos = couch_db_engine:open_docs(Db, DocIds),
+handle_call({set_purge_infos_limit, Limit}, _From, Db) ->
+    {ok, Db2} = couch_db_engine:set_purge_infos_limit(Db, Limit),
+    ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
+    {reply, ok, Db2, idle_limit()};
 
-    NewDocInfos = lists:flatmap(fun
-        ({{Id, Revs}, #full_doc_info{id = Id, rev_tree = Tree} = FDI}) ->
-            case couch_key_tree:remove_leafs(Tree, Revs) of
-                {_, [] = _RemovedRevs} -> % no change
-                    [];
-                {NewTree, RemovedRevs} ->
-                    NewFDI = FDI#full_doc_info{rev_tree = NewTree},
-                    [{FDI, NewFDI, RemovedRevs}]
-            end;
-        ({_, not_found}) ->
-            []
-    end, lists:zip(IdRevs, OldDocInfos)),
+handle_call({purge_docs, [], _}, _From, Db) ->
+    {reply, {ok, []}, Db, idle_limit()};
 
-    InitUpdateSeq = couch_db_engine:get_update_seq(Db),
-    InitAcc = {InitUpdateSeq, [], []},
-    FinalAcc = lists:foldl(fun({_, #full_doc_info{} = OldFDI, RemRevs}, Acc) ->
-        #full_doc_info{
-            id = Id,
-            rev_tree = OldTree
-        } = OldFDI,
-        {SeqAcc0, FDIAcc, IdRevsAcc} = Acc,
-
-        {NewFDIAcc, NewSeqAcc} = case OldTree of
-            [] ->
-                % If we purged every #leaf{} in the doc record
-                % then we're removing it completely from the
-                % database.
-                FDIAcc;
-            _ ->
-                % Its possible to purge the #leaf{} that contains
-                % the update_seq where this doc sits in the update_seq
-                % sequence. Rather than do a bunch of complicated checks
-                % we just re-label every #leaf{} and reinsert it into
-                % the update_seq sequence.
-                {NewTree, SeqAcc1} = couch_key_tree:mapfold(fun
-                    (_RevId, Leaf, leaf, InnerSeqAcc) ->
-                        {Leaf#leaf{seq = InnerSeqAcc + 1}, InnerSeqAcc + 1};
-                    (_RevId, Value, _Type, InnerSeqAcc) ->
-                        {Value, InnerSeqAcc}
-                end, SeqAcc0, OldTree),
-
-                NewFDI = OldFDI#full_doc_info{
-                    update_seq = SeqAcc1,
-                    rev_tree = NewTree
-                },
-
-                {[NewFDI | FDIAcc], SeqAcc1}
-        end,
-        NewIdRevsAcc = [{Id, RemRevs} | IdRevsAcc],
-        {NewSeqAcc, NewFDIAcc, NewIdRevsAcc}
-    end, InitAcc, NewDocInfos),
-
-    {_FinalSeq, FDIs, PurgedIdRevs} = FinalAcc,
-
-    % We need to only use the list of #full_doc_info{} records
-    % that we have actually changed due to a purge.
-    PreviousFDIs = [PrevFDI || {PrevFDI, _, _} <- NewDocInfos],
-    Pairs = pair_purge_info(PreviousFDIs, FDIs),
-
-    {ok, Db2} = couch_db_engine:write_doc_infos(Db, Pairs, [], PurgedIdRevs),
-    Db3 = commit_data(Db2),
-    ok = gen_server:call(couch_server, {db_updated, Db3}, infinity),
-    couch_event:notify(Db#db.name, updated),
-
-    PurgeSeq = couch_db_engine:get_purge_seq(Db3),
-    {reply, {ok, PurgeSeq, PurgedIdRevs}, Db3, idle_limit()};
+handle_call({purge_docs, PurgeReqs0, Options}, _From, Db) ->
+    % Filter out any previously applied updates during
+    % internal replication
+    IsRepl = lists:member(replicated_changes, Options),
+    PurgeReqs = if not IsRepl -> PurgeReqs0; true ->
+        UUIDs = [UUID || {UUID, _Id, _Revs} <- PurgeReqs0],
+        PurgeInfos = couch_db_engine:load_purge_infos(Db, UUIDs),
+        lists:flatmap(fun
+            ({not_found, PReq}) -> [PReq];
+            ({{_, _, _, _}, _}) -> []
+        end, lists:zip(PurgeInfos, PurgeReqs0))
+    end,
+    {ok, NewDb, Replies} = purge_docs(Db, PurgeReqs),
+    {reply, {ok, Replies}, NewDb, idle_limit()};
 
 handle_call(Msg, From, Db) ->
     case couch_db_engine:handle_db_updater_call(Msg, From, Db) of
@@ -506,7 +455,7 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
     NewDocInfo0 = lists:foldl(fun({Client, NewDoc}, OldInfoAcc) ->
         merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts)
     end, OldDocInfo, NewDocs),
-    NewDocInfo1 = stem_full_doc_info(NewDocInfo0, Limit),
+    NewDocInfo1 = maybe_stem_full_doc_info(NewDocInfo0, Limit),
     % When MergeConflicts is false, we updated #full_doc_info.deleted on every
     % iteration of merge_rev_tree. However, merge_rev_tree does not update
     % #full_doc_info.deleted when MergeConflicts is true, since we don't need
@@ -624,9 +573,14 @@ merge_rev_tree(OldInfo, NewDoc, _Client, true) ->
     {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0),
     OldInfo#full_doc_info{rev_tree = NewTree}.
 
-stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
-    Stemmed = couch_key_tree:stem(Tree, Limit),
-    Info#full_doc_info{rev_tree = Stemmed}.
+maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
+    case config:get_boolean("couchdb", "stem_interactive_updates", true) of
+        true ->
+            Stemmed = couch_key_tree:stem(Tree, Limit),
+            Info#full_doc_info{rev_tree = Stemmed};
+        false ->
+            Info
+    end.
 
 update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
@@ -651,7 +605,7 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
     LocalDocs2 = update_local_doc_revs(LocalDocs),
 
-    {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2, []),
+    {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
 
     WriteCount = length(IndexFDIs),
     couch_stats:increment_counter([couchdb, document_inserts],
@@ -697,6 +651,87 @@ update_local_doc_revs(Docs) ->
     end, Docs).
 
 
+purge_docs(Db, []) ->
+    {ok, Db, []};
+
+purge_docs(Db, PurgeReqs) ->
+    Ids = lists:usort(lists:map(fun({_UUID, Id, _Revs}) -> Id end, PurgeReqs)),
+    FDIs = couch_db_engine:open_docs(Db, Ids),
+    USeq = couch_db_engine:get_update_seq(Db),
+
+    IdFDIs = lists:zip(Ids, FDIs),
+    {NewIdFDIs, Replies} = apply_purge_reqs(PurgeReqs, IdFDIs, USeq, []),
+
+    Pairs = lists:flatmap(fun({DocId, OldFDI}) ->
+        {DocId, NewFDI} = lists:keyfind(DocId, 1, NewIdFDIs),
+        case {OldFDI, NewFDI} of
+            {not_found, not_found} ->
+                [];
+            {#full_doc_info{} = A, #full_doc_info{} = A} ->
+                [];
+            {#full_doc_info{}, _} ->
+                [{OldFDI, NewFDI}]
+        end
+    end, IdFDIs),
+
+    PSeq = couch_db_engine:get_purge_seq(Db),
+    {RevPInfos, _} = lists:foldl(fun({UUID, DocId, Revs}, {PIAcc, PSeqAcc}) ->
+        Info = {PSeqAcc + 1, UUID, DocId, Revs},
+        {[Info | PIAcc], PSeqAcc + 1}
+    end, {[], PSeq}, PurgeReqs),
+    PInfos = lists:reverse(RevPInfos),
+
+    {ok, Db1} = couch_db_engine:purge_docs(Db, Pairs, PInfos),
+    Db2 = commit_data(Db1),
+    ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
+    couch_event:notify(Db2#db.name, updated),
+    {ok, Db2, Replies}.
+
+
+apply_purge_reqs([], IdFDIs, _USeq, Replies) ->
+    {IdFDIs, lists:reverse(Replies)};
+
+apply_purge_reqs([Req | RestReqs], IdFDIs, USeq, Replies) ->
+    {_UUID, DocId, Revs} = Req,
+    {value, {_, FDI0}, RestIdFDIs} = lists:keytake(DocId, 1, IdFDIs),
+    {NewFDI, RemovedRevs, NewUSeq} = case FDI0 of
+        #full_doc_info{rev_tree = Tree} ->
+            case couch_key_tree:remove_leafs(Tree, Revs) of
+                {_, []} ->
+                    % No change
+                    {FDI0, [], USeq};
+                {[], Removed} ->
+                    % Completely purged
+                    {not_found, Removed, USeq};
+                {NewTree, Removed} ->
+                    % Its possible to purge the #leaf{} that contains
+                    % the update_seq where this doc sits in the
+                    % update_seq sequence. Rather than do a bunch of
+                    % complicated checks we just re-label every #leaf{}
+                    % and reinsert it into the update_seq sequence.
+                    {NewTree2, NewUpdateSeq} = couch_key_tree:mapfold(fun
+                        (_RevId, Leaf, leaf, SeqAcc) ->
+                            {Leaf#leaf{seq = SeqAcc + 1},
+                                SeqAcc + 1};
+                        (_RevId, Value, _Type, SeqAcc) ->
+                            {Value, SeqAcc}
+                    end, USeq, NewTree),
+
+                    FDI1 = FDI0#full_doc_info{
+                        update_seq = NewUpdateSeq,
+                        rev_tree = NewTree2
+                    },
+                    {FDI1, Removed, NewUpdateSeq}
+            end;
+        not_found ->
+            % Not found means nothing to change
+            {not_found, [], USeq}
+    end,
+    NewIdFDIs = [{DocId, NewFDI} | RestIdFDIs],
+    NewReplies = [{ok, RemovedRevs} | Replies],
+    apply_purge_reqs(RestReqs, NewIdFDIs, NewUSeq, NewReplies).
+
+
 commit_data(Db) ->
     commit_data(Db, false).
 
@@ -724,15 +759,6 @@ pair_write_info(Old, New) ->
             false -> {not_found, FDI}
         end
     end, New).
-
-
-pair_purge_info(Old, New) ->
-    lists:map(fun(OldFDI) ->
-        case lists:keyfind(OldFDI#full_doc_info.id, #full_doc_info.id, New) of
-            #full_doc_info{} = NewFDI -> {OldFDI, NewFDI};
-            false -> {OldFDI, not_found}
-        end
-    end, Old).
 
 
 get_meta_body_size(Meta) ->

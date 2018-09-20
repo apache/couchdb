@@ -47,7 +47,7 @@
 -export([last_read/1]).
 
 % gen_server callbacks
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2, code_change/3, format_status/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 %% helper functions
@@ -132,7 +132,7 @@ append_binary(Fd, Bin) ->
     
 append_binary_md5(Fd, Bin) ->
     ioq:call(Fd,
-        {append_bin, assemble_file_chunk(Bin, crypto:hash(md5, Bin))},
+        {append_bin, assemble_file_chunk(Bin, couch_hash:md5_hash(Bin))},
         erlang:get(io_priority)).
 
 append_raw_chunk(Fd, Chunk) ->
@@ -175,7 +175,7 @@ pread_iolist(Fd, Pos) ->
     {ok, IoList, <<>>} ->
         {ok, IoList};
     {ok, IoList, Md5} ->
-        case crypto:hash(md5, IoList) of
+        case couch_hash:md5_hash(IoList) of
         Md5 ->
             {ok, IoList};
         _ ->
@@ -333,7 +333,7 @@ read_header(Fd) ->
 
 write_header(Fd, Data) ->
     Bin = term_to_binary(Data),
-    Md5 = crypto:hash(md5, Bin),
+    Md5 = couch_hash:md5_hash(Bin),
     % now we assemble the final header binary and write to disk
     FinalBin = <<Md5/binary, Bin/binary>>,
     ioq:call(Fd, {write_header, FinalBin}, erlang:get(io_priority)).
@@ -526,6 +526,9 @@ handle_info({'DOWN', Ref, process, _Pid, _Info}, #file{db_monitor=Ref}=File) ->
         false -> {noreply, File}
     end.
 
+format_status(_Opt, [PDict, #file{} = File]) ->
+    {_Fd, FilePath} = couch_util:get_value(couch_file_fd, PDict),
+    [{data, [{"State", File}, {"InitialFilePath", FilePath}]}].
 
 find_header(Fd, Block) ->
     case (catch load_header(Fd, Block)) of
@@ -559,7 +562,7 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
     end,
     <<Md5Sig:16/binary, HeaderBin/binary>> =
         iolist_to_binary(remove_block_prefixes(?PREFIX_SIZE, RawBin)),
-    Md5Sig = crypto:hash(md5, HeaderBin),
+    Md5Sig = couch_hash:md5_hash(HeaderBin),
     {ok, HeaderBin}.
 
 

@@ -37,7 +37,7 @@
 -export([unique_monotonic_integer/0]).
 -export([check_config_blacklist/1]).
 -export([check_md5/2]).
--export([set_mqd_off_heap/0]).
+-export([set_mqd_off_heap/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -302,15 +302,45 @@ separate_cmd_args(" " ++ Rest, CmdAcc) ->
 separate_cmd_args([Char|Rest], CmdAcc) ->
     separate_cmd_args(Rest, [Char | CmdAcc]).
 
-% Is a character whitespace?
-is_whitespace($\s) -> true;
-is_whitespace($\t) -> true;
-is_whitespace($\n) -> true;
-is_whitespace($\r) -> true;
+% Is a character whitespace (from https://en.wikipedia.org/wiki/Whitespace_character#Unicode)?
+is_whitespace(9) -> true;
+is_whitespace(10) -> true;
+is_whitespace(11) -> true;
+is_whitespace(12) -> true;
+is_whitespace(13) -> true;
+is_whitespace(32) -> true;
+is_whitespace(133) -> true;
+is_whitespace(160) -> true;
+is_whitespace(5760) -> true;
+is_whitespace(8192) -> true;
+is_whitespace(8193) -> true;
+is_whitespace(8194) -> true;
+is_whitespace(8195) -> true;
+is_whitespace(8196) -> true;
+is_whitespace(8197) -> true;
+is_whitespace(8198) -> true;
+is_whitespace(8199) -> true;
+is_whitespace(8200) -> true;
+is_whitespace(8201) -> true;
+is_whitespace(8202) -> true;
+is_whitespace(8232) -> true;
+is_whitespace(8233) -> true;
+is_whitespace(8239) -> true;
+is_whitespace(8287) -> true;
+is_whitespace(12288) -> true;
+is_whitespace(6158) -> true;
+is_whitespace(8203) -> true;
+is_whitespace(8204) -> true;
+is_whitespace(8205) -> true;
+is_whitespace(8288) -> true;
+is_whitespace(65279) -> true;
 is_whitespace(_Else) -> false.
 
 
 % removes leading and trailing whitespace from a string
+trim(String) when is_binary(String) ->
+    % mirror string:trim() behaviour of returning a binary when a binary is passed in
+    ?l2b(trim(?b2l(String)));
 trim(String) ->
     String2 = lists:dropwhile(fun is_whitespace/1, String),
     lists:reverse(lists:dropwhile(fun is_whitespace/1, lists:reverse(String2))).
@@ -640,12 +670,17 @@ check_md5(Sig, Sig) -> ok;
 check_md5(_, _) -> throw(md5_mismatch).
 
 
-set_mqd_off_heap() ->
-    try
-        erlang:process_flag(message_queue_data, off_heap),
-        ok
-    catch error:badarg ->
-        ok
+set_mqd_off_heap(Module) ->
+    case config:get_boolean("off_heap_mqd", atom_to_list(Module), true) of
+        true ->
+            try
+                erlang:process_flag(message_queue_data, off_heap),
+                ok
+            catch error:badarg ->
+                    ok
+            end;
+        false ->
+            ok
     end.
 
 

@@ -85,11 +85,7 @@ def run_couchjs(test, fmt):
         if not line:
             break
         line = line.decode()
-        if line.strip() == "restart":
-            sys.stdout.write("reboot_nodes(ctx)" + os.linesep)
-            sys.stdout.flush()
-        else:
-            sys.stderr.write(line)
+        sys.stderr.write(line)
     p.wait()
     fmt(p.returncode == 0)
     return p.returncode
@@ -134,10 +130,11 @@ def main():
                 tmp.append(name)
         tests = tmp
 
-    fmt = mkformatter(tests)
     passed = 0
     failed = 0
-    for test in tests:
+    if len(tests) > 0 :
+     fmt = mkformatter(tests)
+     for test in tests:
         result = run_couchjs(test, fmt)
         if result == 0:
             passed += 1
@@ -169,8 +166,7 @@ def build_test_case_paths(path,args=None):
             elif os.path.isfile(pname + ".js"):
                 tests.append(pname + ".js")
             else:
-                sys.stderr.write("Unknown test: " + name + os.linesep)
-                exit(1)
+                sys.stderr.write("Waring - Unknown test: " + name + os.linesep)
     return tests
 
 

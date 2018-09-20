@@ -87,7 +87,7 @@ refresh(DbName, DDocIds) ->
 
 
 init(_) ->
-    couch_util:set_mqd_off_heap(),
+    couch_util:set_mqd_off_heap(?MODULE),
     process_flag(trap_exit, true),
     BaseOpts = [public, named_table],
     CacheOpts = [

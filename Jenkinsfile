@@ -39,13 +39,13 @@ pipeline {
       }
       steps {
         // This image has the oldest Erlang we support, 16B03
-        sh 'docker pull couchdbdev/ubuntu-trusty-erlang-default:latest'
+        sh 'docker pull couchdbdev/debian-jessie-erlang-17.5.3:latest'
         timeout(time: 15, unit: "MINUTES") {
           // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
           // We need the jenkins user mapped inside of the image
           // npm config cache below is required because /home/jenkins doesn't
           // ACTUALLY exist in the image
-          withDockerContainer(image: 'couchdbdev/ubuntu-trusty-erlang-default', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
+          withDockerContainer(image: 'couchdbdev/debian-jessie-erlang-17.5.3', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
             sh '''
               set
               rm -rf apache-couchdb-*
@@ -78,7 +78,32 @@ pipeline {
     // Build packages on supported platforms using esl's erlang
     stage('Test') {
       steps {
-        parallel(centos6: {
+        parallel(freebsd: {
+          node(label: 'couchdb && freebsd') {
+            timeout(time: 60, unit: "MINUTES") {
+              deleteDir()
+              unstash 'tarball'
+              withEnv(['HOME='+pwd()]) {
+                sh '''
+                  cwd=$(pwd)
+                  mkdir -p $COUCHDB_IO_LOG_DIR
+  
+                  # Build CouchDB from tarball & test
+                  builddir=$(mktemp -d)
+                  cd $builddir
+                  tar -xf $cwd/apache-couchdb-*.tar.gz
+                  cd apache-couchdb-*
+                  ./configure --with-curl
+                  gmake check || (build-aux/logfile-uploader.py && false)
+
+                  # No package build for FreeBSD at this time
+                '''
+              } // withEnv
+            } // timeout
+            deleteDir()
+          } // node
+        },
+        centos6: {
           node(label: 'ubuntu') {
             timeout(time: 60, unit: "MINUTES") {
               sh 'docker pull couchdbdev/centos-6-erlang-19.3.6'

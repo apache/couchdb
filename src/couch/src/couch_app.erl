@@ -16,11 +16,17 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
--export([start/2, stop/1]).
+-export([
+    start/2,
+    stop/1,
+    uptime/0
+]).
 
 start(_Type, _) ->
     case couch_sup:start_link() of
         {ok, _} = Resp ->
+            {Time, _} = statistics(wall_clock),
+            application:set_env(couch, start_time, Time),
             Resp;
         Else ->
             throw(Else)
@@ -29,3 +35,6 @@ start(_Type, _) ->
 stop(_) ->
     ok.
 
+uptime() ->
+    {Time, _} = statistics(wall_clock),
+    Time - application:get_env(couch, start_time, Time).

@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(test_engine_attachments).
+-module(cpse_test_attachments).
 -compile(export_all).
 
 
@@ -18,32 +18,40 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
-cet_write_attachment() ->
-    {ok, Engine, DbPath, St1} = test_engine_util:init_engine(dbpath),
+setup_each() ->
+    {ok, Db} = cpse_util:create_db(),
+    Db.
 
+
+teardown_each(Db) ->
+    ok = couch_server:delete(couch_db:name(Db), []).
+
+
+cpse_write_attachment(Db1) ->
     AttBin = crypto:strong_rand_bytes(32768),
 
     try
-        [Att0] = test_engine_util:prep_atts(Engine, St1, [
+        [Att0] = cpse_util:prep_atts(Db1, [
                 {<<"ohai.txt">>, AttBin}
             ]),
 
         {stream, Stream} = couch_att:fetch(data, Att0),
-        ?assertEqual(true, Engine:is_active_stream(St1, Stream)),
+        ?assertEqual(true, couch_db_engine:is_active_stream(Db1, Stream)),
 
-        Actions = [{create, {<<"first">>, [], [Att0]}}],
-        {ok, St2} = test_engine_util:apply_actions(Engine, St1, Actions),
-        {ok, St3} = Engine:commit_data(St2),
-        Engine:terminate(normal, St3),
+        Actions = [{create, {<<"first">>, {[]}, [Att0]}}],
+        {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
+        {ok, _} = couch_db:ensure_full_commit(Db2),
+        cpse_util:shutdown_db(Db2),
 
-        {ok, St4} = Engine:init(DbPath, []),
-        [FDI] = Engine:open_docs(St4, [<<"first">>]),
+        {ok, Db3} = couch_db:reopen(Db2),
+
+        [FDI] = couch_db_engine:open_docs(Db3, [<<"first">>]),
 
         #rev_info{
             rev = {RevPos, PrevRevId},
             deleted = Deleted,
             body_sp = DocPtr
-        } = test_engine_util:prev_rev(FDI),
+        } = cpse_util:prev_rev(FDI),
 
         Doc0 = #doc{
             id = <<"foo">>,
@@ -52,12 +60,12 @@ cet_write_attachment() ->
             body = DocPtr
         },
 
-        Doc1 = Engine:read_doc_body(St4, Doc0),
+        Doc1 = couch_db_engine:read_doc_body(Db3, Doc0),
         Atts1 = if not is_binary(Doc1#doc.atts) -> Doc1#doc.atts; true ->
             couch_compress:decompress(Doc1#doc.atts)
         end,
 
-        StreamSrc = fun(Sp) -> Engine:open_read_stream(St4, Sp) end,
+        StreamSrc = fun(Sp) -> couch_db_engine:open_read_stream(Db3, Sp) end,
         [Att1] = [couch_att:from_disk_term(StreamSrc, T) || T <- Atts1],
         ReadBin = couch_att:to_binary(Att1),
         ?assertEqual(AttBin, ReadBin)
@@ -71,23 +79,21 @@ cet_write_attachment() ->
 % attachments streams when restarting (for instance if
 % we ever have something that stores attachemnts in
 % an external object store)
-cet_inactive_stream() ->
-    {ok, Engine, DbPath, St1} = test_engine_util:init_engine(dbpath),
-
+cpse_inactive_stream(Db1) ->
     AttBin = crypto:strong_rand_bytes(32768),
 
     try
-        [Att0] = test_engine_util:prep_atts(Engine, St1, [
+        [Att0] = cpse_util:prep_atts(Db1, [
                 {<<"ohai.txt">>, AttBin}
             ]),
 
         {stream, Stream} = couch_att:fetch(data, Att0),
-        ?assertEqual(true, Engine:is_active_stream(St1, Stream)),
+        ?assertEqual(true, couch_db_engine:is_active_stream(Db1, Stream)),
 
-        Engine:terminate(normal, St1),
-        {ok, St2} = Engine:init(DbPath, []),
+        cpse_util:shutdown_db(Db1),
+        {ok, Db2} = couch_db:reopen(Db1),
 
-        ?assertEqual(false, Engine:is_active_stream(St2, Stream))
+        ?assertEqual(false, couch_db_engine:is_active_stream(Db2, Stream))
     catch throw:not_supported ->
         ok
     end.

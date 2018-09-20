@@ -31,8 +31,9 @@
     seq_tree_state/1,
     latest/1,
     local_tree_state/1,
-    purge_seq/1,
-    purged_docs/1,
+    purge_tree_state/1,
+    purge_seq_tree_state/1,
+    purge_infos_limit/1,
     security_ptr/1,
     revs_limit/1,
     uuid/1,
@@ -51,7 +52,7 @@
 % if the disk revision is incremented, then new upgrade logic will need to be
 % added to couch_db_updater:init_db.
 
--define(LATEST_DISK_VERSION, 6).
+-define(LATEST_DISK_VERSION, 7).
 
 -record(db_header, {
     disk_version = ?LATEST_DISK_VERSION,
@@ -60,13 +61,14 @@
     id_tree_state = nil,
     seq_tree_state = nil,
     local_tree_state = nil,
-    purge_seq = 0,
-    purged_docs = nil,
+    purge_tree_state = nil,
+    purge_seq_tree_state = nil, %purge tree: purge_seq -> uuid
     security_ptr = nil,
     revs_limit = 1000,
     uuid,
     epochs,
-    compacted_seq
+    compacted_seq,
+    purge_infos_limit = 1000
 }).
 
 
@@ -150,12 +152,12 @@ local_tree_state(Header) ->
     get_field(Header, local_tree_state).
 
 
-purge_seq(Header) ->
-    get_field(Header, purge_seq).
+purge_tree_state(Header) ->
+    get_field(Header, purge_tree_state).
 
 
-purged_docs(Header) ->
-    get_field(Header, purged_docs).
+purge_seq_tree_state(Header) ->
+    get_field(Header, purge_seq_tree_state).
 
 
 security_ptr(Header) ->
@@ -176,6 +178,10 @@ epochs(Header) ->
 
 compacted_seq(Header) ->
     get_field(Header, compacted_seq).
+
+
+purge_infos_limit(Header) ->
+    get_field(Header, purge_infos_limit).
 
 
 get_field(Header, Field) ->
@@ -229,6 +235,7 @@ upgrade_disk_version(#db_header{}=Header) ->
         3 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
         4 -> Header#db_header{security_ptr = nil}; % [0.10 - 0.11)
         5 -> Header; % pre 1.2
+        6 -> Header; % pre clustered purge
         ?LATEST_DISK_VERSION -> Header;
         _ ->
             Reason = "Incorrect disk header version",
@@ -322,8 +329,8 @@ mk_header(Vsn) ->
         foo, % id_tree_state
         bar, % seq_tree_state
         bam, % local_tree_state
-        1, % purge_seq
-        baz, % purged_docs
+        flam, % was purge_seq - now purge_tree_state
+        baz, % was purged_docs - now purge_seq_tree_state
         bang, % security_ptr
         999 % revs_limit
     }.
@@ -342,8 +349,8 @@ upgrade_v3_test() ->
     ?assertEqual(foo, id_tree_state(NewHeader)),
     ?assertEqual(bar, seq_tree_state(NewHeader)),
     ?assertEqual(bam, local_tree_state(NewHeader)),
-    ?assertEqual(1, purge_seq(NewHeader)),
-    ?assertEqual(baz, purged_docs(NewHeader)),
+    ?assertEqual(flam, purge_tree_state(NewHeader)),
+    ?assertEqual(baz, purge_seq_tree_state(NewHeader)),
     ?assertEqual(bang, security_ptr(NewHeader)),
     ?assertEqual(999, revs_limit(NewHeader)),
     ?assertEqual(undefined, uuid(NewHeader)),
