@@ -14,6 +14,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include("../src/couch_server_int.hrl").
 
 start() ->
     Ctx = test_util:start_couch(),
@@ -105,3 +106,175 @@ bad_engine_option_test_() ->
 t_bad_engine_option() ->
     Resp = couch_server:create(?tempdb(), [{engine, <<"cowabunga!">>}]),
     ?assertEqual(Resp, {error, {invalid_engine_extension, <<"cowabunga!">>}}).
+
+
+interleaved_requests_test_() ->
+    {
+        setup,
+        fun start_interleaved/0,
+        fun stop_interleaved/1,
+        fun make_interleaved_requests/1
+    }.
+
+
+start_interleaved() ->
+    TestDbName = ?tempdb(),
+    meck:new(couch_db, [passthrough]),
+    meck:expect(couch_db, start_link, fun(Engine, DbName, Filename, Options) ->
+        case DbName of
+            TestDbName ->
+                receive
+                    go -> ok
+                end,
+                Res = meck:passthrough([Engine, DbName, Filename, Options]),
+                % We're unlinking and sending a delayed
+                % EXIT signal so that we can mimic a specific
+                % message order in couch_server. On a test machine
+                % this is a big race condition which affects the
+                % ability to induce the bug.
+                case Res of
+                    {ok, Db} ->
+                        DbPid = couch_db:get_pid(Db),
+                        unlink(DbPid),
+                        Msg = {'EXIT', DbPid, killed},
+                        erlang:send_after(2000, whereis(couch_server), Msg);
+                    _ ->
+                        ok
+                end,
+                Res;
+            _ ->
+                meck:passthrough([Engine, DbName, Filename, Options])
+        end
+    end),
+    {test_util:start_couch(), TestDbName}.
+
+
+stop_interleaved({Ctx, TestDbName}) ->
+    couch_server:delete(TestDbName, [?ADMIN_CTX]),
+    meck:unload(),
+    test_util:stop_couch(Ctx).
+
+
+make_interleaved_requests({_, TestDbName}) ->
+    [
+        fun() -> t_interleaved_create_delete_open(TestDbName) end
+    ].
+
+
+t_interleaved_create_delete_open(DbName) ->
+    {CrtRef, DelRef, OpenRef} = {make_ref(), make_ref(), make_ref()},
+    CrtMsg = {'$gen_call', {self(), CrtRef}, {create, DbName, [?ADMIN_CTX]}},
+    DelMsg = {'$gen_call', {self(), DelRef}, {delete, DbName, [?ADMIN_CTX]}},
+    OpenMsg = {'$gen_call', {self(), OpenRef}, {open, DbName, [?ADMIN_CTX]}},
+
+    % Get the current couch_server pid so we're sure
+    % to not end up messaging two different pids
+    CouchServer = whereis(couch_server),
+
+    % Start our first instance that will succeed in
+    % an invalid state. Notice that the opener pid
+    % spawned by couch_server:open_async/5 will halt
+    % in our meck expect function waiting for a message.
+    %
+    % We're using raw message passing here so that we don't
+    % have to coordinate multiple processes for this test.
+    CouchServer ! CrtMsg,
+    {ok, Opener} = get_opener_pid(DbName),
+
+    % We have to suspend couch_server so that we can enqueue
+    % our next requests and let the opener finish processing.
+    erlang:suspend_process(CouchServer),
+
+    % Since couch_server is suspend, this delete request won't
+    % be processed until after the opener has sent its
+    % successful open response via gen_server:call/3
+    CouchServer ! DelMsg,
+
+    % This open request will be in the queue after the
+    % delete request but before the gen_server:call/3
+    % message which will establish the mixed up state
+    % in the couch_dbs ets table
+    CouchServer ! OpenMsg,
+
+    % First release the opener pid so it can continue
+    % working while we tweak meck
+    Opener ! go,
+
+    % Replace our expect call to meck so that the OpenMsg
+    % isn't blocked on the receive
+    meck:expect(couch_db, start_link, fun(Engine, DbName1, Filename, Options) ->
+        meck:passthrough([Engine, DbName1, Filename, Options])
+    end),
+
+    % Wait for the '$gen_call' message from OpenerPid to arrive
+    % in couch_server's mailbox
+    ok = wait_for_open_async_result(CouchServer, Opener),
+
+    % Now monitor and resume the couch_server and assert that
+    % couch_server does not crash while processing OpenMsg
+    CSRef = erlang:monitor(process, CouchServer),
+    erlang:resume_process(CouchServer),
+    check_monitor_not_triggered(CSRef),
+
+    % The create response is expected to return not_found
+    % due to the delete request canceling the async opener
+    % pid and sending not_found to all waiters unconditionally
+    ?assertEqual({CrtRef, not_found}, get_next_message()),
+
+    % Our delete request was processed normally
+    ?assertEqual({DelRef, ok}, get_next_message()),
+
+    % The db was deleted thus it should be not found
+    % when we try and open it.
+    ?assertMatch({OpenRef, {not_found, no_db_file}}, get_next_message()),
+
+    % And finally assert that couch_server is still
+    % alive.
+    ?assert(is_process_alive(CouchServer)),
+    check_monitor_not_triggered(CSRef).
+
+
+get_opener_pid(DbName) ->
+    WaitFun = fun() ->
+        case ets:lookup(couch_dbs, DbName) of
+            [#entry{pid = Pid}] ->
+                {ok, Pid};
+            [] ->
+                wait
+        end
+    end,
+    test_util:wait(WaitFun).
+
+
+wait_for_open_async_result(CouchServer, Opener) ->
+    WaitFun = fun() ->
+        {_, Messages} = erlang:process_info(CouchServer, messages),
+        Found = lists:foldl(fun(Msg, Acc) ->
+            case Msg of
+                {'$gen_call', {Opener, _}, {open_result, _, _, {ok, _}}} ->
+                    true;
+                _ ->
+                    Acc
+            end
+        end, false, Messages),
+        if Found -> ok; true -> wait end
+    end,
+    test_util:wait(WaitFun).
+
+
+check_monitor_not_triggered(Ref) ->
+    receive
+        {'DOWN', Ref, _, _, Reason0} ->
+            erlang:error({monitor_triggered, Reason0})
+    after 100 ->
+        ok
+    end.
+
+
+get_next_message() ->
+    receive
+        Msg ->
+            Msg
+    after 5000 ->
+        erlang:error(timeout)
+    end.

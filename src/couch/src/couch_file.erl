@@ -47,7 +47,7 @@
 -export([last_read/1]).
 
 % gen_server callbacks
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2, code_change/3, format_status/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 %% helper functions
@@ -526,6 +526,9 @@ handle_info({'DOWN', Ref, process, _Pid, _Info}, #file{db_monitor=Ref}=File) ->
         false -> {noreply, File}
     end.
 
+format_status(_Opt, [PDict, #file{} = File]) ->
+    {_Fd, FilePath} = couch_util:get_value(couch_file_fd, PDict),
+    [{data, [{"State", File}, {"InitialFilePath", FilePath}]}].
 
 find_header(Fd, Block) ->
     case (catch load_header(Fd, Block)) of

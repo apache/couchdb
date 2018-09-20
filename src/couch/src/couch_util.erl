@@ -37,7 +37,7 @@
 -export([unique_monotonic_integer/0]).
 -export([check_config_blacklist/1]).
 -export([check_md5/2]).
--export([set_mqd_off_heap/0]).
+-export([set_mqd_off_heap/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -670,12 +670,17 @@ check_md5(Sig, Sig) -> ok;
 check_md5(_, _) -> throw(md5_mismatch).
 
 
-set_mqd_off_heap() ->
-    try
-        erlang:process_flag(message_queue_data, off_heap),
-        ok
-    catch error:badarg ->
-        ok
+set_mqd_off_heap(Module) ->
+    case config:get_boolean("off_heap_mqd", atom_to_list(Module), true) of
+        true ->
+            try
+                erlang:process_flag(message_queue_data, off_heap),
+                ok
+            catch error:badarg ->
+                    ok
+            end;
+        false ->
+            ok
     end.
 
 
