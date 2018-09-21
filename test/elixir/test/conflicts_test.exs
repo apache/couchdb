@@ -83,12 +83,6 @@ defmodule RevisionTest do
     Couch.put("/#{db}/#{doc._id}", [body: doc]).body
   end
 
-  # Update doc's _rev entry with request result
-  @spec rev(map(), map()) :: map()
-  defp rev(doc = %{_id: id}, %{"id" => id, "rev" => rev}) do
-    Map.put(doc, :_rev, rev)
-  end
-
   defp suffix(rev) do
     hd(tl(String.split(rev, "-")))
   end
