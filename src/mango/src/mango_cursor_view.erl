@@ -405,30 +405,40 @@ doc_member(Cursor, RowProps) ->
     Opts = Cursor#cursor.opts,
     ExecutionStats = Cursor#cursor.execution_stats,
     Selector = Cursor#cursor.selector,
-    Incr = case couch_util:get_value(value, RowProps) of
-        N when is_integer(N) -> N;
-        _ -> 1
+    {Matched, Incr} = case couch_util:get_value(value, RowProps) of
+        N when is_integer(N) -> {true, N};
+        _ -> {false, 1}
     end,
     case couch_util:get_value(doc, RowProps) of
         {DocProps} ->
             ExecutionStats1 = mango_execution_stats:incr_docs_examined(ExecutionStats, Incr),
-            {ok, {DocProps}, {execution_stats, ExecutionStats1}};
+            case Matched of
+                true ->
+                    {ok, {DocProps}, {execution_stats, ExecutionStats1}};
+                false ->
+                    match_doc(Selector, {DocProps}, ExecutionStats1)
+                end;
         undefined ->
             ExecutionStats1 = mango_execution_stats:incr_quorum_docs_examined(ExecutionStats),
             Id = couch_util:get_value(id, RowProps),
             case mango_util:defer(fabric, open_doc, [Db, Id, Opts]) of
                 {ok, #doc{}=DocProps} ->
                     Doc = couch_doc:to_json_obj(DocProps, []),
-                    case mango_selector:match(Selector, Doc) of
-                        true ->
-                            {ok, Doc, {execution_stats, ExecutionStats1}};
-                        false ->
-                            {no_match, Doc, {execution_stats, ExecutionStats1}}
-                    end;
+                    match_doc(Selector, Doc, ExecutionStats1);
                 Else ->
                     Else
             end
     end.
+
+
+match_doc(Selector, Doc, ExecutionStats) ->
+    case mango_selector:match(Selector, Doc) of
+        true ->
+            {ok, Doc, {execution_stats, ExecutionStats}};
+        false ->
+            {no_match, Doc, {execution_stats, ExecutionStats}}
+    end.
+
 
 is_design_doc(RowProps) ->
     case couch_util:get_value(id, RowProps) of
@@ -446,3 +456,55 @@ update_bookmark_keys(#cursor{limit = Limit} = Cursor, Props) when Limit > 0 ->
     };
 update_bookmark_keys(Cursor, _Props) ->
     Cursor.
+
+
+%%%%%%%% module tests below %%%%%%%%
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+runs_match_on_doc_with_no_value_test() ->
+    Cursor = #cursor {
+        db = <<"db">>,
+        opts = [],
+        execution_stats = #execution_stats{},
+        selector = mango_selector:normalize({[{<<"user_id">>, <<"1234">>}]})
+    },
+    RowProps = [
+        {id,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+        {key,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+        {doc,{
+            [
+                {<<"_id">>,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+                {<<"_rev">>,<<"1-a954fe2308f14307756067b0e18c2968">>},
+                {<<"user_id">>,11}
+            ]
+        }}
+    ],
+    {Match, _, _} = doc_member(Cursor, RowProps),
+    ?assertEqual(Match, no_match).
+
+does_not_run_match_on_doc_with_value_test() ->
+    Cursor = #cursor {
+        db = <<"db">>,
+        opts = [],
+        execution_stats = #execution_stats{},
+        selector = mango_selector:normalize({[{<<"user_id">>, <<"1234">>}]})
+    },
+    RowProps = [
+        {id,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+        {key,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+        {value,1},
+        {doc,{
+            [
+                {<<"_id">>,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
+                {<<"_rev">>,<<"1-a954fe2308f14307756067b0e18c2968">>},
+                {<<"user_id">>,11}
+            ]
+        }}
+    ],
+    {Match, _, _} = doc_member(Cursor, RowProps),
+    ?assertEqual(Match, ok).
+
+
+-endif.
