@@ -436,7 +436,7 @@ cookie_scheme(#httpd{mochi_req=MochiReq}) ->
     end.
 
 max_age() ->
-    case config:get("couch_httpd_auth", "allow_persistent_cookies", "false") of
+    case config:get("couch_httpd_auth", "allow_persistent_cookies", "true") of
         "false" ->
             [];
         "true" ->

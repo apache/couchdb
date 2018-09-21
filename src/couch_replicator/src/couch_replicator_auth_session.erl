@@ -79,9 +79,11 @@
 -type headers() :: [{string(), string()}].
 -type code() :: non_neg_integer().
 -type creds() :: {string() | undefined, string() | undefined}.
+-type time_sec() :: non_neg_integer().
+-type age() :: time_sec() | undefined.
 
-
--define(MIN_UPDATE_INTERVAL, 5).
+-define(MIN_UPDATE_INTERVAL_SEC, 5).
+-define(DEFAULT_REFRESH_INTERVAL_SEC, 550).
 
 
 -record(state, {
@@ -448,7 +450,7 @@ http_response({error, Error}, #state{session_url = Url, user = User}) ->
     {error, {session_request_failed, Url, User, Error}}.
 
 
--spec parse_cookie(list()) -> {ok, string()} | {error, term()}.
+-spec parse_cookie(list()) -> {ok, age(), string()} | {error, term()}.
 parse_cookie(Headers0) ->
     Headers = mochiweb_headers:make(Headers0),
     case mochiweb_headers:get_value("Set-Cookie", Headers) of
@@ -461,8 +463,29 @@ parse_cookie(Headers0) ->
                 undefined ->
                     {error, cookie_format_invalid};
                 Cookie ->
-                    {ok, Cookie}
+                    MaxAge = parse_max_age(CaseInsKVs),
+                    {ok, MaxAge, Cookie}
             end
+    end.
+
+
+-spec parse_max_age(list()) -> age().
+parse_max_age(CaseInsKVs) ->
+    case mochiweb_headers:get_value("Max-Age", CaseInsKVs) of
+        String when is_list(String) ->
+            try
+                list_to_integer(String)
+            of
+                MaxAge when MaxAge >= 0 ->
+                    MaxAge;
+                _ ->
+                    undefined
+            catch
+                error:badarg ->
+                    undefined
+            end;
+        _ ->
+            undefined
     end.
 
 
@@ -470,39 +493,58 @@ parse_cookie(Headers0) ->
     {ok, string()} | {error, term()}.
 maybe_update_cookie(ResponseHeaders, State) ->
     case parse_cookie(ResponseHeaders) of
-        {ok, Cookie} ->
-            {ok, update_cookie(State, Cookie, now_sec())};
+        {ok, MaxAge, Cookie} ->
+            {ok, update_cookie(State, Cookie, now_sec(), MaxAge)};
         {error, Error} ->
             {error, Error}
     end.
 
 
--spec update_cookie(#state{}, string(), non_neg_integer()) -> #state{}.
-update_cookie(#state{cookie = Cookie} = State, Cookie, _) ->
+-spec update_cookie(#state{}, string(), time_sec(), age()) -> #state{}.
+update_cookie(#state{cookie = Cookie} = State, Cookie, _, _) ->
     State;
-update_cookie(#state{epoch = Epoch} = State, Cookie, NowSec) ->
-    State#state{
+update_cookie(#state{epoch = Epoch} = State, Cookie, NowSec, MaxAge) ->
+    NextRefresh = next_refresh(NowSec, MaxAge, refresh_interval()),
+    NewState = State#state{
         epoch = Epoch + 1,
         cookie = Cookie,
         refresh_tstamp = NowSec
-    }.
+    },
+    schedule_refresh(NextRefresh, NewState).
 
 
--spec cookie_age_sec(#state{}, non_neg_integer()) -> non_neg_integer().
+-spec next_refresh(time_sec(), age(), time_sec()) -> time_sec().
+next_refresh(NowSec, undefined, RefreshInterval) ->
+    NowSec + RefreshInterval;
+
+next_refresh(NowSec, MaxAge, _) when is_integer(MaxAge) ->
+    % Apply a fudge factor to account for delays in receving the cookie
+    % and / or time adjustments happening over a longer period of time
+    NowSec + trunc(MaxAge * 0.9).
+
+
+-spec cookie_age_sec(#state{}, time_sec()) -> time_sec().
 cookie_age_sec(#state{refresh_tstamp = RefreshTs}, Now) ->
     max(0, Now - RefreshTs).
 
 
--spec now_sec() -> non_neg_integer().
+-spec now_sec() -> time_sec().
 now_sec() ->
     {Mega, Sec, _Micro} = os:timestamp(),
     Mega * 1000000 + Sec.
 
 
--spec min_update_interval() -> non_neg_integer().
+-spec min_update_interval() -> time_sec().
 min_update_interval() ->
     config:get_integer("replicator", "session_min_update_interval",
-        ?MIN_UPDATE_INTERVAL).
+        ?MIN_UPDATE_INTERVAL_SEC).
+
+
+-spec refresh_interval() -> integer().
+refresh_interval() ->
+    config:get_integer("replicator", "session_refresh_interval_sec",
+        ?DEFAULT_REFRESH_INTERVAL_SEC).
+
 
 
 -spec b64creds(string(), string()) -> string().
@@ -593,7 +635,8 @@ cookie_update_test_() ->
         fun setup/0,
         fun teardown/1,
         [
-            t_do_refresh(),
+            t_do_refresh_without_max_age(),
+            t_do_refresh_with_max_age(),
             t_dont_refresh(),
             t_process_auth_failure(),
             t_process_auth_failure_stale_epoch(),
@@ -609,24 +652,41 @@ cookie_update_test_() ->
     }.
 
 
-t_do_refresh() ->
+t_do_refresh_without_max_age() ->
     ?_test(begin
         State = #state{next_refresh = 0},
         {ok, State1} = maybe_refresh(State),
-        ?assertMatch(#state{
-            next_refresh = infinity,
-            epoch = 1,
-            cookie = "Abc"
-        }, State1)
+        ?assertMatch(#state{epoch = 1, cookie = "Abc"}, State1),
+        #state{next_refresh = NextRefresh} = State1,
+        RefreshInterval = NextRefresh - now_sec(),
+        ?assert(540 < RefreshInterval andalso RefreshInterval =< 550)
+    end).
+
+
+t_do_refresh_with_max_age() ->
+    ?_test(begin
+        State = #state{next_refresh = 0},
+        mock_http_cookie_response_with_age("Zig", "100"),
+        {ok, State1} = maybe_refresh(State),
+        ?assertMatch(#state{epoch = 1, cookie = "Zig"}, State1),
+        #state{next_refresh = NextRefresh} = State1,
+        RefreshInterval = NextRefresh - now_sec(),
+        ?assert(80 < RefreshInterval andalso RefreshInterval =< 90)
     end).
 
 
 t_dont_refresh() ->
     ?_test(begin
-        State = #state{next_refresh = now_sec() + 100},
+        State = #state{
+            next_refresh = now_sec() + 100,
+            refresh_tstamp = now_sec()
+        },
         {ok, State1} = maybe_refresh(State),
         ?assertMatch(State, State1),
-        State2 = #state{next_refresh = infinity},
+        State2 = #state{
+            next_refresh = infinity,
+            refresh_tstamp = now_sec()
+        },
         {ok, State3} = maybe_refresh(State2),
         ?assertMatch(State2, State3)
     end).
@@ -731,6 +791,13 @@ mock_http_cookie_response(Cookie) ->
     meck:expect(ibrowse, send_req_direct, 7, Resp).
 
 
+mock_http_cookie_response_with_age(Cookie, Age) ->
+    AgeKV = "Max-Age=" ++ Age,
+    CookieKV = "AuthSession=" ++ Cookie,
+    Resp = {ok, "200", [{"Set-Cookie", CookieKV ++ ";" ++ AgeKV}], []},
+    meck:expect(ibrowse, send_req_direct, 7, Resp).
+
+
 mock_http_401_response() ->
     meck:expect(ibrowse, send_req_direct, 7, {ok, "401", [], []}).
 
@@ -755,5 +822,22 @@ extract_creds_error_test_() ->
         {#httpdb{url = "some_junk"}, invalid_uri},
         {#httpdb{url = "http://h/db"}, missing_credentials}
     ]].
+
+
+parse_max_age_test_() ->
+    [?_assertEqual(R, parse_max_age(mochiweb_headers:make([{"Max-Age", A}])))
+        ||  {A, R} <- [
+            {"-10", undefined},
+            {"\ufeff", undefined},
+            {"*", undefined},
+            {"\n1", undefined},
+            {"1", 1},
+            {"1 1", undefined},
+            {"2", 2},
+            {"100", 100},
+            {"1234567890", 1234567890}
+        ]
+    ].
+
 
 -endif.
