@@ -347,7 +347,8 @@ read_repair_filter(DbName, Docs, NodeRevs, Options) ->
 % as the read_repair option to update_docs.
 read_repair_filter(Db, Docs, NodeRevs) ->
     [#doc{id = DocId} | _] = Docs,
-    Nodes = lists:usort([Node || {Node, _} <- NodeRevs, Node /= node()]),
+    NonLocalNodeRevs = [NR || {N, _} = NR <- NodeRevs, N /= node()],
+    Nodes = lists:usort([Node || {Node, _} <- NonLocalNodeRevs]),
     NodeSeqs = get_node_seqs(Db, Nodes),
 
     DbPSeq = couch_db:get_purge_seq(Db),
@@ -360,7 +361,7 @@ read_repair_filter(Db, Docs, NodeRevs) ->
         {Node, NodeSeq} = lists:keyfind(Node, 1, NodeSeqs),
         NodeSeq >= DbPSeq - Lag
     end,
-    RecentNodeRevs = lists:filter(NodeFiltFun, NodeRevs),
+    RecentNodeRevs = lists:filter(NodeFiltFun, NonLocalNodeRevs),
 
     % For each node we scan the purge infos to filter out any
     % revisions that have been locally purged since we last
