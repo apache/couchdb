@@ -64,7 +64,14 @@ do_rewrite(#httpd{mochi_req=MochiReq}=Req, {Props}=Rewrite) when is_list(Props) 
                                                Path,
                                                MochiReq:get(version),
                                                Headers),
-            NewMochiReq:cleanup(),
+            Body = case couch_util:get_value(<<"body">>, Props) of
+                undefined -> erlang:get(mochiweb_request_body);
+                B -> B
+            end,
+            case Body of
+                undefined -> NewMochiReq:cleanup();
+                _ -> erlang:put(mochiweb_request_body, Body)
+            end,
             couch_log:debug("rewrite to ~p", [Path]),
             chttpd:handle_request_int(NewMochiReq);
         Code ->
