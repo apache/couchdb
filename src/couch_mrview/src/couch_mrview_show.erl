@@ -370,8 +370,8 @@ json_req_obj(Req, Db) ->
             % use a separate process because we're already in a receive loop,
             % and json_req_obj calls fabric:get_db_info()
             JRO = fun() -> exit(chttpd_external:json_req_obj(Req, Db)) end,
-            spawn_monitor(JRO),
-            receive {'DOWN', _, _, _, JsonReq} -> JsonReq end;
+            {Pid, Ref} = spawn_monitor(JRO),
+            receive {'DOWN', Ref, process, Pid, JsonReq} -> JsonReq end;
         false ->
             chttpd_external:json_req_obj(Req, Db)
     end.

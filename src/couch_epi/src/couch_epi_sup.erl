@@ -121,7 +121,8 @@ modules(#couch_epi_spec{kind = services, value = Module}) ->
     [Module];
 modules(#couch_epi_spec{kind = data_providers, value = Value}) ->
     case Value of
-        {module, Module} -> [Module];
+        {static_module, Module} -> [Module];
+        {callback_module, Module} -> [Module];
         _ -> []
     end;
 modules(#couch_epi_spec{kind = data_subscriptions, behaviour = Module}) ->
@@ -159,7 +160,7 @@ services() ->
 
 data_providers() ->
     [
-        {{test_app, descriptions}, {module, ?MODULE}, [{interval, 100}]}
+        {{test_app, descriptions}, {static_module, ?MODULE}, [{interval, 100}]}
     ].
 
 data_subscriptions() ->

@@ -25,6 +25,7 @@
     r,
     state,
     replies,
+    node_revs = [],
     q_reply
 }).
 
@@ -83,7 +84,13 @@ handle_message({rexi_EXIT, _Reason}, Worker, Acc) ->
     end;
 handle_message(Reply, Worker, Acc) ->
     NewReplies = fabric_util:update_counter(Reply, 1, Acc#acc.replies),
-    NewAcc = Acc#acc{replies = NewReplies},
+    NewNodeRevs = case Reply of
+        {ok, #doc{revs = {Pos, [Rev | _]}}} ->
+            [{Worker#shard.node, [{Pos, Rev}]} | Acc#acc.node_revs];
+        _ ->
+            Acc#acc.node_revs
+    end,
+    NewAcc = Acc#acc{replies = NewReplies, node_revs = NewNodeRevs},
     case is_r_met(Acc#acc.workers, NewReplies, Acc#acc.r) of
     {true, QuorumReply} ->
         fabric_util:cleanup(lists:delete(Worker, Acc#acc.workers)),
@@ -122,14 +129,14 @@ is_r_met(Workers, Replies, R) ->
         no_more_workers
     end.
 
-read_repair(#acc{dbname=DbName, replies=Replies}) ->
+read_repair(#acc{dbname=DbName, replies=Replies, node_revs=NodeRevs}) ->
     Docs = [Doc || {_, {{ok, #doc{}=Doc}, _}} <- Replies],
     case Docs of
     % omit local docs from read repair
     [#doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} | _] ->
         choose_reply(Docs);
     [#doc{id=Id} | _] ->
-        Opts = [replicated_changes, ?ADMIN_CTX],
+        Opts = [?ADMIN_CTX, {read_repair, NodeRevs}],
         Res = fabric:update_docs(DbName, Docs, Opts),
         case Res of
             {ok, []} ->
@@ -174,85 +181,85 @@ format_reply(not_found, _) ->
 format_reply(Else, _) ->
     Else.
 
-is_r_met_test() ->
-    Workers0 = [],
-    Workers1 = [nil],
-    Workers2 = [nil,nil],
 
-    % Successful cases
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
 
-    ?assertEqual(
-        {true, foo},
-        is_r_met([], [fabric_util:kv(foo,2)], 2)
-    ),
 
-    ?assertEqual(
-        {true, foo},
-        is_r_met([], [fabric_util:kv(foo,3)], 2)
-    ),
+setup() ->
+    meck:new([
+        couch_log,
+        couch_stats,
+        fabric,
+        fabric_util,
+        mem3,
+        rexi,
+        rexi_monitor
+    ], [passthrough]).
 
-    ?assertEqual(
-        {true, foo},
-        is_r_met([], [fabric_util:kv(foo,1)], 1)
-    ),
 
-    ?assertEqual(
-        {true, foo},
-        is_r_met([], [fabric_util:kv(foo,2), fabric_util:kv(bar,1)], 2)
-    ),
+teardown(_) ->
+    meck:unload().
 
-    ?assertEqual(
-        {true, bar},
-        is_r_met([], [fabric_util:kv(bar,1), fabric_util:kv(bar,2)], 2)
-    ),
 
-    ?assertEqual(
-        {true, bar},
-        is_r_met([], [fabric_util:kv(bar,2), fabric_util:kv(foo,1)], 2)
-    ),
+open_doc_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            t_is_r_met(),
+            t_handle_message_down(),
+            t_handle_message_exit(),
+            t_handle_message_reply(),
+            t_store_node_revs(),
+            t_read_repair(),
+            t_handle_response_quorum_met(),
+            t_get_doc_info()
+        ]
+    }.
 
-    % Not met, but wait for more messages
 
-    ?assertEqual(
-        wait_for_more,
-        is_r_met(Workers2, [fabric_util:kv(foo,1)], 2)
-    ),
+t_is_r_met() ->
+    ?_test(begin
+        Workers0 = [],
+        Workers1 = [nil],
+        Workers2 = [nil, nil],
 
-    ?assertEqual(
-        wait_for_more,
-        is_r_met(Workers2, [fabric_util:kv(foo,2)], 3)
-    ),
+        SuccessCases = [
+            {{true, foo}, [fabric_util:kv(foo, 2)], 2},
+            {{true, foo}, [fabric_util:kv(foo, 3)], 2},
+            {{true, foo}, [fabric_util:kv(foo, 1)], 1},
+            {{true, foo}, [fabric_util:kv(foo, 2), fabric_util:kv(bar, 1)], 2},
+            {{true, bar}, [fabric_util:kv(bar, 1), fabric_util:kv(bar, 2)], 2},
+            {{true, bar}, [fabric_util:kv(bar, 2), fabric_util:kv(foo, 1)], 2}
+        ],
+        lists:foreach(fun({Expect, Replies, Q}) ->
+            ?assertEqual(Expect, is_r_met(Workers0, Replies, Q))
+        end, SuccessCases),
 
-    ?assertEqual(
-        wait_for_more,
-        is_r_met(Workers2, [fabric_util:kv(foo,1), fabric_util:kv(bar,1)], 2)
-    ),
+        WaitForMoreCases = [
+            {[fabric_util:kv(foo, 1)], 2},
+            {[fabric_util:kv(foo, 2)], 3},
+            {[fabric_util:kv(foo, 1), fabric_util:kv(bar, 1)], 2}
+        ],
+        lists:foreach(fun({Replies, Q}) ->
+            ?assertEqual(wait_for_more, is_r_met(Workers2, Replies, Q))
+        end, WaitForMoreCases),
 
-    % Not met, bail out
+        FailureCases = [
+            {Workers0, [fabric_util:kv(foo, 1)], 2},
+            {Workers1, [fabric_util:kv(foo, 1)], 2},
+            {Workers1, [fabric_util:kv(foo, 1), fabric_util:kv(bar, 1)], 2},
+            {Workers1, [fabric_util:kv(foo, 2)], 3}
+        ],
+        lists:foreach(fun({Workers, Replies, Q}) ->
+            ?assertEqual(no_more_workers, is_r_met(Workers, Replies, Q))
+        end, FailureCases)
+    end).
 
-    ?assertEqual(
-        no_more_workers,
-        is_r_met(Workers0, [fabric_util:kv(foo,1)], 2)
-    ),
 
-    ?assertEqual(
-        no_more_workers,
-        is_r_met(Workers1, [fabric_util:kv(foo,1)], 2)
-    ),
-
-    ?assertEqual(
-        no_more_workers,
-        is_r_met(Workers1, [fabric_util:kv(foo,1), fabric_util:kv(bar,1)], 2)
-    ),
-
-    ?assertEqual(
-        no_more_workers,
-        is_r_met(Workers1, [fabric_util:kv(foo,2)], 3)
-    ),
-
-    ok.
-
-handle_message_down_test() ->
+t_handle_message_down() ->
     Node0 = 'foo@localhost',
     Node1 = 'bar@localhost',
     Down0 = {rexi_DOWN, nil, {nil, Node0}, nil},
@@ -261,279 +268,328 @@ handle_message_down_test() ->
     Worker1 = #shard{node=Node1},
     Workers1 = Workers0 ++ [Worker1],
 
-    % Stop when no more workers are left
-    ?assertEqual(
-        {stop, #acc{workers=[]}},
-        handle_message(Down0, nil, #acc{workers=Workers0})
-    ),
+    ?_test(begin
+        % Stop when no more workers are left
+        ?assertEqual(
+            {stop, #acc{workers=[]}},
+            handle_message(Down0, nil, #acc{workers=Workers0})
+        ),
 
-    % Continue when we have more workers
-    ?assertEqual(
-        {ok, #acc{workers=[Worker1]}},
-        handle_message(Down0, nil, #acc{workers=Workers1})
-    ),
+        % Continue when we have more workers
+        ?assertEqual(
+            {ok, #acc{workers=[Worker1]}},
+            handle_message(Down0, nil, #acc{workers=Workers1})
+        ),
 
-    % A second DOWN removes the remaining workers
-    ?assertEqual(
-        {stop, #acc{workers=[]}},
-        handle_message(Down1, nil, #acc{workers=[Worker1]})
-    ),
+        % A second DOWN removes the remaining workers
+        ?assertEqual(
+            {stop, #acc{workers=[]}},
+            handle_message(Down1, nil, #acc{workers=[Worker1]})
+        )
+    end).
 
-    ok.
 
-handle_message_exit_test() ->
+t_handle_message_exit() ->
     Exit = {rexi_EXIT, nil},
     Worker0 = #shard{ref=erlang:make_ref()},
     Worker1 = #shard{ref=erlang:make_ref()},
 
-    % Only removes the specified worker
-    ?assertEqual(
-        {ok, #acc{workers=[Worker1]}},
-        handle_message(Exit, Worker0, #acc{workers=[Worker0, Worker1]})
-    ),
+    ?_test(begin
+        % Only removes the specified worker
+        ?assertEqual(
+            {ok, #acc{workers=[Worker1]}},
+            handle_message(Exit, Worker0, #acc{workers=[Worker0, Worker1]})
+        ),
 
-    ?assertEqual(
-        {ok, #acc{workers=[Worker0]}},
-        handle_message(Exit, Worker1, #acc{workers=[Worker0, Worker1]})
-    ),
+        ?assertEqual(
+            {ok, #acc{workers=[Worker0]}},
+            handle_message(Exit, Worker1, #acc{workers=[Worker0, Worker1]})
+        ),
 
-    % We bail if it was the last worker
-    ?assertEqual(
-        {stop, #acc{workers=[]}},
-        handle_message(Exit, Worker0, #acc{workers=[Worker0]})
-    ),
+        % We bail if it was the last worker
+        ?assertEqual(
+            {stop, #acc{workers=[]}},
+            handle_message(Exit, Worker0, #acc{workers=[Worker0]})
+        )
+    end).
 
-    ok.
 
-handle_message_reply_test() ->
-    start_meck_(),
-    meck:expect(rexi, kill, fun(_, _) -> ok end),
-
+t_handle_message_reply() ->
     Worker0 = #shard{ref=erlang:make_ref()},
     Worker1 = #shard{ref=erlang:make_ref()},
     Worker2 = #shard{ref=erlang:make_ref()},
     Workers = [Worker0, Worker1, Worker2],
     Acc0 = #acc{workers=Workers, r=2, replies=[]},
 
-    % Test that we continue when we haven't met R yet
-    ?assertEqual(
-        {ok, Acc0#acc{
-            workers=[Worker0, Worker1],
-            replies=[fabric_util:kv(foo,1)]
-        }},
-        handle_message(foo, Worker2, Acc0)
-    ),
+    ?_test(begin
+        meck:expect(rexi, kill, fun(_, _) -> ok end),
 
-    ?assertEqual(
-        {ok, Acc0#acc{
-            workers=[Worker0, Worker1],
-            replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,1)]
-        }},
-        handle_message(bar, Worker2, Acc0#acc{
-            replies=[fabric_util:kv(foo,1)]
-        })
-    ),
+        % Test that we continue when we haven't met R yet
+        ?assertMatch(
+            {ok, #acc{
+                workers=[Worker0, Worker1],
+                replies=[{foo, {foo, 1}}]
+            }},
+            handle_message(foo, Worker2, Acc0)
+        ),
 
-    % Test that we don't get a quorum when R isn't met. q_reply
-    % isn't set and state remains unchanged and {stop, NewAcc}
-    % is returned. Bit subtle on the assertions here.
+        ?assertMatch(
+            {ok, #acc{
+                workers=[Worker0, Worker1],
+                replies=[{bar, {bar, 1}}, {foo, {foo, 1}}]
+            }},
+            handle_message(bar, Worker2, Acc0#acc{
+                replies=[{foo, {foo, 1}}]
+            })
+        ),
 
-    ?assertEqual(
-        {stop, Acc0#acc{workers=[],replies=[fabric_util:kv(foo,1)]}},
-        handle_message(foo, Worker0, Acc0#acc{workers=[Worker0]})
-    ),
+        % Test that we don't get a quorum when R isn't met. q_reply
+        % isn't set and state remains unchanged and {stop, NewAcc}
+        % is returned. Bit subtle on the assertions here.
 
-    ?assertEqual(
-        {stop, Acc0#acc{
-            workers=[],
-            replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,1)]
-        }},
-        handle_message(bar, Worker0, Acc0#acc{
-            workers=[Worker0],
-            replies=[fabric_util:kv(foo,1)]
-        })
-    ),
+        ?assertMatch(
+            {stop, #acc{workers=[], replies=[{foo, {foo, 1}}]}},
+            handle_message(foo, Worker0, Acc0#acc{workers=[Worker0]})
+        ),
 
-    % Check that when R is met we stop with a new state and
-    % a q_reply.
+        ?assertMatch(
+            {stop, #acc{
+                workers=[],
+                replies=[{bar, {bar, 1}}, {foo, {foo, 1}}]
+            }},
+            handle_message(bar, Worker0, Acc0#acc{
+                workers=[Worker0],
+                replies=[{foo, {foo, 1}}]
+            })
+        ),
 
-    ?assertEqual(
-        {stop, Acc0#acc{
-            workers=[],
-            replies=[fabric_util:kv(foo,2)],
-            state=r_met,
-            q_reply=foo
-        }},
-        handle_message(foo, Worker1, Acc0#acc{
-            workers=[Worker0, Worker1],
-            replies=[fabric_util:kv(foo,1)]
-        })
-    ),
+        % Check that when R is met we stop with a new state and
+        % a q_reply.
 
-    ?assertEqual(
-        {stop, Acc0#acc{
-            workers=[],
-            r=1,
-            replies=[fabric_util:kv(foo,1)],
-            state=r_met,
-            q_reply=foo
-        }},
-        handle_message(foo, Worker0, Acc0#acc{r=1})
-    ),
+        ?assertMatch(
+            {stop, #acc{
+                workers=[],
+                replies=[{foo, {foo, 2}}],
+                state=r_met,
+                q_reply=foo
+            }},
+            handle_message(foo, Worker1, Acc0#acc{
+                workers=[Worker0, Worker1],
+                replies=[{foo, {foo, 1}}]
+            })
+        ),
 
-    ?assertEqual(
-        {stop, Acc0#acc{
-            workers=[],
-            replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,2)],
-            state=r_met,
-            q_reply=foo
-        }},
-        handle_message(foo, Worker0, Acc0#acc{
-            workers=[Worker0],
-            replies=[fabric_util:kv(bar,1), fabric_util:kv(foo,1)]
-        })
-    ),
+        ?assertEqual(
+            {stop, #acc{
+                workers=[],
+                r=1,
+                replies=[{foo, {foo, 1}}],
+                state=r_met,
+                q_reply=foo
+            }},
+            handle_message(foo, Worker0, Acc0#acc{r=1})
+        ),
 
-    stop_meck_(),
-    ok.
+        ?assertMatch(
+            {stop, #acc{
+                workers=[],
+                replies=[{bar, {bar, 1}}, {foo, {foo, 2}}],
+                state=r_met,
+                q_reply=foo
+            }},
+            handle_message(foo, Worker0, Acc0#acc{
+                workers=[Worker0],
+                replies=[{bar, {bar, 1}}, {foo, {foo, 1}}]
+            })
+        )
+    end).
 
-read_repair_test() ->
-    start_meck_(),
-    meck:expect(couch_log, notice, fun(_, _) -> ok end),
-    meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
 
+t_store_node_revs() ->
+    W1 = #shard{node = w1, ref = erlang:make_ref()},
+    W2 = #shard{node = w2, ref = erlang:make_ref()},
+    W3 = #shard{node = w3, ref = erlang:make_ref()},
+    Foo1 = {ok, #doc{id = <<"bar">>, revs = {1, [<<"foo">>]}}},
+    Foo2 = {ok, #doc{id = <<"bar">>, revs = {2, [<<"foo2">>, <<"foo">>]}}},
+    NFM = {not_found, missing},
+
+    InitAcc = #acc{workers = [W1, W2, W3], replies = [], r = 2},
+
+    ?_test(begin
+        meck:expect(rexi, kill, fun(_, _) -> ok end),
+
+        % Simple case
+        {ok, #acc{node_revs = NodeRevs1}} = handle_message(Foo1, W1, InitAcc),
+        ?assertEqual([{w1, [{1, <<"foo">>}]}], NodeRevs1),
+
+        % Make sure we only hold the head rev
+        {ok, #acc{node_revs = NodeRevs2}} = handle_message(Foo2, W1, InitAcc),
+        ?assertEqual([{w1, [{2, <<"foo2">>}]}], NodeRevs2),
+
+        % Make sure we don't capture anything on error
+        {ok, #acc{node_revs = NodeRevs3}} = handle_message(NFM, W1, InitAcc),
+        ?assertEqual([], NodeRevs3),
+
+        % Make sure we accumulate node revs
+        Acc1 = InitAcc#acc{node_revs = [{w1, [{1, <<"foo">>}]}]},
+        {ok, #acc{node_revs = NodeRevs4}} = handle_message(Foo2, W2, Acc1),
+        ?assertEqual(
+                [{w2, [{2, <<"foo2">>}]}, {w1, [{1, <<"foo">>}]}],
+                NodeRevs4
+            ),
+
+        % Make sure rexi_DOWN doesn't modify node_revs
+        Down = {rexi_DOWN, nil, {nil, w1}, nil},
+        {ok, #acc{node_revs = NodeRevs5}} = handle_message(Down, W2, Acc1),
+        ?assertEqual([{w1, [{1, <<"foo">>}]}], NodeRevs5),
+
+        % Make sure rexi_EXIT doesn't modify node_revs
+        Exit = {rexi_EXIT, reason},
+        {ok, #acc{node_revs = NodeRevs6}} = handle_message(Exit, W2, Acc1),
+        ?assertEqual([{w1, [{1, <<"foo">>}]}], NodeRevs6),
+
+        % Make sure an error doesn't remove any node revs
+        {ok, #acc{node_revs = NodeRevs7}} = handle_message(NFM, W2, Acc1),
+        ?assertEqual([{w1, [{1, <<"foo">>}]}], NodeRevs7),
+
+        % Make sure we have all of our node_revs when meeting
+        % quorum
+        {ok, Acc2} = handle_message(Foo1, W1, InitAcc),
+        {ok, Acc3} = handle_message(Foo2, W2, Acc2),
+        {stop, Acc4} = handle_message(NFM, W3, Acc3),
+        ?assertEqual(
+                [{w2, [{2, <<"foo2">>}]}, {w1, [{1, <<"foo">>}]}],
+                Acc4#acc.node_revs
+            )
+    end).
+
+
+t_read_repair() ->
     Foo1 = {ok, #doc{revs = {1,[<<"foo">>]}}},
     Foo2 = {ok, #doc{revs = {2,[<<"foo2">>,<<"foo">>]}}},
     NFM = {not_found, missing},
 
-    % Test when we have actual doc data to repair
+    ?_test(begin
+        meck:expect(couch_log, notice, fun(_, _) -> ok end),
+        meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
 
-    meck:expect(fabric, update_docs, fun(_, [_], _) -> {ok, []} end),
-    Acc0 = #acc{
-        dbname = <<"name">>,
-        replies = [fabric_util:kv(Foo1,1)]
-    },
-    ?assertEqual(Foo1, read_repair(Acc0)),
+        % Test when we have actual doc data to repair
+        meck:expect(fabric, update_docs, fun(_, [_], _) -> {ok, []} end),
+        Acc0 = #acc{
+            dbname = <<"name">>,
+            replies = [fabric_util:kv(Foo1,1)]
+        },
+        ?assertEqual(Foo1, read_repair(Acc0)),
 
-    meck:expect(fabric, update_docs, fun(_, [_, _], _) -> {ok, []} end),
-    Acc1 = #acc{
-        dbname = <<"name">>,
-        replies = [fabric_util:kv(Foo1,1), fabric_util:kv(Foo2,1)]
-    },
-    ?assertEqual(Foo2, read_repair(Acc1)),
+        meck:expect(fabric, update_docs, fun(_, [_, _], _) -> {ok, []} end),
+        Acc1 = #acc{
+            dbname = <<"name">>,
+            replies = [fabric_util:kv(Foo1,1), fabric_util:kv(Foo2,1)]
+        },
+        ?assertEqual(Foo2, read_repair(Acc1)),
 
-    % Test when we have nothing but errors
+        % Test when we have nothing but errors
+        Acc2 = #acc{replies=[fabric_util:kv(NFM, 1)]},
+        ?assertEqual(NFM, read_repair(Acc2)),
 
-    Acc2 = #acc{replies=[fabric_util:kv(NFM, 1)]},
-    ?assertEqual(NFM, read_repair(Acc2)),
+        Acc3 = #acc{replies=[fabric_util:kv(NFM,1), fabric_util:kv(foo,2)]},
+        ?assertEqual(NFM, read_repair(Acc3)),
 
-    Acc3 = #acc{replies=[fabric_util:kv(NFM,1), fabric_util:kv(foo,2)]},
-    ?assertEqual(NFM, read_repair(Acc3)),
+        Acc4 = #acc{replies=[fabric_util:kv(foo,1), fabric_util:kv(bar,1)]},
+        ?assertEqual(bar, read_repair(Acc4))
+    end).
 
-    Acc4 = #acc{replies=[fabric_util:kv(foo,1), fabric_util:kv(bar,1)]},
-    ?assertEqual(bar, read_repair(Acc4)),
 
-    stop_meck_(),
-    ok.
-
-handle_response_quorum_met_test() ->
-    start_meck_(),
-    meck:expect(couch_log, notice, fun(_, _) -> ok end),
-    meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, []} end),
-    meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
-
+t_handle_response_quorum_met() ->
     Foo1 = {ok, #doc{revs = {1,[<<"foo">>]}}},
     Foo2 = {ok, #doc{revs = {2,[<<"foo2">>,<<"foo">>]}}},
     Bar1 = {ok, #doc{revs = {1,[<<"bar">>]}}},
 
-    BasicOkAcc = #acc{
-        state=r_met,
-        replies=[fabric_util:kv(Foo1,2)],
-        q_reply=Foo1
-    },
-    ?assertEqual(Foo1, handle_response(BasicOkAcc)),
+    ?_test(begin
+        meck:expect(couch_log, notice, fun(_, _) -> ok end),
+        meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, []} end),
+        meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
 
-    WithAncestorsAcc = #acc{
-        state=r_met,
-        replies=[fabric_util:kv(Foo1,1), fabric_util:kv(Foo2,2)],
-        q_reply=Foo2
-    },
-    ?assertEqual(Foo2, handle_response(WithAncestorsAcc)),
+        BasicOkAcc = #acc{
+            state=r_met,
+            replies=[fabric_util:kv(Foo1,2)],
+            q_reply=Foo1
+        },
+        ?assertEqual(Foo1, handle_response(BasicOkAcc)),
 
-    % This also checks when the quorum isn't the most recent
-    % revision.
-    DeeperWinsAcc = #acc{
-        state=r_met,
-        replies=[fabric_util:kv(Foo1,2), fabric_util:kv(Foo2,1)],
-        q_reply=Foo1
-    },
-    ?assertEqual(Foo2, handle_response(DeeperWinsAcc)),
+        WithAncestorsAcc = #acc{
+            state=r_met,
+            replies=[fabric_util:kv(Foo1,1), fabric_util:kv(Foo2,2)],
+            q_reply=Foo2
+        },
+        ?assertEqual(Foo2, handle_response(WithAncestorsAcc)),
 
-    % Check that we return the proper doc based on rev
-    % (ie, pos is equal)
-    BiggerRevWinsAcc = #acc{
-        state=r_met,
-        replies=[fabric_util:kv(Foo1,1), fabric_util:kv(Bar1,2)],
-        q_reply=Bar1
-    },
-    ?assertEqual(Foo1, handle_response(BiggerRevWinsAcc)),
+        % This also checks when the quorum isn't the most recent
+        % revision.
+        DeeperWinsAcc = #acc{
+            state=r_met,
+            replies=[fabric_util:kv(Foo1,2), fabric_util:kv(Foo2,1)],
+            q_reply=Foo1
+        },
+        ?assertEqual(Foo2, handle_response(DeeperWinsAcc)),
 
-    % r_not_met is a proxy to read_repair so we rely on
-    % read_repair_test for those conditions.
+        % Check that we return the proper doc based on rev
+        % (ie, pos is equal)
+        BiggerRevWinsAcc = #acc{
+            state=r_met,
+            replies=[fabric_util:kv(Foo1,1), fabric_util:kv(Bar1,2)],
+            q_reply=Bar1
+        },
+        ?assertEqual(Foo1, handle_response(BiggerRevWinsAcc))
 
-    stop_meck_(),
-    ok.
+        % r_not_met is a proxy to read_repair so we rely on
+        % read_repair_test for those conditions.
+    end).
 
-get_doc_info_test() ->
-    start_meck_(),
-    meck:new([mem3, rexi_monitor, fabric_util]),
-    meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, []} end),
-    meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
-    meck:expect(fabric_util, submit_jobs, fun(_, _, _) -> ok end),
-    meck:expect(fabric_util, create_monitors, fun(_) -> ok end),
-    meck:expect(rexi_monitor, stop, fun(_) -> ok end),
-    meck:expect(mem3, shards, fun(_, _) -> ok end),
-    meck:expect(mem3, n, fun(_) -> 3 end),
-    meck:expect(mem3, quorum, fun(_) -> 2 end),
 
-    meck:expect(fabric_util, recv, fun(_, _, _, _) ->
-        {ok, #acc{state = r_not_met}}
-    end),
-    Rsp1 = fabric_doc_open:go("test", "one", [doc_info]),
-    ?assertEqual({error, quorum_not_met}, Rsp1),
+t_get_doc_info() ->
+    ?_test(begin
+        meck:expect(fabric, update_docs, fun(_, _, _) -> {ok, []} end),
+        meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
+        meck:expect(fabric_util, submit_jobs, fun(_, _, _) -> ok end),
+        meck:expect(fabric_util, create_monitors, fun(_) -> ok end),
+        meck:expect(rexi_monitor, stop, fun(_) -> ok end),
+        meck:expect(mem3, shards, fun(_, _) -> ok end),
+        meck:expect(mem3, n, fun(_) -> 3 end),
+        meck:expect(mem3, quorum, fun(_) -> 2 end),
 
-    Rsp2 = fabric_doc_open:go("test", "one", [{doc_info, full}]),
-    ?assertEqual({error, quorum_not_met}, Rsp2),
+        meck:expect(fabric_util, recv, fun(_, _, _, _) ->
+            {ok, #acc{state = r_not_met}}
+        end),
+        Rsp1 = fabric_doc_open:go("test", "one", [doc_info]),
+        ?assertEqual({error, quorum_not_met}, Rsp1),
 
-    meck:expect(fabric_util, recv, fun(_, _, _, _) ->
-        {ok, #acc{state = r_met, q_reply = not_found}}
-    end),
-    MissingRsp1 = fabric_doc_open:go("test", "one", [doc_info]),
-    ?assertEqual({not_found, missing}, MissingRsp1),
-    MissingRsp2 = fabric_doc_open:go("test", "one", [{doc_info, full}]),
-    ?assertEqual({not_found, missing}, MissingRsp2),
+        Rsp2 = fabric_doc_open:go("test", "one", [{doc_info, full}]),
+        ?assertEqual({error, quorum_not_met}, Rsp2),
 
-    meck:expect(fabric_util, recv, fun(_, _, _, _) ->
-        A = #doc_info{},
-        {ok, #acc{state = r_met, q_reply = {ok, A}}}
-    end),
-    {ok, Rec1} = fabric_doc_open:go("test", "one", [doc_info]),
-    ?assert(is_record(Rec1, doc_info)),
+        meck:expect(fabric_util, recv, fun(_, _, _, _) ->
+            {ok, #acc{state = r_met, q_reply = not_found}}
+        end),
+        MissingRsp1 = fabric_doc_open:go("test", "one", [doc_info]),
+        ?assertEqual({not_found, missing}, MissingRsp1),
+        MissingRsp2 = fabric_doc_open:go("test", "one", [{doc_info, full}]),
+        ?assertEqual({not_found, missing}, MissingRsp2),
 
-    meck:expect(fabric_util, recv, fun(_, _, _, _) ->
-        A = #full_doc_info{deleted = true},
-        {ok, #acc{state = r_met, q_reply = {ok, A}}}
-    end),
-    Rsp3 = fabric_doc_open:go("test", "one", [{doc_info, full}]),
-    ?assertEqual({not_found, deleted}, Rsp3),
-    {ok, Rec2} = fabric_doc_open:go("test", "one", [{doc_info, full},deleted]),
-    ?assert(is_record(Rec2, full_doc_info)),
+        meck:expect(fabric_util, recv, fun(_, _, _, _) ->
+            A = #doc_info{},
+            {ok, #acc{state = r_met, q_reply = {ok, A}}}
+        end),
+        {ok, Rec1} = fabric_doc_open:go("test", "one", [doc_info]),
+        ?assert(is_record(Rec1, doc_info)),
 
-    meck:unload([mem3, rexi_monitor, fabric_util]),
-    stop_meck_().
+        meck:expect(fabric_util, recv, fun(_, _, _, _) ->
+            A = #full_doc_info{deleted = true},
+            {ok, #acc{state = r_met, q_reply = {ok, A}}}
+        end),
+        Rsp3 = fabric_doc_open:go("test", "one", [{doc_info, full}]),
+        ?assertEqual({not_found, deleted}, Rsp3),
+        {ok, Rec2} = fabric_doc_open:go("test", "one", [{doc_info, full},deleted]),
+        ?assert(is_record(Rec2, full_doc_info))
+    end).
 
-start_meck_() ->
-    meck:new([couch_log, rexi, fabric, couch_stats]).
-
-stop_meck_() ->
-    meck:unload([couch_log, rexi, fabric, couch_stats]).
+-endif.

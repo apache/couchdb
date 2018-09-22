@@ -141,12 +141,10 @@ update(Idx, Mod, IdxState) ->
         DbUpdateSeq = couch_db:get_update_seq(Db),
         DbCommittedSeq = couch_db:get_committed_update_seq(Db),
 
-        PurgedIdxState = case purge_index(Db, Mod, IdxState) of
-            {ok, IdxState0} -> IdxState0;
-            reset -> exit({reset, self()})
-        end,
-
-        NumChanges = couch_db:count_changes_since(Db, CurrSeq),
+        NumUpdateChanges = couch_db:count_changes_since(Db, CurrSeq),
+        NumPurgeChanges = count_pending_purged_docs_since(Db, Mod, IdxState),
+        TotalChanges = NumUpdateChanges + NumPurgeChanges,
+        {ok, PurgedIdxState} = purge_index(Db, Mod, IdxState),
 
         GetSeq = fun
             (#full_doc_info{update_seq=Seq}) -> Seq;
@@ -185,8 +183,13 @@ update(Idx, Mod, IdxState) ->
                     {ok, {NewSt, true}}
             end
         end,
+        {ok, InitIdxState} = Mod:start_update(
+                Idx,
+                PurgedIdxState,
+                TotalChanges,
+                NumPurgeChanges
+            ),
 
-        {ok, InitIdxState} = Mod:start_update(Idx, PurgedIdxState, NumChanges),
         Acc0 = {InitIdxState, true},
         {ok, Acc} = couch_db:fold_changes(Db, CurrSeq, Proc, Acc0, []),
         {ProcIdxSt, SendLast} = Acc,
@@ -206,14 +209,29 @@ update(Idx, Mod, IdxState) ->
 
 
 purge_index(Db, Mod, IdxState) ->
-    {ok, DbPurgeSeq} = couch_db:get_purge_seq(Db),
+    DbPurgeSeq = couch_db:get_purge_seq(Db),
     IdxPurgeSeq = Mod:get(purge_seq, IdxState),
-    if
-        DbPurgeSeq == IdxPurgeSeq ->
-            {ok, IdxState};
-        DbPurgeSeq == IdxPurgeSeq + 1 ->
-            {ok, PurgedIdRevs} = couch_db:get_last_purged(Db),
-            Mod:purge(Db, DbPurgeSeq, PurgedIdRevs, IdxState);
-        true ->
-            reset
+    if IdxPurgeSeq == DbPurgeSeq -> {ok, IdxState}; true ->
+        FoldFun = fun({PurgeSeq, _UUId, Id, Revs}, Acc) ->
+            Mod:purge(Db, PurgeSeq, [{Id, Revs}], Acc)
+        end,
+        {ok, NewStateAcc} = try
+            couch_db:fold_purge_infos(
+                    Db,
+                    IdxPurgeSeq,
+                    FoldFun,
+                    IdxState,
+                    []
+                )
+        catch error:{invalid_start_purge_seq, _} ->
+            exit({reset, self()})
+        end,
+        Mod:update_local_purge_doc(Db, NewStateAcc),
+        {ok, NewStateAcc}
     end.
+
+
+count_pending_purged_docs_since(Db, Mod, IdxState) ->
+    DbPurgeSeq = couch_db:get_purge_seq(Db),
+    IdxPurgeSeq = Mod:get(purge_seq, IdxState),
+    DbPurgeSeq - IdxPurgeSeq.

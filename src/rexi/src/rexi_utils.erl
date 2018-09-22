@@ -81,6 +81,8 @@ process_message(RefList, Keypos, Fun, Acc0, TimeoutRef, PerMsgTO) ->
         Worker ->
             Fun(Msg, {Worker, From}, Acc0)
         end;
+    {rexi, '$rexi_ping'} ->
+        {ok, Acc0};
     {Ref, Msg} ->
         case lists:keyfind(Ref, Keypos, RefList) of
         false ->

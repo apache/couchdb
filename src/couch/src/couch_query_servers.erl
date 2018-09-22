@@ -171,7 +171,8 @@ builtin_reduce(_Re, [], _KVs, Acc) ->
     {ok, lists:reverse(Acc)};
 builtin_reduce(Re, [<<"_sum",_/binary>>|BuiltinReds], KVs, Acc) ->
     Sum = builtin_sum_rows(KVs, 0),
-    builtin_reduce(Re, BuiltinReds, KVs, [Sum|Acc]);
+    Red = check_sum_overflow(?term_size(KVs), ?term_size(Sum), Sum),
+    builtin_reduce(Re, BuiltinReds, KVs, [Red|Acc]);
 builtin_reduce(reduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
     Count = length(KVs),
     builtin_reduce(reduce, BuiltinReds, KVs, [Count|Acc]);
@@ -246,6 +247,30 @@ sum_arrays([X|Xs], [Y|Ys]) when is_number(X), is_number(Y) ->
     [X+Y | sum_arrays(Xs,Ys)];
 sum_arrays(Else, _) ->
     throw_sum_error(Else).
+
+check_sum_overflow(InSize, OutSize, Sum) ->
+    Overflowed = OutSize > 4906 andalso OutSize * 2 > InSize,
+    case config:get("query_server_config", "reduce_limit", "true") of
+        "true" when Overflowed ->
+            Msg = log_sum_overflow(InSize, OutSize),
+            {[
+                {<<"error">>, <<"builtin_reduce_error">>},
+                {<<"reason">>, Msg}
+            ]};
+        "log" when Overflowed ->
+            log_sum_overflow(InSize, OutSize),
+            Sum;
+        _ ->
+            Sum
+    end.
+
+log_sum_overflow(InSize, OutSize) ->
+    Fmt = "Reduce output must shrink more rapidly: "
+            "input size: ~b "
+            "output size: ~b",
+    Msg = iolist_to_binary(io_lib:format(Fmt, [InSize, OutSize])),
+    couch_log:error(Msg, []),
+    Msg.
 
 builtin_stats(_, []) ->
     {0, 0, 0, 0, 0};

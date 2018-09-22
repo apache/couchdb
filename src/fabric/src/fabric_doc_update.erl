@@ -37,7 +37,8 @@ go(DbName, AllDocs0, Opts) ->
         dict:new()},
     Timeout = fabric_util:request_timeout(),
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc0, infinity, Timeout) of
-    {ok, {Health, Results}} when Health =:= ok; Health =:= accepted ->
+    {ok, {Health, Results}}
+            when Health =:= ok; Health =:= accepted; Health =:= error ->
         {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
     {timeout, Acc} ->
         {_, _, W1, GroupedDocs1, DocReplDict} = Acc,
