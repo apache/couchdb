@@ -43,14 +43,14 @@ check_refresh_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        {with, [
-            fun refresh_ddoc/1,
-            fun refresh_ddoc_rev/1,
-            fun refresh_vdu/1,
-            fun refresh_custom/1,
-            fun refresh_multiple/1,
-            fun check_upgrade_clause/1
-        ]}
+        ddoc_cache_tutil:with([
+            {"refresh_ddoc", fun refresh_ddoc/1},
+            {"refresh_ddoc_rev", fun refresh_ddoc_rev/1},
+            {"refresh_vdu", fun refresh_vdu/1},
+            {"refresh_custom", fun refresh_custom/1},
+            {"refresh_multiple", fun refresh_multiple/1},
+            {"check_upgrade_clause", fun check_upgrade_clause/1}
+        ])
     }.
 
 

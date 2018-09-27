@@ -43,15 +43,15 @@ check_basic_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        {with, [
-            fun cache_ddoc/1,
-            fun cache_ddoc_rev/1,
-            fun cache_vdu/1,
-            fun cache_custom/1,
-            fun cache_ddoc_refresher_unchanged/1,
-            fun dont_cache_not_found/1,
-            fun deprecated_api_works/1
-        ]}
+        ddoc_cache_tutil:with([
+            {"cache_ddoc", fun cache_ddoc/1},
+            {"cache_ddoc_rev", fun cache_ddoc_rev/1},
+            {"cache_vdu", fun cache_vdu/1},
+            {"cache_custom", fun cache_custom/1},
+            {"cache_ddoc_refresher_unchanged", fun cache_ddoc_refresher_unchanged/1},
+            {"dont_cache_not_found", fun dont_cache_not_found/1},
+            {"deprecated_api_works", fun deprecated_api_works/1}
+        ])
     }.
 
 
@@ -60,10 +60,10 @@ check_no_vdu_test_() ->
         setup,
         fun() -> ddoc_cache_tutil:start_couch([{write_ddocs, false}]) end,
         fun ddoc_cache_tutil:stop_couch/1,
-        {with, [
-            fun cache_no_vdu_no_ddoc/1,
-            fun cache_no_vdu_empty_ddoc/1
-        ]}
+        ddoc_cache_tutil:with([
+            {"cache_no_vdu_no_ddoc", fun cache_no_vdu_no_ddoc/1},
+            {"cache_no_vdu_empty_ddoc", fun cache_no_vdu_empty_ddoc/1}
+        ])
     }.
 
 

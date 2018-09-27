@@ -36,9 +36,9 @@ check_open_error_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        {with, [
-            fun handle_open_error/1
-        ]}
+        ddoc_cache_tutil:with([
+            {"handle_open_error", fun handle_open_error/1}
+        ])
     }.
 
 

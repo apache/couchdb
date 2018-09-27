@@ -46,15 +46,15 @@ check_entry_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        {with, [
-            fun cancel_and_replace_opener/1,
-            fun condenses_access_messages/1,
-            fun kill_opener_on_terminate/1,
-            fun evict_when_not_accessed/1,
-            fun open_dead_entry/1,
-            fun handles_bad_messages/1,
-            fun handles_code_change/1
-        ]}
+        ddoc_cache_tutil:with([
+            {"cancel_and_replace_opener", fun cancel_and_replace_opener/1},
+            {"condenses_access_messages", fun condenses_access_messages/1},
+            {"kill_opener_on_terminate", fun kill_opener_on_terminate/1},
+            {"evict_when_not_accessed", fun evict_when_not_accessed/1},
+            {"open_dead_entry", fun open_dead_entry/1},
+            {"handles_bad_messages", fun handles_bad_messages/1},
+            {"handles_code_change", fun handles_code_change/1}
+        ])
     }.
 
 
