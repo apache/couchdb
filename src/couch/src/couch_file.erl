@@ -528,7 +528,7 @@ handle_info({'DOWN', Ref, process, _Pid, _Info}, #file{db_monitor=Ref}=File) ->
 
 format_status(_Opt, [PDict, #file{} = File]) ->
     {_Fd, FilePath} = couch_util:get_value(couch_file_fd, PDict),
-    [{data, [{"State", File}, {"InitialFilePath", FilePath}]}].
+    [{data, [{"State", File}, {initial_file_path, FilePath}]}].
 
 find_header(Fd, Block) ->
     case (catch load_header(Fd, Block)) of
