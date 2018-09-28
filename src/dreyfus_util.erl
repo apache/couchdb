@@ -22,6 +22,16 @@
 -export([get_shards/2, sort/2, upgrade/1, export/1, time/2]).
 -export([in_black_list/1, in_black_list/3, maybe_deny_index/3]).
 -export([get_design_docid/1]).
+-export([
+    ensure_local_purge_docs/2,
+    get_value_from_options/2,
+    get_local_purge_doc_id/1,
+    get_local_purge_doc_body/4,
+    maybe_create_local_purge_doc/2,
+    maybe_create_local_purge_doc/3,
+    get_signature_from_idxdir/1,
+    verify_index_exists/2
+]).
 
 get_shards(DbName, #index_query_args{stale=ok}) ->
     mem3:ushards(DbName);
@@ -196,7 +206,136 @@ maybe_deny_index(DbName, GroupId, IndexName) ->
     end.
 
 get_design_docid(#doc{id = <<"_design/", DesignName/binary>>}) ->
-  DesignName.
+    DesignName.
+
+get_value_from_options(Key, Options) ->
+    case couch_util:get_value(Key, Options) of
+        undefined ->
+            Reason = binary_to_list(Key) ++ " must exist in Options.",
+            throw({bad_request, Reason});
+        Value -> Value
+    end.
+
+ensure_local_purge_docs(DbName, DDocs) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        lists:foreach(fun(DDoc) ->
+            #doc{body = {Props}} = DDoc,
+            case couch_util:get_value(<<"indexes">>, Props) of
+                undefined -> false;
+                _ ->
+                    try dreyfus_index:design_doc_to_indexes(DDoc) of
+                        SIndexes -> ensure_local_purge_doc(Db, SIndexes)
+                    catch _:_ ->
+                        ok
+                    end
+            end
+        end, DDocs)
+    end).
+
+ensure_local_purge_doc(Db, SIndexes) ->
+    if SIndexes =/= [] ->
+        lists:map(fun(SIndex) ->
+            maybe_create_local_purge_doc(Db, SIndex)
+        end, SIndexes);
+    true -> ok end.
+
+maybe_create_local_purge_doc(Db, Index) ->
+    DocId = dreyfus_util:get_local_purge_doc_id(Index#index.sig),
+    case couch_db:open_doc(Db, DocId) of
+        {not_found, _} ->
+            DbPurgeSeq = couch_db:get_purge_seq(Db),
+            DocContent = dreyfus_util:get_local_purge_doc_body(
+                Db, DocId, DbPurgeSeq, Index),
+            couch_db:update_doc(Db, DocContent, []);
+        _ ->
+            ok
+    end.
+
+maybe_create_local_purge_doc(Db, IndexPid, Index) ->
+    DocId = dreyfus_util:get_local_purge_doc_id(Index#index.sig),
+    case couch_db:open_doc(Db, DocId) of
+        {not_found, _} ->
+            DbPurgeSeq = couch_db:get_purge_seq(Db),
+            clouseau_rpc:set_purge_seq(IndexPid, DbPurgeSeq),
+            DocContent = dreyfus_util:get_local_purge_doc_body(
+                Db, DocId, DbPurgeSeq, Index),
+            couch_db:update_doc(Db, DocContent, []);
+        _ ->
+            ok
+    end.
+
+get_local_purge_doc_id(Sig) ->
+    ?l2b(?LOCAL_DOC_PREFIX ++ "purge-" ++ "dreyfus-" ++ Sig).
+
+get_signature_from_idxdir(IdxDir) ->
+    IdxDirList = filename:split(IdxDir),
+    Sig = lists:last(IdxDirList),
+    case [Ch || Ch <- Sig, not (((Ch >= $0) and (Ch =< $9))
+        orelse ((Ch >= $a) and (Ch =< $f))
+        orelse ((Ch >= $A) and (Ch =< $F)))] == [] of
+        true -> Sig;
+        false -> undefined
+    end.
+
+get_local_purge_doc_body(Db, LocalDocId, PurgeSeq, Index) ->
+    #index{
+        name = IdxName,
+        ddoc_id = DDocId,
+        sig = Sig
+    } = Index,
+    {Mega, Secs, _} = os:timestamp(),
+    NowSecs = Mega * 1000000 + Secs,
+    JsonList = {[
+        {<<"_id">>, LocalDocId},
+        {<<"purge_seq">>, PurgeSeq},
+        {<<"timestamp_utc">>, NowSecs},
+        {<<"indexname">>, IdxName},
+        {<<"ddoc_id">>, DDocId},
+        {<<"signature">>, Sig},
+        {<<"type">>, <<"dreyfus">>}
+    ]},
+    couch_doc:from_json_obj(JsonList).
+
+verify_index_exists(DbName, Props) ->
+    try
+        Type = couch_util:get_value(<<"type">>, Props),
+        if Type =/= <<"dreyfus">> -> false; true ->
+            DDocId = couch_util:get_value(<<"ddoc_id">>, Props),
+            IndexName = couch_util:get_value(<<"indexname">>, Props),
+            Sig = couch_util:get_value(<<"signature">>, Props),
+            couch_util:with_db(DbName, fun(Db) ->
+                {ok, DesignDocs} = couch_db:get_design_docs(Db),
+                case get_ddoc(DbName, DesignDocs, DDocId) of
+                    #doc{} = DDoc ->
+                        {ok, IdxState} = dreyfus_index:design_doc_to_index(
+                            DDoc, IndexName),
+                        IdxState#index.sig == Sig;
+                    not_found ->
+                        false
+                end
+            end)
+        end
+    catch _:_ ->
+      false
+    end.
+
+get_ddoc(<<"shards/", _/binary>> = _DbName, DesignDocs, DDocId) ->
+    DDocs = [couch_doc:from_json_obj(DD) || DD <- DesignDocs],
+    case lists:keyfind(DDocId, #doc.id, DDocs) of
+        #doc{} = DDoc -> DDoc;
+        false -> not_found
+    end;
+get_ddoc(DbName, DesignDocs, DDocId) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        case lists:keyfind(DDocId, #full_doc_info.id, DesignDocs) of
+            #full_doc_info{} = DDocInfo ->
+                {ok, DDoc} = couch_db:open_doc_int(
+                    Db, DDocInfo, [ejson_body]),
+                 DDoc;
+            false ->
+                not_found
+        end
+    end).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

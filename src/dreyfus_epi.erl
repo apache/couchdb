@@ -19,7 +19,8 @@ app() ->
 
 providers() ->
     [
-         {chttpd_handlers, dreyfus_httpd_handlers}
+        {couch_db, dreyfus_plugin_couch_db},
+        {chttpd_handlers, dreyfus_httpd_handlers}
     ].
 
 
