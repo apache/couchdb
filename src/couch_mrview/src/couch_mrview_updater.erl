@@ -25,7 +25,6 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
     QueueOpts = [{max_size, MaxSize}, {max_items, MaxItems}],
     {ok, DocQueue} = couch_work_queue:new(QueueOpts),
     {ok, WriteQueue} = couch_work_queue:new(QueueOpts),
-
     InitState = State#mrst{
         first_build=State#mrst.update_seq==0,
         partial_resp_pid=Partial,
@@ -37,6 +36,8 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
     Self = self(),
 
     MapFun = fun() ->
+        erlang:put(io_priority,
+            {view_update, State#mrst.db_name, State#mrst.idx_name}),
         Progress = case NumChanges of
             0 -> 0;
             _ -> (NumChangesDone * 100) div NumChanges
@@ -53,8 +54,11 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
         couch_task_status:set_update_frequency(500),
         map_docs(Self, InitState)
     end,
-    WriteFun = fun() -> write_results(Self, InitState) end,
-
+    WriteFun = fun() ->
+        erlang:put(io_priority,
+            {view_update, State#mrst.db_name, State#mrst.idx_name}),
+        write_results(Self, InitState)
+    end,
     spawn_link(MapFun),
     spawn_link(WriteFun),
 
@@ -219,7 +223,6 @@ write_results(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State) ->
         stop ->
             Parent ! {new_state, State};
         {Go, {Seq, ViewKVs, DocIdKeys, Seqs, Log}} ->
-            erlang:put(io_priority, {view_update, DbName, IdxName}),
             NewState = write_kvs(State, Seq, ViewKVs, DocIdKeys, Seqs, Log),
             if Go == stop ->
                 Parent ! {new_state, NewState};

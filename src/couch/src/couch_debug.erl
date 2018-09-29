@@ -234,19 +234,17 @@ opened_files_contains(FileNameFragment) ->
         string:str(Path, FileNameFragment) > 0
     end, couch_debug:opened_files()).
 
+
 process_name(Pid) when is_pid(Pid) ->
-    case process_info(Pid, registered_name) of
-        {registered_name, Name} ->
+    Info = process_info(Pid, [registered_name, dictionary, initial_call]),
+    case Info of
+        undefined ->
+            iolist_to_list(io_lib:format("[~p]", [Pid]));
+        [{registered_name, Name} | _] when Name =/= [] ->
             iolist_to_list(io_lib:format("~s[~p]", [Name, Pid]));
-        _ ->
-            {dictionary, Dict} = process_info(Pid, dictionary),
-            case proplists:get_value('$initial_call', Dict) of
-                undefined ->
-                    {initial_call, {M, F, A}} = process_info(Pid, initial_call),
-                    iolist_to_list(io_lib:format("~p:~p/~p[~p]", [M, F, A, Pid]));
-                {M, F, A} ->
-                    iolist_to_list(io_lib:format("~p:~p/~p[~p]", [M, F, A, Pid]))
-            end
+        [_, {dictionary, Dict}, {initial_call, MFA}] ->
+            {M, F, A} = proplists:get_value('$initial_call', Dict, MFA),
+            iolist_to_list(io_lib:format("~p:~p/~p[~p]", [M, F, A, Pid]))
     end;
 process_name(Else) ->
     iolist_to_list(io_lib:format("~p", [Else])).
