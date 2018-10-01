@@ -481,7 +481,7 @@ get_partition_info(#db{} = Db, Partition) when is_binary(Partition) ->
     Sizes = couch_db_engine:get_partition_info(Db, Partition),
     {ok, Sizes};
 get_partition_info(_Db, _Partition) ->
-    throw({badrequest, <<"`partition` is not valid">>}).
+    throw({bad_request, <<"`partition` is not valid">>}).
 
 
 get_design_docs(#db{name = <<"shards/", _:18/binary, DbName/binary>>}) ->

@@ -86,7 +86,13 @@ get_db_info(DbName) ->
 
 %% @doc returns the size of a given partition
 -spec get_partition_info(dbname(), Partition::binary()) ->
-    {ok, {partition_info, non_neg_integer()}}.
+    {ok, [
+        {db_name, binary()} |
+        {partition, binary()} |
+        {doc_count, non_neg_integer()} |
+        {doc_del_count, non_neg_integer()} |
+        {sizes, json_obj()}
+    ]}.
 get_partition_info(DbName, Partition) ->
     fabric_db_partition_info:go(dbname(DbName), Partition).
 

@@ -43,10 +43,10 @@
 -type epochs() :: [{Node::atom(), UpdateSeq::non_neg_integer()}].
 -type size_info() :: [{Name::atom(), Size::non_neg_integer()}].
 -type partition_info() :: [
-    {Partition::atom(), Partition::binary()} |
-    {DocCount::atom(), DocCount::non_neg_integer()} |
-    {DocDelCount::atom(), DocDelCount::non_neg_integer()} |
-    {Size::atom(), size_info()}
+    {partition, Partition::binary()} |
+    {doc_count, DocCount::non_neg_integer()} |
+    {doc_del_count, DocDelCount::non_neg_integer()} |
+    {sizes, size_info()}
 ].
 
 -type write_stream_options() :: [

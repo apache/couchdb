@@ -66,9 +66,7 @@ handle_message({ok, Sizes}, #shard{dbname=Name} = Shard, {Counters, Acc}) ->
         true ->
             [FirstInfo | RestInfos] = Acc2,
             PartitionInfo = get_max_partition_size(FirstInfo, RestInfos),
-            {stop, 
-             [{db_name, Name} | format_partition(PartitionInfo)]
-             };
+            {stop, [{db_name, Name} | format_partition(PartitionInfo)]};
         false ->
             {ok, {Counters1, Acc2}}
     end;
@@ -79,8 +77,8 @@ handle_message(_, _, Acc) ->
 get_max_partition_size(Max, []) ->
     Max;
 get_max_partition_size(MaxInfo, [NextInfo | Rest]) ->
-    {size, MaxSize} = lists:keyfind(size, 1, MaxInfo),
-    {size, NextSize} = lists:keyfind(size, 1, NextInfo),
+    {sizes, MaxSize} = lists:keyfind(sizes, 1, MaxInfo),
+    {sizes, NextSize} = lists:keyfind(sizes, 1, NextInfo),
 
     {external, MaxExtSize} = lists:keyfind(external, 1, MaxSize),
     {external, NextExtSize} = lists:keyfind(external, 1, NextSize),
@@ -95,6 +93,6 @@ get_max_partition_size(MaxInfo, [NextInfo | Rest]) ->
 % for JS to work nicely we need to convert the size list
 % to a jiffy object
 format_partition(PartitionInfo) ->
-    {value, {size, Size}, PartitionInfo1} = lists:keytake(size, 1, PartitionInfo),
-    [{size, {Size}} | PartitionInfo1].
+    {value, {sizes, Size}, PartitionInfo1} = lists:keytake(sizes, 1, PartitionInfo),
+    [{sizes, {Size}} | PartitionInfo1].
 
