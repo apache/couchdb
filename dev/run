@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
@@ -34,12 +34,12 @@ from pbkdf2 import pbkdf2_hex
 COMMON_SALT = uuid.uuid4().hex
 
 try:
-    from urllib import urlopen
+    from urllib.request import urlopen
 except ImportError:
     from urllib.request import urlopen
 
 try:
-    import httplib as httpclient
+    import http.client as httpclient
 except ImportError:
     import http.client as httpclient
 
@@ -58,7 +58,8 @@ def log(msg):
                 if log.verbose:
                     sys.stdout.write(chars)
                     sys.stdout.flush()
-            callargs = dict(list(zip(inspect.getargspec(func).args, args)))
+            argnames = list(inspect.signature(func).parameters.keys())
+            callargs = dict(list(zip(argnames, args)))
             callargs.update(kwargs)
             print_('[ * ] ' + msg.format(**callargs) + ' ... ')
             try:
@@ -365,7 +366,7 @@ def boot_nodes(ctx):
 
 
 def ensure_all_nodes_alive(ctx):
-    status = dict((num, False) for num in range(ctx['N']))
+    status = dict((num, False) for num in list(range(ctx['N'])))
     for _ in range(10):
         for num in range(ctx['N']):
             if status[num]:
