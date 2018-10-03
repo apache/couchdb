@@ -339,4 +339,4 @@ class BasicFindTests(mango.UserDocsTests):
             "_id": {"$gt": 0},
             "age": {"$gt": 0}
         }, sort=["_id"], explain=True)
-        self.assertEquals(explain["index"]["type"], "special")
+        self.assertEqual(explain["index"]["type"], "special")

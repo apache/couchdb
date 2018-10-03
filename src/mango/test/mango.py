@@ -67,7 +67,7 @@ class Database(object):
         return "{}/{}".format(self.root_url, self.dbname)
 
     def path(self, parts):
-        if isinstance(parts, ("".__class__, u"".__class__)):
+        if isinstance(parts, ("".__class__, "".__class__)):
             parts = [parts]
         return "/".join([self.url] + parts)
 
