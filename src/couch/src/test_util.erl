@@ -34,6 +34,7 @@
 -export([wait/1, wait/2, wait/3]).
 
 -export([start/1, start/2, start/3, stop/1]).
+-export([maybe_configure_file_logger/0]).
 
 -export([fake_db/1]).
 
@@ -77,6 +78,7 @@ start_couch(IniFiles, ExtraApps) ->
     ok = application:set_env(config, ini_files, IniFiles),
     Apps = start_applications(?DEFAULT_APPS ++ ExtraApps),
     ok = config:delete("compactions", "_default", false),
+    maybe_configure_file_logger(),
     #test_context{started = Apps}.
 
 stop_couch() ->
@@ -86,6 +88,20 @@ stop_couch(#test_context{started = Apps}) ->
     stop_applications(Apps);
 stop_couch(_) ->
     stop_couch().
+
+maybe_configure_file_logger() ->
+    case {os:getenv("EUNIT_LOG_FILE"), os:getenv("EUNIT_LOG_LEVEL")} of
+        {false, _} ->
+            ok;
+        {FilePath, Value} ->
+            Level = if Value == false -> "info"; true -> Value end,
+            LogFile = case filename:pathtype(FilePath) of absolute -> FilePath;
+                _ -> filename:absname(FilePath, ?BUILDDIR()) end,
+            ok = config:set("log", "writer", "file", false),
+            ok = config:set("log", "file", LogFile, false),
+            ok = config:set("log", "level", Level, false),
+            ok
+    end.
 
 start_applications(Apps) ->
     StartOrder = calculate_start_order(Apps),
