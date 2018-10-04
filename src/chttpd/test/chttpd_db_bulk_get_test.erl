@@ -14,6 +14,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include("couch/src/couch_db_int.hrl").
 
 -define(TIMEOUT, 3000).
 
@@ -26,6 +27,7 @@ setup() ->
     mock(couch_stats),
     mock(fabric),
     mock(mochireq),
+    mock(mem3),
     Pid = spawn_accumulator(),
     Pid.
 
@@ -38,7 +40,8 @@ teardown(Pid) ->
     meck:unload(couch_httpd),
     meck:unload(couch_stats),
     meck:unload(fabric),
-    meck:unload(mochireq).
+    meck:unload(mochireq),
+    meck:unload(mem3).
 
 
 bulk_get_test_() ->
@@ -95,7 +98,8 @@ should_get_doc_with_all_revs(Pid) ->
     DocRevB = #doc{id = DocId, body = {[{<<"_rev">>, <<"1-CDE">>}]}},
 
     mock_open_revs(all, {ok, [{ok, DocRevA}, {ok, DocRevB}]}),
-    chttpd_db:db_req(Req, nil),
+    Db = fake_db(),
+    chttpd_db:db_req(Req, Db),
 
     [{Result}] = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
@@ -115,7 +119,8 @@ should_validate_doc_with_bad_id(Pid) ->
     DocId = <<"_docudoc">>,
 
     Req = fake_request(DocId),
-    chttpd_db:db_req(Req, nil),
+    Db = fake_db(),
+    chttpd_db:db_req(Req, Db),
 
     [{Result}] = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
@@ -138,7 +143,8 @@ should_validate_doc_with_bad_rev(Pid) ->
     Rev = <<"revorev">>,
 
     Req = fake_request(DocId, Rev),
-    chttpd_db:db_req(Req, nil),
+    Db = fake_db(),
+    chttpd_db:db_req(Req, Db),
 
     [{Result}] = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
@@ -162,7 +168,8 @@ should_validate_missing_doc(Pid) ->
 
     Req = fake_request(DocId, Rev),
     mock_open_revs([{1,<<"revorev">>}], {ok, []}),
-    chttpd_db:db_req(Req, nil),
+    Db = fake_db(),
+    chttpd_db:db_req(Req, Db),
 
     [{Result}] = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
@@ -186,7 +193,8 @@ should_validate_bad_atts_since(Pid) ->
 
     Req = fake_request(DocId, Rev, <<"badattsince">>),
     mock_open_revs([{1,<<"revorev">>}], {ok, []}),
-    chttpd_db:db_req(Req, nil),
+    Db = fake_db(),
+    chttpd_db:db_req(Req, Db),
 
     [{Result}] = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
@@ -210,10 +218,11 @@ should_include_attachments_when_atts_since_specified(_) ->
 
     Req = fake_request(DocId, Rev, [<<"1-abc">>]),
     mock_open_revs([{1,<<"revorev">>}], {ok, []}),
-    chttpd_db:db_req(Req, nil),
+    Db = fake_db(),
+    chttpd_db:db_req(Req, Db),
 
     ?_assert(meck:called(fabric, open_revs,
-                         [nil, DocId, [{1, <<"revorev">>}],
+                         [Db, DocId, [{1, <<"revorev">>}],
                           [{atts_since, [{1, <<"abc">>}]}, attachments]])).
 
 %% helpers
@@ -231,6 +240,10 @@ fake_request(DocId, Rev, AttsSince) ->
     fake_request({[{<<"docs">>, [{[{<<"id">>, DocId},
                                    {<<"rev">>, Rev},
                                    {<<"atts_since">>, AttsSince}]}]}]}).
+
+
+fake_db() ->
+    #db{name = <<"dbName">>}.
 
 
 mock_open_revs(RevsReq0, RevsResp) ->
@@ -276,6 +289,10 @@ mock(fabric) ->
 mock(config) ->
     ok = meck:new(config, [passthrough]),
     ok = meck:expect(config, get, fun(_, _, Default) -> Default end),
+    ok;
+mock(mem3) ->
+    ok = meck:new(mem3, [passthrough]),
+    ok = meck:expect(mem3, is_partitioned, 1, false),
     ok.
 
 

@@ -20,9 +20,11 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Args0 = couch_mrview_http:parse_params(Req, undefined),
     {ok, #mrst{views=Views}} = couch_mrview_util:ddoc_to_mrst(Db, DDoc),
     Args1 = couch_mrview_util:set_view_type(Args0, ViewName, Views),
+    % We don't support multi query in partitions
+    Args2 = couch_mrview_util:set_extra(Args1, partitioned, false),
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg = couch_mrview_http:parse_params(Query, undefined,
-            Args1, [decoded]),
+            Args2, [decoded]),
         QueryArg1 = couch_mrview_util:set_view_type(QueryArg, ViewName, Views),
         couch_mrview_util:validate_args(QueryArg1)
     end, Queries),
