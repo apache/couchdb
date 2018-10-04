@@ -395,7 +395,7 @@ cancel_read_pids(Pids) ->
         Args = #mrargs{
             start_key = null,
             end_key = null,
-            extra = [{partitioned, true}]
+            extra = [{partitioned, false}]
         },
         meck:expect(mem3, shards, fun(<<"db">>) -> [] end),
         shards(DbName, Args),

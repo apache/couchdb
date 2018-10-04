@@ -338,7 +338,9 @@ get_shards(DbName, #mrargs{} = Args) ->
         {false, true, undefined} ->
             mem3:shards(DbName);
         {false, true, Partition} ->
-            mem3:shards(DbName, Partition)
+            mem3:shards(DbName, Partition);
+        {false, undefined, _} ->
+            mem3:shards(DbName)
     end.
 
 % create a fake docid within the specified partition.

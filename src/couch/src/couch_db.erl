@@ -1139,7 +1139,11 @@ doc_tag(#doc{meta=Meta}) ->
 update_docs(Db, Docs0, Options, replicated_changes) ->
     increment_stat(Db, [couchdb, database_writes]),
     Docs = tag_docs(Docs0),
-    DocBuckets = before_docs_update(Db, group_alike_docs(Docs)),
+
+    % Separate _local docs from normal docs
+    {NonRepDocs, Docs2} = lists:partition(fun is_local/1, Docs),
+
+    DocBuckets = before_docs_update(Db, group_alike_docs(Docs2)),
 
     case (Db#db.validate_doc_funs /= []) orelse
         lists:any(
@@ -1160,7 +1164,7 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
     end,
     DocBuckets4 = [[doc_flush_atts(Db, check_dup_atts(Doc))
             || Doc <- Bucket] || Bucket <- DocBuckets3],
-    {ok, []} = write_and_commit(Db, DocBuckets4, [], [merge_conflicts | Options]),
+    {ok, _} = write_and_commit(Db, DocBuckets4, NonRepDocs, [merge_conflicts | Options]),
     {ok, DocErrors};
 
 update_docs(Db, Docs0, Options, interactive_edit) ->
@@ -1169,11 +1173,7 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
     Docs = tag_docs(Docs0),
 
     % Separate _local docs from normal docs
-    IsLocal = fun
-        (#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
-        (_) -> false
-    end,
-    {NonRepDocs, Docs2} = lists:partition(IsLocal, Docs),
+    {NonRepDocs, Docs2} = lists:partition(fun is_local/1, Docs),
 
     DocBuckets = before_docs_update(Db, group_alike_docs(Docs2)),
 
@@ -1226,6 +1226,11 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
             dict:fetch(doc_tag(Doc), ResultsDict)
         end, Docs)}
     end.
+
+is_local(#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) ->
+    true;
+is_local(_) ->
+    false.
 
 % Returns the first available document on disk. Input list is a full rev path
 % for the doc.
