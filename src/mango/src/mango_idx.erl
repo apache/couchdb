@@ -422,6 +422,7 @@ index(SelectorName, Selector) ->
            <<"Selected">>,<<"json">>,
            {[{<<"fields">>,{[{<<"location">>,<<"asc">>}]}},
              {SelectorName,{Selector}}]},
+           [],
            [{<<"def">>,{[{<<"fields">>,[<<"location">>]}]}}]
     }.
 
