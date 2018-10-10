@@ -1738,8 +1738,15 @@ validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
 is_systemdb(DbName) when is_list(DbName) ->
     is_systemdb(?l2b(DbName));
 is_systemdb(DbName) when is_binary(DbName) ->
-    lists:member(dbname_suffix(DbName), ?SYSTEM_DATABASES).
-
+    Normalized = normalize_dbname(DbName),
+    Suffix = filename:basename(Normalized),
+    case {filename:dirname(Normalized), lists:member(Suffix, ?SYSTEM_DATABASES)} of
+        {<<".">>, Result} -> Result;
+        {Prefix, false} -> false;
+        {Prefix, true} ->
+            ReOpts =  [{capture,none}, dollar_endonly],
+            re:run(Prefix, ?DBNAME_REGEX, ReOpts) == match
+    end.
 
 set_design_doc_keys(Options1) ->
     Dir = case lists:keyfind(dir, 1, Options1) of
@@ -1831,7 +1838,9 @@ validate_dbname_fail_test_() ->
     Cases = generate_cases("_long/co$mplex-/path+/_something")
        ++ generate_cases("_something")
        ++ generate_cases_with_shards("long/co$mplex-/path+/_something#")
-       ++ generate_cases_with_shards("long/co$mplex-/path+/some.thing"),
+       ++ generate_cases_with_shards("long/co$mplex-/path+/some.thing")
+       ++ generate_cases("!abcdefg/werwej/_users")
+       ++ generate_cases_with_shards("!abcdefg/werwej/_users"),
     {
         foreach, fun setup/0, fun teardown/1,
         [should_fail_validate_dbname(A) || {_, A} <- Cases]
