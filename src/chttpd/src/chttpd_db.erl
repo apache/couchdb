@@ -523,6 +523,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
         false -> throw({bad_request, "Exceeded maximum number of revisions."});
         true -> ok
     end,
+    couch_stats:increment_counter([couchdb, document_purges, total], length(IdsRevs2)),
     {ok, Results} = fabric:purge_docs(Db, IdsRevs2, Options),
     {Code, Json} = purge_results_to_json(IdsRevs2, Results),
     send_json(Req, Code, {[{<<"purge_seq">>, null}, {<<"purged">>, {Json}}]});
@@ -1027,14 +1028,17 @@ purge_results_to_json([], []) ->
     {201, []};
 purge_results_to_json([{DocId, _Revs} | RIn], [{ok, PRevs} | ROut]) ->
     {Code, Results} = purge_results_to_json(RIn, ROut),
+    couch_stats:increment_counter([couchdb, document_purges, success]),
     {Code, [{DocId, couch_doc:revs_to_strs(PRevs)} | Results]};
 purge_results_to_json([{DocId, _Revs} | RIn], [{accepted, PRevs} | ROut]) ->
     {Code, Results} = purge_results_to_json(RIn, ROut),
+    couch_stats:increment_counter([couchdb, document_purges, success]),
     NewResults = [{DocId, couch_doc:revs_to_strs(PRevs)} | Results],
     {erlang:max(Code, 202), NewResults};
 purge_results_to_json([{DocId, _Revs} | RIn], [Error | ROut]) ->
     {Code, Results} = purge_results_to_json(RIn, ROut),
     {NewCode, ErrorStr, Reason} = chttpd:error_info(Error),
+    couch_stats:increment_counter([couchdb, document_purges, failure]),
     NewResults = [{DocId, {[{error, ErrorStr}, {reason, Reason}]}} | Results],
     {erlang:max(NewCode, Code), NewResults}.
 
