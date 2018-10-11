@@ -178,6 +178,7 @@ handle_dbs_info_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
 handle_task_status_req(#httpd{method='GET'}=Req) ->
+    ok = chttpd:verify_is_server_admin(Req),
     {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),
     Response = lists:flatmap(fun({Node, Tasks}) ->
         [{[{node,Node} | Task]} || Task <- Tasks]
