@@ -482,8 +482,9 @@ db_req(#httpd{method='POST', path_parts=[_, <<"_bulk_get">>]}=Req, Db) ->
             throw({bad_request, <<"Missing JSON list of 'docs'.">>});
         Docs ->
             #doc_query_args{
-                options = Options
+                options = Options0
             } = bulk_get_parse_doc_query(Req),
+            Options = [{user_ctx, Req#httpd.user_ctx} | Options0],
 
             {ok, Resp} = start_json_response(Req, 200),
             send_chunk(Resp, <<"{\"results\": [">>),
