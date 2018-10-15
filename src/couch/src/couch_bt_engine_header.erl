@@ -234,8 +234,8 @@ upgrade_disk_version(#db_header{}=Header) ->
         2 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
         3 -> throw({database_disk_version_error, ?OLD_DISK_VERSION_ERROR});
         4 -> Header#db_header{security_ptr = nil}; % [0.10 - 0.11)
-        5 -> Header; % pre 1.2
-        6 -> Header; % pre clustered purge
+        5 -> Header#db_header{disk_version = ?LATEST_DISK_VERSION}; % pre 1.2
+        6 -> Header#db_header{disk_version = ?LATEST_DISK_VERSION}; % pre clustered purge
         ?LATEST_DISK_VERSION -> Header;
         _ ->
             Reason = "Incorrect disk header version",
