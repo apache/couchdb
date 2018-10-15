@@ -614,18 +614,18 @@ read_raw_iolist_int(Fd, {Pos, _Size}, Len) -> % 0110 UPGRADE CODE
 read_raw_iolist_int(#file{fd = Fd, pread_limit = Limit} = F, Pos, Len) ->
     BlockOffset = Pos rem ?SIZE_BLOCK,
     TotalBytes = calculate_total_read_len(BlockOffset, Len),
-    case Pos + TotalBytes of
-    Size when Size > F#file.eof ->
-        couch_stats:increment_counter([pread, exceed_eof]),
-        {_Fd, Filepath} = get(couch_file_fd),
-        throw({read_beyond_eof, Filepath});
-    Size when Size > Limit ->
-        couch_stats:increment_counter([pread, exceed_limit]),
-        {_Fd, Filepath} = get(couch_file_fd),
-        throw({exceed_pread_limit, Filepath, Limit});
-    Size ->
-        {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
-        {remove_block_prefixes(BlockOffset, RawBin), Size}
+    if
+        (Pos + TotalBytes) > F#file.eof ->
+            couch_stats:increment_counter([pread, exceed_eof]),
+            {_Fd, Filepath} = get(couch_file_fd),
+            throw({read_beyond_eof, Filepath});
+        TotalBytes > Limit ->
+            couch_stats:increment_counter([pread, exceed_limit]),
+            {_Fd, Filepath} = get(couch_file_fd),
+            throw({exceed_pread_limit, Filepath, Limit});
+        true ->
+            {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
+            {remove_block_prefixes(BlockOffset, RawBin), Pos + TotalBytes}
     end.
 
 -spec extract_md5(iolist()) -> {binary(), iolist()}.
