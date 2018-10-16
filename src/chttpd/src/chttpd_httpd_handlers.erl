@@ -12,7 +12,7 @@
 
 -module(chttpd_httpd_handlers).
 
--export([url_handler/1, db_handler/1, design_handler/1, partition_design_handler/1]).
+-export([url_handler/1, db_handler/1, design_handler/1, partition_design_handler/1, partition_handler/1]).
 
 url_handler(<<>>)                  -> fun chttpd_misc:handle_welcome_req/1;
 url_handler(<<"favicon.ico">>)     -> fun chttpd_misc:handle_favicon_req/1;
@@ -47,3 +47,5 @@ design_handler(_) -> no_match.
 
 partition_design_handler(<<"_view">>) -> fun chttpd_view:handle_partition_view_req/4;
 partition_design_handler(_) -> no_match.
+
+partition_handler(_) -> no_match.

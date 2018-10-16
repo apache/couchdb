@@ -151,8 +151,8 @@ check_partition_restrictions(#mrargs{} = Args) ->
         {<<"stable">>, Args#mrargs.stable, true},
         {<<"conflicts">>, Args#mrargs.conflicts, true}
     ],
-    lists:foreach(fun ({Param, Field, Value}) ->
-        case Field =:= Value of
+    lists:foreach(fun ({Param, ArgValue, RestrictedValue}) ->
+        case ArgValue =:= RestrictedValue of
             true ->
                 Msg = [<<"`">>, Param, <<"=true` is not supported in this view.">>],
                 throw({bad_request, ?l2b(Msg)});
