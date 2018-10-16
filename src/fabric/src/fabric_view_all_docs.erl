@@ -138,8 +138,14 @@ go(DbName, _Options, Workers, QueryArgs, Callback, Acc0) ->
     end.
 
 shards(DbName, Args) ->
-    case couch_mrview_util:get_extra(Args, partitioned) of
-        true ->
+    case {couch_mrview_util:get_extra(Args, partitioned, false),
+        couch_mrview_util:get_extra(Args, partition, undefined)}  of
+        {false, _} ->
+            mem3:shards(DbName);
+        {true, undefined} ->
+            % This is an added in optimisation. If a user specifies a specific 
+            % partition in the startkey and endkey then it is possible to just choose the shards
+            % with that partition in it.
             StartKey = partition(Args#mrargs.start_key),
             EndKey = partition(Args#mrargs.end_key),
             case {StartKey, EndKey} of
@@ -148,16 +154,16 @@ shards(DbName, Args) ->
                 {_, _} ->
                     mem3:shards(DbName)
             end;
-        _ ->
-            mem3:shards(DbName)
+        {true, Partition} ->
+            mem3:shards(DbName, <<Partition/binary, ":foo">>)
     end.
 
-partition(undefined) ->
-    undefined;
-partition(null) ->
-    null;
+
 partition(Key) when is_binary(Key) ->
-    hd(binary:split(Key, <<":">>)).
+    hd(binary:split(Key, <<":">>));
+partition(_) ->
+    undefined.
+
 
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
     fabric_view:check_down_shards(State, NodeRef);

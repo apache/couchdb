@@ -79,12 +79,9 @@ get_usable_indexes(Db, Selector, Opts) ->
 
 filter_indexes_by_partitioned(false, Indexes, _PQ) ->
     Indexes;
-filter_indexes_by_partitioned(DbPartitioned, Indexes, PQ) ->
+filter_indexes_by_partitioned(true, Indexes, PQ) ->
     FilterFun = fun (Idx)->
-        PartitionedIdx = case lists:keyfind(partitioned, 1, Idx#idx.design_opts) of
-            {partitioned, PI} -> PI;
-            false -> DbPartitioned
-        end,
+        PartitionedIdx = couch_util:get_value(partitioned, Idx#idx.design_opts, true),
         filter_index_by_partitioned(Idx#idx.def, PartitionedIdx, PQ)
     end,
     lists:filter(FilterFun, Indexes).
@@ -148,9 +145,9 @@ validate_new(Idx, Db) ->
 
 
 validate_design_opts(Props) ->
-    case lists:keyfind(<<"options">>, 1, Props) of
-        {<<"options">>, {[{<<"partitioned">>, P}]}}
-            when is_boolean(P) ->
+    {Options} = couch_util:get_value(<<"options">>, Props, []),
+    case couch_util:get_value(<<"partitioned">>, Options) of
+        P when is_boolean(P) ->
             [{partitioned, P}];
         _ ->
             []
