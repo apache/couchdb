@@ -368,12 +368,12 @@ upgrade_v3_test() ->
 
 -endif.
 
-upgrade_v5_test() ->
+upgrade_v5_to_v7_test() ->
     Vsn5Header = mk_header(5),
     NewHeader = upgrade_disk_version(upgrade_tuple(Vsn5Header)),
 
     ?assert(is_record(NewHeader, db_header)),
-    ?assertEqual(5, disk_version(NewHeader)),
+    ?assertEqual(7, disk_version(NewHeader)),
 
     % Security ptr isn't changed for v5 headers
     ?assertEqual(bang, security_ptr(NewHeader)).
