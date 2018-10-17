@@ -149,14 +149,32 @@ version_method(Defs) ->
 getter(Source, Key, Data) ->
     D = couch_epi_codegen:format_term(Data),
     Src = atom_to_list(Source),
-    K = couch_epi_codegen:format_term(Key),
     couch_epi_codegen:scan(
-        "get(" ++ Src ++ ", " ++ K ++ ") ->" ++ D ++ ";").
+        "get(" ++ Src ++ ", " ++ format_key(Key) ++ ") ->" ++ D ++ ";").
 
 version(Source, Data) ->
     Src = atom_to_list(Source),
     VSN = couch_epi_util:hash(Data),
     couch_epi_codegen:scan("version(" ++ Src ++ ") ->" ++ VSN ++ ";").
+
+format_key(Key) when is_tuple(Key) ->
+    Parts = lists:map(fun format_key/1, tuple_to_list(Key)),
+    "{" ++ string:join(Parts, ",") ++ "}";
+format_key(Key) when is_list(Key) ->
+    case lists:reverse(Key) of
+        "*" ++ K -> "\"" ++ lists:reverse(K) ++ "\" ++ _";
+        _ -> couch_epi_codegen:format_term(Key)
+    end;
+format_key(Key) when is_binary(Key) andalso size(Key) > 0 ->
+    case binary:last(Key) of
+        $* ->
+            KeyList = binary_to_list(binary:part(Key, {0, size(Key) - 1})),
+            "<<\"" ++ KeyList ++ "\", _/binary>>";
+        _ ->
+            "<<\"" ++ binary_to_list(Key) ++ "\">>"
+    end;
+format_key(Key) ->
+    couch_epi_codegen:format_term(Key).
 
 %% ------------------------------------------------------------------
 %% Helper functions
