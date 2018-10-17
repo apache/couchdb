@@ -26,7 +26,7 @@ start_link() ->
 
 init([]) ->
     ok = couch_log_config:init(),
-    {ok, {{one_for_one, 1, 1}, children()}}.
+    {ok, {{one_for_one, 10, 10}, children()}}.
 
 
 children() ->
