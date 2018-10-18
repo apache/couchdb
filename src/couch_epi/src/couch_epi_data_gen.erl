@@ -205,8 +205,8 @@ defined_subscribers(Defs) ->
     [Source || {Source, _} <- Defs].
 
 fold_defs(Defs, Acc, Fun) ->
-    lists:foldl(fun({Source, SourceData}, Clauses) ->
-        lists:foldl(fun({Key, Data}, InAcc) ->
+    lists:foldr(fun({Source, SourceData}, Clauses) ->
+        lists:foldr(fun({Key, Data}, InAcc) ->
             Fun({Source, Key, Data}, InAcc)
         end, [], SourceData) ++ Clauses
     end, Acc, Defs).
