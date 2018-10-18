@@ -18,6 +18,7 @@
 -export([init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,handle_info/2]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("stdlib/include/assert.hrl").
 -include("couch_db_int.hrl").
 
 -define(IDLE_LIMIT_DEFAULT, 61000).
@@ -456,13 +457,13 @@ doc_tag(#doc{meta=Meta}) ->
         Else -> throw({invalid_doc_tag, Else})
     end.
 
-merge_rev_trees(_Limit, _Merge, [], [], AccNewInfos, AccRemoveSeqs, AccSeq) ->
-    {ok, lists:reverse(AccNewInfos), AccRemoveSeqs, AccSeq};
+merge_rev_trees(_Limit, _Merge, [], [], AccNewInfos, AccRemoveSeqs, AccSeq, PP) ->
+    {ok, lists:reverse(AccNewInfos), AccRemoveSeqs, AccSeq, PP};
 merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
-        [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq) ->
+        [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq, PP) ->
     erlang:put(last_id_merged, OldDocInfo#full_doc_info.id), % for debugging
     NewDocInfo0 = lists:foldl(fun({Client, NewDoc}, OldInfoAcc) ->
-        merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts)
+        merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts, PP)
     end, OldDocInfo, NewDocs),
     NewDocInfo1 = maybe_stem_full_doc_info(NewDocInfo0, Limit),
     % When MergeConflicts is false, we updated #full_doc_info.deleted on every
@@ -482,7 +483,7 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
     if NewDocInfo2 == OldDocInfo ->
         % nothing changed
         merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
-            AccNewInfos, AccRemoveSeqs, AccSeq);
+            AccNewInfos, AccRemoveSeqs, AccSeq, PP);
     true ->
         % We have updated the document, give it a new update_seq. Its
         % important to note that the update_seq on OldDocInfo should
@@ -496,10 +497,10 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
             _ -> [OldSeq | AccRemoveSeqs]
         end,
         merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
-            [NewDocInfo3|AccNewInfos], RemoveSeqs, AccSeq+1)
+            [NewDocInfo3|AccNewInfos], RemoveSeqs, AccSeq+1, PP)
     end.
 
-merge_rev_tree(OldInfo, NewDoc, Client, false)
+merge_rev_tree(OldInfo, NewDoc, Client, false, PP)
         when OldInfo#full_doc_info.deleted ->
     % We're recreating a document that was previously
     % deleted. To check that this is a recreation from
@@ -537,10 +538,21 @@ merge_rev_tree(OldInfo, NewDoc, Client, false)
                 {NewTree1, new_leaf} ->
                     % We changed the revision id so inform the caller
                     send_result(Client, NewDoc, {ok, {OldPos+1, NewRevId}}),
-                    OldInfo#full_doc_info{
+                    NewInfo = OldInfo#full_doc_info{
                         rev_tree = NewTree1,
                         deleted = false
-                    };
+                    },
+                    case check_overflow(NewInfo, OldInfo, PP) of
+                        true ->
+                            Partition = partition(OldInfo#full_doc_info.id),
+                            send_result(Client, NewDoc,
+                                {partition_overflow, Partition}),
+                            OldInfo;
+                        false ->
+                            % We changed the revision id so inform the caller
+                            send_result(Client, NewDoc, {ok, {OldPos+1, NewRevId}}),
+                            NewInfo
+                    end;
                 _ ->
                     throw(doc_recreation_failed)
             end;
@@ -548,7 +560,7 @@ merge_rev_tree(OldInfo, NewDoc, Client, false)
             send_result(Client, NewDoc, conflict),
             OldInfo
     end;
-merge_rev_tree(OldInfo, NewDoc, Client, false) ->
+merge_rev_tree(OldInfo, NewDoc, Client, false, PP) ->
     % We're attempting to merge a new revision into an
     % undeleted document. To not be a conflict we require
     % that the merge results in extending a branch.
@@ -558,10 +570,19 @@ merge_rev_tree(OldInfo, NewDoc, Client, false) ->
     NewDeleted = NewDoc#doc.deleted,
     case couch_key_tree:merge(OldTree, NewTree0) of
         {NewTree, new_leaf} when not NewDeleted ->
-            OldInfo#full_doc_info{
+            NewInfo = OldInfo#full_doc_info{
                 rev_tree = NewTree,
                 deleted = false
-            };
+            },
+            case check_overflow(NewInfo, OldInfo, PP) of
+                true ->
+                    Partition = partition(OldInfo#full_doc_info.id),
+                    send_result(Client, NewDoc,
+                        {partition_overflow, Partition}),
+                    OldInfo;
+                false ->
+                    NewInfo
+            end;
         {NewTree, new_leaf} when NewDeleted ->
             % We have to check if we just deleted this
             % document completely or if it was a conflict
@@ -574,13 +595,19 @@ merge_rev_tree(OldInfo, NewDoc, Client, false) ->
             send_result(Client, NewDoc, conflict),
             OldInfo
     end;
-merge_rev_tree(OldInfo, NewDoc, _Client, true) ->
+merge_rev_tree(OldInfo, NewDoc, _Client, true, _PP) ->
     % We're merging in revisions without caring about
     % conflicts. Most likely this is a replication update.
     OldTree = OldInfo#full_doc_info.rev_tree,
     NewTree0 = couch_doc:to_path(NewDoc),
     {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0),
     OldInfo#full_doc_info{rev_tree = NewTree}.
+
+check_overflow(#full_doc_info{} = _New, #full_doc_info{} = _Old, []) ->
+    false;
+check_overflow(#full_doc_info{} = New, #full_doc_info{} = Old, PP) ->
+    Partition = partition(New#full_doc_info.id),
+    lists:member(Partition, PP) andalso (estimate_size(New) >= estimate_size(Old)).
 
 maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
     case config:get_boolean("couchdb", "stem_interactive_updates", true) of
@@ -604,9 +631,20 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
         (Id, not_found) ->
             #full_doc_info{id=Id}
     end, Ids, OldDocLookups),
+
+    %% get the list of partitions that are at or above the size limit.
+    ProhibitedPartitions = case couch_db:is_partitioned(Db) of
+        true ->
+            Max = config:get_integer("couchdb", "max_partition_size", 10000000000),
+            Partitions = lists:usort([partition(Id) || Id <- Ids]),
+            [P || P <- Partitions, partition_size(Db, P) >= Max];
+        false ->
+            []
+    end,
+
     % Merge the new docs into the revision trees.
-    {ok, NewFullDocInfos, RemSeqs, _} = merge_rev_trees(RevsLimit,
-            MergeConflicts, DocsList, OldDocInfos, [], [], UpdateSeq),
+    {ok, NewFullDocInfos, RemSeqs, _, _} = merge_rev_trees(RevsLimit,
+        MergeConflicts, DocsList, OldDocInfos, [], [], UpdateSeq, ProhibitedPartitions),
 
     % Write out the document summaries (the bodies are stored in the nodes of
     % the trees, the attachments are already written to disk)
@@ -634,6 +672,40 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
 
     {ok, commit_data(Db1, not FullCommit), UpdatedDDocIds}.
 
+partition_size(#db{} = Db, Partition) ->
+    {ok, Info} = couch_db:get_partition_info(Db, Partition),
+    Sizes = couch_util:get_value(sizes, Info),
+    couch_util:get_value(external, Sizes).
+
+estimate_size(#full_doc_info{} = FDI) ->
+    #full_doc_info{rev_tree = RevTree} = FDI,
+    Fun = fun
+        (_Rev, Value, leaf, SizesAcc) ->
+            case Value of
+                #doc{} = Doc ->
+                    ExternalSize = get_meta_body_size(Value#doc.meta),
+                    {size_info, AttSizeInfo} =
+                        lists:keyfind(size_info, 1, Doc#doc.meta),
+                    Leaf = #leaf{
+                        sizes = #size_info{
+                            external = ExternalSize
+                        },
+                        atts = AttSizeInfo
+                    },
+                    add_sizes(leaf, Leaf, SizesAcc);
+                #leaf{} ->
+                    add_sizes(leaf, Value, SizesAcc)
+            end;
+        (_Rev, _Value, branch, SizesAcc) ->
+            SizesAcc
+    end,
+    {_FinalAS, FinalES, FinalAtts} = couch_key_tree:fold(Fun, {0, 0, []}, RevTree),
+    TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
+    FinalES + TotalAttSize.
+
+partition(Id) ->
+    [Partition | _] = binary:split(Id, <<":">>),
+    Partition.
 
 update_local_doc_revs(Docs) ->
     lists:map(fun({Client, NewDoc}) ->

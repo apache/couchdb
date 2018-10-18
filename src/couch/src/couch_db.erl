@@ -47,6 +47,7 @@
     get_revs_limit/1,
     get_security/1,
     get_props/1,
+    is_partitioned/1,
     get_update_seq/1,
     get_user_ctx/1,
     get_uuid/1,
@@ -739,6 +740,10 @@ set_prop(#db{main_pid=Pid}=Db, Key, Value) ->
     ok = gen_server:call(Pid, {set_prop, Key, Value}, infinity),
     {ok, _} = ensure_full_commit(Db),
     ok.
+
+is_partitioned(#db{} = Db) ->
+    Props = get_props(Db),
+    proplists:get_value(partitioned, Props) == true.
 
 set_user_ctx(#db{} = Db, UserCtx) ->
     {ok, Db#db{user_ctx = UserCtx}}.
