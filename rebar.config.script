@@ -52,7 +52,7 @@ DepDescs = [
 {b64url,           "b64url",           {tag, "1.0.1"}},
 {ets_lru,          "ets-lru",          {tag, "1.0.0"}},
 {khash,            "khash",            {tag, "1.0.1"}},
-{snappy,           "snappy",           {tag, "CouchDB-1.0.1"}},
+{snappy,           "snappy",           {tag, "CouchDB-1.0.2"}},
 {ioq,              "ioq",              {tag, "1.0.1"}},
 
 %% Non-Erlang deps
