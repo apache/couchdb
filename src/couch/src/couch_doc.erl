@@ -200,7 +200,7 @@ parse_revs(_) ->
 
 validate_docid(DocId, DbName) ->
     case DbName =:= ?l2b(config:get("mem3", "shards_db", "_dbs")) andalso
-        lists:member(DocId, ?SYSTEM_DATABASES) of
+        couch_db:is_system_db_name(DocId) of
         true ->
             ok;
         false ->
