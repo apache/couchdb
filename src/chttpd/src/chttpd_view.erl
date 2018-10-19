@@ -147,12 +147,12 @@ handle_partition_view_req(Req, _Db, _DDoc, _Pk) ->
 
 check_partition_restrictions(#mrargs{} = Args) ->
     Restrictions = [
-        {<<"include_docs">>, Args#mrargs.include_docs, true},
-        {<<"stable">>, Args#mrargs.stable, true},
-        {<<"conflicts">>, Args#mrargs.conflicts, true}
+        {<<"include_docs">>, Args#mrargs.include_docs},
+        {<<"stable">>, Args#mrargs.stable},
+        {<<"conflicts">>, Args#mrargs.conflicts}
     ],
-    lists:foreach(fun ({Param, ArgValue, RestrictedValue}) ->
-        case ArgValue =:= RestrictedValue of
+    lists:foreach(fun ({Param, ArgValue}) ->
+        case ArgValue =:= true of
             true ->
                 Msg = [<<"`">>, Param, <<"=true` is not supported in this view.">>],
                 throw({bad_request, ?l2b(Msg)});
