@@ -52,6 +52,7 @@ static const char USAGE_TEMPLATE[] =
     "              should not be enabled for production systems)\n"
     "  -S SIZE     specify that the runtime should allow at\n"
     "              most SIZE bytes of memory to be allocated\n"
+    "              default is 64 MiB\n"
     "  -u FILE     path to a .uri file containing the address\n"
     "              (or addresses) of one or more servers\n"
     "  --eval      Enable runtime code evaluation (dangerous!)\n"
