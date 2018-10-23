@@ -309,10 +309,35 @@ index_of(X, [X|_Rest], I) ->
 index_of(X, [_|Rest], I) ->
     index_of(X, Rest, I+1).
 
-get_shards(DbName, #mrargs{stable=true}) ->
-    mem3:ushards(DbName);
-get_shards(DbName, #mrargs{stable=false}) ->
-    mem3:shards(DbName).
+
+get_shards(DbName, #mrargs{} = Args) ->
+    Partitioned = couch_mrview_util:get_extra(Args, partitioned),
+    Partition = partition_docid(Args),
+    case {Args#mrargs.stable, Partitioned, Partition} of
+        {true, false, _} ->
+            mem3:ushards(DbName);
+        {true, true, undefined} ->
+            mem3:ushards(DbName);
+        {true, true, Partition} ->
+            mem3:ushards(DbName, Partition);
+        {false, false, _} ->
+            mem3:shards(DbName);
+        {false, true, undefined} ->
+            mem3:shards(DbName);
+        {false, true, Partition} ->
+            mem3:shards(DbName, Partition);
+        {false, undefined, _} ->
+            mem3:shards(DbName)
+    end.
+
+% create a fake docid within the specified partition.
+partition_docid(Args) ->
+    case couch_mrview_util:get_extra(Args, partition) of
+        undefined ->
+            undefined;
+        Partition when is_binary(Partition) ->
+            <<Partition/binary, ":foo">>
+    end.
 
 maybe_update_others(DbName, DDoc, ShardsInvolved, ViewName,
     #mrargs{update=lazy} = Args) ->

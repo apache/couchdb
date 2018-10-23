@@ -16,6 +16,7 @@
     n_val/2, q_val/1, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     shard_info/1, ensure_exists/1, open_db_doc/1]).
 -export([is_deleted/1, rotate_list/2]).
+-export([docid_hash/1, docid_hash/2]).
 
 %% do not use outside mem3.
 -export([build_ordered_shards/2, downcast/1]).
@@ -33,6 +34,27 @@ hash(Item) when is_binary(Item) ->
     erlang:crc32(Item);
 hash(Item) ->
     erlang:crc32(term_to_binary(Item)).
+
+docid_hash(DocId) when is_binary(DocId) ->
+    docid_hash(DocId, []).
+
+docid_hash(<<"_design/", _/binary>> = DocId, _Options) ->
+    erlang:crc32(DocId); % design docs are never placed by partition
+
+docid_hash(DocId, []) when is_binary(DocId) ->
+    docid_hash(DocId, [{partitioned, false}]);
+
+docid_hash(DocId, [{partitioned, false}]) when is_binary(DocId) ->
+    erlang:crc32(DocId);
+
+docid_hash(DocId, [{partitioned, true}]) when is_binary(DocId) ->
+    case binary:split(DocId, <<":">>) of
+        [Partition, _Rest] ->
+            erlang:crc32(Partition);
+        _ ->
+            throw({illegal_docid, <<"doc id must be of form partition:id">>})
+    end.
+
 
 name_shard(Shard) ->
     name_shard(Shard, "").
@@ -278,3 +300,61 @@ downcast(#ordered_shard{}=S) ->
       };
 downcast(Shards) when is_list(Shards) ->
     [downcast(Shard) || Shard <- Shards].
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+docid_hash_design_doc_test() ->
+    Id = <<"_design/ddoc">>,
+    Hash = docid_hash(Id),
+    ?assertEqual(Hash, erlang:crc32(Id)).
+
+docid_hash_doc_partition_false_test() ->
+    Id = <<"partitionkey:docid">>,
+    IdHash = erlang:crc32(Id),
+    Hash = docid_hash(Id),
+    ?assertEqual(Hash, IdHash),
+    Hash = docid_hash(Id, []),
+    ?assertEqual(Hash, IdHash).
+
+docid_hash_doc_partition_true_test() ->
+    Id = <<"partitionkey:doc:id">>,
+    Hash = docid_hash(Id, [{partitioned, true}]),
+    ?assertEqual(Hash, erlang:crc32(<<"partitionkey">>)).
+
+
+add_shards_by_node_adds_partition_prop_test() ->
+    DocProp = [
+    {<<"_id">>, <<"database-name">>},
+    {<<"_rev">>,<<"1-fb8e28457a6e0c49de1848b5e4a28238">>},
+    {<<"shard_suffix">>,".1533550200"},
+    {<<"changelog">>, [[<<"add">>,<<"00000000-1fffffff">>,<<"node1@127.0.0.1">>]]},
+    {<<"by_node">>, {[{<<"node1@127.0.0.1">>, [<<"00000000-1fffffff">>,<<"20000000-3fffffff">>]}]}},
+    {<<"by_range">>, {[{<<"00000000-1fffffff">>,[<<"node1@127.0.0.1">>]}]}},
+    {<<"options">>,{[{partitioned,true}]}}
+   ],
+
+    [ShardRange | _] = build_shards_by_node(<<"database-name">>, DocProp),
+    Opts = ShardRange#shard.opts,
+    Partitioned = lists:keyfind(partitioned, 1, Opts),
+    ?assertEqual(Partitioned, {partitioned, true}).
+
+    
+add_shards_by_range_adds_partition_prop_test() ->
+    DocProp = [
+    {<<"_id">>, <<"database-name">>},
+    {<<"_rev">>,<<"1-fb8e28457a6e0c49de1848b5e4a28238">>},
+    {<<"shard_suffix">>,".1533550200"},
+    {<<"changelog">>, [[<<"add">>,<<"00000000-1fffffff">>,<<"node1@127.0.0.1">>]]},
+    {<<"by_node">>, {[{<<"node1@127.0.0.1">>, [<<"00000000-1fffffff">>,<<"20000000-3fffffff">>]}]}},
+    {<<"by_range">>, {[{<<"00000000-1fffffff">>,[<<"node1@127.0.0.1">>]}]}},
+    {<<"options">>,{[{partitioned,true}]}}
+   ],
+
+    [ShardRange | _] = build_shards_by_range(<<"database-name">>, DocProp),
+    Opts = ShardRange#ordered_shard.opts,
+    Partitioned = lists:keyfind(partitioned, 1, Opts),
+    ?assertEqual(Partitioned, {partitioned, true}).
+
+-endif.

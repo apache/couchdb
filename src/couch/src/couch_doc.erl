@@ -16,7 +16,7 @@
 -export([from_json_obj/1, from_json_obj_validate/1]).
 -export([from_json_obj/2, from_json_obj_validate/2]).
 -export([to_json_obj/2, has_stubs/1, merge_stubs/2]).
--export([validate_docid/1, validate_docid/2, get_validate_doc_fun/1]).
+-export([validate_docid/1, validate_docid/2, validate_docid/3, get_validate_doc_fun/1]).
 -export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
 -export([doc_from_multi_part_stream/4]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
@@ -199,12 +199,30 @@ parse_revs(_) ->
 
 
 validate_docid(DocId, DbName) ->
-    case DbName =:= ?l2b(config:get("mem3", "shards_db", "_dbs")) andalso
-        lists:member(DocId, ?SYSTEM_DATABASES) of
+    validate_docid(DocId, DbName, []).
+
+validate_docid(DocId, DbName, Options) ->
+    SystemId = DbName =:= ?l2b(config:get("mem3", "shards_db", "_dbs")) andalso
+        lists:member(DocId, ?SYSTEM_DATABASES),
+    case SystemId of
         true ->
             ok;
         false ->
-            validate_docid(DocId)
+            Partitioned = couch_util:get_value(partitioned, Options, false),
+            case Partitioned of
+                true ->
+                    case binary:split(DocId, <<":">>) of
+                        [<<"_design/", _/binary>> | _Rest] ->
+                            validate_docid(DocId);
+                        [Partition, Rest] when Rest =/= <<>> ->
+                            ok = validate_docid(Partition),
+                            validate_docid(Rest);
+                        _ ->
+                            throw({illegal_docid, <<"doc id must be of form partition:id">>})
+                    end;
+                false ->
+                    validate_docid(DocId)
+            end
     end.
 
 validate_docid(<<"">>) ->

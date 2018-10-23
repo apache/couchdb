@@ -66,8 +66,22 @@ for_db(DbName, Options) ->
 for_docid(DbName, DocId) ->
     for_docid(DbName, DocId, []).
 
+%% This function performs one or two lookups now as it is not known
+%% ahead of time if the database is partitioned We first ask for the
+%% shards as if the database is not partitioned and then test the
+%% returned shards for a counter-indication that it was.  If so, we
+%% run the function again with the docid hash option enabled.
 for_docid(DbName, DocId, Options) ->
-    HashKey = mem3_util:hash(DocId),
+    Shards = for_docid(DbName, DocId, Options, [{partitioned, false}]),
+    case mem3:is_partitioned(Shards) of
+        true ->
+            for_docid(DbName, DocId, Options, [{partitioned, true}]);
+        false ->
+            Shards
+    end.
+
+for_docid(DbName, DocId, Options, HashOptions) ->
+    HashKey = mem3_util:docid_hash(DocId, HashOptions),
     ShardHead = #shard{
         dbname = DbName,
         range = ['$1', '$2'],
@@ -397,7 +411,8 @@ load_shards_from_db(ShardDb, DbName) ->
 
 load_shards_from_disk(DbName, DocId)->
     Shards = load_shards_from_disk(DbName),
-    HashKey = mem3_util:hash(DocId),
+    Options = [{partitioned, mem3:is_partitioned(Shards)}],
+    HashKey = mem3_util:docid_hash(DocId, Options),
     [S || S <- Shards, in_range(S, HashKey)].
 
 in_range(Shard, HashKey) ->
@@ -521,7 +536,6 @@ filter_shards_by_name(Name, Matches, [#shard{name=Name}=S|Ss]) ->
 filter_shards_by_name(Name, Matches, [_|Ss]) ->
     filter_shards_by_name(Name, Matches, Ss).
 
-
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -545,7 +559,9 @@ mem3_shards_test_() ->
             t_writer_does_not_delete_other_writers_for_same_shard(),
             t_spawn_writer_in_load_shards_from_db(),
             t_cache_insert_takes_new_update(),
-            t_cache_insert_ignores_stale_update_and_kills_worker()
+            t_cache_insert_ignores_stale_update_and_kills_worker(),
+            t_load_shards_from_disk_returns_correct_shard_for_partition(),
+            t_for_docid_returns_correct_shard_for_partition()
         ]
     }.
 
@@ -688,6 +704,70 @@ t_cache_insert_ignores_stale_update_and_kills_worker() ->
         ?assertEqual([], ets:tab2list(?SHARDS)),
         ?assertEqual([], ets:tab2list(?OPENERS))
     end).
+
+t_load_shards_from_disk_returns_correct_shard_for_partition() ->
+    ?_test(begin
+        Shards = [
+            #ordered_shard{
+                name = <<"shards/80000000-9fffffff/db1.1533630706">>,
+                node = 'node1@127.0.0.1',
+                dbname = <<"db1">>,
+                range = [2147483648,2684354559],
+                ref = undefined,
+                order = 1,
+                opts = [{partitioned,true}]
+            }
+        ],
+        DbName = <<"db1">>,
+        DocId = <<"foo:123">>,
+        Doc = #doc{body = {[]}},
+        meck:expect(couch_db, open_doc, 3, {ok, Doc}),
+        meck:expect(couch_db, get_update_seq, 1, 1),
+        meck:expect(mem3_util, build_ordered_shards, 2, Shards),
+        meck:expect(mem3_util, ensure_exists, 1, {ok, <<"shard-name">>}),
+        meck:expect(couch_db, close, 1, ok),
+
+        [Shard] = load_shards_from_disk(DbName, DocId),
+
+        meck:validate(couch_db),
+        meck:validate(mem3_util),
+
+        ShardName = Shard#ordered_shard.name,
+        ?assertEqual(ShardName, <<"shards/80000000-9fffffff/db1.1533630706">>)
+    end).
+
+t_for_docid_returns_correct_shard_for_partition() ->
+        ?_test(begin
+            Shards = [
+                #ordered_shard{
+                    name = <<"shards/60000000-7fffffff/db1.1533630706">>,
+                    node = 'node1@127.0.0.1',
+                    dbname = <<"db1">>,
+                    range = [1610612736,2147483647],
+                    ref = undefined,
+                    order = 1,
+                    opts = [{partitioned,true}]
+                },
+                #ordered_shard{
+                    name = <<"shards/80000000-9fffffff/db1.1533630706">>,
+                    node = 'node1@127.0.0.1',
+                    dbname = <<"db1">>,
+                    range = [2147483648,2684354559],
+                    ref = undefined,
+                    order = 1,
+                    opts = [{partitioned,true}]
+                }
+            ],
+            DbName = <<"db1">>,
+            DocId = <<"foo:123">>,
+
+            true = ets:insert(?SHARDS, Shards),
+
+            [Shard] = for_docid(DbName, DocId, [ordered]),
+    
+            ShardName = Shard#ordered_shard.name,
+            ?assertEqual(ShardName, <<"shards/80000000-9fffffff/db1.1533630706">>)
+        end).
 
 
 mock_state(UpdateSeq) ->

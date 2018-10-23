@@ -15,6 +15,7 @@
 -export([start/2, stop/1]).
 
 start(_Type, StartArgs) ->
+    config:enable_feature(partitions),
     mango_sup:start_link(StartArgs).
 
 stop(_State) ->

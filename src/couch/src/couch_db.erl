@@ -122,7 +122,9 @@
     validate_dbname/1,
 
     make_doc/5,
-    new_revid/1
+    new_revid/1,
+
+    get_partition_info/2
 ]).
 
 
@@ -581,6 +583,10 @@ get_db_info(Db) ->
         undefined -> null;
         Else1 -> Else1
     end,
+    Props = case get_props(Db) of
+        undefined -> null;
+        Else2 -> Else2
+    end,
     InfoList = [
         {db_name, Name},
         {engine, couch_db_engine:get_engine(Db)},
@@ -602,9 +608,18 @@ get_db_info(Db) ->
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
         {compacted_seq, CompactedSeq},
+        {props, {Props}},
         {uuid, Uuid}
     ],
     {ok, InfoList}.
+
+
+get_partition_info(#db{} = Db, Partition) when is_binary(Partition) ->
+    Sizes = couch_db_engine:get_partition_info(Db, Partition),
+    {ok, Sizes};
+get_partition_info(_Db, _Partition) ->
+    throw({bad_request, <<"`partition` is not valid">>}).
+
 
 get_design_docs(#db{name = <<"shards/", _:18/binary, DbFullName/binary>>}) ->
     DbName = ?l2b(filename:rootname(filename:basename(?b2l(DbFullName)))),
@@ -1124,7 +1139,11 @@ doc_tag(#doc{meta=Meta}) ->
 update_docs(Db, Docs0, Options, replicated_changes) ->
     increment_stat(Db, [couchdb, database_writes]),
     Docs = tag_docs(Docs0),
-    DocBuckets = before_docs_update(Db, group_alike_docs(Docs)),
+
+    % Separate _local docs from normal docs
+    {NonRepDocs, Docs2} = lists:partition(fun is_local/1, Docs),
+
+    DocBuckets = before_docs_update(Db, group_alike_docs(Docs2)),
 
     case (Db#db.validate_doc_funs /= []) orelse
         lists:any(
@@ -1145,7 +1164,7 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
     end,
     DocBuckets4 = [[doc_flush_atts(Db, check_dup_atts(Doc))
             || Doc <- Bucket] || Bucket <- DocBuckets3],
-    {ok, []} = write_and_commit(Db, DocBuckets4, [], [merge_conflicts | Options]),
+    {ok, _} = write_and_commit(Db, DocBuckets4, NonRepDocs, [merge_conflicts | Options]),
     {ok, DocErrors};
 
 update_docs(Db, Docs0, Options, interactive_edit) ->
@@ -1154,11 +1173,7 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
     Docs = tag_docs(Docs0),
 
     % Separate _local docs from normal docs
-    IsLocal = fun
-        (#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
-        (_) -> false
-    end,
-    {NonRepDocs, Docs2} = lists:partition(IsLocal, Docs),
+    {NonRepDocs, Docs2} = lists:partition(fun is_local/1, Docs),
 
     DocBuckets = before_docs_update(Db, group_alike_docs(Docs2)),
 
@@ -1211,6 +1226,11 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
             dict:fetch(doc_tag(Doc), ResultsDict)
         end, Docs)}
     end.
+
+is_local(#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) ->
+    true;
+is_local(_) ->
+    false.
 
 % Returns the first available document on disk. Input list is a full rev path
 % for the doc.

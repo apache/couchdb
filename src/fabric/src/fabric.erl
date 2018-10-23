@@ -22,7 +22,7 @@
     set_security/2, set_security/3, get_revs_limit/1, get_security/1,
     get_security/2, get_all_security/1, get_all_security/2,
     get_purge_infos_limit/1, set_purge_infos_limit/3,
-    compact/1, compact/2]).
+    compact/1, compact/2, get_partition_info/2]).
 
 % Documents
 -export([open_doc/3, open_revs/4, get_doc_info/3, get_full_doc_info/3,
@@ -84,6 +84,19 @@ all_dbs(Prefix) when is_list(Prefix) ->
     ]}.
 get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).
+
+%% @doc returns the size of a given partition
+-spec get_partition_info(dbname(), Partition::binary()) ->
+    {ok, [
+        {db_name, binary()} |
+        {partition, binary()} |
+        {doc_count, non_neg_integer()} |
+        {doc_del_count, non_neg_integer()} |
+        {sizes, json_obj()}
+    ]}.
+get_partition_info(DbName, Partition) ->
+    fabric_db_partition_info:go(dbname(DbName), Partition).
+
 
 %% @doc the number of docs in a database
 -spec get_doc_count(dbname()) ->
