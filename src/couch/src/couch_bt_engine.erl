@@ -42,6 +42,7 @@
     get_security/1,
     get_props/1,
     get_size_info/1,
+    get_partition_info/2,
     get_update_seq/1,
     get_uuid/1,
 
@@ -274,6 +275,48 @@ get_size_info(#st{} = St) ->
         {active, ActiveSize},
         {external, ExternalSize},
         {file, FileSize}
+    ].
+
+
+partition_size_cb(traverse, Key, {DC, DDC, Sizes}, {Partition, DCAcc, DDCAcc, SizesAcc}) ->
+    case couch_partition:is_member(Key, Partition) of
+        true ->
+            {skip, {Partition, DC + DCAcc, DDC + DDCAcc, reduce_sizes(Sizes, SizesAcc)}};
+        false ->
+            {ok, {Partition, DCAcc, DDCAcc, SizesAcc}}
+    end;
+
+partition_size_cb(visit, FDI, _PrevReds, {Partition, DCAcc, DDCAcc, Acc}) ->
+    InPartition = couch_partition:is_member(FDI#full_doc_info.id, Partition),
+    Deleted = FDI#full_doc_info.deleted,
+    case {InPartition, Deleted} of
+        {true, true} ->
+            {ok, {Partition, DCAcc, DDCAcc + 1,
+                reduce_sizes(FDI#full_doc_info.sizes, Acc)}};
+        {true, false} ->
+            {ok, {Partition, DCAcc + 1, DDCAcc,
+                reduce_sizes(FDI#full_doc_info.sizes, Acc)}};
+        {false, _} ->
+            {ok, {Partition, DCAcc, DDCAcc, Acc}}
+    end.
+
+
+get_partition_info(#st{} = St, Partition) ->
+    StartKey = couch_partition:start_key(Partition),
+    EndKey = couch_partition:end_key(Partition),
+    Fun = fun partition_size_cb/4,
+    InitAcc = {Partition, 0, 0, #size_info{}},
+    Options = [{start_key, StartKey}, {end_key, EndKey}],
+    {ok, _, OutAcc} = couch_btree:fold(St#st.id_tree, Fun, InitAcc, Options),
+    {Partition, DocCount, DocDelCount, SizeInfo} = OutAcc,
+    [
+        {partition, Partition},
+        {doc_count, DocCount},
+        {doc_del_count, DocDelCount},
+        {sizes, [
+            {active, SizeInfo#size_info.active},
+            {external, SizeInfo#size_info.external}
+        ]}
     ].
 
 

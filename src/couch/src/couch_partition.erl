@@ -18,6 +18,9 @@
     from_docid/1,
     is_member/2,
 
+    start_key/1,
+    end_key/1,
+
     validate_dbname/2,
     validate_docid/1,
     validate_partition/1,
@@ -57,6 +60,14 @@ is_member(DocId, Partition) ->
         _ ->
             false
     end.
+
+
+start_key(Partition) ->
+    <<Partition/binary, ":">>.
+
+
+end_key(Partition) ->
+    <<Partition/binary, ";">>.
 
 
 validate_dbname(DbName, Options) when is_list(DbName) ->

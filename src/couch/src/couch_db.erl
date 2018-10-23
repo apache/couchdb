@@ -38,6 +38,7 @@
     get_compacted_seq/1,
     get_compactor_pid/1,
     get_db_info/1,
+    get_partition_info/2,
     get_del_doc_count/1,
     get_doc_count/1,
     get_epochs/1,
@@ -632,6 +633,13 @@ get_db_info(Db) ->
         {uuid, Uuid}
     ],
     {ok, InfoList}.
+
+get_partition_info(#db{} = Db, Partition) when is_binary(Partition) ->
+    Info = couch_db_engine:get_partition_info(Db, Partition),
+    {ok, Info};
+get_partition_info(_Db, _Partition) ->
+    throw({bad_request, <<"`partition` is not valid">>}).
+
 
 get_design_doc(#db{name = <<"shards/", _/binary>> = ShardDbName}, DDocId0) ->
     DDocId = couch_util:normalize_ddoc_id(DDocId0),
