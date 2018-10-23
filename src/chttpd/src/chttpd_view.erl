@@ -14,15 +14,17 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--export([handle_view_req/3, handle_temp_view_req/2]).
+-export([handle_view_req/3, handle_temp_view_req/2, handle_partition_view_req/4]).
 
 multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Args0 = couch_mrview_http:parse_params(Req, undefined),
     {ok, #mrst{views=Views}} = couch_mrview_util:ddoc_to_mrst(Db, DDoc),
     Args1 = couch_mrview_util:set_view_type(Args0, ViewName, Views),
+    % We don't support multi query in partitions
+    Args2 = couch_mrview_util:set_extra(Args1, partitioned, false),
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg = couch_mrview_http:parse_params(Query, undefined,
-            Args1, [decoded]),
+            Args2, [decoded]),
         QueryArg1 = couch_mrview_util:set_view_type(QueryArg, ViewName, Views),
         couch_mrview_util:validate_args(QueryArg1)
     end, Queries),
@@ -40,8 +42,17 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     chttpd:end_delayed_json_response(Resp1).
 
 
-design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
-    Args = couch_mrview_http:parse_params(Req, Keys),
+design_doc_view(#httpd{path_parts=[DbName | _]}=Req, Db, DDoc, ViewName, Keys) ->
+    Args0 = couch_mrview_http:parse_params(Req, Keys),
+    {Props} = DDoc#doc.body,
+    {Options} = couch_util:get_value(<<"options">>, Props, {[]}),
+    DbPartitioned = mem3:is_partitioned(DbName),
+    Partitioned = couch_util:get_value(<<"partitioned">>, Options, DbPartitioned),
+    Args = couch_mrview_util:set_extra(Args0, partitioned, Partitioned),
+    design_doc_view_int(Req, Db, DDoc, ViewName, Args).
+
+
+design_doc_view_int(Req, Db, DDoc, ViewName, Args) ->
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
@@ -112,6 +123,7 @@ handle_partition_view_req(#httpd{method='POST',
             Args0 = couch_mrview_http:parse_params(Req, Keys),
             Args1 = couch_mrview_util:set_extra(Args0, partition, Partition),
             Args2 = couch_mrview_util:set_extra(Args1, partitioned, true),
+            ok = check_partition_restrictions(Args2),
             design_doc_view_int(Req, Db, DDoc, ViewName, Args2);
         _ ->
             throw({
@@ -126,10 +138,29 @@ handle_partition_view_req(#httpd{method='GET',
     Args = couch_mrview_http:parse_params(Req, Keys),
     Args1 = couch_mrview_util:set_extra(Args, partition, Partition),
     Args2 = couch_mrview_util:set_extra(Args1, partitioned, true),
+    ok = check_partition_restrictions(Args2),
     design_doc_view_int(Req, Db, DDoc, ViewName, Args2);
 
 handle_partition_view_req(Req, _Db, _DDoc, _Pk) ->
         chttpd:send_method_not_allowed(Req, "GET").
+
+
+check_partition_restrictions(#mrargs{} = Args) ->
+    Restrictions = [
+        {<<"include_docs">>, Args#mrargs.include_docs},
+        {<<"stable">>, Args#mrargs.stable},
+        {<<"conflicts">>, Args#mrargs.conflicts}
+    ],
+    lists:foreach(fun ({Param, ArgValue}) ->
+        case ArgValue =:= true of
+            true ->
+                Msg = [<<"`">>, Param, <<"=true` is not supported in this view.">>],
+                throw({bad_request, ?l2b(Msg)});
+            false ->
+                ok
+        end
+    end, Restrictions),
+    ok.
 
 
 -ifdef(TEST).
