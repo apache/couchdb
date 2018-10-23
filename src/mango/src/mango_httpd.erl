@@ -14,7 +14,8 @@
 
 
 -export([
-    handle_req/2
+    handle_req/2,
+    handle_partition_req/3
 ]).
 
 
@@ -38,13 +39,7 @@ handle_req(#httpd{} = Req, Db0) ->
         handle_req_int(Req, Db)
     catch
         throw:{mango_error, Module, Reason} ->
-            case mango_error:info(Module, Reason) of
-            {500, ErrorStr, ReasonStr} ->
-                Stack = erlang:get_stacktrace(),
-                chttpd:send_error(Req, {ErrorStr, ReasonStr, Stack});
-            {Code, ErrorStr, ReasonStr} ->
-                chttpd:send_error(Req, Code, ErrorStr, ReasonStr)
-            end
+            handle_req_error(Req, Module, Reason)
     end.
 
 
@@ -56,6 +51,34 @@ handle_req_int(#httpd{path_parts=[_, <<"_find">> | _]} = Req, Db) ->
     handle_find_req(Req, Db);
 handle_req_int(_, _) ->
     throw({not_found, missing}).
+
+
+handle_partition_req(#httpd{} = Req, Db0, Partition) ->
+        try
+            Db = set_user_ctx(Req, Db0),
+            handle_partition_req_int(Req, Db, Partition)
+        catch
+            throw:{mango_error, Module, Reason} ->
+                handle_req_error(Req, Module, Reason)
+        end.
+
+
+handle_partition_req_int(#httpd{path_parts=[_, _, _, <<"_explain">> | _]} = Req, Db, Partition) ->
+    handle_partition_explain_req(Req, Db, Partition);
+handle_partition_req_int(#httpd{path_parts=[_, _, _,<<"_find">> | _]} = Req, Db, Partition) ->
+    handle_partition_find_req(Req, Db, Partition);
+handle_partition_req_int(_, _, _) ->
+    throw({not_found, missing}).
+
+
+handle_req_error(Req, Module, Reason) ->
+    case mango_error:info(Module, Reason) of
+    {500, ErrorStr, ReasonStr} ->
+        Stack = erlang:get_stacktrace(),
+        chttpd:send_error(Req, {ErrorStr, ReasonStr, Stack});
+    {Code, ErrorStr, ReasonStr} ->
+        chttpd:send_error(Req, Code, ErrorStr, ReasonStr)
+    end.
 
 
 handle_index_req(#httpd{method='GET', path_parts=[_, _]}=Req, Db) ->
@@ -81,9 +104,9 @@ handle_index_req(#httpd{method='GET', path_parts=[_, _]}=Req, Db) ->
     JsonIdxs = lists:sublist(JsonIdxs0, Skip+1, Limit),
 	chttpd:send_json(Req, {[{total_rows, TotalRows}, {indexes, JsonIdxs}]});
 
-handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
+handle_index_req(#httpd{method='POST', path_parts=[DbName, _]}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
-    {ok, Opts} = mango_opts:validate_idx_create(chttpd:json_body_obj(Req)),
+    {ok, Opts} = mango_opts:validate_idx_create(DbName, chttpd:json_body_obj(Req)),
     {ok, Idx0} = mango_idx:new(Db, Opts),
     {ok, Idx} = mango_idx:validate_new(Idx0, Db),
     DbOpts = [{user_ctx, Req#httpd.user_ctx}, deleted, ejson_body],
@@ -170,7 +193,9 @@ handle_index_req(#httpd{path_parts=[_, _, _DDocId0, _Type, _Name]}=Req, _Db) ->
 
 handle_explain_req(#httpd{method='POST'}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
-    {ok, Opts0} = mango_opts:validate_find(chttpd:json_body_obj(Req)),
+    {Body0} = chttpd:json_body_obj(Req),
+    check_for_partition_param(Body0),
+    {ok, Opts0} = mango_opts:validate_find({Body0}),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     Resp = mango_crud:explain(Db, Sel, Opts),
     chttpd:send_json(Req, Resp);
@@ -179,9 +204,24 @@ handle_explain_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
 
 
+handle_partition_explain_req(#httpd{method='POST'}=Req, Db, Partition) ->
+    chttpd:validate_ctype(Req, "application/json"),
+    {ok, Body} = add_partition_to_query(Req, Partition),
+    {ok, Opts0} = mango_opts:validate_find(Body),
+    ok = mango_opts:validate_partition(Body),
+    {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
+    Resp = mango_crud:explain(Db, Sel, Opts),
+    chttpd:send_json(Req, Resp);
+
+handle_partition_explain_req(Req, _Db, _Partition) ->
+    chttpd:send_method_not_allowed(Req, "POST").
+
+
 handle_find_req(#httpd{method='POST'}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
-    {ok, Opts0} = mango_opts:validate_find(chttpd:json_body_obj(Req)),
+    {Body0} = chttpd:json_body_obj(Req),
+    check_for_partition_param(Body0),
+    {ok, Opts0} = mango_opts:validate_find({Body0}),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     {ok, Resp0} = start_find_resp(Req),
     {ok, AccOut} = run_find(Resp0, Db, Sel, Opts),
@@ -189,6 +229,33 @@ handle_find_req(#httpd{method='POST'}=Req, Db) ->
 
 handle_find_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
+
+
+handle_partition_find_req(#httpd{method='POST'}=Req, Db, Partition) ->
+    chttpd:validate_ctype(Req, "application/json"),
+    {ok, Body} = add_partition_to_query(Req, Partition),
+    {ok, Opts0} = mango_opts:validate_find(Body),
+    ok = mango_opts:validate_partition(Body),
+    {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
+    {ok, Resp0} = start_find_resp(Req),
+    {ok, AccOut} = run_find(Resp0, Db, Sel, Opts),
+    end_find_resp(AccOut);
+
+handle_partition_find_req(Req, _Db, _Partition) ->
+    chttpd:send_method_not_allowed(Req, "POST").
+
+check_for_partition_param(Body) ->
+    case lists:keyfind(<<"partition">>, 1, Body) of
+        false -> ok;
+        _ -> ?MANGO_ERROR(partition_field_error)
+    end.
+
+
+add_partition_to_query(Req, Partition) ->
+    {Body0} = chttpd:json_body_obj(Req),
+    check_for_partition_param(Body0),
+    Body1 = [{<<"partition">>, Partition} | Body0],
+    {ok, {Body1}}.
 
 
 set_user_ctx(#httpd{user_ctx=Ctx}, Db) ->

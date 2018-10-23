@@ -51,7 +51,8 @@ add(#doc{body={Props0}}=DDoc, Idx) ->
     Texts2 = lists:keystore(element(1, NewText), 1, Texts1, NewText),
     Props1 = lists:keystore(<<"indexes">>, 1, Props0, {<<"indexes">>,
         {Texts2}}),
-    {ok, DDoc#doc{body={Props1}}}.
+    Props2 = lists:keystore(<<"options">>, 1, Props1, {<<"options">>, {Idx#idx.design_opts}}),
+    {ok, DDoc#doc{body={Props2}}}.
 
 
 remove(#doc{body={Props0}}=DDoc, Idx) ->
@@ -75,6 +76,7 @@ remove(#doc{body={Props0}}=DDoc, Idx) ->
 
 
 from_ddoc({Props}) ->
+    DesignOpts = mango_idx:validate_design_opts(Props),
     case lists:keyfind(<<"indexes">>, 1, Props) of
         {<<"indexes">>, {Texts}} when is_list(Texts) ->
             lists:flatmap(fun({Name, {VProps}}) ->
@@ -85,7 +87,8 @@ from_ddoc({Props}) ->
                         I = #idx{
                         type = <<"text">>,
                         name = Name,
-                        def = Def
+                        def = Def,
+                        design_opts = DesignOpts
                         },
                         [I]
                 end
@@ -257,7 +260,8 @@ opts() ->
 make_text(Idx) ->
     Text= {[
         {<<"index">>, Idx#idx.def},
-        {<<"analyzer">>, construct_analyzer(Idx#idx.def)}
+        {<<"analyzer">>, construct_analyzer(Idx#idx.def)},
+        {<<"options">>, {Idx#idx.opts}}
     ]},
     {Idx#idx.name, Text}.
 

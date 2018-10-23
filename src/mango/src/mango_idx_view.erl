@@ -54,7 +54,8 @@ add(#doc{body={Props0}}=DDoc, Idx) ->
     NewView = make_view(Idx),
     Views2 = lists:keystore(element(1, NewView), 1, Views1, NewView),
     Props1 = lists:keystore(<<"views">>, 1, Props0, {<<"views">>, {Views2}}),
-    {ok, DDoc#doc{body={Props1}}}.
+    Props2 = lists:keystore(<<"options">>, 1, Props1, {<<"options">>, {Idx#idx.design_opts}}),
+    {ok, DDoc#doc{body={Props2}}}.
 
 
 remove(#doc{body={Props0}}=DDoc, Idx) ->
@@ -78,6 +79,7 @@ remove(#doc{body={Props0}}=DDoc, Idx) ->
 
 
 from_ddoc({Props}) ->
+    DesignOpts = mango_idx:validate_design_opts(Props),
     case lists:keyfind(<<"views">>, 1, Props) of
         {<<"views">>, {Views}} when is_list(Views) ->
             lists:flatmap(fun({Name, {VProps}}) ->
@@ -89,6 +91,7 @@ from_ddoc({Props}) ->
                         type = <<"json">>,
                         name = Name,
                         def = Def,
+                        design_opts = DesignOpts,
                         opts = Opts
                         },
                         [I]
@@ -104,6 +107,7 @@ to_json(Idx) ->
         {ddoc, Idx#idx.ddoc},
         {name, Idx#idx.name},
         {type, Idx#idx.type},
+        {design_opts, {Idx#idx.design_opts}},
         {def, {def_to_json(Idx#idx.def)}}
     ]}.
 

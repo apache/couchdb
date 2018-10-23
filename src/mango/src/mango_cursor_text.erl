@@ -25,6 +25,7 @@
 -include_lib("dreyfus/include/dreyfus.hrl").
 -include("mango_cursor.hrl").
 -include("mango.hrl").
+-include("mango_idx.hrl").
 
 
 -record(cacc, {
@@ -96,6 +97,20 @@ execute(Cursor, UserFun, UserAcc) ->
         sort = sort_query(Opts, Selector),
         raw_bookmark = true
     },
+
+    DbPartitioned = mem3:is_partitioned(couch_db:name(Db)),
+    Partitioned = couch_util:get_value(partitioned, Idx#idx.design_opts, DbPartitioned),
+    QueryArgs1 = case Partitioned of
+        true -> 
+            Partition = couch_util:get_value(partition, Opts),
+            QueryArgs#index_query_args{
+                partition = Partition,
+                partitioned = true
+            };
+        false ->
+            QueryArgs
+    end,
+
     CAcc = #cacc{
         selector = Selector,
         dbname = couch_db:name(Db),
@@ -104,7 +119,7 @@ execute(Cursor, UserFun, UserAcc) ->
         bookmark = get_bookmark(Opts),
         limit = Limit,
         skip = Skip,
-        query_args = QueryArgs,
+        query_args = QueryArgs1,
         user_fun = UserFun,
         user_acc = UserAcc,
         fields = Cursor#cursor.fields,

@@ -16,5 +16,6 @@
     name,
     type,
     def,
+    design_opts,
     opts
 }).

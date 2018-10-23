@@ -13,7 +13,7 @@
 -module(mango_opts).
 
 -export([
-    validate_idx_create/1,
+    validate_idx_create/2,
     validate_find/1
 ]).
 
@@ -34,6 +34,7 @@
     validate_sort/1,
     validate_fields/1,
     validate_bulk_delete/1,
+    validate_partition/1,
 
     default_limit/0
 ]).
@@ -42,10 +43,16 @@
 -include("mango.hrl").
 
 
-validate_idx_create({Props}) ->
+validate_idx_create(DbName, {Props}) ->
     Opts = [
         {<<"index">>, [
             {tag, def}
+        ]},
+        {<<"partitioned">>, [
+            {tag, partitioned},
+            {optional, true},
+            {default, mem3:is_partitioned(DbName)},
+            {validator, fun is_boolean/1}
         ]},
         {<<"type">>, [
             {tag, type},
@@ -80,6 +87,12 @@ validate_find({Props}) ->
         {<<"selector">>, [
             {tag, selector},
             {validator, fun validate_selector/1}
+        ]},
+        {<<"partition">>, [
+            {tag, partition},
+            {optional, true},
+            {default, <<>>},
+            {validator, fun is_string/1}
         ]},
         {<<"use_index">>, [
             {tag, use_index},
@@ -345,3 +358,15 @@ validate_opt(Name, [{validator, Fun} | Rest], Value) ->
 
 default_limit() ->
     config:get_integer("mango", "default_limit", 25).
+
+
+validate_partition({Props}) ->
+    case lists:keyfind(<<"r">>, 1, Props) of
+        false ->
+            ok;
+        {<<"r">>, 1} ->
+            ok;
+        {<<"r">>, _Value} ->
+            ?MANGO_ERROR(invalid_partition_read)
+
+    end.
