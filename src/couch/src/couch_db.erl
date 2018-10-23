@@ -56,6 +56,7 @@
     is_db/1,
     is_system_db/1,
     is_clustered/1,
+    is_system_db_name/1,
 
     set_revs_limit/2,
     set_purge_infos_limit/2,
@@ -1729,15 +1730,15 @@ validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
         match ->
             ok;
         nomatch ->
-            case is_systemdb(Normalized) of
+            case is_system_db_name(Normalized) of
                 true -> ok;
                 false -> {error, {illegal_database_name, DbName}}
             end
     end.
 
-is_systemdb(DbName) when is_list(DbName) ->
-    is_systemdb(?l2b(DbName));
-is_systemdb(DbName) when is_binary(DbName) ->
+is_system_db_name(DbName) when is_list(DbName) ->
+    is_system_db_name(?l2b(DbName));
+is_system_db_name(DbName) when is_binary(DbName) ->
     Normalized = normalize_dbname(DbName),
     Suffix = filename:basename(Normalized),
     case {filename:dirname(Normalized), lists:member(Suffix, ?SYSTEM_DATABASES)} of
@@ -1860,7 +1861,7 @@ dbname_suffix_test_() ->
     [{test_name({Expected, Db}), ?_assertEqual(Expected, dbname_suffix(Db))}
         || {Expected, Db} <- WithExpected].
 
-is_systemdb_test_() ->
+is_system_db_name_test_() ->
     Cases = lists:append([
         generate_cases_with_shards("long/co$mplex-/path+/" ++ ?b2l(Db))
             || Db <- ?SYSTEM_DATABASES]
@@ -1869,7 +1870,7 @@ is_systemdb_test_() ->
     WithExpected = [{?l2b(filename:basename(filename:rootname(Arg))), Db}
         || {Arg, Db} <- Cases],
     [{test_name({Expected, Db}) ++ " in ?SYSTEM_DATABASES",
-        ?_assert(is_systemdb(Db))} || {Expected, Db} <- WithExpected].
+        ?_assert(is_system_db_name(Db))} || {Expected, Db} <- WithExpected].
 
 should_pass_validate_dbname(DbName) ->
     {test_name(DbName), ?_assertEqual(ok, validate_dbname(DbName))}.
