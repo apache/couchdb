@@ -32,6 +32,7 @@
 -export([extract_view/4, extract_view_reduce/1]).
 -export([get_view_keys/1, get_view_queries/1]).
 -export([set_view_type/3]).
+-export([set_extra/3, get_extra/2, get_extra/3]).
 -export([changes_key_opts/2]).
 -export([fold_changes/4]).
 -export([to_key_seq/1]).
@@ -39,6 +40,12 @@
 -define(MOD, couch_mrview_index).
 -define(GET_VIEW_RETRY_COUNT, 1).
 -define(GET_VIEW_RETRY_DELAY, 50).
+-define(LOWEST_KEY, null).
+-define(HIGHEST_KEY, {<<255, 255, 255, 255>>}).
+-define(PARTITION_START(P), <<P/binary, $:>>).
+-define(PARTITION_END(P), <<P/binary, $;>>).
+-define(LOWEST(A, B), (if A < B -> A; true -> B end)).
+-define(HIGHEST(A, B), (if A > B -> A; true -> B end)).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -213,6 +220,19 @@ set_view_type(Args, ViewName, [View | Rest]) ->
     end.
 
 
+set_extra(#mrargs{} = Args, Key, Value) ->
+    Extra0 = Args#mrargs.extra,
+    Extra1 = lists:ukeysort(1, [{Key, Value} | Extra0]),
+    Args#mrargs{extra = Extra1}.
+
+
+get_extra(#mrargs{} = Args, Key) ->
+    couch_util:get_value(Key, Args#mrargs.extra).
+
+get_extra(#mrargs{} = Args, Key, Default) ->
+    couch_util:get_value(Key, Args#mrargs.extra, Default).
+
+
 extract_view(_Lang, _Args, _ViewName, []) ->
     throw({not_found, missing_named_view});
 extract_view(Lang, #mrargs{view_type=map}=Args, Name, [View | Rest]) ->
@@ -247,11 +267,12 @@ view_sig(_Db, State, View, Args0) ->
     PurgeSeq = View#mrview.purge_seq,
     SeqIndexed = View#mrview.seq_indexed,
     KeySeqIndexed = View#mrview.keyseq_indexed,
+    Partitioned = get_extra(Args0, partitioned, false),
     Args = Args0#mrargs{
         preflight_fun=undefined,
         extra=[]
     },
-    Term = view_sig_term(Sig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args),
+    Term = view_sig_term(Sig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Partitioned, Args),
     couch_index_util:hexsig(couch_hash:md5_hash(term_to_binary(Term))).
 
 view_sig_term(BaseSig, UpdateSeq, PurgeSeq, false, false) ->
@@ -259,10 +280,12 @@ view_sig_term(BaseSig, UpdateSeq, PurgeSeq, false, false) ->
 view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed) ->
     {BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed}.
 
-view_sig_term(BaseSig, UpdateSeq, PurgeSeq, false, false, Args) ->
+view_sig_term(BaseSig, UpdateSeq, PurgeSeq, false, false, false, Args) ->
     {BaseSig, UpdateSeq, PurgeSeq, Args};
-view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args) ->
-    {BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args}.
+view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, false, Args) ->
+    {BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Args};
+view_sig_term(BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Partitioned, Args) ->
+    {BaseSig, UpdateSeq, PurgeSeq, KeySeqIndexed, SeqIndexed, Partitioned, Args}.
 
 
 init_state(Db, Fd, #mrst{views=Views}=State, nil) ->
@@ -598,7 +621,55 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
     end,
 
-    Args#mrargs{
+    Style = get_extra(Args, style, normal),
+    Partitioned = get_extra(Args, partitioned, false),
+    Partition = get_extra(Args, partition),
+
+    case {Style, Partitioned, Partition} of
+        {all_docs, true, _} ->
+            ok; % _all_docs can be called with or without partition parameter.
+        {all_docs, false, undefined} ->
+            ok;
+        {all_docs, false, _Partition} ->
+            mrverror(<<"`partition` parameter is not supported in this db.">>);
+        {normal, true, undefined} ->
+            mrverror(<<"`partition` parameter is mandatory for queries to this view.">>);
+        {normal, true, Partition} ->
+            couch_doc:validate_docid(Partition);
+        {normal, false, undefined} ->
+            ok;
+        {normal, false, _Partition} ->
+            mrverror(<<"`partition` parameter is not supported in this view.">>)
+    end,
+
+    case {Partitioned, Args#mrargs.conflicts} of
+        {true, true} ->
+            mrverror(<<"`conflicts=true` is not supported in this view.">>);
+        {_, _} ->
+            ok
+    end,
+
+    case {Partitioned, Args#mrargs.stable} of
+        {true, true} ->
+            mrverror(<<"`stable=true` is not supported in this view.">>);
+        {_, _} ->
+            ok
+    end,
+
+    Args1 = case {Style, Partitioned, Partition} of
+        {all_docs, true, undefined} ->
+            Args;
+        {all_docs, true, Partition} ->
+            apply_partition(Args, all_docs);
+        {all_docs, false, _} ->
+            Args;
+        {normal, true, _} ->
+            apply_partition(Args, normal);
+        {normal, false, _} ->
+            Args
+    end,
+
+    Args1#mrargs{
         start_key_docid=SKDocId,
         end_key_docid=EKDocId,
         group_level=GroupLevel
@@ -615,6 +686,68 @@ determine_group_level(#mrargs{group=true, group_level=undefined}) ->
     exact;
 determine_group_level(#mrargs{group_level=GroupLevel}) ->
     GroupLevel.
+
+apply_partition(#mrargs{} = Args0, Style) ->
+    Partition = get_extra(Args0, partition),
+    case Style of
+        normal   -> apply_partition(Partition, Args0);
+        all_docs -> apply_all_docs_partition(Partition, Args0)
+    end;
+
+apply_partition(_Partition, #mrargs{keys=[{p, _, _} | _]} = Args) ->
+    Args; % already applied
+
+apply_partition(Partition, #mrargs{keys=Keys} = Args) when Keys /= undefined ->
+    Args#mrargs{keys=[{p, Partition, K} || K <- Keys]};
+
+apply_partition(_Partition, #mrargs{start_key={p, _, _}, end_key={p, _, _}} = Args) ->
+    Args; % already applied.
+
+apply_partition(Partition, Args) ->
+    #mrargs{
+        direction = Dir,
+        start_key = StartKey,
+        end_key = EndKey
+    } = Args,
+
+    {DefSK, DefEK} = case Dir of
+        fwd -> {?LOWEST_KEY, ?HIGHEST_KEY};
+        rev -> {?HIGHEST_KEY, ?LOWEST_KEY}
+    end,
+
+    SK0 = if StartKey /= undefined -> StartKey; true -> DefSK end,
+    EK0 = if EndKey /= undefined -> EndKey; true -> DefEK end,
+
+    Args#mrargs{
+        start_key = {p, Partition, SK0},
+        end_key = {p, Partition, EK0}
+    }.
+
+%% all_docs is special as it's not really a view and is already
+%% effectively partitioned as the partition is a prefix of all keys.
+apply_all_docs_partition(Partition, #mrargs{direction=fwd, start_key=undefined, end_key=undefined} = Args) ->
+    Args#mrargs{start_key = ?PARTITION_START(Partition), end_key = ?PARTITION_END(Partition)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=rev, start_key=undefined, end_key=undefined} = Args) ->
+    Args#mrargs{start_key = ?PARTITION_END(Partition), end_key = ?PARTITION_START(Partition)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=fwd, start_key=SK, end_key=undefined} = Args) ->
+    Args#mrargs{start_key = ?HIGHEST(?PARTITION_START(Partition), SK), end_key = ?PARTITION_END(Partition)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=rev, start_key=SK, end_key=undefined} = Args) ->
+    Args#mrargs{start_key = ?LOWEST(?PARTITION_END(Partition), SK), end_key = ?PARTITION_START(Partition)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=fwd, start_key=undefined, end_key=EK} = Args) ->
+    Args#mrargs{start_key = ?PARTITION_START(Partition), end_key = ?LOWEST(?PARTITION_END(Partition), EK)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=rev, start_key=undefined, end_key=EK} = Args) ->
+    Args#mrargs{start_key = ?PARTITION_END(Partition), end_key = ?HIGHEST(?PARTITION_START(Partition), EK)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=fwd, start_key=SK, end_key=EK} = Args) ->
+    Args#mrargs{start_key = ?HIGHEST(?PARTITION_START(Partition), SK), end_key = ?LOWEST(?PARTITION_END(Partition), EK)};
+
+apply_all_docs_partition(Partition, #mrargs{direction=rev, start_key=SK, end_key=EK} = Args) ->
+    Args#mrargs{start_key = ?LOWEST(?PARTITION_END(Partition), SK), end_key = ?HIGHEST(?PARTITION_START(Partition), EK)}.
 
 
 check_range(#mrargs{start_key=undefined}, _Cmp) ->

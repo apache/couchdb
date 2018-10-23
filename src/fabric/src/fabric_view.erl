@@ -16,6 +16,7 @@
     transform_row/1, keydict/1, extract_view/4, get_shards/2,
     check_down_shards/2, handle_worker_exit/3,
     get_shard_replacements/2, maybe_update_others/5]).
+-export([fix_skip_and_limit/1]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -119,8 +120,10 @@ maybe_send_row(State) ->
         counters = Counters,
         skip = Skip,
         limit = Limit,
-        user_acc = AccIn
+        user_acc = AccIn,
+        query_args = QueryArgs
     } = State,
+    Partitioned = couch_mrview_util:get_extra(QueryArgs, partitioned),
     case fabric_dict:any(0, Counters) of
     true ->
         {ok, State};
@@ -128,8 +131,14 @@ maybe_send_row(State) ->
         try get_next_row(State) of
         {_, NewState} when Skip > 0 ->
             maybe_send_row(NewState#collector{skip=Skip-1});
-        {Row, NewState} ->
-            case Callback(transform_row(possibly_embed_doc(NewState,Row)), AccIn) of
+        {Row0, NewState} ->
+            Row1 = possibly_embed_doc(NewState, Row0),
+            Row2 = if
+                Partitioned -> detach_partition(Row1);
+                true -> Row1
+            end,
+            Row3 = transform_row(Row2),
+            case Callback(Row3, AccIn) of
             {stop, Acc} ->
                 {stop, NewState#collector{user_acc=Acc, limit=Limit-1}};
             {ok, Acc} ->
@@ -194,6 +203,10 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
         _ -> Row
     end.
 
+detach_partition(#view_row{key={p, _Partition, Key}} = Row) ->
+    Row#view_row{key = Key};
+detach_partition(#view_row{} = Row) ->
+    Row.
 
 keydict(undefined) ->
     undefined;
@@ -339,6 +352,7 @@ partition_docid(Args) ->
             <<Partition/binary, ":foo">>
     end.
 
+
 maybe_update_others(DbName, DDoc, ShardsInvolved, ViewName,
     #mrargs{update=lazy} = Args) ->
     ShardsNeedUpdated = mem3:shards(DbName) -- ShardsInvolved,
@@ -376,6 +390,21 @@ get_shard_replacements(DbName, UsedShards0) ->
                 Acc
         end
     end, [], UsedShards).
+
+-spec fix_skip_and_limit(#mrargs{}) -> {CoordArgs::#mrargs{}, WorkerArgs::#mrargs{}}.
+fix_skip_and_limit(#mrargs{} = Args) ->
+    {CoordArgs, WorkerArgs} = case couch_mrview_util:get_extra(Args, partition) of
+        undefined ->
+            #mrargs{skip=Skip, limit=Limit}=Args,
+            {Args, Args#mrargs{skip=0, limit=Skip+Limit}};
+        _Partition ->
+            {Args#mrargs{skip=0}, Args}
+    end,
+    %% the coordinator needs to finalize each row, so make sure the shards don't
+    {CoordArgs, remove_finalizer(WorkerArgs)}.
+
+remove_finalizer(Args) ->
+    couch_mrview_util:set_extra(Args, finalizer, null).
 
 % unit test
 is_progress_possible_test() ->

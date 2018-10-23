@@ -24,6 +24,7 @@
 -export([refresh/2]).
 -export([compact/2, compact/3, cancel_compaction/2]).
 -export([cleanup/1]).
+-export([get_partitioned_opt/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -57,6 +58,9 @@ validate_ddoc_fields(DDoc) ->
         [{<<"language">>, string}],
         [{<<"lists">>, object}, {any, [object, string]}],
         [{<<"options">>, object}],
+        [{<<"options">>, object}, {<<"include_design">>, boolean}],
+        [{<<"options">>, object}, {<<"partitioned">>, boolean}],
+        [{<<"options">>, object}, {<<"local_seq">>, boolean}],
         [{<<"rewrites">>, [string, array]}],
         [{<<"shows">>, object}, {any, [object, string]}],
         [{<<"updates">>, object}, {any, [object, string]}],
@@ -133,6 +137,8 @@ validate_ddoc_field(Value, array) when is_list(Value) ->
     ok;
 validate_ddoc_field({Value}, object) when is_list(Value) ->
     ok;
+validate_ddoc_field(Value, boolean) when is_boolean(Value) ->
+    ok;
 validate_ddoc_field({Props}, {any, Type}) ->
     validate_ddoc_field1(Props, Type);
 validate_ddoc_field({Props}, {Key, Type}) ->
@@ -169,8 +175,46 @@ join([H|T], Sep, Acc) ->
     join(T, Sep, [Sep, H | Acc]).
 
 
+validate_partitioned_ddoc(#doc{} = DDoc) ->
+    {DDocProps} = DDoc#doc.body,
+    Banned = [
+        <<"shows">>,
+        <<"rewrites">>,
+        <<"lists">>,
+        <<"updates">>,
+        <<"filters">>,
+        <<"validate_doc_update">>
+        ],
+    validate_partitioned_ddoc(DDocProps, Banned).
+
+
+validate_partitioned_ddoc([], _Banned) ->
+    ok;
+validate_partitioned_ddoc([{Key, _Value} | Rest], Banned) ->
+    case lists:member(Key, Banned) of
+        true ->
+            Msg = [<<"`">>, Key, <<"` cannot be used in a partitioned design doc">>],
+            throw({invalid_design_doc, ?l2b(Msg)});
+        false ->
+            validate_partitioned_ddoc(Rest, Banned)
+    end.
+
+
 validate(DbName,  DDoc) ->
     ok = validate_ddoc_fields(DDoc#doc.body),
+    DbPartitioned = mem3:is_partitioned(DbName),
+    DDocPartitioned = get_partitioned_opt(DDoc#doc.body, DbPartitioned),
+
+    case {DbPartitioned, DDocPartitioned} of
+        {true, true} ->
+            validate_partitioned_ddoc(DDoc);
+        {false, true} ->
+            throw({invalid_design_doc,
+                <<"partitioned option cannot be true in a "
+                  "non-partitioned database.">>});
+        {_, _} -> 
+            ok
+    end,
     GetName = fun
         (#mrview{map_names = [Name | _]}) -> Name;
         (#mrview{reduce_funs = [{Name, _} | _]}) -> Name;
@@ -189,6 +233,9 @@ validate(DbName,  DDoc) ->
                 ok;
             ({_RedName, <<"_", _/binary>> = Bad}) ->
                 Msg = ["`", Bad, "` is not a supported reduce function."],
+                throw({invalid_design_doc, Msg});
+            ({_RedName, _RedSrc}) when DDocPartitioned ->
+                Msg = <<"Javascript reduces not supported in partitioned view.">>,
                 throw({invalid_design_doc, Msg});
             ({RedName, RedSrc}) ->
                 couch_query_servers:try_compile(Proc, reduce, RedName, RedSrc)
@@ -210,6 +257,9 @@ validate(DbName,  DDoc) ->
         ok
     end.
 
+get_partitioned_opt({Props}, Default) ->
+    {Options} = couch_util:get_value(<<"options">>, Props, {[]}),
+    couch_util:get_value(<<"partitioned">>, Options, Default).
 
 query_all_docs(Db, Args) ->
     query_all_docs(Db, Args, fun default_cb/2, []).
@@ -223,12 +273,13 @@ query_all_docs(Db, Args0, Callback, Acc) ->
         couch_index_util:hexsig(couch_hash:md5_hash(term_to_binary(Info)))
     end),
     Args1 = Args0#mrargs{view_type=map},
-    Args2 = couch_mrview_util:validate_args(Args1),
-    {ok, Acc1} = case Args2#mrargs.preflight_fun of
+    Args2 = couch_mrview_util:set_extra(Args1, style, all_docs),
+    Args3 = couch_mrview_util:validate_args(Args2),
+    {ok, Acc1} = case Args3#mrargs.preflight_fun of
         PFFun when is_function(PFFun, 2) -> PFFun(Sig, Acc);
         _ -> {ok, Acc}
     end,
-    all_docs_fold(Db, Args2, Callback, Acc1).
+    all_docs_fold(Db, Args3, Callback, Acc1).
 
 
 query_view(Db, DDoc, VName) ->
@@ -609,6 +660,8 @@ red_fold(Db, {NthRed, _Lang, View}=RedView, Args, Callback, UAcc) ->
     end, Acc, OptList),
     finish_fold(Acc2, []).
 
+red_fold({p, _Partition, Key}, Red, Acc) ->
+    red_fold(Key, Red, Acc);
 red_fold(_Key, _Red, #mracc{skip=N}=Acc) when N > 0 ->
     {ok, Acc#mracc{skip=N-1, last_go=ok}};
 red_fold(Key, Red, #mracc{meta_sent=false}=Acc) ->
