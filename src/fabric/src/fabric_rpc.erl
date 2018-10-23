@@ -19,7 +19,7 @@
 -export([all_docs/3, changes/3, map_view/4, reduce_view/4, group_info/2]).
 -export([create_db/1, create_db/2, delete_db/1, reset_validation_funs/1,
     set_security/3, set_revs_limit/3, create_shard_db_doc/2,
-    delete_shard_db_doc/2]).
+    delete_shard_db_doc/2, get_partition_info/2]).
 -export([get_all_security/2, open_shard/2]).
 -export([compact/1, compact/2]).
 -export([get_purge_seq/2, purge_docs/3, set_purge_infos_limit/3]).
@@ -194,6 +194,9 @@ get_db_info(DbName) ->
 
 get_db_info(DbName, DbOptions) ->
     with_db(DbName, DbOptions, {couch_db, get_db_info, []}).
+
+get_partition_info(DbName, Partition) ->
+    with_db(DbName, [], {couch_db, get_partition_info, [Partition]}).
 
 %% equiv get_doc_count(DbName, [])
 get_doc_count(DbName) ->
