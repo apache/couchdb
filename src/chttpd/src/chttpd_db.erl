@@ -285,12 +285,17 @@ create_db_req(#httpd{}=Req, DbName) ->
     Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
     P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
     EngineOpt = parse_engine_opt(Req),
+    Partitioned = parse_partitioned_opt(Req),
     Options = [
         {n, N},
         {q, Q},
-        {placement, P}
+        {placement, P},
+        {initial_props, [{partitioned, Partitioned}]}
     ] ++ EngineOpt,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
+
+    ok = validate_partition_database_create(DbName, Partitioned),
+
     case fabric:create_db(DbName, Options) of
     ok ->
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
@@ -417,16 +422,19 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     _ ->
         Options = [{user_ctx,Ctx}, {w,W}]
     end,
+    DbName = couch_db:name(Db),
+    VOpts = [{partitioned, mem3:is_partitioned(DbName)}],
     case couch_util:get_value(<<"new_edits">>, JsonProps, true) of
     true ->
         Docs = lists:map(
             fun(JsonObj) ->
-                Doc = couch_doc:from_json_obj_validate(JsonObj),
+                Doc = couch_doc:from_json_obj_validate(JsonObj, DbName),
                 validate_attachment_names(Doc),
                 Id = case Doc#doc.id of
                     <<>> -> couch_uuids:new();
                     Id0 -> Id0
                 end,
+                couch_doc:validate_docid(Id, DbName, VOpts),
                 Doc#doc{id=Id}
             end,
             DocsArray),
@@ -452,7 +460,11 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
             send_json(Req, 417, ErrorsJson)
         end;
     false ->
-        Docs = [couch_doc:from_json_obj_validate(JsonObj) || JsonObj <- DocsArray],
+        Docs = [begin
+            couch_doc:from_json_obj_validate(JsonObj)
+            end
+            || JsonObj <- DocsArray],
+        [couch_doc:validate_docid(D#doc.id, DbName, VOpts) || D <- Docs],
         [validate_attachment_names(D) || D <- Docs],
         case fabric:update_docs(Db, Docs, [replicated_changes|Options]) of
         {ok, Errors} ->
@@ -783,7 +795,7 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
 
 db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     couch_httpd:validate_referer(Req),
-    couch_doc:validate_docid(DocId, couch_db:name(Db)),
+    validate_docid(DocId, couch_db:name(Db)),
     chttpd:validate_ctype(Req, "multipart/form-data"),
 
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
@@ -839,7 +851,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         update_type = UpdateType
     } = parse_doc_query(Req),
     DbName = couch_db:name(Db),
-    couch_doc:validate_docid(DocId, DbName),
+    validate_docid(DocId, DbName),
 
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
@@ -1330,7 +1342,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
                 % check for the existence of the doc to handle the 404 case.
                 couch_doc_open(Db, DocId, nil, [])
             end,
-            couch_doc:validate_docid(DocId, couch_db:name(Db)),
+            validate_docid(DocId, couch_db:name(Db)),
             #doc{id=DocId};
         Rev ->
             case fabric:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
@@ -1452,6 +1464,20 @@ parse_engine_opt(Req) ->
                     throw({bad_request, invalid_engine_extension})
             end
     end.
+
+
+parse_partitioned_opt(Req) ->
+    case chttpd:qs_value(Req, "partitioned") of
+        undefined ->
+            false;
+        "true" ->
+            true;
+        "false" ->
+            false;
+        _ ->
+            throw({bad_request, <<"`partitioned` parameter can only be set to true or false.">>})
+    end.
+
 
 parse_doc_query({Key, Value}, Args) ->
     case {Key, Value} of
@@ -1592,6 +1618,18 @@ extract_header_rev(Req, ExplicitRev) ->
     end.
 
 
+% cannot partition a system database
+validate_partition_database_create(DbName, Partitioned) ->
+    SystemId = DbName =:= ?l2b(config:get("mem3", "shards_db", "_dbs")) orelse
+        lists:member(DbName, ?SYSTEM_DATABASES),
+    case {Partitioned, SystemId} of
+        {true, true} ->
+            throw({bad_request, <<"Cannot partition a system database">>});
+        {_, _} ->
+            ok
+    end.
+
+
 validate_attachment_names(Doc) ->
     lists:foreach(fun(Att) ->
         Name = couch_att:fetch(name, Att),
@@ -1672,7 +1710,7 @@ bulk_get_open_doc_revs(Db, {Props}, Options) ->
 
 
 bulk_get_open_doc_revs1(Db, Props, Options, {}) ->
-    case parse_field(<<"id">>, couch_util:get_value(<<"id">>, Props)) of
+    case parse_id_field(couch_util:get_value(<<"id">>, Props), Db) of
         {error, {DocId, Error, Reason}} ->
             {DocId, {error, {null, Error, Reason}}, Options};
 
@@ -1721,16 +1759,18 @@ bulk_get_open_doc_revs1(Db, Props, _, {DocId, Revs, Options}) ->
     end.
 
 
-parse_field(<<"id">>, undefined) ->
+parse_id_field(undefined, _Db) ->
     {ok, undefined};
-parse_field(<<"id">>, Value) ->
+parse_id_field(Value, Db) ->
     try
-        ok = couch_doc:validate_docid(Value),
+        ok = validate_docid(Value, couch_db:name(Db)),
         {ok, Value}
     catch
         throw:{Error, Reason} ->
             {error, {Value, Error, Reason}}
-    end;
+    end.
+
+
 parse_field(<<"rev">>, undefined) ->
     {ok, undefined};
 parse_field(<<"rev">>, Value) ->
@@ -1792,6 +1832,11 @@ bulk_get_json_error(DocId, Rev, Error, Reason) ->
                              {<<"rev">>, Rev},
                              {<<"error">>, Error},
                              {<<"reason">>, Reason}]}}]}).
+
+validate_docid(DocId, DbName) ->
+    Partitioned = mem3:is_partitioned(DbName),
+    Options = [{partitioned, Partitioned}],
+    couch_doc:validate_docid(DocId, DbName, Options).
 
 
 -ifdef(TEST).
