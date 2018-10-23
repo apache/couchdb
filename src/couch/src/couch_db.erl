@@ -38,6 +38,7 @@
     get_compacted_seq/1,
     get_compactor_pid/1,
     get_db_info/1,
+    get_partition_info/2,
     get_del_doc_count/1,
     get_doc_count/1,
     get_epochs/1,
@@ -632,8 +633,16 @@ get_db_info(Db) ->
     ],
     {ok, InfoList}.
 
-get_design_docs(#db{name = <<"shards/", _/binary>> = ShardDbName}) ->
-    DbName = mem3:dbname(ShardDbName),
+
+get_partition_info(#db{} = Db, Partition) when is_binary(Partition) ->
+    Sizes = couch_db_engine:get_partition_info(Db, Partition),
+    {ok, Sizes};
+get_partition_info(_Db, _Partition) ->
+    throw({bad_request, <<"`partition` is not valid">>}).
+
+
+get_design_docs(#db{name = <<"shards/", _:18/binary, DbFullName/binary>>}) ->
+    DbName = ?l2b(filename:rootname(filename:basename(?b2l(DbFullName)))),
     {_, Ref} = spawn_monitor(fun() -> exit(fabric:design_docs(DbName)) end),
     receive {'DOWN', Ref, _, _, Response} ->
         Response
