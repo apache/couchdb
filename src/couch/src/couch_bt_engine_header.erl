@@ -26,6 +26,7 @@
 
 -export([
     disk_version/1,
+    latest_disk_version/0,
     update_seq/1,
     id_tree_state/1,
     seq_tree_state/1,
@@ -72,6 +73,9 @@
 }).
 
 
+-define(PARTITION_DISK_VERSION, 8).
+
+
 new() ->
     #db_header{
         uuid = couch_uuids:random(),
@@ -99,6 +103,7 @@ is_header(Header) ->
 
 upgrade(Header) ->
     Funs = [
+        fun downgrade_partition_header/1,
         fun upgrade_tuple/1,
         fun upgrade_disk_version/1,
         fun upgrade_uuid/1,
@@ -134,6 +139,10 @@ set(Header0, Fields) ->
 
 disk_version(Header) ->
     get_field(Header, disk_version).
+
+
+latest_disk_version() ->
+        ?LATEST_DISK_VERSION.
 
 
 update_seq(Header) ->
@@ -208,6 +217,50 @@ indexes() ->
     Fields = record_info(fields, db_header),
     Indexes = lists:seq(2, record_info(size, db_header)),
     lists:zip(Fields, Indexes).
+
+
+downgrade_partition_header(Header) ->
+    DiskVersion = disk_version(Header),
+    Latest = latest_disk_version(),
+    case DiskVersion of
+        N when N =< Latest ->
+            Header;
+        ?PARTITION_DISK_VERSION ->
+            {
+                db_header,
+                _DiskVer,
+                UpSeq,
+                _Unused,
+                IdTreeState,
+                SeqTreeState,
+                LocalTreeState,
+                PurgeTreeState,
+                PurgeSeqTreeState,
+                SecurityPtr,
+                RevsLimit,
+                Uuid,
+                Epochs,
+                CompactedSeq,
+                PurgeInfosLimit,
+                _PropsPtr
+            } = Header,
+            
+            NewHeader = new(),
+            set(NewHeader, [
+                {update_seq, UpSeq},
+                {id_tree_state, IdTreeState},
+                {seq_tree_state, SeqTreeState},
+                {local_tree_state, LocalTreeState},
+                {purge_tree_state, PurgeTreeState},
+                {purge_seq_tree_state, PurgeSeqTreeState},
+                {security_ptr, SecurityPtr},
+                {revs_limit, RevsLimit},
+                {uuid, Uuid},
+                {epochs, Epochs},
+                {compacted_seq, CompactedSeq},
+                {purge_infos_limit, PurgeInfosLimit}
+            ])
+    end.
 
 
 upgrade_tuple(Old) when is_record(Old, db_header) ->
