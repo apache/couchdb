@@ -524,8 +524,11 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
         true -> ok
     end,
     couch_stats:increment_counter([couchdb, document_purges, total], length(IdsRevs2)),
-    {ok, Results} = fabric:purge_docs(Db, IdsRevs2, Options),
-    {Code, Json} = purge_results_to_json(IdsRevs2, Results),
+    Results2 = case fabric:purge_docs(Db, IdsRevs2, Options) of
+        {ok, Results} -> Results;
+        {accepted, Results} -> Results
+    end,
+    {Code, Json} = purge_results_to_json(IdsRevs2, Results2),
     send_json(Req, Code, {[{<<"purge_seq">>, null}, {<<"purged">>, {Json}}]});
 
 db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->
