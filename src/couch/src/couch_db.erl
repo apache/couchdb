@@ -847,7 +847,7 @@ group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
 
 validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
     case catch check_is_admin(Db) of
-        ok -> validate_ddoc(Db#db.name, Doc);
+        ok -> validate_ddoc(Db, Doc);
         Error -> Error
     end;
 validate_doc_update(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
@@ -865,9 +865,9 @@ validate_doc_update(Db, Doc, GetDiskDocFun) ->
             validate_doc_update_int(Db, Doc, GetDiskDocFun)
     end.
 
-validate_ddoc(DbName, DDoc) ->
+validate_ddoc(Db, DDoc) ->
     try
-        ok = couch_index_server:validate(DbName, couch_doc:with_ejson_body(DDoc))
+        ok = couch_index_server:validate(Db, couch_doc:with_ejson_body(DDoc))
     catch
         throw:{invalid_design_doc, Reason} ->
             {bad_request, invalid_design_doc, Reason};

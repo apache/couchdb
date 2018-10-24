@@ -169,7 +169,7 @@ join([H|T], Sep, Acc) ->
     join(T, Sep, [Sep, H | Acc]).
 
 
-validate(DbName,  DDoc) ->
+validate(Db,  DDoc) ->
     ok = validate_ddoc_fields(DDoc#doc.body),
     GetName = fun
         (#mrview{map_names = [Name | _]}) -> Name;
@@ -194,8 +194,11 @@ validate(DbName,  DDoc) ->
                 couch_query_servers:try_compile(Proc, reduce, RedName, RedSrc)
         end, Reds)
     end,
-    {ok, #mrst{language=Lang, views=Views}}
-            = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
+    {ok, #mrst{
+        language = Lang,
+        views = Views
+    }} = couch_mrview_util:ddoc_to_mrst(couch_db:name(Db), DDoc),
+
     try Views =/= [] andalso couch_query_servers:get_os_process(Lang) of
         false ->
             ok;
