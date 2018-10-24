@@ -57,6 +57,8 @@ validate_ddoc_fields(DDoc) ->
         [{<<"language">>, string}],
         [{<<"lists">>, object}, {any, [object, string]}],
         [{<<"options">>, object}],
+        [{<<"options">>, object}, {<<"include_design">>, boolean}],
+        [{<<"options">>, object}, {<<"local_seq">>, boolean}],
         [{<<"rewrites">>, [string, array]}],
         [{<<"shows">>, object}, {any, [object, string]}],
         [{<<"updates">>, object}, {any, [object, string]}],
@@ -132,6 +134,8 @@ validate_ddoc_field(Value, string) when is_binary(Value) ->
 validate_ddoc_field(Value, array) when is_list(Value) ->
     ok;
 validate_ddoc_field({Value}, object) when is_list(Value) ->
+    ok;
+validate_ddoc_field(Value, boolean) when is_boolean(Value) ->
     ok;
 validate_ddoc_field({Props}, {any, Type}) ->
     validate_ddoc_field1(Props, Type);
