@@ -41,7 +41,7 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 
-validate(DbName, DDoc) ->
+validate(Db, DDoc) ->
     LoadModFun = fun
         ({ModNameList, "true"}) ->
             try
@@ -54,7 +54,7 @@ validate(DbName, DDoc) ->
     end,
     ValidateFun = fun
         (ModName) ->
-            ModName:validate(DbName, DDoc)
+            ModName:validate(Db, DDoc)
     end,
     EnabledIndexers = lists:flatmap(LoadModFun, config:get("indexers")),
     lists:foreach(ValidateFun, EnabledIndexers).
