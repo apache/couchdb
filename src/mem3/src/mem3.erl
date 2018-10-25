@@ -237,15 +237,15 @@ dbname(_) ->
 %% @doc Determine if DocId belongs in shard (identified by record or filename)
 belongs(#shard{}=Shard, DocId) when is_binary(DocId) ->
     [Begin, End] = range(Shard),
-    belongs(Begin, End, DocId);
+    belongs(Begin, End, Shard, DocId);
 belongs(<<"shards/", _/binary>> = ShardName, DocId) when is_binary(DocId) ->
     [Begin, End] = range(ShardName),
-    belongs(Begin, End, DocId);
+    belongs(Begin, End, ShardName, DocId);
 belongs(DbName, DocId) when is_binary(DbName), is_binary(DocId) ->
     true.
 
-belongs(Begin, End, DocId) ->
-    HashKey = mem3_util:hash(DocId),
+belongs(Begin, End, Shard, DocId) ->
+    HashKey = mem3_hash:calculate(Shard, DocId),
     Begin =< HashKey andalso HashKey =< End.
 
 range(#shard{range = Range}) ->
