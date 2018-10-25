@@ -425,20 +425,22 @@ get_minimum_purge_seq(#db{} = Db) ->
         case DocId of
             <<?LOCAL_DOC_PREFIX, "purge-", _/binary>> ->
                 ClientSeq = couch_util:get_value(<<"purge_seq">>, Props),
+                DbName = couch_db:name(Db),
+                % If there's a broken doc we have to keep every
+                % purge info until the doc is fixed or removed.
+                Fmt = "Invalid purge doc '~s' on ~p with purge_seq '~w'",
                 case ClientSeq of
                     CS when is_integer(CS), CS >= PurgeSeq - PurgeInfosLimit ->
                         {ok, SeqAcc};
                     CS when is_integer(CS) ->
-                        case purge_client_exists(Db, DocId, Props) of
-                            true -> {ok, erlang:min(CS, SeqAcc)};
-                            false -> {ok, SeqAcc}
+                        case purge_client_exists(DbName, DocId, Props) of
+                            true ->
+                                {ok, erlang:min(CS, SeqAcc)};
+                            false ->
+                                couch_log:error(Fmt, [DocId, DbName, ClientSeq]),
+                                {ok, SeqAcc}
                         end;
                     _ ->
-                        % If there's a broken doc we have to keep every
-                        % purge info until the doc is fixed or removed.
-                        Fmt = "Invalid purge doc '~s' on database ~p
-                            with purge_seq '~w'",
-                        DbName = couch_db:name(Db),
                         couch_log:error(Fmt, [DocId, DbName, ClientSeq]),
                         {ok, erlang:min(OldestPurgeSeq, SeqAcc)}
                 end;
@@ -491,7 +493,7 @@ purge_client_exists(DbName, DocId, Props) ->
         % it exists.
         Fmt2 = "Failed to check purge checkpoint using
             document '~p' in database ~p",
-        couch_log:error(Fmt2, [DbName, DocId]),
+        couch_log:error(Fmt2, [DocId, DbName]),
         true
     end.
 
@@ -605,8 +607,8 @@ get_db_info(Db) ->
     ],
     {ok, InfoList}.
 
-get_design_docs(#db{name = <<"shards/", _:18/binary, DbFullName/binary>>}) ->
-    DbName = ?l2b(filename:rootname(filename:basename(?b2l(DbFullName)))),
+get_design_docs(#db{name = <<"shards/", _/binary>> = ShardDbName}) ->
+    DbName = mem3:dbname(ShardDbName),
     {_, Ref} = spawn_monitor(fun() -> exit(fabric:design_docs(DbName)) end),
     receive {'DOWN', Ref, _, _, Response} ->
         Response
