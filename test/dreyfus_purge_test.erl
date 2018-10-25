@@ -544,7 +544,7 @@ test_local_doc() ->
         {ok, Db} = couch_db:open_int(Shard#shard.name, [?ADMIN_CTX]),
         {ok, LDoc} = couch_db:open_doc(Db, LocalId, []),
         {Props} = couch_doc:to_json_obj(LDoc, []),
-        dreyfus_util:get_value_from_options(<<"timestamp_utc">>, Props),
+        dreyfus_util:get_value_from_options(<<"updated_on">>, Props),
         PurgeSeq = dreyfus_util:get_value_from_options(<<"purge_seq">>, Props),
         Type = dreyfus_util:get_value_from_options(<<"type">>, Props),
         ?assertEqual(<<"dreyfus">>, Type),
