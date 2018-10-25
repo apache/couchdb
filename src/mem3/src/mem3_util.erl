@@ -12,7 +12,7 @@
 
 -module(mem3_util).
 
--export([hash/1, name_shard/2, create_partition_map/5, build_shards/2,
+-export([name_shard/2, create_partition_map/5, build_shards/2,
     n_val/2, q_val/1, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     shard_info/1, ensure_exists/1, open_db_doc/1]).
 -export([is_deleted/1, rotate_list/2]).
@@ -32,10 +32,6 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-hash(Item) when is_binary(Item) ->
-    erlang:crc32(Item);
-hash(Item) ->
-    erlang:crc32(term_to_binary(Item)).
 
 name_shard(Shard) ->
     name_shard(Shard, "").
@@ -165,7 +161,7 @@ build_shards_by_node(DbName, DocProps) ->
                 dbname = DbName,
                 node = to_atom(Node),
                 range = [Beg, End],
-                opts = get_engine_opt(DocProps)
+                opts = get_shard_opts(DocProps)
             }, Suffix)
         end, Ranges)
     end, ByNode).
@@ -183,7 +179,7 @@ build_shards_by_range(DbName, DocProps) ->
                 node = to_atom(Node),
                 range = [Beg, End],
                 order = Order,
-                opts = get_engine_opt(DocProps)
+                opts = get_shard_opts(DocProps)
             }, Suffix)
         end, lists:zip(Nodes, lists:seq(1, length(Nodes))))
     end, ByRange).
@@ -200,10 +196,21 @@ to_integer(N) when is_binary(N) ->
 to_integer(N) when is_list(N) ->
     list_to_integer(N).
 
+get_shard_opts(DocProps) ->
+    get_engine_opt(DocProps) ++ get_props_opt(DocProps).
+
 get_engine_opt(DocProps) ->
     case couch_util:get_value(<<"engine">>, DocProps) of
         Engine when is_binary(Engine) ->
             [{engine, Engine}];
+        _ ->
+            []
+    end.
+
+get_props_opt(DocProps) ->
+    case couch_util:get_value(<<"props">>, DocProps) of
+        {Props} when is_list(Props) ->
+            [{props, Props}];
         _ ->
             []
     end.
