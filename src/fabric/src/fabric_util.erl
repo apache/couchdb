@@ -17,7 +17,8 @@
         remove_down_workers/2, doc_id_and_rev/1]).
 -export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0]).
 -export([log_timeout/2, remove_done_workers/2]).
--export([is_users_db/1, is_replicator_db/1, fake_db/2]).
+-export([is_users_db/1, is_replicator_db/1]).
+-export([open_cluster_db/1, open_cluster_db/2]).
 -export([upgrade_mrargs/1]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
@@ -214,7 +215,17 @@ is_users_db(DbName) ->
 path_ends_with(Path, Suffix) ->
     Suffix =:= couch_db:dbname_suffix(Path).
 
-fake_db(DbName, Opts) ->
+open_cluster_db(#shard{dbname = DbName, opts = Options}) ->
+    case couch_util:get_value(props, Options) of
+        Props when is_list(Props) ->
+            {ok, Db} = couch_db:clustered_db(DbName, [{props, Props}]),
+            Db;
+        _ ->
+            {ok, Db} = couch_db:clustered_db(DbName, []),
+            Db
+    end.
+
+open_cluster_db(DbName, Opts) ->
     {SecProps} = fabric:get_security(DbName), % as admin
     UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
     {ok, Db} = couch_db:clustered_db(DbName, UserCtx, SecProps),

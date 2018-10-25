@@ -383,7 +383,7 @@ query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
     Db = dbname(DbName), View = name(ViewName),
     case fabric_util:is_users_db(Db) of
     true ->
-        FakeDb = fabric_util:fake_db(Db, Options),
+        FakeDb = fabric_util:open_cluster_db(DbName, Options),
         couch_users_db:after_doc_read(DDoc, FakeDb);
     false ->
         ok
