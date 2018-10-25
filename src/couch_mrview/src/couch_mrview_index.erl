@@ -40,10 +40,12 @@ get(update_options, #mrst{design_opts = Opts}) ->
     LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
     SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
     KeySeqIndexed = couch_util:get_value(<<"keyseq_indexed">>, Opts, false),
+    Partitioned = couch_util:get_value(<<"partitioned">>, Opts, false),
     if IncDesign -> [include_design]; true -> [] end
         ++ if LocalSeq -> [local_seq]; true -> [] end
         ++ if KeySeqIndexed -> [keyseq_indexed]; true -> [] end
-        ++ if SeqIndexed -> [seq_indexed]; true -> [] end;
+        ++ if SeqIndexed -> [seq_indexed]; true -> [] end
+        ++ if Partitioned -> [partitioned]; true -> [] end;
 get(fd, #mrst{fd = Fd}) ->
     Fd;
 get(language, #mrst{language = Language}) ->
@@ -94,14 +96,15 @@ get(Other, _) ->
 
 
 init(Db, DDoc) ->
-    couch_mrview_util:ddoc_to_mrst(couch_db:name(Db), DDoc).
+    {ok, State} = couch_mrview_util:ddoc_to_mrst(couch_db:name(Db), DDoc),
+    {ok, set_partitioned(Db, State)}.
 
 
-open(Db, State) ->
+open(Db, State0) ->
     #mrst{
         db_name=DbName,
         sig=Sig
-    } = State,
+    } = State = set_partitioned(Db, State0),
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
 
     % If we are upgrading from <=1.2.x, we upgrade the view
@@ -262,6 +265,29 @@ get_ddoc(DbName, DesignDocs, DDocId) ->
                 not_found
         end
     end).
+
+
+set_partitioned(Db, State) ->
+    #mrst{
+        design_opts = DesignOpts
+    } = State,
+    DbPartitioned = couch_db:is_partitioned(Db),
+    ViewPartitioned = proplists:get_value(<<"partitioned">>, DesignOpts),
+    IsPartitioned = case {DbPartitioned, ViewPartitioned} of
+        {true, undefined} ->
+            true;
+        {true, true} ->
+            true;
+        {true, false} ->
+            false;
+        {false, undefined} ->
+            false;
+        {false, false} ->
+            false;
+        _ ->
+            throw({bad_request, <<"invalid partition option">>})
+    end,
+    State#mrst{partitioned = IsPartitioned}.
 
 
 ensure_local_purge_docs(DbName, DDocs) ->

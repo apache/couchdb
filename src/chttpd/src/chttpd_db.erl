@@ -22,7 +22,8 @@
     db_req/2, couch_doc_open/4,handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
     handle_design_info_req/3, handle_view_cleanup_req/2,
-    update_doc/4, http_code_from_status/1]).
+    update_doc/4, http_code_from_status/1,
+    handle_partition_req/2]).
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -253,6 +254,41 @@ handle_compact_req(Req, _Db) ->
 handle_view_cleanup_req(Req, Db) ->
     ok = fabric:cleanup_index_files_all_nodes(Db),
     send_json(Req, 202, {[{ok, true}]}).
+
+
+handle_partition_req(#httpd{method='GET', path_parts=[_,_,PartId]}=Req, Db) ->
+    couch_partition:validate_partition(PartId),
+    case couch_db:is_partitioned(Db) of
+        true ->
+            {ok, PartitionInfo} = fabric:get_partition_info(Db, PartId),
+            send_json(Req, {PartitionInfo});
+        false ->
+            throw({bad_request, <<"database is not partitioned">>})
+    end;
+
+handle_partition_req(#httpd{path_parts = [_, _, _]}=Req, _Db) ->
+    send_method_not_allowed(Req, "GET");
+
+handle_partition_req(#httpd{path_parts=[DbName, _, PartId | Rest]}=Req, Db) ->
+    case couch_db:is_partitioned(Db) of
+        true ->
+            QS = chttpd:qs(Req),
+            NewQS = lists:ukeysort(1, [{"partition", ?b2l(PartId)} | QS]),
+            NewReq = Req#httpd{
+                path_parts = [DbName | Rest],
+                qs = NewQS
+            },
+            case Rest of
+                [] ->
+                    do_db_req(NewReq, Db);
+                [SecondPart|_] ->
+                    Handler = chttpd_handlers:db_handler(SecondPart, fun db_req/2),
+                    do_db_req(NewReq, Handler)
+            end;
+        false ->
+            throw({bad_request, <<"database is not partitioned">>})
+    end.
+
 
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
@@ -749,7 +785,7 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg1 = couch_mrview_http:parse_params(Query, undefined,
             Args1, [decoded]),
-        QueryArgs2 = couch_mrview_util:validate_args(QueryArg1),
+        QueryArgs2 = fabric_util:validate_all_docs_args(Db, QueryArg1),
         set_namespace(OP, QueryArgs2)
     end, Queries),
     Options = [{user_ctx, Req#httpd.user_ctx}],
@@ -769,7 +805,7 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
 all_docs_view(Req, Db, Keys, OP) ->
     Args0 = couch_mrview_http:parse_params(Req, Keys),
     Args1 = Args0#mrargs{view_type=map},
-    Args2 = couch_mrview_util:validate_args(Args1),
+    Args2 = fabric_util:validate_all_docs_args(Db, Args1),
     Args3 = set_namespace(OP, Args2),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),
@@ -1766,8 +1802,8 @@ set_namespace(<<"_local_docs">>, Args) ->
     set_namespace(<<"_local">>, Args);
 set_namespace(<<"_design_docs">>, Args) ->
     set_namespace(<<"_design">>, Args);
-set_namespace(NS, #mrargs{extra = Extra} = Args) ->
-    Args#mrargs{extra = [{namespace, NS} | Extra]}.
+set_namespace(NS, #mrargs{} = Args) ->
+    couch_mrview_util:set_extra(Args, namespace, NS).
 
 
 %% /db/_bulk_get stuff

@@ -392,10 +392,11 @@ query_view(Db, Options, GroupId, ViewName, Callback, Acc0, QueryArgs)
         when is_binary(GroupId) ->
     DbName = dbname(Db),
     {ok, DDoc} = ddoc_cache:open(DbName, <<"_design/", GroupId/binary>>),
-    query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs);
-query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
-    Db = dbname(DbName), View = name(ViewName),
-    case fabric_util:is_users_db(Db) of
+    query_view(Db, Options, DDoc, ViewName, Callback, Acc0, QueryArgs);
+query_view(Db342, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
+    DbName = dbname(Db342),
+    View = name(ViewName),
+    case fabric_util:is_users_db(DbName) of
     true ->
         FakeDb = fabric_util:make_cluster_db(DbName, Options),
         couch_users_db:after_doc_read(DDoc, FakeDb);
@@ -403,14 +404,14 @@ query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
         ok
     end,
     {ok, #mrst{views=Views, language=Lang}} =
-        couch_mrview_util:ddoc_to_mrst(Db, DDoc),
+        couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
     QueryArgs1 = couch_mrview_util:set_view_type(QueryArgs0, View, Views),
-    QueryArgs2 = couch_mrview_util:validate_args(QueryArgs1),
+    QueryArgs2 = fabric_util:validate_args(Db342, DDoc, QueryArgs1),
     VInfo = couch_mrview_util:extract_view(Lang, QueryArgs2, View, Views),
     case is_reduce_view(QueryArgs2) of
         true ->
             fabric_view_reduce:go(
-                Db,
+                Db342,
                 DDoc,
                 View,
                 QueryArgs2,
@@ -420,7 +421,7 @@ query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
             );
         false ->
             fabric_view_map:go(
-                Db,
+                Db342,
                 Options,
                 DDoc,
                 View,
