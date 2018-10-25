@@ -270,7 +270,7 @@ update_doc(DbName, Doc, Options) ->
         throw(Error);
     {ok, []} ->
         % replication success
-        #doc{revs = {Pos, [RevId | _]}} = doc(Doc),
+        #doc{revs = {Pos, [RevId | _]}} = doc(DbName, Doc),
         {ok, {Pos, RevId}};
     {error, [Error]} ->
         throw(Error)
@@ -279,9 +279,10 @@ update_doc(DbName, Doc, Options) ->
 %% @doc update a list of docs
 -spec update_docs(dbname(), [#doc{} | json_obj()], [option()]) ->
     {ok, any()} | any().
-update_docs(DbName, Docs, Options) ->
+update_docs(DbName, Docs0, Options) ->
     try
-        fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options)) of
+        Docs1 = docs(DbName, Docs0),
+        fabric_doc_update:go(dbname(DbName), Docs1, opts(Options)) of
         {ok, Results} ->
             {ok, Results};
         {accepted, Results} ->
@@ -536,16 +537,25 @@ docid(DocId) when is_list(DocId) ->
 docid(DocId) ->
     DocId.
 
-docs(Docs) when is_list(Docs) ->
-    [doc(D) || D <- Docs];
-docs(Docs) ->
+docs(Db, Docs) when is_list(Docs) ->
+    [doc(Db, D) || D <- Docs];
+docs(_Db, Docs) ->
     erlang:error({illegal_docs_list, Docs}).
 
-doc(#doc{} = Doc) ->
+doc(_Db, #doc{} = Doc) ->
     Doc;
-doc({_} = Doc) ->
-    couch_doc:from_json_obj_validate(Doc);
-doc(Doc) ->
+doc(Db0, {_} = Doc) ->
+    Db = case couch_db:is_db(Db0) of
+        true ->
+            Db0;
+        false ->
+            Shard = hd(mem3:shards(Db0)),
+            Props = couch_util:get_value(props, Shard#shard.opts, []),
+            {ok, Db1} = couch_db:clustered_db(Db0, [{props, Props}]),
+            Db1
+    end,
+    couch_db:doc_from_json_obj_validate(Db, Doc);
+doc(_Db, Doc) ->
     erlang:error({illegal_doc_format, Doc}).
 
 design_doc(#doc{} = DDoc) ->

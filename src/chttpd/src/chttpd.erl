@@ -905,6 +905,8 @@ error_info({error, {illegal_database_name, Name}}) ->
     {400, <<"illegal_database_name">>, Message};
 error_info({illegal_docid, Reason}) ->
     {400, <<"illegal_docid">>, Reason};
+error_info({illegal_partition, Reason}) ->
+    {400, <<"illegal_partition">>, Reason};
 error_info({_DocID,{illegal_docid,DocID}}) ->
     {400, <<"illegal_docid">>,DocID};
 error_info({error, {database_name_too_long, DbName}}) ->
