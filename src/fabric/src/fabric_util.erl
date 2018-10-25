@@ -20,6 +20,7 @@
 -export([is_users_db/1, is_replicator_db/1]).
 -export([open_cluster_db/1, open_cluster_db/2]).
 -export([is_partitioned/1]).
+-export([validate_all_docs_args/2, validate_args/3]).
 -export([upgrade_mrargs/1]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
@@ -246,6 +247,26 @@ is_partitioned(DbName0) when is_binary(DbName0) ->
 
 is_partitioned(Db) ->
     couch_db:is_partitioned(Db).
+
+
+validate_all_docs_args(DbName, Args) when is_binary(DbName) ->
+    Shards = mem3:shards(fabric:dbname(DbName)),
+    Db = open_cluster_db(hd(Shards)),
+    validate_all_docs_args(Db, Args);
+
+validate_all_docs_args(Db, Args) ->
+    true = couch_db:is_clustered(Db),
+    couch_mrview_util:validate_all_docs_args(Db, Args).
+
+
+validate_args(DbName, DDoc, Args) when is_binary(DbName) ->
+    Shards = mem3:shards(fabric:dbname(DbName)),
+    Db = open_cluster_db(hd(Shards)),
+    validate_args(Db, DDoc, Args);
+
+validate_args(Db, DDoc, Args) ->
+    true = couch_db:is_clustered(Db),
+    couch_mrview_util:validate_args(Db, DDoc, Args).
 
 
 upgrade_mrargs(#mrargs{} = Args) ->

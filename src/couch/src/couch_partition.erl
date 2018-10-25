@@ -20,6 +20,7 @@
 
     start_key/1,
     end_key/1,
+    shard_key/1,
 
     validate_dbname/2,
     validate_docid/1,
@@ -68,6 +69,10 @@ start_key(Partition) ->
 
 end_key(Partition) ->
     <<Partition/binary, ";">>.
+
+
+shard_key(Partition) ->
+    <<Partition/binary, ":foo">>.
 
 
 validate_dbname(DbName, Options) when is_list(DbName) ->

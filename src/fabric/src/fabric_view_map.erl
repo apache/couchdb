@@ -24,8 +24,9 @@ go(DbName, Options, GroupId, View, Args, Callback, Acc, VInfo)
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
     go(DbName, Options, DDoc, View, Args, Callback, Acc, VInfo);
 
-go(DbName, Options, DDoc, View, Args, Callback, Acc, VInfo) ->
-    Shards = fabric_view:get_shards(DbName, Args),
+go(Db, Options, DDoc, View, Args, Callback, Acc, VInfo) ->
+    DbName = fabric:dbname(Db),
+    Shards = fabric_view:get_shards(Db, Args),
     DocIdAndRev = fabric_util:doc_id_and_rev(DDoc),
     fabric_view:maybe_update_others(DbName, DocIdAndRev, Shards, View, Args),
     Repls = fabric_view:get_shard_replacements(DbName, Shards),

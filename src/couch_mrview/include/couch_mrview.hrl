@@ -20,6 +20,7 @@
     design_opts=[],
     seq_indexed=false,
     keyseq_indexed=false,
+    partitioned=false,
     lib,
     views,
     id_btree=nil,
