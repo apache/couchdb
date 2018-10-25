@@ -65,7 +65,8 @@ purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
     #mrst{
         id_btree=IdBtree,
         log_btree=LogBtree,
-        views=Views
+        views=Views,
+        partitioned=Partitioned
     } = State,
 
     Ids = [Id || {Id, _Revs} <- PurgedIdRevs],
@@ -84,7 +85,11 @@ purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
             FoldFun = fun
                 ({ViewNum, {Key, Seq, _Op}}, DictAcc2) ->
                     dict:append(ViewNum, {Key, Seq, DocId}, DictAcc2);
-                ({ViewNum, RowKey}, DictAcc2) ->
+                ({ViewNum, RowKey0}, DictAcc2) ->
+                    RowKey = if not Partitioned -> RowKey0; true ->
+                        [{RK, _}] = inject_partition([{RowKey0, DocId}]),
+                        RK
+                    end,
                     dict:append(ViewNum, {RowKey, DocId}, DictAcc2)
             end,
             lists:foldl(FoldFun, DictAcc, ViewNumRowKeys);
@@ -315,7 +320,8 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
     #mrst{
         id_btree=IdBtree,
         log_btree=LogBtree,
-        first_build=FirstBuild
+        first_build=FirstBuild,
+        partitioned=Partitioned
     } = State,
 
     Revs = dict:from_list(dict:fetch_keys(Log0)),
@@ -332,9 +338,17 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
         _ -> update_log(LogBtree, Log, Revs, Seqs, FirstBuild)
     end,
 
-    UpdateView = fun(#mrview{id_num=ViewId}=View, {ViewId, {KVs, SKVs}}) ->
+    UpdateView = fun(#mrview{id_num=ViewId}=View, {ViewId, {KVs0, SKVs}}) ->
         #mrview{seq_indexed=SIndexed, keyseq_indexed=KSIndexed} = View,
-        ToRem = couch_util:dict_find(ViewId, ToRemByView, []),
+        ToRem0 = couch_util:dict_find(ViewId, ToRemByView, []),
+        {KVs, ToRem} = case Partitioned of
+            true ->
+                KVs1 = inject_partition(KVs0),
+                ToRem1 = inject_partition(ToRem0),
+                {KVs1, ToRem1};
+            false ->
+                {KVs0, ToRem0}
+        end,
         {ok, VBtree2} = couch_btree:add_remove(View#mrview.btree, KVs, ToRem),
         NewUpdateSeq = case VBtree2 =/= View#mrview.btree of
             true -> UpdateSeq;
@@ -381,6 +395,20 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
         id_btree=IdBtree2,
         log_btree=LogBtree2
     }.
+
+
+inject_partition(Rows) ->
+    lists:map(fun
+        ({{Key, DocId}, Value}) ->
+            % Adding a row to the view
+            {Partition, _} = couch_partition:extract(DocId),
+            {{{p, Partition, Key}, DocId}, Value};
+        ({Key, DocId}) ->
+            % Removing a row based on values in id_tree
+            {Partition, _} = couch_partition:extract(DocId),
+            {{p, Partition, Key}, DocId}
+    end, Rows).
+
 
 update_id_btree(Btree, DocIdKeys, true) ->
     ToAdd = [{Id, DIKeys} || {Id, DIKeys} <- DocIdKeys, DIKeys /= []],

@@ -26,12 +26,13 @@
 -export([temp_view_to_ddoc/1]).
 -export([calculate_external_size/1]).
 -export([calculate_active_size/1]).
--export([validate_args/1]).
+-export([validate_all_docs_args/2, validate_args/1, validate_args/3]).
 -export([maybe_load_doc/3, maybe_load_doc/4]).
 -export([maybe_update_index_file/1]).
 -export([extract_view/4, extract_view_reduce/1]).
 -export([get_view_keys/1, get_view_queries/1]).
 -export([set_view_type/3]).
+-export([set_extra/3, get_extra/2, get_extra/3]).
 -export([changes_key_opts/2]).
 -export([fold_changes/4]).
 -export([to_key_seq/1]).
@@ -39,6 +40,10 @@
 -define(MOD, couch_mrview_index).
 -define(GET_VIEW_RETRY_COUNT, 1).
 -define(GET_VIEW_RETRY_DELAY, 50).
+-define(LOWEST_KEY, null).
+-define(HIGHEST_KEY, {<<255, 255, 255, 255>>}).
+-define(LOWEST(A, B), (if A < B -> A; true -> B end)).
+-define(HIGHEST(A, B), (if A > B -> A; true -> B end)).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -94,7 +99,7 @@ get_view(Db, DDoc, ViewName, Args0) ->
 get_view_index_pid(Db, DDoc, ViewName, Args0) ->
     ArgCheck = fun(InitState) ->
         Args1 = set_view_type(Args0, ViewName, InitState#mrst.views),
-        {ok, validate_args(Args1)}
+        {ok, validate_args(InitState, Args1)}
     end,
     couch_index_server:get_index(?MOD, Db, DDoc, ArgCheck).
 
@@ -169,6 +174,7 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
     {DesignOpts} = proplists:get_value(<<"options">>, Fields, {[]}),
     SeqIndexed = proplists:get_value(<<"seq_indexed">>, DesignOpts, false),
     KeySeqIndexed = proplists:get_value(<<"keyseq_indexed">>, DesignOpts, false),
+    Partitioned = proplists:get_value(<<"partitioned">>, DesignOpts, false),
 
     {RawViews} = couch_util:get_value(<<"views">>, Fields, {[]}),
     BySrc = lists:foldl(MakeDict, dict:new(), RawViews),
@@ -189,7 +195,8 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
         language=Language,
         design_opts=DesignOpts,
         seq_indexed=SeqIndexed,
-        keyseq_indexed=KeySeqIndexed
+        keyseq_indexed=KeySeqIndexed,
+        partitioned=Partitioned
     },
     SigInfo = {Views, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
     {ok, IdxState#mrst{sig=couch_hash:md5_hash(term_to_binary(SigInfo))}}.
@@ -211,6 +218,19 @@ set_view_type(Args, ViewName, [View | Rest]) ->
                 false -> set_view_type(Args, ViewName, Rest)
             end
     end.
+
+
+set_extra(#mrargs{} = Args, Key, Value) ->
+    Extra0 = Args#mrargs.extra,
+    Extra1 = lists:ukeysort(1, [{Key, Value} | Extra0]),
+    Args#mrargs{extra = Extra1}.
+
+
+get_extra(#mrargs{} = Args, Key) ->
+    couch_util:get_value(Key, Args#mrargs.extra).
+
+get_extra(#mrargs{} = Args, Key, Default) ->
+    couch_util:get_value(Key, Args#mrargs.extra, Default).
 
 
 extract_view(_Lang, _Args, _ViewName, []) ->
@@ -476,6 +496,49 @@ fold_reduce({NthRed, Lang, View}, Fun,  Acc, Options) ->
     couch_btree:fold_reduce(Bt, WrapperFun, Acc, Options).
 
 
+validate_args(Db, DDoc, Args) ->
+    {ok, State} = couch_mrview_index:init(Db, DDoc),
+    validate_args(State, Args).
+
+
+validate_args(#mrst{} = State, Args0) ->
+    Args = validate_args(Args0),
+
+    ViewPartitioned = State#mrst.partitioned,
+    Partition = get_extra(Args, partition),
+
+    case {ViewPartitioned, Partition} of
+        {true, undefined} ->
+            Msg1 = <<"`partition` parameter is mandatory "
+                    "for queries to this view.">>,
+            mrverror(Msg1);
+        {true, _} ->
+            apply_partition(Args, Partition);
+        {false, undefined} ->
+            Args;
+        {false, Value} when is_binary(Value) ->
+            Msg2 = <<"`partition` parameter is not "
+                    "supported in this design doc">>,
+            mrverror(Msg2)
+    end.
+
+
+validate_all_docs_args(Db, Args0) ->
+    Args = validate_args(Args0),
+
+    DbPartitioned = couch_db:is_partitioned(Db),
+    Partition = get_extra(Args, partition),
+
+    case {DbPartitioned, Partition} of
+        {false, <<_/binary>>} ->
+            mrverror(<<"`partition` parameter is not supported on this db">>);
+        {_, <<_/binary>>} ->
+            apply_all_docs_partition(Args, Partition);
+        _ ->
+            Args
+    end.
+
+
 validate_args(Args) ->
     GroupLevel = determine_group_level(Args),
     Reduce = Args#mrargs.reduce,
@@ -598,6 +661,12 @@ validate_args(Args) ->
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
     end,
 
+    case get_extra(Args, partition) of
+        undefined -> ok;
+        Partition when is_binary(Partition), Partition /= <<>> -> ok;
+        _ -> mrverror(<<"Invalid value for `partition`.">>)
+    end,
+
     Args#mrargs{
         start_key_docid=SKDocId,
         end_key_docid=EKDocId,
@@ -615,6 +684,70 @@ determine_group_level(#mrargs{group=true, group_level=undefined}) ->
     exact;
 determine_group_level(#mrargs{group_level=GroupLevel}) ->
     GroupLevel.
+
+apply_partition(#mrargs{keys=[{p, _, _} | _]} = Args, _Partition) ->
+    Args; % already applied
+
+apply_partition(#mrargs{keys=Keys} = Args, Partition) when Keys /= undefined ->
+    Args#mrargs{keys=[{p, Partition, K} || K <- Keys]};
+
+apply_partition(#mrargs{start_key={p, _, _}, end_key={p, _, _}} = Args, _Partition) ->
+    Args; % already applied.
+
+apply_partition(Args, Partition) ->
+    #mrargs{
+        direction = Dir,
+        start_key = StartKey,
+        end_key = EndKey
+    } = Args,
+
+    {DefSK, DefEK} = case Dir of
+        fwd -> {?LOWEST_KEY, ?HIGHEST_KEY};
+        rev -> {?HIGHEST_KEY, ?LOWEST_KEY}
+    end,
+
+    SK0 = if StartKey /= undefined -> StartKey; true -> DefSK end,
+    EK0 = if EndKey /= undefined -> EndKey; true -> DefEK end,
+
+    Args#mrargs{
+        start_key = {p, Partition, SK0},
+        end_key = {p, Partition, EK0}
+    }.
+
+%% all_docs is special as it's not really a view and is already
+%% effectively partitioned as the partition is a prefix of all keys.
+apply_all_docs_partition(#mrargs{} = Args, Partition) ->
+    #mrargs{
+        direction = Dir,
+        start_key = StartKey,
+        end_key = EndKey
+    } = Args,
+
+    {DefSK, DefEK} = case Dir of
+        fwd ->
+            {
+                couch_partition:start_key(Partition),
+                couch_partition:end_key(Partition)
+            };
+        rev ->
+            {
+                couch_partition:end_key(Partition),
+                couch_partition:start_key(Partition)
+            }
+    end,
+
+    SK0 = if StartKey == undefined -> DefSK; true -> StartKey end,
+    EK0 = if EndKey == undefined -> DefEK; true -> EndKey end,
+
+    {SK1, EK1} = case Dir of
+        fwd -> {?HIGHEST(DefSK, SK0), ?LOWEST(DefEK, EK0)};
+        rev -> {?LOWEST(DefSK, SK0), ?HIGHEST(DefEK, EK0)}
+    end,
+
+    Args#mrargs{
+        start_key = SK1,
+        end_key = EK1
+    }.
 
 
 check_range(#mrargs{start_key=undefined}, _Cmp) ->

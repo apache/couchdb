@@ -23,10 +23,11 @@ go(DbName, GroupId, View, Args, Callback, Acc0, VInfo) when is_binary(GroupId) -
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
     go(DbName, DDoc, View, Args, Callback, Acc0, VInfo);
 
-go(DbName, DDoc, VName, Args, Callback, Acc, VInfo) ->
+go(Db, DDoc, VName, Args, Callback, Acc, VInfo) ->
+    DbName = fabric:dbname(Db),
     DocIdAndRev = fabric_util:doc_id_and_rev(DDoc),
     RPCArgs = [DocIdAndRev, VName, Args],
-    Shards = fabric_view:get_shards(DbName, Args),
+    Shards = fabric_view:get_shards(Db, Args),
     fabric_view:maybe_update_others(DbName, DocIdAndRev, Shards, VName, Args),
     Repls = fabric_view:get_shard_replacements(DbName, Shards),
     StartFun = fun(Shard) ->

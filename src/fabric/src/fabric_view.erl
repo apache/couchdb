@@ -128,8 +128,11 @@ maybe_send_row(State) ->
         try get_next_row(State) of
         {_, NewState} when Skip > 0 ->
             maybe_send_row(NewState#collector{skip=Skip-1});
-        {Row, NewState} ->
-            case Callback(transform_row(possibly_embed_doc(NewState,Row)), AccIn) of
+        {Row0, NewState} ->
+            Row1 = possibly_embed_doc(NewState, Row0),
+            Row2 = detach_partition(Row1),
+            Row3 = transform_row(Row2),
+            case Callback(Row3, AccIn) of
             {stop, Acc} ->
                 {stop, NewState#collector{user_acc=Acc, limit=Limit-1}};
             {ok, Acc} ->
@@ -194,6 +197,10 @@ possibly_embed_doc(#collector{db_name=DbName, query_args=Args},
         _ -> Row
     end.
 
+detach_partition(#view_row{key={p, _Partition, Key}} = Row) ->
+    Row#view_row{key = Key};
+detach_partition(#view_row{} = Row) ->
+    Row.
 
 keydict(undefined) ->
     undefined;
@@ -309,10 +316,26 @@ index_of(X, [X|_Rest], I) ->
 index_of(X, [_|Rest], I) ->
     index_of(X, Rest, I+1).
 
-get_shards(DbName, #mrargs{stable=true}) ->
-    mem3:ushards(DbName);
-get_shards(DbName, #mrargs{stable=false}) ->
-    mem3:shards(DbName).
+get_shards(Db, #mrargs{} = Args) ->
+    DbPartitioned = fabric_util:is_partitioned(Db),
+    Partition = couch_mrview_util:get_extra(Args, partition),
+    if DbPartitioned orelse Partition == undefined -> ok; true ->
+        throw({bad_request, <<"partition specified on non-partitioned db">>})
+    end,
+    DbName = fabric:dbname(Db),
+    % Decide which version of mem3:shards/1,2 or
+    % mem3:ushards/1,2 to use for the current
+    % request.
+    case {Args#mrargs.stable, Partition} of
+        {true, undefined} ->
+            mem3:ushards(DbName);
+        {true, Partition} ->
+            mem3:ushards(DbName, couch_partition:shard_key(Partition));
+        {false, undefined} ->
+            mem3:shards(DbName);
+        {false, Partition} ->
+            mem3:shards(DbName, couch_partition:shard_key(Partition))
+    end.
 
 maybe_update_others(DbName, DDoc, ShardsInvolved, ViewName,
     #mrargs{update=lazy} = Args) ->
