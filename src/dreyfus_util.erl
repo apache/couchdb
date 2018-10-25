@@ -288,7 +288,7 @@ get_local_purge_doc_body(Db, LocalDocId, PurgeSeq, Index) ->
     JsonList = {[
         {<<"_id">>, LocalDocId},
         {<<"purge_seq">>, PurgeSeq},
-        {<<"timestamp_utc">>, NowSecs},
+        {<<"updated_on">>, NowSecs},
         {<<"indexname">>, IdxName},
         {<<"ddoc_id">>, DDocId},
         {<<"signature">>, Sig},
