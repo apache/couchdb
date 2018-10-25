@@ -23,6 +23,7 @@
 go(DbName, Options) ->
     case validate_dbname(DbName, Options) of
     ok ->
+        couch_partition:validate_dbname(DbName, Options),
         case db_exists(DbName) of
         true ->
             {error, file_exists};
@@ -168,6 +169,10 @@ make_document([#shard{dbname=DbName}|_] = Shards, Suffix, Options) ->
         E when is_binary(E) -> [{<<"engine">>, E}];
         _ -> []
     end,
+    DbProps = case couch_util:get_value(props, Options) of
+        Props when is_list(Props) -> [{<<"props">>, {Props}}];
+        _ -> []
+    end,
     #doc{
         id = DbName,
         body = {[
@@ -175,7 +180,7 @@ make_document([#shard{dbname=DbName}|_] = Shards, Suffix, Options) ->
             {<<"changelog">>, lists:sort(RawOut)},
             {<<"by_node">>, {[{K,lists:sort(V)} || {K,V} <- ByNodeOut]}},
             {<<"by_range">>, {[{K,lists:sort(V)} || {K,V} <- ByRangeOut]}}
-        ] ++ EngineProp}
+        ] ++ EngineProp ++ DbProps}
     }.
 
 db_exists(DbName) -> is_list(catch mem3:shards(DbName)).
