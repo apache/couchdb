@@ -157,10 +157,10 @@ ensure_in_single_revision_leaf(DbName) ->
 
     [{ok, Doc2}] = Leaves,
     ?assertEqual(Doc, Doc2).
-    
+
 bulk_delete_create(DbName, InitRev) ->
     {ok, Db} = couch_db:open_int(DbName, []),
-    
+
     DeletedDoc = couch_doc:from_json_obj({[
         {<<"_id">>, ?DOC_ID},
         {<<"_rev">>, InitRev},
@@ -176,7 +176,7 @@ bulk_delete_create(DbName, InitRev) ->
 
     ?assertEqual(2, length([ok || {ok, _} <- Results])),
     [{ok, Rev1}, {ok, Rev2}] = Results,
-    
+
     {ok, Db2} = couch_db:open_int(DbName, []),
     {ok, [{ok, Doc1}]} = couch_db:open_doc_revs(
         Db2, ?DOC_ID, [Rev1], [conflicts, deleted_conflicts]),
