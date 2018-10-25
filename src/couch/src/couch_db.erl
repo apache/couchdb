@@ -185,11 +185,22 @@ reopen(#db{} = Db) ->
 incref(#db{} = Db) ->
     couch_db_engine:incref(Db).
 
-clustered_db(DbName, UserCtx) ->
-    clustered_db(DbName, UserCtx, []).
+clustered_db(DbName, Options) when is_list(Options) ->
+    UserCtx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
+    SecProps = couch_util:get_value(security, Options, []),
+    Props = couch_util:get_value(props, Options, []),
+    {ok, #db{
+        name = DbName,
+        user_ctx = UserCtx,
+        security = SecProps,
+        options = [{props, Props}]
+    }};
+
+clustered_db(DbName, #user_ctx{} = UserCtx) ->
+    clustered_db(DbName, [{user_ctx, UserCtx}]).
 
 clustered_db(DbName, UserCtx, SecProps) ->
-    {ok, #db{name = DbName, user_ctx = UserCtx, security = SecProps}}.
+    clustered_db(DbName, [{user_ctx, UserCtx}, {security, SecProps}]).
 
 is_db(#db{}) ->
     true;
