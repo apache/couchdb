@@ -19,6 +19,7 @@
 -export([log_timeout/2, remove_done_workers/2]).
 -export([is_users_db/1, is_replicator_db/1]).
 -export([open_cluster_db/1, open_cluster_db/2]).
+-export([is_partitioned/1]).
 -export([upgrade_mrargs/1]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
@@ -237,6 +238,14 @@ kv(Item, Count) ->
 
 doc_id_and_rev(#doc{id=DocId, revs={RevNum, [RevHash|_]}}) ->
     {DocId, {RevNum, RevHash}}.
+
+
+is_partitioned(DbName0) when is_binary(DbName0) ->
+    Shards = mem3:shards(fabric:dbname(DbName0)),
+    is_partitioned(open_cluster_db(hd(Shards)));
+
+is_partitioned(Db) ->
+    couch_db:is_partitioned(Db).
 
 
 upgrade_mrargs(#mrargs{} = Args) ->

@@ -57,6 +57,7 @@
     is_system_db/1,
     is_clustered/1,
     is_system_db_name/1,
+    is_partitioned/1,
 
     set_revs_limit/2,
     set_purge_infos_limit/2,
@@ -84,6 +85,9 @@
 
     get_minimum_purge_seq/1,
     purge_client_exists/3,
+
+    validate_docid/2,
+    doc_from_json_obj_validate/2,
 
     update_doc/3,
     update_doc/4,
@@ -216,6 +220,10 @@ is_clustered(#db{}) ->
     false;
 is_clustered(?OLD_DB_REC = Db) ->
     ?OLD_DB_MAIN_PID(Db) == undefined.
+
+is_partitioned(#db{options = Options}) ->
+    Props = couch_util:get_value(props, Options, []),
+    couch_util:get_value(partitioned, Props, false).
 
 ensure_full_commit(#db{main_pid=Pid, instance_start_time=StartTime}) ->
     ok = gen_server:call(Pid, full_commit, infinity),
@@ -797,6 +805,30 @@ name(#db{name=Name}) ->
     Name;
 name(?OLD_DB_REC = Db) ->
     ?OLD_DB_NAME(Db).
+
+
+validate_docid(#db{} = Db, DocId) when is_binary(DocId) ->
+    couch_doc:validate_docid(DocId, name(Db)),
+    case is_partitioned(Db) of
+        true ->
+            couch_partition:validate_docid(DocId);
+        false ->
+            ok
+    end.
+
+
+doc_from_json_obj_validate(#db{} = Db, DocJson) ->
+    Doc = couch_doc:from_json_obj_validate(DocJson, name(Db)),
+    {Props} = DocJson,
+    case couch_util:get_value(<<"_id">>, Props) of
+        DocId when is_binary(DocId) ->
+            % Only validate the docid if it was provided
+            validate_docid(Db, DocId);
+        _ ->
+            ok
+    end,
+    Doc.
+
 
 update_doc(Db, Doc, Options) ->
     update_doc(Db, Doc, Options, interactive_edit).

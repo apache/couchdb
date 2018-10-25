@@ -112,7 +112,9 @@ merge_results(Info) ->
             [{disk_format_version, lists:max(X)} | Acc];
         (cluster, [X], Acc) ->
             [{cluster, {X}} | Acc];
-        (_, _, Acc) ->
+        (props, Xs, Acc) ->
+            [{props, {merge_object(Xs)}} | Acc];
+        (_K, _V, Acc) ->
             Acc
     end, [{instance_start_time, <<"0">>}], Dict).
 
@@ -132,9 +134,16 @@ merge_object(Objects) ->
         lists:foldl(fun({K,V},D0) -> orddict:append(K,V,D0) end, D, Props)
     end, orddict:new(), Objects),
     orddict:fold(fun
-        (Key, X, Acc) ->
-            [{Key, lists:sum(X)} | Acc]
+        (Key, [X | _] = Xs, Acc) when is_integer(X) ->
+            [{Key, lists:sum(Xs)} | Acc];
+        (Key, [X | _] = Xs, Acc) when is_boolean(X) ->
+            [{Key, lists:all(fun all_true/1, Xs)} | Acc];
+        (_Key, _Xs, Acc) ->
+            Acc
     end, [], Dict).
+
+all_true(true) -> true;
+all_true(_) -> false.
 
 get_cluster_info(Shards) ->
     Dict = lists:foldl(fun(#shard{range = R}, Acc) ->

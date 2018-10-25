@@ -116,6 +116,7 @@ close_lru() ->
 
 create(DbName, Options0) ->
     Options = maybe_add_sys_db_callbacks(DbName, Options0),
+    couch_partition:validate_dbname(DbName, Options),
     case gen_server:call(couch_server, {create, DbName, Options}, infinity) of
     {ok, Db0} ->
         Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
@@ -220,6 +221,9 @@ init([]) ->
 
     % Mark pluggable storage engines as a supported feature
     config:enable_feature('pluggable-storage-engines'),
+
+    % Mark partitioned databases as a supported feature
+    config:enable_feature(partitions),
 
     % read config and register for configuration changes
 
