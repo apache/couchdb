@@ -105,11 +105,11 @@ before_doc_update(DbName, Docs, Opts) ->
     case {fabric_util:is_replicator_db(DbName), fabric_util:is_users_db(DbName)} of
         {true, _} ->
             %% fake db is expensive to create so we only do it if we have to
-            Db = fabric_util:fake_db(DbName, Opts),
+            Db = fabric_util:make_cluster_db(DbName, Opts),
             [couch_replicator_manager:before_doc_update(Doc, Db) || Doc <- Docs];
         {_, true} ->
             %% fake db is expensive to create so we only do it if we have to
-            Db = fabric_util:fake_db(DbName, Opts),
+            Db = fabric_util:make_cluster_db(DbName, Opts),
             [couch_users_db:before_doc_update(Doc, Db) || Doc <- Docs];
         _ ->
             Docs
