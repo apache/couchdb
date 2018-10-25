@@ -135,6 +135,32 @@ go(DbName, _Options, Workers, QueryArgs, Callback, Acc0) ->
         {ok, Resp}
     end.
 
+shards(Db, Args) ->
+    DbPartitioned = fabric_util:is_partitioned(Db),
+    Partition = couch_mrview_util:get_extra(Args, partition),
+    NewArgs = case {DbPartitioned, Partition} of
+        {true, undefined} ->
+            % If a user specifies the same partition on both
+            % the start and end keys we can optimize the
+            % query by limiting to the partition shard.
+            Start = couch_partition:extract(Args#mrargs.start_key),
+            End = couch_partition:extract(Args#mrargs.end_key),
+            case {Start, End} of
+                {{Partition, SK}, {Partition, EK}} ->
+                    A1 = Args#mrargs{
+                        start_key = SK,
+                        end_key = EK
+                    },
+                    couch_mrview_util:set_extra(A1, partition, Partition);
+                _ ->
+                    Args
+            end;
+        _ ->
+            Args
+    end,
+    fabric_view:get_shards(Db, NewArgs).
+
+
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
     fabric_view:check_down_shards(State, NodeRef);
 
