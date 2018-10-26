@@ -81,7 +81,7 @@ get(Handle, Key) when Handle /= undefined ->
     couch_epi_data_gen:get(Handle, Key).
 
 -spec get_value(Handle :: handle(), Subscriber :: app(), Key :: key()) ->
-    properties().
+    term().
 
 get_value(Handle, Subscriber, Key) when Handle /= undefined ->
     couch_epi_data_gen:get(Handle, Subscriber, Key).
