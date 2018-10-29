@@ -104,6 +104,7 @@ to_json(Idx) ->
         {ddoc, Idx#idx.ddoc},
         {name, Idx#idx.name},
         {type, Idx#idx.type},
+        {partitioned, Idx#idx.partitioned},
         {def, {def_to_json(Idx#idx.def)}}
     ]}.
 
