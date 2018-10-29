@@ -71,6 +71,7 @@ explain(Cursor) ->
         {include_docs, Args#mrargs.include_docs},
         {view_type, Args#mrargs.view_type},
         {reduce, Args#mrargs.reduce},
+        {partition, couch_mrview_util:get_extra(Args, partition, null)},
         {start_key, maybe_replace_max_json(Args#mrargs.start_key)},
         {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
         {direction, Args#mrargs.direction},
@@ -397,6 +398,11 @@ apply_opts([{update, false} | Rest], Args) ->
     NewArgs = Args#mrargs{
         update = false
     },
+    apply_opts(Rest, NewArgs);
+apply_opts([{partition, <<>>} | Rest], Args) ->
+    apply_opts(Rest, Args);
+apply_opts([{partition, Partition} | Rest], Args) when is_binary(Partition) ->
+    NewArgs = couch_mrview_util:set_extra(Args, partition, Partition),
     apply_opts(Rest, NewArgs);
 apply_opts([{_, _} | Rest], Args) ->
     % Ignore unknown options

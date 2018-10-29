@@ -71,6 +71,7 @@ explain(#cursor{}=Cursor) ->
     {[
         {dbname, mango_idx:dbname(Idx)},
         {index, mango_idx:to_json(Idx)},
+        {partitioned, mango_idx:partitioned(Idx)},
         {selector, Selector},
         {opts, {Opts}},
         {limit, Limit},
