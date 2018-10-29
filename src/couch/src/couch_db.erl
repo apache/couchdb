@@ -1114,69 +1114,35 @@ doc_tag(#doc{meta=Meta}) ->
     end.
 
 update_docs(Db, Docs0, Options, replicated_changes) ->
-    increment_stat(Db, [couchdb, database_writes]),
     Docs = tag_docs(Docs0),
-    DocBuckets = before_docs_update(Db, group_alike_docs(Docs)),
 
-    case (Db#db.validate_doc_funs /= []) orelse
-        lists:any(
-            fun(#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}) -> true;
-            (#doc{atts=Atts}) ->
-                Atts /= []
-            end, Docs) of
-    true ->
-        Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
-        ExistingDocs = get_full_doc_infos(Db, Ids),
-
-        {DocBuckets2, DocErrors} =
-                prep_and_validate_replicated_updates(Db, DocBuckets, ExistingDocs, [], []),
-        DocBuckets3 = [Bucket || [_|_]=Bucket <- DocBuckets2]; % remove empty buckets
-    false ->
-        DocErrors = [],
-        DocBuckets3 = DocBuckets
+    PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
+        prep_and_validate_replicated_updates(Db0, DocBuckets0,
+            ExistingDocInfos, [], [])
     end,
-    DocBuckets4 = [[doc_flush_atts(Db, check_dup_atts(Doc))
-            || Doc <- Bucket] || Bucket <- DocBuckets3],
-    {ok, []} = write_and_commit(Db, DocBuckets4, [], [merge_conflicts | Options]),
+
+    {ok, DocBuckets, NonRepDocs, DocErrors}
+        = before_docs_update(Db, Docs, PrepValidateFun),
+
+    DocBuckets2 = [[doc_flush_atts(Db, check_dup_atts(Doc))
+            || Doc <- Bucket] || Bucket <- DocBuckets],
+    {ok, _} = write_and_commit(Db, DocBuckets2,
+        NonRepDocs, [merge_conflicts | Options]),
     {ok, DocErrors};
 
 update_docs(Db, Docs0, Options, interactive_edit) ->
-    increment_stat(Db, [couchdb, database_writes]),
-    AllOrNothing = lists:member(all_or_nothing, Options),
     Docs = tag_docs(Docs0),
 
-    % Separate _local docs from normal docs
-    IsLocal = fun
-        (#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
-        (_) -> false
-    end,
-    {NonRepDocs, Docs2} = lists:partition(IsLocal, Docs),
-
-    DocBuckets = before_docs_update(Db, group_alike_docs(Docs2)),
-
-    case (Db#db.validate_doc_funs /= []) orelse
-        lists:any(
-            fun(#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}) ->
-                true;
-            (#doc{atts=Atts}) ->
-                Atts /= []
-            end, Docs2) of
-    true ->
-        % lookup the doc by id and get the most recent
-        Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
-        ExistingDocInfos = get_full_doc_infos(Db, Ids),
-
-        {DocBucketsPrepped, PreCommitFailures} = prep_and_validate_updates(Db,
-                DocBuckets, ExistingDocInfos, AllOrNothing, [], []),
-
-        % strip out any empty buckets
-        DocBuckets2 = [Bucket || [_|_] = Bucket <- DocBucketsPrepped];
-    false ->
-        PreCommitFailures = [],
-        DocBuckets2 = DocBuckets
+    AllOrNothing = lists:member(all_or_nothing, Options),
+    PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
+        prep_and_validate_updates(Db0, DocBuckets0, ExistingDocInfos,
+            AllOrNothing, [], [])
     end,
 
-    if (AllOrNothing) and (PreCommitFailures /= []) ->
+    {ok, DocBuckets, NonRepDocs, DocErrors}
+        = before_docs_update(Db, Docs, PrepValidateFun),
+
+    if (AllOrNothing) and (DocErrors /= []) ->
         RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),
         {aborted, lists:map(fun({Ref, Error}) ->
             #doc{id=Id,revs={Start,RevIds}} = dict:fetch(Ref, RefErrorDict),
@@ -1184,21 +1150,22 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
                 {Pos, [RevId | _]} -> {{Id, {Pos, RevId}}, Error};
                 {0, []} -> {{Id, {0, <<>>}}, Error}
             end
-        end, PreCommitFailures)};
+        end, DocErrors)};
     true ->
         Options2 = if AllOrNothing -> [merge_conflicts];
                 true -> [] end ++ Options,
-        DocBuckets3 = [[
+        DocBuckets2 = [[
                 doc_flush_atts(Db, set_new_att_revpos(
                         check_dup_atts(Doc)))
-                || Doc <- B] || B <- DocBuckets2],
-        {DocBuckets4, IdRevs} = new_revs(DocBuckets3, [], []),
+                || Doc <- B] || B <- DocBuckets],
+        {DocBuckets3, IdRevs} = new_revs(DocBuckets2, [], []),
 
-        {ok, CommitResults} = write_and_commit(Db, DocBuckets4, NonRepDocs, Options2),
+        {ok, CommitResults} = write_and_commit(Db, DocBuckets3,
+            NonRepDocs, Options2),
 
         ResultsDict = lists:foldl(fun({Key, Resp}, ResultsAcc) ->
             dict:store(Key, Resp, ResultsAcc)
-        end, dict:from_list(IdRevs), CommitResults ++ PreCommitFailures),
+        end, dict:from_list(IdRevs), CommitResults ++ DocErrors),
         {ok, lists:map(fun(Doc) ->
             dict:fetch(doc_tag(Doc), ResultsDict)
         end, Docs)}
@@ -1316,13 +1283,42 @@ prepare_doc_summaries(Db, BucketList) ->
         Bucket) || Bucket <- BucketList].
 
 
-before_docs_update(#db{} = Db, BucketList) ->
-    [lists:map(
-            fun(Doc) ->
-                DocWithBody = couch_doc:with_ejson_body(Doc),
-                couch_db_plugin:before_doc_update(Db, DocWithBody)
-            end,
-        Bucket) || Bucket <- BucketList].
+before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun) ->
+    increment_stat(Db, [couchdb, database_writes]),
+
+    % Separate _local docs from normal docs
+    IsLocal = fun
+        (#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
+        (_) -> false
+    end,
+    {NonRepDocs, Docs2} = lists:partition(IsLocal, Docs),
+
+    BucketList = group_alike_docs(Docs2),
+
+    DocBuckets = lists:map(fun(Bucket) ->
+        lists:map(fun(Doc) ->
+            DocWithBody = couch_doc:with_ejson_body(Doc),
+            couch_db_plugin:before_doc_update(Db, DocWithBody)
+        end, Bucket)
+    end, BucketList),
+
+    ValidatePred = fun
+        (#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>}) -> true;
+        (#doc{atts = Atts}) -> Atts /= []
+    end,
+
+    case (VDFuns /= []) orelse lists:any(ValidatePred, Docs2) of
+        true ->
+            % lookup the doc by id and get the most recent
+            Ids = [Id || [#doc{id = Id} | _] <- DocBuckets],
+            ExistingDocs = get_full_doc_infos(Db, Ids),
+            {DocBuckets2, DocErrors} = PVFun(Db, DocBuckets, ExistingDocs),
+             % remove empty buckets
+            DocBuckets3 = [Bucket || Bucket <- DocBuckets2, Bucket /= []],
+            {ok, DocBuckets3, NonRepDocs, DocErrors};
+        false ->
+            {ok, DocBuckets, NonRepDocs, []}
+    end.
 
 
 set_new_att_revpos(#doc{revs={RevPos,_Revs},atts=Atts0}=Doc) ->
