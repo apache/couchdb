@@ -339,20 +339,8 @@ args_to_proplist2(#index_query_args{} = Args) ->
 
 search_int(Pid, QueryArgs0) ->
     QueryArgs = dreyfus_util:upgrade(QueryArgs0),
-    case QueryArgs of
-        #index_query_args{counts=nil,ranges=nil,drilldown=[],include_fields=nil,
-                         highlight_fields=nil} ->
-            clouseau_rpc:search(
-                Pid,
-                QueryArgs#index_query_args.q,
-                QueryArgs#index_query_args.limit,
-                QueryArgs#index_query_args.stale =:= false,
-                QueryArgs#index_query_args.bookmark,
-                QueryArgs#index_query_args.sort);
-        _ ->
-            Props = args_to_proplist(QueryArgs),
-            clouseau_rpc:search(Pid, Props)
-    end.
+    Props = args_to_proplist(QueryArgs),
+    clouseau_rpc:search(Pid, Props).
 
 group1_int(Pid, QueryArgs0) ->
     QueryArgs = dreyfus_util:upgrade(QueryArgs0),
@@ -371,25 +359,8 @@ group1_int(Pid, QueryArgs0) ->
 
 group2_int(Pid, QueryArgs0) ->
     QueryArgs = dreyfus_util:upgrade(QueryArgs0),
-    case QueryArgs of
-        #index_query_args{include_fields=nil, highlight_fields=nil} -> %remove after upgrade
-            #index_query_args{
-                q = Query,
-                stale = Stale,
-                sort = DocSort,
-                limit = DocLimit,
-                grouping = #grouping{
-                    by = GroupBy,
-                    groups = Groups,
-                    sort = GroupSort
-                }
-            } = QueryArgs,
-            clouseau_rpc:group2(Pid, Query, GroupBy, Stale =:= false, Groups,
-                                GroupSort, DocSort, DocLimit);
-        _ ->
-            Props = args_to_proplist2(QueryArgs),
-            clouseau_rpc:group2(Pid, Props)
-    end.
+    Props = args_to_proplist2(QueryArgs),
+    clouseau_rpc:group2(Pid, Props).
 
 info_int(Pid) ->
     clouseau_rpc:info(Pid).
