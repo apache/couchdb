@@ -31,17 +31,10 @@ handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
     DbName = couch_db:name(Db),
     Start = os:timestamp(),
     QueryArgs = #index_query_args{
-        q = Query,
         include_docs = IncludeDocs,
         grouping = Grouping
     } = parse_index_params(Req),
-    case Query of
-        undefined ->
-            Msg = <<"Query must include a 'q' or 'query' argument">>,
-            throw({query_parse_error, Msg});
-        _ ->
-            ok
-    end,
+    validate_search_restrictions(Db, DDoc, QueryArgs),
     Response = case Grouping#grouping.by of
         nil ->
             case dreyfus_fabric_search:go(DbName, DDoc, IndexName, QueryArgs) of
@@ -206,6 +199,8 @@ parse_index_params(IndexParams) ->
 
 validate_index_query(q, Value, Args) ->
     Args#index_query_args{q=Value};
+validate_index_query(partition, Value, Args) ->
+    Args#index_query_args{partition=Value};
 validate_index_query(stale, Value, Args) ->
     Args#index_query_args{stale=Value};
 validate_index_query(limit, Value, Args) ->
@@ -254,6 +249,8 @@ parse_index_param("q", Value) ->
     [{q, ?l2b(Value)}];
 parse_index_param("query", Value) ->
     [{q, ?l2b(Value)}];
+parse_index_param("partition", Value) ->
+    [{partition, ?l2b(Value)}];
 parse_index_param("bookmark", Value) ->
     [{bookmark, ?l2b(Value)}];
 parse_index_param("sort", Value) ->
@@ -301,6 +298,8 @@ parse_json_index_param(<<"q">>, Value) ->
     [{q, Value}];
 parse_json_index_param(<<"query">>, Value) ->
     [{q, Value}];
+parse_json_index_param(<<"partition">>, Value) ->
+    [{partition, Value}];
 parse_json_index_param(<<"bookmark">>, Value) ->
     [{bookmark, Value}];
 parse_json_index_param(<<"sort">>, Value) ->
@@ -416,6 +415,63 @@ parse_non_negative_int_param(Name, Val, Prop, Default) ->
         Msg = io_lib:format(Fmt, [Name, Val]),
         throw({query_parse_error, ?l2b(Msg)})
     end.
+
+
+validate_search_restrictions(Db, DDoc, Args) ->
+    #index_query_args{
+        q = Query,
+        partition = Partition,
+        grouping = Grouping
+    } = Args,
+    #grouping{
+        by = GroupBy
+    } = Grouping,
+
+    case Query of
+        undefined ->
+            Msg1 = <<"Query must include a 'q' or 'query' argument">>,
+            throw({query_parse_error, Msg1});
+        _ ->
+            ok
+    end,
+
+    DbPartitioned = fabric_util:is_partitioned(Db),
+    ViewPartitioned = get_view_partition_option(DDoc, DbPartitioned),
+
+    case not DbPartitioned andalso is_binary(Partition) of
+        true ->
+            Msg2 = <<"`partition` not supported on this index">>,
+            throw({bad_request, Msg2});
+        false ->
+            ok
+    end,
+
+    case {ViewPartitioned, is_binary(Partition)} of
+        {false, false} ->
+            ok;
+        {true, true} -> 
+            ok;
+        {true, false} ->
+            Msg3 = <<"`partition` parameter is mandatory "
+                        "for queries to this index.">>,
+            throw({bad_request, Msg3});
+        {false, true} ->
+            Msg4 = <<"`partition` not supported on this index">>,
+            throw({bad_request, Msg4})
+    end,
+
+    case GroupBy /= nil andalso is_binary(Partition) of
+        true ->
+            Msg5 = <<"`group_by` and `partition` are incompatible">>,
+            throw({bad_request, Msg5});
+        false ->
+            ok
+    end.
+
+
+get_view_partition_option(#doc{body = {Props}}, Default) ->
+    {Options} = couch_util:get_value(<<"options">>, Props, {[]}),
+    couch_util:get_value(<<"partitioned">>, Options, Default).
 
 
 hits_to_json(DbName, IncludeDocs, Hits) ->

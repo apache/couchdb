@@ -32,6 +32,7 @@
 
 -record(index_query_args, {
     q,
+    partition=nil,
     limit=25,
     stale=false,
     include_docs=false,

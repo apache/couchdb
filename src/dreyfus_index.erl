@@ -305,6 +305,7 @@ index_name(#index{dbname=DbName,ddoc_id=DDocId,name=IndexName}) ->
 args_to_proplist(#index_query_args{} = Args) ->
     [
      {'query', Args#index_query_args.q},
+     {partition, Args#index_query_args.partition},
      {limit, Args#index_query_args.limit},
      {refresh, Args#index_query_args.stale =:= false},
      {'after', Args#index_query_args.bookmark},
