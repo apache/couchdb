@@ -57,22 +57,14 @@ should_have_uuid(Url) ->
         {ok, Status, _, Body} = test_request:get(Url, [?CONTENT_JSON, ?AUTH]),
         ?assertEqual(200, Status),
         {Json} = ?JSON_DECODE(Body),
-<<<<<<< HEAD
-=======
-        Version = couch_util:get_value(<<"version">>, Json, undefined),
->>>>>>> 41254f0a39c9ba428482c70d4c113cdc8993117f
         CouchDB = couch_util:get_value(<<"couchdb">>, Json, undefined),
         Uuid = couch_util:get_value(<<"uuid">>, Json, undefined),
         Features = couch_util:get_value(<<"features">>, Json, undefined),
         Sha = couch_util:get_value(<<"git_sha">>, Json, undefined),
         ?assertNotEqual(Sha, undefined),
         ?assertEqual(<<"Welcome">>, CouchDB),
-<<<<<<< HEAD
-
         RealUuid = couch_server:get_uuid(),
-=======
-        RealUuid = couch_server:get_version(),
->>>>>>> 41254f0a39c9ba428482c70d4c113cdc8993117f
+
         ?assertEqual(RealUuid, Uuid),
         ?assert(is_list(Features))
     end).
