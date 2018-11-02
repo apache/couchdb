@@ -50,6 +50,7 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
         {couchdb, WelcomeMessage},
         {version, list_to_binary(couch_server:get_version())},
         {git_sha, list_to_binary(couch_server:get_git_sha())},
+        {uuid, list_to_binary(couch_server:get_uuid())},
         {features, config:features()}
         ] ++ case config:get("vendor") of
         [] ->
