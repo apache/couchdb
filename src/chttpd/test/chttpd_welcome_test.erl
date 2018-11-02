@@ -45,11 +45,29 @@ welcome_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun should_have_version/1,
-                    fun should_have_features/1
+                    fun should_have_features/1,
+                    fun should_have_uuid/1
                 ]
             }
         }
     }.
+
+should_have_uuid(Url) ->
+    ?_test(begin
+        {ok, Status, _, Body} = test_request:get(Url, [?CONTENT_JSON, ?AUTH]),
+        ?assertEqual(200, Status),
+        {Json} = ?JSON_DECODE(Body),
+        CouchDB = couch_util:get_value(<<"couchdb">>, Json, undefined),
+        Uuid = couch_util:get_value(<<"uuid">>, Json, undefined),
+        Features = couch_util:get_value(<<"features">>, Json, undefined),
+        Sha = couch_util:get_value(<<"git_sha">>, Json, undefined),
+        ?assertNotEqual(Sha, undefined),
+        ?assertEqual(<<"Welcome">>, CouchDB),
+
+        RealUuid = couch_server:get_uuid(),
+        ?assertEqual(RealUuid, Uuid),
+        ?assert(is_list(Features))
+    end).
 
 
 should_have_version(Url) ->
