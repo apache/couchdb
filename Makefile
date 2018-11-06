@@ -149,6 +149,7 @@ check: all
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: couch
+	@ulimit -a && exit 1
 	@$(REBAR) setup_eunit 2> /dev/null
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 

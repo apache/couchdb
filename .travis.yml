@@ -49,6 +49,7 @@ env:
 
 # Then comment this section out
 before_script:
+  - ulimit -a
   - rm -rf /tmp/couchjslogs
   - mkdir -p /tmp/couchjslogs
   - ./configure -c --disable-docs --disable-fauxton
