@@ -13,7 +13,23 @@
 import random
 
 import mango
+import copy
 import unittest
+
+DOCS = [
+    {
+        "_id": "1",
+        "name": "Jimi",
+        "age": 10,
+        "cars": 1
+    },
+    {
+        "_id": "2",
+        "name": "kate",
+        "age": 8,
+        "cars": 0
+    }
+]
 
 class IndexCrudTests(mango.DbPerClass):
     def setUp(self):
@@ -270,6 +286,25 @@ class IndexCrudTests(mango.DbPerClass):
             self.db.list_indexes(limit=0)
         except Exception as e:
             self.assertEqual(e.response.status_code, 500)
+
+    def test_out_of_sync(self):
+        self.db.save_docs(copy.deepcopy(DOCS))
+        self.db.create_index(["age"], name="age")
+
+        selector = {
+            "age": {
+                "$gt": 0
+            },
+        }
+        docs = self.db.find(selector,
+            use_index="_design/a017b603a47036005de93034ff689bbbb6a873c4")
+        self.assertEqual(len(docs), 2)
+
+        self.db.delete_doc("1")
+
+        docs1 = self.db.find(selector, update="False",
+            use_index="_design/a017b603a47036005de93034ff689bbbb6a873c4")
+        self.assertEqual(len(docs1), 1)
 
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")

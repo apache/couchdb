@@ -229,6 +229,9 @@ view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
         doc = couch_util:get_value(doc, Row)
     },
     case ViewRow#view_row.doc of
+        null ->
+            put(mango_docs_examined, get(mango_docs_examined) + 1),
+            maybe_send_mango_ping();
         undefined ->
             ViewRow2 = ViewRow#view_row{
                 value = couch_util:get_value(value, Row)
@@ -427,7 +430,10 @@ doc_member(Cursor, RowProps) ->
                     match_doc(Selector, Doc, ExecutionStats1);
                 Else ->
                     Else
-            end
+            end;
+        null ->
+            ExecutionStats1 = mango_execution_stats:incr_docs_examined(ExecutionStats),
+            {no_match, null, {execution_stats, ExecutionStats1}}
     end.
 
 

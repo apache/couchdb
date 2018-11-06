@@ -113,6 +113,12 @@ class Database(object):
         r.raise_for_status()
         return r.json()
 
+    def delete_doc(self, docid):
+        r = self.sess.get(self.path(docid))
+        r.raise_for_status()
+        original_rev = r.json()['_rev']
+        self.sess.delete(self.path(docid), params={"rev": original_rev})
+
     def ddoc_info(self, ddocid):
         r = self.sess.get(self.path([ddocid, "_info"]))
         r.raise_for_status()
