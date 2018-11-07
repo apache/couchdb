@@ -127,3 +127,27 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.db.create_index(["name", "_rev"], ddoc="aaa")
         explain = self.db.find({"name": "Eddie"}, explain=True)
         self.assertEqual(explain["index"]["ddoc"], '_design/aaa')
+
+    def test_not_choose_index_with_not(self):
+        self.db.create_index(["tags"], ddoc="aaa")
+        selector = {
+            "$not": {
+                "tags": {
+                    "$elemMatch": {
+                    "$eq": "tags2"
+                    }
+                }
+            }
+        }
+        explain = self.db.find(selector, explain=True)
+        self.assertEqual(explain["index"]["name"], '_all_docs')
+    
+    def test_ne_chooses_index(self):
+        self.db.create_index(["tags"], ddoc="aaa")
+        selector = {
+            "tags": {
+                "$ne": "tags2"
+            }
+        }
+        explain = self.db.find(selector, explain=True)
+        self.assertEqual(explain["index"]["ddoc"], '_design/aaa')

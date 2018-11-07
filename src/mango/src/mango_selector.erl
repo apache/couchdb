@@ -628,6 +628,9 @@ has_required_fields_int([{[{<<"$and">>, Args}]} | Rest], RequiredFields)
     Remainder = has_required_fields_int(Args, RequiredFields),
     has_required_fields_int(Rest, Remainder);
 
+has_required_fields_int([{[{_Field, {[{<<"$not">>, _Args}]}}]} | Rest], RequiredFields) ->
+    has_required_fields_int(Rest, RequiredFields);
+
 has_required_fields_int([{[{Field, Cond}]} | Rest], RequiredFields) ->
     case Cond of
         % $exists:false is a special case - this is the only operator
