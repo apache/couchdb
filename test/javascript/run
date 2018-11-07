@@ -146,7 +146,7 @@ def main():
     sys.stderr.write("======================================================="
         + os.linesep)
     sys.stderr.write("JavaScript tests complete." + os.linesep)
-    sys.stderr.write("  Failed: {}.  Skipped or passed: {}.".format(
+    sys.stderr.write("  Failed: {0}.  Skipped or passed: {1}.".format(
         failed, passed) + os.linesep)
     exit(failed > 0)
 
