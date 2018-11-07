@@ -523,7 +523,8 @@ view_cleanup(DbName) ->
 count_users(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     DbPid = couch_db:get_pid(Db),
-    {monitored_by, Monitors} = process_info(DbPid, monitored_by),
+    {monitored_by, Monitors0} = process_info(DbPid, monitored_by),
+    Monitors = lists:filter(fun is_pid/1, Monitors0),
     CouchFiles = [P || P <- Monitors, couch_file:process_info(P) =/= undefined],
     ok = couch_db:close(Db),
     length(lists:usort(Monitors) -- [self() | CouchFiles]).

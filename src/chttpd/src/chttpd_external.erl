@@ -12,6 +12,8 @@
 
 -module(chttpd_external).
 
+-compile(tuple_calls).
+
 -export([handle_external_req/2, handle_external_req/3]).
 -export([send_external_response/2]).
 -export([json_req_obj_fields/0, json_req_obj/2, json_req_obj/3, json_req_obj/4]).

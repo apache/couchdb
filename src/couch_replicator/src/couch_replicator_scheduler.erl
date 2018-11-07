@@ -102,12 +102,17 @@ start_link() ->
 
 -spec add_job(#rep{}) -> ok.
 add_job(#rep{} = Rep) when Rep#rep.id /= undefined ->
-    Job = #job{
-        id = Rep#rep.id,
-        rep = Rep,
-        history = [{added, os:timestamp()}]
-    },
-    gen_server:call(?MODULE, {add_job, Job}, infinity).
+    case existing_replication(Rep) of
+        false ->
+            Job = #job{
+                id = Rep#rep.id,
+                rep = Rep,
+                history = [{added, os:timestamp()}]
+            },
+            gen_server:call(?MODULE, {add_job, Job}, infinity);
+        true ->
+            ok
+    end.
 
 
 -spec remove_job(job_id()) -> ok.
@@ -925,6 +930,17 @@ stats_fold(#job{pid = P, history = [{started, _} | _]}, Acc) when is_pid(P) ->
     Acc#stats_acc{running_n = Acc#stats_acc.running_n + 1}.
 
 
+-spec existing_replication(#rep{}) -> boolean().
+existing_replication(#rep{} = NewRep) ->
+    case job_by_id(NewRep#rep.id) of
+        {ok, #job{rep = CurRep}} ->
+            NormCurRep = couch_replicator_utils:normalize_rep(CurRep),
+            NormNewRep = couch_replicator_utils:normalize_rep(NewRep),
+            NormCurRep == NormNewRep;
+        {error, not_found} ->
+            false
+    end.
+
 
 -ifdef(TEST).
 
@@ -1017,6 +1033,7 @@ scheduler_test_() ->
             t_start_oldest_first(),
             t_dont_stop_if_nothing_pending(),
             t_max_churn_limits_number_of_rotated_jobs(),
+            t_existing_jobs(),
             t_if_pending_less_than_running_start_all_pending(),
             t_running_less_than_pending_swap_all_running(),
             t_oneshot_dont_get_rotated(),
@@ -1306,6 +1323,30 @@ t_if_permanent_job_crashes_it_stays_in_ets() ->
         [Latest | _] = Job1#job.history,
         ?assertMatch({{crashed, failed}, _}, Latest)
    end).
+
+
+t_existing_jobs() ->
+    ?_test(begin
+        Rep = #rep{
+            id = job1,
+            db_name = <<"db">>,
+            source = <<"s">>,
+            target = <<"t">>,
+            options = [{continuous, true}]
+        },
+        setup_jobs([#job{id = Rep#rep.id, rep = Rep}]),
+        NewRep = #rep{
+            id = Rep#rep.id,
+            db_name = <<"db">>,
+            source = <<"s">>,
+            target = <<"t">>,
+            options = [{continuous, true}]
+        },
+        ?assert(existing_replication(NewRep)),
+        ?assertNot(existing_replication(NewRep#rep{source = <<"s1">>})),
+        ?assertNot(existing_replication(NewRep#rep{target = <<"t1">>})),
+        ?assertNot(existing_replication(NewRep#rep{options = []}))
+    end).
 
 
 t_job_summary_running() ->

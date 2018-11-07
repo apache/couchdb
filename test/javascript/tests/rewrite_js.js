@@ -100,9 +100,12 @@ couchTests.rewrite = function(debug) {
             return {path: '_list/simpleForm/complexView2',
                     query: {key: JSON.stringify({"c": 1})}};
         }
-        if (req.path.slice(4).join('/') === 'simpleForm/complexView4') {
-            return {path: '_list/simpleForm/complexView2',
-                    query: {key: JSON.stringify({"c": 1})}};
+        if (req.path.slice(4).join('/') === 'simpleForm/sendBody1') {
+            return {path:   '_list/simpleForm/complexView2',
+                    method: 'POST',
+                    query:  {limit: '1'},
+                    headers:{'Content-type':'application/json'},
+                    body:  JSON.stringify( {keys: [{"c": 1}]} )};
         }
         if (req.path.slice(4).join('/') === '/') {
             return {path: '_view/basicView'};
@@ -282,6 +285,11 @@ couchTests.rewrite = function(debug) {
     xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/complexView4");
     T(xhr.status == 200, "with query params");
     T(/Value: doc 5/.test(xhr.responseText));
+
+    // COUCHDB-1612 - send body rewriting get to post
+    xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/simpleForm/sendBody1");
+    T(xhr.status == 200, "get->post rewrite failed:\n"+xhr.responseText);
+    T(/Value: doc 5 LineNo: 1/.test(xhr.responseText), "get->post rewrite responded wrong:\n"+xhr.responseText);
 
     // COUCHDB-2031 - path normalization versus qs params
     xhr = CouchDB.request("GET", "/"+dbName+"/_design/test/_rewrite/db/_design/test?meta=true");

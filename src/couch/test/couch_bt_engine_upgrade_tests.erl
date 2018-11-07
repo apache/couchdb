@@ -66,12 +66,13 @@ t_upgrade_without_purge_req() ->
         % db with zero purge entries
         DbName = <<"db_without_purge_req">>,
 
+        ?assertEqual(6, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
             ?assertEqual(0, couch_db:get_purge_seq(Db)),
             couch_db:fold_purge_infos(Db, 0, fun fold_fun/2, [])
         end),
         ?assertEqual([], UpgradedPurged),
-
+        ?assertEqual(7, get_disk_version_from_header(DbName)),
         {ok, Rev} = save_doc(
             DbName, {[{<<"_id">>, <<"doc4">>}, {<<"v">>, 1}]}
         ),
@@ -104,10 +105,12 @@ t_upgrade_with_1_purge_req() ->
         % with a single purge entry
         DbName = <<"db_with_1_purge_req">>,
 
+        ?assertEqual(6, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
             ?assertEqual(1, couch_db:get_purge_seq(Db)),
             couch_db:fold_purge_infos(Db, 0, fun fold_fun/2, [])
         end),
+        ?assertEqual(7, get_disk_version_from_header(DbName)),
         ?assertEqual([{1, <<"doc1">>}], UpgradedPurged),
 
         {ok, Rev} = save_doc(
@@ -142,10 +145,12 @@ t_upgrade_with_N_purge_req() ->
         % with two docs that have been purged
         DbName = <<"db_with_2_purge_req">>,
 
+        ?assertEqual(6, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
             ?assertEqual(2, couch_db:get_purge_seq(Db)),
             couch_db:fold_purge_infos(Db, 1, fun fold_fun/2, [])
         end),
+        ?assertEqual(7, get_disk_version_from_header(DbName)),
         ?assertEqual([{2, <<"doc2">>}], UpgradedPurged),
 
         {ok, Rev} = save_doc(DbName, {[{<<"_id">>, <<"doc4">>}, {<<"v">>, 1}]}),
@@ -179,10 +184,12 @@ t_upgrade_with_1_purge_req_for_2_docs() ->
         % with one purge req for Doc1 and another purge req for Doc 2 and Doc3
         DbName = <<"db_with_1_purge_req_for_2_docs">>,
 
+        ?assertEqual(6, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
             ?assertEqual(3, couch_db:get_purge_seq(Db)),
             couch_db:fold_purge_infos(Db, 1, fun fold_fun/2, [])
         end),
+        ?assertEqual(7, get_disk_version_from_header(DbName)),
         ?assertEqual([{3,<<"doc2">>},{2,<<"doc3">>}], UpgradedPurged),
 
         {ok, Rev} = save_doc(DbName, {[{<<"_id">>, <<"doc6">>}, {<<"v">>, 1}]}),
@@ -218,3 +225,13 @@ save_doc(DbName, Json) ->
 
 fold_fun({PSeq, _UUID, Id, _Revs}, Acc) ->
     {ok, [{PSeq, Id} | Acc]}.
+
+
+get_disk_version_from_header(DbFileName) ->
+    DbDir = config:get("couchdb", "database_dir"),
+    DbFilePath = filename:join([DbDir, ?l2b(?b2l(DbFileName) ++ ".couch")]),
+    {ok, Fd} = couch_file:open(DbFilePath, []),
+    {ok, Header} = couch_file:read_header(Fd),
+    DiskVerison = couch_bt_engine_header:disk_version(Header),
+    couch_file:close(Fd),
+    DiskVerison.

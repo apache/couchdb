@@ -46,7 +46,7 @@ test:
 # target: pip-install - Installs requires Python packages
 pip-install:
 	pip install nose requests
-	pip install hypothesis
+	pip install hypothesis==3.79.0
 
 
 .PHONY: venv

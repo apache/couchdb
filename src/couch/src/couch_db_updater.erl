@@ -627,28 +627,31 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
 
 
 update_local_doc_revs(Docs) ->
-    lists:map(fun({Client, NewDoc}) ->
-        #doc{
-            deleted = Delete,
-            revs = {0, PrevRevs}
-        } = NewDoc,
-        case PrevRevs of
-            [RevStr | _] ->
-                PrevRev = binary_to_integer(RevStr);
-            [] ->
-                PrevRev = 0
-        end,
-        NewRev = case Delete of
-            false ->
-                PrevRev + 1;
-            true  ->
-                0
-        end,
-        send_result(Client, NewDoc, {ok, {0, integer_to_binary(NewRev)}}),
-        NewDoc#doc{
-            revs = {0, [NewRev]}
-        }
-    end, Docs).
+    lists:foldl(fun({Client, Doc}, Acc) ->
+        case increment_local_doc_revs(Doc) of
+            {ok, #doc{revs = {0, [NewRev]}} = NewDoc} ->
+                send_result(Client, Doc, {ok, {0, integer_to_binary(NewRev)}}),
+                [NewDoc | Acc];
+            {error, Error} ->
+                send_result(Client, Doc, {error, Error}),
+                Acc
+        end
+    end, [], Docs).
+
+
+increment_local_doc_revs(#doc{deleted = true} = Doc) ->
+    {ok, Doc#doc{revs = {0, [0]}}};
+increment_local_doc_revs(#doc{revs = {0, []}} = Doc) ->
+    {ok, Doc#doc{revs = {0, [1]}}};
+increment_local_doc_revs(#doc{revs = {0, [RevStr | _]}} = Doc) ->
+    try
+        PrevRev = binary_to_integer(RevStr),
+        {ok, Doc#doc{revs = {0, [PrevRev + 1]}}}
+    catch error:badarg ->
+        {error, <<"Invalid rev format">>}
+    end;
+increment_local_doc_revs(#doc{}) ->
+    {error, <<"Invalid rev format">>}.
 
 
 purge_docs(Db, []) ->
@@ -808,3 +811,64 @@ hibernate_if_no_idle_limit() ->
         Timeout when is_integer(Timeout) ->
             Timeout
     end.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+update_local_doc_revs_test_() ->
+    {inparallel, [
+        {"Test local doc with valid rev", fun t_good_local_doc/0},
+        {"Test local doc with invalid rev", fun t_bad_local_doc/0},
+        {"Test deleted local doc", fun t_dead_local_doc/0}
+    ]}.
+
+
+t_good_local_doc() ->
+    Doc = #doc{
+        id = <<"_local/alice">>,
+        revs = {0, [<<"1">>]},
+        meta = [{ref, make_ref()}]
+    },
+    [NewDoc] = update_local_doc_revs([{self(), Doc}]),
+    ?assertEqual({0, [2]}, NewDoc#doc.revs),
+    {ok, Result} = receive_result(Doc),
+    ?assertEqual({ok,{0,<<"2">>}}, Result).
+
+
+t_bad_local_doc() ->
+    lists:foreach(fun(BadRevs) ->
+        Doc = #doc{
+            id = <<"_local/alice">>,
+            revs = BadRevs,
+            meta = [{ref, make_ref()}]
+        },
+        NewDocs = update_local_doc_revs([{self(), Doc}]),
+        ?assertEqual([], NewDocs),
+        {ok, Result} = receive_result(Doc),
+        ?assertEqual({error,<<"Invalid rev format">>}, Result)
+    end, [{0, [<<"a">>]}, {1, [<<"1">>]}]).
+
+
+
+t_dead_local_doc() ->
+    Doc = #doc{
+        id = <<"_local/alice">>,
+        revs = {0, [<<"122">>]},
+        deleted = true,
+        meta = [{ref, make_ref()}]
+    },
+    [NewDoc] = update_local_doc_revs([{self(), Doc}]),
+    ?assertEqual({0, [0]}, NewDoc#doc.revs),
+    {ok, Result} = receive_result(Doc),
+    ?assertEqual({ok,{0,<<"0">>}}, Result).
+
+
+receive_result(#doc{meta = Meta}) ->
+    Ref = couch_util:get_value(ref, Meta),
+    receive
+        {result, _, {Ref, Result}} -> {ok, Result}
+    end.
+
+-endif.

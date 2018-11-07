@@ -68,6 +68,8 @@ cluster_stable(Server) ->
 init(ChildMod) ->
     {ok, _Mem3Cluster} = mem3_cluster:start_link(?MODULE, self(),
         ?CLUSTER_STABILITY_PERIOD_SEC, ?CLUSTER_STABILITY_PERIOD_SEC),
+    start_servers(ChildMod),
+    couch_log:notice("~s : started servers", [ChildMod]),
     {ok, ChildMod}.
 
 

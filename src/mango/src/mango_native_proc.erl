@@ -89,11 +89,11 @@ handle_call({prompt, [<<"add_fun">>, IndexInfo]}, _From, St) ->
 handle_call({prompt, [<<"map_doc">>, Doc]}, _From, St) ->
     {reply, map_doc(St, mango_json:to_binary(Doc)), St};
 
-handle_call({prompt, [<<"reduce">>, _, _]}, _From, St) ->
-    {reply, null, St};
+handle_call({prompt, [<<"reduce">>, RedSrcs, _]}, _From, St) ->
+    {reply, [true, [null || _ <- RedSrcs]], St};
 
-handle_call({prompt, [<<"rereduce">>, _, _]}, _From, St) ->
-    {reply, null, St};
+handle_call({prompt, [<<"rereduce">>, RedSrcs, _]}, _From, St) ->
+    {reply, [true, [null || _ <- RedSrcs]], St};
 
 handle_call({prompt, [<<"index_doc">>, Doc]}, _From, St) ->
     Vals = case index_doc(St, mango_json:to_binary(Doc)) of
