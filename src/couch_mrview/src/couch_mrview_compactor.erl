@@ -86,7 +86,9 @@ compact(State) ->
         {type, view_compaction},
         {database, DbName},
         {design_document, IdxName},
-        {progress, 0}
+        {progress, 0},
+        {changes_done, 0},
+        {total_changes, TotalChanges}
     ]),
 
     BufferSize0 = config:get(
