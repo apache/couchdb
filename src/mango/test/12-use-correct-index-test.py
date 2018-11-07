@@ -22,6 +22,7 @@ DOCS = [
         "name": "Jimi",
         "location": "UK",
         "number": 4,
+        "tags": ["tags1", "tags2", "tags3"]
     },
     {
         "_id": "54af50622071121b25402dc3",
@@ -30,6 +31,7 @@ DOCS = [
         "name": "Eddie",
         "location": "ZAR",
         "number": 2,
+        "tags": ["tags1"]
     },
     {
         "_id": "54af50622071121b25402dc6",
@@ -37,13 +39,15 @@ DOCS = [
         "age": 6,
         "name": "Harry",
         "location": "US",
-        "number": 8,
+        "number":8,
+        "tags": ["tags2"]
     },
     {
         "_id": "54af50622071121b25402dc9",
         "name": "Eddie",
         "occupation": "engineer",
-        "number": 7,
+        "number":7,
+        "tags": []
     },
 ]
 
@@ -130,4 +134,50 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
     def test_choose_index_with_rev(self):
         self.db.create_index(["name", "_rev"], ddoc="aaa")
         explain = self.db.find({"name": "Eddie"}, explain=True)
-        self.assertEqual(explain["index"]["ddoc"], "_design/aaa")
+        self.assertEqual(explain["index"]["ddoc"], '_design/aaa')
+    
+    def test_dont_choose_index_with_exists_false(self):
+        self.db.create_index(["tags"])
+        selector = {
+            "$not": {
+                "tags": {
+                    "$elemMatch": {
+                    "$regex": "tags2"
+                    }
+                }
+            },
+            "tags": {"$exists": False},
+        }
+        explain = self.db.find(selector, explain=True)
+        self.assertEqual(explain["index"]["name"], '_all_docs')
+
+    def test_dont_choose_index_with_exists_false_two(self):
+        self.db.create_index(["tags"])
+        selector = {
+            "$or": [
+                {
+                    "tags": {
+                        "$elemMatch": {
+                            "$eq": "tag1"
+                        }
+                    },
+                },{
+                    "tags": {"$exists": False},
+                }
+            ]
+        }
+        explain = self.db.find(selector, explain=True)
+        self.assertEqual(explain["index"]["name"], '_all_docs')
+    
+    def test_negation_of_exists_false(self):
+        self.db.create_index(["tags"], ddoc="aaa")
+        selector = {
+            "$not": {
+                "tags": {
+                    "$exists": False
+                }
+            }
+        }
+        explain = self.db.find(selector, explain=True)
+        self.assertEqual(explain["index"]["ddoc"], '_design/aaa')
+        

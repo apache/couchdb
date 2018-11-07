@@ -573,27 +573,26 @@ match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
 % Returns true if Selector requires all  
 % fields in RequiredFields to exist in any matching documents.
 
+% Creates a tuple list with all fields initially set to false
 % For each condition in the selector, check
 % whether the field is in RequiredFields.
-% If it is, remove it from RequiredFields and continue
-% until we match then all or run out of selector to
+% If it is, set the field to true and continue
+% until run out of selector to
 % match against.
 
-has_required_fields(Selector, RequiredFields) ->
-    Remainder = has_required_fields_int(Selector, RequiredFields),
+has_required_fields(Selector, Fields) ->
+    RequiredFields = [{Field, false} || Field <- Fields],
+    RequiredFields1 = has_required_fields_int(Selector, RequiredFields),
+    Remainder = [Result || {_Field, Result} <- RequiredFields1, Result =:= false],
     Remainder == [].
 
 % Empty selector
-has_required_fields_int({[]}, Remainder) ->
-    Remainder;
-
-% No more required fields
-has_required_fields_int(_, []) ->
-    [];
+has_required_fields_int({[]}, RequiredFields) ->
+    RequiredFields;
 
 % No more selector
-has_required_fields_int([], Remainder) ->
-    Remainder;
+has_required_fields_int([], RequiredFields) ->
+    RequiredFields;
 
 has_required_fields_int(Selector, RequiredFields) when not is_list(Selector) ->
     has_required_fields_int([Selector], RequiredFields);
@@ -608,35 +607,42 @@ has_required_fields_int([{[{<<"$and">>, Args}]}], RequiredFields)
 % must be covered by all children.
 has_required_fields_int([{[{<<"$or">>, Args}]} | Rest], RequiredFields) 
         when is_list(Args) ->
-    Remainder0 = lists:foldl(fun(Arg, Acc) ->
+    RequiredFields0 = lists:foldl(fun(Arg, Acc) ->
         % for each child test coverage against the full
         % set of required fields
-        Remainder = has_required_fields_int(Arg, RequiredFields),
+        ProcessedFields = has_required_fields_int(Arg, RequiredFields),
 
         % collect the remaining fields across all children
-        Acc ++ Remainder
+        Acc ++ ProcessedFields
     end, [], Args),
 
     % remove duplicate fields
-    Remainder1 = lists:usort(Remainder0),
-    has_required_fields_int(Rest, Remainder1);
+    RequiredFields1 = lists:usort(RequiredFields0),
+    has_required_fields_int(Rest, RequiredFields1);
 
 % Handle $and operator where it has peers. Required fields
 % can be covered by any child.
 has_required_fields_int([{[{<<"$and">>, Args}]} | Rest], RequiredFields) 
         when is_list(Args) ->
-    Remainder = has_required_fields_int(Args, RequiredFields),
-    has_required_fields_int(Rest, Remainder);
+    RequiredFields1 = has_required_fields_int(Args, RequiredFields),
+    has_required_fields_int(Rest, RequiredFields1);
 
 has_required_fields_int([{[{Field, Cond}]} | Rest], RequiredFields) ->
-    case Cond of
+    RequiredFields1 = case {Cond, lists:keymember(Field, 1, RequiredFields)} of
         % $exists:false is a special case - this is the only operator
         % that explicitly does not require a field to exist
-        {[{<<"$exists">>, false}]} ->
-            has_required_fields_int(Rest, RequiredFields);
-        _ ->
-            has_required_fields_int(Rest, lists:delete(Field, RequiredFields))
-    end.
+        {{[{<<"$exists">>, false}]}, true} ->
+            % case lists:keymember(Field, 1, RequiredFields) of
+            %     true -> 
+                    [{exists, false}];
+                % false -> has_required_fields_int(Rest, RequiredFields)
+            % end;
+        {_, true} ->
+            lists:keyreplace(Field, 1, RequiredFields, {Field, true});
+        {_, false} ->
+            RequiredFields
+    end,
+    has_required_fields_int(Rest, RequiredFields1).
 
 
 % Returns true if a field in the selector is a constant value e.g. {a: {$eq: 1}}
@@ -666,6 +672,53 @@ is_constant_field([{[{_UnMatched, _}]} | Rest], Field) ->
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+
+exists_false_basic_test() ->
+    RequiredFields = [{<<"A">>, false}],
+    Selector = normalize({[{<<"A">>,{[{<<"$exists">>,false}]}}]}),
+    ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
+
+exists_false_basic_two_test() ->
+    RequiredFields = [{<<"A">>, true}],
+    Selector = normalize({[{<<"A">>,{[{<<"$exists">>,false}]}}]}),
+    ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
+
+exists_false_basic_three_test() ->
+    RequiredFields = [{<<"A">>, false}],
+    Selector = normalize({[{<<"A">>,{[{<<"$exists">>,true}]}}]}),
+    ?assertEqual([{<<"A">>, true}], has_required_fields_int(Selector, RequiredFields)).
+
+exists_false_and_test() ->
+    RequiredFields = [{<<"age">>, false}],
+    Selector = normalize({[{<<"$and">>,
+        [
+            {[{<<"cars">>,{[{<<"$eq">>,<<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$exists">>,false}]}}]}
+        ]
+    }]}),
+    ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
+
+exists_false_and_repeat_test() ->
+    RequiredFields = [{<<"age">>, false}],
+    Selector = normalize({[{<<"$and">>,
+        [
+            {[{<<"age">>,{[{<<"$eq">>,<<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$exists">>,false}]}}]}
+        ]
+    }]}),
+    ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
+
+exists_false_or_test() ->
+    RequiredFields = [{<<"age">>, false}],
+    Selector = normalize({[{<<"$or">>,
+        [
+            {[{<<"age">>,{[{<<"$eq">>,<<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$exists">>,false}]}}]}
+        ]
+    }]}),
+    % Check that on side sees exist false and the other age: true. In required_fields this would 
+    % still be rejected as there would be a false tuple in the array.
+    ?assertEqual([{exists, false}, {<<"age">>, true}], has_required_fields_int(Selector, RequiredFields)).
 
 is_constant_field_basic_test() ->
     Selector = normalize({[{<<"A">>, <<"foo">>}]}),
