@@ -279,7 +279,7 @@ without needing any other steps like setting git upstreams! :sparkles:
 
 ## Thanks
 
-Special thanks to [Hoodie][https://github.com/hoodiehq/hoodie] for the great
+Special thanks to [Hoodie](https://github.com/hoodiehq/hoodie) for the great
 CONTRIBUTING.md template.
 
 [1]: http://mail-archives.apache.org/mod_mbox/couchdb-user/
