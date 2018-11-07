@@ -15,6 +15,8 @@
 -vsn(1).
 -behaviour(config_listener).
 
+-compile(tuple_calls).
+
 -export([start_link/0, reload/0, get_state/0, dispatch_host/1]).
 -export([urlsplit_netloc/2, redirect_to_vhost/2]).
 -export([host/1, split_host_port/1]).

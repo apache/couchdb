@@ -12,6 +12,7 @@
 
 -module(chttpd_prefer_header).
 
+-compile(tuple_calls).
 
 -export([
     maybe_return_minimal/2

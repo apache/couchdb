@@ -12,6 +12,8 @@
 
 -module(fabric_doc_attachments).
 
+-compile(tuple_calls).
+
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 

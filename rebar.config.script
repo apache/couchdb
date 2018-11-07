@@ -52,7 +52,7 @@ DepDescs = [
 {b64url,           "b64url",           {tag, "1.0.1"}},
 {ets_lru,          "ets-lru",          {tag, "1.0.0"}},
 {khash,            "khash",            {tag, "1.0.1"}},
-{snappy,           "snappy",           {tag, "CouchDB-1.0.1"}},
+{snappy,           "snappy",           {tag, "CouchDB-1.0.2"}},
 {ioq,              "ioq",              {tag, "1.0.1"}},
 
 %% Non-Erlang deps
@@ -65,7 +65,7 @@ DepDescs = [
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-4"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-2"}},
-{mochiweb,         "mochiweb",         {tag, "v2.17.0"}},
+{mochiweb,         "mochiweb",         {tag, "CouchDB-v2.18.0-1"}},
 {meck,             "meck",             {tag, "0.8.8"}}
 ],
 
@@ -91,7 +91,7 @@ ErlOpts = case os:getenv("ERL_OPTS") of
 end,
 
 AddConfig = [
-    {require_otp_vsn, "17|18|19|20"},
+    {require_otp_vsn, "17|18|19|20|21"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, SubDirs},
