@@ -18,6 +18,7 @@ dev/lib/
 dev/logs/
 ebin/
 erl_crash.dump
+erln8.config
 install.mk
 rel/*.config
 rel/couchdb
