@@ -118,7 +118,6 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
         source_name = SourceName,
         target_name = TargetName,
         start_seq = {_Ts, StartSeq},
-        committed_seq = {_, CommittedSeq},
         highest_seq_done = {_, HighestSeq},
         checkpoint_interval = CheckpointInterval
     } = State = init_state(Rep),
@@ -159,16 +158,9 @@ do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
         {source, ?l2b(SourceName)},
         {target, ?l2b(TargetName)},
         {continuous, get_value(continuous, Options, false)},
-        {revisions_checked, 0},
-        {missing_revisions_found, 0},
-        {docs_read, 0},
-        {docs_written, 0},
-        {changes_pending, get_pending_count(State)},
-        {doc_write_failures, 0},
         {source_seq, HighestSeq},
-        {checkpointed_source_seq, CommittedSeq},
         {checkpoint_interval, CheckpointInterval}
-    ]),
+    ] ++ rep_stats(State)),
     couch_task_status:set_update_frequency(1000),
 
     % Until OTP R14B03:
@@ -582,7 +574,8 @@ init_state(Rep) ->
         source = Src0, target = Tgt,
         options = Options, user_ctx = UserCtx,
         type = Type, view = View,
-        start_time = StartTime
+        start_time = StartTime,
+        stats = Stats
     } = Rep,
     % Adjust minimum number of http source connections to 2 to avoid deadlock
     Src = adjust_maxconn(Src0, BaseId),
@@ -631,7 +624,8 @@ init_state(Rep) ->
         checkpoint_interval = get_value(checkpoint_interval, Options,
                                         ?DEFAULT_CHECKPOINT_INTERVAL),
         type = Type,
-        view = View
+        view = View,
+        stats = Stats
     },
     State#rep_state{timer = start_timer(State)}.
 
@@ -983,11 +977,17 @@ update_task(State) ->
         current_through_seq = {_, ThroughSeq},
         highest_seq_done = {_, HighestSeq}
     } = State,
+    update_scheduler_job_stats(State),
     couch_task_status:update(
         rep_stats(State) ++ [
         {source_seq, HighestSeq},
         {through_seq, ThroughSeq}
     ]).
+
+
+update_scheduler_job_stats(#rep_state{rep_details = Rep, stats = Stats}) ->
+    JobId = Rep#rep.id,
+    couch_replicator_scheduler:update_job_stats(JobId, Stats).
 
 
 rep_stats(State) ->
