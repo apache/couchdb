@@ -11,6 +11,9 @@
 % the License.
 
 -module(couch_httpd).
+
+-compile(tuple_calls).
+
 -include_lib("couch/include/couch_db.hrl").
 
 -export([start_link/0, start_link/1, stop/0, handle_request/5]).
@@ -37,6 +40,8 @@
 
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
+-define(MAX_DRAIN_BYTES, 1048576).
+-define(MAX_DRAIN_TIME_MSEC, 1000).
 
 start_link() ->
     start_link(http).
@@ -1178,10 +1183,9 @@ respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
     % just increases the chances of 413 being detected correctly by the client
     % (rather than getting a brutal TCP reset).
     erlang:put(mochiweb_request_force_close, true),
-    Socket = MochiReq:get(socket),
-    mochiweb_socket:recv(Socket, 0, 0),
     Result = MochiReq:Type({413, Headers, Args}),
-    mochiweb_socket:recv(Socket, 0, 0),
+    Socket = MochiReq:get(socket),
+    mochiweb_socket:recv(Socket, ?MAX_DRAIN_BYTES, ?MAX_DRAIN_TIME_MSEC),
     Result;
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).

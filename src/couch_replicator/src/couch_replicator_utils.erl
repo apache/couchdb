@@ -28,7 +28,8 @@
    pp_rep_id/1,
    iso8601/1,
    filter_state/3,
-   remove_basic_auth_from_headers/1
+   remove_basic_auth_from_headers/1,
+   normalize_rep/1
 ]).
 
 -export([
@@ -208,6 +209,25 @@ decode_basic_creds(Base64) ->
     end.
 
 
+% Normalize a #rep{} record such that it doesn't contain time dependent fields
+% pids (like httpc pools), and options / props are sorted. This function would
+% used during comparisons.
+-spec normalize_rep(#rep{} | nil) -> #rep{} | nil.
+normalize_rep(nil) ->
+    nil;
+
+normalize_rep(#rep{} = Rep)->
+    #rep{
+        source = couch_replicator_api_wrap:normalize_db(Rep#rep.source),
+        target = couch_replicator_api_wrap:normalize_db(Rep#rep.target),
+        options = Rep#rep.options,  % already sorted in make_options/1
+        type = Rep#rep.type,
+        view = Rep#rep.view,
+        doc_id = Rep#rep.doc_id,
+        db_name = Rep#rep.db_name
+    }.
+
+
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -258,5 +278,32 @@ remove_basic_auth_from_headers_test_() ->
 b64creds(User, Pass) ->
     base64:encode_to_string(User ++ ":" ++ Pass).
 
+
+normalize_rep_test_() ->
+    {
+        setup,
+        fun() -> meck:expect(config, get,
+            fun(_, _, Default) -> Default end)
+        end,
+        fun(_) -> meck:unload() end,
+        ?_test(begin
+            EJson1 = {[
+                {<<"source">>, <<"http://host.com/source_db">>},
+                {<<"target">>, <<"local">>},
+                {<<"doc_ids">>, [<<"a">>, <<"c">>, <<"b">>]},
+                {<<"other_field">>, <<"some_value">>}
+            ]},
+            Rep1 = couch_replicator_docs:parse_rep_doc_without_id(EJson1),
+            EJson2 = {[
+                {<<"other_field">>, <<"unrelated">>},
+                {<<"target">>, <<"local">>},
+                {<<"source">>, <<"http://host.com/source_db">>},
+                {<<"doc_ids">>, [<<"c">>, <<"a">>, <<"b">>]},
+                {<<"other_field2">>, <<"unrelated2">>}
+            ]},
+            Rep2 = couch_replicator_docs:parse_rep_doc_without_id(EJson2),
+            ?assertEqual(normalize_rep(Rep1), normalize_rep(Rep2))
+        end)
+    }.
 
 -endif.

@@ -366,6 +366,14 @@ save_rep_doc(DbName, Doc) ->
     {ok, Db} = couch_db:open_int(DbName, [?CTX, sys_db]),
     try
         couch_db:update_doc(Db, Doc, [])
+    catch
+        % User can accidently write a VDU which prevents _replicator from
+        % updating replication documents. Avoid crashing replicator and thus
+        % preventing all other replication jobs on the node from running.
+        throw:{forbidden, Reason} ->
+            Msg = "~p VDU function preventing doc update to ~s ~s ~p",
+            couch_log:error(Msg, [?MODULE, DbName, Doc#doc.id, Reason]),
+            {ok, forbidden}
     after
         couch_db:close(Db)
     end.
@@ -694,7 +702,9 @@ error_reason(Reason) ->
 
 -ifdef(TEST).
 
--include_lib("eunit/include/eunit.hrl").
+
+-include_lib("couch/include/couch_eunit.hrl").
+
 
 check_options_pass_values_test() ->
     ?assertEqual(check_options([]), []),
@@ -765,5 +775,51 @@ check_strip_credentials_test() ->
             {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"baz">>}]}
         }
     ]].
+
+
+setup() ->
+    DbName = ?tempdb(),
+    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
+    ok = couch_db:close(Db),
+    create_vdu(DbName),
+    DbName.
+
+
+teardown(DbName) when is_binary(DbName) ->
+    couch_server:delete(DbName, [?ADMIN_CTX]),
+    ok.
+
+
+create_vdu(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        VduFun = <<"function(newdoc, olddoc, userctx) {throw({'forbidden':'fail'})}">>,
+        Doc = #doc{
+            id = <<"_design/vdu">>,
+            body = {[{<<"validate_doc_update">>, VduFun}]}
+        },
+        {ok, _} = couch_db:update_docs(Db, [Doc]),
+        couch_db:ensure_full_commit(Db)
+    end).
+
+
+update_replicator_doc_with_bad_vdu_test_() ->
+    {
+        setup,
+        fun test_util:start_couch/0,
+        fun test_util:stop_couch/1,
+        {
+            foreach, fun setup/0, fun teardown/1,
+            [
+                fun t_vdu_does_not_crash_on_save/1
+            ]
+        }
+    }.
+
+
+t_vdu_does_not_crash_on_save(DbName) ->
+    ?_test(begin
+        Doc = #doc{id = <<"some_id">>, body = {[{<<"foo">>, 42}]}},
+        ?assertEqual({ok, forbidden}, save_rep_doc(DbName, Doc))
+    end).
 
 -endif.

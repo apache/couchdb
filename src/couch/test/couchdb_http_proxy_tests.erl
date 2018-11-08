@@ -12,6 +12,8 @@
 
 -module(couchdb_http_proxy_tests).
 
+-compile(tuple_calls).
+
 -include_lib("couch/include/couch_eunit.hrl").
 
 -record(req, {method=get, path="", headers=[], body="", opts=[]}).

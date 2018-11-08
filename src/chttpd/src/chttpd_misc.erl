@@ -50,6 +50,7 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
         {couchdb, WelcomeMessage},
         {version, list_to_binary(couch_server:get_version())},
         {git_sha, list_to_binary(couch_server:get_git_sha())},
+        {uuid, couch_server:get_uuid()},
         {features, config:features()}
         ] ++ case config:get("vendor") of
         [] ->
@@ -178,6 +179,7 @@ handle_dbs_info_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
 handle_task_status_req(#httpd{method='GET'}=Req) ->
+    ok = chttpd:verify_is_server_admin(Req),
     {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),
     Response = lists:flatmap(fun({Node, Tasks}) ->
         [{[{node,Node} | Task]} || Task <- Tasks]
@@ -240,7 +242,10 @@ cancel_replication(PostBody, Ctx) ->
         [] ->
             {error, badrpc};
         Else ->
-            hd(Else)
+            % Unclear what to do here -- pick the first error?
+            % Except try ignoring any {error, not_found} responses
+            % because we'll always get two of those
+            hd(Else -- [{error, not_found}])
         end
     end.
 

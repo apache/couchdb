@@ -11,6 +11,8 @@
 % the License.
 -module(couch_httpd_proxy).
 
+-compile(tuple_calls).
+
 -export([handle_proxy_req/2]).
 
 -include_lib("couch/include/couch_db.hrl").

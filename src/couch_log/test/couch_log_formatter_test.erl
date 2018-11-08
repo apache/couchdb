@@ -37,6 +37,29 @@ format_reason_test() ->
     ?assertEqual(Formatted, lists:flatten(Entry#log_entry.msg)).
 
 
+crashing_formatting_test() ->
+    Pid = self(),
+    Event = {
+        error,
+        erlang:group_leader(),
+        {
+            Pid,
+            "** Generic server and some stuff",
+            [a_gen_server, {foo, bar}, server_state]  % not enough args!
+        }
+    },
+    ?assertMatch(
+        #log_entry{
+            level = error,
+            pid = Pid
+        },
+        do_format(Event)
+    ),
+    do_matches(do_format(Event), [
+        "Encountered error {error,{badmatch"
+    ]).
+
+
 gen_server_error_test() ->
     Pid = self(),
     Event = {
@@ -59,7 +82,35 @@ gen_server_error_test() ->
         "gen_server a_gen_server terminated",
         "with reason: some_reason",
         "last msg: {foo,bar}",
-        "state: server_state"
+        "state: server_state",
+        "extra: \\[\\]"
+    ]).
+
+
+gen_server_error_with_extra_args_test() ->
+    Pid = self(),
+    Event = {
+        error,
+        erlang:group_leader(),
+        {
+            Pid,
+            "** Generic server and some stuff",
+            [a_gen_server, {foo, bar}, server_state, some_reason, sad, args]
+        }
+    },
+    ?assertMatch(
+        #log_entry{
+            level = error,
+            pid = Pid
+        },
+        do_format(Event)
+    ),
+    do_matches(do_format(Event), [
+        "gen_server a_gen_server terminated",
+        "with reason: some_reason",
+        "last msg: {foo,bar}",
+        "state: server_state",
+        "extra: \\[sad,args\\]"
     ]).
 
 
@@ -85,7 +136,35 @@ gen_fsm_error_test() ->
         "gen_fsm a_gen_fsm in state state_name",
         "with reason: barf",
         "last msg: {ohai,there}",
-        "state: curr_state"
+        "state: curr_state",
+        "extra: \\[\\]"
+    ]).
+
+
+gen_fsm_error_with_extra_args_test() ->
+    Pid = self(),
+    Event = {
+        error,
+        erlang:group_leader(),
+        {
+            Pid,
+            "** State machine did a thing",
+            [a_gen_fsm, {ohai,there}, state_name, curr_state, barf, sad, args]
+        }
+    },
+    ?assertMatch(
+        #log_entry{
+            level = error,
+            pid = Pid
+        },
+        do_format(Event)
+    ),
+    do_matches(do_format(Event), [
+        "gen_fsm a_gen_fsm in state state_name",
+        "with reason: barf",
+        "last msg: {ohai,there}",
+        "state: curr_state",
+        "extra: \\[sad,args\\]"
     ]).
 
 

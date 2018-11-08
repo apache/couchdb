@@ -12,6 +12,8 @@
 
 -module(couch_httpd_external).
 
+-compile(tuple_calls).
+
 -export([handle_external_req/2, handle_external_req/3]).
 -export([send_external_response/2, json_req_obj/2, json_req_obj/3]).
 -export([default_or_content_type/2, parse_external_response/1]).

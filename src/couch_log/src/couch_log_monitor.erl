@@ -38,6 +38,7 @@ start_link() ->
 
 
 init(_) ->
+    error_logger:start(),
     ok = gen_event:add_sup_handler(error_logger, ?HANDLER_MOD, []),
     {ok, nil}.
 

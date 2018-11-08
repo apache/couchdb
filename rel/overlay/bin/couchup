@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python2
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
 # the License at
@@ -172,6 +172,25 @@ def _put_filter(args, db=None):
             print(exc.response.text)
             exit(1)
 
+def _do_security(args, db=None):
+    """Copies the _security object from source to target DB."""
+    try:
+        req = requests.get(
+            'http://127.0.0.1:{}/{}/_security'.format(
+                args['local_port'], db),
+                auth=args['creds'])
+        req.raise_for_status()
+        security_doc = _tojson(req)
+        req = requests.put(
+            'http://127.0.0.1:{}/{}/_security'.format(
+                args['clustered_port'], db),
+                data=json.dumps(security_doc),
+                auth=args['creds'])
+        req.raise_for_status()
+    except requests.exceptions.HTTPError as exc:
+        print(exc.response.text)
+        exit(1)
+
 def _replicate(args):
     args = _args(args)
     if args['all_dbs']:
@@ -229,6 +248,11 @@ def _replicate(args):
         if req.get('no_changes'):
             if not args['quiet']:
                 print("No changes, replication is caught up.")
+
+        if not args['quiet']:
+            print('Copying _security object for ' + db + '...')
+        _do_security(args, db)
+
         if not args['quiet']:
             print("Replication complete.")
 
@@ -474,7 +498,11 @@ def main(argv):
     parser_delete.set_defaults(func=_delete)
 
     args = parser.parse_args(argv[1:])
-    args.func(args)
+    try:
+        args.func(args)
+    except AttributeError:
+        parser.print_help()
+        sys.exit(0)
 
 if __name__ == '__main__':
     main(sys.argv)

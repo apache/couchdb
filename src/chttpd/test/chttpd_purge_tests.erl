@@ -70,6 +70,7 @@ purge_test_() ->
                 [
                     fun test_empty_purge_request/1,
                     fun test_ok_purge_request/1,
+                    fun test_accepted_purge_request/1,
                     fun test_partial_purge_request/1,
                     fun test_mixed_purge_request/1,
                     fun test_overmany_ids_or_revs_purge_request/1,
@@ -132,6 +133,38 @@ test_ok_purge_request(Url) ->
                 ]},
                 ResultJson
             )
+    end).
+
+
+test_accepted_purge_request(Url) ->
+    ?_test(begin
+        {ok, _, _, Body} = create_doc(Url, "doc1"),
+        {Json} = ?JSON_DECODE(Body),
+        Rev1 = couch_util:get_value(<<"rev">>, Json, undefined),
+        IdsRevsEJson = {[
+            {<<"doc1">>, [Rev1]}
+        ]},
+        IdsRevs = binary_to_list(?JSON_ENCODE(IdsRevsEJson)),
+        meck:new(fabric, [passthrough]),
+        meck:expect(fabric, purge_docs,
+            fun(_, _, _) -> {accepted,[{accepted,[{1,
+                <<57,27,64,134,152,18,73,243,40,1,141,214,135,104,79,188>>}]}]}
+            end
+        ),
+        {ok, Status, _, ResultBody} = test_request:post(Url ++ "/_purge/",
+            [?CONTENT_JSON, ?AUTH], IdsRevs),
+        ResultJson = ?JSON_DECODE(ResultBody),
+        meck:unload(fabric),
+        ?assert(Status =:= 202),
+        ?assertEqual(
+            {[
+                {<<"purge_seq">>, null},
+                {<<"purged">>, {[
+                    {<<"doc1">>, [Rev1]}
+                ]}}
+            ]},
+            ResultJson
+        )
     end).
 
 
