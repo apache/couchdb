@@ -55,7 +55,6 @@ get_status() ->
 
 init([]) ->
     Seeds = get_seeds(),
-    timer:send_interval(?REPLICATION_INTERVAL, start_replication),
     InitStatus = [{Seed, {[]}} || Seed <- Seeds],
     State = #st{
         seeds = Seeds,
