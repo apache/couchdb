@@ -19,7 +19,7 @@
     find_common_seq/4,
     get_missing_revs/4,
     update_docs/4,
-    pull_from_seed/1,
+    pull_replication/1,
     load_checkpoint/4,
     save_checkpoint/6,
 
@@ -46,7 +46,7 @@
 % "Pull" is a bit of a misnomer here, as what we're actually doing is
 % issuing an RPC request and telling the remote node to push updates to
 % us. This lets us reuse all of the battle-tested machinery of mem3_rpc.
-pull_from_seed(Seed) ->
+pull_replication(Seed) ->
     rexi_call(Seed, {mem3_rpc, pull_replication_rpc, [node()]}).
 
 get_missing_revs(Node, DbName, IdsRevs, Options) ->

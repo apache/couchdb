@@ -97,7 +97,7 @@ start_replication([]) ->
     nil;
 start_replication([Seed | _]) ->
     spawn_monitor(fun() ->
-        Reply = mem3_rpc:pull_from_seed(Seed),
+        Reply = mem3_rpc:pull_replication(Seed),
         exit({ok, Reply})
     end).
 
