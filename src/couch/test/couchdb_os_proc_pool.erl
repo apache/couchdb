@@ -206,8 +206,7 @@ should_reduce_pool_on_idle_os_procs() ->
 
 
 setup_config() ->
-    MFA = "{couch_native_process, start_link, []}",
-    config:set("native_query_servers", "test_lang", MFA, false),
+    config:set("native_query_servers", "enable_erlang_query_server", "true", false),
     config:set("query_server_config", "os_process_limit", "3", false),
     config:set("query_server_config", "os_process_soft_limit", "2", false),
     ok = confirm_config("os_process_soft_limit", "2").
@@ -235,7 +234,7 @@ spawn_client() ->
     Parent = self(),
     Ref = make_ref(),
     Pid = spawn(fun() ->
-        Proc = couch_query_servers:get_os_process(<<"test_lang">>),
+        Proc = couch_query_servers:get_os_process(<<"erlang">>),
         loop(Parent, Ref, Proc)
     end),
     {Pid, Ref}.
@@ -245,7 +244,7 @@ spawn_client(DDocId) ->
     Ref = make_ref(),
     Pid = spawn(fun() ->
         DDocKey = {DDocId, <<"1-abcdefgh">>},
-        DDoc = #doc{body={[{<<"language">>, <<"test_lang">>}]}},
+        DDoc = #doc{body={[{<<"language">>, <<"erlang">>}]}},
         Proc = couch_query_servers:get_ddoc_process(DDoc, DDocKey),
         loop(Parent, Ref, Proc)
     end),
