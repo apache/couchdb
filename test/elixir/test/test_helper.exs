@@ -200,8 +200,9 @@ defmodule CouchTestCase do
       end
 
       defp retry_until(condition, start, sleep, timeout) do
-        if (now(:ms) > start + timeout) do
-          raise "timed out"
+        now = now(:ms)
+        if now > start + timeout do
+          raise "timed out after #{now - start} ms"
         else
           if condition.() do
             :ok
