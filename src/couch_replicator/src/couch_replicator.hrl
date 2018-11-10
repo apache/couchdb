@@ -22,7 +22,8 @@
     view = nil :: any() | '_',
     doc_id :: any() | '_',
     db_name = null :: null | binary() | '_',
-    start_time = {0, 0, 0} :: erlang:timestamp() | '_'
+    start_time = {0, 0, 0} :: erlang:timestamp() | '_',
+    stats = couch_replicator_stats:new() :: orddict:orddict() | '_'
 }).
 
 -type rep_id() :: {string(), string()}.

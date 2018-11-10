@@ -420,19 +420,16 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     _ ->
         Options = [{user_ctx,Ctx}, {w,W}]
     end,
+    Docs = lists:map(fun(JsonObj) ->
+        Doc = couch_doc:from_json_obj_validate(JsonObj),
+        validate_attachment_names(Doc),
+        case Doc#doc.id of
+            <<>> -> Doc#doc{id = couch_uuids:new()};
+            _ -> Doc
+        end
+    end, DocsArray),
     case couch_util:get_value(<<"new_edits">>, JsonProps, true) of
     true ->
-        Docs = lists:map(
-            fun(JsonObj) ->
-                Doc = couch_doc:from_json_obj_validate(JsonObj),
-                validate_attachment_names(Doc),
-                Id = case Doc#doc.id of
-                    <<>> -> couch_uuids:new();
-                    Id0 -> Id0
-                end,
-                Doc#doc{id=Id}
-            end,
-            DocsArray),
         Options2 =
         case couch_util:get_value(<<"all_or_nothing">>, JsonProps) of
         true  -> [all_or_nothing|Options];
@@ -455,8 +452,6 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
             send_json(Req, 417, ErrorsJson)
         end;
     false ->
-        Docs = [couch_doc:from_json_obj_validate(JsonObj) || JsonObj <- DocsArray],
-        [validate_attachment_names(D) || D <- Docs],
         case fabric:update_docs(Db, Docs, [replicated_changes|Options]) of
         {ok, Errors} ->
             ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
@@ -524,8 +519,11 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
         true -> ok
     end,
     couch_stats:increment_counter([couchdb, document_purges, total], length(IdsRevs2)),
-    {ok, Results} = fabric:purge_docs(Db, IdsRevs2, Options),
-    {Code, Json} = purge_results_to_json(IdsRevs2, Results),
+    Results2 = case fabric:purge_docs(Db, IdsRevs2, Options) of
+        {ok, Results} -> Results;
+        {accepted, Results} -> Results
+    end,
+    {Code, Json} = purge_results_to_json(IdsRevs2, Results2),
     send_json(Req, Code, {[{<<"purge_seq">>, null}, {<<"purged">>, {Json}}]});
 
 db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->

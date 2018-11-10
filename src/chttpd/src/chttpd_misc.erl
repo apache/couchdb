@@ -50,6 +50,7 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
         {couchdb, WelcomeMessage},
         {version, list_to_binary(couch_server:get_version())},
         {git_sha, list_to_binary(couch_server:get_git_sha())},
+        {uuid, couch_server:get_uuid()},
         {features, config:features()}
         ] ++ case config:get("vendor") of
         [] ->
@@ -242,7 +243,9 @@ cancel_replication(PostBody, Ctx) ->
             {error, badrpc};
         Else ->
             % Unclear what to do here -- pick the first error?
-            hd(Else)
+            % Except try ignoring any {error, not_found} responses
+            % because we'll always get two of those
+            hd(Else -- [{error, not_found}])
         end
     end.
 

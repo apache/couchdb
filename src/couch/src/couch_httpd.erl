@@ -104,25 +104,28 @@ start_link(Name, Options) ->
                       Else -> Else
                   end,
     ok = validate_bind_address(BindAddress),
-    DefaultSpec = "{couch_httpd_db, handle_request}",
-    DefaultFun = make_arity_1_fun(
-        config:get("httpd", "default_handler", DefaultSpec)
-    ),
+    DefaultFun = make_arity_1_fun("{couch_httpd_db, handle_request}"),
+
+    {ok, HttpdGlobalHandlers} = application:get_env(httpd_global_handlers),
 
     UrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_1_fun(SpecStr)}
-        end, config:get("httpd_global_handlers")),
+        end, HttpdGlobalHandlers),
+
+    {ok, HttpdDbHandlers} = application:get_env(httpd_db_handlers),
 
     DbUrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
-        end, config:get("httpd_db_handlers")),
+        end, HttpdDbHandlers),
+
+    {ok, HttpdDesignHandlers} = application:get_env(httpd_design_handlers),
 
     DesignUrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_3_fun(SpecStr)}
-        end, config:get("httpd_design_handlers")),
+        end, HttpdDesignHandlers),
 
     UrlHandlers = dict:from_list(UrlHandlersList),
     DbUrlHandlers = dict:from_list(DbUrlHandlersList),
