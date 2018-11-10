@@ -213,7 +213,7 @@ defmodule CouchTestCase do
       end
 
       defp now(:ms) do
-        div(:erlang.system_time, 100000)
+        div(:erlang.system_time, 1000000)
       end
 
       @spec rev(map(), map()) :: map()
