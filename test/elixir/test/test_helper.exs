@@ -204,11 +204,16 @@ defmodule CouchTestCase do
         if now > start + timeout do
           raise "timed out after #{now - start} ms"
         else
-          if condition.() do
-            :ok
-          else
-            :timer.sleep(sleep)
-            retry_until(condition, start, sleep, timeout)
+          try do
+            if condition.() do
+              :ok
+            else
+              raise ExUnit.AssertionError
+            end
+          rescue
+            ExUnit.AssertionError ->
+              :timer.sleep(sleep)
+              retry_until(condition, start, sleep, timeout)
           end
         end
       end
