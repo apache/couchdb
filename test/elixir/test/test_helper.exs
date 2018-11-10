@@ -200,20 +200,26 @@ defmodule CouchTestCase do
       end
 
       defp retry_until(condition, start, sleep, timeout) do
-        if (now(:ms) > start + timeout) do
-          raise "timed out"
+        now = now(:ms)
+        if now > start + timeout do
+          raise "timed out after #{now - start} ms"
         else
-          if condition.() do
-            :ok
-          else
-            :timer.sleep(sleep)
-            retry_until(condition, start, sleep, timeout)
+          try do
+            if condition.() do
+              :ok
+            else
+              raise ExUnit.AssertionError
+            end
+          rescue
+            ExUnit.AssertionError ->
+              :timer.sleep(sleep)
+              retry_until(condition, start, sleep, timeout)
           end
         end
       end
 
       defp now(:ms) do
-        div(:erlang.system_time, 100000)
+        div(:erlang.system_time, 1000000)
       end
 
       @spec rev(map(), map()) :: map()
