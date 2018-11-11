@@ -56,23 +56,33 @@ format(Level, Pid, Msg) ->
     }.
 
 
-format({error, _GL, {Pid, "** Generic server " ++ _, Args}}) ->
+format(Event) ->
+    try
+        do_format(Event)
+    catch
+        Tag:Err ->
+            Msg = "Encountered error ~w when formatting ~w",
+            format(error, self(),  Msg, [{Tag, Err}, Event])
+    end.
+
+
+do_format({error, _GL, {Pid, "** Generic server " ++ _, Args}}) ->
     %% gen_server terminate
-    [Name, LastMsg, State, Reason] = Args,
+    [Name, LastMsg, State, Reason | Extra] = Args,
     MsgFmt = "gen_server ~w terminated with reason: ~s~n" ++
-                "  last msg: ~p~n     state: ~p",
-    MsgArgs = [Name, format_reason(Reason), LastMsg, State],
+                "  last msg: ~p~n     state: ~p~n    extra: ~p",
+    MsgArgs = [Name, format_reason(Reason), LastMsg, State, Extra],
     format(error, Pid, MsgFmt, MsgArgs);
 
-format({error, _GL, {Pid, "** State machine " ++ _, Args}}) ->
+do_format({error, _GL, {Pid, "** State machine " ++ _, Args}}) ->
     %% gen_fsm terminate
-    [Name, LastMsg, StateName, State, Reason] = Args,
+    [Name, LastMsg, StateName, State, Reason | Extra] = Args,
     MsgFmt = "gen_fsm ~w in state ~w terminated with reason: ~s~n" ++
-                " last msg: ~p~n     state: ~p",
-    MsgArgs = [Name, StateName, format_reason(Reason), LastMsg, State],
+                " last msg: ~p~n     state: ~p~n    extra: ~p",
+    MsgArgs = [Name, StateName, format_reason(Reason), LastMsg, State, Extra],
     format(error, Pid, MsgFmt, MsgArgs);
 
-format({error, _GL, {Pid, "** gen_event handler" ++ _, Args}}) ->
+do_format({error, _GL, {Pid, "** gen_event handler" ++ _, Args}}) ->
     %% gen_event handler terminate
     [ID, Name, LastMsg, State, Reason] = Args,
     MsgFmt = "gen_event ~w installed in ~w terminated with reason: ~s~n" ++
@@ -80,20 +90,20 @@ format({error, _GL, {Pid, "** gen_event handler" ++ _, Args}}) ->
     MsgArgs = [ID, Name, format_reason(Reason), LastMsg, State],
     format(error, Pid, MsgFmt, MsgArgs);
 
-format({error, _GL, {emulator, "~s~n", [Msg]}}) when is_list(Msg) ->
+do_format({error, _GL, {emulator, "~s~n", [Msg]}}) when is_list(Msg) ->
     % These messages are for whenever any process exits due
     % to a throw or error. We intercept here to remove the
     % extra newlines.
     NewMsg = lists:sublist(Msg, length(Msg) - 1),
     format(error, emulator, NewMsg);
 
-format({error, _GL, {Pid, Fmt, Args}}) ->
+do_format({error, _GL, {Pid, Fmt, Args}}) ->
     format(error, Pid, Fmt, Args);
 
-format({error_report, _GL, {Pid, std_error, D}}) ->
+do_format({error_report, _GL, {Pid, std_error, D}}) ->
     format(error, Pid, print_silly_list(D));
 
-format({error_report, _GL, {Pid, supervisor_report, D}}) ->
+do_format({error_report, _GL, {Pid, supervisor_report, D}}) ->
     case lists:sort(D) of
         [{errorContext, Ctx}, {offender, Off},
                 {reason, Reason}, {supervisor, Name}] ->
@@ -111,20 +121,20 @@ format({error_report, _GL, {Pid, supervisor_report, D}}) ->
             format(error, Pid, "SUPERVISOR REPORT " ++ print_silly_list(D))
     end;
 
-format({error_report, _GL, {Pid, crash_report, [Report, Neighbors]}}) ->
+do_format({error_report, _GL, {Pid, crash_report, [Report, Neighbors]}}) ->
     Msg = "CRASH REPORT " ++ format_crash_report(Report, Neighbors),
     format(error, Pid, Msg);
 
-format({warning_msg, _GL, {Pid, Fmt, Args}}) ->
+do_format({warning_msg, _GL, {Pid, Fmt, Args}}) ->
     format(warning, Pid, Fmt, Args);
 
-format({warning_report, _GL, {Pid, std_warning, Report}}) ->
+do_format({warning_report, _GL, {Pid, std_warning, Report}}) ->
     format(warning, Pid, print_silly_list(Report));
 
-format({info_msg, _GL, {Pid, Fmt, Args}}) ->
+do_format({info_msg, _GL, {Pid, Fmt, Args}}) ->
     format(info, Pid, Fmt, Args);
 
-format({info_report, _GL, {Pid, std_info, D}}) when is_list(D) ->
+do_format({info_report, _GL, {Pid, std_info, D}}) when is_list(D) ->
     case lists:sort(D) of
         [{application, App}, {exited, Reason}, {type, _Type}] ->
             MsgFmt = "Application ~w exited with reason: ~s",
@@ -133,10 +143,10 @@ format({info_report, _GL, {Pid, std_info, D}}) when is_list(D) ->
             format(info, Pid, print_silly_list(D))
     end;
 
-format({info_report, _GL, {Pid, std_info, D}}) ->
+do_format({info_report, _GL, {Pid, std_info, D}}) ->
     format(info, Pid, "~w", [D]);
 
-format({info_report, _GL, {Pid, progress, D}}) ->
+do_format({info_report, _GL, {Pid, progress, D}}) ->
     case lists:sort(D) of
         [{application, App}, {started_at, Node}] ->
             MsgFmt = "Application ~w started on node ~w",
@@ -150,7 +160,7 @@ format({info_report, _GL, {Pid, progress, D}}) ->
             format(info, Pid, "PROGRESS REPORT " ++ print_silly_list(D))
     end;
 
-format(Event) ->
+do_format(Event) ->
     format(warning, self(), "Unexpected error_logger event ~w", [Event]).
 
 

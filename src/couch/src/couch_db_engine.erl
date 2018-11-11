@@ -22,6 +22,8 @@
 -type rev() :: {non_neg_integer(), binary()}.
 -type revs() :: [rev()].
 -type json() :: any().
+-type uuid() :: binary().
+-type purge_seq() :: non_neg_integer().
 
 -type doc_pair() :: {
         #full_doc_info{} | not_found,
@@ -39,7 +41,7 @@
         sync
     ].
 
--type purge_info() :: [{docid(), revs()}].
+-type purge_info() :: {purge_seq(), uuid(), docid(), revs()}.
 -type epochs() :: [{Node::atom(), UpdateSeq::non_neg_integer()}].
 -type size_info() :: [{Name::atom(), Size::non_neg_integer()}].
 
@@ -62,6 +64,13 @@
         {dir, fwd | rev}
     ].
 
+-type purge_fold_options() :: [
+        {start_key, Key::any()} |
+        {end_key, Key::any()} |
+        {end_key_gt, Key::any()} |
+        {dir, fwd | rev}
+    ].
+
 -type db_handle() :: any().
 
 -type doc_fold_fun() :: fun((#full_doc_info{}, UserAcc::any()) ->
@@ -73,6 +82,10 @@
         {stop, NewUserAcc::any()}).
 
 -type changes_fold_fun() :: fun((#doc_info{}, UserAcc::any()) ->
+        {ok, NewUserAcc::any()} |
+        {stop, NewUserAcc::any()}).
+
+-type purge_fold_fun() :: fun((purge_info(), UserAcc::any()) ->
         {ok, NewUserAcc::any()} |
         {stop, NewUserAcc::any()}).
 
@@ -170,7 +183,7 @@
 % value would be hard to report its ok to just return the
 % result of os:timestamp/0 as this will just disable idle
 % databases from automatically closing.
--callback last_activity(DbHandle::db_handle()) -> elrang:timestamp().
+-callback last_activity(DbHandle::db_handle()) -> erlang:timestamp().
 
 
 % All of the get_* functions may be called from many
@@ -208,13 +221,18 @@
 -callback get_epochs(DbHandle::db_handle()) -> Epochs::epochs().
 
 
-% Get the last purge request performed.
--callback get_last_purged(DbHandle::db_handle()) -> LastPurged::purge_info().
+% Get the current purge sequence known to the engine. This
+% value should be updated during calls to purge_docs.
+-callback get_purge_seq(DbHandle::db_handle()) -> purge_seq().
 
 
-% Get the current purge sequence. This should be incremented
-% for every purge operation.
--callback get_purge_seq(DbHandle::db_handle()) -> PurgeSeq::non_neg_integer().
+% Get the oldest purge sequence known to the engine
+-callback get_oldest_purge_seq(DbHandle::db_handle()) -> purge_seq().
+
+
+% Get the purged infos limit. This should just return the last
+% value that was passed to set_purged_docs_limit/2.
+-callback get_purge_infos_limit(DbHandle::db_handle()) -> pos_integer().
 
 
 % Get the revision limit. This should just return the last
@@ -263,6 +281,11 @@
 -callback set_revs_limit(DbHandle::db_handle(), RevsLimit::pos_integer()) ->
         {ok, NewDbHandle::db_handle()}.
 
+
+-callback set_purge_infos_limit(DbHandle::db_handle(), Limit::pos_integer()) ->
+        {ok, NewDbHandle::db_handle()}.
+
+
 -callback set_security(DbHandle::db_handle(), SecProps::any()) ->
         {ok, NewDbHandle::db_handle()}.
 
@@ -301,6 +324,15 @@
 % is the traditional approach and is recommended).
 -callback read_doc_body(DbHandle::db_handle(), RawDoc::doc()) ->
         doc().
+
+
+% This function will be called from many contexts concurrently.
+% If the storage engine has a purge_info() record for any of the
+% provided UUIDs, those purge_info() records should be returned. The
+% resulting list should have the same length as the input list of
+% UUIDs.
+-callback load_purge_infos(DbHandle::db_handle(), [uuid()]) ->
+        [purge_info() | not_found].
 
 
 % This function is called concurrently by any client process
@@ -343,30 +375,19 @@
 % #full_doc_info{} records. The first element of the pair is
 % the #full_doc_info{} that exists on disk. The second element
 % is the new version that should be written to disk. There are
-% three basic cases that should be followed:
+% two basic cases that should be followed:
 %
 %     1. {not_found, #full_doc_info{}} - A new document was created
 %     2. {#full_doc_info{}, #full_doc_info{}} - A document was updated
-%     3. {#full_doc_info{}, not_found} - A document was purged completely
 %
-% Number one and two are fairly straight forward as long as proper
-% accounting for moving entries in the udpate sequence are accounted
-% for. However, case 3 you'll notice is "purged completely" which
-% means it needs to be removed from the database including the
-% update sequence. Also, for engines that are not using append
-% only storage like the legacy engine, case 2 can be the result of
-% a purge so special care will be needed to see which revisions
-% should be removed.
+% The cases are fairly straight forward as long as proper
+% accounting for moving entries in the update sequence are accounted
+% for.
 %
 % The LocalDocs variable is applied separately. Its important to
 % note for new storage engine authors that these documents are
 % separate because they should *not* be included as part of the
 % changes index for the database.
-%
-% The PurgedDocIdRevs is the list of Ids and Revisions that were
-% purged during this update. While its not guaranteed by the API,
-% currently there will never be purge changes comingled with
-% standard updates.
 %
 % Traditionally an invocation of write_doc_infos should be all
 % or nothing in so much that if an error occurs (or the VM dies)
@@ -378,8 +399,40 @@
 -callback write_doc_infos(
     DbHandle::db_handle(),
     Pairs::doc_pairs(),
-    LocalDocs::[#doc{}],
-    PurgedDocIdRevs::[{docid(), revs()}]) ->
+    LocalDocs::[#doc{}]) ->
+        {ok, NewDbHandle::db_handle()}.
+
+
+% This function is called from the context of couch_db_updater
+% and as such is guaranteed single threaded for the given
+% DbHandle.
+%
+% Each doc_pair() is a 2-tuple of #full_doc_info{} records. The
+% first element of the pair is the #full_doc_info{} that exists
+% on disk. The second element is the new version that should be
+% written to disk. There are three basic cases that should be considered:
+%
+%     1. {#full_doc_info{}, #full_doc_info{}} - A document was partially purged
+%     2. {#full_doc_info{}, not_found} - A document was completely purged
+%     3. {not_found, not_found} - A no-op purge
+%
+% In case 1, non-tail-append engines may have to remove revisions
+% specifically rather than rely on compaction to remove them. Also
+% note that the new #full_doc_info{} will have a different update_seq
+% that will need to be reflected in the changes feed.
+%
+% In case 2 you'll notice is "purged completely" which
+% means it needs to be removed from the database including the
+% update sequence.
+%
+% In case 3 we just need to store the purge_info() to know that it
+% was processed even though it produced no changes to the database.
+%
+% The purge_info() tuples contain the purge_seq, uuid, docid and
+% revisions that were requested to be purged. This should be persisted
+% in such a way that we can efficiently load purge_info() by its UUID
+% as well as iterate over purge_info() entries in order of their PurgeSeq.
+-callback purge_docs(DbHandle::db_handle(), [doc_pair()], [purge_info()]) ->
         {ok, NewDbHandle::db_handle()}.
 
 
@@ -438,9 +491,9 @@
 %
 %     1. start_key - Start iteration at the provided key or
 %        or just after if the key doesn't exist
-%     2. end_key - Stop iteration prior to visiting the provided
+%     2. end_key - Stop iteration just after the provided key
+%     3. end_key_gt - Stop iteration prior to visiting the provided
 %        key
-%     3. end_key_gt - Stop iteration just after the provided key
 %     4. dir - The atom fwd or rev. This is to be able to iterate
 %        over documents in reverse order. The logic for comparing
 %        start_key, end_key, and end_key_gt are then reversed (ie,
@@ -494,12 +547,12 @@
 % This function is called to fold over the documents (not local
 % documents) in order of their most recent update. Each document
 % in the database should have exactly one entry in this sequence.
-% If a document is updated during a call to this funciton it should
+% If a document is updated during a call to this function it should
 % not be included twice as that will probably lead to Very Bad Things.
 %
 % This should behave similarly to fold_docs/4 in that the supplied
 % user function should be invoked with a #full_doc_info{} record
-% as the first arugment and the current user accumulator as the
+% as the first argument and the current user accumulator as the
 % second argument. The same semantics for the return value from the
 % user function should be handled as in fold_docs/4.
 %
@@ -515,6 +568,21 @@
     UserFold::changes_fold_fun(),
     UserAcc::any(),
     changes_fold_options()) ->
+        {ok, LastUserAcc::any()}.
+
+
+% This function may be called by many processes concurrently.
+%
+% This function is called to fold over purged requests in order of
+% their oldest purge (increasing purge_seq order)
+%
+% The StartPurgeSeq parameter indicates where the fold should start *after*.
+-callback fold_purge_infos(
+    DbHandle::db_handle(),
+    StartPurgeSeq::purge_seq(),
+    UserFold::purge_fold_fun(),
+    UserAcc::any(),
+    purge_fold_options()) ->
         {ok, LastUserAcc::any()}.
 
 
@@ -601,8 +669,9 @@
     get_disk_version/1,
     get_doc_count/1,
     get_epochs/1,
-    get_last_purged/1,
     get_purge_seq/1,
+    get_oldest_purge_seq/1,
+    get_purge_infos_limit/1,
     get_revs_limit/1,
     get_security/1,
     get_size_info/1,
@@ -611,14 +680,17 @@
 
     set_revs_limit/2,
     set_security/2,
+    set_purge_infos_limit/2,
 
     open_docs/2,
     open_local_docs/2,
     read_doc_body/2,
+    load_purge_infos/2,
 
     serialize_doc/2,
     write_doc_body/2,
-    write_doc_infos/4,
+    write_doc_infos/3,
+    purge_docs/3,
     commit_data/1,
 
     open_write_stream/2,
@@ -628,10 +700,12 @@
     fold_docs/4,
     fold_local_docs/4,
     fold_changes/5,
+    fold_purge_infos/5,
     count_changes_since/2,
 
     start_compaction/1,
-    finish_compaction/2
+    finish_compaction/2,
+    trigger_on_compact/1
 ]).
 
 
@@ -747,14 +821,19 @@ get_epochs(#db{} = Db) ->
     Engine:get_epochs(EngineState).
 
 
-get_last_purged(#db{} = Db) ->
-    #db{engine = {Engine, EngineState}} = Db,
-    Engine:get_last_purged(EngineState).
-
-
 get_purge_seq(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_purge_seq(EngineState).
+
+
+get_oldest_purge_seq(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_oldest_purge_seq(EngineState).
+
+
+get_purge_infos_limit(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_purge_infos_limit(EngineState).
 
 
 get_revs_limit(#db{} = Db) ->
@@ -787,6 +866,12 @@ set_revs_limit(#db{} = Db, RevsLimit) ->
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 
+set_purge_infos_limit(#db{} = Db, PurgedDocsLimit) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:set_purge_infos_limit(EngineState, PurgedDocsLimit),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+
 set_security(#db{} = Db, SecProps) ->
     #db{engine = {Engine, EngineState}} = Db,
     {ok, NewSt} = Engine:set_security(EngineState, SecProps),
@@ -808,6 +893,11 @@ read_doc_body(#db{} = Db, RawDoc) ->
     Engine:read_doc_body(EngineState, RawDoc).
 
 
+load_purge_infos(#db{} = Db, UUIDs) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:load_purge_infos(EngineState, UUIDs).
+
+
 serialize_doc(#db{} = Db, #doc{} = Doc) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:serialize_doc(EngineState, Doc).
@@ -818,10 +908,16 @@ write_doc_body(#db{} = Db, #doc{} = Doc) ->
     Engine:write_doc_body(EngineState, Doc).
 
 
-write_doc_infos(#db{} = Db, DocUpdates, LocalDocs, PurgedDocIdRevs) ->
+write_doc_infos(#db{} = Db, DocUpdates, LocalDocs) ->
     #db{engine = {Engine, EngineState}} = Db,
-    {ok, NewSt} = Engine:write_doc_infos(
-            EngineState, DocUpdates, LocalDocs, PurgedDocIdRevs),
+    {ok, NewSt} = Engine:write_doc_infos(EngineState, DocUpdates, LocalDocs),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+
+purge_docs(#db{} = Db, DocUpdates, Purges) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:purge_docs(
+        EngineState, DocUpdates, Purges),
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 
@@ -859,6 +955,12 @@ fold_local_docs(#db{} = Db, UserFun, UserAcc, Options) ->
 fold_changes(#db{} = Db, StartSeq, UserFun, UserAcc, Options) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:fold_changes(EngineState, StartSeq, UserFun, UserAcc, Options).
+
+
+fold_purge_infos(#db{} = Db, StartPurgeSeq, UserFun, UserAcc, Options) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:fold_purge_infos(
+            EngineState, StartPurgeSeq, UserFun, UserAcc, Options).
 
 
 count_changes_since(#db{} = Db, StartSeq) ->
@@ -901,3 +1003,31 @@ finish_compaction(Db, CompactInfo) ->
     end,
     ok = gen_server:call(couch_server, {db_updated, NewDb}, infinity),
     {ok, NewDb}.
+
+
+trigger_on_compact(DbName) ->
+    {ok, DDocs} = get_ddocs(DbName),
+    couch_db_plugin:on_compact(DbName, DDocs).
+
+
+get_ddocs(<<"shards/", _/binary>> = DbName) ->
+    {_, Ref} = spawn_monitor(fun() ->
+        exit(fabric:design_docs(mem3:dbname(DbName)))
+    end),
+    receive
+        {'DOWN', Ref, _, _, {ok, JsonDDocs}} ->
+            {ok, lists:map(fun(JsonDDoc) ->
+                couch_doc:from_json_obj(JsonDDoc)
+            end, JsonDDocs)};
+        {'DOWN', Ref, _, _, Else} ->
+            Else
+    end;
+get_ddocs(DbName) ->
+    couch_util:with_db(DbName, fun(Db) ->
+        FoldFun = fun(FDI, Acc) ->
+            {ok, Doc} = couch_db:open_doc_int(Db, FDI, []),
+            {ok, [Doc | Acc]}
+        end,
+        {ok, Docs} = couch_db:fold_design_docs(Db, FoldFun, [], []),
+        {ok, lists:reverse(Docs)}
+    end).

@@ -50,6 +50,7 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
         {couchdb, WelcomeMessage},
         {version, list_to_binary(couch_server:get_version())},
         {git_sha, list_to_binary(couch_server:get_git_sha())},
+        {uuid, couch_server:get_uuid()},
         {features, config:features()}
         ] ++ case config:get("vendor") of
         [] ->
@@ -178,6 +179,7 @@ handle_dbs_info_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
 handle_task_status_req(#httpd{method='GET'}=Req) ->
+    ok = chttpd:verify_is_server_admin(Req),
     {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),
     Response = lists:flatmap(fun({Node, Tasks}) ->
         [{[{node,Node} | Task]} || Task <- Tasks]
@@ -241,7 +243,9 @@ cancel_replication(PostBody, Ctx) ->
             {error, badrpc};
         Else ->
             % Unclear what to do here -- pick the first error?
-            hd(Else)
+            % Except try ignoring any {error, not_found} responses
+            % because we'll always get two of those
+            hd(Else -- [{error, not_found}])
         end
     end.
 
@@ -344,6 +348,12 @@ handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_system">>]}=Req) -
     send_json(Req, EJSON);
 handle_node_req(#httpd{path_parts=[_, _Node, <<"_system">>]}=Req) ->
     send_method_not_allowed(Req, "GET");
+% POST /_node/$node/_restart
+handle_node_req(#httpd{method='POST', path_parts=[_, Node, <<"_restart">>]}=Req) ->
+    call_node(Node, init, restart, []),
+    send_json(Req, 200, {[{ok, true}]});
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_restart">>]}=Req) ->
+    send_method_not_allowed(Req, "POST");
 handle_node_req(#httpd{path_parts=[_]}=Req) ->
     chttpd:send_error(Req, {bad_request, <<"Incomplete path to _node request">>});
 handle_node_req(#httpd{path_parts=[_, _Node]}=Req) ->
@@ -395,7 +405,7 @@ get_stats() ->
     MessageQueues0 = [{couch_file, {CF}}, {couch_db_updater, {CDU}}],
     MessageQueues = MessageQueues0 ++ message_queues(registered()),
     [
-        {uptime, element(1,statistics(wall_clock)) div 1000},
+        {uptime, couch_app:uptime() div 1000},
         {memory, {Memory}},
         {run_queue, statistics(run_queue)},
         {ets_table_count, length(ets:all())},
@@ -470,7 +480,13 @@ handle_up_req(#httpd{method='GET'} = Req) ->
     "nolb" ->
         send_json(Req, 404, {[{status, nolb}]});
     _ ->
-        send_json(Req, 200, {[{status, ok}]})
+        {ok, {Status}} = mem3_seeds:get_status(),
+        case couch_util:get_value(status, Status) of
+            ok ->
+                send_json(Req, 200, {Status});
+            seeding ->
+                send_json(Req, 404, {Status})
+        end
     end;
 
 handle_up_req(Req) ->

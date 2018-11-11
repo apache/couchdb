@@ -12,12 +12,12 @@
 
 % type specification hacked to suppress dialyzer warning re: match spec
 -record(shard, {
-    name :: binary() | '_',
-    node :: node() | '_',
-    dbname :: binary(),
-    range :: [non_neg_integer() | '$1' | '$2'] | '_',
-    ref :: reference() | 'undefined' | '_',
-    opts :: list()
+    name :: binary() | '_' | 'undefined',
+    node :: node() | '_' | 'undefined',
+    dbname :: binary() | 'undefined',
+    range :: [non_neg_integer() | '$1' | '$2'] | '_' | 'undefined',
+    ref :: reference() | '_' | 'undefined',
+    opts :: list() | 'undefined'
 }).
 
 %% Do not reference outside of mem3.

@@ -45,7 +45,6 @@
     get_epochs/1,
     get_filepath/1,
     get_instance_start_time/1,
-    get_last_purged/1,
     get_pid/1,
     get_revs_limit/1,
     get_security/1,
@@ -53,12 +52,16 @@
     get_user_ctx/1,
     get_uuid/1,
     get_purge_seq/1,
+    get_oldest_purge_seq/1,
+    get_purge_infos_limit/1,
 
     is_db/1,
     is_system_db/1,
     is_clustered/1,
+    is_system_db_name/1,
 
     set_revs_limit/2,
+    set_purge_infos_limit/2,
     set_security/2,
     set_user_ctx/2,
 
@@ -77,6 +80,10 @@
     get_full_doc_infos/2,
     get_missing_revs/2,
     get_design_docs/1,
+    get_purge_infos/2,
+
+    get_minimum_purge_seq/1,
+    purge_client_exists/3,
 
     update_doc/3,
     update_doc/4,
@@ -86,6 +93,7 @@
     delete_doc/3,
 
     purge_docs/2,
+    purge_docs/3,
 
     with_stream/3,
     open_write_stream/2,
@@ -99,6 +107,8 @@
     fold_changes/4,
     fold_changes/5,
     count_changes_since/2,
+    fold_purge_infos/4,
+    fold_purge_infos/5,
 
     calculate_start_seq/3,
     owner_of/2,
@@ -163,8 +173,11 @@ reopen(#db{} = Db) ->
     % We could have just swapped out the storage engine
     % for this database during a compaction so we just
     % reimplement this as a close/open pair now.
-    close(Db),
-    open(Db#db.name, [{user_ctx, Db#db.user_ctx} | Db#db.options]).
+    try
+        open(Db#db.name, [{user_ctx, Db#db.user_ctx} | Db#db.options])
+    after
+        close(Db)
+    end.
 
 
 % You shouldn't call this. Its part of the ref counting between
@@ -373,8 +386,131 @@ get_full_doc_info(Db, Id) ->
 get_full_doc_infos(Db, Ids) ->
     couch_db_engine:open_docs(Db, Ids).
 
-purge_docs(#db{main_pid=Pid}, IdsRevs) ->
-    gen_server:call(Pid, {purge_docs, IdsRevs}).
+purge_docs(Db, IdRevs) ->
+    purge_docs(Db, IdRevs, []).
+
+-spec purge_docs(#db{}, [{UUId, Id, [Rev]}], [PurgeOption]) ->
+    {ok, [Reply]} when
+    UUId :: binary(),
+    Id :: binary(),
+    Rev :: {non_neg_integer(), binary()},
+    PurgeOption :: interactive_edit | replicated_changes,
+    Reply :: {ok, []} | {ok, [Rev]}.
+purge_docs(#db{main_pid = Pid} = Db, UUIDsIdsRevs, Options) ->
+    % Check here if any UUIDs already exist when
+    % we're not replicating purge infos
+    IsRepl = lists:member(replicated_changes, Options),
+    if IsRepl -> ok; true ->
+        UUIDs = [UUID || {UUID, _, _} <- UUIDsIdsRevs],
+        lists:foreach(fun(Resp) ->
+            if Resp == not_found -> ok; true ->
+                Fmt = "Duplicate purge info UIUD: ~s",
+                Reason = io_lib:format(Fmt, [element(2, Resp)]),
+                throw({badreq, Reason})
+            end
+        end, get_purge_infos(Db, UUIDs))
+    end,
+    increment_stat(Db, [couchdb, database_purges]),
+    gen_server:call(Pid, {purge_docs, UUIDsIdsRevs, Options}).
+
+-spec get_purge_infos(#db{}, [UUId]) -> [PurgeInfo] when
+    UUId :: binary(),
+    PurgeInfo :: {PurgeSeq, UUId, Id, [Rev]} | not_found,
+    PurgeSeq :: non_neg_integer(),
+    Id :: binary(),
+    Rev :: {non_neg_integer(), binary()}.
+get_purge_infos(Db, UUIDs) ->
+    couch_db_engine:load_purge_infos(Db, UUIDs).
+
+
+get_minimum_purge_seq(#db{} = Db) ->
+    PurgeSeq = couch_db_engine:get_purge_seq(Db),
+    OldestPurgeSeq = couch_db_engine:get_oldest_purge_seq(Db),
+    PurgeInfosLimit = couch_db_engine:get_purge_infos_limit(Db),
+
+    FoldFun = fun(#doc{id = DocId, body = {Props}}, SeqAcc) ->
+        case DocId of
+            <<?LOCAL_DOC_PREFIX, "purge-", _/binary>> ->
+                ClientSeq = couch_util:get_value(<<"purge_seq">>, Props),
+                DbName = couch_db:name(Db),
+                % If there's a broken doc we have to keep every
+                % purge info until the doc is fixed or removed.
+                Fmt = "Invalid purge doc '~s' on ~p with purge_seq '~w'",
+                case ClientSeq of
+                    CS when is_integer(CS), CS >= PurgeSeq - PurgeInfosLimit ->
+                        {ok, SeqAcc};
+                    CS when is_integer(CS) ->
+                        case purge_client_exists(DbName, DocId, Props) of
+                            true ->
+                                {ok, erlang:min(CS, SeqAcc)};
+                            false ->
+                                couch_log:error(Fmt, [DocId, DbName, ClientSeq]),
+                                {ok, SeqAcc}
+                        end;
+                    _ ->
+                        couch_log:error(Fmt, [DocId, DbName, ClientSeq]),
+                        {ok, erlang:min(OldestPurgeSeq, SeqAcc)}
+                end;
+            _ ->
+                {stop, SeqAcc}
+        end
+    end,
+    InitMinSeq = PurgeSeq - PurgeInfosLimit,
+    Opts = [
+        {start_key, list_to_binary(?LOCAL_DOC_PREFIX ++ "purge-")}
+    ],
+    {ok, MinIdxSeq} = couch_db:fold_local_docs(Db, FoldFun, InitMinSeq, Opts),
+    FinalSeq = case MinIdxSeq < PurgeSeq - PurgeInfosLimit of
+        true -> MinIdxSeq;
+        false -> erlang:max(0, PurgeSeq - PurgeInfosLimit)
+    end,
+    % Log a warning if we've got a purge sequence exceeding the
+    % configured threshold.
+    if FinalSeq >= (PurgeSeq - PurgeInfosLimit) -> ok; true ->
+        Fmt = "The purge sequence for '~s' exceeds configured threshold",
+        couch_log:warning(Fmt, [couch_db:name(Db)])
+    end,
+    FinalSeq.
+
+
+purge_client_exists(DbName, DocId, Props) ->
+    % Warn about clients that have not updated their purge
+    % checkpoints in the last "index_lag_warn_seconds"
+    LagWindow = config:get_integer(
+            "purge", "index_lag_warn_seconds", 86400), % Default 24 hours
+
+    {Mega, Secs, _} = os:timestamp(),
+    NowSecs = Mega * 1000000 + Secs,
+    LagThreshold = NowSecs - LagWindow,
+
+    try
+        Exists = couch_db_plugin:is_valid_purge_client(DbName, Props),
+        if not Exists -> ok; true ->
+            Updated = couch_util:get_value(<<"updated_on">>, Props),
+            if is_integer(Updated) and Updated > LagThreshold -> ok; true ->
+                Diff = NowSecs - Updated,
+                Fmt1 = "Purge checkpoint '~s' not updated in ~p seconds
+                    in database ~p",
+                couch_log:error(Fmt1, [DocId, Diff, DbName])
+            end
+        end,
+        Exists
+    catch _:_ ->
+        % If we fail to check for a client we have to assume that
+        % it exists.
+        Fmt2 = "Failed to check purge checkpoint using
+            document '~p' in database ~p",
+        couch_log:error(Fmt2, [DocId, DbName]),
+        true
+    end.
+
+
+set_purge_infos_limit(#db{main_pid=Pid}=Db, Limit) when Limit > 0 ->
+    check_is_admin(Db),
+    gen_server:call(Pid, {set_purge_infos_limit, Limit}, infinity);
+set_purge_infos_limit(_Db, _Limit) ->
+    throw(invalid_purge_infos_limit).
+
 
 get_after_doc_read_fun(#db{after_doc_read = Fun}) ->
     Fun.
@@ -394,10 +530,13 @@ get_user_ctx(?OLD_DB_REC = Db) ->
     ?OLD_DB_USER_CTX(Db).
 
 get_purge_seq(#db{}=Db) ->
-    {ok, couch_db_engine:get_purge_seq(Db)}.
+    couch_db_engine:get_purge_seq(Db).
 
-get_last_purged(#db{}=Db) ->
-    {ok, couch_db_engine:get_last_purged(Db)}.
+get_oldest_purge_seq(#db{}=Db) ->
+    couch_db_engine:get_oldest_purge_seq(Db).
+
+get_purge_infos_limit(#db{}=Db) ->
+    couch_db_engine:get_purge_infos_limit(Db).
 
 get_pid(#db{main_pid = Pid}) ->
     Pid.
@@ -475,7 +614,8 @@ get_db_info(Db) ->
     ],
     {ok, InfoList}.
 
-get_design_docs(#db{name = <<"shards/", _:18/binary, DbName/binary>>}) ->
+get_design_docs(#db{name = <<"shards/", _/binary>> = ShardDbName}) ->
+    DbName = mem3:dbname(ShardDbName),
     {_, Ref} = spawn_monitor(fun() -> exit(fabric:design_docs(DbName)) end),
     receive {'DOWN', Ref, _, _, Response} ->
         Response
@@ -484,7 +624,6 @@ get_design_docs(#db{} = Db) ->
     FoldFun = fun(FDI, Acc) -> {ok, [FDI | Acc]} end,
     {ok, Docs} = fold_design_docs(Db, FoldFun, [], []),
     {ok, lists:reverse(Docs)}.
-
 
 check_is_admin(#db{user_ctx=UserCtx}=Db) ->
     case is_admin(Db) of
@@ -982,69 +1121,35 @@ doc_tag(#doc{meta=Meta}) ->
     end.
 
 update_docs(Db, Docs0, Options, replicated_changes) ->
-    increment_stat(Db, [couchdb, database_writes]),
     Docs = tag_docs(Docs0),
-    DocBuckets = before_docs_update(Db, group_alike_docs(Docs)),
 
-    case (Db#db.validate_doc_funs /= []) orelse
-        lists:any(
-            fun(#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}) -> true;
-            (#doc{atts=Atts}) ->
-                Atts /= []
-            end, Docs) of
-    true ->
-        Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
-        ExistingDocs = get_full_doc_infos(Db, Ids),
-
-        {DocBuckets2, DocErrors} =
-                prep_and_validate_replicated_updates(Db, DocBuckets, ExistingDocs, [], []),
-        DocBuckets3 = [Bucket || [_|_]=Bucket <- DocBuckets2]; % remove empty buckets
-    false ->
-        DocErrors = [],
-        DocBuckets3 = DocBuckets
+    PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
+        prep_and_validate_replicated_updates(Db0, DocBuckets0,
+            ExistingDocInfos, [], [])
     end,
-    DocBuckets4 = [[doc_flush_atts(Db, check_dup_atts(Doc))
-            || Doc <- Bucket] || Bucket <- DocBuckets3],
-    {ok, []} = write_and_commit(Db, DocBuckets4, [], [merge_conflicts | Options]),
+
+    {ok, DocBuckets, NonRepDocs, DocErrors}
+        = before_docs_update(Db, Docs, PrepValidateFun),
+
+    DocBuckets2 = [[doc_flush_atts(Db, check_dup_atts(Doc))
+            || Doc <- Bucket] || Bucket <- DocBuckets],
+    {ok, _} = write_and_commit(Db, DocBuckets2,
+        NonRepDocs, [merge_conflicts | Options]),
     {ok, DocErrors};
 
 update_docs(Db, Docs0, Options, interactive_edit) ->
-    increment_stat(Db, [couchdb, database_writes]),
-    AllOrNothing = lists:member(all_or_nothing, Options),
     Docs = tag_docs(Docs0),
 
-    % Separate _local docs from normal docs
-    IsLocal = fun
-        (#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
-        (_) -> false
-    end,
-    {NonRepDocs, Docs2} = lists:partition(IsLocal, Docs),
-
-    DocBuckets = before_docs_update(Db, group_alike_docs(Docs2)),
-
-    case (Db#db.validate_doc_funs /= []) orelse
-        lists:any(
-            fun(#doc{id= <<?DESIGN_DOC_PREFIX, _/binary>>}) ->
-                true;
-            (#doc{atts=Atts}) ->
-                Atts /= []
-            end, Docs2) of
-    true ->
-        % lookup the doc by id and get the most recent
-        Ids = [Id || [#doc{id=Id}|_] <- DocBuckets],
-        ExistingDocInfos = get_full_doc_infos(Db, Ids),
-
-        {DocBucketsPrepped, PreCommitFailures} = prep_and_validate_updates(Db,
-                DocBuckets, ExistingDocInfos, AllOrNothing, [], []),
-
-        % strip out any empty buckets
-        DocBuckets2 = [Bucket || [_|_] = Bucket <- DocBucketsPrepped];
-    false ->
-        PreCommitFailures = [],
-        DocBuckets2 = DocBuckets
+    AllOrNothing = lists:member(all_or_nothing, Options),
+    PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
+        prep_and_validate_updates(Db0, DocBuckets0, ExistingDocInfos,
+            AllOrNothing, [], [])
     end,
 
-    if (AllOrNothing) and (PreCommitFailures /= []) ->
+    {ok, DocBuckets, NonRepDocs, DocErrors}
+        = before_docs_update(Db, Docs, PrepValidateFun),
+
+    if (AllOrNothing) and (DocErrors /= []) ->
         RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),
         {aborted, lists:map(fun({Ref, Error}) ->
             #doc{id=Id,revs={Start,RevIds}} = dict:fetch(Ref, RefErrorDict),
@@ -1052,21 +1157,22 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
                 {Pos, [RevId | _]} -> {{Id, {Pos, RevId}}, Error};
                 {0, []} -> {{Id, {0, <<>>}}, Error}
             end
-        end, PreCommitFailures)};
+        end, DocErrors)};
     true ->
         Options2 = if AllOrNothing -> [merge_conflicts];
                 true -> [] end ++ Options,
-        DocBuckets3 = [[
+        DocBuckets2 = [[
                 doc_flush_atts(Db, set_new_att_revpos(
                         check_dup_atts(Doc)))
-                || Doc <- B] || B <- DocBuckets2],
-        {DocBuckets4, IdRevs} = new_revs(DocBuckets3, [], []),
+                || Doc <- B] || B <- DocBuckets],
+        {DocBuckets3, IdRevs} = new_revs(DocBuckets2, [], []),
 
-        {ok, CommitResults} = write_and_commit(Db, DocBuckets4, NonRepDocs, Options2),
+        {ok, CommitResults} = write_and_commit(Db, DocBuckets3,
+            NonRepDocs, Options2),
 
         ResultsDict = lists:foldl(fun({Key, Resp}, ResultsAcc) ->
             dict:store(Key, Resp, ResultsAcc)
-        end, dict:from_list(IdRevs), CommitResults ++ PreCommitFailures),
+        end, dict:from_list(IdRevs), CommitResults ++ DocErrors),
         {ok, lists:map(fun(Doc) ->
             dict:fetch(doc_tag(Doc), ResultsDict)
         end, Docs)}
@@ -1184,13 +1290,42 @@ prepare_doc_summaries(Db, BucketList) ->
         Bucket) || Bucket <- BucketList].
 
 
-before_docs_update(#db{} = Db, BucketList) ->
-    [lists:map(
-            fun(Doc) ->
-                DocWithBody = couch_doc:with_ejson_body(Doc),
-                couch_db_plugin:before_doc_update(Db, DocWithBody)
-            end,
-        Bucket) || Bucket <- BucketList].
+before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun) ->
+    increment_stat(Db, [couchdb, database_writes]),
+
+    % Separate _local docs from normal docs
+    IsLocal = fun
+        (#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
+        (_) -> false
+    end,
+    {NonRepDocs, Docs2} = lists:partition(IsLocal, Docs),
+
+    BucketList = group_alike_docs(Docs2),
+
+    DocBuckets = lists:map(fun(Bucket) ->
+        lists:map(fun(Doc) ->
+            DocWithBody = couch_doc:with_ejson_body(Doc),
+            couch_db_plugin:before_doc_update(Db, DocWithBody)
+        end, Bucket)
+    end, BucketList),
+
+    ValidatePred = fun
+        (#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>}) -> true;
+        (#doc{atts = Atts}) -> Atts /= []
+    end,
+
+    case (VDFuns /= []) orelse lists:any(ValidatePred, Docs2) of
+        true ->
+            % lookup the doc by id and get the most recent
+            Ids = [Id || [#doc{id = Id} | _] <- DocBuckets],
+            ExistingDocs = get_full_doc_infos(Db, Ids),
+            {DocBuckets2, DocErrors} = PVFun(Db, DocBuckets, ExistingDocs),
+             % remove empty buckets
+            DocBuckets3 = [Bucket || Bucket <- DocBuckets2, Bucket /= []],
+            {ok, DocBuckets3, NonRepDocs, DocErrors};
+        false ->
+            {ok, DocBuckets, NonRepDocs, []}
+    end.
 
 
 set_new_att_revpos(#doc{revs={RevPos,_Revs},atts=Atts0}=Doc) ->
@@ -1319,9 +1454,17 @@ calculate_start_seq(Db, _Node, {Seq, Uuid, EpochNode}) ->
         true ->
             case is_owner(EpochNode, Seq, get_epochs(Db)) of
                 true -> Seq;
-                false -> 0
+                false ->
+                    couch_log:warning("~p calculate_start_seq not owner "
+                        "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p, epochs: ~p",
+                        [?MODULE, Db#db.name, Seq, Uuid, EpochNode,
+                            get_epochs(Db)]),
+                    0
             end;
         false ->
+            couch_log:warning("~p calculate_start_seq uuid prefix mismatch "
+                "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p",
+                [?MODULE, Db#db.name, Seq, Uuid, EpochNode]),
             %% The file was rebuilt, most likely in a different
             %% order, so rewind.
             0
@@ -1402,6 +1545,14 @@ fold_changes(Db, StartSeq, UserFun, UserAcc) ->
 
 fold_changes(Db, StartSeq, UserFun, UserAcc, Opts) ->
     couch_db_engine:fold_changes(Db, StartSeq, UserFun, UserAcc, Opts).
+
+
+fold_purge_infos(Db, StartPurgeSeq, Fun, Acc) ->
+    fold_purge_infos(Db, StartPurgeSeq, Fun, Acc, []).
+
+
+fold_purge_infos(Db, StartPurgeSeq, UFun, UAcc, Opts) ->
+    couch_db_engine:fold_purge_infos(Db, StartPurgeSeq, UFun, UAcc, Opts).
 
 
 count_changes_since(Db, SinceSeq) ->
@@ -1584,17 +1735,24 @@ validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
         match ->
             ok;
         nomatch ->
-            case is_systemdb(Normalized) of
+            case is_system_db_name(Normalized) of
                 true -> ok;
                 false -> {error, {illegal_database_name, DbName}}
             end
     end.
 
-is_systemdb(DbName) when is_list(DbName) ->
-    is_systemdb(?l2b(DbName));
-is_systemdb(DbName) when is_binary(DbName) ->
-    lists:member(dbname_suffix(DbName), ?SYSTEM_DATABASES).
-
+is_system_db_name(DbName) when is_list(DbName) ->
+    is_system_db_name(?l2b(DbName));
+is_system_db_name(DbName) when is_binary(DbName) ->
+    Normalized = normalize_dbname(DbName),
+    Suffix = filename:basename(Normalized),
+    case {filename:dirname(Normalized), lists:member(Suffix, ?SYSTEM_DATABASES)} of
+        {<<".">>, Result} -> Result;
+        {Prefix, false} -> false;
+        {Prefix, true} ->
+            ReOpts =  [{capture,none}, dollar_endonly],
+            re:run(Prefix, ?DBNAME_REGEX, ReOpts) == match
+    end.
 
 set_design_doc_keys(Options1) ->
     Dir = case lists:keyfind(dir, 1, Options1) of
@@ -1686,7 +1844,9 @@ validate_dbname_fail_test_() ->
     Cases = generate_cases("_long/co$mplex-/path+/_something")
        ++ generate_cases("_something")
        ++ generate_cases_with_shards("long/co$mplex-/path+/_something#")
-       ++ generate_cases_with_shards("long/co$mplex-/path+/some.thing"),
+       ++ generate_cases_with_shards("long/co$mplex-/path+/some.thing")
+       ++ generate_cases("!abcdefg/werwej/_users")
+       ++ generate_cases_with_shards("!abcdefg/werwej/_users"),
     {
         foreach, fun setup/0, fun teardown/1,
         [should_fail_validate_dbname(A) || {_, A} <- Cases]
@@ -1706,7 +1866,7 @@ dbname_suffix_test_() ->
     [{test_name({Expected, Db}), ?_assertEqual(Expected, dbname_suffix(Db))}
         || {Expected, Db} <- WithExpected].
 
-is_systemdb_test_() ->
+is_system_db_name_test_() ->
     Cases = lists:append([
         generate_cases_with_shards("long/co$mplex-/path+/" ++ ?b2l(Db))
             || Db <- ?SYSTEM_DATABASES]
@@ -1715,7 +1875,7 @@ is_systemdb_test_() ->
     WithExpected = [{?l2b(filename:basename(filename:rootname(Arg))), Db}
         || {Arg, Db} <- Cases],
     [{test_name({Expected, Db}) ++ " in ?SYSTEM_DATABASES",
-        ?_assert(is_systemdb(Db))} || {Expected, Db} <- WithExpected].
+        ?_assert(is_system_db_name(Db))} || {Expected, Db} <- WithExpected].
 
 should_pass_validate_dbname(DbName) ->
     {test_name(DbName), ?_assertEqual(ok, validate_dbname(DbName))}.
@@ -1745,6 +1905,7 @@ calculate_start_seq_test_() ->
 setup_start_seq() ->
     meck:new(couch_db_engine, [passthrough]),
     meck:expect(couch_db_engine, get_uuid, fun(_) -> <<"foo">> end),
+    ok = meck:expect(couch_log, warning, 2, ok),
     Epochs = [
         {node2, 10},
         {node1, 1}

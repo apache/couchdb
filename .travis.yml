@@ -3,6 +3,7 @@ sudo: false
 
 os: linux
 otp_release:
+   - 21.1
    - 20.3
    - 19.3
    - 18.3

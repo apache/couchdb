@@ -13,9 +13,12 @@
 -module(mem3_util).
 
 -export([hash/1, name_shard/2, create_partition_map/5, build_shards/2,
-    n_val/2, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
+    n_val/2, q_val/1, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     shard_info/1, ensure_exists/1, open_db_doc/1]).
 -export([is_deleted/1, rotate_list/2]).
+-export([
+    iso8601_timestamp/0
+]).
 
 %% do not use outside mem3.
 -export([build_ordered_shards/2, downcast/1]).
@@ -52,15 +55,15 @@ make_name(DbName, [B,E], Suffix) ->
 create_partition_map(DbName, N, Q, Nodes) ->
     create_partition_map(DbName, N, Q, Nodes, "").
 
-create_partition_map(DbName, N, Q, Nodes, Suffix) ->
+create_partition_map(DbName, N, Q, Nodes, Suffix) when Q > 0 ->
     UniqueShards = make_key_ranges((?RINGTOP) div Q, 0, []),
     Shards0 = lists:flatten([lists:duplicate(N, S) || S <- UniqueShards]),
     Shards1 = attach_nodes(Shards0, [], Nodes, []),
     [name_shard(S#shard{dbname=DbName}, Suffix) || S <- Shards1].
 
-make_key_ranges(_, CurrentPos, Acc) when CurrentPos >= ?RINGTOP ->
+make_key_ranges(I, CurrentPos, Acc) when I > 0, CurrentPos >= ?RINGTOP ->
     Acc;
-make_key_ranges(Increment, Start, Acc) ->
+make_key_ranges(Increment, Start, Acc) when Increment > 0 ->
     case Start + 2*Increment of
     X when X > ?RINGTOP ->
         End = ?RINGTOP - 1;
@@ -217,6 +220,13 @@ n_val(N, _) when N < 1 ->
 n_val(N, _) ->
     N.
 
+q_val(Q) when is_list(Q) ->
+    q_val(list_to_integer(Q));
+q_val(Q) when Q > 0 ->
+    Q;
+q_val(_) ->
+    throw({error, invalid_q_value}).
+
 shard_info(DbName) ->
     [{n, mem3:n(DbName)},
      {q, length(mem3:shards(DbName)) div mem3:n(DbName)}].
@@ -263,3 +273,9 @@ downcast(#ordered_shard{}=S) ->
       };
 downcast(Shards) when is_list(Shards) ->
     [downcast(Shard) || Shard <- Shards].
+
+iso8601_timestamp() ->
+    {_,_,Micro} = Now = os:timestamp(),
+    {{Year,Month,Date},{Hour,Minute,Second}} = calendar:now_to_datetime(Now),
+    Format = "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
+    io_lib:format(Format, [Year, Month, Date, Hour, Minute, Second, Micro]).

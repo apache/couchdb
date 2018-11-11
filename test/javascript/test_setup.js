@@ -76,6 +76,14 @@ function getUptime() {
   return stats['uptime'];
 }
 
+function restartNodeRequest(node) {
+    var url = "/_node/" + node +"/_restart"
+    var result = JSON.parse(CouchDB.request("POST", url).responseText);
+    if (result.ok != true) {
+        throw(Error('FAILED to restart: ' + node));
+    }
+}
+
 function restartServer() {
   var olduptime = getUptime();
   if (olduptime < 15) {
@@ -83,7 +91,8 @@ function restartServer() {
     sleep(15000);
     olduptime = getUptime();
   }
-  print('restart');
+
+  restartNodeRequest('node1@127.0.0.1');
 
   /* Wait up to 15s for server to restart */
   var start = new Date().getTime();

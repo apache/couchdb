@@ -19,21 +19,35 @@
     find_common_seq/4,
     get_missing_revs/4,
     update_docs/4,
+    pull_replication/1,
     load_checkpoint/4,
-    save_checkpoint/6
+    save_checkpoint/6,
+
+    load_purge_infos/4,
+    save_purge_checkpoint/4,
+    purge_docs/4
 ]).
 
 % Private RPC callbacks
 -export([
     find_common_seq_rpc/3,
     load_checkpoint_rpc/3,
-    save_checkpoint_rpc/5
+    pull_replication_rpc/1,
+    save_checkpoint_rpc/5,
+
+    load_purge_infos_rpc/3,
+    save_purge_checkpoint_rpc/3
 ]).
 
 
 -include("mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+% "Pull" is a bit of a misnomer here, as what we're actually doing is
+% issuing an RPC request and telling the remote node to push updates to
+% us. This lets us reuse all of the battle-tested machinery of mem3_rpc.
+pull_replication(Seed) ->
+    rexi_call(Seed, {mem3_rpc, pull_replication_rpc, [node()]}).
 
 get_missing_revs(Node, DbName, IdsRevs, Options) ->
     rexi_call(Node, {fabric_rpc, get_missing_revs, [DbName, IdsRevs, Options]}).
@@ -56,6 +70,20 @@ save_checkpoint(Node, DbName, DocId, Seq, Entry, History) ->
 find_common_seq(Node, DbName, SourceUUID, SourceEpochs) ->
     Args = [DbName, SourceUUID, SourceEpochs],
     rexi_call(Node, {mem3_rpc, find_common_seq_rpc, Args}).
+
+
+load_purge_infos(Node, DbName, SourceUUID, Count) ->
+    Args = [DbName, SourceUUID, Count],
+    rexi_call(Node, {mem3_rpc, load_purge_infos_rpc, Args}).
+
+
+save_purge_checkpoint(Node, DbName, PurgeDocId, Body) ->
+    Args = [DbName, PurgeDocId, Body],
+    rexi_call(Node, {mem3_rpc, save_purge_checkpoint_rpc, Args}).
+
+
+purge_docs(Node, DbName, PurgeInfos, Options) ->
+    rexi_call(Node, {fabric_rpc, purge_docs, [DbName, PurgeInfos, Options]}).
 
 
 load_checkpoint_rpc(DbName, SourceNode, SourceUUID) ->
@@ -125,6 +153,58 @@ find_common_seq_rpc(DbName, SourceUUID, SourceEpochs) ->
         end;
     Error ->
         rexi:reply(Error)
+    end.
+
+pull_replication_rpc(Target) ->
+    Dbs = mem3_sync:local_dbs(),
+    Opts = [{batch_size, 1000}, {batch_count, 50}],
+    Repl = fun(Db) -> {Db, mem3_rep:go(Db, Target, Opts)} end,
+    rexi:reply({ok, lists:map(Repl, Dbs)}).
+
+
+load_purge_infos_rpc(DbName, SrcUUID, BatchSize) ->
+    erlang:put(io_priority, {internal_repl, DbName}),
+    case get_or_create_db(DbName, [?ADMIN_CTX]) of
+        {ok, Db} ->
+            TgtUUID = couch_db:get_uuid(Db),
+            PurgeDocId = mem3_rep:make_purge_id(SrcUUID, TgtUUID),
+            StartSeq = case couch_db:open_doc(Db, PurgeDocId, []) of
+                {ok, #doc{body = {Props}}} ->
+                    couch_util:get_value(<<"purge_seq">>, Props);
+                {not_found, _} ->
+                    Oldest = couch_db:get_oldest_purge_seq(Db),
+                    erlang:max(0, Oldest - 1)
+            end,
+            FoldFun = fun({PSeq, UUID, Id, Revs}, {Count, Infos, _}) ->
+                NewCount = Count + length(Revs),
+                NewInfos = [{UUID, Id, Revs} | Infos],
+                Status = if NewCount < BatchSize -> ok; true -> stop end,
+                {Status, {NewCount, NewInfos, PSeq}}
+            end,
+            InitAcc = {0, [], StartSeq},
+            {ok, {_, PurgeInfos, ThroughSeq}} =
+                    couch_db:fold_purge_infos(Db, StartSeq, FoldFun, InitAcc),
+            PurgeSeq = couch_db:get_purge_seq(Db),
+            Remaining = PurgeSeq - ThroughSeq,
+            rexi:reply({ok, {PurgeDocId, PurgeInfos, ThroughSeq, Remaining}});
+        Else ->
+            rexi:reply(Else)
+    end.
+
+
+save_purge_checkpoint_rpc(DbName, PurgeDocId, Body) ->
+    erlang:put(io_priority, {internal_repl, DbName}),
+    case get_or_create_db(DbName, [?ADMIN_CTX]) of
+        {ok, Db} ->
+            Doc = #doc{id = PurgeDocId, body = Body},
+            Resp = try couch_db:update_doc(Db, Doc, []) of
+                Resp0 -> Resp0
+            catch T:R ->
+                {T, R}
+            end,
+            rexi:reply(Resp);
+        Error ->
+            rexi:reply(Error)
     end.
 
 

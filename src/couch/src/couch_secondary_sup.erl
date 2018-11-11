@@ -26,18 +26,42 @@ init([]) ->
             worker,
             dynamic}
     ],
+    Daemons = [
+        {index_server, {couch_index_server, start_link, []}},
+        {query_servers, {couch_proc_manager, start_link, []}},
+        {vhosts, {couch_httpd_vhost, start_link, []}},
+        {httpd, {couch_httpd, start_link, []}},
+        {uuids, {couch_uuids, start, []}},
+        {auth_cache, {couch_auth_cache, start_link, []}},
+        {compaction_daemon, {couch_compaction_daemon, start_link, []}}
+    ],
+
+    MaybeHttps = case https_enabled() of
+        true -> [{httpsd, {chttpd, start_link, [https]}}];
+        _False -> []
+    end,
+
     Children = SecondarySupervisors ++ [
         begin
-            {ok, {Module, Fun, Args}} = couch_util:parse_term(SpecStr),
+            {Module, Fun, Args} = Spec,
 
-            {list_to_atom(Name),
+            {Name,
                 {Module, Fun, Args},
                 permanent,
                 brutal_kill,
                 worker,
                 [Module]}
         end
-        || {Name, SpecStr}
-        <- config:get("daemons"), SpecStr /= ""],
+        || {Name, Spec}
+        <- Daemons ++ MaybeHttps, Spec /= ""],
     {ok, {{one_for_one, 50, 3600},
         couch_epi:register_service(couch_db_epi, Children)}}.
+
+https_enabled() ->
+    % 1. [ssl] enable = true | false
+    % 2. if [daemons] httpsd == {chttpd, start_link, [https]} -> pretend true as well
+    SSLEnabled = config:get_boolean("ssl", "enable", false),
+    LegacySSL = config:get("daemons", "httpsd"),
+    LegacySSLEnabled = LegacySSL =:= "{chttpd, start_link, [https]}",
+
+    SSLEnabled orelse LegacySSLEnabled.

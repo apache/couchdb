@@ -61,6 +61,8 @@ all_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun should_return_ok_true_on_bulk_update/1,
+                    fun should_return_ok_true_on_ensure_full_commit/1,
+                    fun should_return_404_for_ensure_full_commit_on_no_db/1,
                     fun should_accept_live_as_an_alias_for_continuous/1,
                     fun should_return_404_for_delete_att_on_notadoc/1,
                     fun should_return_409_for_del_att_without_rev/1,
@@ -98,6 +100,26 @@ should_return_ok_true_on_bulk_update(Url) ->
             {InnerJson} = lists:nth(1, ResultJson),
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
         end).
+
+
+should_return_ok_true_on_ensure_full_commit(Url0) ->
+    ?_test(begin
+        Url = Url0 ++ "/_ensure_full_commit",
+        {ok, RC, _, Body} = test_request:post(Url, [?CONTENT_JSON, ?AUTH], []),
+        {Json} = ?JSON_DECODE(Body),
+        ?assertEqual(201, RC),
+        ?assert(couch_util:get_value(<<"ok">>, Json))
+    end).
+
+
+should_return_404_for_ensure_full_commit_on_no_db(Url0) ->
+    ?_test(begin
+        Url = Url0 ++ "-missing-db" ++ "/_ensure_full_commit",
+        {ok, RC, _, Body} = test_request:post(Url, [?CONTENT_JSON, ?AUTH], []),
+        {Json} = ?JSON_DECODE(Body),
+        ?assertEqual(404, RC),
+        ?assertEqual(<<"not_found">>, couch_util:get_value(<<"error">>, Json))
+    end).
 
 
 should_accept_live_as_an_alias_for_continuous(Url) ->

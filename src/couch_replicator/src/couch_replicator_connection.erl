@@ -156,7 +156,11 @@ handle_cast({connection_close_interval, V}, State) ->
 handle_info({'DOWN', Ref, process, _Pid, _Reason}, State) ->
     couch_stats:increment_counter([couch_replicator, connection,
         owner_crashes]),
-    ets:match_delete(?MODULE, #connection{mref=Ref, _='_'}),
+    Conns = ets:match_object(?MODULE, #connection{mref = Ref, _='_'}),
+    lists:foreach(fun(Conn) ->
+        couch_stats:increment_counter([couch_replicator, connection, closes]),
+        delete_worker(Conn)
+    end, Conns),
     {noreply, State};
 
 % worker crashed

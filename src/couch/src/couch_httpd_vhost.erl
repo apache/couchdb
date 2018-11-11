@@ -15,6 +15,8 @@
 -vsn(1).
 -behaviour(config_listener).
 
+-compile(tuple_calls).
+
 -export([start_link/0, reload/0, get_state/0, dispatch_host/1]).
 -export([urlsplit_netloc/2, redirect_to_vhost/2]).
 -export([host/1, split_host_port/1]).
@@ -378,10 +380,6 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 
-handle_config_change("httpd", "vhost_global_handlers", _, _, _) ->
-    {ok, ?MODULE:reload()};
-handle_config_change("httpd", "redirect_vhost_handler", _, _, _) ->
-    {ok, ?MODULE:reload()};
 handle_config_change("vhosts", _, _, _, _) ->
     {ok, ?MODULE:reload()};
 handle_config_change(_, _, _, _, _) ->
@@ -394,25 +392,23 @@ handle_config_terminate(_Server, _Reason, _State) ->
 
 load_conf() ->
     %% get vhost globals
-    VHostGlobals = re:split(config:get("httpd",
-            "vhost_global_handlers",""), "\\s*,\\s*",[{return, list}]),
+    VHostGlobals = re:split("_utils, _uuids, _session, _users", "\\s*,\\s*",
+        [{return, list}]),
 
     %% build vhosts matching rules
     VHosts = make_vhosts(),
 
     %% build vhosts handler fun
     DefaultVHostFun = "{couch_httpd_vhost, redirect_to_vhost}",
-    Fun = couch_httpd:make_arity_2_fun(config:get("httpd",
-            "redirect_vhost_handler", DefaultVHostFun)),
+    Fun = couch_httpd:make_arity_2_fun(DefaultVHostFun),
 
     {VHostGlobals, VHosts, Fun}.
 
 %% cheaply determine if there are any virtual hosts
 %% configured at all.
 vhost_enabled() ->
-    case {config:get("httpd", "vhost_global_handlers"),
-          config:get("vhosts")} of
-        {undefined, []} ->
+    case config:get("vhosts") of
+        [] ->
             false;
         _ ->
             true

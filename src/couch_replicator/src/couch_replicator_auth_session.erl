@@ -94,7 +94,8 @@
     httpdb_ibrowse_options = [] :: list(),
     session_url :: string(),
     next_refresh = infinity :: infinity |  non_neg_integer(),
-    refresh_tstamp = 0 :: non_neg_integer()
+    refresh_tstamp = 0 :: non_neg_integer(),
+    require_valid_user = false :: boolean()
 }).
 
 
@@ -210,6 +211,19 @@ init_state(#httpdb{} = HttpDb) ->
                     {ok, HttpDb1, State1};
                 {error, {session_not_supported, _, _}} ->
                     ignore;
+                {error, {session_requires_valid_user, _, _}} ->
+                    % If endpoint requires basic auth for _session then try
+                    % to refresh again with basic auth creds, then remember
+                    % this fact in the state for all subsequent requests to
+                    % _session endpoint
+                    case refresh(State#state{require_valid_user = true}) of
+                        {ok, State1} ->
+                            {ok, HttpDb1, State1};
+                        {error, {session_not_supported, _, _}} ->
+                            ignore;
+                        {error, Error} ->
+                            {error, Error}
+                    end;
                 {error, Error} ->
                     {error, Error}
             end;
@@ -359,7 +373,13 @@ maybe_refresh(#state{next_refresh = T} = State) ->
 -spec refresh(#state{}) -> {ok, #state{}} | {error, term()}.
 refresh(#state{session_url = Url, user = User, pass = Pass} = State) ->
     Body =  mochiweb_util:urlencode([{name, User}, {password, Pass}]),
-    Headers = [{"Content-Type", "application/x-www-form-urlencoded"}],
+    Headers0 = [{"Content-Type", "application/x-www-form-urlencoded"}],
+    Headers = case State#state.require_valid_user of
+        true ->
+            Headers0 ++ [{"Authorization", "Basic " ++ b64creds(User, Pass)}];
+        false ->
+            Headers0
+    end,
     Result = http_request(State, Url, Headers, post, Body),
     http_response(Result, State).
 
@@ -375,9 +395,33 @@ http_request(#state{httpdb_pool = Pool} = State, Url, Headers, Method, Body) ->
     ],
     {ok, Wrk} = couch_replicator_httpc_pool:get_worker(Pool),
     try
-        ibrowse:send_req_direct(Wrk, Url, Headers, Method, Body, Opts, Timeout)
+        Result = ibrowse:send_req_direct(Wrk, Url, Headers, Method, Body, Opts,
+            Timeout),
+        case Result of
+            {ok, _, ResultHeaders, _} ->
+                stop_worker_if_server_requested(ResultHeaders, Wrk);
+            _Other ->
+                ok
+       end,
+       Result
     after
-        ok = couch_replicator_httpc_pool:release_worker(Pool, Wrk)
+        ok = couch_replicator_httpc_pool:release_worker_sync(Pool, Wrk)
+    end.
+
+
+-spec stop_worker_if_server_requested(headers(), pid()) -> ok.
+stop_worker_if_server_requested(ResultHeaders0, Worker) ->
+    ResultHeaders = mochiweb_headers:make(ResultHeaders0),
+    case mochiweb_headers:get_value("Connection", ResultHeaders) of
+        "close" ->
+            Ref = erlang:monitor(process, Worker),
+            ibrowse_http_client:stop(Worker),
+            receive
+                {'DOWN', Ref, _, _, _} ->
+                    ok
+            end;
+        _Other ->
+            ok
     end.
 
 
@@ -385,8 +429,15 @@ http_request(#state{httpdb_pool = Pool} = State, Url, Headers, Method, Body) ->
     #state{}) -> {ok, #state{}} | {error, term()}.
 http_response({ok, "200", Headers, _}, State) ->
     maybe_update_cookie(Headers, State);
-http_response({ok, "401", _, _}, #state{session_url = Url, user = User}) ->
-    {error, {session_request_unauthorized, Url, User}};
+http_response({ok, "401", Headers0, _}, #state{session_url = Url,
+        user = User}) ->
+    Headers = mochiweb_headers:make(Headers0),
+    case mochiweb_headers:get_value("WWW-Authenticate", Headers) of
+        undefined ->
+            {error, {session_request_unauthorized, Url, User}};
+        _SomeValue ->
+            {error, {session_requires_valid_user, Url, User}}
+    end;
 http_response({ok, "403", _, _}, #state{session_url = Url, user = User}) ->
     {error, {session_request_forbidden, Url, User}};
 http_response({ok, "404", _, _}, #state{session_url = Url, user = User}) ->
@@ -452,6 +503,11 @@ now_sec() ->
 min_update_interval() ->
     config:get_integer("replicator", "session_min_update_interval",
         ?MIN_UPDATE_INTERVAL).
+
+
+-spec b64creds(string(), string()) -> string().
+b64creds(User, Pass) ->
+    base64:encode_to_string(User ++ ":" ++ Pass).
 
 
 -ifdef(TEST).
@@ -545,6 +601,7 @@ cookie_update_test_() ->
             t_process_ok_update_cookie(),
             t_process_ok_no_cookie(),
             t_init_state_fails_on_401(),
+            t_init_state_401_with_require_valid_user(),
             t_init_state_404(),
             t_init_state_no_creds(),
             t_init_state_http_error()
@@ -627,6 +684,14 @@ t_init_state_fails_on_401() ->
     end).
 
 
+t_init_state_401_with_require_valid_user() ->
+    ?_test(begin
+        mock_http_401_response_with_require_valid_user(),
+        ?assertMatch({ok, #httpdb{}, #state{cookie = "Cookie"}},
+            init_state(#httpdb{url = "http://u:p@h"}))
+    end).
+
+
 t_init_state_404() ->
     ?_test(begin
         mock_http_404_response(),
@@ -651,7 +716,7 @@ t_init_state_http_error() ->
 
 setup() ->
     meck:expect(couch_replicator_httpc_pool, get_worker, 1, {ok, worker}),
-    meck:expect(couch_replicator_httpc_pool, release_worker, 2, ok),
+    meck:expect(couch_replicator_httpc_pool, release_worker_sync, 2, ok),
     meck:expect(config, get, fun(_, _, Default) -> Default end),
     mock_http_cookie_response("Abc"),
     ok.
@@ -670,6 +735,12 @@ mock_http_401_response() ->
     meck:expect(ibrowse, send_req_direct, 7, {ok, "401", [], []}).
 
 
+mock_http_401_response_with_require_valid_user() ->
+    Resp1 = {ok, "401", [{"WWW-Authenticate", "Basic realm=\"server\""}], []},
+    Resp2 = {ok, "200", [{"Set-Cookie", "AuthSession=Cookie"}], []},
+    meck:expect(ibrowse, send_req_direct, 7, meck:seq([Resp1, Resp2])).
+
+
 mock_http_404_response() ->
     meck:expect(ibrowse, send_req_direct, 7, {ok, "404", [], []}).
 
@@ -684,10 +755,5 @@ extract_creds_error_test_() ->
         {#httpdb{url = "some_junk"}, invalid_uri},
         {#httpdb{url = "http://h/db"}, missing_credentials}
     ]].
-
-
-b64creds(User, Pass) ->
-    base64:encode_to_string(User ++ ":" ++ Pass).
-
 
 -endif.

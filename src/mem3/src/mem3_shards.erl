@@ -184,7 +184,7 @@ handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 init([]) ->
-    couch_util:set_mqd_off_heap(),
+    couch_util:set_mqd_off_heap(?MODULE),
     ets:new(?SHARDS, [
         bag,
         public,

@@ -17,6 +17,7 @@
 
 -define(i2l(I), integer_to_list(I)).
 -define(DOC_ID, <<"foobar">>).
+-define(LOCAL_DOC_ID, <<"_local/foobar">>).
 -define(NUM_CLIENTS, [100, 500, 1000, 2000, 5000, 10000]).
 -define(TIMEOUT, 20000).
 
@@ -52,7 +53,7 @@ view_indexes_cleanup_test_() ->
             fun start/0, fun test_util:stop_couch/1,
             [
                 concurrent_updates(),
-                couchdb_188()
+                bulk_docs_updates()
             ]
         }
     }.
@@ -68,13 +69,17 @@ concurrent_updates()->
         }
     }.
 
-couchdb_188()->
+bulk_docs_updates()->
     {
-        "COUCHDB-188",
+        "Bulk docs updates",
         {
             foreach,
             fun setup/0, fun teardown/1,
-            [fun should_bulk_create_delete_doc/1]
+            [
+                fun should_bulk_create_delete_doc/1,
+                fun should_bulk_create_local_doc/1,
+                fun should_ignore_invalid_local_doc/1
+            ]
         }
     }.
 
@@ -90,6 +95,12 @@ should_concurrently_update_doc(NumClients, {DbName, InitRev})->
 
 should_bulk_create_delete_doc({DbName, InitRev})->
     ?_test(bulk_delete_create(DbName, InitRev)).
+
+should_bulk_create_local_doc({DbName, _})->
+    ?_test(bulk_create_local_doc(DbName)).
+
+should_ignore_invalid_local_doc({DbName, _})->
+    ?_test(ignore_invalid_local_doc(DbName)).
 
 
 concurrent_doc_update(NumClients, DbName, InitRev) ->
@@ -157,10 +168,10 @@ ensure_in_single_revision_leaf(DbName) ->
 
     [{ok, Doc2}] = Leaves,
     ?assertEqual(Doc, Doc2).
-    
+
 bulk_delete_create(DbName, InitRev) ->
     {ok, Db} = couch_db:open_int(DbName, []),
-    
+
     DeletedDoc = couch_doc:from_json_obj({[
         {<<"_id">>, ?DOC_ID},
         {<<"_rev">>, InitRev},
@@ -176,7 +187,7 @@ bulk_delete_create(DbName, InitRev) ->
 
     ?assertEqual(2, length([ok || {ok, _} <- Results])),
     [{ok, Rev1}, {ok, Rev2}] = Results,
-    
+
     {ok, Db2} = couch_db:open_int(DbName, []),
     {ok, [{ok, Doc1}]} = couch_db:open_doc_revs(
         Db2, ?DOC_ID, [Rev1], [conflicts, deleted_conflicts]),
@@ -212,6 +223,45 @@ bulk_delete_create(DbName, InitRev) ->
     ?assertEqual(2, element(1, Rev1)),
     %% New leaf revision has position 3
     ?assertEqual(3, element(1, Rev2)).
+
+
+bulk_create_local_doc(DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, []),
+
+    LocalDoc = couch_doc:from_json_obj({[
+        {<<"_id">>, ?LOCAL_DOC_ID},
+        {<<"_rev">>, <<"0-1">>}
+    ]}),
+
+    {ok, Results} = couch_db:update_docs(Db, [LocalDoc],
+        [], replicated_changes),
+    ok = couch_db:close(Db),
+    ?assertEqual([], Results),
+
+    {ok, Db2} = couch_db:open_int(DbName, []),
+    {ok, LocalDoc1} = couch_db:open_doc_int(Db2, ?LOCAL_DOC_ID, []),
+    ok = couch_db:close(Db2),
+    ?assertEqual(?LOCAL_DOC_ID, LocalDoc1#doc.id),
+    ?assertEqual({0, [<<"2">>]}, LocalDoc1#doc.revs).
+
+
+ignore_invalid_local_doc(DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, []),
+
+    LocalDoc = couch_doc:from_json_obj({[
+        {<<"_id">>, ?LOCAL_DOC_ID},
+        {<<"_rev">>, <<"0-abcdef">>}
+    ]}),
+
+    {ok, Results} = couch_db:update_docs(Db, [LocalDoc],
+        [], replicated_changes),
+    ok = couch_db:close(Db),
+    ?assertEqual([], Results),
+
+    {ok, Db2} = couch_db:open_int(DbName, []),
+    Result2 = couch_db:open_doc_int(Db2, ?LOCAL_DOC_ID, []),
+    ok = couch_db:close(Db2),
+    ?assertEqual({not_found, missing}, Result2).
 
 
 spawn_client(DbName, Doc) ->

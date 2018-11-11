@@ -214,7 +214,8 @@ should_include_attachments_when_atts_since_specified(_) ->
 
     ?_assert(meck:called(fabric, open_revs,
                          [nil, DocId, [{1, <<"revorev">>}],
-                          [{atts_since, [{1, <<"abc">>}]}, attachments]])).
+                          [{atts_since, [{1, <<"abc">>}]}, attachments,
+                           {user_ctx, undefined}]])).
 
 %% helpers
 

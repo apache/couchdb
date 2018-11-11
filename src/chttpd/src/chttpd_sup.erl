@@ -80,21 +80,18 @@ maybe_replace(Key, Value, Settings) ->
     end.
 
 lru_opts() ->
-    case config:get("chttpd_auth_cache", "max_objects") of
-        MxObjs when is_integer(MxObjs), MxObjs > 0 ->
-            [{max_objects, MxObjs}];
-        _ ->
-            []
-    end ++
-    case config:get("chttpd_auth_cache", "max_size", "104857600") of
-        MxSize when is_integer(MxSize), MxSize > 0 ->
-            [{max_size, MxSize}];
-        _ ->
-            []
-    end ++
-    case config:get("chttpd_auth_cache", "max_lifetime", "600000") of
-        MxLT when is_integer(MxLT), MxLT > 0 ->
-            [{max_lifetime, MxLT}];
-        _ ->
-            []
-    end.
+    lists:foldl(fun append_if_set/2, [], [
+        {max_objects, config:get_integer("chttpd_auth_cache", "max_objects", 0)},
+        {max_size, config:get_integer("chttpd_auth_cache", "max_size", 104857600)},
+        {max_lifetime, config:get_integer("chttpd_auth_cache", "max_lifetime", 600000)}
+    ]).
+
+append_if_set({Key, Value}, Opts) when Value > 0 ->
+    [{Key, Value} | Opts];
+append_if_set({Key, 0}, Opts) ->
+    Opts;
+append_if_set({Key, Value}, Opts) ->
+    couch_log:error(
+        "The value for `~s` should be string convertable "
+        "to integer which is >= 0 (got `~p`)", [Key, Value]),
+    Opts.

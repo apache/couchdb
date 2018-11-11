@@ -123,9 +123,12 @@ last_log() ->
 
 
 remove_error_loggers() ->
-    lists:foreach(fun(Handler) ->
-        error_logger:delete_report_handler(Handler)
-    end, gen_event:which_handlers(error_logger)).
+    ErrorLoggerPid = whereis(error_logger),
+    if ErrorLoggerPid == undefined -> ok; true ->
+        lists:foreach(fun(Handler) ->
+            error_logger:delete_report_handler(Handler)
+        end, gen_event:which_handlers(ErrorLoggerPid))
+    end.
 
 
 config_files() ->

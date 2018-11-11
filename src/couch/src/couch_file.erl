@@ -48,7 +48,7 @@
 -export([lock/1, unlock/1]).
 
 % gen_server callbacks
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2, code_change/3, format_status/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 %% helper functions
@@ -527,6 +527,9 @@ handle_info({'DOWN', Ref, process, _Pid, _Info}, #file{db_monitor=Ref}=File) ->
         false -> {noreply, File}
     end.
 
+format_status(_Opt, [PDict, #file{} = File]) ->
+    {_Fd, FilePath} = couch_util:get_value(couch_file_fd, PDict),
+    [{data, [{"State", File}, {"InitialFilePath", FilePath}]}].
 
 find_header(Fd, Block) ->
     case (catch load_header(Fd, Block)) of
@@ -612,18 +615,18 @@ read_raw_iolist_int(Fd, {Pos, _Size}, Len) -> % 0110 UPGRADE CODE
 read_raw_iolist_int(#file{fd = Fd, pread_limit = Limit} = F, Pos, Len) ->
     BlockOffset = Pos rem ?SIZE_BLOCK,
     TotalBytes = calculate_total_read_len(BlockOffset, Len),
-    case Pos + TotalBytes of
-    Size when Size > F#file.eof ->
-        couch_stats:increment_counter([pread, exceed_eof]),
-        {_Fd, Filepath} = get(couch_file_fd),
-        throw({read_beyond_eof, Filepath});
-    Size when Size > Limit ->
-        couch_stats:increment_counter([pread, exceed_limit]),
-        {_Fd, Filepath} = get(couch_file_fd),
-        throw({exceed_pread_limit, Filepath, Limit});
-    Size ->
-        {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
-        {remove_block_prefixes(BlockOffset, RawBin), Size}
+    if
+        (Pos + TotalBytes) > F#file.eof ->
+            couch_stats:increment_counter([pread, exceed_eof]),
+            {_Fd, Filepath} = get(couch_file_fd),
+            throw({read_beyond_eof, Filepath});
+        TotalBytes > Limit ->
+            couch_stats:increment_counter([pread, exceed_limit]),
+            {_Fd, Filepath} = get(couch_file_fd),
+            throw({exceed_pread_limit, Filepath, Limit});
+        true ->
+            {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
+            {remove_block_prefixes(BlockOffset, RawBin), Pos + TotalBytes}
     end.
 
 -spec extract_md5(iolist()) -> {binary(), iolist()}.
@@ -693,24 +696,27 @@ split_iolist([Sublist| Rest], SplitAt, BeginAcc) when is_list(Sublist) ->
 split_iolist([Byte | Rest], SplitAt, BeginAcc) when is_integer(Byte) ->
     split_iolist(Rest, SplitAt - 1, [Byte | BeginAcc]).
 
+monitored_by_pids() ->
+    {monitored_by, PidsAndRefs} = process_info(self(), monitored_by),
+    lists:filter(fun is_pid/1, PidsAndRefs).
 
 % System dbs aren't monitored by couch_stats_process_tracker
 is_idle(#file{is_sys=true}) ->
-    case process_info(self(), monitored_by) of
-        {monitored_by, []} -> lock(self());
+    case monitored_by_pids() of
+        [] -> lock(self());
         _ -> false
     end;
 is_idle(#file{is_sys=false}) ->
     Tracker = whereis(couch_stats_process_tracker),
-    case process_info(self(), monitored_by) of
-        {monitored_by, []} -> lock(self());
-        {monitored_by, [Tracker]} -> lock(self());
-        {monitored_by, [_]} -> exit(tracker_monitoring_failed);
+    case monitored_by_pids() of
+        [] -> lock(self());
+        [Tracker] -> lock(self());
+        [_] -> exit(tracker_monitoring_failed);
         _ -> false
     end.
 
 lock(Fd) -> try
-                ets:new(list_to_atom(pid_to_list(Fd)), named_table), true
+                ets:new(list_to_atom(pid_to_list(Fd)), [named_table]), true
             catch
                 _:_ -> false
             end.
