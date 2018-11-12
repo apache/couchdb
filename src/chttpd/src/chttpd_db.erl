@@ -468,7 +468,8 @@ db_req(#httpd{path_parts=[_,<<"_bulk_docs">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
 
-db_req(#httpd{method='POST', path_parts=[_, <<"_bulk_get">>]}=Req, Db) ->
+db_req(#httpd{method='POST', path_parts=[_, <<"_bulk_get">>],
+                             mochi_req=MochiReq}=Req, Db) ->
     couch_stats:increment_counter([couchdb, httpd, bulk_requests]),
     couch_httpd:validate_ctype(Req, "application/json"),
     {JsonProps} = chttpd:json_body_obj(Req),
@@ -481,18 +482,62 @@ db_req(#httpd{method='POST', path_parts=[_, <<"_bulk_get">>]}=Req, Db) ->
             } = bulk_get_parse_doc_query(Req),
             Options = [{user_ctx, Req#httpd.user_ctx} | Options0],
 
-            {ok, Resp} = start_json_response(Req, 200),
-            send_chunk(Resp, <<"{\"results\": [">>),
-
-            lists:foldl(fun(Doc, Sep) ->
-                {DocId, Results, Options1} = bulk_get_open_doc_revs(Db, Doc,
-                                                                    Options),
-                bulk_get_send_docs_json(Resp, DocId, Results, Options1, Sep),
-                <<",">>
-            end, <<"">>, Docs),
-
-            send_chunk(Resp, <<"]}">>),
-            end_json_response(Resp)
+            AcceptJson =  MochiReq:accepts_content_type("application/json"),
+            AcceptMixedMp = MochiReq:accepts_content_type("multipart/mixed"),
+            AcceptRelatedMp = MochiReq:accepts_content_type("multipart/related"),
+            AcceptMp = not AcceptJson andalso (AcceptMixedMp orelse AcceptRelatedMp),
+            case AcceptMp of
+                false ->
+                    {ok, Resp} = start_json_response(Req, 200),
+                    send_chunk(Resp, <<"{\"results\": [">>),
+                    lists:foldl(fun(Doc, Sep) ->
+                        {DocId, Results, Options1} = bulk_get_open_doc_revs(Db, Doc,
+                            Options),
+                        bulk_get_send_docs_json(Resp, DocId, Results, Options1, Sep),
+                        <<",">>
+                    end, <<"">>, Docs),
+                    send_chunk(Resp, <<"]}">>),
+                    end_json_response(Resp);
+                true ->
+                    OuterBoundary = bulk_get_multipart_boundary(),
+                    MpType = case AcceptMixedMp of
+                        true ->
+                            "multipart/mixed";
+                        _ ->
+                            "multipart/related"
+                    end,
+                    CType = {"Content-Type", MpType ++ "; boundary=\"" ++
+                                          ?b2l(OuterBoundary) ++  "\""},
+                    {ok, Resp} = start_chunked_response(Req, 200, [CType]),
+                    lists:foldl(fun(Doc, _Pre) ->
+                        case bulk_get_open_doc_revs(Db, Doc, Options) of
+                            {_, {ok, []}, _Options1} ->
+                                ok;
+                            {_, {ok, Results}, Options1} ->
+                                send_docs_multipart_bulk_get(Results, Options1,
+                                    OuterBoundary, Resp);
+                            {DocId, {error, {RevId, Error, Reason}}, _Options1} ->
+                                Json = ?JSON_ENCODE({[
+                                    {<<"id">>, DocId},
+                                    {<<"rev">>, RevId},
+                                    {<<"error">>, Error},
+                                    {<<"reason">>, Reason}
+                                ]}),
+                                couch_httpd:send_chunk(Resp,[
+                                    <<"\r\n--", OuterBoundary/binary>>,
+                                    <<"\r\nContent-Type: application/json; error=\"true\"\r\n\r\n">>,
+                                    Json
+                                ])
+                        end
+                    end, <<"">>, Docs),
+                    case Docs of
+                        [] ->
+                            ok;
+                        _ ->
+                            couch_httpd:send_chunk(Resp, <<"\r\n", "--", OuterBoundary/binary, "--\r\n">>)
+                    end,
+                    couch_httpd:last_chunk(Resp)
+            end
     end;
 db_req(#httpd{path_parts=[_, <<"_bulk_get">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
@@ -962,6 +1007,39 @@ send_doc_efficiently(#httpd{mochi_req=MochiReq}=Req, #doc{atts=Atts}=Doc, Header
         send_json(Req, 200, Headers, couch_doc:to_json_obj(Doc, Options))
     end.
 
+send_docs_multipart_bulk_get(Results, Options0, OuterBoundary, Resp) ->
+    InnerBoundary = bulk_get_multipart_boundary(),
+    Options = [attachments, follows, att_encoding_info | Options0],
+    lists:foreach(
+        fun({ok, #doc{id=Id, revs=Revs, atts=Atts}=Doc}) ->
+            Refs = monitor_attachments(Doc#doc.atts),
+            try
+            JsonBytes = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, Options)),
+            couch_httpd:send_chunk(Resp, <<"\r\n--", OuterBoundary/binary>>),
+            case Atts of
+              [] ->
+                couch_httpd:send_chunk(Resp, <<"\r\nContent-Type: application/json\r\n\r\n">>);
+              _ ->
+                lists:foreach(fun(Header) -> couch_httpd:send_chunk(Resp, Header) end,
+                              bulk_get_multipart_headers(Revs, Id, InnerBoundary))
+            end,
+            couch_doc:doc_to_multi_part_stream(InnerBoundary, JsonBytes, Atts,
+                    fun(Data) -> couch_httpd:send_chunk(Resp, Data)
+                    end, true)
+            after
+                demonitor_refs(Refs)
+            end;
+          ({{not_found, missing}, RevId}) ->
+              RevStr = couch_doc:rev_to_str(RevId),
+              Json = ?JSON_ENCODE({[{<<"rev">>, RevStr},
+                                    {<<"error">>, <<"not_found">>},
+                                    {<<"reason">>, <<"missing">>}]}),
+              couch_httpd:send_chunk(Resp,
+                  [<<"\r\n--", OuterBoundary/binary>>,
+                  <<"\r\nContent-Type: application/json; error=\"true\"\r\n\r\n">>,
+                  Json])
+          end, Results).
+
 send_docs_multipart(Req, Results, Options1) ->
     OuterBoundary = couch_uuids:random(),
     InnerBoundary = couch_uuids:random(),
@@ -996,6 +1074,23 @@ send_docs_multipart(Req, Results, Options1) ->
          end, Results),
     couch_httpd:send_chunk(Resp, <<"--">>),
     couch_httpd:last_chunk(Resp).
+
+bulk_get_multipart_headers({0, []}, Id, Boundary) ->
+    [
+        <<"\r\nX-Doc-Id: ", Id/binary>>,
+        <<"\r\nContent-Type: multipart/related; boundary=", Boundary/binary, "\r\n\r\n">>
+    ];
+bulk_get_multipart_headers({Start, [FirstRevId|_]}, Id, Boundary) ->
+    RevStr = couch_doc:rev_to_str({Start, FirstRevId}),
+    [
+        <<"\r\nX-Doc-Id: ", Id/binary>>,
+        <<"\r\nX-Rev-Id: ", RevStr/binary>>,
+        <<"\r\nContent-Type: multipart/related; boundary=", Boundary/binary, "\r\n\r\n">>
+    ].
+
+bulk_get_multipart_boundary() ->
+    Unique = couch_uuids:random(),
+    <<"--", Unique/binary>>.
 
 receive_request_data(Req) ->
     receive_request_data(Req, chttpd:body_length(Req)).
