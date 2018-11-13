@@ -69,10 +69,7 @@ defmodule ConfigTest do
 
   test "Standard config options are present", context do
     assert context[:config]["couchdb"]["database_dir"]
-    assert context[:config]["daemons"]["httpd"]
-    assert context[:config]["httpd_global_handlers"]["_config"]
     assert context[:config]["log"]["level"]
-    assert context[:config]["query_servers"]["javascript"]
   end
 
   test "Settings can be altered with undefined whitelist allowing any change", context do

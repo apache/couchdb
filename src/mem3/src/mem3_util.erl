@@ -16,6 +16,9 @@
     n_val/2, q_val/1, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
     shard_info/1, ensure_exists/1, open_db_doc/1]).
 -export([is_deleted/1, rotate_list/2]).
+-export([
+    iso8601_timestamp/0
+]).
 
 %% do not use outside mem3.
 -export([build_ordered_shards/2, downcast/1]).
@@ -270,3 +273,9 @@ downcast(#ordered_shard{}=S) ->
       };
 downcast(Shards) when is_list(Shards) ->
     [downcast(Shard) || Shard <- Shards].
+
+iso8601_timestamp() ->
+    {_,_,Micro} = Now = os:timestamp(),
+    {{Year,Month,Date},{Hour,Minute,Second}} = calendar:now_to_datetime(Now),
+    Format = "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
+    io_lib:format(Format, [Year, Month, Date, Hour, Minute, Second, Micro]).

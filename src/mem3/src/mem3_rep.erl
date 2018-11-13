@@ -495,7 +495,7 @@ update_locals(Acc) ->
         {<<"source_node">>, atom_to_binary(node(), utf8)},
         {<<"source_uuid">>, couch_db:get_uuid(Db)},
         {<<"source_seq">>, Seq},
-        {<<"timestamp">>, list_to_binary(iso8601_timestamp())}
+        {<<"timestamp">>, list_to_binary(mem3_util:iso8601_timestamp())}
     ],
     NewBody = mem3_rpc:save_checkpoint(Node, Name, Id, Seq, NewEntry, History),
     {ok, _} = couch_db:update_doc(Db, #doc{id = Id, body = NewBody}, []).
@@ -570,13 +570,6 @@ filter_doc(Filter, FullDocInfo) when is_function(Filter) ->
     end;
 filter_doc(_, _) ->
     keep.
-
-
-iso8601_timestamp() ->
-    {_,_,Micro} = Now = os:timestamp(),
-    {{Year,Month,Date},{Hour,Minute,Second}} = calendar:now_to_datetime(Now),
-    Format = "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
-    io_lib:format(Format, [Year, Month, Date, Hour, Minute, Second, Micro]).
 
 
 -ifdef(TEST).
