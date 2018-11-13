@@ -47,7 +47,7 @@ defmodule Couch do
   """
 
   def process_url(url) do
-    "http://localhost:15984" <> url
+    "http://127.0.0.1:15984" <> url
   end
 
   def process_request_headers(headers, options) do
