@@ -630,13 +630,10 @@ has_required_fields_int([{[{<<"$and">>, Args}]} | Rest], RequiredFields)
 has_required_fields_int([{[{Field, Cond}]} | Rest], RequiredFields) ->
     RequiredFields1 = case {Cond, lists:keymember(Field, 1, RequiredFields)} of
         % $exists:false is a special case - this is the only operator
-        % that explicitly does not require a field to exist
+        % that explicitly does not require a field to exist and so if a field in
+        % the index has a $exists: false in the selector for it. We cannot use this index
         {{[{<<"$exists">>, false}]}, true} ->
-            % case lists:keymember(Field, 1, RequiredFields) of
-            %     true -> 
-                    [{exists, false}];
-                % false -> has_required_fields_int(Rest, RequiredFields)
-            % end;
+            [{exists, false}];
         {_, true} ->
             lists:keyreplace(Field, 1, RequiredFields, {Field, true});
         {_, false} ->
@@ -675,25 +672,25 @@ is_constant_field([{[{_UnMatched, _}]} | Rest], Field) ->
 
 exists_false_basic_test() ->
     RequiredFields = [{<<"A">>, false}],
-    Selector = normalize({[{<<"A">>,{[{<<"$exists">>,false}]}}]}),
+    Selector = normalize({[{<<"A">>,{[{<<"$exists">>, false}]}}]}),
     ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
 
 exists_false_basic_two_test() ->
     RequiredFields = [{<<"A">>, true}],
-    Selector = normalize({[{<<"A">>,{[{<<"$exists">>,false}]}}]}),
+    Selector = normalize({[{<<"A">>,{[{<<"$exists">>, false}]}}]}),
     ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
 
 exists_false_basic_three_test() ->
     RequiredFields = [{<<"A">>, false}],
-    Selector = normalize({[{<<"A">>,{[{<<"$exists">>,true}]}}]}),
+    Selector = normalize({[{<<"A">>,{[{<<"$exists">>, true}]}}]}),
     ?assertEqual([{<<"A">>, true}], has_required_fields_int(Selector, RequiredFields)).
 
 exists_false_and_test() ->
     RequiredFields = [{<<"age">>, false}],
     Selector = normalize({[{<<"$and">>,
         [
-            {[{<<"cars">>,{[{<<"$eq">>,<<"2">>}]}}]},
-            {[{<<"age">>,{[{<<"$exists">>,false}]}}]}
+            {[{<<"cars">>,{[{<<"$eq">>, <<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$exists">>, false}]}}]}
         ]
     }]}),
     ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
@@ -702,8 +699,8 @@ exists_false_and_repeat_test() ->
     RequiredFields = [{<<"age">>, false}],
     Selector = normalize({[{<<"$and">>,
         [
-            {[{<<"age">>,{[{<<"$eq">>,<<"2">>}]}}]},
-            {[{<<"age">>,{[{<<"$exists">>,false}]}}]}
+            {[{<<"age">>,{[{<<"$eq">>, <<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$exists">>, false}]}}]}
         ]
     }]}),
     ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
@@ -712,8 +709,8 @@ exists_false_or_test() ->
     RequiredFields = [{<<"age">>, false}],
     Selector = normalize({[{<<"$or">>,
         [
-            {[{<<"age">>,{[{<<"$eq">>,<<"2">>}]}}]},
-            {[{<<"age">>,{[{<<"$exists">>,false}]}}]}
+            {[{<<"age">>,{[{<<"$eq">>, <<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$exists">>, false}]}}]}
         ]
     }]}),
     % Check that on side sees exist false and the other age: true. In required_fields this would 
@@ -728,8 +725,8 @@ is_constant_field_basic_test() ->
 is_constant_field_basic_two_test() ->
     Selector = normalize({[{<<"$and">>,
         [
-            {[{<<"cars">>,{[{<<"$eq">>,<<"2">>}]}}]},
-            {[{<<"age">>,{[{<<"$gt">>,10}]}}]}
+            {[{<<"cars">>,{[{<<"$eq">>, <<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$gt">>, 10}]}}]}
         ]
     }]}),
     Field = <<"cars">>,
@@ -738,8 +735,8 @@ is_constant_field_basic_two_test() ->
 is_constant_field_not_eq_test() ->
     Selector = normalize({[{<<"$and">>,
         [
-            {[{<<"cars">>,{[{<<"$eq">>,<<"2">>}]}}]},
-            {[{<<"age">>,{[{<<"$gt">>,10}]}}]}
+            {[{<<"cars">>,{[{<<"$eq">>, <<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$gt">>, 10}]}}]}
         ]
     }]}),
     Field = <<"age">>,
@@ -748,8 +745,8 @@ is_constant_field_not_eq_test() ->
 is_constant_field_missing_field_test() ->
     Selector = normalize({[{<<"$and">>,
         [
-            {[{<<"cars">>,{[{<<"$eq">>,<<"2">>}]}}]},
-            {[{<<"age">>,{[{<<"$gt">>,10}]}}]}
+            {[{<<"cars">>,{[{<<"$eq">>, <<"2">>}]}}]},
+            {[{<<"age">>,{[{<<"$gt">>, 10}]}}]}
         ]
     }]}),
     Field = <<"wrong">>,
@@ -779,7 +776,7 @@ is_constant_nested_and_test() ->
     }]},
     Selector2 = {[{<<"$and">>,
           [
-              {[{<<"B">>, {[{<<"$gt">>,10}]}}]}
+              {[{<<"B">>, {[{<<"$gt">>, 10}]}}]}
           ]
     }]},
     Selector = {[{<<"$and">>,
