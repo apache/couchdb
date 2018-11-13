@@ -435,10 +435,10 @@ def boot_node(ctx, node):
         os.path.join(node_etcdir, "local.ini"),
         "-reltool_config", os.path.join(reldir, "reltool.config"),
         "-parent_pid", str(os.getpid()),
-        "-pa", ctx['devdir'],
-        "-pa", os.path.join(erl_libs, "*"),
-        "-s", "boot_node"
+        "-pa", ctx['devdir']
     ]
+    cmd += [ p[:-1] for p in glob.glob(erl_libs + "/*/") ]
+    cmd += [ "-s", "boot_node" ]
     if ctx['reset_logs']:
         mode = "wb"
     else:
