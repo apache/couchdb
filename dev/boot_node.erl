@@ -29,12 +29,24 @@ monitor_parent() ->
 
 monitor_parent(PPid) ->
     timer:sleep(1000),
-    case os:cmd("kill -0 " ++ PPid) of
-        "" ->
-            monitor_parent(PPid);
-        _Else ->
-            % Assume _Else is a no such process error
-            init:stop()
+    case os:type() of
+        {unix, _} ->
+            case os:cmd("kill -0 " ++ PPid) of
+                "" ->
+                    monitor_parent(PPid);
+                _Else ->
+                    % Assume _Else is a no such process error
+                    init:stop()
+            end;
+        {win32, _} ->
+            Fmt = "tasklist /fi \"PID eq ~s\" /fo csv /nh",
+            Retval = os:cmd(io_lib:format(Fmt, [PPid])),
+            case re:run(Retval, "^\"python.exe\",*") of
+                {match, _} ->
+                    monitor_parent(PPid);
+                nomatch ->
+                    init:stop()
+            end
     end.
 
 

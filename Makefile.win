@@ -123,9 +123,26 @@ check: all
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 eunit: export BUILDDIR = $(shell echo %cd%)
-eunit:
+eunit: couch
 	@$(REBAR) setup_eunit 2> nul
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
+
+setup-eunit: export BUILDDIR = $(shell pwd)
+setup-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
+setup-eunit:
+	@$(REBAR) setup_eunit 2> nul
+
+just-eunit: export BUILDDIR = $(shell pwd)
+just-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
+just-eunit:
+	@$(REBAR) -r eunit $(EUNIT_OPTS)
+
+.PHONY: elixir
+elixir:
+	@del /s/q dev\lib 2> nul
+	@dev\run -a adm:pass --no-eval test\elixir\run.cmd
+
+
 
 
 .PHONY: javascript
