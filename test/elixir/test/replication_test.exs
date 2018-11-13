@@ -10,9 +10,9 @@ defmodule ReplicationTest do
   @admin_account "adm:pass"
   @db_pairs_prefixes [
     {"local-to-local", "", ""},
-    {"remote-to-local", "http://localhost:15984/", ""},
-    {"local-to-remote", "", "http://localhost:15984/"},
-    {"remote-to-remote", "http://localhost:15984/", "http://localhost:15984/"}
+    {"remote-to-local", "http://127.0.0.1:15984/", ""},
+    {"local-to-remote", "", "http://127.0.0.1:15984/"},
+    {"remote-to-remote", "http://127.0.0.1:15984/", "http://127.0.0.1:15984/"}
   ]
 
   # This should probably go into `make elixir` like what
@@ -31,7 +31,7 @@ defmodule ReplicationTest do
 
   test "source database not found with host" do
     name = random_db_name()
-    url = "http://localhost:15984/" <> name <> "_src"
+    url = "http://127.0.0.1:15984/" <> name <> "_src"
     check_not_found(url, name <> "_tgt")
   end
 
@@ -53,7 +53,7 @@ defmodule ReplicationTest do
     doc = %{"_id" => "doc1"}
     [doc] = save_docs(src_db_name, [doc])
 
-    result = replicate(src_db_name, "http://localhost:15984/" <> tgt_db_name)
+    result = replicate(src_db_name, "http://127.0.0.1:15984/" <> tgt_db_name)
     assert result["ok"]
     assert is_list(result["history"])
     history = Enum.at(result["history"], 0)
@@ -73,7 +73,7 @@ defmodule ReplicationTest do
     })
     [doc] = save_docs(src_db_name, [doc])
 
-    result = replicate(src_db_name, "http://localhost:15984/" <> tgt_db_name)
+    result = replicate(src_db_name, "http://127.0.0.1:15984/" <> tgt_db_name)
 
     assert result["ok"]
     assert is_list(result["history"])
@@ -157,7 +157,7 @@ defmodule ReplicationTest do
 
     save_docs(src_db_name, make_docs(1..6))
 
-    repl_src = "http://localhost:15984/" <> src_db_name
+    repl_src = "http://127.0.0.1:15984/" <> src_db_name
     repl_body = %{"continuous" => true}
     result = replicate(repl_src, tgt_db_name, body: repl_body)
 

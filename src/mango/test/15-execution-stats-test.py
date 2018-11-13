@@ -12,6 +12,7 @@
 
 
 import mango
+import os
 import unittest
 
 class ExecutionStatsTests(mango.UserDocsTests):
@@ -23,7 +24,10 @@ class ExecutionStatsTests(mango.UserDocsTests):
         self.assertEqual(resp["execution_stats"]["total_docs_examined"], 3)
         self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 0)
         self.assertEqual(resp["execution_stats"]["results_returned"], 3)
-        self.assertGreater(resp["execution_stats"]["execution_time_ms"], 0)
+        # See https://github.com/apache/couchdb/issues/1732
+        # Erlang os:timestamp() only has ms accuracy on Windows!
+        if os.name != 'nt':
+            self.assertGreater(resp["execution_stats"]["execution_time_ms"], 0)
 
     def test_no_execution_stats(self):
         resp = self.db.find({"age": {"$lt": 35}}, return_raw=True, executionStats=False)
@@ -36,7 +40,10 @@ class ExecutionStatsTests(mango.UserDocsTests):
         self.assertEqual(resp["execution_stats"]["total_docs_examined"], 0)
         self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 3)
         self.assertEqual(resp["execution_stats"]["results_returned"], 3)
-        self.assertGreater(resp["execution_stats"]["execution_time_ms"], 0)
+        # See https://github.com/apache/couchdb/issues/1732
+        # Erlang os:timestamp() only has ms accuracy on Windows!
+        if os.name != 'nt':
+            self.assertGreater(resp["execution_stats"]["execution_time_ms"], 0)
 
     def test_results_returned_limit(self):
         resp = self.db.find({"age": {"$lt": 35}}, limit=2, return_raw=True, executionStats=True)

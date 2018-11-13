@@ -119,19 +119,27 @@ check: all
 	@$(MAKE) -f Makefile.win test-cluster-without-quorum
 	@$(MAKE) -f Makefile.win eunit
 	@$(MAKE) -f Makefile.win javascript
+	@$(MAKE) -f Makefile.win mango-test
+#	@$(MAKE) -f Makefile.win elixir
 
 
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
+eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
+eunit: export BUILDDIR = $(shell echo %cd%)
 eunit: couch
-	@set ERL_AFLAGS="-config rel/files/eunit.config" && set BUILDDIR = $(shell echo %cd%) && $(REBAR) setup_eunit 2> nul
-	@set ERL_AFLAGS="-config rel/files/eunit.config" && set BUILDDIR = $(shell echo %cd%) && $(REBAR) -r eunit $(EUNIT_OPTS)
+	@$(REBAR) setup_eunit 2> nul
+	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
+setup-eunit: export BUILDDIR = $(shell pwd)
+setup-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 setup-eunit:
-	@set ERL_AFLAGS="-config rel/files/eunit.config" && set BUILDDIR = $(shell echo %cd%) && $(REBAR) setup_eunit 2> nul
+	@$(REBAR) setup_eunit 2> nul
 
+just-eunit: export BUILDDIR = $(shell pwd)
+just-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 just-eunit:
-	@set ERL_AFLAGS="-config rel/files/eunit.config" && set BUILDDIR = $(shell echo %cd%) && $(REBAR) -r eunit $(EUNIT_OPTS)
+	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
 
 .PHONY: elixir
