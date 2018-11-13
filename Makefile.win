@@ -40,15 +40,15 @@ else
 COUCHDB_GIT_SHA=$(shell git rev-parse --short --verify HEAD)
 # IN_RC contains the -RCx suffix in the name if present
 IN_RC = $(shell git describe --tags --always --first-parent \
-        | grep -Eo -- '-RC[0-9]+' 2>/dev/null)
+        | grep -Eo -- '-RC[0-9]+' 2>nul)
 # ON_TAG matches *ONLY* if we are on a release or RC tag
 ON_TAG = $(shell git describe --tags --always --first-parent \
-        | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$' 2>/dev/null)
+        | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$' 2>nul)
 # RELTAG contains the #.#.# from git describe, which might be used
 RELTAG = $(shell git describe --tags --always --first-parent \
-        | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+' 2>/dev/null)
+        | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+' 2>nul)
 # DIRTY identifies if we're not on a commit
-DIRTY = $(shell git describe --dirty | grep -Eo -- '-dirty' 2>/dev/null)
+DIRTY = $(shell git describe --dirty | grep -Eo -- '-dirty' 2>nul)
 
 ifeq ($(ON_TAG),)
 # 4. Not on a tag.
@@ -115,27 +115,24 @@ fauxton: share\www
 .PHONY: check
 # target: check - Test everything
 check: all
+	@$(MAKE) -f Makefile.win test-cluster-with-quorum
+	@$(MAKE) -f Makefile.win test-cluster-without-quorum
 	@$(MAKE) -f Makefile.win eunit
 	@$(MAKE) -f Makefile.win javascript
 
 
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
-eunit: export BUILDDIR = $(shell echo %cd%)
 eunit: couch
-	@$(REBAR) setup_eunit 2> nul
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
+	@set ERL_AFLAGS="-config rel/files/eunit.config" && set BUILDDIR = $(shell echo %cd%) && $(REBAR) setup_eunit 2> nul
+	@set ERL_AFLAGS="-config rel/files/eunit.config" && set BUILDDIR = $(shell echo %cd%) && $(REBAR) -r eunit $(EUNIT_OPTS)
 
-setup-eunit: export BUILDDIR = $(shell pwd)
-setup-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 setup-eunit:
-	@$(REBAR) setup_eunit 2> nul
+	@set ERL_AFLAGS="-config rel/files/eunit.config" && set BUILDDIR = $(shell echo %cd%) && $(REBAR) setup_eunit 2> nul
 
-just-eunit: export BUILDDIR = $(shell pwd)
-just-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 just-eunit:
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
+	@set ERL_AFLAGS="-config rel/files/eunit.config" && set BUILDDIR = $(shell echo %cd%) && $(REBAR) -r eunit $(EUNIT_OPTS)
+
 
 .PHONY: elixir
 elixir:
@@ -143,6 +140,37 @@ elixir:
 	@dev\run -a adm:pass --no-eval test\elixir\run.cmd
 
 
+.PHONY: test-cluster-with-quorum
+test-cluster-with-quorum: devclean
+	-@mkdir share\www\script\test
+ifeq ($(IN_RELEASE), true)
+	@copy test\javascript\tests\lorem*.txt share\www\script\test
+else
+	-@mkdir src\fauxton\dist\release\test
+	@copy test\javascript\tests\lorem*.txt src\fauxton\dist\release\test
+endif
+	@dev\run -n 3 -q --with-admin-party-please \
+		--enable-erlang-views --degrade-cluster 1 \
+		-c "startup_jitter=0" \
+		"python test\javascript\run --suites \"$(suites)\" \
+		--ignore \"$(ignore_js_suites)\" \
+		--path test\javascript\tests-cluster\with-quorum"
+
+.PHONY: test-cluster-without-quorum
+test-cluster-without-quorum: devclean
+	-@mkdir share\www\script\test
+ifeq ($(IN_RELEASE), true)
+	@copy test\javascript\tests\lorem*.txt share\www\script\test
+else
+	-@mkdir src\fauxton\dist\release\test
+	@copy test\javascript\tests\lorem*.txt src\fauxton\dist\release\test
+endif
+	@dev\run -n 3 -q --with-admin-party-please \
+		--enable-erlang-views --degrade-cluster 2 \
+		-c "startup_jitter=0" \
+		"python test\javascript\run --suites \"$(suites)\" \
+		--ignore \"$(ignore_js_suites)\" \
+		--path test\javascript\tests-cluster\without-quorum"
 
 
 .PHONY: javascript
@@ -160,6 +188,11 @@ endif
 		--enable-erlang-views \
 		-c startup_jitter=0 \
 		python test\javascript\run $(suites)
+
+
+.PHONY: mango-test
+mango-test: devclean all
+	@cd src\mango && ..\..\dev\run -n 1 --admin=testuser:testpass nosetests
 
 
 .PHONY: check-qs

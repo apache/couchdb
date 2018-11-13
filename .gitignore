@@ -4,6 +4,8 @@
 *.snap
 *.so
 *.pyc
+*.swp
+*~
 .DS_Store
 .rebar/
 .eunit/

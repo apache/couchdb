@@ -191,7 +191,6 @@ endif
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
 
-# TODO: port to Makefile.win
 .PHONY: test-cluster-with-quorum
 test-cluster-with-quorum: devclean
 	@mkdir -p share/www/script/test
@@ -208,7 +207,6 @@ endif
             --ignore "$(ignore_js_suites)" \
 	    --path test/javascript/tests-cluster/with-quorum'
 
-# TODO: port to Makefile.win
 .PHONY: test-cluster-without-quorum
 test-cluster-without-quorum: devclean
 	@mkdir -p share/www/script/test
@@ -281,8 +279,7 @@ build-test:
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
 mango-test: devclean all
-	./test/build/test-run-couch-for-mango.sh \
-
+	@cd src/mango && ../../dev/run -n 1 --admin=testuser:testpass nosetests
 
 ################################################################################
 # Developing
