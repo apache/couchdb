@@ -462,6 +462,8 @@ make_options(Props) ->
     {ok, DefSocketOptions} = couch_util:parse_term(
         config:get("replicator", "socket_options",
             "[{keepalive, true}, {nodelay, false}]")),
+    StopOnDocWriteFailure = config:get("replicator",
+        "stop_on_doc_write_failure", "false"),
     lists:ukeymerge(1, Options, lists:keysort(1, [
         {connection_timeout, list_to_integer(DefTimeout)},
         {retries, list_to_integer(DefRetries)},
@@ -470,7 +472,9 @@ make_options(Props) ->
         {worker_batch_size, list_to_integer(DefBatchSize)},
         {worker_processes, list_to_integer(DefWorkers)},
         {use_checkpoints, list_to_existing_atom(UseCheckpoints)},
-        {checkpoint_interval, list_to_integer(DefCheckpointInterval)}
+        {checkpoint_interval, list_to_integer(DefCheckpointInterval)},
+        {stop_on_doc_write_failure,
+            list_to_existing_atom(StopOnDocWriteFailure)}
     ])).
 
 
@@ -533,6 +537,12 @@ convert_options([{<<"use_checkpoints">>, V} | R]) ->
     [{use_checkpoints, V} | convert_options(R)];
 convert_options([{<<"checkpoint_interval">>, V} | R]) ->
     [{checkpoint_interval, couch_util:to_integer(V)} | convert_options(R)];
+convert_options([{<<"stop_on_doc_write_failure">>, V} | _R])
+        when not is_boolean(V)->
+    ErrMsg = <<"parameter `stop_on_doc_write_failure` must be a boolean">>,
+    throw({bad_request, ErrMsg});
+convert_options([{<<"stop_on_doc_write_failure">>, V} | R]) ->
+    [{stop_on_doc_write_failure, V} | convert_options(R)];
 convert_options([_ | R]) -> % skip unknown option
     convert_options(R).
 
@@ -737,7 +747,9 @@ check_convert_options_pass_test() ->
     ?assertEqual([{doc_ids, [<<"id">>]}],
         convert_options([{<<"doc_ids">>, [<<"id">>]}])),
     ?assertEqual([{selector, {key, value}}],
-        convert_options([{<<"selector">>, {key, value}}])).
+        convert_options([{<<"selector">>, {key, value}}])),
+    ?assertEqual([{stop_on_doc_write_failure, true}],
+        convert_options([{<<"stop_on_doc_write_failure">>, true}])).
 
 
 check_convert_options_fail_test() ->
@@ -750,7 +762,10 @@ check_convert_options_fail_test() ->
     ?assertThrow({bad_request, _},
         convert_options([{<<"doc_ids">>, not_a_list}])),
     ?assertThrow({bad_request, _},
-        convert_options([{<<"selector">>, [{key, value}]}])).
+        convert_options([{<<"selector">>, [{key, value}]}])),
+    ?assertThrow({bad_request, _},
+        convert_options([{<<"stop_on_doc_write_failure">>, "42"}])).
+
 
 check_strip_credentials_test() ->
     [?assertEqual(Expected, strip_credentials(Body)) || {Expected, Body} <- [

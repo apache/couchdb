@@ -304,6 +304,12 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
             throw(Stub);
         {'DOWN', Ref, process, Pid, {http_request_failed, _, _, max_backoff}} ->
             exit(max_backoff);
+        {'DOWN', Ref, process, Pid, {http_request_failed, _, _,
+                {shutdown, {doc_write_failure, _, _}} = DocWriteFailure}} ->
+            exit(DocWriteFailure);
+        {'DOWN', Ref, process, Pid, {shutdown, {doc_write_failure, _, _}} =
+                DocWriteFailure} ->
+            exit(DocWriteFailure);
         {'DOWN', Ref, process, Pid, request_uri_too_long} ->
             NewMaxLen = get_value(max_url_len, Options, ?MAX_URL_LEN) div 2,
             case NewMaxLen < ?MIN_URL_LEN of

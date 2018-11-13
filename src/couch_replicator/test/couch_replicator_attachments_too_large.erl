@@ -29,6 +29,7 @@ teardown(_, {Ctx, {Source, Target}}) ->
     delete_db(Source),
     delete_db(Target),
     config:delete("couchdb", "max_attachment_size"),
+    config:delete("replicator", "stop_on_doc_write_failure"),
     ok = test_util:stop_couch(Ctx).
 
 
@@ -40,7 +41,9 @@ attachment_too_large_replication_test_() ->
             foreachx,
             fun setup/1, fun teardown/2,
             [{Pair, fun should_succeed/2} || Pair <- Pairs] ++
-            [{Pair, fun should_fail/2} || Pair <- Pairs]
+            [{Pair, fun should_fail/2} || Pair <- Pairs] ++
+            [{Pair, fun should_crash_small/2} || Pair <- Pairs] ++
+            [{Pair, fun should_crash_large/2} || Pair <- Pairs]
         }
     }.
 
@@ -64,6 +67,39 @@ should_fail({From, To}, {_Ctx, {Source, Target}}) ->
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
     ?_assertError({badmatch, {not_found, missing}},
         couch_replicator_test_helper:compare_dbs(Source, Target)).
+
+
+should_crash_small({From, To}, {_Ctx, {Source, Target}}) ->
+    ?_test(begin
+        RepObject = {[
+            {<<"source">>, db_url(From, Source)},
+            {<<"target">>, db_url(To, Target)}
+        ]},
+        config:set("couchdb", "max_attachment_size", "999", _Persist = false),
+        config:set_boolean("replicator", "stop_on_doc_write_failure", true,
+            false),
+        Result = couch_replicator:replicate(
+            RepObject, ?ADMIN_USER),
+        ?assertEqual({error, doc_write_failure}, Result)
+    end).
+
+
+should_crash_large({From, To}, {_Ctx, {Source, Target}}) ->
+    ?_test(begin
+        % see couch_replicator_worker.erl ?MAX_BULK_ATT_SIZE macro
+        create_doc_with_attachment(Source, <<"largedoc">>, 65537),
+        RepObject = {[
+            {<<"source">>, db_url(From, Source)},
+            {<<"target">>, db_url(To, Target)}
+        ]},
+        config:set("couchdb", "max_attachment_size", "65536", _Persist = false),
+        config:set_boolean("replicator", "stop_on_doc_write_failure", true,
+            false),
+        Result = couch_replicator:replicate(
+            RepObject, ?ADMIN_USER),
+        ?assertEqual({error, doc_write_failure}, Result)
+    end).
+
 
 
 create_db() ->
