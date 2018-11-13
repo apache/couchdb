@@ -52,7 +52,8 @@
     <<"httpd_global_handlers">>,
     <<"native_query_servers">>,
     <<"os_daemons">>,
-    <<"query_servers">>
+    <<"query_servers">>,
+    <<"feature_flags">>
 ]).
 
 
