@@ -119,6 +119,8 @@ check: all
 	@$(MAKE) -f Makefile.win test-cluster-without-quorum
 	@$(MAKE) -f Makefile.win eunit
 	@$(MAKE) -f Makefile.win javascript
+	@$(MAKE) -f Makefile.win mango-test
+#	@$(MAKE) -f Makefile.win elixir
 
 
 .PHONY: eunit
