@@ -1,4 +1,5 @@
-%{"httpotion": {:hex, :httpotion, "3.0.3", "17096ea1a7c0b2df74509e9c15a82b670d66fc4d66e6ef584189f63a9759428d", [], [{:ibrowse, "~> 4.4", [hex: :ibrowse, repo: "hexpm", optional: false]}], "hexpm"},
-  "ibrowse": {:hex, :ibrowse, "4.4.0", "2d923325efe0d2cb09b9c6a047b2835a5eda69d8a47ed6ff8bc03628b764e991", [], [], "hexpm"},
-  "jiffy": {:hex, :jiffy, "0.14.11", "919a87d491c5a6b5e3bbc27fafedc3a0761ca0b4c405394f121f582fd4e3f0e5", [], [], "hexpm"},
+%{
+  "httpotion": {:hex, :httpotion, "3.0.3", "17096ea1a7c0b2df74509e9c15a82b670d66fc4d66e6ef584189f63a9759428d", [:mix], [{:ibrowse, "~> 4.4", [hex: :ibrowse, repo: "hexpm", optional: false]}], "hexpm"},
+  "ibrowse": {:hex, :ibrowse, "4.4.0", "2d923325efe0d2cb09b9c6a047b2835a5eda69d8a47ed6ff8bc03628b764e991", [:rebar3], [], "hexpm"},
+  "jiffy": {:hex, :jiffy, "0.14.11", "919a87d491c5a6b5e3bbc27fafedc3a0761ca0b4c405394f121f582fd4e3f0e5", [:rebar3], [], "hexpm"},
 }

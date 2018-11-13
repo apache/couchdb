@@ -132,7 +132,7 @@ defmodule ReplicationTest do
     assert task["replication_id"] == repl_id
     repl_body = %{
       "replication_id" => repl_id,
-      "cancel": true
+      cancel: true
     }
     result = Couch.post("/_replicate", body: repl_body)
     assert result.status_code == 200
@@ -175,7 +175,7 @@ defmodule ReplicationTest do
 
     repl_body = %{
       "replication_id" => repl_id,
-      "cancel": true
+      cancel: true
     }
     resp = Couch.Session.post(sess, "/_replicate", body: repl_body)
     assert resp.status_code == 401
@@ -1349,7 +1349,7 @@ defmodule ReplicationTest do
     assert resp["ok"]
     assert resp["_local_id"] == repl_id
 
-    doc = %{"_id" => "foobar", "value": 666}
+    doc = %{"_id" => "foobar", "value" => 666}
     [doc] = save_docs(src_db_name, [doc])
 
     wait_for_repl_stop(repl_id, 30000)
@@ -1395,7 +1395,7 @@ defmodule ReplicationTest do
     assert history["doc_write_failures"] == 0
 
     token = Enum.random(1..1_000_000)
-    query = %{"att_encoding_info": "true", "bypass_cache": token}
+    query = %{att_encoding_info: true, bypass_cache: token}
     resp = Couch.get("/#{tgt_db_name}/#{doc["_id"]}", query: query)
     assert resp.status_code < 300
     assert is_map(resp.body["_attachments"])

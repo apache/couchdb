@@ -175,8 +175,8 @@ defmodule CouchTestCase do
 
       def sample_doc_foo do
         %{
-          "_id": "foo",
-          "bar": "baz"
+          _id: "foo",
+          bar: "baz"
         }
       end
 
