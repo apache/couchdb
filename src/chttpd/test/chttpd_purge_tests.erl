@@ -75,7 +75,8 @@ purge_test_() ->
                     fun test_mixed_purge_request/1,
                     fun test_overmany_ids_or_revs_purge_request/1,
                     fun test_exceed_limits_on_purge_infos/1,
-                    fun should_error_set_purged_docs_limit_to0/1
+                    fun should_error_set_purged_docs_limit_to0/1,
+                    fun test_timeout_set_purged_infos_limit/1
                 ]
             }
         }
@@ -350,4 +351,21 @@ should_error_set_purged_docs_limit_to0(Url) ->
         {ok, Status, _, _} = test_request:put(Url ++ "/_purged_infos_limit/",
             [?CONTENT_JSON, ?AUTH], "0"),
         ?assert(Status =:= 400)
+    end).
+
+
+test_timeout_set_purged_infos_limit(Url) ->
+    ?_test(begin
+        meck:new(fabric, [passthrough]),
+        meck:expect(fabric, set_purge_infos_limit, fun(_, _, _) ->
+            {error, timeout} end),
+        {ok, Status, _, ResultBody} = test_request:put(Url
+            ++ "/_purged_infos_limit/", [?CONTENT_JSON, ?AUTH], "2"),
+        meck:unload(fabric),
+        ResultJson = ?JSON_DECODE(ResultBody),
+        ?assert(Status =:= 500),
+        ?assertMatch({[
+            {<<"error">>,<<"error">>},
+            {<<"reason">>,<<"timeout">>}]},
+            ResultJson)
     end).

@@ -688,8 +688,12 @@ db_req(#httpd{method='PUT',path_parts=[_,<<"_purged_infos_limit">>]}=Req, Db) ->
     Options = [{user_ctx, Req#httpd.user_ctx}],
     case chttpd:json_body(Req) of
         Limit when is_integer(Limit), Limit > 0 ->
-            ok = fabric:set_purge_infos_limit(Db, Limit, Options),
-            send_json(Req, {[{<<"ok">>, true}]});
+            case fabric:set_purge_infos_limit(Db, Limit, Options) of
+                ok ->
+                    send_json(Req, {[{<<"ok">>, true}]});
+                Error ->
+                    throw(Error)
+            end;
         _->
             throw({bad_request, "`purge_infos_limit` must be positive integer"})
     end;
