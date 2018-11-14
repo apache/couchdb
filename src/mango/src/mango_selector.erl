@@ -24,7 +24,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 
-
 % Validate and normalize each operator. This translates
 % every selector operator into a consistent version that
 % we can then rely on for all other selector functions.
@@ -581,10 +580,13 @@ match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
 % match against.
 
 has_required_fields(Selector, Fields) ->
-    RequiredFields = [{Field, false} || Field <- Fields],
-    RequiredFields1 = has_required_fields_int(Selector, RequiredFields),
-    Remainder = [Result || {_Field, Result} <- RequiredFields1, Result =:= false],
-    Remainder == [].
+    try
+        RequiredFields = [{Field, false} || Field <- Fields],
+        RequiredFields1 = has_required_fields_int(Selector, RequiredFields),
+        lists:all(fun({_, Status}) -> Status end, RequiredFields1)
+    catch throw:exists_false_mismatch ->
+        false
+    end.
 
 % Empty selector
 has_required_fields_int({[]}, RequiredFields) ->
@@ -629,11 +631,11 @@ has_required_fields_int([{[{<<"$and">>, Args}]} | Rest], RequiredFields)
 
 has_required_fields_int([{[{Field, Cond}]} | Rest], RequiredFields) ->
     RequiredFields1 = case {Cond, lists:keymember(Field, 1, RequiredFields)} of
-        % $exists:false is a special case - this is the only operator
-        % that explicitly does not require a field to exist and so if a field in
-        % the index has a $exists: false in the selector for it. We cannot use this index
+        % $exists:false is a special case. During indexing, any document that
+        % does not have the field is not indexed, thus any index using this field
+        % is incompatible with $exists:false
         {{[{<<"$exists">>, false}]}, true} ->
-            [{exists, false}];
+            throw(exists_false_mismatch);
         {_, true} ->
             lists:keyreplace(Field, 1, RequiredFields, {Field, true});
         {_, false} ->
@@ -670,15 +672,20 @@ is_constant_field([{[{_UnMatched, _}]} | Rest], Field) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+exists_false_catches_exception_test() ->
+    RequiredFields = [<<"A">>],
+    Selector = normalize({[{<<"A">>,{[{<<"$exists">>, false}]}}]}),
+    ?assertEqual(false, has_required_fields(Selector, RequiredFields)).
+
 exists_false_basic_test() ->
     RequiredFields = [{<<"A">>, false}],
     Selector = normalize({[{<<"A">>,{[{<<"$exists">>, false}]}}]}),
-    ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
+    ?assertThrow(exists_false_mismatch, has_required_fields_int(Selector, RequiredFields)).
 
 exists_false_basic_two_test() ->
     RequiredFields = [{<<"A">>, true}],
     Selector = normalize({[{<<"A">>,{[{<<"$exists">>, false}]}}]}),
-    ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
+    ?assertThrow(exists_false_mismatch, has_required_fields_int(Selector, RequiredFields)).
 
 exists_false_basic_three_test() ->
     RequiredFields = [{<<"A">>, false}],
@@ -693,7 +700,7 @@ exists_false_and_test() ->
             {[{<<"age">>,{[{<<"$exists">>, false}]}}]}
         ]
     }]}),
-    ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
+    ?assertThrow(exists_false_mismatch, has_required_fields_int(Selector, RequiredFields)).
 
 exists_false_and_repeat_test() ->
     RequiredFields = [{<<"age">>, false}],
@@ -703,7 +710,7 @@ exists_false_and_repeat_test() ->
             {[{<<"age">>,{[{<<"$exists">>, false}]}}]}
         ]
     }]}),
-    ?assertEqual([{exists, false}], has_required_fields_int(Selector, RequiredFields)).
+    ?assertThrow(exists_false_mismatch, has_required_fields_int(Selector, RequiredFields)).
 
 exists_false_or_test() ->
     RequiredFields = [{<<"age">>, false}],
@@ -713,9 +720,7 @@ exists_false_or_test() ->
             {[{<<"age">>,{[{<<"$exists">>, false}]}}]}
         ]
     }]}),
-    % Check that on side sees exist false and the other age: true. In required_fields this would 
-    % still be rejected as there would be a false tuple in the array.
-    ?assertEqual([{exists, false}, {<<"age">>, true}], has_required_fields_int(Selector, RequiredFields)).
+    ?assertThrow(exists_false_mismatch, has_required_fields_int(Selector, RequiredFields)).
 
 is_constant_field_basic_test() ->
     Selector = normalize({[{<<"A">>, <<"foo">>}]}),
