@@ -323,8 +323,12 @@ handle_node_req(#httpd{method='DELETE',path_parts=[_, Node, <<"_config">>, Secti
     undefined ->
         throw({not_found, unknown_config_value});
     OldValue ->
-        call_node(Node, config, delete, [Section, Key, Persist]),
-        send_json(Req, 200, list_to_binary(OldValue))
+        case call_node(Node, config, delete, [Section, Key, Persist]) of
+            ok ->
+                send_json(Req, 200, list_to_binary(OldValue));
+            {error, Reason} ->
+                chttpd:send_error(Req, {bad_request, Reason})
+        end
     end;
 handle_node_req(#httpd{path_parts=[_, _Node, <<"_config">>, _Section, _Key]}=Req) ->
     send_method_not_allowed(Req, "GET,PUT,DELETE");
