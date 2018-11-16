@@ -42,7 +42,7 @@ couchTests.design_docs_query = function(debug) {
   var xhr_AllDDocs = CouchDB.request("GET", path);
   T(xhr_AllDDocs.status == 200, "standard get should be 200");
   var allDDocs = JSON.parse(xhr_AllDDocs.responseText);
-  TEquals(10, allDDocs.total_rows, "total_rows mismatch");
+  TEquals(5, allDDocs.total_rows, "total_rows mismatch");
   TEquals(5, allDDocs.rows.length, "amount of rows mismatch");
 
   // test key="_design/ddoc03"
