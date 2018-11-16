@@ -78,6 +78,7 @@
     get_full_doc_infos/2,
     get_missing_revs/2,
     get_design_docs/1,
+    get_design_doc_count/1,
     get_purge_infos/2,
 
     get_minimum_purge_seq/1,
@@ -617,6 +618,10 @@ get_design_docs(#db{} = Db) ->
     FoldFun = fun(FDI, Acc) -> {ok, [FDI | Acc]} end,
     {ok, Docs} = fold_design_docs(Db, FoldFun, [], []),
     {ok, lists:reverse(Docs)}.
+
+get_design_doc_count(#db{} = Db) ->
+    FoldFun = fun(_, Acc) -> {ok, Acc + 1} end,
+    fold_design_docs(Db, FoldFun, 0, []).
 
 check_is_admin(#db{user_ctx=UserCtx}=Db) ->
     case is_admin(Db) of

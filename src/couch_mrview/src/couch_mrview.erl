@@ -712,6 +712,9 @@ get_total_rows(Db, #mrargs{extra = Extra}) ->
     case couch_util:get_value(namespace, Extra) of
         <<"_local">> ->
             null;
+        <<"_design">> ->
+            {ok, N} = couch_db:get_design_doc_count(Db),
+            N;
         _ ->
             {ok, Info} = couch_db:get_db_info(Db),
             couch_util:get_value(doc_count, Info)
