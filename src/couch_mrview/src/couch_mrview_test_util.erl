@@ -52,7 +52,7 @@ make_docs(_, Count) ->
 
 make_docs(_, Since, Count) ->
     [doc(I) || I <- lists:seq(Since, Count)].
-        
+
 
 ddoc({changes, Opts}) ->
     ViewOpts = case Opts of
