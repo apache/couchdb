@@ -127,6 +127,7 @@ check: all
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 eunit: export BUILDDIR = $(shell echo %cd%)
+eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
 eunit: couch
 	@$(REBAR) setup_eunit 2> nul
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
