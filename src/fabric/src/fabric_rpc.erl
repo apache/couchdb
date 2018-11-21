@@ -12,7 +12,8 @@
 
 -module(fabric_rpc).
 
--export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
+-export([get_db_info/1, get_doc_count/1, get_design_doc_count/1,
+         get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_doc_info/3, get_full_doc_info/3,
     get_missing_revs/2, get_missing_revs/3, update_docs/3]).
 -export([all_docs/3, changes/3, map_view/4, reduce_view/4, group_info/2]).
@@ -23,8 +24,9 @@
 -export([compact/1, compact/2]).
 -export([get_purge_seq/2, purge_docs/3, set_purge_infos_limit/3]).
 
--export([get_db_info/2, get_doc_count/2, get_update_seq/2,
-         changes/4, map_view/5, reduce_view/5, group_info/3, update_mrview/4]).
+-export([get_db_info/2, get_doc_count/2, get_design_doc_count/2,
+         get_update_seq/2, changes/4, map_view/5, reduce_view/5,
+         group_info/3, update_mrview/4]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -180,6 +182,13 @@ get_doc_count(DbName) ->
 
 get_doc_count(DbName, DbOptions) ->
     with_db(DbName, DbOptions, {couch_db, get_doc_count, []}).
+
+%% equiv get_design_doc_count(DbName, [])
+get_design_doc_count(DbName) ->
+    get_design_doc_count(DbName, []).
+
+get_design_doc_count(DbName, DbOptions) ->
+    with_db(DbName, DbOptions, {couch_db, get_design_doc_count, []}).
 
 %% equiv get_update_seq(DbName, [])
 get_update_seq(DbName) ->

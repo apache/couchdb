@@ -18,9 +18,10 @@
 
 % DBs
 -export([all_dbs/0, all_dbs/1, create_db/1, create_db/2, delete_db/1,
-    delete_db/2, get_db_info/1, get_doc_count/1, set_revs_limit/3,
-    set_security/2, set_security/3, get_revs_limit/1, get_security/1,
-    get_security/2, get_all_security/1, get_all_security/2,
+    delete_db/2, get_db_info/1, get_doc_count/1, get_doc_count/2,
+    set_revs_limit/3, set_security/2, set_security/3,
+    get_revs_limit/1, get_security/1, get_security/2,
+    get_all_security/1, get_all_security/2,
     get_purge_infos_limit/1, set_purge_infos_limit/3,
     compact/1, compact/2]).
 
@@ -86,12 +87,21 @@ get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).
 
 %% @doc the number of docs in a database
--spec get_doc_count(dbname()) ->
-    {ok, non_neg_integer()} |
+%% @equiv get_doc_count(DbName, <<"_all_docs">>)
+get_doc_count(DbName) ->
+    get_doc_count(DbName, <<"_all_docs">>).
+
+%% @doc the number of design docs in a database
+-spec get_doc_count(dbname(), Namespace::binary()) ->
+    {ok, non_neg_integer() | null} |
     {error, atom()} |
     {error, atom(), any()}.
-get_doc_count(DbName) ->
-    fabric_db_doc_count:go(dbname(DbName)).
+get_doc_count(DbName, <<"_all_docs">>) ->
+    fabric_db_doc_count:go(dbname(DbName));
+get_doc_count(DbName, <<"_design">>) ->
+    fabric_design_doc_count:go(dbname(DbName));
+get_doc_count(_DbName, <<"_local">>) ->
+    {ok, null}.
 
 %% @equiv create_db(DbName, [])
 create_db(DbName) ->
