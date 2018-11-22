@@ -44,11 +44,11 @@ check_eviction_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        {with, [
-            fun evict_all/1,
-            fun dont_evict_all_unrelated/1,
-            fun check_upgrade_clause/1
-        ]}
+        ddoc_cache_tutil:with([
+            {"evict_all", fun evict_all/1},
+            {"dont_evict_all_unrelated", fun dont_evict_all_unrelated/1},
+            {"check_upgrade_clause", fun check_upgrade_clause/1}
+        ])
     }.
 
 

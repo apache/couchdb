@@ -29,11 +29,11 @@ check_disabled_test_() ->
         setup,
         fun start_couch/0,
         fun ddoc_cache_tutil:stop_couch/1,
-        {with, [
-            fun resp_ok/1,
-            fun resp_not_found/1,
-            fun check_effectively_disabled/1
-        ]}
+        ddoc_cache_tutil:with([
+            {"resp_ok", fun resp_ok/1},
+            {"resp_not_found", fun resp_not_found/1},
+            {"check_effectively_disabled", fun check_effectively_disabled/1}
+        ])
     }.
 
 

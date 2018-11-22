@@ -61,13 +61,13 @@ check_lru_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        {with, [
-            fun check_multi_start/1,
-            fun check_multi_open/1,
-            fun check_capped_size/1,
-            fun check_cache_refill/1,
-            fun check_evict_and_exit/1
-        ]}
+        ddoc_cache_tutil:with([
+            {"check_multi_start", fun check_multi_start/1},
+            {"check_multi_open", fun check_multi_open/1},
+            {"check_capped_size", fun check_capped_size/1},
+            {"check_cache_refill", fun check_cache_refill/1},
+            {"check_evict_and_exit", fun check_evict_and_exit/1}
+        ])
     }.
 
 

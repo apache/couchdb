@@ -106,11 +106,14 @@ open(Pid, Key) ->
             {open_error, {T, R, S}} ->
                 erlang:raise(T, R, S)
         end
-    catch exit:_ ->
-        % Its possible that this process was evicted just
-        % before we tried talking to it. Just fallback
-        % to a standard recovery
-        recover(Key)
+    catch
+        error:database_does_not_exist ->
+            erlang:error(database_does_not_exist);
+        exit:_ ->
+            % Its possible that this process was evicted just
+            % before we tried talking to it. Just fallback
+            % to a standard recovery
+            recover(Key)
     end.
 
 
