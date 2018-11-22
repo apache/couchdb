@@ -120,8 +120,8 @@ parse_flags(_Tokens, _) ->
     [flag_id()] | {error, Reason :: term()}.
 
 parse_flags_term(FlagsBin) ->
-    case couch_util:parse_term(FlagsBin) of
-        {ok, Flags} when is_list(Flags) ->
+    case couch_util:parse_term(<<"[", FlagsBin/binary, "]">>) of
+        {ok, Flags} ->
             lists:usort(Flags);
         Term ->
             {error, {
@@ -272,12 +272,12 @@ get_config_section(Section) ->
 
 all_combinations_return_same_result_test_() ->
     Config = [
-         {"[foo, bar]||*", "true"},
-         {"[baz, qux]||*", "false"},
-         {"[baz]||shards/test*", "true"},
-         {"[baz]||shards/blacklist*", "false"},
-         {"[bar]||shards/test*", "false"},
-         {"[bar]||shards/test/blacklist*", "true"}
+         {"foo, bar||*", "true"},
+         {"baz, qux||*", "false"},
+         {"baz||shards/test*", "true"},
+         {"baz||shards/blacklist*", "false"},
+         {"bar||shards/test*", "false"},
+         {"bar||shards/test/blacklist*", "true"}
     ],
     Expected = [
         {{<<"shards/test/blacklist*">>},{<<"shards/test/blacklist*">>,22,[bar, foo]}},
@@ -303,12 +303,12 @@ rules_are_sorted_test() ->
 latest_overide_wins_test_() ->
     Cases = [
         {[
-            {"[flag]||*", "false"}, {"[flag]||a*", "true"},
-            {"[flag]||ab*", "true"}, {"[flag]||abc*", "true"}
+            {"flag||*", "false"}, {"flag||a*", "true"},
+            {"flag||ab*", "true"}, {"flag||abc*", "true"}
         ], true},
         {[
-            {"[flag]||*", "true"}, {"[flag]||a*", "false"},
-            {"[flag]||ab*", "true"}, {"[flag]||abc*", "false"}
+            {"flag||*", "true"}, {"flag||a*", "false"},
+            {"flag||ab*", "true"}, {"flag||abc*", "false"}
         ], false}
     ],
     [{test_id(Rules, Expected),
@@ -327,14 +327,14 @@ test_id(Items) ->
 
 test_config() ->
     [
-        {"[flag_foo]||*", "true"},
-        {"[flag_bar]||*", "false"},
-        {"[flag_bar]||shards/test*", "true"},
-        {"[flag_foo]||shards/blacklist*", "false"},
-        {"[baz]||shards/test*", "true"},
-        {"[baz]||shards/test/blacklist*", "false"},
-        {"[flag_bar]||shards/exact", "true"},
-        {"[flag_bar]||shards/test/exact", "true"}
+        {"flag_foo||*", "true"},
+        {"flag_bar||*", "false"},
+        {"flag_bar||shards/test*", "true"},
+        {"flag_foo||shards/blacklist*", "false"},
+        {"baz||shards/test*", "true"},
+        {"baz||shards/test/blacklist*", "false"},
+        {"flag_bar||shards/exact", "true"},
+        {"flag_bar||shards/test/exact", "true"}
     ].
 
 -endif.
