@@ -21,6 +21,7 @@
 ]).
 
 -define(DATA_INTERVAL, 1000).
+-define(MAX_FLAG_NAME_LENGTH, 256).
 
 -type pattern()
     :: binary(). %% non empty binary which optionally can end with *
@@ -120,14 +121,32 @@ parse_flags(_Tokens, _) ->
     [flag_id()] | {error, Reason :: term()}.
 
 parse_flags_term(FlagsBin) ->
-    case couch_util:parse_term(FlagsBin) of
-        {ok, Flags} when is_list(Flags) ->
-            lists:usort(Flags);
-        Term ->
-            {error, {
-                "Flags should be list of atoms (got \"~s\"): ~p",
-                [FlagsBin, Term]
-            }}
+    {Flags, Errors} = lists:splitwith(fun erlang:is_atom/1,
+        [parse_flag(F) || F <- split_by_comma(FlagsBin)]),
+    case Errors of
+       [] ->
+           lists:usort(Flags);
+       _ ->
+           {error, {
+               "Cannot parse list of tags: ~n~p",
+               Errors
+           }}
+    end.
+
+split_by_comma(Binary) ->
+    case binary:split(Binary, <<",">>, [global]) of
+       [<<>>] -> [];
+       Tokens -> Tokens
+    end.
+
+parse_flag(FlagName) when size(FlagName) > ?MAX_FLAG_NAME_LENGTH ->
+    {too_long, FlagName};
+parse_flag(FlagName) ->
+    FlagNameS = string:strip(binary_to_list(FlagName)),
+    try
+       list_to_existing_atom(FlagNameS)
+    catch
+        _:_ -> {invalid_flag, FlagName}
     end.
 
 -spec parse_pattern(Pattern :: binary()) -> parse_pattern().
@@ -272,12 +291,12 @@ get_config_section(Section) ->
 
 all_combinations_return_same_result_test_() ->
     Config = [
-         {"[foo, bar]||*", "true"},
-         {"[baz, qux]||*", "false"},
-         {"[baz]||shards/test*", "true"},
-         {"[baz]||shards/blacklist*", "false"},
-         {"[bar]||shards/test*", "false"},
-         {"[bar]||shards/test/blacklist*", "true"}
+         {"foo, bar||*", "true"},
+         {"baz, qux||*", "false"},
+         {"baz||shards/test*", "true"},
+         {"baz||shards/blacklist*", "false"},
+         {"bar||shards/test*", "false"},
+         {"bar||shards/test/blacklist*", "true"}
     ],
     Expected = [
         {{<<"shards/test/blacklist*">>},{<<"shards/test/blacklist*">>,22,[bar, foo]}},
@@ -303,12 +322,12 @@ rules_are_sorted_test() ->
 latest_overide_wins_test_() ->
     Cases = [
         {[
-            {"[flag]||*", "false"}, {"[flag]||a*", "true"},
-            {"[flag]||ab*", "true"}, {"[flag]||abc*", "true"}
+            {"flag||*", "false"}, {"flag||a*", "true"},
+            {"flag||ab*", "true"}, {"flag||abc*", "true"}
         ], true},
         {[
-            {"[flag]||*", "true"}, {"[flag]||a*", "false"},
-            {"[flag]||ab*", "true"}, {"[flag]||abc*", "false"}
+            {"flag||*", "true"}, {"flag||a*", "false"},
+            {"flag||ab*", "true"}, {"flag||abc*", "false"}
         ], false}
     ],
     [{test_id(Rules, Expected),
@@ -327,14 +346,29 @@ test_id(Items) ->
 
 test_config() ->
     [
-        {"[flag_foo]||*", "true"},
-        {"[flag_bar]||*", "false"},
-        {"[flag_bar]||shards/test*", "true"},
-        {"[flag_foo]||shards/blacklist*", "false"},
-        {"[baz]||shards/test*", "true"},
-        {"[baz]||shards/test/blacklist*", "false"},
-        {"[flag_bar]||shards/exact", "true"},
-        {"[flag_bar]||shards/test/exact", "true"}
+        {"flag_foo||*", "true"},
+        {"flag_bar||*", "false"},
+        {"flag_bar||shards/test*", "true"},
+        {"flag_foo||shards/blacklist*", "false"},
+        {"baz||shards/test*", "true"},
+        {"baz||shards/test/blacklist*", "false"},
+        {"flag_bar||shards/exact", "true"},
+        {"flag_bar||shards/test/exact", "true"}
     ].
+
+parse_flags_term_test_() ->
+    LongBinary = binary:copy(<<"a">>, ?MAX_FLAG_NAME_LENGTH + 1),
+    ExpectedError = {error, {"Cannot parse list of tags: ~n~p",
+       [{too_long, LongBinary}]}},
+    ExpectedUnknownError = {error,{"Cannot parse list of tags: ~n~p",
+       [{invalid_flag,<<"dddddddd">>}]}},
+	[
+		{"empty binary", ?_assertEqual([], parse_flags_term(<<>>))},
+		{"single flag", ?_assertEqual([fff], parse_flags_term(<<"fff">>))},
+		{"sorted", ?_assertEqual([aaa,bbb,fff], parse_flags_term(<<"fff,aaa,bbb">>))},
+		{"whitespace", ?_assertEqual([aaa,bbb,fff], parse_flags_term(<<"fff , aaa, bbb ">>))},
+		{"error", ?_assertEqual(ExpectedError, parse_flags_term(LongBinary))},
+		{"unknown_flag", ?_assertEqual(ExpectedUnknownError, parse_flags_term(<<"dddddddd">>))}
+	].
 
 -endif.
