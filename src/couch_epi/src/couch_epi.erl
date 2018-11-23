@@ -58,8 +58,12 @@
 
 -type apply_opts() :: [apply_opt()].
 
+-type data_spec_opt()
+   :: {interval, pos_integer()}.
+
 -type data_spec()
-    :: {module, module()}
+    :: {static_module, module()}
+        | {callback_module, module()}
         | {priv_file, FileName :: string()}
         | {file, FileName :: string()}.
 
