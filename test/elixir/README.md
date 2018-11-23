@@ -27,7 +27,7 @@ X means done, - means partially
   - [ ] Port batch_save.js
   - [ ] Port bulk_docs.js
   - [X] Port changes.js
-  - [ ] Port coffee.js
+  - [X] Port coffee.js
   - [ ] Port compact.js
   - [X] Port config.js
   - [ ] Port conflicts.js
