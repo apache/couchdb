@@ -15,7 +15,7 @@ couchTests.design_docs_query = function(debug) {
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
-  
+
   var docs = makeDocs(5);
 
   // create the docs
@@ -24,7 +24,7 @@ couchTests.design_docs_query = function(debug) {
   for (var i = 0; i < 5; i++) {
     T(results[i].id == docs[i]._id);
   }
-  
+
   // create the ddocs
   for (var i = 0; i < 5; i++) {
     T(db.save({
@@ -35,16 +35,16 @@ couchTests.design_docs_query = function(debug) {
         }
       }
     }).ok);
-  }  
-  
-  // test design_docs 
+  }
+
+  // test design_docs
   var path = "/" + db_name + "/_design_docs?";
   var xhr_AllDDocs = CouchDB.request("GET", path);
   T(xhr_AllDDocs.status == 200, "standard get should be 200");
   var allDDocs = JSON.parse(xhr_AllDDocs.responseText);
-  TEquals(10, allDDocs.total_rows, "total_rows mismatch");
+  TEquals(5, allDDocs.total_rows, "total_rows mismatch");
   TEquals(5, allDDocs.rows.length, "amount of rows mismatch");
-  
+
   // test key="_design/ddoc03"
   var xhr = CouchDB.request("GET", path + "key=\"_design/ddoc03\"");
   T(xhr.status = 200, "standard get should be 200");
@@ -72,21 +72,21 @@ couchTests.design_docs_query = function(debug) {
   var result = JSON.parse(xhr.responseText);
   TEquals(3, result.rows.length, "amount of rows mismatch");
   TEquals("_design/ddoc03", result.rows[2].key, "end_key test");
-  
+
   // test endkey="_design/ddoc03"
   var xhr = CouchDB.request("GET", path + "endkey=\"_design/ddoc03\"");
   T(xhr.status = 200, "standard get should be 200");
   var result = JSON.parse(xhr.responseText);
   TEquals(3, result.rows.length, "amount of rows mismatch");
   TEquals("_design/ddoc03", result.rows[2].key, "endkey test");
-  
+
   // test start_key="_design/ddoc03"
   var xhr = CouchDB.request("GET", path + "start_key=\"_design/ddoc03\"");
   T(xhr.status = 200, "standard get should be 200");
   var result = JSON.parse(xhr.responseText);
   TEquals(3, result.rows.length, "amount of rows mismatch");
   TEquals("_design/ddoc03", result.rows[0].key, "start_key test");
-  
+
   // test startkey="_design/ddoc03"
   var xhr = CouchDB.request("GET", path + "startkey=\"_design/ddoc03\"");
   T(xhr.status = 200, "standard get should be 200");
@@ -107,39 +107,39 @@ couchTests.design_docs_query = function(debug) {
   var result = JSON.parse(xhr.responseText);
   TEquals(2, result.rows.length, "amount of rows mismatch");
   TEquals("_design/ddoc02", result.rows[1].key, "end_key and inclusive_end test");
-  
+
   // test end_key="_design/ddoc03"&inclusive_end=false&descending=true
-  var xhr = CouchDB.request("GET", path + 
+  var xhr = CouchDB.request("GET", path +
                             "end_key=\"_design/ddoc03\"&inclusive_end=false&descending=true");
   T(xhr.status = 200, "standard get should be 200");
   var result = JSON.parse(xhr.responseText);
   TEquals(2, result.rows.length, "amount of rows mismatch");
   TEquals("_design/ddoc04", result.rows[1].key, "end_key, inclusive_end and descending test");
-  
+
   // test end_key="_design/ddoc05"&limit=2
-  var xhr = CouchDB.request("GET", path + 
+  var xhr = CouchDB.request("GET", path +
                             "end_key=\"_design/ddoc05\"&limit=2");
   T(xhr.status = 200, "standard get should be 200");
   var result = JSON.parse(xhr.responseText);
   TEquals(2, result.rows.length, "amount of rows mismatch");
   TEquals("_design/ddoc02", result.rows[1].key, "end_key and limit test");
-  
+
   // test end_key="_design/ddoc05"&skip=2
-  var xhr = CouchDB.request("GET", path + 
+  var xhr = CouchDB.request("GET", path +
                             "end_key=\"_design/ddoc05\"&skip=2");
   T(xhr.status = 200, "standard get should be 200");
   var result = JSON.parse(xhr.responseText);
   TEquals(3, result.rows.length, "amount of rows mismatch");
   TEquals("_design/ddoc03", result.rows[0].key, "end_key and skip test");
   TEquals("_design/ddoc05", result.rows[2].key, "end_key and skip test");
-  
+
   // test end_key="_design/ddoc05"&update_seq=true
-  var xhr = CouchDB.request("GET", path + 
+  var xhr = CouchDB.request("GET", path +
                             "end_key=\"_design/ddoc05\"&update_seq=true");
   T(xhr.status = 200, "standard get should be 200");
   var result = JSON.parse(xhr.responseText);
   T(result.update_seq);
-  
+
   // test POST with keys
   var xhr = CouchDB.request("POST", path, {
     headers: {"Content-Type": "application/json"},

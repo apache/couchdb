@@ -82,24 +82,22 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
         true -> lists:sublist(Keys2, Limit);
         false -> Keys2
     end,
-    Resp = case couch_util:get_value(namespace, Extra, <<"_all_docs">>) of
-        <<"_local">> ->
-            {ok, null};
-        _ ->
-            Timeout = fabric_util:all_docs_timeout(),
-            {_, Ref0} = spawn_monitor(fun() ->
-                exit(fabric:get_doc_count(DbName))
-            end),
-            receive {'DOWN', Ref0, _, _, Result} ->
-                Result
-            after Timeout ->
-                timeout
-            end
+    %% namespace can be _set_ to `undefined`, so we want simulate enum here
+    Namespace = case couch_util:get_value(namespace, Extra) of
+        <<"_all_docs">> -> <<"_all_docs">>;
+        <<"_design">> -> <<"_design">>;
+        <<"_local">> -> <<"_local">>;
+        _ -> <<"_all_docs">>
     end,
-    case Resp of
-        {ok, TotalRows} ->
+    Timeout = fabric_util:all_docs_timeout(),
+    {_, Ref} = spawn_monitor(fun() ->
+        exit(fabric:get_doc_count(DbName, Namespace))
+    end),
+    receive
+        {'DOWN', Ref, _, _, {ok, TotalRows}} ->
             Meta = case UpdateSeq of
-                false -> [{total, TotalRows}, {offset, null}];
+                false ->
+                    [{total, TotalRows}, {offset, null}];
                 true ->
                     [{total, TotalRows}, {offset, null}, {update_seq, null}]
             end,
@@ -108,10 +106,10 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
                 Keys3, queue:new(), SpawnFun, MaxJobs, Callback, Acc1
             ),
             Callback(complete, Acc2);
-        timeout ->
-            Callback(timeout, Acc0);
-        Error ->
+        {'DOWN', Ref, _, _, Error} ->
             Callback({error, Error}, Acc0)
+    after Timeout ->
+        Callback(timeout, Acc0)
     end.
 
 go(DbName, _Options, Workers, QueryArgs, Callback, Acc0) ->

@@ -73,8 +73,7 @@ get_from_cache(UserName) ->
             couch_log:debug("cache hit for ~s", [UserName]),
             Props;
         _ ->
-            couch_stats:increment_counter([couchdb, auth_cache_misses]),
-            couch_log:debug("cache miss for ~s", [UserName]),
+            maybe_increment_auth_cache_miss(UserName),
             case load_user_from_db(UserName) of
                 nil ->
                     nil;
@@ -84,9 +83,18 @@ get_from_cache(UserName) ->
             end
     catch
         error:badarg ->
-            couch_stats:increment_counter([couchdb, auth_cache_misses]),
-            couch_log:debug("cache miss for ~s", [UserName]),
+            maybe_increment_auth_cache_miss(UserName),
             load_user_from_db(UserName)
+    end.
+
+maybe_increment_auth_cache_miss(UserName) ->
+    Admins = config:get("admins"),
+    case lists:keymember(?b2l(UserName), 1, Admins) of
+        false ->
+            couch_stats:increment_counter([couchdb, auth_cache_misses]),
+            couch_log:debug("cache miss for ~s", [UserName]);
+        _True ->
+            ok
     end.
 
 %% gen_server callbacks

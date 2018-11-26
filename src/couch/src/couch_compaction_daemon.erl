@@ -192,7 +192,7 @@ maybe_compact_db(Parent, DbName, Config) ->
                     couch_db:close(Db);
                 {error, Reason} ->
                     couch_db:close(Db),
-                    couch_log:error("Compaction daemon - an error ocurred while"
+                    couch_log:error("Compaction daemon - an error occurred while"
                         " compacting the database `~s`: ~p", [DbName, Reason])
             end,
             case ViewsMonRef of

@@ -52,13 +52,13 @@ check_refresh_test_() ->
         setup,
         fun start_couch/0,
         fun stop_couch/1,
-        {with, [
-            fun remove_ddoc/1,
-            fun remove_ddoc_rev/1,
-            fun remove_ddoc_rev_only/1,
-            fun remove_custom_not_ok/1,
-            fun remove_custom_error/1
-        ]}
+        ddoc_cache_tutil:with([
+            {"remove_ddoc", fun remove_ddoc/1},
+            {"remove_ddoc_rev", fun remove_ddoc_rev/1},
+            {"remove_ddoc_rev_only", fun remove_ddoc_rev_only/1},
+            {"remove_custom_not_ok", fun remove_custom_not_ok/1},
+            {"remove_custom_error", fun remove_custom_error/1}
+        ])
     }.
 
 

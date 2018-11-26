@@ -43,7 +43,10 @@
 -callback providers() -> [{couch_epi:service_id(), module()}].
 -callback services() -> [{couch_epi:service_id(), module()}].
 -callback data_subscriptions() -> [{couch_epi:service_id(), couch_epi:key()}].
--callback data_providers() -> [{couch_epi:service_id(), couch_epi:data_spec()}].
+-callback data_providers() -> [
+    {couch_epi:key(), couch_epi:data_spec()}
+        | {couch_epi:key(), couch_epi:data_spec(), [couch_epi:data_spec_opt()]}
+].
 -callback processes() -> [{couch_epi:plugin_id(), [supervisor:child_spec()]}].
 -callback notify(Key :: term(), Old :: term(), New :: term()) -> ok.
 

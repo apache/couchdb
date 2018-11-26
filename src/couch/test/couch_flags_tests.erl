@@ -136,11 +136,11 @@ match_performance() ->
 
 test_config() ->
     [
-        {"[foo]||/*", "true"},
-        {"[bar]||/*", "false"},
-        {"[bar]||/shards/test*", "true"},
-        {"[foo]||/shards/blacklist*", "false"},
-        {"[baz]||/shards/test*", "true"},
-        {"[bar]||/shards/exact", "true"},
-        {"[bar]||/shards/test/exact", "true"}
+        {"foo||/*", "true"},
+        {"bar||/*", "false"},
+        {"bar||/shards/test*", "true"},
+        {"foo||/shards/blacklist*", "false"},
+        {"baz||/shards/test*", "true"},
+        {"bar||/shards/exact", "true"},
+        {"bar||/shards/test/exact", "true"}
     ].
