@@ -87,7 +87,7 @@ go2(DbName, Workers, {red, {_, Lang, View}, _}=VInfo, Args, Callback, Acc0) ->
         update_seq = case UpdateSeq of true -> []; false -> nil end
     },
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
-        State, infinity, 1000 * 60 * 60) of
+        State, fabric_util:view_timeout(Args), 1000 * 60 * 60) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};
     {timeout, NewState} ->
