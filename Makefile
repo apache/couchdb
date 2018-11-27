@@ -172,9 +172,13 @@ soak-eunit: couch
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
 .PHONY: elixir
-elixir:
+elixir: elixir-check-formatted
 	@rm -rf dev/lib
 	@dev/run -a adm:pass --no-eval test/elixir/run
+
+.PHONY: elixir-check-formatted
+elixir-check-formatted:
+	@cd test/elixir/ && mix format --check-formatted
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
