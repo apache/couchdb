@@ -10,13 +10,16 @@ defmodule SecurityValidationTest do
 
   @auth_headers %{
     jerry: [
-      authorization: "Basic amVycnk6bW91c2U=" # jerry:mouse
+      # jerry:mouse
+      authorization: "Basic amVycnk6bW91c2U="
     ],
     tom: [
-      authorization: "Basic dG9tOmNhdA==" # tom:cat
+      # tom:cat
+      authorization: "Basic dG9tOmNhdA=="
     ],
     spike_cat: [
-      authorization: "Basic c3Bpa2U6Y2F0" # spike:cat - which is wrong
+      # spike:cat - which is wrong
+      authorization: "Basic c3Bpa2U6Y2F0"
     ]
   }
 
@@ -50,10 +53,12 @@ defmodule SecurityValidationTest do
     on_exit(fn -> delete_db(auth_db_name) end)
 
     configs = [
-      {"httpd", "authentication_handlers", "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}"},
+      {"httpd", "authentication_handlers",
+       "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}"},
       {"couch_httpd_auth", "authentication_db", auth_db_name},
       {"chttpd_auth", "authentication_db", auth_db_name}
     ]
+
     Enum.each(configs, &set_config/1)
 
     # port of comment from security_validation.js
@@ -63,6 +68,7 @@ defmodule SecurityValidationTest do
     # btw: this needs to be INSIDE configured server to propagate correctly ;-)
     # At least they'd run in the build, though
     users = [{"tom", "cat"}, {"jerry", "mouse"}, {"spike", "dog"}]
+
     Enum.each(users, fn {name, pass} ->
       doc = %{
         :_id => "org.couchdb.user:#{name}",
@@ -70,6 +76,7 @@ defmodule SecurityValidationTest do
         :roles => [],
         :password => pass
       }
+
       assert Couch.post("/#{auth_db_name}", body: doc).body["ok"]
     end)
 
@@ -78,15 +85,17 @@ defmodule SecurityValidationTest do
 
   @tag :with_db_name
   test "Saving document using the wrong credentials", context do
-    headers = @auth_headers[:spike_cat] # spike:cat - which is wrong
-    resp = Couch.post("/#{context[:db_name]}", [body: %{foo: 1}, headers: headers])
+    # spike:cat - which is wrong
+    headers = @auth_headers[:spike_cat]
+    resp = Couch.post("/#{context[:db_name]}", body: %{foo: 1}, headers: headers)
     assert resp.body["error"] == "unauthorized"
     assert resp.status_code == 401
   end
 
   test "Force basic login" do
-    headers = @auth_headers[:spike_cat] # spike:cat - which is wrong
-    resp = Couch.get("/_session", [query: %{basic: true}, headers: headers])
+    # spike:cat - which is wrong
+    headers = @auth_headers[:spike_cat]
+    resp = Couch.get("/_session", query: %{basic: true}, headers: headers)
     assert resp.status_code == 401
     assert resp.body["error"] == "unauthorized"
   end
@@ -103,7 +112,7 @@ defmodule SecurityValidationTest do
   @tag :with_db
   test "Non-admin user cannot save a ddoc", context do
     headers = @auth_headers[:jerry]
-    resp = Couch.post("/#{context[:db_name]}", [body: @ddoc, headers: headers])
+    resp = Couch.post("/#{context[:db_name]}", body: @ddoc, headers: headers)
     assert resp.status_code == 403
     assert resp.body["error"] == "forbidden"
   end
@@ -120,7 +129,7 @@ defmodule SecurityValidationTest do
     ddoc = Map.put(@ddoc, :_rev, new_rev) |> Map.put(:foo, "bar")
     headers = @auth_headers[:tom]
     # attempt to save doc in replication context, eg ?new_edits=false
-    resp = Couch.put("/#{db_name}/#{ddoc[:_id]}", [body: ddoc, headers: headers, query: %{new_edits: false}])
+    resp = Couch.put("/#{db_name}/#{ddoc[:_id]}", body: ddoc, headers: headers, query: %{new_edits: false})
     assert resp.status_code == 403
     assert resp.body["error"] == "forbidden"
   end
@@ -143,18 +152,18 @@ defmodule SecurityValidationTest do
     assert Couch.put("/#{db_name}/_security", body: sec_obj).body["ok"]
     assert Couch.post("/#{db_name}", body: @ddoc).body["ok"]
 
-    resp = Couch.put("/#{db_name}/test_doc", [body: %{foo: 1}, headers: jerry])
+    resp = Couch.put("/#{db_name}/test_doc", body: %{foo: 1}, headers: jerry)
     assert resp.status_code == 403
     assert resp.body["error"] == "forbidden"
     assert resp.body["reason"] == "Documents must have an author field"
 
     # Jerry can write the document
-    assert Couch.put("/#{db_name}/test_doc", [body: %{foo: 1, author: "jerry"}, headers: jerry]).body["ok"]
+    assert Couch.put("/#{db_name}/test_doc", body: %{foo: 1, author: "jerry"}, headers: jerry).body["ok"]
 
     test_doc = Couch.get("/#{db_name}/test_doc").body
 
     # Tom cannot write the document
-    resp = Couch.post("/#{db_name}", [body: %{foo: 1}, headers: tom])
+    resp = Couch.post("/#{db_name}", body: %{foo: 1}, headers: tom)
     assert resp.status_code == 403
     assert resp.body["error"] == "forbidden"
 
@@ -169,12 +178,12 @@ defmodule SecurityValidationTest do
 
     # Now Tom can update the document
     test_doc = Map.put(test_doc, "foo", "asdf")
-    resp = Couch.put("/#{db_name}/test_doc", [body: test_doc, headers: tom])
+    resp = Couch.put("/#{db_name}/test_doc", body: test_doc, headers: tom)
     assert resp.body["ok"]
     test_doc = Map.put(test_doc, "_rev", resp.body["rev"])
 
     # Jerry can't delete it
-    retry_until(fn() ->
+    retry_until(fn ->
       opts = [headers: jerry]
       resp = Couch.delete("/#{db_name}/test_doc?rev=#{test_doc["_rev"]}", opts)
       resp.status_code == 401 and resp.body["error"] == "unauthorized"
@@ -213,7 +222,7 @@ end
 #
 #
 #      // now all or nothing with a failure - no more available on cluster
-#/*      var docs = [{_id:"booboo",author:"Damien Katz",foo:"bar"},{_id:"foofoo",foo:"baz"}];
+# /*      var docs = [{_id:"booboo",author:"Damien Katz",foo:"bar"},{_id:"foofoo",foo:"baz"}];
 #
 #      // Create the docs
 #      var results = db.bulkSave(docs, {all_or_nothing:true});
@@ -222,7 +231,7 @@ end
 #      T(results.errors[0].error == "forbidden");
 #      T(db.open("booboo") == null);
 #      T(db.open("foofoo") == null);
-#*/
+# */
 #
 #      // Now test replication
 #      var AuthHeaders = {"Authorization": "Basic c3Bpa2U6ZG9n"}; // spike
@@ -307,4 +316,4 @@ end
 #  req.open("DELETE", "http://127.0.0.1:15986/" + authDb_name, false);
 #  req.send("");
 #  CouchDB.maybeThrowError(req);
-#};
+# };

@@ -14,10 +14,10 @@ defmodule AllDocsTest do
   @tag :with_db
   test "All Docs tests", context do
     db_name = context[:db_name]
-    resp1 = Couch.post("/#{db_name}", [body: %{:_id => "0", :a => 1, :b => 1}]).body
-    resp2 = Couch.post("/#{db_name}", [body: %{:_id => "3", :a => 4, :b => 16}]).body
-    resp3 = Couch.post("/#{db_name}", [body: %{:_id => "1", :a => 2, :b => 4}]).body
-    resp4 = Couch.post("/#{db_name}", [body: %{:_id => "2", :a => 3, :b => 9}]).body
+    resp1 = Couch.post("/#{db_name}", body: %{:_id => "0", :a => 1, :b => 1}).body
+    resp2 = Couch.post("/#{db_name}", body: %{:_id => "3", :a => 4, :b => 16}).body
+    resp3 = Couch.post("/#{db_name}", body: %{:_id => "1", :a => 2, :b => 4}).body
+    resp4 = Couch.post("/#{db_name}", body: %{:_id => "2", :a => 3, :b => 9}).body
 
     assert resp1["ok"]
     assert resp2["ok"]
@@ -30,6 +30,7 @@ defmodule AllDocsTest do
     resp = Couch.get("/#{db_name}/_all_docs").body
     rows = resp["rows"]
     assert resp["total_rows"] == length(rows)
+
     Enum.each(rows, fn row ->
       assert row["id"] >= "0" && row["id"] <= "4"
     end)
@@ -44,14 +45,19 @@ defmodule AllDocsTest do
     assert resp["offset"] == 2
 
     # Confirm that queries may assume raw collation
-    resp = Couch.get("/#{db_name}/_all_docs", query: %{
-      :startkey => "\"org.couchdb.user:\"",
-      :endkey => "\"org.couchdb.user;\""
-    })
+    resp =
+      Couch.get("/#{db_name}/_all_docs",
+        query: %{
+          :startkey => "\"org.couchdb.user:\"",
+          :endkey => "\"org.couchdb.user;\""
+        }
+      )
+
     assert length(resp.body["rows"]) == 0
 
     # Check that all docs show up in the changes feed; order can vary
     resp = Couch.get("/#{db_name}/_changes").body
+
     Enum.each(resp["results"], fn row ->
       assert Enum.member?(revs, hd(row["changes"])["rev"]), "doc #{row["id"]} should be in changes"
     end)
@@ -103,7 +109,11 @@ defmodule AllDocsTest do
     assert Couch.put("/#{db_name}/3", query: %{:new_edits => false}, body: conflicted_doc2).body["ok"]
 
     win_rev = Couch.get("/#{db_name}/3").body
-    changes = Couch.get("/#{db_name}/_changes", query: %{:include_docs => true, :conflicts => true, :style => "all_docs"}).body["results"]
+
+    changes =
+      Couch.get("/#{db_name}/_changes", query: %{:include_docs => true, :conflicts => true, :style => "all_docs"}).body[
+        "results"
+      ]
 
     doc3 = Enum.find(changes, fn row -> row["id"] == "3" end)
     assert doc3["id"] == "3"
