@@ -28,6 +28,10 @@ import subprocess as sp
 import sys
 import time
 import uuid
+import pkgutil
+import imp
+import traceback
+
 
 from pbkdf2 import pbkdf2_hex
 
@@ -78,7 +82,9 @@ log.verbose = True
 
 def main():
     ctx = setup()
+    apply_hooks_from_dir(ctx['hooks_dir'], 'before_startup', ctx=ctx)
     startup(ctx)
+    apply_hooks_from_dir(ctx['hooks_dir'], 'after_startup', ctx=ctx)
     if ctx['cmd']:
         run_command(ctx, ctx['cmd'])
     else:
@@ -88,10 +94,13 @@ def main():
 def setup():
     opts, args = setup_argparse()
     ctx = setup_context(opts, args)
+    print ctx
+    apply_hooks_from_dir(ctx['hooks_dir'], 'before_setup', ctx=ctx)
     setup_logging(ctx)
     setup_dirs(ctx)
     check_beams(ctx)
     setup_configs(ctx)
+    apply_hooks_from_dir(ctx['hooks_dir'], 'after_setup', ctx=ctx)
     return ctx
 
 
@@ -134,6 +143,9 @@ def setup_argparse():
                       help='The number of nodes that should be stopped after cluster config')
     parser.add_option('--no-eval', action='store_true', default=False,
                       help='Do not eval subcommand output')
+    parser.add_option('--hooks-dir', dest='hooks_dir',
+                      default=os.path.join(os.path.dirname(os.path.realpath(__file__)), "hooks"),
+                      help='Do not eval subcommand output')
     return parser.parse_args()
 
 
@@ -157,7 +169,8 @@ def setup_context(opts, args):
             'config_overrides': opts.config_overrides,
             'no_eval': opts.no_eval,
             'reset_logs': True,
-            'procs': []}
+            'procs': [],
+            'hooks_dir': opts.hooks_dir}
 
 
 @log('Setup environment')
@@ -325,8 +338,10 @@ def hashify(pwd, salt=COMMON_SALT, iterations=10, keylen=20):
 
 def startup(ctx):
     atexit.register(kill_processes, ctx)
+    apply_hooks_from_dir(ctx['hooks_dir'], 'before_boot_nodes', ctx=ctx)
     boot_nodes(ctx)
     ensure_all_nodes_alive(ctx)
+    apply_hooks_from_dir(ctx['hooks_dir'], 'after_boot_nodes', ctx=ctx)
     if ctx['no_join']:
         return
     if ctx['with_admin_party']:
@@ -561,6 +576,27 @@ def create_system_databases(host, port):
         if resp.status == 404:
             try_request(host, port, 'PUT', '/' + dbname, (201, 202, 412))
 
+def apply_hooks_from_dir(hooks_dir, hook_name, **kvargs):
+    for module_name in list_modules(hooks_dir):
+        hook_module = import_module_from_dir(hooks_dir, module_name)
+        if hook_module:
+            hook = getattr(hook_module, hook_name)
+            if hook:
+                print "==> Executing {0}".format(hook.__name__)
+                hook = getattr(hook_module, hook_name)
+                hook(**kvargs)
+                print "==="
+
+def import_module_from_dir(hooks_dir, module_name):
+    try:
+        fid, pathname, desc = imp.find_module(module_name, [hooks_dir])
+        return imp.load_module(module_name, fid, pathname, desc)
+    except:
+        print traceback.format_exc()
+        return None
+
+def list_modules(directory):
+    return sorted([name for _, name, _ in pkgutil.iter_modules([directory])])
 
 @log('Developers cluster is set up at http://127.0.0.1:{lead_port}.\n'
      'Admin username: {user}\n'
