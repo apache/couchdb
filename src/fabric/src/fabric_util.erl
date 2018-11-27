@@ -15,7 +15,7 @@
 -export([submit_jobs/3, submit_jobs/4, cleanup/1, recv/4, get_db/1, get_db/2, error_info/1,
         update_counter/3, remove_ancestors/2, create_monitors/1, kv/2,
         remove_down_workers/2, doc_id_and_rev/1]).
--export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0]).
+-export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0, view_timeout/1]).
 -export([log_timeout/2, remove_done_workers/2]).
 -export([is_users_db/1, is_replicator_db/1]).
 -export([open_cluster_db/1, open_cluster_db/2]).
@@ -64,6 +64,13 @@ all_docs_timeout() ->
 
 attachments_timeout() ->
     timeout("attachments", "600000").
+
+view_timeout(Args) ->
+    PartitionQuery = couch_mrview_util:get_extra(Args, partition, false),
+    case PartitionQuery of
+        false -> timeout("view", "infinity");
+        _ -> timeout("partition_view", "infinity")
+    end.
 
 timeout(Type, Default) ->
     case config:get("fabric", Type ++ "_timeout", Default) of

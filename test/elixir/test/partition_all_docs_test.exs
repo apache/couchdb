@@ -115,4 +115,39 @@ defmodule PartitionAllDocsTest do
     assert length(ids) == 1
     assert ids == ["foo:22"]
   end
+
+  # This test is timing based so it could be a little flaky.
+  # If that turns out to be the case we should probably just skip it
+  test "partition _all_docs with timeout", context do
+    on_exit(fn ->
+      resp = Couch.get("/_membership")
+      %{:body => body} = resp
+
+      Enum.each(body["all_nodes"], fn node ->
+        resp = Couch.put("/_node/#{node}/_config/fabric/partition_view_timeout", body: "\"3600000\"")
+        assert resp.status_code == 200
+      end)
+    end)
+
+    resp = Couch.get("/_membership")
+    %{:body => body} = resp
+
+     Enum.each(body["all_nodes"], fn node ->
+      resp = Couch.put("/_node/#{node}/_config/fabric/partition_view_timeout", body: "\"1\"")
+      assert resp.status_code == 200
+    end)
+
+    db_name = context[:db_name]
+    create_partition_docs(db_name)
+
+    retry_until(fn ->
+      url = "/#{db_name}/_partition/foo/_all_docs"
+      case Couch.get(url) do
+        %{:body => %{"reason" => reason}} ->
+          Regex.match?(~r/not be processed in a reasonable amount of time./, reason)
+        _ -> 
+          false
+      end
+    end)
+  end
 end
