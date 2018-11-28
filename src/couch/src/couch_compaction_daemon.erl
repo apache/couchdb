@@ -239,18 +239,23 @@ maybe_compact_views(DbName, [DDocName | Rest], Config) ->
 
 
 db_ddoc_names(Db) ->
-    FoldFun = fun ddoc_name/2,
-    Opts = [{start_key, <<"_design/">>}],
-    {ok, DDocNames} = couch_db:fold_docs(Db, FoldFun, [], Opts),
-    DDocNames.
+    case couch_db:get_design_docs(Db) of
+        {ok, DDocs} ->
+            [ddoc_name(DDoc) || DDoc <- DDocs];
+        Error ->
+            ErrMsg = "Could not get design docs for ~p error:~p",
+            couch_log:error(ErrMsg, [couch_db:name(Db), Error]),
+            []
+    end.
 
-ddoc_name(#full_doc_info{id = <<"_design/", _/binary>>, deleted = true}, Acc) ->
-    {ok, Acc};
-ddoc_name(#full_doc_info{id = <<"_design/", Id/binary>>}, Acc) ->
-    {ok, [Id | Acc]};
-ddoc_name(_, Acc) ->
-    {stop, Acc}.
 
+% Node local docs will be FDIs while cluster ones will be ejson
+ddoc_name(#full_doc_info{id = <<"_design/", Id/binary>>}) ->
+    Id;
+ddoc_name({Props}) ->
+    DocId = proplists:get_value(<<"_id">>, Props),
+    <<"_design/", GroupName/binary>> = DocId,
+    GroupName.
 
 maybe_compact_view(DbName, GroupId, Config) ->
     DDocId = <<"_design/", GroupId/binary>>,
