@@ -53,7 +53,7 @@ defmodule AllDocsTest do
         }
       )
 
-    assert length(resp.body["rows"]) == 0
+    assert Enum.empty?(resp.body["rows"])
 
     # Check that all docs show up in the changes feed; order can vary
     resp = Couch.get("/#{db_name}/_changes").body

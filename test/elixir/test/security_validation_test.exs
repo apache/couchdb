@@ -126,7 +126,7 @@ defmodule SecurityValidationTest do
     assert Couch.post("/#{db_name}", body: @ddoc).body["ok"]
 
     new_rev = "2-642e20f96624a0aae6025b4dba0c6fb2"
-    ddoc = Map.put(@ddoc, :_rev, new_rev) |> Map.put(:foo, "bar")
+    ddoc = @ddoc |> Map.put(:_rev, new_rev) |> Map.put(:foo, "bar")
     headers = @auth_headers[:tom]
     # attempt to save doc in replication context, eg ?new_edits=false
     resp = Couch.put("/#{db_name}/#{ddoc[:_id]}", body: ddoc, headers: headers, query: %{new_edits: false})

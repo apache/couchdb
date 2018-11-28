@@ -1,4 +1,8 @@
 defmodule Couch.Session do
+  @moduledoc """
+  CouchDB session helpers.
+  """
+
   @enforce_keys [:cookie]
   defstruct [:cookie]
 
