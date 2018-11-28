@@ -44,7 +44,7 @@ X means done, - means partially
   - [ ] Port http.js
   - [ ] Port invalid_docids.js
   - [ ] Port jsonp.js
-  - [ ] Port large_docs.js
+  - [X] Port large_docs.js
   - [ ] Port list_views.js
   - [ ] Port lorem_b64.txt
   - [ ] Port lorem.txt
