@@ -24,6 +24,7 @@ import optparse
 import os
 import posixpath
 import re
+import shutil
 import subprocess as sp
 import sys
 import time
@@ -77,6 +78,11 @@ def log(msg):
 log.verbose = True
 
 
+def clean_lib(ctx):
+    lib = os.path.join(ctx['devdir'], "lib")
+    shutil.rmtree(lib)
+
+
 def main():
     ctx = setup()
     startup(ctx)
@@ -89,6 +95,8 @@ def main():
 def setup():
     opts, args = setup_argparse()
     ctx = setup_context(opts, args)
+    if opts.clean:
+        clean_lib(ctx)
     setup_logging(ctx)
     setup_dirs(ctx)
     check_beams(ctx)
@@ -135,6 +143,10 @@ def setup_argparse():
                       help='The number of nodes that should be stopped after cluster config')
     parser.add_option('--no-eval', action='store_true', default=False,
                       help='Do not eval subcommand output')
+    parser.add_option("--clean", dest="clean",
+                      default=False, action="store_true",
+                      help="Wipe the dev cluster state before booting nodes")
+
     return parser.parse_args()
 
 
