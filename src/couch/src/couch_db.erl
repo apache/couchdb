@@ -736,19 +736,23 @@ validate_security_object(SecProps) ->
 
 % validate user input
 validate_names_and_roles({Props}) when is_list(Props) ->
-    case couch_util:get_value(<<"names">>,Props,[]) of
+    case couch_util:get_value(<<"names">>, Props, []) of
     Ns when is_list(Ns) ->
             [throw("names must be a JSON list of strings") ||N <- Ns, not is_binary(N)],
             Ns;
-    _ -> throw("names must be a JSON list of strings")
+    _ ->
+        throw("names must be a JSON list of strings")
     end,
-    case couch_util:get_value(<<"roles">>,Props,[]) of
+    case couch_util:get_value(<<"roles">>, Props, []) of
     Rs when is_list(Rs) ->
         [throw("roles must be a JSON list of strings") ||R <- Rs, not is_binary(R)],
         Rs;
-    _ -> throw("roles must be a JSON list of strings")
+    _ ->
+        throw("roles must be a JSON list of strings")
     end,
-    ok.
+    ok;
+validate_names_and_roles(_) ->
+    throw("admins or members must be a JSON list of strings").
 
 get_revs_limit(#db{} = Db) ->
     couch_db_engine:get_revs_limit(Db).
