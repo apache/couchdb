@@ -15,31 +15,40 @@ defmodule CouchTestCase do
           &set_config_context/1,
           &set_user_context/1
         ]
-        context = Enum.reduce(setup_funs, context, fn setup_fun, acc ->
-          setup_fun.(acc)
-        end)
+
+        context =
+          Enum.reduce(setup_funs, context, fn setup_fun, acc ->
+            setup_fun.(acc)
+          end)
+
         {:ok, context}
       end
 
       def set_db_context(context) do
-        context = case context do
-          %{:with_db_name => true} ->
-            Map.put(context, :db_name, random_db_name())
-          %{:with_db_name => db_name} when is_binary(db_name) ->
-            Map.put(context, :db_name, db_name)
-          %{:with_random_db => db_name} when is_binary(db_name) ->
-            context
-            |> Map.put(:db_name, random_db_name(db_name))
-            |> Map.put(:with_db, true)
-          %{:with_db => true} ->
-            Map.put(context, :db_name, random_db_name())
-          %{:with_db => db_name} when is_binary(db_name) ->
-            Map.put(context, :db_name, db_name)
-          _ ->
-            context
-        end
+        context =
+          case context do
+            %{:with_db_name => true} ->
+              Map.put(context, :db_name, random_db_name())
 
-        if Map.has_key? context, :with_db do
+            %{:with_db_name => db_name} when is_binary(db_name) ->
+              Map.put(context, :db_name, db_name)
+
+            %{:with_random_db => db_name} when is_binary(db_name) ->
+              context
+              |> Map.put(:db_name, random_db_name(db_name))
+              |> Map.put(:with_db, true)
+
+            %{:with_db => true} ->
+              Map.put(context, :db_name, random_db_name())
+
+            %{:with_db => db_name} when is_binary(db_name) ->
+              Map.put(context, :db_name, db_name)
+
+            _ ->
+              context
+          end
+
+        if Map.has_key?(context, :with_db) do
           {:ok, _} = create_db(context[:db_name])
           on_exit(fn -> delete_db(context[:db_name]) end)
         end
@@ -53,6 +62,7 @@ defmodule CouchTestCase do
             set_config(cfg)
           end)
         end
+
         context
       end
 
@@ -60,13 +70,16 @@ defmodule CouchTestCase do
         case Map.get(context, :user) do
           nil ->
             context
+
           user when is_list(user) ->
             user = create_user(user)
+
             on_exit(fn ->
               query = %{:rev => user["_rev"]}
               resp = Couch.delete("/_users/#{user["_id"]}", query: query)
-              assert HTTPotion.Response.success? resp
+              assert HTTPotion.Response.success?(resp)
             end)
+
             context = Map.put(context, :user, user)
             userinfo = user["name"] <> ":" <> user["password"]
             Map.put(context, :userinfo, userinfo)
@@ -85,6 +98,7 @@ defmodule CouchTestCase do
 
       def set_config({section, key, value}) do
         existing = set_config_raw(section, key, value)
+
         on_exit(fn ->
           Enum.each(existing, fn {node, prev_value} ->
             if prev_value != "" do
@@ -105,6 +119,7 @@ defmodule CouchTestCase do
 
       def set_config_raw(section, key, value) do
         resp = Couch.get("/_membership")
+
         Enum.map(resp.body["all_nodes"], fn node ->
           url = "/_node/#{node}/_config/#{section}/#{key}"
           headers = ["X-Couch-Persist": "false"]
@@ -117,6 +132,7 @@ defmodule CouchTestCase do
 
       def create_user(user) do
         required = [:name, :password, :roles]
+
         Enum.each(required, fn key ->
           assert Keyword.has_key?(user, key), "User missing key: #{key}"
         end)
@@ -128,6 +144,7 @@ defmodule CouchTestCase do
         assert is_binary(name), "User name must be a string"
         assert is_binary(password), "User password must be a string"
         assert is_list(roles), "Roles must be a list of strings"
+
         Enum.each(roles, fn role ->
           assert is_binary(role), "Roles must be a list of strings"
         end)
@@ -139,15 +156,20 @@ defmodule CouchTestCase do
           "roles" => roles,
           "password" => password
         }
+
         resp = Couch.get("/_users/#{user_doc["_id"]}")
-        user_doc = case resp.status_code do
-          404 ->
-            user_doc
-          sc when sc >= 200 and sc < 300 ->
-            Map.put(user_doc, "_rev", resp.body["_rev"])
-        end
+
+        user_doc =
+          case resp.status_code do
+            404 ->
+              user_doc
+
+            sc when sc >= 200 and sc < 300 ->
+              Map.put(user_doc, "_rev", resp.body["_rev"])
+          end
+
         resp = Couch.post("/_users", body: user_doc)
-        assert HTTPotion.Response.success? resp
+        assert HTTPotion.Response.success?(resp)
         assert resp.body["ok"]
         Map.put(user_doc, "_rev", resp.body["rev"])
       end
@@ -167,7 +189,7 @@ defmodule CouchTestCase do
       end
 
       def create_doc(db_name, body) do
-        resp = Couch.post("/#{db_name}", [body: body])
+        resp = Couch.post("/#{db_name}", body: body)
         assert resp.status_code == 201
         assert resp.body["ok"]
         {:ok, resp}
@@ -201,6 +223,7 @@ defmodule CouchTestCase do
 
       defp retry_until(condition, start, sleep, timeout) do
         now = now(:ms)
+
         if now > start + timeout do
           raise "timed out after #{now - start} ms"
         else
@@ -219,7 +242,7 @@ defmodule CouchTestCase do
       end
 
       defp now(:ms) do
-        div(:erlang.system_time, 1000000)
+        div(:erlang.system_time(), 1_000_000)
       end
 
       @spec rev(map(), map()) :: map()
@@ -233,11 +256,9 @@ defmodule CouchTestCase do
       end
 
       def pretty_inspect(resp) do
-        opts = [
-          pretty: true, width: 20, limit: :infinity, printable_limit: :infinity]
+        opts = [pretty: true, width: 20, limit: :infinity, printable_limit: :infinity]
         inspect(resp, opts)
       end
-
     end
   end
 end

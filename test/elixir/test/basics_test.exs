@@ -62,7 +62,7 @@ defmodule BasicsTest do
 
   @tag :with_db
   test "Create a document and save it to the database", context do
-    resp = Couch.post("/#{context[:db_name]}", [body: %{:_id => "0", :a => 1, :b => 1}])
+    resp = Couch.post("/#{context[:db_name]}", body: %{:_id => "0", :a => 1, :b => 1})
     assert resp.status_code == 201, "Should be 201 created"
     assert resp.body["id"], "Id should be present"
     assert resp.body["rev"], "Rev should be present"
@@ -76,7 +76,7 @@ defmodule BasicsTest do
   test "Revs info status is good", context do
     db_name = context[:db_name]
     {:ok, _} = create_doc(db_name, sample_doc_foo())
-    resp = Couch.get("/#{db_name}/foo", [query: %{:revs_info => true}])
+    resp = Couch.get("/#{db_name}/foo", query: %{:revs_info => true})
     assert hd(resp.body["_revs_info"])["status"] == "available", "Revs info is available"
   end
 
@@ -84,16 +84,17 @@ defmodule BasicsTest do
   test "Make sure you can do a seq=true option", context do
     db_name = context[:db_name]
     {:ok, _} = create_doc(db_name, sample_doc_foo())
-    resp = Couch.get("/#{db_name}/foo", [query: %{:local_seq => true}])
+    resp = Couch.get("/#{db_name}/foo", query: %{:local_seq => true})
     assert resp.body["_local_seq"] == 1, "Local seq value == 1"
   end
 
   @tag :with_db
   test "Can create several documents", context do
     db_name = context[:db_name]
-    assert Couch.post("/#{db_name}", [body: %{:_id => "1", :a => 2, :b => 4}]).body["ok"]
-    assert Couch.post("/#{db_name}", [body: %{:_id => "2", :a => 3, :b => 9}]).body["ok"]
-    assert Couch.post("/#{db_name}", [body: %{:_id => "3", :a => 4, :b => 16}]).body["ok"]
+    assert Couch.post("/#{db_name}", body: %{:_id => "1", :a => 2, :b => 4}).body["ok"]
+    assert Couch.post("/#{db_name}", body: %{:_id => "2", :a => 3, :b => 9}).body["ok"]
+    assert Couch.post("/#{db_name}", body: %{:_id => "3", :a => 4, :b => 16}).body["ok"]
+
     retry_until(fn ->
       Couch.get("/#{db_name}").body["doc_count"] == 3
     end)
@@ -105,20 +106,20 @@ defmodule BasicsTest do
     db_name = context[:db_name]
     doc = %{:_id => "COUCHDB-954", :a => 1}
 
-    resp1 = Couch.post("/#{db_name}", [body: doc])
+    resp1 = Couch.post("/#{db_name}", body: doc)
     assert resp1.body["ok"]
     old_rev = resp1.body["rev"]
 
     doc = Map.put(doc, :_rev, old_rev)
-    resp2 = Couch.post("/#{db_name}", [body: doc])
+    resp2 = Couch.post("/#{db_name}", body: doc)
     assert resp2.body["ok"]
     _new_rev = resp2.body["rev"]
 
     # TODO: enable chunked encoding
-    #resp3 = Couch.get("/#{db_name}/COUCHDB-954", [query: %{:open_revs => "[#{old_rev}, #{new_rev}]"}])
-    #assert length(resp3.body) == 2, "Should get two revisions back"
-    #resp3 = Couch.get("/#{db_name}/COUCHDB-954", [query: %{:open_revs => "[#{old_rev}]", :latest => true}])
-    #assert resp3.body["_rev"] == new_rev
+    # resp3 = Couch.get("/#{db_name}/COUCHDB-954", [query: %{:open_revs => "[#{old_rev}, #{new_rev}]"}])
+    # assert length(resp3.body) == 2, "Should get two revisions back"
+    # resp3 = Couch.get("/#{db_name}/COUCHDB-954", [query: %{:open_revs => "[#{old_rev}]", :latest => true}])
+    # assert resp3.body["_rev"] == new_rev
   end
 
   @tag :with_db
@@ -130,12 +131,12 @@ defmodule BasicsTest do
     red_doc = %{:views => %{:baz => %{:map => map_fun, :reduce => red_fun}}}
 
     # Bootstrap database and ddoc
-    assert Couch.post("/#{db_name}", [body: %{:_id => "0", :a => 1, :b => 1}]).body["ok"]
-    assert Couch.post("/#{db_name}", [body: %{:_id => "1", :a => 2, :b => 4}]).body["ok"]
-    assert Couch.post("/#{db_name}", [body: %{:_id => "2", :a => 3, :b => 9}]).body["ok"]
-    assert Couch.post("/#{db_name}", [body: %{:_id => "3", :a => 4, :b => 16}]).body["ok"]
-    assert Couch.put("/#{db_name}/_design/foo", [body: map_doc]).body["ok"]
-    assert Couch.put("/#{db_name}/_design/bar", [body: red_doc]).body["ok"]
+    assert Couch.post("/#{db_name}", body: %{:_id => "0", :a => 1, :b => 1}).body["ok"]
+    assert Couch.post("/#{db_name}", body: %{:_id => "1", :a => 2, :b => 4}).body["ok"]
+    assert Couch.post("/#{db_name}", body: %{:_id => "2", :a => 3, :b => 9}).body["ok"]
+    assert Couch.post("/#{db_name}", body: %{:_id => "3", :a => 4, :b => 16}).body["ok"]
+    assert Couch.put("/#{db_name}/_design/foo", body: map_doc).body["ok"]
+    assert Couch.put("/#{db_name}/_design/bar", body: red_doc).body["ok"]
     assert Couch.get("/#{db_name}").body["doc_count"] == 6
 
     # Initial view query test
@@ -146,17 +147,20 @@ defmodule BasicsTest do
     # Modified doc and test for updated view results
     doc0 = Couch.get("/#{db_name}/0").body
     doc0 = Map.put(doc0, :a, 4)
-    assert Couch.put("/#{db_name}/0", [body: doc0]).body["ok"]
+    assert Couch.put("/#{db_name}/0", body: doc0).body["ok"]
+
     retry_until(fn ->
       Couch.get("/#{db_name}/_design/foo/_view/baz").body["total_rows"] == 2
     end)
 
     # Write 2 more docs and test for updated view results
-    assert Couch.post("/#{db_name}", [body: %{:a => 3, :b => 9}]).body["ok"]
-    assert Couch.post("/#{db_name}", [body: %{:a => 4, :b => 16}]).body["ok"]
+    assert Couch.post("/#{db_name}", body: %{:a => 3, :b => 9}).body["ok"]
+    assert Couch.post("/#{db_name}", body: %{:a => 4, :b => 16}).body["ok"]
+
     retry_until(fn ->
       Couch.get("/#{db_name}/_design/foo/_view/baz").body["total_rows"] == 3
     end)
+
     assert Couch.get("/#{db_name}").body["doc_count"] == 8
 
     # Test reduce function
@@ -166,9 +170,11 @@ defmodule BasicsTest do
     # Delete doc and test for updated view results
     doc0 = Couch.get("/#{db_name}/0").body
     assert Couch.delete("/#{db_name}/0?rev=#{doc0["_rev"]}").body["ok"]
+
     retry_until(fn ->
       Couch.get("/#{db_name}/_design/foo/_view/baz").body["total_rows"] == 2
     end)
+
     assert Couch.get("/#{db_name}").body["doc_count"] == 7
     assert Couch.get("/#{db_name}/0").status_code == 404
     refute Couch.get("/#{db_name}/0?rev=#{doc0["_rev"]}").status_code == 404
@@ -177,7 +183,7 @@ defmodule BasicsTest do
   @tag :with_db
   test "POST doc response has a Location header", context do
     db_name = context[:db_name]
-    resp = Couch.post("/#{db_name}", [body: %{:foo => :bar}])
+    resp = Couch.post("/#{db_name}", body: %{:foo => :bar})
     assert resp.body["ok"]
     loc = resp.headers["Location"]
     assert loc, "should have a Location header"
@@ -189,7 +195,7 @@ defmodule BasicsTest do
   @tag :with_db
   test "POST doc with an _id field isn't overwritten by uuid", context do
     db_name = context[:db_name]
-    resp = Couch.post("/#{db_name}", [body: %{:_id => "oppossum", :yar => "matey"}])
+    resp = Couch.post("/#{db_name}", body: %{:_id => "oppossum", :yar => "matey"})
     assert resp.body["ok"]
     assert resp.body["id"] == "oppossum"
     assert Couch.get("/#{db_name}/oppossum").body["yar"] == "matey"
@@ -199,7 +205,7 @@ defmodule BasicsTest do
   @tag :with_db
   test "PUT doc has a Location header", context do
     db_name = context[:db_name]
-    resp = Couch.put("/#{db_name}/newdoc", [body: %{:a => 1}])
+    resp = Couch.put("/#{db_name}/newdoc", body: %{:a => 1})
     assert String.ends_with?(resp.headers["location"], "/#{db_name}/newdoc")
     # TODO: make protocol check use defined protocol value
     assert String.starts_with?(resp.headers["location"], "http")
@@ -214,6 +220,7 @@ defmodule BasicsTest do
   @tag :with_db
   test "Check for invalid document members", context do
     db_name = context[:db_name]
+
     bad_docs = [
       {:goldfish, %{:_zing => 4}},
       {:zebrafish, %{:_zoom => "hello"}},
@@ -222,11 +229,11 @@ defmodule BasicsTest do
     ]
 
     Enum.each(bad_docs, fn {id, doc} ->
-      resp = Couch.put("/#{db_name}/#{id}", [body: doc])
+      resp = Couch.put("/#{db_name}/#{id}", body: doc)
       assert resp.status_code == 400
       assert resp.body["error"] == "doc_validation"
 
-      resp = Couch.post("/#{db_name}", [body: doc])
+      resp = Couch.post("/#{db_name}", body: doc)
       assert resp.status_code == 400
       assert resp.body["error"] == "doc_validation"
     end)
@@ -235,7 +242,7 @@ defmodule BasicsTest do
   @tag :with_db
   test "PUT error when body not an object", context do
     db_name = context[:db_name]
-    resp = Couch.put("/#{db_name}/bar", [body: "[]"])
+    resp = Couch.put("/#{db_name}/bar", body: "[]")
     assert resp.status_code == 400
     assert resp.body["error"] == "bad_request"
     assert resp.body["reason"] == "Document must be a JSON object"
@@ -244,7 +251,7 @@ defmodule BasicsTest do
   @tag :with_db
   test "_bulk_docs POST error when body not an object", context do
     db_name = context[:db_name]
-    resp = Couch.post("/#{db_name}/_bulk_docs", [body: "[]"])
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: "[]")
     assert resp.status_code == 400
     assert resp.body["error"] == "bad_request"
     assert resp.body["reason"] == "Request body must be a JSON object"
@@ -253,12 +260,12 @@ defmodule BasicsTest do
   @tag :with_db
   test "_all_docs POST error when multi-get is not a {'key': [...]} structure", context do
     db_name = context[:db_name]
-    resp = Couch.post("/#{db_name}/_all_docs", [body: "[]"])
+    resp = Couch.post("/#{db_name}/_all_docs", body: "[]")
     assert resp.status_code == 400
     assert resp.body["error"] == "bad_request"
     assert resp.body["reason"] == "Request body must be a JSON object"
 
-    resp = Couch.post("/#{db_name}/_all_docs", [body: %{:keys => 1}])
+    resp = Couch.post("/#{db_name}/_all_docs", body: %{:keys => 1})
     assert resp.status_code == 400
     assert resp.body["error"] == "bad_request"
     assert resp.body["reason"] == "`keys` body member must be an array."
@@ -270,7 +277,9 @@ defmodule BasicsTest do
     resp = Couch.delete("/#{db_name}/?rev=foobarbaz")
     assert resp.status_code == 400, "should return a bad request"
     assert resp.body["error"] == "bad_request"
-    assert resp.body["reason"] == "You tried to DELETE a database with a ?=rev parameter. Did you mean to DELETE a document instead?"
+
+    assert resp.body["reason"] ==
+             "You tried to DELETE a database with a ?=rev parameter. Did you mean to DELETE a document instead?"
   end
 
   @tag :pending

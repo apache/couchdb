@@ -11,11 +11,12 @@ defmodule RewriteTest do
   Enum.each(["test_rewrite_suite_db", "test_rewrite_suite_db%2Fwith_slashes"], fn db_name ->
     @tag with_random_db: db_name
     @tag config: [
-      {"httpd", "authentication_handlers", "{couch_httpd_auth, special_test_authentication_handler}"},
-      {"httpd", "WWW-Authenticate", "X-Couch-Test-Auth"}
-    ]
+           {"httpd", "authentication_handlers", "{couch_httpd_auth, special_test_authentication_handler}"},
+           {"httpd", "WWW-Authenticate", "X-Couch-Test-Auth"}
+         ]
     test "Test basic rewrites on #{db_name}", context do
       db_name = context[:db_name]
+
       ddoc = ~S"""
       {
         "_id": "_design/test",
@@ -261,9 +262,11 @@ defmodule RewriteTest do
         }
       }
       """
+
       ddoc = String.replace(ddoc, ~r/[\r\n]+/, "")
 
       docs1 = make_docs(0..9)
+
       docs2 = [
         %{"a" => 1, "b" => 1, "string" => "doc 1", "type" => "complex"},
         %{"a" => 1, "b" => 2, "string" => "doc 2", "type" => "complex"},
@@ -272,9 +275,9 @@ defmodule RewriteTest do
         %{"a" => %{"c" => 1}, "b" => "", "string" => "doc 5", "type" => "complex"}
       ]
 
-      assert Couch.put("/#{db_name}/_design/test", [body: ddoc]).body["ok"]
-      assert Couch.post("/#{db_name}/_bulk_docs", [body: %{:docs => docs1}, query: %{w: 3}]).status_code == 201
-      assert Couch.post("/#{db_name}/_bulk_docs", [body: %{:docs => docs2}, query: %{w: 3}]).status_code == 201
+      assert Couch.put("/#{db_name}/_design/test", body: ddoc).body["ok"]
+      assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs1}, query: %{w: 3}).status_code == 201
+      assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs2}, query: %{w: 3}).status_code == 201
 
       # Test simple rewriting
       resp = Couch.get("/#{db_name}/_design/test/_rewrite/foo")
@@ -286,7 +289,7 @@ defmodule RewriteTest do
       assert resp.headers["Content-Type"] == "text/plain"
 
       # Test POST, hello update world
-      resp = Couch.post("/#{db_name}", [body: %{"word" => "plankton", "name" => "Rusty"}]).body
+      resp = Couch.post("/#{db_name}", body: %{"word" => "plankton", "name" => "Rusty"}).body
       assert resp["ok"]
       doc_id = resp["id"]
       assert doc_id

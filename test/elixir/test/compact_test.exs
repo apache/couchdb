@@ -38,7 +38,6 @@ defmodule CompactTest do
     assert final_data_size < deleted_data_size
   end
 
-
   defp assert_attachment_available(db) do
     resp = Couch.get("/#{db}/#{@att_doc_id}/#{@att_name}")
     assert resp.body == @att_plaintext
@@ -48,36 +47,40 @@ defmodule CompactTest do
 
   defp populate(db) do
     docs = create_docs(0..19)
-    resp = Couch.post("/#{db}/_bulk_docs", [body: %{docs: docs}])
+    resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs})
     assert resp.status_code == 201
     docs = rev(docs, resp.body)
+
     doc = %{
       _id: "#{@att_doc_id}",
-      _attachments: %{
-        "#{@att_name}": %{
-          content_type: "text/plain",
-          data: Base.encode64(@att_plaintext)}}}
-    resp = Couch.put("/#{db}/#{doc._id}", [body: doc])
+      _attachments: %{"#{@att_name}": %{content_type: "text/plain", data: Base.encode64(@att_plaintext)}}
+    }
+
+    resp = Couch.put("/#{db}/#{doc._id}", body: doc)
     assert resp.status_code == 201
     docs
   end
 
   defp delete(db, docs) do
     docs = Enum.map(docs, &Map.put(&1, :_deleted, true))
-    resp = Couch.post("/#{db}/_bulk_docs", [body: %{docs: docs}])
+    resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs})
     assert resp.status_code == 201
     assert Couch.post("/#{db}/_ensure_full_commit").body["ok"] == true
   end
 
   defp compact(db) do
     assert Couch.post("/#{db}/_compact").status_code == 202
-    retry_until(fn() ->
-      Couch.get("/#{db}").body["compact_running"] == false
-    end, 200, 20_000)
+
+    retry_until(
+      fn ->
+        Couch.get("/#{db}").body["compact_running"] == false
+      end,
+      200,
+      20_000
+    )
   end
 
   defp get_info(db) do
     Couch.get("/#{db}").body
   end
-
 end

@@ -20,24 +20,25 @@ defmodule RevisionTest do
   test "multiple updates with same _rev raise conflict errors", context do
     db = context[:db_name]
     doc = context[:doc]
-    doc2 = %{doc | a: 2, b: 2} # doc and doc2 have same _rev
-    _doc = rev(doc, put(db, doc)) # doc updated with new _rev
-    assert_conflict Couch.put("/#{db}/#{doc2._id}", [body: doc2])
+    # doc and doc2 have same _rev
+    doc2 = %{doc | a: 2, b: 2}
+    # doc updated with new _rev
+    _doc = rev(doc, put(db, doc))
+    assert_conflict(Couch.put("/#{db}/#{doc2._id}", body: doc2))
 
     resp = Couch.get("/#{db}/_changes")
     assert length(resp.body["results"]) == 1
 
     doc2 = Map.delete(doc2, :_rev)
-    assert_conflict(Couch.put("/#{db}/#{doc2._id}", [body: doc2]))
+    assert_conflict(Couch.put("/#{db}/#{doc2._id}", body: doc2))
   end
 
   @tag :with_db
   test "mismatched rev in body and query string returns error", context do
     db = context[:db_name]
     doc = context[:doc]
-    resp = Couch.put("/#{db}/#{doc._id}?rev=1-foobar", [body: doc])
-    expected_reason = "Document rev from request body and query string " <>
-      "have different values"
+    resp = Couch.put("/#{db}/#{doc._id}?rev=1-foobar", body: doc)
+    expected_reason = "Document rev from request body and query string " <> "have different values"
     assert_bad_request(resp, expected_reason)
   end
 
@@ -68,19 +69,18 @@ defmodule RevisionTest do
     expected = %{
       "_id" => "doc",
       "_rev" => r3._rev,
-      "_revisions" => %{
-        "ids" => (for r <- [r3._rev, r2._rev, r1._rev], do: suffix(r)),
-        "start" => 3},
-      "val" => r2.val}
+      "_revisions" => %{"ids" => for(r <- [r3._rev, r2._rev, r1._rev], do: suffix(r)), "start" => 3},
+      "val" => r2.val
+    }
+
     assert Couch.get("/#{db}/doc?revs=true").body == expected
 
     opts = [body: %{docs: [r3, r2, r1], new_edits: false}]
     assert Couch.post("/#{db}/_bulk_docs", opts).body == []
   end
 
-
   defp put(db, doc) do
-    Couch.put("/#{db}/#{doc._id}", [body: doc]).body
+    Couch.put("/#{db}/#{doc._id}", body: doc).body
   end
 
   defp suffix(rev) do
@@ -98,5 +98,4 @@ defmodule RevisionTest do
     assert resp.body["error"] == "bad_request"
     assert resp.body["reason"] == reason
   end
-
 end
