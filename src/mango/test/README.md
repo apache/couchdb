@@ -5,10 +5,10 @@ CouchDB should be started with `./dev/run -a testuser:testpass`.
 
 To run these, do this in the Mango top level directory:
 
-    $ virtualenv --python=python3 venv
+    $ python3 -m venv venv
     $ . venv/bin/activate
     $ pip3 install -r requirements.txt
-    $ ./venv/bin/nosetests
+    $ venv/bin/nosetests
 
 To run an individual test suite:
     nosetests --nocapture test/12-use-correct-index.py 

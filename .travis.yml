@@ -1,7 +1,7 @@
 language: erlang
-sudo: false
-
 os: linux
+dist: trusty
+
 otp_release:
    - 21.1
    - 20.3
@@ -18,15 +18,13 @@ addons:
     - libicu-dev
     - libmozjs185-dev
     - pkg-config
-    - python-requests
-    - python-sphinx
-    - python-virtualenv
+    - python3
+    - python3-requests
+    - python3-sphinx
+    - python3.4-venv
 #    - sphinx-rtd-theme
     - help2man
     - shunit2
-
-python:
-  - "3.4"
 
 git:
   depth: 10

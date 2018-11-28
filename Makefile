@@ -281,10 +281,9 @@ build-test:
 # target: mango-test - Run Mango tests
 mango-test: devclean all
 	@cd src/mango && \
-		virtualenv --python=python3 venv && \
-		. ./venv/bin/activate && \
-		pip3 install -r requirements.txt
-	@cd src/mango && ../../dev/run -n 1 --admin=testuser:testpass ./venv/bin/nosetests
+		python3 -m venv venv && \
+		venv/bin/pip3 install -r requirements.txt
+	@cd src/mango && ../../dev/run -n 1 --admin=testuser:testpass venv/bin/nosetests
 
 ################################################################################
 # Developing

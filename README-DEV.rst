@@ -57,7 +57,7 @@ Debian-based (inc. Ubuntu) Systems
 ::
 
     sudo apt-get install help2man python-sphinx gnupg nodejs npm \
-         python3 python3-virtualenv
+         python3 python3-venv
 
 Gentoo-based Systems
 ~~~~~~~~~~~~~~~~~~~~
@@ -73,7 +73,7 @@ Centos 7 and RHEL 7
 ::
 
     sudo yum install help2man python-sphinx python-docutils \
-        python-pygments gnupg nodejs npm python34-virtualenv
+        python-pygments gnupg nodejs npm
 
 
 Mac OS X
