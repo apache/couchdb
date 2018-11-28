@@ -1,6 +1,8 @@
 ExUnit.configure(exclude: [pending: true])
 ExUnit.start()
 
+Code.require_file "partition_helpers.exs", __DIR__
+
 defmodule CouchTestCase do
   use ExUnit.Case
 
@@ -31,6 +33,11 @@ defmodule CouchTestCase do
             context
             |> Map.put(:db_name, random_db_name(db_name))
             |> Map.put(:with_db, true)
+          %{:with_partitioned_db => true} ->
+            context
+            |> Map.put(:db_name, random_db_name())
+            |> Map.put(:query, %{partitioned: true})
+            |> Map.put(:with_db, true)
           %{:with_db => true} ->
             Map.put(context, :db_name, random_db_name())
           %{:with_db => db_name} when is_binary(db_name) ->
@@ -40,7 +47,7 @@ defmodule CouchTestCase do
         end
 
         if Map.has_key? context, :with_db do
-          {:ok, _} = create_db(context[:db_name])
+          {:ok, _} = create_db(context[:db_name], query: context[:query])
           on_exit(fn -> delete_db(context[:db_name]) end)
         end
 
@@ -152,8 +159,8 @@ defmodule CouchTestCase do
         Map.put(user_doc, "_rev", resp.body["rev"])
       end
 
-      def create_db(db_name) do
-        resp = Couch.put("/#{db_name}")
+      def create_db(db_name, opts \\ []) do
+        resp = Couch.put("/#{db_name}", opts)
         assert resp.status_code == 201
         assert resp.body == %{"ok" => true}
         {:ok, resp}
