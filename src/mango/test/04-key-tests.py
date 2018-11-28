@@ -75,9 +75,9 @@ class KeyTests(mango.DbPerClass):
         fields = ["title", "dot\\.key", "none.dot"]
         def check(docs):
             assert len(docs) == 4
-            assert docs[1].has_key("dot.key")
+            assert "dot.key" in docs[1]
             assert docs[1]["dot.key"] == "dot's value"
-            assert docs[1].has_key("none")
+            assert "none" in docs[1]
             assert docs[1]["none"]["dot"] == "none dot's value"
         self.run_check(query, check, fields=fields)
 
@@ -86,9 +86,9 @@ class KeyTests(mango.DbPerClass):
         fields = ["title", "$key", "deep.$key"]
         def check(docs):
             assert len(docs) == 4
-            assert docs[2].has_key("$key")
+            assert "$key" in docs[2]
             assert docs[2]["$key"] == "peso"
-            assert docs[2].has_key("deep")
+            assert "deep" in docs[2]
             assert docs[2]["deep"]["$key"] == "deep peso"
         self.run_check(query, check, fields=fields)
 
@@ -98,8 +98,8 @@ class KeyTests(mango.DbPerClass):
         def check(docs):
             assert len(docs) == 4
             # note:  == \uf8ff
-            assert docs[3].has_key(u'\uf8ff')
-            assert docs[3][u'\uf8ff'] == "apple"
+            assert '\uf8ff' in docs[3]
+            assert docs[3]['\uf8ff'] == "apple"
         self.run_check(query, check, fields=fields)
 
     # The rest of these tests are only run against the text
@@ -110,7 +110,7 @@ class KeyTests(mango.DbPerClass):
         query = {"" : "apple"}
         def check(docs):
             assert len(docs) == 1
-            assert docs[0][u"\uf8ff"] == "apple"
+            assert docs[0]["\uf8ff"] == "apple"
         self.run_check(query, check, indexes=["text"])
 
     def test_internal_field_tests(self):

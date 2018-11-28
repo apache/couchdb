@@ -285,7 +285,7 @@ class BasicTextTests(mango.UserDocsTextTests):
             assert d["user_id"] in (1, 9)
 
         # Limits on boolean clauses?
-        docs = self.db.find({"age": {"$in": range(1000)}})
+        docs = self.db.find({"age": {"$in": list(range(1000))}})
         assert len(docs) == 15
 
     def test_in_with_array(self):
@@ -323,7 +323,7 @@ class BasicTextTests(mango.UserDocsTextTests):
             assert d["user_id"] not in (1, 9)
 
         # Limits on boolean clauses?
-        docs = self.db.find({"age": {"$nin": range(1000)}})
+        docs = self.db.find({"age": {"$nin": list(range(1000))}})
         assert len(docs) == 0
 
     def test_nin_with_array(self):
