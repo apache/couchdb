@@ -136,6 +136,7 @@ changes_callback(start, #cacc{feed = continuous} = Acc) ->
     {ok, Resp} = chttpd:start_delayed_json_response(Acc#cacc.mochi, 200),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback({change, Change}, #cacc{feed = continuous} = Acc) ->
+    chttpd_stats:incr_rows(),
     Data = [?JSON_ENCODE(Change) | "\n"],
     Len = iolist_size(Data),
     maybe_flush_changes_feed(Acc, Data, Len);
@@ -159,6 +160,7 @@ changes_callback(start, #cacc{feed = eventsource} = Acc) ->
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, Headers),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback({change, {ChangeProp}=Change}, #cacc{feed = eventsource} = Acc) ->
+    chttpd_stats:incr_rows(),
     Seq = proplists:get_value(seq, ChangeProp),
     Chunk = [
         "data: ", ?JSON_ENCODE(Change),
@@ -190,6 +192,7 @@ changes_callback(start, Acc) ->
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [], FirstChunk),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback({change, Change}, Acc) ->
+    chttpd_stats:incr_rows(),
     Data = [Acc#cacc.prepend, ?JSON_ENCODE(Change)],
     Len = iolist_size(Data),
     maybe_flush_changes_feed(Acc, Data, Len);
@@ -409,8 +412,12 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
         % async_batching
         spawn(fun() ->
                 case catch(fabric:update_doc(Db, Doc2, Options)) of
-                {ok, _} -> ok;
-                {accepted, _} -> ok;
+                {ok, _} ->
+                    chttpd_stats:incr_writes(),
+                    ok;
+                {accepted, _} ->
+                    chttpd_stats:incr_writes(),
+                    ok;
                 Error ->
                     couch_log:debug("Batch doc error (~s): ~p",[DocId, Error])
                 end
@@ -426,8 +433,10 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
             $/, couch_util:url_encode(DocId)]),
         case fabric:update_doc(Db, Doc2, Options) of
         {ok, NewRev} ->
+            chttpd_stats:incr_writes(),
             HttpCode = 201;
         {accepted, NewRev} ->
+            chttpd_stats:incr_writes(),
             HttpCode = 202
         end,
         send_json(Req, HttpCode, [{"Location", DocUrl}], {[
@@ -500,11 +509,13 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         case fabric:update_docs(Db, Docs, Options2) of
         {ok, Results} ->
             % output the results
+            chttpd_stats:incr_writes(length(Results)),
             DocResults = lists:zipwith(fun update_doc_result_to_json/2,
                 Docs, Results),
             send_json(Req, 201, DocResults);
         {accepted, Results} ->
             % output the results
+            chttpd_stats:incr_writes(length(Results)),
             DocResults = lists:zipwith(fun update_doc_result_to_json/2,
                 Docs, Results),
             send_json(Req, 202, DocResults);
@@ -516,9 +527,11 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     false ->
         case fabric:update_docs(Db, Docs, [replicated_changes|Options]) of
         {ok, Errors} ->
+            chttpd_stats:incr_writes(length(Docs)),
             ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
             send_json(Req, 201, ErrorsJson);
         {accepted, Errors} ->
+            chttpd_stats:incr_writes(length(Docs)),
             ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
             send_json(Req, 202, ErrorsJson)
         end;
@@ -627,8 +640,12 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
     end,
     couch_stats:increment_counter([couchdb, document_purges, total], length(IdsRevs2)),
     Results2 = case fabric:purge_docs(Db, IdsRevs2, Options) of
-        {ok, Results} -> Results;
-        {accepted, Results} -> Results
+        {ok, Results} ->
+            chttpd_stats:incr_writes(length(Results)),
+            Results;
+        {accepted, Results} ->
+            chttpd_stats:incr_writes(length(Results)),
+            Results
     end,
     {Code, Json} = purge_results_to_json(IdsRevs2, Results2),
     send_json(Req, Code, {[{<<"purge_seq">>, null}, {<<"purged">>, {Json}}]});
@@ -814,7 +831,7 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     VAcc1 = VAcc0#vacc{resp=Resp0},
     VAcc2 = lists:foldl(fun(Args, Acc0) ->
         {ok, Acc1} = fabric:all_docs(Db, Options,
-            fun couch_mrview_http:view_cb/2, Acc0, Args),
+            fun view_cb/2, Acc0, Args),
         Acc1
     end, VAcc1, ArgQueries),
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
@@ -828,8 +845,19 @@ all_docs_view(Req, Db, Keys, OP) ->
     Options = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
-    {ok, Resp} = fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc, Args3),
+    {ok, Resp} = fabric:all_docs(Db, Options, fun view_cb/2, VAcc, Args3),
     {ok, Resp#vacc.resp}.
+
+view_cb({row, Row} = Msg, Acc) ->
+    case lists:keymember(doc, 1, Row) of
+        true -> chttpd_stats:incr_reads();
+        false -> ok
+    end,
+    chttpd_stats:incr_rows(),
+    couch_mrview_http:view_cb(Msg, Acc);
+
+view_cb(Msg, Acc) ->
+    couch_mrview_http:view_cb(Msg, Acc).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
@@ -865,6 +893,7 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
             {ok, []} when Revs == all ->
                 chttpd:send_error(Req, {not_found, missing});
             {ok, Results} ->
+                chttpd_stats:incr_reads(length(Results)),
                 case MochiReq:accepts_content_type("multipart/mixed") of
                 false ->
                     {ok, Resp} = start_json_response(Req, 200),
@@ -912,8 +941,11 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     false ->
         Rev = couch_doc:parse_rev(list_to_binary(couch_util:get_value("_rev", Form))),
         Doc = case fabric:open_revs(Db, DocId, [Rev], []) of
-            {ok, [{ok, Doc0}]} -> Doc0;
-            {error, Error} -> throw(Error)
+            {ok, [{ok, Doc0}]} ->
+                chttpd_stats:incr_reads(),
+                Doc0;
+            {error, Error} ->
+                throw(Error)
         end
     end,
     UpdatedAtts = [
@@ -939,8 +971,10 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     },
     case fabric:update_doc(Db, NewDoc, Options) of
     {ok, NewRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 201;
     {accepted, NewRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 202
     end,
     send_json(Req, HttpCode, [{"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
@@ -986,8 +1020,12 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
 
             spawn(fun() ->
                     case catch(fabric:update_doc(Db, Doc, Options)) of
-                    {ok, _} -> ok;
-                    {accepted, _} -> ok;
+                    {ok, _} ->
+                        chttpd_stats:incr_writes(),
+                        ok;
+                    {accepted, _} ->
+                        chttpd_stats:incr_writes(),
+                        ok;
                     Error ->
                         couch_log:notice("Batch doc error (~s): ~p",[DocId, Error])
                     end
@@ -1018,8 +1056,10 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     case fabric:update_doc(Db,
         Doc#doc{id=TargetDocId, revs=TargetRevs}, [{user_ctx,Ctx}]) of
     {ok, NewTargetRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 201;
     {accepted, NewTargetRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 202
     end,
     % respond
@@ -1322,6 +1362,7 @@ couch_doc_open(Db, DocId, Rev, Options0) ->
     nil -> % open most recent rev
         case fabric:open_doc(Db, DocId, Options) of
         {ok, Doc} ->
+            chttpd_stats:incr_reads(),
             Doc;
          Error ->
              throw(Error)
@@ -1329,6 +1370,7 @@ couch_doc_open(Db, DocId, Rev, Options0) ->
     _ -> % open a specific rev (deletions come back as stubs)
         case fabric:open_revs(Db, DocId, [Rev], Options) of
         {ok, [{ok, Doc}]} ->
+            chttpd_stats:incr_reads(),
             Doc;
         {ok, [{{not_found, missing}, Rev}]} ->
             throw(not_found);
@@ -1503,9 +1545,13 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
             #doc{id=DocId};
         Rev ->
             case fabric:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
-            {ok, [{ok, Doc0}]}  -> Doc0;
-            {ok, [Error]}       -> throw(Error);
-            {error, Error}      -> throw(Error)
+            {ok, [{ok, Doc0}]} ->
+                chttpd_stats:incr_reads(),
+                Doc0;
+            {ok, [Error]} ->
+                throw(Error);
+            {error, Error} ->
+                throw(Error)
             end
     end,
 
@@ -1516,8 +1562,10 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     case fabric:update_doc(Db, DocEdited, [{user_ctx,Ctx}, {w,W}]) of
     {ok, UpdatedRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 201;
     {accepted, UpdatedRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 202
     end,
     erlang:put(mochiweb_request_recv, true),
@@ -1913,8 +1961,11 @@ bulk_get_open_doc_revs1(Db, Props, _, {DocId, Revs, Options}) ->
             RevStr = couch_util:get_value(<<"rev">>, Props),
             Error = {RevStr, <<"not_found">>, <<"missing">>},
             {DocId, {error, Error}, Options};
-        Results ->
-            {DocId, Results, Options}
+        {ok, Resps} = Results ->
+            chttpd_stats:incr_reads(length(Resps)),
+            {DocId, Results, Options};
+        Else ->
+            {DocId, Else, Options}
     end.
 
 
