@@ -129,7 +129,13 @@ defmodule SecurityValidationTest do
     ddoc = @ddoc |> Map.put(:_rev, new_rev) |> Map.put(:foo, "bar")
     headers = @auth_headers[:tom]
     # attempt to save doc in replication context, eg ?new_edits=false
-    resp = Couch.put("/#{db_name}/#{ddoc[:_id]}", body: ddoc, headers: headers, query: %{new_edits: false})
+    resp =
+      Couch.put("/#{db_name}/#{ddoc[:_id]}",
+        body: ddoc,
+        headers: headers,
+        query: %{new_edits: false}
+      )
+
     assert resp.status_code == 403
     assert resp.body["error"] == "forbidden"
   end
@@ -158,7 +164,10 @@ defmodule SecurityValidationTest do
     assert resp.body["reason"] == "Documents must have an author field"
 
     # Jerry can write the document
-    assert Couch.put("/#{db_name}/test_doc", body: %{foo: 1, author: "jerry"}, headers: jerry).body["ok"]
+    assert Couch.put("/#{db_name}/test_doc",
+             body: %{foo: 1, author: "jerry"},
+             headers: jerry
+           ).body["ok"]
 
     test_doc = Couch.get("/#{db_name}/test_doc").body
 
@@ -168,7 +177,9 @@ defmodule SecurityValidationTest do
     assert resp.body["error"] == "forbidden"
 
     # Enable admin override for changing author values
-    assert Couch.put("/#{db_name}/_security", body: %{sec_obj | admin_override: true}).body["ok"]
+    assert Couch.put("/#{db_name}/_security", body: %{sec_obj | admin_override: true}).body[
+             "ok"
+           ]
 
     # Change owner to Tom
     test_doc = Map.put(test_doc, "author", "tom")
@@ -222,7 +233,9 @@ end
 #
 #
 #      // now all or nothing with a failure - no more available on cluster
-# /*      var docs = [{_id:"booboo",author:"Damien Katz",foo:"bar"},{_id:"foofoo",foo:"baz"}];
+# /*      var docs = [
+#           {_id:"booboo",author:"Damien Katz",foo:"bar"},{_id:"foofoo",foo:"baz"}
+#         ];
 #
 #      // Create the docs
 #      var results = db.bulkSave(docs, {all_or_nothing:true});
@@ -239,7 +252,8 @@ end
 #      adminDbB = new CouchDB("" + db_name + "_b", {"X-Couch-Full-Commit":"false"});
 #      var dbA = new CouchDB("" + db_name + "_a", AuthHeaders);
 #      var dbB = new CouchDB("" + db_name + "_b", AuthHeaders);
-#      // looping does not really add value as the scenario is the same anyway (there's nothing 2 be gained from it)
+#      // looping does not really add value as the scenario is the same anyway
+#      // (there's nothing 2 be gained from it)
 #      var A = CouchDB.protocol + CouchDB.host + "/" + db_name + "_a";
 #      var B = CouchDB.protocol + CouchDB.host + "/" + db_name + "_b";
 #
@@ -287,7 +301,8 @@ end
 #      foo2.value = "b";
 #      T(dbB.save(foo2).ok);
 #
-#      var results = CouchDB.replicate({"url": B, "headers": AuthHeaders}, {"url": A, "headers": AuthHeaders}, {headers:AuthHeaders});
+#      var results = CouchDB.replicate({"url": B, "headers": AuthHeaders},
+#         {"url": A, "headers": AuthHeaders}, {headers:AuthHeaders});
 #      T(results.ok);
 #      TEquals(1, results.history[0].docs_written);
 #      TEquals(2, results.history[0].doc_write_failures);

@@ -36,7 +36,8 @@ defmodule BasicsTest do
   end
 
   @tag :with_db_name
-  test "Creating a new DB with slashes should return Location header (COUCHDB-411)", context do
+  test "Creating a new DB with slashes should return Location header (COUCHDB-411)",
+       context do
     db_name = context[:db_name] <> "%2Fwith_slashes"
     {:ok, resp} = create_db(db_name)
     msg = "Should return Location header for new db"
@@ -47,7 +48,9 @@ defmodule BasicsTest do
   @tag :with_db
   test "Created database has appropriate db info name", context do
     db_name = context[:db_name]
-    assert Couch.get("/#{db_name}").body["db_name"] == db_name, "Get correct database name"
+
+    assert Couch.get("/#{db_name}").body["db_name"] == db_name,
+           "Get correct database name"
   end
 
   @tag :with_db
@@ -57,7 +60,8 @@ defmodule BasicsTest do
 
   @tag :with_db
   test "Empty database should have zero docs", context do
-    assert Couch.get("/#{context[:db_name]}").body["doc_count"] == 0, "Empty doc count in empty db"
+    assert Couch.get("/#{context[:db_name]}").body["doc_count"] == 0,
+           "Empty doc count in empty db"
   end
 
   @tag :with_db
@@ -284,7 +288,8 @@ defmodule BasicsTest do
 
   @tag :pending
   @tag :with_db
-  test "On restart, a request for creating an already existing db can not override", _context do
+  test "On restart, a request for creating an already existing db can not override",
+       _context do
     # TODO
     assert true
   end

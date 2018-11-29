@@ -38,7 +38,10 @@ defmodule RevisionTest do
     db = context[:db_name]
     doc = context[:doc]
     resp = Couch.put("/#{db}/#{doc._id}?rev=1-foobar", body: doc)
-    expected_reason = "Document rev from request body and query string " <> "have different values"
+
+    expected_reason =
+      "Document rev from request body and query string " <> "have different values"
+
     assert_bad_request(resp, expected_reason)
   end
 
@@ -69,7 +72,10 @@ defmodule RevisionTest do
     expected = %{
       "_id" => "doc",
       "_rev" => r3._rev,
-      "_revisions" => %{"ids" => for(r <- [r3._rev, r2._rev, r1._rev], do: suffix(r)), "start" => 3},
+      "_revisions" => %{
+        "ids" => for(r <- [r3._rev, r2._rev, r1._rev], do: suffix(r)),
+        "start" => 3
+      },
       "val" => r2.val
     }
 
