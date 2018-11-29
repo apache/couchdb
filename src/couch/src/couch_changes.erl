@@ -24,7 +24,9 @@
     filter/3,
     handle_db_event/3,
     handle_view_event/3,
-    view_filter/3
+    view_filter/3,
+    send_changes_doc_ids/6,
+    send_changes_design_docs/6
 ]).
 
 -export([changes_enumerator/2]).
@@ -627,7 +629,14 @@ send_lookup_changes(FullDocInfos, StartSeq, Dir, Db, Fun, Acc0) ->
         {stop, Acc} -> Acc
     end,
     case Dir of
-        fwd -> {ok, FinalAcc#changes_acc{seq = couch_db:get_update_seq(Db)}};
+        fwd ->
+            FinalAcc0 = case element(1, FinalAcc) of
+                changes_acc -> % we came here via couch_http or internal call
+                    FinalAcc#changes_acc{seq = couch_db:get_update_seq(Db)};
+                fabric_changes_acc -> % we came here via chttpd / fabric / rexi
+                    FinalAcc#fabric_changes_acc{seq = couch_db:get_update_seq(Db)}
+            end,
+            {ok, FinalAcc0};
         rev -> {ok, FinalAcc}
     end.
 

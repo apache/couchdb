@@ -203,6 +203,14 @@
     atts = []
 }).
 
+-record (fabric_changes_acc, {
+    db,
+    seq,
+    args,
+    options,
+    pending,
+    epochs
+}).
 
 -type doc() :: #doc{}.
 -type ddoc() :: #doc{}.
