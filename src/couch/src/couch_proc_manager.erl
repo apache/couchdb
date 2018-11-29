@@ -43,6 +43,7 @@
 -define(PROCS, couch_proc_manager_procs).
 -define(WAITERS, couch_proc_manager_waiters).
 -define(OPENING, couch_proc_manager_opening).
+-define(SERVERS, couch_proc_manager_servers).
 -define(RELISTEN_DELAY, 5000).
 
 -record(state, {
@@ -104,6 +105,11 @@ init([]) ->
     ets:new(?PROCS, TableOpts ++ [{keypos, #proc_int.pid}]),
     ets:new(?WAITERS, TableOpts ++ [{keypos, #client.timestamp}]),
     ets:new(?OPENING, [public, named_table, set]),
+    ets:new(?SERVERS, [public, named_table, set]),
+    ets:insert(?SERVERS, get_servers_from_env("COUCHDB_QUERY_SERVER_")),
+    ets:insert(?SERVERS, get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_")),
+    ets:insert(?SERVERS, [{"QUERY", {mango_native_proc, start_link, []}}]),
+    maybe_configure_erlang_native_servers(),
 
     {ok, #state{
         config = get_proc_config(),
@@ -207,6 +213,7 @@ handle_cast(reload_config, State) ->
         hard_limit = get_hard_limit(),
         soft_limit = get_soft_limit()
     },
+    maybe_configure_erlang_native_servers(),
     {noreply, flush_waiters(NewState)};
 
 handle_cast(_Msg, State) ->
@@ -267,6 +274,9 @@ handle_config_terminate(_Server, _Reason, _State) ->
     gen_server:cast(?MODULE, reload_config),
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
+handle_config_change("native_query_servers", _, _, _, _) ->
+    gen_server:cast(?MODULE, reload_config),
+    {ok, undefined};
 handle_config_change("query_server_config", _, _, _, _) ->
     gen_server:cast(?MODULE, reload_config),
     {ok, undefined};
@@ -372,23 +382,36 @@ new_proc(Client) ->
     end,
     exit(Resp).
 
-get_env_for_spec(Spec, Target) ->
-    % loop over os:getenv(), match SPEC_TARGET
-    lists:filtermap(fun(VarName) ->
-        SpecStr = Spec ++ Target,
-        case string:tokens(VarName, "=") of
-            [SpecStr, Cmd] -> {true, Cmd};
-            _Else -> false
+split_string_if_longer(String, Pos) ->
+    case length(String) > Pos of
+        true -> lists:split(Pos, String);
+        false -> false
+    end.
+
+split_by_char(String, Char) ->
+    %% 17.5 doesn't have string:split
+    %% the function doesn't handle errors
+    %% it is designed to be used only in specific context
+    Pos = string:chr(String, Char),
+    {Key, [_Eq | Value]} = lists:split(Pos - 1, String),
+    {Key, Value}.
+
+get_servers_from_env(Spec) ->
+    SpecLen = length(Spec),
+    % loop over os:getenv(), match SPEC_
+    lists:filtermap(fun(EnvStr) ->
+        case split_string_if_longer(EnvStr, SpecLen) of
+            {Spec, Rest} ->
+                {true, split_by_char(Rest, $=)};
+            _ ->
+                false
         end
     end, os:getenv()).
 
 get_query_server(LangStr) ->
-    % look for COUCH_QUERY_SERVER_LANGSTR in env
-    % if exists, return value, else undefined
-    UpperLangString = string:to_upper(LangStr),
-    case get_env_for_spec("COUCHDB_QUERY_SERVER_", UpperLangString) of
-        [] -> undefined;
-        [Command] -> Command
+    case ets:lookup(?SERVERS, string:to_upper(LangStr)) of
+        [{_, Command}] -> Command;
+        _ -> undefined
     end.
 
 native_query_server_enabled() ->
@@ -397,36 +420,25 @@ native_query_server_enabled() ->
     NativeEnabled = config:get_boolean("native_query_servers", "enable_erlang_query_server", false),
     NativeLegacyConfig = config:get("native_query_servers", "erlang", ""),
     NativeLegacyEnabled = NativeLegacyConfig =:= "{couch_native_process, start_link, []}",
-
     NativeEnabled orelse NativeLegacyEnabled.
 
-get_native_query_server("query") -> % mango query server
-    "{mango_native_proc, start_link, []}";
-get_native_query_server("erlang") -> % erlang query server
+maybe_configure_erlang_native_servers() ->
     case native_query_server_enabled() of
-        true -> "{couch_native_process, start_link, []}";
-        _Else -> undefined
-    end;
-get_native_query_server(LangStr) ->
-    % same as above, but COUCH_NATIVE_QUERY_SERVER_LANGSTR
-    UpperLangString = string:uppercase(LangStr),
-    case get_env_for_spec("COUCHDB_NATIVE_QUERY_SERVER_", UpperLangString) of
-        [] -> undefined;
-        [Command] -> Command
+        true ->
+           ets:insert(?SERVERS, [
+               {"ERLANG", {couch_native_process, start_link, []}}]);
+        _Else ->
+           ok
     end.
 
 new_proc_int(From, Lang) when is_binary(Lang) ->
     LangStr = binary_to_list(Lang),
     case get_query_server(LangStr) of
     undefined ->
-        case get_native_query_server(LangStr) of
-        undefined ->
-            gen_server:reply(From, {unknown_query_language, Lang});
-        SpecStr ->
-            {ok, {M,F,A}} = couch_util:parse_term(SpecStr),
-            {ok, Pid} = apply(M, F, A),
-            make_proc(Pid, Lang, M)
-        end;
+        gen_server:reply(From, {unknown_query_language, Lang});
+    {M, F, A} ->
+        {ok, Pid} = apply(M, F, A),
+        make_proc(Pid, Lang, M);
     Command ->
         {ok, Pid} = couch_os_process:start_link(Command),
         make_proc(Pid, Lang, couch_os_process)
