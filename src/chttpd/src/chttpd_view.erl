@@ -33,7 +33,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     VAcc1 = VAcc0#vacc{resp=Resp0},
     VAcc2 = lists:foldl(fun(Args, Acc0) ->
         {ok, Acc1} = fabric:query_view(Db, Options, DDoc, ViewName,
-            fun couch_mrview_http:view_cb/2, Acc0, Args),
+            fun view_cb/2, Acc0, Args),
         Acc1
     end, VAcc1, ArgQueries),
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
@@ -46,8 +46,21 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = fabric:query_view(Db, Options, DDoc, ViewName,
-        fun couch_mrview_http:view_cb/2, VAcc, Args),
+            fun view_cb/2, VAcc, Args),
     {ok, Resp#vacc.resp}.
+
+
+view_cb({row, Row} = Msg, Acc) ->
+    case lists:keymember(doc, 1, Row) of
+        true -> chttpd_stats:incr_reads();
+        false -> ok
+    end,
+    chttpd_stats:incr_rows(),
+    couch_mrview_http:view_cb(Msg, Acc);
+
+view_cb(Msg, Acc) ->
+    couch_mrview_http:view_cb(Msg, Acc).
+
 
 handle_view_req(#httpd{method='POST',
     path_parts=[_, _, _, _, ViewName, <<"queries">>]}=Req, Db, DDoc) ->

@@ -265,6 +265,7 @@ handle_request_int(MochiReq) ->
 
 before_request(HttpReq) ->
     try
+        chttpd_stats:init(),
         chttpd_plugin:before_request(HttpReq)
     catch Tag:Error ->
         {error, catch_error(HttpReq, Tag, Error)}
@@ -280,6 +281,7 @@ after_request(HttpReq, HttpResp0) ->
             {ok, HttpResp0#httpd_resp{status = aborted}}
         end,
     HttpResp2 = update_stats(HttpReq, HttpResp1),
+    chttpd_stats:report(HttpReq, HttpResp2),
     maybe_log(HttpReq, HttpResp2),
     HttpResp2.
 
