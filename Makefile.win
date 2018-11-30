@@ -144,8 +144,7 @@ just-eunit:
 
 
 .PHONY: elixir
-elixir: elixir-check-formatted
-	@del /s/q dev\lib 2> nul
+elixir: elixir-check-formatted devclean
 	@dev\run -a adm:pass --no-eval test\elixir\run.cmd
 
 .PHONY: elixir-check-formatted
