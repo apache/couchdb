@@ -295,4 +295,12 @@ defmodule PartitionCrudTest do
     %{:body => %{"reason" => reason}} = resp
     assert Regex.match?(~r/Cannot partition a system database/, reason)
   end
+
+  test "can create unpartitioned system db", _context do
+    Couch.delete("/_replicator")
+
+    resp = Couch.put("/_replicator")
+    assert resp.status_code == 201
+    assert resp.body == %{"ok" => true}
+  end
 end
