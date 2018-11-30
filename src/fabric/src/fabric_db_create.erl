@@ -23,8 +23,7 @@
 go(DbName, Options) ->
     case validate_dbname(DbName, Options) of
     ok ->
-        is_partitioned(Options) andalso
-            couch_partition:validate_dbname(DbName),
+        couch_partition:maybe_validate_dbname(DbName, Options),
         case db_exists(DbName) of
         true ->
             {error, file_exists};
@@ -55,14 +54,6 @@ validate_dbname(DbName, Options) ->
         ok;
     true ->
         couch_db:validate_dbname(DbName)
-    end.
-
-is_partitioned(Options) ->
-    case proplists:get_value(props, Options) of
-        Props when is_list(Props) ->
-            proplists:get_value(partitioned, Props, false);
-        _ ->
-            false
     end.
 
 generate_shard_map(DbName, Options) ->

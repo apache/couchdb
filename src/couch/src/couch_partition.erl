@@ -18,6 +18,7 @@
     from_docid/1,
     is_member/2,
 
+    maybe_validate_dbname/2,
     validate_dbname/1,
     validate_docid/1,
     validate_partition/1,
@@ -54,6 +55,19 @@ is_member(DocId, Partition) ->
     case extract(DocId) of
         {Partition, _} ->
             true;
+        _ ->
+            false
+    end.
+
+
+maybe_validate_dbname(DbName, Options) ->
+    is_partitioned(Options) andalso validate_dbname(DbName).
+
+
+is_partitioned(Options) ->
+    case couch_util:get_value(props, Options) of
+        Props when is_list(Props) ->
+            couch_util:get_value(partitioned, Props, false);
         _ ->
             false
     end.
