@@ -172,8 +172,7 @@ soak-eunit: couch
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
 .PHONY: elixir
-elixir: elixir-check-formatted
-	@rm -rf dev/lib
+elixir: elixir-check-formatted devclean
 	@dev/run -a adm:pass --no-eval test/elixir/run
 
 .PHONY: elixir-check-formatted
