@@ -19,7 +19,8 @@
     execute/3,
     maybe_filter_indexes_by_ddoc/2,
     remove_indexes_with_partial_filter_selector/1,
-    maybe_add_warning/3
+    maybe_add_warning/3,
+    maybe_noop_range/2
 ]).
 
 
@@ -186,6 +187,22 @@ maybe_add_warning_int(Warning, UserFun, UserAcc) ->
     Arg = {add_key, warning, Warning},
     {_Go, UserAcc0} = UserFun(Arg, UserAcc),
     UserAcc0.
+
+% When there is an empty array for certain operators, we don't actually
+% want to execute the query so we deny it by making the range [empty].
+% To clarify, we don't want this query to execute: {"$or": []}. Results should
+% be empty. We do want this query to execute: {"age": 22, "$or": []}. It should
+% return the same results as {"age": 22}
+maybe_noop_range({[{Op, []}]}, IndexRanges) ->
+    Noops = [<<"$all">>, <<"$and">>, <<"$or">>, <<"$in">>],
+    case lists:member(Op, Noops) of
+        true ->
+            [empty];
+        false ->
+            IndexRanges
+    end;
+maybe_noop_range(_, IndexRanges) ->
+    IndexRanges.
 
 
 fmt(Format, Args) ->
