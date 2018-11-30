@@ -326,7 +326,7 @@ clean:
 	-@del /f/q/s src\*.dll
 	-@del /f/q src\couch\priv\*.exe
 	-@del /f/q share\server\main.js share\server\main-coffee.js
-	-@rmdir /s/q tmp 
+	-@rmdir /s/q tmp
 	-@rmdir /s/q dev\data
 	-@rmdir /s/q dev\lib
 	-@rmdir /s/q dev\logs
