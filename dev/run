@@ -163,7 +163,6 @@ def setup_context(opts, args):
 
 @log('Setup environment')
 def setup_dirs(ctx):
-    ensure_dir_exists(ctx['devdir'], 'data')
     ensure_dir_exists(ctx['devdir'], 'logs')
 
 
