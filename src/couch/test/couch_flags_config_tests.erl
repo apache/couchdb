@@ -4,7 +4,28 @@
 %% value copied from couch_flags_config
 -define(MAX_FLAG_NAME_LENGTH, 256).
 
-all_combinations_return_same_result_test_() ->
+setup() ->
+    meck:new(couch_log),
+    meck:expect(couch_log, error, ['_', '_'], meck:val(ok)),
+    ok.
+
+teardown(_) ->
+    meck:unload().
+
+couch_flags_config_test_() ->
+    {
+        "test couch_flags_config",
+        {
+            setup, fun setup/0, fun teardown/1,
+            all_combinations_return_same_result()
+                ++ latest_overide_wins()
+                ++ [
+                    {"rules_are_sorted", fun rules_are_sorted/0}
+                ]
+        }
+    }.
+
+all_combinations_return_same_result() ->
     Config = [
          {"foo, bar||*", "true"},
          {"baz, qux||*", "false"},
@@ -23,7 +44,7 @@ all_combinations_return_same_result_test_() ->
     [{test_id(Items), ?_assertEqual(Expected, couch_flags_config:data(Items))}
         || Items <- Combinations].
 
-rules_are_sorted_test() ->
+rules_are_sorted() ->
     Expected = [
         {{<<"shards/test/exact">>},{<<"shards/test/exact">>, 17, [baz,flag_bar,flag_foo]}},
         {{<<"shards/test/blacklist*">>},{<<"shards/test/blacklist*">>,22,[flag_foo]}},
@@ -34,7 +55,7 @@ rules_are_sorted_test() ->
     ],
     ?assertEqual(Expected, couch_flags_config:data(test_config())).
 
-latest_overide_wins_test_() ->
+latest_overide_wins() ->
     Cases = [
         {[
             {"flag||*", "false"}, {"flag||a*", "true"},
