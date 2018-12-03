@@ -251,6 +251,16 @@ class OperatorTests:
             })
         user_ids = [12,13,14]
         self.assertUserIds(user_ids, docs)
+
+    def test_ne_returns_correct_docs(self):
+        selector = {
+            "twitter": {
+                "$ne": "@nonahorton"
+            }
+        }
+        docs = self.db.find(selector, fields=["user_id"])
+        ex = self.db.find(selector, fields=["user_id"], explain=True)
+        self.assertUserIds([0,1,9,13], docs)
         
 
 
