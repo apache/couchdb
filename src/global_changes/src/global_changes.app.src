@@ -12,7 +12,7 @@
 
 {application, global_changes, [
     {description, "_changes-like feeds for multiple DBs"},
-    {vsn, git},
+    {vsn, "2.3.0-f18d602"},{id, "f18d602"},
     {registered, [global_changes_config_listener, global_changes_server]},
     {applications, [
         kernel,

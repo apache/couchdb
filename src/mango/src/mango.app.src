@@ -12,7 +12,7 @@
 
 {application, mango, [
     {description, "MongoDB API compatibility layer for CouchDB"},
-    {vsn, git},
+    {vsn, "2.3.0-f18d602"},{id, "f18d602"},
     {registered, []},
     {applications, [
         kernel,

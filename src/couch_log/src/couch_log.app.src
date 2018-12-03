@@ -12,7 +12,7 @@
 
 {application, couch_log, [
     {description, "CouchDB Log API"},
-    {vsn, git},
+    {vsn, "2.3.0-f18d602"},{id, "f18d602"},
     {registered, [couch_log_sup]},
     {applications, [kernel, stdlib, config]},
     {mod, {couch_log_app, []}}

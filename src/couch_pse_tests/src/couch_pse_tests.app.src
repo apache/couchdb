@@ -12,7 +12,7 @@
 
 {application, couch_pse_tests, [
     {description, "Apache CouchDB Pluggable Storage Engine Test Suite"},
-    {vsn, git},
+    {vsn, "2.3.0-f18d602"},{id, "f18d602"},
     {applications, [
         kernel,
         stdlib

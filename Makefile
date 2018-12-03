@@ -45,13 +45,13 @@ IN_RC = $(shell git describe --tags --always --first-parent \
 # ON_TAG matches *ONLY* if we are on a release or RC tag
 ON_TAG = $(shell git describe --tags --always --first-parent \
         | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$' 2>/dev/null)
-# RELTAG contains the #.#.# from git describe, which might be used
-RELTAG = $(shell git describe --tags --always --first-parent \
+# REL_TAG contains the #.#.# from git describe, which might be used
+REL_TAG = $(shell git describe --tags --always --first-parent \
         | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+' 2>/dev/null)
 # DIRTY identifies if we're not on a commit
 DIRTY = $(shell git describe --dirty | grep -Eo -- '-dirty' 2>/dev/null)
 # COUCHDB_GIT_SHA is our current git hash.
-COUCHDB_GIT_SHA=$(shell git rev-parse --short --verify HEAD)
+COUCHDB_GIT_SHA=$(shell git rev-parse --short=7 --verify HEAD)
 
 ifeq ($(ON_TAG),)
 # 4. Not on a tag.
@@ -59,7 +59,7 @@ COUCHDB_VERSION_SUFFIX = $(COUCHDB_GIT_SHA)$(DIRTY)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
 else
 # 2 and 3. On a tag.
-COUCHDB_VERSION = $(RELTAG)$(DIRTY)
+COUCHDB_VERSION = $(REL_TAG)$(DIRTY)
 endif
 endif
 
@@ -67,6 +67,8 @@ endif
 comma:= ,
 empty:=
 space:= $(empty) $(empty)
+# the version string that will be replaced in all OTP apps later on
+SUB_VSN={vsn, \"${COUCHDB_VERSION}\"},{id, \"${COUCHDB_GIT_SHA}${DIRTY}\"}
 
 DESTDIR=
 
@@ -104,6 +106,17 @@ TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 # target: all - Build everything
 all: couch fauxton docs
 
+# target: derived - display all derived parameters used during build
+derived:
+	@echo "COUCHDB_GIT_SHA:        $(COUCHDB_GIT_SHA)"
+	@echo "COUCHDB_VERSION:        $(COUCHDB_VERSION)"
+	@echo "COUCHDB_VERSION_SUFFIX: $(COUCHDB_VERSION_SUFFIX)"
+	@echo "DIRTY:                  $(DIRTY)"
+	@echo "IN_RC:                  $(IN_RC)"
+	@echo "IN_RELEASE:             $(IN_RELEASE)"
+	@echo "ON_TAG:                 $(ON_TAG)"
+	@echo "REL_TAG:                $(REL_TAG)"
+	@echo "SUB_VSN:                $(SUB_VSN)"
 
 .PHONY: help
 # target: help - Print this help
@@ -121,10 +134,13 @@ help:
 
 .PHONY: couch
 # target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
-couch: config.erl
+couch: config.erl derived set_otp_vsn
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
 	@cp src/couch/priv/couchjs bin/
 
+# target: set_otp_vsn - ensure that vsn field in OTP app is set appropriately
+set_otp_vsn:
+	@sed -i '' -e "s/{vsn, git}/${SUB_VSN}/" $(shell find ./src -type f -name \*.app.src)
 
 .PHONY: docs
 # target: docs - Build documentation
@@ -384,7 +400,7 @@ introspect:
 .PHONY: dist
 # target: dist - Make release tarball
 dist: all
-	@./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
+	./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
 	@mkdir -p apache-couchdb-$(COUCHDB_VERSION)/share/docs/html

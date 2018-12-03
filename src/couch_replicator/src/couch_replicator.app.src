@@ -12,7 +12,7 @@
 
 {application, couch_replicator, [
     {description, "CouchDB replicator"},
-    {vsn, git},
+    {vsn, "2.3.0-f18d602"},{id, "f18d602"},
     {mod, {couch_replicator_app, []}},
     {registered, [
         couch_replicator_sup,

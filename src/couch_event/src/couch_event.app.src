@@ -12,7 +12,7 @@
 
 {application, couch_event, [
     {description, "Event notification system for Apache CouchDB"},
-    {vsn, git},
+    {vsn, "2.3.0-f18d602"},{id, "f18d602"},
     {registered, [
         couch_event_sup,
         couch_event_server

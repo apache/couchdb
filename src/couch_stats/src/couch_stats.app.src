@@ -12,7 +12,7 @@
 
 {application, couch_stats, [
     {description, "Simple statistics collection"},
-    {vsn, git},
+    {vsn, "2.3.0-f18d602"},{id, "f18d602"},
     {registered, [couch_stats_aggregator, couch_stats_process_tracker]},
     {applications, [kernel, stdlib, folsom]},
     {mod, {couch_stats_app, []}},
