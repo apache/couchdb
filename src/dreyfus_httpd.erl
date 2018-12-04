@@ -17,6 +17,7 @@
 
 -export([handle_search_req/3, handle_info_req/3, handle_disk_size_req/3,
          handle_cleanup_req/2, handle_analyze_req/1]).
+
 -include("dreyfus.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -import(chttpd, [send_method_not_allowed/2, send_json/2, send_json/3,
