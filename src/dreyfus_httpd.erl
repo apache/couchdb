@@ -34,7 +34,7 @@ handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
     QueryArgs = #index_query_args{
         include_docs = IncludeDocs,
         grouping = Grouping
-    } = parse_index_params(Req),
+    } = parse_index_params(Req, Db),
     validate_search_restrictions(Db, DDoc, QueryArgs),
     Response = case Grouping#grouping.by of
         nil ->
@@ -184,16 +184,22 @@ analyze(Req, Analyzer, Text) ->
             send_error(Req, Reason)
     end.
 
-parse_index_params(#httpd{method='GET'}=Req) ->
+parse_index_params(#httpd{method='GET'}=Req, Db) ->
     IndexParams = lists:flatmap(fun({K, V}) -> parse_index_param(K, V) end,
         chttpd:qs(Req)),
-    parse_index_params(IndexParams);
-parse_index_params(#httpd{method='POST'}=Req) ->
+    parse_index_params(IndexParams, Db);
+parse_index_params(#httpd{method='POST'}=Req, Db) ->
     IndexParams = lists:flatmap(fun({K, V}) -> parse_json_index_param(K, V) end,
         element(1, chttpd:json_body_obj(Req))),
-    parse_index_params(IndexParams);
-parse_index_params(IndexParams) ->
-    Args = #index_query_args{},
+    parse_index_params(IndexParams, Db);
+parse_index_params(IndexParams, Db) ->
+    DefaultLimit = case fabric_util:is_partitioned(Db) of
+        true ->
+            list_to_integer(config:get("dreyfus", "limit_partitions", "2000"));
+        false ->
+            list_to_integer(config:get("dreyfus", "limit", "25"))
+    end,
+    Args = #index_query_args{limit=DefaultLimit},
     lists:foldl(fun({K, V}, Args2) ->
         validate_index_query(K, V, Args2)
     end, Args, IndexParams).
@@ -257,7 +263,7 @@ parse_index_param("bookmark", Value) ->
 parse_index_param("sort", Value) ->
     [{sort, ?JSON_DECODE(Value)}];
 parse_index_param("limit", Value) ->
-    [{limit, parse_non_negative_int_param("limit", Value, "max_limit", "200")}];
+    [{limit, ?JSON_DECODE(Value)}];
 parse_index_param("stale", "ok") ->
     [{stale, ok}];
 parse_index_param("stale", _Value) ->
@@ -306,7 +312,7 @@ parse_json_index_param(<<"bookmark">>, Value) ->
 parse_json_index_param(<<"sort">>, Value) ->
     [{sort, Value}];
 parse_json_index_param(<<"limit">>, Value) ->
-    [{limit, parse_non_negative_int_param("limit", Value, "max_limit", "200")}];
+    [{limit, ?JSON_DECODE(Value)}];
 parse_json_index_param(<<"stale">>, <<"ok">>) ->
     [{stale, ok}];
 parse_json_index_param(<<"include_docs">>, Value) when is_boolean(Value) ->
@@ -422,7 +428,8 @@ validate_search_restrictions(Db, DDoc, Args) ->
     #index_query_args{
         q = Query,
         partition = Partition,
-        grouping = Grouping
+        grouping = Grouping,
+        limit = Limit
     } = Args,
     #grouping{
         by = GroupBy
@@ -450,7 +457,7 @@ validate_search_restrictions(Db, DDoc, Args) ->
     case {ViewPartitioned, is_binary(Partition)} of
         {false, false} ->
             ok;
-        {true, true} -> 
+        {true, true} ->
             ok;
         {true, false} ->
             Msg3 = <<"`partition` parameter is mandatory "
@@ -459,6 +466,16 @@ validate_search_restrictions(Db, DDoc, Args) ->
         {false, true} ->
             Msg4 = <<"`partition` not supported on this index">>,
             throw({bad_request, Msg4})
+    end,
+
+    case DbPartitioned of
+        true ->
+            MaxLimit = config:get("dreyfus", "max_limit", "2000"),
+            parse_non_negative_int_param(
+                "limit", Limit, "max_limit_partitions", MaxLimit);
+        false ->
+            MaxLimit = config:get("dreyfus", "max_limit", "200"),
+            parse_non_negative_int_param("limit", Limit, "max_limit", MaxLimit)
     end,
 
     case GroupBy /= nil andalso is_binary(Partition) of
