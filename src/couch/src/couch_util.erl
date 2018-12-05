@@ -27,6 +27,7 @@
 -export([reorder_results/2]).
 -export([url_strip_password/1]).
 -export([encode_doc_id/1]).
+-export([normalize_ddoc_id/1]).
 -export([with_db/2]).
 -export([rfc1123_date/0, rfc1123_date/1]).
 -export([integer_to_boolean/1, boolean_to_integer/1]).
@@ -543,6 +544,10 @@ encode_doc_id(<<"_local/", Rest/binary>>) ->
 encode_doc_id(Id) ->
     url_encode(Id).
 
+normalize_ddoc_id(<<"_design/", _/binary>> = DDocId) ->
+    DDocId;
+normalize_ddoc_id(DDocId) when is_binary(DDocId) ->
+    <<"_design/", DDocId/binary>>.
 
 with_db(DbName, Fun)  when is_binary(DbName) ->
     case couch_db:open_int(DbName, [?ADMIN_CTX]) of

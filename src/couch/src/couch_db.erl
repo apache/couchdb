@@ -77,6 +77,7 @@
     get_full_doc_info/2,
     get_full_doc_infos/2,
     get_missing_revs/2,
+    get_design_doc/2,
     get_design_docs/1,
     get_design_doc_count/1,
     get_purge_infos/2,
@@ -607,6 +608,19 @@ get_db_info(Db) ->
         {uuid, Uuid}
     ],
     {ok, InfoList}.
+
+get_design_doc(#db{name = <<"shards/", _/binary>> = ShardDbName}, DDocId0) ->
+    DDocId = couch_util:normalize_ddoc_id(DDocId0),
+    DbName = mem3:dbname(ShardDbName),
+    {_, Ref} = spawn_monitor(fun() ->
+        exit(fabric:open_doc(DbName, DDocId, []))
+    end),
+    receive {'DOWN', Ref, _, _, Response} ->
+        Response
+    end;
+get_design_doc(#db{} = Db, DDocId0) ->
+    DDocId = couch_util:normalize_ddoc_id(DDocId0),
+    couch_db:open_doc_int(Db, DDocId, [ejson_body]).
 
 get_design_docs(#db{name = <<"shards/", _/binary>> = ShardDbName}) ->
     DbName = mem3:dbname(ShardDbName),
