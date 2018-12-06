@@ -25,11 +25,8 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         # These two are to test the default analyzer for
         # each field.
         {"name": "location.state", "type": "string"},
-        {
-            "name": "location.address.street",
-            "type": "string"
-        },
-        {"name": "name\\.first", "type": "string"}
+        {"name": "location.address.street", "type": "string"},
+        {"name": "name\\.first", "type": "string"},
     ]
 
     def test_basic(self):
@@ -55,10 +52,11 @@ class CustomFieldsTest(mango.UserDocsTextTests):
     # favorites.[], and not the string field favorites
     def test_index_selection(self):
         try:
-            self.db.find({"selector": {"$or": [{"favorites": "Ruby"},
-                {"favorites.0":"Ruby"}]}})
+            self.db.find(
+                {"selector": {"$or": [{"favorites": "Ruby"}, {"favorites.0": "Ruby"}]}}
+            )
         except Exception as e:
-                assert e.response.status_code == 400
+            assert e.response.status_code == 400
 
     def test_in_with_array(self):
         vals = ["Lisp", "Python"]
@@ -84,7 +82,7 @@ class CustomFieldsTest(mango.UserDocsTextTests):
         try:
             self.db.find({"favorites": {"$in": vals}})
         except Exception as e:
-                assert e.response.status_code == 400
+            assert e.response.status_code == 400
 
     def test_nin_with_array(self):
         vals = ["Lisp", "Python"]
@@ -125,42 +123,43 @@ class CustomFieldsTest(mango.UserDocsTextTests):
             return
 
     def test_filtered_search_fields(self):
-        docs = self.db.find({"age": 22}, fields = ["age", "location.state"])
+        docs = self.db.find({"age": 22}, fields=["age", "location.state"])
         assert len(docs) == 1
         assert docs == [{"age": 22, "location": {"state": "Missouri"}}]
 
-        docs = self.db.find({"age": 22}, fields = ["age", "Random Garbage"])
+        docs = self.db.find({"age": 22}, fields=["age", "Random Garbage"])
         assert len(docs) == 1
         assert docs == [{"age": 22}]
 
-        docs = self.db.find({"age": 22}, fields = ["favorites"])
+        docs = self.db.find({"age": 22}, fields=["favorites"])
         assert len(docs) == 1
         assert docs == [{"favorites": ["Lisp", "Erlang", "Python"]}]
 
-        docs = self.db.find({"age": 22}, fields = ["favorites.[]"])
+        docs = self.db.find({"age": 22}, fields=["favorites.[]"])
         assert len(docs) == 1
         assert docs == [{}]
 
-        docs = self.db.find({"age": 22}, fields = ["all_fields"])
+        docs = self.db.find({"age": 22}, fields=["all_fields"])
         assert len(docs) == 1
         assert docs == [{}]
 
     def test_two_or(self):
-        docs = self.db.find({"$or": [{"location.state": "New Hampshire"},
-            {"location.state": "Don't Exist"}]})
+        docs = self.db.find(
+            {
+                "$or": [
+                    {"location.state": "New Hampshire"},
+                    {"location.state": "Don't Exist"},
+                ]
+            }
+        )
         assert len(docs) == 1
         assert docs[0]["user_id"] == 10
 
     def test_all_match(self):
-        docs = self.db.find({
-            "favorites": {
-                "$allMatch": {
-                    "$eq": "Erlang"
-                }
-            }
-        })
+        docs = self.db.find({"favorites": {"$allMatch": {"$eq": "Erlang"}}})
         assert len(docs) == 1
         assert docs[0]["user_id"] == 10
+
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class CustomFieldsExistsTest(mango.UserDocsTextTests):
@@ -169,7 +168,7 @@ class CustomFieldsExistsTest(mango.UserDocsTextTests):
         {"name": "exists_field", "type": "string"},
         {"name": "exists_array.[]", "type": "string"},
         {"name": "exists_object.should", "type": "string"},
-        {"name": "twitter", "type": "string"}
+        {"name": "twitter", "type": "string"},
     ]
 
     def test_exists_field(self):
@@ -205,8 +204,6 @@ class CustomFieldsExistsTest(mango.UserDocsTextTests):
             self.assertNotEqual(d["user_id"], 11)
 
     def test_exists_false_same_as_views(self):
-        docs = self.db.find({
-                "twitter": {"$exists": False}
-            })
+        docs = self.db.find({"twitter": {"$exists": False}})
         for d in docs:
             self.assertNotIn(d["user_id"], (0, 1, 4, 13))
