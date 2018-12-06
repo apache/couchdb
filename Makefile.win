@@ -119,6 +119,7 @@ check: all
 	@$(MAKE) -f Makefile.win test-cluster-without-quorum
 	@$(MAKE) -f Makefile.win eunit
 	@$(MAKE) -f Makefile.win javascript
+	@$(MAKE) -f Makefile.win python-black
 	@$(MAKE) -f Makefile.win mango-test
 #	@$(MAKE) -f Makefile.win elixir
 
@@ -142,6 +143,26 @@ just-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
+.venv/bin/black:
+	@python.exe -m venv .venv
+	@.venv\Scripts\pip3.exe install black || copy /b .venv\Scripts\black.exe +,,
+
+# Python code formatter - only runs if we're on Python 3.6 or greater
+python-black: .venv/bin/black
+	@python.exe -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
+		echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
+	@python.exe -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
+		.venv\Scripts\black.exe --check \
+		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
+		. dev\run rel\overlay\bin\couchup test\javascript\run
+
+python-black-update: .venv/bin/black
+	@python.exe -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
+		echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
+	@python.exe -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
+		.venv\Scripts\black.exe \
+		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
+		. dev\run rel\overlay\bin\couchup test\javascript\run
 
 .PHONY: elixir
 elixir: elixir-check-formatted devclean
@@ -204,9 +225,9 @@ endif
 .PHONY: mango-test
 mango-test: devclean all
 	@cd src\mango && \
-		python.exe -m venv venv && \
-		venv\Scripts\pip.exe install -r requirements.txt
-	@cd src\mango && venv\Scripts\python.exe ..\..\dev\run -n 1 --admin=testuser:testpass venv\Scripts\nosetests
+		python.exe -m venv .venv && \
+		.venv\Scripts\pip.exe install -r requirements.txt
+	@cd src\mango && .venv\Scripts\python.exe ..\..\dev\run -n 1 --admin=testuser:testpass .venv\Scripts\nosetests
 
 
 .PHONY: check-qs
@@ -329,6 +350,7 @@ clean:
 	-@rmdir /s/q dev\data
 	-@rmdir /s/q dev\lib
 	-@rmdir /s/q dev\logs
+	-@rmdir /s/q src\mango\.venv
 	-@del /f/q src\couch\priv\couch_js\config.h
 	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log
 

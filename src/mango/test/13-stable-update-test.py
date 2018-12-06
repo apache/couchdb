@@ -20,7 +20,7 @@ DOCS1 = [
         "age": 10,
         "name": "Jimi",
         "location": "UK",
-        "number": 4
+        "number": 4,
     },
     {
         "_id": "54af50622071121b25402dc3",
@@ -28,9 +28,10 @@ DOCS1 = [
         "age": 12,
         "name": "Eddie",
         "location": "ZAR",
-        "number": 2
+        "number": 2,
     },
 ]
+
 
 class SupportStableAndUpdate(mango.DbPerClass):
     def setUp(self):
