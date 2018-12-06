@@ -116,36 +116,82 @@ defmodule PartitionAllDocsTest do
     assert ids == ["foo:22"]
   end
 
+  test "partition all docs can set query limits", context do
+    set_config({"query_server_config", "partition_query_limit", "2000"})
+
+    db_name = context[:db_name]
+    create_partition_docs(db_name)
+    create_partition_ddoc(db_name)
+
+    url = "/#{db_name}/_partition/foo/_all_docs"
+
+    resp =
+      Couch.get(url,
+        query: %{
+          limit: 20
+        }
+      )
+
+    assert resp.status_code == 200
+    ids = get_ids(resp)
+    assert length(ids) == 20
+
+    resp = Couch.get(url)
+    assert resp.status_code == 200
+    ids = get_ids(resp)
+    assert length(ids) == 50
+
+    resp =
+      Couch.get(url,
+        query: %{
+          limit: 2000
+        }
+      )
+
+    assert resp.status_code == 200
+    ids = get_ids(resp)
+    assert length(ids) == 50
+
+    resp =
+      Couch.get(url,
+        query: %{
+          limit: 2001
+        }
+      )
+
+    assert resp.status_code == 400
+    %{:body => %{"reason" => reason}} = resp
+    assert Regex.match?(~r/Limit is too large/, reason)
+
+    resp =
+      Couch.get(url,
+        query: %{
+          limit: 2000,
+          skip: 25
+        }
+      )
+
+    assert resp.status_code == 200
+    ids = get_ids(resp)
+    assert length(ids) == 25
+  end
+
   # This test is timing based so it could be a little flaky.
   # If that turns out to be the case we should probably just skip it
   test "partition _all_docs with timeout", context do
-    on_exit(fn ->
-      resp = Couch.get("/_membership")
-      %{:body => body} = resp
-
-      Enum.each(body["all_nodes"], fn node ->
-        resp = Couch.put("/_node/#{node}/_config/fabric/partition_view_timeout", body: "\"3600000\"")
-        assert resp.status_code == 200
-      end)
-    end)
-
-    resp = Couch.get("/_membership")
-    %{:body => body} = resp
-
-     Enum.each(body["all_nodes"], fn node ->
-      resp = Couch.put("/_node/#{node}/_config/fabric/partition_view_timeout", body: "\"1\"")
-      assert resp.status_code == 200
-    end)
+    set_config({"fabric", "partition_view_timeout", "1"})
 
     db_name = context[:db_name]
     create_partition_docs(db_name)
 
     retry_until(fn ->
       url = "/#{db_name}/_partition/foo/_all_docs"
+
       case Couch.get(url) do
         %{:body => %{"reason" => reason}} ->
           Regex.match?(~r/not be processed in a reasonable amount of time./, reason)
-        _ -> 
+
+        _ ->
           false
       end
     end)
