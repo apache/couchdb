@@ -426,10 +426,14 @@ find_missing_revs(Acc) ->
         #doc_info{id=Id, revs=RevInfos} = couch_doc:to_doc_info(FDI),
         {Id, [R || #rev_info{rev=R} <- RevInfos]}
     end, Infos),
-    mem3_rpc:get_missing_revs(Node, Name, IdsRevs, [
+    Missing = mem3_rpc:get_missing_revs(Node, Name, IdsRevs, [
         {io_priority, {internal_repl, Name}},
         ?ADMIN_CTX
-    ]).
+    ]),
+    lists:filter(fun
+        ({_Id, [], _Ancestors}) -> false;
+        ({_Id, _Revs, _Ancestors}) -> true
+    end, Missing).
 
 
 chunk_revs(Revs) ->
