@@ -6,6 +6,7 @@
 *.pyc
 *.swp
 *~
+.venv
 .DS_Store
 .rebar/
 .eunit/

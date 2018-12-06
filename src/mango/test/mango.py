@@ -26,12 +26,15 @@ import limit_docs
 def random_db_name():
     return "mango_test_" + uuid.uuid4().hex
 
+
 def has_text_service():
-    return os.environ.get('MANGO_TEXT_INDEXES') == '1'
+    return os.environ.get("MANGO_TEXT_INDEXES") == "1"
+
 
 def get_from_environment(key, default):
     value = os.environ.get(key)
     return value if value is not None else default
+
 
 # add delay functionality
 def delay(n=5, t=0.5):
@@ -40,13 +43,18 @@ def delay(n=5, t=0.5):
 
 
 class Database(object):
-    def __init__(self, dbname,
-                 host="127.0.0.1", port="15984",
-                 user='testuser', password='testpass'):
-        root_url = get_from_environment('COUCH_HOST', "http://{}:{}".format(host, port))
-        auth_header = get_from_environment('COUCH_AUTH_HEADER', None)
-        user = get_from_environment('COUCH_USER', user)
-        password = get_from_environment('COUCH_PASSWORD', password)
+    def __init__(
+        self,
+        dbname,
+        host="127.0.0.1",
+        port="15984",
+        user="testuser",
+        password="testpass",
+    ):
+        root_url = get_from_environment("COUCH_HOST", "http://{}:{}".format(host, port))
+        auth_header = get_from_environment("COUCH_AUTH_HEADER", None)
+        user = get_from_environment("COUCH_USER", user)
+        password = get_from_environment("COUCH_PASSWORD", password)
 
         self.root_url = root_url
         self.dbname = dbname
@@ -61,7 +69,6 @@ class Database(object):
 
         self.sess.headers["Content-Type"] = "application/json"
 
-
     @property
     def url(self):
         return "{}/{}".format(self.root_url, self.dbname)
@@ -74,7 +81,7 @@ class Database(object):
     def create(self, q=1, n=1):
         r = self.sess.get(self.url)
         if r.status_code == 404:
-            r = self.sess.put(self.url, params={"q":q, "n": n})
+            r = self.sess.put(self.url, params={"q": q, "n": n})
             r.raise_for_status()
 
     def delete(self):
@@ -116,7 +123,7 @@ class Database(object):
     def delete_doc(self, docid):
         r = self.sess.get(self.path(docid))
         r.raise_for_status()
-        original_rev = r.json()['_rev']
+        original_rev = r.json()["_rev"]
         self.sess.delete(self.path(docid), params={"rev": original_rev})
 
     def ddoc_info(self, ddocid):
@@ -124,15 +131,16 @@ class Database(object):
         r.raise_for_status()
         return r.json()
 
-    def create_index(self, fields, idx_type="json", name=None, ddoc=None, 
-        partial_filter_selector=None, selector=None):
-        body = {
-            "index": {
-                "fields": fields
-            },
-            "type": idx_type,
-            "w": 3
-        }
+    def create_index(
+        self,
+        fields,
+        idx_type="json",
+        name=None,
+        ddoc=None,
+        partial_filter_selector=None,
+        selector=None,
+    ):
+        body = {"index": {"fields": fields}, "type": idx_type, "w": 3}
         if name is not None:
             body["name"] = name
         if ddoc is not None:
@@ -155,15 +163,19 @@ class Database(object):
 
         return created
 
-    def create_text_index(self, analyzer=None, idx_type="text",
-        partial_filter_selector=None, selector=None, default_field=None, fields=None, 
-        name=None, ddoc=None,index_array_lengths=None):
-        body = {
-            "index": {
-            },
-            "type": idx_type,
-            "w": 3,
-        }
+    def create_text_index(
+        self,
+        analyzer=None,
+        idx_type="text",
+        partial_filter_selector=None,
+        selector=None,
+        default_field=None,
+        fields=None,
+        name=None,
+        ddoc=None,
+        index_array_lengths=None,
+    ):
+        body = {"index": {}, "type": idx_type, "w": 3}
         if name is not None:
             body["name"] = name
         if analyzer is not None:
@@ -190,10 +202,10 @@ class Database(object):
             limit = "limit=" + str(limit)
         if skip != "":
             skip = "skip=" + str(skip)
-        r = self.sess.get(self.path("_index?"+limit+";"+skip))
+        r = self.sess.get(self.path("_index?" + limit + ";" + skip))
         r.raise_for_status()
         return r.json()["indexes"]
-    
+
     def get_index(self, ddocid, name):
         if ddocid is None:
             return [i for i in self.list_indexes() if i["name"] == name]
@@ -205,7 +217,11 @@ class Database(object):
         if name is None:
             return [i for i in self.list_indexes() if i["ddoc"] == ddocid]
         else:
-            return [i for i in self.list_indexes() if i["ddoc"] == ddocid and i["name"] == name]
+            return [
+                i
+                for i in self.list_indexes()
+                if i["ddoc"] == ddocid and i["name"] == name
+            ]
 
     def delete_index(self, ddocid, name, idx_type="json"):
         path = ["_index", ddocid, idx_type, name]
@@ -216,24 +232,34 @@ class Database(object):
             delay(t=0.1)
 
     def bulk_delete(self, docs):
-        body = {
-            "docids" : docs,
-            "w": 3
-        }
+        body = {"docids": docs, "w": 3}
         body = json.dumps(body)
         r = self.sess.post(self.path("_index/_bulk_delete"), data=body)
         return r.json()
 
-    def find(self, selector, limit=25, skip=0, sort=None, fields=None,
-                r=1, conflicts=False, use_index=None, explain=False,
-                bookmark=None, return_raw=False, update=True, executionStats=False):
+    def find(
+        self,
+        selector,
+        limit=25,
+        skip=0,
+        sort=None,
+        fields=None,
+        r=1,
+        conflicts=False,
+        use_index=None,
+        explain=False,
+        bookmark=None,
+        return_raw=False,
+        update=True,
+        executionStats=False,
+    ):
         body = {
             "selector": selector,
             "use_index": use_index,
             "limit": limit,
             "skip": skip,
             "r": r,
-            "conflicts": conflicts
+            "conflicts": conflicts,
         }
         if sort is not None:
             body["sort"] = sort
@@ -268,7 +294,6 @@ class Database(object):
 
 
 class UsersDbTests(unittest.TestCase):
-
     @classmethod
     def setUpClass(klass):
         klass.db = Database("_users")
@@ -279,7 +304,6 @@ class UsersDbTests(unittest.TestCase):
 
 
 class DbPerClass(unittest.TestCase):
-
     @classmethod
     def setUpClass(klass):
         klass.db = Database(random_db_name())
@@ -290,7 +314,6 @@ class DbPerClass(unittest.TestCase):
 
 
 class UserDocsTests(DbPerClass):
-
     @classmethod
     def setUpClass(klass):
         super(UserDocsTests, klass).setUpClass()
@@ -298,14 +321,10 @@ class UserDocsTests(DbPerClass):
 
 
 class UserDocsTestsNoIndexes(DbPerClass):
-
     @classmethod
     def setUpClass(klass):
         super(UserDocsTestsNoIndexes, klass).setUpClass()
-        user_docs.setup(
-                    klass.db,
-                    index_type="_all_docs"
-            )
+        user_docs.setup(klass.db, index_type="_all_docs")
 
 
 class UserDocsTextTests(DbPerClass):
@@ -318,23 +337,22 @@ class UserDocsTextTests(DbPerClass):
         super(UserDocsTextTests, klass).setUpClass()
         if has_text_service():
             user_docs.setup(
-                    klass.db,
-                    index_type="text",
-                    default_field=klass.DEFAULT_FIELD,
-                    fields=klass.FIELDS
+                klass.db,
+                index_type="text",
+                default_field=klass.DEFAULT_FIELD,
+                fields=klass.FIELDS,
             )
 
 
 class FriendDocsTextTests(DbPerClass):
-
     @classmethod
     def setUpClass(klass):
         super(FriendDocsTextTests, klass).setUpClass()
         if has_text_service():
             friend_docs.setup(klass.db, index_type="text")
 
-class LimitDocsTextTests(DbPerClass):
 
+class LimitDocsTextTests(DbPerClass):
     @classmethod
     def setUpClass(klass):
         super(LimitDocsTextTests, klass).setUpClass()

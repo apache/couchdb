@@ -13,20 +13,10 @@
 import mango
 import copy
 
-DOC = [
-    {
-        "_id": "doc",
-        "a": 2
-    }
-]
+DOC = [{"_id": "doc", "a": 2}]
 
-CONFLICT = [
-    {
-        "_id": "doc",
-        "_rev": "1-23202479633c2b380f79507a776743d5",
-        "a": 1
-    }
-]
+CONFLICT = [{"_id": "doc", "_rev": "1-23202479633c2b380f79507a776743d5", "a": 1}]
+
 
 class ChooseCorrectIndexForDocs(mango.DbPerClass):
     def setUp(self):
@@ -36,6 +26,8 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
 
     def test_retrieve_conflicts(self):
         self.db.create_index(["_conflicts"])
-        result = self.db.find({"_conflicts": { "$exists": True}}, conflicts=True)
-        self.assertEqual(result[0]['_conflicts'][0], '1-23202479633c2b380f79507a776743d5')
-        self.assertEqual(result[0]['_rev'], '1-3975759ccff3842adf690a5c10caee42')
+        result = self.db.find({"_conflicts": {"$exists": True}}, conflicts=True)
+        self.assertEqual(
+            result[0]["_conflicts"][0], "1-23202479633c2b380f79507a776743d5"
+        )
+        self.assertEqual(result[0]["_rev"], "1-3975759ccff3842adf690a5c10caee42")

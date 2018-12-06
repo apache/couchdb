@@ -140,6 +140,7 @@ check: all
 	@$(MAKE) test-cluster-without-quorum
 	@$(MAKE) eunit
 	@$(MAKE) javascript
+	@$(MAKE) python-black
 	@$(MAKE) mango-test
 #	@$(MAKE) build-test
 
@@ -170,6 +171,27 @@ soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
+
+.venv/bin/black:
+	@python3 -m venv .venv
+	@.venv/bin/pip3 install black || touch .venv/bin/black
+
+# Python code formatter - only runs if we're on Python 3.6 or greater
+python-black: .venv/bin/black
+	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
+	       echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
+	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
+		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
+		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
+		. dev/run rel/overlay/bin/couchup test/javascript/run
+
+python-black-update: .venv/bin/black
+	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
+	       echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
+	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
+		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
+		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
+		. dev/run rel/overlay/bin/couchup test/javascript/run
 
 .PHONY: elixir
 elixir: elixir-check-formatted
@@ -285,9 +307,9 @@ build-test:
 # target: mango-test - Run Mango tests
 mango-test: devclean all
 	@cd src/mango && \
-		python3 -m venv venv && \
-		venv/bin/pip3 install -r requirements.txt
-	@cd src/mango && ../../dev/run -n 1 --admin=testuser:testpass venv/bin/nosetests
+		python3 -m venv .venv && \
+		.venv/bin/pip3 install -r requirements.txt
+	@cd src/mango && ../../dev/run -n 1 --admin=testuser:testpass .venv/bin/nosetests
 
 ################################################################################
 # Developing
@@ -400,6 +422,7 @@ clean:
 	@rm -rf src/couch/priv/{couchspawnkillable,couchjs}
 	@rm -rf share/server/main.js share/server/main-coffee.js
 	@rm -rf tmp dev/data dev/lib dev/logs
+	@rm -rf src/mango/.venv
 	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/boot_node.beam dev/pbkdf2.pyc log/crash.log

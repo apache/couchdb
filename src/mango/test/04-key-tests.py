@@ -16,40 +16,29 @@ import mango
 import unittest
 
 TEST_DOCS = [
-    {
-        "type": "complex_key",
-        "title": "normal key"
-    },
+    {"type": "complex_key", "title": "normal key"},
     {
         "type": "complex_key",
         "title": "key with dot",
         "dot.key": "dot's value",
-        "none": {
-            "dot": "none dot's value"
-        },
-        "name.first" : "Kvothe"
+        "none": {"dot": "none dot's value"},
+        "name.first": "Kvothe",
     },
     {
         "type": "complex_key",
         "title": "key with peso",
         "$key": "peso",
-        "deep": {
-            "$key": "deep peso"
-        },
-        "name": {"first" : "Master Elodin"}
+        "deep": {"$key": "deep peso"},
+        "name": {"first": "Master Elodin"},
     },
-    {
-        "type": "complex_key",
-        "title": "unicode key",
-        "": "apple"
-    },
+    {"type": "complex_key", "title": "unicode key", "": "apple"},
     {
         "title": "internal_fields_format",
-        "utf8-1[]:string" : "string",
-        "utf8-2[]:boolean[]" : True,
-        "utf8-3[]:number" : 9,
-        "utf8-3[]:null" : None
-    }
+        "utf8-1[]:string": "string",
+        "utf8-2[]:boolean[]": True,
+        "utf8-3[]:number": 9,
+        "utf8-3[]:null": None,
+    },
 ]
 
 
@@ -73,33 +62,39 @@ class KeyTests(mango.DbPerClass):
     def test_dot_key(self):
         query = {"type": "complex_key"}
         fields = ["title", "dot\\.key", "none.dot"]
+
         def check(docs):
             assert len(docs) == 4
             assert "dot.key" in docs[1]
             assert docs[1]["dot.key"] == "dot's value"
             assert "none" in docs[1]
             assert docs[1]["none"]["dot"] == "none dot's value"
+
         self.run_check(query, check, fields=fields)
 
     def test_peso_key(self):
         query = {"type": "complex_key"}
         fields = ["title", "$key", "deep.$key"]
+
         def check(docs):
             assert len(docs) == 4
             assert "$key" in docs[2]
             assert docs[2]["$key"] == "peso"
             assert "deep" in docs[2]
             assert docs[2]["deep"]["$key"] == "deep peso"
+
         self.run_check(query, check, fields=fields)
 
     def test_unicode_in_fieldname(self):
         query = {"type": "complex_key"}
         fields = ["title", ""]
+
         def check(docs):
             assert len(docs) == 4
             # note:  == \uf8ff
-            assert '\uf8ff' in docs[3]
-            assert docs[3]['\uf8ff'] == "apple"
+            assert "\uf8ff" in docs[3]
+            assert docs[3]["\uf8ff"] == "apple"
+
         self.run_check(query, check, fields=fields)
 
     # The rest of these tests are only run against the text
@@ -107,45 +102,57 @@ class KeyTests(mango.DbPerClass):
     # field *name* escaping in the index.
 
     def test_unicode_in_selector_field(self):
-        query = {"" : "apple"}
+        query = {"": "apple"}
+
         def check(docs):
             assert len(docs) == 1
             assert docs[0]["\uf8ff"] == "apple"
+
         self.run_check(query, check, indexes=["text"])
 
     def test_internal_field_tests(self):
         queries = [
-            {"utf8-1[]:string" : "string"},
-            {"utf8-2[]:boolean[]" : True},
-            {"utf8-3[]:number" : 9},
-            {"utf8-3[]:null" : None}
+            {"utf8-1[]:string": "string"},
+            {"utf8-2[]:boolean[]": True},
+            {"utf8-3[]:number": 9},
+            {"utf8-3[]:null": None},
         ]
+
         def check(docs):
             assert len(docs) == 1
             assert docs[0]["title"] == "internal_fields_format"
+
         for query in queries:
             self.run_check(query, check, indexes=["text"])
 
     def test_escape_period(self):
-        query = {"name\\.first" : "Kvothe"}
+        query = {"name\\.first": "Kvothe"}
+
         def check(docs):
             assert len(docs) == 1
             assert docs[0]["name.first"] == "Kvothe"
+
         self.run_check(query, check, indexes=["text"])
 
-        query = {"name.first" : "Kvothe"}
+        query = {"name.first": "Kvothe"}
+
         def check_empty(docs):
             assert len(docs) == 0
+
         self.run_check(query, check_empty, indexes=["text"])
 
     def test_object_period(self):
-        query = {"name.first" : "Master Elodin"}
+        query = {"name.first": "Master Elodin"}
+
         def check(docs):
             assert len(docs) == 1
             assert docs[0]["title"] == "key with peso"
+
         self.run_check(query, check, indexes=["text"])
 
-        query = {"name\\.first" : "Master Elodin"}
+        query = {"name\\.first": "Master Elodin"}
+
         def check_empty(docs):
             assert len(docs) == 0
+
         self.run_check(query, check_empty, indexes=["text"])
