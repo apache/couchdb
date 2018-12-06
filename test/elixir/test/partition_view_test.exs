@@ -286,6 +286,66 @@ defmodule ViewPartitionTest do
            ]
   end
 
+  test "partition query can set query limits", context do
+    set_config({"query_server_config", "partition_query_limit", "2000"})
+
+    db_name = context[:db_name]
+    create_partition_docs(db_name)
+    create_partition_ddoc(db_name)
+
+    url = "/#{db_name}/_partition/foo/_design/mrtest/_view/some"
+
+    resp =
+      Couch.get(url,
+        query: %{
+          limit: 20
+        }
+      )
+
+    assert resp.status_code == 200
+    ids = get_ids(resp)
+    assert length(ids) == 20
+
+    resp = Couch.get(url)
+    assert resp.status_code == 200
+    ids = get_ids(resp)
+    assert length(ids) == 50
+
+    resp =
+      Couch.get(url,
+        query: %{
+          limit: 2000
+        }
+      )
+
+    assert resp.status_code == 200
+    ids = get_ids(resp)
+    assert length(ids) == 50
+
+    resp =
+      Couch.get(url,
+        query: %{
+          limit: 2001
+        }
+      )
+
+    assert resp.status_code == 400
+    %{:body => %{"reason" => reason}} = resp
+    assert Regex.match?(~r/Limit is too large/, reason)
+
+    resp =
+      Couch.get(url,
+        query: %{
+          limit: 2000,
+          skip: 25
+        }
+      )
+
+    assert resp.status_code == 200
+    ids = get_ids(resp)
+    assert length(ids) == 25
+  end
+
   test "include_design works correctly", context do
     db_name = context[:db_name]
 

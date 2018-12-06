@@ -496,9 +496,10 @@ fold_reduce({NthRed, Lang, View}, Fun,  Acc, Options) ->
     couch_btree:fold_reduce(Bt, WrapperFun, Acc, Options).
 
 
-validate_args(Db, DDoc, Args) ->
+validate_args(Db, DDoc, Args0) ->
     {ok, State} = couch_mrview_index:init(Db, DDoc),
-    validate_args(State, Args).
+    Args1 = apply_limit(State#mrst.partitioned, Args0),
+    validate_args(State, Args1).
 
 
 validate_args(#mrst{} = State, Args0) ->
@@ -523,6 +524,28 @@ validate_args(#mrst{} = State, Args0) ->
     end.
 
 
+apply_limit(ViewPartitioned, Args) ->
+    LimitType = case ViewPartitioned of
+        true -> "partition_query_limit";
+        false -> "query_limit"
+    end,
+
+    MaxLimit = config:get_integer("query_server_config",
+        LimitType, ?MAX_VIEW_LIMIT),
+
+    % Set the highest limit possible if a user has not
+    % specified a limit
+    Args1 = case Args#mrargs.limit == ?MAX_VIEW_LIMIT of
+        true -> Args#mrargs{limit = MaxLimit};
+        false -> Args
+    end,
+
+    if Args1#mrargs.limit =< MaxLimit -> Args1; true ->
+        Fmt = "Limit is too large, must not exceed ~p",
+        mrverror(io_lib:format(Fmt, [MaxLimit]))
+    end.
+
+
 validate_all_docs_args(Db, Args0) ->
     Args = validate_args(Args0),
 
@@ -533,7 +556,8 @@ validate_all_docs_args(Db, Args0) ->
         {false, <<_/binary>>} ->
             mrverror(<<"`partition` parameter is not supported on this db">>);
         {_, <<_/binary>>} ->
-            apply_all_docs_partition(Args, Partition);
+            Args1 = apply_limit(true, Args),
+            apply_all_docs_partition(Args1, Partition);
         _ ->
             Args
     end.

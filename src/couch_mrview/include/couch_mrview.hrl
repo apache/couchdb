@@ -60,6 +60,7 @@
     view_states=nil
 }).
 
+-define(MAX_VIEW_LIMIT, 16#10000000).
 
 -record(mrargs, {
     view_type,
@@ -74,7 +75,7 @@
     keys,
 
     direction = fwd,
-    limit = 16#10000000,
+    limit = ?MAX_VIEW_LIMIT,
     skip = 0,
     group_level = 0,
     group = undefined,
