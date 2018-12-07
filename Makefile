@@ -194,12 +194,18 @@ python-black-update: .venv/bin/black
 		. dev/run rel/overlay/bin/couchup test/javascript/run
 
 .PHONY: elixir
-elixir: elixir-check-formatted devclean
+elixir: elixir-check-formatted elixir-credo devclean
 	@dev/run -a adm:pass --no-eval test/elixir/run
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted:
 	@cd test/elixir/ && mix format --check-formatted
+
+# Credo is a static code analysis tool for Elixir.
+# We use it in our tests
+.PHONY: elixir-credo
+elixir-credo:
+	@cd test/elixir/ && mix deps.get && mix credo
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option

@@ -91,7 +91,10 @@ defmodule ConfigTest do
     set_config(context, "admins", "administrator", plain_pass)
     assert Couch.login("administrator", plain_pass)
     hash_pass = get_config(context, "admins", "administrator")
-    assert Regex.match?(~r/^-pbkdf2-/, hash_pass) or Regex.match?(~r/^-hashed-/, hash_pass)
+
+    assert Regex.match?(~r/^-pbkdf2-/, hash_pass) or
+             Regex.match?(~r/^-hashed-/, hash_pass)
+
     delete_config(context, "admins", "administrator")
     assert Couch.delete("/_session").body["ok"]
   end
@@ -135,7 +138,12 @@ defmodule ConfigTest do
     vals = ["{test,foo}", "{\"test\",\"foo\"}", "{<<\"test\">>,<<\"foo\">>}"]
 
     Enum.each(vals, fn pair ->
-      set_config(context, "httpd", "config_whitelist", "[{httpd,config_whitelist}, #{pair}")
+      set_config(
+        context,
+        "httpd",
+        "config_whitelist",
+        "[{httpd,config_whitelist}, #{pair}"
+      )
 
       pair_format =
         case String.at(pair, 1) do
