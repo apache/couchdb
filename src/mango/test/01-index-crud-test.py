@@ -17,19 +17,10 @@ import copy
 import unittest
 
 DOCS = [
-    {
-        "_id": "1",
-        "name": "Jimi",
-        "age": 10,
-        "cars": 1
-    },
-    {
-        "_id": "2",
-        "name": "kate",
-        "age": 8,
-        "cars": 0
-    }
+    {"_id": "1", "name": "Jimi", "age": 10, "cars": 1},
+    {"_id": "2", "name": "kate", "age": 8, "cars": 0},
 ]
+
 
 class IndexCrudTests(mango.DbPerClass):
     def setUp(self):
@@ -46,7 +37,7 @@ class IndexCrudTests(mango.DbPerClass):
             [{"foo": 2}],
             [{"foo": "asc", "bar": "desc"}],
             [{"foo": "asc"}, {"bar": "desc"}],
-            [""]
+            [""],
         ]
         for fields in bad_fields:
             try:
@@ -62,27 +53,23 @@ class IndexCrudTests(mango.DbPerClass):
             True,
             False,
             1.5,
-            "foo", # Future support
-            "geo", # Future support
+            "foo",  # Future support
+            "geo",  # Future support
             {"foo": "bar"},
-            ["baz", 3.0]
+            ["baz", 3.0],
         ]
         for bt in bad_types:
             try:
                 self.db.create_index(["foo"], idx_type=bt)
             except Exception as e:
-                self.assertEqual(e.response.status_code, 400, (bt, e.response.status_code))
+                self.assertEqual(
+                    e.response.status_code, 400, (bt, e.response.status_code)
+                )
             else:
                 raise AssertionError("bad create index")
 
     def test_bad_names(self):
-        bad_names = [
-            True,
-            False,
-            1.5,
-            {"foo": "bar"},
-            [None, False]
-        ]
+        bad_names = [True, False, 1.5, {"foo": "bar"}, [None, False]]
         for bn in bad_names:
             try:
                 self.db.create_index(["foo"], name=bn)
@@ -136,7 +123,7 @@ class IndexCrudTests(mango.DbPerClass):
             doc = self.db.open_doc(ddocid)
             self.assertEqual(doc["_id"], ddocid)
             info = self.db.ddoc_info(ddocid)
-            self.assertEqual(info["name"], ddocid.split('_design/')[-1])
+            self.assertEqual(info["name"], ddocid.split("_design/")[-1])
 
     def test_delete_idx_escaped(self):
         self.db.create_index(["foo", "bar"], name="idx_01")
@@ -271,7 +258,7 @@ class IndexCrudTests(mango.DbPerClass):
         assert ret is True
 
         self.assertEqual(len(self.db.list_indexes(limit=2)), 2)
-        self.assertEqual(len(self.db.list_indexes(limit=5,skip=4)), 2)
+        self.assertEqual(len(self.db.list_indexes(limit=5, skip=4)), 2)
         self.assertEqual(len(self.db.list_indexes(skip=5)), 1)
         self.assertEqual(len(self.db.list_indexes(skip=6)), 0)
         self.assertEqual(len(self.db.list_indexes(skip=100)), 0)
@@ -291,19 +278,19 @@ class IndexCrudTests(mango.DbPerClass):
         self.db.save_docs(copy.deepcopy(DOCS))
         self.db.create_index(["age"], name="age")
 
-        selector = {
-            "age": {
-                "$gt": 0
-            },
-        }
-        docs = self.db.find(selector,
-            use_index="_design/a017b603a47036005de93034ff689bbbb6a873c4")
+        selector = {"age": {"$gt": 0}}
+        docs = self.db.find(
+            selector, use_index="_design/a017b603a47036005de93034ff689bbbb6a873c4"
+        )
         self.assertEqual(len(docs), 2)
 
         self.db.delete_doc("1")
 
-        docs1 = self.db.find(selector, update="False",
-            use_index="_design/a017b603a47036005de93034ff689bbbb6a873c4")
+        docs1 = self.db.find(
+            selector,
+            update="False",
+            use_index="_design/a017b603a47036005de93034ff689bbbb6a873c4",
+        )
         self.assertEqual(len(docs1), 1)
 
 
@@ -314,18 +301,18 @@ class IndexCrudTextTests(mango.DbPerClass):
 
     def test_create_text_idx(self):
         fields = [
-            {"name":"stringidx", "type" : "string"},
-            {"name":"booleanidx", "type": "boolean"}
+            {"name": "stringidx", "type": "string"},
+            {"name": "booleanidx", "type": "boolean"},
         ]
         ret = self.db.create_text_index(fields=fields, name="text_idx_01")
         assert ret is True
         for idx in self.db.list_indexes():
             if idx["name"] != "text_idx_01":
                 continue
-            self.assertEqual(idx["def"]["fields"], [
-                {"stringidx": "string"},
-                {"booleanidx": "boolean"}
-            ])
+            self.assertEqual(
+                idx["def"]["fields"],
+                [{"stringidx": "string"}, {"booleanidx": "boolean"}],
+            )
             return
         raise AssertionError("index not created")
 
@@ -339,9 +326,9 @@ class IndexCrudTextTests(mango.DbPerClass):
             [{"name": "foo2"}],
             [{"name": "foo3", "type": "garbage"}],
             [{"type": "number"}],
-            [{"name": "age", "type": "number"} , {"name": "bad"}],
-            [{"name": "age", "type": "number"} , "bla"],
-            [{"name": "", "type": "number"} , "bla"]
+            [{"name": "age", "type": "number"}, {"name": "bad"}],
+            [{"name": "age", "type": "number"}, "bla"],
+            [{"name": "", "type": "number"}, "bla"],
         ]
         for fields in bad_fields:
             try:
@@ -350,7 +337,7 @@ class IndexCrudTextTests(mango.DbPerClass):
                 self.assertEqual(e.response.status_code, 400)
             else:
                 raise AssertionError("bad create text index")
-    
+
     def test_limit_skip_index(self):
         fields = ["field1"]
         ret = self.db.create_index(fields, name="idx_01")
@@ -369,14 +356,14 @@ class IndexCrudTextTests(mango.DbPerClass):
         assert ret is True
 
         fields = [
-            {"name":"stringidx", "type" : "string"},
-            {"name":"booleanidx", "type": "boolean"}
+            {"name": "stringidx", "type": "string"},
+            {"name": "booleanidx", "type": "boolean"},
         ]
         ret = self.db.create_text_index(fields=fields, name="idx_05")
         assert ret is True
 
         self.assertEqual(len(self.db.list_indexes(limit=2)), 2)
-        self.assertEqual(len(self.db.list_indexes(limit=5,skip=4)), 2)
+        self.assertEqual(len(self.db.list_indexes(limit=5, skip=4)), 2)
         self.assertEqual(len(self.db.list_indexes(skip=5)), 1)
         self.assertEqual(len(self.db.list_indexes(skip=6)), 0)
         self.assertEqual(len(self.db.list_indexes(skip=100)), 0)

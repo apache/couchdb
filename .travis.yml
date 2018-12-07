@@ -11,6 +11,8 @@ otp_release:
 
 addons:
   apt:
+    sources:
+      - deadsnakes
     packages:
     - build-essential
     - curl
@@ -18,10 +20,10 @@ addons:
     - libicu-dev
     - libmozjs185-dev
     - pkg-config
-    - python3
+    - python3.6
+    - python3.6-venv
     - python3-requests
     - python3-sphinx
-    - python3.4-venv
 #    - sphinx-rtd-theme
     - help2man
     - shunit2
@@ -50,6 +52,8 @@ before_script:
   - rm -rf /tmp/couchjslogs
   - mkdir -p /tmp/couchjslogs
   - ./configure -c --disable-docs --disable-fauxton
+  - python3.6 -m venv /tmp/.venv
+  - source /tmp/.venv/bin/activate
 
 script:
    - make check

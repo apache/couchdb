@@ -72,14 +72,13 @@ def mkformatter(tests):
 
 def run_couchjs(test, fmt):
     fmt(test)
-    cmd = [COUCHJS, "--eval", "-H", "-T"] + \
-            ["-u", "test/javascript/couchdb.uri"] + SCRIPTS + [test, RUNNER]
-    p = sp.Popen(
-        cmd,
-        stdin=sp.PIPE,
-        stdout=sp.PIPE,
-        stderr=sys.stderr
+    cmd = (
+        [COUCHJS, "--eval", "-H", "-T"]
+        + ["-u", "test/javascript/couchdb.uri"]
+        + SCRIPTS
+        + [test, RUNNER]
     )
+    p = sp.Popen(cmd, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sys.stderr)
     while True:
         line = p.stdout.readline()
         if not line:
@@ -93,20 +92,48 @@ def run_couchjs(test, fmt):
 
 def options():
     return [
-        op.make_option("-s", "--start", metavar="FILENAME", default=None,
-                       help="Start from the given filename if multiple files "
-                            "are passed"),
-        op.make_option("-a", "--all", action="store_true", dest="all",
-                       help="Run all tests, even if one or more fail"),
-        op.make_option("-i", "--ignore", type="string", action="callback",
-                       default=None, callback=get_delimited_list,
-                       dest="ignore", help="Ignore test suites"),
-        op.make_option("-u", "--suites", type="string", action="callback",
-                       default=None, callback=get_delimited_list,
-                       dest="suites", help="Run specific suites"),
-        op.make_option("-p", "--path", type="string",
-                       default="test/javascript/tests",
-                       dest="test_path", help="Path where the tests are located")
+        op.make_option(
+            "-s",
+            "--start",
+            metavar="FILENAME",
+            default=None,
+            help="Start from the given filename if multiple files " "are passed",
+        ),
+        op.make_option(
+            "-a",
+            "--all",
+            action="store_true",
+            dest="all",
+            help="Run all tests, even if one or more fail",
+        ),
+        op.make_option(
+            "-i",
+            "--ignore",
+            type="string",
+            action="callback",
+            default=None,
+            callback=get_delimited_list,
+            dest="ignore",
+            help="Ignore test suites",
+        ),
+        op.make_option(
+            "-u",
+            "--suites",
+            type="string",
+            action="callback",
+            default=None,
+            callback=get_delimited_list,
+            dest="suites",
+            help="Run specific suites",
+        ),
+        op.make_option(
+            "-p",
+            "--path",
+            type="string",
+            default="test/javascript/tests",
+            dest="test_path",
+            help="Path where the tests are located",
+        ),
     ]
 
 
@@ -118,10 +145,10 @@ def main():
     ignore_list = []
     tests = []
     run_list = [opts.test_path] if not opts.suites else opts.suites
-    run_list = build_test_case_paths(opts.test_path,run_list)
-    ignore_list = build_test_case_paths(opts.test_path,opts.ignore)
+    run_list = build_test_case_paths(opts.test_path, run_list)
+    ignore_list = build_test_case_paths(opts.test_path, opts.ignore)
     # sort is needed because certain tests fail if executed out of order
-    tests = sorted(list(set(run_list)-set(ignore_list)))
+    tests = sorted(list(set(run_list) - set(ignore_list)))
 
     if opts.start is not None:
         tmp = []
@@ -132,25 +159,28 @@ def main():
 
     passed = 0
     failed = 0
-    if len(tests) > 0 :
-     fmt = mkformatter(tests)
-     for test in tests:
-        result = run_couchjs(test, fmt)
-        if result == 0:
-            passed += 1
-        else:
-            failed += 1
-            if not opts.all:
-                break
+    if len(tests) > 0:
+        fmt = mkformatter(tests)
+        for test in tests:
+            result = run_couchjs(test, fmt)
+            if result == 0:
+                passed += 1
+            else:
+                failed += 1
+                if not opts.all:
+                    break
 
-    sys.stderr.write("======================================================="
-        + os.linesep)
+    sys.stderr.write(
+        "=======================================================" + os.linesep
+    )
     sys.stderr.write("JavaScript tests complete." + os.linesep)
-    sys.stderr.write("  Failed: {0}.  Skipped or passed: {1}.".format(
-        failed, passed) + os.linesep)
+    sys.stderr.write(
+        "  Failed: {0}.  Skipped or passed: {1}.".format(failed, passed) + os.linesep
+    )
     exit(failed > 0)
 
-def build_test_case_paths(path,args=None):
+
+def build_test_case_paths(path, args=None):
     tests = []
     if args is None:
         args = []
@@ -171,8 +201,9 @@ def build_test_case_paths(path,args=None):
 
 
 def get_delimited_list(option, opt, value, parser):
-    delimited = [i for i in re.split(r',|\s', value.strip()) if i]
+    delimited = [i for i in re.split(r",|\s", value.strip()) if i]
     setattr(parser.values, option.dest, delimited)
+
 
 if __name__ == "__main__":
     try:
