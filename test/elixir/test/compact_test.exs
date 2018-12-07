@@ -53,7 +53,9 @@ defmodule CompactTest do
 
     doc = %{
       _id: "#{@att_doc_id}",
-      _attachments: %{"#{@att_name}": %{content_type: "text/plain", data: Base.encode64(@att_plaintext)}}
+      _attachments: %{
+        "#{@att_name}": %{content_type: "text/plain", data: Base.encode64(@att_plaintext)}
+      }
     }
 
     resp = Couch.put("/#{db}/#{doc._id}", body: doc)

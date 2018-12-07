@@ -30,7 +30,9 @@ defmodule ReduceTest do
 
     assert Couch.put("/#{db_name}/_design/foo", body: red_doc).body["ok"]
     docs = make_docs(1..num_docs)
-    assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code == 201
+
+    assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code ==
+             201
 
     rows = Couch.get(view_url).body["rows"]
     assert hd(rows)["value"] == 2 * summate(num_docs)
@@ -90,7 +92,9 @@ defmodule ReduceTest do
           %{keys: ["d", "c"]}
         ]
 
-        assert Couch.post("/#{db_name}/_bulk_docs", body: %{docs: docs}, query: %{w: 3}).status_code == 201
+        assert Couch.post("/#{db_name}/_bulk_docs", body: %{docs: docs}, query: %{w: 3}).status_code ==
+                 201
+
         total_docs = 1 + (i - 1) * 10 * 11 + (j + 1) * 11
         assert Couch.get("/#{db_name}").body["doc_count"] == total_docs
       end
@@ -188,7 +192,9 @@ defmodule ReduceTest do
 
     Enum.each(1..10, fn _ ->
       docs = for i <- 1..10, do: %{val: i * 10}
-      assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code == 201
+
+      assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code ==
+               201
     end)
 
     rows = Couch.get(view_url).body["rows"]
@@ -219,7 +225,9 @@ defmodule ReduceTest do
 
     assert Couch.put("/#{db_name}/_design/foo", body: ddoc).body["ok"]
     docs = for i <- 0..1122, do: %{_id: Integer.to_string(i), int: i}
-    assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code == 201
+
+    assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code ==
+             201
 
     rand_val = fn -> :rand.uniform(100_000_000) end
 
@@ -234,32 +242,71 @@ defmodule ReduceTest do
     query = %{startkey: 400, endkey: 402, foobar: rand_val.(), inclusive_end: false}
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 6
-    query = %{startkey: 402, endkey: 400, foobar: rand_val.(), inclusive_end: false, descending: true}
+
+    query = %{
+      startkey: 402,
+      endkey: 400,
+      foobar: rand_val.(),
+      inclusive_end: false,
+      descending: true
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 6
 
     query = %{startkey: 400, endkey: 402, foobar: rand_val.(), endkey_docid: "400"}
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 7
-    query = %{startkey: 400, endkey: 402, foobar: rand_val.(), endkey_docid: "400", inclusive_end: false}
+
+    query = %{
+      startkey: 400,
+      endkey: 402,
+      foobar: rand_val.(),
+      endkey_docid: "400",
+      inclusive_end: false
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 6
 
     query = %{startkey: 400, endkey: 402, foobar: rand_val.(), endkey_docid: "401"}
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 8
-    query = %{startkey: 400, endkey: 402, foobar: rand_val.(), endkey_docid: "401", inclusive_end: false}
+
+    query = %{
+      startkey: 400,
+      endkey: 402,
+      foobar: rand_val.(),
+      endkey_docid: "401",
+      inclusive_end: false
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 7
 
     query = %{startkey: 400, endkey: 402, foobar: rand_val.(), endkey_docid: "402"}
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 9
-    query = %{startkey: 400, endkey: 402, foobar: rand_val.(), endkey_docid: "402", inclusive_end: false}
+
+    query = %{
+      startkey: 400,
+      endkey: 402,
+      foobar: rand_val.(),
+      endkey_docid: "402",
+      inclusive_end: false
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 8
 
-    query = %{startkey: 402, endkey: 400, foobar: rand_val.(), endkey_docid: "398", descending: true}
+    query = %{
+      startkey: 402,
+      endkey: 400,
+      foobar: rand_val.(),
+      endkey_docid: "398",
+      descending: true
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 9
 
@@ -275,7 +322,14 @@ defmodule ReduceTest do
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 8
 
-    query = %{startkey: 402, endkey: 400, foobar: rand_val.(), endkey_docid: "399", descending: true}
+    query = %{
+      startkey: 402,
+      endkey: 400,
+      foobar: rand_val.(),
+      endkey_docid: "399",
+      descending: true
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 8
 
@@ -291,7 +345,14 @@ defmodule ReduceTest do
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 7
 
-    query = %{startkey: 402, endkey: 400, foobar: rand_val.(), endkey_docid: "400", descending: true}
+    query = %{
+      startkey: 402,
+      endkey: 400,
+      foobar: rand_val.(),
+      endkey_docid: "400",
+      descending: true
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 7
 
@@ -307,7 +368,14 @@ defmodule ReduceTest do
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 6
 
-    query = %{startkey: 402, endkey: 400, foobar: rand_val.(), startkey_docid: "400", descending: true}
+    query = %{
+      startkey: 402,
+      endkey: 400,
+      foobar: rand_val.(),
+      startkey_docid: "400",
+      descending: true
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert hd(rows)["value"] == 7
 
@@ -334,7 +402,14 @@ defmodule ReduceTest do
     assert Enum.at(rows, 2)["key"] == 402
     assert Enum.at(rows, 2)["value"] == 3
 
-    query = %{:group => true, startkey: 402, endkey: 400, foobar: rand_val.(), descending: true}
+    query = %{
+      :group => true,
+      startkey: 402,
+      endkey: 400,
+      foobar: rand_val.(),
+      descending: true
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert length(rows) == 3
     assert Enum.at(rows, 0)["key"] == 402
@@ -344,7 +419,14 @@ defmodule ReduceTest do
     assert Enum.at(rows, 2)["key"] == 400
     assert Enum.at(rows, 2)["value"] == 3
 
-    query = %{:group => true, startkey: 400, endkey: 402, foobar: rand_val.(), inclusive_end: false}
+    query = %{
+      :group => true,
+      startkey: 400,
+      endkey: 402,
+      foobar: rand_val.(),
+      inclusive_end: false
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert length(rows) == 2
     assert Enum.at(rows, 0)["key"] == 400
@@ -352,7 +434,15 @@ defmodule ReduceTest do
     assert Enum.at(rows, 1)["key"] == 401
     assert Enum.at(rows, 1)["value"] == 3
 
-    query = %{:group => true, startkey: 402, endkey: 400, foobar: rand_val.(), inclusive_end: false, descending: true}
+    query = %{
+      :group => true,
+      startkey: 402,
+      endkey: 400,
+      foobar: rand_val.(),
+      inclusive_end: false,
+      descending: true
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert length(rows) == 2
     assert Enum.at(rows, 0)["key"] == 402
@@ -360,7 +450,14 @@ defmodule ReduceTest do
     assert Enum.at(rows, 1)["key"] == 401
     assert Enum.at(rows, 1)["value"] == 3
 
-    query = %{:group => true, startkey: 400, endkey: 402, foobar: rand_val.(), endkey_docid: "401"}
+    query = %{
+      :group => true,
+      startkey: 400,
+      endkey: 402,
+      foobar: rand_val.(),
+      endkey_docid: "401"
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert length(rows) == 3
     assert Enum.at(rows, 0)["key"] == 400
@@ -370,7 +467,14 @@ defmodule ReduceTest do
     assert Enum.at(rows, 2)["key"] == 402
     assert Enum.at(rows, 2)["value"] == 2
 
-    query = %{:group => true, startkey: 400, endkey: 402, foobar: rand_val.(), endkey_docid: "400"}
+    query = %{
+      :group => true,
+      startkey: 400,
+      endkey: 402,
+      foobar: rand_val.(),
+      endkey_docid: "400"
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert length(rows) == 3
     assert Enum.at(rows, 0)["key"] == 400
@@ -380,7 +484,15 @@ defmodule ReduceTest do
     assert Enum.at(rows, 2)["key"] == 402
     assert Enum.at(rows, 2)["value"] == 1
 
-    query = %{:group => true, startkey: 402, endkey: 400, foobar: rand_val.(), startkey_docid: "401", descending: true}
+    query = %{
+      :group => true,
+      startkey: 402,
+      endkey: 400,
+      foobar: rand_val.(),
+      startkey_docid: "401",
+      descending: true
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert length(rows) == 3
     assert Enum.at(rows, 0)["key"] == 402
@@ -390,7 +502,15 @@ defmodule ReduceTest do
     assert Enum.at(rows, 2)["key"] == 400
     assert Enum.at(rows, 2)["value"] == 3
 
-    query = %{:group => true, startkey: 402, endkey: 400, foobar: rand_val.(), startkey_docid: "400", descending: true}
+    query = %{
+      :group => true,
+      startkey: 402,
+      endkey: 400,
+      foobar: rand_val.(),
+      startkey_docid: "400",
+      descending: true
+    }
+
     rows = Couch.get(view_url, query: query).body["rows"]
     assert length(rows) == 3
     assert Enum.at(rows, 0)["key"] == 402

@@ -32,7 +32,8 @@ defmodule CoffeeTest do
       :views => %{
         :myview => %{
           :map => "(doc) -> if doc.foo\n  emit(doc.foo, 1)",
-          :reduce => "(keys, values, rereduce) ->\n  sum = 0\n  for x in values\n    sum = sum + x\n  sum"
+          :reduce =>
+            "(keys, values, rereduce) ->\n  sum = 0\n  for x in values\n    sum = sum + x\n  sum"
         }
       },
       :shows => %{
@@ -58,10 +59,13 @@ defmodule CoffeeTest do
 
     assert Couch.get("/#{db_name}/_design/coffee/_show/myshow/a").body === "Foo 100"
 
-    %{"resp" => list_output} = Couch.get("/#{db_name}/_design/coffee/_list/mylist/myview").body
+    %{"resp" => list_output} =
+      Couch.get("/#{db_name}/_design/coffee/_list/mylist/myview").body
+
     assert list_output === "Foo 5"
 
-    %{"results" => changes_results} = Couch.get("/#{db_name}/_changes", query: %{"filter" => "coffee/filter"}).body
+    %{"results" => changes_results} =
+      Couch.get("/#{db_name}/_changes", query: %{"filter" => "coffee/filter"}).body
 
     assert length(changes_results) === 5
   end

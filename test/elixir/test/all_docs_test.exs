@@ -53,13 +53,14 @@ defmodule AllDocsTest do
         }
       )
 
-    assert length(resp.body["rows"]) == 0
+    assert Enum.empty?(resp.body["rows"])
 
     # Check that all docs show up in the changes feed; order can vary
     resp = Couch.get("/#{db_name}/_changes").body
 
     Enum.each(resp["results"], fn row ->
-      assert Enum.member?(revs, hd(row["changes"])["rev"]), "doc #{row["id"]} should be in changes"
+      assert Enum.member?(revs, hd(row["changes"])["rev"]),
+             "doc #{row["id"]} should be in changes"
     end)
 
     # Check that deletions also show up right
@@ -78,14 +79,17 @@ defmodule AllDocsTest do
     doc3 = Map.put(doc3, :updated, "totally")
     assert Couch.put("/#{db_name}/3", body: doc3).body["ok"]
 
-    # The update should make doc id 3 have another seq num (not nec. higher or the last though)
+    # The update should make doc id 3 have another seq num
+    # (not nec. higher or the last though)
     changes = Couch.get("/#{db_name}/_changes").body["results"]
     assert length(changes) == 4
     updated_doc = Enum.find(changes, fn row -> row["id"] == "3" end)
     assert orig_doc["seq"] != updated_doc["seq"], "seq num should be different"
 
     # Ok, now let's see what happens with include docs
-    changes = Couch.get("/#{db_name}/_changes", query: %{:include_docs => true}).body["results"]
+    changes =
+      Couch.get("/#{db_name}/_changes", query: %{:include_docs => true}).body["results"]
+
     assert length(changes) == 4
     updated_doc = Enum.find(changes, fn row -> row["id"] == doc3["_id"] end)
     assert updated_doc["doc"]["updated"] == "totally"
@@ -94,7 +98,12 @@ defmodule AllDocsTest do
     assert deleted_doc["doc"]["_deleted"]
 
     # Test _all_docs with keys
-    rows = Couch.post("/#{db_name}/_all_docs", query: %{:include_docs => true}, body: %{:keys => ["1"]}).body["rows"]
+    rows =
+      Couch.post("/#{db_name}/_all_docs",
+        query: %{:include_docs => true},
+        body: %{:keys => ["1"]}
+      ).body["rows"]
+
     row = hd(rows)
     assert length(rows) == 1
     assert row["key"] == "1"
@@ -103,17 +112,32 @@ defmodule AllDocsTest do
     assert row["doc"] == :null
 
     # Add conflicts
-    conflicted_doc1 = %{:_id => "3", :_rev => "2-aa01552213fafa022e6167113ed01087", :value => "X"}
-    conflicted_doc2 = %{:_id => "3", :_rev => "2-ff01552213fafa022e6167113ed01087", :value => "Z"}
-    assert Couch.put("/#{db_name}/3", query: %{:new_edits => false}, body: conflicted_doc1).body["ok"]
-    assert Couch.put("/#{db_name}/3", query: %{:new_edits => false}, body: conflicted_doc2).body["ok"]
+    conflicted_doc1 = %{
+      :_id => "3",
+      :_rev => "2-aa01552213fafa022e6167113ed01087",
+      :value => "X"
+    }
+
+    conflicted_doc2 = %{
+      :_id => "3",
+      :_rev => "2-ff01552213fafa022e6167113ed01087",
+      :value => "Z"
+    }
+
+    assert Couch.put("/#{db_name}/3", query: %{:new_edits => false}, body: conflicted_doc1).body[
+             "ok"
+           ]
+
+    assert Couch.put("/#{db_name}/3", query: %{:new_edits => false}, body: conflicted_doc2).body[
+             "ok"
+           ]
 
     win_rev = Couch.get("/#{db_name}/3").body
 
     changes =
-      Couch.get("/#{db_name}/_changes", query: %{:include_docs => true, :conflicts => true, :style => "all_docs"}).body[
-        "results"
-      ]
+      Couch.get("/#{db_name}/_changes",
+        query: %{:include_docs => true, :conflicts => true, :style => "all_docs"}
+      ).body["results"]
 
     doc3 = Enum.find(changes, fn row -> row["id"] == "3" end)
     assert doc3["id"] == "3"
@@ -122,7 +146,11 @@ defmodule AllDocsTest do
     assert is_list(doc3["doc"]["_conflicts"])
     assert length(doc3["doc"]["_conflicts"]) == 2
 
-    rows = Couch.get("/#{db_name}/_all_docs", query: %{:include_docs => true, :conflicts => true}).body["rows"]
+    rows =
+      Couch.get("/#{db_name}/_all_docs",
+        query: %{:include_docs => true, :conflicts => true}
+      ).body["rows"]
+
     assert length(rows) == 3
     change = hd(tl(tl(rows)))
     assert change["key"] == "3"
@@ -136,7 +164,12 @@ defmodule AllDocsTest do
     # Test that _all_docs collates sanely
     assert Couch.post("/#{db_name}", body: %{:_id => "Z", :foo => "Z"}).body["ok"]
     assert Couch.post("/#{db_name}", body: %{:_id => "a", :foo => "a"}).body["ok"]
-    rows = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "\"Z\"", :endkey => "\"Z\""}).body["rows"]
+
+    rows =
+      Couch.get("/#{db_name}/_all_docs",
+        query: %{:startkey => "\"Z\"", :endkey => "\"Z\""}
+      ).body["rows"]
+
     assert length(rows) == 1
   end
 end
