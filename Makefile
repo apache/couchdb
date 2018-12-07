@@ -175,6 +175,12 @@ soak-eunit: couch
 elixir: elixir-check-formatted devclean
 	@dev/run -a adm:pass --no-eval test/elixir/run
 
+.PHONY: elixir-cluster-without-quorum
+elixir-cluster-without-quorum: elixir-check-formatted devclean
+	@dev/run -n 3 -a adm:pass \
+	          --degrade-cluster 2 \
+            --no-eval test/elixir/run test-cluster/without-quorum/*.exs
+
 .PHONY: elixir-check-formatted
 elixir-check-formatted:
 	@cd test/elixir/ && mix format --check-formatted

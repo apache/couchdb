@@ -3,4 +3,4 @@ cd "$(dirname "$0")"
 mix local.hex --force
 mix local.rebar --force
 mix deps.get
-mix test --trace
+mix test $1 --trace
