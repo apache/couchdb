@@ -37,4 +37,4 @@ cd "$(dirname "$0")"
 mix local.hex --force
 mix local.rebar --force
 mix deps.get
-mix test $FONLY $FINCLUDE $FEXCLUDE --trace
+mix test --trace $FONLY $FINCLUDE $FEXCLUDE $PARAMS
