@@ -754,7 +754,7 @@ defmodule ReplicationTest do
     Enum.each(docs, fn doc ->
       resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
 
-      if(rem(doc["integer"], 2) == 0 || doc["string"] == "7") do
+      if rem(doc["integer"], 2) == 0 || doc["string"] == "7" do
         assert resp.status_code < 300
         assert cmp_json(doc, resp.body)
       else
@@ -804,7 +804,7 @@ defmodule ReplicationTest do
     Enum.each(new_docs, fn doc ->
       resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
 
-      if(rem(doc["integer"], 2) == 0) do
+      if rem(doc["integer"], 2) == 0 do
         assert resp.status_code < 300
         assert cmp_json(doc, resp.body)
       else
@@ -1005,7 +1005,7 @@ defmodule ReplicationTest do
     result = replicate(repl_src, repl_tgt, body: repl_body)
     assert result["ok"]
 
-    if(total_replicated == 0) do
+    if total_replicated == 0 do
       assert result["no_changes"]
     else
       assert is_binary(result["start_time"])
@@ -1020,7 +1020,7 @@ defmodule ReplicationTest do
       orig = Couch.get!("/#{src_db_name}/#{doc_id}")
       copy = Couch.get!("/#{tgt_db_name}/#{doc_id}")
 
-      if(String.starts_with?(doc_id, "foo_")) do
+      if String.starts_with?(doc_id, "foo_") do
         assert orig.status_code == 404
         assert copy.status_code == 404
       else
@@ -1036,7 +1036,7 @@ defmodule ReplicationTest do
       copy = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
       is_doc_id = &Enum.member?(doc_ids, &1)
 
-      if(is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id)) do
+      if is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id) do
         assert HTTPotion.Response.success?(copy)
       else
         assert copy.status_code == 404
@@ -1059,7 +1059,7 @@ defmodule ReplicationTest do
 
     total_replicated_after = length(doc_ids_after) - num_missing_after
 
-    if(total_replicated_after == 0) do
+    if total_replicated_after == 0 do
       assert result["no_changes"]
     else
       assert is_binary(result["start_time"])
@@ -1073,7 +1073,7 @@ defmodule ReplicationTest do
       orig = Couch.get!("/#{src_db_name}/#{doc_id}")
       copy = Couch.get!("/#{tgt_db_name}/#{doc_id}")
 
-      if(String.starts_with?(doc_id, "foo_")) do
+      if String.starts_with?(doc_id, "foo_") do
         assert orig.status_code == 404
         assert copy.status_code == 404
       else
@@ -1091,7 +1091,7 @@ defmodule ReplicationTest do
       copy = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
       is_doc_id = &Enum.member?(all_doc_ids, &1)
 
-      if(is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id)) do
+      if is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id) do
         assert HTTPotion.Response.success?(copy)
       else
         assert copy.status_code == 404
@@ -1224,7 +1224,7 @@ defmodule ReplicationTest do
     assert is_binary(result["_local_id"])
 
     repl_id = result["_local_id"]
-    task = get_task(repl_id, 30000)
+    task = get_task(repl_id, 30_000)
     assert is_map(task), "Error waiting for replication to start"
 
     wait_for_repl(src_db_name, repl_id, 26)
@@ -1403,7 +1403,7 @@ defmodule ReplicationTest do
     doc = %{"_id" => "foobar", "value" => 666}
     [doc] = save_docs(src_db_name, [doc])
 
-    wait_for_repl_stop(repl_id, 30000)
+    wait_for_repl_stop(repl_id, 30_000)
 
     resp = Couch.get("/#{tgt_db_name}/#{doc["_id"]}")
     assert resp.status_code == 404
@@ -1583,7 +1583,7 @@ defmodule ReplicationTest do
     tgt = set_user(tgt, userinfo)
 
     defaults = [headers: [], body: %{}, timeout: 30_000]
-    options = Keyword.merge(defaults, options) |> Enum.into(%{})
+    options = defaults |> Keyword.merge(options) |> Enum.into(%{})
 
     %{body: body} = options
     body = [source: src, target: tgt] |> Enum.into(body)
@@ -1635,7 +1635,7 @@ defmodule ReplicationTest do
       content_type: "text/plain"
     ]
 
-    att = Keyword.merge(defaults, att) |> Enum.into(%{})
+    att = defaults |> Keyword.merge(att) |> Enum.into(%{})
     uri = "/#{db_name}/#{URI.encode(doc["_id"])}/#{att[:name]}"
     headers = ["Content-Type": att[:content_type]]
 
@@ -1652,7 +1652,7 @@ defmodule ReplicationTest do
   end
 
   def wait_for_repl(src_db_name, repl_id, expect_revs_checked) do
-    wait_for_repl(src_db_name, repl_id, expect_revs_checked, 30000)
+    wait_for_repl(src_db_name, repl_id, expect_revs_checked, 30_000)
   end
 
   def wait_for_repl(_, _, _, wait_left) when wait_left <= 0 do
@@ -1674,7 +1674,7 @@ defmodule ReplicationTest do
   end
 
   def wait_for_repl_stop(repl_id) do
-    wait_for_repl_stop(repl_id, 30000)
+    wait_for_repl_stop(repl_id, 30_000)
   end
 
   def wait_for_repl_stop(repl_id, wait_left) when wait_left <= 0 do

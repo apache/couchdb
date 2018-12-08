@@ -1,4 +1,8 @@
 defmodule Couch.Session do
+  @moduledoc """
+  CouchDB session helpers.
+  """
+
   @enforce_keys [:cookie]
   defstruct [:cookie]
 
@@ -155,18 +159,41 @@ defmodule Couch do
     options = process_options(options)
 
     body = Keyword.get(options, :body, "")
-    headers = Keyword.merge(Application.get_env(:httpotion, :default_headers, []), Keyword.get(options, :headers, []))
-    timeout = Keyword.get(options, :timeout, Application.get_env(:httpotion, :default_timeout, 5000))
+
+    headers =
+      Keyword.merge(
+        Application.get_env(:httpotion, :default_headers, []),
+        Keyword.get(options, :headers, [])
+      )
+
+    timeout =
+      Keyword.get(
+        options,
+        :timeout,
+        Application.get_env(:httpotion, :default_timeout, 5000)
+      )
 
     ib_options =
-      Keyword.merge(Application.get_env(:httpotion, :default_ibrowse, []), Keyword.get(options, :ibrowse, []))
+      Keyword.merge(
+        Application.get_env(:httpotion, :default_ibrowse, []),
+        Keyword.get(options, :ibrowse, [])
+      )
 
     follow_redirects =
-      Keyword.get(options, :follow_redirects, Application.get_env(:httpotion, :default_follow_redirects, false))
+      Keyword.get(
+        options,
+        :follow_redirects,
+        Application.get_env(:httpotion, :default_follow_redirects, false)
+      )
 
     ib_options =
       if stream_to = Keyword.get(options, :stream_to),
-        do: Keyword.put(ib_options, :stream_to, spawn(__MODULE__, :transformer, [stream_to, method, url, options])),
+        do:
+          Keyword.put(
+            ib_options,
+            :stream_to,
+            spawn(__MODULE__, :transformer, [stream_to, method, url, options])
+          ),
         else: ib_options
 
     ib_options =
@@ -182,7 +209,9 @@ defmodule Couch do
       url: url |> to_string |> process_url(options) |> to_charlist,
       body: body |> process_request_body,
       headers:
-        headers |> process_request_headers(options) |> Enum.map(fn {k, v} -> {to_charlist(k), to_charlist(v)} end),
+        headers
+        |> process_request_headers(options)
+        |> Enum.map(fn {k, v} -> {to_charlist(k), to_charlist(v)} end),
       timeout: timeout,
       ib_options: ib_options,
       follow_redirects: follow_redirects

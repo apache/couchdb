@@ -18,7 +18,9 @@ defmodule LotsOfDocsTest do
     |> Enum.chunk_every(100)
     |> Enum.each(fn docs -> bulk_post(docs, db_name) end)
 
-    %{"rows" => rows, "total_rows" => total_rows} = Couch.get("/#{db_name}/_all_docs").body
+    %{"rows" => rows, "total_rows" => total_rows} =
+      Couch.get("/#{db_name}/_all_docs").body
+
     assert total_rows === Enum.count(@docs_range)
     assert total_rows === Enum.count(rows)
 
@@ -66,7 +68,9 @@ defmodule LotsOfDocsTest do
       assert Map.fetch!(Enum.at(rows, i), "key") === i
     end)
 
-    %{"rows" => desc_rows, "total_rows" => desc_total_rows} = query_view(db_name, "descending")
+    %{"rows" => desc_rows, "total_rows" => desc_total_rows} =
+      query_view(db_name, "descending")
+
     assert desc_total_rows === Enum.count(desc_rows)
     assert desc_total_rows === Enum.count(@docs_range)
 
