@@ -715,12 +715,42 @@ is_idle(#file{is_sys=false}) ->
         _ -> false
     end.
 
-lock(Fd) -> try
-                ets:new(list_to_atom(pid_to_list(Fd)), [named_table]), true
-            catch
-                _:_ -> false
-            end.
-unlock(Fd) -> ets:delete(list_to_atom(pid_to_list(Fd))).
+
+lock(Fd) ->
+    Me = self(), Pid = spawn_link(fun() -> locking(Fd,Me) end),
+    receive
+        {locked,Pid} -> true
+    end.
+
+unlock(Fd) ->
+    lockname(Fd) ! {unlock,self()}, true.
+
+lockname(Fd) when is_pid(Fd) ->
+    list_to_atom(pid_to_list(Fd)).
+
+locking(Fd,Parent) ->
+    case
+        try
+            {registered,register(lockname(Fd),self())}
+        catch
+            _:_ ->
+                {wait,monitor(process,lockname(Fd))}
+        end of
+        {registered,true} ->
+            ParentRef = monitor(process,Parent), Parent ! {locked,self()},
+            receive
+            % wait for unlocking
+                {unlock,Parent} -> true;
+            % parent died normally
+                {'DOWN',ParentRef,_,_,_} -> false
+            end;
+        {wait,LocknameRef} ->
+            receive
+            % wait for unlocked
+                {'DOWN',LocknameRef,_,_,_} -> locking(Fd,Parent)
+            end
+    end.
+
 
 -spec process_info(CouchFilePid :: pid()) ->
     {Fd :: pid() | tuple(), FilePath :: string()} | undefined.
