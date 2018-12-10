@@ -1,4 +1,6 @@
 defmodule Couch.DBTest do
+  @moduledoc false
+
   import ExUnit.Callbacks, only: [on_exit: 1]
   import ExUnit.Assertions, only: [assert: 1, assert: 2]
 
