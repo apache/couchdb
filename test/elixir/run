@@ -1,40 +1,6 @@
 #!/bin/bash -e
-
-PARAMS=""
-while (( "$#" )); do
-  case "$1" in
-    -o|--only)
-      FONLY="$FONLY --only $2"
-      shift 2
-      ;;
-    -e|--exclude)
-      FEXCLUDE="$FEXCLUDE --exclude $2"
-      shift 2
-      ;;
-    -i|--include)
-     FINCLUDE="$FINCLUDE --include $2"
-     shift 2
-     ;;
-    --) # end argument parsing
-      shift
-      break
-      ;;
-    -*|--*=) # unsupported flags
-      echo "Error: Unsupported flag $1" >&2
-      exit 1
-      ;;
-    *) # preserve positional arguments
-      PARAMS="$PARAMS $1"
-      shift
-      ;;
-  esac
-done
-
-# set positional arguments in their proper place
-eval set -- "$PARAMS"
-
 cd "$(dirname "$0")"
 mix local.hex --force
 mix local.rebar --force
 mix deps.get
-mix test --trace $FONLY $FINCLUDE $FEXCLUDE $PARAMS
+mix test --trace "$@"
