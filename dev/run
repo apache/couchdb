@@ -381,7 +381,7 @@ def write_config(ctx, node, env):
 def boot_haproxy(ctx):
     if not ctx["with_haproxy"]:
         return
-    config = os.path.join(ctx["devdir"], "rel", "haproxy.cfg")
+    config = os.path.join(ctx["devdir"], "lib", "haproxy.cfg")
     cmd = [ctx["haproxy"], "-f", config]
     logfname = os.path.join(ctx["devdir"], "logs", "haproxy.log")
     log = open(logfname, "w")
