@@ -239,4 +239,57 @@ defmodule Couch.DBTest do
     opts = [pretty: true, width: 20, limit: :infinity, printable_limit: :infinity]
     inspect(resp, opts)
   end
+
+  def restart_cluster() do
+    resp = Couch.get("/_membership")
+    assert resp.status_code == 200
+    nodes = resp.body["all_nodes"]
+
+    nodes_ports =
+      Enum.reduce(nodes, [], fn node, acc ->
+        port = node_to_port(node)
+        [{node, port} | acc]
+      end)
+
+    tasks =
+      Enum.map(nodes_ports, fn {node, port} ->
+        Task.async(fn -> restart_node(node, port) end)
+      end)
+
+    Task.yield_many(tasks, length(nodes) * 5000)
+  end
+
+  def restart_node(node \\ "node1@127.0.0.1") do
+    port = node_to_port(node)
+    restart_node(node, port)
+  end
+
+  defp restart_node(node, port) do
+    url = "http://127.0.0.1:#{port}/_node/#{node}/_restart"
+    resp = Couch.post(url)
+    assert HTTPotion.Response.success?(resp)
+    assert resp.body["ok"]
+    # make sure node went down. we assuming the node can't bounce quick
+    # enough to inroduce a race here
+    retry_until(fn -> !node_is_running(port) end)
+    # wait utill node is back
+    retry_until(fn -> node_is_running(port) end, 500, 10_000)
+  end
+
+  defp node_is_running(port) do
+    url = "http://127.0.0.1:#{port}/_up"
+    resp = Couch.get(url)
+
+    case HTTPotion.Response.success?(resp) do
+      true -> resp.status_code in 200..399
+      false -> false
+    end
+  end
+
+  defp node_to_port(node) do
+    url = "/_node/#{node}/_config/chttpd/port"
+    resp = Couch.get(url)
+    assert HTTPotion.Response.success?(resp)
+    resp.body
+  end
 end
