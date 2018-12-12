@@ -50,6 +50,10 @@ defmodule Couch do
   CouchDB library to power test suite.
   """
 
+  def process_url("http://" <> _ = url) do
+    url
+  end
+
   def process_url(url) do
     "http://127.0.0.1:15984" <> url
   end

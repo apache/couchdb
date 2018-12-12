@@ -116,6 +116,27 @@ all_test_() ->
         }
     }.
 
+security_object_validate_test_() ->
+    {
+        "chttpd security object validate tests",
+        {
+            setup,
+            fun chttpd_test_util:start_couch/0, fun chttpd_test_util:stop_couch/1,
+            {
+                foreach,
+                fun setup/0, fun teardown/1,
+                [
+                    fun should_return_ok_for_sec_obj_with_roles/1,
+                    fun should_return_ok_for_sec_obj_with_names/1,
+                    fun should_return_ok_for_sec_obj_with_roles_and_names/1,
+                    fun should_return_error_for_sec_obj_with_incorrect_roles_and_names/1,
+                    fun should_return_error_for_sec_obj_with_incorrect_roles/1,
+                    fun should_return_error_for_sec_obj_with_incorrect_names/1
+                ]
+            }
+        }
+    }.
+
 should_allow_admin_db_compaction([Url,_UsersUrl]) ->
     ?_assertEqual(true,
         begin
@@ -125,7 +146,6 @@ should_allow_admin_db_compaction([Url,_UsersUrl]) ->
             {InnerJson} = ResultJson,
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
         end).
-
 
 should_allow_valid_password_to_create_user([_Url, UsersUrl]) ->
     UserDoc = "{\"_id\": \"org.couchdb.user:foo\", \"name\": \"foo\",
@@ -207,3 +227,99 @@ should_disallow_anonymous_db_view_cleanup([Url,_UsersUrl]) ->
     {InnerJson} = ResultJson,
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
     ?_assertEqual(<<"unauthorized">>, ErrType).
+
+should_return_ok_for_sec_obj_with_roles([Url,_UsersUrl]) ->
+    SecurityUrl = lists:concat([Url, "/_security"]),
+    SecurityProperties = [
+        {<<"admins">>,{[{<<"roles">>,[<<?TEST_ADMIN>>]}]}},
+        {<<"members">>,{[{<<"roles">>,[<<?TEST_MEMBER>>]}]}}
+    ],
+
+    Body = jiffy:encode({SecurityProperties}),
+    {ok, Status, _, _} = test_request:put(SecurityUrl,
+        [?CONTENT_JSON, ?AUTH], Body),
+    ?_assertEqual(200, Status).
+
+should_return_ok_for_sec_obj_with_names([Url,_UsersUrl]) ->
+    SecurityUrl = lists:concat([Url, "/_security"]),
+    SecurityProperties = [
+        {<<"admins">>,{[{<<"names">>,[<<?TEST_ADMIN>>]}]}},
+        {<<"members">>,{[{<<"names">>,[<<?TEST_MEMBER>>]}]}}
+    ],
+
+    Body = jiffy:encode({SecurityProperties}),
+    {ok, Status, _, _} = test_request:put(SecurityUrl,
+        [?CONTENT_JSON, ?AUTH], Body),
+    ?_assertEqual(200, Status).
+
+should_return_ok_for_sec_obj_with_roles_and_names([Url,_UsersUrl]) ->
+    SecurityUrl = lists:concat([Url, "/_security"]),
+    SecurityProperties = [
+        {<<"admins">>, {[{<<"names">>,[<<?TEST_ADMIN>>]},
+                         {<<"roles">>,[<<?TEST_ADMIN>>]}]}},
+        {<<"members">>,{[{<<"names">>,[<<?TEST_MEMBER>>]},
+                         {<<"roles">>,[<<?TEST_MEMBER>>]}]}}
+    ],
+
+    Body = jiffy:encode({SecurityProperties}),
+    {ok, Status, _, _} = test_request:put(SecurityUrl,
+        [?CONTENT_JSON, ?AUTH], Body),
+    ?_assertEqual(200, Status).
+
+should_return_error_for_sec_obj_with_incorrect_roles_and_names(
+    [Url,_UsersUrl]) ->
+    SecurityUrl = lists:concat([Url, "/_security"]),
+    SecurityProperties = [
+        {<<"admins">>,{[{<<"names">>,[123]}]}},
+        {<<"members">>,{[{<<"roles">>,["foo"]}]}}
+    ],
+
+    Body = jiffy:encode({SecurityProperties}),
+    {ok, Status, _, RespBody} = test_request:put(SecurityUrl,
+        [?CONTENT_JSON, ?AUTH], Body),
+    ResultJson = ?JSON_DECODE(RespBody),
+    [
+        ?_assertEqual(500, Status),
+        ?_assertEqual({[
+            {<<"error">>,<<"error">>},
+            {<<"reason">>,<<"no_majority">>}
+        ]}, ResultJson)
+    ].
+
+should_return_error_for_sec_obj_with_incorrect_roles([Url,_UsersUrl]) ->
+    SecurityUrl = lists:concat([Url, "/_security"]),
+    SecurityProperties = [
+        {<<"admins">>,{[{<<"roles">>,[?TEST_ADMIN]}]}},
+        {<<"members">>,{[{<<"roles">>,[<<?TEST_MEMBER>>]}]}}
+    ],
+
+    Body = jiffy:encode({SecurityProperties}),
+    {ok, Status, _, RespBody} = test_request:put(SecurityUrl,
+        [?CONTENT_JSON, ?AUTH], Body),
+    ResultJson = ?JSON_DECODE(RespBody),
+    [
+        ?_assertEqual(500, Status),
+        ?_assertEqual({[
+            {<<"error">>,<<"error">>},
+            {<<"reason">>,<<"no_majority">>}
+        ]}, ResultJson)
+    ].
+
+should_return_error_for_sec_obj_with_incorrect_names([Url,_UsersUrl]) ->
+    SecurityUrl = lists:concat([Url, "/_security"]),
+    SecurityProperties = [
+        {<<"admins">>,{[{<<"names">>,[<<?TEST_ADMIN>>]}]}},
+        {<<"members">>,{[{<<"names">>,[?TEST_MEMBER]}]}}
+    ],
+
+    Body = jiffy:encode({SecurityProperties}),
+    {ok, Status, _, RespBody} = test_request:put(SecurityUrl,
+        [?CONTENT_JSON, ?AUTH], Body),
+    ResultJson = ?JSON_DECODE(RespBody),
+    [
+        ?_assertEqual(500, Status),
+        ?_assertEqual({[
+            {<<"error">>,<<"error">>},
+            {<<"reason">>,<<"no_majority">>}
+        ]}, ResultJson)
+    ].

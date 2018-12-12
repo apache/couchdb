@@ -24,10 +24,13 @@ import optparse
 import os
 import posixpath
 import re
+import socket
 import subprocess as sp
 import sys
 import time
 import uuid
+import traceback
+from configparser import ConfigParser
 
 from pbkdf2 import pbkdf2_hex
 
@@ -89,7 +92,7 @@ def main():
     if ctx["cmd"]:
         run_command(ctx, ctx["cmd"])
     else:
-        join(ctx, 15984, *ctx["admin"])
+        join(ctx, cluster_port(ctx, 1), *ctx["admin"])
 
 
 def setup():
@@ -190,6 +193,13 @@ def setup_argparse():
         default=False,
         help="Do not eval subcommand output",
     )
+    parser.add_option(
+        "--auto-ports",
+        dest="auto_ports",
+        default=False,
+        action="store_true",
+        help="Select available ports for nodes automatically",
+    )
     return parser.parse_args()
 
 
@@ -215,6 +225,7 @@ def setup_context(opts, args):
         "no_eval": opts.no_eval,
         "reset_logs": True,
         "procs": [],
+        "auto_ports": opts.auto_ports,
     }
 
 
@@ -244,7 +255,7 @@ def setup_configs(ctx):
         fauxton_root = "share/www"
 
     for idx, node in enumerate(ctx["nodes"]):
-        cluster_port, backend_port = get_ports(idx + ctx["node_number"])
+        cluster_port, backend_port = get_ports(ctx, idx + ctx["node_number"])
         env = {
             "prefix": toposixpath(ctx["rootdir"]),
             "package_author_name": "The Apache Software Foundation",
@@ -263,6 +274,32 @@ def setup_configs(ctx):
             "compaction_daemon": "{}",
         }
         write_config(ctx, node, env)
+    generate_haproxy_config(ctx)
+
+
+def generate_haproxy_config(ctx):
+    haproxy_config = os.path.join(ctx["devdir"], "lib", "haproxy.cfg")
+    template = os.path.join(ctx["rootdir"], "rel", "haproxy.cfg")
+
+    with open(template) as handle:
+        config = handle.readlines()
+
+    out = []
+    for line in config:
+        match = re.match("(.*?)<<(.*?)>>(.*?)", line, re.S)
+        if match:
+            prefix, template, suffix = match.groups()
+            for node in ctx["nodes"]:
+                node_idx = int(node.replace("node", ""))
+                text = template.format(
+                    **{"node_idx": node_idx, "port": cluster_port(ctx, node_idx)}
+                )
+                out.append(prefix + text + suffix)
+        else:
+            out.append(line)
+
+    with open(haproxy_config, "w") as handle:
+        handle.write("\n".join(out))
 
 
 def apply_config_overrides(ctx, content):
@@ -275,9 +312,43 @@ def apply_config_overrides(ctx, content):
     return content
 
 
-def get_ports(idnode):
+def get_ports(ctx, idnode):
     assert idnode
-    return ((10000 * idnode) + 5984, (10000 * idnode) + 5986)
+    if idnode <= 5 and not ctx["auto_ports"]:
+        return ((10000 * idnode) + 5984, (10000 * idnode) + 5986)
+    else:
+        return tuple(get_available_ports(2))
+
+
+def get_available_ports(num):
+    ports = []
+    while len(ports) < num:
+        with contextlib.closing(
+            socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        ) as soc:
+            soc.bind(("localhost", 0))
+            _, port = soc.getsockname()
+            if port not in ports:
+                ports.append(port)
+    return ports
+
+
+def get_node_config(ctx, node_idx):
+    node = "node{}".format(node_idx)
+    config_dir = os.path.join(ctx["devdir"], "lib", node, "etc")
+    config = ConfigParser()
+    config.read(
+        [os.path.join(config_dir, "default.ini"), os.path.join(config_dir, "local.ini")]
+    )
+    return config
+
+
+def backend_port(ctx, n):
+    return int(get_node_config(ctx, n).get("httpd", "port"))
+
+
+def cluster_port(ctx, n):
+    return int(get_node_config(ctx, n).get("chttpd", "port"))
 
 
 def write_config(ctx, node, env):
@@ -310,7 +381,7 @@ def write_config(ctx, node, env):
 def boot_haproxy(ctx):
     if not ctx["with_haproxy"]:
         return
-    config = os.path.join(ctx["rootdir"], "rel", "haproxy.cfg")
+    config = os.path.join(ctx["devdir"], "lib", "haproxy.cfg")
     cmd = [ctx["haproxy"], "-f", config]
     logfname = os.path.join(ctx["devdir"], "logs", "haproxy.log")
     log = open(logfname, "w")
@@ -425,7 +496,7 @@ def ensure_all_nodes_alive(ctx):
         for num in range(ctx["N"]):
             if status[num]:
                 continue
-            local_port, _ = get_ports(num + ctx["node_number"])
+            local_port = cluster_port(ctx, num + 1)
             url = "http://127.0.0.1:{0}/".format(local_port)
             try:
                 check_node_alive(url)
@@ -512,12 +583,13 @@ def boot_node(ctx, node):
 
 @log("Running cluster setup")
 def cluster_setup(ctx):
-    lead_port, _ = get_ports(1)
+    lead_port = cluster_port(ctx, 1)
     if enable_cluster(ctx["N"], lead_port, *ctx["admin"]):
         for num in range(1, ctx["N"]):
-            node_port, _ = get_ports(num + 1)
+            node_port = cluster_port(ctx, num + 1)
+            node_name = ctx["nodes"][num]
             enable_cluster(ctx["N"], node_port, *ctx["admin"])
-            add_node(lead_port, node_port, *ctx["admin"])
+            add_node(lead_port, node_name, node_port, *ctx["admin"])
         finish_cluster(lead_port, *ctx["admin"])
     return lead_port
 
@@ -550,7 +622,7 @@ def enable_cluster(node_count, port, user, pswd):
     return True
 
 
-def add_node(lead_port, node_port, user, pswd):
+def add_node(lead_port, node_name, node_port, user, pswd):
     conn = httpclient.HTTPConnection("127.0.0.1", lead_port)
     conn.request(
         "POST",
@@ -560,6 +632,7 @@ def add_node(lead_port, node_port, user, pswd):
                 "action": "add_node",
                 "host": "127.0.0.1",
                 "port": node_port,
+                "name": node_name,
                 "username": user,
                 "password": pswd,
             }
@@ -616,7 +689,7 @@ def generate_cookie():
 
 
 def cluster_setup_with_admin_party(ctx):
-    host, port = "127.0.0.1", 15986
+    host, port = "127.0.0.1", backend_port(ctx, 1)
     for node in ctx["nodes"]:
         body = "{}"
         conn = httpclient.HTTPConnection(host, port)
@@ -625,7 +698,7 @@ def cluster_setup_with_admin_party(ctx):
         if resp.status not in (200, 201, 202, 409):
             print(("Failed to join %s into cluster: %s" % (node, resp.read())))
             sys.exit(1)
-    create_system_databases(host, 15984)
+    create_system_databases(host, cluster_port(ctx, 1))
 
 
 def try_request(host, port, meth, path, success_codes, retries=10, retry_dt=1):
