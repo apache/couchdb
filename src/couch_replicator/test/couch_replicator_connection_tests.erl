@@ -73,7 +73,7 @@ connections_not_shared_after_owner_death({Host, Port}) ->
         Self = self(),
         spawn(fun() ->
             Self ! couch_replicator_connection:acquire(URL),
-            1/0
+            error("simulate division by zero without compiler warning")
         end),
         receive
             {ok, Pid} ->
