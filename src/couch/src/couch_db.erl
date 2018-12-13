@@ -1767,7 +1767,7 @@ is_system_db_name(DbName) when is_binary(DbName) ->
     Suffix = filename:basename(Normalized),
     case {filename:dirname(Normalized), lists:member(Suffix, ?SYSTEM_DATABASES)} of
         {<<".">>, Result} -> Result;
-        {Prefix, false} -> false;
+        {_Prefix, false} -> false;
         {Prefix, true} ->
             ReOpts =  [{capture,none}, dollar_endonly],
             re:run(Prefix, ?DBNAME_REGEX, ReOpts) == match

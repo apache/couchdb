@@ -137,7 +137,6 @@ verify_purge_checkpoint(DbName, Props) ->
             Target = binary_to_existing_atom(TargetBin, latin1),
 
             try
-                Shards = mem3:shards(DbName),
                 Nodes = lists:foldl(fun(Shard, Acc) ->
                     case Shard#shard.range == Range of
                         true -> [Shard#shard.node | Acc];

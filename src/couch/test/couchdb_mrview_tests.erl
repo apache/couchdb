@@ -151,7 +151,7 @@ should_cleanup_index_files(_PortType, {Host, DbName}) ->
             ".[0-9]*_design/mrview/*"
         ],
         ReqUrl = Host ++ "/" ++ DbName ++ "/_design/foo/_view/view1",
-        {ok, Status0, _Headers0, Body0} = test_request:get(ReqUrl, [?AUTH]),
+        {ok, _Status0, _Headers0, _Body0} = test_request:get(ReqUrl, [?AUTH]),
         FileList0 = filelib:wildcard(IndexWildCard),
         ?assertNotEqual([], FileList0),
 
@@ -169,7 +169,7 @@ should_cleanup_index_files(_PortType, {Host, DbName}) ->
         ?assertEqual([], lists:usort(FileList1 -- (FileList0 ++ ToDelete))),
 
         CleanupUrl = Host ++ "/" ++ DbName ++ "/_view_cleanup",
-        {ok, Status1, _Headers1, Body1} = test_request:post(
+        {ok, _Status1, _Headers1, _Body1} = test_request:post(
             CleanupUrl, [], <<>>, [?AUTH]),
         test_util:wait(fun() ->
                 IndexFiles = filelib:wildcard(IndexWildCard),

@@ -97,7 +97,7 @@ should_run_replication(RepPid, RepId, Source, Target) ->
 should_ensure_replication_still_running(RepPid, RepId, Source, Target) ->
     ?_test(check_active_tasks(RepPid, RepId, Source, Target)).
 
-check_active_tasks(RepPid, {BaseId, Ext} = RepId, Src, Tgt) ->
+check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt) ->
     Source = case Src of
         {remote, NameSrc} ->
             <<(db_url(NameSrc))/binary, $/>>;
