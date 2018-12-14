@@ -21,6 +21,7 @@
 -include("couch_db_int.hrl").
 
 -define(IDLE_LIMIT_DEFAULT, 61000).
+-define(DEFAULT_MAX_PARTITION_SIZE, 16#280000000). % 10 GiB
 
 
 -record(merge_acc, {
@@ -28,7 +29,8 @@
     merge_conflicts,
     add_infos = [],
     rem_seqs = [],
-    cur_seq
+    cur_seq,
+    full_partitions = []
 }).
 
 
@@ -466,13 +468,22 @@ merge_rev_trees([], [], Acc) ->
 merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
     #merge_acc{
         revs_limit = Limit,
-        merge_conflicts = MergeConflicts
+        merge_conflicts = MergeConflicts,
+        full_partitions = FullPartitions
     } = Acc,
 
     % Track doc ids so we can debug large revision trees
     erlang:put(last_id_merged, OldDocInfo#full_doc_info.id),
     NewDocInfo0 = lists:foldl(fun({Client, NewDoc}, OldInfoAcc) ->
-        merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts)
+        NewInfo = merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts),
+        case is_overflowed(NewInfo, OldInfoAcc, FullPartitions) of
+            true when not MergeConflicts ->
+                DocId = NewInfo#full_doc_info.id,
+                send_result(Client, NewDoc, {partition_overflow, DocId}),
+                OldInfoAcc;
+            _ ->
+                NewInfo
+        end
     end, OldDocInfo, NewDocs),
     NewDocInfo1 = maybe_stem_full_doc_info(NewDocInfo0, Limit),
     % When MergeConflicts is false, we updated #full_doc_info.deleted on every
@@ -595,6 +606,24 @@ merge_rev_tree(OldInfo, NewDoc, _Client, true) ->
     {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0),
     OldInfo#full_doc_info{rev_tree = NewTree}.
 
+is_overflowed(_New, _Old, []) ->
+    false;
+is_overflowed(Old, Old, _FullPartitions) ->
+    false;
+is_overflowed(New, Old, FullPartitions) ->
+    case New#full_doc_info.id of
+        <<"_design/", _/binary>> ->
+            false;
+        DDocId ->
+            Partition = couch_partition:from_docid(DDocId),
+            case lists:member(Partition, FullPartitions) of
+                true ->
+                    estimate_size(New) > estimate_size(Old);
+                false ->
+                    false
+            end
+    end.
+
 maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
     case config:get_boolean("couchdb", "stem_interactive_updates", true) of
         true ->
@@ -617,13 +646,34 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
         (Id, not_found) ->
             #full_doc_info{id=Id}
     end, Ids, OldDocLookups),
+
+    %% Get the list of full partitions
+    FullPartitions = case couch_db:is_partitioned(Db) of
+        true ->
+            case max_partition_size() of
+                N when N =< 0 ->
+                    [];
+                Max ->
+                    Partitions = lists:usort(lists:flatmap(fun(Id) ->
+                        case couch_partition:extract(Id) of
+                            undefined -> [];
+                            {Partition, _} -> [Partition]
+                        end
+                    end, Ids)),
+                    [P || P <- Partitions, partition_size(Db, P) >= Max]
+            end;
+        false ->
+            []
+    end,
+
     % Merge the new docs into the revision trees.
     AccIn = #merge_acc{
         revs_limit = RevsLimit,
         merge_conflicts = MergeConflicts,
         add_infos = [],
         rem_seqs = [],
-        cur_seq = UpdateSeq
+        cur_seq = UpdateSeq,
+        full_partitions = FullPartitions
     },
     {ok, AccOut} = merge_rev_trees(DocsList, OldDocInfos, AccIn),
     #merge_acc{
@@ -685,6 +735,40 @@ increment_local_doc_revs(#doc{revs = {0, [RevStr | _]}} = Doc) ->
 increment_local_doc_revs(#doc{}) ->
     {error, <<"Invalid rev format">>}.
 
+max_partition_size() ->
+    config:get_integer("couchdb", "max_partition_size",
+            ?DEFAULT_MAX_PARTITION_SIZE).
+
+partition_size(Db, Partition) ->
+    {ok, Info} = couch_db:get_partition_info(Db, Partition),
+    Sizes = couch_util:get_value(sizes, Info),
+    couch_util:get_value(external, Sizes).
+
+estimate_size(#full_doc_info{} = FDI) ->
+    #full_doc_info{rev_tree = RevTree} = FDI,
+    Fun = fun
+        (_Rev, Value, leaf, SizesAcc) ->
+            case Value of
+                #doc{} = Doc ->
+                    ExternalSize = get_meta_body_size(Value#doc.meta),
+                    {size_info, AttSizeInfo} =
+                        lists:keyfind(size_info, 1, Doc#doc.meta),
+                    Leaf = #leaf{
+                        sizes = #size_info{
+                            external = ExternalSize
+                        },
+                        atts = AttSizeInfo
+                    },
+                    add_sizes(leaf, Leaf, SizesAcc);
+                #leaf{} ->
+                    add_sizes(leaf, Value, SizesAcc)
+            end;
+        (_Rev, _Value, branch, SizesAcc) ->
+            SizesAcc
+    end,
+    {_, FinalES, FinalAtts} = couch_key_tree:fold(Fun, {0, 0, []}, RevTree),
+    TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
+    FinalES + TotalAttSize.
 
 purge_docs(Db, []) ->
     {ok, Db, []};
