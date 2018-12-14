@@ -23,6 +23,15 @@
 -define(IDLE_LIMIT_DEFAULT, 61000).
 
 
+-record(merge_acc, {
+    revs_limit,
+    merge_conflicts,
+    add_infos = [],
+    rem_seqs = [],
+    cur_seq
+}).
+
+
 init({Engine, DbName, FilePath, Options0}) ->
     erlang:put(io_priority, {db_update, DbName}),
     update_idle_limit_from_config(),
@@ -450,11 +459,18 @@ doc_tag(#doc{meta=Meta}) ->
         Else -> throw({invalid_doc_tag, Else})
     end.
 
-merge_rev_trees(_Limit, _Merge, [], [], AccNewInfos, AccRemoveSeqs, AccSeq) ->
-    {ok, lists:reverse(AccNewInfos), AccRemoveSeqs, AccSeq};
-merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
-        [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq) ->
-    erlang:put(last_id_merged, OldDocInfo#full_doc_info.id), % for debugging
+merge_rev_trees([], [], Acc) ->
+    {ok, Acc#merge_acc{
+        add_infos = lists:reverse(Acc#merge_acc.add_infos)
+    }};
+merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
+    #merge_acc{
+        revs_limit = Limit,
+        merge_conflicts = MergeConflicts
+    } = Acc,
+
+    % Track doc ids so we can debug large revision trees
+    erlang:put(last_id_merged, OldDocInfo#full_doc_info.id),
     NewDocInfo0 = lists:foldl(fun({Client, NewDoc}, OldInfoAcc) ->
         merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts)
     end, OldDocInfo, NewDocs),
@@ -475,22 +491,25 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
     end,
     if NewDocInfo2 == OldDocInfo ->
         % nothing changed
-        merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
-            AccNewInfos, AccRemoveSeqs, AccSeq);
+        merge_rev_trees(RestDocsList, RestOldInfo, Acc);
     true ->
         % We have updated the document, give it a new update_seq. Its
         % important to note that the update_seq on OldDocInfo should
         % be identical to the value on NewDocInfo1.
         OldSeq = OldDocInfo#full_doc_info.update_seq,
         NewDocInfo3 = NewDocInfo2#full_doc_info{
-            update_seq = AccSeq + 1
+            update_seq = Acc#merge_acc.cur_seq + 1
         },
         RemoveSeqs = case OldSeq of
-            0 -> AccRemoveSeqs;
-            _ -> [OldSeq | AccRemoveSeqs]
+            0 -> Acc#merge_acc.rem_seqs;
+            _ -> [OldSeq | Acc#merge_acc.rem_seqs]
         end,
-        merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
-            [NewDocInfo3|AccNewInfos], RemoveSeqs, AccSeq+1)
+        NewAcc = Acc#merge_acc{
+            add_infos = [NewDocInfo3 | Acc#merge_acc.add_infos],
+            rem_seqs = RemoveSeqs,
+            cur_seq = Acc#merge_acc.cur_seq + 1
+        },
+        merge_rev_trees(RestDocsList, RestOldInfo, NewAcc)
     end.
 
 merge_rev_tree(OldInfo, NewDoc, Client, false)
@@ -599,8 +618,18 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
             #full_doc_info{id=Id}
     end, Ids, OldDocLookups),
     % Merge the new docs into the revision trees.
-    {ok, NewFullDocInfos, RemSeqs, _} = merge_rev_trees(RevsLimit,
-            MergeConflicts, DocsList, OldDocInfos, [], [], UpdateSeq),
+    AccIn = #merge_acc{
+        revs_limit = RevsLimit,
+        merge_conflicts = MergeConflicts,
+        add_infos = [],
+        rem_seqs = [],
+        cur_seq = UpdateSeq
+    },
+    {ok, AccOut} = merge_rev_trees(DocsList, OldDocInfos, AccIn),
+    #merge_acc{
+        add_infos = NewFullDocInfos,
+        rem_seqs = RemSeqs
+    } = AccOut,
 
     % Write out the document summaries (the bodies are stored in the nodes of
     % the trees, the attachments are already written to disk)
