@@ -83,7 +83,7 @@ load_docs(FDI, {I, IndexPid, Db, Proc, Total, LastCommitTime, ExcludeIdRevs}=Acc
     case timer:now_diff(Now = now(), LastCommitTime) >= 60000000 of
         true ->
             ok = clouseau_rpc:commit(IndexPid, Seq),
-            {ok, {I+1, IndexPid, Db, Proc, Total, Now}};
+            {ok, {I+1, IndexPid, Db, Proc, Total, Now, ExcludeIdRevs}};
         false ->
             {ok, setelement(1, Acc, I+1)}
     end.
