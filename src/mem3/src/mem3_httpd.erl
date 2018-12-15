@@ -12,7 +12,8 @@
 
 -module(mem3_httpd).
 
--export([handle_membership_req/1, handle_shards_req/2]).
+-export([handle_membership_req/1, handle_shards_req/2,
+    handle_sync_req/2]).
 
 %% includes
 -include_lib("mem3/include/mem3.hrl").
@@ -52,6 +53,16 @@ handle_shards_req(#httpd{path_parts=[_DbName, <<"_shards">>]}=Req, _Db) ->
 handle_shards_req(#httpd{path_parts=[_DbName, <<"_shards">>, _DocId]}=Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "GET").
 
+handle_sync_req(#httpd{method='POST',
+        path_parts=[_DbName, <<"_sync_shards">>]} = Req, Db) ->
+    DbName = mem3:dbname(couch_db:name(Db)),
+    ShardList = [S#shard.name || S <- mem3:ushards(DbName)],
+    [ sync_shard(S) || S <- ShardList ],
+    chttpd:send_json(Req, 202, {[{ok, true}]});
+handle_sync_req(Req, _) ->
+    chttpd:send_method_not_allowed(Req, "POST").
+
+
 %%
 %% internal
 %%
@@ -64,3 +75,10 @@ json_shards([#shard{node=Node, range=[B,E]} | Rest], AccIn) ->
     HexEnd = couch_util:to_hex(<<E:32/integer>>),
     Range = list_to_binary(HexBeg ++ "-" ++ HexEnd),
     json_shards(Rest, dict:append(Range, Node, AccIn)).
+
+sync_shard(ShardName) ->
+    Shards = mem3_shards:for_shard_name(ShardName),
+    [rpc:call(S1#shard.node, mem3_sync, push, [S1, S2#shard.node]) ||
+            S1 <- Shards, S2 <- Shards, S1 =/= S2],
+    ok.
+
