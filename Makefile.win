@@ -1,4 +1,4 @@
-# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+﻿# Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
 # the License at
 #
@@ -166,7 +166,19 @@ python-black-update: .venv/bin/black
 
 .PHONY: elixir
 elixir: elixir-check-formatted elixir-credo devclean
-	@dev\run -a adm:pass --no-eval test\elixir\run.cmd
+	@dev\run -a adm:pass --no-eval 'test\elixir\run.cmd --exclude without_quorum_test --exclude with_quorum_test'
+
+.PHONY: elixir-cluster-without-quorum
+elixir-cluster-without-quorum: elixir-check-formatted elixir-credo devclean
+	@dev\run -n 3 -q -a adm:pass \
+	         --degrade-cluster 2 \
+                 --no-eval 'test\elixir\run --only without_quorum_test'
+
+.PHONY: elixir-cluster-with-quorum
+elixir-cluster-with-quorum: elixir-check-formatted elixir-credo devclean
+	@dev\run -n 3 -q -a adm:pass \
+	         --degrade-cluster 1 \
+		 --no-eval 'test\elixir\run --only with_quorum_test'
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted:
