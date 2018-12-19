@@ -106,12 +106,12 @@ function restartServer() {
     } catch (e) {}
 
     var now = new Date().getTime();
-    if (now > start + 15000) {
+    if (now > start + 30000) {
       try {
         uptime = getUptime();
         throw(Error('FAILED to restart: ' + uptime + ' not < ' + olduptime));
       } catch (e) {
-        throw(Error('FAILED to restart: server is unresponsive, waited 15s'));
+        throw(Error('FAILED to restart: server is unresponsive, waited 30s'));
       }
     }
   }

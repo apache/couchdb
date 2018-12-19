@@ -273,7 +273,7 @@ defmodule Couch.DBTest do
     # enough to inroduce a race here
     retry_until(fn -> !node_is_running(port) end)
     # wait utill node is back
-    retry_until(fn -> node_is_running(port) end, 500, 10_000)
+    retry_until(fn -> node_is_running(port) end, 500, 30_000)
   end
 
   defp node_is_running(port) do
