@@ -37,8 +37,7 @@ class IndexSelectionTests:
         self.assertEqual(resp["index"]["type"], "json")
 
     def test_with_or(self):
-        # index on ["company","manager"]
-        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        ddocid = "_design/company_and_manager"
 
         resp = self.db.find(
             {
@@ -50,8 +49,7 @@ class IndexSelectionTests:
         self.assertEqual(resp["index"]["ddoc"], ddocid)
 
     def test_use_most_columns(self):
-        # ddoc id for the age index
-        ddocid = "_design/ad3d537c03cd7c6a43cf8dff66ef70ea54c2b40f"
+        ddocid = "_design/age"
         resp = self.db.find(
             {
                 "name.first": "Stephanie",
@@ -60,7 +58,7 @@ class IndexSelectionTests:
             },
             explain=True,
         )
-        self.assertNotEqual(resp["index"]["ddoc"], "_design/" + ddocid)
+        self.assertNotEqual(resp["index"]["ddoc"], ddocid)
 
         resp = self.db.find(
             {
@@ -83,7 +81,7 @@ class IndexSelectionTests:
 
     def test_invalid_use_index(self):
         # ddoc id for the age index
-        ddocid = "_design/ad3d537c03cd7c6a43cf8dff66ef70ea54c2b40f"
+        ddocid = "_design/age"
         r = self.db.find({}, use_index=ddocid, return_raw=True)
         self.assertEqual(
             r["warning"],
@@ -105,8 +103,7 @@ class IndexSelectionTests:
         self.assertEqual(resp_explain["index"]["type"], "json")
 
     def test_reject_use_index_invalid_fields(self):
-        # index on ["company","manager"] which should not be valid
-        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        ddocid = "_design/company_and_manager"
         selector = {"company": "Pharmex"}
         r = self.db.find(selector, use_index=ddocid, return_raw=True)
         self.assertEqual(
@@ -121,9 +118,8 @@ class IndexSelectionTests:
             self.assertEqual(d["company"], "Pharmex")
 
     def test_reject_use_index_ddoc_and_name_invalid_fields(self):
-        # index on ["company","manager"] which should not be valid
-        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
-        name = "a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        ddocid = "_design/company_and_manager"
+        name = "company_and_manager"
         selector = {"company": "Pharmex"}
 
         resp = self.db.find(selector, use_index=[ddocid, name], return_raw=True)
@@ -141,7 +137,7 @@ class IndexSelectionTests:
     def test_reject_use_index_sort_order(self):
         # index on ["company","manager"] which should not be valid
         # and there is no valid fallback (i.e. an index on ["company"])
-        ddocid = "_design/a0c425a60cf3c3c09e3c537c9ef20059dcef9198"
+        ddocid = "_design/company_and_manager"
         selector = {"company": {"$gt": None}}
         try:
             self.db.find(selector, use_index=ddocid, sort=[{"company": "desc"}])
