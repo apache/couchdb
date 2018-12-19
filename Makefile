@@ -206,14 +206,14 @@ elixir: elixir-check-formatted elixir-credo devclean
 .PHONY: elixir-cluster-without-quorum
 elixir-cluster-without-quorum: elixir-check-formatted elixir-credo devclean
 	@dev/run -n 3 -q -a adm:pass \
-	          --degrade-cluster 2 \
-            --no-eval 'test/elixir/run --only without_quorum_test $(EXUNIT_OPTS)'
+		--degrade-cluster 2 \
+		--no-eval 'test/elixir/run --only without_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-cluster-with-quorum
 elixir-cluster-with-quorum: elixir-check-formatted elixir-credo devclean
 	@dev/run -n 3 -q -a adm:pass \
-			--degrade-cluster 1 \
-			--no-eval 'test/elixir/run --only with_quorum_test $(EXUNIT_OPTS)'
+		--degrade-cluster 1 \
+		--no-eval 'test/elixir/run --only with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted:
