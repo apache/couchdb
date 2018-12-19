@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.show_documents = function(debug) {
-  return console.log('TODO: config not available on cluster');
 
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
@@ -203,7 +202,7 @@ couchTests.show_documents = function(debug) {
   T(xhr.status == 404);
   var resp = JSON.parse(xhr.responseText);
   T(resp.error == "not_found");
-  
+
   // show with doc
   xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/just-name/"+docid);
   T(xhr.responseText == "Just Rusty");
@@ -277,39 +276,6 @@ couchTests.show_documents = function(debug) {
   });
   // status is 200
   T(xhr.status == 200);
-
-  // get new etag and request again
-  etag = xhr.getResponseHeader("etag");
-  xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // should be 304
-  T(xhr.status == 304);
-
-  // update design doc (but not function)
-  designDoc.isChanged = true;
-  T(db.save(designDoc).ok);
-
-  xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // should not be 304 if we change the doc
-  T(xhr.status != 304, "changed ddoc");
-
-  // update design doc function
-  designDoc.shows["just-name"] = stringFun(function(doc, req) {
-   return {
-     body : "Just old " + doc.name
-   };
-  });
-  T(db.save(designDoc).ok);
-
-  xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/just-name/"+docid, {
-    headers: {"if-none-match": etag}
-  });
-  // status is 200
-  T(xhr.status == 200);
-
 
   // JS can't set etag
   xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/no-set-etag/"+docid);
@@ -393,24 +359,16 @@ couchTests.show_documents = function(debug) {
   var xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/show-deleted/testdoc");
   TEquals("No doc testdoc", xhr.responseText, "should return 'no doc testdoc'");
 
-
-  run_on_modified_server(
-    [{section: "httpd",
-      key: "authentication_handlers",
-      value: "{couch_httpd_auth, special_test_authentication_handler}"},
-     {section:"httpd",
-      key: "WWW-Authenticate",
-      value:  "X-Couch-Test-Auth"}],
-
-      function() {
-        T(db.setDbProperty("_security", {foo: true}).ok);
-        T(db.save({_id:"testdoc",foo:1}).ok);
-
-        xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/secObj");
-        var resp = JSON.parse(xhr.responseText);
-        T(resp.foo == true);
-      }
-  );
+  // (we don't need no modified server!)
+  T(db.setDbProperty("_security", {foo: true}).ok);
+  T(db.save({_id:"testdoc",foo:1}).ok);
+  // nasty source of Heisenbugs - it replicates after a short time, so give it some tries
+  // (needs PR #400 and #401 to be merged)
+  retry_part(function(){
+    xhr = CouchDB.request("GET", "/" + db_name + "/_design/template/_show/secObj");
+    var resp = JSON.parse(xhr.responseText);
+    T(resp.foo == true);
+  }, 10);
 
   // cleanup
   db.deleteDb();

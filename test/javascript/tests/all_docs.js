@@ -79,18 +79,22 @@ couchTests.all_docs = function(debug) {
   })[0];
   TEquals("1", deleted_doc.id, "deletes");
 
+  // (remember old seq) 
+  var orig_doc = changes.results.filter(function(row) {
+    return row.id == "3"
+  })[0];
   // do an update
   var doc3 = db.open("3");
   doc3.updated = "totally";
   doc3 = db.save(doc3);
   changes = db.changes();
 
-  // the update should make doc id 3 have the last seq num
+  // the update should make doc id 3 have another seq num (not nec. higher or the last though)
   T(changes.results.length == 4);
   var updated_doc = changes.results.filter(function(row) {
-    return row.id == doc3.id
+    return row.id == "3"
   })[0];
-  TEquals("3", updated_doc.id, "doc id should be 3");
+  T(orig_doc.seq != updated_doc.seq, "seq num should be different");
 
   // ok now lets see what happens with include docs
   changes = db.changes({include_docs: true});

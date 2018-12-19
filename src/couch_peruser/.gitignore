@@ -1,0 +1,9 @@
+/.eunit
+/doc
+/ebin
+/deps
+/.rebar
+/couchperuser-*
+erl_crash.dump
+TEST-*.xml
+*.beam

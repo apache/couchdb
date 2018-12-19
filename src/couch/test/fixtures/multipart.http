@@ -1,0 +1,13 @@
+{
+ "_id": "our document goes here"
+}
+
+--multipart_related_boundary~~~~~~~~~~~~~~~~~~~~
+Content-Type: application/json
+
+{"value":0,"_id":"doc0","_rev":"1-7e97409c987eac3a99385a17ad4cbabe","_attachments":{"plus1":{"stub":false,"follows":true,"content_type":"application/json","length":14}},".cache":{"plus1":{"timestamp":"2012-08-13T13:59:27.826Z"}}}
+--multipart_related_boundary~~~~~~~~~~~~~~~~~~~~
+
+{"value":"01"}
+--multipart_related_boundary~~~~~~~~~~~~~~~~~~~~--
+

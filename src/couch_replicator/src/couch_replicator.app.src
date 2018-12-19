@@ -1,0 +1,37 @@
+% Licensed under the Apache License, Version 2.0 (the "License"); you may not
+% use this file except in compliance with the License. You may obtain a copy of
+% the License at
+%
+%   http://www.apache.org/licenses/LICENSE-2.0
+%
+% Unless required by applicable law or agreed to in writing, software
+% distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+% WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+% License for the specific language governing permissions and limitations under
+% the License.
+
+{application, couch_replicator, [
+    {description, "CouchDB replicator"},
+    {vsn, git},
+    {mod, {couch_replicator_app, []}},
+    {registered, [
+        couch_replicator_sup,
+        couch_replicator_rate_limiter,
+        couch_replicator_connection,
+        couch_replication,  % couch_replication_event gen_event
+        couch_replicator_clustering,
+        couch_replicator_scheduler,
+        couch_replicator_scheduler_sup,
+        couch_replicator_doc_processor
+    ]},
+    {applications, [
+        kernel,
+        stdlib,
+        couch_log,
+        mem3,
+        config,
+        couch,
+        couch_event,
+        couch_stats
+    ]}
+]}.

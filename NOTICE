@@ -1,30 +1,14 @@
 Apache CouchDB
-Copyright 2009-2014 The Apache Software Foundation
+Copyright 2009-2016 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
 
 This product also includes the following third-party components:
 
- * ac_check_icu.m4 (http://autoconf-archive.cryp.to/ac_check_icu.html)
-
-   Copyright 2008, Akos Maroy <darkeye@tyrell.hu>
-
- * ac_check_curl.m4 (http://autoconf-archive.cryp.to/ac_check_curl.html)
-
-   Copyright 2008, Akos Maroy <darkeye@tyrell.hu>
-
- * pkg.m4 (http://http://pkg-config.freedesktop.org/wiki/)
-
-   Copyright 2004, Scott James Remnant <scott@netsplit.com>
-
- * jQuery (http://jquery.org/)
-
+* jQuery (http://jquery.org/)		
+		
    Copyright 2012 jQuery Foundation and other contributors
- 
- * jQuery UI (http://jqueryui.com)
-
-   Copyright 2011, Paul Bakaus
 
  * json2.js (http://www.json.org/)
 
@@ -37,14 +21,6 @@ This product also includes the following third-party components:
  * ibrowse (http://github.com/cmullaparthi/ibrowse/tree/master)
 
    Copyright 2005-2012, Chandrashekhar Mullaparthi
-
- * Erlang OAuth (http://github.com/tim/erlang-oauth)
-
-   Copyright 2012, the authors and contributors
-
- * ETap (http://github.com/ngerakines/etap/)
-
-   Copyright 2009, Nick Gerakines <nick@gerakines.net>
 
  * mimeparse.js (http://code.google.com/p/mimeparse/)
 
@@ -176,7 +152,7 @@ This product also includes the following third-party components:
 
 * React.js
 
-  Copyright (c) 2013-2015, Facebook, Inc.
+  Copyright (c) 2013-2017, Facebook, Inc.
 
 * Flux.js
 
@@ -197,3 +173,11 @@ This product also includes the following third-party components:
 * react-bootstrap.js
 
   Copyright (c) 2014 Stephen J. Collings, Matthew Honnibal, Pieter Vanderwerff
+
+* velocity-react
+
+  Copyright (c) 2015 Twitter, Inc.
+
+* hyper
+
+  Copyright (c) 2014 Game Analytics ApS

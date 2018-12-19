@@ -321,6 +321,11 @@ function TEquals(expected, actual, testName) {
     "', got '" + repr(actual) + "'", testName);
 }
 
+function TNotEquals(expected, actual, testName) {
+  T(notEquals(expected, actual), "expected != '" + repr(expected) +
+    "', got '" + repr(actual) + "'", testName);
+}
+
 function TEqualsIgnoreCase(expected, actual, testName) {
   T(equals(expected.toUpperCase(), actual.toUpperCase()), "expected '" + repr(expected) +
     "', got '" + repr(actual) + "'", testName);
@@ -333,6 +338,11 @@ function equals(a,b) {
   } catch (e) {
     return false;
   }
+}
+
+function notEquals(a,b) {
+  if (a != b) return true;
+  return false;
 }
 
 function repr(val) {
@@ -417,43 +427,14 @@ function waitForSuccess(fun, tag) {
       try {
         fun();
         break;
-      } catch (e) {}
+      } catch (e) {
+        log(e)
+      }
       // sync http req allow async req to happen
       try {
         CouchDB.request("GET", "/test_suite_db/?tag="+encodeURIComponent(tag));
       } catch (e) {}
     }
-  }
-}
-
-function getCurrentToken() {
-  var xhr = CouchDB.request("GET", "/_restart/token");
-  return JSON.parse(xhr.responseText).token;
-};
-
-
-function restartServer() {
-  var token = getCurrentToken();
-  var token_changed = false;
-  var tDelta = 5000;
-  var t0 = new Date();
-  var t1;
-
-  CouchDB.request("POST", "/_restart");
-
-  do {
-    try {
-      if(token != getCurrentToken()) {
-        token_changed = true;
-      }
-    } catch (e) {
-      // Ignore errors while the server restarts
-    }
-    t1 = new Date();
-  } while(((t1 - t0) <= tDelta) && !token_changed);
-
-  if(!token_changed) {
-    throw("Server restart failed");
   }
 }
 
@@ -482,4 +463,27 @@ function get_random_string() {
 
 function get_random_db_name() {
   return "test_suite_db_" + get_random_string()
+}
+
+// for Heisenbug-prone spots: retry n times (e.g. quora not met immediately)
+// if the problem still persists afterwards, we need sth else (similar to e.g. webdriver)
+function retry_part(fct, n, duration) {
+  n = n || 3;
+  duration = (duration == undefined ? 100 : duration);
+  for(var i=1; i<=n; i++){
+    try {
+      return fct();
+    }catch(e){
+      if(i<n){
+        // wait
+        sleep(duration);
+      }else{
+        throw e;
+      }
+    }
+  }
+}
+
+function wait(ms) {
+  sleep(ms);
 }

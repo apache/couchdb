@@ -33,6 +33,24 @@ couchTests.attachments= function(debug) {
   var save_response = db.save(binAttDoc);
   T(save_response.ok);
 
+  var badAttDoc = {
+    _id: "bad_doc",
+    _attachments: {
+      "foo.txt": {
+        content_type: "text/plain",
+        data: "notBase64Encoded="
+      }
+    }
+  };
+
+  try {
+    db.save(badAttDoc);
+    T(false && "Shouldn't get here!");
+  } catch (e) {
+    TEquals("bad_request", e.error);
+    TEquals("Invalid attachment data for foo.txt", e.message);
+  }
+
   var xhr = CouchDB.request("GET", "/" + db_name + "/bin_doc/foo.txt");
   T(xhr.responseText == "This is a base64 encoded text");
   T(xhr.getResponseHeader("Content-Type") == "application/octet-stream");
@@ -116,8 +134,7 @@ couchTests.attachments= function(debug) {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:bin_data
   });
-// TODO: revisit whether 500 makes sense for non-existing revs
-  T(xhr.status == 409 || xhr.status == 500);
+  T(xhr.status == 409);
 
   // with current rev
   var xhr = CouchDB.request("PUT", "/" + db_name + "/bin_doc3/attachment.txt?rev=" + rev, {
@@ -217,7 +234,10 @@ couchTests.attachments= function(debug) {
 */
 
   // test large attachments - COUCHDB-366
-  var lorem = CouchDB.request("GET", "http://localhost:15984/_utils/test/lorem.txt").responseText;
+  var lorem = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '
+  for (var i=0; i<10; i++) {
+    lorem = lorem + lorem;
+  }
   var xhr = CouchDB.request("PUT", "/" + db_name + "/bin_doc5/lorem.txt", {
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:lorem
@@ -230,8 +250,10 @@ couchTests.attachments= function(debug) {
   TEqualsIgnoreCase("text/plain;charset=utf-8", xhr.getResponseHeader("Content-Type"));
 
   // test large inline attachment too
-  var lorem_b64 = CouchDB.request("GET", "http://localhost:15984/_utils/test/lorem_b64.txt");
-  lorem_b64 = lorem_b64.responseText;
+  var lorem_b64 = 'TG9yZW0gaXBzdW0gZG9sb3Igc2l0IGFtZXQsIGNvbnNlY3RldHVyIGFkaXBpc2NpbmcgZWxpdC4g'
+  for (var i=0; i<10; i++) {
+    lorem_b64 = lorem_b64 + lorem_b64;
+  }
   var doc = db.open("bin_doc5", {attachments:true});
   TEquals(lorem_b64, doc._attachments["lorem.txt"].data, 'binary attachment data should match');
 

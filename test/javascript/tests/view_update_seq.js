@@ -11,7 +11,6 @@
 // the License.
 
 couchTests.view_update_seq = function(debug) {
-  return console.log("TODO: update_seq for _all_docs not implemented yet");
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -37,14 +36,23 @@ couchTests.view_update_seq = function(debug) {
       }
     }
   };
+
+  var seqInt = function(val) {
+    if (typeof(val) === 'string') {
+      return parseInt(val.split('-')[0]);
+    } else {
+      return val;
+    }
+  };
+
   T(db.save(designDoc).ok);
 
-  T(db.info().update_seq == 1);
+  TEquals(1, seqInt(db.info().update_seq));
 
   resp = db.allDocs({update_seq:true});
 
   T(resp.rows.length == 1);
-  T(resp.update_seq == 1);
+  TEquals(1, seqInt(resp.update_seq));
 
   var docs = makeDocs(0, 100);
   db.bulkSave(docs);
@@ -55,11 +63,11 @@ couchTests.view_update_seq = function(debug) {
 
   resp = db.allDocs({limit: 1, update_seq:true});
   T(resp.rows.length == 1);
-  T(resp.update_seq == 101);
+  TEquals(101, seqInt(resp.update_seq));
 
   resp = db.view('test/all_docs', {limit: 1, update_seq:true});
   T(resp.rows.length == 1);
-  T(resp.update_seq == 101);
+  TEquals(101, seqInt(resp.update_seq));
 
   resp = db.view('test/all_docs', {limit: 1, update_seq:false});
   T(resp.rows.length == 1);
@@ -67,18 +75,18 @@ couchTests.view_update_seq = function(debug) {
 
   resp = db.view('test/summate', {update_seq:true});
   T(resp.rows.length == 1);
-  T(resp.update_seq == 101);
+  TEquals(101, seqInt(resp.update_seq));
 
   db.save({"id":"0", "integer": 1});
   resp = db.view('test/all_docs', {limit: 1,stale: "ok", update_seq:true});
   T(resp.rows.length == 1);
-  T(resp.update_seq == 101);
+  TEquals(101, seqInt(resp.update_seq));
 
   db.save({"id":"00", "integer": 2});
   resp = db.view('test/all_docs',
     {limit: 1, stale: "update_after", update_seq: true});
   T(resp.rows.length == 1);
-  T(resp.update_seq == 101);
+  TEquals(101, seqInt(resp.update_seq));
 
   // wait 5 seconds for the next assertions to pass in very slow machines
   var t0 = new Date(), t1;
@@ -89,20 +97,20 @@ couchTests.view_update_seq = function(debug) {
 
   resp = db.view('test/all_docs', {limit: 1, stale: "ok", update_seq: true});
   T(resp.rows.length == 1);
-  T(resp.update_seq == 103);
+  TEquals(103, seqInt(resp.update_seq));
 
   resp = db.view('test/all_docs', {limit: 1, update_seq:true});
   T(resp.rows.length == 1);
-  T(resp.update_seq == 103);
+  TEquals(103, seqInt(resp.update_seq));
 
   resp = db.view('test/all_docs',{update_seq:true},["0","1"]);
-  T(resp.update_seq == 103);
+  TEquals(103, seqInt(resp.update_seq));
 
   resp = db.view('test/all_docs',{update_seq:true},["0","1"]);
-  T(resp.update_seq == 103);
+  TEquals(103, seqInt(resp.update_seq));
 
   resp = db.view('test/summate',{group:true, update_seq:true},[0,1]);
-  TEquals(103, resp.update_seq);
+  TEquals(103, seqInt(resp.update_seq));
 
   // cleanup
   db.deleteDb();

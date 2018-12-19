@@ -17,8 +17,11 @@ var Views = (function() {
   var map_results = []; // holds temporary emitted values during doc map
 
   function runReduce(reduceFuns, keys, values, rereduce) {
+    var code_size = 0;
     for (var i in reduceFuns) {
-      reduceFuns[i] = Couch.compileFunction(reduceFuns[i]);
+      var fun_body =  reduceFuns[i];
+      code_size += fun_body.length;
+      reduceFuns[i] = Couch.compileFunction(fun_body);
     };
     var reductions = new Array(reduceFuns.length);
     for(var i = 0; i < reduceFuns.length; i++) {
@@ -32,13 +35,21 @@ var Views = (function() {
     };
     var reduce_line = JSON.stringify(reductions);
     var reduce_length = reduce_line.length;
+    var input_length =  State.line_length - code_size
     // TODO make reduce_limit config into a number
     if (State.query_config && State.query_config.reduce_limit &&
-          reduce_length > 200 && ((reduce_length * 2) > State.line_length)) {
-      var reduce_preview = "Current output: '"+(reduce_line.substring(0,100) + "'... (first 100 of "+reduce_length+" bytes)");
-      throw(["error", 
-        "reduce_overflow_error", 
-        "Reduce output must shrink more rapidly: "+reduce_preview]);
+          reduce_length > 4096 && ((reduce_length * 2) > input_length)) {
+      var log_message = [
+          "Reduce output must shrink more rapidly:",
+          "input size:", input_length,
+          "output size:", reduce_length
+      ].join(" ");
+      if (State.query_config.reduce_limit === "log") {
+          log("reduce_overflow_error: " + log_message);
+          print("[true," + reduce_line + "]");
+      } else {
+          throw(["error", "reduce_overflow_error", log_message]);
+      };
     } else {
       print("[true," + reduce_line + "]");
     }

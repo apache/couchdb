@@ -53,8 +53,7 @@ couchTests.replicator_db_bad_rep_id = function(debug) {
     T(repDoc1._replication_state === "completed",
       "replication document with bad replication id failed");
     T(typeof repDoc1._replication_state_time === "string");
-    T(typeof repDoc1._replication_id  === "string");
-    T(repDoc1._replication_id !== "1234abc");
+    T(typeof repDoc1._replication_id === "undefined");
   }
 
   /*var server_config = [

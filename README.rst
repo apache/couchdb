@@ -1,6 +1,18 @@
 Apache CouchDB README
 =====================
 
++--------------------------------+------------+
+| Travis CI master build status  | |travisci| |
++--------------------------------+------------+
+| Jenkins CI master build status | |jenkins|  |
++--------------------------------+------------+
+
+.. |travisci| image:: https://travis-ci.org/apache/couchdb.svg?branch=master
+    :target: https://travis-ci.org/apache/couchdb
+
+.. |jenkins| image:: https://builds.apache.org/job/CouchDB/job/master/badge/icon
+    :target: https://builds.apache.org/blue/organizations/jenkins/CouchDB/activity
+
 Installation
 ------------
 
@@ -23,17 +35,13 @@ We have documentation:
 
     http://docs.couchdb.org/
 
-They include a changelog:
+It includes a changelog:
 
-    http://docs.couchdb.org/en/latest/changelog.html
+    http://docs.couchdb.org/en/latest/whatsnew/
 
-For troubleshooting, see:
+For troubleshooting or cryptic error messages, see:
 
-    http://wiki.apache.org/couchdb/Troubleshooting
-
-If you're getting a cryptic error message, see:
-
-    http://wiki.apache.org/couchdb/Error_messages
+    http://docs.couchdb.org/en/latest/install/troubleshooting.html
 
 For general help, see:
 
@@ -47,40 +55,38 @@ The mailing lists provide a wealth of support and knowledge for you to tap into.
 Feel free to drop by with your questions or discussion. See the official CouchDB
 website for more information about our community resources.
 
-Running the Testsuite
----------------------
+Verifying your Installation
+---------------------------
 
-Run the testsuite for couch.js and jquery.couch.js by browsing here:
+Run a basic test suite for CouchDB by browsing here:
 
-    http://127.0.0.1:5984/_utils/spec/run.html
-
-It should work in at least Firefox >= 3.6 with Private Browsing mode enabled.
-
-Read more about JSpec here:
-
-    https://github.com/liblime/jspec
-
-When you change the specs, but your changes have no effect, manually reload
-the changed spec file in the browser. When the spec that tests Erlang views
-fails, make sure you have enabled Erlang views as described here:
-
-       http://wiki.apache.org/couchdb/EnableErlangViews
+    http://127.0.0.1:5984/_utils/#verifyinstall
 
 Getting started with developing
 -------------------------------
 
-Basically you just have to install the needed dependencies which are
-documented in the install docs and then run `./configure && make`.
+For more detail, read the README-DEV.rst file in this directory.
 
-You don't need to run `make install` after compiling, just use
-`./dev/run` to spin up three nodes. There is a haproxy config file in `./rel`.
-Just run: `cd rel && haproxy -f haproxy.cfg`. You will now have a local
-cluster listening on port `5984`.
+Basically you just have to install the needed dependencies which are
+documented in the install docs and then run ``./configure && make``.
+
+You don't need to run ``make install`` after compiling, just use
+``./dev/run`` to spin up three nodes. You can add haproxy as a caching
+layer in front of this cluster by running ``./dev/run --with-haproxy
+--haproxy=/path/to/haproxy`` . You will now have a local cluster
+listening on port 5984.
 
 For Fauxton developers fixing the admin-party does not work via the button in
-Fauxton. To fix the admin party you have to run `./dev/run` with the `admin`
-flag, e.g. `./dev/run --admin=username:password`. If you want to have an
+Fauxton. To fix the admin party you have to run ``./dev/run`` with the ``admin``
+flag, e.g. ``./dev/run --admin=username:password``. If you want to have an
 admin-party, just omit the flag.
+
+Contributing to CouchDB
+-----------------------
+
+You can learn more about our contributing process here:
+
+    https://github.com/apache/couchdb/blob/master/CONTRIBUTING.md
 
 Cryptographic Software Notice
 -----------------------------

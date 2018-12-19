@@ -1,0 +1,6 @@
+*~
+*.beam
+deps
+ebin
+doc
+.project

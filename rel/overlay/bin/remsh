@@ -1,0 +1,76 @@
+#!/bin/sh
+
+# Licensed under the Apache License, Version 2.0 (the "License"); you may not
+# use this file except in compliance with the License. You may obtain a copy of
+# the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+# WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+# License for the specific language governing permissions and limitations under
+# the License.
+
+COUCHDB_BIN_DIR=$(cd "${0%/*}" && pwd)
+ERTS_BIN_DIR=$COUCHDB_BIN_DIR/../
+ROOTDIR=${ERTS_BIN_DIR%/*}
+START_ERL=$(cat "$ROOTDIR/releases/start_erl.data")
+ERTS_VSN=${START_ERL% *}
+APP_VSN=${START_ERL#* }
+BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
+
+PROGNAME=${0##*/}
+VERBOSE=""
+NODE="couchdb@127.0.0.1"
+COOKIE=monster
+LHOST=127.0.0.1
+
+printHelpAndExit() {
+  echo "Usage: ${PROGNAME} [OPTION]... [-- <additional Erlang cli options>]"
+  echo "  -c cookie     specify shared Erlang cookie (default: monster)"
+  echo "  -l HOST       specify remsh's host name (default: 127.0.0.1)"
+  echo "  -m            use output of \`hostname -f\` as remsh's host name"
+  echo "  -n NAME@HOST  specify couchdb's Erlang node name (-name in vm.args)"
+  echo "  -v            verbose; print invocation line"
+  echo "  -h            this help message"
+  exit
+}
+
+while getopts ":hn:c:l:mv" optionName; do
+  case "$optionName" in
+    h)
+      printHelpAndExit 0
+      ;;
+    n)
+      NODE=$OPTARG
+      ;;
+    c)
+      COOKIE=$OPTARG
+      ;;
+    l)
+      LHOST=$OPTARG
+      ;;
+    m)
+      LHOST=$(hostname -f)
+      ;;
+    v)
+      VERBOSE=0
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      printHelpAndExit 0
+      ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [ ! -z "$VERBOSE" ]; then
+  # cheap but it works
+  set -x
+fi
+
+exec "$BINDIR/erl" -boot "$ROOTDIR/releases/$APP_VSN/start_clean" \
+    -name remsh$$@$LHOST -remsh $NODE -hidden -setcookie $COOKIE \
+    "$@"

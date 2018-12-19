@@ -344,34 +344,6 @@ couchTests.replicator_db_security = function(debug) {
            doc.source, "source field contains credentials (doc from _changes)");
         CouchDB.logout();
 
-        var fdmananaRepDocOAuth = {
-          _id: "fdmanana-rep-doc-oauth",
-          source: dbC.name,
-          target: {
-            url: "http://" + CouchDB.host + "/" + dbA.name,
-            oauth: {
-              token: "abc",
-              token_secret: "foo",
-              consumer_key: "123",
-              consumer_secret: "321"
-            }
-          },
-          user_ctx: { name: "fdmanana", roles: [] }
-        };
-
-        var result = save_as(repDb, fdmananaRepDocOAuth, "fdmanana");
-        TEquals(true, result.ok, "should create rep doc");
-        waitForDocPos(repDb, fdmananaRepDocOAuth._id, 3);
-        fdmananaRepDocOAuth = open_as(repDb, fdmananaRepDocOAuth._id, "fdmanana");
-        TEquals("fdmanana", fdmananaRepDocOAuth.owner, "should assign correct owner");
-        TEquals("object", typeof fdmananaRepDocOAuth.target.oauth,
-          "target field has oauth credentials");
-
-        fdmananaRepDocOAuth = open_as(repDb, fdmananaRepDocOAuth._id, "jchris");
-        TEquals("fdmanana", fdmananaRepDocOAuth.owner, "should assign correct owner");
-        TEquals("undefined", typeof fdmananaRepDocOAuth.target.oauth,
-          "target field doesn't have oauth credentials");
-
         // ensure "old" replicator docs still work
         // done in replicator_db.js?
 

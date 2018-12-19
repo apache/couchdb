@@ -1,0 +1,29 @@
+language: erlang
+
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get -y install libmozjs-dev python-virtualenv
+  - git clone --depth=1 https://github.com/apache/couchdb
+  - cd couchdb
+  - ./configure --disable-docs --disable-fauxton
+  - cp -R ../src ./src/mango
+  - make
+  - cd ..
+  - couchdb/dev/run -n 1 --admin=testuser:testpass &
+  - sleep 10
+
+before_script:
+  - make venv
+  - source venv/bin/activate
+  - make pip-install
+
+matrix:
+   include:
+      - otp_release: 18.1
+        python: 2.7
+      - otp_release: 17.5
+        python: 2.7
+      - otp_release: R16B03-1
+        python: 2.7
+
+cache: apt

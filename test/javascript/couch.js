@@ -139,12 +139,16 @@ function CouchDB(name, httpHeaders, globalRequestOptions) {
 
   // Applies the map function to the contents of database and returns the results.
   this.query = function(mapFun, reduceFun, options, keys, language) {
-    var body = {language: language || "javascript"};
+    //var body = {language: language || "javascript"};
+    var body = {}
     if(keys) {
       options.keys = keys ;
     }
     if (typeof(mapFun) != "string") {
       mapFun = mapFun.toSource ? mapFun.toSource() : "(" + mapFun.toString() + ")";
+    }
+    if ((!language) || language.toLowerCase() == "javascript") {
+      mapFun = mapFun + "/" + "* avoid race cond " + (new Date().getTime()) + " *" + "/";
     }
     body.map = mapFun;
     if (reduceFun != null) {
@@ -159,6 +163,7 @@ function CouchDB(name, httpHeaders, globalRequestOptions) {
         delete options.options;
     }
     var ddoc = {
+      language: language || "javascript",
       views: {
         view: body
       }
@@ -470,7 +475,7 @@ CouchDB.requestStats = function(path, test) {
     query_arg = "?flush=true";
   }
 
-  var url = "/_stats/" + path.join("/") + query_arg;
+  var url = "/_node/_local/_stats/" + path.join("/") + query_arg;
   var stat = CouchDB.request("GET", url).responseText;
   return JSON.parse(stat);
 };

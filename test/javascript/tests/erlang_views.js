@@ -11,16 +11,13 @@
 // the License.
 
 couchTests.erlang_views = function(debug) {
-  return console.log('TODO: config not available on cluster');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
   if (debug) debugger;
 
   run_on_modified_server(
-    [{section: "native_query_servers",
-      key: "erlang",
-      value: "{couch_native_process, start_link, []}"}],
+    [],
     function() {
       // Note we just do some basic 'smoke tests' here - the
       // test/query_server_spec.rb tests have more comprehensive tests
@@ -59,7 +56,7 @@ couchTests.erlang_views = function(debug) {
             '  {Info} = couch_util:get_value(<<"info">>, Req, {[]}), ' +
             '  Purged = couch_util:get_value(<<"purge_seq">>, Info, -1), ' +
             '  Verb = couch_util:get_value(<<"method">>, Req, <<"not_get">>), ' +
-            '  R = list_to_binary(io_lib:format("~b - ~s", [Purged, Verb])), ' +
+            '  R = list_to_binary(io_lib:format("~s - ~s", [Purged, Verb])), ' +
             '  {[{<<"code">>, 200}, {<<"headers">>, {[]}}, {<<"body">>, R}]} ' +
             'end.'
         },
@@ -88,7 +85,8 @@ couchTests.erlang_views = function(debug) {
       var url = "/" + db_name + "/_design/erlview/_show/simple/1";
       var xhr = CouchDB.request("GET", url);
       T(xhr.status == 200, "standard get should be 200");
-      T(xhr.responseText == "0 - GET");
+      T(/0-/.test(xhr.responseText));
+      T(/- GET/.test(xhr.responseText));
 
       var url = "/" + db_name + "/_design/erlview/_list/simple_list/simple_view";
       var xhr = CouchDB.request("GET", url);
@@ -97,8 +95,11 @@ couchTests.erlang_views = function(debug) {
 
       // Larger dataset
 
-      // db.deleteDb();
-      // db.createDb();
+      db.deleteDb();
+      // avoid Heisenbugs when files are not cleared entirely
+      db_name = get_random_db_name();
+      db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
+      db.createDb();
       var words = "foo bar abc def baz xxyz".split(/\s+/);
       
       var docs = [];

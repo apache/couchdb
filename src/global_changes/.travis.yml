@@ -1,0 +1,23 @@
+language: erlang
+
+otp_release:
+  - 18.0
+  - 17.5
+  - R16B03-1
+
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get -y install libmozjs-dev
+  - git clone https://github.com/apache/couchdb
+
+before_script:
+  - cd couchdb
+  - ./configure --disable-docs --disable-fauxton
+  - cp -r ../!(couchdb) ./src/global_changes
+  - make
+
+script:
+  - ./bin/rebar setup_eunit
+  - BUILDDIR=`pwd` ./bin/rebar -r eunit apps=global_changes
+
+cache: apt

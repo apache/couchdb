@@ -12,18 +12,25 @@ If you're unsure what this means, ignore this document.
 Dependencies
 ------------
 
-You may need:
+You need the following to run tests:
+
+* `Python 3               <https://www.python.org/>`_
+
+You need the following optionally to build documentation:
 
 * `Sphinx                 <http://sphinx.pocoo.org/>`_
-* `LaTex                  <http://www.latex-project.org/>`_
-* `GNU Texinfo            <http://www.gnu.org/software/texinfo/>`_
 * `GNU help2man           <http://www.gnu.org/software/help2man/>`_
 * `GnuPG                  <http://www.gnupg.org/>`_
+
+You need the following optionally to build releases:
+
 * `md5sum                 <http://www.microbrew.org/tools/md5sha1sum/>`_
 * `sha1sum                <http://www.microbrew.org/tools/md5sha1sum/>`_
 
-The first of these optional dependencies are required for building the
-documentation. The last three are needed to build releases.
+You need the following optionally to build Fauxton:
+
+* `nodejs                 <http://nodejs.org/>`_
+* `npm                    <https://www.npmjs.com/>`_               
 
 You will need these optional dependencies installed if:
 
@@ -36,7 +43,7 @@ However, you do not need them if:
 * You don't care about building the documentation
 
 If you intend to build Fauxton, you will also need to install its
-dependencies. After running ./configure to download all of the
+dependencies. After running ``./configure`` to download all of the
 dependent repositories, you can read about required dependencies in
 `src/fauxton/readme.md`. Typically, installing npm and node.js are
 sufficient to enable a Fauxton build.
@@ -49,25 +56,25 @@ Debian-based (inc. Ubuntu) Systems
 
 ::
 
-    sudo apt-get install help2man python-sphinx \
-        texlive-latex-base texlive-latex-recommended \
-        texlive-latex-extra texlive-fonts-recommended texinfo gnupg
+    sudo apt-get install help2man python-sphinx gnupg nodejs npm \
+         python3 python3-venv
 
 Gentoo-based Systems
 ~~~~~~~~~~~~~~~~~~~~
 
 ::
 
-    sudo emerge texinfo gnupg coreutils pkgconfig help2man
-    sudo USE=latex emerge sphinx
+    sudo emerge gnupg coreutils pkgconfig help2man sphinx python
+    sudo pip install hypothesis requests nose
 
-RedHat-based (Fedora, Centos, RHEL) Systems
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Centos 7 and RHEL 7
+~~~~~~~~~~~~~~~~~~~
 
 ::
 
     sudo yum install help2man python-sphinx python-docutils \
-        python-pygments texlive-latex texlive-latex-fonts texinfo gnupg
+        python-pygments gnupg nodejs npm
+
 
 Mac OS X
 ~~~~~~~~
@@ -79,7 +86,7 @@ Unless you want to install the optional dependencies, skip to the next section.
 
 Install what else we can with Homebrew::
 
-    brew install help2man gnupg md5sha1sum
+    brew install help2man gnupg md5sha1sum node python
 
 If you don't already have pip installed, install it::
 
@@ -87,19 +94,15 @@ If you don't already have pip installed, install it::
 
 Now, install the required Python packages::
 
-    sudo pip install sphinx
-    sudo pip install docutils
-    sudo pip install pygments
-
-Download `MacTeX <http://www.tug.org/mactex/>`_ and follow the instructions 
-to get a working LaTeX install on your system.
+    sudo pip install sphinx docutils pygments sphinx_rtd_theme
 
 FreeBSD
 ~~~~~~~
 
 ::
 
-    pkg install help2man texinfo gnupg py27-sphinx texlive-full tex-formats
+    pkg install help2man gnupg py27-sphinx node
+    pip install nose requests hypothesis
 
 Windows
 ~~~~~~~
@@ -118,13 +121,9 @@ If you intend to run the test suites::
 
     ./configure -c
 
-If you want to build it into different destination than `/usr/local`.:
-
-    ./configure --prefix=/<your directory path>
-
-If you don't want to build Fauxton or documentation specify ``--disable-fauxton``
-and/or ``--disable-docs`` arguments for `configure` to ignore their build and
-avoid any issues with their dependencies.
+If you don't want to build Fauxton or documentation specify
+``--disable-fauxton`` and/or ``--disable-docs`` arguments for ``configure`` to
+ignore their build and avoid any issues with their dependencies.
 
 See ``./configure --help`` for more information.
 
@@ -148,7 +147,7 @@ to make targets::
     make eunit apps=couch,chttpd
 
     # Run only tests from couch_btree_tests suite
-    make eunit suites=couch_btree_tests
+    make eunit apps=couch suites=couch_btree
 
     # Run only only specific tests
     make eunit tests=btree_open_test,reductions_test
@@ -171,8 +170,15 @@ JavaScript tests accepts only `suites` option, but in the same way::
     # Run only basic and design_options tests
     make javascript suites="basic design_options"
 
-Note that tests are delimited here by whitespace, not by comma. You can get list
-of all possible test targets with the following command::
+    # Ignore specific test suites via command line
+    make javascript ignore_js_suites="all_docs bulk_docs"
+
+    # Ignore specific test suites in makefile
+    ignore_js_suites=all_docs,bulk_docs
+
+Note that tests on the command line are delimited here by whitespace,
+not by comma.You can get list of all possible test targets with the
+following command::
 
     make list-js-suites
 
@@ -189,59 +195,35 @@ See ``make help`` for more info and useful commands.
 
 Please report any problems to the developer's mailing list.
 
-Testing a cluster
------------------
-
-We use `Docker <https://docker.io>`_ to safely run a local three node
-cluster all inside a single docker container.
-
-Assuming you have Docker installed and running::
-
-    make docker-image
-
-This will create a docker image (tagged 'couchdb/dev-cluster') capable
-of running a joined three node cluster.
-
-To start it up::
-
-    make docker-start
-
-A three node cluster should now be running (you can now use ``docker ps``
-to find the exposed ports of the nodes).
-
-To stop it::
-
-    make docker-stop
-
 Releasing
 ---------
 
 The release procedure is documented here::
 
-    https://wiki.apache.org/couchdb/Release_Procedure
+    https://cwiki.apache.org/confluence/display/COUCHDB/Release+Procedure
 
 Unix-like Systems
 ~~~~~~~~~~~~~~~~~
 
-Prepare the release artifacts by running::
+A release tarball can be built by running::
 
-    make distcheck
+    make dist
 
-You can prepare signed release artifacts by running::
+An Erlang CouchDB release includes the full Erlang Run Time System and
+all dependent applications necessary to run CouchDB, standalone. The
+release created is completely relocatable on the file system, and is
+the recommended way to distribute binaries of CouchDB. A release can be
+built by running::
 
-    make distsign
+    make release
 
-The release artifacts can be found in the root source directory.
+The release can then be found in the rel/couchdb directory.
 
 Microsoft Windows
 ~~~~~~~~~~~~~~~~~
 
-Prepare the release artifacts by running::
+The release tarball and Erlang CouchDB release commands work on
+Microsoft Windows the same as they do on Unix-like systems. To create
+a full installer, the separate couchdb-glazier repository is required.
+Full instructions are available in that repository's README file.
 
-    make dist
-
-The release artifacts can be found in the `etc/windows` directory.
-
-Until the build system has been improved, you must make sure that you run this
-command from a clean source checkout. If you do not, your test database and log
-files will be bundled up in the release artifacts.

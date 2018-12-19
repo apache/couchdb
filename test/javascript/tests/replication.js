@@ -15,25 +15,27 @@ couchTests.replication = function(debug) {
   if (debug) debugger;
 
   var host = CouchDB.host;
-  var sourceDb = new CouchDB("test_suite_db_a",{"X-Couch-Full-Commit":"false"});
-  var targetDb = new CouchDB("test_suite_db_b",{"X-Couch-Full-Commit":"false"});
+  // as we change names during execution, do NOT use test_suite_db or a
+  // pre-computed value like ''+sourceDb.name (compute only on use)
+  var sourceDb;
+  var targetDb;
 
-  var dbPairs = [
+  var dbPairsPrefixes = [
     {
-      source: sourceDb.name,
-      target: targetDb.name
+      source: "",
+      target: ""
     },
     {
-      source: CouchDB.protocol + host + "/" + sourceDb.name,
-      target: targetDb.name
+      source: CouchDB.protocol + host + "/",
+      target: ""
     },
     {
-      source: sourceDb.name,
-      target: CouchDB.protocol + host + "/" + targetDb.name
+      source: "",
+      target: CouchDB.protocol + host + "/"
     },
     {
-      source: CouchDB.protocol + host + "/" + sourceDb.name,
-      target: CouchDB.protocol + host + "/" + targetDb.name
+      source: CouchDB.protocol + host + "/",
+      target: CouchDB.protocol + host + "/"
     }
   ];
 
@@ -58,17 +60,17 @@ couchTests.replication = function(debug) {
     return data;
   }
 
-  
+
   function runAllNodes(callback) {
     // new and fancy: clustered version: pull cluster_members and walk over all of them
-    var xhr = CouchDB.request("GET", "/_membership"); 
+    var xhr = CouchDB.request("GET", "/_membership");
     T(xhr.status === 200);
     JSON.parse(xhr.responseText).cluster_nodes.forEach(callback);
   }
 
   function runFirstNode(callback) {
     // new and fancy: clustered version: pull cluster_members and walk over all of them
-    var xhr = CouchDB.request("GET", "/_membership"); 
+    var xhr = CouchDB.request("GET", "/_membership");
     T(xhr.status === 200);
     var node = JSON.parse(xhr.responseText).cluster_nodes[0];
     return callback(node);
@@ -124,17 +126,36 @@ couchTests.replication = function(debug) {
   }
 
 
-  function populateDb(db, docs, dontRecreateDb) {
-    if (dontRecreateDb !== true) {
-      db.deleteDb();
-      db.createDb();
+  function populateSourceDb(docs, dontRecreateDb) {
+    if(dontRecreateDb !== true) {
+      if(sourceDb) {
+        sourceDb.deleteDb();
+      }
+      sourceDb = new CouchDB(get_random_db_name() + "_src",{"X-Couch-Full-Commit":"false"});
+      sourceDb.createDb();
     }
     for (var i = 0; i < docs.length; i++) {
       var doc = docs[i];
       delete doc._rev;
     }
     if (docs.length > 0) {
-      db.bulkSave(docs);
+      sourceDb.bulkSave(docs);
+    }
+  }
+  function populateTargetDb(docs, dontRecreateDb) {
+    if(dontRecreateDb !== true) {
+      if(targetDb) {
+        targetDb.deleteDb();
+      }
+      targetDb = new CouchDB(get_random_db_name() + "_tgt",{"X-Couch-Full-Commit":"false"});
+      targetDb.createDb();
+    }
+    for (var i = 0; i < docs.length; i++) {
+      var doc = docs[i];
+      delete doc._rev;
+    }
+    if (docs.length > 0) {
+      targetDb.bulkSave(docs);
     }
   }
 
@@ -190,18 +211,22 @@ couchTests.replication = function(debug) {
           return tasks[i];
         }
       }
+      sleep(500);
       t1 = new Date();
     } while((t1 - t0) <= delay);
 
     return null;
   }
 
+  function getSourceLastSeq(sourceDb) {
+      return sourceDb.changes({"since":"now"}).last_seq;
+  }
 
   function waitForSeq(sourceDb, targetDb, rep_id) {
-    var sourceSeq = sourceDb.info().update_seq,
+    var sourceSeq = getSourceLastSeq(sourceDb),
         t0 = new Date(),
         t1,
-        ms = 3000;
+        ms = 30000;
 
     do {
       var task = getTask(rep_id, 0);
@@ -209,7 +234,24 @@ couchTests.replication = function(debug) {
         return;
       }
       t1 = new Date();
+      sleep(500);
     } while (((t1 - t0) <= ms));
+    throw(Error('Timeout waiting for replication through_seq = source update seq'));
+  }
+
+  function waitReplicationTaskStop(rep_id) {
+      var t0 = new Date(),
+          t1,
+          ms = 30000;
+      do {
+        var task = getTask(rep_id, 0);
+        if(task == null) {
+            return;
+        }
+        t1 = new Date();
+        sleep(500);
+      } while (((t1 - t0) <= ms));
+      throw(Error('Timeout waiting for replication task stop' + rep_id));
   }
 
   // test simple replications (not continuous, not filtered), including
@@ -221,16 +263,16 @@ couchTests.replication = function(debug) {
     value: "ddoc"
   });
 
-  for (i = 0; i < dbPairs.length; i++) {
-    populateDb(sourceDb, docs);
-    populateDb(targetDb, []);
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
+    populateSourceDb(docs);
+    populateTargetDb([]);
 
     // add some attachments
     for (j = 10; j < 15; j++) {
       addAtt(sourceDb, docs[j], "readme.txt", att1_data, "text/plain");
     }
 
-    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
     TEquals(true, repResult.ok);
 
     sourceInfo = sourceDb.info();
@@ -293,7 +335,7 @@ couchTests.replication = function(debug) {
       addAtt(sourceDb, docs[j], "data.dat", att2_data, "application/binary");
     }
 
-    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
     TEquals(true, repResult.ok);
 
     sourceInfo = sourceDb.info();
@@ -360,7 +402,7 @@ couchTests.replication = function(debug) {
     doc = sourceDb.open(docs[1]._id);
     TEquals(true, sourceDb.deleteDoc(doc).ok);
 
-    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
     TEquals(true, repResult.ok);
 
     sourceInfo = sourceDb.info();
@@ -403,7 +445,7 @@ couchTests.replication = function(debug) {
     copy.value = "black";
     TEquals(true, targetDb.save(copy).ok);
 
-    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
     TEquals(true, repResult.ok);
 
     sourceInfo = sourceDb.info();
@@ -434,7 +476,7 @@ couchTests.replication = function(debug) {
     doc.value = "yellow";
     TEquals(true, sourceDb.save(doc).ok);
 
-    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
     TEquals(true, repResult.ok);
 
     sourceInfo = sourceDb.info();
@@ -468,7 +510,7 @@ couchTests.replication = function(debug) {
     doc.value = "rainbow";
     TEquals(true, sourceDb.save(doc).ok);
 
-    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
     TEquals(true, repResult.ok);
 
     sourceInfo = sourceDb.info();
@@ -500,7 +542,7 @@ couchTests.replication = function(debug) {
     TEquals(true, sourceDb.save({_id: "foo3", value: 333}).ok);
     TEquals(true, targetDb.save({_id: "foo3", value: 333}).ok);
 
-    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
     TEquals(true, repResult.ok);
 
     sourceInfo = sourceDb.info();
@@ -520,7 +562,7 @@ couchTests.replication = function(debug) {
     TEquals(true, sourceDb.save({_id: "foo5", value: 555}).ok);
     TEquals(true, targetDb.save({_id: "foo5", value: 555}).ok);
 
-    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
     TEquals(true, repResult.ok);
 
     sourceInfo = sourceDb.info();
@@ -535,7 +577,7 @@ couchTests.replication = function(debug) {
     TEquals(0, repResult.history[0].docs_written);
     TEquals(0, repResult.history[0].doc_write_failures);
 
-    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
     TEquals(true, repResult.ok);
     TEquals(true, repResult.no_changes);
     sourceInfo = sourceDb.info();
@@ -571,9 +613,9 @@ couchTests.replication = function(debug) {
   // test since_seq parameter
   docs = makeDocs(1, 6);
 
-  for (i = 0; i < dbPairs.length; i++) {
-    populateDb(sourceDb, docs);
-    populateDb(targetDb, []);
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
+    populateSourceDb(docs);
+    populateTargetDb([]);
     // sequences are no longer simple numbers - so pull #3 from a feed
     var since_seq = sourceDb.changes().results[2].seq;
 
@@ -590,8 +632,8 @@ couchTests.replication = function(debug) {
     // effect.
     try {
       CouchDB.replicate(
-        dbPairs[i].source,
-        dbPairs[i].target,
+        dbPairsPrefixes[i].source+sourceDb.name,
+        dbPairsPrefixes[i].target+targetDb.name,
         {body: {cancel: true}}
       );
     } catch (x) {
@@ -599,8 +641,8 @@ couchTests.replication = function(debug) {
       TEquals("not_found", x.error);
     }
     repResult = CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target,
+      dbPairsPrefixes[i].source+sourceDb.name,
+      dbPairsPrefixes[i].target+targetDb.name,
       {body: {since_seq: since_seq}}
     );
     // Same reason as before. But here we don't want since_seq to affect
@@ -608,8 +650,8 @@ couchTests.replication = function(debug) {
     // supervisor (since_seq is not used to calculate the replication ID).
     try {
       CouchDB.replicate(
-        dbPairs[i].source,
-        dbPairs[i].target,
+        dbPairsPrefixes[i].source+sourceDb.name,
+        dbPairsPrefixes[i].target+targetDb.name,
         {body: {cancel: true}}
       );
     } catch (x) {
@@ -655,13 +697,13 @@ couchTests.replication = function(debug) {
     }).toString()
   };
 
-  for (i = 0; i < dbPairs.length; i++) {
-    populateDb(sourceDb, docs);
-    populateDb(targetDb, [ddoc]);
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
+    populateSourceDb(docs);
+    populateTargetDb([ddoc]);
 
     repResult = CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target
+      dbPairsPrefixes[i].source+sourceDb.name,
+      dbPairsPrefixes[i].target+targetDb.name
     );
     TEquals(true, repResult.ok);
     TEquals(7, repResult.history[0].missing_checked);
@@ -687,13 +729,13 @@ couchTests.replication = function(debug) {
   // test create_target option
   docs = makeDocs(1, 2);
 
-  for (i = 0; i < dbPairs.length; i++) {
-    populateDb(sourceDb, docs);
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
+    populateSourceDb(docs);
     targetDb.deleteDb();
 
     repResult = CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target,
+      dbPairsPrefixes[i].source+sourceDb.name,
+      dbPairsPrefixes[i].target+targetDb.name,
       {body: {create_target: true}}
     );
     TEquals(true, repResult.ok);
@@ -720,13 +762,13 @@ couchTests.replication = function(debug) {
     }
   });
 
-  for (i = 0; i < dbPairs.length; i++) {
-    populateDb(sourceDb, docs);
-    populateDb(targetDb, []);
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
+    populateSourceDb(docs);
+    populateTargetDb([]);
 
     repResult = CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target,
+      dbPairsPrefixes[i].source+sourceDb.name,
+      dbPairsPrefixes[i].target+targetDb.name,
       {
         body: {
           filter: "mydesign/myfilter",
@@ -787,11 +829,11 @@ couchTests.replication = function(debug) {
 
     // add new docs to source and resume the same replication
     var newDocs = makeDocs(50, 56);
-    populateDb(sourceDb, newDocs, true);
+    populateSourceDb(newDocs, true);
 
     repResult = CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target,
+      dbPairsPrefixes[i].source+sourceDb.name,
+      dbPairsPrefixes[i].target+targetDb.name,
       {
         body: {
           filter: "mydesign/myfilter",
@@ -848,9 +890,9 @@ couchTests.replication = function(debug) {
     return true;
   }).toString();
 
-  for (i = 0; i < dbPairs.length; i++) {
-    populateDb(targetDb, []);
-    populateDb(sourceDb, []);
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
+    populateTargetDb([]);
+    populateSourceDb([]);
 
     TEquals(true, sourceDb.save({_id: "foo1", value: 1}).ok);
     TEquals(true, sourceDb.save({_id: "foo2", value: 2}).ok);
@@ -868,8 +910,8 @@ couchTests.replication = function(debug) {
     TEquals(true, sourceDb.save(ddoc).ok);
 
     repResult = CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target,
+      dbPairsPrefixes[i].source+sourceDb.name,
+      dbPairsPrefixes[i].target+targetDb.name,
       {
         body: {
           filter: "mydesign/myfilter",
@@ -907,8 +949,8 @@ couchTests.replication = function(debug) {
     TEquals(true, sourceDb.save(ddoc).ok);
 
     repResult = CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target,
+      dbPairsPrefixes[i].source+sourceDb.name,
+      dbPairsPrefixes[i].target+targetDb.name,
       {
         body: {
           filter: "mydesign/myfilter",
@@ -966,7 +1008,7 @@ couchTests.replication = function(debug) {
   var id, num_inexistent_docs, after_num_inexistent_docs;
   var total, after_total;
 
-  for (i = 0; i < dbPairs.length; i++) {
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
 
     for (j = 0; j < target_doc_ids.length; j++) {
       doc_ids = target_doc_ids[j].initial;
@@ -979,12 +1021,12 @@ couchTests.replication = function(debug) {
         }
       }
 
-      populateDb(sourceDb, docs);
-      populateDb(targetDb, []);
+      populateSourceDb(docs);
+      populateTargetDb([]);
 
       repResult = CouchDB.replicate(
-        dbPairs[i].source,
-        dbPairs[i].target,
+        dbPairsPrefixes[i].source+sourceDb.name,
+        dbPairsPrefixes[i].target+targetDb.name,
         {
           body: {
             doc_ids: doc_ids
@@ -1048,8 +1090,8 @@ couchTests.replication = function(debug) {
       }
 
       repResult = CouchDB.replicate(
-        dbPairs[i].source,
-        dbPairs[i].target,
+        dbPairsPrefixes[i].source+sourceDb.name,
+        dbPairsPrefixes[i].target+targetDb.name,
         {
           body: {
             doc_ids: after_doc_ids
@@ -1113,8 +1155,8 @@ couchTests.replication = function(debug) {
       addAtt(sourceDb, doc, "data.dat", att2_data, "application/binary");
 
       repResult = CouchDB.replicate(
-        dbPairs[i].source,
-        dbPairs[i].target,
+        dbPairsPrefixes[i].source+sourceDb.name,
+        dbPairsPrefixes[i].target+targetDb.name,
         {
           body: {
             doc_ids: [id]
@@ -1170,8 +1212,8 @@ couchTests.replication = function(debug) {
       TEquals(true, targetDb.save(copy).ok);
 
       repResult = CouchDB.replicate(
-        dbPairs[i].source,
-        dbPairs[i].target,
+        dbPairsPrefixes[i].source+sourceDb.name,
+        dbPairsPrefixes[i].target+targetDb.name,
         {
           body: {
             doc_ids: [id]
@@ -1203,9 +1245,9 @@ couchTests.replication = function(debug) {
     }
   });
 
-  for (i = 0; i < dbPairs.length; i++) {
-    populateDb(sourceDb, docs);
-    populateDb(targetDb, []);
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
+    populateSourceDb(docs);
+    populateTargetDb([]);
 
     // add some attachments
     for (j = 10; j < 15; j++) {
@@ -1213,8 +1255,8 @@ couchTests.replication = function(debug) {
     }
 
     repResult = CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target,
+      dbPairsPrefixes[i].source+sourceDb.name,
+      dbPairsPrefixes[i].target+targetDb.name,
       {
         body: {
           continuous: true
@@ -1344,7 +1386,7 @@ couchTests.replication = function(debug) {
 
     // add more docs to source
     var newDocs = makeDocs(25, 35);
-    populateDb(sourceDb, newDocs, true);
+    populateSourceDb(newDocs, true);
 
     waitForSeq(sourceDb, targetDb, rep_id);
 
@@ -1383,8 +1425,8 @@ couchTests.replication = function(debug) {
 
     // cancel the replication
     repResult = CouchDB.replicate(
-      dbPairs[i].source,
-      dbPairs[i].target,
+      dbPairsPrefixes[i].source+sourceDb.name,
+      dbPairsPrefixes[i].target+targetDb.name,
       {
         body: {
           continuous: true,
@@ -1401,7 +1443,8 @@ couchTests.replication = function(debug) {
     };
     TEquals(true, sourceDb.save(doc).ok);
 
-    waitForSeq(sourceDb, targetDb, rep_id);
+    waitReplicationTaskStop(rep_id);
+
     copy = targetDb.open(doc._id);
     TEquals(null, copy);
   }
@@ -1418,8 +1461,8 @@ couchTests.replication = function(debug) {
       myfilter: (function(doc, req) { return true; }).toString()
     }
   });
-  populateDb(sourceDb, docs);
-  populateDb(targetDb, []);
+  populateSourceDb(docs);
+  populateTargetDb([]);
 
   repResult = CouchDB.replicate(
     CouchDB.protocol + host + "/" + sourceDb.name,
@@ -1473,9 +1516,9 @@ couchTests.replication = function(debug) {
   var compressionLevel = oldSettings.level;
   var compressibleTypes = oldSettings.types;
 
-  for (i = 0; i < dbPairs.length; i++) {
-    populateDb(sourceDb, [doc]);
-    populateDb(targetDb, []);
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
+    populateSourceDb([doc]);
+    populateTargetDb([]);
 
     // enable compression of text types
     enableAttCompression("8", "text/*");
@@ -1494,7 +1537,7 @@ couchTests.replication = function(debug) {
     // disable compression and replicate
     disableAttCompression();
 
-    repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+    repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
     TEquals(true, repResult.ok);
     TEquals(true, repResult.history instanceof Array);
     TEquals(1, repResult.history.length);
@@ -1530,6 +1573,7 @@ couchTests.replication = function(debug) {
     roles: ["erlanger"]
   }, "erly");
   var defaultUsersDb = new CouchDB("_users", {"X-Couch-Full-Commit":"false"});
+  try { defaultUsersDb.createDb(); } catch (e) { /* ignore if exists*/ }
   //var usersDb = new CouchDB("test_suite_auth", {"X-Couch-Full-Commit":"false"});
   /*var server_config = [
     {
@@ -1545,29 +1589,29 @@ couchTests.replication = function(debug) {
     language: "javascript"
   });
 
-  dbPairs = [
+  dbPairsPrefixes = [
     {
-      source: sourceDb.name,
-      target: targetDb.name
+      source: "",
+      target: ""
     },
     {
-      source: CouchDB.protocol + host + "/" + sourceDb.name,
-      target: targetDb.name
+      source: CouchDB.protocol + host + "/",
+      target: ""
     },
     {
-      source: sourceDb.name,
-      target: CouchDB.protocol + "joe:erly@" + host + "/" + targetDb.name
+      source: "",
+      target: CouchDB.protocol + "joe:erly@" + host + "/"
     },
     {
-      source: CouchDB.protocol + host + "/" + sourceDb.name,
-      target: CouchDB.protocol + "joe:erly@" + host + "/" + targetDb.name
+      source: CouchDB.protocol + host + "/",
+      target: CouchDB.protocol + "joe:erly@" + host + "/"
     }
   ];
 
-  for (i = 0; i < dbPairs.length; i++) {
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
     //usersDb.deleteDb();
-    populateDb(sourceDb, docs);
-    populateDb(targetDb, []);
+    populateSourceDb(docs);
+    populateTargetDb([]);
 
     TEquals(true, targetDb.setSecObj({
       admins: {
@@ -1583,12 +1627,14 @@ couchTests.replication = function(debug) {
       if (prevJoeUserDoc) {
         joeUserDoc._rev = prevJoeUserDoc._rev;
       }
-      TEquals(true, defaultUsersDb.save(joeUserDoc).ok);
-
+      if(i == 0) {
+        TEquals(true, defaultUsersDb.save(joeUserDoc).ok);
+        wait(5000);
+      }
       TEquals(true, CouchDB.login("joe", "erly").ok);
       TEquals('joe', CouchDB.session().userCtx.name);
 
-      repResult = CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+      repResult = CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
 
       TEquals(true, CouchDB.logout().ok);
 
@@ -1612,29 +1658,29 @@ couchTests.replication = function(debug) {
   }
 
   // case 2) user triggering the replication is not a reader (nor admin) of the source DB
-  dbPairs = [
+  dbPairsPrefixes = [
     {
-      source: sourceDb.name,
-      target: targetDb.name
+      source: "",
+      target: ""
     },
     {
-      source: CouchDB.protocol + "joe:erly@" + host + "/" + sourceDb.name,
-      target: targetDb.name
+      source: CouchDB.protocol + "joe:erly@" + host + "/",
+      target: ""
     },
     {
-      source: sourceDb.name,
-      target: CouchDB.protocol + host + "/" + targetDb.name
+      source: "",
+      target: CouchDB.protocol + host + "/"
     },
     {
-      source: CouchDB.protocol + "joe:erly@" + host + "/" + sourceDb.name,
-      target: CouchDB.protocol + host + "/" + targetDb.name
+      source: CouchDB.protocol + "joe:erly@" + host + "/",
+      target: CouchDB.protocol + host + "/"
     }
   ];
 
-  for (i = 0; i < dbPairs.length; i++) {
+  for (i = 0; i < dbPairsPrefixes.length; i++) {
     //usersDb.deleteDb();
-    populateDb(sourceDb, docs);
-    populateDb(targetDb, []);
+    populateSourceDb(docs);
+    populateTargetDb([]);
 
     TEquals(true, sourceDb.setSecObj({
       admins: {
@@ -1660,13 +1706,16 @@ couchTests.replication = function(debug) {
       if (prevJoeUserDoc) {
         joeUserDoc._rev = prevJoeUserDoc._rev;
       }
-      TEquals(true, defaultUsersDb.save(joeUserDoc).ok);
+      if(i == 0) {
+        TEquals(true, defaultUsersDb.save(joeUserDoc).ok);
+        wait(5000);
+      }
 
       TEquals(true, CouchDB.login("joe", "erly").ok);
       TEquals('joe', CouchDB.session().userCtx.name);
 
       try {
-        CouchDB.replicate(dbPairs[i].source, dbPairs[i].target);
+        CouchDB.replicate(dbPairsPrefixes[i].source+sourceDb.name, dbPairsPrefixes[i].target+targetDb.name);
         T(false, "should have raised an exception");
       } catch (x) {
         // TODO: small thing: DB exists but is no more found - at least we have an exception, so it's rather minor
@@ -1687,13 +1736,8 @@ couchTests.replication = function(debug) {
 
   // COUCHDB-885 - push replication of a doc with attachment causes a
   //               conflict in the target.
-  sourceDb = new CouchDB("test_suite_db_a");
-  targetDb = new CouchDB("test_suite_db_b");
-
-  sourceDb.deleteDb();
-  sourceDb.createDb();
-  targetDb.deleteDb();
-  targetDb.createDb();
+  populateSourceDb([]);
+  populateTargetDb([]);
 
   doc = {
     _id: "doc1"
@@ -1770,8 +1814,8 @@ couchTests.replication = function(debug) {
   // like  {"replication_id": Id, "cancel": true}. The replication ID
   // can be obtained from a continuous replication request response
   // (_local_id field), from _active_tasks or from the log
-  populateDb(sourceDb, makeDocs(1, 6));
-  populateDb(targetDb, []);
+  populateSourceDb(makeDocs(1, 6));
+  populateTargetDb([]);
 
   repResult = CouchDB.replicate(
     CouchDB.protocol + host + "/" + sourceDb.name,
@@ -1797,7 +1841,7 @@ couchTests.replication = function(debug) {
       headers: {"Content-Type": "application/json"}
   });
   TEquals(200, xhr.status, "Replication cancel request success");
-
+  waitReplicationTaskStop(repId);
   task = getTask(repId);
   TEquals(null, task, "Replication was canceled");
 
@@ -1826,8 +1870,8 @@ couchTests.replication = function(debug) {
   ];*/
 
   //run_on_modified_server(server_config, function() {
-    populateDb(sourceDb, makeDocs(1, 6));
-    populateDb(targetDb, []);
+    populateSourceDb(makeDocs(1, 6));
+    populateTargetDb([]);
     var prevUserDoc = defaultUsersDb.open(userDoc._id);
     if(prevUserDoc) {
       userDoc._rev = prevUserDoc._rev;
@@ -1871,5 +1915,6 @@ couchTests.replication = function(debug) {
   //usersDb.deleteDb();
   sourceDb.deleteDb();
   targetDb.deleteDb();
+  // (not sure what this is - cleanup after 'file not found tests' poss. - not harmful anyway)
   (new CouchDB("test_suite_db")).deleteDb();
 };

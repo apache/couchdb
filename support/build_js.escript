@@ -40,13 +40,15 @@ main([]) ->
                    "share/server/coffee-script.js",
                    "share/server/loop.js"],
 
+    Pre = "(function () {\n",
+    Post = "})();\n",
 
     Concat = fun(Files, To) ->
             AccBin = lists:foldl(fun(Path, Acc) ->
                             {ok, Bin} = file:read_file(Path),
                             [Bin | Acc]
                     end, [], Files),
-            FinalBin = iolist_to_binary(lists:reverse(AccBin)),
+            FinalBin = iolist_to_binary(Pre ++ lists:reverse(AccBin) ++ Post),
             file:write_file(To, FinalBin)
     end,
 

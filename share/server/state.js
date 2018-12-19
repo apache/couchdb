@@ -16,7 +16,6 @@ var State = {
     State.funs = [];
     State.lib = null;
     State.query_config = config || {};
-    init_sandbox();
     gc();
     print("true"); // indicates success
   },

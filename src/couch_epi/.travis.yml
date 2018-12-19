@@ -1,0 +1,34 @@
+language: erlang
+
+otp_release:
+  - 18.1
+  - 17.5
+  - R16B03-1
+
+matrix:
+  allow_failures:
+    - otp_release: R16B03-1
+
+sudo: false
+
+addons:
+  apt:
+    packages:
+      - libmozjs185-dev
+
+before_install:
+  - git clone https://github.com/apache/couchdb
+
+before_script:
+  - cd couchdb
+  - ./configure --disable-docs --disable-fauxton
+  - cp -r ../!(couchdb) ./src/couch_epi
+  - make
+
+script:
+  - ./bin/rebar setup_eunit
+  - BUILDDIR=`pwd` ./bin/rebar -r eunit apps=couch_epi skip_deps=couch_log
+  - ./bin/rebar -r build-plt apps=couch_epi skip_deps=couch_log
+  - ./bin/rebar -r dialyze apps=couch_epi skip_deps=couch_log
+
+cache: apt
