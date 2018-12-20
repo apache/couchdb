@@ -70,7 +70,7 @@
         # If you don't want TODO comments to cause `mix credo` to fail, just
         # set this value to 0 (zero).
         #
-        {Credo.Check.Design.TagTODO, [exit_status: 0]},
+        {Credo.Check.Design.TagTODO, false},
         {Credo.Check.Design.TagFIXME, []},
 
         #
@@ -108,7 +108,10 @@
         {Credo.Check.Refactor.NegatedConditionsWithElse, []},
         {Credo.Check.Refactor.Nesting, false},
         {Credo.Check.Refactor.PipeChainStart,
-         [excluded_argument_types: [:atom, :binary, :fn, :keyword], excluded_functions: []]},
+         [
+           excluded_argument_types: [:atom, :binary, :fn, :keyword],
+           excluded_functions: []
+         ]},
         {Credo.Check.Refactor.UnlessWithElse, []},
 
         #
