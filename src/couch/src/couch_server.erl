@@ -160,20 +160,20 @@ maybe_add_sys_db_callbacks(DbName, Options) ->
     IsUsersDb = path_ends_with(DbName, "_users")
         orelse path_ends_with(DbName, UsersDbSuffix),
     if
-	DbName == DbsDbName ->
-	    [sys_db | Options];
-	DbName == NodesDbName ->
-	    [sys_db | Options];
-	IsReplicatorDb ->
-	    [{before_doc_update, fun couch_replicator_manager:before_doc_update/2},
-	     {after_doc_read, fun couch_replicator_manager:after_doc_read/2},
-	     sys_db | Options];
-	IsUsersDb ->
-	    [{before_doc_update, fun couch_users_db:before_doc_update/2},
-	     {after_doc_read, fun couch_users_db:after_doc_read/2},
-	     sys_db | Options];
-	true ->
-	    Options
+        DbName == DbsDbName ->
+            [sys_db | Options];
+        DbName == NodesDbName ->
+            [sys_db | Options];
+        IsReplicatorDb ->
+            [{before_doc_update, fun couch_replicator_docs:before_doc_update/2},
+             {after_doc_read, fun couch_replicator_docs:after_doc_read/2},
+             sys_db | Options];
+        IsUsersDb ->
+            [{before_doc_update, fun couch_users_db:before_doc_update/2},
+             {after_doc_read, fun couch_users_db:after_doc_read/2},
+             sys_db | Options];
+        true ->
+            Options
     end.
 
 path_ends_with(Path, Suffix) when is_binary(Suffix) ->

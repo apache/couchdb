@@ -106,7 +106,7 @@ before_doc_update(DbName, Docs, Opts) ->
         {true, _} ->
             %% fake db is expensive to create so we only do it if we have to
             Db = fabric_util:fake_db(DbName, Opts),
-            [couch_replicator_manager:before_doc_update(Doc, Db) || Doc <- Docs];
+            [couch_replicator_docs:before_doc_update(Doc, Db) || Doc <- Docs];
         {_, true} ->
             %% fake db is expensive to create so we only do it if we have to
             Db = fabric_util:fake_db(DbName, Opts),
