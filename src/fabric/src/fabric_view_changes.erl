@@ -166,7 +166,7 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     end,
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_util:stream_start(Workers0, #shard.ref, StartFun, Repls) of
+        case fabric_streams:start(Workers0, #shard.ref, StartFun, Repls) of
             {ok, Workers} ->
                 try
                     LiveSeqs = lists:map(fun(W) ->
@@ -178,7 +178,7 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
                     send_changes(DbName, Workers, LiveSeqs, ChangesArgs,
                             Callback, AccIn, Timeout)
                 after
-                    fabric_util:cleanup(Workers)
+                    fabric_streams:cleanup(Workers)
                 end;
             {timeout, NewState} ->
                 DefunctWorkers = fabric_util:remove_done_workers(
