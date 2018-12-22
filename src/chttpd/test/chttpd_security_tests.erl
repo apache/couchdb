@@ -131,7 +131,8 @@ security_object_validate_test_() ->
                     fun should_return_ok_for_sec_obj_with_roles_and_names/1,
                     fun should_return_error_for_sec_obj_with_incorrect_roles_and_names/1,
                     fun should_return_error_for_sec_obj_with_incorrect_roles/1,
-                    fun should_return_error_for_sec_obj_with_incorrect_names/1
+                    fun should_return_error_for_sec_obj_with_incorrect_names/1,
+                    fun should_return_error_for_sec_obj_in_user_db/1
                 ]
             }
         }
@@ -321,5 +322,26 @@ should_return_error_for_sec_obj_with_incorrect_names([Url,_UsersUrl]) ->
         ?_assertEqual({[
             {<<"error">>,<<"error">>},
             {<<"reason">>,<<"no_majority">>}
+        ]}, ResultJson)
+    ].
+
+should_return_error_for_sec_obj_in_user_db([_,_UsersUrl]) ->
+    SecurityUrl = lists:concat([_UsersUrl, "/_security"]),
+    SecurityProperties = [
+        {<<"admins">>, {[{<<"names">>,[<<?TEST_ADMIN>>]},
+            {<<"roles">>,[<<?TEST_ADMIN>>]}]}},
+        {<<"members">>,{[{<<"names">>,[<<?TEST_MEMBER>>]},
+            {<<"roles">>,[<<?TEST_MEMBER>>]}]}}
+    ],
+
+    Body = jiffy:encode({SecurityProperties}),
+    {ok, Status, _, RespBody} = test_request:put(SecurityUrl,
+        [?CONTENT_JSON, ?AUTH], Body),
+    ResultJson = ?JSON_DECODE(RespBody),
+    [
+        ?_assertEqual(403, Status),
+        ?_assertEqual({[
+            {<<"error">>,<<"forbidden">>},
+            {<<"reason">>,<<"You can't edit the security object of the user database.">>}
         ]}, ResultJson)
     ].

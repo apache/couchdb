@@ -658,6 +658,8 @@ db_req(#httpd{path_parts=[_,<<"_revs_diff">>]}=Req, _Db) ->
 
 db_req(#httpd{method='PUT',path_parts=[_,<<"_security">>],user_ctx=Ctx}=Req,
         Db) ->
+    DbName = ?b2l(couch_db:name(Db)),
+    validate_security_can_be_edited(DbName),
     SecObj = chttpd:json_body(Req),
     case fabric:set_security(Db, SecObj, [{user_ctx, Ctx}]) of
         ok ->
@@ -1696,6 +1698,15 @@ extract_header_rev(Req, ExplicitRev) ->
         throw({bad_request, "Document rev and etag have different values"})
     end.
 
+validate_security_can_be_edited(DbName) ->
+    UserDbName = config:get("chttpd_auth", "authentication_db", "_users"),
+    CanEditUserSecurityObject = config:get("couchdb","users_db_security_editable","false"),
+    case {DbName,CanEditUserSecurityObject} of
+        {UserDbName,"false"} ->
+            Msg = "You can't edit the security object of the user database.",
+            throw({forbidden, Msg});
+        {_,_} -> ok
+    end.
 
 validate_attachment_names(Doc) ->
     lists:foreach(fun(Att) ->
