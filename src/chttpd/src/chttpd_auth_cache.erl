@@ -160,9 +160,12 @@ changes_callback({change, {Change}}, _) ->
         <<"_design/", _/binary>> ->
             ok;
         DocId ->
-            UserName = username(DocId),
-            couch_log:debug("Invalidating cached credentials for ~s", [UserName]),
-            ets_lru:remove(?CACHE, UserName)
+            try
+                UserName = username(DocId),
+                couch_log:debug("Invalidating cached credentials for ~s", [UserName]),
+                ets_lru:remove(?CACHE, UserName)
+            catch _:_ -> couch_log:info("Invalid user document id for ~s", [DocId])
+            end
     end,
     {ok, couch_util:get_value(seq, Change)};
 changes_callback(timeout, Acc) ->
