@@ -136,7 +136,7 @@ single_byte_data_fun([H | T]) ->
 multiple_bytes_data_fun([]) ->
     done;
 multiple_bytes_data_fun(L) ->
-    N = crypto:rand_uniform(0, 7),
+    N = couch_rand:uniform(7) - 1,
     {Part, Rest} = split(L, N),
     {list_to_binary(Part), fun() -> multiple_bytes_data_fun(Rest) end}.
 

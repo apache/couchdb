@@ -170,23 +170,9 @@ do_mutation_ordering(Db, Seq, [{DocId, _OldSeq} | Rest], DocSeqAcc) ->
 
 
 shuffle(List) ->
-    random:seed(os:timestamp()),
-    Paired = [{random:uniform(), I} || I <- List],
+    Paired = [{couch_rand:uniform(), I} || I <- List],
     Sorted = lists:sort(Paired),
     [I || {_, I} <- Sorted].
-
-
-remove_random(List) ->
-    Pos = random:uniform(length(List)),
-    remove_random(Pos, List).
-
-
-remove_random(1, [Item | Rest]) ->
-    {Item, Rest};
-
-remove_random(N, [Skip | Rest]) when N > 1 ->
-    {Item, Tail} = remove_random(N - 1, Rest),
-    {Item, [Skip | Tail]}.
 
 
 fold_fun(#full_doc_info{id=Id, update_seq=Seq}, Acc) ->

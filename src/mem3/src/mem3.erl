@@ -196,9 +196,12 @@ choose_shards(DbName, Nodes, Options) ->
     Q = mem3_util:q_val(couch_util:get_value(q, Options,
         config:get("cluster", "q", "8"))),
     %% rotate to a random entry in the nodelist for even distribution
-    {A, B} = lists:split(crypto:rand_uniform(1,length(Nodes)+1), Nodes),
-    RotatedNodes = B ++ A,
+    RotatedNodes = rotate_rand(Nodes),
     mem3_util:create_partition_map(DbName, N, Q, RotatedNodes, Suffix).
+
+rotate_rand(Nodes) ->
+    {A, B} = lists:split(couch_rand:uniform(length(Nodes)), Nodes),
+    B ++ A.
 
 get_placement(Options) ->
     case couch_util:get_value(placement, Options) of
@@ -381,5 +384,12 @@ allowed_nodes_test_() ->
             ?_assertMatch([?ALLOWED_NODE], allowed_nodes())
         ]
     }]}.
+
+rotate_rand_degenerate_test() ->
+    ?assertEqual([1], rotate_rand([1])).
+
+rotate_rand_distribution_test() ->
+    Cases = [rotate_rand([1, 2, 3]) || _ <- lists:seq(1, 100)],
+    ?assertEqual(3, length(lists:usort(Cases))).
 
 -endif.
