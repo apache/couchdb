@@ -46,7 +46,8 @@ defmodule AllDocsTest do
 
     # Confirm that queries may assume raw collation
     resp =
-      Couch.get("/#{db_name}/_all_docs",
+      Couch.get(
+        "/#{db_name}/_all_docs",
         query: %{
           :startkey => "\"org.couchdb.user:\"",
           :endkey => "\"org.couchdb.user;\""
@@ -99,7 +100,8 @@ defmodule AllDocsTest do
 
     # Test _all_docs with keys
     rows =
-      Couch.post("/#{db_name}/_all_docs",
+      Couch.post(
+        "/#{db_name}/_all_docs",
         query: %{:include_docs => true},
         body: %{:keys => ["1"]}
       ).body["rows"]
@@ -124,18 +126,23 @@ defmodule AllDocsTest do
       :value => "Z"
     }
 
-    assert Couch.put("/#{db_name}/3", query: %{:new_edits => false}, body: conflicted_doc1).body[
-             "ok"
-           ]
+    assert Couch.put(
+             "/#{db_name}/3",
+             query: %{:new_edits => false},
+             body: conflicted_doc1
+           ).body["ok"]
 
-    assert Couch.put("/#{db_name}/3", query: %{:new_edits => false}, body: conflicted_doc2).body[
-             "ok"
-           ]
+    assert Couch.put(
+             "/#{db_name}/3",
+             query: %{:new_edits => false},
+             body: conflicted_doc2
+           ).body["ok"]
 
     win_rev = Couch.get("/#{db_name}/3").body
 
     changes =
-      Couch.get("/#{db_name}/_changes",
+      Couch.get(
+        "/#{db_name}/_changes",
         query: %{:include_docs => true, :conflicts => true, :style => "all_docs"}
       ).body["results"]
 
@@ -147,7 +154,8 @@ defmodule AllDocsTest do
     assert length(doc3["doc"]["_conflicts"]) == 2
 
     rows =
-      Couch.get("/#{db_name}/_all_docs",
+      Couch.get(
+        "/#{db_name}/_all_docs",
         query: %{:include_docs => true, :conflicts => true}
       ).body["rows"]
 
@@ -166,7 +174,8 @@ defmodule AllDocsTest do
     assert Couch.post("/#{db_name}", body: %{:_id => "a", :foo => "a"}).body["ok"]
 
     rows =
-      Couch.get("/#{db_name}/_all_docs",
+      Couch.get(
+        "/#{db_name}/_all_docs",
         query: %{:startkey => "\"Z\"", :endkey => "\"Z\""}
       ).body["rows"]
 

@@ -50,7 +50,8 @@ defmodule WithoutQuorumTest do
     Couch.put("/#{db_name}")
 
     resp =
-      Couch.post("/#{context[:db_name]}",
+      Couch.post(
+        "/#{context[:db_name]}",
         query: %{:w => 1},
         body: %{:_id => "0", :a => 1}
       )
@@ -62,7 +63,8 @@ defmodule WithoutQuorumTest do
     rev = resp.body["_rev"]
 
     resp =
-      Couch.put("/#{context[:db_name]}/0",
+      Couch.put(
+        "/#{context[:db_name]}/0",
         query: %{:w => 1},
         body: %{:_id => "0", :_rev => rev, :a => 2}
       )
@@ -84,7 +86,8 @@ defmodule WithoutQuorumTest do
     db_name = context[:db_name]
     Couch.put("/#{db_name}")
 
-    Couch.post("/#{context[:db_name]}",
+    Couch.post(
+      "/#{context[:db_name]}",
       body: %{:_id => "0", :a => 1}
     )
 
@@ -129,7 +132,8 @@ defmodule WithoutQuorumTest do
     rev = resp.body["rev"]
 
     resp =
-      Couch.put("/#{context[:db_name]}/0/foo.txt",
+      Couch.put(
+        "/#{context[:db_name]}/0/foo.txt",
         query: %{:rev => rev},
         body: "This is a no bas64 encoded text",
         headers: ["Content-Type": "text/plain;charset=utf-8"]
@@ -154,7 +158,8 @@ defmodule WithoutQuorumTest do
     rev = resp.body["rev"]
 
     resp =
-      Couch.put("/#{context[:db_name]}/0/foo.txt",
+      Couch.put(
+        "/#{context[:db_name]}/0/foo.txt",
         query: %{:rev => rev, :w => 1},
         body: "This is a no bas64 encoded text",
         headers: ["Content-Type": "text/plain;charset=utf-8"]
@@ -166,7 +171,8 @@ defmodule WithoutQuorumTest do
     rev = resp.body["rev"]
 
     resp =
-      Couch.delete("/#{context[:db_name]}/0/foo.txt",
+      Couch.delete(
+        "/#{context[:db_name]}/0/foo.txt",
         query: %{:rev => rev, :w => 1}
       )
 
