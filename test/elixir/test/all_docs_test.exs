@@ -69,9 +69,12 @@ defmodule AllDocsTest do
     assert Couch.delete("/#{db_name}/1", query: %{:rev => doc1["_rev"]}).body["ok"]
     changes = Couch.get("/#{db_name}/_changes").body["results"]
     assert length(changes) == 4
-    deleted = Enum.filter(changes, fn row -> row["deleted"] end)
-    assert length(deleted) == 1
-    assert hd(deleted)["id"] == "1"
+
+    retry_until(fn ->
+      deleted = Enum.filter(changes, fn row -> row["deleted"] end)
+      assert length(deleted) == 1
+      assert hd(deleted)["id"] == "1"
+    end)
 
     # (remember old seq)
     orig_doc = Enum.find(changes, fn row -> row["id"] == "3" end)
