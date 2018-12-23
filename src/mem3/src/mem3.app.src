@@ -13,20 +13,6 @@
 {application, mem3, [
     {description, "CouchDB Cluster Membership"},
     {vsn, git},
-    {modules, [
-        mem3,
-        mem3_app,
-        mem3_httpd,
-        mem3_nodes,
-        mem3_rep,
-        mem3_shards,
-        mem3_sup,
-        mem3_sync,
-        mem3_sync_event,
-        mem3_sync_nodes,
-        mem3_sync_security,
-        mem3_util
-    ]},
     {mod, {mem3_app, []}},
     {registered, [
         mem3_events,
