@@ -14,7 +14,6 @@
 
 -include_lib("triq/include/triq.hrl").
 -triq(eunit).
--include_lib("eunit/include/eunit.hrl").
 
 -define(SIZE_REDUCTION, 3).  % How much to reduce size with tree depth.
 -define(MAX_BRANCHES, 4).  % Maximum number of branches.

@@ -13,7 +13,16 @@
 -module(ddoc_cache_tutil).
 
 
--compile(export_all).
+-export([
+    start_couch/0,
+    start_couch/1,
+    stop_couch/1,
+    clear/0,
+    get_rev/2,
+    ddocs/0,
+    purge_modules/0,
+    with/1
+]).
 
 
 -include_lib("couch/include/couch_db.hrl").
