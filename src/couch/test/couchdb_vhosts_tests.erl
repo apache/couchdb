@@ -270,7 +270,3 @@ should_return_path_for_vhost_with_wildcard_host({Url, DbName}) ->
                               {reason, ?iofmt("Request failed: ~p", [Else])}]})
         end
     end).
-
-ensure_index_file() ->
-    Body = <<"<!DOCTYPE html>\n<html>\n<body>\nHello world\n</body>\n</html>">>,
-    file:write_file(filename:join([?TEMPDIR, "index.html"]), Body).

@@ -12,7 +12,11 @@
 
 -module(couch).
 
--compile(export_all).
+-export([
+    start/0,
+    stop/0,
+    restart/0
+]).
 
 
 deps() ->

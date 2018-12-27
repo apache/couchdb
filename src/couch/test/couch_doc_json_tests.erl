@@ -51,6 +51,8 @@ json_doc_test_() ->
         fun setup/0, fun teardown/1,
         fun(_) ->
             [{"Document from JSON", [
+                from_json_with_dbname_error_cases(),
+                from_json_with_db_name_success_cases(),
                 from_json_success_cases(),
                 from_json_error_cases()
              ]},

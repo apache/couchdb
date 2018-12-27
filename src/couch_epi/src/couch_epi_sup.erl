@@ -37,6 +37,11 @@
 %% Supervisor callbacks
 -export([init/1]).
 
+%% For testing
+-export([
+    plugin_childspecs/3
+]).
+
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
 
@@ -132,105 +137,3 @@ merge([], Children) ->
     Children;
 merge([{Id, _, _, _, _, _} = Spec | Rest], Children) ->
     merge(Rest, lists:keystore(Id, 1, Children, Spec)).
-
-
-%% ------------------------------------------------------------------
-%% Tests
-%% ------------------------------------------------------------------
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-%% ----
-%% BEGIN couch_epi_plugin behaviour callbacks
-
--compile([export_all]).
-
-app() -> test_app.
-providers() ->
-    [
-        {my_service, provider1},
-        {my_service, provider2}
-    ].
-
-services() ->
-    [
-        {my_service, ?MODULE}
-    ].
-
-data_providers() ->
-    [
-        {{test_app, descriptions}, {static_module, ?MODULE}, [{interval, 100}]}
-    ].
-
-data_subscriptions() ->
-    [
-        {test_app, descriptions}
-    ].
-
-processes() ->
-    [
-        {?MODULE, [?CHILD(extra_process, worker)]},
-        {?MODULE, [{to_replace, {new, start_link, [bar]},
-            permanent, 5000, worker, [bar]}]}
-    ].
-
-notify(_Key, _OldData, _NewData) ->
-    ok.
-
-%% END couch_epi_plugin behaviour callbacks
-%% ----
-
-parse_child_id(Id) when is_atom(Id) ->
-    Id;
-parse_child_id(Id) ->
-    ["couch_epi_codechange_monitor", ServiceName, KindStr] = string:tokens(Id, "|"),
-    Kind = list_to_atom(KindStr),
-    case string:tokens(ServiceName, ":") of
-        [ServiceId, Key] ->
-            {{list_to_atom(ServiceId), list_to_atom(Key)}, Kind};
-        [Key] ->
-            {list_to_atom(Key), Kind}
-    end.
-
-basic_test() ->
-    Expected = lists:sort([
-        {extra_process, [], [extra_process]},
-        {to_replace, [bar], [bar]},
-        {{my_service, providers},
-            [couch_epi_functions_gen_my_service],
-            [couch_epi_codechange_monitor, couch_epi_functions_gen_my_service,
-                provider1, provider2]},
-        {{my_service, services},
-            [couch_epi_functions_gen_my_service],
-            [couch_epi_codechange_monitor, couch_epi_functions_gen_my_service,
-                couch_epi_sup]},
-        {{{test_app, descriptions}, data_subscriptions},
-            [couch_epi_data_gen_test_app_descriptions],
-            [couch_epi_codechange_monitor,
-                couch_epi_data_gen_test_app_descriptions, couch_epi_sup]},
-        {{{test_app, descriptions}, data_providers},
-            [couch_epi_data_gen_test_app_descriptions],
-            [couch_epi_codechange_monitor, couch_epi_data_gen_test_app_descriptions,
-                couch_epi_sup]}
-    ]),
-
-    ToReplace = {to_replace, {old, start_link, [foo]}, permanent, 5000, worker, [foo]},
-    Children = lists:sort(plugin_childspecs(?MODULE, [?MODULE], [ToReplace])),
-    Results = [
-        {parse_child_id(Id), Args, lists:sort(Modules)}
-            || {Id, {_M, _F, Args}, _, _, _, Modules} <- Children
-    ],
-
-    Tests = lists:zip(Expected, Results),
-    [?assertEqual(Expect, Result) || {Expect, Result} <- Tests],
-
-    ExpectedChild = {to_replace, {new, start_link, [bar]},
-        permanent, 5000, worker, [bar]},
-    ?assertEqual(
-        ExpectedChild,
-        lists:keyfind(to_replace, 1, Children)),
-
-    ok.
-
--endif.

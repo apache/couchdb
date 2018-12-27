@@ -124,14 +124,14 @@ is_enabled() ->
             ?_assertNot(couch_flags:is_enabled(non_existent, "shards/blacklist/4"))}
     ]}].
 
-match_performance() ->
-    [{"match_performance", [
-        ?_test(begin
-            ?debugTime("1 million of operations took", lists:foreach(fun(_) ->
-                couch_flags:is_enabled(bar, "shards/test/exact")
-            end, lists:seq(1, 1000000)))
-        end)
-    ]}].
+%% match_performance() ->
+%%     [{"match_performance", [
+%%         ?_test(begin
+%%             ?debugTime("1 million of operations took", lists:foreach(fun(_) ->
+%%                 couch_flags:is_enabled(bar, "shards/test/exact")
+%%             end, lists:seq(1, 1000000)))
+%%         end)
+%%     ]}].
 
 
 test_config() ->
