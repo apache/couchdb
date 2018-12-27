@@ -156,21 +156,21 @@ defmodule Couch.DBTest do
 
   def create_db(db_name) do
     resp = Couch.put("/#{db_name}")
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     assert resp.body == %{"ok" => true}
     {:ok, resp}
   end
 
   def delete_db(db_name) do
     resp = Couch.delete("/#{db_name}")
-    assert resp.status_code == 200
+    assert resp.status_code in [200, 202]
     assert resp.body == %{"ok" => true}
     {:ok, resp}
   end
 
   def create_doc(db_name, body) do
     resp = Couch.post("/#{db_name}", body: body)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     assert resp.body["ok"]
     {:ok, resp}
   end
