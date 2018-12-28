@@ -737,18 +737,9 @@ process_dict_get(Pid, Key, DefaultValue) ->
     end.
 
 
--ifdef(PRE18TIMEFEATURES).
-
-unique_monotonic_integer() ->
-    {Ms, S, Us} = erlang:now(),
-    (Ms * 1000000 + S) * 1000000 + Us.
-
--else.
-
 unique_monotonic_integer() ->
     erlang:unique_integer([monotonic, positive]).
 
--endif.
 
 check_config_blacklist(Section) ->
     case lists:member(Section, ?BLACKLIST_CONFIG_SECTIONS) of
