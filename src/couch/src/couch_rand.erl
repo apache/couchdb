@@ -19,39 +19,9 @@
 ]).
 
 
--ifdef(NORANDMODULE).
-
-
-uniform() ->
-    maybe_set_random_seed(),
-    random:uniform().
-
-
-uniform(N) ->
-    maybe_set_random_seed(),
-    random:uniform(N).
-
-
-maybe_set_random_seed() ->
-    case get(random_seed) of
-        undefined ->
-            {_, Sec, USec} = os:timestamp(),
-            Seed = {erlang:phash2(self()), Sec, USec},
-            random:seed(Seed);
-        _ ->
-            ok
-    end.
-
-
--else.
-
-
 uniform() ->
     rand:uniform().
 
 
 uniform(N) ->
     rand:uniform(N).
-
-
--endif.
