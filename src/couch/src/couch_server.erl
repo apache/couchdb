@@ -165,11 +165,11 @@ maybe_add_sys_db_callbacks(DbName, Options) ->
         DbName == NodesDbName ->
             [sys_db | Options];
         IsReplicatorDb ->
-            [{before_doc_update, fun couch_replicator_docs:before_doc_update/2},
+            [{before_doc_update, fun couch_replicator_docs:before_doc_update/3},
              {after_doc_read, fun couch_replicator_docs:after_doc_read/2},
              sys_db | Options];
         IsUsersDb ->
-            [{before_doc_update, fun couch_users_db:before_doc_update/2},
+            [{before_doc_update, fun couch_users_db:before_doc_update/3},
              {after_doc_read, fun couch_users_db:after_doc_read/2},
              sys_db | Options];
         true ->
