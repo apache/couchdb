@@ -735,8 +735,8 @@ do_checkpoint(State) ->
     {SrcInstanceStartTime, TgtInstanceStartTime} ->
         couch_log:notice("recording a checkpoint for `~s` -> `~s` at source update_seq ~p",
             [SourceName, TargetName, NewSeq]),
-        UniversalStartTime = calendar:now_to_universal_time(ReplicationStartTime),
-        StartTime = ?l2b(httpd_util:rfc1123_date(UniversalStartTime)),
+        LocalStartTime = calendar:now_to_local_time(ReplicationStartTime),
+        StartTime = ?l2b(httpd_util:rfc1123_date(LocalStartTime)),
         EndTime = ?l2b(httpd_util:rfc1123_date()),
         NewHistoryEntry = {[
             {<<"session_id">>, SessionId},
