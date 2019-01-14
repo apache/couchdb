@@ -136,7 +136,7 @@ read_repair(#acc{dbname=DbName, replies=Replies, node_revs=NodeRevs}) ->
     [#doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} | _] ->
         choose_reply(Docs);
     [#doc{id=Id} | _] ->
-        Opts = [?ADMIN_CTX, {read_repair, NodeRevs}],
+        Opts = [?ADMIN_CTX, replicated_changes, {read_repair, NodeRevs}],
         Res = fabric:update_docs(DbName, Docs, Opts),
         case Res of
             {ok, []} ->
