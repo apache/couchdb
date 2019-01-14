@@ -224,7 +224,7 @@ dict_repair_docs(Replies, ReplyCount) ->
 
 
 read_repair(Db, Docs, NodeRevs) ->
-    Opts = [?ADMIN_CTX, {read_repair, NodeRevs}],
+    Opts = [?ADMIN_CTX, replicated_changes, {read_repair, NodeRevs}],
     Res = fabric:update_docs(Db, Docs, Opts),
     case Res of
         {ok, []} ->
