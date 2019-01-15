@@ -60,12 +60,16 @@ setup() ->
 
     application:load(couch_epi),
     application:set_env(couch_epi, plugins, [couch_db_epi, ?MODULE]),
-    test_util:start_couch([couch_epi]).
+    meck:expect(config, get, 1, []),
+
+    Ctx = test_util:start_couch([couch_epi]),
+    Ctx. 
 
 
 teardown(Ctx) ->
     test_util:stop_couch(Ctx),
     ok = application:unload(couch_epi),
+    meck:unload(),
     ok.
 
 couch_flags_test_() ->
