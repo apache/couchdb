@@ -243,8 +243,7 @@ format_reply(true, Replies, _) ->
     tree_format_replies(Replies);
 
 format_reply(false, Replies, _) ->
-    Filtered = filter_reply(Replies),
-    dict_format_replies(Filtered).
+    dict_format_replies(Replies).
 
 
 tree_format_replies(RevTree) ->
@@ -260,22 +259,59 @@ tree_format_replies(RevTree) ->
 
 
 dict_format_replies(Dict) ->
-    lists:sort([Reply || {_, {Reply, _}} <- Dict]).
+    Replies0 = [Reply || {_, {Reply, _}} <- Dict],
 
-filter_reply(Replies) ->
-    AllFoundRevs = lists:foldl(fun
-        ({{{not_found, missing}, _}, _}, Acc) ->
-            Acc;
-        ({{_, {Pos, [Rev | _]}}, _}, Acc) ->
-            [{Pos, Rev} | Acc]
-    end, [], Replies),
-    %% keep not_found replies only for the revs that don't also have doc reply
-    lists:filter(fun
-        ({{{not_found, missing}, Rev}, _}) ->
-            not lists:member(Rev, AllFoundRevs);
-        (_) ->
-            true
-    end, Replies).
+    AllFoundRevs = lists:foldl(fun(Reply, Acc) ->
+        case Reply of
+            {ok, #doc{revs = {Pos, [RevId | _]}}} ->
+                [{Pos, RevId} | Acc];
+            _ ->
+                Acc
+        end
+    end, [], Replies0),
+
+    %% Drop any not_found replies for which we
+    %% found the revision on a different node.
+    Replies1 = lists:filter(fun(Reply) ->
+        case Reply of
+            {{not_found, missing}, Rev} ->
+                not lists:member(Rev, AllFoundRevs);
+            _ ->
+                true
+        end
+    end, Replies0),
+
+    % Remove replies with shorter revision
+    % paths for a given revision.
+    collapse_duplicate_revs(Replies1).
+
+
+collapse_duplicate_revs(Replies) ->
+    % The collapse logic requires that replies are
+    % sorted so that shorter rev paths are in
+    % the list just before longer lists.
+    %
+    % This somewhat implicitly relies on Erlang's
+    % sorting of [A, B] < [A, B, C] for all values
+    % of C.
+    collapse_duplicate_revs_int(lists:sort(Replies)).
+
+
+collapse_duplicate_revs_int([]) ->
+    [];
+
+collapse_duplicate_revs_int([{ok, Doc1}, {ok, Doc2} | Rest]) ->
+    {D1, R1} = Doc1#doc.revs,
+    {D2, R2} = Doc2#doc.revs,
+    Head = case D1 == D2 andalso lists:prefix(R1, R2) of
+        true -> [];
+        false -> [{ok, Doc1}]
+    end,
+    Head ++ collapse_duplicate_revs([{ok, Doc2} | Rest]);
+
+collapse_duplicate_revs_int([Reply | Rest]) ->
+    [Reply | collapse_duplicate_revs(Rest)].
+
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -313,7 +349,9 @@ revs() -> [{1,<<"foo">>}, {1,<<"bar">>}, {1,<<"baz">>}].
 
 foo1() -> {ok, #doc{revs = {1, [<<"foo">>]}}}.
 foo2() -> {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}}.
+foo2stemmed() -> {ok, #doc{revs = {2, [<<"foo2">>]}}}.
 fooNF() -> {{not_found, missing}, {1,<<"foo">>}}.
+foo2NF() -> {{not_found, missing}, {2, <<"foo2">>}}.
 bar1() -> {ok, #doc{revs = {1, [<<"bar">>]}}}.
 barNF() -> {{not_found, missing}, {1,<<"bar">>}}.
 bazNF() -> {{not_found, missing}, {1,<<"baz">>}}.
@@ -351,7 +389,10 @@ open_doc_revs_test_() ->
             check_node_rev_unmodified_on_down_or_exit(),
             check_not_found_replies_are_removed_when_doc_found(),
             check_not_found_returned_when_one_of_docs_not_found(),
-            check_not_found_returned_when_doc_not_found()
+            check_not_found_returned_when_doc_not_found(),
+            check_longer_rev_list_returned(),
+            check_longer_rev_list_not_combined(),
+            check_not_found_removed_and_longer_rev_list()
         ]
     }.
 
@@ -685,23 +726,48 @@ check_node_rev_unmodified_on_down_or_exit() ->
 check_not_found_replies_are_removed_when_doc_found() ->
     ?_test(begin
         Replies = replies_to_dict([foo1(), bar1(), fooNF()]),
-        Expect = replies_to_dict([foo1(), bar1()]),
-        ?assertEqual(Expect, filter_reply(Replies))
+        Expect = [bar1(), foo1()],
+        ?assertEqual(Expect, dict_format_replies(Replies))
     end).
 
 check_not_found_returned_when_one_of_docs_not_found() ->
     ?_test(begin
         Replies = replies_to_dict([foo1(), foo2(), barNF()]),
-        Expect = replies_to_dict([foo1(), foo2(), barNF()]),
-        ?assertEqual(Expect, filter_reply(Replies))
+        Expect = [foo1(), foo2(), barNF()],
+        ?assertEqual(Expect, dict_format_replies(Replies))
     end).
 
 check_not_found_returned_when_doc_not_found() ->
     ?_test(begin
         Replies = replies_to_dict([fooNF(), barNF(), bazNF()]),
-        Expect = replies_to_dict([fooNF(), barNF(), bazNF()]),
-        ?assertEqual(Expect, filter_reply(Replies))
+        Expect = [barNF(), bazNF(), fooNF()],
+        ?assertEqual(Expect, dict_format_replies(Replies))
     end).
+
+check_longer_rev_list_returned() ->
+    ?_test(begin
+        Replies = replies_to_dict([foo2(), foo2stemmed()]),
+        Expect = [foo2()],
+        ?assertEqual(2, length(Replies)),
+        ?assertEqual(Expect, dict_format_replies(Replies))
+    end).
+
+check_longer_rev_list_not_combined() ->
+    ?_test(begin
+        Replies = replies_to_dict([foo2(), foo2stemmed(), bar1()]),
+        Expect = [bar1(), foo2()],
+        ?assertEqual(3, length(Replies)),
+        ?assertEqual(Expect, dict_format_replies(Replies))
+    end).
+
+check_not_found_removed_and_longer_rev_list() ->
+    ?_test(begin
+        Replies = replies_to_dict([foo2(), foo2stemmed(), foo2NF()]),
+        Expect = [foo2()],
+        ?assertEqual(3, length(Replies)),
+        ?assertEqual(Expect, dict_format_replies(Replies))
+    end).
+
 
 replies_to_dict(Replies) ->
     [reply_to_element(R) || R <- Replies].
