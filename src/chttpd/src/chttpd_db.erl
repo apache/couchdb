@@ -1630,12 +1630,22 @@ parse_partitioned_opt(Req) ->
         "false" ->
             [];
         "true" ->
+            ok = validate_partitioned_db_enabled(Req),
             [
                 {partitioned, true},
                 {hash, [couch_partition, hash, []]}
             ];
         _ ->
             throw({bad_request, <<"Invalid `partitioned` parameter">>})
+    end.
+
+
+validate_partitioned_db_enabled(Req) ->
+    case couch_flags:is_enabled(partitioned, Req) of
+        true -> 
+            ok;
+        false ->
+            throw({bad_request, <<"Partitioned feature is not enabled.">>})
     end.
 
 
@@ -1981,5 +1991,58 @@ monitor_attachments_test_() ->
             ?_assertEqual([], monitor_attachments(Atts))
         end
     }.
+
+parse_partitioned_opt_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            t_should_allow_partitioned_db(),
+            t_should_throw_on_not_allowed_partitioned_db(),
+            t_returns_empty_array_for_partitioned_false(),
+            t_returns_empty_array_for_no_partitioned_qs()
+        ]
+    }.
+
+
+setup() ->
+    ok.
+
+teardown(_) ->
+    meck:unload().
+
+mock_request(Url) ->
+    Headers = mochiweb_headers:make([{"Host", "examples.com"}]),
+    MochiReq = mochiweb_request:new(nil, 'PUT', Url, {1, 1}, Headers),
+    #httpd{mochi_req = MochiReq}.
+
+t_should_allow_partitioned_db() ->
+    ?_test(begin
+        meck:expect(couch_flags, is_enabled, 2, true),
+        Req = mock_request("/all-test21?partitioned=true"),
+        [Partitioned, _] = parse_partitioned_opt(Req),
+        ?assertEqual(Partitioned, {partitioned, true})
+    end).
+
+t_should_throw_on_not_allowed_partitioned_db() ->
+    ?_test(begin
+        meck:expect(couch_flags, is_enabled, 2, false),
+        Req = mock_request("/all-test21?partitioned=true"),
+        Throw = {bad_request, <<"Partitioned feature is not enabled.">>},
+        ?assertThrow(Throw, parse_partitioned_opt(Req))
+    end).
+
+t_returns_empty_array_for_partitioned_false() ->
+    ?_test(begin
+        Req = mock_request("/all-test21?partitioned=false"),
+        ?assertEqual(parse_partitioned_opt(Req), [])
+    end).
+
+t_returns_empty_array_for_no_partitioned_qs() ->
+    ?_test(begin
+        Req = mock_request("/all-test21"),
+        ?assertEqual(parse_partitioned_opt(Req), [])
+    end).
 
 -endif.
