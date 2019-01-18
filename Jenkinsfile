@@ -38,14 +38,14 @@ pipeline {
         }
       }
       steps {
-        // This image has the oldest Erlang we support, 16B03
-        sh 'docker pull couchdbdev/debian-jessie-erlang-17.5.3:latest'
+        // This image has the oldest Erlang we support, 19
+        sh 'docker pull couchdbdev/debian-stretch-erlang-19.3.6'
         timeout(time: 15, unit: "MINUTES") {
           // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
           // We need the jenkins user mapped inside of the image
           // npm config cache below is required because /home/jenkins doesn't
           // ACTUALLY exist in the image
-          withDockerContainer(image: 'couchdbdev/debian-jessie-erlang-17.5.3', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
+          withDockerContainer(image: 'couchdbdev/debian-stretch-erlang-19.3.6', args: '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group') {
             sh '''
               set
               rm -rf apache-couchdb-*
