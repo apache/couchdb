@@ -378,13 +378,12 @@ get_chunk_size() ->
     end.
 
 modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
-    case RootPointerInfo of
+    {NodeType, NodeList} = case RootPointerInfo of
     nil ->
-        NodeType = kv_node,
-        NodeList = [];
+        {kv_node, []};
     _Tuple ->
         Pointer = element(1, RootPointerInfo),
-        {NodeType, NodeList} = get_node(Bt, Pointer)
+        get_node(Bt, Pointer)
     end,
     NodeTuple = list_to_tuple(NodeList),
 

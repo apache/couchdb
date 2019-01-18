@@ -87,7 +87,7 @@ flush_test() ->
         _IntsToAGazillion = lists:seq(1, 200000),
         _LotsOfData = lists:map(fun(_) -> <<"foobar">> end,
                                 lists:seq(1, 500000)),
-        _BigBin = list_to_binary(_LotsOfData),
+        _ = list_to_binary(_LotsOfData),
 
         %% Allocation 200K tuples puts us above the memory threshold
         %% Originally, there should be:

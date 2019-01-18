@@ -285,12 +285,14 @@ defmodule RewriteTest do
 
         assert Couch.put("/#{db_name}/_design/test", body: ddoc).body["ok"]
 
-        assert Couch.post("/#{db_name}/_bulk_docs",
+        assert Couch.post(
+                 "/#{db_name}/_bulk_docs",
                  body: %{:docs => docs1},
                  query: %{w: 3}
                ).status_code == 201
 
-        assert Couch.post("/#{db_name}/_bulk_docs",
+        assert Couch.post(
+                 "/#{db_name}/_bulk_docs",
                  body: %{:docs => docs2},
                  query: %{w: 3}
                ).status_code == 201

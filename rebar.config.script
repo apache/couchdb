@@ -27,12 +27,13 @@ SubDirs = [
     "src/couch_log",
     "src/chttpd",
     "src/couch",
+    "src/couch_event",
+    "src/mem3",
     "src/couch_index",
     "src/couch_mrview",
     "src/couch_replicator",
     "src/couch_plugins",
     "src/couch_pse_tests",
-    "src/couch_event",
     "src/couch_stats",
     "src/couch_peruser",
     "src/couch_tests",
@@ -40,7 +41,6 @@ SubDirs = [
     "src/fabric",
     "src/global_changes",
     "src/mango",
-    "src/mem3",
     "src/rexi",
     "src/setup",
     "rel"
@@ -91,7 +91,7 @@ ErlOpts = case os:getenv("ERL_OPTS") of
 end,
 
 AddConfig = [
-    {require_otp_vsn, "17|18|19|20|21"},
+    {require_otp_vsn, "19|20|21"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs)},
     {sub_dirs, SubDirs},

@@ -52,6 +52,11 @@ create_doc(Url, Id, Content) ->
         [?CONTENT_JSON, ?AUTH], "{\"mr\": \"" ++ Content ++ "\"}").
 
 
+create_docs(Url, Docs) ->
+    test_request:post(Url ++ "/_bulk_docs",
+        [?CONTENT_JSON, ?AUTH], ?JSON_ENCODE({[{docs, Docs}]})).
+
+
 delete_db(Url) ->
     {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
 
@@ -70,6 +75,7 @@ purge_test_() ->
                 [
                     fun test_empty_purge_request/1,
                     fun test_ok_purge_request/1,
+                    fun test_ok_purge_request_with_101_docid/1,
                     fun test_accepted_purge_request/1,
                     fun test_partial_purge_request/1,
                     fun test_mixed_purge_request/1,
@@ -134,6 +140,35 @@ test_ok_purge_request(Url) ->
                 ]},
                 ResultJson
             )
+    end).
+
+
+test_ok_purge_request_with_101_docid(Url) ->
+    ?_test(begin
+        PurgedDocsNum = 101,
+        Docs = lists:foldl(fun(I, Acc) ->
+            Id = list_to_binary(integer_to_list(I)),
+            Doc = {[{<<"_id">>, Id}, {value, I}]},
+            [Doc | Acc]
+        end, [], lists:seq(1, PurgedDocsNum)),
+
+        {ok, _, _, Body} = create_docs(Url, Docs),
+        BodyJson = ?JSON_DECODE(Body),
+
+        PurgeBody = lists:map(fun({DocResp}) ->
+            Id = couch_util:get_value(<<"id">>, DocResp, undefined),
+            Rev = couch_util:get_value(<<"rev">>, DocResp, undefined),
+            {Id, [Rev]}
+        end, BodyJson),
+
+        ok = config:set("purge", "max_document_id_number", "101"),
+        try
+            {ok, Status, _, _} = test_request:post(Url ++ "/_purge/",
+                [?CONTENT_JSON, ?AUTH], ?JSON_ENCODE({PurgeBody})),
+            ?assert(Status =:= 201 orelse Status =:= 202)
+        after
+            ok = config:delete("purge", "max_document_id_number")
+        end
     end).
 
 

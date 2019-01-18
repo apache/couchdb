@@ -12,6 +12,7 @@
 
 -module(cpse_util).
 -compile(export_all).
+-compile(nowarn_export_all).
 
 
 -include_lib("eunit/include/eunit.hrl").
@@ -30,7 +31,8 @@
     cpse_test_purge_replication,
     cpse_test_purge_bad_checkpoints,
     cpse_test_compaction,
-    cpse_test_ref_counting
+    cpse_test_ref_counting,
+    cpse_test_purge_seqs
 ]).
 
 

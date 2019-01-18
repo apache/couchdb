@@ -1148,7 +1148,7 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
     end,
 
     {ok, DocBuckets, NonRepDocs, DocErrors}
-        = before_docs_update(Db, Docs, PrepValidateFun),
+        = before_docs_update(Db, Docs, PrepValidateFun, replicated_changes),
 
     DocBuckets2 = [[doc_flush_atts(Db, check_dup_atts(Doc))
             || Doc <- Bucket] || Bucket <- DocBuckets],
@@ -1166,7 +1166,7 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
     end,
 
     {ok, DocBuckets, NonRepDocs, DocErrors}
-        = before_docs_update(Db, Docs, PrepValidateFun),
+        = before_docs_update(Db, Docs, PrepValidateFun, interactive_edit),
 
     if (AllOrNothing) and (DocErrors /= []) ->
         RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),
@@ -1309,7 +1309,7 @@ prepare_doc_summaries(Db, BucketList) ->
         Bucket) || Bucket <- BucketList].
 
 
-before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun) ->
+before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun, UpdateType) ->
     increment_stat(Db, [couchdb, database_writes]),
 
     % Separate _local docs from normal docs
@@ -1324,7 +1324,7 @@ before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun) ->
     DocBuckets = lists:map(fun(Bucket) ->
         lists:map(fun(Doc) ->
             DocWithBody = couch_doc:with_ejson_body(Doc),
-            couch_db_plugin:before_doc_update(Db, DocWithBody)
+            couch_db_plugin:before_doc_update(Db, DocWithBody, UpdateType)
         end, Bucket)
     end, BucketList),
 
@@ -1767,7 +1767,7 @@ is_system_db_name(DbName) when is_binary(DbName) ->
     Suffix = filename:basename(Normalized),
     case {filename:dirname(Normalized), lists:member(Suffix, ?SYSTEM_DATABASES)} of
         {<<".">>, Result} -> Result;
-        {Prefix, false} -> false;
+        {_Prefix, false} -> false;
         {Prefix, true} ->
             ReOpts =  [{capture,none}, dollar_endonly],
             re:run(Prefix, ?DBNAME_REGEX, ReOpts) == match

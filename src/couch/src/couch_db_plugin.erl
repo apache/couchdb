@@ -14,7 +14,7 @@
 
 -export([
     validate_dbname/3,
-    before_doc_update/2,
+    before_doc_update/3,
     after_doc_read/2,
     validate_docid/1,
     check_is_admin/1,
@@ -34,11 +34,13 @@
 validate_dbname(DbName, Normalized, Default) ->
     maybe_handle(validate_dbname, [DbName, Normalized], Default).
 
-before_doc_update(Db, Doc0) ->
+before_doc_update(Db, Doc0, UpdateType) ->
     Fun = couch_db:get_before_doc_update_fun(Db),
-    case with_pipe(before_doc_update, [Doc0, Db]) of
-        [Doc1, _Db] when is_function(Fun) -> Fun(Doc1, Db);
-        [Doc1, _Db] -> Doc1
+    case with_pipe(before_doc_update, [Doc0, Db, UpdateType]) of
+        [Doc1, _Db, UpdateType1] when is_function(Fun) ->
+            Fun(Doc1, Db, UpdateType1);
+        [Doc1, _Db, _UpdateType] ->
+            Doc1
     end.
 
 after_doc_read(Db, Doc0) ->

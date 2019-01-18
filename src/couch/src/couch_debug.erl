@@ -551,7 +551,7 @@ should_include_extra_info({InitialPid, _Processes, _Tree}) ->
                     ?assert(lists:keymember(reductions, 1, Props)),
                     ?assert(lists:keymember(message_queue_len, 1, Props)),
                     ?assert(lists:keymember(memory, 1, Props));
-                Port ->
+                _Port ->
                     ok
             end,
             Props

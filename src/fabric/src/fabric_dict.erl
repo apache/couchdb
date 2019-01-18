@@ -12,6 +12,7 @@
 
 -module(fabric_dict).
 -compile(export_all).
+-compile(nowarn_export_all).
 
 % Instead of ets, let's use an ordered keylist. We'll need to revisit if we
 % have >> 100 shards, so a private interface is a good idea. - APK June 2010

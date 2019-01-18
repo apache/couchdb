@@ -130,7 +130,8 @@ defmodule SecurityValidationTest do
     headers = @auth_headers[:tom]
     # attempt to save doc in replication context, eg ?new_edits=false
     resp =
-      Couch.put("/#{db_name}/#{ddoc[:_id]}",
+      Couch.put(
+        "/#{db_name}/#{ddoc[:_id]}",
         body: ddoc,
         headers: headers,
         query: %{new_edits: false}
@@ -164,7 +165,8 @@ defmodule SecurityValidationTest do
     assert resp.body["reason"] == "Documents must have an author field"
 
     # Jerry can write the document
-    assert Couch.put("/#{db_name}/test_doc",
+    assert Couch.put(
+             "/#{db_name}/test_doc",
              body: %{foo: 1, author: "jerry"},
              headers: jerry
            ).body["ok"]

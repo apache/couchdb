@@ -46,7 +46,7 @@ setup2(Arg1, Arg2) ->
            Ctx1 = couch_tests:start_applications([public_key], Ctx0),
            couch_tests:set_state(Fixture, Ctx1, {Arg1, Arg2})
         end,
-        fun(Fixture, Ctx) ->
+        fun(_Fixture, Ctx) ->
            Ctx
         end).
 

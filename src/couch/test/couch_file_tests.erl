@@ -418,7 +418,7 @@ nuke_dir_test_() ->
                 File0 = ?tempfile() ++ ".couch",
                 RootDir = filename:dirname(File0),
                 BaseName = filename:basename(File0),
-                Seed = crypto:rand_uniform(1000000000, 9999999999),
+                Seed = couch_rand:uniform(8999999999) + 999999999,
                 DDocDir = io_lib:format("db.~b_design", [Seed]),
                 ViewDir = filename:join([RootDir, DDocDir]),
                 file:make_dir(ViewDir),

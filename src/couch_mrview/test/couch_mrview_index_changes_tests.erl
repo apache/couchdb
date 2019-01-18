@@ -186,15 +186,13 @@ test_stream(Db) ->
 test_indexer(Db) ->
     Result = run_query(Db, [{since, 14}, refresh]),
     Expect = {ok, 15, [{{15,14,<<"14">>},14}]},
-    ?_assertEqual(Result, Expect),
 
     {ok, Db1} = save_doc(Db, 15),
     timer:sleep(1500),
     Result1 = run_query(Db1, [{since, 14}], false),
     Expect1 = {ok, 16, [{{15,14,<<"14">>},14},
                        {{16,15,<<"15">>},15}]},
-    ?_assertEqual(Result1, Expect1),
-    ok.
+    ?_assert(Result == Expect andalso Result1 == Expect1).
 
 
 save_doc(Db, Id) ->

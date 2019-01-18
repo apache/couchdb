@@ -12,6 +12,7 @@
 
 -module(cpse_test_read_write_docs).
 -compile(export_all).
+-compile(nowarn_export_all).
 
 
 -include_lib("eunit/include/eunit.hrl").

@@ -12,7 +12,7 @@
 
 -module(mem3_seeds_test).
 
--include_lib("eunit/include/eunit.hrl").
+-include_lib("couch/include/couch_eunit.hrl").
 
 a_test_() ->
     Tests = [
@@ -29,7 +29,7 @@ empty_seedlist_status_ok() ->
         ?assertEqual({[]}, couch_util:get_value(seeds, Result)),
         ?assertEqual(ok, couch_util:get_value(status, Result))
     after
-        application:stop(mem3)
+        cleanup()
     end.
 
 seedlist_misconfiguration() ->
@@ -43,7 +43,7 @@ seedlist_misconfiguration() ->
         ?assertMatch({_}, couch_util:get_value('couchdb@node2.example.com', Seeds)),
         ?assertEqual(seeding, couch_util:get_value(status, Result))
     after
-        application:stop(mem3)
+        cleanup()
     end.
 
 check_nodelist() ->
@@ -54,8 +54,13 @@ check_nodelist() ->
         ?assert(lists:member('couchdb@node1.example.com', Nodes)),
         ?assert(lists:member('couchdb@node2.example.com', Nodes))
     after
-        application:stop(mem3)
+        cleanup()
     end.
+
+cleanup() ->
+    application:stop(mem3),
+    Filename = config:get("mem3", "nodes_db", "_nodes") ++ ".couch",
+    file:delete(filename:join([?BUILDDIR(), "tmp", "data", Filename])).
 
 setup() ->
     test_util:start_couch([rexi]).

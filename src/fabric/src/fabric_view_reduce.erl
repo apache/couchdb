@@ -35,14 +35,14 @@ go(DbName, DDoc, VName, Args, Callback, Acc, VInfo) ->
     Workers0 = fabric_util:submit_jobs(Shards,fabric_rpc,reduce_view,RPCArgs),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_util:stream_start(Workers0, #shard.ref, StartFun, Repls) of
+        case fabric_streams:start(Workers0, #shard.ref, StartFun, Repls) of
             {ok, ddoc_updated} ->
                 Callback({error, ddoc_updated}, Acc);
             {ok, Workers} ->
                 try
                     go2(DbName, Workers, VInfo, Args, Callback, Acc)
                 after
-                    fabric_util:cleanup(Workers)
+                    fabric_streams:cleanup(Workers)
                 end;
             {timeout, NewState} ->
                 DefunctWorkers = fabric_util:remove_done_workers(

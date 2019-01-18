@@ -269,7 +269,7 @@ should_set_sync_frequency(Pid) ->
         ok
     end).
 
-should_restart_listener(Pid) ->
+should_restart_listener(_Pid) ->
     ?_test(begin
         meck:reset(config_notifier),
         config:set("mem3", "sync_frequency", "error", false),

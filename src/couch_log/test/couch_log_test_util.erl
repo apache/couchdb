@@ -11,8 +11,17 @@
 % the License.
 
 -module(couch_log_test_util).
--compile(export_all).
 
+-export([
+    start/0,
+    stop/1,
+    last_log/0,
+    last_log_key/0,
+    wait_for_config/0,
+    with_config_listener/1,
+    with_level/2,
+    with_meck/2
+]).
 
 -include("couch_log.hrl").
 

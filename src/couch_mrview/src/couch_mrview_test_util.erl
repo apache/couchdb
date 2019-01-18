@@ -13,6 +13,7 @@
 -module(couch_mrview_test_util).
 
 -compile(export_all).
+-compile(nowarn_export_all).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").

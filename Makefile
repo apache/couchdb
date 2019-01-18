@@ -59,6 +59,11 @@ COUCHDB_VERSION = $(RELTAG)$(DIRTY)
 endif
 endif
 
+# needed to do text substitutions
+comma:= ,
+empty:=
+space:= $(empty) $(empty)
+
 DESTDIR=
 
 # Rebar options
@@ -80,6 +85,7 @@ DIALYZE_OPTS=$(shell echo "\
 	apps=$(apps) \
 	skip_deps=$(skip_deps) \
 	" | sed -e 's/[a-z]\{1,\}= / /g')
+EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
 #ignore javascript tests
 ignore_js_suites=
@@ -195,7 +201,19 @@ python-black-update: .venv/bin/black
 
 .PHONY: elixir
 elixir: elixir-check-formatted elixir-credo devclean
-	@dev/run -a adm:pass --no-eval test/elixir/run
+	@dev/run -a adm:pass --no-eval 'test/elixir/run --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+
+.PHONY: elixir-cluster-without-quorum
+elixir-cluster-without-quorum: elixir-check-formatted elixir-credo devclean
+	@dev/run -n 3 -q -a adm:pass \
+		--degrade-cluster 2 \
+		--no-eval 'test/elixir/run --only without_quorum_test $(EXUNIT_OPTS)'
+
+.PHONY: elixir-cluster-with-quorum
+elixir-cluster-with-quorum: elixir-check-formatted elixir-credo devclean
+	@dev/run -n 3 -q -a adm:pass \
+		--degrade-cluster 1 \
+		--no-eval 'test/elixir/run --only with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted:
