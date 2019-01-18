@@ -18,6 +18,12 @@ defmodule Couch.DBTest do
           |> Map.put(:db_name, random_db_name(db_name))
           |> Map.put(:with_db, true)
 
+        %{:with_partitioned_db => true} ->
+          context
+          |> Map.put(:db_name, random_db_name())
+          |> Map.put(:query, %{partitioned: true})
+          |> Map.put(:with_db, true)
+
         %{:with_db => true} ->
           Map.put(context, :db_name, random_db_name())
 
@@ -29,7 +35,7 @@ defmodule Couch.DBTest do
       end
 
     if Map.has_key?(context, :with_db) do
-      {:ok, _} = create_db(context[:db_name])
+      {:ok, _} = create_db(context[:db_name], query: context[:query])
       on_exit(fn -> delete_db(context[:db_name]) end)
     end
 
@@ -154,8 +160,8 @@ defmodule Couch.DBTest do
     Map.put(user_doc, "_rev", resp.body["rev"])
   end
 
-  def create_db(db_name) do
-    resp = Couch.put("/#{db_name}")
+  def create_db(db_name, opts \\ []) do
+    resp = Couch.put("/#{db_name}", opts)
     assert resp.status_code in [201, 202]
     assert resp.body == %{"ok" => true}
     {:ok, resp}

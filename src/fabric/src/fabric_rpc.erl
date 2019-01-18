@@ -19,7 +19,7 @@
 -export([all_docs/3, changes/3, map_view/4, reduce_view/4, group_info/2]).
 -export([create_db/1, create_db/2, delete_db/1, reset_validation_funs/1,
     set_security/3, set_revs_limit/3, create_shard_db_doc/2,
-    delete_shard_db_doc/2]).
+    delete_shard_db_doc/2, get_partition_info/2]).
 -export([get_all_security/2, open_shard/2]).
 -export([compact/1, compact/2]).
 -export([get_purge_seq/2, purge_docs/3, set_purge_infos_limit/3]).
@@ -118,9 +118,8 @@ do_changes(Db, StartSeq, Enum, Acc0, Opts) ->
 
 all_docs(DbName, Options, Args0) ->
     case fabric_util:upgrade_mrargs(Args0) of
-        #mrargs{keys=undefined} = Args1 ->
+        #mrargs{keys=undefined} = Args ->
             set_io_priority(DbName, Options),
-            Args = fix_skip_and_limit(Args1),
             {ok, Db} = get_or_create_db(DbName, Options),
             CB = get_view_cb(Args),
             couch_mrview:query_all_docs(Db, Args, CB, Args)
@@ -144,7 +143,7 @@ map_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
     map_view(DbName, DDoc, ViewName, Args0, DbOptions);
 map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
-    Args = fix_skip_and_limit(fabric_util:upgrade_mrargs(Args0)),
+    Args = fabric_util:upgrade_mrargs(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     CB = get_view_cb(Args),
     couch_mrview:query_view(Db, DDoc, ViewName, Args, CB, Args).
@@ -158,15 +157,10 @@ reduce_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
     reduce_view(DbName, DDoc, ViewName, Args0, DbOptions);
 reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
-    Args = fix_skip_and_limit(fabric_util:upgrade_mrargs(Args0)),
+    Args = fabric_util:upgrade_mrargs(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun reduce_cb/2, VAcc0).
-
-fix_skip_and_limit(Args) ->
-    #mrargs{skip=Skip, limit=Limit, extra=Extra}=Args,
-    % the coordinator needs to finalize each row, so make sure the shards don't
-    Args#mrargs{skip=0, limit=Skip+Limit, extra=[{finalizer,null} | Extra]}.
 
 create_db(DbName) ->
     create_db(DbName, []).
@@ -194,6 +188,9 @@ get_db_info(DbName) ->
 
 get_db_info(DbName, DbOptions) ->
     with_db(DbName, DbOptions, {couch_db, get_db_info, []}).
+
+get_partition_info(DbName, Partition) ->
+    with_db(DbName, [], {couch_db, get_partition_info, [Partition]}).
 
 %% equiv get_doc_count(DbName, [])
 get_doc_count(DbName) ->

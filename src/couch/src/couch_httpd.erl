@@ -878,6 +878,8 @@ error_info(md5_mismatch) ->
     {400, <<"content_md5_mismatch">>, <<"Possible message corruption.">>};
 error_info({illegal_docid, Reason}) ->
     {400, <<"illegal_docid">>, Reason};
+error_info({illegal_partition, Reason}) ->
+    {400, <<"illegal_partition">>, Reason};
 error_info(not_found) ->
     {404, <<"not_found">>, <<"missing">>};
 error_info({not_found, Reason}) ->

@@ -15,14 +15,6 @@
 -include("mem3.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-hash_test() ->
-    ?assertEqual(1624516141,mem3_util:hash(0)),
-    ?assertEqual(3816901808,mem3_util:hash("0")),
-    ?assertEqual(3523407757,mem3_util:hash(<<0>>)),
-    ?assertEqual(4108050209,mem3_util:hash(<<"0">>)),
-    ?assertEqual(3094724072,mem3_util:hash(zero)),
-    ok.
-
 name_shard_test() ->
     Shard1 = #shard{},
     ?assertError(function_clause, mem3_util:name_shard(Shard1, ".1234")),

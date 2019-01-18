@@ -296,7 +296,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     {ok, _, _, Args1} = couch_mrview_util:get_view(Db, DDoc, ViewName, Args0),
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg = parse_params(Query, undefined, Args1),
-        couch_mrview_util:validate_args(QueryArg)
+        couch_mrview_util:validate_args(Db, DDoc, QueryArg)
     end, Queries),
     {ok, Resp2} = couch_httpd:etag_maybe(Req, fun() ->
         Max = chttpd:chunked_response_buffer_size(),
@@ -582,6 +582,10 @@ parse_param(Key, Val, Args, IsDecoded) ->
             Args#mrargs{callback=couch_util:to_binary(Val)};
         "sorted" ->
             Args#mrargs{sorted=parse_boolean(Val)};
+        "partition" ->
+            Partition = couch_util:to_binary(Val),
+            couch_partition:validate_partition(Partition),
+            couch_mrview_util:set_extra(Args, partition, Partition);
         _ ->
             BKey = couch_util:to_binary(Key),
             BVal = couch_util:to_binary(Val),

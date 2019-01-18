@@ -13,7 +13,7 @@
 -module(mem3).
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
-    choose_shards/2, n/1, n/2, dbname/1, ushards/1]).
+    choose_shards/2, n/1, n/2, dbname/1, ushards/1, ushards/2]).
 -export([get_shard/3, local_shards/1, shard_suffix/1, fold_shards/2]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
@@ -71,7 +71,9 @@ compare_shards(DbName) ->
 
 -spec n(DbName::iodata()) -> integer().
 n(DbName) ->
-    n(DbName, <<"foo">>).
+    % Use _design to avoid issues with
+    % partition validation
+    n(DbName, <<"_design/foo">>).
 
 n(DbName, DocId) ->
     length(mem3:shards(DbName, DocId)).
@@ -135,6 +137,12 @@ ushards(DbName) ->
     ZoneMap = zone_map(Nodes),
     Shards = ushards(DbName, live_shards(DbName, Nodes, [ordered]), ZoneMap),
     mem3_util:downcast(Shards).
+
+-spec ushards(DbName::iodata(), DocId::binary()) -> [#shard{}].
+ushards(DbName, DocId) ->
+    Shards = shards_int(DbName, DocId, [ordered]),
+    Shard = hd(Shards),
+    mem3_util:downcast([Shard]).
 
 ushards(DbName, Shards0, ZoneMap) ->
     {L,S,D} = group_by_proximity(Shards0, ZoneMap),
@@ -237,15 +245,15 @@ dbname(_) ->
 %% @doc Determine if DocId belongs in shard (identified by record or filename)
 belongs(#shard{}=Shard, DocId) when is_binary(DocId) ->
     [Begin, End] = range(Shard),
-    belongs(Begin, End, DocId);
+    belongs(Begin, End, Shard, DocId);
 belongs(<<"shards/", _/binary>> = ShardName, DocId) when is_binary(DocId) ->
     [Begin, End] = range(ShardName),
-    belongs(Begin, End, DocId);
+    belongs(Begin, End, ShardName, DocId);
 belongs(DbName, DocId) when is_binary(DbName), is_binary(DocId) ->
     true.
 
-belongs(Begin, End, DocId) ->
-    HashKey = mem3_util:hash(DocId),
+belongs(Begin, End, Shard, DocId) ->
+    HashKey = mem3_hash:calculate(Shard, DocId),
     Begin =< HashKey andalso HashKey =< End.
 
 range(#shard{range = Range}) ->

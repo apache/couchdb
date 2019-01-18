@@ -20,16 +20,18 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
-go(DbName, Options, #mrargs{keys=undefined} = QueryArgs, Callback, Acc) ->
-    Shards = mem3:shards(DbName),
+go(Db, Options, #mrargs{keys=undefined} = QueryArgs, Callback, Acc) ->
+    {CoordArgs, WorkerArgs} = fabric_view:fix_skip_and_limit(QueryArgs),
+    DbName = fabric:dbname(Db),
+    Shards = shards(Db, QueryArgs),
     Workers0 = fabric_util:submit_jobs(
-            Shards, fabric_rpc, all_docs, [Options, QueryArgs]),
+            Shards, fabric_rpc, all_docs, [Options, WorkerArgs]),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
         case fabric_streams:start(Workers0, #shard.ref) of
             {ok, Workers} ->
                 try
-                    go(DbName, Options, Workers, QueryArgs, Callback, Acc)
+                    go(DbName, Options, Workers, CoordArgs, Callback, Acc)
                 after
                     fabric_streams:cleanup(Workers)
                 end;
@@ -133,6 +135,32 @@ go(DbName, _Options, Workers, QueryArgs, Callback, Acc0) ->
     {error, Resp} ->
         {ok, Resp}
     end.
+
+shards(Db, Args) ->
+    DbPartitioned = fabric_util:is_partitioned(Db),
+    Partition = couch_mrview_util:get_extra(Args, partition),
+    NewArgs = case {DbPartitioned, Partition} of
+        {true, undefined} ->
+            % If a user specifies the same partition on both
+            % the start and end keys we can optimize the
+            % query by limiting to the partition shard.
+            Start = couch_partition:extract(Args#mrargs.start_key),
+            End = couch_partition:extract(Args#mrargs.end_key),
+            case {Start, End} of
+                {{Partition, SK}, {Partition, EK}} ->
+                    A1 = Args#mrargs{
+                        start_key = SK,
+                        end_key = EK
+                    },
+                    couch_mrview_util:set_extra(A1, partition, Partition);
+                _ ->
+                    Args
+            end;
+        _ ->
+            Args
+    end,
+    fabric_view:get_shards(Db, NewArgs).
+
 
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
     fabric_view:check_down_shards(State, NodeRef);

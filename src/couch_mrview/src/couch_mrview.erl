@@ -57,6 +57,9 @@ validate_ddoc_fields(DDoc) ->
         [{<<"language">>, string}],
         [{<<"lists">>, object}, {any, [object, string]}],
         [{<<"options">>, object}],
+        [{<<"options">>, object}, {<<"include_design">>, boolean}],
+        [{<<"options">>, object}, {<<"local_seq">>, boolean}],
+        [{<<"options">>, object}, {<<"partitioned">>, boolean}],
         [{<<"rewrites">>, [string, array]}],
         [{<<"shows">>, object}, {any, [object, string]}],
         [{<<"updates">>, object}, {any, [object, string]}],
@@ -133,6 +136,8 @@ validate_ddoc_field(Value, array) when is_list(Value) ->
     ok;
 validate_ddoc_field({Value}, object) when is_list(Value) ->
     ok;
+validate_ddoc_field(Value, boolean) when is_boolean(Value) ->
+    ok;
 validate_ddoc_field({Props}, {any, Type}) ->
     validate_ddoc_field1(Props, Type);
 validate_ddoc_field({Props}, {Key, Type}) ->
@@ -169,7 +174,7 @@ join([H|T], Sep, Acc) ->
     join(T, Sep, [Sep, H | Acc]).
 
 
-validate(DbName,  DDoc) ->
+validate(Db,  DDoc) ->
     ok = validate_ddoc_fields(DDoc#doc.body),
     GetName = fun
         (#mrview{map_names = [Name | _]}) -> Name;
@@ -194,8 +199,21 @@ validate(DbName,  DDoc) ->
                 couch_query_servers:try_compile(Proc, reduce, RedName, RedSrc)
         end, Reds)
     end,
-    {ok, #mrst{language=Lang, views=Views}}
-            = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
+    {ok, #mrst{
+        language = Lang,
+        views = Views,
+        partitioned = Partitioned
+    }} = couch_mrview_util:ddoc_to_mrst(couch_db:name(Db), DDoc),
+
+    case {couch_db:is_partitioned(Db), Partitioned} of
+        {false, true} ->
+            throw({invalid_design_doc,
+                <<"partitioned option cannot be true in a "
+                  "non-partitioned database.">>});
+        {_, _} ->
+            ok
+    end,
+
     try Views =/= [] andalso couch_query_servers:get_os_process(Lang) of
         false ->
             ok;
@@ -223,7 +241,7 @@ query_all_docs(Db, Args0, Callback, Acc) ->
         couch_index_util:hexsig(couch_hash:md5_hash(term_to_binary(Info)))
     end),
     Args1 = Args0#mrargs{view_type=map},
-    Args2 = couch_mrview_util:validate_args(Args1),
+    Args2 = couch_mrview_util:validate_all_docs_args(Db, Args1),
     {ok, Acc1} = case Args2#mrargs.preflight_fun of
         PFFun when is_function(PFFun, 2) -> PFFun(Sig, Acc);
         _ -> {ok, Acc}
@@ -609,6 +627,8 @@ red_fold(Db, {NthRed, _Lang, View}=RedView, Args, Callback, UAcc) ->
     end, Acc, OptList),
     finish_fold(Acc2, []).
 
+red_fold({p, _Partition, Key}, Red, Acc) ->
+    red_fold(Key, Red, Acc);
 red_fold(_Key, _Red, #mracc{skip=N}=Acc) when N > 0 ->
     {ok, Acc#mracc{skip=N-1, last_go=ok}};
 red_fold(Key, Red, #mracc{meta_sent=false}=Acc) ->

@@ -16,12 +16,14 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
     db_req/2, couch_doc_open/4,handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
     handle_design_info_req/3, handle_view_cleanup_req/2,
-    update_doc/4, http_code_from_status/1]).
+    update_doc/4, http_code_from_status/1,
+    handle_partition_req/2]).
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -53,6 +55,11 @@
     T == <<"_all_docs">>
     orelse T == <<"_local_docs">>
     orelse T == <<"_design_docs">>)).
+
+-define(IS_MANGO(T), (
+    T == <<"_index">>
+    orelse T == <<"_find">>
+    orelse T == <<"_explain">>)).
 
 % Database request handlers
 handle_request(#httpd{path_parts=[DbName|RestParts],method=Method}=Req)->
@@ -253,6 +260,51 @@ handle_view_cleanup_req(Req, Db) ->
     ok = fabric:cleanup_index_files_all_nodes(Db),
     send_json(Req, 202, {[{ok, true}]}).
 
+
+handle_partition_req(#httpd{method='GET', path_parts=[_,_,PartId]}=Req, Db) ->
+    couch_partition:validate_partition(PartId),
+    case couch_db:is_partitioned(Db) of
+        true ->
+            {ok, PartitionInfo} = fabric:get_partition_info(Db, PartId),
+            send_json(Req, {PartitionInfo});
+        false ->
+            throw({bad_request, <<"database is not partitioned">>})
+    end;
+
+handle_partition_req(#httpd{path_parts = [_, _, _]}=Req, _Db) ->
+    send_method_not_allowed(Req, "GET");
+
+handle_partition_req(#httpd{path_parts=[DbName, _, PartId | Rest]}=Req, Db) ->
+    case couch_db:is_partitioned(Db) of
+        true ->
+            couch_partition:validate_partition(PartId),
+            QS = chttpd:qs(Req),
+            NewQS = lists:ukeysort(1, [{"partition", ?b2l(PartId)} | QS]),
+            NewReq = Req#httpd{
+                path_parts = [DbName | Rest],
+                qs = NewQS
+            },
+            case Rest of
+                [OP | _] when OP == <<"_all_docs">> orelse ?IS_MANGO(OP) ->
+                    case chttpd_handlers:db_handler(OP, fun db_req/2) of
+                        Handler when is_function(Handler, 2) ->
+                            Handler(NewReq, Db);
+                        _ ->
+                            chttpd:send_error(Req, not_found)
+                    end;
+                [<<"_design">>, _Name, <<"_", _/binary>> | _] ->
+                    handle_design_req(NewReq, Db);
+                _ ->
+                    chttpd:send_error(Req, not_found)
+            end;
+        false ->
+            throw({bad_request, <<"database is not partitioned">>})
+    end;
+
+handle_partition_req(Req, _Db) ->
+    chttpd:send_error(Req, not_found).
+
+
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) ->
@@ -288,10 +340,12 @@ create_db_req(#httpd{}=Req, DbName) ->
     Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
     P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
     EngineOpt = parse_engine_opt(Req),
+    DbProps = parse_partitioned_opt(Req),
     Options = [
         {n, N},
         {q, Q},
-        {placement, P}
+        {placement, P},
+        {props, DbProps}
     ] ++ EngineOpt,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
     case fabric:create_db(DbName, Options) of
@@ -317,7 +371,15 @@ delete_db_req(#httpd{}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
-    {ok, Db} = couch_db:clustered_db(DbName, Ctx),
+    Shard = hd(mem3:shards(DbName)),
+    Props = couch_util:get_value(props, Shard#shard.opts, []),
+    Opts = case Ctx of
+        undefined ->
+            [{props, Props}];
+        #user_ctx{} ->
+            [{user_ctx, Ctx}, {props, Props}]
+    end,
+    {ok, Db} = couch_db:clustered_db(DbName, Opts),
     Fun(Req, Db).
 
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
@@ -334,7 +396,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
-    Doc = couch_doc:from_json_obj_validate(chttpd:json_body(Req)),
+    Doc = couch_db:doc_from_json_obj_validate(Db, chttpd:json_body(Req)),
     Doc2 = case Doc#doc.id of
         <<"">> ->
             Doc#doc{id=couch_uuids:new(), revs={0, []}};
@@ -421,7 +483,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         Options = [{user_ctx,Ctx}, {w,W}]
     end,
     Docs = lists:map(fun(JsonObj) ->
-        Doc = couch_doc:from_json_obj_validate(JsonObj),
+        Doc = couch_db:doc_from_json_obj_validate(Db, JsonObj),
         validate_attachment_names(Doc),
         case Doc#doc.id of
             <<>> -> Doc#doc{id = couch_uuids:new()};
@@ -741,7 +803,7 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg1 = couch_mrview_http:parse_params(Query, undefined,
             Args1, [decoded]),
-        QueryArgs2 = couch_mrview_util:validate_args(QueryArg1),
+        QueryArgs2 = fabric_util:validate_all_docs_args(Db, QueryArg1),
         set_namespace(OP, QueryArgs2)
     end, Queries),
     Options = [{user_ctx, Req#httpd.user_ctx}],
@@ -761,7 +823,7 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
 all_docs_view(Req, Db, Keys, OP) ->
     Args0 = couch_mrview_http:parse_params(Req, Keys),
     Args1 = Args0#mrargs{view_type=map},
-    Args2 = couch_mrview_util:validate_args(Args1),
+    Args2 = fabric_util:validate_all_docs_args(Db, Args1),
     Args3 = set_namespace(OP, Args2),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),
@@ -778,7 +840,8 @@ db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     Rev ->
         Body = {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}
     end,
-    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, DocId, Body));
+    Doc = couch_doc_from_req(Req, Db, DocId, Body),
+    send_updated_doc(Req, Db, DocId, Doc);
 
 db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
     #doc_query_args{
@@ -835,7 +898,7 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
 
 db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     couch_httpd:validate_referer(Req),
-    couch_doc:validate_docid(DocId, couch_db:name(Db)),
+    couch_db:validate_docid(Db, DocId),
     chttpd:validate_ctype(Req, "multipart/form-data"),
 
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
@@ -845,7 +908,7 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     case proplists:is_defined("_doc", Form) of
     true ->
         Json = ?JSON_DECODE(couch_util:get_value("_doc", Form)),
-        Doc = couch_doc_from_req(Req, DocId, Json);
+        Doc = couch_doc_from_req(Req, Db, DocId, Json);
     false ->
         Rev = couch_doc:parse_rev(list_to_binary(couch_util:get_value("_rev", Form))),
         Doc = case fabric:open_revs(Db, DocId, [Rev], []) of
@@ -891,7 +954,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         update_type = UpdateType
     } = parse_doc_query(Req),
     DbName = couch_db:name(Db),
-    couch_doc:validate_docid(DocId, DbName),
+    couch_db:validate_docid(Db, DocId),
 
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
@@ -905,7 +968,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         couch_httpd_multipart:num_mp_writers(mem3:n(mem3:dbname(DbName), DocId)),
         {ok, Doc0, WaitFun, Parser} = couch_doc:doc_from_multi_part_stream(ContentType,
                 fun() -> receive_request_data(Req) end),
-        Doc = couch_doc_from_req(Req, DocId, Doc0),
+        Doc = couch_doc_from_req(Req, Db, DocId, Doc0),
         try
             Result = send_updated_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
             WaitFun(),
@@ -919,7 +982,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         case chttpd:qs_value(Req, "batch") of
         "ok" ->
             % batch
-            Doc = couch_doc_from_req(Req, DocId, chttpd:json_body(Req)),
+            Doc = couch_doc_from_req(Req, Db, DocId, chttpd:json_body(Req)),
 
             spawn(fun() ->
                     case catch(fabric:update_doc(Db, Doc, Options)) of
@@ -936,7 +999,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         _Normal ->
             % normal
             Body = chttpd:json_body(Req),
-            Doc = couch_doc_from_req(Req, DocId, Body),
+            Doc = couch_doc_from_req(Req, Db, DocId, Body),
             send_updated_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType)
         end
     end;
@@ -1217,7 +1280,7 @@ update_doc(Db, DocId, #doc{deleted=Deleted, body=DocBody}=Doc, Options) ->
     Body = {[{ok, true}, {id, DocId}, {rev, NewRevStr}]},
     {Status, {etag, Etag}, Body}.
 
-couch_doc_from_req(Req, DocId, #doc{revs=Revs} = Doc) ->
+couch_doc_from_req(Req, _Db, DocId, #doc{revs=Revs} = Doc) ->
     validate_attachment_names(Doc),
     Rev = case chttpd:qs_value(Req, "rev") of
     undefined ->
@@ -1244,8 +1307,9 @@ couch_doc_from_req(Req, DocId, #doc{revs=Revs} = Doc) ->
         end
     end,
     Doc#doc{id=DocId, revs=Revs2};
-couch_doc_from_req(Req, DocId, Json) ->
-    couch_doc_from_req(Req, DocId, couch_doc:from_json_obj_validate(Json)).
+couch_doc_from_req(Req, Db, DocId, Json) ->
+    Doc = couch_db:doc_from_json_obj_validate(Db, Json),
+    couch_doc_from_req(Req, Db, DocId, Doc).
 
 
 % Useful for debugging
@@ -1435,7 +1499,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
                 % check for the existence of the doc to handle the 404 case.
                 couch_doc_open(Db, DocId, nil, [])
             end,
-            couch_doc:validate_docid(DocId, couch_db:name(Db)),
+            couch_db:validate_docid(Db, DocId),
             #doc{id=DocId};
         Rev ->
             case fabric:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
@@ -1557,6 +1621,23 @@ parse_engine_opt(Req) ->
                     throw({bad_request, invalid_engine_extension})
             end
     end.
+
+
+parse_partitioned_opt(Req) ->
+    case chttpd:qs_value(Req, "partitioned") of
+        undefined ->
+            [];
+        "false" ->
+            [];
+        "true" ->
+            [
+                {partitioned, true},
+                {hash, [couch_partition, hash, []]}
+            ];
+        _ ->
+            throw({bad_request, <<"Invalid `partitioned` parameter">>})
+    end.
+
 
 parse_doc_query({Key, Value}, Args) ->
     case {Key, Value} of
@@ -1739,8 +1820,8 @@ set_namespace(<<"_local_docs">>, Args) ->
     set_namespace(<<"_local">>, Args);
 set_namespace(<<"_design_docs">>, Args) ->
     set_namespace(<<"_design">>, Args);
-set_namespace(NS, #mrargs{extra = Extra} = Args) ->
-    Args#mrargs{extra = [{namespace, NS} | Extra]}.
+set_namespace(NS, #mrargs{} = Args) ->
+    couch_mrview_util:set_extra(Args, namespace, NS).
 
 
 %% /db/_bulk_get stuff
@@ -1777,16 +1858,17 @@ bulk_get_open_doc_revs(Db, {Props}, Options) ->
 
 
 bulk_get_open_doc_revs1(Db, Props, Options, {}) ->
-    case parse_field(<<"id">>, couch_util:get_value(<<"id">>, Props)) of
-        {error, {DocId, Error, Reason}} ->
-            {DocId, {error, {null, Error, Reason}}, Options};
-
-        {ok, undefined} ->
+    case couch_util:get_value(<<"id">>, Props) of
+        undefined ->
             Error = {null, bad_request, <<"document id missed">>},
             {null, {error, Error}, Options};
-
-        {ok, DocId} ->
-            bulk_get_open_doc_revs1(Db, Props, Options, {DocId})
+        DocId ->
+            try
+                couch_db:validate_docid(Db, DocId),
+                bulk_get_open_doc_revs1(Db, Props, Options, {DocId})
+            catch throw:{Error, Reason} ->
+                {DocId, {error, {null, Error, Reason}}, Options}
+            end
     end;
 bulk_get_open_doc_revs1(Db, Props, Options, {DocId}) ->
     RevStr = couch_util:get_value(<<"rev">>, Props),
@@ -1826,16 +1908,6 @@ bulk_get_open_doc_revs1(Db, Props, _, {DocId, Revs, Options}) ->
     end.
 
 
-parse_field(<<"id">>, undefined) ->
-    {ok, undefined};
-parse_field(<<"id">>, Value) ->
-    try
-        ok = couch_doc:validate_docid(Value),
-        {ok, Value}
-    catch
-        throw:{Error, Reason} ->
-            {error, {Value, Error, Reason}}
-    end;
 parse_field(<<"rev">>, undefined) ->
     {ok, undefined};
 parse_field(<<"rev">>, Value) ->

@@ -70,24 +70,27 @@ def setup(db, index_type="view", **kwargs):
 
 def add_view_indexes(db, kwargs):
     indexes = [
-        ["user_id"],
-        ["name.last", "name.first"],
-        ["age"],
-        [
-            "location.state",
-            "location.city",
-            "location.address.street",
-            "location.address.number",
-        ],
-        ["company", "manager"],
-        ["manager"],
-        ["favorites"],
-        ["favorites.3"],
-        ["twitter"],
-        ["ordered"],
+        (["user_id"], "user_id"),
+        (["name.last", "name.first"], "name"),
+        (["age"], "age"),
+        (
+            [
+                "location.state",
+                "location.city",
+                "location.address.street",
+                "location.address.number",
+            ],
+            "location",
+        ),
+        (["company", "manager"], "company_and_manager"),
+        (["manager"], "manager"),
+        (["favorites"], "favorites"),
+        (["favorites.3"], "favorites_3"),
+        (["twitter"], "twitter"),
+        (["ordered"], "ordered"),
     ]
-    for idx in indexes:
-        assert db.create_index(idx) is True
+    for (idx, name) in indexes:
+        assert db.create_index(idx, name=name, ddoc=name) is True
 
 
 def add_text_indexes(db, kwargs):

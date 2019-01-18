@@ -38,6 +38,7 @@
     get_compacted_seq/1,
     get_compactor_pid/1,
     get_db_info/1,
+    get_partition_info/2,
     get_del_doc_count/1,
     get_doc_count/1,
     get_epochs/1,
@@ -57,6 +58,7 @@
     is_system_db/1,
     is_clustered/1,
     is_system_db_name/1,
+    is_partitioned/1,
 
     set_revs_limit/2,
     set_purge_infos_limit/2,
@@ -84,6 +86,9 @@
 
     get_minimum_purge_seq/1,
     purge_client_exists/3,
+
+    validate_docid/2,
+    doc_from_json_obj_validate/2,
 
     update_doc/3,
     update_doc/4,
@@ -185,11 +190,22 @@ reopen(#db{} = Db) ->
 incref(#db{} = Db) ->
     couch_db_engine:incref(Db).
 
-clustered_db(DbName, UserCtx) ->
-    clustered_db(DbName, UserCtx, []).
+clustered_db(DbName, Options) when is_list(Options) ->
+    UserCtx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
+    SecProps = couch_util:get_value(security, Options, []),
+    Props = couch_util:get_value(props, Options, []),
+    {ok, #db{
+        name = DbName,
+        user_ctx = UserCtx,
+        security = SecProps,
+        options = [{props, Props}]
+    }};
+
+clustered_db(DbName, #user_ctx{} = UserCtx) ->
+    clustered_db(DbName, [{user_ctx, UserCtx}]).
 
 clustered_db(DbName, UserCtx, SecProps) ->
-    {ok, #db{name = DbName, user_ctx = UserCtx, security = SecProps}}.
+    clustered_db(DbName, [{user_ctx, UserCtx}, {security, SecProps}]).
 
 is_db(#db{}) ->
     true;
@@ -205,6 +221,10 @@ is_clustered(#db{}) ->
     false;
 is_clustered(?OLD_DB_REC = Db) ->
     ?OLD_DB_MAIN_PID(Db) == undefined.
+
+is_partitioned(#db{options = Options}) ->
+    Props = couch_util:get_value(props, Options, []),
+    couch_util:get_value(partitioned, Props, false).
 
 ensure_full_commit(#db{main_pid=Pid, instance_start_time=StartTime}) ->
     ok = gen_server:call(Pid, full_commit, infinity),
@@ -584,6 +604,10 @@ get_db_info(Db) ->
         undefined -> null;
         Else1 -> Else1
     end,
+    Props = case couch_db_engine:get_props(Db) of
+        undefined -> null;
+        Else2 -> {Else2}
+    end,
     InfoList = [
         {db_name, Name},
         {engine, couch_db_engine:get_engine(Db)},
@@ -605,9 +629,17 @@ get_db_info(Db) ->
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
         {compacted_seq, CompactedSeq},
+        {props, Props},
         {uuid, Uuid}
     ],
     {ok, InfoList}.
+
+get_partition_info(#db{} = Db, Partition) when is_binary(Partition) ->
+    Info = couch_db_engine:get_partition_info(Db, Partition),
+    {ok, Info};
+get_partition_info(_Db, _Partition) ->
+    throw({bad_request, <<"`partition` is not valid">>}).
+
 
 get_design_doc(#db{name = <<"shards/", _/binary>> = ShardDbName}, DDocId0) ->
     DDocId = couch_util:normalize_ddoc_id(DDocId0),
@@ -782,6 +814,30 @@ name(#db{name=Name}) ->
 name(?OLD_DB_REC = Db) ->
     ?OLD_DB_NAME(Db).
 
+
+validate_docid(#db{} = Db, DocId) when is_binary(DocId) ->
+    couch_doc:validate_docid(DocId, name(Db)),
+    case is_partitioned(Db) of
+        true ->
+            couch_partition:validate_docid(DocId);
+        false ->
+            ok
+    end.
+
+
+doc_from_json_obj_validate(#db{} = Db, DocJson) ->
+    Doc = couch_doc:from_json_obj_validate(DocJson, name(Db)),
+    {Props} = DocJson,
+    case couch_util:get_value(<<"_id">>, Props) of
+        DocId when is_binary(DocId) ->
+            % Only validate the docid if it was provided
+            validate_docid(Db, DocId);
+        _ ->
+            ok
+    end,
+    Doc.
+
+
 update_doc(Db, Doc, Options) ->
     update_doc(Db, Doc, Options, interactive_edit).
 
@@ -831,7 +887,7 @@ group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
 
 validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
     case catch check_is_admin(Db) of
-        ok -> validate_ddoc(Db#db.name, Doc);
+        ok -> validate_ddoc(Db, Doc);
         Error -> Error
     end;
 validate_doc_update(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
@@ -849,9 +905,9 @@ validate_doc_update(Db, Doc, GetDiskDocFun) ->
             validate_doc_update_int(Db, Doc, GetDiskDocFun)
     end.
 
-validate_ddoc(DbName, DDoc) ->
+validate_ddoc(Db, DDoc) ->
     try
-        ok = couch_index_server:validate(DbName, couch_doc:with_ejson_body(DDoc))
+        ok = couch_index_server:validate(Db, couch_doc:with_ejson_body(DDoc))
     catch
         throw:{invalid_design_doc, Reason} ->
             {bad_request, invalid_design_doc, Reason};

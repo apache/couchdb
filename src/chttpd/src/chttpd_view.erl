@@ -24,7 +24,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         QueryArg = couch_mrview_http:parse_params(Query, undefined,
             Args1, [decoded]),
         QueryArg1 = couch_mrview_util:set_view_type(QueryArg, ViewName, Views),
-        couch_mrview_util:validate_args(QueryArg1)
+        fabric_util:validate_args(Db, DDoc, QueryArg1)
     end, Queries),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
@@ -122,17 +122,19 @@ check_multi_query_reduce_view_overrides_test_() ->
 t_check_include_docs_throw_validation_error() ->
     ?_test(begin
         Req = #httpd{qs = []},
+        Db = test_util:fake_db([{name, <<"foo">>}]),
         Query = {[{<<"include_docs">>, true}]},
         Throw = {query_parse_error, <<"`include_docs` is invalid for reduce">>},
-        ?assertThrow(Throw, multi_query_view(Req, db, ddoc, <<"v">>, [Query]))
+        ?assertThrow(Throw, multi_query_view(Req, Db, ddoc, <<"v">>, [Query]))
     end).
 
 
 t_check_user_can_override_individual_query_type() ->
     ?_test(begin
         Req = #httpd{qs = []},
+        Db = test_util:fake_db([{name, <<"foo">>}]),
         Query = {[{<<"include_docs">>, true}, {<<"reduce">>, false}]},
-        multi_query_view(Req, db, ddoc, <<"v">>, [Query]),
+        multi_query_view(Req, Db, ddoc, <<"v">>, [Query]),
         ?assertEqual(1, meck:num_calls(chttpd, start_delayed_json_response, '_'))
     end).
 

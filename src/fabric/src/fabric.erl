@@ -23,7 +23,7 @@
     get_revs_limit/1, get_security/1, get_security/2,
     get_all_security/1, get_all_security/2,
     get_purge_infos_limit/1, set_purge_infos_limit/3,
-    compact/1, compact/2]).
+    compact/1, compact/2, get_partition_info/2]).
 
 % Documents
 -export([open_doc/3, open_revs/4, get_doc_info/3, get_full_doc_info/3,
@@ -85,6 +85,19 @@ all_dbs(Prefix) when is_list(Prefix) ->
     ]}.
 get_db_info(DbName) ->
     fabric_db_info:go(dbname(DbName)).
+
+%% @doc returns the size of a given partition
+-spec get_partition_info(dbname(), Partition::binary()) ->
+    {ok, [
+        {db_name, binary()} |
+        {partition, binary()} |
+        {doc_count, non_neg_integer()} |
+        {doc_del_count, non_neg_integer()} |
+        {sizes, json_obj()}
+    ]}.
+get_partition_info(DbName, Partition) ->
+    fabric_db_partition_info:go(dbname(DbName), Partition).
+
 
 %% @doc the number of docs in a database
 %% @equiv get_doc_count(DbName, <<"_all_docs">>)
@@ -270,7 +283,7 @@ update_doc(DbName, Doc, Options) ->
         throw(Error);
     {ok, []} ->
         % replication success
-        #doc{revs = {Pos, [RevId | _]}} = doc(Doc),
+        #doc{revs = {Pos, [RevId | _]}} = doc(DbName, Doc),
         {ok, {Pos, RevId}};
     {error, [Error]} ->
         throw(Error)
@@ -279,9 +292,10 @@ update_doc(DbName, Doc, Options) ->
 %% @doc update a list of docs
 -spec update_docs(dbname(), [#doc{} | json_obj()], [option()]) ->
     {ok, any()} | any().
-update_docs(DbName, Docs, Options) ->
+update_docs(DbName, Docs0, Options) ->
     try
-        fabric_doc_update:go(dbname(DbName), docs(Docs), opts(Options)) of
+        Docs1 = docs(DbName, Docs0),
+        fabric_doc_update:go(dbname(DbName), Docs1, opts(Options)) of
         {ok, Results} ->
             {ok, Results};
         {accepted, Results} ->
@@ -378,20 +392,21 @@ query_view(Db, Options, GroupId, ViewName, Callback, Acc0, QueryArgs)
         when is_binary(GroupId) ->
     DbName = dbname(Db),
     {ok, DDoc} = ddoc_cache:open(DbName, <<"_design/", GroupId/binary>>),
-    query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs);
-query_view(DbName, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
-    Db = dbname(DbName), View = name(ViewName),
-    case fabric_util:is_users_db(Db) of
+    query_view(Db, Options, DDoc, ViewName, Callback, Acc0, QueryArgs);
+query_view(Db, Options, DDoc, ViewName, Callback, Acc0, QueryArgs0) ->
+    DbName = dbname(Db),
+    View = name(ViewName),
+    case fabric_util:is_users_db(DbName) of
     true ->
-        FakeDb = fabric_util:fake_db(Db, Options),
+        FakeDb = fabric_util:open_cluster_db(DbName, Options),
         couch_users_db:after_doc_read(DDoc, FakeDb);
     false ->
         ok
     end,
     {ok, #mrst{views=Views, language=Lang}} =
-        couch_mrview_util:ddoc_to_mrst(Db, DDoc),
+        couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
     QueryArgs1 = couch_mrview_util:set_view_type(QueryArgs0, View, Views),
-    QueryArgs2 = couch_mrview_util:validate_args(QueryArgs1),
+    QueryArgs2 = fabric_util:validate_args(Db, DDoc, QueryArgs1),
     VInfo = couch_mrview_util:extract_view(Lang, QueryArgs2, View, Views),
     case is_reduce_view(QueryArgs2) of
         true ->
@@ -536,16 +551,25 @@ docid(DocId) when is_list(DocId) ->
 docid(DocId) ->
     DocId.
 
-docs(Docs) when is_list(Docs) ->
-    [doc(D) || D <- Docs];
-docs(Docs) ->
+docs(Db, Docs) when is_list(Docs) ->
+    [doc(Db, D) || D <- Docs];
+docs(_Db, Docs) ->
     erlang:error({illegal_docs_list, Docs}).
 
-doc(#doc{} = Doc) ->
+doc(_Db, #doc{} = Doc) ->
     Doc;
-doc({_} = Doc) ->
-    couch_doc:from_json_obj_validate(Doc);
-doc(Doc) ->
+doc(Db0, {_} = Doc) ->
+    Db = case couch_db:is_db(Db0) of
+        true ->
+            Db0;
+        false ->
+            Shard = hd(mem3:shards(Db0)),
+            Props = couch_util:get_value(props, Shard#shard.opts, []),
+            {ok, Db1} = couch_db:clustered_db(Db0, [{props, Props}]),
+            Db1
+    end,
+    couch_db:doc_from_json_obj_validate(Db, Doc);
+doc(_Db, Doc) ->
     erlang:error({illegal_doc_format, Doc}).
 
 design_doc(#doc{} = DDoc) ->

@@ -2,7 +2,7 @@
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
 %
-% http://www.apache.org/licenses/LICENSE-2.0
+%   http://www.apache.org/licenses/LICENSE-2.0
 %
 % Unless required by applicable law or agreed to in writing, software
 % distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -10,12 +10,14 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--record(idx, {
-    dbname,
-    ddoc,
-    name,
-    type,
-    def,
-    partitioned,
-    opts
-}).
+-module(mem3_hash_test).
+
+-include_lib("eunit/include/eunit.hrl").
+
+hash_test() ->
+    ?assertEqual(1624516141,mem3_hash:crc32(0)),
+    ?assertEqual(3816901808,mem3_hash:crc32("0")),
+    ?assertEqual(3523407757,mem3_hash:crc32(<<0>>)),
+    ?assertEqual(4108050209,mem3_hash:crc32(<<"0">>)),
+    ?assertEqual(3094724072,mem3_hash:crc32(zero)),
+    ok.
