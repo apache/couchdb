@@ -132,13 +132,19 @@ update_or_delete_index(IndexPid, Db, DI, Proc) ->
         true ->
             ok = clouseau_rpc:delete(IndexPid, Id);
         false ->
-            {ok, Doc} = couch_db:open_doc(Db, DI, []),
-            Json = couch_doc:to_json_obj(Doc, []),
-            [Fields|_] = proc_prompt(Proc, [<<"index_doc">>, Json]),
-            Fields1 = [list_to_tuple(Field) || Field <- Fields],
-            case Fields1 of
-                [] -> ok = clouseau_rpc:delete(IndexPid, Id);
-                _  -> ok = clouseau_rpc:update(IndexPid, Id, Fields1)
+            case maybe_skip_doc(Db, Id) of
+                true ->
+                    ok;
+                false ->
+                    {ok, Doc} = couch_db:open_doc(Db, DI, []),
+                    Json = couch_doc:to_json_obj(Doc, []),
+                    [Fields|_] = proc_prompt(Proc, [<<"index_doc">>, Json]),
+                    Fields1 = [list_to_tuple(Field) || Field <- Fields],
+                    Fields2 = maybe_add_partition(Db, Id, Fields1),
+                    case Fields2 of
+                        [] -> ok = clouseau_rpc:delete(IndexPid, Id);
+                        _  -> ok = clouseau_rpc:update(IndexPid, Id, Fields2)
+                    end
             end
     end.
 
@@ -157,3 +163,19 @@ update_task(NumChanges) ->
             (Changes2 * 100) div Total
     end,
     couch_task_status:update([{progress, Progress}, {changes_done, Changes2}]).
+
+maybe_skip_doc(Db, <<"_design/", _/binary>>) ->
+    couch_db:is_partitioned(Db);
+maybe_skip_doc(_Db, _Id) ->
+    false.
+
+maybe_add_partition(_Db, _Id, []) ->
+    [];
+maybe_add_partition(Db, Id, Fields) ->
+    case couch_db:is_partitioned(Db) of
+        true ->
+            Partition = couch_partition:from_docid(Id),
+            [{<<"_partition">>, Partition, {[]}} | Fields];
+        false ->
+            Fields
+    end.

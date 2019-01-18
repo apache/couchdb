@@ -33,15 +33,31 @@
     verify_index_exists/2
 ]).
 
-get_shards(DbName, #index_query_args{stale=ok}) ->
-    mem3:ushards(DbName);
-get_shards(DbName, #index_query_args{stable=true}) ->
-    mem3:ushards(DbName);
-get_shards(DbName, #index_query_args{stale=false}) ->
-    mem3:shards(DbName);
+
+get_shards(DbName, #index_query_args{partition = nil} = Args) ->
+    case use_ushards(Args) of
+        true ->
+            mem3:ushards(DbName);
+        false ->
+            mem3:shards(DbName)
+    end;
+get_shards(DbName, #index_query_args{partition = Partition} = Args) ->
+    PartitionId = couch_partition:shard_key(Partition),
+    case use_ushards(Args) of
+        true ->
+            mem3:ushards(DbName, PartitionId);
+        false ->
+            mem3:shards(DbName, PartitionId)
+    end;
 get_shards(DbName, Args) ->
     get_shards(DbName, upgrade(Args)).
 
+use_ushards(#index_query_args{stale=ok}) ->
+    true;
+use_ushards(#index_query_args{stable=true}) ->
+    true;
+use_ushards(#index_query_args{}) ->
+    false.
 
 -spec sort(Order :: relevance | [any()], [#sortable{}]) -> [#sortable{}].
 sort(Sort, List0) ->
@@ -136,10 +152,34 @@ upgrade({index_query_args, Query, Limit, Stale, IncludeDocs, Bookmark,
         highlight_post_tag = HighlightPostTag,
         highlight_number = HighlightNumber,
         highlight_size = HighlightSize
+    };
+upgrade({index_query_args, Query, Limit, Stale, IncludeDocs, Bookmark,
+         Sort, Grouping, Stable, Counts, Ranges, Drilldown,
+         IncludeFields, HighlightFields, HighlightPreTag, HighlightPostTag,
+         HighlightNumber, HighlightSize, RawBookmark}) ->
+    #index_query_args{
+        q = Query,
+        limit = Limit,
+        stale = Stale,
+        include_docs = IncludeDocs,
+        bookmark = Bookmark,
+        sort = Sort,
+        grouping =  Grouping,
+        stable = Stable,
+        counts = Counts,
+        ranges = Ranges,
+        drilldown = Drilldown,
+        include_fields = IncludeFields,
+        highlight_fields = HighlightFields,
+        highlight_pre_tag = HighlightPreTag,
+        highlight_post_tag = HighlightPostTag,
+        highlight_number = HighlightNumber,
+        highlight_size = HighlightSize,
+        raw_bookmark = RawBookmark
     }.
 
-export(#index_query_args{counts = nil, ranges = nil, drilldown = [],
-    include_fields = nil, highlight_fields = nil} = Args) ->
+export(#index_query_args{partition = nil, counts = nil, ranges = nil,
+    drilldown = [], include_fields = nil, highlight_fields = nil} = Args) ->
     % Ensure existing searches work during the upgrade by creating an
     % #index_query_args record in the old format
     {index_query_args,
@@ -152,7 +192,8 @@ export(#index_query_args{counts = nil, ranges = nil, drilldown = [],
         Args#index_query_args.grouping,
         Args#index_query_args.stable
     };
-export(#index_query_args{include_fields = nil, highlight_fields = nil} = Args) ->
+export(#index_query_args{partition = nil, include_fields = nil,
+    highlight_fields = nil} = Args) ->
     {index_query_args,
         Args#index_query_args.q,
         Args#index_query_args.limit,
@@ -165,6 +206,27 @@ export(#index_query_args{include_fields = nil, highlight_fields = nil} = Args) -
         Args#index_query_args.counts,
         Args#index_query_args.ranges,
         Args#index_query_args.drilldown
+    };
+export(#index_query_args{partition = nil} = Args) ->
+    {index_query_args,
+        Args#index_query_args.q,
+        Args#index_query_args.limit,
+        Args#index_query_args.stale,
+        Args#index_query_args.include_docs,
+        Args#index_query_args.bookmark,
+        Args#index_query_args.sort,
+        Args#index_query_args.grouping,
+        Args#index_query_args.stable,
+        Args#index_query_args.counts,
+        Args#index_query_args.ranges,
+        Args#index_query_args.drilldown,
+        Args#index_query_args.include_fields,
+        Args#index_query_args.highlight_fields,
+        Args#index_query_args.highlight_pre_tag,
+        Args#index_query_args.highlight_post_tag,
+        Args#index_query_args.highlight_number,
+        Args#index_query_args.highlight_size,
+        Args#index_query_args.raw_bookmark
     };
 export(QueryArgs) ->
     QueryArgs.

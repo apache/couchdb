@@ -18,8 +18,8 @@
 -include("dreyfus.hrl").
 
 -export([open_index/3]).
--export([await/2, commit/2, get_update_seq/1, info/1, search/6, search/2]).
--export([group1/7, group2/8, group2/2]).
+-export([await/2, commit/2, get_update_seq/1, info/1, search/2]).
+-export([group1/7, group2/2]).
 -export([delete/2, update/3, cleanup/1, cleanup/2, rename/1]).
 -export([analyze/2, version/0, disk_size/1]).
 -export([set_purge_seq/2, get_purge_seq/1, get_root_dir/0]).
@@ -50,10 +50,6 @@ set_purge_seq(Ref, Seq) ->
 get_purge_seq(Ref) ->
     rpc(Ref, get_purge_seq).
 
-%% @deprecated
-search(Ref, Query, Limit, Refresh, Bookmark, Sort) ->
-    rpc(Ref, {search, Query, Limit, Refresh, Bookmark, Sort}).
-
 search(Ref, Args) ->
     case rpc(Ref, {search, Args}) of
         {ok, Response} when is_list(Response) ->
@@ -70,9 +66,6 @@ search(Ref, Args) ->
 
 group1(Ref, Query, GroupBy, Refresh, Sort, Offset, Limit) ->
     rpc(Ref, {group1, Query, GroupBy, Refresh, Sort, Offset, Limit}).
-
-group2(Ref, Query, GroupBy, Refresh, Groups, GroupSort, DocSort, DocLimit) ->
-    rpc(Ref, {group2, Query, GroupBy, Refresh, Groups, GroupSort, DocSort, DocLimit}).
 
 group2(Ref, Args) ->
     rpc(Ref, {group2, Args}).

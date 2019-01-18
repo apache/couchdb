@@ -1,2 +1,4 @@
 ebin/
 .*.sw?
+test/elixir/_build
+test/elixir/deps
