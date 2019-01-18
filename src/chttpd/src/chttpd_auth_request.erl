@@ -70,6 +70,8 @@ authorize_request_int(#httpd{path_parts=[_DbName, <<"_compact">>|_]}=Req) ->
     require_db_admin(Req);
 authorize_request_int(#httpd{path_parts=[_DbName, <<"_view_cleanup">>]}=Req) ->
     require_db_admin(Req);
+authorize_request_int(#httpd{path_parts=[_DbName, <<"_sync_shards">>]}=Req) ->
+    require_admin(Req);
 authorize_request_int(#httpd{path_parts=[_DbName|_]}=Req) ->
     db_authorization_check(Req).
 
