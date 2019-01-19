@@ -21,6 +21,8 @@
 #endif
 
 #include <jsapi.h>
+#include <js/Initialization.h>
+
 #include "config.h"
 #include "http.h"
 #include "utf8.h"
@@ -34,30 +36,45 @@
     JS_EndRequest(cx); \
     JS_ClearContextThread(cx);
 
+static JSClassOps global_ops = {
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    JS_GlobalObjectTraceHook
+};
 
+/* The class of the global object. */
 static JSClass global_class = {
-    "GlobalClass",
+    "global",
     JSCLASS_GLOBAL_FLAGS,
-    JS_PropertyStub,
-    JS_PropertyStub,
-    JS_PropertyStub,
-    JS_StrictPropertyStub,
-    JS_EnumerateStub,
-    JS_ResolveStub,
-    JS_ConvertStub,
-    JS_FinalizeStub,
+    &global_ops
+};
+
+static JSClass CouchHTTPClass = {
+    "CouchHTTP",  /* name */
+    0,        /* flags */
+    nullptr,
+    nullptr,
+    nullptr,
     JSCLASS_NO_OPTIONAL_MEMBERS
 };
 
-
-static JSBool
-req_ctor(JSContext* cx, uintN argc, jsval* vp)
+static bool
+req_ctor(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    JSBool ret;
-    JSObject* obj = JS_NewObjectForConstructor(cx, vp);
+    bool ret;
+    JSObject* obj = JS_NewObjectForConstructor(cx, CouchHTTPClass, vp);
     if(!obj) {
-        JS_ReportError(cx, "Failed to create CouchHTTP instance.\n");
-        return JS_FALSE;
+        JS_ReportError(cx, "Failed to create CouchHTTP instance.\n", NULL);
+        return false;
     }
     ret = http_ctor(cx, obj);
     JS_SET_RVAL(cx, vp, OBJECT_TO_JSVAL(obj));
@@ -72,12 +89,12 @@ req_dtor(JSContext* cx, JSObject* obj)
 }
 
 
-static JSBool
-req_open(JSContext* cx, uintN argc, jsval* vp)
+static bool
+req_open(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    jsval* argv = JS_ARGV(cx, vp);
-    JSBool ret = JS_FALSE;
+    JS::Value* argv = JS_ARGV(cx, vp);
+    bool ret = false;
 
     if(argc == 2) {
         ret = http_open(cx, obj, argv[0], argv[1], JSVAL_FALSE);
@@ -92,12 +109,12 @@ req_open(JSContext* cx, uintN argc, jsval* vp)
 }
 
 
-static JSBool
-req_set_hdr(JSContext* cx, uintN argc, jsval* vp)
+static bool
+req_set_hdr(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    jsval* argv = JS_ARGV(cx, vp);
-    JSBool ret = JS_FALSE;
+    JS::Value* argv = JS_ARGV(cx, vp);
+    bool ret = false;
 
     if(argc == 2) {
         ret = http_set_hdr(cx, obj, argv[0], argv[1]);
@@ -110,12 +127,12 @@ req_set_hdr(JSContext* cx, uintN argc, jsval* vp)
 }
 
 
-static JSBool
-req_send(JSContext* cx, uintN argc, jsval* vp)
+static bool
+req_send(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    jsval* argv = JS_ARGV(cx, vp);
-    JSBool ret = JS_FALSE;
+    JS::Value* argv = JS_ARGV(cx, vp);
+    bool ret = false;
 
     if(argc == 1) {
         ret = http_send(cx, obj, argv[0]);
@@ -128,30 +145,30 @@ req_send(JSContext* cx, uintN argc, jsval* vp)
 }
 
 
-static JSBool
-req_status(JSContext* cx, JSObject* obj, jsid pid, jsval* vp)
+static bool
+req_status(JSContext* cx, JSObject* obj, jsid pid, JS::Value* vp)
 {
     int status = http_status(cx, obj);
     if(status < 0)
-        return JS_FALSE;
+        return false;
 
     JS_SET_RVAL(cx, vp, INT_TO_JSVAL(status));
-    return JS_TRUE;
+    return true;
 }
 
 
-static JSBool
-base_url(JSContext *cx, JSObject* obj, jsid pid, jsval* vp)
+static bool
+base_url(JSContext *cx, JSObject* obj, jsid pid, JS::Value* vp)
 {
     couch_args *args = (couch_args*)JS_GetContextPrivate(cx);
     return http_uri(cx, obj, args, &JS_RVAL(cx, vp));
 }
 
 
-static JSBool
-evalcx(JSContext *cx, uintN argc, jsval* vp)
+static bool
+evalcx(JSContext *cx, unsigned int argc, JS::Value* vp)
 {
-    jsval* argv = JS_ARGV(cx, vp);
+    JS::Value* argv = JS_ARGV(cx, vp);
     JSString* str;
     JSObject* sandbox;
     JSObject* global;
@@ -159,19 +176,19 @@ evalcx(JSContext *cx, uintN argc, jsval* vp)
     JSCrossCompartmentCall* call = NULL;
     const jschar* src;
     size_t srclen;
-    jsval rval;
-    JSBool ret = JS_FALSE;
+    JS::Value rval;
+    bool ret = false;
     char *name = NULL;
 
     sandbox = NULL;
     if(!JS_ConvertArguments(cx, argc, argv, "S / o", &str, &sandbox)) {
-        return JS_FALSE;
+        return false;
     }
 
     subcx = JS_NewContext(JS_GetRuntime(cx), 8L * 1024L);
     if(!subcx) {
         JS_ReportOutOfMemory(cx);
-        return JS_FALSE;
+        return false;
     }
 
     SETUP_REQUEST(subcx);
@@ -202,7 +219,7 @@ evalcx(JSContext *cx, uintN argc, jsval* vp)
         JS_SET_RVAL(cx, vp, rval);
     }
     
-    ret = JS_TRUE;
+    ret = true;
 
 done:
     if(name) JS_free(cx, name);
@@ -213,37 +230,37 @@ done:
 }
 
 
-static JSBool
-gc(JSContext* cx, uintN argc, jsval* vp)
+static bool
+gc(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JS_GC(cx);
     JS_SET_RVAL(cx, vp, JSVAL_VOID);
-    return JS_TRUE;
+    return true;
 }
 
 
-static JSBool
-print(JSContext* cx, uintN argc, jsval* vp)
+static bool
+print(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    jsval* argv = JS_ARGV(cx, vp);
+    JS::Value* argv = JS_ARGV(cx, vp);
     couch_print(cx, argc, argv);
     JS_SET_RVAL(cx, vp, JSVAL_VOID);
-    return JS_TRUE;
+    return true;
 }
 
 
-static JSBool
-quit(JSContext* cx, uintN argc, jsval* vp)
+static bool
+quit(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    jsval* argv = JS_ARGV(cx, vp);
+    JS::Value* argv = JS_ARGV(cx, vp);
     int exit_code = 0;
     JS_ConvertArguments(cx, argc, argv, "/i", &exit_code);
     exit(exit_code);
 }
 
 
-static JSBool
-readline(JSContext* cx, uintN argc, jsval* vp)
+static bool
+readline(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JSString* line;
 
@@ -251,27 +268,27 @@ readline(JSContext* cx, uintN argc, jsval* vp)
     JS_MaybeGC(cx);
 
     line = couch_readline(cx, stdin);
-    if(line == NULL) return JS_FALSE;
+    if(line == NULL) return false;
 
     JS_SET_RVAL(cx, vp, STRING_TO_JSVAL(line));
-    return JS_TRUE;
+    return true;
 }
 
 
-static JSBool
-seal(JSContext* cx, uintN argc, jsval* vp)
+static bool
+seal(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    jsval* argv = JS_ARGV(cx, vp);
+    JS::Value* argv = JS_ARGV(cx, vp);
     JSObject *target;
-    JSBool deep = JS_FALSE;
-    JSBool ret;
+    bool deep = false;
+    bool ret;
 
     if(!JS_ConvertArguments(cx, argc, argv, "o/b", &target, &deep))
-        return JS_FALSE;
+        return false;
 
     if(!target) {
         JS_SET_RVAL(cx, vp, JSVAL_VOID);
-        return JS_TRUE;
+        return true;
     }
 
     
@@ -281,13 +298,13 @@ seal(JSContext* cx, uintN argc, jsval* vp)
 }
 
 
-static JSBool
-js_sleep(JSContext* cx, uintN argc, jsval* vp)
+static bool
+js_sleep(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    jsval* argv = JS_ARGV(cx, vp);
+    JS::Value* argv = JS_ARGV(cx, vp);
     int duration = 0;
     if(!JS_ConvertArguments(cx, argc, argv, "/i", &duration)) {
-        return JS_FALSE;
+        return false;
     }
 
 #ifdef XP_WIN
@@ -296,26 +313,8 @@ js_sleep(JSContext* cx, uintN argc, jsval* vp)
     usleep(duration * 1000);
 #endif
 
-    return JS_TRUE;
+    return true;
 }
-
-
-JSClass CouchHTTPClass = {
-    "CouchHTTP",
-    JSCLASS_HAS_PRIVATE
-        | JSCLASS_CONSTRUCT_PROTOTYPE
-        | JSCLASS_HAS_RESERVED_SLOTS(2),
-    JS_PropertyStub,
-    JS_PropertyStub,
-    JS_PropertyStub,
-    JS_StrictPropertyStub,
-    JS_EnumerateStub,
-    JS_ResolveStub,
-    JS_ConvertStub,
-    req_dtor,
-    JSCLASS_NO_OPTIONAL_MEMBERS
-};
-
 
 JSPropertySpec CouchHTTPProperties[] = {
     {"status", 0, JSPROP_READONLY, req_status, NULL},
@@ -349,14 +348,14 @@ static JSFunctionSpec global_functions[] = {
 };
 
 
-static JSBool
+static bool
 csp_allows(JSContext* cx)
 {
     couch_args *args = (couch_args*)JS_GetContextPrivate(cx);
     if(args->eval) {
-        return JS_TRUE;
+        return true;
     } else {
-        return JS_FALSE;
+        return false;
     }
 }
 
@@ -381,8 +380,8 @@ main(int argc, const char* argv[])
     JSString* scriptsrc;
     const jschar* schars;
     size_t slen;
-    jsval sroot;
-    jsval result;
+    JS::Value sroot;
+    JS::Value result;
     int i;
 
     couch_args* args = couch_parse_args(argc, argv);
@@ -417,7 +416,7 @@ main(int argc, const char* argv[])
     if(!JS_InitStandardClasses(cx, global))
         return 1;
 
-    if(couch_load_funcs(cx, global, global_functions) != JS_TRUE)
+    if(couch_load_funcs(cx, global, global_functions) != true)
         return 1;
  
     if(args->use_http) {
@@ -440,7 +439,7 @@ main(int argc, const char* argv[])
     } 
 
     if(args->use_test_funs) {
-        if(couch_load_funcs(cx, global, TestSuiteFunctions) != JS_TRUE)
+        if(couch_load_funcs(cx, global, TestSuiteFunctions) != true)
             return 1;
     }
 
@@ -454,7 +453,7 @@ main(int argc, const char* argv[])
 
         // Root it so GC doesn't collect it.
         sroot = STRING_TO_JSVAL(scriptsrc);
-        if(JS_AddValueRoot(cx, &sroot) != JS_TRUE) {
+        if(JS_AddValueRoot(cx, &sroot) != true) {
             fprintf(stderr, "Internal root error.\n");
             return 1;
         }
@@ -467,7 +466,7 @@ main(int argc, const char* argv[])
             return 1;
         }
 
-        if(JS_ExecuteScript(cx, global, script, &result) != JS_TRUE) {
+        if(JS_ExecuteScript(cx, global, script, &result) != true) {
             fprintf(stderr, "Failed to execute script.\n");
             return 1;
         }

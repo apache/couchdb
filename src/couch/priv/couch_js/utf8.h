@@ -13,7 +13,7 @@
 #ifndef COUCH_JS_UTF_8_H
 #define COUCH_JS_UTF_8_H
 
-char* enc_string(JSContext* cx, jsval arg, size_t* buflen);
+char* enc_string(JSContext* cx, JS::Value arg, size_t* buflen);
 JSString* dec_string(JSContext* cx, const char* buf, size_t buflen);
 
 #endif

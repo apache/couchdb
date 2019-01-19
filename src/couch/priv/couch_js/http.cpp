@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <jsapi.h>
+#include <js/Initialization.h>
 #include "config.h"
 #include "utf8.h"
 #include "util.h"
@@ -33,51 +34,51 @@ http_check_enabled()
 }
 
 
-JSBool
+bool
 http_ctor(JSContext* cx, JSObject* req)
 {
-    return JS_FALSE;
+    return false;
 }
 
 
-JSBool
+bool
 http_dtor(JSContext* cx, JSObject* req)
 {
-    return JS_FALSE;
+    return false;
 }
 
 
-JSBool
-http_open(JSContext* cx, JSObject* req, jsval mth, jsval url, jsval snc)
+bool
+http_open(JSContext* cx, JSObject* req, JS::Value mth, JS::Value url, JS::Value snc)
 {
-    return JS_FALSE;
+    return false;
 }
 
 
-JSBool
-http_set_hdr(JSContext* cx, JSObject* req, jsval name, jsval val)
+bool
+http_set_hdr(JSContext* cx, JSObject* req, JS::Value name, JS::Value val)
 {
-    return JS_FALSE;
+    return false;
 }
 
 
-JSBool
-http_send(JSContext* cx, JSObject* req, jsval body)
+bool
+http_send(JSContext* cx, JSObject* req, JS::Value body)
 {
-    return JS_FALSE;
+    return false;
 }
 
 
 int
-http_status(JSContext* cx, JSObject* req, jsval body)
+http_status(JSContext* cx, JSObject* req, JS::Value body)
 {
     return -1;
 }
 
-JSBool
-http_uri(JSContext* cx, JSObject* req, couch_args* args, jsval* uri_val)
+bool
+http_uri(JSContext* cx, JSObject* req, couch_args* args, JS::Value* uri_val)
 {
-    return JS_FALSE;
+    return false;
 }
 
 
@@ -126,7 +127,7 @@ char* METHODS[] = {"GET", "HEAD", "POST", "PUT", "DELETE", "COPY", "OPTIONS", NU
 #define OPTIONS 6
 
 
-static JSBool
+static bool
 go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t blen);
 
 
@@ -134,11 +135,11 @@ static JSString*
 str_from_binary(JSContext* cx, char* data, size_t length);
 
 
-JSBool
+bool
 http_ctor(JSContext* cx, JSObject* req)
 {
     HTTPData* http = NULL;
-    JSBool ret = JS_FALSE;
+    bool ret = false;
 
     http = (HTTPData*) malloc(sizeof(HTTPData));
     if(!http)
@@ -181,13 +182,13 @@ http_dtor(JSContext* cx, JSObject* obj)
 }
 
 
-JSBool
-http_open(JSContext* cx, JSObject* req, jsval mth, jsval url, jsval snc)
+bool
+http_open(JSContext* cx, JSObject* req, JS::Value mth, JS::Value url, JS::Value snc)
 {
     HTTPData* http = (HTTPData*) JS_GetPrivate(cx, req);
     char* method = NULL;
     int methid;
-    JSBool ret = JS_FALSE;
+    bool ret = false;
 
     if(!http) {
         JS_ReportError(cx, "Invalid CouchHTTP instance.");
@@ -253,15 +254,15 @@ done:
 }
 
 
-JSBool
-http_set_hdr(JSContext* cx, JSObject* req, jsval name, jsval val)
+bool
+http_set_hdr(JSContext* cx, JSObject* req, JS::Value name, JS::Value val)
 {
     HTTPData* http = (HTTPData*) JS_GetPrivate(cx, req);
     char* keystr = NULL;
     char* valstr = NULL;
     char* hdrbuf = NULL;
     size_t hdrlen = -1;
-    JSBool ret = JS_FALSE;
+    bool ret = false;
 
     if(!http) {
         JS_ReportError(cx, "Invalid CouchHTTP instance.");
@@ -313,13 +314,13 @@ done:
     return ret;
 }
 
-JSBool
-http_send(JSContext* cx, JSObject* req, jsval body)
+bool
+http_send(JSContext* cx, JSObject* req, JS::Value body)
 {
     HTTPData* http = (HTTPData*) JS_GetPrivate(cx, req);
     char* bodystr = NULL;
     size_t bodylen = 0;
-    JSBool ret = JS_FALSE;
+    bool ret = false;
     
     if(!http) {
         JS_ReportError(cx, "Invalid CouchHTTP instance.");
@@ -348,14 +349,14 @@ http_status(JSContext* cx, JSObject* req)
     
     if(!http) {
         JS_ReportError(cx, "Invalid CouchHTTP instance.");
-        return JS_FALSE;
+        return false;
     }
 
     return http->last_status;
 }
 
-JSBool
-http_uri(JSContext* cx, JSObject* req, couch_args* args, jsval* uri_val)
+bool
+http_uri(JSContext* cx, JSObject* req, couch_args* args, JS::Value* uri_val)
 {
     FILE* uri_fp = NULL;
     JSString* uri_str;
@@ -387,7 +388,7 @@ http_uri(JSContext* cx, JSObject* req, couch_args* args, jsval* uri_val)
 
 error:
     if(uri_fp) fclose(uri_fp);
-    return JS_FALSE;
+    return false;
 }
 
 
@@ -418,14 +419,14 @@ static int seek_body(void *ptr, curl_off_t offset, int origin);
 static size_t recv_body(void *ptr, size_t size, size_t nmem, void *data);
 static size_t recv_header(void *ptr, size_t size, size_t nmem, void *data);
 
-static JSBool
+static bool
 go(JSContext* cx, JSObject* obj, HTTPData* http, char* body, size_t bodylen)
 {
     CurlState state;
     char* referer;
     JSString* jsbody;
-    JSBool ret = JS_FALSE;
-    jsval tmp;
+    bool ret = false;
+    JS::Value tmp;
     
     state.cx = cx;
     state.http = http;
@@ -609,7 +610,7 @@ recv_header(void *ptr, size_t size, size_t nmem, void *data)
     size_t length = size * nmem;
     JSString* hdr = NULL;
     jsuint hdrlen;
-    jsval hdrval;
+    JS::Value hdrval;
     
     if(length > 7 && strncasecmp(header, "HTTP/1.", 7) == 0) {
         if(length < 12) {

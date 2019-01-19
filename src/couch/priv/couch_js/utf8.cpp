@@ -11,6 +11,7 @@
 // the License.
 
 #include <jsapi.h>
+#include <js/Initialization.h>
 #include "config.h"
 
 static int

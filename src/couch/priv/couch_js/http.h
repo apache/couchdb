@@ -16,12 +16,12 @@
 #include "util.h"
 
 void http_check_enabled();
-JSBool http_ctor(JSContext* cx, JSObject* req);
+bool http_ctor(JSContext* cx, JSObject* req);
 void http_dtor(JSContext* cx, JSObject* req);
-JSBool http_open(JSContext* cx, JSObject* req, jsval mth, jsval url, jsval snc);
-JSBool http_set_hdr(JSContext* cx, JSObject* req, jsval name, jsval val);
-JSBool http_send(JSContext* cx, JSObject* req, jsval body);
+bool http_open(JSContext* cx, JSObject* req, JS::Value mth, JS::Value url, JS::Value snc);
+bool http_set_hdr(JSContext* cx, JSObject* req, JS::Value name, JS::Value val);
+bool http_send(JSContext* cx, JSObject* req, JS::Value body);
 int http_status(JSContext* cx, JSObject* req);
-JSBool http_uri(JSContext* cx, JSObject *req, couch_args* args, jsval* uri);
+bool http_uri(JSContext* cx, JSObject *req, couch_args* args, JS::Value* uri);
 
 #endif

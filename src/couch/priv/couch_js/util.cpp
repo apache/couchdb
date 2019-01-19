@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include <jsapi.h>
+#include <js/Initialization.h>
 
 #include "help.h"
 #include "util.h"
@@ -211,7 +212,7 @@ couch_readfile(JSContext* cx, const char* filename)
 
 
 void
-couch_print(JSContext* cx, uintN argc, jsval* argv)
+couch_print(JSContext* cx, unsigned int argc, jsval* argv)
 {
     char *bytes = NULL;
     FILE *stream = stdout;
@@ -284,15 +285,15 @@ couch_error(JSContext* cx, const char* mesg, JSErrorReport* report)
 }
 
 
-JSBool
+bool
 couch_load_funcs(JSContext* cx, JSObject* obj, JSFunctionSpec* funcs)
 {
     JSFunctionSpec* f;
     for(f = funcs; f->name != NULL; f++) {
         if(!JS_DefineFunction(cx, obj, f->name, f->call, f->nargs, f->flags)) {
             fprintf(stderr, "Failed to create function: %s\n", f->name);
-            return JS_FALSE;
+            return false;
         }
     }
-    return JS_TRUE;
+    return true;
 }

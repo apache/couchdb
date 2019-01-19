@@ -87,18 +87,18 @@ end,
             {unix, freebsd} ->
                 {"-DHAVE_CURL -I/usr/local/include", "-DHAVE_CURL -lmozjs185 -lcurl"};
             _ ->
-                {"-DHAVE_CURL", "-DHAVE_CURL -lmozjs185 -lcurl"}
+                {"-DHAVE_CURL", "-DHAVE_CURL -lmozjs-52 -lcurl"}
         end;
     _ ->
         case os:type() of
             {win32, _} ->
                 {"", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src mozjs185-1.0.lib"};
             _ ->
-                {"", "-lmozjs185"}
+                {"", "-lmozjs-52"}
         end
 end,
 
-CouchJSSrc = ["priv/couch_js/*.c"],
+CouchJSSrc = ["priv/couch_js/*.cpp"],
 
 IcuPath = "priv/couch_icu_driver.so",
 IcuSrc = ["priv/icu_driver/*.c"],
@@ -116,7 +116,7 @@ CompareSrc = ["priv/couch_ejson_compare/*.c"],
 
 BaseSpecs = [
         %% couchjs
-        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib"}]}]},
+        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CXXFLAGS", JS_CFLAGS ++ "-std=gnu++11 -DXP_UNIX -I/Users/jan/Work/mozjs-52.9.1pre1/js/src/obj/dist/include"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/Users/jan/Work/mozjs-52.9.1pre1/js/src/obj/dist/sdk/lib"}]}]},
         {"linux",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
         {"bsd",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib -lm"}]}]},
         {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " /DXP_WIN /IC:\\relax\\js-1.8.5\\js\\src"}, {"LDFLAGS", JS_LDFLAGS}]}]},
