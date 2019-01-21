@@ -85,6 +85,17 @@ defmodule BasicsTest do
   end
 
   @tag :with_db
+  test "A document read with etag works", context do
+    db_name = context[:db_name]
+    {:ok, resp} = create_doc(db_name, sample_doc_foo())
+    etag = ~s("#{resp.body["rev"]}")
+    resp = Couch.get("/#{db_name}/foo", headers: ["If-None-Match": etag])
+    assert resp.status_code == 304, "Should be 304 Not Modified"
+    assert resp.headers[:"Content-Length"] == "0", "Should have zero content length"
+    assert resp.body == "", "Should have an empty body"
+  end
+
+  @tag :with_db
   test "Make sure you can do a seq=true option", context do
     db_name = context[:db_name]
     {:ok, _} = create_doc(db_name, sample_doc_foo())
