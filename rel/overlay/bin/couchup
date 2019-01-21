@@ -22,7 +22,7 @@ import sys
 try:
     from urllib.parse import quote
 except ImportError:
-    from urllib.parse import quote
+    from urllib import quote
 import requests
 
 try:
