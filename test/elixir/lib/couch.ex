@@ -100,7 +100,9 @@ defmodule Couch do
   end
 
   def process_response_body(headers, body) do
-    if String.match?(headers[:"Content-Type"], ~r/application\/json/) do
+    content_type = headers[:"Content-Type"]
+
+    if !!content_type and String.match?(content_type, ~r/application\/json/) do
       body |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps])
     else
       process_response_body(body)
