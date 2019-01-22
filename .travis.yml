@@ -3,7 +3,7 @@ os: linux
 dist: trusty
 
 otp_release:
-   - 21.1
+   - 21.2.3
    - 20.3
    - 19.3
 
