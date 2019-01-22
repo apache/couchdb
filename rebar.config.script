@@ -65,7 +65,7 @@ DepDescs = [
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-4"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-2"}},
-{mochiweb,         "mochiweb",         {tag, "CouchDB-v2.18.0-1"}},
+{mochiweb,         "mochiweb",         {tag, "v2.19.0"}},
 {meck,             "meck",             {tag, "0.8.8"}}
 ],
 
