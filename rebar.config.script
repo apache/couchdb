@@ -1,3 +1,4 @@
+%% -*- erlang -*-
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
@@ -9,6 +10,42 @@
 % WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 % License for the specific language governing permissions and limitations under
 % the License.
+
+%
+% Blacklist some bad releases.
+%
+{ok, Version} = file:read_file(filename:join(
+    [code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"]
+)).
+
+% Version may be binary if file has /n at end :(
+% there is no string:trim/1 in Erlang 19 :(
+VerString = case Version of
+    V when is_binary(V) -> string:strip(binary_to_list(V), right, $\n);
+    _ -> string:strip(Version, right, $\n)
+end.
+VerList = lists:map(fun(X) -> {Int, _} = string:to_integer(X), Int end,
+    string:tokens(VerString, ".")).
+
+NotSupported = fun(Ver) ->
+    io:fwrite("CouchDB does not support this version of Erlang (~p).~n", [Ver]),
+    io:fwrite("Check https://docs.couchdb.org/en/latest/whatsnew/index.html for the~n"),
+    io:fwrite("latest information on supported releases.~n"),
+    case os:getenv("TRAVIS") of
+        "true" -> 
+            io:fwrite("Travis run, ignoring bad release. You have been warned!~n"),
+            ok;
+        _ -> halt(1)
+    end
+end.
+
+case VerList of
+    [20 | _] = V20 when V20 < [20, 3, 8, 11] -> NotSupported(VerString);
+    [20 | _] = V20 when V20 >= [20, 3, 8, 11] -> ok;
+    [21, 2] -> NotSupported(VerString);
+    [21, 2, N | _] when N < 3 -> NotSupported(VerString);
+    _ -> ok
+end.
 
 % Set the path to the configuration environment generated
 % by `./configure`.

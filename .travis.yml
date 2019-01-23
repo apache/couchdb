@@ -4,7 +4,7 @@ dist: trusty
 
 otp_release:
    - 21.2.3
-   - 20.3
+   - 20.3.8.5
    - 19.3
    - 18.3
    - 17.5
@@ -49,6 +49,7 @@ env:
 
 # Then comment this section out
 before_script:
+  - kerl list installations
   - rm -rf /tmp/couchjslogs
   - mkdir -p /tmp/couchjslogs
   - ./configure -c --disable-docs --disable-fauxton
