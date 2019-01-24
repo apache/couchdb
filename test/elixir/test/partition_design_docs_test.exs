@@ -9,7 +9,7 @@ defmodule PartitionDesignDocsTest do
   test "/_partition/:pk/_design/doc 404", context do
     db_name = context[:db_name]
 
-    url = "/#{db_name}/_partition/fake-key/_design/mrtest/"
+    url = "/#{db_name}/_partition/fakekey/_design/mrtest/_view/some"
     resp = Couch.get(url)
     assert resp.status_code == 404
   end
