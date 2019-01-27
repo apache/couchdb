@@ -102,7 +102,7 @@ full_reduce_with_options(Bt, Options0) ->
     [UserName] = proplists:get_value(start_key, Options0, <<"">>),
     % couch_log:info("~n Options0:~p~n", [Options0]),
     % couch_log:info("~n UserName:~p~n", [UserName]),
-    EndKey = {[UserName, {[]}], {[]}},
+    EndKey = {[UserName, {[]}]},
     % couch_log:info("~n EndKey:~p~n", [EndKey]),
     Options = Options0 ++ [
         {end_key, EndKey}

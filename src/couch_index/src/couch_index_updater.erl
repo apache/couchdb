@@ -133,8 +133,8 @@ update(Idx, Mod, IdxState) ->
     CommittedOnly = lists:member(committed_only, UpdateOpts),
     IncludeDesign = lists:member(include_design, UpdateOpts),
     DocOpts = case lists:member(local_seq, UpdateOpts) of
-        true -> [conflicts, deleted_conflicts, local_seq];
-        _ -> [conflicts, deleted_conflicts]
+        true -> [conflicts, deleted_conflicts, local_seq, deleted];
+        _ -> [conflicts, deleted_conflicts, local_seq, deleted]
     end,
 
     couch_util:with_db(DbName, fun(Db) ->
@@ -160,15 +160,21 @@ update(Idx, Mod, IdxState) ->
 
         LoadDoc = fun(DI) ->
             {DocId, Seq, Deleted, DocInfo} = GetInfo(DI),
+            couch_log:info("~n~nDbName: ~p OPeed Dc: ~p~n~n", [DbName, DocId]),
 
             case {IncludeDesign, DocId} of
                 {false, <<"_design/", _/binary>>} ->
                     {nil, Seq};
-                _ when Deleted ->
-                    {#doc{id=DocId, deleted=true}, Seq};
+                % _ when Deleted ->
+                %     {#doc{id=DocId, deleted=true}, Seq};
                 _ ->
                     {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
-                    {Doc, Seq}
+                    couch_log:info("~n~nDbName: ~p DOC Dc: ~p from DocInfo~p~n~n", [DbName, Doc, DocInfo]),
+                    [RevInfo] = DocInfo#doc_info.revs,
+                    Doc1 = Doc#doc{
+                        meta = [{body_sp, RevInfo#rev_info.body_sp}]
+                    },
+                    {Doc1, Seq}
             end
         end,
 

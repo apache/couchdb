@@ -121,6 +121,7 @@ code_change(_OldVsn, St, _Extra) ->
 % {"id":"account/bongel","key":"account/bongel","value":{"rev":"1-967a00dff5e02add41819138abb3284d"}},
 
 map_doc(_St, {Doc}) ->
+    couch_log:info("Mebbe Indexing: Doc: ~p", [Doc]),
     case couch_util:get_value(<<"_access">>, Doc) of
         undefined ->
             [[],[]]; % do not index this doc
@@ -128,15 +129,24 @@ map_doc(_St, {Doc}) ->
             Id = couch_util:get_value(<<"_id">>, Doc),
             Rev = couch_util:get_value(<<"_rev">>, Doc),
             Seq = couch_util:get_value(<<"_seq">>, Doc),
+            Deleted = couch_util:get_value(<<"_deleted">>, Doc, false),
+            BodySp = couch_util:get_value(<<"_body_sp">>, Doc),
+            
+            couch_log:info("RELLY Indexing: Id: ~p, Rev: ~p, Seq: ~p, Deleted: ~p, BodySp: ~p~n", [Id, Rev, Seq, Deleted, BodySp]),
             % by-access-id
-            lists:map(fun(UserOrRole) -> [
-                [[UserOrRole, Id], Rev]
-            ] end, Access)
-            ++
+            ById = case Deleted of
+                false ->
+                    lists:map(fun(UserOrRole) -> [
+                        [[UserOrRole, Id], Rev]
+                    ] end, Access);
+                _True -> [[]]
+            end,
+
             % by-access-seq
-            lists:map(fun(UserOrRole) -> [
-                [[UserOrRole, Seq], Rev]
-            ] end, Access);
+            BySeq = lists:map(fun(UserOrRole) -> [
+                [[UserOrRole, Seq], [{rev, Rev}, {deleted, Deleted}, {body_sp, BodySp}]]
+            ] end, Access),
+            ById ++ BySeq;
         _Else ->
             [[],[]] % no comprende: should not be needed once we implement _access field validation
     end.

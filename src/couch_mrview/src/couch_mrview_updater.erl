@@ -144,9 +144,9 @@ process_doc(Doc, Seq, #mrst{doc_acc=Acc}=State) when length(Acc) > 100 ->
     process_doc(Doc, Seq, State#mrst{doc_acc=[]});
 process_doc(nil, Seq, #mrst{doc_acc=Acc}=State) ->
     {ok, State#mrst{doc_acc=[{nil, Seq, nil, nil} | Acc]}};
-process_doc(#doc{id=Id, deleted=true}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->
-    Rev= extract_rev(Doc#doc.revs),
-    {ok, State#mrst{doc_acc=[{Id, Seq, Rev, deleted} | Acc]}};
+% process_doc(#doc{id=Id, deleted=true}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->
+%     Rev= extract_rev(Doc#doc.revs),
+%     {ok, State#mrst{doc_acc=[{Id, Seq, Rev, deleted} | Acc]}};
 process_doc(#doc{id=Id}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->
     Rev = extract_rev(Doc#doc.revs),
     {ok, State#mrst{doc_acc=[{Id, Seq, Rev, Doc} | Acc]}}.
@@ -174,6 +174,13 @@ finish_update(#mrst{doc_acc=Acc}=State) ->
             }}
     end.
 
+make_deleted_body({Props}, Meta, Seq) ->
+    BodySp = couch_util:get_value(body_sp, Meta),
+    Result = [{<<"_seq">>, Seq}, {<<"_body_sp">>, BodySp}],
+    case couch_util:get_value(<<"_access">>, Props) of
+    undefined -> Result;
+    Access -> [{<<"_access">>, Access} | Result]
+    end.
 
 map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
     erlang:put(io_priority, {view_update, DbName, IdxName}),
@@ -192,8 +199,25 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
             DocFun = fun
                 ({nil, Seq, _, _}, {SeqAcc, Results}) ->
                     {erlang:max(Seq, SeqAcc), Results};
-                ({Id, Seq, Rev, deleted}, {SeqAcc, Results}) ->
-                    {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, []} | Results]};
+                ({Id, Seq, Rev, #doc{deleted=true, body=Body, meta=Meta}}, {SeqAcc, Results}) ->
+                    % _access needs deleted docs
+                    case IdxName of
+                        <<"_design/_access">> ->
+                            % splice in seq
+                            couch_log:info("~n~nRevvvv: ~p Body~p, Meta: ~p~n", [Rev, Body, Meta]),
+                            {Start, Rev1} = Rev,
+                            Doc = #doc{
+                                id = Id,
+                                revs = {Start, [Rev1]},
+                                body = {make_deleted_body(Body, Meta, Seq)}, %% todo: only keep _access and add _seq
+                                deleted = true
+                            },
+                            {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc),
+                            couch_log:info("~n~nRessss: ~p~n~n", [Res]),
+                            {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, Res} | Results]};
+                        _Else ->
+                            {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, []} | Results]}
+                        end;
                 ({Id, Seq, Rev, Doc}, {SeqAcc, Results}) ->
                     couch_stats:increment_counter([couchdb, mrview, map_doc]),
                     % couch_log:info("~nIdxName: ~p, Doc: ~p~n~n", [IdxName, Doc]),
@@ -201,8 +225,9 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
                         <<"_design/_access">> ->
                             % splice in seq
                             {Props} = Doc#doc.body,
+                            BodySp = couch_util:get_value(body_sp, Doc#doc.meta),
                             Doc#doc{
-                                body = {Props++[{<<"_seq">>, Seq}]}
+                                body = {Props++[{<<"_seq">>, Seq}, {<<"_body_sp">>, BodySp}]}
                             };
                         _Else ->
                             Doc

@@ -309,9 +309,9 @@ init_db(DbName, FilePath, EngineState, Options) ->
 
     BDU = couch_util:get_value(before_doc_update, Options, nil),
     ADR = couch_util:get_value(after_doc_read, Options, nil),
-
+    Access = couch_util:get_value(access, Options, false),
     CleanedOpts = [Opt || Opt <- Options, Opt /= create],
-
+    
     InitDb = #db{
         name = DbName,
         filepath = FilePath,
@@ -319,8 +319,10 @@ init_db(DbName, FilePath, EngineState, Options) ->
         instance_start_time = StartTime,
         options = CleanedOpts,
         before_doc_update = BDU,
-        after_doc_read = ADR
+        after_doc_read = ADR,
+        access = Access
     },
+    couch_log:info("~n~nNEW DB WITH OPTIONS~p ~p ACCESSS~p ININTDB~p~n~n", [DbName, CleanedOpts, Access, InitDb]),
 
     InitDb#db{
         committed_update_seq = couch_db_engine:get_update_seq(InitDb),

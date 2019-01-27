@@ -273,7 +273,7 @@ bad_action_req(#httpd{path_parts=[_, _, Name|FileNameParts]}=Req, Db, _DDoc) ->
 
 handle_design_info_req(#httpd{method='GET'}=Req, Db, #doc{} = DDoc) ->
     [_, _, Name, _] = Req#httpd.path_parts,
-    {ok, GroupInfoList} = fabric:get_view_group_info(Db, DDoc),
+    {ok, GroupInfoList} = fabric:get_view_group_isnfo(Db, DDoc),
     send_json(Req, 200, {[
         {name,  Name},
         {view_index, {GroupInfoList}}
@@ -287,14 +287,19 @@ create_db_req(#httpd{}=Req, DbName) ->
     N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
     Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
     P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
+    Access = chttpd:qs_value(Req, "access", false),
     EngineOpt = parse_engine_opt(Req),
     Options = [
         {n, N},
         {q, Q},
         {placement, P}
     ] ++ EngineOpt,
+    Options1 = case Access of
+        "true" -> [{access, true} | Options];
+        _ -> Options
+    end,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-    case fabric:create_db(DbName, Options) of
+    case fabric:create_db(DbName, Options1) of
     ok ->
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
     accepted ->
@@ -771,14 +776,20 @@ all_docs_view(Req, Db, Keys, OP) ->
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
-    couch_doc_open(Db, DocId, nil, []),
-    case chttpd:qs_value(Req, "rev") of
+    #doc{body={OldDocProps}} = Doc = couch_doc_open(Db, DocId, nil, []),
+    NewProps0 = case chttpd:qs_value(Req, "rev") of
     undefined ->
-        Body = {[{<<"_deleted">>,true}]};
+        [{<<"_deleted">>,true}];
     Rev ->
-        Body = {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}
+        [{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]
     end,
-    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, DocId, Body));
+    NewProps1 = case couch_util:get_value(<<"_access">>, OldDocProps) of
+    undefined ->
+        NewProps0;
+    Access ->
+        [{<<"_access">>, Access} | NewProps0]
+    end,
+    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, DocId, {NewProps1}));
 
 db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
     #doc_query_args{

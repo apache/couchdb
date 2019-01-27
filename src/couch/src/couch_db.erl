@@ -30,6 +30,7 @@
     is_admin/1,
     check_is_admin/1,
     check_is_member/1,
+    validate_access/2,
 
     name/1,
     get_after_doc_read_fun/1,
@@ -283,17 +284,24 @@ open_doc(Db, Id, Options) ->
     {ok, #doc{deleted=true}=Doc} ->
         case lists:member(deleted, Options) of
         true ->
-            apply_open_options({ok, Doc},Options);
+            apply_open_options(Db, {ok, Doc},Options);
         false ->
             {not_found, deleted}
         end;
     Else ->
-        apply_open_options(Else,Options)
+        apply_open_options(Db, Else,Options)
     end.
 
-apply_open_options({ok, Doc},Options) ->
+apply_open_options(Db, {ok, Doc}, Options) ->
+    ok = validate_access(Db, Doc),
+    apply_open_options1({ok, Doc}, Options);
+apply_open_options(_Db, Else, _Options) ->
+    Else.
+
+
+apply_open_options1({ok, Doc}, Options) ->
     apply_open_options2(Doc,Options);
-apply_open_options(Else,_Options) ->
+apply_open_options1(Else, _Options) ->
     Else.
 
 apply_open_options2(Doc,[]) ->
@@ -329,7 +337,7 @@ find_ancestor_rev_pos({RevPos, [RevId|Rest]}, AttsSinceRevs) ->
 open_doc_revs(Db, Id, Revs, Options) ->
     increment_stat(Db, [couchdb, database_reads]),
     [{ok, Results}] = open_doc_revs_int(Db, [{Id, Revs}], Options),
-    {ok, [apply_open_options(Result, Options) || Result <- Results]}.
+    {ok, [apply_open_options(Db, Result, Options) || Result <- Results]}.
 
 % Each returned result is a list of tuples:
 % {Id, MissingRevs, PossibleAncestors}
@@ -738,6 +746,56 @@ security_error_type(#user_ctx{name=null}) ->
 security_error_type(#user_ctx{name=_}) ->
     forbidden.
 
+% validate_access(#db{access=true, user_ctx={name=UserName,roles=UserRoles}}=Db, #doc{body=Props}=Doc) ->
+validate_access(Db, Doc) ->
+    validate_access1(check_access(Db, Doc)).
+
+validate_access1(true) -> ok;
+validate_access1(_) -> throw({forbidden, <<"can't touch this">>}).
+
+check_access(Db, Doc) ->
+    couch_log:info("check_access: ~n~n~p ~p~n~n", [Db, Doc]),
+    {Props} = Doc#doc.body,
+    #user_ctx{
+        name=UserName,
+        roles=UserRoles
+    } = Db#db.user_ctx,
+    case couch_util:get_value(<<"_access">>, Props) of
+    undefined ->
+        couch_log:info("check_access: ~n~nno _access, require admin~n~n", []),
+        % if doc has no _access, userCtX must be admin
+        ok =:= check_is_admin(Db);
+    Access ->
+        % if doc has _access, userCtx must be admin OR matching user or role
+        % _access = ["a", "b", ]
+        case is_admin(Db) of
+        true ->
+            couch_log:info("check_access: ~n~nhas _access, has admin~n~n", []),
+            true;
+        _ ->
+            couch_log:info("check_access: ~n~nhas _access, no admin~n~n", []),
+            case {check_name(UserName, Access), check_roles(UserRoles, Access)} of
+            {true, _} -> true;
+            {_, true} -> true;
+            _ -> false
+            end
+        end
+    end.
+% validate_access(Db, Doc) ->
+%     couch_log:info("~n~nDoc no auth!~p ~p~n~n", [Db, Doc]),
+%     ok.
+check_name(null, _Access) -> true;
+check_name(UserName, Access) ->
+    couch_log:info("check_name: ~n~n~p ~p~n~n", [UserName, Access]),
+    lists:member(UserName, Access).
+% nicked from couch_db:check_security
+
+check_roles(Roles, Access) ->
+    couch_log:info("check_roles: ~n~n~p ~p~n~n", [Roles, Access]),
+    
+    UserRolesSet = ordsets:from_list(Roles),
+    RolesSet = ordsets:from_list(Access),
+    not ordsets:is_disjoint(UserRolesSet, RolesSet).
 
 get_admins(#db{security=SecProps}) ->
     couch_util:get_value(<<"admins">>, SecProps, {[]}).
@@ -854,19 +912,25 @@ group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
        group_alike_docs(Rest, [[Doc]|[Bucket|RestBuckets]])
     end.
 
-validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
+validate_doc_update(Db, Doc, Fun) ->
+    couch_log:info("~n~nDb ~p, Doc ~p, Fun ~p~n~n", [Db, Doc, Fun]),
+    case catch validate_access(Db, Doc) of
+        ok -> validate_doc_update1(Db, Doc, Fun);
+        Error -> Error
+    end.
+validate_doc_update1(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
     case catch check_is_admin(Db) of
         ok -> validate_ddoc(Db#db.name, Doc);
         Error -> Error
     end;
-validate_doc_update(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
+validate_doc_update1(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
     ValidationFuns = load_validation_funs(Db),
     validate_doc_update(Db#db{validate_doc_funs=ValidationFuns}, Doc, Fun);
-validate_doc_update(#db{validate_doc_funs=[]}, _Doc, _GetDiskDocFun) ->
+validate_doc_update1(#db{validate_doc_funs=[]}, _Doc, _GetDiskDocFun) ->
     ok;
-validate_doc_update(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
+validate_doc_update1(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
     ok;
-validate_doc_update(Db, Doc, GetDiskDocFun) ->
+validate_doc_update1(Db, Doc, GetDiskDocFun) ->
     case get(io_priority) of
         {internal_repl, _} ->
             ok;
@@ -1333,10 +1397,8 @@ prepare_doc_summaries(Db, BucketList) ->
         end,
         Bucket) || Bucket <- BucketList].
 
-
 before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun, UpdateType) ->
     increment_stat(Db, [couchdb, database_writes]),
-
     % Separate _local docs from normal docs
     IsLocal = fun
         (#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
@@ -1485,8 +1547,8 @@ open_read_stream(Db, AttState) ->
 
 changes_since(Db, StartSeq, Fun, Options, Acc) when is_record(Db, db) ->
     case couch_db:is_admin(Db) of
-        true -> changes_since_admin(Db#db.seq_tree, StartSeq, Fun, Options, Acc);
-        false -> changes_since_admin(Db#db.seq_tree, StartSeq, Fun, Options, Acc)
+        true -> couch_db_engine:fold_changes(Db, StartSeq, Fun, Options, Acc);
+        false -> couch_mrview:query_changes_access(Db, StartSeq, Fun, Options, Acc)
         % false -> changes_since_access(Db, StartSeq, Fun, Options, Acc)
     end.
 
@@ -1508,99 +1570,100 @@ changes_since(Db, StartSeq, Fun, Options, Acc) when is_record(Db, db) ->
     args
 }).
 
-changes_since_access(Db, StartSeq, Fun, Options, Acc) ->
-    %% query view _access/_by_access_seq
-    %% fudge result to look like changes_since / Fun expect.
-    % query our not yest existing, home-grown _access view.
-    % use query_view for this.
-    DDoc = #doc{ % TODO: dupe: externalise or move into shared function
-        id = <<"_design/_access">>,
-        body = {[
-            {<<"language">>,<<"_access">>},
-            {<<"views">>, {[
-                {<<"_access_by_id">>, {[
-                    {<<"map">>, <<"_access/by-id-map">>},
-                    {<<"reduce">>, <<"_count">>}
-                ]}},
-                {<<"_access_by_seq">>, {[
-                    {<<"map">>, <<"_access/by-seq-map">>},
-                    {<<"reduce">>, <<"_count">>}
-                ]}}
-            ]}}
-        ]}
-    },
-    %% add startkey/endkey
-    UserCtx = couch_db:get_user_ctx(Db),
-    UserName = UserCtx#user_ctx.name,
-    Direction = proplists:get_value(dir, Options, fwd),
-    Args0 = #mrargs{
-        direction = Direction,
-        start_key = StartSeq,
-        reduce = false
-    },
-    Args = prefix_startkey_endkey(UserName, Args0, Direction),
-    % filter out the user-prefix from the key, so _all_docs looks normal
-    % this isn’t a separate function because I’m binding Callback0 and I don’t
-    % know the Erlang equivalent of JS’s fun.bind(this, newarg)
-    % also translate view output into by-seq output
-    Callback = fun
-        ({meta, _}, Acc0) ->
-            Acc0;
-        ({row, Props}=Row, Acc0) ->
-            couch_log:info("~nRow: ~p~n~n", [Row]),
-            [_User, Key] = proplists:get_value(key, Props),
-            Row0 = proplists:delete(key, Props),
-            Row = [{key, Key} | Row0],
-            Fun({row, Row}, Acc0);
-        (Row, Acc0) ->
-            couch_log:info("~nRow: ~p~n~n", [Row]),
-            Fun(Row, Acc0)
-        end,
-    VName = <<"_access_by_seq">>,
-    couch_mrview:query_view(Db, DDoc, VName, Args, Callback, #mracc{user_acc = Acc}).
+%% %changes_since_access(Db, StartSeq, Fun, Options, Acc) ->
+%%     %% query view _access/_by_access_seq
+%%     %% fudge result to look like changes_since / Fun expect.
+%%     % query our not yest existing, home-grown _access view.
+%%     % use query_view for this.
+
+%%     %% DDoc = #doc{ % TODO: dupe: externalise or move into shared function
+%%         id = <<"_design/_access">>,
+%%         body = {[
+%%             {<<"language">>,<<"_access">>},
+%%             {<<"views">>, {[
+%%                 {<<"_access_by_id">>, {[
+%%                     {<<"map">>, <<"_access/by-id-map">>},
+%%                     {<<"reduce">>, <<"_count">>}
+%%                 ]}},
+%%                 {<<"_access_by_seq">>, {[
+%%                     {<<"map">>, <<"_access/by-seq-map">>},
+%%                     {<<"reduce">>, <<"_count">>}
+%%                 ]}}
+%%             ]}}
+%%         ]}
+%%     },
+%%     %% add startkey/endkey
+%%     UserCtx = couch_db:get_user_ctx(Db),
+%%     UserName = UserCtx#user_ctx.name,
+%%     Direction = proplists:get_value(dir, Options, fwd),
+%%     Args0 = #mrargs{
+%%         direction = Direction,
+%%         start_key = StartSeq,
+%%         reduce = false
+%%     },
+%%     Args = prefix_startkey_endkey(UserName, Args0, Direction),
+%%     % filter out the user-prefix from the key, so _all_docs looks normal
+%%     % this isn’t a separate function because I’m binding Callback0 and I don’t
+%%     % know the Erlang equivalent of JS’s fun.bind(this, newarg)
+%%     % also translate view output into by-seq output
+%%     Callback = fun
+%%         ({meta, _}, Acc0) ->
+%%             Acc0;
+%%         ({row, Props}=Row, Acc0) ->
+%%             couch_log:info("~nRow: ~p~n~n", [Row]),
+%%             [_User, Key] = proplists:get_value(key, Props),
+%%             Row0 = proplists:delete(key, Props),
+%%             Row = [{key, Key} | Row0],
+%%             Fun({row, Row}, Acc0);
+%%         (Row, Acc0) ->
+%%             couch_log:info("~nRow: ~p~n~n", [Row]),
+%%             Fun(Row, Acc0)
+%%         end,
+%%     VName = <<"_access_by_seq">>,
+%%     couch_mrview:query_view(Db, DDoc, VName, Args, Callback, #mracc{user_acc = Acc}).
 
 
-% TODO: dupe: externalise or move into shared function
-prefix_startkey_endkey(UserName, Args, fwd) ->
-    #mrargs{start_key=StartKey, end_key=EndKey} = Args,
-    Args#mrargs {
-        start_key = case StartKey of
-            undefined -> [UserName];
-            StartKey -> [UserName, StartKey]
-        end,
-        end_key = case EndKey of
-            undefined -> [UserName, {}];
-            EndKey -> [UserName, EndKey, {}]
-        end
-    };
-prefix_startkey_endkey(UserName, Args, rev) ->
-    #mrargs{start_key=StartKey, end_key=EndKey} = Args,
-    Args#mrargs {
-        end_key = case StartKey of
-            undefined -> [UserName];
-            StartKey -> [UserName, StartKey]
-        end,
-        start_key = case EndKey of
-            undefined -> [UserName, {}];
-            EndKey -> [UserName, EndKey, {}]
-        end
-    }.
+%% % TODO: dupe: externalise or move into shared function
+%% prefix_startkey_endkey(UserName, Args, fwd) ->
+%%     #mrargs{start_key=StartKey, end_key=EndKey} = Args,
+%%     Args#mrargs {
+%%         start_key = case StartKey of
+%%             undefined -> [UserName];
+%%             StartKey -> [UserName, StartKey]
+%%         end,
+%%         end_key = case EndKey of
+%%             undefined -> [UserName, {}];
+%%             EndKey -> [UserName, EndKey, {}]
+%%         end
+%%     };
+%% prefix_startkey_endkey(UserName, Args, rev) ->
+%%     #mrargs{start_key=StartKey, end_key=EndKey} = Args,
+%%     Args#mrargs {
+%%         end_key = case StartKey of
+%%             undefined -> [UserName];
+%%             StartKey -> [UserName, StartKey]
+%%         end,
+%%         start_key = case EndKey of
+%%             undefined -> [UserName, {}];
+%%             EndKey -> [UserName, EndKey, {}]
+%%         end
+%%     }.
 
 
-changes_since_admin(SeqTree, StartSeq, Fun, Options, Acc) ->
-    Wrapper = fun(FullDocInfo, _Offset, Acc2) ->
-        DocInfo = case FullDocInfo of
-            #full_doc_info{} ->
-                couch_doc:to_doc_info(FullDocInfo);
-            #doc_info{} ->
-                FullDocInfo
-        end,
-        couch_log:info("~nDocInfo: ~p~n~n", [DocInfo]),
-        Fun(DocInfo, Acc2)
-    end,
-    {ok, _LastReduction, AccOut} = couch_btree:fold(SeqTree,
-        Wrapper, Acc, [{start_key, StartSeq + 1}] ++ Options),
-    {ok, AccOut}.
+%% changes_since_admin(SeqTree, StartSeq, Fun, Options, Acc) ->
+%%     Wrapper = fun(FullDocInfo, _Offset, Acc2) ->
+%%         DocInfo = case FullDocInfo of
+%%             #full_info{} ->
+%%                 couch_doc:to_doc_info(FullDocInfo);
+%%             #doc_info{} ->
+%%                 FullDocInfo
+%%         end,
+%%         couch_log:info("~nDocInfo: ~p~n~n", [DocInfo]),
+%%         Fun(DocInfo, Acc2)
+%%     end,
+%%     {ok, _LastReduction, AccOut} = couch_btree:fold(SeqTree,
+%%         Wrapper, Acc, [{start_key, StartSeq + 1}] ++ Options),
+%%     {ok, AccOut}.
 
 
 is_active_stream(Db, StreamEngine) ->
@@ -1707,8 +1770,11 @@ fold_changes(Db, StartSeq, UserFun, UserAcc) ->
 
 
 fold_changes(Db, StartSeq, UserFun, UserAcc, Opts) ->
-    couch_db_engine:fold_changes(Db, StartSeq, UserFun, UserAcc, Opts).
-
+    case couch_db:is_admin(Db) of
+        true -> couch_db_engine:fold_changes(Db, StartSeq, UserFun, UserAcc, Opts);
+        false -> couch_mrview:query_changes_access(Db, StartSeq, UserFun, Opts, UserAcc)
+        % false -> changes_since_access(Db, StartSeq, Fun, Options, Acc)
+    end.
 
 fold_purge_infos(Db, StartPurgeSeq, Fun, Acc) ->
     fold_purge_infos(Db, StartPurgeSeq, Fun, Acc, []).
@@ -1765,21 +1831,21 @@ open_doc_revs_int(Db, IdRevs, Options) ->
 open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, Options) ->
     case couch_db_engine:open_local_docs(Db, [Id]) of
     [#doc{} = Doc] ->
-        apply_open_options({ok, Doc}, Options);
+        apply_open_options(Db, {ok, Doc}, Options);
     [not_found] ->
         {not_found, missing}
     end;
 open_doc_int(Db, #doc_info{id=Id,revs=[RevInfo|_]}=DocInfo, Options) ->
     #rev_info{deleted=IsDeleted,rev={Pos,RevId},body_sp=Bp} = RevInfo,
     Doc = make_doc(Db, Id, IsDeleted, Bp, {Pos,[RevId]}),
-    apply_open_options(
+    apply_open_options(Db,
        {ok, Doc#doc{meta=doc_meta_info(DocInfo, [], Options)}}, Options);
 open_doc_int(Db, #full_doc_info{id=Id,rev_tree=RevTree}=FullDocInfo, Options) ->
     #doc_info{revs=[#rev_info{deleted=IsDeleted,rev=Rev,body_sp=Bp}|_]} =
         DocInfo = couch_doc:to_doc_info(FullDocInfo),
     {[{_, RevPath}], []} = couch_key_tree:get(RevTree, [Rev]),
     Doc = make_doc(Db, Id, IsDeleted, Bp, RevPath),
-    apply_open_options(
+    apply_open_options(Db,
         {ok, Doc#doc{meta=doc_meta_info(DocInfo, RevTree, Options)}}, Options);
 open_doc_int(Db, Id, Options) ->
     case get_full_doc_info(Db, Id) of
@@ -1846,6 +1912,7 @@ make_doc(#db{} = Db, Id, Deleted, Bp, {Pos, Revs}) ->
         body = Bp,
         deleted = Deleted
     }),
+
     Doc1 = case Doc0#doc.atts of
         BinAtts when is_binary(BinAtts) ->
             Doc0#doc{

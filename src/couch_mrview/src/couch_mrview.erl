@@ -13,7 +13,7 @@
 -module(couch_mrview).
 
 -export([validate/2]).
--export([query_all_docs/2, query_all_docs/4]).
+-export([query_all_docs/2, query_all_docs/4, query_changes_access/5]).
 -export([query_view/3, query_view/4, query_view/6, get_view_index_pid/4]).
 -export([view_changes_since/5]).
 -export([view_changes_since/6, view_changes_since/7]).
@@ -223,10 +223,8 @@ query_all_docs(Db, Args0, Callback, Acc) ->
         false -> query_all_docs_access(Db, Args0, Callback, Acc)
     end.
 
-query_all_docs_access(Db, Args0, Callback0, Acc) ->
-    % query our not yest existing, home-grown _access view.
-    % use query_view for this.
-    DDoc = #doc{
+access_ddoc() ->
+    #doc{
         id = <<"_design/_access">>,
         body = {[
             {<<"language">>,<<"_access">>},
@@ -241,7 +239,72 @@ query_all_docs_access(Db, Args0, Callback0, Acc) ->
                 ]}}
             ]}}
         ]}
-    },
+    }.
+
+%%  Acc0 = #fabric_changes_acc{                            
+%%    db = Db,                                             
+%%    seq = StartSeq,                                      
+%%    args = Args,                                         
+%%    options = Options,                                   
+%%    pending = couch_db:count_changes_since(Db, StartSeq),
+%%    epochs = couch_db:get_epochs(Db)                     
+%%  },                                                     
+
+%% changes_enumerator(#full_doc_info{} = FDI, Acc) ->                                         
+%%     changes_enumerator(couch_doc:to_doc_info(FDI), Acc);                                   
+%% changes_enumerator(#doc_info{id= <<"_local/", _/binary>>, high_seq=Seq}, Acc) ->           
+%%     {ok, Acc#fabric_changes_acc{seq = Seq, pending = Acc#fabric_changes_acc.pending-1}};   
+%% changes_enumerator(DocInfo, Acc) ->                                                        
+
+
+query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
+    %% couch_log:info("~n~n Db: ~p", [Db]),
+    %% couch_log:info("~n~n StartSeq: ~p", [StartSeq]),
+    %% couch_log:info("~n~n Fun: ~p", [Fun]),
+    %% couch_log:info("~n~n Options: ~p", [Options]),
+    %% couch_log:info("~n~n Acc: ~p", [Acc]),
+    DDoc = access_ddoc(),
+    UserCtx = couch_db:get_user_ctx(Db),
+    UserName = UserCtx#user_ctx.name,
+    %% % TODO: add roles
+    Args1 = prefix_startkey_endkey(UserName, #mrargs{}, fwd),
+    Args2 = Args1#mrargs{deleted=true},
+    Args = Args2#mrargs{reduce=false},
+    %% % filter out the user-prefix from the key, so _all_docs looks normal
+    %% % this isn’t a separate function because I’m binding Callback0 and I don’t
+    %% % know the Erlang equivalent of JS’s fun.bind(this, newarg)
+    Callback = fun
+         ({meta, _}, Acc0) ->
+            {ok, Acc0}; % ignore for now
+         ({row, Props}, Acc0) ->
+            couch_log:info("~n~n Props: ~p", [Props]),
+            % turn row into FDI
+            Value = couch_util:get_value(value, Props),
+            [_Owner, Seq] = couch_util:get_value(key, Props),
+
+            Rev = couch_util:get_value(rev, Value),
+            Deleted = couch_util:get_value(deleted, Value, false),
+            BodySp = couch_util:get_value(body_sp, Value),
+
+            [Pos, RevId] = string:split(?b2l(Rev), "-"),
+            FDI = #full_doc_info{
+                id = proplists:get_value(id, Props),
+                rev_tree = [{list_to_integer(Pos), {?l2b(RevId), #leaf{deleted=Deleted, ptr=BodySp, seq=Seq, sizes=#size_info{}}, []}}],
+                deleted = Deleted,
+                update_seq = 0,
+                sizes = #size_info{}
+            },
+            Fun(FDI, Acc0);
+        (_Else, Acc0) ->
+            {ok, Acc0} % ignore for now
+        end,
+    VName = <<"_access_by_seq">>,
+    query_view(Db, DDoc, VName, Args, Callback, Acc).
+
+query_all_docs_access(Db, Args0, Callback0, Acc) ->
+    % query our not yest existing, home-grown _access view.
+    % use query_view for this.
+    DDoc = access_ddoc(),
     UserCtx = couch_db:get_user_ctx(Db),
     UserName = UserCtx#user_ctx.name,
     % TODO: add roles
@@ -553,7 +616,7 @@ map_fold(Db, View, Args, Callback, UAcc) ->
     % couch_log:info("~n~n View: ~p~n", [View]),
     {ok, Total} = case View#mrview.def of
         <<"_access/by-id-map">> ->
-            couch_mrview_util:get_access_row_count(View, Args#mrargs.start_key);
+            {ok, 0}; %couch_mrview_util:get_access_row_count(View, Args#mrargs.start_key);
         _Else ->
             couch_mrview_util:get_row_count(View)
     end,
@@ -580,6 +643,7 @@ map_fold(Db, View, Args, Callback, UAcc) ->
 
 map_fold(#full_doc_info{} = FullDocInfo, OffsetReds, Acc) ->
     % matches for _all_docs and translates #full_doc_info{} -> KV pair
+    couch_log:info("~n~n Acc: ~p~n", [Acc]),
     case couch_doc:to_doc_info(FullDocInfo) of
         #doc_info{id=Id, revs=[#rev_info{deleted=false, rev=Rev}|_]} = DI ->
             Value = {[{rev, couch_doc:rev_to_str(Rev)}]},
