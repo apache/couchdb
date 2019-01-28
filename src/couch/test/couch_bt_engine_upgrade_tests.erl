@@ -16,14 +16,18 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
-setup() ->
+setup(_) ->
     Ctx = test_util:start_couch(),
     DbDir = config:get("couchdb", "database_dir"),
     DbFileNames = [
-        "db_without_purge_req.couch",
-        "db_with_1_purge_req.couch",
-        "db_with_2_purge_req.couch",
-        "db_with_1_purge_req_for_2_docs.couch"
+        "db_v6_without_purge_req.couch",
+        "db_v6_with_1_purge_req.couch",
+        "db_v6_with_2_purge_req.couch",
+        "db_v6_with_1_purge_req_for_2_docs.couch",
+        "db_v7_without_purge_req.couch",
+        "db_v7_with_1_purge_req.couch",
+        "db_v7_with_2_purge_req.couch",
+        "db_v7_with_1_purge_req_for_2_docs.couch"
     ],
     NewPaths = lists:map(fun(DbFileName) ->
         OldDbFilePath = filename:join([?FIXTURESDIR, DbFileName]),
@@ -36,7 +40,7 @@ setup() ->
     {Ctx, NewPaths}.
 
 
-teardown({Ctx, Paths}) ->
+teardown(_, {Ctx, Paths}) ->
     test_util:stop_couch(Ctx),
     lists:foreach(fun(Path) ->
         file:delete(Path)
@@ -44,35 +48,34 @@ teardown({Ctx, Paths}) ->
 
 
 upgrade_test_() ->
+    From = [6, 7],
     {
         "Couch Bt Engine Upgrade tests",
         {
-            setup,
-            fun setup/0,
-            fun teardown/1,
-            [
-                t_upgrade_without_purge_req(),
-                t_upgrade_with_1_purge_req(),
-                t_upgrade_with_N_purge_req(),
-                t_upgrade_with_1_purge_req_for_2_docs()
-            ]
+            foreachx,
+            fun setup/1, fun teardown/2,
+            [{F, fun t_upgrade_without_purge_req/2} || F <- From] ++
+            [{F, fun t_upgrade_with_1_purge_req/2} || F <- From] ++
+            [{F, fun t_upgrade_with_N_purge_req/2} || F <- From] ++
+            [{F, fun t_upgrade_with_1_purge_req_for_2_docs/2} || F <- From]
         }
     }.
 
 
-t_upgrade_without_purge_req() ->
+t_upgrade_without_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
     ?_test(begin
         % There are three documents in the fixture
         % db with zero purge entries
-        DbName = <<"db_without_purge_req">>,
+        DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
+            ++ "_without_purge_req"),
 
-        ?assertEqual(6, get_disk_version_from_header(DbName)),
+        ?assertEqual(VersionFrom, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
             ?assertEqual(0, couch_db:get_purge_seq(Db)),
             couch_db:fold_purge_infos(Db, 0, fun fold_fun/2, [])
         end),
         ?assertEqual([], UpgradedPurged),
-        ?assertEqual(7, get_disk_version_from_header(DbName)),
+        ?assertEqual(8, get_disk_version_from_header(DbName)),
         {ok, Rev} = save_doc(
             DbName, {[{<<"_id">>, <<"doc4">>}, {<<"v">>, 1}]}
         ),
@@ -99,18 +102,19 @@ t_upgrade_without_purge_req() ->
     end).
 
 
-t_upgrade_with_1_purge_req() ->
+t_upgrade_with_1_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
     ?_test(begin
         % There are two documents in the fixture database
         % with a single purge entry
-        DbName = <<"db_with_1_purge_req">>,
+        DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
+            ++ "_with_1_purge_req"),
 
-        ?assertEqual(6, get_disk_version_from_header(DbName)),
+        ?assertEqual(VersionFrom, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
             ?assertEqual(1, couch_db:get_purge_seq(Db)),
             couch_db:fold_purge_infos(Db, 0, fun fold_fun/2, [])
         end),
-        ?assertEqual(7, get_disk_version_from_header(DbName)),
+        ?assertEqual(8, get_disk_version_from_header(DbName)),
         ?assertEqual([{1, <<"doc1">>}], UpgradedPurged),
 
         {ok, Rev} = save_doc(
@@ -139,18 +143,19 @@ t_upgrade_with_1_purge_req() ->
     end).
 
 
-t_upgrade_with_N_purge_req() ->
+t_upgrade_with_N_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
     ?_test(begin
         % There is one document in the fixture database
         % with two docs that have been purged
-        DbName = <<"db_with_2_purge_req">>,
+        DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
+            ++ "_with_2_purge_req"),
 
-        ?assertEqual(6, get_disk_version_from_header(DbName)),
+        ?assertEqual(VersionFrom, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
             ?assertEqual(2, couch_db:get_purge_seq(Db)),
             couch_db:fold_purge_infos(Db, 1, fun fold_fun/2, [])
         end),
-        ?assertEqual(7, get_disk_version_from_header(DbName)),
+        ?assertEqual(8, get_disk_version_from_header(DbName)),
         ?assertEqual([{2, <<"doc2">>}], UpgradedPurged),
 
         {ok, Rev} = save_doc(DbName, {[{<<"_id">>, <<"doc4">>}, {<<"v">>, 1}]}),
@@ -177,19 +182,20 @@ t_upgrade_with_N_purge_req() ->
     end).
 
 
-t_upgrade_with_1_purge_req_for_2_docs() ->
+t_upgrade_with_1_purge_req_for_2_docs(VersionFrom, {_Ctx, _NewPaths}) ->
     ?_test(begin
         % There are two documents (Doc4 and Doc5) in the fixture database
         % with three docs (Doc1, Doc2 and Doc3) that have been purged, and
         % with one purge req for Doc1 and another purge req for Doc 2 and Doc3
-        DbName = <<"db_with_1_purge_req_for_2_docs">>,
+        DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
+            ++ "_with_1_purge_req_for_2_docs"),
 
-        ?assertEqual(6, get_disk_version_from_header(DbName)),
+        ?assertEqual(VersionFrom, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
             ?assertEqual(3, couch_db:get_purge_seq(Db)),
             couch_db:fold_purge_infos(Db, 1, fun fold_fun/2, [])
         end),
-        ?assertEqual(7, get_disk_version_from_header(DbName)),
+        ?assertEqual(8, get_disk_version_from_header(DbName)),
         ?assertEqual([{3,<<"doc2">>},{2,<<"doc3">>}], UpgradedPurged),
 
         {ok, Rev} = save_doc(DbName, {[{<<"_id">>, <<"doc6">>}, {<<"v">>, 1}]}),
