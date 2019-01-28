@@ -223,7 +223,7 @@ init([]) ->
     config:enable_feature('pluggable-storage-engines'),
 
     % Mark partitioned databases as a supported feature
-    config:enable_feature(partitions),
+    config:enable_feature(partitioned),
 
     % read config and register for configuration changes
 
