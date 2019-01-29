@@ -1,4 +1,5 @@
-language: erlang
+language: elixir
+elixir: 1.6.6
 os: linux
 dist: trusty
 
@@ -39,6 +40,10 @@ env:
     - secure: "UdA/gKIlyuXaW+hUgRx40t1TYjLCGxMqHvM5Uw7UbUH2dqEkgJiLfhZGchS1JVzl8M01VKZUUzS7v2nvRLiHZN1kvaw5kfq31VRoafUah8jfmvqNWZVdLovHl3aw5UX/HRt0RkbWbhdbdknTfh6+YinSZ+Nb54jCErMg9nabXtM="
     - COUCHDB_IO_LOG_DIR=/tmp/couchjslogs
 
+# Change to elixir folder so that travis can run mix deps.get during install
+before_install:
+  - cd test/elixir
+
 # Enable this block if you want to build docs & fauxton too
 #node_js:
 #  - 6
@@ -47,6 +52,7 @@ env:
 
 # Then comment this section out
 before_script:
+  - cd ../..
   - kerl list installations
   - rm -rf /tmp/couchjslogs
   - mkdir -p /tmp/couchjslogs
