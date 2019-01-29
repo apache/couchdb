@@ -148,6 +148,7 @@ check: all
 	@$(MAKE) javascript
 	@$(MAKE) python-black
 	@$(MAKE) mango-test
+	@$(MAKE) elixir
 #	@$(MAKE) build-test
 
 
