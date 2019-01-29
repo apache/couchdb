@@ -280,7 +280,8 @@ defmodule PartitionCrudTest do
     assert Map.get(resp, :body) == "This is a text document to save"
 
     resp =
-      Couch.put("/#{db_name}/#{id}/bar.txt?rev=#{rev}",
+      Couch.put(
+        "/#{db_name}/#{id}/bar.txt?rev=#{rev}",
         headers: ["Content-Type": "text/plain"],
         body: "This is another document"
       )

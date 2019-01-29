@@ -38,7 +38,8 @@ defmodule PartitionViewUpdateTest do
     url = "/#{db_name}/_partition/foo/_design/mrtest/_view/some"
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           update: "true",
           limit: 3
@@ -59,7 +60,8 @@ defmodule PartitionViewUpdateTest do
     Couch.put("/#{db_name}/foo:1", body: %{some: "field"})
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           update: "false",
           limit: 3
