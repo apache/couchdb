@@ -108,6 +108,28 @@ defmodule PartitionSearchTest do
     assert resp.status_code == 400
   end
 
+  @tag :with_db
+  test "Works with limit using POST for on non-partitioned db", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_design/library/_search/books"
+    resp = Couch.post(url, body: %{:q => "some:field", :limit => 1})
+    assert resp.status_code == 200
+  end
+
+  @tag :with_partitioned_db
+  test "Works with limit using POST for partitioned db", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_partition/foo/_design/library/_search/books"
+    resp = Couch.post(url, body: %{:q => "some:field", :limit => 1, :partition=> "true"})
+    assert resp.status_code == 200
+  end
+
   @tag :with_partitioned_db
   test "Cannot do global query with partition view", context do
     db_name = context[:db_name]

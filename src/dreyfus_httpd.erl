@@ -312,7 +312,7 @@ parse_json_index_param(<<"bookmark">>, Value) ->
 parse_json_index_param(<<"sort">>, Value) ->
     [{sort, Value}];
 parse_json_index_param(<<"limit">>, Value) ->
-    [{limit, ?JSON_DECODE(Value)}];
+    [{limit, Value}];
 parse_json_index_param(<<"stale">>, <<"ok">>) ->
     [{stale, ok}];
 parse_json_index_param(<<"include_docs">>, Value) when is_boolean(Value) ->
