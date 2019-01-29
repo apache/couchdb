@@ -110,7 +110,13 @@ all_test_() ->
                     fun should_allow_admin_view_compaction/1,
                     fun should_disallow_anonymous_view_compaction/1,
                     fun should_allow_admin_db_view_cleanup/1,
-                    fun should_disallow_anonymous_db_view_cleanup/1
+                    fun should_disallow_anonymous_db_view_cleanup/1,
+                    fun should_allow_admin_purge/1,
+                    fun should_disallow_anonymous_purge/1,
+                    fun should_disallow_db_member_purge/1,
+                    fun should_allow_admin_purged_infos_limit/1,
+                    fun should_disallow_anonymous_purged_infos_limit/1,
+                    fun should_disallow_db_member_purged_infos_limit/1
                 ]
             }
         }
@@ -227,6 +233,59 @@ should_disallow_anonymous_db_view_cleanup([Url,_UsersUrl]) ->
     {InnerJson} = ResultJson,
     ErrType = couch_util:get_value(<<"error">>, InnerJson),
     ?_assertEqual(<<"unauthorized">>, ErrType).
+
+should_allow_admin_purge([Url,_UsersUrl]) ->
+    ?_assertEqual(null,
+        begin
+            IdsRevs = "{}",
+            {ok, _, _, ResultBody} = test_request:post(Url ++ "/_purge",
+                [?CONTENT_JSON, ?AUTH], IdsRevs),
+            ResultJson = ?JSON_DECODE(ResultBody),
+            {InnerJson} = ResultJson,
+            couch_util:get_value(<<"purge_seq">>, InnerJson, undefined)
+        end).
+
+should_disallow_anonymous_purge([Url,_UsersUrl]) ->
+    {ok, _, _, ResultBody} = test_request:post(Url ++ "/_purge",
+        [?CONTENT_JSON], ""),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ErrType = couch_util:get_value(<<"error">>, InnerJson),
+    ?_assertEqual(<<"unauthorized">>, ErrType).
+
+should_disallow_db_member_purge([Url,_UsersUrl]) ->
+    {ok, _, _, ResultBody} = test_request:post(Url ++ "/_purge",
+        [?CONTENT_JSON, ?TEST_MEMBER_AUTH], ""),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ErrType = couch_util:get_value(<<"error">>, InnerJson),
+    ?_assertEqual(<<"unauthorized">>,ErrType).
+
+should_allow_admin_purged_infos_limit([Url,_UsersUrl]) ->
+    ?_assertEqual(true,
+        begin
+            {ok, _, _, ResultBody} = test_request:put(Url
+                ++ "/_purged_infos_limit/", [?CONTENT_JSON, ?AUTH], "2"),
+            ResultJson = ?JSON_DECODE(ResultBody),
+            {InnerJson} = ResultJson,
+            couch_util:get_value(<<"ok">>, InnerJson, undefined)
+        end).
+
+should_disallow_anonymous_purged_infos_limit([Url,_UsersUrl]) ->
+    {ok, _, _, ResultBody} = test_request:put(Url ++ "/_purged_infos_limit/",
+        [?CONTENT_JSON, ?TEST_MEMBER_AUTH], "2"),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ErrType = couch_util:get_value(<<"error">>, InnerJson),
+    ?_assertEqual(<<"unauthorized">>, ErrType).
+
+should_disallow_db_member_purged_infos_limit([Url,_UsersUrl]) ->
+    {ok, _, _, ResultBody} = test_request:put(Url ++ "/_purged_infos_limit/",
+        [?CONTENT_JSON, ?TEST_MEMBER_AUTH], "2"),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    {InnerJson} = ResultJson,
+    ErrType = couch_util:get_value(<<"error">>, InnerJson),
+    ?_assertEqual(<<"unauthorized">>,ErrType).
 
 should_return_ok_for_sec_obj_with_roles([Url,_UsersUrl]) ->
     SecurityUrl = lists:concat([Url, "/_security"]),
