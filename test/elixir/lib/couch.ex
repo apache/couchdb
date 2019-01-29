@@ -55,8 +55,8 @@ defmodule Couch do
   end
 
   def process_url(url) do
-    baseUrl = System.get_env("COUCH_URL") || "http://127.0.0.1:15984"
-    baseUrl <> url
+    base_url = System.get_env("COUCH_URL") || "http://127.0.0.1:15984"
+    base_url <> url
   end
 
   def process_request_headers(headers, options) do

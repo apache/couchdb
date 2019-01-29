@@ -37,7 +37,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/foo/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             _id: %{
@@ -56,7 +57,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             _id: %{
@@ -82,7 +84,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/foo/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             _id: %{
@@ -101,7 +104,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             _id: %{
@@ -127,7 +131,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/foo/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             some: "field"
@@ -144,7 +149,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/bar/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             some: "field"
@@ -167,7 +173,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/foo/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             some: "field"
@@ -184,7 +191,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/bar/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             some: "field"
@@ -207,7 +215,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             some: "field"
@@ -225,7 +234,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             some: "field"
@@ -250,7 +260,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/foo/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             value: %{
@@ -269,7 +280,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/bar42/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             value: %{
@@ -294,7 +306,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/foo/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             value: %{
@@ -313,7 +326,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/bar/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             value: %{
@@ -338,7 +352,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/foo/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             value: %{
@@ -357,7 +372,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/bar42/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             value: %{
@@ -383,7 +399,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/foo/_explain"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             value: %{
@@ -402,7 +419,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/bar/_explain"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             some: "field"
@@ -425,7 +443,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_explain"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             value: %{
@@ -442,7 +461,8 @@ defmodule PartitionMangoTest do
     assert body["mrargs"]["partition"] == :null
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             some: "field"
@@ -465,7 +485,8 @@ defmodule PartitionMangoTest do
     url = "/#{db_name}/_partition/foo/_find"
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             value: %{
@@ -485,7 +506,8 @@ defmodule PartitionMangoTest do
     %{:body => %{"bookmark" => bookmark}} = resp
 
     resp =
-      Couch.post(url,
+      Couch.post(
+        url,
         body: %{
           selector: %{
             value: %{

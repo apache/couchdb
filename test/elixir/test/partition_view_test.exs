@@ -246,7 +246,8 @@ defmodule ViewPartitionTest do
     url = "/#{db_name}/_partition/foo/_design/map_some/_view/some"
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           startkey: "[\"field\",\"one\"]",
           endkey: "[\"field\",\"one\"]",
@@ -296,7 +297,8 @@ defmodule ViewPartitionTest do
     url = "/#{db_name}/_partition/foo/_design/mrtest/_view/some"
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           limit: 20
         }
@@ -312,7 +314,8 @@ defmodule ViewPartitionTest do
     assert length(ids) == 50
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           limit: 2000
         }
@@ -323,7 +326,8 @@ defmodule ViewPartitionTest do
     assert length(ids) == 50
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           limit: 2001
         }
@@ -334,7 +338,8 @@ defmodule ViewPartitionTest do
     assert Regex.match?(~r/Limit is too large/, reason)
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           limit: 2000,
           skip: 25

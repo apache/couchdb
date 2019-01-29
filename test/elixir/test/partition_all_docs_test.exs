@@ -126,7 +126,8 @@ defmodule PartitionAllDocsTest do
     url = "/#{db_name}/_partition/foo/_all_docs"
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           limit: 20
         }
@@ -142,7 +143,8 @@ defmodule PartitionAllDocsTest do
     assert length(ids) == 50
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           limit: 2000
         }
@@ -153,7 +155,8 @@ defmodule PartitionAllDocsTest do
     assert length(ids) == 50
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           limit: 2001
         }
@@ -164,7 +167,8 @@ defmodule PartitionAllDocsTest do
     assert Regex.match?(~r/Limit is too large/, reason)
 
     resp =
-      Couch.get(url,
+      Couch.get(
+        url,
         query: %{
           limit: 2000,
           skip: 25

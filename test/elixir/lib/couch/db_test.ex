@@ -246,7 +246,7 @@ defmodule Couch.DBTest do
     inspect(resp, opts)
   end
 
-  def restart_cluster() do
+  def restart_cluster do
     resp = Couch.get("/_membership")
     assert resp.status_code == 200
     nodes = resp.body["all_nodes"]
