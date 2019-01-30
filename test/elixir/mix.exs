@@ -29,7 +29,8 @@ defmodule Foo.Mixfile do
       # {:dep_from_hexpm, "~> 0.3.0"},
       {:httpotion, "~> 3.0"},
       {:jiffy, "~> 0.15.2"},
-      {:credo, "~> 1.0.0", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.0.0", only: [:dev, :test], runtime: false},
+      {:junit_formatter, "~> 3.0", only: [:test]}
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
     ]
   end
