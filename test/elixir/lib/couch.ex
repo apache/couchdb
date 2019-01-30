@@ -55,7 +55,8 @@ defmodule Couch do
   end
 
   def process_url(url) do
-    "http://127.0.0.1:15984" <> url
+    baseUrl = System.get_env("COUCH_URL") || "http://127.0.0.1:15984"
+    baseUrl <> url
   end
 
   def process_request_headers(headers, options) do
@@ -84,7 +85,9 @@ defmodule Couch do
       if headers[:basic_auth] != nil or headers[:authorization] != nil do
         options
       else
-        Keyword.put(options, :basic_auth, {"adm", "pass"})
+        username = System.get_env("USER") || "adm"
+        password = System.get_env("PASS") || "pass"
+        Keyword.put(options, :basic_auth, {username, password})
       end
     else
       options
