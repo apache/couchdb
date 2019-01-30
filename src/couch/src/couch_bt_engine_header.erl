@@ -53,7 +53,7 @@
 % if the disk revision is incremented, then new upgrade logic will need to be
 % added to couch_db_updater:init_db.
 
--define(LATEST_DISK_VERSION, 7).
+-define(LATEST_DISK_VERSION, 8).
 
 -record(db_header, {
     disk_version = ?LATEST_DISK_VERSION,
@@ -104,7 +104,6 @@ is_header(Header) ->
 
 upgrade(Header) ->
     Funs = [
-        fun downgrade_partition_header/1,
         fun upgrade_tuple/1,
         fun upgrade_disk_version/1,
         fun upgrade_uuid/1,
@@ -220,50 +219,6 @@ indexes() ->
     lists:zip(Fields, Indexes).
 
 
-downgrade_partition_header(Header) ->
-    DiskVersion = disk_version(Header),
-    Latest = latest_disk_version(),
-    case DiskVersion of
-        N when N =< Latest ->
-            Header;
-        ?PARTITION_DISK_VERSION ->
-            {
-                db_header,
-                _DiskVer,
-                UpSeq,
-                _Unused,
-                IdTreeState,
-                SeqTreeState,
-                LocalTreeState,
-                PurgeTreeState,
-                PurgeSeqTreeState,
-                SecurityPtr,
-                RevsLimit,
-                Uuid,
-                Epochs,
-                CompactedSeq,
-                PurgeInfosLimit,
-                _PropsPtr
-            } = Header,
-            
-            NewHeader = new(),
-            set(NewHeader, [
-                {update_seq, UpSeq},
-                {id_tree_state, IdTreeState},
-                {seq_tree_state, SeqTreeState},
-                {local_tree_state, LocalTreeState},
-                {purge_tree_state, PurgeTreeState},
-                {purge_seq_tree_state, PurgeSeqTreeState},
-                {security_ptr, SecurityPtr},
-                {revs_limit, RevsLimit},
-                {uuid, Uuid},
-                {epochs, Epochs},
-                {compacted_seq, CompactedSeq},
-                {purge_infos_limit, PurgeInfosLimit}
-            ])
-    end.
-
-
 upgrade_tuple(Old) when is_record(Old, db_header) ->
     Old;
 upgrade_tuple(Old) when is_tuple(Old) ->
@@ -290,6 +245,7 @@ upgrade_disk_version(#db_header{}=Header) ->
         4 -> Header#db_header{security_ptr = nil}; % [0.10 - 0.11)
         5 -> Header#db_header{disk_version = ?LATEST_DISK_VERSION}; % pre 1.2
         6 -> Header#db_header{disk_version = ?LATEST_DISK_VERSION}; % pre clustered purge
+        7 -> Header#db_header{disk_version = ?LATEST_DISK_VERSION}; % pre partitioned dbs
         ?LATEST_DISK_VERSION -> Header;
         _ ->
             Reason = "Incorrect disk header version",
@@ -422,12 +378,12 @@ upgrade_v3_test() ->
 
 -endif.
 
-upgrade_v5_to_v7_test() ->
+upgrade_v5_to_v8_test() ->
     Vsn5Header = mk_header(5),
     NewHeader = upgrade_disk_version(upgrade_tuple(Vsn5Header)),
 
     ?assert(is_record(NewHeader, db_header)),
-    ?assertEqual(7, disk_version(NewHeader)),
+    ?assertEqual(8, disk_version(NewHeader)),
 
     % Security ptr isn't changed for v5 headers
     ?assertEqual(bang, security_ptr(NewHeader)).
