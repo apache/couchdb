@@ -11,7 +11,16 @@ mix deps.get
 mix test --trace
 ```
 
-# Tests to port
+## Set CouchDB credentials
+
+By default the Elixir tests require CouchDB running at http://127.0.0.1:15984 with credentials `adm:pass`.
+You can override those using the following:
+
+```
+$ USER=myusername PASS=password COUCH_URL=http://my-couchdb.com mix test
+```
+
+## Tests to port
 
 X means done, - means partially
 
