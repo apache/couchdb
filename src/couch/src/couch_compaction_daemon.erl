@@ -125,8 +125,16 @@ handle_config_terminate(_, stop, _) ->
 handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
+get_snooze_period() ->
+    % The snooze_period_ms option should be used, but snooze_period is supported
+    % for legacy reasons.
+    Default = config:get_integer("compaction_daemon", "snooze_period", 3),
+    case config:get_integer("compaction_daemon", "snooze_period_ms", -1) of
+        -1 -> Default * 1000;
+        SnoozePeriod -> SnoozePeriod
+    end.
+
 compact_loop(Parent) ->
-    SnoozePeriod = config:get_integer("compaction_daemon", "snooze_period", 3),
     {ok, _} = couch_server:all_databases(
         fun(DbName, Acc) ->
             case ets:info(?CONFIG_ETS, size) =:= 0 of
@@ -140,7 +148,7 @@ compact_loop(Parent) ->
                     case check_period(Config) of
                     true ->
                         maybe_compact_db(Parent, DbName, Config),
-                        ok = timer:sleep(SnoozePeriod * 1000);
+                        ok = timer:sleep(get_snooze_period());
                     false ->
                         ok
                     end
@@ -231,8 +239,7 @@ maybe_compact_views(DbName, [DDocName | Rest], Config) ->
         timeout ->
             ok
         end,
-        SnoozePeriod = config:get_integer("compaction_daemon", "snooze_period", 3),
-        ok = timer:sleep(SnoozePeriod * 1000);
+        ok = timer:sleep(get_snooze_period());
     false ->
         ok
     end.
@@ -596,5 +603,61 @@ abs_path2_test() ->
     ?assertEqual({ok, "/a/b/"}, abs_path2("/a/b")),
     ?assertEqual({ok, "/a/b/"}, abs_path2("/a/b")),
     ok.
+
+get_snooze_period_test_() ->
+    {
+        foreach,
+        fun() ->
+            meck:new(config, [passthrough])
+        end,
+        fun(_) ->
+            meck:unload()
+        end,
+        [
+            {"should return default value without config attributes",
+            fun should_default_without_config/0},
+            {"should respect old config attribute",
+            fun should_respect_old_config/0},
+            {"should respect old config set to zero",
+            fun should_respect_old_config_zero/0},
+            {"should respect new config attribute",
+            fun should_respect_new_config/0},
+            {"should respect new config set to zero",
+            fun should_respect_new_config_zero/0}
+        ]
+    }.
+
+should_default_without_config() ->
+    ?assertEqual(3000, get_snooze_period()).
+
+should_respect_old_config() ->
+    meck:expect(config, get_integer, fun
+        ("compaction_daemon", "snooze_period", _) -> 1;
+        (_, _, Default) -> Default
+    end),
+    ?assertEqual(1000, get_snooze_period()).
+
+should_respect_old_config_zero() ->
+    meck:expect(config, get_integer, fun
+        ("compaction_daemon", "snooze_period", _) -> 0;
+        (_, _, Default) -> Default
+    end),
+    ?assertEqual(0, get_snooze_period()).
+
+should_respect_new_config() ->
+    meck:expect(config, get_integer, fun
+        ("compaction_daemon", "snooze_period", _) -> 1;
+        ("compaction_daemon", "snooze_period_ms", _) -> 300;
+        (_, _, Default) -> Default
+    end),
+    ?assertEqual(300, get_snooze_period()).
+
+should_respect_new_config_zero() ->
+    meck:expect(config, get_integer, fun
+        ("compaction_daemon", "snooze_period", _) -> 1;
+        ("compaction_daemon", "snooze_period_ms", _) -> 0;
+        (_, _, Default) -> Default
+    end),
+    ?assertEqual(0, get_snooze_period()).
 
 -endif.
