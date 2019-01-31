@@ -13,7 +13,7 @@
 -module(mem3_shard_split_httpd).
 
 -export([
-    handle_shard_splits_req/1
+    handle_reshard_req/1
 ]).
 
 -import(couch_httpd, [
@@ -35,26 +35,26 @@
 -define(S_RUNNING, <<"running">>).
 -define(S_STOPPED, <<"stopped">>).
 
-% GET /_shard_splits
+% GET /_reshard
 %
-handle_shard_splits_req(#httpd{method='GET', path_parts=[_]} = Req) ->
+handle_reshard_req(#httpd{method='GET', path_parts=[_]} = Req) ->
     State = get_summary(),
     send_json(Req, State);
 
-handle_shard_splits_req(#httpd{path_parts=[_]} = Req) ->
+handle_reshard_req(#httpd{path_parts=[_]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD");
 
 
-% GET /_shard_splits/state
+% GET /_reshard/state
 %
-handle_shard_splits_req(#httpd{method='GET',
+handle_reshard_req(#httpd{method='GET',
         path_parts=[_, ?STATE]} = Req) ->
     State = get_shard_splitting_state(),
     send_json(Req, {[{state, State}]});
 
-% PUT /_shard_splits/state
+% PUT /_reshard/state
 %
-handle_shard_splits_req(#httpd{method='PUT',
+handle_reshard_req(#httpd{method='PUT',
         path_parts=[_, ?STATE]} = Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     {Props} = couch_httpd:json_body_obj(Req),
@@ -85,20 +85,20 @@ handle_shard_splits_req(#httpd{method='PUT',
      end;
 
 
-handle_shard_splits_req(#httpd{path_parts=[_, ?STATE]} = Req) ->
+handle_reshard_req(#httpd{path_parts=[_, ?STATE]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,PUT");
 
 
-% GET /_shard_splits/jobs
+% GET /_reshard/jobs
 %
-handle_shard_splits_req(#httpd{method='GET', path_parts=[_,?JOBS]}=Req) ->
+handle_reshard_req(#httpd{method='GET', path_parts=[_,?JOBS]}=Req) ->
     Jobs = get_jobs(),
     Total = length(Jobs),
     send_json(Req, {[{total_rows, Total}, {offset, 0}, {jobs, Jobs}]});
 
-% POST /_shard_splits/jobs {"node": "...", "shard": "..."}
+% POST /_reshard/jobs {"node": "...", "shard": "..."}
 %
-handle_shard_splits_req(#httpd{method = 'POST',
+handle_reshard_req(#httpd{method = 'POST',
         path_parts=[_, ?JOBS]} = Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     JobProps = couch_httpd:json_body_obj(Req),
@@ -117,13 +117,13 @@ handle_shard_splits_req(#httpd{method = 'POST',
             send_json(Req, 500, {[{error, to_binary(Error)}]})
     end;
 
-handle_shard_splits_req(#httpd{path_parts=[_, ?JOBS]} = Req) ->
+handle_reshard_req(#httpd{path_parts=[_, ?JOBS]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
 
 
-% GET /_shard_splits/jobs/$jobid
+% GET /_reshard/jobs/$jobid
 %
-handle_shard_splits_req(#httpd{method='GET',
+handle_reshard_req(#httpd{method='GET',
         path_parts=[_, ?JOBS, JobId]}=Req) ->
     case get_job(JobId) of
         {ok, JobInfo} ->
@@ -132,9 +132,9 @@ handle_shard_splits_req(#httpd{method='GET',
             throw(not_found)
     end;
 
-% DELETE /_shard_splits/jobs/$jobid
+% DELETE /_reshard/jobs/$jobid
 %
-handle_shard_splits_req(#httpd{method='DELETE',
+handle_reshard_req(#httpd{method='DELETE',
         path_parts=[_, ?JOBS, JobId]}=Req) ->
     case get_job(JobId) of
         {ok, {Props}} ->
@@ -151,14 +151,14 @@ handle_shard_splits_req(#httpd{method='DELETE',
     end;
 
 
-handle_shard_splits_req(#httpd{path_parts=[_, ?JOBS, _]} = Req) ->
+handle_reshard_req(#httpd{path_parts=[_, ?JOBS, _]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,DELETE");
 
 
-% GET /_shard_splits/jobs/$jobid/state
+% GET /_reshard/jobs/$jobid/state
 %
 
-handle_shard_splits_req(#httpd{method='GET',
+handle_reshard_req(#httpd{method='GET',
         path_parts=[_, ?JOBS, JobId, ?STATE]} = Req) ->
    case get_job(JobId) of
         {ok, {Props}} ->
@@ -169,9 +169,9 @@ handle_shard_splits_req(#httpd{method='GET',
             throw(not_found)
     end;
 
-% PUT /_shard_splits/jobs/$jobid/state
+% PUT /_reshard/jobs/$jobid/state
 
-handle_shard_splits_req(#httpd{method='PUT',
+handle_reshard_req(#httpd{method='PUT',
         path_parts=[_, ?JOBS, JobId, ?STATE]} = Req) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     {Props} = couch_httpd:json_body_obj(Req),
@@ -205,7 +205,7 @@ handle_shard_splits_req(#httpd{method='PUT',
             throw({bad_request, <<"State field not `running` or `stopped`">>})
      end;
 
-handle_shard_splits_req(#httpd{path_parts=[_, ?JOBS ,_, ?STATE ]} = Req) ->
+handle_reshard_req(#httpd{path_parts=[_, ?JOBS ,_, ?STATE ]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,PUT").
 
 
