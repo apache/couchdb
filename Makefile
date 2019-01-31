@@ -201,8 +201,12 @@ python-black-update: .venv/bin/black
 		. dev/run rel/overlay/bin/couchup test/javascript/run
 
 .PHONY: elixir
-elixir: elixir-check-formatted elixir-credo devclean
+elixir: elixir-init elixir-check-formatted elixir-credo devclean
 	@dev/run -a adm:pass --no-eval 'test/elixir/run --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+
+.PHONY: elixir-init
+elixir-init:
+	@cd test/elixir && mix local.rebar --force && mix local.hex --force && mix deps.get
 
 .PHONY: elixir-cluster-without-quorum
 elixir-cluster-without-quorum: elixir-check-formatted elixir-credo devclean
@@ -224,7 +228,7 @@ elixir-check-formatted:
 # We use it in our tests
 .PHONY: elixir-credo
 elixir-credo:
-	@cd test/elixir/ && mix deps.get && mix credo
+	@cd test/elixir/ && mix credo
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
