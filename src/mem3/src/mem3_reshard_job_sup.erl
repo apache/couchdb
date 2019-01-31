@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mem3_shard_split_job_sup).
+-module(mem3_reshard_job_sup).
 
 -behaviour(supervisor).
 
@@ -22,7 +22,7 @@
     init/1
 ]).
 
--include("mem3_shard_split.hrl").
+-include("mem3_reshard.hrl").
 
 
 start_link() ->
@@ -45,10 +45,10 @@ count_children() ->
 init(_Args) ->
     Children = [
         {undefined,
-            {mem3_shard_split_job, start_link, []},
+            {mem3_reshard_job, start_link, []},
             temporary,
             60000,
             worker,
-            [mem3_shard_split_job]}
+            [mem3_reshard_job]}
     ],
     {ok, {{simple_one_for_one, 10, 3}, Children}}.

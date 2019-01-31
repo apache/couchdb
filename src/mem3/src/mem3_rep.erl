@@ -433,7 +433,7 @@ changes_append_fdi(FDI, #{undefined := Target} = Targets, _)
     #tgt{infos = Infos} = Target,
     Targets#{undefined :=  Target#tgt{infos = [FDI | Infos]}};
 changes_append_fdi(#full_doc_info{id = Id} = FDI, Targets, HashFun) ->
-    Key = mem3_shard_split_job:pickfun(Id, maps:keys(Targets), HashFun),
+    Key = mem3_reshard_job:pickfun(Id, maps:keys(Targets), HashFun),
     maps:update_with(Key, fun(#tgt{infos = Infos} = T) ->
         T#tgt{infos = [FDI | Infos]}
     end, Targets).

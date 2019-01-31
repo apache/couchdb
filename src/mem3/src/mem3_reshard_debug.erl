@@ -10,11 +10,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mem3_shard_split_debug).
+-module(mem3_reshard_debug).
 
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("mem3/src/mem3_shard_split.hrl").
+-include_lib("mem3/src/mem3_reshard.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl"). % for all_docs function
 
 
@@ -33,9 +33,9 @@
 trace_enable() ->
     dbg:stop_clear(),
     dbg:tracer(),
-    %trace_funs(mem3_shard_split, [start_job, init, spawn_job, report, checkpoint]),
-    trace_funs(mem3_shard_split_index, [design_docs, target_indices, indices]),
-    %%trace_funs(mem3_shard_split_job, [init, terminate, next_state, retry_state]),
+    %trace_funs(mem3_reshard, [start_job, init, spawn_job, report, checkpoint]),
+    trace_funs(mem3_reshard_index, [design_docs, target_indices, indices]),
+    %%trace_funs(mem3_reshard_job, [init, terminate, next_state, retry_state]),
     %% dbg:tpl(mem3_rep, find_missing_revs, [{
     %%     ['$1'],
     %%     [{is_tuple,'$1'}, {'=:=',{element, 2,'$1'},2000}],
@@ -58,7 +58,7 @@ start_test_job() ->
 
 
 start_test_job(DbName) ->
-    mem3_shard_split:reset_state(),
+    mem3_reshard:reset_state(),
     io:format("~nCreating db: ~p~n", [DbName]),
     create_test_db(DbName),
     add_test_docs(DbName, [0, 10], [0, 1], [0, 1]),
@@ -67,7 +67,7 @@ start_test_job(DbName) ->
     io:format("Starting job for ~p~n", [ShardName]),
     state_intercept_init(),
     state_intercept(topoff1, fun(Job) ->
-        JobStr = mem3_shard_split_job:jobfmt(Job),
+        JobStr = mem3_reshard_job:jobfmt(Job),
         io:format("Intercept in topoff1 ~s. Addding docs~n", [JobStr]),
         %io:fread("Press key when ready to continue...", ""),
         add_test_docs(DbName, [200, 201], [10, 11], [10, 11]),
@@ -75,7 +75,7 @@ start_test_job(DbName) ->
         ok
     end),
     state_intercept(topoff2, fun(Job) ->
-        JobStr = mem3_shard_split_job:jobfmt(Job),
+        JobStr = mem3_reshard_job:jobfmt(Job),
         io:format("Intercept in topoff2 ~s. Addding docs~n", [JobStr]),
         add_test_docs(DbName, [300, 301], [12, 13], [12, 13]),
         timer:sleep(1000),
@@ -83,7 +83,7 @@ start_test_job(DbName) ->
     end),
     %trace_enable(),
     %io:fread("Press key when ready to start job...", ""),
-    Res = mem3_shard_split:start_job(ShardName),
+    Res = mem3_reshard:start_job(ShardName),
     io:format("Job started:~p. Waiting for update_shardmap1 state ~n", [Res]),
     state_wait(completed, 180000),
     io:format("Job completed, adding extra documents ~n", []),
@@ -109,9 +109,9 @@ state_intercept_init() ->
     meck:unload(),
     catch ets:delete(?MODULE),
     ets:new(?MODULE, [named_table, public, set]),
-    meck:new(mem3_shard_split, [passthrough]),
+    meck:new(mem3_reshard, [passthrough]),
     GL = erlang:group_leader(),
-    meck:expect(mem3_shard_split, checkpoint,
+    meck:expect(mem3_reshard, checkpoint,
         fun(Server, #job{} = Job) ->
             case ets:lookup(?MODULE, Job#job.split_state) of
                 [{_, Fun}] ->
@@ -135,7 +135,7 @@ state_intercept_init() ->
 
 state_wait(State, Timeout) ->
     Args = ['_', #job{split_state = State, _ = '_'}],
-    ok = meck:wait(mem3_shard_split, checkpoint, Args, Timeout).
+    ok = meck:wait(mem3_reshard, checkpoint, Args, Timeout).
 
 
 create_test_db(DbName) ->

@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mem3_shard_split_job).
+-module(mem3_reshard_job).
 
 
 -behaviour(gen_server).
@@ -39,7 +39,7 @@
 
 
 -include("couch/include/couch_db.hrl").
--include("mem3_shard_split.hrl").
+-include("mem3_reshard.hrl").
 
 
 start_link(#job{} = Job) ->
@@ -66,7 +66,7 @@ init([#job{} = Job0]) ->
     Job = Job0#job{
         target_filters = build_target_filters(Job0#job.targets),
         pid = self(),
-        time_started = mem3_shard_split:now_sec(),
+        time_started = mem3_reshard:now_sec(),
         workers = [],
         retries = 0
     },
@@ -197,12 +197,12 @@ switch_state(#job{manager = ManagerPid} = Job0, NewState) ->
     Info2 = info_delete(reason, Info1),
     Job = Job0#job{
         split_state = NewState,
-        time_updated = mem3_shard_split:now_sec(),
+        time_updated = mem3_reshard:now_sec(),
         retries = 0,
         state_info = Info2,
         workers = []
     },
-    ok = mem3_shard_split:checkpoint(ManagerPid, check_state(Job)),
+    ok = mem3_reshard:checkpoint(ManagerPid, check_state(Job)),
     gen_server:cast(self(), do_state),
     Job.
 
@@ -233,7 +233,7 @@ do_state(#job{split_state = copy_local_docs} = Job) ->
     {ok, report(Job#job{workers = [Pid]})};
 
 do_state(#job{split_state = update_shardmap} = Job) ->
-    Pid = spawn_link(mem3_shard_split_dbdoc, update_shard_map, [Job]),
+    Pid = spawn_link(mem3_reshard_dbdoc, update_shard_map, [Job]),
     {ok, report(Job#job{workers = [Pid]})};
 
 do_state(#job{split_state = wait_source_close} = Job) ->
@@ -267,8 +267,8 @@ maybe_retry(#job{} = Job, _, Error) ->
 
 -spec report(#job{}) -> #job{}.
 report(#job{manager = ManagerPid} = Job) ->
-    Job1 = Job#job{time_updated = mem3_shard_split:now_sec()},
-    ok = mem3_shard_split:report(ManagerPid, Job1),
+    Job1 = Job#job{time_updated = mem3_reshard:now_sec()},
+    ok = mem3_reshard:report(ManagerPid, Job1),
     Job1.
 
 
@@ -405,9 +405,9 @@ pickfun(DocId, [[B, E] | _] = Ranges, {_M, _F, _A} = HashFun) when
 
 
 build_indices(#shard{name = Source}, Targets) ->
-    {ok, DDocs} = mem3_shard_split_index:design_docs(Source),
-    Indices = mem3_shard_split_index:target_indices(DDocs, Targets),
-    mem3_shard_split_index:spawn_builders(Indices).
+    {ok, DDocs} = mem3_reshard_index:design_docs(Source),
+    Indices = mem3_reshard_index:target_indices(DDocs, Targets),
+    mem3_reshard_index:spawn_builders(Indices).
 
 
 copy_local_docs(#job{source = Source, targets = Targets0}) ->
@@ -421,10 +421,10 @@ copy_local_docs(#job{source = Source, targets = Targets0}) ->
 
 
 wait_source_close(#job{source = #shard{name = Name}}) ->
-    Timeout = config:get_integer("mem3_shard_split",
+    Timeout = config:get_integer("mem3_reshard",
         "source_close_timeout_sec", 600),
     couch_util:with_db(Name, fun(Db) ->
-        Now = mem3_shard_split:now_sec(),
+        Now = mem3_reshard:now_sec(),
         case wait_source_close(Db, 5, Now + Timeout) of
             true ->
                 ok;
@@ -439,7 +439,7 @@ wait_source_close(Db, SleepSec, UntilSec) ->
          [] ->
             true;
          [_ | _] ->
-            Now = mem3_shard_split:now_sec(),
+            Now = mem3_reshard:now_sec(),
             case Now < UntilSec of
                 true ->
                     LogMsg = "~p : Waiting for source shard ~p to be closed",
@@ -453,7 +453,7 @@ wait_source_close(Db, SleepSec, UntilSec) ->
 
 
 source_delete(#job{source = #shard{name = Name}}) ->
-    case config:get_boolean("mem3_shard_split", "delete_source", true) of
+    case config:get_boolean("mem3_reshard", "delete_source", true) of
         true ->
             ok = couch_server:delete(Name, [?ADMIN_CTX]),
             couch_log:warning("~p : deleted source shard ~p", [?MODULE, Name]);
@@ -465,12 +465,12 @@ source_delete(#job{source = #shard{name = Name}}) ->
 
 -spec max_retries() -> integer().
 max_retries() ->
-    config:get_integer("mem3_shard_split", "max_retries", 1).
+    config:get_integer("mem3_reshard", "max_retries", 1).
 
 
 -spec retry_interval_sec() -> integer().
 retry_interval_sec() ->
-    config:get_integer("mem3_shard_split", "retry_interval_sec", 10).
+    config:get_integer("mem3_reshard", "retry_interval_sec", 10).
 
 
 -spec info_update(atom(), any(), [tuple()]) -> [tuple()].

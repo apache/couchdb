@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mem3_shard_split_store).
+-module(mem3_reshard_store).
 
 
 -export([
@@ -31,7 +31,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
--include("mem3_shard_split.hrl").
+-include("mem3_reshard.hrl").
 
 
 -spec init(#state{}, binary(), binary()) -> #state{}.
@@ -207,8 +207,8 @@ job_from_ejson({Props}) ->
         time_created = TCreated,
         time_started = TStarted,
         time_updated = TUpdated,
-        source = mem3_shard_split:shard_from_name(Source),
-        targets = [mem3_shard_split:shard_from_name(T) || T <- Targets]
+        source = mem3_reshard:shard_from_name(Source),
+        targets = [mem3_reshard:shard_from_name(T) || T <- Targets]
     }.
 
 
@@ -239,4 +239,4 @@ state_info_from_ejson({Props}) ->
 
 
 store_state() ->
-    config:get_boolean("mem3_shard_split", "store_state", true).
+    config:get_boolean("mem3_reshard", "store_state", true).

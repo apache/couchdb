@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mem3_shard_split_index).
+-module(mem3_reshard_index).
 
 
 -export([

@@ -239,7 +239,7 @@ save_purge_checkpoint_rpc(DbName, PurgeDocId, Body) ->
 
 update_shard_map_rpc(DocId, OldBody, Body) ->
     rexi:reply(try
-        {ok, mem3_shard_split_dbdoc:update_shard_map_rpc(DocId, OldBody, Body)}
+        {ok, mem3_reshard_dbdoc:update_shard_map_rpc(DocId, OldBody, Body)}
     catch
         Tag:Error ->
             {Tag, Error}

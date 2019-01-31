@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mem3_shard_split_sup).
+-module(mem3_reshard_sup).
 
 -behaviour(supervisor).
 
@@ -24,17 +24,17 @@ start_link() ->
 
 init(_Args) ->
     Children = [
-        {mem3_shard_split_job_sup,
-            {mem3_shard_split_job_sup, start_link, []},
+        {mem3_reshard_job_sup,
+            {mem3_reshard_job_sup, start_link, []},
             permanent,
             infinity,
             supervisor,
-            [mem3_shard_split_job_sup]},
-        {mem3_shard_split,
-            {mem3_shard_split, start_link, []},
+            [mem3_reshard_job_sup]},
+        {mem3_reshard,
+            {mem3_reshard, start_link, []},
             permanent,
             brutal_kill,
             worker,
-            [mem3_shard_split]}
+            [mem3_reshard]}
     ],
     {ok, {{one_for_all, 5, 5}, Children}}.

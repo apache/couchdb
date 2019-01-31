@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mem3_shard_split_httpd).
+-module(mem3_reshard_httpd).
 
 -export([
     handle_reshard_req/1
@@ -104,7 +104,7 @@ handle_reshard_req(#httpd{method = 'POST',
     JobProps = couch_httpd:json_body_obj(Req),
     Node = get_jobs_post_node(JobProps),
     Shard = get_jobs_post_shard(JobProps),
-    case rpc:call(Node, mem3_shard_split, start_job, [Shard]) of
+    case rpc:call(Node, mem3_reshard, start_job, [Shard]) of
         {ok, JobId} ->
             send_json(Req, 200, {[{ok, true}, {<<"id">>, JobId}]});
         {error, {Error, Reason}} ->
@@ -140,7 +140,7 @@ handle_reshard_req(#httpd{method='DELETE',
         {ok, {Props}} ->
             NodeBin = couch_util:get_value(node, Props),
             Node = binary_to_atom(NodeBin, utf8),
-            case rpc:call(Node, mem3_shard_split, remove_job, [JobId]) of
+            case rpc:call(Node, mem3_reshard, remove_job, [JobId]) of
                 ok ->
                     send_json(Req, 200, {[{ok, true}]});
                 {error, not_found} ->
@@ -241,13 +241,13 @@ get_jobs_post_shard({Props}) ->
 
 get_jobs() ->
     Nodes = mem3_util:live_nodes(),
-    {Replies, _Bad} = rpc:multicall(Nodes, mem3_shard_split, jobs, []),
+    {Replies, _Bad} = rpc:multicall(Nodes, mem3_reshard, jobs, []),
     lists:flatten(Replies).
 
 
 get_job(JobId) ->
     Nodes = mem3_util:live_nodes(),
-    {Replies, _Bad} = rpc:multicall(Nodes, mem3_shard_split, job, [JobId]),
+    {Replies, _Bad} = rpc:multicall(Nodes, mem3_reshard, job, [JobId]),
     case [JobInfo || {ok, JobInfo} <- Replies] of
         [JobInfo] ->
             {ok, JobInfo};
@@ -258,7 +258,7 @@ get_job(JobId) ->
 
 resume_job(JobId) ->
     Nodes = mem3_util:live_nodes(),
-    {Replies, _Bad} = rpc:multicall(Nodes, mem3_shard_split, resume_job,
+    {Replies, _Bad} = rpc:multicall(Nodes, mem3_reshard, resume_job,
         [JobId]),
     WithoutNotFound = [R || R <- Replies, R =/= {error, not_found}],
     case lists:usort(WithoutNotFound) of
@@ -273,7 +273,7 @@ resume_job(JobId) ->
 
 stop_job(JobId, Reason) ->
     Nodes = mem3_util:live_nodes(),
-    {Replies, _Bad} = rpc:multicall(Nodes, mem3_shard_split, stop_job,
+    {Replies, _Bad} = rpc:multicall(Nodes, mem3_reshard, stop_job,
         [JobId, Reason]),
     WithoutNotFound = [R || R <- Replies, R =/= {error, not_found}],
     case lists:usort(WithoutNotFound) of
@@ -288,7 +288,7 @@ stop_job(JobId, Reason) ->
 
 get_summary() ->
     Nodes = mem3_util:live_nodes(),
-    {Replies, _Bad} = rpc:multicall(Nodes, mem3_shard_split, get_state, []),
+    {Replies, _Bad} = rpc:multicall(Nodes, mem3_reshard, get_state, []),
     Stats0 = #{running => 0, total => 0, completed => 0, failed => 0,
         stopped => 0},
     {Stats, States} = lists:foldl(fun({Res}, {Stats, States}) ->
@@ -307,7 +307,7 @@ get_summary() ->
 
 get_shard_splitting_state() ->
     Nodes = mem3_util:live_nodes(),
-    {Replies, _Bad} = rpc:multicall(Nodes, mem3_shard_split, get_state, []),
+    {Replies, _Bad} = rpc:multicall(Nodes, mem3_reshard, get_state, []),
     Running = lists:foldl(fun({Res}, R) ->
        case couch_util:get_value(state, Res) of
            ?S_RUNNING -> R + 1;
@@ -322,7 +322,7 @@ get_shard_splitting_state() ->
 
 
 start_shard_splitting() ->
-    {Replies, _Bad} = rpc:multicall(mem3_shard_split, start, []),
+    {Replies, _Bad} = rpc:multicall(mem3_reshard, start, []),
     case lists:usort(lists:flatten(Replies)) of
         [ok] ->
             {ok, {[{ok, true}]}};
@@ -332,7 +332,7 @@ start_shard_splitting() ->
 
 
 stop_shard_splitting(Reason) ->
-    {Replies, _Bad} = rpc:multicall(mem3_shard_split, stop, [Reason]),
+    {Replies, _Bad} = rpc:multicall(mem3_reshard, stop, [Reason]),
     case lists:usort(lists:flatten(Replies)) of
         [ok] ->
             {ok, {[{ok, true}]}};

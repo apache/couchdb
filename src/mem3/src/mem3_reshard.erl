@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mem3_shard_split).
+-module(mem3_reshard).
 
 -behaviour(gen_server).
 
@@ -42,7 +42,7 @@
 ]).
 
 
--include("mem3_shard_split.hrl").
+-include("mem3_reshard.hrl").
 
 
 -define(JOB_ID_VERSION, 1).
@@ -64,10 +64,10 @@ start_job(<<"shards/", _:8/binary,"-", _:8/binary, "/", _/binary>> = Name) ->
 
 -spec start_job(#shard{}, split()) -> {ok, binary()} | {error, any()}.
 start_job(#shard{} = Source, Split) ->
-    case mem3_shard_split_validate:start_args(Source, Split) of
+    case mem3_reshard_validate:start_args(Source, Split) of
         ok ->
             Targets = target_shards(Source, Split),
-            case mem3_shard_split_validate:targets(Source, Targets) of
+            case mem3_reshard_validate:targets(Source, Targets) of
                 ok ->
                     Job = #job{
                         job_state = new,
@@ -104,7 +104,7 @@ remove_job(JobId) when is_binary(JobId) ->
 -spec jobs() -> [[tuple()]].
 jobs() ->
     ets:foldl(fun(Job, Acc) ->
-        Props = mem3_shard_split_store:job_to_ejson_props(Job),
+        Props = mem3_reshard_store:job_to_ejson_props(Job),
         [{Props} | Acc]
     end, [], ?MODULE).
 
@@ -113,7 +113,7 @@ jobs() ->
 job(JobId) ->
     case job_by_id(JobId) of
         #job{} = Job ->
-            Props = mem3_shard_split_store:job_to_ejson_props(Job),
+            Props = mem3_reshard_store:job_to_ejson_props(Job),
             {ok, {Props}};
         not_found ->
             {error, not_found}
@@ -167,8 +167,8 @@ init(_) ->
         node = node(),
         db_monitor = spawn_link(?MODULE, db_monitor, [self()])
     },
-    State1 = mem3_shard_split_store:init(State, ?JOB_PREFIX, state_id()),
-    State2 = mem3_shard_split_store:load_state(State1),
+    State1 = mem3_reshard_store:init(State, ?JOB_PREFIX, state_id()),
+    State2 = mem3_reshard_store:load_state(State1),
     gen_server:cast(self(), reload_jobs),
     {ok, State2}.
 
@@ -187,7 +187,7 @@ handle_call(start, _From, #state{state = stopped} = State) ->
         time_updated = now_sec(),
         state_info = info_update(reason, <<"Restarted">>, State#state.state_info)
     },
-    ok = mem3_shard_split_store:store_state(State1),
+    ok = mem3_reshard_store:store_state(State1),
     State2 = reload_jobs(State1),
     {reply, ok, State2};
 
@@ -200,7 +200,7 @@ handle_call({stop, Reason}, _From, #state{state = running} = State) ->
         time_updated = now_sec(),
         state_info = info_update(reason, Reason, State#state.state_info)
     },
-    ok = mem3_shard_split_store:store_state(State1),
+    ok = mem3_reshard_store:store_state(State1),
     [kill_job_int(Job) || Job <- running_jobs()],
     {reply, ok, State1};
 
@@ -218,8 +218,8 @@ handle_call({start_job, _}, _From, #state{state = stopped} = State) ->
 handle_call({start_job, #job{id = Id, source = Source} = Job}, _From, State) ->
     couch_log:notice("~p start_job call ~p", [?MODULE, jobfmt(Job)]),
     MaxJobs = get_max_jobs(),
-    RunningJobs = mem3_shard_split_job_sup:count_children(),
-    SourceOk = mem3_shard_split_validate:source(Source),
+    RunningJobs = mem3_reshard_job_sup:count_children(),
+    SourceOk = mem3_reshard_validate:source(Source),
     case {job_by_id(Id), RunningJobs =< MaxJobs, SourceOk} of
         {not_found, true, ok} ->
             case start_job_int(Job, State) of
@@ -278,7 +278,7 @@ handle_call({remove_job, Id}, _From, State) ->
     case job_by_id(Id) of
         #job{} = Job ->
             ok = stop_job_int(Job, stopped, "Removed by user", State),
-            ok = mem3_shard_split_store:delete_job(State, Id),
+            ok = mem3_reshard_store:delete_job(State, Id),
             ets:delete(?MODULE, Job#job.id),
             {reply, ok, State};
         not_found ->
@@ -293,7 +293,7 @@ handle_call({report, Job}, {FromPid, _}, State) ->
     {reply, ok, State};
 
 handle_call(get_state, _From, #state{state = GlobalState} = State) ->
-    StateProps = mem3_shard_split_store:state_to_ejson_props(State),
+    StateProps = mem3_reshard_store:state_to_ejson_props(State),
     Stats0 =  #{running => 0, completed => 0, failed => 0, stopped => 0},
     StateStats = ets:foldl(fun(#job{job_state = JS}, Acc) ->
         % When jobs are disabled globally their state is not checkpointed as
@@ -362,7 +362,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 -spec reload_jobs(#state{}) -> #state{}.
 reload_jobs(State) ->
-    Jobs = mem3_shard_split_store:get_jobs(State),
+    Jobs = mem3_reshard_store:get_jobs(State),
     lists:foldl(fun reload_job/2, State, Jobs).
 
 
@@ -403,19 +403,19 @@ reload_job(#job{} = Job, #state{} = State) ->
 
 -spec get_max_jobs() -> integer().
 get_max_jobs() ->
-    config:get_integer("mem3_shard_split", "max_jobs", ?DEFAULT_MAX_JOBS).
+    config:get_integer("mem3_reshard", "max_jobs", ?DEFAULT_MAX_JOBS).
 
 
 -spec get_start_delay_sec() -> integer().
 get_start_delay_sec() ->
-    config:get_integer("mem3_shard_split", "start_delay_sec", 0).
+    config:get_integer("mem3_reshard", "start_delay_sec", 0).
 
 
 -spec start_job_int(#job{}, #state{}) -> ok | {error, term()}.
 start_job_int(Job, State) ->
     case spawn_job(Job) of
         {ok, #job{} = Job1} ->
-            ok = mem3_shard_split_store:store_job(State, Job1),
+            ok = mem3_reshard_store:store_job(State, Job1),
             true = ets:insert(?MODULE, Job1),
             ok;
         {error, Error} ->
@@ -433,7 +433,7 @@ spawn_job(#job{} = Job0) ->
         workers = [],
         retries = 0
     },
-    case mem3_shard_split_job_sup:start_child(Job) of
+    case mem3_reshard_job_sup:start_child(Job) of
         {ok, Pid} ->
             Ref = monitor(process, Pid),
             {ok, Job#job{pid = Pid, ref = Ref}};
@@ -454,7 +454,7 @@ stop_job_int(#job{} = Job, JobState, Reason, State) ->
         time_updated = now_sec(),
         state_info = [{reason, Reason}]
     },
-    ok = mem3_shard_split_store:store_job(State, Job2),
+    ok = mem3_reshard_store:store_job(State, Job2),
     couch_log:info("~p stop_job_int stopped ~p", [?MODULE, jobfmt(Job2)]),
     ok.
 
@@ -467,7 +467,7 @@ kill_job_int(#job{pid = Pid, ref = Ref} = Job) ->
     couch_log:info("~p kill_job_int ~p", [?MODULE, jobfmt(Job)]),
     case erlang:is_process_alive(Pid) of
         true ->
-            ok = mem3_shard_split_job_sup:terminate_child(Pid);
+            ok = mem3_reshard_job_sup:terminate_child(Pid);
         false ->
             ok
     end,
@@ -487,7 +487,7 @@ handle_job_exit(#job{split_state = completed} = Job, normal, State) ->
         time_updated = now_sec(),
         state_info = []
     },
-    ok = mem3_shard_split_store:store_job(State, Job1),
+    ok = mem3_reshard_store:store_job(State, Job1),
     true = ets:insert(?MODULE, Job1),
     ok;
 
@@ -540,7 +540,7 @@ handle_job_exit(#job{} = Job, Error, State) ->
         time_updated = now_sec(),
         state_info = info_update(reason, Error, OldInfo)
     },
-    ok = mem3_shard_split_store:store_job(State, Job1),
+    ok = mem3_reshard_store:store_job(State, Job1),
     true = ets:insert(?MODULE, Job1),
     ok.
 
@@ -657,7 +657,7 @@ checkpoint_int(Job, State, From) ->
     couch_log:notice("~p checkpoint ~s", [?MODULE, jobfmt(Job)]),
     case report_int(Job, From) of
         ok ->
-            ok = mem3_shard_split_store:store_job(State, Job),
+            ok = mem3_reshard_store:store_job(State, Job),
             State;
         not_found ->
             couch_log:error("~p checkpoint : couldn't find ~p", [?MODULE, Job]),
@@ -710,11 +710,11 @@ db_monitor_loop(Server, EvtRef) ->
 -spec reset_state(#state{}) -> #state{}.
 reset_state(#state{} = State) ->
     couch_log:warning("~p deleting state", [?MODULE]),
-    ok = mem3_shard_split_store:delete_state(State),
-    Jobs = mem3_shard_split_store:get_jobs(State),
+    ok = mem3_reshard_store:delete_state(State),
+    Jobs = mem3_reshard_store:get_jobs(State),
     lists:foldl(fun(#job{id = Id}, StateAcc) ->
         couch_log:warning("~p deleting job ~p", [?MODULE, Id]),
-        ok = mem3_shard_split_store:delete_job(StateAcc, Id),
+        ok = mem3_reshard_store:delete_job(StateAcc, Id),
         StateAcc
     end, State, Jobs).
 
@@ -737,7 +737,7 @@ statefmt(#state{} = State) ->
         db_monitor = Pid
     } = State,
     Total = ets:info(?MODULE, size),
-    Active = mem3_shard_split_job_sup:count_children(),
+    Active = mem3_reshard_job_sup:count_children(),
     UpdatedFmt = iso8601(Updated),
     Msg = "#state{~s updated:~s total:~B active:~B mon:~p}",
     Fmt = io_lib:format(Msg, [StateName, UpdatedFmt, Total, Active, Pid]),
@@ -751,4 +751,4 @@ statefmt(State) ->
 
 -spec jobfmt(#job{}) -> string().
 jobfmt(#job{} = Job) ->
-    mem3_shard_split_job:jobfmt(Job).
+    mem3_reshard_job:jobfmt(Job).

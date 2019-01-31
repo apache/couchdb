@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mem3_shard_split_dbdoc).
+-module(mem3_reshard_dbdoc).
 
 
 -export([
@@ -20,7 +20,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
--include("mem3_shard_split.hrl").
+-include("mem3_reshard.hrl").
 
 
 update_shard_map(#job{source = Source, targets = Targets} = Job) ->
@@ -41,14 +41,14 @@ update_shard_map(#job{source = Source, targets = Targets} = Job) ->
     end,
     Node = hd(mem3_util:live_nodes()),
     Body = update_shard_props(OldBody, Source, Targets),
-    JobStr = mem3_shard_split_job:jobfmt(Job),
+    JobStr = mem3_reshard_job:jobfmt(Job),
     LogArgs1 = [?MODULE, JobStr, Node, OldBody, Body],
     couch_log:notice("~p : ~s node:~p doc ~p -> ~p", LogArgs1),
     case mem3_rpc:update_shard_map(Node, DocId, OldBody, Body, 600000) of
         {ok, Res} ->
             LogArgs2 = [?MODULE, JobStr, Node, Res],
             couch_log:notice("~p : ~s node:~p updated ~p", LogArgs2),
-            UntilSec = mem3_shard_split:now_sec() + 600,
+            UntilSec = mem3_reshard:now_sec() + 600,
             case wait_source_removed(Source, 5, UntilSec) of
                 true ->
                     ok;
@@ -88,7 +88,7 @@ wait_source_removed(#shard{name = Name} = Source, SleepSec, UntilSec) ->
         true ->
             true;
         false ->
-            case mem3_shard_split:now_sec() < UntilSec of
+            case mem3_reshard:now_sec() < UntilSec of
                 true ->
                     LogMsg = "~p : Waiting for shard ~p removal confirmation",
                     couch_log:notice(LogMsg, [?MODULE, Name]),
