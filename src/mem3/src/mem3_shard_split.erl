@@ -177,7 +177,7 @@ terminate(Reason, State) ->
     couch_log:notice("~p terminate ~p ~p", [?MODULE, Reason, statefmt(State)]),
     catch unlink(State#state.db_monitor),
     catch exit(State#state.db_monitor, kill),
-    [kill_job_int(Job, State) || Job <- running_jobs()],
+    [kill_job_int(Job) || Job <- running_jobs()],
     ok.
 
 
@@ -201,7 +201,7 @@ handle_call({stop, Reason}, _From, #state{state = running} = State) ->
         state_info = info_update(reason, Reason, State#state.state_info)
     },
     ok = mem3_shard_split_store:store_state(State1),
-    [kill_job_int(Job, State1) || Job <- running_jobs()],
+    [kill_job_int(Job) || Job <- running_jobs()],
     {reply, ok, State1};
 
 handle_call({stop, _}, _From, State) ->
@@ -295,17 +295,17 @@ handle_call({report, Job}, {FromPid, _}, State) ->
 handle_call(get_state, _From, #state{state = GlobalState} = State) ->
     StateProps = mem3_shard_split_store:state_to_ejson_props(State),
     Stats0 =  #{running => 0, completed => 0, failed => 0, stopped => 0},
-    StateStats = ets:foldl(fun(#job{job_state = State}, Acc) ->
+    StateStats = ets:foldl(fun(#job{job_state = JS}, Acc) ->
         % When jobs are disabled globally their state is not checkpointed as
         % "stopped", but it stays as "running". But when returning the state we
         % don't want to mislead and indicate that there are "N running jobs"
         % when the global state is "stopped".
-        State1 = case GlobalState =:= stopped andalso State =:= running of
+        JS1 = case GlobalState =:= stopped andalso JS =:= running of
             true -> stopped;
-            false -> State
+            false -> JS
         end,
-        Acc#{State => maps:get(State1, Acc, 0) + 1}
-    end, #{}, ?MODULE),
+        Acc#{JS1 => maps:get(JS1, Acc, 0) + 1}
+    end, Stats0, ?MODULE),
     Total = ets:info(?MODULE, size),
     StateStats1 = maps:to_list(StateStats) ++ [{total, Total}],
     Result = {lists:sort(StateProps ++ StateStats1)},
@@ -448,22 +448,22 @@ stop_job_int(#job{pid = undefined}, _JobState, _Reason, _State) ->
 
 stop_job_int(#job{} = Job, JobState, Reason, State) ->
     couch_log:info("~p stop_job_int ~p : ~p", [?MODULE, jobfmt(Job), Reason]),
-    Job1 = kill_job_int(Job, State),
+    Job1 = kill_job_int(Job),
     Job2 = Job1#job{
         job_state = JobState,
         time_updated = now_sec(),
         state_info = [{reason, Reason}]
     },
-    ok = mem3_shard_split_store:store_job(State, Job1),
-    couch_log:info("~p stop_job_int stopped ~p", [?MODULE, jobfmt(Job1)]),
+    ok = mem3_shard_split_store:store_job(State, Job2),
+    couch_log:info("~p stop_job_int stopped ~p", [?MODULE, jobfmt(Job2)]),
     ok.
 
 
--spec kill_job_int(#job{}, #state{}) -> #job{}.
-kill_job_int(#job{pid = undefined} = Job, State) ->
+-spec kill_job_int(#job{}) -> #job{}.
+kill_job_int(#job{pid = undefined} = Job) ->
     Job;
 
-kill_job_int(#job{pid = Pid, ref = Ref} = Job, State) ->
+kill_job_int(#job{pid = Pid, ref = Ref} = Job) ->
     couch_log:info("~p kill_job_int ~p", [?MODULE, jobfmt(Job)]),
     case erlang:is_process_alive(Pid) of
         true ->
