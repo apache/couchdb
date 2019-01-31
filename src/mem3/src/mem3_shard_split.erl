@@ -17,6 +17,8 @@
 -export([
    start_job/1,
    remove_job/1,
+   stop_job/2,
+   resume_job/1,
    jobs/0,
    job/1,
    shard_from_name/1,
@@ -84,7 +86,17 @@ start_job(#shard{} = Source, Split) ->
     end.
 
 
--spec remove_job(binary()) -> ok | not_found.
+-spec stop_job(binary(), binary()) -> ok | {error, any()}.
+stop_job(JobId, Reason) when is_binary(JobId), is_binary(Reason) ->
+    gen_server:call(?MODULE, {stop_job, JobId, Reason}, infinity).
+
+
+-spec resume_job(binary()) -> ok | {error, any()}.
+resume_job(JobId) when is_binary(JobId) ->
+    gen_server:call(?MODULE, {resume_job, JobId}, infinity).
+
+
+-spec remove_job(binary()) -> ok | {error, not_found}.
 remove_job(JobId) when is_binary(JobId) ->
     gen_server:call(?MODULE, {remove_job, JobId}, infinity).
 
@@ -150,7 +162,7 @@ init(_) ->
     ?MODULE = ets:new(?MODULE, EtsOpts),
     State = #state{
         state = running,
-        state_info = [{reason, <<"Started">>}],
+        state_info = [],
         time_updated = now_sec(),
         node = node(),
         db_monitor = spawn_link(?MODULE, db_monitor, [self()])
@@ -165,7 +177,7 @@ terminate(Reason, State) ->
     couch_log:notice("~p terminate ~p ~p", [?MODULE, Reason, statefmt(State)]),
     catch unlink(State#state.db_monitor),
     catch exit(State#state.db_monitor, kill),
-    stop_jobs(<<"Shard splitting stopped">>, State),
+    [kill_job_int(Job, State) || Job <- running_jobs()],
     ok.
 
 
@@ -189,7 +201,7 @@ handle_call({stop, Reason}, _From, #state{state = running} = State) ->
         state_info = info_update(reason, Reason, State#state.state_info)
     },
     ok = mem3_shard_split_store:store_state(State1),
-    ok = stop_jobs(<<"Shard splitting disabled">>, State1),
+    [kill_job_int(Job, State1) || Job <- running_jobs()],
     {reply, ok, State1};
 
 handle_call({stop, _}, _From, State) ->
@@ -224,6 +236,43 @@ handle_call({start_job, #job{id = Id, source = Source} = Job}, _From, State) ->
             {reply, SourceError, State}
     end;
 
+handle_call({resume_job, _}, _From, #state{state = stopped} = State) ->
+    case couch_util:get_value(reason, State#state.state_info) of
+        undefined ->
+            {reply, {error, stopped}, State};
+        Reason ->
+            {reply, {error, {stopped, Reason}}, State}
+    end;
+
+handle_call({resume_job, Id}, _From, State) ->
+    couch_log:notice("~p resume_job call ~p", [?MODULE, Id]),
+    case job_by_id(Id) of
+        #job{job_state = stopped} = Job ->
+            case start_job_int(Job, State) of
+                ok ->
+                    {reply, ok, State};
+                {error, Error} ->
+                    {reply, {error, Error}, State}
+            end;
+        #job{} ->
+            {reply, ok, State};
+        not_found ->
+            {reply, {error, not_found}, State}
+    end;
+
+handle_call({stop_job, Id, Reason}, _From, State) ->
+    couch_log:notice("~p stop_job Id:~p Reason:~p", [?MODULE, Id, Reason]),
+    case job_by_id(Id) of
+        #job{job_state = running} = Job ->
+            ok = stop_job_int(Job, stopped, Reason, State),
+            {reply, ok, State};
+        #job{} ->
+            {reply, ok, State};
+        not_found ->
+            {reply, {error, not_found}, State}
+    end;
+
+
 handle_call({remove_job, Id}, _From, State) ->
     couch_log:notice("~p call remove_job Id:~p", [?MODULE, Id]),
     case job_by_id(Id) of
@@ -243,15 +292,24 @@ handle_call({report, Job}, {FromPid, _}, State) ->
     report_int(Job, FromPid),
     {reply, ok, State};
 
-handle_call(get_state, _From, #state{} = State) ->
+handle_call(get_state, _From, #state{state = GlobalState} = State) ->
     StateProps = mem3_shard_split_store:state_to_ejson_props(State),
+    Stats0 =  #{running => 0, completed => 0, failed => 0, stopped => 0},
+    StateStats = ets:foldl(fun(#job{job_state = State}, Acc) ->
+        % When jobs are disabled globally their state is not checkpointed as
+        % "stopped", but it stays as "running". But when returning the state we
+        % don't want to mislead and indicate that there are "N running jobs"
+        % when the global state is "stopped".
+        State1 = case GlobalState =:= stopped andalso State =:= running of
+            true -> stopped;
+            false -> State
+        end,
+        Acc#{State => maps:get(State1, Acc, 0) + 1}
+    end, #{}, ?MODULE),
     Total = ets:info(?MODULE, size),
-    Running = mem3_shard_split_job_sup:count_children(),
-    StateProps1 = StateProps ++ [
-        {jobs_total, Total},
-        {jobs_running, Running}
-    ],
-    {reply, {StateProps1}, State};
+    StateStats1 = maps:to_list(StateStats) ++ [{total, Total}],
+    Result = {lists:sort(StateProps ++ StateStats1)},
+    {reply, Result, State};
 
 handle_call(reset_state, _From, State) ->
     {reply, ok, reset_state(State)};
@@ -308,7 +366,7 @@ reload_jobs(State) ->
     lists:foldl(fun reload_job/2, State, Jobs).
 
 
-% This is a case when main application is stopped but a job is reload that was
+% This is a case when main application is stopped but a job is reloaded that was
 % checkpointed in running state. Set that state to stopped to avoid the API
 % results looking odd.
 -spec reload_job(#job{}, #state{}) -> #state{}.
@@ -325,9 +383,8 @@ reload_job(#job{job_state = running} = Job, #state{state = stopped} = State) ->
     true = ets:insert(?MODULE, Job1),
     State;
 
-% This is a case when a job process is spawned.
-reload_job(#job{job_state = JSt} = Job, #state{state = running} = State)
-        when JSt =:= running orelse JSt =:= stopped ->
+% This is a case when a job process should be spawend
+reload_job(#job{job_state = running} = Job, #state{state = running} = State) ->
     case start_job_int(Job, State) of
         ok ->
             State;
@@ -337,7 +394,8 @@ reload_job(#job{job_state = JSt} = Job, #state{state = running} = State)
             State
     end;
 
-% The default case is to just load the job into the ets table.
+% The default case is to just load the job into the ets table. This would be
+% failed or completed jobs for example
 reload_job(#job{} = Job, #state{} = State) ->
     true = ets:insert(?MODULE, Job),
     State.
@@ -384,32 +442,39 @@ spawn_job(#job{} = Job0) ->
     end.
 
 
--spec stop_jobs(term(), #state{}) -> ok.
-stop_jobs(Reason, State) ->
-    couch_log:notice("~p stop_jobs reason:~p", [?MODULE, Reason]),
-    [stop_job_int(Job, stopped, Reason, State) || Job <- running_jobs()],
-    ok.
-
-
 -spec stop_job_int(#job{}, job_state(), term(), #state{}) -> ok.
 stop_job_int(#job{pid = undefined}, _JobState, _Reason, _State) ->
     ok;
 
 stop_job_int(#job{} = Job, JobState, Reason, State) ->
     couch_log:info("~p stop_job_int ~p : ~p", [?MODULE, jobfmt(Job), Reason]),
-    ok = mem3_shard_split_job_sup:terminate_child(Job#job.pid),
-    demonitor(Job#job.ref, [flush]),
-    Job1 = Job#job{
-        pid = undefined,
-        ref = undefined,
+    Job1 = kill_job_int(Job, State),
+    Job2 = Job1#job{
         job_state = JobState,
         time_updated = now_sec(),
         state_info = [{reason, Reason}]
     },
     ok = mem3_shard_split_store:store_job(State, Job1),
-    true = ets:insert(?MODULE, Job1),
     couch_log:info("~p stop_job_int stopped ~p", [?MODULE, jobfmt(Job1)]),
     ok.
+
+
+-spec kill_job_int(#job{}, #state{}) -> #job{}.
+kill_job_int(#job{pid = undefined} = Job, State) ->
+    Job;
+
+kill_job_int(#job{pid = Pid, ref = Ref} = Job, State) ->
+    couch_log:info("~p kill_job_int ~p", [?MODULE, jobfmt(Job)]),
+    case erlang:is_process_alive(Pid) of
+        true ->
+            ok = mem3_shard_split_job_sup:terminate_child(Pid);
+        false ->
+            ok
+    end,
+    demonitor(Ref, [flush]),
+    Job1 = Job#job{pid = undefined, ref = undefined},
+    true = ets:insert(?MODULE, Job1),
+    Job1.
 
 
 -spec handle_job_exit(#job{}, term(), #state{}) -> ok.
