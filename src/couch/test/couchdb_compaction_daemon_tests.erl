@@ -24,7 +24,7 @@
 start() ->
     Ctx = test_util:start_couch(),
     ok = config:set("compaction_daemon", "check_interval", "3", false),
-    ok = config:set("compaction_daemon", "snooze_period", "0", false),
+    ok = config:set("compaction_daemon", "snooze_period_ms", "0", false),
     ok = config:set("compaction_daemon", "min_file_size", "100000", false),
     ok = config:delete("compactions", "_default", false),
     ok = meck:new(?MODS_TO_MOCK, [passthrough]),
