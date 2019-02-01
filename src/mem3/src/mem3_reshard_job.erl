@@ -29,7 +29,7 @@
    code_change/3,
 
    initial_copy/1,
-   topoff/3,
+   topoff/2,
    copy_local_docs/1,
    wait_source_close/1,
    source_delete/1,
@@ -64,7 +64,6 @@ jobfmt(#job{} = Job) ->
 init([#job{} = Job0]) ->
     process_flag(trap_exit, true),
     Job = Job0#job{
-        target_filters = build_target_filters(Job0#job.targets),
         pid = self(),
         time_started = mem3_reshard:now_sec(),
         workers = [],
@@ -330,16 +329,16 @@ create_artificial_mem3_rep_checkpoints(#job{} = Job, Seq) ->
     Timestamp = list_to_binary(mem3_util:iso8601_timestamp()),
     couch_util:with_db(SourceName, fun(SDb) ->
         [couch_util:with_db(TName, fun(TDb) ->
-            Doc = mem3_rep_checkpoint_doc(SDb, TDb, Filter, Timestamp, Seq),
+            Doc = mem3_rep_checkpoint_doc(SDb, TDb, Timestamp, Seq),
             {ok, _} = couch_db:update_doc(SDb, Doc, []),
             {ok, _} = couch_db:update_doc(TDb, Doc, []),
             ok
-        end) || {TName, Filter} <- lists:zip(TNames, Job#job.target_filters)]
+        end) || TName <- TNames]
     end),
     ok.
 
 
-mem3_rep_checkpoint_doc(SourceDb, TargetDb, Filter, Timestamp, Seq) ->
+mem3_rep_checkpoint_doc(SourceDb, TargetDb, Timestamp, Seq) ->
     Node = atom_to_binary(node(), utf8),
     SourceUUID =  couch_db:get_uuid(SourceDb),
     TargetUUID = couch_db:get_uuid(TargetDb),
@@ -357,45 +356,29 @@ mem3_rep_checkpoint_doc(SourceDb, TargetDb, Filter, Timestamp, Seq) ->
         {<<"target_uuid">>, TargetUUID},
         {<<"history">>, {[{Node, [History]}]}}
     ]},
-    Id = mem3_rep:make_local_id(SourceUUID, TargetUUID, Filter),
+    Id = mem3_rep:make_local_id(SourceUUID, TargetUUID),
     #doc{id = Id, body = Body}.
 
 
 do_state_topoff(#job{} = Job) ->
-    #job{source = Source, targets = Targets, target_filters = Filters} = Job,
-    TZip = lists:zip(Targets, Filters),
-    Pids = [spawn_link(?MODULE, topoff, [Source, T, F]) ||  {T, F} <- TZip],
-    {ok, report(Job#job{workers = Pids})}.
+    #job{source = Source, targets = Targets} = Job,
+    Pid = spawn_link(?MODULE, topoff, [Source, Targets]),
+    {ok, report(Job#job{workers = [Pid]})}.
 
 
--spec build_target_filters([#shard{}]) -> fun().
-build_target_filters(Targets) when is_list(Targets) ->
-    lists:map(fun(#shard{range = [Begin, End]}) ->
-        fun(#full_doc_info{id = DocId}) ->
-            HashKey = mem3_util:hash(DocId),
-            if
-                Begin =< HashKey andalso HashKey =< End -> keep;
-                true -> discard
-            end
-        end
-   end, Targets).
-
-
--spec topoff(#shard{}, #shard{}, fun()) -> ok | no_return().
-topoff(#shard{} = Source, #shard{} = Target, Filter) ->
-    couch_log:notice("~p topoff starting ~p", [?MODULE, shardsstr(Source, Target)]),
-    Opts =  [{filter, Filter}, {batch_size, 2000}, {batch_count, all}],
-    % Using a targets map here in order to avoid mem3_rep attempt to load
-    % all target shards from the shard map, as target shards are not in the
-    % shard map yet.
-    case mem3_rep:go(Source, #{undefined => Target}, Opts) of
+-spec topoff(#shard{}, [#shard{}]) -> ok | no_return().
+topoff(#shard{} = Source, Targets) ->
+    couch_log:notice("~p topoff starting ~p", [?MODULE, shardsstr(Source, Targets)]),
+    TMap = maps:from_list([{R, T} || #shard{range = R} = T <- Targets]),
+    Opts =  [{batch_size, 2000}, {batch_count, all}],
+    case mem3_rep:go(Source, TMap, Opts) of
         {ok, Count} ->
-            Args = [?MODULE, shardsstr(Source, Target), Count],
-            couch_log:notice("~p topoff done ~s count: ~p", Args),
+            Args = [?MODULE, shardsstr(Source, Targets), Count],
+            couch_log:notice("~p topoff done ~s, count: ~p", Args),
             ok;
         {error, Error} ->
-            Args = [?MODULE, shardsstr(Source, Target), Error],
-            couch_log:error("~p topoff ~s failed: ~p", Args),
+            Args = [?MODULE, shardsstr(Source, Targets), Error],
+            couch_log:error("~p topoff failed ~s, error: ~p", Args),
             exit({error, Error})
     end.
 
