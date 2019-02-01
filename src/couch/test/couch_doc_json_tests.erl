@@ -270,6 +270,12 @@ from_json_error_cases() ->
             "Revision ids must be strings."
         },
         {
+            {[{<<"_revisions">>, {[{<<"start">>, 0},
+                {<<"ids">>, [<<"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">>]}]}}]},
+            {doc_validation, "RevId isn't a valid hexadecimal"},
+            "Revision ids must be a valid hex."
+        },
+        {
             {[{<<"_something">>, 5}]},
             {doc_validation, <<"Bad special document member: _something">>},
             "Underscore prefix fields are reserved."
