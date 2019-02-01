@@ -127,13 +127,14 @@ create_jobs(Node, Shard, Db, Range, split) ->
 pick_shards(undefined, undefined, Db, undefined) ->
     mem3:shards(Db);
 
-pick_shards(Node, undefined, Db, undefined) when is_atom(Node) ->
+pick_shards(Node, undefined, Db, undefined) when is_atom(Node), is_binary(Db) ->
     [S || S <- mem3:shards(Db), mem3:node(S) == Node];
 
-pick_shards(undefined, undefined, Db, [_B, _E] = Range) ->
+pick_shards(undefined, undefined, Db, [_B, _E] = Range) when  is_binary(Db) ->
     [S || S <- mem3:shards(Db), mem3:range(S) == Range];
 
-pick_shards(Node, undefined, Db, [_B, _E] = Range) when is_atom(Node) ->
+pick_shards(Node, undefined, Db, [_B, _E] = Range) when is_atom(Node),
+        is_binary(Db) ->
     [S || S <- mem3:shards(Db), mem3:node(S) == Node, mem3:range(S) == Range];
 
 pick_shards(undefined, Shard, undefined, undefined) when is_binary(Shard) ->

@@ -103,8 +103,12 @@ handle_cast(Cast, Job) ->
     {noreply, Job}.
 
 
+handle_info(retry, #job{split_state = initial_copy} = Job) ->
+    % For initial copy before retrying make sure to reset the targets
+    % as initial copy works from newly created copy every time
+    handle_cast(do_state, reset_targets(Job));
+
 handle_info(retry, #job{} = Job) ->
-    couch_log:notice("~p retry timer expired ~p", [?MODULE, jobfmt(Job)]),
     handle_cast(do_state, Job);
 
 handle_info({'EXIT', Pid, Reason}, #job{workers = Workers} = Job) ->
