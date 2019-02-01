@@ -379,7 +379,7 @@ handle_garbage_collect_cast_test() ->
     ?assertEqual({noreply, []}, handle_cast(garbage_collect, [])),
     receive
         {'DOWN', TracerRef, _, _, Msg} -> ?assertEqual(gc_start, Msg)
-    after 1000 ->
+    after 10000 ->
         erlang:error({assertion_failed, [{module, ?MODULE}, {line, ?LINE},
             {expected, gc_start}, {reason, timeout}]})
     end.
