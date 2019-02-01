@@ -508,7 +508,7 @@ reset_targets(#job{source = Source, targets = Targets} = Job) ->
             {true, false} ->
                 LogMsg = "~p : ~p resetting ~p target when recovering",
                 couch_log:warning(LogMsg, [?MODULE, jobfmt(Job), Name]),
-                ok = couch_server:delete(Name, [?ADMIN_CTX]);
+                ok = couch_db_split:cleanup_target(Source#shard.name, Name);
             {false, false} ->
                 ok
         end

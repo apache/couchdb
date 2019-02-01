@@ -15,7 +15,8 @@
 
 -export([
     split/3,
-    copy_local_docs/3
+    copy_local_docs/3,
+    cleanup_target/2
 ]).
 
 
@@ -95,6 +96,15 @@ copy_local_docs(Source, #{} = Targets0, PickFun) when
                 T#target{db = undefined}
             end, Targets)
         end
+    after
+        couch_db:close(SourceDb)
+    end.
+
+
+cleanup_target(Source, Target) when is_binary(Source), is_binary(Target) ->
+    {ok, SourceDb} = couch_db:open_int(Source, [?ADMIN_CTX]),
+    try
+        delete_target(Target, get_engine(SourceDb))
     after
         couch_db:close(SourceDb)
     end.

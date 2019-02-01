@@ -218,7 +218,7 @@ job_from_ejson({Props}) ->
 state_to_ejson_props(#state{} = State) ->
     [
         {state, atom_to_binary(State#state.state, utf8)},
-        {state_info, state_info_to_ejson(State#job.state_info)},
+        {state_info, state_info_to_ejson(State#state.state_info)},
         {time_updated, State#state.time_updated},
         {node, atom_to_binary(State#state.node, utf8)}
     ].
