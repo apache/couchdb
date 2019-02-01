@@ -44,7 +44,6 @@ source(#shard{name = Name}) ->
 -spec targets(#shard{}, [#shard{}]) -> ok | {error, term()}.
 targets(#shard{} = Source, Targets) ->
     first_error([
-        targets_do_not_exist(Targets),
         target_ranges(Source, Targets)
    ]).
 
@@ -75,19 +74,6 @@ check_node(#shard{node = Node}) when Node =:= node() ->
 
 check_node(#shard{node = Node}) ->
     {error, {source_shard_node_is_not_current_node, Node}}.
-
-
--spec targets_do_not_exist([#shard{}]) -> ok | {error, term()}.
-targets_do_not_exist([]) ->
-    ok;
-
-targets_do_not_exist([#shard{name = Name} | Rest]) ->
-    case couch_server:exists(Name) of
-        true ->
-            {error, {target_shard_already_exists, Name}};
-        false ->
-            targets_do_not_exist(Rest)
-    end.
 
 
 -spec target_ranges(#shard{}, [#shard{}]) -> ok | {error, any()}.

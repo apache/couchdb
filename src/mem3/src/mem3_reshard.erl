@@ -15,7 +15,7 @@
 -behaviour(gen_server).
 
 -export([
-   start_job/1,
+   start_split_job/1,
    remove_job/1,
    stop_job/2,
    resume_job/1,
@@ -48,28 +48,29 @@
 -define(JOB_ID_VERSION, 1).
 -define(JOB_STATE_VERSION, 1).
 -define(DEFAULT_MAX_JOBS, 25).
--define(JOB_PREFIX, <<"shard-split-job-">>).
--define(STATE_PREFIX, <<"shard-split-state-">>).
+-define(JOB_PREFIX, <<"reshard-job-">>).
+-define(STATE_PREFIX, <<"reshard-state-">>).
 
 
 %% Public API
 
--spec start_job(#shard{} | binary()) -> {ok, binary()} | {error, term()}.
-start_job(#shard{} = Shard) ->
-    start_job(Shard, 2);
+-spec start_split_job(#shard{} | binary()) -> {ok, binary()} | {error, term()}.
+start_split_job(#shard{} = Shard) ->
+    start_split_job(Shard, 2);
 
-start_job(<<"shards/", _:8/binary,"-", _:8/binary, "/", _/binary>> = Name) ->
-    start_job(shard_from_name(Name), 2).
+start_split_job(ShardName) when is_binary(ShardName) ->
+    start_split_job(shard_from_name(ShardName), 2).
 
 
--spec start_job(#shard{}, split()) -> {ok, binary()} | {error, any()}.
-start_job(#shard{} = Source, Split) ->
+-spec start_split_job(#shard{}, split()) -> {ok, binary()} | {error, any()}.
+start_split_job(#shard{} = Source, Split) ->
     case mem3_reshard_validate:start_args(Source, Split) of
         ok ->
             Targets = target_shards(Source, Split),
             case mem3_reshard_validate:targets(Source, Targets) of
                 ok ->
                     Job = #job{
+                        type = split,
                         job_state = new,
                         split_state = new,
                         time_created = now_sec(),
@@ -77,7 +78,8 @@ start_job(#shard{} = Source, Split) ->
                         source = Source,
                         targets = Targets
                    },
-                   gen_server:call(?MODULE, {start_job, set_job_id(Job)}, infinity);
+                   Job1 = Job#job{id = job_id(Job)},
+                   gen_server:call(?MODULE, {start_job, Job1}, infinity);
                 {error, Error} ->
                     {error, Error}
             end;
@@ -571,12 +573,13 @@ state_id() ->
     <<?STATE_PREFIX/binary, Ver/binary>>.
 
 
--spec set_job_id(#job{}) -> #job{}.
-set_job_id(#job{source = #shard{name = SourceName}} = Job) ->
-    IdHashList = couch_util:to_hex(crypto:hash(sha256, SourceName)),
+-spec job_id(#job{}) -> binary().
+job_id(#job{source = #shard{name = SourceName}}) ->
+    HashInput = [SourceName, atom_to_binary(node(), utf8)],
+    IdHashList = couch_util:to_hex(crypto:hash(sha256, HashInput)),
     IdHash = iolist_to_binary(IdHashList),
     Prefix = iolist_to_binary(io_lib:format("~3..0B", [?JOB_ID_VERSION])),
-    Job#job{id = <<Prefix/binary, "-", IdHash/binary>>}.
+    <<Prefix/binary, "-", IdHash/binary>>.
 
 
 -spec target_shards(#shard{}, split()) -> [#shard{}].

@@ -16,6 +16,7 @@
 -type range_pos() :: non_neg_integer().
 -type split() :: pos_integer().  % also power of 2
 -type job_id() :: binary() | undefined.
+-type job_type() :: split.
 
 -type shard_split_main_state() ::
     running |
@@ -35,12 +36,16 @@
     build_indices |
     topoff2 |
     copy_local_docs |
-    update_shardmap1 |
+    update_shardmap |
+    wait_source_close |
+    topoff3 |
+    source_delete |
     completed.
 
 
 -record(job, {
     id :: job_id() | '$1' | '_',
+    type :: job_type(),
     source :: #shard{},
     targets :: [#shard{}],
     job_state :: job_state(),

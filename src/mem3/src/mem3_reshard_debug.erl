@@ -33,7 +33,7 @@
 trace_enable() ->
     dbg:stop_clear(),
     dbg:tracer(),
-    %trace_funs(mem3_reshard, [start_job, init, spawn_job, report, checkpoint]),
+    %trace_funs(mem3_reshard, [start_split_job, init, spawn_job, report, checkpoint]),
     trace_funs(mem3_reshard_index, [design_docs, target_indices, indices]),
     %%trace_funs(mem3_reshard_job, [init, terminate, next_state, retry_state]),
     %% dbg:tpl(mem3_rep, find_missing_revs, [{
@@ -83,7 +83,7 @@ start_test_job(DbName) ->
     end),
     %trace_enable(),
     %io:fread("Press key when ready to start job...", ""),
-    Res = mem3_reshard:start_job(ShardName),
+    Res = mem3_reshard:start_split_job(ShardName),
     io:format("Job started:~p. Waiting for update_shardmap1 state ~n", [Res]),
     state_wait(completed, 180000),
     io:format("Job completed, adding extra documents ~n", []),

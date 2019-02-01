@@ -176,11 +176,12 @@ load_doc(Db, DocId) ->
 job_to_ejson_props(#job{source = Source, targets = Targets} = Job) ->
     [
         {id, Job#job.id},
+        {type, Job#job.type},
         {source, Source#shard.name},
         {targets, [T#shard.name || T <- Targets]},
         {job_state, Job#job.job_state},
         {split_state, Job#job.split_state},
-        {state_info, {Job#job.state_info}},
+        {state_info, state_info_to_ejson(Job#job.state_info)},
         {node, atom_to_binary(Job#job.node, utf8)},
         {time_created, Job#job.time_created},
         {time_started, Job#job.time_started},
@@ -190,6 +191,7 @@ job_to_ejson_props(#job{source = Source, targets = Targets} = Job) ->
 
 job_from_ejson({Props}) ->
     Id = couch_util:get_value(<<"id">>, Props),
+    Type = couch_util:get_value(<<"type">>, Props),
     Source = couch_util:get_value(<<"source">>, Props),
     Targets = couch_util:get_value(<<"targets">>, Props),
     JobState = couch_util:get_value(<<"job_state">>, Props),
@@ -200,6 +202,7 @@ job_from_ejson({Props}) ->
     TUpdated = couch_util:get_value(<<"time_updated">>, Props),
     #job{
         id = Id,
+        type = binary_to_atom(Type, utf8),
         job_state = binary_to_atom(JobState, utf8),
         split_state = binary_to_atom(SplitState, utf8),
         state_info = state_info_from_ejson(StateInfo),
@@ -215,7 +218,7 @@ job_from_ejson({Props}) ->
 state_to_ejson_props(#state{} = State) ->
     [
         {state, atom_to_binary(State#state.state, utf8)},
-        {state_info, {State#state.state_info}},
+        {state_info, state_info_to_ejson(State#job.state_info)},
         {time_updated, State#state.time_updated},
         {node, atom_to_binary(State#state.node, utf8)}
     ].
@@ -234,8 +237,13 @@ state_from_ejson(#state{} = State, {Props}) ->
 
 
 state_info_from_ejson({Props}) ->
-    Props1 = [{binary_to_atom(K, utf8), V} || {K, V} <- Props],
+    Props1 = [{binary_to_atom(K, utf8), couch_util:to_binary(V)}
+        || {K, V} <- Props],
     lists:sort(Props1).
+
+
+state_info_to_ejson(Props) ->
+    {lists:sort([{K, couch_util:to_binary(V)} || {K, V} <- Props])}.
 
 
 store_state() ->

@@ -76,7 +76,7 @@ init([#job{} = Job0]) ->
 
 
 terminate(Reason, Job) ->
-    couch_log:notice("~p terminate ~p ~s", [?MODULE, Reason, jobfmt(Job)]),
+    couch_log:notice("~p terminate ~p ~p", [?MODULE, Reason, jobfmt(Job)]),
     ok.
 
 
@@ -141,10 +141,12 @@ next_state(State, [_ | Rest]) ->
 
 -spec maybe_recover(#job{}) -> #job{} | no_return().
 maybe_recover(#job{split_state = new} = Job) ->
-    switch_state(Job, initial_copy);
+    Job1 = reset_targets(Job),
+    switch_state(Job1, initial_copy);
 
 maybe_recover(#job{split_state = initial_copy} = Job) ->
-    switch_state(Job, initial_copy);
+    Job1 = reset_targets(Job),
+    switch_state(Job1, initial_copy);
 
 maybe_recover(#job{split_state = topoff1} = Job) ->
     switch_state(Job, topoff1);
@@ -491,3 +493,24 @@ shardsstr(#shard{name = SourceName}, Targets) ->
     TNames = [TN || #shard{name = TN} <- Targets],
     TargetsStr = string:join([binary_to_list(T) || T <- TNames], ","),
     lists:flatten(io_lib:format("~s -> ~s", [SourceName, TargetsStr])).
+
+
+-spec reset_targets(#job{}) -> #job{}.
+reset_targets(#job{source = Source, targets = Targets} = Job) ->
+    ShardNames = [N || #shard{name = N} <- mem3:shards(mem3:dbname(Source))],
+    lists:map(fun(#shard{name = Name}) ->
+        case {couch_server:exists(Name), lists:member(Name, ShardNames)} of
+            {_, true} ->
+                % Should never get here but if we do crash and don't continue
+                LogMsg = "~p : ~p target unexpectedly found in shard map ~p",
+                couch_log:error(LogMsg, [?MODULE, jobfmt(Job), Name]),
+                erlang:error({target_present_in_shard_map, Name});
+            {true, false} ->
+                LogMsg = "~p : ~p resetting ~p target when recovering",
+                couch_log:warning(LogMsg, [?MODULE, jobfmt(Job), Name]),
+                ok = couch_server:delete(Name, [?ADMIN_CTX]);
+            {false, false} ->
+                ok
+        end
+    end, Targets),
+    Job.
