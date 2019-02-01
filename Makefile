@@ -76,7 +76,6 @@ COMPILE_OPTS=$(shell echo "\
 	apps=$(apps) \
 	" | sed -e 's/[a-z_]\{1,\}= / /g')
 EUNIT_OPTS=$(shell echo "\
-	apps=$(apps) \
 	skip_deps=$(skip_deps) \
 	suites=$(suites) \
 	tests=$(tests) \
@@ -154,13 +153,21 @@ check: all
 
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
+
+ifdef apps
+subdirs = $(apps)
+else
+subdirs=$(shell ls src)
+endif
+
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
-
+	@for dir in $(subdirs); do \
+	  $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir; \
+	done
 
 setup-eunit: export BUILDDIR = $(shell pwd)
 setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
