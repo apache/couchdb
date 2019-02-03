@@ -54,6 +54,8 @@ handle_req_int(#httpd{path_parts=[_, <<"_explain">> | _]} = Req, Db) ->
     handle_explain_req(Req, Db);
 handle_req_int(#httpd{path_parts=[_, <<"_find">> | _]} = Req, Db) ->
     handle_find_req(Req, Db);
+handle_req_int(#httpd{path_parts=[_, <<"_update">> | _]} = Req, Db) ->
+    handle_update_req(Req, Db);
 handle_req_int(_, _) ->
     throw({not_found, missing}).
 
@@ -189,6 +191,34 @@ handle_find_req(#httpd{method='POST'}=Req, Db) ->
 
 handle_find_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
+
+
+handle_update_req(#httpd{method='GET'}=Req, Db) ->
+    % TODO retrieve vdus
+    ok.
+
+handle_update_req(#httpd{method='POST'}=Req, Db) ->
+    % submit a doc for validation
+    chttpd:validate_ctype(Req, "application/json"),
+    Doc = chttpd:json_body_obj(Req),
+    case mango_opts:validate_update(Req, Db, Doc) of
+        ok ->
+            couch_db:update_doc(Db, Doc, []),
+            chttpd:send_json(Req, 201, {[{ok, true}]});
+        {error, Message} ->
+            chttpd:send_error(Req, 400, <<"bad_request">>, Message)
+    end;
+
+handle_update_req(#httpd{method='PUT'}=Req, Db) ->
+    % TODO add new vdu
+    ok.
+
+handle_update_req(#httpd{method='DELETE'}=Req, Db) ->
+    % TODO delete a vdu
+    ok.
+
+handle_update_req(Req, _Db) ->
+    chttpd:send_method_not_allowed(Req, "GET,PUT,POST,DELETE").
 
 
 set_user_ctx(#httpd{user_ctx=Ctx}, Db) ->
