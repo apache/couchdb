@@ -45,8 +45,8 @@ handle_reshard_req(#httpd{path_parts=[_]} = Req) ->
 %
 handle_reshard_req(#httpd{method='GET',
         path_parts=[_, ?STATE]} = Req) ->
-    State = mem3_reshard_httpd_util:get_shard_splitting_state(),
-    send_json(Req, {[{state, State}]});
+    {State, Reason} = mem3_reshard_httpd_util:get_shard_splitting_state(),
+    send_json(Req, {[{state, State}, {reason, Reason}]});
 
 % PUT /_reshard/state
 %
@@ -129,6 +129,9 @@ handle_reshard_req(#httpd{method = 'POST',
 
 handle_reshard_req(#httpd{path_parts=[_, ?JOBS]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
+
+handle_reshard_req(#httpd{path_parts=[_, _]} = Req) ->
+    throw(not_found);
 
 
 % GET /_reshard/jobs/$jobid

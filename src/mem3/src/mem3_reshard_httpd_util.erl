@@ -205,33 +205,55 @@ get_summary() ->
     {Replies, _Bad} = rpc:multicall(Nodes, mem3_reshard, get_state, []),
     Stats0 = #{running => 0, total => 0, completed => 0, failed => 0,
         stopped => 0},
-    {Stats, States} = lists:foldl(fun({Res}, {Stats, States}) ->
-       Stats1 = maps:map(fun(Stat, OldVal) ->
+    StatsF = lists:foldl(fun({Res}, Stats) ->
+       maps:map(fun(Stat, OldVal) ->
            OldVal + couch_util:get_value(Stat, Res, 0)
-       end, Stats),
-       NewStates = [couch_util:get_value(state, Res) | States],
-       {Stats1, NewStates}
-    end, {Stats0, []}, Replies),
-    State = case lists:member(<<"running">>, States) of
-        true -> running;
-        false -> stopped
-    end,
-    {[{state, State}] ++ lists:sort(maps:to_list(Stats))}.
+       end, Stats)
+    end, Stats0, Replies),
+    {State, Reason} = state_and_reason(Replies),
+    {[{state, State}, {state_reason, Reason}] ++ lists:sort(maps:to_list(StatsF))}.
 
 
 get_shard_splitting_state() ->
     Nodes = mem3_util:live_nodes(),
     {Replies, _Bad} = rpc:multicall(Nodes, mem3_reshard, get_state, []),
-    Running = lists:foldl(fun({Res}, R) ->
-       case couch_util:get_value(state, Res) of
-           <<"running">> -> R + 1;
-           _ -> R
+    state_and_reason(Replies).
+
+
+state_and_reason(StateReplies) ->
+    AccF = lists:foldl(fun({ResProps}, Acc) ->
+       Reason = get_reason(ResProps),
+       case couch_util:get_value(state, ResProps) of
+           <<"running">> -> orddict:append(running, Reason, Acc);
+           <<"stopped">> -> orddict:append(stopped, Reason, Acc);
+           undefined -> Acc
        end
-    end, 0, Replies),
-    % If at least one node is "running", then overall state is "running"
-    case Running > 0 of
-        true -> running;
-        false -> stopped
+    end, orddict:from_list([{running, []}, {stopped, []}]), StateReplies),
+    Running = orddict:fetch(running, AccF),
+    case length(Running) > 0 of
+        true ->
+            Reason = pick_reason(Running),
+            {running, Reason};
+        false ->
+            Reason = pick_reason(orddict:fetch(stopped, AccF)),
+            {stopped, Reason}
+    end.
+
+
+pick_reason(Reasons) ->
+    Reasons1 = lists:usort(Reasons),
+    Reasons2 = [R || R <- Reasons1, R =/= undefined],
+    case Reasons2 of
+        [] -> null;
+        [R1 | _] -> R1
+    end.
+
+
+get_reason(StateProps) when is_list(StateProps) ->
+    case couch_util:get_value(state_info, StateProps) of
+        [] -> undefined;
+        undefined -> undefined;
+        {SInfoProps} -> couch_util:get_value(reason, SInfoProps)
     end.
 
 

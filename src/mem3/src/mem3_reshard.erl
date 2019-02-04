@@ -187,7 +187,7 @@ handle_call(start, _From, #state{state = stopped} = State) ->
     State1 = State#state{
         state = running,
         time_updated = now_sec(),
-        state_info = info_update(reason, <<"Restarted">>, State#state.state_info)
+        state_info = info_delete(reason, State#state.state_info)
     },
     ok = mem3_reshard_store:store_state(State1),
     State2 = reload_jobs(State1),
