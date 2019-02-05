@@ -282,7 +282,13 @@ handle_partition_req(#httpd{path_parts=[DbName, _, PartId | Rest]}=Req, Db) ->
         true ->
             couch_partition:validate_partition(PartId),
             QS = chttpd:qs(Req),
-            NewQS = lists:ukeysort(1, [{"partition", ?b2l(PartId)} | QS]),
+            PartIdStr = ?b2l(PartId),
+            QSPartIdStr = couch_util:get_value("partition", QS, PartIdStr),
+            if QSPartIdStr == PartIdStr -> ok; true ->
+                Msg = <<"Conflicting value for `partition` in query string">>,
+                throw({bad_request, Msg})
+            end,
+            NewQS = lists:ukeysort(1, [{"partition", PartIdStr} | QS]),
             NewReq = Req#httpd{
                 path_parts = [DbName | Rest],
                 qs = NewQS

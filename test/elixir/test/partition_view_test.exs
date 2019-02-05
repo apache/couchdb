@@ -106,6 +106,16 @@ defmodule ViewPartitionTest do
     assert Enum.dedup(partitions) == ["bar"]
   end
 
+  test "conflicting partitions in path and query string rejected", context do
+    db_name = context[:db_name]
+
+    url = "/#{db_name}/_partition/foo/_design/map/_view/some"
+    resp = Couch.get(url, query: %{partition: "bar"})
+    assert resp.status_code == 400
+    %{:body => %{"reason" => reason}} = resp
+    assert Regex.match?(~r/Conflicting value/, reason)
+  end
+
   test "query will return zero results for wrong inputs", context do
     db_name = context[:db_name]
 
