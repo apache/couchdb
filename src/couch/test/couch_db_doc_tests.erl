@@ -42,7 +42,8 @@ couch_db_doc_test_() ->
                 foreach,
                 fun setup/0, fun teardown/1,
                 [
-                    fun should_truncate_number_of_revisions/1
+                    fun should_truncate_number_of_revisions/1,
+                    fun should_raise_bad_request_on_invalid_rev/1
                 ]
             }
         }
@@ -57,6 +58,24 @@ should_truncate_number_of_revisions(DbName) ->
     Rev10 = add_revisions(Db, DocId, Rev, 10),
     {ok, [{ok, #doc{revs = {11, Revs}}}]} = open_doc_rev(Db, DocId, Rev10),
     ?_assertEqual(5, length(Revs)).
+
+
+should_raise_bad_request_on_invalid_rev(DbName) ->
+    DocId = <<"foo">>,
+    InvalidRev1 = <<"foo">>,
+    InvalidRev2 = <<"a-foo">>,
+    InvalidRev3 = <<"1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">>,
+    Expect = {bad_request, <<"Invalid rev format">>},
+    Db = open_db(DbName),
+    create_doc(Db, DocId),
+    [
+        {InvalidRev1,
+        ?_assertThrow(Expect, add_revisions(Db, DocId, InvalidRev1, 1))},
+        {InvalidRev2,
+        ?_assertThrow(Expect, add_revisions(Db, DocId, InvalidRev2, 1))},
+        {InvalidRev3,
+        ?_assertThrow(Expect, add_revisions(Db, DocId, InvalidRev3, 1))}
+    ].
 
 
 open_db(DbName) ->

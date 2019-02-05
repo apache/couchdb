@@ -179,12 +179,12 @@ parse_rev(Rev) when is_list(Rev) ->
     SplitRev = lists:splitwith(fun($-) -> false; (_) -> true end, Rev),
     case SplitRev of
         {Pos, [$- | RevId]} ->
-            IntPos = try list_to_integer(Pos) of
-                Val -> Val
+            try
+                IntPos = list_to_integer(Pos),
+                {IntPos, parse_revid(RevId)}
             catch
                 error:badarg -> throw({bad_request, <<"Invalid rev format">>})
-            end,
-            {IntPos, parse_revid(RevId)};
+            end;
         _Else -> throw({bad_request, <<"Invalid rev format">>})
     end;
 parse_rev(_BadRev) ->
@@ -275,9 +275,16 @@ transfer_fields([{<<"_revisions">>, {Props}} | Rest], Doc, DbName) ->
     true ->
         ok
     end,
-    [throw({doc_validation, "RevId isn't a string"}) ||
-            RevId <- RevIds, not is_binary(RevId)],
-    RevIds2 = [parse_revid(RevId) || RevId <- RevIds],
+    RevIds2 = lists:map(fun(RevId) ->
+        try
+            parse_revid(RevId)
+        catch
+            error:function_clause ->
+                throw({doc_validation, "RevId isn't a string"});
+            error:badarg ->
+                throw({doc_validation, "RevId isn't a valid hexadecimal"})
+        end
+    end, RevIds),
     transfer_fields(Rest, Doc#doc{revs={Start, RevIds2}}, DbName);
 
 transfer_fields([{<<"_deleted">>, B} | Rest], Doc, DbName) when is_boolean(B) ->

@@ -270,6 +270,12 @@ from_json_error_cases() ->
             "Revision ids must be strings."
         },
         {
+            {[{<<"_revisions">>, {[{<<"start">>, 0},
+                {<<"ids">>, [<<"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">>]}]}}]},
+            {doc_validation, "RevId isn't a valid hexadecimal"},
+            "Revision ids must be a valid hex."
+        },
+        {
             {[{<<"_something">>, 5}]},
             {doc_validation, <<"Bad special document member: _something">>},
             "Underscore prefix fields are reserved."
@@ -288,18 +294,14 @@ from_json_error_cases() ->
 
     lists:map(fun
         ({Fun, Expect, Msg}) when is_function(Fun, 0) ->
-            Error = (catch couch_doc:from_json_obj_validate(Fun())),
-            {Msg, ?_assertMatch(Expect, Error)};
+            {Msg,
+            ?_assertThrow(Expect, couch_doc:from_json_obj_validate(Fun()))};
         ({EJson, Expect, Msg}) ->
-            Error = (catch couch_doc:from_json_obj_validate(EJson)),
-            {Msg, ?_assertMatch(Expect, Error)};
+            {Msg,
+            ?_assertThrow(Expect, couch_doc:from_json_obj_validate(EJson))};
         ({EJson, Msg}) ->
-            try
-                couch_doc:from_json_obj_validate(EJson),
-                {"Conversion failed to raise an exception", ?_assert(false)}
-            catch
-                _:_ -> {Msg, ?_assert(true)}
-            end
+            {Msg,
+            ?_assertThrow(_, couch_doc:from_json_obj_validate(EJson))}
     end, Cases).
 
 from_json_with_dbname_error_cases() ->
