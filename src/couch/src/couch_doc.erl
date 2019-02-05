@@ -179,12 +179,12 @@ parse_rev(Rev) when is_list(Rev) ->
     SplitRev = lists:splitwith(fun($-) -> false; (_) -> true end, Rev),
     case SplitRev of
         {Pos, [$- | RevId]} ->
-            IntPos = try list_to_integer(Pos) of
-                Val -> Val
+            try
+                IntPos = list_to_integer(Pos),
+                {IntPos, parse_revid(RevId)}
             catch
                 error:badarg -> throw({bad_request, <<"Invalid rev format">>})
-            end,
-            {IntPos, parse_revid(RevId)};
+            end;
         _Else -> throw({bad_request, <<"Invalid rev format">>})
     end;
 parse_rev(_BadRev) ->
