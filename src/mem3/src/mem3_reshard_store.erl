@@ -257,10 +257,10 @@ state_info_from_ejson({Props}) ->
 
 
 history_to_ejson(Hist, true) when is_list(Hist) ->
-    [{[{timestamp, iso8601(T)}, {type, S}, {detail, D}]} || {S, D, T} <- Hist];
+    [{[{timestamp, iso8601(T)}, {type, S}, {detail, D}]} || {T, S, D} <- Hist];
 
 history_to_ejson(Hist, _) when is_list(Hist) ->
-    [{[{timestamp, T}, {type, S}, {detail, D}]} || {S, D, T} <- Hist].
+    [{[{timestamp, T}, {type, S}, {detail, D}]} || {T, S, D} <- Hist].
 
 
 history_from_ejson(HistoryEJson) when is_list(HistoryEJson) ->

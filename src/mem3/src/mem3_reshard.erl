@@ -756,20 +756,20 @@ update_history(State, Detail, Ts, History) ->
     TrimmedRev = lists:sublist(UpdatedRev, max_history()),
     lists:reverse(TrimmedRev).
 
-update_history_rev(State, null, Ts, [{State, Detail, _} | Rest]) ->
+update_history_rev(State, null, Ts, [{_, State, Detail} | Rest]) ->
     % Just updated the detail, state stays the same, no new entry added
-    [{State, Detail, Ts} | Rest];
+    [{Ts, State, Detail} | Rest];
 
-update_history_rev(State, Detail, Ts, [{State, Detail, _} | Rest]) ->
+update_history_rev(State, Detail, Ts, [{_, State, Detail} | Rest]) ->
     % State and detail were same as last event, just update the timestamp
-    [{State, Detail, Ts} | Rest];
+    [{Ts, State, Detail} | Rest];
 
-update_history_rev(State, Detail, Ts, [{State, Detail, _} | Rest]) ->
+update_history_rev(State, Detail, Ts, [{_, State, Detail} | Rest]) ->
     % State and detail were same as last event, just update the timestamp
-    [{State, Detail, Ts} | Rest];
+    [{Ts, State, Detail} | Rest];
 
 update_history_rev(State, Detail, Ts, History) ->
-    [{State, Detail, Ts} | History].
+    [{Ts, State, Detail} | History].
 
 
 -spec max_history() -> non_neg_integer().
@@ -778,12 +778,7 @@ max_history() ->
 
 
 -spec statefmt(#state{} | term()) -> string().
-statefmt(#state{} = State) ->
-    #state{
-        state = StateName,
-        update_time = Updated,
-        db_monitor = Pid
-    } = State,
+statefmt(#state{state = StateName, db_monitor = Pid}) ->
     Total = ets:info(?MODULE, size),
     Active = mem3_reshard_job_sup:count_children(),
     Msg = "#state{~s total:~B active:~B mon:~p}",
