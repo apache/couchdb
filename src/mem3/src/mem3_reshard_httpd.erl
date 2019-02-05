@@ -130,7 +130,7 @@ handle_reshard_req(#httpd{method = 'POST',
 handle_reshard_req(#httpd{path_parts=[_, ?JOBS]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
 
-handle_reshard_req(#httpd{path_parts=[_, _]} = Req) ->
+handle_reshard_req(#httpd{path_parts=[_, _]}) ->
     throw(not_found);
 
 

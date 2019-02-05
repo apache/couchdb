@@ -30,7 +30,7 @@
    reset_state/0,
    db_monitor/1,
    now_sec/0,
-   update_history/3,
+   update_history/4,
 
    start_link/0,
 
@@ -76,13 +76,15 @@ start_split_job(#shard{} = Source, Split) ->
                         type = split,
                         job_state = new,
                         split_state = new,
-                        state_history = [{new, TStamp}],
+                        start_time = TStamp,
+                        update_time = TStamp,
                         node = node(),
                         source = Source,
                         targets = Targets
                    },
                    Job1 = Job#job{id = job_id(Job)},
-                   gen_server:call(?MODULE, {start_job, Job1}, infinity);
+                   Job2 = update_job_history(Job1),
+                   gen_server:call(?MODULE, {start_job, Job2}, infinity);
                 {error, Error} ->
                     {error, Error}
             end;
@@ -170,7 +172,7 @@ init(_) ->
     State = #state{
         state = running,
         state_info = [],
-        time_updated = now_sec(),
+        update_time = now_sec(),
         node = node(),
         db_monitor = spawn_link(?MODULE, db_monitor, [self()])
     },
@@ -191,7 +193,7 @@ terminate(Reason, State) ->
 handle_call(start, _From, #state{state = stopped} = State) ->
     State1 = State#state{
         state = running,
-        time_updated = now_sec(),
+        update_time = now_sec(),
         state_info = info_delete(reason, State#state.state_info)
     },
     ok = mem3_reshard_store:store_state(State1),
@@ -204,7 +206,7 @@ handle_call(start, _From, State) ->
 handle_call({stop, Reason}, _From, #state{state = running} = State) ->
     State1 = State#state{
         state = stopped,
-        time_updated = now_sec(),
+        update_time = now_sec(),
         state_info = info_update(reason, Reason, State#state.state_info)
     },
     ok = mem3_reshard_store:store_state(State1),
@@ -381,13 +383,13 @@ reload_job(#job{job_state = running} = Job, #state{state = stopped} = State) ->
     OldInfo = Job#job.state_info,
     Job1 = Job#job{
         job_state = stopped,
-        time_updated = now_sec(),
-        time_started = 0,
+        update_time = now_sec(),
+        start_time = 0,
         state_info = info_update(reason, <<"Shard splitting disabled">>, OldInfo),
         pid = undefined,
         ref = undefined
     },
-    true = ets:insert(?MODULE, update_job_state_history(Job1)),
+    true = ets:insert(?MODULE, update_job_history(Job1)),
     State;
 
 % This is a case when a job process should be spawend
@@ -422,7 +424,7 @@ get_start_delay_sec() ->
 start_job_int(Job, State) ->
     case spawn_job(Job) of
         {ok, #job{} = Job1} ->
-            Job2 = update_job_state_history(Job1),
+            Job2 = update_job_history(Job1),
             ok = mem3_reshard_store:store_job(State, Job2),
             true = ets:insert(?MODULE, Job2),
             ok;
@@ -434,8 +436,8 @@ start_job_int(Job, State) ->
 spawn_job(#job{} = Job0) ->
     Job = Job0#job{
         job_state = running,
-        time_started = 0,
-        time_updated = now_sec(),
+        start_time = 0,
+        update_time = now_sec(),
         state_info = info_delete(reason, Job0#job.state_info),
         manager = self(),
         workers = [],
@@ -459,7 +461,7 @@ stop_job_int(#job{} = Job, JobState, Reason, State) ->
     Job1 = kill_job_int(Job),
     Job2 = Job1#job{
         job_state = JobState,
-        time_updated = now_sec(),
+        update_time = now_sec(),
         state_info = [{reason, Reason}]
     },
     ok = mem3_reshard_store:store_job(State, Job2),
@@ -492,10 +494,10 @@ handle_job_exit(#job{split_state = completed} = Job, normal, State) ->
         pid = undefined,
         ref = undefined,
         job_state = completed,
-        time_updated = now_sec(),
+        update_time = now_sec(),
         state_info = []
     },
-    Job2 = update_job_state_history(Job1),
+    Job2 = update_job_history(Job1),
     ok = mem3_reshard_store:store_job(State, Job2),
     true = ets:insert(?MODULE, Job2),
     ok;
@@ -507,10 +509,10 @@ handle_job_exit(#job{job_state = running} = Job, normal, _State) ->
         pid = undefined,
         ref = undefined,
         job_state = stopped,
-        time_updated = now_sec(),
+        update_time = now_sec(),
         state_info = info_update(reason, <<"Job stopped">>, OldInfo)
     },
-    true = ets:insert(?MODULE, update_job_state_history(Job1)),
+    true = ets:insert(?MODULE, update_job_history(Job1)),
     ok;
 
 handle_job_exit(#job{job_state = running} = Job, shutdown, _State) ->
@@ -520,10 +522,10 @@ handle_job_exit(#job{job_state = running} = Job, shutdown, _State) ->
         pid = undefined,
         ref = undefined,
         job_state = stopped,
-        time_updated = now_sec(),
+        update_time = now_sec(),
         state_info = info_update(reason, <<"Job shutdown">>, OldInfo)
     },
-    true = ets:insert(?MODULE, update_job_state_history(Job1)),
+    true = ets:insert(?MODULE, update_job_history(Job1)),
     ok;
 
 handle_job_exit(#job{job_state = running} = Job, {shutdown, Msg},  _State) ->
@@ -533,10 +535,10 @@ handle_job_exit(#job{job_state = running} = Job, {shutdown, Msg},  _State) ->
         pid = undefined,
         ref = undefined,
         job_state = stopped,
-        time_updated = now_sec(),
+        update_time = now_sec(),
         state_info = info_update(reason, <<"Job shutdown">>, OldInfo)
     },
-    true = ets:insert(?MODULE, update_job_state_history(Job1)),
+    true = ets:insert(?MODULE, update_job_history(Job1)),
     ok;
 
 handle_job_exit(#job{} = Job, Error, State) ->
@@ -546,10 +548,10 @@ handle_job_exit(#job{} = Job, Error, State) ->
         pid = undefined,
         ref = undefined,
         job_state = failed,
-        time_updated = now_sec(),
+        update_time = now_sec(),
         state_info = info_update(reason, Error, OldInfo)
     },
-    Job2 = update_job_state_history(Job1),
+    Job2 = update_job_history(Job1),
     ok = mem3_reshard_store:store_job(State, Job2),
     true = ets:insert(?MODULE, Job2),
     ok.
@@ -730,27 +732,44 @@ reset_state(#state{} = State) ->
     end, State, Jobs).
 
 
--spec iso8601(non_neg_integer()) -> string().
-iso8601(UnixSec) ->
-    Base = calendar:datetime_to_gregorian_seconds({{1970, 1, 1}, {0, 0, 0}}),
-    GSec = Base + UnixSec,
-    {{Y, Mon, D}, {H, Min, S}} = calendar:gregorian_seconds_to_datetime(GSec),
-    Format = "~B-~2..0B-~2..0BT~2..0B:~2..0B:~2..0BZ",
-    lists:flatten(io_lib:format(Format, [Y, Mon, D, H, Min, S])).
+-spec update_job_history(#job{}) -> #job{}.
+update_job_history(#job{job_state = St, update_time = Ts} = Job) ->
+    Hist = Job#job.history,
+    Reason = case couch_util:get_value(reason, Job#job.state_info) of
+        undefined -> null;
+        Val -> couch_util:to_binary(Val)
+    end,
+    Job#job{history = update_history(St, Reason, Ts, Hist)}.
 
 
--spec update_job_state_history(#job{}) -> #job{}.
-update_job_state_history(#job{job_state = St, time_updated = Ts} = Job) ->
-    Hist = Job#job.state_history,
-    Job#job{state_history = update_history(St, Ts, Hist)}.
 
+-spec update_history_rev(atom(), binary() | null, time_sec(), list()) -> list().
+update_history(State, State, Ts, History) ->
+    % State is the same as detail. Make the detail null to avoid duplication
+    update_history(State, null, Ts, History);
 
--spec update_history(atom(), time_sec(), list()) -> list().
-update_history(State, Ts, [{State, _} | Rest]) ->
-    lists:sublist([{State, Ts} | Rest], max_history());
+update_history(State, Detail, Ts, History) ->
+    % Reverse, so we can process the last event as the head using
+    % head matches, then after append and trimming, reserse again
+    Rev = lists:reverse(History),
+    UpdatedRev = update_history_rev(State, Detail, Ts, Rev),
+    TrimmedRev = lists:sublist(UpdatedRev, max_history()),
+    lists:reverse(TrimmedRev).
 
-update_history(State, Ts, History) ->
-    lists:sublist([{State, Ts} | History], max_history()).
+update_history_rev(State, null, Ts, [{State, Detail, _} | Rest]) ->
+    % Just updated the detail, state stays the same, no new entry added
+    [{State, Detail, Ts} | Rest];
+
+update_history_rev(State, Detail, Ts, [{State, Detail, _} | Rest]) ->
+    % State and detail were same as last event, just update the timestamp
+    [{State, Detail, Ts} | Rest];
+
+update_history_rev(State, Detail, Ts, [{State, Detail, _} | Rest]) ->
+    % State and detail were same as last event, just update the timestamp
+    [{State, Detail, Ts} | Rest];
+
+update_history_rev(State, Detail, Ts, History) ->
+    [{State, Detail, Ts} | History].
 
 
 -spec max_history() -> non_neg_integer().
@@ -762,14 +781,13 @@ max_history() ->
 statefmt(#state{} = State) ->
     #state{
         state = StateName,
-        time_updated = Updated,
+        update_time = Updated,
         db_monitor = Pid
     } = State,
     Total = ets:info(?MODULE, size),
     Active = mem3_reshard_job_sup:count_children(),
-    UpdatedFmt = iso8601(Updated),
-    Msg = "#state{~s updated:~s total:~B active:~B mon:~p}",
-    Fmt = io_lib:format(Msg, [StateName, UpdatedFmt, Total, Active, Pid]),
+    Msg = "#state{~s total:~B active:~B mon:~p}",
+    Fmt = io_lib:format(Msg, [StateName, Total, Active, Pid]),
     lists:flatten(Fmt);
 
 statefmt(State) ->

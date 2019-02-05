@@ -65,7 +65,7 @@ init([#job{} = Job0]) ->
     process_flag(trap_exit, true),
     Job = Job0#job{
         pid = self(),
-        time_started = mem3_reshard:now_sec(),
+        start_time = mem3_reshard:now_sec(),
         workers = [],
         retries = 0
     },
@@ -202,12 +202,12 @@ switch_state(#job{manager = ManagerPid} = Job0, NewState) ->
     Info2 = info_delete(reason, Info1),
     Job = Job0#job{
         split_state = NewState,
-        time_updated = mem3_reshard:now_sec(),
+        update_time = mem3_reshard:now_sec(),
         retries = 0,
         state_info = Info2,
         workers = []
     },
-    Job1 = update_split_state_history(Job),
+    Job1 = update_split_history(Job),
     ok = mem3_reshard:checkpoint(ManagerPid, check_state(Job1)),
     gen_server:cast(self(), do_state),
     Job1.
@@ -273,7 +273,7 @@ maybe_retry(#job{} = Job, _, Error) ->
 
 -spec report(#job{}) -> #job{}.
 report(#job{manager = ManagerPid} = Job) ->
-    Job1 = Job#job{time_updated = mem3_reshard:now_sec()},
+    Job1 = Job#job{update_time = mem3_reshard:now_sec()},
     ok = mem3_reshard:report(ManagerPid, Job1),
     Job1.
 
@@ -504,7 +504,14 @@ reset_targets(#job{source = Source, targets = Targets} = Job) ->
     Job.
 
 
--spec update_split_state_history(#job{}) -> #job{}.
-update_split_state_history(#job{split_state = St, time_updated = Ts} = Job) ->
-    Hist = Job#job.state_history,
-    Job#job{state_history = mem3_reshard:update_history(St, Ts, Hist)}.
+-spec update_split_history(#job{}) -> #job{}.
+update_split_history(#job{split_state = St, update_time = Ts} = Job) ->
+    Hist = Job#job.history,
+    JobSt = case St of
+        completed -> completed;
+        failed -> failed;
+        new -> new;
+        stopped -> stopped;
+        _ -> running
+    end,
+    Job#job{history = mem3_reshard:update_history(JobSt, St, Ts, Hist)}.
