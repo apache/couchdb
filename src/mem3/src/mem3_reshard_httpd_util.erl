@@ -156,7 +156,7 @@ pick_shards(_, Db, Shard, _) when is_binary(Db), is_binary(Shard) ->
 get_jobs() ->
     Nodes = mem3_util:live_nodes(),
     {Replies, _Bad} = rpc:multicall(Nodes, mem3_reshard, jobs, []),
-    [iso8160_timestamps(R) || R <- lists:flatten(Replies)].
+    lists:flatten(Replies).
 
 
 get_job(JobId) ->
@@ -164,7 +164,7 @@ get_job(JobId) ->
     {Replies, _Bad} = rpc:multicall(Nodes, mem3_reshard, job, [JobId]),
     case [JobInfo || {ok, JobInfo} <- Replies] of
         [JobInfo | _] ->
-            {ok, iso8160_timestamps(JobInfo)};
+            {ok, JobInfo};
         [] ->
             {error, not_found}
     end.
@@ -275,25 +275,3 @@ stop_shard_splitting(Reason) ->
         [Error | _] ->
             {error, {[{error, couch_util:to_binary(Error)}]}}
     end.
-
-
-iso8160_timestamps({Props}) ->
-    NewProps = lists:map(fun
-        ({time_created, UnixSec}) ->
-            {time_created, unix_to_iso8601(UnixSec)};
-        ({time_updated, UnixSec}) ->
-            {time_updated, unix_to_iso8601(UnixSec)};
-        ({time_started, UnixSec}) ->
-            {time_started, unix_to_iso8601(UnixSec)};
-        ({K, V}) ->
-            {K, V}
-    end, Props),
-    {NewProps}.
-
-
-unix_to_iso8601(UnixSec) ->
-    Mega = UnixSec div 1000000,
-    Sec = UnixSec rem 1000000,
-    {{Y, Mon, D}, {H, Min, S}} = calendar:now_to_universal_time({Mega, Sec, 0}),
-    Format = "~B-~2..0B-~2..0BT~2..0B:~2..0B:~2..0BZ",
-    iolist_to_binary(io_lib:format(Format, [Y, Mon, D, H, Min, S])).

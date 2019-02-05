@@ -207,9 +207,10 @@ switch_state(#job{manager = ManagerPid} = Job0, NewState) ->
         state_info = Info2,
         workers = []
     },
-    ok = mem3_reshard:checkpoint(ManagerPid, check_state(Job)),
+    Job1 = update_split_state_history(Job),
+    ok = mem3_reshard:checkpoint(ManagerPid, check_state(Job1)),
     gen_server:cast(self(), do_state),
-    Job.
+    Job1.
 
 
 -spec do_state(#job{}) -> #job{}.
@@ -501,3 +502,9 @@ reset_targets(#job{source = Source, targets = Targets} = Job) ->
         end
     end, Targets),
     Job.
+
+
+-spec update_split_state_history(#job{}) -> #job{}.
+update_split_state_history(#job{split_state = St, time_updated = Ts} = Job) ->
+    Hist = Job#job.state_history,
+    Job#job{state_history = mem3_reshard:update_history(St, Ts, Hist)}.

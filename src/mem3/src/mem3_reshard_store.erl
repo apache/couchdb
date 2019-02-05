@@ -25,7 +25,7 @@
    load_state/1,
    delete_state/1,  % for debugging
 
-   job_to_ejson_props/1,
+   job_to_ejson_props/2,
    state_to_ejson_props/1
 ]).
 
@@ -173,7 +173,21 @@ load_doc(Db, DocId) ->
     end.
 
 
-job_to_ejson_props(#job{source = Source, targets = Targets} = Job) ->
+job_to_ejson_props(#job{} = Job) ->
+    job_to_ejson_props(Job, []).
+
+
+job_to_ejson_props(#job{source = Source, targets = Targets} = Job, Opts) ->
+    Iso8601 = proplists:get_value(iso8601, Opts),
+    History = state_history_to_ejson(Job#job.state_history, Iso8601),
+    TimeStarted = case Iso8601 of
+        true -> unix_to_iso8601(Job#job.time_started);
+        _ -> Job#job.time_started
+    end,
+    TimeUpdated = case Iso8601 of
+        true -> unix_to_iso8601(Job#job.time_updated);
+        _ -> Job#job.time_updated
+    end,
     [
         {id, Job#job.id},
         {type, Job#job.type},
@@ -183,9 +197,9 @@ job_to_ejson_props(#job{source = Source, targets = Targets} = Job) ->
         {split_state, Job#job.split_state},
         {state_info, state_info_to_ejson(Job#job.state_info)},
         {node, atom_to_binary(Job#job.node, utf8)},
-        {time_created, Job#job.time_created},
-        {time_started, Job#job.time_started},
-        {time_updated, Job#job.time_updated}
+        {time_started, TimeStarted},
+        {time_updated, TimeUpdated},
+        {state_history, History}
     ].
 
 
@@ -197,9 +211,9 @@ job_from_ejson({Props}) ->
     JobState = couch_util:get_value(<<"job_state">>, Props),
     SplitState = couch_util:get_value(<<"split_state">>, Props),
     StateInfo = couch_util:get_value(<<"state_info">>, Props),
-    TCreated = couch_util:get_value(<<"time_created">>, Props),
     TStarted = couch_util:get_value(<<"time_started">>, Props),
     TUpdated = couch_util:get_value(<<"time_updated">>, Props),
+    History = couch_util:get_value(<<"state_history">>, Props),
     #job{
         id = Id,
         type = binary_to_atom(Type, utf8),
@@ -207,11 +221,11 @@ job_from_ejson({Props}) ->
         split_state = binary_to_atom(SplitState, utf8),
         state_info = state_info_from_ejson(StateInfo),
         node = node(),
-        time_created = TCreated,
         time_started = TStarted,
         time_updated = TUpdated,
         source = mem3_reshard:shard_from_name(Source),
-        targets = [mem3_reshard:shard_from_name(T) || T <- Targets]
+        targets = [mem3_reshard:shard_from_name(T) || T <- Targets],
+        state_history = state_history_from_ejson(History)
     }.
 
 
@@ -242,9 +256,33 @@ state_info_from_ejson({Props}) ->
     lists:sort(Props1).
 
 
+state_history_to_ejson(History, true) when is_list(History) ->
+    [{[{state, S}, {ts, unix_to_iso8601(T)}]} || {S, T} <- History];
+
+state_history_to_ejson(History, _) when is_list(History) ->
+    [{[{state, S}, {ts, T}]} || {S, T} <- History].
+
+
+
+state_history_from_ejson(HistoryEJson) when is_list(HistoryEJson) ->
+    lists:map(fun({EventProps}) ->
+        State = couch_util:get_value(<<"state">>, EventProps),
+        Timestamp = couch_util:get_value(<<"ts">>, EventProps),
+        {binary_to_atom(State, utf8), Timestamp}
+    end, HistoryEJson).
+
+
 state_info_to_ejson(Props) ->
     {lists:sort([{K, couch_util:to_binary(V)} || {K, V} <- Props])}.
 
 
 store_state() ->
     config:get_boolean("mem3_reshard", "store_state", true).
+
+
+unix_to_iso8601(UnixSec) ->
+    Mega = UnixSec div 1000000,
+    Sec = UnixSec rem 1000000,
+    {{Y, Mon, D}, {H, Min, S}} = calendar:now_to_universal_time({Mega, Sec, 0}),
+    Format = "~B-~2..0B-~2..0BT~2..0B:~2..0B:~2..0BZ",
+    iolist_to_binary(io_lib:format(Format, [Y, Mon, D, H, Min, S])).

@@ -17,6 +17,7 @@
 -type split() :: pos_integer().  % also power of 2
 -type job_id() :: binary() | undefined.
 -type job_type() :: split.
+-type time_sec() :: non_neg_integer().
 
 -type shard_split_main_state() ::
     running |
@@ -50,8 +51,8 @@
     targets :: [#shard{}],
     job_state :: job_state(),
     split_state :: split_state(),
-    state_info = []:: [{atom(), any()}],
-    time_created :: non_neg_integer(),
+    state_info = [] :: [{atom(), any()}],
+    state_history = [] :: [{atom(), time_sec()}],
     time_started = 0 :: non_neg_integer(),
     time_updated = 0 :: non_neg_integer(),
     node :: node(),

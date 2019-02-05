@@ -30,6 +30,7 @@
    reset_state/0,
    db_monitor/1,
    now_sec/0,
+   update_history/3,
 
    start_link/0,
 
@@ -48,6 +49,7 @@
 -define(JOB_ID_VERSION, 1).
 -define(JOB_STATE_VERSION, 1).
 -define(DEFAULT_MAX_JOBS, 25).
+-define(DEFAULT_MAX_HISTORY, 20).
 -define(JOB_PREFIX, <<"reshard-job-">>).
 -define(STATE_PREFIX, <<"reshard-state-">>).
 
@@ -69,11 +71,12 @@ start_split_job(#shard{} = Source, Split) ->
             Targets = target_shards(Source, Split),
             case mem3_reshard_validate:targets(Source, Targets) of
                 ok ->
+                    TStamp = now_sec(),
                     Job = #job{
                         type = split,
                         job_state = new,
                         split_state = new,
-                        time_created = now_sec(),
+                        state_history = [{new, TStamp}],
                         node = node(),
                         source = Source,
                         targets = Targets
@@ -106,7 +109,8 @@ remove_job(JobId) when is_binary(JobId) ->
 -spec jobs() -> [[tuple()]].
 jobs() ->
     ets:foldl(fun(Job, Acc) ->
-        Props = mem3_reshard_store:job_to_ejson_props(Job),
+        Opts = [iso8601],
+        Props = mem3_reshard_store:job_to_ejson_props(Job, Opts),
         [{Props} | Acc]
     end, [], ?MODULE).
 
@@ -115,7 +119,8 @@ jobs() ->
 job(JobId) ->
     case job_by_id(JobId) of
         #job{} = Job ->
-            Props = mem3_reshard_store:job_to_ejson_props(Job),
+            Opts = [iso8601],
+            Props = mem3_reshard_store:job_to_ejson_props(Job, Opts),
             {ok, {Props}};
         not_found ->
             {error, not_found}
@@ -382,7 +387,7 @@ reload_job(#job{job_state = running} = Job, #state{state = stopped} = State) ->
         pid = undefined,
         ref = undefined
     },
-    true = ets:insert(?MODULE, Job1),
+    true = ets:insert(?MODULE, update_job_state_history(Job1)),
     State;
 
 % This is a case when a job process should be spawend
@@ -417,8 +422,9 @@ get_start_delay_sec() ->
 start_job_int(Job, State) ->
     case spawn_job(Job) of
         {ok, #job{} = Job1} ->
-            ok = mem3_reshard_store:store_job(State, Job1),
-            true = ets:insert(?MODULE, Job1),
+            Job2 = update_job_state_history(Job1),
+            ok = mem3_reshard_store:store_job(State, Job2),
+            true = ets:insert(?MODULE, Job2),
             ok;
         {error, Error} ->
             {error, Error}
@@ -489,8 +495,9 @@ handle_job_exit(#job{split_state = completed} = Job, normal, State) ->
         time_updated = now_sec(),
         state_info = []
     },
-    ok = mem3_reshard_store:store_job(State, Job1),
-    true = ets:insert(?MODULE, Job1),
+    Job2 = update_job_state_history(Job1),
+    ok = mem3_reshard_store:store_job(State, Job2),
+    true = ets:insert(?MODULE, Job2),
     ok;
 
 handle_job_exit(#job{job_state = running} = Job, normal, _State) ->
@@ -503,7 +510,7 @@ handle_job_exit(#job{job_state = running} = Job, normal, _State) ->
         time_updated = now_sec(),
         state_info = info_update(reason, <<"Job stopped">>, OldInfo)
     },
-    true = ets:insert(?MODULE, Job1),
+    true = ets:insert(?MODULE, update_job_state_history(Job1)),
     ok;
 
 handle_job_exit(#job{job_state = running} = Job, shutdown, _State) ->
@@ -516,7 +523,7 @@ handle_job_exit(#job{job_state = running} = Job, shutdown, _State) ->
         time_updated = now_sec(),
         state_info = info_update(reason, <<"Job shutdown">>, OldInfo)
     },
-    true = ets:insert(?MODULE, Job1),
+    true = ets:insert(?MODULE, update_job_state_history(Job1)),
     ok;
 
 handle_job_exit(#job{job_state = running} = Job, {shutdown, Msg},  _State) ->
@@ -529,7 +536,7 @@ handle_job_exit(#job{job_state = running} = Job, {shutdown, Msg},  _State) ->
         time_updated = now_sec(),
         state_info = info_update(reason, <<"Job shutdown">>, OldInfo)
     },
-    true = ets:insert(?MODULE, Job1),
+    true = ets:insert(?MODULE, update_job_state_history(Job1)),
     ok;
 
 handle_job_exit(#job{} = Job, Error, State) ->
@@ -542,8 +549,9 @@ handle_job_exit(#job{} = Job, Error, State) ->
         time_updated = now_sec(),
         state_info = info_update(reason, Error, OldInfo)
     },
-    ok = mem3_reshard_store:store_job(State, Job1),
-    true = ets:insert(?MODULE, Job1),
+    Job2 = update_job_state_history(Job1),
+    ok = mem3_reshard_store:store_job(State, Job2),
+    true = ets:insert(?MODULE, Job2),
     ok.
 
 
@@ -731,6 +739,24 @@ iso8601(UnixSec) ->
     lists:flatten(io_lib:format(Format, [Y, Mon, D, H, Min, S])).
 
 
+-spec update_job_state_history(#job{}) -> #job{}.
+update_job_state_history(#job{job_state = St, time_updated = Ts} = Job) ->
+    Hist = Job#job.state_history,
+    Job#job{state_history = update_history(St, Ts, Hist)}.
+
+
+-spec update_history(atom(), time_sec(), list()) -> list().
+update_history(State, Ts, [{State, _} | Rest]) ->
+    lists:sublist([{State, Ts} | Rest], max_history());
+
+update_history(State, Ts, History) ->
+    lists:sublist([{State, Ts} | History], max_history()).
+
+
+-spec max_history() -> non_neg_integer().
+max_history() ->
+    config:get_integer("reshard", "max_history", ?DEFAULT_MAX_HISTORY).
+
 
 -spec statefmt(#state{} | term()) -> string().
 statefmt(#state{} = State) ->
@@ -749,7 +775,6 @@ statefmt(#state{} = State) ->
 statefmt(State) ->
     Fmt = io_lib:format("<Unknown split state:~p>", [State]),
     lists:flatten(Fmt).
-
 
 
 -spec jobfmt(#job{}) -> string().
