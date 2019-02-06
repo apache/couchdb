@@ -189,8 +189,15 @@ parse_index_params(#httpd{method='GET'}=Req, Db) ->
         chttpd:qs(Req)),
     parse_index_params(IndexParams, Db);
 parse_index_params(#httpd{method='POST'}=Req, Db) ->
-    IndexParams = lists:flatmap(fun({K, V}) -> parse_json_index_param(K, V) end,
-        element(1, chttpd:json_body_obj(Req))),
+    {JsonBody} = chttpd:json_body_obj(Req),
+    QSEntry = case chttpd:qs_value(Req, "partition") of
+        undefined -> [];
+        StrVal -> [{<<"partition">>, ?l2b(StrVal)}]
+    end,
+    IndexParams = lists:flatmap(fun({K, V}) ->
+        parse_json_index_param(K, V)
+    end, QSEntry ++ [JsonBody]),
+    ensure_unique_partition(IndexParams),
     parse_index_params(IndexParams, Db);
 parse_index_params(IndexParams, Db) ->
     DefaultLimit = case fabric_util:is_partitioned(Db) of
@@ -421,6 +428,19 @@ parse_non_negative_int_param(Name, Val, Prop, Default) ->
         Fmt = "Invalid value for ~s: ~p",
         Msg = io_lib:format(Fmt, [Name, Val]),
         throw({query_parse_error, ?l2b(Msg)})
+    end.
+
+
+ensure_unique_partition(IndexParams) ->
+    Partitions = lists:filter(fun({Key, _Val}) ->
+        Key == partition
+    end, IndexParams),
+    case length(length:usort(Partitions)) > 1 of
+        true ->
+            Msg = <<"Multiple conflicting values for `partition` provided">>,
+            throw({bad_request, Msg});
+        false ->
+            ok
     end.
 
 

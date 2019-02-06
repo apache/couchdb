@@ -21,7 +21,7 @@ defmodule PartitionSearchTest do
       }
     end
 
-    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs} )
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3})
     assert resp.status_code == 201
   end
 
@@ -126,7 +126,7 @@ defmodule PartitionSearchTest do
     create_ddoc(db_name)
 
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
-    resp = Couch.post(url, body: %{:q => "some:field", :limit => 1, :partition=> "true"})
+    resp = Couch.post(url, body: %{:q => "some:field", :limit => 1})
     assert resp.status_code == 200
   end
 
@@ -206,4 +206,14 @@ defmodule PartitionSearchTest do
     assert resp.status_code == 400
   end
 
+  @tag :with_partitioned_db
+  test "rejects conflicting partition values", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    url = "/#{db_name}/_partition/foo/_design/library/_search/books"
+    resp = Couch.post(url, body: %{q: "some:field", partition: "bar"})
+    assert resp.status_code == 400
+  end
 end
