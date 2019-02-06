@@ -143,9 +143,9 @@ fauxton: share/www
 check: all
 	@$(MAKE) test-cluster-with-quorum
 	@$(MAKE) test-cluster-without-quorum
+	@$(MAKE) python-black
 	@$(MAKE) eunit
 	@$(MAKE) javascript
-	@$(MAKE) python-black
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
 #	@$(MAKE) build-test
