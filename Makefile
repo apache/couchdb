@@ -147,6 +147,7 @@ check: all
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
+	@$(MAKE) elixir
 #	@$(MAKE) build-test
 
 
@@ -208,7 +209,7 @@ python-black-update: .venv/bin/black
 
 .PHONY: elixir
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run -a adm:pass --no-eval 'test/elixir/run --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run -a adm:pass --no-eval 'test/elixir/run --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)' || true
 
 .PHONY: elixir-init
 elixir-init:
