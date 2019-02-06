@@ -271,7 +271,6 @@ def setup_configs(ctx):
             "fauxton_root": fauxton_root,
             "uuid": "fake_uuid_for_dev",
             "_default": "",
-            "compaction_daemon": "{}",
         }
         write_config(ctx, node, env)
     generate_haproxy_config(ctx)
