@@ -176,7 +176,12 @@ handle_reshard_req(#httpd{method='GET',
    case mem3_reshard_httpd_util:get_job(JobId) of
         {ok, {Props}} ->
              JobState = couch_util:get_value(job_state, Props),
-             send_json(Req, 200, {[{state, JobState}]});
+             {SIProps} = couch_util:get_value(state_info, Props),
+             Reason = case couch_util:get_value(reason, SIProps) of
+                 undefined -> null;
+                 Val -> couch_util:to_binary(Val)
+             end,
+             send_json(Req, 200, {[{state, JobState}, {reason, Reason}]});
         {error, not_found} ->
             throw(not_found)
     end;

@@ -475,13 +475,13 @@ kill_job_int(#job{pid = undefined} = Job) ->
 
 kill_job_int(#job{pid = Pid, ref = Ref} = Job) ->
     couch_log:info("~p kill_job_int ~p", [?MODULE, jobfmt(Job)]),
+    demonitor(Ref, [flush]),
     case erlang:is_process_alive(Pid) of
         true ->
             ok = mem3_reshard_job_sup:terminate_child(Pid);
         false ->
             ok
     end,
-    demonitor(Ref, [flush]),
     Job1 = Job#job{pid = undefined, ref = undefined},
     true = ets:insert(?MODULE, Job1),
     Job1.
@@ -681,8 +681,11 @@ checkpoint_int(Job, State, From) ->
 -spec report_int(#job{}, pid()) -> ok | not_found.
 report_int(Job, From) ->
     case ets:lookup(?MODULE, Job#job.id) of
-        [#job{pid = From}] ->
-            true = ets:insert(?MODULE, Job),
+        [#job{pid = From, ref = Ref}] ->
+            % We care over the reference used to monitor this job. The job
+            % record coming in from the job itself won't have and if we just
+            % ets:insert it we'd end up forgetting the old ref
+            true = ets:insert(?MODULE, Job#job{ref = Ref}),
             ok;
         _ ->
             couch_log:error("~p reporting : couldn't find ~p", [?MODULE, Job]),

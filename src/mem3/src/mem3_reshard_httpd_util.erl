@@ -53,7 +53,10 @@ validate_node(Node0) when is_binary(Node0) ->
     catch
         error:badarg ->
             throw({bad_request, <<"`node` is not a valid node name">>})
-    end.
+    end;
+
+validate_node(_Node) ->
+    throw({bad_request, <<"Invalid `node`">>}).
 
 
 validate_shard(undefined) ->
@@ -65,7 +68,10 @@ validate_shard(Shard) when is_binary(Shard) ->
             Shard;
         _ ->
             throw({bad_request, <<"`shard` is invalid">>})
-    end.
+    end;
+
+validate_shard(_Shard) ->
+    throw({bad_request, <<"Invalid `shard`">>}).
 
 
 validate_db(undefined) ->
@@ -78,7 +84,11 @@ validate_db(DbName) when is_binary(DbName) ->
     catch
         _:_ ->
             throw({bad_request, <<"Invalid `db`">>})
-    end.
+    end;
+
+validate_db(_bName) ->
+    throw({bad_request, <<"Invalid `db`">>}).
+
 
 
 validate_range(undefined) ->
