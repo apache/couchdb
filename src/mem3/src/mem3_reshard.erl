@@ -131,12 +131,14 @@ job(JobId) ->
 
 -spec report(pid(), #job{}) -> ok.
 report(Server, #job{} = Job) when is_pid(Server) ->
-    ok = gen_server:call(Server, {report, Job}, infinity).
+    couch_log:notice("~p reporting ~p ~p", [?MODULE, Server, jobfmt(Job)]),
+    gen_server:cast(Server, {report, Job}).
 
 
 -spec checkpoint(pid(), #job{}) -> ok.
 checkpoint(Server, #job{} = Job) ->
-    ok = gen_server:call(Server, {checkpoint, Job}, infinity).
+    couch_log:notice("~p checkpointing ~p ~p", [?MODULE, Server, jobfmt(Job)]),
+    gen_server:cast(Server, {checkpoint, Job}).
 
 
 -spec get_state() -> {[_ | _]}.
@@ -216,26 +218,25 @@ handle_call({stop, Reason}, _From, #state{state = running} = State) ->
 handle_call({stop, _}, _From, State) ->
     {reply, ok, State};
 
-handle_call({start_job, _}, _From, #state{state = stopped} = State) ->
-    case couch_util:get_value(reason, State#state.state_info) of
-        undefined ->
-            {reply, {error, stopped}, State};
-        Reason ->
-            {reply, {error, {stopped, Reason}}, State}
-    end;
-
 handle_call({start_job, #job{id = Id, source = Source} = Job}, _From, State) ->
     couch_log:notice("~p start_job call ~p", [?MODULE, jobfmt(Job)]),
-    MaxJobs = get_max_jobs(),
-    RunningJobs = mem3_reshard_job_sup:count_children(),
+    Total = ets:info(?MODULE, size),
     SourceOk = mem3_reshard_validate:source(Source),
-    case {job_by_id(Id), RunningJobs =< MaxJobs, SourceOk} of
+    case {job_by_id(Id), Total =<  get_max_jobs(), SourceOk} of
         {not_found, true, ok} ->
-            case start_job_int(Job, State) of
-                ok ->
-                    {reply, {ok, Job#job.id}, State};
-                {error, Error} ->
-                    {reply, {error, Error}, State}
+            case State#state.state of
+                running ->
+                    case start_job_int(Job, State) of
+                        ok -> {reply, {ok, Job#job.id}, State};
+                        {error, Error} -> {reply, {error, Error}, State}
+                    end;
+                stopped ->
+                    ok = mem3_reshard_store:store_job(State, Job),
+                    % Since resharding is stop cluster-wide, job is
+                    % temporarily marked as stopped in the ets table so as not
+                    % to return a "running" result which would look odd.
+                    temporarily_stop_job(Job),
+                    {reply, {ok, Job#job.id}, State}
             end;
         {#job{}, _, _} ->
             {reply, {error, job_already_exists}, State};
@@ -294,12 +295,6 @@ handle_call({remove_job, Id}, _From, State) ->
             {reply, {error, not_found}, State}
     end;
 
-handle_call({checkpoint, Job}, {FromPid, _}, State) ->
-    {reply, ok, checkpoint_int(Job, State, FromPid)};
-
-handle_call({report, Job}, {FromPid, _}, State) ->
-    report_int(Job, FromPid),
-    {reply, ok, State};
 
 handle_call(get_state, _From, #state{state = GlobalState} = State) ->
     StateProps = mem3_reshard_store:state_to_ejson_props(State),
@@ -328,10 +323,15 @@ handle_call(Call, From, State) ->
     {noreply, State}.
 
 
+handle_cast({report, Job}, State) ->
+    report_int(Job),
+    {noreply, State};
+
+
+handle_cast({checkpoint, Job}, State) ->
+    {noreply, checkpoint_int(Job, State)};
+
 handle_cast(reload_jobs, State) ->
-    StartupDelaySec = get_start_delay_sec(),
-    couch_log:notice("~p startup delay ~p", [?MODULE, StartupDelaySec]),
-    timer:sleep(StartupDelaySec * 1000),
     couch_log:notice("~p starting reloading jobs", [?MODULE]),
     State1 = reload_jobs(State),
     couch_log:notice("~p finished reloading jobs", [?MODULE]),
@@ -369,17 +369,11 @@ code_change(_OldVsn, State, _Extra) ->
 
 %% Private API
 
--spec reload_jobs(#state{}) -> #state{}.
-reload_jobs(State) ->
-    Jobs = mem3_reshard_store:get_jobs(State),
-    lists:foldl(fun reload_job/2, State, Jobs).
 
-
-% This is a case when main application is stopped but a job is reloaded that was
-% checkpointed in running state. Set that state to stopped to avoid the API
-% results looking odd.
--spec reload_job(#job{}, #state{}) -> #state{}.
-reload_job(#job{job_state = running} = Job, #state{state = stopped} = State) ->
+% Insert job in the ets table as a temporarily stopped job. This would happen
+% then job is reload or added when cluster-wide resharding is stopped.
+-spec temporarily_stop_job(#job{}) -> #job{}.
+temporarily_stop_job(Job) ->
     OldInfo = Job#job.state_info,
     Job1 = Job#job{
         job_state = stopped,
@@ -390,10 +384,27 @@ reload_job(#job{job_state = running} = Job, #state{state = stopped} = State) ->
         ref = undefined
     },
     true = ets:insert(?MODULE, update_job_history(Job1)),
+    Job1.
+
+
+-spec reload_jobs(#state{}) -> #state{}.
+reload_jobs(State) ->
+    Jobs = mem3_reshard_store:get_jobs(State),
+    lists:foldl(fun reload_job/2, State, Jobs).
+
+
+% This is a case when main application is stopped but a job is reloaded that was
+% checkpointed in running state. Set that state to stopped to avoid the API
+% results looking odd.
+-spec reload_job(#job{}, #state{}) -> #state{}.
+reload_job(#job{job_state = JS} = Job, #state{state = stopped} = State)
+        when JS =:= running orelse JS =:= new ->
+    ok = temporarily_stop_job(Job),
     State;
 
 % This is a case when a job process should be spawend
-reload_job(#job{job_state = running} = Job, #state{state = running} = State) ->
+reload_job(#job{job_state = JS} = Job, #state{state = running} = State)
+        when JS =:= running orelse JS =:= new ->
     case start_job_int(Job, State) of
         ok ->
             State;
@@ -405,7 +416,8 @@ reload_job(#job{job_state = running} = Job, #state{state = running} = State) ->
 
 % The default case is to just load the job into the ets table. This would be
 % failed or completed jobs for example
-reload_job(#job{} = Job, #state{} = State) ->
+reload_job(#job{job_state = JS} = Job, #state{} = State)
+        when JS =:= failed orelse JS =:= completed ->
     true = ets:insert(?MODULE, Job),
     State.
 
@@ -413,11 +425,6 @@ reload_job(#job{} = Job, #state{} = State) ->
 -spec get_max_jobs() -> integer().
 get_max_jobs() ->
     config:get_integer("mem3_reshard", "max_jobs", ?DEFAULT_MAX_JOBS).
-
-
--spec get_start_delay_sec() -> integer().
-get_start_delay_sec() ->
-    config:get_integer("mem3_reshard", "start_delay_sec", 0).
 
 
 -spec start_job_int(#job{}, #state{}) -> ok | {error, term()}.
@@ -457,7 +464,8 @@ stop_job_int(#job{pid = undefined}, _JobState, _Reason, _State) ->
     ok;
 
 stop_job_int(#job{} = Job, JobState, Reason, State) ->
-    couch_log:info("~p stop_job_int ~p : ~p", [?MODULE, jobfmt(Job), Reason]),
+    couch_log:info("~p stop_job_int ~p newstate: ~p reason:~p", [?MODULE,
+        jobfmt(Job), JobState, Reason]),
     Job1 = kill_job_int(Job),
     Job2 = Job1#job{
         job_state = JobState,
@@ -665,12 +673,13 @@ info_delete(Key, StateInfo) ->
     lists:keydelete(Key, 1, StateInfo).
 
 
--spec checkpoint_int(#job{}, #state{}, pid()) -> #state{}.
-checkpoint_int(Job, State, From) ->
+-spec checkpoint_int(#job{}, #state{}) -> #state{}.
+checkpoint_int(#job{} = Job, State) ->
     couch_log:notice("~p checkpoint ~s", [?MODULE, jobfmt(Job)]),
-    case report_int(Job, From) of
+    case report_int(Job) of
         ok ->
             ok = mem3_reshard_store:store_job(State, Job),
+            ok = mem3_reshard_job:checkpoint_done(Job),
             State;
         not_found ->
             couch_log:error("~p checkpoint : couldn't find ~p", [?MODULE, Job]),
@@ -678,10 +687,11 @@ checkpoint_int(Job, State, From) ->
     end.
 
 
--spec report_int(#job{}, pid()) -> ok | not_found.
-report_int(Job, From) ->
+-spec report_int(#job{}) -> ok | not_found.
+report_int(Job) ->
     case ets:lookup(?MODULE, Job#job.id) of
-        [#job{pid = From, ref = Ref}] ->
+        [#job{ref = Ref}] ->
+            couch_log:notice("~p reported ~s", [?MODULE, jobfmt(Job)]),
             % We care over the reference used to monitor this job. The job
             % record coming in from the job itself won't have and if we just
             % ets:insert it we'd end up forgetting the old ref

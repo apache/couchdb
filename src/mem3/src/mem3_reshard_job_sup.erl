@@ -44,7 +44,7 @@ count_children() ->
 
 init(_Args) ->
     Children = [
-        {undefined,
+        {mem3_reshard_job,
             {mem3_reshard_job, start_link, []},
             temporary,
             60000,

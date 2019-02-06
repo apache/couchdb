@@ -18,6 +18,7 @@
 
 -export([
    start_link/1,
+   checkpoint_done/1,
    jobfmt/1,
    pickfun/3,
 
@@ -46,6 +47,15 @@ start_link(#job{} = Job) ->
     gen_server:start_link(?MODULE, [Job], []).
 
 
+% This is called by the main proces after it has checkpointed the progress
+% of the job. After the new state was checkpointed, we signal the job do start
+% executing that state.
+checkpoint_done(#job{pid = Pid} = Job) ->
+    couch_log:notice(" ~p : checkpoint done for ~p", [?MODULE, jobfmt(Job)]),
+    gen_server:cast(Pid, do_state).
+
+
+% Formatting function, used for logging mostly
 jobfmt(#job{} = Job) ->
     #job{
         id = Id,
@@ -75,7 +85,7 @@ init([#job{} = Job0]) ->
 
 
 terminate(Reason, Job) ->
-    couch_log:notice("~p terminate ~p ~p", [?MODULE, Reason, jobfmt(Job)]),
+    couch_log:notice("~p terminate ~p ~p", [?MODULE, Reason, Job]),
     ok.
 
 
@@ -111,6 +121,7 @@ handle_info(retry, #job{} = Job) ->
     handle_cast(do_state, Job);
 
 handle_info({'EXIT', Pid, Reason}, #job{workers = Workers} = Job) ->
+    couch_log:notice("~p EXIT pid:~p reason:~p", [?MODULE, Pid, Reason]),
     case lists:member(Pid, Workers) of
         true ->
             Job1 = Job#job{workers = Workers -- [Pid]},
@@ -122,7 +133,7 @@ handle_info({'EXIT', Pid, Reason}, #job{workers = Workers} = Job) ->
     end;
 
 handle_info(Info, Job) ->
-    couch_log:notice("~p info ~p", [?MODULE, Info]),
+    couch_log:notice("~p info ~p ~p", [?MODULE, Info, Job]),
     {noreply, Job}.
 
 
@@ -208,8 +219,12 @@ switch_state(#job{manager = ManagerPid} = Job0, NewState) ->
         workers = []
     },
     Job1 = update_split_history(Job),
+    % Ask main process to checkpoint. When if it has finished it will notify us by calling
+    % by checkpoint_done/1. The reason not to call the main process via a gen_server:call
+    % is because the main process could be in the middle of terminating the job and then it
+    % would deadlock (after sending us a shutdown message) and it would end up using the
+    % whole supervisor termination timeout before finally.
     ok = mem3_reshard:checkpoint(ManagerPid, check_state(Job1)),
-    gen_server:cast(self(), do_state),
     Job1.
 
 

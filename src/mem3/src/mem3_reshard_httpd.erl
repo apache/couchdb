@@ -80,9 +80,11 @@ handle_reshard_req(#httpd{method='PUT',
             throw({bad_request, <<"State field not `running` or `stopped`">>})
      end;
 
-
 handle_reshard_req(#httpd{path_parts=[_, ?STATE]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,PUT");
+
+handle_reshard_req(#httpd{path_parts=[_, ?STATE | _]} = Req) ->
+    throw(not_found);
 
 
 % GET /_reshard/jobs

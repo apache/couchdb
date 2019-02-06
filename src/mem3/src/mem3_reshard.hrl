@@ -47,11 +47,11 @@
 -record(job, {
     id :: job_id() | '$1' | '_',
     type :: job_type(),
-    source :: #shard{},
-    targets :: [#shard{}],
     job_state :: job_state(),
     split_state :: split_state(),
     state_info = [] :: [{atom(), any()}],
+    source :: #shard{},
+    targets :: [#shard{}],
     history = [] :: [{atom(), time_sec()}],
     start_time = 0 :: non_neg_integer(),
     update_time = 0 :: non_neg_integer(),
@@ -60,8 +60,7 @@
     ref :: undefined | reference() | '_',
     manager :: undefined | pid(),
     workers = [] :: [pid()],
-    retries = 0 :: non_neg_integer(),
-    target_filters :: [fun()]
+    retries = 0 :: non_neg_integer()
 }).
 
 -record(state, {
