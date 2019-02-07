@@ -7,7 +7,6 @@ otp_release:
    - 20.3.8.5
    - 19.3
    - 18.3
-   - 17.5
 
 addons:
   apt:
