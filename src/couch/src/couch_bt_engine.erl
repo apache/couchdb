@@ -552,7 +552,6 @@ purge_docs(#st{} = St, Pairs, PurgeInfos) ->
 
 copy_purge_infos(#st{} = St, PurgeInfos) ->
     #st{
-
         purge_tree = PurgeTree,
         purge_seq_tree = PurgeSeqTree
     } = St,
