@@ -15,6 +15,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("mem3/src/mem3_reshard.hrl").
 
 
 -define(USER, "mem3_reshard_api_test_admin").
@@ -27,6 +28,7 @@
 -define(RESHARD, "_reshard/").
 -define(JOBS, "_reshard/jobs/").
 -define(STATE, "_reshard/state").
+-define(ID, <<"id">>).
 
 
 setup() ->
@@ -39,11 +41,14 @@ setup() ->
     create_db(Url ++ ?DB1 ++ "?q=1&n=1"),
     create_db(Url ++ ?DB2 ++ "?q=1&n=1"),
     create_db(Url ++ ?DB3 ++ "?q=2&n=1"),
+    %mem3_reshard_debug:state_intercept_init(),
     Url.
 
 
 teardown(Url) ->
+    meck:unload(),
     mem3_reshard:reset_state(),
+    %mem3_reshard_debug:state_intercept_cleanup(),
     delete_db(Url ++ ?DB1),
     delete_db(Url ++ ?DB2),
     delete_db(Url ++ ?DB3),
@@ -68,18 +73,20 @@ mem3_reshard_api_test_() ->
                 foreach,
                 fun setup/0, fun teardown/1,
                 [
-                    fun reshard_basics/1,
-                    fun reshard_create_job_basic/1,
-                    fun reshard_create_two_jobs/1,
-                    fun reshard_start_stop_cluster_basic/1,
-                    fun reshard_start_stop_cluster_with_a_job/1
+                    fun basics/1,
+                    fun create_job_basic/1,
+                    fun create_two_jobs/1,
+                    fun start_stop_cluster_basic/1,
+                    fun start_stop_cluster_with_a_job/1,
+                    fun individual_job_start_stop/1,
+                    fun individual_job_stop_when_cluster_stopped/1
                 ]
             }
         }
     }.
 
 
-reshard_basics(Top) ->
+basics(Top) ->
     ?_test(begin
         % GET /_reshard
         ?assertMatch({200, #{
@@ -107,17 +114,17 @@ reshard_basics(Top) ->
     end).
 
 
-reshard_create_job_basic(Top) ->
+create_job_basic(Top) ->
     ?_test(begin
         % POST /_reshard/jobs
         {C1, R1} = req(post, Top ++ ?JOBS,  #{type => split, db => <<?DB1>>}),
         ?assertEqual(201, C1),
         ?assertMatch([#{<<"ok">> := true, <<"id">> := J, <<"shard">> :=  S}]
             when is_binary(J) andalso is_binary(S), R1),
-        [#{<<"id">> := Id, <<"shard">> := Shard}] = R1,
+        [#{?ID := Id, <<"shard">> := Shard}] = R1,
         % GET /_reshard/jobs
         ?assertMatch({200, #{
-            <<"jobs">> := [#{<<"id">> := Id, <<"type">> := <<"split">>}],
+            <<"jobs">> := [#{?ID := Id, <<"type">> := <<"split">>}],
             <<"offset">> := 0,
             <<"total_rows">> := 1
         }}, req(get, Top ++ ?JOBS)),
@@ -125,7 +132,7 @@ reshard_create_job_basic(Top) ->
         {C2, R2} = req(get, Top ++ ?JOBS ++ ?b2l(Id)),
         ?assertEqual(200, C2),
         ThisNode = atom_to_binary(node(), utf8),
-        ?assertMatch(#{<<"id">> := Id}, R2),
+        ?assertMatch(#{?ID := Id}, R2),
         ?assertMatch(#{<<"type">> := <<"split">>}, R2),
         ?assertMatch(#{<<"source">> := Shard}, R2),
         ?assertMatch(#{<<"history">> := History} when length(History) > 1, R2),
@@ -154,19 +161,19 @@ reshard_create_job_basic(Top) ->
     end).
 
 
-reshard_create_two_jobs(Top) ->
+create_two_jobs(Top) ->
     ?_test(begin
         ?assertMatch({201, [#{<<"ok">> := true}]},
             req(post, Top ++ ?JOBS, #{type => split, db => <<?DB1>>})),
         ?assertMatch({201, [#{<<"ok">> := true}]},
             req(post, Top ++ ?JOBS, #{type => split, db => <<?DB2>>})),
         ?assertMatch({200, #{
-            <<"jobs">> := [#{<<"id">> := Id1}, #{<<"id">> := Id2}],
+            <<"jobs">> := [#{?ID := Id1}, #{?ID := Id2}],
             <<"offset">> := 0,
             <<"total_rows">> := 2
         }} when Id1 =/= Id2, req(get, Top ++ ?JOBS)),
         ?assertMatch({200, #{<<"total">> := 2}}, req(get, Top ++ ?RESHARD)),
-        {200, #{<<"jobs">> := [#{<<"id">> := Id1}, #{<<"id">> := Id2}]}} =
+        {200, #{<<"jobs">> := [#{?ID := Id1}, #{?ID := Id2}]}} =
             req(get, Top ++ ?JOBS),
         {200, #{<<"ok">> := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id1)),
         ?assertMatch({200, #{<<"total">> := 1}}, req(get, Top ++ ?RESHARD)),
@@ -175,7 +182,7 @@ reshard_create_two_jobs(Top) ->
     end).
 
 
-reshard_start_stop_cluster_basic(Top) ->
+start_stop_cluster_basic(Top) ->
     ?_test(begin
         Url = Top ++ ?STATE,
         ?assertMatch({200, #{
@@ -204,7 +211,7 @@ reshard_start_stop_cluster_basic(Top) ->
     end).
 
 
-reshard_start_stop_cluster_with_a_job(Top) ->
+start_stop_cluster_with_a_job(Top) ->
     ?_test(begin
         Url = Top ++ ?STATE,
         ?assertMatch({200, _}, req(put, Url, #{state => stopped})),
@@ -212,9 +219,9 @@ reshard_start_stop_cluster_with_a_job(Top) ->
         % Can add jobs with global state stopped, they just won't be running
         {201, R1} = req(post, Top ++ ?JOBS, #{type => split, db => <<?DB1>>}),
         ?assertMatch([#{<<"ok">> := true}], R1),
-        [#{<<"id">> := Id1}] = R1,
+        [#{?ID := Id1}] = R1,
         {200, J1} = req(get, Top ++ ?JOBS ++ ?b2l(Id1)),
-        ?assertMatch(#{<<"id">> := Id1, <<"job_state">> := <<"stopped">>}, J1),
+        ?assertMatch(#{?ID := Id1, <<"job_state">> := <<"stopped">>}, J1),
         % Check summary stats
         ?assertMatch({200, #{
             <<"state">> := <<"stopped">>,
@@ -231,16 +238,109 @@ reshard_start_stop_cluster_with_a_job(Top) ->
             <<"total">> := 0
         }}, req(get, Top ++ ?RESHARD)),
         % Add same job again
-        {201, [#{<<"id">> := Id2}]} = req(post, Top ++ ?JOBS, #{type => split,
+        {201, [#{?ID := Id2}]} = req(post, Top ++ ?JOBS, #{type => split,
             db => <<?DB1>>}),
-        ?assertMatch({200, #{<<"id">> := Id2, <<"job_state">> := <<"stopped">>}},
+        ?assertMatch({200, #{?ID := Id2, <<"job_state">> := <<"stopped">>}},
             req(get, Top ++ ?JOBS ++ ?b2l(Id2))),
         % Job should start after resharding is started on the cluster
         ?assertMatch({200, _}, req(put, Url, #{state => running})),
-        ?assertMatch({200, #{<<"id">> := Id2, <<"job_state">> := JSt}}
+        ?assertMatch({200, #{?ID := Id2, <<"job_state">> := JSt}}
             when JSt =/= <<"stopped">>, req(get, Top ++ ?JOBS ++ ?b2l(Id2))),
         {200, #{<<"ok">> := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id2))
      end).
+
+
+individual_job_start_stop(Top) ->
+    ?_test(begin
+        intercept_state(topoff1),
+        Body = #{type => split, db => <<?DB1>>},
+        {201, [#{?ID := Id}]} = req(post, Top ++ ?JOBS, Body),
+        JobUrl = Top ++ ?JOBS ++ ?b2l(Id),
+        StUrl =  JobUrl ++ "/state",
+        % Wait for the the job to start running and intercept it in topoff1 state
+        receive {JobPid, topoff1} -> ok end,
+        % Tell the intercept to never finish checkpointing so job is left hanging
+        % forever in running state
+        JobPid ! cancel,
+        ?assertMatch({200, #{<<"state">> := <<"running">>}}, req(get, StUrl)),
+        {200, _} = req(put, StUrl, #{state => stopped}),
+        wait_state(StUrl, <<"stopped">>),
+        % Stop/start resharding globally and job should still stay stopped
+        ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => stopped})),
+        ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running})),
+        ?assertMatch({200, #{<<"state">> := <<"stopped">>}}, req(get, StUrl)),
+        % Start the job again
+        ?assertMatch({200, _}, req(put, StUrl, #{state => running})),
+        % Wait for the the job to start running and intercept it in topoff1 state
+        receive {JobPid2, topoff1} -> ok end,
+        ?assertMatch({200, #{<<"state">> := <<"running">>}}, req(get, StUrl)),
+        % Let it continue running and it should complete eventually
+        JobPid2 ! continue,
+        wait_state(StUrl, <<"completed">>),
+        ?assertMatch({200, #{<<"ok">> := true}}, req(delete, JobUrl))
+    end).
+
+
+individual_job_stop_when_cluster_stopped(Top) ->
+    ?_test(begin
+        intercept_state(topoff1),
+        Body = #{type => split, db => <<?DB1>>},
+        {201, [#{?ID := Id}]} = req(post, Top ++ ?JOBS, Body),
+        JobUrl = Top ++ ?JOBS ++ ?b2l(Id),
+        StUrl =  JobUrl ++ "/state",
+        % Wait for the the job to start running and intercept it in topoff1 state
+        receive {JobPid, topoff1} -> ok end,
+        % Tell the intercept to never finish checkpointing so job is left hanging
+        % forever in running state
+        JobPid ! cancel,
+        ?assertMatch({200, #{<<"state">> := <<"running">>}}, req(get, StUrl)),
+        % Stop resharding globally
+        ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => stopped})),
+        wait_state(StUrl, <<"stopped">>),
+        % Stop the job specifically
+        {200, _} = req(put, StUrl, #{state => stopped}),
+        % Job stays stopped
+        ?assertMatch({200, #{<<"state">> := <<"stopped">>}}, req(get, StUrl)),
+        % Set cluster to running again
+        ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running})),
+        % The job should stay stopped
+        ?assertMatch({200, #{<<"state">> := <<"stopped">>}}, req(get, StUrl)),
+        % The it should be possible to resume the job and it should complete
+        ?assertMatch({200, _}, req(put, StUrl, #{state => running})),
+        % Wait for the the job to start running and intercept it in topoff1 state
+        receive {JobPid2, topoff1} -> ok end,
+        ?assertMatch({200, #{<<"state">> := <<"running">>}}, req(get, StUrl)),
+        % Let it continue running and it should complete eventually
+        JobPid2 ! continue,
+        wait_state(StUrl, <<"completed">>),
+        ?assertMatch({200, #{<<"ok">> := true}}, req(delete, JobUrl))
+    end).
+
+
+intercept_state(State) ->
+    TestPid = self(),
+    meck:new(mem3_reshard_job, [passthrough]),
+    meck:expect(mem3_reshard_job, checkpoint_done, fun(Job) ->
+            case Job#job.split_state of
+                State ->
+                    TestPid ! {self(), State},
+                    receive
+                        continue -> meck:passthrough([Job]);
+                        cancel -> ok
+                    end;
+                _ ->
+                   meck:passthrough([Job])
+            end
+        end).
+
+
+wait_state(Url, State) ->
+    test_util:wait(fun() ->
+            case req(get, Url) of
+                {200, #{<<"state">> := State}} -> ok;
+                {200, #{}} -> timer:sleep(250), wait
+            end
+    end).
 
 
 create_db(Url) ->

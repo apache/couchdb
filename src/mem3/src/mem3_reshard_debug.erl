@@ -19,6 +19,9 @@
 
 
 -export([
+    state_intercept_init/0,
+    state_intercept_cleanup/0,
+    state_intercept/2,
     start_test_job/0,
     start_test_job/1,
     create_test_db/1,
@@ -102,18 +105,34 @@ all_docs(DbName) ->
     fabric:all_docs(DbName, Cb, ok, #mrargs{}).
 
 
+
+state_intercept_tid() ->
+     list_to_atom("mem3_reshard_" ++ erlang:pid_to_list(self())).
+
+
+state_intercept_cleanup() ->
+    meck:unload(),
+    catch ets:delete(state_intercept_tid()),
+    ok.
+
+
 state_intercept(State, Fun) ->
-    ets:insert(?MODULE, {State, Fun}).
+    Tid = state_intercept_tid(),
+    case ets:info(Tid) of
+        undefined -> state_intercept_init();
+        [_ | _] -> ok
+    end,
+    ets:insert(Tid, {State, Fun}).
+
 
 state_intercept_init() ->
-    meck:unload(),
-    catch ets:delete(?MODULE),
-    ets:new(?MODULE, [named_table, public, set]),
-    meck:new(mem3_reshard, [passthrough]),
+    Tid = state_intercept_tid(),
+    ets:new(Tid, [named_table, public, set]),
+    catch meck:new(mem3_reshard, [passthrough]),
     GL = erlang:group_leader(),
     meck:expect(mem3_reshard, checkpoint,
         fun(Server, #job{} = Job) ->
-            case ets:lookup(?MODULE, Job#job.split_state) of
+            case ets:lookup(Tid, Job#job.split_state) of
                 [{_, Fun}] ->
                     {_, Ref} = spawn_monitor(fun() ->
                         erlang:group_leader(GL, self()),

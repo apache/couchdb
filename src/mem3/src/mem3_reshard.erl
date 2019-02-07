@@ -212,7 +212,7 @@ handle_call({stop, Reason}, _From, #state{state = running} = State) ->
         state_info = info_update(reason, Reason, State#state.state_info)
     },
     ok = mem3_reshard_store:store_state(State1),
-    [kill_job_int(Job) || Job <- running_jobs()],
+    [temporarily_stop_job(Job) || Job <- running_jobs()],
     {reply, ok, State1};
 
 handle_call({stop, _}, _From, State) ->
@@ -273,7 +273,8 @@ handle_call({resume_job, Id}, _From, State) ->
 handle_call({stop_job, Id, Reason}, _From, State) ->
     couch_log:notice("~p stop_job Id:~p Reason:~p", [?MODULE, Id, Reason]),
     case job_by_id(Id) of
-        #job{job_state = running} = Job ->
+        #job{job_state = JSt} = Job when JSt =:= running orelse JSt =:= new
+                orelse JSt =:= stopped ->
             ok = stop_job_int(Job, stopped, Reason, State),
             {reply, ok, State};
         #job{} ->
@@ -371,11 +372,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 % Insert job in the ets table as a temporarily stopped job. This would happen
-% then job is reload or added when cluster-wide resharding is stopped.
+% then job is reloaded or added when cluster-wide resharding is stopped.
 -spec temporarily_stop_job(#job{}) -> #job{}.
 temporarily_stop_job(Job) ->
-    OldInfo = Job#job.state_info,
-    Job1 = Job#job{
+    Job1 = kill_job_int(Job),
+    OldInfo = Job1#job.state_info,
+    Job2 = Job1#job{
         job_state = stopped,
         update_time = now_sec(),
         start_time = 0,
@@ -383,8 +385,9 @@ temporarily_stop_job(Job) ->
         pid = undefined,
         ref = undefined
     },
-    true = ets:insert(?MODULE, update_job_history(Job1)),
-    Job1.
+    Job3 = update_job_history(Job2),
+    true = ets:insert(?MODULE, Job3),
+    Job3.
 
 
 -spec reload_jobs(#state{}) -> #state{}.
@@ -414,10 +417,10 @@ reload_job(#job{job_state = JS} = Job, #state{state = running} = State)
             State
     end;
 
-% The default case is to just load the job into the ets table. This would be
-% failed or completed jobs for example
+% If job is disabled individually (stopped by the user), is completed or failed
+% then simply load it into the ets table
 reload_job(#job{job_state = JS} = Job, #state{} = State)
-        when JS =:= failed orelse JS =:= completed ->
+        when JS =:= failed orelse JS =:= completed orelse JS =:= stopped ->
     true = ets:insert(?MODULE, Job),
     State.
 
@@ -460,9 +463,6 @@ spawn_job(#job{} = Job0) ->
 
 
 -spec stop_job_int(#job{}, job_state(), term(), #state{}) -> ok.
-stop_job_int(#job{pid = undefined}, _JobState, _Reason, _State) ->
-    ok;
-
 stop_job_int(#job{} = Job, JobState, Reason, State) ->
     couch_log:info("~p stop_job_int ~p newstate: ~p reason:~p", [?MODULE,
         jobfmt(Job), JobState, Reason]),
@@ -473,6 +473,7 @@ stop_job_int(#job{} = Job, JobState, Reason, State) ->
         state_info = [{reason, Reason}]
     },
     ok = mem3_reshard_store:store_job(State, Job2),
+    true = ets:insert(?MODULE, Job2),
     couch_log:info("~p stop_job_int stopped ~p", [?MODULE, jobfmt(Job2)]),
     ok.
 
@@ -652,7 +653,7 @@ jobs_by_dbname(Name) ->
 -spec running_jobs() -> [#job{}].
 running_jobs() ->
     Pat = #job{job_state = running, _ = '_'},
-    [Job || [Job] <- ets:match_object(?MODULE, Pat)].
+    ets:match_object(?MODULE, Pat).
 
 
 -spec fail_jobs_for_deleted_sources([#job{}], #state{}) -> ok.
@@ -690,13 +691,19 @@ checkpoint_int(#job{} = Job, State) ->
 -spec report_int(#job{}) -> ok | not_found.
 report_int(Job) ->
     case ets:lookup(?MODULE, Job#job.id) of
-        [#job{ref = Ref}] ->
-            couch_log:notice("~p reported ~s", [?MODULE, jobfmt(Job)]),
-            % We care over the reference used to monitor this job. The job
-            % record coming in from the job itself won't have and if we just
-            % ets:insert it we'd end up forgetting the old ref
-            true = ets:insert(?MODULE, Job#job{ref = Ref}),
-            ok;
+        [#job{ref = Ref, pid = OldPid}] ->
+            case Job#job.pid =:= OldPid of
+                true ->
+                    couch_log:notice("~p reported ~s", [?MODULE, jobfmt(Job)]),
+                    % Carry over the reference from ets as the #job{} coming
+                    % from the job process won't have it's own monitor ref.
+                    true = ets:insert(?MODULE, Job#job{ref = Ref}),
+                    ok;
+                false ->
+                    LogMsg = "~p ignoring old job report ~p new job:~p",
+                    couch_log:warning(LogMsg, [?MODULE, jobfmt(Job), OldPid]),
+                    not_found
+            end;
         _ ->
             couch_log:error("~p reporting : couldn't find ~p", [?MODULE, Job]),
             not_found

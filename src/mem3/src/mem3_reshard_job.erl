@@ -66,8 +66,8 @@ jobfmt(#job{} = Job) ->
         pid = Pid
     } = Job,
     TargetCount = length(Targets),
-    Msg = "#job{~s ~s /~B job:~s state:~s pid:~p}",
-    Fmt = io_lib:format(Msg, [Id, Source, TargetCount, State, JobState, Pid]),
+    Msg = "#job{~s ~s /~B job_state:~s split_state:~s pid:~p}",
+    Fmt = io_lib:format(Msg, [Id, Source, TargetCount, JobState, State, Pid]),
     lists:flatten(Fmt).
 
 
