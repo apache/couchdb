@@ -435,7 +435,7 @@ ensure_unique_partition(IndexParams) ->
     Partitions = lists:filter(fun({Key, _Val}) ->
         Key == partition
     end, IndexParams),
-    case length(length:usort(Partitions)) > 1 of
+    case length(lists:usort(Partitions)) > 1 of
         true ->
             Msg = <<"Multiple conflicting values for `partition` provided">>,
             throw({bad_request, Msg});
