@@ -108,6 +108,36 @@ t_bad_engine_option() ->
     ?assertEqual(Resp, {error, {invalid_engine_extension, <<"cowabunga!">>}}).
 
 
+get_engine_path_test_() ->
+    {
+        setup,
+        fun start/0, fun test_util:stop/1,
+        {
+            foreach,
+            fun setup/0, fun teardown/1,
+            [
+                fun should_return_engine_path/1,
+                fun should_return_invalid_engine_error/1
+            ]
+        }
+    }.
+
+
+should_return_engine_path(Db) ->
+    DbName = couch_db:name(Db),
+    Engine = couch_db_engine:get_engine(Db),
+    Resp = couch_server:get_engine_path(DbName, Engine),
+    FilePath = couch_db:get_filepath(Db),
+    ?_assertMatch({ok, FilePath}, Resp).
+
+
+should_return_invalid_engine_error(Db) ->
+    DbName = couch_db:name(Db),
+    Engine = fake_engine,
+    Resp = couch_server:get_engine_path(DbName, Engine),
+    ?_assertMatch({error, {invalid_engine, Engine}}, Resp).
+
+
 interleaved_requests_test_() ->
     {
         setup,
