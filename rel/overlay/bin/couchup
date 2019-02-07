@@ -231,7 +231,9 @@ def _replicate(args):
         if args["filter_deleted"]:
             doc["filter"] = "repl_filters/no_deleted"
         if args["creds"]:
-            auth = "Basic " + base64.b64encode(":".join(args["creds"]))
+            auth = (
+                "Basic " + base64.b64encode(":".join(args["creds"]).encode()).decode()
+            )
             headers = {"authorization": auth}
             doc["source"]["headers"] = headers
             doc["target"]["headers"] = headers
