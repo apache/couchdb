@@ -134,7 +134,7 @@ create_jobs(Node, Shard, Db, Range, split) ->
     end, pick_shards(Node, Shard, Db, Range)).
 
 
-pick_shards(undefined, undefined, Db, undefined) ->
+pick_shards(undefined, undefined, Db, undefined) when is_binary(Db) ->
     mem3:shards(Db);
 
 pick_shards(Node, undefined, Db, undefined) when is_atom(Node), is_binary(Db) ->

@@ -29,26 +29,24 @@
 -define(JOBS, "_reshard/jobs/").
 -define(STATE, "_reshard/state").
 -define(ID, <<"id">>).
+-define(OK, <<"ok">>).
 
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
-    %ok = config:set("mem3_reshard", "store_state", "false", false),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
     Url = lists:concat(["http://", Addr, ":", Port, "/"]),
     create_db(Url ++ ?DB1 ++ "?q=1&n=1"),
     create_db(Url ++ ?DB2 ++ "?q=1&n=1"),
     create_db(Url ++ ?DB3 ++ "?q=2&n=1"),
-    %mem3_reshard_debug:state_intercept_init(),
     Url.
 
 
 teardown(Url) ->
     meck:unload(),
     mem3_reshard:reset_state(),
-    %mem3_reshard_debug:state_intercept_cleanup(),
     delete_db(Url ++ ?DB1),
     delete_db(Url ++ ?DB2),
     delete_db(Url ++ ?DB3),
@@ -79,7 +77,11 @@ mem3_reshard_api_test_() ->
                     fun start_stop_cluster_basic/1,
                     fun start_stop_cluster_with_a_job/1,
                     fun individual_job_start_stop/1,
-                    fun individual_job_stop_when_cluster_stopped/1
+                    fun individual_job_stop_when_cluster_stopped/1,
+                    fun create_job_with_invalid_arguments/1,
+                    fun create_job_with_db/1,
+                    fun create_job_with_shard_name/1,
+                    fun completed_job_handling/1
                 ]
             }
         }
@@ -98,15 +100,18 @@ basics(Top) ->
             <<"stopped">> := 0,
             <<"total">> := 0
         }}, req(get, Top ++ ?RESHARD)),
+
         % GET _reshard/state
         ?assertMatch({200, #{<<"state">> := <<"running">>}},
             req(get, Top ++ ?STATE)),
+
         % GET _reshard/jobs
         ?assertMatch({200, #{
             <<"jobs">> := [],
             <<"offset">> := 0,
             <<"total_rows">> := 0
         }}, req(get, Top ++ ?JOBS)),
+
         % Some invalid paths and methods
         ?assertMatch({404, _}, req(get, Top ++ ?RESHARD ++ "/invalidpath")),
         ?assertMatch({405, _}, req(put, Top ++ ?RESHARD, #{dont => thinkso})),
@@ -119,15 +124,17 @@ create_job_basic(Top) ->
         % POST /_reshard/jobs
         {C1, R1} = req(post, Top ++ ?JOBS,  #{type => split, db => <<?DB1>>}),
         ?assertEqual(201, C1),
-        ?assertMatch([#{<<"ok">> := true, <<"id">> := J, <<"shard">> :=  S}]
+        ?assertMatch([#{?OK := true, ?ID := J, <<"shard">> :=  S}]
             when is_binary(J) andalso is_binary(S), R1),
         [#{?ID := Id, <<"shard">> := Shard}] = R1,
+
         % GET /_reshard/jobs
         ?assertMatch({200, #{
             <<"jobs">> := [#{?ID := Id, <<"type">> := <<"split">>}],
             <<"offset">> := 0,
             <<"total_rows">> := 1
         }}, req(get, Top ++ ?JOBS)),
+
         % GET /_reshard/job/$jobid
         {C2, R2} = req(get, Top ++ ?JOBS ++ ?b2l(Id)),
         ?assertEqual(200, C2),
@@ -141,21 +148,27 @@ create_job_basic(Top) ->
         ?assertMatch(#{<<"job_state">> := JSt} when is_binary(JSt), R2),
         ?assertMatch(#{<<"state_info">> := #{}}, R2),
         ?assertMatch(#{<<"targets">> := Targets} when length(Targets) == 2, R2),
+
         % GET  /_reshard/job/$jobid/state
         ?assertMatch({200, #{<<"state">> := S, <<"reason">> := R}}
             when is_binary(S) andalso (is_binary(R) orelse R =:= null),
             req(get, Top ++ ?JOBS ++ ?b2l(Id) ++ "/state")),
+
         % GET /_reshard
         ?assertMatch({200, #{<<"state">> := <<"running">>, <<"total">> := 1}},
             req(get, Top ++ ?RESHARD)),
+
         % DELETE /_reshard/jobs/$jobid
-        ?assertMatch({200, #{<<"ok">> := true}},
+        ?assertMatch({200, #{?OK := true}},
             req(delete, Top ++ ?JOBS ++ ?b2l(Id))),
+
         % GET _reshard/jobs
         ?assertMatch({200, #{<<"jobs">> := [], <<"total_rows">> := 0}},
             req(get, Top ++ ?JOBS)),
+
         % GET /_reshard/job/$jobid should be a 404
         ?assertMatch({404, #{}}, req(get, Top ++ ?JOBS ++ ?b2l(Id))),
+
         % DELETE /_reshard/jobs/$jobid  should be a 404 as well
         ?assertMatch({404, #{}}, req(delete, Top ++ ?JOBS ++ ?b2l(Id)))
     end).
@@ -163,10 +176,11 @@ create_job_basic(Top) ->
 
 create_two_jobs(Top) ->
     ?_test(begin
-        ?assertMatch({201, [#{<<"ok">> := true}]},
+        ?assertMatch({201, [#{?OK := true}]},
             req(post, Top ++ ?JOBS, #{type => split, db => <<?DB1>>})),
-        ?assertMatch({201, [#{<<"ok">> := true}]},
+        ?assertMatch({201, [#{?OK := true}]},
             req(post, Top ++ ?JOBS, #{type => split, db => <<?DB2>>})),
+
         ?assertMatch({200, #{
             <<"jobs">> := [#{?ID := Id1}, #{?ID := Id2}],
             <<"offset">> := 0,
@@ -175,9 +189,10 @@ create_two_jobs(Top) ->
         ?assertMatch({200, #{<<"total">> := 2}}, req(get, Top ++ ?RESHARD)),
         {200, #{<<"jobs">> := [#{?ID := Id1}, #{?ID := Id2}]}} =
             req(get, Top ++ ?JOBS),
-        {200, #{<<"ok">> := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id1)),
+
+        {200, #{?OK := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id1)),
         ?assertMatch({200, #{<<"total">> := 1}}, req(get, Top ++ ?RESHARD)),
-        {200, #{<<"ok">> := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id2)),
+        {200, #{?OK := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id2)),
         ?assertMatch({200, #{<<"total">> := 0}}, req(get, Top ++ ?RESHARD))
     end).
 
@@ -185,22 +200,27 @@ create_two_jobs(Top) ->
 start_stop_cluster_basic(Top) ->
     ?_test(begin
         Url = Top ++ ?STATE,
+
         ?assertMatch({200, #{
             <<"state">> := <<"running">>,
             <<"reason">> := null
         }}, req(get, Url)),
+
         ?assertMatch({200, _}, req(put, Url, #{state => stopped})),
         ?assertMatch({200, #{
             <<"state">> := <<"stopped">>,
             <<"reason">> := R
         }} when is_binary(R), req(get, Url)),
+
         ?assertMatch({200, _}, req(put, Url, #{state => running})),
+
         % Make sure the reason shows in the state GET request
         Reason = <<"somereason">>,
         ?assertMatch({200, _}, req(put, Url, #{state => stopped,
             reason => Reason})),
         ?assertMatch({200, #{<<"state">> := <<"stopped">>,
             <<"reason">> := Reason}}, req(get, Url)),
+
         % Top level summary also shows the reason
         ?assertMatch({200, #{
             <<"state">> := <<"stopped">>,
@@ -214,11 +234,13 @@ start_stop_cluster_basic(Top) ->
 start_stop_cluster_with_a_job(Top) ->
     ?_test(begin
         Url = Top ++ ?STATE,
+
         ?assertMatch({200, _}, req(put, Url, #{state => stopped})),
         ?assertMatch({200, #{<<"state">> := <<"stopped">>}}, req(get, Url)),
+
         % Can add jobs with global state stopped, they just won't be running
         {201, R1} = req(post, Top ++ ?JOBS, #{type => split, db => <<?DB1>>}),
-        ?assertMatch([#{<<"ok">> := true}], R1),
+        ?assertMatch([#{?OK := true}], R1),
         [#{?ID := Id1}] = R1,
         {200, J1} = req(get, Top ++ ?JOBS ++ ?b2l(Id1)),
         ?assertMatch(#{?ID := Id1, <<"job_state">> := <<"stopped">>}, J1),
@@ -229,46 +251,56 @@ start_stop_cluster_with_a_job(Top) ->
             <<"stopped">> := 1,
             <<"total">> := 1
         }}, req(get, Top ++ ?RESHARD)),
+
         % Can delete the job when stopped
-        {200, #{<<"ok">> := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id1)),
+        {200, #{?OK := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id1)),
         ?assertMatch({200, #{
             <<"state">> := <<"stopped">>,
             <<"running">> := 0,
             <<"stopped">> := 0,
             <<"total">> := 0
         }}, req(get, Top ++ ?RESHARD)),
+
         % Add same job again
         {201, [#{?ID := Id2}]} = req(post, Top ++ ?JOBS, #{type => split,
             db => <<?DB1>>}),
         ?assertMatch({200, #{?ID := Id2, <<"job_state">> := <<"stopped">>}},
             req(get, Top ++ ?JOBS ++ ?b2l(Id2))),
+
         % Job should start after resharding is started on the cluster
         ?assertMatch({200, _}, req(put, Url, #{state => running})),
         ?assertMatch({200, #{?ID := Id2, <<"job_state">> := JSt}}
             when JSt =/= <<"stopped">>, req(get, Top ++ ?JOBS ++ ?b2l(Id2))),
-        {200, #{<<"ok">> := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id2))
+
+        {200, #{?OK := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id2))
      end).
 
 
 individual_job_start_stop(Top) ->
     ?_test(begin
         intercept_state(topoff1),
+
         Body = #{type => split, db => <<?DB1>>},
         {201, [#{?ID := Id}]} = req(post, Top ++ ?JOBS, Body),
+
         JobUrl = Top ++ ?JOBS ++ ?b2l(Id),
         StUrl =  JobUrl ++ "/state",
+
         % Wait for the the job to start running and intercept it in topoff1 state
         receive {JobPid, topoff1} -> ok end,
         % Tell the intercept to never finish checkpointing so job is left hanging
         % forever in running state
         JobPid ! cancel,
         ?assertMatch({200, #{<<"state">> := <<"running">>}}, req(get, StUrl)),
+
         {200, _} = req(put, StUrl, #{state => stopped}),
         wait_state(StUrl, <<"stopped">>),
+
         % Stop/start resharding globally and job should still stay stopped
         ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => stopped})),
         ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running})),
         ?assertMatch({200, #{<<"state">> := <<"stopped">>}}, req(get, StUrl)),
+
         % Start the job again
         ?assertMatch({200, _}, req(put, StUrl, #{state => running})),
         % Wait for the the job to start running and intercept it in topoff1 state
@@ -277,34 +309,43 @@ individual_job_start_stop(Top) ->
         % Let it continue running and it should complete eventually
         JobPid2 ! continue,
         wait_state(StUrl, <<"completed">>),
-        ?assertMatch({200, #{<<"ok">> := true}}, req(delete, JobUrl))
+
+        ?assertMatch({200, #{?OK := true}}, req(delete, JobUrl))
     end).
 
 
 individual_job_stop_when_cluster_stopped(Top) ->
     ?_test(begin
         intercept_state(topoff1),
+
         Body = #{type => split, db => <<?DB1>>},
         {201, [#{?ID := Id}]} = req(post, Top ++ ?JOBS, Body),
+
         JobUrl = Top ++ ?JOBS ++ ?b2l(Id),
         StUrl =  JobUrl ++ "/state",
+
         % Wait for the the job to start running and intercept it in topoff1 state
         receive {JobPid, topoff1} -> ok end,
         % Tell the intercept to never finish checkpointing so job is left hanging
         % forever in running state
         JobPid ! cancel,
         ?assertMatch({200, #{<<"state">> := <<"running">>}}, req(get, StUrl)),
+
         % Stop resharding globally
         ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => stopped})),
         wait_state(StUrl, <<"stopped">>),
+
         % Stop the job specifically
         {200, _} = req(put, StUrl, #{state => stopped}),
         % Job stays stopped
         ?assertMatch({200, #{<<"state">> := <<"stopped">>}}, req(get, StUrl)),
+
         % Set cluster to running again
         ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running})),
+
         % The job should stay stopped
         ?assertMatch({200, #{<<"state">> := <<"stopped">>}}, req(get, StUrl)),
+
         % The it should be possible to resume the job and it should complete
         ?assertMatch({200, _}, req(put, StUrl, #{state => running})),
         % Wait for the the job to start running and intercept it in topoff1 state
@@ -313,8 +354,169 @@ individual_job_stop_when_cluster_stopped(Top) ->
         % Let it continue running and it should complete eventually
         JobPid2 ! continue,
         wait_state(StUrl, <<"completed">>),
-        ?assertMatch({200, #{<<"ok">> := true}}, req(delete, JobUrl))
+
+        ?assertMatch({200, #{?OK := true}}, req(delete, JobUrl))
     end).
+
+
+create_job_with_invalid_arguments(Top) ->
+    ?_test(begin
+        Jobs = Top ++ ?JOBS,
+
+        % Nothing in the body
+        ?assertMatch({400, _}, req(post, Jobs, #{})),
+
+        % Missing type
+        ?assertMatch({400, _}, req(post, Jobs, #{db => <<?DB1>>})),
+
+        % Have type but no db and no shard
+        ?assertMatch({400, _}, req(post, Jobs, #{type => split})),
+
+        % Have type and db but db is invalid
+        ?assertMatch({400, _}, req(post, Jobs,  #{db => <<"baddb">>,
+            type => split})),
+
+        % Have type and shard but shard is not an existing database
+        ?assertMatch({404, _}, req(post, Jobs, #{type => split,
+            shard => <<"shards/80000000-ffffffff/baddb.1549492084">>})),
+
+        % Bad range values, too large, different types, inverted
+        ?assertMatch({400, _}, req(post, Jobs, #{db => <<?DB1>>, range => 42,
+            type => split})),
+        ?assertMatch({400, _}, req(post, Jobs, #{db => <<?DB1>>,
+            range => <<"x">>, type => split})),
+        ?assertMatch({400, _}, req(post, Jobs, #{db => <<?DB1>>,
+            range => <<"ffffffff-80000000">>, type => split})),
+        ?assertMatch({400, _}, req(post, Jobs, #{db => <<?DB1>>,
+            range => <<"00000000-fffffffff">>, type => split})),
+
+        % Can't have both db and shard
+        ?assertMatch({400, _}, req(post, Jobs, #{type => split, db => <<?DB1>>,
+             shard => <<"blah">>}))
+    end).
+
+
+create_job_with_db(Top) ->
+    ?_test(begin
+        Jobs = Top ++ ?JOBS,
+        Db1 = #{type => split, db => <<?DB1>>},
+
+        % Node with db
+        N = atom_to_binary(node(), utf8),
+        {C1, R1} = req(post, Jobs, Db1#{node => N}),
+        ?assertMatch({201, [#{?OK := true}]}, {C1, R1}),
+        wait_to_complete_then_cleanup(Top, R1),
+
+        % Range and db
+        {C2, R2} = req(post, Jobs, Db1#{range => <<"00000000-7fffffff">>}),
+        ?assertMatch({201, [#{?OK := true}]}, {C2, R2}),
+        wait_to_complete_then_cleanup(Top, R2),
+
+        % Node, range and db
+        Range = <<"80000000-ffffffff">>,
+        {C3, R3} = req(post, Jobs, Db1#{range => Range, node => N}),
+        ?assertMatch({201, [#{?OK := true}]}, {C3, R3}),
+        wait_to_complete_then_cleanup(Top, R3),
+
+        ?assertMatch([
+            [16#00000000, 16#3fffffff],
+            [16#40000000, 16#7fffffff],
+            [16#80000000, 16#bfffffff],
+            [16#c0000000, 16#ffffffff]
+        ], [mem3:range(S) || S <- lists:sort(mem3:shards(<<?DB1>>))])
+    end).
+
+
+create_job_with_shard_name(Top) ->
+    ?_test(begin
+        Jobs = Top ++ ?JOBS,
+        [S1, S2] = [mem3:name(S) || S <- lists:sort(mem3:shards(<<?DB3>>))],
+
+        % Shard only
+        {C1, R1} = req(post, Jobs, #{type => split, shard => S1}),
+        ?assertMatch({201, [#{?OK := true}]}, {C1, R1}),
+        wait_to_complete_then_cleanup(Top, R1),
+
+        % Shard with a node
+        N = atom_to_binary(node(), utf8),
+        {C2, R2} = req(post, Jobs, #{type => split, shard => S2, node => N}),
+        ?assertMatch({201, [#{?OK := true}]}, {C2, R2}),
+        wait_to_complete_then_cleanup(Top, R2),
+
+        ?assertMatch([
+            [16#00000000, 16#3fffffff],
+            [16#40000000, 16#7fffffff],
+            [16#80000000, 16#bfffffff],
+            [16#c0000000, 16#ffffffff]
+        ], [mem3:range(S) || S <- lists:sort(mem3:shards(<<?DB3>>))])
+    end).
+
+
+completed_job_handling(Top) ->
+    ?_test(begin
+        Jobs = Top ++ ?JOBS,
+
+        % Run job to completion
+        {C1, R1} = req(post, Jobs, #{type => split, db => <<?DB1>>}),
+        ?assertMatch({201, [#{?OK := true}]}, {C1, R1}),
+        [#{?ID := Id}] = R1,
+        wait_to_complete(Top, R1),
+
+        % Check top level stats
+        ?assertMatch({200, #{
+            <<"state">> := <<"running">>,
+            <<"state_reason">> := null,
+            <<"completed">> := 1,
+            <<"failed">> := 0,
+            <<"running">> := 0,
+            <<"stopped">> := 0,
+            <<"total">> := 1
+        }}, req(get, Top ++ ?RESHARD)),
+
+        % Job state itself
+        JobUrl = Jobs ++ ?b2l(Id),
+        ?assertMatch({200, #{
+            <<"split_state">> := <<"completed">>,
+            <<"job_state">> := <<"completed">>
+        }}, req(get, JobUrl)),
+
+        % Job's state endpoint
+        StUrl = Jobs ++ ?b2l(Id) ++ "/state",
+        ?assertMatch({200, #{<<"state">> := <<"completed">>}}, req(get, StUrl)),
+
+        % Try to stop it and it should stay completed
+        {200, _} = req(put, StUrl, #{state => stopped}),
+        ?assertMatch({200, #{<<"state">> := <<"completed">>}}, req(get, StUrl)),
+
+        % Try to resume it and it should stay completed
+        {200, _} = req(put, StUrl, #{state => running}),
+        ?assertMatch({200, #{<<"state">> := <<"completed">>}}, req(get, StUrl)),
+
+        % Stop resharding globally and job should still stay completed
+        ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => stopped})),
+        ?assertMatch({200, #{<<"state">> := <<"completed">>}}, req(get, StUrl)),
+
+        % Start resharding and job stays completed
+        ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running})),
+        ?assertMatch({200, #{<<"state">> := <<"completed">>}}, req(get, StUrl)),
+
+        ?assertMatch({200, #{?OK := true}}, req(delete, JobUrl))
+    end).
+
+
+wait_to_complete_then_cleanup(Top, Jobs) ->
+    JobsUrl = Top ++ ?JOBS,
+    lists:foreach(fun(#{?ID := Id}) ->
+        wait_state(JobsUrl ++ ?b2l(Id) ++ "/state", <<"completed">>),
+        {200, _} = req(delete, JobsUrl ++ ?b2l(Id))
+    end, Jobs).
+
+
+wait_to_complete(Top, Jobs) ->
+    JobsUrl = Top ++ ?JOBS,
+    lists:foreach(fun(#{?ID := Id}) ->
+        wait_state(JobsUrl ++ ?b2l(Id) ++ "/state", <<"completed">>)
+    end, Jobs).
 
 
 intercept_state(State) ->
@@ -338,7 +540,7 @@ wait_state(Url, State) ->
     test_util:wait(fun() ->
             case req(get, Url) of
                 {200, #{<<"state">> := State}} -> ok;
-                {200, #{}} -> timer:sleep(250), wait
+                {200, #{}} -> timer:sleep(10), wait
             end
     end).
 
