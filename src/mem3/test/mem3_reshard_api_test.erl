@@ -45,11 +45,12 @@ setup() ->
 
 
 teardown(Url) ->
-    meck:unload(),
     mem3_reshard:reset_state(),
-    delete_db(Url ++ ?DB1),
-    delete_db(Url ++ ?DB2),
-    delete_db(Url ++ ?DB3),
+    meck:unload(),
+    catch delete_db(Url ++ ?DB1),
+    catch delete_db(Url ++ ?DB2),
+    catch delete_db(Url ++ ?DB3),
+    ok = config:delete("mem3_reshard", "max_jobs", _Persist=false),
     ok = config:delete("admins", ?USER, _Persist=false).
 
 
@@ -74,6 +75,7 @@ mem3_reshard_api_test_() ->
                     fun basics/1,
                     fun create_job_basic/1,
                     fun create_two_jobs/1,
+                    fun create_multiple_jobs_from_one_post/1,
                     fun start_stop_cluster_basic/1,
                     fun start_stop_cluster_with_a_job/1,
                     fun individual_job_start_stop/1,
@@ -81,7 +83,13 @@ mem3_reshard_api_test_() ->
                     fun create_job_with_invalid_arguments/1,
                     fun create_job_with_db/1,
                     fun create_job_with_shard_name/1,
-                    fun completed_job_handling/1
+                    fun completed_job_handling/1,
+                    fun handle_source_deletion_in_initial_copy/1,
+                    fun handle_source_deletion_in_topoff/1,
+                    fun handle_source_deletion_in_copy_local_docs/1,
+                    fun handle_source_deletion_in_build_indices/1,
+                    fun handle_source_deletion_in_update_shard_map/1,
+                    fun handle_source_deletion_in_source_delete/1
                 ]
             }
         }
@@ -176,24 +184,36 @@ create_job_basic(Top) ->
 
 create_two_jobs(Top) ->
     ?_test(begin
+        Jobs = Top ++ ?JOBS,
+
         ?assertMatch({201, [#{?OK := true}]},
-            req(post, Top ++ ?JOBS, #{type => split, db => <<?DB1>>})),
+            req(post, Jobs, #{type => split, db => <<?DB1>>})),
         ?assertMatch({201, [#{?OK := true}]},
-            req(post, Top ++ ?JOBS, #{type => split, db => <<?DB2>>})),
+            req(post, Jobs, #{type => split, db => <<?DB2>>})),
+
+        ?assertMatch({200, #{<<"total">> := 2}}, req(get, Top ++ ?RESHARD)),
 
         ?assertMatch({200, #{
             <<"jobs">> := [#{?ID := Id1}, #{?ID := Id2}],
             <<"offset">> := 0,
             <<"total_rows">> := 2
-        }} when Id1 =/= Id2, req(get, Top ++ ?JOBS)),
-        ?assertMatch({200, #{<<"total">> := 2}}, req(get, Top ++ ?RESHARD)),
-        {200, #{<<"jobs">> := [#{?ID := Id1}, #{?ID := Id2}]}} =
-            req(get, Top ++ ?JOBS),
+        }} when Id1 =/= Id2, req(get, Jobs)),
 
-        {200, #{?OK := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id1)),
+        {200, #{<<"jobs">> := [#{?ID := Id1}, #{?ID := Id2}]}} = req(get, Jobs),
+
+        {200, #{?OK := true}} = req(delete, Jobs ++ ?b2l(Id1)),
         ?assertMatch({200, #{<<"total">> := 1}}, req(get, Top ++ ?RESHARD)),
-        {200, #{?OK := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id2)),
+        {200, #{?OK := true}} = req(delete, Jobs ++ ?b2l(Id2)),
         ?assertMatch({200, #{<<"total">> := 0}}, req(get, Top ++ ?RESHARD))
+    end).
+
+
+create_multiple_jobs_from_one_post(Top) ->
+     ?_test(begin
+        Jobs = Top ++ ?JOBS,
+        {C1, R1} = req(post, Jobs, #{type => split, db => <<?DB3>>}),
+        ?assertMatch({201, [#{?OK := true}, #{?OK := true}]}, {C1, R1}),
+        ?assertMatch({200, #{<<"total">> := 2}}, req(get, Top ++ ?RESHARD))
     end).
 
 
@@ -270,9 +290,7 @@ start_stop_cluster_with_a_job(Top) ->
         % Job should start after resharding is started on the cluster
         ?assertMatch({200, _}, req(put, Url, #{state => running})),
         ?assertMatch({200, #{?ID := Id2, <<"job_state">> := JSt}}
-            when JSt =/= <<"stopped">>, req(get, Top ++ ?JOBS ++ ?b2l(Id2))),
-
-        {200, #{?OK := true}} = req(delete, Top ++ ?JOBS ++ ?b2l(Id2))
+            when JSt =/= <<"stopped">>, req(get, Top ++ ?JOBS ++ ?b2l(Id2)))
      end).
 
 
@@ -308,9 +326,7 @@ individual_job_start_stop(Top) ->
         ?assertMatch({200, #{<<"state">> := <<"running">>}}, req(get, StUrl)),
         % Let it continue running and it should complete eventually
         JobPid2 ! continue,
-        wait_state(StUrl, <<"completed">>),
-
-        ?assertMatch({200, #{?OK := true}}, req(delete, JobUrl))
+        wait_state(StUrl, <<"completed">>)
     end).
 
 
@@ -353,9 +369,8 @@ individual_job_stop_when_cluster_stopped(Top) ->
         ?assertMatch({200, #{<<"state">> := <<"running">>}}, req(get, StUrl)),
         % Let it continue running and it should complete eventually
         JobPid2 ! continue,
-        wait_state(StUrl, <<"completed">>),
+        wait_state(StUrl, <<"completed">>)
 
-        ?assertMatch({200, #{?OK := true}}, req(delete, JobUrl))
     end).
 
 
@@ -504,6 +519,50 @@ completed_job_handling(Top) ->
     end).
 
 
+handle_source_deletion_in_topoff(Top) ->
+    ?_test(begin
+        JobId = delete_source_in_state(Top, ?DB1, topoff1),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
+    end).
+
+
+handle_source_deletion_in_initial_copy(Top) ->
+    ?_test(begin
+        JobId = delete_source_in_state(Top, ?DB1, initial_copy),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
+    end).
+
+
+handle_source_deletion_in_copy_local_docs(Top) ->
+    ?_test(begin
+        JobId = delete_source_in_state(Top, ?DB1, copy_local_docs),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
+    end).
+
+
+handle_source_deletion_in_build_indices(Top) ->
+    ?_test(begin
+        JobId = delete_source_in_state(Top, ?DB1, build_indices),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
+    end).
+
+
+handle_source_deletion_in_update_shard_map(Top) ->
+    ?_test(begin
+        JobId = delete_source_in_state(Top, ?DB1, update_shardmap),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
+    end).
+
+
+handle_source_deletion_in_source_delete(Top) ->
+    ?_test(begin
+        JobId = delete_source_in_state(Top, ?DB1, source_delete),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
+    end).
+
+
+% Test help functions
+
 wait_to_complete_then_cleanup(Top, Jobs) ->
     JobsUrl = Top ++ ?JOBS,
     lists:foreach(fun(#{?ID := Id}) ->
@@ -540,9 +599,19 @@ wait_state(Url, State) ->
     test_util:wait(fun() ->
             case req(get, Url) of
                 {200, #{<<"state">> := State}} -> ok;
-                {200, #{}} -> timer:sleep(10), wait
+                {200, #{}} -> timer:sleep(100), wait
             end
     end).
+
+
+delete_source_in_state(Top, Db, State) when is_atom(State) ->
+    intercept_state(State),
+    Body = #{type => split, db => list_to_binary(Db)},
+    {201, [#{?ID := Id}]} = req(post, Top ++ ?JOBS, Body),
+    receive {JobPid, State} -> ok end,
+    delete_db(Top ++ Db),
+    JobPid ! continue,
+    Id.
 
 
 create_db(Url) ->

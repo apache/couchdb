@@ -28,7 +28,6 @@
    stop/1,
    get_state/0,
    reset_state/0,
-   db_monitor/1,
    now_sec/0,
    update_history/4,
 
@@ -175,8 +174,7 @@ init(_) ->
         state = running,
         state_info = [],
         update_time = now_sec(),
-        node = node(),
-        db_monitor = spawn_link(?MODULE, db_monitor, [self()])
+        node = node()
     },
     State1 = mem3_reshard_store:init(State, ?JOB_PREFIX, state_id()),
     State2 = mem3_reshard_store:load_state(State1),
@@ -186,8 +184,6 @@ init(_) ->
 
 terminate(Reason, State) ->
     couch_log:notice("~p terminate ~p ~p", [?MODULE, Reason, statefmt(State)]),
-    catch unlink(State#state.db_monitor),
-    catch exit(State#state.db_monitor, kill),
     [kill_job_int(Job) || Job <- running_jobs()],
     ok.
 
@@ -328,7 +324,6 @@ handle_cast({report, Job}, State) ->
     report_int(Job),
     {noreply, State};
 
-
 handle_cast({checkpoint, Job}, State) ->
     {noreply, checkpoint_int(Job, State)};
 
@@ -337,11 +332,6 @@ handle_cast(reload_jobs, State) ->
     State1 = reload_jobs(State),
     couch_log:notice("~p finished reloading jobs", [?MODULE]),
     {noreply, State1};
-
-handle_cast({db_deleted, Jobs}, State) ->
-    couch_log:notice("~p db_deleted: ~B jobs", [?MODULE, length(Jobs)]),
-    fail_jobs_for_deleted_sources(Jobs, State),
-    {noreply, State};
 
 handle_cast(Cast, State) ->
     couch_log:error("~p unexpected cast ~p", [?MODULE, Cast]),
@@ -644,24 +634,10 @@ now_sec() ->
     Mega * 1000000 + Sec.
 
 
--spec jobs_by_dbname(binary()) -> [#job{}].
-jobs_by_dbname(Name) ->
-    Pat = #job{source = #shard{name = Name, _ = '_'}, _ = '_'},
-    [Job || [Job] <- ets:match_object(?MODULE, Pat)].
-
-
 -spec running_jobs() -> [#job{}].
 running_jobs() ->
     Pat = #job{job_state = running, _ = '_'},
     ets:match_object(?MODULE, Pat).
-
-
--spec fail_jobs_for_deleted_sources([#job{}], #state{}) -> ok.
-fail_jobs_for_deleted_sources(Jobs, #state{} = State) ->
-    JobCount = length(Jobs),
-    couch_log:notice("~p fail ~B jobs, source deleted", [?MODULE, JobCount]),
-    [stop_job_int(Job, failed, "Source was deleted", State) || Job <- Jobs],
-    ok.
 
 
 -spec info_update(atom(), any(), [tuple()]) -> [tuple()].
@@ -710,46 +686,27 @@ report_int(Job) ->
     end.
 
 
--spec db_monitor(pid()) -> no_return().
-db_monitor(Server) ->
-    couch_log:notice("~p db monitor ~p starting", [?MODULE, self()]),
-    EvtRef = erlang:monitor(process, couch_event_server),
-    couch_event:register_all(self()),
-    db_monitor_loop(Server, EvtRef).
-
-
--spec db_monitor_loop(pid(), reference()) -> no_return().
-db_monitor_loop(Server, EvtRef) ->
-    receive
-        {'$couch_event', DbName, deleted} ->
-            case jobs_by_dbname(DbName) of
-                [] ->
-                    ok;
-                Jobs ->
-                    gen_server:cast(Server, {db_deleted, Jobs})
-            end,
-            db_monitor_loop(Server, EvtRef);
-        {'$couch_event', _, _} ->
-            db_monitor_loop(Server, EvtRef);
-        {'DOWN', EvtRef, _, _, Info} ->
-            couch_log:error("~p db monitor listener died ~p", [?MODULE, Info]),
-            exit({db_monitor_died, Info});
-        Msg ->
-            couch_log:error("~p db monitor unexpected msg ~p", [?MODULE, Msg]),
-            db_monitor_loop(Server, EvtRef)
-    end.
-
-
+% This function is for testing and debugging only
 -spec reset_state(#state{}) -> #state{}.
 reset_state(#state{} = State) ->
-    couch_log:warning("~p deleting state", [?MODULE]),
+    couch_log:warning("~p resetting state", [?MODULE]),
     ok = mem3_reshard_store:delete_state(State),
+    couch_log:warning("~p killing all running jobs", [?MODULE]),
+    [kill_job_int(Job) || Job <- running_jobs()],
+    ets:delete_all_objects(?MODULE),
+    couch_log:warning("~p resetting all job states", [?MODULE]),
     Jobs = mem3_reshard_store:get_jobs(State),
     lists:foldl(fun(#job{id = Id}, StateAcc) ->
-        couch_log:warning("~p deleting job ~p", [?MODULE, Id]),
+        couch_log:warning("~p resetting job state ~p", [?MODULE, Id]),
         ok = mem3_reshard_store:delete_job(StateAcc, Id),
         StateAcc
-    end, State, Jobs).
+    end, State, Jobs),
+    couch_log:warning("~p resetting state done", [?MODULE]),
+    State#state{
+        state = running,
+        state_info = [],
+        update_time = now_sec()
+    }.
 
 
 -spec update_job_history(#job{}) -> #job{}.
@@ -798,11 +755,11 @@ max_history() ->
 
 
 -spec statefmt(#state{} | term()) -> string().
-statefmt(#state{state = StateName, db_monitor = Pid}) ->
+statefmt(#state{state = StateName}) ->
     Total = ets:info(?MODULE, size),
     Active = mem3_reshard_job_sup:count_children(),
-    Msg = "#state{~s total:~B active:~B mon:~p}",
-    Fmt = io_lib:format(Msg, [StateName, Total, Active, Pid]),
+    Msg = "#state{~s total:~B active:~B}",
+    Fmt = io_lib:format(Msg, [StateName, Total, Active]),
     lists:flatten(Fmt);
 
 statefmt(State) ->

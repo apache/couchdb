@@ -55,58 +55,71 @@
 % Public API
 
 split(Source, #{} = Targets, PickFun) when is_function(PickFun, 3) ->
-    {ok, SourceDb} = couch_db:open_int(Source, [?ADMIN_CTX]),
-    Engine = get_engine(SourceDb),
-    Partitioned = couch_db:is_partitioned(SourceDb),
-    {_M, _F, _A} = HashFun = mem3_hash:get_hash_fun(couch_db:name(SourceDb)),
-    try
-        try
-            split(SourceDb, Partitioned, Engine, Targets, PickFun, HashFun)
-        catch
-            throw:{target_create_error, DbName, Error, CreatedTargets} ->
-                cleanup_targets(CreatedTargets, Engine),
-                {error, {target_create_error, DbName, Error}}
-        end
-    after
-        couch_db:close(SourceDb)
+    case couch_db:open_int(Source, [?ADMIN_CTX]) of
+        {ok, SourceDb} ->
+            Engine = get_engine(SourceDb),
+            Partitioned = couch_db:is_partitioned(SourceDb),
+            HashFun = mem3_hash:get_hash_fun(couch_db:name(SourceDb)),
+            try
+                try
+                    split(SourceDb, Partitioned, Engine, Targets, PickFun,
+                        HashFun)
+                catch
+                    throw:{target_create_error, DbName, Error, TargetDbs} ->
+                        cleanup_targets(TargetDbs, Engine),
+                        {error, {target_create_error, DbName, Error}}
+                end
+            after
+                couch_db:close(SourceDb)
+            end;
+        {not_found, _} ->
+            {error, missing_source}
     end.
 
 
 copy_local_docs(Source, #{} = Targets0, PickFun) when
         is_binary(Source), is_function(PickFun, 3) ->
-    {ok, SourceDb} = couch_db:open_int(Source, [?ADMIN_CTX]),
-    try
-        Targets = maps:map(fun(_, DbName) ->
-            {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
-            #target{db = Db, uuid = couch_db:get_uuid(Db)}
-        end, Targets0),
-        try
-            State = #state{
-                source_db = SourceDb,
-                source_uuid = couch_db:get_uuid(SourceDb),
-                targets = Targets,
-                pickfun = PickFun,
-                hashfun = mem3_hash:get_hash_fun(couch_db:name(SourceDb))
-            },
-            copy_local_docs(State),
-            ok
-        after
-            maps:map(fun(_, #target{db = Db} = T) ->
-                couch_db:close(Db),
-                T#target{db = undefined}
-            end, Targets)
-        end
-    after
-        couch_db:close(SourceDb)
+    case couch_db:open_int(Source, [?ADMIN_CTX]) of
+        {ok, SourceDb} ->
+            try
+                Targets = maps:map(fun(_, DbName) ->
+                    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+                    #target{db = Db, uuid = couch_db:get_uuid(Db)}
+                end, Targets0),
+                try
+                    State = #state{
+                        source_db = SourceDb,
+                        source_uuid = couch_db:get_uuid(SourceDb),
+                        targets = Targets,
+                        pickfun = PickFun,
+                        hashfun = mem3_hash:get_hash_fun(couch_db:name(SourceDb))
+                    },
+                    copy_local_docs(State),
+                    ok
+                after
+                    maps:map(fun(_, #target{db = Db} = T) ->
+                        couch_db:close(Db),
+                        T#target{db = undefined}
+                    end, Targets)
+                end
+            after
+                couch_db:close(SourceDb)
+            end;
+        {not_found, _} ->
+            {error, missing_source}
     end.
 
 
 cleanup_target(Source, Target) when is_binary(Source), is_binary(Target) ->
-    {ok, SourceDb} = couch_db:open_int(Source, [?ADMIN_CTX]),
-    try
-        delete_target(Target, get_engine(SourceDb))
-    after
-        couch_db:close(SourceDb)
+    case couch_db:open_int(Source, [?ADMIN_CTX]) of
+        {ok, SourceDb} ->
+            try
+                delete_target(Target, get_engine(SourceDb))
+            after
+                couch_db:close(SourceDb)
+            end;
+        {not_found, _} ->
+            {error, missing_source}
     end.
 
 

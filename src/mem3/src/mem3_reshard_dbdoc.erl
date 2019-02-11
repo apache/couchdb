@@ -29,15 +29,17 @@ update_shard_map(#job{source = Source, targets = Targets} = Job) ->
         ok ->
             ok;
         Error ->
-            error(Error)
+            exit(Error)
     end,
     #shard{name = SourceName} = Source,
     DocId = mem3:dbname(SourceName),
     OldBody = case mem3_util:open_db_doc(DocId) of
         {ok, #doc{body = DocBody}} ->
             DocBody;
+        {not_found, deleted} ->
+            exit({error, missing_source});
         OpenErr ->
-            error({shard_doc_open_error, OpenErr})
+            exit({shard_doc_open_error, OpenErr})
     end,
     Node = hd(mem3_util:live_nodes()),
     Body = update_shard_props(OldBody, Source, Targets),
@@ -53,12 +55,12 @@ update_shard_map(#job{source = Source, targets = Targets} = Job) ->
                 true ->
                     ok;
                 false ->
-                    error({shard_update_did_not_propagate, Source})
+                    exit({shard_update_did_not_propagate, Source})
             end;
         UpdateErr ->
             ErrArgs = [?MODULE, JobStr, Node, UpdateErr],
             couch_log:error("~p : ~s node:~p error:~p", ErrArgs),
-            error({shard_doc_update_error, UpdateErr})
+            exit({shard_doc_update_error, UpdateErr})
     end.
 
 
@@ -152,7 +154,7 @@ remove_node_from_source(ByRange, Source) ->
         true ->
             ok;
         false ->
-            error({source_shard_missing_node, NodeKey, SourceNodes})
+            exit({source_shard_missing_node, NodeKey, SourceNodes})
     end,
     SourceNodes1 = SourceNodes -- [NodeKey],
     case SourceNodes1 of
@@ -173,7 +175,7 @@ add_node_to_target_foldl(#shard{} = Target, ByRange) ->
                 false ->
                     ok;
                 true ->
-                    error({target_shard_already_has_node, NodeKey, Nodes})
+                    exit({target_shard_already_has_node, NodeKey, Nodes})
             end,
             Nodes1 = lists:sort([NodeKey | Nodes]),
             lists:keyreplace(TKey, 1, ByRange, {TKey, Nodes1});

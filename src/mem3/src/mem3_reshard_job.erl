@@ -305,6 +305,12 @@ worker_exited(normal, #job{workers = Workers} = Job) when Workers =/= [] ->
     couch_log:debug(Msg, [?MODULE, jobfmt(Job), WaitingOn]),
     {noreply, Job};
 
+worker_exited({error, missing_source}, #job{} = Job) ->
+    Msg = "~p stopping worker due to source missing ~p",
+    couch_log:error(Msg, [?MODULE, jobfmt(Job)]),
+    [begin unlink(Pid), exit(Pid, kill) end || Pid <- Job#job.workers],
+    {stop, {error, missing_source}, Job};
+
 worker_exited(Reason, #job{} = Job0) ->
     couch_log:error("~p worker error ~p ~p", [?MODULE, jobfmt(Job0), Reason]),
     [begin unlink(Pid), exit(Pid, kill) end || Pid <- Job0#job.workers],
@@ -333,10 +339,21 @@ initial_copy(#job{source = Source, targets = Targets0} = Job) ->
     #shard{name = SourceName} = Source,
     Targets = [{Range, Name} || #shard{range = Range, name = Name} <- Targets0],
     TMap = maps:from_list(Targets),
-    couch_log:notice("~p initial_copy start ~s", [?MODULE, shardsstr(Source, Targets0)]),
-    {ok, Seq} = couch_db_split:split(SourceName, TMap, fun pickfun/3),
-    couch_log:notice("~p initial_copy of ~p finished @ ~p", [?MODULE, Source, Seq]),
-    create_artificial_mem3_rep_checkpoints(Job, Seq).
+    LogMsg1 = "~p initial_copy started ~s",
+    LogArgs1 = [?MODULE, shardsstr(Source, Targets0)],
+    couch_log:notice(LogMsg1,  LogArgs1),
+    case couch_db_split:split(SourceName, TMap, fun pickfun/3) of
+        {ok, Seq} ->
+            LogMsg2 = "~p initial_copy of ~s finished @ seq:~p",
+            LogArgs2 = [?MODULE, shardsstr(Source, Targets0), Seq],
+            couch_log:notice(LogMsg2, LogArgs2),
+            create_artificial_mem3_rep_checkpoints(Job, Seq);
+        {error, Error} ->
+            LogMsg3 = "~p initial_copy of ~p finished @ ~p",
+            LogArgs3 = [?MODULE, shardsstr(Source, Targets0), Error],
+            couch_log:notice(LogMsg3, LogArgs3),
+            exit({error, Error})
+    end.
 
 
 create_artificial_mem3_rep_checkpoints(#job{} = Job, Seq) ->
@@ -419,24 +436,34 @@ copy_local_docs(#job{source = Source, targets = Targets0}) ->
     #shard{name = SourceName} = Source,
     Targets = [{Range, Name} || #shard{range = Range, name = Name} <- Targets0],
     TMap = maps:from_list(Targets),
-    couch_log:notice("~p copy local docs start ~p -> ~p", [?MODULE, Source, Targets]),
-    ok = couch_db_split:copy_local_docs(SourceName, TMap, fun pickfun/3),
-    couch_log:notice("~p copy local docs finished for ~p", [?MODULE, Source]),
-    ok.
+    LogArg1 = [?MODULE, shardsstr(Source, Targets)],
+    couch_log:notice("~p copy local docs start ~s", LogArg1),
+    case couch_db_split:copy_local_docs(SourceName, TMap, fun pickfun/3) of
+        ok ->
+            couch_log:notice("~p copy local docs finished for ~s", LogArg1),
+            ok;
+        {error, Error} ->
+            LogArg2 = [?MODULE, shardsstr(Source, Targets), Error],
+            couch_log:error("~p copy local docs failed for ~s ~p", LogArg2),
+            exit({error, Error})
+    end.
 
 
 wait_source_close(#job{source = #shard{name = Name}}) ->
     Timeout = config:get_integer("mem3_reshard",
         "source_close_timeout_sec", 600),
-    couch_util:with_db(Name, fun(Db) ->
-        Now = mem3_reshard:now_sec(),
-        case wait_source_close(Db, 5, Now + Timeout) of
-            true ->
-                ok;
-            false ->
-                exit({error, source_db_close_timeout, Name, Timeout})
-        end
-    end).
+    case couch_db:open_int(Name, [?ADMIN_CTX]) of
+        {ok, Db} ->
+            Now = mem3_reshard:now_sec(),
+            case wait_source_close(Db, 5, Now + Timeout) of
+                true ->
+                    ok;
+                false ->
+                    exit({error, source_db_close_timeout, Name, Timeout})
+            end;
+        {not_found, _} ->
+            exit({error, missing_source})
+    end.
 
 
 wait_source_close(Db, SleepSec, UntilSec) ->
@@ -460,8 +487,14 @@ wait_source_close(Db, SleepSec, UntilSec) ->
 source_delete(#job{source = #shard{name = Name}}) ->
     case config:get_boolean("mem3_reshard", "delete_source", true) of
         true ->
-            ok = couch_server:delete(Name, [?ADMIN_CTX]),
-            couch_log:warning("~p : deleted source shard ~p", [?MODULE, Name]);
+            case couch_server:delete(Name, [?ADMIN_CTX]) of
+                ok ->
+                    couch_log:notice("~p : deleted source shard ~p",
+                        [?MODULE, Name]);
+                not_found ->
+                    couch_log:warning("~p : source was already deleted ~p",
+                        [?MODULE, Name])
+            end;
         false ->
             couch_log:notice("~p : not deleting source shard ~p", [?MODULE, Name])
     end,

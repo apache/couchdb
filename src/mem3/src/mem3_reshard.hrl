@@ -69,7 +69,6 @@
     update_time :: non_neg_integer(),
     job_prefix :: binary(),
     state_id :: binary(),
-    db_monitor :: pid(),
     node :: node()
 }).
 
