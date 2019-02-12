@@ -98,8 +98,11 @@ go(#acc{source=Source, batch_count=BC}=Acc) ->
         Resp = try
             HashFun = mem3_hash:get_hash_fun(couch_db:name(Db)),
             repl(Acc#acc{db = Db, hashfun = HashFun})
-        catch error:{not_found, no_db_file} ->
-            {error, missing_target}
+        catch
+            error:{error, missing_source} ->
+                {error, missing_source};
+            error:{not_found, no_db_file} ->
+                {error, missing_target}
         after
             couch_db:close(Db)
         end,
@@ -591,11 +594,15 @@ find_repl_doc(SrcDb, TgtUUIDPrefix) ->
 
 
 with_src_db(#acc{source = Source}, Fun) ->
-    {ok, Db} = couch_db:open(Source#shard.name, [?ADMIN_CTX]),
-    try
-        Fun(Db)
-    after
-        couch_db:close(Db)
+    case couch_db:open(Source#shard.name, [?ADMIN_CTX]) of
+        {ok, Db} ->
+            try
+                Fun(Db)
+            after
+                couch_db:close(Db)
+            end;
+         {not_found, _} ->
+            error({error, missing_source})
     end.
 
 

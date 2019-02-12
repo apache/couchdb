@@ -38,20 +38,21 @@ setup() ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
     Url = lists:concat(["http://", Addr, ":", Port, "/"]),
-    create_db(Url ++ ?DB1 ++ "?q=1&n=1"),
-    create_db(Url ++ ?DB2 ++ "?q=1&n=1"),
-    create_db(Url ++ ?DB3 ++ "?q=2&n=1"),
+    create_db(Url, ?DB1, "?q=1&n=1"),
+    create_db(Url, ?DB2, "?q=1&n=1"),
+    create_db(Url, ?DB3, "?q=2&n=1"),
     Url.
 
 
 teardown(Url) ->
     mem3_reshard:reset_state(),
-    meck:unload(),
-    catch delete_db(Url ++ ?DB1),
-    catch delete_db(Url ++ ?DB2),
-    catch delete_db(Url ++ ?DB3),
+    delete_db(Url, ?DB1),
+    delete_db(Url, ?DB2),
+    delete_db(Url, ?DB3),
     ok = config:delete("mem3_reshard", "max_jobs", _Persist=false),
-    ok = config:delete("admins", ?USER, _Persist=false).
+    ok = config:delete("admins", ?USER, _Persist=false),
+    meck:unload().
+
 
 
 start_couch() ->
@@ -84,12 +85,22 @@ mem3_reshard_api_test_() ->
                     fun create_job_with_db/1,
                     fun create_job_with_shard_name/1,
                     fun completed_job_handling/1,
-                    fun handle_source_deletion_in_initial_copy/1,
-                    fun handle_source_deletion_in_topoff/1,
-                    fun handle_source_deletion_in_copy_local_docs/1,
-                    fun handle_source_deletion_in_build_indices/1,
-                    fun handle_source_deletion_in_update_shard_map/1,
-                    fun handle_source_deletion_in_source_delete/1
+                    fun handle_db_deletion_in_initial_copy/1,
+                    fun handle_db_deletion_in_topoff1/1,
+                    fun handle_db_deletion_in_copy_local_docs/1,
+                    fun handle_db_deletion_in_build_indices/1,
+                    fun handle_db_deletion_in_update_shard_map/1,
+                    fun handle_db_deletion_in_wait_source_close/1,
+                    fun handle_db_deletion_in_topoff3/1,
+                    fun handle_db_deletion_in_source_delete/1,
+                    fun recover_in_initial_copy/1,
+                    fun recover_in_topoff1/1,
+                    fun recover_in_copy_local_docs/1,
+                    fun recover_in_build_indices/1,
+                    fun recover_in_update_shard_map/1,
+                    fun recover_in_wait_source_close/1,
+                    fun recover_in_topoff3/1,
+                    fun recover_in_source_delete/1
                 ]
             }
         }
@@ -519,46 +530,117 @@ completed_job_handling(Top) ->
     end).
 
 
-handle_source_deletion_in_topoff(Top) ->
+handle_db_deletion_in_topoff1(Top) ->
     ?_test(begin
         JobId = delete_source_in_state(Top, ?DB1, topoff1),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
     end).
 
 
-handle_source_deletion_in_initial_copy(Top) ->
+handle_db_deletion_in_initial_copy(Top) ->
     ?_test(begin
         JobId = delete_source_in_state(Top, ?DB1, initial_copy),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
     end).
 
 
-handle_source_deletion_in_copy_local_docs(Top) ->
+handle_db_deletion_in_copy_local_docs(Top) ->
     ?_test(begin
         JobId = delete_source_in_state(Top, ?DB1, copy_local_docs),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
     end).
 
 
-handle_source_deletion_in_build_indices(Top) ->
+handle_db_deletion_in_build_indices(Top) ->
     ?_test(begin
         JobId = delete_source_in_state(Top, ?DB1, build_indices),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
     end).
 
 
-handle_source_deletion_in_update_shard_map(Top) ->
+handle_db_deletion_in_update_shard_map(Top) ->
     ?_test(begin
         JobId = delete_source_in_state(Top, ?DB1, update_shardmap),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
     end).
 
 
-handle_source_deletion_in_source_delete(Top) ->
+handle_db_deletion_in_wait_source_close(Top) ->
+    ?_test(begin
+        JobId = delete_source_in_state(Top, ?DB1, wait_source_close),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
+    end).
+
+
+handle_db_deletion_in_topoff3(Top) ->
+    ?_test(begin
+        JobId = delete_source_in_state(Top, ?DB1, topoff3),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
+    end).
+
+
+handle_db_deletion_in_source_delete(Top) ->
     ?_test(begin
         JobId = delete_source_in_state(Top, ?DB1, source_delete),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
+    end).
+
+
+recover_in_topoff1(Top) ->
+    ?_test(begin
+        JobId = recover_in_state(Top, ?DB1, topoff1),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
     end).
+
+
+recover_in_initial_copy(Top) ->
+    {timeout, 60, ?_test(begin
+        JobId = recover_in_state(Top, ?DB1, initial_copy),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
+    end)}.
+
+
+recover_in_copy_local_docs(Top) ->
+    ?_test(begin
+        JobId = recover_in_state(Top, ?DB1, copy_local_docs),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
+    end).
+
+
+recover_in_build_indices(Top) ->
+    ?_test(begin
+        JobId = recover_in_state(Top, ?DB1, build_indices),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
+    end).
+
+
+recover_in_update_shard_map(Top) ->
+    ?_test(begin
+        JobId = recover_in_state(Top, ?DB1, update_shardmap),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
+    end).
+
+
+recover_in_wait_source_close(Top) ->
+    ?_test(begin
+        JobId = recover_in_state(Top, ?DB1, wait_source_close),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
+    end).
+
+
+recover_in_topoff3(Top) ->
+    ?_test(begin
+        JobId = recover_in_state(Top, ?DB1, topoff3),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
+    end).
+
+
+recover_in_source_delete(Top) ->
+    ?_test(begin
+        JobId = recover_in_state(Top, ?DB1, source_delete),
+        wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
+    end).
+
 
 
 % Test help functions
@@ -595,13 +677,19 @@ intercept_state(State) ->
         end).
 
 
+cancel_intercept() ->
+     meck:expect(mem3_reshard_job, checkpoint_done, fun(Job) ->
+         meck:passthrough([Job])
+     end).
+
+
 wait_state(Url, State) ->
     test_util:wait(fun() ->
             case req(get, Url) of
                 {200, #{<<"state">> := State}} -> ok;
                 {200, #{}} -> timer:sleep(100), wait
             end
-    end).
+    end, 30000).
 
 
 delete_source_in_state(Top, Db, State) when is_atom(State) ->
@@ -609,18 +697,51 @@ delete_source_in_state(Top, Db, State) when is_atom(State) ->
     Body = #{type => split, db => list_to_binary(Db)},
     {201, [#{?ID := Id}]} = req(post, Top ++ ?JOBS, Body),
     receive {JobPid, State} -> ok end,
-    delete_db(Top ++ Db),
+    delete_db(Top, Db),
     JobPid ! continue,
     Id.
 
 
-create_db(Url) ->
+recover_in_state(Top, Db, State) when is_atom(State) ->
+    intercept_state(State),
+    Body = #{type => split, db => list_to_binary(Db)},
+    {201, [#{?ID := Id}]} = req(post, Top ++ ?JOBS, Body),
+    receive {JobPid, State} -> ok end,
+    % Job is now stuck in running we prevented it from executing
+    % the given state
+    JobPid ! cancel,
+    % Now restart resharding
+    ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => stopped})),
+    cancel_intercept(),
+    ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running})),
+    Id.
+
+
+create_db(Top, Db) ->
+    create_db(Top, Db, "").
+
+
+create_db(Top, Db, QArgs) ->
+    Url = Top ++ Db ++ QArgs,
     {ok, Status, _, _} = test_request:put(Url, [?JSON, ?AUTH], "{}"),
     ?assert(Status =:= 201 orelse Status =:= 202).
 
 
-delete_db(Url) ->
-    {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
+delete_db(Top, Db) ->
+    Url = Top ++ Db,
+    case test_request:get(Url, [?AUTH]) of
+        {ok, 404, _, _} ->
+            ok;
+        {ok, 200, _, _} ->
+            Shards = mem3:local_shards(list_to_binary(Db)),
+            ShardNames = [mem3:name(S) || S <- Shards],
+            {ok, 200, _, _} = test_request:delete(Url, [?AUTH]),
+            % delete is asynchronous (db doc is deleted but shards are deleted in
+            % spawned workers after the client gets a response so we resort to
+            % directly cleaning up the shards as well
+            [couch_server:delete(N, [?ADMIN_CTX]) || N <- ShardNames],
+            ok
+    end.
 
 
 req(Method, Url) ->

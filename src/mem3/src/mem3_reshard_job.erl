@@ -306,10 +306,29 @@ worker_exited(normal, #job{workers = Workers} = Job) when Workers =/= [] ->
     {noreply, Job};
 
 worker_exited({error, missing_source}, #job{} = Job) ->
-    Msg = "~p stopping worker due to source missing ~p",
+    Msg1 = "~p stopping worker due to source missing ~p",
+    couch_log:error(Msg1, [?MODULE, jobfmt(Job)]),
+    [begin unlink(Pid), exit(Pid, kill) end || Pid <- Job#job.workers],
+    case lists:member(Job#job.split_state, [
+        initial_copy,
+        topoff1,
+        build_indices,
+        topoff2,
+        copy_local_docs
+    ]) of
+        true ->
+            Msg2 = "~p cleaning targets after db was deleted ~p",
+            couch_log:error(Msg2, [?MODULE, jobfmt(Job)]),
+            {stop, {error, missing_source}, reset_targets(Job)};
+        false ->
+            {stop, {error, missing_source}, Job}
+    end;
+
+worker_exited({error, missing_target}, #job{} = Job) ->
+    Msg = "~p stopping worker due to target db missing ~p",
     couch_log:error(Msg, [?MODULE, jobfmt(Job)]),
     [begin unlink(Pid), exit(Pid, kill) end || Pid <- Job#job.workers],
-    {stop, {error, missing_source}, Job};
+    {stop, {error, missing_target}, Job};
 
 worker_exited(Reason, #job{} = Job0) ->
     couch_log:error("~p worker error ~p ~p", [?MODULE, jobfmt(Job0), Reason]),
@@ -357,7 +376,8 @@ initial_copy(#job{source = Source, targets = Targets0} = Job) ->
 
 
 create_artificial_mem3_rep_checkpoints(#job{} = Job, Seq) ->
-    #job{source = #shard{name = SourceName}, targets = Targets} = Job,
+    #job{source = Source = #shard{name = SourceName}, targets = Targets} = Job,
+    check_source_exists(Source, initial_copy),
     TNames = [TN || #shard{name = TN} <- Targets],
     Timestamp = list_to_binary(mem3_util:iso8601_timestamp()),
     couch_util:with_db(SourceName, fun(SDb) ->
@@ -402,6 +422,8 @@ do_state_topoff(#job{} = Job) ->
 -spec topoff(#shard{}, [#shard{}]) -> ok | no_return().
 topoff(#shard{} = Source, Targets) ->
     couch_log:notice("~p topoff starting ~p", [?MODULE, shardsstr(Source, Targets)]),
+    check_source_exists(Source, topoff),
+    check_targets_exist(Targets, topoff),
     TMap = maps:from_list([{R, T} || #shard{range = R} = T <- Targets]),
     Opts =  [{batch_size, 2000}, {batch_count, all}],
     case mem3_rep:go(Source, TMap, Opts) of
@@ -426,8 +448,33 @@ pickfun(DocId, [[B, E] | _] = Ranges, {_M, _F, _A} = HashFun) when
     Key.
 
 
-build_indices(#shard{name = Source}, Targets) ->
-    {ok, DDocs} = mem3_reshard_index:design_docs(Source),
+check_source_exists(#shard{name = Name}, StateName) ->
+    case couch_server:exists(Name) of
+        true ->
+            ok;
+        false ->
+            ErrMsg = "~p source ~p is unexpectedly missing in ~p",
+            couch_log:error(ErrMsg, [?MODULE, Name, StateName]),
+            exit({error, missing_source})
+    end.
+
+
+check_targets_exist(Targets, StateName) ->
+    lists:foreach(fun(#shard{name = Name}) ->
+        case couch_server:exists(Name) of
+            true ->
+                ok;
+            false ->
+                ErrMsg = "~p target ~p is unexpectedly missing in ~p",
+                couch_log:error(ErrMsg, [?MODULE, Name, StateName]),
+                exit({error, missing_target})
+        end
+    end, Targets).
+
+
+build_indices(#shard{name = SourceName} = Source, Targets) ->
+    check_source_exists(Source, build_indices),
+    {ok, DDocs} = mem3_reshard_index:design_docs(SourceName),
     Indices = mem3_reshard_index:target_indices(DDocs, Targets),
     mem3_reshard_index:spawn_builders(Indices).
 
@@ -449,20 +496,22 @@ copy_local_docs(#job{source = Source, targets = Targets0}) ->
     end.
 
 
-wait_source_close(#job{source = #shard{name = Name}}) ->
+wait_source_close(#job{source = #shard{name = Name}, targets = Targets}) ->
     Timeout = config:get_integer("mem3_reshard",
         "source_close_timeout_sec", 600),
+    check_targets_exist(Targets, wait_source_close),
     case couch_db:open_int(Name, [?ADMIN_CTX]) of
         {ok, Db} ->
             Now = mem3_reshard:now_sec(),
-            case wait_source_close(Db, 5, Now + Timeout) of
+            case wait_source_close(Db, 1, Now + Timeout) of
                 true ->
                     ok;
                 false ->
                     exit({error, source_db_close_timeout, Name, Timeout})
             end;
         {not_found, _} ->
-            exit({error, missing_source})
+            couch_log:warning("~p source already deleted ~p", [?MODULE, Name]),
+            ok
     end.
 
 
@@ -484,7 +533,8 @@ wait_source_close(Db, SleepSec, UntilSec) ->
     end.
 
 
-source_delete(#job{source = #shard{name = Name}}) ->
+source_delete(#job{source = #shard{name = Name}, targets = Targets}) ->
+    check_targets_exist(Targets, source_delete),
     case config:get_boolean("mem3_reshard", "delete_source", true) of
         true ->
             case couch_server:delete(Name, [?ADMIN_CTX]) of
@@ -496,9 +546,9 @@ source_delete(#job{source = #shard{name = Name}}) ->
                         [?MODULE, Name])
             end;
         false ->
-            couch_log:notice("~p : not deleting source shard ~p", [?MODULE, Name])
-    end,
-    ok.
+            LogMsg = "~p : according to configuration not deleting source ~p",
+            couch_log:warning(LogMsg, [?MODULE, Name])
+    end.
 
 
 -spec max_retries() -> integer().
@@ -533,7 +583,12 @@ shardsstr(#shard{name = SourceName}, Targets) ->
 
 -spec reset_targets(#job{}) -> #job{}.
 reset_targets(#job{source = Source, targets = Targets} = Job) ->
-    ShardNames = [N || #shard{name = N} <- mem3:shards(mem3:dbname(Source))],
+    ShardNames = try
+        [N || #shard{name = N} <- mem3:shards(mem3:dbname(Source))]
+    catch
+        error:database_does_not_exist ->
+            []
+    end,
     lists:map(fun(#shard{name = Name}) ->
         case {couch_server:exists(Name), lists:member(Name, ShardNames)} of
             {_, true} ->
@@ -542,9 +597,9 @@ reset_targets(#job{source = Source, targets = Targets} = Job) ->
                 couch_log:error(LogMsg, [?MODULE, jobfmt(Job), Name]),
                 erlang:error({target_present_in_shard_map, Name});
             {true, false} ->
-                LogMsg = "~p : ~p resetting ~p target when recovering",
+                LogMsg = "~p : ~p resetting ~p target",
                 couch_log:warning(LogMsg, [?MODULE, jobfmt(Job), Name]),
-                ok = couch_db_split:cleanup_target(Source#shard.name, Name);
+                couch_db_split:cleanup_target(Source#shard.name, Name);
             {false, false} ->
                 ok
         end
