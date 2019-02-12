@@ -430,14 +430,13 @@ remove_finalizer(Args) ->
 find_replacements(Workers, AllShards) ->
     % Build map [B, E] => [Worker1, Worker2, ...] for all workers
     WrkMap = lists:foldl(fun({#shard{range = [B, E]}, _} = W, Acc) ->
-         maps:update_with({B, E}, fun(Ws) -> [W | Ws] end, [], Acc)
+         maps:update_with({B, E}, fun(Ws) -> [W | Ws] end, [W], Acc)
     end, #{}, fabric_dict:to_list(Workers)),
 
     % Build map [B, E] => [Shard1, Shard2, ...] for all shards
     AllMap = lists:foldl(fun(#shard{range = [B, E]} = S, Acc) ->
-         maps:update_with({B, E}, fun(Ss) -> [S | Ss] end, [], Acc)
+         maps:update_with({B, E}, fun(Ss) -> [S | Ss] end, [S], Acc)
     end, #{}, AllShards),
-
     % The sort function will  prioritize workers over other shards.
     % The idea is to not unnecessarily kill workers if we don't have to
     SortFun = fun

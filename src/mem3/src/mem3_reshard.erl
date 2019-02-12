@@ -392,7 +392,7 @@ reload_jobs(State) ->
 -spec reload_job(#job{}, #state{}) -> #state{}.
 reload_job(#job{job_state = JS} = Job, #state{state = stopped} = State)
         when JS =:= running orelse JS =:= new ->
-    ok = temporarily_stop_job(Job),
+    temporarily_stop_job(Job),
     State;
 
 % This is a case when a job process should be spawend

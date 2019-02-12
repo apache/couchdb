@@ -265,7 +265,7 @@ pull_purges(#acc{source = Source} = Acc0) ->
         Targets = maps:map(fun(_, #tgt{} = T) ->
             pull_purges_tgt(Db, Count, Source, T)
         end, reset_remaining(Targets0)),
-        Remaining = maps:foldl(fun(_, #tgt{remaining = R}, Sum) ->
+        Remaining = maps:fold(fun(_, #tgt{remaining = R}, Sum) ->
             Sum + R
         end, 0, Targets),
         if Remaining == 0 -> Acc0#acc{targets = Targets}; true ->
@@ -300,7 +300,7 @@ push_purges(#acc{source = SrcShard} = Acc) ->
         Targets = maps:map(fun(_, #tgt{} = T) ->
             push_purges_tgt(Db, BatchSize, SrcShard, T)
         end, reset_remaining(Targets0)),
-        Remaining = maps:foldl(fun(_, #tgt{remaining = R}, Sum) ->
+        Remaining = maps:fold(fun(_, #tgt{remaining = R}, Sum) ->
             Sum + R
         end, 0, Targets),
         if Remaining == 0 -> Acc#acc{targets = Targets}; true ->

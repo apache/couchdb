@@ -453,7 +453,7 @@ do_unpack_seqs(Opaque, DbName) ->
         true ->
             Unpacked;
         false ->
-            Shards = mem3:shard(DbName),
+            Shards = mem3:shards(DbName),
             {Unpacked1, Dead, Reps} =
                 fabric_view:find_replacements(Unpacked, Shards),
             {Splits0, Reps1} = find_split_shard_replacements(Dead, Reps),
@@ -514,7 +514,7 @@ find_split_shard_replacements(DeadWorkers, Shards) ->
         SplitShards = mem3_util:non_overlapping_shards(ShardsOnSameNode, B, E),
         NewWorkers = [{S, Seq} || S <- SplitShards],
         NewAvailable = [S || S <- Available, not lists:member(S, SplitShards)],
-        {[NewWorkers | SplitWorkers], NewAvailable}
+        {NewWorkers ++ SplitWorkers, NewAvailable}
     end, Acc0, DeadWorkers).
 
 
