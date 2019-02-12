@@ -100,7 +100,8 @@ mem3_reshard_api_test_() ->
                     fun recover_in_update_shard_map/1,
                     fun recover_in_wait_source_close/1,
                     fun recover_in_topoff3/1,
-                    fun recover_in_source_delete/1
+                    fun recover_in_source_delete/1,
+                    fun check_max_jobs/1
                 ]
             }
         }
@@ -641,6 +642,42 @@ recover_in_source_delete(Top) ->
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
     end).
 
+
+check_max_jobs(Top) ->
+    ?_test(begin
+        Jobs = Top ++ ?JOBS,
+
+        config:set("mem3_reshard", "max_jobs", "0", _Persist=false),
+        {C1, R1} = req(post, Jobs, #{type => split, db => <<?DB1>>}),
+        ?assertMatch({500, [#{<<"error">> := <<"max_jobs_exceeded">>}]}, {C1, R1}),
+
+        config:set("mem3_reshard", "max_jobs", "1", _Persist=false),
+        {C2, R2} = req(post, Jobs,  #{type => split, db => <<?DB1>>}),
+        wait_to_complete(Top, R2),
+
+        % Stop clustering so jobs are not started anymore and ensure max jobs is
+        % is enforced even if jobs are stopped
+        ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => stopped})),
+
+        {C3, R3} = req(post, Jobs,  #{type => split, db => <<?DB2>>}),
+        ?assertMatch({500, [#{<<"error">> := <<"max_jobs_exceeded">>}]}, {C3, R3}),
+
+        % Allow the job to be created by raising max_jobs
+        config:set("mem3_reshard", "max_jobs", "2", _Persist=false),
+
+        {C4, R4} = req(post, Jobs,  #{type => split, db => <<?DB2>>}),
+        ?assertEqual(201, C4),
+
+        % Lower max_jobs after job is created but it's not running
+        config:set("mem3_reshard", "max_jobs", "1", _Persist=false),
+
+        % Start resharding again
+        ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running})),
+
+        % Jobs that have been created already are not removed if max jobs is lowered
+        % so make sure the job completes
+        wait_to_complete(Top, R4)
+    end).
 
 
 % Test help functions

@@ -218,7 +218,7 @@ handle_call({start_job, #job{id = Id, source = Source} = Job}, _From, State) ->
     couch_log:notice("~p start_job call ~p", [?MODULE, jobfmt(Job)]),
     Total = ets:info(?MODULE, size),
     SourceOk = mem3_reshard_validate:source(Source),
-    case {job_by_id(Id), Total =<  get_max_jobs(), SourceOk} of
+    case {job_by_id(Id), Total + 1 =<  get_max_jobs(), SourceOk} of
         {not_found, true, ok} ->
             case State#state.state of
                 running ->
