@@ -50,9 +50,9 @@ document are to be interpreted as described in
 
 [TIP]: # ( If the changes will affect how a user interacts with CouchDB, explain. )
 
-## Modules affected
+## Applications and Modules affected
 
-[NOTE]: # ( List the OTP or functional modules in CouchDB affected by the proposal. )
+[NOTE]: # ( List the OTP applications or functional modules in CouchDB affected by the proposal. )
 
 ## HTTP API additions
 
@@ -70,6 +70,10 @@ document are to be interpreted as described in
 [NOTE]: # ( Provide *exact* detail on the API endpoints to be deprecated. )
 [NOTE]: # ( If these endpoints are replaced by new endpoints, list those as well. )
 [NOTE]: # ( State the proposed version in which the deprecation and removal will occur. )
+
+# Security Considerations
+
+[NOTE]: # ( Include any impact to the security of CouchDB here. )
 
 # References
 
