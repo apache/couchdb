@@ -99,9 +99,9 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
         {'DOWN', Ref, _, _, {ok, TotalRows}} ->
             Meta = case UpdateSeq of
                 false ->
-                    [{total, TotalRows}, {offset, null}];
+                    [{total, TotalRows}];
                 true ->
-                    [{total, TotalRows}, {offset, null}, {update_seq, null}]
+                    [{total, TotalRows}, {update_seq, null}]
             end,
             {ok, Acc1} = Callback({meta, Meta}, Acc0),
             {ok, Acc2} = doc_receive_loop(

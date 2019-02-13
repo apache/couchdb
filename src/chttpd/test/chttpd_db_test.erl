@@ -234,7 +234,7 @@ should_return_update_seq_when_set_on_all_docs(Url) ->
         {ResultJson} = ?JSON_DECODE(RespBody),
         ?assertNotEqual(undefined,
             couch_util:get_value(<<"update_seq">>, ResultJson)),
-        ?assertNotEqual(undefined,
+        ?assertEqual(undefined,
             couch_util:get_value(<<"offset">>, ResultJson))
     end).
 
@@ -248,7 +248,7 @@ should_not_return_update_seq_when_unset_on_all_docs(Url) ->
         {ResultJson} = ?JSON_DECODE(RespBody),
         ?assertEqual(undefined,
             couch_util:get_value(<<"update_seq">>, ResultJson)),
-        ?assertNotEqual(undefined,
+        ?assertEqual(undefined,
             couch_util:get_value(<<"offset">>, ResultJson))
     end).
 
