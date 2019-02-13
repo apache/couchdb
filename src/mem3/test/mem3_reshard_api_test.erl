@@ -652,7 +652,7 @@ check_max_jobs(Top) ->
         ?assertMatch({500, [#{<<"error">> := <<"max_jobs_exceeded">>}]}, {C1, R1}),
 
         config:set("mem3_reshard", "max_jobs", "1", _Persist=false),
-        {C2, R2} = req(post, Jobs,  #{type => split, db => <<?DB1>>}),
+        {201, R2} = req(post, Jobs,  #{type => split, db => <<?DB1>>}),
         wait_to_complete(Top, R2),
 
         % Stop clustering so jobs are not started anymore and ensure max jobs is
@@ -752,10 +752,6 @@ recover_in_state(Top, Db, State) when is_atom(State) ->
     cancel_intercept(),
     ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running})),
     Id.
-
-
-create_db(Top, Db) ->
-    create_db(Top, Db, "").
 
 
 create_db(Top, Db, QArgs) ->
