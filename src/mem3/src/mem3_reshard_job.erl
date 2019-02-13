@@ -60,12 +60,12 @@ jobfmt(#job{} = Job) ->
     #job{
         id = Id,
         source = #shard{name = Source},
-        targets = Targets,
+        target = Target,
         split_state = State,
         job_state = JobState,
         pid = Pid
     } = Job,
-    TargetCount = length(Targets),
+    TargetCount = length(Target),
     Msg = "#job{~s ~s /~B job_state:~s split_state:~s pid:~p}",
     Fmt = io_lib:format(Msg, [Id, Source, TargetCount, JobState, State, Pid]),
     lists:flatten(Fmt).
@@ -113,9 +113,9 @@ handle_cast(Cast, Job) ->
 
 
 handle_info(retry, #job{split_state = initial_copy} = Job) ->
-    % For initial copy before retrying make sure to reset the targets
+    % For initial copy before retrying make sure to reset the target
     % as initial copy works from newly created copy every time
-    handle_cast(do_state, reset_targets(Job));
+    handle_cast(do_state, reset_target(Job));
 
 handle_info(retry, #job{} = Job) ->
     handle_cast(do_state, Job);
@@ -155,11 +155,11 @@ next_state(State, [_ | Rest]) ->
 
 -spec maybe_recover(#job{}) -> #job{} | no_return().
 maybe_recover(#job{split_state = new} = Job) ->
-    Job1 = reset_targets(Job),
+    Job1 = reset_target(Job),
     switch_state(Job1, initial_copy);
 
 maybe_recover(#job{split_state = initial_copy} = Job) ->
-    Job1 = reset_targets(Job),
+    Job1 = reset_target(Job),
     switch_state(Job1, initial_copy);
 
 maybe_recover(#job{split_state = topoff1} = Job) ->
@@ -237,7 +237,7 @@ do_state(#job{split_state = topoff1} = Job) ->
     do_state_topoff(Job);
 
 do_state(#job{split_state = build_indices} = Job) ->
-    case build_indices(Job#job.source, Job#job.targets) of
+    case build_indices(Job#job.source, Job#job.target) of
         {ok, []} ->
             {ok, switch_state(Job, next_state(build_indices))};
         {ok, Pids} when is_list(Pids) ->
@@ -317,9 +317,9 @@ worker_exited({error, missing_source}, #job{} = Job) ->
         copy_local_docs
     ]) of
         true ->
-            Msg2 = "~p cleaning targets after db was deleted ~p",
+            Msg2 = "~p cleaning target after db was deleted ~p",
             couch_log:error(Msg2, [?MODULE, jobfmt(Job)]),
-            {stop, {error, missing_source}, reset_targets(Job)};
+            {stop, {error, missing_source}, reset_target(Job)};
         false ->
             {stop, {error, missing_source}, Job}
     end;
@@ -354,7 +354,7 @@ check_state(#job{split_state = State} = Job) ->
     end.
 
 
-initial_copy(#job{source = Source, targets = Targets0} = Job) ->
+initial_copy(#job{source = Source, target = Targets0} = Job) ->
     #shard{name = SourceName} = Source,
     Targets = [{Range, Name} || #shard{range = Range, name = Name} <- Targets0],
     TMap = maps:from_list(Targets),
@@ -376,7 +376,7 @@ initial_copy(#job{source = Source, targets = Targets0} = Job) ->
 
 
 create_artificial_mem3_rep_checkpoints(#job{} = Job, Seq) ->
-    #job{source = Source = #shard{name = SourceName}, targets = Targets} = Job,
+    #job{source = Source = #shard{name = SourceName}, target = Targets} = Job,
     check_source_exists(Source, initial_copy),
     TNames = [TN || #shard{name = TN} <- Targets],
     Timestamp = list_to_binary(mem3_util:iso8601_timestamp()),
@@ -414,7 +414,7 @@ mem3_rep_checkpoint_doc(SourceDb, TargetDb, Timestamp, Seq) ->
 
 
 do_state_topoff(#job{} = Job) ->
-    #job{source = Source, targets = Targets} = Job,
+    #job{source = Source, target = Targets} = Job,
     Pid = spawn_link(?MODULE, topoff, [Source, Targets]),
     {ok, report(Job#job{workers = [Pid]})}.
 
@@ -479,7 +479,7 @@ build_indices(#shard{name = SourceName} = Source, Targets) ->
     mem3_reshard_index:spawn_builders(Indices).
 
 
-copy_local_docs(#job{source = Source, targets = Targets0}) ->
+copy_local_docs(#job{source = Source, target = Targets0}) ->
     #shard{name = SourceName} = Source,
     Targets = [{Range, Name} || #shard{range = Range, name = Name} <- Targets0],
     TMap = maps:from_list(Targets),
@@ -496,7 +496,7 @@ copy_local_docs(#job{source = Source, targets = Targets0}) ->
     end.
 
 
-wait_source_close(#job{source = #shard{name = Name}, targets = Targets}) ->
+wait_source_close(#job{source = #shard{name = Name}, target = Targets}) ->
     Timeout = config:get_integer("mem3_reshard",
         "source_close_timeout_sec", 600),
     check_targets_exist(Targets, wait_source_close),
@@ -533,7 +533,7 @@ wait_source_close(Db, SleepSec, UntilSec) ->
     end.
 
 
-source_delete(#job{source = #shard{name = Name}, targets = Targets}) ->
+source_delete(#job{source = #shard{name = Name}, target = Targets}) ->
     check_targets_exist(Targets, source_delete),
     case config:get_boolean("mem3_reshard", "delete_source", true) of
         true ->
@@ -581,8 +581,8 @@ shardsstr(#shard{name = SourceName}, Targets) ->
     lists:flatten(io_lib:format("~s -> ~s", [SourceName, TargetsStr])).
 
 
--spec reset_targets(#job{}) -> #job{}.
-reset_targets(#job{source = Source, targets = Targets} = Job) ->
+-spec reset_target(#job{}) -> #job{}.
+reset_target(#job{source = Source, target = Targets} = Job) ->
     ShardNames = try
         [N || #shard{name = N} <- mem3:shards(mem3:dbname(Source))]
     catch

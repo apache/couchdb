@@ -67,8 +67,8 @@ start_split_job(ShardName) when is_binary(ShardName) ->
 start_split_job(#shard{} = Source, Split) ->
     case mem3_reshard_validate:start_args(Source, Split) of
         ok ->
-            Targets = target_shards(Source, Split),
-            case mem3_reshard_validate:targets(Source, Targets) of
+            Target = target_shards(Source, Split),
+            case mem3_reshard_validate:targets(Source, Target) of
                 ok ->
                     TStamp = now_sec(),
                     Job = #job{
@@ -79,7 +79,7 @@ start_split_job(#shard{} = Source, Split) ->
                         update_time = TStamp,
                         node = node(),
                         source = Source,
-                        targets = Targets
+                        target = Target
                    },
                    Job1 = Job#job{id = job_id(Job)},
                    Job2 = update_job_history(Job1),

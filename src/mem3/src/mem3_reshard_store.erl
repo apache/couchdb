@@ -177,7 +177,7 @@ job_to_ejson_props(#job{} = Job) ->
     job_to_ejson_props(Job, []).
 
 
-job_to_ejson_props(#job{source = Source, targets = Targets} = Job, Opts) ->
+job_to_ejson_props(#job{source = Source, target = Targets} = Job, Opts) ->
     Iso8601 = proplists:get_value(iso8601, Opts),
     History = history_to_ejson(Job#job.history, Iso8601),
     StartTime = case Iso8601 of
@@ -192,7 +192,7 @@ job_to_ejson_props(#job{source = Source, targets = Targets} = Job, Opts) ->
         {id, Job#job.id},
         {type, Job#job.type},
         {source, Source#shard.name},
-        {targets, [T#shard.name || T <- Targets]},
+        {target, [T#shard.name || T <- Targets]},
         {job_state, Job#job.job_state},
         {split_state, Job#job.split_state},
         {state_info, state_info_to_ejson(Job#job.state_info)},
@@ -207,7 +207,7 @@ job_from_ejson({Props}) ->
     Id = couch_util:get_value(<<"id">>, Props),
     Type = couch_util:get_value(<<"type">>, Props),
     Source = couch_util:get_value(<<"source">>, Props),
-    Targets = couch_util:get_value(<<"targets">>, Props),
+    Target = couch_util:get_value(<<"target">>, Props),
     JobState = couch_util:get_value(<<"job_state">>, Props),
     SplitState = couch_util:get_value(<<"split_state">>, Props),
     StateInfo = couch_util:get_value(<<"state_info">>, Props),
@@ -224,7 +224,7 @@ job_from_ejson({Props}) ->
         start_time = TStarted,
         update_time = TUpdated,
         source = mem3_reshard:shard_from_name(Source),
-        targets = [mem3_reshard:shard_from_name(T) || T <- Targets],
+        target = [mem3_reshard:shard_from_name(T) || T <- Target],
         history = history_from_ejson(History)
     }.
 

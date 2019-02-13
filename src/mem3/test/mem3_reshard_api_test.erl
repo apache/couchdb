@@ -167,7 +167,7 @@ create_job_basic(Top) ->
         ?assertMatch(#{<<"split_state">> := SSt} when is_binary(SSt), R2),
         ?assertMatch(#{<<"job_state">> := JSt} when is_binary(JSt), R2),
         ?assertMatch(#{<<"state_info">> := #{}}, R2),
-        ?assertMatch(#{<<"targets">> := Targets} when length(Targets) == 2, R2),
+        ?assertMatch(#{<<"target">> := Target} when length(Target) == 2, R2),
 
         % GET  /_reshard/job/$jobid/state
         ?assertMatch({200, #{<<"state">> := S, <<"reason">> := R}}

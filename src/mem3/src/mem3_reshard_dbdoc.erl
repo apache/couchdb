@@ -23,7 +23,7 @@
 -include("mem3_reshard.hrl").
 
 
-update_shard_map(#job{source = Source, targets = Targets} = Job) ->
+update_shard_map(#job{source = Source, target = Target} = Job) ->
     couch_log:info("~p : replicating dbs to local node", [?MODULE]),
     case mem3_util:replicate_dbs_from_all_nodes(600000) of
         ok ->
@@ -42,7 +42,7 @@ update_shard_map(#job{source = Source, targets = Targets} = Job) ->
             exit({shard_doc_open_error, OpenErr})
     end,
     Node = hd(mem3_util:live_nodes()),
-    Body = update_shard_props(OldBody, Source, Targets),
+    Body = update_shard_props(OldBody, Source, Target),
     JobStr = mem3_reshard_job:jobfmt(Job),
     LogArgs1 = [?MODULE, JobStr, Node, OldBody, Body],
     couch_log:notice("~p : ~s node:~p doc ~p -> ~p", LogArgs1),

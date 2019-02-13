@@ -51,7 +51,7 @@
     split_state :: split_state(),
     state_info = [] :: [{atom(), any()}],
     source :: #shard{},
-    targets :: [#shard{}],
+    target :: [#shard{}],
     history = [] :: [{atom(), time_sec()}],
     start_time = 0 :: non_neg_integer(),
     update_time = 0 :: non_neg_integer(),
