@@ -196,7 +196,7 @@ parse_index_params(#httpd{method='POST'}=Req, Db) ->
     end,
     IndexParams = lists:flatmap(fun({K, V}) ->
         parse_json_index_param(K, V)
-    end, QSEntry ++ [JsonBody]),
+    end, QSEntry ++ JsonBody),
     ensure_unique_partition(IndexParams),
     parse_index_params(IndexParams, Db);
 parse_index_params(IndexParams, Db) ->
