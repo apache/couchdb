@@ -24,6 +24,12 @@ start_link() ->
 
 init(_Args) ->
     Children = [
+        {mem3_reshard_dbdoc,
+            {mem3_reshard_dbdoc, start_link, []},
+            permanent,
+            infinity,
+            worker,
+            [mem3_reshard_dbdoc]},
         {mem3_reshard_job_sup,
             {mem3_reshard_job_sup, start_link, []},
             permanent,

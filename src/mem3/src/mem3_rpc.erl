@@ -28,7 +28,6 @@
     save_purge_checkpoint/4,
     purge_docs/4,
 
-    update_shard_map/5,
     replicate/4
 ]).
 
@@ -43,7 +42,6 @@
     load_purge_infos_rpc/3,
     save_purge_checkpoint_rpc/3,
 
-    update_shard_map_rpc/3,
     replicate_rpc/2
 
 ]).
@@ -98,11 +96,6 @@ save_purge_checkpoint(Node, DbName, PurgeDocId, Body) ->
 
 purge_docs(Node, DbName, PurgeInfos, Options) ->
     rexi_call(Node, {fabric_rpc, purge_docs, [DbName, PurgeInfos, Options]}).
-
-
-update_shard_map(Node, DocId, OldBody, Body, Timeout) ->
-    Args = [DocId, OldBody, Body],
-    rexi_call(Node, {mem3_rpc, update_shard_map_rpc, Args}, Timeout).
 
 
 replicate(Source, Target, DbName, Timeout)
@@ -235,15 +228,6 @@ save_purge_checkpoint_rpc(DbName, PurgeDocId, Body) ->
         Error ->
             rexi:reply(Error)
     end.
-
-
-update_shard_map_rpc(DocId, OldBody, Body) ->
-    rexi:reply(try
-        {ok, mem3_reshard_dbdoc:update_shard_map_rpc(DocId, OldBody, Body)}
-    catch
-        Tag:Error ->
-            {Tag, Error}
-    end).
 
 
 replicate_rpc(DbName, Target) ->
