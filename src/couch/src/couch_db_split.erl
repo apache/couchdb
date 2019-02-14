@@ -61,14 +61,11 @@ split(Source, #{} = Targets, PickFun) when is_function(PickFun, 3) ->
             Partitioned = couch_db:is_partitioned(SourceDb),
             HashFun = mem3_hash:get_hash_fun(couch_db:name(SourceDb)),
             try
-                try
-                    split(SourceDb, Partitioned, Engine, Targets, PickFun,
-                        HashFun)
-                catch
-                    throw:{target_create_error, DbName, Error, TargetDbs} ->
-                        cleanup_targets(TargetDbs, Engine),
-                        {error, {target_create_error, DbName, Error}}
-                end
+                split(SourceDb, Partitioned, Engine, Targets, PickFun, HashFun)
+            catch
+                throw:{target_create_error, DbName, Error, TargetDbs} ->
+                    cleanup_targets(TargetDbs, Engine),
+                    {error, {target_create_error, DbName, Error}}
             after
                 couch_db:close(SourceDb)
             end;
