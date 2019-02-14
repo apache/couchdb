@@ -59,18 +59,20 @@ defmodule PartitionViewUpdateTest do
 
     Couch.put("/#{db_name}/foo:1", body: %{some: "field"})
 
-    resp =
-      Couch.get(
-        url,
-        query: %{
-          update: "false",
-          limit: 3
-        }
-      )
+    retry_until(fn ->
+      resp =
+        Couch.get(
+          url,
+          query: %{
+            update: "false",
+            limit: 3
+          }
+        )
 
-    assert resp.status_code == 200
-    ids = get_ids(resp)
-    assert ids == ["foo:2", "foo:4", "foo:6"]
+      assert resp.status_code == 200
+      ids = get_ids(resp)
+      assert ids == ["foo:2", "foo:4", "foo:6"]
+    end)
   end
 
   @tag :with_partitioned_db

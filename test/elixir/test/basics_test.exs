@@ -151,7 +151,7 @@ defmodule BasicsTest do
     assert Couch.post("/#{db_name}", body: %{:_id => "2", :a => 3, :b => 9}).body["ok"]
     assert Couch.post("/#{db_name}", body: %{:_id => "3", :a => 4, :b => 16}).body["ok"]
     assert Couch.put("/#{db_name}/_design/foo", body: map_doc).body["ok"]
-    assert Couch.put("/#{db_name}/_design/bar", body: red_doc).body["ok"]
+    assert Couch.put("/#{db_name}/_design/bar", body: red_doc, query: [w: 3]).body["ok"]
     assert Couch.get("/#{db_name}").body["doc_count"] == 6
 
     # Initial view query test
