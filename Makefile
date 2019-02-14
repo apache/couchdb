@@ -147,6 +147,7 @@ check: all
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
+	@$(MAKE) elixir
 #	@$(MAKE) build-test
 
 
