@@ -24,7 +24,7 @@
 prop_get_ring_with_connected_intervals() ->
     ?FORALL({Start, End}, oneof(ranges()),
         ?FORALL(Intervals, g_connected_intervals(Start, End),
-            mem3_util:get_ring(Intervals, Start, End) =/= []
+            mem3_util:get_ring(Intervals, Start, End) =:= Intervals
         )
     ).
 
