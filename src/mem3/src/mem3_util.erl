@@ -473,3 +473,64 @@ sort_ranges_fun({B, E1}, {B, E2}) ->
 
 sort_ranges_fun({B1, _}, {B2, _}) ->
     B1 =< B2.
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+range_overlap_test_() ->
+    [?_assertEqual(Res, range_overlap(R1, R2)) || {R1, R2, Res} <- [
+        {[2, 6], [1, 3], true},
+        {[2, 6], [3, 4], true},
+        {[2, 6], [4, 8], true},
+        {[2, 6], [1, 9], true},
+        {[2, 6], [1, 2], true},
+        {[2, 6], [6, 7], true},
+        {[2, 6], [0, 1], false},
+        {[2, 6], [7, 9], false}
+    ]].
+
+
+non_overlapping_shards_test() ->
+    [?_assertEqual(Res, non_overlapping_shards(Shards)) || {Shards, Res} <- [
+        {
+            [shard(0, ?RING_END)],
+            [shard(0, ?RING_END)]
+        },
+        {
+            [shard(0, 1)],
+            [shard(0, 1)]
+        },
+        {
+            [shard(0, 1), shard(0, 1)],
+            [shard(0, 1)]
+        },
+        {
+            [shard(0, 1), shard(3, 4)],
+            []
+        },
+        {
+            [shard(0, 1), shard(1, 2), shard(2, 3)],
+            [shard(0, 1), shard(2, 3)]
+        },
+        {
+            [shard(1, 2), shard(0, 1)],
+            [shard(0, 1), shard(1, 2)]
+        },
+        {
+            [shard(0, 1), shard(0, 2), shard(2, 5), shard(3, 5)],
+            [shard(0, 2), shard(2, 5)]
+        },
+        {
+            [shard(0, 2), shard(4, 5), shard(1, 3)],
+            []
+        }
+
+    ]].
+
+
+shard(Begin, End) ->
+    #shard{range = [Begin, End]}.
+
+-endif.
