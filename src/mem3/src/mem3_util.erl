@@ -24,6 +24,7 @@
     range_overlap/2,
     get_ring/1,
     get_ring/2,
+    get_ring/3,
     get_ring/4,
     non_overlapping_shards/1,
     non_overlapping_shards/3
@@ -411,9 +412,14 @@ non_overlapping_shards(Shards, Start, End) ->
 get_ring(Ranges) ->
     get_ring(Ranges, fun sort_ranges_fun/2, 0, ?RING_END).
 
+
 get_ring(Ranges, SortFun) when is_function(SortFun, 2) ->
     get_ring(Ranges, SortFun, 0, ?RING_END).
 
+
+get_ring(Ranges, Start, End) when is_integer(Start), is_integer(End),
+        Start >= 0, End >= 0, Start =< End ->
+    get_ring(Ranges, fun sort_ranges_fun/2, Start, End).
 
 % Build a ring out of a list of possibly overlapping ranges. If a ring cannot
 % be built then [] is returned. Start and End supply a custom range such that
@@ -423,7 +429,7 @@ get_ring(Ranges, SortFun) when is_function(SortFun, 2) ->
 % shortest ranges first (and thus have more total shards) or longer or any
 % other scheme.
 %
-get_ring([], _SortFun, _Begin, _End) ->
+get_ring([], _SortFun, _Start, _End) ->
     [];
 get_ring(Ranges, SortFun, Start, End) when is_function(SortFun, 2),
         is_integer(Start), is_integer(End),
