@@ -54,7 +54,8 @@
 
 % Public API
 
-split(Source, #{} = Targets, PickFun) when is_function(PickFun, 3) ->
+split(Source, #{} = Targets, PickFun) when
+        map_size(Targets) >= 2, is_function(PickFun, 3) ->
     case couch_db:open_int(Source, [?ADMIN_CTX]) of
         {ok, SourceDb} ->
             Engine = get_engine(SourceDb),
