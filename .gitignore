@@ -47,17 +47,21 @@ src/docs/
 src/ets_lru/
 src/fauxton/
 src/folsom/
+src/hqueue/
+src/hyper/
 src/ibrowse/
 src/ioq/
 src/jiffy/
+src/ken/
 src/khash/
 src/meck/
 src/mochiweb/
 src/oauth/
+src/proper/
 src/rebar/
+src/smoosh/
 src/snappy/
 src/triq/
-src/hyper/
 tmp/
 
 src/couch/*.o
