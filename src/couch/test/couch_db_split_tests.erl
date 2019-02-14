@@ -16,7 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(RINGTOP, 2 bsl 31).
--define(BIGRANGE, [0, 2 bsl 31 - 1]).
+
 
 setup() ->
     DbName = ?tempdb(),
@@ -35,7 +35,6 @@ teardown(DbName) ->
 split_test_() ->
     Cases = [
         {"Should split an empty shard", 0, 2},
-        {"Should split shard into itself", 100, 1},
         {"Should split shard in half", 100, 2},
         {"Should split shard in three", 99, 3},
         {"Should split shard in four", 100, 4}
@@ -54,7 +53,8 @@ split_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun should_fail_on_missing_source/1,
-                    fun should_fail_on_existing_target/1
+                    fun should_fail_on_existing_target/1,
+                    fun should_crash_on_invalid_tmap/1
                 ]
             }
         ]
@@ -94,15 +94,24 @@ should_split_shard({Desc, TotalDocs, Q}, DbName) ->
 
 should_fail_on_missing_source(_DbName) ->
     DbName = ?tempdb(),
-    TMap = maps:from_list([{?BIGRANGE, ?tempdb()}]),
+    Ranges = make_ranges(2),
+    TMap = make_targets(Ranges),
     Response = couch_db_split:split(DbName, TMap, fun fake_pickfun/3),
     ?_assertEqual({error, missing_source}, Response).
 
 
 should_fail_on_existing_target(DbName) ->
-    TMap = maps:from_list([{?BIGRANGE, DbName}]),
+    Ranges = make_ranges(2),
+    TMap = maps:map(fun(_, _) -> DbName end, make_targets(Ranges)),
     Response = couch_db_split:split(DbName, TMap, fun fake_pickfun/3),
     ?_assertMatch({error, {target_create_error, DbName, eexist}}, Response).
+
+
+should_crash_on_invalid_tmap(DbName) ->
+    Ranges = make_ranges(1),
+    TMap = make_targets(Ranges),
+    ?_assertError(function_clause,
+        couch_db_split:split(DbName, TMap, fun fake_pickfun/3)).
 
 
 copy_local_docs_test_() ->
@@ -157,7 +166,8 @@ should_copy_local_docs({Desc, TotalDocs, Q}, DbName) ->
 
 should_fail_copy_local_on_missing_source() ->
     DbName = ?tempdb(),
-    TMap = maps:from_list([{?BIGRANGE, ?tempdb()}]),
+    Ranges = make_ranges(2),
+    TMap = make_targets(Ranges),
     PickFun = fun fake_pickfun/3,
     Response = couch_db_split:copy_local_docs(DbName, TMap, PickFun),
     ?assertEqual({error, missing_source}, Response).
