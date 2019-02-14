@@ -12,7 +12,7 @@
 
 -module(smoosh_server).
 -behaviour(gen_server).
--vsn(3).
+-vsn(4).
 -behaviour(config_listener).
 -include_lib("couch/include/couch_db.hrl").
 
@@ -37,6 +37,12 @@
 
 % exported but for internal use.
 -export([enqueue_request/2]).
+
+-ifdef(TEST).
+-define(RELISTEN_DELAY, 50).
+-else.
+-define(RELISTEN_DELAY, 5000).
+-endif.
 
 % private records.
 
@@ -122,12 +128,11 @@ handle_config_change("smoosh", "schema_channels", L, _, _) ->
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(_, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, nil)
-    end).
+handle_config_terminate(_Server, stop, _State) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY,
+        whereis(?MODULE), restart_config_listener).
 
 handle_call(status, _From, State) ->
     Acc = ets:foldl(fun get_channel_status/2, [], State#state.tab),
@@ -194,6 +199,10 @@ handle_info({'DOWN', Ref, _, _, _}, State) ->
     Waiting = dict:filter(fun(_Key, Value) -> Value =/= Ref end,
                           State#state.waiting),
     {noreply, State#state{waiting=Waiting}};
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 
 handle_info(_Msg, State) ->
     {noreply, State}.
@@ -446,6 +455,18 @@ setup() ->
 teardown(_) ->
     meck:unload().
 
+config_change_test_() ->
+    {
+        "Test config updates",
+        {
+            foreach,
+            fun() -> test_util:start_couch([smoosh]) end,
+            fun test_util:stop_couch/1,
+            [
+                fun t_restart_config_listener/1
+            ]
+        }
+}.
 
 get_priority_test_() ->
     {
@@ -464,6 +485,20 @@ get_priority_test_() ->
         ]
 }.
 
+t_restart_config_listener(_) ->
+    ?_test(begin
+        ConfigMonitor = config_listener_mon(),
+        ?assert(is_process_alive(ConfigMonitor)),
+        test_util:stop_sync(ConfigMonitor),
+        ?assertNot(is_process_alive(ConfigMonitor)),
+        NewConfigMonitor = test_util:wait(fun() ->
+            case config_listener_mon() of
+                undefined -> wait;
+                Pid -> Pid
+            end
+        end),
+        ?assert(is_process_alive(NewConfigMonitor))
+    end).
 
 t_ratio_view({ok, Shard, GroupId}) ->
     ?_test(begin
@@ -541,5 +576,15 @@ t_invalid_view({ok, Shard, GroupId}) ->
         ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
     end).
 
+config_listener_mon() ->
+    IsConfigMonitor = fun(P) ->
+        [M | _] = string:tokens(couch_debug:process_name(P), ":"),
+        M =:= "config_listener_mon"
+    end,
+    [{_, MonitoredBy}] = process_info(whereis(?MODULE), [monitored_by]),
+    case lists:filter(IsConfigMonitor, MonitoredBy) of
+        [Pid] -> Pid;
+        [] -> undefined
+    end.
 
 -endif.
