@@ -54,6 +54,7 @@ split_test_() ->
                 [
                     fun should_fail_on_missing_source/1,
                     fun should_fail_on_existing_target/1,
+                    fun should_fail_on_invalid_target_name/1,
                     fun should_crash_on_invalid_tmap/1
                 ]
             }
@@ -105,6 +106,17 @@ should_fail_on_existing_target(DbName) ->
     TMap = maps:map(fun(_, _) -> DbName end, make_targets(Ranges)),
     Response = couch_db_split:split(DbName, TMap, fun fake_pickfun/3),
     ?_assertMatch({error, {target_create_error, DbName, eexist}}, Response).
+
+
+should_fail_on_invalid_target_name(DbName) ->
+    Ranges = make_ranges(2),
+    TMap = maps:map(fun([B, _], _) ->
+        iolist_to_binary(["_$", couch_util:to_hex(<<B:32/integer>>)])
+    end, make_targets(Ranges)),
+    Expect = {error, {target_create_error, <<"_$00000000">>,
+        {illegal_database_name, <<"_$00000000">>}}},
+    Response = couch_db_split:split(DbName, TMap, fun fake_pickfun/3),
+    ?_assertMatch(Expect, Response).
 
 
 should_crash_on_invalid_tmap(DbName) ->

@@ -125,6 +125,11 @@ cleanup_target(Source, Target) when is_binary(Source), is_binary(Target) ->
 
 split(SourceDb, Partitioned, Engine, Targets0, PickFun, {M, F, A} = HashFun) ->
     Targets = maps:fold(fun(Key, DbName, Map) ->
+        case couch_db:validate_dbname(DbName) of
+            ok -> ok;
+            {error, E} ->
+                throw({target_create_error, DbName, E, Map})
+        end,
         {ok, Filepath} = couch_server:get_engine_path(DbName, Engine),
         Opts = [create, ?ADMIN_CTX] ++ case Partitioned of
             true -> [{partitioned, true}, {hash, [M, F, A]}];
