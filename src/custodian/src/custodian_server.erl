@@ -2,7 +2,7 @@
 
 -module(custodian_server).
 -behaviour(gen_server).
--vsn(2).
+-vsn(3).
 -behaviour(config_listener).
 
 % public api.
@@ -30,29 +30,34 @@
 
 -define(VSN_0_2_7, 184129240591641721395874905059581858099).
 
+-ifdef(TEST).
+-define(RELISTEN_DELAY, 50).
+-else.
+-define(RELISTEN_DELAY, 5000).
+-endif.
+
+
 % public functions.
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 handle_config_change("couchdb", "maintenance_mode", _, _, S) ->
-    ok = gen_server:cast(S, refresh),
+    ok = gen_server:cast(?MODULE, refresh),
     {ok, S};
 handle_config_change(_, _, _, _, S) ->
     {ok, S}.
 
-handle_config_terminate(_, stop, _) -> ok;
-handle_config_terminate(Self, _, _) ->
-    spawn(fun() ->
-        timer:sleep(5000),
-        config:listen_for_changes(?MODULE, Self)
-    end).
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
 
 % gen_server functions.
 init(_) ->
     process_flag(trap_exit, true),
     net_kernel:monitor_nodes(true),
-    ok = config:listen_for_changes(?MODULE, self()),
+    ok = config:listen_for_changes(?MODULE, nil),
     {ok, LisPid} = start_event_listener(),
     {ok, start_shard_checker(#state{
         event_listener=LisPid
@@ -87,7 +92,11 @@ handle_info({'EXIT', Pid, Reason}, #state{shard_checker=Pid}=State) ->
 handle_info({'EXIT', Pid, Reason}, #state{event_listener=Pid}=State) ->
     couch_log:notice("custodian update notifier died ~p", [Reason]),
     {ok, Pid1} = start_event_listener(),
-    {noreply, State#state{event_listener=Pid1}}.
+    {noreply, State#state{event_listener=Pid1}};
+
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State}.
 
 terminate(_Reason, State) ->
     couch_event:stop_listener(State#state.event_listener),
@@ -95,7 +104,7 @@ terminate(_Reason, State) ->
     ok.
 
 code_change(?VSN_0_2_7, State, _Extra) ->
-    ok = config:listen_for_changes(?MODULE, self()),
+    ok = config:listen_for_changes(?MODULE, nil),
     {ok, State};
 code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
@@ -170,3 +179,49 @@ copies(1) ->
     "copy";
 copies(_) ->
     "copies".
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+config_update_test_() ->
+    {
+        "Test config updates",
+        {
+            foreach,
+            fun() -> test_util:start_couch([custodian]) end,
+            fun test_util:stop_couch/1,
+            [
+                fun t_restart_config_listener/1
+            ]
+        }
+}.
+
+t_restart_config_listener(_) ->
+    ?_test(begin
+        ConfigMonitor = config_listener_mon(),
+        ?assert(is_process_alive(ConfigMonitor)),
+        test_util:stop_sync(ConfigMonitor),
+        ?assertNot(is_process_alive(ConfigMonitor)),
+        NewConfigMonitor = test_util:wait(fun() ->
+            case config_listener_mon() of
+                undefined -> wait;
+                Pid -> Pid
+            end
+        end),
+        ?assertNotEqual(ConfigMonitor, NewConfigMonitor),
+        ?assert(is_process_alive(NewConfigMonitor))
+    end).
+
+config_listener_mon() ->
+    IsConfigMonitor = fun(P) ->
+        [M | _] = string:tokens(couch_debug:process_name(P), ":"),
+        M =:= "config_listener_mon"
+    end,
+    [{_, MonitoredBy}] = process_info(whereis(?MODULE), [monitored_by]),
+    case lists:filter(IsConfigMonitor, MonitoredBy) of
+        [Pid] -> Pid;
+        [] -> undefined
+    end.
+
+-endif.
