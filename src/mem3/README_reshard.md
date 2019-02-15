@@ -1,5 +1,5 @@
-Developer Oriented For Resharding
-=================================
+Developer Oriented Resharding Description
+=========================================
 
 This is a technical description of the resharding logic. The discussion will focus on a few aspects such a job's life cycle, data definitions and the state transition mechanism. The main audience is CouchDB developers and assumes knowledge of Erlang/OTP supervision trees as well as CouchDB internals.
 
