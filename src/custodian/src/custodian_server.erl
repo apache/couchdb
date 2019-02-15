@@ -30,7 +30,11 @@
 
 -define(VSN_0_2_7, 184129240591641721395874905059581858099).
 
+-ifdef(TEST).
+-define(RELISTEN_DELAY, 50).
+-else.
 -define(RELISTEN_DELAY, 5000).
+-endif.
 
 
 % public functions.
@@ -175,3 +179,49 @@ copies(1) ->
     "copy";
 copies(_) ->
     "copies".
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+config_update_test_() ->
+    {
+        "Test config updates",
+        {
+            foreach,
+            fun() -> test_util:start_couch([custodian]) end,
+            fun test_util:stop_couch/1,
+            [
+                fun t_restart_config_listener/1
+            ]
+        }
+}.
+
+t_restart_config_listener(_) ->
+    ?_test(begin
+        ConfigMonitor = config_listener_mon(),
+        ?assert(is_process_alive(ConfigMonitor)),
+        test_util:stop_sync(ConfigMonitor),
+        ?assertNot(is_process_alive(ConfigMonitor)),
+        NewConfigMonitor = test_util:wait(fun() ->
+            case config_listener_mon() of
+                undefined -> wait;
+                Pid -> Pid
+            end
+        end),
+        ?assertNotEqual(ConfigMonitor, NewConfigMonitor),
+        ?assert(is_process_alive(NewConfigMonitor))
+    end).
+
+config_listener_mon() ->
+    IsConfigMonitor = fun(P) ->
+        [M | _] = string:tokens(couch_debug:process_name(P), ":"),
+        M =:= "config_listener_mon"
+    end,
+    [{_, MonitoredBy}] = process_info(whereis(?MODULE), [monitored_by]),
+    case lists:filter(IsConfigMonitor, MonitoredBy) of
+        [Pid] -> Pid;
+        [] -> undefined
+    end.
+
+-endif.
