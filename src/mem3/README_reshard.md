@@ -13,8 +13,8 @@ Jobs creation happens in the `mem3_reshard_httpd` API handler module. That modul
 
 A single shard splitting job will be running in a gen_server from the `mem3_reshard_job` module. That job will go through a series of steps such as `initial_copy`, `build_indices`, `update_shard_map`, .... So, it will copy the data from the source to the targets, then build indices, then update the shard map and so on. After each splitting step is complete, the job goes to the next step and immediately "checkpoints" where it reports back to `mem3_reshard` manager. The manager persists that split start a `_local/...` document in _dbs db and notifies the job to continue executing. Eventually, after the jobs successfully goes through all the steps, the job process exits, goes to the `completed` state and stays in the system for the user to inspect it and then remove it.
 
-Data!Definitions
-------------------------
+Data Definitions
+----------------
 
 Right below the `mem3_reshard:start_split_job/1` API level a job is converted to a `#job{}` record defined in the `mem3_reshard.hrl` internal header file. That record is then used throughout the resharding logic: the job manager `mem3_reshard` gen_server stores it in its jobs ets table as is. When a job process is started in `mem3_reshard_job` it gets passed a `#job{}` record as well. Then as the job process is running it will periodically report state back to the `mem3_reshard` manager again as an updated `#job{}` record instance.
 
