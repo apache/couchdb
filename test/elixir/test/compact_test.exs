@@ -24,18 +24,26 @@ defmodule CompactTest do
     assert orig_data_size < orig_disk_size
 
     delete(db, docs)
+
+    retry_until(fn ->
+      deleted_data_size = get_info(db)["data_size"]
+      assert deleted_data_size > orig_data_size
+    end)
+
     deleted_data_size = get_info(db)["data_size"]
-    assert deleted_data_size > orig_data_size
 
     compact(db)
-    assert get_info(db)["instance_start_time"] == start_time
-    assert_attachment_available(db)
-    info = get_info(db)
-    final_data_size = info["data_size"]
-    final_disk_size = info["disk_size"]
-    assert final_data_size < final_disk_size
-    assert is_integer(final_data_size) and is_integer(final_disk_size)
-    assert final_data_size < deleted_data_size
+
+    retry_until(fn ->
+      assert get_info(db)["instance_start_time"] == start_time
+      assert_attachment_available(db)
+      info = get_info(db)
+      final_data_size = info["data_size"]
+      final_disk_size = info["disk_size"]
+      assert final_data_size < final_disk_size
+      assert is_integer(final_data_size) and is_integer(final_disk_size)
+      assert final_data_size < deleted_data_size
+    end)
   end
 
   defp assert_attachment_available(db) do

@@ -32,22 +32,24 @@ defmodule LotsOfDocsTest do
       assert Map.fetch!(Enum.at(rows, index), "key") === value
     end)
 
-    %{"rows" => desc_rows, "total_rows" => desc_total_rows} =
-      Couch.get(
-        "/#{db_name}/_all_docs",
-        query: %{:descending => true}
-      ).body
+    retry_until(fn ->
+      %{"rows" => desc_rows, "total_rows" => desc_total_rows} =
+        Couch.get(
+          "/#{db_name}/_all_docs",
+          query: %{:descending => true}
+        ).body
 
-    assert desc_total_rows === Enum.count(@docs_range)
-    assert desc_total_rows === Enum.count(desc_rows)
+      assert desc_total_rows === Enum.count(@docs_range)
+      assert desc_total_rows === Enum.count(desc_rows)
 
-    @docs_range
-    |> Enum.map(fn i -> Integer.to_string(i) end)
-    |> Enum.sort()
-    |> Enum.reverse()
-    |> Enum.with_index()
-    |> Enum.each(fn {value, index} ->
-      assert Map.fetch!(Enum.at(desc_rows, index), "key") === value
+      @docs_range
+      |> Enum.map(fn i -> Integer.to_string(i) end)
+      |> Enum.sort()
+      |> Enum.reverse()
+      |> Enum.with_index()
+      |> Enum.each(fn {value, index} ->
+        assert Map.fetch!(Enum.at(desc_rows, index), "key") === value
+      end)
     end)
   end
 

@@ -7,8 +7,12 @@ defmodule DelayedCommitsTest do
 
   Note that delayed_commits is deprecated in 2.0, so this is a minimal
   test to show it still works. delayed_commits will be removed in 3.0.
+
+  This test is now skipped. Its a bit of a flaky test so no point running it
+  since we are removing this feature.
   """
 
+  @tag :pending
   @tag config: [
          {"couchdb", "delayed_commits", "true"}
        ]

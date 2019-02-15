@@ -1606,7 +1606,7 @@ defmodule ReplicationTest do
 
   def get_db_changes(db_name, query \\ %{}) do
     resp = Couch.get("/#{db_name}/_changes", query: query)
-    assert HTTPotion.Response.success?(resp), "#{inspect(resp)}"
+    assert HTTPotion.Response.success?(resp), "#{inspect(resp)} #{inspect(query)}"
     resp.body
   end
 
@@ -1661,7 +1661,7 @@ defmodule ReplicationTest do
 
   def wait_for_repl(src_db_name, repl_id, expect_revs_checked, wait_left) do
     task = get_task(repl_id, 0)
-    through_seq = task["through_seq"]
+    through_seq = task["through_seq"] || "0"
     revs_checked = task["revisions_checked"]
     changes = get_db_changes(src_db_name, %{:since => through_seq})
 
