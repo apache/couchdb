@@ -48,7 +48,7 @@ update_shard_map(#job{source = Source, target = Target} = Job) ->
         end
     catch
         _:Err ->
-            exit({shard_update_error, Err})
+            exit(Err)
     end,
     LogMsg2 = "~p : update_shard_map on node returned. ~p",
     couch_log:notice(LogMsg2, [?MODULE, Node]),

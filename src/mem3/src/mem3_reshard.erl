@@ -170,11 +170,13 @@ init(_) ->
     couch_log:notice("~p start init()", [?MODULE]),
     EtsOpts = [named_table, {keypos, #job.id}, {read_concurrency, true}],
     ?MODULE = ets:new(?MODULE, EtsOpts),
+    ManagerPid = self(),
     State = #state{
         state = running,
         state_info = [],
         update_time = now_sec(),
-        node = node()
+        node = node(),
+        db_monitor = spawn_link(fun() -> db_monitor(ManagerPid) end)
     },
     State1 = mem3_reshard_store:init(State, ?JOB_PREFIX, state_id()),
     State2 = mem3_reshard_store:load_state(State1),
@@ -184,6 +186,8 @@ init(_) ->
 
 terminate(Reason, State) ->
     couch_log:notice("~p terminate ~p ~p", [?MODULE, Reason, statefmt(State)]),
+    catch unlink(State#state.db_monitor),
+    catch exit(State#state.db_monitor, kill),
     [kill_job_int(Job) || Job <- running_jobs()],
     ok.
 
@@ -279,19 +283,8 @@ handle_call({stop_job, Id, Reason}, _From, State) ->
             {reply, {error, not_found}, State}
     end;
 
-
 handle_call({remove_job, Id}, _From, State) ->
-    couch_log:notice("~p call remove_job Id:~p", [?MODULE, Id]),
-    case job_by_id(Id) of
-        #job{} = Job ->
-            ok = stop_job_int(Job, stopped, "Removed by user", State),
-            ok = mem3_reshard_store:delete_job(State, Id),
-            ets:delete(?MODULE, Job#job.id),
-            {reply, ok, State};
-        not_found ->
-            {reply, {error, not_found}, State}
-    end;
-
+    {reply, remove_job_int(Id, State), State};
 
 handle_call(get_state, _From, #state{state = GlobalState} = State) ->
     StateProps = mem3_reshard_store:state_to_ejson_props(State),
@@ -319,6 +312,11 @@ handle_call(Call, From, State) ->
     couch_log:error("~p unknown call ~p from: ~p", [?MODULE, Call, From]),
     {noreply, State}.
 
+handle_cast({db_deleted, JobIds}, State) ->
+    LogMsg = "~p removing ~p jobs after db was deleted",
+    couch_log:notice(LogMsg, [?MODULE, length(JobIds)]),
+    [remove_job_int(JobId, State) || JobId <- JobIds],
+    {noreply, State};
 
 handle_cast({report, Job}, State) ->
     report_int(Job),
@@ -686,6 +684,20 @@ report_int(Job) ->
     end.
 
 
+-spec remove_job_int(#job{}, #state{}) -> ok | {error, not_found}.
+remove_job_int(Id, State) ->
+    couch_log:notice("~p call remove_job Id:~p", [?MODULE, Id]),
+    case job_by_id(Id) of
+        #job{} = Job ->
+            kill_job_int(Job),
+            ok = mem3_reshard_store:delete_job(State, Id),
+            ets:delete(?MODULE, Job#job.id),
+            ok;
+        not_found ->
+            {error, not_found}
+    end.
+
+
 % This function is for testing and debugging only
 -spec reset_state(#state{}) -> #state{}.
 reset_state(#state{} = State) ->
@@ -717,7 +729,6 @@ update_job_history(#job{job_state = St, update_time = Ts} = Job) ->
         Val -> couch_util:to_binary(Val)
     end,
     Job#job{history = update_history(St, Reason, Ts, Hist)}.
-
 
 
 -spec update_history_rev(atom(), binary() | null, time_sec(), list()) -> list().
@@ -753,6 +764,47 @@ update_history_rev(State, Detail, Ts, History) ->
 max_history() ->
     config:get_integer("reshard", "max_history", ?DEFAULT_MAX_HISTORY).
 
+
+
+-spec completed_jobs_by_dbname(binary()) -> [#job{}].
+completed_jobs_by_dbname(Name) ->
+    DbName = mem3:dbname(Name),
+    Pat = #job{
+        job_state = completed,
+        source = #shard{dbname = DbName, _ = '_'},
+        _ = '_'
+    },
+    [JobId || #job{id = JobId} <- ets:match_object(?MODULE, Pat)].
+
+
+-spec db_monitor(pid()) -> no_return().
+db_monitor(Server) ->
+    couch_log:notice("~p db monitor ~p starting", [?MODULE, self()]),
+    EvtRef = erlang:monitor(process, couch_event_server),
+    couch_event:register_all(self()),
+    db_monitor_loop(Server, EvtRef).
+
+
+-spec db_monitor_loop(pid(), reference()) -> no_return().
+db_monitor_loop(Server, EvtRef) ->
+    receive
+        {'$couch_event', DbName, deleted} ->
+            case completed_jobs_by_dbname(DbName) of
+                [] ->
+                    ok;
+                JobIds ->
+                    gen_server:cast(Server, {db_deleted, JobIds})
+            end,
+            db_monitor_loop(Server, EvtRef);
+        {'$couch_event', _, _} ->
+            db_monitor_loop(Server, EvtRef);
+        {'DOWN', EvtRef, _, _, Info} ->
+            couch_log:error("~p db monitor listener died ~p", [?MODULE, Info]),
+            exit({db_monitor_died, Info});
+        Msg ->
+            couch_log:error("~p db monitor unexpected msg ~p", [?MODULE, Msg]),
+            db_monitor_loop(Server, EvtRef)
+    end.
 
 -spec statefmt(#state{} | term()) -> string().
 statefmt(#state{state = StateName}) ->

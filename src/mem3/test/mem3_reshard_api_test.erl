@@ -101,7 +101,8 @@ mem3_reshard_api_test_() ->
                     fun recover_in_wait_source_close/1,
                     fun recover_in_topoff3/1,
                     fun recover_in_source_delete/1,
-                    fun check_max_jobs/1
+                    fun check_max_jobs/1,
+                    fun cleanup_completed_jobs/1
                 ]
             }
         }
@@ -680,6 +681,17 @@ check_max_jobs(Top) ->
     end).
 
 
+cleanup_completed_jobs(Top) ->
+    ?_test(begin
+        Body = #{type => split, db => <<?DB1>>},
+        {201, [#{?ID := Id}]} = req(post, Top ++ ?JOBS, Body),
+        JobUrl = Top ++ ?JOBS ++ ?b2l(Id),
+        wait_state(JobUrl ++ "/state", <<"completed">>),
+        delete_db(Top, ?DB1),
+        wait_for_http_code(JobUrl, 404)
+    end).
+
+
 % Test help functions
 
 wait_to_complete_then_cleanup(Top, Jobs) ->
@@ -725,6 +737,15 @@ wait_state(Url, State) ->
             case req(get, Url) of
                 {200, #{<<"state">> := State}} -> ok;
                 {200, #{}} -> timer:sleep(100), wait
+            end
+    end, 30000).
+
+
+wait_for_http_code(Url, Code) when is_integer(Code) ->
+    test_util:wait(fun() ->
+            case req(get, Url) of
+                {Code, _} -> ok;
+                {_, _} -> timer:sleep(100), wait
             end
     end, 30000).
 
