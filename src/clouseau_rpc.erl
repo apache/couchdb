@@ -71,7 +71,7 @@ group2(Ref, Args) ->
     rpc(Ref, {group2, Args}).
 
 delete(Ref, Id) ->
-    rpc(Ref, {delete, Id}).
+    rpc(Ref, {delete, couch_util:to_binary(Id)}).
 
 update(Ref, Id, Fields) ->
     rpc(Ref, {update, Id, Fields}).
