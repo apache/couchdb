@@ -768,7 +768,7 @@ check_access(Db, Access) ->
     [] ->
         couch_log:info("check_access: ~n~nno _access, require admin~n~n", []),
         % if doc has no _access, userCtX must be admin
-        ok =:= check_is_admin(Db);
+        is_admin(Db);
     Access ->
         % if doc has _access, userCtx must be admin OR matching user or role
         % _access = ["a", "b", ]
@@ -925,8 +925,8 @@ validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDoc
 validate_doc_update(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
     ValidationFuns = load_validation_funs(Db),
     validate_doc_update(Db#db{validate_doc_funs=ValidationFuns}, Doc, Fun);
-validate_doc_update(#db{validate_doc_funs=[]}, _Doc, _GetDiskDocFun) ->
-    ok;
+validate_doc_update(#db{validate_doc_funs=[]}=Db, _Doc, _GetDiskDocFun) ->
+	ok;
 validate_doc_update(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
     ok;
 validate_doc_update(Db, Doc, GetDiskDocFun) ->
@@ -1007,6 +1007,7 @@ reload_validation_funs(#db{} = Db) ->
 
 prep_and_validate_update(Db, #doc{id=Id,revs={RevStart, Revs}}=Doc,
         OldFullDocInfo, LeafRevsDict, AllowConflict) ->
+ 	couch_log:info("~n~nprep_and_validate_update Doc ~p, ~n~n", [Doc]),
     case Revs of
     [PrevRev|_] ->
         case dict:find({RevStart, PrevRev}, LeafRevsDict) of
@@ -1233,8 +1234,31 @@ validate_update(Db, Doc) ->
         Error -> Error
     end.
 
+
+validate_docs_access(Db, DocBuckets, DocErrors) ->
+	validate_docs_access1(Db, DocBuckets, {[], DocErrors}).
+
+validate_docs_access1(_Db, [], {DocBuckets0, DocErrors}) ->
+	DocBuckets1 = lists:reverse(lists:map(fun lists:reverse/1, DocBuckets0)),
+	DocBuckets = case DocBuckets1 of
+		[[]] -> [];
+		Else -> Else
+	end,
+	couch_log:info("~n~n< validate_docs_access DocBuckets ~p, DocErrors ~p, interactive_edit~n~n", [DocBuckets, DocErrors]),	
+	{ok, DocBuckets, DocErrors};
+validate_docs_access1(Db, [DocBucket|RestBuckets], {DocAcc, ErrorAcc}) ->
+	{NewBuckets, NewErrors} = lists:foldl(fun(Doc, {Acc, ErrAcc}) ->
+		case catch validate_access(Db, Doc) of
+			ok -> {[Doc|Acc], ErrAcc};
+			Error -> {Acc, [{doc_tag(Doc), Error}|ErrAcc]}
+		end
+	end, {[], ErrorAcc}, DocBucket),
+    couch_log:info("~n~nvalidate_docs_access NewBuckets ~p, NewErrors ~p, RestBuckets ~p, interactive_edit~n~n", [NewBuckets, NewErrors, RestBuckets]),
+	validate_docs_access1(Db, RestBuckets, {[NewBuckets|DocAcc], NewErrors}).
+
+
 update_docs(Db, Docs0, Options, replicated_changes) ->
-%    Docs1 = lists:filter(fun(Doc) -> ok =:= check_access(Db, Doc) end, Docs0),
+   	% Docs1 = lists:filter(fun(Doc) -> ok =:= check_access(Db, Doc) end, Docs0),
     Docs = tag_docs(Docs0),
 
     PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
@@ -1252,7 +1276,7 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
     {ok, DocErrors};
 
 update_docs(Db, Docs0, Options, interactive_edit) ->
-%    Docs1 = lists:filter(fun(Doc) -> ok =:= check_access(Db, Doc) end, Docs0),
+    couch_log:info("~n~nupdate_docs Db ~p, Docs0 ~p, Options ~p, interactive_edit~n~n", [Db, Docs0, Options]),
     Docs = tag_docs(Docs0),
 
     AllOrNothing = lists:member(all_or_nothing, Options),
@@ -1261,8 +1285,12 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
             AllOrNothing, [], [])
     end,
 
-    {ok, DocBuckets, NonRepDocs, DocErrors}
+    {ok, DocBuckets0, NonRepDocs, DocErrors0}
         = before_docs_update(Db, Docs, PrepValidateFun, interactive_edit),
+
+	% TODO: this shuld really happen before before_docs_update()
+    {ok, DocBuckets, DocErrors} = validate_docs_access(Db, DocBuckets0, DocErrors0),	
+    couch_log:info("~n~nDocBuckets0: ~p, DocErrors0: ~p~nDocBuckets: ~p, DocErrors: ~p, interactive_edit~n~n", [DocBuckets0, DocErrors0, DocBuckets, DocErrors]),
 
     if (AllOrNothing) and (DocErrors /= []) ->
         RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),
@@ -1427,7 +1455,7 @@ before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun, UpdateType
         (#doc{atts = Atts}) -> Atts /= []
     end,
 
-    case (VDFuns /= []) orelse lists:any(ValidatePred, Docs2) of
+    case lists:any(ValidatePred, Docs2) of
         true ->
             % lookup the doc by id and get the most recent
             Ids = [Id || [#doc{id = Id} | _] <- DocBuckets],

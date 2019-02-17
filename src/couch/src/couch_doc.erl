@@ -262,7 +262,6 @@ transfer_fields([{<<"_id">>, Id} | Rest], Doc, DbName) ->
 
 transfer_fields([{<<"_access">>, Access} = Field | Rest],
     #doc{body=Fields} = Doc, DbName) ->
-        couch_log:info("~n~ntransferring access: ~p~n~n", [Access]),
     % TODO: validate access as array strings, and optional arrays of strings
     transfer_fields(Rest, Doc#doc{body=[Field|Fields],access=Access}, DbName);
 
