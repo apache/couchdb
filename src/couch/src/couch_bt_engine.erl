@@ -409,6 +409,7 @@ write_doc_infos(#st{} = St, Pairs, LocalDocs) ->
     end, {[], [], []}, Pairs),
 
     {Add, RemIds, RemSeqs} = FinalAcc,
+    couch_log:info("~n~nadding these to by-id and by-seq~p~n~n", [Add]),
     {ok, IdTree2} = couch_btree:add_remove(IdTree, Add, RemIds),
     {ok, SeqTree2} = couch_btree:add_remove(SeqTree, Add, RemSeqs),
 

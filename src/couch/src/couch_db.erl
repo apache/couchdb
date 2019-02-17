@@ -31,6 +31,7 @@
     check_is_admin/1,
     check_is_member/1,
     validate_access/2,
+    check_access/2,
 
     name/1,
     get_after_doc_read_fun/1,
@@ -748,20 +749,23 @@ security_error_type(#user_ctx{name=_}) ->
 
 % validate_access(#db{access=true, user_ctx={name=UserName,roles=UserRoles}}=Db, #doc{body=Props}=Doc) ->
 validate_access(Db, Doc) ->
+    
     validate_access1(check_access(Db, Doc)).
 
 validate_access1(true) -> ok;
 validate_access1(_) -> throw({forbidden, <<"can't touch this">>}).
 
-check_access(Db, Doc) ->
+
+check_access(Db, #doc{access=Access}=Doc) ->
     couch_log:info("check_access: ~n~n~p ~p~n~n", [Db, Doc]),
-    {Props} = Doc#doc.body,
+    check_access(Db, Access);
+check_access(Db, Access) ->
     #user_ctx{
         name=UserName,
         roles=UserRoles
     } = Db#db.user_ctx,
-    case couch_util:get_value(<<"_access">>, Props) of
-    undefined ->
+    case Access of
+    [] ->
         couch_log:info("check_access: ~n~nno _access, require admin~n~n", []),
         % if doc has no _access, userCtX must be admin
         ok =:= check_is_admin(Db);
@@ -912,25 +916,20 @@ group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
        group_alike_docs(Rest, [[Doc]|[Bucket|RestBuckets]])
     end.
 
-validate_doc_update(Db, Doc, Fun) ->
-    couch_log:info("~n~nDb ~p, Doc ~p, Fun ~p~n~n", [Db, Doc, Fun]),
-    case catch validate_access(Db, Doc) of
-        ok -> validate_doc_update1(Db, Doc, Fun);
-        Error -> Error
-    end.
-validate_doc_update1(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
+
+validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
     case catch check_is_admin(Db) of
         ok -> validate_ddoc(Db#db.name, Doc);
         Error -> Error
     end;
-validate_doc_update1(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
+validate_doc_update(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
     ValidationFuns = load_validation_funs(Db),
     validate_doc_update(Db#db{validate_doc_funs=ValidationFuns}, Doc, Fun);
-validate_doc_update1(#db{validate_doc_funs=[]}, _Doc, _GetDiskDocFun) ->
+validate_doc_update(#db{validate_doc_funs=[]}, _Doc, _GetDiskDocFun) ->
     ok;
-validate_doc_update1(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
+validate_doc_update(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
     ok;
-validate_doc_update1(Db, Doc, GetDiskDocFun) ->
+validate_doc_update(Db, Doc, GetDiskDocFun) ->
     case get(io_priority) of
         {internal_repl, _} ->
             ok;
@@ -1228,7 +1227,14 @@ doc_tag(#doc{meta=Meta}) ->
         Else -> throw({invalid_doc_tag, Else})
     end.
 
+validate_update(Db, Doc) ->
+    case catch validate_access(Db, Doc) of
+        ok -> Doc;
+        Error -> Error
+    end.
+
 update_docs(Db, Docs0, Options, replicated_changes) ->
+%    Docs1 = lists:filter(fun(Doc) -> ok =:= check_access(Db, Doc) end, Docs0),
     Docs = tag_docs(Docs0),
 
     PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
@@ -1246,6 +1252,7 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
     {ok, DocErrors};
 
 update_docs(Db, Docs0, Options, interactive_edit) ->
+%    Docs1 = lists:filter(fun(Doc) -> ok =:= check_access(Db, Doc) end, Docs0),
     Docs = tag_docs(Docs0),
 
     AllOrNothing = lists:member(all_or_nothing, Options),

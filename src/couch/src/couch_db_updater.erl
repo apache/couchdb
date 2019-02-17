@@ -589,14 +589,16 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
     Ids = [Id || [{_Client, #doc{id=Id}}|_] <- DocsList],
+    Accesses = [Access || [{_Client, #doc{access=Access}}|_] <- DocsList],
+
     % lookup up the old documents, if they exist.
     OldDocLookups = couch_db_engine:open_docs(Db, Ids),
-    OldDocInfos = lists:zipwith(fun
-        (_Id, #full_doc_info{} = FDI) ->
-            FDI;
-        (Id, not_found) ->
-            #full_doc_info{id=Id}
-    end, Ids, OldDocLookups),
+    OldDocInfos = lists:zipwith3(fun
+        (_Id, #full_doc_info{} = FDI, Access) ->
+            FDI#full_doc_info{access=Access};
+        (Id, not_found, Access) ->
+            #full_doc_info{id=Id,access=Access}
+    end, Ids, OldDocLookups, Accesses),
     % Merge the new docs into the revision trees.
     {ok, NewFullDocInfos, RemSeqs, _} = merge_rev_trees(RevsLimit,
             MergeConflicts, DocsList, OldDocInfos, [], [], UpdateSeq),

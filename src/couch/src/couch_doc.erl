@@ -41,15 +41,23 @@ to_branch(Doc, [RevId | Rest]) ->
     [{RevId, ?REV_MISSING, to_branch(Doc, Rest)}].
 
 % helpers used by to_json_obj
+reduce_access({Access}) -> Access;
+reduce_access(Access) -> Access.
+
 to_json_rev(0, []) ->
     [];
 to_json_rev(Start, [FirstRevId|_]) ->
     [{<<"_rev">>, ?l2b([integer_to_list(Start),"-",revid_to_str(FirstRevId)])}].
 
-to_json_body(true, {Body}) ->
-    Body ++ [{<<"_deleted">>, true}];
-to_json_body(false, {Body}) ->
-    Body.
+to_json_body(Del, Body) ->
+    to_json_body(Del, Body, []).
+
+to_json_body(true, {Body}, Access0) ->
+    Access = reduce_access(Access0),
+    Body ++ [{<<"_deleted">>, true}] ++ [{<<"_access">>, {Access}}];
+to_json_body(false, {Body}, Access0) ->
+    Access = reduce_access(Access0),
+    Body ++ [{<<"_access">>, {Access}}].
 
 to_json_revisions(Options, Start, RevIds0) ->
     RevIds = case proplists:get_value(revs, Options) of
@@ -118,10 +126,10 @@ to_json_obj(Doc, Options) ->
     doc_to_json_obj(with_ejson_body(Doc), Options).
 
 doc_to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
-            meta=Meta}=Doc,Options)->
+            meta=Meta,access=Access}=Doc,Options)->
     {[{<<"_id">>, Id}]
         ++ to_json_rev(Start, RevIds)
-        ++ to_json_body(Del, Body)
+        ++ to_json_body(Del, Body, Access)
         ++ to_json_revisions(Options, Start, RevIds)
         ++ to_json_meta(Meta)
         ++ to_json_attachments(Doc#doc.atts, Options)
@@ -252,10 +260,11 @@ transfer_fields([{<<"_id">>, Id} | Rest], Doc, DbName) ->
     validate_docid(Id, DbName),
     transfer_fields(Rest, Doc#doc{id=Id}, DbName);
 
-transfer_fields([{<<"_access">>, _Access} = Field | Rest],
+transfer_fields([{<<"_access">>, Access} = Field | Rest],
     #doc{body=Fields} = Doc, DbName) ->
+        couch_log:info("~n~ntransferring access: ~p~n~n", [Access]),
     % TODO: validate access as array strings, and optional arrays of strings
-    transfer_fields(Rest, Doc#doc{body=[Field|Fields]}, DbName);
+    transfer_fields(Rest, Doc#doc{body=[Field|Fields],access=Access}, DbName);
 
 transfer_fields([{<<"_rev">>, Rev} | Rest], #doc{revs={0, []}}=Doc, DbName) ->
     {Pos, RevId} = parse_rev(Rev),
