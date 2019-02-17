@@ -198,8 +198,74 @@ setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
 
 
 finish_cluster(Options) ->
+    ok = wait_connected(),
+    ok = sync_admins(),
     Dbs = proplists:get_value(ensure_dbs_exist, Options, cluster_system_dbs()),
     finish_cluster_int(Dbs, has_cluster_system_dbs(Dbs)).
+
+
+wait_connected() ->
+    Nodes = other_nodes(),
+    Result = test_util:wait(fun() ->
+        case disconnected(Nodes) of
+            [] -> ok;
+            _ -> wait
+        end
+    end),
+    case Result of
+        timeout ->
+            Reason = "Cluster setup timed out waiting for nodes to connect",
+            throw({setup_error, Reason});
+        ok ->
+            ok
+    end.
+
+
+other_nodes() ->
+    mem3:nodes() -- [node()].
+
+
+disconnected(Nodes) ->
+    lists:filter(fun(Node) ->
+        case net_adm:ping(Node) of
+            pong -> false;
+            pang -> true
+        end
+    end, Nodes).
+
+
+sync_admins() ->
+    ok = lists:foreach(fun({User, Pass}) ->
+        sync_admin(User, Pass)
+    end, config:get("admins")).
+
+
+sync_admin(User, Pass) ->
+    {Results, Errors} = rpc:multicall(other_nodes(), config, set,
+        ["admins", User, Pass]),
+    case validate_multicall(Results, Errors) of
+        ok ->
+            ok;
+        error ->
+            log:error("~p sync_admin results ~p errors ~p",
+                [?MODULE, Results, Errors]),
+            Reason = "Cluster setup unable to sync admin passwords",
+            throw({setup_error, Reason})
+    end.
+
+
+validate_multicall(Results, Errors) ->
+    AllOk = lists:all(fun
+        (ok) -> true;
+        (_) -> false
+    end, Results),
+    case AllOk andalso Errors == [] of
+        true ->
+            ok;
+        false ->
+            error
+    end.
+
 
 finish_cluster_int(_Dbs, true) ->
     {error, cluster_finished};
