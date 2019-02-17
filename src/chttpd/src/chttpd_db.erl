@@ -273,7 +273,7 @@ bad_action_req(#httpd{path_parts=[_, _, Name|FileNameParts]}=Req, Db, _DDoc) ->
 
 handle_design_info_req(#httpd{method='GET'}=Req, Db, #doc{} = DDoc) ->
     [_, _, Name, _] = Req#httpd.path_parts,
-    {ok, GroupInfoList} = fabric:get_view_group_isnfo(Db, DDoc),
+    {ok, GroupInfoList} = fabric:get_view_group_info(Db, DDoc),
     send_json(Req, 200, {[
         {name,  Name},
         {view_index, {GroupInfoList}}

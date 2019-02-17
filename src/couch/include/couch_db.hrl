@@ -62,7 +62,7 @@
     id = <<"">>,
     high_seq = 0,
     revs = [], % rev_info
-    access = [] 
+    access = []
 }).
 
 -record(size_info, {

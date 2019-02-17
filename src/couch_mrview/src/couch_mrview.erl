@@ -241,28 +241,7 @@ access_ddoc() ->
         ]}
     }.
 
-%%  Acc0 = #fabric_changes_acc{                            
-%%    db = Db,                                             
-%%    seq = StartSeq,                                      
-%%    args = Args,                                         
-%%    options = Options,                                   
-%%    pending = couch_db:count_changes_since(Db, StartSeq),
-%%    epochs = couch_db:get_epochs(Db)                     
-%%  },                                                     
-
-%% changes_enumerator(#full_doc_info{} = FDI, Acc) ->                                         
-%%     changes_enumerator(couch_doc:to_doc_info(FDI), Acc);                                   
-%% changes_enumerator(#doc_info{id= <<"_local/", _/binary>>, high_seq=Seq}, Acc) ->           
-%%     {ok, Acc#fabric_changes_acc{seq = Seq, pending = Acc#fabric_changes_acc.pending-1}};   
-%% changes_enumerator(DocInfo, Acc) ->                                                        
-
-
 query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
-    %% couch_log:info("~n~n Db: ~p", [Db]),
-    %% couch_log:info("~n~n StartSeq: ~p", [StartSeq]),
-    %% couch_log:info("~n~n Fun: ~p", [Fun]),
-    %% couch_log:info("~n~n Options: ~p", [Options]),
-    %% couch_log:info("~n~n Acc: ~p", [Acc]),
     DDoc = access_ddoc(),
     UserCtx = couch_db:get_user_ctx(Db),
     UserName = UserCtx#user_ctx.name,
@@ -613,7 +592,6 @@ all_docs_fold(Db, #mrargs{direction=Dir, keys=Keys0}=Args, Callback, UAcc) ->
 
 
 map_fold(Db, View, Args, Callback, UAcc) ->
-    % couch_log:info("~n~n View: ~p~n", [View]),
     {ok, Total} = case View#mrview.def of
         <<"_access/by-id-map">> ->
             {ok, 0}; % TODO: couch_mrview_util:get_access_row_count(View, Args#mrargs.start_key);
@@ -643,7 +621,6 @@ map_fold(Db, View, Args, Callback, UAcc) ->
 
 map_fold(#full_doc_info{} = FullDocInfo, OffsetReds, Acc) ->
     % matches for _all_docs and translates #full_doc_info{} -> KV pair
-    couch_log:info("~n~n Acc: ~p~n", [Acc]),
     case couch_doc:to_doc_info(FullDocInfo) of
         #doc_info{id=Id, revs=[#rev_info{deleted=false, rev=Rev}|_]} = DI ->
             Value = {[{rev, couch_doc:rev_to_str(Rev)}]},

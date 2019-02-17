@@ -131,8 +131,6 @@ map_doc(_St, {Doc}) ->
             Seq = couch_util:get_value(<<"_seq">>, Doc),
             Deleted = couch_util:get_value(<<"_deleted">>, Doc, false),
             BodySp = couch_util:get_value(<<"_body_sp">>, Doc),
-            
-            couch_log:info("RELLY Indexing: Id: ~p, Rev: ~p, Seq: ~p, Deleted: ~p, BodySp: ~p~n", [Id, Rev, Seq, Deleted, BodySp]),
             % by-access-id
             ById = case Deleted of
                 false ->

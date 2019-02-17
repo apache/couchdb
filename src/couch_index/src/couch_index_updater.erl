@@ -160,7 +160,6 @@ update(Idx, Mod, IdxState) ->
 
         LoadDoc = fun(DI) ->
             {DocId, Seq, Deleted, DocInfo} = GetInfo(DI),
-            couch_log:info("~n~nDbName: ~p OPeed Dc: ~p~n~n", [DbName, DocId]),
 
             case {IncludeDesign, DocId} of
                 {false, <<"_design/", _/binary>>} ->
@@ -169,7 +168,6 @@ update(Idx, Mod, IdxState) ->
                 %     {#doc{id=DocId, deleted=true}, Seq};
                 _ ->
                     {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
-                    couch_log:info("~n~nDbName: ~p DOC Dc: ~p from DocInfo~p~n~n", [DbName, Doc, DocInfo]),
                     [RevInfo] = DocInfo#doc_info.revs,
                     Doc1 = Doc#doc{
                         meta = [{body_sp, RevInfo#rev_info.body_sp}]

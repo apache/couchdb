@@ -322,7 +322,6 @@ init_db(DbName, FilePath, EngineState, Options) ->
         after_doc_read = ADR,
         access = Access
     },
-    couch_log:info("~n~nNEW DB WITH OPTIONS~p ~p ACCESSS~p ININTDB~p~n~n", [DbName, CleanedOpts, Access, InitDb]),
 
     InitDb#db{
         committed_update_seq = couch_db_engine:get_update_seq(InitDb),
