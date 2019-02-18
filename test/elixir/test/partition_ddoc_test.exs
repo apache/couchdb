@@ -156,6 +156,7 @@ defmodule PartitionDDocTest do
     assert %{"rows" => [%{"id" => "_design/foo"}]} = body
   end
 
+  @tag :skip_on_jenkins
   test "GET /dbname/_design_docs", context do
     db_name = context[:db_name]
 

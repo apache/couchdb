@@ -12,6 +12,7 @@ defmodule CompactTest do
   @att_name "foo.txt"
   @att_plaintext "This is plain text"
 
+  @tag :skip_on_jenkins
   @tag :with_db
   test "compaction reduces size of deleted docs", context do
     db = context[:db_name]

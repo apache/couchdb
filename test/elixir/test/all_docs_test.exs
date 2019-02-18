@@ -41,8 +41,10 @@ defmodule AllDocsTest do
     assert resp["total_rows"] == length(rows)
 
     # Check _all_docs offset
-    resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "\"2\""}).body
-    assert resp["offset"] == 2
+    retry_until(fn ->
+      resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "\"2\""}).body
+      assert resp["offset"] == 2
+    end)
 
     # Confirm that queries may assume raw collation
     resp =
