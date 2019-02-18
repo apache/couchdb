@@ -96,35 +96,33 @@ for_docid(DbName, DocId, Options) ->
     end.
 
 for_shard_name(ShardName) ->
-    for_shard_name(ShardName, []).
-
-for_shard_name(ShardName, Options) ->
     DbName = mem3:dbname(ShardName),
+    [B, E] = mem3:range(ShardName),
     ShardHead = #shard{
-        name = ShardName,
         dbname = DbName,
+        range = ['$1', '$2'],
         _ = '_'
     },
     OrderedShardHead = #ordered_shard{
-        name = ShardName,
         dbname = DbName,
+        range = ['$1', '$2'],
         _ = '_'
     },
-    ShardSpec = {ShardHead, [], ['$_']},
-    OrderedShardSpec = {OrderedShardHead, [], ['$_']},
+    % see mem3_util:range_overlap/2 for an explanation how it works
+    Conditions = [{'=<', '$1', E}, {'=<', B, '$2'}],
+    ShardSpec = {ShardHead, Conditions, ['$_']},
+    OrderedShardSpec = {OrderedShardHead, Conditions, ['$_']},
     Shards = try ets:select(?SHARDS, [ShardSpec, OrderedShardSpec]) of
         [] ->
-            filter_shards_by_name(ShardName, load_shards_from_disk(DbName));
+            filter_shards_by_range([B, E], load_shards_from_disk(DbName));
         Else ->
             gen_server:cast(?MODULE, {cache_hit, DbName}),
             Else
     catch error:badarg ->
-        filter_shards_by_name(ShardName, load_shards_from_disk(DbName))
+        filter_shards_by_range([B, E], load_shards_from_disk(DbName))
     end,
-    case lists:member(ordered, Options) of
-        true  -> Shards;
-        false -> mem3_util:downcast(Shards)
-    end.
+    mem3_util:downcast(Shards).
+
 
 get(DbName, Node, Range) ->
     Res = lists:foldl(fun(#shard{node=N, range=R}=S, Acc) ->
@@ -509,17 +507,12 @@ flush_write(DbName, Writer, WriteTimeout) ->
         erlang:exit({mem3_shards_write_timeout, DbName})
     end.
 
-filter_shards_by_name(Name, Shards) ->
-    filter_shards_by_name(Name, [], Shards).
 
-filter_shards_by_name(_, Matches, []) ->
-    Matches;
-filter_shards_by_name(Name, Matches, [#ordered_shard{name=Name}=S|Ss]) ->
-    filter_shards_by_name(Name, [S|Matches], Ss);
-filter_shards_by_name(Name, Matches, [#shard{name=Name}=S|Ss]) ->
-    filter_shards_by_name(Name, [S|Matches], Ss);
-filter_shards_by_name(Name, Matches, [_|Ss]) ->
-    filter_shards_by_name(Name, Matches, Ss).
+filter_shards_by_range(Range, Shards)->
+    lists:filter(fun
+        (#ordered_shard{range = R}) -> mem3_util:range_overlap(Range, R);
+        (#shard{range = R}) -> mem3_util:range_overlap(Range, R)
+    end, Shards).
 
 
 -ifdef(TEST).

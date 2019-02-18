@@ -17,7 +17,14 @@
     shard_info/1, ensure_exists/1, open_db_doc/1]).
 -export([is_deleted/1, rotate_list/2]).
 -export([
-    iso8601_timestamp/0
+    iso8601_timestamp/0,
+    range_overlap/2,
+    get_ring/1,
+    get_ring/2,
+    get_ring/3,
+    get_ring/4,
+    non_overlapping_shards/1,
+    non_overlapping_shards/3
 ]).
 
 %% do not use outside mem3.
@@ -286,3 +293,174 @@ iso8601_timestamp() ->
     {{Year,Month,Date},{Hour,Minute,Second}} = calendar:now_to_datetime(Now),
     Format = "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
     io_lib:format(Format, [Year, Month, Date, Hour, Minute, Second, Micro]).
+
+
+% Consider these cases:
+%
+%       A-------B
+%
+% overlap:
+%   X--------Y
+%         X-Y
+%          X-------Y
+% X-------------------Y
+%
+% no overlap:
+% X-Y                     because A !=< Y
+%                   X-Y   because X !=< B
+%
+range_overlap([A, B], [X, Y]) when
+        is_integer(A), is_integer(B),
+        is_integer(X), is_integer(Y),
+        A =< B, X =< Y ->
+    A =< Y andalso X =< B.
+
+
+non_overlapping_shards(Shards) ->
+    {Start, End} = lists:foldl(fun(Shard, {Min, Max}) ->
+        [B, E] = mem3:range(Shard),
+        {min(B, Min), max(E, Max)}
+    end, {0, ?RING_END}, Shards),
+    non_overlapping_shards(Shards, Start, End).
+
+
+non_overlapping_shards([], _, _) ->
+    [];
+
+non_overlapping_shards(Shards, Start, End) ->
+    Ranges = lists:map(fun(Shard) ->
+        [B, E] = mem3:range(Shard),
+        {B, E}
+    end, Shards),
+    Ring = get_ring(Ranges, fun sort_ranges_fun/2, Start, End),
+    lists:filter(fun(Shard) ->
+        [B, E] = mem3:range(Shard),
+        lists:member({B, E}, Ring)
+    end, Shards).
+
+
+get_ring(Ranges) ->
+    get_ring(Ranges, fun sort_ranges_fun/2, 0, ?RING_END).
+
+
+get_ring(Ranges, SortFun) when is_function(SortFun, 2) ->
+    get_ring(Ranges, SortFun, 0, ?RING_END).
+
+
+get_ring(Ranges, Start, End) when is_integer(Start), is_integer(End),
+        Start >= 0, End >= 0, Start =< End ->
+    get_ring(Ranges, fun sort_ranges_fun/2, Start, End).
+
+% Build a ring out of a list of possibly overlapping ranges. If a ring cannot
+% be built then [] is returned. Start and End supply a custom range such that
+% only intervals in that range will be considered. SortFun is a custom sorting
+% function to sort intervals before the ring is built. The custom sort function
+% can be used to prioritize how the ring is built, for example, whether to use
+% shortest ranges first (and thus have more total shards) or longer or any
+% other scheme.
+%
+get_ring([], _SortFun, _Start, _End) ->
+    [];
+get_ring(Ranges, SortFun, Start, End) when is_function(SortFun, 2),
+        is_integer(Start), is_integer(End),
+        Start >= 0, End >= 0, Start =< End  ->
+    Sorted = lists:usort(SortFun, Ranges),
+    case get_subring_int(Start, End, Sorted) of
+        fail -> [];
+        Ring -> Ring
+    end.
+
+
+get_subring_int(_, _, []) ->
+    fail;
+
+get_subring_int(Start, EndMax, [{Start, End} = Range | Tail]) ->
+    case End =:= EndMax of
+        true ->
+            [Range];
+        false ->
+            case get_subring_int(End + 1, EndMax, Tail) of
+                fail ->
+                    get_subring_int(Start, EndMax, Tail);
+                Acc ->
+                    [Range | Acc]
+            end
+    end;
+
+get_subring_int(Start1, _, [{Start2, _} | _]) when Start2 > Start1 ->
+    % Found a gap, this attempt is done
+    fail;
+
+get_subring_int(Start1, EndMax, [{Start2, _} | Rest]) when Start2 < Start1 ->
+    % We've overlapped the head, skip the shard
+    get_subring_int(Start1, EndMax, Rest).
+
+
+% Sort ranges by starting point, then sort so that
+% the longest range comes first
+sort_ranges_fun({B, E1}, {B, E2}) ->
+    E2 =< E1;
+
+sort_ranges_fun({B1, _}, {B2, _}) ->
+    B1 =< B2.
+
+
+-ifdef(TEST).
+
+-include_lib("eunit/include/eunit.hrl").
+
+range_overlap_test_() ->
+    [?_assertEqual(Res, range_overlap(R1, R2)) || {R1, R2, Res} <- [
+        {[2, 6], [1, 3], true},
+        {[2, 6], [3, 4], true},
+        {[2, 6], [4, 8], true},
+        {[2, 6], [1, 9], true},
+        {[2, 6], [1, 2], true},
+        {[2, 6], [6, 7], true},
+        {[2, 6], [0, 1], false},
+        {[2, 6], [7, 9], false}
+    ]].
+
+
+non_overlapping_shards_test() ->
+    [?_assertEqual(Res, non_overlapping_shards(Shards)) || {Shards, Res} <- [
+        {
+            [shard(0, ?RING_END)],
+            [shard(0, ?RING_END)]
+        },
+        {
+            [shard(0, 1)],
+            [shard(0, 1)]
+        },
+        {
+            [shard(0, 1), shard(0, 1)],
+            [shard(0, 1)]
+        },
+        {
+            [shard(0, 1), shard(3, 4)],
+            []
+        },
+        {
+            [shard(0, 1), shard(1, 2), shard(2, 3)],
+            [shard(0, 1), shard(2, 3)]
+        },
+        {
+            [shard(1, 2), shard(0, 1)],
+            [shard(0, 1), shard(1, 2)]
+        },
+        {
+            [shard(0, 1), shard(0, 2), shard(2, 5), shard(3, 5)],
+            [shard(0, 2), shard(2, 5)]
+        },
+        {
+            [shard(0, 2), shard(4, 5), shard(1, 3)],
+            []
+        }
+
+    ]].
+
+
+shard(Begin, End) ->
+    #shard{range = [Begin, End]}.
+
+-endif.
