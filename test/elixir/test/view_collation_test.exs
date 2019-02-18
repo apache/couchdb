@@ -89,9 +89,11 @@ defmodule ViewCollationTest do
 
   test "key query option", context do
     Enum.each(@values, fn value ->
-      resp = Couch.get(url(context), query: %{:key => :jiffy.encode(value)})
-      assert length(resp.body["rows"]) == 1
-      assert Enum.at(resp.body["rows"], 0)["key"] == convert(value)
+      retry_until(fn ->
+        resp = Couch.get(url(context), query: %{:key => :jiffy.encode(value)})
+        assert length(resp.body["rows"]) == 1
+        assert Enum.at(resp.body["rows"], 0)["key"] == convert(value)
+      end)
     end)
   end
 

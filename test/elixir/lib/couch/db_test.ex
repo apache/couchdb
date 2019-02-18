@@ -214,8 +214,8 @@ defmodule Couch.DBTest do
       raise "timed out after #{now - start} ms"
     else
       try do
-        if condition.() do
-          :ok
+        if result = condition.() do
+          result
         else
           raise ExUnit.AssertionError
         end

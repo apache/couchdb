@@ -182,6 +182,7 @@ defmodule PartitionSizeTest do
     assert post_infos == pre_infos
   end
 
+  @tag :skip_on_jenkins
   test "get all partition sizes", context do
     db_name = context[:db_name]
     mk_docs(db_name)
