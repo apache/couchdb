@@ -53,9 +53,10 @@ handle_worker_exit(Collector, _Worker, Reason) ->
 
 -spec get_worker_ranges([{#shard{}, any()}]) -> [{integer(), integer()}].
 get_worker_ranges(Counters) ->
-    fabric_dict:fold(fun(#shard{range=[X, Y]}, _, Acc) ->
+    Ranges = fabric_dict:fold(fun(#shard{range=[X, Y]}, _, Acc) ->
         [{X, Y} | Acc]
-    end, [], Counters).
+    end, [], Counters),
+    lists:usort(Ranges).
 
 
 %% @doc looks for a fully covered keyrange in the list of counters
@@ -78,17 +79,18 @@ remove_overlapping_shards(#shard{} = Shard, Counters, RemoveCb) ->
 
 
 filter_possible_overlaps(Shard, Counters, RemoveCb) ->
-    Ranges = get_worker_ranges(Counters),
+    Ranges0 = get_worker_ranges(Counters),
+    #shard{range = [BShard, EShard]} = Shard,
+    Ranges = Ranges0 ++ [{BShard, EShard}],
     {Bs, Es} = lists:unzip(Ranges),
     {MinB, MaxE} = {lists:min(Bs), lists:max(Es)},
-    #shard{range = [BShard, _] = RShard} = Shard,
     % Use a custom sort function which prioritizes the given shard
     % range when the start endpoints match.
     SortFun  = fun
-        (R, {BO, _}) when R =:= RShard, BO =:= BShard ->
+        ({B, E}, {B, _}) when {B, E} =:= {BShard, EShard} ->
             % If start matches with the shard's start, shard always wins
             true;
-        ({BO, _}, R) when R =:= RShard, BO =:= BShard ->
+        ({B, _}, {B, E}) when {B, E} =:= {BShard, EShard} ->
             % If start matches with te shard's start, shard always wins
             false;
         ({B, E1}, {B, E2}) ->
@@ -492,41 +494,52 @@ find_replacements(Workers, AllShards) ->
     {Workers1, Removed, Rep}.
 
 
-% unit test
+% Unit tests
+
 is_progress_possible_test() ->
-    EndPoint = 2 bsl 31,
-    T1 = [[0, EndPoint-1]],
-    ?assertEqual(is_progress_possible(mk_cnts(T1)),true),
-    T2 = [[0,10],[11,20],[21,EndPoint-1]],
-    ?assertEqual(is_progress_possible(mk_cnts(T2)),true),
+    T1 = [[0, ?RING_END]],
+    ?assertEqual(is_progress_possible(mk_cnts(T1)), true),
+    T2 = [[0, 10], [11, 20], [21, ?RING_END]],
+    ?assertEqual(is_progress_possible(mk_cnts(T2)), true),
     % gap
-    T3 = [[0,10],[12,EndPoint-1]],
-    ?assertEqual(is_progress_possible(mk_cnts(T3)),false),
+    T3 = [[0, 10], [12, ?RING_END]],
+    ?assertEqual(is_progress_possible(mk_cnts(T3)), false),
     % outside range
-    T4 = [[1,10],[11,20],[21,EndPoint-1]],
-    ?assertEqual(is_progress_possible(mk_cnts(T4)),false),
+    T4 = [[1, 10], [11, 20], [21, ?RING_END]],
+    ?assertEqual(is_progress_possible(mk_cnts(T4)), false),
     % outside range
-    T5 = [[0,10],[11,20],[21,EndPoint]],
-    ?assertEqual(is_progress_possible(mk_cnts(T5)),false).
+    T5 = [[0, 10], [11, 20], [21, ?RING_END + 1]],
+    ?assertEqual(is_progress_possible(mk_cnts(T5)), false),
+    % possible progress but with backtracking
+    T6 = [[0, 10], [11, 20], [0, 5], [6, 21], [21, ?RING_END]],
+    ?assertEqual(is_progress_possible(mk_cnts(T6)), true),
+    % not possible, overlap is not exact
+    T7 = [[0, 10], [13, 20], [21, ?RING_END], [9, 12]],
+    ?assertEqual(is_progress_possible(mk_cnts(T7)), false).
+
 
 remove_overlapping_shards_test() ->
-    meck:new(rexi),
-    meck:expect(rexi, kill, fun(_, _) -> ok end),
-    EndPoint = 2 bsl 31,
-    T1 = [[0,10],[11,20],[21,EndPoint-1]],
-    Shards = mk_cnts(T1,3),
-    ?assertEqual(orddict:size(
-              remove_overlapping_shards(#shard{name=list_to_atom("node-3"),
-                                               node=list_to_atom("node-3"),
-                                               range=[11,20]},
-                                        Shards)),7),
-    meck:unload(rexi).
+    Cb = undefined,
+
+    Shards = mk_cnts([[0, 10], [11, 20], [21, ?RING_END]], 3),
+
+    % Simple (exact) overlap
+    Shard1 = mk_shard("node-3", [11,20]),
+    Shards1 = fabric_dict:store(Shard1, nil, Shards),
+    R1 = remove_overlapping_shards(Shard1, Shards1, Cb),
+    ?assertEqual([{0, 10}, {11, 20}, {21, ?RING_END}], get_worker_ranges(R1)),
+    ?assert(fabric_dict:is_key(Shard1, R1)),
+
+    % Split overlap (shard overlap multiple workers)
+    Shard2 = mk_shard("node-3", [0, 20]),
+    Shards2 = fabric_dict:store(Shard2, nil, Shards),
+    R2 = remove_overlapping_shards(Shard2, Shards2, Cb),
+    ?assertEqual([{0, 20}, {21, ?RING_END}], get_worker_ranges(R2)),
+    ?assert(fabric_dict:is_key(Shard2, R2)).
+
 
 mk_cnts(Ranges) ->
-    Shards = lists:map(fun(Range) ->
-                               #shard{range=Range}
-                                    end,
-                        Ranges),
+    Shards = lists:map(fun mk_shard/1, Ranges),
     orddict:from_list([{Shard,nil} || Shard <- Shards]).
 
 mk_cnts(Ranges, NoNodes) ->
@@ -541,6 +554,15 @@ mk_cnts(Ranges, NoNodes) ->
 mk_shards(0,_Range,Shards) ->
     Shards;
 mk_shards(NoNodes,Range,Shards) ->
-    NodeName = list_to_atom("node-" ++ integer_to_list(NoNodes)),
-    mk_shards(NoNodes-1,Range,
-              [#shard{name=NodeName, node=NodeName, range=Range} | Shards]).
+    Name ="node-" ++ integer_to_list(NoNodes),
+    mk_shards(NoNodes-1,Range, [mk_shard(Name, Range) | Shards]).
+
+
+mk_shard([B, E]) when is_integer(B), is_integer(E) ->
+    #shard{range = [B, E]}.
+
+
+mk_shard(Name, Range) ->
+    Node = list_to_atom(Name),
+    BName = list_to_binary(Name),
+    #shard{name=BName, node=Node, range=Range}.
