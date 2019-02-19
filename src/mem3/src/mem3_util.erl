@@ -18,6 +18,9 @@
 -export([is_deleted/1, rotate_list/2]).
 -export([
     iso8601_timestamp/0,
+    live_nodes/0,
+    replicate_dbs_to_all_nodes/1,
+    replicate_dbs_from_all_nodes/1,
     range_overlap/2,
     get_ring/1,
     get_ring/2,
@@ -293,6 +296,73 @@ iso8601_timestamp() ->
     {{Year,Month,Date},{Hour,Minute,Second}} = calendar:now_to_datetime(Now),
     Format = "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0B.~6.10.0BZ",
     io_lib:format(Format, [Year, Month, Date, Hour, Minute, Second, Micro]).
+
+
+live_nodes() ->
+    LiveNodes = [node() | nodes()],
+    Mem3Nodes = lists:sort(mem3:nodes()),
+    [N || N <- Mem3Nodes, lists:member(N, LiveNodes)].
+
+
+% Replicate "dbs" db to all nodes. Basically push the changes to all the live
+% mem3:nodes(). Returns only after all current changes have been replicated,
+% which could be a while.
+%
+replicate_dbs_to_all_nodes(Timeout) ->
+    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+    Targets= mem3_util:live_nodes() -- [node()],
+    Res =  [start_replication(node(), T, DbName, Timeout) || T <- Targets],
+    collect_replication_results(Res, Timeout).
+
+
+% Replicate "dbs" db from all nodes to this node. Basically make an rpc call
+% to all the nodes an have them push their changes to this node. Then monitor
+% them until they are all done.
+%
+replicate_dbs_from_all_nodes(Timeout) ->
+    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+    Sources = mem3_util:live_nodes() -- [node()],
+    Res = [start_replication(S, node(), DbName, Timeout) || S <- Sources],
+    collect_replication_results(Res, Timeout).
+
+
+% Spawn and monitor a single replication of a database to a target node.
+% Returns {ok, PidRef}. This function could be called locally or remotely from
+% mem3_rpc, for instance when replicating other nodes' data to this node.
+%
+start_replication(Source, Target, DbName, Timeout) ->
+    spawn_monitor(fun() ->
+        case mem3_rpc:replicate(Source, Target, DbName, Timeout) of
+            {ok, 0} ->
+                exit(ok);
+            Other ->
+                exit(Other)
+        end
+    end).
+
+
+collect_replication_results(Replications, Timeout) ->
+    Res = [collect_replication_result(R, Timeout) || R <- Replications],
+    case [R || R <- Res, R =/= ok] of
+        [] ->
+            ok;
+        Errors ->
+            {error, Errors}
+    end.
+
+
+collect_replication_result({Pid, Ref}, Timeout) when is_pid(Pid) ->
+    receive
+        {'DOWN', Ref, _, _, Res} ->
+            Res
+    after Timeout ->
+        demonitor(Pid, [flush]),
+        exit(Pid, kill),
+        {error, {timeout, Timeout, node(Pid)}}
+    end;
+
+collect_replication_result(Error, _) ->
+    {error, Error}.
 
 
 % Consider these cases:
