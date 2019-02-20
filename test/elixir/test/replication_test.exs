@@ -406,12 +406,14 @@ defmodule ReplicationTest do
     result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
     assert result["ok"]
 
-    src_info = get_db_info(src_db_name)
-    tgt_info = get_db_info(tgt_db_name)
+    retry_until(fn ->
+      src_info = get_db_info(src_db_name)
+      tgt_info = get_db_info(tgt_db_name)
 
-    assert tgt_info["doc_count"] == src_info["doc_count"]
-    assert tgt_info["doc_del_count"] == src_info["doc_del_count"]
-    assert tgt_info["doc_del_count"] == 1
+      assert tgt_info["doc_count"] == src_info["doc_count"]
+      assert tgt_info["doc_del_count"] == src_info["doc_del_count"]
+      assert tgt_info["doc_del_count"] == 1
+    end)
 
     assert is_list(result["history"])
     assert length(result["history"]) == 3
