@@ -128,7 +128,7 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     LiveNodes = [node() | nodes()],
     AllLiveShards = mem3:live_shards(DbName, LiveNodes),
     Seqs0 = unpack_seqs(PackedSeqs, DbName),
-    {WSeqs0, Dead, Reps} = fabric_view:find_replacements(Seqs0, AllLiveShards),
+    {WSeqs0, Dead, Reps} = find_replacements(Seqs0, AllLiveShards),
     % Start workers which didn't need replacements
     WSeqs = lists:map(fun({#shard{name = Name, node = N} = S, Seq}) ->
          Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, Seq]}),
@@ -454,8 +454,7 @@ do_unpack_seqs(Opaque, DbName) ->
             Unpacked;
         false ->
             Shards = mem3:shards(DbName),
-            {Unpacked1, Dead, Reps} =
-                fabric_view:find_replacements(Unpacked, Shards),
+            {Unpacked1, Dead, Reps} = find_replacements(Unpacked, Shards),
             {Splits0, Reps1} = find_split_shard_replacements(Dead, Reps),
             Splits1 = lists:map(fun({#shard{} = S, Seq}) ->
                 {S, Seq}
@@ -501,6 +500,75 @@ changes_row(Props0) ->
     Allowed = [seq, id, changes, deleted, doc, error],
     Props2 = lists:filter(fun({K,_V}) -> lists:member(K, Allowed) end, Props1),
     {change, {Props2}}.
+
+
+find_replacements(Workers, AllShards) ->
+    % Build map [B, E] => [Worker1, Worker2, ...] for all workers
+    WrkMap = lists:foldl(fun({#shard{range = [B, E]}, _} = W, Acc) ->
+         maps:update_with({B, E}, fun(Ws) -> [W | Ws] end, [W], Acc)
+    end, #{}, fabric_dict:to_list(Workers)),
+
+    % Build map [B, E] => [Shard1, Shard2, ...] for all shards
+    AllMap = lists:foldl(fun(#shard{range = [B, E]} = S, Acc) ->
+         maps:update_with({B, E}, fun(Ss) -> [S | Ss] end, [S], Acc)
+    end, #{}, AllShards),
+
+    % Custom sort function will prioritize workers over other shards.
+    % The idea is to not unnecessarily kill workers if we don't have to
+    SortFun = fun
+        (R1 = {B, E1}, R2 = {B, E2}) ->
+            case {maps:is_key(R1, WrkMap), maps:is_key(R2, WrkMap)} of
+                {true, true} ->
+                    % Both are workers, larger interval wins
+                    E1 >= E2;
+                {true, false} ->
+                    % First element is a worker range, it wins
+                    true;
+                {false, true} ->
+                    % Second element is a worker range, it wins
+                    false;
+                {false, false} ->
+                    % Neither one is a worker interval, pick larger one
+                    E1 >= E2
+            end;
+        ({B1, _}, {B2, _}) ->
+            B1 =< B2
+    end,
+    Ring = mem3_util:get_ring(maps:keys(AllMap), SortFun),
+
+    % Keep only workers in the ring  and from one of the available nodes
+    Keep = fun(#shard{range = [B, E], node = N}) ->
+        lists:member({B, E}, Ring) andalso lists:keyfind(N, #shard.node,
+            maps:get({B, E}, AllMap)) =/= false
+    end,
+    Workers1 = fabric_dict:filter(fun(S, _) -> Keep(S) end, Workers),
+    Removed = fabric_dict:filter(fun(S, _) -> not Keep(S) end, Workers),
+
+    {Rep, _} = lists:foldl(fun(R, {RepAcc, AllMapAcc}) ->
+        case maps:is_key(R, WrkMap)of
+            true ->
+                % It's a worker and in the map of available shards. Make sure to
+                % keep it only if there is a range available on that node only
+                % (reuse Keep/1 predicate from above)
+                WorkersInRange = maps:get(R, WrkMap),
+                case lists:any(fun({S, _}) -> Keep(S) end, WorkersInRange) of
+                    true ->
+                        {RepAcc, AllMapAcc};
+                    false ->
+                        [Shard | Rest] = maps:get(R, AllMapAcc),
+                        {[Shard | RepAcc], AllMapAcc#{R := Rest}}
+                end;
+             false ->
+                % No worker for this range. Replace from available shards
+                [Shard | Rest] = maps:get(R, AllMapAcc),
+                {[Shard | RepAcc], AllMapAcc#{R := Rest}}
+         end
+    end, {[], AllMap}, Ring),
+
+    % Return the list of workers that are part of ring, list of removed workers
+    % and a list of replacement shards that could be used to make sure the ring
+    % completes.
+    {Workers1, Removed, Rep}.
 
 
 % From the list of dead workers determine if any are a result of a split shard. In that
@@ -600,3 +668,79 @@ unpack_seqs_test() ->
 
 assert_shards(Packed) ->
     ?assertMatch([{#shard{},_}|_], unpack_seqs(Packed, <<"foo">>)).
+
+
+find_replacements_test() ->
+    % None of the workers are in the live list of shard but there is a
+    % replacement on n3 for the full range. It should get picked instead of
+    % the two smaller one on n2.
+    Workers1 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}]),
+    AllShards1 = [
+        mk_shard("n1", 11, ?RING_END),
+        mk_shard("n2", 0, 4),
+        mk_shard("n2", 5, 10),
+        mk_shard("n3", 0, ?RING_END)
+    ],
+    {WorkersRes1, Dead1, Reps1} = find_replacements(Workers1, AllShards1),
+    ?assertEqual([], WorkersRes1),
+    ?assertEqual(Workers1, Dead1),
+    ?assertEqual([mk_shard("n3", 0, ?RING_END)], Reps1),
+
+    % None of the workers are in the live list of shards and there is a
+    % split replacement from n2 (range [0, 10] replaced with [0, 4], [5, 10])
+    Workers2 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}]),
+    AllShards2 = [
+        mk_shard("n1", 11, ?RING_END),
+        mk_shard("n2", 0, 4),
+        mk_shard("n2", 5, 10)
+    ],
+    {WorkersRes2, Dead2, Reps2} = find_replacements(Workers2, AllShards2),
+    ?assertEqual([], WorkersRes2),
+    ?assertEqual(Workers2, Dead2),
+    ?assertEqual([
+        mk_shard("n1", 11, ?RING_END),
+        mk_shard("n2", 0, 4),
+        mk_shard("n2", 5, 10)
+    ], lists:sort(Reps2)),
+
+    % One worker is available and one needs to be replaced. Replacement will be
+    % from two split shards
+    Workers3 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}]),
+    AllShards3 = [
+        mk_shard("n1", 11, ?RING_END),
+        mk_shard("n2", 0, 4),
+        mk_shard("n2", 5, 10),
+        mk_shard("n2", 11, ?RING_END)
+    ],
+    {WorkersRes3, Dead3, Reps3} = find_replacements(Workers3, AllShards3),
+    ?assertEqual(mk_workers([{"n2", 11, ?RING_END}]), WorkersRes3),
+    ?assertEqual(mk_workers([{"n1", 0, 10}]), Dead3),
+    ?assertEqual([
+        mk_shard("n2", 0, 4),
+        mk_shard("n2", 5, 10)
+    ], lists:sort(Reps3)),
+
+    % All workers are available. Make sure they are not killed even if there is
+    % a longer (single) shard to replace them.
+    Workers4 = mk_workers([{"n1", 0, 10}, {"n1", 11, ?RING_END}]),
+    AllShards4 = [
+        mk_shard("n1", 0, 10),
+        mk_shard("n1", 11, ?RING_END),
+        mk_shard("n2", 0, 4),
+        mk_shard("n2", 5, 10),
+        mk_shard("n3", 0, ?RING_END)
+    ],
+    {WorkersRes4, Dead4, Reps4} = find_replacements(Workers4, AllShards4),
+    ?assertEqual(Workers4, WorkersRes4),
+    ?assertEqual([], Dead4),
+    ?assertEqual([], Reps4).
+
+
+mk_workers(NodesRanges) ->
+    orddict:from_list([{mk_shard(N, B, E), nil} || {N, B, E} <- NodesRanges]).
+
+
+mk_shard(Name, B, E) ->
+    Node = list_to_atom(Name),
+    BName = list_to_binary(Name),
+    #shard{name=BName, node=Node, range=[B, E]}.

@@ -16,8 +16,7 @@
     remove_overlapping_shards/3, maybe_send_row/1,
     transform_row/1, keydict/1, extract_view/4, get_shards/2,
     check_down_shards/2, handle_worker_exit/3,
-    get_shard_replacements/2, maybe_update_others/5,
-    find_replacements/2
+    get_shard_replacements/2, maybe_update_others/5
 ]).
 
 -export([fix_skip_and_limit/1]).
@@ -388,8 +387,9 @@ get_shard_replacements(DbName, UsedShards0) ->
     % that aren't already used.
     AllLiveShards = mem3:live_shards(DbName, [node() | nodes()]),
     UsedShards = [S#shard{ref=undefined} || S <- UsedShards0],
-    UnusedShards = AllLiveShards -- UsedShards,
+    get_shard_replacements_int(AllLiveShards -- UsedShards, UsedShards).
 
+get_shard_replacements_int(UnusedShards, UsedShards) ->
     % If we have more than one copy of a range then we don't
     % want to try and add a replacement to any copy.
     RangeCounts = lists:foldl(fun(#shard{range=R}, Acc) ->
@@ -429,71 +429,6 @@ remove_finalizer(Args) ->
     couch_mrview_util:set_extra(Args, finalizer, null).
 
 
-find_replacements(Workers, AllShards) ->
-    % Build map [B, E] => [Worker1, Worker2, ...] for all workers
-    WrkMap = lists:foldl(fun({#shard{range = [B, E]}, _} = W, Acc) ->
-         maps:update_with({B, E}, fun(Ws) -> [W | Ws] end, [W], Acc)
-    end, #{}, fabric_dict:to_list(Workers)),
-
-    % Build map [B, E] => [Shard1, Shard2, ...] for all shards
-    AllMap = lists:foldl(fun(#shard{range = [B, E]} = S, Acc) ->
-         maps:update_with({B, E}, fun(Ss) -> [S | Ss] end, [S], Acc)
-    end, #{}, AllShards),
-    % The sort function will  prioritize workers over other shards.
-    % The idea is to not unnecessarily kill workers if we don't have to
-    SortFun = fun
-        (R1 = {B, E1}, R2 = {B, E2}) ->
-            case {maps:is_key(R1, WrkMap), maps:is_key(R2, AllMap)} of
-                {true, true} ->
-                    % Both are workers, larger interval wins
-                    E1 >= E2;
-                {true, false} ->
-                    % First element is a worker range, it wins
-                    true;
-                {false, true} ->
-                    % Second element is a worker range, it wins
-                    false;
-                {false, false} ->
-                    % Neither one is a worker interval, pick larger one
-                    E1 >= E2
-            end;
-        ({B1, _}, {B2, _}) ->
-            B1 =< B2
-    end,
-
-    % Call get_ring/2 with all the ranges combined and the custom sort
-    % function. It returns a sequence of ranges that complete the ring. As many
-    % as possible will be workers but some workers might have been replaced.
-    Ring = mem3_util:get_ring(maps:keys(WrkMap) ++ maps:keys(AllMap), SortFun),
-
-    % Keep only workers that are members of the ring.
-    Workers1 = fabric_dict:filter(fun(#shard{range = [B, E]}, _) ->
-       lists:member({B, E}, Ring)
-    end, Workers),
-
-    % Also return workers that had to be removed
-    Removed = fabric_dict:filter(fun(#shard{range = [B, E]}, _) ->
-       not lists:member({B, E}, Ring)
-    end, Workers),
-
-   {Rep, _} = lists:foldl(fun(R, {RepAcc, AllMapAcc}) ->
-        case {maps:is_key(R, WrkMap), maps:is_key(R, AllMapAcc)} of
-            {true, _} ->
-                % There is a worker in that range. Don't change anything.
-                {RepAcc, AllMapAcc};
-            {false, true} ->
-                % No worker for this range. Replace from shards
-                [Shard | Rest] = maps:get(R, AllMapAcc),
-                {[Shard | RepAcc], AllMapAcc#{R := Rest}}
-         end
-    end, {[], AllMap}, Ring),
-
-    % Return the list of workers that are part of ring, list of removed workers
-    % and a list of replacement shards that could be used to make sure the ring
-    % completes.
-    {Workers1, Removed, Rep}.
-
-
 % Unit tests
 
 is_progress_possible_test() ->
@@ -524,7 +459,7 @@ remove_overlapping_shards_test() ->
     Shards = mk_cnts([[0, 10], [11, 20], [21, ?RING_END]], 3),
 
     % Simple (exact) overlap
-    Shard1 = mk_shard("node-3", [11,20]),
+    Shard1 = mk_shard("node-3", [11, 20]),
     Shards1 = fabric_dict:store(Shard1, nil, Shards),
     R1 = remove_overlapping_shards(Shard1, Shards1, Cb),
     ?assertEqual([{0, 10}, {11, 20}, {21, ?RING_END}], get_worker_ranges(R1)),
@@ -536,6 +471,27 @@ remove_overlapping_shards_test() ->
     R2 = remove_overlapping_shards(Shard2, Shards2, Cb),
     ?assertEqual([{0, 20}, {21, ?RING_END}], get_worker_ranges(R2)),
     ?assert(fabric_dict:is_key(Shard2, R2)).
+
+
+get_shard_replacements_test() ->
+    Unused = [mk_shard(N, [B, E]) || {N, B, E} <- [
+        {"n1", 11, 20}, {"n1", 21, ?RING_END},
+        {"n2", 0, 4}, {"n2", 5, 10}, {"n2", 11, 20},
+        {"n3", 0, 21, ?RING_END}
+    ]],
+    Used = [mk_shard(N, [B, E]) || {N, B, E} <- [
+        {"n2", 21, ?RING_END},
+        {"n3", 0, 10}, {"n3", 11, 20}
+    ]],
+    Res = lists:sort(get_shard_replacements_int(Unused, Used)),
+    % Notice that [0, 10] range can be replaces by spawning the
+    % [0, 4] and [5, 10] workers on n1
+    Expect = [
+        {[0, 10], [mk_shard("n2", [0, 4]), mk_shard("n2", [5, 10])]},
+        {[11, 20], [mk_shard("n1", [11, 20]), mk_shard("n2", [11, 20])]},
+        {[21, ?RING_END], [mk_shard("n1", [21, ?RING_END])]}
+    ],
+    ?assertEqual(Expect, Res).
 
 
 mk_cnts(Ranges) ->
