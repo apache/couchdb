@@ -19,6 +19,8 @@ defmodule ReplicationTest do
   # happens for JavaScript tests.
   @moduletag config: [{"replicator", "startup_jitter", "0"}]
 
+  @moduletag :skip_on_jenkins
+
   test "source database does not exist" do
     name = random_db_name()
     check_not_found(name <> "_src", name <> "_tgt")
