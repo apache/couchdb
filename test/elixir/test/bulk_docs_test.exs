@@ -56,13 +56,16 @@ defmodule BulkDocsTest do
     assert resp.status_code == 201
     # Attempt to delete all docs
     docs = Enum.map(docs, fn doc -> Map.put(doc, :_deleted, true) end)
-    resp = bulk_post(docs, db)
-    # Confirm first doc not updated, and result has no rev field
-    res = hd(resp.body)
-    assert res["id"] == "1" and res["error"] == "conflict"
-    assert Map.get(res, "rev") == nil
-    # Confirm other docs updated normally
-    assert revs_start_with(tl(resp.body), "2-")
+
+    retry_until(fn ->
+      resp = bulk_post(docs, db)
+      # Confirm first doc not updated, and result has no rev field
+      res = hd(resp.body)
+      assert res["id"] == "1" and res["error"] == "conflict"
+      assert Map.get(res, "rev") == nil
+      # Confirm other docs updated normally
+      assert revs_start_with(tl(resp.body), "2-")
+    end)
   end
 
   @tag :with_db
