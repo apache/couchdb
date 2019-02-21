@@ -81,11 +81,13 @@ defmodule ViewCollationTest do
   end
 
   test "descending collation order", context do
-    resp = Couch.get(url(context), query: %{"descending" => "true"})
-    pairs = Enum.zip(resp.body["rows"], Enum.reverse(@values))
+    retry_until(fn ->
+      resp = Couch.get(url(context), query: %{"descending" => "true"})
+      pairs = Enum.zip(resp.body["rows"], Enum.reverse(@values))
 
-    Enum.each(pairs, fn {row, value} ->
-      assert row["key"] == convert(value)
+      Enum.each(pairs, fn {row, value} ->
+        assert row["key"] == convert(value)
+      end)
     end)
   end
 
