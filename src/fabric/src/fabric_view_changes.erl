@@ -547,9 +547,9 @@ find_replacements(Workers, AllShards) ->
     {Rep, _} = lists:foldl(fun(R, {RepAcc, AllMapAcc}) ->
         case maps:is_key(R, WrkMap)of
             true ->
-                % It's a worker and in the map of available shards. Make sure to
-                % keep it only if there is a range available on that node only
-                % (reuse Keep/1 predicate from above)
+                % It's a worker and in the map of available shards. Make sure
+                % to keep it only if there is a range available on that node
+                % only (reuse Keep/1 predicate from above)
                 WorkersInRange = maps:get(R, WrkMap),
                 case lists:any(fun({S, _}) -> Keep(S) end, WorkersInRange) of
                     true ->
@@ -571,11 +571,13 @@ find_replacements(Workers, AllShards) ->
     {Workers1, Removed, Rep}.
 
 
-% From the list of dead workers determine if any are a result of a split shard. In that
-% case perhaps there is a way to not rewind the changes feed back to 0
+% From the list of dead workers determine if any are a result of a split shard.
+% In that case perhaps there is a way to not rewind the changes feed back to 0.
+% Returns {NewWorkers, Available} where NewWorkers is the list of
+% viable workers Available is the list of still unused input Shards
 find_split_shard_replacements(DeadWorkers, Shards) ->
     Acc0 = {[], Shards},
-    fabric_dict:fold(fun(#shard{node = WN, range = R}, Seq, Acc) ->
+    AccF = fabric_dict:fold(fun(#shard{node = WN, range = R}, Seq, Acc) ->
         [B, E] = R,
         {SplitWorkers, Available} = Acc,
         ShardsOnSameNode = [S || #shard{node = N} = S <- Available, N =:= WN],
@@ -583,7 +585,9 @@ find_split_shard_replacements(DeadWorkers, Shards) ->
         NewWorkers = [{S, Seq} || S <- SplitShards],
         NewAvailable = [S || S <- Available, not lists:member(S, SplitShards)],
         {NewWorkers ++ SplitWorkers, NewAvailable}
-    end, Acc0, DeadWorkers).
+    end, Acc0, DeadWorkers),
+    {Workers, Available} = AccF,
+    {fabric_dict:from_list(Workers), Available}.
 
 
 validate_start_seq(_DbName, "now") ->
@@ -737,10 +741,53 @@ find_replacements_test() ->
 
 
 mk_workers(NodesRanges) ->
-    orddict:from_list([{mk_shard(N, B, E), nil} || {N, B, E} <- NodesRanges]).
+    mk_workers(NodesRanges, nil).
+
+mk_workers(NodesRanges, Val) ->
+    orddict:from_list([{mk_shard(N, B, E), Val} || {N, B, E} <- NodesRanges]).
 
 
 mk_shard(Name, B, E) ->
     Node = list_to_atom(Name),
     BName = list_to_binary(Name),
     #shard{name=BName, node=Node, range=[B, E]}.
+
+
+find_split_shard_replacements_test() ->
+    % One worker is can be replaced and one can't
+    Dead1 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}], 42),
+    Shards1 = [
+        mk_shard("n1", 0, 4),
+        mk_shard("n1", 5, 10),
+        mk_shard("n3", 11, ?RING_END)
+    ],
+    {Workers1, ShardsLeft1} = find_split_shard_replacements(Dead1, Shards1),
+    ?assertEqual(mk_workers([{"n1", 0, 4}, {"n1", 5, 10}], 42), Workers1),
+    ?assertEqual([mk_shard("n3", 11, ?RING_END)], ShardsLeft1),
+
+    % All workers can be replaced - one by 1 shard, another by 3 smaller shards
+    Dead2 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}], 42),
+    Shards2 = [
+        mk_shard("n1", 0, 10),
+        mk_shard("n2", 11, 12),
+        mk_shard("n2", 13, 14),
+        mk_shard("n2", 15, ?RING_END)
+    ],
+    {Workers2, ShardsLeft2} = find_split_shard_replacements(Dead2, Shards2),
+    ?assertEqual(mk_workers([
+       {"n1", 0, 10},
+       {"n2", 11, 12},
+       {"n2", 13, 14},
+       {"n2", 15, ?RING_END}
+    ], 42), Workers2),
+    ?assertEqual([], ShardsLeft2),
+
+    % No workers can be replaced. Ranges match but they are on different nodes
+    Dead3 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}], 42),
+    Shards3 = [
+        mk_shard("n2", 0, 10),
+        mk_shard("n3", 11, ?RING_END)
+    ],
+    {Workers3, ShardsLeft3} = find_split_shard_replacements(Dead3, Shards3),
+    ?assertEqual([], Workers3),
+    ?assertEqual(Shards3, ShardsLeft3).
