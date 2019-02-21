@@ -407,16 +407,18 @@ purge_docs(Db, IdRevs) ->
 -spec purge_docs(#db{}, [{UUId, Id, [Rev]}], [PurgeOption]) ->
     {ok, [Reply]} when
     UUId :: binary(),
-    Id :: binary(),
+    Id :: binary() | list(),
     Rev :: {non_neg_integer(), binary()},
     PurgeOption :: interactive_edit | replicated_changes,
     Reply :: {ok, []} | {ok, [Rev]}.
 purge_docs(#db{main_pid = Pid} = Db, UUIDsIdsRevs, Options) ->
+    UUIDsIdsRevs2 = [{UUID, couch_util:to_binary(Id), Revs}
+        || {UUID, Id, Revs}  <- UUIDsIdsRevs],
     % Check here if any UUIDs already exist when
     % we're not replicating purge infos
     IsRepl = lists:member(replicated_changes, Options),
     if IsRepl -> ok; true ->
-        UUIDs = [UUID || {UUID, _, _} <- UUIDsIdsRevs],
+        UUIDs = [UUID || {UUID, _, _} <- UUIDsIdsRevs2],
         lists:foreach(fun(Resp) ->
             if Resp == not_found -> ok; true ->
                 Fmt = "Duplicate purge info UIUD: ~s",
@@ -426,7 +428,7 @@ purge_docs(#db{main_pid = Pid} = Db, UUIDsIdsRevs, Options) ->
         end, get_purge_infos(Db, UUIDs))
     end,
     increment_stat(Db, [couchdb, database_purges]),
-    gen_server:call(Pid, {purge_docs, UUIDsIdsRevs, Options}).
+    gen_server:call(Pid, {purge_docs, UUIDsIdsRevs2, Options}).
 
 -spec get_purge_infos(#db{}, [UUId]) -> [PurgeInfo] when
     UUId :: binary(),

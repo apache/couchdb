@@ -48,6 +48,8 @@ view_purge_test_() ->
                     fun test_purge_nochange/1,
                     fun test_purge_index_reset/1,
                     fun test_purge_compact_size_check/1,
+                    fun test_purge_single_for_docid_with_list/1,
+                    fun test_purge_complete_for_docid_with_list/1,
                     fun test_purge_compact_for_stale_purge_cp_without_client/1,
                     fun test_purge_compact_for_stale_purge_cp_with_client/1
                 ]
@@ -88,6 +90,38 @@ test_purge_single(Db) ->
         ?assertEqual(Expect2, Result2)
     end).
 
+
+test_purge_single_for_docid_with_list(Db) ->
+    ?_test(begin
+        Result = run_query(Db, []),
+        Expect = {ok, [
+            {meta, [{total, 5}, {offset, 0}]},
+            {row, [{id, <<"1">>}, {key, 1}, {value, 1}]},
+            {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
+            {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+            {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+            {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
+        ]},
+        ?assertEqual(Expect, Result),
+
+        FDI = couch_db:get_full_doc_info(Db, <<"1">>),
+        Rev = get_rev(FDI),
+        {ok, [{ok, _PRevs}]} = couch_db:purge_docs(
+            Db,
+            [{<<"UUID1">>, "1", [Rev]}]
+        ),
+        {ok, Db2} = couch_db:reopen(Db),
+
+        Result2 = run_query(Db2, []),
+        Expect2 = {ok, [
+            {meta, [{total, 4}, {offset, 0}]},
+            {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
+            {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+            {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+            {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
+        ]},
+        ?assertEqual(Expect2, Result2)
+    end).
 
 test_purge_partial(Db) ->
     ?_test(begin
@@ -149,6 +183,41 @@ test_purge_complete(Db) ->
             {<<"UUID1">>, <<"1">>, [Rev1]},
             {<<"UUID2">>, <<"2">>, [Rev2]},
             {<<"UUID5">>, <<"5">>, [Rev5]}
+        ],
+        {ok, _} = couch_db:purge_docs(Db, PurgeInfos),
+        {ok, Db2} = couch_db:reopen(Db),
+
+        Result2 = run_query(Db2, []),
+        Expect2 = {ok, [
+            {meta, [{total, 2}, {offset, 0}]},
+            {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+            {row, [{id, <<"4">>}, {key, 4}, {value, 4}]}
+        ]},
+        ?assertEqual(Expect2, Result2)
+    end).
+
+
+test_purge_complete_for_docid_with_list(Db) ->
+    ?_test(begin
+        Result = run_query(Db, []),
+        Expect = {ok, [
+            {meta, [{total, 5}, {offset, 0}]},
+            {row, [{id, <<"1">>}, {key, 1}, {value, 1}]},
+            {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
+            {row, [{id, <<"3">>}, {key, 3}, {value, 3}]},
+            {row, [{id, <<"4">>}, {key, 4}, {value, 4}]},
+            {row, [{id, <<"5">>}, {key, 5}, {value, 5}]}
+        ]},
+        ?assertEqual(Expect, Result),
+
+        FDI1 = couch_db:get_full_doc_info(Db, <<"1">>), Rev1 = get_rev(FDI1),
+        FDI2 = couch_db:get_full_doc_info(Db, <<"2">>), Rev2 = get_rev(FDI2),
+        FDI5 = couch_db:get_full_doc_info(Db, <<"5">>), Rev5 = get_rev(FDI5),
+
+        PurgeInfos = [
+            {<<"UUID1">>, "1", [Rev1]},
+            {<<"UUID2">>, "2", [Rev2]},
+            {<<"UUID5">>, "5", [Rev5]}
         ],
         {ok, _} = couch_db:purge_docs(Db, PurgeInfos),
         {ok, Db2} = couch_db:reopen(Db),
