@@ -44,6 +44,7 @@ defmodule BulkDocsTest do
   end
 
   @tag :with_db
+  @tag :skip_on_jenkins
   test "bulk docs can detect conflicts", ctx do
     db = ctx[:db_name]
     docs = create_docs(@doc_range)
