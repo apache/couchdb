@@ -70,11 +70,13 @@ defmodule ViewCollationTest do
   end
 
   test "ascending collation order", context do
-    resp = Couch.get(url(context))
-    pairs = Enum.zip(resp.body["rows"], @values)
+    retry_until(fn ->
+      resp = Couch.get(url(context))
+      pairs = Enum.zip(resp.body["rows"], @values)
 
-    Enum.each(pairs, fn {row, value} ->
-      assert row["key"] == convert(value)
+      Enum.each(pairs, fn {row, value} ->
+        assert row["key"] == convert(value)
+      end)
     end)
   end
 

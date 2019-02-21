@@ -1,4 +1,4 @@
-# If build number detected assum we running on Jenkins
+# If build number detected assume we running on Jenkins
 # and skip certain tests that fail on jenkins.
 exclude =
   case System.get_env("BUILD_NUMBER") !== nil do
