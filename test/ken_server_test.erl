@@ -12,8 +12,6 @@
 
 -module(ken_server_test).
 
--compile([export_all]).
-
 -include_lib("eunit/include/eunit.hrl").
 
 %% hardcoded defaults: limit: 20; batch: 1; delay: 5000; prune: 60000
