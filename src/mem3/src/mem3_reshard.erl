@@ -15,30 +15,30 @@
 -behaviour(gen_server).
 
 -export([
-   start_split_job/1,
-   remove_job/1,
-   stop_job/2,
-   resume_job/1,
-   jobs/0,
-   job/1,
-   shard_from_name/1,
-   report/2,
-   checkpoint/2,
-   start/0,
-   stop/1,
-   get_state/0,
-   reset_state/0,
-   now_sec/0,
-   update_history/4,
+    start_split_job/1,
+    remove_job/1,
+    stop_job/2,
+    resume_job/1,
+    jobs/0,
+    job/1,
+    shard_from_name/1,
+    report/2,
+    checkpoint/2,
+    start/0,
+    stop/1,
+    get_state/0,
+    reset_state/0,
+    now_sec/0,
+    update_history/4,
 
-   start_link/0,
+    start_link/0,
 
-   init/1,
-   terminate/2,
-   handle_call/3,
-   handle_info/2,
-   handle_cast/2,
-   code_change/3
+    init/1,
+    terminate/2,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    code_change/3
 ]).
 
 
