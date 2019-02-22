@@ -84,13 +84,13 @@ init([#job{} = Job0]) ->
     {ok, Job}.
 
 
-terminate(normal, Job) ->
+terminate(normal, _Job) ->
     ok;
 
-terminate(shutdown, Job) ->
+terminate(shutdown, _Job) ->
     ok;
 
-terminate({shutdown, _}, Job) ->
+terminate({shutdown, _}, _Job) ->
     ok;
 
 terminate(Reason, Job) ->

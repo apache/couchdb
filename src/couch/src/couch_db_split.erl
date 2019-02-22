@@ -132,7 +132,7 @@ split(SourceDb, Partitioned, Engine, Targets0, PickFun, {M, F, A} = HashFun) ->
         end,
         {ok, Filepath} = couch_server:get_engine_path(DbName, Engine),
         Opts = [create, ?ADMIN_CTX] ++ case Partitioned of
-            true -> [{partitioned, true}, {hash, [M, F, A]}];
+            true -> [{props, [{partitioned, true}, {hash, [M, F, A]}]}];
             false -> []
         end,
         case couch_db:start_link(Engine, DbName, Filepath, Opts) of

@@ -25,7 +25,7 @@ setup() ->
     create_db(Db1, [{q, 1}, {n, 1}]),
     PartProps = [{partitioned, true}, {hash, [couch_partition, hash, []]}],
     create_db(Db2, [{q, 1}, {n, 1}, {props, PartProps}]),
-    #{db1 => Db1, db => Db2}.
+    #{db1 => Db1, db2 => Db2}.
 
 
 teardown(#{} = Dbs) ->
@@ -54,7 +54,8 @@ mem3_reshard_db_test_() ->
                 [
                     fun split_one_shard/1,
                     fun update_docs_before_topoff1/1,
-                    fun indices_are_built/1
+                    fun indices_are_built/1,
+                    fun split_partitioned_db/1
                 ]
             }
         }
@@ -167,7 +168,6 @@ update_docs_before_topoff1(#{db1 := Db}) ->
 indices_are_built(#{db1 := Db}) ->
     ?_test(begin
         add_test_docs(Db, #{docs => 10, mrview => 2, search => 2, geo => 2}),
-        Docs0 = get_all_docs(Db),
         [#shard{name=Shard}] = lists:sort(mem3:local_shards(Db)),
         {ok, JobId} = mem3_reshard:start_split_job(Shard),
         wait_state(JobId, completed),
@@ -175,6 +175,77 @@ indices_are_built(#{db1 := Db}) ->
         ?assertEqual(2, length(ResultShards)),
         MRViewGroupInfo =  get_group_info(Db, <<"_design/mrview00000">>),
         ?assertMatch(#{<<"update_seq">> := 32}, MRViewGroupInfo)
+    end).
+
+
+% Split partitioned database
+split_partitioned_db(#{db2 := Db}) ->
+    ?_test(begin
+        DocSpec = #{
+            pdocs => #{
+                <<"PX">> => 5,
+                <<"PY">> => 5
+            },
+            mrview => 1,
+            local => 1
+        },
+        add_test_docs(Db, DocSpec),
+
+        % Save documents before the split
+        Docs0 = get_all_docs(Db),
+        Local0 = get_local_docs(Db),
+
+        % Set some custom metadata properties
+        set_revs_limit(Db, 942),
+        set_purge_infos_limit(Db, 943),
+        SecObj = {[{<<"foo">>, <<"bar">>}]},
+        set_security(Db, SecObj),
+
+        % DbInfo is saved after setting metadata bits
+        % as those could bump the update sequence
+        DbInfo0 = get_db_info(Db),
+        PX0 = get_partition_info(Db, <<"PX">>),
+        PY0 = get_partition_info(Db, <<"PY">>),
+
+        % Split the one shard
+        [#shard{name=Shard}] = lists:sort(mem3:local_shards(Db)),
+        {ok, JobId} = mem3_reshard:start_split_job(Shard),
+        wait_state(JobId, completed),
+
+        % Perform some basic checks that the shard was split
+        ResultShards = lists:sort(mem3:local_shards(Db)),
+        ?assertEqual(2, length(ResultShards)),
+        [#shard{range = R1}, #shard{range = R2}] = ResultShards,
+        ?assertEqual([16#00000000, 16#7fffffff], R1),
+        ?assertEqual([16#80000000, 16#ffffffff], R2),
+
+        % Check metadata bits after the split
+        ?assertEqual(942, get_revs_limit(Db)),
+        ?assertEqual(943, get_purge_infos_limit(Db)),
+        ?assertEqual(SecObj, get_security(Db)),
+
+        DbInfo1 = get_db_info(Db),
+        Docs1 = get_all_docs(Db),
+        Local1 = get_local_docs(Db),
+
+        % When comparing db infos, ignore update sequences they won't be the
+        % same since they are more shards involved after the split
+        ?assertEqual(without_seqs(DbInfo0), without_seqs(DbInfo1)),
+
+        % Update seq prefix number is a sum of all shard update sequences
+        #{<<"update_seq">> := UpdateSeq0} = update_seq_to_num(DbInfo0),
+        #{<<"update_seq">> := UpdateSeq1} = update_seq_to_num(DbInfo1),
+        ?assertEqual(UpdateSeq0 * 2, UpdateSeq1),
+
+        % Finally compare that documents are still there after the split
+        ?assertEqual(Docs0, Docs1),
+
+        ?assertEqual(PX0, get_partition_info(Db, <<"PX">>)),
+        ?assertEqual(PY0, get_partition_info(Db, <<"PY">>)),
+
+        % Don't forget about the local but don't include internal checkpoints
+        % as some of those are munged and transformed during the split
+        ?assertEqual(without_meta_locals(Local0), without_meta_locals(Local1))
     end).
 
 
@@ -193,12 +264,6 @@ intercept_state(State) ->
                    meck:passthrough([Job])
             end
         end).
-
-
-cancel_intercept() ->
-     meck:expect(mem3_reshard_job, checkpoint_done, fun(Job) ->
-         meck:passthrough([Job])
-     end).
 
 
 wait_state(JobId, State) ->
@@ -368,6 +433,7 @@ with_proc(Fun, GroupLeader, Timeout) ->
 
 add_test_docs(DbName, #{} = DocSpec) ->
     Docs = docs(maps:get(docs, DocSpec, []))
+        ++ pdocs(maps:get(pdocs, DocSpec, #{}))
         ++ ddocs(mrview, maps:get(mrview, DocSpec, []))
         ++ ddocs(search, maps:get(search, DocSpec, []))
         ++ ddocs(geo, maps:get(geo, DocSpec, []))
@@ -404,13 +470,22 @@ delete_docs(_, _) ->
     [].
 
 
-docs(N) when is_integer(N), N > 0 ->
-    docs([0, N - 1]);
-docs([S, E]) when E >= S ->
-    [doc(<<"">>, I) || I <- lists:seq(S, E)];
-docs(_) ->
-    [].
+pdocs(#{} = PMap) ->
+    maps:fold(fun(Part, DocSpec, DocsAcc) ->
+        docs(DocSpec, <<Part/binary, ":">>) ++ DocsAcc
+    end, [], PMap).
 
+
+docs(DocSpec) ->
+    docs(DocSpec, <<"">>).
+
+
+docs(N, Prefix) when is_integer(N), N > 0 ->
+    docs([0, N - 1], Prefix);
+docs([S, E], Prefix) when E >= S ->
+    [doc(Prefix, I) || I <- lists:seq(S, E)];
+docs(_, _) ->
+    [].
 
 ddocs(Type, N) when is_integer(N), N > 0 ->
     ddocs(Type, [0, N - 1]);
