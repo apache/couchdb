@@ -154,7 +154,7 @@ update_doc(Db, DocId, Body) ->
     case store_state() of
         true ->
             {ok, _} = couch_db:update_doc(Db, Doc, []),
-            couch_log:notice("~p updated doc ~p ~p", [?MODULE, DocId, Body]),
+            couch_log:debug("~p updated doc ~p ~p", [?MODULE, DocId, Body]),
             {ok, _} = couch_db:ensure_full_commit(Db),
             ok;
         false ->

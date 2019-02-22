@@ -84,8 +84,17 @@ init([#job{} = Job0]) ->
     {ok, Job}.
 
 
+terminate(normal, Job) ->
+    ok;
+
+terminate(shutdown, Job) ->
+    ok;
+
+terminate({shutdown, _}, Job) ->
+    ok;
+
 terminate(Reason, Job) ->
-    couch_log:notice("~p terminate ~p ~p", [?MODULE, Reason, Job]),
+    couch_log:error("~p terminate ~p ~p", [?MODULE, Reason, Job]),
     ok.
 
 
@@ -121,7 +130,6 @@ handle_info(retry, #job{} = Job) ->
     handle_cast(do_state, Job);
 
 handle_info({'EXIT', Pid, Reason}, #job{workers = Workers} = Job) ->
-    couch_log:notice("~p EXIT pid:~p reason:~p", [?MODULE, Pid, Reason]),
     case lists:member(Pid, Workers) of
         true ->
             Job1 = Job#job{workers = Workers -- [Pid]},
@@ -296,13 +304,10 @@ report(#job{manager = ManagerPid} = Job) ->
 -spec worker_exited(any(), #job{}) ->
     {noreply, #job{}} | {stop, any()} | {retry, any(), #job{}}.
 worker_exited(normal, #job{split_state = State, workers = []} = Job) ->
-    couch_log:notice("~p LAST worker exited ~p", [?MODULE, jobfmt(Job)]),
+    couch_log:notice("~p last worker exited ~p", [?MODULE, jobfmt(Job)]),
     {noreply, switch_state(Job, next_state(State))};
 
 worker_exited(normal, #job{workers = Workers} = Job) when Workers =/= [] ->
-    WaitingOn = length(Workers),
-    Msg = "~p worker exited normal ~p, waiting on ~p more workers",
-    couch_log:debug(Msg, [?MODULE, jobfmt(Job), WaitingOn]),
     {noreply, Job};
 
 worker_exited({error, missing_source}, #job{} = Job) ->

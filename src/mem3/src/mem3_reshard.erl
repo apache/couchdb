@@ -130,7 +130,6 @@ job(JobId) ->
 
 -spec report(pid(), #job{}) -> ok.
 report(Server, #job{} = Job) when is_pid(Server) ->
-    couch_log:notice("~p reporting ~p ~p", [?MODULE, Server, jobfmt(Job)]),
     gen_server:cast(Server, {report, Job}).
 
 
@@ -650,7 +649,7 @@ info_delete(Key, StateInfo) ->
 
 -spec checkpoint_int(#job{}, #state{}) -> #state{}.
 checkpoint_int(#job{} = Job, State) ->
-    couch_log:notice("~p checkpoint ~s", [?MODULE, jobfmt(Job)]),
+    couch_log:debug("~p checkpoint ~s", [?MODULE, jobfmt(Job)]),
     case report_int(Job) of
         ok ->
             ok = mem3_reshard_store:store_job(State, Job),
@@ -668,7 +667,7 @@ report_int(Job) ->
         [#job{ref = Ref, pid = OldPid}] ->
             case Job#job.pid =:= OldPid of
                 true ->
-                    couch_log:notice("~p reported ~s", [?MODULE, jobfmt(Job)]),
+                    couch_log:debug("~p reported ~s", [?MODULE, jobfmt(Job)]),
                     % Carry over the reference from ets as the #job{} coming
                     % from the job process won't have it's own monitor ref.
                     true = ets:insert(?MODULE, Job#job{ref = Ref}),
