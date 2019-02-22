@@ -166,7 +166,10 @@ eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell
 eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
-	  $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir; \
+	  $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir;  \
+          if grep -r 'context setup failed' -C1 src/$$dir/.eunit/couch.log ; then \
+            echo "Failing because eunit context setup failed"; exit 1; \
+          fi \
 	done
 
 setup-eunit: export BUILDDIR = $(shell pwd)
