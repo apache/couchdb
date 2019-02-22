@@ -53,7 +53,8 @@ mem3_reshard_db_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun split_one_shard/1,
-                    fun update_docs_before_topoff1/1
+                    fun update_docs_before_topoff1/1,
+                    fun indices_are_built/1
                 ]
             }
         }
@@ -64,14 +65,7 @@ mem3_reshard_db_test_() ->
 % db meta props like revs limits and security.
 split_one_shard(#{db1 := Db}) ->
     ?_test(begin
-        DocSpec = #{
-            docs => [0, 9],
-            delete => [5, 9],
-            mrview => [0, 0],
-            search => [0, 0],
-            geo => [0, 0],
-            local => [0, 0]
-        },
+        DocSpec = #{docs => 10, delete => [5, 9], mrview => 1, local => 1},
         add_test_docs(Db, DocSpec),
 
         % Save documents before the split
@@ -114,8 +108,8 @@ split_one_shard(#{db1 := Db}) ->
         ?assertEqual(without_seqs(DbInfo0), without_seqs(DbInfo1)),
 
         % Update seq prefix number is a sum of all shard update sequences
-        #{<<"update_seq">> := UpdateSeq0} = DbInfo0,
-        #{<<"update_seq">> := UpdateSeq1} = DbInfo1,
+        #{<<"update_seq">> := UpdateSeq0} = update_seq_to_num(DbInfo0),
+        #{<<"update_seq">> := UpdateSeq1} = update_seq_to_num(DbInfo1),
         ?assertEqual(UpdateSeq0 * 2, UpdateSeq1),
 
         % Finally compare that the documents are still there after the split
@@ -131,7 +125,7 @@ split_one_shard(#{db1 := Db}) ->
 % lost. Topoff1 state happens before indices are built
 update_docs_before_topoff1(#{db1 := Db}) ->
     ?_test(begin
-        add_test_docs(Db, #{docs => [0, 9]}),
+        add_test_docs(Db, #{docs => 10}),
 
         intercept_state(topoff1),
 
@@ -139,7 +133,7 @@ update_docs_before_topoff1(#{db1 := Db}) ->
         {ok, JobId} = mem3_reshard:start_split_job(Shard),
 
         receive {JobPid, topoff1} -> ok end,
-        add_test_docs(Db, #{docs => [10, 19], local => [0, 0]}),
+        add_test_docs(Db, #{docs => [10, 19], local => 1}),
         Docs0 = get_all_docs(Db),
         Local0 = get_local_docs(Db),
         DbInfo0 = get_db_info(Db),
@@ -162,10 +156,25 @@ update_docs_before_topoff1(#{db1 := Db}) ->
         % would have been 20. But then 10 more docs were added (3 might have
         % ended up on one target and 7 on another) so the final update sequence
         % would then be 20 + 10 = 30.
-        ?assertMatch(#{<<"update_seq">> := 30}, DbInfo1),
+        ?assertMatch(#{<<"update_seq">> := 30}, update_seq_to_num(DbInfo1)),
 
         ?assertEqual(Docs0, Docs1),
         ?assertEqual(without_meta_locals(Local0), without_meta_locals(Local1))
+    end).
+
+
+% This test that indices are built during shard splitting.
+indices_are_built(#{db1 := Db}) ->
+    ?_test(begin
+        add_test_docs(Db, #{docs => 10, mrview => 2, search => 2, geo => 2}),
+        Docs0 = get_all_docs(Db),
+        [#shard{name=Shard}] = lists:sort(mem3:local_shards(Db)),
+        {ok, JobId} = mem3_reshard:start_split_job(Shard),
+        wait_state(JobId, completed),
+        ResultShards = lists:sort(mem3:local_shards(Db)),
+        ?assertEqual(2, length(ResultShards)),
+        MRViewGroupInfo =  get_group_info(Db, <<"_design/mrview00000">>),
+        ?assertMatch(#{<<"update_seq">> := 32}, MRViewGroupInfo)
     end).
 
 
@@ -234,21 +243,19 @@ get_security(DbName) ->
 get_db_info(DbName) ->
     with_proc(fun() ->
         {ok, Info} = fabric:get_db_info(DbName),
-        Map = maps:with([
+        maps:with([
             <<"db_name">>, <<"doc_count">>, <<"props">>,  <<"doc_del_count">>,
             <<"update_seq">>, <<"purge_seq">>, <<"disk_format_version">>
-        ], to_map(Info)),
-        update_seq_to_num(Map)
+        ], to_map(Info))
     end).
 
 
 get_group_info(DbName, DesignId) ->
     with_proc(fun() ->
         {ok, GInfo} = fabric:get_view_group_info(DbName, DesignId),
-        Map = maps:with([
+        maps:with([
             <<"language">>, <<"purge_seq">>, <<"signature">>, <<"update_seq">>
-        ], to_map(GInfo)),
-        update_seq_to_num(Map)
+        ], to_map(GInfo))
     end).
 
 
@@ -397,12 +404,16 @@ delete_docs(_, _) ->
     [].
 
 
+docs(N) when is_integer(N), N > 0 ->
+    docs([0, N - 1]);
 docs([S, E]) when E >= S ->
     [doc(<<"">>, I) || I <- lists:seq(S, E)];
 docs(_) ->
     [].
 
 
+ddocs(Type, N) when is_integer(N), N > 0 ->
+    ddocs(Type, [0, N - 1]);
 ddocs(Type, [S, E]) when E >= S ->
     Body = ddprop(Type),
     BType = atom_to_binary(Type, utf8),
@@ -411,6 +422,8 @@ ddocs(_, _) ->
     [].
 
 
+ldocs(N) when is_integer(N), N > 0 ->
+    ldocs([0, N - 1]);
 ldocs([S, E]) when E >= S ->
     [doc(<<"_local/">>, I, bodyprops(), 0) || I <- lists:seq(S, E)];
 ldocs(_) ->
