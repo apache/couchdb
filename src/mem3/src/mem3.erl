@@ -150,7 +150,8 @@ ushards(DbName, Shards0, ZoneMap) ->
     % but sort each zone separately to ensure a consistent choice between
     % nodes in the same zone.
     Shards = choose_ushards(DbName, L ++ S) ++ choose_ushards(DbName, D),
-    lists:ukeysort(#shard.range, Shards).
+    OverlappedShards = lists:ukeysort(#shard.range, Shards),
+    mem3_util:non_overlapping_shards(OverlappedShards).
 
 get_shard(DbName, Node, Range) ->
     mem3_shards:get(DbName, Node, Range).
