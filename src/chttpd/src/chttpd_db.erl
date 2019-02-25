@@ -274,6 +274,11 @@ handle_partition_req(#httpd{method='GET', path_parts=[_,_,PartId]}=Req, Db) ->
             throw({bad_request, <<"database is not partitioned">>})
     end;
 
+handle_partition_req(#httpd{method='POST',
+    path_parts=[_, <<"_partition">>, <<"_", _/binary>>]}, _Db) ->
+    Msg = <<"Partition must not start with an underscore">>,
+    throw({illegal_partition, Msg});
+
 handle_partition_req(#httpd{path_parts = [_, _, _]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET");
 
