@@ -24,8 +24,8 @@ new() ->
 
 last_updated(Key, #priority_queue{dict=Dict}) ->
     case dict:find(Key, Dict) of
-        {ok, {_, LastUpdated}} ->
-            LastUpdated;
+        {ok, {_Priority, {LastUpdatedMTime, _MInt}}} ->
+            LastUpdatedMTime;
         error ->
             false
     end.
@@ -43,7 +43,8 @@ in(Key, Value, Priority, Capacity, #priority_queue{dict=Dict, tree=Tree}) ->
         error ->
             Tree
     end,
-    TreeKey1 = {Priority, now()},
+    Now = {erlang:monotonic_time(), erlang:unique_integer([monotonic])},
+    TreeKey1 = {Priority, Now},
     Tree2 = gb_trees:enter(TreeKey1, {Key, Value}, Tree1),
     Dict1 = dict:store(Key, TreeKey1, Dict),
     truncate(Capacity, #priority_queue{dict=Dict1, tree=Tree2}).

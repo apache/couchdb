@@ -28,6 +28,8 @@
     status/0
 ]).
 
+-define(SECONDS_PER_MINUTE, 60).
+
 % gen_server api.
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
     code_change/3, terminate/2]).
@@ -264,9 +266,11 @@ find_channel(_Tab, [], _Object) ->
 find_channel(Tab, [Channel|Rest], Object) ->
     Pid = channel_pid(Tab, Channel),
     LastUpdated = smoosh_channel:last_updated(Pid, Object),
-    Staleness = 6.0e7 * list_to_integer(config:get("smoosh", "staleness", "5")),
-    case LastUpdated =:= false orelse
-        timer:now_diff(now(), LastUpdated) > Staleness of
+    StalenessInSec = config:get_integer("smoosh", "staleness", 5)
+        * ?SECONDS_PER_MINUTE,
+    Staleness = erlang:convert_time_unit(StalenessInSec, seconds, native),
+    Now = erlang:monotonic_time(),
+    case LastUpdated =:= false orelse Now - LastUpdated > Staleness of
     true ->
         case smoosh_utils:ignore_db(Object) of
         true ->
