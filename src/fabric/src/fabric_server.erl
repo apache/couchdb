@@ -40,8 +40,21 @@ start_link() ->
 
 
 init(_) ->
+    ets:new(?MODULE, [
+            protected,
+            named_table,
+            {read_concurrency, true}
+        ]),
+
     ClusterStr = config:get("erlfdb", "cluster_file", "/usr/local/etc/foundationdb/fdb.cluster"),
     Db = erlfdb:open(iolist_to_binary(ClusterStr)),
+    Dirs = init_cluster(Db),
+
+    ets:insert(?MODULE, {'$handle$', Db}),
+    lists:foreach(fun({K, V}) ->
+        ets:insert(?MODULE, {K, V})
+    end, Dirs),
+
     {ok, #st{db = Db}}.
 
 
@@ -63,3 +76,21 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+
+init_cluster(Db) ->
+    erlfdb:transactional(Db, fun(Tx) ->
+        Root = erlfdb_directory:root(),
+        CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
+        Meta = erlfdb_directory:create_or_open(Tx, CouchDB, [<<"meta">>]),
+        Config = erlfdb_directory:create_or_open(Tx, Meta, [<<"config">>]),
+        Dbs = erlfdb_directory:create_or_open(Tx, CouchDB, [<<"dbs">>]),
+        [
+            {root, Root},
+            {couchdb, CouchDB},
+            {meta, Meta},
+            {config, Config},
+            {dbs, Dbs}
+        ]
+    end).
