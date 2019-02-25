@@ -49,12 +49,16 @@ src/fauxton/
 src/folsom/
 src/ibrowse/
 src/ioq/
+src/hqueue/
 src/jiffy/
+src/ken/
 src/khash/
 src/meck/
 src/mochiweb/
 src/oauth/
+src/proper/
 src/rebar/
+src/smoosh/
 src/snappy/
 src/triq/
 src/hyper/
