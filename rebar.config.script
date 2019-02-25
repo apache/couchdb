@@ -93,7 +93,7 @@ DepDescs = [
 {ioq,              "ioq",              {tag, "2.0.0"}},
 {hqueue,           "hqueue",           {tag, "1.0.0"}},
 {smoosh,           "smoosh",           {tag, "1.0.0"}},
-{ken,              "ken",              {tag, "1.0.0"}},
+{ken,              "ken",              {tag, "1.0.3"}},
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
