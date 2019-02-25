@@ -309,15 +309,15 @@ update_ddoc_indexes(Name, #doc{}=Doc, State) ->
     false ->
         ok
     end,
-    SearchUpdated = search_updated(Doc, Seq, State),
-    STUpdated = st_updated(Doc, Seq, State),
+    SearchUpdated = search_updated(Name, Doc, Seq, State),
+    STUpdated = st_updated(Name, Doc, Seq, State),
     case {ViewUpdated, SearchUpdated, STUpdated} of
         {ok, ok, ok} -> ok;
         _ -> resubmit
     end.
 
--ifdef(HAS_DREYFUS).
-search_updated(Doc, Seq, State) ->
+-ifdef(HAVE_DREYFUS).
+search_updated(Name, Doc, Seq, State) ->
     case should_update(Doc, <<"indexes">>) of true ->
         try dreyfus_index:design_doc_to_indexes(Doc) of
             SIndexes -> update_ddoc_search_indexes(Name, SIndexes, Seq, State)
@@ -332,8 +332,8 @@ search_updated(_Doc, _Seq, _State) ->
     ok.
 -endif.
 
--ifdef(HAS_HASTINGS).
-st_updated(Doc, Seq, State) ->
+-ifdef(HAVE_HASTINGS).
+st_updated(Name, Doc, Seq, State) ->
     case should_update(Doc, <<"st_indexes">>) of true ->
         try
             hastings_index:design_doc_to_indexes(Doc) of
