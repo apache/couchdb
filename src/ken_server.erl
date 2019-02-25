@@ -333,7 +333,7 @@ search_updated(Name, Doc, Seq, State) ->
         ok
     end.
 -else.
-search_updated(_Doc, _Seq, _State) ->
+search_updated(_Name, _Doc, _Seq, _State) ->
     ok.
 -endif.
 
@@ -350,7 +350,7 @@ st_updated(Name, Doc, Seq, State) ->
         ok
     end.
 -else.
-st_updated(_Doc, _Seq, _State) ->
+st_updated(_Name, _Doc, _Seq, _State) ->
     ok.
 -endif.
 
