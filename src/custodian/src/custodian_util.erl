@@ -64,34 +64,25 @@ fold_dbs1(#full_doc_info{id = Id} = FDI, State) ->
         ConflictCount ->
             (State#state.callback)(Id, null, {conflicted, ConflictCount}, State#state.acc)
     end,
-    Shards = load_shards(State#state.db, FDI),
-    Rs = [R || #shard{range=R} <- lists:ukeysort(#shard.range, Shards)],
-    ActualN = [{R1, [N || #shard{node=N,range=R2} <- Shards, R1 == R2]} ||  R1 <- Rs],
-    fold_dbs(Id, ActualN, State#state{acc=InternalAcc}).
+    fold_dbs(Id, load_shards(State#state.db, FDI), State#state{acc=InternalAcc}).
 
-fold_dbs(_Id, [], Acc) ->
-    {ok, Acc};
-fold_dbs(Id, [{Range, Nodes}|Rest], State) ->
-    Live = [Node || Node <- Nodes, lists:member(Node, State#state.live)],
-    Safe = [Node || Node <- Nodes, lists:member(Node, State#state.safe)],
+
+fold_dbs(Id, Shards, State) ->
+    IsSafe = fun(#shard{node = N}) -> lists:member(N, State#state.safe) end,
+    IsLive = fun(#shard{node = N}) -> lists:member(N, State#state.live) end,
     TargetN = State#state.n,
+    Range = [0, ?RING_END],
     Acc0 = State#state.acc,
-
-    Acc1 = case length(Live) of
-        TargetN ->
-            Acc0;
-        LiveN ->
-            (State#state.callback)(Id, Range, {live, LiveN}, Acc0)
+    Acc1 = case mem3_util:calculate_max_n(lists:filter(IsLive, Shards)) of
+        TargetN -> Acc0;
+        LiveN -> (State#state.callback)(Id, Range, {live, LiveN}, Acc0)
     end,
-
-    Acc2 = case length(Safe) of
-        TargetN ->
-            Acc1;
-        SafeN ->
-            (State#state.callback)(Id, Range, {safe, SafeN}, Acc1)
+    Acc2 = case mem3_util:calculate_max_n(lists:filter(IsSafe, Shards)) of
+        TargetN -> Acc1;
+        SafeN -> (State#state.callback)(Id, Range, {safe, SafeN}, Acc1)
     end,
+    {ok, State#state{acc = Acc2}}.
 
-    fold_dbs(Id, Rest, State#state{acc=Acc2}).
 
 cluster_n() ->
     list_to_integer(config:get("cluster", "n", "3")).
