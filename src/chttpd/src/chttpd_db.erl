@@ -350,27 +350,14 @@ handle_design_info_req(Req, _Db, _DDoc) ->
 
 create_db_req(#httpd{}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
-    N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
-    Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
-    P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
-    EngineOpt = parse_engine_opt(Req),
-    DbProps = parse_partitioned_opt(Req),
-    Options = [
-        {n, N},
-        {q, Q},
-        {placement, P},
-        {props, DbProps}
-    ] ++ EngineOpt,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-    case fabric:create_db(DbName, Options) of
-    ok ->
-        send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
-    accepted ->
-        send_json(Req, 202, [{"Location", DocUrl}], {[{ok, true}]});
-    {error, file_exists} ->
-        chttpd:send_error(Req, file_exists);
-    Error ->
-        throw(Error)
+    case fabric2:create_db(DbName) of
+        ok ->
+            send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
+        {error, file_exists} ->
+            chttpd:send_error(Req, file_exists);
+        Error ->
+            throw(Error)
     end.
 
 delete_db_req(#httpd{}=Req, DbName) ->
@@ -1666,46 +1653,6 @@ get_md5_header(Req) ->
 
 parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
-
-parse_engine_opt(Req) ->
-    case chttpd:qs_value(Req, "engine") of
-        undefined ->
-            [];
-        Extension ->
-            Available = couch_server:get_engine_extensions(),
-            case lists:member(Extension, Available) of
-                true ->
-                    [{engine, iolist_to_binary(Extension)}];
-                false ->
-                    throw({bad_request, invalid_engine_extension})
-            end
-    end.
-
-
-parse_partitioned_opt(Req) ->
-    case chttpd:qs_value(Req, "partitioned") of
-        undefined ->
-            [];
-        "false" ->
-            [];
-        "true" ->
-            ok = validate_partitioned_db_enabled(Req),
-            [
-                {partitioned, true},
-                {hash, [couch_partition, hash, []]}
-            ];
-        _ ->
-            throw({bad_request, <<"Invalid `partitioned` parameter">>})
-    end.
-
-
-validate_partitioned_db_enabled(Req) ->
-    case couch_flags:is_enabled(partitioned, Req) of
-        true -> 
-            ok;
-        false ->
-            throw({bad_request, <<"Partitioned feature is not enabled.">>})
-    end.
 
 
 parse_doc_query({Key, Value}, Args) ->

@@ -16,7 +16,11 @@
 
 
 -export([
-    start_link/0
+    start_link/0,
+    transactional/1,
+    get_dir/1,
+
+    debug_cluster/0
 ]).
 
 
@@ -37,6 +41,30 @@
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+
+
+transactional(Fun) when is_function(Fun, 1) ->
+    [{'$handle$', Db}] = ets:lookup(?MODULE, '$handle$'),
+    erlfdb:transactional(Db, Fun).
+
+
+get_dir(Name) ->
+    case ets:lookup(?MODULE, Name) of
+        [{Name, Dir}] -> Dir;
+        [] -> not_found
+    end.
+
+
+debug_cluster() ->
+    transactional(fun(Tx) ->
+        lists:foreach(fun({Key, Val}) ->
+            io:format("~s~n => ~s~n~n", [
+                    erlfdb_util:repr(Key),
+                    erlfdb_util:repr(Val)
+                ])
+        end, erlfdb:get_range(Tx, <<>>, <<16#FE, 16#FF>>))
+    end).
 
 
 init(_) ->
@@ -83,13 +111,13 @@ init_cluster(Db) ->
     erlfdb:transactional(Db, fun(Tx) ->
         Root = erlfdb_directory:root(),
         CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
-        Meta = erlfdb_directory:create_or_open(Tx, CouchDB, [<<"meta">>]),
-        Config = erlfdb_directory:create_or_open(Tx, Meta, [<<"config">>]),
         Dbs = erlfdb_directory:create_or_open(Tx, CouchDB, [<<"dbs">>]),
+        Config = erlfdb_directory:create_or_open(Tx, CouchDB, [
+                <<"meta">>,
+                <<"config">>
+            ]),
         [
             {root, Root},
-            {couchdb, CouchDB},
-            {meta, Meta},
             {config, Config},
             {dbs, Dbs}
         ]
