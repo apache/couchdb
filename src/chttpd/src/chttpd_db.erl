@@ -362,13 +362,11 @@ create_db_req(#httpd{}=Req, DbName) ->
 
 delete_db_req(#httpd{}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
-    case fabric:delete_db(DbName, []) of
-    ok ->
-        send_json(Req, 200, {[{ok, true}]});
-    accepted ->
-        send_json(Req, 202, {[{ok, true}]});
-    Error ->
-        throw(Error)
+    case fabric2:delete_db(DbName, []) of
+        ok ->
+            send_json(Req, 200, {[{ok, true}]});
+        Error ->
+            throw(Error)
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->

@@ -19,11 +19,11 @@
     %% all_dbs/1,
 
     create_db/1,
-    create_db/2
+    create_db/2,
 
-    %% delete_db/1,
-    %% delete_db/2,
-    %%
+    delete_db/1,
+    delete_db/2
+
     %% get_db_info/1,
     %% get_doc_count/1,
     %% get_doc_count/2,
@@ -105,6 +105,21 @@ create_db(DbName, _Options) ->
             {error, file_exists}
         end
     end).
+
+
+delete_db(DbName) ->
+    delete_db(DbName, []).
+
+
+delete_db(DbName, _Options) ->
+    DbsDir = fabric_server:get_dir(dbs),
+    try
+        fabric_server:transactional(fun(Tx) ->
+            erlfdb_directory:remove(Tx, DbsDir, DbName)
+        end)
+    catch error:{erlfdb_directory, {remove_error, path_missing, _}} ->
+        erlang:error(database_does_not_exist, DbName)
+    end.
 
 
 init_db(Tx, DbDir) ->
