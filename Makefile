@@ -162,6 +162,7 @@ endif
 
 .PHONY: check
 check:  all
+	@$(MAKE) emilio
 	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango,chttpd
 	make elixir tests=test/elixir/test/basics_test.exs,test/elixir/test/replication_test.exs,test/elixir/test/map_test.exs,test/elixir/test/all_docs_test.exs,test/elixir/test/bulk_docs_test.exs
 	make exunit tests=src/couch_rate/test/exunit/
@@ -206,6 +207,9 @@ soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
+
+emilio:
+	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3
 
 .venv/bin/black:
 	@python3 -m venv .venv
