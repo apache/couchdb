@@ -12,6 +12,11 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
+
+-define(uint2bin(I), binary:encode_unsigned(I, little)).
+-define(bin2uint(I), binary:decode_unsigned(I, little)).
+
+
 -record(collector, {
     db_name=nil,
     query_args,

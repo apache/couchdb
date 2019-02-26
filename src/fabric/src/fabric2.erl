@@ -22,17 +22,17 @@
     create_db/2,
 
     delete_db/1,
-    delete_db/2
+    delete_db/2,
 
-    %% get_db_info/1,
-    %% get_doc_count/1,
-    %% get_doc_count/2,
-    %%
+    get_db_info/1,
+    get_doc_count/1,
+    get_doc_count/2,
+
     %% get_revs_limit/1,
     %% set_revs_limit/3,
-    %%
-    %% get_security/1,
-    %% get_security/2,
+
+    get_security/1,
+    get_security/2
     %% get_all_security/1,
     %% get_all_security/2,
     %% set_security/2,
@@ -88,6 +88,10 @@
 ]).
 
 
+-include_lib("fabric/include/fabric.hrl").
+-include_lib("couch/include/couch_db.hrl").
+
+
 -define(DEFAULT_SECURITY, <<"{}">>).
 
 
@@ -112,27 +116,121 @@ delete_db(DbName) ->
 
 
 delete_db(DbName, _Options) ->
-    DbsDir = fabric_server:get_dir(dbs),
     try
+        DbsDir = fabric_server:get_dir(dbs),
         fabric_server:transactional(fun(Tx) ->
             erlfdb_directory:remove(Tx, DbsDir, DbName)
         end)
     catch error:{erlfdb_directory, {remove_error, path_missing, _}} ->
-        erlang:error(database_does_not_exist, DbName)
+        erlang:error(database_does_not_exist)
     end.
+
+
+get_db_info(DbName) ->
+    [DbDir, MetaRows, LastChangeRow] = fabric_server:transactional(fun(Tx) ->
+        DbDir = open_db(Tx, DbName),
+        Meta = erlfdb_directory:pack(DbDir, {<<"meta">>, <<"stats">>}),
+        MetaFuture = erlfdb:get_range_startswith(Tx, Meta),
+        {CStart, CEnd} = erlfdb_directory:range(DbDir, {<<"changes">>}),
+        ChangesFuture = erlfdb:get_range(Tx, CStart, CEnd, [
+                {streaming_mode, exact},
+                {limit, 1},
+                {reverse, true}
+            ]),
+        [DbDir] ++ erlfdb:wait_for_all([MetaFuture, ChangesFuture])
+    end),
+    BaseProps = [
+        {cluster, {[{n, 0}, {q, 0}, {r, 0}, {w, 0}]}},
+        {compact_running, false},
+        {data_size, 0},
+        {db_name, DbName},
+        {disk_format_version, 0},
+        {disk_size, 0},
+        {instance_start_time, <<"0">>},
+        {purge_seq, 0}
+    ],
+    WithMeta = lists:foldl(fun({KBin, VBin}, PropAcc) ->
+        case erlfdb_directory:unpack(DbDir, KBin) of
+            {_, _, <<"doc_count">>} ->
+                Val = ?bin2uint(VBin),
+                lists:keystore(doc_count, 1, PropAcc, {doc_count, Val});
+            {_, _, <<"doc_del_count">>} ->
+                Val = ?bin2uint(VBin),
+                lists:keystore(doc_del_count, 1, PropAcc, {doc_del_count, Val});
+            {_, _, <<"size">>} ->
+                Val = ?bin2uint(VBin),
+                Other = {other, {[{data_size, Val}]}},
+                Sizes = {sizes, {[
+                        {active, 0},
+                        {external, Val},
+                        {file, 0}
+                    ]}},
+                PA1 = lists:keystore(other, 1, PropAcc, Other),
+                lists:keystore(sizes, 1, PA1, Sizes);
+            _ ->
+                PropAcc
+        end
+    end, BaseProps, MetaRows),
+    RawSeq = case LastChangeRow of
+        [] ->
+            <<0:80>>;
+        [{KBin, _}] ->
+            {<<"changes">>, SeqBin} = erlfdb_directory:unpack(DbDir, KBin),
+            SeqBin
+    end,
+    Seq = couch_util:to_hex(RawSeq),
+    lists:keystore(update_seq, 1, WithMeta, {update_seq, Seq}).
+
+
+get_doc_count(DbName) ->
+    get_doc_count(DbName, <<"_all_docs">>).
+
+
+get_doc_count(DbName, <<"_all_docs">>) ->
+    get_doc_count(DbName, <<"doc_count">>);
+
+get_doc_count(DbName, <<"_design">>) ->
+    get_doc_count(DbName, <<"doc_design_count">>);
+
+get_doc_count(DbName, <<"_local">>) ->
+    get_doc_count(DbName, <<"doc_local_count">>);
+
+get_doc_count(DbName, Key) ->
+    fabric_server:transactional(fun(Tx) ->
+        DbDir = open_db(Tx, DbName),
+        Key = erlfdb_directory:pack(DbDir, {<<"meta">>, <<"stats">>, Key}),
+        VBin = erlfdb:wait(erlfdb:get(Tx, Key)),
+        ?bin2uint(VBin)
+    end).
+
+
+get_security(DbName) ->
+    get_security(DbName, [?ADMIN_CTX]).
+
 
 
 init_db(Tx, DbDir) ->
     Defaults = [
-        {{<<"meta">>, <<"config">>, <<"revs_limit">>}, 1000},
+        {{<<"meta">>, <<"config">>, <<"revs_limit">>}, ?uint2bin(1000)},
         {{<<"meta">>, <<"config">>, <<"security_doc">>}, ?DEFAULT_SECURITY},
-        {{<<"meta">>, <<"stats">>, <<"doc_count">>}, 0},
-        {{<<"meta">>, <<"stats">>, <<"doc_del_count">>}, 0},
-        {{<<"meta">>, <<"stats">>, <<"size">>}, 2}
+        {{<<"meta">>, <<"stats">>, <<"doc_count">>}, ?uint2bin(0)},
+        {{<<"meta">>, <<"stats">>, <<"doc_del_count">>}, ?uint2bin(0)},
+        {{<<"meta">>, <<"stats">>, <<"doc_design_count">>}, ?uint2bin(0)},
+        {{<<"meta">>, <<"stats">>, <<"doc_local_count">>}, ?uint2bin(0)},
+        {{<<"meta">>, <<"stats">>, <<"size">>}, ?uint2bin(2)}
     ],
     lists:foreach(fun({K, V}) ->
         BinKey = erlfdb_directory:pack(DbDir, K),
-        BinVal = erlfdb_tuple:pack({V}),
-        erlfdb:set(Tx, BinKey, BinVal)
+        erlfdb:set(Tx, BinKey, V)
     end, Defaults).
 
+
+open_db(Tx, DbName) ->
+    % We'll eventually want to cache this in the
+    % fabric_server ets table.
+    DbsDir = fabric_server:get_dir(dbs),
+    try
+        erlfdb_directory:open(Tx, DbsDir, DbName)
+    catch error:{erlfdb_directory, {open_error, path_missing, _}} ->
+        erlang:error(database_does_not_exist)
+    end.

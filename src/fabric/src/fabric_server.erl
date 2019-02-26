@@ -108,7 +108,7 @@ code_change(_OldVsn, St, _Extra) ->
 
 
 init_cluster(Db) ->
-    erlfdb:transactional(Db, fun(Tx) ->
+    Dirs = erlfdb:transactional(Db, fun(Tx) ->
         Root = erlfdb_directory:root(),
         CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
         Dbs = erlfdb_directory:create_or_open(Tx, CouchDB, [<<"dbs">>]),
@@ -121,4 +121,14 @@ init_cluster(Db) ->
             {config, Config},
             {dbs, Dbs}
         ]
-    end).
+    end),
+    drain_ready(Dirs).
+
+
+drain_ready(Dirs) ->
+    receive
+        {Ref, ready} when is_reference(Ref) ->
+            drain_ready(Dirs)
+    after 100 ->
+        Dirs
+    end.
