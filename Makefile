@@ -10,6 +10,10 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+# *******************************************************
+# WARNING! If you edit this file, also edit Makefile.win!
+# *******************************************************
+
 include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
