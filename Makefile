@@ -166,7 +166,7 @@ eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell
 eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
-	  $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir; \
+	  $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
 	done
 
 setup-eunit: export BUILDDIR = $(shell pwd)
