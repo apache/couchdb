@@ -39,12 +39,22 @@
 start(#st{} = St, DbName, Options, Parent) ->
     erlang:put(io_priority, {db_compact, DbName}),
     #st{
+        fd = FdPid,
         filepath = FilePath,
         header = Header
     } = St,
     couch_log:debug("Compaction process spawned for db \"~s\"", [DbName]),
 
     couch_db_engine:trigger_on_compact(DbName),
+
+    IOQPid = case lists:member(sys_db, Options) of
+        false ->
+            Ctx = couch_util:get_value(user_ctx, Options, undefined),
+            ioq:fetch_pid_for(DbName, Ctx, FdPid);
+        true ->
+            undefined
+    end,
+    ok = ioq:set_pid_for(FdPid, IOQPid),
 
     {ok, NewSt, DName, DFd, MFd, Retry} =
             open_compaction_files(Header, FilePath, Options),

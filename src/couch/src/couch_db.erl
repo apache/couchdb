@@ -45,6 +45,7 @@
     get_filepath/1,
     get_instance_start_time/1,
     get_pid/1,
+    get_fd_pid/1,
     get_revs_limit/1,
     get_security/1,
     get_update_seq/1,
@@ -249,7 +250,8 @@ monitored_by(Db) ->
     case couch_db_engine:monitored_by(Db) of
         Pids when is_list(Pids) ->
             PidTracker = whereis(couch_stats_process_tracker),
-            Pids -- [Db#db.main_pid, PidTracker];
+            IOQOpener = whereis(ioq_opener),
+            Pids -- [Db#db.main_pid, PidTracker, IOQOpener];
         undefined ->
             []
     end.
@@ -555,6 +557,9 @@ get_purge_infos_limit(#db{}=Db) ->
 
 get_pid(#db{main_pid = Pid}) ->
     Pid.
+
+get_fd_pid(#db{}=Db) ->
+    couch_db_engine:get_fd_pid(Db).
 
 get_del_doc_count(Db) ->
     {ok, couch_db_engine:get_del_doc_count(Db)}.

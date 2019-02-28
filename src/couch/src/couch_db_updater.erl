@@ -42,12 +42,16 @@ init({Engine, DbName, FilePath, Options0}) ->
     try
         {ok, EngineState} = couch_db_engine:init(Engine, FilePath, Options),
         Db = init_db(DbName, FilePath, EngineState, Options),
-        case lists:member(sys_db, Options) of
+        Ctx = couch_util:get_value(user_ctx, Options, undefined),
+        FdPid = couch_db:get_fd_pid(Db),
+        IOQPid = case lists:member(sys_db, Options) of
             false ->
-                couch_stats_process_tracker:track([couchdb, open_databases]);
+                couch_stats_process_tracker:track([couchdb, open_databases]),
+                ioq:fetch_pid_for(DbName, Ctx, FdPid);
             true ->
-                ok
+                undefined
         end,
+        ok = ioq:set_pid_for(FdPid, IOQPid),
         % Don't load validation funs here because the fabric query is
         % liable to race conditions. Instead see
         % couch_db:validate_doc_update, which loads them lazily.

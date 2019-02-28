@@ -601,6 +601,10 @@ clean_stack() ->
         erlang:get_stacktrace()).
 
 set_io_priority(DbName, Options) ->
+    %% HACK: experiment with spawning IOQ2 pids prior to couch_file open
+    %%Ctx = couch_util:get_value(user_ctx, Options, undefined),
+    %%IOQPid = ioq:fetch_pid_for(DbName, Ctx),
+    %%ok = ioq:set_pid_for(DbName, IOQPid),
     case lists:keyfind(io_priority, 1, Options) of
     {io_priority, Pri} ->
         erlang:put(io_priority, Pri);

@@ -80,17 +80,21 @@ sup_start_link() ->
 open(DbName, Options0) ->
     Ctx = couch_util:get_value(user_ctx, Options0, #user_ctx{}),
     case ets:lookup(couch_dbs, DbName) of
-    [#entry{db = Db0, lock = Lock} = Entry] when Lock =/= locked ->
+    [#entry{db = Db0, lock = Lock, ioq_pid=IOQPid} = Entry] when Lock =/= locked ->
         update_lru(DbName, Entry#entry.db_options),
         {ok, Db1} = couch_db:incref(Db0),
+        FdPid = couch_db:get_fd_pid(Db1),
+        ok = ioq:set_pid_for(FdPid, IOQPid),
         couch_db:set_user_ctx(Db1, Ctx);
     _ ->
         Options = maybe_add_sys_db_callbacks(DbName, Options0),
         Timeout = couch_util:get_value(timeout, Options, infinity),
         Create = couch_util:get_value(create_if_missing, Options, false),
         case gen_server:call(couch_server, {open, DbName, Options}, Timeout) of
-        {ok, Db0} ->
+        {ok, #entry{db=Db0, ioq_pid=IOQPid}} ->
             {ok, Db1} = couch_db:incref(Db0),
+            FdPid = couch_db:get_fd_pid(Db1),
+            ok = ioq:set_pid_for(FdPid, IOQPid),
             couch_db:set_user_ctx(Db1, Ctx);
         {not_found, no_db_file} when Create ->
             couch_log:warning("creating missing database: ~s", [DbName]),
@@ -118,7 +122,7 @@ create(DbName, Options0) ->
     Options = maybe_add_sys_db_callbacks(DbName, Options0),
     couch_partition:validate_dbname(DbName, Options),
     case gen_server:call(couch_server, {create, DbName, Options}, infinity) of
-    {ok, Db0} ->
+    {ok, #entry{db=Db0}} ->
         Ctx = couch_util:get_value(user_ctx, Options, #user_ctx{}),
         {ok, Db1} = couch_db:incref(Db0),
         couch_db:set_user_ctx(Db1, Ctx);
@@ -364,13 +368,22 @@ open_async(Server, From, DbName, {Module, Filepath}, Options) ->
     T0 = os:timestamp(),
     Opener = spawn_link(fun() ->
         Res = couch_db:start_link(Module, DbName, Filepath, Options),
-        case {Res, lists:member(create, Options)} of
-            {{ok, _Db}, true} ->
-                couch_event:notify(DbName, created);
+        IOQPid = case Res of
+            {ok, Db} ->
+                case lists:member(create, Options) of
+                    true -> couch_event:notify(DbName, created);
+                    false -> ok
+                end,
+                Ctx = couch_util:get_value(user_ctx, Options, undefined),
+                FdPid = couch_db:get_fd_pid(Db),
+                case couch_db:is_system_db(Db) of
+                    true -> undefined; %% use default IOQ pid for system dbs
+                    false -> ioq:fetch_pid_for(DbName, Ctx, FdPid)
+                end;
             _ ->
-                ok
+                undefined
         end,
-        gen_server:call(Parent, {open_result, T0, DbName, Res}, infinity),
+        gen_server:call(Parent, {open_result, T0, DbName, Res, IOQPid}, infinity),
         unlink(Parent)
     end),
     ReqType = case lists:member(create, Options) of
@@ -405,7 +418,7 @@ handle_call(reload_engines, _From, Server) ->
     {reply, ok, Server#server{engines = get_configured_engines()}};
 handle_call(get_server, _From, Server) ->
     {reply, {ok, Server}, Server};
-handle_call({open_result, T0, DbName, {ok, Db}}, {Opener, _}, Server) ->
+handle_call({open_result, T0, DbName, {ok, Db}, IOQPid}, {Opener, _}, Server) ->
     true = ets:delete(couch_dbs_pid_to_name, Opener),
     OpenTime = timer:now_diff(os:timestamp(), T0) / 1000,
     couch_stats:update_histogram([couchdb, db_open_time], OpenTime),
@@ -415,9 +428,18 @@ handle_call({open_result, T0, DbName, {ok, Db}}, {Opener, _}, Server) ->
             % db was deleted during async open
             exit(DbPid, kill),
             {reply, ok, Server};
-        [#entry{pid = Opener, req_type = ReqType, waiters = Waiters} = Entry] ->
+        [#entry{pid = Opener, req_type = ReqType, waiters = Waiters} = Entry0] ->
             link(DbPid),
-            [gen_server:reply(Waiter, {ok, Db}) || Waiter <- Waiters],
+            Entry = #entry{
+                name = DbName,
+                db = Db,
+                pid = DbPid,
+                ioq_pid = IOQPid,
+                lock = unlocked,
+                db_options = Entry0#entry.db_options,
+                start_time = couch_db:get_instance_start_time(Db)
+            },
+            [gen_server:reply(Waiter, {ok, Entry}) || Waiter <- Waiters],
             % Cancel the creation request if it exists.
             case ReqType of
                 {create, DbName, _Engine, _Options, CrFrom} ->
@@ -425,14 +447,7 @@ handle_call({open_result, T0, DbName, {ok, Db}}, {Opener, _}, Server) ->
                 _ ->
                     ok
             end,
-            true = ets:insert(couch_dbs, #entry{
-                name = DbName,
-                db = Db,
-                pid = DbPid,
-                lock = unlocked,
-                db_options = Entry#entry.db_options,
-                start_time = couch_db:get_instance_start_time(Db)
-            }),
+            true = ets:insert(couch_dbs, Entry),
             true = ets:insert(couch_dbs_pid_to_name, {DbPid, DbName}),
             Lru = case couch_db:is_system_db(Db) of
                 false ->
@@ -448,9 +463,9 @@ handle_call({open_result, T0, DbName, {ok, Db}}, {Opener, _}, Server) ->
             exit(couch_db:get_pid(Db), kill),
             {reply, ok, Server}
     end;
-handle_call({open_result, T0, DbName, {error, eexist}}, From, Server) ->
-    handle_call({open_result, T0, DbName, file_exists}, From, Server);
-handle_call({open_result, _T0, DbName, Error}, {Opener, _}, Server) ->
+handle_call({open_result, T0, DbName, {error, eexist}, IOQPid}, From, Server) ->
+    handle_call({open_result, T0, DbName, file_exists, IOQPid}, From, Server);
+handle_call({open_result, _T0, DbName, Error, _}, {Opener, _}, Server) ->
     case ets:lookup(couch_dbs, DbName) of
         [] ->
             % db was deleted during async open

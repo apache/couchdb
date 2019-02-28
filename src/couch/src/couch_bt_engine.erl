@@ -45,6 +45,7 @@
     get_partition_info/2,
     get_update_seq/1,
     get_uuid/1,
+    get_fd_pid/1,
 
     set_revs_limit/2,
     set_purge_infos_limit/2,
@@ -346,6 +347,10 @@ get_update_seq(#st{header = Header}) ->
 
 get_uuid(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, uuid).
+
+
+get_fd_pid(#st{fd = Fd}) ->
+    Fd.
 
 
 set_revs_limit(#st{header = Header} = St, RevsLimit) ->

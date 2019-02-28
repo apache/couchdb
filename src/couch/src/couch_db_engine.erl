@@ -706,6 +706,7 @@
     get_partition_info/2,
     get_update_seq/1,
     get_uuid/1,
+    get_fd_pid/1,
 
     set_revs_limit/2,
     set_security/2,
@@ -892,6 +893,11 @@ get_update_seq(#db{} = Db) ->
 get_uuid(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_uuid(EngineState).
+
+
+get_fd_pid(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_fd_pid(EngineState).
 
 
 set_revs_limit(#db{} = Db, RevsLimit) ->

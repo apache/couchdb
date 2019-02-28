@@ -251,7 +251,7 @@ wait_for_open_async_result(CouchServer, Opener) ->
         {_, Messages} = erlang:process_info(CouchServer, messages),
         Found = lists:foldl(fun(Msg, Acc) ->
             case Msg of
-                {'$gen_call', {Opener, _}, {open_result, _, _, {ok, _}}} ->
+                {'$gen_call', {Opener, _}, {open_result, _, _, {ok, _}, _}} ->
                     true;
                 _ ->
                     Acc

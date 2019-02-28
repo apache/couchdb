@@ -37,7 +37,8 @@ cpse_empty_monitors({Db, Pid}) ->
     Expected = [
         Pid,
         couch_db:get_pid(Db),
-        whereis(couch_stats_process_tracker)
+        whereis(couch_stats_process_tracker),
+        whereis(ioq_opener)
     ],
     ?assertEqual([], Pids -- Expected).
 
@@ -63,13 +64,13 @@ cpse_incref_decref_many({Db, _}) ->
     lists:foreach(fun(C) -> wait_client(C) end, Clients),
 
     Pids1 = couch_db_engine:monitored_by(Db),
-    % +3 for self, db pid, and process tracker
-    ?assertEqual(?NUM_CLIENTS + 3, length(Pids1)),
+    % +4 for self, db pid, process tracker, and ioq opener
+    ?assertEqual(?NUM_CLIENTS + 4, length(Pids1)),
 
     lists:foreach(fun(C) -> close_client(C) end, Clients),
 
     Pids2 = couch_db_engine:monitored_by(Db),
-    ?assertEqual(3, length(Pids2)).
+    ?assertEqual(4, length(Pids2)).
 
 
 start_client(Db0) ->

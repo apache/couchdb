@@ -15,6 +15,7 @@
     name,
     db,
     pid,
+    ioq_pid,
     lock,
     waiters,
     req_type,

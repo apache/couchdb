@@ -36,7 +36,14 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
 
     Self = self(),
 
+    #mrst{
+        id_btree=#btree{fd=Fd},
+        db_name=DbName
+    } = InitState,
+    IOQPid = ioq:fetch_pid_for(DbName, undefined, Fd),
+
     MapFun = fun() ->
+        ok = ioq:set_pid_for(Fd, IOQPid),
         Progress = case NumChanges of
             0 -> 0;
             _ -> (NumChangesDone * 100) div NumChanges
@@ -53,7 +60,10 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
         couch_task_status:set_update_frequency(500),
         map_docs(Self, InitState)
     end,
-    WriteFun = fun() -> write_results(Self, InitState) end,
+    WriteFun = fun() ->
+        ok = ioq:set_pid_for(Fd, IOQPid),
+        write_results(Self, InitState)
+    end,
 
     spawn_link(MapFun),
     spawn_link(WriteFun),
