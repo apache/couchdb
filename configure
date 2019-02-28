@@ -23,6 +23,7 @@ PACKAGE_AUTHOR_NAME="The Apache Software Foundation"
 
 # TEST=0
 WITH_CURL="false"
+WITH_PROPER="true"
 WITH_FAUXTON=1
 WITH_DOCS=1
 ERLANG_MD5="false"
@@ -64,6 +65,12 @@ parse_opts() {
 
             --with-curl|-c)
                 WITH_CURL="true"
+                shift
+                continue
+                ;;
+
+            --without-proper)
+                WITH_PROPER="false"
                 shift
                 continue
                 ;;
@@ -203,6 +210,7 @@ EOF
 
 cat > $rootdir/config.erl << EOF
 {with_curl, $WITH_CURL}.
+{with_proper, $WITH_PROPER}.
 {erlang_md5, $ERLANG_MD5}.
 EOF
 
