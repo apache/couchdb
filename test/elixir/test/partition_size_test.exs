@@ -50,8 +50,11 @@ defmodule PartitionSizeTest do
       end
 
     body = %{:w => 3, :docs => docs}
-    resp = Couch.post("/#{db_name}/_bulk_docs", body: body)
-    assert resp.status_code == 201
+
+    retry_until(fn ->
+      resp = Couch.post("/#{db_name}/_bulk_docs", body: body)
+      assert resp.status_code == 201
+    end)
   end
 
   def save_doc(db_name, doc) do
@@ -182,6 +185,7 @@ defmodule PartitionSizeTest do
     assert post_infos == pre_infos
   end
 
+  @tag :skip_on_jenkins
   test "get all partition sizes", context do
     db_name = context[:db_name]
     mk_docs(db_name)

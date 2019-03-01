@@ -610,4 +610,27 @@ defmodule PartitionMangoTest do
     assert length(partitions) == 50
     assert_correct_partition(partitions, "foo")
   end
+
+  @tag :with_partitioned_db
+  test "partitioned _find and _explain with missing partition returns 400", context do
+    db_name = context[:db_name]
+
+    selector = %{
+      selector: %{
+        some: "field"
+      }
+    }
+
+    resp = Couch.get("/#{db_name}/_partition/_find", body: selector)
+    validate_missing_partition(resp)
+
+    resp = Couch.get("/#{db_name}/_partition/_explain", body: selector)
+    validate_missing_partition(resp)
+  end
+
+  defp validate_missing_partition(resp) do
+    assert resp.status_code == 400
+    %{:body => %{"reason" => reason}} = resp
+    assert Regex.match?(~r/Partition must not start/, reason)
+  end
 end

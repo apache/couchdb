@@ -44,6 +44,7 @@ defmodule BulkDocsTest do
   end
 
   @tag :with_db
+  @tag :skip_on_jenkins
   test "bulk docs can detect conflicts", ctx do
     db = ctx[:db_name]
     docs = create_docs(@doc_range)
@@ -56,13 +57,16 @@ defmodule BulkDocsTest do
     assert resp.status_code == 201
     # Attempt to delete all docs
     docs = Enum.map(docs, fn doc -> Map.put(doc, :_deleted, true) end)
-    resp = bulk_post(docs, db)
-    # Confirm first doc not updated, and result has no rev field
-    res = hd(resp.body)
-    assert res["id"] == "1" and res["error"] == "conflict"
-    assert Map.get(res, "rev") == nil
-    # Confirm other docs updated normally
-    assert revs_start_with(tl(resp.body), "2-")
+
+    retry_until(fn ->
+      resp = bulk_post(docs, db)
+      # Confirm first doc not updated, and result has no rev field
+      res = hd(resp.body)
+      assert res["id"] == "1" and res["error"] == "conflict"
+      assert Map.get(res, "rev") == nil
+      # Confirm other docs updated normally
+      assert revs_start_with(tl(resp.body), "2-")
+    end)
   end
 
   @tag :with_db
@@ -126,14 +130,16 @@ defmodule BulkDocsTest do
   end
 
   defp bulk_post(docs, db) do
-    resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs})
+    retry_until(fn ->
+      resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs})
 
-    assert resp.status_code == 201 and length(resp.body) == length(docs), """
-    Expected 201 and the same number of response rows as in request, but got
-    #{pretty_inspect(resp)}
-    """
+      assert resp.status_code == 201 and length(resp.body) == length(docs), """
+      Expected 201 and the same number of response rows as in request, but got
+      #{pretty_inspect(resp)}
+      """
 
-    resp
+      resp
+    end)
   end
 
   defp revs_start_with(rows, prefix) do

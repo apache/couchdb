@@ -159,10 +159,12 @@ defmodule SecurityValidationTest do
     assert Couch.put("/#{db_name}/_security", body: sec_obj).body["ok"]
     assert Couch.post("/#{db_name}", body: @ddoc).body["ok"]
 
-    resp = Couch.put("/#{db_name}/test_doc", body: %{foo: 1}, headers: jerry)
-    assert resp.status_code == 403
-    assert resp.body["error"] == "forbidden"
-    assert resp.body["reason"] == "Documents must have an author field"
+    retry_until(fn ->
+      resp = Couch.put("/#{db_name}/test_doc", body: %{foo: 1}, headers: jerry)
+      assert resp.status_code == 403
+      assert resp.body["error"] == "forbidden"
+      assert resp.body["reason"] == "Documents must have an author field"
+    end)
 
     # Jerry can write the document
     assert Couch.put(

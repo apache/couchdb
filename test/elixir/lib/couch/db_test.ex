@@ -161,10 +161,12 @@ defmodule Couch.DBTest do
   end
 
   def create_db(db_name, opts \\ []) do
-    resp = Couch.put("/#{db_name}", opts)
-    assert resp.status_code in [201, 202]
-    assert resp.body == %{"ok" => true}
-    {:ok, resp}
+    retry_until(fn ->
+      resp = Couch.put("/#{db_name}", opts)
+      assert resp.status_code in [201, 202]
+      assert resp.body == %{"ok" => true}
+      {:ok, resp}
+    end)
   end
 
   def delete_db(db_name) do
@@ -214,8 +216,8 @@ defmodule Couch.DBTest do
       raise "timed out after #{now - start} ms"
     else
       try do
-        if condition.() do
-          :ok
+        if result = condition.() do
+          result
         else
           raise ExUnit.AssertionError
         end

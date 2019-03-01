@@ -56,6 +56,14 @@ os:putenv("COUCHDB_ROOT", COUCHDB_ROOT).
 ConfigureEnv = filename:join(COUCHDB_ROOT, "config.erl").
 os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
+CouchConfig = case filelib:is_file(ConfigureEnv) of
+    true ->
+        {ok, Result} = file:consult(ConfigureEnv),
+        Result;
+    false ->
+        []
+end.
+
 os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 
 SubDirs = [
@@ -85,15 +93,15 @@ SubDirs = [
 
 DepDescs = [
 %% Independent Apps
-{config,           "config",           {tag, "2.1.5"}},
+{config,           "config",           {tag, "2.1.6"}},
 {b64url,           "b64url",           {tag, "1.0.1"}},
 {ets_lru,          "ets-lru",          {tag, "1.0.0"}},
 {khash,            "khash",            {tag, "1.0.1"}},
 {snappy,           "snappy",           {tag, "CouchDB-1.0.2"}},
-{ioq,              "ioq",              {tag, "2.0.0"}},
-{hqueue,           "hqueue",           {tag, "1.0.0"}},
-{smoosh,           "smoosh",           {tag, "1.0.0"}},
-{ken,              "ken",              {tag, "1.0.0"}},
+{ioq,              "ioq",              {tag, "2.1.0"}},
+{hqueue,           "hqueue",           {tag, "1.0.1"}},
+{smoosh,           "smoosh",           {tag, "1.0.1"}},
+{ken,              "ken",              {tag, "1.0.3"}},
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
@@ -101,7 +109,7 @@ DepDescs = [
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
                    {tag, "v1.1.19"}, [raw]},
 %% Third party deps
-{folsom,           "folsom",           {tag, "CouchDB-0.8.2"}},
+{folsom,           "folsom",           {tag, "CouchDB-0.8.3"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-4"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-2"}},
@@ -109,6 +117,14 @@ DepDescs = [
 {meck,             "meck",             {tag, "0.8.8"}}
 ],
 
+WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true},
+
+OptionalDeps = case WithProper of
+    true ->
+        [{proper, {url, "https://github.com/proper-testing/proper"}, {tag, "v1.3"}}];
+    false ->
+        []
+end,
 
 BaseUrl = "https://github.com/apache/",
 
@@ -133,7 +149,7 @@ end,
 AddConfig = [
     {require_otp_vsn, "19|20|21"},
     {deps_dir, "src"},
-    {deps, lists:map(MakeDep, DepDescs)},
+    {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},
     {lib_dirs, ["src"]},
     {erl_opts, [{i, "../"} | ErlOpts]},

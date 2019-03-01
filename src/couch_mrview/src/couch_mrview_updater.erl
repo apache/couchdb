@@ -218,7 +218,7 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
     end.
 
 
-write_results(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State) ->
+write_results(Parent, #mrst{} = State) ->
     case accumulate_writes(State, State#mrst.write_queue, nil) of
         stop ->
             Parent ! {new_state, State};

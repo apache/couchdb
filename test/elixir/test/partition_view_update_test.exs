@@ -29,6 +29,7 @@ defmodule PartitionViewUpdateTest do
     check_key.(2, 0)
   end
 
+  @tag :skip_on_jenkins
   @tag :with_partitioned_db
   test "query with update=false works", context do
     db_name = context[:db_name]

@@ -53,6 +53,7 @@ defmodule LotsOfDocsTest do
     end)
   end
 
+  @tag :skip_on_jenkins
   @tag :with_db
   test "lots of docs with a regular view", context do
     db_name = context[:db_name]
@@ -70,17 +71,19 @@ defmodule LotsOfDocsTest do
       assert Map.fetch!(Enum.at(rows, i), "key") === i
     end)
 
-    %{"rows" => desc_rows, "total_rows" => desc_total_rows} =
-      query_view(db_name, "descending")
+    retry_until(fn ->
+      %{"rows" => desc_rows, "total_rows" => desc_total_rows} =
+        query_view(db_name, "descending")
 
-    assert desc_total_rows === Enum.count(desc_rows)
-    assert desc_total_rows === Enum.count(@docs_range)
+      assert desc_total_rows === Enum.count(desc_rows)
+      assert desc_total_rows === Enum.count(@docs_range)
 
-    @docs_range
-    |> Enum.reverse()
-    |> Enum.with_index()
-    |> Enum.each(fn {value, index} ->
-      assert Map.fetch!(Enum.at(desc_rows, index), "key") === value
+      @docs_range
+      |> Enum.reverse()
+      |> Enum.with_index()
+      |> Enum.each(fn {value, index} ->
+        assert Map.fetch!(Enum.at(desc_rows, index), "key") === value
+      end)
     end)
   end
 

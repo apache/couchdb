@@ -80,7 +80,7 @@ pipeline {
       steps {
         parallel(freebsd: {
           node(label: 'couchdb && freebsd') {
-            timeout(time: 60, unit: "MINUTES") {
+            timeout(time: 90, unit: "MINUTES") {
               deleteDir()
               unstash 'tarball'
               withEnv(['HOME='+pwd()]) {
@@ -105,7 +105,7 @@ pipeline {
         },
         centos6: {
           node(label: 'ubuntu') {
-            timeout(time: 60, unit: "MINUTES") {
+            timeout(time: 90, unit: "MINUTES") {
               sh 'docker pull couchdbdev/centos-6-erlang-19.3.6'
               withDockerContainer(image: 'couchdbdev/centos-6-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
@@ -144,7 +144,7 @@ pipeline {
         },
         centos7: {
           node(label: 'ubuntu') {
-            timeout(time: 60, unit: "MINUTES") {
+            timeout(time: 90, unit: "MINUTES") {
               sh 'docker pull couchdbdev/centos-7-erlang-19.3.6'
               withDockerContainer(image: 'couchdbdev/centos-7-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
@@ -183,7 +183,7 @@ pipeline {
         },
         ubuntutrusty: {
           node(label: 'ubuntu') {
-            timeout(time: 60, unit: "MINUTES") {
+            timeout(time: 90, unit: "MINUTES") {
               sh 'docker pull couchdbdev/ubuntu-trusty-erlang-19.3.6'
               withDockerContainer(image: 'couchdbdev/ubuntu-trusty-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
@@ -222,7 +222,7 @@ pipeline {
         },
         ubuntuxenial: {
           node(label: 'ubuntu') {
-            timeout(time: 60, unit: "MINUTES") {
+            timeout(time: 90, unit: "MINUTES") {
               sh 'docker pull couchdbdev/ubuntu-xenial-erlang-19.3.6'
               withDockerContainer(image: 'couchdbdev/ubuntu-xenial-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
@@ -261,7 +261,7 @@ pipeline {
         },
         ubuntubionic: {
           node(label: 'ubuntu') {
-            timeout(time: 60, unit: "MINUTES") {
+            timeout(time: 90, unit: "MINUTES") {
               sh 'docker pull couchdbdev/ubuntu-bionic-erlang-19.3.6'
               withDockerContainer(image: 'couchdbdev/ubuntu-bionic-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
@@ -300,7 +300,7 @@ pipeline {
         },
         debianjessie: {
           node(label: 'ubuntu') {
-            timeout(time: 60, unit: "MINUTES") {
+            timeout(time: 90, unit: "MINUTES") {
               sh 'docker pull couchdbdev/debian-jessie-erlang-19.3.6'
               withDockerContainer(image: 'couchdbdev/debian-jessie-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
@@ -339,7 +339,7 @@ pipeline {
         },
         debianstretch: {
           node(label: 'ubuntu') {
-            timeout(time: 60, unit: "MINUTES") {
+            timeout(time: 90, unit: "MINUTES") {
               sh 'docker pull couchdbdev/debian-stretch-erlang-19.3.6'
               withDockerContainer(image: 'couchdbdev/debian-stretch-erlang-19.3.6') {
                 sh 'rm -f apache-couchdb-*.tar.gz'
