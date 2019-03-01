@@ -32,12 +32,8 @@
     %% set_revs_limit/3,
 
     get_security/1,
-    get_security/2
-    %% get_all_security/1,
-    %% get_all_security/2,
-    %% set_security/2,
-    %% set_security/3,
-    %%
+    set_security/2
+
     %% get_purge_infos_limit/1,
     %% set_purge_infos_limit/3,
     %%
@@ -178,8 +174,8 @@ get_db_info(DbName) ->
             {<<"changes">>, SeqBin} = erlfdb_directory:unpack(DbDir, KBin),
             SeqBin
     end,
-    Seq = couch_util:to_hex(RawSeq),
-    lists:keystore(update_seq, 1, WithMeta, {update_seq, Seq}).
+    Seq = ?l2b(couch_util:to_hex(RawSeq)),
+    {ok, lists:keystore(update_seq, 1, WithMeta, {update_seq, Seq})}.
 
 
 get_doc_count(DbName) ->
@@ -205,8 +201,23 @@ get_doc_count(DbName, Key) ->
 
 
 get_security(DbName) ->
-    get_security(DbName, [?ADMIN_CTX]).
+    SecJson = fabric_server:transactional(fun(Tx) ->
+        DbDir = open_db(Tx, DbName),
+        Tuple = {<<"meta">>, <<"config">>, <<"security_doc">>},
+        Key = erlfdb_directory:pack(DbDir, Tuple),
+        erlfdb:wait(erlfdb:get(Tx, Key))
+    end),
+    ?JSON_DECODE(SecJson).
 
+
+set_security(DbName, ErlJson) ->
+    SecJson = ?JSON_ENCODE(ErlJson),
+    fabric_server:transactional(fun(Tx) ->
+        DbDir = open_db(Tx, DbName),
+        Tuple = {<<"meta">>, <<"config">>, <<"security_doc">>},
+        Key = erlfdb_directory:pack(DbDir, Tuple),
+        erlfdb:set(Tx, Key, SecJson)
+    end).
 
 
 init_db(Tx, DbDir) ->

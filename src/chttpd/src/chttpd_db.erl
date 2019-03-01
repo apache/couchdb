@@ -370,21 +370,16 @@ delete_db_req(#httpd{}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
-    Shard = hd(mem3:shards(DbName)),
-    Props = couch_util:get_value(props, Shard#shard.opts, []),
-    Opts = case Ctx of
-        undefined ->
-            [{props, Props}];
-        #user_ctx{} ->
-            [{user_ctx, Ctx}, {props, Props}]
-    end,
-    {ok, Db} = couch_db:clustered_db(DbName, Opts),
+    Db = #{
+        name => DbName,
+        user_ctx => Ctx
+    },
     Fun(Req, Db).
 
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
     % measure the time required to generate the etag, see if it's worth it
     T0 = os:timestamp(),
-    {ok, DbInfo} = fabric:get_db_info(DbName),
+    {ok, DbInfo} = fabric2:get_db_info(DbName),
     DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
     couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
     send_json(Req, {DbInfo});
