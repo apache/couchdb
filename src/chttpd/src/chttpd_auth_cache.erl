@@ -100,7 +100,7 @@ maybe_increment_auth_cache_miss(UserName) ->
 %% gen_server callbacks
 
 init([]) ->
-    self() ! {start_listener, 0},
+    self() ! {maybe_start_listener, 0},
     {ok, #state{}}.
 
 handle_call(_Call, _From, State) ->
@@ -110,17 +110,24 @@ handle_cast(_Msg, State) ->
     {noreply, State}.
 
 handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
-    Seq = case Reason of
-        {seq, EndSeq} ->
+    Seq = case {Reason, db_exists(dbname())} of
+        {{seq, EndSeq}, true} ->
             EndSeq;
         _ ->
             couch_log:notice("~p changes listener died ~r", [?MODULE, Reason]),
             0
     end,
-    erlang:send_after(5000, self(), {start_listener, Seq}),
-    {noreply, State#state{last_seq=Seq}};
-handle_info({start_listener, Seq}, State) ->
-    {noreply, State#state{changes_pid = spawn_changes(Seq)}};
+    erlang:send_after(5000, self(), {maybe_start_listener, Seq}),
+    {noreply, State#state{last_seq = Seq, changes_pid = undefined}};
+handle_info({maybe_start_listener, Seq}, State) ->
+    State1 = case may_spawn_listener(State) of
+        true ->
+            State#state{changes_pid = spawn_changes(Seq)};
+        false ->
+            erlang:send_after(5000, self(), {maybe_start_listener, Seq}),
+            State
+    end,
+    {noreply, State1};
 handle_info(_Msg, State) ->
     {noreply, State}.
 
@@ -133,6 +140,17 @@ code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
 
 %% private functions
+
+may_spawn_listener(#state{changes_pid = Pid}) ->
+    case is_pid(Pid) andalso is_process_alive(Pid) of
+        true ->
+            false;
+        false ->
+            db_exists(dbname())
+    end.
+
+db_exists(DbName) ->
+    is_list(catch mem3:shards(DbName)).
 
 spawn_changes(Since) ->
     {Pid, _} = spawn_monitor(?MODULE, listen_for_changes, [Since]),
