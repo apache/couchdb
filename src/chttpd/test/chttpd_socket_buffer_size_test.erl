@@ -21,115 +21,69 @@
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
 
 
-setup() ->
-    Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
-    SocketOptions = config:get("chttpd", "socket_options"),
+setup(SocketOpts) ->
+    StartCtx = start_couch_with_cfg(SocketOpts),
     Db = ?tempdb(),
-    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
-    Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
-    Url = "http://" ++ Addr ++ ":" ++ Port ++ "/" ++ ?b2l(Db),
-    create_db(Url),
-    {Db, SocketOptions}.
+    create_db(url(Db)),
+    {StartCtx, Db}.
 
 
-teardown({Db, SocketOptions}) ->
+teardown(_, {StartCtx, Db}) ->
     delete_db(url(Db)),
-    ok = config:delete("chttpd", "socket_options", _Persist=false),
     ok = config:delete("admins", ?USER, _Persist=false),
-    case SocketOptions of
-        undefined ->
-            ok;
-        _ ->
-            ok = config:set("chttpd", "socket_options", SocketOptions)
-    end.
+    test_util:stop_couch(StartCtx).
 
 
 socket_buffer_size_test_() ->
     {
         "chttpd socket_buffer_size_test",
         {
-            setup,
-            fun chttpd_test_util:start_couch/0,
-            fun chttpd_test_util:stop_couch/1,
-            {
-                foreach,
-                fun setup/0, fun teardown/1,
-                [
-                    fun buffer_too_small_url_fails/1,
-                    fun buffer_too_small_header_fails/1,
-                    fun recbuf_too_small_url_fails/1,
-                    fun recbuf_too_small_header_fails/1,
-                    fun default_buffer_settings_work/1
-                ]
-            }
+            foreachx,
+            fun setup/1, fun teardown/2,
+            [
+                {"[{recbuf, undefined}]", fun default_buffer/2},
+                {"[{recbuf, 1024}]", fun small_recbuf/2},
+                {"[{buffer, 1024}]", fun small_buffer/2}
+            ]
         }
     }.
 
 
-buffer_too_small_url_fails({Db, _}) ->
-    ?_test(begin
-        restart_chttpd("[{buffer, 1024}]"),
-        Id = data(1500),
-        Status1 = put_req(url(Db) ++ "/" ++ Id, "{}"),
-        ?assertEqual(400, Status1),
-        restart_chttpd("[{buffer, 2048}]"),
-        Status2 = put_req(url(Db) ++ "/" ++ Id, "{}"),
-        ?assert(Status2 =:= 201 orelse Status2 =:= 202)
-    end).
+small_recbuf(_, {_, Db}) ->
+    {timeout, 30, ?_test(begin
+        Id = data(2048),
+        Response = put_req(url(Db) ++ "/" ++ Id, "{}"),
+        ?assert(Response =:= 400 orelse Response =:= request_failed)
+    end)}.
 
 
-buffer_too_small_header_fails({Db, _}) ->
-    ?_test(begin
-        restart_chttpd("[{buffer, 1024}]"),
-        Headers = [{"Blah", data(1500)}],
-        Status1 = put_req(url(Db) ++ "/d", Headers, "{}"),
-        ?assertEqual(400, Status1),
-        restart_chttpd("[{buffer, 2048}]"),
-        Status2 = put_req(url(Db) ++ "/d", Headers, "{}"),
-        ?assert(Status2 =:= 201 orelse Status2 =:= 202)
-    end).
+small_buffer(_, {_, Db}) ->
+    {timeout, 30, ?_test(begin
+        Id = data(2048),
+        Response = put_req(url(Db) ++ "/" ++ Id, "{}"),
+        ?assert(Response =:= 400 orelse Response =:= request_failed)
+    end)}.
 
 
-recbuf_too_small_url_fails({Db, _}) ->
-    ?_test(begin
-        restart_chttpd("[{recbuf, 1024}]"),
-        Id = data(1500),
-        Status1 = put_req(url(Db) ++ "/" ++ Id, "{}"),
-        ?assertEqual(400, Status1),
-        restart_chttpd("[{recbuf, 2048}]"),
-        Status2 = put_req(url(Db) ++ "/" ++ Id, "{}"),
-        ?assert(Status2 =:= 201 orelse Status2 =:= 202)
-    end).
-
-
-recbuf_too_small_header_fails({Db, _}) ->
-    ?_test(begin
-        restart_chttpd("[{recbuf, 1024}]"),
-        Headers = [{"Blah", data(1500)}],
-        Status1 = put_req(url(Db) ++ "/d", Headers, "{}"),
-        ?assertEqual(400, Status1),
-        restart_chttpd("[{recbuf, 2048}]"),
-        Status2 = put_req(url(Db) ++ "/d", Headers, "{}"),
-        ?assert(Status2 =:= 201 orelse Status2 =:= 202)
-    end).
-
-
-default_buffer_settings_work({Db, _}) ->
-    ?_test(begin
-        restart_chttpd("[{recbuf, undefined}]"),
+default_buffer(_, {_, Db}) ->
+    {timeout, 30, ?_test(begin
         Id = data(7000),
-        Status = put_req(url(Db) ++ "/" ++ Id, "{}"),
+        Headers = [{"Blah", data(7000)}],
+        Status = put_req(url(Db) ++ "/" ++ Id, Headers, "{}"),
         ?assert(Status =:= 201 orelse Status =:= 202)
-    end).
+    end)}.
 
 
 % Helper functions
 
-url(Db) ->
+url() ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
-    "http://" ++ Addr ++ ":" ++ Port ++ "/" ++ ?b2l(Db).
+    "http://" ++ Addr ++ ":" ++ Port.
+
+
+url(Db) ->
+    url() ++ "/" ++ ?b2l(Db).
 
 
 create_db(Url) ->
@@ -147,17 +101,27 @@ put_req(Url, Body) ->
 
 put_req(Url, Headers, Body) ->
     AllHeaders = Headers ++ [?CONTENT_JSON, ?AUTH],
-    {ok, Status, _, _} = test_request:put(Url, AllHeaders, Body),
-    Status.
+    case test_request:put(Url, AllHeaders, Body) of
+        {ok, Status, _, _} -> Status;
+        {error, Error} -> Error
+    end.
 
 
 data(Size) ->
     string:copies("x", Size).
 
 
-restart_chttpd(ServerOptions) ->
-    ok = application:stop(chttpd),
-    ok = application:stop(mochiweb),
-    config:set("chttpd", "server_options", ServerOptions, _Persist=false),
-    ok = application:start(mochiweb),
-    ok = application:start(chttpd).
+append_to_cfg_chain(Cfg) ->
+    CfgDir = filename:dirname(lists:last(?CONFIG_CHAIN)),
+    CfgFile = filename:join([CfgDir, "chttpd_socket_buffer_extra_cfg.ini"]),
+    CfgSect = io_lib:format("[chttpd]~nserver_options = ~s~n", [Cfg]),
+    ok = file:write_file(CfgFile, CfgSect),
+    ?CONFIG_CHAIN ++ [CfgFile].
+
+
+start_couch_with_cfg(Cfg) ->
+    CfgChain = append_to_cfg_chain(Cfg),
+    StartCtx = test_util:start_couch(CfgChain, [chttpd]),
+    Hashed = couch_passwords:hash_admin_password(?PASS),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    StartCtx.
