@@ -80,11 +80,13 @@ go(DbName, Workers, {map, View, _}, Args, Callback, Acc0) ->
         user_acc = Acc0,
         update_seq = case UpdateSeq of true -> []; false -> nil end
     },
+    fabric_util:increment_view_read_counter(Args),
     case rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
         State, fabric_util:view_timeout(Args), 1000 * 60 * 60) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};
     {timeout, NewState} ->
+        fabric_util:increment_view_timeout_counter(Args),
         Callback({error, timeout}, NewState#collector.user_acc);
     {error, Resp} ->
         {ok, Resp}
