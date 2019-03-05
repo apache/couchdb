@@ -25,7 +25,7 @@ defmodule AttachmentsTest do
   test "saves attachment successfully", context do
     db_name = context[:db_name]
 
-    resp = Couch.put("/#{db_name}/bin_doc", body: @bin_att_doc)
+    resp = Couch.put("/#{db_name}/bin_doc", body: @bin_att_doc, query: %{w: 3})
     assert resp.status_code in [201, 202]
     assert resp.body["ok"]
   end
@@ -44,7 +44,7 @@ defmodule AttachmentsTest do
       }
     }
 
-    resp = Couch.put("/#{db_name}/bad_doc", body: bad_att_doc)
+    resp = Couch.put("/#{db_name}/bad_doc", body: bad_att_doc, query: %{w: 3})
     assert resp.status_code == 400
   end
 
@@ -52,7 +52,7 @@ defmodule AttachmentsTest do
   test "reads attachment successfully", context do
     db_name = context[:db_name]
 
-    resp = Couch.put("/#{db_name}/bin_doc", body: @bin_att_doc)
+    resp = Couch.put("/#{db_name}/bin_doc", body: @bin_att_doc, query: %{w: 3})
     assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/bin_doc/foo.txt", body: @bin_att_doc)
@@ -76,7 +76,7 @@ defmodule AttachmentsTest do
       }
     }
 
-    resp = Couch.put("/#{db_name}/bin_doc2", body: bin_att_doc2)
+    resp = Couch.put("/#{db_name}/bin_doc2", body: bin_att_doc2, query: %{w: 3})
     assert resp.status_code in [201, 202]
     rev = resp.body["rev"]
 
@@ -88,7 +88,7 @@ defmodule AttachmentsTest do
     resp =
       Couch.put(
         "/#{db_name}/bin_doc2/foo2.txt",
-        query: %{rev: rev},
+        query: %{rev: rev, w: 3},
         body: "This is no base64 encoded text",
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
@@ -101,15 +101,15 @@ defmodule AttachmentsTest do
   test "delete attachment", context do
     db_name = context[:db_name]
 
-    resp = Couch.put("/#{db_name}/bin_doc", body: @bin_att_doc)
+    resp = Couch.put("/#{db_name}/bin_doc", body: @bin_att_doc, query: %{w: 3})
     assert resp.status_code in [201, 202]
     rev = resp.body["rev"]
 
-    resp = Couch.delete("/#{db_name}/bin_doc/foo.txt")
+    resp = Couch.delete("/#{db_name}/bin_doc/foo.txt", query: %{w: 3})
 
     assert resp.status_code == 409
 
-    resp = Couch.delete("/#{db_name}/bin_doc/foo.txt", query: %{rev: rev})
+    resp = Couch.delete("/#{db_name}/bin_doc/foo.txt", query: %{w: 3, rev: rev})
     assert resp.status_code == 200
     assert resp.headers["location"] == nil
   end
@@ -125,7 +125,7 @@ defmodule AttachmentsTest do
         "/#{db_name}/bin_doc3/attachment.txt",
         body: bin_data,
         headers: ["Content-Type": "text/plain;charset=utf-8"],
-        query: {w: 3}
+        query: %{w: 3}
       )
 
     assert resp.status_code in [201, 202]
@@ -136,14 +136,14 @@ defmodule AttachmentsTest do
     resp = Couch.get("/#{db_name}/bin_doc3/attachment.txt")
     assert resp.body == bin_data
 
-    resp = Couch.put("/#{db_name}/bin_doc3/attachment.txt", body: bin_data, query: {w: 3})
+    resp = Couch.put("/#{db_name}/bin_doc3/attachment.txt", body: bin_data, query: %{w: 3})
     assert resp.status_code == 409
 
     # non-existent rev
     resp =
       Couch.put(
         "/#{db_name}/bin_doc3/attachment.txt",
-        query: %{rev: "1-adae8575ecea588919bd08eb020c708e"},
+        query: %{rev: "1-adae8575ecea588919bd08eb020c708e", w: 3},
         headers: ["Content-Type": "text/plain;charset=utf-8"],
         body: bin_data
       )
@@ -154,7 +154,7 @@ defmodule AttachmentsTest do
     resp =
       Couch.put(
         "/#{db_name}/bin_doc3/attachment.txt",
-        query: %{rev: rev},
+        query: %{rev: rev, w: 3},
         headers: ["Content-Type": "text/plain;charset=utf-8"],
         body: bin_data
       )
@@ -171,7 +171,7 @@ defmodule AttachmentsTest do
     assert String.downcase(resp.headers["Content-Type"]) == "text/plain;charset=utf-8"
     assert resp.body == bin_data
 
-    resp = Couch.delete("/#{db_name}/bin_doc3/attachment.txt", query: %{rev: rev})
+    resp = Couch.delete("/#{db_name}/bin_doc3/attachment.txt", query: %{rev: rev, w: 3})
     assert resp.status_code == 200
 
     resp = Couch.get("/#{db_name}/bin_doc3/attachment.txt")
@@ -190,7 +190,8 @@ defmodule AttachmentsTest do
       Couch.put(
         "/#{db_name}/bin_doc4/attachment.txt",
         body: "",
-        headers: ["Content-Type": "text/plain;charset=utf-8"]
+        headers: ["Content-Type": "text/plain;charset=utf-8"],
+        query: %{w: 3}
       )
 
     assert resp.status_code in [201, 202]
@@ -205,7 +206,7 @@ defmodule AttachmentsTest do
     resp =
       Couch.put(
         "/#{db_name}/bin_doc4/attachment.txt",
-        query: %{rev: rev},
+        query: %{rev: rev, w: 3},
         headers: ["Content-Type": "text/plain;charset=utf-8"],
         body: "This is a string"
       )
@@ -230,6 +231,7 @@ defmodule AttachmentsTest do
       Couch.put(
         "/#{db_name}/bin_doc5/attachment.txt",
         body: large_att,
+        query: %{w: 3},
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
 
@@ -267,7 +269,8 @@ defmodule AttachmentsTest do
       Couch.put(
         "/#{db_name}/bin_doc6/attachment.txt",
         body: lorem_att,
-        headers: ["Content-Type": "text/plain;charset=utf-8"]
+        headers: ["Content-Type": "text/plain;charset=utf-8"],
+        query: %{w: 3}
       )
 
     assert resp.status_code in [201, 202]
@@ -293,7 +296,8 @@ defmodule AttachmentsTest do
       Couch.put(
         "/#{db_name}/bin_doc7/attachment.txt",
         body: lorem_att,
-        headers: ["Content-Type": "text/plain;charset=utf-8"]
+        headers: ["Content-Type": "text/plain;charset=utf-8"],
+        query: %{w: 3}
       )
 
     assert resp.status_code in [201, 202]
@@ -304,7 +308,7 @@ defmodule AttachmentsTest do
     resp =
       Couch.put(
         "/#{db_name}/bin_doc7/empty.txt",
-        query: %{rev: rev},
+        query: %{rev: rev, w: 3},
         body: "",
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
@@ -315,7 +319,7 @@ defmodule AttachmentsTest do
     resp =
       Couch.put(
         "/#{db_name}/bin_doc7/empty.txt",
-        query: %{rev: rev},
+        query: %{rev: rev, w: 3},
         body: "",
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
@@ -332,7 +336,8 @@ defmodule AttachmentsTest do
       Couch.put(
         "/#{db_name}/_nonexistant/attachment.txt",
         body: "ATTACHMENT INFO",
-        headers: ["Content-Type": "text/plain;charset=utf-8"]
+        headers: ["Content-Type": "text/plain;charset=utf-8"],
+        query: %{w: 3}
       )
 
     assert resp.status_code == 400
@@ -410,7 +415,8 @@ defmodule AttachmentsTest do
       Couch.put(
         "/#{db_name}/bin_doc8/attachment.txt",
         body: bin_data,
-        headers: ["Content-Type": "application/octet-stream", "Content-MD5": md5]
+        headers: ["Content-Type": "application/octet-stream", "Content-MD5": md5],
+        query: %{w: 3}
       )
 
     assert resp.status_code in [201, 202]
@@ -432,7 +438,8 @@ defmodule AttachmentsTest do
     resp =
       Couch.put(
         "/#{db_name}/form_data_doc",
-        body: form_data_doc
+        body: form_data_doc,
+        query: %{w: 3}
       )
 
     assert resp.status_code in [201, 202]
@@ -453,6 +460,7 @@ defmodule AttachmentsTest do
       Couch.post(
         "/#{db_name}/form_data_doc",
         body: body,
+        query: %{w: 3},
         headers: [
           Referer: "http://127.0.0.1:15984",
           "Content-Type": "multipart/form-data; boundary=----TF",
