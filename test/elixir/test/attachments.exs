@@ -136,7 +136,9 @@ defmodule AttachmentsTest do
     resp = Couch.get("/#{db_name}/bin_doc3/attachment.txt")
     assert resp.body == bin_data
 
-    resp = Couch.put("/#{db_name}/bin_doc3/attachment.txt", body: bin_data, query: %{w: 3})
+    resp =
+      Couch.put("/#{db_name}/bin_doc3/attachment.txt", body: bin_data, query: %{w: 3})
+
     assert resp.status_code == 409
 
     # non-existent rev
