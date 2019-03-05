@@ -51,7 +51,7 @@ X means done, - means partially
   - [ ] Port etags_views.js
   - [ ] Port form_submit.js
   - [ ] Port http.js
-  - [ ] Port invalid_docids.js
+  - [X] Port invalid_docids.js
   - [ ] Port jsonp.js
   - [X] Port large_docs.js
   - [ ] Port list_views.js
