@@ -22,7 +22,6 @@
 -export([is_partitioned/1]).
 -export([validate_all_docs_args/2, validate_args/3]).
 -export([upgrade_mrargs/1]).
--export([increment_view_read_counter/1, increment_view_timeout_counter/1]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
 
@@ -69,32 +68,15 @@ attachments_timeout() ->
 view_timeout(Args) ->
     PartitionQuery = couch_mrview_util:get_extra(Args, partition, false),
     case PartitionQuery of
-        false -> timeout("view", "infinity");
-        _ -> timeout("partition_view", "infinity")
+        false -> 1; %timeout("view", "infinity");
+        % _ -> timeout("partition_view", "infinity")
+        _ -> 1
     end.
 
 timeout(Type, Default) ->
     case config:get("fabric", Type ++ "_timeout", Default) of
         "infinity" -> infinity;
         N -> list_to_integer(N)
-    end.
-
-increment_view_read_counter(Args) ->
-    PartitionQuery = couch_mrview_util:get_extra(Args, partition, false),
-    case PartitionQuery of
-        false ->
-            couch_stats:increment_counter([fabric, view_query, reads]);
-        _ ->
-            couch_stats:increment_counter([fabric, view_query, partition_reads])
-    end.
-
-increment_view_timeout_counter(Args) ->
-    PartitionQuery = couch_mrview_util:get_extra(Args, partition, false),
-    case PartitionQuery of
-        false ->
-            couch_stats:increment_counter([fabric, view_query, timeouts]);
-        _ ->
-            couch_stats:increment_counter([fabric, view_query, partition_timeouts])
     end.
 
 log_timeout(Workers, EndPoint) ->
