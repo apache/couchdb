@@ -354,7 +354,8 @@ defmodule AttachmentsTest do
     resp =
       Couch.put(
         "/#{db_name}/stub_doc",
-        body: stub_doc
+        body: stub_doc,
+        query: %{w: 3}
       )
 
     assert resp.status_code in [201, 202]
@@ -371,7 +372,7 @@ defmodule AttachmentsTest do
     resp =
       Couch.put(
         "/#{db_name}/stub_doc",
-        query: %{rev: rev},
+        query: %{rev: rev, w: 3},
         body: stub_doc
       )
 
