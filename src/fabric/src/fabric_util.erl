@@ -68,9 +68,8 @@ attachments_timeout() ->
 view_timeout(Args) ->
     PartitionQuery = couch_mrview_util:get_extra(Args, partition, false),
     case PartitionQuery of
-        false -> 1; %timeout("view", "infinity");
-        % _ -> timeout("partition_view", "infinity")
-        _ -> 1
+        false -> timeout("view", "infinity");
+        _ -> timeout("partition_view", "infinity")
     end.
 
 timeout(Type, Default) ->

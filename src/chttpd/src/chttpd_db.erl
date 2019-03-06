@@ -883,7 +883,6 @@ view_cb({row, Row} = Msg, Acc) ->
     couch_mrview_http:view_cb(Msg, Acc);
 
 view_cb(Msg, Acc) ->
-    io:format("ERROR ALL DOCS ~p ~n", [Msg]),
     couch_mrview_http:view_cb(Msg, Acc).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
