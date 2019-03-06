@@ -72,9 +72,20 @@ get_usable_indexes(Db, Selector, Opts) ->
 
     case lists:filter(UsableFilter, UsableIndexes1) of
         [] ->
-            ?MANGO_ERROR({no_usable_index, missing_sort_index});
+            mango_sort_error(Db, Opts);
         UsableIndexes ->
             UsableIndexes
+    end.
+
+
+mango_sort_error(Db, Opts) ->
+    case {fabric_util:is_partitioned(Db), is_opts_partitioned(Opts)} of
+        {false, _} ->
+            ?MANGO_ERROR({no_usable_index, missing_sort_index});
+        {true, true} ->
+            ?MANGO_ERROR({no_usable_index, missing_sort_index_partitioned});
+        {true, false} ->
+            ?MANGO_ERROR({no_usable_index, missing_sort_index_global})
     end.
 
 
@@ -410,12 +421,20 @@ get_idx_partitioned(Db, DDocProps) ->
             Default
     end.
 
+is_opts_partitioned(Opts) ->
+    case couch_util:get_value(partition, Opts) of
+        <<>> ->
+            false;
+        Partition when is_binary(Partition) ->
+            true
+    end.
+
 
 filter_partition_indexes(Indexes, Opts) ->
-    PFilt = case couch_util:get_value(partition, Opts) of
-        <<>> ->
+    PFilt = case is_opts_partitioned(Opts) of
+        false ->
             fun(#idx{partitioned = P}) -> not P end;
-        Partition when is_binary(Partition) ->
+        true ->
             fun(#idx{partitioned = P}) -> P end
     end,
     Filt = fun(Idx) -> type(Idx) == <<"special">> orelse PFilt(Idx) end,
