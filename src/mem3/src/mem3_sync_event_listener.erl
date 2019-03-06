@@ -258,6 +258,7 @@ subscribe_for_config_test_() ->
 should_set_sync_delay(Pid) ->
     ?_test(begin
         config:set("mem3", "sync_delay", "123", false),
+        timer:sleep(100),
         ?assertMatch(#state{delay = 123}, capture(Pid)),
         ok
     end).
@@ -265,6 +266,7 @@ should_set_sync_delay(Pid) ->
 should_set_sync_frequency(Pid) ->
     ?_test(begin
         config:set("mem3", "sync_frequency", "456", false),
+        timer:sleep(100),
         ?assertMatch(#state{frequency = 456}, capture(Pid)),
         ok
     end).
