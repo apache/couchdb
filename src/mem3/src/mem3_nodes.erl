@@ -41,6 +41,8 @@ get_node_info(Node, Key) ->
     end.
 
 init([]) ->
+    DbName = list_to_binary(config:get("mem3", "nodes_db", "_nodes")),
+    erlang:put(io_priority, {system, DbName}),
     ets:new(?MODULE, [named_table, {read_concurrency, true}]),
     UpdateSeq = initialize_nodelist(),
     {Pid, _} = spawn_monitor(fun() -> listen_for_changes(UpdateSeq) end),
@@ -109,6 +111,7 @@ first_fold(#full_doc_info{id=Id}=DocInfo, Db) ->
 
 listen_for_changes(Since) ->
     DbName = config:get("mem3", "nodes_db", "_nodes"),
+    erlang:put(io_priority, {system, DbName}),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",

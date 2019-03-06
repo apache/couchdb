@@ -109,6 +109,9 @@ init(InitArgs) ->
 
 do_init(#rep{options = Options, id = {BaseId, Ext}, user_ctx=UserCtx} = Rep) ->
     process_flag(trap_exit, true),
+    %% TODO: what value to put here
+    %% what is using this?
+    erlang:put(io_priority, {db_update, <<"asdf">>}),
 
     timer:sleep(startup_jitter()),
 

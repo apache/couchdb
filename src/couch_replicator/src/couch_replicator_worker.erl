@@ -76,6 +76,7 @@ start_link(Cp, #httpdb{} = Source, Target, ChangesManager, MaxConns) ->
 start_link(Cp, Source, Target, ChangesManager, _MaxConns) ->
     Pid = spawn_link(fun() ->
         erlang:put(last_stats_report, os:timestamp()),
+        erlang:put(io_priority, {interactive, couch_db:name(Source)}),
         queue_fetch_loop(Source, Target, Cp, Cp, ChangesManager)
     end),
     {ok, Pid}.
@@ -84,7 +85,11 @@ start_link(Cp, Source, Target, ChangesManager, _MaxConns) ->
 init({Cp, Source, Target, ChangesManager, MaxConns}) ->
     process_flag(trap_exit, true),
     Parent = self(),
+    %% TODO: set proper dbname value here, extract from #httpdb{}/#db{}
+    Priority = {interactive, <<"asdf">>},
+    erlang:put(io_priority, Priority),
     LoopPid = spawn_link(fun() ->
+        erlang:put(io_priority, Priority),
         queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
     end),
     erlang:put(last_stats_report, os:timestamp()),
@@ -408,8 +413,10 @@ spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
         ok
     end,
     Parent = self(),
+    Priority = erlang:get(io_priority),
     spawn_link(
         fun() ->
+            erlang:put(io_priority, Priority),
             Target2 = open_db(Target),
             Stats = flush_docs(Target2, DocList),
             close_db(Target2),

@@ -39,6 +39,8 @@
 % Database request handlers
 handle_request(#httpd{path_parts=[DbName|RestParts],method=Method,
         db_url_handlers=DbUrlHandlers}=Req)->
+    %% TODO: set proper io_priority value here
+    erlang:put(io_priority, {interactive, DbName}),
     case {Method, RestParts} of
     {'PUT', []} ->
         create_db_req(Req, DbName);

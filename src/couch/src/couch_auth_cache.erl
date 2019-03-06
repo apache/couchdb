@@ -150,6 +150,7 @@ init(_) ->
     ?BY_USER = ets:new(?BY_USER, [set, protected, named_table]),
     ?BY_ATIME = ets:new(?BY_ATIME, [ordered_set, private, named_table]),
     AuthDbName = config:get("couch_httpd_auth", "authentication_db"),
+    erlang:put(io_priority, {system, AuthDbName}),
     process_flag(trap_exit, true),
     ok = config:listen_for_changes(?MODULE, nil),
     {ok, Listener} = couch_event:link_listener(

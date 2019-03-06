@@ -225,6 +225,7 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
 
 
 write_results(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State) ->
+    erlang:put(io_priority, {view_update, DbName, IdxName}),
     case accumulate_writes(State, State#mrst.write_queue, nil) of
         stop ->
             Parent ! {new_state, State};

@@ -229,6 +229,8 @@ handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
 
 handle_request_int(MochiReq, DefaultFun,
             UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
+    %% TODO: find appropriate value for internal API
+    erlang:put(io_priority, {interactive, <<"asdf">>}),
     Begin = os:timestamp(),
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact

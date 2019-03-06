@@ -37,6 +37,7 @@ start_link(StartSeq, #httpdb{} = Db, ChangesQueue, Options) ->
 start_link(StartSeq, Db, ChangesQueue, Options) ->
     Parent = self(),
     {ok, spawn_link(fun() ->
+        erlang:put(io_priority, {interactive, couch_db:name(Db)}),
         ?MODULE:read_changes(Parent, StartSeq, Db, ChangesQueue, Options)
     end)}.
 

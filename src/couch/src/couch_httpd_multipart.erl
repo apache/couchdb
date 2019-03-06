@@ -26,7 +26,9 @@
 decode_multipart_stream(ContentType, DataFun, Ref) ->
     Parent = self(),
     NumMpWriters = num_mp_writers(),
+    Priority = erlang:get(io_priority),
     {Parser, ParserRef} = spawn_monitor(fun() ->
+        erlang:put(io_priority, Priority),
         ParentRef = erlang:monitor(process, Parent),
         put(mp_parent_ref, ParentRef),
         num_mp_writers(NumMpWriters),
@@ -244,6 +246,14 @@ atts_to_mp([], _Boundary, WriteFun, _AttFun) ->
     WriteFun(<<"--">>);
 atts_to_mp([{Att, Name, Len, Type, Encoding} | RestAtts], Boundary, WriteFun,
     AttFun)  ->
+    case erlang:get(io_priority) of
+        undefined ->
+            %% TODO: set proper io_priority
+            %% TODO: this case shouldn't happen
+            erlang:put(io_priority, {interactive, <<"asdf">>});
+        _ ->
+            ok
+    end,
     LengthBin = list_to_binary(integer_to_list(Len)),
     % write headers
     WriteFun(<<"\r\nContent-Disposition: attachment; filename=\"", Name/binary, "\"">>),

@@ -66,7 +66,9 @@ parse(Options) ->
 -spec fetch(binary(), binary(), binary(), #user_ctx{}) ->
     {ok, {[_]}} | {error, binary()}.
 fetch(DDocName, FilterName, Source, UserCtx) ->
+    Priority = erlang:get(io_priority),
     {Pid, Ref} = spawn_monitor(fun() ->
+        erlang:put(io_priority, Priority),
         try fetch_internal(DDocName, FilterName, Source, UserCtx) of
             Resp ->
                 exit({exit_ok, Resp})

@@ -117,6 +117,8 @@ compact(Parent, Mod, IdxState) ->
 
 compact(Idx, Mod, IdxState, Opts) ->
     DbName = Mod:get(db_name, IdxState),
+    IndexName = Mod:get(idx_name, IdxState),
+    erlang:put(io_priority, {view_compact, DbName, IndexName}),
     Args = [DbName, Mod:get(idx_name, IdxState)],
     couch_log:info("Compaction started for db: ~s idx: ~s", Args),
     {ok, NewIdxState} = couch_util:with_db(DbName, fun(Db) ->

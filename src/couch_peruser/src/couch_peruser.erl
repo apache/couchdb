@@ -73,6 +73,7 @@ init_state() ->
         couch_log:debug("peruser: enabled on node ~p", [node()]),
         DbName = ?l2b(config:get(
                          "couch_httpd_auth", "authentication_db", "_users")),
+        erlang:put(io_priority, {system, DbName}),
         DeleteDbs = config:get_boolean("couch_peruser", "delete_dbs", false),
         Q = config:get_integer("couch_peruser", "q", 1),
         Prefix = config:get("couch_peruser", "database_prefix", ?DEFAULT_USERDB_PREFIX),
@@ -137,6 +138,7 @@ start_listening(#state{db_name=DbName, delete_dbs=DeleteDbs,
 
 -spec init_changes_handler(ChangesState :: #changes_state{}) -> ok.
 init_changes_handler(#changes_state{db_name=DbName} = ChangesState) ->
+    erlang:put(io_priority, {system, DbName}),
     % couch_log:debug("peruser: init_changes_handler() on DbName ~p", [DbName]),
     try
         {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX, sys_db]),

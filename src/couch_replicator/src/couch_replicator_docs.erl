@@ -123,6 +123,10 @@ update_error(#rep{db_name = DbName, doc_id = DocId, id = RepId}, Error) ->
 
 -spec ensure_rep_db_exists() -> {ok, Db::any()}.
 ensure_rep_db_exists() ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {system, ?REP_DB_NAME});
+        _ -> ok
+    end,
     Db = case couch_db:open_int(?REP_DB_NAME, [?CTX, sys_db,
             nologifmissing]) of
         {ok, Db0} ->
@@ -137,6 +141,10 @@ ensure_rep_db_exists() ->
 
 -spec ensure_rep_ddoc_exists(binary()) -> ok.
 ensure_rep_ddoc_exists(RepDb) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {system, ?REP_DB_NAME});
+        _ -> ok
+    end,
     case mem3:belongs(RepDb, ?REP_DESIGN_DOC) of
         true ->
             ensure_rep_ddoc_exists(RepDb, ?REP_DESIGN_DOC);
@@ -147,6 +155,10 @@ ensure_rep_ddoc_exists(RepDb) ->
 
 -spec ensure_rep_ddoc_exists(binary(), binary()) -> ok.
 ensure_rep_ddoc_exists(RepDb, DDocId) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {system, ?REP_DB_NAME});
+        _ -> ok
+    end,
     case open_rep_doc(RepDb, DDocId) of
         {not_found, no_db_file} ->
             %% database was deleted.

@@ -433,6 +433,13 @@ len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, SendEncodedAtts) ->
 
 doc_to_multi_part_stream(Boundary, JsonBytes, Atts, WriteFun,
     SendEncodedAtts) ->
+    case erlang:get(io_priority) of
+        undefined ->
+            %% TODO: use proper dbname here
+            erlang:put(interactive, <<"asdf">>);
+        _ ->
+            ok
+    end,
     AttsToInclude = lists:filter(fun(Att)-> couch_att:fetch(data, Att) /= stub end, Atts),
     AttsDecoded = decode_attributes(AttsToInclude, SendEncodedAtts),
     AttFun = case SendEncodedAtts of

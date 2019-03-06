@@ -60,6 +60,9 @@ init([]) ->
     UpdateDb = case UpdateDb0 of "false" -> false; _ -> true end,
     MaxWriteDelay = list_to_integer(MaxWriteDelay0),
 
+    GlobalChangesDbName = global_changes_util:get_dbname(),
+    erlang:put(io_priority, {db_update, GlobalChangesDbName}),
+
     % Start our write triggers
     erlang:send_after(MaxWriteDelay, self(), flush_updates),
 
@@ -68,7 +71,7 @@ init([]) ->
         pending_update_count=0,
         pending_updates=sets:new(),
         max_write_delay=MaxWriteDelay,
-        dbname=global_changes_util:get_dbname(),
+        dbname=GlobalChangesDbName,
         handler_ref=erlang:monitor(process, Handler)
     },
     {ok, State}.

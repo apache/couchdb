@@ -198,6 +198,8 @@ init([]) ->
     ok = config:listen_for_changes(?MODULE, nil),
     SizeList = config:get("mem3", "shard_cache_size", "25000"),
     WriteTimeout = config:get_integer("mem3", "shard_write_timeout", 1000),
+    DbName = config:get("mem3", "shards_db", "_dbs"),
+    erlang:put(io_priority, {system, DbName}),
     UpdateSeq = get_update_seq(),
     {ok, #st{
         max_size = list_to_integer(SizeList),
@@ -319,6 +321,7 @@ get_update_seq() ->
 
 listen_for_changes(Since) ->
     DbName = config:get("mem3", "shards_db", "_dbs"),
+    erlang:put(io_priority, {system, DbName}),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     Args = #changes_args{
         feed = "continuous",
@@ -365,6 +368,10 @@ changes_callback(timeout, _) ->
 load_shards_from_disk(DbName) when is_binary(DbName) ->
     couch_stats:increment_counter([mem3, shard_cache, miss]),
     X = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {system, X});
+        _ -> ok
+    end,
     {ok, Db} = mem3_util:ensure_exists(X),
     try
         load_shards_from_db(Db, DbName)
@@ -373,6 +380,10 @@ load_shards_from_disk(DbName) when is_binary(DbName) ->
     end.
 
 load_shards_from_db(ShardDb, DbName) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {system, couch_db:name(ShardDb)});
+        _ -> ok
+    end,
     case couch_db:open_doc(ShardDb, DbName, [ejson_body]) of
     {ok, #doc{body = {Props}}} ->
         Seq = couch_db:get_update_seq(ShardDb),

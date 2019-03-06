@@ -216,6 +216,10 @@ ensure_full_commit(Db) ->
 
 
 get_missing_revs(#httpdb{} = Db, IdRevs) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {system, db_uri(Db)});
+        _ -> ok
+    end,
     JsonBody = {[{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs} <- IdRevs]},
     send_req(
         Db,
@@ -234,6 +238,10 @@ get_missing_revs(#httpdb{} = Db, IdRevs) ->
             {ok, lists:map(ConvertToNativeFun, Props)}
         end);
 get_missing_revs(Db, IdRevs) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {system, couch_db:name(Db)});
+        _ -> ok
+    end,
     couch_db:get_missing_revs(Db, IdRevs).
 
 
@@ -250,6 +258,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
     Path = encode_doc_id(Id),
     QS = options_to_query_args(HttpDb, Path, [revs, {open_revs, Revs} | Options]),
     {Pid, Ref} = spawn_monitor(fun() ->
+        erlang:put(io_priority, {system, db_uri(HttpDb)}),
         Self = self(),
         Callback = fun
           (200, Headers, StreamDataFun) ->
@@ -753,6 +762,8 @@ receive_docs(Streamer, UserFun, Ref, UserAcc) ->
 
 run_user_fun(UserFun, Arg, UserAcc, OldRef) ->
     {Pid, Ref} = spawn_monitor(fun() ->
+        %% TODO: find proper db name value here
+        erlang:put(io_priority, {system, <<"asdf">>}),
         try UserFun(Arg, UserAcc) of
             Resp ->
                 exit({exit_ok, Resp})

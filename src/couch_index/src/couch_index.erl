@@ -81,6 +81,7 @@ get_compactor_pid(Pid) ->
 
 init({Mod, IdxState}) ->
     DbName = Mod:get(db_name, IdxState),
+    erlang:put(io_priority, {system, DbName}),
     erlang:send_after(?CHECK_INTERVAL, self(), maybe_close),
     Resp = couch_util:with_db(DbName, fun(Db) ->
         case Mod:open(Db, IdxState) of

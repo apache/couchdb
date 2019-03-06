@@ -231,6 +231,7 @@ start_changes_reader(DbName, Since) ->
 
 
 changes_reader(Server, DbName, Since) ->
+    erlang:put(io_priority, {system, DbName}),
     {ok, Db} = couch_db:open_int(DbName, [?CTX, sys_db]),
     ChangesArgs = #changes_args{
         include_docs = true,
@@ -253,9 +254,10 @@ changes_reader_cb(_, _, Acc) ->
 
 
 scan_all_dbs(Server, DbSuffix) when is_pid(Server) ->
+    DbName = config:get("mem3", "shards_db", "_dbs"),
+    erlang:put(io_priority, {system, DbName}),
     ok = scan_local_db(Server, DbSuffix),
-    {ok, Db} = mem3_util:ensure_exists(
-        config:get("mem3", "shards_db", "_dbs")),
+    {ok, Db} = mem3_util:ensure_exists(DbName),
     ChangesFun = couch_changes:handle_changes(#changes_args{}, nil, Db, nil),
     ChangesFun({fun scan_changes_cb/3, {Server, DbSuffix, 1}}),
     couch_db:close(Db).
