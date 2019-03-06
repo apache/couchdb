@@ -298,6 +298,7 @@ handle_partition_req(#httpd{path_parts=[DbName, _, PartId | Rest]}=Req, Db) ->
                 path_parts = [DbName | Rest],
                 qs = NewQS
             },
+            update_partition_stats(Rest),
             case Rest of
                 [OP | _] when OP == <<"_all_docs">> orelse ?IS_MANGO(OP) ->
                     case chttpd_handlers:db_handler(OP, fun db_req/2) of
@@ -317,6 +318,20 @@ handle_partition_req(#httpd{path_parts=[DbName, _, PartId | Rest]}=Req, Db) ->
 
 handle_partition_req(Req, _Db) ->
     chttpd:send_error(Req, not_found).
+
+update_partition_stats(PathParts) ->
+    case PathParts of
+            [<<"_design">> | _] ->
+                couch_stats:increment_counter([couchdb, httpd, partition_view_requests]);
+            [<<"_all_docs">> | _] ->
+                couch_stats:increment_counter([couchdb, httpd, partition_all_docs_requests]);
+            [<<"_find">> | _] ->
+                couch_stats:increment_counter([couchdb, httpd, partition_find_requests]);
+            [<<"_explain">> | _] ->
+                couch_stats:increment_counter([couchdb, httpd, partition_explain_requests]);
+            _ ->
+                ok % ignore path that do not match
+        end.
 
 
 handle_design_req(#httpd{
