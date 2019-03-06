@@ -693,9 +693,15 @@ etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->
     etag_match(Req, binary_to_list(CurrentEtag));
 
 etag_match(Req, CurrentEtag) ->
-    EtagsToMatch = string:tokens(
+    EtagsToMatch0 = string:tokens(
         chttpd:header_value(Req, "If-None-Match", ""), ", "),
+    EtagsToMatch = lists:map(fun strip_weak_prefix/1, EtagsToMatch0),
     lists:member(CurrentEtag, EtagsToMatch).
+
+strip_weak_prefix([$W, $/ | Etag]) ->
+    Etag;
+strip_weak_prefix(Etag) ->
+    Etag.
 
 etag_respond(Req, CurrentEtag, RespFun) ->
     case etag_match(Req, CurrentEtag) of
