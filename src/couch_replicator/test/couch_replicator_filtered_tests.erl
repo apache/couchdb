@@ -198,6 +198,7 @@ read_doc(Db, DocIdOrInfo) ->
 
 create_db() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.

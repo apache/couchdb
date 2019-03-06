@@ -21,14 +21,16 @@
 
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
-    Db.
+    {Db, erlang:get(io_priority)}.
 
 
-teardown_each(Db) ->
+teardown_each({Db, Priority}) ->
+    erlang:put(io_priority, Priority),
     ok = couch_server:delete(couch_db:name(Db), []).
 
 
-cpse_write_attachment(Db1) ->
+cpse_write_attachment({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     AttBin = crypto:strong_rand_bytes(32768),
 
     try
@@ -80,7 +82,8 @@ cpse_write_attachment(Db1) ->
 % attachments streams when restarting (for instance if
 % we ever have something that stores attachemnts in
 % an external object store)
-cpse_inactive_stream(Db1) ->
+cpse_inactive_stream({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     AttBin = crypto:strong_rand_bytes(32768),
 
     try

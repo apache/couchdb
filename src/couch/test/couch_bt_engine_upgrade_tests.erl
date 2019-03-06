@@ -68,6 +68,7 @@ t_upgrade_without_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
         % db with zero purge entries
         DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
             ++ "_without_purge_req"),
+        erlang:put(io_priority, {db_update, DbName}),
 
         ?assertEqual(VersionFrom, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
@@ -108,6 +109,7 @@ t_upgrade_with_1_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
         % with a single purge entry
         DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
             ++ "_with_1_purge_req"),
+        erlang:put(io_priority, {db_update, DbName}),
 
         ?assertEqual(VersionFrom, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
@@ -149,6 +151,7 @@ t_upgrade_with_N_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
         % with two docs that have been purged
         DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
             ++ "_with_2_purge_req"),
+        erlang:put(io_priority, {db_update, DbName}),
 
         ?assertEqual(VersionFrom, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->
@@ -189,6 +192,7 @@ t_upgrade_with_1_purge_req_for_2_docs(VersionFrom, {_Ctx, _NewPaths}) ->
         % with one purge req for Doc1 and another purge req for Doc 2 and Doc3
         DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
             ++ "_with_1_purge_req_for_2_docs"),
+        erlang:put(io_priority, {db_update, DbName}),
 
         ?assertEqual(VersionFrom, get_disk_version_from_header(DbName)),
         {ok, UpgradedPurged} = couch_util:with_db(DbName, fun(Db) ->

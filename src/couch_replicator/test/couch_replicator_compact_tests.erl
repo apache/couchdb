@@ -29,6 +29,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
@@ -83,7 +84,9 @@ should_populate_replicate_compact({From, To}, {_Ctx, {Source, Target}}) ->
      ]}}.
 
 should_all_processes_be_alive(RepPid, Source, Target) ->
+    Priority = erlang:get(io_priority),
     ?_test(begin
+        erlang:put(io_priority, Priority),
         {ok, SourceDb} = reopen_db(Source),
         {ok, TargetDb} = reopen_db(Target),
         ?assert(is_process_alive(RepPid)),
@@ -92,10 +95,18 @@ should_all_processes_be_alive(RepPid, Source, Target) ->
     end).
 
 should_run_replication(RepPid, RepId, Source, Target) ->
-    ?_test(check_active_tasks(RepPid, RepId, Source, Target)).
+    Priority = erlang:get(io_priority),
+    ?_test(begin
+        erlang:put(io_priority, Priority),
+        check_active_tasks(RepPid, RepId, Source, Target)
+    end).
 
 should_ensure_replication_still_running(RepPid, RepId, Source, Target) ->
-    ?_test(check_active_tasks(RepPid, RepId, Source, Target)).
+    Priority = erlang:get(io_priority),
+    ?_test(begin
+        erlang:put(io_priority, Priority),
+        check_active_tasks(RepPid, RepId, Source, Target)
+    end).
 
 check_active_tasks(RepPid, {BaseId, Ext} = _RepId, Src, Tgt) ->
     Source = case Src of
@@ -147,13 +158,17 @@ wait_for_task_status() ->
     end).
 
 should_cancel_replication(RepId, RepPid) ->
+    Priority = erlang:get(io_priority),
     ?_assertNot(begin
+        erlang:put(io_priority, Priority),
         ok = couch_replicator_scheduler:remove_job(RepId),
         is_process_alive(RepPid)
     end).
 
 should_populate_and_compact(RepPid, Source, Target, BatchSize, Rounds) ->
+    Priority = erlang:get(io_priority),
     {timeout, ?TIMEOUT_EUNIT, ?_test(begin
+        erlang:put(io_priority, Priority),
         {ok, SourceDb0} = reopen_db(Source),
         Writer = spawn_writer(SourceDb0),
         lists:foreach(
@@ -200,7 +215,9 @@ should_wait_target_in_sync({remote, Source}, Target) ->
 should_wait_target_in_sync(Source, {remote, Target}) ->
     should_wait_target_in_sync(Source, Target);
 should_wait_target_in_sync(Source, Target) ->
+    Priority = erlang:get(io_priority),
     {timeout, ?TIMEOUT_EUNIT, ?_assert(begin
+        erlang:put(io_priority, Priority),
         {ok, SourceDb} = couch_db:open_int(Source, []),
         {ok, SourceInfo} = couch_db:get_db_info(SourceDb),
         ok = couch_db:close(SourceDb),
@@ -233,7 +250,9 @@ should_compare_databases({remote, Source}, Target) ->
 should_compare_databases(Source, {remote, Target}) ->
     should_compare_databases(Source, Target);
 should_compare_databases(Source, Target) ->
+    Priority = erlang:get(io_priority),
     {timeout, 35, ?_test(begin
+        erlang:put(io_priority, Priority),
         {ok, SourceDb} = couch_db:open_int(Source, []),
         {ok, TargetDb} = couch_db:open_int(Target, []),
         Fun = fun(FullDocInfo, Acc) ->
@@ -340,8 +359,12 @@ wait_writer(Pid, NumDocs) ->
     end.
 
 spawn_writer(Db) ->
+    Priority = erlang:get(io_priority),
     Parent = self(),
-    Pid = spawn(fun() -> writer_loop(Db, Parent, 0) end),
+    Pid = spawn(fun() ->
+        erlang:put(io_priority, Priority),
+        writer_loop(Db, Parent, 0)
+    end),
     Pid.
 
 

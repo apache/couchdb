@@ -27,6 +27,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = create_db(DbName),
     Revs = [R || {ok, R} <- [
         save_doc(Db, {[{<<"_id">>, <<"doc1">>}]}),
@@ -178,6 +179,7 @@ continuous_feed() ->
 should_filter_by_specific_doc_ids({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             ChArgs = #changes_args{
                 filter = "_doc_ids"
             },
@@ -197,6 +199,7 @@ should_filter_by_specific_doc_ids({DbName, _}) ->
 should_filter_by_specific_doc_ids_descending({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             ChArgs = #changes_args{
                 filter = "_doc_ids",
                 dir = rev
@@ -217,6 +220,7 @@ should_filter_by_specific_doc_ids_descending({DbName, _}) ->
 should_filter_by_specific_doc_ids_with_since({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             ChArgs = #changes_args{
                 filter = "_doc_ids",
                 since = 5
@@ -235,6 +239,7 @@ should_filter_by_specific_doc_ids_with_since({DbName, _}) ->
 should_filter_by_specific_doc_ids_no_result({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             ChArgs = #changes_args{
                 filter = "_doc_ids",
                 since = 6
@@ -250,6 +255,7 @@ should_filter_by_specific_doc_ids_no_result({DbName, _}) ->
 should_handle_deleted_docs({DbName, Revs}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             Rev3_2 = element(6, Revs),
             {ok, Db} = couch_db:open_int(DbName, []),
             {ok, _} = save_doc(
@@ -277,6 +283,7 @@ should_handle_deleted_docs({DbName, Revs}) ->
 should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             {ok, Db} = couch_db:open_int(DbName, []),
             ChangesArgs = #changes_args{
                 filter = "_doc_ids",
@@ -347,6 +354,7 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
 
 should_end_changes_when_db_deleted({DbName, _Revs}) ->
     ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         {ok, _Db} = couch_db:open_int(DbName, []),
         ChangesArgs = #changes_args{
             filter = "_doc_ids",
@@ -367,6 +375,7 @@ should_end_changes_when_db_deleted({DbName, _Revs}) ->
 should_select_basic({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             ChArgs = #changes_args{filter = "_selector"},
             Selector = {[{<<"_id">>, <<"doc3">>}]},
             Req = {json_req, {[{<<"selector">>, Selector}]}},
@@ -381,6 +390,7 @@ should_select_basic({DbName, _}) ->
 should_select_with_since({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             ChArgs = #changes_args{filter = "_selector", since = 9},
             GteDoc2 = {[{<<"$gte">>, <<"doc1">>}]},
             Selector = {[{<<"_id">>, GteDoc2}]},
@@ -396,6 +406,7 @@ should_select_with_since({DbName, _}) ->
 should_select_when_no_result({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             ChArgs = #changes_args{filter = "_selector"},
             Selector = {[{<<"_id">>, <<"nopers">>}]},
             Req = {json_req, {[{<<"selector">>, Selector}]}},
@@ -407,6 +418,7 @@ should_select_when_no_result({DbName, _}) ->
 should_select_with_deleted_docs({DbName, Revs}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             Rev3_2 = element(6, Revs),
             {ok, Db} = couch_db:open_int(DbName, []),
             {ok, _} = save_doc(
@@ -428,6 +440,7 @@ should_select_with_deleted_docs({DbName, Revs}) ->
 should_select_with_continuous({DbName, Revs}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             {ok, Db} = couch_db:open_int(DbName, []),
             ChArgs = #changes_args{filter = "_selector", feed = "continuous"},
             GteDoc8 = {[{<<"$gte">>, <<"doc8">>}]},
@@ -468,6 +481,7 @@ should_select_with_continuous({DbName, Revs}) ->
 should_stop_selector_when_db_deleted({DbName, _Revs}) ->
     ?_test(
        begin
+           erlang:put(io_priority, {interactive, DbName}),
            {ok, _Db} = couch_db:open_int(DbName, []),
            ChArgs = #changes_args{filter = "_selector", feed = "continuous"},
            Selector = {[{<<"_id">>, <<"doc3">>}]},
@@ -485,6 +499,7 @@ should_stop_selector_when_db_deleted({DbName, _Revs}) ->
 should_select_with_empty_fields({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             ChArgs = #changes_args{filter = "_selector", include_docs=true},
             Selector = {[{<<"_id">>, <<"doc3">>}]},
             Req = {json_req, {[{<<"selector">>, Selector},
@@ -501,6 +516,7 @@ should_select_with_empty_fields({DbName, _}) ->
 should_select_with_fields({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             ChArgs = #changes_args{filter = "_selector", include_docs=true},
             Selector = {[{<<"_id">>, <<"doc3">>}]},
             Req = {json_req, {[{<<"selector">>, Selector},
@@ -518,6 +534,7 @@ should_select_with_fields({DbName, _}) ->
 should_emit_only_design_documents({DbName, Revs}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             ChArgs = #changes_args{
                 filter = "_design"
             },
@@ -617,6 +634,7 @@ should_emit_only_design_documents({DbName, Revs}) ->
 should_filter_by_doc_attribute({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             DDocId = <<"_design/app">>,
             DDoc = couch_doc:from_json_obj({[
                 {<<"_id">>, DDocId},
@@ -642,6 +660,7 @@ should_filter_by_doc_attribute({DbName, _}) ->
 should_filter_by_user_ctx({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             DDocId = <<"_design/app">>,
             DDoc = couch_doc:from_json_obj({[
                 {<<"_id">>, DDocId},
@@ -671,6 +690,7 @@ should_filter_by_user_ctx({DbName, _}) ->
 should_filter_by_view({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             DDocId = <<"_design/app">>,
             DDoc = couch_doc:from_json_obj({[
                 {<<"_id">>, DDocId},
@@ -702,6 +722,7 @@ should_filter_by_view({DbName, _}) ->
 should_filter_by_fast_view({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             DDocId = <<"_design/app">>,
             DDoc = couch_doc:from_json_obj({[
                 {<<"_id">>, DDocId},
@@ -739,6 +760,7 @@ should_filter_by_fast_view({DbName, _}) ->
 should_filter_by_erlang_view({DbName, _}) ->
     ?_test(
         begin
+            erlang:put(io_priority, {interactive, DbName}),
             DDocId = <<"_design/app">>,
             DDoc = couch_doc:from_json_obj({[
                 {<<"_id">>, DDocId},
@@ -904,6 +926,7 @@ wait_row_notifications(N) ->
 spawn_consumer(DbName, ChangesArgs0, Req) ->
     Parent = self(),
     spawn_monitor(fun() ->
+        erlang:put(io_priority, {interactive, DbName}),
         put(heartbeat_count, 0),
         Callback = fun
             ({change, {Change}, _}, _, Acc) ->

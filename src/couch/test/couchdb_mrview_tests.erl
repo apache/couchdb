@@ -51,6 +51,7 @@ setup(PortType) ->
     ok = meck:expect(mochiweb_socket, recv, fun mochiweb_socket_recv/3),
 
     DbName = ?tempdb(),
+    erlang:put(io_priority, {view_update, DbName}),
     ok = create_db(PortType, DbName),
 
     Host = host_url(PortType),
@@ -183,6 +184,10 @@ should_cleanup_index_files(_PortType, {Host, DbName}) ->
 
 
 create_doc(backdoor, DbName, Id, Body) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {db_update, DbName});
+        _ -> ok
+    end,
     JsonDoc = couch_util:json_apply_field({<<"_id">>, Id}, Body),
     Doc = couch_doc:from_json_obj(JsonDoc),
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
@@ -196,6 +201,10 @@ create_doc(clustered, DbName, Id, Body) ->
     ok.
 
 create_db(backdoor, DbName) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {db_update, DbName});
+        _ -> ok
+    end,
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     couch_db:close(Db);
 create_db(clustered, DbName) ->
@@ -204,6 +213,10 @@ create_db(clustered, DbName) ->
     ok.
 
 delete_db(backdoor, DbName) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {db_update, DbName});
+        _ -> ok
+    end,
     couch_server:delete(DbName, [?ADMIN_CTX]);
 delete_db(clustered, DbName) ->
     {ok, Status, _, _} = test_request:delete(db_url(DbName), [?AUTH]),

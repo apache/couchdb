@@ -214,6 +214,7 @@ wrap({Name, Fun}) ->
 
 create_db() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {db_update, DbName}),
     couch_db:create(DbName, [?ADMIN_CTX]).
 
 
@@ -229,6 +230,12 @@ populate_db(Db) ->
 
 
 open_doc(DbName, DocId) ->
+    case erlang:get(io_priority) of
+        undefined ->
+            erlang:put(io_priority, {interactive, DbName});
+        _ ->
+            ok
+    end,
     couch_util:with_db(DbName, fun(Db) ->
         couch_db:open_doc(Db, DocId, [])
     end).

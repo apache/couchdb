@@ -19,7 +19,9 @@
 
 
 setup() ->
-    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map, 1000),
+    DbName = ?tempdb(),
+    erlang:put(io_priority, {view_compact, DbName}),
+    {ok, Db} = couch_mrview_test_util:init_db(DbName, map, 1000),
     ok = meck:new(couch_mrview_compactor, [passthrough]),
     Db.
 
@@ -50,6 +52,7 @@ compaction_test_() ->
 
 should_swap(Db) ->
     ?_test(begin
+        erlang:put(io_priority, {view_compact, couch_db:name(Db)}),
         couch_mrview:query_view(Db, <<"_design/bar">>, <<"baz">>),
         {ok, QPid} = start_query(Db),
         {ok, MonRef} = couch_mrview:compact(Db, <<"_design/bar">>, [monitor]),
@@ -76,6 +79,7 @@ should_swap(Db) ->
 
 should_remove(Db) ->
     ?_test(begin
+        erlang:put(io_priority, {view_compact, couch_db:name(Db)}),
         DDoc = <<"_design/bar">>,
         {ok, _Results} = couch_mrview:query_view(Db, DDoc, <<"baz">>),
         {ok, IndexPid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
@@ -103,6 +107,7 @@ should_remove(Db) ->
 start_query(Db) ->
     Self = self(),
     Pid = spawn(fun() ->
+        erlang:put(io_priority, {view_compact, couch_db:name(Db)}),
         CB = fun
             (_, wait) -> receive {Self, continue} -> {ok, 0} end;
             ({row, _}, Count) -> {ok, Count+1};

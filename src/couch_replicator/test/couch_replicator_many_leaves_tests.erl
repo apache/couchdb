@@ -33,6 +33,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
@@ -87,21 +88,25 @@ should_populate_replicate_compact({From, To}, {_Ctx, {Source, Target}}) ->
 should_populate_source({remote, Source}) ->
     should_populate_source(Source);
 should_populate_source(Source) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(populate_db(Source))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), populate_db(Source) end)}.
 
 should_replicate({remote, Source}, Target) ->
     should_replicate(db_url(Source), Target);
 should_replicate(Source, {remote, Target}) ->
     should_replicate(Source, db_url(Target));
 should_replicate(Source, Target) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(replicate(Source, Target))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), replicate(Source, Target) end)}.
 
 should_verify_target({remote, Source}, Target) ->
     should_verify_target(Source, Target);
 should_verify_target(Source, {remote, Target}) ->
     should_verify_target(Source, Target);
 should_verify_target(Source, Target) ->
+    Priority = erlang:get(io_priority),
     {timeout, ?TIMEOUT_EUNIT, ?_test(begin
+        erlang:put(io_priority, Priority),
         {ok, SourceDb} = couch_db:open_int(Source, []),
         {ok, TargetDb} = couch_db:open_int(Target, []),
         verify_target(SourceDb, TargetDb, ?DOCS_CONFLICTS),
@@ -112,7 +117,9 @@ should_verify_target(Source, Target) ->
 should_add_attachments_to_source({remote, Source}) ->
     should_add_attachments_to_source(Source);
 should_add_attachments_to_source(Source) ->
+    Priority = erlang:get(io_priority),
     {timeout, ?TIMEOUT_EUNIT, ?_test(begin
+        erlang:put(io_priority, Priority),
         {ok, SourceDb} = couch_db:open_int(Source, []),
         add_attachments(SourceDb, ?NUM_ATTS, ?DOCS_CONFLICTS),
         ok = couch_db:close(SourceDb)

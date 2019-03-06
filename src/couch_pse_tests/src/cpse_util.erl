@@ -95,11 +95,13 @@ create_db() ->
 
 
 create_db(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     Engine = get_engine(),
     couch_db:create(DbName, [{engine, Engine}, ?ADMIN_CTX]).
 
 
 open_db(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     Engine = get_engine(),
     couch_db:open_int(DbName, [{engine, Engine}, ?ADMIN_CTX]).
 
@@ -383,6 +385,7 @@ prep_atts(_Db, []) ->
 
 prep_atts(Db, [{FileName, Data} | Rest]) ->
     {_, Ref} = spawn_monitor(fun() ->
+        erlang:put(io_priority, {db_update, couch_db:name(Db)}),
         {ok, Stream} = couch_db:open_write_stream(Db, []),
         exit(write_att(Stream, FileName, Data, Data))
     end),

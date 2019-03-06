@@ -21,6 +21,7 @@ start() ->
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {db_update, DbName}),
     config:set("couchdb", "stem_interactive_updates", "false", false),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     couch_db:close(Db),
@@ -108,6 +109,11 @@ add_revision(Db0, DocId, Rev) ->
 
 
 add_revisions(Db, DocId, Rev, N) ->
+    DbName = couch_db:name(Db),
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {db_update, DbName});
+        _ -> ok
+    end,
     lists:foldl(fun(_, OldRev) ->
         add_revision(Db, DocId, OldRev)
     end, Rev, lists:seq(1, N)).

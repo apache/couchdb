@@ -40,14 +40,16 @@ setup_each() ->
     end, lists:seq(0, 9)),
     {ok, _} = cpse_util:purge(couch_db:name(Db1), PInfos),
     {ok, Db2} = couch_db:reopen(Db1),
-    Db2.
+    {Db2, erlang:get(io_priority)}.
 
 
-teardown_each(Db) ->
+teardown_each({Db, Priority}) ->
+    erlang:put(io_priority, Priority),
     ok = couch_server:delete(couch_db:name(Db), []).
 
 
-cpse_bad_purge_seq(Db1) ->
+cpse_bad_purge_seq({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Db2 = save_local_doc(Db1, <<"foo">>),
     ?assertEqual(0, couch_db:get_minimum_purge_seq(Db2)),
 
@@ -56,7 +58,8 @@ cpse_bad_purge_seq(Db1) ->
     ?assertEqual(1, couch_db:get_minimum_purge_seq(Db3)).
 
 
-cpse_verify_non_boolean(Db1) ->
+cpse_verify_non_boolean({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Db2 = save_local_doc(Db1, 2),
     ?assertEqual(0, couch_db:get_minimum_purge_seq(Db2)),
 

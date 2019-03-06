@@ -28,6 +28,7 @@ teardown_each(DbName) ->
 
 
 cpse_increment_purge_seq_on_complete_purge(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
     {ok, Rev2} = cpse_util:save_doc(DbName, {[{'_id', foo2}, {vsn, 1.2}]}),
 
@@ -69,6 +70,7 @@ cpse_increment_purge_seq_on_complete_purge(DbName) ->
 
 
 cpse_increment_purge_multiple_times(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
     {ok, Rev2} = cpse_util:save_doc(DbName, {[{'_id', foo2}, {vsn, 1.2}]}),
 
@@ -98,6 +100,7 @@ cpse_increment_purge_multiple_times(DbName) ->
 
 
 cpse_increment_purge_seq_on_partial_purge(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, <<"1.1">>}]}),
     Update = {[
         {'_id', foo1},

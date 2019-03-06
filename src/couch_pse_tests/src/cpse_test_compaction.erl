@@ -21,14 +21,16 @@
 
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
-    Db.
+    {Db, erlang:get(io_priority)}.
 
 
-teardown_each(Db) ->
+teardown_each({Db, Priority}) ->
+    erlang:put(io_priority, Priority),
     ok = couch_server:delete(couch_db:name(Db), []).
 
 
-cpse_compact_empty(Db1) ->
+cpse_compact_empty({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Term1 = cpse_util:db_as_term(Db1),
 
     cpse_util:compact(Db1),
@@ -40,7 +42,8 @@ cpse_compact_empty(Db1) ->
     ?assertEqual(nodiff, Diff).
 
 
-cpse_compact_doc(Db1) ->
+cpse_compact_doc({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions = [{create, {<<"foo">>, {[]}}}],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     Term1 = cpse_util:db_as_term(Db2),
@@ -54,7 +57,8 @@ cpse_compact_doc(Db1) ->
     ?assertEqual(nodiff, Diff).
 
 
-cpse_compact_local_doc(Db1) ->
+cpse_compact_local_doc({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions = [{create, {<<"_local/foo">>, {[]}}}],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     Term1 = cpse_util:db_as_term(Db2),
@@ -68,7 +72,8 @@ cpse_compact_local_doc(Db1) ->
     ?assertEqual(nodiff, Diff).
 
 
-cpse_compact_with_everything(Db1) ->
+cpse_compact_with_everything({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     % Add a whole bunch of docs
     DocActions = lists:map(fun(Seq) ->
         {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
@@ -152,7 +157,8 @@ cpse_compact_with_everything(Db1) ->
     ?assertEqual(nodiff, Diff).
 
 
-cpse_recompact_updates(Db1) ->
+cpse_recompact_updates({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions1 = lists:map(fun(Seq) ->
         {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
     end, lists:seq(1, 1000)),
@@ -179,7 +185,8 @@ cpse_recompact_updates(Db1) ->
     ?assertEqual(nodiff, Diff).
 
 
-cpse_purge_during_compact(Db1) ->
+cpse_purge_during_compact({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions1 = lists:map(fun(Seq) ->
         {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
     end, lists:seq(1, 1000)),
@@ -218,7 +225,8 @@ cpse_purge_during_compact(Db1) ->
     ?assertEqual(nodiff, Diff).
 
 
-cpse_multiple_purge_during_compact(Db1) ->
+cpse_multiple_purge_during_compact({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions1 = lists:map(fun(Seq) ->
         {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
     end, lists:seq(1, 1000)),
@@ -263,7 +271,8 @@ cpse_multiple_purge_during_compact(Db1) ->
     ?assertEqual(nodiff, Diff).
 
 
-cpse_compact_purged_docs_limit(Db1) ->
+cpse_compact_purged_docs_limit({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     NumDocs = 1200,
     {RActions, RIds} = lists:foldl(fun(Id, {CActions, CIds}) ->
         Id1 = docid(Id),

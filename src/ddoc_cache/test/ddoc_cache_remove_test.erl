@@ -196,6 +196,7 @@ init_custom_ddoc(DbName) ->
 
 
 do_compact(ShardName) ->
+    erlang:put(io_priority, {db_compact, ShardName}),
     {ok, Db} = couch_db:open_int(ShardName, []),
     try
         {ok, Pid} = couch_db:start_compact(Db),

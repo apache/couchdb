@@ -26,6 +26,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
@@ -81,19 +82,23 @@ should_replicate_docs_with_missed_att_stubs({From, To}, {_Ctx, {Source, Target}}
 should_populate_source({remote, Source}) ->
     should_populate_source(Source);
 should_populate_source(Source) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(populate_db(Source))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), populate_db(Source) end)}.
 
 should_replicate({remote, Source}, Target) ->
     should_replicate(db_url(Source), Target);
 should_replicate(Source, {remote, Target}) ->
     should_replicate(Source, db_url(Target));
 should_replicate(Source, Target) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(replicate(Source, Target))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), replicate(Source, Target) end)}.
 
 should_set_target_revs_limit({remote, Target}, RevsLimit) ->
     should_set_target_revs_limit(Target, RevsLimit);
 should_set_target_revs_limit(Target, RevsLimit) ->
+    Priority = erlang:get(io_priority),
     ?_test(begin
+        erlang:put(io_priority, Priority),
         {ok, Db} = couch_db:open_int(Target, [?ADMIN_CTX]),
         ?assertEqual(ok, couch_db:set_revs_limit(Db, RevsLimit)),
         ok = couch_db:close(Db)
@@ -104,12 +109,14 @@ should_compare_databases({remote, Source}, Target) ->
 should_compare_databases(Source, {remote, Target}) ->
     should_compare_databases(Source, Target);
 should_compare_databases(Source, Target) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(compare_dbs(Source, Target))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), compare_dbs(Source, Target) end)}.
 
 should_update_source_docs({remote, Source}, Times) ->
     should_update_source_docs(Source, Times);
 should_update_source_docs(Source, Times) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(update_db_docs(Source, Times))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), update_db_docs(Source, Times) end)}.
 
 
 populate_db(DbName) ->

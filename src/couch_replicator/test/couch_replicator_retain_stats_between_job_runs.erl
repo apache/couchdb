@@ -46,7 +46,9 @@ stats_retained_test_() ->
 
 
 t_stats_retained({_Ctx, {Source, Target}}) ->
+    Priority = erlang:get(io_priority),
     ?_test(begin
+        erlang:put(io_priority, Priority),
         populate_db(Source, 42),
         {ok, RepPid, RepId} = replicate(Source, Target),
         wait_target_in_sync(Source, Target),
@@ -59,6 +61,7 @@ t_stats_retained({_Ctx, {Source, Target}}) ->
 
 setup_db() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.

@@ -24,20 +24,23 @@
 
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
-    Db.
+    {Db, erlang:get(io_priority)}.
 
 
-teardown_each(Db) ->
+teardown_each({Db, Priority}) ->
+    erlang:put(io_priority, Priority),
     ok = couch_server:delete(couch_db:name(Db), []).
 
 
-cpse_empty_changes(Db) ->
+cpse_empty_changes({Db, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual(0, couch_db_engine:count_changes_since(Db, 0)),
     ?assertEqual({ok, []},
             couch_db_engine:fold_changes(Db, 0, fun fold_fun/2, [], [])).
 
 
-cpse_single_change(Db1) ->
+cpse_single_change({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions = [{create, {<<"a">>, {[]}}}],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
 
@@ -46,7 +49,8 @@ cpse_single_change(Db1) ->
             couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], [])).
 
 
-cpse_two_changes(Db1) ->
+cpse_two_changes({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions = [
         {create, {<<"a">>, {[]}}},
         {create, {<<"b">>, {[]}}}
@@ -59,7 +63,8 @@ cpse_two_changes(Db1) ->
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes)).
 
 
-cpse_two_changes_batch(Db1) ->
+cpse_two_changes_batch({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions = [
         {batch, [
             {create, {<<"a">>, {[]}}},
@@ -74,7 +79,8 @@ cpse_two_changes_batch(Db1) ->
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes)).
 
 
-cpse_two_changes_batch_sorted(Db1) ->
+cpse_two_changes_batch_sorted({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions = [
         {batch, [
             {create, {<<"b">>, {[]}}},
@@ -89,7 +95,8 @@ cpse_two_changes_batch_sorted(Db1) ->
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 2}], lists:reverse(Changes)).
 
 
-cpse_update_one(Db1) ->
+cpse_update_one({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions = [
         {create, {<<"a">>, {[]}}},
         {update, {<<"a">>, {[]}}}
@@ -101,7 +108,8 @@ cpse_update_one(Db1) ->
             couch_db_engine:fold_changes(Db2, 0, fun fold_fun/2, [], [])).
 
 
-cpse_update_first_of_two(Db1) ->
+cpse_update_first_of_two({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions = [
         {create, {<<"a">>, {[]}}},
         {create, {<<"b">>, {[]}}},
@@ -115,7 +123,8 @@ cpse_update_first_of_two(Db1) ->
     ?assertEqual([{<<"b">>, 2}, {<<"a">>, 3}], lists:reverse(Changes)).
 
 
-cpse_update_second_of_two(Db1) ->
+cpse_update_second_of_two({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions = [
         {create, {<<"a">>, {[]}}},
         {create, {<<"b">>, {[]}}},
@@ -129,7 +138,8 @@ cpse_update_second_of_two(Db1) ->
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 3}], lists:reverse(Changes)).
 
 
-cpse_check_mutation_ordering(Db1) ->
+cpse_check_mutation_ordering({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions = shuffle(lists:map(fun(Seq) ->
         {create, {docid(Seq), {[]}}}
     end, lists:seq(1, ?NUM_DOCS))),

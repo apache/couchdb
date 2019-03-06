@@ -17,6 +17,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {view_update, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     create_design_doc(DbName, <<"_design/foo">>),

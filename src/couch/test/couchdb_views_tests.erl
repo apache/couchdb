@@ -22,6 +22,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {view_update, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     FooRev = create_design_doc(DbName, <<"_design/foo">>, <<"bar">>),
@@ -32,6 +33,7 @@ setup() ->
 
 setup_with_docs() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {view_update, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     create_docs(DbName),
@@ -165,6 +167,7 @@ upgrade_test_() ->
 
 should_not_remember_docs_in_index_after_backup_restore(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, DbName}),
         %% COUCHDB-640
 
         ok = backup_db_file(DbName),
@@ -187,6 +190,7 @@ should_not_remember_docs_in_index_after_backup_restore(DbName) ->
 
 should_upgrade_legacy_view_files({DbName, Files}) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, DbName}),
         [_NewDbFilePath, OldViewFilePath, NewViewFilePath] = Files,
         ok = config:set("query_server_config", "commit_freq", "0", false),
 
@@ -234,6 +238,7 @@ should_cleanup_all_index_files({DbName, {FooRev, BooRev}})->
 
 couchdb_1138(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, DbName}),
         {ok, IndexerPid} = couch_index_server:get_index(
             couch_mrview_index, DbName, <<"_design/foo">>),
         ?assert(is_pid(IndexerPid)),
@@ -272,6 +277,7 @@ couchdb_1138(DbName) ->
 
 couchdb_1309(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, DbName}),
         {ok, IndexerPid} = couch_index_server:get_index(
             couch_mrview_index, DbName, <<"_design/foo">>),
         ?assert(is_pid(IndexerPid)),
@@ -324,7 +330,9 @@ couchdb_1283() ->
         ok = config:set("couchdb", "max_dbs_open", "3", false),
         ok = config:set("couchdb", "delayed_commits", "false", false),
 
-        {ok, MDb1} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
+        DbName = ?tempdb(),
+        erlang:put(io_priority, {view_update, DbName}),
+        {ok, MDb1} = couch_db:create(DbName, [?ADMIN_CTX]),
         DDoc = couch_doc:from_json_obj({[
             {<<"_id">>, <<"_design/foo">>},
             {<<"language">>, <<"javascript">>},

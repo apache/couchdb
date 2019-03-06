@@ -20,6 +20,7 @@
 
 setup() ->
     Name = ?tempdb(),
+    erlang:put(io_priority, {view_update, Name}),
     couch_server:delete(Name, [?ADMIN_CTX]),
     {ok, Db} = couch_db:create(Name, [?ADMIN_CTX]),
     DDoc = couch_doc:from_json_obj({[
@@ -83,6 +84,7 @@ ddoc_update_test_() ->
 
 check_indexing_stops_on_ddoc_change(Db) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, couch_db:name(Db)}),
         DDocID = <<"_design/bar">>,
 
         IndexesBefore = get_indexes_by_ddoc(DDocID, 1),
@@ -100,6 +102,7 @@ check_indexing_stops_on_ddoc_change(Db) ->
         % spawn a process for query
         Self = self(),
         QPid = spawn(fun() ->
+            erlang:put(io_priority, {view_update, couch_db:name(Db)}),
             {ok, Result} = couch_mrview:query_view(
                 Db, <<"_design/bar">>, <<"baz">>, []),
             Self ! {self(), Result}

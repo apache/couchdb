@@ -29,6 +29,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
@@ -80,21 +81,24 @@ should_populate_replicate_compact({From, To}, {_Ctx, {Source, Target}}) ->
 should_populate_source({remote, Source}) ->
     should_populate_source(Source);
 should_populate_source(Source) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(populate_db(Source, ?DOCS_COUNT))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), populate_db(Source, ?DOCS_COUNT) end)}.
 
 should_replicate({remote, Source}, Target) ->
     should_replicate(db_url(Source), Target);
 should_replicate(Source, {remote, Target}) ->
     should_replicate(Source, db_url(Target));
 should_replicate(Source, Target) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(replicate(Source, Target))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), replicate(Source, Target) end)}.
 
 should_compare_databases({remote, Source}, Target) ->
     should_compare_databases(Source, Target);
 should_compare_databases(Source, {remote, Target}) ->
     should_compare_databases(Source, Target);
 should_compare_databases(Source, Target) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(compare_dbs(Source, Target))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), compare_dbs(Source, Target) end)}.
 
 
 populate_db(DbName, DocCount) ->

@@ -17,7 +17,9 @@
 -define(ENGINE(FdVar), {couch_bt_engine_stream, {FdVar, []}}).
 
 setup() ->
-    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
+    DbName = ?tempfile(),
+    erlang:put(io_priority, {interactive, DbName}),
+    {ok, Fd} = couch_file:open(DbName, [create, overwrite]),
     {ok, Stream} = couch_stream:open(?ENGINE(Fd), []),
     {Fd, Stream}.
 
@@ -51,14 +53,17 @@ stream_test_() ->
 
 
 should_write({_, Stream}) ->
-    ?_assertEqual(ok, couch_stream:write(Stream, <<"food">>)).
+    Res = couch_stream:write(Stream, <<"food">>),
+    ?_assertEqual(ok, Res).
 
 should_write_consecutive({_, Stream}) ->
     couch_stream:write(Stream, <<"food">>),
-    ?_assertEqual(ok, couch_stream:write(Stream, <<"foob">>)).
+    Res = couch_stream:write(Stream, <<"foob">>),
+    ?_assertEqual(ok, Res).
 
 should_write_empty_binary({_, Stream}) ->
-    ?_assertEqual(ok, couch_stream:write(Stream, <<>>)).
+    Res = couch_stream:write(Stream, <<>>),
+    ?_assertEqual(ok, Res).
 
 should_return_file_pointers_on_close({_, Stream}) ->
     couch_stream:write(Stream, <<"foodfoob">>),
@@ -74,7 +79,8 @@ should_return_stream_size_on_close({_, Stream}) ->
 should_return_valid_pointers({_Fd, Stream}) ->
     couch_stream:write(Stream, <<"foodfoob">>),
     {NewEngine, _, _, _, _} = couch_stream:close(Stream),
-    ?_assertEqual(<<"foodfoob">>, read_all(NewEngine)).
+    Res = read_all(NewEngine),
+    ?_assertEqual(<<"foodfoob">>, Res).
 
 should_recall_last_pointer_position({Fd, Stream}) ->
     couch_stream:write(Stream, <<"foodfoob">>),
@@ -89,7 +95,8 @@ should_recall_last_pointer_position({Fd, Stream}) ->
     {ok, Ptrs} = couch_stream:to_disk_term(NewEngine),
     [{ExpPtr, 20}] = Ptrs,
     AllBits = iolist_to_binary([OneBits, ZeroBits]),
-    ?_assertEqual(AllBits, read_all(NewEngine)).
+    Res = read_all(NewEngine),
+    ?_assertEqual(AllBits, Res).
 
 should_stream_more_with_4K_chunk_size({Fd, _}) ->
     {ok, Stream} = couch_stream:open(?ENGINE(Fd), [{buffer_size, 4096}]),
@@ -107,6 +114,8 @@ should_stop_on_normal_exit_of_stream_opener({Fd, _}) ->
     RunnerPid = self(),
     OpenerPid = spawn(
         fun() ->
+            %% TODO: bubble real dbname down through setup?
+            erlang:put(io_priority, {interactive, <<"test_db">>}),
             {ok, StreamPid} = couch_stream:open(?ENGINE(Fd)),
             RunnerPid ! {pid, StreamPid}
         end),

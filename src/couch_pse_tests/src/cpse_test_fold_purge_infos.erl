@@ -24,19 +24,22 @@
 
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
-    Db.
+    {Db, erlang:get(io_priority)}.
 
 
-teardown_each(Db) ->
+teardown_each({Db, Priority}) ->
+    erlang:put(io_priority, Priority),
     ok = couch_server:delete(couch_db:name(Db), []).
 
 
-cpse_empty_purged_docs(Db) ->
+cpse_empty_purged_docs({Db, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual({ok, []}, couch_db_engine:fold_purge_infos(
             Db, 0, fun fold_fun/2, [], [])).
 
 
-cpse_all_purged_docs(Db1) ->
+cpse_all_purged_docs({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     {RActions, RIds} = lists:foldl(fun(Id, {CActions, CIds}) ->
         Id1 = docid(Id),
         Action = {create, {Id1, {[{<<"int">>, Id}]}}},
@@ -62,7 +65,8 @@ cpse_all_purged_docs(Db1) ->
     ?assertEqual(IdsRevs, lists:reverse(PurgedIdRevs)).
 
 
-cpse_start_seq(Db1) ->
+cpse_start_seq({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions1 = [
         {create, {docid(1), {[{<<"int">>, 1}]}}},
         {create, {docid(2), {[{<<"int">>, 2}]}}},
@@ -90,7 +94,8 @@ cpse_start_seq(Db1) ->
     ?assertEqual(StartSeqIdRevs, lists:reverse(PurgedIdRevs)).
 
 
-cpse_id_rev_repeated(Db1) ->
+cpse_id_rev_repeated({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     Actions1 = [
         {create, {<<"foo">>, {[{<<"vsn">>, 1}]}}},
         {conflict, {<<"foo">>, {[{<<"vsn">>, 2}]}}}

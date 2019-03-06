@@ -20,6 +20,7 @@
 
 
 setup() ->
+    erlang:put(io_priority, {db_update, ?tempdb()}),
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
     Fd.
 
@@ -46,11 +47,12 @@ open_close_test_() ->
     }.
 
 should_return_enoent_if_missed() ->
-    ?_assertEqual({error, enoent}, couch_file:open("not a real file")).
+    Res = couch_file:open("not a real file"),
+    ?_assertEqual({error, enoent}, Res).
 
 should_ignore_invalid_flags_with_open() ->
-    ?_assertMatch({ok, _},
-                  couch_file:open(?tempfile(), [create, invalid_option])).
+    Res = couch_file:open(?tempfile(), [create, invalid_option]),
+    ?_assertMatch({ok, _}, Res).
 
 should_return_pid_on_file_open(Fd) ->
     ?_assert(is_pid(Fd)).
@@ -61,7 +63,8 @@ should_close_file_properly() ->
     ?_assert(true).
 
 should_create_empty_new_files(Fd) ->
-    ?_assertMatch({ok, 0}, couch_file:bytes(Fd)).
+    Res = couch_file:bytes(Fd),
+    ?_assertMatch({ok, 0}, Res).
 
 
 read_write_test_() ->
@@ -95,29 +98,35 @@ should_increase_file_size_on_write(Fd) ->
 should_return_current_file_size_on_write(Fd) ->
     {ok, 0, _} = couch_file:append_term(Fd, foo),
     {ok, Size} = couch_file:bytes(Fd),
-    ?_assertMatch({ok, Size, _}, couch_file:append_term(Fd, bar)).
+    Res = couch_file:append_term(Fd, bar),
+    ?_assertMatch({ok, Size, _}, Res).
 
 should_write_and_read_term(Fd) ->
     {ok, Pos, _} = couch_file:append_term(Fd, foo),
-    ?_assertMatch({ok, foo}, couch_file:pread_term(Fd, Pos)).
+    Res = couch_file:pread_term(Fd, Pos),
+    ?_assertMatch({ok, foo}, Res).
 
 should_write_and_read_binary(Fd) ->
     {ok, Pos, _} = couch_file:append_binary(Fd, <<"fancy!">>),
-    ?_assertMatch({ok, <<"fancy!">>}, couch_file:pread_binary(Fd, Pos)).
+    Res = couch_file:pread_binary(Fd, Pos),
+    ?_assertMatch({ok, <<"fancy!">>}, Res).
 
 should_return_term_as_binary_for_reading_binary(Fd) ->
     {ok, Pos, _} = couch_file:append_term(Fd, foo),
     Foo = couch_compress:compress(foo, snappy),
-    ?_assertMatch({ok, Foo}, couch_file:pread_binary(Fd, Pos)).
+    Res = couch_file:pread_binary(Fd, Pos),
+    ?_assertMatch({ok, Foo}, Res).
 
 should_read_term_written_as_binary(Fd) ->
     {ok, Pos, _} = couch_file:append_binary(Fd, <<131,100,0,3,102,111,111>>),
-    ?_assertMatch({ok, foo}, couch_file:pread_term(Fd, Pos)).
+    Res = couch_file:pread_term(Fd, Pos),
+    ?_assertMatch({ok, foo}, Res).
 
 should_write_and_read_large_binary(Fd) ->
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
     {ok, Pos, _} = couch_file:append_binary(Fd, BigBin),
-    ?_assertMatch({ok, BigBin}, couch_file:pread_binary(Fd, Pos)).
+    Res = couch_file:pread_binary(Fd, Pos),
+    ?_assertMatch({ok, BigBin}, Res).
 
 should_read_iolist(Fd) ->
     %% append_binary == append_iolist?
@@ -141,7 +150,14 @@ should_not_read_beyond_eof(Fd) ->
     unlink(Fd),
     ExpectedError = {badmatch, {'EXIT', {bad_return_value,
         {read_beyond_eof, Filepath}}}},
-    ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
+    Res =
+        try
+            couch_file:pread_binary(Fd, Pos),
+            ok
+        catch _Error:Reason ->
+            Reason
+    end,
+    ?_assertMatch(ExpectedError, Res).
 
 should_truncate(Fd) ->
     {ok, 0, _} = couch_file:append_term(Fd, foo),
@@ -149,7 +165,8 @@ should_truncate(Fd) ->
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
     {ok, _, _} = couch_file:append_binary(Fd, BigBin),
     ok = couch_file:truncate(Fd, Size),
-    ?_assertMatch({ok, foo}, couch_file:pread_term(Fd, 0)).
+    Res = couch_file:pread_term(Fd, 0),
+    ?_assertMatch({ok, foo}, Res).
 
 pread_limit_test_() ->
     {
@@ -182,7 +199,14 @@ should_not_read_more_than_pread_limit(Fd) ->
     unlink(Fd),
     ExpectedError = {badmatch, {'EXIT', {bad_return_value,
         {exceed_pread_limit, Filepath, 50000}}}},
-    ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
+    Res =
+        try
+            couch_file:pread_binary(Fd, Pos),
+            ok
+        catch _Error:Reason ->
+            Reason
+    end,
+    ?_assertMatch(ExpectedError, Res).
 
 
 header_test_() ->
@@ -211,23 +235,27 @@ header_test_() ->
 
 should_write_and_read_atom_header(Fd) ->
     ok = couch_file:write_header(Fd, hello),
-    ?_assertMatch({ok, hello}, couch_file:read_header(Fd)).
+    Res = couch_file:read_header(Fd),
+    ?_assertMatch({ok, hello}, Res).
 
 should_write_and_read_tuple_header(Fd) ->
     ok = couch_file:write_header(Fd, {<<"some_data">>, 32}),
-    ?_assertMatch({ok, {<<"some_data">>, 32}}, couch_file:read_header(Fd)).
+    Res = couch_file:read_header(Fd),
+    ?_assertMatch({ok, {<<"some_data">>, 32}}, Res).
 
 should_write_and_read_second_header(Fd) ->
     ok = couch_file:write_header(Fd, {<<"some_data">>, 32}),
     ok = couch_file:write_header(Fd, [foo, <<"more">>]),
-    ?_assertMatch({ok, [foo, <<"more">>]}, couch_file:read_header(Fd)).
+    Res = couch_file:read_header(Fd),
+    ?_assertMatch({ok, [foo, <<"more">>]}, Res).
 
 should_truncate_second_header(Fd) ->
     ok = couch_file:write_header(Fd, {<<"some_data">>, 32}),
     {ok, Size} = couch_file:bytes(Fd),
     ok = couch_file:write_header(Fd, [foo, <<"more">>]),
     ok = couch_file:truncate(Fd, Size),
-    ?_assertMatch({ok, {<<"some_data">>, 32}}, couch_file:read_header(Fd)).
+    Res = couch_file:read_header(Fd),
+    ?_assertMatch({ok, {<<"some_data">>, 32}}, Res).
 
 should_produce_same_file_size_on_rewrite(Fd) ->
     ok = couch_file:write_header(Fd, {<<"some_data">>, 32}),
@@ -236,12 +264,14 @@ should_produce_same_file_size_on_rewrite(Fd) ->
     {ok, Size2} = couch_file:bytes(Fd),
     ok = couch_file:truncate(Fd, Size1),
     ok = couch_file:write_header(Fd, [foo, <<"more">>]),
-    ?_assertMatch({ok, Size2}, couch_file:bytes(Fd)).
+    Res = couch_file:bytes(Fd),
+    ?_assertMatch({ok, Size2}, Res).
 
 should_save_headers_larger_than_block_size(Fd) ->
     Header = erlang:make_tuple(5000, <<"CouchDB">>),
     couch_file:write_header(Fd, Header),
-    {"COUCHDB-1319", ?_assertMatch({ok, Header}, couch_file:read_header(Fd))}.
+    Res = couch_file:read_header(Fd),
+    {"COUCHDB-1319", ?_assertMatch({ok, Header}, Res)}.
 
 
 should_recover_header_marker_corruption() ->

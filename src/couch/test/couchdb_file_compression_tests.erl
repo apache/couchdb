@@ -22,6 +22,7 @@
 setup() ->
     config:set("couchdb", "file_compression", "none", false),
     DbName = ?tempdb(),
+    erlang:put(io_priority, {db_update, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = populate_db(Db, ?DOCS_COUNT),
     DDoc = couch_doc:from_json_obj({[
@@ -185,6 +186,10 @@ refresh_index(DbName) ->
     ok = couch_db:close(Db).
 
 compact_db(DbName) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {db_compact, DbName});
+        _ -> ok
+    end,
     DiskSizeBefore = db_disk_size(DbName),
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, _CompactPid} = couch_db:start_compact(Db),
@@ -194,6 +199,10 @@ compact_db(DbName) ->
     ?assert(DiskSizeBefore > DiskSizeAfter).
 
 compact_view(DbName) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {view_compact, DbName});
+        _ -> ok
+    end,
     DiskSizeBefore = view_disk_size(DbName),
     {ok, _MonRef} = couch_mrview:compact(DbName, ?DDOC_ID, [monitor]),
     wait_compaction(DbName, "view group", ?LINE),
@@ -201,18 +210,30 @@ compact_view(DbName) ->
     ?assert(DiskSizeBefore > DiskSizeAfter).
 
 db_disk_size(DbName) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {interactive, DbName});
+        _ -> ok
+    end,
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, Info} = couch_db:get_db_info(Db),
     ok = couch_db:close(Db),
     active_size(Info).
 
 db_external_size(DbName) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {interactive, DbName});
+        _ -> ok
+    end,
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, Info} = couch_db:get_db_info(Db),
     ok = couch_db:close(Db),
     external_size(Info).
 
 view_disk_size(DbName) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {interactive, DbName});
+        _ -> ok
+    end,
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, DDoc} = couch_db:open_doc(Db, ?DDOC_ID, [ejson_body]),
     {ok, Info} = couch_mrview:get_info(Db, DDoc),
@@ -220,6 +241,10 @@ view_disk_size(DbName) ->
     active_size(Info).
 
 view_external_size(DbName) ->
+    case erlang:get(io_priority) of
+        undefined -> erlang:put(io_priority, {interactive, DbName});
+        _ -> ok
+    end,
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, DDoc} = couch_db:open_doc(Db, ?DDOC_ID, [ejson_body]),
     {ok, Info} = couch_mrview:get_info(Db, DDoc),

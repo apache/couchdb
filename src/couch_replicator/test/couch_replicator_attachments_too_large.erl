@@ -20,6 +20,7 @@
 setup(_) ->
     Ctx = test_util:start_couch([couch_replicator]),
     Source = create_db(),
+    erlang:put(io_priority, {system, Source}),
     create_doc_with_attachment(Source, <<"doc">>, 1000),
     Target = create_db(),
     {Ctx, {Source, Target}}.
@@ -52,7 +53,8 @@ should_succeed({From, To}, {_Ctx, {Source, Target}}) ->
     ]},
     config:set("couchdb", "max_attachment_size", "1000", _Persist = false),
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
-    ?_assertEqual(ok, couch_replicator_test_helper:compare_dbs(Source, Target)).
+    Res = couch_replicator_test_helper:compare_dbs(Source, Target),
+    ?_assertEqual(ok, Res).
 
 
 should_fail({From, To}, {_Ctx, {Source, Target}}) ->
@@ -62,8 +64,13 @@ should_fail({From, To}, {_Ctx, {Source, Target}}) ->
     ]},
     config:set("couchdb", "max_attachment_size", "999", _Persist = false),
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
-    ?_assertError({badmatch, {not_found, missing}},
-        couch_replicator_test_helper:compare_dbs(Source, Target)).
+    Res =
+        try
+            couch_replicator_test_helper:compare_dbs(Source, Target)
+        catch _Error:Reason ->
+            Reason
+    end,
+    ?_assertMatch({badmatch, {not_found, missing}}, Res).
 
 
 create_db() ->

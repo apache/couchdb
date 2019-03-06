@@ -19,7 +19,9 @@
 
 
 setup() ->
-    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map),
+    DbName = ?tempdb(),
+    erlang:put(io_priority, {view_update, DbName}),
+    {ok, Db} = couch_mrview_test_util:init_db(DbName, map),
     couch_mrview:query_view(Db, <<"_design/bar">>, <<"baz">>),
     {ok, Info} = couch_mrview:get_info(Db, <<"_design/bar">>),
     {Db, Info}.

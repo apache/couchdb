@@ -791,6 +791,7 @@ check_strip_credentials_test() ->
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     create_vdu(DbName),
@@ -829,9 +830,8 @@ update_replicator_doc_with_bad_vdu_test_() ->
 
 
 t_vdu_does_not_crash_on_save(DbName) ->
-    ?_test(begin
-        Doc = #doc{id = <<"some_id">>, body = {[{<<"foo">>, 42}]}},
-        ?assertEqual({ok, forbidden}, save_rep_doc(DbName, Doc))
-    end).
+    Doc = #doc{id = <<"some_id">>, body = {[{<<"foo">>, 42}]}},
+    Res = save_rep_doc(DbName, Doc),
+    ?_test(?assertEqual({ok, forbidden}, Res)).
 
 -endif.

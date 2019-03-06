@@ -14,6 +14,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
@@ -102,21 +103,24 @@ should_populate_source({remote, Source}) ->
     should_populate_source(Source);
 
 should_populate_source(Source) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(add_docs(Source, 5, 3000, 0))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), add_docs(Source, 5, 3000, 0) end)}.
 
 
 should_populate_source_one_large_one_small({remote, Source}) ->
     should_populate_source_one_large_one_small(Source);
 
 should_populate_source_one_large_one_small(Source) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(one_large_one_small(Source, 12000, 3000))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), one_large_one_small(Source, 12000, 3000) end)}.
 
 
 should_populate_source_one_large_attachment({remote, Source}) ->
    should_populate_source_one_large_attachment(Source);
 
 should_populate_source_one_large_attachment(Source) ->
-  {timeout, ?TIMEOUT_EUNIT, ?_test(one_large_attachment(Source, 70000, 70000))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), one_large_attachment(Source, 70000, 70000) end)}.
 
 
 should_replicate({remote, Source}, Target) ->
@@ -126,7 +130,8 @@ should_replicate(Source, {remote, Target}) ->
     should_replicate(Source, db_url(Target));
 
 should_replicate(Source, Target) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(replicate(Source, Target))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), replicate(Source, Target) end)}.
 
 
 should_compare_databases({remote, Source}, Target, ExceptIds) ->
@@ -136,7 +141,8 @@ should_compare_databases(Source, {remote, Target}, ExceptIds) ->
     should_compare_databases(Source, Target, ExceptIds);
 
 should_compare_databases(Source, Target, ExceptIds) ->
-    {timeout, ?TIMEOUT_EUNIT, ?_test(compare_dbs(Source, Target, ExceptIds))}.
+    Priority = erlang:get(io_priority),
+    {timeout, ?TIMEOUT_EUNIT, ?_test(begin erlang:put(io_priority, Priority), compare_dbs(Source, Target, ExceptIds) end)}.
 
 
 binary_chunk(Size) when is_integer(Size), Size > 0 ->

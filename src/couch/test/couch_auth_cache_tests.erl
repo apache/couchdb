@@ -140,6 +140,7 @@ should_get_nil_on_missed_cache(_) ->
 
 should_get_right_password_hash(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         PasswordHash = hash_password("pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
@@ -149,6 +150,7 @@ should_get_right_password_hash(DbName) ->
 
 should_ensure_doc_hash_equals_cached_one(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
 
@@ -159,6 +161,7 @@ should_ensure_doc_hash_equals_cached_one(DbName) ->
 
 should_update_password(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         PasswordHash = hash_password("pass2"),
         {ok, Rev} = update_user_doc(DbName, "joe", "pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass2", Rev),
@@ -169,6 +172,7 @@ should_update_password(DbName) ->
 
 should_cleanup_cache_after_userdoc_deletion(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         delete_user_doc(DbName, "joe"),
         ?assertEqual(nil, couch_auth_cache:get_user_creds("joe"))
@@ -176,6 +180,7 @@ should_cleanup_cache_after_userdoc_deletion(DbName) ->
 
 should_restore_cache_after_userdoc_recreation(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         PasswordHash = hash_password("pass5"),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         delete_user_doc(DbName, "joe"),
@@ -190,6 +195,7 @@ should_restore_cache_after_userdoc_recreation(DbName) ->
 
 should_drop_cache_on_auth_db_change(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         full_commit(DbName),
         config:set("couch_httpd_auth", "authentication_db",
@@ -199,6 +205,7 @@ should_drop_cache_on_auth_db_change(DbName) ->
 
 should_restore_cache_on_auth_db_change(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         PasswordHash = hash_password("pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
@@ -221,6 +228,7 @@ should_restore_cache_on_auth_db_change(DbName) ->
 
 should_recover_cache_after_shutdown(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         PasswordHash = hash_password("pass2"),
         {ok, Rev0} = update_user_doc(DbName, "joe", "pass1"),
         {ok, Rev1} = update_user_doc(DbName, "joe", "pass2", Rev0),
@@ -232,6 +240,7 @@ should_recover_cache_after_shutdown(DbName) ->
 
 should_close_old_db_on_auth_db_change(DbName) ->
     {timeout, ?DB_TIMEOUT, ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         ?assertEqual(ok, wait_db(DbName, fun is_opened/1)),
         config:set("couch_httpd_auth", "authentication_db",
                          ?b2l(?tempdb()), false),

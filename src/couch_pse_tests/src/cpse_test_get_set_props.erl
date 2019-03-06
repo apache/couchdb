@@ -28,6 +28,7 @@ teardown_each(DbName) ->
 
 cpse_default_props(DbName) ->
     {ok, {_App, Engine, _Extension}} = application:get_env(couch, test_engine),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = cpse_util:create_db(DbName),
     Node = node(),
 
@@ -59,6 +60,7 @@ cpse_default_props(DbName) ->
 
 cpse_admin_only_security(DbName) ->
     Config = [{"couchdb", "default_security", "admin_only"}],
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db1} = cpse_util:with_config(Config, fun() ->
         cpse_util:create_db(DbName)
     end),
@@ -81,6 +83,7 @@ cpse_set_revs_limit(DbName) ->
 
 
 check_prop_set(DbName, GetFun, SetFun, Default, Value) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db0} = cpse_util:create_db(DbName),
 
     ?assertEqual(Default, couch_db:GetFun(Db0)),

@@ -53,7 +53,8 @@ should_succeed({From, To}, {_Ctx, {Source, Target}}) ->
     ]},
     config:set("replicator", "max_document_id_length", "5"),
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
-    ?_assertEqual(ok, couch_replicator_test_helper:compare_dbs(Source, Target)).
+    Res = couch_replicator_test_helper:compare_dbs(Source, Target),
+    ?_assertEqual(ok, Res).
 
 
 should_fail({From, To}, {_Ctx, {Source, Target}}) ->
@@ -63,12 +64,18 @@ should_fail({From, To}, {_Ctx, {Source, Target}}) ->
     ]},
     config:set("replicator", "max_document_id_length", "4"),
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
-    ?_assertError({badmatch, {not_found, missing}},
-        couch_replicator_test_helper:compare_dbs(Source, Target)).
+    Res =
+        try
+            couch_replicator_test_helper:compare_dbs(Source, Target)
+        catch _Error:Reason ->
+            Reason
+    end,
+    ?_assertMatch({badmatch, {not_found, missing}}, Res).
 
 
 create_db() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.

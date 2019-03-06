@@ -57,7 +57,9 @@
 
 
 setup() ->
-    {ok, Db1} = couch_mrview_test_util:new_db(?tempdb(), map),
+    DbName = ?tempdb(),
+    erlang:put(io_priority, {view_update, DbName}),
+    {ok, Db1} = couch_mrview_test_util:new_db(DbName, map),
     Docs = [couch_mrview_test_util:ddoc(red) | make_docs()],
     {ok, Db2} = couch_mrview_test_util:save_docs(Db1, Docs),
     Db2.
@@ -158,6 +160,7 @@ should_collate_without_inclusive_end_rev(Db) ->
 
 should_collate_with_endkey_docid(Db) ->
     ?_test(begin
+        erlang:put(io_priority, {interactive, couch_db:name(Db)}),
         {ok, Rows0} = run_query(Db, [
             {end_key, <<"b">>}, {end_key_docid, <<"10">>},
             {inclusive_end, false}

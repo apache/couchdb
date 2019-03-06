@@ -23,6 +23,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {db_compact, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     create_docs(DbName),
@@ -52,6 +53,7 @@ compaction_resume_test_() ->
 
 compaction_resume(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {db_update, DbName}),
         check_db_validity(DbName),
         compact_db(DbName),
         check_db_validity(DbName),

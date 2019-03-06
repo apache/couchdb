@@ -20,7 +20,9 @@
 
 
 setup() ->
-    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), design),
+    DbName = ?tempdb(),
+    erlang:put(io_priority, {view_update, DbName}),
+    {ok, Db} = couch_mrview_test_util:init_db(DbName, design),
     Db.
 
 teardown(Db) ->

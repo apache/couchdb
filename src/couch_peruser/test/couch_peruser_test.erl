@@ -34,6 +34,7 @@ teardown_all(TestCtx) ->
 
 setup() ->
     TestAuthDb = ?tempdb(),
+    erlang:put(io_priority, {interactive, TestAuthDb}),
     do_request(put, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     do_request(put, get_cluster_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     set_config("couch_httpd_auth", "authentication_db", ?b2l(TestAuthDb)),

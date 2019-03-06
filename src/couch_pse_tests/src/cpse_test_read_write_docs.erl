@@ -21,14 +21,16 @@
 
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
-    Db.
+    {Db, erlang:get(io_priority)}.
 
 
-teardown_each(Db) ->
+teardown_each({Db, Priority}) ->
+    erlang:put(io_priority, Priority),
     ok = couch_server:delete(couch_db:name(Db), []).
 
 
-cpse_read_docs_from_empty_db(Db) ->
+cpse_read_docs_from_empty_db({Db, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual([not_found], couch_db_engine:open_docs(Db, [<<"foo">>])),
     ?assertEqual(
         [not_found, not_found],
@@ -36,7 +38,8 @@ cpse_read_docs_from_empty_db(Db) ->
     ).
 
 
-cpse_read_empty_local_docs(Db) ->
+cpse_read_empty_local_docs({Db, Priority}) ->
+    erlang:put(io_priority, Priority),
     {LocalA, LocalB} = {<<"_local/a">>, <<"_local/b">>},
     ?assertEqual([not_found], couch_db_engine:open_local_docs(Db, [LocalA])),
     ?assertEqual(
@@ -45,7 +48,8 @@ cpse_read_empty_local_docs(Db) ->
     ).
 
 
-cpse_write_one_doc(Db1) ->
+cpse_write_one_doc({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -86,7 +90,8 @@ cpse_write_one_doc(Db1) ->
     ?assertEqual({[{<<"vsn">>, 1}]}, Body1).
 
 
-cpse_write_two_docs(Db1) ->
+cpse_write_two_docs({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -109,7 +114,8 @@ cpse_write_two_docs(Db1) ->
     ?assertEqual(false, lists:member(not_found, Resps)).
 
 
-cpse_write_three_doc_batch(Db1) ->
+cpse_write_three_doc_batch({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -135,7 +141,8 @@ cpse_write_three_doc_batch(Db1) ->
     ?assertEqual(false, lists:member(not_found, Resps)).
 
 
-cpse_update_doc(Db1) ->
+cpse_update_doc({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -177,7 +184,8 @@ cpse_update_doc(Db1) ->
     ?assertEqual({[{<<"vsn">>, 2}]}, Body1).
 
 
-cpse_delete_doc(Db1) ->
+cpse_delete_doc({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -218,7 +226,8 @@ cpse_delete_doc(Db1) ->
     ?assertEqual({[]}, Body1).
 
 
-cpse_write_local_doc(Db1) ->
+cpse_write_local_doc({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -241,7 +250,8 @@ cpse_write_local_doc(Db1) ->
     ?assertEqual({[{<<"yay">>, false}]}, Doc#doc.body).
 
 
-cpse_write_mixed_batch(Db1) ->
+cpse_write_mixed_batch({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -269,7 +279,8 @@ cpse_write_mixed_batch(Db1) ->
     [#doc{}] = couch_db_engine:open_local_docs(Db3, [<<"_local/foo">>]).
 
 
-cpse_update_local_doc(Db1) ->
+cpse_update_local_doc({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),
@@ -293,7 +304,8 @@ cpse_update_local_doc(Db1) ->
     ?assertEqual({[{<<"stuff">>, null}]}, Doc#doc.body).
 
 
-cpse_delete_local_doc(Db1) ->
+cpse_delete_local_doc({Db1, Priority}) ->
+    erlang:put(io_priority, Priority),
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_update_seq(Db1)),

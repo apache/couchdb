@@ -21,6 +21,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {db_update, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     Doc = couch_doc:from_json_obj({[
         {<<"_id">>, <<"doc1">>},

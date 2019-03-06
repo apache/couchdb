@@ -22,6 +22,7 @@
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {db_update, DbName}),
     ok = fabric:create_db(DbName, [?ADMIN_CTX, {q, 1}]),
     meck:new(couch_mrview_index, [passthrough]),
     meck:expect(couch_mrview_index, ensure_local_purge_docs, fun(A, B) ->
@@ -57,6 +58,7 @@ view_purge_fabric_test_() ->
 
 test_purge_verify_index(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, DbName}),
         Docs1 = couch_mrview_test_util:make_docs(normal, 5),
         {ok, _} = fabric:update_docs(DbName, Docs1, [?ADMIN_CTX]),
         {ok, _} = fabric:update_doc(
@@ -104,6 +106,7 @@ test_purge_verify_index(DbName) ->
 
 test_purge_hook_before_compaction(DbName) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, DbName}),
         Docs1 = couch_mrview_test_util:make_docs(normal, 5),
         {ok, _} = fabric:update_docs(DbName, Docs1, [?ADMIN_CTX]),
         {ok, _} = fabric:update_doc(

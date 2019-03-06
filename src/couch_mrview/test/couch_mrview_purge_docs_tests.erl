@@ -21,7 +21,9 @@
 
 setup() ->
     meck:new(couch_index_updater, [passthrough]),
-    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map, 5),
+    DbName = ?tempdb(),
+    erlang:put(io_priority, {view_update, DbName}),
+    {ok, Db} = couch_mrview_test_util:init_db(DbName, map, 5),
     Db.
 
 teardown(Db) ->
@@ -58,6 +60,7 @@ view_purge_test_() ->
 
 test_purge_single(Db) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, couch_db:name(Db)}),
         Result = run_query(Db, []),
         Expect = {ok, [
             {meta, [{total, 5}, {offset, 0}]},
@@ -91,6 +94,7 @@ test_purge_single(Db) ->
 
 test_purge_partial(Db) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, couch_db:name(Db)}),
         Result = run_query(Db, []),
         Expect = {ok, [
             {meta, [{total, 5}, {offset, 0}]},
@@ -130,6 +134,7 @@ test_purge_partial(Db) ->
 
 test_purge_complete(Db) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, couch_db:name(Db)}),
         Result = run_query(Db, []),
         Expect = {ok, [
             {meta, [{total, 5}, {offset, 0}]},
@@ -165,6 +170,7 @@ test_purge_complete(Db) ->
 
 test_purge_nochange(Db) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, couch_db:name(Db)}),
         Result = run_query(Db, []),
         Expect = {ok, [
             {meta, [{total, 5}, {offset, 0}]},
@@ -200,6 +206,7 @@ test_purge_nochange(Db) ->
 
 test_purge_index_reset(Db) ->
     ?_test(begin
+        erlang:put(io_priority, {view_update, couch_db:name(Db)}),
         ok = couch_db:set_purge_infos_limit(Db, 2),
         {ok, Db1} = couch_db:reopen(Db),
 
@@ -259,6 +266,7 @@ test_purge_index_reset(Db) ->
 test_purge_compact_size_check(Db) ->
     ?_test(begin
         DbName = couch_db:name(Db),
+        erlang:put(io_priority, {view_update, DbName}),
         Docs = couch_mrview_test_util:make_docs(normal, 6, 200),
         {ok, Db1} = couch_mrview_test_util:save_docs(Db, Docs),
         _Result = run_query(Db1, []),
@@ -298,6 +306,7 @@ test_purge_compact_size_check(Db) ->
 test_purge_compact_for_stale_purge_cp_without_client(Db) ->
     ?_test(begin
         DbName = couch_db:name(Db),
+        erlang:put(io_priority, {view_update, DbName}),
         % add more documents to database for purge
         Docs = couch_mrview_test_util:make_docs(normal, 6, 200),
         {ok, Db1} = couch_mrview_test_util:save_docs(Db, Docs),
@@ -351,6 +360,7 @@ test_purge_compact_for_stale_purge_cp_without_client(Db) ->
 test_purge_compact_for_stale_purge_cp_with_client(Db) ->
     ?_test(begin
         DbName = couch_db:name(Db),
+        erlang:put(io_priority, {view_update, DbName}),
         % add more documents to database for purge
         Docs = couch_mrview_test_util:make_docs(normal, 6, 200),
         {ok, Db1} = couch_mrview_test_util:save_docs(Db, Docs),

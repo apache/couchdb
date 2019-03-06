@@ -36,6 +36,7 @@ teardown_each({SrcDb, TgtDb}) ->
 
 
 cpse_purge_http_replication({Source, Target}) ->
+    erlang:put(io_priority, {interactive, Source}),
     {ok, Rev1} = cpse_util:save_doc(Source, {[{'_id', foo}, {vsn, 1}]}),
 
     cpse_util:assert_db_props(?MODULE, ?LINE, Source, [
@@ -120,6 +121,7 @@ cpse_purge_http_replication({Source, Target}) ->
 
 
 cpse_purge_internal_repl_disabled({Source, Target}) ->
+    erlang:put(io_priority, {interactive, Source}),
     cpse_util:with_config([{"mem3", "replicate_purges", "false"}], fun() ->
         repl(Source, Target),
 
@@ -153,6 +155,7 @@ cpse_purge_internal_repl_disabled({Source, Target}) ->
 
 
 cpse_purge_repl_simple_pull({Source, Target}) ->
+    erlang:put(io_priority, {interactive, Source}),
     repl(Source, Target),
 
     {ok, Rev} = cpse_util:save_doc(Source, {[{'_id', foo}, {vsn, 1}]}),
@@ -167,6 +170,7 @@ cpse_purge_repl_simple_pull({Source, Target}) ->
 
 
 cpse_purge_repl_simple_push({Source, Target}) ->
+    erlang:put(io_priority, {interactive, Source}),
     repl(Source, Target),
 
     {ok, Rev} = cpse_util:save_doc(Source, {[{'_id', foo}, {vsn, 1}]}),

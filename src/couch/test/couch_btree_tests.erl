@@ -19,6 +19,7 @@
 
 
 setup() ->
+    erlang:put(io_priority, {db_update, ?tempdb()}),
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
     {ok, Btree} = couch_btree:open(nil, Fd, [{compression, none},
                                              {reduce, fun reduce_fun/2}]),
@@ -448,6 +449,7 @@ should_not_be_empty(Btree) ->
     ?_assert(couch_btree:size(Btree) > 0).
 
 fold_reduce(Btree, Opts) ->
+    erlang:put(io_priority, {db_update, ?tempdb()}),
     GroupFun = fun({K1, _}, {K2, _}) ->
         K1 == K2
     end,
@@ -484,6 +486,7 @@ randomize(List) ->
     D1.
 
 test_btree(Btree, KeyValues) ->
+    erlang:put(io_priority, {db_update, ?tempdb()}),
     ok = test_key_access(Btree, KeyValues),
     ok = test_lookup_access(Btree, KeyValues),
     ok = test_final_reductions(Btree, KeyValues),
@@ -491,6 +494,7 @@ test_btree(Btree, KeyValues) ->
     true.
 
 test_add_remove(Btree, OutKeyValues, RemainingKeyValues) ->
+    erlang:put(io_priority, {db_update, ?tempdb()}),
     Btree2 = lists:foldl(
         fun({K, _}, BtAcc) ->
             {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [], [K]),
@@ -506,6 +510,7 @@ test_add_remove(Btree, OutKeyValues, RemainingKeyValues) ->
     true = test_btree(Btree3, OutKeyValues ++ RemainingKeyValues).
 
 test_key_access(Btree, List) ->
+    erlang:put(io_priority, {db_update, ?tempdb()}),
     FoldFun = fun(Element, {[HAcc|TAcc], Count}) ->
         case Element == HAcc of
             true -> {ok, {TAcc, Count + 1}};
@@ -520,6 +525,7 @@ test_key_access(Btree, List) ->
     ok.
 
 test_lookup_access(Btree, KeyValues) ->
+    erlang:put(io_priority, {db_update, ?tempdb()}),
     FoldFun = fun({Key, Value}, {Key, Value}) -> {stop, true} end,
     lists:foreach(
         fun({Key, Value}) ->
@@ -529,6 +535,7 @@ test_lookup_access(Btree, KeyValues) ->
         end, KeyValues).
 
 test_final_reductions(Btree, KeyValues) ->
+    erlang:put(io_priority, {db_update, ?tempdb()}),
     KVLen = length(KeyValues),
     FoldLFun = fun(_X, LeadingReds, Acc) ->
         CountToStart = KVLen div 3 + Acc,
@@ -556,6 +563,7 @@ test_final_reductions(Btree, KeyValues) ->
     ok.
 
 test_traversal_callbacks(Btree, _KeyValues) ->
+    erlang:put(io_priority, {db_update, ?tempdb()}),
     FoldFun = fun
         (visit, _GroupedKey, _Unreduced, Acc) ->
             {ok, Acc andalso false};

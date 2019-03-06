@@ -37,6 +37,7 @@ start() ->
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {db_update, DbName}),
     {ok, Db} = couch_db:create(DbName, []),
     ok = couch_db:close(Db),
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
@@ -524,11 +525,13 @@ compact_after_lowering_attachment_size_limit_test_() ->
             fun() ->
                 Ctx = test_util:start_couch(),
                 DbName = ?tempdb(),
+                erlang:put(io_priority, {interactive, DbName}),
                 {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
                 ok = couch_db:close(Db),
                 {Ctx, DbName}
             end,
             fun({Ctx, DbName}) ->
+                erlang:put(io_priority, {interactive, DbName}),
                 config:delete("couchdb", "max_attachment_size"),
                 ok = couch_server:delete(DbName, [?ADMIN_CTX]),
                 test_util:stop_couch(Ctx)
@@ -542,6 +545,7 @@ compact_after_lowering_attachment_size_limit_test_() ->
 
 should_compact_after_lowering_attachment_size_limit({_Ctx, DbName}) ->
     {timeout, ?TIMEOUT_EUNIT, ?_test(begin
+        erlang:put(io_priority, {interactive, DbName}),
         {ok, Db1} = couch_db:open(DbName, [?ADMIN_CTX]),
         Doc1 = #doc{id = <<"doc1">>, atts = att(1000)},
         {ok, _} = couch_db:update_doc(Db1, Doc1, []),
@@ -609,16 +613,20 @@ internal_replication_after_lowering_attachment_size_limit_test_() ->
             fun() ->
                 Ctx = test_util:start_couch([mem3]),
                 SrcName = ?tempdb(),
+                erlang:put(io_priority, {db_update, SrcName}),
                 {ok, SrcDb} = couch_db:create(SrcName, [?ADMIN_CTX]),
                 ok = couch_db:close(SrcDb),
                 TgtName = ?tempdb(),
+                erlang:put(io_priority, {db_update, TgtName}),
                 {ok, TgtDb} = couch_db:create(TgtName, [?ADMIN_CTX]),
                 ok = couch_db:close(TgtDb),
                 {Ctx, SrcName, TgtName}
             end,
             fun({Ctx, SrcName, TgtName}) ->
                 config:delete("couchdb", "max_attachment_size"),
+                erlang:put(io_priority, {db_update, SrcName}),
                 ok = couch_server:delete(SrcName, [?ADMIN_CTX]),
+                erlang:put(io_priority, {db_update, TgtName}),
                 ok = couch_server:delete(TgtName, [?ADMIN_CTX]),
                 test_util:stop_couch(Ctx)
             end,
@@ -630,6 +638,7 @@ internal_replication_after_lowering_attachment_size_limit_test_() ->
 
 should_replicate_after_lowering_attachment_size({_Ctx, SrcName, TgtName}) ->
     {timeout, ?TIMEOUT_EUNIT, ?_test(begin
+        erlang:put(io_priority, {interactive, SrcName}),
         {ok, SrcDb} = couch_db:open(SrcName, [?ADMIN_CTX]),
         SrcDoc = #doc{id = <<"doc">>, atts = att(1000)},
         {ok, _} = couch_db:update_doc(SrcDb, SrcDoc, []),

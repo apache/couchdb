@@ -32,7 +32,9 @@ changes_since_basic_test_() ->
                 foreach,
                 fun() ->
                     Type = {changes, seq_indexed},
-                    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), Type),
+                    DbName = ?tempdb(),
+                    erlang:put(io_priority, {view_update, DbName}),
+                    {ok, Db} = couch_mrview_test_util:init_db(DbName, Type),
                     Db
                 end,
                 fun teardown/1,
@@ -57,7 +59,9 @@ changes_since_range_test_() ->
                 foreach,
                 fun() ->
                     Type = {changes, keyseq_indexed},
-                    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), Type),
+                    DbName = ?tempdb(),
+                    erlang:put(io_priority, {view_update, DbName}),
+                    {ok, Db} = couch_mrview_test_util:init_db(DbName, Type),
                     Db
                 end,
                 fun teardown/1,
@@ -79,7 +83,9 @@ changes_since_range_count_test_() ->
                 foreach,
                 fun() ->
                     Type = {changes, seq_indexed_keyseq_indexed},
-                    {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), Type),
+                    DbName = ?tempdb(),
+                    erlang:put(io_priority, {view_update, DbName}),
+                    {ok, Db} = couch_mrview_test_util:init_db(DbName, Type),
                     Db
                 end,
                 fun teardown/1,

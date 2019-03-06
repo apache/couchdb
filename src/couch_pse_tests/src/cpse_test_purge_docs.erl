@@ -32,6 +32,7 @@ teardown_each(DbName) ->
 
 
 cpse_purge_simple(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Rev} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
 
     cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
@@ -59,6 +60,7 @@ cpse_purge_simple(DbName) ->
 
 
 cpse_purge_simple_info_check(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Rev} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
     PurgeInfos = [
         {cpse_util:uuid(), <<"foo1">>, [Rev]}
@@ -74,6 +76,7 @@ cpse_purge_simple_info_check(DbName) ->
 
 
 cpse_purge_empty_db(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     PurgeInfos = [
         {cpse_util:uuid(), <<"foo">>, [{0, <<0>>}]}
     ],
@@ -92,6 +95,7 @@ cpse_purge_empty_db(DbName) ->
 
 
 cpse_purge_single_docid(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, [Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
         {[{'_id', foo1}, {vsn, 1}]},
         {[{'_id', foo2}, {vsn, 2}]}
@@ -123,6 +127,7 @@ cpse_purge_single_docid(DbName) ->
 
 
 cpse_purge_multiple_docids(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, [Rev1, Rev2]} = cpse_util:save_docs(DbName, [
         {[{'_id', foo1}, {vsn, 1.1}]},
         {[{'_id', foo2}, {vsn, 1.2}]}
@@ -158,6 +163,7 @@ cpse_purge_multiple_docids(DbName) ->
 
 
 cpse_purge_no_docids(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, [_Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
         {[{'_id', foo1}, {vsn, 1}]},
         {[{'_id', foo2}, {vsn, 2}]}
@@ -185,6 +191,7 @@ cpse_purge_no_docids(DbName) ->
 
 
 cpse_purge_rev_path(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, 1}]}),
     Update = {[
         {<<"_id">>, <<"foo">>},
@@ -221,6 +228,7 @@ cpse_purge_rev_path(DbName) ->
 
 
 cpse_purge_deep_revision_path(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, InitRev} = cpse_util:save_doc(DbName, {[{'_id', bar}, {vsn, 0}]}),
     LastRev = lists:foldl(fun(Count, PrevRev) ->
         Update = {[
@@ -250,6 +258,7 @@ cpse_purge_deep_revision_path(DbName) ->
 
 
 cpse_purge_partial_revs(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, <<"1.1">>}]}),
     Update = {[
         {'_id', foo},
@@ -276,6 +285,7 @@ cpse_purge_partial_revs(DbName) ->
 
 
 cpse_purge_missing_docid(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, [Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
         {[{'_id', foo1}, {vsn, 1}]},
         {[{'_id', foo2}, {vsn, 2}]}
@@ -307,6 +317,7 @@ cpse_purge_missing_docid(DbName) ->
 
 
 cpse_purge_duplicate_docids(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, [Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
         {[{'_id', foo1}, {vsn, 1}]},
         {[{'_id', foo2}, {vsn, 2}]}
@@ -340,6 +351,7 @@ cpse_purge_duplicate_docids(DbName) ->
 
 
 cpse_purge_internal_revision(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, 1}]}),
     Update = {[
         {'_id', foo},
@@ -366,6 +378,7 @@ cpse_purge_internal_revision(DbName) ->
 
 
 cpse_purge_missing_revision(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, [_Rev1, Rev2]} = cpse_util:save_docs(DbName, [
         {[{'_id', foo1}, {vsn, 1}]},
         {[{'_id', foo2}, {vsn, 2}]}
@@ -389,6 +402,7 @@ cpse_purge_missing_revision(DbName) ->
 
 
 cpse_purge_repeated_revisions(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, <<"1.1">>}]}),
     Update = {[
         {'_id', foo},
@@ -426,6 +440,7 @@ cpse_purge_repeated_revisions(DbName) ->
 
 
 cpse_purge_repeated_uuid(DbName) ->
+    erlang:put(io_priority, {interactive, DbName}),
     {ok, Rev} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
 
     cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [

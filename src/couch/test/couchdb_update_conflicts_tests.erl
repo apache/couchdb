@@ -28,6 +28,7 @@ start() ->
 
 setup() ->
     DbName = ?tempdb(),
+    erlang:put(io_priority, {db_update, DbName}),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX, overwrite]),
     Doc = couch_doc:from_json_obj({[{<<"_id">>, ?DOC_ID},
                                     {<<"value">>, 0}]}),
@@ -104,6 +105,7 @@ should_ignore_invalid_local_doc({DbName, _})->
 
 
 concurrent_doc_update(NumClients, DbName, InitRev) ->
+    erlang:put(io_priority, {db_update, DbName}),
     Clients = lists:map(
         fun(Value) ->
             ClientDoc = couch_doc:from_json_obj({[
@@ -152,6 +154,7 @@ concurrent_doc_update(NumClients, DbName, InitRev) ->
     ?assertEqual(SavedValue, couch_util:get_value(<<"value">>, JsonDoc)).
 
 ensure_in_single_revision_leaf(DbName) ->
+    erlang:put(io_priority, {db_update, DbName}),
     {ok, Db} = couch_db:open_int(DbName, []),
     {ok, Leaves} = couch_db:open_doc_revs(Db, ?DOC_ID, all, []),
     ok = couch_db:close(Db),
@@ -170,6 +173,7 @@ ensure_in_single_revision_leaf(DbName) ->
     ?assertEqual(Doc, Doc2).
 
 bulk_delete_create(DbName, InitRev) ->
+    erlang:put(io_priority, {db_update, DbName}),
     {ok, Db} = couch_db:open_int(DbName, []),
 
     DeletedDoc = couch_doc:from_json_obj({[
@@ -226,6 +230,7 @@ bulk_delete_create(DbName, InitRev) ->
 
 
 bulk_create_local_doc(DbName) ->
+    erlang:put(io_priority, {db_update, DbName}),
     {ok, Db} = couch_db:open_int(DbName, []),
 
     LocalDoc = couch_doc:from_json_obj({[
@@ -246,6 +251,7 @@ bulk_create_local_doc(DbName) ->
 
 
 ignore_invalid_local_doc(DbName) ->
+    erlang:put(io_priority, {db_update, DbName}),
     {ok, Db} = couch_db:open_int(DbName, []),
 
     LocalDoc = couch_doc:from_json_obj({[
@@ -266,6 +272,7 @@ ignore_invalid_local_doc(DbName) ->
 
 spawn_client(DbName, Doc) ->
     spawn(fun() ->
+        erlang:put(io_priority, {db_update, DbName}),
         {ok, Db} = couch_db:open_int(DbName, []),
         receive
             go -> ok
