@@ -1130,6 +1130,9 @@ active_size(#st{} = St, #size_info{} = SI) ->
 
 
 fold_docs_int(St, Tree, UserFun, UserAcc, Options) ->
+    case erlang:get(io_priority) of
+        Priority when Priority =/= undefined -> ok
+    end,
     Fun = case lists:member(include_deleted, Options) of
         true -> fun include_deleted/4;
         false -> fun skip_deleted/4

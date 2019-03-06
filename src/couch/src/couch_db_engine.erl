@@ -925,6 +925,10 @@ set_props(#db{} = Db, Props) ->
 
 
 open_docs(#db{} = Db, DocIds) ->
+    _IOP = case erlang:get(io_priority) of
+        {_C, E} when E =/= undefined -> E;
+        {_C, E, _} when E =/= undefined -> E
+    end,
     #db{engine = {Engine, EngineState}} = Db,
     Engine:open_docs(EngineState, DocIds).
 
