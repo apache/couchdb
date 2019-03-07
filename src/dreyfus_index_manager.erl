@@ -38,8 +38,9 @@ start_link() ->
 get_index(DbName, Index) ->
     gen_server:call(?MODULE, {get_index, DbName, Index}, infinity).
 
-get_disk_size(DbName, Index) ->
-    gen_server:call(?MODULE, {get_disk_size, DbName, Index}, infinity).
+get_disk_size(DbName, #index{sig=Sig}) ->
+    Path = <<DbName/binary, "/", Sig/binary>>,
+    clouseau_rpc:disk_size(Path).
 
 % gen_server functions.
 
@@ -63,11 +64,6 @@ handle_call({get_index, DbName, #index{sig=Sig}=Index}, From, State) ->
     [{_, ExistingPid}] ->
         {reply, {ok, ExistingPid}, State}
     end;
-
-handle_call({get_disk_size, DbName, #index{sig=Sig}=Index}, From, State) ->
-    Path = <<DbName/binary,"/",Sig/binary>>,
-    Reply = clouseau_rpc:disk_size(Path),
-    {reply, Reply, State};
 
 handle_call({open_ok, DbName, Sig, NewPid}, {OpenerPid, _}, State) ->
     link(NewPid),
