@@ -25,13 +25,15 @@ info(mango_idx, {no_usable_index, missing_sort_index}) ->
     {
         400,
         <<"no_usable_index">>,
-        <<"No index exists for this sort, try indexing by the sort fields.">>
+        <<"No index exists for this sort, "
+            "try indexing by the sort fields.">>
     };
 info(mango_idx, {no_usable_index, missing_sort_index_partitioned}) ->
     {
         400,
         <<"no_usable_index">>,
-        <<"No partitioned index exists for this sort, try indexing by the sort fields.">>
+        <<"No partitioned index exists for this sort, "
+            "try indexing by the sort fields.">>
     };
 info(mango_idx, {no_usable_index, missing_sort_index_global}) ->
     {

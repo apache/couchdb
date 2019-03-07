@@ -422,7 +422,7 @@ get_idx_partitioned(Db, DDocProps) ->
     end.
 
 is_opts_partitioned(Opts) ->
-    case couch_util:get_value(partition, Opts) of
+    case couch_util:get_value(partition, Opts, <<>>) of
         <<>> ->
             false;
         Partition when is_binary(Partition) ->
