@@ -633,4 +633,31 @@ defmodule PartitionMangoTest do
     %{:body => %{"reason" => reason}} = resp
     assert Regex.match?(~r/Partition must not start/, reason)
   end
+
+  @tag :with_partitioned_db
+  test "partitioned query sends correct errors for sort errors", context do
+    db_name = context[:db_name]
+    create_partition_docs(db_name)
+
+    url = "/#{db_name}/_partition/foo/_find"
+
+    selector = %{
+      selector: %{
+        some: "field"
+      },
+      sort: ["some"],
+      limit: 50
+    }
+
+    resp = Couch.post(url, body: selector)
+    assert resp.status_code == 400
+    %{:body => %{"reason" => reason}} = resp
+    assert Regex.match?(~r/No partitioned index exists for this sort/, reason)
+
+    url = "/#{db_name}/_find"
+    resp = Couch.post(url, body: selector)
+    assert resp.status_code == 400
+    %{:body => %{"reason" => reason}} = resp
+    assert Regex.match?(~r/No global index exists for this sort/, reason)
+  end
 end
