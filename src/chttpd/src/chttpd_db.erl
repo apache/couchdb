@@ -370,16 +370,13 @@ delete_db_req(#httpd{}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
-    Db = #{
-        name => DbName,
-        user_ctx => Ctx
-    },
+    Db = fabric2:open_db(DbName, [{user_ctx, Ctx}]),
     Fun(Req, Db).
 
-db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
+db_req(#httpd{method='GET',path_parts=[DbName]}=Req, Db) ->
     % measure the time required to generate the etag, see if it's worth it
     T0 = os:timestamp(),
-    {ok, DbInfo} = fabric2:get_db_info(DbName),
+    {ok, DbInfo} = fabric2:get_db_info(Db),
     DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
     couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
     send_json(Req, {DbInfo});
@@ -402,7 +399,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     "ok" ->
         % async_batching
         spawn(fun() ->
-                case catch(fabric:update_doc(Db, Doc2, Options)) of
+                case catch(fabric2:update_doc(Db, Doc2, Options)) of
                 {ok, _} ->
                     chttpd_stats:incr_writes(),
                     ok;
@@ -422,7 +419,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
         % normal
         DocUrl = absolute_uri(Req, [$/, couch_util:url_encode(DbName),
             $/, couch_util:url_encode(DocId)]),
-        case fabric:update_doc(Db, Doc2, Options) of
+        case fabric2:update_doc(Db, Doc2, Options) of
         {ok, NewRev} ->
             chttpd_stats:incr_writes(),
             HttpCode = 201;
@@ -497,7 +494,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         true  -> [all_or_nothing|Options];
         _ -> Options
         end,
-        case fabric:update_docs(Db, Docs, Options2) of
+        case fabric2:update_docs(Db, Docs, Options2) of
         {ok, Results} ->
             % output the results
             chttpd_stats:incr_writes(length(Results)),
@@ -516,7 +513,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
             send_json(Req, 417, ErrorsJson)
         end;
     false ->
-        case fabric:update_docs(Db, Docs, [replicated_changes|Options]) of
+        case fabric2:update_docs(Db, Docs, [replicated_changes|Options]) of
         {ok, Errors} ->
             chttpd_stats:incr_writes(length(Docs)),
             ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
@@ -960,7 +957,7 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     NewDoc = Doc#doc{
         atts = UpdatedAtts ++ OldAtts2
     },
-    case fabric:update_doc(Db, NewDoc, Options) of
+    case fabric2:update_doc(Db, NewDoc, Options) of
     {ok, NewRev} ->
         chttpd_stats:incr_writes(),
         HttpCode = 201;
@@ -978,11 +975,10 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
     #doc_query_args{
         update_type = UpdateType
     } = parse_doc_query(Req),
-    DbName = couch_db:name(Db),
-    couch_db:validate_docid(Db, DocId),
+    DbName = fabric2_db:name(Db),
+    couch_doc:validate_docid(DocId),
 
-    W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
-    Options = [{user_ctx,Ctx}, {w,W}],
+    Options = [{user_ctx, Ctx}],
 
     Loc = absolute_uri(Req, [$/, couch_util:url_encode(DbName),
         $/, couch_util:url_encode(DocId)]),
@@ -1010,7 +1006,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
             Doc = couch_doc_from_req(Req, Db, DocId, chttpd:json_body(Req)),
 
             spawn(fun() ->
-                    case catch(fabric:update_doc(Db, Doc, Options)) of
+                    case catch(fabric2:update_doc(Db, Doc, Options)) of
                     {ok, _} ->
                         chttpd_stats:incr_writes(),
                         ok;
@@ -1044,7 +1040,7 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc
-    case fabric:update_doc(Db,
+    case fabric2:update_doc(Db,
         Doc#doc{id=TargetDocId, revs=TargetRevs}, [{user_ctx,Ctx}]) of
     {ok, NewTargetRev} ->
         chttpd_stats:incr_writes(),
@@ -1241,15 +1237,14 @@ send_updated_doc(Req, Db, DocId, Doc, Headers) ->
 
 send_updated_doc(#httpd{user_ctx=Ctx} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
         Headers, UpdateType) ->
-    W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options =
         case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
         "true" ->
-            [full_commit, UpdateType, {user_ctx,Ctx}, {w,W}];
+            [full_commit, UpdateType, {user_ctx,Ctx}];
         "false" ->
-            [delay_commit, UpdateType, {user_ctx,Ctx}, {w,W}];
+            [delay_commit, UpdateType, {user_ctx,Ctx}];
         _ ->
-            [UpdateType, {user_ctx,Ctx}, {w,W}]
+            [UpdateType, {user_ctx,Ctx}]
         end,
     {Status, {etag, Etag}, Body} = update_doc(Db, DocId,
         #doc{deleted=Deleted}=Doc, Options),
@@ -1269,7 +1264,7 @@ http_code_from_status(Status) ->
 
 update_doc(Db, DocId, #doc{deleted=Deleted, body=DocBody}=Doc, Options) ->
     {_, Ref} = spawn_monitor(fun() ->
-        try fabric:update_doc(Db, Doc, Options) of
+        try fabric2:update_doc(Db, Doc, Options) of
             Resp ->
                 exit({exit_ok, Resp})
         catch
@@ -1339,7 +1334,7 @@ couch_doc_from_req(Req, _Db, DocId, #doc{revs=Revs} = Doc) ->
     end,
     Doc#doc{id=DocId, revs=Revs2};
 couch_doc_from_req(Req, Db, DocId, Json) ->
-    Doc = couch_db:doc_from_json_obj_validate(Db, Json),
+    Doc = couch_doc:from_json_obj_validate(Json, fabric2_db:name(Db)),
     couch_doc_from_req(Req, Db, DocId, Doc).
 
 
@@ -1551,7 +1546,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
         atts = NewAtt ++ [A || A <- Atts, couch_att:fetch(name, A) /= FileName]
     },
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
-    case fabric:update_doc(Db, DocEdited, [{user_ctx,Ctx}, {w,W}]) of
+    case fabric2:update_doc(Db, DocEdited, [{user_ctx,Ctx}, {w,W}]) of
     {ok, UpdatedRev} ->
         chttpd_stats:incr_writes(),
         HttpCode = 201;
