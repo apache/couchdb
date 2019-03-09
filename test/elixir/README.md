@@ -33,13 +33,13 @@ X means done, - means partially
   - [ ] Port attachment_views.js
   - [ ] Port auth_cache.js
   - [X] Port basics.js
-  - [ ] Port batch_save.js
-  - [ ] Port bulk_docs.js
+  - [X] Port batch_save.js
+  - [X] Port bulk_docs.js
   - [X] Port changes.js
   - [X] Port coffee.js
-  - [ ] Port compact.js
+  - [X] Port compact.js
   - [X] Port config.js
-  - [ ] Port conflicts.js
+  - [X] Port conflicts.js
   - [ ] Port cookie_auth.js
   - [ ] Port copy_doc.js
   - [X] Port delayed_commits.js
@@ -68,7 +68,7 @@ X means done, - means partially
   - [ ] Port reduce_false.js
   - [ ] Port reduce_false_temp.js
   - [X] Port reduce.js
-  - [-] Port replication.js
+  - [X] Port replication.js
   - [ ] Port replicator_db_bad_rep_id.js
   - [ ] Port replicator_db_by_doc_id.js
   - [ ] Port replicator_db_compact_rep_db.js
@@ -90,7 +90,7 @@ X means done, - means partially
   - [ ] Port rev_stemming.js
   - [X] Port rewrite.js
   - [ ] Port rewrite_js.js
-  - [ ] Port security_validation.js
+  - [X] Port security_validation.js
   - [ ] Port show_documents.js
   - [ ] Port stats.js
   - [ ] Port update_documents.js

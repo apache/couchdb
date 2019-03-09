@@ -63,6 +63,10 @@ couchTests.etags_head = function(debug) {
     headers: {"if-none-match": etag}
   });
   T(xhr.status == 304);
+  xhr = CouchDB.request("GET", "/" + db_name + "/1", {
+    headers: {"if-none-match": "W/" + etag}
+  });
+  T(xhr.status == 304);
 
   // fail to delete a doc
   xhr = CouchDB.request("DELETE", "/" + db_name + "/1", {
