@@ -20,7 +20,8 @@
     transactional/1,
     get_dir/1,
 
-    debug_cluster/0
+    debug_cluster/0,
+    debug_cluster/2
 ]).
 
 
@@ -57,13 +58,17 @@ get_dir(Name) ->
 
 
 debug_cluster() ->
+    debug_cluster(<<>>, <<16#FE, 16#FF, 16#FF>>).
+
+
+debug_cluster(Start, End) ->
     transactional(fun(Tx) ->
         lists:foreach(fun({Key, Val}) ->
-            io:format("~s~n => ~s~n~n", [
-                    erlfdb_util:repr(Key),
+            io:format("~s => ~s~n", [
+                    string:pad(erlfdb_util:repr(Key), 60),
                     erlfdb_util:repr(Val)
                 ])
-        end, erlfdb:get_range(Tx, <<>>, <<16#FE, 16#FF>>))
+        end, erlfdb:get_range(Tx, Start, End))
     end).
 
 
