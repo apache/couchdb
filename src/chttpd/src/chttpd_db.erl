@@ -1342,11 +1342,10 @@ couch_doc_from_req(Req, Db, DocId, Json) ->
 % couch_doc_open(Db, DocId) ->
 %   couch_doc_open(Db, DocId, nil, []).
 
-couch_doc_open(Db, DocId, Rev, Options0) ->
-    Options = [{user_ctx, couch_db:get_user_ctx(Db)} | Options0],
+couch_doc_open(Db, DocId, Rev, Options) ->
     case Rev of
     nil -> % open most recent rev
-        case fabric:open_doc(Db, DocId, Options) of
+        case fabric2:open_doc(Db, DocId, Options) of
         {ok, Doc} ->
             chttpd_stats:incr_reads(),
             Doc;

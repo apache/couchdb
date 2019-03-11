@@ -27,12 +27,12 @@
 
 
 get_fdi(TxDb, DocId) ->
-    Future = fabric2_db:get(TxDb, {<<"revs">>, DocId}),
+    Future = fabric2_db:get(TxDb, {<<"docs">>, DocId}),
     fdb_to_fdi(TxDb, DocId, erlfdb:wait(Future)).
 
 
 open(TxDb, DocId, {Pos, [Rev | _] = Path}) ->
-    Key = {<<"docs">>, DocId, Pos, Rev},
+    Key = {<<"revs">>, DocId, Pos, Rev},
     Future = fabric2_db:get(TxDb, Key),
     fdb_to_doc(TxDb, DocId, Pos, Path, erlfdb:wait(Future)).
 
@@ -396,7 +396,7 @@ doc_to_fdb(TxDb, #doc{} = Doc) ->
         atts = Atts,
         deleted = Deleted
     } = Doc,
-    Key = {<<"docs">>, Id, Start, Rev},
+    Key = {<<"revs">>, Id, Start, Rev},
     KeyBin = fabric2_db:pack(TxDb, Key),
     Val = {Body, Atts, Deleted},
     {KeyBin, term_to_binary(Val, [{minor_version, 1}])}.
@@ -422,7 +422,7 @@ fdi_to_fdb(TxDb, #full_doc_info{} = FDI) ->
         rev_tree = RevTree
     } = flush_tree(FDI),
 
-    Key = {<<"revs">>, Id},
+    Key = {<<"docs">>, Id},
     KeyBin = fabric2_db:pack(TxDb, Key),
     RevTreeBin = term_to_binary(RevTree, [{minor_version, 1}]),
     ValTuple = {Deleted, RevTreeBin, {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF}},

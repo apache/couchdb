@@ -45,8 +45,8 @@
     %%
     %% get_partition_info/2,
     %%
-    %% % Documents
-    %% open_doc/3,
+    % Documents
+    open_doc/3,
     %% open_revs/4,
     %%
     %% get_doc_info/3,
@@ -237,6 +237,21 @@ set_security(Db, ErlJson) ->
     SecJson = ?JSON_ENCODE(ErlJson),
     fabric2_db:with_tx(Db, fun(TxDb) ->
         fabric2_db:set(TxDb, Key, SecJson)
+    end).
+
+
+open_doc(Db, DocId, Options) ->
+    fabric2_db:with_tx(Db, fun(TxDb) ->
+        case fabric2_doc:get_fdi(TxDb, DocId) of
+            not_found ->
+                {not_found, missing};
+            #full_doc_info{} = FDI ->
+                {_, Path} = couch_doc:to_doc_info_path(FDI),
+                case fabric2_doc:open(TxDb, DocId, Path) of
+                    #doc{} = Doc -> {ok, Doc};
+                    Error -> Error
+                end
+        end
     end).
 
 
