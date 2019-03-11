@@ -23,6 +23,12 @@
 
 -define(CACHE, chttpd_auth_cache_lru).
 
+-ifdef(TEST).
+-define(LISTENER_RESTART_CHECK_INTERVAL_MS, 5).
+-else.
+-define(LISTENER_RESTART_CHECK_INTERVAL_MS, 5000).
+-endif.
+
 -record(state, {
     changes_pid,
     last_seq="0"

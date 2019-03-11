@@ -75,7 +75,8 @@ is_single_node_enabled(Dbs) ->
     end.
 
 cluster_system_dbs() ->
-    ["_users", "_replicator", "_global_changes"].
+    %% ["_users", "_replicator", "_global_changes"].
+    [].
 
 
 has_cluster_system_dbs([]) ->

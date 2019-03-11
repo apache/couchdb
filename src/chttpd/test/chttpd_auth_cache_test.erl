@@ -23,7 +23,8 @@ setup() ->
 
 
 teardown(DbName) ->
-    fabric:delete_db(DbName).
+    ok = config:delete("chttpd_auth", "authentication_db", false),
+    catch fabric:delete_db(DbName).
 
 
 auth_db_change_listener_lifecycle_test_() ->
@@ -37,7 +38,7 @@ auth_db_change_listener_lifecycle_test_() ->
                 foreach,
                 fun setup/0, fun teardown/1,
                 [
-                    fun change_listener_should_not_start_if_auth_db_missing/1,
+                    fun change_listener_should_not_start_if_auth_db_undefined/1,
                     fun change_listener_should_start_if_auth_db_exists/1
                 ]
             }
@@ -46,12 +47,12 @@ auth_db_change_listener_lifecycle_test_() ->
 
 
 
-change_listener_should_not_start_if_auth_db_missing(_DbName) ->
+change_listener_should_not_start_if_auth_db_undefined(_DbName) ->
     ?_test(begin
-        %% ok = restart_app(chttpd),
         AuthCachePid = whereis(chttpd_auth_cache),
         ?assert(is_pid(AuthCachePid)),
         Expected = {state, undefined, "0"},
+        timer:sleep(10),
         ?assertEqual(Expected, sys:get_state(AuthCachePid)),
         ok
     end).
@@ -70,10 +71,22 @@ change_listener_should_start_if_auth_db_exists(DbName) ->
             end
         end, 1000, 10),
         ?assert(is_pid(ListenerPid) andalso is_process_alive(ListenerPid)),
-        config:set("chttpd_auth", "authentication_db", "_users", false),
+
+        %% change listener should stop and not restart after auth db deleted
+        ok = fabric:delete_db(DbName),
+        test_util:wait(fun() ->
+            case is_process_alive(ListenerPid) of
+                true -> wait;
+                false -> ok
+            end
+        end, 1000, 10),
+        ?assert(is_process_alive(AuthCachePid)),
+        timer:sleep(10), % assert that it doesn't restart after 10 ms
+        ?assertEqual({state, undefined, 0}, sys:get_state(AuthCachePid)),
         ok
     end).
 
+% change_listener_should_start_after_auth_db_created
 
 restart_app(App) ->
     ok = application:stop(App),
