@@ -32,6 +32,11 @@ def main():
     assert r.status_code == 201
     assert "rev" in r.json()
 
+    r = S.get(db_url + "/foo")
+    print r.text
+    assert r.status_code == 200
+    assert "_rev" in r.json()
+
 
 if __name__ == "__main__":
     main()
