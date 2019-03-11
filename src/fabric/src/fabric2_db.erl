@@ -18,6 +18,7 @@
     init/3,
 
     name/1,
+    get_vdus/1,
 
     with_tx/2,
 
@@ -43,7 +44,7 @@ open(DbName, Options) when is_binary(DbName), is_list(Options) ->
         tx => undefined,
         dir => undefined,
         user_ctx => #user_ctx{},
-        validate_doc_update => undefined
+        validate_doc_update => []
     },
     lists:foldl(fun({K, V}, DbAcc) ->
         maps:put(K, V, DbAcc)
@@ -52,6 +53,10 @@ open(DbName, Options) when is_binary(DbName), is_list(Options) ->
 
 name(#{name := Name}) ->
     Name.
+
+
+get_vdus(#{validate_doc_update := VDUs}) ->
+    VDUs.
 
 
 init(DbName, Tx, DbDir) ->

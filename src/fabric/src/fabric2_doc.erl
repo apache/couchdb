@@ -317,7 +317,12 @@ validate_doc_update(TxDb, Doc, GetDiskDocFun) ->
         end
     end,
     Stat = [couchdb, query_server, vdu_process_time],
-    couch_stats:update_histogram(Stat, Fun).
+    case fabric2_db:get_vdus(TxDb) of
+        [] ->
+            ok;
+        _ ->
+            couch_stats:update_histogram(Stat, Fun)
+    end.
 
 
 validate_ddoc(TxDb, DDoc) ->
