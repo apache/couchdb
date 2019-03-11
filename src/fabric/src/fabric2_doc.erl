@@ -28,13 +28,13 @@
 
 get_fdi(TxDb, DocId) ->
     Future = fabric2_db:get(TxDb, {<<"revs">>, DocId}),
-    fdb_to_fdi(DocId, erlfdb:wait(Future)).
+    fdb_to_fdi(TxDb, DocId, erlfdb:wait(Future)).
 
 
 open(TxDb, DocId, {Pos, [Rev | _] = Path}) ->
     Key = {<<"docs">>, DocId, Pos, Rev},
     Future = fabric2_db:get(TxDb, Key),
-    fdb_to_doc(DocId, Pos, Path, erlfdb:wait(Future)).
+    fdb_to_doc(TxDb, DocId, Pos, Path, erlfdb:wait(Future)).
 
 
 % TODO: Handle _local docs separately.
@@ -51,17 +51,20 @@ update(TxDb, #doc{} = Doc0, Options) ->
             interactive_edit -> new_revid(Doc1);
             replicated_changes -> Doc1
         end,
-        {FDI2, Doc3} = merge_rev_tree(FDI1, Doc2, UpdateType),
+        FDI2 = if FDI1 /= not_found -> FDI1; true ->
+            #full_doc_info{id = Doc2#doc.id}
+        end,
+        {FDI3, Doc3} = merge_rev_tree(FDI2, Doc2, UpdateType),
 
         #{tx := Tx} = TxDb,
 
         % Delete old entry in changes feed
-        OldSeqKey = {<<"changes">>, FDI1#full_doc_info.update_seq},
+        OldSeqKey = {<<"changes">>, FDI3#full_doc_info.update_seq},
         OldSeqKeyBin = fabric2_db:pack(TxDb, OldSeqKey),
         erlfdb:clear(Tx, OldSeqKeyBin),
 
         % Add new entry to changes feed
-        NewSeqKey = {<<"changes">>, <<16#FFFFFFFFFFFFFFFFFFFF:80>>},
+        NewSeqKey = {<<"changes">>, {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF}},
         NewSeqKeyBin = fabric2_db:pack_vs(TxDb, NewSeqKey),
         erlfdb:set_versionstamped_key(Tx, NewSeqKeyBin, Doc3#doc.id),
 
@@ -72,10 +75,10 @@ update(TxDb, #doc{} = Doc0, Options) ->
         erlfdb:set(Tx, NewDocKey, NewDocVal),
 
         % Update revision tree entry
-        {NewFDIKey, NewFDIVal} = fdi_to_fdb(TxDb, FDI2),
-        erlfdb:set_versionstampled_value(Tx, NewFDIKey, NewFDIVal),
+        {NewFDIKey, NewFDIVal} = fdi_to_fdb(TxDb, FDI3),
+        erlfdb:set_versionstamped_value(Tx, NewFDIKey, NewFDIVal),
 
-        {DocIncr, DocDelIncr} = case {FDI1, FDI2} of
+        {DocIncr, DocDelIncr} = case {FDI1, FDI3} of
             {not_found, _} ->
                 {1, 0};
             {#full_doc_info{deleted = true}, #full_doc_info{deleted = false}} ->
@@ -110,10 +113,12 @@ update(TxDb, #doc{} = Doc0, Options) ->
 
 prep_and_validate(TxDb, not_found, Doc, UpdateType) ->
     case Doc#doc.revs of
-        {0, []} when UpdateType == interactive_edit ->
-            ?RETURN({error, conflict});
+        {0, []} ->
+            ok;
+        _ when UpdateType == replicated_changes ->
+            ok;
         _ ->
-            ok
+            ?RETURN({error, conflict})
     end,
     prep_and_validate(TxDb, Doc, fun() -> nil end);
 
@@ -397,7 +402,7 @@ doc_to_fdb(TxDb, #doc{} = Doc) ->
     {KeyBin, term_to_binary(Val, [{minor_version, 1}])}.
 
 
-fdb_to_doc(DocId, Pos, Path, Bin) when is_binary(Bin) ->
+fdb_to_doc(_TxDb, DocId, Pos, Path, Bin) when is_binary(Bin) ->
     {Body, Atts, Deleted} = binary_to_term(Bin, [safe]),
     #doc{
         id = DocId,
@@ -406,7 +411,7 @@ fdb_to_doc(DocId, Pos, Path, Bin) when is_binary(Bin) ->
         atts = Atts,
         deleted = Deleted
     };
-fdb_to_doc(_DocId, _Pos, _Path, not_found) ->
+fdb_to_doc(_TxDb, _DocId, _Pos, _Path, not_found) ->
     {not_found, missing}.
 
 
@@ -419,19 +424,23 @@ fdi_to_fdb(TxDb, #full_doc_info{} = FDI) ->
 
     Key = {<<"revs">>, Id},
     KeyBin = fabric2_db:pack(TxDb, Key),
-    Val = {Deleted, RevTree, <<16#FFFFFFFFFFFFFFFFFFFF:80>>},
-    {KeyBin, term_to_binary(Val, [{minor_version, 1}])}.
+    RevTreeBin = term_to_binary(RevTree, [{minor_version, 1}]),
+    ValTuple = {Deleted, RevTreeBin, {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF}},
+    Val = fabric2_db:pack_vs(TxDb, ValTuple),
+    {KeyBin, Val}.
 
 
-fdb_to_fdi(Id, Bin) when is_binary(Bin) ->
-    {Deleted, RevTree, UpdateSeq} = binary_to_term(Bin, [safe]),
+fdb_to_fdi(TxDb, Id, Bin) when is_binary(Bin) ->
+    {Deleted, RevTreeBin, {versionstamp, V, B}} = fabric2_db:unpack(TxDb, Bin),
+    RevTree = binary_to_term(RevTreeBin, [safe]),
+    UpdateSeq = <<V:64/big, B:16/big>>,
     #full_doc_info{
         id = Id,
         deleted = Deleted,
         rev_tree = RevTree,
         update_seq = UpdateSeq
     };
-fdb_to_fdi(_Id, not_found) ->
+fdb_to_fdi(_TxDb, _Id, not_found) ->
     not_found.
 
 

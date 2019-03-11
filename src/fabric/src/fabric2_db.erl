@@ -23,6 +23,7 @@
     with_tx/2,
 
     pack/2,
+    pack_vs/2,
     unpack/2,
     range_bounds/2,
 
@@ -99,6 +100,16 @@ pack(Db, Tuple) ->
         dir := Dir
     } = Db,
     erlfdb_directory:pack(Dir, Tuple).
+
+
+pack_vs(#{dir := undefined} = Db, _Tuple) ->
+    erlang:error({no_directory, Db});
+
+pack_vs(Db, Tuple) ->
+    #{
+        dir := Dir
+    } = Db,
+    erlfdb_directory:pack_vs(Dir, Tuple).
 
 
 unpack(#{dir := undefined} = Db, _Key) ->
