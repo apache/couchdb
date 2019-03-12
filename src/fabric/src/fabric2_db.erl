@@ -41,11 +41,21 @@
 
 open(DbName, Options) when is_binary(DbName), is_list(Options) ->
     BaseDb = #{
+        vsn => 1,
         name => DbName,
+
         tx => undefined,
         dir => undefined,
+
+        instance_start_time => 0,
         user_ctx => #user_ctx{},
-        validate_doc_update => []
+        security => [],
+        validate_doc_update => [],
+
+        before_doc_update => nil,
+        after_doc_read => nil,
+
+        options => []
     },
     lists:foldl(fun({K, V}, DbAcc) ->
         maps:put(K, V, DbAcc)
