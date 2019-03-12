@@ -43,3 +43,16 @@ Things of Note
 9. I'm cheating really bad with term_to_binary and ignoring serialization
    but given that's all going to change I'm not too concerned about it
    at this point.
+
+10. We'll need to think harder on open_revs, especially when opening all
+    revisions. I could see us easily getting into an absurd case where the
+    amount of revisions for a given document exceed the fdb transaction
+    limits.
+
+11. We'll want to look at how we currently apply open options to individual
+    elements of an open_revs call. Might turn out that we have to grab a
+    full FDI even if we could look up a rev directly. (i.e., revs_info
+    would require us having the entire FDI, however it'd be wasteful to return
+    all of that in an open_revs call, but bug compatibility ftw!)
+
+12.
