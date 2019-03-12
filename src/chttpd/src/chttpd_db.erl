@@ -877,7 +877,7 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
         Doc = couch_doc_open(Db, DocId, Rev, Options2),
         send_doc(Req, Doc, Options2);
     _ ->
-        case fabric:open_revs(Db, DocId, Revs, Options) of
+        case fabric2:open_revs(Db, DocId, Revs, Options) of
             {ok, []} when Revs == all ->
                 chttpd:send_error(Req, {not_found, missing});
             {ok, Results} ->
@@ -928,7 +928,7 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
         Doc = couch_doc_from_req(Req, Db, DocId, Json);
     false ->
         Rev = couch_doc:parse_rev(list_to_binary(couch_util:get_value("_rev", Form))),
-        Doc = case fabric:open_revs(Db, DocId, [Rev], []) of
+        Doc = case fabric2:open_revs(Db, DocId, [Rev], []) of
             {ok, [{ok, Doc0}]} ->
                 chttpd_stats:incr_reads(),
                 Doc0;
@@ -1353,7 +1353,7 @@ couch_doc_open(Db, DocId, Rev, Options) ->
              throw(Error)
          end;
     _ -> % open a specific rev (deletions come back as stubs)
-        case fabric:open_revs(Db, DocId, [Rev], Options) of
+        case fabric2:open_revs(Db, DocId, [Rev], Options) of
         {ok, [{ok, Doc}]} ->
             chttpd_stats:incr_reads(),
             Doc;
@@ -1529,7 +1529,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
             couch_db:validate_docid(Db, DocId),
             #doc{id=DocId};
         Rev ->
-            case fabric:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
+            case fabric2:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
             {ok, [{ok, Doc0}]} ->
                 chttpd_stats:incr_reads(),
                 Doc0;
@@ -1901,7 +1901,7 @@ bulk_get_open_doc_revs1(Db, Props, Options, {DocId, Revs}) ->
             bulk_get_open_doc_revs1(Db, Props, Options, {DocId, Revs, Options1})
     end;
 bulk_get_open_doc_revs1(Db, Props, _, {DocId, Revs, Options}) ->
-    case fabric:open_revs(Db, DocId, Revs, Options) of
+    case fabric2:open_revs(Db, DocId, Revs, Options) of
         {ok, []} ->
             RevStr = couch_util:get_value(<<"rev">>, Props),
             Error = {RevStr, <<"not_found">>, <<"missing">>},

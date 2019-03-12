@@ -47,7 +47,7 @@
     %%
     % Documents
     open_doc/3,
-    %% open_revs/4,
+    open_revs/4,
     %%
     %% get_doc_info/3,
     %% get_full_doc_info/3,
@@ -249,6 +249,20 @@ open_doc(Db, DocId, Options) ->
                 {_, Path} = couch_doc:to_doc_info_path(FDI),
                 case fabric2_doc:open(TxDb, DocId, Path) of
                     #doc{} = Doc -> {ok, Doc};
+                    Error -> Error
+                end
+        end
+    end).
+
+
+open_revs(Db, DocId, Revs, Options) ->
+    fabric2_db:with_tx(Db, fun(TxDb) ->
+        case fabrci2_doc:get_fdi(TxDb, DocId) of
+            not_found ->
+                {not_found, missing};
+            #full_doc_info{} = FDI ->
+                case fabric2_doc:open_revs(TxDb, FDI, Revs, Options) of
+                    [_ | _] = Opened -> {ok, Opened};
                     Error -> Error
                 end
         end

@@ -15,7 +15,10 @@
 
 -export([
     get_fdi/2,
+
     open/3,
+    open_revs/4,
+
     update/3
 ]).
 
@@ -35,6 +38,36 @@ open(TxDb, DocId, {Pos, [Rev | _] = Path}) ->
     Key = {<<"revs">>, DocId, Pos, Rev},
     Future = fabric2_db:get(TxDb, Key),
     fdb_to_doc(TxDb, DocId, Pos, Path, erlfdb:wait(Future)).
+
+
+open_revs(TxDb, FDI, Revs, Options) ->
+    #full_doc_info{
+        id = Id,
+        rev_tree = RevTree
+    } = FDI,
+    Latest = lists:member(latest, Options),
+    {Found, Missing} = case Revs of
+        all ->
+            {couch_key_tree:get_all_leafs(RevTree), []};
+        _ when Latest ->
+            couch_key_tree:get_key_leafs(RevTree, Revs);
+        _ ->
+            couch_key_tree:get(RevTree, Revs)
+    end,
+    Docs = lists:map(fun({Value, {Pos, [Rev | _]} = RevPath}) ->
+        case Value of
+            ?REV_MISSING ->
+                % We have the rev in our list but know nothing about it
+                {{not_found, missing}, {Pos, Rev}};
+            _ ->
+                case open(TxDb, Id, RevPath) of
+                    #doc{} = Doc -> {ok, Doc};
+                    Else -> {Else, {Pos, Rev}}
+                end
+        end
+    end, Found),
+    MissingDocs = [{{not_found, missing}, MRev} || MRev <- Missing],
+    {ok, Docs ++ MissingDocs}.
 
 
 % TODO: Handle _local docs separately.
