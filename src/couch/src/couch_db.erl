@@ -248,7 +248,9 @@ is_idle(_Db) ->
 
 monitored_by(Db) ->
     case couch_db_engine:monitored_by(Db) of
-        Pids when is_list(Pids) ->
+        Pids0 when is_list(Pids0) ->
+            %% Remove duplicate ioq_opener monitors
+            Pids = lists:usort(Pids0),
             PidTracker = whereis(couch_stats_process_tracker),
             IOQOpener = whereis(ioq_opener),
             Pids -- [Db#db.main_pid, PidTracker, IOQOpener];
