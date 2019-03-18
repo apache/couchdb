@@ -297,13 +297,13 @@ copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
         {NewRevTree, FinalAcc} = couch_key_tree:mapfold(fun
             ({RevPos, RevId}, #leaf{ptr=Sp}=Leaf, leaf, SizesAcc) ->
                 {Body, AttInfos} = copy_doc_attachments(St, Sp, NewSt),
-                % In the future, we should figure out how to do this for
-                % upgrade purposes.
-                ExternalSize = case is_binary(Body) of
-                    true ->
+                #size_info{external = OldExternalSize} = Leaf#leaf.sizes,
+                ExternalSize = case OldExternalSize of
+                    0 when is_binary(Body) ->
                         couch_compress:uncompressed_size(Body);
-                    false ->
-                        ?term_size(Body)
+                    0 ->
+                        couch_ejson_size:encoded_size(Body);
+                    N -> N
                 end,
                 Doc0 = #doc{
                     id = Info#full_doc_info.id,
