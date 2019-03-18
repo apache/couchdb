@@ -171,8 +171,7 @@ defmodule Couch.DBTest do
 
   def delete_db(db_name) do
     resp = Couch.delete("/#{db_name}")
-    assert resp.status_code in [200, 202]
-    assert resp.body == %{"ok" => true}
+    assert resp.status_code in [200, 202, 404]
     {:ok, resp}
   end
 
