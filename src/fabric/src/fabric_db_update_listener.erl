@@ -111,7 +111,7 @@ cleanup_monitor(Parent, Ref, Notifiers) ->
     end.
 
 stop_update_notifiers(Notifiers) ->
-    [rexi:kill(Node, Ref) || #worker{node=Node, ref=Ref} <- Notifiers].
+    rexi:kill_all([{N, Ref} || #worker{node = N, ref = Ref} <- Notifiers]).
 
 stop({Pid, Ref}) ->
     erlang:send(Pid, {Ref, done}).
@@ -169,7 +169,7 @@ handle_message(done, _, _) ->
 
 handle_error(Node, Reason, #acc{shards = Shards} = Acc) ->
     Rest = lists:filter(fun(#shard{node = N}) -> N /= Node end, Shards),
-    case fabric_view:is_progress_possible([{R, nil} || R <- Rest]) of
+    case fabric_ring:is_progress_possible([{R, nil} || R <- Rest]) of
         true ->
             {ok, Acc#acc{shards = Rest}};
         false ->

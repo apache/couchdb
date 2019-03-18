@@ -23,7 +23,8 @@ go(DbName) ->
     RexiMon = fabric_util:create_monitors(Shards),
     Fun = fun handle_message/3,
     {ok, ClusterInfo} = get_cluster_info(Shards),
-    Acc0 = {fabric_dict:init(Workers, nil), [], [{cluster, ClusterInfo}]},
+    CInfo =  [{cluster, ClusterInfo}],
+    Acc0 = {fabric_dict:init(Workers, nil), [], CInfo},
     try
         case fabric_util:recv(Workers, #shard.ref, Fun, Acc0) of
 
@@ -46,49 +47,47 @@ go(DbName) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN,
-        _, {_,NodeRef},_}, _Shard, {Counters, PseqAcc, Acc}) ->
-    case fabric_util:remove_down_workers(Counters, NodeRef) of
-    {ok, NewCounters} ->
-        {ok, {NewCounters, PseqAcc, Acc}};
-    error ->
-        {error, {nodedown, <<"progress not possible">>}}
+
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _, {Counters, Resps, CInfo}) ->
+    case fabric_ring:node_down(NodeRef, Counters, Resps) of
+        {ok, Counters1} -> {ok, {Counters1, Resps, CInfo}};
+        error -> {error, {nodedown, <<"progress not possible">>}}
     end;
 
-handle_message({rexi_EXIT, Reason}, Shard, {Counters, PseqAcc, Acc}) ->
-    NewCounters = fabric_dict:erase(Shard, Counters),
-    case fabric_view:is_progress_possible(NewCounters) of
-    true ->
-        {ok, {NewCounters, PseqAcc, Acc}};
-    false ->
-        {error, Reason}
+handle_message({rexi_EXIT, Reason}, Shard, {Counters, Resps, CInfo}) ->
+    case fabric_ring:handle_error(Shard, Counters, Resps) of
+        {ok, Counters1} -> {ok, {Counters1, Resps, CInfo}};
+        error -> {error, Reason}
     end;
 
-handle_message({ok, Info}, #shard{dbname=Name} = Shard, {Counters, PseqAcc, Acc}) ->
-    case fabric_dict:lookup_element(Shard, Counters) of
-    undefined ->
-        % already heard from someone else in this range
-        {ok, {Counters, PseqAcc, Acc}};
-    nil ->
+handle_message({ok, Info}, Shard, {Counters, Resps, CInfo}) ->
+    case fabric_ring:handle_response(Shard, Info, Counters, Resps) of
+        {ok, {Counters1, Resps1}} ->
+            {ok, {Counters1, Resps1, CInfo}};
+        {stop, Resps1} ->
+            {stop, build_final_response(CInfo, Shard#shard.dbname, Resps1)}
+    end;
+
+handle_message(Reason, Shard, {Counters, Resps, CInfo}) ->
+    case fabric_ring:handle_error(Shard, Counters, Resps) of
+        {ok, Counters1} -> {ok, {Counters1, Resps, CInfo}};
+        error -> {error, Reason}
+    end.
+
+
+build_final_response(CInfo, DbName, Responses) ->
+    AccF = fabric_dict:fold(fun(Shard, Info, {Seqs, PSeqs, Infos}) ->
         Seq = couch_util:get_value(update_seq, Info),
-        C1 = fabric_dict:store(Shard, Seq, Counters),
-        C2 = fabric_view:remove_overlapping_shards(Shard, C1),
         PSeq = couch_util:get_value(purge_seq, Info),
-        NewPseqAcc = [{Shard, PSeq}|PseqAcc],
-        case fabric_dict:any(nil, C2) of
-        true ->
-            {ok, {C2, NewPseqAcc, [Info|Acc]}};
-        false ->
-            {stop, [
-                {db_name,Name},
-                {purge_seq, fabric_view_changes:pack_seqs(NewPseqAcc)},
-                {update_seq, fabric_view_changes:pack_seqs(C2)} |
-                merge_results(lists:flatten([Info|Acc]))
-            ]}
-        end
-    end;
-handle_message(_, _, Acc) ->
-    {ok, Acc}.
+        {[{Shard, Seq} | Seqs], [{Shard, PSeq} | PSeqs], [Info | Infos]}
+    end, {[], [], []}, Responses),
+    {Seqs, PSeqs, Infos} = AccF,
+    PackedSeq =  fabric_view_changes:pack_seqs(Seqs),
+    PackedPSeq = fabric_view_changes:pack_seqs(PSeqs),
+    MergedInfos = merge_results(lists:flatten([CInfo | Infos])),
+    Sequences = [{purge_seq, PackedPSeq}, {update_seq, PackedSeq}],
+    [{db_name, DbName}] ++ Sequences ++ MergedInfos.
+
 
 merge_results(Info) ->
     Dict = lists:foldl(fun({K,V},D0) -> orddict:append(K,V,D0) end,

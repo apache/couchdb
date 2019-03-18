@@ -77,7 +77,7 @@ json_shards([#shard{node=Node, range=[B,E]} | Rest], AccIn) ->
     json_shards(Rest, dict:append(Range, Node, AccIn)).
 
 sync_shard(ShardName) ->
-    Shards = mem3_shards:for_shard_name(ShardName),
+    Shards = mem3_shards:for_shard_range(ShardName),
     [rpc:call(S1#shard.node, mem3_sync, push, [S1, S2#shard.node]) ||
             S1 <- Shards, S2 <- Shards, S1 =/= S2],
     ok.

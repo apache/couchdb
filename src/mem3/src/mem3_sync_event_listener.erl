@@ -192,7 +192,7 @@ maybe_push_shards(St) ->
     end.
 
 push_shard(ShardName) ->
-    try mem3_shards:for_shard_name(ShardName) of
+    try mem3_shards:for_shard_range(ShardName) of
     Shards ->
         Live = nodes(),
         lists:foreach(
