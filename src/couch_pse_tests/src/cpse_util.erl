@@ -27,6 +27,7 @@
     cpse_test_fold_docs,
     cpse_test_fold_changes,
     cpse_test_fold_purge_infos,
+    cpse_test_copy_purge_infos,
     cpse_test_purge_docs,
     cpse_test_purge_replication,
     cpse_test_purge_bad_checkpoints,
