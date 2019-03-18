@@ -322,7 +322,7 @@ t_handle_message_reply() ->
     Acc0 = #acc{workers=Workers, r=2, replies=[]},
 
     ?_test(begin
-        meck:expect(rexi, kill, fun(_, _) -> ok end),
+        meck:expect(rexi, kill_all, fun(_) -> ok end),
 
         % Test that we continue when we haven't met R yet
         ?assertMatch(
@@ -416,7 +416,7 @@ t_store_node_revs() ->
     InitAcc = #acc{workers = [W1, W2, W3], replies = [], r = 2},
 
     ?_test(begin
-        meck:expect(rexi, kill, fun(_, _) -> ok end),
+        meck:expect(rexi, kill_all, fun(_) -> ok end),
 
         % Simple case
         {ok, #acc{node_revs = NodeRevs1}} = handle_message(Foo1, W1, InitAcc),

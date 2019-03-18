@@ -25,19 +25,20 @@ go(DbName, GroupId, View, Args, Callback, Acc0, VInfo) when is_binary(GroupId) -
 
 go(Db, DDoc, VName, Args, Callback, Acc, VInfo) ->
     DbName = fabric:dbname(Db),
-    Shards = fabric_view:get_shards(Db, Args),
+    {Shards, RingOpts} = fabric_view:get_shards(Db, Args),
     {CoordArgs, WorkerArgs} = fabric_view:fix_skip_and_limit(Args),
     DocIdAndRev = fabric_util:doc_id_and_rev(DDoc),
     RPCArgs = [DocIdAndRev, VName, WorkerArgs],
     fabric_view:maybe_update_others(DbName, DocIdAndRev, Shards, VName, Args),
-    Repls = fabric_view:get_shard_replacements(DbName, Shards),
+    Repls = fabric_ring:get_shard_replacements(DbName, Shards),
     StartFun = fun(Shard) ->
         hd(fabric_util:submit_jobs([Shard], fabric_rpc, reduce_view, RPCArgs))
     end,
     Workers0 = fabric_util:submit_jobs(Shards,fabric_rpc,reduce_view,RPCArgs),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_streams:start(Workers0, #shard.ref, StartFun, Repls) of
+        case fabric_streams:start(Workers0, #shard.ref, StartFun, Repls,
+                RingOpts) of
             {ok, ddoc_updated} ->
                 Callback({error, ddoc_updated}, Acc);
             {ok, Workers} ->

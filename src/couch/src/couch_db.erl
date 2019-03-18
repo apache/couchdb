@@ -1526,6 +1526,17 @@ calculate_start_seq(_Db, _Node, Seq) when is_integer(Seq) ->
 calculate_start_seq(Db, Node, {Seq, Uuid}) ->
     % Treat the current node as the epoch node
     calculate_start_seq(Db, Node, {Seq, Uuid, Node});
+calculate_start_seq(Db, _Node, {Seq, {split, Uuid}, EpochNode}) ->
+    case is_owner(EpochNode, Seq, get_epochs(Db)) of
+        true ->
+            % Find last replicated sequence from split source to target
+            mem3_rep:find_split_target_seq(Db, EpochNode, Uuid, Seq);
+        false ->
+            couch_log:warning("~p calculate_start_seq not owner "
+                "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p, epochs: ~p",
+                [?MODULE, Db#db.name, Seq, Uuid, EpochNode, get_epochs(Db)]),
+            0
+    end;
 calculate_start_seq(Db, _Node, {Seq, Uuid, EpochNode}) ->
     case is_prefix(Uuid, get_uuid(Db)) of
         true ->

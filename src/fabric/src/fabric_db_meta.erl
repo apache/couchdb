@@ -135,9 +135,9 @@ check_sec_set_int(NumWorkers, SetWorkers) ->
         true -> throw(no_majority);
         false -> ok
     end,
-    % Hack to reuse fabric_view:is_progress_possible/1
+    % Hack to reuse fabric_ring:is_progress_possible/1
     FakeCounters = [{S, 0} || S <- SetWorkers],
-    case fabric_view:is_progress_possible(FakeCounters) of
+    case fabric_ring:is_progress_possible(FakeCounters) of
         false -> throw(no_ring);
         true -> ok
     end,

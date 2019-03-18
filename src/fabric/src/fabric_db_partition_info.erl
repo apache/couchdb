@@ -52,7 +52,7 @@ handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc}) ->
 
 handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc}) ->
     NewCounters = fabric_dict:erase(Shard, Counters),
-    case fabric_view:is_progress_possible(NewCounters) of
+    case fabric_ring:is_progress_possible(NewCounters) of
     true ->
         {ok, {NewCounters, Acc}};
     false ->
