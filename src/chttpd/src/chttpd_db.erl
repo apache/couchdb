@@ -412,6 +412,7 @@ db_req(#httpd{method='POST', path_parts=[DbName]}=Req, Db) ->
 
     Doc0 = chttpd:json_body(Req),
     Doc1 = couch_doc:from_json_obj_validate(Doc0, fabric2_db:name(Db)),
+    validate_attachment_names(Doc1),
     Doc2 = case Doc1#doc.id of
         <<"">> ->
             Doc1#doc{id=couch_uuids:new(), revs={0, []}};
