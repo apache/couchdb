@@ -437,6 +437,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     Options = [{user_ctx,Ctx}, {w,W}],
 
     Doc = couch_db:doc_from_json_obj_validate(Db, chttpd:json_body(Req)),
+    validate_attachment_names(Doc),
     Doc2 = case Doc#doc.id of
         <<"">> ->
             Doc#doc{id=couch_uuids:new(), revs={0, []}};
