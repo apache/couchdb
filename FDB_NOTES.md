@@ -55,4 +55,5 @@ Things of Note
     would require us having the entire FDI, however it'd be wasteful to return
     all of that in an open_revs call, but bug compatibility ftw!)
 
-12.
+12. Is it possible that a server_admin can delete a db without being able
+    to open it? If so that's probably changed behavior.

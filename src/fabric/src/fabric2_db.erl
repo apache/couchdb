@@ -124,7 +124,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("fabric/include/fabric2.hrl").
+-include("fabric2.hrl").
 
 
 -define(DBNAME_REGEX,
@@ -138,18 +138,19 @@
 
 create(DbName, Options) ->
     Result = transactional(DbName, Options, fun(TxDb) ->
-        case fabric2_fdb:db_exists(TxDb) of
+        case fabric2_fdb:exists(TxDb) of
             true ->
                 {error, file_exists};
             false ->
-                fabric2_fdb:db_create(TxDb)
+                fabric2_fdb:create(TxDb, Options)
         end
     end),
     % We cache outside of the transaction so that we're sure
     % that this request created the database
     case Result of
         #{} = Db ->
-            fabric2_server:store(Db);
+            ok = fabric2_server:store(Db),
+            {ok, Db#{tx => undefined}};
         Error ->
             Error
     end.
@@ -159,27 +160,29 @@ open(DbName, Options) ->
     case fabric2_server:fetch(DbName) of
         #{} = Db ->
             with_tx(Db, fun(TxDb) ->
-                case fabric2_fdb:db_is_current(TxDb) of
+                case fabric2_fdb:is_current(TxDb) of
                     true ->
-                        Db;
+                        {ok, maybe_set_user_ctx(Db, Options)};
                     false ->
-                        Reopened = fabric2_fdb:db_open(TxDb),
-                        fabric2_server:store(Reopened)
+                        Reopened = fabric2_fdb:open(TxDb, Options),
+                        ok = fabric2_server:store(Reopened),
+                        {ok, Reopened}
                 end
             end);
         undefined ->
             transactional(DbName, Options, fun(TxDb) ->
-                Opened = fabric2_fdb:db_open(TxDb),
-                fabric2_server:store(Opened)
+                Opened = fabric2_fdb:open(TxDb, Options),
+                ok = fabric2_server:store(Opened),
+                {ok, Opened#{tx => undefined}}
             end)
     end.
 
 
 delete(DbName, Options) ->
     % This will throw if the db does not exist
-    Db = open(DbName, Options),
+    {ok, Db} = open(DbName, Options),
     with_tx(Db, fun(TxDb) ->
-        fabric2_fdb:db_delete(TxDb)
+        fabric2_fdb:delete(TxDb)
     end).
 
 
@@ -237,7 +240,7 @@ get_compactor_pid(#{} = _Db) ->
 
 get_db_info(#{} = Db) ->
     DbProps = with_tx(Db, fun(TxDb) ->
-        fabric2_fdb:db_get_info(TxDb)
+        fabric2_fdb:get_info(TxDb)
     end),
 
     BaseProps = [
@@ -296,7 +299,7 @@ get_security(#{security_doc := SecurityDoc}) ->
 
 
 get_update_seq(#{} = Db) ->
-    case fabric2_fdb:db_get_changes(Db, [{limit, 1}, {reverse, true}]) of
+    case fabric2_fdb:get_changes(Db, [{limit, 1}, {reverse, true}]) of
         [] ->
             fabric2_util:to_hex(<<0:80>>);
         [{Seq, _}] ->
@@ -346,14 +349,14 @@ is_system_db_name(DbName) when is_binary(DbName) ->
 set_revs_limit(#{} = Db, RevsLimit) ->
     RevsLimBin = ?uint2bin(RevsLimit),
     with_tx(Db, fun(TxDb) ->
-        fabric2_fdb:db_set_config(TxDb, <<"revs_limit">>, RevsLimBin)
+        fabric2_fdb:set_config(TxDb, <<"revs_limit">>, RevsLimBin)
     end).
 
 
 set_security(#{} = Db, Security) ->
     SecBin = ?JSON_ENCODE(Security),
     with_tx(Db, fun(TxDb) ->
-        fabric2_fdb:db_set_config(TxDb, <<"security_doc">>, SecBin)
+        fabric2_fdb:set_config(TxDb, <<"security_doc">>, SecBin)
     end).
 
 
@@ -388,36 +391,35 @@ open_doc(#{} = Db, DocId, _Options) ->
     end).
 
 
-open_doc_revs(Db, FDI, Revs, Options) ->
-    #full_doc_info{
-        id = Id,
-        rev_tree = RevTree
-    } = FDI,
+open_doc_revs(Db, DocId, Revs, Options) ->
     Latest = lists:member(latest, Options),
-    {Found, Missing} = case Revs of
-        all ->
-            {couch_key_tree:get_all_leafs(RevTree), []};
-        _ when Latest ->
-            couch_key_tree:get_key_leafs(RevTree, Revs);
-        _ ->
-            couch_key_tree:get(RevTree, Revs)
-    end,
-    Docs = with_tx(Db, fun(TxDb) ->
-        lists:map(fun({Value, {Pos, [Rev | _]} = RevPath}) ->
+    with_tx(Db, fun(TxDb) ->
+        #full_doc_info{
+            rev_tree = RevTree
+        } = fabric2_db:get_full_doc_info(TxDb, DocId),
+        {Found, Missing} = case Revs of
+            all ->
+                {couch_key_tree:get_all_leafs(RevTree), []};
+            _ when Latest ->
+                couch_key_tree:get_key_leafs(RevTree, Revs);
+            _ ->
+                couch_key_tree:get(RevTree, Revs)
+        end,
+        Docs = lists:map(fun({Value, {Pos, [Rev | _]} = RevPath}) ->
             case Value of
                 ?REV_MISSING ->
                     % We have the rev in our list but know nothing about it
                     {{not_found, missing}, {Pos, Rev}};
                 _ ->
-                    case fabric2_fdb:get_doc_body(TxDb, Id, RevPath) of
+                    case fabric2_fdb:get_doc_body(TxDb, DocId, RevPath) of
                         #doc{} = Doc -> {ok, Doc};
                         Else -> {Else, {Pos, Rev}}
                     end
             end
-        end, Found)
-    end),
-    MissingDocs = [{{not_found, missing}, MRev} || MRev <- Missing],
-    {ok, Docs ++ MissingDocs}.
+        end, Found),
+        MissingDocs = [{{not_found, missing}, MRev} || MRev <- Missing],
+        {ok, Docs ++ MissingDocs}
+    end).
 
 
 update_doc(Db, Doc) ->
@@ -475,6 +477,15 @@ new_revid(Doc) ->
     end,
 
     Doc#doc{revs = {OldStart + 1, [Rev | OldRevs]}}.
+
+
+maybe_set_user_ctx(Db, Options) ->
+    case fabric2_util:get_value(user_ctx, Options) of
+        #user_ctx{} = UserCtx ->
+            set_user_ctx(Db, UserCtx);
+        undefined ->
+            Db
+    end.
 
 
 is_member(Db) ->
@@ -589,7 +600,7 @@ update_doc_int(#{} = Db, #doc{} = Doc0, Options) ->
         end,
         NewExists = not FDI3#full_doc_info.deleted,
 
-        ok = fabric2_fdb:write_doc(Db, FDI3, Doc3),
+        ok = fabric2_fdb:store_doc(Db, FDI3, Doc3),
 
         case {OldExists, NewExists} of
             {false, true} ->

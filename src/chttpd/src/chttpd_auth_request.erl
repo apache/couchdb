@@ -101,7 +101,8 @@ server_authorization_check(#httpd{path_parts=[<<"_", _/binary>>|_]}=Req) ->
     require_admin(Req).
 
 db_authorization_check(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
-    fabric_security:check_is_member(DbName, Ctx),
+    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, Ctx}]),
+    fabric2_db:check_is_member(Db),
     Req.
 
 require_admin(Req) ->
@@ -109,7 +110,8 @@ require_admin(Req) ->
     Req.
 
 require_db_admin(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
-    Sec = fabric2:get_security(DbName),
+    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, Ctx}]),
+    Sec = fabric2_db:get_security(Db),
     case is_db_admin(Ctx,Sec) of
         true -> Req;
         false ->  throw({unauthorized, <<"You are not a server or db admin.">>})

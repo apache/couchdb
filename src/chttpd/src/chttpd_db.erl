@@ -351,8 +351,8 @@ handle_design_info_req(Req, _Db, _DDoc) ->
 create_db_req(#httpd{}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-    case fabric2:create_db(DbName) of
-        ok ->
+    case fabric2_db:create(DbName, []) of
+        {ok, _} ->
             send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
         {error, file_exists} ->
             chttpd:send_error(Req, file_exists);
@@ -362,7 +362,7 @@ create_db_req(#httpd{}=Req, DbName) ->
 
 delete_db_req(#httpd{}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
-    case fabric2:delete_db(DbName, []) of
+    case fabric2_db:delete(DbName, []) of
         ok ->
             send_json(Req, 200, {[{ok, true}]});
         Error ->
@@ -370,13 +370,13 @@ delete_db_req(#httpd{}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
-    Db = fabric2:open_db(DbName, [{user_ctx, Ctx}]),
+    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, Ctx}]),
     Fun(Req, Db).
 
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, Db) ->
     % measure the time required to generate the etag, see if it's worth it
     T0 = os:timestamp(),
-    {ok, DbInfo} = fabric2:get_db_info(Db),
+    {ok, DbInfo} = fabric2_db:get_db_info(Db),
     DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
     couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
     send_json(Req, {DbInfo});
@@ -399,7 +399,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     "ok" ->
         % async_batching
         spawn(fun() ->
-                case catch(fabric2:update_doc(Db, Doc2, Options)) of
+                case catch(fabric2_db:update_doc(Db, Doc2, Options)) of
                 {ok, _} ->
                     chttpd_stats:incr_writes(),
                     ok;
@@ -419,7 +419,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
         % normal
         DocUrl = absolute_uri(Req, [$/, couch_util:url_encode(DbName),
             $/, couch_util:url_encode(DocId)]),
-        case fabric2:update_doc(Db, Doc2, Options) of
+        case fabric2_db:update_doc(Db, Doc2, Options) of
         {ok, NewRev} ->
             chttpd_stats:incr_writes(),
             HttpCode = 201;
@@ -494,7 +494,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         true  -> [all_or_nothing|Options];
         _ -> Options
         end,
-        case fabric2:update_docs(Db, Docs, Options2) of
+        case fabric2_db:update_docs(Db, Docs, Options2) of
         {ok, Results} ->
             % output the results
             chttpd_stats:incr_writes(length(Results)),
@@ -513,7 +513,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
             send_json(Req, 417, ErrorsJson)
         end;
     false ->
-        case fabric2:update_docs(Db, Docs, [replicated_changes|Options]) of
+        case fabric2_db:update_docs(Db, Docs, [replicated_changes|Options]) of
         {ok, Errors} ->
             chttpd_stats:incr_writes(length(Docs)),
             ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
@@ -877,7 +877,7 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
         Doc = couch_doc_open(Db, DocId, Rev, Options2),
         send_doc(Req, Doc, Options2);
     _ ->
-        case fabric2:open_revs(Db, DocId, Revs, Options) of
+        case fabric2_db:open_revs(Db, DocId, Revs, Options) of
             {ok, []} when Revs == all ->
                 chttpd:send_error(Req, {not_found, missing});
             {ok, Results} ->
@@ -928,7 +928,7 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
         Doc = couch_doc_from_req(Req, Db, DocId, Json);
     false ->
         Rev = couch_doc:parse_rev(list_to_binary(couch_util:get_value("_rev", Form))),
-        Doc = case fabric2:open_revs(Db, DocId, [Rev], []) of
+        Doc = case fabric2_db:open_revs(Db, DocId, [Rev], []) of
             {ok, [{ok, Doc0}]} ->
                 chttpd_stats:incr_reads(),
                 Doc0;
@@ -957,7 +957,7 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     NewDoc = Doc#doc{
         atts = UpdatedAtts ++ OldAtts2
     },
-    case fabric2:update_doc(Db, NewDoc, Options) of
+    case fabric2_db:update_doc(Db, NewDoc, Options) of
     {ok, NewRev} ->
         chttpd_stats:incr_writes(),
         HttpCode = 201;
@@ -1006,7 +1006,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
             Doc = couch_doc_from_req(Req, Db, DocId, chttpd:json_body(Req)),
 
             spawn(fun() ->
-                    case catch(fabric2:update_doc(Db, Doc, Options)) of
+                    case catch(fabric2_db:update_doc(Db, Doc, Options)) of
                     {ok, _} ->
                         chttpd_stats:incr_writes(),
                         ok;
@@ -1040,7 +1040,7 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc
-    case fabric2:update_doc(Db,
+    case fabric2_db:update_doc(Db,
         Doc#doc{id=TargetDocId, revs=TargetRevs}, [{user_ctx,Ctx}]) of
     {ok, NewTargetRev} ->
         chttpd_stats:incr_writes(),
@@ -1263,31 +1263,7 @@ http_code_from_status(Status) ->
     end.
 
 update_doc(Db, DocId, #doc{deleted=Deleted, body=DocBody}=Doc, Options) ->
-    {_, Ref} = spawn_monitor(fun() ->
-        try fabric2:update_doc(Db, Doc, Options) of
-            Resp ->
-                exit({exit_ok, Resp})
-        catch
-            throw:Reason ->
-                exit({exit_throw, Reason});
-            error:Reason ->
-                exit({exit_error, Reason});
-            exit:Reason ->
-                exit({exit_exit, Reason})
-        end
-    end),
-    Result = receive
-        {'DOWN', Ref, _, _, {exit_ok, Ret}} ->
-            Ret;
-        {'DOWN', Ref, _, _, {exit_throw, Reason}} ->
-            throw(Reason);
-        {'DOWN', Ref, _, _, {exit_error, Reason}} ->
-            erlang:error(Reason);
-        {'DOWN', Ref, _, _, {exit_exit, Reason}} ->
-            erlang:exit(Reason)
-    end,
-
-    case Result of
+    case fabric2_db:update_doc(Db, Doc, Options) of
     {ok, NewRev} ->
         Accepted = false;
     {accepted, NewRev} ->
@@ -1345,7 +1321,7 @@ couch_doc_from_req(Req, Db, DocId, Json) ->
 couch_doc_open(Db, DocId, Rev, Options) ->
     case Rev of
     nil -> % open most recent rev
-        case fabric2:open_doc(Db, DocId, Options) of
+        case fabric2_db:open_doc(Db, DocId, Options) of
         {ok, Doc} ->
             chttpd_stats:incr_reads(),
             Doc;
@@ -1353,7 +1329,7 @@ couch_doc_open(Db, DocId, Rev, Options) ->
              throw(Error)
          end;
     _ -> % open a specific rev (deletions come back as stubs)
-        case fabric2:open_revs(Db, DocId, [Rev], Options) of
+        case fabric2_db:open_revs(Db, DocId, [Rev], Options) of
         {ok, [{ok, Doc}]} ->
             chttpd_stats:incr_reads(),
             Doc;
@@ -1529,7 +1505,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
             couch_db:validate_docid(Db, DocId),
             #doc{id=DocId};
         Rev ->
-            case fabric2:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
+            case fabric2_db:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
             {ok, [{ok, Doc0}]} ->
                 chttpd_stats:incr_reads(),
                 Doc0;
@@ -1545,7 +1521,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
         atts = NewAtt ++ [A || A <- Atts, couch_att:fetch(name, A) /= FileName]
     },
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
-    case fabric2:update_doc(Db, DocEdited, [{user_ctx,Ctx}, {w,W}]) of
+    case fabric2_db:update_doc(Db, DocEdited, [{user_ctx,Ctx}, {w,W}]) of
     {ok, UpdatedRev} ->
         chttpd_stats:incr_writes(),
         HttpCode = 201;
@@ -1901,7 +1877,7 @@ bulk_get_open_doc_revs1(Db, Props, Options, {DocId, Revs}) ->
             bulk_get_open_doc_revs1(Db, Props, Options, {DocId, Revs, Options1})
     end;
 bulk_get_open_doc_revs1(Db, Props, _, {DocId, Revs, Options}) ->
-    case fabric2:open_revs(Db, DocId, Revs, Options) of
+    case fabric2_db:open_revs(Db, DocId, Revs, Options) of
         {ok, []} ->
             RevStr = couch_util:get_value(<<"rev">>, Props),
             Error = {RevStr, <<"not_found">>, <<"missing">>},

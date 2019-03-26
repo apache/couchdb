@@ -16,8 +16,8 @@
 -export([
     init/3,
 
-    create/1,
-    open/1,
+    create/2,
+    open/2,
     delete/1,
     exists/1,
     is_current/1,
@@ -71,15 +71,15 @@
 
 % Various utility macros
 
--define(REQUIRE_TX(Db), {erlfdb_transaction, _} = maps:get(Db, tx)).
+-define(REQUIRE_TX(Db), {erlfdb_transaction, _} = maps:get(tx, Db)).
 -define(REQUIRE_CURRENT(Db), true = is_current(Db)).
 
 -define(UNSET_VS, {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF}).
 
 
 init(Tx, DbName, Options) ->
-    Root = erlfdb_directory:get_root(),
-    CouchDB = erlfdb_directory:create_or_open(Root, [<<"couchdb">>]),
+    Root = erlfdb_directory:root(),
+    CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
     Prefix = erlfdb_directory:get_name(CouchDB),
     #{
         name => DbName,
@@ -89,7 +89,7 @@ init(Tx, DbName, Options) ->
     }.
 
 
-create(#{} = Db) ->
+create(#{} = Db, Options) ->
     ?REQUIRE_TX(Db),
     #{
         name := DbName,
@@ -120,17 +120,18 @@ create(#{} = Db) ->
         erlfdb:set(Tx, Key, V)
     end, Defaults),
 
+    UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
     Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
 
     Db#{
         uuid => UUID,
         db_prefix => DbPrefix,
-        version => Version,
+        md_version => Version,
         revs_limit => 1000,
         security_doc => {[]},
         validate_doc_update_funs => [],
 
-        user_ctx => #user_ctx{},
+        user_ctx => UserCtx,
 
         before_doc_update => undefined,
         after_doc_update => undefined
@@ -138,7 +139,7 @@ create(#{} = Db) ->
     }.
 
 
-open(#{} = Db0) ->
+open(#{} = Db0, Options) ->
     ?REQUIRE_TX(Db0),
     #{
         name := DbName,
@@ -152,13 +153,14 @@ open(#{} = Db0) ->
         not_found -> erlang:error(database_does_not_exist)
     end,
 
+    UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
     Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
 
     Db1 = Db0#{
-        db_preix => DbPrefix,
-        version => Version,
+        db_prefix => DbPrefix,
+        md_version => Version,
 
-        user_ctx => #user_ctx{},
+        user_ctx => UserCtx,
 
         % Place holders until we implement these
         % bits.
@@ -167,14 +169,14 @@ open(#{} = Db0) ->
         after_doc_read => undefined
     },
 
-    lists:foldl(fun({Key, Val}) ->
+    lists:foldl(fun({Key, Val}, DbAcc) ->
         case Key of
             <<"uuid">> ->
-                Db1#{uuid => Val};
+                DbAcc#{uuid => Val};
             <<"revs_limit">> ->
-                Db1#{revs_limit => ?bin2uint(Val)};
+                DbAcc#{revs_limit => ?bin2uint(Val)};
             <<"security_doc">> ->
-                Db1#{security_doc => ?JSON_DECODE(Val)}
+                DbAcc#{security_doc => ?JSON_DECODE(Val)}
         end
     end, Db1, get_config(Db1)).
 
@@ -188,10 +190,10 @@ delete(#{} = Db) ->
         db_prefix := DbPrefix
     } = Db,
 
-    DbKey = erlfdb_tuple:pack({?DBS, DbName}, LayerPrefix),
+    DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
     erlfdb:clear(Tx, DbKey),
     erlfdb:clear_range_startswith(Tx, DbPrefix),
-    bump_metadata_version(Db),
+    bump_metadata_version(Tx),
     ok.
 
 
@@ -229,14 +231,14 @@ get_info(#{} = Db) ->
         db_prefix := DbPrefix
     } = Db,
 
-    {CStart, CEnd} = erlfdb_tuple:pack({?DB_CHANGES}, DbPrefix),
+    {CStart, CEnd} = erlfdb_tuple:range({?DB_CHANGES}, DbPrefix),
     ChangesFuture = erlfdb:get_range(Tx, CStart, CEnd, [
         {streaming_mode, exact},
         {limit, 1},
         {reverse, true}
     ]),
 
-    StatsPrefix = erlfdb_tuple:pack(?DB_STATS, DbPrefix),
+    StatsPrefix = erlfdb_tuple:pack({?DB_STATS}, DbPrefix),
     MetaFuture = erlfdb:get_range_startswith(Tx, StatsPrefix),
 
     RawSeq = case erlfdb:wait(ChangesFuture) of
@@ -279,10 +281,10 @@ get_config(#{} = Db) ->
         db_prefix := DbPrefix
     } = Db,
 
-    {Start, End} = erlfdb_tuple:pack({?DB_CONFIG}, DbPrefix),
+    {Start, End} = erlfdb_tuple:range({?DB_CONFIG}, DbPrefix),
     Future = erlfdb:get_range(Tx, Start, End),
 
-    lists:map(fun(K, V) ->
+    lists:map(fun({K, V}) ->
         {?DB_CONFIG, Key} = erlfdb_tuple:unpack(K, DbPrefix),
         {Key, V}
     end, erlfdb:wait(Future)).
@@ -389,7 +391,7 @@ get_changes(#{} = Db, Options) ->
         db_prefix := DbPrefix
     } = Db,
 
-    {CStart, CEnd} = erlfdb_tuple:pack({?DB_CHANGES}, DbPrefix),
+    {CStart, CEnd} = erlfdb_tuple:range({?DB_CHANGES}, DbPrefix),
     Future = erlfdb:get_range(Tx, CStart, CEnd, Options),
     lists:map(fun({Key, Val}) ->
         {?DB_CHANGES, Seq} = erlfdb_tuple:unpack(Key, DbPrefix),
