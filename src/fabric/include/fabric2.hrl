@@ -10,22 +10,12 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, fabric, [
-    {description, "Routing and proxying layer for CouchDB cluster"},
-    {vsn, git},
-    {mod, {fabric2_app, []}},
-    {registered, [
-        fabric_server
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        config,
-        couch,
-        rexi,
-        mem3,
-        couch_log,
-        couch_stats,
-        erlfdb
-    ]}
-]}.
+
+-define(SYSTEM_DATABASES, [
+    <<"_dbs">>,
+    <<"_global_changes">>,
+    <<"_metadata">>,
+    <<"_nodes">>,
+    <<"_replicator">>,
+    <<"_users">>
+]).

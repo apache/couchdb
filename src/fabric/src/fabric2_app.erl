@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(fabric_app).
+-module(fabric2_app).
 -behaviour(application).
 
 
@@ -21,7 +21,7 @@
 
 
 start(_Type, StartArgs) ->
-    fabric_sup:start_link(StartArgs).
+    fabric2_sup:start_link(StartArgs).
 
 
 stop(_State) ->

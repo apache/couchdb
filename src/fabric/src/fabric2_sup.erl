@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(fabric_sup).
+-module(fabric2_sup).
 -behaviour(supervisor).
 -vsn(1).
 
@@ -36,8 +36,8 @@ init([]) ->
     },
     Children = [
         #{
-            id => fabric_server,
-            start => {fabric_server, start_link, []}
+            id => fabric2_server,
+            start => {fabric2_server, start_link, []}
         }
     ],
     {ok, {Flags, Children}}.
