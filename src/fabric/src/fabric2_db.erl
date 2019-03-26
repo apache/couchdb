@@ -18,6 +18,10 @@
     open/2,
     delete/2,
 
+    is_admin/1,
+    check_is_admin/1,
+    check_is_member/1,
+
     name/1,
     get_after_doc_read_fun/1,
     get_before_doc_update_fun/1,
@@ -119,6 +123,7 @@
 ]).
 
 
+-include_lib("couch/include/couch_db.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 
 
@@ -132,13 +137,13 @@
 
 
 create(DbName, Options) ->
-    Result = fabric2_util:transactional(DbName, Options, fun(TxDb) ->
+    Result = transactional(DbName, Options, fun(TxDb) ->
         case fabric2_fdb:db_exists(TxDb) of
             true ->
                 {error, file_exists};
             false ->
                 fabric2_fdb:db_create(TxDb)
-        end,
+        end
     end),
     % We cache outside of the transaction so that we're sure
     % that this request created the database
@@ -153,17 +158,17 @@ create(DbName, Options) ->
 open(DbName, Options) ->
     case fabric2_server:fetch(DbName) of
         #{} = Db ->
-            fabric2_util:transactional(Db, fun(TxDb) ->
+            with_tx(Db, fun(TxDb) ->
                 case fabric2_fdb:db_is_current(TxDb) of
                     true ->
                         Db;
                     false ->
-                        Reopend = fabric2_fdb:db_open(TxDb),
+                        Reopened = fabric2_fdb:db_open(TxDb),
                         fabric2_server:store(Reopened)
                 end
             end);
         undefined ->
-            fabric2_util:transactional(DbName, Options, fun(TxDb) ->
+            transactional(DbName, Options, fun(TxDb) ->
                 Opened = fabric2_fdb:db_open(TxDb),
                 fabric2_server:store(Opened)
             end)
@@ -178,6 +183,34 @@ delete(DbName, Options) ->
     end).
 
 
+is_admin(Db) ->
+    % TODO: Need to re-consider couch_db_plugin:check_is_admin/1
+    {SecProps} = get_security(Db),
+    UserCtx = get_user_ctx(Db),
+    {Admins} = get_admins(SecProps),
+    is_authorized(Admins, UserCtx).
+
+
+check_is_admin(Db) ->
+    case is_admin(Db) of
+        true ->
+            ok;
+        false ->
+            UserCtx = get_user_ctx(Db),
+            Reason = <<"You are not a db or server admin.">>,
+            throw_security_error(UserCtx, Reason)
+    end.
+
+
+check_is_member(Db) ->
+    case is_member(Db) of
+        true ->
+            ok;
+        false ->
+            UserCtx = get_user_ctx(Db),
+            throw_security_error(UserCtx)
+    end.
+
 
 name(#{name := DbName}) ->
     DbName.
@@ -190,7 +223,7 @@ get_after_doc_read_fun(#{after_doc_read := AfterDocRead}) ->
 get_before_doc_update_fun(#{before_doc_update := BeforeDocUpdate}) ->
     BeforeDocUpdate.
 
-get_commited_update_seq(#{} = Db) ->
+get_committed_update_seq(#{} = Db) ->
     get_update_seq(Db).
 
 
@@ -198,7 +231,7 @@ get_compacted_seq(#{} = Db) ->
     get_update_seq(Db).
 
 
-get_compactor_pid(#{} = Db) ->
+get_compactor_pid(#{} = _Db) ->
     nil.
 
 
@@ -211,7 +244,7 @@ get_db_info(#{} = Db) ->
         {cluster, {[{n, 0}, {q, 0}, {r, 0}, {w, 0}]}},
         {compact_running, false},
         {data_size, 0},
-        {db_name, DbName},
+        {db_name, name(Db)},
         {disk_format_version, 0},
         {disk_size, 0},
         {instance_start_time, <<"0">>},
@@ -246,7 +279,7 @@ get_doc_count(Db, Key) ->
     end).
 
 
-get_instance_startime(#{}) ->
+get_instance_start_time(#{}) ->
     0.
 
 
@@ -269,6 +302,10 @@ get_update_seq(#{} = Db) ->
         [{Seq, _}] ->
             Seq
     end.
+
+
+get_user_ctx(#{user_ctx := UserCtx}) ->
+    UserCtx.
 
 
 get_uuid(#{uuid := UUID}) ->
@@ -336,7 +373,7 @@ open_doc(#{} = Db, DocId) ->
     open_doc(Db, DocId, []).
 
 
-open_doc(#{} = Db, DocId, Options) ->
+open_doc(#{} = Db, DocId, _Options) ->
     with_tx(Db, fun(TxDb) ->
         case fabric2_fdb:get_full_doc_info(TxDb, DocId) of
             not_found ->
@@ -372,7 +409,7 @@ open_doc_revs(Db, FDI, Revs, Options) ->
                     % We have the rev in our list but know nothing about it
                     {{not_found, missing}, {Pos, Rev}};
                 _ ->
-                    case fabric2_fdb:get_doc_body(Db, Id, RevPath) of
+                    case fabric2_fdb:get_doc_body(TxDb, Id, RevPath) of
                         #doc{} = Doc -> {ok, Doc};
                         Else -> {Else, {Pos, Rev}}
                     end
@@ -400,7 +437,7 @@ update_docs(Db, Docs) ->
 update_docs(Db, Docs, Options) ->
     with_tx(Db, fun(TxDb) ->
         {Resps, Status} = lists:mapfoldl(fun(Doc, Acc) ->
-            case fabric2_doc:update(TxDb, Doc, opts(Options)) of
+            case fabric2_doc:update(TxDb, Doc, Options) of
                 {ok, _} = Resp ->
                     {Resp, Acc};
                 {error, _} = Resp ->
@@ -440,6 +477,92 @@ new_revid(Doc) ->
     Doc#doc{revs = {OldStart + 1, [Rev | OldRevs]}}.
 
 
+is_member(Db) ->
+    {SecProps} = get_security(Db),
+    case is_admin(Db) of
+        true ->
+            true;
+        false ->
+            case is_public_db(SecProps) of
+                true ->
+                    true;
+                false ->
+                    {Members} = get_members(SecProps),
+                    UserCtx = get_user_ctx(Db),
+                    is_authorized(Members, UserCtx)
+            end
+    end.
+
+
+is_authorized(Group, UserCtx) ->
+    #user_ctx{
+        name = UserName,
+        roles = UserRoles
+    } = UserCtx,
+    Names = fabric2_util:get_value(<<"names">>, Group, []),
+    Roles = fabric2_util:get_value(<<"roles">>, Group, []),
+    case check_security(roles, UserRoles, [<<"_admin">> | Roles]) of
+        true ->
+            true;
+        false ->
+            check_security(names, UserName, Names)
+    end.
+
+
+check_security(roles, [], _) ->
+    false;
+check_security(roles, UserRoles, Roles) ->
+    UserRolesSet = ordsets:from_list(UserRoles),
+    RolesSet = ordsets:from_list(Roles),
+    not ordsets:is_disjoint(UserRolesSet, RolesSet);
+check_security(names, _, []) ->
+    false;
+check_security(names, null, _) ->
+    false;
+check_security(names, UserName, Names) ->
+    lists:member(UserName, Names).
+
+
+throw_security_error(#user_ctx{name = null} = UserCtx) ->
+    Reason = <<"You are not authorized to access this db.">>,
+    throw_security_error(UserCtx, Reason);
+throw_security_error(#user_ctx{name = _} = UserCtx) ->
+    Reason = <<"You are not allowed to access this db.">>,
+    throw_security_error(UserCtx, Reason).
+
+
+throw_security_error(#user_ctx{} = UserCtx, Reason) ->
+    Error = security_error_type(UserCtx),
+    throw({Error, Reason}).
+
+
+security_error_type(#user_ctx{name = null}) ->
+    unauthorized;
+security_error_type(#user_ctx{name = _}) ->
+    forbidden.
+
+
+is_public_db(SecProps) ->
+    {Members} = get_members(SecProps),
+    Names = fabric2_util:get_value(<<"names">>, Members, []),
+    Roles = fabric2_util:get_value(<<"roles">>, Members, []),
+    Names =:= [] andalso Roles =:= [].
+
+
+get_admins(SecProps) ->
+    fabric2_util:get_value(<<"admins">>, SecProps, {[]}).
+
+
+get_members(SecProps) ->
+    % we fallback to readers here for backwards compatibility
+    case fabric2_util:get_value(<<"members">>, SecProps) of
+        undefined ->
+            fabric2_util:get_value(<<"readers">>, SecProps, {[]});
+        Members ->
+            Members
+    end.
+
+
 % TODO: Handle _local docs separately.
 update_doc_int(#{} = Db, #doc{} = Doc0, Options) ->
     UpdateType = case lists:member(replicated_changes, Options) of
@@ -449,7 +572,7 @@ update_doc_int(#{} = Db, #doc{} = Doc0, Options) ->
 
     try
         FDI1 = fabric2_fdb:get_full_doc_info(Db, Doc0#doc.id),
-        Doc1 = prep_and_validate(TxDb, FDI1, Doc0, UpdateType),
+        Doc1 = prep_and_validate(Db, FDI1, Doc0, UpdateType),
         Doc2 = case UpdateType of
             interactive_edit -> new_revid(Doc1);
             replicated_changes -> Doc1
@@ -466,7 +589,7 @@ update_doc_int(#{} = Db, #doc{} = Doc0, Options) ->
         end,
         NewExists = not FDI3#full_doc_info.deleted,
 
-        ok = fabric2_fdb:write_doc(Db, FDI3, Doc3)
+        ok = fabric2_fdb:write_doc(Db, FDI3, Doc3),
 
         case {OldExists, NewExists} of
             {false, true} ->
@@ -482,6 +605,9 @@ update_doc_int(#{} = Db, #doc{} = Doc0, Options) ->
         % Need to count design documents
         % Need to track db size changes
 
+        #doc{
+            revs = {RevStart, [Rev | _]}
+        } = Doc3,
         {ok, {RevStart, Rev}}
     catch throw:{?MODULE, Return} ->
         Return
@@ -526,9 +652,9 @@ prep_and_validate(Db, FDI, Doc, interactive_edit) ->
                     ?RETURN({error, conflict})
             end
     end,
-    prep_and_validate(TxDb, Doc, GetDocFun);
+    prep_and_validate(Db, Doc, GetDocFun);
 
-prep_and_validate(TxDb, FDI, Doc, replicated_changes) ->
+prep_and_validate(Db, FDI, Doc, replicated_changes) ->
     #full_doc_info{
         rev_tree = RevTree
     } = FDI,
@@ -570,7 +696,7 @@ prep_and_validate(TxDb, FDI, Doc, replicated_changes) ->
             ?RETURN({ok, []})
     end,
 
-    prep_and_validate(TxDb, Doc, GetDocFun).
+    prep_and_validate(Db, Doc, GetDocFun).
 
 
 prep_and_validate(Db, Doc, GetDocBody) ->
@@ -606,7 +732,7 @@ merge_rev_tree(FDI, Doc, interactive_edit) when FDI#full_doc_info.deleted ->
             % Update the new doc based on revisions in OldInfo
             #doc_info{revs=[WinningRev | _]} = couch_doc:to_doc_info(FDI),
             #rev_info{rev={OldPos, OldRev}} = WinningRev,
-            Body = case couch_util:get_value(comp_body, Doc#doc.meta) of
+            Body = case fabric2_util:get_value(comp_body, Doc#doc.meta) of
                 CompBody when is_binary(CompBody) ->
                     couch_compress:decompress(CompBody);
                 _ ->
@@ -676,9 +802,6 @@ merge_rev_tree(FDI, Doc, replicated_changes) ->
 
 
 validate_doc_update(Db, #doc{id = <<"_design/", _/binary>>} = Doc, _) ->
-    #{
-        security_doc := Security
-    } = Db,
     case catch check_is_admin(Db) of
         ok -> validate_ddoc(Db, Doc);
         Error -> ?RETURN(Error)
@@ -693,7 +816,7 @@ validate_doc_update(Db, Doc, GetDiskDocFun) ->
     } = Db,
     Fun = fun() ->
         DiskDoc = GetDiskDocFun(),
-        JsonCtx = fabric2_util:user_ctx_to_json(TxDb),
+        JsonCtx = fabric2_util:user_ctx_to_json(UserCtx),
         try
             lists:map(fun(VDU) ->
                 case VDU(Doc, DiskDoc, JsonCtx, Security) of
@@ -740,6 +863,12 @@ find_prev_known_rev(Pos, [{_Rev, ?REV_MISSING} | RestPath]) ->
     find_prev_known_rev(Pos - 1, RestPath);
 find_prev_known_rev(Pos, [{_Rev, #leaf{}} | _] = DocPath) ->
     {Pos, [Rev || {Rev, _Val} <- DocPath]}.
+
+
+transactional(DbName, Options, Fun) ->
+    fabric2_util:transactional(fun(Tx) ->
+        Fun(fabric2_fdb:init(Tx, DbName, Options))
+    end).
 
 
 with_tx(#{tx := undefined} = Db, Fun) ->

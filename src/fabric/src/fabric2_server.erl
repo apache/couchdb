@@ -32,6 +32,9 @@
 ]).
 
 
+-include_lib("couch/include/couch_db.hrl").
+
+
 -define(CLUSTER_FILE, "/usr/local/etc/foundationdb/fdb.cluster").
 
 
@@ -41,7 +44,7 @@ start_link() ->
 
 fetch(DbName) when is_binary(DbName) ->
     case ets:lookup(?MODULE, DbName) of
-        [{DbName, #{} = Db] -> Db;
+        [{DbName, #{} = Db}] -> Db;
         [] -> undefined
     end.
 
@@ -51,7 +54,7 @@ store(#{name := DbName} = Db0) when is_binary(DbName) ->
         tx => undefined,
         user_ctx => #user_ctx{}
     },
-    true = ets:insert(?MODULE, {DbName, Db1}}),
+    true = ets:insert(?MODULE, {DbName, Db1}),
     Db1.
 
 
@@ -66,7 +69,6 @@ init(_) ->
     ClusterStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
     Db = erlfdb:open(iolist_to_binary(ClusterStr)),
     application:set_env(fabric, db, Db),
-    init_cluster(Db),
 
     {ok, nil}.
 

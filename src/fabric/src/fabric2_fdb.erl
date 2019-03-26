@@ -38,6 +38,10 @@
 ]).
 
 
+-include("couch/include/couch_db.hrl").
+-include("fabric2.hrl").
+
+
 % This will eventually be the `\xFFmetadataVersion` key that is
 % currently only available in FoundationDB master.
 %
@@ -55,18 +59,20 @@
 -define(CLUSTER_CONFIG, 0).
 -define(ALL_DBS, 1).
 -define(DBS, 15).
+
 -define(DB_CONFIG, 16).
 -define(DB_STATS, 17).
 -define(DB_ALL_DOCS, 18).
 -define(DB_CHANGES, 19).
--define(DB_DOCS, 20).
--define(DB_REVS, 21).
+-define(DB_REVS, 20).
+-define(DB_DOCS, 21).
+-define(DB_LOCAL_DOCS, 22).
 
 
 % Various utility macros
 
 -define(REQUIRE_TX(Db), {erlfdb_transaction, _} = maps:get(Db, tx)).
--define(REQUIRE_CURRENT(Db), true = db_is_current(Db)).
+-define(REQUIRE_CURRENT(Db), true = is_current(Db)).
 
 -define(UNSET_VS, {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF}).
 
@@ -95,7 +101,7 @@ create(#{} = Db) ->
     % we're just using the DbName so that debugging is easier.
     DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
     DbPrefix = erlfdb_tuple:pack({?DBS, DbName}, LayerPrefix),
-    ets:set(Tx, DbKey, DbPrefix),
+    erlfdb:set(Tx, DbKey, DbPrefix),
 
     UUID = fabric2_util:uuid(),
 
@@ -121,7 +127,7 @@ create(#{} = Db) ->
         db_prefix => DbPrefix,
         version => Version,
         revs_limit => 1000,
-        security_doc => {[]}
+        security_doc => {[]},
         validate_doc_update_funs => [],
 
         user_ctx => #user_ctx{},
@@ -161,7 +167,6 @@ open(#{} = Db0) ->
         after_doc_read => undefined
     },
 
-    Config = db_get_config(Db1),
     lists:foldl(fun({Key, Val}) ->
         case Key of
             <<"uuid">> ->
@@ -171,7 +176,7 @@ open(#{} = Db0) ->
             <<"security_doc">> ->
                 Db1#{security_doc => ?JSON_DECODE(Val)}
         end
-    end, Db1, db_get_config(Db1)).
+    end, Db1, get_config(Db1)).
 
 
 delete(#{} = Db) ->
@@ -186,7 +191,7 @@ delete(#{} = Db) ->
     DbKey = erlfdb_tuple:pack({?DBS, DbName}, LayerPrefix),
     erlfdb:clear(Tx, DbKey),
     erlfdb:clear_range_startswith(Tx, DbPrefix),
-    bump_metadata_version(),
+    bump_metadata_version(Db),
     ok.
 
 
@@ -207,7 +212,7 @@ exists(#{name := DbName} = Db) when is_binary(DbName) ->
 is_current(#{} = Db) ->
     ?REQUIRE_TX(Db),
     #{
-        name := DbName,
+        tx := Tx,
         md_version := MetaDataVersion
     } = Db,
 
@@ -220,7 +225,6 @@ is_current(#{} = Db) ->
 get_info(#{} = Db) ->
     ?REQUIRE_CURRENT(Db),
     #{
-        name := DbName,
         tx := Tx,
         db_prefix := DbPrefix
     } = Db,
@@ -361,10 +365,6 @@ store_doc(#{} = Db, #full_doc_info{} = FDI, #doc{} = Doc) ->
         update_seq = OldUpdateSeq
     } = FDI,
 
-    #doc{
-        revs = {RevStart, [Rev | _]}
-    } = Doc,
-
     % Delete old entry in changes feed
     OldSeqKey = erlfdb_tuple:pack({?DB_CHANGES, OldUpdateSeq}, DbPrefix),
     erlfdb:clear(Tx, OldSeqKey),
@@ -378,7 +378,7 @@ store_doc(#{} = Db, #full_doc_info{} = FDI, #doc{} = Doc) ->
     erlfdb:set(Tx, NewDocKey, NewDocVal),
 
     % Update revision tree entry
-    {NewFDIKey, NewFDIVal} = fdi_to_fdb(TxDb, FDI),
+    {NewFDIKey, NewFDIVal} = fdi_to_fdb(Db, FDI),
     erlfdb:set_versionstamped_value(Tx, NewFDIKey, NewFDIVal).
 
 
@@ -453,7 +453,7 @@ fdi_to_fdb(Db, #full_doc_info{} = FDI) ->
     ValTuple = {
         Deleted,
         RevTreeBin,
-        {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF}
+        ?UNSET_VS
     },
     Val = erlfdb_tuple:pack_vs(ValTuple),
     {Key, Val}.

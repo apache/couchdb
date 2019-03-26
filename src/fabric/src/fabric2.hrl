@@ -11,11 +11,6 @@
 % the License.
 
 
--define(SYSTEM_DATABASES, [
-    <<"_dbs">>,
-    <<"_global_changes">>,
-    <<"_metadata">>,
-    <<"_nodes">>,
-    <<"_replicator">>,
-    <<"_users">>
-]).
+-define(uint2bin(I), binary:encode_unsigned(I, little)).
+-define(bin2uint(I), binary:decode_unsigned(I, little)).
+

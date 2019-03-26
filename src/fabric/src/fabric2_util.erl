@@ -14,26 +14,28 @@
 
 
 -export([
-    transactional/2,
-    transactional/3,
-
+    transactional/1,
     get_db_handle/0,
 
     user_ctx_to_json/1,
 
-    uuid/0,
-
+    get_value/2,
+    get_value/3,
     to_hex/1,
+    uuid/0,
 
     debug_cluster/0,
     debug_cluster/2
 ]).
 
 
+-include_lib("couch/include/couch_db.hrl").
+
+
 -define(PDICT_DB_KEY, '$erlfdb_handle').
 
 
-trasactional(Fun) when is_function(Fun, 1) ->
+transactional(Fun) when is_function(Fun, 1) ->
     Db = get_db_handle(),
     erlfdb:transactional(Db, Fun).
 
@@ -53,14 +55,22 @@ user_ctx_to_json(Db) ->
     UserCtx = fabric2_db:get_user_ctx(Db),
     {[
         {<<"db">>, fabric2_db:name(Db)},
-        {<<"name">>, Ctx#user_ctx.name},
-        {<<"roles">>, Ctx#user_ctx.roles}
+        {<<"name">>, UserCtx#user_ctx.name},
+        {<<"roles">>, UserCtx#user_ctx.roles}
     ]}.
 
 
+get_value(Key, List) ->
+    get_value(Key, List, undefined).
 
-uuid() ->
-    to_hex(crypto:strong_rand_bytes(16)).
+
+get_value(Key, List, Default) ->
+    case lists:keysearch(Key, 1, List) of
+        {value, {Key,Value}} ->
+            Value;
+        false ->
+            Default
+    end.
 
 
 to_hex(Bin) ->
@@ -70,7 +80,7 @@ to_hex(Bin) ->
 to_hex_int(<<>>) ->
     [];
 to_hex_int(<<Hi:4, Lo:4, Rest/binary>>) ->
-    [nibble_to_hex(Hi), nibble_to_hex(Lo) | to_hex(Rest)];
+    [nibble_to_hex(Hi), nibble_to_hex(Lo) | to_hex(Rest)].
 
 
 nibble_to_hex(I) ->
@@ -92,6 +102,10 @@ nibble_to_hex(I) ->
         14 -> $e;
         15 -> $f
     end.
+
+
+uuid() ->
+    to_hex(crypto:strong_rand_bytes(16)).
 
 
 debug_cluster() ->
