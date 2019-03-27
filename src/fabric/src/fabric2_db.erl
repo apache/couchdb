@@ -439,7 +439,7 @@ update_docs(Db, Docs) ->
 update_docs(Db, Docs, Options) ->
     with_tx(Db, fun(TxDb) ->
         {Resps, Status} = lists:mapfoldl(fun(Doc, Acc) ->
-            case fabric2_doc:update(TxDb, Doc, Options) of
+            case update_doc_int(TxDb, Doc, Options) of
                 {ok, _} = Resp ->
                     {Resp, Acc};
                 {error, _} = Resp ->
@@ -615,6 +615,7 @@ update_doc_int(#{} = Db, #doc{} = Doc0, Options) ->
 
         % Need to count design documents
         % Need to track db size changes
+        % Need to update VDUs on ddoc change
 
         #doc{
             revs = {RevStart, [Rev | _]}
@@ -623,6 +624,7 @@ update_doc_int(#{} = Db, #doc{} = Doc0, Options) ->
     catch throw:{?MODULE, Return} ->
         Return
     end.
+
 
 prep_and_validate(Db, not_found, Doc, UpdateType) ->
     case Doc#doc.revs of
@@ -889,4 +891,3 @@ with_tx(#{tx := undefined} = Db, Fun) ->
 
 with_tx(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
     Fun(Db).
-

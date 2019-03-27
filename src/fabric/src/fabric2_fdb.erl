@@ -38,7 +38,7 @@
 ]).
 
 
--include("couch/include/couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -include("fabric2.hrl").
 
 
@@ -298,7 +298,8 @@ set_config(#{} = Db, ConfigKey, ConfigVal) ->
     } = Db,
 
     Key = erlfdb_tuple:pack({?DB_CONFIG, ConfigKey}, DbPrefix),
-    erlfdb:set(Tx, Key, ConfigVal).
+    erlfdb:set(Tx, Key, ConfigVal),
+    bump_metadata_version(Tx).
 
 
 get_stat(#{} = Db, StatKey) ->
@@ -313,11 +314,10 @@ get_stat(#{} = Db, StatKey) ->
     % Might need to figure out some sort of type
     % system here. Uints are because stats are all
     % atomic op adds for the moment.
-    ?bin2uint(erlfdb:wait(erlfdb:get(Tx, Key))),
-    bump_metadata_version(Tx).
+    ?bin2uint(erlfdb:wait(erlfdb:get(Tx, Key))).
 
 
-incr_stat(_Db, _Statey, 0) ->
+incr_stat(_Db, _StatKey, 0) ->
     ok;
 
 incr_stat(#{} = Db, StatKey, Increment) when is_integer(Increment) ->
@@ -343,14 +343,14 @@ get_full_doc_info(#{} = Db, DocId) ->
     fdb_to_fdi(Db, DocId, Val).
 
 
-get_doc_body(#{} = Db, DocId, {Pos, [Rev | _]} = Path) ->
+get_doc_body(#{} = Db, DocId, {Pos, [Rev | _] = Path}) ->
     ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = Db,
 
-    Key = erlfdb_tupe:pack({?DB_REVS, DocId, Pos, Rev}, DbPrefix),
+    Key = erlfdb_tuple:pack({?DB_REVS, DocId, Pos, Rev}, DbPrefix),
     Val = erlfdb:wait(erlfdb:get(Tx, Key)),
     fdb_to_doc(Db, DocId, Pos, Path, Val).
 
@@ -372,7 +372,7 @@ store_doc(#{} = Db, #full_doc_info{} = FDI, #doc{} = Doc) ->
     erlfdb:clear(Tx, OldSeqKey),
 
     % Add new entry to changes feed
-    NewSeqKey = erlfdb_tuple:pack({?DB_CHANGES, ?UNSET_VS}, DbPrefix),
+    NewSeqKey = erlfdb_tuple:pack_vs({?DB_CHANGES, ?UNSET_VS}, DbPrefix),
     erlfdb:set_versionstamped_key(Tx, NewSeqKey, DocId),
 
     % Write document data
@@ -397,8 +397,6 @@ get_changes(#{} = Db, Options) ->
         {?DB_CHANGES, Seq} = erlfdb_tuple:unpack(Key, DbPrefix),
         {fabric2_util:to_hex(Seq), Val}
     end, erlfdb:wait(Future)).
-
-
 
 
 bump_metadata_version(Tx) ->
