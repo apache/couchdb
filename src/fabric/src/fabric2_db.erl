@@ -18,6 +18,9 @@
     open/2,
     delete/2,
 
+    list_dbs/0,
+    list_dbs/1,
+
     is_admin/1,
     check_is_admin/1,
     check_is_member/1,
@@ -96,12 +99,12 @@
     %% open_read_stream/2,
     %% is_active_stream/2,
 
-    %% fold_docs/3,
-    %% fold_docs/4,
+    fold_docs/3,
+    fold_docs/4,
     %% fold_local_docs/4,
     %% fold_design_docs/4,
-    %% fold_changes/4,
-    %% fold_changes/5,
+    fold_changes/4,
+    fold_changes/5,
     %% count_changes_since/2,
     %% fold_purge_infos/4,
     %% fold_purge_infos/5,
@@ -183,6 +186,16 @@ delete(DbName, Options) ->
     {ok, Db} = open(DbName, Options),
     with_tx(Db, fun(TxDb) ->
         fabric2_fdb:delete(TxDb)
+    end).
+
+
+list_dbs() ->
+    list_dbs([]).
+
+
+list_dbs(Options) ->
+    fabric2_util:transactional(fun(Tx) ->
+        fabric2_fdb:list_dbs(Tx, Options)
     end).
 
 
@@ -450,6 +463,25 @@ update_docs(Db, Docs, Options) ->
     end).
 
 
+fold_docs(Db, UserFun, UserAcc) ->
+    fold_docs(Db, UserFun, UserAcc, []).
+
+
+fold_docs(Db, UserFun, UserAcc, Options) ->
+    with_tx(Db, fun(TxDb) ->
+        fabric2_fdb:fold_docs(TxDb, UserFun, UserAcc, Options)
+    end).
+
+
+fold_changes(Db, SinceSeq, UserFun, UserAcc) ->
+    fold_changes(Db, SinceSeq, UserFun, UserAcc, []).
+
+
+fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
+    with_tx(Db, fun(TxDb) ->
+        fabric2_fdb:fold_changes(TxDb, SinceSeq, UserFun, UserAcc, Options)
+    end).
+
 new_revid(Doc) ->
     #doc{
         body = Body,
@@ -602,10 +634,14 @@ update_doc_int(#{} = Db, #doc{} = Doc0, Options) ->
 
         ok = fabric2_fdb:store_doc(Db, FDI3, Doc3),
 
+        {_, {WinPos, [WinRev | _]}} = couch_doc:to_doc_info_path(FDI3),
+
         case {OldExists, NewExists} of
             {false, true} ->
+                fabric2_fdb:add_to_all_docs(Db, Doc3#doc.id, {WinPos, WinRev}),
                 fabric2_fdb:incr_stat(Db, <<"doc_count">>, 1);
             {true, false} ->
+                fabric2_fdb:rem_from_all_docs(Db, Doc3#doc.id),
                 fabric2_fdb:incr_stat(Db, <<"doc_count">>, -1),
                 fabric2_fdb:incr_stat(Db, <<"doc_del_count">>, 1);
             {Exists, Exists} ->
@@ -616,7 +652,6 @@ update_doc_int(#{} = Db, #doc{} = Doc0, Options) ->
         % Need to count design documents
         % Need to track db size changes
         % Need to update VDUs on ddoc change
-
         #doc{
             revs = {RevStart, [Rev | _]}
         } = Doc3,

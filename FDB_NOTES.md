@@ -57,3 +57,8 @@ Things of Note
 
 12. Is it possible that a server_admin can delete a db without being able
     to open it? If so that's probably changed behavior.
+
+13. All docs on large active databases might be a thing getting the doc
+    count. If we allow range requests up to 5s, and we continue to return
+    the doc count total we may have to play games with snapshot reads on
+    the doc count key or else it'll whack any _all_docs range requests

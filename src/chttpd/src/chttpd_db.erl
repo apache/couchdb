@@ -94,17 +94,12 @@ handle_changes_req1(#httpd{}=Req, Db) ->
     #changes_args{filter=Raw, style=Style} = Args0 = parse_changes_query(Req),
     ChangesArgs = Args0#changes_args{
         filter_fun = couch_changes:configure_filter(Raw, Style, Req, Db),
-        db_open_options = [{user_ctx, couch_db:get_user_ctx(Db)}]
+        db_open_options = [{user_ctx, fabric2_db:get_user_ctx(Db)}]
     },
     Max = chttpd:chunked_response_buffer_size(),
     case ChangesArgs#changes_args.feed of
     "normal" ->
-        T0 = os:timestamp(),
-        {ok, Info} = fabric:get_db_info(Db),
-        Suffix = mem3:shard_suffix(Db),
-        Etag = chttpd:make_etag({Info, Suffix}),
-        DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
-        couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
+        Etag = <<"foo">>,
         chttpd:etag_respond(Req, Etag, fun() ->
             Acc0 = #cacc{
                 feed = normal,
@@ -112,7 +107,7 @@ handle_changes_req1(#httpd{}=Req, Db) ->
                 mochi = Req,
                 threshold = Max
             },
-            fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
+            fabric2_db:fold_changes(Db, <<>>, fun changes_callback/2, Acc0)
         end);
     Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource"  ->
         couch_stats:increment_counter([couchdb, httpd, clients_requesting_changes]),
@@ -825,15 +820,15 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
     chttpd:end_delayed_json_response(Resp1).
 
-all_docs_view(Req, Db, Keys, OP) ->
-    Args0 = couch_mrview_http:parse_params(Req, Keys),
-    Args1 = Args0#mrargs{view_type=map},
-    Args2 = fabric_util:validate_all_docs_args(Db, Args1),
-    Args3 = set_namespace(OP, Args2),
+all_docs_view(Req, Db, _Keys, _OP) ->
+    % Args0 = couch_mrview_http:parse_params(Req, Keys),
+    % Args1 = Args0#mrargs{view_type=map},
+    % Args2 = fabric_util:validate_all_docs_args(Db, Args1),
+    % Args3 = set_namespace(OP, Args2),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
-    {ok, Resp} = fabric:all_docs(Db, Options, fun view_cb/2, VAcc, Args3),
+    {ok, Resp} = fabric2_db:fold_docs(Db, fun view_cb/2, VAcc, Options),
     {ok, Resp#vacc.resp}.
 
 view_cb({row, Row} = Msg, Acc) ->

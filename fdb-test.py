@@ -8,11 +8,20 @@ S.headers["Content-Type"] = "application/json"
 
 
 def main():
-    db_url = "http://127.0.0.1:15984/fdb-test"
+    base_url = "http://127.0.0.1:15984"
+    db_url = base_url + "/fdb-test"
     S.delete(db_url)
+
+    r = S.get(base_url + "/_all_dbs")
+    assert r.status_code == 200
+    assert "fdb-test" not in r.json()
 
     r = S.put(db_url)
     assert r.status_code == 201
+
+    r = S.get(base_url + "/_all_dbs")
+    assert r.status_code == 200
+    assert "fdb-test" in r.json()
 
     r = S.get(db_url)
     assert r.status_code == 200
@@ -37,6 +46,19 @@ def main():
     assert r.status_code == 200
     assert "_rev" in r.json()
 
+    r = S.get(db_url + "/_all_docs")
+    print r.text
+    assert r.status_code == 200
+    assert "rows" in r.json()
+    ids = [r["key"] for r in r.json()["rows"]]
+    assert "foo" in ids
+
+    r = S.get(db_url + "/_changes")
+    print r.text
+    assert r.status_code == 200
+    assert "results" in r.json()
+    ids = [r["id"] for r in r.json()["results"]]
+    assert "foo" in ids
 
 if __name__ == "__main__":
     main()

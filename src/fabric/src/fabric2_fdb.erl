@@ -22,6 +22,8 @@
     exists/1,
     is_current/1,
 
+    list_dbs/2,
+
     get_info/1,
     get_config/1,
     set_config/3,
@@ -33,6 +35,12 @@
     get_doc_body/3,
 
     store_doc/3,
+
+    add_to_all_docs/3,
+    rem_from_all_docs/2,
+
+    fold_docs/4,
+    fold_changes/5,
 
     get_changes/2
 ]).
@@ -224,6 +232,18 @@ is_current(#{} = Db) ->
     end.
 
 
+list_dbs(Tx, _Options) ->
+    Root = erlfdb_directory:root(),
+    CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
+    LayerPrefix = erlfdb_directory:get_name(CouchDB),
+    {Start, End} = erlfdb_tuple:range({?ALL_DBS}, LayerPrefix),
+    Future = erlfdb:get_range(Tx, Start, End),
+    lists:map(fun({K, _V}) ->
+        {?ALL_DBS, DbName} = erlfdb_tuple:unpack(K, LayerPrefix),
+        DbName
+    end, erlfdb:wait(Future)).
+
+
 get_info(#{} = Db) ->
     ?REQUIRE_CURRENT(Db),
     #{
@@ -367,13 +387,19 @@ store_doc(#{} = Db, #full_doc_info{} = FDI, #doc{} = Doc) ->
         update_seq = OldUpdateSeq
     } = FDI,
 
+    #doc{
+        revs = {Pos, [Rev | _]},
+        deleted = Deleted
+    } = Doc,
+
     % Delete old entry in changes feed
     OldSeqKey = erlfdb_tuple:pack({?DB_CHANGES, OldUpdateSeq}, DbPrefix),
     erlfdb:clear(Tx, OldSeqKey),
 
     % Add new entry to changes feed
     NewSeqKey = erlfdb_tuple:pack_vs({?DB_CHANGES, ?UNSET_VS}, DbPrefix),
-    erlfdb:set_versionstamped_key(Tx, NewSeqKey, DocId),
+    NewSeqVal = erlfdb_tuple:pack({DocId, Deleted, {Pos, Rev}}),
+    erlfdb:set_versionstamped_key(Tx, NewSeqKey, NewSeqVal),
 
     % Write document data
     {NewDocKey, NewDocVal} = doc_to_fdb(Db, Doc),
@@ -382,6 +408,104 @@ store_doc(#{} = Db, #full_doc_info{} = FDI, #doc{} = Doc) ->
     % Update revision tree entry
     {NewFDIKey, NewFDIVal} = fdi_to_fdb(Db, FDI),
     erlfdb:set_versionstamped_value(Tx, NewFDIKey, NewFDIVal).
+
+
+add_to_all_docs(#{} = Db, DocId, {Pos, Rev}) ->
+    ?REQUIRE_CURRENT(Db),
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = Db,
+
+    Key = erlfdb_tuple:pack({?DB_ALL_DOCS, DocId}, DbPrefix),
+    Val = erlfdb_tuple:pack({Pos, Rev}),
+    erlfdb:set(Tx, Key, Val).
+
+
+rem_from_all_docs(#{} = Db, DocId) ->
+    ?REQUIRE_CURRENT(Db),
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = Db,
+
+    Key = erlfdb_tuple:pack({?DB_ALL_DOCS, DocId}, DbPrefix),
+    ok = erlfdb:clear(Tx, Key).
+
+
+fold_docs(#{} = Db, UserFun, UserAcc0, _Options) ->
+    ?REQUIRE_CURRENT(Db),
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = Db,
+
+    DocCountKey = erlfdb_tuple:pack({?DB_STATS, <<"doc_count">>}, DbPrefix),
+    DocCountFuture = erlfdb:get(Tx, DocCountKey),
+
+    {Start, End} = erlfdb_tuple:range({?DB_ALL_DOCS}, DbPrefix),
+    RangeFuture = erlfdb:get_range(Tx, Start, End),
+
+    DocCount = ?bin2uint(erlfdb:wait(DocCountFuture)),
+
+    {ok, UserAcc1} = UserFun({meta, [
+        {total, DocCount},
+        {offset, null}
+    ]}, UserAcc0),
+
+    UserAcc2 = lists:foldl(fun({K, V}, Acc) ->
+        {?DB_ALL_DOCS, DocId} = erlfdb_tuple:unpack(K, DbPrefix),
+        RevId = erlfdb_tuple:unpack(V),
+
+        {ok, NewAcc} = UserFun({row, [
+            {id, DocId},
+            {key, DocId},
+            {value, couch_doc:rev_to_str(RevId)}
+        ]}, Acc),
+
+        NewAcc
+    end, UserAcc1, erlfdb:wait(RangeFuture)),
+
+    UserFun(complete, UserAcc2).
+
+
+fold_changes(#{} = Db, SinceSeq, UserFun, UserAcc0, _Options) ->
+    ?REQUIRE_CURRENT(Db),
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = Db,
+
+    {Start0, End} = erlfdb_tuple:range({?DB_CHANGES}, DbPrefix),
+    Start = erlang:max(Start0, SinceSeq),
+    Future = erlfdb:get_range(Tx, Start, End),
+
+    {ok, UserAcc1} = UserFun(start, UserAcc0),
+
+    UserAcc2 = lists:foldl(fun({K, V}, Acc) ->
+        {?DB_CHANGES, UpdateSeq} = erlfdb_tuple:unpack(K, DbPrefix),
+        {DocId, Deleted, RevId} = erlfdb_tuple:unpack(V),
+
+        UpdateSeqEJson = fabric2_util:to_hex(erlfdb_tuple:pack({UpdateSeq})),
+
+        DelMember = if not Deleted -> []; true ->
+            [{deleted, true}]
+        end,
+
+        {ok, NewAcc} = UserFun({change, {[
+            {seq, UpdateSeqEJson},
+            {id, DocId},
+            {changes, [{[{rev, couch_doc:rev_to_str(RevId)}]}]}
+        ] ++ DelMember}}, Acc),
+
+        NewAcc
+    end, UserAcc1, erlfdb:wait(Future)),
+
+    {LastKey, _} = lists:last(erlfdb:wait(Future)),
+    {?DB_CHANGES, LastSeq} = erlfdb_tuple:unpack(LastKey, DbPrefix),
+    LastSeqEJson = fabric2_util:to_hex(erlfdb_tuple:pack({LastSeq})),
+
+    UserFun({stop, LastSeqEJson, 0}, UserAcc2).
 
 
 get_changes(#{} = Db, Options) ->
