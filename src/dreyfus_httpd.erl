@@ -514,7 +514,9 @@ get_view_partition_option(#doc{body = {Props}}, Default) ->
 
 hits_to_json(DbName, IncludeDocs, Hits) ->
     {Ids, HitData} = lists:unzip(lists:map(fun get_hit_data/1, Hits)),
+    chttpd_stats:incr_rows(length(Hits)),
     if IncludeDocs ->
+        chttpd_stats:incr_reads(length(Hits)),
         {ok, JsonDocs} = dreyfus_fabric:get_json_docs(DbName, Ids),
         lists:zipwith(fun(Hit, {Id, Doc}) ->
                 case Hit of
