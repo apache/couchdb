@@ -1359,7 +1359,7 @@ prepare_doc_summaries(Db, BucketList) ->
                 meta = [
                     {size_info, SizeInfo},
                     {atts_stream, AttsStream},
-                    {ejson_size, ?term_size(Body)}
+                    {ejson_size, couch_ejson_size:encoded_size(Body)}
                 ] ++ Doc0#doc.meta
             },
             couch_db_engine:serialize_doc(Db, Doc1)
