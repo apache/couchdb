@@ -25,12 +25,12 @@ $ EX_USERNAME=myusername EX_PASSWORD=password EX_COUCH_URL=http://my-couchdb.com
 X means done, - means partially
 
   - [X] Port all_docs.js
-  - [ ] Port attachment_names.js
-  - [ ] Port attachment_paths.js
-  - [ ] Port attachment_ranges.js
-  - [ ] Port attachments.js
+  - [X] Port attachment_names.js
+  - [X] Port attachment_paths.js
+  - [X] Port attachment_ranges.js
+  - [X] Port attachments.js
   - [ ] Port attachments_multipart.js
-  - [ ] Port attachment_views.js
+  - [X] Port attachment_views.js
   - [ ] Port auth_cache.js
   - [X] Port basics.js
   - [X] Port batch_save.js
