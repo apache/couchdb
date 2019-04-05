@@ -332,6 +332,25 @@ defmodule Couch.DBTest do
     inspect(resp, opts)
   end
 
+  def run_on_modified_server(settings, fun) do
+    resp = Couch.get("/_membership")
+    assert resp.status_code == 200
+    nodes = resp.body["all_nodes"]
+
+    Enum.each(settings, fn setting ->
+      Enum.each(nodes, fn node ->
+        assert setting.value == nil
+
+        Couch.put("/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+          headers: ["X-Couch-Persist": "false"],
+          body: setting.value
+        )
+      end)
+    end)
+
+    fun.()
+  end
+
   def restart_cluster do
     resp = Couch.get("/_membership")
     assert resp.status_code == 200

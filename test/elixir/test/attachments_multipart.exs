@@ -233,9 +233,32 @@ defmodule AttachmentMultipartTest do
     assert doc["_attachments"]["foo.txt"]["stub"] == true
     assert doc["_attachments"]["bar.txt"]["follows"] == true
     assert Enum.at(sections, 1).body == "this is 18 chars l"
+  end
+
+  @tag :with_db
+  test "manages compressed attachment successfully", context do
+    db_name = context[:db_name]
 
     # check that with the document multipart/mixed API it's possible to receive
     #  attachments in compressed form (if they're stored in compressed form)
+    server_config = [
+      %{
+        :section => "attachments",
+        :key => "compression_level",
+        :value => "8"
+      },
+      %{
+        :section => "attachments",
+        :key => "compressible_types",
+        :value => "text/plain"
+      }
+    ]
+
+    run_on_modified_server(server_config, &test_multipart_att_compression/0)
+  end
+
+  defp test_multipart_att_compression do
+    nil
   end
 
   def get_boundary(response) do
