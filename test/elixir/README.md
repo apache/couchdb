@@ -29,7 +29,7 @@ X means done, - means partially
   - [X] Port attachment_paths.js
   - [X] Port attachment_ranges.js
   - [X] Port attachments.js
-  - [ ] Port attachments_multipart.js
+  - [X] Port attachments_multipart.js
   - [X] Port attachment_views.js
   - [ ] Port auth_cache.js
   - [X] Port basics.js

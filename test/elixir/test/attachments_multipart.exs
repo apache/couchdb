@@ -236,7 +236,7 @@ defmodule AttachmentMultipartTest do
   end
 
   @tag :with_db
-  test "manages compressed attachment successfully", context do
+  test "manages compressed attachments successfully", context do
     db_name = context[:db_name]
 
     # check that with the document multipart/mixed API it's possible to receive
@@ -254,11 +254,100 @@ defmodule AttachmentMultipartTest do
       }
     ]
 
-    run_on_modified_server(server_config, &test_multipart_att_compression/0)
+    run_on_modified_server(
+      server_config,
+      fn -> test_multipart_att_compression(db_name) end
+    )
   end
 
-  defp test_multipart_att_compression do
-    nil
+  defp test_multipart_att_compression(dbname) do
+    doc = %{
+      "_id" => "foobar"
+    }
+
+    lorem = Couch.get("/_utils/script/test/lorem.txt").body
+    hello_data = "hello world"
+    {_, resp} = create_doc(dbname, doc)
+    first_rev = resp.body["rev"]
+
+    resp =
+      Couch.put("/#{dbname}/#{doc["_id"]}/data.bin",
+        query: %{:rev => first_rev},
+        body: hello_data,
+        headers: ["Content-Type": "application/binary"]
+      )
+
+    assert resp.status_code == 201
+    second_rev = resp.body["rev"]
+
+    resp =
+      Couch.put("/#{dbname}/#{doc["_id"]}/lorem.txt",
+        query: %{:rev => second_rev},
+        body: lorem,
+        headers: ["Content-Type": "text/plain"]
+      )
+
+    assert resp.status_code == 201
+    third_rev = resp.body["rev"]
+
+    resp =
+      Couch.get("/#{dbname}/#{doc["_id"]}",
+        query: %{:open_revs => ~s(["#{third_rev}"])},
+        headers: [Accept: "multipart/mixed", "X-CouchDB-Send-Encoded-Atts": "true"]
+      )
+
+    assert resp.status_code == 200
+    sections = parse_multipart(resp)
+    # 1 section, with a multipart/related Content-Type
+    assert length(sections) == 1
+    ctype_value = Enum.at(sections, 0).headers["Content-Type"]
+    assert String.starts_with?(ctype_value, "multipart/related;") == true
+
+    inner_sections = parse_multipart(Enum.at(sections, 0))
+    # 3 inner sections: a document body section plus 2 attachment data sections
+    assert length(inner_sections) == 3
+    assert Enum.at(inner_sections, 0).headers["Content-Type"] == "application/json"
+
+    doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps])
+    assert doc["_attachments"]["lorem.txt"]["follows"] == true
+    assert doc["_attachments"]["lorem.txt"]["encoding"] == "gzip"
+    assert doc["_attachments"]["data.bin"]["follows"] == true
+    assert doc["_attachments"]["data.bin"]["encoding"] != "gzip"
+
+    if Enum.at(inner_sections, 1).body == hello_data do
+      assert Enum.at(inner_sections, 2).body != lorem
+    else
+      if assert Enum.at(inner_sections, 2).body == hello_data do
+        assert Enum.at(inner_sections, 1).body != lorem
+      else
+        assert false, "Could not found data.bin attachment data"
+      end
+    end
+
+    # now test that it works together with the atts_since parameter
+
+    resp =
+      Couch.get("/#{dbname}/#{doc["_id"]}",
+        query: %{:open_revs => ~s(["#{third_rev}"]), :atts_since => ~s(["#{second_rev}"])},
+        headers: [Accept: "multipart/mixed", "X-CouchDB-Send-Encoded-Atts": "true"]
+      )
+
+    assert resp.status_code == 200
+    sections = parse_multipart(resp)
+    # 1 section, with a multipart/related Content-Type
+
+    assert length(sections) == 1
+    ctype_value = Enum.at(sections, 0).headers["Content-Type"]
+    assert String.starts_with?(ctype_value, "multipart/related;") == true
+
+    inner_sections = parse_multipart(Enum.at(sections, 0))
+    # 3 inner sections: a document body section plus 2 attachment data sections
+    assert length(inner_sections) == 3
+    assert Enum.at(inner_sections, 0).headers["Content-Type"] == "application/json"
+    doc = :jiffy.decode(Enum.at(inner_sections, 0).body, [:return_maps])
+    assert doc["_attachments"]["lorem.txt"]["follows"] == true
+    assert doc["_attachments"]["lorem.txt"]["encoding"] == "gzip"
+    assert Enum.at(inner_sections, 1).body != lorem
   end
 
   def get_boundary(response) do

@@ -337,18 +337,43 @@ defmodule Couch.DBTest do
     assert resp.status_code == 200
     nodes = resp.body["all_nodes"]
 
-    Enum.each(settings, fn setting ->
-      Enum.each(nodes, fn node ->
-        assert setting.value == nil
+    prev_settings =
+      Enum.map(settings, fn setting ->
+        prev_setting_node =
+          Enum.reduce(nodes, %{}, fn node, acc ->
+            resp =
+              Couch.put("/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+                headers: ["X-Couch-Persist": false],
+                body: :jiffy.encode(setting.value)
+              )
 
-        Couch.put("/_node/#{node}/_config/#{setting.section}/#{setting.key}",
-          headers: ["X-Couch-Persist": "false"],
-          body: setting.value
-        )
+            Map.put(acc, node, resp.body)
+          end)
+
+        Map.put(setting, :nodes, Map.to_list(prev_setting_node))
       end)
-    end)
 
-    fun.()
+    try do
+      fun.()
+    after
+      Enum.each(prev_settings, fn setting ->
+        Enum.each(setting.nodes, fn node_value ->
+          node = elem(node_value, 0)
+          value = elem(node_value, 1)
+
+          if value == ~s(""\\n) do
+            Couch.delete("/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+              headers: ["X-Couch-Persist": false]
+            )
+          else
+            Couch.put("/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+              headers: ["X-Couch-Persist": false],
+              body: :jiffy.encode(value)
+            )
+          end
+        end)
+      end)
+    end
   end
 
   def restart_cluster do
