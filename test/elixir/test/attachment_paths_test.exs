@@ -75,7 +75,8 @@ defmodule AttachmentPathsTest do
     assert resp.body == "We like percent two F."
 
     resp =
-      Couch.put("/#{db_name}/bin_doc/foo/attachment.txt",
+      Couch.put(
+        "/#{db_name}/bin_doc/foo/attachment.txt",
         body: "Just some text",
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
@@ -83,7 +84,8 @@ defmodule AttachmentPathsTest do
     assert resp.status_code == 409
 
     resp =
-      Couch.put("/#{db_name}/bin_doc/foo/bar2.txt",
+      Couch.put(
+        "/#{db_name}/bin_doc/foo/bar2.txt",
         query: %{rev: rev},
         body: "This is no base64 encoded text",
         headers: ["Content-Type": "text/plain;charset=utf-8"]
@@ -100,8 +102,8 @@ defmodule AttachmentPathsTest do
     assert att_doc["_attachments"]["foo%2Fbaz.txt"]
     assert att_doc["_attachments"]["foo/bar2.txt"]
 
-    assert att_doc["_attachments"]["foo/bar2.txt"]["content_type"] ==
-             "text/plain;charset=utf-8"
+    ctype = att_doc["_attachments"]["foo/bar2.txt"]["content_type"]
+    assert ctype == "text/plain;charset=utf-8"
 
     assert att_doc["_attachments"]["foo/bar2.txt"]["length"] == 30
     delete_db(db_name)
@@ -139,7 +141,8 @@ defmodule AttachmentPathsTest do
     assert resp.body == "We like percent two F."
 
     resp =
-      Couch.put("/#{db_name}/_design/bin_doc/foo/attachment.txt",
+      Couch.put(
+        "/#{db_name}/_design/bin_doc/foo/attachment.txt",
         body: "Just some text",
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
@@ -147,7 +150,8 @@ defmodule AttachmentPathsTest do
     assert resp.status_code == 409
 
     resp =
-      Couch.put("/#{db_name}/_design/bin_doc/foo/bar2.txt",
+      Couch.put(
+        "/#{db_name}/_design/bin_doc/foo/bar2.txt",
         query: %{rev: rev},
         body: "This is no base64 encoded text",
         headers: ["Content-Type": "text/plain;charset=utf-8"]
@@ -164,8 +168,8 @@ defmodule AttachmentPathsTest do
     assert att_doc["_attachments"]["foo%2Fbaz.txt"]
     assert att_doc["_attachments"]["foo/bar2.txt"]
 
-    assert att_doc["_attachments"]["foo/bar2.txt"]["content_type"] ==
-             "text/plain;charset=utf-8"
+    ctype = att_doc["_attachments"]["foo/bar2.txt"]["content_type"]
+    assert ctype == "text/plain;charset=utf-8"
 
     assert att_doc["_attachments"]["foo/bar2.txt"]["length"] == 30
     delete_db(db_name)

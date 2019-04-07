@@ -62,7 +62,8 @@ defmodule AttachmentNamesTest do
 
     # standalone docs
     resp =
-      Couch.put("/#{db_name}/bin_doc3/attachmenttxt",
+      Couch.put(
+        "/#{db_name}/bin_doc3/attachmenttxt",
         body: @bin_data,
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
@@ -75,14 +76,16 @@ defmodule AttachmentNamesTest do
     }
 
     resp =
-      Couch.post("/#{db_name}/_bulk_docs",
+      Couch.post(
+        "/#{db_name}/_bulk_docs",
         body: docs
       )
 
     assert(resp.status_code == 201)
 
     resp =
-      Couch.put("/#{db_name}/bin_doc2",
+      Couch.put(
+        "/#{db_name}/bin_doc2",
         body: @leading_underscores_att
       )
 

@@ -25,7 +25,8 @@ defmodule AttachmentRangesTest do
     create_doc(db_name, bin_att_doc)
     # Fetching the whole entity is a 206
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes=0-28"]
       )
 
@@ -36,7 +37,8 @@ defmodule AttachmentRangesTest do
 
     # Fetch the whole entity without an end offset is a 200
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes=0-"]
       )
 
@@ -47,7 +49,8 @@ defmodule AttachmentRangesTest do
 
     # Even if you ask multiple times.
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes=0-,0-,0-"]
       )
 
@@ -55,7 +58,8 @@ defmodule AttachmentRangesTest do
 
     # Badly formed range header is a 200
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes:0-"]
       )
 
@@ -63,7 +67,8 @@ defmodule AttachmentRangesTest do
 
     # Fetch the end of an entity without an end offset is a 206
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes=2-"]
       )
 
@@ -74,7 +79,8 @@ defmodule AttachmentRangesTest do
 
     # Fetch first part of entity is a 206
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes=0-3"]
       )
 
@@ -85,7 +91,8 @@ defmodule AttachmentRangesTest do
 
     # Fetch middle of entity is also a 206
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes=10-15"]
       )
 
@@ -96,7 +103,8 @@ defmodule AttachmentRangesTest do
 
     # Fetch end of entity is also a 206
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes=-3"]
       )
 
@@ -107,7 +115,8 @@ defmodule AttachmentRangesTest do
 
     # backward range is 416
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes=5-3"]
       )
 
@@ -115,7 +124,8 @@ defmodule AttachmentRangesTest do
 
     # range completely outside of entity is 416
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes=300-310"]
       )
 
@@ -123,7 +133,8 @@ defmodule AttachmentRangesTest do
 
     # We ignore a Range header with too many ranges
     resp =
-      Couch.get("/#{db_name}/bin_doc/foo.txt",
+      Couch.get(
+        "/#{db_name}/bin_doc/foo.txt",
         headers: [Range: "bytes=0-1,0-1,0-1,0-1,0-1,0-1,0-1,0-1,0-1,0-1"]
       )
 

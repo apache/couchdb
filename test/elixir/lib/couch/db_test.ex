@@ -185,7 +185,8 @@ defmodule Couch.DBTest do
 
   def bulk_save(db_name, docs) do
     resp =
-      Couch.post("/#{db_name}/_bulk_docs",
+      Couch.post(
+        "/#{db_name}/_bulk_docs",
         body: %{
           docs: docs
         }
@@ -245,7 +246,8 @@ defmodule Couch.DBTest do
       end
 
     resp =
-      Couch.put("/#{db_name}/#{ddoc_name}",
+      Couch.put(
+        "/#{db_name}/#{ddoc_name}",
         headers: ["Content-Type": "application/json"],
         body: ddoc
       )
@@ -342,7 +344,8 @@ defmodule Couch.DBTest do
         prev_setting_node =
           Enum.reduce(nodes, %{}, fn node, acc ->
             resp =
-              Couch.put("/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+              Couch.put(
+                "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
                 headers: ["X-Couch-Persist": false],
                 body: :jiffy.encode(setting.value)
               )
@@ -362,11 +365,13 @@ defmodule Couch.DBTest do
           value = elem(node_value, 1)
 
           if value == ~s(""\\n) do
-            Couch.delete("/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+            Couch.delete(
+              "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
               headers: ["X-Couch-Persist": false]
             )
           else
-            Couch.put("/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+            Couch.put(
+              "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
               headers: ["X-Couch-Persist": false],
               body: :jiffy.encode(value)
             )

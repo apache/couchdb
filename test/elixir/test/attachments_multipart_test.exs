@@ -9,7 +9,7 @@ defmodule AttachmentMultipartTest do
   """
 
   @tag :with_db
-  test "manages attachments in views successfully", context do
+  test "manages attachments multipart requests successfully", context do
     db_name = context[:db_name]
 
     document = """
@@ -46,13 +46,11 @@ defmodule AttachmentMultipartTest do
         "\r\n--abc123\r\n" <>
         "\r\n" <>
         "this is 20 chars lon" <>
-        "\r\n--abc123\r\n" <>
-        "\r\n" <>
-        "this is 19 chars lo" <>
-        "\r\n--abc123--epilogue"
+        "\r\n--abc123\r\n" <> "\r\n" <> "this is 19 chars lo" <> "\r\n--abc123--epilogue"
 
     resp =
-      Couch.put("/#{db_name}/multipart",
+      Couch.put(
+        "/#{db_name}/multipart",
         body: multipart_data,
         headers: ["Content-Type": "multipart/related;boundary=\"abc123\""]
       )
@@ -106,13 +104,11 @@ defmodule AttachmentMultipartTest do
         "content-type: application/json\r\n" <>
         "\r\n" <>
         document_updated <>
-        "\r\n--abc123\r\n" <>
-        "\r\n" <>
-        "this is 18 chars l" <>
-        "\r\n--abc123--"
+        "\r\n--abc123\r\n" <> "\r\n" <> "this is 18 chars l" <> "\r\n--abc123--"
 
     resp =
-      Couch.put("/#{db_name}/multipart",
+      Couch.put(
+        "/#{db_name}/multipart",
         body: multipart_data_updated,
         headers: ["Content-Type": "multipart/related;boundary=\"abc123\""]
       )
@@ -128,7 +124,8 @@ defmodule AttachmentMultipartTest do
     assert resp.status_code == 404
 
     resp =
-      Couch.get("/#{db_name}/multipart",
+      Couch.get(
+        "/#{db_name}/multipart",
         query: %{:attachments => true},
         headers: [accept: "multipart/related,*/*;"]
       )
@@ -167,7 +164,8 @@ defmodule AttachmentMultipartTest do
     # a certain rev).
 
     resp =
-      Couch.get("/#{db_name}/multipart",
+      Couch.get(
+        "/#{db_name}/multipart",
         query: %{:atts_since => ~s(["#{first_rev}"])},
         headers: [accept: "multipart/related,*/*;"]
       )
@@ -185,7 +183,8 @@ defmodule AttachmentMultipartTest do
 
     # try the atts_since parameter together with the open_revs parameter
     resp =
-      Couch.get("/#{db_name}/multipart",
+      Couch.get(
+        "/#{db_name}/multipart",
         query: %{
           :open_revs => ~s(["#{doc["_rev"]}"]),
           :atts_since => ~s(["#{first_rev}"])
@@ -217,7 +216,8 @@ defmodule AttachmentMultipartTest do
     # try it with a rev that doesn't exist (should get all attachments)
 
     resp =
-      Couch.get("/#{db_name}/multipart",
+      Couch.get(
+        "/#{db_name}/multipart",
         query: %{
           :atts_since => ~s(["1-2897589","#{first_rev}"])
         },
@@ -271,7 +271,8 @@ defmodule AttachmentMultipartTest do
     first_rev = resp.body["rev"]
 
     resp =
-      Couch.put("/#{dbname}/#{doc["_id"]}/data.bin",
+      Couch.put(
+        "/#{dbname}/#{doc["_id"]}/data.bin",
         query: %{:rev => first_rev},
         body: hello_data,
         headers: ["Content-Type": "application/binary"]
@@ -281,7 +282,8 @@ defmodule AttachmentMultipartTest do
     second_rev = resp.body["rev"]
 
     resp =
-      Couch.put("/#{dbname}/#{doc["_id"]}/lorem.txt",
+      Couch.put(
+        "/#{dbname}/#{doc["_id"]}/lorem.txt",
         query: %{:rev => second_rev},
         body: lorem,
         headers: ["Content-Type": "text/plain"]
@@ -291,7 +293,8 @@ defmodule AttachmentMultipartTest do
     third_rev = resp.body["rev"]
 
     resp =
-      Couch.get("/#{dbname}/#{doc["_id"]}",
+      Couch.get(
+        "/#{dbname}/#{doc["_id"]}",
         query: %{:open_revs => ~s(["#{third_rev}"])},
         headers: [Accept: "multipart/mixed", "X-CouchDB-Send-Encoded-Atts": "true"]
       )
@@ -327,7 +330,8 @@ defmodule AttachmentMultipartTest do
     # now test that it works together with the atts_since parameter
 
     resp =
-      Couch.get("/#{dbname}/#{doc["_id"]}",
+      Couch.get(
+        "/#{dbname}/#{doc["_id"]}",
         query: %{:open_revs => ~s(["#{third_rev}"]), :atts_since => ~s(["#{second_rev}"])},
         headers: [Accept: "multipart/mixed", "X-CouchDB-Send-Encoded-Atts": "true"]
       )
