@@ -185,7 +185,8 @@ register_with_event_server(Server) ->
 
 -spec db_callback(created | deleted | updated, binary(), #state{}) -> #state{}.
 db_callback(created, DbName, #state{mod = Mod, ctx = Ctx} = State) ->
-    State#state{ctx = Mod:db_created(DbName, Ctx)};
+    NewState = State#state{ctx = Mod:db_created(DbName, Ctx)},
+    resume_scan(DbName, NewState);
 db_callback(deleted, DbName, #state{mod = Mod, ctx = Ctx} = State) ->
     State#state{ctx = Mod:db_deleted(DbName, Ctx)};
 db_callback(updated, DbName, State) ->
@@ -446,7 +447,8 @@ t_handle_call_checkpoint_existing() ->
 
 t_handle_info_created() ->
     ?_test(begin
-        State = mock_state(),
+        Tid = mock_ets(),
+        State = mock_state(Tid),
         handle_info_check({'$couch_event', ?DBNAME, created}, State),
         ?assert(meck:validate(?MOD)),
         ?assert(meck:called(?MOD, db_created, [?DBNAME, zig]))

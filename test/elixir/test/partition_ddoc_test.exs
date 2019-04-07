@@ -160,16 +160,20 @@ defmodule PartitionDDocTest do
   test "GET /dbname/_design_docs", context do
     db_name = context[:db_name]
 
-    retry_until(fn ->
-      resp = Couch.put("/#{db_name}/_design/foo", body: %{stuff: "here"})
-      assert resp.status_code == 201
+    retry_until(
+      fn ->
+        resp = Couch.put("/#{db_name}/_design/foo", body: %{stuff: "here"})
+        assert resp.status_code == 201
 
-      resp = Couch.get("/#{db_name}/_design_docs")
-      assert resp.status_code == 200
-      %{body: body} = resp
+        resp = Couch.get("/#{db_name}/_design_docs")
+        assert resp.status_code == 200
+        %{body: body} = resp
 
-      assert length(body["rows"]) == 1
-      %{"rows" => [%{"id" => "_design/foo"}]} = body
-    end)
+        assert length(body["rows"]) == 1
+        %{"rows" => [%{"id" => "_design/foo"}]} = body
+      end,
+      500,
+      10_000
+    )
   end
 end

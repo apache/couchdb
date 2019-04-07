@@ -23,12 +23,12 @@
 go(Db, Options, #mrargs{keys=undefined} = QueryArgs, Callback, Acc) ->
     {CoordArgs, WorkerArgs} = fabric_view:fix_skip_and_limit(QueryArgs),
     DbName = fabric:dbname(Db),
-    Shards = shards(Db, QueryArgs),
+    {Shards, RingOpts} = shards(Db, QueryArgs),
     Workers0 = fabric_util:submit_jobs(
             Shards, fabric_rpc, all_docs, [Options, WorkerArgs]),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_streams:start(Workers0, #shard.ref) of
+        case fabric_streams:start(Workers0, #shard.ref, RingOpts) of
             {ok, Workers} ->
                 try
                     go(DbName, Options, Workers, CoordArgs, Callback, Acc)

@@ -22,9 +22,9 @@ shards total, so 8 nodes will hold none of the data for this database.  Given
 this feature, we even shard use out across the cluster by altering the 'start'
 node for the database's shards.
 
-Splitting and merging shards is an immature feature of the system, and will
-require attention in the near-term. We believe we can implement both
-functions and perform them while the database remains online.
+Shards can be split using the `/_reshard` API endpoint. Refer to a separate
+[README](README_reshard.md) regarding the technical detail on how shard
+splitting works.
 
 ### Getting Started
 

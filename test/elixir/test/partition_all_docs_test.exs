@@ -182,6 +182,7 @@ defmodule PartitionAllDocsTest do
 
   # This test is timing based so it could be a little flaky.
   # If that turns out to be the case we should probably just skip it
+  @tag :pending
   test "partition _all_docs with timeout", context do
     set_config({"fabric", "partition_view_timeout", "1"})
 
