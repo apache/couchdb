@@ -31,13 +31,12 @@
     get_stat/2,
     incr_stat/3,
 
-    get_full_doc_info/2,
+    get_winning_revs/3,
+    get_non_deleted_rev/2,
+
     get_doc_body/3,
 
-    store_doc/3,
-
-    add_to_all_docs/3,
-    rem_from_all_docs/2,
+    write_doc_interactive/6,
 
     fold_docs/4,
     fold_changes/5,
@@ -75,6 +74,11 @@
 -define(DB_REVS, 20).
 -define(DB_DOCS, 21).
 -define(DB_LOCAL_DOCS, 22).
+
+
+% Versions
+
+-define(CURR_REV_FORMAT, 0).
 
 
 % Various utility macros
@@ -351,86 +355,162 @@ incr_stat(#{} = Db, StatKey, Increment) when is_integer(Increment) ->
     erlfdb:add(Tx, Key, Increment).
 
 
-get_full_doc_info(#{} = Db, DocId) ->
+get_winning_revs(Db, #doc{} = Doc, NumRevs) ->
+    get_winning_revs(Db, Doc#doc.id, NumRevs);
+
+get_winning_revs(#{} = Db, DocId, NumRevs) ->
     ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = Db,
 
-    Key = erlfdb_tuple:pack({?DB_DOCS, DocId}, DbPrefix),
-    Val = erlfdb:wait(erlfdb:get(Tx, Key)),
-    fdb_to_fdi(Db, DocId, Val).
+    Prefix = erlfdb_tuple:pack({?DB_REVS, DocId}, DbPrefix),
+    Options = [{reverse, true}, {limit, NumRevs}],
+    Future = erlfdb:get_range_startswith(Tx, Prefix, Options),
+    lists:map(fun({K, V}) ->
+        Key = erlfdb_tuple:unpack(K, DbPrefix),
+        Val = erlfdb_tuple:unpack(V),
+        fdb_to_revinfo(Key, Val)
+    end, erlfdb:wait(Future)).
 
 
-get_doc_body(#{} = Db, DocId, {Pos, [Rev | _] = Path}) ->
+get_non_deleted_rev(#{} = Db, #doc{} = Doc) ->
     ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = Db,
-
-    Key = erlfdb_tuple:pack({?DB_REVS, DocId, Pos, Rev}, DbPrefix),
-    Val = erlfdb:wait(erlfdb:get(Tx, Key)),
-    fdb_to_doc(Db, DocId, Pos, Path, Val).
-
-
-store_doc(#{} = Db, #full_doc_info{} = FDI, #doc{} = Doc) ->
-    ?REQUIRE_CURRENT(Db),
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = Db,
-
-    #full_doc_info{
-        id = DocId,
-        update_seq = OldUpdateSeq
-    } = FDI,
 
     #doc{
-        revs = {Pos, [Rev | _]},
+        revs = {RevPos, [Rev | _]}
+    } = Doc,
+
+    BaseKey = {?DB_REVS, Doc#doc.id, true, RevPos, Rev},
+    Key = erlfdb_tuple:pack(BaseKey, DbPrefix),
+    case erlfdb:wait(erlfdb:get(Tx, Key)) of
+        not_found ->
+            not_found;
+        Val ->
+            fdb_to_revinfo(Key, erlfdb_tuple:unpack(Val))
+    end.
+
+
+get_doc_body(#{} = Db, DocId, RevInfo) ->
+    ?REQUIRE_CURRENT(Db),
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = Db,
+
+    #{
+        rev_id := {RevPos, Rev},
+        rev_path := RevPath
+    } = RevInfo,
+
+    Key = erlfdb_tuple:pack({?DB_DOCS, DocId, RevPos, Rev}, DbPrefix),
+    Val = erlfdb:wait(erlfdb:get(Tx, Key)),
+    fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], Val).
+
+
+write_doc_interactive(Db, Doc, NewWinner, OldWinner, UpdateInfos, RemInfos) ->
+    ?REQUIRE_CURRENT(Db),
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = Db,
+
+    #doc{
+        id = DocId,
         deleted = Deleted
     } = Doc,
 
-    % Delete old entry in changes feed
-    OldSeqKey = erlfdb_tuple:pack({?DB_CHANGES, OldUpdateSeq}, DbPrefix),
-    erlfdb:clear(Tx, OldSeqKey),
+    NewRevId = maps:get(rev_id, NewWinner),
 
-    % Add new entry to changes feed
+    % Update the revision tree
+
+    {WKey, WVal} = revinfo_to_fdb(DbPrefix, DocId, NewWinner),
+    ok = erlfdb:set_versionstamped_value(Tx, WKey, WVal),
+
+    lists:foreach(fun(RI) ->
+        {K, V} = revinfo_to_fdb(DbPrefix, DocId, RI),
+        ok = erlfdb:set(Tx, K, V)
+    end, UpdateInfos),
+
+    lists:foreach(fun(RI) ->
+        if RI == not_found -> ok; true ->
+            {K, _} = revinfo_to_fdb(DbPrefix, DocId, RI),
+            ok = erlfdb:clear(Tx, K)
+        end
+    end, RemInfos),
+
+    % Update all_docs index
+
+    UpdateStatus = case {OldWinner, NewWinner} of
+        {not_found, #{deleted := false}} ->
+            created;
+        {#{deleted := true}, #{deleted := false}} ->
+            recreated;
+        {#{deleted := false}, #{deleted := false}} ->
+            updated;
+        {#{deleted := false}, #{deleted := true}} ->
+            deleted
+    end,
+
+    case UpdateStatus of
+        Status when Status == created orelse Status == recreated ->
+            ADKey = erlfdb_tuple:pack({?DB_ALL_DOCS, DocId}, DbPrefix),
+            ADVal = erlfdb_tuple:pack(NewRevId),
+            ok = erlfdb:set(Tx, ADKey, ADVal);
+        deleted ->
+            ADKey = erlfdb_tuple:pack({?DB_ALL_DOCS, DocId}, DbPrefix),
+            ok = erlfdb:clear(Tx, ADKey);
+        updated ->
+            ok
+    end,
+
+    % Update the changes index
+
+    if OldWinner == not_found -> ok; true ->
+        OldSeq = maps:get(sequence, OldWinner),
+        OldSeqKey = erlfdb_tuple:pack({?DB_CHANGES, OldSeq}, DbPrefix),
+        erlfdb:clear(Tx, OldSeqKey)
+    end,
+
     NewSeqKey = erlfdb_tuple:pack_vs({?DB_CHANGES, ?UNSET_VS}, DbPrefix),
-    NewSeqVal = erlfdb_tuple:pack({DocId, Deleted, {Pos, Rev}}),
+    NewSeqVal = erlfdb_tuple:pack({DocId, Deleted, NewRevId}),
     erlfdb:set_versionstamped_key(Tx, NewSeqKey, NewSeqVal),
 
-    % Write document data
+    % Store document metadata and body
+
+    ok = write_doc_body(Db, Doc),
+
+    % Update doc counts
+
+    case UpdateStatus of
+        created ->
+            incr_stat(Db, <<"doc_count">>, 1);
+        recreated ->
+            incr_stat(Db, <<"doc_count">>, 1),
+            incr_stat(Db, <<"doc_del_count">>, -1);
+        deleted ->
+            incr_stat(Db, <<"doc_count">>, -1),
+            incr_stat(Db, <<"doc_del_count">>, 1);
+        updated ->
+            ok
+    end,
+
+    ok.
+
+
+write_doc_body(#{} = Db, #doc{} = Doc) ->
+    ?REQUIRE_CURRENT(Db),
+    #{
+        tx := Tx
+    } = Db,
+
     {NewDocKey, NewDocVal} = doc_to_fdb(Db, Doc),
-    erlfdb:set(Tx, NewDocKey, NewDocVal),
-
-    % Update revision tree entry
-    {NewFDIKey, NewFDIVal} = fdi_to_fdb(Db, FDI),
-    erlfdb:set_versionstamped_value(Tx, NewFDIKey, NewFDIVal).
-
-
-add_to_all_docs(#{} = Db, DocId, {Pos, Rev}) ->
-    ?REQUIRE_CURRENT(Db),
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = Db,
-
-    Key = erlfdb_tuple:pack({?DB_ALL_DOCS, DocId}, DbPrefix),
-    Val = erlfdb_tuple:pack({Pos, Rev}),
-    erlfdb:set(Tx, Key, Val).
-
-
-rem_from_all_docs(#{} = Db, DocId) ->
-    ?REQUIRE_CURRENT(Db),
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = Db,
-
-    Key = erlfdb_tuple:pack({?DB_ALL_DOCS, DocId}, DbPrefix),
-    ok = erlfdb:clear(Tx, Key).
+    erlfdb:set(Tx, NewDocKey, NewDocVal).
 
 
 fold_docs(#{} = Db, UserFun, UserAcc0, _Options) ->
@@ -530,6 +610,57 @@ bump_metadata_version(Tx) ->
     erlfdb:set_versionstamped_value(Tx, ?METADATA_VERSION_KEY, <<0:112>>).
 
 
+revinfo_to_fdb(DbPrefix, DocId, #{winner := true} = RevId) ->
+    #{
+        deleted := Deleted,
+        rev_id := {RevPos, Rev},
+        rev_path := RevPath,
+        branch_count := BranchCount
+    } = RevId,
+    Key = {?DB_REVS, DocId, not Deleted, RevPos, Rev},
+    Val = {?CURR_REV_FORMAT, ?UNSET_VS, BranchCount, list_to_tuple(RevPath)},
+    KBin = erlfdb_tuple:pack(Key, DbPrefix),
+    VBin = erlfdb_tuple:pack_vs(Val),
+    {KBin, VBin};
+
+revinfo_to_fdb(DbPrefix, DocId, #{} = RevId) ->
+    #{
+        deleted := Deleted,
+        rev_id := {RevPos, Rev},
+        rev_path := RevPath
+    } = RevId,
+    Key = {?DB_REVS, DocId, not Deleted, RevPos, Rev},
+    Val = {?CURR_REV_FORMAT, list_to_tuple(RevPath)},
+    KBin = erlfdb_tuple:pack(Key, DbPrefix),
+    VBin = erlfdb_tuple:pack(Val),
+    {KBin, VBin}.
+
+
+fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _} = Val) ->
+    {?DB_REVS, _DocId, NotDeleted, RevPos, Rev} = Key,
+    {_RevFormat, Sequence, BranchCount, RevPath} = Val,
+    #{
+        winner => true,
+        deleted => not NotDeleted,
+        rev_id => {RevPos, Rev},
+        rev_path => tuple_to_list(RevPath),
+        sequence => Sequence,
+        branch_count => BranchCount
+    };
+
+fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _} = Val)  ->
+    {?DB_REVS, _DocId, NotDeleted, RevPos, Rev} = Key,
+    {_RevFormat, RevPath} = Val,
+    #{
+        winner => false,
+        deleted => not NotDeleted,
+        rev_id => {RevPos, Rev},
+        rev_path => tuple_to_list(RevPath),
+        sequence => undefined,
+        branch_count => undefined
+    }.
+
+
 doc_to_fdb(Db, #doc{} = Doc) ->
     #{
         db_prefix := DbPrefix
@@ -543,7 +674,7 @@ doc_to_fdb(Db, #doc{} = Doc) ->
         deleted = Deleted
     } = Doc,
 
-    Key = erlfdb_tuple:pack({?DB_REVS, Id, Start, Rev}, DbPrefix),
+    Key = erlfdb_tuple:pack({?DB_DOCS, Id, Start, Rev}, DbPrefix),
     Val = {Body, Atts, Deleted},
     {Key, term_to_binary(Val, [{minor_version, 1}])}.
 
@@ -559,56 +690,3 @@ fdb_to_doc(_Db, DocId, Pos, Path, Bin) when is_binary(Bin) ->
     };
 fdb_to_doc(_Db, _DocId, _Pos, _Path, not_found) ->
     {not_found, missing}.
-
-
-fdi_to_fdb(Db, #full_doc_info{} = FDI) ->
-    #{
-        db_prefix := DbPrefix
-    } = Db,
-
-    #full_doc_info{
-        id = Id,
-        deleted = Deleted,
-        rev_tree = RevTree
-    } = flush_tree(FDI),
-
-    Key = erlfdb_tuple:pack({?DB_DOCS, Id}, DbPrefix),
-    RevTreeBin = term_to_binary(RevTree, [{minor_version, 1}]),
-    ValTuple = {
-        Deleted,
-        RevTreeBin,
-        ?UNSET_VS
-    },
-    Val = erlfdb_tuple:pack_vs(ValTuple),
-    {Key, Val}.
-
-
-flush_tree(FDI) ->
-    #full_doc_info{
-        rev_tree = Unflushed
-    } = FDI,
-
-    Flushed = couch_key_tree:map(fun(_Rev, Value) ->
-        case Value of
-            #doc{deleted = Del} -> #leaf{deleted = Del};
-            _ -> Value
-        end
-    end, Unflushed),
-
-    FDI#full_doc_info{
-        rev_tree = Flushed
-    }.
-
-
-fdb_to_fdi(_Db, Id, Bin) when is_binary(Bin) ->
-    {Deleted, RevTreeBin, {versionstamp, V, B}} = erlfdb_tuple:unpack(Bin),
-    RevTree = binary_to_term(RevTreeBin, [safe]),
-    UpdateSeq = <<V:64/big, B:16/big>>,
-    #full_doc_info{
-        id = Id,
-        deleted = Deleted,
-        rev_tree = RevTree,
-        update_seq = UpdateSeq
-    };
-fdb_to_fdi(_Db, _Id, not_found) ->
-    not_found.

@@ -391,14 +391,13 @@ open_doc(#{} = Db, DocId) ->
 
 open_doc(#{} = Db, DocId, _Options) ->
     with_tx(Db, fun(TxDb) ->
-        case fabric2_fdb:get_full_doc_info(TxDb, DocId) of
-            not_found ->
+        case fabric2_fdb:get_winning_revs(TxDb, DocId, 1) of
+            [] ->
                 {not_found, missing};
-            #full_doc_info{} = FDI ->
-                {_, Path} = couch_doc:to_doc_info_path(FDI),
-                case fabric2_fdb:get_doc_body(TxDb, DocId, Path) of
+            [#{winner := true} = RevInfo] ->
+                case fabric2_fdb:get_doc_body(TxDb, DocId, RevInfo) of
                     #doc{} = Doc -> {ok, Doc};
-                    Error -> Error
+                    Else -> Else
                 end
         end
     end).
@@ -450,17 +449,17 @@ update_docs(Db, Docs) ->
 
 
 update_docs(Db, Docs, Options) ->
-    with_tx(Db, fun(TxDb) ->
-        {Resps, Status} = lists:mapfoldl(fun(Doc, Acc) ->
+    {Resps, Status} = lists:mapfoldl(fun(Doc, Acc) ->
+        with_tx(Db, fun(TxDb) ->
             case update_doc_int(TxDb, Doc, Options) of
                 {ok, _} = Resp ->
                     {Resp, Acc};
                 {error, _} = Resp ->
                     {Resp, error}
             end
-        end, ok, Docs),
-        {Status, Resps}
-    end).
+        end)
+    end, ok, Docs),
+    {Status, Resps}.
 
 
 fold_docs(Db, UserFun, UserAcc) ->
@@ -481,6 +480,7 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
     with_tx(Db, fun(TxDb) ->
         fabric2_fdb:fold_changes(TxDb, SinceSeq, UserFun, UserAcc, Options)
     end).
+
 
 new_revid(Doc) ->
     #doc{
@@ -607,246 +607,157 @@ get_members(SecProps) ->
 
 
 % TODO: Handle _local docs separately.
-update_doc_int(#{} = Db, #doc{} = Doc0, Options) ->
-    UpdateType = case lists:member(replicated_changes, Options) of
-        true -> replicated_changes;
-        false -> interactive_edit
-    end,
-
+update_doc_int(#{} = Db, #doc{} = Doc, Options) ->
     try
-        FDI1 = fabric2_fdb:get_full_doc_info(Db, Doc0#doc.id),
-        Doc1 = prep_and_validate(Db, FDI1, Doc0, UpdateType),
-        Doc2 = case UpdateType of
-            interactive_edit -> new_revid(Doc1);
-            replicated_changes -> Doc1
-        end,
-        FDI2 = if FDI1 /= not_found -> FDI1; true ->
-            #full_doc_info{id = Doc2#doc.id}
-        end,
-        {FDI3, Doc3} = merge_rev_tree(FDI2, Doc2, UpdateType),
-
-        OldExists = case FDI1 of
-            not_found -> false;
-            #full_doc_info{deleted = true} -> false;
-            _ -> true
-        end,
-        NewExists = not FDI3#full_doc_info.deleted,
-
-        ok = fabric2_fdb:store_doc(Db, FDI3, Doc3),
-
-        {_, {WinPos, [WinRev | _]}} = couch_doc:to_doc_info_path(FDI3),
-
-        case {OldExists, NewExists} of
-            {false, true} ->
-                fabric2_fdb:add_to_all_docs(Db, Doc3#doc.id, {WinPos, WinRev}),
-                fabric2_fdb:incr_stat(Db, <<"doc_count">>, 1);
-            {true, false} ->
-                fabric2_fdb:rem_from_all_docs(Db, Doc3#doc.id),
-                fabric2_fdb:incr_stat(Db, <<"doc_count">>, -1),
-                fabric2_fdb:incr_stat(Db, <<"doc_del_count">>, 1);
-            {Exists, Exists} ->
-                % No change
-                ok
-        end,
-
-        % Need to count design documents
-        % Need to track db size changes
-        % Need to update VDUs on ddoc change
-        #doc{
-            revs = {RevStart, [Rev | _]}
-        } = Doc3,
-        {ok, {RevStart, Rev}}
+        case lists:member(replicated_changes, Options) of
+            false -> update_doc_interactive(Db, Doc, Options);
+            true -> update_doc_replicated(Db, Doc, Options)
+        end
     catch throw:{?MODULE, Return} ->
         Return
     end.
 
 
-prep_and_validate(Db, not_found, Doc, UpdateType) ->
-    case Doc#doc.revs of
-        {0, []} ->
-            ok;
-        _ when UpdateType == replicated_changes ->
-            ok;
-        _ ->
-            ?RETURN({error, conflict})
-    end,
-    prep_and_validate(Db, Doc, fun() -> nil end);
+update_doc_interactive(Db, Doc0, _Options) ->
+    DocRevId = doc_to_revid(Doc0),
 
-prep_and_validate(Db, FDI, Doc, interactive_edit) ->
-    #doc{
-        revs = {Start, Revs}
-    } = Doc,
-
-    Leafs = couch_key_tree:get_all_leafs(FDI#full_doc_info.rev_tree),
-    LeafRevs = lists:map(fun({_Leaf, {LeafStart, [LeafRev | _] = Path}}) ->
-        {{LeafStart, LeafRev}, Path}
-    end, Leafs),
-
-    GetDocFun = case Revs of
-        [PrevRev | _] ->
-            case lists:keyfind({Start, PrevRev}, 1, LeafRevs) of
-                {{Start, PrevRev}, Path} ->
-                    fun() ->
-                        fabric2_fdb:get_doc_body(Db, Doc#doc.id, {Start, Path})
-                    end;
-                false ->
-                    ?RETURN({error, conflict})
+    {Winner, MaybeNewWinner} = case Doc0#doc.deleted of
+        true ->
+            case fabric2_fdb:get_winning_revs(Db, Doc0, 2) of
+                [] ->
+                    {not_found, not_found};
+                [Winner0] ->
+                    {Winner0, not_found};
+                [Winner0, MaybeNewWinner0] ->
+                    {Winner0, MaybeNewWinner0}
             end;
-        [] ->
-            case FDI#full_doc_info.deleted of
-                true ->
-                    fun() -> nil end;
-                false ->
+        false ->
+            case fabric2_fdb:get_winning_revs(Db, Doc0, 1) of
+                [] ->
+                    {not_found, not_found};
+                [Winner0] ->
+                    {Winner0, not_found}
+            end
+    end,
+
+    {Doc1, ExtendedRevInfo} = case Winner of
+        not_found when DocRevId == {0, <<>>} ->
+            {Doc0, not_found};
+        #{winner := true, deleted := true} when DocRevId == {0, <<>>} ->
+            {WPos, WRev} = maps:get(rev_id, Winner),
+            {Doc0#doc{revs = {WPos, [WRev]}}, Winner};
+        #{winner := true, deleted := false} when DocRevId == {0, <<>>} ->
+            ?RETURN({error, conflict});
+        #{winner := true, deleted := false, rev_id := DocRevId} ->
+            {Doc0, Winner};
+        #{winner := true, rev_id := WRevId} when WRevId /= DocRevId ->
+            case fabric2_fdb:get_non_deleted_rev(Db, Doc0) of
+                not_found ->
+                    ?RETURN({error, conflict});
+                #{deleted := false, rev_id := DocRevId} = PrevRevInfo->
+                    {Doc0, PrevRevInfo};
+                #{deleted := true} ->
                     ?RETURN({error, conflict})
             end
     end,
-    prep_and_validate(Db, Doc, GetDocFun);
-
-prep_and_validate(Db, FDI, Doc, replicated_changes) ->
-    #full_doc_info{
-        rev_tree = RevTree
-    } = FDI,
-    OldLeafs = couch_key_tree:get_all_leafs_full(RevTree),
-    OldLeafsLU = [{Start, RevId} || {Start, [{RevId, _} | _]} <- OldLeafs],
-
-    NewPath = couch_doc:to_path(Doc),
-    NewRevTree = couch_key_tree:merge(RevTree, NewPath),
-
-    Leafs = couch_key_tree:get_all_leafs_full(NewRevTree),
-    LeafRevsFull = lists:map(fun({Start, [{RevId, _} | _]} = FullPath) ->
-        [{{Start, RevId}, FullPath}]
-    end, Leafs),
-    LeafRevsFullDict = dict:from_list(LeafRevsFull),
 
     #doc{
-        revs = {DocStart, [DocRev | _]}
-    } = Doc,
-    DocRevId = {DocStart, DocRev},
+        deleted = NewDeleted,
+        revs = {NewRevPos, [NewRev | NewRevPath]}
+    } = Doc2 = prep_and_validate_interactive(Db, Doc1, ExtendedRevInfo),
 
-    IsOldLeaf = lists:member(DocRevId, OldLeafsLU),
-    GetDocFun = case dict:find(DocRevId, LeafRevsFullDict) of
-        {ok, {DocStart, RevPath}} when not IsOldLeaf ->
-            % An incoming replicated edit only sends us leaf
-            % nodes which may have included multiple updates
-            % we haven't seen locally. Thus we have to search
-            % back through the tree to find the first edit
-            % we do know about.
-            case find_prev_known_rev(DocStart, RevPath) of
-                not_found -> fun() -> nil end;
-                PrevRevs -> fun() ->
-                    fabric2_fdb:get_doc_body(Db, Doc#doc.id, PrevRevs)
-                end
-            end;
-        _ ->
-            % The update merged to an internal node that we
-            % already know about which means we're done with
-            % this update.
-            ?RETURN({ok, []})
+    NewRevInfo = #{
+        winner => undefined,
+        deleted => NewDeleted,
+        rev_id => {NewRevPos, NewRev},
+        rev_path => NewRevPath,
+        sequence => undefined,
+        branch_count => undefined
+    },
+
+    AllRevInfos = [NewRevInfo, Winner, MaybeNewWinner],
+    {NewWinner, ToUpdate} = interactive_winner(AllRevInfos, ExtendedRevInfo),
+
+    ok = fabric2_fdb:write_doc_interactive(
+            Db,
+            Doc2,
+            NewWinner,
+            Winner,
+            ToUpdate,
+            [ExtendedRevInfo]
+        ),
+
+    {ok, {NewRevPos, NewRev}}.
+
+
+prep_and_validate_interactive(Db, Doc, ExtendedRevInfo) ->
+    HasStubs = couch_doc:has_stubs(Doc),
+    HasVDUs = [] /= maps:get(validate_doc_update_funs, Db),
+    IsDDoc = case Doc#doc.id of
+        <<?DESIGN_DOC_PREFIX, _/binary>> -> true;
+        _ -> false
     end,
 
-    prep_and_validate(Db, Doc, GetDocFun).
-
-
-prep_and_validate(Db, Doc, GetDocBody) ->
-    NewDoc = case couch_doc:has_stubs(Doc) of
+    PrevDoc = case HasStubs orelse (HasVDUs and not IsDDoc) of
         true ->
-            case GetDocBody() of
-                #doc{} = PrevDoc ->
-                    couch_doc:merge_stubs(Doc, PrevDoc);
-                _ ->
-                    % Force a missing stubs error
-                    couch_doc:mege_stubs(Doc, #doc{})
+            case fabric2_fdb:get_doc_body(Db, Doc, ExtendedRevInfo) of
+                #doc{} = Doc -> Doc;
+                {not_found, _} -> #doc{}
             end;
         false ->
-            Doc
+            nil
     end,
-    validate_doc_update(Db, NewDoc, GetDocBody),
-    NewDoc.
+
+    MergedDoc = if not HasStubs -> Doc; true ->
+        couch_doc:merge_stubs(Doc, PrevDoc)
+    end,
+
+    validate_doc_update(Db, MergedDoc, PrevDoc),
+    new_revid(MergedDoc).
 
 
-merge_rev_tree(FDI, Doc, interactive_edit) when FDI#full_doc_info.deleted ->
-    % We're recreating a document that was previously
-    % deleted. To check that this is a recreation from
-    % the root we assert that the new document has a
-    % revision depth of 1 (this is to avoid recreating a
-    % doc from a previous internal revision) and is also
-    % not deleted. To avoid expanding the revision tree
-    % unnecessarily we create a new revision based on
-    % the winning deleted revision.
+interactive_winner(RevInfos0, ExtendedRevInfo) ->
+    % Fetch the current winner so we can copy
+    % the current branch count
+    BranchCount = case [W || #{winner := true} = W <- RevInfos0] of
+        [] ->
+            % Creating a doc, the branch count is
+            % now 1 by definition
+            1;
+        [#{winner := true, branch_count := Count}] ->
+            % Interactive edits can never create new
+            % branches so we just copy the current Count
+            Count
+    end,
 
-    {RevDepth, _} = Doc#doc.revs,
-    case RevDepth == 1 andalso not Doc#doc.deleted of
-        true ->
-            % Update the new doc based on revisions in OldInfo
-            #doc_info{revs=[WinningRev | _]} = couch_doc:to_doc_info(FDI),
-            #rev_info{rev={OldPos, OldRev}} = WinningRev,
-            Body = case fabric2_util:get_value(comp_body, Doc#doc.meta) of
-                CompBody when is_binary(CompBody) ->
-                    couch_compress:decompress(CompBody);
-                _ ->
-                    Doc#doc.body
-            end,
-            NewDoc = new_revid(Doc#doc{
-                revs = {OldPos, [OldRev]},
-                body = Body
-            }),
+    % Remove the previous winner if it was updated
+    RevInfos1 = RevInfos0 -- [ExtendedRevInfo],
 
-            % Merge our modified new doc into the tree
-            #full_doc_info{rev_tree = RevTree} = FDI,
-            case couch_key_tree:merge(RevTree, couch_doc:to_path(NewDoc)) of
-                {NewRevTree, new_leaf} ->
-                    % We changed the revision id so inform the caller
-                    NewFDI = FDI#full_doc_info{
-                        rev_tree = NewRevTree,
-                        deleted = false
-                    },
-                    {NewFDI, NewDoc};
-                _ ->
-                    throw(doc_recreation_failed)
-            end;
-        _ ->
-            ?RETURN({error, conflict})
-    end;
-merge_rev_tree(FDI, Doc, interactive_edit) ->
-    % We're attempting to merge a new revision into an
-    % undeleted document. To not be a conflict we require
-    % that the merge results in extending a branch.
+    % Remove not_found if we didn't need or have a
+    % MaybeNewWinner
+    RevInfos2 = RevInfos1 -- [not_found],
 
-    RevTree = FDI#full_doc_info.rev_tree,
-    case couch_key_tree:merge(RevTree, couch_doc:to_path(Doc)) of
-        {NewRevTree, new_leaf} when not Doc#doc.deleted ->
-            NewFDI = FDI#full_doc_info{
-                rev_tree = NewRevTree,
-                deleted = false
-            },
-            {NewFDI, Doc};
-        {NewRevTree, new_leaf} when Doc#doc.deleted ->
-            % We have to check if we just deleted this
-            % document completely or if it was a conflict
-            % resolution.
-            NewFDI = FDI#full_doc_info{
-                rev_tree = NewRevTree,
-                deleted = couch_doc:is_deleted(NewRevTree)
-            },
-            {NewFDI, Doc};
-        _ ->
-            ?RETURN({error, conflict})
-    end;
-merge_rev_tree(FDI, Doc, replicated_changes) ->
-    % We're merging in revisions without caring about
-    % conflicts. Most likely this is a replication update.
-    RevTree = FDI#full_doc_info.rev_tree,
-    {NewRevTree, _} = couch_key_tree:merge(RevTree, couch_doc:to_path(Doc)),
-    NewFDI = FDI#full_doc_info{
-        rev_tree = NewRevTree,
-        deleted = couch_doc:is_deleted(NewRevTree)
+    SortFun = fun(A, B) ->
+        #{
+            deleted := DeletedA,
+            rev_id := RevIdA
+        } = A,
+        #{
+            deleted := DeletedB,
+            rev_id := RevIdB
+        } = B,
+        {not DeletedA, RevIdA} > {not DeletedB, RevIdB}
+    end,
+    [Winner0 | Rest0] = lists:sort(SortFun, RevInfos2),
+    Winner = Winner0#{
+        winner := true,
+        branch_count := BranchCount
     },
-    % If a replicated change did not modify the revision
-    % tree then we've got nothing else to do.
-    if NewFDI /= FDI -> ok; true ->
-        ?RETURN({ok, []})
-    end,
-    {NewFDI, Doc}.
+    {Winner, [R#{winner := false} || R <- Rest0]}.
+
+
+update_doc_replicated(_Db, _Doc, _Options) ->
+    erlang:error(not_implemented).
 
 
 validate_doc_update(Db, #doc{id = <<"_design/", _/binary>>} = Doc, _) ->
@@ -856,18 +767,17 @@ validate_doc_update(Db, #doc{id = <<"_design/", _/binary>>} = Doc, _) ->
     end;
 validate_doc_update(_Db, #doc{id = <<"_local/", _/binary>>}, _) ->
     ok;
-validate_doc_update(Db, Doc, GetDiskDocFun) ->
+validate_doc_update(Db, Doc, PrevDoc) ->
     #{
         security_doc := Security,
         user_ctx := UserCtx,
         validate_doc_update_funs := VDUs
     } = Db,
     Fun = fun() ->
-        DiskDoc = GetDiskDocFun(),
         JsonCtx = fabric2_util:user_ctx_to_json(UserCtx),
         try
             lists:map(fun(VDU) ->
-                case VDU(Doc, DiskDoc, JsonCtx, Security) of
+                case VDU(Doc, PrevDoc, JsonCtx, Security) of
                     ok -> ok;
                     Error -> ?RETURN(Error)
                 end
@@ -897,20 +807,20 @@ validate_ddoc(Db, DDoc) ->
     end.
 
 
-find_prev_known_rev(_Pos, []) ->
-    not_found;
-find_prev_known_rev(Pos, [{_Rev, #doc{}} | RestPath]) ->
-    % doc records are skipped because these are the result
-    % of replication sending us an update. We're only interested
-    % in what we have locally since we're comparing attachment
-    % stubs. The replicator should never do this because it
-    % should only ever send leaves but the possibility exists
-    % so we account for it.
-    find_prev_known_rev(Pos - 1, RestPath);
-find_prev_known_rev(Pos, [{_Rev, ?REV_MISSING} | RestPath]) ->
-    find_prev_known_rev(Pos - 1, RestPath);
-find_prev_known_rev(Pos, [{_Rev, #leaf{}} | _] = DocPath) ->
-    {Pos, [Rev || {Rev, _Val} <- DocPath]}.
+%% find_prev_known_rev(_Pos, []) ->
+%%     not_found;
+%% find_prev_known_rev(Pos, [{_Rev, #doc{}} | RestPath]) ->
+%%     % doc records are skipped because these are the result
+%%     % of replication sending us an update. We're only interested
+%%     % in what we have locally since we're comparing attachment
+%%     % stubs. The replicator should never do this because it
+%%     % should only ever send leaves but the possibility exists
+%%     % so we account for it.
+%%     find_prev_known_rev(Pos - 1, RestPath);
+%% find_prev_known_rev(Pos, [{_Rev, ?REV_MISSING} | RestPath]) ->
+%%     find_prev_known_rev(Pos - 1, RestPath);
+%% find_prev_known_rev(Pos, [{_Rev, #leaf{}} | _] = DocPath) ->
+%%     {Pos, [Rev || {Rev, _Val} <- DocPath]}.
 
 
 transactional(DbName, Options, Fun) ->
@@ -926,3 +836,10 @@ with_tx(#{tx := undefined} = Db, Fun) ->
 
 with_tx(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
     Fun(Db).
+
+
+doc_to_revid(#doc{revs = Revs}) ->
+    case Revs of
+        {0, []} -> {0, <<>>};
+        {RevPos, [Rev | _]} -> {RevPos, Rev}
+    end.
