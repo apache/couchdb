@@ -182,6 +182,85 @@ defmodule Couch.DBTest do
     {:ok, resp}
   end
 
+  def bulk_save(db_name, docs) do
+    resp =
+      Couch.post(
+        "/#{db_name}/_bulk_docs",
+        body: %{
+          docs: docs
+        }
+      )
+
+    assert resp.status_code == 201
+  end
+
+  def query(
+        db_name,
+        map_fun,
+        reduce_fun \\ nil,
+        options \\ nil,
+        keys \\ nil,
+        language \\ "javascript"
+      ) do
+    l_map_function =
+      if language == "javascript" do
+        "#{map_fun} /* avoid race cond #{now(:ms)} */"
+      else
+        map_fun
+      end
+
+    view = %{
+      :map => l_map_function
+    }
+
+    view =
+      if reduce_fun != nil do
+        Map.put(view, :reduce, reduce_fun)
+      else
+        view
+      end
+
+    {view, request_options} =
+      if options != nil and Map.has_key?(options, :options) do
+        {Map.put(view, :options, options.options), Map.delete(options, :options)}
+      else
+        {view, options}
+      end
+
+    ddoc_name = "_design/temp_#{now(:ms)}"
+
+    ddoc = %{
+      _id: ddoc_name,
+      language: language,
+      views: %{
+        view: view
+      }
+    }
+
+    request_options =
+      if keys != nil and is_list(keys) do
+        Map.merge(request_options || %{}, %{:keys => :jiffy.encode(keys)})
+      else
+        request_options
+      end
+
+    resp =
+      Couch.put(
+        "/#{db_name}/#{ddoc_name}",
+        headers: ["Content-Type": "application/json"],
+        body: ddoc
+      )
+
+    assert resp.status_code == 201
+
+    resp = Couch.get("/#{db_name}/#{ddoc_name}/_view/view", query: request_options)
+    assert resp.status_code == 200
+
+    Couch.delete("/#{db_name}/#{ddoc_name}")
+
+    resp.body
+  end
+
   def sample_doc_foo do
     %{
       _id: "foo",
@@ -193,6 +272,13 @@ defmodule Couch.DBTest do
   def make_docs(id_range) do
     for id <- id_range, str_id = Integer.to_string(id) do
       %{"_id" => str_id, "integer" => id, "string" => str_id}
+    end
+  end
+
+  # Generate range of docs based on a template
+  def make_docs(id_range, template_doc) do
+    for id <- id_range, str_id = Integer.to_string(id) do
+      Map.merge(template_doc, %{"_id" => str_id})
     end
   end
 
@@ -245,6 +331,53 @@ defmodule Couch.DBTest do
   def pretty_inspect(resp) do
     opts = [pretty: true, width: 20, limit: :infinity, printable_limit: :infinity]
     inspect(resp, opts)
+  end
+
+  def run_on_modified_server(settings, fun) do
+    resp = Couch.get("/_membership")
+    assert resp.status_code == 200
+    nodes = resp.body["all_nodes"]
+
+    prev_settings =
+      Enum.map(settings, fn setting ->
+        prev_setting_node =
+          Enum.reduce(nodes, %{}, fn node, acc ->
+            resp =
+              Couch.put(
+                "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+                headers: ["X-Couch-Persist": false],
+                body: :jiffy.encode(setting.value)
+              )
+
+            Map.put(acc, node, resp.body)
+          end)
+
+        Map.put(setting, :nodes, Map.to_list(prev_setting_node))
+      end)
+
+    try do
+      fun.()
+    after
+      Enum.each(prev_settings, fn setting ->
+        Enum.each(setting.nodes, fn node_value ->
+          node = elem(node_value, 0)
+          value = elem(node_value, 1)
+
+          if value == ~s(""\\n) do
+            Couch.delete(
+              "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+              headers: ["X-Couch-Persist": false]
+            )
+          else
+            Couch.put(
+              "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+              headers: ["X-Couch-Persist": false],
+              body: :jiffy.encode(value)
+            )
+          end
+        end)
+      end)
+    end
   end
 
   def restart_cluster do
