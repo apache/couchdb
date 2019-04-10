@@ -17,6 +17,9 @@
     transactional/1,
     get_db_handle/0,
 
+    revinfo_to_path/1,
+    find_winning_revinfo/1,
+
     user_ctx_to_json/1,
 
     get_value/2,
@@ -49,6 +52,41 @@ get_db_handle() ->
         Db ->
             Db
     end.
+
+
+revinfo_to_path(RevInfo) ->
+    #{
+        rev_id := {RevPos, Rev},
+        rev_path := RevPath
+    } = RevInfo,
+    Revs = lists:reverse(RevPath, [Rev]),
+    Path = revinfo_to_path(RevInfo, Revs),
+    {RevPos - length(Revs) + 1, Path}.
+
+
+revinfo_to_path(RevInfo, [Rev]) ->
+    {Rev, RevInfo, []};
+
+revinfo_to_path(RevInfo, [Rev | Rest]) ->
+    {Rev, ?REV_MISSING, [revinfo_to_path(RevInfo, Rest)]}.
+
+
+sort_revinfos(RevInfos) ->
+    CmpFun = fun(A, B) ->
+        case rev_sort_key(A) > rev_sort_key(B) of
+            true -> A;
+            false -> B
+        end
+    end,
+    lists:sort(CmpFun, RevInfos).
+
+
+rev_sort_key(#{} = RevInfo) ->
+    #{
+        deleted := Deleted,
+        rev_id := {RevPos, Rev}
+    } = RevInfo,
+    {not Deleted, RevPos, Rev}.
 
 
 user_ctx_to_json(Db) ->

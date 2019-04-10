@@ -36,7 +36,7 @@
 
     get_doc_body/3,
 
-    write_doc_interactive/6,
+    write_doc/6,
 
     fold_docs/4,
     fold_changes/5,
@@ -355,9 +355,6 @@ incr_stat(#{} = Db, StatKey, Increment) when is_integer(Increment) ->
     erlfdb:add(Tx, Key, Increment).
 
 
-get_winning_revs(Db, #doc{} = Doc, NumRevs) ->
-    get_winning_revs(Db, Doc#doc.id, NumRevs);
-
 get_winning_revs(#{} = Db, DocId, NumRevs) ->
     ?REQUIRE_CURRENT(Db),
     #{
@@ -367,7 +364,6 @@ get_winning_revs(#{} = Db, DocId, NumRevs) ->
 
     Prefix = erlfdb_tuple:pack({?DB_REVS, DocId}, DbPrefix),
     Options = [{reverse, true}, {limit, NumRevs}],
-    Future = erlfdb:get_range_startswith(Tx, Prefix, Options),
     lists:map(fun({K, V}) ->
         Key = erlfdb_tuple:unpack(K, DbPrefix),
         Val = erlfdb_tuple:unpack(V),
@@ -375,24 +371,22 @@ get_winning_revs(#{} = Db, DocId, NumRevs) ->
     end, erlfdb:wait(Future)).
 
 
-get_non_deleted_rev(#{} = Db, #doc{} = Doc) ->
+get_non_deleted_rev(#{} = Db, DocId, RevId) ->
     ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = Db,
 
-    #doc{
-        revs = {RevPos, [Rev | _]}
-    } = Doc,
+    {RevPos, Rev} = RevId,
 
-    BaseKey = {?DB_REVS, Doc#doc.id, true, RevPos, Rev},
+    BaseKey = {?DB_REVS, DocId, true, RevPos, Rev},
     Key = erlfdb_tuple:pack(BaseKey, DbPrefix),
     case erlfdb:wait(erlfdb:get(Tx, Key)) of
         not_found ->
             not_found;
         Val ->
-            fdb_to_revinfo(Key, erlfdb_tuple:unpack(Val))
+            fdb_to_revinfo(BaseKey, erlfdb_tuple:unpack(Val))
     end.
 
 
@@ -413,7 +407,7 @@ get_doc_body(#{} = Db, DocId, RevInfo) ->
     fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], Val).
 
 
-write_doc_interactive(Db, Doc, NewWinner, OldWinner, UpdateInfos, RemInfos) ->
+write_doc(Db, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
@@ -425,26 +419,30 @@ write_doc_interactive(Db, Doc, NewWinner, OldWinner, UpdateInfos, RemInfos) ->
         deleted = Deleted
     } = Doc,
 
+    % Revision tree
+
+    NewWinner = NewWinner0#{
+        winner := true,
+        branch_count := maps:get(branch_count, OldWinner)
+    },
     NewRevId = maps:get(rev_id, NewWinner),
 
-    % Update the revision tree
-
-    {WKey, WVal} = revinfo_to_fdb(DbPrefix, DocId, NewWinner),
+    {WKey, WVal} = revinfo_to_fdb(DbPrefix, DocId, Winner),
     ok = erlfdb:set_versionstamped_value(Tx, WKey, WVal),
 
-    lists:foreach(fun(RI) ->
+    lists:foreach(fun(RI0) ->
+        RI = RI0#{winner := false},
         {K, V} = revinfo_to_fdb(DbPrefix, DocId, RI),
         ok = erlfdb:set(Tx, K, V)
-    end, UpdateInfos),
+    end, ToUpdate),
 
-    lists:foreach(fun(RI) ->
-        if RI == not_found -> ok; true ->
-            {K, _} = revinfo_to_fdb(DbPrefix, DocId, RI),
-            ok = erlfdb:clear(Tx, K)
-        end
-    end, RemInfos),
+    lists:foreach(fun(RI0) ->
+        RI = RI0#{winner := false},
+        {K, _} = revinfo_to_fdb(DbPrefix, DocId, RI),
+        ok = erlfdb:clear(Tx, K)
+    end, ToRemove),
 
-    % Update all_docs index
+    % _all_docs
 
     UpdateStatus = case {OldWinner, NewWinner} of
         {not_found, #{deleted := false}} ->
@@ -469,7 +467,7 @@ write_doc_interactive(Db, Doc, NewWinner, OldWinner, UpdateInfos, RemInfos) ->
             ok
     end,
 
-    % Update the changes index
+    % _changes
 
     if OldWinner == not_found -> ok; true ->
         OldSeq = maps:get(sequence, OldWinner),
@@ -481,11 +479,9 @@ write_doc_interactive(Db, Doc, NewWinner, OldWinner, UpdateInfos, RemInfos) ->
     NewSeqVal = erlfdb_tuple:pack({DocId, Deleted, NewRevId}),
     erlfdb:set_versionstamped_key(Tx, NewSeqKey, NewSeqVal),
 
-    % Store document metadata and body
+    % And all the rest...
 
     ok = write_doc_body(Db, Doc),
-
-    % Update doc counts
 
     case UpdateStatus of
         created ->

@@ -619,78 +619,130 @@ update_doc_int(#{} = Db, #doc{} = Doc, Options) ->
 
 
 update_doc_interactive(Db, Doc0, _Options) ->
-    DocRevId = doc_to_revid(Doc0),
-
-    {Winner, MaybeNewWinner} = case Doc0#doc.deleted of
-        true ->
-            case fabric2_fdb:get_winning_revs(Db, Doc0, 2) of
-                [] ->
-                    {not_found, not_found};
-                [Winner0] ->
-                    {Winner0, not_found};
-                [Winner0, MaybeNewWinner0] ->
-                    {Winner0, MaybeNewWinner0}
-            end;
-        false ->
-            case fabric2_fdb:get_winning_revs(Db, Doc0, 1) of
-                [] ->
-                    {not_found, not_found};
-                [Winner0] ->
-                    {Winner0, not_found}
+    % Get the current winning revision. This is needed
+    % regardless of which branch we're updating. The extra
+    % revision we're grabbing is an optimization to
+    % save us a round trip if we end up deleting
+    % the winning revision branch.
+    NumRevs = if Doc0#doc.deleted -> 2; true -> 1 end,
+    RevInfos = fabric2_fdb:get_winning_revs(Db, Doc0#doc.id, NumRevs),
+    {Winner, SecondPlace} = case RevInfos of
+        [] -> {not_found, not_found};
+        [WRI] -> {WRI, not_found};
+        [WRI, SPRI] -> {WRI, SPRI}
+    end,
+    WinnerRevId = case Winner of
+        not_found ->
+            {0, <<>>};
+        _ ->
+            case maps:get(deleted, Winner) of
+                true -> {0, <<>>};
+                false -> maps:get(rev_id, Winner)
             end
     end,
 
-    {Doc1, ExtendedRevInfo} = case Winner of
-        not_found when DocRevId == {0, <<>>} ->
-            {Doc0, not_found};
-        #{winner := true, deleted := true} when DocRevId == {0, <<>>} ->
-            {WPos, WRev} = maps:get(rev_id, Winner),
-            {Doc0#doc{revs = {WPos, [WRev]}}, Winner};
-        #{winner := true, deleted := false} when DocRevId == {0, <<>>} ->
-            ?RETURN({error, conflict});
-        #{winner := true, deleted := false, rev_id := DocRevId} ->
-            {Doc0, Winner};
-        #{winner := true, rev_id := WRevId} when WRevId /= DocRevId ->
-            case fabric2_fdb:get_non_deleted_rev(Db, Doc0) of
+    % Check that a revision was specified if required
+    Doc0RevId = doc_to_revid(Doc0),
+    if Doc0RevId /= {0, <<>>} orelse WinnerRevId == {0, <<>>} -> ok; true ->
+        ?RETURN({error, conflict});
+    end,
+
+    % Check that we're not trying to create a deleted doc
+    if Doc0RevId /= {0, <<>>} orelse not Doc0#doc.deleted -> ok; true ->
+        ?RETURN({error, conflict})
+    end,
+
+    % Get the target revision to update
+    Target = case DocId0RevId == WinnerRevId of
+        true ->
+            Winner;
+        false ->
+            case fabric2_fdb:get_non_deleted_rev(Db, Doc0#doc.id, Doc0RevId) of
+                #{deleted := false} = Target0 ->
+                    Target0;
                 not_found ->
-                    ?RETURN({error, conflict});
-                #{deleted := false, rev_id := DocRevId} = PrevRevInfo->
-                    {Doc0, PrevRevInfo};
-                #{deleted := true} ->
+                    % Either a missing revision or a deleted
+                    % revision. Either way a conflict. Note
+                    % that we get not_found for a deleted revision
+                    % because we only check for the non-deleted
+                    % key in fdb
                     ?RETURN({error, conflict})
             end
     end,
 
+    % When recreating a deleted document we want to extend
+    % the winning revision branch rather than create a
+    % new branch. If we did not do this we could be
+    % recreating into a state that previously existed.
+    Doc1 = case Winner of
+        #{deleted := true} when not Doc0#doc.deleted ->
+            {WinnerRevPos, WinnerRev} = maps:get(rev_id, Winner),
+            Doc0#doc{revs = {WinnerRevPos, [WinnerRev]}};
+        #{deleted := true} when Doc0#doc.deleted ->
+            % We disable extending deleted revisions with
+            % new deletions during interactive updates
+            ?RETURN({error, conflict});
+        _ ->
+            Doc0
+    end,
+
+    % Validate the doc update and create the
+    % new revinfo map
+    Doc2 = prep_and_validate(Db, Doc1, Target),
     #doc{
         deleted = NewDeleted,
         revs = {NewRevPos, [NewRev | NewRevPath]}
-    } = Doc2 = prep_and_validate_interactive(Db, Doc1, ExtendedRevInfo),
+    } = Doc3 = new_revid(Doc2),
 
     NewRevInfo = #{
-        winner => undefined,
-        deleted => NewDeleted,
-        rev_id => {NewRevPos, NewRev},
-        rev_path => NewRevPath,
-        sequence => undefined,
-        branch_count => undefined
+        winner := undefined,
+        deleted := NewDeleted,
+        rev_id := {NewRevPos, NewRev},
+        rev_path := NewRevPath,
+        sequence := undefined,
+        branch_count := undefined
     },
 
-    AllRevInfos = [NewRevInfo, Winner, MaybeNewWinner],
-    {NewWinner, ToUpdate} = interactive_winner(AllRevInfos, ExtendedRevInfo),
+    % Gather the list of possible winnig revisions
+    Possible = case Target == Winner of
+        true when not Doc3#doc.deleted ->
+            [NewRevInfo];
+        true when Doc3#doc.deleted ->
+            case SecondPlace of
+                #{} -> [NewRevInfo, SecondPlace];
+                not_found -> [NewRevInfo]
+            end;
+        false ->
+            [NewRevInfo, Winner]
+    end,
 
-    ok = fabric2_fdb:write_doc_interactive(
+    % Sort the rev infos such that the winner is first
+    {NewWinner, NonWinner} = case fabric2_util:sort_revinfos(Possible) of
+        [W] -> {W, not_found};
+        [W, NW] -> {W, NW}
+    end,
+
+    ToUpdate = if NonWinner == not_found -> []; true -> [NonWinner] end,
+    ToRemove = if Target == not_found -> []; true -> [Target] end,
+
+    ok = fabric2_fdb:write_doc(
             Db,
-            Doc2,
+            Doc3,
             NewWinner,
             Winner,
             ToUpdate,
-            [ExtendedRevInfo]
+            ToRemove
         ),
 
     {ok, {NewRevPos, NewRev}}.
 
 
-prep_and_validate_interactive(Db, Doc, ExtendedRevInfo) ->
+update_doc_replicated(_Db, _Doc, _Options) ->
+    erlang:error(not_implemented).
+
+
+
+prep_and_validate(Db, Doc, PrevRevInfo) ->
     HasStubs = couch_doc:has_stubs(Doc),
     HasVDUs = [] /= maps:get(validate_doc_update_funs, Db),
     IsDDoc = case Doc#doc.id of
@@ -700,64 +752,21 @@ prep_and_validate_interactive(Db, Doc, ExtendedRevInfo) ->
 
     PrevDoc = case HasStubs orelse (HasVDUs and not IsDDoc) of
         true ->
-            case fabric2_fdb:get_doc_body(Db, Doc, ExtendedRevInfo) of
+            case fabric2_fdb:get_doc_body(Db, Doc#doc.id, PrevRevInfo) of
                 #doc{} = Doc -> Doc;
-                {not_found, _} -> #doc{}
+                {not_found, _} -> nil
             end;
         false ->
             nil
     end,
 
     MergedDoc = if not HasStubs -> Doc; true ->
+        % This will throw an error if we have any
+        % attachment stubs missing data
         couch_doc:merge_stubs(Doc, PrevDoc)
     end,
-
     validate_doc_update(Db, MergedDoc, PrevDoc),
-    new_revid(MergedDoc).
-
-
-interactive_winner(RevInfos0, ExtendedRevInfo) ->
-    % Fetch the current winner so we can copy
-    % the current branch count
-    BranchCount = case [W || #{winner := true} = W <- RevInfos0] of
-        [] ->
-            % Creating a doc, the branch count is
-            % now 1 by definition
-            1;
-        [#{winner := true, branch_count := Count}] ->
-            % Interactive edits can never create new
-            % branches so we just copy the current Count
-            Count
-    end,
-
-    % Remove the previous winner if it was updated
-    RevInfos1 = RevInfos0 -- [ExtendedRevInfo],
-
-    % Remove not_found if we didn't need or have a
-    % MaybeNewWinner
-    RevInfos2 = RevInfos1 -- [not_found],
-
-    SortFun = fun(A, B) ->
-        #{
-            deleted := DeletedA,
-            rev_id := RevIdA
-        } = A,
-        #{
-            deleted := DeletedB,
-            rev_id := RevIdB
-        } = B,
-        {not DeletedA, RevIdA} > {not DeletedB, RevIdB}
-    end,
-    [Winner0 | Rest0] = lists:sort(SortFun, RevInfos2),
-    Winner = Winner0#{
-        winner := true,
-        branch_count := BranchCount
-    },
-    {Winner, [R#{winner := false} || R <- Rest0]}.
-
-
-update_doc_replicated(_Db, _Doc, _Options) ->
-    erlang:error(not_implemented).
+    MergedDoc.
 
 
 validate_doc_update(Db, #doc{id = <<"_design/", _/binary>>} = Doc, _) ->
@@ -843,3 +852,7 @@ doc_to_revid(#doc{revs = Revs}) ->
         {0, []} -> {0, <<>>};
         {RevPos, [Rev | _]} -> {RevPos, Rev}
     end.
+
+
+doc_to_revpath(#doc{revs = {_, [_ | RevPath]}}) ->
+    RevPath.
