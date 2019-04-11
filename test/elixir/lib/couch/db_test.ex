@@ -116,13 +116,14 @@ defmodule Couch.DBTest do
     end)
   end
 
-  def create_user(user) do
+  def prepare_user_doc(user) do
     required = [:name, :password, :roles]
 
     Enum.each(required, fn key ->
       assert Keyword.has_key?(user, key), "User missing key: #{key}"
     end)
 
+    id = Keyword.get(user, :id)
     name = Keyword.get(user, :name)
     password = Keyword.get(user, :password)
     roles = Keyword.get(user, :roles)
@@ -135,14 +136,17 @@ defmodule Couch.DBTest do
       assert is_binary(role), "Roles must be a list of strings"
     end)
 
-    user_doc = %{
-      "_id" => "org.couchdb.user:" <> name,
+    %{
+      "_id" => id || "org.couchdb.user:" <> name,
       "type" => "user",
       "name" => name,
       "roles" => roles,
       "password" => password
     }
+  end
 
+  def create_user(user) do
+    user_doc = prepare_user_doc(user)
     resp = Couch.get("/_users/#{user_doc["_id"]}")
 
     user_doc =
@@ -180,6 +184,32 @@ defmodule Couch.DBTest do
     assert resp.status_code in [201, 202]
     assert resp.body["ok"]
     {:ok, resp}
+  end
+
+  def save_doc(db_name, body) do
+    resp = Couch.put("/#{db_name}/#{body["_id"]}", body: body)
+    assert resp.status_code in [201, 202]
+    assert resp.body["ok"]
+    {:ok, resp}
+  end
+
+  def delete_doc(db_name, body) do
+    resp = Couch.delete("/#{db_name}/#{body["_id"]}", query: [rev: body["_rev"]])
+    assert resp.status_code in [200, 202]
+    assert resp.body["ok"]
+    {:ok, resp}
+  end
+
+  def compact(db_name) do
+    resp = Couch.post("/#{db_name}/_compact")
+    assert resp.status_code == 202
+    resp.body
+  end
+
+  def info(db_name) do
+    resp = Couch.get("/#{db_name}")
+    assert resp.status_code == 200
+    resp.body
   end
 
   def bulk_save(db_name, docs) do
@@ -288,6 +318,26 @@ defmodule Couch.DBTest do
     for id <- id_range, str_id = Integer.to_string(id) do
       %{_id: str_id, integer: id, string: str_id}
     end
+  end
+
+  def request_stats(path_steps, is_test) do
+    path =
+      List.foldl(
+        path_steps,
+        "/_node/_local/_stats",
+        fn p, acc ->
+          "#{acc}/#{p}"
+        end
+      )
+
+    path =
+      if is_test do
+        path <> "?flush=true"
+      else
+        path
+      end
+
+    Couch.get(path).body
   end
 
   def retry_until(condition, sleep \\ 100, timeout \\ 5000) do

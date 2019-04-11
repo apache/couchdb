@@ -3,11 +3,10 @@ defmodule Couch.Session do
   CouchDB session helpers.
   """
 
-  @enforce_keys [:cookie]
-  defstruct [:cookie]
+  defstruct [:cookie, :error]
 
-  def new(cookie) do
-    %Couch.Session{cookie: cookie}
+  def new(cookie, error \\ "") do
+    %Couch.Session{cookie: cookie, error: error}
   end
 
   def logout(sess) do
@@ -119,10 +118,14 @@ defmodule Couch do
 
   def login(user, pass) do
     resp = Couch.post("/_session", body: %{:username => user, :password => pass})
-    true = resp.body["ok"]
-    cookie = resp.headers[:"set-cookie"]
-    [token | _] = String.split(cookie, ";")
-    %Couch.Session{cookie: token}
+
+    if resp.body["ok"] do
+      cookie = resp.headers[:"set-cookie"]
+      [token | _] = String.split(cookie, ";")
+      %Couch.Session{cookie: token}
+    else
+      %Couch.Session{error: resp.body["error"]}
+    end
   end
 
   # HACK: this is here until this commit lands in a release
