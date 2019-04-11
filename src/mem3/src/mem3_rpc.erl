@@ -68,7 +68,11 @@ get_missing_revs(Node, DbName, IdsRevs, Options) ->
 update_docs(Node, DbName, Docs, Options) ->
     rexi_call(Node, {fabric_rpc, update_docs, [DbName, Docs, Options]}).
 
-
+load_checkpoint(Node, DbName, SourceNode, SourceUUID, <<>>) ->
+    % Upgrade clause for a mixed cluster for old nodes that don't have
+    % load_checkpoint_rpc/4 yet. FilterHash is currently not
+    % used and so defaults to <<>> everywhere
+    load_checkpoint(Node, DbName, SourceNode, SourceUUID);
 load_checkpoint(Node, DbName, SourceNode, SourceUUID, FilterHash) ->
     Args = [DbName, SourceNode, SourceUUID, FilterHash],
     rexi_call(Node, {mem3_rpc, load_checkpoint_rpc, Args}).
