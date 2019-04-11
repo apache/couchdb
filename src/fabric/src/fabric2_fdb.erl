@@ -31,6 +31,7 @@
     get_stat/2,
     incr_stat/3,
 
+    get_all_revs/2,
     get_winning_revs/3,
     get_non_deleted_rev/2,
 
@@ -355,7 +356,7 @@ incr_stat(#{} = Db, StatKey, Increment) when is_integer(Increment) ->
     erlfdb:add(Tx, Key, Increment).
 
 
-get_winning_revs(#{} = Db, DocId, NumRevs) ->
+get_all_revs(#{} = Db, DocId) ->
     ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
@@ -363,7 +364,25 @@ get_winning_revs(#{} = Db, DocId, NumRevs) ->
     } = Db,
 
     Prefix = erlfdb_tuple:pack({?DB_REVS, DocId}, DbPrefix),
+    Options = [{streaming_mode, want_all}],
+    Future = erlfdb:get_range_startswith(Tx, Prefix, Options)
+    lists:map(fun({K, V}) ->
+        Key = erlfdb_tuple:unpack(K, DbPrefix),
+        Val = erlfdb_tuple:unpack(V),
+        fdb_to_revinfo(Key, Val)
+    end, erlfdb:wait(Future)).
+
+
+get_winning_revs(#{} = Db, DocId, NumRevs) ->
+    ?REQUIRE_CURRENT(Db),
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = Db,
+
+    {StartKey, EndKey} = erlfdb_tuple:range({?DB_REVS, DocId}, DbPrefix),
     Options = [{reverse, true}, {limit, NumRevs}],
+    Future = erlfdb:get_range(Tx, StartKey, EndKey, Options),
     lists:map(fun({K, V}) ->
         Key = erlfdb_tuple:unpack(K, DbPrefix),
         Val = erlfdb_tuple:unpack(V),
@@ -421,10 +440,7 @@ write_doc(Db, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
 
     % Revision tree
 
-    NewWinner = NewWinner0#{
-        winner := true,
-        branch_count := maps:get(branch_count, OldWinner)
-    },
+    NewWinner = NewWinner0#{winner := true},
     NewRevId = maps:get(rev_id, NewWinner),
 
     {WKey, WVal} = revinfo_to_fdb(DbPrefix, DocId, Winner),

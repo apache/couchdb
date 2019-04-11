@@ -717,11 +717,12 @@ update_doc_interactive(Db, Doc0, _Options) ->
     end,
 
     % Sort the rev infos such that the winner is first
-    {NewWinner, NonWinner} = case fabric2_util:sort_revinfos(Possible) of
+    {NewWinner0, NonWinner} = case fabric2_util:sort_revinfos(Possible) of
         [W] -> {W, not_found};
         [W, NW] -> {W, NW}
     end,
 
+    NewWinner = NewWinnner0#{branch_count := maps:get(branch_count, Winner)},
     ToUpdate = if NonWinner == not_found -> []; true -> [NonWinner] end,
     ToRemove = if Target == not_found -> []; true -> [Target] end,
 
@@ -737,9 +738,71 @@ update_doc_interactive(Db, Doc0, _Options) ->
     {ok, {NewRevPos, NewRev}}.
 
 
-update_doc_replicated(_Db, _Doc, _Options) ->
-    erlang:error(not_implemented).
+update_doc_replicated(Db, Doc0, Options) ->
+    #doc{
+        id = DocId,
+        deleted = Deleted,
+        revs = {RevPos, [Rev | RevPath]}
+    } = Doc0,
 
+    DocRevInfo = #{
+        winner => undefined,
+        deleted => Deleted,
+        rev_id => {RevPos, Rev},
+        rev_path => RevPath,
+        sequence => undefined,
+        branch_count => undefined
+    },
+
+    AllRevs = fabric2_fdb:get_all_revs(Db, DocId),
+
+    RevTree = lists:foldl(fun(RI, TreeAcc) ->
+        RIPath = fabric2_util:revinfo_to_path(RI),
+        {Merged, _} = couch_key_tree:merge(TreeAcc, RevTree),
+        Merged
+    end, [], AllRevs),
+
+    DocRevPath = fabric2_util:revinfo_to_path(RI),
+    {NewTree, Status} = couch_key_tree:merge(RevTree, DocRevPath),
+    if Status /= internal_node -> ok; true ->
+        % We already know this revision so nothing
+        % left to do.
+        ?RETURN({ok, []})
+    end,
+
+    AllLeafsFull = couch_key_tree:get_all_leafs_full(NewTree),
+    LeafPath = get_leaf_path(RevPos, Rev, AllLeafsFull),
+    PrevRevInfo = find_prev_revinfo(LeafPath),
+    Doc1 = prep_and_validate(Db, Doc0, PrevRevInfo),
+
+    % Possible winners are the previous winner and
+    % the new DocRevInfo
+    Winner = case fabric2_util:sort_revinfos(AllRevInfos) of
+        [#{winner := true} = WRI | _] -> WRI;
+        [] -> not_found
+    end,
+    {NewWinner0, NonWinner} = case Winner == PrevRevInfo of
+        true ->
+            {DocRevInfo, not_found};
+        false ->
+            [W, NW] = fabric2_util:sort_revinfos([Winner, DocRevInfo]),
+            {N, NW}
+    end,
+
+    NewWinner = NewWinner0#{branch_count := length(AllLeafsFull)},
+    ToUpdate = if NonWinner == not_found -> []; true -> [NonWinner] end,
+    ToRemove = if PrevRevInfo == not_found -> []; true -> [PrevRevInfo] end,
+
+    ok = fabric2_fdb:write_doc(
+            Db,
+            Doc3,
+            NewWinner,
+            Winner,
+            ToUpdate,
+            ToRemove
+        ),
+
+    {ok, {NewRevPos, NewRev}}.
 
 
 prep_and_validate(Db, Doc, PrevRevInfo) ->
@@ -751,12 +814,12 @@ prep_and_validate(Db, Doc, PrevRevInfo) ->
     end,
 
     PrevDoc = case HasStubs orelse (HasVDUs and not IsDDoc) of
-        true ->
+        true when PrevRevInfo /= not_found ->
             case fabric2_fdb:get_doc_body(Db, Doc#doc.id, PrevRevInfo) of
                 #doc{} = Doc -> Doc;
                 {not_found, _} -> nil
             end;
-        false ->
+        _ ->
             nil
     end,
 
@@ -816,20 +879,18 @@ validate_ddoc(Db, DDoc) ->
     end.
 
 
-%% find_prev_known_rev(_Pos, []) ->
-%%     not_found;
-%% find_prev_known_rev(Pos, [{_Rev, #doc{}} | RestPath]) ->
-%%     % doc records are skipped because these are the result
-%%     % of replication sending us an update. We're only interested
-%%     % in what we have locally since we're comparing attachment
-%%     % stubs. The replicator should never do this because it
-%%     % should only ever send leaves but the possibility exists
-%%     % so we account for it.
-%%     find_prev_known_rev(Pos - 1, RestPath);
-%% find_prev_known_rev(Pos, [{_Rev, ?REV_MISSING} | RestPath]) ->
-%%     find_prev_known_rev(Pos - 1, RestPath);
-%% find_prev_known_rev(Pos, [{_Rev, #leaf{}} | _] = DocPath) ->
-%%     {Pos, [Rev || {Rev, _Val} <- DocPath]}.
+get_leaf_path(Pos, Rev, [{Pos, [{Rev, _RevInfo} | LeafPath]} | _]) ->
+    LeafPath;
+get_doc_leaf(Pos, Rev, [_WrongLeaf | RestLeafs]) ->
+    get_doc_leaf(Pos, Rev, RestLeafs).
+
+
+find_prev_revinfo(_Pos, []) ->
+    not_found;
+find_prev_revinfo(Pos, [{_Rev, ?REV_MISSING} | RestPath]) ->
+    find_prev_known_rev(Pos - 1, RestPath);
+find_prev_revinfo(_Pos, [{_Rev, #{} = RevInfo} | _]) ->
+    RevInfo.
 
 
 transactional(DbName, Options, Fun) ->
