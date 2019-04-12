@@ -149,7 +149,7 @@ create(DbName, Options) ->
         end
     end),
     % We cache outside of the transaction so that we're sure
-    % that this request created the database
+    % that the transaction was committed.
     case Result of
         #{} = Db ->
             ok = fabric2_server:store(Db),
