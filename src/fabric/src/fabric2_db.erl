@@ -162,16 +162,7 @@ create(DbName, Options) ->
 open(DbName, Options) ->
     case fabric2_server:fetch(DbName) of
         #{} = Db ->
-            with_tx(Db, fun(TxDb) ->
-                case fabric2_fdb:is_current(TxDb) of
-                    true ->
-                        {ok, maybe_set_user_ctx(Db, Options)};
-                    false ->
-                        Reopened = fabric2_fdb:open(TxDb, Options),
-                        ok = fabric2_server:store(Reopened),
-                        {ok, Reopened}
-                end
-            end);
+            {ok, maybe_set_user_ctx(Db, Options)};
         undefined ->
             transactional(DbName, Options, fun(TxDb) ->
                 Opened = fabric2_fdb:open(TxDb, Options),
@@ -184,7 +175,7 @@ open(DbName, Options) ->
 delete(DbName, Options) ->
     % This will throw if the db does not exist
     {ok, Db} = open(DbName, Options),
-    with_tx(Db, fun(TxDb) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:delete(TxDb)
     end).
 
@@ -252,7 +243,7 @@ get_compactor_pid(#{} = _Db) ->
 
 
 get_db_info(#{} = Db) ->
-    DbProps = with_tx(Db, fun(TxDb) ->
+    DbProps = fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:get_info(TxDb)
     end),
 
@@ -290,7 +281,7 @@ get_doc_count(DbName, <<"_local">>) ->
     get_doc_count(DbName, <<"doc_local_count">>);
 
 get_doc_count(Db, Key) ->
-    with_tx(Db, fun(TxDb) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:get_stat(TxDb, Key)
     end).
 
@@ -361,14 +352,14 @@ is_system_db_name(DbName) when is_binary(DbName) ->
 
 set_revs_limit(#{} = Db, RevsLimit) ->
     RevsLimBin = ?uint2bin(RevsLimit),
-    with_tx(Db, fun(TxDb) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:set_config(TxDb, <<"revs_limit">>, RevsLimBin)
     end).
 
 
 set_security(#{} = Db, Security) ->
     SecBin = ?JSON_ENCODE(Security),
-    with_tx(Db, fun(TxDb) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:set_config(TxDb, <<"security_doc">>, SecBin)
     end).
 
@@ -390,7 +381,7 @@ open_doc(#{} = Db, DocId) ->
 
 
 open_doc(#{} = Db, DocId, _Options) ->
-    with_tx(Db, fun(TxDb) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
         case fabric2_fdb:get_winning_revs(TxDb, DocId, 1) of
             [] ->
                 {not_found, missing};
@@ -405,7 +396,7 @@ open_doc(#{} = Db, DocId, _Options) ->
 
 open_doc_revs(Db, DocId, Revs, Options) ->
     Latest = lists:member(latest, Options),
-    with_tx(Db, fun(TxDb) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
         #full_doc_info{
             rev_tree = RevTree
         } = fabric2_db:get_full_doc_info(TxDb, DocId),
@@ -439,7 +430,7 @@ update_doc(Db, Doc) ->
 
 
 update_doc(Db, Doc, Options) ->
-    with_tx(Db, fun(TxDb) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
         update_doc_int(TxDb, Doc, Options)
     end).
 
@@ -450,7 +441,7 @@ update_docs(Db, Docs) ->
 
 update_docs(Db, Docs, Options) ->
     {Resps, Status} = lists:mapfoldl(fun(Doc, Acc) ->
-        with_tx(Db, fun(TxDb) ->
+        fabric2_fdb:transactional(Db, fun(TxDb) ->
             case update_doc_int(TxDb, Doc, Options) of
                 {ok, _} = Resp ->
                     {Resp, Acc};
@@ -467,7 +458,7 @@ fold_docs(Db, UserFun, UserAcc) ->
 
 
 fold_docs(Db, UserFun, UserAcc, Options) ->
-    with_tx(Db, fun(TxDb) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:fold_docs(TxDb, UserFun, UserAcc, Options)
     end).
 
@@ -477,7 +468,7 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc) ->
 
 
 fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
-    with_tx(Db, fun(TxDb) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:fold_changes(TxDb, SinceSeq, UserFun, UserAcc, Options)
     end).
 
@@ -891,21 +882,6 @@ find_prev_revinfo(Pos, [{_Rev, ?REV_MISSING} | RestPath]) ->
     find_prev_known_rev(Pos - 1, RestPath);
 find_prev_revinfo(_Pos, [{_Rev, #{} = RevInfo} | _]) ->
     RevInfo.
-
-
-transactional(DbName, Options, Fun) ->
-    fabric2_util:transactional(fun(Tx) ->
-        Fun(fabric2_fdb:init(Tx, DbName, Options))
-    end).
-
-
-with_tx(#{tx := undefined} = Db, Fun) ->
-    fabric2_util:transactional(fun(Tx) ->
-        Fun(Db#{tx => Tx})
-    end);
-
-with_tx(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
-    Fun(Db).
 
 
 doc_to_revid(#doc{revs = Revs}) ->

@@ -14,9 +14,6 @@
 
 
 -export([
-    transactional/1,
-    get_db_handle/0,
-
     revinfo_to_path/1,
     find_winning_revinfo/1,
 
@@ -33,25 +30,6 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
-
-
--define(PDICT_DB_KEY, '$erlfdb_handle').
-
-
-transactional(Fun) when is_function(Fun, 1) ->
-    Db = get_db_handle(),
-    erlfdb:transactional(Db, Fun).
-
-
-get_db_handle() ->
-    case get(?PDICT_DB_KEY) of
-        undefined ->
-            {ok, Db} = application:get_env(fabric, db),
-            put(?PDICT_DB_KEY, Db),
-            Db;
-        Db ->
-            Db
-    end.
 
 
 revinfo_to_path(RevInfo) ->

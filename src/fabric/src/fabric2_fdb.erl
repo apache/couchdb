@@ -14,7 +14,9 @@
 
 
 -export([
-    init/3,
+    transactional/1,
+    transactional/3,
+    transactional/2,
 
     create/2,
     open/2,
@@ -67,6 +69,7 @@
 -define(CLUSTER_CONFIG, 0).
 -define(ALL_DBS, 1).
 -define(DBS, 15).
+-define(TX_IDS, 255).
 
 -define(DB_CONFIG, 16).
 -define(DB_STATS, 17).
@@ -82,6 +85,15 @@
 -define(CURR_REV_FORMAT, 0).
 
 
+% Misc constants
+
+-define(PDICT_DB_KEY, '$fabric_db_handle').
+-define(PDICT_LAYER_CACHE, '$fabric_layer_id').
+-define(PDICT_TX_ID_KEY, '$fabric_tx_id').
+-define(PDICT_TX_RES_KEY, '$fabric_tx_result').
+-define(COMMIT_UNKOWN_RESULT, 1021).
+
+
 % Various utility macros
 
 -define(REQUIRE_TX(Db), {erlfdb_transaction, _} = maps:get(tx, Db)).
@@ -90,16 +102,30 @@
 -define(UNSET_VS, {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF}).
 
 
-init(Tx, DbName, Options) ->
-    Root = erlfdb_directory:root(),
-    CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
-    Prefix = erlfdb_directory:get_name(CouchDB),
-    #{
-        name => DbName,
-        tx => Tx,
-        layer_prefix => Prefix,
-        options => Options
-    }.
+transactional(Fun) when is_function(Fun, 1) ->
+    Db = get_db_handle(),
+    try
+        erlfdb:transactional(Db, fun(Tx) ->
+            tx_wrap(Tx, Fun)
+        end)
+    after
+        tx_clear()
+    end.
+
+
+transactional(DbName, Options, Fun) when is_binary(DbName) ->
+    transactional(fun(Tx) ->
+        Fun(init_db(Tx, DbName, Options))
+    end).
+
+
+transactional(#{tx := undefined} = Db, Fun) ->
+    transactional(fun(Tx) ->
+        Fun(Db#{tx => Tx})
+    end);
+
+transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
+    Fun(Db).
 
 
 create(#{} = Db, Options) ->
@@ -615,6 +641,18 @@ get_changes(#{} = Db, Options) ->
     end, erlfdb:wait(Future)).
 
 
+init(Tx, DbName, Options) ->
+    Root = erlfdb_directory:root(),
+    CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
+    Prefix = erlfdb_directory:get_name(CouchDB),
+    #{
+        name => DbName,
+        tx => Tx,
+        layer_prefix => Prefix,
+        options => Options
+    }.
+
+
 bump_metadata_version(Tx) ->
     % The 14 zero bytes is pulled from the PR for adding the
     % metadata version key. Not sure why 14 bytes when version
@@ -702,3 +740,60 @@ fdb_to_doc(_Db, DocId, Pos, Path, Bin) when is_binary(Bin) ->
     };
 fdb_to_doc(_Db, _DocId, _Pos, _Path, not_found) ->
     {not_found, missing}.
+
+
+get_db_handle() ->
+    case get(?PDICT_DB_KEY) of
+        undefined ->
+            {ok, Db} = application:get_env(fabric, db),
+            put(?PDICT_DB_KEY, Db),
+            Db;
+        Db ->
+            Db
+    end.
+
+
+tx_wrap(Tx, Fun) ->
+    case get(erlfdb_error) of
+        ?COMMIT_UNKNOWN_RESULT ->
+            tx_check_applied(Tx, Fun);
+        _ ->
+            tx_attempt(Tx, Fun)
+    end.
+
+
+tx_clear() ->
+    fabric2_txid_cleaner:remove(get(?PDICT_TX_ID_KEY)),
+    put(?PDICT_TX_ID_KEY, undefined),
+    put(?PDICT_TX_RES_KEY, undefined).
+
+
+tx_check_applied(Tx, Fun) ->
+    case get(?PDICT_TX_ID_KEY) of
+        undefined ->
+            tx_attempt(Tx, Fun);
+        TxId when is_binary(TxId) ->
+            case erlfdb:wait(erlfdb:get(Tx, TxId)) of
+                <<>> ->
+                    get(?PDICT_TX_RES_KEY);
+                not_found ->
+                    tx_attempt(Tx, Fun)
+            end
+    end.
+
+
+tx_attempt(Tx, Fun) ->
+    Result = Fun(Tx),
+    TxId = tx_id(Tx),
+    ok = erlfdb:set(Tx, TxId, <<>>),
+    put(?PDICT_TX_RES_KEY, Result),
+    Result.
+
+
+tx_id(Tx) ->
+    Root = erlfdb_directory:root(),
+    CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
+    Prefix = erlfdb_directory:get_name(CouchDB),
+    {Mega, Secs, Micro} = os:timestamp(),
+    Key = {?TX_IDS, Mega, Secs, Micro, fabric2_util:uuid()},
+    erlfdb_tuple:pack(Key, Prefix).
