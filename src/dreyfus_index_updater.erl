@@ -28,7 +28,7 @@ update(IndexPid, Index) ->
         ddoc_id = DDocId,
         name = IndexName
     } = Index,
-    erlang:put(io_priority, {view_update, DbName, IndexName}),
+    erlang:put(io_priority, {search, DbName, IndexName}),
     {ok, Db} = couch_db:open_int(DbName, []),
     try
         TotalUpdateChanges = couch_db:count_changes_since(Db, CurSeq),
