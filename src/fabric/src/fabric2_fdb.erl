@@ -18,6 +18,8 @@
     transactional/3,
     transactional/2,
 
+    sweep_tx_ids/2,
+
     create/2,
     open/2,
     delete/1,
@@ -44,62 +46,15 @@
     fold_docs/4,
     fold_changes/5,
 
-    get_changes/2
+    get_changes/2,
+
+    debug_cluster/0,
+    debug_cluster/2
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
 -include("fabric2.hrl").
-
-
-% This will eventually be the `\xFFmetadataVersion` key that is
-% currently only available in FoundationDB master.
-%
-%  https://forums.foundationdb.org/t/a-new-tool-for-managing-layer-metadata/1191
-%
-% Until then we'll fake the same behavior using a randomish
-% key for tracking metadata changse. Once we get to the
-% new feature this will be more performant by updating
-% this define.
--define(METADATA_VERSION_KEY, <<"$metadata_version_key$">>).
-
-
-% Prefix Definitions
-
--define(CLUSTER_CONFIG, 0).
--define(ALL_DBS, 1).
--define(DBS, 15).
--define(TX_IDS, 255).
-
--define(DB_CONFIG, 16).
--define(DB_STATS, 17).
--define(DB_ALL_DOCS, 18).
--define(DB_CHANGES, 19).
--define(DB_REVS, 20).
--define(DB_DOCS, 21).
--define(DB_LOCAL_DOCS, 22).
-
-
-% Versions
-
--define(CURR_REV_FORMAT, 0).
-
-
-% Misc constants
-
--define(PDICT_DB_KEY, '$fabric_db_handle').
--define(PDICT_LAYER_CACHE, '$fabric_layer_id').
--define(PDICT_TX_ID_KEY, '$fabric_tx_id').
--define(PDICT_TX_RES_KEY, '$fabric_tx_result').
--define(COMMIT_UNKOWN_RESULT, 1021).
-
-
-% Various utility macros
-
--define(REQUIRE_TX(Db), {erlfdb_transaction, _} = maps:get(tx, Db)).
--define(REQUIRE_CURRENT(Db), true = is_current(Db)).
-
--define(UNSET_VS, {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF}).
 
 
 transactional(Fun) when is_function(Fun, 1) ->
@@ -639,6 +594,21 @@ get_changes(#{} = Db, Options) ->
         {?DB_CHANGES, Seq} = erlfdb_tuple:unpack(Key, DbPrefix),
         {fabric2_util:to_hex(Seq), Val}
     end, erlfdb:wait(Future)).
+
+
+debug_cluster() ->
+    debug_cluster(<<>>, <<16#FE, 16#FF, 16#FF>>).
+
+
+debug_cluster(Start, End) ->
+    transactional(fun(Tx) ->
+        lists:foreach(fun({Key, Val}) ->
+            io:format("~s => ~s~n", [
+                    string:pad(erlfdb_util:repr(Key), 60),
+                    erlfdb_util:repr(Val)
+                ])
+        end, erlfdb:get_range(Tx, Start, End))
+    end).
 
 
 init(Tx, DbName, Options) ->

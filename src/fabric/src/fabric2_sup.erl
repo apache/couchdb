@@ -38,6 +38,10 @@ init([]) ->
         #{
             id => fabric2_server,
             start => {fabric2_server, start_link, []}
+        },
+        #{
+            id => fabric2_txid_cleaner,
+            start => {fabric2_txid_cleaner, start_link, []}
         }
     ],
     {ok, {Flags, Children}}.

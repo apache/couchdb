@@ -15,17 +15,14 @@
 
 -export([
     revinfo_to_path/1,
-    find_winning_revinfo/1,
+    sort_revinfos/1,
 
     user_ctx_to_json/1,
 
     get_value/2,
     get_value/3,
     to_hex/1,
-    uuid/0,
-
-    debug_cluster/0,
-    debug_cluster/2
+    uuid/0
 ]).
 
 
@@ -122,18 +119,3 @@ nibble_to_hex(I) ->
 
 uuid() ->
     to_hex(crypto:strong_rand_bytes(16)).
-
-
-debug_cluster() ->
-    debug_cluster(<<>>, <<16#FE, 16#FF, 16#FF>>).
-
-
-debug_cluster(Start, End) ->
-    transactional(fun(Tx) ->
-        lists:foreach(fun({Key, Val}) ->
-            io:format("~s => ~s~n", [
-                    string:pad(erlfdb_util:repr(Key), 60),
-                    erlfdb_util:repr(Val)
-                ])
-        end, erlfdb:get_range(Tx, Start, End))
-    end).
