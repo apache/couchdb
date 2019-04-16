@@ -117,7 +117,7 @@ defmodule Couch.DBTest do
   end
 
   def prepare_user_doc(user) do
-    required = [:name, :password, :roles]
+    required = [:name, :password]
 
     Enum.each(required, fn key ->
       assert Keyword.has_key?(user, key), "User missing key: #{key}"
@@ -126,7 +126,7 @@ defmodule Couch.DBTest do
     id = Keyword.get(user, :id)
     name = Keyword.get(user, :name)
     password = Keyword.get(user, :password)
-    roles = Keyword.get(user, :roles)
+    roles = Keyword.get(user, :roles, [])
 
     assert is_binary(name), "User name must be a string"
     assert is_binary(password), "User password must be a string"
@@ -184,26 +184,6 @@ defmodule Couch.DBTest do
     assert resp.status_code in [201, 202]
     assert resp.body["ok"]
     {:ok, resp}
-  end
-
-  def save_doc(db_name, body) do
-    resp = Couch.put("/#{db_name}/#{body["_id"]}", body: body)
-    assert resp.status_code in [201, 202]
-    assert resp.body["ok"]
-    {:ok, resp}
-  end
-
-  def delete_doc(db_name, body) do
-    resp = Couch.delete("/#{db_name}/#{body["_id"]}", query: [rev: body["_rev"]])
-    assert resp.status_code in [200, 202]
-    assert resp.body["ok"]
-    {:ok, resp}
-  end
-
-  def compact(db_name) do
-    resp = Couch.post("/#{db_name}/_compact")
-    assert resp.status_code == 202
-    resp.body
   end
 
   def info(db_name) do

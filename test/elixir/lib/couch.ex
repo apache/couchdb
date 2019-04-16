@@ -19,6 +19,16 @@ defmodule Couch.Session do
     Couch.delete!("/_session", headers: headers)
   end
 
+  def info(sess) do
+    headers = [
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CouchDB-WWW-Authenticate": "Cookie",
+      Cookie: sess.cookie
+    ]
+
+    Couch.get("/_session", headers: headers).body
+  end
+
   def get(sess, url, opts \\ []), do: go(sess, :get, url, opts)
   def get!(sess, url, opts \\ []), do: go!(sess, :get, url, opts)
   def put(sess, url, opts \\ []), do: go(sess, :put, url, opts)

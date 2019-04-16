@@ -111,6 +111,26 @@ defmodule AuthCacheTest do
     end
   end
 
+  defp compact(db_name) do
+    resp = Couch.post("/#{db_name}/_compact")
+    assert resp.status_code == 202
+    resp.body
+  end
+
+  def save_doc(db_name, body) do
+    resp = Couch.put("/#{db_name}/#{body["_id"]}", body: body)
+    assert resp.status_code in [201, 202]
+    assert resp.body["ok"]
+    {:ok, resp}
+  end
+
+  def delete_doc(db_name, body) do
+    resp = Couch.delete("/#{db_name}/#{body["_id"]}", query: [rev: body["_rev"]])
+    assert resp.status_code in [200, 202]
+    assert resp.body["ok"]
+    {:ok, resp}
+  end
+
   defp test_fun(db_name) do
     fdmanana =
       prepare_user_doc([
