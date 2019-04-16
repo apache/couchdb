@@ -31,11 +31,6 @@ defmodule CookieAuthTest do
         :section => "admins",
         :key => "jan",
         :value => "apple"
-      },
-      %{
-        :section => "log",
-        :key => "level",
-        :value => "debug"
       }
     ]
 
