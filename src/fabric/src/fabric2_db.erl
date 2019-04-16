@@ -140,7 +140,7 @@
 
 
 create(DbName, Options) ->
-    Result = transactional(DbName, Options, fun(TxDb) ->
+    Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
         case fabric2_fdb:exists(TxDb) of
             true ->
                 {error, file_exists};
@@ -164,7 +164,7 @@ open(DbName, Options) ->
         #{} = Db ->
             {ok, maybe_set_user_ctx(Db, Options)};
         undefined ->
-            transactional(DbName, Options, fun(TxDb) ->
+            fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
                 Opened = fabric2_fdb:open(TxDb, Options),
                 ok = fabric2_server:store(Opened),
                 {ok, Opened#{tx => undefined}}
@@ -635,7 +635,7 @@ update_doc_interactive(Db, Doc0, _Options) ->
     % Check that a revision was specified if required
     Doc0RevId = doc_to_revid(Doc0),
     if Doc0RevId /= {0, <<>>} orelse WinnerRevId == {0, <<>>} -> ok; true ->
-        ?RETURN({error, conflict});
+        ?RETURN({error, conflict})
     end,
 
     % Check that we're not trying to create a deleted doc
@@ -644,7 +644,7 @@ update_doc_interactive(Db, Doc0, _Options) ->
     end,
 
     % Get the target revision to update
-    Target = case DocId0RevId == WinnerRevId of
+    Target = case Doc0RevId == WinnerRevId of
         true ->
             Winner;
         false ->
@@ -686,12 +686,12 @@ update_doc_interactive(Db, Doc0, _Options) ->
     } = Doc3 = new_revid(Doc2),
 
     NewRevInfo = #{
-        winner := undefined,
-        deleted := NewDeleted,
-        rev_id := {NewRevPos, NewRev},
-        rev_path := NewRevPath,
-        sequence := undefined,
-        branch_count := undefined
+        winner => undefined,
+        deleted => NewDeleted,
+        rev_id => {NewRevPos, NewRev},
+        rev_path => NewRevPath,
+        sequence => undefined,
+        branch_count => undefined
     },
 
     % Gather the list of possible winnig revisions
@@ -713,7 +713,7 @@ update_doc_interactive(Db, Doc0, _Options) ->
         [W, NW] -> {W, NW}
     end,
 
-    NewWinner = NewWinnner0#{branch_count := maps:get(branch_count, Winner)},
+    NewWinner = NewWinner0#{branch_count := maps:get(branch_count, Winner)},
     ToUpdate = if NonWinner == not_found -> []; true -> [NonWinner] end,
     ToRemove = if Target == not_found -> []; true -> [Target] end,
 
@@ -729,7 +729,7 @@ update_doc_interactive(Db, Doc0, _Options) ->
     {ok, {NewRevPos, NewRev}}.
 
 
-update_doc_replicated(Db, Doc0, Options) ->
+update_doc_replicated(Db, Doc0, _Options) ->
     #doc{
         id = DocId,
         deleted = Deleted,
@@ -745,15 +745,15 @@ update_doc_replicated(Db, Doc0, Options) ->
         branch_count => undefined
     },
 
-    AllRevs = fabric2_fdb:get_all_revs(Db, DocId),
+    AllRevInfos = fabric2_fdb:get_all_revs(Db, DocId),
 
     RevTree = lists:foldl(fun(RI, TreeAcc) ->
         RIPath = fabric2_util:revinfo_to_path(RI),
-        {Merged, _} = couch_key_tree:merge(TreeAcc, RevTree),
+        {Merged, _} = couch_key_tree:merge(TreeAcc, RIPath),
         Merged
-    end, [], AllRevs),
+    end, [], AllRevInfos),
 
-    DocRevPath = fabric2_util:revinfo_to_path(RI),
+    DocRevPath = fabric2_util:revinfo_to_path(DocRevInfo),
     {NewTree, Status} = couch_key_tree:merge(RevTree, DocRevPath),
     if Status /= internal_node -> ok; true ->
         % We already know this revision so nothing
@@ -763,7 +763,7 @@ update_doc_replicated(Db, Doc0, Options) ->
 
     AllLeafsFull = couch_key_tree:get_all_leafs_full(NewTree),
     LeafPath = get_leaf_path(RevPos, Rev, AllLeafsFull),
-    PrevRevInfo = find_prev_revinfo(LeafPath),
+    PrevRevInfo = find_prev_revinfo(RevPos, LeafPath),
     Doc1 = prep_and_validate(Db, Doc0, PrevRevInfo),
 
     % Possible winners are the previous winner and
@@ -777,7 +777,7 @@ update_doc_replicated(Db, Doc0, Options) ->
             {DocRevInfo, not_found};
         false ->
             [W, NW] = fabric2_util:sort_revinfos([Winner, DocRevInfo]),
-            {N, NW}
+            {W, NW}
     end,
 
     NewWinner = NewWinner0#{branch_count := length(AllLeafsFull)},
@@ -786,13 +786,16 @@ update_doc_replicated(Db, Doc0, Options) ->
 
     ok = fabric2_fdb:write_doc(
             Db,
-            Doc3,
+            Doc1,
             NewWinner,
             Winner,
             ToUpdate,
             ToRemove
         ),
 
+    #doc{
+        revs = {NewRevPos, [NewRev | _]}
+    } = Doc1,
     {ok, {NewRevPos, NewRev}}.
 
 
@@ -872,14 +875,14 @@ validate_ddoc(Db, DDoc) ->
 
 get_leaf_path(Pos, Rev, [{Pos, [{Rev, _RevInfo} | LeafPath]} | _]) ->
     LeafPath;
-get_doc_leaf(Pos, Rev, [_WrongLeaf | RestLeafs]) ->
-    get_doc_leaf(Pos, Rev, RestLeafs).
+get_leaf_path(Pos, Rev, [_WrongLeaf | RestLeafs]) ->
+    get_leaf_path(Pos, Rev, RestLeafs).
 
 
 find_prev_revinfo(_Pos, []) ->
     not_found;
 find_prev_revinfo(Pos, [{_Rev, ?REV_MISSING} | RestPath]) ->
-    find_prev_known_rev(Pos - 1, RestPath);
+    find_prev_revinfo(Pos - 1, RestPath);
 find_prev_revinfo(_Pos, [{_Rev, #{} = RevInfo} | _]) ->
     RevInfo.
 
@@ -889,7 +892,3 @@ doc_to_revid(#doc{revs = Revs}) ->
         {0, []} -> {0, <<>>};
         {RevPos, [Rev | _]} -> {RevPos, Rev}
     end.
-
-
-doc_to_revpath(#doc{revs = {_, [_ | RevPath]}}) ->
-    RevPath.

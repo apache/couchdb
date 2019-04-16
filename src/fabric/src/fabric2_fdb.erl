@@ -18,8 +18,6 @@
     transactional/3,
     transactional/2,
 
-    sweep_tx_ids/2,
-
     create/2,
     open/2,
     delete/1,
@@ -37,7 +35,7 @@
 
     get_all_revs/2,
     get_winning_revs/3,
-    get_non_deleted_rev/2,
+    get_non_deleted_rev/3,
 
     get_doc_body/3,
 
@@ -346,7 +344,7 @@ get_all_revs(#{} = Db, DocId) ->
 
     Prefix = erlfdb_tuple:pack({?DB_REVS, DocId}, DbPrefix),
     Options = [{streaming_mode, want_all}],
-    Future = erlfdb:get_range_startswith(Tx, Prefix, Options)
+    Future = erlfdb:get_range_startswith(Tx, Prefix, Options),
     lists:map(fun({K, V}) ->
         Key = erlfdb_tuple:unpack(K, DbPrefix),
         Val = erlfdb_tuple:unpack(V),
@@ -424,7 +422,7 @@ write_doc(Db, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     NewWinner = NewWinner0#{winner := true},
     NewRevId = maps:get(rev_id, NewWinner),
 
-    {WKey, WVal} = revinfo_to_fdb(DbPrefix, DocId, Winner),
+    {WKey, WVal} = revinfo_to_fdb(DbPrefix, DocId, NewWinner),
     ok = erlfdb:set_versionstamped_value(Tx, WKey, WVal),
 
     lists:foreach(fun(RI0) ->
@@ -611,7 +609,7 @@ debug_cluster(Start, End) ->
     end).
 
 
-init(Tx, DbName, Options) ->
+init_db(Tx, DbName, Options) ->
     Root = erlfdb_directory:root(),
     CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
     Prefix = erlfdb_directory:get_name(CouchDB),

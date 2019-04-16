@@ -53,7 +53,7 @@
 -define(PDICT_LAYER_CACHE, '$fabric_layer_id').
 -define(PDICT_TX_ID_KEY, '$fabric_tx_id').
 -define(PDICT_TX_RES_KEY, '$fabric_tx_result').
--define(COMMIT_UNKOWN_RESULT, 1021).
+-define(COMMIT_UNKNOWN_RESULT, 1021).
 
 
 % Various utility macros
