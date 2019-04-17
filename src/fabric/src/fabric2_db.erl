@@ -185,7 +185,7 @@ list_dbs() ->
 
 
 list_dbs(Options) ->
-    fabric2_util:transactional(fun(Tx) ->
+    fabric2_fdb:transactional(fun(Tx) ->
         fabric2_fdb:list_dbs(Tx, Options)
     end).
 

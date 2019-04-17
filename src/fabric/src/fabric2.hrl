@@ -58,7 +58,4 @@
 
 % Various utility macros
 
--define(REQUIRE_TX(Db), {erlfdb_transaction, _} = maps:get(tx, Db)).
--define(REQUIRE_CURRENT(Db), true = is_current(Db)).
-
 -define(UNSET_VS, {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF}).

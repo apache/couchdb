@@ -20,9 +20,9 @@
 
     create/2,
     open/2,
+    reopen/1,
     delete/1,
     exists/1,
-    is_current/1,
 
     list_dbs/2,
 
@@ -82,7 +82,7 @@ transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
 
 
 create(#{} = Db, Options) ->
-    ?REQUIRE_TX(Db),
+    require_transaction(Db),
     #{
         name := DbName,
         tx := Tx,
@@ -119,20 +119,22 @@ create(#{} = Db, Options) ->
         uuid => UUID,
         db_prefix => DbPrefix,
         md_version => Version,
+
         revs_limit => 1000,
         security_doc => {[]},
-        validate_doc_update_funs => [],
-
         user_ctx => UserCtx,
 
+        validate_doc_update_funs => [],
         before_doc_update => undefined,
-        after_doc_update => undefined
-        % All other db things as we add features
+        after_doc_update => undefined,
+        % All other db things as we add features,
+
+        db_options => Options
     }.
 
 
 open(#{} = Db0, Options) ->
-    ?REQUIRE_TX(Db0),
+    require_transaction(Db0),
     #{
         name := DbName,
         tx := Tx,
@@ -152,13 +154,17 @@ open(#{} = Db0, Options) ->
         db_prefix => DbPrefix,
         md_version => Version,
 
+        revs_limit => 1000,
+        security_doc => {[]},
         user_ctx => UserCtx,
 
         % Place holders until we implement these
         % bits.
         validate_doc_upate_funs => [],
         before_doc_update => undefined,
-        after_doc_read => undefined
+        after_doc_read => undefined,
+
+        db_options => Options
     },
 
     lists:foldl(fun({Key, Val}, DbAcc) ->
@@ -173,14 +179,23 @@ open(#{} = Db0, Options) ->
     end, Db1, get_config(Db1)).
 
 
+reopen(#{} = OldDb) ->
+    require_transaction(OldDb),
+    #{
+        tx := Tx,
+        dbname := DbName,
+        db_options := Options
+    } = OldDb,
+    open(init_db(Tx, DbName, Options), Options).
+
+
 delete(#{} = Db) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         name := DbName,
         tx := Tx,
         layer_prefix := LayerPrefix,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
     erlfdb:clear(Tx, DbKey),
@@ -190,29 +205,15 @@ delete(#{} = Db) ->
 
 
 exists(#{name := DbName} = Db) when is_binary(DbName) ->
-    ?REQUIRE_TX(Db),
     #{
         tx := Tx,
         layer_prefix := LayerPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
     case erlfdb:wait(erlfdb:get(Tx, DbKey)) of
         Bin when is_binary(Bin) -> true;
         not_found -> false
-    end.
-
-
-is_current(#{} = Db) ->
-    ?REQUIRE_TX(Db),
-    #{
-        tx := Tx,
-        md_version := MetaDataVersion
-    } = Db,
-
-    case erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)) of
-        MetaDataVersion -> true;
-        _NewVersion -> false
     end.
 
 
@@ -229,11 +230,10 @@ list_dbs(Tx, _Options) ->
 
 
 get_info(#{} = Db) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     {CStart, CEnd} = erlfdb_tuple:range({?DB_CHANGES}, DbPrefix),
     ChangesFuture = erlfdb:get_range(Tx, CStart, CEnd, [
@@ -279,11 +279,10 @@ get_info(#{} = Db) ->
 
 
 get_config(#{} = Db) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = Db = ensure_current(Db),
 
     {Start, End} = erlfdb_tuple:range({?DB_CONFIG}, DbPrefix),
     Future = erlfdb:get_range(Tx, Start, End),
@@ -295,11 +294,10 @@ get_config(#{} = Db) ->
 
 
 set_config(#{} = Db, ConfigKey, ConfigVal) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     Key = erlfdb_tuple:pack({?DB_CONFIG, ConfigKey}, DbPrefix),
     erlfdb:set(Tx, Key, ConfigVal),
@@ -307,11 +305,10 @@ set_config(#{} = Db, ConfigKey, ConfigVal) ->
 
 
 get_stat(#{} = Db, StatKey) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     Key = erlfdb_tuple:pack({?DB_STATS, StatKey}, DbPrefix),
 
@@ -325,22 +322,20 @@ incr_stat(_Db, _StatKey, 0) ->
     ok;
 
 incr_stat(#{} = Db, StatKey, Increment) when is_integer(Increment) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     Key = erlfdb_tuple:pack({?DB_STATS, StatKey}, DbPrefix),
     erlfdb:add(Tx, Key, Increment).
 
 
 get_all_revs(#{} = Db, DocId) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     Prefix = erlfdb_tuple:pack({?DB_REVS, DocId}, DbPrefix),
     Options = [{streaming_mode, want_all}],
@@ -353,11 +348,10 @@ get_all_revs(#{} = Db, DocId) ->
 
 
 get_winning_revs(#{} = Db, DocId, NumRevs) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     {StartKey, EndKey} = erlfdb_tuple:range({?DB_REVS, DocId}, DbPrefix),
     Options = [{reverse, true}, {limit, NumRevs}],
@@ -370,11 +364,10 @@ get_winning_revs(#{} = Db, DocId, NumRevs) ->
 
 
 get_non_deleted_rev(#{} = Db, DocId, RevId) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     {RevPos, Rev} = RevId,
 
@@ -388,12 +381,11 @@ get_non_deleted_rev(#{} = Db, DocId, RevId) ->
     end.
 
 
-get_doc_body(#{} = Db, DocId, RevInfo) ->
-    ?REQUIRE_CURRENT(Db),
+get_doc_body(#{} = Db0, DocId, RevInfo) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = Db = ensure_current(Db0),
 
     #{
         rev_id := {RevPos, Rev},
@@ -405,12 +397,11 @@ get_doc_body(#{} = Db, DocId, RevInfo) ->
     fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], Val).
 
 
-write_doc(Db, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
-    ?REQUIRE_CURRENT(Db),
+write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = Db = ensure_current(Db0),
 
     #doc{
         id = DocId,
@@ -494,22 +485,20 @@ write_doc(Db, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     ok.
 
 
-write_doc_body(#{} = Db, #doc{} = Doc) ->
-    ?REQUIRE_CURRENT(Db),
+write_doc_body(#{} = Db0, #doc{} = Doc) ->
     #{
         tx := Tx
-    } = Db,
+    } = Db = ensure_current(Db0),
 
     {NewDocKey, NewDocVal} = doc_to_fdb(Db, Doc),
     erlfdb:set(Tx, NewDocKey, NewDocVal).
 
 
 fold_docs(#{} = Db, UserFun, UserAcc0, _Options) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     DocCountKey = erlfdb_tuple:pack({?DB_STATS, <<"doc_count">>}, DbPrefix),
     DocCountFuture = erlfdb:get(Tx, DocCountKey),
@@ -541,11 +530,10 @@ fold_docs(#{} = Db, UserFun, UserAcc0, _Options) ->
 
 
 fold_changes(#{} = Db, SinceSeq, UserFun, UserAcc0, _Options) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     {Start0, End} = erlfdb_tuple:range({?DB_CHANGES}, DbPrefix),
     Start = erlang:max(Start0, SinceSeq),
@@ -580,11 +568,10 @@ fold_changes(#{} = Db, SinceSeq, UserFun, UserAcc0, _Options) ->
 
 
 get_changes(#{} = Db, Options) ->
-    ?REQUIRE_CURRENT(Db),
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db,
+    } = ensure_current(Db),
 
     {CStart, CEnd} = erlfdb_tuple:range({?DB_CHANGES}, DbPrefix),
     Future = erlfdb:get_range(Tx, CStart, CEnd, Options),
@@ -718,6 +705,26 @@ get_db_handle() ->
             Db;
         Db ->
             Db
+    end.
+
+
+require_transaction(#{tx := {erlfdb_transaction, _}} = _Db) ->
+    ok;
+require_transaction(#{} = _Db) ->
+    erlang:error(transaction_required).
+
+
+ensure_current(#{} = Db) ->
+    require_transaction(Db),
+
+    #{
+        tx := Tx,
+        md_version := MetaDataVersion
+    } = Db,
+
+    case erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)) of
+        MetaDataVersion -> Db;
+        _NewVersion -> reopen(Db)
     end.
 
 
