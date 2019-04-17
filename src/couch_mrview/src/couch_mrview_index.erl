@@ -122,7 +122,7 @@ open(Db, State0) ->
 
     case couch_mrview_util:open_file(IndexFName) of
         {ok, Fd} ->
-            case (catch couch_file:read_header(Fd)) of
+            case couch_file:read_header(Fd) of
                 % upgrade code for <= 1.2.x
                 {ok, {OldSig, Header}} ->
                     % Matching view signatures.
@@ -135,7 +135,7 @@ open(Db, State0) ->
                     NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt};
-                _ ->
+                no_valid_header ->
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt}

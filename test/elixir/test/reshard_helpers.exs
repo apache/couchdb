@@ -83,9 +83,12 @@ defmodule ReshardHelpers do
   def get_first_node do
     mresp = Couch.get("/_membership")
     assert mresp.status_code == 200
-    cluster_nodes = mresp.body["cluster_nodes"]
-    [node1 | _] = cluster_nodes
-    node1
+    all_nodes = mresp.body["all_nodes"]
+
+    mresp.body["cluster_nodes"]
+    |> Enum.filter(fn n -> n in all_nodes end)
+    |> Enum.sort()
+    |> hd()
   end
 
   def wait_job_removed(id) do
