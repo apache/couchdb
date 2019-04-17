@@ -752,9 +752,14 @@ tx_check_applied(Tx, Fun) ->
 
 tx_attempt(Tx, Fun) ->
     Result = Fun(Tx),
-    TxId = tx_id(Tx),
-    ok = erlfdb:set(Tx, TxId, <<>>),
-    put(?PDICT_TX_RES_KEY, Result),
+    case erlfdb:is_read_only(Tx) of
+        true ->
+            ok;
+        false ->
+            TxId = tx_id(Tx),
+            ok = erlfdb:set(Tx, TxId, <<>>),
+            put(?PDICT_TX_RES_KEY, Result)
+    end,
     Result.
 
 
