@@ -59,10 +59,15 @@ transactional(Fun) when is_function(Fun, 1) ->
     Db = get_db_handle(),
     try
         erlfdb:transactional(Db, fun(Tx) ->
-            tx_wrap(Tx, Fun)
+            case is_transaction_applied(Tx) of
+                true ->
+                    get_previous_transaction_result();
+                false ->
+                    execute_transaction(Tx, Fun)
+            end
         end)
     after
-        tx_clear()
+        clear_transaction()
     end.
 
 
@@ -81,13 +86,12 @@ transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
     Fun(Db).
 
 
-create(#{} = Db, Options) ->
-    require_transaction(Db),
+create(#{} = Db0, Options) ->
     #{
         name := DbName,
         tx := Tx,
         layer_prefix := LayerPrefix
-    } = Db,
+    } = Db = ensure_current(Db0),
 
     % Eventually DbPrefix will be HCA allocated. For now
     % we're just using the DbName so that debugging is easier.
@@ -113,12 +117,10 @@ create(#{} = Db, Options) ->
     end, Defaults),
 
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
-    Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
 
     Db#{
         uuid => UUID,
         db_prefix => DbPrefix,
-        md_version => Version,
 
         revs_limit => 1000,
         security_doc => {[]},
@@ -134,12 +136,11 @@ create(#{} = Db, Options) ->
 
 
 open(#{} = Db0, Options) ->
-    require_transaction(Db0),
     #{
         name := DbName,
         tx := Tx,
         layer_prefix := LayerPrefix
-    } = Db0,
+    } = Db1 = ensure_current(Db0),
 
     DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
     DbPrefix = case erlfdb:wait(erlfdb:get(Tx, DbKey)) of
@@ -148,11 +149,9 @@ open(#{} = Db0, Options) ->
     end,
 
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
-    Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
 
-    Db1 = Db0#{
+    Db2 = Db1#{
         db_prefix => DbPrefix,
-        md_version => Version,
 
         revs_limit => 1000,
         security_doc => {[]},
@@ -176,7 +175,7 @@ open(#{} = Db0, Options) ->
             <<"security_doc">> ->
                 DbAcc#{security_doc => ?JSON_DECODE(Val)}
         end
-    end, Db1, get_config(Db1)).
+    end, Db2, get_config(Db2)).
 
 
 reopen(#{} = OldDb) ->
@@ -600,11 +599,14 @@ init_db(Tx, DbName, Options) ->
     Root = erlfdb_directory:root(),
     CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
     Prefix = erlfdb_directory:get_name(CouchDB),
+    Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
     #{
         name => DbName,
         tx => Tx,
         layer_prefix => Prefix,
-        options => Options
+        md_version => Version,
+
+        db_options => Options
     }.
 
 
@@ -728,36 +730,17 @@ ensure_current(#{} = Db) ->
     end.
 
 
-tx_wrap(Tx, Fun) ->
-    case get(erlfdb_error) of
-        ?COMMIT_UNKNOWN_RESULT ->
-            tx_check_applied(Tx, Fun);
-        _ ->
-            tx_attempt(Tx, Fun)
-    end.
+is_transaction_applied(Tx) ->
+    is_commit_unknown_result()
+        andalso has_transaction_id()
+        andalso transaction_id_exist(Tx).
 
 
-tx_clear() ->
-    fabric2_txid_cleaner:remove(get(?PDICT_TX_ID_KEY)),
-    put(?PDICT_TX_ID_KEY, undefined),
-    put(?PDICT_TX_RES_KEY, undefined).
+get_previous_transaction_result() ->
+    get(?PDICT_TX_RES_KEY).
 
 
-tx_check_applied(Tx, Fun) ->
-    case get(?PDICT_TX_ID_KEY) of
-        undefined ->
-            tx_attempt(Tx, Fun);
-        TxId when is_binary(TxId) ->
-            case erlfdb:wait(erlfdb:get(Tx, TxId)) of
-                <<>> ->
-                    get(?PDICT_TX_RES_KEY);
-                not_found ->
-                    tx_attempt(Tx, Fun)
-            end
-    end.
-
-
-tx_attempt(Tx, Fun) ->
+execute_transaction(Tx, Fun) ->
     Result = Fun(Tx),
     case erlfdb:is_read_only(Tx) of
         true ->
@@ -770,10 +753,19 @@ tx_attempt(Tx, Fun) ->
     Result.
 
 
-tx_id(Tx) ->
-    Root = erlfdb_directory:root(),
-    CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
-    Prefix = erlfdb_directory:get_name(CouchDB),
-    {Mega, Secs, Micro} = os:timestamp(),
-    Key = {?TX_IDS, Mega, Secs, Micro, fabric2_util:uuid()},
-    erlfdb_tuple:pack(Key, Prefix).
+clear_transaction() ->
+    fabric2_txids:remove(get(?PDICT_TX_ID_KEY)),
+    put(?PDICT_TX_ID_KEY, undefined),
+    put(?PDICT_TX_RES_KEY, undefined).
+
+
+is_commit_unknown_result() ->
+    erlfdb:get_last_error() == ?COMMIT_UNKNOWN_RESULT.
+
+
+has_transaction_id() ->
+    is_binary(get(?PDICT_TX_ID_KEY)).
+
+
+transaction_id_exists(Tx) ->
+    erlfdb:wait(erlfdb:get(Tx, get(?PDICT_TX_ID_KEY))) == <<>>.

@@ -10,13 +10,14 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(fabric2_txid_cleaner).
+-module(fabric2_txids).
 -behaviour(gen_server).
 -vsn(1).
 
 
 -export([
     start_link/0,
+    create/1,
     remove/1
 ]).
 
@@ -40,6 +41,15 @@
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+
+create(Tx) ->
+    Root = erlfdb_directory:root(),
+    CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
+    Prefix = erlfdb_directory:get_name(CouchDB),
+    {Mega, Secs, Micro} = os:timestamp(),
+    Key = {?TX_IDS, Mega, Secs, Micro, fabric2_util:uuid()},
+    erlfdb_tuple:pack(Key, Prefix).
 
 
 remove(TxId) when is_binary(TxId) ->
