@@ -38,7 +38,7 @@ group2(DbName, DDoc, IndexName, QueryArgs) ->
 
 call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
     QueryArgs = dreyfus_util:upgrade(QueryArgs0),
-    erlang:put(io_priority, {interactive, DbName}),
+    erlang:put(io_priority, {search, DbName}),
     check_interactive_mode(),
     {ok, Db} = get_or_create_db(DbName, []),
     #index_query_args{
@@ -75,7 +75,7 @@ info(DbName, DDoc, IndexName) ->
     dreyfus_util:time([rpc, info], MFA).
 
 info_int(DbName, DDoc, IndexName) ->
-    erlang:put(io_priority, {interactive, DbName}),
+    erlang:put(io_priority, {search, DbName}),
     check_interactive_mode(),
     case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
         {ok, Index} ->
@@ -91,7 +91,7 @@ info_int(DbName, DDoc, IndexName) ->
     end.
 
 disk_size(DbName, DDoc, IndexName) ->
-    erlang:put(io_priority, {interactive, DbName}),
+    erlang:put(io_priority, {search, DbName}),
     check_interactive_mode(),
     case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
         {ok, Index} ->
