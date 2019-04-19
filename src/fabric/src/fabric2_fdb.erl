@@ -733,7 +733,7 @@ ensure_current(#{} = Db) ->
 is_transaction_applied(Tx) ->
     is_commit_unknown_result()
         andalso has_transaction_id()
-        andalso transaction_id_exist(Tx).
+        andalso transaction_id_exists(Tx).
 
 
 get_previous_transaction_result() ->
@@ -746,8 +746,7 @@ execute_transaction(Tx, Fun) ->
         true ->
             ok;
         false ->
-            TxId = tx_id(Tx),
-            ok = erlfdb:set(Tx, TxId, <<>>),
+            erlfdb:set(Tx, get_transaction_id(Tx), <<>>),
             put(?PDICT_TX_RES_KEY, Result)
     end,
     Result.
@@ -769,3 +768,14 @@ has_transaction_id() ->
 
 transaction_id_exists(Tx) ->
     erlfdb:wait(erlfdb:get(Tx, get(?PDICT_TX_ID_KEY))) == <<>>.
+
+
+get_transaction_id(Tx) ->
+    case get(?PDICT_TX_ID_KEY) of
+        undefined ->
+            TxId = fabric2_txids:create(Tx),
+            put(?PDICT_TX_ID_KEY, TxId),
+            TxId;
+        TxId when is_binary(TxId) ->
+            TxId
+    end.
