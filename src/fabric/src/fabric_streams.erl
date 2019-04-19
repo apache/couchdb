@@ -169,82 +169,82 @@ add_worker_to_cleaner(CoordinatorPid, Worker) ->
 
 
 
--ifdef(TEST).
-
--include_lib("eunit/include/eunit.hrl").
-
-worker_cleaner_test_() ->
-    {
-        "Fabric spawn_worker_cleaner test", {
-            setup, fun setup/0, fun teardown/1,
-            fun(_) -> [
-                should_clean_workers(),
-                does_not_fire_if_cleanup_called(),
-                should_clean_additional_worker_too()
-            ] end
-        }
-    }.
-
-
-should_clean_workers() ->
-    ?_test(begin
-        meck:reset(rexi),
-        erase(?WORKER_CLEANER),
-        Workers = [
-            #shard{node = 'n1', ref = make_ref()},
-            #shard{node = 'n2', ref = make_ref()}
-        ],
-        {Coord, _} = spawn_monitor(fun() -> receive die -> ok end end),
-        Cleaner = spawn_worker_cleaner(Coord, Workers),
-        Ref = erlang:monitor(process, Cleaner),
-        Coord ! die,
-        receive {'DOWN', Ref, _, Cleaner, _} -> ok end,
-        ?assertEqual(2, meck:num_calls(rexi, kill, 2))
-    end).
-
-
-does_not_fire_if_cleanup_called() ->
-    ?_test(begin
-        meck:reset(rexi),
-        erase(?WORKER_CLEANER),
-        Workers = [
-            #shard{node = 'n1', ref = make_ref()},
-            #shard{node = 'n2', ref = make_ref()}
-        ],
-        {Coord, _} = spawn_monitor(fun() -> receive die -> ok end end),
-        Cleaner = spawn_worker_cleaner(Coord, Workers),
-        Ref = erlang:monitor(process, Cleaner),
-        cleanup(Workers),
-        Coord ! die,
-        receive {'DOWN', Ref, _, _, _} -> ok end,
-        % 2 calls would be from cleanup/1 function. If cleanup process fired
-        % too it would have been 4 calls total.
-        ?assertEqual(2, meck:num_calls(rexi, kill, 2))
-    end).
-
-
-should_clean_additional_worker_too() ->
-    ?_test(begin
-        meck:reset(rexi),
-        erase(?WORKER_CLEANER),
-        Workers = [
-            #shard{node = 'n1', ref = make_ref()}
-        ],
-        {Coord, _} = spawn_monitor(fun() -> receive die -> ok end end),
-        Cleaner = spawn_worker_cleaner(Coord, Workers),
-        add_worker_to_cleaner(Coord, #shard{node = 'n2', ref = make_ref()}),
-        Ref = erlang:monitor(process, Cleaner),
-        Coord ! die,
-        receive {'DOWN', Ref, _, Cleaner, _} -> ok end,
-        ?assertEqual(2, meck:num_calls(rexi, kill, 2))
-    end).
-
-
-setup() ->
-    ok = meck:expect(rexi, kill, fun(_, _) -> ok end).
-
-
-teardown(_) ->
-    meck:unload().
-
--endif.
+%% -ifdef(TEST).
+%%
+%% -include_lib("eunit/include/eunit.hrl").
+%%
+%% worker_cleaner_test_() ->
+%%     {
+%%         "Fabric spawn_worker_cleaner test", {
+%%             setup, fun setup/0, fun teardown/1,
+%%             fun(_) -> [
+%%                 should_clean_workers(),
+%%                 does_not_fire_if_cleanup_called(),
+%%                 should_clean_additional_worker_too()
+%%             ] end
+%%         }
+%%     }.
+%%
+%%
+%% should_clean_workers() ->
+%%     ?_test(begin
+%%         meck:reset(rexi),
+%%         erase(?WORKER_CLEANER),
+%%         Workers = [
+%%             #shard{node = 'n1', ref = make_ref()},
+%%             #shard{node = 'n2', ref = make_ref()}
+%%         ],
+%%         {Coord, _} = spawn_monitor(fun() -> receive die -> ok end end),
+%%         Cleaner = spawn_worker_cleaner(Coord, Workers),
+%%         Ref = erlang:monitor(process, Cleaner),
+%%         Coord ! die,
+%%         receive {'DOWN', Ref, _, Cleaner, _} -> ok end,
+%%         ?assertEqual(2, meck:num_calls(rexi, kill, 2))
+%%     end).
+%%
+%%
+%% does_not_fire_if_cleanup_called() ->
+%%     ?_test(begin
+%%         meck:reset(rexi),
+%%         erase(?WORKER_CLEANER),
+%%         Workers = [
+%%             #shard{node = 'n1', ref = make_ref()},
+%%             #shard{node = 'n2', ref = make_ref()}
+%%         ],
+%%         {Coord, _} = spawn_monitor(fun() -> receive die -> ok end end),
+%%         Cleaner = spawn_worker_cleaner(Coord, Workers),
+%%         Ref = erlang:monitor(process, Cleaner),
+%%         cleanup(Workers),
+%%         Coord ! die,
+%%         receive {'DOWN', Ref, _, _, _} -> ok end,
+%%         % 2 calls would be from cleanup/1 function. If cleanup process fired
+%%         % too it would have been 4 calls total.
+%%         ?assertEqual(2, meck:num_calls(rexi, kill, 2))
+%%     end).
+%%
+%%
+%% should_clean_additional_worker_too() ->
+%%     ?_test(begin
+%%         meck:reset(rexi),
+%%         erase(?WORKER_CLEANER),
+%%         Workers = [
+%%             #shard{node = 'n1', ref = make_ref()}
+%%         ],
+%%         {Coord, _} = spawn_monitor(fun() -> receive die -> ok end end),
+%%         Cleaner = spawn_worker_cleaner(Coord, Workers),
+%%         add_worker_to_cleaner(Coord, #shard{node = 'n2', ref = make_ref()}),
+%%         Ref = erlang:monitor(process, Cleaner),
+%%         Coord ! die,
+%%         receive {'DOWN', Ref, _, Cleaner, _} -> ok end,
+%%         ?assertEqual(2, meck:num_calls(rexi, kill, 2))
+%%     end).
+%%
+%%
+%% setup() ->
+%%     ok = meck:expect(rexi, kill, fun(_, _) -> ok end).
+%%
+%%
+%% teardown(_) ->
+%%     meck:unload().
+%%
+%% -endif.

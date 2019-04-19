@@ -224,349 +224,349 @@ has_quorum(Resps, Count, W) ->
     end.
 
 
--ifdef(TEST).
-
--include_lib("eunit/include/eunit.hrl").
-
-purge_test_() ->
-    {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_w2_ok(),
-            t_w3_ok(),
-
-            t_w2_mixed_accepted(),
-            t_w3_mixed_accepted(),
-
-            t_w2_exit1_ok(),
-            t_w2_exit2_accepted(),
-            t_w2_exit3_error(),
-
-            t_w4_accepted(),
-
-            t_mixed_ok_accepted(),
-            t_mixed_errors()
-        ]
-    }.
-
-
-setup() ->
-    meck:new(couch_log),
-    meck:expect(couch_log, warning, fun(_, _) -> ok end),
-    meck:expect(couch_log, notice, fun(_, _) -> ok end).
-
-
-teardown(_) ->
-    meck:unload().
-
-
-t_w2_ok() ->
-    ?_test(begin
-        Acc0 = create_init_acc(2),
-        Msg = {ok, [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}]},
-
-        {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
-        ?assertEqual(2, length(Acc1#acc.worker_uuids)),
-        check_quorum(Acc1, false),
-
-        {stop, Acc2} = handle_message(Msg, worker(2, Acc0), Acc1),
-        ?assertEqual(1, length(Acc2#acc.worker_uuids)),
-        check_quorum(Acc2, true),
-
-        Expect = [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}],
-        Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc2),
-        ?assertEqual(Expect, Resps),
-        ?assertEqual(ok, resp_health(Resps))
-    end).
-
-
-t_w3_ok() ->
-    ?_test(begin
-        Acc0 = create_init_acc(3),
-        Msg = {ok, [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}]},
-
-        {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
-        check_quorum(Acc1, false),
-
-        {ok, Acc2} = handle_message(Msg, worker(2, Acc0), Acc1),
-        ?assertEqual(1, length(Acc2#acc.worker_uuids)),
-        check_quorum(Acc2, false),
-
-        {stop, Acc3} = handle_message(Msg, worker(3, Acc0), Acc2),
-        ?assertEqual(0, length(Acc3#acc.worker_uuids)),
-        check_quorum(Acc3, true),
-
-        Expect = [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}],
-        Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc3),
-        ?assertEqual(Expect, Resps),
-        ?assertEqual(ok, resp_health(Resps))
-    end).
-
-
-t_w2_mixed_accepted() ->
-    ?_test(begin
-        Acc0 = create_init_acc(2),
-        Msg1 = {ok, [{ok, [{1, <<"foo1">>}]}, {ok, [{2, <<"bar1">>}]}]},
-        Msg2 = {ok, [{ok, [{1, <<"foo2">>}]}, {ok, [{2, <<"bar2">>}]}]},
-
-        {ok, Acc1} = handle_message(Msg1, worker(1, Acc0), Acc0),
-        ?assertEqual(2, length(Acc1#acc.worker_uuids)),
-        check_quorum(Acc1, false),
-
-        {ok, Acc2} = handle_message(Msg2, worker(2, Acc0), Acc1),
-        ?assertEqual(1, length(Acc2#acc.worker_uuids)),
-        check_quorum(Acc2, false),
-
-        {stop, Acc3} = handle_message(Msg1, worker(3, Acc0), Acc2),
-        ?assertEqual(0, length(Acc3#acc.worker_uuids)),
-        check_quorum(Acc3, true),
-
-        Expect = [
-            {accepted, [{1, <<"foo1">>}, {1, <<"foo2">>}]},
-            {accepted, [{2, <<"bar1">>}, {2, <<"bar2">>}]}
-        ],
-        Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc2),
-        ?assertEqual(Expect, Resps),
-        ?assertEqual(accepted, resp_health(Resps))
-    end).
-
-
-t_w3_mixed_accepted() ->
-    ?_test(begin
-        Acc0 = create_init_acc(3),
-        Msg1 = {ok, [{ok, [{1, <<"foo1">>}]}, {ok, [{2, <<"bar1">>}]}]},
-        Msg2 = {ok, [{ok, [{1, <<"foo2">>}]}, {ok, [{2, <<"bar2">>}]}]},
-
-        {ok, Acc1} = handle_message(Msg1, worker(1, Acc0), Acc0),
-        ?assertEqual(2, length(Acc1#acc.worker_uuids)),
-        check_quorum(Acc1, false),
-
-        {ok, Acc2} = handle_message(Msg2, worker(2, Acc0), Acc1),
-        ?assertEqual(1, length(Acc2#acc.worker_uuids)),
-        check_quorum(Acc2, false),
-
-        {stop, Acc3} = handle_message(Msg2, worker(3, Acc0), Acc2),
-        ?assertEqual(0, length(Acc3#acc.worker_uuids)),
-        check_quorum(Acc3, true),
-
-        Expect = [
-            {accepted, [{1, <<"foo1">>}, {1, <<"foo2">>}]},
-            {accepted, [{2, <<"bar1">>}, {2, <<"bar2">>}]}
-        ],
-        Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc2),
-        ?assertEqual(Expect, Resps),
-        ?assertEqual(accepted, resp_health(Resps))
-    end).
-
-
-t_w2_exit1_ok() ->
-    ?_test(begin
-        Acc0 = create_init_acc(2),
-        Msg = {ok, [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}]},
-        ExitMsg = {rexi_EXIT, blargh},
-
-        {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
-        ?assertEqual(2, length(Acc1#acc.worker_uuids)),
-        check_quorum(Acc1, false),
-
-        {ok, Acc2} = handle_message(ExitMsg, worker(2, Acc0), Acc1),
-        ?assertEqual(1, length(Acc2#acc.worker_uuids)),
-        check_quorum(Acc2, false),
-
-        {stop, Acc3} = handle_message(Msg, worker(3, Acc0), Acc2),
-        ?assertEqual(0, length(Acc3#acc.worker_uuids)),
-        check_quorum(Acc3, true),
-
-        Expect = [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}],
-        Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc3),
-        ?assertEqual(Expect, Resps),
-        ?assertEqual(ok, resp_health(Resps))
-    end).
-
-
-t_w2_exit2_accepted() ->
-    ?_test(begin
-        Acc0 = create_init_acc(2),
-        Msg = {ok, [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}]},
-        ExitMsg = {rexi_EXIT, blargh},
-
-        {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
-        ?assertEqual(2, length(Acc1#acc.worker_uuids)),
-        check_quorum(Acc1, false),
-
-        {ok, Acc2} = handle_message(ExitMsg, worker(2, Acc0), Acc1),
-        ?assertEqual(1, length(Acc2#acc.worker_uuids)),
-        check_quorum(Acc2, false),
-
-        {stop, Acc3} = handle_message(ExitMsg, worker(3, Acc0), Acc2),
-        ?assertEqual(0, length(Acc3#acc.worker_uuids)),
-        check_quorum(Acc3, true),
-
-        Expect = [{accepted, [{1, <<"foo">>}]}, {accepted, [{2, <<"bar">>}]}],
-        Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc3),
-        ?assertEqual(Expect, Resps),
-        ?assertEqual(accepted, resp_health(Resps))
-    end).
-
-
-t_w2_exit3_error() ->
-    ?_test(begin
-        Acc0 = create_init_acc(2),
-        ExitMsg = {rexi_EXIT, blargh},
-
-        {ok, Acc1} = handle_message(ExitMsg, worker(1, Acc0), Acc0),
-        ?assertEqual(2, length(Acc1#acc.worker_uuids)),
-        check_quorum(Acc1, false),
-
-        {ok, Acc2} = handle_message(ExitMsg, worker(2, Acc0), Acc1),
-        ?assertEqual(1, length(Acc2#acc.worker_uuids)),
-        check_quorum(Acc2, false),
-
-        {stop, Acc3} = handle_message(ExitMsg, worker(3, Acc0), Acc2),
-        ?assertEqual(0, length(Acc3#acc.worker_uuids)),
-        check_quorum(Acc3, true),
-
-        Expect = [
-            {error, internal_server_error},
-            {error, internal_server_error}
-        ],
-        Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc3),
-        ?assertEqual(Expect, Resps),
-        ?assertEqual(error, resp_health(Resps))
-    end).
-
-
-t_w4_accepted() ->
-    % Make sure we return when all workers have responded
-    % rather than wait around for a timeout if a user asks
-    % for a qourum with more than the available number of
-    % shards.
-    ?_test(begin
-        Acc0 = create_init_acc(4),
-        Msg = {ok, [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}]},
-
-        {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
-        ?assertEqual(2, length(Acc1#acc.worker_uuids)),
-        check_quorum(Acc1, false),
-
-        {ok, Acc2} = handle_message(Msg, worker(2, Acc0), Acc1),
-        ?assertEqual(1, length(Acc2#acc.worker_uuids)),
-        check_quorum(Acc2, false),
-
-        {stop, Acc3} = handle_message(Msg, worker(3, Acc0), Acc2),
-        ?assertEqual(0, length(Acc3#acc.worker_uuids)),
-        check_quorum(Acc3, true),
-
-        Expect = [{accepted, [{1, <<"foo">>}]}, {accepted, [{2, <<"bar">>}]}],
-        Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc3),
-        ?assertEqual(Expect, Resps),
-        ?assertEqual(accepted, resp_health(Resps))
-    end).
-
-
-t_mixed_ok_accepted() ->
-    ?_test(begin
-        WorkerUUIDs = [
-            {#shard{node = a, range = [1, 2]}, [<<"uuid1">>]},
-            {#shard{node = b, range = [1, 2]}, [<<"uuid1">>]},
-            {#shard{node = c, range = [1, 2]}, [<<"uuid1">>]},
-
-            {#shard{node = a, range = [3, 4]}, [<<"uuid2">>]},
-            {#shard{node = b, range = [3, 4]}, [<<"uuid2">>]},
-            {#shard{node = c, range = [3, 4]}, [<<"uuid2">>]}
-        ],
-
-        Acc0 = #acc{
-            worker_uuids = WorkerUUIDs,
-            resps = dict:from_list([{<<"uuid1">>, []}, {<<"uuid2">>, []}]),
-            uuid_counts = dict:from_list([{<<"uuid1">>, 3}, {<<"uuid2">>, 3}]),
-            w = 2
-        },
-
-        Msg1 = {ok, [{ok, [{1, <<"foo">>}]}]},
-        Msg2 = {ok, [{ok, [{2, <<"bar">>}]}]},
-        ExitMsg = {rexi_EXIT, blargh},
-
-        {ok, Acc1} = handle_message(Msg1, worker(1, Acc0), Acc0),
-        {ok, Acc2} = handle_message(Msg1, worker(2, Acc0), Acc1),
-        {ok, Acc3} = handle_message(ExitMsg, worker(4, Acc0), Acc2),
-        {ok, Acc4} = handle_message(ExitMsg, worker(5, Acc0), Acc3),
-        {stop, Acc5} = handle_message(Msg2, worker(6, Acc0), Acc4),
-
-        Expect = [{ok, [{1, <<"foo">>}]}, {accepted, [{2, <<"bar">>}]}],
-        Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc5),
-        ?assertEqual(Expect, Resps),
-        ?assertEqual(accepted, resp_health(Resps))
-    end).
-
-
-t_mixed_errors() ->
-    ?_test(begin
-        WorkerUUIDs = [
-            {#shard{node = a, range = [1, 2]}, [<<"uuid1">>]},
-            {#shard{node = b, range = [1, 2]}, [<<"uuid1">>]},
-            {#shard{node = c, range = [1, 2]}, [<<"uuid1">>]},
-
-            {#shard{node = a, range = [3, 4]}, [<<"uuid2">>]},
-            {#shard{node = b, range = [3, 4]}, [<<"uuid2">>]},
-            {#shard{node = c, range = [3, 4]}, [<<"uuid2">>]}
-        ],
-
-        Acc0 = #acc{
-            worker_uuids = WorkerUUIDs,
-            resps = dict:from_list([{<<"uuid1">>, []}, {<<"uuid2">>, []}]),
-            uuid_counts = dict:from_list([{<<"uuid1">>, 3}, {<<"uuid2">>, 3}]),
-            w = 2
-        },
-
-        Msg = {ok, [{ok, [{1, <<"foo">>}]}]},
-        ExitMsg = {rexi_EXIT, blargh},
-
-        {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
-        {ok, Acc2} = handle_message(Msg, worker(2, Acc0), Acc1),
-        {ok, Acc3} = handle_message(ExitMsg, worker(4, Acc0), Acc2),
-        {ok, Acc4} = handle_message(ExitMsg, worker(5, Acc0), Acc3),
-        {stop, Acc5} = handle_message(ExitMsg, worker(6, Acc0), Acc4),
-
-        Expect = [{ok, [{1, <<"foo">>}]}, {error, internal_server_error}],
-        Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc5),
-        ?assertEqual(Expect, Resps),
-        ?assertEqual(error, resp_health(Resps))
-    end).
-
-
-create_init_acc(W) ->
-    UUID1 = <<"uuid1">>,
-    UUID2 = <<"uuid2">>,
-
-    Nodes = [node1, node2, node3],
-    Shards = mem3_util:create_partition_map(<<"foo">>, 3, 1, Nodes),
-
-    % Create our worker_uuids. We're relying on the fact that
-    % we're using a fake Q=1 db so we don't have to worry
-    % about any hashing here.
-    WorkerUUIDs = lists:map(fun(Shard) ->
-        {Shard#shard{ref = erlang:make_ref()}, [UUID1, UUID2]}
-    end, Shards),
-
-    #acc{
-        worker_uuids = WorkerUUIDs,
-        resps = dict:from_list([{UUID1, []}, {UUID2, []}]),
-        uuid_counts = dict:from_list([{UUID1, 3}, {UUID2, 3}]),
-        w = W
-    }.
-
-
-worker(N, #acc{worker_uuids = WorkerUUIDs}) ->
-    {Worker, _} = lists:nth(N, WorkerUUIDs),
-    Worker.
-
-
-check_quorum(Acc, Expect) ->
-    dict:fold(fun(_Shard, Resps, _) ->
-        ?assertEqual(Expect, has_quorum(Resps, 3, Acc#acc.w))
-    end, nil, Acc#acc.resps).
-
--endif.
+%% -ifdef(TEST).
+%%
+%% -include_lib("eunit/include/eunit.hrl").
+%%
+%% purge_test_() ->
+%%     {
+%%         foreach,
+%%         fun setup/0,
+%%         fun teardown/1,
+%%         [
+%%             t_w2_ok(),
+%%             t_w3_ok(),
+%%
+%%             t_w2_mixed_accepted(),
+%%             t_w3_mixed_accepted(),
+%%
+%%             t_w2_exit1_ok(),
+%%             t_w2_exit2_accepted(),
+%%             t_w2_exit3_error(),
+%%
+%%             t_w4_accepted(),
+%%
+%%             t_mixed_ok_accepted(),
+%%             t_mixed_errors()
+%%         ]
+%%     }.
+%%
+%%
+%% setup() ->
+%%     meck:new(couch_log),
+%%     meck:expect(couch_log, warning, fun(_, _) -> ok end),
+%%     meck:expect(couch_log, notice, fun(_, _) -> ok end).
+%%
+%%
+%% teardown(_) ->
+%%     meck:unload().
+%%
+%%
+%% t_w2_ok() ->
+%%     ?_test(begin
+%%         Acc0 = create_init_acc(2),
+%%         Msg = {ok, [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}]},
+%%
+%%         {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
+%%         ?assertEqual(2, length(Acc1#acc.worker_uuids)),
+%%         check_quorum(Acc1, false),
+%%
+%%         {stop, Acc2} = handle_message(Msg, worker(2, Acc0), Acc1),
+%%         ?assertEqual(1, length(Acc2#acc.worker_uuids)),
+%%         check_quorum(Acc2, true),
+%%
+%%         Expect = [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}],
+%%         Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc2),
+%%         ?assertEqual(Expect, Resps),
+%%         ?assertEqual(ok, resp_health(Resps))
+%%     end).
+%%
+%%
+%% t_w3_ok() ->
+%%     ?_test(begin
+%%         Acc0 = create_init_acc(3),
+%%         Msg = {ok, [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}]},
+%%
+%%         {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
+%%         check_quorum(Acc1, false),
+%%
+%%         {ok, Acc2} = handle_message(Msg, worker(2, Acc0), Acc1),
+%%         ?assertEqual(1, length(Acc2#acc.worker_uuids)),
+%%         check_quorum(Acc2, false),
+%%
+%%         {stop, Acc3} = handle_message(Msg, worker(3, Acc0), Acc2),
+%%         ?assertEqual(0, length(Acc3#acc.worker_uuids)),
+%%         check_quorum(Acc3, true),
+%%
+%%         Expect = [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}],
+%%         Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc3),
+%%         ?assertEqual(Expect, Resps),
+%%         ?assertEqual(ok, resp_health(Resps))
+%%     end).
+%%
+%%
+%% t_w2_mixed_accepted() ->
+%%     ?_test(begin
+%%         Acc0 = create_init_acc(2),
+%%         Msg1 = {ok, [{ok, [{1, <<"foo1">>}]}, {ok, [{2, <<"bar1">>}]}]},
+%%         Msg2 = {ok, [{ok, [{1, <<"foo2">>}]}, {ok, [{2, <<"bar2">>}]}]},
+%%
+%%         {ok, Acc1} = handle_message(Msg1, worker(1, Acc0), Acc0),
+%%         ?assertEqual(2, length(Acc1#acc.worker_uuids)),
+%%         check_quorum(Acc1, false),
+%%
+%%         {ok, Acc2} = handle_message(Msg2, worker(2, Acc0), Acc1),
+%%         ?assertEqual(1, length(Acc2#acc.worker_uuids)),
+%%         check_quorum(Acc2, false),
+%%
+%%         {stop, Acc3} = handle_message(Msg1, worker(3, Acc0), Acc2),
+%%         ?assertEqual(0, length(Acc3#acc.worker_uuids)),
+%%         check_quorum(Acc3, true),
+%%
+%%         Expect = [
+%%             {accepted, [{1, <<"foo1">>}, {1, <<"foo2">>}]},
+%%             {accepted, [{2, <<"bar1">>}, {2, <<"bar2">>}]}
+%%         ],
+%%         Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc2),
+%%         ?assertEqual(Expect, Resps),
+%%         ?assertEqual(accepted, resp_health(Resps))
+%%     end).
+%%
+%%
+%% t_w3_mixed_accepted() ->
+%%     ?_test(begin
+%%         Acc0 = create_init_acc(3),
+%%         Msg1 = {ok, [{ok, [{1, <<"foo1">>}]}, {ok, [{2, <<"bar1">>}]}]},
+%%         Msg2 = {ok, [{ok, [{1, <<"foo2">>}]}, {ok, [{2, <<"bar2">>}]}]},
+%%
+%%         {ok, Acc1} = handle_message(Msg1, worker(1, Acc0), Acc0),
+%%         ?assertEqual(2, length(Acc1#acc.worker_uuids)),
+%%         check_quorum(Acc1, false),
+%%
+%%         {ok, Acc2} = handle_message(Msg2, worker(2, Acc0), Acc1),
+%%         ?assertEqual(1, length(Acc2#acc.worker_uuids)),
+%%         check_quorum(Acc2, false),
+%%
+%%         {stop, Acc3} = handle_message(Msg2, worker(3, Acc0), Acc2),
+%%         ?assertEqual(0, length(Acc3#acc.worker_uuids)),
+%%         check_quorum(Acc3, true),
+%%
+%%         Expect = [
+%%             {accepted, [{1, <<"foo1">>}, {1, <<"foo2">>}]},
+%%             {accepted, [{2, <<"bar1">>}, {2, <<"bar2">>}]}
+%%         ],
+%%         Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc2),
+%%         ?assertEqual(Expect, Resps),
+%%         ?assertEqual(accepted, resp_health(Resps))
+%%     end).
+%%
+%%
+%% t_w2_exit1_ok() ->
+%%     ?_test(begin
+%%         Acc0 = create_init_acc(2),
+%%         Msg = {ok, [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}]},
+%%         ExitMsg = {rexi_EXIT, blargh},
+%%
+%%         {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
+%%         ?assertEqual(2, length(Acc1#acc.worker_uuids)),
+%%         check_quorum(Acc1, false),
+%%
+%%         {ok, Acc2} = handle_message(ExitMsg, worker(2, Acc0), Acc1),
+%%         ?assertEqual(1, length(Acc2#acc.worker_uuids)),
+%%         check_quorum(Acc2, false),
+%%
+%%         {stop, Acc3} = handle_message(Msg, worker(3, Acc0), Acc2),
+%%         ?assertEqual(0, length(Acc3#acc.worker_uuids)),
+%%         check_quorum(Acc3, true),
+%%
+%%         Expect = [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}],
+%%         Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc3),
+%%         ?assertEqual(Expect, Resps),
+%%         ?assertEqual(ok, resp_health(Resps))
+%%     end).
+%%
+%%
+%% t_w2_exit2_accepted() ->
+%%     ?_test(begin
+%%         Acc0 = create_init_acc(2),
+%%         Msg = {ok, [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}]},
+%%         ExitMsg = {rexi_EXIT, blargh},
+%%
+%%         {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
+%%         ?assertEqual(2, length(Acc1#acc.worker_uuids)),
+%%         check_quorum(Acc1, false),
+%%
+%%         {ok, Acc2} = handle_message(ExitMsg, worker(2, Acc0), Acc1),
+%%         ?assertEqual(1, length(Acc2#acc.worker_uuids)),
+%%         check_quorum(Acc2, false),
+%%
+%%         {stop, Acc3} = handle_message(ExitMsg, worker(3, Acc0), Acc2),
+%%         ?assertEqual(0, length(Acc3#acc.worker_uuids)),
+%%         check_quorum(Acc3, true),
+%%
+%%         Expect = [{accepted, [{1, <<"foo">>}]}, {accepted, [{2, <<"bar">>}]}],
+%%         Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc3),
+%%         ?assertEqual(Expect, Resps),
+%%         ?assertEqual(accepted, resp_health(Resps))
+%%     end).
+%%
+%%
+%% t_w2_exit3_error() ->
+%%     ?_test(begin
+%%         Acc0 = create_init_acc(2),
+%%         ExitMsg = {rexi_EXIT, blargh},
+%%
+%%         {ok, Acc1} = handle_message(ExitMsg, worker(1, Acc0), Acc0),
+%%         ?assertEqual(2, length(Acc1#acc.worker_uuids)),
+%%         check_quorum(Acc1, false),
+%%
+%%         {ok, Acc2} = handle_message(ExitMsg, worker(2, Acc0), Acc1),
+%%         ?assertEqual(1, length(Acc2#acc.worker_uuids)),
+%%         check_quorum(Acc2, false),
+%%
+%%         {stop, Acc3} = handle_message(ExitMsg, worker(3, Acc0), Acc2),
+%%         ?assertEqual(0, length(Acc3#acc.worker_uuids)),
+%%         check_quorum(Acc3, true),
+%%
+%%         Expect = [
+%%             {error, internal_server_error},
+%%             {error, internal_server_error}
+%%         ],
+%%         Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc3),
+%%         ?assertEqual(Expect, Resps),
+%%         ?assertEqual(error, resp_health(Resps))
+%%     end).
+%%
+%%
+%% t_w4_accepted() ->
+%%     % Make sure we return when all workers have responded
+%%     % rather than wait around for a timeout if a user asks
+%%     % for a qourum with more than the available number of
+%%     % shards.
+%%     ?_test(begin
+%%         Acc0 = create_init_acc(4),
+%%         Msg = {ok, [{ok, [{1, <<"foo">>}]}, {ok, [{2, <<"bar">>}]}]},
+%%
+%%         {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
+%%         ?assertEqual(2, length(Acc1#acc.worker_uuids)),
+%%         check_quorum(Acc1, false),
+%%
+%%         {ok, Acc2} = handle_message(Msg, worker(2, Acc0), Acc1),
+%%         ?assertEqual(1, length(Acc2#acc.worker_uuids)),
+%%         check_quorum(Acc2, false),
+%%
+%%         {stop, Acc3} = handle_message(Msg, worker(3, Acc0), Acc2),
+%%         ?assertEqual(0, length(Acc3#acc.worker_uuids)),
+%%         check_quorum(Acc3, true),
+%%
+%%         Expect = [{accepted, [{1, <<"foo">>}]}, {accepted, [{2, <<"bar">>}]}],
+%%         Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc3),
+%%         ?assertEqual(Expect, Resps),
+%%         ?assertEqual(accepted, resp_health(Resps))
+%%     end).
+%%
+%%
+%% t_mixed_ok_accepted() ->
+%%     ?_test(begin
+%%         WorkerUUIDs = [
+%%             {#shard{node = a, range = [1, 2]}, [<<"uuid1">>]},
+%%             {#shard{node = b, range = [1, 2]}, [<<"uuid1">>]},
+%%             {#shard{node = c, range = [1, 2]}, [<<"uuid1">>]},
+%%
+%%             {#shard{node = a, range = [3, 4]}, [<<"uuid2">>]},
+%%             {#shard{node = b, range = [3, 4]}, [<<"uuid2">>]},
+%%             {#shard{node = c, range = [3, 4]}, [<<"uuid2">>]}
+%%         ],
+%%
+%%         Acc0 = #acc{
+%%             worker_uuids = WorkerUUIDs,
+%%             resps = dict:from_list([{<<"uuid1">>, []}, {<<"uuid2">>, []}]),
+%%             uuid_counts = dict:from_list([{<<"uuid1">>, 3}, {<<"uuid2">>, 3}]),
+%%             w = 2
+%%         },
+%%
+%%         Msg1 = {ok, [{ok, [{1, <<"foo">>}]}]},
+%%         Msg2 = {ok, [{ok, [{2, <<"bar">>}]}]},
+%%         ExitMsg = {rexi_EXIT, blargh},
+%%
+%%         {ok, Acc1} = handle_message(Msg1, worker(1, Acc0), Acc0),
+%%         {ok, Acc2} = handle_message(Msg1, worker(2, Acc0), Acc1),
+%%         {ok, Acc3} = handle_message(ExitMsg, worker(4, Acc0), Acc2),
+%%         {ok, Acc4} = handle_message(ExitMsg, worker(5, Acc0), Acc3),
+%%         {stop, Acc5} = handle_message(Msg2, worker(6, Acc0), Acc4),
+%%
+%%         Expect = [{ok, [{1, <<"foo">>}]}, {accepted, [{2, <<"bar">>}]}],
+%%         Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc5),
+%%         ?assertEqual(Expect, Resps),
+%%         ?assertEqual(accepted, resp_health(Resps))
+%%     end).
+%%
+%%
+%% t_mixed_errors() ->
+%%     ?_test(begin
+%%         WorkerUUIDs = [
+%%             {#shard{node = a, range = [1, 2]}, [<<"uuid1">>]},
+%%             {#shard{node = b, range = [1, 2]}, [<<"uuid1">>]},
+%%             {#shard{node = c, range = [1, 2]}, [<<"uuid1">>]},
+%%
+%%             {#shard{node = a, range = [3, 4]}, [<<"uuid2">>]},
+%%             {#shard{node = b, range = [3, 4]}, [<<"uuid2">>]},
+%%             {#shard{node = c, range = [3, 4]}, [<<"uuid2">>]}
+%%         ],
+%%
+%%         Acc0 = #acc{
+%%             worker_uuids = WorkerUUIDs,
+%%             resps = dict:from_list([{<<"uuid1">>, []}, {<<"uuid2">>, []}]),
+%%             uuid_counts = dict:from_list([{<<"uuid1">>, 3}, {<<"uuid2">>, 3}]),
+%%             w = 2
+%%         },
+%%
+%%         Msg = {ok, [{ok, [{1, <<"foo">>}]}]},
+%%         ExitMsg = {rexi_EXIT, blargh},
+%%
+%%         {ok, Acc1} = handle_message(Msg, worker(1, Acc0), Acc0),
+%%         {ok, Acc2} = handle_message(Msg, worker(2, Acc0), Acc1),
+%%         {ok, Acc3} = handle_message(ExitMsg, worker(4, Acc0), Acc2),
+%%         {ok, Acc4} = handle_message(ExitMsg, worker(5, Acc0), Acc3),
+%%         {stop, Acc5} = handle_message(ExitMsg, worker(6, Acc0), Acc4),
+%%
+%%         Expect = [{ok, [{1, <<"foo">>}]}, {error, internal_server_error}],
+%%         Resps = format_resps([<<"uuid1">>, <<"uuid2">>], Acc5),
+%%         ?assertEqual(Expect, Resps),
+%%         ?assertEqual(error, resp_health(Resps))
+%%     end).
+%%
+%%
+%% create_init_acc(W) ->
+%%     UUID1 = <<"uuid1">>,
+%%     UUID2 = <<"uuid2">>,
+%%
+%%     Nodes = [node1, node2, node3],
+%%     Shards = mem3_util:create_partition_map(<<"foo">>, 3, 1, Nodes),
+%%
+%%     % Create our worker_uuids. We're relying on the fact that
+%%     % we're using a fake Q=1 db so we don't have to worry
+%%     % about any hashing here.
+%%     WorkerUUIDs = lists:map(fun(Shard) ->
+%%         {Shard#shard{ref = erlang:make_ref()}, [UUID1, UUID2]}
+%%     end, Shards),
+%%
+%%     #acc{
+%%         worker_uuids = WorkerUUIDs,
+%%         resps = dict:from_list([{UUID1, []}, {UUID2, []}]),
+%%         uuid_counts = dict:from_list([{UUID1, 3}, {UUID2, 3}]),
+%%         w = W
+%%     }.
+%%
+%%
+%% worker(N, #acc{worker_uuids = WorkerUUIDs}) ->
+%%     {Worker, _} = lists:nth(N, WorkerUUIDs),
+%%     Worker.
+%%
+%%
+%% check_quorum(Acc, Expect) ->
+%%     dict:fold(fun(_Shard, Resps, _) ->
+%%         ?assertEqual(Expect, has_quorum(Resps, 3, Acc#acc.w))
+%%     end, nil, Acc#acc.resps).
+%%
+%% -endif.
