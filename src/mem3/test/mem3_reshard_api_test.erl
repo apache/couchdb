@@ -49,6 +49,8 @@ teardown({Url, {Db1, Db2, Db3}}) ->
     delete_db(Url, Db2),
     delete_db(Url, Db3),
     ok = config:delete("reshard", "max_jobs", _Persist=false),
+    ok = config:delete("reshard", "require_node_param", _Persist=false),
+    ok = config:delete("reshard", "require_range_param", _Persist=false),
     ok = config:delete("admins", ?USER, _Persist=false),
     meck:unload().
 
@@ -99,6 +101,7 @@ mem3_reshard_api_test_() ->
                     fun recover_in_topoff3/1,
                     fun recover_in_source_delete/1,
                     fun check_max_jobs/1,
+                    fun check_node_and_range_required_params/1,
                     fun cleanup_completed_jobs/1
                 ]
             }
@@ -675,6 +678,32 @@ check_max_jobs({Top, {Db1, Db2, _}}) ->
         % Jobs that have been created already are not removed if max jobs is lowered
         % so make sure the job completes
         wait_to_complete(Top, R4)
+    end).
+
+
+check_node_and_range_required_params({Top, {Db1, _, _}}) ->
+    ?_test(begin
+        Jobs = Top ++ ?JOBS,
+
+        Node = atom_to_binary(node(), utf8),
+        Range = <<"00000000-ffffffff">>,
+
+        config:set("reshard", "require_node_param", "true", _Persist=false),
+        {C1, R1} = req(post, Jobs, #{type => split, db => Db1}),
+        NodeRequiredErr =  <<"`node` prameter is required">>,
+        ?assertEqual({400, #{<<"error">> => <<"bad_request">>,
+            <<"reason">> => NodeRequiredErr}}, {C1, R1}),
+
+        config:set("reshard", "require_range_param", "true", _Persist=false),
+        {C2, R2} = req(post, Jobs, #{type => split, db => Db1, node => Node}),
+        RangeRequiredErr =  <<"`range` prameter is required">>,
+        ?assertEqual({400, #{<<"error">> => <<"bad_request">>,
+            <<"reason">> => RangeRequiredErr}}, {C2, R2}),
+
+        Body = #{type => split, db => Db1, range => Range, node => Node},
+        {C3, R3} = req(post, Jobs, Body),
+        ?assertMatch({201, [#{?OK := true}]}, {C3, R3}),
+        wait_to_complete_then_cleanup(Top, R3)
     end).
 
 
