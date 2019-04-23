@@ -166,13 +166,17 @@ get_reason(StateProps) when is_list(StateProps) ->
 
 
 pick_shards(undefined, undefined, Db, undefined) when is_binary(Db) ->
+    check_node_required(),
+    check_range_required(),
     mem3:shards(Db);
 
 pick_shards(Node, undefined, Db, undefined) when is_atom(Node),
         is_binary(Db) ->
+    check_range_required(),
     [S || S <- mem3:shards(Db), mem3:node(S) == Node];
 
 pick_shards(undefined, undefined, Db, [_B, _E] = Range) when  is_binary(Db) ->
+    check_node_required(),
     [S || S <- mem3:shards(Db), mem3:range(S) == Range];
 
 pick_shards(Node, undefined, Db, [_B, _E] = Range) when is_atom(Node),
@@ -180,6 +184,7 @@ pick_shards(Node, undefined, Db, [_B, _E] = Range) when is_atom(Node),
     [S || S <- mem3:shards(Db), mem3:node(S) == Node, mem3:range(S) == Range];
 
 pick_shards(undefined, Shard, undefined, undefined) when is_binary(Shard) ->
+    check_node_required(),
     Db = mem3:dbname(Shard),
     [S || S <- mem3:shards(Db), mem3:name(S) == Shard];
 
@@ -193,3 +198,20 @@ pick_shards(_, undefined, undefined, _) ->
 
 pick_shards(_, Db, Shard, _) when is_binary(Db), is_binary(Shard) ->
     throw({bad_request, <<"`db` and `shard` are mutually exclusive">>}).
+
+
+check_node_required() ->
+    case config:get_boolean("reshard", "require_node_param", false) of
+        true ->
+            throw({bad_request, <<"`node` prameter is required">>});
+        false ->
+            ok
+    end.
+
+check_range_required() ->
+    case config:get_boolean("reshard", "require_range_param", false) of
+        true ->
+            throw({bad_request, <<"`range` prameter is required">>});
+        false ->
+            ok
+    end.
