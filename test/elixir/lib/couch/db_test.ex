@@ -379,6 +379,7 @@ defmodule Couch.DBTest do
                 body: :jiffy.encode(setting.value)
               )
 
+            assert resp.status_code == 200
             Map.put(acc, node, resp.body)
           end)
 
@@ -394,16 +395,22 @@ defmodule Couch.DBTest do
           value = elem(node_value, 1)
 
           if value == ~s(""\\n) do
-            Couch.delete(
-              "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
-              headers: ["X-Couch-Persist": false]
-            )
+            resp =
+              Couch.delete(
+                "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+                headers: ["X-Couch-Persist": false]
+              )
+
+            assert resp.status_code == 200
           else
-            Couch.put(
-              "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
-              headers: ["X-Couch-Persist": false],
-              body: :jiffy.encode(value)
-            )
+            resp =
+              Couch.put(
+                "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+                headers: ["X-Couch-Persist": false],
+                body: :jiffy.encode(value)
+              )
+
+            assert resp.status_code == 200
           end
         end)
       end)

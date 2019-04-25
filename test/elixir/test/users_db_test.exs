@@ -54,12 +54,22 @@ defmodule UsersDbTest do
       |> Map.put("source", source)
       |> Map.put("target", target)
 
-    Couch.post("/_replicate", headers: headers, body: body)
+    retry_until(
+      fn ->
+        resp = Couch.post("/_replicate", headers: headers, body: body, timeout: 10_000)
+        assert HTTPotion.Response.success?(resp)
+        assert resp.status_code == 200
+        assert resp.body["ok"]
+        resp
+      end,
+      500,
+      20_000
+    )
   end
 
   defp save_as(db_name, doc, options) do
     session = Keyword.get(options, :use_session)
-    expect_response = Keyword.get(options, :expect_response, 201)
+    expect_response = Keyword.get(options, :expect_response, [201, 202])
     expect_message = Keyword.get(options, :error_message)
     expect_reason = Keyword.get(options, :error_reason)
 
@@ -80,7 +90,11 @@ defmodule UsersDbTest do
         body: doc
       )
 
-    assert resp.status_code == expect_response
+    if is_list(expect_response) do
+      assert resp.status_code in expect_response
+    else
+      assert resp.status_code == expect_response
+    end
 
     if expect_message != nil do
       assert resp.body["error"] == expect_message
@@ -116,8 +130,6 @@ defmodule UsersDbTest do
 
     {:ok, resp} = create_doc(@users_db_name, jchris_user_doc)
     jchris_rev = resp.body["rev"]
-
-    # assert :base64.decode("amNocmlzQGFwYWNoZS5vcmc6ZnVubnlib25l") == nil
 
     resp =
       Couch.get(
@@ -206,6 +218,8 @@ defmodule UsersDbTest do
           "X-CouchDB-www-Authenticate": "Cookie"
         ]
       )
+
+    assert resp.status_code == 200
 
     jchris_user_doc = Map.replace!(resp.body, "type", "not user")
 

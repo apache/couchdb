@@ -111,7 +111,7 @@ defmodule CookieAuthTest do
   defp save_as(db_name, doc, options) do
     use_session = Keyword.get(options, :use_session)
     user = Keyword.get(options, :user)
-    expect_response = Keyword.get(options, :expect_response, 201)
+    expect_response = Keyword.get(options, :expect_response, [201, 202])
     expect_message = Keyword.get(options, :error_message)
 
     session =
@@ -135,7 +135,11 @@ defmodule CookieAuthTest do
       logout(session)
     end
 
-    assert resp.status_code == expect_response
+    if is_list(expect_response) do
+      assert resp.status_code in expect_response
+    else
+      assert resp.status_code == expect_response
+    end
 
     if expect_message != nil do
       assert resp.body["error"] == expect_message
@@ -147,7 +151,7 @@ defmodule CookieAuthTest do
   defp delete_as(db_name, doc, options) do
     use_session = Keyword.get(options, :use_session)
     user = Keyword.get(options, :user)
-    expect_response = Keyword.get(options, :expect_response, 200)
+    expect_response = Keyword.get(options, :expect_response, [200, 202])
     expect_message = Keyword.get(options, :error_message)
 
     session =
@@ -170,7 +174,11 @@ defmodule CookieAuthTest do
       logout(session)
     end
 
-    assert resp.status_code == expect_response
+    if is_list(expect_response) do
+      assert resp.status_code in expect_response
+    else
+      assert resp.status_code == expect_response
+    end
 
     if expect_message != nil do
       assert resp.body["error"] == expect_message
