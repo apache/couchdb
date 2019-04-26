@@ -85,13 +85,13 @@ handle_call(Msg, _From, St) ->
 handle_cast({remove, TxId}, St) ->
     #{
         last_sweep := LastSweep,
-        txidsd := TxIds
+        txids := TxIds
     } = St,
 
     NewTxIds = [TxId | TxIds],
     NewSt = St#{txids := NewTxIds},
 
-    NeedsSweep = os:timer_diff(os:timestamp(), LastSweep) > ?ONE_HOUR,
+    NeedsSweep = timer:now_diff(os:timestamp(), LastSweep) > ?ONE_HOUR,
 
     case NeedsSweep orelse length(NewTxIds) >= ?MAX_TX_IDS of
         true ->
