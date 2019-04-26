@@ -175,9 +175,12 @@ open(DbName, Options) ->
 delete(DbName, Options) ->
     % This will throw if the db does not exist
     {ok, Db} = open(DbName, Options),
-    fabric2_fdb:transactional(Db, fun(TxDb) ->
+    Resp = fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:delete(TxDb)
-    end).
+    end),
+    if Resp /= ok -> Resp; true ->
+        fabric2_server:remove(DbName)
+    end.
 
 
 list_dbs() ->

@@ -18,7 +18,8 @@
 -export([
     start_link/0,
     fetch/1,
-    store/1
+    store/1,
+    remove/1
 ]).
 
 
@@ -55,6 +56,11 @@ store(#{name := DbName} = Db0) when is_binary(DbName) ->
         user_ctx := #user_ctx{}
     },
     true = ets:insert(?MODULE, {DbName, Db1}),
+    ok.
+
+
+remove(DbName) when is_binary(DbName) ->
+    true = ets:delete(?MODULE, DbName),
     ok.
 
 
