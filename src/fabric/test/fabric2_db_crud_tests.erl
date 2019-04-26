@@ -10,8 +10,31 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-[
-    {kernel, [{error_logger, silent}]},
-    {sasl, [{sasl_error_logger, false}]},
-    {fabric, [{eunit_run, true}]}
-].
+-module(fabric2_db_crud_tests).
+
+
+-include_lib("couch/include/couch_eunit.hrl").
+-include_lib("eunit/include/eunit.hrl").
+
+
+-define(TDEF(A), {atom_to_list(A), fun A/0}).
+
+
+crud_test_() ->
+    {
+        "Test database CRUD operations",
+        {
+            setup,
+            fun() -> test_util:start_couch([fabric]) end,
+            fun test_util:stop_couch/1,
+            [
+                ?TDEF(create_db)
+            ]
+        }
+    }.
+
+
+create_db() ->
+    DbName = ?tempdb(),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])).
+

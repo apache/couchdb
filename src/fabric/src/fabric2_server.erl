@@ -66,8 +66,13 @@ init(_) ->
             {write_concurrency, true}
         ]),
 
-    ClusterStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
-    Db = erlfdb:open(iolist_to_binary(ClusterStr)),
+    Db = case application:get_env(fabric, eunit_run) of
+        {ok, true} ->
+            erlfdb_util:get_test_db([empty]);
+        undefined ->
+            ClusterStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
+            erlfdb:open(iolist_to_binary(ClusterStr))
+    end,
     application:set_env(fabric, db, Db),
 
     {ok, nil}.
