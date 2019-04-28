@@ -355,20 +355,26 @@ is_system_db_name(DbName) when is_binary(DbName) ->
 
 set_revs_limit(#{} = Db, RevsLimit) ->
     RevsLimBin = ?uint2bin(RevsLimit),
-    fabric2_fdb:transactional(Db, fun(TxDb) ->
+    Resp = fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:set_config(TxDb, <<"revs_limit">>, RevsLimBin)
-    end).
+    end),
+    if Resp /= ok -> Resp; true ->
+        fabric2_server:store(Db#{revs_limit := RevsLimit})
+    end.
 
 
 set_security(#{} = Db, Security) ->
     SecBin = ?JSON_ENCODE(Security),
-    fabric2_fdb:transactional(Db, fun(TxDb) ->
+    Resp = fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:set_config(TxDb, <<"security_doc">>, SecBin)
-    end).
+    end),
+    if Resp /= ok -> Resp; true ->
+        fabric2_server:store(Db#{security_doc := Security})
+    end.
 
 
 set_user_ctx(#{} = Db, UserCtx) ->
-    Db#{user_ctx => UserCtx}.
+    Db#{user_ctx := UserCtx}.
 
 
 ensure_full_commit(#{}) ->

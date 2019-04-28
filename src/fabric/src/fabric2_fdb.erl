@@ -182,7 +182,7 @@ reopen(#{} = OldDb) ->
     require_transaction(OldDb),
     #{
         tx := Tx,
-        dbname := DbName,
+        name := DbName,
         db_options := Options
     } = OldDb,
     open(init_db(Tx, DbName, Options), Options).

@@ -30,7 +30,8 @@ crud_test_() ->
             [
                 ?TDEF(create_db),
                 ?TDEF(open_db),
-                ?TDEF(delete_db)
+                ?TDEF(delete_db),
+                ?TDEF(list_dbs)
             ]
         }
     }.
@@ -69,3 +70,19 @@ delete_db() ->
     ?assertEqual(false, ets:member(fabric2_server, DbName)),
 
     ?assertError(database_does_not_exist, fabric2_db:open(DbName, [])).
+
+
+list_dbs() ->
+    DbName = ?tempdb(),
+    AllDbs1 = fabric2_db:list_dbs(),
+
+    ?assert(is_list(AllDbs1)),
+    ?assert(not lists:member(DbName, AllDbs1)),
+
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+    AllDbs2 = fabric2_db:list_dbs(),
+    ?assert(lists:member(DbName, AllDbs2)),
+
+    ?assertEqual(ok, fabric2_db:delete(DbName, [])),
+    AllDbs3 = fabric2_db:list_dbs(),
+    ?assert(not lists:member(DbName, AllDbs3)).
