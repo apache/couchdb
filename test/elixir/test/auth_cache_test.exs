@@ -55,7 +55,7 @@ defmodule AuthCacheTest do
   end
 
   defp login_fail(user, password) do
-    resp = Couch.login(user, password)
+    resp = Couch.login(user, password, :fail)
     assert resp.error, "Login error is expected."
   end
 

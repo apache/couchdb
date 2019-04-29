@@ -126,14 +126,16 @@ defmodule Couch do
     login(user, pass)
   end
 
-  def login(user, pass) do
+  def login(user, pass, expect \\ :success) do
     resp = Couch.post("/_session", body: %{:username => user, :password => pass})
 
-    if resp.body["ok"] do
+    if expect == :success do
+      true = resp.body["ok"]
       cookie = resp.headers[:"set-cookie"]
       [token | _] = String.split(cookie, ";")
       %Couch.Session{cookie: token}
     else
+      true = Map.has_key?(resp.body, "error")
       %Couch.Session{error: resp.body["error"]}
     end
   end
@@ -192,7 +194,7 @@ defmodule Couch do
       Keyword.get(
         options,
         :timeout,
-        Application.get_env(:httpotion, :default_timeout, 5000)
+        Application.get_env(:httpotion, :default_timeout, 20_000)
       )
 
     ib_options =
