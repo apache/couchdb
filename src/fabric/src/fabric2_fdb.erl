@@ -128,7 +128,7 @@ create(#{} = Db0, Options) ->
 
         validate_doc_update_funs => [],
         before_doc_update => undefined,
-        after_doc_update => undefined,
+        after_doc_read => undefined,
         % All other db things as we add features,
 
         db_options => Options

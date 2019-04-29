@@ -306,12 +306,13 @@ get_security(#{security_doc := SecurityDoc}) ->
 
 
 get_update_seq(#{} = Db) ->
-    case fabric2_fdb:get_changes(Db, [{limit, 1}, {reverse, true}]) of
-        [] ->
-            fabric2_util:to_hex(<<0:80>>);
-        [{Seq, _}] ->
-            Seq
-    end.
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        Opts = [{limit, 1}, {reverse, true}],
+        case fabric2_fdb:get_changes(TxDb, Opts) of
+            [] -> fabric2_util:to_hex(<<0:80>>);
+            [{Seq, _}] -> Seq
+        end
+    end).
 
 
 get_user_ctx(#{user_ctx := UserCtx}) ->
@@ -406,9 +407,12 @@ open_doc(#{} = Db, DocId, _Options) ->
 open_doc_revs(Db, DocId, Revs, Options) ->
     Latest = lists:member(latest, Options),
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        #full_doc_info{
-            rev_tree = RevTree
-        } = fabric2_db:get_full_doc_info(TxDb, DocId),
+        AllRevInfos = fabric2_fdb:get_all_revs(Db, DocId),
+        RevTree = lists:foldl(fun(RI, TreeAcc) ->
+            RIPath = fabric2_util:revinfo_to_path(RI),
+            {Merged, _} = couch_key_tree:merge(TreeAcc, RIPath),
+            Merged
+        end, [], AllRevInfos),
         {Found, Missing} = case Revs of
             all ->
                 {couch_key_tree:get_all_leafs(RevTree), []};
@@ -439,9 +443,18 @@ update_doc(Db, Doc) ->
 
 
 update_doc(Db, Doc, Options) ->
-    fabric2_fdb:transactional(Db, fun(TxDb) ->
-        update_doc_int(TxDb, Doc, Options)
-    end).
+    case update_docs(Db, [Doc], Options) of
+        {ok, [{ok, NewRev}]} ->
+            {ok, NewRev};
+        {ok, [{{_Id, _Rev}, Error}]} ->
+            throw(Error);
+        {error, [Error]} ->
+            throw(Error);
+        {ok, []} ->
+            % replication success
+            {Pos, [RevId | _]} = Doc#doc.revs,
+            {ok, {Pos, RevId}}
+    end.
 
 
 update_docs(Db, Docs) ->
@@ -449,7 +462,7 @@ update_docs(Db, Docs) ->
 
 
 update_docs(Db, Docs, Options) ->
-    {Resps, Status} = lists:mapfoldl(fun(Doc, Acc) ->
+    {Resps0, Status} = lists:mapfoldl(fun(Doc, Acc) ->
         fabric2_fdb:transactional(Db, fun(TxDb) ->
             case update_doc_int(TxDb, Doc, Options) of
                 {ok, _} = Resp ->
@@ -459,7 +472,12 @@ update_docs(Db, Docs, Options) ->
             end
         end)
     end, ok, Docs),
-    {Status, Resps}.
+    Resps1 = case lists:member(replicated_changes, Options) of
+        true -> [R || R <- Resps0, R /= {ok, []}];
+        false -> Resps0
+    end,
+    %io:format(standard_error, "~nRESPS: ~p :: ~p~n~n", [Resps0, Resps1]),
+    {Status, Resps1}.
 
 
 fold_docs(Db, UserFun, UserAcc) ->
@@ -677,11 +695,8 @@ update_doc_interactive(Db, Doc0, _Options) ->
     Doc1 = case Winner of
         #{deleted := true} when not Doc0#doc.deleted ->
             {WinnerRevPos, WinnerRev} = maps:get(rev_id, Winner),
-            Doc0#doc{revs = {WinnerRevPos, [WinnerRev]}};
-        #{deleted := true} when Doc0#doc.deleted ->
-            % We disable extending deleted revisions with
-            % new deletions during interactive updates
-            ?RETURN({error, conflict});
+            WinnerRevPath = maps:get(rev_path, Winner),
+            Doc0#doc{revs = {WinnerRevPos, [WinnerRev | WinnerRevPath]}};
         _ ->
             Doc0
     end,
@@ -722,7 +737,11 @@ update_doc_interactive(Db, Doc0, _Options) ->
         [W, NW] -> {W, NW}
     end,
 
-    NewWinner = NewWinner0#{branch_count := maps:get(branch_count, Winner)},
+    BranchCount = case Winner of
+        not_found -> 1;
+        #{branch_count := BC} -> BC
+    end,
+    NewWinner = NewWinner0#{branch_count := BranchCount},
     ToUpdate = if NonWinner == not_found -> []; true -> [NonWinner] end,
     ToRemove = if Target == not_found -> []; true -> [Target] end,
 
@@ -745,7 +764,7 @@ update_doc_replicated(Db, Doc0, _Options) ->
         revs = {RevPos, [Rev | RevPath]}
     } = Doc0,
 
-    DocRevInfo = #{
+    DocRevInfo0 = #{
         winner => undefined,
         deleted => Deleted,
         rev_id => {RevPos, Rev},
@@ -762,7 +781,7 @@ update_doc_replicated(Db, Doc0, _Options) ->
         Merged
     end, [], AllRevInfos),
 
-    DocRevPath = fabric2_util:revinfo_to_path(DocRevInfo),
+    DocRevPath = fabric2_util:revinfo_to_path(DocRevInfo0),
     {NewTree, Status} = couch_key_tree:merge(RevTree, DocRevPath),
     if Status /= internal_node -> ok; true ->
         % We already know this revision so nothing
@@ -770,10 +789,25 @@ update_doc_replicated(Db, Doc0, _Options) ->
         ?RETURN({ok, []})
     end,
 
+    % Its possible to have a replication with fewer than $revs_limit
+    % revisions which extends an existing branch. To avoid
+    % losing revision history we extract the new node from the
+    % tree and use the combined path after stemming.
+    {[{_, {RevPos, UnstemmedRevs}}], []}
+            = couch_key_tree:get(NewTree, [{RevPos, Rev}]),
+    RevsLimit = fabric2_db:get_revs_limit(Db),
+    Doc1 = Doc0#doc{
+        revs = {RevPos, lists:sublist(UnstemmedRevs, RevsLimit)}
+    },
+    {RevPos, [Rev | NewRevPath]} = Doc1#doc.revs,
+    DocRevInfo1 = DocRevInfo0#{rev_path := NewRevPath},
+
+    % Find any previous revision we knew about for
+    % validation and attachment handling.
     AllLeafsFull = couch_key_tree:get_all_leafs_full(NewTree),
     LeafPath = get_leaf_path(RevPos, Rev, AllLeafsFull),
     PrevRevInfo = find_prev_revinfo(RevPos, LeafPath),
-    Doc1 = prep_and_validate(Db, Doc0, PrevRevInfo),
+    Doc2 = prep_and_validate(Db, Doc1, PrevRevInfo),
 
     % Possible winners are the previous winner and
     % the new DocRevInfo
@@ -783,9 +817,9 @@ update_doc_replicated(Db, Doc0, _Options) ->
     end,
     {NewWinner0, NonWinner} = case Winner == PrevRevInfo of
         true ->
-            {DocRevInfo, not_found};
+            {DocRevInfo1, not_found};
         false ->
-            [W, NW] = fabric2_util:sort_revinfos([Winner, DocRevInfo]),
+            [W, NW] = fabric2_util:sort_revinfos([Winner, DocRevInfo1]),
             {W, NW}
     end,
 
@@ -795,17 +829,14 @@ update_doc_replicated(Db, Doc0, _Options) ->
 
     ok = fabric2_fdb:write_doc(
             Db,
-            Doc1,
+            Doc2,
             NewWinner,
             Winner,
             ToUpdate,
             ToRemove
         ),
 
-    #doc{
-        revs = {NewRevPos, [NewRev | _]}
-    } = Doc1,
-    {ok, {NewRevPos, NewRev}}.
+    {ok, []}.
 
 
 prep_and_validate(Db, Doc, PrevRevInfo) ->

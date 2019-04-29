@@ -47,12 +47,7 @@ revinfo_to_path(RevInfo, [Rev | Rest]) ->
 
 
 sort_revinfos(RevInfos) ->
-    CmpFun = fun(A, B) ->
-        case rev_sort_key(A) > rev_sort_key(B) of
-            true -> A;
-            false -> B
-        end
-    end,
+    CmpFun = fun(A, B) -> rev_sort_key(A) > rev_sort_key(B) end,
     lists:sort(CmpFun, RevInfos).
 
 

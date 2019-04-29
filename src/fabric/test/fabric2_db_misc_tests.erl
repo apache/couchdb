@@ -29,7 +29,9 @@ misc_test_() ->
             fun cleanup/1,
             {with, [
                 fun empty_db_info/1,
-                fun accessors/1
+                fun accessors/1,
+                fun is_system_db/1,
+                fun ensure_full_commit/1
             ]}
         }
     }.
@@ -56,6 +58,34 @@ empty_db_info({DbName, Db, _}) ->
 
 
 accessors({DbName, Db, _}) ->
+    SeqZero = fabric2_util:to_hex(<<0:80>>),
     ?assertEqual(DbName, fabric2_db:name(Db)),
     ?assertEqual(0, fabric2_db:get_instance_start_time(Db)),
-    ?assertEqual(nil, fabric2_db:get_pid(Db)).
+    ?assertEqual(nil, fabric2_db:get_pid(Db)),
+    ?assertEqual(undefined, fabric2_db:get_before_doc_update_fun(Db)),
+    ?assertEqual(undefined, fabric2_db:get_after_doc_read_fun(Db)),
+    ?assertEqual(SeqZero, fabric2_db:get_committed_update_seq(Db)),
+    ?assertEqual(SeqZero, fabric2_db:get_compacted_seq(Db)),
+    ?assertEqual(SeqZero, fabric2_db:get_update_seq(Db)),
+    ?assertEqual(nil, fabric2_db:get_compactor_pid(Db)),
+    ?assertEqual(1000, fabric2_db:get_revs_limit(Db)),
+    ?assertMatch(<<_:32/binary>>, fabric2_db:get_uuid(Db)),
+    ?assertEqual(true, fabric2_db:is_db(Db)),
+    ?assertEqual(false, fabric2_db:is_db(#{})),
+    ?assertEqual(false, fabric2_db:is_partitioned(Db)).
+
+
+is_system_db({DbName, Db, _}) ->
+    ?assertEqual(false, fabric2_db:is_system_db(Db)),
+    ?assertEqual(false, fabric2_db:is_system_db_name("foo")),
+    ?assertEqual(false, fabric2_db:is_system_db_name(DbName)),
+    ?assertEqual(true, fabric2_db:is_system_db_name(<<"_replicator">>)),
+    ?assertEqual(true, fabric2_db:is_system_db_name("_replicator")),
+    ?assertEqual(true, fabric2_db:is_system_db_name(<<"foo/_replicator">>)),
+    ?assertEqual(false, fabric2_db:is_system_db_name(<<"f.o/_replicator">>)),
+    ?assertEqual(false, fabric2_db:is_system_db_name(<<"foo/bar">>)).
+
+
+ensure_full_commit({_, Db, _}) ->
+    ?assertEqual({ok, 0}, fabric2_db:ensure_full_commit(Db)),
+    ?assertEqual({ok, 0}, fabric2_db:ensure_full_commit(Db, 5)).
