@@ -64,7 +64,13 @@ go(DbName, Node, Opts) when is_binary(DbName), is_atom(Node) ->
     go(#shard{name=DbName, node=node()}, #shard{name=DbName, node=Node}, Opts);
 
 go(#shard{} = Source, #shard{} = Target, Opts) ->
-    go(Source, targets_map(Source, Target), Opts);
+    case mem3:db_is_current(Source) of
+        true ->
+            go(Source, targets_map(Source, Target), Opts);
+        false ->
+            % Database could have been recreated
+            {error, missing_source}
+    end;
 
 go(#shard{} = Source, #{} = Targets0, Opts) when map_size(Targets0) > 0 ->
     Targets = maps:map(fun(_, T) -> #tgt{shard = T} end, Targets0),
