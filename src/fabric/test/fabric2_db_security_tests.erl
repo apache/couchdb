@@ -17,6 +17,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
+-define(TDEF1(A), {atom_to_list(A), fun A/1}).
 
 security_test_() ->
     {
@@ -25,21 +26,21 @@ security_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun is_admin_name/1,
-                fun is_not_admin_name/1,
-                fun is_admin_role/1,
-                fun is_not_admin_role/1,
-                fun check_is_admin/1,
-                fun check_is_not_admin/1,
-                fun check_is_member_name/1,
-                fun check_is_not_member_name/1,
-                fun check_is_member_role/1,
-                fun check_is_not_member_role/1,
-                fun check_admin_is_member/1,
-                fun check_is_member_of_public_db/1,
-                fun check_set_user_ctx/1
-            ]}
+            test_util:with([
+                ?TDEF1(is_admin_name),
+                ?TDEF1(is_not_admin_name),
+                ?TDEF1(is_admin_role),
+                ?TDEF1(is_not_admin_role),
+                ?TDEF1(check_is_admin),
+                ?TDEF1(check_is_not_admin),
+                ?TDEF1(check_is_member_name),
+                ?TDEF1(check_is_not_member_name),
+                ?TDEF1(check_is_member_role),
+                ?TDEF1(check_is_not_member_role),
+                ?TDEF1(check_admin_is_member),
+                ?TDEF1(check_is_member_of_public_db),
+                ?TDEF1(check_set_user_ctx)
+            ])
         }
     }.
 

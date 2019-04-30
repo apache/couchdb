@@ -37,6 +37,7 @@
 -export([start/1, start/2, start/3, stop/1]).
 
 -export([fake_db/1]).
+-export([with/1]).
 
 -record(test_context, {mocked = [], started = [], module}).
 
@@ -360,3 +361,9 @@ sort_apps(Apps) ->
 
 weight_app(couch_log) -> {0.0, couch_log};
 weight_app(Else) -> {1.0, Else}.
+
+%% eunit implementation of {with, Tests} doesn't detect test name correctly
+with(Tests) ->
+  fun(ArgsTuple) ->
+      [{Name, ?_test(Fun(ArgsTuple))} || {Name, Fun} <- Tests]
+  end.

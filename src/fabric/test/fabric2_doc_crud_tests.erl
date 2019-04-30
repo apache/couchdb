@@ -17,6 +17,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
+-define(TDEF1(A), {atom_to_list(A), fun A/1}).
 
 doc_crud_test_() ->
     {
@@ -25,26 +26,26 @@ doc_crud_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun open_missing_doc/1,
-                fun create_new_doc/1,
-                fun update_doc_basic/1,
-                fun update_doc_replicated/1,
-                fun update_doc_replicated_add_conflict/1,
-                fun update_doc_replicated_changes_winner/1,
-                fun update_doc_replicated_extension/1,
-                fun update_doc_replicate_existing_rev/1,
-                fun update_winning_conflict_branch/1,
-                fun update_non_winning_conflict_branch/1,
-                fun delete_doc_basic/1,
-                fun delete_changes_winner/1,
-                fun recreate_doc_basic/1,
-                fun conflict_on_create_new_with_rev/1,
-                fun conflict_on_update_with_no_rev/1,
-                fun conflict_on_create_as_deleted/1,
-                fun conflict_on_recreate_as_deleted/1,
-                fun conflict_on_extend_deleted/1
-            ]}
+            test_util:with([
+                ?TDEF1(open_missing_doc),
+                ?TDEF1(create_new_doc),
+                ?TDEF1(update_doc_basic),
+                ?TDEF1(update_doc_replicated),
+                ?TDEF1(update_doc_replicated_add_conflict),
+                ?TDEF1(update_doc_replicated_changes_winner),
+                ?TDEF1(update_doc_replicated_extension),
+                ?TDEF1(update_doc_replicate_existing_rev),
+                ?TDEF1(update_winning_conflict_branch),
+                ?TDEF1(update_non_winning_conflict_branch),
+                ?TDEF1(delete_doc_basic),
+                ?TDEF1(delete_changes_winner),
+                ?TDEF1(recreate_doc_basic),
+                ?TDEF1(conflict_on_create_new_with_rev),
+                ?TDEF1(conflict_on_update_with_no_rev),
+                ?TDEF1(conflict_on_create_as_deleted),
+                ?TDEF1(conflict_on_recreate_as_deleted),
+                ?TDEF1(conflict_on_extend_deleted)
+            ])
         }
     }.
 

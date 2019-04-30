@@ -17,8 +17,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 
--define(TDEF(A), {atom_to_list(A), fun A/1}).
-
+-define(TDEF1(A), {atom_to_list(A), fun A/1}).
 
 misc_test_() ->
     {
@@ -27,12 +26,12 @@ misc_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun empty_db_info/1,
-                fun accessors/1,
-                fun is_system_db/1,
-                fun ensure_full_commit/1
-            ]}
+            test_util:with([
+                ?TDEF1(empty_db_info),
+                ?TDEF1(accessors),
+                ?TDEF1(is_system_db),
+                ?TDEF1(ensure_full_commit)
+            ])
         }
     }.
 
