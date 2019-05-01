@@ -106,8 +106,13 @@ handle_stream_start({rexi_EXIT, Reason}, Worker, St) ->
                         fabric_dict:store(NewWorker, waiting, NewWorkers)
                     end, Workers, WorkerReplacements),
                     % Assert that our replaced worker provides us
-                    % the oppurtunity to make progress.
-                    true = fabric_ring:is_progress_possible(FinalWorkers),
+                    % the oppurtunity to make progress. Need to make sure
+                    % to include already processed responses, since we are
+                    % checking the full range and some workers have already
+                    % responded and were removed from the workers list
+                    ReadyWorkers = [{W, R} || {_, W, R} <- Ready],
+                    AllWorkers = FinalWorkers ++ ReadyWorkers,
+                    true = fabric_ring:is_progress_possible(AllWorkers),
                     NewRefs = fabric_dict:fetch_keys(FinalWorkers),
                     {new_refs, NewRefs, St#stream_acc{
                         workers=FinalWorkers,
