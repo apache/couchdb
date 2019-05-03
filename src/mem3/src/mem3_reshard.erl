@@ -56,7 +56,7 @@
 
 -define(JOB_ID_VERSION, 1).
 -define(JOB_STATE_VERSION, 1).
--define(DEFAULT_MAX_JOBS, 25).
+-define(DEFAULT_MAX_JOBS, 48).
 -define(DEFAULT_MAX_HISTORY, 20).
 -define(JOB_PREFIX, <<"reshard-job-">>).
 -define(STATE_PREFIX, <<"reshard-state-">>).
