@@ -127,13 +127,15 @@ to_json_obj(Doc, Options) ->
 
 doc_to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
             meta=Meta,access=Access}=Doc,Options)->
-    {[{<<"_id">>, Id}]
+    R={[{<<"_id">>, Id}]
         ++ to_json_rev(Start, RevIds)
         ++ to_json_body(Del, Body, Access)
         ++ to_json_revisions(Options, Start, RevIds)
         ++ to_json_meta(Meta)
         ++ to_json_attachments(Doc#doc.atts, Options)
-    }.
+    },
+    couch_log:info("~n~n loading this from disk: Doc: ~p ~n~n", [R]),
+    R.
 
 from_json_obj_validate(EJson) ->
     from_json_obj_validate(EJson, undefined).
@@ -141,6 +143,7 @@ from_json_obj_validate(EJson) ->
 from_json_obj_validate(EJson, DbName) ->
     MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
     Doc = from_json_obj(EJson, DbName),
+    couch_log:info("~n~n writing this to disk: Doc: ~p ~n~n", [Doc]),
     case couch_ejson_size:encoded_size(Doc#doc.body) =< MaxSize of
         true ->
              validate_attachment_sizes(Doc#doc.atts),
@@ -260,10 +263,9 @@ transfer_fields([{<<"_id">>, Id} | Rest], Doc, DbName) ->
     validate_docid(Id, DbName),
     transfer_fields(Rest, Doc#doc{id=Id}, DbName);
 
-transfer_fields([{<<"_access">>, Access} = Field | Rest],
-    #doc{body=Fields} = Doc, DbName) ->
+transfer_fields([{<<"_access">>, Access} = Field | Rest], Doc, DbName) ->
     % TODO: validate access as array strings, and optional arrays of strings
-    transfer_fields(Rest, Doc#doc{body=[Field|Fields],access=Access}, DbName);
+    transfer_fields(Rest, Doc#doc{body=Rest,access=Access}, DbName);
 
 transfer_fields([{<<"_rev">>, Rev} | Rest], #doc{revs={0, []}}=Doc, DbName) ->
     {Pos, RevId} = parse_rev(Rev),
