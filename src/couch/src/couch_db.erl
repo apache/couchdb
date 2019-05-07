@@ -1491,7 +1491,14 @@ calculate_start_seq(Db, _Node, {Seq, Uuid, EpochNode}) ->
 calculate_start_seq(Db, _Node, {replace, OriginalNode, Uuid, Seq}) ->
     case is_prefix(Uuid, couch_db:get_uuid(Db)) of
         true ->
-            start_seq(get_epochs(Db), OriginalNode, Seq);
+            try
+                start_seq(get_epochs(Db), OriginalNode, Seq)
+            catch throw:epoch_mismatch ->
+                couch_log:warning("~p start_seq duplicate uuid on node: ~p "
+                    "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p",
+                    [?MODULE, node(), Db#db.name, Seq, Uuid, OriginalNode]),
+                0
+            end;
         false ->
             {replace, OriginalNode, Uuid, Seq}
     end.
@@ -1538,8 +1545,8 @@ start_seq([{_, NewSeq}, {OrigNode, _} | _], OrigNode, Seq) when Seq > NewSeq ->
     NewSeq;
 start_seq([_ | Rest], OrigNode, Seq) ->
     start_seq(Rest, OrigNode, Seq);
-start_seq([], OrigNode, Seq) ->
-    erlang:error({epoch_mismatch, OrigNode, Seq}).
+start_seq([], _OrigNode, _Seq) ->
+    throw(epoch_mismatch).
 
 
 fold_docs(Db, UserFun, UserAcc) ->
@@ -1917,7 +1924,8 @@ calculate_start_seq_test_() ->
             t_calculate_start_seq_uuid_mismatch(),
             t_calculate_start_seq_is_owner(),
             t_calculate_start_seq_not_owner(),
-            t_calculate_start_seq_raw()
+            t_calculate_start_seq_raw(),
+            t_calculate_start_seq_epoch_mismatch()
         ]
     }.
 
@@ -1960,6 +1968,14 @@ t_calculate_start_seq_raw() ->
         Db = test_util:fake_db([]),
         Seq = calculate_start_seq(Db, node1, 13),
         ?assertEqual(13, Seq)
+    end).
+
+t_calculate_start_seq_epoch_mismatch() ->
+    ?_test(begin
+        Db = test_util:fake_db([]),
+        SeqIn = {replace, not_this_node, get_uuid(Db), 42},
+        Seq = calculate_start_seq(Db, node1, SeqIn),
+        ?assertEqual(0, Seq)
     end).
 
 is_owner_test() ->
