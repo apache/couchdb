@@ -173,6 +173,20 @@ eunit: couch
 	  $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
 	done
 
+.PHONY: eunit
+# target: exunit - Run ExUnit tests
+exunit: export BUILDDIR = $(shell pwd)
+exunit: export MIX_ENV=test
+exunit: export ERL_LIBS = $(shell pwd)/src
+exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+exunit: couch elixir-check-formatted elixir-credo
+	@mix local.hex --force
+	@mix local.rebar rebar ${REBAR} --force
+	@mix deps.get
+	@$(REBAR) setup_eunit 2> /dev/null
+	@mix test --trace
+
 setup-eunit: export BUILDDIR = $(shell pwd)
 setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 setup-eunit:
@@ -233,13 +247,13 @@ elixir-cluster-with-quorum: elixir-check-formatted elixir-credo devclean
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted:
-	@cd test/elixir/ && mix format --check-formatted
+	mix format --check-formatted
 
 # Credo is a static code analysis tool for Elixir.
 # We use it in our tests
 .PHONY: elixir-credo
 elixir-credo:
-	@cd test/elixir/ && mix credo
+	mix credo
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
