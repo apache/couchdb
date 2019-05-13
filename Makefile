@@ -173,7 +173,7 @@ eunit: couch
 	  $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
 	done
 
-.PHONY: eunit
+.PHONY: exunit
 # target: exunit - Run ExUnit tests
 exunit: export BUILDDIR = $(shell pwd)
 exunit: export MIX_ENV=test

@@ -27,7 +27,7 @@ defmodule Foo.Mixfile do
   defp deps do
     [
       # {:dep_from_hexpm, "~> 0.3.0"},
-      {:httpotion, "~> 3.0"},
+      {:httpotion, "~> 3.1.2"},
       {:jiffy, "~> 0.15.2"},
       {:credo, "~> 1.0.0", only: [:dev, :test], runtime: false},
       {:junit_formatter, "~> 3.0", only: [:test]}

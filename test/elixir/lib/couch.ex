@@ -3,11 +3,15 @@ defmodule Couch.Session do
   CouchDB session helpers.
   """
 
-  @enforce_keys [:cookie]
-  defstruct [:cookie]
+  @enforce_keys [:client, :cookie]
+  defstruct [:client, :cookie, :base_url]
 
-  def new(cookie) do
-    %Couch.Session{cookie: cookie}
+  def new(client, cookie) do
+    %Couch.Session{client: client, cookie: cookie}
+  end
+
+  def new(client, cookie) do
+    %Couch.Session{client: client, cookie: cookie}
   end
 
   def logout(sess) do
@@ -17,7 +21,7 @@ defmodule Couch.Session do
       Cookie: sess.cookie
     ]
 
-    Couch.delete!("/_session", headers: headers)
+    sess.client.delete!("/_session", headers: headers)
   end
 
   def get(sess, url, opts \\ []), do: go(sess, :get, url, opts)
@@ -34,12 +38,14 @@ defmodule Couch.Session do
 
   def go(%Couch.Session{} = sess, method, url, opts) do
     opts = Keyword.merge(opts, cookie: sess.cookie)
+    opts = Keyword.merge(opts, base_url: sess.base_url)
     Couch.request(method, url, opts)
   end
 
   def go!(%Couch.Session{} = sess, method, url, opts) do
     opts = Keyword.merge(opts, cookie: sess.cookie)
-    Couch.request!(method, url, opts)
+    opts = Keyword.merge(opts, base_url: sess.base_url)
+    sess.client.request!(method, url, opts)
   end
 end
 
@@ -54,8 +60,13 @@ defmodule Couch do
     url
   end
 
-  def process_url(url) do
-    base_url = System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
+  def process_url(url, options) do
+    base_url = case Keyword.get(options, :base_url) do
+      nil ->
+        System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
+      base_url ->
+        base_url
+    end
     base_url <> url
   end
 
@@ -118,53 +129,25 @@ defmodule Couch do
   end
 
   def login(user, pass) do
-    resp = Couch.post("/_session", body: %{:username => user, :password => pass})
+    login(nil, user, pass)
+  end
+  
+  def login(base_url, user, pass) do
+    resp = Couch.post("/_session", body: %{:username => user, :password => pass}, base_url: base_url)
     true = resp.body["ok"]
     cookie = resp.headers[:"set-cookie"]
     [token | _] = String.split(cookie, ";")
-    %Couch.Session{cookie: token}
-  end
-
-  # HACK: this is here until this commit lands in a release
-  # https://github.com/myfreeweb/httpotion/commit/f3fa2f0bc3b9b400573942b3ba4628b48bc3c614
-  def handle_response(response) do
-    case response do
-      {:ok, status_code, headers, body, _} ->
-        processed_headers = process_response_headers(headers)
-
-        %HTTPotion.Response{
-          status_code: process_status_code(status_code),
-          headers: processed_headers,
-          body: process_response_body(processed_headers, body)
-        }
-
-      {:ok, status_code, headers, body} ->
-        processed_headers = process_response_headers(headers)
-
-        %HTTPotion.Response{
-          status_code: process_status_code(status_code),
-          headers: processed_headers,
-          body: process_response_body(processed_headers, body)
-        }
-
-      {:ibrowse_req_id, id} ->
-        %HTTPotion.AsyncResponse{id: id}
-
-      {:error, {:conn_failed, {:error, reason}}} ->
-        %HTTPotion.ErrorResponse{message: error_to_string(reason)}
-
-      {:error, :conn_failed} ->
-        %HTTPotion.ErrorResponse{message: "conn_failed"}
-
-      {:error, reason} ->
-        %HTTPotion.ErrorResponse{message: error_to_string(reason)}
-    end
+    %Couch.Session{
+      client: __MODULE__,
+      cookie: token,
+      base_url: base_url
+    }
   end
 
   # Anther HACK: Until we can get process_request_headers/2 merged
   # upstream.
   @spec process_arguments(atom, String.t(), [{atom(), any()}]) :: %{}
-  defp process_arguments(method, url, options) do
+  def process_arguments(method, url, options) do
     options = process_options(options)
 
     body = Keyword.get(options, :body, "")
