@@ -249,11 +249,6 @@ def check_beams(ctx):
 
 @log("Prepare configuration files")
 def setup_configs(ctx):
-    if os.path.exists("src/fauxton/dist/release"):
-        fauxton_root = "src/fauxton/dist/release"
-    else:
-        fauxton_root = "share/www"
-
     for idx, node in enumerate(ctx["nodes"]):
         cluster_port, backend_port = get_ports(ctx, idx + ctx["node_number"])
         env = {
@@ -268,7 +263,6 @@ def setup_configs(ctx):
             "node_name": "-name %s@127.0.0.1" % node,
             "cluster_port": cluster_port,
             "backend_port": backend_port,
-            "fauxton_root": fauxton_root,
             "uuid": "fake_uuid_for_dev",
             "_default": "",
         }
@@ -529,6 +523,14 @@ def check_node_alive(url):
 
 
 def set_boot_env(ctx):
+
+    # fudge fauxton path
+    if os.path.exists("src/fauxton/dist/release"):
+        fauxton_root = "src/fauxton/dist/release"
+    else:
+        fauxton_root = "share/www"
+
+    os.environ["COUCHDB_FAUXTON_DOCROOT"] = fauxton_root
 
     # fudge default query server paths
     couchjs = os.path.join(ctx["rootdir"], "src", "couch", "priv", "couchjs")
