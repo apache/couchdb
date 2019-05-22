@@ -149,6 +149,7 @@ check: all
 	@$(MAKE) test-cluster-without-quorum
 	@$(MAKE) python-black
 	@$(MAKE) eunit
+	@$(MAKE) exunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
