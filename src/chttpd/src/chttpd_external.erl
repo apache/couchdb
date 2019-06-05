@@ -74,7 +74,7 @@ json_req_obj_fields() ->
      <<"peer">>, <<"form">>, <<"cookie">>, <<"userCtx">>, <<"secObj">>].
 
 json_req_obj_field(<<"info">>, #httpd{}, Db, _DocId) ->
-    {ok, Info} = get_db_info(Db),
+    {ok, Info} = fabric2_db:get_db_info(Db),
     {Info};
 json_req_obj_field(<<"uuid">>, #httpd{}, _Db, _DocId) ->
     couch_uuids:new();
@@ -117,27 +117,18 @@ json_req_obj_field(<<"form">>, #httpd{mochi_req=Req, method=Method}=HttpReq, Db,
 json_req_obj_field(<<"cookie">>, #httpd{mochi_req=Req}, _Db, _DocId) ->
     to_json_terms(Req:parse_cookie());
 json_req_obj_field(<<"userCtx">>, #httpd{}, Db, _DocId) ->
-    couch_util:json_user_ctx(Db);
-json_req_obj_field(<<"secObj">>, #httpd{user_ctx=UserCtx}, Db, _DocId) ->
-    get_db_security(Db, UserCtx).
+    json_user_ctx(Db);
+json_req_obj_field(<<"secObj">>, #httpd{user_ctx = #user_ctx{}}, Db, _DocId) ->
+    fabric2_db:get_security(Db).
 
 
-get_db_info(Db) ->
-    case couch_db:is_clustered(Db) of
-        true ->
-            fabric:get_db_info(Db);
-        false ->
-            couch_db:get_db_info(Db)
-    end.
-
-
-get_db_security(Db, #user_ctx{}) ->
-    case couch_db:is_clustered(Db) of
-        true ->
-            fabric:get_security(Db);
-        false ->
-            couch_db:get_security(Db)
-    end.
+json_user_ctx(Db) ->
+    Ctx = fabric2_db:get_user_ctx(Db),
+    {[
+        {<<"db">>, fabric2_db:name(Db)},
+        {<<"name">>, Ctx#user_ctx.name},
+        {<<"roles">>, Ctx#user_ctx.roles}
+    ]}.
 
 
 to_json_terms(Data) ->
