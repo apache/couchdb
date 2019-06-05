@@ -10,22 +10,23 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, fabric, [
-    {description, "Routing and proxying layer for CouchDB cluster"},
-    {vsn, git},
-    {mod, {fabric2_app, []}},
-    {registered, [
-        fabric_server
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        config,
-        couch,
-        rexi,
-        mem3,
-        couch_log,
-        couch_stats,
-        erlfdb
-    ]}
-]}.
+-module(fabric2_app).
+-behaviour(application).
+
+
+-export([
+    start/2,
+    stop/1
+]).
+
+
+start(_Type, StartArgs) ->
+    fabric2_sup:start_link(StartArgs).
+
+
+stop(_State) ->
+    case application:get_env(erlfdb, test_cluster_pid) of
+        {ok, Pid} -> Pid ! close;
+        _ -> ok
+    end,
+    ok.
