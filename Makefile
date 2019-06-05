@@ -234,7 +234,11 @@ python-black-update: .venv/bin/black
 .PHONY: elixir
 elixir: export MIX_ENV=integration
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run -a adm:pass --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run --erlang-config=rel/files/eunit.config -n 1 -a adm:pass --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+
+.PHONY: elixir-only
+elixir-only: devclean
+	@dev/run --erlang-config=rel/files/eunit.config -n 1 -a adm:pass --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init:
