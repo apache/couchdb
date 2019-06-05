@@ -637,184 +637,184 @@ increment_changes_epoch() ->
     application:set_env(fabric, changes_epoch, os:timestamp()).
 
 
-unpack_seq_setup() ->
-    meck:new(mem3),
-    meck:new(fabric_view),
-    meck:expect(mem3, get_shard, fun(_, _, _) -> {ok, #shard{}} end),
-    meck:expect(fabric_ring, is_progress_possible, fun(_) -> true end),
-    ok.
-
-
-unpack_seqs_test_() ->
-    {
-        setup,
-        fun unpack_seq_setup/0,
-        fun (_) -> meck:unload() end,
-        [
-            t_unpack_seqs()
-        ]
-    }.
-
-
-t_unpack_seqs() ->
-    ?_test(begin
-        % BigCouch 0.3 style.
-        assert_shards("23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA"),
-
-        % BigCouch 0.4 style.
-        assert_shards([23423,<<"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA">>]),
-
-        % BigCouch 0.4 style (as string).
-        assert_shards("[23423,\"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"),
-        assert_shards("[23423 ,\"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"),
-        assert_shards("[23423, \"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"),
-        assert_shards("[23423 , \"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"),
-
-        % with internal hypen
-        assert_shards("651-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
-        "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
-        "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"),
-        assert_shards([651,"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
-        "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
-        "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"]),
-
-        % CouchDB 1.2 style
-        assert_shards("\"23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
-        "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
-        "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"")
-    end).
-
-
-assert_shards(Packed) ->
-    ?assertMatch([{#shard{},_}|_], unpack_seqs(Packed, <<"foo">>)).
-
-
-find_replacements_test() ->
-    % None of the workers are in the live list of shard but there is a
-    % replacement on n3 for the full range. It should get picked instead of
-    % the two smaller one on n2.
-    Workers1 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}]),
-    AllShards1 = [
-        mk_shard("n1", 11, ?RING_END),
-        mk_shard("n2", 0, 4),
-        mk_shard("n2", 5, 10),
-        mk_shard("n3", 0, ?RING_END)
-    ],
-    {WorkersRes1, Dead1, Reps1} = find_replacements(Workers1, AllShards1),
-    ?assertEqual([], WorkersRes1),
-    ?assertEqual(Workers1, Dead1),
-    ?assertEqual([mk_shard("n3", 0, ?RING_END)], Reps1),
-
-    % None of the workers are in the live list of shards and there is a
-    % split replacement from n2 (range [0, 10] replaced with [0, 4], [5, 10])
-    Workers2 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}]),
-    AllShards2 = [
-        mk_shard("n1", 11, ?RING_END),
-        mk_shard("n2", 0, 4),
-        mk_shard("n2", 5, 10)
-    ],
-    {WorkersRes2, Dead2, Reps2} = find_replacements(Workers2, AllShards2),
-    ?assertEqual([], WorkersRes2),
-    ?assertEqual(Workers2, Dead2),
-    ?assertEqual([
-        mk_shard("n1", 11, ?RING_END),
-        mk_shard("n2", 0, 4),
-        mk_shard("n2", 5, 10)
-    ], lists:sort(Reps2)),
-
-    % One worker is available and one needs to be replaced. Replacement will be
-    % from two split shards
-    Workers3 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}]),
-    AllShards3 = [
-        mk_shard("n1", 11, ?RING_END),
-        mk_shard("n2", 0, 4),
-        mk_shard("n2", 5, 10),
-        mk_shard("n2", 11, ?RING_END)
-    ],
-    {WorkersRes3, Dead3, Reps3} = find_replacements(Workers3, AllShards3),
-    ?assertEqual(mk_workers([{"n2", 11, ?RING_END}]), WorkersRes3),
-    ?assertEqual(mk_workers([{"n1", 0, 10}]), Dead3),
-    ?assertEqual([
-        mk_shard("n2", 0, 4),
-        mk_shard("n2", 5, 10)
-    ], lists:sort(Reps3)),
-
-    % All workers are available. Make sure they are not killed even if there is
-    % a longer (single) shard to replace them.
-    Workers4 = mk_workers([{"n1", 0, 10}, {"n1", 11, ?RING_END}]),
-    AllShards4 = [
-        mk_shard("n1", 0, 10),
-        mk_shard("n1", 11, ?RING_END),
-        mk_shard("n2", 0, 4),
-        mk_shard("n2", 5, 10),
-        mk_shard("n3", 0, ?RING_END)
-    ],
-    {WorkersRes4, Dead4, Reps4} = find_replacements(Workers4, AllShards4),
-    ?assertEqual(Workers4, WorkersRes4),
-    ?assertEqual([], Dead4),
-    ?assertEqual([], Reps4).
-
-
-mk_workers(NodesRanges) ->
-    mk_workers(NodesRanges, nil).
-
-mk_workers(NodesRanges, Val) ->
-    orddict:from_list([{mk_shard(N, B, E), Val} || {N, B, E} <- NodesRanges]).
-
-
-mk_shard(Name, B, E) ->
-    Node = list_to_atom(Name),
-    BName = list_to_binary(Name),
-    #shard{name = BName, node = Node, range = [B, E]}.
-
-
-find_split_shard_replacements_test() ->
-    % One worker is can be replaced and one can't
-    Dead1 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}], 42),
-    Shards1 = [
-        mk_shard("n1", 0, 4),
-        mk_shard("n1", 5, 10),
-        mk_shard("n3", 11, ?RING_END)
-    ],
-    {Workers1, ShardsLeft1} = find_split_shard_replacements(Dead1, Shards1),
-    ?assertEqual(mk_workers([{"n1", 0, 4}, {"n1", 5, 10}], 42), Workers1),
-    ?assertEqual([mk_shard("n3", 11, ?RING_END)], ShardsLeft1),
-
-    % All workers can be replaced - one by 1 shard, another by 3 smaller shards
-    Dead2 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}], 42),
-    Shards2 = [
-        mk_shard("n1", 0, 10),
-        mk_shard("n2", 11, 12),
-        mk_shard("n2", 13, 14),
-        mk_shard("n2", 15, ?RING_END)
-    ],
-    {Workers2, ShardsLeft2} = find_split_shard_replacements(Dead2, Shards2),
-    ?assertEqual(mk_workers([
-       {"n1", 0, 10},
-       {"n2", 11, 12},
-       {"n2", 13, 14},
-       {"n2", 15, ?RING_END}
-    ], 42), Workers2),
-    ?assertEqual([], ShardsLeft2),
-
-    % No workers can be replaced. Ranges match but they are on different nodes
-    Dead3 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}], 42),
-    Shards3 = [
-        mk_shard("n2", 0, 10),
-        mk_shard("n3", 11, ?RING_END)
-    ],
-    {Workers3, ShardsLeft3} = find_split_shard_replacements(Dead3, Shards3),
-    ?assertEqual([], Workers3),
-    ?assertEqual(Shards3, ShardsLeft3).
+%% unpack_seq_setup() ->
+%%     meck:new(mem3),
+%%     meck:new(fabric_view),
+%%     meck:expect(mem3, get_shard, fun(_, _, _) -> {ok, #shard{}} end),
+%%     meck:expect(fabric_ring, is_progress_possible, fun(_) -> true end),
+%%     ok.
+%%
+%%
+%% unpack_seqs_test_() ->
+%%     {
+%%         setup,
+%%         fun unpack_seq_setup/0,
+%%         fun (_) -> meck:unload() end,
+%%         [
+%%             t_unpack_seqs()
+%%         ]
+%%     }.
+%%
+%%
+%% t_unpack_seqs() ->
+%%     ?_test(begin
+%%         % BigCouch 0.3 style.
+%%         assert_shards("23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+%%         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+%%         "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA"),
+%%
+%%         % BigCouch 0.4 style.
+%%         assert_shards([23423,<<"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+%%         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+%%         "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA">>]),
+%%
+%%         % BigCouch 0.4 style (as string).
+%%         assert_shards("[23423,\"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+%%         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+%%         "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"),
+%%         assert_shards("[23423 ,\"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+%%         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+%%         "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"),
+%%         assert_shards("[23423, \"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+%%         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+%%         "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"),
+%%         assert_shards("[23423 , \"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+%%         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+%%         "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"]"),
+%%
+%%         % with internal hypen
+%%         assert_shards("651-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
+%%         "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
+%%         "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"),
+%%         assert_shards([651,"g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwNDLXMwBCwxygOFMiQ"
+%%         "5L8____sxJTcalIUgCSSfZgReE4FTmAFMWDFYXgVJQAUlQPVuSKS1EeC5BkaABSQHXz8"
+%%         "VgJUbgAonB_VqIPfoUHIArvE7T6AUQh0I1-WQAzp1XB"]),
+%%
+%%         % CouchDB 1.2 style
+%%         assert_shards("\"23423-g1AAAAE7eJzLYWBg4MhgTmHgS0ktM3QwND"
+%%         "LXMwBCwxygOFMiQ5L8____sxIZcKlIUgCSSfZgRUw4FTmAFMWDFTHiVJQAUlSPX1Ee"
+%%         "C5BkaABSQHXzsxKZ8StcAFG4H4_bIAoPQBTeJ2j1A4hCUJBkAQC7U1NA\"")
+%%     end).
+%%
+%%
+%% assert_shards(Packed) ->
+%%     ?assertMatch([{#shard{},_}|_], unpack_seqs(Packed, <<"foo">>)).
+%%
+%%
+%% find_replacements_test() ->
+%%     % None of the workers are in the live list of shard but there is a
+%%     % replacement on n3 for the full range. It should get picked instead of
+%%     % the two smaller one on n2.
+%%     Workers1 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}]),
+%%     AllShards1 = [
+%%         mk_shard("n1", 11, ?RING_END),
+%%         mk_shard("n2", 0, 4),
+%%         mk_shard("n2", 5, 10),
+%%         mk_shard("n3", 0, ?RING_END)
+%%     ],
+%%     {WorkersRes1, Dead1, Reps1} = find_replacements(Workers1, AllShards1),
+%%     ?assertEqual([], WorkersRes1),
+%%     ?assertEqual(Workers1, Dead1),
+%%     ?assertEqual([mk_shard("n3", 0, ?RING_END)], Reps1),
+%%
+%%     % None of the workers are in the live list of shards and there is a
+%%     % split replacement from n2 (range [0, 10] replaced with [0, 4], [5, 10])
+%%     Workers2 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}]),
+%%     AllShards2 = [
+%%         mk_shard("n1", 11, ?RING_END),
+%%         mk_shard("n2", 0, 4),
+%%         mk_shard("n2", 5, 10)
+%%     ],
+%%     {WorkersRes2, Dead2, Reps2} = find_replacements(Workers2, AllShards2),
+%%     ?assertEqual([], WorkersRes2),
+%%     ?assertEqual(Workers2, Dead2),
+%%     ?assertEqual([
+%%         mk_shard("n1", 11, ?RING_END),
+%%         mk_shard("n2", 0, 4),
+%%         mk_shard("n2", 5, 10)
+%%     ], lists:sort(Reps2)),
+%%
+%%     % One worker is available and one needs to be replaced. Replacement will be
+%%     % from two split shards
+%%     Workers3 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}]),
+%%     AllShards3 = [
+%%         mk_shard("n1", 11, ?RING_END),
+%%         mk_shard("n2", 0, 4),
+%%         mk_shard("n2", 5, 10),
+%%         mk_shard("n2", 11, ?RING_END)
+%%     ],
+%%     {WorkersRes3, Dead3, Reps3} = find_replacements(Workers3, AllShards3),
+%%     ?assertEqual(mk_workers([{"n2", 11, ?RING_END}]), WorkersRes3),
+%%     ?assertEqual(mk_workers([{"n1", 0, 10}]), Dead3),
+%%     ?assertEqual([
+%%         mk_shard("n2", 0, 4),
+%%         mk_shard("n2", 5, 10)
+%%     ], lists:sort(Reps3)),
+%%
+%%     % All workers are available. Make sure they are not killed even if there is
+%%     % a longer (single) shard to replace them.
+%%     Workers4 = mk_workers([{"n1", 0, 10}, {"n1", 11, ?RING_END}]),
+%%     AllShards4 = [
+%%         mk_shard("n1", 0, 10),
+%%         mk_shard("n1", 11, ?RING_END),
+%%         mk_shard("n2", 0, 4),
+%%         mk_shard("n2", 5, 10),
+%%         mk_shard("n3", 0, ?RING_END)
+%%     ],
+%%     {WorkersRes4, Dead4, Reps4} = find_replacements(Workers4, AllShards4),
+%%     ?assertEqual(Workers4, WorkersRes4),
+%%     ?assertEqual([], Dead4),
+%%     ?assertEqual([], Reps4).
+%%
+%%
+%% mk_workers(NodesRanges) ->
+%%     mk_workers(NodesRanges, nil).
+%%
+%% mk_workers(NodesRanges, Val) ->
+%%     orddict:from_list([{mk_shard(N, B, E), Val} || {N, B, E} <- NodesRanges]).
+%%
+%%
+%% mk_shard(Name, B, E) ->
+%%     Node = list_to_atom(Name),
+%%     BName = list_to_binary(Name),
+%%     #shard{name = BName, node = Node, range = [B, E]}.
+%%
+%%
+%% find_split_shard_replacements_test() ->
+%%     % One worker is can be replaced and one can't
+%%     Dead1 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}], 42),
+%%     Shards1 = [
+%%         mk_shard("n1", 0, 4),
+%%         mk_shard("n1", 5, 10),
+%%         mk_shard("n3", 11, ?RING_END)
+%%     ],
+%%     {Workers1, ShardsLeft1} = find_split_shard_replacements(Dead1, Shards1),
+%%     ?assertEqual(mk_workers([{"n1", 0, 4}, {"n1", 5, 10}], 42), Workers1),
+%%     ?assertEqual([mk_shard("n3", 11, ?RING_END)], ShardsLeft1),
+%%
+%%     % All workers can be replaced - one by 1 shard, another by 3 smaller shards
+%%     Dead2 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}], 42),
+%%     Shards2 = [
+%%         mk_shard("n1", 0, 10),
+%%         mk_shard("n2", 11, 12),
+%%         mk_shard("n2", 13, 14),
+%%         mk_shard("n2", 15, ?RING_END)
+%%     ],
+%%     {Workers2, ShardsLeft2} = find_split_shard_replacements(Dead2, Shards2),
+%%     ?assertEqual(mk_workers([
+%%        {"n1", 0, 10},
+%%        {"n2", 11, 12},
+%%        {"n2", 13, 14},
+%%        {"n2", 15, ?RING_END}
+%%     ], 42), Workers2),
+%%     ?assertEqual([], ShardsLeft2),
+%%
+%%     % No workers can be replaced. Ranges match but they are on different nodes
+%%     Dead3 = mk_workers([{"n1", 0, 10}, {"n2", 11, ?RING_END}], 42),
+%%     Shards3 = [
+%%         mk_shard("n2", 0, 10),
+%%         mk_shard("n3", 11, ?RING_END)
+%%     ],
+%%     {Workers3, ShardsLeft3} = find_split_shard_replacements(Dead3, Shards3),
+%%     ?assertEqual([], Workers3),
+%%     ?assertEqual(Shards3, ShardsLeft3).

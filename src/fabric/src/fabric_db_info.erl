@@ -155,34 +155,34 @@ get_cluster_info(Shards) ->
     {ok, [{q, Q}, {n, N}, {w, WR}, {r, WR}]}.
 
 
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-get_cluster_info_test_() ->
-    {
-        setup,
-        fun setup/0,
-        fun get_cluster_info_test_generator/1
-    }.
-
-
-setup() ->
-    Quorums = [1, 2, 3],
-    Shards = [1, 3, 5, 8, 12, 24],
-    [{N, Q} || N <- Quorums, Q <- Shards].
-
-get_cluster_info_test_generator([]) ->
-    [];
-get_cluster_info_test_generator([{N, Q} | Rest]) ->
-    {generator,
-    fun() ->
-        Nodes = lists:seq(1, 8),
-        Shards = mem3_util:create_partition_map(<<"foo">>, N, Q, Nodes),
-        {ok, Info} = get_cluster_info(Shards),
-        [
-            ?_assertEqual(N, couch_util:get_value(n, Info)),
-            ?_assertEqual(Q, couch_util:get_value(q, Info))
-        ] ++ get_cluster_info_test_generator(Rest)
-    end}.
-
--endif.
+%% -ifdef(TEST).
+%% -include_lib("eunit/include/eunit.hrl").
+%%
+%% get_cluster_info_test_() ->
+%%     {
+%%         setup,
+%%         fun setup/0,
+%%         fun get_cluster_info_test_generator/1
+%%     }.
+%%
+%%
+%% setup() ->
+%%     Quorums = [1, 2, 3],
+%%     Shards = [1, 3, 5, 8, 12, 24],
+%%     [{N, Q} || N <- Quorums, Q <- Shards].
+%%
+%% get_cluster_info_test_generator([]) ->
+%%     [];
+%% get_cluster_info_test_generator([{N, Q} | Rest]) ->
+%%     {generator,
+%%     fun() ->
+%%         Nodes = lists:seq(1, 8),
+%%         Shards = mem3_util:create_partition_map(<<"foo">>, N, Q, Nodes),
+%%         {ok, Info} = get_cluster_info(Shards),
+%%         [
+%%             ?_assertEqual(N, couch_util:get_value(n, Info)),
+%%             ?_assertEqual(Q, couch_util:get_value(q, Info))
+%%         ] ++ get_cluster_info_test_generator(Rest)
+%%     end}.
+%%
+%% -endif.
