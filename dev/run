@@ -181,6 +181,12 @@ def setup_argparse():
         help="Optional key=val config overrides. Can be repeated",
     )
     parser.add_option(
+        "--erlang-config",
+        dest="erlang_config",
+        default="rel/files/sys.config",
+        help="Specify an alternative Erlang application configuration"
+    )
+    parser.add_option(
         "--degrade-cluster",
         dest="degrade_cluster",
         type=int,
@@ -222,6 +228,7 @@ def setup_context(opts, args):
         "haproxy": opts.haproxy,
         "haproxy_port": opts.haproxy_port,
         "config_overrides": opts.config_overrides,
+        "erlang_config": opts.erlang_config,
         "no_eval": opts.no_eval,
         "reset_logs": True,
         "procs": [],
@@ -559,7 +566,7 @@ def boot_node(ctx, node):
         "-args_file",
         os.path.join(node_etcdir, "vm.args"),
         "-config",
-        os.path.join(reldir, "files", "sys"),
+        os.path.join(ctx["rootdir"], ctx["erlang_config"]),
         "-couch_ini",
         os.path.join(node_etcdir, "default.ini"),
         os.path.join(node_etcdir, "local.ini"),
