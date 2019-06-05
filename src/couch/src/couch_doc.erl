@@ -374,6 +374,17 @@ rev_info({#doc{} = Doc, {Pos, [RevId | _]}}) ->
         body_sp = undefined,
         seq = undefined,
         rev = {Pos, RevId}
+    };
+rev_info({#{} = RevInfo, {Pos, [RevId | _]}}) ->
+    #{
+        deleted := Deleted,
+        sequence := Sequence
+    } = RevInfo,
+    #rev_info{
+        deleted = Deleted,
+        body_sp = undefined,
+        seq = Sequence,
+        rev = {Pos, RevId}
     }.
 
 is_deleted(#full_doc_info{rev_tree=Tree}) ->
