@@ -413,66 +413,66 @@ remove_finalizer(Args) ->
     couch_mrview_util:set_extra(Args, finalizer, null).
 
 
-remove_overlapping_shards_test() ->
-    Cb = undefined,
-
-    Shards = mk_cnts([[0, 10], [11, 20], [21, ?RING_END]], 3),
-
-    % Simple (exact) overlap
-    Shard1 = mk_shard("node-3", [11, 20]),
-    Shards1 = fabric_dict:store(Shard1, nil, Shards),
-    R1 = remove_overlapping_shards(Shard1, Shards1, Cb),
-    ?assertEqual([{0, 10}, {11, 20}, {21, ?RING_END}],
-        fabric_util:worker_ranges(R1)),
-    ?assert(fabric_dict:is_key(Shard1, R1)),
-
-    % Split overlap (shard overlap multiple workers)
-    Shard2 = mk_shard("node-3", [0, 20]),
-    Shards2 = fabric_dict:store(Shard2, nil, Shards),
-    R2 = remove_overlapping_shards(Shard2, Shards2, Cb),
-    ?assertEqual([{0, 20}, {21, ?RING_END}],
-        fabric_util:worker_ranges(R2)),
-    ?assert(fabric_dict:is_key(Shard2, R2)).
-
-
-get_shard_replacements_test() ->
-    Unused = [mk_shard(N, [B, E]) || {N, B, E} <- [
-        {"n1", 11, 20}, {"n1", 21, ?RING_END},
-        {"n2", 0, 4}, {"n2", 5, 10}, {"n2", 11, 20},
-        {"n3", 0, 21, ?RING_END}
-    ]],
-    Used = [mk_shard(N, [B, E]) || {N, B, E} <- [
-        {"n2", 21, ?RING_END},
-        {"n3", 0, 10}, {"n3", 11, 20}
-    ]],
-    Res = lists:sort(get_shard_replacements_int(Unused, Used)),
-    % Notice that [0, 10] range can be replaced by spawning the [0, 4] and [5,
-    % 10] workers on n1
-    Expect = [
-        {[0, 10], [mk_shard("n2", [0, 4]), mk_shard("n2", [5, 10])]},
-        {[11, 20], [mk_shard("n1", [11, 20]), mk_shard("n2", [11, 20])]},
-        {[21, ?RING_END], [mk_shard("n1", [21, ?RING_END])]}
-    ],
-    ?assertEqual(Expect, Res).
-
-
-mk_cnts(Ranges, NoNodes) ->
-    orddict:from_list([{Shard,nil}
-                       || Shard <-
-                              lists:flatten(lists:map(
-                                 fun(Range) ->
-                                         mk_shards(NoNodes,Range,[])
-                                 end, Ranges))]
-                     ).
-
-mk_shards(0,_Range,Shards) ->
-    Shards;
-mk_shards(NoNodes,Range,Shards) ->
-    Name ="node-" ++ integer_to_list(NoNodes),
-    mk_shards(NoNodes-1,Range, [mk_shard(Name, Range) | Shards]).
-
-
-mk_shard(Name, Range) ->
-    Node = list_to_atom(Name),
-    BName = list_to_binary(Name),
-    #shard{name = BName, node = Node, range = Range}.
+%% remove_overlapping_shards_test() ->
+%%     Cb = undefined,
+%%
+%%     Shards = mk_cnts([[0, 10], [11, 20], [21, ?RING_END]], 3),
+%%
+%%     % Simple (exact) overlap
+%%     Shard1 = mk_shard("node-3", [11, 20]),
+%%     Shards1 = fabric_dict:store(Shard1, nil, Shards),
+%%     R1 = remove_overlapping_shards(Shard1, Shards1, Cb),
+%%     ?assertEqual([{0, 10}, {11, 20}, {21, ?RING_END}],
+%%         fabric_util:worker_ranges(R1)),
+%%     ?assert(fabric_dict:is_key(Shard1, R1)),
+%%
+%%     % Split overlap (shard overlap multiple workers)
+%%     Shard2 = mk_shard("node-3", [0, 20]),
+%%     Shards2 = fabric_dict:store(Shard2, nil, Shards),
+%%     R2 = remove_overlapping_shards(Shard2, Shards2, Cb),
+%%     ?assertEqual([{0, 20}, {21, ?RING_END}],
+%%         fabric_util:worker_ranges(R2)),
+%%     ?assert(fabric_dict:is_key(Shard2, R2)).
+%%
+%%
+%% get_shard_replacements_test() ->
+%%     Unused = [mk_shard(N, [B, E]) || {N, B, E} <- [
+%%         {"n1", 11, 20}, {"n1", 21, ?RING_END},
+%%         {"n2", 0, 4}, {"n2", 5, 10}, {"n2", 11, 20},
+%%         {"n3", 0, 21, ?RING_END}
+%%     ]],
+%%     Used = [mk_shard(N, [B, E]) || {N, B, E} <- [
+%%         {"n2", 21, ?RING_END},
+%%         {"n3", 0, 10}, {"n3", 11, 20}
+%%     ]],
+%%     Res = lists:sort(get_shard_replacements_int(Unused, Used)),
+%%     % Notice that [0, 10] range can be replaced by spawning the [0, 4] and [5,
+%%     % 10] workers on n1
+%%     Expect = [
+%%         {[0, 10], [mk_shard("n2", [0, 4]), mk_shard("n2", [5, 10])]},
+%%         {[11, 20], [mk_shard("n1", [11, 20]), mk_shard("n2", [11, 20])]},
+%%         {[21, ?RING_END], [mk_shard("n1", [21, ?RING_END])]}
+%%     ],
+%%     ?assertEqual(Expect, Res).
+%%
+%%
+%% mk_cnts(Ranges, NoNodes) ->
+%%     orddict:from_list([{Shard,nil}
+%%                        || Shard <-
+%%                               lists:flatten(lists:map(
+%%                                  fun(Range) ->
+%%                                          mk_shards(NoNodes,Range,[])
+%%                                  end, Ranges))]
+%%                      ).
+%%
+%% mk_shards(0,_Range,Shards) ->
+%%     Shards;
+%% mk_shards(NoNodes,Range,Shards) ->
+%%     Name ="node-" ++ integer_to_list(NoNodes),
+%%     mk_shards(NoNodes-1,Range, [mk_shard(Name, Range) | Shards]).
+%%
+%%
+%% mk_shard(Name, Range) ->
+%%     Node = list_to_atom(Name),
+%%     BName = list_to_binary(Name),
+%%     #shard{name = BName, node = Node, range = Range}.
