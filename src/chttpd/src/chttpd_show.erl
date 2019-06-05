@@ -123,15 +123,14 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
     JsonDoc = couch_query_servers:json_doc(Doc),
     Cmd = [<<"updates">>, UpdateName],
-    W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     UpdateResp = couch_query_servers:ddoc_prompt(DDoc, Cmd, [JsonDoc, JsonReq]),
     JsonResp = case UpdateResp of
         [<<"up">>, {NewJsonDoc}, {JsonResp0}] ->
             case chttpd:header_value(Req, "X-Couch-Full-Commit", "false") of
             "true" ->
-                Options = [full_commit, {user_ctx, Req#httpd.user_ctx}, {w, W}];
+                Options = [full_commit, {user_ctx, Req#httpd.user_ctx}];
             _ ->
-                Options = [{user_ctx, Req#httpd.user_ctx}, {w, W}]
+                Options = [{user_ctx, Req#httpd.user_ctx}]
             end,
             NewDoc = couch_db:doc_from_json_obj_validate(Db, {NewJsonDoc}),
             couch_doc:validate_docid(NewDoc#doc.id),

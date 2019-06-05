@@ -108,43 +108,39 @@ maybe_add_csp_headers(Headers, _) ->
     Headers.
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
-    Args = couch_mrview_http:parse_params(Req, undefined),
-    ShardDbName = config:get("mem3", "shards_db", "_dbs"),
-    %% shard_db is not sharded but mem3:shards treats it as an edge case
-    %% so it can be pushed thru fabric
-    {ok, Info} = fabric:get_db_info(ShardDbName),
-    Etag = couch_httpd:make_etag({Info}),
-    Options = [{user_ctx, Req#httpd.user_ctx}],
+    % TODO: Support args and options properly, transform
+    % this back into a fold call similar to the old
+    % version.
+    %% Args = couch_mrview_http:parse_params(Req, undefined),
+    % Eventually the Etag for this request will be derived
+    % from the \xFFmetadataVersion key in fdb
+    Etag = <<"foo">>,
+    %% Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = chttpd:etag_respond(Req, Etag, fun() ->
-        {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"ETag",Etag}]),
-        VAcc = #vacc{req=Req,resp=Resp},
-        fabric:all_docs(ShardDbName, Options, fun all_dbs_callback/2, VAcc, Args)
-    end),
-    case is_record(Resp, vacc) of
-        true -> {ok, Resp#vacc.resp};
-        _ -> {ok, Resp}
-    end;
+        AllDbs = fabric2_db:list_dbs(),
+        chttpd:send_json(Req, AllDbs)
+    end);
 handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-all_dbs_callback({meta, _Meta}, #vacc{resp=Resp0}=Acc) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
-    {ok, Acc#vacc{resp=Resp1}};
-all_dbs_callback({row, Row}, #vacc{resp=Resp0}=Acc) ->
-    Prepend = couch_mrview_http:prepend_val(Acc),
-    case couch_util:get_value(id, Row) of <<"_design", _/binary>> ->
-        {ok, Acc};
-    DbName ->
-        {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
-        {ok, Acc#vacc{prepend=",", resp=Resp1}}
-    end;
-all_dbs_callback(complete, #vacc{resp=Resp0}=Acc) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "]"),
-    {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
-    {ok, Acc#vacc{resp=Resp2}};
-all_dbs_callback({error, Reason}, #vacc{resp=Resp0}=Acc) ->
-    {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
-    {ok, Acc#vacc{resp=Resp1}}.
+%% all_dbs_callback({meta, _Meta}, #vacc{resp=Resp0}=Acc) ->
+%%     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
+%%     {ok, Acc#vacc{resp=Resp1}};
+%% all_dbs_callback({row, Row}, #vacc{resp=Resp0}=Acc) ->
+%%     Prepend = couch_mrview_http:prepend_val(Acc),
+%%     case couch_util:get_value(id, Row) of <<"_design", _/binary>> ->
+%%         {ok, Acc};
+%%     DbName ->
+%%         {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
+%%         {ok, Acc#vacc{prepend=",", resp=Resp1}}
+%%     end;
+%% all_dbs_callback(complete, #vacc{resp=Resp0}=Acc) ->
+%%     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "]"),
+%%     {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
+%%     {ok, Acc#vacc{resp=Resp2}};
+%% all_dbs_callback({error, Reason}, #vacc{resp=Resp0}=Acc) ->
+%%     {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
+%%     {ok, Acc#vacc{resp=Resp1}}.
 
 handle_dbs_info_req(#httpd{method='POST'}=Req) ->
     chttpd:validate_ctype(Req, "application/json"),

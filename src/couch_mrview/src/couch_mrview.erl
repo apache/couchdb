@@ -173,8 +173,18 @@ join([H|[]], _, Acc) ->
 join([H|T], Sep, Acc) ->
     join(T, Sep, [Sep, H | Acc]).
 
+validate(#{} = Db, DDoc) ->
+    DbName = fabric2_db:name(Db),
+    IsPartitioned = fabric2_db:is_partitioned(Db),
+    validate(DbName, IsPartitioned, DDoc);
 
-validate(Db,  DDoc) ->
+validate(Db, DDoc) ->
+    DbName = couch_db:name(Db),
+    IsPartitioned = couch_db:is_partitioned(Db),
+    validate(DbName, IsPartitioned, DDoc).
+
+
+validate(DbName, IsDbPartitioned,  DDoc) ->
     ok = validate_ddoc_fields(DDoc#doc.body),
     GetName = fun
         (#mrview{map_names = [Name | _]}) -> Name;
@@ -203,9 +213,9 @@ validate(Db,  DDoc) ->
         language = Lang,
         views = Views,
         partitioned = Partitioned
-    }} = couch_mrview_util:ddoc_to_mrst(couch_db:name(Db), DDoc),
+    }} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
 
-    case {couch_db:is_partitioned(Db), Partitioned} of
+    case {IsDbPartitioned, Partitioned} of
         {false, true} ->
             throw({invalid_design_doc,
                 <<"partitioned option cannot be true in a "
