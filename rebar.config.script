@@ -160,7 +160,10 @@ DepDescs = [
 {jiffy,            "jiffy",            {tag, "CouchDB-1.0.4-1"}},
 {mochiweb,         "mochiweb",         {tag, "v2.20.0"}},
 {meck,             "meck",             {tag, "0.8.8"}},
-{recon,            "recon",            {tag, "2.5.0"}}
+{recon,            "recon",            {tag, "2.5.0"}},
+
+%% TMP - Until this is moved to a proper Apache repo
+{erlfdb,           "erlfdb",           {branch, "master"}}
 ],
 
 WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true},
@@ -175,6 +178,8 @@ end,
 BaseUrl = "https://github.com/apache/",
 
 MakeDep = fun
+    ({erlfdb, _, Version}) ->
+        {erlfdb, ".*", {git, "https://github.com/cloudant-labs/couchdb-erlfdb", {branch, "master"}}};
     ({AppName, {url, Url}, Version}) ->
         {AppName, ".*", {git, Url, Version}};
     ({AppName, {url, Url}, Version, Options}) ->
