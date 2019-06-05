@@ -227,10 +227,25 @@ python-black-update: .venv/bin/black
 elixir: export MIX_ENV=integration
 elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 \
+	@dev/run "$(TEST_OPTS)" \
+		-a adm:pass \
+		-n 1 \
 		--enable-erlang-views \
 		--locald-config test/elixir/test/config/test-config.ini \
-		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+		--no-eval \
+		--erlang-config rel/files/eunit.config \
+		'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+
+.PHONY: elixir-only
+elixir-only: devclean
+	@dev/run "$(TEST_OPTS)" \
+		-a adm:pass \
+		-n 1 \
+		--enable-erlang-views \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--no-eval \
+		--erlang-config rel/files/eunit.config \
+		'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test

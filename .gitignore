@@ -11,6 +11,7 @@
 .DS_Store
 .vscode
 .rebar/
+.erlfdb/
 .eunit/
 cover/
 core
@@ -48,6 +49,7 @@ src/couch/priv/icu_driver/couch_icu_driver.d
 src/mango/src/mango_cursor_text.nocompile
 src/docs/
 src/emilio/
+src/erlfdb/
 src/ets_lru/
 src/excoveralls/
 src/fauxton/
@@ -58,6 +60,7 @@ src/hyper/
 src/ibrowse/
 src/idna/
 src/ioq/
+src/hqueue/
 src/jiffy/
 src/ken/
 src/khash/
