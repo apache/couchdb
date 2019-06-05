@@ -100,7 +100,7 @@ defmodule BasicsTest do
     db_name = context[:db_name]
     {:ok, _} = create_doc(db_name, sample_doc_foo())
     resp = Couch.get("/#{db_name}/foo", query: %{:local_seq => true})
-    assert resp.body["_local_seq"] == 1, "Local seq value == 1"
+    assert is_binary(resp.body["_local_seq"]), "Local seq value is a binary"
   end
 
   @tag :with_db
