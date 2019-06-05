@@ -25,7 +25,7 @@
     error_info/1, parse_form/1, json_body/1, json_body_obj/1, body/1,
     doc_etag/1, make_etag/1, etag_respond/3, etag_match/2,
     partition/1, serve_file/3, serve_file/4,
-    server_header/0, start_chunked_response/3,send_chunk/2,
+    server_header/0, start_chunked_response/3,send_chunk/2,last_chunk/1,
     start_response_length/4, send/2, start_json_response/2,
     start_json_response/3, end_json_response/1, send_response/4,
     send_response_no_cors/4,
@@ -746,7 +746,14 @@ start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
 send_chunk({remote, _Pid, _Ref} = Resp, Data) ->
     couch_httpd:send_chunk(Resp, Data);
 send_chunk(Resp, Data) ->
-    Resp:write_chunk(Data),
+    case iolist_size(Data) of
+        0 -> ok; % do nothing
+        _ -> Resp:write_chunk(Data)
+    end,
+    {ok, Resp}.
+
+last_chunk(Resp) ->
+    Resp:write_chunk([]),
     {ok, Resp}.
 
 send_response(Req, Code, Headers0, Body) ->
