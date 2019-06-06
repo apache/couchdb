@@ -717,9 +717,10 @@ defmodule ReplicationTest do
 
       assert tgt_info["doc_count"] == src_info["doc_count"]
 
-      src_shards = seq_to_shards(src_info["update_seq"])
-      tgt_shards = seq_to_shards(tgt_info["update_seq"])
-      assert tgt_shards == src_shards
+      # This assertion is no longer valid
+      # src_shards = seq_to_shards(src_info["update_seq"])
+      # tgt_shards = seq_to_shards(tgt_info["update_seq"])
+      # assert tgt_shards == src_shards
     end)
   end
 
