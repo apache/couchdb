@@ -43,11 +43,9 @@ stop_listener(Pid) ->
 init(Parent, DbName, Mod, Fun, St) ->
     {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
     Since = fabric2_db:get_update_seq(Db),
-    couch_log:error("XKCD: START LISTENER: ~s : ~p for ~p", [DbName, Since, Parent]),
     erlang:monitor(process, Parent),
     Parent ! {self(), initialized},
-    poll(DbName, Since, Mod, Fun, St),
-    couch_log:error("XKCD: STOP LISTENER for ~p", [Parent]).
+    poll(DbName, Since, Mod, Fun, St).
 
 
 poll(DbName, Since, Mod, Fun, St) ->
@@ -56,10 +54,8 @@ poll(DbName, Since, Mod, Fun, St) ->
             {ok, Db} ->
                 case fabric2_db:get_update_seq(Db) of
                     Since ->
-                        couch_log:error("XKCD: NO UPDATE: ~s :: ~p", [DbName, Since]),
                         {{ok, St}, Since};
                     Other ->
-                        couch_log:error("XKCD: UPDATED: ~s :: ~p -> ~p", [DbName, Since, Other]),
                         {Mod:Fun(DbName, updated, St), Other}
                 end;
             Error ->
