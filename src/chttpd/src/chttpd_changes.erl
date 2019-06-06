@@ -61,7 +61,6 @@ handle_db_changes(Args, Req, Db) ->
     handle_changes(Args, Req, Db, db).
 
 handle_changes(Args1, Req, Db, Type) ->
-    ReqPid = chttpd:header_value(Req, "XKCD", "<unknown>"),
     #changes_args{
         style = Style,
         filter = FilterName,
@@ -69,7 +68,6 @@ handle_changes(Args1, Req, Db, Type) ->
         dir = Dir,
         since = Since
     } = Args1,
-    couch_log:error("XKCD: STARTING CHANGES FEED ~p for ~s : ~p", [self(), ReqPid, Since]),
     Filter = configure_filter(FilterName, Style, Req, Db),
     Args = Args1#changes_args{filter_fun = Filter},
     % The type of changes feed depends on the supplied filter. If the query is
@@ -820,7 +818,6 @@ changes_enumerator(Change0, Acc) ->
             stop -> stop
         end,
         reset_heartbeat(),
-        couch_log:error("XKCD: CHANGE SEQ: ~p", [Seq]),
         {RealGo, Acc#changes_acc{
             seq = Seq,
             user_acc = UserAcc2,
@@ -919,22 +916,17 @@ deleted_item(_) -> [].
 
 % waits for a updated msg, if there are multiple msgs, collects them.
 wait_updated(Timeout, TimeoutFun, UserAcc) ->
-    couch_log:error("XKCD: WAITING FOR UPDATE", []),
     receive
     updated ->
-        couch_log:error("XKCD: GOT UPDATED", []),
         get_rest_updated(UserAcc);
     deleted ->
-        couch_log:error("XKCD: DB DELETED", []),
         {stop, UserAcc}
     after Timeout ->
         {Go, UserAcc2} = TimeoutFun(UserAcc),
         case Go of
         ok ->
-            couch_log:error("XKCD: WAIT UPDATED TIMEOUT, RETRY", []),
             ?MODULE:wait_updated(Timeout, TimeoutFun, UserAcc2);
         stop ->
-            couch_log:error("XKCD: WAIT UPDATED TIMEOUT STOP", []),
             {stop, UserAcc2}
         end
     end.
