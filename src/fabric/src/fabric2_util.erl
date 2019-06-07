@@ -24,6 +24,8 @@
 
     validate_security_object/1,
 
+    dbname_ends_with/2,
+
     get_value/2,
     get_value/3,
     to_hex/1,
@@ -111,6 +113,11 @@ validate_json_list_of_strings(Member, Props) ->
             MemberStr = binary_to_list(Member),
             throw(MemberStr ++ " must be a JSON list of strings")
     end.
+
+
+dbname_ends_with(#{} = Db, Suffix) when is_binary(Suffix) ->
+    DbName = fabric2_db:name(Db),
+    Suffix == filename:basename(DbName).
 
 
 get_value(Key, List) ->
