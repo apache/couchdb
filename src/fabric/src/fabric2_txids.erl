@@ -75,7 +75,7 @@ terminate(_, #{txids := TxIds}) ->
         fabric2_fdb:transactional(fun(Tx) ->
             lists:foreach(fun(TxId) ->
                 erlfdb:clear(Tx, TxId)
-            end)
+            end, TxIds)
         end)
     end,
     ok.
