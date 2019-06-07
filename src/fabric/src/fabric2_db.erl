@@ -120,7 +120,7 @@
     %% validate_dbname/1,
 
     %% make_doc/5,
-    new_revid/1
+    new_revid/2
 ]).
 
 
@@ -604,9 +604,7 @@ read_attachment(Db, DocId, AttId) ->
 
 write_attachment(Db, DocId, Att) ->
     Data = couch_att:fetch(data, Att),
-    {ok, AttId} = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:write_attachment(TxDb, DocId, Data)
-    end),
+    {ok, AttId} = fabric2_fdb:write_attachment(Db, DocId, Data),
     couch_att:store(data, {loc, Db, DocId, AttId}, Att).
 
 
@@ -630,33 +628,69 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
     end).
 
 
-new_revid(Doc) ->
+maybe_add_sys_db_callbacks(Db) ->
+    IsReplicatorDb = fabric2_util:dbname_ends_with(Db, <<"_replicator">>),
+
+    CfgUsersSuffix = config:get("couchdb", "users_db_suffix", "_users"),
+    IsCfgUsersDb = fabric2_util:dbname_ends_with(Db, ?l2b(CfgUsersSuffix)),
+    IsGlobalUsersDb = fabric2_util:dbname_ends_with(Db, <<"_users">>),
+    IsUsersDb = IsCfgUsersDb orelse IsGlobalUsersDb,
+
+    {BDU, ADR} = if
+        IsReplicatorDb ->
+            {
+                fun couch_replicator_docs:before_doc_update/3,
+                fun couch_replicator_docs:after_doc_read/2
+            };
+        IsUsersDb ->
+            {
+                fun fabric2_users_db:before_doc_update/3,
+                fun fabric2_users_db:after_doc_read/2
+            };
+        true ->
+            {undefined, undefined}
+    end,
+
+    Db#{
+        before_doc_update := BDU,
+        after_doc_read := ADR
+    }.
+
+
+new_revid(Db, Doc) ->
     #doc{
+        id = DocId,
         body = Body,
         revs = {OldStart, OldRevs},
         atts = Atts,
         deleted = Deleted
     } = Doc,
 
-    DigestedAtts = lists:foldl(fun(Att, Acc) ->
-        [N, T, M] = couch_att:fetch([name, type, md5], Att),
-        case M == <<>> of
-            true -> Acc;
-            false -> [{N, T, M} | Acc]
+    {NewAtts, AttSigInfo} = lists:mapfoldl(fun(Att, Acc) ->
+        [Name, Type, Data, Md5] = couch_att:fetch([name, type, data, md5], Att),
+        case Data of
+            {loc, _, _, _} ->
+                {Att, [{Name, Type, Md5} | Acc]};
+            _ ->
+                Att1 = couch_att:flush(Db, DocId, Att),
+                Att2 = couch_att:store(revpos, OldStart + 1, Att1),
+                {Att2, [{Name, Type, couch_att:fetch(md5, Att2)} | Acc]}
         end
     end, [], Atts),
 
-    Rev = case DigestedAtts of
-        Atts2 when length(Atts) =/= length(Atts2) ->
-            % We must have old style non-md5 attachments
-            list_to_binary(integer_to_list(couch_util:rand32()));
-        Atts2 ->
+    Rev = case length(Atts) == length(AttSigInfo) of
+        true ->
             OldRev = case OldRevs of [] -> 0; [OldRev0 | _] -> OldRev0 end,
-            SigTerm = [Deleted, OldStart, OldRev, Body, Atts2],
-            couch_hash:md5_hash(term_to_binary(SigTerm, [{minor_version, 1}]))
+            SigTerm = [Deleted, OldStart, OldRev, Body, AttSigInfo],
+            couch_hash:md5_hash(term_to_binary(SigTerm, [{minor_version, 1}]));
+        false ->
+            erlang:error(missing_att_info)
     end,
 
-    Doc#doc{revs = {OldStart + 1, [Rev | OldRevs]}}.
+    Doc#doc{
+        revs = {OldStart + 1, [Rev | OldRevs]},
+        atts = NewAtts
+    }.
 
 
 maybe_set_user_ctx(Db, Options) ->
@@ -970,12 +1004,11 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
     % Validate the doc update and create the
     % new revinfo map
     Doc2 = prep_and_validate(Db, Doc1, Target),
+
     #doc{
         deleted = NewDeleted,
         revs = {NewRevPos, [NewRev | NewRevPath]}
-    } = Doc3 = new_revid(Doc2),
-
-    Doc4 = update_attachment_revpos(Doc3),
+    } = Doc3 = new_revid(Db, Doc2),
 
     NewRevInfo = #{
         winner => undefined,
@@ -988,9 +1021,9 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
 
     % Gather the list of possible winnig revisions
     Possible = case Target == Winner of
-        true when not Doc4#doc.deleted ->
+        true when not Doc3#doc.deleted ->
             [NewRevInfo];
-        true when Doc4#doc.deleted ->
+        true when Doc3#doc.deleted ->
             case SecondPlace of
                 #{} -> [NewRevInfo, SecondPlace];
                 not_found -> [NewRevInfo]
@@ -1015,7 +1048,7 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
 
     ok = fabric2_fdb:write_doc(
             Db,
-            Doc4,
+            Doc3,
             NewWinner,
             Winner,
             ToUpdate,
@@ -1076,6 +1109,7 @@ update_doc_replicated(Db, Doc0, _Options) ->
     LeafPath = get_leaf_path(RevPos, Rev, AllLeafsFull),
     PrevRevInfo = find_prev_revinfo(RevPos, LeafPath),
     Doc2 = prep_and_validate(Db, Doc1, PrevRevInfo),
+    Doc3 = flush_doc_atts(Db, Doc2),
 
     % Possible winners are the previous winner and
     % the new DocRevInfo
@@ -1097,7 +1131,7 @@ update_doc_replicated(Db, Doc0, _Options) ->
 
     ok = fabric2_fdb:write_doc(
             Db,
-            Doc2,
+            Doc3,
             NewWinner,
             Winner,
             ToUpdate,
@@ -1119,19 +1153,20 @@ update_local_doc(Db, Doc0, _Options) ->
     {ok, {0, integer_to_binary(Rev)}}.
 
 
-update_attachment_revpos(#doc{revs = {RevPos, _Revs}, atts = Atts0} = Doc) ->
-    Atts = lists:map(fun(Att) ->
+flush_doc_atts(Db, Doc) ->
+    #doc{
+        id = DocId,
+        atts = Atts
+    } = Doc,
+    NewAtts = lists:map(fun(Att) ->
         case couch_att:fetch(data, Att) of
-            {loc, _Db, _DocId, _AttId} ->
-                % Attachment was already on disk
+            {loc, _, _, _} ->
                 Att;
             _ ->
-                % We will write this attachment with this update
-                % so mark it with the RevPos that will be written
-                couch_att:store(revpos, RevPos, Att)
+                couch_att:flush(Db, DocId, Att)
         end
-    end, Atts0),
-    Doc#doc{atts = Atts}.
+    end, Atts),
+    Doc#doc{atts = NewAtts}.
 
 
 get_winning_rev_futures(Db, Docs) ->

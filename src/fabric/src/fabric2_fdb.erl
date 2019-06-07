@@ -924,7 +924,7 @@ doc_to_fdb(Db, #doc{} = Doc) ->
         body = Body,
         atts = Atts,
         deleted = Deleted
-    } = doc_flush_atts(Db, Doc),
+    } = Doc,
 
     Key = erlfdb_tuple:pack({?DB_DOCS, Id, Start, Rev}, DbPrefix),
     Val = {Body, Atts, Deleted},
@@ -975,13 +975,6 @@ fdb_to_local_doc(_Db, DocId, Bin) when is_binary(Bin) ->
     };
 fdb_to_local_doc(_Db, _DocId, not_found) ->
     {not_found, missing}.
-
-
-doc_flush_atts(Db, Doc) ->
-    Atts = lists:map(fun(Att) ->
-        couch_att:flush(Db, Doc#doc.id, Att)
-    end, Doc#doc.atts),
-    Doc#doc{atts = Atts}.
 
 
 chunkify_attachment(Data) ->
