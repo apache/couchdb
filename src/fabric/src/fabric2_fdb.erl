@@ -926,14 +926,19 @@ doc_to_fdb(Db, #doc{} = Doc) ->
         deleted = Deleted
     } = Doc,
 
+    DiskAtts = lists:map(fun couch_att:to_disk_term/1, Atts),
+
     Key = erlfdb_tuple:pack({?DB_DOCS, Id, Start, Rev}, DbPrefix),
-    Val = {Body, Atts, Deleted},
+    Val = {Body, DiskAtts, Deleted},
     {Key, term_to_binary(Val, [{minor_version, 1}])}.
 
 
-fdb_to_doc(_Db, DocId, Pos, Path, Bin) when is_binary(Bin) ->
-    {Body, Atts, Deleted} = binary_to_term(Bin, [safe]),
-    #doc{
+fdb_to_doc(Db, DocId, Pos, Path, Bin) when is_binary(Bin) ->
+    {Body, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
+    Atts = lists:map(fun(Att) ->
+        couch_att:from_disk_term(Db, DocId, Att)
+    end, DiskAtts),
+    Doc0 = #doc{
         id = DocId,
         revs = {Pos, Path},
         body = Body,
