@@ -724,10 +724,9 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_revs_diff">>]}=Req, Db) ->
 db_req(#httpd{path_parts=[_,<<"_revs_diff">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
-db_req(#httpd{method='PUT',path_parts=[_,<<"_security">>],user_ctx=Ctx}=Req,
-        Db) ->
+db_req(#httpd{method = 'PUT',path_parts = [_, <<"_security">>]} = Req, Db) ->
     SecObj = chttpd:json_body(Req),
-    case fabric:set_security(Db, SecObj, [{user_ctx, Ctx}]) of
+    case fabric2_db:set_security(Db, SecObj) of
         ok ->
             send_json(Req, {[{<<"ok">>, true}]});
         Else ->
