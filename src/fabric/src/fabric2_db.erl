@@ -149,9 +149,10 @@ create(DbName, Options) ->
     % We cache outside of the transaction so that we're sure
     % that the transaction was committed.
     case Result of
-        #{} = Db ->
-            ok = fabric2_server:store(Db),
-            {ok, Db#{tx := undefined}};
+        #{} = Db0 ->
+            Db1 = maybe_add_sys_db_callbacks(Db0),
+            ok = fabric2_server:store(Db1),
+            {ok, Db1#{tx := undefined}};
         Error ->
             Error
     end.
@@ -167,9 +168,10 @@ open(DbName, Options) ->
             end),
             % Cache outside the transaction retry loop
             case Result of
-                #{} = Db ->
-                    ok = fabric2_server:store(Db),
-                    {ok, Db#{tx := undefined}};
+                #{} = Db0 ->
+                    Db1 = maybe_add_sys_db_callbacks(Db0),
+                    ok = fabric2_server:store(Db1),
+                    {ok, Db1#{tx := undefined}};
                 Error ->
                     Error
             end
@@ -552,18 +554,19 @@ update_docs(Db, Docs) ->
     update_docs(Db, Docs, []).
 
 
-update_docs(Db, Docs, Options) ->
+update_docs(Db, Docs0, Options) ->
+    Docs1 = apply_before_doc_update(Db, Docs0, Options),
     Resps0 = case lists:member(replicated_changes, Options) of
         false ->
             fabric2_fdb:transactional(Db, fun(TxDb) ->
-                update_docs_interactive(TxDb, Docs, Options)
+                update_docs_interactive(TxDb, Docs1, Options)
             end);
         true ->
             lists:map(fun(Doc) ->
                 fabric2_fdb:transactional(Db, fun(TxDb) ->
                     update_doc_int(TxDb, Doc, Options)
                 end)
-            end, Docs)
+            end, Docs1)
     end,
     % Convert errors
     Resps1 = lists:map(fun(Resp) ->
@@ -880,6 +883,19 @@ find_possible_ancestors(RevInfos, MissingRevs) ->
             false -> []
         end
     end, RevInfos).
+
+
+apply_before_doc_update(Db, Docs, Options) ->
+    #{before_doc_update := BDU} = Db,
+    UpdateType = case lists:member(replicated_changes, Options) of
+        true -> replicated_changes;
+        false -> interactive_edit
+    end,
+    if BDU == undefined -> Docs; true ->
+        lists:map(fun(Doc) ->
+            BDU(Doc, Db, UpdateType)
+        end, Docs)
+    end.
 
 
 update_doc_int(#{} = Db, #doc{} = Doc, Options) ->

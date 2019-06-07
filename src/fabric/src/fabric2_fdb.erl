@@ -944,7 +944,13 @@ fdb_to_doc(Db, DocId, Pos, Path, Bin) when is_binary(Bin) ->
         body = Body,
         atts = Atts,
         deleted = Deleted
-    };
+    },
+
+    case Db of
+        #{after_doc_read := undefined} -> Doc0;
+        #{after_doc_read := ADR} -> ADR(Doc0, Db)
+    end;
+
 fdb_to_doc(_Db, _DocId, _Pos, _Path, not_found) ->
     {not_found, missing}.
 
