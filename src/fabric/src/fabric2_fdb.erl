@@ -338,7 +338,7 @@ set_config(#{} = Db, ConfigKey, ConfigVal) ->
 
     Key = erlfdb_tuple:pack({?DB_CONFIG, ConfigKey}, DbPrefix),
     erlfdb:set(Tx, Key, ConfigVal),
-    bump_metadata_version(Tx).
+    bump_db_version(Db).
 
 
 get_stat(#{} = Db, StatKey) ->
