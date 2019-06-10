@@ -197,6 +197,9 @@ get_callback_acc(Callback) when is_function(Callback, 1) ->
     {fun(Ev, _) -> Callback(Ev) end, ok}.
 
 
+configure_filter(Filter, _Style, _Req, _Db) when is_tuple(Filter) ->
+    % Filter has already been configured
+    Filter;
 configure_filter("_doc_ids", Style, Req, _Db) ->
     {doc_ids, Style, get_doc_ids(Req)};
 configure_filter("_selector", Style, Req, _Db) ->
