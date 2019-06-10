@@ -1196,8 +1196,13 @@ prep_and_validate(Db, NewDoc, PrevRevInfo) ->
         _ -> false
     end,
 
+    WasDeleted = case PrevRevInfo of
+        not_found -> false;
+        #{deleted := D} -> D
+    end,
+
     PrevDoc = case HasStubs orelse (HasVDUs and not IsDDoc) of
-        true when PrevRevInfo /= not_found ->
+        true when PrevRevInfo /= not_found, not WasDeleted ->
             case fabric2_fdb:get_doc_body(Db, NewDoc#doc.id, PrevRevInfo) of
                 #doc{} = PDoc -> PDoc;
                 {not_found, _} -> nil
