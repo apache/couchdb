@@ -130,6 +130,7 @@ SubDirs = [
     "src/ddoc_cache",
     "src/dreyfus",
     "src/fabric",
+    "src/couch_jobs",
     "src/global_changes",
     "src/ioq",
     "src/ken",
