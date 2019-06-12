@@ -84,6 +84,7 @@ SubDirs = [
     "src/couch_tests",
     "src/ddoc_cache",
     "src/fabric",
+    "src/couch_jobs",
     "src/global_changes",
     "src/mango",
     "src/rexi",
