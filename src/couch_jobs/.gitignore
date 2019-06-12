@@ -1,0 +1,4 @@
+*.beam
+.eunit
+ebin/couch_jobs.app
+.DS_Store
