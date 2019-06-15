@@ -345,7 +345,7 @@ make_text_field_name([P | Rest], Type) ->
 
 
 validate_index_info(IndexInfo) ->
-    IdxTypes = case module_loaded(dreyfus_index) of
+    IdxTypes = case clouseau_rpc:connected() of
         true ->
             [mango_idx_view, mango_idx_text];
         false ->
