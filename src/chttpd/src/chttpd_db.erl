@@ -334,7 +334,8 @@ handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) ->
     DbName = fabric2_db:name(Db),
-    case ddoc_cache:open(DbName, <<"_design/", Name/binary>>) of
+%%    case ddoc_cache:open(DbName, <<"_design/", Name/binary>>) of
+    case fabric2_db:open_doc(Db, <<"_design/", Name/binary>>) of
     {ok, DDoc} ->
         Handler = chttpd_handlers:design_handler(Action, fun bad_action_req/3),
         Handler(Req, Db, DDoc);
