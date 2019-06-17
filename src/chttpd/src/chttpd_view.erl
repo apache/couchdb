@@ -43,10 +43,9 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Args = couch_mrview_http:parse_params(Req, Keys),
     Max = chttpd:chunked_response_buffer_size(),
+    Fun = fun view_cb/2,
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
-    Options = [{user_ctx, Req#httpd.user_ctx}],
-    {ok, Resp} = fabric:query_view(Db, Options, DDoc, ViewName,
-            fun view_cb/2, VAcc, Args),
+    {ok, Resp} = couch_views:query(Db, DDoc, ViewName, Fun, VAcc, Args),
     {ok, Resp#vacc.resp}.
 
 

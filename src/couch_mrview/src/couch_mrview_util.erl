@@ -497,7 +497,7 @@ fold_reduce({NthRed, Lang, View}, Fun,  Acc, Options) ->
 
 
 validate_args(Db, DDoc, Args0) ->
-    {ok, State} = couch_mrview_index:init(Db, DDoc),
+    {ok, State} = couch_mrview_util:ddoc_to_mrst(fabric2_db:name(Db), DDoc),
     Args1 = apply_limit(State#mrst.partitioned, Args0),
     validate_args(State, Args1).
 
