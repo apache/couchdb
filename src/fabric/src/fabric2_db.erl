@@ -20,6 +20,7 @@
 
     list_dbs/0,
     list_dbs/1,
+    list_dbs/3,
 
     is_admin/1,
     check_is_admin/1,
@@ -194,8 +195,30 @@ list_dbs() ->
 
 
 list_dbs(Options) ->
+    Callback = fun(DbName, Acc) -> [DbName | Acc] end,
+    DbNames = fabric2_fdb:transactional(fun(Tx) ->
+        fabric2_fdb:list_dbs(Tx, Callback, [], Options)
+    end),
+    lists:reverse(DbNames).
+
+
+list_dbs(UserFun, UserAcc0, Options) ->
+    FoldFun = fun
+        (DbName, Acc) -> maybe_stop(UserFun({row, [{id, DbName}]}, Acc))
+    end,
     fabric2_fdb:transactional(fun(Tx) ->
-        fabric2_fdb:list_dbs(Tx, Options)
+        try
+            UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
+            UserAcc2 = fabric2_fdb:list_dbs(
+                    Tx,
+                    FoldFun,
+                    UserAcc1,
+                    Options
+                ),
+            {ok, maybe_stop(UserFun(complete, UserAcc2))}
+        catch throw:{stop, FinalUserAcc} ->
+            {ok, FinalUserAcc}
+        end
     end).
 
 
@@ -406,6 +429,7 @@ open_doc(#{} = Db, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, _Options) ->
 open_doc(#{} = Db, DocId, Options) ->
     NeedsTreeOpts = [revs_info, conflicts, deleted_conflicts],
     NeedsTree = (Options -- NeedsTreeOpts /= Options),
+    OpenDeleted = lists:member(deleted, Options),
     fabric2_fdb:transactional(Db, fun(TxDb) ->
         Revs = case NeedsTree of
             true -> fabric2_fdb:get_all_revs(TxDb, DocId);
@@ -414,6 +438,8 @@ open_doc(#{} = Db, DocId, Options) ->
         if Revs == [] -> {not_found, missing}; true ->
             #{winner := true} = RI = lists:last(Revs),
             case fabric2_fdb:get_doc_body(TxDb, DocId, RI) of
+                #doc{deleted = true} when not OpenDeleted ->
+                    {not_found, deleted};
                 #doc{} = Doc ->
                     apply_open_doc_opts(Doc, Revs, Options);
                 Else ->
@@ -451,8 +477,10 @@ open_doc_revs(Db, DocId, Revs, Options) ->
                         rev_path => RevPath
                     },
                     case fabric2_fdb:get_doc_body(TxDb, DocId, RevInfo) of
-                        #doc{} = Doc -> {ok, Doc};
-                        Else -> {Else, {Pos, Rev}}
+                        #doc{} = Doc ->
+                            apply_open_doc_opts(Doc, AllRevInfos, Options);
+                        Else ->
+                            {Else, {Pos, Rev}}
                     end
             end
         end, Found),
@@ -615,9 +643,40 @@ fold_docs(Db, UserFun, UserAcc) ->
     fold_docs(Db, UserFun, UserAcc, []).
 
 
-fold_docs(Db, UserFun, UserAcc, Options) ->
+fold_docs(Db, UserFun, UserAcc0, Options) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:fold_docs(TxDb, UserFun, UserAcc, Options)
+        try
+            #{
+                db_prefix := DbPrefix
+            } = TxDb,
+
+            Prefix = erlfdb_tuple:pack({?DB_ALL_DOCS}, DbPrefix),
+            DocCount = get_doc_count(TxDb),
+
+            Meta = case lists:keyfind(update_seq, 1, Options) of
+                {_, true} ->
+                    UpdateSeq = fabric2_db:get_update_seq(TxDb),
+                    [{update_seq, UpdateSeq}];
+                _ ->
+                    []
+            end ++ [{total, DocCount}, {offset, null}],
+
+            UserAcc1 = maybe_stop(UserFun({meta, Meta}, UserAcc0)),
+
+            UserAcc2 = fabric2_fdb:fold_range(TxDb, Prefix, fun({K, V}, Acc) ->
+                {DocId} = erlfdb_tuple:unpack(K, Prefix),
+                RevId = erlfdb_tuple:unpack(V),
+                maybe_stop(UserFun({row, [
+                    {id, DocId},
+                    {key, DocId},
+                    {value, {[{rev, couch_doc:rev_to_str(RevId)}]}}
+                ]}, Acc))
+            end, UserAcc1, Options),
+
+            {ok, maybe_stop(UserFun(complete, UserAcc2))}
+        catch throw:{stop, FinalUserAcc} ->
+            {ok, FinalUserAcc}
+        end
     end).
 
 
@@ -627,7 +686,44 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc) ->
 
 fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:fold_changes(TxDb, SinceSeq, UserFun, UserAcc, Options)
+        try
+            #{
+                db_prefix := DbPrefix
+            } = TxDb,
+
+            Prefix = erlfdb_tuple:pack({?DB_CHANGES}, DbPrefix),
+
+            Dir = case fabric2_util:get_value(dir, Options, fwd) of
+                rev -> rev;
+                _ -> fwd
+            end,
+
+            StartKey = get_since_seq(TxDb, Dir, SinceSeq),
+            EndKey = case Dir of
+                rev -> fabric2_util:seq_zero_vs();
+                _ -> fabric2_util:seq_max_vs()
+            end,
+            FoldOpts = [
+                {start_key, StartKey},
+                {end_key, EndKey}
+            ] ++ Options,
+
+            {ok, fabric2_fdb:fold_range(TxDb, Prefix, fun({K, V}, Acc) ->
+                {SeqVS} = erlfdb_tuple:unpack(K, Prefix),
+                {DocId, Deleted, RevId} = erlfdb_tuple:unpack(V),
+
+                Change = #{
+                    id => DocId,
+                    sequence => fabric2_fdb:vs_to_seq(SeqVS),
+                    rev_id => RevId,
+                    deleted => Deleted
+                },
+
+                maybe_stop(UserFun(Change, Acc))
+            end, UserAcc, FoldOpts)}
+        catch throw:{stop, FinalUserAcc} ->
+            {ok, FinalUserAcc}
+        end
     end).
 
 
@@ -796,7 +892,6 @@ apply_open_doc_opts(Doc, Revs, Options) ->
     IncludeConflicts = lists:member(conflicts, Options),
     IncludeDelConflicts = lists:member(deleted_conflicts, Options),
     IncludeLocalSeq = lists:member(local_seq, Options),
-    ReturnDeleted = lists:member(deleted, Options),
 
     % This revs_info becomes fairly useless now that we're
     % not keeping old document bodies around...
@@ -827,14 +922,7 @@ apply_open_doc_opts(Doc, Revs, Options) ->
         [{local_seq, fabric2_fdb:vs_to_seq(SeqVS)}]
     end,
 
-    case Doc#doc.deleted and not ReturnDeleted of
-        true ->
-            {not_found, deleted};
-        false ->
-            {ok, Doc#doc{
-                meta = Meta1 ++ Meta2 ++ Meta3 ++ Meta4
-            }}
-    end.
+    {ok, Doc#doc{meta = Meta1 ++ Meta2 ++ Meta3 ++ Meta4}}.
 
 
 filter_found_revs(RevInfo, Revs) ->
@@ -1289,6 +1377,26 @@ check_duplicate_attachments(#doc{atts = Atts}) ->
     end, ordsets:new(), Atts).
 
 
+get_since_seq(Db, rev, <<>>) ->
+    get_since_seq(Db, rev, now);
+
+get_since_seq(_Db, _Dir, Seq) when Seq == <<>>; Seq == <<"0">>; Seq == 0->
+    fabric2_util:seq_zero_vs();
+
+get_since_seq(Db, Dir, Seq) when Seq == now; Seq == <<"now">> ->
+    CurrSeq = fabric2_fdb:get_last_change(Db),
+    get_since_seq(Db, Dir, CurrSeq);
+
+get_since_seq(_Db, _Dir, Seq) when is_binary(Seq), size(Seq) == 24 ->
+    fabric2_fdb:next_vs(fabric2_fdb:seq_to_vs(Seq));
+
+get_since_seq(Db, Dir, List) when is_list(List) ->
+    get_since_seq(Db, Dir, list_to_binary(List));
+
+get_since_seq(_Db, _Dir, Seq) ->
+    erlang:error({invalid_since_seq, Seq}).
+
+
 get_leaf_path(Pos, Rev, [{Pos, [{Rev, _RevInfo} | LeafPath]} | _]) ->
     LeafPath;
 get_leaf_path(Pos, Rev, [_WrongLeaf | RestLeafs]) ->
@@ -1353,3 +1461,8 @@ rev(Rev) when is_list(Rev); is_binary(Rev) ->
 rev({Seq, Hash} = Rev) when is_integer(Seq), is_binary(Hash) ->
     Rev.
 
+
+maybe_stop({ok, Acc}) ->
+    Acc;
+maybe_stop({stop, Acc}) ->
+    throw({stop, Acc}).
