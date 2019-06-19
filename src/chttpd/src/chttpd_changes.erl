@@ -871,15 +871,19 @@ changes_row(Results, Change, Acc) ->
 maybe_get_changes_doc(Value, #changes_acc{include_docs=true}=Acc) ->
     #changes_acc{
         db = Db,
-        doc_options = DocOpts,
+        doc_options = DocOpts0,
         conflicts = Conflicts,
         filter = Filter
     } = Acc,
-    Opts = case Conflicts of
+    OpenOpts = case Conflicts of
         true -> [deleted, conflicts];
         false -> [deleted]
     end,
-    load_doc(Db, Value, Opts, DocOpts, Filter);
+    DocOpts1 = case Conflicts of
+        true -> [conflicts | DocOpts0];
+        false -> DocOpts0
+    end,
+    load_doc(Db, Value, OpenOpts, DocOpts1, Filter);
 
 maybe_get_changes_doc(_Value, _Acc) ->
     [].

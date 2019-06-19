@@ -43,7 +43,8 @@ defmodule AllDocsTest do
     # Check _all_docs offset
     retry_until(fn ->
       resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "\"2\""}).body
-      assert resp["offset"] == 2
+      assert resp["offset"] == :null
+			assert Enum.at(resp["rows"], 0)["key"] == "2"
     end)
 
     # Confirm that queries may assume raw collation
