@@ -93,11 +93,18 @@ version() ->
     rpc({main, clouseau()}, version).
 
 connected() ->
-    case version() of
-        {'EXIT', noconnection} ->
-            false;
-        _ ->
-            true
+    HiddenNodes = erlang:nodes(hidden),
+    case lists:member(clouseau(), HiddenNodes) of
+        true ->
+            true;
+        false ->
+            % We might have just booted up, so let's send a test RPC
+            case (catch version()) of
+                {ok, _} ->
+                    true;
+                _Err ->
+                    false
+            end
     end.
 
 rpc(Ref, Msg) ->
