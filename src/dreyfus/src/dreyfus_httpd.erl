@@ -575,18 +575,25 @@ send_grouped_response(Req, {TotalHits, TotalGroupedHits, Groups}, UseNewApi) ->
     end,
     send_json(Req, 200, {GroupResponsePairs}).
 
-handle_error(Req, Db, DDoc, RetryCount, RetryPause, {exit, _}) ->
-    backoff_and_retry(Req, Db, DDoc, RetryCount, RetryPause);
-handle_error(Req, Db, DDoc, RetryCount, RetryPause, {{normal, _}, _}) ->
-    backoff_and_retry(Req, Db, DDoc, RetryPause, RetryCount);
+handle_error(Req, Db, DDoc, RetryCount, RetryPause, {exit, _} = Err) ->
+    backoff_and_retry(Req, Db, DDoc, RetryCount, RetryPause, Err);
+handle_error(Req, Db, DDoc, RetryCount, RetryPause, {{normal, _}, _} = Err) ->
+    backoff_and_retry(Req, Db, DDoc, RetryPause, RetryCount, Err);
 handle_error(Req, _Db, _DDoc, _RetryCount, _RetryPause, Reason) ->
     send_error(Req, Reason).
 
-backoff_and_retry(Req, Db, DDoc, RetryCount, RetryPause) ->
+backoff_and_retry(Req, Db, DDoc, RetryCount, RetryPause, Error) ->
     RetryLimit = list_to_integer(config:get("dreyfus", "retry_limit", "5")),
     case RetryCount > RetryLimit of
         true ->
-            send_error(Req, timeout);
+            case Error of
+                {exit, noconnection} ->
+                    SvcName = config:get("dreyfus", "name", "clouseau@127.0.0.1"),
+                    ErrMsg = "Could not connect to the Clouseau Java service at " ++ SvcName,
+                    send_error(Req, {ou_est_clouseau, ErrMsg});
+                _ ->
+                    send_error(Req, timeout)
+            end;
         false ->
             timer:sleep(RetryPause),
             handle_search_req(Req, Db, DDoc, RetryCount + 1, RetryPause * 2)
