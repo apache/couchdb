@@ -34,7 +34,10 @@ doc_fold_test_() ->
                 fun fold_docs_with_start_key/1,
                 fun fold_docs_with_end_key/1,
                 fun fold_docs_with_both_keys_the_same/1,
-                fun fold_docs_with_different_keys/1
+                fun fold_docs_with_different_keys/1,
+                fun fold_docs_with_limit/1,
+                fun fold_docs_with_skip/1,
+                fun fold_docs_with_skip_and_limit/1
             ]}
         }
     }.
@@ -50,7 +53,7 @@ setup() ->
             body = {[{<<"value">>, Val}]}
         },
         {ok, Rev} = fabric2_db:update_doc(Db, Doc, []),
-        {DocId, couch_doc:rev_to_str(Rev)}
+        {DocId, {[{rev, couch_doc:rev_to_str(Rev)}]}}
     end, lists:seq(1, ?DOC_COUNT)),
     {Db, lists:sort(DocIdRevs), Ctx}.
 
@@ -108,11 +111,58 @@ fold_docs_with_different_keys({Db, DocIdRevs, _}) ->
     end, lists:seq(1, 500)).
 
 
+fold_docs_with_limit({Db, DocIdRevs, _}) ->
+    lists:foreach(fun(Limit) ->
+        Opts1 = [{limit, Limit}],
+        {ok, {?DOC_COUNT, Rows1}} =
+                fabric2_db:fold_docs(Db, fun fold_fun/2, [], Opts1),
+        ?assertEqual(lists:sublist(DocIdRevs, Limit), lists:reverse(Rows1)),
+
+        Opts2 = [{dir, rev} | Opts1],
+        {ok, {?DOC_COUNT, Rows2}} =
+                fabric2_db:fold_docs(Db, fun fold_fun/2, [], Opts2),
+        ?assertEqual(
+                lists:sublist(lists:reverse(DocIdRevs), Limit),
+                lists:reverse(Rows2)
+            )
+    end, lists:seq(0, 51)).
+
+
+fold_docs_with_skip({Db, DocIdRevs, _}) ->
+    lists:foreach(fun(Skip) ->
+        Opts1 = [{skip, Skip}],
+        {ok, {?DOC_COUNT, Rows1}} =
+                fabric2_db:fold_docs(Db, fun fold_fun/2, [], Opts1),
+        Expect1 = case Skip > length(DocIdRevs) of
+            true -> [];
+            false -> lists:nthtail(Skip, DocIdRevs)
+        end,
+        ?assertEqual(Expect1, lists:reverse(Rows1)),
+
+        Opts2 = [{dir, rev} | Opts1],
+        {ok, {?DOC_COUNT, Rows2}} =
+                fabric2_db:fold_docs(Db, fun fold_fun/2, [], Opts2),
+        Expect2 = case Skip > length(DocIdRevs) of
+            true -> [];
+            false -> lists:nthtail(Skip, lists:reverse(DocIdRevs))
+        end,
+        ?assertEqual(Expect2, lists:reverse(Rows2))
+    end, lists:seq(0, 51)).
+
+
+fold_docs_with_skip_and_limit({Db, DocIdRevs, _}) ->
+    lists:foreach(fun(_) ->
+        check_skip_and_limit(Db, [], DocIdRevs),
+        check_skip_and_limit(Db, [{dir, rev}], lists:reverse(DocIdRevs))
+    end, lists:seq(1, 100)).
+
+
 check_all_combos(Db, StartKey, EndKey, Rows) ->
     Opts1 = make_opts(fwd, StartKey, EndKey, true),
     {ok, {?DOC_COUNT, Rows1}} =
             fabric2_db:fold_docs(Db, fun fold_fun/2, [], Opts1),
     ?assertEqual(lists:reverse(Rows), Rows1),
+    check_skip_and_limit(Db, Opts1, Rows),
 
     Opts2 = make_opts(fwd, StartKey, EndKey, false),
     {ok, {?DOC_COUNT, Rows2}} =
@@ -121,11 +171,13 @@ check_all_combos(Db, StartKey, EndKey, Rows) ->
         lists:reverse(all_but_last(Rows))
     end,
     ?assertEqual(Expect2, Rows2),
+    check_skip_and_limit(Db, Opts2, lists:reverse(Expect2)),
 
     Opts3 = make_opts(rev, StartKey, EndKey, true),
     {ok, {?DOC_COUNT, Rows3}} =
             fabric2_db:fold_docs(Db, fun fold_fun/2, [], Opts3),
     ?assertEqual(Rows, Rows3),
+    check_skip_and_limit(Db, Opts3, lists:reverse(Rows)),
 
     Opts4 = make_opts(rev, StartKey, EndKey, false),
     {ok, {?DOC_COUNT, Rows4}} =
@@ -133,8 +185,34 @@ check_all_combos(Db, StartKey, EndKey, Rows) ->
     Expect4 = if StartKey == undefined -> Rows; true ->
         tl(Rows)
     end,
-    ?assertEqual(Expect4, Rows4).
+    ?assertEqual(Expect4, Rows4),
+    check_skip_and_limit(Db, Opts4, lists:reverse(Expect4)).
 
+
+check_skip_and_limit(Db, Opts, []) ->
+    Skip = rand:uniform(?DOC_COUNT + 1) - 1,
+    Limit = rand:uniform(?DOC_COUNT + 1) - 1,
+    NewOpts = [{skip, Skip}, {limit, Limit} | Opts],
+    {ok, {?DOC_COUNT, OutRows}} =
+            fabric2_db:fold_docs(Db, fun fold_fun/2, [], NewOpts),
+    ?assertEqual([], OutRows);
+
+check_skip_and_limit(Db, Opts, Rows) ->
+    Skip = rand:uniform(length(Rows) + 1) - 1,
+    Limit = rand:uniform(?DOC_COUNT + 1 - Skip) - 1,
+
+    ExpectRows = case Skip >= length(Rows) of
+        true ->
+            [];
+        false ->
+            lists:sublist(lists:nthtail(Skip, Rows), Limit)
+    end,
+
+    SkipLimitOpts = [{skip, Skip}, {limit, Limit} | Opts],
+    {ok, {?DOC_COUNT, RevRows}} =
+            fabric2_db:fold_docs(Db, fun fold_fun/2, [], SkipLimitOpts),
+    OutRows = lists:reverse(RevRows),
+    ?assertEqual(ExpectRows, OutRows).
 
 
 make_opts(fwd, StartKey, EndKey, InclusiveEnd) ->
