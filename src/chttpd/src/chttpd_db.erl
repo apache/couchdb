@@ -16,6 +16,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
@@ -825,21 +826,151 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
     chttpd:end_delayed_json_response(Resp1).
 
-all_docs_view(Req, Db, _Keys, _OP) ->
-    % Args0 = couch_mrview_http:parse_params(Req, Keys),
-    % Args1 = Args0#mrargs{view_type=map},
-    % Args2 = fabric_util:validate_all_docs_args(Db, Args1),
-    % Args3 = set_namespace(OP, Args2),
-    Options = [{user_ctx, Req#httpd.user_ctx}],
+all_docs_view(Req, Db, Keys, OP) ->
+    Args0 = couch_mrview_http:parse_params(Req, Keys),
+    Args1 = set_namespace(OP, Args0),
     Max = chttpd:chunked_response_buffer_size(),
-    VAcc = #vacc{db=Db, req=Req, threshold=Max},
-    {ok, Resp} = fabric2_db:fold_docs(Db, fun view_cb/2, VAcc, Options),
-    {ok, Resp#vacc.resp}.
+    VAcc0 = #vacc{
+        db = Db,
+        req = Req,
+        threshold = Max
+    },
+    case Args1#mrargs.keys of
+        undefined ->
+            Options = [
+                {user_ctx, Req#httpd.user_ctx},
+                {dir, Args1#mrargs.direction},
+                {start_key, Args1#mrargs.start_key},
+                {end_key, Args1#mrargs.end_key},
+                {limit, Args1#mrargs.limit},
+                {skip, Args1#mrargs.skip},
+                {update_seq, Args1#mrargs.update_seq}
+            ],
+            Acc = {iter, Db, Args1, VAcc0},
+            {ok, {iter, _, _, Resp}} =
+                    fabric2_db:fold_docs(Db, fun view_cb/2, Acc, Options),
+            {ok, Resp#vacc.resp};
+        Keys0 when is_list(Keys0) ->
+            Keys1 = apply_args_to_keylist(Args1, Keys0),
+            %% namespace can be _set_ to `undefined`, so we
+            %% want simulate enum here
+            NS = case couch_util:get_value(namespace, Args1#mrargs.extra) of
+                <<"_all_docs">> -> <<"_all_docs">>;
+                <<"_design">> -> <<"_design">>;
+                <<"_local">> -> <<"_local">>;
+                _ -> <<"_all_docs">>
+            end,
+            TotalRows = fabric2_db:get_doc_count(Db, NS),
+            Meta = case Args1#mrargs.update_seq of
+                true ->
+                    UpdateSeq = fabric2_db:get_update_seq(Db),
+                    [{update_seq, UpdateSeq}];
+                false ->
+                    []
+            end ++ [{total, TotalRows}, {offset, null}],
+            {ok, VAcc1} = view_cb({meta, Meta}, VAcc0),
+            DocOpts = case Args1#mrargs.conflicts of
+                true -> [conflicts | Args1#mrargs.doc_options];
+                _ -> Args1#mrargs.doc_options
+            end ++ [{user_ctx, Req#httpd.user_ctx}],
+            IncludeDocs = Args1#mrargs.include_docs,
+            VAcc2 = lists:foldl(fun(DocId, Acc) ->
+                OpenOpts = [deleted | DocOpts],
+                Row0 = case fabric2_db:open_doc(Db, DocId, OpenOpts) of
+                    {not_found, missing} ->
+                        #view_row{key = DocId};
+                    {ok, #doc{deleted = true, revs = Revs}} ->
+                        {RevPos, [RevId | _]} = Revs,
+                        Value = {[
+                            {rev, couch_doc:rev_to_str({RevPos, RevId})},
+                            {deleted, true}
+                        ]},
+                        DocValue = if not IncludeDocs -> undefined; true ->
+                            null
+                        end,
+                        #view_row{
+                            key = DocId,
+                            id = DocId,
+                            value = Value,
+                            doc = DocValue
+                        };
+                    {ok, #doc{revs = Revs} = Doc0} ->
+                        {RevPos, [RevId | _]} = Revs,
+                        Value = {[
+                            {rev, couch_doc:rev_to_str({RevPos, RevId})}
+                        ]},
+                        DocValue = if not IncludeDocs -> undefined; true ->
+                            couch_doc:to_json_obj(Doc0, DocOpts)
+                        end,
+                        #view_row{
+                            key = DocId,
+                            id = DocId,
+                            value = Value,
+                            doc = DocValue
+                        }
+                end,
+                Row1 = fabric_view:transform_row(Row0),
+                {ok, NewAcc} = view_cb(Row1, Acc),
+                NewAcc
+            end, VAcc1, Keys1),
+            {ok, VAcc3} = view_cb(complete, VAcc2),
+            {ok, VAcc3#vacc.resp}
+    end.
+
+
+apply_args_to_keylist(Args, Keys0) ->
+    Keys1 = case Args#mrargs.direction of
+        fwd -> Keys0;
+        _ -> lists:reverse(Keys0)
+    end,
+    Keys2 = case Args#mrargs.skip < length(Keys1) of
+        true -> lists:nthtail(Args#mrargs.skip, Keys1);
+        false -> []
+    end,
+    case Args#mrargs.limit < length(Keys2) of
+        true -> lists:sublist(Keys2, Args#mrargs.limit);
+        false -> Keys2
+    end.
+
+
+view_cb({row, Row}, {iter, Db, Args, VAcc}) ->
+    NewRow = case lists:keymember(doc, 1, Row) of
+        true ->
+            chttpd_stats:incr_reads();
+        false when Args#mrargs.include_docs ->
+            {id, DocId} = lists:keyfind(id, 1, Row),
+            chttpd_stats:incr_reads(),
+            DocOpts = case Args#mrargs.conflicts of
+                true -> [conflicts | Args#mrargs.doc_options];
+                _ -> Args#mrargs.doc_options
+            end ++ [{user_ctx, (VAcc#vacc.req)#httpd.user_ctx}],
+            OpenOpts = [deleted | DocOpts],
+            DocMember = case fabric2_db:open_doc(Db, DocId, OpenOpts) of
+                {not_found, missing} ->
+                    [];
+                {ok, #doc{deleted = true}} ->
+                    [{doc, null}];
+                {ok, #doc{} = Doc} ->
+                    [{doc, couch_doc:to_json_obj(Doc, DocOpts)}]
+            end,
+            Row ++ DocMember;
+        _ ->
+            Row
+    end,
+    chttpd_stats:incr_rows(),
+    {Go, NewVAcc} = couch_mrview_http:view_cb({row, NewRow}, VAcc),
+    {Go, {iter, Db, Args, NewVAcc}};
+
+view_cb(Msg, {iter, Db, Args, VAcc}) ->
+    {Go, NewVAcc} = couch_mrview_http:view_cb(Msg, VAcc),
+    {Go, {iter, Db, Args, NewVAcc}};
 
 view_cb({row, Row} = Msg, Acc) ->
     case lists:keymember(doc, 1, Row) of
-        true -> chttpd_stats:incr_reads();
-        false -> ok
+        true ->
+            chttpd_stats:incr_reads();
+        false ->
+            ok
     end,
     chttpd_stats:incr_rows(),
     couch_mrview_http:view_cb(Msg, Acc);
@@ -2005,70 +2136,3 @@ bulk_get_json_error(DocId, Rev, Error, Reason) ->
                              {<<"rev">>, Rev},
                              {<<"error">>, Error},
                              {<<"reason">>, Reason}]}}]}).
-
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-monitor_attachments_test_() ->
-    {"ignore stubs",
-        fun () ->
-            Atts = [couch_att:new([{data, stub}])],
-            ?_assertEqual([], monitor_attachments(Atts))
-        end
-    }.
-
-parse_partitioned_opt_test_() ->
-    {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_should_allow_partitioned_db(),
-            t_should_throw_on_not_allowed_partitioned_db(),
-            t_returns_empty_array_for_partitioned_false(),
-            t_returns_empty_array_for_no_partitioned_qs()
-        ]
-    }.
-
-
-setup() ->
-    ok.
-
-teardown(_) ->
-    meck:unload().
-
-mock_request(Url) ->
-    Headers = mochiweb_headers:make([{"Host", "examples.com"}]),
-    MochiReq = mochiweb_request:new(nil, 'PUT', Url, {1, 1}, Headers),
-    #httpd{mochi_req = MochiReq}.
-
-t_should_allow_partitioned_db() ->
-    ?_test(begin
-        meck:expect(couch_flags, is_enabled, 2, true),
-        Req = mock_request("/all-test21?partitioned=true"),
-        [Partitioned, _] = parse_partitioned_opt(Req),
-        ?assertEqual(Partitioned, {partitioned, true})
-    end).
-
-t_should_throw_on_not_allowed_partitioned_db() ->
-    ?_test(begin
-        meck:expect(couch_flags, is_enabled, 2, false),
-        Req = mock_request("/all-test21?partitioned=true"),
-        Throw = {bad_request, <<"Partitioned feature is not enabled.">>},
-        ?assertThrow(Throw, parse_partitioned_opt(Req))
-    end).
-
-t_returns_empty_array_for_partitioned_false() ->
-    ?_test(begin
-        Req = mock_request("/all-test21?partitioned=false"),
-        ?assertEqual(parse_partitioned_opt(Req), [])
-    end).
-
-t_returns_empty_array_for_no_partitioned_qs() ->
-    ?_test(begin
-        Req = mock_request("/all-test21"),
-        ?assertEqual(parse_partitioned_opt(Req), [])
-    end).
-
--endif.
