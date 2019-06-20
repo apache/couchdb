@@ -180,11 +180,7 @@ exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell pwd)/src
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
-exunit: couch elixir-check-formatted elixir-credo
-	@mix local.hex --force
-	@mix local.rebar rebar ${REBAR} --force
-	@mix deps.get
-	@$(REBAR) setup_eunit 2> /dev/null
+exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
 	@mix test --trace $(EXUNIT_OPTS)
 
 setup-eunit: export BUILDDIR = $(shell pwd)
@@ -226,34 +222,37 @@ python-black-update: .venv/bin/black
 		. dev/run rel/overlay/bin/couchup test/javascript/run
 
 .PHONY: elixir
+elixir: export MIX_ENV=integration
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run -a adm:pass --no-eval 'test/elixir/run --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run -a adm:pass --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init:
-	@cd test/elixir && mix local.rebar --force && mix local.hex --force && mix deps.get
+	@mix local.rebar --force && mix local.hex --force && mix deps.get
 
 .PHONY: elixir-cluster-without-quorum
-elixir-cluster-without-quorum: elixir-check-formatted elixir-credo devclean
+elixir-cluster-without-quorum: export MIX_ENV=integration
+elixir-cluster-without-quorum: elixir-init elixir-check-formatted elixir-credo devclean
 	@dev/run -n 3 -q -a adm:pass \
 		--degrade-cluster 2 \
-		--no-eval 'test/elixir/run --only without_quorum_test $(EXUNIT_OPTS)'
+		--no-eval 'mix test --trace --only without_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-cluster-with-quorum
-elixir-cluster-with-quorum: elixir-check-formatted elixir-credo devclean
+elixir-cluster-with-quorum: export MIX_ENV=integration
+elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devclean
 	@dev/run -n 3 -q -a adm:pass \
 		--degrade-cluster 1 \
-		--no-eval 'test/elixir/run --only with_quorum_test $(EXUNIT_OPTS)'
+		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-check-formatted
-elixir-check-formatted:
-	mix format --check-formatted
+elixir-check-formatted: elixir-init
+	@mix format --check-formatted
 
 # Credo is a static code analysis tool for Elixir.
 # We use it in our tests
 .PHONY: elixir-credo
-elixir-credo:
-	mix credo
+elixir-credo: elixir-init
+	@mix credo
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option

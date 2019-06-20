@@ -29,7 +29,8 @@
           ~r"/src/httpotion",
           ~r"/src/credo",
           ~r"/src/junit_formatter",
-          ~r"/src/bunt"
+          ~r"/src/bunt",
+          ~r"/test/elixir/deps/"
         ]
       },
       #

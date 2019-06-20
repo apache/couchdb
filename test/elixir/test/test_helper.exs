@@ -2,12 +2,14 @@
 # and skip certain tests that fail on jenkins.
 exclude =
   case System.get_env("BUILD_NUMBER") !== nil do
-    true -> [pending: true, skip_on_jenkins: true]
-    false -> [pending: true]
+    true -> [:pending, :skip_on_jenkins]
+    false -> [:pending]
   end
 
+current_exclude = Keyword.get(ExUnit.configuration(), :exclude, [])
+
 ExUnit.configure(
-  exclude: exclude,
+  exclude: Enum.uniq(exclude ++ current_exclude),
   formatters: [JUnitFormatter, ExUnit.CLIFormatter]
 )
 
