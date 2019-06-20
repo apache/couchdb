@@ -176,7 +176,7 @@ changes_callback({change, {Change}}, _) ->
             ets_lru:remove(?CACHE, UserName)
     end,
     {ok, couch_util:get_value(seq, Change)};
-changes_callback(timeout, Acc) ->
+changes_callback({timeout, _ResponseType}, Acc) ->
     {ok, Acc};
 changes_callback({error, _}, EndSeq) ->
     exit({seq, EndSeq}).

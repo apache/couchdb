@@ -485,10 +485,10 @@ get_changes_timeout(Args, Callback) ->
         end;
     true ->
         {DefaultTimeout,
-            fun(UserAcc) -> {ok, Callback(timeout, ResponseType, UserAcc)} end};
+            fun(UserAcc) -> {ok, Callback({timeout, ResponseType}, UserAcc)} end};
     _ ->
         {lists:min([DefaultTimeout, Heartbeat]),
-            fun(UserAcc) -> {ok, Callback(timeout, ResponseType, UserAcc)} end}
+            fun(UserAcc) -> {ok, Callback({timeout, ResponseType}, UserAcc)} end}
     end.
 
 start_sending_changes(Callback, UserAcc) ->
