@@ -63,7 +63,7 @@ handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_favicon_req(Req) ->
-    handle_favicon_req(Req, config:get("chttpd", "docroot")).
+    handle_favicon_req(Req, get_docroot()).
 
 handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     {DateNow, TimeNow} = calendar:universal_time(),
@@ -80,7 +80,7 @@ handle_favicon_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_utils_dir_req(Req) ->
-    handle_utils_dir_req(Req, config:get("chttpd", "docroot")).
+    handle_utils_dir_req(Req, get_docroot()).
 
 handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     "/" ++ UrlPath = chttpd:path(Req),
@@ -504,3 +504,8 @@ message_queues(Registered) ->
         {Type, Length} = process_info(whereis(Name), Type),
         {Name, Length}
     end, Registered).
+
+get_docroot() ->
+    % if the env var isn’t set, let’s not throw an error, but
+    % assume the current working dir is what we want
+    os:getenv("COUCHDB_FAUXTON_DOCROOT", "").

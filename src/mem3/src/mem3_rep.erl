@@ -743,13 +743,24 @@ sync_security(#shard{} = Source, #{} = Targets) ->
 
 
 targets_map(#shard{name = <<"shards/", _/binary>> = SrcName} = Src,
-        #shard{name = <<"shards/", _/binary>>, node = TgtNode}) ->
+        #shard{name = <<"shards/", _/binary>>, node = TgtNode} = Tgt) ->
     % Parse range from name in case the passed shard is built with a name only
     SrcRange = mem3:range(SrcName),
     Shards0 = mem3:shards(mem3:dbname(SrcName)),
     Shards1 = [S || S <- Shards0, not shard_eq(S, Src)],
     Shards2 = [S || S <- Shards1, check_overlap(SrcRange, TgtNode, S)],
-    maps:from_list([{R, S} || #shard{range = R} = S <- Shards2]);
+    TMap = maps:from_list([{R, S} || #shard{range = R} = S <- Shards2]),
+    case [{R, S} || #shard{range = R} = S <- Shards2] of
+        [] ->
+            % If target map is empty, create a target map with just
+            % that one target. This is to support tooling which may be
+            % moving / copying shards using mem3:go/2,3 before the
+            % shards are present in the shard map
+            #{mem3:range(SrcName) => Tgt};
+        [_ | _] = TMapList->
+            maps:from_list(TMapList)
+    end;
+
 
 targets_map(_Src, Tgt) ->
     #{[0, ?RING_END] => Tgt}.
@@ -876,7 +887,8 @@ targets_map_test_() ->
             target_not_a_shard(),
             source_contained_in_target(),
             multiple_targets(),
-            uneven_overlap()
+            uneven_overlap(),
+            target_not_in_shard_map()
         ]
     }.
 
@@ -967,5 +979,21 @@ uneven_overlap() ->
         ?assertMatch(#{R58 := #shard{node = 'n1'}}, Map)
     end).
 
+
+target_not_in_shard_map() ->
+    ?_test(begin
+        R0f = [16#00000000, 16#ffffffff],
+        Name = <<"shards/00000000-ffffffff/d.1551893552">>,
+        Shards = [
+            #shard{name = Name, node = 'n1', range = R0f},
+            #shard{name = Name, node = 'n2', range = R0f}
+        ],
+        meck:expect(mem3, shards, 1, Shards),
+        Src = #shard{name = Name, node = 'n1'},
+        Tgt = #shard{name = Name, node = 'n3'},
+        Map = targets_map(Src, Tgt),
+        ?assertEqual(1, map_size(Map)),
+        ?assertMatch(#{R0f := #shard{name = Name, node = 'n3'}}, Map)
+    end).
 
 -endif.
