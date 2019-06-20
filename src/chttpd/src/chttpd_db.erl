@@ -734,7 +734,7 @@ db_req(#httpd{method = 'PUT',path_parts = [_, <<"_security">>]} = Req, Db) ->
     end;
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_security">>]}=Req, Db) ->
-    send_json(Req, fabric:get_security(Db));
+    send_json(Req, fabric2_db:get_security(Db));
 
 db_req(#httpd{path_parts=[_,<<"_security">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
