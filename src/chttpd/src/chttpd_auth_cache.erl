@@ -231,7 +231,7 @@ update_doc_ignoring_conflict(DbName, Doc) ->
     try
         fabric2_db:update_doc(DbName, Doc)
     catch
-        throw:conflict ->
+        error:conflict ->
             ok
     end.
 
