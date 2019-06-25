@@ -20,6 +20,7 @@
 
 main([]) ->
     JsFiles = ["share/server/json2.js",
+               "share/server/dreyfus.js",
                "share/server/filter.js",
                "share/server/mimeparse.js",
                "share/server/render.js",
@@ -30,6 +31,7 @@ main([]) ->
                "share/server/loop.js"],
 
     CoffeeFiles = ["share/server/json2.js",
+                   "share/server/dreyfus.js",
                    "share/server/filter.js",
                    "share/server/mimeparse.js",
                    "share/server/render.js",

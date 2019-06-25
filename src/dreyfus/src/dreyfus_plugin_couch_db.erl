@@ -10,13 +10,17 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{plugins, [
-    couch_db_epi,
-    chttpd_epi,
-    couch_index_epi,
-    dreyfus_epi,
-    global_changes_epi,
-    mango_epi,
-    mem3_epi,
-    setup_epi
-]}.
+-module(dreyfus_plugin_couch_db).
+
+-export([
+    is_valid_purge_client/2,
+    on_compact/2
+]).
+
+
+is_valid_purge_client(DbName, Props) ->
+    dreyfus_util:verify_index_exists(DbName, Props).
+
+
+on_compact(DbName, DDocs) ->
+    dreyfus_util:ensure_local_purge_docs(DbName, DDocs).

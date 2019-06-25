@@ -2,7 +2,7 @@
 % use this file except in compliance with the License. You may obtain a copy of
 % the License at
 %
-%   http://www.apache.org/licenses/LICENSE-2.0
+% http://www.apache.org/licenses/LICENSE-2.0
 %
 % Unless required by applicable law or agreed to in writing, software
 % distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -10,13 +10,15 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{plugins, [
-    couch_db_epi,
-    chttpd_epi,
-    couch_index_epi,
-    dreyfus_epi,
-    global_changes_epi,
-    mango_epi,
-    mem3_epi,
-    setup_epi
-]}.
+
+%% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
+
+-module(dreyfus_app).
+-behaviour(application).
+-export([start/2, stop/1]).
+
+start(_Type, []) ->
+    dreyfus_sup:start_link().
+
+stop([]) ->
+    ok.
