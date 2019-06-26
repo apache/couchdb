@@ -55,7 +55,7 @@ defmodule CookieAuthTest do
     assert Couch.Session.logout(session).body["ok"]
   end
 
-  defp loginAsUser(user) do
+  defp login_as(user) do
     pws = %{
       "jan" => "apple",
       "Jason Davies" => @password,
@@ -79,12 +79,7 @@ defmodule CookieAuthTest do
     expect_response = Keyword.get(options, :expect_response, 200)
     expect_message = Keyword.get(options, :error_message)
 
-    session =
-      if use_session == nil do
-        loginAsUser(user)
-      else
-        use_session
-      end
+    session = use_session || login_as(user)
 
     resp =
       Couch.get(
@@ -114,12 +109,7 @@ defmodule CookieAuthTest do
     expect_response = Keyword.get(options, :expect_response, [201, 202])
     expect_message = Keyword.get(options, :error_message)
 
-    session =
-      if use_session == nil do
-        loginAsUser(user)
-      else
-        use_session
-      end
+    session = use_session || login_as(user)
 
     resp =
       Couch.put(
@@ -154,12 +144,7 @@ defmodule CookieAuthTest do
     expect_response = Keyword.get(options, :expect_response, [200, 202])
     expect_message = Keyword.get(options, :error_message)
 
-    session =
-      if use_session == nil do
-        loginAsUser(user)
-      else
-        use_session
-      end
+    session = use_session || login_as(user)
 
     resp =
       Couch.delete(
@@ -266,7 +251,7 @@ defmodule CookieAuthTest do
     create_doc_expect_error(@users_db, bad_id_user_doc, 403, "forbidden")
 
     # login works
-    session = loginAsUser("Jason Davies")
+    session = login_as("Jason Davies")
     info = Couch.Session.info(session)
     assert info["userCtx"]["name"] == "Jason Davies"
     assert not Enum.member?(info["userCtx"]["roles"], "_admin")
