@@ -256,6 +256,7 @@ defmodule CookieAuthTest do
     assert info["userCtx"]["name"] == "Jason Davies"
     assert not Enum.member?(info["userCtx"]["roles"], "_admin")
 
+    # update one's own credentials document
     jason_user_doc =
       jason_user_doc
       |> Map.put("_rev", jason_check_doc["_rev"])
