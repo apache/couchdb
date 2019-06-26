@@ -3,7 +3,7 @@ defmodule AuthCacheTest do
 
   @moduletag :authentication
   @tag :with_db
-  test "test auth cache management", context do
+  test "auth cache management", context do
     db_name = context[:db_name]
 
     server_config = [
@@ -32,12 +32,11 @@ defmodule AuthCacheTest do
     run_on_modified_server(server_config, fn -> test_fun(db_name) end)
   end
 
-  defp generate_secret(length) do
-    tab = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-
-    for _i <- 1..length, into: "" do
-      String.at(tab, trunc(Float.floor(:rand.uniform() * 64)))
-    end
+  defp generate_secret(len) do
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    |> String.splitter("", trim: true)
+    |> Enum.take_random(len)
+    |> Enum.join("")
   end
 
   defp hits() do
@@ -66,11 +65,11 @@ defmodule AuthCacheTest do
   end
 
   defp wait_until_compact_complete(db_name) do
-    info = info(db_name)
-
-    if info["compact_running"] do
-      wait_until_compact_complete(db_name)
-    end
+    retry_until(
+      fn -> Map.get(info(db_name), "compact_running") == false end,
+      200,
+      10_000
+    )
   end
 
   defp assert_cache(event, user, password, expect \\ :expect_login_success) do
@@ -121,7 +120,7 @@ defmodule AuthCacheTest do
     resp = Couch.put("/#{db_name}/#{body["_id"]}", body: body)
     assert resp.status_code in [201, 202]
     assert resp.body["ok"]
-    {:ok, resp}
+    Map.put(body, "_rev", resp.body["rev"])
   end
 
   def delete_doc(db_name, body) do
@@ -181,8 +180,7 @@ defmodule AuthCacheTest do
     assert_cache(:expect_hit, "fdmanana", "qwerty")
 
     fdmanana = Map.replace!(fdmanana, "password", "foobar")
-    {:ok, resp} = save_doc(db_name, fdmanana)
-    second_rev = resp.body["rev"]
+    fdmanana = save_doc(db_name, fdmanana)
 
     # Cache was refreshed
     # BUGGED
@@ -191,10 +189,7 @@ defmodule AuthCacheTest do
 
     # and yet another update
     fdmanana = Map.replace!(fdmanana, "password", "javascript")
-    fdmanana = Map.replace!(fdmanana, "_rev", second_rev)
-    {:ok, resp} = save_doc(db_name, fdmanana)
-    third_rev = resp.body["rev"]
-    fdmanana = Map.replace!(fdmanana, "_rev", third_rev)
+    fdmanana = save_doc(db_name, fdmanana)
 
     # Cache was refreshed
     # BUGGED
