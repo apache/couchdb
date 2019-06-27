@@ -7,7 +7,7 @@ defmodule CookieAuthTest do
 
   @password "3.141592653589"
 
-  test "test cookie auth" do
+  test "cookie auth" do
     # Create db if not exists
     Couch.put("/#{@users_db}")
 
