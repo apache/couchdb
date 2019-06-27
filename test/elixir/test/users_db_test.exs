@@ -29,7 +29,7 @@ defmodule UsersDbTest do
   ]
 
   @tag :with_db
-  test "test users db", context do
+  test "users db", context do
     db_name = context[:db_name]
 
     # Create db if not exists
