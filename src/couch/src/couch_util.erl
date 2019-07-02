@@ -14,7 +14,7 @@
 
 -export([priv_dir/0, normpath/1, fold_files/5]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
--export([rand32/0, implode/2, collate/2, collate/3]).
+-export([rand32/0, implode/2, collate/2, collate/3, get_sort_key/1]).
 -export([abs_pathname/1,abs_pathname/2, trim/1, drop_dot_couch_ext/1]).
 -export([encodeBase64Url/1, decodeBase64Url/1]).
 -export([validate_utf8/1, to_hex/1, parse_term/1, dict_find/3]).
@@ -407,10 +407,19 @@ collate(A, B, Options) when is_binary(A), is_binary(B) ->
     SizeA = byte_size(A),
     SizeB = byte_size(B),
     Bin = <<SizeA:32/native, A/binary, SizeB:32/native, B/binary>>,
-    [Result] = erlang:port_control(drv_port(), Operation, Bin),
+    <<Result>> = erlang:port_control(drv_port(), Operation, Bin),
     % Result is 0 for lt, 1 for eq and 2 for gt. Subtract 1 to return the
     % expected typical -1, 0, 1
     Result - 1.
+
+get_sort_key(Str) when is_binary(Str) ->
+    Operation = 2, % get_sort_key
+    Size = byte_size(Str),
+    Bin = <<Size:32/native, Str/binary>>,
+    case erlang:port_control(drv_port(), Operation, Bin) of
+        <<>> -> error;
+        Res -> Res
+    end.
 
 should_flush() ->
     should_flush(?FLUSH_MAX_MEM).
