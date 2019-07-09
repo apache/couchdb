@@ -44,6 +44,8 @@ case VerList of
     [20 | _] = V20 when V20 >= [20, 3, 8, 11] -> ok;
     [21, 2] -> NotSupported(VerString);
     [21, 2, N | _] when N < 3 -> NotSupported(VerString);
+    [22, 0] -> NotSupported(VerString);
+    [22, 0, N | _] when N < 5 -> NotSupported(VerString);
     _ -> ok
 end.
 
@@ -98,7 +100,7 @@ DepDescs = [
 {b64url,           "b64url",           {tag, "1.0.1"}},
 {ets_lru,          "ets-lru",          {tag, "1.0.0"}},
 {khash,            "khash",            {tag, "1.0.1"}},
-{snappy,           "snappy",           {tag, "CouchDB-1.0.2"}},
+{snappy,           "snappy",           {tag, "CouchDB-1.0.4"}},
 {ioq,              "ioq",              {tag, "2.1.2"}},
 {hqueue,           "hqueue",           {tag, "1.0.1"}},
 {smoosh,           "smoosh",           {tag, "1.0.1"}},
@@ -148,7 +150,7 @@ ErlOpts = case os:getenv("ERL_OPTS") of
 end,
 
 AddConfig = [
-    {require_otp_vsn, "19|20|21"},
+    {require_otp_vsn, "19|20|21|22"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},
