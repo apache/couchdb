@@ -1,9 +1,10 @@
 language: elixir
-elixir: 1.6.6
+elixir: 1.7.4
 os: linux
 dist: trusty
 
 otp_release:
+   - 22.0.5
    - 21.2.3
    - 20.3.8.5
    - 19.3
