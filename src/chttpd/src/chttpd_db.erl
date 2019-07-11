@@ -1180,7 +1180,7 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
         HttpCode = 202
     end,
     % respond
-    DbName = couch_db:name(Db),
+    DbName = fabric2_db:name(Db),
     {PartRes} = update_doc_result_to_json(TargetDocId, {ok, NewTargetRev}),
     Loc = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName) ++ "/" ++ couch_util:url_encode(TargetDocId)),
     send_json(Req, HttpCode,
