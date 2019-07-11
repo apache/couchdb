@@ -408,7 +408,7 @@ conflict_on_create_new_with_rev({Db, _}) ->
         revs = {1, [fabric2_util:uuid()]},
         body = {[{<<"foo">>, <<"bar">>}]}
     },
-    ?assertThrow({error, conflict}, fabric2_db:update_doc(Db, Doc)).
+    ?assertThrow(conflict, fabric2_db:update_doc(Db, Doc)).
 
 
 conflict_on_update_with_no_rev({Db, _}) ->
@@ -421,7 +421,7 @@ conflict_on_update_with_no_rev({Db, _}) ->
         revs = {0, []},
         body = {[{<<"state">>, 2}]}
     },
-    ?assertThrow({error, conflict}, fabric2_db:update_doc(Db, Doc2)).
+    ?assertThrow(conflict, fabric2_db:update_doc(Db, Doc2)).
 
 
 conflict_on_create_as_deleted({Db, _}) ->
@@ -430,7 +430,7 @@ conflict_on_create_as_deleted({Db, _}) ->
         deleted = true,
         body = {[{<<"foo">>, <<"bar">>}]}
     },
-    ?assertThrow({error, conflict}, fabric2_db:update_doc(Db, Doc)).
+    ?assertThrow(conflict, fabric2_db:update_doc(Db, Doc)).
 
 
 conflict_on_recreate_as_deleted({Db, _}) ->
@@ -450,7 +450,7 @@ conflict_on_recreate_as_deleted({Db, _}) ->
         deleted = true,
         body = {[{<<"state">>, 3}]}
     },
-    ?assertThrow({error, conflict}, fabric2_db:update_doc(Db, Doc3)).
+    ?assertThrow(conflict, fabric2_db:update_doc(Db, Doc3)).
 
 
 conflict_on_extend_deleted({Db, _}) ->
@@ -470,7 +470,7 @@ conflict_on_extend_deleted({Db, _}) ->
         deleted = false,
         body = {[{<<"state">>, 3}]}
     },
-    ?assertThrow({error, conflict}, fabric2_db:update_doc(Db, Doc3)).
+    ?assertThrow(conflict, fabric2_db:update_doc(Db, Doc3)).
 
 
 open_doc_revs_basic({Db, _}) ->
@@ -725,18 +725,12 @@ create_local_doc_bad_rev({Db, _}) ->
         id = LDocId,
         revs = {0, [<<"not a number">>]}
     },
-    ?assertThrow(
-            {error, <<"Invalid rev format">>},
-            fabric2_db:update_doc(Db, Doc1)
-        ),
+    ?assertThrow(<<"Invalid rev format">>, fabric2_db:update_doc(Db, Doc1)),
 
     Doc2 = Doc1#doc{
         revs = bad_bad_rev_roy_brown
     },
-    ?assertThrow(
-            {error, <<"Invalid rev format">>},
-            fabric2_db:update_doc(Db, Doc2)
-        ).
+    ?assertThrow(<<"Invalid rev format">>, fabric2_db:update_doc(Db, Doc2)).
 
 
 create_local_doc_random_rev({Db, _}) ->
