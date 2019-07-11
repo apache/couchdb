@@ -584,46 +584,52 @@ update_docs(Db, Docs) ->
 
 update_docs(Db, Docs0, Options) ->
     Docs1 = apply_before_doc_update(Db, Docs0, Options),
-    Resps0 = case lists:member(replicated_changes, Options) of
-        false ->
-            fabric2_fdb:transactional(Db, fun(TxDb) ->
-                update_docs_interactive(TxDb, Docs1, Options)
-            end);
-        true ->
-            lists:map(fun(Doc) ->
+    try
+        validate_atomic_update(Docs0, lists:member(all_or_nothing, Options)),
+        Resps0 = case lists:member(replicated_changes, Options) of
+            false ->
                 fabric2_fdb:transactional(Db, fun(TxDb) ->
-                    update_doc_int(TxDb, Doc, Options)
-                end)
-            end, Docs1)
-    end,
-    % Convert errors
-    Resps1 = lists:map(fun(Resp) ->
-        case Resp of
-            {#doc{} = Doc, Error} ->
-                #doc{
-                    id = DocId,
-                    revs = Revs
-                } = Doc,
-                RevId = case Revs of
-                    {RevPos, [Rev | _]} -> {RevPos, Rev};
-                    {0, []} -> {0, <<>>}
-                end,
-                {{DocId, RevId}, Error};
-            Else ->
-                Else
+                    update_docs_interactive(TxDb, Docs1, Options)
+                end);
+            true ->
+                lists:map(fun(Doc) ->
+                    fabric2_fdb:transactional(Db, fun(TxDb) ->
+                        update_doc_int(TxDb, Doc, Options)
+                    end)
+                end, Docs1)
+        end,
+        % Convert errors
+        Resps1 = lists:map(fun(Resp) ->
+            case Resp of
+                {#doc{} = Doc, Error} ->
+                    #doc{
+                        id = DocId,
+                        revs = Revs
+                    } = Doc,
+                    RevId = case Revs of
+                        {RevPos, [Rev | _]} -> {RevPos, Rev};
+                        {0, []} -> {0, <<>>};
+                        Else -> Else
+                    end,
+                    {{DocId, RevId}, Error};
+                Else ->
+                    Else
+            end
+        end, Resps0),
+        case lists:member(replicated_changes, Options) of
+            true ->
+                {ok, lists:flatmap(fun(R) ->
+                    case R of
+                        {ok, []} -> [];
+                        {{_, _}, {ok, []}} -> [];
+                        Else -> [Else]
+                    end
+                end, Resps1)};
+            false ->
+                {ok, Resps1}
         end
-    end, Resps0),
-    case lists:member(replicated_changes, Options) of
-        true ->
-            {ok, [R || R <- Resps1, R /= {ok, []}]};
-        false ->
-            Status = lists:foldl(fun(Resp, Acc) ->
-                case Resp of
-                    {ok, _} -> Acc;
-                    _ -> error
-                end
-            end, ok, Resps1),
-            {Status, Resps1}
+    catch throw:{aborted, Errors} ->
+        {aborted, Errors}
     end.
 
 
@@ -1023,7 +1029,7 @@ update_docs_interactive(Db, #doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} = Doc,
 update_docs_interactive(Db, Doc, Options, Futures, SeenIds) ->
     case lists:member(Doc#doc.id, SeenIds) of
         true ->
-            {{error, conflict}, SeenIds};
+            {conflict, SeenIds};
         false ->
             Future = maps:get(doc_tag(Doc), Futures),
             case update_doc_interactive(Db, Doc, Future, Options) of
@@ -1066,12 +1072,12 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
     % Check that a revision was specified if required
     Doc0RevId = doc_to_revid(Doc0),
     if Doc0RevId /= {0, <<>>} orelse WinnerRevId == {0, <<>>} -> ok; true ->
-        ?RETURN({error, conflict})
+        ?RETURN({Doc0, conflict})
     end,
 
     % Check that we're not trying to create a deleted doc
     if Doc0RevId /= {0, <<>>} orelse not Doc0#doc.deleted -> ok; true ->
-        ?RETURN({error, conflict})
+        ?RETURN({Doc0, conflict})
     end,
 
     % Get the target revision to update
@@ -1088,7 +1094,7 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
                     % that we get not_found for a deleted revision
                     % because we only check for the non-deleted
                     % key in fdb
-                    ?RETURN({error, conflict})
+                    ?RETURN({Doc0, conflict})
             end
     end,
 
@@ -1191,7 +1197,7 @@ update_doc_replicated(Db, Doc0, _Options) ->
     if Status /= internal_node -> ok; true ->
         % We already know this revision so nothing
         % left to do.
-        ?RETURN({ok, []})
+        ?RETURN({Doc0, {ok, []}})
     end,
 
     % Its possible to have a replication with fewer than $revs_limit
@@ -1248,7 +1254,7 @@ update_doc_replicated(Db, Doc0, _Options) ->
 update_local_doc(Db, Doc0, _Options) ->
     Doc1 = case increment_local_doc_rev(Doc0) of
         {ok, Updated} -> Updated;
-        {error, _} = Error -> ?RETURN(Error)
+        {error, Error} -> ?RETURN({Doc0, Error})
     end,
 
     ok = fabric2_fdb:write_local_doc(Db, Doc1),
@@ -1365,6 +1371,20 @@ validate_ddoc(Db, DDoc) ->
         throw:Error ->
             ?RETURN({DDoc, Error})
     end.
+
+
+validate_atomic_update(_, false) ->
+    ok;
+validate_atomic_update(AllDocs, true) ->
+    % TODO actually perform the validation.  This requires some hackery, we need
+    % to basically extract the prep_and_validate_updates function from couch_db
+    % and only run that, without actually writing in case of a success.
+    Error = {not_implemented, <<"all_or_nothing is not supported">>},
+    PreCommitFailures = lists:map(fun(#doc{id=Id, revs = {Pos,Revs}}) ->
+        case Revs of [] -> RevId = <<>>; [RevId|_] -> ok end,
+        {{Id, {Pos, RevId}}, Error}
+    end, AllDocs),
+    throw({aborted, PreCommitFailures}).
 
 
 check_duplicate_attachments(#doc{atts = Atts}) ->
