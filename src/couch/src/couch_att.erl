@@ -667,190 +667,190 @@ validate_attachment_size(_AttName, _AttSize, _MAxAttSize) ->
     ok.
 
 
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-% Eww...
--include("couch_bt_engine.hrl").
-
-%% Test utilities
-
-
-empty_att() -> new().
-
-
-upgraded_empty_att() ->
-    new([{headers, undefined}]).
-
-
-%% Test groups
-
-
-attachment_upgrade_test_() ->
-    {"Lazy record upgrade tests", [
-        {"Existing record fields don't upgrade",
-            {with, empty_att(), [fun test_non_upgrading_fields/1]}
-        },
-        {"New fields upgrade",
-            {with, empty_att(), [fun test_upgrading_fields/1]}
-        }
-    ]}.
-
-
-attachment_defaults_test_() ->
-    {"Attachment defaults tests", [
-        {"Records retain old default values", [
-            {with, empty_att(), [fun test_legacy_defaults/1]}
-        ]},
-        {"Upgraded records inherit defaults", [
-            {with, upgraded_empty_att(), [fun test_legacy_defaults/1]}
-        ]},
-        {"Undefined entries are elided on upgrade", [
-            {with, upgraded_empty_att(), [fun test_elided_entries/1]}
-        ]}
-    ]}.
-
-attachment_field_api_test_() ->
-    {"Basic attachment field api", [
-        fun test_construction/0,
-        fun test_store_and_fetch/0,
-        fun test_transform/0
-    ]}.
-
-
-attachment_disk_term_test_() ->
-    BaseAttachment = new([
-        {name, <<"empty">>},
-        {type, <<"application/octet-stream">>},
-        {att_len, 0},
-        {disk_len, 0},
-        {md5, <<212,29,140,217,143,0,178,4,233,128,9,152,236,248,66,126>>},
-        {revpos, 4},
-        {data, {stream, {couch_bt_engine_stream, {fake_fd, fake_sp}}}},
-        {encoding, identity}
-    ]),
-    BaseDiskTerm = {
-        <<"empty">>,
-        <<"application/octet-stream">>,
-        fake_sp,
-        0, 0, 4,
-        <<212,29,140,217,143,0,178,4,233,128,9,152,236,248,66,126>>,
-        identity
-    },
-    Headers = [{<<"X-Foo">>, <<"bar">>}],
-    ExtendedAttachment = store(headers, Headers, BaseAttachment),
-    ExtendedDiskTerm = {BaseDiskTerm, [{headers, Headers}]},
-    FakeDb = test_util:fake_db([{engine, {couch_bt_engine, #st{fd=fake_fd}}}]),
-    {"Disk term tests", [
-        ?_assertEqual(BaseDiskTerm, to_disk_term(BaseAttachment)),
-        ?_assertEqual(BaseAttachment, from_disk_term(FakeDb, BaseDiskTerm)),
-        ?_assertEqual(ExtendedDiskTerm, to_disk_term(ExtendedAttachment)),
-        ?_assertEqual(ExtendedAttachment, from_disk_term(FakeDb, ExtendedDiskTerm))
-    ]}.
-
-
-attachment_json_term_test_() ->
-    Props = [
-        {<<"content_type">>, <<"application/json">>},
-        {<<"digest">>, <<"md5-QCNtWUNXV0UzJnEjMk92YUk1JA==">>},
-        {<<"length">>, 14},
-        {<<"revpos">>, 1}
-    ],
-    PropsInline = [{<<"data">>, <<"eyJhbnN3ZXIiOiA0Mn0=">>}] ++ Props,
-    InvalidProps = [{<<"data">>, <<"!Base64Encoded$">>}] ++ Props,
-    Att = couch_att:new([
-        {name, <<"attachment.json">>},
-        {type, <<"application/json">>}
-    ]),
-    ResultStub = couch_att:new([
-        {name, <<"attachment.json">>},
-        {type, <<"application/json">>},
-        {att_len, 14},
-        {disk_len, 14},
-        {md5, <<"@#mYCWWE3&q#2OvaI5$">>},
-        {revpos, 1},
-        {data, stub},
-        {encoding, identity}
-    ]),
-    ResultFollows = ResultStub#att{data = follows},
-    ResultInline = ResultStub#att{md5 = <<>>, data = <<"{\"answer\": 42}">>},
-    {"JSON term tests", [
-        ?_assertEqual(ResultStub, stub_from_json(Att, Props)),
-        ?_assertEqual(ResultFollows, follow_from_json(Att, Props)),
-        ?_assertEqual(ResultInline, inline_from_json(Att, PropsInline)),
-        ?_assertThrow({bad_request, _}, inline_from_json(Att, Props)),
-        ?_assertThrow({bad_request, _}, inline_from_json(Att, InvalidProps))
-    ]}.
-
-
-attachment_stub_merge_test_() ->
-    %% Stub merging needs to demonstrate revpos matching, skipping, and missing
-    %% attachment errors.
-    {"Attachment stub merging tests", []}.
-
-
-%% Test generators
-
-
-test_non_upgrading_fields(Attachment) ->
-    Pairs = [
-        {name, "cat.gif"},
-        {type, "text/very-very-plain"},
-        {att_len, 1024},
-        {disk_len, 42},
-        {md5, <<"md5-hashhashhash">>},
-        {revpos, 4},
-        {data, stub},
-        {encoding, gzip}
-    ],
-    lists:foreach(
-        fun({Field, Value}) ->
-            ?assertMatch(#att{}, Attachment),
-            Updated = store(Field, Value, Attachment),
-            ?assertMatch(#att{}, Updated)
-        end,
-    Pairs).
-
-
-test_upgrading_fields(Attachment) ->
-    ?assertMatch(#att{}, Attachment),
-    UpdatedHeaders = store(headers, [{<<"Ans">>, <<"42">>}], Attachment),
-    ?assertMatch(X when is_list(X), UpdatedHeaders),
-    UpdatedHeadersUndefined = store(headers, undefined, Attachment),
-    ?assertMatch(X when is_list(X), UpdatedHeadersUndefined).
-
-
-test_legacy_defaults(Attachment) ->
-    ?assertEqual(<<>>, fetch(md5, Attachment)),
-    ?assertEqual(0, fetch(revpos, Attachment)),
-    ?assertEqual(identity, fetch(encoding, Attachment)).
-
-
-test_elided_entries(Attachment) ->
-    ?assertNot(lists:keymember(name, 1, Attachment)),
-    ?assertNot(lists:keymember(type, 1, Attachment)),
-    ?assertNot(lists:keymember(att_len, 1, Attachment)),
-    ?assertNot(lists:keymember(disk_len, 1, Attachment)),
-    ?assertNot(lists:keymember(data, 1, Attachment)).
-
-
-test_construction() ->
-    ?assert(new() == new()),
-    Initialized = new([{name, <<"foo.bar">>}, {type, <<"application/qux">>}]),
-    ?assertEqual(<<"foo.bar">>, fetch(name, Initialized)),
-    ?assertEqual(<<"application/qux">>, fetch(type, Initialized)).
-
-
-test_store_and_fetch() ->
-    Attachment = empty_att(),
-    ?assertEqual(<<"abc">>, fetch(name, store(name, <<"abc">>, Attachment))),
-    ?assertEqual(42, fetch(ans, store(ans, 42, Attachment))).
-
-
-test_transform() ->
-    Attachment = new([{counter, 0}]),
-    Transformed = transform(counter, fun(Count) -> Count + 1 end, Attachment),
-    ?assertEqual(1, fetch(counter, Transformed)).
-
-
--endif.
+%% -ifdef(TEST).
+%% -include_lib("eunit/include/eunit.hrl").
+%%
+%% % Eww...
+%% -include("couch_bt_engine.hrl").
+%%
+%% %% Test utilities
+%%
+%%
+%% empty_att() -> new().
+%%
+%%
+%% upgraded_empty_att() ->
+%%     new([{headers, undefined}]).
+%%
+%%
+%% %% Test groups
+%%
+%%
+%% attachment_upgrade_test_() ->
+%%     {"Lazy record upgrade tests", [
+%%         {"Existing record fields don't upgrade",
+%%             {with, empty_att(), [fun test_non_upgrading_fields/1]}
+%%         },
+%%         {"New fields upgrade",
+%%             {with, empty_att(), [fun test_upgrading_fields/1]}
+%%         }
+%%     ]}.
+%%
+%%
+%% attachment_defaults_test_() ->
+%%     {"Attachment defaults tests", [
+%%         {"Records retain old default values", [
+%%             {with, empty_att(), [fun test_legacy_defaults/1]}
+%%         ]},
+%%         {"Upgraded records inherit defaults", [
+%%             {with, upgraded_empty_att(), [fun test_legacy_defaults/1]}
+%%         ]},
+%%         {"Undefined entries are elided on upgrade", [
+%%             {with, upgraded_empty_att(), [fun test_elided_entries/1]}
+%%         ]}
+%%     ]}.
+%%
+%% attachment_field_api_test_() ->
+%%     {"Basic attachment field api", [
+%%         fun test_construction/0,
+%%         fun test_store_and_fetch/0,
+%%         fun test_transform/0
+%%     ]}.
+%%
+%%
+%% attachment_disk_term_test_() ->
+%%     BaseAttachment = new([
+%%         {name, <<"empty">>},
+%%         {type, <<"application/octet-stream">>},
+%%         {att_len, 0},
+%%         {disk_len, 0},
+%%         {md5, <<212,29,140,217,143,0,178,4,233,128,9,152,236,248,66,126>>},
+%%         {revpos, 4},
+%%         {data, {stream, {couch_bt_engine_stream, {fake_fd, fake_sp}}}},
+%%         {encoding, identity}
+%%     ]),
+%%     BaseDiskTerm = {
+%%         <<"empty">>,
+%%         <<"application/octet-stream">>,
+%%         fake_sp,
+%%         0, 0, 4,
+%%         <<212,29,140,217,143,0,178,4,233,128,9,152,236,248,66,126>>,
+%%         identity
+%%     },
+%%     Headers = [{<<"X-Foo">>, <<"bar">>}],
+%%     ExtendedAttachment = store(headers, Headers, BaseAttachment),
+%%     ExtendedDiskTerm = {BaseDiskTerm, [{headers, Headers}]},
+%%     FakeDb = test_util:fake_db([{engine, {couch_bt_engine, #st{fd=fake_fd}}}]),
+%%     {"Disk term tests", [
+%%         ?_assertEqual(BaseDiskTerm, to_disk_term(BaseAttachment)),
+%%         ?_assertEqual(BaseAttachment, from_disk_term(FakeDb, BaseDiskTerm)),
+%%         ?_assertEqual(ExtendedDiskTerm, to_disk_term(ExtendedAttachment)),
+%%         ?_assertEqual(ExtendedAttachment, from_disk_term(FakeDb, ExtendedDiskTerm))
+%%     ]}.
+%%
+%%
+%% attachment_json_term_test_() ->
+%%     Props = [
+%%         {<<"content_type">>, <<"application/json">>},
+%%         {<<"digest">>, <<"md5-QCNtWUNXV0UzJnEjMk92YUk1JA==">>},
+%%         {<<"length">>, 14},
+%%         {<<"revpos">>, 1}
+%%     ],
+%%     PropsInline = [{<<"data">>, <<"eyJhbnN3ZXIiOiA0Mn0=">>}] ++ Props,
+%%     InvalidProps = [{<<"data">>, <<"!Base64Encoded$">>}] ++ Props,
+%%     Att = couch_att:new([
+%%         {name, <<"attachment.json">>},
+%%         {type, <<"application/json">>}
+%%     ]),
+%%     ResultStub = couch_att:new([
+%%         {name, <<"attachment.json">>},
+%%         {type, <<"application/json">>},
+%%         {att_len, 14},
+%%         {disk_len, 14},
+%%         {md5, <<"@#mYCWWE3&q#2OvaI5$">>},
+%%         {revpos, 1},
+%%         {data, stub},
+%%         {encoding, identity}
+%%     ]),
+%%     ResultFollows = ResultStub#att{data = follows},
+%%     ResultInline = ResultStub#att{md5 = <<>>, data = <<"{\"answer\": 42}">>},
+%%     {"JSON term tests", [
+%%         ?_assertEqual(ResultStub, stub_from_json(Att, Props)),
+%%         ?_assertEqual(ResultFollows, follow_from_json(Att, Props)),
+%%         ?_assertEqual(ResultInline, inline_from_json(Att, PropsInline)),
+%%         ?_assertThrow({bad_request, _}, inline_from_json(Att, Props)),
+%%         ?_assertThrow({bad_request, _}, inline_from_json(Att, InvalidProps))
+%%     ]}.
+%%
+%%
+%% attachment_stub_merge_test_() ->
+%%     %% Stub merging needs to demonstrate revpos matching, skipping, and missing
+%%     %% attachment errors.
+%%     {"Attachment stub merging tests", []}.
+%%
+%%
+%% %% Test generators
+%%
+%%
+%% test_non_upgrading_fields(Attachment) ->
+%%     Pairs = [
+%%         {name, "cat.gif"},
+%%         {type, "text/very-very-plain"},
+%%         {att_len, 1024},
+%%         {disk_len, 42},
+%%         {md5, <<"md5-hashhashhash">>},
+%%         {revpos, 4},
+%%         {data, stub},
+%%         {encoding, gzip}
+%%     ],
+%%     lists:foreach(
+%%         fun({Field, Value}) ->
+%%             ?assertMatch(#att{}, Attachment),
+%%             Updated = store(Field, Value, Attachment),
+%%             ?assertMatch(#att{}, Updated)
+%%         end,
+%%     Pairs).
+%%
+%%
+%% test_upgrading_fields(Attachment) ->
+%%     ?assertMatch(#att{}, Attachment),
+%%     UpdatedHeaders = store(headers, [{<<"Ans">>, <<"42">>}], Attachment),
+%%     ?assertMatch(X when is_list(X), UpdatedHeaders),
+%%     UpdatedHeadersUndefined = store(headers, undefined, Attachment),
+%%     ?assertMatch(X when is_list(X), UpdatedHeadersUndefined).
+%%
+%%
+%% test_legacy_defaults(Attachment) ->
+%%     ?assertEqual(<<>>, fetch(md5, Attachment)),
+%%     ?assertEqual(0, fetch(revpos, Attachment)),
+%%     ?assertEqual(identity, fetch(encoding, Attachment)).
+%%
+%%
+%% test_elided_entries(Attachment) ->
+%%     ?assertNot(lists:keymember(name, 1, Attachment)),
+%%     ?assertNot(lists:keymember(type, 1, Attachment)),
+%%     ?assertNot(lists:keymember(att_len, 1, Attachment)),
+%%     ?assertNot(lists:keymember(disk_len, 1, Attachment)),
+%%     ?assertNot(lists:keymember(data, 1, Attachment)).
+%%
+%%
+%% test_construction() ->
+%%     ?assert(new() == new()),
+%%     Initialized = new([{name, <<"foo.bar">>}, {type, <<"application/qux">>}]),
+%%     ?assertEqual(<<"foo.bar">>, fetch(name, Initialized)),
+%%     ?assertEqual(<<"application/qux">>, fetch(type, Initialized)).
+%%
+%%
+%% test_store_and_fetch() ->
+%%     Attachment = empty_att(),
+%%     ?assertEqual(<<"abc">>, fetch(name, store(name, <<"abc">>, Attachment))),
+%%     ?assertEqual(42, fetch(ans, store(ans, 42, Attachment))).
+%%
+%%
+%% test_transform() ->
+%%     Attachment = new([{counter, 0}]),
+%%     Transformed = transform(counter, fun(Count) -> Count + 1 end, Attachment),
+%%     ?assertEqual(1, fetch(counter, Transformed)).
+%%
+%%
+%% -endif.
