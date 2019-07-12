@@ -54,9 +54,6 @@ defmodule SecurityValidationTest do
     on_exit(fn -> delete_db(auth_db_name) end)
 
     configs = [
-      {"httpd", "authentication_handlers",
-       "{couch_httpd_auth, cookie_authentication_handler}, {couch_httpd_auth, default_authentication_handler}"},
-      {"couch_httpd_auth", "authentication_db", auth_db_name},
       {"chttpd_auth", "authentication_db", auth_db_name}
     ]
 
@@ -73,6 +70,7 @@ defmodule SecurityValidationTest do
     Enum.each(users, fn {name, pass} ->
       doc = %{
         :_id => "org.couchdb.user:#{name}",
+        :type => "user",
         :name => name,
         :roles => [],
         :password => pass
