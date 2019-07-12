@@ -736,10 +736,14 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
 maybe_add_sys_db_callbacks(Db) ->
     IsReplicatorDb = fabric2_util:dbname_ends_with(Db, <<"_replicator">>),
 
+    AuthenticationDb = config:get("chttpd_auth", "authentication_db"),
+    IsAuthCache = if AuthenticationDb == undefined -> false; true ->
+        name(Db) == ?l2b(AuthenticationDb)
+    end,
     CfgUsersSuffix = config:get("couchdb", "users_db_suffix", "_users"),
     IsCfgUsersDb = fabric2_util:dbname_ends_with(Db, ?l2b(CfgUsersSuffix)),
     IsGlobalUsersDb = fabric2_util:dbname_ends_with(Db, <<"_users">>),
-    IsUsersDb = IsCfgUsersDb orelse IsGlobalUsersDb,
+    IsUsersDb = IsAuthCache orelse IsCfgUsersDb orelse IsGlobalUsersDb,
 
     {BDU, ADR} = if
         IsReplicatorDb ->
