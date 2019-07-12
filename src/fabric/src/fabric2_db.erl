@@ -1098,16 +1098,19 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
             end
     end,
 
-    % When recreating a deleted document we want to extend
-    % the winning revision branch rather than create a
-    % new branch. If we did not do this we could be
-    % recreating into a state that previously existed.
     Doc1 = case Winner of
         #{deleted := true} when not Doc0#doc.deleted ->
-            {WinnerRevPos, WinnerRev} = maps:get(rev_id, Winner),
-            WinnerRevPath = maps:get(rev_path, Winner),
-            Doc0#doc{revs = {WinnerRevPos, [WinnerRev | WinnerRevPath]}};
-        _ ->
+            % When recreating a deleted document we want to extend
+            % the winning revision branch rather than create a
+            % new branch. If we did not do this we could be
+            % recreating into a state that previously existed.
+            Doc0#doc{revs = fabric2_util:revinfo_to_revs(Winner)};
+        #{} ->
+            % Otherwise we're extending the target's revision
+            % history with this update
+            Doc0#doc{revs = fabric2_util:revinfo_to_revs(Target)};
+        not_found ->
+            % Creating a new doc means our revs start empty
             Doc0
     end,
 
