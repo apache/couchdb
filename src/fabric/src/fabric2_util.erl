@@ -14,6 +14,7 @@
 
 
 -export([
+    revinfo_to_revs/1,
     revinfo_to_path/1,
     sort_revinfos/1,
 
@@ -35,6 +36,14 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+
+
+revinfo_to_revs(RevInfo) ->
+    #{
+        rev_id := {RevPos, Rev},
+        rev_path := RevPath
+    } = RevInfo,
+    {RevPos, [Rev | RevPath]}.
 
 
 revinfo_to_path(RevInfo) ->
