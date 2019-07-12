@@ -162,7 +162,7 @@ all_dbs_callback({error, Reason}, #vacc{resp=Resp0}=Acc) ->
     {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
     {ok, Acc#vacc{resp=Resp1}}.
 
-handle_dbs_info_req(#httpd{method='POST'}=Req) ->
+handle_dbs_info_req(#httpd{method='POST', user_ctx=UserCtx}=Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = chttpd:json_body_obj(Req),
     Keys = couch_mrview_util:get_view_keys(Props),
@@ -179,13 +179,14 @@ handle_dbs_info_req(#httpd{method='POST'}=Req) ->
     {ok, Resp} = chttpd:start_json_response(Req, 200),
     send_chunk(Resp, "["),
     lists:foldl(fun(DbName, AccSeparator) ->
-        case catch fabric:get_db_info(DbName) of
-            {ok, Result} ->
-                Json = ?JSON_ENCODE({[{key, DbName}, {info, {Result}}]}),
-                send_chunk(Resp, AccSeparator ++ Json);
-            _ ->
-                Json = ?JSON_ENCODE({[{key, DbName}, {error, not_found}]}),
-                send_chunk(Resp, AccSeparator ++ Json)
+        try
+            {ok, Db} = fabric2_db:open(DbName, [{user_ctx, UserCtx}]),
+            {ok, Info} = fabric2_db:get_db_info(Db),
+            Json = ?JSON_ENCODE({[{key, DbName}, {info, {Info}}]}),
+            send_chunk(Resp, AccSeparator ++ Json)
+        catch error:database_does_not_exist ->
+            ErrJson = ?JSON_ENCODE({[{key, DbName}, {error, not_found}]}),
+            send_chunk(Resp, AccSeparator ++ ErrJson)
         end,
         "," % AccSeparator now has a comma
     end, "", Keys),
