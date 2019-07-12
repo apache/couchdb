@@ -12,16 +12,19 @@
 
 -module(chttpd_auth_cache).
 -behaviour(gen_server).
+-behaviour(config_listener).
 
 -export([start_link/0, get_user_creds/2, update_user_creds/3]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3]).
 -export([listen_for_changes/1, changes_callback/2]).
+-export([handle_config_change/5, handle_config_terminate/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_js_functions.hrl").
 
 -define(CACHE, chttpd_auth_cache_lru).
+-define(RELISTEN_DELAY, 5000).
 
 -record(state, {
     changes_pid,
@@ -101,16 +104,27 @@ maybe_increment_auth_cache_miss(UserName) ->
 %% gen_server callbacks
 
 init([]) ->
-    try
-        fabric2_db:open(dbname(), [?ADMIN_CTX])
-    catch error:database_does_not_exist ->
-        case fabric2_db:create(dbname(), [?ADMIN_CTX]) of
-            {ok, _} -> ok;
-            {error, file_exists} -> ok
-        end
-    end,
+    ensure_auth_db(),
+    ok = config:listen_for_changes(?MODULE, nil),
     self() ! {start_listener, 0},
     {ok, #state{}}.
+
+handle_call(reinit_cache, _From, State) ->
+    #state{
+        changes_pid = Pid
+    } = State,
+
+    % The database may currently be cached. This
+    % ensures that we've removed it so that the
+    % system db callbacks are installed.
+    fabric2_server:remove(dbname()),
+
+    ensure_auth_db(),
+    ets_lru:clear(?CACHE),
+    exit(Pid, shutdown),
+    self() ! {start_listener, 0},
+
+    {reply, ok, State#state{changes_pid = undefined}};
 
 handle_call(_Call, _From, State) ->
     {noreply, State}.
@@ -130,6 +144,9 @@ handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
     {noreply, State#state{last_seq=Seq}};
 handle_info({start_listener, Seq}, State) ->
     {noreply, State#state{changes_pid = spawn_changes(Seq)}};
+handle_info(restart_config_listener, State) ->
+    ok = config:listen_for_changes(?MODULE, nil),
+    {noreply, State};
 handle_info(_Msg, State) ->
     {noreply, State}.
 
@@ -181,6 +198,19 @@ changes_callback({timeout, _ResponseType}, Acc) ->
 changes_callback({error, _}, EndSeq) ->
     exit({seq, EndSeq}).
 
+
+handle_config_change("chttpd_auth", "authentication_db", _DbName, _, _) ->
+    {ok, gen_server:call(?MODULE, reinit_cache, infinity)};
+handle_config_change(_, _, _, _, _) ->
+    {ok, nil}.
+
+handle_config_terminate(_, stop, _) ->
+    ok;
+handle_config_terminate(_Server, _Reason, _State) ->
+    Dst = whereis(?MODULE),
+    erlang:send_after(?RELISTEN_DELAY, Dst, restart_config_listener).
+
+
 load_user_from_db(UserName) ->
     {ok, Db} = fabric2_db:open(dbname(), [?ADMIN_CTX]),
     try fabric2_db:open_doc(Db, docid(UserName), [conflicts]) of
@@ -193,6 +223,18 @@ load_user_from_db(UserName) ->
     catch error:database_does_not_exist ->
         nil
     end.
+
+
+ensure_auth_db() ->
+    try
+        fabric2_db:open(dbname(), [?ADMIN_CTX])
+    catch error:database_does_not_exist ->
+        case fabric2_db:create(dbname(), [?ADMIN_CTX]) of
+            {ok, _} -> ok;
+            {error, file_exists} -> ok
+        end
+    end.
+
 
 dbname() ->
     DbNameStr = config:get("chttpd_auth", "authentication_db", "_users"),
