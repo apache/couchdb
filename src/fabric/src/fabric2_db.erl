@@ -897,7 +897,7 @@ get_members(SecProps) ->
     end.
 
 
-apply_open_doc_opts(Doc, Revs, Options) ->
+apply_open_doc_opts(Doc0, Revs, Options) ->
     IncludeRevsInfo = lists:member(revs_info, Options),
     IncludeConflicts = lists:member(conflicts, Options),
     IncludeDelConflicts = lists:member(deleted_conflicts, Options),
@@ -906,7 +906,7 @@ apply_open_doc_opts(Doc, Revs, Options) ->
     % This revs_info becomes fairly useless now that we're
     % not keeping old document bodies around...
     Meta1 = if not IncludeRevsInfo -> []; true ->
-        {Pos, [Rev | RevPath]} = Doc#doc.revs,
+        {Pos, [Rev | RevPath]} = Doc0#doc.revs,
         RevPathMissing = lists:map(fun(R) -> {R, missing} end, RevPath),
         [{revs_info, Pos, [{Rev, available} | RevPathMissing]}]
     end,
@@ -932,7 +932,36 @@ apply_open_doc_opts(Doc, Revs, Options) ->
         [{local_seq, fabric2_fdb:vs_to_seq(SeqVS)}]
     end,
 
-    {ok, Doc#doc{meta = Meta1 ++ Meta2 ++ Meta3 ++ Meta4}}.
+    Doc1 = case lists:keyfind(atts_since, 1, Options) of
+        {_, PossibleAncestors} ->
+            #doc{
+                revs = DocRevs,
+                atts = Atts0
+            } = Doc0,
+            RevPos = find_ancestor_rev_pos(DocRevs, PossibleAncestors),
+            Atts1 = lists:map(fun(Att) ->
+                [AttPos, Data] = couch_att:fetch([revpos, data], Att),
+                if  AttPos > RevPos -> couch_att:store(data, Data, Att);
+                    true -> couch_att:store(data, stub, Att)
+                end
+            end, Atts0),
+            Doc0#doc{atts = Atts1};
+        false ->
+            Doc0
+    end,
+
+    {ok, Doc1#doc{meta = Meta1 ++ Meta2 ++ Meta3 ++ Meta4}}.
+
+
+find_ancestor_rev_pos({_, []}, _PossibleAncestors) ->
+    0;
+find_ancestor_rev_pos(_DocRevs, []) ->
+    0;
+find_ancestor_rev_pos({RevPos, [RevId | Rest]}, AttsSinceRevs) ->
+    case lists:member({RevPos, RevId}, AttsSinceRevs) of
+        true -> RevPos;
+        false -> find_ancestor_rev_pos({RevPos - 1, Rest}, AttsSinceRevs)
+    end.
 
 
 filter_found_revs(RevInfo, Revs) ->
