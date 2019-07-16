@@ -384,8 +384,12 @@ flush(Db, DocId, Att1) ->
     % If we were sent a gzip'ed attachment with no
     % length data, we have to set it here.
     Att3 = case DiskLen of
-        undefined -> store(disk_len, AttLen, Att2);
-        _ -> Att2
+        undefined when AttLen /= undefined ->
+            store(disk_len, AttLen, Att2);
+        undefined when is_binary(Data) ->
+            store(disk_len, size(Data), Att2);
+        _ ->
+            Att2
     end,
 
     % If no encoding has been set, default to
@@ -537,7 +541,7 @@ range_foldl(Bin1, From, To, Fun, Acc) when is_binary(Bin1) ->
     ReadLen = To - From,
     Bin2 = case Bin1 of
         _ when size(Bin1) < From -> <<>>;
-        <<_:From/binary, B2>> -> B2
+        <<_:From/binary, B2/binary>> -> B2
     end,
     Bin3 = case Bin2 of
         _ when size(Bin2) < ReadLen -> Bin2;
