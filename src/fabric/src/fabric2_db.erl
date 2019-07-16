@@ -55,6 +55,8 @@
     is_partitioned/1,
     is_system_db/1,
     is_system_db_name/1,
+    is_replicator_db/1,
+    is_users_db/1,
 
     set_revs_limit/2,
     %% set_purge_infos_limit/2,
@@ -377,6 +379,29 @@ is_system_db_name(DbName) when is_binary(DbName) ->
             ReOpts =  [{capture,none}, dollar_endonly],
             re:run(Prefix, ?DBNAME_REGEX, ReOpts) == match
     end.
+
+
+is_replicator_db(#{name := DbName}) ->
+    is_replicator_db(DbName);
+
+is_replicator_db(DbName) when is_binary(DbName) ->
+    fabric2_util:dbname_ends_with(DbName, <<"_replicator">>).
+
+
+is_users_db(#{name := DbName}) ->
+    is_users_db(DbName);
+
+is_users_db(DbName) when is_binary(DbName) ->
+    AuthenticationDb = config:get("chttpd_auth", "authentication_db"),
+    CfgUsersSuffix = config:get("couchdb", "users_db_suffix", "_users"),
+
+    IsAuthCache = if AuthenticationDb == undefined -> false; true ->
+        DbName == ?l2b(AuthenticationDb)
+    end,
+    IsCfgUsersDb = fabric2_util:dbname_ends_with(DbName, ?l2b(CfgUsersSuffix)),
+    IsGlobalUsersDb = fabric2_util:dbname_ends_with(DbName, <<"_users">>),
+
+    IsAuthCache orelse IsCfgUsersDb orelse IsGlobalUsersDb.
 
 
 set_revs_limit(#{} = Db, RevsLimit) ->
@@ -734,16 +759,8 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
 
 
 maybe_add_sys_db_callbacks(Db) ->
-    IsReplicatorDb = fabric2_util:dbname_ends_with(Db, <<"_replicator">>),
-
-    AuthenticationDb = config:get("chttpd_auth", "authentication_db"),
-    IsAuthCache = if AuthenticationDb == undefined -> false; true ->
-        name(Db) == ?l2b(AuthenticationDb)
-    end,
-    CfgUsersSuffix = config:get("couchdb", "users_db_suffix", "_users"),
-    IsCfgUsersDb = fabric2_util:dbname_ends_with(Db, ?l2b(CfgUsersSuffix)),
-    IsGlobalUsersDb = fabric2_util:dbname_ends_with(Db, <<"_users">>),
-    IsUsersDb = IsAuthCache orelse IsCfgUsersDb orelse IsGlobalUsersDb,
+    IsReplicatorDb = is_replicator_db(Db),
+    IsUsersDb = is_users_db(Db),
 
     {BDU, ADR} = if
         IsReplicatorDb ->
