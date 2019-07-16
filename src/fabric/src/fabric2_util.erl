@@ -124,8 +124,10 @@ validate_json_list_of_strings(Member, Props) ->
     end.
 
 
-dbname_ends_with(#{} = Db, Suffix) when is_binary(Suffix) ->
-    DbName = fabric2_db:name(Db),
+dbname_ends_with(#{} = Db, Suffix) ->
+    dbname_ends_with(fabric2_db:name(Db), Suffix);
+
+dbname_ends_with(DbName, Suffix) when is_binary(DbName), is_binary(Suffix) ->
     Suffix == filename:basename(DbName).
 
 
