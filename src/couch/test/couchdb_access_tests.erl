@@ -34,8 +34,6 @@ setup(_) ->
     % create users
     UserDbUrl = AdminUrl ++ "/_users",
     {ok, 201, _, _} = test_request:put(UserDbUrl, ""),
-    timer:sleep(10000),
-    
 
     UserXUrl = AdminUrl ++ "/_users/x",
     UserXBody = "{ \"name\":\"x\", \"roles\": [], \"password\":\"x\", \"type\": \"user\" }",
@@ -44,6 +42,10 @@ setup(_) ->
     UserYUrl = AdminUrl ++ "/_users/y",
     UserYBody = "{ \"name\":\"y\", \"roles\": [], \"password\":\"y\", \"type\": \"user\" }",
     {ok, 201, _, _} = test_request:put(UserYUrl, UserYBody),
+
+    ?debugFmt("~n~p", [test_request:get(UserXUrl)]),
+    ?debugFmt("~n~p", [test_request:get(UserYUrl)]),
+
     timer:sleep(10000),
     {AdminUrl, XUrl, YUrl}.
 

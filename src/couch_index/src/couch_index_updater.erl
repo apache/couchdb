@@ -152,14 +152,15 @@ update(Idx, Mod, IdxState) ->
         end,
 
         GetInfo = fun
-            (#full_doc_info{id=Id, update_seq=Seq, deleted=Del}=FDI) ->
-                {Id, Seq, Del, couch_doc:to_doc_info(FDI)};
-            (#doc_info{id=Id, high_seq=Seq, revs=[RI|_]}=DI) ->
-                {Id, Seq, RI#rev_info.deleted, DI}
+            (#full_doc_info{id=Id, update_seq=Seq, deleted=Del,access=Access}=FDI) ->
+                {Id, Seq, Del, couch_doc:to_doc_info(FDI), Access};
+            (#doc_info{id=Id, high_seq=Seq, revs=[RI|_],access=Access}=DI) ->
+                {Id, Seq, RI#rev_info.deleted, DI, Access}
         end,
 
         LoadDoc = fun(DI) ->
-            {DocId, Seq, Deleted, DocInfo} = GetInfo(DI),
+            
+            {DocId, Seq, Deleted, DocInfo, Access} = GetInfo(DI),
 
             case {IncludeDesign, DocId} of
                 {false, <<"_design/", _/binary>>} ->
@@ -170,7 +171,8 @@ update(Idx, Mod, IdxState) ->
                     {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
                     [RevInfo] = DocInfo#doc_info.revs,
                     Doc1 = Doc#doc{
-                        meta = [{body_sp, RevInfo#rev_info.body_sp}]
+                        meta = [{body_sp, RevInfo#rev_info.body_sp}],
+                        access = Access
                     },
                     {Doc1, Seq}
             end

@@ -351,7 +351,7 @@ max_seq(Tree, UpdateSeq) ->
     end,
     couch_key_tree:fold(FoldFun, UpdateSeq, Tree).
 
-to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree,update_seq=FDISeq}) ->
+to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree,update_seq=FDISeq,access=Access}) ->
     RevInfosAndPath = [
         {rev_info(Node), Path} || {_Leaf, Path} = Node <-
             couch_key_tree:get_all_leafs(Tree)
@@ -364,7 +364,7 @@ to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree,update_seq=FDISeq}) ->
         end, RevInfosAndPath),
     [{_RevInfo, WinPath}|_] = SortedRevInfosAndPath,
     RevInfos = [RevInfo || {RevInfo, _Path} <- SortedRevInfosAndPath],
-    {#doc_info{id=Id, high_seq=max_seq(Tree, FDISeq), revs=RevInfos}, WinPath}.
+    {#doc_info{id=Id, high_seq=max_seq(Tree, FDISeq), revs=RevInfos,access=Access}, WinPath}.
 
 rev_info({#leaf{} = Leaf, {Pos, [RevId | _]}}) ->
     #rev_info{

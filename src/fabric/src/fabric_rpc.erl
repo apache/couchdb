@@ -503,6 +503,7 @@ changes_enumerator(#full_doc_info{} = FDI, Acc) ->
 changes_enumerator(#doc_info{id= <<"_local/", _/binary>>, high_seq=Seq}, Acc) ->
     {ok, Acc#fabric_changes_acc{seq = Seq, pending = Acc#fabric_changes_acc.pending-1}};
 changes_enumerator(DocInfo, Acc) ->
+    couch_log:info("~n@@@@@@@@@@@ fabric_rpc:changes_enumerator() DocInfo: ~p~n", [DocInfo]),
     #fabric_changes_acc{
         db = Db,
         args = #changes_args{
@@ -535,6 +536,7 @@ changes_enumerator(DocInfo, Acc) ->
     {ok, Acc#fabric_changes_acc{seq = Seq, pending = Pending-1}}.
 
 doc_member(Shard, DocInfo, Opts, Filter) ->
+    couch_log:info("~n^^^^^^^^^^^^^^^^^^^^^ fabric_rpc:doc_member() DocInfo: ~p~n", [DocInfo]),
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of
     {ok, Doc} ->
         {doc, maybe_filtered_json_doc(Doc, Opts, Filter)};

@@ -258,7 +258,7 @@ query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
          ({row, Props}, Acc0) ->
             % turn row into FDI
             Value = couch_util:get_value(value, Props),
-            [_Owner, Seq] = couch_util:get_value(key, Props),
+            [Owner, Seq] = couch_util:get_value(key, Props),
 
             Rev = couch_util:get_value(rev, Value),
             Deleted = couch_util:get_value(deleted, Value, false),
@@ -270,7 +270,8 @@ query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
                 rev_tree = [{list_to_integer(Pos), {?l2b(RevId), #leaf{deleted=Deleted, ptr=BodySp, seq=Seq, sizes=#size_info{}}, []}}],
                 deleted = Deleted,
                 update_seq = 0,
-                sizes = #size_info{}
+                sizes = #size_info{},
+                access = [Owner]
             },
             Fun(FDI, Acc0);
         (_Else, Acc0) ->
