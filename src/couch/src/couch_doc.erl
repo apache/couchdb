@@ -57,7 +57,7 @@ to_json_body(true, {Body}, Access0) ->
     Body ++ [{<<"_deleted">>, true}] ++ [{<<"_access">>, {Access}}];
 to_json_body(false, {Body}, Access0) ->
     Access = reduce_access(Access0),
-    Body ++ [{<<"_access">>, {Access}}].
+    Body ++ [{<<"_access">>, Access}].
 
 to_json_revisions(Options, Start, RevIds0) ->
     RevIds = case proplists:get_value(revs, Options) of
@@ -127,6 +127,8 @@ to_json_obj(Doc, Options) ->
 
 doc_to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
             meta=Meta,access=Access}=Doc,Options)->
+    couch_log:info("~n~n ___________________doc_to_json_obj Access: ~p ~n~n", [Access]),
+            
     R={[{<<"_id">>, Id}]
         ++ to_json_rev(Start, RevIds)
         ++ to_json_body(Del, Body, Access)
@@ -134,7 +136,7 @@ doc_to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
         ++ to_json_meta(Meta)
         ++ to_json_attachments(Doc#doc.atts, Options)
     },
-    couch_log:info("~n~n loading this from disk: Doc: ~p ~n~n", [R]),
+    couch_log:info("~n~n ___________________loaded this from disk: Doc: ~p ~n~n", [R]),
     R.
 
 from_json_obj_validate(EJson) ->

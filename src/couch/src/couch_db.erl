@@ -280,6 +280,7 @@ open_doc(Db, IdOrDocInfo) ->
     open_doc(Db, IdOrDocInfo, []).
 
 open_doc(Db, Id, Options) ->
+    couch_log:info("~n$$$$$$$$$$$$$$$$$$$$$: open_doc Id: ~p~n", [Id]),
     increment_stat(Db, [couchdb, database_reads]),
     case open_doc_int(Db, Id, Options) of
     {ok, #doc{deleted=true}=Doc} ->
@@ -290,7 +291,8 @@ open_doc(Db, Id, Options) ->
             {not_found, deleted}
         end;
     Else ->
-        apply_open_options(Db, Else,Options)
+        couch_log:info("~n$$$$$$$$$$$$$$$$$$$$$: opened_doc Else : ~p~n", [Else ]),
+        apply_open_options(Db, Else, Options)
     end.
 
 apply_open_options(Db, {ok, Doc}, Options) ->
@@ -732,7 +734,7 @@ validate_access1(_) -> throw({forbidden, <<"can't touch this">>}).
 
 
 check_access(Db, #doc{access=Access}=Doc) ->
-    couch_log:info("check_access: ~n~n~p ~p~n~n", [Db, Doc]),
+    couch_log:info("check_access: ~n~n~p ~p~n~n", [Db#db.name, Doc]),
     check_access(Db, Access);
 check_access(Db, Access) ->
     #user_ctx{
@@ -1733,6 +1735,7 @@ open_doc_revs_int(Db, IdRevs, Options) ->
         IdRevs, LookupResults).
 
 open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, Options) ->
+    couch_log:info(">>> open_doc_int 1", []),
     case couch_db_engine:open_local_docs(Db, [Id]) of
     [#doc{} = Doc] ->
         apply_open_options(Db, {ok, Doc}, Options);
@@ -1740,18 +1743,22 @@ open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, Options) ->
         {not_found, missing}
     end;
 open_doc_int(Db, #doc_info{id=Id,revs=[RevInfo|_]}=DocInfo, Options) ->
+    couch_log:info(">>> open_doc_int 2", []),
     #rev_info{deleted=IsDeleted,rev={Pos,RevId},body_sp=Bp} = RevInfo,
     Doc = make_doc(Db, Id, IsDeleted, Bp, {Pos,[RevId]}),
     apply_open_options(Db,
        {ok, Doc#doc{meta=doc_meta_info(DocInfo, [], Options)}}, Options);
-open_doc_int(Db, #full_doc_info{id=Id,rev_tree=RevTree}=FullDocInfo, Options) ->
+open_doc_int(Db, #full_doc_info{id=Id,rev_tree=RevTree,access=Access}=FullDocInfo, Options) ->
+    couch_log:info(">>> open_doc_int 3, FDI: ~p, Access: ~p", [FullDocInfo, Access]),
     #doc_info{revs=[#rev_info{deleted=IsDeleted,rev=Rev,body_sp=Bp}|_]} =
         DocInfo = couch_doc:to_doc_info(FullDocInfo),
     {[{_, RevPath}], []} = couch_key_tree:get(RevTree, [Rev]),
-    Doc = make_doc(Db, Id, IsDeleted, Bp, RevPath),
+    Doc = make_doc(Db, Id, IsDeleted, Bp, RevPath, Access),
+    couch_log:info(">>> ***** open_doc_int 3 made that doc: ~p", [Doc]),
     apply_open_options(Db,
         {ok, Doc#doc{meta=doc_meta_info(DocInfo, RevTree, Options)}}, Options);
 open_doc_int(Db, Id, Options) ->
+    couch_log:info(">>> open_doc_int 4", []),
     case get_full_doc_info(Db, Id) of
     #full_doc_info{} = FullDocInfo ->
         open_doc_int(Db, FullDocInfo, Options);
@@ -1799,22 +1806,28 @@ doc_meta_info(#doc_info{high_seq=Seq,revs=[#rev_info{rev=Rev}|RestInfo]}, RevTre
     true -> [{local_seq, Seq}]
     end.
 
+make_doc(Db, Id, Deleted, Bp, RevisionPath) ->
+    make_doc(Db, Id, Deleted, Bp, RevisionPath, []);
+make_doc(Db, Id, Deleted, Bp, {Pos, Revs}) ->
+    make_doc(Db, Id, Deleted, Bp, {Pos, Revs}, []).
 
-make_doc(_Db, Id, Deleted, nil = _Bp, RevisionPath) ->
+make_doc(_Db, Id, Deleted, nil = _Bp, RevisionPath, Access) ->
     #doc{
         id = Id,
         revs = RevisionPath,
         body = [],
         atts = [],
-        deleted = Deleted
+        deleted = Deleted,
+        access = Access
     };
-make_doc(#db{} = Db, Id, Deleted, Bp, {Pos, Revs}) ->
+make_doc(#db{} = Db, Id, Deleted, Bp, {Pos, Revs}, Access) ->
     RevsLimit = get_revs_limit(Db),
     Doc0 = couch_db_engine:read_doc_body(Db, #doc{
         id = Id,
         revs = {Pos, lists:sublist(Revs, 1, RevsLimit)},
         body = Bp,
-        deleted = Deleted
+        deleted = Deleted,
+        access = Access
     }),
 
     Doc1 = case Doc0#doc.atts of

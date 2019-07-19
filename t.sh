@@ -1,33 +1,32 @@
 #!/bin/sh -x
 DB=http://a:a@127.0.0.1:15984 #
-XDB=http://x:x@127.0.0.1:15984
+XDB=http://xxxx:x@127.0.0.1:15984
 YDB=http://y:y@127.0.0.1:15984
 
-curl -sX PUT $DB/_users/org.couchdb.user:x -d @user.json > /dev/null #
+curl -sX PUT $DB/_users/org.couchdb.user:xxxx -d @user.json > /dev/null #
 curl -sX PUT $DB/_users/org.couchdb.user:y -d @user2.json > /dev/null #
 
 curl -sX DELETE $DB/db
-
-
 curl -sX PUT $DB/db?q=1'&access=true'
 ##############
-
-
-
-curl -sX PUT $DB/db/a -d '{"a":1,"_access":["x"]}'
-curl -sX PUT $DB/db/b -d '{"b":2,"_access":["x"]}'
-curl -sX PUT $DB/db/c -d '{"c":3,"_access":["y"]}'
-curl -X PUT $XDB/db/c?rev="1-0865d643568aa9be6bcdc15d88b25912" -d '{"c":6,"_access":["y"]}'
+curl -sX PUT $DB/db/a -d '{"a":1,"_access":["xxxx"]}'
+curl -s $DB/db/a
+curl -s $XDB/db/a
+curl -s $YDB/db/a
 #
-curl -sX PUT $DB/db/d -d '{"d":4,"_access":["y"]}'
+# curl -sX PUT $DB/db/b -d '{"b":2,"_access":["x"]}'
+# curl -sX PUT $DB/db/c -d '{"c":3,"_access":["y"]}'
+# curl -X PUT $XDB/db/c?rev="1-0865d643568aa9be6bcdc15d88b25912" -d '{"c":6,"_access":["y"]}'
+# #
+# curl -sX PUT $DB/db/d -d '{"d":4,"_access":["y"]}'
+# #
+# curl -sX DELETE $DB/db/a?rev="1-967a00dff5e02add41819138abb3284d"
 #
-curl -sX DELETE $DB/db/a?rev="1-967a00dff5e02add41819138abb3284d"
-
-echo 
-echo "setup done"
-echo
-
+# echo
+# echo "setup done"
+# echo
 #
+# #
 # curl -s $DB/db/_all_docs?include_docs=true
 # curl -s $XDB/db/_all_docs?include_docs=true
 # curl -s $YDB/db/_all_docs?include_docs=true
@@ -35,16 +34,16 @@ echo
 # curl -s $DB/db/_changes?include_docs=true
 # curl -s $XDB/db/_changes?include_docs=true
 # curl -s $YDB/db/_changes?include_docs=true
-# #
+# # #
 # curl -s $DB/db/a
 # curl -s $DB/db/b
 # curl -s $DB/db/c
 # curl -s $DB/db/d
 #
-curl -s $XDB/db/a
-curl -s $XDB/db/b
-curl -s $XDB/db/c
-curl -s $XDB/db/d
+# curl -s $XDB/db/a
+# curl -s $XDB/db/b
+# curl -s $XDB/db/c
+# curl -s $XDB/db/d
 #
 # curl -s $YDB/db/a
 # curl -s $YDB/db/b

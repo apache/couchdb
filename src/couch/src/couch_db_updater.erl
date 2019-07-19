@@ -255,6 +255,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 sort_and_tag_grouped_docs(Client, GroupedDocs) ->
+    couch_log:info("~nBERTBERTBERTBERTBERTBERTBERTBERTBERT: GroupedDocs: ~p", [GroupedDocs]),
     % These groups should already be sorted but sometimes clients misbehave.
     % The merge_updates function will fail and the database can end up with
     % duplicate documents if the incoming groups are not sorted, so as a sanity
@@ -311,7 +312,7 @@ init_db(DbName, FilePath, EngineState, Options) ->
     ADR = couch_util:get_value(after_doc_read, Options, nil),
     Access = couch_util:get_value(access, Options, false),
     CleanedOpts = [Opt || Opt <- Options, Opt /= create],
-    
+
     InitDb = #db{
         name = DbName,
         filepath = FilePath,
@@ -607,7 +608,6 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
     {ok, IndexFDIs} = flush_trees(Db, NewFullDocInfos, []),
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
     LocalDocs2 = update_local_doc_revs(LocalDocs),
-
     {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
 
     WriteCount = length(IndexFDIs),

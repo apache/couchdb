@@ -35,8 +35,6 @@ assemble(#btree{assemble_kv=Assemble}, Key, Value) ->
 less(#btree{less=undefined}, A, B) ->
     A < B;
 less(#btree{less=Less}, A, B) ->
-    couch_log:info("~n A:~p~n", [A]),
-    couch_log:info("~n B:~p~n", [B]),
     Less(A, B).
 
 % pass in 'nil' for State if a new Btree.
@@ -107,16 +105,15 @@ full_reduce_with_options(Bt, Options0) ->
     Options = Options0 ++ [
         {end_key, EndKey}
     ],
-    couch_log:info("~n Options:~p~n", [Options]),
+    % couch_log:info("~n Options:~p~n", [Options]),
     R = fold_reduce(Bt, CountFun, 0, Options),
-    couch_log:info("~n~n R: ~p ~n", [R]),
+    % couch_log:info("~n~n R: ~p ~n", [R]),
     R.
 
 full_reduce(#btree{root=nil,reduce=Reduce}) ->
     {ok, Reduce(reduce, [])};
 full_reduce(#btree{root=Root}) ->
     {ok, element(2, Root)}.
-
 
 size(#btree{root = nil}) ->
     0;
