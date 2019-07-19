@@ -409,7 +409,6 @@ write_doc_infos(#st{} = St, Pairs, LocalDocs) ->
     end, {[], [], []}, Pairs),
 
     {Add, RemIds, RemSeqs} = FinalAcc,
-    couch_log:info("~n > > > > > write path: ENGINE:write_doc_infos: FinalAcc:~p ~n", [FinalAcc]),
     {ok, IdTree2} = couch_btree:add_remove(IdTree, Add, RemIds),
     {ok, SeqTree2} = couch_btree:add_remove(SeqTree, Add, RemSeqs),
 
@@ -688,22 +687,6 @@ seq_tree_reduce(rereduce, Reds) ->
 
 join_access(Access) -> Access.
 split_access(Access) -> Access.
-
-% split_access([]) ->
-%     [];
-% split_access(Access) when is_list(Access) ->
-%     term_to_binary(Access);
-% split_access(Access) ->
-%     couch_log:info("~n~n &&&&&&&& split IN VAL ID ACC ESS: ~p~n~n", [Access]),
-%     throw(invalid_access_term_in_fdi).
-%
-% join_access([]) ->
-%     [];
-% join_access(Access) when is_binary(Access) ->
-%     binary_to_term(Access);
-% join_access(Access) ->
-%     couch_log:info("~n~n &&&&&&&& JOIN IN VAL ID ACC ESS: ~p~n~n", [Access]),
-%     throw(invalid_access_term_in_fdi).
 
 local_tree_split(#doc{revs = {0, [Rev]}} = Doc) when is_binary(Rev) ->
     #doc{

@@ -256,7 +256,6 @@ query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
          ({meta, _}, Acc0) ->
             {ok, Acc0}; % ignore for now
          ({row, Props}, Acc0) ->
-            couch_log:info("~n~n Props: ~p", [Props]),
             % turn row into FDI
             Value = couch_util:get_value(value, Props),
             [_Owner, Seq] = couch_util:get_value(key, Props),
@@ -598,7 +597,6 @@ map_fold(Db, View, Args, Callback, UAcc) ->
         _Else ->
             couch_mrview_util:get_row_count(View)
     end,
-    couch_log:info("~n~n Total: ~p~n", [Total]),
     Acc = #mracc{
         db=Db,
         total_rows=Total,

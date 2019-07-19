@@ -127,17 +127,13 @@ to_json_obj(Doc, Options) ->
 
 doc_to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
             meta=Meta,access=Access}=Doc,Options)->
-    couch_log:info("~n~n ___________________doc_to_json_obj Access: ~p ~n~n", [Access]),
-            
-    R={[{<<"_id">>, Id}]
+    {[{<<"_id">>, Id}]
         ++ to_json_rev(Start, RevIds)
         ++ to_json_body(Del, Body, Access)
         ++ to_json_revisions(Options, Start, RevIds)
         ++ to_json_meta(Meta)
         ++ to_json_attachments(Doc#doc.atts, Options)
-    },
-    couch_log:info("~n~n ___________________loaded this from disk: Doc: ~p ~n~n", [R]),
-    R.
+    }.
 
 from_json_obj_validate(EJson) ->
     from_json_obj_validate(EJson, undefined).
@@ -145,7 +141,6 @@ from_json_obj_validate(EJson) ->
 from_json_obj_validate(EJson, DbName) ->
     MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
     Doc = from_json_obj(EJson, DbName),
-    couch_log:info("~n~n writing this to disk: Doc: ~p ~n~n", [Doc]),
     case couch_ejson_size:encoded_size(Doc#doc.body) =< MaxSize of
         true ->
              validate_attachment_sizes(Doc#doc.atts),

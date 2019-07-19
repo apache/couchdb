@@ -255,7 +255,7 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 sort_and_tag_grouped_docs(Client, GroupedDocs) ->
-    couch_log:info("~nBERTBERTBERTBERTBERTBERTBERTBERTBERT: GroupedDocs: ~p", [GroupedDocs]),
+    % couch_log:info("~nBERTBERTBERTBERTBERTBERTBERTBERTBERT: GroupedDocs: ~p", [GroupedDocs]),
     % These groups should already be sorted but sometimes clients misbehave.
     % The merge_updates function will fail and the database can end up with
     % duplicate documents if the incoming groups are not sorted, so as a sanity

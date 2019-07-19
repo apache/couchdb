@@ -1269,10 +1269,8 @@ couch_doc_open(Db, DocId, Rev, Options0) ->
     nil -> % open most recent rev
         case fabric:open_doc(Db, DocId, Options) of
         {ok, Doc} ->
-             couch_log:info("~n################ chttpd couch_doc_open: Doc: ~p", [Doc]),
              Doc;
          Error ->
-             couch_log:info("~n################ chttpd couch_doc_open ERROR: Error: ~p", [Error]),
              throw(Error)
          end;
     _ -> % open a specific rev (deletions come back as stubs)

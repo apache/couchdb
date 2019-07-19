@@ -204,7 +204,6 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
                     case IdxName of
                         <<"_design/_access">> ->
                             % splice in seq
-                            couch_log:info("~n~nRevvvv: ~p Body~p, Meta: ~p~n", [Rev, Body, Meta]),
                             {Start, Rev1} = Rev,
                             Doc = #doc{
                                 id = Id,
@@ -213,7 +212,6 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
                                 deleted = true
                             },
                             {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc),
-                            couch_log:info("~n~nRessss: ~p~n~n", [Res]),
                             {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, Res} | Results]};
                         _Else ->
                             {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, []} | Results]}
