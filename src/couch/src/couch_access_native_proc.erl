@@ -145,6 +145,6 @@ map_doc(_St, {Doc}) ->
                 [[UserOrRole, Seq], [{rev, Rev}, {deleted, Deleted}, {body_sp, BodySp}]]
             ] end, Access),
             ById ++ BySeq;
-        _Else ->
+        Else ->
             [[],[]] % no comprende: should not be needed once we implement _access field validation
     end.

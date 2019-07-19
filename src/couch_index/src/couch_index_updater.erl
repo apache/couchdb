@@ -159,7 +159,6 @@ update(Idx, Mod, IdxState) ->
         end,
 
         LoadDoc = fun(DI) ->
-            
             {DocId, Seq, Deleted, DocInfo, Access} = GetInfo(DI),
 
             case {IncludeDesign, DocId} of
