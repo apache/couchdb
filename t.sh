@@ -1,7 +1,7 @@
 #!/bin/sh -x
-DB=http://a:a@127.0.0.1:15984 #
-XDB=http://x:x@127.0.0.1:15984
-YDB=http://y:y@127.0.0.1:15984
+DB=http://a:a@127.0.0.1:63136 #
+XDB=http://x:x@127.0.0.1:63136
+YDB=http://y:y@127.0.0.1:63136
 
 curl -sX DELETE $DB/_users
 curl -sX PUT $DB/_users?q=1

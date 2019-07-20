@@ -121,7 +121,6 @@ code_change(_OldVsn, St, _Extra) ->
 % {"id":"account/bongel","key":"account/bongel","value":{"rev":"1-967a00dff5e02add41819138abb3284d"}},
 
 map_doc(_St, {Doc}) ->
-    couch_log:info("Mebbe Indexing: Doc: ~p", [Doc]),
     case couch_util:get_value(<<"_access">>, Doc) of
         undefined ->
             [[],[]]; % do not index this doc
