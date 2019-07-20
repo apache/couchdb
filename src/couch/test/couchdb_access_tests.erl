@@ -55,7 +55,7 @@ before_all() ->
     Couch.
 
 after_all(_) ->
-    test_util:stop_couch(done).
+    ok = test_util:stop_couch(done).
 
 access_test_() ->
     Tests = [
@@ -65,9 +65,9 @@ access_test_() ->
         fun should_let_admin_read_doc_with_access/2,
         fun user_with_access_can_read_doc/2,
         fun user_without_access_can_not_read_doc/2,
-        % fun should_let_admin_delete_doc_with_access/2,
-        % fun should_let_user_delete_doc_for_themselves/2,
-        % fun should_not_let_user_delete_doc_for_someone_else/2,
+        fun should_let_admin_delete_doc_with_access/2,
+        fun should_let_user_delete_doc_for_themselves/2,
+        fun should_not_let_user_delete_doc_for_someone_else/2,
         fun should_let_admin_fetch_all_docs/2,
         fun should_let_user_fetch_their_own_all_docs/2,
         fun should_let_admin_fetch_changes/2,
@@ -122,18 +122,19 @@ user_without_access_can_not_read_doc(_PortType, Url) ->
 % Doc deletes
 should_let_admin_delete_doc_with_access(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(Url ++ "/db/a", ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
-    {ok, Code, _, _} = test_request:delete(Url ++ "/db/a?rev=1-967a00dff5e02add41819138abb3284d", ?ADMIN_REQ_HEADERS),
-    ?_assertEqual(200, Code).
+    {ok, Code, _, _} = test_request:delete(Url ++ "/db/a?rev=1-23202479633c2b380f79507a776743d5", ?ADMIN_REQ_HEADERS),
+    ?_assertEqual(201, Code).
 
 should_let_user_delete_doc_for_themselves(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(Url ++ "/db/a", ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
-    {ok, Code, _, _} = test_request:delete(Url ++ "/db/a?rev=1-967a00dff5e02add41819138abb3284d"),
-    ?_assertEqual(200, Code).
+    {ok, _, _, _} = test_request:get(Url ++ "/db/a", ?USERX_REQ_HEADERS),
+    {ok, Code, _, _} = test_request:delete(Url ++ "/db/a?rev=1-23202479633c2b380f79507a776743d5", ?USERX_REQ_HEADERS),
+    ?_assertEqual(201, Code).
 
 should_not_let_user_delete_doc_for_someone_else(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(Url ++ "/db/a", ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
-    {ok, Code, _, _} = test_request:delete(Url ++ "/db/a?rev=1-967a00dff5e02add41819138abb3284d", ?USERY_REQ_HEADERS),
-    ?_assertEqual(401, Code).
+    {ok, Code, _, _} = test_request:delete(Url ++ "/db/a?rev=1-23202479633c2b380f79507a776743d5", ?USERY_REQ_HEADERS),
+    ?_assertEqual(403, Code).
 
 % _all_docs with include_docs
 should_let_admin_fetch_all_docs(_PortType, Url) ->

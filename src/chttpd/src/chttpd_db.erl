@@ -776,20 +776,11 @@ all_docs_view(Req, Db, Keys, OP) ->
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
-    #doc{body={OldDocProps}} = Doc = couch_doc_open(Db, DocId, nil, []),
-    NewProps0 = case chttpd:qs_value(Req, "rev") of
-    undefined ->
-        [{<<"_deleted">>,true}];
-    Rev ->
-        [{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]
-    end,
-    NewProps1 = case couch_util:get_value(<<"_access">>, OldDocProps) of
-    undefined ->
-        NewProps0;
-    Access ->
-        [{<<"_access">>, Access} | NewProps0]
-    end,
-    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, DocId, {NewProps1}));
+    OldDoc = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
+    NewRevs = couch_doc:parse_rev(chttpd:qs_value(Req, "rev")),
+    NewBody = {[{<<"_deleted">>}, true]},
+    NewDoc = OldDoc#doc{revs=NewRevs, body=NewBody},
+    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, DocId, NewDoc));
 
 db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
     #doc_query_args{

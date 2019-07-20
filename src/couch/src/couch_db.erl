@@ -732,6 +732,7 @@ validate_access1(_) -> throw({forbidden, <<"can't touch this">>}).
 
 
 check_access(Db, #doc{access=Access}=Doc) ->
+    % couch_log:info("~ncheck da access, Doc: ~p, Db: ~p~n", [Doc, Db]),
     check_access(Db, Access);
 check_access(Db, Access) ->
     #user_ctx{
