@@ -1143,7 +1143,7 @@ prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldI
 
 
 
-new_revid(#doc{body=Body, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted}) ->
+new_revid(#doc{body=Body, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted}=Doc) ->
     DigestedAtts = lists:foldl(fun(Att, Acc) ->
         [N, T, M] = couch_att:fetch([name, type, md5], Att),
         case M == <<>> of
@@ -1157,7 +1157,8 @@ new_revid(#doc{body=Body, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted}) 
             ?l2b(integer_to_list(couch_util:rand32()));
         Atts2 ->
             OldRev = case OldRevs of [] -> 0; [OldRev0|_] -> OldRev0 end,
-            couch_hash:md5_hash(term_to_binary([Deleted, OldStart, OldRev, Body, Atts2], [{minor_version, 1}]))
+            H = couch_hash:md5_hash(term_to_binary([Deleted, OldStart, OldRev, Body, Atts2], [{minor_version, 1}])),
+            H
     end.
 
 new_revs([], OutBuckets, IdRevsAcc) ->
@@ -1420,7 +1421,7 @@ before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun, UpdateType
         (#doc{atts = Atts}) -> Atts /= []
     end,
 
-    case lists:any(ValidatePred, Docs2) of
+    case (VDFuns /= []) orelse lists:any(ValidatePred, Docs2) of
         true ->
             % lookup the doc by id and get the most recent
             Ids = [Id || [#doc{id = Id} | _] <- DocBuckets],
@@ -1732,7 +1733,6 @@ open_doc_revs_int(Db, IdRevs, Options) ->
         IdRevs, LookupResults).
 
 open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, Options) ->
-%    couch_log:info(">>> open_doc_int 1", []),
     case couch_db_engine:open_local_docs(Db, [Id]) of
     [#doc{} = Doc] ->
         apply_open_options(Db, {ok, Doc}, Options);
@@ -1740,22 +1740,18 @@ open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, Options) ->
         {not_found, missing}
     end;
 open_doc_int(Db, #doc_info{id=Id,revs=[RevInfo|_],access=Access}=DocInfo, Options) ->
-%   couch_log:info(">>> open_doc_int 2, DocInfo: ~p", [DocInfo]),
     #rev_info{deleted=IsDeleted,rev={Pos,RevId},body_sp=Bp} = RevInfo,
     Doc = make_doc(Db, Id, IsDeleted, Bp, {Pos,[RevId]}, Access),
     apply_open_options(Db,
        {ok, Doc#doc{meta=doc_meta_info(DocInfo, [], Options)}}, Options);
 open_doc_int(Db, #full_doc_info{id=Id,rev_tree=RevTree,access=Access}=FullDocInfo, Options) ->
-%   couch_log:info(">>> open_doc_int 3, FDI: ~p, Access: ~p", [FullDocInfo, Access]),
     #doc_info{revs=[#rev_info{deleted=IsDeleted,rev=Rev,body_sp=Bp}|_]} =
         DocInfo = couch_doc:to_doc_info(FullDocInfo),
     {[{_, RevPath}], []} = couch_key_tree:get(RevTree, [Rev]),
     Doc = make_doc(Db, Id, IsDeleted, Bp, RevPath, Access),
-%   couch_log:info(">>> ***** open_doc_int 3 made that doc: ~p", [Doc]),
     apply_open_options(Db,
         {ok, Doc#doc{meta=doc_meta_info(DocInfo, RevTree, Options)}}, Options);
 open_doc_int(Db, Id, Options) ->
-%    couch_log:info(">>> open_doc_int 4", []),
     case get_full_doc_info(Db, Id) of
     #full_doc_info{} = FullDocInfo ->
         open_doc_int(Db, FullDocInfo, Options);

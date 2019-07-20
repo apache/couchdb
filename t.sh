@@ -3,10 +3,12 @@ DB=http://a:a@127.0.0.1:15984 #
 XDB=http://x:x@127.0.0.1:15984
 YDB=http://y:y@127.0.0.1:15984
 
+curl -sX DELETE $DB/_users
+curl -sX PUT $DB/_users?q=1
 curl -sX PUT $DB/_users/org.couchdb.user:x -d @user.json > /dev/null #
 curl -sX PUT $DB/_users/org.couchdb.user:y -d @user2.json > /dev/null #
 
-# curl -sX DELETE $DB/_global_changes
+curl -sX DELETE $DB/_global_changes # reduce log noise
 curl -sX DELETE $DB/db
 curl -sX PUT $DB/db?q=1'&access=true'
 
@@ -14,11 +16,11 @@ curl -sX DELETE $DB/db2
 curl -sX PUT $DB/db2
 
 # ##############
-curl -sX PUT $DB/db/a -d '{"a":1,"_access":["x"]}'
-curl -s $DB/db/a
+curl -vX PUT $DB/db/a -d '{"a":1,"_access":["x"]}' -Hcontent-type:application/json
+# curl -s $DB/db/a
 
-curl -sX PUT $DB/db2/a -d '{"a":1,"_access":["x"]}'
-curl -s $DB/db2/a
+curl -vX PUT $DB/db2/a -d '{"b":1,"_access":["x"]}' -Hcontent-type:application/json
+# curl -s $DB/db2/a
 
 
 curl -s $XDB/db/a
@@ -29,7 +31,7 @@ curl -sX PUT $DB/db/c -d '{"c":3,"_access":["y"]}'
 curl -X PUT $XDB/db/c?rev="1-0865d643568aa9be6bcdc15d88b25912" -d '{"c":6,"_access":["y"]}'
 #
 curl -sX PUT $DB/db/d -d '{"d":4,"_access":["y"]}'
-#
+
 curl -sX DELETE $DB/db/a?rev="1-967a00dff5e02add41819138abb3284d"
 
 # echo
