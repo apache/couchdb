@@ -498,3 +498,36 @@ make_delete_dir_test_case({RootDir, ViewDir}, DeleteAfterRename) ->
 remove_dir(Dir) ->
     [file:delete(File) || File <- filelib:wildcard(filename:join([Dir, "*"]))],
     file:del_dir(Dir).
+
+
+fsync_error_test_() ->
+    {
+        "Test fsync raises errors",
+        {
+            setup,
+            fun() ->
+                test_util:start(?MODULE, [ioq])
+            end,
+            fun(Ctx) ->
+                test_util:stop(Ctx)
+            end,
+            [
+                fun fsync_raises_errors/0
+            ]
+        }
+    }.
+
+
+fsync_raises_errors() ->
+    Fd = spawn(fun() -> fake_fsync_fd() end),
+    ?assertError({fsync_error, eio}, couch_file:sync(Fd)).
+
+
+fake_fsync_fd() ->
+    % Mocking gen_server did not go very
+    % well so faking the couch_file pid
+    % will have to do.
+    receive
+        {'$gen_call', From, sync} ->
+            gen:reply(From, {error, eio})
+    end.
