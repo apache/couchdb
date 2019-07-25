@@ -985,17 +985,18 @@ get_fold_opts(RangePrefix, Options) ->
 
     % Set the maximum bounds for the start and endkey
     StartKey2 = case StartKey1 of
-        undefined -> <<>>;
-        SK2 -> SK2
+        undefined ->
+            <<RangePrefix/binary, 16#00>>;
+        SK2 ->
+            erlfdb_tuple:pack({SK2}, RangePrefix)
     end,
 
     EndKey2 = case EndKey1 of
-        undefined -> <<255>>;
-        EK2 -> EK2
+        undefined ->
+            <<RangePrefix/binary, 16#FF>>;
+        EK2 ->
+            erlfdb_tuple:pack({EK2}, RangePrefix)
     end,
-
-    StartKey3 = erlfdb_tuple:pack({StartKey2}, RangePrefix),
-    EndKey3 = erlfdb_tuple:pack({EndKey2}, RangePrefix),
 
     % FoundationDB ranges are applied as SK <= key < EK
     % By default, CouchDB is SK <= key <= EK with the
@@ -1006,20 +1007,20 @@ get_fold_opts(RangePrefix, Options) ->
     % Thus we have this wonderful bit of logic to account
     % for all of those combinations.
 
-    StartKey4 = case {Reverse, InclusiveEnd} of
+    StartKey3 = case {Reverse, InclusiveEnd} of
         {true, false} ->
-            erlfdb_key:first_greater_than(StartKey3);
+            erlfdb_key:first_greater_than(StartKey2);
         _ ->
-            StartKey3
+            StartKey2
     end,
 
-    EndKey4 = case {Reverse, InclusiveEnd} of
+    EndKey3 = case {Reverse, InclusiveEnd} of
         {false, true} when EndKey0 /= undefined ->
-            erlfdb_key:first_greater_than(EndKey3);
+            erlfdb_key:first_greater_than(EndKey2);
         {true, _} ->
-            erlfdb_key:first_greater_than(EndKey3);
+            erlfdb_key:first_greater_than(EndKey2);
         _ ->
-            EndKey3
+            EndKey2
     end,
 
     Skip = case fabric2_util:get_value(skip, Options) of
@@ -1053,7 +1054,7 @@ get_fold_opts(RangePrefix, Options) ->
             ++ StreamingMode
             ++ Snapshot,
 
-    {StartKey4, EndKey4, Skip, OutOpts}.
+    {StartKey3, EndKey3, Skip, OutOpts}.
 
 
 fold_range_cb(KV, {skip, 0, Callback, Acc}) ->
