@@ -170,8 +170,18 @@ eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell
 eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
-	  $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
-	done
+            tries=0; \
+            while true; do \
+                $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir ; \
+                if [ $$? -eq 0 ]; then \
+                    break; \
+                else \
+                    let "tries=tries+1"; \
+                    [ $$tries -gt 2 ] && exit 1; \
+                fi \
+            done \
+        done
+
 
 .PHONY: exunit
 # target: exunit - Run ExUnit tests
