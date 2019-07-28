@@ -46,7 +46,7 @@ pbkdf2_test_()->
                                      <<"sa\0lt">>,
                                      4096, 16))},
 
-         {timeout, 180,  %% this may runs too long on slow hosts
+         {timeout, 600,  %% this may runs too long on slow hosts
           {"Iterations: 16777216 - this may take some time",
            ?_assertEqual(
                {ok, <<"eefe3d61cd4da4e4e9945b3d6ba2158c2634e984">>},
