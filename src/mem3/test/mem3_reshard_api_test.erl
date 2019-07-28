@@ -645,7 +645,7 @@ recover_in_source_delete({Top, {Db1, _, _}}) ->
 
 
 check_max_jobs({Top, {Db1, Db2, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Jobs = Top ++ ?JOBS,
 
         config:set("reshard", "max_jobs", "0", _Persist=false),
@@ -679,7 +679,7 @@ check_max_jobs({Top, {Db1, Db2, _}}) ->
         % Jobs that have been created already are not removed if max jobs is lowered
         % so make sure the job completes
         wait_to_complete(Top, R4)
-    end).
+    end)}.
 
 
 check_node_and_range_required_params({Top, {Db1, _, _}}) ->
