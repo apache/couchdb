@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(ROWS, 1000).
+-define(TIMEOUT, 60). % seconds
 
 
 setup() ->
@@ -276,7 +277,9 @@ should_add_every_odd_key_remove_every_even(KeyValues, {_, Btree}) ->
             false -> {Count + 1, Left, [X | Right]}
         end
                                             end, {0, [], []}, KeyValues),
-    ?_assert(test_add_remove(Btree1, Rem2Keys0, Rem2Keys1)).
+    {timeout, ?TIMEOUT,
+        ?_assert(test_add_remove(Btree1, Rem2Keys0, Rem2Keys1))
+    }.
 
 should_add_every_even_key_remove_every_old(KeyValues, {_, Btree}) ->
     {ok, Btree1} = couch_btree:add_remove(Btree, KeyValues, []),
@@ -286,7 +289,9 @@ should_add_every_even_key_remove_every_old(KeyValues, {_, Btree}) ->
             false -> {Count + 1, Left, [X | Right]}
         end
                                             end, {0, [], []}, KeyValues),
-    ?_assert(test_add_remove(Btree1, Rem2Keys1, Rem2Keys0)).
+    {timeout, ?TIMEOUT,
+        ?_assert(test_add_remove(Btree1, Rem2Keys1, Rem2Keys0))
+    }.
 
 
 should_reduce_without_specified_direction({_, Btree}) ->
