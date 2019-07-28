@@ -27,6 +27,7 @@
 -define(STATE, "_reshard/state").
 -define(ID, <<"id">>).
 -define(OK, <<"ok">>).
+-define(TIMEOUT, 60). % seconds
 
 
 setup() ->
@@ -110,7 +111,7 @@ mem3_reshard_api_test_() ->
 
 
 basics({Top, _}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         % GET /_reshard
         ?assertMatch({200, #{
             <<"state">> := <<"running">>,
@@ -137,11 +138,11 @@ basics({Top, _}) ->
         ?assertMatch({404, _}, req(get, Top ++ ?RESHARD ++ "/invalidpath")),
         ?assertMatch({405, _}, req(put, Top ++ ?RESHARD, #{dont => thinkso})),
         ?assertMatch({405, _}, req(post, Top ++ ?RESHARD, #{nope => nope}))
-    end).
+    end)}.
 
 
 create_job_basic({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         % POST /_reshard/jobs
         {C1, R1} = req(post, Top ++ ?JOBS, #{type => split, db => Db1}),
         ?assertEqual(201, C1),
@@ -192,11 +193,11 @@ create_job_basic({Top, {Db1, _, _}}) ->
 
         % DELETE /_reshard/jobs/$jobid  should be a 404 as well
         ?assertMatch({404, #{}}, req(delete, Top ++ ?JOBS ++ ?b2l(Id)))
-    end).
+    end)}.
 
 
 create_two_jobs({Top, {Db1, Db2, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Jobs = Top ++ ?JOBS,
 
         ?assertMatch({201, [#{?OK := true}]},
@@ -218,20 +219,20 @@ create_two_jobs({Top, {Db1, Db2, _}}) ->
         ?assertMatch({200, #{<<"total">> := 1}}, req(get, Top ++ ?RESHARD)),
         {200, #{?OK := true}} = req(delete, Jobs ++ ?b2l(Id2)),
         ?assertMatch({200, #{<<"total">> := 0}}, req(get, Top ++ ?RESHARD))
-    end).
+    end)}.
 
 
 create_multiple_jobs_from_one_post({Top, {_, _, Db3}}) ->
-     ?_test(begin
+     {timeout, ?TIMEOUT, ?_test(begin
         Jobs = Top ++ ?JOBS,
         {C1, R1} = req(post, Jobs, #{type => split, db => Db3}),
         ?assertMatch({201, [#{?OK := true}, #{?OK := true}]}, {C1, R1}),
         ?assertMatch({200, #{<<"total">> := 2}}, req(get, Top ++ ?RESHARD))
-    end).
+    end)}.
 
 
 start_stop_cluster_basic({Top, _}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Url = Top ++ ?STATE,
 
         ?assertMatch({200, #{
@@ -261,11 +262,11 @@ start_stop_cluster_basic({Top, _}) ->
         }}, req(get, Top ++ ?RESHARD)),
         ?assertMatch({200, _}, req(put, Url, #{state => running})),
         ?assertMatch({200, #{<<"state">> := <<"running">>}}, req(get, Url))
-    end).
+    end)}.
 
 
 test_disabled({Top, _}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         application:set_env(mem3, reshard_disabled, true),
         ?assertMatch({501, _}, req(get, Top ++ ?RESHARD)),
         ?assertMatch({501, _}, req(put, Top ++ ?STATE, #{state => running})),
@@ -273,11 +274,11 @@ test_disabled({Top, _}) ->
         application:unset_env(mem3, reshard_disabled),
         ?assertMatch({200, _}, req(get, Top ++ ?RESHARD)),
         ?assertMatch({200, _}, req(put, Top ++ ?STATE, #{state => running}))
-    end).
+    end)}.
 
 
 start_stop_cluster_with_a_job({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Url = Top ++ ?STATE,
 
         ?assertMatch({200, _}, req(put, Url, #{state => stopped})),
@@ -316,11 +317,11 @@ start_stop_cluster_with_a_job({Top, {Db1, _, _}}) ->
         ?assertMatch({200, _}, req(put, Url, #{state => running})),
         ?assertMatch({200, #{?ID := Id2, <<"job_state">> := JSt}}
             when JSt =/= <<"stopped">>, req(get, Top ++ ?JOBS ++ ?b2l(Id2)))
-     end).
+     end)}.
 
 
 individual_job_start_stop({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         intercept_state(topoff1),
 
         Body = #{type => split, db => Db1},
@@ -352,11 +353,11 @@ individual_job_start_stop({Top, {Db1, _, _}}) ->
         % Let it continue running and it should complete eventually
         JobPid2 ! continue,
         wait_state(StUrl, <<"completed">>)
-    end).
+    end)}.
 
 
 individual_job_stop_when_cluster_stopped({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         intercept_state(topoff1),
 
         Body = #{type => split, db => Db1},
@@ -397,11 +398,11 @@ individual_job_stop_when_cluster_stopped({Top, {Db1, _, _}}) ->
         % Let it continue running and it should complete eventually
         JobPid2 ! continue,
         wait_state(StUrl, <<"completed">>)
-    end).
+    end)}.
 
 
 create_job_with_invalid_arguments({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Jobs = Top ++ ?JOBS,
 
         % Nothing in the body
@@ -434,11 +435,11 @@ create_job_with_invalid_arguments({Top, {Db1, _, _}}) ->
         % Can't have both db and shard
         ?assertMatch({400, _}, req(post, Jobs, #{type => split, db => Db1,
              shard => <<"blah">>}))
-    end).
+    end)}.
 
 
 create_job_with_db({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Jobs = Top ++ ?JOBS,
         Body1 = #{type => split, db => Db1},
 
@@ -465,11 +466,11 @@ create_job_with_db({Top, {Db1, _, _}}) ->
             [16#80000000, 16#bfffffff],
             [16#c0000000, 16#ffffffff]
         ], [mem3:range(S) || S <- lists:sort(mem3:shards(Db1))])
-    end).
+    end)}.
 
 
 create_job_with_shard_name({Top, {_, _, Db3}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Jobs = Top ++ ?JOBS,
         [S1, S2] = [mem3:name(S) || S <- lists:sort(mem3:shards(Db3))],
 
@@ -490,11 +491,11 @@ create_job_with_shard_name({Top, {_, _, Db3}}) ->
             [16#80000000, 16#bfffffff],
             [16#c0000000, 16#ffffffff]
         ], [mem3:range(S) || S <- lists:sort(mem3:shards(Db3))])
-    end).
+    end)}.
 
 
 completed_job_handling({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Jobs = Top ++ ?JOBS,
 
         % Run job to completion
@@ -542,105 +543,105 @@ completed_job_handling({Top, {Db1, _, _}}) ->
         ?assertMatch({200, #{<<"state">> := <<"completed">>}}, req(get, StUrl)),
 
         ?assertMatch({200, #{?OK := true}}, req(delete, JobUrl))
-    end).
+    end)}.
 
 
 handle_db_deletion_in_topoff1({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = delete_source_in_state(Top, Db1, topoff1),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
-    end).
+    end)}.
 
 
 handle_db_deletion_in_initial_copy({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = delete_source_in_state(Top, Db1, initial_copy),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
-    end).
+    end)}.
 
 
 handle_db_deletion_in_copy_local_docs({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = delete_source_in_state(Top, Db1, copy_local_docs),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
-    end).
+    end)}.
 
 
 handle_db_deletion_in_build_indices({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = delete_source_in_state(Top, Db1, build_indices),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
-    end).
+    end)}.
 
 
 handle_db_deletion_in_update_shard_map({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = delete_source_in_state(Top, Db1, update_shardmap),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
-    end).
+    end)}.
 
 
 handle_db_deletion_in_wait_source_close({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = delete_source_in_state(Top, Db1, wait_source_close),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"failed">>)
-    end).
+    end)}.
 
 
 recover_in_topoff1({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = recover_in_state(Top, Db1, topoff1),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
-    end).
+    end)}.
 
 
 recover_in_initial_copy({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = recover_in_state(Top, Db1, initial_copy),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
-    end).
+    end)}.
 
 
 recover_in_copy_local_docs({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = recover_in_state(Top, Db1, copy_local_docs),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
-    end).
+    end)}.
 
 
 recover_in_build_indices({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = recover_in_state(Top, Db1, build_indices),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
-    end).
+    end)}.
 
 
 recover_in_update_shard_map({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = recover_in_state(Top, Db1, update_shardmap),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
-    end).
+    end)}.
 
 
 recover_in_wait_source_close({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = recover_in_state(Top, Db1, wait_source_close),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
-    end).
+    end)}.
 
 
 recover_in_topoff3({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = recover_in_state(Top, Db1, topoff3),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
-    end).
+    end)}.
 
 
 recover_in_source_delete({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         JobId = recover_in_state(Top, Db1, source_delete),
         wait_state(Top ++ ?JOBS ++ ?b2l(JobId) ++ "/state", <<"completed">>)
-    end).
+    end)}.
 
 
 check_max_jobs({Top, {Db1, Db2, _}}) ->
@@ -682,7 +683,7 @@ check_max_jobs({Top, {Db1, Db2, _}}) ->
 
 
 check_node_and_range_required_params({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Jobs = Top ++ ?JOBS,
 
         Node = atom_to_binary(node(), utf8),
@@ -704,18 +705,18 @@ check_node_and_range_required_params({Top, {Db1, _, _}}) ->
         {C3, R3} = req(post, Jobs, Body),
         ?assertMatch({201, [#{?OK := true}]}, {C3, R3}),
         wait_to_complete_then_cleanup(Top, R3)
-    end).
+    end)}.
 
 
 cleanup_completed_jobs({Top, {Db1, _, _}}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Body = #{type => split, db => Db1},
         {201, [#{?ID := Id}]} = req(post, Top ++ ?JOBS, Body),
         JobUrl = Top ++ ?JOBS ++ ?b2l(Id),
         wait_state(JobUrl ++ "/state", <<"completed">>),
         delete_db(Top, Db1),
         wait_for_http_code(JobUrl, 404)
-    end).
+    end)}.
 
 
 % Test help functions
