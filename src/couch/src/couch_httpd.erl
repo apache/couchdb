@@ -37,6 +37,7 @@
 -export([validate_host/1]).
 -export([validate_bind_address/1]).
 -export([check_max_request_length/1]).
+-export([handle_request/1]).
 
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
@@ -104,38 +105,14 @@ start_link(Name, Options) ->
                       Else -> Else
                   end,
     ok = validate_bind_address(BindAddress),
-    DefaultFun = make_arity_1_fun("{couch_httpd_db, handle_request}"),
 
-    {ok, HttpdGlobalHandlers} = application:get_env(httpd_global_handlers),
-
-    UrlHandlersList = lists:map(
-        fun({UrlKey, SpecStr}) ->
-            {?l2b(UrlKey), make_arity_1_fun(SpecStr)}
-        end, HttpdGlobalHandlers),
-
-    {ok, HttpdDbHandlers} = application:get_env(httpd_db_handlers),
-
-    DbUrlHandlersList = lists:map(
-        fun({UrlKey, SpecStr}) ->
-            {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
-        end, HttpdDbHandlers),
-
-    {ok, HttpdDesignHandlers} = application:get_env(httpd_design_handlers),
-
-    DesignUrlHandlersList = lists:map(
-        fun({UrlKey, SpecStr}) ->
-            {?l2b(UrlKey), make_arity_3_fun(SpecStr)}
-        end, HttpdDesignHandlers),
-
-    UrlHandlers = dict:from_list(UrlHandlersList),
-    DbUrlHandlers = dict:from_list(DbUrlHandlersList),
-    DesignUrlHandlers = dict:from_list(DesignUrlHandlersList),
     {ok, ServerOptions} = couch_util:parse_term(
         config:get("httpd", "server_options", "[]")),
     {ok, SocketOptions} = couch_util:parse_term(
         config:get("httpd", "socket_options", "[]")),
 
     set_auth_handlers(),
+    Handlers = get_httpd_handlers(),
 
     % ensure uuid is set so that concurrent replications
     % get the same value.
@@ -148,9 +125,7 @@ start_link(Name, Options) ->
         _ ->
             ok = mochiweb_socket:setopts(Req:get(socket), SocketOptions)
         end,
-        apply(?MODULE, handle_request, [
-            Req, DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers
-        ])
+        apply(?MODULE, handle_request, [Req] ++ Handlers)
     end,
 
     % set mochiweb options
@@ -187,6 +162,34 @@ set_auth_handlers() ->
 auth_handler_name(SpecStr) ->
     lists:nth(?HANDLER_NAME_IN_MODULE_POS, re:split(SpecStr, "[\\W_]", [])).
 
+get_httpd_handlers() ->
+    {ok, HttpdGlobalHandlers} = application:get_env(httpd_global_handlers),
+
+    UrlHandlersList = lists:map(
+        fun({UrlKey, SpecStr}) ->
+            {?l2b(UrlKey), make_arity_1_fun(SpecStr)}
+        end, HttpdGlobalHandlers),
+
+    {ok, HttpdDbHandlers} = application:get_env(httpd_db_handlers),
+
+    DbUrlHandlersList = lists:map(
+        fun({UrlKey, SpecStr}) ->
+            {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
+        end, HttpdDbHandlers),
+
+    {ok, HttpdDesignHandlers} = application:get_env(httpd_design_handlers),
+
+    DesignUrlHandlersList = lists:map(
+        fun({UrlKey, SpecStr}) ->
+            {?l2b(UrlKey), make_arity_3_fun(SpecStr)}
+        end, HttpdDesignHandlers),
+
+    UrlHandlers = dict:from_list(UrlHandlersList),
+    DbUrlHandlers = dict:from_list(DbUrlHandlersList),
+    DesignUrlHandlers = dict:from_list(DesignUrlHandlersList),
+    DefaultFun = make_arity_1_fun("{couch_httpd_db, handle_request}"),
+    [DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers].
+
 % SpecStr is a string like "{my_module, my_fun}"
 %  or "{my_module, my_fun, <<"my_arg">>}"
 make_arity_1_fun(SpecStr) ->
@@ -216,6 +219,14 @@ make_arity_3_fun(SpecStr) ->
 % SpecStr is "{my_module, my_fun}, {my_module2, my_fun2}"
 make_fun_spec_strs(SpecStr) ->
     re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}]).
+
+handle_request(MochiReq) ->
+    %[DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers] = get_httpd_handlers(),
+    DefaultFun = make_arity_1_fun("{couch_httpd_db, handle_request}"),
+    EmptyDict = dict:new(),
+%    handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
+%                   DesignUrlHandlers).
+    handle_request(MochiReq, DefaultFun, EmptyDict, EmptyDict, EmptyDict).
 
 handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
     DesignUrlHandlers) ->
