@@ -50,6 +50,14 @@ defmodule Couch do
   CouchDB library to power test suite.
   """
 
+  # These constants are supplied to the underlying HTTP client and control
+  # how long we will wait before timing out a test. The inactivity timeout
+  # specifically fires during an active HTTP response and defaults to 10_000
+  # if not specified. We're defining it to a different value than the
+  # request_timeout largely just so we know which timeout fired.
+  @request_timeout 60_000
+  @inactivity_timeout 55_000
+
   def process_url("http://" <> _ = url) do
     url
   end
@@ -179,13 +187,13 @@ defmodule Couch do
       Keyword.get(
         options,
         :timeout,
-        Application.get_env(:httpotion, :default_timeout, 5000)
+        Application.get_env(:httpotion, :default_timeout, @request_timeout)
       )
 
     ib_options =
       Keyword.merge(
         Application.get_env(:httpotion, :default_ibrowse, []),
-        Keyword.get(options, :ibrowse, [])
+        Keyword.get(options, :ibrowse, [{:inactivity_timeout, @inactivity_timeout}])
       )
 
     follow_redirects =
