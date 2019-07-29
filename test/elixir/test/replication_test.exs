@@ -1757,11 +1757,11 @@ defmodule ReplicationTest do
   end
 
   def get_att1_data do
-    File.read!("test/data/lorem.txt")
+    File.read!(Path.expand("data/lorem.txt", __DIR__))
   end
 
   def get_att2_data do
-    File.read!("test/data/lorem_b64.txt")
+    File.read!(Path.expand("data/lorem_b64.txt", __DIR__))
   end
 
   def cmp_json(lhs, rhs) when is_map(lhs) and is_map(rhs) do
