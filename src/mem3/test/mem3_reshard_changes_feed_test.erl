@@ -17,6 +17,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/src/mem3_reshard.hrl").
 
+-define(TIMEOUT, 60). % seconds
 
 -define(assertChanges(Expected, Received),
     begin
@@ -66,7 +67,7 @@ mem3_reshard_changes_feed_test_() ->
 
 
 normal_feed_should_work_after_split(#{db1 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         DocSpec = #{
             docs => [1, 10],
             delete => [5, 6]
@@ -141,11 +142,11 @@ normal_feed_should_work_after_split(#{db1 := Db}) ->
         ?assertEqual(4, length(Changes7)),
         [#{seq := Seq7} | _] = Changes7,
         ?assertEqual(EndSeq7, Seq7)
-    end).
+    end)}.
 
 
 continuous_feed_should_work_during_split(#{db1 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         {UpdaterPid, UpdaterRef} = spawn_monitor(fun() ->
             Updater = fun U({State, I}) ->
                 receive
@@ -233,7 +234,7 @@ continuous_feed_should_work_during_split(#{db1 := Db}) ->
         DocIDs = [Id || #{id := Id} <- StopChanges ++ AfterChanges],
         ExpectedDocIDs = [doc_id(<<>>, N) || N <- lists:seq(1, DocCount)],
         ?assertEqual(ExpectedDocIDs, lists:usort(DocIDs))
-    end).
+    end)}.
 
 
 split_and_wait(Db) ->

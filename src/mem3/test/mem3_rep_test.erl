@@ -20,6 +20,7 @@
 
 
 -define(ID, <<"_id">>).
+-define(TIMEOUT, 60). % seconds
 
 setup() ->
     {AllSrc, AllTgt} = {?tempdb(), ?tempdb()},
@@ -65,7 +66,7 @@ mem3_reshard_db_test_() ->
 
 
 replicate_basics(#{allsrc := AllSrc, alltgt := AllTgt}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         DocSpec = #{docs => 10, delete => [5, 9]},
         add_test_docs(AllSrc, DocSpec),
         SDocs = get_all_docs(AllSrc),
@@ -79,11 +80,11 @@ replicate_basics(#{allsrc := AllSrc, alltgt := AllTgt}) ->
         ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts)),
 
         ?assertEqual(SDocs, get_all_docs(AllTgt))
-    end).
+    end)}.
 
 
 replicate_small_batches(#{allsrc := AllSrc, alltgt := AllTgt}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         DocSpec = #{docs => 10, delete => [5, 9]},
         add_test_docs(AllSrc, DocSpec),
         SDocs = get_all_docs(AllSrc),
@@ -97,11 +98,11 @@ replicate_small_batches(#{allsrc := AllSrc, alltgt := AllTgt}) ->
         ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts)),
 
         ?assertEqual(SDocs, get_all_docs(AllTgt))
-    end).
+    end)}.
 
 
 replicate_low_batch_count(#{allsrc := AllSrc, alltgt := AllTgt}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         DocSpec = #{docs => 10, delete => [5, 9]},
         add_test_docs(AllSrc, DocSpec),
         SDocs = get_all_docs(AllSrc),
@@ -122,11 +123,11 @@ replicate_low_batch_count(#{allsrc := AllSrc, alltgt := AllTgt}) ->
         ?assertMatch({ok, 0}, mem3_rep:go(Src, TMap, Opts3)),
 
         ?assertEqual(SDocs, get_all_docs(AllTgt))
-    end).
+    end)}.
 
 
 replicate_with_partitions(#{partsrc := PartSrc, parttgt := PartTgt}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         DocSpec = #{
             pdocs => #{
                 <<"PX">> => 15,
@@ -149,7 +150,7 @@ replicate_with_partitions(#{partsrc := PartSrc, parttgt := PartTgt}) ->
         ?assertEqual(PXSrc, get_partition_info(PartTgt, <<"PX">>)),
         ?assertEqual(PYSrc, get_partition_info(PartTgt, <<"PY">>)),
         ?assertEqual(SDocs, get_all_docs(PartTgt))
-    end).
+    end)}.
 
 
 get_partition_info(DbName, Partition) ->

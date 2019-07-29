@@ -17,16 +17,38 @@
 -include("mem3.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-go_test() ->
-    Ctx = test_util:start_couch([fabric, mem3]),
-    try
-        ok = meck:new(fabric, [passthrough]),
-        meck:expect(fabric, all_dbs, fun() ->
-            {ok, [<<"NoExistDb1">>, <<"NoExistDb2">>]}
-        end),
-        Result = mem3_sync_security:go(),
-        ?assertEqual(ok, Result)
-    after
-        meck:unload(),
-        test_util:stop_couch(Ctx)
-    end.
+-define(TIMEOUT, 5). % seconds
+
+go_test_() ->
+    {
+        "security property sync test",
+        {
+            setup,
+            fun start_couch/0, fun stop_couch/1,
+            {
+                foreach,
+                fun setup/0, fun teardown/1,
+                [
+                    fun sync_security_ok/1
+                ]
+            }
+        }
+    }.
+
+start_couch() ->
+    test_util:start_couch([fabric, mem3]).
+
+stop_couch(Ctx) ->
+    test_util:stop_couch(Ctx).
+
+setup() ->
+    ok = meck:new(fabric, [passthrough]),
+    meck:expect(fabric, all_dbs, fun() ->
+        {ok, [<<"NoExistDb1">>, <<"NoExistDb2">>]}
+    end).
+
+teardown(_) ->
+    meck:unload().
+
+sync_security_ok(_) ->
+    {timeout, ?TIMEOUT, ?_assertEqual(ok, mem3_sync_security:go())}.

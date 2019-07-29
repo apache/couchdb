@@ -19,6 +19,7 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl"). % for all_docs function
 
 -define(ID, <<"_id">>).
+-define(TIMEOUT, 60).
 
 setup() ->
     HaveDreyfus = code:lib_dir(dreyfus) /= {error, bad_name},
@@ -81,7 +82,7 @@ mem3_reshard_db_test_() ->
 % This is a basic test to check that shard splitting preserves documents, and
 % db meta props like revs limits and security.
 split_one_shard(#{db1 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         DocSpec = #{docs => 10, delete => [5, 9], mrview => 1, local => 1},
         add_test_docs(Db, DocSpec),
 
@@ -135,13 +136,13 @@ split_one_shard(#{db1 := Db}) ->
         % Don't forget about the local but don't include internal checkpoints
         % as some of those are munged and transformed during the split
         ?assertEqual(without_meta_locals(Local0), without_meta_locals(Local1))
-    end).
+    end)}.
 
 
 % This test checks that document added while the shard is being split are not
 % lost. Topoff1 state happens before indices are built
 update_docs_before_topoff1(#{db1 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         add_test_docs(Db, #{docs => 10}),
 
         intercept_state(topoff1),
@@ -177,12 +178,12 @@ update_docs_before_topoff1(#{db1 := Db}) ->
 
         ?assertEqual(Docs0, Docs1),
         ?assertEqual(without_meta_locals(Local0), without_meta_locals(Local1))
-    end).
+    end)}.
 
 
 % This test that indices are built during shard splitting.
 indices_are_built(#{db1 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         HaveDreyfus = code:lib_dir(dreyfus) /= {error, bad_name},
         HaveHastings = code:lib_dir(hastings) /= {error, bad_name},
 
@@ -206,7 +207,7 @@ indices_are_built(#{db1 := Db}) ->
             % 4 because there are 2 indices and 2 target shards
             ?assertEqual(4, meck:num_calls(hastings_index, await, 2))
         end
-    end).
+    end)}.
 
 
 mock_dreyfus_indices() ->
@@ -238,7 +239,7 @@ mock_hastings_indices() ->
 
 % Split partitioned database
 split_partitioned_db(#{db2 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         DocSpec = #{
             pdocs => #{
                 <<"PX">> => 5,
@@ -304,14 +305,14 @@ split_partitioned_db(#{db2 := Db}) ->
         % Don't forget about the local but don't include internal checkpoints
         % as some of those are munged and transformed during the split
         ?assertEqual(without_meta_locals(Local0), without_meta_locals(Local1))
-    end).
+    end)}.
 
 
 % Make sure a shard can be split again after it was split once. This checks that
 % too many got added to some range, such that on next split they'd fail to fit
 % in to any of the new target ranges.
 split_twice(#{db1 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         DocSpec = #{docs => 100, delete => [80, 99], mrview => 2, local => 100},
         add_test_docs(Db, DocSpec),
 
@@ -390,11 +391,11 @@ split_twice(#{db1 := Db}) ->
         ?assertEqual(trunc(UpdateSeq1 * 1.5), UpdateSeq2),
         ?assertEqual(Docs1, Docs2),
         ?assertEqual(without_meta_locals(Local1), without_meta_locals(Local2))
-    end).
+    end)}.
 
 
 couch_events_are_emitted(#{db1 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         couch_event:register_all(self()),
 
         % Split the one shard
@@ -425,11 +426,11 @@ couch_events_are_emitted(#{db1 := Db}) ->
         StartAtDeleted = lists:dropwhile(fun(E) -> E =/= deleted end, Events),
         ?assertMatch([deleted, deleted, updated, updated | _], StartAtDeleted),
         couch_event:unregister(self())
-    end).
+    end)}.
 
 
 retries_work(#{db1 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         meck:expect(couch_db_split, split, fun(_, _, _) ->
              error(kapow)
         end),
@@ -439,11 +440,11 @@ retries_work(#{db1 := Db}) ->
 
         wait_state(JobId, failed),
         ?assertEqual(3, meck:num_calls(couch_db_split, split, 3))
-    end).
+    end)}.
 
 
 target_reset_in_initial_copy(#{db1 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [#shard{} = Src] = lists:sort(mem3:local_shards(Db)),
         Job = #job{
             source = Src,
@@ -465,17 +466,17 @@ target_reset_in_initial_copy(#{db1 := Db}) ->
         exit(JobPid, kill),
         exit(BogusParent, kill),
         ?assertEqual(2, meck:num_calls(couch_db_split, cleanup_target, 2))
-    end).
+    end)}.
 
 
 split_an_incomplete_shard_map(#{db1 := Db}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [#shard{} = Src] = lists:sort(mem3:local_shards(Db)),
         [#shard{name=Shard}] = lists:sort(mem3:local_shards(Db)),
         meck:expect(mem3_util, calculate_max_n, 1, 0),
         ?assertMatch({error, {not_enough_shard_copies, _}},
             mem3_reshard:start_split_job(Shard))
-    end).
+    end)}.
 
 
 intercept_state(State) ->
