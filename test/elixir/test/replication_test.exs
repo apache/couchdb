@@ -16,8 +16,6 @@ defmodule ReplicationTest do
   # happens for JavaScript tests.
   @moduletag config: [{"replicator", "startup_jitter", "0"}]
 
-  @moduletag :skip_on_jenkins
-
   test "source database not found with host" do
     name = random_db_name()
     src_url = "http://127.0.0.1:15984/" <> name <> "_src"
