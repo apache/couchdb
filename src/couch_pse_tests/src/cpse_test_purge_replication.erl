@@ -21,7 +21,7 @@
 
 
 setup_all() ->
-    cpse_util:setup_all([mem3, fabric, couch_replicator]).
+    cpse_util:setup_all([mem3, fabric, chttpd, couch_replicator]).
 
 
 setup_each() ->
@@ -48,8 +48,8 @@ cpse_purge_http_replication({Source, Target}) ->
     ]),
 
     RepObject = {[
-        {<<"source">>, Source},
-        {<<"target">>, Target}
+        {<<"source">>, db_url(Source)},
+        {<<"target">>, db_url(Target)}
     ]},
 
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
@@ -100,8 +100,8 @@ cpse_purge_http_replication({Source, Target}) ->
     % Show that replicating from the target
     % back to the source reintroduces the doc
     RepObject2 = {[
-        {<<"source">>, Target},
-        {<<"target">>, Source}
+        {<<"source">>, db_url(Target)},
+        {<<"target">>, db_url(Source)}
     ]},
 
     {ok, _} = couch_replicator:replicate(RepObject2, ?ADMIN_USER),
@@ -200,3 +200,9 @@ make_shard(DbName) ->
         dbname = DbName,
         range = [0, 16#FFFFFFFF]
     }.
+
+
+db_url(DbName) ->
+    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
+    Port = mochiweb_socket_server:get(couch_httpd, port),
+    ?l2b(io_lib:format("http://~s:~b/~s", [Addr, Port, DbName])).

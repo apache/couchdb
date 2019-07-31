@@ -37,8 +37,7 @@ setup() ->
     ok = couch_db:close(Db),
     DbName.
 
-setup(local) ->
-    setup();
+
 setup(remote) ->
     {remote, setup()};
 setup({A, B}) ->
@@ -60,8 +59,7 @@ teardown(_, {Ctx, {Source, Target}}) ->
     ok = test_util:stop_couch(Ctx).
 
 docs_with_many_leaves_test_() ->
-    Pairs = [{local, local}, {local, remote},
-             {remote, local}, {remote, remote}],
+    Pairs = [{remote, remote}],
     {
         "Replicate documents with many leaves",
         {

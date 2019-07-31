@@ -31,8 +31,7 @@ teardown(_, {Ctx, {Source, Target}}) ->
     ok = test_util:stop_couch(Ctx).
 
 selector_replication_test_() ->
-    Pairs = [{local, local}, {local, remote},
-             {remote, local}, {remote, remote}],
+    Pairs = [{remote, remote}],
     {
         "Selector filtered replication tests",
         {
@@ -113,8 +112,6 @@ create_docs(DbName) ->
 delete_db(DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]).
 
-db_url(local, DbName) ->
-    DbName;
 db_url(remote, DbName) ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(couch_httpd, port),

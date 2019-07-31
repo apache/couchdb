@@ -9,9 +9,6 @@ defmodule ReplicationTest do
   # TODO: Parameterize these
   @admin_account "adm:pass"
   @db_pairs_prefixes [
-    {"local-to-local", "", ""},
-    {"remote-to-local", "http://127.0.0.1:15984/", ""},
-    {"local-to-remote", "", "http://127.0.0.1:15984/"},
     {"remote-to-remote", "http://127.0.0.1:15984/", "http://127.0.0.1:15984/"}
   ]
 
@@ -21,20 +18,11 @@ defmodule ReplicationTest do
 
   @moduletag :skip_on_jenkins
 
-  test "source database does not exist" do
-    name = random_db_name()
-    check_not_found(name <> "_src", name <> "_tgt")
-  end
-
-  test "source database not found with path - COUCHDB-317" do
-    name = random_db_name()
-    check_not_found(name <> "_src", name <> "_tgt")
-  end
-
   test "source database not found with host" do
     name = random_db_name()
-    url = "http://127.0.0.1:15984/" <> name <> "_src"
-    check_not_found(url, name <> "_tgt")
+    src_url = "http://127.0.0.1:15984/" <> name <> "_src"
+    tgt_url = "http://127.0.0.1:15984/" <> name <> "_tgt"
+    check_not_found(src_url, tgt_url)
   end
 
   def check_not_found(src, tgt) do
@@ -55,7 +43,9 @@ defmodule ReplicationTest do
     doc = %{"_id" => "doc1"}
     [doc] = save_docs(src_db_name, [doc])
 
-    result = replicate(src_db_name, "http://127.0.0.1:15984/" <> tgt_db_name)
+    repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
     assert result["ok"]
     assert is_list(result["history"])
     history = Enum.at(result["history"], 0)
@@ -79,7 +69,9 @@ defmodule ReplicationTest do
 
     [doc] = save_docs(src_db_name, [doc])
 
-    result = replicate(src_db_name, "http://127.0.0.1:15984/" <> tgt_db_name)
+    repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
 
     assert result["ok"]
     assert is_list(result["history"])
@@ -127,7 +119,8 @@ defmodule ReplicationTest do
 
     repl_body = %{:continuous => true, :create_target => true}
     repl_src = "http://127.0.0.1:15984/" <> src_db_name
-    result = replicate(repl_src, tgt_db_name, body: repl_body)
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt, body: repl_body)
 
     assert result["ok"]
     assert is_binary(result["_local_id"])
@@ -167,8 +160,9 @@ defmodule ReplicationTest do
     save_docs(src_db_name, make_docs(1..6))
 
     repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
     repl_body = %{"continuous" => true}
-    result = replicate(repl_src, tgt_db_name, body: repl_body)
+    result = replicate(repl_src, repl_tgt, body: repl_body)
 
     assert result["ok"]
     assert is_binary(result["_local_id"])
@@ -282,7 +276,9 @@ defmodule ReplicationTest do
         end
       end
 
-    result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
+    repl_src = src_prefix <> src_db_name
+    repl_tgt = tgt_prefix <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
     assert result["ok"]
 
     src_info =
