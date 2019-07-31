@@ -51,8 +51,6 @@ setup() ->
     ok = couch_db:close(Db),
     DbName.
 
-setup(local) ->
-    setup();
 setup(remote) ->
     {remote, setup()};
 setup({_, Fun, {A, B}}) ->
@@ -88,8 +86,7 @@ use_checkpoints_test_() ->
     }.
 
 use_checkpoints_tests(UseCheckpoints, Fun) ->
-    Pairs = [{local, local}, {local, remote},
-             {remote, local}, {remote, remote}],
+    Pairs = [{remote, remote}],
     {
         "use_checkpoints: " ++ atom_to_list(UseCheckpoints),
         {

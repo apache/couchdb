@@ -33,8 +33,6 @@ setup() ->
     ok = couch_db:close(Db),
     DbName.
 
-setup(local) ->
-    setup();
 setup(remote) ->
     {remote, setup()};
 setup({A, B}) ->
@@ -56,8 +54,7 @@ teardown(_, {Ctx, {Source, Target}}) ->
     ok = test_util:stop_couch(Ctx).
 
 compact_test_() ->
-    Pairs = [{local, local}, {local, remote},
-             {remote, local}, {remote, remote}],
+    Pairs = [{remote, remote}],
     {
         "Compaction during replication tests",
         {

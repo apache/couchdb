@@ -33,8 +33,7 @@ teardown(_, {Ctx, {Source, Target}}) ->
 
 
 id_too_long_replication_test_() ->
-    Pairs = [{local, local}, {local, remote},
-             {remote, local}, {remote, remote}],
+    Pairs = [{remote, remote}],
     {
         "Doc id too long tests",
         {
@@ -86,8 +85,6 @@ delete_db(DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]).
 
 
-db_url(local, DbName) ->
-    DbName;
 db_url(remote, DbName) ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(couch_httpd, port),

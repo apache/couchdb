@@ -19,9 +19,6 @@ setup() ->
     DbName.
 
 
-setup(local) ->
-    setup();
-
 setup(remote) ->
     {remote, setup()};
 
@@ -47,7 +44,7 @@ teardown(_, {Ctx, {Source, Target}}) ->
 
 
 reduce_max_request_size_test_() ->
-    Pairs = [{local, remote}, {remote, remote}],
+    Pairs = [{remote, remote}],
     {
         "Replicate docs when target has a small max_http_request_size",
         {

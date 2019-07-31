@@ -137,7 +137,7 @@ maybe_add_job_to_scheduler({DbName, DocId}, Rep, WRef) ->
 
 -define(DB, <<"db">>).
 -define(DOC1, <<"doc1">>).
--define(R1, {"0b7831e9a41f9322a8600ccfa02245f2", ""}).
+-define(R1, {"ad08e05057046eabe898a2572bbfb573", ""}).
 
 
 doc_processor_worker_test_() ->
@@ -277,8 +277,8 @@ did_not_add_job() ->
 change() ->
     {[
          {<<"_id">>, ?DOC1},
-         {<<"source">>, <<"src">>},
-         {<<"target">>, <<"tgt">>}
+         {<<"source">>, <<"http://srchost.local/src">>},
+         {<<"target">>, <<"http://tgthost.local/tgt">>}
      ]}.
 
 -endif.
