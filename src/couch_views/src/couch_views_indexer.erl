@@ -72,7 +72,7 @@ init() ->
 
 
 update(#{} = Db, Mrst0, State0) ->
-    {Mrst2, State3} = fabric2_fdb:transactional(Db, fun(TxDb) ->
+    {Mrst2, State4} = fabric2_fdb:transactional(Db, fun(TxDb) ->
         % In the first iteration of update we need
         % to populate our db and view sequences
         State1 = case State0 of
@@ -107,8 +107,8 @@ update(#{} = Db, Mrst0, State0) ->
                 report_progress(State2, finished),
                 {Mrst1, finished};
             false ->
-                report_progress(State2, update),
-                {Mrst1, State2#{
+                State3 = report_progress(State2, update),
+                {Mrst1, State3#{
                     tx_db := undefined,
                     count := 0,
                     doc_acc := [],
@@ -117,11 +117,11 @@ update(#{} = Db, Mrst0, State0) ->
         end
     end),
 
-    case State3 of
+    case State4 of
         finished ->
             couch_query_servers:stop_doc_map(Mrst2#mrst.qserver);
         _ ->
-            update(Db, Mrst2, State3)
+            update(Db, Mrst2, State4)
     end.
 
 
@@ -229,7 +229,7 @@ start_query_server(#mrst{} = Mrst) ->
 report_progress(State, UpdateType) ->
     #{
         tx_db := TxDb,
-        job := Job,
+        job := Job1,
         job_data := JobData,
         last_seq := LastSeq
     } = State,
@@ -251,9 +251,21 @@ report_progress(State, UpdateType) ->
 
     case UpdateType of
         update ->
-            couch_jobs:update(TxDb, Job, NewData);
+            case couch_jobs:update(TxDb, Job1, NewData) of
+                {ok, Job2} ->
+                    State#{job := Job2};
+                {error, halt} ->
+                    couch_log:error("~s job halted :: ~w", [?MODULE, Job1]),
+                    exit(normal)
+            end;
         finished ->
-            couch_jobs:finish(TxDb, Job, NewData)
+            case couch_jobs:finish(TxDb, Job1, NewData) of
+                ok ->
+                    State;
+                {error, halt} ->
+                    couch_log:error("~s job halted :: ~w", [?MODULE, Job1]),
+                    exit(normal)
+            end
     end.
 
 
