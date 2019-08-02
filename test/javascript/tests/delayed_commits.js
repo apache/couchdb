@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.delayed_commits = function(debug) {
+  return console.log('done in test/elixir/test/delayed_commits_test.exs');
 
   // Note that delayed_commits is deprecated in 2.0, so this is a minimal
   // test to show it still works. delayed_commits will be removed in 3.0.

@@ -12,6 +12,7 @@
 
 // Do some edit conflict detection tests
 couchTests.conflicts = function(debug) {
+  return console.log('done in test/elixir/test/conflicts_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();

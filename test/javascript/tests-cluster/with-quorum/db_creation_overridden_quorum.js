@@ -12,6 +12,7 @@
 
 // Do DB creation under cluster with quorum conditions but overriding write quorum.
 couchTests.db_creation_overridden_quorum = function(debug) {
+  return console.log('done in test/elixir/test/cluster_with_quorum_test.exs');
 
   if (debug) debugger;
 

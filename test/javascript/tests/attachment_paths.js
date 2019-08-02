@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.attachment_paths = function(debug) {
+  return console.log('done in test/elixir/test/attachment_paths_test.exs');
   if (debug) debugger;
   var r_db_name = get_random_db_name()
   var dbNames = [r_db_name, r_db_name + "/with_slashes"];
