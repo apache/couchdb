@@ -1,9 +1,0 @@
-%{
-  "bunt": {:hex, :bunt, "0.2.0", "951c6e801e8b1d2cbe58ebbd3e616a869061ddadcc4863d0a2182541acae9a38", [:mix], [], "hexpm"},
-  "credo": {:hex, :credo, "1.0.0", "aaa40fdd0543a0cf8080e8c5949d8c25f0a24e4fc8c1d83d06c388f5e5e0ea42", [:mix], [{:bunt, "~> 0.2.0", [hex: :bunt, repo: "hexpm", optional: false]}, {:jason, "~> 1.0", [hex: :jason, repo: "hexpm", optional: false]}], "hexpm"},
-  "httpotion": {:hex, :httpotion, "3.1.0", "14d20d9b0ce4e86e253eb91e4af79e469ad949f57a5d23c0a51b2f86559f6589", [:mix], [{:ibrowse, "~> 4.4", [hex: :ibrowse, repo: "hexpm", optional: false]}], "hexpm"},
-  "ibrowse": {:hex, :ibrowse, "4.4.1", "2b7d0637b0f8b9b4182de4bd0f2e826a4da2c9b04898b6e15659ba921a8d6ec2", [:rebar3], [], "hexpm"},
-  "jason": {:hex, :jason, "1.1.2", "b03dedea67a99223a2eaf9f1264ce37154564de899fd3d8b9a21b1a6fd64afe7", [:mix], [{:decimal, "~> 1.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm"},
-  "jiffy": {:hex, :jiffy, "0.15.2", "de266c390111fd4ea28b9302f0bc3d7472468f3b8e0aceabfbefa26d08cd73b7", [:rebar3], [], "hexpm"},
-  "junit_formatter": {:hex, :junit_formatter, "3.0.0", "13950d944dbd295da7d8cc4798b8faee808a8bb9b637c88069954eac078ac9da", [:mix], [], "hexpm"},
-}

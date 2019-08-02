@@ -14,11 +14,6 @@
 
 -export([
    parse_rep_doc/2,
-   open_db/1,
-   close_db/1,
-   local_db_name/1,
-   start_db_compaction_notifier/2,
-   stop_db_compaction_notifier/1,
    replication_id/2,
    sum_stats/2,
    is_deleted/1,
@@ -32,9 +27,6 @@
    normalize_rep/1
 ]).
 
--export([
-    handle_db_event/3
-]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
@@ -44,50 +36,6 @@
     get_value/2,
     get_value/3
 ]).
-
-
-open_db(#httpdb{} = HttpDb) ->
-    HttpDb;
-open_db(Db) ->
-    DbName = couch_db:name(Db),
-    UserCtx = couch_db:get_user_ctx(Db),
-    {ok, NewDb} = couch_db:open(DbName, [{user_ctx, UserCtx}]),
-    NewDb.
-
-
-close_db(#httpdb{}) ->
-    ok;
-close_db(Db) ->
-    couch_db:close(Db).
-
-
-local_db_name(#httpdb{}) ->
-    undefined;
-local_db_name(Db) ->
-    couch_db:name(Db).
-
-
-start_db_compaction_notifier(#httpdb{}, _) ->
-    nil;
-start_db_compaction_notifier(Db, Server) ->
-    DbName = couch_db:name(Db),
-    {ok, Pid} = couch_event:link_listener(
-            ?MODULE, handle_db_event, Server, [{dbname, DbName}]
-        ),
-    Pid.
-
-
-stop_db_compaction_notifier(nil) ->
-    ok;
-stop_db_compaction_notifier(Listener) ->
-    couch_event:stop_listener(Listener).
-
-
-handle_db_event(DbName, compacted, Server) ->
-    gen_server:cast(Server, {db_compacted, DbName}),
-    {ok, Server};
-handle_db_event(_DbName, _Event, Server) ->
-    {ok, Server}.
 
 
 rep_error_to_binary(Error) ->
@@ -289,14 +237,14 @@ normalize_rep_test_() ->
         ?_test(begin
             EJson1 = {[
                 {<<"source">>, <<"http://host.com/source_db">>},
-                {<<"target">>, <<"local">>},
+                {<<"target">>, <<"http://target.local/db">>},
                 {<<"doc_ids">>, [<<"a">>, <<"c">>, <<"b">>]},
                 {<<"other_field">>, <<"some_value">>}
             ]},
             Rep1 = couch_replicator_docs:parse_rep_doc_without_id(EJson1),
             EJson2 = {[
                 {<<"other_field">>, <<"unrelated">>},
-                {<<"target">>, <<"local">>},
+                {<<"target">>, <<"http://target.local/db">>},
                 {<<"source">>, <<"http://host.com/source_db">>},
                 {<<"doc_ids">>, [<<"c">>, <<"a">>, <<"b">>]},
                 {<<"other_field2">>, <<"unrelated2">>}

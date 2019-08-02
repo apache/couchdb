@@ -1,2 +1,4 @@
+SELF_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
+
 all:
-	mix test --trace
+	make -C ${SELF_DIR}../.. elixir
