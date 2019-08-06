@@ -447,20 +447,27 @@ get_doc_body_future(#{} = Db, DocId, RevInfo) ->
         rev_id := {RevPos, Rev}
     } = RevInfo,
 
-    Key = erlfdb_tuple:pack({?DB_DOCS, DocId, RevPos, Rev}, DbPrefix),
-    erlfdb:get(Tx, Key).
+    Key = {?DB_DOCS, DocId, RevPos, Rev},
+    {StartKey, EndKey} = erlfdb_tuple:range(Key, DbPrefix),
+    erlfdb:fold_range_future(Tx, StartKey, EndKey, []).
 
 
 get_doc_body_wait(#{} = Db0, DocId, RevInfo, Future) ->
-    Db = ensure_current(Db0),
+    #{
+        tx := Tx
+    } = Db = ensure_current(Db0),
 
     #{
         rev_id := {RevPos, Rev},
         rev_path := RevPath
     } = RevInfo,
 
-    Val = erlfdb:wait(Future),
-    fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], Val).
+    RevBodyRows = erlfdb:fold_range_wait(Tx, Future, fun({_K, V}, Acc) ->
+        [V | Acc]
+    end, []),
+    BodyRows = lists:reverse(RevBodyRows),
+
+    fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], BodyRows).
 
 
 get_local_doc(#{} = Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
@@ -634,7 +641,7 @@ write_attachment(#{} = Db, DocId, Data) when is_binary(Data) ->
     } = ensure_current(Db),
 
     AttId = fabric2_util:uuid(),
-    Chunks = chunkify_attachment(Data),
+    Chunks = chunkify_binary(Data),
 
     lists:foldl(fun(Chunk, ChunkId) ->
         AttKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId, ChunkId}, DbPrefix),
@@ -823,8 +830,9 @@ write_doc_body(#{} = Db0, #doc{} = Doc) ->
         tx := Tx
     } = Db = ensure_current(Db0),
 
-    {NewDocKey, NewDocVal} = doc_to_fdb(Db, Doc),
-    erlfdb:set(Tx, NewDocKey, NewDocVal).
+    lists:foreach(fun({Key, Value}) ->
+        ok = erlfdb:set(Tx, Key, Value)
+    end, doc_to_fdb(Db, Doc)).
 
 
 revinfo_to_fdb(Tx, DbPrefix, DocId, #{winner := true} = RevId) ->
@@ -894,12 +902,17 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 
     DiskAtts = lists:map(fun couch_att:to_disk_term/1, Atts),
 
-    Key = erlfdb_tuple:pack({?DB_DOCS, Id, Start, Rev}, DbPrefix),
-    Val = {Body, DiskAtts, Deleted},
-    {Key, term_to_binary(Val, [{minor_version, 1}])}.
+    Value = term_to_binary({Body, DiskAtts, Deleted}, [{minor_version, 1}]),
+
+    {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
+        Key = erlfdb_tuple:pack({?DB_DOCS, Id, Start, Rev, ChunkId}, DbPrefix),
+        {{Key, Chunk}, ChunkId + 1}
+    end, 0, chunkify_binary(Value)),
+    Rows.
 
 
-fdb_to_doc(Db, DocId, Pos, Path, Bin) when is_binary(Bin) ->
+fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
+    Bin = iolist_to_binary(BinRows),
     {Body, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
     Atts = lists:map(fun(Att) ->
         couch_att:from_disk_term(Db, DocId, Att)
@@ -954,13 +967,13 @@ fdb_to_local_doc(_Db, _DocId, not_found) ->
     {not_found, missing}.
 
 
-chunkify_attachment(Data) ->
+chunkify_binary(Data) ->
     case Data of
         <<>> ->
             [];
-        <<Head:?ATTACHMENT_CHUNK_SIZE/binary, Rest/binary>> ->
-            [Head | chunkify_attachment(Rest)];
-        <<_/binary>> when size(Data) < ?ATTACHMENT_CHUNK_SIZE ->
+        <<Head:?BINARY_CHUNK_SIZE/binary, Rest/binary>> ->
+            [Head | chunkify_binary(Rest)];
+        <<_/binary>> when size(Data) < ?BINARY_CHUNK_SIZE ->
             [Data]
     end.
 
