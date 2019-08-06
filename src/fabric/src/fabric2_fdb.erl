@@ -509,7 +509,8 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     lists:foreach(fun(RI0) ->
         RI = RI0#{winner := false},
         {K, _, undefined} = revinfo_to_fdb(Tx, DbPrefix, DocId, RI),
-        ok = erlfdb:clear(Tx, K)
+        ok = erlfdb:clear(Tx, K),
+        ok = clear_doc_body(Db, DocId, RI0)
     end, ToRemove),
 
     % _all_docs
@@ -835,6 +836,25 @@ write_doc_body(#{} = Db0, #doc{} = Doc) ->
     end, doc_to_fdb(Db, Doc)).
 
 
+clear_doc_body(_Db, _DocId, not_found) ->
+    % No old body to clear
+    ok;
+
+clear_doc_body(#{} = Db, DocId, #{} = RevInfo) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = Db,
+
+    #{
+        rev_id := {RevPos, Rev}
+    } = RevInfo,
+
+    BaseKey = {?DB_DOCS, DocId, RevPos, Rev},
+    {StartKey, EndKey} = erlfdb_tuple:range(BaseKey, DbPrefix),
+    ok = erlfdb:clear_range(Tx, StartKey, EndKey).
+
+
 revinfo_to_fdb(Tx, DbPrefix, DocId, #{winner := true} = RevId) ->
     #{
         deleted := Deleted,
@@ -911,6 +931,9 @@ doc_to_fdb(Db, #doc{} = Doc) ->
     Rows.
 
 
+fdb_to_doc(_Db, _DocId, _Pos, _Path, []) ->
+    {not_found, missing};
+
 fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
     Bin = iolist_to_binary(BinRows),
     {Body, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
@@ -928,10 +951,7 @@ fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
     case Db of
         #{after_doc_read := undefined} -> Doc0;
         #{after_doc_read := ADR} -> ADR(Doc0, Db)
-    end;
-
-fdb_to_doc(_Db, _DocId, _Pos, _Path, not_found) ->
-    {not_found, missing}.
+    end.
 
 
 local_doc_to_fdb(Db, #doc{} = Doc) ->
