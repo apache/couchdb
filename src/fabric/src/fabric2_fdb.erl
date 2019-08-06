@@ -398,19 +398,20 @@ get_winning_revs_future(#{} = Db, DocId, NumRevs) ->
 
     {StartKey, EndKey} = erlfdb_tuple:range({?DB_REVS, DocId}, DbPrefix),
     Options = [{reverse, true}, {limit, NumRevs}],
-    erlfdb:get_range_raw(Tx, StartKey, EndKey, Options).
+    erlfdb:fold_range_future(Tx, StartKey, EndKey, Options).
 
 
-get_winning_revs_wait(#{} = Db, Future) ->
+get_winning_revs_wait(#{} = Db, RangeFuture) ->
     #{
+        tx := Tx,
         db_prefix := DbPrefix
     } = ensure_current(Db),
-    {Rows, _, _} = erlfdb:wait(Future),
-    lists:map(fun({K, V}) ->
+    RevRows = erlfdb:fold_range_wait(Tx, RangeFuture, fun({K, V}, Acc) ->
         Key = erlfdb_tuple:unpack(K, DbPrefix),
         Val = erlfdb_tuple:unpack(V),
-        fdb_to_revinfo(Key, Val)
-    end, Rows).
+        [fdb_to_revinfo(Key, Val) | Acc]
+    end, []),
+    lists:reverse(RevRows).
 
 
 get_non_deleted_rev(#{} = Db, DocId, RevId) ->
