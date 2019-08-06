@@ -246,7 +246,7 @@ pipeline {
             timeout(time: 90, unit: "MINUTES")
           }
           environment {
-            platform = 'xenial'
+            platform = 'bionic'
           }
           steps {
             sh 'rm -f apache-couchdb-*.tar.gz'
@@ -300,7 +300,7 @@ pipeline {
             timeout(time: 90, unit: "MINUTES")
           }
           environment {
-            platform = 'jessie'
+            platform = 'stretch'
           }
           steps {
             sh 'rm -f apache-couchdb-*.tar.gz'
@@ -327,7 +327,7 @@ pipeline {
             timeout(time: 90, unit: "MINUTES")
           }
           environment {
-            platform = 'jessie'
+            platform = 'aarch64-debian-stretch'
           }
           steps {
             sh 'rm -f apache-couchdb-*.tar.gz'
