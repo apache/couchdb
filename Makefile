@@ -176,7 +176,7 @@ eunit: couch
                 if [ $$? -eq 0 ]; then \
                     break; \
                 else \
-                    let "tries=tries+1"; \
+                    tries=$$((tries+1)); \
                     [ $$tries -gt 2 ] && exit 1; \
                 fi \
             done \
