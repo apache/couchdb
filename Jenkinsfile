@@ -144,6 +144,9 @@ pipeline {
             } // withEnv
           } // steps
           post {
+            always {
+              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+            }
             cleanup {
               sh 'rm -rf $COUCHDB_IO_LOG_DIR'
             }
@@ -172,6 +175,11 @@ pipeline {
               steps {
                 unstash 'tarball'
                 sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
               }
             }
             stage('Build CouchDB packages') {
@@ -214,6 +222,11 @@ pipeline {
               steps {
                 unstash 'tarball'
                 sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
               }
             }
             stage('Build CouchDB packages') {
@@ -258,6 +271,11 @@ pipeline {
                 unstash 'tarball'
                 sh( script: build_and_test )
               }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
+              }
             }
             stage('Build CouchDB packages') {
               steps {
@@ -299,6 +317,11 @@ pipeline {
               steps {
                 unstash 'tarball'
                 sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
               }
             }
             stage('Build CouchDB packages') {
@@ -342,6 +365,11 @@ pipeline {
                 unstash 'tarball'
                 sh( script: build_and_test )
               }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
+              }
             }
             stage('Build CouchDB packages') {
               steps {
@@ -384,6 +412,11 @@ pipeline {
                 unstash 'tarball'
                 sh( script: build_and_test )
               }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
+              }
             }
             stage('Build CouchDB packages') {
               steps {
@@ -425,6 +458,11 @@ pipeline {
               steps {
                 unstash 'tarball'
                 sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
               }
             }
             stage('Build CouchDB packages') {
