@@ -457,7 +457,9 @@ pipeline {
             stage('Build from tarball & test') {
               steps {
                 unstash 'tarball'
-                sh( script: build_and_test )
+                withEnv(['MIX_HOME='+pwd(), 'HEX_HOME='+pwd()]) {
+                  sh( script: build_and_test )
+                }
               }
               post {
                 always {
