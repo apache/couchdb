@@ -17,7 +17,7 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--define(TIMEOUT, 1000).
+-define(TIMEOUT, 60). % seconds
 
 
 setup() ->
@@ -56,7 +56,7 @@ view_purge_fabric_test_() ->
 
 
 test_purge_verify_index(DbName) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Docs1 = couch_mrview_test_util:make_docs(normal, 5),
         {ok, _} = fabric:update_docs(DbName, Docs1, [?ADMIN_CTX]),
         {ok, _} = fabric:update_doc(
@@ -99,11 +99,11 @@ test_purge_verify_index(DbName) ->
         ?assertEqual(1, couch_util:get_value(<<"purge_seq">>, Props2)),
         ?assertEqual(true, couch_mrview_index:verify_index_exists(
             ShardDbName, Props2))
-    end).
+    end)}.
 
 
 test_purge_hook_before_compaction(DbName) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Docs1 = couch_mrview_test_util:make_docs(normal, 5),
         {ok, _} = fabric:update_docs(DbName, Docs1, [?ADMIN_CTX]),
         {ok, _} = fabric:update_doc(
@@ -198,7 +198,7 @@ test_purge_hook_before_compaction(DbName) ->
 
         {ok, #doc{body = {Props4}}} = get_local_purge_doc(DbName),
         ?assertEqual(2, couch_util:get_value(<<"purge_seq">>, Props4))
-    end).
+    end)}.
 
 
 get_local_purge_doc(DbName) ->
