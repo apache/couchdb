@@ -168,11 +168,11 @@ eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 eunit: couch
-	@$(REBAR) setup_eunit 2> /dev/null
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
             tries=0; \
             while true; do \
-                $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir ; \
+                COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir ; \
                 if [ $$? -eq 0 ]; then \
                     break; \
                 else \

@@ -141,8 +141,8 @@ eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 eunit: export BUILDDIR = $(shell echo %cd%)
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
 eunit: couch
-	@$(REBAR) setup_eunit 2> nul
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
+	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) setup_eunit 2> nul
+	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) -r eunit $(EUNIT_OPTS)
 
 .PHONY: exunit
 # target: exunit - Run ExUnit tests
