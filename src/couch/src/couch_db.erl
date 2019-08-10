@@ -765,7 +765,7 @@ check_name(UserName, Access) ->
 
 check_roles(Roles, Access) ->    
     UserRolesSet = ordsets:from_list(Roles),
-    RolesSet = ordsets:from_list(Access),
+    RolesSet = ordsets:from_list(Access ++ ["_users"]),
     not ordsets:is_disjoint(UserRolesSet, RolesSet).
 
 get_admins(#db{security=SecProps}) ->

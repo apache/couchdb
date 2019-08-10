@@ -594,7 +594,8 @@ all_docs_fold(Db, #mrargs{direction=Dir, keys=Keys0}=Args, Callback, UAcc) ->
 map_fold(Db, View, Args, Callback, UAcc) ->
     {ok, Total} = case View#mrview.def of
         <<"_access/by-id-map">> ->
-            {ok, 0}; % TODO: couch_mrview_util:get_access_row_count(View, Args#mrargs.start_key);
+            % TODO: couch_mrview_util:get_access_row_count(View, [Args#mrargs.start_key]);
+            {ok, 0};
         _Else ->
             couch_mrview_util:get_row_count(View)
     end,

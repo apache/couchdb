@@ -18,17 +18,22 @@
 -define(ADMIN_REQ_HEADERS, [?CONTENT_JSON, {basic_auth, {"a", "a"}}]).
 -define(USERX_REQ_HEADERS, [?CONTENT_JSON, {basic_auth, {"x", "x"}}]).
 -define(USERY_REQ_HEADERS, [?CONTENT_JSON, {basic_auth, {"y", "y"}}]).
+-define(SECURITY_OBJECT, {[
+ {<<"members">>,{[{<<"roles">>,[<<"_admin">>, <<"_users">>]}]}},
+ {<<"admins">>, {[{<<"roles">>,[<<"_admin">>]}]}}
+]}).
 
 url() ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     lists:concat(["http://", Addr, ":", port()]).
 
 before_each(_) ->
-    {ok, _, _, _} = test_request:put(url() ++ "/db?q=1&n=1&access=true", ?ADMIN_REQ_HEADERS, ""),
+    {ok, 201, _, _} = test_request:put(url() ++ "/db?q=1&n=1&access=true", ?ADMIN_REQ_HEADERS, ""),
+    {ok, _, _, _} = test_request:put(url() ++ "/db/_security", ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
     url().
 
 after_each(_, Url) ->
-    {ok, _, _, _} = test_request:delete(Url ++ "/db", ?ADMIN_REQ_HEADERS),
+    {ok, 200, _, _} = test_request:delete(Url ++ "/db", ?ADMIN_REQ_HEADERS),
     ok.
 
 before_all() ->
@@ -38,7 +43,7 @@ before_all() ->
 
     % cleanup and setup
     {ok, _, _, _} = test_request:delete(url() ++ "/db", ?ADMIN_REQ_HEADERS),
-    {ok, _, _, _} = test_request:put(url() ++ "/db?q=1&n=1&access=true", ?ADMIN_REQ_HEADERS, ""),
+    % {ok, _, _, _} = test_request:put(url() ++ "/db?q=1&n=1&access=true", ?ADMIN_REQ_HEADERS, ""),
 
     % create users
     UserDbUrl = url() ++ "/_users?q=1&n=1",
@@ -59,6 +64,7 @@ after_all(_) ->
 
 access_test_() ->
     Tests = [
+        fun should_not_let_anonymous_user_create_doc/2,
         fun should_let_admin_create_doc_with_access/2,
         fun should_let_user_create_doc_for_themselves/2,
         fun should_not_let_user_create_doc_for_someone_else/2,
@@ -91,8 +97,13 @@ make_test_cases(Mod, Funs) ->
     }.
 
 % Doc creation
-should_let_admin_create_doc_with_access(_PortType, Url) ->
+
+should_not_let_anonymous_user_create_doc(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(Url ++ "/db/a", "{\"a\":1,\"_access\":[\"x\"]}"),
+    ?_assertEqual(401, Code).
+
+should_let_admin_create_doc_with_access(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(Url ++ "/db/a", ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
     ?_assertEqual(201, Code).
 
 should_let_user_create_doc_for_themselves(_PortType, Url) ->
@@ -154,7 +165,7 @@ should_let_user_fetch_their_own_all_docs(_PortType, Url) ->
     {ok, 200, _, Body} = test_request:get(Url ++ "/db/_all_docs?include_docs=true", ?USERX_REQ_HEADERS),
     {Json} = jiffy:decode(Body),
     ?_assertEqual(2, length(proplists:get_value(<<"rows">>, Json))).
-% TODO    ?_assertEqual(2, proplists:get_value(<<"total_rows">>, Json)).
+    % TODO    ?_assertEqual(2, proplists:get_value(<<"total_rows">>, Json)).
 
 % _changes
 should_let_admin_fetch_changes(_PortType, Url) ->

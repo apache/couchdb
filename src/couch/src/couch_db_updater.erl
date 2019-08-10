@@ -21,12 +21,15 @@
 -include("couch_db_int.hrl").
 
 -define(IDLE_LIMIT_DEFAULT, 61000).
-
+-define(DEFAULT_SECURITY_OBJECT, [
+ {<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
+ {<<"admins">>, {[{<<"roles">>,[<<"_admin">>]}]}}
+]).
 
 init({Engine, DbName, FilePath, Options0}) ->
     erlang:put(io_priority, {db_update, DbName}),
     update_idle_limit_from_config(),
-    DefaultSecObj = default_security_object(DbName),
+    DefaultSecObj = default_security_object(DbName, Options0),
     Options = [{default_security_object, DefaultSecObj} | Options0],
     try
         {ok, EngineState} = couch_db_engine:init(Engine, FilePath, Options),
@@ -770,20 +773,24 @@ get_meta_body_size(Meta) ->
     {ejson_size, ExternalSize} = lists:keyfind(ejson_size, 1, Meta),
     ExternalSize.
 
-
+default_security_object(DbName, []) ->
+    default_security_object(DbName);
+default_security_object(DbName, Options) ->
+    case lists:member({access, true}, Options) of
+        false -> default_security_object(DbName);
+        true -> ?DEFAULT_SECURITY_OBJECT
+    end.
 default_security_object(<<"shards/", _/binary>>) ->
     case config:get("couchdb", "default_security", "everyone") of
         "admin_only" ->
-            [{<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
-             {<<"admins">>,{[{<<"roles">>,[<<"_admin">>]}]}}];
+            ?DEFAULT_SECURITY_OBJECT;
         Everyone when Everyone == "everyone"; Everyone == "admin_local" ->
             []
     end;
 default_security_object(_DbName) ->
     case config:get("couchdb", "default_security", "everyone") of
         Admin when Admin == "admin_only"; Admin == "admin_local" ->
-            [{<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
-             {<<"admins">>,{[{<<"roles">>,[<<"_admin">>]}]}}];
+            ?DEFAULT_SECURITY_OBJECT;
         "everyone" ->
             []
     end.

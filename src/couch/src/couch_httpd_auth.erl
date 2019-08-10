@@ -102,7 +102,7 @@ default_authentication_handler(Req, AuthModule) ->
                     true ->
                         Req#httpd{user_ctx=#user_ctx{
                             name=UserName,
-                            roles=couch_util:get_value(<<"roles">>, UserProps, [])
+                            roles=couch_util:get_value(<<"roles">>, UserProps, []) ++ [<<"_users">>]
                         }};
                     false ->
                         authentication_warning(Req, UserName),
@@ -165,7 +165,7 @@ proxy_auth_user(Req) ->
             Roles = case header_value(Req, XHeaderRoles) of
                 undefined -> [];
                 Else ->
-                    [?l2b(R) || R <- string:tokens(Else, ",")]
+                    [?l2b(R) || R <- string:tokens(Else, ",")] ++ [<<"_users">>]
             end,
             case config:get("couch_httpd_auth", "proxy_use_secret", "false") of
                 "true" ->
@@ -231,7 +231,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req, AuthModule) ->
                                                 [User]),
                                 Req#httpd{user_ctx=#user_ctx{
                                     name=?l2b(User),
-                                    roles=couch_util:get_value(<<"roles">>, UserProps, [])
+                                    roles=couch_util:get_value(<<"roles">>, UserProps, []) ++ [<<"_users">>]
                                 }, auth={FullSecret, TimeLeft < Timeout*0.9}};
                             _Else ->
                                 Req
