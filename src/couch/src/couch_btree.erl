@@ -98,17 +98,11 @@ full_reduce_with_options(Bt, Options0) ->
         {ok, couch_btree:final_reduce(Bt, PartialReds)}
     end,
     [UserName] = proplists:get_value(start_key, Options0, <<"">>),
-    % couch_log:info("~n Options0:~p~n", [Options0]),
-    % couch_log:info("~n UserName:~p~n", [UserName]),
     EndKey = {[UserName, {[]}]},
-    % couch_log:info("~n EndKey:~p~n", [EndKey]),
     Options = Options0 ++ [
         {end_key, EndKey}
     ],
-    % couch_log:info("~n Options:~p~n", [Options]),
-    R = fold_reduce(Bt, CountFun, 0, Options),
-    % couch_log:info("~n~n R: ~p ~n", [R]),
-    R.
+    fold_reduce(Bt, CountFun, 0, Options).
 
 full_reduce(#btree{root=nil,reduce=Reduce}) ->
     {ok, Reduce(reduce, [])};
