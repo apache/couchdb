@@ -616,7 +616,8 @@ init_jtx(undefined) ->
 
 init_jtx({erlfdb_transaction, _} = Tx) ->
     Root = erlfdb_directory:root(),
-    CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
+    Dir = fabric2_server:fdb_directory(),
+    CouchDB = erlfdb_directory:create_or_open(Tx, Root, Dir),
     LayerPrefix = erlfdb_directory:get_name(CouchDB),
     Jobs = erlfdb_tuple:pack({?JOBS}, LayerPrefix),
     Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),

@@ -45,7 +45,8 @@ start_link() ->
 
 create(Tx, undefined) ->
     Root = erlfdb_directory:root(),
-    CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
+    Dir = fabric2_server:fdb_directory(),
+    CouchDB = erlfdb_directory:create_or_open(Tx, Root, Dir),
     Prefix = erlfdb_directory:get_name(CouchDB),
     create(Tx, Prefix);
 
@@ -136,7 +137,8 @@ clean(St, NeedsSweep) ->
 
 sweep(Tx, {Mega, Secs, Micro}) ->
     Root = erlfdb_directory:root(),
-    CouchDB = erlfdb_directory:create_or_open(Tx, Root, [<<"couchdb">>]),
+    Dir = fabric2_server:fdb_directory(),
+    CouchDB = erlfdb_directory:create_or_open(Tx, Root, Dir),
     Prefix = erlfdb_directory:get_name(CouchDB),
     StartKey = erlfdb_tuple:pack({?TX_IDS}, Prefix),
     EndKey = erlfdb_tuple:pack({?TX_IDS, Mega, Secs, Micro}, Prefix),

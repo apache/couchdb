@@ -19,7 +19,8 @@
     start_link/0,
     fetch/1,
     store/1,
-    remove/1
+    remove/1,
+    fdb_directory/0
 ]).
 
 
@@ -37,6 +38,8 @@
 
 
 -define(CLUSTER_FILE, "/usr/local/etc/foundationdb/fdb.cluster").
+-define(FDB_DIRECTORY, fdb_directory).
+-define(DEFAULT_FDB_DIRECTORY, <<"couchdb">>).
 
 
 start_link() ->
@@ -81,6 +84,14 @@ init(_) ->
     end,
     application:set_env(fabric, db, Db),
 
+    Dir = case config:get("fabric", "fdb_directory") of
+        Val when is_list(Val), length(Val) > 0 ->
+            [?l2b(Val)];
+        _ ->
+            [?DEFAULT_FDB_DIRECTORY]
+    end,
+    application:set_env(fabric, ?FDB_DIRECTORY, Dir),
+
     {ok, nil}.
 
 
@@ -102,3 +113,18 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+fdb_directory() ->
+    case get(?FDB_DIRECTORY) of
+        undefined ->
+            case application:get_env(fabric, ?FDB_DIRECTORY) of
+                undefined ->
+                    erlang:error(fabric_application_not_started);
+                {ok, Dir} ->
+                    put(?FDB_DIRECTORY, Dir),
+                    Dir
+            end;
+        Dir ->
+            Dir
+    end.
