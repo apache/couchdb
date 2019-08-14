@@ -117,6 +117,7 @@ SubDirs = [
     "src/couch_log",
     "src/chttpd",
     "src/couch",
+    "src/couch_eval",
     "src/couch_event",
     "src/mem3",
     "src/couch_index",
