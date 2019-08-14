@@ -24,6 +24,7 @@
 
 -define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
 -define(i2l(I), integer_to_list(I)).
+-define(TIMEOUT, 60). % seconds
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
@@ -71,7 +72,7 @@ all_view_test_() ->
 
 
 should_succeed_on_view_with_queries_keys(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         {ok, _, _, _} = test_request:put(Url ++ "/_design/bar",
             [?CONTENT_JSON, ?AUTH], ?DDOC),
@@ -83,11 +84,11 @@ should_succeed_on_view_with_queries_keys(Url) ->
         ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
         {InnerJson} = lists:nth(1, ResultJsonBody),
         ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson)))
-    end).
+    end)}.
 
 
 should_succeed_on_view_with_queries_limit_skip(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         {ok, _, _, _} = test_request:put(Url ++ "/_design/bar",
             [?CONTENT_JSON, ?AUTH], ?DDOC),
@@ -100,11 +101,11 @@ should_succeed_on_view_with_queries_limit_skip(Url) ->
         {InnerJson} = lists:nth(1, ResultJsonBody),
         ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson)),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson)))
-    end).
+    end)}.
 
 
 should_succeed_on_view_with_multiple_queries(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         {ok, _, _, _} = test_request:put(Url ++ "/_design/bar",
             [?CONTENT_JSON, ?AUTH], ?DDOC),
@@ -120,4 +121,4 @@ should_succeed_on_view_with_multiple_queries(Url) ->
         {InnerJson2} = lists:nth(2, ResultJsonBody),
         ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson2)),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
-    end).
+    end)}.
