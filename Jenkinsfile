@@ -529,8 +529,6 @@ pipeline {
             reprepro -b couchdb-pkg/repo includedeb jessie pkgs/jessie/*.deb
             cp js/debian-stretch/*.deb pkgs/stretch
             reprepro -b couchdb-pkg/repo includedeb stretch pkgs/stretch/*.deb
-            cp js/ubuntu-trusty/*.deb pkgs/trusty
-            reprepro -b couchdb-pkg/repo includedeb trusty pkgs/trusty/*.deb
             cp js/ubuntu-xenial/*.deb pkgs/xenial
             reprepro -b couchdb-pkg/repo includedeb xenial pkgs/xenial/*.deb
             cp js/ubuntu-bionic/*.deb pkgs/bionic
