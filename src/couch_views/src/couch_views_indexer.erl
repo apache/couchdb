@@ -215,7 +215,7 @@ write_docs(TxDb, Mrst, Docs, State) ->
     couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq).
 
 
-start_query_server(#mrst{} = Mrst) ->
+start_query_server(#mrst{qserver = nil} = Mrst) ->
     #mrst{
         language = Language,
         lib = Lib,
@@ -223,7 +223,10 @@ start_query_server(#mrst{} = Mrst) ->
     } = Mrst,
     Defs = [View#mrview.def || View <- Views],
     {ok, QServer} = couch_query_servers:start_doc_map(Language, Defs, Lib),
-    Mrst#mrst{qserver = QServer}.
+    Mrst#mrst{qserver = QServer};
+
+start_query_server(#mrst{} = Mrst) ->
+    Mrst.
 
 
 report_progress(State, UpdateType) ->
