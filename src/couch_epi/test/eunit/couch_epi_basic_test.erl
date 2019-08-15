@@ -67,7 +67,9 @@ processes() ->
     [
         {?MODULE, [?CHILD(extra_process, worker)]},
         {?MODULE, [{to_replace, {new, start_link, [bar]},
-            permanent, 5000, worker, [bar]}]}
+            permanent, 5000, worker, [bar]}]},
+        {?MODULE, [#{id => to_replace_map,
+            start => {new, start_link, [bar]}, modules => [bar]}]}
     ].
 
 
@@ -95,9 +97,10 @@ parse_child_id(Id) ->
 -include_lib("eunit/include/eunit.hrl").
 
 basic_test() ->
-    Expected = lists:sort([
+    Expected = [
         {extra_process, [], [extra_process]},
         {to_replace, [bar], [bar]},
+        {to_replace_map, [bar], [bar]},
         {{my_service, providers},
             [couch_epi_functions_gen_my_service],
             [couch_epi_codechange_monitor, couch_epi_functions_gen_my_service,
@@ -114,18 +117,23 @@ basic_test() ->
             [couch_epi_data_gen_test_app_descriptions],
             lists:sort([couch_epi_codechange_monitor,
                 couch_epi_data_gen_test_app_descriptions, ?MODULE])}
-    ]),
-
-    ToReplace = {to_replace,
-        {old, start_link, [foo]}, permanent, 5000, worker, [foo]},
-    Children = lists:sort(couch_epi_sup:plugin_childspecs(
-        ?MODULE, [?MODULE], [ToReplace])),
-    Results = [
-        {parse_child_id(Id), Args, lists:sort(Modules)}
-            || {Id, {_M, _F, Args}, _, _, _, Modules} <- Children
     ],
 
-    Tests = lists:zip(Expected, Results),
+    ToReplace = [
+        {to_replace, {old, start_link, [foo]}, permanent, 5000, worker, [foo]},
+        #{id => to_replace_map, start => {old, start_link, [foo]}}
+    ],
+    Children = lists:sort(couch_epi_sup:plugin_childspecs(
+        ?MODULE, [?MODULE], ToReplace)),
+
+    Results = lists:map(fun
+        ({Id, {_M, _F, Args}, _, _, _, Modules}) ->
+            {parse_child_id(Id), Args, lists:sort(Modules)};
+        (#{id := Id, start := {_M, _F, Args}, modules := Modules}) ->
+            {parse_child_id(Id), Args, lists:sort(Modules)}
+    end, Children),
+
+    Tests = lists:zip(lists:sort(Expected), lists:sort(Results)),
     [?assertEqual(Expect, Result) || {Expect, Result} <- Tests],
 
     ExpectedChild = {to_replace, {new, start_link, [bar]},
@@ -134,4 +142,8 @@ basic_test() ->
         ExpectedChild,
         lists:keyfind(to_replace, 1, Children)),
 
+    ExpectedMapChildSpec = #{id => to_replace_map,
+        start => {new, start_link, [bar]}, modules => [bar]},
+    [MapChildSpec] = [E || #{id := to_replace_map} = E <- Children],
+    ?assertEqual(ExpectedMapChildSpec, MapChildSpec),
     ok.
