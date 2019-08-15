@@ -36,7 +36,8 @@
 
 % miscellany
 -export([design_docs/1, reset_validation_funs/1, cleanup_index_files/0,
-    cleanup_index_files/1, cleanup_index_files_all_nodes/1, dbname/1]).
+    cleanup_index_files/1, cleanup_index_files_all_nodes/1, dbname/1,
+    inactive_index_files/1]).
 
 -include_lib("fabric/include/fabric.hrl").
 
@@ -503,26 +504,30 @@ cleanup_index_files() ->
 %% @doc clean up index files for a specific db
 -spec cleanup_index_files(dbname()) -> ok.
 cleanup_index_files(DbName) ->
+    lists:foreach(fun(File) ->
+        file:delete(File)
+    end, inactive_index_files(DbName)).
+
+%% @doc inactive index files for a specific db
+-spec inactive_index_files(dbname()) -> ok.
+inactive_index_files(DbName) ->
     {ok, DesignDocs} = fabric:design_docs(DbName),
 
-    ActiveSigs = lists:map(fun(#doc{id = GroupId}) ->
+    ActiveSigs = maps:from_list(lists:map(fun(#doc{id = GroupId}) ->
         {ok, Info} = fabric:get_view_group_info(DbName, GroupId),
-        binary_to_list(couch_util:get_value(signature, Info))
-    end, [couch_doc:from_json_obj(DD) || DD <- DesignDocs]),
+        {binary_to_list(couch_util:get_value(signature, Info)), nil}
+    end, [couch_doc:from_json_obj(DD) || DD <- DesignDocs])),
 
     FileList = lists:flatmap(fun(#shard{name = ShardName}) ->
         IndexDir = couch_index_util:index_dir(mrview, ShardName),
         filelib:wildcard([IndexDir, "/*"])
     end, mem3:local_shards(dbname(DbName))),
 
-    DeleteFiles = if ActiveSigs =:= [] -> FileList; true ->
-        {ok, RegExp} = re:compile([$(, string:join(ActiveSigs, "|"), $)]),
+    if ActiveSigs =:= [] -> FileList; true ->
         lists:filter(fun(FilePath) ->
-            re:run(FilePath, RegExp, [{capture, none}]) == nomatch
+            not maps:is_key(filename:basename(FilePath, ".view"), ActiveSigs)
         end, FileList)
-    end,
-    [file:delete(File) || File <- DeleteFiles],
-    ok.
+    end.
 
 %% @doc clean up index files for a specific db on all nodes
 -spec cleanup_index_files_all_nodes(dbname()) -> [reference()].
