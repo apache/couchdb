@@ -26,6 +26,7 @@
           ~r"/_build/",
           ~r"/node_modules/",
           ~r"/src/jason",
+          ~r"/src/mock",
           ~r"/src/httpotion",
           ~r"/src/credo",
           ~r"/src/junit_formatter",

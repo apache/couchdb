@@ -6,4 +6,6 @@
   "jason": {:hex, :jason, "1.1.2", "b03dedea67a99223a2eaf9f1264ce37154564de899fd3d8b9a21b1a6fd64afe7", [:mix], [{:decimal, "~> 1.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm"},
   "jiffy": {:hex, :jiffy, "0.15.2", "de266c390111fd4ea28b9302f0bc3d7472468f3b8e0aceabfbefa26d08cd73b7", [:rebar3], [], "hexpm"},
   "junit_formatter": {:hex, :junit_formatter, "3.0.0", "13950d944dbd295da7d8cc4798b8faee808a8bb9b637c88069954eac078ac9da", [:mix], [], "hexpm"},
+  "meck": {:hex, :meck, "0.8.13", "ffedb39f99b0b99703b8601c6f17c7f76313ee12de6b646e671e3188401f7866", [:rebar3], [], "hexpm"},
+  "mock": {:hex, :mock, "0.3.3", "42a433794b1291a9cf1525c6d26b38e039e0d3a360732b5e467bfc77ef26c914", [:mix], [{:meck, "~> 0.8.13", [hex: :meck, repo: "hexpm", optional: false]}], "hexpm"},
 }
