@@ -35,6 +35,10 @@ defmodule Couch.Test.ExUnit.Case do
   end
 
   setup context do
+    on_exit(fn ->
+      :meck.unload()
+    end)
+
     case context do
       %{:setup => setup_fun} ->
         {:ok, Setup.setup(context, setup_fun)}
