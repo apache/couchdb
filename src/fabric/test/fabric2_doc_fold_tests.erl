@@ -20,6 +20,16 @@
 
 -define(DOC_COUNT, 50).
 
+%% eunit implementation of {with, Tests} doesn't detect test name correctly
+with(Tests) ->
+  fun(ArgsTuple) ->
+      [{Name, ?_test(Fun(ArgsTuple))} || {Name, Fun} <- Tests]
+      ++
+      [{Name, {timeout, Timeout, ?_test(Fun(ArgsTuple))}} || {Name, Timeout, Fun} <- Tests]
+  end.
+
+-define(NAMED(A), {atom_to_list(A), fun A/1}).
+-define(WITH_TIMEOUT(Timeout, A), {atom_to_list(A), Timeout, fun A/1}).
 
 doc_fold_test_() ->
     {
@@ -28,17 +38,17 @@ doc_fold_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun fold_docs_basic/1,
-                fun fold_docs_rev/1,
-                fun fold_docs_with_start_key/1,
-                fun fold_docs_with_end_key/1,
-                fun fold_docs_with_both_keys_the_same/1,
-                fun fold_docs_with_different_keys/1,
-                fun fold_docs_with_limit/1,
-                fun fold_docs_with_skip/1,
-                fun fold_docs_with_skip_and_limit/1
-            ]}
+            with([
+                ?NAMED(fold_docs_basic),
+                ?NAMED(fold_docs_rev),
+                ?NAMED(fold_docs_with_start_key),
+                ?NAMED(fold_docs_with_end_key),
+                ?NAMED(fold_docs_with_both_keys_the_same),
+                ?WITH_TIMEOUT(10000, fold_docs_with_different_keys),
+                ?NAMED(fold_docs_with_limit),
+                ?NAMED(fold_docs_with_skip),
+                ?NAMED(fold_docs_with_skip_and_limit)
+            ])
         }
     }.
 
