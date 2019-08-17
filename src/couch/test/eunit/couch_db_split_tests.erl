@@ -155,7 +155,7 @@ should_copy_local_docs({Desc, TotalDocs, Q}, DbName) ->
     TMap = make_targets(Ranges),
     DocsPerRange = TotalDocs div Q,
     PickFun = make_pickfun(DocsPerRange),
-    {Desc, ?_test(begin
+    {Desc, timeout, ?TIMEOUT, ?_test(begin
         {ok, UpdateSeq} = couch_db_split:split(DbName, TMap, PickFun),
         ?assertEqual(ExpectSeq, UpdateSeq),
         Response = couch_db_split:copy_local_docs(DbName, TMap, PickFun),
