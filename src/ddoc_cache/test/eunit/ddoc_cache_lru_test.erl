@@ -47,14 +47,17 @@ stop_couch(Ctx) ->
 
 check_not_started_test() ->
     % Starting couch, but not ddoc_cache
-    Ctx = test_util:start_couch(),
-    try
-        Key = {ddoc_cache_entry_custom, {<<"dbname">>, ?MODULE}},
-        ?assertEqual({ok, <<"dbname">>}, ddoc_cache_lru:open(Key))
-    after
-        test_util:stop_couch(Ctx)
-    end.
-
+    {
+        setup,
+        fun test_util:start_couch/0,
+        fun test_util:stop_couch/1,
+        [
+            fun(_) ->
+                Key = {ddoc_cache_entry_custom, {<<"dbname">>, ?MODULE}},
+                ?assertEqual({ok, <<"dbname">>}, ddoc_cache_lru:open(Key))
+            end
+        ]
+    }.
 
 check_lru_test_() ->
     {
