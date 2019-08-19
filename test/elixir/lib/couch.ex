@@ -59,7 +59,7 @@ defmodule Couch do
     base_url <> url
   end
 
-  def process_request_headers(headers, options) do
+  def process_request_headers(headers, _body, options) do
     headers = Keyword.put(headers, :"User-Agent", "couch-potion")
 
     headers =
@@ -125,105 +125,4 @@ defmodule Couch do
     %Couch.Session{cookie: token}
   end
 
-  # HACK: this is here until this commit lands in a release
-  # https://github.com/myfreeweb/httpotion/commit/f3fa2f0bc3b9b400573942b3ba4628b48bc3c614
-  def handle_response(response) do
-    case response do
-      {:ok, status_code, headers, body, _} ->
-        processed_headers = process_response_headers(headers)
-
-        %HTTPotion.Response{
-          status_code: process_status_code(status_code),
-          headers: processed_headers,
-          body: process_response_body(processed_headers, body)
-        }
-
-      {:ok, status_code, headers, body} ->
-        processed_headers = process_response_headers(headers)
-
-        %HTTPotion.Response{
-          status_code: process_status_code(status_code),
-          headers: processed_headers,
-          body: process_response_body(processed_headers, body)
-        }
-
-      {:ibrowse_req_id, id} ->
-        %HTTPotion.AsyncResponse{id: id}
-
-      {:error, {:conn_failed, {:error, reason}}} ->
-        %HTTPotion.ErrorResponse{message: error_to_string(reason)}
-
-      {:error, :conn_failed} ->
-        %HTTPotion.ErrorResponse{message: "conn_failed"}
-
-      {:error, reason} ->
-        %HTTPotion.ErrorResponse{message: error_to_string(reason)}
-    end
-  end
-
-  # Anther HACK: Until we can get process_request_headers/2 merged
-  # upstream.
-  @spec process_arguments(atom, String.t(), [{atom(), any()}]) :: %{}
-  defp process_arguments(method, url, options) do
-    options = process_options(options)
-
-    body = Keyword.get(options, :body, "")
-
-    headers =
-      Keyword.merge(
-        Application.get_env(:httpotion, :default_headers, []),
-        Keyword.get(options, :headers, [])
-      )
-
-    timeout =
-      Keyword.get(
-        options,
-        :timeout,
-        Application.get_env(:httpotion, :default_timeout, 5000)
-      )
-
-    ib_options =
-      Keyword.merge(
-        Application.get_env(:httpotion, :default_ibrowse, []),
-        Keyword.get(options, :ibrowse, [])
-      )
-
-    follow_redirects =
-      Keyword.get(
-        options,
-        :follow_redirects,
-        Application.get_env(:httpotion, :default_follow_redirects, false)
-      )
-
-    ib_options =
-      if stream_to = Keyword.get(options, :stream_to),
-        do:
-          Keyword.put(
-            ib_options,
-            :stream_to,
-            spawn(__MODULE__, :transformer, [stream_to, method, url, options])
-          ),
-        else: ib_options
-
-    ib_options =
-      if user_password = Keyword.get(options, :basic_auth) do
-        {user, password} = user_password
-        Keyword.put(ib_options, :basic_auth, {to_charlist(user), to_charlist(password)})
-      else
-        ib_options
-      end
-
-    %{
-      method: method,
-      url: url |> to_string |> process_url(options) |> to_charlist,
-      body: body |> process_request_body,
-      headers:
-        headers
-        |> process_request_headers(options)
-        |> Enum.map(fn {k, v} -> {to_charlist(k), to_charlist(v)} end),
-      timeout: timeout,
-      ib_options: ib_options,
-      follow_redirects: follow_redirects
-    }
-  end
 end
