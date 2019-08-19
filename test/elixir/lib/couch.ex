@@ -87,19 +87,10 @@ defmodule Couch do
   end
 
   def process_options(options) do
-    if Keyword.get(options, :cookie) == nil do
-      headers = Keyword.get(options, :headers, [])
-
-      if headers[:basic_auth] != nil or headers[:authorization] != nil do
-        options
-      else
-        username = System.get_env("EX_USERNAME") || "adm"
-        password = System.get_env("EX_PASSWORD") || "pass"
-        Keyword.put(options, :basic_auth, {username, password})
-      end
-    else
-      options
-    end
+    options
+      |> set_auth_options()
+      |> set_inactivity_timeout()
+      |> set_request_timeout()
   end
 
   def process_request_body(body) do
@@ -118,6 +109,33 @@ defmodule Couch do
     else
       process_response_body(body)
     end
+  end
+
+  def set_auth_options(options) do
+    if Keyword.get(options, :cookie) == nil do
+      headers = Keyword.get(options, :headers, [])
+
+      if headers[:basic_auth] != nil or headers[:authorization] != nil do
+        options
+      else
+        username = System.get_env("EX_USERNAME") || "adm"
+        password = System.get_env("EX_PASSWORD") || "pass"
+        Keyword.put(options, :basic_auth, {username, password})
+      end
+    else
+      options
+    end
+  end
+
+  def set_inactivity_timeout(options) do
+    Keyword.update(options, :ibrowse, [{:inactivity_timeout, @inactivity_timeout}], fn(ibrowse) ->
+      Keyword.put_new(ibrowse, :inactivity_timeout, @inactivity_timeout)
+    end)
+  end
+
+  def set_request_timeout(options) do
+    timeout = Application.get_env(:httpotion, :default_timeout, @request_timeout)
+    Keyword.put_new(options, :timeout, timeout)
   end
 
   def login(userinfo) do
