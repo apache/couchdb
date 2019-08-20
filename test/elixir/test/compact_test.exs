@@ -43,7 +43,7 @@ defmodule CompactTest do
       final_disk_size = info["disk_size"]
       assert final_data_size < final_disk_size
       assert is_integer(final_data_size) and is_integer(final_disk_size)
-      assert final_data_size < deleted_data_size
+      assert final_data_size > deleted_data_size
     end)
   end
 
