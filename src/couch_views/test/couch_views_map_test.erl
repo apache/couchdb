@@ -20,7 +20,12 @@
 
 
 setup() ->
-    test_util:start_couch([fabric, couch_jobs, couch_views]).
+    test_util:start_couch([
+            fabric,
+            couch_jobs,
+            couch_js,
+            couch_views
+        ]).
 
 
 teardown(State) ->

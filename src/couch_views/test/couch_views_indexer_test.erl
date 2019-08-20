@@ -52,6 +52,7 @@ setup() ->
     Ctx = test_util:start_couch([
             fabric,
             couch_jobs,
+            couch_js,
             couch_views
         ]),
     Ctx.

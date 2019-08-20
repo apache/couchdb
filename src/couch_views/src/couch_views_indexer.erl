@@ -120,7 +120,7 @@ update(#{} = Db, Mrst0, State0) ->
 
     case State4 of
         finished ->
-            couch_query_servers:stop_doc_map(Mrst2#mrst.qserver);
+            couch_eval:release_map_context(Mrst2#mrst.qserver);
         _ ->
             update(Db, Mrst2, State4)
     end.
@@ -171,20 +171,42 @@ map_docs(Mrst, Docs) ->
     % Run all the non deleted docs through the view engine and
     Mrst1 = start_query_server(Mrst),
     QServer = Mrst1#mrst.qserver,
-    MapFun = fun
-        (#{deleted := true} = Change) ->
-            Change#{results => []};
-        (#{deleted := false} = Change) ->
-            #{doc := Doc} = Change,
-            couch_stats:increment_counter([couchdb, mrview, map_doc]),
-            {ok, RawResults} = couch_query_servers:map_doc_raw(QServer, Doc),
-            JsonResults = couch_query_servers:raw_to_ejson(RawResults),
-            ListResults = lists:map(fun(ViewResults) ->
-                [list_to_tuple(Res) || Res <- ViewResults]
-            end, JsonResults),
-            Change#{results => ListResults}
-    end,
-    {Mrst1, lists:map(MapFun, Docs)}.
+
+    {Deleted0, NotDeleted0} = lists:partition(fun(Doc) ->
+        #{deleted := Deleted} = Doc,
+        Deleted
+    end, Docs),
+
+    Deleted1 = lists:map(fun(Doc) ->
+        Doc#{results => []}
+    end, Deleted0),
+
+    DocsToMap = lists:map(fun(Doc) ->
+        #{doc := DocRec} = Doc,
+        DocRec
+    end, NotDeleted0),
+
+    {ok, AllResults} = couch_eval:map_docs(QServer, DocsToMap),
+
+    % The expanded function head here is making an assertion
+    % that the results match the given doc
+    NotDeleted1 = lists:zipwith(fun(#{id := DocId} = Doc, {DocId, Results}) ->
+        Doc#{results => Results}
+    end, NotDeleted0, AllResults),
+
+    % I'm being a bit careful here resorting the docs
+    % in order of the changes feed. Theoretically this is
+    % unnecessary since we're inside a single transaction.
+    % However, I'm concerned if we ever split this up
+    % into multiple transactions that this detail might
+    % be important but forgotten.
+    MappedDocs = lists:sort(fun(A, B) ->
+        #{sequence := ASeq} = A,
+        #{sequence := BSeq} = B,
+        ASeq =< BSeq
+    end, Deleted1 ++ NotDeleted1),
+
+    {Mrst1, MappedDocs}.
 
 
 write_docs(TxDb, Mrst, Docs, State) ->
@@ -249,12 +271,21 @@ fetch_docs(Db, Changes) ->
 
 start_query_server(#mrst{qserver = nil} = Mrst) ->
     #mrst{
+        db_name = DbName,
+        idx_name = DDocId,
         language = Language,
+        sig = Sig,
         lib = Lib,
         views = Views
     } = Mrst,
-    Defs = [View#mrview.def || View <- Views],
-    {ok, QServer} = couch_query_servers:start_doc_map(Language, Defs, Lib),
+    {ok, QServer} = couch_eval:acquire_map_context(
+            DbName,
+            DDocId,
+            Language,
+            Sig,
+            Lib,
+            [View#mrview.def || View <- Views]
+        ),
     Mrst#mrst{qserver = QServer};
 
 start_query_server(#mrst{} = Mrst) ->

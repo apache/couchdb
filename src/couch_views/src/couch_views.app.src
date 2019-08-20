@@ -26,6 +26,7 @@
         config,
         couch_stats,
         fabric,
-        couch_jobs
+        couch_jobs,
+        couch_eval
     ]}
 ]}.
