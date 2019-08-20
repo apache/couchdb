@@ -35,45 +35,43 @@ return_error(_DDocId) ->
     {error, timeout}.
 
 
-start(Resp) ->
-    Ctx = ddoc_cache_tutil:start_couch(),
+no_cache_test_() ->
+    {
+        "ddoc_cache no cache test",
+        {
+            setup,
+            fun ddoc_cache_tutil:start_couch/0, fun ddoc_cache_tutil:stop_couch/1,
+            {
+                foreachx,
+                fun setup/1, fun teardown/2,
+                [
+                    {fun ddoc/1, fun no_cache_open_ok_test/2},
+                    {fun not_found/1, fun no_cache_open_not_found_test/2},
+                    {fun return_error/1, fun no_cache_open_error_test/2}
+                ]
+            }
+        }
+    }.
+
+setup(Resp) ->
     meck:new(fabric),
     meck:expect(fabric, open_doc, fun(_, DDocId, _) ->
         Resp(DDocId)
-    end),
-    Ctx.
+    end).
+
+teardown(_, _) ->
+    meck:unload().
+
+no_cache_open_ok_test(_, _) ->
+    Resp = ddoc_cache:open_doc(<<"foo">>, <<"bar">>),
+    ?_assertEqual(ddoc(<<"bar">>), Resp).
 
 
-stop(Ctx) ->
-    meck:unload(),
-    ddoc_cache_tutil:stop_couch(Ctx).
+no_cache_open_not_found_test(_, _) ->
+    Resp = ddoc_cache:open_doc(<<"foo">>, <<"baz">>),
+    ?_assertEqual(not_found(<<"baz">>), Resp).
 
 
-no_cache_open_ok_test() ->
-    Ctx = start(fun ddoc/1),
-    try
-        Resp = ddoc_cache:open_doc(<<"foo">>, <<"bar">>),
-        ?assertEqual(ddoc(<<"bar">>), Resp)
-    after
-        stop(Ctx)
-    end.
-
-
-no_cache_open_not_found_test() ->
-    Ctx = start(fun not_found/1),
-    try
-        Resp = ddoc_cache:open_doc(<<"foo">>, <<"bar">>),
-        ?assertEqual(not_found(<<"bar">>), Resp)
-    after
-        stop(Ctx)
-    end.
-
-
-no_cache_open_error_test() ->
-    Ctx = start(fun return_error/1),
-    try
-        Resp = ddoc_cache:open_doc(<<"foo">>, <<"bar">>),
-        ?assertEqual(return_error(<<"bar">>), Resp)
-    after
-        stop(Ctx)
-    end.
+no_cache_open_error_test(_, _) ->
+    Resp = ddoc_cache:open_doc(<<"foo">>, <<"bif">>),
+    ?_assertEqual(return_error(<<"bif">>), Resp).

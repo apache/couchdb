@@ -21,7 +21,7 @@
 
 
 setup_all() ->
-    cpse_util:setup_all([mem3, fabric, chttpd, couch_replicator]).
+    cpse_util:setup_all([mem3, fabric, couch_replicator]).
 
 
 setup_each() ->
@@ -205,4 +205,11 @@ make_shard(DbName) ->
 db_url(DbName) ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(couch_httpd, port),
-    ?l2b(io_lib:format("http://~s:~b/~s", [Addr, Port, DbName])).
+    Url = ?l2b(io_lib:format("http://~s:~b/~s", [Addr, Port, DbName])),
+    test_util:wait(fun() ->
+        case test_request:get(?b2l(Url)) of
+            {ok, 200, _, _} -> ok;
+            _ -> wait
+        end
+    end),
+    Url.

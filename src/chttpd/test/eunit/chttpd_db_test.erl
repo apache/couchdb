@@ -23,6 +23,7 @@
 -define(DESTHEADER2, {"Destination", "foo%2Fbar%23baz%3Fpow%3Afiz"}).
 -define(FIXTURE_TXT, ?ABS_PATH(?FILE)).
 -define(i2l(I), integer_to_list(I)).
+-define(TIMEOUT, 60). % seconds
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
@@ -88,7 +89,7 @@ all_test_() ->
 
 
 should_return_ok_true_on_bulk_update(Url) ->
-    ?_assertEqual(true,
+    {timeout, ?TIMEOUT, ?_assertEqual(true,
         begin
             {ok, _, _, Body} = create_doc(Url, "testdoc"),
             {Json} = ?JSON_DECODE(Body),
@@ -99,27 +100,27 @@ should_return_ok_true_on_bulk_update(Url) ->
             ResultJson = ?JSON_DECODE(ResultBody),
             {InnerJson} = lists:nth(1, ResultJson),
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
-        end).
+        end)}.
 
 
 should_return_ok_true_on_ensure_full_commit(Url0) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Url = Url0 ++ "/_ensure_full_commit",
         {ok, RC, _, Body} = test_request:post(Url, [?CONTENT_JSON, ?AUTH], []),
         {Json} = ?JSON_DECODE(Body),
         ?assertEqual(201, RC),
         ?assert(couch_util:get_value(<<"ok">>, Json))
-    end).
+    end)}.
 
 
 should_return_404_for_ensure_full_commit_on_no_db(Url0) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         Url = Url0 ++ "-missing-db" ++ "/_ensure_full_commit",
         {ok, RC, _, Body} = test_request:post(Url, [?CONTENT_JSON, ?AUTH], []),
         {Json} = ?JSON_DECODE(Body),
         ?assertEqual(404, RC),
         ?assertEqual(<<"not_found">>, couch_util:get_value(<<"error">>, Json))
-    end).
+    end)}.
 
 
 should_accept_live_as_an_alias_for_continuous(Url) ->
@@ -135,7 +136,7 @@ should_accept_live_as_an_alias_for_continuous(Url) ->
         end,
         couch_util:get_value(<<"last_seq">>, Result, undefined)
     end,
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         {ok, _, _, ResultBody1} =
             test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
         LastSeq1 = GetLastSeq(ResultBody1),
@@ -146,11 +147,11 @@ should_accept_live_as_an_alias_for_continuous(Url) ->
         LastSeq2 = GetLastSeq(ResultBody2),
 
         ?assertNotEqual(LastSeq1, LastSeq2)
-    end).
+    end)}.
 
 
 should_return_404_for_delete_att_on_notadoc(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         {ok, RC, _, RespBody} = test_request:delete(
             Url ++ "/notadoc/att.pdf",
             [?CONTENT_JSON, ?AUTH],
@@ -168,11 +169,11 @@ should_return_404_for_delete_att_on_notadoc(Url) ->
             []
         ),
         ?assertEqual(404, RC1)
-    end).
+    end)}.
 
 
 should_return_409_for_del_att_without_rev(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         {ok, RC, _, _} = test_request:put(
             Url ++ "/testdoc3",
             [?CONTENT_JSON, ?AUTH],
@@ -186,11 +187,11 @@ should_return_409_for_del_att_without_rev(Url) ->
             []
         ),
         ?assertEqual(409, RC1)
-    end).
+    end)}.
 
 
 should_return_200_for_del_att_with_rev(Url) ->
-  ?_test(begin
+  {timeout, ?TIMEOUT, ?_test(begin
       {ok, RC, _Headers, RespBody} = test_request:put(
           Url ++ "/testdoc4",
           [?CONTENT_JSON, ?AUTH],
@@ -207,11 +208,11 @@ should_return_200_for_del_att_with_rev(Url) ->
           []
       ),
       ?assertEqual(200, RC1)
-    end).
+    end)}.
 
 
 should_return_409_for_put_att_nonexistent_rev(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         {ok, RC, _Headers, RespBody} = test_request:put(
             Url ++ "/should_return_404/file.erl?rev=1-000",
             [?CONTENT_JSON, ?AUTH],
@@ -222,11 +223,11 @@ should_return_409_for_put_att_nonexistent_rev(Url) ->
             {<<"error">>,<<"not_found">>},
             {<<"reason">>,<<"missing_rev">>}]},
             ?JSON_DECODE(RespBody))
-    end).
+    end)}.
 
 
 should_return_update_seq_when_set_on_all_docs(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 3)],
         {ok, RC, _, RespBody} = test_request:get(Url ++ "/_all_docs/"
             ++ "?update_seq=true&keys=[\"testdoc1\"]",[?CONTENT_JSON, ?AUTH]),
@@ -236,11 +237,11 @@ should_return_update_seq_when_set_on_all_docs(Url) ->
             couch_util:get_value(<<"update_seq">>, ResultJson)),
         ?assertNotEqual(undefined,
             couch_util:get_value(<<"offset">>, ResultJson))
-    end).
+    end)}.
 
 
 should_not_return_update_seq_when_unset_on_all_docs(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 3)],
         {ok, RC, _, RespBody} = test_request:get(Url ++ "/_all_docs/"
             ++ "?update_seq=false&keys=[\"testdoc1\"]",[?CONTENT_JSON, ?AUTH]),
@@ -250,11 +251,11 @@ should_not_return_update_seq_when_unset_on_all_docs(Url) ->
             couch_util:get_value(<<"update_seq">>, ResultJson)),
         ?assertNotEqual(undefined,
             couch_util:get_value(<<"offset">>, ResultJson))
-    end).
+    end)}.
 
 
 should_return_correct_id_on_doc_copy(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         {ok, _, _, _} = create_doc(Url, "testdoc"),
         {_, _, _, ResultBody1} = test_request:copy(Url ++ "/testdoc/",
             [?CONTENT_JSON, ?AUTH, ?DESTHEADER1]),
@@ -269,7 +270,7 @@ should_return_correct_id_on_doc_copy(Url) ->
             ?assertEqual(<<102,111,111,229,149,138,98,97,114>>, Id1),
             ?assertEqual(<<"foo/bar#baz?pow:fiz">>, Id2)
         ]
-    end).
+    end)}.
 
 
 attachment_doc() ->
@@ -285,7 +286,7 @@ attachment_doc() ->
 
 
 should_return_400_for_bad_engine(_) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         TmpDb = ?tempdb(),
         Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
         Port = mochiweb_socket_server:get(chttpd, port),
@@ -293,11 +294,11 @@ should_return_400_for_bad_engine(_) ->
         Url = BaseUrl ++ "?engine=cowabunga",
         {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
         ?assertEqual(400, Status)
-    end).
+    end)}.
 
 
 should_succeed_on_all_docs_with_queries_keys(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         QueryDoc = "{\"queries\": [{\"keys\": [ \"testdoc3\", \"testdoc8\"]}]}",
         {ok, RC, _, RespBody} = test_request:post(Url ++ "/_all_docs/queries/",
@@ -307,11 +308,11 @@ should_succeed_on_all_docs_with_queries_keys(Url) ->
         ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
         {InnerJson} = lists:nth(1, ResultJsonBody),
         ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson)))
-    end).
+    end)}.
 
 
 should_succeed_on_all_docs_with_queries_limit_skip(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         QueryDoc = "{\"queries\": [{\"limit\": 5, \"skip\": 2}]}",
         {ok, RC, _, RespBody} = test_request:post(Url ++ "/_all_docs/queries/",
@@ -322,11 +323,11 @@ should_succeed_on_all_docs_with_queries_limit_skip(Url) ->
         {InnerJson} = lists:nth(1, ResultJsonBody),
         ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson)),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson)))
-    end).
+    end)}.
 
 
 should_succeed_on_all_docs_with_multiple_queries(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "testdoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         QueryDoc = "{\"queries\": [{\"keys\": [ \"testdoc3\", \"testdoc8\"]},
             {\"limit\": 5, \"skip\": 2}]}",
@@ -340,11 +341,11 @@ should_succeed_on_all_docs_with_multiple_queries(Url) ->
         {InnerJson2} = lists:nth(2, ResultJsonBody),
         ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson2)),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
-    end).
+    end)}.
 
 
 should_succeed_on_design_docs_with_queries_keys(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "_design/ddoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         QueryDoc = "{\"queries\": [{\"keys\": [ \"_design/ddoc3\",
             \"_design/ddoc8\"]}]}",
@@ -355,11 +356,11 @@ should_succeed_on_design_docs_with_queries_keys(Url) ->
         ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
         {InnerJson} = lists:nth(1, ResultJsonBody),
         ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson)))
-    end).
+    end)}.
 
 
 should_succeed_on_design_docs_with_queries_limit_skip(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "_design/ddoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         QueryDoc = "{\"queries\": [{\"limit\": 5, \"skip\": 2}]}",
         {ok, RC, _, RespBody} = test_request:post(Url ++
@@ -370,11 +371,11 @@ should_succeed_on_design_docs_with_queries_limit_skip(Url) ->
         {InnerJson} = lists:nth(1, ResultJsonBody),
         ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson)),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson)))
-    end).
+    end)}.
 
 
 should_succeed_on_design_docs_with_multiple_queries(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "_design/ddoc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         QueryDoc = "{\"queries\": [{\"keys\": [ \"_design/ddoc3\",
             \"_design/ddoc8\"]}, {\"limit\": 5, \"skip\": 2}]}",
@@ -388,11 +389,11 @@ should_succeed_on_design_docs_with_multiple_queries(Url) ->
         {InnerJson2} = lists:nth(2, ResultJsonBody),
         ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson2)),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
-    end).
+    end)}.
 
 
 should_succeed_on_local_docs_with_queries_keys(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "_local/doc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         QueryDoc = "{\"queries\": [{\"keys\":
             [ \"_local/doc3\", \"_local/doc8\"]}]}",
@@ -403,11 +404,11 @@ should_succeed_on_local_docs_with_queries_keys(Url) ->
         ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
         {InnerJson} = lists:nth(1, ResultJsonBody),
         ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson)))
-    end).
+    end)}.
 
 
 should_succeed_on_local_docs_with_queries_limit_skip(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "_local/doc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         QueryDoc = "{\"queries\": [{\"limit\": 5, \"skip\": 2}]}",
         {ok, RC, _, RespBody} = test_request:post(Url ++
@@ -417,11 +418,11 @@ should_succeed_on_local_docs_with_queries_limit_skip(Url) ->
         ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
         {InnerJson} = lists:nth(1, ResultJsonBody),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson)))
-    end).
+    end)}.
 
 
 should_succeed_on_local_docs_with_multiple_queries(Url) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         [create_doc(Url, "_local/doc" ++ ?i2l(I)) || I <- lists:seq(1, 10)],
         QueryDoc = "{\"queries\": [{\"keys\": [ \"_local/doc3\",
             \"_local/doc8\"]}, {\"limit\": 5, \"skip\": 2}]}",
@@ -434,4 +435,4 @@ should_succeed_on_local_docs_with_multiple_queries(Url) ->
         ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson1))),
         {InnerJson2} = lists:nth(2, ResultJsonBody),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
-    end).
+    end)}.

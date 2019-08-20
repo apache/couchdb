@@ -35,7 +35,8 @@ defmodule CouchDBTest.Mixfile do
   # Run "mix help deps" to learn about dependencies.
   defp deps() do
     [
-      {:httpotion, "~> 3.0", only: [:dev, :test, :integration], runtime: false},
+      {:junit_formatter, "~> 3.0", only: [:dev, :test, :integration]},
+      {:httpotion, ">= 3.1.3", only: [:dev, :test, :integration], runtime: false},
       {:jiffy, path: Path.expand("src/jiffy", __DIR__)},
       {:ibrowse,
        path: Path.expand("src/ibrowse", __DIR__), override: true, compile: false},

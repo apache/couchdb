@@ -156,7 +156,7 @@ AddConfig = [
     {sub_dirs, SubDirs},
     {lib_dirs, ["src"]},
     {erl_opts, [{i, "../"} | ErlOpts]},
-    {eunit_opts, [verbose]},
+    {eunit_opts, [verbose, {report,{eunit_surefire,[{dir,"."}]}}]},
     {plugins, [eunit_plugin]},
     {dialyzer, [
         {plt_location, local},

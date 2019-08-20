@@ -19,4 +19,9 @@ defmodule Couch.Test.Setup.Common do
       |> Step.Create.DB.new(:db)
   end
 
+  def with_db(setup) do
+    setup
+      |> Step.Start.new(:start, extra_apps: [:fabric])
+      |> Step.Create.DB.new(:db)
+  end
 end

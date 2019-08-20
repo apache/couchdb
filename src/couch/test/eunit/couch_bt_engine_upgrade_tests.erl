@@ -15,6 +15,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
+-define(TIMEOUT, 60). % seconds
 
 setup(_) ->
     Ctx = test_util:start_couch(),
@@ -63,7 +64,7 @@ upgrade_test_() ->
 
 
 t_upgrade_without_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         % There are three documents in the fixture
         % db with zero purge entries
         DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
@@ -99,11 +100,11 @@ t_upgrade_without_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
             ?assertEqual({ok, 4}, couch_db:get_doc_count(Db)),
             ?assertEqual(1, couch_db:get_purge_seq(Db))
         end)
-    end).
+    end)}.
 
 
 t_upgrade_with_1_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         % There are two documents in the fixture database
         % with a single purge entry
         DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
@@ -140,11 +141,11 @@ t_upgrade_with_1_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
             ?assertEqual({ok, 3}, couch_db:get_doc_count(Db)),
             ?assertEqual(2, couch_db:get_purge_seq(Db))
         end)
-    end).
+    end)}.
 
 
 t_upgrade_with_N_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         % There is one document in the fixture database
         % with two docs that have been purged
         DbName = ?l2b("db_v"  ++ integer_to_list(VersionFrom)
@@ -179,11 +180,11 @@ t_upgrade_with_N_purge_req(VersionFrom, {_Ctx, _NewPaths}) ->
             ?assertEqual({ok, 2}, couch_db:get_doc_count(Db)),
             ?assertEqual(3, couch_db:get_purge_seq(Db))
         end)
-    end).
+    end)}.
 
 
 t_upgrade_with_1_purge_req_for_2_docs(VersionFrom, {_Ctx, _NewPaths}) ->
-    ?_test(begin
+    {timeout, ?TIMEOUT, ?_test(begin
         % There are two documents (Doc4 and Doc5) in the fixture database
         % with three docs (Doc1, Doc2 and Doc3) that have been purged, and
         % with one purge req for Doc1 and another purge req for Doc 2 and Doc3
@@ -219,7 +220,7 @@ t_upgrade_with_1_purge_req_for_2_docs(VersionFrom, {_Ctx, _NewPaths}) ->
             ?assertEqual({ok, 3}, couch_db:get_doc_count(Db)),
             ?assertEqual(4, couch_db:get_purge_seq(Db))
         end)
-    end).
+    end)}.
 
 
 save_doc(DbName, Json) ->

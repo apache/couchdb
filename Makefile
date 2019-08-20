@@ -168,15 +168,15 @@ eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 eunit: couch
-	@$(REBAR) setup_eunit 2> /dev/null
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
             tries=0; \
             while true; do \
-                $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir ; \
+                COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir ; \
                 if [ $$? -eq 0 ]; then \
                     break; \
                 else \
-                    let "tries=tries+1"; \
+                    tries=$$((tries+1)); \
                     [ $$tries -gt 2 ] && exit 1; \
                 fi \
             done \
@@ -370,8 +370,8 @@ build-test:
 mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \
-		.venv/bin/pip3 install -r requirements.txt
-	@cd src/mango && ../../dev/run -n 1 --admin=testuser:testpass .venv/bin/nosetests
+		.venv/bin/python3 -m pip install -r requirements.txt
+	@cd src/mango && ../../dev/run -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose'
 
 ################################################################################
 # Developing
