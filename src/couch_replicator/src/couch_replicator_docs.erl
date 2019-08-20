@@ -424,7 +424,7 @@ parse_rep_db(<<"https://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db({[{<<"url">>, Url}]}, Proxy, Options);
 
 parse_rep_db(<<_/binary>>, _Proxy, _Options) ->
-    throw({error, <<"Local endpoints not supported since CouchDB 3.x">>});
+    throw({error, local_endpoints_not_supported});
 
 parse_rep_db(undefined, _Proxy, _Options) ->
     throw({error, <<"Missing replicator database">>}).
@@ -843,7 +843,7 @@ t_error_on_local_endpoint() ->
             {<<"source">>, <<"localdb">>},
             {<<"target">>, <<"http://somehost.local/tgt">>}
         ]},
-        Expect = <<"Local endpoints not supported since CouchDB 3.x">>,
+        Expect = local_endpoints_not_supported,
         ?assertThrow({bad_rep_doc, Expect}, parse_rep_doc_without_id(RepDoc))
     end).
 
