@@ -144,11 +144,13 @@ replication_states() ->
 
 -spec strip_url_creds(binary() | {[_]}) -> binary().
 strip_url_creds(Endpoint) ->
-    case couch_replicator_docs:parse_rep_db(Endpoint, [], []) of
-        #httpdb{url=Url} ->
-            iolist_to_binary(couch_util:url_strip_password(Url));
-        LocalDb when is_binary(LocalDb) ->
-            LocalDb
+    try
+        couch_replicator_docs:parse_rep_db(Endpoint, [], []) of
+            #httpdb{url = Url} ->
+                iolist_to_binary(couch_util:url_strip_password(Url))
+    catch
+        throw:{error, local_endpoints_not_supported} ->
+            Endpoint
     end.
 
 
@@ -359,7 +361,8 @@ strip_url_creds_test_() ->
         fun (_) -> meck:unload() end,
         [
             t_strip_http_basic_creds(),
-            t_strip_http_props_creds()
+            t_strip_http_props_creds(),
+            t_strip_local_db_creds()
         ]
     }.
 
