@@ -78,10 +78,22 @@ transactional(DbName, Options, Fun) when is_binary(DbName) ->
 
 
 transactional(#{tx := undefined} = Db, Fun) ->
-    #{layer_prefix := LayerPrefix} = Db,
-    do_transaction(fun(Tx) ->
-        Fun(Db#{tx => Tx})
-    end, LayerPrefix);
+    try
+        Reopen = maps:get(reopen, Db, false),
+        Db1 = maps:remove(reopen, Db),
+        LayerPrefix = case Reopen of
+            true -> undefined;
+            false -> maps:get(layer_prefix, Db1)
+        end,
+        do_transaction(fun(Tx) ->
+            case Reopen of
+                true -> Fun(reopen(Db1#{tx => Tx}));
+                false -> Fun(Db1#{tx => Tx})
+            end
+        end, LayerPrefix)
+    catch throw:{?MODULE, reopen} ->
+        transactional(Db#{reopen => true}, Fun)
+    end;
 
 transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
     Fun(Db).
@@ -150,6 +162,7 @@ create(#{} = Db0, Options) ->
     end, Defaults),
 
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
+    Options1 = lists:keydelete(user_ctx, 1, Options),
 
     Db#{
         uuid => UUID,
@@ -165,7 +178,7 @@ create(#{} = Db0, Options) ->
         after_doc_read => undefined,
         % All other db things as we add features,
 
-        db_options => Options
+        db_options => Options1
     }.
 
 
@@ -186,6 +199,7 @@ open(#{} = Db0, Options) ->
     DbVersion = erlfdb:wait(erlfdb:get(Tx, DbVersionKey)),
 
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
+    Options1 = lists:keydelete(user_ctx, 1, Options),
 
     Db2 = Db1#{
         db_prefix => DbPrefix,
@@ -201,7 +215,7 @@ open(#{} = Db0, Options) ->
         before_doc_update => undefined,
         after_doc_read => undefined,
 
-        db_options => Options
+        db_options => Options1
     },
 
     Db3 = lists:foldl(fun({Key, Val}, DbAcc) ->
@@ -223,9 +237,11 @@ reopen(#{} = OldDb) ->
     #{
         tx := Tx,
         name := DbName,
-        db_options := Options
+        db_options := Options,
+        user_ctx := UserCtx
     } = OldDb,
-    open(init_db(Tx, DbName, Options), Options).
+    Options1 = lists:keystore(user_ctx, 1, Options, {user_ctx, UserCtx}),
+    open(init_db(Tx, DbName, Options1), Options1).
 
 
 delete(#{} = Db) ->
@@ -1132,7 +1148,7 @@ ensure_current(#{} = Db, CheckDbVersion) ->
 
     case erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)) of
         MetaDataVersion -> Db;
-        _NewVersion -> reopen(Db)
+        _NewVersion -> throw({?MODULE, reopen})
     end,
 
     AlreadyChecked = get(?PDICT_CHECKED_DB_IS_CURRENT),
@@ -1150,7 +1166,7 @@ ensure_current(#{} = Db, CheckDbVersion) ->
                 Db;
             _NewDBVersion ->
                 fabric2_server:remove(maps:get(name, Db)),
-                reopen(Db)
+                throw({?MODULE, reopen})
         end
     end.
 
