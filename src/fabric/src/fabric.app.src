@@ -21,6 +21,7 @@
         kernel,
         stdlib,
         config,
+        couch_epi,
         couch,
         rexi,
         mem3,

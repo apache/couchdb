@@ -85,7 +85,7 @@
     %% get_minimum_purge_seq/1,
     %% purge_client_exists/3,
 
-    %% validate_docid/2,
+    validate_docid/1,
     %% doc_from_json_obj_validate/2,
 
     update_doc/2,
@@ -118,9 +118,9 @@
     %% wait_for_compaction/1,
     %% wait_for_compaction/2,
 
-    %% dbname_suffix/1,
-    %% normalize_dbname/1,
-    %% validate_dbname/1,
+    dbname_suffix/1,
+    normalize_dbname/1,
+    validate_dbname/1,
 
     %% make_doc/5,
     new_revid/2
@@ -141,21 +141,26 @@
 
 
 create(DbName, Options) ->
-    Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
-        case fabric2_fdb:exists(TxDb) of
-            true ->
-                {error, file_exists};
-            false ->
-                fabric2_fdb:create(TxDb, Options)
-        end
-    end),
-    % We cache outside of the transaction so that we're sure
-    % that the transaction was committed.
-    case Result of
-        #{} = Db0 ->
-            Db1 = maybe_add_sys_db_callbacks(Db0),
-            ok = fabric2_server:store(Db1),
-            {ok, Db1#{tx := undefined}};
+    case validate_dbname(DbName) of
+        ok ->
+            Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
+                case fabric2_fdb:exists(TxDb) of
+                    true ->
+                        {error, file_exists};
+                    false ->
+                        fabric2_fdb:create(TxDb, Options)
+                end
+            end),
+            % We cache outside of the transaction so that we're sure
+            % that the transaction was committed.
+            case Result of
+                #{} = Db0 ->
+                    Db1 = maybe_add_sys_db_callbacks(Db0),
+                    ok = fabric2_server:store(Db1),
+                    {ok, Db1#{tx := undefined}};
+                Error ->
+                    Error
+            end;
         Error ->
             Error
     end.
@@ -225,11 +230,15 @@ list_dbs(UserFun, UserAcc0, Options) ->
 
 
 is_admin(Db) ->
-    % TODO: Need to re-consider couch_db_plugin:check_is_admin/1
-    {SecProps} = get_security(Db),
-    UserCtx = get_user_ctx(Db),
-    {Admins} = get_admins(SecProps),
-    is_authorized(Admins, UserCtx).
+    case fabric2_db_plugin:check_is_admin(Db) of
+        true ->
+            true;
+        false ->
+            {SecProps} = get_security(Db),
+            UserCtx = get_user_ctx(Db),
+            {Admins} = get_admins(SecProps),
+            is_authorized(Admins, UserCtx)
+    end.
 
 
 check_is_admin(Db) ->
@@ -582,6 +591,44 @@ get_missing_revs(Db, JsonIdRevs) ->
     {ok, AllMissing}.
 
 
+validate_docid(<<"">>) ->
+    throw({illegal_docid, <<"Document id must not be empty">>});
+validate_docid(<<"_design/">>) ->
+    throw({illegal_docid, <<"Illegal document id `_design/`">>});
+validate_docid(<<"_local/">>) ->
+    throw({illegal_docid, <<"Illegal document id `_local/`">>});
+validate_docid(Id) when is_binary(Id) ->
+    MaxLen = case config:get("couchdb", "max_document_id_length", "infinity") of
+        "infinity" -> infinity;
+        IntegerVal -> list_to_integer(IntegerVal)
+    end,
+    case MaxLen > 0 andalso byte_size(Id) > MaxLen of
+        true -> throw({illegal_docid, <<"Document id is too long">>});
+        false -> ok
+    end,
+    case couch_util:validate_utf8(Id) of
+        false -> throw({illegal_docid, <<"Document id must be valid UTF-8">>});
+        true -> ok
+    end,
+    case Id of
+    <<?DESIGN_DOC_PREFIX, _/binary>> -> ok;
+    <<?LOCAL_DOC_PREFIX, _/binary>> -> ok;
+    <<"_", _/binary>> ->
+        case fabric2_db_plugin:validate_docid(Id) of
+            true ->
+                ok;
+            false ->
+                throw(
+                  {illegal_docid,
+                   <<"Only reserved document ids may start with underscore.">>})
+        end;
+    _Else -> ok
+    end;
+validate_docid(Id) ->
+    couch_log:debug("Document id is not a string: ~p", [Id]),
+    throw({illegal_docid, <<"Document id must be a string">>}).
+
+
 update_doc(Db, Doc) ->
     update_doc(Db, Doc, []).
 
@@ -756,6 +803,38 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
             {ok, FinalUserAcc}
         end
     end).
+
+
+dbname_suffix(DbName) ->
+    filename:basename(normalize_dbname(DbName)).
+
+
+normalize_dbname(DbName) ->
+    % Remove in the final cleanup. We don't need to handle shards prefix or
+    % remove .couch suffixes anymore. Keep it for now to pass all the existing
+    % tests.
+    couch_db:normalize_dbname(DbName).
+
+
+validate_dbname(DbName) when is_list(DbName) ->
+    validate_dbname(?l2b(DbName));
+
+validate_dbname(DbName) when is_binary(DbName) ->
+    Normalized = normalize_dbname(DbName),
+    fabric2_db_plugin:validate_dbname(
+        DbName, Normalized, fun validate_dbname_int/2).
+
+validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
+    DbNoExt = couch_util:drop_dot_couch_ext(DbName),
+    case re:run(DbNoExt, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
+        match ->
+            ok;
+        nomatch ->
+            case is_system_db_name(Normalized) of
+                true -> ok;
+                false -> {error, {illegal_database_name, DbName}}
+            end
+    end.
 
 
 maybe_add_sys_db_callbacks(Db) ->
@@ -1030,16 +1109,13 @@ find_possible_ancestors(RevInfos, MissingRevs) ->
 
 
 apply_before_doc_update(Db, Docs, Options) ->
-    #{before_doc_update := BDU} = Db,
     UpdateType = case lists:member(replicated_changes, Options) of
         true -> replicated_changes;
         false -> interactive_edit
     end,
-    if BDU == undefined -> Docs; true ->
-        lists:map(fun(Doc) ->
-            BDU(Doc, Db, UpdateType)
-        end, Docs)
-    end.
+    lists:map(fun(Doc) ->
+        fabric2_db_plugin:before_doc_update(Db, Doc, UpdateType)
+    end, Docs).
 
 
 update_doc_int(#{} = Db, #doc{} = Doc, Options) ->
