@@ -35,9 +35,7 @@ read(Db, Mrst, ViewName, UserCallback, UserAcc0, Args) ->
 
     try
         fabric2_fdb:transactional(Db, fun(TxDb) ->
-            TotalRows = couch_views_fdb:get_row_count(TxDb, Mrst, ViewId),
-
-            Meta = {meta, [{total, TotalRows}, {offset, null}]},
+            Meta = get_meta(TxDb, Mrst, ViewId, Args),
             UserAcc1 = maybe_stop(UserCallback(Meta, UserAcc0)),
 
             Acc0 = #{
@@ -71,6 +69,16 @@ read(Db, Mrst, ViewName, UserCallback, UserAcc0, Args) ->
     catch throw:{done, Out} ->
         {ok, Out}
     end.
+
+
+get_meta(TxDb, Mrst, ViewId, #mrargs{update_seq = true}) ->
+    TotalRows = couch_views_fdb:get_row_count(TxDb, Mrst, ViewId),
+    ViewSeq = couch_views_fdb:get_update_seq(TxDb, Mrst),
+    {meta,  [{update_seq, ViewSeq}, {total, TotalRows}, {offset, null}]};
+
+get_meta(TxDb, Mrst, ViewId, #mrargs{}) ->
+    TotalRows = couch_views_fdb:get_row_count(TxDb, Mrst, ViewId),
+    {meta, [{total, TotalRows}, {offset, null}]}.
 
 
 handle_row(_DocId, _Key, _Value, #{skip := Skip} = Acc) when Skip > 0 ->
