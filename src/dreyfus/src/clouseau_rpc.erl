@@ -22,7 +22,7 @@
 -export([group1/7, group2/2]).
 -export([delete/2, update/3, cleanup/1, cleanup/2, rename/1]).
 -export([analyze/2, version/0, disk_size/1]).
--export([set_purge_seq/2, get_purge_seq/1, get_root_dir/0]).
+-export([set_purge_seq/2, get_purge_seq/1, get_root_dir/0, close_lru/0, close_lru/1]).
 -export([connected/0]).
 
 open_index(Peer, Path, Analyzer) ->
@@ -32,6 +32,10 @@ disk_size(Path) ->
     rpc({main, clouseau()}, {disk_size, Path}).
 get_root_dir() ->
     rpc({main, clouseau()}, {get_root_dir}).
+close_lru() ->
+    rpc({main, clouseau()}, {close_lru}).
+close_lru(DbName) ->
+    rpc({main, clouseau()}, {close_lru_by_path, DbName}).
 
 await(Ref, MinSeq) ->
     rpc(Ref, {await, MinSeq}).
@@ -81,6 +85,7 @@ cleanup(DbName) ->
     gen_server:cast({cleanup, clouseau()}, {cleanup, DbName}).
 
 rename(DbName) ->
+  close_lru(DbName),
   gen_server:cast({cleanup, clouseau()}, {rename, DbName}).
 
 cleanup(DbName, ActiveSigs) ->
