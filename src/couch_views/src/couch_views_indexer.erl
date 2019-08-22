@@ -42,7 +42,7 @@ init() ->
         <<"sig">> := JobSig
     } = Data,
 
-    {ok, Db} = fabric2_db:open(DbName, []),
+    {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
     {ok, DDoc} = fabric2_db:open_doc(Db, DDocId),
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     HexSig = fabric2_util:to_hex(Mrst#mrst.sig),
