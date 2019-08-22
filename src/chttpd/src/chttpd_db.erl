@@ -1047,7 +1047,7 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
 
 db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     couch_httpd:validate_referer(Req),
-    couch_doc:validate_docid(DocId, fabric2_db:name(Db)),
+    fabric2_db:validate_docid(DocId),
     chttpd:validate_ctype(Req, "multipart/form-data"),
 
     Options = [{user_ctx,Ctx}],
@@ -1107,7 +1107,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         update_type = UpdateType
     } = parse_doc_query(Req),
     DbName = fabric2_db:name(Db),
-    couch_doc:validate_docid(DocId, fabric2_db:name(Db)),
+    fabric2_db:validate_docid(DocId),
 
     Options = [{user_ctx, Ctx}],
 
@@ -1668,7 +1668,7 @@ db_attachment_req(#httpd{method=Method}=Req, Db, DocId, FileNameParts)
                 % check for the existence of the doc to handle the 404 case.
                 couch_doc_open(Db, DocId, nil, [])
             end,
-            couch_doc:validate_docid(DocId, fabric2_db:name(Db)),
+            fabric2_db:validate_docid(DocId),
             #doc{id=DocId};
         Rev ->
             case fabric2_db:open_doc_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
@@ -2031,7 +2031,7 @@ bulk_get_open_doc_revs1(Db, Props, Options, {}) ->
             {null, {error, Error}, Options};
         DocId ->
             try
-                couch_doc:validate_docid(DocId, fabric2_db:name(Db)),
+                fabric2_db:validate_docid(DocId),
                 bulk_get_open_doc_revs1(Db, Props, Options, {DocId})
             catch throw:{Error, Reason} ->
                 {DocId, {error, {null, Error, Reason}}, Options}

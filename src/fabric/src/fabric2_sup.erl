@@ -29,19 +29,24 @@ start_link(Args) ->
 
 
 init([]) ->
-    Flags = #{
-        strategy => one_for_one,
-        intensity => 1,
-        period => 5
-    },
+    Flags = {one_for_one, 1, 5},
     Children = [
-        #{
-            id => fabric2_server,
-            start => {fabric2_server, start_link, []}
+        {
+            fabric2_server,
+            {fabric2_server, start_link, []},
+            permanent,
+            5000,
+            worker,
+            [fabric2_server]
         },
-        #{
-            id => fabric2_txids,
-            start => {fabric2_txids, start_link, []}
+        {
+            fabric2_txids,
+            {fabric2_txids, start_link, []},
+            permanent,
+            5000,
+            worker,
+            [fabric2_server]
         }
     ],
-    {ok, {Flags, Children}}.
+    ChildrenWithEpi = couch_epi:register_service(fabric2_epi, Children),
+    {ok, {Flags, ChildrenWithEpi}}.
