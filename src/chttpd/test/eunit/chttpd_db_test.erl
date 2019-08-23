@@ -73,6 +73,7 @@ all_test_() ->
                     fun should_not_return_update_seq_when_unset_on_all_docs/1,
                     fun should_return_correct_id_on_doc_copy/1,
                     fun should_return_400_for_bad_engine/1,
+                    fun should_not_change_db_proper_after_rewriting_shardmap/1,
                     fun should_succeed_on_all_docs_with_queries_keys/1,
                     fun should_succeed_on_all_docs_with_queries_limit_skip/1,
                     fun should_succeed_on_all_docs_with_multiple_queries/1,
@@ -294,6 +295,29 @@ should_return_400_for_bad_engine(_) ->
         Url = BaseUrl ++ "?engine=cowabunga",
         {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
         ?assertEqual(400, Status)
+    end)}.
+
+
+should_not_change_db_proper_after_rewriting_shardmap(_) ->
+    {timeout, ?TIMEOUT, ?_test(begin
+        TmpDb = ?tempdb(),
+        Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+        Port = mochiweb_socket_server:get(chttpd, port),
+        AdmPort = mochiweb_socket_server:get(couch_httpd, port),
+
+        BaseUrl = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
+        Url = BaseUrl ++ "?partitioned=true&q=1",
+        {ok, 201, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
+
+        ShardDbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+        {ok, ShardDb} = mem3_util:ensure_exists(ShardDbName),
+        {ok, #doc{body = {Props}}} = couch_db:open_doc(
+            ShardDb, TmpDb, [ejson_body]),
+        Shards = mem3_util:build_shards(TmpDb, Props),
+
+        {Prop2} = ?JSON_DECODE(?JSON_ENCODE({Props})),
+        Shards2 = mem3_util:build_shards(TmpDb, Prop2),
+        ?assertEqual(Shards2, Shards)
     end)}.
 
 
