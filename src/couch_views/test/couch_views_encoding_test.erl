@@ -28,64 +28,87 @@ val_encoding_test() ->
     end, Values).
 
 
-correct_ordering_test() ->
+setup() ->
     % Load the ICU driver for couch_util:get_sort_key/1
     {ok, CfgPid} = gen_server:start_link(config, [], []),
     {ok, DrvPid} = gen_server:start_link(couch_drv, [], []),
+    {CfgPid, DrvPid}.
 
-    Ordered = [
-        %  Special values sort before all other types
-        null,
-        false,
-        true,
 
-        % Then numbers
-        1,
-        2,
-        3.0,
-        4,
+teardown({CfgPid, DrvPid}) ->
+    unlink(CfgPid),
+    unlink(DrvPid),
+    exit(CfgPid, kill),
+    exit(DrvPid, kill).
 
-        % Then text, case sensitive
-        <<"a">>,
-        <<"A">>,
-        <<"aa">>,
-        <<"b">>,
-        <<"B">>,
-        <<"ba">>,
-        <<"bb">>,
 
-        % Then arrays, compared element by element until different.
-        % Longer arrays sort after their prefixes
-        [<<"a">>],
-        [<<"b">>],
-        [<<"b">>, <<"c">>],
-        [<<"b">>, <<"c">>, <<"a">>],
-        [<<"b">>, <<"d">>],
-        [<<"b">>, <<"d">>, <<"e">>],
+correct_ordering_test_() ->
+    {
+        setup,
+        fun setup/0,
+        fun teardown/1,
+        [
+            fun t_correct_ordering/0
+        ]
+    }.
 
-        % Then objects, compared each key value in the list until different.
-        % Larger objects sort after their subset objects
-        {[{<<"a">>, 1}]},
-        {[{<<"a">>, 2}]},
-        {[{<<"b">>, 1}]},
-        {[{<<"b">>, 2}]},
 
-        % Member order does matter for collation
-        {[{<<"b">>, 2}, {<<"a">>, 1}]},
-        {[{<<"b">>, 2}, {<<"c">>, 2}]}
-    ],
+t_correct_ordering() ->
+    ?_test(begin
+        Ordered = [
+            %  Special values sort before all other types
+            null,
+            false,
+            true,
 
-    Encoded = lists:map(fun(Elem) ->
-        K = couch_views_encoding:encode(Elem, key),
-        V = couch_views_encoding:encode(Elem, value),
-        {K, V}
-    end, Ordered),
-    Shuffled = shuffle(Encoded),
-    Reordered = lists:sort(Shuffled),
+            % Then numbers
+            1,
+            2,
+            3.0,
+            4,
 
-    lists:foreach(fun({Original, {_K, ViewEncoded}}) ->
-        ?assertEqual(Original, couch_views_encoding:decode(ViewEncoded))
-    end, lists:zip(Ordered, Reordered)).
+            % Then text, case sensitive
+            <<"a">>,
+            <<"A">>,
+            <<"aa">>,
+            <<"b">>,
+            <<"B">>,
+            <<"ba">>,
+            <<"bb">>,
+
+            % Then arrays, compared element by element until different.
+            % Longer arrays sort after their prefixes
+            [<<"a">>],
+            [<<"b">>],
+            [<<"b">>, <<"c">>],
+            [<<"b">>, <<"c">>, <<"a">>],
+            [<<"b">>, <<"d">>],
+            [<<"b">>, <<"d">>, <<"e">>],
+
+            % Then objects, compared each key value in the list until different.
+            % Larger objects sort after their subset objects
+            {[{<<"a">>, 1}]},
+            {[{<<"a">>, 2}]},
+            {[{<<"b">>, 1}]},
+            {[{<<"b">>, 2}]},
+
+            % Member order does matter for collation
+            {[{<<"b">>, 2}, {<<"a">>, 1}]},
+            {[{<<"b">>, 2}, {<<"c">>, 2}]}
+        ],
+
+        Encoded = lists:map(fun(Elem) ->
+            K = couch_views_encoding:encode(Elem, key),
+            V = couch_views_encoding:encode(Elem, value),
+            {K, V}
+        end, Ordered),
+        Shuffled = shuffle(Encoded),
+        Reordered = lists:sort(Shuffled),
+
+        lists:foreach(fun({Original, {_K, ViewEncoded}}) ->
+            ?assertEqual(Original, couch_views_encoding:decode(ViewEncoded))
+        end, lists:zip(Ordered, Reordered))
+    end).
 
 
 shuffle(List) when is_list(List) ->
