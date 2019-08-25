@@ -88,7 +88,9 @@ access_test_() ->
         fun should_let_user_fetch_their_own_changes/2,
 
         fun should_not_allow_admin_access_ddoc_view_request/2,
-        fun should_not_allow_user_access_ddoc_view_request/2
+        fun should_not_allow_user_access_ddoc_view_request/2,
+        fun should_allow_admin_users_access_ddoc_view_request/2,
+        fun should_allow_user_users_access_ddoc_view_request/2
                 
         % TODO: create test db with role and not _users in _security.members
         % and make sure a user in that group can access while a user not
@@ -286,6 +288,24 @@ should_not_allow_user_access_ddoc_view_request(_PortType, Url) ->
     {ok, Code1, _, _} = test_request:get(Url ++ "/db/_design/a/_view/foo",
         ?USERX_REQ_HEADERS),
     ?_assertEqual(403, Code1).
+
+should_allow_admin_users_access_ddoc_view_request(_PortType, Url) ->
+    DDoc = "{\"a\":1,\"_access\":[\"_users\"],\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
+    {ok, Code, _, _} = test_request:put(Url ++ "/db/_design/a",
+        ?ADMIN_REQ_HEADERS, DDoc),
+    ?_assertEqual(201, Code),
+    {ok, Code1, _, _} = test_request:get(Url ++ "/db/_design/a/_view/foo",
+        ?ADMIN_REQ_HEADERS),
+    ?_assertEqual(200, Code1).
+
+should_allow_user_users_access_ddoc_view_request(_PortType, Url) ->
+    DDoc = "{\"a\":1,\"_access\":[\"_users\"],\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
+    {ok, Code, _, _} = test_request:put(Url ++ "/db/_design/a",
+        ?ADMIN_REQ_HEADERS, DDoc),
+    ?_assertEqual(201, Code),
+    {ok, Code1, _, _} = test_request:get(Url ++ "/db/_design/a/_view/foo",
+        ?USERX_REQ_HEADERS),
+    ?_assertEqual(200, Code1).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
