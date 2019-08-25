@@ -69,17 +69,24 @@ access_test_() ->
         fun should_let_admin_create_doc_without_access/2,
         fun should_let_user_create_doc_for_themselves/2,
         fun should_not_let_user_create_doc_for_someone_else/2,
+
         fun should_let_admin_read_doc_with_access/2,
         fun user_with_access_can_read_doc/2,
         fun user_without_access_can_not_read_doc/2,
         fun user_can_not_read_doc_without_access/2,
+        fun admin_with_access_can_read_conflicted_doc/2,
+        fun user_with_access_can_not_read_conflicted_doc/2,
+
         fun should_let_admin_delete_doc_with_access/2,
         fun should_let_user_delete_doc_for_themselves/2,
         fun should_not_let_user_delete_doc_for_someone_else/2,
+
         fun should_let_admin_fetch_all_docs/2,
         fun should_let_user_fetch_their_own_all_docs/2,
+
         fun should_let_admin_fetch_changes/2,
         fun should_let_user_fetch_their_own_changes/2
+                
         % TODO: create test db with role and not _users in _security.members
         % and make sure a user in that group can access while a user not
         % in that group cant
@@ -140,6 +147,24 @@ user_with_access_can_read_doc(_PortType, Url) ->
         ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
     {ok, Code, _, _} = test_request:get(Url ++ "/db/a",
         ?USERX_REQ_HEADERS),
+    ?_assertEqual(200, Code).
+
+user_with_access_can_not_read_conflicted_doc(_PortType, Url) ->
+    {ok, 201, _, _} = test_request:put(Url ++ "/db/a",
+        ?ADMIN_REQ_HEADERS, "{\"_id\":\"f1\",\"a\":1,\"_access\":[\"x\"]}"),
+    {ok, 201, _, _} = test_request:put(Url ++ "/db/a?new_edits=false",
+        ?ADMIN_REQ_HEADERS, "{\"_id\":\"f1\",\"_rev\":\"7-XYZ\",\"a\":1,\"_access\":[\"x\"]}"),
+    {ok, Code, _, _} = test_request:get(Url ++ "/db/a",
+        ?USERX_REQ_HEADERS),
+    ?_assertEqual(403, Code).
+
+admin_with_access_can_read_conflicted_doc(_PortType, Url) ->
+    {ok, 201, _, _} = test_request:put(Url ++ "/db/a",
+        ?ADMIN_REQ_HEADERS, "{\"_id\":\"a\",\"a\":1,\"_access\":[\"x\"]}"),
+    {ok, 201, _, _} = test_request:put(Url ++ "/db/a?new_edits=false",
+        ?ADMIN_REQ_HEADERS, "{\"_id\":\"a\",\"_rev\":\"7-XYZ\",\"a\":1,\"_access\":[\"x\"]}"),
+    {ok, Code, _, _} = test_request:get(Url ++ "/db/a",
+        ?ADMIN_REQ_HEADERS),
     ?_assertEqual(200, Code).
 
 user_without_access_can_not_read_doc(_PortType, Url) ->

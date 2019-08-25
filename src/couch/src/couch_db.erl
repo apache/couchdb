@@ -271,6 +271,9 @@ wait_for_compaction(#db{main_pid=Pid}=Db, Timeout) ->
             ok
     end.
 
+has_access_enabled(#db{access=false}) -> false;
+has_access_enabled(_) -> true.
+    
 delete_doc(Db, Id, Revisions) ->
     DeletedDocs = [#doc{id=Id, revs=[Rev], deleted=true} || Rev <- Revisions],
     {ok, [Result]} = update_docs(Db, DeletedDocs, []),
@@ -279,8 +282,12 @@ delete_doc(Db, Id, Revisions) ->
 open_doc(Db, IdOrDocInfo) ->
     open_doc(Db, IdOrDocInfo, []).
 
-open_doc(Db, Id, Options) ->
+open_doc(Db, Id, Options0) ->
     increment_stat(Db, [couchdb, database_reads]),
+    Options = case has_access_enabled(Db) of
+        true -> Options0 ++ [conflicts];
+        _Else -> Options0
+    end,
     case open_doc_int(Db, Id, Options) of
     {ok, #doc{deleted=true}=Doc} ->
         case lists:member(deleted, Options) of
@@ -724,12 +731,21 @@ security_error_type(#user_ctx{name=null}) ->
 security_error_type(#user_ctx{name=_}) ->
     forbidden.
 
-validate_access(Db, Doc) ->
-    validate_access1(check_access(Db, Doc)).
+validate_access(Db, #doc{meta=Meta}=Doc) ->
+    case proplists:get_value(conflicts, Meta) of
+        undefined -> % no conflicts
+            validate_access1(Db, Doc);
+        _Else -> % only admins can read conflicted docs in _access dbs
+            case is_admin(Db) of
+                true -> ok;
+                _Else2 -> throw({forbidden, <<"document is in conflict">>})
+            end
+    end.
+validate_access1(Db, Doc) ->
+    validate_access2(check_access(Db, Doc)).
 
-validate_access1(true) -> ok;
-validate_access1(_) -> throw({forbidden, <<"can't touch this">>}).
-
+validate_access2(true) -> ok;
+validate_access2(_) -> throw({forbidden, <<"can't touch this">>}).
 
 check_access(Db, #doc{access=Access}=Doc) ->
     % couch_log:info("~ncheck da access, Doc: ~p, Db: ~p~n", [Doc, Db]),
