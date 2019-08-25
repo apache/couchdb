@@ -64,12 +64,19 @@ after_all(_) ->
 
 access_test_() ->
     Tests = [
+        % Doc creation
         fun should_not_let_anonymous_user_create_doc/2,
         fun should_let_admin_create_doc_with_access/2,
         fun should_let_admin_create_doc_without_access/2,
         fun should_let_user_create_doc_for_themselves/2,
         fun should_not_let_user_create_doc_for_someone_else/2,
 
+        % Doc updates
+        fun users_with_access_can_update_doc/2,
+        fun users_with_access_can_not_change_access/2,
+        fun users_with_access_can_not_remove_access/2,
+
+        % Doc reads
         fun should_let_admin_read_doc_with_access/2,
         fun user_with_access_can_read_doc/2,
         fun user_without_access_can_not_read_doc/2,
@@ -77,16 +84,20 @@ access_test_() ->
         fun admin_with_access_can_read_conflicted_doc/2,
         fun user_with_access_can_not_read_conflicted_doc/2,
 
+        % Doc deletes
         fun should_let_admin_delete_doc_with_access/2,
         fun should_let_user_delete_doc_for_themselves/2,
         fun should_not_let_user_delete_doc_for_someone_else/2,
 
+        % _all_docs with include_docs
         fun should_let_admin_fetch_all_docs/2,
         fun should_let_user_fetch_their_own_all_docs/2,
 
+        % _changes
         fun should_let_admin_fetch_changes/2,
         fun should_let_user_fetch_their_own_changes/2,
 
+        % views
         fun should_not_allow_admin_access_ddoc_view_request/2,
         fun should_not_allow_user_access_ddoc_view_request/2,
         fun should_allow_admin_users_access_ddoc_view_request/2,
@@ -137,6 +148,38 @@ should_let_user_create_doc_for_themselves(_PortType, Url) ->
 should_not_let_user_create_doc_for_someone_else(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(Url ++ "/db/c",
         ?USERY_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+    ?_assertEqual(403, Code).
+
+% Doc updates
+
+users_with_access_can_update_doc(_PortType, Url) ->
+    {ok, _, _, Body} = test_request:put(Url ++ "/db/b",
+        ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+    {Json} = jiffy:decode(Body),
+    Rev = couch_util:get_value(<<"rev">>, Json),
+    {ok, Code, _, _} = test_request:put(Url ++ "/db/b",
+        ?USERX_REQ_HEADERS,
+        "{\"a\":2,\"_access\":[\"x\"],\"_rev\":\"" ++ binary_to_list(Rev) ++ "\"}"),
+    ?_assertEqual(201, Code).
+
+users_with_access_can_not_change_access(_PortType, Url) ->
+    {ok, _, _, Body} = test_request:put(Url ++ "/db/b",
+        ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+    {Json} = jiffy:decode(Body),
+    Rev = couch_util:get_value(<<"rev">>, Json),
+    {ok, Code, _, _} = test_request:put(Url ++ "/db/b",
+        ?USERX_REQ_HEADERS,
+        "{\"a\":2,\"_access\":[\"y\"],\"_rev\":\"" ++ binary_to_list(Rev) ++ "\"}"),
+    ?_assertEqual(403, Code).
+
+users_with_access_can_not_remove_access(_PortType, Url) ->
+    {ok, _, _, Body} = test_request:put(Url ++ "/db/b",
+        ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+    {Json} = jiffy:decode(Body),
+    Rev = couch_util:get_value(<<"rev">>, Json),
+    {ok, Code, _, _} = test_request:put(Url ++ "/db/b",
+        ?USERX_REQ_HEADERS,
+        "{\"a\":2,\"_rev\":\"" ++ binary_to_list(Rev) ++ "\"}"),
     ?_assertEqual(403, Code).
 
 % Doc reads
@@ -271,11 +314,12 @@ should_let_user_fetch_their_own_changes(_PortType, Url) ->
     AmountOfDocs = length(proplists:get_value(<<"results">>, Json)),
     ?_assertEqual(2, AmountOfDocs).
 
+% views
 should_not_allow_admin_access_ddoc_view_request(_PortType, Url) ->
     DDoc = "{\"a\":1,\"_access\":[\"x\"],\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
     {ok, Code, _, _} = test_request:put(Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS, DDoc),
-    ?_assertEqual(201, Code),
+    ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:get(Url ++ "/db/_design/a/_view/foo",
         ?ADMIN_REQ_HEADERS),
     ?_assertEqual(403, Code1).
@@ -284,7 +328,7 @@ should_not_allow_user_access_ddoc_view_request(_PortType, Url) ->
     DDoc = "{\"a\":1,\"_access\":[\"x\"],\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
     {ok, Code, _, _} = test_request:put(Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS, DDoc),
-    ?_assertEqual(201, Code),
+    ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:get(Url ++ "/db/_design/a/_view/foo",
         ?USERX_REQ_HEADERS),
     ?_assertEqual(403, Code1).
@@ -293,7 +337,7 @@ should_allow_admin_users_access_ddoc_view_request(_PortType, Url) ->
     DDoc = "{\"a\":1,\"_access\":[\"_users\"],\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
     {ok, Code, _, _} = test_request:put(Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS, DDoc),
-    ?_assertEqual(201, Code),
+    ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:get(Url ++ "/db/_design/a/_view/foo",
         ?ADMIN_REQ_HEADERS),
     ?_assertEqual(200, Code1).
@@ -302,7 +346,7 @@ should_allow_user_users_access_ddoc_view_request(_PortType, Url) ->
     DDoc = "{\"a\":1,\"_access\":[\"_users\"],\"views\":{\"foo\":{\"map\":\"function() {}\"}}}",
     {ok, Code, _, _} = test_request:put(Url ++ "/db/_design/a",
         ?ADMIN_REQ_HEADERS, DDoc),
-    ?_assertEqual(201, Code),
+    ?assertEqual(201, Code),
     {ok, Code1, _, _} = test_request:get(Url ++ "/db/_design/a/_view/foo",
         ?USERX_REQ_HEADERS),
     ?_assertEqual(200, Code1).
