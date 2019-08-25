@@ -32,6 +32,7 @@
     check_is_member/1,
     validate_access/2,
     check_access/2,
+    has_access_enabled/1,
 
     name/1,
     get_after_doc_read_fun/1,

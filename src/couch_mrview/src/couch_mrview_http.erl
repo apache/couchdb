@@ -99,10 +99,9 @@ handle_view_changes_req(#httpd{path_parts=[_,<<"_design">>,DDocName,<<"_view_cha
     ChangesFun = couch_mrview_changes:handle_view_changes(ChangesArgs, Req, Db, <<"_design/", DDocName/binary>>, ViewName),
     couch_httpd_db:handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
 
-
 handle_view_req(#httpd{method='GET',
                       path_parts=[_, _, DDocName, _, VName, <<"_info">>]}=Req,
-                Db, _DDoc) ->
+                Db, DDoc) ->
     DbName = couch_db:name(Db),
     DDocId = <<"_design/", DDocName/binary >>,
     {ok, Info} = couch_mrview:get_view_info(DbName, DDocId, VName),
@@ -272,7 +271,6 @@ get_view_callback(_DbName, _DbName, false) ->
 % non _users databases get all fields
 get_view_callback(_, _, _) ->
     fun view_cb/2.
-
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Args0 = parse_params(Req, Keys),
