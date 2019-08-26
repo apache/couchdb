@@ -399,6 +399,10 @@ is_deleted(Tree) ->
         false
     end.
 
+get_access({Props}) ->
+    get_access(couch_doc:from_json_obj({Props}));
+get_access(#doc{access=Access}) ->
+    Access.
 
 get_validate_doc_fun({Props}) ->
     get_validate_doc_fun(couch_doc:from_json_obj({Props}));

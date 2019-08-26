@@ -338,6 +338,7 @@ refresh_validate_doc_funs(#db{name = <<"shards/", _/binary>> = Name} = Db) ->
 refresh_validate_doc_funs(Db0) ->
     Db = Db0#db{user_ctx=?ADMIN_USER},
     {ok, DesignDocs} = couch_db:get_design_docs(Db),
+    % TODO: filter out non-admin ddocs
     ProcessDocFuns = lists:flatmap(
         fun(DesignDocInfo) ->
             {ok, DesignDoc} = couch_db:open_doc_int(

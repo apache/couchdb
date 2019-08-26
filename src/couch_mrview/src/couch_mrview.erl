@@ -280,23 +280,62 @@ query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
     VName = <<"_access_by_seq">>,
     query_view(Db, DDoc, VName, Args, Callback, Acc).
 
+get_design_docs(Db) ->
+    {ok, DDocs} = couch_db:get_design_docs(Db),
+    lists:filter(fun({DDoc}) ->
+        couch_util:get_value(<<"_access">>, DDoc) =:= [<<"_users">>]
+    end, DDocs).
+
 query_all_docs_access(Db, Args0, Callback0, Acc) ->
     % query our not yest existing, home-grown _access view.
     % use query_view for this.
     DDoc = access_ddoc(),
     UserCtx = couch_db:get_user_ctx(Db),
     UserName = UserCtx#user_ctx.name,
-    % TODO: add roles
     Args1 = prefix_startkey_endkey(UserName, Args0, Args0#mrargs.direction),
     Args = Args1#mrargs{reduce=false},
-    % filter out the user-prefix from the key, so _all_docs looks normal
-    % this isn’t a separate function because I’m binding Callback0 and I don’t
-    % know the Erlang equivalent of JS’s fun.bind(this, newarg)
+
+    % get all _users design docs so we can splice them into the result
+    % in the right places
+    DDocs = get_design_docs(Db),
+    couch_log:info("~nget_user_design_docs: DDocs ~p~n", [DDocs]),
+    DDIterator = couch_iter:start(length(DDocs)),
+    % couch_log:info("~nDDocs~p~n", [DDocs]),
+
     Callback = fun
         ({row, Props}, Acc0) ->
+
+        % filter out the user-prefix from the key, so _all_docs looks normal
+        % this isn’t a separate function because I’m binding Callback0 and I
+        % don’t know the Erlang equivalent of JS’s fun.bind(this, newarg)
+
             [_User, Key] = proplists:get_value(key, Props),
             Row0 = proplists:delete(key, Props),
             Row = [{key, Key} | Row0],
+
+            couch_log:info("~nRow~p~n", [Row]),
+            % if new row id is > than next ddocs id, call Callback0 with ddoc
+            % id first, move DDocs iterator one forward
+            DDNextIdx = couch_iter:next(DDIterator),
+            case DDNextIdx of
+                done -> done;
+                N ->
+                    {DDNext} = lists:nth(N, DDocs),
+                    DDID = couch_util:get_value(<<"_id">>, DDNext),
+                    DDRev = couch_util:get_value(<<"_rev">>, DDNext),
+                    case Key > DDID of
+                        true ->
+                            DDRow = [
+                                {key, DDID},
+                                {id, DDID},
+                                {value, DDRev},
+                                {doc, {DDNext}}
+                            ],
+                            Callback0({row, DDRow}, Acc0);
+                        _Else
+                            -> ok
+                    end
+            end,
             Callback0({row, Row}, Acc0);
         (Row, Acc0) ->
             Callback0(Row, Acc0)
