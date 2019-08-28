@@ -5,34 +5,34 @@ defmodule CookieAuthTest do
 
   @users_db "_users"
 
+  @moduletag config: [
+               {
+                 "chttpd_auth",
+                 "authentication_db",
+                 @users_db
+               },
+               {
+                 "couch_httpd_auth",
+                 "authentication_db",
+                 @users_db
+               },
+               {
+                 "couch_httpd_auth",
+                 "iterations",
+                 "1"
+               },
+               {
+                 "admins",
+                 "jan",
+                 "apple"
+               }
+             ]
+
   @password "3.141592653589"
 
-  test "cookie auth" do
+  setup do
     # Create db if not exists
     Couch.put("/#{@users_db}")
-
-    server_config = [
-      %{
-        :section => "chttpd_auth",
-        :key => "authentication_db",
-        :value => @users_db
-      },
-      %{
-        :section => "couch_httpd_auth",
-        :key => "authentication_db",
-        :value => @users_db
-      },
-      %{
-        :section => "couch_httpd_auth",
-        :key => "iterations",
-        :value => "1"
-      },
-      %{
-        :section => "admins",
-        :key => "jan",
-        :value => "apple"
-      }
-    ]
 
     resp =
       Couch.get(
@@ -42,7 +42,20 @@ defmodule CookieAuthTest do
 
     assert resp.body
 
-    run_on_modified_server(server_config, &test_fun/0)
+    on_exit(&tear_down/0)
+
+    :ok
+  end
+
+  defp tear_down do
+    # delete users
+    user = URI.encode("org.couchdb.user:jchris")
+    user_doc = Couch.get("/#{@users_db}/#{URI.encode(user)}").body
+    Couch.delete("/#{@users_db}/#{user}", query: [rev: user_doc["_rev"]])
+
+    user = URI.encode("org.couchdb.user:Jason Davies")
+    user_doc = Couch.get("/#{@users_db}/#{user}").body
+    Couch.delete("/#{@users_db}/#{user}", query: [rev: user_doc["_rev"]])
   end
 
   defp login(user, password) do
@@ -199,7 +212,7 @@ defmodule CookieAuthTest do
     logout(sess)
   end
 
-  defp test_fun do
+  test "cookie auth" do
     # test that the users db is born with the auth ddoc
     ddoc = open_as(@users_db, "_design/_auth", user: "jan")
     assert ddoc["validate_doc_update"] != nil
@@ -229,6 +242,7 @@ defmodule CookieAuthTest do
         {:password, "eh, Boo-Boo?"}
       ])
 
+    # make sure we cant create duplicate users
     create_doc_expect_error(@users_db, duplicate_jchris_user_doc, 409, "conflict")
 
     # we can't create _names
@@ -348,9 +362,6 @@ defmodule CookieAuthTest do
         user: "jan"
       )
 
-    # wait for auth cache invalidation
-    :timer.sleep(500)
-
     # test that you can't save system (underscore) roles even if you are admin
     jchris_user_doc =
       jchris_user_doc
@@ -388,14 +399,5 @@ defmodule CookieAuthTest do
 
     # log in one last time so run_on_modified_server can clean up the admin account
     login("jan", "apple")
-  after
-    # delete users
-    user = URI.encode("org.couchdb.user:jchris")
-    user_doc = Couch.get("/#{@users_db}/#{URI.encode(user)}").body
-    Couch.delete("/#{@users_db}/#{user}", query: [rev: user_doc["_rev"]])
-
-    user = URI.encode("org.couchdb.user:Jason Davies")
-    user_doc = Couch.get("/#{@users_db}/#{user}").body
-    Couch.delete("/#{@users_db}/#{user}", query: [rev: user_doc["_rev"]])
   end
 end

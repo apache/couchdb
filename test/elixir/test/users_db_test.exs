@@ -5,33 +5,30 @@ defmodule UsersDbTest do
 
   @users_db_name "_users"
 
-  @server_config [
-    %{
-      :section => "chttpd_auth",
-      :key => "authentication_db",
-      :value => @users_db_name
-    },
-    %{
-      :section => "couch_httpd_auth",
-      :key => "authentication_db",
-      :value => @users_db_name
-    },
-    %{
-      :section => "couch_httpd_auth",
-      :key => "iterations",
-      :value => "1"
-    },
-    %{
-      :section => "admins",
-      :key => "jan",
-      :value => "apple"
-    }
-  ]
+  @moduletag config: [
+               {
+                 "chttpd_auth",
+                 "authentication_db",
+                 @users_db_name
+               },
+               {
+                 "couch_httpd_auth",
+                 "authentication_db",
+                 @users_db_name
+               },
+               {
+                 "couch_httpd_auth",
+                 "iterations",
+                 "1"
+               },
+               {
+                 "admins",
+                 "jan",
+                 "apple"
+               }
+             ]
 
-  @tag :with_db
-  test "users db", context do
-    db_name = context[:db_name]
-
+  setup do
     # Create db if not exists
     Couch.put("/#{@users_db_name}")
 
@@ -42,7 +39,15 @@ defmodule UsersDbTest do
       )
 
     assert resp.body
-    run_on_modified_server(@server_config, fn -> test_fun(db_name) end)
+
+    on_exit(&tear_down/0)
+
+    :ok
+  end
+
+  defp tear_down do
+    delete_db(@users_db_name)
+    create_db(@users_db_name)
   end
 
   defp replicate(source, target, rep_options \\ []) do
@@ -117,7 +122,9 @@ defmodule UsersDbTest do
     assert Couch.Session.logout(session).body["ok"]
   end
 
-  defp test_fun(db_name) do
+  @tag :with_db
+  test "users db", context do
+    db_name = context[:db_name]
     # test that the users db is born with the auth ddoc
     ddoc = Couch.get("/#{@users_db_name}/_design/_auth")
     assert ddoc.body["validate_doc_update"] != nil
@@ -181,16 +188,23 @@ defmodule UsersDbTest do
     logout(session)
 
     # wait for auth_cache invalidation
-    :timer.sleep(5000)
+    retry_until(
+      fn ->
+        resp =
+          Couch.get(
+            "/_session",
+            headers: [
+              authorization: "Basic #{:base64.encode("jchris@apache.org:funnybone")}"
+            ]
+          )
 
-    resp =
-      Couch.get(
-        "/_session",
-        headers: [authorization: "Basic #{:base64.encode("jchris@apache.org:funnybone")}"]
-      )
-
-    assert resp.body["error"] == "unauthorized"
-    assert String.contains?(resp.body["reason"], "conflict")
+        assert resp.body["error"] == "unauthorized"
+        assert String.contains?(resp.body["reason"], "conflict")
+        resp
+      end,
+      500,
+      20_000
+    )
 
     # You can delete a user doc
     session = login("jan", "apple")
@@ -304,8 +318,5 @@ defmodule UsersDbTest do
       )
 
     assert resp.body["userCtx"]["name"] == "foo@example.org"
-  after
-    delete_db(@users_db_name)
-    create_db(@users_db_name)
   end
 end
