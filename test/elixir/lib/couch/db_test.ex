@@ -300,6 +300,7 @@ defmodule Couch.DBTest do
     end
   end
 
+
   def request_stats(path_steps, is_test) do
     path =
       List.foldl(
@@ -320,7 +321,7 @@ defmodule Couch.DBTest do
     Couch.get(path).body
   end
 
-  def retry_until(condition, sleep \\ 100, timeout \\ 5000) do
+  def retry_until(condition, sleep \\ 100, timeout \\ 30_000) do
     retry_until(condition, now(:ms), sleep, timeout)
   end
 

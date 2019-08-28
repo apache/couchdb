@@ -358,7 +358,6 @@ strip_url_creds_test_() ->
         end,
         fun (_) -> meck:unload() end,
         [
-            t_strip_local_db_creds(),
             t_strip_http_basic_creds(),
             t_strip_http_props_creds()
         ]

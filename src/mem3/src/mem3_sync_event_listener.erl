@@ -258,14 +258,16 @@ subscribe_for_config_test_() ->
 should_set_sync_delay(Pid) ->
     ?_test(begin
         config:set("mem3", "sync_delay", "123", false),
-        ?assertMatch(#state{delay = 123}, capture(Pid)),
+        wait_state(Pid, #state.delay, 123),
+        ?assertMatch(#state{delay = 123}, get_state(Pid)),
         ok
     end).
 
 should_set_sync_frequency(Pid) ->
     ?_test(begin
         config:set("mem3", "sync_frequency", "456", false),
-        ?assertMatch(#state{frequency = 456}, capture(Pid)),
+        wait_state(Pid, #state.frequency, 456),
+        ?assertMatch(#state{frequency = 456}, get_state(Pid)),
         ok
     end).
 
@@ -293,17 +295,26 @@ should_terminate(Pid) ->
         ok
     end).
 
-capture(Pid) ->
+
+get_state(Pid) ->
     Ref = make_ref(),
+    Pid ! {get_state, Ref, self()},
+    receive
+        {Ref, State} -> State
+    after 500 ->
+        timeout
+    end.
+
+
+wait_state(Pid, Field, Val) when is_pid(Pid), is_integer(Field) ->
     WaitFun = fun() ->
-        Pid ! {get_state, Ref, self()},
-        receive
-            {Ref, State} -> State
-        after 0 ->
-            wait
+        case get_state(Pid) of
+            #state{} = S when element(Field, S) == Val ->
+                true;
+            _ ->
+                wait
         end
     end,
     test_util:wait(WaitFun).
-
 
 -endif.

@@ -92,7 +92,7 @@ defmodule ReshardHelpers do
   end
 
   def wait_job_removed(id) do
-    retry_until(fn -> get_job(id).status_code == 404 end, 200, 10_000)
+    retry_until(fn -> get_job(id).status_code == 404 end, 200, 60_000)
   end
 
   def wait_job_completed(id) do
@@ -100,7 +100,7 @@ defmodule ReshardHelpers do
   end
 
   def wait_job_state(id, state) do
-    retry_until(fn -> get_job_state(id) == state end, 200, 10_000)
+    retry_until(fn -> get_job_state(id) == state end, 200, 60_000)
   end
 
   def reset_reshard_state do
