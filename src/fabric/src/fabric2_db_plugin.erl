@@ -21,6 +21,10 @@
     is_valid_purge_client/2
 ]).
 
+
+-include_lib("couch/include/couch_db.hrl").
+
+
 -define(SERVICE_ID, fabric2_db).
 
 
@@ -31,6 +35,9 @@
 validate_dbname(DbName, Normalized, Default) ->
     maybe_handle(validate_dbname, [DbName, Normalized], Default).
 
+
+before_doc_update(_, #doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} = Doc, _) ->
+    Doc;
 
 before_doc_update(Db, Doc0, UpdateType) ->
     Fun = fabric2_db:get_before_doc_update_fun(Db),
