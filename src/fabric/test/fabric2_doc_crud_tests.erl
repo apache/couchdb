@@ -60,7 +60,8 @@ doc_crud_test_() ->
                 fun delete_local_doc_basic/1,
                 fun recreate_local_doc/1,
                 fun create_local_doc_bad_rev/1,
-                fun create_local_doc_random_rev/1
+                fun create_local_doc_random_rev/1,
+                fun before_doc_update_skips_local_docs/1
             ]}
         }
     }.
@@ -762,3 +763,24 @@ create_local_doc_random_rev({Db, _}) ->
     ?assertEqual({ok, {0, <<"2">>}}, fabric2_db:update_doc(Db, Doc5)),
     {ok, Doc6} = fabric2_db:open_doc(Db, LDocId, []),
     ?assertEqual(Doc5#doc{revs = {0, [<<"2">>]}}, Doc6).
+
+
+before_doc_update_skips_local_docs({Db0, _}) ->
+
+    BduFun = fun(Doc, _, _) ->
+        Doc#doc{body = {[<<"bdu_was_here">>, true]}}
+    end,
+
+    Db = Db0#{before_doc_update := BduFun},
+
+    LDoc1 = #doc{id = <<"_local/ldoc1">>},
+    Doc1 = #doc{id = <<"doc1">>},
+
+    ?assertMatch({ok, {_, _}}, fabric2_db:update_doc(Db, LDoc1)),
+    ?assertMatch({ok, {_, _}}, fabric2_db:update_doc(Db, Doc1)),
+
+    {ok, LDoc2} = fabric2_db:open_doc(Db, LDoc1#doc.id),
+    {ok, Doc2} = fabric2_db:open_doc(Db, Doc1#doc.id),
+
+    ?assertEqual({[]}, LDoc2#doc.body),
+    ?assertEqual({[<<"bdu_was_here">>, true]}, Doc2#doc.body).
