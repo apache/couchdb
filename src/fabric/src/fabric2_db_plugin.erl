@@ -66,9 +66,7 @@ validate_docid(Id) ->
 check_is_admin(Db) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     %% callbacks return true only if it specifically allow the given Id
-    R = couch_epi:any(Handle, ?SERVICE_ID, check_is_admin, [Db], []),
-    %io:format(standard_error, "~n FFFFFFF ~p check_is_admin Db:~p => ~p~n", [?MODULE, fabric2_db:name(Db), R]),
-    R.
+    couch_epi:any(Handle, ?SERVICE_ID, check_is_admin, [Db], []).
 
 
 is_valid_purge_client(DbName, Props) ->
