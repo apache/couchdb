@@ -857,15 +857,7 @@ all_docs_view(Req, Db, Keys, OP) ->
     },
     case Args1#mrargs.keys of
         undefined ->
-            Options = [
-                {user_ctx, Req#httpd.user_ctx},
-                {dir, Args1#mrargs.direction},
-                {start_key, Args1#mrargs.start_key},
-                {end_key, Args1#mrargs.end_key},
-                {limit, Args1#mrargs.limit},
-                {skip, Args1#mrargs.skip},
-                {update_seq, Args1#mrargs.update_seq}
-            ],
+            Options = all_docs_view_opts(Args1, Req),
             Acc = {iter, Db, Args1, VAcc0},
             {ok, {iter, _, _, Resp}} =
                     fabric2_db:fold_docs(Db, fun view_cb/2, Acc, Options),
@@ -936,6 +928,29 @@ all_docs_view(Req, Db, Keys, OP) ->
             {ok, VAcc3} = view_cb(complete, VAcc2),
             {ok, VAcc3#vacc.resp}
     end.
+
+
+all_docs_view_opts(Args, Req) ->
+    StartKey = case Args#mrargs.start_key of
+        undefined -> Args#mrargs.start_key_docid;
+        SKey -> SKey
+    end,
+    EndKey = case Args#mrargs.end_key of
+        undefined -> Args#mrargs.end_key_docid;
+        EKey -> EKey
+    end,
+    EndKeyOpts = case {EndKey, Args#mrargs.inclusive_end} of
+        {<<_/binary>>, false} -> [{end_key_gt, EndKey}];
+        {_, _} -> [{end_key, EndKey}]
+    end,
+    [
+        {user_ctx, Req#httpd.user_ctx},
+        {dir, Args#mrargs.direction},
+        {start_key, StartKey},
+        {limit, Args#mrargs.limit},
+        {skip, Args#mrargs.skip},
+        {update_seq, Args#mrargs.update_seq}
+    ] ++ EndKeyOpts.
 
 
 apply_args_to_keylist(Args, Keys0) ->
