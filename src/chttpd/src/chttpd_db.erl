@@ -824,113 +824,132 @@ db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
 multi_all_docs_view(Req, Db, OP, Queries) ->
+    UserCtx = Req#httpd.user_ctx,
     Args0 = couch_mrview_http:parse_params(Req, undefined),
     Args1 = Args0#mrargs{view_type=map},
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg1 = couch_mrview_http:parse_params(Query, undefined,
             Args1, [decoded]),
-        QueryArgs2 = fabric_util:validate_all_docs_args(Db, QueryArg1),
+        QueryArgs2 = couch_views_util:validate_args(QueryArg1),
         set_namespace(OP, QueryArgs2)
     end, Queries),
-    Options = [{user_ctx, Req#httpd.user_ctx}],
-    VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
-    FirstChunk = "{\"results\":[",
-    {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req,
-        200, [], FirstChunk),
-    VAcc1 = VAcc0#vacc{resp=Resp0},
-    VAcc2 = lists:foldl(fun(Args, Acc0) ->
-        {ok, Acc1} = fabric2_db:fold_docs(Db, Options,
-            fun view_cb/2, Acc0, Args),
-        Acc1
-    end, VAcc1, ArgQueries),
-    {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
+    Max = chttpd:chunked_response_buffer_size(),
+    First = "{\"results\":[",
+    {ok, Resp0} = chttpd:start_delayed_json_response(Req, 200, [], First),
+    VAcc0 = #vacc{
+        db = Db,
+        req = Req,
+        resp = Resp0,
+        threshold = Max,
+        prepend = "\r\n"
+    },
+    VAcc1 = lists:foldl(fun
+        (#mrargs{keys = undefined} = Args, Acc0) ->
+            send_all_docs(Db, Args, UserCtx, Acc0);
+        (#mrargs{keys = Keys} = Args, Acc0) when is_list(Keys) ->
+            send_all_docs_keys(Db, Args, UserCtx, Acc0)
+    end, VAcc0, ArgQueries),
+    {ok, Resp1} = chttpd:send_delayed_chunk(VAcc1#vacc.resp, "\r\n]}"),
     chttpd:end_delayed_json_response(Resp1).
 
+
 all_docs_view(Req, Db, Keys, OP) ->
+    UserCtx = Req#httpd.user_ctx,
     Args0 = couch_mrview_http:parse_body_and_query(Req, Keys),
-    Aparse_body_and_queryrgs1 = set_namespace(OP, Args0),
+    Args1 = Args0#mrargs{view_type=map},
+    Args2 = couch_views_util:validate_args(Args1),
+    Args3 = set_namespace(OP, Args2),
     Max = chttpd:chunked_response_buffer_size(),
     VAcc0 = #vacc{
         db = Db,
         req = Req,
         threshold = Max
     },
-    case Args1#mrargs.keys of
+    case Args3#mrargs.keys of
         undefined ->
-            Options = all_docs_view_opts(Args1, Req),
-            Acc = {iter, Db, Args1, VAcc0},
-            {ok, {iter, _, _, Resp}} =
-                    fabric2_db:fold_docs(Db, fun view_cb/2, Acc, Options),
-            {ok, Resp#vacc.resp};
-        Keys0 when is_list(Keys0) ->
-            Keys1 = apply_args_to_keylist(Args1, Keys0),
-            %% namespace can be _set_ to `undefined`, so we
-            %% want simulate enum here
-            NS = case couch_util:get_value(namespace, Args1#mrargs.extra) of
-                <<"_all_docs">> -> <<"_all_docs">>;
-                <<"_design">> -> <<"_design">>;
-                <<"_local">> -> <<"_local">>;
-                _ -> <<"_all_docs">>
-            end,
-            TotalRows = fabric2_db:get_doc_count(Db, NS),
-            Meta = case Args1#mrargs.update_seq of
-                true ->
-                    UpdateSeq = fabric2_db:get_update_seq(Db),
-                    [{update_seq, UpdateSeq}];
-                false ->
-                    []
-            end ++ [{total, TotalRows}, {offset, null}],
-            {ok, VAcc1} = view_cb({meta, Meta}, VAcc0),
-            DocOpts = case Args1#mrargs.conflicts of
-                true -> [conflicts | Args1#mrargs.doc_options];
-                _ -> Args1#mrargs.doc_options
-            end ++ [{user_ctx, Req#httpd.user_ctx}],
-            IncludeDocs = Args1#mrargs.include_docs,
-            VAcc2 = lists:foldl(fun(DocId, Acc) ->
-                OpenOpts = [deleted | DocOpts],
-                Row0 = case fabric2_db:open_doc(Db, DocId, OpenOpts) of
-                    {not_found, missing} ->
-                        #view_row{key = DocId};
-                    {ok, #doc{deleted = true, revs = Revs}} ->
-                        {RevPos, [RevId | _]} = Revs,
-                        Value = {[
-                            {rev, couch_doc:rev_to_str({RevPos, RevId})},
-                            {deleted, true}
-                        ]},
-                        DocValue = if not IncludeDocs -> undefined; true ->
-                            null
-                        end,
-                        #view_row{
-                            key = DocId,
-                            id = DocId,
-                            value = Value,
-                            doc = DocValue
-                        };
-                    {ok, #doc{revs = Revs} = Doc0} ->
-                        {RevPos, [RevId | _]} = Revs,
-                        Value = {[
-                            {rev, couch_doc:rev_to_str({RevPos, RevId})}
-                        ]},
-                        DocValue = if not IncludeDocs -> undefined; true ->
-                            couch_doc:to_json_obj(Doc0, DocOpts)
-                        end,
-                        #view_row{
-                            key = DocId,
-                            id = DocId,
-                            value = Value,
-                            doc = DocValue
-                        }
-                end,
-                Row1 = fabric_view:transform_row(Row0),
-                {ok, NewAcc} = view_cb(Row1, Acc),
-                NewAcc
-            end, VAcc1, Keys1),
-            {ok, VAcc3} = view_cb(complete, VAcc2),
-            {ok, VAcc3#vacc.resp}
+            VAcc1 = send_all_docs(Db, Args3, UserCtx, VAcc0),
+            {ok, VAcc1#vacc.resp};
+        Keys when is_list(Keys) ->
+            VAcc1 = send_all_docs_keys(Db, Args3, UserCtx, VAcc0),
+            {ok, VAcc2} = view_cb(complete, VAcc1),
+            {ok, VAcc2#vacc.resp}
     end.
 
 
-all_docs_view_opts(Args, Req) ->
+send_all_docs(Db, #mrargs{keys = undefined} = Args, UserCtx, VAcc0) ->
+    Opts = all_docs_view_opts(Args, UserCtx),
+    Acc = {iter, Db, Args, VAcc0},
+    ViewCb = fun view_cb/2,
+    {ok, {iter, _, _, VAcc1}} = fabric2_db:fold_docs(Db, ViewCb, Acc, Opts),
+    VAcc1.
+
+
+send_all_docs_keys(Db, #mrargs{} = Args, UserCtx, VAcc0) ->
+    Keys = apply_args_to_keylist(Args, Args#mrargs.keys),
+    %% namespace can be _set_ to `undefined`, so we
+    %% want simulate enum here
+    NS = case couch_util:get_value(namespace, Args#mrargs.extra) of
+        <<"_all_docs">> -> <<"_all_docs">>;
+        <<"_design">> -> <<"_design">>;
+        <<"_local">> -> <<"_local">>;
+        _ -> <<"_all_docs">>
+    end,
+    TotalRows = fabric2_db:get_doc_count(Db, NS),
+    Meta = case Args#mrargs.update_seq of
+        true ->
+            UpdateSeq = fabric2_db:get_update_seq(Db),
+            [{update_seq, UpdateSeq}];
+        false ->
+            []
+    end ++ [{total, TotalRows}, {offset, null}],
+    {ok, VAcc1} = view_cb({meta, Meta}, VAcc0),
+    DocOpts = case Args#mrargs.conflicts of
+        true -> [conflicts | Args#mrargs.doc_options];
+        _ -> Args#mrargs.doc_options
+    end ++ [{user_ctx, UserCtx}],
+    IncludeDocs = Args#mrargs.include_docs,
+    VAcc2 = lists:foldl(fun(DocId, Acc) ->
+        OpenOpts = [deleted | DocOpts],
+        Row0 = case fabric2_db:open_doc(Db, DocId, OpenOpts) of
+            {not_found, missing} ->
+                #view_row{key = DocId};
+            {ok, #doc{deleted = true, revs = Revs}} ->
+                {RevPos, [RevId | _]} = Revs,
+                Value = {[
+                    {rev, couch_doc:rev_to_str({RevPos, RevId})},
+                    {deleted, true}
+                ]},
+                DocValue = if not IncludeDocs -> undefined; true ->
+                    null
+                end,
+                #view_row{
+                    key = DocId,
+                    id = DocId,
+                    value = Value,
+                    doc = DocValue
+                };
+            {ok, #doc{revs = Revs} = Doc0} ->
+                {RevPos, [RevId | _]} = Revs,
+                Value = {[
+                    {rev, couch_doc:rev_to_str({RevPos, RevId})}
+                ]},
+                DocValue = if not IncludeDocs -> undefined; true ->
+                    couch_doc:to_json_obj(Doc0, DocOpts)
+                end,
+                #view_row{
+                    key = DocId,
+                    id = DocId,
+                    value = Value,
+                    doc = DocValue
+                }
+        end,
+        Row1 = fabric_view:transform_row(Row0),
+        {ok, NewAcc} = view_cb(Row1, Acc),
+        NewAcc
+    end, VAcc1, Keys).
+
+
+all_docs_view_opts(Args, UserCtx) ->
     StartKey = case Args#mrargs.start_key of
         undefined -> Args#mrargs.start_key_docid;
         SKey -> SKey
@@ -944,7 +963,7 @@ all_docs_view_opts(Args, Req) ->
         {_, _} -> [{end_key, EndKey}]
     end,
     [
-        {user_ctx, Req#httpd.user_ctx},
+        {user_ctx, UserCtx},
         {dir, Args#mrargs.direction},
         {start_key, StartKey},
         {limit, Args#mrargs.limit},
