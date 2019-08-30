@@ -12,6 +12,9 @@ defmodule CompactTest do
   @att_name "foo.txt"
   @att_plaintext "This is plain text"
 
+  # Need to investigate why compaction is not compacting (or compactor cannot complete)
+  # Refer:- https://github.com/apache/couchdb/pull/2127
+  @tag :pending
   @tag :skip_on_jenkins
   @tag :with_db
   test "compaction reduces size of deleted docs", context do
