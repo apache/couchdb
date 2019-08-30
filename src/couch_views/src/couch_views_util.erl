@@ -14,7 +14,8 @@
 
 
 -export([
-    ddoc_to_mrst/2
+    ddoc_to_mrst/2,
+    validate_args/1
 ]).
 
 
@@ -76,3 +77,145 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
     },
     SigInfo = {Views, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
     {ok, IdxState#mrst{sig=couch_hash:md5_hash(term_to_binary(SigInfo))}}.
+
+
+% This is mostly a copy of couch_mrview_util:validate_args/1 but it doesn't
+% update start / end keys and also throws a not_implemented error for reduce
+%
+validate_args(#mrargs{} = Args) ->
+    GroupLevel = determine_group_level(Args),
+    Reduce = Args#mrargs.reduce,
+
+    case Reduce =/= undefined orelse Args#mrargs.view_type == red of
+        true -> throw(not_implemented);
+        false -> ok
+    end,
+
+    case Reduce == undefined orelse is_boolean(Reduce) of
+        true -> ok;
+        _ -> mrverror(<<"Invalid `reduce` value.">>)
+    end,
+
+    case {Args#mrargs.view_type, Reduce} of
+        {map, true} -> mrverror(<<"Reduce is invalid for map-only views.">>);
+        _ -> ok
+    end,
+
+    case {Args#mrargs.view_type, GroupLevel, Args#mrargs.keys} of
+        {red, exact, _} -> ok;
+        {red, _, KeyList} when is_list(KeyList) ->
+            Msg = <<"Multi-key fetchs for reduce views must use `group=true`">>,
+            mrverror(Msg);
+        _ -> ok
+    end,
+
+    case Args#mrargs.keys of
+        Keys when is_list(Keys) -> ok;
+        undefined -> ok;
+        _ -> mrverror(<<"`keys` must be an array of strings.">>)
+    end,
+
+    case {Args#mrargs.keys, Args#mrargs.start_key,
+          Args#mrargs.end_key} of
+        {undefined, _, _} -> ok;
+        {[], _, _} -> ok;
+        {[_|_], undefined, undefined} -> ok;
+        _ -> mrverror(<<"`keys` is incompatible with `key`"
+                        ", `start_key` and `end_key`">>)
+    end,
+
+    case Args#mrargs.start_key_docid of
+        undefined -> ok;
+        SKDocId0 when is_binary(SKDocId0) -> ok;
+        _ -> mrverror(<<"`start_key_docid` must be a string.">>)
+    end,
+
+    case Args#mrargs.end_key_docid of
+        undefined -> ok;
+        EKDocId0 when is_binary(EKDocId0) -> ok;
+        _ -> mrverror(<<"`end_key_docid` must be a string.">>)
+    end,
+
+    case Args#mrargs.direction of
+        fwd -> ok;
+        rev -> ok;
+        _ -> mrverror(<<"Invalid direction.">>)
+    end,
+
+    case {Args#mrargs.limit >= 0, Args#mrargs.limit == undefined} of
+        {true, _} -> ok;
+        {_, true} -> ok;
+        _ -> mrverror(<<"`limit` must be a positive integer.">>)
+    end,
+
+    case Args#mrargs.skip < 0 of
+        true -> mrverror(<<"`skip` must be >= 0">>);
+        _ -> ok
+    end,
+
+    case {Args#mrargs.view_type, GroupLevel} of
+        {red, exact} -> ok;
+        {_, 0} -> ok;
+        {red, Int} when is_integer(Int), Int >= 0 -> ok;
+        {red, _} -> mrverror(<<"`group_level` must be >= 0">>);
+        {map, _} -> mrverror(<<"Invalid use of grouping on a map view.">>)
+    end,
+
+    case Args#mrargs.stable of
+        true -> ok;
+        false -> ok;
+        _ -> mrverror(<<"Invalid value for `stable`.">>)
+    end,
+
+    case Args#mrargs.update of
+        true -> ok;
+        false -> ok;
+        lazy -> ok;
+        _ -> mrverror(<<"Invalid value for `update`.">>)
+    end,
+
+    case is_boolean(Args#mrargs.inclusive_end) of
+        true -> ok;
+        _ -> mrverror(<<"Invalid value for `inclusive_end`.">>)
+    end,
+
+    case {Args#mrargs.view_type, Args#mrargs.include_docs} of
+        {red, true} -> mrverror(<<"`include_docs` is invalid for reduce">>);
+        {_, ID} when is_boolean(ID) -> ok;
+        _ -> mrverror(<<"Invalid value for `include_docs`">>)
+    end,
+
+    case {Args#mrargs.view_type, Args#mrargs.conflicts} of
+        {_, undefined} -> ok;
+        {map, V} when is_boolean(V) -> ok;
+        {red, undefined} -> ok;
+        {map, _} -> mrverror(<<"Invalid value for `conflicts`.">>);
+        {red, _} -> mrverror(<<"`conflicts` is invalid for reduce views.">>)
+    end,
+
+    case is_boolean(Args#mrargs.sorted) of
+        true -> ok;
+        _ -> mrverror(<<"Invalid value for `sorted`.">>)
+    end,
+
+    Args#mrargs{group_level=GroupLevel}.
+
+
+determine_group_level(#mrargs{group=undefined, group_level=undefined}) ->
+    0;
+
+determine_group_level(#mrargs{group=false, group_level=undefined}) ->
+    0;
+
+determine_group_level(#mrargs{group=false, group_level=Level}) when Level > 0 ->
+    mrverror(<<"Can't specify group=false and group_level>0 at the same time">>);
+
+determine_group_level(#mrargs{group=true, group_level=undefined}) ->
+    exact;
+
+determine_group_level(#mrargs{group_level=GroupLevel}) ->
+    GroupLevel.
+
+
+mrverror(Mesg) ->
+    throw({query_parse_error, Mesg}).

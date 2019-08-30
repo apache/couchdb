@@ -316,4 +316,44 @@ defmodule BasicsTest do
     # TODO
     assert true
   end
+
+  @tag :with_db
+  test "_all_docs/queries works", context do
+    db_name = context[:db_name]
+
+    resp = Couch.post("/#{db_name}/_all_docs/queries", body: %{:queries => []})
+    assert resp.status_code == 200
+    assert resp.body["results"] == []
+
+    assert Couch.put("/#{db_name}/doc1", body: %{:a => 1}).body["ok"]
+
+    body = %{
+        :queries => [
+            %{:limit => 1},
+            %{:limit => 0}
+        ]
+    }
+    resp = Couch.post("/#{db_name}/_all_docs/queries", body: body)
+    assert resp.status_code == 200
+
+    assert Map.has_key?(resp.body, "results")
+    results = Enum.sort(resp.body["results"])
+    assert length(results) == 2
+    [res1, res2] = results
+
+    assert res1 == %{"offset" => :null, "rows" => [], "total_rows" => 1}
+
+    assert res2["offset"] == :null
+    assert res2["total_rows"] == 1
+    rows = res2["rows"]
+
+    assert length(rows) == 1
+    [row] = rows
+    assert row["id"] == "doc1"
+    assert row["key"] == "doc1"
+
+    val = row["value"]
+    assert Map.has_key?(val, "rev")
+  end
+
 end
