@@ -859,22 +859,21 @@ all_docs_view(Req, Db, Keys, OP) ->
 
 send_all_docs(Db, #mrargs{keys = undefined} = Args, UserCtx, VAcc0) ->
     Opts = all_docs_view_opts(Args, UserCtx),
-    Acc = {iter, Db, Args, VAcc0},
+    NS = couch_util:get_value(namespace, Opts),
+    FoldFun = case NS of
+        <<"_all_docs">> -> fold_docs;
+        <<"_design">> -> fold_design_docs;
+        <<"_local">> -> fold_local_docs
+    end,
     ViewCb = fun view_cb/2,
-    {ok, {iter, _, _, VAcc1}} = fabric2_db:fold_docs(Db, ViewCb, Acc, Opts),
+    Acc = {iter, Db, Args, VAcc0},
+    {ok, {iter, _, _, VAcc1}} = fabric2_db:FoldFun(Db, ViewCb, Acc, Opts),
     VAcc1.
 
 
 send_all_docs_keys(Db, #mrargs{} = Args, UserCtx, VAcc0) ->
     Keys = apply_args_to_keylist(Args, Args#mrargs.keys),
-    %% namespace can be _set_ to `undefined`, so we
-    %% want simulate enum here
-    NS = case couch_util:get_value(namespace, Args#mrargs.extra) of
-        <<"_all_docs">> -> <<"_all_docs">>;
-        <<"_design">> -> <<"_design">>;
-        <<"_local">> -> <<"_local">>;
-        _ -> <<"_all_docs">>
-    end,
+    NS = couch_util:get_value(namespace, Args#mrargs.extra),
     TotalRows = fabric2_db:get_doc_count(Db, NS),
     Meta = case Args#mrargs.update_seq of
         true ->
@@ -889,7 +888,7 @@ send_all_docs_keys(Db, #mrargs{} = Args, UserCtx, VAcc0) ->
         _ -> Args#mrargs.doc_options
     end ++ [{user_ctx, UserCtx}],
     IncludeDocs = Args#mrargs.include_docs,
-    VAcc2 = lists:foldl(fun(DocId, Acc) ->
+    lists:foldl(fun(DocId, Acc) ->
         OpenOpts = [deleted | DocOpts],
         Row0 = case fabric2_db:open_doc(Db, DocId, OpenOpts) of
             {not_found, missing} ->
@@ -931,6 +930,7 @@ send_all_docs_keys(Db, #mrargs{} = Args, UserCtx, VAcc0) ->
 
 
 all_docs_view_opts(Args, UserCtx) ->
+    NS = couch_util:get_value(namespace, Args#mrargs.extra),
     StartKey = case Args#mrargs.start_key of
         undefined -> Args#mrargs.start_key_docid;
         SKey -> SKey
@@ -939,18 +939,23 @@ all_docs_view_opts(Args, UserCtx) ->
         undefined -> Args#mrargs.end_key_docid;
         EKey -> EKey
     end,
+    StartKeyOpts = case StartKey of
+        <<_/binary>> -> [{start_key, StartKey}];
+        undefined -> []
+    end,
     EndKeyOpts = case {EndKey, Args#mrargs.inclusive_end} of
         {<<_/binary>>, false} -> [{end_key_gt, EndKey}];
-        {_, _} -> [{end_key, EndKey}]
+        {<<_/binary>>, true} -> [{end_key, EndKey}];
+        {undefined, _} -> []
     end,
     [
         {user_ctx, UserCtx},
         {dir, Args#mrargs.direction},
-        {start_key, StartKey},
         {limit, Args#mrargs.limit},
         {skip, Args#mrargs.skip},
-        {update_seq, Args#mrargs.update_seq}
-    ] ++ EndKeyOpts.
+        {update_seq, Args#mrargs.update_seq},
+        {namespace, NS}
+    ] ++ StartKeyOpts ++ EndKeyOpts.
 
 
 apply_args_to_keylist(Args, Keys0) ->
@@ -2015,8 +2020,7 @@ monitor_attachments(Att) ->
 demonitor_refs(Refs) when is_list(Refs) ->
     [demonitor(Ref) || Ref <- Refs].
 
-set_namespace(<<"_all_docs">>, Args) ->
-    set_namespace(undefined, Args);
+
 set_namespace(<<"_local_docs">>, Args) ->
     set_namespace(<<"_local">>, Args);
 set_namespace(<<"_design_docs">>, Args) ->
