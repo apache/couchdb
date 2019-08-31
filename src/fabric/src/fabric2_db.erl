@@ -102,8 +102,8 @@
 
     fold_docs/3,
     fold_docs/4,
-    %% fold_local_docs/4,
-    %% fold_design_docs/4,
+    fold_design_docs/4,
+    fold_local_docs/4,
     fold_changes/4,
     fold_changes/5,
     %% count_changes_since/2,
@@ -136,6 +136,8 @@
     "(\\.[0-9]{10,})?$" % but allow an optional shard timestamp at the end
 ).
 
+-define(FIRST_DDOC_KEY, <<"_design/">>).
+-define(LAST_DDOC_KEY, <<"_design0">>).
 
 -define(RETURN(Term), throw({?MODULE, Term})).
 
@@ -313,6 +315,9 @@ get_del_doc_count(#{} = Db) ->
 get_doc_count(Db) ->
     get_doc_count(Db, <<"doc_count">>).
 
+
+get_doc_count(Db, undefined) ->
+    get_doc_count(Db, <<"doc_count">>);
 
 get_doc_count(Db, <<"_all_docs">>) ->
     get_doc_count(Db, <<"doc_count">>);
@@ -729,8 +734,8 @@ fold_docs(Db, UserFun, UserAcc0, Options) ->
             } = TxDb,
 
             Prefix = erlfdb_tuple:pack({?DB_ALL_DOCS}, DbPrefix),
-            DocCount = get_doc_count(TxDb),
-
+            NS = couch_util:get_value(namespace, Options),
+            DocCount = get_doc_count(TxDb, NS),
             Meta = case lists:keyfind(update_seq, 1, Options) of
                 {_, true} ->
                     UpdateSeq = fabric2_db:get_update_seq(TxDb),
@@ -748,6 +753,42 @@ fold_docs(Db, UserFun, UserAcc0, Options) ->
                     {id, DocId},
                     {key, DocId},
                     {value, {[{rev, couch_doc:rev_to_str(RevId)}]}}
+                ]}, Acc))
+            end, UserAcc1, Options),
+
+            {ok, maybe_stop(UserFun(complete, UserAcc2))}
+        catch throw:{stop, FinalUserAcc} ->
+            {ok, FinalUserAcc}
+        end
+    end).
+
+
+fold_design_docs(Db, UserFun, UserAcc0, Options1) ->
+    Options2 = set_design_doc_keys(Options1),
+    fold_docs(Db, UserFun, UserAcc0, Options2).
+
+
+fold_local_docs(Db, UserFun, UserAcc0, Options) ->
+     fabric2_fdb:transactional(Db, fun(TxDb) ->
+        try
+            #{
+                db_prefix := DbPrefix
+            } = TxDb,
+
+            Prefix = erlfdb_tuple:pack({?DB_LOCAL_DOCS}, DbPrefix),
+            DocCount = get_doc_count(TxDb, <<"doc_local_count">>),
+            Meta = [{total, DocCount}, {offset, null}],
+
+            UserAcc1 = maybe_stop(UserFun({meta, Meta}, UserAcc0)),
+
+            UserAcc2 = fabric2_fdb:fold_range(TxDb, Prefix, fun({K, V}, Acc) ->
+                {DocId} = erlfdb_tuple:unpack(K, Prefix),
+                LDoc = fabric2_fdb:get_local_doc(TxDb, DocId, V),
+                #doc{revs = {Pos, [Rev]}} = LDoc,
+                maybe_stop(UserFun({row, [
+                    {id, DocId},
+                    {key, DocId},
+                    {value, {[{rev, couch_doc:rev_to_str({Pos, Rev})}]}}
                 ]}, Acc))
             end, UserAcc1, Options),
 
@@ -1615,3 +1656,43 @@ maybe_stop({ok, Acc}) ->
     Acc;
 maybe_stop({stop, Acc}) ->
     throw({stop, Acc}).
+
+
+set_design_doc_keys(Options1) ->
+    Dir = couch_util:get_value(dir, Options1, fwd),
+    Options2 = set_design_doc_start_key(Options1, Dir),
+    set_design_doc_end_key(Options2, Dir).
+
+
+set_design_doc_start_key(Options, fwd) ->
+    Key1 = couch_util:get_value(start_key, Options, ?FIRST_DDOC_KEY),
+    Key2 = max(Key1, ?FIRST_DDOC_KEY),
+    lists:keystore(start_key, 1, Options, {start_key, Key2});
+
+set_design_doc_start_key(Options, rev) ->
+    Key1 = couch_util:get_value(start_key, Options, ?LAST_DDOC_KEY),
+    Key2 = min(Key1, ?LAST_DDOC_KEY),
+    lists:keystore(start_key, 1, Options, {start_key, Key2}).
+
+
+set_design_doc_end_key(Options, fwd) ->
+    case couch_util:get_value(end_key_gt, Options) of
+        undefined ->
+            Key1 = couch_util:get_value(end_key, Options, ?LAST_DDOC_KEY),
+            Key2 = min(Key1, ?LAST_DDOC_KEY),
+            lists:keystore(end_key, 1, Options, {end_key, Key2});
+        EKeyGT ->
+            Key2 = min(EKeyGT, ?LAST_DDOC_KEY),
+            lists:keystore(end_key_gt, 1, Options, {end_key_gt, Key2})
+    end;
+
+set_design_doc_end_key(Options, rev) ->
+    case couch_util:get_value(end_key_gt, Options) of
+        undefined ->
+            Key1 = couch_util:get_value(end_key, Options, ?FIRST_DDOC_KEY),
+            Key2 = max(Key1, ?FIRST_DDOC_KEY),
+            lists:keystore(end_key, 1, Options, {end_key, Key2});
+        EKeyGT ->
+            Key2 = max(EKeyGT, ?FIRST_DDOC_KEY),
+            lists:keystore(end_key_gt, 1, Options, {end_key_gt, Key2})
+    end.
