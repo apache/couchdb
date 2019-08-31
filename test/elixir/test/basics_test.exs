@@ -357,4 +357,123 @@ defmodule BasicsTest do
     assert Map.has_key?(val, "rev")
   end
 
+  @tag :with_db
+  test "_design_docs works", context do
+    db_name = context[:db_name]
+    body = %{:a => 1}
+
+    resp = Couch.get("/#{db_name}/_design_docs")
+    assert resp.status_code == 200
+    assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 0}
+
+    assert Couch.put("/#{db_name}/doc1", body: body).body["ok"]
+
+    # Make sure regular documents didn't get picked up
+    resp = Couch.get("/#{db_name}/_design_docs")
+    assert resp.status_code == 200
+    assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 0}
+
+    # Add _design/doc1
+    assert Couch.put("/#{db_name}/_design/doc1", body: body).body["ok"]
+    resp = Couch.get("/#{db_name}/_design_docs")
+    assert resp.status_code == 200
+    assert resp.body["total_rows"] == 1
+    [row] = resp.body["rows"]
+
+    assert row["id"] == "_design/doc1"
+    assert row["key"] == "_design/doc1"
+
+    val = row["value"]
+    assert Map.has_key?(val, "rev")
+
+    # Add _design/doc5
+    assert Couch.put("/#{db_name}/_design/doc5", body: body).body["ok"]
+    resp = Couch.get("/#{db_name}/_design_docs")
+    assert resp.status_code == 200
+    [row1, row2] = resp.body["rows"]
+    assert row1["id"] == "_design/doc1"
+    assert row2["id"] == "_design/doc5"
+
+    # descending=true
+    resp = Couch.get("/#{db_name}/_design_docs?descending=true")
+    assert resp.status_code == 200
+    [row1, row2] = resp.body["rows"]
+    assert row1["id"] == "_design/doc5"
+    assert row2["id"] == "_design/doc1"
+
+    # start_key=doc2
+    resp = Couch.get("/#{db_name}/_design_docs?start_key=\"_design/doc2\"")
+    assert resp.status_code == 200
+    [row] = resp.body["rows"]
+    assert row["id"] == "_design/doc5"
+
+    # end_key=doc2
+    resp = Couch.get("/#{db_name}/_design_docs?end_key=\"_design/doc2\"")
+    assert resp.status_code == 200
+    [row] = resp.body["rows"]
+    assert row["id"] == "_design/doc1"
+
+    # inclusive_end=false
+    qstr = "start_key=\"_design/doc2\"&end_key=\"_design/doc5\"&inclusive_end=false"
+    resp = Couch.get("/#{db_name}/_design_docs?" <> qstr)
+    assert resp.status_code == 200
+    assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 2}
+  end
+
+  @tag :with_db
+  test "_local_docs works", context do
+    db_name = context[:db_name]
+    body = %{:a => 1}
+
+    resp = Couch.get("/#{db_name}/_local_docs")
+    assert resp.status_code == 200
+    assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 0}
+
+    # Add _local/doc1
+    assert Couch.put("/#{db_name}/_local/doc1", body: body).body["ok"]
+    resp = Couch.get("/#{db_name}/_local_docs")
+    assert resp.status_code == 200
+    assert resp.body["total_rows"] == 1
+    [row] = resp.body["rows"]
+
+    assert row["id"] == "_local/doc1"
+    assert row["key"] == "_local/doc1"
+
+    val = row["value"]
+    assert Map.has_key?(val, "rev")
+
+    # Add _local/doc5
+    assert Couch.put("/#{db_name}/_local/doc5", body: body).body["ok"]
+    resp = Couch.get("/#{db_name}/_local_docs")
+    assert resp.status_code == 200
+    [row1, row2] = resp.body["rows"]
+    assert row1["id"] == "_local/doc1"
+    assert row2["id"] == "_local/doc5"
+
+    # descending=true
+    resp = Couch.get("/#{db_name}/_local_docs?descending=true")
+    assert resp.status_code == 200
+    [row1, row2] = resp.body["rows"]
+    assert row1["id"] == "_local/doc5"
+    assert row2["id"] == "_local/doc1"
+
+    # start_key=doc2
+    resp = Couch.get("/#{db_name}/_local_docs?start_key=\"_local/doc2\"")
+    assert resp.status_code == 200
+    [row] = resp.body["rows"]
+    assert row["id"] == "_local/doc5"
+
+    # end_key=doc2
+    resp = Couch.get("/#{db_name}/_local_docs?end_key=\"_local/doc2\"")
+    assert resp.status_code == 200
+    [row] = resp.body["rows"]
+    assert row["id"] == "_local/doc1"
+
+    # inclusive_end=false
+    qstr = "start_key=\"_local/doc2\"&end_key=\"_local/doc5\"&inclusive_end=false"
+    resp = Couch.get("/#{db_name}/_local_docs?" <> qstr)
+    assert resp.status_code == 200
+    assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 2}
+  end
+
 end

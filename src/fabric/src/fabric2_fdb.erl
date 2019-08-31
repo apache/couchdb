@@ -43,6 +43,7 @@
     get_doc_body_future/3,
     get_doc_body_wait/4,
     get_local_doc/2,
+    get_local_doc/3,
 
     write_doc/6,
     write_local_doc/2,
@@ -496,6 +497,11 @@ get_local_doc(#{} = Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
     Key = erlfdb_tuple:pack({?DB_LOCAL_DOCS, DocId}, DbPrefix),
     Val = erlfdb:wait(erlfdb:get(Tx, Key)),
     fdb_to_local_doc(Db, DocId, Val).
+
+
+get_local_doc(#{} = Db, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, Val)
+        when is_binary(Val) orelse Val =:= not_found ->
+    fdb_to_local_doc(ensure_current(Db), DocId, Val).
 
 
 write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
