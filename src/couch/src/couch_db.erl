@@ -594,9 +594,6 @@ get_db_info(Db) ->
     {ok, DocCount} = get_doc_count(Db),
     {ok, DelDocCount} = get_del_doc_count(Db),
     SizeInfo = couch_db_engine:get_size_info(Db),
-    FileSize = couch_util:get_value(file, SizeInfo, null),
-    ActiveSize = couch_util:get_value(active, SizeInfo, null),
-    ExternalSize = couch_util:get_value(external, SizeInfo, null),
     DiskVersion = couch_db_engine:get_disk_version(Db),
     Uuid = case get_uuid(Db) of
         undefined -> null;
