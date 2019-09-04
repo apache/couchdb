@@ -619,14 +619,6 @@ get_db_info(Db) ->
         {purge_seq, couch_db_engine:get_purge_seq(Db)},
         {compact_running, Compactor /= nil},
         {sizes, {SizeInfo}},
-        % TODO: Remove this in 3.0
-        % These are legacy and have been duplicated under
-        % the sizes key since 2.0. We should make a note
-        % in our release notes that we'll remove these
-        % old versions in 3.0
-        {disk_size, FileSize}, % legacy
-        {data_size, ActiveSize},
-        {other, {[{data_size, ExternalSize}]}},
         {instance_start_time, StartTime},
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
