@@ -131,6 +131,10 @@
 -include("fabric2.hrl").
 
 
+% Default max database name length is based on CouchDb < 4.x compatibility. See
+% default.ini entry for additional information.
+-define(DEFAULT_MAX_DATABASE_NAME_LENGTH, 238).
+
 -define(DBNAME_REGEX,
     "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*" % use the stock CouchDB regex
     "(\\.[0-9]{10,})?$" % but allow an optional shard timestamp at the end
@@ -866,6 +870,22 @@ validate_dbname(DbName) when is_binary(DbName) ->
         DbName, Normalized, fun validate_dbname_int/2).
 
 validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
+    case validate_dbname_length(DbName) of
+        ok -> validate_dbname_pat(DbName, Normalized);
+        {error, _} = Error -> Error
+    end.
+
+
+validate_dbname_length(DbName) ->
+    MaxLength = config:get_integer("couchdb", "max_database_name_length",
+        ?DEFAULT_MAX_DATABASE_NAME_LENGTH),
+    case byte_size(DbName) =< MaxLength of
+        true -> ok;
+        false -> {error, {database_name_too_long, DbName}}
+    end.
+
+
+validate_dbname_pat(DbName, Normalized) ->
     DbNoExt = couch_util:drop_dot_couch_ext(DbName),
     case re:run(DbNoExt, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
         match ->
