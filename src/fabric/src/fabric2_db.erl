@@ -738,15 +738,7 @@ fold_docs(Db, UserFun, UserAcc0, Options) ->
             } = TxDb,
 
             Prefix = erlfdb_tuple:pack({?DB_ALL_DOCS}, DbPrefix),
-            NS = couch_util:get_value(namespace, Options),
-            DocCount = get_doc_count(TxDb, NS),
-            Meta = case lists:keyfind(update_seq, 1, Options) of
-                {_, true} ->
-                    UpdateSeq = fabric2_db:get_update_seq(TxDb),
-                    [{update_seq, UpdateSeq}];
-                _ ->
-                    []
-            end ++ [{total, DocCount}, {offset, null}],
+            Meta = get_all_docs_meta(TxDb, Options),
 
             UserAcc1 = maybe_stop(UserFun({meta, Meta}, UserAcc0)),
 
@@ -780,8 +772,7 @@ fold_local_docs(Db, UserFun, UserAcc0, Options) ->
             } = TxDb,
 
             Prefix = erlfdb_tuple:pack({?DB_LOCAL_DOCS}, DbPrefix),
-            DocCount = get_doc_count(TxDb, <<"doc_local_count">>),
-            Meta = [{total, DocCount}, {offset, null}],
+            Meta = get_all_docs_meta(TxDb, Options),
 
             UserAcc1 = maybe_stop(UserFun({meta, Meta}, UserAcc0)),
 
@@ -957,6 +948,18 @@ new_revid(Db, Doc) ->
         revs = {OldStart + 1, [Rev | OldRevs]},
         atts = NewAtts
     }.
+
+
+get_all_docs_meta(TxDb, Options) ->
+    NS = couch_util:get_value(namespace, Options),
+    DocCount = get_doc_count(TxDb, NS),
+    case lists:keyfind(update_seq, 1, Options) of
+        {_, true} ->
+            UpdateSeq = fabric2_db:get_update_seq(TxDb),
+            [{update_seq, UpdateSeq}];
+        _ ->
+            []
+    end ++ [{total, DocCount}, {offset, null}].
 
 
 maybe_set_user_ctx(Db, Options) ->
