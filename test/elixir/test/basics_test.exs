@@ -425,6 +425,11 @@ defmodule BasicsTest do
     resp = Couch.get("/#{db_name}/_design_docs?" <> qstr)
     assert resp.status_code == 200
     assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 2}
+
+    # update_seq=true
+    resp = Couch.get("/#{db_name}/_design_docs?update_seq=true")
+    assert resp.status_code == 200
+    assert Map.has_key?(resp.body, "update_seq")
   end
 
   @tag :with_db
@@ -481,6 +486,11 @@ defmodule BasicsTest do
     resp = Couch.get("/#{db_name}/_local_docs?" <> qstr)
     assert resp.status_code == 200
     assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 2}
+
+    # update_seq=true
+    resp = Couch.get("/#{db_name}/_local_docs?update_seq=true")
+    assert resp.status_code == 200
+    assert Map.has_key?(resp.body, "update_seq")
   end
 
 end
