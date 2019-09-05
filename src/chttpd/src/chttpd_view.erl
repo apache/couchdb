@@ -91,19 +91,19 @@ handle_view_req(#httpd{method='POST',
     Keys = couch_mrview_util:get_view_keys(Props),
     Queries = couch_mrview_util:get_view_queries(Props),
     case {Queries, Keys} of
-        {Queries, undefined} when is_list(Queries) ->
-            [couch_stats:increment_counter([couchdb, httpd, view_reads]) || _I <- Queries],
-            multi_query_view(Req, Db, DDoc, ViewName, Queries);
         {undefined, Keys} when is_list(Keys) ->
             couch_stats:increment_counter([couchdb, httpd, view_reads]),
             design_doc_view(Req, Db, DDoc, ViewName, Keys);
         {undefined, undefined} ->
             throw({
                 bad_request,
-                "POST body must contain `keys` or `queries` field"
+                "POST body must contain `keys` field"
             });
         {_, _} ->
-            throw({bad_request, "`keys` and `queries` are mutually exclusive"})
+            throw({
+                bad_request,
+                "The `queries` parameter is no longer supported at this endpoint"
+            })
     end;
 
 handle_view_req(Req, _Db, _DDoc) ->
