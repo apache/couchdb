@@ -102,7 +102,7 @@ couchTests.view_compaction = function(debug) {
 
   resp = db.designInfo("_design/foo");
   TEquals(30001, resp.view_index.update_seq);
-  T(resp.view_index.disk_size < disk_size_before_compact);
+  T(resp.view_index.sizes.file < disk_size_before_compact);
   TEquals("number", typeof resp.view_index.sizes.active, "data size is a number");
   T(resp.view_index.sizes.active < resp.view_index.sizes.file, "data size < file size");
 
