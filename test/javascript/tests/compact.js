@@ -30,7 +30,7 @@ couchTests.compact = function(debug) {
 
   T(db.save(binAttDoc).ok);
 
-  var originalsize = db.info().sizes.disk;
+  var originalsize = db.info().sizes.file;
   var originaldatasize = db.info().sizes.active;
   var start_time = db.info().instance_start_time;
 
@@ -41,7 +41,7 @@ couchTests.compact = function(debug) {
       db.deleteDoc(docs[i]);
   }
   T(db.ensureFullCommit().ok);
-  var deletesize = db.info().sizes.disk;
+  var deletesize = db.info().sizes.file;
   var deletedatasize = db.info().sizes.active;
   T(deletesize > originalsize);
   T(db.setDbProperty("_revs_limit", 666).ok);
@@ -61,7 +61,7 @@ couchTests.compact = function(debug) {
   T(db.info().doc_count == 1);
   // XXX BUGGED! T(db.info().sizes.active < deletedatasize);
   TEquals("number", typeof db.info().sizes.active, "data size is a number");
-  T(db.info().sizes.active < db.info().sizes.disk, "data size is < then db file size");
+  T(db.info().sizes.active < db.info().sizes.file, "data size is < then db file size");
 
   // cleanup
   db.deleteDb();
