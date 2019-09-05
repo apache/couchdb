@@ -46,6 +46,13 @@ defmodule BasicsTest do
     {:ok, _} = delete_db(db_name)
   end
 
+  test "Exceeding configured DB name size limit returns an error" do
+    db_name = String.duplicate("x", 239)
+    resp = Couch.put("/#{db_name}")
+    assert resp.status_code == 400
+    assert resp.body["error"] == "database_name_too_long"
+  end
+
   @tag :with_db
   test "Created database has appropriate db info name", context do
     db_name = context[:db_name]
