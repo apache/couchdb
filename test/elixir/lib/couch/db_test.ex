@@ -290,7 +290,7 @@ defmodule Couch.DBTest do
     end
   end
 
-  def retry_until(condition, sleep \\ 100, timeout \\ 5000) do
+  def retry_until(condition, sleep \\ 100, timeout \\ 30_000) do
     retry_until(condition, now(:ms), sleep, timeout)
   end
 
