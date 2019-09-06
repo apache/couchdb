@@ -63,6 +63,7 @@ flush(ServerRef) ->
 
 init(Name) ->
     schedule_unpause(),
+    erlang:send_after(60 * 1000, self(), check_window),
     {ok, #state{name=Name}}.
 
 handle_call({last_updated, Object}, _From, State0) ->
@@ -150,6 +151,32 @@ handle_info({Ref, {ok, Pid}}, State0) when is_reference(Ref) ->
         false ->
             {noreply, State}
     end;
+
+handle_info(check_window, State0) ->
+    {ok, State} = code_change(nil, State0, nil),
+    #state{paused = Paused, name = Name} = State,
+    StrictWindow = smoosh_utils:get(Name, "strict_window", "false"),
+    FinalState = case {not Paused, smoosh_utils:in_allowed_window(Name)} of
+        {false, false} ->
+            % already in desired state
+            State;
+        {true, true} ->
+            % already in desired state
+            State;
+        {false, true} ->
+            % resume is always safe even if we did not previously suspend
+            {reply, ok, NewState} = handle_call(resume, nil, State),
+            NewState;
+        {true, false} ->
+            if StrictWindow =:= "true" ->
+                {reply, ok, NewState} = handle_call(suspend, nil, State),
+                NewState;
+            true ->
+                State#state{paused=true}
+            end
+    end,
+    erlang:send_after(60 * 1000, self(), check_window),
+    {noreply, FinalState};
 
 handle_info(pause, State0) ->
     {ok, State} = code_change(nil, State0, nil),

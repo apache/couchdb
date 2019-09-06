@@ -14,6 +14,9 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([get/2, get/3, group_pid/1, split/1, stringify/1, ignore_db/1]).
+-export([
+    in_allowed_window/1
+]).
 
 group_pid({Shard, GroupId}) ->
     case couch_view_group:open_db_group(Shard, GroupId) of
@@ -56,3 +59,34 @@ ignore_db(DbName) when is_list(DbName) ->
     end;
 ignore_db(Db) ->
     ignore_db(couch_db:name(Db)).
+
+in_allowed_window(Channel) ->
+    From = parse_time(get(Channel, "from"), {00, 00}),
+    To = parse_time(get(Channel, "to"), {24, 00}),
+    in_allowed_window(From, To).
+
+in_allowed_window(From, To) ->
+    {HH, MM, _} = erlang:time(),
+    case From < To of
+    true ->
+        ({HH, MM} >= From) andalso ({HH, MM} < To);
+    false ->
+        ({HH, MM} >= From) orelse ({HH, MM} < To)
+    end.
+
+
+parse_time(undefined, Default) ->
+    Default;
+parse_time(String, Default) ->
+    case string:tokens(String, ":") of
+        [HH, MM] ->
+            try
+                {list_to_integer(HH), list_to_integer(MM)}
+            catch error:badarg ->
+                couch_log:error("Malformed compaction schedule configuration: ~s", [String]),
+                Default
+            end;
+        _Else ->
+            couch_log:error("Malformed compaction schedule configuration: ~s", [String]),
+            Default
+    end.
