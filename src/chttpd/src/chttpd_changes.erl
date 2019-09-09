@@ -106,11 +106,9 @@ handle_changes(Args1, Req, Db, Type) ->
         {SNFun, undefined}
     end,
     Start = fun() ->
-        StartSeq = case Dir of
-        rev ->
-            fabric2_fdb:get_update_seq(Db);
-        fwd ->
-            Since
+        StartSeq = case Dir =:= rev orelse Since =:= now of
+            true -> fabric2_db:get_update_seq(Db);
+            false -> Since
         end,
         View2 = if UseViewChanges ->
             {ok, {_, View1, _}, _, _} = couch_mrview_util:get_view(
