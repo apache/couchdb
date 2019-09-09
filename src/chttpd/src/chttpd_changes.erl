@@ -69,11 +69,9 @@ handle_db_changes(Args0, Req, Db0) ->
             )
     end,
     Start = fun() ->
-        StartSeq = case Dir of
-        rev ->
-            fabric2_fdb:get_update_seq(Db);
-        fwd ->
-            Since
+        StartSeq = case Dir =:= rev orelse Since =:= now of
+            true -> fabric2_db:get_update_seq(Db0);
+            false -> Since
         end,
         {Db0, StartSeq}
     end,
