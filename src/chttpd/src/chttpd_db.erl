@@ -223,7 +223,7 @@ changes_callback(waiting_for_updates, Acc) ->
         mochi = Resp1,
         chunks_sent = ChunksSent + 1
     }};
-changes_callback(timeout, Acc) ->
+changes_callback({timeout, _ResponseType}, Acc) ->
     #cacc{mochi = Resp, chunks_sent = ChunksSent} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\n"),
     {ok, Acc#cacc{mochi = Resp1, chunks_sent = ChunksSent + 1}};
