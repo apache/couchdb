@@ -1945,6 +1945,9 @@ parse_changes_query(Req) ->
     end.
 
 
+parse_since_seq(<<"now">>) ->
+    now;
+
 parse_since_seq(Seq) when is_binary(Seq), size(Seq) > 30 ->
     throw({bad_request, url_encoded_since_seq});
 
