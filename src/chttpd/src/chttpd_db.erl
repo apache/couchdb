@@ -210,7 +210,7 @@ changes_callback(waiting_for_updates, Acc) ->
     #cacc{buffer = Buf, mochi = Resp} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
     {ok, Acc#cacc{buffer = [], bufsize = 0, mochi = Resp1}};
-changes_callback(timeout, Acc) ->
+changes_callback({timeout, _ResponseType}, Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Acc#cacc.mochi, "\n"),
     {ok, Acc#cacc{mochi = Resp1}};
 changes_callback({error, Reason}, #cacc{mochi = #httpd{}} = Acc) ->

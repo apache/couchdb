@@ -483,10 +483,10 @@ get_changes_timeout(Args, Callback) ->
         end;
     true ->
         {DefaultTimeout,
-            fun(UserAcc) -> {ok, Callback({timeout, ResponseType}, UserAcc)} end};
+            fun(UserAcc) -> Callback({timeout, ResponseType}, UserAcc) end};
     _ ->
         {lists:min([DefaultTimeout, Heartbeat]),
-            fun(UserAcc) -> {ok, Callback({timeout, ResponseType}, UserAcc)} end}
+            fun(UserAcc) -> Callback({timeout, ResponseType}, UserAcc) end}
     end.
 
 start_sending_changes(Callback, UserAcc) ->
@@ -961,9 +961,9 @@ maybe_heartbeat(Timeout, TimeoutFun, Acc) ->
         Now = os:timestamp(),
         case timer:now_diff(Now, Before) div 1000 >= Timeout of
         true ->
-            Acc2 = TimeoutFun(Acc),
+            {StopOrGo, Acc2} = TimeoutFun(Acc),
             put(last_changes_heartbeat, Now),
-            Acc2;
+            {StopOrGo, Acc2};
         false ->
             {ok, Acc}
         end
