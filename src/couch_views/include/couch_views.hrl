@@ -24,6 +24,7 @@
 % Data keys
 -define(VIEW_ID_RANGE, 0).
 -define(VIEW_MAP_RANGE, 1).
+-define(VIEW_REDUCE_RANGE, 2).
 
 % jobs api
 -define(INDEX_JOB_TYPE, <<"views">>).

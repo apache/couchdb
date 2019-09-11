@@ -197,7 +197,8 @@ do_update(Db, Mrst0, State0) ->
         couch_rate:in(Limiter, Count),
 
         {Mrst1, MappedDocs} = map_docs(Mrst0, DocAcc1),
-        WrittenDocs = write_docs(TxDb, Mrst1, MappedDocs, State2),
+        MappedReducedDocs = run_reduce(Mrst1, MappedDocs),
+        WrittenDocs = write_docs(TxDb, Mrst1, MappedReducedDocs, State2),
 
         couch_rate:success(Limiter, WrittenDocs),
 
@@ -345,6 +346,10 @@ map_docs(Mrst, Docs) ->
     {Mrst1, MappedDocs}.
 
 
+run_reduce(Mrst, MappedResults) ->
+    couch_views_reduce:run_reduce(Mrst, MappedResults).
+
+
 write_docs(TxDb, Mrst, Docs, State) ->
     #mrst{
         views = Views,
@@ -355,13 +360,12 @@ write_docs(TxDb, Mrst, Docs, State) ->
         last_seq := LastSeq
     } = State,
 
-    ViewIds = [View#mrview.id_num || View <- Views],
     KeyLimit = key_size_limit(),
     ValLimit = value_size_limit(),
 
     DocsNumber = lists:foldl(fun(Doc0, N) ->
         Doc1 = calculate_kv_sizes(Mrst, Doc0, KeyLimit, ValLimit),
-        couch_views_fdb:write_doc(TxDb, Sig, ViewIds, Doc1),
+        couch_views_fdb:write_doc(TxDb, Sig, Views, Doc1),
         N + 1
     end, 0, Docs),
 

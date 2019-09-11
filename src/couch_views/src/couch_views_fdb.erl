@@ -180,11 +180,12 @@ write_doc(TxDb, Sig, _ViewIds, #{deleted := true} = Doc) ->
     clear_id_idx(TxDb, Sig, DocId),
     lists:foreach(fun({ViewId, TotalKeys, TotalSize, UniqueKeys}) ->
         clear_map_idx(TxDb, Sig, ViewId, DocId, UniqueKeys),
+        %clear_reduce_idx
         update_row_count(TxDb, Sig, ViewId, -TotalKeys),
         update_kv_size(TxDb, Sig, ViewId, -TotalSize)
     end, ExistingViewKeys);
 
-write_doc(TxDb, Sig, ViewIds, Doc) ->
+write_doc(TxDb, Sig, Views, Doc) ->
     #{
         id := DocId,
         results := Results,
@@ -195,7 +196,7 @@ write_doc(TxDb, Sig, ViewIds, Doc) ->
 
     clear_id_idx(TxDb, Sig, DocId),
 
-    lists:foreach(fun({ViewId, NewRows, KVSize}) ->
+    lists:foreach(fun({#mrview{id_num = ViewId}, NewRows, KVSize}) ->
         update_id_idx(TxDb, Sig, ViewId, DocId, NewRows, KVSize),
 
         ExistingKeys = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
@@ -211,7 +212,9 @@ write_doc(TxDb, Sig, ViewIds, Doc) ->
                 []
         end,
         update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows)
-    end, lists:zip3(ViewIds, Results, KVSizes)).
+    end, lists:zip3(Views, Results, KVSizes)),
+
+    couch_views_reduce_fdb:write_doc_reduce(TxDb, Sig, Views, Doc, ExistingViewKeys).
 
 
 list_signatures(Db) ->
