@@ -89,7 +89,9 @@
     conflicts,
     callback,
     sorted = true,
-    extra = []
+    extra = [],
+
+    use_skiplist = true
 }).
 
 -record(vacc, {

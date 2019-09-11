@@ -586,6 +586,8 @@ parse_param(Key, Val, Args, IsDecoded) ->
             Partition = couch_util:to_binary(Val),
             couch_partition:validate_partition(Partition),
             couch_mrview_util:set_extra(Args, partition, Partition);
+        "use_skiplist" ->
+            Args#mrargs{use_skiplist=parse_boolean(Val)};
         _ ->
             BKey = couch_util:to_binary(Key),
             BVal = couch_util:to_binary(Val),

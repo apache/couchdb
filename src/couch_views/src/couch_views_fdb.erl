@@ -42,6 +42,15 @@
 % View Build Sequence Access
 % (<db>, ?DB_VIEWS, Sig, ?VIEW_UPDATE_SEQ) = Sequence
 
+% Id Range
+% {<db>, ?DB_VIEWS, Sig, ?VIEW_ID_RANGE, DocId, ViewId}
+%   = [TotalKeys, TotalSize, UniqueKeys]
+
+% Map Range
+%{<db>, ?DB_VIEWS, Sig, ?VIEW_MAP_RANGE, ViewId, {{Key, DocId}, DupeId, Type}}
+%   = Value | UnEncodedKey
+% Type = ?VIEW_KEY | ?VIEW_ROW
+
 
 get_update_seq(TxDb, #mrst{sig = Sig}) ->
     #{
@@ -134,21 +143,27 @@ write_doc(TxDb, Sig, _ViewIds, #{deleted := true} = Doc) ->
     clear_id_idx(TxDb, Sig, DocId),
     lists:foreach(fun({ViewId, TotalKeys, TotalSize, UniqueKeys}) ->
         clear_map_idx(TxDb, Sig, ViewId, DocId, UniqueKeys),
+        %clear_reduce_idx
         update_row_count(TxDb, Sig, ViewId, -TotalKeys),
         update_kv_size(TxDb, Sig, ViewId, -TotalSize)
     end, ExistingViewKeys);
 
-write_doc(TxDb, Sig, ViewIds, Doc) ->
+write_doc(TxDb, Sig, Views, Doc) ->
     #{
         id := DocId,
-        results := Results
+        results := Results,
+        reduce_results := ReduceResults
     } = Doc,
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
 
     clear_id_idx(TxDb, Sig, DocId),
 
-    lists:foreach(fun({ViewId, NewRows}) ->
+    lists:foreach(fun({View, NewRows, ViewReduceResult}) ->
+        #mrview{
+            reduce_funs = ViewReduceFuns,
+            id_num = ViewId
+        } = View,
         update_id_idx(TxDb, Sig, ViewId, DocId, NewRows),
 
         ExistingKeys = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
@@ -165,8 +180,20 @@ write_doc(TxDb, Sig, ViewIds, Doc) ->
                 update_kv_size(TxDb, Sig, ViewId, SizeChange),
                 []
         end,
-        update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows)
-    end, lists:zip(ViewIds, Results)).
+        update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows),
+        update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId,
+            ExistingKeys, ViewReduceResult)
+    end, lists:zip3(Views, Results, ReduceResults)).
+
+
+update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ExistingKeys,
+    ViewReduceResult) ->
+    lists:foreach(fun({ViewReduceFun, ReduceResult}) ->
+        {_, ReduceFun} = ViewReduceFun,
+        ReduceId = couch_views_util:reduce_id(ViewId, ReduceFun),
+        couch_views_skiplist:update_idx(TxDb, Sig, ReduceId,
+            ReduceFun, DocId, ExistingKeys, ReduceResult)
+    end, lists:zip(ViewReduceFuns, ViewReduceResult)).
 
 
 % For each row in a map view there are two rows stored in

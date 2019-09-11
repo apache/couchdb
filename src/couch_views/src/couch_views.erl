@@ -38,16 +38,13 @@ query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
     Args1 = to_mrargs(Args0),
     Args2 = couch_mrview_util:set_view_type(Args1, ViewName, Views),
     Args3 = couch_mrview_util:validate_args(Args2),
+
     ok = check_range(Args3),
-    case is_reduce_view(Args3) of
-        true -> throw({not_implemented});
-        false -> ok
-    end,
 
     try
         fabric2_fdb:transactional(Db, fun(TxDb) ->
             ok = maybe_update_view(TxDb, Mrst, Args3),
-            read_view(TxDb, Mrst, ViewName, Callback, Acc0, Args3)
+            read_view(Db, Mrst, ViewName, Callback, Acc0, Args3)
         end)
     catch throw:{build_view, WaitSeq} ->
         couch_views_jobs:build_view(Db, Mrst, WaitSeq),
@@ -58,7 +55,14 @@ query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
 read_view(Db, Mrst, ViewName, Callback, Acc0, Args) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
         try
-            couch_views_reader:read(TxDb, Mrst, ViewName, Callback, Acc0, Args)
+            case is_reduce_view(Args) of
+                true ->
+                    couch_views_reader:read_reduce(Db, Mrst, ViewName,
+                        Callback, Acc0, Args);
+                false ->
+                    couch_views_reader:read(Db, Mrst, ViewName,
+                        Callback, Acc0, Args)
+            end
         after
             UpdateAfter = Args#mrargs.update == lazy,
             if UpdateAfter == false -> ok; true ->

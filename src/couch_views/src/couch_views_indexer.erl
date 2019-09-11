@@ -178,7 +178,8 @@ update(#{} = Db, Mrst0, State0) ->
 
         DocAcc1 = fetch_docs(TxDb, DocAcc),
         {Mrst1, MappedDocs} = map_docs(Mrst0, DocAcc1),
-        write_docs(TxDb, Mrst1, MappedDocs, State2),
+        MappedReducedDocs = run_reduce(Mrst1, MappedDocs),
+        write_docs(TxDb, Mrst1, MappedReducedDocs, State2),
 
         case Count < Limit of
             true ->
@@ -286,6 +287,10 @@ map_docs(Mrst, Docs) ->
     {Mrst1, MappedDocs}.
 
 
+run_reduce(Mrst, MappedResults) ->
+    couch_views_reduce:run_reduce(Mrst, MappedResults).
+
+
 write_docs(TxDb, Mrst, Docs, State) ->
     #mrst{
         views = Views,
@@ -293,13 +298,18 @@ write_docs(TxDb, Mrst, Docs, State) ->
     } = Mrst,
 
     #{
-        last_seq := LastSeq
+        last_seq := LastSeq,
+        view_seq := ViewSeq
     } = State,
 
-    ViewIds = [View#mrview.id_num || View <- Views],
+
+    %%  First build of the view
+    if ViewSeq /= <<>> -> ok; true ->
+        couch_views_skiplist:create_indexes(TxDb, Sig, Views)
+    end,
 
     lists:foreach(fun(Doc) ->
-        couch_views_fdb:write_doc(TxDb, Sig, ViewIds, Doc)
+        couch_views_fdb:write_doc(TxDb, Sig, Views, Doc)
     end, Docs),
 
     couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq).

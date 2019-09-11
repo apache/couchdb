@@ -15,7 +15,11 @@
 
 -export([
     ddoc_to_mrst/2,
-    validate_args/1
+    validate_args/1,
+    reduce_id/2,
+    hash_key/1,
+    group_level_equal/3,
+    group_level_key/2
 ]).
 
 
@@ -207,6 +211,15 @@ validate_args(#mrargs{} = Args) ->
     Args#mrargs{group_level=GroupLevel}.
 
 
+reduce_id(ViewId, ReduceFun) ->
+    <<ViewId, ReduceFun/binary>>.
+
+
+hash_key(Key) ->
+    % TODO: look at alternatives like murmur3 here
+    erlang:phash2(Key).
+
+
 determine_group_level(#mrargs{group=undefined, group_level=undefined}) ->
     0;
 
@@ -221,6 +234,31 @@ determine_group_level(#mrargs{group=true, group_level=undefined}) ->
 
 determine_group_level(#mrargs{group_level=GroupLevel}) ->
     GroupLevel.
+
+
+group_level_equal(_One, _Two, 0) ->
+    true;
+
+group_level_equal(_One, _Two, group_true) ->
+    false;
+
+group_level_equal(One, Two, GroupLevel) ->
+    GroupOne = group_level_key(One, GroupLevel),
+    GroupTwo = group_level_key(Two, GroupLevel),
+    GroupOne == GroupTwo.
+
+
+group_level_key(_Key, 0) ->
+    null;
+
+group_level_key(Key, group_true) ->
+    Key;
+
+group_level_key(Key, GroupLevel) when is_list(Key) ->
+    lists:sublist(Key, GroupLevel);
+
+group_level_key(Key, _GroupLevel) ->
+    Key.
 
 
 mrverror(Mesg) ->

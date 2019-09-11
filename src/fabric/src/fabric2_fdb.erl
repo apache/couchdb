@@ -1283,6 +1283,7 @@ get_fold_opts(RangePrefix, Options) ->
         _ -> false
     end,
 
+    AddTuple = fabric2_util:get_value(add_tuple, Options, true),
     StartKey0 = fabric2_util:get_value(start_key, Options),
     EndKeyGt = fabric2_util:get_value(end_key_gt, Options),
     EndKey0 = fabric2_util:get_value(end_key, Options, EndKeyGt),
@@ -1301,14 +1302,17 @@ get_fold_opts(RangePrefix, Options) ->
         undefined ->
             <<RangePrefix/binary, 16#00>>;
         SK2 ->
-            erlfdb_tuple:pack({SK2}, RangePrefix)
+            SK3 = if AddTuple == false -> SK2; true -> {SK2} end,
+            Out = erlfdb_tuple:pack(SK3, RangePrefix),
+            Out
     end,
 
     EndKey2 = case EndKey1 of
         undefined ->
             <<RangePrefix/binary, 16#FF>>;
         EK2 ->
-            erlfdb_tuple:pack({EK2}, RangePrefix)
+            EK3 = if AddTuple == false -> EK2; true -> {EK2} end,
+            erlfdb_tuple:pack(EK3, RangePrefix)
     end,
 
     % FoundationDB ranges are applied as SK <= key < EK
