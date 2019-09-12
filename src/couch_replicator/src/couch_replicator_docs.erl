@@ -683,8 +683,12 @@ strip_credentials(Url) when is_binary(Url) ->
         "http(s)?://(?:[^:]+):[^@]+@(.*)$",
         "http\\1://\\2",
         [{return, binary}]);
-strip_credentials({Props}) ->
-    {lists:keydelete(<<"headers">>, 1, Props)}.
+strip_credentials({Props0}) ->
+    Props1 = lists:keydelete(<<"headers">>, 1, Props0),
+    % Strip "auth" just like headers, for replication plugins it can be a place
+    % to stash credential that are not necessarily in headers
+    Props2 = lists:keydelete(<<"auth">>, 1, Props1),
+    {Props2}.
 
 
 error_reason({shutdown, Error}) ->
@@ -773,6 +777,10 @@ check_strip_credentials_test() ->
         {
             {[{<<"_id">>, <<"foo">>}]},
             {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"baz">>}]}
+        },
+        {
+            {[{<<"_id">>, <<"foo">>}]},
+            {[{<<"_id">>, <<"foo">>}, {<<"auth">>, <<"pluginsecret">>}]}
         }
     ]].
 
