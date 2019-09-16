@@ -28,6 +28,7 @@
 
     get_info/1,
     get_config/1,
+    get_config/2,
     set_config/3,
 
     get_stat/2,
@@ -338,7 +339,7 @@ get_config(#{} = Db) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db = ensure_current(Db),
+    } = ensure_current(Db),
 
     {Start, End} = erlfdb_tuple:range({?DB_CONFIG}, DbPrefix),
     Future = erlfdb:get_range(Tx, Start, End),
@@ -347,6 +348,19 @@ get_config(#{} = Db) ->
         {?DB_CONFIG, Key} = erlfdb_tuple:unpack(K, DbPrefix),
         {Key, V}
     end, erlfdb:wait(Future)).
+
+
+get_config(#{} = Db, ConfigKey) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = ensure_current(Db),
+
+    Key = erlfdb_tuple:pack({?DB_CONFIG, ConfigKey}, DbPrefix),
+    case erlfdb:wait(erlfdb:get(Tx, Key)) of
+        % config values are expected to be set so we blow if not_found
+        Val when Val =/= not_found -> Val
+    end.
 
 
 set_config(#{} = Db, ConfigKey, ConfigVal) ->

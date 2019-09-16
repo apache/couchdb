@@ -47,6 +47,7 @@ security_test_() ->
 setup() ->
     Ctx = test_util:start_couch([fabric]),
     DbName = ?tempdb(),
+    PubDbName = ?tempdb(),
     {ok, Db1} = fabric2_db:create(DbName, [{user_ctx, ?ADMIN_USER}]),
     SecProps = {[
         {<<"admins">>, {[
@@ -60,40 +61,42 @@ setup() ->
     ]},
     ok = fabric2_db:set_security(Db1, SecProps),
     {ok, Db2} = fabric2_db:open(DbName, []),
-    {Db2, Ctx}.
+    {ok, PubDb} = fabric2_db:create(PubDbName, []),
+    {Db2, PubDb, Ctx}.
 
 
-cleanup({Db, Ctx}) ->
+cleanup({Db, PubDb, Ctx}) ->
     ok = fabric2_db:delete(fabric2_db:name(Db), []),
+    ok = fabric2_db:delete(fabric2_db:name(PubDb), []),
     test_util:stop_couch(Ctx).
 
 
-is_admin_name({Db, _}) ->
+is_admin_name({Db, _, _}) ->
     UserCtx = #user_ctx{name = <<"admin_name1">>},
     ?assertEqual(true, fabric2_db:is_admin(Db#{user_ctx := UserCtx})).
 
 
-is_not_admin_name({Db, _}) ->
+is_not_admin_name({Db, _, _}) ->
     UserCtx = #user_ctx{name = <<"member1">>},
     ?assertEqual(false, fabric2_db:is_admin(Db#{user_ctx := UserCtx})).
 
 
-is_admin_role({Db, _}) ->
+is_admin_role({Db, _, _}) ->
     UserCtx = #user_ctx{roles = [<<"admin_role1">>]},
     ?assertEqual(true, fabric2_db:is_admin(Db#{user_ctx := UserCtx})).
 
 
-is_not_admin_role({Db, _}) ->
+is_not_admin_role({Db, _, _}) ->
     UserCtx = #user_ctx{roles = [<<"member_role1">>]},
     ?assertEqual(false, fabric2_db:is_admin(Db#{user_ctx := UserCtx})).
 
 
-check_is_admin({Db, _}) ->
+check_is_admin({Db, _, _}) ->
     UserCtx = #user_ctx{name = <<"admin_name1">>},
     ?assertEqual(ok, fabric2_db:check_is_admin(Db#{user_ctx := UserCtx})).
 
 
-check_is_not_admin({Db, _}) ->
+check_is_not_admin({Db, _, _}) ->
     UserCtx = #user_ctx{name = <<"member_name1">>},
     ?assertThrow(
         {unauthorized, <<"You are not a db or server admin.">>},
@@ -105,12 +108,12 @@ check_is_not_admin({Db, _}) ->
     ).
 
 
-check_is_member_name({Db, _}) ->
+check_is_member_name({Db, _, _}) ->
     UserCtx = #user_ctx{name = <<"member_name1">>},
     ?assertEqual(ok, fabric2_db:check_is_member(Db#{user_ctx := UserCtx})).
 
 
-check_is_not_member_name({Db, _}) ->
+check_is_not_member_name({Db, _, _}) ->
     UserCtx = #user_ctx{name = <<"foo">>},
     ?assertThrow(
         {unauthorized, <<"You are not authorized", _/binary>>},
@@ -122,12 +125,12 @@ check_is_not_member_name({Db, _}) ->
     ).
 
 
-check_is_member_role({Db, _}) ->
+check_is_member_role({Db, _, _}) ->
     UserCtx = #user_ctx{name = <<"foo">>, roles = [<<"member_role1">>]},
     ?assertEqual(ok, fabric2_db:check_is_member(Db#{user_ctx := UserCtx})).
 
 
-check_is_not_member_role({Db, _}) ->
+check_is_not_member_role({Db, _, _}) ->
     UserCtx = #user_ctx{name = <<"foo">>, roles = [<<"bar">>]},
     ?assertThrow(
         {forbidden, <<"You are not allowed to access", _/binary>>},
@@ -135,25 +138,24 @@ check_is_not_member_role({Db, _}) ->
     ).
 
 
-check_admin_is_member({Db, _}) ->
+check_admin_is_member({Db, _, _}) ->
     UserCtx = #user_ctx{name = <<"admin_name1">>},
     ?assertEqual(ok, fabric2_db:check_is_member(Db#{user_ctx := UserCtx})).
 
 
-check_is_member_of_public_db({Db, _}) ->
-    PublicDb = Db#{security_doc := {[]}},
+check_is_member_of_public_db({_, PubDb, _}) ->
     UserCtx = #user_ctx{name = <<"foo">>, roles = [<<"bar">>]},
     ?assertEqual(
         ok,
-        fabric2_db:check_is_member(PublicDb#{user_ctx := #user_ctx{}})
+        fabric2_db:check_is_member(PubDb#{user_ctx := #user_ctx{}})
     ),
     ?assertEqual(
         ok,
-        fabric2_db:check_is_member(PublicDb#{user_ctx := UserCtx})
+        fabric2_db:check_is_member(PubDb#{user_ctx := UserCtx})
     ).
 
 
-check_set_user_ctx({Db0, _}) ->
+check_set_user_ctx({Db0, _, _}) ->
     DbName = fabric2_db:name(Db0),
     UserCtx = #user_ctx{name = <<"foo">>, roles = [<<"bar">>]},
     {ok, Db1} = fabric2_db:open(DbName, [{user_ctx, UserCtx}]),
