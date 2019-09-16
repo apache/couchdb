@@ -763,11 +763,11 @@ db_req(#httpd{path_parts=[_,<<"_security">>]}=Req, _Db) ->
 db_req(#httpd{method='PUT',path_parts=[_,<<"_revs_limit">>],user_ctx=Ctx}=Req,
         Db) ->
     Limit = chttpd:json_body(Req),
-    ok = fabric:set_revs_limit(Db, Limit, [{user_ctx,Ctx}]),
+    ok = fabric2_db:set_revs_limit(Db, Limit),
     send_json(Req, {[{<<"ok">>, true}]});
 
 db_req(#httpd{method='GET',path_parts=[_,<<"_revs_limit">>]}=Req, Db) ->
-    send_json(Req, fabric:get_revs_limit(Db));
+    send_json(Req, fabric2_db:get_revs_limit(Db));
 
 db_req(#httpd{path_parts=[_,<<"_revs_limit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
