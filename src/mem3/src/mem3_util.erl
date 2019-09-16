@@ -221,10 +221,24 @@ get_engine_opt(DocProps) ->
 get_props_opt(DocProps) ->
     case couch_util:get_value(<<"props">>, DocProps) of
         {Props} when is_list(Props) ->
-            [{props, Props}];
+            [{props, db_props_from_json(Props)}];
         _ ->
             []
     end.
+
+db_props_from_json([]) ->
+    [];
+
+db_props_from_json([{<<"partitioned">>, Value} | Rest]) ->
+    [{partitioned, Value} | db_props_from_json(Rest)];
+
+db_props_from_json([{<<"hash">>, [MBin, FBin, A]} | Rest]) ->
+    M = binary_to_existing_atom(MBin, utf8),
+    F = binary_to_existing_atom(FBin, utf8),
+    [{hash, [M, F, A]} | db_props_from_json(Rest)];
+
+db_props_from_json([{K, V} | Rest]) ->
+    [{K, V} | db_props_from_json(Rest)].
 
 n_val(undefined, NodeCount) ->
     n_val(config:get("cluster", "n", "3"), NodeCount);

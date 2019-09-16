@@ -424,7 +424,7 @@ parse_rep_db(<<"https://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db({[{<<"url">>, Url}]}, Proxy, Options);
 
 parse_rep_db(<<_/binary>>, _Proxy, _Options) ->
-    throw({error, <<"Local endpoints not supported since CouchDB 3.x">>});
+    throw({error, local_endpoints_not_supported});
 
 parse_rep_db(undefined, _Proxy, _Options) ->
     throw({error, <<"Missing replicator database">>}).
@@ -683,8 +683,12 @@ strip_credentials(Url) when is_binary(Url) ->
         "http(s)?://(?:[^:]+):[^@]+@(.*)$",
         "http\\1://\\2",
         [{return, binary}]);
-strip_credentials({Props}) ->
-    {lists:keydelete(<<"headers">>, 1, Props)}.
+strip_credentials({Props0}) ->
+    Props1 = lists:keydelete(<<"headers">>, 1, Props0),
+    % Strip "auth" just like headers, for replication plugins it can be a place
+    % to stash credential that are not necessarily in headers
+    Props2 = lists:keydelete(<<"auth">>, 1, Props1),
+    {Props2}.
 
 
 error_reason({shutdown, Error}) ->
@@ -773,6 +777,10 @@ check_strip_credentials_test() ->
         {
             {[{<<"_id">>, <<"foo">>}]},
             {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"baz">>}]}
+        },
+        {
+            {[{<<"_id">>, <<"foo">>}]},
+            {[{<<"_id">>, <<"foo">>}, {<<"auth">>, <<"pluginsecret">>}]}
         }
     ]].
 
@@ -843,7 +851,7 @@ t_error_on_local_endpoint() ->
             {<<"source">>, <<"localdb">>},
             {<<"target">>, <<"http://somehost.local/tgt">>}
         ]},
-        Expect = <<"Local endpoints not supported since CouchDB 3.x">>,
+        Expect = local_endpoints_not_supported,
         ?assertThrow({bad_rep_doc, Expect}, parse_rep_doc_without_id(RepDoc))
     end).
 
