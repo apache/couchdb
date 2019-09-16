@@ -492,4 +492,21 @@ defmodule BasicsTest do
     assert Map.has_key?(resp.body, "update_seq")
   end
 
+  @tag :with_db
+  test "Check _revs_limit", context do
+    db_name = context[:db_name]
+
+    resp = Couch.get("/#{db_name}/_revs_limit")
+    assert resp.status_code == 200
+    assert resp.body == 1000
+
+    body = "999"
+    resp = Couch.put("/#{db_name}/_revs_limit", body: "999")
+    assert resp.status_code == 200
+    assert resp.body["ok"] == true
+
+    resp = Couch.get("/#{db_name}/_revs_limit")
+    assert resp.status_code == 200
+    assert resp.body == 999
+  end
 end
