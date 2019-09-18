@@ -2,6 +2,8 @@ defmodule AuthCacheTest do
   use CouchTestCase
 
   @moduletag :authentication
+
+  @tag :pending
   @tag :with_db
   test "auth cache management", context do
     db_name = context[:db_name]
