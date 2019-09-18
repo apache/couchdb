@@ -218,7 +218,7 @@ couchTests.attachments= function(debug) {
   // re-create them
   var saved3 = db.bulkSave(docs);
 
-  var before = db.info().disk_size;
+  var before = db.info().sizes.file;
 
   // Compact it.
   /*T(db.compact().ok);
@@ -226,7 +226,7 @@ couchTests.attachments= function(debug) {
   // compaction isn't instantaneous, loop until done
   while (db.info().compact_running) {};
 
-  var after = db.info().disk_size;
+  var after = db.info().sizes.file;
 
   // Compaction should reduce the database slightly, but not
   // orders of magnitude (unless attachments introduce sparseness)
