@@ -111,10 +111,6 @@ merge_results(Info) ->
             [{signature, X} | Acc];
         (language, [X | _], Acc) ->
             [{language, X} | Acc];
-        (disk_size, X, Acc) -> % legacy
-            [{disk_size, lists:sum(X)} | Acc];
-        (data_size, X, Acc) -> % legacy
-            [{data_size, lists:sum(X)} | Acc];
         (sizes, X, Acc) ->
             [{sizes, {merge_object(X)}} | Acc];
         (compact_running, X, Acc) ->
