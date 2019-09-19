@@ -17,7 +17,7 @@
 
 void http_check_enabled();
 bool http_ctor(JSContext* cx, JSObject* req);
-void http_dtor(JSContext* cx, JSObject* req);
+void http_dtor(JSFreeOp* fop, JSObject* req);
 bool http_open(JSContext* cx, JSObject* req, JS::Value mth, JS::Value url, JS::Value snc);
 bool http_set_hdr(JSContext* cx, JSObject* req, JS::Value name, JS::Value val);
 bool http_send(JSContext* cx, JSObject* req, JS::Value body);

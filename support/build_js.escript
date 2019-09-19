@@ -28,6 +28,9 @@ main([]) ->
                "share/server/util.js",
                "share/server/validate.js",
                "share/server/views.js",
+               "share/server/esprima.js",
+               "share/server/escodegen.js",
+               "share/server/rewrite_fun.js",
                "share/server/loop.js"],
 
     CoffeeFiles = ["share/server/json2.js",
@@ -40,6 +43,9 @@ main([]) ->
                    "share/server/validate.js",
                    "share/server/views.js",
                    "share/server/coffee-script.js",
+                   "share/server/esprima.js",
+                   "share/server/escodegen.js",
+                   "share/server/rewrite_fun.js",
                    "share/server/loop.js"],
 
     Pre = "(function () {\n",

@@ -1,7 +1,7 @@
 language: elixir
 elixir: 1.7.4
 os: linux
-dist: trusty
+dist: xenial
 
 otp_release:
    - 22.0.5
@@ -18,7 +18,6 @@ addons:
     - curl
     - libcurl4-openssl-dev
     - libicu-dev
-    - libmozjs185-dev
     - pkg-config
     - python3.6
     - python3.6-dev
@@ -50,6 +49,9 @@ env:
 
 # Then comment this section out
 before_script:
+  - echo "deb http://cz.archive.ubuntu.com/ubuntu cosmic main" | sudo tee -a /etc/apt/sources.list
+  - sudo apt-get -qq update
+  - sudo apt-get -y install libmozjs-60-dev
   - kerl list installations
   - rm -rf /tmp/couchjslogs
   - mkdir -p /tmp/couchjslogs

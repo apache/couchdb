@@ -15,14 +15,55 @@
 
 #include <jsapi.h>
 #include <js/Initialization.h>
+#include <js/Conversions.h>
 
 #include "help.h"
 #include "util.h"
 #include "utf8.h"
 
+std::string
+js_to_string(JSContext* cx, JS::HandleValue val)
+{
+    JS::RootedString sval(cx);
+    sval = val.toString();
+
+    JS::UniqueChars chars(JS_EncodeStringToUTF8(cx, sval));
+    if(!chars) {
+        JS_ClearPendingException(cx);
+        fprintf(stderr, "Error converting value to string.\n");
+        exit(3);
+    }
+
+    return chars.get();
+}
+
+std::string
+js_to_string(JSContext* cx, JSString *str)
+{
+    JS::UniqueChars chars(JS_EncodeString(cx, str));
+    if(!chars) {
+        JS_ClearPendingException(cx);
+        fprintf(stderr, "Error converting  to string.\n");
+        exit(3);
+    }
+
+    return chars.get();
+}
+
+JSString*
+string_to_js(JSContext* cx, const std::string& s)
+{
+    JSString* ret = JS_NewStringCopyN(cx, s.c_str(), s.size());
+    if(ret != nullptr) {
+        return ret;
+    }
+
+    fprintf(stderr, "Unable to allocate string object.\n");
+    exit(3);
+}
 
 size_t
-slurp_file(const char* file, char** outbuf_p)
+couch_readfile(const char* file, char** outbuf_p)
 {
     FILE* fp;
     char fbuf[16384];
@@ -64,7 +105,7 @@ slurp_file(const char* file, char** outbuf_p)
         buf[buflen] = '\0';
     }
     *outbuf_p = buf;
-    return buflen + 1;
+    return buflen ;
 }
 
 couch_args*
@@ -149,9 +190,10 @@ couch_readline(JSContext* cx, FILE* fp)
     char* tmp = NULL;
     size_t used = 0;
     size_t byteslen = 256;
+    size_t oldbyteslen = 256;
     size_t readlen = 0;
 
-    bytes = JS_malloc(cx, byteslen);
+    bytes = (char *)JS_malloc(cx, byteslen);
     if(bytes == NULL) return NULL;
     
     while((readlen = couch_fgets(bytes+used, byteslen-used, fp)) > 0) {
@@ -163,8 +205,9 @@ couch_readline(JSContext* cx, FILE* fp)
         }
         
         // Double our buffer and read more.
+        oldbyteslen = byteslen;
         byteslen *= 2;
-        tmp = JS_realloc(cx, bytes, byteslen);
+        tmp = (char *)JS_realloc(cx, bytes, oldbyteslen, byteslen);
         if(!tmp) {
             JS_free(cx, bytes);
             return NULL;
@@ -176,11 +219,11 @@ couch_readline(JSContext* cx, FILE* fp)
     // Treat empty strings specially
     if(used == 0) {
         JS_free(cx, bytes);
-        return JSVAL_TO_STRING(JS_GetEmptyStringValue(cx));
+        return JS_NewStringCopyZ(cx, nullptr);
     }
 
     // Shring the buffer to the actual data size
-    tmp = JS_realloc(cx, bytes, used);
+    tmp = (char *)JS_realloc(cx, bytes, byteslen, used);
     if(!tmp) {
         JS_free(cx, bytes);
         return NULL;
@@ -188,41 +231,24 @@ couch_readline(JSContext* cx, FILE* fp)
     bytes = tmp;
     byteslen = used;
 
-    str = dec_string(cx, bytes, byteslen);
+    str = string_to_js(cx, std::string(tmp));
     JS_free(cx, bytes);
     return str;
 }
 
 
-JSString*
-couch_readfile(JSContext* cx, const char* filename)
-{
-    JSString *string;
-    size_t byteslen;
-    char *bytes;
-
-    if((byteslen = slurp_file(filename, &bytes))) {
-        string = dec_string(cx, bytes, byteslen);
-
-        free(bytes);
-        return string;
-    }
-    return NULL;    
-}
-
-
 void
-couch_print(JSContext* cx, unsigned int argc, jsval* argv)
+couch_print(JSContext* cx, unsigned int argc, JS::CallArgs argv)
 {
-    char *bytes = NULL;
+    uint8_t* bytes = nullptr;
     FILE *stream = stdout;
 
     if (argc) {
-        if (argc > 1 && argv[1] == JSVAL_TRUE) {
+        if (argc > 1 && argv[1].isTrue()) {
           stream = stderr;
         }
-        bytes = enc_string(cx, argv[0], NULL);
-        if(!bytes) return;
+        JSString* str = JS::ToString(cx, argv.get(0));
+        bytes = reinterpret_cast<uint8_t*>(JS_EncodeString(cx, str));
         fprintf(stream, "%s", bytes);
         JS_free(cx, bytes);
     }
@@ -233,16 +259,15 @@ couch_print(JSContext* cx, unsigned int argc, jsval* argv)
 
 
 void
-couch_error(JSContext* cx, const char* mesg, JSErrorReport* report)
+couch_error(JSContext* cx, JSErrorReport* report)
 {
-    jsval v, replace;
+    JS::RootedValue v(cx), stack(cx), replace(cx);
     char* bytes;
-    JSObject* regexp, *stack;
-    jsval re_args[2];
+    JSObject* regexp;
 
     if(!report || !JSREPORT_IS_WARNING(report->flags))
     {
-        fprintf(stderr, "%s\n", mesg);
+        fprintf(stderr, "%s\n", report->message().c_str());
 
         // Print a stack trace, if available.
         if (JSREPORT_IS_EXCEPTION(report->flags) &&
@@ -253,31 +278,30 @@ couch_error(JSContext* cx, const char* mesg, JSErrorReport* report)
             JS_ClearPendingException(cx);
 
             // Use JS regexp to indent the stack trace.
-            // If the regexp can't be created, don't JS_ReportError since it is
+            // If the regexp can't be created, don't JS_ReportErrorUTF8 since it is
             // probably not productive to wind up here again.
-#ifdef SM185
-            if(JS_GetProperty(cx, JSVAL_TO_OBJECT(v), "stack", &v) &&
-               (regexp = JS_NewRegExpObjectNoStatics(
-                   cx, "^(?=.)", 6, JSREG_GLOB | JSREG_MULTILINE)))
-#else
-            if(JS_GetProperty(cx, JSVAL_TO_OBJECT(v), "stack", &v) &&
+            JS::RootedObject vobj(cx, v.toObjectOrNull());
+
+            if(JS_GetProperty(cx, vobj, "stack", &stack) &&
                (regexp = JS_NewRegExpObject(
                    cx, "^(?=.)", 6, JSREG_GLOB | JSREG_MULTILINE)))
-#endif
             {
                 // Set up the arguments to ``String.replace()``
-                re_args[0] = OBJECT_TO_JSVAL(regexp);
-                re_args[1] = STRING_TO_JSVAL(JS_InternString(cx, "\t"));
+                JS::AutoValueVector re_args(cx);
+                JS::RootedValue arg0(cx, JS::ObjectValue(*regexp));
+                auto arg1 = JS::StringValue(string_to_js(cx, "\t"));
 
-                // Perform the replacement
-                if(JS_ValueToObject(cx, v, &stack) &&
-                   JS_GetProperty(cx, stack, "replace", &replace) &&
-                   JS_CallFunctionValue(cx, stack, replace, 2, re_args, &v))
-                {
-                    // Print the result
-                    bytes = enc_string(cx, v, NULL);
-                    fprintf(stderr, "Stacktrace:\n%s", bytes);
-                    JS_free(cx, bytes);
+                if (re_args.append(arg0) && re_args.append(arg1)) {
+                    // Perform the replacement
+                    JS::RootedObject sobj(cx, stack.toObjectOrNull());
+                    if(JS_GetProperty(cx, sobj, "replace", &replace) &&
+                       JS_CallFunctionValue(cx, sobj, replace, re_args, &v))
+                    {
+                        // Print the result
+                        bytes = enc_string(cx, v, NULL);
+                        fprintf(stderr, "Stacktrace:\n%s", bytes);
+                        JS_free(cx, bytes);
+                    }
                 }
             }
         }
@@ -286,11 +310,11 @@ couch_error(JSContext* cx, const char* mesg, JSErrorReport* report)
 
 
 bool
-couch_load_funcs(JSContext* cx, JSObject* obj, JSFunctionSpec* funcs)
+couch_load_funcs(JSContext* cx, JS::HandleObject obj, JSFunctionSpec* funcs)
 {
     JSFunctionSpec* f;
     for(f = funcs; f->name != NULL; f++) {
-        if(!JS_DefineFunction(cx, obj, f->name, f->call, f->nargs, f->flags)) {
+        if(!JS_DefineFunction(cx, obj, f->name, f->call.op, f->nargs, f->flags)) {
             fprintf(stderr, "Failed to create function: %s\n", f->name);
             return false;
         }

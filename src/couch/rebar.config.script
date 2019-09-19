@@ -83,18 +83,18 @@ end,
     {with_curl, true} ->
         case os:type() of
             {win32, _} ->
-                {"/DHAVE_CURL /IC:\\relax\\curl\\include", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src /LIBPATH:C:\\Relax\\curl\\lib\\release-ssl mozjs185-1.0.lib libcurl_imp.lib"};
+                {"/DHAVE_CURL /IC:\\relax\\curl\\include", "/LIBPATH:C:\\relax\\js-60\\js\\src /LIBPATH:C:\\Relax\\curl\\lib\\release-ssl mozjs-60.lib libcurl_imp.lib"};
             {unix, freebsd} ->
-                {"-DHAVE_CURL -I/usr/local/include", "-DHAVE_CURL -lmozjs185 -lcurl"};
+                {"-DHAVE_CURL -I/usr/local/include", "-DHAVE_CURL `pkg-config --cflags mozjs-60` `pkg-config --libs mozjs-60` -lcurl -std=c++14"};
             _ ->
-                {"-DHAVE_CURL", "-DHAVE_CURL -lmozjs-52 -lcurl"}
+                {"-DHAVE_CURL", "-DHAVE_CURL -lmozjs-60 -lcurl -std=c++14"}
         end;
     _ ->
         case os:type() of
             {win32, _} ->
-                {"", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src mozjs185-1.0.lib"};
+                {"", "/LIBPATH:C:\\relax\\js-60\\js\\src mozjs-60.lib"};
             _ ->
-                {"", "-lmozjs-52"}
+                {"", "-lmozjs-60 -std=c++14"}
         end
 end,
 
@@ -116,10 +116,10 @@ CompareSrc = ["priv/couch_ejson_compare/*.c"],
 
 BaseSpecs = [
         %% couchjs
-        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CXXFLAGS", JS_CFLAGS ++ "-std=gnu++11 -DXP_UNIX -I/Users/jan/Work/mozjs-52.9.1pre1/js/src/obj/dist/include"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/Users/jan/Work/mozjs-52.9.1pre1/js/src/obj/dist/sdk/lib"}]}]},
-        {"linux",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
+        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CXXFLAGS", JS_CFLAGS ++ "-DXP_UNIX -std=c++14 -include /usr/local/include/mozjs-60/js/RequiredDefines.h -I/usr/local/include/mozjs-60"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib -lmozjs-60"}]}]},
+        {"linux", CouchJSPath, CouchJSSrc, [{env, [{"CXXFLAGS", JS_CFLAGS ++ "-DXP_UNIX -std=c++14 -include /usr/include/mozjs-60/js/RequiredDefines.h -I/usr/include/mozjs-60"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib -lmozjs-60"}]}]},
         {"bsd",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib -lm"}]}]},
-        {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " /DXP_WIN /IC:\\relax\\js-1.8.5\\js\\src"}, {"LDFLAGS", JS_LDFLAGS}]}]},
+        {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " /DXP_WIN /IC:\\relax\\js-60\\js\\src"}, {"LDFLAGS", JS_LDFLAGS}]}]},
         % ICU
         {"darwin", IcuPath, IcuSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  IcuPath, IcuSrc, [{env, IcuEnv}]},

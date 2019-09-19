@@ -25,13 +25,17 @@ typedef struct {
     JSString*    uri;
 } couch_args;
 
+std::string js_to_string(JSContext* cx, JS::HandleValue val);
+std::string js_to_string(JSContext* cx, JSString *str);
+JSString* string_to_js(JSContext* cx, const std::string& s);
+
 couch_args* couch_parse_args(int argc, const char* argv[]);
 int couch_fgets(char* buf, int size, FILE* fp);
 JSString* couch_readline(JSContext* cx, FILE* fp);
-JSString* couch_readfile(JSContext* cx, const char* filename);
-void couch_print(JSContext* cx, unsigned int argc, JS::Value* argv);
-void couch_error(JSContext* cx, const char* mesg, JSErrorReport* report);
-bool couch_load_funcs(JSContext* cx, JSObject* obj, JSFunctionSpec* funcs);
+size_t couch_readfile(const char* file, char** outbuf_p);
+void couch_print(JSContext* cx, unsigned int argc, JS::CallArgs argv);
+void couch_error(JSContext* cx, JSErrorReport* report);
+bool couch_load_funcs(JSContext* cx, JS::HandleObject obj, JSFunctionSpec* funcs);
 
 
 #endif // Included util.h

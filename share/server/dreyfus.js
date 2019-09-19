@@ -45,10 +45,10 @@ var Dreyfus = (function() {
     indexDoc: function(doc) {
       Couch.recursivelySeal(doc);
       var buf = [];
-      for each (fun in State.funs) {
+      for (fun in State.funs) {
         index_results = [];
         try {
-          fun(doc);
+          State.funs[fun](doc);
           buf.push(index_results);
         } catch (err) {
           handleIndexError(err, doc);
