@@ -38,7 +38,10 @@ security_test_() ->
                 fun check_is_not_member_role/1,
                 fun check_admin_is_member/1,
                 fun check_is_member_of_public_db/1,
-                fun check_set_user_ctx/1
+                fun check_set_user_ctx/1,
+                fun check_open_forbidden/1,
+                fun check_fail_open_no_opts/1,
+                fun check_fail_open_name_null/1
             ]}
         }
     }.
@@ -48,7 +51,7 @@ setup() ->
     Ctx = test_util:start_couch([fabric]),
     DbName = ?tempdb(),
     PubDbName = ?tempdb(),
-    {ok, Db1} = fabric2_db:create(DbName, [{user_ctx, ?ADMIN_USER}]),
+    {ok, Db1} = fabric2_db:create(DbName, [?ADMIN_CTX]),
     SecProps = {[
         {<<"admins">>, {[
             {<<"names">>, [<<"admin_name1">>, <<"admin_name2">>]},
@@ -60,7 +63,7 @@ setup() ->
         ]}}
     ]},
     ok = fabric2_db:set_security(Db1, SecProps),
-    {ok, Db2} = fabric2_db:open(DbName, []),
+    {ok, Db2} = fabric2_db:open(DbName, [?ADMIN_CTX]),
     {ok, PubDb} = fabric2_db:create(PubDbName, []),
     {Db2, PubDb, Ctx}.
 
@@ -157,8 +160,23 @@ check_is_member_of_public_db({_, PubDb, _}) ->
 
 check_set_user_ctx({Db0, _, _}) ->
     DbName = fabric2_db:name(Db0),
-    UserCtx = #user_ctx{name = <<"foo">>, roles = [<<"bar">>]},
+    UserCtx = #user_ctx{name = <<"foo">>, roles = [<<"admin_role1">>]},
     {ok, Db1} = fabric2_db:open(DbName, [{user_ctx, UserCtx}]),
     ?assertEqual(UserCtx, fabric2_db:get_user_ctx(Db1)).
 
 
+check_open_forbidden({Db0, _, _}) ->
+    DbName = fabric2_db:name(Db0),
+    UserCtx = #user_ctx{name = <<"foo">>, roles = [<<"bar">>]},
+    ?assertThrow({forbidden, _}, fabric2_db:open(DbName, [{user_ctx, UserCtx}])).
+
+
+check_fail_open_no_opts({Db0, _, _}) ->
+    DbName = fabric2_db:name(Db0),
+    ?assertThrow({unauthorized, _}, fabric2_db:open(DbName, [])).
+
+
+check_fail_open_name_null({Db0, _, _}) ->
+    DbName = fabric2_db:name(Db0),
+    UserCtx = #user_ctx{name = null},
+    ?assertThrow({unauthorized, _}, fabric2_db:open(DbName, [{user_ctx, UserCtx}])).
