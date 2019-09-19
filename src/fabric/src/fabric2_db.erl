@@ -175,14 +175,17 @@ create(DbName, Options) ->
 open(DbName, Options) ->
     case fabric2_server:fetch(DbName) of
         #{} = Db ->
-            {ok, maybe_set_user_ctx(Db, Options)};
+            Db1 = maybe_set_user_ctx(Db, Options),
+            ok = check_is_member(Db1),
+            {ok, Db1};
         undefined ->
             Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
                 fabric2_fdb:open(TxDb, Options)
             end),
             % Cache outside the transaction retry loop
             case Result of
-                #{} = Db0 ->
+                #{security_doc := SecDoc} = Db0 ->
+                    ok = check_is_member(Db0, SecDoc),
                     Db1 = maybe_add_sys_db_callbacks(Db0),
                     ok = fabric2_server:store(Db1),
                     {ok, Db1#{tx := undefined}};
@@ -193,8 +196,10 @@ open(DbName, Options) ->
 
 
 delete(DbName, Options) ->
-    % This will throw if the db does not exist
-    {ok, Db} = open(DbName, Options),
+    % Delete doesn't check user_ctx, that's done at the HTTP API level
+    % here we just care to get the `database_does_not_exist` error thrown
+    Options1 = lists:keystore(user_ctx, 1, Options, ?ADMIN_CTX),
+    {ok, Db} = open(DbName, Options1),
     Resp = fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:delete(TxDb)
     end),
@@ -236,11 +241,14 @@ list_dbs(UserFun, UserAcc0, Options) ->
 
 
 is_admin(Db) ->
+    is_admin(Db, get_security(Db)).
+
+
+is_admin(Db, {SecProps}) when is_list(SecProps) ->
     case fabric2_db_plugin:check_is_admin(Db) of
         true ->
             true;
         false ->
-            {SecProps} = get_security(Db),
             UserCtx = get_user_ctx(Db),
             {Admins} = get_admins(SecProps),
             is_authorized(Admins, UserCtx)
@@ -259,7 +267,11 @@ check_is_admin(Db) ->
 
 
 check_is_member(Db) ->
-    case is_member(Db) of
+    check_is_member(Db, get_security(Db)).
+
+
+check_is_member(Db, SecDoc) ->
+    case is_member(Db, SecDoc) of
         true ->
             ok;
         false ->
@@ -977,9 +989,8 @@ maybe_set_user_ctx(Db, Options) ->
     end.
 
 
-is_member(Db) ->
-    {SecProps} = get_security(Db),
-    case is_admin(Db) of
+is_member(Db, {SecProps}) when is_list(SecProps) ->
+    case is_admin(Db, {SecProps}) of
         true ->
             true;
         false ->
