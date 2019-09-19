@@ -53,12 +53,12 @@ cleanup_local_purge_doc(DbName, ActiveSigs) ->
     end, [], LocalShards),
 
     DeadDirs = DirList -- ActiveDirs,
-    lists:foldl(fun(IdxDir) ->
+    lists:foreach(fun(IdxDir) ->
         Sig = dreyfus_util:get_signature_from_idxdir(IdxDir),
         case Sig of undefined -> ok; _ ->
             DocId = dreyfus_util:get_local_purge_doc_id(Sig),
             LocalShards = mem3:local_shards(DbName),
-            lists:foldl(fun(LS, _AccOuter) ->
+            lists:foreach(fun(LS) ->
                 ShardDbName = LS#shard.name,
                 {ok, ShardDb} = couch_db:open_int(ShardDbName, []),
                 case couch_db:open_doc(ShardDb, DocId, []) of
@@ -69,6 +69,6 @@ cleanup_local_purge_doc(DbName, ActiveSigs) ->
                         ok
                 end,
                 couch_db:close(ShardDb)
-            end, [], LocalShards)
+            end, LocalShards)
         end
-    end, [], DeadDirs).
+    end, DeadDirs).

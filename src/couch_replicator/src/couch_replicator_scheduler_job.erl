@@ -40,8 +40,6 @@
 ]).
 
 -import(couch_replicator_utils, [
-    start_db_compaction_notifier/2,
-    stop_db_compaction_notifier/1,
     pp_rep_id/1
 ]).
 
@@ -75,8 +73,6 @@
     workers,
     stats = couch_replicator_stats:new(),
     session_id,
-    source_db_compaction_notifier = nil,
-    target_db_compaction_notifier = nil,
     source_monitor = nil,
     target_monitor = nil,
     source_seq = nil,
@@ -226,21 +222,6 @@ handle_call({report_seq_done, Seq, StatsInc}, From,
     update_task(NewState),
     {noreply, NewState}.
 
-handle_cast({db_compacted, DbName}, State) ->
-    #rep_state{
-        source = Source,
-        target = Target
-    } = State,
-    SourceName = couch_replicator_utils:local_db_name(Source),
-    TargetName = couch_replicator_utils:local_db_name(Target),
-    case DbName of
-        SourceName ->
-            {ok, NewSource} = couch_db:reopen(Source),
-            {noreply, State#rep_state{source = NewSource}};
-        TargetName ->
-            {ok, NewTarget} = couch_db:reopen(Target),
-            {noreply, State#rep_state{target = NewTarget}}
-    end;
 
 handle_cast(checkpoint, State) ->
     case do_checkpoint(State) of
@@ -412,8 +393,6 @@ terminate(Reason, State) ->
 
 terminate_cleanup(State) ->
     update_task(State),
-    stop_db_compaction_notifier(State#rep_state.source_db_compaction_notifier),
-    stop_db_compaction_notifier(State#rep_state.target_db_compaction_notifier),
     couch_replicator_api_wrap:db_close(State#rep_state.source),
     couch_replicator_api_wrap:db_close(State#rep_state.target).
 
@@ -572,16 +551,16 @@ init_state(Rep) ->
     #rep{
         id = {BaseId, _Ext},
         source = Src0, target = Tgt,
-        options = Options, user_ctx = UserCtx,
+        options = Options,
         type = Type, view = View,
         start_time = StartTime,
         stats = Stats
     } = Rep,
     % Adjust minimum number of http source connections to 2 to avoid deadlock
     Src = adjust_maxconn(Src0, BaseId),
-    {ok, Source} = couch_replicator_api_wrap:db_open(Src, [{user_ctx, UserCtx}]),
+    {ok, Source} = couch_replicator_api_wrap:db_open(Src),
     {CreateTargetParams} = get_value(create_target_params, Options, {[]}),
-    {ok, Target} = couch_replicator_api_wrap:db_open(Tgt, [{user_ctx, UserCtx}],
+    {ok, Target} = couch_replicator_api_wrap:db_open(Tgt,
         get_value(create_target, Options, false), CreateTargetParams),
 
     {ok, SourceInfo} = couch_replicator_api_wrap:get_db_info(Source),
@@ -613,10 +592,6 @@ init_state(Rep) ->
         src_starttime = get_value(<<"instance_start_time">>, SourceInfo),
         tgt_starttime = get_value(<<"instance_start_time">>, TargetInfo),
         session_id = couch_uuids:random(),
-        source_db_compaction_notifier =
-            start_db_compaction_notifier(Source, self()),
-        target_db_compaction_notifier =
-            start_db_compaction_notifier(Target, self()),
         source_monitor = db_monitor(Source),
         target_monitor = db_monitor(Target),
         source_seq = SourceSeq,

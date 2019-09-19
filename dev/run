@@ -110,6 +110,11 @@ def setup_logging(ctx):
 
 
 def setup_argparse():
+    parser = get_args_parser()
+    return parser.parse_args()
+
+
+def get_args_parser():
     parser = optparse.OptionParser(description="Runs CouchDB 2.0 dev cluster")
     parser.add_option(
         "-a",
@@ -200,7 +205,13 @@ def setup_argparse():
         action="store_true",
         help="Select available ports for nodes automatically",
     )
-    return parser.parse_args()
+    parser.add_option(
+        "--extra_args",
+        dest="extra_args",
+        default=None,
+        help="Extra arguments to pass to beam process",
+    )
+    return parser
 
 
 def setup_context(opts, args):
@@ -223,6 +234,7 @@ def setup_context(opts, args):
         "haproxy_port": opts.haproxy_port,
         "config_overrides": opts.config_overrides,
         "no_eval": opts.no_eval,
+        "extra_args": opts.extra_args,
         "reset_logs": True,
         "procs": [],
         "auto_ports": opts.auto_ports,
@@ -578,6 +590,8 @@ def boot_node(ctx, node):
         mode = "r+b"
     logfname = os.path.join(ctx["devdir"], "logs", "%s.log" % node)
     log = open(logfname, mode)
+    if "extra_args" in ctx and ctx["extra_args"]:
+        cmd += ctx["extra_args"].split(" ")
     cmd = [toposixpath(x) for x in cmd]
     return sp.Popen(cmd, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env)
 
@@ -690,27 +704,37 @@ def generate_cookie():
 
 
 def cluster_setup_with_admin_party(ctx):
+    connect_nodes(ctx)
+    host, port = "127.0.0.1", cluster_port(ctx, 1)
+    create_system_databases(host, port)
+
+
+def connect_nodes(ctx):
     host, port = "127.0.0.1", backend_port(ctx, 1)
     for node in ctx["nodes"]:
-        body = "{}"
-        conn = httpclient.HTTPConnection(host, port)
-        conn.request("PUT", "/_nodes/%s@127.0.0.1" % node, body)
-        resp = conn.getresponse()
-        if resp.status not in (200, 201, 202, 409):
-            print(("Failed to join %s into cluster: %s" % (node, resp.read())))
-            sys.exit(1)
-    create_system_databases(host, cluster_port(ctx, 1))
+        path = "/_nodes/%s@127.0.0.1" % node
+        try_request(
+            host,
+            port,
+            "PUT",
+            path,
+            (200, 201, 202, 409),
+            body="{}",
+            error="Failed to join %s into cluster:\n" % node,
+        )
 
 
-def try_request(host, port, meth, path, success_codes, retries=10, retry_dt=1):
+def try_request(
+    host, port, meth, path, success_codes, body=None, retries=10, retry_dt=1, error=""
+):
     while True:
         conn = httpclient.HTTPConnection(host, port)
-        conn.request(meth, path)
+        conn.request(meth, path, body=body)
         resp = conn.getresponse()
         if resp.status in success_codes:
             return resp.status, resp.read()
         elif retries <= 0:
-            assert resp.status in success_codes, resp.read()
+            assert resp.status in success_codes, "%s%s" % (error, resp.read())
         retries -= 1
         time.sleep(retry_dt)
 
@@ -721,7 +745,14 @@ def create_system_databases(host, port):
         conn.request("HEAD", "/" + dbname)
         resp = conn.getresponse()
         if resp.status == 404:
-            try_request(host, port, "PUT", "/" + dbname, (201, 202, 412))
+            try_request(
+                host,
+                port,
+                "PUT",
+                "/" + dbname,
+                (201, 202, 412),
+                error="Failed to create '%s' database:\n" % dbname,
+            )
 
 
 @log(

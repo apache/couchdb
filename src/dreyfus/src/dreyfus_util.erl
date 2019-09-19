@@ -332,7 +332,10 @@ get_local_purge_doc_id(Sig) ->
 get_signature_from_idxdir(IdxDir) ->
     IdxDirList = filename:split(IdxDir),
     Sig = lists:last(IdxDirList),
-    case [Ch || Ch <- Sig, not (((Ch >= $0) and (Ch =< $9))
+    Sig2 = if not is_binary(Sig) -> Sig; true ->
+        binary_to_list(Sig)
+    end,
+    case [Ch || Ch <- Sig2, not (((Ch >= $0) and (Ch =< $9))
         orelse ((Ch >= $a) and (Ch =< $f))
         orelse ((Ch >= $A) and (Ch =< $F)))] == [] of
         true -> Sig;

@@ -39,19 +39,19 @@ replication_id(#rep{options = Options} = Rep) ->
 % If a change is made to how replications are identified,
 % please add a new clause and increase ?REP_ID_VERSION.
 
-replication_id(#rep{user_ctx = UserCtx} = Rep, 4) ->
+replication_id(#rep{} = Rep, 4) ->
     UUID = couch_server:get_uuid(),
-    SrcInfo = get_v4_endpoint(UserCtx, Rep#rep.source),
-    TgtInfo = get_v4_endpoint(UserCtx, Rep#rep.target),
+    SrcInfo = get_v4_endpoint(Rep#rep.source),
+    TgtInfo = get_v4_endpoint(Rep#rep.target),
     maybe_append_filters([UUID, SrcInfo, TgtInfo], Rep);
 
-replication_id(#rep{user_ctx = UserCtx} = Rep, 3) ->
+replication_id(#rep{} = Rep, 3) ->
     UUID = couch_server:get_uuid(),
-    Src = get_rep_endpoint(UserCtx, Rep#rep.source),
-    Tgt = get_rep_endpoint(UserCtx, Rep#rep.target),
+    Src = get_rep_endpoint(Rep#rep.source),
+    Tgt = get_rep_endpoint(Rep#rep.target),
     maybe_append_filters([UUID, Src, Tgt], Rep);
 
-replication_id(#rep{user_ctx = UserCtx} = Rep, 2) ->
+replication_id(#rep{} = Rep, 2) ->
     {ok, HostName} = inet:gethostname(),
     Port = case (catch mochiweb_socket_server:get(couch_httpd, port)) of
     P when is_number(P) ->
@@ -64,14 +64,14 @@ replication_id(#rep{user_ctx = UserCtx} = Rep, 2) ->
         % ... mochiweb_socket_server:get(https, port)
         list_to_integer(config:get("httpd", "port", "5984"))
     end,
-    Src = get_rep_endpoint(UserCtx, Rep#rep.source),
-    Tgt = get_rep_endpoint(UserCtx, Rep#rep.target),
+    Src = get_rep_endpoint(Rep#rep.source),
+    Tgt = get_rep_endpoint(Rep#rep.target),
     maybe_append_filters([HostName, Port, Src, Tgt], Rep);
 
-replication_id(#rep{user_ctx = UserCtx} = Rep, 1) ->
+replication_id(#rep{} = Rep, 1) ->
     {ok, HostName} = inet:gethostname(),
-    Src = get_rep_endpoint(UserCtx, Rep#rep.source),
-    Tgt = get_rep_endpoint(UserCtx, Rep#rep.target),
+    Src = get_rep_endpoint(Rep#rep.source),
+    Tgt = get_rep_endpoint(Rep#rep.target),
     maybe_append_filters([HostName, Src, Tgt], Rep).
 
 
@@ -91,7 +91,7 @@ convert({BaseId, Ext} = Id) when is_list(BaseId), is_list(Ext) ->
 % Private functions
 
 maybe_append_filters(Base,
-        #rep{source = Source, user_ctx = UserCtx, options = Options}) ->
+        #rep{source = Source, options = Options}) ->
     Base2 = Base ++
         case couch_replicator_filters:parse(Options) of
         {ok, nil} ->
@@ -99,7 +99,7 @@ maybe_append_filters(Base,
         {ok, {view, Filter, QueryParams}} ->
             [Filter, QueryParams];
         {ok, {user, {Doc, Filter}, QueryParams}} ->
-            case couch_replicator_filters:fetch(Doc, Filter, Source, UserCtx) of
+            case couch_replicator_filters:fetch(Doc, Filter, Source) of
                 {ok, Code} ->
                     [Code, QueryParams];
                 {error, Error} ->
@@ -127,23 +127,19 @@ maybe_append_options(Options, RepOptions) ->
     end, [], Options).
 
 
-get_rep_endpoint(_UserCtx, #httpdb{url=Url, headers=Headers}) ->
+get_rep_endpoint(#httpdb{url=Url, headers=Headers}) ->
     DefaultHeaders = (#httpdb{})#httpdb.headers,
-    {remote, Url, Headers -- DefaultHeaders};
-get_rep_endpoint(UserCtx, <<DbName/binary>>) ->
-    {local, DbName, UserCtx}.
+    {remote, Url, Headers -- DefaultHeaders}.
 
 
-get_v4_endpoint(UserCtx, #httpdb{} = HttpDb) ->
-    {remote, Url, Headers} = get_rep_endpoint(UserCtx, HttpDb),
+get_v4_endpoint(#httpdb{} = HttpDb) ->
+    {remote, Url, Headers} = get_rep_endpoint(HttpDb),
     {{UserFromHeaders, _}, HeadersWithoutBasicAuth} =
         couch_replicator_utils:remove_basic_auth_from_headers(Headers),
     {UserFromUrl, Host, NonDefaultPort, Path} = get_v4_url_info(Url),
     User = pick_defined_value([UserFromUrl, UserFromHeaders]),
     OAuth = undefined, % Keep this to ensure checkpoints don't change
-    {remote, User, Host, NonDefaultPort, Path, HeadersWithoutBasicAuth, OAuth};
-get_v4_endpoint(UserCtx, <<DbName/binary>>) ->
-    {local, DbName, UserCtx}.
+    {remote, User, Host, NonDefaultPort, Path, HeadersWithoutBasicAuth, OAuth}.
 
 
 pick_defined_value(Values) ->
@@ -201,7 +197,7 @@ replication_id_convert_test_() ->
 
 http_v4_endpoint_test_() ->
     [?_assertMatch({remote, User, Host, Port, Path, HeadersNoAuth, undefined},
-        get_v4_endpoint(nil, #httpdb{url = Url, headers = Headers})) ||
+        get_v4_endpoint(#httpdb{url = Url, headers = Headers})) ||
             {{User, Host, Port, Path, HeadersNoAuth}, {Url, Headers}} <- [
                 {
                     {undefined, "host", default, "/", []},

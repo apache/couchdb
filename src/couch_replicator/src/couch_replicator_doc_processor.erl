@@ -886,8 +886,8 @@ change() ->
         {<<"id">>, ?DOC1},
         {doc, {[
             {<<"_id">>, ?DOC1},
-            {<<"source">>, <<"src">>},
-            {<<"target">>, <<"tgt">>}
+            {<<"source">>, <<"http://srchost.local/src">>},
+            {<<"target">>, <<"http://tgthost.local/tgt">>}
         ]}}
     ]}.
 
@@ -897,8 +897,8 @@ change(State) ->
         {<<"id">>, ?DOC1},
         {doc, {[
             {<<"_id">>, ?DOC1},
-            {<<"source">>, <<"src">>},
-            {<<"target">>, <<"tgt">>},
+            {<<"source">>, <<"http://srchost.local/src">>},
+            {<<"target">>, <<"http://tgthost.local/tgt">>},
             {<<"_replication_state">>, State}
         ]}}
     ]}.
@@ -910,8 +910,8 @@ deleted_change() ->
         {<<"deleted">>, true},
         {doc, {[
             {<<"_id">>, ?DOC1},
-            {<<"source">>, <<"src">>},
-            {<<"target">>, <<"tgt">>}
+            {<<"source">>, <<"http://srchost.local/src">>},
+            {<<"target">>, <<"http://tgthost.local/tgt">>}
         ]}}
     ]}.
 

@@ -50,6 +50,14 @@ defmodule Couch do
   CouchDB library to power test suite.
   """
 
+  # These constants are supplied to the underlying HTTP client and control
+  # how long we will wait before timing out a test. The inactivity timeout
+  # specifically fires during an active HTTP response and defaults to 10_000
+  # if not specified. We're defining it to a different value than the
+  # request_timeout largely just so we know which timeout fired.
+  @request_timeout 60_000
+  @inactivity_timeout 55_000
+
   def process_url("http://" <> _ = url) do
     url
   end
@@ -59,7 +67,7 @@ defmodule Couch do
     base_url <> url
   end
 
-  def process_request_headers(headers, options) do
+  def process_request_headers(headers, _body, options) do
     headers = Keyword.put(headers, :"User-Agent", "couch-potion")
 
     headers =
@@ -79,19 +87,10 @@ defmodule Couch do
   end
 
   def process_options(options) do
-    if Keyword.get(options, :cookie) == nil do
-      headers = Keyword.get(options, :headers, [])
-
-      if headers[:basic_auth] != nil or headers[:authorization] != nil do
-        options
-      else
-        username = System.get_env("EX_USERNAME") || "adm"
-        password = System.get_env("EX_PASSWORD") || "pass"
-        Keyword.put(options, :basic_auth, {username, password})
-      end
-    else
-      options
-    end
+    options
+      |> set_auth_options()
+      |> set_inactivity_timeout()
+      |> set_request_timeout()
   end
 
   def process_request_body(body) do
@@ -112,6 +111,33 @@ defmodule Couch do
     end
   end
 
+  def set_auth_options(options) do
+    if Keyword.get(options, :cookie) == nil do
+      headers = Keyword.get(options, :headers, [])
+
+      if headers[:basic_auth] != nil or headers[:authorization] != nil do
+        options
+      else
+        username = System.get_env("EX_USERNAME") || "adm"
+        password = System.get_env("EX_PASSWORD") || "pass"
+        Keyword.put(options, :basic_auth, {username, password})
+      end
+    else
+      options
+    end
+  end
+
+  def set_inactivity_timeout(options) do
+    Keyword.update(options, :ibrowse, [{:inactivity_timeout, @inactivity_timeout}], fn(ibrowse) ->
+      Keyword.put_new(ibrowse, :inactivity_timeout, @inactivity_timeout)
+    end)
+  end
+
+  def set_request_timeout(options) do
+    timeout = Application.get_env(:httpotion, :default_timeout, @request_timeout)
+    Keyword.put_new(options, :timeout, timeout)
+  end
+
   def login(userinfo) do
     [user, pass] = String.split(userinfo, ":", parts: 2)
     login(user, pass)
@@ -125,105 +151,4 @@ defmodule Couch do
     %Couch.Session{cookie: token}
   end
 
-  # HACK: this is here until this commit lands in a release
-  # https://github.com/myfreeweb/httpotion/commit/f3fa2f0bc3b9b400573942b3ba4628b48bc3c614
-  def handle_response(response) do
-    case response do
-      {:ok, status_code, headers, body, _} ->
-        processed_headers = process_response_headers(headers)
-
-        %HTTPotion.Response{
-          status_code: process_status_code(status_code),
-          headers: processed_headers,
-          body: process_response_body(processed_headers, body)
-        }
-
-      {:ok, status_code, headers, body} ->
-        processed_headers = process_response_headers(headers)
-
-        %HTTPotion.Response{
-          status_code: process_status_code(status_code),
-          headers: processed_headers,
-          body: process_response_body(processed_headers, body)
-        }
-
-      {:ibrowse_req_id, id} ->
-        %HTTPotion.AsyncResponse{id: id}
-
-      {:error, {:conn_failed, {:error, reason}}} ->
-        %HTTPotion.ErrorResponse{message: error_to_string(reason)}
-
-      {:error, :conn_failed} ->
-        %HTTPotion.ErrorResponse{message: "conn_failed"}
-
-      {:error, reason} ->
-        %HTTPotion.ErrorResponse{message: error_to_string(reason)}
-    end
-  end
-
-  # Anther HACK: Until we can get process_request_headers/2 merged
-  # upstream.
-  @spec process_arguments(atom, String.t(), [{atom(), any()}]) :: %{}
-  defp process_arguments(method, url, options) do
-    options = process_options(options)
-
-    body = Keyword.get(options, :body, "")
-
-    headers =
-      Keyword.merge(
-        Application.get_env(:httpotion, :default_headers, []),
-        Keyword.get(options, :headers, [])
-      )
-
-    timeout =
-      Keyword.get(
-        options,
-        :timeout,
-        Application.get_env(:httpotion, :default_timeout, 5000)
-      )
-
-    ib_options =
-      Keyword.merge(
-        Application.get_env(:httpotion, :default_ibrowse, []),
-        Keyword.get(options, :ibrowse, [])
-      )
-
-    follow_redirects =
-      Keyword.get(
-        options,
-        :follow_redirects,
-        Application.get_env(:httpotion, :default_follow_redirects, false)
-      )
-
-    ib_options =
-      if stream_to = Keyword.get(options, :stream_to),
-        do:
-          Keyword.put(
-            ib_options,
-            :stream_to,
-            spawn(__MODULE__, :transformer, [stream_to, method, url, options])
-          ),
-        else: ib_options
-
-    ib_options =
-      if user_password = Keyword.get(options, :basic_auth) do
-        {user, password} = user_password
-        Keyword.put(ib_options, :basic_auth, {to_charlist(user), to_charlist(password)})
-      else
-        ib_options
-      end
-
-    %{
-      method: method,
-      url: url |> to_string |> process_url(options) |> to_charlist,
-      body: body |> process_request_body,
-      headers:
-        headers
-        |> process_request_headers(options)
-        |> Enum.map(fn {k, v} -> {to_charlist(k), to_charlist(v)} end),
-      timeout: timeout,
-      ib_options: ib_options,
-      follow_redirects: follow_redirects
-    }
-  end
 end

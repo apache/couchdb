@@ -215,12 +215,26 @@ truncate(Fd, Pos) ->
 sync(Filepath) when is_list(Filepath) ->
     case file:open(Filepath, [append, raw]) of
         {ok, Fd} ->
-            try ok = file:sync(Fd) after ok = file:close(Fd) end;
+            try
+                case file:sync(Fd) of
+                    ok ->
+                        ok;
+                    {error, Reason} ->
+                        erlang:error({fsync_error, Reason})
+                end
+            after
+                ok = file:close(Fd)
+            end;
         {error, Error} ->
             erlang:error(Error)
     end;
 sync(Fd) ->
-    gen_server:call(Fd, sync, infinity).
+    case gen_server:call(Fd, sync, infinity) of
+        ok ->
+            ok;
+        {error, Reason} ->
+            erlang:error({fsync_error, Reason})
+    end.
 
 %%----------------------------------------------------------------------
 %% Purpose: Close the file.
@@ -462,7 +476,16 @@ handle_call({set_db_pid, Pid}, _From, #file{db_monitor=OldRef}=File) ->
     {reply, ok, File#file{db_monitor=Ref}};
 
 handle_call(sync, _From, #file{fd=Fd}=File) ->
-    {reply, file:sync(Fd), File};
+    case file:sync(Fd) of
+        ok ->
+            {reply, ok, File};
+        {error, _} = Error ->
+            % We're intentionally dropping all knowledge
+            % of this Fd so that we don't accidentally
+            % recover in some whacky edge case that I
+            % can't fathom.
+            {stop, Error, Error, #file{fd = nil}}
+    end;
 
 handle_call({truncate, Pos}, _From, #file{fd=Fd}=File) ->
     {ok, Pos} = file:position(Fd, Pos),
