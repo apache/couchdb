@@ -442,7 +442,7 @@ is_users_db(DbName) when is_binary(DbName) ->
 
 set_revs_limit(#{} = Db, RevsLimit) ->
     check_is_admin(Db),
-    RevsLimBin = ?uint2bin(RevsLimit),
+    RevsLimBin = ?uint2bin(max(1, RevsLimit)),
     Resp = fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:set_config(TxDb, <<"revs_limit">>, RevsLimBin)
     end),
@@ -1325,10 +1325,12 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
     % new revinfo map
     Doc2 = prep_and_validate(Db, Doc1, Target),
 
+    Doc3 = new_revid(Db, Doc2),
+
     #doc{
         deleted = NewDeleted,
         revs = {NewRevPos, [NewRev | NewRevPath]}
-    } = Doc3 = new_revid(Db, Doc2),
+    } = Doc4 = stem_revisions(Db, Doc3),
 
     NewRevInfo = #{
         winner => undefined,
@@ -1341,9 +1343,9 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
 
     % Gather the list of possible winnig revisions
     Possible = case Target == Winner of
-        true when not Doc3#doc.deleted ->
+        true when not Doc4#doc.deleted ->
             [NewRevInfo];
-        true when Doc3#doc.deleted ->
+        true when Doc4#doc.deleted ->
             case SecondPlace of
                 #{} -> [NewRevInfo, SecondPlace];
                 not_found -> [NewRevInfo]
@@ -1368,7 +1370,7 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
 
     ok = fabric2_fdb:write_doc(
             Db,
-            Doc3,
+            Doc4,
             NewWinner,
             Winner,
             ToUpdate,
@@ -1403,6 +1405,7 @@ update_doc_replicated(Db, Doc0, _Options) ->
     end, [], AllRevInfos),
 
     DocRevPath = fabric2_util:revinfo_to_path(DocRevInfo0),
+
     {NewTree, Status} = couch_key_tree:merge(RevTree, DocRevPath),
     if Status /= internal_node -> ok; true ->
         % We already know this revision so nothing
@@ -1416,10 +1419,9 @@ update_doc_replicated(Db, Doc0, _Options) ->
     % tree and use the combined path after stemming.
     {[{_, {RevPos, UnstemmedRevs}}], []}
             = couch_key_tree:get(NewTree, [{RevPos, Rev}]),
-    RevsLimit = fabric2_db:get_revs_limit(Db),
-    Doc1 = Doc0#doc{
-        revs = {RevPos, lists:sublist(UnstemmedRevs, RevsLimit)}
-    },
+
+    Doc1 = stem_revisions(Db, Doc0#doc{revs = {RevPos, UnstemmedRevs}}),
+
     {RevPos, [Rev | NewRevPath]} = Doc1#doc.revs,
     DocRevInfo1 = DocRevInfo0#{rev_path := NewRevPath},
 
@@ -1735,4 +1737,13 @@ set_design_doc_end_key(Options, rev) ->
         EKeyGT ->
             Key2 = max(EKeyGT, ?FIRST_DDOC_KEY),
             lists:keystore(end_key_gt, 1, Options, {end_key_gt, Key2})
+    end.
+
+
+stem_revisions(#{} = Db, #doc{} = Doc) ->
+    #{revs_limit := RevsLimit} = Db,
+    #doc{revs = {RevPos, Revs}} = Doc,
+    case RevPos >= RevsLimit of
+        true -> Doc#doc{revs = {RevPos, lists:sublist(Revs, RevsLimit)}};
+        false -> Doc
     end.
