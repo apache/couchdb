@@ -224,7 +224,7 @@ validate(Db,  DDoc) ->
                 couch_query_servers:ret_os_process(Proc)
             end
     catch {unknown_query_language, _Lang} ->
-        %% Allow users to save ddocs written in uknown languages
+    %% Allow users to save ddocs written in unknown languages
         ok
     end.
 

@@ -78,8 +78,8 @@ couchTests.view_compaction = function(debug) {
   resp = db.designInfo("_design/foo");
   TEquals(30001, resp.view_index.update_seq);
 
-  var disk_size_before_compact = resp.view_index.disk_size;
-  var data_size_before_compact = resp.view_index.data_size;
+  var disk_size_before_compact = resp.view_index.sizes.file;
+  var data_size_before_compact = resp.view_index.sizes.active;
 
   TEquals("number", typeof data_size_before_compact, "data size is a number");
   T(data_size_before_compact < disk_size_before_compact, "data size < file size");
@@ -102,9 +102,9 @@ couchTests.view_compaction = function(debug) {
 
   resp = db.designInfo("_design/foo");
   TEquals(30001, resp.view_index.update_seq);
-  T(resp.view_index.disk_size < disk_size_before_compact);
-  TEquals("number", typeof resp.view_index.data_size, "data size is a number");
-  T(resp.view_index.data_size < resp.view_index.disk_size, "data size < file size");
+  T(resp.view_index.sizes.file < disk_size_before_compact);
+  TEquals("number", typeof resp.view_index.sizes.active, "data size is a number");
+  T(resp.view_index.sizes.active < resp.view_index.sizes.file, "data size < file size");
 
   // cleanup
   db.deleteDb();

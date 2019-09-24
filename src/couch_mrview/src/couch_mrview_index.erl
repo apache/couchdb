@@ -80,8 +80,6 @@ get(info, State) ->
     {ok, [
         {signature, list_to_binary(couch_index_util:hexsig(Sig))},
         {language, Lang},
-        {disk_size, FileSize}, % legacy
-        {data_size, ExternalSize}, % legacy
         {sizes, {[
             {file, FileSize},
             {active, ActiveSize},
