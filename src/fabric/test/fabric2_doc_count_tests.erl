@@ -30,6 +30,7 @@ doc_count_test_() ->
             fun cleanup/1,
             {with, [
                 fun normal_docs/1,
+                fun replicated_docs/1,
                 fun design_docs/1,
                 fun local_docs/1
             ]}
@@ -107,6 +108,31 @@ normal_docs({Db, _}) ->
             DDocCount,
             LDocCount
         ).
+
+
+replicated_docs({Db, _}) ->
+    {DocCount, DelDocCount, DDocCount, LDocCount} = get_doc_counts(Db),
+
+    Opts = [replicated_changes],
+    {R1, R2, R3} = {<<"r1">>, <<"r2">>, <<"r3">>},
+
+    % First case is a simple replicated update
+    Doc1 = #doc{id = <<"rd1">>, revs = {1, [R1]}},
+    {ok, {1, R1}} = fabric2_db:update_doc(Db, Doc1, Opts),
+    check_doc_counts(Db, DocCount + 1, DelDocCount, DDocCount, LDocCount),
+
+    % Here a deleted document is replicated into the db. Doc count should not
+    % change, only deleted doc count.
+    Doc2 = #doc{id = <<"rd2">>, revs = {1, [R2]}, deleted = true},
+    {ok, {1, R2}} = fabric2_db:update_doc(Db, Doc2, Opts),
+    check_doc_counts(Db, DocCount + 1, DelDocCount + 1, DDocCount, LDocCount),
+
+    % Here we extended the deleted document's rev path but keep it deleted.
+    % Deleted doc count doesn't bumped since the document was already counted
+    % as deleted
+    Doc3 = #doc{id = <<"rd2">>, revs = {2, [R3, R2]}, deleted = true},
+    {ok, {2, R3}} = fabric2_db:update_doc(Db, Doc3, Opts),
+    check_doc_counts(Db, DocCount + 1, DelDocCount + 1 , DDocCount, LDocCount).
 
 
 design_docs({Db, _}) ->
