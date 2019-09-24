@@ -556,7 +556,7 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
         {not_found, #{deleted := false}} ->
             created;
         {not_found, #{deleted := true}} ->
-            deleted;
+            replicate_deleted;
         {#{deleted := true}, #{deleted := false}} ->
             recreated;
         {#{deleted := false}, #{deleted := false}} ->
@@ -564,10 +564,14 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
         {#{deleted := false}, #{deleted := true}} ->
             deleted;
         {#{deleted := true}, #{deleted := true}} ->
-            deleted
+            ignore
     end,
 
     case UpdateStatus of
+        replicate_deleted ->
+            ok;
+        ignore ->
+            ok;
         deleted ->
             ADKey = erlfdb_tuple:pack({?DB_ALL_DOCS, DocId}, DbPrefix),
             ok = erlfdb:clear(Tx, ADKey);
@@ -614,6 +618,10 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
             end,
             incr_stat(Db, <<"doc_count">>, 1),
             incr_stat(Db, <<"doc_del_count">>, -1);
+        replicate_deleted ->
+            incr_stat(Db, <<"doc_del_count">>, 1);
+        ignore ->
+            ok;
         deleted ->
             if not IsDDoc -> ok; true ->
                 incr_stat(Db, <<"doc_design_count">>, -1)
