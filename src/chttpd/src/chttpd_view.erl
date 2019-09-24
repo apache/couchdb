@@ -88,22 +88,16 @@ handle_view_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
-    Keys = couch_mrview_util:get_view_keys(Props),
-    Queries = couch_mrview_util:get_view_queries(Props),
-    case {Queries, Keys} of
-        {Queries, undefined} when is_list(Queries) ->
-            [couch_stats:increment_counter([couchdb, httpd, view_reads]) || _I <- Queries],
-            multi_query_view(Req, Db, DDoc, ViewName, Queries);
-        {undefined, Keys} when is_list(Keys) ->
+    assert_no_queries_param(couch_mrview_util:get_view_queries(Props)),
+    case couch_mrview_util:get_view_keys(Props) of
+        Keys when is_list(Keys) ->
             couch_stats:increment_counter([couchdb, httpd, view_reads]),
             design_doc_view(Req, Db, DDoc, ViewName, Keys);
-        {undefined, undefined} ->
+        _ ->
             throw({
                 bad_request,
-                "POST body must contain `keys` or `queries` field"
-            });
-        {_, _} ->
-            throw({bad_request, "`keys` and `queries` are mutually exclusive"})
+                "POST body must contain an array called `keys`"
+            })
     end;
 
 handle_view_req(Req, _Db, _DDoc) ->
@@ -113,6 +107,14 @@ handle_temp_view_req(Req, _Db) ->
     Msg = <<"Temporary views are not supported in CouchDB">>,
     chttpd:send_error(Req, 410, gone, Msg).
 
+% See https://github.com/apache/couchdb/issues/2168
+assert_no_queries_param(undefined) ->
+    ok;
+assert_no_queries_param(_) ->
+    throw({
+        bad_request,
+        "The `queries` parameter is no longer supported at this endpoint"
+    }).
 
 
 -ifdef(TEST).
