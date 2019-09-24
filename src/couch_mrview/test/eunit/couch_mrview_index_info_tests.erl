@@ -48,8 +48,6 @@ view_info_test_() ->
                     fun file_size_is_non_neg_int/1,
                     fun active_size_is_non_neg_int/1,
                     fun external_size_is_non_neg_int/1,
-                    fun disk_size_is_file_size/1,
-                    fun data_size_is_external_size/1,
                     fun active_size_less_than_file_size/1,
                     fun update_seq_is_non_neg_int/1,
                     fun purge_seq_is_non_neg_int/1,
@@ -78,14 +76,6 @@ active_size_is_non_neg_int({_, Info}) ->
 
 external_size_is_non_neg_int({_, Info}) ->
     ?_assert(check_non_neg_int([sizes, external], Info)).
-
-
-disk_size_is_file_size({_, Info}) ->
-    ?_assertEqual(prop([sizes, file], Info), prop(disk_size, Info)).
-
-
-data_size_is_external_size({_, Info}) ->
-    ?_assertEqual(prop([sizes, external], Info), prop(data_size, Info)).
 
 
 active_size_less_than_file_size({_, Info}) ->
