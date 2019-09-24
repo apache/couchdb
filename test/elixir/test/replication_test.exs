@@ -428,6 +428,76 @@ defmodule ReplicationTest do
     assert change["id"] == del_doc["_id"]
     assert change["deleted"]
 
+    # Test new deletion is replicated, document wasn't on the target yet
+    [del_doc] = save_docs(src_db_name, [%{"_id" => "new_del_doc_1"}])
+
+    del_doc = Map.put(del_doc, "_deleted", true)
+    [del_doc] = save_docs(src_db_name, [del_doc])
+
+    result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
+    assert result["ok"]
+
+    retry_until(fn ->
+      src_info = get_db_info(src_db_name)
+      tgt_info = get_db_info(tgt_db_name)
+
+      assert tgt_info["doc_count"] == src_info["doc_count"]
+      assert tgt_info["doc_del_count"] == src_info["doc_del_count"]
+      assert tgt_info["doc_del_count"] == 2
+    end)
+
+    assert is_list(result["history"])
+    assert length(result["history"]) == 4
+    history = Enum.at(result["history"], 0)
+    assert history["missing_checked"] == 29
+    assert history["missing_found"] == 29
+    assert history["docs_read"] == 29
+    assert history["docs_written"] == 29
+    assert history["doc_write_failures"] == 0
+
+    resp = Couch.get("/#{tgt_db_name}/#{del_doc["_id"]}")
+    assert resp.status_code == 404
+
+    resp = Couch.get!("/#{tgt_db_name}/_changes")
+    [change] = Enum.filter(resp.body["results"], &(&1["id"] == del_doc["_id"]))
+    assert change["id"] == del_doc["_id"]
+    assert change["deleted"]
+
+    # Test an already deleted deletion being replicated
+    [del_doc] = save_docs(src_db_name, [%{"_id" => "new_del_doc_1"}])
+    del_doc = Map.put(del_doc, "_deleted", true)
+    [del_doc] = save_docs(src_db_name, [del_doc])
+
+    result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
+    assert result["ok"]
+
+    retry_until(fn ->
+      src_info = get_db_info(src_db_name)
+      tgt_info = get_db_info(tgt_db_name)
+
+      assert tgt_info["doc_count"] == src_info["doc_count"]
+      assert tgt_info["doc_del_count"] == src_info["doc_del_count"]
+      assert tgt_info["doc_del_count"] == 2
+    end)
+
+    assert is_list(result["history"])
+    assert length(result["history"]) == 5
+    history = Enum.at(result["history"], 0)
+    assert history["missing_checked"] == 30
+    assert history["missing_found"] == 30
+    assert history["docs_read"] == 30
+    assert history["docs_written"] == 30
+    assert history["doc_write_failures"] == 0
+
+    resp = Couch.get("/#{tgt_db_name}/#{del_doc["_id"]}")
+    assert resp.status_code == 404
+
+    resp = Couch.get!("/#{tgt_db_name}/_changes")
+    [change] = Enum.filter(resp.body["results"], &(&1["id"] == del_doc["_id"]))
+    assert change["id"] == del_doc["_id"]
+    assert change["deleted"]
+
+
     # Test replicating a conflict
     doc = Couch.get!("/#{src_db_name}/2").body
     [doc] = save_docs(src_db_name, [Map.put(doc, :value, "white")])
@@ -444,12 +514,12 @@ defmodule ReplicationTest do
     assert tgt_info["doc_count"] == src_info["doc_count"]
 
     assert is_list(result["history"])
-    assert length(result["history"]) == 4
+    assert length(result["history"]) == 6
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 29
-    assert history["missing_found"] == 29
-    assert history["docs_read"] == 29
-    assert history["docs_written"] == 29
+    assert history["missing_checked"] == 31
+    assert history["missing_found"] == 31
+    assert history["docs_read"] == 31
+    assert history["docs_written"] == 31
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -471,12 +541,12 @@ defmodule ReplicationTest do
     assert tgt_info["doc_count"] == src_info["doc_count"]
 
     assert is_list(result["history"])
-    assert length(result["history"]) == 5
+    assert length(result["history"]) == 7
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 30
-    assert history["missing_found"] == 30
-    assert history["docs_read"] == 30
-    assert history["docs_written"] == 30
+    assert history["missing_checked"] == 32
+    assert history["missing_found"] == 32
+    assert history["docs_read"] == 32
+    assert history["docs_written"] == 32
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -500,12 +570,12 @@ defmodule ReplicationTest do
     assert tgt_info["doc_count"] == src_info["doc_count"]
 
     assert is_list(result["history"])
-    assert length(result["history"]) == 6
+    assert length(result["history"]) == 8
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 31
-    assert history["missing_found"] == 31
-    assert history["docs_read"] == 31
-    assert history["docs_written"] == 31
+    assert history["missing_checked"] == 33
+    assert history["missing_found"] == 33
+    assert history["docs_read"] == 33
+    assert history["docs_written"] == 33
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -532,12 +602,12 @@ defmodule ReplicationTest do
     assert tgt_info["doc_count"] == src_info["doc_count"]
 
     assert is_list(result["history"])
-    assert length(result["history"]) == 7
+    assert length(result["history"]) == 9
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 34
-    assert history["missing_found"] == 32
-    assert history["docs_read"] == 32
-    assert history["docs_written"] == 32
+    assert history["missing_checked"] == 36
+    assert history["missing_found"] == 34
+    assert history["docs_read"] == 34
+    assert history["docs_written"] == 34
     assert history["doc_write_failures"] == 0
 
     docs = [
@@ -557,12 +627,12 @@ defmodule ReplicationTest do
     assert tgt_info["doc_count"] == src_info["doc_count"]
 
     assert is_list(result["history"])
-    assert length(result["history"]) == 8
+    assert length(result["history"]) == 10
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 36
-    assert history["missing_found"] == 32
-    assert history["docs_read"] == 32
-    assert history["docs_written"] == 32
+    assert history["missing_checked"] == 38
+    assert history["missing_found"] == 34
+    assert history["docs_read"] == 34
+    assert history["docs_written"] == 34
     assert history["doc_write_failures"] == 0
 
     # Test nothing to replicate
