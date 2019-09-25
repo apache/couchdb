@@ -104,3 +104,10 @@ src/global_changes/ebin/
 src/mango/ebin/
 src/mango/test/*.pyc
 src/mango/venv/
+
+/_build/
+/src/bunt
+/src/credo/
+/src/httpotion/
+/src/jason/
+/src/junit_formatter/

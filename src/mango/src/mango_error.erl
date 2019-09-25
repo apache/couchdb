@@ -69,7 +69,7 @@ info(mango_cursor_text, {text_search_error, {error, {bad_request, Msg}}})
     };
 info(mango_cursor_text, {text_search_error, {error, Error}}) ->
     {
-        400,
+        500,
         <<"text_search_error">>,
         fmt("~p", [Error])
     };

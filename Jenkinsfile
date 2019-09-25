@@ -14,35 +14,33 @@
 // the License.
 
 // DRYing out the Jenkinsfile...
-build_script = '''
-mkdir -p ${COUCHDB_IO_LOG_DIR}
 
-echo
-echo "Build CouchDB from tarball & test"
-builddir=$(mktemp -d)
-cd ${builddir}
+build_and_test = '''
+mkdir -p ${COUCHDB_IO_LOG_DIR}
+rm -rf build
+mkdir build
+cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
 ./configure --with-curl
 make check || (build-aux/logfile-uploader.py && false)
+'''
 
-echo
-echo "Build CouchDB packages"
-cd ${builddir}
+make_packages = '''
 git clone https://github.com/apache/couchdb-pkg
+rm -rf couchdb
 mkdir couchdb
 cp ${WORKSPACE}/apache-couchdb-*.tar.gz couchdb
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz -C couchdb
 cd couchdb-pkg
 make ${platform} PLATFORM=${platform}
+'''
 
-echo
-echo "Cleanup & save for posterity"
+cleanup_and_save = '''
 rm -rf ${WORKSPACE}/pkgs/${platform}
 mkdir -p ${WORKSPACE}/pkgs/${platform}
-mv ../rpmbuild/RPMS/$(arch)/*rpm ${WORKSPACE}/pkgs/${platform} || true
-mv ../couchdb/*.deb ${WORKSPACE}/pkgs/${platform} || true
-rm -rf ${builddir} ${COUCHDB_IO_LOG_DIR}
+mv ${WORKSPACE}/rpmbuild/RPMS/$(arch)/*rpm ${WORKSPACE}/pkgs/${platform} || true
+mv ${WORKSPACE}/couchdb/*.deb ${WORKSPACE}/pkgs/${platform} || true
 '''
 
 pipeline {
@@ -113,11 +111,7 @@ pipeline {
     // https://issues.jenkins-ci.org/browse/JENKINS-47962
     // https://issues.jenkins-ci.org/browse/JENKINS-48050
 
-    // The builddir stuff is to prevent all the builds from live syncing
-    // their build results to each other during the build, which ACTUALLY
-    // HAPPENS. Ugh.
-
-    stage('make check') {
+    stage('Test and Package') {
 
       parallel {
 
@@ -138,18 +132,25 @@ pipeline {
                 mkdir -p $COUCHDB_IO_LOG_DIR
 
                 # Build CouchDB from tarball & test
-                builddir=$(mktemp -d)
-                cd $builddir
+                mkdir build
+                cd build
                 tar -xf $WORKSPACE/apache-couchdb-*.tar.gz
                 cd apache-couchdb-*
                 ./configure --with-curl
                 gmake check || (build-aux/logfile-uploader.py && false)
 
                 # No package build for FreeBSD at this time
-                rm -rf $builddir $COUCHDB_IO_LOG_DIR
               '''
             } // withEnv
           } // steps
+          post {
+            always {
+              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+            }
+            cleanup {
+              sh 'rm -rf $COUCHDB_IO_LOG_DIR'
+            }
+          } // post
         } // stage FreeBSD
 
         stage('CentOS 6') {
@@ -158,6 +159,8 @@ pipeline {
               image 'couchdbdev/centos-6-erlang-19.3.6:latest'
               alwaysPull true
               label 'ubuntu'
+              // this keeps builds landing on the same host from clashing with each other
+              customWorkspace pwd() + '/centos6'
             }
           }
           options {
@@ -167,14 +170,33 @@ pipeline {
           environment {
             platform = 'centos6'
           }
-          steps {
-            sh 'rm -f apache-couchdb-*.tar.gz'
-            unstash 'tarball'
-            sh( script: build_script )
-          } // steps
+          stages {
+            stage('Build from tarball & test') {
+              steps {
+                unstash 'tarball'
+                sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
+              }
+            }
+            stage('Build CouchDB packages') {
+              steps {
+                sh( script: make_packages )
+                sh( script: cleanup_and_save )
+              }
+              post {
+                success {
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+                }
+              }
+            }
+          } // stages
           post {
-            success {
-              archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+            cleanup {
+              sh 'rm -rf ${WORKSPACE}/*'
             }
           } // post
         } // stage
@@ -185,6 +207,7 @@ pipeline {
               image 'couchdbdev/centos-7-erlang-19.3.6:latest'
               alwaysPull true
               label 'ubuntu'
+              customWorkspace pwd() + '/centos7'
             }
           }
           options {
@@ -194,14 +217,34 @@ pipeline {
           environment {
             platform = 'centos7'
           }
-          steps {
-            sh 'rm -f apache-couchdb-*.tar.gz'
-            unstash 'tarball'
-            sh( script: build_script )
-          } // steps
+          stages {
+            stage('Build from tarball & test') {
+              steps {
+                unstash 'tarball'
+                sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
+              }
+            }
+            stage('Build CouchDB packages') {
+              steps {
+                unstash 'tarball'
+                sh( script: make_packages )
+                sh( script: cleanup_and_save )
+              }
+              post {
+                success {
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+                }
+              }
+            }
+          } // stages
           post {
-            success {
-              archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+            cleanup {
+              sh 'rm -rf ${WORKSPACE}/*'
             }
           } // post
         } // stage
@@ -212,6 +255,7 @@ pipeline {
               image 'couchdbdev/ubuntu-xenial-erlang-19.3.6:latest'
               alwaysPull true
               label 'ubuntu'
+              customWorkspace pwd() + '/xenial'
             }
           }
           options {
@@ -221,14 +265,33 @@ pipeline {
           environment {
             platform = 'xenial'
           }
-          steps {
-            sh 'rm -f apache-couchdb-*.tar.gz'
-            unstash 'tarball'
-            sh( script: build_script )
-          } // steps
+          stages {
+            stage('Build from tarball & test') {
+              steps {
+                unstash 'tarball'
+                sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
+              }
+            }
+            stage('Build CouchDB packages') {
+              steps {
+                sh( script: make_packages )
+                sh( script: cleanup_and_save )
+              }
+              post {
+                success {
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+                }
+              }
+            }
+          } // stages
           post {
-            success {
-              archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+            cleanup {
+              sh 'rm -rf ${WORKSPACE}/*'
             }
           } // post
         } // stage
@@ -239,6 +302,7 @@ pipeline {
               image 'couchdbdev/ubuntu-bionic-erlang-19.3.6:latest'
               alwaysPull true
               label 'ubuntu'
+              customWorkspace pwd() + '/bionic'
             }
           }
           options {
@@ -246,16 +310,35 @@ pipeline {
             timeout(time: 90, unit: "MINUTES")
           }
           environment {
-            platform = 'xenial'
+            platform = 'bionic'
           }
-          steps {
-            sh 'rm -f apache-couchdb-*.tar.gz'
-            unstash 'tarball'
-            sh( script: build_script )
-          } // steps
+          stages {
+            stage('Build from tarball & test') {
+              steps {
+                unstash 'tarball'
+                sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
+              }
+            }
+            stage('Build CouchDB packages') {
+              steps {
+                sh( script: make_packages )
+                sh( script: cleanup_and_save )
+              }
+              post {
+                success {
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+                }
+              }
+            }
+          } // stages
           post {
-            success {
-              archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+            cleanup {
+              sh 'rm -rf ${WORKSPACE}/*'
             }
           } // post
         } // stage
@@ -266,6 +349,7 @@ pipeline {
               image 'couchdbdev/debian-jessie-erlang-19.3.6:latest'
               alwaysPull true
               label 'ubuntu'
+              customWorkspace pwd() + '/jessie'
             }
           }
           options {
@@ -275,14 +359,33 @@ pipeline {
           environment {
             platform = 'jessie'
           }
-          steps {
-            sh 'rm -f apache-couchdb-*.tar.gz'
-            unstash 'tarball'
-            sh( script: build_script )
-          } // steps
+          stages {
+            stage('Build from tarball & test') {
+              steps {
+                unstash 'tarball'
+                sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
+              }
+            }
+            stage('Build CouchDB packages') {
+              steps {
+                sh( script: make_packages )
+                sh( script: cleanup_and_save )
+              }
+              post {
+                success {
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+                }
+              }
+            }
+          } // stages
           post {
-            success {
-              archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+            cleanup {
+              sh 'rm -rf ${WORKSPACE}/*'
             }
           } // post
         } // stage
@@ -293,6 +396,7 @@ pipeline {
               image 'couchdbdev/debian-stretch-erlang-19.3.6:latest'
               alwaysPull true
               label 'ubuntu'
+              customWorkspace pwd() + '/stretch'
             }
           }
           options {
@@ -300,16 +404,35 @@ pipeline {
             timeout(time: 90, unit: "MINUTES")
           }
           environment {
-            platform = 'jessie'
+            platform = 'stretch'
           }
-          steps {
-            sh 'rm -f apache-couchdb-*.tar.gz'
-            unstash 'tarball'
-            sh( script: build_script )
-          } // steps
+          stages {
+            stage('Build from tarball & test') {
+              steps {
+                unstash 'tarball'
+                sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
+              }
+            }
+            stage('Build CouchDB packages') {
+              steps {
+                sh( script: make_packages )
+                sh( script: cleanup_and_save )
+              }
+              post {
+                success {
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+                }
+              }
+            }
+          } // stages
           post {
-            success {
-              archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+            cleanup {
+              sh 'rm -rf ${WORKSPACE}/*'
             }
           } // post
         } // stage
@@ -320,6 +443,7 @@ pipeline {
               image 'couchdbdev/aarch64-debian-stretch-erlang-20.3.8.20:latest'
               alwaysPull true
               label 'arm'
+              customWorkspace pwd() + '/arm'
             }
           }
           options {
@@ -327,16 +451,37 @@ pipeline {
             timeout(time: 90, unit: "MINUTES")
           }
           environment {
-            platform = 'jessie'
+            platform = 'aarch64-debian-stretch'
           }
-          steps {
-            sh 'rm -f apache-couchdb-*.tar.gz'
-            unstash 'tarball'
-            sh( script: build_script )
-          } // steps
+          stages {
+            stage('Build from tarball & test') {
+              steps {
+                unstash 'tarball'
+                withEnv(['MIX_HOME='+pwd(), 'HEX_HOME='+pwd()]) {
+                  sh( script: build_and_test )
+                }
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                }
+              }
+            }
+            stage('Build CouchDB packages') {
+              steps {
+                sh( script: make_packages )
+                sh( script: cleanup_and_save )
+              }
+              post {
+                success {
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+                }
+              }
+            }
+          } // stages
           post {
-            success {
-              archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+            cleanup {
+              sh 'rm -rf ${WORKSPACE}/*'
             }
           } // post
         } // stage
@@ -384,8 +529,6 @@ pipeline {
             reprepro -b couchdb-pkg/repo includedeb jessie pkgs/jessie/*.deb
             cp js/debian-stretch/*.deb pkgs/stretch
             reprepro -b couchdb-pkg/repo includedeb stretch pkgs/stretch/*.deb
-            cp js/ubuntu-trusty/*.deb pkgs/trusty
-            reprepro -b couchdb-pkg/repo includedeb trusty pkgs/trusty/*.deb
             cp js/ubuntu-xenial/*.deb pkgs/xenial
             reprepro -b couchdb-pkg/repo includedeb xenial pkgs/xenial/*.deb
             cp js/ubuntu-bionic/*.deb pkgs/bionic
@@ -442,7 +585,7 @@ pipeline {
         body: "Boo, we failed. ${env.RUN_DISPLAY_URL}"
     }
     cleanup {
-      sh 'rm -rf ${WORKSPACE}/*'
+      sh 'rm -rf ${COUCHDB_IO_LOG_DIR}'
     }
   }
 

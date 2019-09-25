@@ -26,12 +26,12 @@ defmodule PartitionSearchTest do
   end
 
   def create_ddoc(db_name, opts \\ %{}) do
-    indexFn = "function(doc) {\n  if (doc.some) {\n    index('some', doc.some);\n }\n}"
+    index_fn = "function(doc) {\n  if (doc.some) {\n    index('some', doc.some);\n }\n}"
     default_ddoc = %{
       indexes: %{
         books: %{
           analyzer: %{name: "standard"},
-          index: indexFn
+          index: index_fn
         }
       }
     }

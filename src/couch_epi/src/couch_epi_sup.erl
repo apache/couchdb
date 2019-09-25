@@ -136,4 +136,7 @@ modules(#couch_epi_spec{kind = data_subscriptions, behaviour = Module}) ->
 merge([], Children) ->
     Children;
 merge([{Id, _, _, _, _, _} = Spec | Rest], Children) ->
-    merge(Rest, lists:keystore(Id, 1, Children, Spec)).
+    merge(Rest, lists:keystore(Id, 1, Children, Spec));
+merge([#{id := Id} = Spec | Rest], Children) ->
+    Replace = fun(#{id := I}) when I == Id -> Spec; (E) -> E end,
+    merge(Rest, lists:map(Replace, Children)).
