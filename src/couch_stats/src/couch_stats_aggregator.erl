@@ -55,8 +55,8 @@ start_link() ->
 
 init([]) ->
     {ok, Descs} = reload_metrics(),
-    {ok, CT} = timer:send_after(get_interval(collect), self(), collect),
-    {ok, RT} = timer:send_after(get_interval(reload), self(), reload),
+    {ok, CT} = erlang:send_after(get_interval(collect), self(), collect),
+    {ok, RT} = erlang:send_after(get_interval(reload), self(), reload),
     {ok, #st{descriptions=Descs, stats=[], collect_timer=CT, reload_timer=RT}}.
 
 handle_call(fetch, _from, #st{stats = Stats}=State) ->
@@ -154,10 +154,10 @@ collect(#st{collect_timer=OldCT} = State) ->
 
 update_timer(collect) ->
     Interval = get_interval(collect),
-    timer:send_after(Interval, self(), collect);
+    erlang:send_after(Interval, self(), collect);
 update_timer(reload) ->
     Interval = get_interval(reload),
-    timer:send_after(Interval, self(), reload).
+    erlang:send_after(Interval, self(), reload).
 
 get_interval(reload) -> 1000 * ?RELOAD_INTERVAL;
 get_interval(collect) -> 1000 * config:get_integer("stats", "interval", ?DEFAULT_INTERVAL).
