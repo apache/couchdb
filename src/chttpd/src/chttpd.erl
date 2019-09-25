@@ -157,6 +157,7 @@ handle_request(MochiReq0) ->
     handle_request_int(MochiReq).
 
 handle_request_int(MochiReq) ->
+    Span = start_span(),
     Begin = os:timestamp(),
     case config:get("chttpd", "socket_options") of
     undefined ->
@@ -231,6 +232,8 @@ handle_request_int(MochiReq) ->
                 || Part <- string:tokens(RequestedPath, "/")]
     },
 
+    HttpReq1 = attach_span(HttpReq0, Span),
+
     % put small token on heap to keep requests synced to backend calls
     erlang:put(nonce, Nonce),
 
@@ -238,11 +241,11 @@ handle_request_int(MochiReq) ->
     erlang:put(dont_log_request, true),
     erlang:put(dont_log_response, true),
 
-    {HttpReq2, Response} = case before_request(HttpReq0) of
-        {ok, HttpReq1} ->
-            process_request(HttpReq1);
+    {HttpReq3, Response} = case before_request(HttpReq1) of
+        {ok, HttpReq2} ->
+            process_request(HttpReq2);
         {error, Response0} ->
-            {HttpReq0, Response0}
+            {HttpReq1, Response0}
     end,
 
     {Status, Code, Reason, Resp} = split_response(Response),
@@ -251,12 +254,13 @@ handle_request_int(MochiReq) ->
         code = Code,
         status = Status,
         response = Resp,
-        nonce = HttpReq2#httpd.nonce,
+        nonce = HttpReq3#httpd.nonce,
         reason = Reason
     },
 
-    case after_request(HttpReq2, HttpResp) of
+    case after_request(HttpReq3, HttpResp) of
         #httpd_resp{status = ok, response = Resp} ->
+            finish_span(HttpReq3, span_ok(HttpResp)),
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
             couch_log:error("Response abnormally terminated: ~p", [Reason]),
@@ -1048,16 +1052,20 @@ send_error(#httpd{} = Req, Code, ErrorStr, ReasonStr) ->
     send_error(Req, Code, [], ErrorStr, ReasonStr, []).
 
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, []) ->
-    send_json(Req, Code, Headers,
+    Return = send_json(Req, Code, Headers,
         {[{<<"error">>,  ErrorStr},
-        {<<"reason">>, ReasonStr}]});
+        {<<"reason">>, ReasonStr}]}),
+    finish_span(Req, span_error(ErrorStr, ReasonStr, [])),
+    Return;
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
     log_error_with_stack_trace({ErrorStr, ReasonStr, Stack}),
-    send_json(Req, Code, [stack_trace_id(Stack) | Headers],
+    Return = send_json(Req, Code, [stack_trace_id(Stack) | Headers],
         {[{<<"error">>,  ErrorStr},
         {<<"reason">>, ReasonStr} |
         case Stack of [] -> []; _ -> [{<<"ref">>, stack_hash(Stack)}] end
-    ]}).
+    ]}),
+    finish_span(Req, span_error(ErrorStr, ReasonStr, [])),
+    Return.
 
 update_timeout_stats(<<"timeout">>, #httpd{requested_path_parts = PathParts}) ->
     update_timeout_stats(PathParts);
@@ -1210,6 +1218,24 @@ get_user(#httpd{user_ctx = #user_ctx{name = User}}) ->
     couch_util:url_encode(User);
 get_user(#httpd{user_ctx = undefined}) ->
     "undefined".
+
+start_span() ->
+    span.
+
+attach_span(Req, _Span) ->
+    Req.
+
+trace(Req, _Fun) ->
+    Req.
+
+finish_span(_Req, _Fun) ->
+    ok.
+
+span_ok(_Resp) ->
+    fun(Span) -> Span end.
+
+span_error(_ErrorStr, _ReasonStr, []) ->
+    fun(Span) -> Span end.
 
 -ifdef(TEST).
 
