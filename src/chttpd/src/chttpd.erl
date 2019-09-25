@@ -1038,9 +1038,6 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
 error_headers(_, Code, _, _) ->
     {Code, []}.
 
-send_error(_Req, {already_sent, Resp, _Error}) ->
-    {ok, Resp};
-
 send_error(#httpd{} = Req, Error) ->
     update_timeout_stats(Error, Req),
 
