@@ -107,7 +107,7 @@ maybe_add_csp_headers(Headers, "true") ->
 maybe_add_csp_headers(Headers, _) ->
     Headers.
 
-handle_all_dbs_req(#httpd{method='GET'}=Req) ->
+handle_all_dbs_req(#httpd{method='GET', request_ctx=RequestCtx}=Req) ->
     #mrargs{
         start_key = StartKey,
         end_key = EndKey,
@@ -121,7 +121,8 @@ handle_all_dbs_req(#httpd{method='GET'}=Req) ->
         {end_key, EndKey},
         {dir, Dir},
         {limit, Limit},
-        {skip, Skip}
+        {skip, Skip},
+        {request_ctx, RequestCtx}
     ],
 
     % Eventually the Etag for this request will be derived
