@@ -51,7 +51,7 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
         {version, list_to_binary(couch_server:get_version())},
         {git_sha, list_to_binary(couch_server:get_git_sha())},
         {uuid, couch_server:get_uuid()},
-        {features, config:features()}
+        {features, get_features()}
         ] ++ case config:get("vendor") of
         [] ->
             [];
@@ -61,6 +61,14 @@ handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
     });
 handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
+
+get_features() ->
+    case clouseau_rpc:connected() of
+        true ->
+            [search | config:features()];
+        false ->
+            config:features()
+    end.
 
 handle_favicon_req(Req) ->
     handle_favicon_req(Req, get_docroot()).
