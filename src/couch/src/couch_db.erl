@@ -65,9 +65,6 @@
     set_security/2,
     set_user_ctx/2,
 
-    ensure_full_commit/1,
-    ensure_full_commit/2,
-
     load_validation_funs/1,
     reload_validation_funs/1,
 
@@ -226,21 +223,12 @@ is_partitioned(#db{options = Options}) ->
     Props = couch_util:get_value(props, Options, []),
     couch_util:get_value(partitioned, Props, false).
 
-ensure_full_commit(#db{main_pid=Pid, instance_start_time=StartTime}) ->
-    ok = gen_server:call(Pid, full_commit, infinity),
-    {ok, StartTime}.
-
-ensure_full_commit(Db, RequiredSeq) ->
-    #db{main_pid=Pid, instance_start_time=StartTime} = Db,
-    ok = gen_server:call(Pid, {full_commit, RequiredSeq}, infinity),
-    {ok, StartTime}.
-
 close(#db{} = Db) ->
     ok = couch_db_engine:decref(Db);
 close(?OLD_DB_REC) ->
     ok.
 
-is_idle(#db{compactor_pid=nil, waiting_delayed_commit=nil} = Db) ->
+is_idle(#db{compactor_pid=nil} = Db) ->
     monitored_by(Db) == [];
 is_idle(_Db) ->
     false.
@@ -753,9 +741,7 @@ get_security(?OLD_DB_REC = Db) ->
 set_security(#db{main_pid=Pid}=Db, {NewSecProps}) when is_list(NewSecProps) ->
     check_is_admin(Db),
     ok = validate_security_object(NewSecProps),
-    ok = gen_server:call(Pid, {set_security, NewSecProps}, infinity),
-    {ok, _} = ensure_full_commit(Db),
-    ok;
+    gen_server:call(Pid, {set_security, NewSecProps}, infinity);
 set_security(_, _) ->
     throw(bad_request).
 
@@ -1256,24 +1242,6 @@ make_first_doc_on_disk(Db, Id, Pos, [{_Rev, #leaf{deleted=IsDel, ptr=Sp}} |_]=Do
     Revs = [Rev || {Rev, _} <- DocPath],
     make_doc(Db, Id, IsDel, Sp, {Pos, Revs}).
 
-set_commit_option(Options) ->
-    CommitSettings = {
-        [true || O <- Options, O==full_commit orelse O==delay_commit],
-        config:get("couchdb", "delayed_commits", "false")
-    },
-    case CommitSettings of
-    {[true], _} ->
-        Options; % user requested explicit commit setting, do not change it
-    {_, "true"} ->
-        Options; % delayed commits are enabled, do nothing
-    {_, "false"} ->
-        [full_commit|Options];
-    {_, Else} ->
-        couch_log:error("[couchdb] delayed_commits setting must be true/false,"
-                        " not ~p", [Else]),
-        [full_commit|Options]
-    end.
-
 collect_results_with_metrics(Pid, MRef, []) ->
     Begin = os:timestamp(),
     try
@@ -1299,14 +1267,12 @@ collect_results(Pid, MRef, ResultsAcc) ->
     end.
 
 write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
-        NonRepDocs, Options0) ->
+        NonRepDocs, Options) ->
     DocBuckets = prepare_doc_summaries(Db, DocBuckets1),
-    Options = set_commit_option(Options0),
     MergeConflicts = lists:member(merge_conflicts, Options),
-    FullCommit = lists:member(full_commit, Options),
     MRef = erlang:monitor(process, Pid),
     try
-        Pid ! {update_docs, self(), DocBuckets, NonRepDocs, MergeConflicts, FullCommit},
+        Pid ! {update_docs, self(), DocBuckets, NonRepDocs, MergeConflicts},
         case collect_results_with_metrics(Pid, MRef, []) of
         {ok, Results} -> {ok, Results};
         retry ->
@@ -1320,7 +1286,7 @@ write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
             % We only retry once
             DocBuckets3 = prepare_doc_summaries(Db2, DocBuckets2),
             close(Db2),
-            Pid ! {update_docs, self(), DocBuckets3, NonRepDocs, MergeConflicts, FullCommit},
+            Pid ! {update_docs, self(), DocBuckets3, NonRepDocs, MergeConflicts},
             case collect_results_with_metrics(Pid, MRef, []) of
             {ok, Results} -> {ok, Results};
             retry -> throw({update_error, compaction_retry})

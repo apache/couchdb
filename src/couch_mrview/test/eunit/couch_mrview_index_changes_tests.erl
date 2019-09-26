@@ -198,7 +198,6 @@ test_indexer(Db) ->
 save_doc(Db, Id) ->
     Doc = couch_mrview_test_util:doc(Id),
     {ok, _Rev} = couch_db:update_doc(Db, Doc, []),
-    {ok, _} =  couch_db:ensure_full_commit(Db),
     couch_db:reopen(Db).
 
 run_query(Db, Opts) ->

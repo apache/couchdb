@@ -187,7 +187,6 @@ create_doc(backdoor, DbName, Id, Body) ->
     Doc = couch_doc:from_json_obj(JsonDoc),
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     {ok, _} = couch_db:update_docs(Db, [Doc]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db);
 create_doc(clustered, DbName, Id, Body) ->
     JsonDoc = couch_util:json_apply_field({<<"_id">>, Id}, Body),

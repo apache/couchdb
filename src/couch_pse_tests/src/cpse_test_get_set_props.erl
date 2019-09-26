@@ -89,7 +89,6 @@ check_prop_set(DbName, GetFun, SetFun, Default, Value) ->
     {ok, Db1} = couch_db:reopen(Db0),
     ?assertEqual(Value, couch_db:GetFun(Db1)),
 
-    ?assertMatch({ok, _}, couch_db:ensure_full_commit(Db1)),
     cpse_util:shutdown_db(Db1),
 
     {ok, Db2} = couch_db:reopen(Db1),

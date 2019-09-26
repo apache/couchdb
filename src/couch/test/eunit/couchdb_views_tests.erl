@@ -322,7 +322,6 @@ couchdb_1309(DbName) ->
 couchdb_1283() ->
     ?_test(begin
         ok = config:set("couchdb", "max_dbs_open", "3", false),
-        ok = config:set("couchdb", "delayed_commits", "false", false),
 
         {ok, MDb1} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
         DDoc = couch_doc:from_json_obj({[
@@ -406,7 +405,6 @@ create_doc(DbName, DocId) when is_binary(DocId) ->
         {<<"value">>, 999}
     ]}),
     {ok, _} = couch_db:update_docs(Db, [Doc666]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db).
 
 create_docs(DbName) ->
@@ -427,7 +425,6 @@ create_docs(DbName) ->
 
     ]}),
     {ok, _} = couch_db:update_docs(Db, [Doc1, Doc2, Doc3]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db).
 
 populate_db(Db, BatchSize, N) when N > 0 ->
@@ -456,7 +453,6 @@ create_design_doc(DbName, DDName, ViewName) ->
         ]}}
     ]}),
     {ok, Rev} = couch_db:update_doc(Db, DDoc, []),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
     Rev.
 
@@ -476,7 +472,6 @@ update_design_doc(DbName, DDName, ViewName) ->
         ]}}
     ]}),
     {ok, NewRev} = couch_db:update_doc(Db, DDoc, [?ADMIN_CTX]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
     NewRev.
 

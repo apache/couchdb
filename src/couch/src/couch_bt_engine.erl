@@ -567,7 +567,6 @@ copy_purge_infos(#st{} = St, PurgeInfos) ->
 commit_data(St) ->
     #st{
         fd = Fd,
-        fsync_options = FsyncOptions,
         header = OldHeader,
         needs_commit = NeedsCommit
     } = St,
@@ -576,13 +575,9 @@ commit_data(St) ->
 
     case NewHeader /= OldHeader orelse NeedsCommit of
         true ->
-            Before = lists:member(before_header, FsyncOptions),
-            After = lists:member(after_header, FsyncOptions),
-
-            if Before -> couch_file:sync(Fd); true -> ok end,
+            couch_file:sync(Fd),
             ok = couch_file:write_header(Fd, NewHeader),
-            if After -> couch_file:sync(Fd); true -> ok end,
-
+            couch_file:sync(Fd),
             {ok, St#st{
                 header = NewHeader,
                 needs_commit = false
@@ -872,14 +867,7 @@ open_db_file(FilePath, Options) ->
 
 
 init_state(FilePath, Fd, Header0, Options) ->
-    DefaultFSync = "[before_header, after_header, on_file_open]",
-    FsyncStr = config:get("couchdb", "fsync_options", DefaultFSync),
-    {ok, FsyncOptions} = couch_util:parse_term(FsyncStr),
-
-    case lists:member(on_file_open, FsyncOptions) of
-        true -> ok = couch_file:sync(Fd);
-        _ -> ok
-    end,
+    ok = couch_file:sync(Fd),
 
     Compression = couch_compress:get_compression_method(),
 
@@ -930,7 +918,6 @@ init_state(FilePath, Fd, Header0, Options) ->
         filepath = FilePath,
         fd = Fd,
         fd_monitor = erlang:monitor(process, Fd),
-        fsync_options = FsyncOptions,
         header = Header,
         needs_commit = false,
         id_tree = IdTree,

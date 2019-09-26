@@ -377,17 +377,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 maybe_restart_updater(#st{waiters=[]}) ->
     ok;
-maybe_restart_updater(#st{mod=Mod, idx_state=IdxState}=State) ->
-    couch_util:with_db(Mod:get(db_name, IdxState), fun(Db) ->
-        UpdateSeq = couch_db:get_update_seq(Db),
-        CommittedSeq = couch_db:get_committed_update_seq(Db),
-        CanUpdate = UpdateSeq > CommittedSeq,
-        UOpts = Mod:get(update_options, IdxState),
-        case CanUpdate and lists:member(committed_only, UOpts) of
-            true -> couch_db:ensure_full_commit(Db);
-            false -> ok
-        end
-    end),
+maybe_restart_updater(#st{idx_state=IdxState}=State) ->
     couch_index_updater:run(State#st.updater, IdxState).
 
 

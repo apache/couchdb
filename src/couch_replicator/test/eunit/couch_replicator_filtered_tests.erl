@@ -228,7 +228,6 @@ create_docs(DbName) ->
 
     ]}),
     {ok, _} = couch_db:update_docs(Db, [DDoc, Doc1, Doc2, Doc3, Doc4]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db).
 
 delete_db(DbName) ->
