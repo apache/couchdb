@@ -168,7 +168,6 @@ test_remove_key(Db) ->
     Doc = couch_mrview_test_util:doc(11),
     {ok, Rev} = couch_db:update_doc(Db, Doc, []),
     RevStr = couch_doc:rev_to_str(Rev),
-    {ok, _} =  couch_db:ensure_full_commit(Db),
     {ok, Db1} = couch_db:reopen(Db),
     Result = run_count_query(Db1, 0, []),
     %% check new view key

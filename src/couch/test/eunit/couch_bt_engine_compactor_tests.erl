@@ -101,8 +101,7 @@ create_docs(DbName) ->
             {<<"value">>, 3}
 
         ]}),
-        {ok, _} = couch_db:update_docs(Db, [Doc1, Doc2, Doc3]),
-        couch_db:ensure_full_commit(Db)
+        {ok, _} = couch_db:update_docs(Db, [Doc1, Doc2, Doc3])
     end).
 
 

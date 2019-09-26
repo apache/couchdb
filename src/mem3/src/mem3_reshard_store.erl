@@ -169,7 +169,6 @@ delete_doc(Db, DocId) ->
     case couch_db:open_doc(Db, DocId, []) of
         {ok, #doc{revs = {_, Revs}}} ->
             {ok, _} = couch_db:delete_doc(Db, DocId, Revs),
-            {ok, _} = couch_db:ensure_full_commit(Db),
             ok;
         {not_found, _} ->
             ok
@@ -190,7 +189,6 @@ update_doc(Db, DocId, Body) ->
         true ->
             {ok, _} = couch_db:update_doc(Db, Doc, []),
             couch_log:debug("~p updated doc ~p ~p", [?MODULE, DocId, Body]),
-            {ok, _} = couch_db:ensure_full_commit(Db),
             ok;
         false ->
             couch_log:debug("~p not storing state in ~p", [?MODULE, DocId]),
