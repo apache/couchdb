@@ -38,12 +38,12 @@ start_link() ->
 
 get_user_creds(Req, UserName) when is_list(UserName) ->
     get_user_creds(Req, ?l2b(UserName));
-get_user_creds(_Req, UserName) when is_binary(UserName) ->
+get_user_creds(Req, UserName) when is_binary(UserName) ->
     Resp = case couch_auth_cache:get_admin(UserName) of
     nil ->
-        get_from_cache(UserName);
+        get_from_cache(Req, UserName);
     Props ->
-        case get_from_cache(UserName) of
+        case get_from_cache(Req, UserName) of
         nil ->
             Props;
         UserProps when is_list(UserProps) ->
@@ -53,9 +53,10 @@ get_user_creds(_Req, UserName) when is_binary(UserName) ->
     end,
     maybe_validate_user_creds(Resp).
 
-update_user_creds(_Req, UserDoc, _Ctx) ->
+update_user_creds(#httpd{request_ctx = RequestCtx}, UserDoc, _Ctx) ->
+    Options = [?ADMIN_CTX, {request_ctx, RequestCtx}],
     {_, Ref} = spawn_monitor(fun() ->
-        {ok, Db} = fabric2_db:open(dbname(), [?ADMIN_CTX]),
+        {ok, Db} = fabric2_db:open(dbname(), Options),
         case fabric2_db:update_doc(Db, UserDoc) of
             {ok, _} ->
                 exit(ok);
@@ -70,7 +71,7 @@ update_user_creds(_Req, UserDoc, _Ctx) ->
             Else
     end.
 
-get_from_cache(UserName) ->
+get_from_cache(Req, UserName) ->
     try ets_lru:lookup_d(?CACHE, UserName) of
         {ok, Props} ->
             couch_stats:increment_counter([couchdb, auth_cache_hits]),
@@ -78,7 +79,7 @@ get_from_cache(UserName) ->
             Props;
         _ ->
             maybe_increment_auth_cache_miss(UserName),
-            case load_user_from_db(UserName) of
+            case load_user_from_db(Req, UserName) of
                 nil ->
                     nil;
                 Props ->
@@ -88,7 +89,7 @@ get_from_cache(UserName) ->
     catch
         error:badarg ->
             maybe_increment_auth_cache_miss(UserName),
-            load_user_from_db(UserName)
+            load_user_from_db(Req, UserName)
     end.
 
 maybe_increment_auth_cache_miss(UserName) ->
@@ -211,8 +212,9 @@ handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, Dst, restart_config_listener).
 
 
-load_user_from_db(UserName) ->
-    {ok, Db} = fabric2_db:open(dbname(), [?ADMIN_CTX]),
+load_user_from_db(#httpd{request_ctx = RequestCtx}, UserName) ->
+    Options = [?ADMIN_CTX, {request_ctx, RequestCtx}],
+    {ok, Db} = fabric2_db:open(dbname(), Options),
     try fabric2_db:open_doc(Db, docid(UserName), [conflicts]) of
     {ok, Doc} ->
         {Props} = couch_doc:to_json_obj(Doc, []),
