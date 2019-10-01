@@ -45,6 +45,7 @@
     get_security/1,
     get_update_seq/1,
     get_user_ctx/1,
+    get_request_ctx/1,
     get_uuid/1,
     %% get_purge_seq/1,
     %% get_oldest_purge_seq/1,
@@ -123,7 +124,9 @@
     validate_dbname/1,
 
     %% make_doc/5,
-    new_revid/2
+    new_revid/2,
+    contexts_to_list/1,
+    set_contexts/2
 ]).
 
 
@@ -176,8 +179,9 @@ open(DbName, Options) ->
     case fabric2_server:fetch(DbName) of
         #{} = Db ->
             Db1 = maybe_set_user_ctx(Db, Options),
-            ok = check_is_member(Db1),
-            {ok, Db1};
+            Db2 = maybe_set_request_ctx(Db1, Options),
+            ok = check_is_member(Db2),
+            {ok, Db2};
         undefined ->
             Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
                 fabric2_fdb:open(TxDb, Options)
@@ -385,6 +389,8 @@ get_user_ctx(#{user_ctx := UserCtx}) ->
 get_uuid(#{uuid := UUID}) ->
     UUID.
 
+get_request_ctx(#{request_ctx := RequestCtx}) ->
+    RequestCtx.
 
 is_clustered(#{}) ->
     false.
@@ -994,6 +1000,13 @@ maybe_set_user_ctx(Db, Options) ->
             Db
     end.
 
+maybe_set_request_ctx(Db, Options) ->
+    case fabric2_util:get_value(request_ctx, Options) of
+        #{} = RequestCtx ->
+            Db#{request_ctx => RequestCtx};
+        undefined ->
+            Db
+    end.
 
 is_member(Db, {SecProps}) when is_list(SecProps) ->
     case is_admin(Db, {SecProps}) of
@@ -1752,4 +1765,22 @@ stem_revisions(#{} = Db, #doc{} = Doc) ->
     case RevPos >= RevsLimit of
         true -> Doc#doc{revs = {RevPos, lists:sublist(Revs, RevsLimit)}};
         false -> Doc
+    end.
+
+
+contexts_to_list(Db) ->
+    set_contexts(Db, []).
+
+set_contexts(#{} = Db, KVList0) ->
+    %% Supplied options win
+    RequestCtx = fabric2_fdb:get_request_ctx(Db),
+    UserCtx = fabric2_fdb:get_user_ctx(Db),
+    KVList1 = set_if_not_present(KVList0, request_ctx, RequestCtx),
+    KVList2 = set_if_not_present(KVList1, user_ctx, UserCtx),
+    KVList2.
+
+set_if_not_present(KVList, Key, Value) ->
+    case lists:keymember(Key, 1, KVList) of
+        true -> KVList;
+        false -> [{Key, Value} | KVList]
     end.
