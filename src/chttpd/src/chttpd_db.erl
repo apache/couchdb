@@ -330,7 +330,7 @@ update_partition_stats(PathParts) ->
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) ->
-    DbName = fabric2_db:name(Db),
+%%    DbName = fabric2_db:name(Db),
 %%    case ddoc_cache:open(DbName, <<"_design/", Name/binary>>) of
     case fabric2_db:open_doc(Db, <<"_design/", Name/binary>>) of
     {ok, DDoc} ->
