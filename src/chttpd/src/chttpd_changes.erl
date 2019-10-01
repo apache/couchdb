@@ -658,8 +658,7 @@ send_lookup_changes(FullDocInfos, StartSeq, Dir, Db, Fun, Acc0) ->
 keep_sending_changes(Args, Acc0, FirstRound) ->
     #changes_args{
         feed = ResponseType,
-        limit = Limit,
-        db_open_options = DbOptions
+        limit = Limit
     } = Args,
 
     {ok, ChangesAcc} = send_changes(Acc0, fwd, FirstRound),
@@ -678,9 +677,8 @@ keep_sending_changes(Args, Acc0, FirstRound) ->
         if Go /= ok -> end_sending_changes(Callback, UserAcc3, EndSeq); true ->
             case wait_updated(Timeout, TimeoutFun, UserAcc3) of
             {updated, UserAcc4} ->
-                UserCtx = fabric2_db:get_user_ctx(Db),
-                DbOptions1 = [{user_ctx, UserCtx} | DbOptions],
-                case fabric2_db:open(fabric2_db:name(Db), DbOptions1) of
+                DbOptions = fabric2_db:contexts_to_list(Db),
+                case fabric2_db:open(fabric2_db:name(Db), DbOptions) of
                 {ok, Db2} ->
                     ?MODULE:keep_sending_changes(
                       Args#changes_args{limit=NewLimit},
