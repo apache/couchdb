@@ -31,6 +31,10 @@
     get_config/2,
     set_config/3,
 
+    get_contexts/1,
+    get_request_ctx/1,
+    get_user_ctx/1,
+
     get_stat/2,
     incr_stat/3,
 
@@ -165,6 +169,8 @@ create(#{} = Db0, Options) ->
 
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
     Options1 = lists:keydelete(user_ctx, 1, Options),
+    RequestCtx = fabric2_util:get_value(request_ctx, Options, #{}),
+    Options2 = lists:keydelete(request_ctx, 1, Options),
 
     Db#{
         uuid => UUID,
@@ -174,13 +180,14 @@ create(#{} = Db0, Options) ->
         revs_limit => 1000,
         security_doc => {[]},
         user_ctx => UserCtx,
+        request_ctx => RequestCtx,
 
         validate_doc_update_funs => [],
         before_doc_update => undefined,
         after_doc_read => undefined,
         % All other db things as we add features,
 
-        db_options => Options1
+        db_options => Options2
     }.
 
 
@@ -202,6 +209,8 @@ open(#{} = Db0, Options) ->
 
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
     Options1 = lists:keydelete(user_ctx, 1, Options),
+    RequestCtx = fabric2_util:get_value(request_ctx, Options1, #{}),
+    Options2 = lists:keydelete(request_ctx, 1, Options1),
 
     Db2 = Db1#{
         db_prefix => DbPrefix,
@@ -210,14 +219,14 @@ open(#{} = Db0, Options) ->
         revs_limit => 1000,
         security_doc => {[]},
         user_ctx => UserCtx,
+        request_ctx => RequestCtx,
 
         % Place holders until we implement these
         % bits.
         validate_doc_update_funs => [],
         before_doc_update => undefined,
         after_doc_read => undefined,
-
-        db_options => Options1
+        db_options => Options2
     },
 
     Db3 = lists:foldl(fun({Key, Val}, DbAcc) ->
@@ -240,10 +249,12 @@ reopen(#{} = OldDb) ->
         tx := Tx,
         name := DbName,
         db_options := Options,
-        user_ctx := UserCtx
+        user_ctx := UserCtx,
+        request_ctx := RequestCtx
     } = OldDb,
     Options1 = lists:keystore(user_ctx, 1, Options, {user_ctx, UserCtx}),
-    open(init_db(Tx, DbName, Options1), Options1).
+    Options2 = lists:keystore(request_ctx, 1, Options1, {request_ctx, RequestCtx}),
+    open(init_db(Tx, DbName, Options2), Options2).
 
 
 delete(#{} = Db) ->
@@ -373,6 +384,18 @@ set_config(#{} = Db, ConfigKey, ConfigVal) ->
     erlfdb:set(Tx, Key, ConfigVal),
     bump_db_version(Db).
 
+
+get_contexts(#{} = Db) ->
+    [
+        {user_ctx, get_user_ctx(Db)},
+        {request_ctx, get_request_ctx(Db)}
+    ].
+
+get_request_ctx(#{} = Db) ->
+    maps:get(request_ctx, Db, #{}).
+
+get_user_ctx(#{} = Db) ->
+    maps:get(user_ctx, Db, #user_ctx{}).
 
 get_stat(#{} = Db, StatKey) ->
     #{
