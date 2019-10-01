@@ -355,10 +355,10 @@ handle_design_info_req(#httpd{method='GET'}=Req, Db, #doc{} = DDoc) ->
 handle_design_info_req(Req, _Db, _DDoc) ->
     send_method_not_allowed(Req, "GET").
 
-create_db_req(#httpd{user_ctx=Ctx}=Req, DbName) ->
+create_db_req(#httpd{}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-    case fabric2_db:create(DbName, [{user_ctx, Ctx}]) of
+    case fabric2_db:create(DbName, chttpd:contexts_to_list(Req)) of
         {ok, _} ->
             send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
         {error, file_exists} ->
@@ -367,17 +367,17 @@ create_db_req(#httpd{user_ctx=Ctx}=Req, DbName) ->
             throw(Error)
     end.
 
-delete_db_req(#httpd{user_ctx=Ctx}=Req, DbName) ->
+delete_db_req(#httpd{}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
-    case fabric2_db:delete(DbName, [{user_ctx, Ctx}]) of
+    case fabric2_db:delete(DbName, chttpd:contexts_to_list(Req)) of
         ok ->
             send_json(Req, 200, {[{ok, true}]});
         Error ->
             throw(Error)
     end.
 
-do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
-    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, Ctx}]),
+do_db_req(#httpd{path_parts=[DbName|_]}=Req, Fun) ->
+    {ok, Db} = fabric2_db:open(DbName, chttpd:contexts_to_list(Req)),
     Fun(Req, Db).
 
 db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->

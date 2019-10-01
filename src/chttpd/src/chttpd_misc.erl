@@ -107,7 +107,7 @@ maybe_add_csp_headers(Headers, "true") ->
 maybe_add_csp_headers(Headers, _) ->
     Headers.
 
-handle_all_dbs_req(#httpd{method='GET', request_ctx=RequestCtx}=Req) ->
+handle_all_dbs_req(#httpd{method='GET'}=Req) ->
     #mrargs{
         start_key = StartKey,
         end_key = EndKey,
@@ -121,8 +121,7 @@ handle_all_dbs_req(#httpd{method='GET', request_ctx=RequestCtx}=Req) ->
         {end_key, EndKey},
         {dir, Dir},
         {limit, Limit},
-        {skip, Skip},
-        {request_ctx, RequestCtx}
+        {skip, Skip}
     ],
 
     % Eventually the Etag for this request will be derived
@@ -133,7 +132,7 @@ handle_all_dbs_req(#httpd{method='GET', request_ctx=RequestCtx}=Req) ->
         {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"ETag",Etag}]),
         Callback = fun all_dbs_callback/2,
         Acc = #vacc{req=Req,resp=Resp},
-        fabric2_db:list_dbs(Callback, Acc, Options)
+        fabric2_db:list_dbs(Callback, Acc, chttpd:set_contexts(Req, Options))
     end),
     case is_record(Resp, vacc) of
         true -> {ok, Resp#vacc.resp};
@@ -158,7 +157,7 @@ all_dbs_callback({error, Reason}, #vacc{resp=Resp0}=Acc) ->
     {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
     {ok, Acc#vacc{resp=Resp1}}.
 
-handle_dbs_info_req(#httpd{method='POST', user_ctx=UserCtx}=Req) ->
+handle_dbs_info_req(#httpd{method='POST'}=Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = chttpd:json_body_obj(Req),
     Keys = couch_mrview_util:get_view_keys(Props),
@@ -176,7 +175,7 @@ handle_dbs_info_req(#httpd{method='POST', user_ctx=UserCtx}=Req) ->
     send_chunk(Resp, "["),
     lists:foldl(fun(DbName, AccSeparator) ->
         try
-            {ok, Db} = fabric2_db:open(DbName, [{user_ctx, UserCtx}]),
+            {ok, Db} = fabric2_db:open(DbName, chttpd:contexts_to_list(Req)),
             {ok, Info} = fabric2_db:get_db_info(Db),
             Json = ?JSON_ENCODE({[{key, DbName}, {info, {Info}}]}),
             send_chunk(Resp, AccSeparator ++ Json)
