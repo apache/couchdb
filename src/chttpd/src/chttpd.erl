@@ -44,7 +44,9 @@
 
 -export([
     chunked_response_buffer_size/0,
-    close_delayed_json_object/4
+    close_delayed_json_object/4,
+    contexts_to_list/1,
+    set_contexts/2
 ]).
 
 -record(delayed_resp, {
@@ -1236,6 +1238,14 @@ span_ok(_Resp) ->
 
 span_error(_ErrorStr, _ReasonStr, []) ->
     fun(Span) -> Span end.
+
+contexts_to_list(Req) ->
+    set_contexts(Req, []).
+
+set_contexts(#httpd{user_ctx=UserCtx, request_ctx=RequestCtx}, KVList0) ->
+    KVList1 = lists:keystore(request_ctx, 1, KVList0, {request_ctx, RequestCtx}),
+    KVList2 = lists:keystore(user_ctx, 1, KVList1, {user_ctx, UserCtx}),
+    KVList2.
 
 -ifdef(TEST).
 
