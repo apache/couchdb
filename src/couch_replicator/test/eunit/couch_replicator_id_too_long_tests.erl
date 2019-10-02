@@ -77,7 +77,6 @@ create_doc(DbName) ->
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     Doc = couch_doc:from_json_obj({[{<<"_id">>, <<"12345">>}]}),
     {ok, _} = couch_db:update_doc(Db, Doc, []),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db).
 
 

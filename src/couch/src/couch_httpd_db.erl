@@ -283,23 +283,7 @@ db_req(#httpd{path_parts=[_DbName]}=Req, _Db) ->
 db_req(#httpd{method='POST',path_parts=[_,<<"_ensure_full_commit">>]}=Req, Db) ->
     couch_httpd:validate_ctype(Req, "application/json"),
     _ = couch_httpd:body(Req),
-    UpdateSeq = couch_db:get_update_seq(Db),
-    CommittedSeq = couch_db:get_committed_update_seq(Db),
-    {ok, StartTime} =
-    case couch_httpd:qs_value(Req, "seq") of
-    undefined ->
-        couch_db:ensure_full_commit(Db);
-    RequiredStr ->
-        RequiredSeq = list_to_integer(RequiredStr),
-        if RequiredSeq > UpdateSeq ->
-            throw({bad_request,
-                "can't do a full commit ahead of current update_seq"});
-        RequiredSeq > CommittedSeq ->
-            couch_db:ensure_full_commit(Db);
-        true ->
-            {ok, couch_db:get_instance_start_time(Db)}
-        end
-    end,
+    StartTime = couch_db:get_instance_start_time(Db),
     send_json(Req, 201, {[
         {ok, true},
         {instance_start_time, StartTime}

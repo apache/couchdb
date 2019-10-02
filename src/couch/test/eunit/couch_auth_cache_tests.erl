@@ -191,7 +191,6 @@ should_restore_cache_after_userdoc_recreation(DbName) ->
 should_drop_cache_on_auth_db_change(DbName) ->
     ?_test(begin
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
-        full_commit(DbName),
         config:set("couch_httpd_auth", "authentication_db",
                          ?b2l(?tempdb()), false),
         ?assertEqual(nil, couch_auth_cache:get_user_creds("joe"))
@@ -202,14 +201,12 @@ should_restore_cache_on_auth_db_change(DbName) ->
         PasswordHash = hash_password("pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
-        full_commit(DbName),
 
         DbName1 = ?tempdb(),
         config:set("couch_httpd_auth", "authentication_db",
                          ?b2l(DbName1), false),
 
         {ok, _} = update_user_doc(DbName1, "joe", "pass5"),
-        full_commit(DbName1),
 
         config:set("couch_httpd_auth", "authentication_db",
                          ?b2l(DbName), false),
@@ -224,7 +221,6 @@ should_recover_cache_after_shutdown(DbName) ->
         PasswordHash = hash_password("pass2"),
         {ok, Rev0} = update_user_doc(DbName, "joe", "pass1"),
         {ok, Rev1} = update_user_doc(DbName, "joe", "pass2", Rev0),
-        full_commit(DbName),
         shutdown_db(DbName),
         {ok, Rev1} = get_doc_rev(DbName, "joe"),
         ?assertEqual(PasswordHash, get_user_doc_password_sha(DbName, "joe"))
@@ -326,11 +322,6 @@ delete_user_doc(DbName, UserName) ->
         {<<"_deleted">>, true}
     ]}),
     {ok, _} = couch_db:update_doc(AuthDb, DeletedDoc, []),
-    ok = couch_db:close(AuthDb).
-
-full_commit(DbName) ->
-    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
-    {ok, _} = couch_db:ensure_full_commit(AuthDb),
     ok = couch_db:close(AuthDb).
 
 is_opened(DbName) ->

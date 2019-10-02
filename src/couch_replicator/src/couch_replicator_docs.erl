@@ -805,8 +805,7 @@ create_vdu(DbName) ->
             id = <<"_design/vdu">>,
             body = {[{<<"validate_doc_update">>, VduFun}]}
         },
-        {ok, _} = couch_db:update_docs(Db, [Doc]),
-        couch_db:ensure_full_commit(Db)
+        {ok, _} = couch_db:update_docs(Db, [Doc])
     end).
 
 

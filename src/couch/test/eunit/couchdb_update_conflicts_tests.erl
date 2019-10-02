@@ -22,9 +22,8 @@
 -define(TIMEOUT, 20000).
 
 start() ->
-    Ctx = test_util:start_couch(),
-    config:set("couchdb", "delayed_commits", "true", false),
-    Ctx.
+    test_util:start_couch().
+
 
 setup() ->
     DbName = ?tempdb(),
