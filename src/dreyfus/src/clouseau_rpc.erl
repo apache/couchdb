@@ -98,13 +98,8 @@ connected() ->
         true ->
             true;
         false ->
-            % We might have just booted up, so let's send a test RPC
-            case (catch version()) of
-                {ok, _} ->
-                    true;
-                _Err ->
-                    false
-            end
+            % We might have just booted up, so let's ping
+            pong == net_adm:ping(clouseau())
     end.
 
 rpc(Ref, Msg) ->
