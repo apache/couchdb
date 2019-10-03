@@ -744,7 +744,7 @@ t_find_shard() ->
     ?_test(begin
         DbName = ?tempdb(),
         ok = fabric:create_db(DbName, [?CTX]),
-        ?assertEqual(8, length(local_shards(DbName))),
+        ?assertEqual(2, length(local_shards(DbName))),
         fabric:delete_db(DbName, [?CTX])
     end).
 
