@@ -18,7 +18,7 @@ assignees: ''
 
 [NOTE]: # ( Include commands to reproduce, if possible. curl is preferred. )
 
-## Expected Behavior
+## Expected Behaviour
 
 [NOTE]: # ( Tell us what you expected to happen. )
 
