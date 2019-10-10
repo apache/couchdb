@@ -20,7 +20,6 @@
     parse_rep_doc_without_id/2,
     before_doc_update/3,
     after_doc_read/2,
-    ensure_rep_db_exists/0,
     ensure_rep_ddoc_exists/1,
     ensure_cluster_rep_ddoc_exists/1,
     remove_state_fields/2,
@@ -119,20 +118,6 @@ update_error(#rep{db_name = DbName, doc_id = DocId, id = RepId}, Error) ->
         {<<"_replication_stats">>, undefined},
         {<<"_replication_id">>, BinRepId}]),
     ok.
-
-
--spec ensure_rep_db_exists() -> {ok, Db::any()}.
-ensure_rep_db_exists() ->
-    Db = case couch_db:open_int(?REP_DB_NAME, [?CTX, sys_db,
-            nologifmissing]) of
-        {ok, Db0} ->
-            Db0;
-        _Error ->
-            {ok, Db0} = couch_db:create(?REP_DB_NAME, [?CTX, sys_db]),
-            Db0
-    end,
-    ok = ensure_rep_ddoc_exists(?REP_DB_NAME),
-    {ok, Db}.
 
 
 -spec ensure_rep_ddoc_exists(binary()) -> ok.

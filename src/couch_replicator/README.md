@@ -278,14 +278,6 @@ A description of each child:
         of replications running, having each one checking their filter often is
         not a good idea.
 
- * `couch_replicator`: This is an unusual but useful pattern. This child is not
-   an actual process but a one-time call to the
-   `couch_replicator:ensure_rep_db_exists/0` function, executed by the
-   supervisor in the correct order (and monitored for crashes). This ensures
-   the local replicator db exists, then returns `ignore`. This pattern is
-   useful for doing setup-like things at the top level and in the correct order
-   regarding the rest of the children in the supervisor.
-
  * `couch_replicator_db_changes`: This process specializes and configures
    `couch_multidb_changes` so that it looks for `_replicator` suffixed shards
    and makes sure to restart it when node membership changes.
