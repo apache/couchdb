@@ -14,7 +14,6 @@
 
 -export([
     replicate/2,
-    ensure_rep_db_exists/0,
     replication_states/0,
     job/1,
     doc/3,
@@ -77,14 +76,6 @@ replicate(PostBody, Ctx) ->
         couch_replicator_notifier:stop(Listener),
         Result
     end.
-
-
-% This is called from supervisor. Must respect supervisor protocol so
-% it returns `ignore`.
--spec ensure_rep_db_exists() -> ignore.
-ensure_rep_db_exists() ->
-    {ok, _Db} = couch_replicator_docs:ensure_rep_db_exists(),
-    ignore.
 
 
 -spec do_replication_loop(#rep{}) ->
