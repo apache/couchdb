@@ -25,8 +25,7 @@
     handle_utils_dir_req/2,
     handle_uuids_req/1,
     handle_welcome_req/1,
-    handle_welcome_req/2,
-    get_stats/0
+    handle_welcome_req/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -273,85 +272,6 @@ handle_uuids_req(Req) ->
     couch_httpd_misc_handlers:handle_uuids_req(Req).
 
 
-get_stats() ->
-    Other = erlang:memory(system) - lists:sum([X || {_,X} <-
-        erlang:memory([atom, code, binary, ets])]),
-    Memory = [{other, Other} | erlang:memory([atom, atom_used, processes,
-        processes_used, binary, code, ets])],
-    {NumberOfGCs, WordsReclaimed, _} = statistics(garbage_collection),
-    {{input, Input}, {output, Output}} = statistics(io),
-    {CF, CDU} = db_pid_stats(),
-    MessageQueues0 = [{couch_file, {CF}}, {couch_db_updater, {CDU}}],
-    MessageQueues = MessageQueues0 ++ message_queues(registered()),
-    [
-        {uptime, couch_app:uptime() div 1000},
-        {memory, {Memory}},
-        {run_queue, statistics(run_queue)},
-        {ets_table_count, length(ets:all())},
-        {context_switches, element(1, statistics(context_switches))},
-        {reductions, element(1, statistics(reductions))},
-        {garbage_collection_count, NumberOfGCs},
-        {words_reclaimed, WordsReclaimed},
-        {io_input, Input},
-        {io_output, Output},
-        {os_proc_count, couch_proc_manager:get_proc_count()},
-        {stale_proc_count, couch_proc_manager:get_stale_proc_count()},
-        {process_count, erlang:system_info(process_count)},
-        {process_limit, erlang:system_info(process_limit)},
-        {message_queues, {MessageQueues}},
-        {internal_replication_jobs, mem3_sync:get_backlog()},
-        {distribution, {get_distribution_stats()}}
-    ].
-
-db_pid_stats() ->
-    {monitors, M} = process_info(whereis(couch_stats_process_tracker), monitors),
-    Candidates = [Pid || {process, Pid} <- M],
-    CouchFiles = db_pid_stats(couch_file, Candidates),
-    CouchDbUpdaters = db_pid_stats(couch_db_updater, Candidates),
-    {CouchFiles, CouchDbUpdaters}.
-
-db_pid_stats(Mod, Candidates) ->
-    Mailboxes = lists:foldl(
-        fun(Pid, Acc) ->
-            case process_info(Pid, [message_queue_len, dictionary]) of
-                undefined ->
-                    Acc;
-                PI ->
-                    Dictionary = proplists:get_value(dictionary, PI, []),
-                    case proplists:get_value('$initial_call', Dictionary) of
-                        {Mod, init, 1} ->
-                            case proplists:get_value(message_queue_len, PI) of
-                                undefined -> Acc;
-                                Len -> [Len|Acc]
-                            end;
-                        _  ->
-                            Acc
-                    end
-            end
-        end, [], Candidates
-    ),
-    format_pid_stats(Mailboxes).
-
-format_pid_stats([]) ->
-    [];
-format_pid_stats(Mailboxes) ->
-    Sorted = lists:sort(Mailboxes),
-    Count = length(Sorted),
-    [
-        {count, Count},
-        {min, hd(Sorted)},
-        {max, lists:nth(Count, Sorted)},
-        {'50', lists:nth(round(Count * 0.5), Sorted)},
-        {'90', lists:nth(round(Count * 0.9), Sorted)},
-        {'99', lists:nth(round(Count * 0.99), Sorted)}
-    ].
-
-get_distribution_stats() ->
-    lists:map(fun({Node, Socket}) ->
-        {ok, Stats} = inet:getstat(Socket),
-        {Node, {Stats}}
-    end, erlang:system_info(dist_ctrl)).
-
 handle_up_req(#httpd{method='GET'} = Req) ->
     case config:get("couchdb", "maintenance_mode") of
     "true" ->
@@ -370,13 +290,6 @@ handle_up_req(#httpd{method='GET'} = Req) ->
 
 handle_up_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
-
-message_queues(Registered) ->
-    lists:map(fun(Name) ->
-        Type = message_queue_len,
-        {Type, Length} = process_info(whereis(Name), Type),
-        {Name, Length}
-    end, Registered).
 
 get_docroot() ->
     % if the env var isn’t set, let’s not throw an error, but
