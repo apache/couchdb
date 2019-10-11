@@ -19,7 +19,6 @@
     handle_favicon_req/2,
     handle_replicate_req/1,
     handle_reload_query_servers_req/1,
-    handle_system_req/1,
     handle_task_status_req/1,
     handle_up_req/1,
     handle_utils_dir_req/1,
@@ -273,13 +272,6 @@ handle_reload_query_servers_req(Req) ->
 handle_uuids_req(Req) ->
     couch_httpd_misc_handlers:handle_uuids_req(Req).
 
-
-% Note: this resource is exposed on the backdoor interface, but it's in chttpd
-% because it's not couch trunk
-handle_system_req(Req) ->
-    Stats = get_stats(),
-    EJSON = couch_stats_httpd:to_ejson(Stats),
-    send_json(Req, EJSON).
 
 get_stats() ->
     Other = erlang:memory(system) - lists:sum([X || {_,X} <-
