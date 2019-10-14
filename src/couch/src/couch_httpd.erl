@@ -37,6 +37,7 @@
 -export([validate_host/1]).
 -export([validate_bind_address/1]).
 -export([check_max_request_length/1]).
+-export([handle_request/1]).
 
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
@@ -218,6 +219,9 @@ make_arity_3_fun(SpecStr) ->
 % SpecStr is "{my_module, my_fun}, {my_module2, my_fun2}"
 make_fun_spec_strs(SpecStr) ->
     re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}]).
+
+handle_request(MochiReq) ->
+    apply(?MODULE, handle_request, [MochiReq | get_httpd_handlers()]).
 
 handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
     DesignUrlHandlers) ->
