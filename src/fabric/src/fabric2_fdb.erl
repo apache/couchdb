@@ -24,7 +24,7 @@
     delete/1,
     exists/1,
 
-    create_or_open_couchdb_dir/1,
+    get_dir/1,
 
     list_dbs/4,
 
@@ -276,7 +276,7 @@ exists(#{name := DbName} = Db) when is_binary(DbName) ->
     end.
 
 
-create_or_open_couchdb_dir(Tx) ->
+get_dir(Tx) ->
     Root = erlfdb_directory:root(),
     Dir = fabric2_server:fdb_directory(),
     CouchDB = erlfdb_directory:create_or_open(Tx, Root, Dir),
@@ -284,7 +284,7 @@ create_or_open_couchdb_dir(Tx) ->
 
 
 list_dbs(Tx, Callback, AccIn, Options) ->
-    LayerPrefix = create_or_open_couchdb_dir(Tx),
+    LayerPrefix = get_dir(Tx),
     Prefix = erlfdb_tuple:pack({?ALL_DBS}, LayerPrefix),
     fold_range({tx, Tx}, Prefix, fun({K, _V}, Acc) ->
         {DbName} = erlfdb_tuple:unpack(K, Prefix),
@@ -787,7 +787,7 @@ debug_cluster(Start, End) ->
 
 
 init_db(Tx, DbName, Options) ->
-    Prefix = create_or_open_couchdb_dir(Tx),
+    Prefix = get_dir(Tx),
     Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
     #{
         name => DbName,
