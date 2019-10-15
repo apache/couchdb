@@ -44,7 +44,7 @@ start_link() ->
 
 
 create(Tx, undefined) ->
-    Prefix = fabric2_fdb:create_or_open_couchdb_dir(Tx),
+    Prefix = fabric2_fdb:get_dir(Tx),
     create(Tx, Prefix);
 
 create(_Tx, LayerPrefix) ->
@@ -133,7 +133,7 @@ clean(St, NeedsSweep) ->
 
 
 sweep(Tx, {Mega, Secs, Micro}) ->
-    Prefix = fabric2_fdb:create_or_open_couchdb_dir(Tx),
+    Prefix = fabric2_fdb:get_dir(Tx),
     StartKey = erlfdb_tuple:pack({?TX_IDS}, Prefix),
     EndKey = erlfdb_tuple:pack({?TX_IDS, Mega, Secs, Micro}, Prefix),
     erlfdb:set_option(Tx, next_write_no_write_conflict_range),

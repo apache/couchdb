@@ -615,7 +615,7 @@ init_jtx(undefined) ->
     fabric2_fdb:transactional(fun(Tx) -> init_jtx(Tx) end);
 
 init_jtx({erlfdb_transaction, _} = Tx) ->
-    LayerPrefix = fabric2_fdb:create_or_open_couchdb_dir(Tx),
+    LayerPrefix = fabric2_fdb:get_dir(Tx),
     Jobs = erlfdb_tuple:pack({?JOBS}, LayerPrefix),
     Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
     % layer_prefix, md_version and tx here match db map fields in fabric2_fdb
