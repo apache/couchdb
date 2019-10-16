@@ -238,6 +238,8 @@ handle_request_int(MochiReq) ->
     erlang:put(dont_log_request, true),
     erlang:put(dont_log_response, true),
 
+    maybe_trace_fdb(MochiReq:get_header_value("x-couchdb-fdb-trace")),
+
     {HttpReq2, Response} = case before_request(HttpReq0) of
         {ok, HttpReq1} ->
             process_request(HttpReq1);
@@ -1213,6 +1215,22 @@ get_user(#httpd{user_ctx = #user_ctx{name = User}}) ->
     couch_util:url_encode(User);
 get_user(#httpd{user_ctx = undefined}) ->
     "undefined".
+
+maybe_trace_fdb("true") ->
+    % Remember to also enable tracing in erlfdb application environment:
+    %   network_options = [{trace_enable, ...}]
+    % Or via the OS environment variable:
+    %   FDB_NETWORK_OPTION_TRACE_ENABLE = ""
+    case config:get_boolean("fabric", "fdb_trace", false) of
+        true ->
+            Nonce = erlang:get(nonce),
+            erlang:put(erlfdb_trace, list_to_binary(Nonce));
+        false ->
+            ok
+    end;
+maybe_trace_fdb(_) ->
+    ok.
+
 
 -ifdef(TEST).
 
