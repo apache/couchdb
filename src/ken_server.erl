@@ -525,8 +525,9 @@ prune_worker_table(State) ->
     State#state{pruned_last = erlang:monotonic_time()}.
 
 allowed_languages() ->
-    Config = config:get("query_servers") ++ config:get("native_query_servers"),
-    [list_to_binary(Lang) || {Lang, _Cmd} <- Config].
+    Config = couch_proc_manager:get_servers_from_env("COUCHDB_QUERY_SERVER_") ++
+        couch_proc_manager:get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_"),
+    [list_to_binary(string:to_lower(Lang)) || {Lang, _Cmd} <- Config].
 
 config(Key, Default) ->
     config:get("ken", Key, Default).
