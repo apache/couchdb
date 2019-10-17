@@ -86,7 +86,7 @@ couchTests.view_update_seq = function(debug) {
   resp = db.view('test/all_docs',
     {limit: 1, stale: "update_after", update_seq: true});
   T(resp.rows.length == 1);
-  TEquals(101, seqInt(resp.update_seq));
+  T(seqInt(resp.update_seq) == 101 || seqInt(resp.update_seq) == 102);
 
   // wait 5 seconds for the next assertions to pass in very slow machines
   var t0 = new Date(), t1;
