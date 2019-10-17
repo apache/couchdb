@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2.hrl").
 
 
 -define(TDEF(A), {atom_to_list(A), fun A/1}).
@@ -34,7 +35,9 @@ misc_test_() ->
                 fun set_revs_limit/1,
                 fun set_security/1,
                 fun is_system_db/1,
-                fun ensure_full_commit/1
+                fun ensure_full_commit/1,
+                fun metadata_bump/1,
+                fun db_version_bump/1
             ]}
         }
     }.
@@ -111,3 +114,54 @@ is_system_db({DbName, Db, _}) ->
 ensure_full_commit({_, Db, _}) ->
     ?assertEqual({ok, 0}, fabric2_db:ensure_full_commit(Db)),
     ?assertEqual({ok, 0}, fabric2_db:ensure_full_commit(Db, 5)).
+
+
+metadata_bump({DbName, _, _}) ->
+    % Call open again here to make sure we have a version in the cache
+    % as we'll be checking if that version gets its metadata bumped
+    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, ?ADMIN_USER}]),
+
+    % Emulate a remote client bumping the metadataversion
+    {ok, Fdb} = application:get_env(fabric, db),
+    erlfdb:transactional(Fdb, fun(Tx) ->
+        erlfdb:set_versionstamped_value(Tx, ?METADATA_VERSION_KEY, <<0:112>>)
+    end),
+    NewMDVersion = erlfdb:transactional(Fdb, fun(Tx) ->
+        erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY))
+    end),
+
+    % Perform a random operation which calls ensure_current
+    {ok, _} = fabric2_db:get_db_info(Db),
+
+    % Check that db handle in the cache got the new metadata version
+    ?assertMatch(#{md_version := NewMDVersion}, fabric2_server:fetch(DbName)).
+
+
+db_version_bump({DbName, _, _}) ->
+    % Call open again here to make sure we have a version in the cache
+    % as we'll be checking if that version gets its metadata bumped
+    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, ?ADMIN_USER}]),
+
+    % Emulate a remote client bumping db version. We don't go through the
+    % regular db open + update security doc or something like that to make sure
+    % we don't touch the local cache
+    #{db_prefix := DbPrefix} = Db,
+    DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
+    {ok, Fdb} = application:get_env(fabric, db),
+    NewDbVersion = fabric2_util:uuid(),
+    erlfdb:transactional(Fdb, fun(Tx) ->
+        erlfdb:set(Tx, DbVersionKey, NewDbVersion),
+        erlfdb:set_versionstamped_value(Tx, ?METADATA_VERSION_KEY, <<0:112>>)
+    end),
+
+    % Perform a random operation which calls ensure_current
+    {ok, _} = fabric2_db:get_db_info(Db),
+
+    % After previous operation, the cache should have been cleared
+    ?assertMatch(undefined, fabric2_server:fetch(DbName)),
+
+    % Call open again and check that we have the latest db version
+    {ok, Db2} = fabric2_db:open(DbName, [{user_ctx, ?ADMIN_USER}]),
+
+    % Check that db handle in the cache got the new metadata version
+    ?assertMatch(#{db_version := NewDbVersion}, Db2).
