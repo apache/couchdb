@@ -117,7 +117,11 @@ do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
                 true ->
                     get_previous_transaction_result();
                 false ->
-                    execute_transaction(Tx, Fun, LayerPrefix)
+                    try
+                        execute_transaction(Tx, Fun, LayerPrefix)
+                    after
+                        erase({?PDICT_ON_COMMIT_FUN, Tx})
+                    end
             end
         end)
     after
@@ -864,6 +868,31 @@ bump_metadata_version(Tx) ->
     erlfdb:set_versionstamped_value(Tx, ?METADATA_VERSION_KEY, <<0:112>>).
 
 
+check_metadata_version(#{} = Db) ->
+    #{
+        tx := Tx,
+        layer_prefix := LayerPrefix,
+        name := DbName,
+        md_version := Version
+    } = Db,
+
+    AlreadyChecked = get(?PDICT_CHECKED_MD_IS_CURRENT),
+    if AlreadyChecked == true -> {current, Db}; true ->
+        case erlfdb:wait(erlfdb:get_ss(Tx, ?METADATA_VERSION_KEY)) of
+            Version ->
+                put(?PDICT_CHECKED_MD_IS_CURRENT, true),
+                % We want to set a read conflict on the db version as we'd want
+                % to to conflict with any writes to this particular db
+                DbPrefix = erlfdb_tuple:pack({?DBS, DbName}, LayerPrefix),
+                DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
+                erlfdb:add_read_conflict_key(Tx, DbVersionKey),
+                {current, Db};
+            NewVersion ->
+                {stale, Db#{md_version := NewVersion}}
+        end
+    end.
+
+
 bump_db_version(#{} = Db) ->
     #{
         tx := Tx,
@@ -872,7 +901,30 @@ bump_db_version(#{} = Db) ->
 
     DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
     DbVersion = fabric2_util:uuid(),
-    ok = erlfdb:set(Tx, DbVersionKey, DbVersion).
+    ok = erlfdb:set(Tx, DbVersionKey, DbVersion),
+    ok = bump_metadata_version(Tx).
+
+
+check_db_version(#{} = Db, CheckDbVersion) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix,
+        db_version := DbVersion
+    } = Db,
+
+    AlreadyChecked = get(?PDICT_CHECKED_DB_IS_CURRENT),
+    if not CheckDbVersion orelse AlreadyChecked == true -> Db; true ->
+        DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
+        case erlfdb:wait(erlfdb:get(Tx, DbVersionKey)) of
+            DbVersion ->
+                put(?PDICT_CHECKED_DB_IS_CURRENT, true),
+                on_commit(Tx, fun() -> fabric2_server:store(Db) end),
+                Db;
+            _NewDBVersion ->
+                fabric2_server:remove(maps:get(name, Db)),
+                throw({?MODULE, reopen})
+        end
+    end.
 
 
 write_doc_body(#{} = Db0, #doc{} = Doc) ->
@@ -1171,34 +1223,9 @@ ensure_current(Db) ->
 
 ensure_current(#{} = Db, CheckDbVersion) ->
     require_transaction(Db),
-
-    #{
-        tx := Tx,
-        md_version := MetaDataVersion
-    } = Db,
-
-    case erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)) of
-        MetaDataVersion -> Db;
-        _NewVersion -> throw({?MODULE, reopen})
-    end,
-
-    AlreadyChecked = get(?PDICT_CHECKED_DB_IS_CURRENT),
-    if not CheckDbVersion orelse AlreadyChecked == true -> Db; true ->
-        #{
-            db_prefix := DbPrefix,
-            db_version := DbVersion
-        } = Db,
-
-        DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
-
-        case erlfdb:wait(erlfdb:get(Tx, DbVersionKey)) of
-            DbVersion ->
-                put(?PDICT_CHECKED_DB_IS_CURRENT, true),
-                Db;
-            _NewDBVersion ->
-                fabric2_server:remove(maps:get(name, Db)),
-                throw({?MODULE, reopen})
-        end
+    case check_metadata_version(Db) of
+        {current, Db1} -> Db1;
+        {stale, Db1} -> check_db_version(Db1, CheckDbVersion)
     end.
 
 
@@ -1222,12 +1249,14 @@ execute_transaction(Tx, Fun, LayerPrefix) ->
             erlfdb:set(Tx, get_transaction_id(Tx, LayerPrefix), <<>>),
             put(?PDICT_TX_RES_KEY, Result)
     end,
+    ok = run_on_commit_fun(Tx),
     Result.
 
 
 clear_transaction() ->
     fabric2_txids:remove(get(?PDICT_TX_ID_KEY)),
     erase(?PDICT_CHECKED_DB_IS_CURRENT),
+    erase(?PDICT_CHECKED_MD_IS_CURRENT),
     erase(?PDICT_TX_ID_KEY),
     erase(?PDICT_TX_RES_KEY).
 
@@ -1259,3 +1288,24 @@ new_versionstamp(Tx) ->
     TxId = erlfdb:get_next_tx_id(Tx),
     {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF, TxId}.
 
+
+on_commit(Tx, Fun) when is_function(Fun, 0) ->
+    % Here we rely on Tx objects matching. However they contain a nif resource
+    % object. Before Erlang 20.0 those would have been represented as empty
+    % binaries and would have compared equal to each other. See
+    % http://erlang.org/doc/man/erl_nif.html for more info. We assume we run on
+    % Erlang 20+ here and don't worry about that anymore.
+    case get({?PDICT_ON_COMMIT_FUN, Tx}) of
+        undefined -> put({?PDICT_ON_COMMIT_FUN, Tx}, Fun);
+        _ -> error({?MODULE, on_commit_function_already_set})
+    end.
+
+
+run_on_commit_fun(Tx) ->
+    case get({?PDICT_ON_COMMIT_FUN, Tx}) of
+        undefined ->
+            ok;
+        Fun when is_function(Fun, 0) ->
+            Fun(),
+            ok
+    end.
