@@ -527,7 +527,8 @@ prune_worker_table(State) ->
 allowed_languages() ->
     Config = couch_proc_manager:get_servers_from_env("COUCHDB_QUERY_SERVER_") ++
         couch_proc_manager:get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_"),
-    [list_to_binary(string:to_lower(Lang)) || {Lang, _Cmd} <- Config].
+    Allowed = [list_to_binary(string:to_lower(Lang)) || {Lang, _Cmd} <- Config],
+    [<<"query">> | Allowed].
 
 config(Key, Default) ->
     config:get("ken", Key, Default).
