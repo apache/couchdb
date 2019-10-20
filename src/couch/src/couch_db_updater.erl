@@ -198,9 +198,12 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
                     couch_event:notify(Db2#db.name, {ddoc_updated, DDocId})
                 end, UpdatedDDocIds),
                 couch_event:notify(Db2#db.name, ddoc_updated),
+                couch_log:info("~n--------~nupdating ddoc cache with ids: ~p", [UpdatedDDocIds]),
                 ddoc_cache:refresh(Db2#db.name, UpdatedDDocIds),
                 refresh_validate_doc_funs(Db2);
             false ->
+                couch_log:info("~n--------~nupdating ddoc cache NOPE", []),
+                
                 Db2
         end,
         {noreply, Db3, hibernate_if_no_idle_limit()}
@@ -339,6 +342,7 @@ refresh_validate_doc_funs(Db0) ->
     Db = Db0#db{user_ctx=?ADMIN_USER},
     {ok, DesignDocs} = couch_db:get_design_docs(Db),
     % TODO: filter out non-admin ddocs
+    couch_log:info("~n~nrefresh_validate_doc_funs() -> DesignDocs: ~p~n~n", [DesignDocs]),
     ProcessDocFuns = lists:flatmap(
         fun(DesignDocInfo) ->
             {ok, DesignDoc} = couch_db:open_doc_int(
@@ -622,12 +626,13 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
         length(LocalDocs2)
     ),
 
-    % Check if we just updated any design documents, and update the validation
-    % funs if we did.
+    % Check if we just updated any non-access design documents,
+    % and update the validation funs if we did.
+    NonAccessIds = [Id || [{_Client, #doc{id=Id,access=[]}}|_] <- DocsList],
     UpdatedDDocIds = lists:flatmap(fun
         (<<"_design/", _/binary>> = Id) -> [Id];
         (_) -> []
-    end, Ids),
+    end, NonAccessIds),
 
     {ok, commit_data(Db1, not FullCommit), UpdatedDDocIds}.
 

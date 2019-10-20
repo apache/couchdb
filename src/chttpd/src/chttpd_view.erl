@@ -16,12 +16,6 @@
 
 -export([handle_view_req/3, handle_temp_view_req/2]).
 
-validate_design_access(DDoc) ->
-    is_users_ddoc(DDoc).
-
-is_users_ddoc(#doc{access=[<<"_users">>]}) -> ok;
-is_users_ddoc(_) -> throw({forbidden, <<"per-user ddoc access">>}).
-
 multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Args0 = couch_mrview_http:parse_params(Req, undefined),
     {ok, #mrst{views=Views}} = couch_mrview_util:ddoc_to_mrst(Db, DDoc),
@@ -57,7 +51,7 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
 
 handle_view_req(#httpd{method='POST',
     path_parts=[_, _, _, _, ViewName, <<"queries">>]}=Req, Db, DDoc) ->
-    ok = validate_design_access(DDoc),
+    ok =  couch_util:validate_design_access(DDoc),
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     case couch_mrview_util:get_view_queries(Props) of
@@ -74,14 +68,14 @@ handle_view_req(#httpd{path_parts=[_, _, _, _, _, <<"queries">>]}=Req,
 
 handle_view_req(#httpd{method='GET',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
-    ok = validate_design_access(DDoc),
+    ok =  couch_util:validate_design_access(DDoc),
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
     design_doc_view(Req, Db, DDoc, ViewName, Keys);
 
 handle_view_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
-    ok = validate_design_access(DDoc),
+    ok =  couch_util:validate_design_access(DDoc),
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     Keys = couch_mrview_util:get_view_keys(Props),

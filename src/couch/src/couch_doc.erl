@@ -25,7 +25,7 @@
 
 -export([with_ejson_body/1]).
 -export([is_deleted/1]).
-
+-export([has_access/1, has_no_access/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -403,6 +403,15 @@ get_access({Props}) ->
     get_access(couch_doc:from_json_obj({Props}));
 get_access(#doc{access=Access}) ->
     Access.
+
+has_access(Doc) ->
+    has_access1(get_access(Doc)).
+    
+has_no_access(Doc) ->
+    not has_access1(get_access(Doc)).
+
+has_access1([]) -> false;
+has_access1(_) -> true.
 
 get_validate_doc_fun({Props}) ->
     get_validate_doc_fun(couch_doc:from_json_obj({Props}));

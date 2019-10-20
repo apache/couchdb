@@ -34,6 +34,8 @@ handle_doc_show_req(#httpd{
         path_parts=[_, _, _, _, ShowName, DocId]
     }=Req, Db, DDoc) ->
 
+    ok =  couch_util:validate_design_access(DDoc),
+
     % open the doc
     Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
     Doc = maybe_open_doc(Db, DocId, Options),
@@ -45,6 +47,8 @@ handle_doc_show_req(#httpd{
 handle_doc_show_req(#httpd{
         path_parts=[_, _, _, _, ShowName, DocId|Rest]
     }=Req, Db, DDoc) ->
+
+    ok =  couch_util:validate_design_access(DDoc),
 
     DocParts = [DocId|Rest],
     DocId1 = ?l2b(string:join([?b2l(P)|| P <- DocParts], "/")),
@@ -103,11 +107,13 @@ show_etag(#httpd{user_ctx=UserCtx}=Req, Doc, DDoc, More) ->
 handle_doc_update_req(#httpd{
         path_parts=[_, _, _, _, UpdateName]
     }=Req, Db, DDoc) ->
+    ok =  couch_util:validate_design_access(DDoc),
     send_doc_update_response(Req, Db, DDoc, UpdateName, nil, null);
 
 handle_doc_update_req(#httpd{
         path_parts=[_, _, _, _, UpdateName | DocIdParts]
     }=Req, Db, DDoc) ->
+    ok =  couch_util:validate_design_access(DDoc),
     DocId = ?l2b(string:join([?b2l(P) || P <- DocIdParts], "/")),
     Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
     Doc = maybe_open_doc(Db, DocId, Options),
@@ -159,12 +165,14 @@ handle_view_list_req(#httpd{method=Method,
         path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc)
         when Method =:= 'GET' orelse Method =:= 'OPTIONS' ->
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
+    ok =  couch_util:validate_design_access(DDoc),
     handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
 
 % view-list request with view and list from different design docs.
 handle_view_list_req(#httpd{method=Method,
         path_parts=[_, _, _, _, ListName, DesignName, ViewName]}=Req, Db, DDoc)
         when Method =:= 'GET' orelse Method =:= 'OPTIONS' ->
+    ok =  couch_util:validate_design_access(DDoc),
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
     handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
 
@@ -174,6 +182,7 @@ handle_view_list_req(#httpd{method=Method}=Req, _Db, _DDoc)
 
 handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
+    ok =  couch_util:validate_design_access(DDoc),
     chttpd:validate_ctype(Req, "application/json"),
     ReqBody = chttpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),
@@ -183,6 +192,7 @@ handle_view_list_req(#httpd{method='POST',
 
 handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ListName, DesignName, ViewName]}=Req, Db, DDoc) ->
+    ok =  couch_util:validate_design_access(DDoc),
     chttpd:validate_ctype(Req, "application/json"),
     ReqBody = chttpd:body(Req),
     {Props2} = ?JSON_DECODE(ReqBody),

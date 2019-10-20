@@ -648,7 +648,10 @@ get_design_docs(#db{name = <<"shards/", _/binary>> = ShardDbName}) ->
         Response
     end;
 get_design_docs(#db{} = Db) ->
-    FoldFun = fun(FDI, Acc) -> {ok, [FDI | Acc]} end,
+    FoldFun = fun(FDI, Acc) ->
+        couch_log:info("~n===========~nget_design_docs() FDI: ~p~n--------------~n", [FDI]),
+        {ok, [FDI | Acc]}
+    end,
     {ok, Docs} = fold_design_docs(Db, FoldFun, [], []),
     {ok, lists:reverse(Docs)}.
 
@@ -902,12 +905,18 @@ group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
 
 
 validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
-    case catch check_is_admin(Db) of
-        ok -> validate_ddoc(Db#db.name, Doc);
-        Error -> Error
-    end;
-validate_doc_update(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
+    case couch_doc:has_access(Doc) of
+        true ->
+            validate_ddoc(Db#db.name, Doc);
+        _Else ->
+            case catch check_is_admin(Db) of
+                ok -> validate_ddoc(Db#db.name, Doc);
+                Error -> Error
+            end
+        end;
+validate_doc_update(#db{validate_doc_funs = undefined, name = Name} = Db, Doc, Fun) ->
     ValidationFuns = load_validation_funs(Db),
+    couch_log:info("~n====== attemptint to write Doc: ~p, VDUs: ~p, for Db: ~p~n===========~n", [Doc, ValidationFuns, Name]),
     validate_doc_update(Db#db{validate_doc_funs=ValidationFuns}, Doc, Fun);
 validate_doc_update(#db{validate_doc_funs=[]}=Db, _Doc, _GetDiskDocFun) ->
 	ok;
@@ -955,11 +964,13 @@ validate_doc_update_int(Db, Doc, GetDiskDocFun) ->
 
 % to be safe, spawn a middleman here
 load_validation_funs(#db{main_pid=Pid, name = <<"shards/", _/binary>>}=Db) ->
+    couch_log:info("~n~nload_validation_funs_shards~n~n", []),
     {_, Ref} = spawn_monitor(fun() ->
         exit(ddoc_cache:open(mem3:dbname(Db#db.name), validation_funs))
     end),
     receive
         {'DOWN', Ref, _, _, {ok, Funs}} ->
+            couch_log:info("~n~nloaded_validation_funs_shards: ~p~n~n", [Funs]),
             gen_server:cast(Pid, {load_validation_funs, Funs}),
             Funs;
         {'DOWN', Ref, _, _, {database_does_not_exist, _StackTrace}} ->
@@ -971,6 +982,7 @@ load_validation_funs(#db{main_pid=Pid, name = <<"shards/", _/binary>>}=Db) ->
     end;
 load_validation_funs(#db{main_pid=Pid}=Db) ->
     {ok, DDocInfos} = get_design_docs(Db),
+    couch_log:info("~n~nload_validation_funs() -> DDocInfos: ~p~n~n", [DDocInfos]),
     OpenDocs = fun
         (#full_doc_info{}=D) ->
             {ok, Doc} = open_doc_int(Db, D, [ejson_body]),

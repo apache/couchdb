@@ -30,7 +30,9 @@ ddocid(_) ->
 
 
 recover(DbName) ->
-    {ok, DDocs} = fabric:design_docs(mem3:dbname(DbName)),
+    {ok, DDocs0} = fabric:design_docs(mem3:dbname(DbName)),
+    DDocs = lists:filter(fun couch_doc:has_no_access/1, DDocs0),
+    couch_log:info("~n~n~n~nrecover validation funs: ~p From DDocs0: ~p~n~n~n~n", [DDocs, DDocs0]),
     Funs = lists:flatmap(fun(DDoc) ->
         case couch_doc:get_validate_doc_fun(DDoc) of
             nil -> [];

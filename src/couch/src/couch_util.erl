@@ -39,6 +39,7 @@
 -export([check_config_blacklist/1]).
 -export([check_md5/2]).
 -export([set_mqd_off_heap/1]).
+-export([validate_design_access/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -749,3 +750,9 @@ check_config_blacklist(Section) ->
     _ ->
         ok
     end.
+
+validate_design_access(DDoc) ->
+    is_users_ddoc(DDoc).
+
+is_users_ddoc(#doc{access=[<<"_users">>]}) -> ok;
+is_users_ddoc(_) -> throw({forbidden, <<"per-user ddoc access">>}).

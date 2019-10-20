@@ -40,6 +40,7 @@ before_all() ->
     Couch = test_util:start_couch([chttpd]),
     Hashed = couch_passwords:hash_admin_password("a"),
     ok = config:set("admins", "a", binary_to_list(Hashed), _Persist=false),
+    % ok = config:set("log", "level", "debug", _Persist=false),
 
     % cleanup and setup
     {ok, _, _, _} = test_request:delete(url() ++ "/db", ?ADMIN_REQ_HEADERS),
@@ -70,6 +71,8 @@ access_test_() ->
         fun should_let_admin_create_doc_without_access/2,
         fun should_let_user_create_doc_for_themselves/2,
         fun should_not_let_user_create_doc_for_someone_else/2,
+        fun should_let_user_create_access_ddoc/2,
+        fun access_ddoc_should_have_no_effects/2,
 
         % Doc updates
         fun users_with_access_can_update_doc/2,
@@ -93,7 +96,7 @@ access_test_() ->
         fun should_let_admin_fetch_all_docs/2,
         fun should_let_user_fetch_their_own_all_docs/2,
         % potential future feature
-        %fun should_let_user_fetch_their_own_all_docs_plus_users_ddocs/2%,
+        % % % fun should_let_user_fetch_their_own_all_docs_plus_users_ddocs/2%,
 
         % _changes
         fun should_let_admin_fetch_changes/2,
@@ -104,7 +107,7 @@ access_test_() ->
         fun should_not_allow_user_access_ddoc_view_request/2,
         fun should_allow_admin_users_access_ddoc_view_request/2,
         fun should_allow_user_users_access_ddoc_view_request/2
-                
+
         % TODO: create test db with role and not _users in _security.members
         % and make sure a user in that group can access while a user not
         % in that group cant
@@ -151,6 +154,38 @@ should_not_let_user_create_doc_for_someone_else(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(Url ++ "/db/c",
         ?USERY_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
     ?_assertEqual(403, Code).
+
+should_let_user_create_access_ddoc(_PortType, Url) ->
+    {ok, Code, _, _} = test_request:put(Url ++ "/db/_design/dx",
+        ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+    ?_assertEqual(201, Code).
+
+access_ddoc_should_have_no_effects(_PortType, Url) ->
+    Ddoc = "{ \"_access\":[\"x\"], \"validate_doc_update\": \"function(newDoc, oldDoc, userCtx) { throw({unauthorized: 'throw error'})}\",   \"views\": {     \"foo\": {       \"map\": \"function(doc) { emit(doc._id) }\"     }   },   \"shows\": {     \"boo\": \"function() {}\"   },   \"lists\": {     \"hoo\": \"function() {}\"   },   \"update\": {     \"goo\": \"function() {}\"   },   \"filters\": {     \"loo\": \"function() {}\"   }   }",
+    {ok, Code, _, _} = test_request:put(Url ++ "/db/_design/dx",
+        ?USERX_REQ_HEADERS, Ddoc),
+    ?_assertEqual(201, Code),
+    {ok, Code1, _, _} = test_request:put(Url ++ "/db/b",
+        ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+    ?_assertEqual(401, Code1),
+    {ok, Code2, _, _} = test_request:get(Url ++ "/db/_design/dx/_view/foo",
+        ?USERX_REQ_HEADERS),
+    ?_assertEqual(403, Code2),
+    {ok, Code3, _, _} = test_request:get(Url ++ "/db/_design/dx/_show/boo/b",
+        ?USERX_REQ_HEADERS),
+    ?_assertEqual(403, Code3),
+    {ok, Code4, _, _} = test_request:get(Url ++ "/db/_design/dx/_list/hoo/foo",
+        ?USERX_REQ_HEADERS),
+    ?_assertEqual(403, Code4),
+    {ok, Code5, _, _} = test_request:post(Url ++ "/db/_design/dx/_update/goo",
+        ?USERX_REQ_HEADERS, ""),
+    ?_assertEqual(403, Code5),
+    {ok, Code6, _, _} = test_request:get(Url ++ "/db/_changes?filter=dx/loo",
+        ?USERX_REQ_HEADERS),
+    ?_assertEqual(403, Code6),
+    {ok, Code7, _, _} = test_request:get(Url ++ "/db/_changes?filter=_view&view=dx/foo",
+        ?USERX_REQ_HEADERS),
+    ?_assertEqual(403, Code7).
 
 % Doc updates
 
