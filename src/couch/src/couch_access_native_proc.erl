@@ -32,7 +32,7 @@
 
 -record(st, {
     indexes = [],
-    timeout = 5000
+    timeout = 5000 % TODO: make configurable
 }).
 
 start_link() ->
@@ -110,7 +110,7 @@ code_change(_OldVsn, St, _Extra) ->
 % -seq, since that one we will always need, and by-access-id can be opt-in.
 % the second dimension is the number of emit kv pairs:
 % [ // the return value
-%   [ // the first views
+%   [ // the first view
 %     ['k1', 'v1'], // the first k/v pair for the first view
 %     ['k2', 'v2']  // second, etc.
 %   ],

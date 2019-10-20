@@ -92,7 +92,8 @@ access_test_() ->
         % _all_docs with include_docs
         fun should_let_admin_fetch_all_docs/2,
         fun should_let_user_fetch_their_own_all_docs/2,
-        fun should_let_user_fetch_their_own_all_docs_plus_users_ddocs/2,
+        % potential future feature
+        %fun should_let_user_fetch_their_own_all_docs_plus_users_ddocs/2%,
 
         % _changes
         fun should_let_admin_fetch_changes/2,
@@ -284,29 +285,30 @@ should_let_user_fetch_their_own_all_docs(_PortType, Url) ->
     ?_assertEqual(2, length(proplists:get_value(<<"rows">>, Json))).
     % TODO    ?_assertEqual(2, proplists:get_value(<<"total_rows">>, Json)).
 
-should_let_user_fetch_their_own_all_docs_plus_users_ddocs(_PortType, Url) ->
-    {ok, 201, _, _} = test_request:put(Url ++ "/db/a",
-        ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
-    {ok, 201, _, _} = test_request:put(Url ++ "/db/_design/foo",
-        ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"_users\"]}"),
-    {ok, 201, _, _} = test_request:put(Url ++ "/db/_design/bar",
-        ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"houdini\"]}"),
-    {ok, 201, _, _} = test_request:put(Url ++ "/db/b",
-        ?USERX_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
-
-    % % TODO: add allowing non-admin users adding non-admin ddocs
-    % {ok, 201, _, _} = test_request:put(Url ++ "/db/_design/x",
-    %     ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
-
-    {ok, 201, _, _} = test_request:put(Url ++ "/db/c",
-        ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"y\"]}"),
-    {ok, 201, _, _} = test_request:put(Url ++ "/db/d",
-        ?USERY_REQ_HEADERS, "{\"d\":4,\"_access\":[\"y\"]}"),
-    {ok, 200, _, Body} = test_request:get(Url ++ "/db/_all_docs?include_docs=true",
-        ?USERX_REQ_HEADERS),
-    {Json} = jiffy:decode(Body),
-    ?debugFmt("~nHSOIN: ~p~n", [Json]),
-    ?_assertEqual(3, length(proplists:get_value(<<"rows">>, Json))).
+% Potential future feature:%
+% should_let_user_fetch_their_own_all_docs_plus_users_ddocs(_PortType, Url) ->
+%     {ok, 201, _, _} = test_request:put(Url ++ "/db/a",
+%         ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+%     {ok, 201, _, _} = test_request:put(Url ++ "/db/_design/foo",
+%         ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"_users\"]}"),
+%     {ok, 201, _, _} = test_request:put(Url ++ "/db/_design/bar",
+%         ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"houdini\"]}"),
+%     {ok, 201, _, _} = test_request:put(Url ++ "/db/b",
+%         ?USERX_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+%
+%     % % TODO: add allowing non-admin users adding non-admin ddocs
+%     {ok, 201, _, _} = test_request:put(Url ++ "/db/_design/x",
+%         ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+%
+%     {ok, 201, _, _} = test_request:put(Url ++ "/db/c",
+%         ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"y\"]}"),
+%     {ok, 201, _, _} = test_request:put(Url ++ "/db/d",
+%         ?USERY_REQ_HEADERS, "{\"d\":4,\"_access\":[\"y\"]}"),
+%     {ok, 200, _, Body} = test_request:get(Url ++ "/db/_all_docs?include_docs=true",
+%         ?USERX_REQ_HEADERS),
+%     {Json} = jiffy:decode(Body),
+%     ?debugFmt("~nHSOIN: ~p~n", [Json]),
+%     ?_assertEqual(3, length(proplists:get_value(<<"rows">>, Json))).
 
 % _changes
 should_let_admin_fetch_changes(_PortType, Url) ->
