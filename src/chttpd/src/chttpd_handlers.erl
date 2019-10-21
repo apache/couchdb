@@ -15,7 +15,8 @@
 -export([
     url_handler/2,
     db_handler/2,
-    design_handler/2
+    design_handler/2,
+    handler_info/1
 ]).
 
 -define(SERVICE_ID, chttpd_handlers).
@@ -34,6 +35,10 @@ db_handler(HandlerKey, DefaultFun) ->
 
 design_handler(HandlerKey, DefaultFun) ->
     select(collect(design_handler, [HandlerKey]), DefaultFun).
+
+handler_info(HttpReq) ->
+    Default = {'unknown.unknown', []},
+    select(collect(handler_info, [HttpReq]), Default).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

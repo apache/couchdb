@@ -12,7 +12,10 @@
 
 -module(chttpd_httpd_handlers).
 
--export([url_handler/1, db_handler/1, design_handler/1]).
+-export([url_handler/1, db_handler/1, design_handler/1, handler_info/1]).
+
+-include_lib("couch/include/couch_db.hrl").
+
 
 url_handler(<<>>)                  -> fun chttpd_misc:handle_welcome_req/1;
 url_handler(<<"favicon.ico">>)     -> fun chttpd_misc:handle_favicon_req/1;
@@ -44,3 +47,28 @@ design_handler(<<"_update">>)  -> fun chttpd_show:handle_doc_update_req/3;
 design_handler(<<"_info">>)    -> fun chttpd_db:handle_design_info_req/3;
 design_handler(<<"_rewrite">>) -> fun chttpd_rewrite:handle_rewrite_req/3;
 design_handler(_) -> no_match.
+
+%% TODO Populate in another PR
+handler_info(#httpd{path_parts=[<<"_all_dbs">>], method=Method})
+        when Method =:= 'HEAD' orelse Method =:= 'GET' ->
+    {'all-dbs.read', []};
+
+handler_info(#httpd{path_parts=[<<"_session">>], method=Method})
+        when Method =:= 'HEAD' orelse Method =:= 'GET' ->
+    {'session.read', []};
+handler_info(#httpd{path_parts=[<<"_session">>], method='POST'}) ->
+    {'session.write', []};
+handler_info(#httpd{path_parts=[<<"_session">>], method='DELETE'}) ->
+    {'session.delete', []};
+
+handler_info(#httpd{path_parts=[_Db], method=Method})
+        when Method =:= 'HEAD' orelse Method =:= 'GET' ->
+    {'database-info.read', []};
+handler_info(#httpd{path_parts=[_Db], method='POST'}) ->
+    {'document.write', []};
+handler_info(#httpd{path_parts=[_Db], method='PUT'}) ->
+    {'database.create', []};
+handler_info(#httpd{path_parts=[_Db], method='DELETE'}) ->
+    {'database.delete', []};
+
+handler_info(_) -> no_match.
