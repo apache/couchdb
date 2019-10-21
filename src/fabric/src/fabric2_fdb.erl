@@ -402,7 +402,7 @@ get_contexts(#{} = Db) ->
     ].
 
 get_request_ctx(#{} = Db) ->
-    maps:get(request_ctx, Db, #{}).
+    maps:get(request_ctx, Db, ctrace:new_request_ctx()).
 
 get_user_ctx(#{} = Db) ->
     maps:get(user_ctx, Db, #user_ctx{}).
@@ -1390,4 +1390,4 @@ run_on_commit_fun(Tx) ->
 
 
 request_ctx(Options) ->
-    fabric2_util:get_value(request_ctx, Options, #{}).
+    fabric2_util:get_value(request_ctx, Options, ctrace:new_request_ctx()).

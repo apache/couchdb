@@ -58,6 +58,7 @@
     resp=nil
 }).
 
+
 start_link() ->
     start_link(http).
 start_link(http) ->
@@ -1263,6 +1264,7 @@ set_contexts(#httpd{user_ctx=UserCtx, request_ctx=RequestCtx}, KVList0) ->
     KVList1 = lists:keystore(request_ctx, 1, KVList0, {request_ctx, RequestCtx}),
     KVList2 = lists:keystore(user_ctx, 1, KVList1, {user_ctx, UserCtx}),
     KVList2.
+
 
 -ifdef(TEST).
 

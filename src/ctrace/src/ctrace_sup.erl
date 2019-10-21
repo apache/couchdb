@@ -10,24 +10,28 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, fabric, [
-    {description, "Routing and proxying layer for CouchDB cluster"},
-    {vsn, git},
-    {mod, {fabric2_app, []}},
-    {registered, [
-        fabric_server
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        config,
-        couch_epi,
-        couch,
-        ctrace,
-        rexi,
-        mem3,
-        couch_log,
-        couch_stats,
-        erlfdb
-    ]}
-]}.
+-module(ctrace_sup).
+-behaviour(supervisor).
+-vsn(1).
+
+-export([
+    start_link/0,
+    init/1
+]).
+
+%% Helper macro for declaring children of supervisor
+-define(CHILD_WITH_ARGS(I, Type, Args), {I, {I, start_link, Args}, permanent, 5000, Type, [I]}).
+
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+init([]) ->
+    {ok, {
+        {one_for_one, 5, 10},
+        [
+            ?CHILD_WITH_ARGS(
+                config_listener_mon,
+                worker, [ctrace, nil]
+            )
+        ]
+    }}.
