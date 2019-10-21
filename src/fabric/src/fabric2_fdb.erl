@@ -76,16 +76,17 @@
 
 
 transactional(Fun) ->
-    do_transaction(Fun, undefined).
-
+    {name, OperationName} = erlang:fun_info(Fun, name),
+    do_transaction(OperationName, ctrace:new_request_ctx(), Fun, undefined).
 
 transactional(DbName, Options, Fun) when is_binary(DbName) ->
-    transactional(fun(Tx) ->
+    {name, OperationName} = erlang:fun_info(Fun, name),
+    do_transaction(OperationName, request_ctx(Options), fun(Tx) ->
         Fun(init_db(Tx, DbName, Options))
-    end).
-
+    end, undefined).
 
 transactional(#{tx := undefined} = Db, Fun) ->
+    {name, OperationName} = erlang:fun_info(Fun, name),
     try
         Reopen = maps:get(reopen, Db, false),
         Db1 = maps:remove(reopen, Db),
@@ -93,7 +94,7 @@ transactional(#{tx := undefined} = Db, Fun) ->
             true -> undefined;
             false -> maps:get(layer_prefix, Db1)
         end,
-        do_transaction(fun(Tx) ->
+        do_transaction(OperationName, request_ctx(Db), fun(Tx) ->
             case Reopen of
                 true -> Fun(reopen(Db1#{tx => Tx}));
                 false -> Fun(Db1#{tx => Tx})
@@ -107,8 +108,9 @@ transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
     Fun(Db).
 
 
-do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
+do_transaction(Operation, ReqCtx, Fun, LayerPrefix) when is_function(Fun, 1) ->
     Db = get_db_handle(),
+    ReqCtx1 = ctrace:start_span(ReqCtx, Operation),
     try
         erlfdb:transactional(Db, fun(Tx) ->
             case get(erlfdb_trace) of
@@ -129,6 +131,7 @@ do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
             end
         end)
     after
+        ctrace:finish_span(ReqCtx1),
         clear_transaction()
     end.
 
@@ -852,12 +855,12 @@ debug_cluster(Start, End) ->
 init_db(Tx, DbName, Options) ->
     Prefix = get_dir(Tx),
     Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
+
     #{
         name => DbName,
         tx => Tx,
         layer_prefix => Prefix,
         md_version => Version,
-
         db_options => Options
     }.
 
@@ -1389,5 +1392,7 @@ run_on_commit_fun(Tx) ->
     end.
 
 
+request_ctx(#{request_ctx := RequestCtx}) ->
+    RequestCtx;
 request_ctx(Options) ->
     fabric2_util:get_value(request_ctx, Options, ctrace:new_request_ctx()).
