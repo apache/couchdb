@@ -359,14 +359,8 @@ context(Span) ->
 update_tracers() ->
     case is_enabled() of
         true ->
-<<<<<<< HEAD
-            Sampler = passage_sampler_all:new(),
-            jaeger_passage:start_tracer(?MAIN_TRACER, Sampler),
-            config_update();
-=======
             maybe_start_main_tracer(?MAIN_TRACER)
                 andalso config_update();
->>>>>>> c47b47eae... fixup for implementation maybe_start_main_tracer
         false ->
             jaeger_passage:stop_tracer(?MAIN_TRACER)
     end,

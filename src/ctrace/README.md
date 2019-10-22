@@ -233,6 +233,20 @@ Where:
    - `=/=`
    - `/=` - not equal
 
+### Open tracing agent configuration
+
+```
+[tracing]
+
+thrift_format = compact ; compact | binary
+agent_host = 127.0.0.1
+agent_port = 6831
+; app_name is the value whicj would be used for
+; `location.application` tag
+app_name = couchdb
+```
+
+
 Bellow is an example of a configuration:
 
 ```ini
