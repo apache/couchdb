@@ -454,6 +454,8 @@ defmodule BasicsTest do
     assert Map.has_key?(val, "rev")
 
     # Add _local/doc5
+    # Use a body > 100Kb to tests local docs chunkifier
+    body = %{:b => String.duplicate("b", 110_000)}
     assert Couch.put("/#{db_name}/_local/doc5", body: body).body["ok"]
     resp = Couch.get("/#{db_name}/_local_docs")
     assert resp.status_code == 200

@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2.hrl").
 
 
 doc_crud_test_() ->
@@ -61,6 +62,9 @@ doc_crud_test_() ->
                 fun recreate_local_doc/1,
                 fun create_local_doc_bad_rev/1,
                 fun create_local_doc_random_rev/1,
+                fun create_a_large_local_doc/1,
+                fun create_2_large_local_docs/1,
+                fun local_doc_with_previous_encoding/1,
                 fun before_doc_update_skips_local_docs/1
             ]}
         }
@@ -763,6 +767,109 @@ create_local_doc_random_rev({Db, _}) ->
     ?assertEqual({ok, {0, <<"2">>}}, fabric2_db:update_doc(Db, Doc5)),
     {ok, Doc6} = fabric2_db:open_doc(Db, LDocId, []),
     ?assertEqual(Doc5#doc{revs = {0, [<<"2">>]}}, Doc6).
+
+
+create_a_large_local_doc({Db, _}) ->
+    UUID = fabric2_util:uuid(),
+    LDocId = <<?LOCAL_DOC_PREFIX, UUID/binary>>,
+    Body = << <<"x">> || _ <- lists:seq(1, 300000) >>,
+    Doc1 = #doc{
+        id = LDocId,
+        revs = {0, []},
+        body = Body
+    },
+    ?assertEqual({ok, {0, <<"1">>}}, fabric2_db:update_doc(Db, Doc1)),
+    {ok, Doc2} = fabric2_db:open_doc(Db, Doc1#doc.id, []),
+    ?assertEqual(Doc1#doc{revs = {0, [<<"1">>]}}, Doc2),
+
+    % Read via fold_local_docs
+    {ok, Result} = fabric2_db:fold_local_docs(Db, fun(Data, Acc) ->
+        case Data of
+            {row, [{id, DocId} | _]} when LDocId =:= DocId ->
+                {ok, [Data | Acc]};
+            _ ->
+                {ok, Acc}
+        end
+    end, [], []),
+    ?assertEqual([{row, [
+         {id, LDocId},
+         {key, LDocId},
+         {value, {[{rev, <<"0-1">>}]}}
+    ]}], Result).
+
+
+create_2_large_local_docs({Db, _}) ->
+    % Create a large doc then overwrite with a smaller one. The reason is to
+    % ensure the previous one correctly clears its range before writting the
+    % new smaller one it its place.
+    UUID = fabric2_util:uuid(),
+    LDocId = <<?LOCAL_DOC_PREFIX, UUID/binary>>,
+    Body1 = << <<"x">> || _ <- lists:seq(1, 400000) >>,
+    Body2 = << <<"y">> || _ <- lists:seq(1, 150000) >>,
+
+    Doc1 = #doc{
+        id = LDocId,
+        revs = {0, []},
+        body = Body1
+    },
+
+    ?assertEqual({ok, {0, <<"1">>}}, fabric2_db:update_doc(Db, Doc1)),
+
+    Doc2 = Doc1#doc{body = Body2},
+    ?assertEqual({ok, {0, <<"1">>}}, fabric2_db:update_doc(Db, Doc2)),
+
+    {ok, Doc3} = fabric2_db:open_doc(Db, LDocId, []),
+    ?assertEqual(Doc2#doc{revs = {0, [<<"1">>]}}, Doc3).
+
+
+local_doc_with_previous_encoding({Db, _}) ->
+    #{db_prefix := DbPrefix} = Db,
+
+    Id = <<"_local/old_doc">>,
+    Body = {[{<<"x">>, 5}]},
+    Rev = <<"1">>,
+    Key = erlfdb_tuple:pack({?DB_LOCAL_DOCS, Id}, DbPrefix),
+
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{tx := Tx} = TxDb,
+        Term = term_to_binary({Rev, Body}, [{minor_version, 1}]),
+        ok = erlfdb:set(Tx, Key, Term)
+    end),
+
+    % Read old doc
+    {ok, Doc1} = fabric2_db:open_doc(Db, Id, []),
+    ?assertEqual({0, [<<"1">>]}, Doc1#doc.revs),
+    ?assertEqual({[{<<"x">>, 5}]}, Doc1#doc.body),
+
+    % Read via fold_local_docs.
+    {ok, Result} = fabric2_db:fold_local_docs(Db, fun(Data, Acc) ->
+        case Data of
+            {row, [{id, DocId} | _]} when Id =:= DocId ->
+                {ok, [Data | Acc]};
+            _ ->
+                {ok, Acc}
+        end
+    end, [], []),
+    ?assertEqual([{row, [
+         {id, Id},
+         {key, Id},
+         {value, {[{rev, <<"0-1">>}]}}
+    ]}], Result),
+
+    % Update doc
+    NewBody = {[{<<"y">>, 6}]},
+    Doc2 = Doc1#doc{body = NewBody},
+    ?assertEqual({ok, {0, <<"2">>}}, fabric2_db:update_doc(Db, Doc2)),
+    {ok, Doc3} = fabric2_db:open_doc(Db, Doc2#doc.id, []),
+    ?assertEqual({0, [<<"2">>]}, Doc3#doc.revs),
+    ?assertEqual(NewBody, Doc3#doc.body),
+
+    % Old doc now has only the rev number in it
+    OldDocBin = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{tx := Tx} = TxDb,
+        erlfdb:wait(erlfdb:get(Tx, Key))
+    end),
+    ?assertEqual(<<"2">> , OldDocBin).
 
 
 before_doc_update_skips_local_docs({Db0, _}) ->
