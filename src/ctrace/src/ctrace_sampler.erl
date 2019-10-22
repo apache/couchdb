@@ -10,29 +10,27 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(ctrace_sup).
--behaviour(supervisor).
--vsn(1).
+-module(ctrace_sampler).
 
 -export([
-    start_link/0,
-    init/1
+    all/0,
+    null/0,
+    probalistic/1
 ]).
 
-%% Helper macro for declaring children of supervisor
--define(CHILD_WITH_ARGS(I, Type, Args), {I, {I, start_link, Args}, permanent, 5000, Type, [I]}).
+-spec all() -> passage_sampler:sampler().
 
-start_link() ->
-    ctrace:update_tracers(),
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+all() ->
+    passage_sampler_all:new().
 
-init([]) ->
-    {ok, {
-        {one_for_one, 5, 10},
-        [
-            ?CHILD_WITH_ARGS(
-                config_listener_mon,
-                worker, [ctrace, nil]
-            )
-        ]
-    }}.
+-spec null() -> passage_sampler:sampler().
+
+null() ->
+    passage_sampler_null:new().
+
+-spec probalistic(
+        Rate :: float()
+    ) -> passage_sampler:sampler().
+
+probalistic(SamplingRate) ->
+    passage_sampler_probalistic:new(SamplingRate).

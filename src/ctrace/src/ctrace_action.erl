@@ -10,29 +10,29 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(ctrace_sup).
--behaviour(supervisor).
--vsn(1).
+-module(ctrace_action).
 
 -export([
-    start_link/0,
-    init/1
+    sample/1,
+    report/1
 ]).
 
-%% Helper macro for declaring children of supervisor
--define(CHILD_WITH_ARGS(I, Type, Args), {I, {I, start_link, Args}, permanent, 5000, Type, [I]}).
+-type action_fun()
+    :: fun((Span :: passage_span:span()) -> boolean()).
 
-start_link() ->
-    ctrace:update_tracers(),
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+-spec sample(
+        [SamplingRate :: float() | integer()]
+    ) -> action_fun().
 
-init([]) ->
-    {ok, {
-        {one_for_one, 5, 10},
-        [
-            ?CHILD_WITH_ARGS(
-                config_listener_mon,
-                worker, [ctrace, nil]
-            )
-        ]
-    }}.
+sample([SamplingRate]) ->
+    fun(_Span) -> rand:uniform() < SamplingRate end.
+
+-spec report(
+        [ReporterId :: passage:tracer_id()]
+    ) -> action_fun().
+
+report([TracerId]) ->
+    fun(Span) ->
+        jaeger_passage_reporter:report(TracerId, Span),
+        true
+    end.

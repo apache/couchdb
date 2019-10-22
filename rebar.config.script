@@ -123,6 +123,10 @@ DepDescs = [
 {jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-2"}},
 {mochiweb,         "mochiweb",         {tag, "v2.19.0"}},
 {meck,             "meck",             {tag, "0.8.8"}},
+{passage,          {url, "https://github.com/sile/passage.git"},
+                   {tag, "0.2.6"}},
+{jaeger_passage,   {url, "https://github.com/sile/jaeger_passage.git"},
+                   {tag, "0.1.12"}},
 
 %% TMP - Until this is moved to a proper Apache repo
 {erlfdb,           "erlfdb",           {branch, "master"}}
