@@ -46,7 +46,7 @@
     get_doc_body_future/3,
     get_doc_body_wait/4,
     get_local_doc/2,
-    get_local_doc/3,
+    get_local_doc_rev/3,
 
     write_doc/6,
     write_local_doc/2,
@@ -519,13 +519,32 @@ get_local_doc(#{} = Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
     } = Db = ensure_current(Db0),
 
     Key = erlfdb_tuple:pack({?DB_LOCAL_DOCS, DocId}, DbPrefix),
-    Val = erlfdb:wait(erlfdb:get(Tx, Key)),
-    fdb_to_local_doc(Db, DocId, Val).
+    Rev = erlfdb:wait(erlfdb:get(Tx, Key)),
+
+    Prefix = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, DocId}, DbPrefix),
+    Future = erlfdb:get_range_startswith(Tx, Prefix),
+    Chunks = lists:map(fun({_K, V}) -> V end, erlfdb:wait(Future)),
+
+    fdb_to_local_doc(Db, DocId, Rev, Chunks).
 
 
-get_local_doc(#{} = Db, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, Val)
-        when is_binary(Val) orelse Val =:= not_found ->
-    fdb_to_local_doc(ensure_current(Db), DocId, Val).
+get_local_doc_rev(_Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, Val) ->
+    case Val of
+        <<131, _/binary>> ->
+            % Compatibility clause for an older encoding format
+            {Rev, _} = binary_to_term(Val, [safe]),
+            Rev;
+        <<_/binary>> ->
+            try binary_to_integer(Val) of
+                IntVal when IntVal >= 0 ->
+                    Val;
+                _ ->
+                    erlang:error({invalid_local_doc_rev, DocId, Val})
+            catch
+                error:badarg ->
+                    erlang:error({invalid_local_doc_rev, DocId, Val})
+            end
+    end.
 
 
 write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
@@ -647,19 +666,31 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
 
 write_local_doc(#{} = Db0, Doc) ->
     #{
-        tx := Tx
+        tx := Tx,
+        db_prefix := DbPrefix
     } = Db = ensure_current(Db0),
 
-    {LDocKey, LDocVal} = local_doc_to_fdb(Db, Doc),
+    Id = Doc#doc.id,
+
+    {LDocKey, LDocVal, Rows} = local_doc_to_fdb(Db, Doc),
 
     WasDeleted = case erlfdb:wait(erlfdb:get(Tx, LDocKey)) of
         <<_/binary>> -> false;
         not_found -> true
     end,
 
+    BPrefix = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, Id}, DbPrefix),
+
     case Doc#doc.deleted of
-        true -> erlfdb:clear(Tx, LDocKey);
-        false -> erlfdb:set(Tx, LDocKey, LDocVal)
+        true ->
+            erlfdb:clear(Tx, LDocKey),
+            erlfdb:clear_range_startswith(Tx, BPrefix);
+        false ->
+            erlfdb:set(Tx, LDocKey, LDocVal),
+            % Make sure to clear the whole range, in case there was a larger
+            % document body there before.
+            erlfdb:clear_range_startswith(Tx, BPrefix),
+            lists:foreach(fun({K, V}) -> erlfdb:set(Tx, K, V) end, Rows)
     end,
 
     case {WasDeleted, Doc#doc.deleted} of
@@ -1066,26 +1097,45 @@ local_doc_to_fdb(Db, #doc{} = Doc) ->
         body = Body
     } = Doc,
 
+    Key = erlfdb_tuple:pack({?DB_LOCAL_DOCS, Id}, DbPrefix),
+
     StoreRev = case Rev of
         _ when is_integer(Rev) -> integer_to_binary(Rev);
         _ when is_binary(Rev) -> Rev
     end,
 
-    Key = erlfdb_tuple:pack({?DB_LOCAL_DOCS, Id}, DbPrefix),
-    Val = {StoreRev, Body},
-    {Key, term_to_binary(Val, [{minor_version, 1}])}.
+    BVal = term_to_binary(Body, [{minor_version, 1}]),
+    {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
+        K = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, Id, ChunkId}, DbPrefix),
+        {{K, Chunk}, ChunkId + 1}
+    end, 0, chunkify_binary(BVal)),
+
+    {Key, StoreRev, Rows}.
 
 
-fdb_to_local_doc(_Db, DocId, Bin) when is_binary(Bin) ->
-    {Rev, Body} = binary_to_term(Bin, [safe]),
+fdb_to_local_doc(_Db, DocId, <<131, _/binary>> = Val, []) ->
+    % This is an upgrade clause for the old encoding. We allow reading the old
+    % value and will perform an upgrade of the storage format on an update.
+    {Rev, Body} = binary_to_term(Val, [safe]),
     #doc{
         id = DocId,
         revs = {0, [Rev]},
         deleted = false,
         body = Body
     };
-fdb_to_local_doc(_Db, _DocId, not_found) ->
-    {not_found, missing}.
+
+fdb_to_local_doc(_Db, _DocId, not_found, []) ->
+    {not_found, missing};
+
+fdb_to_local_doc(_Db, DocId, Rev, Rows) when is_list(Rows), is_binary(Rev) ->
+    BodyBin = iolist_to_binary(Rows),
+    Body = binary_to_term(BodyBin, [safe]),
+    #doc{
+        id = DocId,
+        revs = {0, [Rev]},
+        deleted = false,
+        body = Body
+    }.
 
 
 chunkify_binary(Data) ->
