@@ -782,7 +782,14 @@ fold_design_docs(Db, UserFun, UserAcc0, Options1) ->
     fold_docs(Db, UserFun, UserAcc0, Options2).
 
 
-fold_local_docs(Db, UserFun, UserAcc0, Options) ->
+fold_local_docs(Db, UserFun, UserAcc0, Options0) ->
+     % This is mostly for testing and sanity checking. When calling from a test
+     % namespace will be automatically set. We also assert when called from the
+     % API the correct namespace was set
+     Options = case lists:keyfind(namespace, 1, Options0) of
+         {namespace, <<"_local">>} -> Options0;
+         false -> [{namespace, <<"_local">>} | Options0]
+     end,
      fabric2_fdb:transactional(Db, fun(TxDb) ->
         try
             #{
@@ -796,12 +803,11 @@ fold_local_docs(Db, UserFun, UserAcc0, Options) ->
 
             UserAcc2 = fabric2_fdb:fold_range(TxDb, Prefix, fun({K, V}, Acc) ->
                 {DocId} = erlfdb_tuple:unpack(K, Prefix),
-                LDoc = fabric2_fdb:get_local_doc(TxDb, DocId, V),
-                #doc{revs = {Pos, [Rev]}} = LDoc,
+                Rev = fabric2_fdb:get_local_doc_rev(TxDb, DocId, V),
                 maybe_stop(UserFun({row, [
                     {id, DocId},
                     {key, DocId},
-                    {value, {[{rev, couch_doc:rev_to_str({Pos, Rev})}]}}
+                    {value, {[{rev, couch_doc:rev_to_str({0, Rev})}]}}
                 ]}, Acc))
             end, UserAcc1, Options),
 

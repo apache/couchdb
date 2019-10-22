@@ -47,6 +47,7 @@
 -define(DB_LOCAL_DOCS, 22).
 -define(DB_ATTS, 23).
 -define(DB_VIEWS, 24).
+-define(DB_LOCAL_DOC_BODIES, 25).
 
 
 % Versions
