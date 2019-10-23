@@ -1816,7 +1816,14 @@ parse_changes_query(Req) ->
         {"heartbeat", "true"} ->
             Args#changes_args{heartbeat=true};
         {"heartbeat", _} ->
-            Args#changes_args{heartbeat=list_to_integer(Value)};
+            try list_to_integer(Value) of
+                HeartbeatInteger when HeartbeatInteger > 0 ->
+                    Args#changes_args{heartbeat=HeartbeatInteger};
+                _ ->
+                    throw({bad_request, <<"The heartbeat value should be a positive integer (in milliseconds).">>})
+            catch error:badarg ->
+                throw({bad_request, <<"Invalid heartbeat value. Expecting a positive integer value (in milliseconds).">>})
+            end;
         {"timeout", _} ->
             Args#changes_args{timeout=list_to_integer(Value)};
         {"include_docs", "true"} ->
