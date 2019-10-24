@@ -15,7 +15,7 @@
 -vsn(1).
 
 % public API
--export([start_link/2, stop/1]).
+-export([start_link/2, start_link/3, stop/1]).
 -export([get_worker/1, release_worker/2, release_worker_sync/2]).
 
 % gen_server API
@@ -30,6 +30,7 @@
 
 -record(state, {
     url,
+    proxy_url,
     limit,                  % max # of workers allowed
     workers = [],
     waiting = queue:new(),  % blocked clients waiting for a worker
@@ -38,7 +39,10 @@
 
 
 start_link(Url, Options) ->
-    gen_server:start_link(?MODULE, {Url, Options}, []).
+    start_link(Url, undefined, Options).
+
+start_link(Url, ProxyUrl, Options) ->
+    gen_server:start_link(?MODULE, {Url, ProxyUrl, Options}, []).
 
 stop(Pool) ->
     ok = gen_server:call(Pool, stop, infinity).
@@ -54,10 +58,11 @@ release_worker(Pool, Worker) ->
 release_worker_sync(Pool, Worker) ->
     ok = gen_server:call(Pool, {release_worker_sync, Worker}).
 
-init({Url, Options}) ->
+init({Url, ProxyUrl, Options}) ->
     process_flag(trap_exit, true),
     State = #state{
         url = Url,
+        proxy_url = ProxyUrl,
         limit = get_value(max_connections, Options)
     },
     {ok, State}.
@@ -68,6 +73,7 @@ handle_call(get_worker, From, State) ->
         waiting = Waiting,
         callers = Callers,
         url = Url,
+        proxy_url = ProxyUrl,
         limit = Limit,
         workers = Workers
     } = State,
@@ -77,7 +83,7 @@ handle_call(get_worker, From, State) ->
     false ->
         % If the call to acquire fails, the worker pool will crash with a
         % badmatch.
-        {ok, Worker} = couch_replicator_connection:acquire(Url),
+        {ok, Worker} = couch_replicator_connection:acquire(Url, ProxyUrl),
         NewState = State#state{
             workers = [Worker | Workers],
             callers = monitor_client(Callers, Worker, From)
@@ -97,6 +103,7 @@ handle_cast({release_worker, Worker}, State) ->
 handle_info({'EXIT', Pid, _Reason}, State) ->
     #state{
         url = Url,
+        proxy_url = ProxyUrl,
         workers = Workers,
         waiting = Waiting,
         callers = Callers
@@ -111,7 +118,7 @@ handle_info({'EXIT', Pid, _Reason}, State) ->
                     {noreply, State#state{workers = Workers2,
                         callers = NewCallers0}};
                 {{value, From}, Waiting2} ->
-                    {ok, Worker} = couch_replicator_connection:acquire(Url),
+                    {ok, Worker} = couch_replicator_connection:acquire(Url, ProxyUrl),
                     NewCallers1 = monitor_client(NewCallers0, Worker, From),
                     gen_server:reply(From, {ok, Worker}),
                     NewState = State#state{

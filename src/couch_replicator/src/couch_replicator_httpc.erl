@@ -45,13 +45,9 @@ setup(Db) ->
         httpc_pool = nil,
         url = Url,
         http_connections = MaxConns,
-        proxy_url = ProxyURL
+        proxy_url = ProxyUrl
     } = Db,
-    HttpcURL = case ProxyURL of
-        undefined -> Url;
-        _ when is_list(ProxyURL) -> ProxyURL
-    end,
-    {ok, Pid} = couch_replicator_httpc_pool:start_link(HttpcURL,
+    {ok, Pid} = couch_replicator_httpc_pool:start_link(Url, ProxyUrl,
         [{max_connections, MaxConns}]),
     case couch_replicator_auth:initialize(Db#httpdb{httpc_pool = Pid}) of
         {ok, Db1} ->
