@@ -532,8 +532,13 @@ get_local_doc_rev(_Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, Val) ->
     case Val of
         <<131, _/binary>> ->
             % Compatibility clause for an older encoding format
-            {Rev, _} = binary_to_term(Val, [safe]),
-            Rev;
+            try binary_to_term(Val, [safe]) of
+                {Rev, _} -> Rev;
+                _ -> erlang:error({invalid_local_doc_rev, DocId, Val})
+            catch
+                error:badarg ->
+                    erlang:error({invalid_local_doc_rev, DocId, Val})
+            end;
         <<_/binary>> ->
             try binary_to_integer(Val) of
                 IntVal when IntVal >= 0 ->
