@@ -760,8 +760,12 @@ rotate_jobs(State, ChurnSoFar) ->
     % Reduce MaxChurn by the number of already stopped jobs in the
     % current rescheduling cycle.
     Churn = max(0, MaxChurn - ChurnSoFar),
-    if Running =< MaxJobs ->
-        StopCount = lists:min([Pending, Running, Churn]),
+    SlotsAvailable = MaxJobs - Running,
+    if SlotsAvailable >= 0 ->
+        % If there is are enough SlotsAvailable reduce StopCount to avoid
+        % unnesessarily stopping jobs. `stop_jobs/3` ignores 0 or negative
+        % values so we don't worry about that here.
+        StopCount = lists:min([Pending - SlotsAvailable, Running, Churn]),
         stop_jobs(StopCount, true, State),
         StartCount = max(0, MaxJobs - running_job_count()),
         start_jobs(StartCount, State);
@@ -1047,6 +1051,8 @@ scheduler_test_() ->
             t_stop_oldest_first(),
             t_start_oldest_first(),
             t_jobs_churn_even_if_not_all_max_jobs_are_running(),
+            t_jobs_dont_churn_if_there_are_available_running_slots(),
+            t_start_only_pending_jobs_do_not_churn_existing_ones(),
             t_dont_stop_if_nothing_pending(),
             t_max_churn_limits_number_of_rotated_jobs(),
             t_existing_jobs(),
@@ -1209,6 +1215,32 @@ t_jobs_churn_even_if_not_all_max_jobs_are_running() ->
         reschedule(mock_state(2, 2)),
         ?assertEqual({2, 1}, run_stop_count()),
         ?assertEqual([7], jobs_stopped())
+    end).
+
+
+t_jobs_dont_churn_if_there_are_available_running_slots() ->
+     ?_test(begin
+        setup_jobs([
+            continuous_running(1),
+            continuous_running(2)
+        ]),
+        reschedule(mock_state(2, 2)),
+        ?assertEqual({2, 0}, run_stop_count()),
+        ?assertEqual([], jobs_stopped()),
+        ?assertEqual(0, meck:num_calls(couch_replicator_scheduler_sup, start_child, 1))
+    end).
+
+
+t_start_only_pending_jobs_do_not_churn_existing_ones() ->
+     ?_test(begin
+        setup_jobs([
+            continuous(1),
+            continuous_running(2)
+        ]),
+        reschedule(mock_state(2, 2)),
+        ?assertEqual(1, meck:num_calls(couch_replicator_scheduler_sup, start_child, 1)),
+        ?assertEqual([], jobs_stopped()),
+        ?assertEqual({2, 0}, run_stop_count())
     end).
 
 
