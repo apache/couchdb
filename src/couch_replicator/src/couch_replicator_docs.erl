@@ -241,15 +241,15 @@ parse_rep_doc(Doc, UserCtx) ->
 
 -spec parse_rep_doc_without_id({[_]}, #user_ctx{}) -> {ok, #rep{}}.
 parse_rep_doc_without_id({Props}, UserCtx) ->
-    Proxy = get_value(<<"proxy">>, Props, <<>>),
+    {SrcProxy, TgtProxy} = parse_proxy_settings(Props),
     Opts = make_options(Props),
     case get_value(cancel, Opts, false) andalso
         (get_value(id, Opts, nil) =/= nil) of
     true ->
         {ok, #rep{options = Opts, user_ctx = UserCtx}};
     false ->
-        Source = parse_rep_db(get_value(<<"source">>, Props), Proxy, Opts),
-        Target = parse_rep_db(get_value(<<"target">>, Props), Proxy, Opts),
+        Source = parse_rep_db(get_value(<<"source">>, Props), SrcProxy, Opts),
+        Target = parse_rep_db(get_value(<<"target">>, Props), TgtProxy, Opts),
         {Type, View} = case couch_replicator_filters:view_type(Props, Opts) of
         {error, Error} ->
             throw({bad_request, Error});
@@ -273,6 +273,25 @@ parse_rep_doc_without_id({Props}, UserCtx) ->
              ok
         end,
         {ok, Rep}
+    end.
+
+
+parse_proxy_settings(Props) when is_list(Props) ->
+    Proxy = get_value(<<"proxy">>, Props, <<>>),
+    SrcProxy = get_value(<<"source_proxy">>, Props, <<>>),
+    TgtProxy = get_value(<<"target_proxy">>, Props, <<>>),
+
+    case Proxy =/= <<>> of
+        true when SrcProxy =/= <<>> ->
+            Error = "`proxy` is mutually exclusive with `source_proxy`",
+            throw({bad_request, Error});
+        true when  TgtProxy =/= <<>> ->
+            Error = "`proxy` is mutually exclusive with `target_proxy`",
+            throw({bad_request, Error});
+        true ->
+            {Proxy, Proxy};
+        false ->
+            {SrcProxy, TgtProxy}
     end.
 
 
