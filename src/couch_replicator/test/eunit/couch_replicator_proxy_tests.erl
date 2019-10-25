@@ -36,7 +36,10 @@ replicator_proxy_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun parse_rep_doc_without_proxy/1,
-                    fun parse_rep_doc_with_proxy/1
+                    fun parse_rep_doc_with_proxy/1,
+                    fun parse_rep_source_target_proxy/1,
+                    fun mutually_exclusive_proxy_and_source_proxy/1,
+                    fun mutually_exclusive_proxy_and_target_proxy/1
                 ]
             }
         }
@@ -66,4 +69,48 @@ parse_rep_doc_with_proxy(_) ->
         Rep = couch_replicator_docs:parse_rep_doc(ProxyDoc),
         ?assertEqual((Rep#rep.source)#httpdb.proxy_url, binary_to_list(ProxyURL)),
         ?assertEqual((Rep#rep.target)#httpdb.proxy_url, binary_to_list(ProxyURL))
+    end).
+
+
+parse_rep_source_target_proxy(_) ->
+    ?_test(begin
+        SrcProxyURL = <<"http://mysrcproxy.com">>,
+        TgtProxyURL = <<"http://mytgtproxy.com:9999">>,
+        ProxyDoc = {[
+            {<<"source">>, <<"http://unproxied.com">>},
+            {<<"target">>, <<"http://otherunproxied.com">>},
+            {<<"source_proxy">>, SrcProxyURL},
+            {<<"target_proxy">>, TgtProxyURL}
+        ]},
+        Rep = couch_replicator_docs:parse_rep_doc(ProxyDoc),
+        ?assertEqual((Rep#rep.source)#httpdb.proxy_url,
+            binary_to_list(SrcProxyURL)),
+        ?assertEqual((Rep#rep.target)#httpdb.proxy_url,
+            binary_to_list(TgtProxyURL))
+    end).
+
+
+mutually_exclusive_proxy_and_source_proxy(_) ->
+    ?_test(begin
+        ProxyDoc = {[
+            {<<"source">>, <<"http://unproxied.com">>},
+            {<<"target">>, <<"http://otherunproxied.com">>},
+            {<<"proxy">>, <<"oldstyleproxy.local">>},
+            {<<"source_proxy">>, <<"sourceproxy.local">>}
+        ]},
+        ?assertThrow({bad_rep_doc, _},
+            couch_replicator_docs:parse_rep_doc(ProxyDoc))
+    end).
+
+
+mutually_exclusive_proxy_and_target_proxy(_) ->
+    ?_test(begin
+        ProxyDoc = {[
+            {<<"source">>, <<"http://unproxied.com">>},
+            {<<"target">>, <<"http://otherunproxied.com">>},
+            {<<"proxy">>, <<"oldstyleproxy.local">>},
+            {<<"target_proxy">>, <<"targetproxy.local">>}
+        ]},
+        ?assertThrow({bad_rep_doc, _},
+            couch_replicator_docs:parse_rep_doc(ProxyDoc))
     end).
