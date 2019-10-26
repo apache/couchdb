@@ -105,11 +105,12 @@ on how to send one :)
 
    ```bash
    # Clone your fork of the repo into the current directory
-   git clone https://github.com/<your-username>/<repo-name>
-   # Navigate to the newly cloned directory
+   git clone https://github.com/<your-username-Edd0408>/<repo-apache-1>
+   # Navigate to the newly cloned direct
    cd <repo-name>
    # Assign the original repo to a remote called "upstream"
-   git remote add upstream https://github.com/apache/<repo-name>
+   git remote add upstream https://github.com/apache/<repo-n
+Update apache>
    ```
 
 2. If you cloned a while ago, get the latest changes from upstream:
