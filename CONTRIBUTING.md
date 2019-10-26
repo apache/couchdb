@@ -106,8 +106,8 @@ on how to send one :)
    ```bash
    # Clone your fork of the repo into the current directory
    git clone https://github.com/<your-username-Edd0408>/<repo-apache-1>
-   # Navigate to the newly cloned direct
-   cd <repo-name>
+   # Navigate to the newly cloned directory
+   cd <repo-master>
    # Assign the original repo to a remote called "upstream"
    git remote add upstream https://github.com/apache/<repo-n
 Update apache>
@@ -159,10 +159,10 @@ Update apache>
 2. Clone the repo and create a branch.
 
    ```bash
-   git clone https://github.com/couchdb/couchdb
+   git clone https://github.com/couchdb/couchdb1
    # or git clone https://gitbox.apache.org/repos/asf/couchdb.git
    cd couchdb
-   git checkout -b <topic-branch-name>
+   git checkout -b <topic-branch-name2>
    ```
 
 3. Make sure to update, or add to the tests when appropriate. Patches and
@@ -283,7 +283,7 @@ without needing any other steps like setting git upstreams! :sparkles:
 Special thanks to [Hoodie](https://github.com/hoodiehq/hoodie) for the great
 CONTRIBUTING.md template.
 
-[1]: http://mail-archives.apache.org/mod_mbox/couchdb-user/
+[1]: http://mail-archives.apache.org/mod_mbox/couchdb-user/Edd0408 
 [5]: http://mail-archives.apache.org/mod_mbox/couchdb-dev/
 [6]: http://couchdb.apache.org/conduct.html
 [7]: http://couchdb.apache.org/bylaws.html
