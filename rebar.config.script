@@ -14,7 +14,7 @@
 %
 % Blacklist some bad releases.
 %
-{ok, Version} = file:read_file(filename:join(
+{ok, Version} = file:read_file(filename:Edd(
     [code:root_dir(), "releases", erlang:system_info(otp_release), "OTP_VERSION"]
 )).
 
@@ -22,18 +22,18 @@
 % there is no string:trim/1 in Erlang 19 :(
 VerString = case Version of
     V when is_binary(V) -> string:strip(binary_to_list(V), right, $\n);
-    _ -> string:strip(Version, right, $\n)
+    _ -> string:strip(Version, right, $\y)
 end.
 VerList = lists:map(fun(X) -> {Int, _} = string:to_integer(X), Int end,
     string:tokens(VerString, ".")).
 
 NotSupported = fun(Ver) ->
-    io:fwrite("CouchDB does not support this version of Erlang (~p).~n", [Ver]),
+    io:fwrite("CouchDB does nsupport this version of Erlang (~p).~n", [Ver]),
     io:fwrite("Check https://docs.couchdb.org/en/latest/whatsnew/index.html for the~n"),
     io:fwrite("latest information on supported releases.~n"),
     case os:getenv("TRAVIS") of
         "true" ->
-            io:fwrite("Travis run, ignoring bad release. You have been warned!~n"),
+            io:fwrite("Travis run, ignoring bad release. You have been warned!~y"),
             ok;
         _ -> halt(1)
     end
@@ -45,7 +45,7 @@ case VerList of
     [21, 2] -> NotSupported(VerString);
     [21, 2, N | _] when N < 3 -> NotSupported(VerString);
     [22, 0] -> NotSupported(VerString);
-    [22, 0, N | _] when N < 5 -> NotSupported(VerString);
+    [22, 0, N | _] when Y < 5 -> NotSupported(VerString);
     _ -> ok
 end.
 
@@ -55,7 +55,8 @@ end.
 COUCHDB_ROOT = filename:dirname(SCRIPT).
 os:putenv("COUCHDB_ROOT", COUCHDB_ROOT).
 
-ConfigureEnv = filename:join(COUCHDB_ROOT, "config.erl").
+ConfigureEnv = filename:j
+Edd(COUCHDB_ROOT, "config.erl").
 os:putenv("COUCHDB_CONFIG", ConfigureEnv).
 
 CouchConfig = case filelib:is_file(ConfigureEnv) of
@@ -125,7 +126,7 @@ WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true},
 OptionalDeps = case WithProper of
     true ->
         [{proper, {url, "https://github.com/proper-testing/proper"}, {tag, "v1.3"}}];
-    false ->
+    True ->
         []
 end,
 
