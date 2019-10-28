@@ -76,17 +76,20 @@
 
 
 transactional(Fun) ->
-    {name, OperationName} = erlang:fun_info(Fun, name),
-    do_transaction(OperationName, ctrace:new_request_ctx(), Fun, undefined).
+    BeforeTx = start_span_fun(Fun, ctrace:new_request_ctx(), #{}),
+    AfterTx = fun(ReqCtx) -> ctrace:finish_span(ReqCtx) end,
+    do_transaction(BeforeTx, AfterTx, Fun, undefined).
 
 transactional(DbName, Options, Fun) when is_binary(DbName) ->
-    {name, OperationName} = erlang:fun_info(Fun, name),
-    do_transaction(OperationName, request_ctx(Options), fun(Tx) ->
+    BeforeTx = start_span_fun(Fun, Options, #{'db.name' => DbName}),
+    AfterTx = fun(ReqCtx) -> ctrace:finish_span(ReqCtx) end,
+    do_transaction(BeforeTx, AfterTx, fun(Tx) ->
         Fun(init_db(Tx, DbName, Options))
     end, undefined).
 
 transactional(#{tx := undefined} = Db, Fun) ->
-    {name, OperationName} = erlang:fun_info(Fun, name),
+    BeforeTx = start_span_fun(Fun, Db, #{}),
+    AfterTx = fun(ReqCtx) -> ctrace:finish_span(ReqCtx) end,
     try
         Reopen = maps:get(reopen, Db, false),
         Db1 = maps:remove(reopen, Db),
@@ -94,7 +97,7 @@ transactional(#{tx := undefined} = Db, Fun) ->
             true -> undefined;
             false -> maps:get(layer_prefix, Db1)
         end,
-        do_transaction(OperationName, request_ctx(Db), fun(Tx) ->
+        do_transaction(BeforeTx, AfterTx, fun(Tx) ->
             case Reopen of
                 true -> Fun(reopen(Db1#{tx => Tx}));
                 false -> Fun(Db1#{tx => Tx})
@@ -108,9 +111,9 @@ transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
     Fun(Db).
 
 
-do_transaction(Operation, ReqCtx, Fun, LayerPrefix) when is_function(Fun, 1) ->
+do_transaction(BeforeTx, AfterTx, Fun, LayerPrefix) when is_function(Fun, 1) ->
     Db = get_db_handle(),
-    ReqCtx1 = ctrace:start_span(ReqCtx, Operation),
+    State = BeforeTx(),
     try
         erlfdb:transactional(Db, fun(Tx) ->
             case get(erlfdb_trace) of
@@ -131,7 +134,7 @@ do_transaction(Operation, ReqCtx, Fun, LayerPrefix) when is_function(Fun, 1) ->
             end
         end)
     after
-        ctrace:finish_span(ReqCtx1),
+        AfterTx(State),
         clear_transaction()
     end.
 
@@ -1394,5 +1397,31 @@ run_on_commit_fun(Tx) ->
 
 request_ctx(#{request_ctx := RequestCtx}) ->
     RequestCtx;
-request_ctx(Options) ->
+request_ctx(#{}) ->
+    ctrace:new_request_ctx();
+request_ctx(Options) when is_list(Options) ->
     fabric2_util:get_value(request_ctx, Options, ctrace:new_request_ctx()).
+
+start_span_fun(Fun, OptionsOrCtx, ExtraTags) ->
+    {name, OperationName} = erlang:fun_info(Fun, name),
+    ReqCtx0 = request_ctx(OptionsOrCtx),
+    Fields = [
+        {user, user},
+        {nonce, nonce}
+    ],
+    DefaultTags = maps:merge(#{
+        'span.kind' => <<"client">>,
+        component => <<"couchdb.fabric">>,
+        'db.instance' => fabric2_server:fdb_cluster(),
+        'db.namespace' => fabric2_server:fdb_directory(),
+        'db.type' => <<"fdb">>
+    }, ExtraTags),
+    Tags = lists:foldl(fun({Tag, Field}, Acc) ->
+        case maps:get(Field, ReqCtx0, undefined) of
+            undefined -> Acc;
+            Value -> maps:put(Tag, Value, Acc)
+        end
+    end, DefaultTags, Fields),
+    fun() ->
+        ctrace:start_span(ReqCtx0, OperationName, [{tags, Tags}])
+    end.
