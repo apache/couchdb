@@ -436,6 +436,73 @@ defmodule ViewMapTest do
     assert Enum.at(rows, 9)["value"] == "multiple values!"
   end
 
+  test "can do design doc swap", context do
+    db_name = context[:db_name]
+
+    docs = [
+      %{_id: "doc1", foo: "foo", bar: "bar"},
+      %{
+        _id: "_design/view1",
+        views: %{
+          view: %{
+            map: """
+                function (doc) {
+                  if (!doc.foo) {
+                    return;
+                  }
+                  emit(doc.foo);
+                }
+            """
+          }
+        }
+      },
+      %{
+        _id: "_design/view2",
+        views: %{
+          view: %{
+            map: """
+                function (doc) {
+                  if (!doc.bar) {
+                    return;
+                  }
+                  emit(doc.bar);
+                }
+            """
+          }
+        }
+      }
+    ]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs})
+    assert resp.status_code == 201
+
+    url1 = "/#{db_name}/_design/view1/_view/view"
+    url2 = "/#{db_name}/_design/view2/_view/view"
+
+    resp = Couch.get(url1)
+    assert resp.status_code == 200
+    keys = get_keys(resp)
+    assert keys == ["foo"]
+
+    resp = Couch.get(url2)
+    assert resp.status_code == 200
+    keys = get_keys(resp)
+    assert keys == ["bar"]
+
+    view1 = Couch.get("/#{db_name}/_design/view1")
+    view2 = Couch.get("/#{db_name}/_design/view2")
+
+    new_view1 = Map.replace!(view1.body, "views", view2.body["views"])
+
+    resp = Couch.put("/#{db_name}/_design/view1", body: new_view1)
+    assert resp.status_code in [201, 202]
+
+    resp = Couch.get(url1, query: %{update: false})
+    assert resp.status_code == 200
+    keys = get_keys(resp)
+    assert keys == ["bar"]
+  end
+
   def update_doc_value(db_name, id, value) do
     resp = Couch.get("/#{db_name}/#{id}")
     doc = convert(resp.body)
