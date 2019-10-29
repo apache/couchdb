@@ -18,6 +18,7 @@
     {applications, [
         kernel,
         stdlib,
+        syntax_tools,
         config,
         jaeger_passage,
         passage
