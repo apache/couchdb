@@ -38,13 +38,9 @@ get(purge_seq, #mrst{purge_seq = PurgeSeq}) ->
 get(update_options, #mrst{design_opts = Opts}) ->
     IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
     LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
-    SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
-    KeySeqIndexed = couch_util:get_value(<<"keyseq_indexed">>, Opts, false),
     Partitioned = couch_util:get_value(<<"partitioned">>, Opts, false),
     if IncDesign -> [include_design]; true -> [] end
         ++ if LocalSeq -> [local_seq]; true -> [] end
-        ++ if KeySeqIndexed -> [keyseq_indexed]; true -> [] end
-        ++ if SeqIndexed -> [seq_indexed]; true -> [] end
         ++ if Partitioned -> [partitioned]; true -> [] end;
 get(fd, #mrst{fd = Fd}) ->
     Fd;
@@ -57,7 +53,6 @@ get(info, State) ->
         fd = Fd,
         sig = Sig,
         id_btree = IdBtree,
-        log_btree = LogBtree,
         language = Lang,
         update_seq = UpdateSeq,
         purge_seq = PurgeSeq,
@@ -66,13 +61,7 @@ get(info, State) ->
     {ok, FileSize} = couch_file:bytes(Fd),
     {ok, ExternalSize} = couch_mrview_util:calculate_external_size(Views),
     {ok, ActiveViewSize} = couch_mrview_util:calculate_active_size(Views),
-    LogBtSize = case LogBtree of
-        nil ->
-            0;
-        _ ->
-            couch_btree:size(LogBtree)
-    end,
-    ActiveSize = couch_btree:size(IdBtree) + LogBtSize + ActiveViewSize,
+    ActiveSize = couch_btree:size(IdBtree) + ActiveViewSize,
 
     UpdateOptions0 = get(update_options, State),
     UpdateOptions = [atom_to_binary(O, latin1) || O <- UpdateOptions0],
