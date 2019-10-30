@@ -13,18 +13,7 @@
 
 -define(uint2bin(I), binary:encode_unsigned(I, little)).
 -define(bin2uint(I), binary:decode_unsigned(I, little)).
-
-% This will eventually be the `\xFFmetadataVersion` key that is
-% currently only available in FoundationDB master.
-%
-%  https://forums.foundationdb.org/t/a-new-tool-for-managing-layer-metadata/1191
-%
-% Until then we'll fake the same behavior using a randomish
-% key for tracking metadata changse. Once we get to the
-% new feature this will be more performant by updating
-% this define.
--define(METADATA_VERSION_KEY, <<"$metadata_version_key$">>).
-
+-define(METADATA_VERSION_KEY, <<16#FF, "/metadataVersion">>).
 
 % Prefix Definitions
 
