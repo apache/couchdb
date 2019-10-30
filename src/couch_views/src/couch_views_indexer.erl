@@ -42,8 +42,27 @@ init() ->
         <<"sig">> := JobSig
     } = Data,
 
-    {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
-    {ok, DDoc} = fabric2_db:open_doc(Db, DDocId),
+    {ok, Db} = try
+        fabric2_db:open(DbName, [?ADMIN_CTX])
+    catch error:database_does_not_exist ->
+        couch_jobs:finish(undefined, Job, Data#{
+            error => db_deleted,
+            reason => "Database was deleted"
+        }),
+        exit(normal)
+    end,
+
+    {ok, DDoc} = case fabric2_db:open_doc(Db, DDocId) of
+        {ok, DDoc0} ->
+            {ok, DDoc0};
+        {not_found, _} ->
+            couch_jobs:finish(undefined, Job, Data#{
+                error => ddoc_deleted,
+                reason => "Design document was deleted"
+            }),
+            exit(normal)
+    end,
+
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     HexSig = fabric2_util:to_hex(Mrst#mrst.sig),
 
