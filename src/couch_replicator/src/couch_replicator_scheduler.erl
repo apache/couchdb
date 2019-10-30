@@ -165,7 +165,8 @@ job_summary(JobId, HealthThreshold) ->
                 {last_updated, last_updated(History)},
                 {start_time,
                     couch_replicator_utils:iso8601(Rep#rep.start_time)},
-                {proxy, job_proxy_url(Rep#rep.source)}
+                {source_proxy, job_proxy_url(Rep#rep.source)},
+                {target_proxy, job_proxy_url(Rep#rep.target)}
             ];
         {error, not_found} ->
             nil  % Job might have just completed
@@ -1068,7 +1069,8 @@ scheduler_test_() ->
             t_job_summary_running(),
             t_job_summary_pending(),
             t_job_summary_crashing_once(),
-            t_job_summary_crashing_many_times()
+            t_job_summary_crashing_many_times(),
+            t_job_summary_proxy_fields()
          ]
     }.
 
@@ -1476,6 +1478,31 @@ t_job_summary_crashing_many_times() ->
         ?assertEqual(crashing, proplists:get_value(state, Summary)),
         ?assertEqual(<<"some_reason">>, proplists:get_value(info, Summary)),
         ?assertEqual(2, proplists:get_value(error_count, Summary))
+    end).
+
+
+t_job_summary_proxy_fields() ->
+    ?_test(begin
+        Job =  #job{
+            id = job1,
+            history = [started(10), added()],
+            rep = #rep{
+                source = #httpdb{
+                    url = "https://s",
+                    proxy_url = "http://u:p@sproxy:12"
+                },
+                target = #httpdb{
+                    url = "http://t",
+                    proxy_url = "socks5://u:p@tproxy:34"
+                }
+            }
+        },
+        setup_jobs([Job]),
+        Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
+        ?assertEqual(<<"http://u:*****@sproxy:12">>,
+            proplists:get_value(source_proxy, Summary)),
+        ?assertEqual(<<"socks5://u:*****@tproxy:34">>,
+            proplists:get_value(target_proxy, Summary))
     end).
 
 
