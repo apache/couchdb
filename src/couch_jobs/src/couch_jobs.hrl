@@ -10,6 +10,8 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+-include_lib("fabric/include/fabric2.hrl").
+
 
 % Job map/json field definitions
 %
@@ -20,10 +22,7 @@
 
 % These might be in a fabric public hrl eventually
 %
--define(uint2bin(I), binary:encode_unsigned(I, little)).
--define(bin2uint(I), binary:decode_unsigned(I, little)).
 -define(UNSET_VS, {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF}).
--define(METADATA_VERSION_KEY, <<"$metadata_version_key$">>).
 
 % Data model definitions
 %
