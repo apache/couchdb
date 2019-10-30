@@ -21,6 +21,7 @@ addons:
     - libmozjs185-dev
     - pkg-config
     - python3.6
+    - python3.6-dev
     - python3.6-venv
     - python3-requests
     - python3-sphinx
