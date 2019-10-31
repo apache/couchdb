@@ -24,7 +24,8 @@
    iso8601/1,
    filter_state/3,
    remove_basic_auth_from_headers/1,
-   normalize_rep/1
+   normalize_rep/1,
+   ejson_state_info/1
 ]).
 
 
@@ -174,6 +175,19 @@ normalize_rep(#rep{} = Rep)->
         doc_id = Rep#rep.doc_id,
         db_name = Rep#rep.db_name
     }.
+
+
+-spec ejson_state_info(binary() | nil) -> binary() | null.
+ejson_state_info(nil) ->
+    null;
+ejson_state_info(Info) when is_binary(Info) ->
+    Info;
+ejson_state_info([]) ->
+    null;  % Status not set yet => null for compatibility reasons
+ejson_state_info([{_, _} | _] = Info) ->
+    {Info};
+ejson_state_info(Info) ->
+    couch_replicator_utils:rep_error_to_binary(Info).
 
 
 -ifdef(TEST).

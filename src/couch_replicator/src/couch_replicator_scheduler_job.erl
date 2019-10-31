@@ -600,7 +600,7 @@ init_state(Rep) ->
                                         ?DEFAULT_CHECKPOINT_INTERVAL),
         type = Type,
         view = View,
-        stats = Stats
+        stats = couch_replicator_stats:new(Stats)
     },
     State#rep_state{timer = start_timer(State)}.
 
@@ -949,20 +949,16 @@ get_pending_count_int(#rep_state{source = Db}=St) ->
 
 update_task(State) ->
     #rep_state{
+        rep_details = #rep{id = JobId},
         current_through_seq = {_, ThroughSeq},
         highest_seq_done = {_, HighestSeq}
     } = State,
-    update_scheduler_job_stats(State),
-    couch_task_status:update(
-        rep_stats(State) ++ [
+    Status = rep_stats(State) ++ [
         {source_seq, HighestSeq},
         {through_seq, ThroughSeq}
-    ]).
-
-
-update_scheduler_job_stats(#rep_state{rep_details = Rep, stats = Stats}) ->
-    JobId = Rep#rep.id,
-    couch_replicator_scheduler:update_job_stats(JobId, Stats).
+    ],
+    couch_replicator_scheduler:update_job_stats(JobId, Status),
+    couch_task_status:update(Status).
 
 
 rep_stats(State) ->
