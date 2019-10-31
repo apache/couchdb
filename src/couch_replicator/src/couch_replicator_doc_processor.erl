@@ -533,15 +533,6 @@ doc_lookup(Db, DocId, HealthThreshold) ->
     end.
 
 
--spec ejson_state_info(binary() | nil) -> binary() | null.
-ejson_state_info(nil) ->
-    null;
-ejson_state_info(Info) when is_binary(Info) ->
-    Info;
-ejson_state_info(Info) ->
-    couch_replicator_utils:rep_error_to_binary(Info).
-
-
 -spec ejson_rep_id(rep_id() | nil) -> binary() | null.
 ejson_rep_id(nil) ->
     null;
@@ -579,7 +570,7 @@ ejson_doc(#rdoc{state = RepState} = RDoc, _HealthThreshold) ->
         {database, DbName},
         {id, ejson_rep_id(RepId)},
         {state, RepState},
-        {info, ejson_state_info(StateInfo)},
+        {info, couch_replicator_utils:ejson_state_info(StateInfo)},
         {error_count, ErrorCount},
         {node, node()},
         {last_updated, couch_replicator_utils:iso8601(StateTime)},

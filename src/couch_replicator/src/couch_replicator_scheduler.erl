@@ -148,19 +148,19 @@ job_summary(JobId, HealthThreshold) ->
                         [{{crashed, Error}, _When} | _] ->
                             {crashing, crash_reason_json(Error)};
                         [_ | _] ->
-                            {pending, null}
+                            {pending, Rep#rep.stats}
                     end;
                 {undefined, ErrorCount} when ErrorCount > 0 ->
                      [{{crashed, Error}, _When} | _] = History,
                      {crashing, crash_reason_json(Error)};
                 {Pid, ErrorCount} when is_pid(Pid) ->
-                     {running, null}
+                     {running, Rep#rep.stats}
             end,
             [
                 {source, iolist_to_binary(ejson_url(Rep#rep.source))},
                 {target, iolist_to_binary(ejson_url(Rep#rep.target))},
                 {state, State},
-                {info, Info},
+                {info, couch_replicator_utils:ejson_state_info(Info)},
                 {error_count, ErrorCount},
                 {last_updated, last_updated(History)},
                 {start_time,
@@ -829,6 +829,7 @@ job_ejson(Job) ->
         {database, Rep#rep.db_name},
         {user, (Rep#rep.user_ctx)#user_ctx.name},
         {doc_id, Rep#rep.doc_id},
+        {info, couch_replicator_utils:ejson_state_info(Rep#rep.stats)},
         {history, History},
         {node, node()},
         {start_time, couch_replicator_utils:iso8601(Rep#rep.start_time)}
@@ -1431,7 +1432,12 @@ t_job_summary_running() ->
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
         ?assertEqual(running, proplists:get_value(state, Summary)),
         ?assertEqual(null, proplists:get_value(info, Summary)),
-        ?assertEqual(0, proplists:get_value(error_count, Summary))
+        ?assertEqual(0, proplists:get_value(error_count, Summary)),
+
+        Stats = [{source_seq, <<"1-abc">>}],
+        handle_cast({update_job_stats, job1, Stats}, mock_state(1)),
+        Summary1 = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
+        ?assertEqual({Stats}, proplists:get_value(info, Summary1))
     end).
 
 
@@ -1447,7 +1453,12 @@ t_job_summary_pending() ->
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
         ?assertEqual(pending, proplists:get_value(state, Summary)),
         ?assertEqual(null, proplists:get_value(info, Summary)),
-        ?assertEqual(0, proplists:get_value(error_count, Summary))
+        ?assertEqual(0, proplists:get_value(error_count, Summary)),
+
+        Stats = [{doc_write_failures, 1}],
+        handle_cast({update_job_stats, job1, Stats}, mock_state(1)),
+        Summary1 = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
+        ?assertEqual({Stats}, proplists:get_value(info, Summary1))
     end).
 
 
