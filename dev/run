@@ -152,11 +152,6 @@ def get_args_parser():
         help="Enables the Erlang view server",
     )
     parser.add_option(
-        "--enable-standalone",
-        action="store_true",
-        help="Enables the automated setup for standalone mode view server",
-    )
-    parser.add_option(
         "--no-join",
         dest="no_join",
         default=False,
@@ -242,7 +237,6 @@ def setup_context(opts, args):
         "extra_args": opts.extra_args,
         "reset_logs": True,
         "procs": [],
-        "enable_standalone": opts.enable_standalone,
         "auto_ports": opts.auto_ports,
     }
 
@@ -414,13 +408,6 @@ def hack_default_ini(ctx, node, contents):
         contents = re.sub(
             "^\[native_query_servers\]$",
             "[native_query_servers]\nerlang = {couch_native_process, start_link, []}",
-            contents,
-            flags=re.MULTILINE,
-        )
-    if ctx["enable_standalone"]:
-        contents = re.sub(
-            "^\[couchdb\]$",
-            "[couchdb]\nstandalone = true",
             contents,
             flags=re.MULTILINE,
         )

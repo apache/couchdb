@@ -147,10 +147,10 @@ Option `standalone` set to `true` in `[couchdb]` configuration executes single n
 
 ### Testing standalone auto setup
 
-Pass `--enable-standalone` and `-n 1` to `dev/run`
+Pass `--config-overrides standalone=true` and `-n 1` to `dev/run`
 
 
-    $ dev/run --no-join -n 1 --admin a:b --enable-standalone
+    $ dev/run --no-join -n 1 --admin a:b --config-overrides standalone=true
 
 
 Then, in a new terminal:
