@@ -35,4 +35,10 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
+    case config:get_boolean("couchdb", "standalone", false) of 
+        true -> 
+            setup:finish_cluster([]);
+        false ->
+            ok
+    end,
     {ok, {{one_for_one, 5, 10}, couch_epi:register_service(setup_epi, [])}}.
