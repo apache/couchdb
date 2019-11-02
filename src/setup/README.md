@@ -141,6 +141,23 @@ b. Same as in a.
   _replicator and _metadata, _db_updates endpoints and
   whatever else is needed. // TBD: collect what else is needed.
 
+## Standalone auto setup
+
+Option `standalone` set to `true` in `[couchdb]` configuration executes single node configuration on startup so the node is ready for use immediately.
+
+### Testing standalone auto setup
+
+Pass `--enable-standalone` and `-n 1` to `dev/run`
+
+
+    $ dev/run --no-join -n 1 --admin a:b --enable-standalone
+
+
+Then, in a new terminal:
+
+    $ src/setup/test/t-standalone.sh
+
+The script should show that single node is enabled. 
 
 ## The Setup Endpoint
 
