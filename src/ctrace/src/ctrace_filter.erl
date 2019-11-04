@@ -46,7 +46,19 @@ new(Id, Module) ->
     ) -> ok.
 
 report(#{'__struct__' := ?MODULE, module := Module} = _State, PSpan) ->
-    Tags = passage_span:get_tags(PSpan),
+    Operation = passage_span:get_operation_name(PSpan),
+    Tags = case passage_span:get_finish_time(PSpan) of
+        {ok, FinishTime} ->
+            StartTime =  passage_span:get_start_time(PSpan),
+            Duration = timer:now_diff(FinishTime, StartTime),
+            maps:merge(passage_span:get_tags(PSpan), #{
+                duration => Duration,
+                operation_id => Operation
+            });
+        error ->
+            maps:put(operation_id, Operation, passage_span:get_tags(PSpan))
+    end,
+
     %% FIXME handle the case when module is not compiled yet
     case Module:match(Tags) of
         false ->
