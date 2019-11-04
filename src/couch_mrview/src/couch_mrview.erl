@@ -184,7 +184,7 @@ validate(Db, DDoc) ->
     validate(DbName, IsPartitioned, DDoc).
 
 
-validate(DbName, IsDbPartitioned,  DDoc) ->
+validate(DbName, _IsDbPartitioned,  DDoc) ->
     ok = validate_ddoc_fields(DDoc#doc.body),
     GetName = fun
         (#mrview{map_names = [Name | _]}) -> Name;
@@ -211,18 +211,8 @@ validate(DbName, IsDbPartitioned,  DDoc) ->
     end,
     {ok, #mrst{
         language = Lang,
-        views = Views,
-        partitioned = Partitioned
+        views = Views
     }} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
-
-    case {IsDbPartitioned, Partitioned} of
-        {false, true} ->
-            throw({invalid_design_doc,
-                <<"partitioned option cannot be true in a "
-                  "non-partitioned database.">>});
-        {_, _} ->
-            ok
-    end,
 
     try Views =/= [] andalso couch_query_servers:get_os_process(Lang) of
         false ->
