@@ -33,6 +33,7 @@ doc_crud_test_() ->
                 fun create_ddoc_requires_admin/1,
                 fun create_ddoc_requires_validation/1,
                 fun create_ddoc_requires_compilation/1,
+                fun can_create_a_partitioned_ddoc/1,
                 fun update_doc_basic/1,
                 fun update_ddoc_basic/1,
                 fun update_doc_replicated/1,
@@ -106,6 +107,23 @@ create_ddoc_basic({Db, _}) ->
     {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Doc),
     NewDoc = Doc#doc{revs = {RevPos, [Rev]}},
     ?assertEqual({ok, NewDoc}, fabric2_db:open_doc(Db, Doc#doc.id)).
+
+
+can_create_a_partitioned_ddoc({Db, _}) ->
+    UUID = fabric2_util:uuid(),
+    DDocId = <<"_design/", UUID/binary>>,
+    Doc = #doc{
+        id = DDocId,
+        body = {[
+            {<<"options">>, {[{<<"partitioned">>, true}]}},
+            {<<"views">>, {[
+                {<<"foo">>, {[
+                    {<<"map">>, <<"function(doc) {}">>}
+                ]}}
+            ]}}
+        ]}
+    },
+    ?assertMatch({ok, {_, _}}, fabric2_db:update_doc(Db, Doc)).
 
 
 create_ddoc_requires_admin({Db, _}) ->
