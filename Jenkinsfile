@@ -115,43 +115,44 @@ pipeline {
 
       parallel {
 
-        stage('FreeBSD') {
-          agent {
-            label 'couchdb && freebsd'
-          }
-          options {
-            skipDefaultCheckout()
-            timeout(time: 90, unit: "MINUTES")
-          }
-          steps {
-            // deleteDir is OK here because we're not inside of a Docker container!
-            deleteDir()
-            unstash 'tarball'
-            withEnv(['HOME='+pwd()]) {
-              sh '''
-                mkdir -p $COUCHDB_IO_LOG_DIR
+        // See https://github.com/apache/couchdb/issues/2301
+        // stage('FreeBSD') {
+        //   agent {
+        //     label 'couchdb && freebsd'
+        //   }
+        //   options {
+        //     skipDefaultCheckout()
+        //     timeout(time: 90, unit: "MINUTES")
+        //   }
+        //   steps {
+        //     // deleteDir is OK here because we're not inside of a Docker container!
+        //     deleteDir()
+        //     unstash 'tarball'
+        //     withEnv(['HOME='+pwd()]) {
+        //       sh '''
+        //         mkdir -p $COUCHDB_IO_LOG_DIR
 
-                # Build CouchDB from tarball & test
-                mkdir build
-                cd build
-                tar -xf $WORKSPACE/apache-couchdb-*.tar.gz
-                cd apache-couchdb-*
-                ./configure --with-curl
-                gmake check || (build-aux/logfile-uploader.py && false)
+        //         # Build CouchDB from tarball & test
+        //         mkdir build
+        //         cd build
+        //         tar -xf $WORKSPACE/apache-couchdb-*.tar.gz
+        //         cd apache-couchdb-*
+        //         ./configure --with-curl
+        //         gmake check || (build-aux/logfile-uploader.py && false)
 
-                # No package build for FreeBSD at this time
-              '''
-            } // withEnv
-          } // steps
-          post {
-            always {
-              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
-            }
-            cleanup {
-              sh 'rm -rf $COUCHDB_IO_LOG_DIR'
-            }
-          } // post
-        } // stage FreeBSD
+        //         # No package build for FreeBSD at this time
+        //       '''
+        //     } // withEnv
+        //   } // steps
+        //   post {
+        //     always {
+        //       junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+        //     }
+        //     cleanup {
+        //       sh 'rm -rf $COUCHDB_IO_LOG_DIR'
+        //     }
+        //   } // post
+        // } // stage FreeBSD
 
         stage('CentOS 6') {
           agent {
