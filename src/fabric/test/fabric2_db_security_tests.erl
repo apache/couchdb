@@ -39,9 +39,9 @@ security_test_() ->
                 fun check_admin_is_member/1,
                 fun check_is_member_of_public_db/1,
                 fun check_set_user_ctx/1,
-                fun check_open_forbidden/1,
-                fun check_fail_open_no_opts/1,
-                fun check_fail_open_name_null/1
+                fun check_forbidden/1,
+                fun check_fail_no_opts/1,
+                fun check_fail_name_null/1
             ]}
         }
     }.
@@ -165,18 +165,21 @@ check_set_user_ctx({Db0, _, _}) ->
     ?assertEqual(UserCtx, fabric2_db:get_user_ctx(Db1)).
 
 
-check_open_forbidden({Db0, _, _}) ->
+check_forbidden({Db0, _, _}) ->
     DbName = fabric2_db:name(Db0),
     UserCtx = #user_ctx{name = <<"foo">>, roles = [<<"bar">>]},
-    ?assertThrow({forbidden, _}, fabric2_db:open(DbName, [{user_ctx, UserCtx}])).
+    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, UserCtx}]),
+    ?assertThrow({forbidden, _}, fabric2_db:get_db_info(Db)).
 
 
-check_fail_open_no_opts({Db0, _, _}) ->
+check_fail_no_opts({Db0, _, _}) ->
     DbName = fabric2_db:name(Db0),
-    ?assertThrow({unauthorized, _}, fabric2_db:open(DbName, [])).
+    {ok, Db} = fabric2_db:open(DbName, []),
+    ?assertThrow({unauthorized, _}, fabric2_db:get_db_info(Db)).
 
 
-check_fail_open_name_null({Db0, _, _}) ->
+check_fail_name_null({Db0, _, _}) ->
     DbName = fabric2_db:name(Db0),
     UserCtx = #user_ctx{name = null},
-    ?assertThrow({unauthorized, _}, fabric2_db:open(DbName, [{user_ctx, UserCtx}])).
+    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, UserCtx}]),
+    ?assertThrow({unauthorized, _}, fabric2_db:get_db_info(Db)).

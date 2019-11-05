@@ -106,9 +106,8 @@ server_authorization_check(#httpd{path_parts=[<<"_node">>,_ , <<"_system">>|_]}=
 server_authorization_check(#httpd{path_parts=[<<"_", _/binary>>|_]}=Req) ->
     require_admin(Req).
 
-db_authorization_check(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
-    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, Ctx}]),
-    fabric2_db:check_is_member(Db),
+db_authorization_check(#httpd{path_parts=[_DbName|_]}=Req) ->
+    % Db authorization checks are performed in fabric before every FDB operation
     Req.
 
 
