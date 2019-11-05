@@ -56,7 +56,8 @@ fetch(DbName) when is_binary(DbName) ->
 store(#{name := DbName} = Db0) when is_binary(DbName) ->
     Db1 = Db0#{
         tx := undefined,
-        user_ctx := #user_ctx{}
+        user_ctx := #user_ctx{},
+        security_fun := undefined
     },
     true = ets:insert(?MODULE, {DbName, Db1}),
     ok.

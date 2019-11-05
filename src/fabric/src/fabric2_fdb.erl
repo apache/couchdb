@@ -20,7 +20,7 @@
 
     create/2,
     open/2,
-    reopen/1,
+    ensure_current/1,
     delete/1,
     exists/1,
 
@@ -30,7 +30,6 @@
 
     get_info/1,
     get_config/1,
-    get_config/2,
     set_config/3,
 
     get_stat/2,
@@ -246,10 +245,12 @@ reopen(#{} = OldDb) ->
         tx := Tx,
         name := DbName,
         db_options := Options,
-        user_ctx := UserCtx
+        user_ctx := UserCtx,
+        security_fun := SecurityFun
     } = OldDb,
     Options1 = lists:keystore(user_ctx, 1, Options, {user_ctx, UserCtx}),
-    open(init_db(Tx, DbName, Options1), Options1).
+    NewDb = open(init_db(Tx, DbName, Options1), Options1),
+    NewDb#{security_fun := SecurityFun}.
 
 
 delete(#{} = Db) ->
@@ -358,19 +359,6 @@ get_config(#{} = Db) ->
         {?DB_CONFIG, Key} = erlfdb_tuple:unpack(K, DbPrefix),
         {Key, V}
     end, erlfdb:wait(Future)).
-
-
-get_config(#{} = Db, ConfigKey) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = ensure_current(Db),
-
-    Key = erlfdb_tuple:pack({?DB_CONFIG, ConfigKey}, DbPrefix),
-    case erlfdb:wait(erlfdb:get(Tx, Key)) of
-        % config values are expected to be set so we blow if not_found
-        Val when Val =/= not_found -> Val
-    end.
 
 
 set_config(#{} = Db, ConfigKey, ConfigVal) ->
@@ -835,6 +823,7 @@ init_db(Tx, DbName, Options) ->
         layer_prefix => Prefix,
         md_version => Version,
 
+        security_fun => undefined,
         db_options => Options
     }.
 
@@ -1276,12 +1265,20 @@ ensure_current(Db) ->
     ensure_current(Db, true).
 
 
-ensure_current(#{} = Db, CheckDbVersion) ->
-    require_transaction(Db),
-    case check_metadata_version(Db) of
+ensure_current(#{} = Db0, CheckDbVersion) ->
+    require_transaction(Db0),
+    Db2 = case check_metadata_version(Db0) of
         {current, Db1} -> Db1;
         {stale, Db1} -> check_db_version(Db1, CheckDbVersion)
-    end.
+    end,
+    case maps:get(security_fun, Db2) of
+        SecurityFun when is_function(SecurityFun, 2) ->
+            #{security_doc := SecDoc} = Db2,
+            ok = SecurityFun(Db2, SecDoc);
+        undefined ->
+            ok
+    end,
+    Db2.
 
 
 is_transaction_applied(Tx) ->

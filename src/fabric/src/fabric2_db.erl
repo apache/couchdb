@@ -176,19 +176,18 @@ open(DbName, Options) ->
     case fabric2_server:fetch(DbName) of
         #{} = Db ->
             Db1 = maybe_set_user_ctx(Db, Options),
-            ok = check_is_member(Db1),
-            {ok, Db1};
+            {ok, require_member_check(Db1)};
         undefined ->
             Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
                 fabric2_fdb:open(TxDb, Options)
             end),
             % Cache outside the transaction retry loop
             case Result of
-                #{security_doc := SecDoc} = Db0 ->
-                    ok = check_is_member(Db0, SecDoc),
+                #{} = Db0 ->
                     Db1 = maybe_add_sys_db_callbacks(Db0),
                     ok = fabric2_server:store(Db1),
-                    {ok, Db1#{tx := undefined}};
+                    Db2 = Db1#{tx := undefined},
+                    {ok, require_member_check(Db2)};
                 Error ->
                     Error
             end
@@ -256,7 +255,11 @@ is_admin(Db, {SecProps}) when is_list(SecProps) ->
 
 
 check_is_admin(Db) ->
-    case is_admin(Db) of
+    check_is_admin(Db, get_security(Db)).
+
+
+check_is_admin(Db, SecDoc) ->
+    case is_admin(Db, SecDoc) of
         true ->
             ok;
         false ->
@@ -278,6 +281,18 @@ check_is_member(Db, SecDoc) ->
             UserCtx = get_user_ctx(Db),
             throw_security_error(UserCtx)
     end.
+
+
+require_admin_check(#{} = Db) ->
+    Db#{security_fun := fun check_is_admin/2}.
+
+
+require_member_check(#{} = Db) ->
+    Db#{security_fun := fun check_is_member/2}.
+
+
+no_security_check(#{} = Db) ->
+    Db#{security_fun := undefined}.
 
 
 name(#{name := DbName}) ->
@@ -359,17 +374,17 @@ get_pid(#{}) ->
 
 
 get_revs_limit(#{} = Db) ->
-    RevsLimitBin = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:get_config(TxDb, <<"revs_limit">>)
+    #{revs_limit := RevsLimit} = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        fabric2_fdb:ensure_current(TxDb)
     end),
-    ?bin2uint(RevsLimitBin).
+    RevsLimit.
 
 
 get_security(#{} = Db) ->
-    SecBin = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:get_config(TxDb, <<"security_doc">>)
+    #{security_doc := SecDoc} = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        fabric2_fdb:ensure_current(no_security_check(TxDb))
     end),
-    ?JSON_DECODE(SecBin).
+    SecDoc.
 
 
 get_update_seq(#{} = Db) ->
@@ -440,26 +455,26 @@ is_users_db(DbName) when is_binary(DbName) ->
     IsAuthCache orelse IsCfgUsersDb orelse IsGlobalUsersDb.
 
 
-set_revs_limit(#{} = Db, RevsLimit) ->
-    check_is_admin(Db),
+set_revs_limit(#{} = Db0, RevsLimit) ->
+    Db1 = require_admin_check(Db0),
     RevsLimBin = ?uint2bin(max(1, RevsLimit)),
-    Resp = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:set_config(TxDb, <<"revs_limit">>, RevsLimBin)
+    {Resp, Db2} = fabric2_fdb:transactional(Db1, fun(TxDb) ->
+        {fabric2_fdb:set_config(TxDb, <<"revs_limit">>, RevsLimBin), TxDb}
     end),
     if Resp /= ok -> Resp; true ->
-        fabric2_server:store(Db#{revs_limit := RevsLimit})
+        fabric2_server:store(Db2#{revs_limit := RevsLimit})
     end.
 
 
-set_security(#{} = Db, Security) ->
-    check_is_admin(Db),
+set_security(#{} = Db0, Security) ->
+    Db1 = require_admin_check(Db0),
     ok = fabric2_util:validate_security_object(Security),
     SecBin = ?JSON_ENCODE(Security),
-    Resp = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:set_config(TxDb, <<"security_doc">>, SecBin)
+    {Resp, Db2} = fabric2_fdb:transactional(Db1, fun(TxDb) ->
+        {fabric2_fdb:set_config(TxDb, <<"security_doc">>, SecBin), TxDb}
     end),
     if Resp /= ok -> Resp; true ->
-        fabric2_server:store(Db#{security_doc := Security})
+        fabric2_server:store(Db2#{security_doc := Security})
     end.
 
 
