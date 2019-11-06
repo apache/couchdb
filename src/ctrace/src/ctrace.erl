@@ -145,7 +145,8 @@ start_span(Subject, OperationName, Options0) ->
                     #span{
                         span = PassageSpan,
                         active = true,
-                        tracer = OperationName
+                        tracer = OperationName,
+                        operation_name = OperationName
                     }
             end;
         (#{'__struct__' := request_ctx, tracing := false}) ->
