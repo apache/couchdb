@@ -267,15 +267,15 @@ database-info.read = all
 [tracing.view.build]
 
 a_select = (#{'view.name' := Name}) when Name == "blablabla" -> [report]
-details = (#{parent := Parent}) when Parent == <<"view.build">> -> [report]
+details = (#{origin := Origin}) when Origin == <<"view.build">> -> [report]
 
 [tracing.database-info.read]
 
 select = (#{'http.method' := Method}) when Method == 'GET' -> [report]
-details = (#{parent := Parent}) when Parent == <<"database-info.read">> -> [report]
+details = (#{origin := Origin}) when Origin == <<"database-info.read">> -> [report]
 ```
 
-Note: It is important to add `details = (#{parent := Parent}) when Parent == <<"database-info.read">> -> [report]`
+Note: It is important to add `details = (#{origin := Origin}) when Origin == <<"database-info.read">> -> [report]`
 rule if you wanted to report children spans.
 
 

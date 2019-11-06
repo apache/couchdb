@@ -69,7 +69,7 @@
 
 -record(span, {
     active = false,
-    operation_name = undefined, %% root_span
+    origin = undefined,
     span = undefined,
     tracer = undefined,
     backend = passage
@@ -128,9 +128,9 @@ start_span(Subject, OperationName, Options0) ->
                 undefined ->
                     Span#span{active = false};
                 PSpan1 ->
-                    Parent = atom_to_binary(Span#span.operation_name, utf8),
+                    Origin = atom_to_binary(Span#span.origin, utf8),
                     Tags = #{
-                        parent => Parent
+                        origin => Origin
                     },
                     tag(Span#span{span = PSpan1}, Tags)
             end;
@@ -146,7 +146,7 @@ start_span(Subject, OperationName, Options0) ->
                         span = PassageSpan,
                         active = true,
                         tracer = OperationName,
-                        operation_name = OperationName
+                        origin = OperationName
                     }
             end;
         (#{'__struct__' := request_ctx, tracing := false}) ->
@@ -232,15 +232,15 @@ finish_lifetime(Subject) ->
     ) -> #span{}.
 
 set_operation_name(#span{active = false} = Span, OperationName) ->
-    Span#span{operation_name = OperationName};
+    Span#span{origin = OperationName};
 set_operation_name(#span{span = PSpan0, backend = passage} = Span, OperationName) ->
     PSpan1 = passage:set_operation_name(PSpan0, OperationName),
     PSpan2 = passage:set_tracer(PSpan1, OperationName),
-    Span#span{operation_name = OperationName, span = PSpan2};
+    Span#span{origin = OperationName, span = PSpan2};
 set_operation_name(#span{backend = passage_pd} = Span, OperationName) ->
     passage_pd:set_operation_name(OperationName),
     passage_pd:set_tracer(OperationName),
-    Span#span{operation_name = OperationName}.
+    Span#span{origin = OperationName}.
 
 -spec tag(
         Span :: #span{},
