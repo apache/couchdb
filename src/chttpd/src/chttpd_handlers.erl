@@ -37,7 +37,7 @@ design_handler(HandlerKey, DefaultFun) ->
     select(collect(design_handler, [HandlerKey]), DefaultFun).
 
 handler_info(HttpReq) ->
-    Default = {'unknown.unknown', []},
+    Default = {'unknown.unknown', #{}},
     select(collect(handler_info, [HttpReq]), Default).
 
 %% ------------------------------------------------------------------

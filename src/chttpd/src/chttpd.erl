@@ -160,7 +160,6 @@ handle_request(MochiReq0) ->
     handle_request_int(MochiReq).
 
 handle_request_int(MochiReq) ->
-    RequestCtx = start_span(MochiReq),
     Begin = os:timestamp(),
     case config:get("chttpd", "socket_options") of
     undefined ->
@@ -235,18 +234,6 @@ handle_request_int(MochiReq) ->
                 || Part <- string:tokens(RequestedPath, "/")]
     },
 
-    HttpReq1 = attach_request_ctx(HttpReq0, RequestCtx),
-    HttpReq2 = ctrace:trace(HttpReq1, fun(S) ->
-        ctrace:tag(S, #{
-            peer => Peer,
-            'http.method' => Method,
-            nonce => Nonce,
-            'http.url' => Path,
-            'span.kind' => <<"server">>,
-            component => <<"couchdb.chttpd">>
-        })
-    end),
-
     % put small token on heap to keep requests synced to backend calls
     erlang:put(nonce, Nonce),
 
@@ -256,11 +243,11 @@ handle_request_int(MochiReq) ->
 
     maybe_trace_fdb(MochiReq:get_header_value("x-couchdb-fdb-trace")),
 
-    {HttpReq4, Response} = case before_request(HttpReq2) of
-        {ok, HttpReq3} ->
-            process_request(HttpReq3);
+    {HttpReq2, Response} = case before_request(HttpReq0) of
+        {ok, HttpReq1} ->
+            process_request(HttpReq1);
         {error, Response0} ->
-            {HttpReq2, Response0}
+            {HttpReq0, Response0}
     end,
 
     {Status, Code, Reason, Resp} = split_response(Response),
@@ -269,13 +256,13 @@ handle_request_int(MochiReq) ->
         code = Code,
         status = Status,
         response = Resp,
-        nonce = HttpReq4#httpd.nonce,
+        nonce = HttpReq2#httpd.nonce,
         reason = Reason
     },
 
-    case after_request(HttpReq4, HttpResp) of
+    case after_request(HttpReq2, HttpResp) of
         #httpd_resp{status = ok, response = Resp} ->
-            finish_span(HttpReq4, span_ok(HttpResp)),
+            finish_span(HttpReq2, span_ok(HttpResp)),
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
             couch_log:error("Response abnormally terminated: ~p", [Reason]),
@@ -283,7 +270,7 @@ handle_request_int(MochiReq) ->
     end.
 
 before_request(HttpReq0) ->
-    HttpReq1 = set_action(HttpReq0),
+    HttpReq1 = start_span(HttpReq0),
     try
         chttpd_stats:init(),
         chttpd_plugin:before_request(HttpReq1)
@@ -1250,23 +1237,38 @@ maybe_trace_fdb("true") ->
 maybe_trace_fdb(_) ->
     ok.
 
-start_span(_MochiReq) ->
+start_span(Req) ->
+    #httpd{
+        mochi_req = MochiReq,
+        begin_ts = Begin,
+        peer = Peer,
+        nonce = Nonce,
+        method = Method,
+        path_parts = PathParts
+    } = Req,
+    {OperationName, ExtraTags} = get_action(Req),
+    Tags = maps:merge(#{
+        peer => Peer,
+        'http.method' => Method,
+        nonce => Nonce,
+        'http.url' => MochiReq:get(raw_path),
+        path_parts => PathParts,
+        'span.kind' => <<"server">>,
+        component => <<"couchdb.chttpd">>
+    }, ExtraTags),
+
     RequestCtx = ctrace:new_request_ctx(),
-    ctrace:start_span(RequestCtx, undefined).
+    ctrace:start_span(Req#httpd{request_ctx = RequestCtx}, OperationName, [
+        {tags, Tags},
+        {time, Begin}
+    ]).
 
-attach_request_ctx(#httpd{} = Req, RequestCtx) ->
-    Req#httpd{request_ctx = RequestCtx}.
-
-set_action(#httpd{} = Req) ->
+get_action(#httpd{} = Req) ->
     try
-        {Action, Tags} = chttpd_handlers:handler_info(Req),
-        ctrace:trace(Req, Action, fun(Span0) ->
-            Span1 = ctrace:set_operation_name(Span0, Action),
-            ctrace:tag(Span1, Tags)
-        end)
+        chttpd_handlers:handler_info(Req)
     catch Tag:Error ->
         couch_log:error("Cannot set tracing action ~p:~p", [Tag, Error]),
-        Req
+        {undefind, #{}}
     end.
 
 finish_span(Req0, Fun) ->

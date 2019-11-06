@@ -51,24 +51,24 @@ design_handler(_) -> no_match.
 %% TODO Populate in another PR
 handler_info(#httpd{path_parts=[<<"_all_dbs">>], method=Method})
         when Method =:= 'HEAD' orelse Method =:= 'GET' ->
-    {'all-dbs.read', []};
+    {'all-dbs.read', #{}};
 
 handler_info(#httpd{path_parts=[<<"_session">>], method=Method})
         when Method =:= 'HEAD' orelse Method =:= 'GET' ->
-    {'session.read', []};
+    {'session.read', #{}};
 handler_info(#httpd{path_parts=[<<"_session">>], method='POST'}) ->
-    {'session.write', []};
+    {'session.write', #{}};
 handler_info(#httpd{path_parts=[<<"_session">>], method='DELETE'}) ->
-    {'session.delete', []};
+    {'session.delete', #{}};
 
 handler_info(#httpd{path_parts=[_Db], method=Method})
         when Method =:= 'HEAD' orelse Method =:= 'GET' ->
-    {'database-info.read', []};
+    {'database-info.read', #{}};
 handler_info(#httpd{path_parts=[_Db], method='POST'}) ->
-    {'document.write', []};
+    {'document.write', #{}};
 handler_info(#httpd{path_parts=[_Db], method='PUT'}) ->
-    {'database.create', []};
+    {'database.create', #{}};
 handler_info(#httpd{path_parts=[_Db], method='DELETE'}) ->
-    {'database.delete', []};
+    {'database.delete', #{}};
 
 handler_info(_) -> no_match.
