@@ -79,8 +79,7 @@
             {"_rewrite", "{couch_httpd_rewrite, handle_rewrite_req}"},
             {"_show", "{couch_mrview_show, handle_doc_show_req}"},
             {"_update", "{couch_mrview_show, handle_doc_update_req}"},
-            {"_view", "{couch_mrview_http, handle_view_req}"},
-            {"_view_changes", "{couch_mrview_http, handle_view_changes_req}"}
+            {"_view", "{couch_mrview_http, handle_view_req}"}
         ]}
     ]}
 ]}.
