@@ -12,15 +12,14 @@ defmodule Couch.CTrace.Test do
     end)
 
     :config.set('tracing.samplers', 'all-docs', 'all', false)
+
     :config.set('tracing.all-docs', 'all', ~C"(#{method := M}) when M == get -> []", false)
+    :test_util.wait_other_value(fn ->
+       :ctrace_config.get('all-docs')
+    end, :undefined)
     :config.set_boolean('tracing', 'enabled', true, false)
 
-    {:ok, reporter} = wait_non_error(fn ->
-      :passage_tracer_registry.get_reporter(:"all-docs")
-    end)
-
-    filter = :passage_reporter.get_state(reporter)
-    %{filter: :ctrace_filter.module(filter)}
+    %{filter: :ctrace.filter_module_name(:'all-docs')}
   end
 
   describe "Supervision tree :" do
@@ -28,13 +27,6 @@ defmodule Couch.CTrace.Test do
       assert match?(
                {:ok, _},
                :passage_tracer_registry.get_reporter(:jaeger_passage_reporter)
-             )
-    end
-
-    test "pre-configured reporter is started" do
-      assert match?(
-               {:ok, _},
-               :passage_tracer_registry.get_reporter(:'all-docs')
              )
     end
 

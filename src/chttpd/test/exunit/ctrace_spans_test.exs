@@ -80,7 +80,7 @@ defmodule Couch.HTTP.CTrace.Sans.Test do
         assert Map.has_key?(tags, :"http.method"), "expecting to have 'http.method' tag"
         assert :GET == Map.get(tags, :"http.method")
         assert Map.has_key?(tags, :"http.url"), "expecting to have 'http.component' tag"
-        assert String.to_charlist(db_name) == Map.get(tags, :"http.url")
+        assert '/' ++ String.to_charlist(db_name) == Map.get(tags, :"http.url")
       end
     end
   end
@@ -108,7 +108,7 @@ defmodule Couch.HTTP.CTrace.Sans.Test do
         assert Map.has_key?(tags, :"http.method"), "expecting to have 'http.method' tag"
         assert :GET == Map.get(tags, :"http.method")
         assert Map.has_key?(tags, :"http.url"), "expecting to have 'http.component' tag"
-        assert String.to_charlist(db_name) == Map.get(tags, :"http.url")
+        assert '/' ++ String.to_charlist(db_name) == Map.get(tags, :"http.url")
       end
       events = capture(:ctrace, :finish_span, 1, 1)
       assert Enum.any?(events, fn event ->

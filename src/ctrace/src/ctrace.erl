@@ -42,7 +42,10 @@
     trace_id/1,
     span_id/1,
     tracer/1,
-    context/1
+    context/1,
+
+    match/2,
+    filter_module_name/1
 ]).
 
 -export([
@@ -72,7 +75,8 @@
     origin = undefined,
     span = undefined,
     tracer = undefined,
-    backend = passage
+    backend = passage,
+    actions = []
 }).
 
 -type trace_subject()
@@ -137,18 +141,7 @@ start_span(Subject, OperationName, Options0) ->
         (#span{} = Span) ->
             Span;
         (#{'__struct__' := request_ctx, tracing := true}) ->
-            Options = [{tracer, OperationName} | Options0],
-            case passage:start_span(OperationName, Options) of
-                undefined ->
-                    #span{};
-                PassageSpan ->
-                    #span{
-                        span = PassageSpan,
-                        active = true,
-                        tracer = OperationName,
-                        origin = OperationName
-                    }
-            end;
+            start_root_span(OperationName, Options0);
         (#{'__struct__' := request_ctx, tracing := false}) ->
             #span{}
     end).
@@ -207,13 +200,16 @@ finish_span(Subject) ->
 
 finish_span(Subject, Options) ->
     unwrap(Subject, fun
-        (#span{active = true, span = PassageSpan} = Span) ->
-            passage:finish_span(PassageSpan, Options),
+        (#span{active = true, span = PassageSpan, actions = Actions} = Span) ->
+            lists:takewhile(fun(Action) ->
+                Action(PassageSpan, Options)
+            end, Actions),
             Span;
         (Anything) ->
             Anything
     end).
 
+%% FIXME
 -spec finish_lifetime() -> ok.
 
 finish_lifetime() ->
@@ -367,13 +363,7 @@ update_tracers() ->
     end,
     ok.
 
-handle_config_change("tracing.samplers", OperationId, deleted, _, St) ->
-    deregister_filter(list_to_atom(OperationId)),
-    {ok, St};
-handle_config_change("tracing.samplers", OperationId, _Value, _, St) ->
-    SamplerStr = config:get("tracing.samplers", OperationId),
-    Sampler = ctrace_config:parse_sampler(SamplerStr),
-    update_sampler(list_to_atom(OperationId), Sampler),
+handle_config_change("tracing.samplers", _Key, _Val, _Persist, St) ->
     {ok, St};
 handle_config_change("tracing." ++ OperationId, _Key, _Val, _Persist, St) ->
     compile_rules(list_to_atom(OperationId)),
@@ -410,19 +400,35 @@ unwrap(#span{} = Span, Fun) ->
 unwrap(Subject, Fun) ->
     Fun(Subject).
 
+start_root_span(OperationName, Options0) ->
+    Tags = case lists:keyfind(tags, 1, Options0) of
+        {tags, T} ->
+            T;
+        false ->
+            #{}
+    end,
+    case match(OperationName, Tags) of
+        false ->
+            #span{};
+        Actions ->
+            Options = [{tracer, ?MAIN_TRACER} | Options0],
+            case passage:start_span(OperationName, Options) of
+                undefined ->
+                    #span{};
+                PassageSpan ->
+                    #span{
+                        span = PassageSpan,
+                        active = true,
+                        tracer = OperationName,
+                        origin = OperationName,
+                        actions = Actions
+                    }
+            end
+    end.
+
 config_update() ->
     lists:foreach(fun(OperationId) ->
-        compile_rules(list_to_atom(OperationId)),
-        lists:foreach(fun(Sampler) ->
-            case Sampler of
-                undefined ->
-                    ok;
-                Sampler ->
-                    handle_config_change(
-                        "tracing.samplers",
-                        OperationId, Sampler, false, nil)
-            end
-        end, ctrace_config:sampler(OperationId))
+        compile_rules(list_to_atom(OperationId))
     end, ctrace_config:samplers()).
 
 compile_rules(OperationId) ->
@@ -458,23 +464,10 @@ set_action({sample, Rate}) ->
 set_action(report) ->
     {ctrace_action, report, [?MAIN_TRACER]}.
 
-update_sampler(OperationId, Sampler) ->
-    case passage_tracer_registry:get_reporter(OperationId) of
-        {ok, _Reporter} ->
-           passage_tracer_registry:set_sampler(OperationId, Sampler);
-        error ->
-           register_filter(OperationId, Sampler)
-    end.
-
-register_filter(OperationId, Sampler) ->
-    FilterModule = filter_module_name(OperationId),
-    NewFilter = ctrace_filter:new(OperationId, FilterModule),
-    Filter = passage_reporter:new(ctrace_filter, NewFilter),
-    Context = jaeger_passage_span_context,
-    passage_tracer_registry:register(OperationId, Context, Sampler, Filter).
-
-deregister_filter(OperationId) ->
-    passage_tracer_registry:deregister(OperationId).
+match(OperationId, Tags) ->
+    Module = filter_module_name(OperationId),
+    erlang:function_exported(Module, match, 1)
+        andalso Module:match(Tags).
 
 filter_module_name(OperationId) ->
     list_to_atom("ctrace_filter_" ++ atom_to_list(OperationId)).

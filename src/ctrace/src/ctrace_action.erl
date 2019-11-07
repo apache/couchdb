@@ -14,7 +14,8 @@
 
 -export([
     sample/1,
-    report/1
+    report/1,
+    report_longer_than/1
 ]).
 
 -type action_fun()
@@ -32,7 +33,28 @@ sample([SamplingRate]) ->
     ) -> action_fun().
 
 report([TracerId]) ->
-    fun(Span) ->
-        jaeger_passage_reporter:report(TracerId, Span),
+    fun(Span, Options) ->
+        passage:finish_span(Span, Options),
         true
     end.
+
+report_longer_than([TracerId, Threshold]) ->
+    fun(Span, Options) ->
+        case longer_than(Span, Threshold) of
+            true ->
+                 passage:finish_span(Span, Options),
+                true;
+            false ->
+                true
+        end
+    end.
+
+longer_than(Span, Threshold) ->
+    case passage_span:get_finish_time(Span) of
+        {ok, FinishTime} ->
+            StartTime =  passage_span:get_start_time(Span),
+            timer:now_diff(FinishTime, StartTime) > Threshold;
+        _ ->
+            true
+    end.
+
