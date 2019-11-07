@@ -25,8 +25,8 @@
     finish_span/0,
     finish_span/1,
     finish_span/2,
-    finish_lifetime/0,
     finish_lifetime/1,
+    finish_lifetime/2,
 
     set_operation_name/2,
 
@@ -215,18 +215,26 @@ finish_span(Subject, Options0) ->
             Anything
     end).
 
-%% FIXME
--spec finish_lifetime() -> ok.
-
-finish_lifetime() ->
-    passage_pd:finish_span([{lifetime, self()}]).
+%% finish_lifetime works only with passage backend
 
 -spec finish_lifetime(
-        Subject :: trace_subject()
-    ) -> trace_subject().
+	        Subject :: trace_subject()
+    ) -> ok.
 
 finish_lifetime(Subject) ->
-    finish_span(Subject, [{lifetime, self()}]).
+    finish_lifetime(Subject, self()).
+
+-spec finish_lifetime(
+        Subject :: trace_subject(),
+        Pid :: pid()
+    ) -> ok.
+
+finish_lifetime(Subject, Pid) ->
+    spawn(fun () ->
+        Monitor = monitor(process, Pid),
+        finish_span_when_process_exits(Monitor, Subject)
+    end),
+    ok.
 
 -spec set_operation_name(
         Span :: #span{},
@@ -502,4 +510,22 @@ start_main_tracer(TracerId) ->
         {error, Reason} ->
             couch_log:error("Cannot start main tracer: ~p~n", [Reason]),
             false
+    end.
+
+finish_span_when_process_exits(Monitor, Subject) ->
+    receive
+        {'DOWN', Monitor, _, _, normal} ->
+            finish_span(Subject);
+        {'DOWN', Monitor, _, _, shutdown} ->
+            finish_span(Subject);
+        {'DOWN', Monitor, _, _, {shutdown, _}} ->
+            finish_span(Subject);
+        {'DOWN', Monitor, _, _, Reason} ->
+            finish_span(trace(fun(Span0) ->
+                Span1 = log(Span0, #{event => exit, 'exit.reason' => Reason}),
+                Span2 = tag(Span1, #{error => true}),
+                Span2
+            end));
+        _ ->
+            finish_span_when_process_exits(Monitor, Subject)
     end.
