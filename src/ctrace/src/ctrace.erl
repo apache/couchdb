@@ -198,7 +198,13 @@ finish_span(Subject) ->
         Options :: list()
     ) -> trace_subject().
 
-finish_span(Subject, Options) ->
+finish_span(Subject, Options0) ->
+    Options = case lists:keymember(time, 1, Options0) of
+        true ->
+            Options0;
+        false ->
+            [{time, os:timestamp()} | Options0]
+    end,
     unwrap(Subject, fun
         (#span{active = true, span = PassageSpan, actions = Actions} = Span) ->
             lists:takewhile(fun(Action) ->
