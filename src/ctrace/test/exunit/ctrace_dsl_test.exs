@@ -49,6 +49,22 @@ defmodule Couch.CTrace.DSL.Test do
       rule_str = ~C"(#{}) -> []"
       assert match?(%{}, parse(rule_str))
     end
+
+    test "sample action with float" do
+      rule_str = ~C"(#{}) -> [sample(0.2)]"
+      assert match?(%{}, parse(rule_str))
+    end
+
+    test "sample action with integer" do
+      rule_str = ~C"(#{}) -> [sample(10)]"
+      assert match?(%{}, parse(rule_str))
+    end
+
+    test "report_longer_than action" do
+      rule_str = ~C"(#{}) -> [report_longer_than(1000)]"
+      assert match?(%{}, parse(rule_str))
+    end
+
   end
 
   describe "DSL parsing error handling :" do
@@ -63,6 +79,18 @@ defmodule Couch.CTrace.DSL.Test do
       rule_str = ~C"(#{}) -> [module:function()]"
       error_str = ~C"unsuported action 'module:function()'"
 
+      assert catch_throw(parse(rule_str)) == {:error, error_str}
+    end
+
+    test "wrong type of argument for sample action" do
+      rule_str = ~C"(#{}) -> [sample(hello)]"
+      error_str = ~C"expecting `integer | float` in `sample` action"
+      assert catch_throw(parse(rule_str)) == {:error, error_str}
+    end
+
+    test "wrong type of argument for report_longer_than action" do
+      rule_str = ~C"(#{}) -> [report_longer_than(hello)]"
+      error_str = ~C"expecting `integer` in `report_longer_than` action"
       assert catch_throw(parse(rule_str)) == {:error, error_str}
     end
 
