@@ -111,6 +111,10 @@ parse_action(ActionAST) ->
     case ActionAST of
         ?Q("report") ->
             report;
+        ?Q("report_longer_than(_@AST)") when erl_syntax:type(AST) == integer ->
+            {report_longer_than, erl_syntax:integer_value(AST)};
+        ?Q("report_longer_than(_@AST)") ->
+            fail("expecting `integer` in `report_longer_than` action");
         ?Q("sample(_@AST)") when erl_syntax:type(AST) == integer ->
             {sample, erl_syntax:integer_value(AST)};
         ?Q("sample(_@AST)") when erl_syntax:type(AST) == float ->
