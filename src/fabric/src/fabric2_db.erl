@@ -458,11 +458,14 @@ is_users_db(DbName) when is_binary(DbName) ->
 set_revs_limit(#{} = Db0, RevsLimit) ->
     Db1 = require_admin_check(Db0),
     RevsLimBin = ?uint2bin(max(1, RevsLimit)),
-    {Resp, Db2} = fabric2_fdb:transactional(Db1, fun(TxDb) ->
-        {fabric2_fdb:set_config(TxDb, <<"revs_limit">>, RevsLimBin), TxDb}
+    Resp = fabric2_fdb:transactional(Db1, fun(TxDb) ->
+        fabric2_fdb:set_config(TxDb, <<"revs_limit">>, RevsLimBin)
     end),
-    if Resp /= ok -> Resp; true ->
-        fabric2_server:store(Db2#{revs_limit := RevsLimit})
+    case Resp of
+        {ok, #{} = Db2} ->
+             fabric2_server:store(Db2#{revs_limit := RevsLimit});
+        Err ->
+            Err
     end.
 
 
@@ -470,11 +473,14 @@ set_security(#{} = Db0, Security) ->
     Db1 = require_admin_check(Db0),
     ok = fabric2_util:validate_security_object(Security),
     SecBin = ?JSON_ENCODE(Security),
-    {Resp, Db2} = fabric2_fdb:transactional(Db1, fun(TxDb) ->
-        {fabric2_fdb:set_config(TxDb, <<"security_doc">>, SecBin), TxDb}
+    Resp = fabric2_fdb:transactional(Db1, fun(TxDb) ->
+        fabric2_fdb:set_config(TxDb, <<"security_doc">>, SecBin)
     end),
-    if Resp /= ok -> Resp; true ->
-        fabric2_server:store(Db2#{security_doc := Security})
+    case Resp of
+        {ok, #{} = Db2} ->
+            fabric2_server:store(Db2#{security_doc := Security});
+        Err ->
+            Err
     end.
 
 
