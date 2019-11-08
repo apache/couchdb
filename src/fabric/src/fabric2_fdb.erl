@@ -82,16 +82,17 @@ transactional(DbName, Options, Fun) when is_binary(DbName) ->
 
 transactional(#{tx := undefined} = Db, Fun) ->
     try
-        Reopen = maps:get(reopen, Db, false),
-        Db1 = maps:remove(reopen, Db),
+        Db1 = refresh(Db),
+        Reopen = maps:get(reopen, Db1, false),
+        Db2 = maps:remove(reopen, Db1),
         LayerPrefix = case Reopen of
             true -> undefined;
-            false -> maps:get(layer_prefix, Db1)
+            false -> maps:get(layer_prefix, Db2)
         end,
         do_transaction(fun(Tx) ->
             case Reopen of
-                true -> Fun(reopen(Db1#{tx => Tx}));
-                false -> Fun(Db1#{tx => Tx})
+                true -> Fun(reopen(Db2#{tx => Tx}));
+                false -> Fun(Db2#{tx => Tx})
             end
         end, LayerPrefix)
     catch throw:{?MODULE, reopen} ->
@@ -239,6 +240,26 @@ open(#{} = Db0, Options) ->
     load_validate_doc_funs(Db3).
 
 
+refresh(#{tx := undefined, name := DbName, md_version := OldVer} = Db) ->
+    case fabric2_server:fetch(DbName) of
+        % Relying on these assumptions about the `md_version` value:
+        %  - It is bumped every time `db_version` is bumped
+        %  - Is a versionstamp, so we can check which one is newer
+        %  - If it is `not_found`, it would sort less than a binary value
+        #{md_version := Ver} = Db1 when Ver > OldVer ->
+            Db1#{
+                user_ctx := maps:get(user_ctx, Db),
+                security_fun := maps:get(security_fun, Db)
+            };
+        _ ->
+            Db
+    end;
+
+refresh(#{} = Db) ->
+    Db.
+
+
+
 reopen(#{} = OldDb) ->
     require_transaction(OldDb),
     #{
@@ -361,15 +382,16 @@ get_config(#{} = Db) ->
     end, erlfdb:wait(Future)).
 
 
-set_config(#{} = Db, ConfigKey, ConfigVal) ->
+set_config(#{} = Db0, ConfigKey, ConfigVal) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = ensure_current(Db),
+    } = Db = ensure_current(Db0),
 
     Key = erlfdb_tuple:pack({?DB_CONFIG, ConfigKey}, DbPrefix),
     erlfdb:set(Tx, Key, ConfigVal),
-    bump_db_version(Db).
+    {ok, DbVersion} = bump_db_version(Db),
+    {ok, Db#{db_version := DbVersion}}.
 
 
 get_stat(#{} = Db, StatKey) ->
@@ -927,7 +949,8 @@ bump_db_version(#{} = Db) ->
     DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
     DbVersion = fabric2_util:uuid(),
     ok = erlfdb:set(Tx, DbVersionKey, DbVersion),
-    ok = bump_metadata_version(Tx).
+    ok = bump_metadata_version(Tx),
+    {ok, DbVersion}.
 
 
 check_db_version(#{} = Db, CheckDbVersion) ->
@@ -1274,11 +1297,11 @@ ensure_current(#{} = Db0, CheckDbVersion) ->
     case maps:get(security_fun, Db2) of
         SecurityFun when is_function(SecurityFun, 2) ->
             #{security_doc := SecDoc} = Db2,
-            ok = SecurityFun(Db2, SecDoc);
+            ok = SecurityFun(Db2, SecDoc),
+            Db2#{security_fun := undefined};
         undefined ->
-            ok
-    end,
-    Db2.
+            Db2
+    end.
 
 
 is_transaction_applied(Tx) ->
