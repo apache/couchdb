@@ -74,12 +74,15 @@ transactional(Fun) ->
 
 
 transactional(DbName, Options, Fun) when is_binary(DbName) ->
-    transactional(fun(Tx) ->
-        Fun(init_db(Tx, DbName, Options))
+    with_span(Fun, #{'db.name' => DbName}, fun() ->
+        transactional(fun(Tx) ->
+            Fun(init_db(Tx, DbName, Options))
+        end)
     end).
 
 
 transactional(#{tx := undefined} = Db, Fun) ->
+    DbName = maps:get(name, Db, undefined),
     try
         Db1 = refresh(Db),
         Reopen = maps:get(reopen, Db1, false),
@@ -88,18 +91,25 @@ transactional(#{tx := undefined} = Db, Fun) ->
             true -> undefined;
             false -> maps:get(layer_prefix, Db2)
         end,
-        do_transaction(fun(Tx) ->
-            case Reopen of
-                true -> Fun(reopen(Db2#{tx => Tx}));
-                false -> Fun(Db2#{tx => Tx})
-            end
-        end, LayerPrefix)
+        with_span(Fun, #{'db.name' => DbName}, fun() ->
+            do_transaction(fun(Tx) ->
+                case Reopen of
+                    true -> Fun(reopen(Db2#{tx => Tx}));
+                    false -> Fun(Db2#{tx => Tx})
+                end
+            end, LayerPrefix)
+        end)
     catch throw:{?MODULE, reopen} ->
-        transactional(Db#{reopen => true}, Fun)
+        with_span('db.reopen', #{'db.name' => DbName}, fun() ->
+            transactional(Db#{reopen => true}, Fun)
+        end)
     end;
 
 transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
-    Fun(Db).
+    DbName = maps:get(name, Db, undefined),
+    with_span(Fun, #{'db.name' => DbName}, fun() ->
+        Fun(Db)
+    end).
 
 
 do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
@@ -1383,4 +1393,21 @@ run_on_commit_fun(Tx) ->
         Fun when is_function(Fun, 0) ->
             Fun(),
             ok
+    end.
+
+with_span(Operation, ExtraTags, Fun) ->
+    case ctrace:has_span() of
+        true ->
+            Tags = maps:merge(#{
+                'span.kind' => <<"client">>,
+                component => <<"couchdb.fabric">>,
+                'db.instance' => fabric2_server:fdb_cluster(),
+                'db.namespace' => fabric2_server:fdb_directory(),
+                'db.type' => <<"fdb">>,
+                nonce => get(nonce),
+                pid => self()
+            }, ExtraTags),
+            ctrace:with_span(Operation, Tags, Fun);
+        false ->
+            Fun()
     end.

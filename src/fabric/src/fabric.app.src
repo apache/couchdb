@@ -23,6 +23,7 @@
         config,
         couch_epi,
         couch,
+        ctrace,
         rexi,
         mem3,
         couch_log,
