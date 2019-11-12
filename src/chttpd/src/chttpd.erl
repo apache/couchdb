@@ -259,6 +259,7 @@ handle_request_int(MochiReq) ->
 
     case after_request(HttpReq2, HttpResp) of
         #httpd_resp{status = ok, response = Resp} ->
+            span_ok(HttpResp),
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
             couch_log:error("Response abnormally terminated: ~p", [Reason]),
@@ -266,6 +267,7 @@ handle_request_int(MochiReq) ->
     end.
 
 before_request(HttpReq) ->
+    ctrace:is_enabled() andalso start_span(HttpReq),
     try
         chttpd_stats:init(),
         chttpd_plugin:before_request(HttpReq)
@@ -316,6 +318,8 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
     end.
 
 handle_req_after_auth(HandlerKey, HttpReq) ->
+    #httpd{user_ctx = #user_ctx{name = User}} = HttpReq,
+    ctrace:tag(#{user => User}),
     try
         HandlerFun = chttpd_handlers:url_handler(HandlerKey,
             fun chttpd_db:handle_request/1),
@@ -1052,16 +1056,20 @@ send_error(#httpd{} = Req, Code, ErrorStr, ReasonStr) ->
     send_error(Req, Code, [], ErrorStr, ReasonStr, []).
 
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, []) ->
-    send_json(Req, Code, Headers,
+    Return = send_json(Req, Code, Headers,
         {[{<<"error">>,  ErrorStr},
-        {<<"reason">>, ReasonStr}]});
+        {<<"reason">>, ReasonStr}]}),
+    span_error(Code, ErrorStr, ReasonStr, []),
+    Return;
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
     log_error_with_stack_trace({ErrorStr, ReasonStr, Stack}),
-    send_json(Req, Code, [stack_trace_id(Stack) | Headers],
+    Return = send_json(Req, Code, [stack_trace_id(Stack) | Headers],
         {[{<<"error">>,  ErrorStr},
         {<<"reason">>, ReasonStr} |
         case Stack of [] -> []; _ -> [{<<"ref">>, stack_hash(Stack)}] end
-    ]}).
+    ]}),
+    span_error(Code, ErrorStr, ReasonStr, Stack),
+    Return.
 
 update_timeout_stats(<<"timeout">>, #httpd{requested_path_parts = PathParts}) ->
     update_timeout_stats(PathParts);
@@ -1230,6 +1238,104 @@ maybe_trace_fdb("true") ->
 maybe_trace_fdb(_) ->
     ok.
 
+start_span(Req) ->
+    #httpd{
+        mochi_req = MochiReq,
+        begin_ts = Begin,
+        peer = Peer,
+        nonce = Nonce,
+        method = Method,
+        path_parts = PathParts
+    } = Req,
+    {OperationName, ExtraTags} = get_action(Req),
+    Tags = maps:merge(#{
+        peer => Peer,
+        'http.method' => Method,
+        nonce => Nonce,
+        'http.url' => MochiReq:get(raw_path),
+        path_parts => PathParts,
+        'span.kind' => <<"server">>,
+        component => <<"couchdb.chttpd">>
+    }, ExtraTags),
+
+    ctrace:start_span(OperationName, [
+        {tags, Tags},
+        {time, Begin}
+    ] ++ maybe_root_span(MochiReq)).
+
+maybe_root_span(MochiReq) ->
+    case get_trace_headers(MochiReq) of
+        [undefined, _, _] ->
+            [];
+        [TraceId, SpanId, ParentSpanId] ->
+            Span = ctrace:external_span(TraceId, SpanId, ParentSpanId),
+            [{root, Span}]
+    end.
+
+parse_trace_id(undefined) ->
+    undefined;
+parse_trace_id(Hex) ->
+    to_int(Hex, 32).
+
+parse_span_id(undefined) ->
+    undefined;
+parse_span_id(Hex) ->
+    to_int(Hex, 16).
+
+to_int(Hex, N) when length(Hex) =:= N ->
+    try
+        list_to_integer(Hex, 16)
+    catch error:badarg ->
+        undefined
+    end.
+
+get_trace_headers(MochiReq) ->
+    case MochiReq:get_header_value("b3") of
+        undefined ->
+            [
+                parse_trace_id(MochiReq:get_header_value("X-B3-TraceId")),
+                parse_span_id(MochiReq:get_header_value("X-B3-SpanId")),
+                parse_span_id(MochiReq:get_header_value("X-B3-ParentSpanId"))
+            ];
+        Value ->
+            case binary:split(Value, <<"-">>, [global]) of
+                [TraceIdStr, SpanIdStr, _SampledStr, ParentSpanIdStr] ->
+                    [
+                        parse_trace_id(TraceIdStr),
+                        parse_span_id(SpanIdStr),
+                        parse_span_id(ParentSpanIdStr)
+                    ];
+                _ ->
+                    [undefined, undefined, undefined]
+             end
+    end.
+
+get_action(#httpd{} = Req) ->
+    try
+        chttpd_handlers:handler_info(Req)
+    catch Tag:Error ->
+        couch_log:error("Cannot set tracing action ~p:~p", [Tag, Error]),
+        {undefind, #{}}
+    end.
+
+span_ok(#httpd_resp{code = Code}) ->
+    ctrace:tag(#{
+        error => false,
+        'http.status_code' => Code
+    }),
+    ctrace:finish_span().
+
+span_error(Code, ErrorStr, ReasonStr, Stack) ->
+    ctrace:tag(#{
+        error => true,
+        'http.status_code' => Code
+    }),
+    ctrace:log(#{
+        'error.kind' => ErrorStr,
+        message => ReasonStr,
+        stack => Stack
+    }),
+    ctrace:finish_span().
 
 -ifdef(TEST).
 
