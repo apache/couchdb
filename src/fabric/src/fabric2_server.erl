@@ -20,7 +20,8 @@
     fetch/1,
     store/1,
     remove/1,
-    fdb_directory/0
+    fdb_directory/0,
+    fdb_cluster/0
 ]).
 
 
@@ -39,6 +40,7 @@
 
 -define(CLUSTER_FILE, "/usr/local/etc/foundationdb/fdb.cluster").
 -define(FDB_DIRECTORY, fdb_directory).
+-define(FDB_CLUSTER, fdb_cluster).
 -define(DEFAULT_FDB_DIRECTORY, <<"couchdb">>).
 
 
@@ -76,13 +78,16 @@ init(_) ->
             {write_concurrency, true}
         ]),
 
-    Db = case application:get_env(fabric, eunit_run) of
+    {Cluster, Db} = case application:get_env(fabric, eunit_run) of
         {ok, true} ->
-            erlfdb_util:get_test_db([empty]);
+            {<<"eunit_test">>, erlfdb_util:get_test_db([empty])};
         undefined ->
-            ClusterStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
-            erlfdb:open(iolist_to_binary(ClusterStr))
+            ClusterFileStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
+            {ok, ConnectionStr} = file:read_file(ClusterFileStr),
+            DbHandle = erlfdb:open(iolist_to_binary(ClusterFileStr)),
+            {string:trim(ConnectionStr), DbHandle}
     end,
+    application:set_env(fabric, ?FDB_CLUSTER, Cluster),
     application:set_env(fabric, db, Db),
 
     Dir = case config:get("fabric", "fdb_directory") of
@@ -117,15 +122,21 @@ code_change(_OldVsn, St, _Extra) ->
 
 
 fdb_directory() ->
-    case get(?FDB_DIRECTORY) of
+    get_env(?FDB_DIRECTORY).
+
+fdb_cluster() ->
+    get_env(?FDB_CLUSTER).
+
+get_env(Key) ->
+    case get(Key) of
         undefined ->
-            case application:get_env(fabric, ?FDB_DIRECTORY) of
+            case application:get_env(fabric, Key) of
                 undefined ->
                     erlang:error(fabric_application_not_started);
-                {ok, Dir} ->
-                    put(?FDB_DIRECTORY, Dir),
-                    Dir
+                {ok, Value} ->
+                    put(Key, Value),
+                    Value
             end;
-        Dir ->
-            Dir
+        Value ->
+            Value
     end.
