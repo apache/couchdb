@@ -130,6 +130,7 @@ SubDirs = [
     "src/couch_peruser",
     "src/couch_tests",
     "src/couch_views",
+    "src/ctrace",
     "src/ddoc_cache",
     "src/dreyfus",
     "src/fabric",
@@ -161,10 +162,14 @@ DepDescs = [
 {folsom,           "folsom",           {tag, "CouchDB-0.8.3"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-6"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1-1"}},
+{jaeger_passage,   "jaeger-passage",   {tag, "CouchDB-0.1.13-1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-1.0.4-1"}},
+{local,            "local",            {tag, "0.2.1"}},
 {mochiweb,         "mochiweb",         {tag, "v2.20.0"}},
 {meck,             "meck",             {tag, "0.8.8"}},
 {recon,            "recon",            {tag, "2.5.0"}},
+{passage,          "passage",          {tag, "0.2.6"}},
+{thrift_protocol,  "thrift-protocol",  {tag, "0.1.3"}},
 
 %% TMP - Until this is moved to a proper Apache repo
 {erlfdb,           "erlfdb",           {branch, "master"}}
