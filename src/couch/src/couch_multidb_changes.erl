@@ -257,7 +257,7 @@ scan_all_dbs(Server, DbSuffix) when is_pid(Server) ->
     ok = scan_local_db(Server, DbSuffix),
     {ok, Db} = mem3_util:ensure_exists(
         config:get("mem3", "shards_db", "_dbs")),
-    ChangesFun = couch_changes:handle_changes(#changes_args{}, nil, Db, nil),
+    ChangesFun = couch_changes:handle_db_changes(#changes_args{}, nil, Db),
     ChangesFun({fun scan_changes_cb/3, {Server, DbSuffix, 1}}),
     couch_db:close(Db).
 
@@ -383,7 +383,7 @@ setup() ->
     meck:expect(config, get, ["mem3", "shards_db", '_'], "_dbs"),
     meck:expect(mem3_util, ensure_exists, 1, {ok, dbs}),
     ChangesFun = meck:val(fun(_) -> ok end),
-    meck:expect(couch_changes, handle_changes, 4, ChangesFun),
+    meck:expect(couch_changes, handle_db_changes, 3, ChangesFun),
     meck:expect(couch_db, open_int,
         fun(?DBNAME, [?CTX, sys_db]) -> {ok, db};
             (_, _) -> {not_found, no_db_file}
