@@ -47,15 +47,15 @@
 -define(FLUSH_MAX_MEM, 10000000).
 
 -define(BLACKLIST_CONFIG_SECTIONS, [
-    <<"daemons">>,
-    <<"external">>,
-    <<"httpd_design_handlers">>,
-    <<"httpd_db_handlers">>,
-    <<"httpd_global_handlers">>,
-    <<"native_query_servers">>,
-    <<"os_daemons">>,
-    <<"query_servers">>,
-    <<"feature_flags">>
+    <<"^daemons$">>,
+    <<"^external$">>,
+    <<"^httpd_design_handlers$">>,
+    <<"^httpd_db_handlers$">>,
+    <<"^httpd_global_handlers$">>,
+    <<"^native_query_servers$">>,
+    <<"^os_daemons$">>,
+    <<"^query_servers$">>,
+    <<"^feature_flags$">>
 ]).
 
 
@@ -765,10 +765,13 @@ unique_monotonic_integer() ->
 
 
 check_config_blacklist(Section) ->
-    case lists:member(Section, ?BLACKLIST_CONFIG_SECTIONS) of
-    true ->
-        Msg = <<"Config section blacklisted for modification over HTTP API.">>,
-        throw({forbidden, Msg});
-    _ ->
-        ok
-    end.
+    lists:foreach(fun(RegExp) ->
+        case re:run(Section, RegExp) of
+            nomatch ->
+                ok;
+            _ ->
+                Msg = <<"Config section blacklisted for modification over HTTP API.">>,
+                throw({forbidden, Msg})
+        end
+    end, ?BLACKLIST_CONFIG_SECTIONS),
+    ok.
