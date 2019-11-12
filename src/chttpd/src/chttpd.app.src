@@ -26,6 +26,7 @@
         couch_stats,
         config,
         couch,
+        ctrace,
         ets_lru,
         fabric
     ]},
