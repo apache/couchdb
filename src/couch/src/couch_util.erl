@@ -56,7 +56,9 @@
     <<"^native_query_servers$">>,
     <<"^os_daemons$">>,
     <<"^query_servers$">>,
-    <<"^feature_flags$">>
+    <<"^feature_flags$">>,
+    <<"^tracing\..*$">>,
+    <<"^tracing$">>
 ]).
 
 
