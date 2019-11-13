@@ -36,9 +36,6 @@
 
 -record(changes_acc, {
     db,
-    view_name,
-    ddoc_name,
-    view,
     seq,
     prepend,
     filter,
@@ -434,7 +431,7 @@ send_changes(Acc, Dir, FirstRound) ->
         db = Db,
         seq = StartSeq,
         filter = Filter
-    } = Acc,
+    } = maybe_upgrade_changes_acc(Acc),
     DbEnumFun = fun changes_enumerator/2,
     case can_optimize(FirstRound, Filter) of
         {true, Fun} ->
@@ -534,7 +531,7 @@ keep_sending_changes(Args, Acc0, FirstRound) ->
         db = Db, callback = Callback,
         timeout = Timeout, timeout_fun = TimeoutFun, seq = EndSeq,
         prepend = Prepend2, user_acc = UserAcc2, limit = NewLimit
-    } = ChangesAcc,
+    } = maybe_upgrade_changes_acc(ChangesAcc),
 
     couch_db:close(Db),
     if Limit > NewLimit, ResponseType == "longpoll" ->
@@ -571,7 +568,7 @@ changes_enumerator(Value, Acc) ->
         filter = Filter, callback = Callback, prepend = Prepend,
         user_acc = UserAcc, limit = Limit, resp_type = ResponseType, db = Db,
         timeout = Timeout, timeout_fun = TimeoutFun
-    } = Acc,
+    } = maybe_upgrade_changes_acc(Acc),
     Results0 = filter(Db, Value, Filter),
     Results = [Result || Result <- Results0, Result /= null],
     Seq = case Value of
@@ -610,7 +607,8 @@ changes_enumerator(Value, Acc) ->
 
 changes_row(Results, #full_doc_info{} = FDI, Acc) ->
     changes_row(Results, couch_doc:to_doc_info(FDI), Acc);
-changes_row(Results, DocInfo, Acc) ->
+changes_row(Results, DocInfo, Acc0) ->
+    Acc = maybe_upgrade_changes_acc(Acc0),
     #doc_info{
         id = Id, high_seq = Seq, revs = [#rev_info{deleted = Del} | _]
     } = DocInfo,
@@ -702,3 +700,25 @@ maybe_heartbeat(Timeout, TimeoutFun, Acc) ->
             {ok, Acc}
         end
     end.
+
+
+maybe_upgrade_changes_acc(#changes_acc{} = Acc) ->
+    Acc;
+maybe_upgrade_changes_acc(Acc) when tuple_size(Acc) == 19 ->
+    #changes_acc{
+        db = element(2, Acc),
+        seq = element(6, Acc),
+        prepend = element(7, Acc),
+        filter = element(8, Acc),
+        callback = element(9, Acc),
+        user_acc = element(10, Acc),
+        resp_type = element(11, Acc),
+        limit = element(12, Acc),
+        include_docs = element(13, Acc),
+        doc_options = element(14, Acc),
+        conflicts = element(15, Acc),
+        timeout = element(16, Acc),
+        timeout_fun = element(17, Acc),
+        aggregation_kvs = element(18, Acc),
+        aggregation_results = element(19, Acc)
+    }.
