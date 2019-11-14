@@ -29,7 +29,6 @@
     list_dbs/4,
 
     get_info/1,
-    get_config/1,
     set_config/3,
 
     get_stat/2,
@@ -226,16 +225,7 @@ open(#{} = Db0, Options) ->
         db_options => Options1
     },
 
-    Db3 = lists:foldl(fun({Key, Val}, DbAcc) ->
-        case Key of
-            <<"uuid">> ->
-                DbAcc#{uuid => Val};
-            <<"revs_limit">> ->
-                DbAcc#{revs_limit => ?bin2uint(Val)};
-            <<"security_doc">> ->
-                DbAcc#{security_doc => ?JSON_DECODE(Val)}
-        end
-    end, Db2, get_config(Db2)),
+    Db3 = load_config(Db2),
 
     load_validate_doc_funs(Db3).
 
@@ -367,31 +357,39 @@ get_info(#{} = Db) ->
     [CProp | MProps].
 
 
-get_config(#{} = Db) ->
+load_config(#{} = Db) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = ensure_current(Db),
+    } = Db,
 
     {Start, End} = erlfdb_tuple:range({?DB_CONFIG}, DbPrefix),
     Future = erlfdb:get_range(Tx, Start, End),
 
-    lists:map(fun({K, V}) ->
+    lists:foldl(fun({K, V}, DbAcc) ->
         {?DB_CONFIG, Key} = erlfdb_tuple:unpack(K, DbPrefix),
-        {Key, V}
-    end, erlfdb:wait(Future)).
+        case Key of
+            <<"uuid">> ->  DbAcc#{uuid => V};
+            <<"revs_limit">> -> DbAcc#{revs_limit => ?bin2uint(V)};
+            <<"security_doc">> -> DbAcc#{security_doc => ?JSON_DECODE(V)}
+        end
+    end, Db, erlfdb:wait(Future)).
 
 
-set_config(#{} = Db0, ConfigKey, ConfigVal) ->
+set_config(#{} = Db0, Key, Val) when is_atom(Key) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = Db = ensure_current(Db0),
-
-    Key = erlfdb_tuple:pack({?DB_CONFIG, ConfigKey}, DbPrefix),
-    erlfdb:set(Tx, Key, ConfigVal),
+    {BinKey, BinVal} = case Key of
+        uuid -> {<<"uuid">>, Val};
+        revs_limit -> {<<"revs_limit">>, ?uint2bin(max(1, Val))};
+        security_doc -> {<<"security_doc">>, ?JSON_ENCODE(Val)}
+    end,
+    DbKey = erlfdb_tuple:pack({?DB_CONFIG, BinKey}, DbPrefix),
+    erlfdb:set(Tx, DbKey, BinVal),
     {ok, DbVersion} = bump_db_version(Db),
-    {ok, Db#{db_version := DbVersion}}.
+    {ok, Db#{db_version := DbVersion, Key := Val}}.
 
 
 get_stat(#{} = Db, StatKey) ->
