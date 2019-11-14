@@ -212,8 +212,10 @@ open(#{} = Db0, Options) ->
         db_prefix => DbPrefix,
         db_version => DbVersion,
 
+        uuid => <<>>,
         revs_limit => 1000,
         security_doc => {[]},
+
         user_ctx => UserCtx,
 
         % Place holders until we implement these
@@ -369,9 +371,9 @@ load_config(#{} = Db) ->
     lists:foldl(fun({K, V}, DbAcc) ->
         {?DB_CONFIG, Key} = erlfdb_tuple:unpack(K, DbPrefix),
         case Key of
-            <<"uuid">> ->  DbAcc#{uuid => V};
-            <<"revs_limit">> -> DbAcc#{revs_limit => ?bin2uint(V)};
-            <<"security_doc">> -> DbAcc#{security_doc => ?JSON_DECODE(V)}
+            <<"uuid">> ->  DbAcc#{uuid := V};
+            <<"revs_limit">> -> DbAcc#{revs_limit := ?bin2uint(V)};
+            <<"security_doc">> -> DbAcc#{security_doc := ?JSON_DECODE(V)}
         end
     end, Db, erlfdb:wait(Future)).
 
