@@ -22,7 +22,6 @@
     list_dbs/1,
     list_dbs/3,
 
-    is_admin/1,
     check_is_admin/1,
     check_is_member/1,
 
@@ -239,10 +238,6 @@ list_dbs(UserFun, UserAcc0, Options) ->
     end).
 
 
-is_admin(Db) ->
-    is_admin(Db, get_security(Db)).
-
-
 is_admin(Db, {SecProps}) when is_list(SecProps) ->
     case fabric2_db_plugin:check_is_admin(Db) of
         true ->
@@ -289,10 +284,6 @@ require_admin_check(#{} = Db) ->
 
 require_member_check(#{} = Db) ->
     Db#{security_fun := fun check_is_member/2}.
-
-
-no_security_check(#{} = Db) ->
-    Db#{security_fun := undefined}.
 
 
 name(#{name := DbName}) ->
@@ -382,7 +373,7 @@ get_revs_limit(#{} = Db) ->
 
 get_security(#{} = Db) ->
     #{security_doc := SecDoc} = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:ensure_current(no_security_check(TxDb))
+        fabric2_fdb:ensure_current(TxDb)
     end),
     SecDoc.
 
