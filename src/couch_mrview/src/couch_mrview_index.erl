@@ -94,15 +94,19 @@ open(Db, State0) ->
     } = State = set_partitioned(Db, State0),
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
 
-    % If we are upgrading from <=1.2.x, we upgrade the view
+    % If we are upgrading from <= 2.x, we upgrade the view
     % index file on the fly, avoiding an index reset.
+    % We are making commit with a new state
+    % right after the upgrade to ensure
+    % that we have a proper sig in the header
+    % when open the view next time
     %
     % OldSig is `ok` if no upgrade happened.
     %
-    % To remove suppport for 1.2.x auto-upgrades in the
+    % To remove support for 2.x auto-upgrades in the
     % future, just remove the next line and the code
-    % between "upgrade code for <= 1.2.x" and
-    % "end upgrade code for <= 1.2.x" and the corresponding
+    % between "upgrade code for <= 2.x" and
+    % "end of upgrade code for <= 2.x" and the corresponding
     % code in couch_mrview_util
 
     OldSig = couch_mrview_util:maybe_update_index_file(State),
@@ -110,13 +114,14 @@ open(Db, State0) ->
     case couch_mrview_util:open_file(IndexFName) of
         {ok, Fd} ->
             case couch_file:read_header(Fd) of
-                % upgrade code for <= 1.2.x
+                % upgrade code for <= 2.x
                 {ok, {OldSig, Header}} ->
                     % Matching view signatures.
                     NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
+                    ok = commit(NewSt),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt};
-                % end of upgrade code for <= 1.2.x
+                % end of upgrade code for <= 2.x
                 {ok, {Sig, Header}} ->
                     % Matching view signatures.
                     NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),

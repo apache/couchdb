@@ -276,19 +276,6 @@ init_state(Db, Fd, #mrst{views=Views}=State, nil) ->
         view_states=[make_view_state(#mrview{}) || _ <- Views]
     },
     init_state(Db, Fd, State, Header);
-% read <= 1.2.x header record and transpile it to >=1.3.x
-% header record
-init_state(Db, Fd, State, #index_header{
-    seq=Seq,
-    purge_seq=PurgeSeq,
-    id_btree_state=IdBtreeState,
-    view_states=ViewStates}) ->
-    init_state(Db, Fd, State, #mrheader{
-        seq=Seq,
-        purge_seq=PurgeSeq,
-        id_btree_state=IdBtreeState,
-        view_states=[make_view_state(V) || V <- ViewStates]
-    });
 init_state(Db, Fd, State, Header) ->
     #mrst{
         language=Lang,
@@ -299,7 +286,7 @@ init_state(Db, Fd, State, Header) ->
         purge_seq=PurgeSeq,
         id_btree_state=IdBtreeState,
         view_states=ViewStates
-    } = Header,
+    } = maybe_update_header(Header),
 
     IdBtOpts = [
         {compression, couch_compress:get_compression_method()}
@@ -951,30 +938,18 @@ mrverror(Mesg) ->
     throw({query_parse_error, Mesg}).
 
 
-%% Updates 1.2.x or earlier view files to 1.3.x or later view files
-%% transparently, the first time the 1.2.x view file is opened by
-%% 1.3.x or later.
+%% Updates 2.x  view files to 3.x or later view files
+%% transparently, the first time the 2.x view file is opened by
+%% 3.x or later.
 %%
 %% Here's how it works:
 %%
 %% Before opening a view index,
 %% If no matching index file is found in the new location:
-%%  calculate the <= 1.2.x view signature
+%%  calculate the <= 2.x view signature
 %%  if a file with that signature lives in the old location
 %%    rename it to the new location with the new signature in the name.
 %% Then proceed to open the view index as usual.
-%% After opening, read its header.
-%%
-%% If the header matches the <= 1.2.x style #index_header record:
-%%   upgrade the header to the new #mrheader record
-%% The next time the view is used, the new header is used.
-%%
-%% If we crash after the rename, but before the header upgrade,
-%%   the header upgrade is done on the next view opening.
-%%
-%% If we crash between upgrading to the new header and writing
-%%   that header to disk, we start with the old header again,
-%%   do the upgrade and write to disk.
 
 maybe_update_index_file(State) ->
     DbName = State#mrst.db_name,
@@ -990,10 +965,10 @@ maybe_update_index_file(State) ->
     end.
 
 update_index_file(State) ->
-    Sig = sig_vsn_12x(State),
+    Sig = sig_vsn_2x(State),
     DbName = State#mrst.db_name,
     FileName = couch_index_util:hexsig(Sig) ++ ".view",
-    IndexFile = couch_index_util:index_file("", DbName, FileName),
+    IndexFile = couch_index_util:index_file("mrview", DbName, FileName),
 
     % If we have an old index, rename it to the new position.
     case file:read_file_info(IndexFile) of
@@ -1002,40 +977,63 @@ update_index_file(State) ->
         % If the target exists, e.g. the next request will find the
         % new file and we are good. We might need to catch this
         % further up to avoid a full server crash.
-        couch_log:info("Attempting to update legacy view index file.", []),
         NewIndexFile = index_file(DbName, State#mrst.sig),
+        couch_log:notice("Attempting to update legacy view index file"
+            " from ~p to ~s", [IndexFile, NewIndexFile]),
         ok = filelib:ensure_dir(NewIndexFile),
         ok = file:rename(IndexFile, NewIndexFile),
-        couch_log:info("Successfully updated legacy view index file.", []),
+        couch_log:notice("Successfully updated legacy view index file"
+            " ~s", [IndexFile]),
         Sig;
-    _ ->
+    {error, enoent} ->
         % Ignore missing index file
+        ok;
+    {error, Reason} ->
+        couch_log:error("Failed to update legacy view index file"
+            " ~s : ~s", [IndexFile, file:format_error(Reason)]),
         ok
     end.
 
-sig_vsn_12x(State) ->
-    ViewInfo = [old_view_format(V) || V <- State#mrst.views],
-    SigData = case State#mrst.lib of
-    {[]} ->
-        {ViewInfo, State#mrst.language, State#mrst.design_opts};
-    _ ->
-        {ViewInfo, State#mrst.language, State#mrst.design_opts,
-            couch_index_util:sort_lib(State#mrst.lib)}
-    end,
-    couch_hash:md5_hash(term_to_binary(SigData)).
+sig_vsn_2x(State) ->
+    #mrst{
+        lib = Lib,
+        language = Language,
+        design_opts = DesignOpts
+    } = State,
+    SI = proplists:get_value(<<"seq_indexed">>, DesignOpts, false),
+    KSI = proplists:get_value(<<"keyseq_indexed">>, DesignOpts, false),
+    Views = [old_view_format(V, SI, KSI) || V <- State#mrst.views],
+    SigInfo = {Views, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
+    couch_hash:md5_hash(term_to_binary(SigInfo)).
 
-old_view_format(View) ->
+old_view_format(View, SI, KSI) ->
 {
-    view,
+    mrview,
     View#mrview.id_num,
+    View#mrview.update_seq,
+    View#mrview.purge_seq,
     View#mrview.map_names,
+    View#mrview.reduce_funs,
     View#mrview.def,
     View#mrview.btree,
-    View#mrview.reduce_funs,
+    nil,
+    nil,
+    SI,
+    KSI,
     View#mrview.options
 }.
 
-%% End of <= 1.2.x upgrade code.
+maybe_update_header(#mrheader{} = Header) ->
+    Header;
+maybe_update_header(Header) when tuple_size(Header) == 6 ->
+    #mrheader{
+        seq = element(2, Header),
+        purge_seq = element(3, Header),
+        id_btree_state = element(4, Header),
+        view_states = [make_view_state(S) || S <- element(6, Header)]
+    }.
+
+%% End of <= 2.x upgrade code.
 
 make_view_state(#mrview{} = View) ->
     BTState = get_btree_state(View#mrview.btree),
