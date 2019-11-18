@@ -46,6 +46,7 @@
     mochi,
     prepend = "",
     responding = false,
+    chunks_sent = 0,
     buffer = [],
     bufsize = 0,
     threshold
@@ -170,10 +171,10 @@ changes_callback({change, {ChangeProp}=Change}, #cacc{feed = eventsource} = Acc)
     Len = iolist_size(Chunk),
     maybe_flush_changes_feed(Acc, Chunk, Len);
 changes_callback(timeout, #cacc{feed = eventsource} = Acc) ->
-    #cacc{mochi = Resp} = Acc,
+    #cacc{mochi = Resp, chunks_sent = ChunksSet} = Acc,
     Chunk = "event: heartbeat\ndata: \n\n",
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
-    {ok, Acc#cacc{mochi = Resp1}};
+    {ok, Acc#cacc{mochi = Resp1, chunks_sent = ChunksSet + 1}};
 changes_callback({stop, _EndSeq}, #cacc{feed = eventsource} = Acc) ->
     #cacc{mochi = Resp, buffer = Buf} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
@@ -209,14 +210,27 @@ changes_callback({stop, EndSeq, Pending}, Acc) ->
     chttpd:end_delayed_json_response(Resp1);
 
 changes_callback(waiting_for_updates, #cacc{buffer = []} = Acc) ->
-    {ok, Acc};
+    #cacc{mochi = Resp, chunks_sent = ChunksSent} = Acc,
+    case ChunksSent > 0 of
+        true ->
+            {ok, Acc};
+        false ->
+            {ok, Resp1} = chttpd:send_delayed_chunk(Resp, <<"\n">>),
+            {ok, Acc#cacc{mochi = Resp1, chunks_sent = 1}}
+    end;
 changes_callback(waiting_for_updates, Acc) ->
-    #cacc{buffer = Buf, mochi = Resp} = Acc,
+    #cacc{buffer = Buf, mochi = Resp, chunks_sent = ChunksSent} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
-    {ok, Acc#cacc{buffer = [], bufsize = 0, mochi = Resp1}};
+    {ok, Acc#cacc{
+        buffer = [],
+        bufsize = 0,
+        mochi = Resp1,
+        chunks_sent = ChunksSent + 1
+    }};
 changes_callback(timeout, Acc) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Acc#cacc.mochi, "\n"),
-    {ok, Acc#cacc{mochi = Resp1}};
+    #cacc{mochi = Resp, chunks_sent = ChunksSent} = Acc,
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\n"),
+    {ok, Acc#cacc{mochi = Resp1, chunks_sent = ChunksSent + 1}};
 changes_callback({error, Reason}, #cacc{mochi = #httpd{}} = Acc) ->
     #cacc{mochi = Req} = Acc,
     chttpd:send_error(Req, Reason);
@@ -232,11 +246,12 @@ maybe_flush_changes_feed(#cacc{bufsize=Size, threshold=Max} = Acc, Data, Len)
     {ok, R1} = chttpd:send_delayed_chunk(Resp, Buffer),
     {ok, Acc#cacc{prepend = ",\r\n", buffer = Data, bufsize=Len, mochi = R1}};
 maybe_flush_changes_feed(Acc0, Data, Len) ->
-    #cacc{buffer = Buf, bufsize = Size} = Acc0,
+    #cacc{buffer = Buf, bufsize = Size, chunks_sent = ChunksSent} = Acc0,
     Acc = Acc0#cacc{
         prepend = ",\r\n",
         buffer = [Buf | Data],
-        bufsize = Size + Len
+        bufsize = Size + Len,
+        chunks_sent = ChunksSent + 1
     },
     {ok, Acc}.
 
@@ -1801,7 +1816,14 @@ parse_changes_query(Req) ->
         {"heartbeat", "true"} ->
             Args#changes_args{heartbeat=true};
         {"heartbeat", _} ->
-            Args#changes_args{heartbeat=list_to_integer(Value)};
+            try list_to_integer(Value) of
+                HeartbeatInteger when HeartbeatInteger > 0 ->
+                    Args#changes_args{heartbeat=HeartbeatInteger};
+                _ ->
+                    throw({bad_request, <<"The heartbeat value should be a positive integer (in milliseconds).">>})
+            catch error:badarg ->
+                throw({bad_request, <<"Invalid heartbeat value. Expecting a positive integer value (in milliseconds).">>})
+            end;
         {"timeout", _} ->
             Args#changes_args{timeout=list_to_integer(Value)};
         {"include_docs", "true"} ->

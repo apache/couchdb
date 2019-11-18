@@ -43,7 +43,6 @@ setup() ->
         ]}
     ]}),
     {ok, _} = couch_db:update_docs(Db, [Doc, Doc1]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
 
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),

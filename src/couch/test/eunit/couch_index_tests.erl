@@ -113,7 +113,6 @@ create_docs(DbName) ->
 
     ]}),
     {ok, _} = couch_db:update_docs(Db, [Doc1, Doc2, Doc3]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db).
 
 create_design_doc(DbName, DDName, ViewName) ->
@@ -128,7 +127,6 @@ create_design_doc(DbName, DDName, ViewName) ->
         ]}}
     ]}),
     {ok, Rev} = couch_db:update_doc(Db, DDoc, []),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
     Rev.
 

@@ -977,9 +977,6 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
         {Code, []}
     end.
 
-send_error(_Req, {already_sent, Resp, _Error}) ->
-    {ok, Resp};
-
 send_error(Req, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
     {Code1, Headers} = error_headers(Req, Code, ErrorStr, ReasonStr),

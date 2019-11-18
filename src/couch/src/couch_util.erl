@@ -529,8 +529,8 @@ reorder_results(Keys, SortedResults) ->
 
 url_strip_password(Url) ->
     re:replace(Url,
-        "http(s)?://([^:]+):[^@]+@(.*)$",
-        "http\\1://\\2:*****@\\3",
+        "(http|https|socks5)://([^:]+):[^@]+@(.*)$",
+        "\\1://\\2:*****@\\3",
         [{return, list}]).
 
 encode_doc_id(#doc{id = Id}) ->

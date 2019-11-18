@@ -103,7 +103,6 @@ add_revision(Db0, DocId, Rev) ->
         {<<"value">>, DocId}
     ] ++ Rev}),
     {ok, NewRev} = couch_db:update_doc(Db, Doc, []),
-    {ok, _} = couch_db:ensure_full_commit(Db),
     couch_doc:rev_to_str(NewRev).
 
 

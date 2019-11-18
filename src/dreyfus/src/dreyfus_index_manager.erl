@@ -123,6 +123,7 @@ handle_db_event(DbName, deleted, _St) ->
         "enable_database_recovery", false),
     case RecoveryEnabled of
         true ->
+            clouseau_rpc:close_lru(DbName),
             gen_server:cast(?MODULE, {rename, DbName});
         false ->
             gen_server:cast(?MODULE, {cleanup, DbName})

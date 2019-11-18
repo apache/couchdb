@@ -145,7 +145,7 @@ pipeline {
           } // steps
           post {
             always {
-              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
             }
             cleanup {
               sh 'rm -rf $COUCHDB_IO_LOG_DIR'
@@ -178,7 +178,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
                 }
               }
             }
@@ -225,7 +225,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
                 }
               }
             }
@@ -273,7 +273,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
                 }
               }
             }
@@ -320,7 +320,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
                 }
               }
             }
@@ -367,7 +367,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
                 }
               }
             }
@@ -414,7 +414,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
                 }
               }
             }
@@ -463,7 +463,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
                 }
               }
             }

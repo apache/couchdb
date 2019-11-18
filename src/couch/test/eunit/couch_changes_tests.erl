@@ -36,7 +36,6 @@ setup() ->
         save_doc(Db, {[{<<"_id">>, <<"doc5">>}]})
     ]],
     Rev = lists:nth(3, Revs),
-    couch_db:ensure_full_commit(Db),
     {ok, Db1} = couch_db:reopen(Db),
 
     {ok, Rev1} = save_doc(Db1, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev}]}),
