@@ -21,8 +21,15 @@ setup(PortType) ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     lists:concat(["http://", Addr, ":", port(PortType), "/_session"]).
 
+setup_require_valid_user(PortType) ->
+    ok = config:set("couchdb", "require_valid_user", "true", _Persist=false),
+    setup(PortType).
+
 teardown(_, _) ->
     ok.
+
+teardown_require_valid_user(_, _) ->
+    config:set("couchdb", "require_valid_user", "false", _Persist=false).
 
 
 auth_test_() ->
@@ -31,6 +38,10 @@ auth_test_() ->
         fun should_not_return_authenticated_field/2,
         fun should_return_list_of_handlers/2
     ],
+    RequireValidUserTests = [
+        % See #1947 - this should work even with require_valid_user
+        fun should_return_username_on_post_to_session/2
+    ],
     {
         "Auth tests",
         {
@@ -38,7 +49,8 @@ auth_test_() ->
             fun() -> test_util:start_couch([chttpd]) end, fun test_util:stop_couch/1,
             [
                 make_test_cases(clustered, Tests),
-                make_test_cases(backdoor, Tests)
+                make_test_cases(backdoor, Tests),
+                make_require_valid_user_test_cases(clustered, RequireValidUserTests)
             ]
         }
     }.
@@ -47,6 +59,13 @@ make_test_cases(Mod, Funs) ->
     {
         lists:flatten(io_lib:format("~s", [Mod])),
         {foreachx, fun setup/1, fun teardown/2, [{Mod, Fun} || Fun <- Funs]}
+    }.
+
+make_require_valid_user_test_cases(Mod, Funs) ->
+    {
+        lists:flatten(io_lib:format("~s", [Mod])),
+        {foreachx, fun setup_require_valid_user/1, fun teardown_require_valid_user/2,
+            [{Mod, Fun} || Fun <- Funs]}
     }.
 
 should_return_username_on_post_to_session(_PortType, Url) ->
