@@ -12,7 +12,7 @@
 
 -module(setup_httpd_handlers).
 
--export([url_handler/1, db_handler/1, design_handler/1]).
+-export([url_handler/1, db_handler/1, design_handler/1, handler_info/3]).
 
 url_handler(<<"_cluster_setup">>) -> fun setup_httpd:handle_setup_req/1;
 url_handler(_) -> no_match.
@@ -20,3 +20,13 @@ url_handler(_) -> no_match.
 db_handler(_) -> no_match.
 
 design_handler(_) -> no_match.
+
+
+handler_info('GET', [<<"_cluster_setup">>], _) ->
+    {'cluster_setup.read', #{}};
+
+handler_info('POST', [<<"_cluster_setup">>], _) ->
+    {'cluster_setup.write', #{}};
+
+handler_info(_, _, _) ->
+    no_match.

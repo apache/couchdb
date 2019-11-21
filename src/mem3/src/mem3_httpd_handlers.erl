@@ -12,7 +12,7 @@
 
 -module(mem3_httpd_handlers).
 
--export([url_handler/1, db_handler/1, design_handler/1]).
+-export([url_handler/1, db_handler/1, design_handler/1, handler_info/3]).
 
 url_handler(<<"_membership">>) -> fun mem3_httpd:handle_membership_req/1;
 url_handler(<<"_reshard">>) -> fun mem3_reshard_httpd:handle_reshard_req/1;
@@ -23,3 +23,39 @@ db_handler(<<"_sync_shards">>)   -> fun mem3_httpd:handle_sync_req/2;
 db_handler(_) -> no_match.
 
 design_handler(_) -> no_match.
+
+handler_info('GET', [<<"_membership">>], _) ->
+    {'cluster.membership.read', #{}};
+
+handler_info('GET', [<<"_reshard">>], _) ->
+    {'reshard.summary.read', #{}};
+
+handler_info('GET', [<<"_reshard">>, <<"state">>], _) ->
+    {'reshard.state.read', #{}};
+
+handler_info('PUT', [<<"_reshard">>, <<"state">>], _) ->
+    {'reshard.state.write', #{}};
+
+handler_info('GET', [<<"_reshard">>, <<"jobs">>], _) ->
+    {'reshard.jobs.read', #{}};
+
+handler_info('POST', [<<"_reshard">>, <<"jobs">>], _) ->
+    {'reshard.jobs.create', #{}};
+
+handler_info('GET', [<<"_reshard">>, <<"jobs">>, JobId], _) ->
+    {'reshard.job.read', #{'job.id' => JobId}};
+
+handler_info('DELETE', [<<"_reshard">>, <<"jobs">>, JobId], _) ->
+    {'reshard.job.delete', #{'job.id' => JobId}};
+
+handler_info('GET', [DbName, <<"_shards">>], _) ->
+    {'db.shards.read', #{'db.name' => DbName}};
+
+handler_info('GET', [DbName, <<"_shards">>, DocId], _) ->
+    {'db.shards.read', #{'db.name' => DbName, 'doc.id' => DocId}};
+
+handler_info('POST', [DbName, <<"_sync_shards">>], _) ->
+    {'db.shards.sync', #{'db.name' => DbName}};
+
+handler_info(_, _, _) ->
+    no_match.
