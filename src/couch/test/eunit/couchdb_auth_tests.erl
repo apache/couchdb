@@ -22,14 +22,14 @@ setup(PortType) ->
     lists:concat(["http://", Addr, ":", port(PortType), "/_session"]).
 
 setup_require_valid_user(PortType) ->
-    ok = config:set("couchdb", "require_valid_user", "true", _Persist=false),
+    ok = config:set("chttpd", "require_valid_user", "true", _Persist=false),
     setup(PortType).
 
 teardown(_, _) ->
     ok.
 
 teardown_require_valid_user(_, _) ->
-    config:set("couchdb", "require_valid_user", "false", _Persist=false).
+    config:set("chttpd", "require_valid_user", "false", _Persist=false).
 
 
 auth_test_() ->
@@ -63,7 +63,7 @@ make_test_cases(Mod, Funs) ->
 
 make_require_valid_user_test_cases(Mod, Funs) ->
     {
-        lists:flatten(io_lib:format("~s", [Mod])),
+        lists:flatten(io_lib:format("~s require_valid_user=true", [Mod])),
         {foreachx, fun setup_require_valid_user/1, fun teardown_require_valid_user/2,
             [{Mod, Fun} || Fun <- Funs]}
     }.
