@@ -18,17 +18,25 @@
 
 -export([init/1]).
 
--export([start_link/1]).
+-export([start_link/0]).
 
 -export([handle_config_change/5, handle_config_terminate/3]).
 
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 100, Type, [I]}).
 
-start_link(Args) ->
-    supervisor:start_link({local,?MODULE}, ?MODULE, Args).
+start_link() ->
+    Arg = case fabric2_node_types:is_type(api_frontend) of
+        true -> normal;
+        false -> disabled
+    end,
+    supervisor:start_link({local,?MODULE}, ?MODULE, Arg).
 
-init([]) ->
+init(disabled) ->
+    couch_log:notice("~p : api_frontend disabled", [?MODULE]),
+    {ok, {{one_for_one, 3, 10}, []}};
+
+init(normal) ->
     Children = [
         {
             config_listener_mon,
