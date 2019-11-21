@@ -101,6 +101,9 @@ db_change(DbName, {ChangeProps} = Change, Server) ->
     try
         ok = process_change(DbName, Change)
     catch
+    exit:{Error, {gen_server, call, [?MODULE, _, _]}} ->
+        ErrMsg = "~p exited ~p while processing change from db ~p",
+        couch_log:error(ErrMsg, [?MODULE, Error, DbName]);
     _Tag:Error ->
         {RepProps} = get_json_value(doc, ChangeProps),
         DocId = get_json_value(<<"_id">>, RepProps),
@@ -530,15 +533,6 @@ doc_lookup(Db, DocId, HealthThreshold) ->
     end.
 
 
--spec ejson_state_info(binary() | nil) -> binary() | null.
-ejson_state_info(nil) ->
-    null;
-ejson_state_info(Info) when is_binary(Info) ->
-    Info;
-ejson_state_info(Info) ->
-    couch_replicator_utils:rep_error_to_binary(Info).
-
-
 -spec ejson_rep_id(rep_id() | nil) -> binary() | null.
 ejson_rep_id(nil) ->
     null;
@@ -576,7 +570,7 @@ ejson_doc(#rdoc{state = RepState} = RDoc, _HealthThreshold) ->
         {database, DbName},
         {id, ejson_rep_id(RepId)},
         {state, RepState},
-        {info, ejson_state_info(StateInfo)},
+        {info, couch_replicator_utils:ejson_state_info(StateInfo)},
         {error_count, ErrorCount},
         {node, node()},
         {last_updated, couch_replicator_utils:iso8601(StateTime)},
@@ -611,6 +605,7 @@ cluster_membership_foldl(#rdoc{id = {DbName, DocId} = Id, rid = RepId}, nil) ->
 -include_lib("eunit/include/eunit.hrl").
 
 -define(DB, <<"db">>).
+-define(EXIT_DB, <<"exit_db">>).
 -define(DOC1, <<"doc1">>).
 -define(DOC2, <<"doc2">>).
 -define(R1, {"1", ""}).
@@ -625,6 +620,7 @@ doc_processor_test_() ->
         [
             t_bad_change(),
             t_regular_change(),
+            t_change_with_doc_processor_crash(),
             t_change_with_existing_job(),
             t_deleted_change(),
             t_triggered_change(),
@@ -656,6 +652,15 @@ t_regular_change() ->
         ?assert(ets:member(?MODULE, {?DB, ?DOC1})),
         ?assert(started_worker({?DB, ?DOC1}))
     end).
+
+
+% Handle cases where doc processor exits or crashes while processing a change
+t_change_with_doc_processor_crash() ->
+    ?_test(begin
+        mock_existing_jobs_lookup([]),
+        ?assertEqual(acc, db_change(?EXIT_DB, change(), acc)),
+        ?assert(failed_state_not_updated())
+  end).
 
 
 % Regular change, parse to a #rep{} and then add job but there is already
@@ -834,16 +839,19 @@ setup() ->
     meck:expect(couch_replicator_clustering, owner, 2, node()),
     meck:expect(couch_replicator_clustering, link_cluster_event_listener, 3,
         ok),
-    meck:expect(couch_replicator_doc_processor_worker, spawn_worker, 4, pid),
+    meck:expect(couch_replicator_doc_processor_worker, spawn_worker, fun
+        ({?EXIT_DB, _}, _, _, _) -> exit(kapow);
+        (_, _, _, _) -> pid
+    end),
     meck:expect(couch_replicator_scheduler, remove_job, 1, ok),
     meck:expect(couch_replicator_docs, remove_state_fields, 2, ok),
     meck:expect(couch_replicator_docs, update_failed, 3, ok),
     {ok, Pid} = start_link(),
+    unlink(Pid),
     Pid.
 
 
 teardown(Pid) ->
-    unlink(Pid),
     exit(Pid, kill),
     meck:unload().
 
@@ -871,10 +879,14 @@ did_not_spawn_worker() ->
 updated_doc_with_failed_state() ->
     1 == meck:num_calls(couch_replicator_docs, update_failed, '_').
 
+failed_state_not_updated() ->
+    0 == meck:num_calls(couch_replicator_docs, update_failed, '_').
 
 mock_existing_jobs_lookup(ExistingJobs) ->
-    meck:expect(couch_replicator_scheduler, find_jobs_by_doc,
-        fun(?DB, ?DOC1) -> ExistingJobs end).
+    meck:expect(couch_replicator_scheduler, find_jobs_by_doc, fun
+        (?EXIT_DB, ?DOC1) -> [];
+        (?DB, ?DOC1) -> ExistingJobs
+    end).
 
 
 test_rep(Id) ->

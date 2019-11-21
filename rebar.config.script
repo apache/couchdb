@@ -32,7 +32,7 @@ NotSupported = fun(Ver) ->
     io:fwrite("Check https://docs.couchdb.org/en/latest/whatsnew/index.html for the~n"),
     io:fwrite("latest information on supported releases.~n"),
     case os:getenv("TRAVIS") of
-        "true" -> 
+        "true" ->
             io:fwrite("Travis run, ignoring bad release. You have been warned!~n"),
             ok;
         _ -> halt(1)
@@ -104,13 +104,13 @@ DepDescs = [
 {ioq,              "ioq",              {tag, "2.1.2"}},
 {hqueue,           "hqueue",           {tag, "1.0.1"}},
 {smoosh,           "smoosh",           {tag, "1.0.1"}},
-{ken,              "ken",              {tag, "1.0.3"}},
+{ken,              "ken",              {tag, "1.0.6"}},
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
                    {tag, "2.3.0"}, [raw]},
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                   {tag, "v1.1.20"}, [raw]},
+                   {tag, "v1.2.2"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.3"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-4"}},

@@ -16,7 +16,6 @@
     {registered, [
         couch_db_update,
         couch_db_update_notifier_sup,
-        couch_external_manager,
         couch_httpd,
         couch_primary_services,
         couch_proc_manager,

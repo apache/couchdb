@@ -65,6 +65,7 @@ all_test_() ->
                     fun should_return_ok_true_on_ensure_full_commit/1,
                     fun should_return_404_for_ensure_full_commit_on_no_db/1,
                     fun should_accept_live_as_an_alias_for_continuous/1,
+                    fun should_return_headers_after_starting_continious/1,
                     fun should_return_404_for_delete_att_on_notadoc/1,
                     fun should_return_409_for_del_att_without_rev/1,
                     fun should_return_200_for_del_att_with_rev/1,
@@ -125,10 +126,8 @@ should_return_404_for_ensure_full_commit_on_no_db(Url0) ->
 
 
 should_accept_live_as_an_alias_for_continuous(Url) ->
-    GetLastSeq = fun(Bin) ->
-        Parts = binary:split(Bin, <<"\n">>, [global]),
-        Filtered = [P || P <- Parts, size(P) > 0],
-        LastSeqBin = lists:last(Filtered),
+    GetLastSeq = fun(Chunks) ->
+        LastSeqBin = lists:last(Chunks),
         {Result} = try ?JSON_DECODE(LastSeqBin) of
             Data -> Data
         catch
@@ -138,14 +137,11 @@ should_accept_live_as_an_alias_for_continuous(Url) ->
         couch_util:get_value(<<"last_seq">>, Result, undefined)
     end,
     {timeout, ?TIMEOUT, ?_test(begin
-        {ok, _, _, ResultBody1} =
-            test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
-        LastSeq1 = GetLastSeq(ResultBody1),
+        LastSeq1 = GetLastSeq(wait_non_empty_chunk(Url)),
 
         {ok, _, _, _} = create_doc(Url, "testdoc2"),
-        {ok, _, _, ResultBody2} =
-            test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
-        LastSeq2 = GetLastSeq(ResultBody2),
+
+        LastSeq2 = GetLastSeq(wait_non_empty_chunk(Url)),
 
         ?assertNotEqual(LastSeq1, LastSeq2)
     end)}.
@@ -460,3 +456,27 @@ should_succeed_on_local_docs_with_multiple_queries(Url) ->
         {InnerJson2} = lists:nth(2, ResultJsonBody),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
     end)}.
+
+
+should_return_headers_after_starting_continious(Url) ->
+    {timeout, ?TIMEOUT, ?_test(begin
+       {ok, _, _, Bin} =
+            test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
+
+        Parts = binary:split(Bin, <<"\n">>, [global]),
+        %% we should receive at least one part even when timeout=1
+        ?assertNotEqual([], Parts)
+    end)}.
+
+wait_non_empty_chunk(Url) ->
+    test_util:wait(fun() ->
+        {ok, _, _, Bin} =
+            test_request:get(Url ++ "/_changes?feed=live&timeout=1", [?AUTH]),
+
+        Parts = binary:split(Bin, <<"\n">>, [global]),
+
+        case [P || P <- Parts, size(P) > 0] of
+            [] -> wait;
+            Chunks -> Chunks
+        end
+    end).
