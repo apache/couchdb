@@ -1248,12 +1248,16 @@ start_span(Req) ->
         path_parts = PathParts
     } = Req,
     {OperationName, ExtraTags} = get_action(Req),
+    Path = case PathParts of
+        [] -> <<"">>;
+        [_ | _] -> filename:join(PathParts)
+    end,
     Tags = maps:merge(#{
         peer => Peer,
         'http.method' => Method,
         nonce => Nonce,
         'http.url' => MochiReq:get(raw_path),
-        path_parts => PathParts,
+        path_parts => Path,
         'span.kind' => <<"server">>,
         component => <<"couchdb.chttpd">>
     }, ExtraTags),
