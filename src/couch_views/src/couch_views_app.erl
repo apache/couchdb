@@ -23,8 +23,8 @@
 ]).
 
 
-start(_StartType, StartArgs) ->
-    couch_views_sup:start_link(StartArgs).
+start(_StartType, _StartArgs) ->
+    couch_views_sup:start_link().
 
 
 stop(_State) ->
