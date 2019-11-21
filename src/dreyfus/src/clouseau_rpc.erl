@@ -20,7 +20,7 @@
 -export([open_index/3]).
 -export([await/2, commit/2, get_update_seq/1, info/1, search/2]).
 -export([group1/7, group2/2]).
--export([delete/2, update/3, cleanup/1, cleanup/2, rename/1]).
+-export([delete/2, soft_delete/1, update/3, cleanup/1, cleanup/2]).
 -export([analyze/2, version/0, disk_size/1]).
 -export([set_purge_seq/2, get_purge_seq/1, get_root_dir/0, close_lru/0, close_lru/1]).
 -export([connected/0]).
@@ -78,15 +78,14 @@ group2(Ref, Args) ->
 delete(Ref, Id) ->
     rpc(Ref, {delete, couch_util:to_binary(Id)}).
 
+soft_delete(DbName) ->
+    gen_server:cast({cleanup, clouseau()}, {soft_delete, DbName}).
+
 update(Ref, Id, Fields) ->
     rpc(Ref, {update, Id, Fields}).
 
 cleanup(DbName) ->
     gen_server:cast({cleanup, clouseau()}, {cleanup, DbName}).
-
-rename(DbName) ->
-  close_lru(DbName),
-  gen_server:cast({cleanup, clouseau()}, {rename, DbName}).
 
 cleanup(DbName, ActiveSigs) ->
     gen_server:cast({cleanup, clouseau()}, {cleanup, DbName, ActiveSigs}).

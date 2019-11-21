@@ -84,8 +84,8 @@ handle_cast({cleanup, DbName}, State) ->
     clouseau_rpc:cleanup(DbName),
     {noreply, State};
 
-handle_cast({rename, DbName}, State) ->
-    clouseau_rpc:rename(DbName),
+handle_cast({soft_delete, DbName}, State) ->
+    clouseau_rpc:soft_delete(DbName),
     {noreply, State}.
 
 handle_info({'EXIT', FromPid, Reason}, State) ->
@@ -123,8 +123,7 @@ handle_db_event(DbName, deleted, _St) ->
         "enable_database_recovery", false),
     case RecoveryEnabled of
         true ->
-            clouseau_rpc:close_lru(DbName),
-            gen_server:cast(?MODULE, {rename, DbName});
+            gen_server:cast(?MODULE, {soft_delete, DbName});
         false ->
             gen_server:cast(?MODULE, {cleanup, DbName})
     end,
