@@ -18,6 +18,12 @@ defmodule BasicsTest do
     assert Couch.get("/").body["couchdb"] == "Welcome", "Should say welcome"
   end
 
+  test "Ready endpoint" do
+    resp = Couch.get("/_up")
+    assert resp.status_code == 200
+    assert resp.body["status"] == "ok"
+  end
+
   @tag :with_db
   test "PUT on existing DB should return 412 instead of 500", context do
     db_name = context[:db_name]
