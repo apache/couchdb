@@ -498,12 +498,11 @@ handle_up_req(#httpd{method='GET'} = Req) ->
     "nolb" ->
         send_json(Req, 404, {[{status, nolb}]});
     _ ->
-        {ok, {Status}} = mem3_seeds:get_status(),
-        case couch_util:get_value(status, Status) of
-            ok ->
-                send_json(Req, 200, {Status});
-            seeding ->
-                send_json(Req, 404, {Status})
+        try
+            fabric2_db:list_dbs([{limit, 0}]),
+            send_json(Req, 200, {[{status, ok}]})
+        catch error:{timeout, _} ->
+            send_json(Req, 404, {[{status, backend_unavailable}]})
         end
     end;
 
