@@ -96,7 +96,8 @@ job_data(Db, Mrst) ->
     #{
         db_name => fabric2_db:name(Db),
         ddoc_id => DDocId,
-        sig => fabric2_util:to_hex(Sig)
+        sig => fabric2_util:to_hex(Sig),
+        retries => 0
     }.
 
 

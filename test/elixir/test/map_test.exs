@@ -503,6 +503,38 @@ defmodule ViewMapTest do
     assert keys == ["bar"]
   end
 
+  test "send error for failed indexing", context do
+    db_name = context[:db_name]
+
+    docs = [
+      %{_id: "doc1", foo: "foo", bar: "bar"},
+      %{
+        _id: "_design/view1",
+        views: %{
+          view: %{
+            map: """
+                function (doc) {
+                  for (var i=0; i<10000; i++) {
+                  emit({doc: doc._id + 1}, doc._id);
+                }
+              }
+            """
+          }
+        }
+      }
+    ]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs})
+    assert resp.status_code == 201
+
+    url = "/#{db_name}/_design/view1/_view/view"
+
+    resp = Couch.get(url, timeout: 500_000)
+    assert resp.status_code == 500
+    %{:body => %{"error" => error}} = resp
+    assert error == "foundationdb_error"
+  end
+
   def update_doc_value(db_name, id, value) do
     resp = Couch.get("/#{db_name}/#{id}")
     doc = convert(resp.body)

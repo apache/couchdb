@@ -35,11 +35,13 @@ spawn_link() ->
 
 
 init() ->
-    {ok, Job, Data} = couch_jobs:accept(?INDEX_JOB_TYPE, #{}),
+    {ok, Job, Data0} = couch_jobs:accept(?INDEX_JOB_TYPE, #{}),
+    Data = upgrade_data(Data0),
     #{
         <<"db_name">> := DbName,
         <<"ddoc_id">> := DDocId,
-        <<"sig">> := JobSig
+        <<"sig">> := JobSig,
+        <<"retries">> := Retries
     } = Data,
 
     {ok, Db} = try
@@ -87,7 +89,63 @@ init() ->
         design_opts => Mrst#mrst.design_opts
     },
 
-    update(Db, Mrst, State).
+    try
+        update(Db, Mrst, State)
+    catch
+        exit:normal ->
+            ok;
+        Error:Reason  ->
+            NewRetry = Retries + 1,
+            RetryLimit = retry_limit(),
+
+            case should_retry(NewRetry, RetryLimit, Reason) of
+                true ->
+                    DataErr = Data#{<<"retries">> := NewRetry},
+                    % Set the last_seq to 0 so that it doesn't trigger a
+                    % successful view build for anyone listening to the
+                    % couch_views_jobs:wait_for_job
+                    % Note this won't cause the view to rebuild from 0 again
+                    StateErr = State#{job_data := DataErr, last_seq := <<"0">>},
+                    report_progress(StateErr, update);
+                false ->
+                    NewData = add_error(Error, Reason, Data),
+                    couch_jobs:finish(undefined, Job, NewData),
+                    exit(normal)
+            end
+    end.
+
+
+upgrade_data(Data) ->
+    case maps:is_key(<<"retries">>, Data) of
+        true -> Data;
+        false -> Data#{<<"retries">> =>0}
+    end.
+
+
+% Transaction limit exceeded don't retry
+should_retry(_, _, {erlfdb_error, 2101}) ->
+    false;
+
+should_retry(Retries, RetryLimit, _) when Retries < RetryLimit ->
+    true;
+
+should_retry(_, _, _) ->
+    false.
+
+
+add_error(error, {erlfdb_error, Code}, Data) ->
+    CodeBin = couch_util:to_binary(Code),
+    CodeString = erlfdb:get_error_string(Code),
+    Data#{
+        error => foundationdb_error,
+        reason => list_to_binary([CodeBin, <<"-">>, CodeString])
+    };
+
+add_error(Error, Reason, Data) ->
+    Data#{
+        error => couch_util:to_binary(Error),
+        reason => couch_util:to_binary(Reason)
+    }.
 
 
 update(#{} = Db, Mrst0, State0) ->
@@ -322,7 +380,8 @@ report_progress(State, UpdateType) ->
     #{
         <<"db_name">> := DbName,
         <<"ddoc_id">> := DDocId,
-        <<"sig">> := Sig
+        <<"sig">> := Sig,
+        <<"retries">> := Retries
     } = JobData,
 
     % Reconstruct from scratch to remove any
@@ -331,7 +390,8 @@ report_progress(State, UpdateType) ->
         <<"db_name">> => DbName,
         <<"ddoc_id">> => DDocId,
         <<"sig">> => Sig,
-        <<"view_seq">> => LastSeq
+        <<"view_seq">> => LastSeq,
+        <<"retries">> => Retries
     },
 
     case UpdateType of
@@ -356,3 +416,7 @@ report_progress(State, UpdateType) ->
 
 num_changes() ->
     config:get_integer("couch_views", "change_limit", 100).
+
+
+retry_limit() ->
+    config:get_integer("couch_views", "retry_limit", 3).
