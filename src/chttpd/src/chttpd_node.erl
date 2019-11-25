@@ -117,9 +117,20 @@ handle_node_req(#httpd{method='POST', path_parts=[_, Node, <<"_restart">>]}=Req)
     send_json(Req, 200, {[{ok, true}]});
 handle_node_req(#httpd{path_parts=[_, _Node, <<"_restart">>]}=Req) ->
     send_method_not_allowed(Req, "POST");
+handle_node_req(#httpd{path_parts=[_, Node | PathParts],
+                       mochi_req=MochiReq0}) ->
+    % strip /_node/{node} from Req0 before descending further
+    RawUri = MochiReq0:get(raw_path),
+    {_, Query, Fragment} = mochiweb_util:urlsplit_path(RawUri),
+    NewPath0 = "/" ++ lists:join("/", [?b2l(P) || P <- PathParts]),
+    NewRawPath = mochiweb_util:urlunsplit_path({NewPath0, Query, Fragment}),
+    MochiReq = mochiweb_request:new(self(),
+                               MochiReq0:get(method),
+                               NewRawPath,
+                               MochiReq0:get(version),
+                               MochiReq0:get(headers)),
+    call_node(Node, couch_httpd, handle_request, [MochiReq]);
 handle_node_req(#httpd{path_parts=[_]}=Req) ->
-    chttpd:send_error(Req, {bad_request, <<"Incomplete path to _node request">>});
-handle_node_req(#httpd{path_parts=[_, _Node]}=Req) ->
     chttpd:send_error(Req, {bad_request, <<"Incomplete path to _node request">>});
 handle_node_req(Req) ->
     chttpd:send_error(Req, not_found).
