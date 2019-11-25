@@ -221,6 +221,8 @@ make_fun_spec_strs(SpecStr) ->
     re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}]).
 
 handle_request(MochiReq) ->
+    Body = proplists:get_value(body, MochiReq:get(opts)),
+    erlang:put(mochiweb_request_body, Body),
     apply(?MODULE, handle_request, [MochiReq | get_httpd_handlers()]).
 
 handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
@@ -262,7 +264,7 @@ handle_request_int(MochiReq, DefaultFun,
         MochiReq:get(method),
         RawUri,
         MochiReq:get(version),
-        MochiReq:get(peer),
+        peer(MochiReq),
         mochiweb_headers:to_list(MochiReq:get(headers))
     ]),
 
@@ -305,7 +307,7 @@ handle_request_int(MochiReq, DefaultFun,
 
     HttpReq = #httpd{
         mochi_req = MochiReq,
-        peer = MochiReq:get(peer),
+        peer = peer(MochiReq),
         method = Method,
         requested_path_parts =
             [?l2b(unquote(Part)) || Part <- string:tokens(RequestedPath, "/")],
@@ -752,6 +754,9 @@ start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
     end,
     {ok, Resp}.
 
+send_chunk({remote, Pid, Ref} = Resp, Data) ->
+    Pid ! {Ref, chunk, Data},
+    {ok, Resp};
 send_chunk(Resp, Data) ->
     case iolist_size(Data) of
     0 -> ok; % do nothing
@@ -759,6 +764,9 @@ send_chunk(Resp, Data) ->
     end,
     {ok, Resp}.
 
+last_chunk({remote, Pid, Ref} = Resp) ->
+    Pid ! {Ref, chunk, <<>>},
+    {ok, Resp};
 last_chunk(Resp) ->
     Resp:write_chunk([]),
     {ok, Resp}.
@@ -1181,9 +1189,18 @@ before_response(Req0, Code0, Headers0, {json, JsonObj}) ->
 before_response(Req0, Code0, Headers0, Args0) ->
     chttpd_plugin:before_response(Req0, Code0, Headers0, Args0).
 
-respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
+respond_(#httpd{mochi_req = MochiReq} = Req, Code, Headers, Args, Type) ->
+    case MochiReq:get(socket) of
+        {remote, Pid, Ref} ->
+            Pid ! {Ref, Code, Headers, Args, Type},
+            {remote, Pid, Ref};
+        _Else ->
+            http_respond_(Req, Code, Headers, Args, Type)
+    end.
+
+http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
     MochiReq:start_response({Code, Headers});
-respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
+http_respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
     % Special handling for the 413 response. Make sure the socket is closed as
     % we don't know how much data was read before the error was thrown. Also
     % drain all the data in the receive buffer to avoid connction being reset
@@ -1195,8 +1212,16 @@ respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
     Socket = MochiReq:get(socket),
     mochiweb_socket:recv(Socket, ?MAX_DRAIN_BYTES, ?MAX_DRAIN_TIME_MSEC),
     Result;
-respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
+http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
+
+peer(MochiReq) ->
+    case MochiReq:get(socket) of
+        {remote, Pid, _} ->
+            node(Pid);
+        _ ->
+            MochiReq:get(peer)
+    end.
 
 %%%%%%%% module tests below %%%%%%%%
 
