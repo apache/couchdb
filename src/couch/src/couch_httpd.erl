@@ -163,21 +163,21 @@ auth_handler_name(SpecStr) ->
     lists:nth(?HANDLER_NAME_IN_MODULE_POS, re:split(SpecStr, "[\\W_]", [])).
 
 get_httpd_handlers() ->
-    {ok, HttpdGlobalHandlers} = application:get_env(httpd_global_handlers),
+    {ok, HttpdGlobalHandlers} = application:get_env(couch, httpd_global_handlers),
 
     UrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_1_fun(SpecStr)}
         end, HttpdGlobalHandlers),
 
-    {ok, HttpdDbHandlers} = application:get_env(httpd_db_handlers),
+    {ok, HttpdDbHandlers} = application:get_env(couch, httpd_db_handlers),
 
     DbUrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
             {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
         end, HttpdDbHandlers),
 
-    {ok, HttpdDesignHandlers} = application:get_env(httpd_design_handlers),
+    {ok, HttpdDesignHandlers} = application:get_env(couch, httpd_design_handlers),
 
     DesignUrlHandlersList = lists:map(
         fun({UrlKey, SpecStr}) ->
