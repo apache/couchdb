@@ -44,16 +44,28 @@ query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
         false -> ok
     end,
 
-    ok = maybe_update_view(Db, Mrst, Args3),
-
     try
-        couch_views_reader:read(Db, Mrst, ViewName, Callback, Acc0, Args3)
-    after
-        UpdateAfter = Args3#mrargs.update == lazy,
-        if UpdateAfter == false -> ok; true ->
-            couch_views_jobs:build_view_async(Db, Mrst)
-        end
+        fabric2_fdb:transactional(Db, fun(TxDb) ->
+            ok = maybe_update_view(TxDb, Mrst, Args3),
+            read_view(TxDb, Mrst, ViewName, Callback, Acc0, Args3)
+        end)
+    catch throw:{build_view, WaitSeq} ->
+        couch_views_jobs:build_view(Db, Mrst, WaitSeq),
+        read_view(Db, Mrst, ViewName, Callback, Acc0, Args3)
     end.
+
+
+read_view(Db, Mrst, ViewName, Callback, Acc0, Args) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        try
+            couch_views_reader:read(TxDb, Mrst, ViewName, Callback, Acc0, Args)
+        after
+            UpdateAfter = Args#mrargs.update == lazy,
+            if UpdateAfter == false -> ok; true ->
+                couch_views_jobs:build_view_async(TxDb, Mrst)
+            end
+        end
+    end).
 
 
 maybe_update_view(_Db, _Mrst, #mrargs{update = false}) ->
@@ -62,18 +74,12 @@ maybe_update_view(_Db, _Mrst, #mrargs{update = false}) ->
 maybe_update_view(_Db, _Mrst, #mrargs{update = lazy}) ->
     ok;
 
-maybe_update_view(Db, Mrst, _Args) ->
-    WaitSeq = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        DbSeq = fabric2_db:get_update_seq(TxDb),
-        ViewSeq = couch_views_fdb:get_update_seq(TxDb, Mrst),
-        case DbSeq == ViewSeq of
-            true -> ready;
-            false -> DbSeq
-        end
-    end),
-
-    if WaitSeq == ready -> ok; true ->
-        couch_views_jobs:build_view(Db, Mrst, WaitSeq)
+maybe_update_view(TxDb, Mrst, _Args) ->
+    DbSeq = fabric2_db:get_update_seq(TxDb),
+    ViewSeq = couch_views_fdb:get_update_seq(TxDb, Mrst),
+    case DbSeq == ViewSeq of
+        true -> ok;
+        false -> throw({build_view, DbSeq})
     end.
 
 
