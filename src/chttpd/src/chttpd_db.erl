@@ -279,6 +279,9 @@ handle_view_cleanup_req(Req, Db) ->
     send_json(Req, 202, {[{ok, true}]}).
 
 
+handle_partition_req(#httpd{path_parts=[_,_]}=_Req, _Db) ->
+    throw({bad_request, invalid_partition_req});
+
 handle_partition_req(#httpd{method='GET', path_parts=[_,_,PartId]}=Req, Db) ->
     couch_partition:validate_partition(PartId),
     case couch_db:is_partitioned(Db) of
