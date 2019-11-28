@@ -30,14 +30,18 @@ init([]) ->
         {index_server, {couch_index_server, start_link, []}},
         {query_servers, {couch_proc_manager, start_link, []}},
         {vhosts, {couch_httpd_vhost, start_link, []}},
-        {httpd, {couch_httpd, start_link, []}},
         {uuids, {couch_uuids, start, []}},
         {auth_cache, {couch_auth_cache, start_link, []}}
     ],
 
+    MaybeHttp = case http_enabled() of
+        true -> [{httpd, {couch_httpd, start_link, []}}];
+        false -> couch_httpd:set_auth_handlers(), []
+    end,
+
     MaybeHttps = case https_enabled() of
         true -> [{httpsd, {chttpd, start_link, [https]}}];
-        _False -> []
+        false -> []
     end,
 
     Children = SecondarySupervisors ++ [
@@ -52,9 +56,12 @@ init([]) ->
                 [Module]}
         end
         || {Name, Spec}
-        <- Daemons ++ MaybeHttps, Spec /= ""],
+        <- Daemons ++ MaybeHttp ++ MaybeHttps, Spec /= ""],
     {ok, {{one_for_one, 50, 3600},
         couch_epi:register_service(couch_db_epi, Children)}}.
+
+http_enabled() ->
+    config:get_boolean("httpd", "enable", false).
 
 https_enabled() ->
     % 1. [ssl] enable = true | false
