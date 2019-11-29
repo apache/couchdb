@@ -56,6 +56,7 @@ before_script:
   - ./configure -c --disable-docs --disable-fauxton
   - python3.6 -m venv /tmp/.venv
   - source /tmp/.venv/bin/activate
+  - pip install requests
 
 script:
    - make check
