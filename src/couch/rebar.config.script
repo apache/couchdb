@@ -54,6 +54,16 @@ CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
         []
 end.
 
+SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
+    {_, "1.8.5"} ->
+        "1.8.5";
+    undefined ->
+        "1.8.5";
+    {_, Unsupported} ->
+        io:format(standard_error, "Unsupported SpiderMonkey version: ~s~n", [Unsupported]),
+        erlang:halt(1)
+end.
+
 ConfigH = [
     {"SM185", ""},
     {"HAVE_JS_GET_STRING_CHARS_AND_LENGTH", "1"},
@@ -66,7 +76,7 @@ ConfigH = [
     {"PACKAGE_VERSION", "\"" ++ Version ++ "\""}
 ],
 
-CouchJSConfig = "priv/couch_js/config.h",
+CouchJSConfig = "priv/couch_js/" ++ SMVsn ++ "/config.h",
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH],
 ConfigBin = iolist_to_binary(ConfigSrc),
 ok = CopyIfDifferent(CouchJSConfig, ConfigBin),
@@ -78,27 +88,45 @@ MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
         []
 end,
 
-%% TODO support curl on Windows
-{JS_CFLAGS, JS_LDFLAGS} = case lists:keyfind(with_curl, 1, CouchConfig) of
+{JS_CFLAGS, JS_LDFLAGS} = case os:type() of
+    {win32, _} when SMVsn == "1.8.5" ->
+        {
+            "/DXP_WIN /IC:\\relax\\js-1.8.5\\js\\src",
+            "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src mozjs185-1.0.lib"
+        };
+    _ when SMVsn == "1.8.5" ->
+        {
+            "-DXP_UNIX -I/usr/inlude/js -I/usr/local/include/js",
+            "-L/usr/local/lib -lmozjs185 -lm"
+        }
+end.
+
+{CURL_CFLAGS, CURL_LDFLAGS} = case lists:keyfind(with_curl, 1, CouchConfig) of
     {with_curl, true} ->
         case os:type() of
             {win32, _} ->
-                {"/DHAVE_CURL /IC:\\relax\\curl\\include", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src /LIBPATH:C:\\Relax\\curl\\lib\\release-ssl mozjs185-1.0.lib libcurl_imp.lib"};
+                {
+                    "/DHAVE_CURL /IC:\\relax\\curl\\include",
+                    "/LIBPATH:C:\\Relax\\curl\\lib\\release-ssl libcurl_imp.lib"
+                };
             {unix, freebsd} ->
-                {"-DHAVE_CURL -I/usr/local/include", "-DHAVE_CURL -lmozjs185 -lcurl"};
+                {
+                    "-DHAVE_CURL -I/usr/local/include",
+                    "-DHAVE_CURL -lcurl"
+                };
             _ ->
-                {"-DHAVE_CURL", "-DHAVE_CURL -lmozjs185 -lcurl"}
+                {
+                    "-DHAVE_CURL",
+                    "-DHAVE_CURL -lcurl"
+                }
         end;
     _ ->
-        case os:type() of
-            {win32, _} ->
-                {"", "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src mozjs185-1.0.lib"};
-            _ ->
-                {"", "-lmozjs185"}
-        end
+        {"", ""}
 end,
 
-CouchJSSrc = ["priv/couch_js/*.c"],
+CouchJSSrc = case SMVsn of
+    "1.8.5" -> ["priv/couch_js/1.8.5/*.c"]
+end.
 
 IcuPath = "priv/couch_icu_driver.so",
 IcuSrc = ["priv/icu_driver/*.c"],
@@ -116,10 +144,7 @@ CompareSrc = ["priv/couch_ejson_compare/*.c"],
 
 BaseSpecs = [
         %% couchjs
-        {"darwin", CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib"}]}]},
-        {"linux",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -lm"}]}]},
-        {"bsd",   CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " -DXP_UNIX -I/usr/local/include/js"}, {"LDFLAGS", JS_LDFLAGS ++ " -L/usr/local/lib -lm"}]}]},
-        {"win32",  CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " /DXP_WIN /IC:\\relax\\js-1.8.5\\js\\src"}, {"LDFLAGS", JS_LDFLAGS}]}]},
+        {".*", CouchJSPath, CouchJSSrc, [{env, [{"CFLAGS", JS_CFLAGS ++ " " ++ CURL_CFLAGS}, {"LDFLAGS", JS_LDFLAGS ++ " " ++ CURL_LDFLAGS}]}]},
         % ICU
         {"darwin", IcuPath, IcuSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  IcuPath, IcuSrc, [{env, IcuEnv}]},

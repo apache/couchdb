@@ -35,14 +35,11 @@ share/www
 src/b64url/
 src/bear/
 src/config/
-src/couch/priv/couch_js/config.h
+src/couch/priv/couch_js/**/config.h
 src/couch/priv/couchjs
 src/couch/priv/couchspawnkillable
 src/couch/priv/couch_ejson_compare/couch_ejson_compare.d
-src/couch/priv/couch_js/http.d
-src/couch/priv/couch_js/main.d
-src/couch/priv/couch_js/utf8.d
-src/couch/priv/couch_js/util.d
+src/couch/priv/couch_js/**/*.d
 src/couch/priv/icu_driver/couch_icu_driver.d
 src/mango/src/mango_cursor_text.nocompile
 src/docs/
