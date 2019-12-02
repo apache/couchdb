@@ -60,8 +60,7 @@
             {"_uuids", "{couch_httpd_misc_handlers, handle_uuids_req}"},
             {"_stats", "{couch_stats_httpd, handle_stats_req}"},
             {"_session", "{couch_httpd_auth, handle_session_req}"},
-            {"_plugins", "{couch_plugins_httpd, handle_req}"},
-            {"_system", "{chttpd_misc, handle_system_req}"}
+            {"_plugins", "{couch_plugins_httpd, handle_req}"}
         ]},
           { httpd_db_handlers, [
             {"_all_docs", "{couch_mrview_http, handle_all_docs_req}"},

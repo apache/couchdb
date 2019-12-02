@@ -37,7 +37,8 @@
 -export([validate_host/1]).
 -export([validate_bind_address/1]).
 -export([check_max_request_length/1]).
-
+-export([handle_request/1]).
+-export([set_auth_handlers/0]).
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 -define(MAX_DRAIN_BYTES, 1048576).
@@ -104,38 +105,14 @@ start_link(Name, Options) ->
                       Else -> Else
                   end,
     ok = validate_bind_address(BindAddress),
-    DefaultFun = make_arity_1_fun("{couch_httpd_db, handle_request}"),
 
-    {ok, HttpdGlobalHandlers} = application:get_env(httpd_global_handlers),
-
-    UrlHandlersList = lists:map(
-        fun({UrlKey, SpecStr}) ->
-            {?l2b(UrlKey), make_arity_1_fun(SpecStr)}
-        end, HttpdGlobalHandlers),
-
-    {ok, HttpdDbHandlers} = application:get_env(httpd_db_handlers),
-
-    DbUrlHandlersList = lists:map(
-        fun({UrlKey, SpecStr}) ->
-            {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
-        end, HttpdDbHandlers),
-
-    {ok, HttpdDesignHandlers} = application:get_env(httpd_design_handlers),
-
-    DesignUrlHandlersList = lists:map(
-        fun({UrlKey, SpecStr}) ->
-            {?l2b(UrlKey), make_arity_3_fun(SpecStr)}
-        end, HttpdDesignHandlers),
-
-    UrlHandlers = dict:from_list(UrlHandlersList),
-    DbUrlHandlers = dict:from_list(DbUrlHandlersList),
-    DesignUrlHandlers = dict:from_list(DesignUrlHandlersList),
     {ok, ServerOptions} = couch_util:parse_term(
         config:get("httpd", "server_options", "[]")),
     {ok, SocketOptions} = couch_util:parse_term(
         config:get("httpd", "socket_options", "[]")),
 
     set_auth_handlers(),
+    Handlers = get_httpd_handlers(),
 
     % ensure uuid is set so that concurrent replications
     % get the same value.
@@ -148,9 +125,7 @@ start_link(Name, Options) ->
         _ ->
             ok = mochiweb_socket:setopts(Req:get(socket), SocketOptions)
         end,
-        apply(?MODULE, handle_request, [
-            Req, DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers
-        ])
+        apply(?MODULE, handle_request, [Req | Handlers])
     end,
 
     % set mochiweb options
@@ -187,6 +162,34 @@ set_auth_handlers() ->
 auth_handler_name(SpecStr) ->
     lists:nth(?HANDLER_NAME_IN_MODULE_POS, re:split(SpecStr, "[\\W_]", [])).
 
+get_httpd_handlers() ->
+    {ok, HttpdGlobalHandlers} = application:get_env(couch, httpd_global_handlers),
+
+    UrlHandlersList = lists:map(
+        fun({UrlKey, SpecStr}) ->
+            {?l2b(UrlKey), make_arity_1_fun(SpecStr)}
+        end, HttpdGlobalHandlers),
+
+    {ok, HttpdDbHandlers} = application:get_env(couch, httpd_db_handlers),
+
+    DbUrlHandlersList = lists:map(
+        fun({UrlKey, SpecStr}) ->
+            {?l2b(UrlKey), make_arity_2_fun(SpecStr)}
+        end, HttpdDbHandlers),
+
+    {ok, HttpdDesignHandlers} = application:get_env(couch, httpd_design_handlers),
+
+    DesignUrlHandlersList = lists:map(
+        fun({UrlKey, SpecStr}) ->
+            {?l2b(UrlKey), make_arity_3_fun(SpecStr)}
+        end, HttpdDesignHandlers),
+
+    UrlHandlers = dict:from_list(UrlHandlersList),
+    DbUrlHandlers = dict:from_list(DbUrlHandlersList),
+    DesignUrlHandlers = dict:from_list(DesignUrlHandlersList),
+    DefaultFun = make_arity_1_fun("{couch_httpd_db, handle_request}"),
+    [DefaultFun, UrlHandlers, DbUrlHandlers, DesignUrlHandlers].
+
 % SpecStr is a string like "{my_module, my_fun}"
 %  or "{my_module, my_fun, <<"my_arg">>}"
 make_arity_1_fun(SpecStr) ->
@@ -216,6 +219,11 @@ make_arity_3_fun(SpecStr) ->
 % SpecStr is "{my_module, my_fun}, {my_module2, my_fun2}"
 make_fun_spec_strs(SpecStr) ->
     re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}]).
+
+handle_request(MochiReq) ->
+    Body = proplists:get_value(body, MochiReq:get(opts)),
+    erlang:put(mochiweb_request_body, Body),
+    apply(?MODULE, handle_request, [MochiReq | get_httpd_handlers()]).
 
 handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
     DesignUrlHandlers) ->
@@ -256,7 +264,7 @@ handle_request_int(MochiReq, DefaultFun,
         MochiReq:get(method),
         RawUri,
         MochiReq:get(version),
-        MochiReq:get(peer),
+        peer(MochiReq),
         mochiweb_headers:to_list(MochiReq:get(headers))
     ]),
 
@@ -299,7 +307,7 @@ handle_request_int(MochiReq, DefaultFun,
 
     HttpReq = #httpd{
         mochi_req = MochiReq,
-        peer = MochiReq:get(peer),
+        peer = peer(MochiReq),
         method = Method,
         requested_path_parts =
             [?l2b(unquote(Part)) || Part <- string:tokens(RequestedPath, "/")],
@@ -746,6 +754,9 @@ start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
     end,
     {ok, Resp}.
 
+send_chunk({remote, Pid, Ref} = Resp, Data) ->
+    Pid ! {Ref, chunk, Data},
+    {ok, Resp};
 send_chunk(Resp, Data) ->
     case iolist_size(Data) of
     0 -> ok; % do nothing
@@ -753,6 +764,9 @@ send_chunk(Resp, Data) ->
     end,
     {ok, Resp}.
 
+last_chunk({remote, Pid, Ref} = Resp) ->
+    Pid ! {Ref, chunk, <<>>},
+    {ok, Resp};
 last_chunk(Resp) ->
     Resp:write_chunk([]),
     {ok, Resp}.
@@ -1175,9 +1189,18 @@ before_response(Req0, Code0, Headers0, {json, JsonObj}) ->
 before_response(Req0, Code0, Headers0, Args0) ->
     chttpd_plugin:before_response(Req0, Code0, Headers0, Args0).
 
-respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
+respond_(#httpd{mochi_req = MochiReq} = Req, Code, Headers, Args, Type) ->
+    case MochiReq:get(socket) of
+        {remote, Pid, Ref} ->
+            Pid ! {Ref, Code, Headers, Args, Type},
+            {remote, Pid, Ref};
+        _Else ->
+            http_respond_(Req, Code, Headers, Args, Type)
+    end.
+
+http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
     MochiReq:start_response({Code, Headers});
-respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
+http_respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
     % Special handling for the 413 response. Make sure the socket is closed as
     % we don't know how much data was read before the error was thrown. Also
     % drain all the data in the receive buffer to avoid connction being reset
@@ -1189,8 +1212,16 @@ respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
     Socket = MochiReq:get(socket),
     mochiweb_socket:recv(Socket, ?MAX_DRAIN_BYTES, ?MAX_DRAIN_TIME_MSEC),
     Result;
-respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
+http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
+
+peer(MochiReq) ->
+    case MochiReq:get(socket) of
+        {remote, Pid, _} ->
+            node(Pid);
+        _ ->
+            MochiReq:get(peer)
+    end.
 
 %%%%%%%% module tests below %%%%%%%%
 
