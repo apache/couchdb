@@ -29,6 +29,7 @@
     parse_int/1,
     parse_pos_int/1,
     prepend_val/1,
+    parse_body_and_query/3,
     parse_params/2,
     parse_params/3,
     parse_params/4,
@@ -453,12 +454,21 @@ parse_params(Props, Keys, Args) ->
 
 parse_params(Props, Keys, #mrargs{}=Args0, Options) ->
     IsDecoded = lists:member(decoded, Options),
-    % group_level set to undefined to detect if explicitly set by user
-    Args1 = Args0#mrargs{keys=Keys, group=undefined, group_level=undefined},
+    Args1 = case lists:member(keep_group_level, Options) of
+        true ->
+            Args0;
+        _ ->
+            % group_level set to undefined to detect if explicitly set by user
+            Args0#mrargs{keys=Keys, group=undefined, group_level=undefined}
+    end,
     lists:foldl(fun({K, V}, Acc) ->
         parse_param(K, V, Acc, IsDecoded)
     end, Args1, Props).
 
+parse_body_and_query(Req, {Props}, Keys) ->
+    Args = #mrargs{keys=Keys, group=undefined, group_level=undefined},
+    BodyArgs = parse_params(Props, Keys, Args, [decoded]),
+    parse_params(chttpd:qs(Req), Keys, BodyArgs, [keep_group_level]).
 
 parse_param(Key, Val, Args, IsDecoded) when is_binary(Key) ->
     parse_param(binary_to_list(Key), Val, Args, IsDecoded);
