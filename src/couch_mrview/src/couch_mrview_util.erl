@@ -1152,7 +1152,6 @@ extract_view_reduce({red, {N, _Lang, #mrview{reduce_funs=Reds}}, _Ref}) ->
 get_view_keys({Props}) ->
     case couch_util:get_value(<<"keys">>, Props) of
         undefined ->
-            couch_log:debug("POST with no keys member.", []),
             undefined;
         Keys when is_list(Keys) ->
             Keys;
