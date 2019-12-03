@@ -41,10 +41,10 @@ http_ctor(JSContext* cx, JSObject* req)
 }
 
 
-bool
+void
 http_dtor(JSFreeOp* fop, JSObject* req)
 {
-    return false;
+    return;
 }
 
 
