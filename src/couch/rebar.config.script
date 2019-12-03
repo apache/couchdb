@@ -94,7 +94,7 @@ end,
     {win32, _} when SMVsn == "1.8.5" ->
         {
             "/DXP_WIN /IC:\\relax\\js-1.8.5\\js\\src",
-            "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src mozjs60.lib"
+            "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src mozjs185-1.0.lib"
         };
     {unix, _} when SMVsn == "1.8.5" ->
         {
@@ -104,7 +104,7 @@ end,
     {win32, _} when SMVsn == "60" ->
         {
             "/DXP_WIN /IC:\\relax\\js-60\\js\\src",
-            "/LIBPATH:C:\\relax\\js-60\\js\\src mozjs60.0.lib"
+            "/LIBPATH:C:\\relax\\js-60\\js\\src mozjs-60.lib"
         };
     {unix, _} when SMVsn == "60" ->
         {

@@ -87,7 +87,7 @@ req_ctor(JSContext* cx, unsigned int argc, JS::Value* vp)
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     JSObject* obj = JS_NewObjectForConstructor(cx, &CouchHTTPClass, args);
     if(!obj) {
-        JS_ReportErrorUTF8(cx, "Failed to create CouchHTTP instance.\n", NULL);
+        JS_ReportErrorUTF8(cx, "Failed to create CouchHTTP instance");
         return false;
     }
     ret = http_ctor(cx, obj);
@@ -255,7 +255,7 @@ evalcx(JSContext *cx, unsigned int argc, JS::Value* vp)
 
         JS::CompileOptions opts(cx);
         JS::RootedValue rval(cx);
-        opts.setFileAndLine(__FILE__, __LINE__);
+        opts.setFileAndLine("<unknown>", 1);
         if (!JS::Evaluate(cx, opts, src, srclen, args.rval())) {
              return false;
          }
@@ -322,9 +322,10 @@ seal(JSContext* cx, unsigned int argc, JS::Value* vp)
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     JS::RootedObject target(cx);
     target = JS::ToObject(cx, args[0]);
-    if (!target)
+    if (!target) {
         args.rval().setUndefined();
         return true;
+    }
     bool deep = false;
     deep = args[1].toBoolean();
     bool ret = deep ? JS_DeepFreezeObject(cx, target) : JS_FreezeObject(cx, target);
@@ -466,7 +467,7 @@ main(int argc, const char* argv[])
 
         // Compile and run
         JS::CompileOptions options(cx);
-        options.setFileAndLine(__FILE__, __LINE__);
+        options.setFileAndLine(args->scripts[i], 1);
         JS::RootedScript script(cx);
 
         if(!JS_CompileScript(cx, scriptsrc, slen, options, &script)) {
