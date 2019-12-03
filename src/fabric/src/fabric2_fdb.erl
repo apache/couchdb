@@ -27,6 +27,7 @@
     get_dir/1,
 
     list_dbs/4,
+    list_dbs_info/4,
 
     get_info/1,
     get_info_future/2,
@@ -327,6 +328,16 @@ list_dbs(Tx, Callback, AccIn, Options) ->
     fold_range({tx, Tx}, Prefix, fun({K, _V}, Acc) ->
         {DbName} = erlfdb_tuple:unpack(K, Prefix),
         Callback(DbName, Acc)
+    end, AccIn, Options).
+
+
+list_dbs_info(Tx, Callback, AccIn, Options) ->
+    LayerPrefix = get_dir(Tx),
+    Prefix = erlfdb_tuple:pack({?ALL_DBS}, LayerPrefix),
+    fold_range({tx, Tx}, Prefix, fun({DbNameKey, DbPrefix}, Acc) ->
+        {DbName} = erlfdb_tuple:unpack(DbNameKey, Prefix),
+        InfoFuture = get_info_future(Tx, DbPrefix),
+        Callback(DbName, InfoFuture, Acc)
     end, AccIn, Options).
 
 
