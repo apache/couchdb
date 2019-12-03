@@ -29,7 +29,8 @@ crud_test_() ->
                 ?TDEF(create_db),
                 ?TDEF(open_db),
                 ?TDEF(delete_db),
-                ?TDEF(list_dbs)
+                ?TDEF(list_dbs),
+                ?TDEF(list_dbs_info)
             ])
         }
     }.
@@ -84,3 +85,31 @@ list_dbs(_) ->
     ?assertEqual(ok, fabric2_db:delete(DbName, [])),
     AllDbs3 = fabric2_db:list_dbs(),
     ?assert(not lists:member(DbName, AllDbs3)).
+
+
+list_dbs_info(_) ->
+    DbName = ?tempdb(),
+    {ok, AllDbInfos1} = fabric2_db:list_dbs_info(),
+
+    ?assert(is_list(AllDbInfos1)),
+    ?assert(not is_db_info_member(DbName, AllDbInfos1)),
+
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+    {ok, AllDbInfos2} = fabric2_db:list_dbs_info(),
+    ?assert(is_db_info_member(DbName, AllDbInfos2)),
+
+    ?assertEqual(ok, fabric2_db:delete(DbName, [])),
+    {ok, AllDbInfos3} = fabric2_db:list_dbs_info(),
+    ?assert(not is_db_info_member(DbName, AllDbInfos3)).
+
+
+is_db_info_member(_, []) ->
+    false;
+
+is_db_info_member(DbName, [DbInfo | RestInfos]) ->
+    case lists:keyfind(db_name, 1, DbInfo) of
+        {db_name, DbName} ->
+            true;
+        _E ->
+            is_db_info_member(DbName, RestInfos)
+    end.
