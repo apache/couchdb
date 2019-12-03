@@ -174,11 +174,16 @@ create(#{} = Db0, Options) ->
         {?DB_STATS, <<"doc_del_count">>, ?uint2bin(0)},
         {?DB_STATS, <<"doc_design_count">>, ?uint2bin(0)},
         {?DB_STATS, <<"doc_local_count">>, ?uint2bin(0)},
-        {?DB_STATS, <<"size">>, ?uint2bin(2)}
+        {?DB_STATS, <<"sizes">>, <<"external">>, ?uint2bin(2)},
+        {?DB_STATS, <<"sizes">>, <<"views">>, ?uint2bin(0)}
     ],
-    lists:foreach(fun({P, K, V}) ->
-        Key = erlfdb_tuple:pack({P, K}, DbPrefix),
-        erlfdb:set(Tx, Key, V)
+    lists:foreach(fun
+        ({P, K, V}) ->
+            Key = erlfdb_tuple:pack({P, K}, DbPrefix),
+            erlfdb:set(Tx, Key, V);
+        ({P, S, K, V}) ->
+            Key = erlfdb_tuple:pack({P, S, K}, DbPrefix),
+            erlfdb:set(Tx, Key, V)
     end, Defaults),
 
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
@@ -348,26 +353,21 @@ get_info(#{} = Db) ->
     end,
     CProp = {update_seq, RawSeq},
 
-    MProps = lists:flatmap(fun({K, V}) ->
+    MProps = lists:foldl(fun({K, V}, Acc) ->
         case erlfdb_tuple:unpack(K, DbPrefix) of
             {?DB_STATS, <<"doc_count">>} ->
-                [{doc_count, ?bin2uint(V)}];
+                [{doc_count, ?bin2uint(V)} | Acc];
             {?DB_STATS, <<"doc_del_count">>} ->
-                [{doc_del_count, ?bin2uint(V)}];
-            {?DB_STATS, <<"size">>} ->
+                [{doc_del_count, ?bin2uint(V)} | Acc];
+            {?DB_STATS, <<"sizes">>, Name} ->
                 Val = ?bin2uint(V),
-                [
-                    {other, {[{data_size, Val}]}},
-                    {sizes, {[
-                        {active, 0},
-                        {external, Val},
-                        {file, 0}
-                    ]}}
-                ];
+                {_, {Sizes}} = lists:keyfind(sizes, 1, Acc),
+                NewSizes = lists:keystore(Name, 1, Sizes, {Name, Val}),
+                lists:keystore(sizes, 1, Acc, {sizes, {NewSizes}});
             {?DB_STATS, _} ->
-                []
+                Acc
         end
-    end, erlfdb:wait(MetaFuture)),
+    end, [{sizes, {[]}}], erlfdb:wait(MetaFuture)),
 
     [CProp | MProps].
 
