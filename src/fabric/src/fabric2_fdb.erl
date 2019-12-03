@@ -29,6 +29,8 @@
     list_dbs/4,
 
     get_info/1,
+    get_info_future/2,
+    get_info_wait/1,
     set_config/3,
 
     get_stat/2,
@@ -333,7 +335,10 @@ get_info(#{} = Db) ->
         tx := Tx,
         db_prefix := DbPrefix
     } = ensure_current(Db),
+    get_info_wait(get_info_future(Tx, DbPrefix)).
 
+
+get_info_future(Tx, DbPrefix) ->
     {CStart, CEnd} = erlfdb_tuple:range({?DB_CHANGES}, DbPrefix),
     ChangesFuture = erlfdb:get_range(Tx, CStart, CEnd, [
         {streaming_mode, exact},
@@ -344,6 +349,10 @@ get_info(#{} = Db) ->
     StatsPrefix = erlfdb_tuple:pack({?DB_STATS}, DbPrefix),
     MetaFuture = erlfdb:get_range_startswith(Tx, StatsPrefix),
 
+    {DbPrefix, ChangesFuture, MetaFuture}.
+
+
+get_info_wait({DbPrefix, ChangesFuture, MetaFuture}) ->
     RawSeq = case erlfdb:wait(ChangesFuture) of
         [] ->
             vs_to_seq(fabric2_util:seq_zero_vs());
