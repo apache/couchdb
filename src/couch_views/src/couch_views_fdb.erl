@@ -272,8 +272,16 @@ update_kv_size(TxDb, Sig, ViewId, Increment) ->
         tx := Tx,
         db_prefix := DbPrefix
     } = TxDb,
-    Key = kv_size_key(DbPrefix, Sig, ViewId),
-    erlfdb:add(Tx, Key, Increment).
+
+    % Track a view specific size for calls to
+    % GET /dbname/_design/doc/_info`
+    IdxKey = kv_size_key(DbPrefix, Sig, ViewId),
+    erlfdb:add(Tx, IdxKey, Increment),
+
+    % Track a database level rollup for calls to
+    % GET /dbname
+    DbKey = db_kv_size_key(DbPrefix),
+    erlfdb:add(Tx, DbKey, Increment).
 
 
 seq_key(DbPrefix, Sig) ->
@@ -288,6 +296,11 @@ row_count_key(DbPrefix, Sig, ViewId) ->
 
 kv_size_key(DbPrefix, Sig, ViewId) ->
     Key = {?DB_VIEWS, Sig, ?VIEW_ID_INFO, ViewId, ?VIEW_KV_SIZE},
+    erlfdb_tuple:pack(Key, DbPrefix).
+
+
+db_kv_size_key(DbPrefix) ->
+    Key = {?DB_STATS, <<"sizes">>, <<"views">>},
     erlfdb_tuple:pack(Key, DbPrefix).
 
 
