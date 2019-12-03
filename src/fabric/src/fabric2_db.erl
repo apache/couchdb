@@ -22,6 +22,10 @@
     list_dbs/1,
     list_dbs/3,
 
+    list_dbs_info/0,
+    list_dbs_info/1,
+    list_dbs_info/3,
+
     check_is_admin/1,
     check_is_member/1,
 
@@ -238,6 +242,46 @@ list_dbs(UserFun, UserAcc0, Options) ->
     end).
 
 
+list_dbs_info() ->
+    list_dbs_info([]).
+
+
+list_dbs_info(Options) ->
+    Callback = fun(Value, Acc) ->
+        NewAcc = case Value of
+            {meta, _} -> Acc;
+            {row, DbInfo} -> [DbInfo | Acc];
+            complete -> Acc
+        end,
+        {ok, NewAcc}
+    end,
+    {ok, DbInfos} = list_dbs_info(Callback, [], Options),
+    {ok, lists:reverse(DbInfos)}.
+
+
+list_dbs_info(UserFun, UserAcc0, Options) ->
+    FoldFun = fun(DbName, InfoFuture, {FutureQ, Count, Acc}) ->
+        NewFutureQ = queue:in({DbName, InfoFuture}, FutureQ),
+        drain_info_futures(NewFutureQ, Count + 1, UserFun, Acc)
+    end,
+    fabric2_fdb:transactional(fun(Tx) ->
+        try
+            UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
+            InitAcc = {queue:new(), 0, UserAcc1},
+            {FinalFutureQ, _, UserAcc2} = fabric2_fdb:list_dbs_info(
+                    Tx,
+                    FoldFun,
+                    InitAcc,
+                    Options
+                ),
+            UserAcc3 = drain_all_info_futures(FinalFutureQ, UserFun, UserAcc2),
+            {ok, maybe_stop(UserFun(complete, UserAcc3))}
+        catch throw:{stop, FinalUserAcc} ->
+            {ok, FinalUserAcc}
+        end
+    end).
+
+
 is_admin(Db, {SecProps}) when is_list(SecProps) ->
     case fabric2_db_plugin:check_is_admin(Db) of
         true ->
@@ -313,21 +357,7 @@ get_db_info(#{} = Db) ->
     DbProps = fabric2_fdb:transactional(Db, fun(TxDb) ->
         fabric2_fdb:get_info(TxDb)
     end),
-
-    BaseProps = [
-        {cluster, {[{n, 0}, {q, 0}, {r, 0}, {w, 0}]}},
-        {compact_running, false},
-        {data_size, 0},
-        {db_name, name(Db)},
-        {disk_format_version, 0},
-        {disk_size, 0},
-        {instance_start_time, <<"0">>},
-        {purge_seq, 0}
-    ],
-
-    {ok, lists:foldl(fun({Key, Val}, Acc) ->
-        lists:keystore(Key, 1, Acc, {Key, Val})
-    end, BaseProps, DbProps)}.
+    {ok, make_db_info(name(Db), DbProps)}.
 
 
 get_del_doc_count(#{} = Db) ->
@@ -942,6 +972,46 @@ maybe_add_sys_db_callbacks(Db) ->
         before_doc_update := BDU,
         after_doc_read := ADR
     }.
+
+
+make_db_info(DbName, Props) ->
+    BaseProps = [
+        {cluster, {[{n, 0}, {q, 0}, {r, 0}, {w, 0}]}},
+        {compact_running, false},
+        {data_size, 0},
+        {db_name, DbName},
+        {disk_format_version, 0},
+        {disk_size, 0},
+        {instance_start_time, <<"0">>},
+        {purge_seq, 0}
+    ],
+
+    lists:foldl(fun({Key, Val}, Acc) ->
+        lists:keystore(Key, 1, Acc, {Key, Val})
+    end, BaseProps, Props).
+
+
+drain_info_futures(FutureQ, Count, _UserFun, Acc) when Count < 100 ->
+    {FutureQ, Count, Acc};
+
+drain_info_futures(FutureQ, Count, UserFun, Acc) when Count >= 100 ->
+    {{value, {DbName, Future}}, RestQ} = queue:out(FutureQ),
+    InfoProps = fabric2_fdb:get_info_wait(Future),
+    DbInfo = make_db_info(DbName, InfoProps),
+    NewAcc = maybe_stop(UserFun({row, DbInfo}, Acc)),
+    {RestQ, Count - 1, NewAcc}.
+
+
+drain_all_info_futures(FutureQ, UserFun, Acc) ->
+    case queue:out(FutureQ) of
+        {{value, {DbName, Future}}, RestQ} ->
+            InfoProps = fabric2_fdb:get_info_wait(Future),
+            DbInfo = make_db_info(DbName, InfoProps),
+            NewAcc = maybe_stop(UserFun({row, DbInfo}, Acc)),
+            drain_all_info_futures(RestQ, UserFun, NewAcc);
+        {empty, _} ->
+            Acc
+    end.
 
 
 new_revid(Db, Doc) ->
