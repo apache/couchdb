@@ -15,9 +15,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
-
-
--define(TDEF(A), {atom_to_list(A), fun A/0}).
+-include("fabric2_test.hrl").
 
 
 crud_test_() ->
@@ -27,24 +25,24 @@ crud_test_() ->
             setup,
             fun() -> test_util:start_couch([fabric]) end,
             fun test_util:stop_couch/1,
-            [
+            with([
                 ?TDEF(create_db),
                 ?TDEF(open_db),
                 ?TDEF(delete_db),
                 ?TDEF(list_dbs)
-            ]
+            ])
         }
     }.
 
 
-create_db() ->
+create_db(_) ->
     DbName = ?tempdb(),
     ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
     ?assertEqual(true, ets:member(fabric2_server, DbName)),
     ?assertEqual({error, file_exists}, fabric2_db:create(DbName, [])).
 
 
-open_db() ->
+open_db(_) ->
     DbName = ?tempdb(),
     ?assertError(database_does_not_exist, fabric2_db:open(DbName, [])),
 
@@ -59,7 +57,7 @@ open_db() ->
     ?assertMatch({ok, _}, fabric2_db:open(DbName, [])).
 
 
-delete_db() ->
+delete_db(_) ->
     DbName = ?tempdb(),
     ?assertError(database_does_not_exist, fabric2_db:delete(DbName, [])),
 
@@ -72,7 +70,7 @@ delete_db() ->
     ?assertError(database_does_not_exist, fabric2_db:open(DbName, [])).
 
 
-list_dbs() ->
+list_dbs(_) ->
     DbName = ?tempdb(),
     AllDbs1 = fabric2_db:list_dbs(),
 

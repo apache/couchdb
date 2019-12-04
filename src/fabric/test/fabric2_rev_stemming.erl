@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2_test.hrl").
 
 
 doc_crud_test_() ->
@@ -25,16 +26,16 @@ doc_crud_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun update_doc/1,
-                fun update_doc_replicated_no_stemming/1,
-                fun update_doc_replicated_with_stemming/1,
-                fun update_doc_replicate_existing_rev/1,
-                fun update_winning_conflict_branch/1,
-                fun update_non_winning_conflict_branch/1,
-                fun delete_doc_basic/1,
-                fun recreate_doc_basic/1
-            ]}
+            with([
+                ?TDEF(update_doc),
+                ?TDEF(update_doc_replicated_no_stemming),
+                ?TDEF(update_doc_replicated_with_stemming),
+                ?TDEF(update_doc_replicate_existing_rev),
+                ?TDEF(update_winning_conflict_branch),
+                ?TDEF(update_non_winning_conflict_branch),
+                ?TDEF(delete_doc_basic),
+                ?TDEF(recreate_doc_basic)
+            ])
         }
     }.
 
@@ -192,7 +193,7 @@ recreate_doc_basic({Db, _}) ->
         deleted = true,
         body = {[{<<"state">>, 2}]}
     },
-    {ok, {2, Rev2}} = fabric2_db:update_doc(Db, Doc2),
+    {ok, {2, _Rev2}} = fabric2_db:update_doc(Db, Doc2),
     Doc3 = Doc1#doc{
         revs = {0, []},
         deleted = false,

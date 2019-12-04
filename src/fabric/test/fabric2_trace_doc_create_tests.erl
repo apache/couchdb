@@ -16,20 +16,21 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2_test.hrl").
 
 
-doc_crud_test_() ->
+trace_doc_create_test_() ->
     {
         "Test document CRUD operations",
         {
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun create_new_doc/1,
-                fun create_two_docs/1,
-                fun create_50_docs/1
-            ]}
+            with([
+                ?TDEF(create_new_doc),
+                ?TDEF(create_two_docs),
+                ?TDEF(create_50_docs)
+            ])
         }
     }.
 

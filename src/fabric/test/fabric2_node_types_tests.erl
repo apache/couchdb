@@ -14,15 +14,13 @@
 
 
 -include_lib("eunit/include/eunit.hrl").
-
-
--define(TDEF(A), {atom_to_list(A), fun A/0}).
+-include("fabric2_test.hrl").
 
 
 node_types_test_() ->
     {
         "Test node types",
-        foreach,
+        setup,
         fun() ->
             os:putenv("COUCHDB_NODE_TYPE_FOO", "false"),
             os:putenv("COUCHDB_NODE_TYPE_BAZ", "true"),
@@ -30,26 +28,23 @@ node_types_test_() ->
             % erlfdb, rexi and mem3 are all dependent apps for fabric. We make
             % sure to start them so when fabric is started during the test it
             % already has its dependencies
-            test_util:start_couch([erlfdb, rexi, mem3, ctrace])
+            test_util:start_couch([erlfdb, rexi, mem3, ctrace, fabric])
         end,
         fun(Ctx) ->
-            ok = application:stop(fabric),
             test_util:stop_couch(Ctx),
             application:unset_env(fabric, node_types),
             os:unsetenv("COUCHDB_NODE_TYPE_FOO"),
             os:unsetenv("COUCHDB_NODE_TYPE_BAZ"),
             os:unsetenv("COUCHDB_NODE_TYPE_ZIG")
         end,
-        [
+        with([
             ?TDEF(basics),
             ?TDEF(os_env_priority)
-        ]
+        ])
     }.
 
 
-basics() ->
-    ok = application:start(fabric),
-
+basics(_) ->
     % default is true for new types
     ?assert(fabric2_node_types:is_type(some_new_node_type)),
 
@@ -64,9 +59,7 @@ basics() ->
     ?assert(not fabric2_node_types:is_type(bam)).
 
 
-os_env_priority() ->
-    ok = application:start(fabric),
-
+os_env_priority(_) ->
     % os env takes precedence
     application:set_env(fabric, node_types, [{foo, true}, {baz, false}]),
     ?assert(not fabric2_node_types:is_type(foo)),

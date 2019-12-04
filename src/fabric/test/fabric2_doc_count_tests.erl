@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2_test.hrl").
 
 
 -define(DOC_COUNT, 10).
@@ -28,12 +29,12 @@ doc_count_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun normal_docs/1,
-                fun replicated_docs/1,
-                fun design_docs/1,
-                fun local_docs/1
-            ]}
+            with([
+                ?TDEF(normal_docs),
+                ?TDEF(replicated_docs),
+                ?TDEF(design_docs),
+                ?TDEF(local_docs)
+            ])
         }
     }.
 
