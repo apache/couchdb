@@ -884,11 +884,12 @@ local_doc_with_previous_encoding({Db, _}) ->
     ?assertEqual(NewBody, Doc3#doc.body),
 
     % Old doc now has only the rev number in it
-    OldDocBin = fabric2_fdb:transactional(Db, fun(TxDb) ->
+    <<255, OldDocBin/binary>> = fabric2_fdb:transactional(Db, fun(TxDb) ->
         #{tx := Tx} = TxDb,
         erlfdb:wait(erlfdb:get(Tx, Key))
     end),
-    ?assertEqual(<<"2">> , OldDocBin).
+    Unpacked = erlfdb_tuple:unpack(OldDocBin),
+    ?assertMatch({?CURR_LDOC_FORMAT, <<"2">>, _}, Unpacked).
 
 
 before_doc_update_skips_local_docs({Db0, _}) ->

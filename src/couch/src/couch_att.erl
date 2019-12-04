@@ -27,6 +27,7 @@
 ]).
 
 -export([
+    external_size/1,
     size_info/1,
     to_disk_term/1,
     from_disk_term/3
@@ -175,6 +176,20 @@ merge_stubs([Att | Rest], OnDisk, Merged) ->
     end;
 merge_stubs([], _, Merged) ->
     {ok, lists:reverse(Merged)}.
+
+
+external_size(Att) ->
+    NameSize = size(fetch(name, Att)),
+    TypeSize = case fetch(type, Att) of
+        undefined -> 0;
+        Type -> size(Type)
+    end,
+    AttSize = fetch(att_len, Att),
+    Md5Size = case fetch(md5, Att) of
+        undefined -> 0;
+        Md5 -> size(Md5)
+    end,
+    NameSize + TypeSize + AttSize + Md5Size.
 
 
 size_info([]) ->
