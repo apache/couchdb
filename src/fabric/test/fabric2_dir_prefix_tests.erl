@@ -15,34 +15,34 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
-
-
--define(TDEF(A), {atom_to_list(A), fun A/0}).
+-include("fabric2_test.hrl").
 
 
 dir_prefix_test_() ->
     {
         "Test couchdb fdb directory prefix",
-        foreach,
+        setup,
         fun() ->
             % erlfdb, rexi and mem3 are all dependent apps for fabric. We make
             % sure to start them so when fabric is started during the test it
             % already has its dependencies
-            test_util:start_couch([erlfdb, rexi, mem3, ctrace])
+            test_util:start_couch([erlfdb, rexi, mem3, ctrace, fabric])
         end,
         fun(Ctx) ->
             config:delete("fabric", "fdb_directory"),
-            ok = application:stop(fabric),
             test_util:stop_couch(Ctx)
         end,
-        [
+        with([
             ?TDEF(default_prefix),
             ?TDEF(custom_prefix)
-        ]
+        ])
     }.
 
 
-default_prefix() ->
+default_prefix(_) ->
+    erase(fdb_directory),
+    ok = config:delete("fabric", "fdb_directory", false),
+    ok = application:stop(fabric),
     ok = application:start(fabric),
 
     ?assertEqual([<<"couchdb">>], fabric2_server:fdb_directory()),
@@ -55,8 +55,10 @@ default_prefix() ->
     ?assertMatch({ok, _}, fabric2_db:create(DbName, [])).
 
 
-custom_prefix() ->
-    ok = config:set("fabric", "fdb_directory", "couchdb_foo"),
+custom_prefix(_) ->
+    erase(fdb_directory),
+    ok = config:set("fabric", "fdb_directory", "couchdb_foo", false),
+    ok = application:stop(fabric),
     ok = application:start(fabric),
 
     ?assertEqual([<<"couchdb_foo">>], fabric2_server:fdb_directory()),

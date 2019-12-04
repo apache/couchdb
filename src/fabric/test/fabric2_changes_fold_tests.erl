@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2_test.hrl").
 
 
 -define(DOC_COUNT, 25).
@@ -28,14 +29,14 @@ changes_fold_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun fold_changes_basic/1,
-                fun fold_changes_since_now/1,
-                fun fold_changes_since_seq/1,
-                fun fold_changes_basic_rev/1,
-                fun fold_changes_since_now_rev/1,
-                fun fold_changes_since_seq_rev/1
-            ]}
+            with([
+                ?TDEF(fold_changes_basic),
+                ?TDEF(fold_changes_since_now),
+                ?TDEF(fold_changes_since_seq),
+                ?TDEF(fold_changes_basic_rev),
+                ?TDEF(fold_changes_since_now_rev),
+                ?TDEF(fold_changes_since_seq_rev)
+            ])
         }
     }.
 

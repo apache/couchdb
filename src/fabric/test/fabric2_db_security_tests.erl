@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2_test.hrl").
 
 
 security_test_() ->
@@ -25,22 +26,22 @@ security_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun check_is_admin/1,
-                fun check_is_not_admin/1,
-                fun check_is_admin_role/1,
-                fun check_is_not_admin_role/1,
-                fun check_is_member_name/1,
-                fun check_is_not_member_name/1,
-                fun check_is_member_role/1,
-                fun check_is_not_member_role/1,
-                fun check_admin_is_member/1,
-                fun check_is_member_of_public_db/1,
-                fun check_set_user_ctx/1,
-                fun check_forbidden/1,
-                fun check_fail_no_opts/1,
-                fun check_fail_name_null/1
-            ]}
+            with([
+                ?TDEF(check_is_admin),
+                ?TDEF(check_is_not_admin),
+                ?TDEF(check_is_admin_role),
+                ?TDEF(check_is_not_admin_role),
+                ?TDEF(check_is_member_name),
+                ?TDEF(check_is_not_member_name),
+                ?TDEF(check_is_member_role),
+                ?TDEF(check_is_not_member_role),
+                ?TDEF(check_admin_is_member),
+                ?TDEF(check_is_member_of_public_db),
+                ?TDEF(check_set_user_ctx),
+                ?TDEF(check_forbidden),
+                ?TDEF(check_fail_no_opts),
+                ?TDEF(check_fail_name_null)
+            ])
         }
     }.
 

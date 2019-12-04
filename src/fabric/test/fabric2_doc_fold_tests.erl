@@ -16,20 +16,11 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2_test.hrl").
 
 
 -define(DOC_COUNT, 50).
 
-%% eunit implementation of {with, Tests} doesn't detect test name correctly
-with(Tests) ->
-  fun(ArgsTuple) ->
-      [{Name, ?_test(Fun(ArgsTuple))} || {Name, Fun} <- Tests]
-      ++
-      [{Name, {timeout, Timeout, ?_test(Fun(ArgsTuple))}} || {Name, Timeout, Fun} <- Tests]
-  end.
-
--define(NAMED(A), {atom_to_list(A), fun A/1}).
--define(WITH_TIMEOUT(Timeout, A), {atom_to_list(A), Timeout, fun A/1}).
 
 doc_fold_test_() ->
     {
@@ -39,15 +30,15 @@ doc_fold_test_() ->
             fun setup/0,
             fun cleanup/1,
             with([
-                ?NAMED(fold_docs_basic),
-                ?NAMED(fold_docs_rev),
-                ?NAMED(fold_docs_with_start_key),
-                ?NAMED(fold_docs_with_end_key),
-                ?NAMED(fold_docs_with_both_keys_the_same),
-                ?WITH_TIMEOUT(10000, fold_docs_with_different_keys),
-                ?NAMED(fold_docs_with_limit),
-                ?NAMED(fold_docs_with_skip),
-                ?NAMED(fold_docs_with_skip_and_limit)
+                ?TDEF(fold_docs_basic),
+                ?TDEF(fold_docs_rev),
+                ?TDEF(fold_docs_with_start_key),
+                ?TDEF(fold_docs_with_end_key),
+                ?TDEF(fold_docs_with_both_keys_the_same),
+                ?TDEF(fold_docs_with_different_keys, 10000),
+                ?TDEF(fold_docs_with_limit),
+                ?TDEF(fold_docs_with_skip),
+                ?TDEF(fold_docs_with_skip_and_limit)
             ])
         }
     }.
