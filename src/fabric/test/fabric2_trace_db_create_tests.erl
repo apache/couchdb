@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2_test.hrl").
 
 
 trace_test_() ->
@@ -25,9 +26,9 @@ trace_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            [
-                fun create_db/0
-            ]
+            with([
+                ?TDEF(create_db)
+            ])
         }
     }.
 
@@ -41,6 +42,6 @@ cleanup(Ctx) ->
     test_util:stop_couch(Ctx).
 
 
-create_db() ->
+create_db(_) ->
     put(erlfdb_trace, <<"create db">>),
     {ok, _Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]).

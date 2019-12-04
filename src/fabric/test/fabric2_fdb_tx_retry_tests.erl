@@ -14,12 +14,26 @@
 
 
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2_test.hrl").
 
 
--define(TDEF(A), {atom_to_list(A), fun A/0}).
+retry_test_() ->
+    {
+        setup,
+        fun setup/0,
+        fun cleanup/1,
+        with([
+            ?TDEF(read_only_no_retry),
+            ?TDEF(read_only_commit_unknown_result),
+            ?TDEF(run_on_first_try),
+            ?TDEF(retry_when_commit_conflict),
+            ?TDEF(retry_when_txid_not_found),
+            ?TDEF(no_retry_when_txid_found)
+        ])
+    }.
 
 
-meck_setup() ->
+setup() ->
     meck:new(erlfdb),
     meck:new(fabric2_txids),
     EnvSt = case application:get_env(fabric, db) of
@@ -30,7 +44,7 @@ meck_setup() ->
     EnvSt.
 
 
-meck_cleanup(EnvSt) ->
+cleanup(EnvSt) ->
     case EnvSt of
         {ok, Db} -> application:set_env(fabric, db, Db);
         undefined -> application:unset_env(fabric, db)
@@ -38,23 +52,7 @@ meck_cleanup(EnvSt) ->
     meck:unload().
 
 
-retry_test_() ->
-    {
-        foreach,
-        fun meck_setup/0,
-        fun meck_cleanup/1,
-        [
-            ?TDEF(read_only_no_retry),
-            ?TDEF(read_only_commit_unknown_result),
-            ?TDEF(run_on_first_try),
-            ?TDEF(retry_when_commit_conflict),
-            ?TDEF(retry_when_txid_not_found),
-            ?TDEF(no_retry_when_txid_found)
-        ]
-    }.
-
-
-read_only_no_retry() ->
+read_only_no_retry(_) ->
     meck:expect(erlfdb, transactional, fun(_Db, UserFun) ->
         UserFun(not_a_real_transaction)
     end),
@@ -72,7 +70,7 @@ read_only_no_retry() ->
     ?assert(meck:validate([erlfdb, fabric2_txids])).
 
 
-read_only_commit_unknown_result() ->
+read_only_commit_unknown_result(_) ->
     % Not 100% certain that this would ever actually
     % happen in the wild but might as well test that
     % we don't blow up if it does.
@@ -93,7 +91,7 @@ read_only_commit_unknown_result() ->
     ?assert(meck:validate([erlfdb, fabric2_txids])).
 
 
-run_on_first_try() ->
+run_on_first_try(_) ->
     meck:expect(erlfdb, transactional, fun(_Db, UserFun) ->
         UserFun(not_a_real_transaction)
     end),
@@ -113,7 +111,7 @@ run_on_first_try() ->
     ?assert(meck:validate([erlfdb, fabric2_txids])).
 
 
-retry_when_commit_conflict() ->
+retry_when_commit_conflict(_) ->
     meck:expect(erlfdb, transactional, fun(_Db, UserFun) ->
         UserFun(not_a_real_transaction)
     end),
@@ -133,7 +131,7 @@ retry_when_commit_conflict() ->
     ?assert(meck:validate([erlfdb, fabric2_txids])).
 
 
-retry_when_txid_not_found() ->
+retry_when_txid_not_found(_) ->
     meck:expect(erlfdb, transactional, fun(_Db, UserFun) ->
         UserFun(not_a_real_transaction)
     end),
@@ -157,7 +155,7 @@ retry_when_txid_not_found() ->
     ?assert(meck:validate([erlfdb, fabric2_txids])).
 
 
-no_retry_when_txid_found() ->
+no_retry_when_txid_found(_) ->
     meck:expect(erlfdb, transactional, fun(_Db, UserFun) ->
         UserFun(not_a_real_transaction)
     end),

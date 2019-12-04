@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include("fabric2_test.hrl").
 
 
 trace_test_() ->
@@ -25,9 +26,9 @@ trace_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun delete_db/1
-            ]}
+            with([
+                ?TDEF(delete_db)
+            ])
         }
     }.
 
