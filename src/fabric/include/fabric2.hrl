@@ -45,8 +45,13 @@
 
 % 0 - Initial implementation
 % 1 - Added attachment hash
+% 2 - Added size information
 
--define(CURR_REV_FORMAT, 1).
+-define(CURR_REV_FORMAT, 2).
+
+% 0 - Adding local doc versions
+
+-define(CURR_LDOC_FORMAT, 0).
 
 % Misc constants
 
