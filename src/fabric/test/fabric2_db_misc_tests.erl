@@ -17,9 +17,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2.hrl").
-
-
--define(TDEF(A), {atom_to_list(A), fun A/1}).
+-include("fabric2_test.hrl").
 
 
 misc_test_() ->
@@ -29,16 +27,16 @@ misc_test_() ->
             setup,
             fun setup/0,
             fun cleanup/1,
-            {with, [
-                fun empty_db_info/1,
-                fun accessors/1,
-                fun set_revs_limit/1,
-                fun set_security/1,
-                fun is_system_db/1,
-                fun ensure_full_commit/1,
-                fun metadata_bump/1,
-                fun db_version_bump/1
-            ]}
+            with([
+                ?TDEF(empty_db_info),
+                ?TDEF(accessors),
+                ?TDEF(set_revs_limit),
+                ?TDEF(set_security),
+                ?TDEF(is_system_db),
+                ?TDEF(ensure_full_commit),
+                ?TDEF(metadata_bump),
+                ?TDEF(db_version_bump)
+            ])
         }
     }.
 
