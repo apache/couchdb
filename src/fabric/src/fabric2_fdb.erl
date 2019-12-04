@@ -36,6 +36,7 @@
 
     get_stat/2,
     incr_stat/3,
+    incr_stat/4,
 
     get_all_revs/2,
     get_winning_revs/3,
@@ -471,6 +472,19 @@ incr_stat(#{} = Db, StatKey, Increment) when is_integer(Increment) ->
     erlfdb:add(Tx, Key, Increment).
 
 
+incr_stat(_Db, _Section, _Key, 0) ->
+    ok;
+
+incr_stat(#{} = Db, Section, Key, Increment) when is_integer(Increment) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = ensure_current(Db),
+
+    BinKey = erlfdb_tuple:pack({?DB_STATS, Section, Key}, DbPrefix),
+    erlfdb:add(Tx, BinKey, Increment).
+
+
 get_all_revs(#{} = Db, DocId) ->
     #{
         tx := Tx,
@@ -590,6 +604,15 @@ get_local_doc(#{} = Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
 
 get_local_doc_rev(_Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, Val) ->
     case Val of
+        <<255, RevBin/binary>> ->
+            % Versioned local docs
+            try
+                case erlfdb_tuple:unpack(RevBin) of
+                    {?CURR_LDOC_FORMAT, Rev, _Size} -> Rev
+                end
+            catch _:_ ->
+                erlang:error({invalid_local_doc_rev, DocId, Val})
+            end;
         <<131, _/binary>> ->
             % Compatibility clause for an older encoding format
             try binary_to_term(Val, [safe]) of
@@ -656,7 +679,9 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
 
     % Revision tree
 
-    NewWinner = NewWinner0#{winner := true},
+    NewWinner = NewWinner0#{
+        winner := true
+    },
     NewRevId = maps:get(rev_id, NewWinner),
 
     {WKey, WVal, WinnerVS} = revinfo_to_fdb(Tx, DbPrefix, DocId, NewWinner),
@@ -718,7 +743,7 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     NewSeqVal = erlfdb_tuple:pack({DocId, Deleted, NewRevId}),
     erlfdb:set_versionstamped_key(Tx, NewSeqKey, NewSeqVal),
 
-    % And all the rest...
+    % Bump db version on design doc changes
 
     IsDDoc = case Doc#doc.id of
         <<?DESIGN_DOC_PREFIX, _/binary>> -> true;
@@ -728,6 +753,8 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     if not IsDDoc -> ok; true ->
         bump_db_version(Db)
     end,
+
+    % Update our document counts
 
     case UpdateStatus of
         created ->
@@ -755,6 +782,11 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
             ok
     end,
 
+    % Update database size
+    AddSize = sum_add_rev_sizes([NewWinner | ToUpdate]),
+    RemSize = sum_rem_rev_sizes(ToRemove),
+    incr_stat(Db, <<"sizes">>, <<"external">>, AddSize - RemSize),
+
     ok.
 
 
@@ -766,11 +798,18 @@ write_local_doc(#{} = Db0, Doc) ->
 
     Id = Doc#doc.id,
 
-    {LDocKey, LDocVal, Rows} = local_doc_to_fdb(Db, Doc),
+    {LDocKey, LDocVal, NewSize, Rows} = local_doc_to_fdb(Db, Doc),
 
-    WasDeleted = case erlfdb:wait(erlfdb:get(Tx, LDocKey)) of
-        <<_/binary>> -> false;
-        not_found -> true
+    {WasDeleted, PrevSize} = case erlfdb:wait(erlfdb:get(Tx, LDocKey)) of
+        <<255, RevBin/binary>> ->
+            case erlfdb_tuple:unpack(RevBin) of
+                {?CURR_LDOC_FORMAT, _Rev, Size} ->
+                    {false, Size}
+            end;
+        <<_/binary>> ->
+            {false, 0};
+        not_found ->
+            {true, 0}
     end,
 
     BPrefix = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, Id}, DbPrefix),
@@ -795,6 +834,8 @@ write_local_doc(#{} = Db0, Doc) ->
         _ ->
             ok
     end,
+
+    incr_stat(Db, <<"sizes">>, <<"external">>, NewSize - PrevSize),
 
     ok.
 
@@ -1086,9 +1127,10 @@ write_doc_body(#{} = Db0, #doc{} = Doc) ->
         tx := Tx
     } = Db = ensure_current(Db0),
 
+    Rows = doc_to_fdb(Db, Doc),
     lists:foreach(fun({Key, Value}) ->
         ok = erlfdb:set(Tx, Key, Value)
-    end, doc_to_fdb(Db, Doc)).
+    end, Rows).
 
 
 clear_doc_body(_Db, _DocId, not_found) ->
@@ -1164,7 +1206,8 @@ revinfo_to_fdb(Tx, DbPrefix, DocId, #{winner := true} = RevId) ->
         rev_id := {RevPos, Rev},
         rev_path := RevPath,
         branch_count := BranchCount,
-        att_hash := AttHash
+        att_hash := AttHash,
+        rev_size := RevSize
     } = RevId,
     VS = new_versionstamp(Tx),
     Key = {?DB_REVS, DocId, not Deleted, RevPos, Rev},
@@ -1173,7 +1216,8 @@ revinfo_to_fdb(Tx, DbPrefix, DocId, #{winner := true} = RevId) ->
         VS,
         BranchCount,
         list_to_tuple(RevPath),
-        AttHash
+        AttHash,
+        RevSize
     },
     KBin = erlfdb_tuple:pack(Key, DbPrefix),
     VBin = erlfdb_tuple:pack_vs(Val),
@@ -1184,39 +1228,44 @@ revinfo_to_fdb(_Tx, DbPrefix, DocId, #{} = RevId) ->
         deleted := Deleted,
         rev_id := {RevPos, Rev},
         rev_path := RevPath,
-        att_hash := AttHash
+        att_hash := AttHash,
+        rev_size := RevSize
     } = RevId,
     Key = {?DB_REVS, DocId, not Deleted, RevPos, Rev},
-    Val = {?CURR_REV_FORMAT, list_to_tuple(RevPath), AttHash},
+    Val = {?CURR_REV_FORMAT, list_to_tuple(RevPath), AttHash, RevSize},
     KBin = erlfdb_tuple:pack(Key, DbPrefix),
     VBin = erlfdb_tuple:pack(Val),
     {KBin, VBin, undefined}.
 
 
-fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _, _} = Val) ->
+fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _, _, _} = Val) ->
     {?DB_REVS, _DocId, NotDeleted, RevPos, Rev} = Key,
-    {_RevFormat, Sequence, BranchCount, RevPath, AttHash} = Val,
+    {_RevFormat, Sequence, BranchCount, RevPath, AttHash, RevSize} = Val,
     #{
         winner => true,
+        exists => true,
         deleted => not NotDeleted,
         rev_id => {RevPos, Rev},
         rev_path => tuple_to_list(RevPath),
         sequence => Sequence,
         branch_count => BranchCount,
-        att_hash => AttHash
+        att_hash => AttHash,
+        rev_size => RevSize
     };
 
-fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _} = Val)  ->
+fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _} = Val)  ->
     {?DB_REVS, _DocId, NotDeleted, RevPos, Rev} = Key,
-    {_RevFormat, RevPath, AttHash} = Val,
+    {_RevFormat, RevPath, AttHash, RevSize} = Val,
     #{
         winner => false,
+        exists => true,
         deleted => not NotDeleted,
         rev_id => {RevPos, Rev},
         rev_path => tuple_to_list(RevPath),
         sequence => undefined,
         branch_count => undefined,
-        att_hash => AttHash
+        att_hash => AttHash,
+        rev_size => RevSize
     };
 
 fdb_to_revinfo(Key, {0, Seq, BCount, RPath}) ->
@@ -1225,6 +1274,14 @@ fdb_to_revinfo(Key, {0, Seq, BCount, RPath}) ->
 
 fdb_to_revinfo(Key, {0, RPath}) ->
     Val = {?CURR_REV_FORMAT, RPath, <<>>},
+    fdb_to_revinfo(Key, Val);
+
+fdb_to_revinfo(Key, {1, Seq, BCount, RPath, AttHash}) ->
+    Val = {?CURR_REV_FORMAT, Seq, BCount, RPath, AttHash, 0},
+    fdb_to_revinfo(Key, Val);
+
+fdb_to_revinfo(Key, {1, RPath, AttHash}) ->
+    Val = {?CURR_REV_FORMAT, RPath, AttHash, 0},
     fdb_to_revinfo(Key, Val).
 
 
@@ -1244,11 +1301,13 @@ doc_to_fdb(Db, #doc{} = Doc) ->
     DiskAtts = lists:map(fun couch_att:to_disk_term/1, Atts),
 
     Value = term_to_binary({Body, DiskAtts, Deleted}, [{minor_version, 1}]),
+    Chunks = chunkify_binary(Value),
 
     {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
         Key = erlfdb_tuple:pack({?DB_DOCS, Id, Start, Rev, ChunkId}, DbPrefix),
         {{Key, Chunk}, ChunkId + 1}
-    end, 0, chunkify_binary(Value)),
+    end, 0, Chunks),
+
     Rows.
 
 
@@ -1299,8 +1358,17 @@ local_doc_to_fdb(Db, #doc{} = Doc) ->
         {{K, Chunk}, ChunkId + 1}
     end, 0, chunkify_binary(BVal)),
 
-    {Key, StoreRev, Rows}.
+    NewSize = fabric2_util:ldoc_size(Doc),
+    RawValue = erlfdb_tuple:pack({?CURR_LDOC_FORMAT, StoreRev, NewSize}),
 
+    % Prefix our tuple encoding to make upgrades easier
+    Value = <<255, RawValue/binary>>,
+
+    {Key, Value, NewSize, Rows}.
+
+
+fdb_to_local_doc(_Db, _DocId, not_found, []) ->
+    {not_found, missing};
 
 fdb_to_local_doc(_Db, DocId, <<131, _/binary>> = Val, []) ->
     % This is an upgrade clause for the old encoding. We allow reading the old
@@ -1313,18 +1381,48 @@ fdb_to_local_doc(_Db, DocId, <<131, _/binary>> = Val, []) ->
         body = Body
     };
 
-fdb_to_local_doc(_Db, _DocId, not_found, []) ->
-    {not_found, missing};
+fdb_to_local_doc(_Db, DocId, <<255, RevBin/binary>>, Rows) when is_list(Rows) ->
+    Rev = case erlfdb_tuple:unpack(RevBin) of
+        {?CURR_LDOC_FORMAT, Rev0, _Size} -> Rev0
+    end,
 
-fdb_to_local_doc(_Db, DocId, Rev, Rows) when is_list(Rows), is_binary(Rev) ->
     BodyBin = iolist_to_binary(Rows),
     Body = binary_to_term(BodyBin, [safe]),
+
     #doc{
         id = DocId,
         revs = {0, [Rev]},
         deleted = false,
         body = Body
-    }.
+    };
+
+fdb_to_local_doc(Db, DocId, RawRev, Rows) ->
+    BaseRev = erlfdb_tuple:pack({?CURR_LDOC_FORMAT, RawRev, 0}),
+    Rev = <<255, BaseRev/binary>>,
+    fdb_to_local_doc(Db, DocId, Rev, Rows).
+
+
+sum_add_rev_sizes(RevInfos) ->
+    lists:foldl(fun(RI, Acc) ->
+        #{
+            exists := Exists,
+            rev_size := Size
+        } = RI,
+        case Exists of
+            true -> Acc;
+            false -> Size + Acc
+        end
+    end, 0, RevInfos).
+
+
+sum_rem_rev_sizes(RevInfos) ->
+    lists:foldl(fun(RI, Acc) ->
+        #{
+            exists := true,
+            rev_size := Size
+        } = RI,
+        Size + Acc
+    end, 0, RevInfos).
 
 
 chunkify_binary(Data) ->
