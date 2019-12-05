@@ -29,6 +29,7 @@
     parse_int/1,
     parse_pos_int/1,
     prepend_val/1,
+    parse_body_and_query/2,
     parse_body_and_query/3,
     parse_params/2,
     parse_params/3,
@@ -209,7 +210,7 @@ is_public_fields_configured(Db) ->
     end.
 
 do_all_docs_req(Req, Db, Keys, NS) ->
-    Args0 = parse_params(Req, Keys),
+    Args0 = couch_mrview_http:parse_body_and_query(Req, Keys),
     Args1 = set_namespace(NS, Args0),
     ETagFun = fun(Sig, Acc0) ->
         check_view_etag(Sig, Acc0, Req)
@@ -464,6 +465,15 @@ parse_params(Props, Keys, #mrargs{}=Args0, Options) ->
     lists:foldl(fun({K, V}, Acc) ->
         parse_param(K, V, Acc, IsDecoded)
     end, Args1, Props).
+
+
+parse_body_and_query(#httpd{method='POST'} = Req, Keys) ->
+    Props = chttpd:json_body_obj(Req),
+    parse_body_and_query(Req, Props, Keys);
+
+parse_body_and_query(Req, Keys) ->
+    parse_params(chttpd:qs(Req), Keys, #mrargs{keys=Keys, group=undefined,
+        group_level=undefined}, [keep_group_level]).
 
 parse_body_and_query(Req, {Props}, Keys) ->
     Args = #mrargs{keys=Keys, group=undefined, group_level=undefined},
