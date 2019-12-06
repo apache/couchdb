@@ -1341,7 +1341,8 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
 
     #doc{
         deleted = NewDeleted,
-        revs = {NewRevPos, [NewRev | NewRevPath]}
+        revs = {NewRevPos, [NewRev | NewRevPath]},
+        atts = Atts
     } = Doc4 = stem_revisions(Db, Doc3),
 
     NewRevInfo = #{
@@ -1350,7 +1351,8 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
         rev_id => {NewRevPos, NewRev},
         rev_path => NewRevPath,
         sequence => undefined,
-        branch_count => undefined
+        branch_count => undefined,
+        att_hash => fabric2_util:hash_atts(Atts)
     },
 
     % Gather the list of possible winnig revisions
@@ -1405,7 +1407,8 @@ update_doc_replicated(Db, Doc0, _Options) ->
         rev_id => {RevPos, Rev},
         rev_path => RevPath,
         sequence => undefined,
-        branch_count => undefined
+        branch_count => undefined,
+        att_hash => <<>>
     },
 
     AllRevInfos = fabric2_fdb:get_all_revs(Db, DocId),
@@ -1444,6 +1447,9 @@ update_doc_replicated(Db, Doc0, _Options) ->
     PrevRevInfo = find_prev_revinfo(RevPos, LeafPath),
     Doc2 = prep_and_validate(Db, Doc1, PrevRevInfo),
     Doc3 = flush_doc_atts(Db, Doc2),
+    DocRevInfo2 = DocRevInfo1#{
+        atts_hash => fabric2_util:hash_atts(Doc3#doc.atts)
+    },
 
     % Possible winners are the previous winner and
     % the new DocRevInfo
@@ -1453,9 +1459,9 @@ update_doc_replicated(Db, Doc0, _Options) ->
     end,
     {NewWinner0, NonWinner} = case Winner == PrevRevInfo of
         true ->
-            {DocRevInfo1, not_found};
+            {DocRevInfo2, not_found};
         false ->
-            [W, NW] = fabric2_util:sort_revinfos([Winner, DocRevInfo1]),
+            [W, NW] = fabric2_util:sort_revinfos([Winner, DocRevInfo2]),
             {W, NW}
     end,
 
