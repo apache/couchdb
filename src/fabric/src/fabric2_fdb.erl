@@ -580,8 +580,39 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
 
     #doc{
         id = DocId,
-        deleted = Deleted
+        deleted = Deleted,
+        atts = Atts
     } = Doc,
+
+    % Doc body
+
+    ok = write_doc_body(Db, Doc),
+
+    % Attachment bookkeeping
+
+    % If a document's attachments have changed we have to scan
+    % for any attachments that may need to be deleted. The check
+    % for `>= 2` is a bit subtle. The important point is that
+    % one of the revisions will be from the new document so we
+    % have to find at least one more beyond that to assert that
+    % the attachments have not changed.
+    AttHash = fabric2_util:hash_atts(Atts),
+    RevsToCheck = [NewWinner0] ++ ToUpdate ++ ToRemove,
+    AttHashCount = lists:foldl(fun(Att, Count) ->
+        #{att_hash := RevAttHash} = Att,
+        case RevAttHash == AttHash of
+            true -> Count + 1;
+            false -> Count
+        end
+    end, 0, RevsToCheck),
+    if
+        AttHashCount == length(RevsToCheck) ->
+            ok;
+        AttHashCount >= 2 ->
+            ok;
+        true ->
+            cleanup_attachments(Db, DocId, Doc, ToRemove)
+    end,
 
     % Revision tree
 
@@ -648,8 +679,6 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     erlfdb:set_versionstamped_key(Tx, NewSeqKey, NewSeqVal),
 
     % And all the rest...
-
-    ok = write_doc_body(Db, Doc),
 
     IsDDoc = case Doc#doc.id of
         <<?DESIGN_DOC_PREFIX, _/binary>> -> true;
@@ -754,6 +783,9 @@ write_attachment(#{} = Db, DocId, Data) when is_binary(Data) ->
 
     AttId = fabric2_util:uuid(),
     Chunks = chunkify_binary(Data),
+
+    IdKey = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId, AttId}, DbPrefix),
+    ok = erlfdb:set(Tx, IdKey, <<>>),
 
     lists:foldl(fun(Chunk, ChunkId) ->
         AttKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId, ChunkId}, DbPrefix),
@@ -1014,16 +1046,71 @@ clear_doc_body(#{} = Db, DocId, #{} = RevInfo) ->
     ok = erlfdb:clear_range(Tx, StartKey, EndKey).
 
 
+cleanup_attachments(Db, DocId, NewDoc, ToRemove) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = Db,
+
+    RemoveRevs = lists:map(fun(#{rev_id := RevId}) -> RevId end, ToRemove),
+
+    % Gather all known document revisions
+    {ok, DiskDocs} = fabric2_db:open_doc_revs(Db, DocId, all, []),
+    AllDocs = [{ok, NewDoc} | DiskDocs],
+
+    % Get referenced attachment ids
+    ActiveIdSet = lists:foldl(fun({ok, Doc}, Acc) ->
+        #doc{
+            revs = {Pos, [Rev | _]}
+        } = Doc,
+        case lists:member({Pos, Rev}, RemoveRevs) of
+            true ->
+                Acc;
+            false ->
+                lists:foldl(fun(Att, InnerAcc) ->
+                    {loc, _Db, _DocId, AttId} = couch_att:fetch(data, Att),
+                    sets:add_element(AttId, InnerAcc)
+                end, Acc, Doc#doc.atts)
+        end
+    end, sets:new(), AllDocs),
+
+    AttPrefix = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId}, DbPrefix),
+    Options = [{streaming_mode, want_all}],
+    Future = erlfdb:get_range_startswith(Tx, AttPrefix, Options),
+
+    ExistingIdSet = lists:foldl(fun({K, _}, Acc) ->
+        {?DB_ATT_NAMES, DocId, AttId} = erlfdb_tuple:unpack(K, DbPrefix),
+        sets:add_element(AttId, Acc)
+    end, sets:new(), erlfdb:wait(Future)),
+
+    AttsToRemove = sets:subtract(ExistingIdSet, ActiveIdSet),
+
+    lists:foreach(fun(AttId) ->
+        IdKey = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId, AttId}, DbPrefix),
+        erlfdb:clear(Tx, IdKey),
+
+        ChunkKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId}, DbPrefix),
+        erlfdb:clear_range_startswith(Tx, ChunkKey)
+    end, sets:to_list(AttsToRemove)).
+
+
 revinfo_to_fdb(Tx, DbPrefix, DocId, #{winner := true} = RevId) ->
     #{
         deleted := Deleted,
         rev_id := {RevPos, Rev},
         rev_path := RevPath,
-        branch_count := BranchCount
+        branch_count := BranchCount,
+        att_hash := AttHash
     } = RevId,
     VS = new_versionstamp(Tx),
     Key = {?DB_REVS, DocId, not Deleted, RevPos, Rev},
-    Val = {?CURR_REV_FORMAT, VS, BranchCount, list_to_tuple(RevPath)},
+    Val = {
+        ?CURR_REV_FORMAT,
+        VS,
+        BranchCount,
+        list_to_tuple(RevPath),
+        AttHash
+    },
     KBin = erlfdb_tuple:pack(Key, DbPrefix),
     VBin = erlfdb_tuple:pack_vs(Val),
     {KBin, VBin, VS};
@@ -1032,38 +1119,49 @@ revinfo_to_fdb(_Tx, DbPrefix, DocId, #{} = RevId) ->
     #{
         deleted := Deleted,
         rev_id := {RevPos, Rev},
-        rev_path := RevPath
+        rev_path := RevPath,
+        att_hash := AttHash
     } = RevId,
     Key = {?DB_REVS, DocId, not Deleted, RevPos, Rev},
-    Val = {?CURR_REV_FORMAT, list_to_tuple(RevPath)},
+    Val = {?CURR_REV_FORMAT, list_to_tuple(RevPath), AttHash},
     KBin = erlfdb_tuple:pack(Key, DbPrefix),
     VBin = erlfdb_tuple:pack(Val),
     {KBin, VBin, undefined}.
 
 
-fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _} = Val) ->
+fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _, _} = Val) ->
     {?DB_REVS, _DocId, NotDeleted, RevPos, Rev} = Key,
-    {_RevFormat, Sequence, BranchCount, RevPath} = Val,
+    {_RevFormat, Sequence, BranchCount, RevPath, AttHash} = Val,
     #{
         winner => true,
         deleted => not NotDeleted,
         rev_id => {RevPos, Rev},
         rev_path => tuple_to_list(RevPath),
         sequence => Sequence,
-        branch_count => BranchCount
+        branch_count => BranchCount,
+        att_hash => AttHash
     };
 
-fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _} = Val)  ->
+fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _} = Val)  ->
     {?DB_REVS, _DocId, NotDeleted, RevPos, Rev} = Key,
-    {_RevFormat, RevPath} = Val,
+    {_RevFormat, RevPath, AttHash} = Val,
     #{
         winner => false,
         deleted => not NotDeleted,
         rev_id => {RevPos, Rev},
         rev_path => tuple_to_list(RevPath),
         sequence => undefined,
-        branch_count => undefined
-    }.
+        branch_count => undefined,
+        att_hash => AttHash
+    };
+
+fdb_to_revinfo(Key, {0, Seq, BCount, RPath}) ->
+    Val = {?CURR_REV_FORMAT, Seq, BCount, RPath, <<>>},
+    fdb_to_revinfo(Key, Val);
+
+fdb_to_revinfo(Key, {0, RPath}) ->
+    Val = {?CURR_REV_FORMAT, RPath, <<>>},
+    fdb_to_revinfo(Key, Val).
 
 
 doc_to_fdb(Db, #doc{} = Doc) ->

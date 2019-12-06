@@ -25,6 +25,8 @@
 
     validate_security_object/1,
 
+    hash_atts/1,
+
     dbname_ends_with/2,
 
     get_value/2,
@@ -122,6 +124,20 @@ validate_json_list_of_strings(Member, Props) ->
             MemberStr = binary_to_list(Member),
             throw(MemberStr ++ " must be a JSON list of strings")
     end.
+
+
+hash_atts([]) ->
+    <<>>;
+
+hash_atts(Atts) ->
+    SortedAtts = lists:sort(fun(A, B) ->
+        couch_att:fetch(name, A) =< couch_att:fetch(name, B)
+    end, Atts),
+    Md5St = lists:foldl(fun(Att, Acc) ->
+        {loc, _Db, _DocId, AttId} = couch_att:fetch(data, Att),
+        couch_hash:md5_hash_update(Acc, AttId)
+    end, couch_hash:md5_hash_init(), SortedAtts),
+    couch_hash:md5_hash_final(Md5St).
 
 
 dbname_ends_with(#{} = Db, Suffix) ->
