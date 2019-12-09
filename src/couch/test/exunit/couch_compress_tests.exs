@@ -2,10 +2,6 @@ defmodule Couch.Test.CouchCompress do
   use Couch.Test.ExUnit.Case
   alias Couch.Test.Utils
 
-  alias Couch.Test.Setup
-
-  alias Couch.Test.Setup.Step
-
   import Utils
 
   @term {[{:a, 1}, {:b, 2}, {:c, 3}, {:d, 4}, {:e, 5}]}
@@ -22,35 +18,64 @@ defmodule Couch.Test.CouchCompress do
             8, 8, 98, 97, 2, 5, 8, 8, 99, 97, 3, 5, 8, 44, 100, 97, 4, 104, 2, 100, 0, 1,
             101, 97, 5, 106>>
 
+  @snappy_bigendian <<1, 49, 60, 131, 104, 1, 108, 0, 0, 0, 5, 104, 2, 100, 0, 1, 97, 97,
+                      1, 5, 8, 8, 98, 97, 2, 5, 8, 8, 99, 97, 3, 5, 8, 44, 100, 97, 4,
+                      104, 2, 100, 0, 1, 101, 97, 5, 106>>
+
   @corrupt <<2, 12, 85, 06>>
 
-  describe "CouchDB Compression" do
+  describe "couch_compress" do
     test "compress" do
       assert @none === :couch_compress.compress(@term, :none)
-      assert @deflate === :couch_compress.compress(@term, {:deflate, 9})
-      assert @snappy === :couch_compress.compress(@term, :snappy)
+      assert @none !== :couch_compress.compress(@term, {:deflate, 9})
+      assert @none !== :couch_compress.compress(@term, :snappy)
+
+      # assert that compressed output is smaller than uncompressed input
+      assert bit_size(:couch_compress.compress(@term, {:deflate, 9})) < bit_size(@none)
+      assert bit_size(:couch_compress.compress(@term, :snappy)) < bit_size(@none)
     end
 
     test "decompress" do
       assert @term === :couch_compress.decompress(@none)
       assert @term === :couch_compress.decompress(@deflate)
       assert @term === :couch_compress.decompress(@snappy)
+      assert @term === :couch_compress.decompress(@snappy_bigendian)
       assert catch_error(:couch_compress.decompress(@corrupt)) == :invalid_compression
     end
 
     test "recompress" do
-      assert @deflate === :couch_compress.compress(@none, {:deflate, 9})
-      assert @snappy === :couch_compress.compress(@none, :snappy)
-      assert @none === :couch_compress.compress(@deflate, :none)
-      assert @snappy === :couch_compress.compress(@deflate, :snappy)
-      assert @none === :couch_compress.compress(@snappy, :none)
-      assert @deflate === :couch_compress.compress(@snappy, {:deflate, 9})
+      res = @none
+
+      # none -> deflate
+      res = :couch_compress.compress(res, {:deflate, 9})
+      assert :couch_compress.is_compressed(res, {:deflate, 9})
+
+      # deflate -> snappy
+      res = :couch_compress.compress(res, :snappy)
+      assert :couch_compress.is_compressed(res, :snappy)
+
+      # snappy -> none
+      res = :couch_compress.compress(res, :none)
+      assert :couch_compress.is_compressed(res, :none)
+
+      # none -> snappy
+      res = :couch_compress.compress(res, :snappy)
+      assert :couch_compress.is_compressed(res, :snappy)
+
+      # snappy -> deflate
+      res = :couch_compress.compress(res, {:deflate, 9})
+      assert :couch_compress.is_compressed(res, {:deflate, 9})
+
+      # deflate -> none
+      res = :couch_compress.compress(res, :none)
+      assert :couch_compress.is_compressed(res, :none)
     end
 
-    test "is compressed" do
+    test "is_compressed" do
       assert :couch_compress.is_compressed(@none, :none)
       assert :couch_compress.is_compressed(@deflate, {:deflate, 9})
       assert :couch_compress.is_compressed(@snappy, :snappy)
+      assert :couch_compress.is_compressed(@snappy_bigendian, :snappy)
       refute :couch_compress.is_compressed(@none, {:deflate, 0})
       refute :couch_compress.is_compressed(@none, {:deflate, 9})
       refute :couch_compress.is_compressed(@none, :snappy)
@@ -58,6 +83,8 @@ defmodule Couch.Test.CouchCompress do
       refute :couch_compress.is_compressed(@deflate, :snappy)
       refute :couch_compress.is_compressed(@snappy, :none)
       refute :couch_compress.is_compressed(@snappy, {:deflate, 9})
+      refute :couch_compress.is_compressed(@snappy_bigendian, :none)
+      refute :couch_compress.is_compressed(@snappy_bigendian, {:deflate, 9})
 
       assert catch_error(:couch_compress.is_compressed(@corrupt, :none)) ==
                :invalid_compression
@@ -69,10 +96,11 @@ defmodule Couch.Test.CouchCompress do
                :invalid_compression
     end
 
-    test "uncompressed size" do
+    test "uncompressed_size" do
       assert :couch_compress.uncompressed_size(@none) === 49
       assert :couch_compress.uncompressed_size(@deflate) === 49
       assert :couch_compress.uncompressed_size(@snappy) === 49
+      assert :couch_compress.uncompressed_size(@snappy_bigendian) === 49
 
       assert :couch_compress.uncompressed_size(
                :couch_compress.compress(:x, {:deflate, 9})
