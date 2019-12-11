@@ -71,6 +71,10 @@ if [ ! -z "$VERBOSE" ]; then
   set -x
 fi
 
-exec "$BINDIR/erl" -boot "$ROOTDIR/releases/$APP_VSN/start_clean" \
+# If present, strip -name or -setcookie from ERL_FLAGS
+# to avoid conflicts with the cli parameters
+ERL_FLAGS_CLEAN=$(echo "$ERL_FLAGS" | sed 's/-setcookie \([^ ][^ ]*\)//g' | sed 's/-name \([^ ][^ ]*\)//g')
+
+exec env ERL_FLAGS="$ERL_FLAGS_CLEAN" "$BINDIR/erl" -boot "$ROOTDIR/releases/$APP_VSN/start_clean" \
     -name remsh$$@$LHOST -remsh $NODE -hidden -setcookie $COOKIE \
     "$@"
