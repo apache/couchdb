@@ -88,9 +88,11 @@ SubDirs = [
     "src/dreyfus",
     "src/fabric",
     "src/global_changes",
+    "src/ken",
     "src/mango",
     "src/rexi",
     "src/setup",
+    "src/smoosh",
     "rel"
 ],
 
@@ -103,8 +105,6 @@ DepDescs = [
 {snappy,           "snappy",           {tag, "CouchDB-1.0.4"}},
 {ioq,              "ioq",              {tag, "2.1.2"}},
 {hqueue,           "hqueue",           {tag, "1.0.1"}},
-{smoosh,           "smoosh",           {tag, "1.0.1"}},
-{ken,              "ken",              {tag, "1.0.6"}},
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},

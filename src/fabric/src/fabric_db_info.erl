@@ -30,7 +30,7 @@ go(DbName) ->
 
             {ok, Acc} ->
                 {ok, Acc};
-            {timeout, {WorkersDict, _}} ->
+            {timeout, {WorkersDict, _, _}} ->
                 DefunctWorkers = fabric_util:remove_done_workers(
                     WorkersDict,
                     nil

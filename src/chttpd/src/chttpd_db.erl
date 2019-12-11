@@ -279,6 +279,9 @@ handle_view_cleanup_req(Req, Db) ->
     send_json(Req, 202, {[{ok, true}]}).
 
 
+handle_partition_req(#httpd{path_parts=[_,_]}=_Req, _Db) ->
+    throw({bad_request, invalid_partition_req});
+
 handle_partition_req(#httpd{method='GET', path_parts=[_,_,PartId]}=Req, Db) ->
     couch_partition:validate_partition(PartId),
     case couch_db:is_partitioned(Db) of
@@ -879,7 +882,7 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     chttpd:end_delayed_json_response(Resp1).
 
 all_docs_view(Req, Db, Keys, OP) ->
-    Args0 = couch_mrview_http:parse_params(Req, Keys),
+    Args0 = couch_mrview_http:parse_body_and_query(Req, Keys),
     Args1 = Args0#mrargs{view_type=map},
     Args2 = fabric_util:validate_all_docs_args(Db, Args1),
     Args3 = set_namespace(OP, Args2),

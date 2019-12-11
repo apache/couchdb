@@ -95,6 +95,15 @@ defmodule PartitionCrudTest do
   end
 
   @tag :with_partitioned_db
+  test "GET to partition returns 400", context do
+    db_name = context[:db_name]
+    url = "/#{db_name}/_partition"
+
+    resp = Couch.get("#{url}")
+    assert resp.status_code == 400
+  end
+
+  @tag :with_partitioned_db
   test "POST and _bulk_get document", context do
     db_name = context[:db_name]
     id = "my-partition-post:doc"

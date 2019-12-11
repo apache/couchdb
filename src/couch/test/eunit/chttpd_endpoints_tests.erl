@@ -43,7 +43,7 @@ handlers(url_handler) ->
         {<<"_all_dbs">>, chttpd_misc, handle_all_dbs_req},
         {<<"_dbs_info">>, chttpd_misc, handle_dbs_info_req},
         {<<"_active_tasks">>, chttpd_misc, handle_task_status_req},
-        {<<"_node">>, chttpd_misc, handle_node_req},
+        {<<"_node">>, chttpd_node, handle_node_req},
         {<<"_reload_query_servers">>, chttpd_misc, handle_reload_query_servers_req},
         {<<"_replicate">>, chttpd_misc, handle_replicate_req},
         {<<"_uuids">>, chttpd_misc, handle_uuids_req},
