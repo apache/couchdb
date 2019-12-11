@@ -822,8 +822,9 @@ kill_mock_changes_reader_and_get_its_args(Pid) ->
 
 mock_changes_reader() ->
     meck:expect(couch_changes, handle_db_changes,
-        fun(_ChArgs, _Req, db) ->
-            fun mock_changes_reader_loop/1
+        fun
+            (_ChArgs, _Req, db) -> fun mock_changes_reader_loop/1;
+            (_ChArgs, _Req, dbs) -> fun(_) -> ok end
         end).
 
 
