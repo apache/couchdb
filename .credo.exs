@@ -25,11 +25,19 @@
         excluded: [
           ~r"/_build/",
           ~r"/node_modules/",
+          ~r"/src/certifi/",
+          ~r"/src/excoveralls/",
           ~r"/src/jason",
+          ~r"/src/hackney",
           ~r"/src/httpotion",
           ~r"/src/credo",
+          ~r"/src/idna",
           ~r"/src/junit_formatter",
           ~r"/src/bunt",
+          ~r"/src/metrics",
+          ~r"/src/minerl",
+          ~r"/src/parse_trans",
+          ~r"/src/ssl_verify_fun",
           ~r"/test/elixir/deps/"
         ]
       },

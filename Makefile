@@ -191,7 +191,7 @@ exunit: export ERL_LIBS = $(shell pwd)/src
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
-	@mix test --trace $(EXUNIT_OPTS)
+	@mix test --cover --trace $(EXUNIT_OPTS)
 
 setup-eunit: export BUILDDIR = $(shell pwd)
 setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
