@@ -77,7 +77,7 @@ pipeline {
         // npm config cache below is required because /home/jenkins doesn't
         // ACTUALLY exist in the image
         docker {
-          image 'couchdbdev/debian-stretch-erlang-19.3.6:latest'
+          image 'couchdbdev/debian-stretch-erlang-20.3.8.24-1:latest'
           alwaysPull true
           args '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
           label 'ubuntu'
@@ -156,7 +156,7 @@ pipeline {
         stage('CentOS 6') {
           agent {
             docker {
-              image 'couchdbdev/centos-6-erlang-19.3.6:latest'
+              image 'couchdbdev/centos-6-erlang-20.3.8.24-1:latest'
               alwaysPull true
               label 'ubuntu'
               // this keeps builds landing on the same host from clashing with each other
@@ -204,7 +204,7 @@ pipeline {
         stage('CentOS 7') {
           agent {
             docker {
-              image 'couchdbdev/centos-7-erlang-19.3.6:latest'
+              image 'couchdbdev/centos-7-erlang-20.3.8.24-1:latest'
               alwaysPull true
               label 'ubuntu'
               customWorkspace pwd() + '/centos7'
@@ -252,7 +252,7 @@ pipeline {
         stage('Ubuntu Xenial') {
           agent {
             docker {
-              image 'couchdbdev/ubuntu-xenial-erlang-19.3.6:latest'
+              image 'couchdbdev/ubuntu-xenial-erlang-20.3.8.24-1:latest'
               alwaysPull true
               label 'ubuntu'
               customWorkspace pwd() + '/xenial'
@@ -299,7 +299,7 @@ pipeline {
         stage('Ubuntu Bionic') {
           agent {
             docker {
-              image 'couchdbdev/ubuntu-bionic-erlang-19.3.6:latest'
+              image 'couchdbdev/ubuntu-bionic-erlang-20.3.8.24-1:latest'
               alwaysPull true
               label 'ubuntu'
               customWorkspace pwd() + '/bionic'
@@ -346,7 +346,7 @@ pipeline {
         stage('Debian Jessie') {
           agent {
             docker {
-              image 'couchdbdev/debian-jessie-erlang-19.3.6:latest'
+              image 'couchdbdev/debian-jessie-erlang-20.3.8.24-1:latest'
               alwaysPull true
               label 'ubuntu'
               customWorkspace pwd() + '/jessie'
@@ -393,7 +393,7 @@ pipeline {
         stage('Debian Stretch x86_64') {
           agent {
             docker {
-              image 'couchdbdev/debian-stretch-erlang-19.3.6:latest'
+              image 'couchdbdev/debian-stretch-erlang-20.3.8.24-1:latest'
               alwaysPull true
               label 'ubuntu'
               customWorkspace pwd() + '/stretch'
@@ -497,7 +497,7 @@ pipeline {
 
       agent {
         docker {
-          image 'couchdbdev/debian-stretch-erlang-19.3.6:latest'
+          image 'couchdbdev/debian-stretch-erlang-20.3.8.24-1:latest'
           alwaysPull true
           args '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
           label 'ubuntu'

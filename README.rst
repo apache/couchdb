@@ -2,13 +2,8 @@ Apache CouchDB README
 =====================
 
 +--------------------------------+------------+
-| Travis CI master build status  | |travisci| |
-+--------------------------------+------------+
 | Jenkins CI master build status | |jenkins|  |
 +--------------------------------+------------+
-
-.. |travisci| image:: https://travis-ci.org/apache/couchdb.svg?branch=master
-    :target: https://travis-ci.org/apache/couchdb
 
 .. |jenkins| image:: https://builds.apache.org/job/CouchDB/job/master/badge/icon
     :target: https://builds.apache.org/blue/organizations/jenkins/CouchDB/activity
