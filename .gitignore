@@ -10,6 +10,7 @@
 .DS_Store
 .rebar/
 .eunit/
+cover/
 log
 apache-couchdb-*/
 bin/
@@ -32,6 +33,7 @@ share/server/main.js
 share/www
 src/b64url/
 src/bear/
+src/certifi/
 src/config/
 src/couch/priv/couch_js/config.h
 src/couch/priv/couchjs
@@ -45,23 +47,31 @@ src/couch/priv/icu_driver/couch_icu_driver.d
 src/mango/src/mango_cursor_text.nocompile
 src/docs/
 src/ets_lru/
+src/excoveralls/
 src/fauxton/
 src/folsom/
+src/hackney/
 src/hqueue/
 src/hyper/
 src/ibrowse/
+src/idna/
 src/ioq/
 src/jiffy/
 src/ken/
 src/khash/
 src/meck/
+src/metrics/
+src/mimerl/
 src/mochiweb/
 src/oauth/
+src/parse_trans/
 src/proper/
 src/rebar/
 src/smoosh/
 src/snappy/
+src/ssl_verify_fun/
 src/triq/
+src/unicode_util_compat/
 tmp/
 
 src/couch/*.o
