@@ -213,7 +213,8 @@ stream(Msg, Limit, Timeout) ->
 
 %% @equiv stream2(Msg, 10, 300000)
 stream2(Msg) ->
-    stream2(Msg, 10, 300000).
+    Limit = config:get_integer("rexi", "stream_limit", 10),
+    stream2(Msg, Limit).
 
 %% @equiv stream2(Msg, Limit, 300000)
 stream2(Msg, Limit) ->
