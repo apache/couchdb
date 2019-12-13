@@ -66,7 +66,7 @@ in_allowed_window(Channel) ->
     in_allowed_window(From, To).
 
 in_allowed_window(From, To) ->
-    {HH, MM, _} = erlang:time(),
+    {_, {HH, MM, _}} = calendar:universal_time(),
     case From < To of
     true ->
         ({HH, MM} >= From) andalso ({HH, MM} < To);
