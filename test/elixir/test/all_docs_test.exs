@@ -224,7 +224,7 @@ defmodule AllDocsTest do
     db_name = context[:db_name]
 
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..2)})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.post(
       "/#{db_name}/_all_docs",
@@ -240,7 +240,7 @@ defmodule AllDocsTest do
     db_name = context[:db_name]
 
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.post(
       "/#{db_name}/_all_docs",
@@ -259,7 +259,7 @@ defmodule AllDocsTest do
     db_name = context[:db_name]
 
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.post(
       "/#{db_name}/_all_docs",
@@ -280,7 +280,7 @@ defmodule AllDocsTest do
     db_name = context[:db_name]
 
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.post(
       "/#{db_name}/_all_docs",
