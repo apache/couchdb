@@ -67,7 +67,7 @@ defmodule BasicsTest do
   @tag :with_db
   test "Create a document and save it to the database", context do
     resp = Couch.post("/#{context[:db_name]}", body: %{:_id => "0", :a => 1, :b => 1})
-    assert resp.status_code == 201, "Should be 201 created"
+    assert resp.status_code in [201, 202], "Should be 201 created"
     assert resp.body["id"], "Id should be present"
     assert resp.body["rev"], "Rev should be present"
 

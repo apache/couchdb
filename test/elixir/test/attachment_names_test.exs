@@ -50,7 +50,7 @@ defmodule AttachmentNamesTest do
     filename = URI.encode("Kолян.txt", &URI.char_unreserved?(&1))
     resp = Couch.post("/#{db_name}", body: @good_doc)
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
 
     resp = Couch.get("/#{db_name}/good_doc/#{filename}")
     assert resp.body == "This is a base64 encoded text"

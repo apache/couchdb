@@ -19,37 +19,37 @@ defmodule PartitionSizeLimitTest do
 
   defp get_db_info(dbname) do
     resp = Couch.get("/#{dbname}")
-    assert resp.status_code == 200
+    assert resp.status_code in [200, 202]
     %{:body => body} = resp
     body
   end
 
   defp get_partition_info(dbname, partition) do
     resp = Couch.get("/#{dbname}/_partition/#{partition}")
-    assert resp.status_code == 200
+    assert resp.status_code in [200, 202]
     %{:body => body} = resp
     body
   end
 
-  defp open_doc(db_name, docid, status_assert \\ 200) do
+  defp open_doc(db_name, docid, status_assert \\ [200, 202]) do
     resp = Couch.get("/#{db_name}/#{docid}")
-    assert resp.status_code == status_assert
+    assert resp.status_code in status_assert
     %{:body => body} = resp
     body
   end
 
-  defp save_doc(db_name, doc, status_assert \\ 201) do
+  defp save_doc(db_name, doc, status_assert \\ [201, 202]) do
     resp = Couch.post("/#{db_name}", query: [w: 3], body: doc)
-    assert resp.status_code == status_assert
+    assert resp.status_code in status_assert
     %{:body => body} = resp
     body["rev"]
   end
 
-  defp delete_doc(db_name, doc, status_assert \\ 200) do
+  defp delete_doc(db_name, doc, status_assert \\ [200, 202]) do
     url = "/#{db_name}/#{doc["_id"]}"
     rev = doc["_rev"]
     resp = Couch.delete(url, query: [w: 3, rev: rev])
-    assert resp.status_code == status_assert
+    assert resp.status_code in status_assert
     %{:body => body} = resp
     body["rev"]
   end
@@ -65,7 +65,7 @@ defmodule PartitionSizeLimitTest do
 
     body = %{:w => 3, :docs => docs}
     resp = Couch.post("/#{db_name}/_bulk_docs", body: body)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   defp compact(db) do
@@ -92,7 +92,7 @@ defmodule PartitionSizeLimitTest do
         doc = %{_id: docid, value: "0" |> String.pad_leading(1024)}
         resp = Couch.post("/#{db_name}", query: [w: 3], body: doc)
 
-        if resp.status_code == 201 do
+        if resp.status_code in [201, 202] do
           false
         else
           resp
@@ -135,7 +135,7 @@ defmodule PartitionSizeLimitTest do
 
     body = %{w: 3, docs: [%{_id: "foo:bar"}]}
     resp = Couch.post("/#{db_name}/_bulk_docs", query: [w: 3], body: body)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{body: body} = resp
     doc_resp = Enum.at(body, 0)
     assert doc_resp["error"] == "partition_overflow"
@@ -147,7 +147,7 @@ defmodule PartitionSizeLimitTest do
 
     body = %{w: 3, docs: [%{_id: "foo:bar"}, %{_id: "baz:bang"}]}
     resp = Couch.post("/#{db_name}/_bulk_docs", query: [w: 3], body: body)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{body: body} = resp
 
     doc_resp1 = Enum.at(body, 0)
@@ -197,7 +197,7 @@ defmodule PartitionSizeLimitTest do
   test "replication into a full partition works", context do
     db_name = context[:db_name]
     fill_partition(db_name)
-    save_doc(db_name, %{_id: "foo:bar", value: "stuff"}, 403)
+    save_doc(db_name, %{_id: "foo:bar", value: "stuff"}, [403])
 
     doc = %{
       _id: "foo:bar",
@@ -208,7 +208,7 @@ defmodule PartitionSizeLimitTest do
     url = "/#{db_name}/#{doc[:_id]}"
     query = [new_edits: false, w: 3]
     resp = Couch.put(url, query: query, body: doc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   test "compacting a full partition works", context do
@@ -237,7 +237,7 @@ defmodule PartitionSizeLimitTest do
 
     url = "/#{db_name}/_partition/foo/_design/foo/_view/bar"
     resp = Couch.get(url)
-    assert resp.status_code == 200
+    assert resp.status_code in [200, 202]
     %{body: body} = resp
 
     assert length(body["rows"]) > 0
@@ -257,7 +257,7 @@ defmodule PartitionSizeLimitTest do
     ]
 
     resp = Couch.get("/#{db_name}/_all_docs", query: query)
-    assert resp.status_code == 200
+    assert resp.status_code in [200, 202]
     %{body: body} = resp
 
     pbody =
@@ -267,7 +267,7 @@ defmodule PartitionSizeLimitTest do
       end)
 
     resp = Couch.post("/#{db_name}/_purge", query: [w: 3], body: pbody)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     save_doc(db_name, %{_id: "foo:bar", value: "some value"})
   end
@@ -300,6 +300,6 @@ defmodule PartitionSizeLimitTest do
     old_size = Integer.to_string(@max_size)
     set_config_raw("couchdb", "max_partition_size", old_size)
 
-    save_doc(db_name, %{_id: "foo:baz", value: "stuff"}, 403)
+    save_doc(db_name, %{_id: "foo:baz", value: "stuff"}, [403])
   end
 end
