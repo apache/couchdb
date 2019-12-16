@@ -59,8 +59,7 @@ NotSupported = fun(Ver) ->
         "See https://docs.couchdb.org/en/stable/install/unix.html#dependencies~n"
         "for the latest information on dependencies.",
         [Ver]
-    ),
-    timer:sleep(5000)
+    )
 end.
 
 BadErlang = fun(Ver) ->
