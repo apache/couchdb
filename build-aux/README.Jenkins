@@ -1,0 +1,121 @@
+# Building with a dedicated Jenkins CI instance
+
+## History
+
+Around April 2019, once Travis CI performance became so abysmal that the
+development team couldn't tolerate it any longer. We decided to move off
+of it entirely and onto our own dedicated Jenkins instance. Performance
+was bad because:
+
+* The Travis CI VMs are severely underpowered, leading to many
+  unexpected test failures
+* The ASF wait queue for Travis was exceedingly long, with jobs
+  sometimes taking 30-45 minutes just to _launch_
+* Our test suites (all 3 of Erlang, JavaScript and Elixir) had
+  sporadic failures, requiring many re-launches of builds before
+  we could move forward
+
+We also had other reasons to want to move to a dedicated server:
+
+* Credentials on the main Jenkins instance could be reused by *anyone*
+  in the ASF
+* Credentials on the Travis CI setup should not contain credentials
+  for things such as building binaries, to ensure the best possible
+  security
+
+Other options we explored:
+
+* ASF BuildBot. This required a lot more work and couldn't guarantee
+  availability of sufficient workers.
+* Circle CI, GitHub CI, etc.: Lack of availability of alternate binary
+  platforms we've been asked to support (arm64v8, ppc64le) or alternate
+  OSes (OSX, FreeBSD, Windows), though there is some support for either
+  or both.
+
+## Cloudbees Core
+
+End of November 2019, ASF and CloudBees reached an agreement to allow
+the Foundation to use CloudBees Core to have a farm of managed Jenkins
+masters. This allows the ASF to give larger projects their own dedicated
+Jenkins master, which can be custom configured for the project. They can
+readily manage this farm of Jenkins masters centrally, including push
+updates to all masters and their plugins. Naturally, this also reduces
+contention, as well as providing increased security for project-level
+credentials.  CouchDB is the first project to use this setup, via
+jenkins-cm1.apache.org. A CNAME for ci.couchdb.org is being established
+to point to this server.
+
+Only members of the ASF LDAP group `couchdb-pmc` have write access to
+the Jenkins CI server, and all jobs are set to not trust changes to the
+Jenkinsfile from forked repos (see below).
+
+Further, IBM is sponsoring CouchDB with cloud-based worker nodes, for
+the project's exclusive use. Combined with the FreeBSD and OSX nodes the
+project already had, this will provide the necessary compute resources
+to meet the needs of the project for some time to come.
+
+# Jenkins configuration
+
+All jobs on the new Jenkins master are contained in a CouchDB folder.
+Credentials for the project are placed within this folder; this is a
+unique capability of CloudBees Core at this time.
+
+## Pull Request job configuration
+
+Blue Ocean link: https://jenkins-cm1.apache.org/blue/organizations/jenkins/jenkins-cm1%2FPullRequests/activity/
+
+To implement build-a-PR functionality in the same way that Travis
+performs builds, Jenkins offers the Multibranch Pipeline job. Here's how
+it's configured for CouchDB through the GUI:
+
+* Job name: PullRequests (jobs shouldn't have spaces in them, because
+  the job name is used for workspace path naming.)
+* Display Name: "Pull Requests"
+* Description: "This job builds all GitHub pull requests against
+  apache/couchdb."
+* Branch sources: Github
+  * Credentials: a GitHub API key from wohali. These credentials are
+    stored in the top-level Jenkins CouchDB folder on the server.
+    The API token credentials are `user:email` and `repo:status`.
+  * URL https://github.com/apache/couchdb
+  * Behaviors
+    * Discover branches: Exclude branches that are also filed as PRs
+    * Discover PRs from origin: Merging the PR with the current target
+      branch revision
+    * Discover PRs from works: Merging the PR with the current target
+      branch revision, trust Nobody [2]
+    * Advanced clone behaviours:
+      * Fetch tags
+      * Clear "Shallow clone" [1]
+    * Clean before checkout [1]
+    * Prune stale remote-tracking branches
+  * Property strategy: All branches get the same properties
+* Build Configuration
+  * Mode: by Jenkinsfile
+  * Script path: `build-aux/Jenkinsfile.pr`
+* Scan Repository Triggers
+  * Periodically if not other wise run
+  * Interval: 1 day (do not set this too high, GitHub has an API token
+  throttle that can cause issues!)
+* Orphaned Item Strategy
+  * Discard old items
+  * Days to keep old items: <blank>
+  * Max # of old items to keep: 10
+* Everything else set as defaults.
+
+[1]: https://issues.jenkins-ci.org/browse/JENKINS-44598 explains why we have the build set to Clean Before Checkout every time, and why clones are not shallow.
+
+[2]: https://issues.apache.org/jira/browse/INFRA-17449 explains why "Discover pull requests from forks/Trust" has been set to "Nobody."
+
+## `master` and release branch configuration
+
+Our old Jenkins job (formerly `/Jenkinsfile`) is now
+`build-aux/Jenkinsfile.full`. This builds CouchDB on `master`, all of
+our release branches (`2.*`, `3.*`, etc.) as well as `jenkins-*` for
+testing.
+
+Settings are identical to the last job, with the following changes:
+
+* **TODO**
+
+
