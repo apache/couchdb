@@ -13,6 +13,15 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+create_tarball = '''
+set
+rm -rf apache-couchdb-*
+. /usr/local/kerl/${LOW_ERLANG_VER}/activate
+./configure --with-curl
+make dist
+chmod -R a+w * .
+'''
+
 build_and_test = '''
 mkdir -p ${COUCHDB_IO_LOG_DIR}
 rm -rf build
@@ -62,7 +71,7 @@ pipeline {
   }
 
   stages {
-    stage('Build Release Tarball') {
+    stage('Create Release Tarball') {
       agent {
         docker {
           image "${DOCKER_IMAGE}"
@@ -75,14 +84,7 @@ pipeline {
         timeout(time: 15, unit: "MINUTES")
       }
       steps {
-        sh '''
-          set
-          rm -rf apache-couchdb-*
-          . /usr/local/kerl/${LOW_ERLANG_VER}/activate
-          ./configure --with-curl
-          make dist
-          chmod -R a+w * .
-        '''
+        sh( script: create_tarball, label: 'Create Tarball' )
       }
       post {
         success {
@@ -128,7 +130,7 @@ pipeline {
             }
             steps {
               unstash 'tarball'
-              sh( script: build_and_test )
+              sh( script: build_and_test, label: 'Configure, Build, Test' )
             }
             post {
               always {
