@@ -19,7 +19,7 @@ defmodule Couch.Test.Setup.Step.Create.DB do
 
   defstruct [:name]
 
-  import ExUnit.Assertions, only: [assert: 1, assert: 2]
+  import ExUnit.Assertions, only: [assert: 2]
 
   import Utils
 
@@ -41,7 +41,7 @@ defmodule Couch.Test.Setup.Step.Create.DB do
     step
   end
 
-  def teardown(setup, %__MODULE__{name: name} = step) do
+  def teardown(_setup, %__MODULE__{name: name} = _step) do
     :fabric.delete_db(name, [@admin])
     :ok
   end
