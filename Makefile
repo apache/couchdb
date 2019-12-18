@@ -93,6 +93,8 @@ EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 #ignore javascript tests
 ignore_js_suites=
 
+TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
+
 ################################################################################
 # Main commands
 ################################################################################
@@ -221,7 +223,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run rel/overlay/bin/couchup test/javascript/run
+		. dev/run "$(TEST_OPTS)" rel/overlay/bin/couchup test/javascript/run
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -234,7 +236,7 @@ python-black-update: .venv/bin/black
 .PHONY: elixir
 elixir: export MIX_ENV=integration
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run -a adm:pass -n 1 --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
@@ -277,7 +279,7 @@ else
 endif
 	@dev/run -n 1 -q --with-admin-party-please \
             --enable-erlang-views \
-            -c 'startup_jitter=0' \
+            "$(TEST_OPTS)" \
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
 
@@ -292,7 +294,7 @@ else
 endif
 	@dev/run -n 3 -q --with-admin-party-please \
             --enable-erlang-views --degrade-cluster 1 \
-            -c 'startup_jitter=0' \
+            "$(TEST_OPTS)" \
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)" \
 	    --path test/javascript/tests-cluster/with-quorum'
@@ -308,7 +310,7 @@ else
 endif
 	@dev/run -n 3 -q --with-admin-party-please \
             --enable-erlang-views --degrade-cluster 2 \
-            -c 'startup_jitter=0' \
+            "$(TEST_OPTS)" \
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)" \
             --path test/javascript/tests-cluster/without-quorum'
@@ -325,7 +327,7 @@ endif
 	@rm -rf dev/lib
 	while [ $$? -eq 0 ]; do \
 		dev/run -n 1 -q --with-admin-party-please \
-				-c 'startup_jitter=0' \
+				"$(TEST_OPTS)" \
 				'test/javascript/run --suites "$(suites)" \
 				--ignore "$(ignore_js_suites)"'  \
 	done
@@ -372,7 +374,7 @@ mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \
 		.venv/bin/python3 -m pip install -r requirements.txt
-	@cd src/mango && ../../dev/run -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose --with-xunit'
+	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose --with-xunit'
 
 ################################################################################
 # Developing
