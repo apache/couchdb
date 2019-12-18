@@ -118,7 +118,10 @@ do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
         erlfdb:transactional(Db, fun(Tx) ->
             case get(erlfdb_trace) of
                 Name when is_binary(Name) ->
-                    erlfdb:set_option(Tx, transaction_logging_enable, Name);
+                    UId = erlang:unique_integer([positive]),
+                    UIdBin = integer_to_binary(UId, 36),
+                    TxId = <<Name/binary, "_", UIdBin/binary>>,
+                    erlfdb:set_option(Tx, transaction_logging_enable, TxId);
                 _ ->
                     ok
             end,
