@@ -26,7 +26,7 @@
     concurrency,
     ratio,
     interactive=queue:new(),
-    compaction=queue:new(),
+    background=queue:new(),
     running=[]
 }).
 
@@ -41,7 +41,38 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-call(Fd, Msg, Priority) ->
+call(Fd, Msg, Metadata) ->
+    Priority = io_class(Msg, Metadata),
+    case bypass(Priority) of
+        true ->
+            gen_server:call(Fd, Msg);
+        false ->
+            queued_call(Fd, Msg, Priority)
+    end.
+
+bypass(Priority) ->
+    config:get("ioq.bypass", atom_to_list(Priority)) =:= "true".
+
+io_class({prompt, _}, _) ->
+    os_process;
+io_class({data, _}, _) ->
+    os_process;
+io_class(_, {interactive, _}) ->
+    read;
+io_class(_, {db_update, _}) ->
+    write;
+io_class(_, {view_update, _, _}) ->
+    view_update;
+io_class(_, {internal_repl, _}) ->
+    shard_sync;
+io_class(_, {db_compact, _}) ->
+    compaction;
+io_class(_, {view_compact, _, _}) ->
+    compaction;
+io_class(_, _) ->
+    other.
+
+queued_call(Fd, Msg, Priority) ->
     Request = #request{fd=Fd, msg=Msg, priority=Priority, from=self()},
     try
         gen_server:call(?MODULE, Request, infinity)
@@ -107,10 +138,10 @@ code_change(_Vsn, State, _Extra) ->
 terminate(_Reason, _State) ->
     ok.
 
-enqueue_request(#request{priority={db_compact, _}}=Request, #state{}=State) ->
-    State#state{compaction=queue:in(Request, State#state.compaction)};
-enqueue_request(#request{priority={view_compact, _, _}}=Request, #state{}=State) ->
-    State#state{compaction=queue:in(Request, State#state.compaction)};
+enqueue_request(#request{priority=compaction}=Request, #state{}=State) ->
+    State#state{background=queue:in(Request, State#state.background)};
+enqueue_request(#request{priority=shard_sync}=Request, #state{}=State) ->
+    State#state{background=queue:in(Request, State#state.background)};
 enqueue_request(#request{}=Request, #state{}=State) ->
     State#state{interactive=queue:in(Request, State#state.interactive)}.
 
@@ -128,17 +159,17 @@ maybe_submit_request(State) ->
     State.
 
 make_next_request(#state{}=State) ->
-    case {queue:is_empty(State#state.compaction), queue:is_empty(State#state.interactive)} of
+    case {queue:is_empty(State#state.background), queue:is_empty(State#state.interactive)} of
         {true, true} ->
             State;
         {true, false} ->
             choose_next_request(#state.interactive, State);
         {false, true} ->
-            choose_next_request(#state.compaction, State);
+            choose_next_request(#state.background, State);
         {false, false} ->
             case couch_rand:uniform() < State#state.ratio of
                 true ->
-                    choose_next_request(#state.compaction, State);
+                    choose_next_request(#state.background, State);
                 false ->
                     choose_next_request(#state.interactive, State)
             end
