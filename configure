@@ -237,4 +237,12 @@ if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then
     ${REBAR} get-deps update-deps
 fi
 
+# External repos frequently become integrated with the primary repo,
+# resulting in obsolete .git directories, and possible confusion.
+# It is usually a good idea to delete these .git directories.
+for path in $(find src -name .git -type d); do
+    git ls-files --error-unmatch $(dirname $path) > /dev/null 2>&1 && \
+        echo "WARNING unexpected .git directory $path"
+done
+
 echo "You have configured Apache CouchDB, time to relax. Relax."
