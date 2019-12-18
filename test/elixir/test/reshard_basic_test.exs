@@ -69,7 +69,7 @@ defmodule ReshardBasicTest do
     node1 = get_first_node()
 
     resp = post_job_node(db, node1)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     body = resp.body
     assert is_list(body)
@@ -109,7 +109,7 @@ defmodule ReshardBasicTest do
     resp = Couch.get("/#{db}/_shards")
     assert resp.status_code == 200
     shards = resp.body["shards"]
-    assert node1 not in shards["00000000-ffffffff"]
+    assert node1 not in Map.get(shards, "00000000-ffffffff", [])
     assert shards["00000000-7fffffff"] == [node1]
     assert shards["80000000-ffffffff"] == [node1]
 
@@ -132,7 +132,7 @@ defmodule ReshardBasicTest do
     node1 = get_first_node()
 
     resp = post_job_node(db, node1)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     body = resp.body
     assert is_list(body)
@@ -156,8 +156,8 @@ defmodule ReshardBasicTest do
     resp = Couch.get("/#{db}/_shards")
     assert resp.status_code == 200
     shards = resp.body["shards"]
-    assert node1 not in shards["00000000-7fffffff"]
-    assert node1 not in shards["80000000-ffffffff"]
+    assert node1 not in Map.get(shards, "00000000-7fffffff", [])
+    assert node1 not in Map.get(shards, "80000000-ffffffff", [])
     assert shards["00000000-3fffffff"] == [node1]
     assert shards["40000000-7fffffff"] == [node1]
     assert shards["80000000-bfffffff"] == [node1]
