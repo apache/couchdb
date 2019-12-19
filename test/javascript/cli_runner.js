@@ -22,6 +22,10 @@ function runTest() {
   var count = 0;
   var start = new Date().getTime();
 
+  if(couchTests.skip) {
+      quit(2);
+  }
+
   for(var name in couchTests) {
       count++;
   }

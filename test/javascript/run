@@ -44,14 +44,17 @@ RUNNER = "test/javascript/cli_runner.js"
 def mkformatter(tests):
     longest = max([len(x) for x in tests])
     green = "\033[32m"
+    orange = "\033[33m"
     red = "\033[31m"
     clear = "\033[0m"
     if not sys.stderr.isatty():
-        green, read, clear = "", "", ""
+        green, orange, red, clear = "", "", "", ""
 
-    def _colorized(passed):
-        if passed:
+    def _colorized(rval):
+        if rval == 0:
             return green + "pass" + clear
+        elif rval == 2:
+            return orange + "skipped" + clear
         else:
             return red + "fail" + clear
 
@@ -60,7 +63,7 @@ def mkformatter(tests):
             padding = (longest - len(test)) * " "
             sys.stderr.write(test + "   " + padding)
             sys.stderr.flush()
-        elif isinstance(test, bool):
+        elif isinstance(test, int):
             if test:
                 sys.stderr.write(_colorized(test) + os.linesep)
             else:
@@ -86,7 +89,7 @@ def run_couchjs(test, fmt):
         line = line.decode()
         sys.stderr.write(line)
     p.wait()
-    fmt(p.returncode == 0)
+    fmt(p.returncode)
     return p.returncode
 
 
@@ -163,7 +166,7 @@ def main():
         fmt = mkformatter(tests)
         for test in tests:
             result = run_couchjs(test, fmt)
-            if result == 0:
+            if result == 0 or result == 2:
                 passed += 1
             else:
                 failed += 1
