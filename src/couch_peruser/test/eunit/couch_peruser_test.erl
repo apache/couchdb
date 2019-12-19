@@ -18,7 +18,7 @@
 -define(ADMIN_USERNAME, "admin").
 -define(ADMIN_PASSWORD, "secret").
 
--define(WAIT_FOR_USER_DELETE_TIMEOUT, 3000).
+-define(WAIT_FOR_USER_DELETE_TIMEOUT, 1000).
 
 setup_all() ->
     TestCtx = test_util:start_couch([chttpd]),
@@ -37,8 +37,8 @@ setup() ->
     do_request(put, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     do_request(put, get_cluster_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     set_config("couch_httpd_auth", "authentication_db", ?b2l(TestAuthDb)),
-    set_config("couch_peruser", "cluster_quiet_period", "1"),
-    set_config("couch_peruser", "cluster_start_period", "1"),
+    set_config("couch_peruser", "cluster_quiet_period", "0"),
+    set_config("couch_peruser", "cluster_start_period", "0"),
     set_config("couch_peruser", "enable", "true"),
     set_config("cluster", "n", "1"),
     TestAuthDb.
