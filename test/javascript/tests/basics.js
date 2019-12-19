@@ -11,6 +11,7 @@
 // the License.
 
 // Do some basic tests.
+couchTests.elixir = true;
 couchTests.basics = function(debug) {
 
   if (debug) debugger;

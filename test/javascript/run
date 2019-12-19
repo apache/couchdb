@@ -55,6 +55,8 @@ def mkformatter(tests):
             return green + "pass" + clear
         elif rval == 2:
             return orange + "skipped" + clear
+        elif rval == 3:
+            return green + "ported to elixir" + clear
         else:
             return red + "fail" + clear
 
@@ -166,7 +168,7 @@ def main():
         fmt = mkformatter(tests)
         for test in tests:
             result = run_couchjs(test, fmt)
-            if result == 0 or result == 2:
+            if result == 0 or result == 2 or result == 3:
                 passed += 1
             else:
                 failed += 1

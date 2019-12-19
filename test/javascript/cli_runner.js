@@ -26,6 +26,10 @@ function runTest() {
       quit(2);
   }
 
+  if(couchTests.elixir) {
+      quit(3);
+  }
+
   for(var name in couchTests) {
       count++;
   }
