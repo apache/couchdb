@@ -62,6 +62,7 @@ script:
    - make check
 
 after_failure:
+  - build-aux/show-test-results.py
   - build-aux/logfile-uploader.py
 
 # start a push build on master and release branches + PRs build on every branch
