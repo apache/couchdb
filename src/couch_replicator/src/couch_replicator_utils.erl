@@ -181,13 +181,14 @@ normalize_rep(#rep{} = Rep)->
 ejson_state_info(nil) ->
     null;
 ejson_state_info(Info) when is_binary(Info) ->
-    Info;
+    {[{<<"error">>, Info}]};
 ejson_state_info([]) ->
     null;  % Status not set yet => null for compatibility reasons
 ejson_state_info([{_, _} | _] = Info) ->
     {Info};
 ejson_state_info(Info) ->
-    couch_replicator_utils:rep_error_to_binary(Info).
+    ErrMsg = couch_replicator_utils:rep_error_to_binary(Info),
+    {[{<<"error">>, ErrMsg}]}.
 
 
 -ifdef(TEST).

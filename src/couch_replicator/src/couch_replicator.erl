@@ -250,8 +250,9 @@ info_from_doc(RepDb, {Props}) ->
                         end
             end;
         failed ->
-            Info = get_value(<<"_replication_state_reason">>, Props, null),
-            {State0, Info, 1, StateTime};
+            Info = get_value(<<"_replication_state_reason">>, Props, nil),
+            EJsonInfo = couch_replicator_utils:ejson_state_info(Info),
+            {State0, EJsonInfo, 1, StateTime};
         _OtherState ->
             {null, null, 0, null}
     end,

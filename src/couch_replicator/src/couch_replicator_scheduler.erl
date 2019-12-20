@@ -1472,7 +1472,8 @@ t_job_summary_crashing_once() ->
         setup_jobs([Job]),
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
         ?assertEqual(crashing, proplists:get_value(state, Summary)),
-        ?assertEqual(<<"some_reason">>, proplists:get_value(info, Summary)),
+        Info = proplists:get_value(info, Summary),
+        ?assertEqual({[{<<"error">>, <<"some_reason">>}]}, Info),
         ?assertEqual(0, proplists:get_value(error_count, Summary))
     end).
 
@@ -1487,7 +1488,8 @@ t_job_summary_crashing_many_times() ->
         setup_jobs([Job]),
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
         ?assertEqual(crashing, proplists:get_value(state, Summary)),
-        ?assertEqual(<<"some_reason">>, proplists:get_value(info, Summary)),
+        Info = proplists:get_value(info, Summary),
+        ?assertEqual({[{<<"error">>, <<"some_reason">>}]}, Info),
         ?assertEqual(2, proplists:get_value(error_count, Summary))
     end).
 
