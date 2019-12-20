@@ -1037,42 +1037,47 @@ longest_running_test() ->
 
 scheduler_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_pending_jobs_simple(),
-            t_pending_jobs_skip_crashed(),
-            t_one_job_starts(),
-            t_no_jobs_start_if_max_is_0(),
-            t_one_job_starts_if_max_is_1(),
-            t_max_churn_does_not_throttle_initial_start(),
-            t_excess_oneshot_only_jobs(),
-            t_excess_continuous_only_jobs(),
-            t_excess_prefer_continuous_first(),
-            t_stop_oldest_first(),
-            t_start_oldest_first(),
-            t_jobs_churn_even_if_not_all_max_jobs_are_running(),
-            t_jobs_dont_churn_if_there_are_available_running_slots(),
-            t_start_only_pending_jobs_do_not_churn_existing_ones(),
-            t_dont_stop_if_nothing_pending(),
-            t_max_churn_limits_number_of_rotated_jobs(),
-            t_existing_jobs(),
-            t_if_pending_less_than_running_start_all_pending(),
-            t_running_less_than_pending_swap_all_running(),
-            t_oneshot_dont_get_rotated(),
-            t_rotate_continuous_only_if_mixed(),
-            t_oneshot_dont_get_starting_priority(),
-            t_oneshot_will_hog_the_scheduler(),
-            t_if_excess_is_trimmed_rotation_still_happens(),
-            t_if_transient_job_crashes_it_gets_removed(),
-            t_if_permanent_job_crashes_it_stays_in_ets(),
-            t_job_summary_running(),
-            t_job_summary_pending(),
-            t_job_summary_crashing_once(),
-            t_job_summary_crashing_many_times(),
-            t_job_summary_proxy_fields()
-         ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_pending_jobs_simple(),
+                t_pending_jobs_skip_crashed(),
+                t_one_job_starts(),
+                t_no_jobs_start_if_max_is_0(),
+                t_one_job_starts_if_max_is_1(),
+                t_max_churn_does_not_throttle_initial_start(),
+                t_excess_oneshot_only_jobs(),
+                t_excess_continuous_only_jobs(),
+                t_excess_prefer_continuous_first(),
+                t_stop_oldest_first(),
+                t_start_oldest_first(),
+                t_jobs_churn_even_if_not_all_max_jobs_are_running(),
+                t_jobs_dont_churn_if_there_are_available_running_slots(),
+                t_start_only_pending_jobs_do_not_churn_existing_ones(),
+                t_dont_stop_if_nothing_pending(),
+                t_max_churn_limits_number_of_rotated_jobs(),
+                t_existing_jobs(),
+                t_if_pending_less_than_running_start_all_pending(),
+                t_running_less_than_pending_swap_all_running(),
+                t_oneshot_dont_get_rotated(),
+                t_rotate_continuous_only_if_mixed(),
+                t_oneshot_dont_get_starting_priority(),
+                t_oneshot_will_hog_the_scheduler(),
+                t_if_excess_is_trimmed_rotation_still_happens(),
+                t_if_transient_job_crashes_it_gets_removed(),
+                t_if_permanent_job_crashes_it_stays_in_ets(),
+                t_job_summary_running(),
+                t_job_summary_pending(),
+                t_job_summary_crashing_once(),
+                t_job_summary_crashing_many_times(),
+                t_job_summary_proxy_fields()
+            ]
+        }
     }.
 
 
@@ -1519,7 +1524,7 @@ t_job_summary_proxy_fields() ->
 
 % Test helper functions
 
-setup() ->
+setup_all() ->
     catch ets:delete(?MODULE),
     meck:expect(couch_log, notice, 2, ok),
     meck:expect(couch_log, warning, 2, ok),
@@ -1531,9 +1536,21 @@ setup() ->
     meck:expect(couch_replicator_scheduler_sup, start_child, 1, {ok, Pid}).
 
 
-teardown(_) ->
+teardown_all(_) ->
     catch ets:delete(?MODULE),
     meck:unload().
+
+
+setup() ->
+    meck:reset([
+        couch_log,
+        couch_replicator_scheduler_sup,
+        couch_stats
+    ]).
+
+
+teardown(_) ->
+    ok.
 
 
 setup_jobs(Jobs) when is_list(Jobs) ->

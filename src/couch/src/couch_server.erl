@@ -775,19 +775,30 @@ get_engine_path(DbName, Engine) when is_binary(DbName), is_atom(Engine) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-setup() ->
+setup_all() ->
     ok = meck:new(config, [passthrough]),
     ok = meck:expect(config, get, fun config_get/3),
     ok.
 
-teardown(_) ->
-    (catch meck:unload(config)).
+teardown_all(_) ->
+    meck:unload().
 
 config_get("couchdb", "users_db_suffix", _) -> "users_db";
 config_get(_, _, _) -> undefined.
 
 maybe_add_sys_db_callbacks_pass_test_() ->
-    SysDbCases = [
+    {
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        [
+            fun should_add_sys_db_callbacks/0,
+            fun should_not_add_sys_db_callbacks/0
+        ]
+    }.
+
+should_add_sys_db_callbacks() ->
+    Cases = [
         "shards/00000000-3fffffff/foo/users_db.1415960794.couch",
         "shards/00000000-3fffffff/foo/users_db.1415960794",
         "shards/00000000-3fffffff/foo/users_db",
@@ -816,8 +827,13 @@ maybe_add_sys_db_callbacks_pass_test_() ->
         "_replicator.couch",
         "_replicator"
     ],
+    lists:foreach(fun(DbName) ->
+        check_case(DbName, true),
+        check_case(?l2b(DbName), true)
+    end, Cases).
 
-    NonSysDbCases = [
+should_not_add_sys_db_callbacks() ->
+    Cases = [
         "shards/00000000-3fffffff/foo/mydb.1415960794.couch",
         "shards/00000000-3fffffff/foo/mydb.1415960794",
         "shards/00000000-3fffffff/mydb",
@@ -826,34 +842,13 @@ maybe_add_sys_db_callbacks_pass_test_() ->
         "mydb.couch",
         "mydb"
     ],
-    {
-        foreach, fun setup/0, fun teardown/1,
-        [
-            [should_add_sys_db_callbacks(C) || C <- SysDbCases]
-            ++
-            [should_add_sys_db_callbacks(?l2b(C)) || C <- SysDbCases]
-            ++
-            [should_not_add_sys_db_callbacks(C) || C <- NonSysDbCases]
-            ++
-            [should_not_add_sys_db_callbacks(?l2b(C)) || C <- NonSysDbCases]
-        ]
-    }.
+    lists:foreach(fun(DbName) ->
+        check_case(DbName, false),
+        check_case(?l2b(DbName), false)
+    end, Cases).
 
-should_add_sys_db_callbacks(DbName) ->
-    {test_name(DbName), ?_test(begin
-        Options = maybe_add_sys_db_callbacks(DbName, [other_options]),
-        ?assert(lists:member(sys_db, Options)),
-        ok
-    end)}.
-should_not_add_sys_db_callbacks(DbName) ->
-    {test_name(DbName), ?_test(begin
-        Options = maybe_add_sys_db_callbacks(DbName, [other_options]),
-        ?assertNot(lists:member(sys_db, Options)),
-        ok
-    end)}.
-
-test_name(DbName) ->
-    lists:flatten(io_lib:format("~p", [DbName])).
-
+check_case(DbName, IsAdded) ->
+    Options = maybe_add_sys_db_callbacks(DbName, [other_options]),
+    ?assertEqual(IsAdded, lists:member(sys_db, Options)).
 
 -endif.
