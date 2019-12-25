@@ -217,7 +217,9 @@ subscribe_for_config() ->
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
-setup() ->
+setup_all() ->
+    application:start(config),
+
     ok = meck:new(couch_event, [passthrough]),
     ok = meck:expect(couch_event, register_all, ['_'], ok),
 
@@ -225,33 +227,39 @@ setup() ->
     ok = meck:expect(config_notifier, handle_event, [
         {[{'_', '_', '_', "error", '_'}, '_'], meck:raise(throw, raised_error)},
         {['_', '_'], meck:passthrough()}
-    ]),
+    ]).
 
-    application:start(config),
+teardown_all(_) ->
+    meck:unload(),
+    application:stop(config).
+
+setup() ->
     {ok, Pid} = ?MODULE:start_link(),
     erlang:unlink(Pid),
     meck:wait(config_notifier, subscribe, '_', 1000),
     Pid.
 
 teardown(Pid) ->
-    exit(Pid, shutdown),
-    application:stop(config),
-    (catch meck:unload(couch_event)),
-    (catch meck:unload(config_notifier)),
-    ok.
+    exit(Pid, shutdown).
 
 subscribe_for_config_test_() ->
     {
-        "Subscrive for configuration changes",
+        "Subscribe for configuration changes",
         {
-            foreach,
-            fun setup/0, fun teardown/1,
-            [
-                fun should_set_sync_delay/1,
-                fun should_set_sync_frequency/1,
-                fun should_restart_listener/1,
-                fun should_terminate/1
-            ]
+            setup,
+            fun setup_all/0,
+            fun teardown_all/1,
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    fun should_set_sync_delay/1,
+                    fun should_set_sync_frequency/1,
+                    fun should_restart_listener/1,
+                    fun should_terminate/1
+                ]
+            }
         }
     }.
 
@@ -286,11 +294,20 @@ should_terminate(Pid) ->
 
         EventMgr = whereis(config_event),
 
+        Ref = erlang:monitor(process, Pid),
+
         RestartFun = fun() -> exit(EventMgr, kill) end,
         test_util:with_process_restart(config_event, RestartFun),
 
         ?assertNot(is_process_alive(EventMgr)),
-        ?assertNot(is_process_alive(Pid)),
+
+        receive
+            {'DOWN', Ref, _, _, _} ->
+                ok
+        after 1000 ->
+            ?assert(false)
+        end,
+
         ?assert(is_process_alive(whereis(config_event))),
         ok
     end).
