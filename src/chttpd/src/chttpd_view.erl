@@ -123,13 +123,18 @@ assert_no_queries_param(_) ->
 
 check_multi_query_reduce_view_overrides_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_check_include_docs_throw_validation_error(),
-            t_check_user_can_override_individual_query_type()
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_check_include_docs_throw_validation_error(),
+                t_check_user_can_override_individual_query_type()
+            ]
+        }
     }.
 
 
@@ -153,7 +158,7 @@ t_check_user_can_override_individual_query_type() ->
     end).
 
 
-setup() ->
+setup_all() ->
     Views = [#mrview{reduce_funs = [{<<"v">>, <<"_count">>}]}],
     meck:expect(couch_mrview_util, ddoc_to_mrst, 2, {ok, #mrst{views = Views}}),
     meck:expect(chttpd, start_delayed_json_response, 4, {ok, resp}),
@@ -162,8 +167,20 @@ setup() ->
     meck:expect(chttpd, end_delayed_json_response, 1, ok).
 
 
-teardown(_) ->
+teardown_all(_) ->
     meck:unload().
+
+
+setup() ->
+    meck:reset([
+        chttpd,
+        couch_mrview_util,
+        fabric
+    ]).
+
+
+teardown(_) ->
+    ok.
 
 
 -endif.
