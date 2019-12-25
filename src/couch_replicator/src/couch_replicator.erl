@@ -346,11 +346,13 @@ expect_rep_user_ctx(Name, Role) ->
 
 strip_url_creds_test_() ->
      {
-        foreach,
-        fun () -> meck:expect(config, get,
-            fun(_, _, Default) -> Default end)
+        setup,
+        fun() ->
+            meck:expect(config, get, fun(_, _, Default) -> Default end)
         end,
-        fun (_) -> meck:unload() end,
+        fun(_) ->
+            meck:unload()
+        end,
         [
             t_strip_http_basic_creds(),
             t_strip_http_props_creds(),
