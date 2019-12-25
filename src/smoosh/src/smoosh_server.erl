@@ -446,18 +446,22 @@ needs_upgrade(Props) ->
 -include_lib("eunit/include/eunit.hrl").
 
 
-setup() ->
+setup_all() ->
     meck:new([config, couch_index, couch_index_server], [passthrough]),
     Pid = list_to_pid("<0.0.0>"),
     meck:expect(couch_index_server, get_index, 3, {ok, Pid}),
-    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    meck:expect(config, get, fun(_, _, Default) -> Default end).
+
+teardown_all(_) ->
+    meck:unload().
+
+setup() ->
     Shard = <<"shards/00000000-1fffffff/test.1529510412">>,
     GroupId = <<"_design/ddoc">>,
     {ok, Shard, GroupId}.
 
-
 teardown(_) ->
-    meck:unload().
+    ok.
 
 config_change_test_() ->
     {
@@ -474,20 +478,25 @@ config_change_test_() ->
 
 get_priority_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            fun t_ratio_view/1,
-            fun t_slack_view/1,
-            fun t_no_data_view/1,
-            fun t_below_min_priority_view/1,
-            fun t_below_min_size_view/1,
-            fun t_timeout_view/1,
-            fun t_missing_view/1,
-            fun t_invalid_view/1
-        ]
-}.
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                fun t_ratio_view/1,
+                fun t_slack_view/1,
+                fun t_no_data_view/1,
+                fun t_below_min_priority_view/1,
+                fun t_below_min_size_view/1,
+                fun t_timeout_view/1,
+                fun t_missing_view/1,
+                fun t_invalid_view/1
+            ]
+        }
+    }.
 
 t_restart_config_listener(_) ->
     ?_test(begin
