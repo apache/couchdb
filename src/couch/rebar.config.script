@@ -63,7 +63,9 @@ SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
         "1.8.5";
     {_, Unsupported} ->
         io:format(standard_error, "Unsupported SpiderMonkey version: ~s~n", [Unsupported]),
-        erlang:halt(1)
+        erlang:halt(1);
+    false ->
+        "1.8.5"
 end.
 
 ConfigH = [
