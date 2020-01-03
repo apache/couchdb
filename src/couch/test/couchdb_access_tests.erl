@@ -108,6 +108,19 @@ access_test_() ->
         fun should_allow_admin_users_access_ddoc_view_request/2,
         fun should_allow_user_users_access_ddoc_view_request/2
 
+        % replication
+        % admin should be able to replicate all docs
+        %  - from access to access
+        %  - from no-access to access
+        %  - from access to no-access
+        %  - from no-access to no-access while retainting _access for docs
+        % user should be able to replicate:
+        %  - access to access
+        %  - access to no-access
+        %  - no-access (w/ _access docs) to _access
+        
+        
+
         % TODO: create test db with role and not _users in _security.members
         % and make sure a user in that group can access while a user not
         % in that group cant
