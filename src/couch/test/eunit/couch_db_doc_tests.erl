@@ -84,9 +84,8 @@ should_allow_access_in_doc_keys_test(_DbName) ->
     Expected = {[{<<"_id">>,<<"foo">>}, {<<"_access">>, [<<"test">>]}]},
     EJson = Expected,
     Doc = couch_doc:from_json_obj(EJson),
-    NewEJson = couch_doc:to_json_obj(Doc),
-    NewEJson = Expected,
-    ok.
+    NewEJson = couch_doc:to_json_obj(Doc, []),
+    ?_assertEqual(NewEJson, Expected).
 
 open_db(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
