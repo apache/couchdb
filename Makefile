@@ -93,7 +93,7 @@ EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 #ignore javascript tests
 ignore_js_suites=
 
-TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
+TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local' -c 'COUCH_TEST_ADMIN_PARTY_OVERRIDE=1'"
 
 ################################################################################
 # Main commands
