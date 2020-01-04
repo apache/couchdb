@@ -56,7 +56,8 @@ split_test_() ->
                     fun should_fail_on_missing_source/1,
                     fun should_fail_on_existing_target/1,
                     fun should_fail_on_invalid_target_name/1,
-                    fun should_crash_on_invalid_tmap/1
+                    fun should_crash_on_invalid_tmap/1,
+                    fun should_fail_on_opened_target/1
                 ]
             }
         ]
@@ -104,9 +105,23 @@ should_fail_on_missing_source(_DbName) ->
 
 should_fail_on_existing_target(DbName) ->
     Ranges = make_ranges(2),
-    TMap = maps:map(fun(_, _) -> DbName end, make_targets(Ranges)),
+    TMap = maps:map(fun(_, TName) ->
+        % We create the target but make sure to remove it from the cache so we
+        % hit the eexist error instaed of already_opened
+        {ok, Db} = couch_db:create(TName, [?ADMIN_CTX]),
+        Pid = couch_db:get_pid(Db),
+        ok = couch_db:close(Db),
+        exit(Pid, kill),
+        test_util:wait(fun() ->
+            case ets:lookup(couch_dbs, TName) of
+                [] -> ok;
+                [_ | _] -> wait
+            end
+        end),
+        TName
+    end, make_targets(Ranges)),
     Response = couch_db_split:split(DbName, TMap, fun fake_pickfun/3),
-    ?_assertMatch({error, {target_create_error, DbName, eexist}}, Response).
+    ?_assertMatch({error, {target_create_error, _, eexist}}, Response).
 
 
 should_fail_on_invalid_target_name(DbName) ->
@@ -125,6 +140,20 @@ should_crash_on_invalid_tmap(DbName) ->
     TMap = make_targets(Ranges),
     ?_assertError(function_clause,
         couch_db_split:split(DbName, TMap, fun fake_pickfun/3)).
+
+
+should_fail_on_opened_target(DbName) ->
+    Ranges = make_ranges(2),
+    TMap = maps:map(fun(_, TName) ->
+        % We create and keep the target open but delete
+        % its file on disk so we don't fail with eexist
+        {ok, Db} = couch_db:create(TName, [?ADMIN_CTX]),
+        FilePath = couch_db:get_filepath(Db),
+        ok = file:delete(FilePath),
+        TName
+    end, make_targets(Ranges)),
+    ?_assertMatch({error, {target_create_error, _, already_opened}},
+         couch_db_split:split(DbName, TMap, fun fake_pickfun/3)).
 
 
 copy_local_docs_test_() ->
