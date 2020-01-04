@@ -26,8 +26,8 @@ export BINDIR="$ROOTDIR/erts-$ERTS_VSN/bin"
 export EMU=beam
 export PROGNAME=`echo $0 | sed 's/.*\///'`
 
-export COUCHDB_QUERY_SERVER_JAVASCRIPT="{{prefix}}/bin/couchjs {{prefix}}/share/server/main.js"
-export COUCHDB_QUERY_SERVER_COFFEESCRIPT="{{prefix}}/bin/couchjs {{prefix}}/share/server/main-coffee.js"
+export COUCHDB_QUERY_SERVER_JAVASCRIPT="${COUCHDB_QUERY_SERVER_JAVASCRIPT:-{{prefix}}/bin/couchjs {{prefix}}/share/server/main.js"
+export COUCHDB_QUERY_SERVER_COFFEESCRIPT="${COUCHDB_QUERY_SERVER_COFFEESCRIPT:-{{prefix}}/bin/couchjs {{prefix}}/share/server/main-coffee.js"
 export COUCHDB_FAUXTON_DOCROOT={{fauxton_root}}
 
 ARGS_FILE="${COUCHDB_ARGS_FILE:-$ROOTDIR/etc/vm.args}"
