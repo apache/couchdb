@@ -11,9 +11,8 @@ import xml.dom.minidom as md
 TEST_COLLECTIONS = {
     "EUnit": "src/**/.eunit/*.xml",
     "EXUnit": "_build/integration/lib/couchdbtest/*.xml",
-    "Mango": "src/mango/*.xml"
+    "Mango": "src/mango/*.xml",
 }
-
 
 
 def _attrs(elem):
@@ -30,7 +29,7 @@ def _text(elem):
             rc.append(node.data)
         else:
             rc.append(self._text(node))
-    return ''.join(rc)
+    return "".join(rc)
 
 
 class TestCase(object):
@@ -79,17 +78,14 @@ class TestCase(object):
     def _name(self, attrs):
         klass = attrs.get("classname", "")
         if klass.startswith("Elixir."):
-            klass = klass[len("Elixir."):]
+            klass = klass[len("Elixir.") :]
         if klass:
             return "%s - %s" % (klass, attrs["name"])
         return attrs["name"]
 
 
 class TestSuite(object):
-    SUITE_NAME_PATTERNS = [
-        re.compile("module '([^']+)'"),
-        re.compile("Elixir\.(.+)")
-    ]
+    SUITE_NAME_PATTERNS = [re.compile("module '([^']+)'"), re.compile("Elixir\.(.+)")]
 
     def __init__(self, elem):
         self.elem = elem
@@ -151,53 +147,42 @@ class TestCollection(object):
 def parse_args():
     parser = argparse.ArgumentParser(description="Show test result summaries")
     parser.add_argument(
-            "--ignore-failures",
-            action="store_true",
-            default=False,
-            help="Don't display test failures"
-        )
+        "--ignore-failures",
+        action="store_true",
+        default=False,
+        help="Don't display test failures",
+    )
     parser.add_argument(
-            "--ignore-errors",
-            action="store_true",
-            default=False,
-            help="Don't display test errors"
-        )
+        "--ignore-errors",
+        action="store_true",
+        default=False,
+        help="Don't display test errors",
+    )
     parser.add_argument(
-            "--ignore-skipped",
-            action="store_true",
-            default=False,
-            help="Don't display skipped tests"
-        )
+        "--ignore-skipped",
+        action="store_true",
+        default=False,
+        help="Don't display skipped tests",
+    )
     parser.add_argument(
-            "--all",
-            type=int,
-            default=0,
-            help="Number of rows to show for all groups"
-        )
+        "--all", type=int, default=0, help="Number of rows to show for all groups"
+    )
     parser.add_argument(
-            "--collection",
-            action="append",
-            default=[],
-            help="Which collection to display. May be repeated."
-        )
+        "--collection",
+        action="append",
+        default=[],
+        help="Which collection to display. May be repeated.",
+    )
     parser.add_argument(
-            "--suites",
-            type=int,
-            default=0,
-            help="Number of suites to show"
-        )
+        "--suites", type=int, default=0, help="Number of suites to show"
+    )
+    parser.add_argument("--tests", type=int, default=0, help="Number of tests to show")
     parser.add_argument(
-            "--tests",
-            type=int,
-            default=0,
-            help="Number of tests to show"
-        )
-    parser.add_argument(
-            "--sort",
-            default="total",
-            choices=["test", "fixture", "total"],
-            help="Timing column to sort on"
-        )
+        "--sort",
+        default="total",
+        choices=["test", "fixture", "total"],
+        help="Timing column to sort on",
+    )
     return parser.parse_args()
 
 
@@ -304,7 +289,7 @@ def display_collections(collections, sort):
             num_failures,
             num_errors,
             num_skipped,
-            collection.name + "        "
+            collection.name + "        ",
         )
         rows.append(cols)
 
@@ -313,22 +298,16 @@ def display_collections(collections, sort):
         scol = 1
     elif sort == "test":
         scol = 2
+
     def skey(row):
         return (-1.0 * row[scol], row[-1])
+
     rows.sort(key=skey)
 
     print "Collections"
     print "==========="
     print
-    headers = [
-        "Total",
-        "Fixture",
-        "Test",
-        "Count",
-        "Failed",
-        "Errors",
-        "Skipped"
-    ]
+    headers = ["Total", "Fixture", "Test", "Count", "Failed", "Errors", "Skipped"]
     display_table([headers] + rows)
     print
 
@@ -345,7 +324,7 @@ def display_suites(collections, count, sort):
                 suite.num_failures,
                 suite.num_errors,
                 suite.num_skipped,
-                collection.name + " - " + suite.name
+                collection.name + " - " + suite.name,
             ]
             rows.append(cols)
 
@@ -354,8 +333,10 @@ def display_suites(collections, count, sort):
         scol = 1
     elif sort == "test":
         scol = 2
+
     def skey(row):
         return (-1.0 * row[scol], row[-1])
+
     rows.sort(key=skey)
 
     rows = rows[:count]
@@ -363,15 +344,7 @@ def display_suites(collections, count, sort):
     print "Suites"
     print "======"
     print
-    headers = [
-        "Total",
-        "Fixture",
-        "Test",
-        "Count",
-        "Failed",
-        "Errors",
-        "Skipped"
-    ]
+    headers = ["Total", "Fixture", "Test", "Count", "Failed", "Errors", "Skipped"]
     display_table([headers] + rows)
     print
 
@@ -389,6 +362,7 @@ def display_tests(collections, count):
 
     def skey(row):
         return (-1.0 * row[0], row[-1])
+
     rows.sort(key=skey)
     rows = rows[:count]
 

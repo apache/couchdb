@@ -93,7 +93,7 @@ EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 #ignore javascript tests
 ignore_js_suites=
 
-TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local' -c 'COUCH_TEST_ADMIN_PARTY_OVERRIDE=1'"
+TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 
 ################################################################################
 # Main commands
@@ -169,6 +169,7 @@ endif
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+eunit: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
@@ -223,7 +224,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run "$(TEST_OPTS)" rel/overlay/bin/couchup test/javascript/run
+		. dev/run rel/overlay/bin/couchup test/javascript/run
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -235,6 +236,7 @@ python-black-update: .venv/bin/black
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
+elixir: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
 	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
@@ -269,6 +271,7 @@ elixir-credo: elixir-init
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
+javascript: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 javascript: devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
@@ -284,6 +287,7 @@ endif
             --ignore "$(ignore_js_suites)"'
 
 .PHONY: test-cluster-with-quorum
+test-cluster-with-quorum: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 test-cluster-with-quorum: devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
@@ -300,6 +304,7 @@ endif
 	    --path test/javascript/tests-cluster/with-quorum'
 
 .PHONY: test-cluster-without-quorum
+test-cluster-without-quorum: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 test-cluster-without-quorum: devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
@@ -316,6 +321,7 @@ endif
             --path test/javascript/tests-cluster/without-quorum'
 
 .PHONY: soak-javascript
+soak-javascript: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 soak-javascript:
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
@@ -370,6 +376,7 @@ build-test:
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
+mango-test: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \
