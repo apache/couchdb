@@ -29,7 +29,7 @@
 
 start_link() ->
     assert_admins(),
-    launch_admin_annoyance_reporter(),
+    maybe_launch_admin_annoyance_reporter(),
     write_pidfile(),
     notify_starting(),
 
@@ -100,7 +100,8 @@ assert_admins() ->
             % Wait a second so the log message can make it to the log
             timer:sleep(500),
             throw(admin_account_required);
-
+        _ -> ok
+    end.
 
 send_no_admin_account_error_message() ->
     couch_log:error("No Admin Account configured."
