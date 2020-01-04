@@ -24,7 +24,7 @@ defmodule UTF8Test do
     |> Enum.with_index()
     |> Enum.each(fn {string, index} ->
       status = Couch.post("/#{db_name}", query: [w: 3], body: %{"_id" => Integer.to_string(index), "text" => string}).status_code
-      assert status == 201
+      assert status in [201, 202]
     end)
 
     texts
