@@ -26,6 +26,7 @@
 -export([exists/1]).
 -export([get_engine_extensions/0]).
 -export([get_engine_path/2]).
+-export([lock/2, unlock/1]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -77,8 +78,15 @@ get_stats() ->
 sup_start_link() ->
     gen_server:start_link({local, couch_server}, couch_server, [], []).
 
+open(DbName, Options) ->
+    case ets:lookup(couch_dbs_locks, DbName) of
+        [] ->
+            open_int(DbName, Options);
+        [{DbName, Reason}] ->
+            {error, {locked, Reason}}
+    end.
 
-open(DbName, Options0) ->
+open_int(DbName, Options0) ->
     Ctx = couch_util:get_value(user_ctx, Options0, #user_ctx{}),
     case ets:lookup(couch_dbs, DbName) of
     [#entry{db = Db0, lock = Lock} = Entry] when Lock =/= locked ->
@@ -115,7 +123,15 @@ update_lru(DbName, Options) ->
 close_lru() ->
     gen_server:call(couch_server, close_lru).
 
-create(DbName, Options0) ->
+create(DbName, Options) ->
+    case ets:lookup(couch_dbs_locks, DbName) of
+        [] ->
+            create_int(DbName, Options);
+        [{DbName, Reason}] ->
+            {error, {locked, Reason}}
+    end.
+
+create_int(DbName, Options0) ->
     Options = maybe_add_sys_db_callbacks(DbName, Options0),
     couch_partition:validate_dbname(DbName, Options),
     case gen_server:call(couch_server, {create, DbName, Options}, infinity) of
@@ -251,6 +267,12 @@ init([]) ->
         {read_concurrency, true}
     ]),
     ets:new(couch_dbs_pid_to_name, [set, protected, named_table]),
+    ets:new(couch_dbs_locks, [
+        set,
+        public,
+        named_table,
+        {read_concurrency, true}
+    ]),
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir,
                 engines = Engines,
@@ -773,6 +795,19 @@ get_engine_path(DbName, Engine) when is_binary(DbName), is_atom(Engine) ->
         false ->
             {error, {invalid_engine, Engine}}
     end.
+
+lock(DbName, Reason) when is_binary(DbName), is_binary(Reason) ->
+    case ets:lookup(couch_dbs, DbName) of
+        [] ->
+            true = ets:insert(couch_dbs_locks, {DbName, Reason}),
+            ok;
+        [#entry{}] ->
+            {error, already_opened}
+    end.
+
+unlock(DbName) when is_binary(DbName) ->
+    true = ets:delete(couch_dbs_locks, DbName),
+    ok.
 
 
 -ifdef(TEST).
