@@ -40,7 +40,7 @@ X means done, - means partially
   - [X] Port compact.js
   - [X] Port config.js
   - [X] Port conflicts.js
-  - [ ] Port cookie_auth.js
+  - [X] Port cookie_auth.js
   - [X] Port copy_doc.js
   - [ ] Port design_docs.js
   - [ ] Port design_options.js
@@ -93,7 +93,7 @@ X means done, - means partially
   - [ ] Port show_documents.js
   - [ ] Port stats.js
   - [ ] Port update_documents.js
-  - [ ] Port users_db.js
+  - [X] Port users_db.js
   - [ ] Port users_db_security.js
   - [X] Port utf8.js
   - [X] Port uuids.js
