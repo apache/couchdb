@@ -147,8 +147,8 @@ fauxton: share/www
 .PHONY: check
 # target: check - Test everything
 check: all
-	@$(MAKE) test-cluster-with-quorum
-	@$(MAKE) test-cluster-without-quorum
+	# @$(MAKE) test-cluster-with-quorum
+	# @$(MAKE) test-cluster-without-quorum
 	@$(MAKE) python-black
 	@$(MAKE) eunit
 	@$(MAKE) javascript
@@ -286,39 +286,6 @@ endif
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
 
-.PHONY: test-cluster-with-quorum
-test-cluster-with-quorum: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-test-cluster-with-quorum: devclean
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@dev/run -n 3 -q --with-admin-party-please \
-            --enable-erlang-views --degrade-cluster 1 \
-            "$(TEST_OPTS)" \
-            'test/javascript/run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)" \
-	    --path test/javascript/tests-cluster/with-quorum'
-
-.PHONY: test-cluster-without-quorum
-test-cluster-without-quorum: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-test-cluster-without-quorum: devclean
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@dev/run -n 3 -q --with-admin-party-please \
-            --enable-erlang-views --degrade-cluster 2 \
-            "$(TEST_OPTS)" \
-            'test/javascript/run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)" \
-            --path test/javascript/tests-cluster/without-quorum'
 
 .PHONY: soak-javascript
 soak-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
