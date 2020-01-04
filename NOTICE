@@ -178,6 +178,14 @@ This product also includes the following third-party components:
 
   Copyright (c) 2015 Twitter, Inc.
 
+* esprima.js (https://github.com/jquery/esprima)
+
+  Copyright JS Foundation and other contributors, https://js.foundation/
+
+* escodegen.js (https://github.com/estools/escodegen)
+
+  Copyright (C) 2012 Yusuke Suzuki (twitter: @Constellation) and other contributors.
+
 * hyper
 
   Copyright (c) 2014 Game Analytics ApS

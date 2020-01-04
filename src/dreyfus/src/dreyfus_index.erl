@@ -197,7 +197,7 @@ handle_info({'EXIT', FromPid, {updated, NewSeq}},
                 nil;
             false ->
                 spawn_link(fun() ->
-                    dreyfus_index_updater:update(IndexPid, Index) 
+                    dreyfus_index_updater:update(IndexPid, Index)
                 end)
         end,
         {noreply, State#state{index=Index,
@@ -274,7 +274,7 @@ design_doc_to_index(#doc{id=Id,body={Fields}}, IndexName) ->
                 undefined ->
                     {error, InvalidDDocError};
                 Def ->
-                    Sig = ?l2b(couch_util:to_hex(crypto:hash(md5,
+                    Sig = ?l2b(couch_util:to_hex(couch_hash:md5_hash(
                         term_to_binary({Analyzer, Def})))),
                     {ok, #index{
                         analyzer=Analyzer,

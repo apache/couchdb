@@ -55,7 +55,7 @@ defmodule AttachmentMultipartTest do
         headers: ["Content-Type": "multipart/related;boundary=\"abc123\""]
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     assert resp.body["ok"] == true
 
     resp = Couch.get("/#{db_name}/multipart/foo.txt")
@@ -113,7 +113,7 @@ defmodule AttachmentMultipartTest do
         headers: ["Content-Type": "multipart/related;boundary=\"abc123\""]
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/multipart/bar.txt")
 
@@ -278,7 +278,7 @@ defmodule AttachmentMultipartTest do
         headers: ["Content-Type": "application/binary"]
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     second_rev = resp.body["rev"]
 
     resp =
@@ -289,7 +289,7 @@ defmodule AttachmentMultipartTest do
         headers: ["Content-Type": "text/plain"]
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     third_rev = resp.body["rev"]
 
     resp =

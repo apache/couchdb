@@ -742,6 +742,8 @@ start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
     end,
     {ok, Resp}.
 
+send_chunk({remote, _Pid, _Ref} = Resp, Data) ->
+    couch_httpd:send_chunk(Resp, Data);
 send_chunk(Resp, Data) ->
     Resp:write_chunk(Data),
     {ok, Resp}.

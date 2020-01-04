@@ -188,30 +188,41 @@ db_exists(DbName) -> is_list(catch mem3:shards(DbName)).
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-db_exists_for_existing_db_test() ->
-    start_meck_(),
+db_exists_test_() ->
+    {
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        [
+            fun db_exists_for_existing_db/0,
+            fun db_exists_for_missing_db/0
+        ]
+    }.
+
+
+setup_all() ->
+    meck:new(mem3).
+
+
+teardown_all(_) ->
+    meck:unload().
+
+
+db_exists_for_existing_db() ->
     Mock = fun(DbName) when is_binary(DbName) ->
         [#shard{dbname = DbName, range = [0,100]}]
     end,
     ok = meck:expect(mem3, shards, Mock),
     ?assertEqual(true, db_exists(<<"foobar">>)),
-    ?assertEqual(true, meck:validate(mem3)),
-    stop_meck_().
+    ?assertEqual(true, meck:validate(mem3)).
 
-db_exists_for_missing_db_test() ->
-    start_meck_(),
+
+db_exists_for_missing_db() ->
     Mock = fun(DbName) ->
         erlang:error(database_does_not_exist, DbName)
     end,
     ok = meck:expect(mem3, shards, Mock),
     ?assertEqual(false, db_exists(<<"foobar">>)),
-    ?assertEqual(false, meck:validate(mem3)),
-    stop_meck_().
-
-start_meck_() ->
-    ok = meck:new(mem3).
-
-stop_meck_() ->
-    ok = meck:unload(mem3).
+    ?assertEqual(false, meck:validate(mem3)).
 
 -endif.

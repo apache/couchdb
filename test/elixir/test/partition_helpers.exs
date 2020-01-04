@@ -27,7 +27,7 @@ defmodule PartitionHelpers do
       end
 
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:w => 3, :docs => docs})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   def create_partition_ddoc(db_name, opts \\ %{}) do
@@ -50,7 +50,7 @@ defmodule PartitionHelpers do
     ddoc = Enum.into(opts, default_ddoc)
 
     resp = Couch.put("/#{db_name}/_design/mrtest", body: ddoc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     assert Map.has_key?(resp.body, "ok") == true
   end
 

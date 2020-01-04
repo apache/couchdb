@@ -17,6 +17,26 @@ defmodule PartitionMangoTest do
 
     assert resp.status_code == 200
     assert resp.body["result"] == "created"
+    assert resp.body["id"] != nil
+    assert resp.body["name"] != nil
+
+    # wait until the database reports the index as available
+    retry_until(fn ->
+      get_index(db_name, resp.body["id"], resp.body["name"]) != nil
+    end)
+  end
+
+  def list_indexes(db_name) do
+    resp = Couch.get("/#{db_name}/_index")
+    assert resp.status_code == 200
+    resp.body["indexes"]
+  end
+
+  def get_index(db_name, ddocid, name) do
+    indexes = list_indexes(db_name)
+    Enum.find(indexes, fn(index) ->
+      match?(%{"ddoc" => ^ddocid, "name" => ^name}, index)
+    end)
   end
 
   def get_partitions(resp) do

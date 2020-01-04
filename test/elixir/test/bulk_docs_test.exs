@@ -54,7 +54,7 @@ defmodule BulkDocsTest do
     # Update just the first doc to create a conflict in subsequent bulk update
     doc = hd(docs)
     resp = Couch.put("/#{db}/#{doc._id}", body: doc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     # Attempt to delete all docs
     docs = Enum.map(docs, fn doc -> Map.put(doc, :_deleted, true) end)
 
@@ -133,7 +133,7 @@ defmodule BulkDocsTest do
     retry_until(fn ->
       resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs})
 
-      assert resp.status_code == 201 and length(resp.body) == length(docs), """
+      assert resp.status_code in [201, 202] and length(resp.body) == length(docs), """
       Expected 201 and the same number of response rows as in request, but got
       #{pretty_inspect(resp)}
       """

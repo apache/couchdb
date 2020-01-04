@@ -26,6 +26,7 @@
 -define(TIMEOUT, 360000).
 -define(TIMEOUT_WRITER, 100000).
 -define(TIMEOUT_EUNIT, ?TIMEOUT div 1000 + 70).
+-define(WRITE_BATCH_SIZE, 25).
 
 setup() ->
     DbName = ?tempdb(),
@@ -408,33 +409,35 @@ writer_loop(Db0, Parent, Counter) ->
     DbName = couch_db:name(Db0),
     {ok, Data} = file:read_file(?ATTFILE),
     maybe_pause(Parent, Counter),
-    Doc = couch_doc:from_json_obj({[
-        {<<"_id">>, ?l2b(integer_to_list(Counter + 1))},
-        {<<"value">>, Counter + 1},
-        {<<"_attachments">>, {[
-            {<<"icon1.png">>, {[
-                {<<"data">>, base64:encode(Data)},
-                {<<"content_type">>, <<"image/png">>}
-            ]}},
-            {<<"icon2.png">>, {[
-                {<<"data">>, base64:encode(iolist_to_binary([Data, Data]))},
-                {<<"content_type">>, <<"image/png">>}
+    Docs = lists:map(fun(I) ->
+        couch_doc:from_json_obj({[
+            {<<"_id">>, ?l2b(integer_to_list(Counter + I))},
+            {<<"value">>, Counter + I},
+            {<<"_attachments">>, {[
+                {<<"icon1.png">>, {[
+                    {<<"data">>, base64:encode(Data)},
+                    {<<"content_type">>, <<"image/png">>}
+                ]}},
+                {<<"icon2.png">>, {[
+                    {<<"data">>, base64:encode(iolist_to_binary([Data, Data]))},
+                    {<<"content_type">>, <<"image/png">>}
+                ]}}
             ]}}
-        ]}}
-    ]}),
+        ]})
+    end, lists:seq(1, ?WRITE_BATCH_SIZE)),
     maybe_pause(Parent, Counter),
     {ok, Db} = couch_db:open_int(DbName, []),
-    {ok, _} = couch_db:update_doc(Db, Doc, []),
+    {ok, _} = couch_db:update_docs(Db, Docs, []),
     ok = couch_db:close(Db),
     receive
         {get_count, Ref} ->
-            Parent ! {count, Ref, Counter + 1},
-            writer_loop(Db, Parent, Counter + 1);
+            Parent ! {count, Ref, Counter + ?WRITE_BATCH_SIZE},
+            writer_loop(Db, Parent, Counter + ?WRITE_BATCH_SIZE);
         {stop, Ref} ->
-            Parent ! {stopped, Ref, Counter + 1}
+            Parent ! {stopped, Ref, Counter + ?WRITE_BATCH_SIZE}
     after 0 ->
         timer:sleep(?DELAY),
-        writer_loop(Db, Parent, Counter + 1)
+        writer_loop(Db, Parent, Counter + ?WRITE_BATCH_SIZE)
     end.
 
 maybe_pause(Parent, Counter) ->
