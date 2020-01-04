@@ -60,7 +60,7 @@ defmodule CompactTest do
   defp populate(db) do
     docs = create_docs(0..19)
     resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     docs = rev(docs, resp.body)
 
     doc = %{
@@ -71,14 +71,14 @@ defmodule CompactTest do
     }
 
     resp = Couch.put("/#{db}/#{doc._id}", body: doc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     docs
   end
 
   defp delete(db, docs) do
     docs = Enum.map(docs, &Map.put(&1, :_deleted, true))
     resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     assert Couch.post("/#{db}/_ensure_full_commit").body["ok"] == true
   end
 

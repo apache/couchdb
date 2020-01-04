@@ -1870,13 +1870,19 @@ set_design_doc_end_key(Options, rev) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-setup() ->
+setup_all() ->
     ok = meck:new(couch_epi, [passthrough]),
     ok = meck:expect(couch_epi, decide, fun(_, _, _, _, _) -> no_decision end),
     ok.
 
+teardown_all(_) ->
+    meck:unload().
+
+setup() ->
+    meck:reset([couch_epi]).
+
 teardown(_) ->
-    (catch meck:unload(couch_epi)).
+    ok.
 
 validate_dbname_success_test_() ->
     Cases =
@@ -1886,8 +1892,15 @@ validate_dbname_success_test_() ->
             [generate_cases_with_shards(?b2l(SystemDb))
                 || SystemDb <- ?SYSTEM_DATABASES]),
     {
-        foreach, fun setup/0, fun teardown/1,
-        [should_pass_validate_dbname(A) || {_, A} <- Cases]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [should_pass_validate_dbname(A) || {_, A} <- Cases]
+        }
     }.
 
 validate_dbname_fail_test_() ->
@@ -1898,8 +1911,15 @@ validate_dbname_fail_test_() ->
        ++ generate_cases("!abcdefg/werwej/_users")
        ++ generate_cases_with_shards("!abcdefg/werwej/_users"),
     {
-        foreach, fun setup/0, fun teardown/1,
-        [should_fail_validate_dbname(A) || {_, A} <- Cases]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [should_fail_validate_dbname(A) || {_, A} <- Cases]
+        }
     }.
 
 normalize_dbname_test_() ->
@@ -1941,19 +1961,24 @@ should_fail_validate_dbname(DbName) ->
 
 calculate_start_seq_test_() ->
     {
-        foreach,
-        fun setup_start_seq/0,
-        fun teardown_start_seq/1,
-        [
-            t_calculate_start_seq_uuid_mismatch(),
-            t_calculate_start_seq_is_owner(),
-            t_calculate_start_seq_not_owner(),
-            t_calculate_start_seq_raw(),
-            t_calculate_start_seq_epoch_mismatch()
-        ]
+        setup,
+        fun setup_start_seq_all/0,
+        fun teardown_start_seq_all/1,
+        {
+            foreach,
+            fun setup_start_seq/0,
+            fun teardown_start_seq/1,
+            [
+                t_calculate_start_seq_uuid_mismatch(),
+                t_calculate_start_seq_is_owner(),
+                t_calculate_start_seq_not_owner(),
+                t_calculate_start_seq_raw(),
+                t_calculate_start_seq_epoch_mismatch()
+            ]
+        }
     }.
 
-setup_start_seq() ->
+setup_start_seq_all() ->
     meck:new(couch_db_engine, [passthrough]),
     meck:expect(couch_db_engine, get_uuid, fun(_) -> <<"foo">> end),
     ok = meck:expect(couch_log, warning, 2, ok),
@@ -1963,8 +1988,17 @@ setup_start_seq() ->
     ],
     meck:expect(couch_db_engine, get_epochs, fun(_) -> Epochs end).
 
-teardown_start_seq(_) ->
+teardown_start_seq_all(_) ->
     meck:unload().
+
+setup_start_seq() ->
+    meck:reset([
+        couch_db_engine,
+        couch_log
+    ]).
+
+teardown_start_seq(_) ->
+    ok.
 
 t_calculate_start_seq_uuid_mismatch() ->
     ?_test(begin

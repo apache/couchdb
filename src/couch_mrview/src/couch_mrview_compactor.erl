@@ -248,11 +248,23 @@ remove_compacted(#mrst{sig = Sig, db_name = DbName} = State) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+setup_all() ->
+    meck:new(couch_index_updater),
+    meck:new(couch_log).
+
+teardown_all(_) ->
+    meck:unload().
+
 recompact_test_() ->
-    [
-        recompact_success_after_progress(),
-        recompact_exceeded_retry_count()
-    ].
+    {
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        [
+            recompact_success_after_progress(),
+            recompact_exceeded_retry_count()
+        ]
+    }.
 
 recompact_success_after_progress() ->
     ?_test(begin
@@ -262,12 +274,8 @@ recompact_success_after_progress() ->
                 timer:sleep(100),
                 exit({updated, self(), State#mrst{update_seq = 2}})
         end),
-        try
-            State = #mrst{fd=self(), update_seq=0},
-            ?assertEqual({ok, State#mrst{update_seq = 2}}, recompact(State))
-        after
-            meck:unload(couch_index_updater)
-        end
+        State = #mrst{fd=self(), update_seq=0},
+        ?assertEqual({ok, State#mrst{update_seq = 2}}, recompact(State))
     end).
 
 recompact_exceeded_retry_count() ->
@@ -277,15 +285,10 @@ recompact_exceeded_retry_count() ->
                 exit(error)
         end),
         ok = meck:expect(couch_log, warning, fun(_, _) -> ok end),
-        try
-            State = #mrst{fd=self(), db_name=foo, idx_name=bar},
-            ExpectedError = {exceeded_recompact_retry_count,
-                [{db_name, foo}, {idx_name, bar}]},
-                ?assertError(ExpectedError, recompact(State))
-        after
-            meck:unload(couch_log),
-            meck:unload(couch_index_updater)
-        end
+        State = #mrst{fd=self(), db_name=foo, idx_name=bar},
+        ExpectedError = {exceeded_recompact_retry_count,
+            [{db_name, foo}, {idx_name, bar}]},
+            ?assertError(ExpectedError, recompact(State))
     end).
 
 -endif.

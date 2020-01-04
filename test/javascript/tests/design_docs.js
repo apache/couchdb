@@ -45,6 +45,7 @@ couchTests.design_docs = function(debug) {
     var designDoc = {
       _id: "_design/test",
       language: "javascript",
+      autoupdate: false,
       whatever : {
         stringzone : "exports.string = 'plankton';",
         commonjs : {

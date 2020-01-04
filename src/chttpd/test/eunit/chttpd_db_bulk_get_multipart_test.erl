@@ -18,39 +18,60 @@
 -define(TIMEOUT, 3000).
 
 
-setup() ->
+setup_all() ->
     mock(config),
     mock(chttpd),
     mock(couch_epi),
     mock(couch_httpd),
     mock(couch_stats),
     mock(fabric),
-    mock(mochireq),
-    Pid = spawn_accumulator(),
-    Pid.
+    mock(mochireq).
+
+
+teardown_all(_) ->
+    meck:unload().
+
+
+setup() ->
+    meck:reset([
+        config,
+        chttpd,
+        couch_epi,
+        couch_httpd,
+        couch_stats,
+        fabric,
+        mochireq
+    ]),
+    spawn_accumulator().
 
 
 teardown(Pid) ->
-    ok = stop_accumulator(Pid),
-    meck:unload().
+    ok = stop_accumulator(Pid).
 
 
 bulk_get_test_() ->
     {
         "/db/_bulk_get tests",
         {
-            foreach, fun setup/0, fun teardown/1,
-            [
-                fun should_require_docs_field/1,
-                fun should_not_accept_specific_query_params/1,
-                fun should_return_empty_results_on_no_docs/1,
-                fun should_get_doc_with_all_revs/1,
-                fun should_validate_doc_with_bad_id/1,
-                fun should_validate_doc_with_bad_rev/1,
-                fun should_validate_missing_doc/1,
-                fun should_validate_bad_atts_since/1,
-                fun should_include_attachments_when_atts_since_specified/1
-            ]
+            setup,
+            fun setup_all/0,
+            fun teardown_all/1,
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    fun should_require_docs_field/1,
+                    fun should_not_accept_specific_query_params/1,
+                    fun should_return_empty_results_on_no_docs/1,
+                    fun should_get_doc_with_all_revs/1,
+                    fun should_validate_doc_with_bad_id/1,
+                    fun should_validate_doc_with_bad_rev/1,
+                    fun should_validate_missing_doc/1,
+                    fun should_validate_bad_atts_since/1,
+                    fun should_include_attachments_when_atts_since_specified/1
+                ]
+            }
         }
     }.
 
@@ -65,12 +86,10 @@ should_not_accept_specific_query_params(_) ->
     Req = fake_request({[{<<"docs">>, []}]}),
     Db  = test_util:fake_db([{name, <<"foo">>}]),
     lists:map(fun (Param) ->
-        {Param, ?_assertThrow({bad_request, _},
-                              begin
-                                  ok = meck:expect(chttpd, qs,
-                                                   fun(_) -> [{Param, ""}] end),
-                                  chttpd_db:db_req(Req, Db)
-                              end)}
+        {Param, ?_assertThrow({bad_request, _}, begin
+            BadReq = Req#httpd{qs = [{Param, ""}]},
+            chttpd_db:db_req(BadReq, Db)
+        end)}
     end, ["rev", "open_revs", "atts_since", "w", "new_edits"]).
 
 

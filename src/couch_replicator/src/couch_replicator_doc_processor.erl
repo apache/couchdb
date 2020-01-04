@@ -614,25 +614,30 @@ cluster_membership_foldl(#rdoc{id = {DbName, DocId} = Id, rid = RepId}, nil) ->
 
 doc_processor_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_bad_change(),
-            t_regular_change(),
-            t_change_with_doc_processor_crash(),
-            t_change_with_existing_job(),
-            t_deleted_change(),
-            t_triggered_change(),
-            t_completed_change(),
-            t_active_replication_completed(),
-            t_error_change(),
-            t_failed_change(),
-            t_change_for_different_node(),
-            t_change_when_cluster_unstable(),
-            t_ejson_docs(),
-            t_cluster_membership_foldl()
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_bad_change(),
+                t_regular_change(),
+                t_change_with_doc_processor_crash(),
+                t_change_with_existing_job(),
+                t_deleted_change(),
+                t_triggered_change(),
+                t_completed_change(),
+                t_active_replication_completed(),
+                t_error_change(),
+                t_failed_change(),
+                t_change_for_different_node(),
+                t_change_when_cluster_unstable(),
+                t_ejson_docs(),
+                t_cluster_membership_foldl()
+            ]
+        }
     }.
 
 
@@ -829,7 +834,7 @@ get_worker_ref_test_() ->
 % Test helper functions
 
 
-setup() ->
+setup_all() ->
     meck:expect(couch_log, info, 2, ok),
     meck:expect(couch_log, notice, 2, ok),
     meck:expect(couch_log, warning, 2, ok),
@@ -845,15 +850,32 @@ setup() ->
     end),
     meck:expect(couch_replicator_scheduler, remove_job, 1, ok),
     meck:expect(couch_replicator_docs, remove_state_fields, 2, ok),
-    meck:expect(couch_replicator_docs, update_failed, 3, ok),
+    meck:expect(couch_replicator_docs, update_failed, 3, ok).
+
+
+teardown_all(_) ->
+    meck:unload().
+
+
+setup() ->
+    meck:reset([
+        config,
+        couch_log,
+        couch_replicator_clustering,
+        couch_replicator_doc_processor_worker,
+        couch_replicator_docs,
+        couch_replicator_scheduler
+    ]),
+    % Set this expectation back to the default for
+    % each test since some tests change it
+    meck:expect(couch_replicator_clustering, owner, 2, node()),
     {ok, Pid} = start_link(),
     unlink(Pid),
     Pid.
 
 
 teardown(Pid) ->
-    exit(Pid, kill),
-    meck:unload().
+    exit(Pid, kill).
 
 
 removed_state_fields() ->

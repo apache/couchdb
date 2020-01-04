@@ -250,8 +250,9 @@ info_from_doc(RepDb, {Props}) ->
                         end
             end;
         failed ->
-            Info = get_value(<<"_replication_state_reason">>, Props, null),
-            {State0, Info, 1, StateTime};
+            Info = get_value(<<"_replication_state_reason">>, Props, nil),
+            EJsonInfo = couch_replicator_utils:ejson_state_info(Info),
+            {State0, EJsonInfo, 1, StateTime};
         _OtherState ->
             {null, null, 0, null}
     end,
@@ -345,11 +346,13 @@ expect_rep_user_ctx(Name, Role) ->
 
 strip_url_creds_test_() ->
      {
-        foreach,
-        fun () -> meck:expect(config, get,
-            fun(_, _, Default) -> Default end)
+        setup,
+        fun() ->
+            meck:expect(config, get, fun(_, _, Default) -> Default end)
         end,
-        fun (_) -> meck:unload() end,
+        fun(_) ->
+            meck:unload()
+        end,
         [
             t_strip_http_basic_creds(),
             t_strip_http_props_creds(),

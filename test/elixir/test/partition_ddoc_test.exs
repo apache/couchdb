@@ -16,7 +16,7 @@ defmodule PartitionDDocTest do
   test "PUT /dbname/_design/foo", context do
     db_name = context[:db_name]
     resp = Couch.put("/#{db_name}/_design/foo", body: %{stuff: "here"})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   test "PUT /dbname/_design/foo to update", context do
@@ -29,13 +29,13 @@ defmodule PartitionDDocTest do
     }
 
     resp = Couch.put("/#{db_name}/#{ddoc_id}", body: ddoc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{body: body} = resp
 
     ddoc = Map.put(ddoc, :_rev, body["rev"])
     ddoc = Map.put(ddoc, :other, "attribute")
     resp = Couch.put("/#{db_name}/#{ddoc_id}", body: ddoc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   test "PUT /dbname/_design/foo/readme.txt", context do
@@ -48,7 +48,7 @@ defmodule PartitionDDocTest do
     }
 
     resp = Couch.put("/#{db_name}/#{ddoc_id}", body: ddoc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{body: body} = resp
 
     att = "This is a readme.txt"
@@ -60,7 +60,7 @@ defmodule PartitionDDocTest do
     ]
 
     resp = Couch.put("/#{db_name}/#{ddoc_id}/readme.txt", opts)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   test "DELETE /dbname/_design/foo", context do
@@ -73,7 +73,7 @@ defmodule PartitionDDocTest do
     }
 
     resp = Couch.put("/#{db_name}/#{ddoc_id}", body: ddoc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{body: body} = resp
 
     resp = Couch.delete("/#{db_name}/#{ddoc_id}", query: [rev: body["rev"]])
@@ -84,20 +84,20 @@ defmodule PartitionDDocTest do
     db_name = context[:db_name]
     body = %{_id: "_design/foo", stuff: "here"}
     resp = Couch.post("/#{db_name}", body: body)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   test "POST /dbname/_bulk_docs with design doc", context do
     db_name = context[:db_name]
     body = %{:docs => [%{_id: "_design/foo", stuff: "here"}]}
     resp = Couch.post("/#{db_name}/_bulk_docs", body: body)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   test "GET /dbname/_design/foo", context do
     db_name = context[:db_name]
     resp = Couch.put("/#{db_name}/_design/foo", body: %{stuff: "here"})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/_design/foo")
     assert resp.status_code == 200
@@ -106,7 +106,7 @@ defmodule PartitionDDocTest do
   test "GET /dbname/_design/foo?rev=$rev", context do
     db_name = context[:db_name]
     resp = Couch.put("/#{db_name}/_design/foo", body: %{stuff: "here"})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{body: body} = resp
 
     resp = Couch.get("/#{db_name}/_design/foo", query: [rev: body["rev"]])
@@ -116,7 +116,7 @@ defmodule PartitionDDocTest do
   test "GET /dbname/_bulk_get", context do
     db_name = context[:db_name]
     resp = Couch.put("/#{db_name}/_design/foo", body: %{stuff: "here"})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     body = %{docs: [%{id: "_design/foo"}]}
     resp = Couch.post("/#{db_name}/_bulk_get", body: body)
@@ -131,7 +131,7 @@ defmodule PartitionDDocTest do
   test "GET /dbname/_bulk_get with rev", context do
     db_name = context[:db_name]
     resp = Couch.put("/#{db_name}/_design/foo", body: %{stuff: "here"})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{body: body} = resp
 
     body = %{docs: [%{id: "_design/foo", rev: body["rev"]}]}
@@ -146,7 +146,7 @@ defmodule PartitionDDocTest do
   test "GET /dbname/_all_docs?key=$ddoc_id", context do
     db_name = context[:db_name]
     resp = Couch.put("/#{db_name}/_design/foo", body: %{stuff: "here"}, query: [w: 3])
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/_all_docs", query: [key: "\"_design/foo\""])
     assert resp.status_code == 200
@@ -163,7 +163,7 @@ defmodule PartitionDDocTest do
     retry_until(
       fn ->
         resp = Couch.put("/#{db_name}/_design/foo", body: %{stuff: "here"})
-        assert resp.status_code == 201
+        assert resp.status_code in [201, 202]
 
         resp = Couch.get("/#{db_name}/_design_docs")
         assert resp.status_code == 200

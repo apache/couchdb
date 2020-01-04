@@ -17,7 +17,7 @@ defmodule PartitionCrudTest do
 
     resp = Couch.put(url, body: %{partitioned_doc: true})
     %{body: doc} = resp
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     assert doc["id"] == id
 
     resp = Couch.get(url)
@@ -85,7 +85,7 @@ defmodule PartitionCrudTest do
     url = "/#{db_name}"
 
     resp = Couch.post(url, body: %{_id: id, partitioned_doc: true})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("#{url}/#{id}")
     assert resp.status_code == 200
@@ -110,7 +110,7 @@ defmodule PartitionCrudTest do
     url = "/#{db_name}"
 
     resp = Couch.post(url, body: %{_id: id, partitioned_doc: true})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.post("#{url}/_bulk_get", body: %{docs: [%{id: id}]})
     assert resp.status_code == 200
@@ -185,7 +185,7 @@ defmodule PartitionCrudTest do
 
     url = "/#{db_name}"
     resp = Couch.post("#{url}/_bulk_docs", body: %{:docs => docs})
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("#{url}/foo:1")
     assert resp.status_code == 200
@@ -268,7 +268,7 @@ defmodule PartitionCrudTest do
 
     resp = Couch.put("/#{db_name}/#{id}", body: doc)
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/#{id}")
     assert resp.status_code == 200
@@ -298,7 +298,7 @@ defmodule PartitionCrudTest do
         body: "This is another document"
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{:body => body} = resp
     assert body["ok"] == true
     assert body["id"] == id
@@ -314,7 +314,7 @@ defmodule PartitionCrudTest do
     }
 
     resp = Couch.post("/#{db_name}", query: [w: 3], body: doc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{body: body} = resp
     rev = body["rev"]
 
@@ -323,7 +323,7 @@ defmodule PartitionCrudTest do
 
     body = %{"foo:bar" => [rev]}
     resp = Couch.post("/#{db_name}/_purge", query: [w: 3], body: body)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/foo:bar")
     assert resp.status_code == 404
@@ -353,7 +353,7 @@ defmodule PartitionCrudTest do
   test "can create unpartitioned system db", _context do
     Couch.delete("/_replicator")
     resp = Couch.put("/_replicator")
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     assert resp.body == %{"ok" => true}
   end
 

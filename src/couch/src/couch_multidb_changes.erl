@@ -342,41 +342,46 @@ is_design_doc_id(_) ->
 
 couch_multidb_changes_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_handle_call_change(),
-            t_handle_call_change_filter_design_docs(),
-            t_handle_call_checkpoint_new(),
-            t_handle_call_checkpoint_existing(),
-            t_handle_info_created(),
-            t_handle_info_deleted(),
-            t_handle_info_updated(),
-            t_handle_info_other_event(),
-            t_handle_info_created_other_db(),
-            t_handle_info_scanner_exit_normal(),
-            t_handle_info_scanner_crashed(),
-            t_handle_info_event_server_exited(),
-            t_handle_info_unknown_pid_exited(),
-            t_handle_info_change_feed_exited(),
-            t_handle_info_change_feed_exited_and_need_rescan(),
-            t_spawn_changes_reader(),
-            t_changes_reader_cb_change(),
-            t_changes_reader_cb_stop(),
-            t_changes_reader_cb_other(),
-            t_handle_call_resume_scan_no_chfeed_no_ets_entry(),
-            t_handle_call_resume_scan_chfeed_no_ets_entry(),
-            t_handle_call_resume_scan_chfeed_ets_entry(),
-            t_handle_call_resume_scan_no_chfeed_ets_entry(),
-            t_start_link(),
-            t_start_link_no_ddocs(),
-            t_misc_gen_server_callbacks()
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_handle_call_change(),
+                t_handle_call_change_filter_design_docs(),
+                t_handle_call_checkpoint_new(),
+                t_handle_call_checkpoint_existing(),
+                t_handle_info_created(),
+                t_handle_info_deleted(),
+                t_handle_info_updated(),
+                t_handle_info_other_event(),
+                t_handle_info_created_other_db(),
+                t_handle_info_scanner_exit_normal(),
+                t_handle_info_scanner_crashed(),
+                t_handle_info_event_server_exited(),
+                t_handle_info_unknown_pid_exited(),
+                t_handle_info_change_feed_exited(),
+                t_handle_info_change_feed_exited_and_need_rescan(),
+                t_spawn_changes_reader(),
+                t_changes_reader_cb_change(),
+                t_changes_reader_cb_stop(),
+                t_changes_reader_cb_other(),
+                t_handle_call_resume_scan_no_chfeed_no_ets_entry(),
+                t_handle_call_resume_scan_chfeed_no_ets_entry(),
+                t_handle_call_resume_scan_chfeed_ets_entry(),
+                t_handle_call_resume_scan_no_chfeed_ets_entry(),
+                t_start_link(),
+                t_start_link_no_ddocs(),
+                t_misc_gen_server_callbacks()
+            ]
+        }
     }.
 
 
-setup() ->
+setup_all() ->
     mock_logs(),
     mock_callback_mod(),
     meck:expect(couch_event, register_all, 1, ok),
@@ -397,10 +402,24 @@ setup() ->
     EvtPid.
 
 
-teardown(EvtPid) ->
+teardown_all(EvtPid) ->
     unlink(EvtPid),
     exit(EvtPid, kill),
     meck:unload().
+
+
+setup() ->
+    meck:reset([
+        ?MOD,
+        couch_changes,
+        couch_db,
+        couch_event,
+        couch_log
+    ]).
+
+
+teardown(_) ->
+    ok.
 
 
 t_handle_call_change() ->
@@ -728,38 +747,41 @@ t_misc_gen_server_callbacks() ->
 
 scan_dbs_test_() ->
 {
-    foreach,
-    fun() -> test_util:start_couch([mem3, fabric]) end,
-    fun(Ctx) -> test_util:stop_couch(Ctx) end,
-    [
-        t_find_shard(),
-        t_shard_not_found(),
-        t_pass_local(),
-        t_fail_local()
-    ]
+    setup,
+    fun() ->
+        Ctx = test_util:start_couch([mem3, fabric]),
+        GlobalDb = ?tempdb(),
+        ok = fabric:create_db(GlobalDb, [?CTX]),
+        #shard{name = LocalDb} = hd(mem3:local_shards(GlobalDb)),
+        {Ctx, GlobalDb, LocalDb}
+    end,
+    fun({Ctx, GlobalDb, _LocalDb}) ->
+        fabric:delete_db(GlobalDb, [?CTX]),
+        test_util:stop_couch(Ctx)
+    end,
+    {with, [
+        fun t_find_shard/1,
+        fun t_shard_not_found/1,
+        fun t_pass_local/1,
+        fun t_fail_local/1
+    ]}
 }.
 
 
-t_find_shard() ->
+t_find_shard({_, DbName, _}) ->
     ?_test(begin
-        DbName = ?tempdb(),
-        ok = fabric:create_db(DbName, [?CTX]),
-        ?assertEqual(2, length(local_shards(DbName))),
-        fabric:delete_db(DbName, [?CTX])
+        ?assertEqual(2, length(local_shards(DbName)))
     end).
 
 
-t_shard_not_found() ->
+t_shard_not_found(_) ->
     ?_test(begin
         ?assertEqual([], local_shards(?tempdb()))
     end).
 
 
-t_pass_local() ->
+t_pass_local({_, _, LocalDb}) ->
     ?_test(begin
-        LocalDb = ?tempdb(),
-        {ok, Db} = couch_db:create(LocalDb, [?CTX]),
-        ok = couch_db:close(Db),
         scan_local_db(self(), LocalDb),
         receive
             {'$gen_cast', Msg} ->
@@ -770,11 +792,8 @@ t_pass_local() ->
     end).
 
 
-t_fail_local() ->
+t_fail_local({_, _, LocalDb}) ->
     ?_test(begin
-        LocalDb = ?tempdb(),
-        {ok, Db} = couch_db:create(LocalDb, [?CTX]),
-        ok = couch_db:close(Db),
         scan_local_db(self(), <<"some_other_db">>),
         receive
             {'$gen_cast', Msg} ->

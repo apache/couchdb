@@ -381,40 +381,52 @@ forbid_index_all() ->
 -include_lib("eunit/include/eunit.hrl").
 
 
-setup() ->
+setup_all() ->
     Ctx = test_util:start_couch(),
     meck:expect(couch_log, warning, 2,
         fun(_,_) ->
             throw({test_error, logged_warning})
         end),
+    Ctx.
+
+
+teardown_all(Ctx) ->
+    meck:unload(),
+    test_util:stop_couch(Ctx).
+
+
+setup() ->
     %default index all def that generates {fields, all_fields}
     Index = #idx{def={[]}},
     DbName = <<"testdb">>,
     UserCtx = #user_ctx{name = <<"u1">>},
     {ok, Db} = couch_db:clustered_db(DbName, UserCtx),
-    {Index, Db, Ctx}.
+    {Index, Db}.
 
 
-teardown({_, _, Ctx}) ->
-    meck:unload(),
-    test_util:stop_couch(Ctx).
+teardown(_) ->
+    ok.
 
 
 index_all_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            fun forbid_index_all/1,
-            fun default_and_false_index_all/1,
-            fun warn_index_all/1
-        ]
-
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                fun forbid_index_all/1,
+                fun default_and_false_index_all/1,
+                fun warn_index_all/1
+            ]
+        }
     }.
 
 
-forbid_index_all({Idx, Db, _}) ->
+forbid_index_all({Idx, Db}) ->
     ?_test(begin
         ok = config:set("mango", "index_all_disabled", "true", false),
         ?assertThrow({mango_error, ?MODULE, index_all_disabled},
@@ -423,8 +435,9 @@ forbid_index_all({Idx, Db, _}) ->
     end).
 
 
-default_and_false_index_all({Idx, Db, _}) ->
+default_and_false_index_all({Idx, Db}) ->
     ?_test(begin
+        config:delete("mango", "index_all_disabled", false),
         {ok, #idx{def={Def}}} = validate_new(Idx, Db),
         Fields = couch_util:get_value(fields, Def),
         ?assertEqual(all_fields, Fields),
@@ -435,7 +448,7 @@ default_and_false_index_all({Idx, Db, _}) ->
     end).
 
 
-warn_index_all({Idx, Db, _}) ->
+warn_index_all({Idx, Db}) ->
     ?_test(begin
         ok = config:set("mango", "index_all_disabled", "warn", false),
         ?assertThrow({test_error, logged_warning}, validate_new(Idx, Db))

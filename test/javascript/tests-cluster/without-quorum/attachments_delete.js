@@ -10,6 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.skip = true;
 couchTests.attachments_delete= function(debug) {
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
@@ -26,7 +27,7 @@ couchTests.attachments_delete= function(debug) {
   var rev = JSON.parse(xhr.responseText).rev;
 
   xhr = CouchDB.request("DELETE", "/" + db_name + "/dummy/foo.txt?rev=" + rev);
-  console.log("Skipped-TODO: Clarify correct behaviour. Is not considering quorum. 202->"+xhr.status);
+  console.log("TODO: Clarify correct behaviour. Is not considering quorum. 202->"+xhr.status);
   //TODO: Define correct behaviour
   //T(xhr.status == 202,"Should return 202 Accepted but returns "+xhr.status);
 

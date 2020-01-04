@@ -98,6 +98,8 @@ start_applications([App|Apps], Acc) when App == kernel; App == stdlib ->
     start_applications(Apps, Acc);
 start_applications([App|Apps], Acc) ->
     case application:start(App) of
+    {error, {already_started, crypto}} ->
+        start_applications(Apps, [crypto | Acc]);
     {error, {already_started, App}} ->
         io:format(standard_error, "Application ~s was left running!~n", [App]),
         application:stop(App),
