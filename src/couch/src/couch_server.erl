@@ -226,6 +226,9 @@ init([]) ->
     % Mark partitioned databases as a supported feature
     config:enable_feature(partitioned),
 
+    % Mark being able to receive documents with an _access property as a supported feature
+    config:enable_feature('access-ready'),
+
     % read config and register for configuration changes
 
     % just stop if one of the config settings change. couch_server_sup

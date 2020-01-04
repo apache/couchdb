@@ -147,8 +147,8 @@ fauxton: share/www
 .PHONY: check
 # target: check - Test everything
 check: all
-	@$(MAKE) test-cluster-with-quorum
-	@$(MAKE) test-cluster-without-quorum
+	# @$(MAKE) test-cluster-with-quorum
+	# @$(MAKE) test-cluster-without-quorum
 	@$(MAKE) python-black
 	@$(MAKE) eunit
 	@$(MAKE) javascript
@@ -169,6 +169,7 @@ endif
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
@@ -223,7 +224,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run "$(TEST_OPTS)" rel/overlay/bin/couchup test/javascript/run
+		. dev/run rel/overlay/bin/couchup test/javascript/run
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -235,8 +236,9 @@ python-black-update: .venv/bin/black
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
+elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 --enable-erlang-views --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
@@ -269,6 +271,7 @@ elixir-credo: elixir-init
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
+javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 javascript: devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
@@ -283,39 +286,9 @@ endif
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
 
-.PHONY: test-cluster-with-quorum
-test-cluster-with-quorum: devclean
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@dev/run -n 3 -q --with-admin-party-please \
-            --enable-erlang-views --degrade-cluster 1 \
-            "$(TEST_OPTS)" \
-            'test/javascript/run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)" \
-	    --path test/javascript/tests-cluster/with-quorum'
-
-.PHONY: test-cluster-without-quorum
-test-cluster-without-quorum: devclean
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@dev/run -n 3 -q --with-admin-party-please \
-            --enable-erlang-views --degrade-cluster 2 \
-            "$(TEST_OPTS)" \
-            'test/javascript/run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)" \
-            --path test/javascript/tests-cluster/without-quorum'
 
 .PHONY: soak-javascript
+soak-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 soak-javascript:
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
@@ -370,6 +343,7 @@ build-test:
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
+mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \

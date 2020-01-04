@@ -12,6 +12,7 @@
 
 couchTests.skip = true;
 couchTests.doc_copy_overriden_quorum = function(debug) {
+  return console.log('done in test/elixir/test/cluster_with_quorum_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"},{"w":3});
   db.createDb();

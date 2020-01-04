@@ -12,6 +12,7 @@
 
 couchTests.elixir = true;
 couchTests.all_docs = function(debug) {
+  return console.log('done in test/elixir/test/all_docs_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"}, {w: 3});
   db.createDb();
