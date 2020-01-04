@@ -12,6 +12,7 @@
 
 couchTests.skip = true;
 couchTests.attachments_delete= function(debug) {
+  return console.log('done in test/elixir/test/cluster_without_quorum_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
