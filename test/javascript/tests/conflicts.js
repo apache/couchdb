@@ -11,6 +11,7 @@
 // the License.
 
 // Do some edit conflict detection tests
+couchTests.elixir = true;
 couchTests.conflicts = function(debug) {
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});

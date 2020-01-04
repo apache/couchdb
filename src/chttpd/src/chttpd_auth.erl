@@ -51,6 +51,9 @@ cookie_authentication_handler(Req) ->
 proxy_authentication_handler(Req) ->
     couch_httpd_auth:proxy_authentication_handler(Req).
 
+party_mode_handler(#httpd{method='POST', path_parts=[<<"_session">>]} = Req) ->
+    % See #1947 - users should always be able to attempt a login
+    Req#httpd{user_ctx=#user_ctx{}};
 party_mode_handler(Req) ->
     case config:get("chttpd", "require_valid_user", "false") of
     "true" ->

@@ -106,7 +106,7 @@ defmodule LotsOfDocsTest do
   defp bulk_post(docs, db) do
     resp = Couch.post("/#{db}/_bulk_docs", query: [w: 3], body: %{docs: docs})
 
-    assert resp.status_code == 201 and length(resp.body) == length(docs), """
+    assert resp.status_code in [201, 202] and length(resp.body) == length(docs), """
     Expected 201 and the same number of response rows as in request, but got
     #{pretty_inspect(resp)}
     """

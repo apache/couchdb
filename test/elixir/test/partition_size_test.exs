@@ -53,13 +53,13 @@ defmodule PartitionSizeTest do
 
     retry_until(fn ->
       resp = Couch.post("/#{db_name}/_bulk_docs", body: body)
-      assert resp.status_code == 201
+      assert resp.status_code in [201, 202]
     end)
   end
 
   def save_doc(db_name, doc) do
     resp = Couch.post("/#{db_name}", query: [w: 3], body: doc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{:body => body} = resp
     body["rev"]
   end
@@ -350,7 +350,7 @@ defmodule PartitionSizeTest do
       end)
 
     resp = Couch.post("/#{db_name}/_purge", query: [w: 3], body: pbody)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     post_info = get_partition_info(db_name, partition)
     assert post_info["doc_count"] == pre_info["doc_count"] - 50

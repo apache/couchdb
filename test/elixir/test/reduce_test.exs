@@ -31,8 +31,8 @@ defmodule ReduceTest do
     assert Couch.put("/#{db_name}/_design/foo", body: red_doc).body["ok"]
     docs = make_docs(1..num_docs)
 
-    assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code ==
-             201
+    assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code in
+             [201, 202]
 
     rows = Couch.get(view_url).body["rows"]
     assert hd(rows)["value"] == 2 * summate(num_docs)
@@ -92,8 +92,8 @@ defmodule ReduceTest do
           %{keys: ["d", "c"]}
         ]
 
-        assert Couch.post("/#{db_name}/_bulk_docs", body: %{docs: docs}, query: %{w: 3}).status_code ==
-                 201
+        assert Couch.post("/#{db_name}/_bulk_docs", body: %{docs: docs}, query: %{w: 3}).status_code in
+                 [201, 202]
 
         total_docs = 1 + (i - 1) * 10 * 11 + (j + 1) * 11
         assert Couch.get("/#{db_name}").body["doc_count"] == total_docs
@@ -193,8 +193,8 @@ defmodule ReduceTest do
     Enum.each(1..10, fn _ ->
       docs = for i <- 1..10, do: %{val: i * 10}
 
-      assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code ==
-               201
+      assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code in
+               [201, 202]
     end)
 
     rows = Couch.get(view_url).body["rows"]
@@ -226,8 +226,9 @@ defmodule ReduceTest do
     assert Couch.put("/#{db_name}/_design/foo", body: ddoc).body["ok"]
     docs = for i <- 0..1122, do: %{_id: Integer.to_string(i), int: i}
 
-    assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code ==
-             201
+    assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code in
+             [201, 202]
+
 
     rand_val = fn -> :rand.uniform(100_000_000) end
 

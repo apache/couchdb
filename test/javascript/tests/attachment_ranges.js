@@ -14,6 +14,7 @@ function cacheBust() {
     return "?anti-cache=" + String(Math.round(Math.random() * 1000000));
 };
 
+couchTests.elixir = true;
 couchTests.attachment_ranges = function(debug) {
     var db_name = get_random_db_name();
     var db = new CouchDB(db_name, {
@@ -132,7 +133,7 @@ couchTests.attachment_ranges = function(debug) {
     TEquals("ext", xhr.responseText);
     TEquals("3", xhr.getResponseHeader("Content-Length"));
     TEquals("bytes 26-28/29", xhr.getResponseHeader("Content-Range"));
-    
+
     // backward range is 416
     var xhr = CouchDB.request("GET", "/" + db_name + "/bin_doc/foo.txt" + cacheBust(), {
        headers: {

@@ -880,7 +880,7 @@ doc_() ->
 
 targets_map_test_() ->
     {
-        foreach,
+        setup,
         fun() -> meck:new(mem3, [passthrough]) end,
         fun(_) -> meck:unload() end,
         [

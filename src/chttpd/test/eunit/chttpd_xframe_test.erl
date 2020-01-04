@@ -4,13 +4,19 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-setup() ->
+setup_all() ->
     ok = meck:new(config),
     ok = meck:expect(config, get, fun(_, _, _) -> "X-Forwarded-Host" end),
     ok.
 
+teardown_all(_) ->
+    meck:unload().
+
+setup() ->
+    meck:reset([config]).
+
 teardown(_) ->
-    meck:unload(config).
+    ok.
 
 mock_request() ->
     Headers = mochiweb_headers:make([{"Host", "examples.com"}]),
@@ -62,12 +68,19 @@ xframe_host_test_() ->
     {
         "xframe host tests",
         {
-            foreach, fun setup/0, fun teardown/1,
-            [
-                fun allow_with_wildcard_host/1,
-                fun allow_with_specific_host/1,
-                fun deny_with_different_host/1
-            ]
+            setup,
+            fun setup_all/0,
+            fun teardown_all/1,
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    fun allow_with_wildcard_host/1,
+                    fun allow_with_specific_host/1,
+                    fun deny_with_different_host/1
+                ]
+            }
         }
     }.
 

@@ -12,7 +12,7 @@ defmodule Couch.Test.Setup.Step.Config do
     setup |> Setup.step(id, %__MODULE__{config_file: config_file})
   end
 
-  def setup(_setup, %__MODULE__{config_file: config_file} = step) do
+  def setup(_setup, %__MODULE__{config_file: _config_file} = step) do
     # TODO we would need to access config file here
     %{step | config: %{
        backdoor: %{

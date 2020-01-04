@@ -20,7 +20,7 @@ defmodule CopyDocTest do
       )
 
     assert resp.body["ok"]
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     assert Couch.get("/#{db_name}/doc_that_was_copied").body["v"] == 1
 
@@ -63,7 +63,7 @@ defmodule CopyDocTest do
         headers: [Destination: "doc_to_be_overwritten?rev=#{rev}"]
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     resp = Couch.get("/#{db_name}/doc_to_be_overwritten")
     assert resp.body["_rev"] != rev
     assert resp.body["v"] == 1

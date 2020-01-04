@@ -27,6 +27,7 @@ set PATH=%PATH%;%COUCHDB_BIN_DIR%
 
 set COUCHDB_QUERY_SERVER_JAVASCRIPT="{{prefix}}/bin/couchjs {{prefix}}/share/server/main.js"
 set COUCHDB_QUERY_SERVER_COFFEESCRIPT="{{prefix}}/bin/couchjs {{prefix}}/share/server/main-coffee.js"
+REM set COUCHDB_FAUXTON_DOCROOT="{{fauxton_root}}"
 
 "%BINDIR%\erl" -boot "%ROOTDIR%\releases\%APP_VSN%\couchdb" ^
 -args_file "%ROOTDIR%\etc\vm.args" ^

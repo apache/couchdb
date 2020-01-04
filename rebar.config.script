@@ -27,25 +27,68 @@ end.
 VerList = lists:map(fun(X) -> {Int, _} = string:to_integer(X), Int end,
     string:tokens(VerString, ".")).
 
+
+DisplayMsg = fun(Msg, Args) ->
+    Base = iolist_to_binary(io_lib:format(Msg, Args)),
+    Lines = binary:split(Base, <<"\n">>, [global]),
+    MaxLen = lists:foldl(fun(Line, Acc) ->
+        max(Acc, size(Line))
+    end, 0, Lines),
+    Decoration = iolist_to_binary(["*" || _ <- lists:seq(1, MaxLen)]),
+    ReNewLined = [[L, "~n"] || L <- Lines],
+    NewLines = ["~n", Decoration, "~n", ReNewLined, Decoration, "~n~n"],
+    MsgBin = iolist_to_binary(NewLines),
+    io:format(binary_to_list(MsgBin), [])
+end.
+
+ErlangTooOld = fun(Ver) ->
+    DisplayMsg(
+        "This version of Erlang (~p) is too old for use with Apache CouchDB.~n~n"
+        "See https://docs.couchdb.org/en/stable/install/unix.html#dependencies~n"
+        "for the latest information on dependencies.",
+        [Ver]
+    ),
+    halt(1)
+end.
+
 NotSupported = fun(Ver) ->
-    io:fwrite("CouchDB does not support this version of Erlang (~p).~n", [Ver]),
-    io:fwrite("Check https://docs.couchdb.org/en/latest/whatsnew/index.html for the~n"),
-    io:fwrite("latest information on supported releases.~n"),
+    DisplayMsg(
+        "This version of Erlang (~p) is not officially supported by Apache~n"
+        "CouchDB. While we do not officially support this version, there~n"
+        "are also no known bugs or incompatibilities.~n~n"
+        "See https://docs.couchdb.org/en/stable/install/unix.html#dependencies~n"
+        "for the latest information on dependencies.",
+        [Ver]
+    )
+end.
+
+BadErlang = fun(Ver) ->
+    DisplayMsg(
+        "This version of Erlang (~p) is known to contain bugs that directly~n"
+        "affect the correctness of Apache CouchDB.~n~n"
+        "You should *NOT* use this version of Erlang.~n~n"
+        "See https://docs.couchdb.org/en/stable/install/unix.html#dependencies~n"
+        "for the latest information on dependencies.",
+        [Ver]
+    ),
     case os:getenv("TRAVIS") of
         "true" ->
             io:fwrite("Travis run, ignoring bad release. You have been warned!~n"),
             ok;
-        _ -> halt(1)
+        _ ->
+            halt(1)
     end
 end.
 
 case VerList of
-    [20 | _] = V20 when V20 < [20, 3, 8, 11] -> NotSupported(VerString);
-    [20 | _] = V20 when V20 >= [20, 3, 8, 11] -> ok;
-    [21, 2] -> NotSupported(VerString);
-    [21, 2, N | _] when N < 3 -> NotSupported(VerString);
-    [22, 0] -> NotSupported(VerString);
-    [22, 0, N | _] when N < 5 -> NotSupported(VerString);
+    [OldVer | _] when OldVer < 19 -> ErlangTooOld(VerString);
+
+    [19 | _] -> NotSupported(VerString);
+
+    [20 | _] = V20 when V20 < [20, 3, 8, 11] -> BadErlang(VerString);
+    [21, 2, N | _] when N < 3 -> BadErlang(VerString);
+    [22, 0, N | _] when N < 5 -> BadErlang(VerString);
+
     _ -> ok
 end.
 
@@ -88,9 +131,11 @@ SubDirs = [
     "src/dreyfus",
     "src/fabric",
     "src/global_changes",
+    "src/ken",
     "src/mango",
     "src/rexi",
     "src/setup",
+    "src/smoosh",
     "rel"
 ],
 
@@ -103,14 +148,12 @@ DepDescs = [
 {snappy,           "snappy",           {tag, "CouchDB-1.0.4"}},
 {ioq,              "ioq",              {tag, "2.1.2"}},
 {hqueue,           "hqueue",           {tag, "1.0.1"}},
-{smoosh,           "smoosh",           {tag, "1.0.1"}},
-{ken,              "ken",              {tag, "1.0.3"}},
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
                    {tag, "2.3.0"}, [raw]},
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                   {tag, "v1.2.1"}, [raw]},
+                   {tag, "v1.2.2"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.3"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-4"}},

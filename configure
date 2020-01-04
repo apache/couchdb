@@ -30,6 +30,7 @@ ERLANG_MD5="false"
 SKIP_DEPS=0
 
 COUCHDB_USER="$(whoami 2>/dev/null || echo couchdb)"
+SM_VSN="1.8.5"
 
 . ${rootdir}/version.mk
 COUCHDB_VERSION=${vsn_major}.${vsn_minor}.${vsn_patch}
@@ -50,6 +51,7 @@ Options:
   --disable-docs              do not build any documentation or manpages
   --erlang-md5                use erlang for md5 hash operations
   --dev                       alias for --with-curl --disable-docs --disable-fauxton
+  --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
   --skip-deps                 do not update erlang dependencies
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
 EOF
@@ -140,6 +142,24 @@ parse_opts() {
                 printf 'ERROR: "--user" requires a non-empty argument.\n' >&2
                 exit 1
                 ;;
+
+            --spidermonkey-version)
+                if [ -n "$2" ]; then
+                    eval SM_VSN=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--spidermonkey-version" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --spidermonkey-version=?*)
+                eval SM_VSN=${1#*=}
+                ;;
+            --spidermonkey-version=)
+                printf 'ERROR: "--spidermonkey-version" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
             --) # End of options
                 shift
                 break
@@ -180,6 +200,7 @@ cat > rel/couchdb.config << EOF
 {log_file, "$LOG_FILE"}.
 {fauxton_root, "./share/www"}.
 {user, "$COUCHDB_USER"}.
+{spidermonkey_version, "$SM_VSN"}.
 {node_name, "-name couchdb@127.0.0.1"}.
 {cluster_port, 5984}.
 {backend_port, 5986}.
@@ -206,12 +227,14 @@ with_fauxton = $WITH_FAUXTON
 with_docs = $WITH_DOCS
 
 user = $COUCHDB_USER
+spidermonkey_version = $SM_VSN
 EOF
 
 cat > $rootdir/config.erl << EOF
 {with_curl, $WITH_CURL}.
 {with_proper, $WITH_PROPER}.
 {erlang_md5, $ERLANG_MD5}.
+{spidermonkey_version, "$SM_VSN"}.
 EOF
 
 install_local_rebar() {
@@ -236,5 +259,13 @@ if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then
     echo "==> updating dependencies"
     ${REBAR} get-deps update-deps
 fi
+
+# External repos frequently become integrated with the primary repo,
+# resulting in obsolete .git directories, and possible confusion.
+# It is usually a good idea to delete these .git directories.
+for path in $(find src -name .git -type d); do
+    git ls-files --error-unmatch $(dirname $path) > /dev/null 2>&1 && \
+        echo "WARNING unexpected .git directory $path"
+done
 
 echo "You have configured Apache CouchDB, time to relax. Relax."

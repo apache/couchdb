@@ -108,7 +108,7 @@ couchTests.proxyauth = function(debug) {
   run_on_modified_server(
     [{section: "httpd",
       key: "authentication_handlers",
-      value:"{chttpd_auth, proxy_authentification_handler}, {chttpd_auth, default_authentication_handler}"},
+      value:"{chttpd_auth, proxy_authentication_handler}, {chttpd_auth, default_authentication_handler}"},
       {section: "chttpd_auth",
         key: "authentication_db", 
         value: users_db_name},
