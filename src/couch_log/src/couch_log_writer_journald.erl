@@ -32,23 +32,6 @@ terminate(_, _St) ->
     ok.
 
 
-% log level mapping from sd-daemon(3)
-% https://www.freedesktop.org/software/systemd/man/sd-daemon.html
--spec level_to_integer(atom() | string() | integer()) -> integer().
-level_to_integer(debug)                 -> 7;
-level_to_integer(info)                  -> 6;
-level_to_integer(notice)                -> 5;
-level_to_integer(warning)               -> 4;
-level_to_integer(warn)                  -> 4;
-level_to_integer(error)                 -> 3;
-level_to_integer(err)                   -> 3;
-level_to_integer(critical)              -> 2;
-level_to_integer(crit)                  -> 2;
-level_to_integer(alert)                 -> 1;
-level_to_integer(emergency)             -> 0;
-level_to_integer(emerg)                 -> 0;
-level_to_integer(none)                  -> 6.
-
 write(Entry, St) ->
     #log_entry{
         level = Level,
@@ -58,7 +41,7 @@ write(Entry, St) ->
     } = Entry,
     Fmt = "<~B>~s ~p ~s ",
     Args = [
-        level_to_integer(Level),
+        level_for_journald(Level),
         node(),
         Pid,
         MsgId
@@ -67,3 +50,20 @@ write(Entry, St) ->
     Data = couch_log_trunc_io:format(Fmt, Args, MsgSize),
     io:format(standard_error, [Data, Msg, "\n"], []),
     {ok, St}.
+
+
+% log level mapping from sd-daemon(3)
+% https://www.freedesktop.org/software/systemd/man/sd-daemon.html
+-spec level_for_journald(atom()) -> integer().
+level_for_journald(Level) when is_atom(Level) ->
+    case Level of
+        debug       -> 7;
+        info        -> 6;
+        notice      -> 5;
+        warning     -> 4;
+        error       -> 3;
+        critical    -> 2;
+        alert       -> 1;
+        emergency   -> 0;
+        _           -> 3
+    end.
