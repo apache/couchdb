@@ -140,6 +140,7 @@ check: all
 eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 eunit: export BUILDDIR = $(shell echo %cd%)
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
+eunit: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
 	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) setup_eunit 2> nul
 	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) -r eunit $(EUNIT_OPTS)
@@ -186,6 +187,7 @@ python-black-update: .venv/bin/black
 		. dev\run rel\overlay\bin\couchup test\javascript\run
 
 .PHONY: elixir
+elixir: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
 	@dev\run -a adm:pass --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
@@ -216,6 +218,7 @@ elixir-credo:
 	@mix credo
 
 .PHONY: test-cluster-with-quorum
+test-cluster-with-quorum: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 test-cluster-with-quorum: devclean
 	-@mkdir share\www\script\test
 ifeq ($(IN_RELEASE), true)
@@ -232,6 +235,7 @@ endif
 		--path test\javascript\tests-cluster\with-quorum"
 
 .PHONY: test-cluster-without-quorum
+test-cluster-without-quorum: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 test-cluster-without-quorum: devclean
 	-@mkdir share\www\script\test
 ifeq ($(IN_RELEASE), true)
@@ -250,6 +254,7 @@ endif
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
+javascript: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 javascript:
 	-@mkdir share\www\script\test
 ifeq ($(IN_RELEASE), true)
@@ -266,6 +271,7 @@ endif
 
 
 .PHONY: mango-test
+mango-test: export COUCH_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@cd src\mango && \
 		python.exe -m venv .venv && \
