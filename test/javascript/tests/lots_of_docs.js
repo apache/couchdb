@@ -11,6 +11,7 @@
 // the License.
 
 // test saving a semi-large quanitity of documents and do some view queries.
+couchTests.elixir = true;
 couchTests.lots_of_docs = function(debug) {
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});

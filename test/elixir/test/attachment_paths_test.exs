@@ -53,7 +53,7 @@ defmodule AttachmentPathsTest do
     resp = Couch.post("/#{db_name}", body: @bin_att_doc)
     msg = "Should return 201-Created"
 
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
 
     rev = resp.body["rev"]
 
@@ -91,7 +91,7 @@ defmodule AttachmentPathsTest do
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/bin_doc")
     assert resp.status_code == 200
@@ -119,7 +119,7 @@ defmodule AttachmentPathsTest do
 
     create_db(db_name)
     resp = Couch.post("/#{db_name}", body: @design_att_doc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     rev = resp.body["rev"]
 
@@ -157,7 +157,7 @@ defmodule AttachmentPathsTest do
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/_design/bin_doc")
     assert resp.status_code == 200

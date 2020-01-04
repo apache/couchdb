@@ -15,7 +15,6 @@ defmodule Couch.Test.Setup.Step.User do
   """
 
   alias Couch.Test.Setup
-  alias Couch.Test.Setup.Step
   alias Couch.Test.Utils
 
   import ExUnit.Callbacks, only: [on_exit: 1]
@@ -32,7 +31,7 @@ defmodule Couch.Test.Setup.Step.User do
     setup |> Setup.step(id, %__MODULE__{roles: roles || []})
   end
 
-  def setup(setup, %__MODULE__{roles: roles} = step) do
+  def setup(_setup, %__MODULE__{roles: roles} = step) do
     users_db = IO.chardata_to_string(
       :config.get('chttpd_auth', 'authentication_db', '_users'))
     if not Utils.db_exists?(users_db) do
@@ -75,7 +74,7 @@ defmodule Couch.Test.Setup.Step.User do
     end
   end
 
-  def teardown(setup, %__MODULE__{name: name, users_db: users_db, roles: roles} = step) do
+  def teardown(_setup, %__MODULE__{name: name, users_db: users_db, roles: roles} = _step) do
     if :server_admin in roles do
       :config.delete("admins", String.to_charlist(name), false)
     else

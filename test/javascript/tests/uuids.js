@@ -10,6 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.uuids = function(debug) {
   var etags = [];
   var testHashBustingHeaders = function(xhr) {
@@ -19,7 +20,7 @@ couchTests.uuids = function(debug) {
     var newetag = xhr.getResponseHeader("ETag");
     T(etags.indexOf(newetag) < 0);
     etags[etags.length] = newetag;
-    
+
     // Removing the time based tests as they break easily when
     // running CouchDB on a remote server in regards to the browser
     // running the Futon test suite.

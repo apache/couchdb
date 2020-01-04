@@ -21,6 +21,7 @@ addons:
     - libmozjs185-dev
     - pkg-config
     - python3.6
+    - python3.6-dev
     - python3.6-venv
     - python3-requests
     - python3-sphinx
@@ -55,11 +56,13 @@ before_script:
   - ./configure -c --disable-docs --disable-fauxton
   - python3.6 -m venv /tmp/.venv
   - source /tmp/.venv/bin/activate
+  - pip install requests
 
 script:
    - make check
 
 after_failure:
+  - build-aux/show-test-results.py
   - build-aux/logfile-uploader.py
 
 # start a push build on master and release branches + PRs build on every branch

@@ -40,14 +40,20 @@
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 
 
-start() ->
+setup_all() ->
     Ctx = test_util:start_couch([chttpd]),
+    ok = meck:new(mochiweb_socket, [passthrough]),
     Hashed = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
     Ctx.
 
+teardown_all(Ctx) ->
+    meck:unload(),
+    ok = config:delete("admins", ?USER, _Persist=false),
+    test_util:stop_couch(Ctx).
+
 setup(PortType) ->
-    ok = meck:new(mochiweb_socket, [passthrough]),
+    meck:reset([mochiweb_socket]),
     ok = meck:expect(mochiweb_socket, recv, fun mochiweb_socket_recv/3),
 
     DbName = ?tempdb(),
@@ -57,12 +63,7 @@ setup(PortType) ->
     upload_ddoc(Host, ?b2l(DbName)),
     {Host, ?b2l(DbName)}.
 
-teardown(Ctx) ->
-    ok = config:delete("admins", ?USER, _Persist=false),
-    test_util:stop_couch(Ctx).
-
 teardown(PortType, {_Host, DbName}) ->
-    (catch meck:unload(mochiweb_socket)),
     delete_db(PortType, ?l2b(DbName)),
     ok.
 
@@ -71,7 +72,8 @@ mrview_show_test_() ->
         "Check show functionality",
         {
             setup,
-            fun start/0, fun teardown/1,
+            fun setup_all/0,
+            fun teardown_all/1,
             [
                 make_test_case(clustered, [fun should_return_invalid_request_body/2]),
                 make_test_case(backdoor, [fun should_return_invalid_request_body/2])
@@ -84,7 +86,8 @@ mrview_query_test_() ->
         "Check view query functionality",
         {
             setup,
-            fun start/0, fun teardown/1,
+            fun setup_all/0,
+            fun teardown_all/1,
             [
                 make_test_case(clustered, [fun should_return_400_for_wrong_order_of_keys/2]),
                 make_test_case(backdoor, [fun should_return_400_for_wrong_order_of_keys/2])
@@ -97,7 +100,8 @@ mrview_cleanup_index_files_test_() ->
         "Check index files cleanup",
         {
             setup,
-            fun start/0, fun teardown/1,
+            fun setup_all/0,
+            fun teardown_all/1,
             [
                 make_test_case(clustered, [fun should_cleanup_index_files/2])
             ]
@@ -108,7 +112,12 @@ mrview_cleanup_index_files_test_() ->
 make_test_case(Mod, Funs) ->
     {
         lists:flatten(io_lib:format("~s", [Mod])),
-        {foreachx, fun setup/1, fun teardown/2, [{Mod, Fun} || Fun <- Funs]}
+        {
+            foreachx,
+            fun setup/1,
+            fun teardown/2,
+            [{Mod, Fun} || Fun <- Funs]
+        }
     }.
 
 should_return_invalid_request_body(PortType, {Host, DbName}) ->

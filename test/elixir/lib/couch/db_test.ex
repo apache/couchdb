@@ -191,7 +191,7 @@ defmodule Couch.DBTest do
         }
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   def query(
@@ -251,7 +251,7 @@ defmodule Couch.DBTest do
         body: ddoc
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/#{ddoc_name}/_view/view", query: request_options)
     assert resp.status_code == 200

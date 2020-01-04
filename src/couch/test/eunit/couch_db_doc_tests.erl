@@ -43,7 +43,8 @@ couch_db_doc_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun should_truncate_number_of_revisions/1,
-                    fun should_raise_bad_request_on_invalid_rev/1
+                    fun should_raise_bad_request_on_invalid_rev/1,
+                    fun should_allow_access_in_doc_keys_test/1
                 ]
             }
         }
@@ -77,6 +78,14 @@ should_raise_bad_request_on_invalid_rev(DbName) ->
         ?_assertThrow(Expect, add_revisions(Db, DocId, InvalidRev3, 1))}
     ].
 
+should_allow_access_in_doc_keys_test(_DbName) ->
+    Json = <<"{\"_id\":\"foo\",\"_access\":[\"test\"]}">>,
+    EJson = couch_util:json_decode(Json),
+    Expected = {[{<<"_id">>,<<"foo">>}, {<<"_access">>, [<<"test">>]}]},
+    EJson = Expected,
+    Doc = couch_doc:from_json_obj(EJson),
+    NewEJson = couch_doc:to_json_obj(Doc, []),
+    ?_assertEqual(NewEJson, Expected).
 
 open_db(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),

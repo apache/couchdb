@@ -14,7 +14,6 @@
 
 -compile(tuple_calls).
 
--export([handle_external_req/2, handle_external_req/3]).
 -export([send_external_response/2, json_req_obj/2, json_req_obj/3]).
 -export([default_or_content_type/2, parse_external_response/1]).
 
@@ -22,39 +21,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
-% handle_external_req/2
-% for the old type of config usage:
-% _external = {couch_httpd_external, handle_external_req}
-% with urls like
-% /db/_external/action/design/name
-handle_external_req(#httpd{
-                        path_parts=[_DbName, _External, UrlName | _Path]
-                    }=HttpReq, Db) ->
-    process_external_req(HttpReq, Db, UrlName);
-handle_external_req(#httpd{path_parts=[_, _]}=Req, _Db) ->
-    send_error(Req, 404, <<"external_server_error">>, <<"No server name specified.">>);
-handle_external_req(Req, _) ->
-    send_error(Req, 404, <<"external_server_error">>, <<"Broken assumption">>).
-
-% handle_external_req/3
-% for this type of config usage:
-% _action = {couch_httpd_external, handle_external_req, <<"action">>}
-% with urls like
-% /db/_action/design/name
-handle_external_req(HttpReq, Db, Name) ->
-    process_external_req(HttpReq, Db, Name).
-
-process_external_req(HttpReq, Db, Name) ->
-
-    Response = couch_external_manager:execute(binary_to_list(Name),
-        json_req_obj(HttpReq, Db)),
-
-    case Response of
-    {unknown_external_server, Msg} ->
-        send_error(HttpReq, 404, <<"external_server_error">>, Msg);
-    _ ->
-        send_external_response(HttpReq, Response)
-    end.
 json_req_obj(Req, Db) -> json_req_obj(Req, Db, null).
 json_req_obj(#httpd{mochi_req=Req,
                method=Method,

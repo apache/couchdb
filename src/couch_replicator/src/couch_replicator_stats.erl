@@ -12,14 +12,6 @@
 
 -module(couch_replicator_stats).
 
--record(rep_stats, {
-    missing_checked = 0,
-    missing_found = 0,
-    docs_read = 0,
-    docs_written = 0,
-    doc_write_failures = 0
-}).
-
 -export([
     new/0,
     new/1,
@@ -39,26 +31,27 @@
 new() ->
     orddict:new().
 
-new(Initializers) when is_list(Initializers) ->
-    orddict:from_list(Initializers).
+new(Initializers0) when is_list(Initializers0) ->
+    Initializers1 = lists:filtermap(fun fmap/1, Initializers0),
+    orddict:from_list(Initializers1).
 
 missing_checked(Stats) ->
-    get(missing_checked, upgrade(Stats)).
+    get(missing_checked, Stats).
 
 missing_found(Stats) ->
-    get(missing_found, upgrade(Stats)).
+    get(missing_found, Stats).
 
 docs_read(Stats) ->
-    get(docs_read, upgrade(Stats)).
+    get(docs_read, Stats).
 
 docs_written(Stats) ->
-    get(docs_written, upgrade(Stats)).
+    get(docs_written, Stats).
 
 doc_write_failures(Stats) ->
-    get(doc_write_failures, upgrade(Stats)).
+    get(doc_write_failures, Stats).
 
 get(Field, Stats) ->
-    case orddict:find(Field, upgrade(Stats)) of
+    case orddict:find(Field, Stats) of
         {ok, Value} ->
             Value;
         error ->
@@ -66,18 +59,19 @@ get(Field, Stats) ->
     end.
 
 increment(Field, Stats) ->
-    orddict:update_counter(Field, 1, upgrade(Stats)).
+    orddict:update_counter(Field, 1, Stats).
 
 sum_stats(S1, S2) ->
-    orddict:merge(fun(_, V1, V2) -> V1+V2 end, upgrade(S1), upgrade(S2)).
+    orddict:merge(fun(_, V1, V2) -> V1+V2 end, S1, S2).
 
-upgrade(#rep_stats{} = Stats) ->
-    orddict:from_list([
-        {missing_checked, Stats#rep_stats.missing_checked},
-        {missing_found, Stats#rep_stats.missing_found},
-        {docs_read, Stats#rep_stats.docs_read},
-        {docs_written, Stats#rep_stats.docs_written},
-        {doc_write_failures, Stats#rep_stats.doc_write_failures}
-    ]);
-upgrade(Stats) ->
-    Stats.
+
+% Handle initializing from a status object which uses same values but different
+% field names.
+fmap({revisions_checked, V})       -> {true, {missing_checked, V}};
+fmap({missing_revisions_found, V}) -> {true, {missing_found, V}};
+fmap({missing_checked, _})         -> true;
+fmap({missing_found, _})           -> true;
+fmap({docs_read, _})               -> true;
+fmap({docs_written, _})            -> true;
+fmap({doc_write_failures, _})      -> true;
+fmap({_, _})                       -> false.

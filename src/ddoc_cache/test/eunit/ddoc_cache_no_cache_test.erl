@@ -40,10 +40,12 @@ no_cache_test_() ->
         "ddoc_cache no cache test",
         {
             setup,
-            fun ddoc_cache_tutil:start_couch/0, fun ddoc_cache_tutil:stop_couch/1,
+            fun setup_all/0,
+            fun teardown_all/1,
             {
                 foreachx,
-                fun setup/1, fun teardown/2,
+                fun setup/1,
+                fun teardown/2,
                 [
                     {fun ddoc/1, fun no_cache_open_ok_test/2},
                     {fun not_found/1, fun no_cache_open_not_found_test/2},
@@ -53,8 +55,16 @@ no_cache_test_() ->
         }
     }.
 
-setup(Resp) ->
+setup_all() ->
+    Ctx = ddoc_cache_tutil:start_couch(),
     meck:new(fabric),
+    Ctx.
+
+teardown_all(Ctx) ->
+    meck:unload(),
+    ddoc_cache_tutil:stop_couch(Ctx).
+
+setup(Resp) ->
     meck:expect(fabric, open_doc, fun(_, DDocId, _) ->
         Resp(DDocId)
     end).
