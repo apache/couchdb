@@ -42,13 +42,14 @@ setup_legacy() ->
     DbName = <<"test">>,
     DbFileName = "test.couch",
     OldDbFilePath = filename:join([?FIXTURESDIR, DbFileName]),
-    OldViewName = "3b835456c235b1827e012e25666152f3.view",
+    OldViewName = "6cf2c2f766f87b618edf6630b00f8736.view",
     FixtureViewFilePath = filename:join([?FIXTURESDIR, OldViewName]),
-    NewViewName = "6cf2c2f766f87b618edf6630b00f8736.view",
+    NewViewName = "a1c5929f912aca32f13446122cc6ce50.view",
 
     DbDir = config:get("couchdb", "database_dir"),
     ViewDir = config:get("couchdb", "view_index_dir"),
-    OldViewFilePath = filename:join([ViewDir, ".test_design", OldViewName]),
+    OldViewFilePath = filename:join([ViewDir, ".test_design", "mrview",
+                                     OldViewName]),
     NewViewFilePath = filename:join([ViewDir, ".test_design", "mrview",
                                      NewViewName]),
 
@@ -192,28 +193,31 @@ should_upgrade_legacy_view_files({DbName, Files}) ->
 
         % ensure old header
         OldHeader = read_header(OldViewFilePath),
-        ?assertMatch(#index_header{}, OldHeader),
+        ?assertEqual(6, tuple_size(OldHeader)),
+        ?assertMatch(mrheader, element(1, OldHeader)),
 
         % query view for expected results
         Rows0 = query_view(DbName, "test", "test"),
-        ?assertEqual(2, length(Rows0)),
+        ?assertEqual(3, length(Rows0)),
 
         % ensure old file gone
         ?assertNot(filelib:is_regular(OldViewFilePath)),
 
         % add doc to trigger update
-        DocUrl = db_url(DbName) ++ "/boo",
+        DocUrl = db_url(DbName) ++ "/bar",
         {ok, _, _, _} = test_request:put(
-            DocUrl, [{"Content-Type", "application/json"}], <<"{\"a\":3}">>),
+            DocUrl, [{"Content-Type", "application/json"}], <<"{\"a\":4}">>),
 
         % query view for expected results
         Rows1 = query_view(DbName, "test", "test"),
-        ?assertEqual(3, length(Rows1)),
+        ?assertEqual(4, length(Rows1)),
 
         % ensure new header
         timer:sleep(2000),  % have to wait for awhile to upgrade the index
         NewHeader = read_header(NewViewFilePath),
-        ?assertMatch(#mrheader{}, NewHeader)
+        ?assertMatch(#mrheader{}, NewHeader),
+        NewViewStatus = hd(NewHeader#mrheader.view_states),
+        ?assertEqual(3, tuple_size(NewViewStatus))
     end).
 
 
@@ -322,7 +326,6 @@ couchdb_1309(DbName) ->
 couchdb_1283() ->
     ?_test(begin
         ok = config:set("couchdb", "max_dbs_open", "3", false),
-        ok = config:set("couchdb", "delayed_commits", "false", false),
 
         {ok, MDb1} = couch_db:create(?tempdb(), [?ADMIN_CTX]),
         DDoc = couch_doc:from_json_obj({[
@@ -406,7 +409,6 @@ create_doc(DbName, DocId) when is_binary(DocId) ->
         {<<"value">>, 999}
     ]}),
     {ok, _} = couch_db:update_docs(Db, [Doc666]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db).
 
 create_docs(DbName) ->
@@ -427,7 +429,6 @@ create_docs(DbName) ->
 
     ]}),
     {ok, _} = couch_db:update_docs(Db, [Doc1, Doc2, Doc3]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db).
 
 populate_db(Db, BatchSize, N) when N > 0 ->
@@ -456,7 +457,6 @@ create_design_doc(DbName, DDName, ViewName) ->
         ]}}
     ]}),
     {ok, Rev} = couch_db:update_doc(Db, DDoc, []),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
     Rev.
 
@@ -476,7 +476,6 @@ update_design_doc(DbName, DDName, ViewName) ->
         ]}}
     ]}),
     {ok, NewRev} = couch_db:update_doc(Db, DDoc, [?ADMIN_CTX]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
     NewRev.
 

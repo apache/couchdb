@@ -488,7 +488,6 @@ copy_local_docs(#state{source_db = Db, targets = Targets} = State) ->
             [_ | _] ->
                 Docs1 = lists:reverse(Docs),
                 {ok, _} = couch_db:update_docs(TDb, Docs1),
-                {ok, _} = couch_db:ensure_full_commit(TDb),
                 T#target{buffer = []}
         end
     end, Targets1),

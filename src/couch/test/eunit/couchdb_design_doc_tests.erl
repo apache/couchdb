@@ -77,7 +77,6 @@ create_design_doc(DbName, DDName) ->
         ]}}
     ]}),
     {ok, Rev} = couch_db:update_doc(Db, DDoc, []),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db),
     Rev.
 

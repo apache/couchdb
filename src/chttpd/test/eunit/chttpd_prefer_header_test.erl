@@ -51,7 +51,7 @@ minimal_options_headers() ->
 
 default_no_exclude_header_test() ->
     Headers = chttpd_prefer_header:maybe_return_minimal(
-        mock_request([]), 
+        mock_request([]),
         default_headers()
         ),
     ?assertEqual(default_headers(), Headers).
@@ -68,30 +68,45 @@ empty_header_test() ->
     Headers = chttpd_prefer_header:maybe_return_minimal(Req, default_headers()),
     ?assertEqual(default_headers(), Headers).
 
-setup() ->
+setup_all() ->
     ok = meck:new(config),
-    ok = meck:expect(config, get, fun("chttpd", "prefer_minimal",  _) -> 
+    ok = meck:expect(config, get, fun("chttpd", "prefer_minimal",  _) ->
         "Cache-Control, Content-Length, Content-Type, ETag, Server, Vary"
     end),
     ok.
 
 
+teardown_all(_) ->
+    meck:unload().
+
+
+setup() ->
+    meck:reset([config]).
+
+
 teardown(_) ->
-    meck:unload(config).
+    ok.
 
 
 exclude_headers_test_() ->
-     {
-         "Test Prefer headers",
-         {
-             foreach, fun setup/0, fun teardown/1,
-             [
-                 fun minimal_options/1,
-                 fun minimal_options_check_header_case/1,
-                 fun minimal_options_check_header_value_case/1
-             ]
-         }
-     }.
+    {
+        "Test Prefer headers",
+        {
+            setup,
+            fun setup_all/0,
+            fun teardown_all/1,
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    fun minimal_options/1,
+                    fun minimal_options_check_header_case/1,
+                    fun minimal_options_check_header_value_case/1
+                ]
+            }
+        }
+    }.
 
 
 minimal_options(_) ->

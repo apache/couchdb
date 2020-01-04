@@ -277,7 +277,6 @@ create_docs(DbName, DocNum) ->
     end, [], lists:seq(DocNum, 1, -1)),
     couch_util:with_db(DbName, fun(Db) ->
         {ok, _Result} = couch_db:update_docs(Db, Docs),
-        {ok, _StartTime} = couch_db:ensure_full_commit(Db),
         {ok, Db1} = couch_db:reopen(Db),
         UpdateSeq = couch_db:get_update_seq(Db1),
         {ok, UpdateSeq}

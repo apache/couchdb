@@ -524,8 +524,11 @@ inactive_index_files(DbName) ->
     end, mem3:local_shards(dbname(DbName))),
 
     if ActiveSigs =:= [] -> FileList; true ->
+        %% <sig>.view and <sig>.compact.view where <sig> is in ActiveSigs
+        %% will be excluded from FileList because they are active view
+        %% files and should not be deleted.
         lists:filter(fun(FilePath) ->
-            not maps:is_key(filename:basename(FilePath, ".view"), ActiveSigs)
+            not maps:is_key(get_view_sig_from_filename(FilePath), ActiveSigs)
         end, FileList)
     end.
 
@@ -662,6 +665,8 @@ kl_to_record(KeyList,RecName) ->
 set_namespace(NS, #mrargs{extra = Extra} = Args) ->
     Args#mrargs{extra = [{namespace, NS} | Extra]}.
 
+get_view_sig_from_filename(FilePath) ->
+    filename:basename(filename:basename(FilePath, ".view"), ".compact").
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

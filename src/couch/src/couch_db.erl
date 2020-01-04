@@ -65,9 +65,6 @@
     set_security/2,
     set_user_ctx/2,
 
-    ensure_full_commit/1,
-    ensure_full_commit/2,
-
     load_validation_funs/1,
     reload_validation_funs/1,
 
@@ -226,21 +223,12 @@ is_partitioned(#db{options = Options}) ->
     Props = couch_util:get_value(props, Options, []),
     couch_util:get_value(partitioned, Props, false).
 
-ensure_full_commit(#db{main_pid=Pid, instance_start_time=StartTime}) ->
-    ok = gen_server:call(Pid, full_commit, infinity),
-    {ok, StartTime}.
-
-ensure_full_commit(Db, RequiredSeq) ->
-    #db{main_pid=Pid, instance_start_time=StartTime} = Db,
-    ok = gen_server:call(Pid, {full_commit, RequiredSeq}, infinity),
-    {ok, StartTime}.
-
 close(#db{} = Db) ->
     ok = couch_db_engine:decref(Db);
 close(?OLD_DB_REC) ->
     ok.
 
-is_idle(#db{compactor_pid=nil, waiting_delayed_commit=nil} = Db) ->
+is_idle(#db{compactor_pid=nil} = Db) ->
     monitored_by(Db) == [];
 is_idle(_Db) ->
     false.
@@ -594,9 +582,6 @@ get_db_info(Db) ->
     {ok, DocCount} = get_doc_count(Db),
     {ok, DelDocCount} = get_del_doc_count(Db),
     SizeInfo = couch_db_engine:get_size_info(Db),
-    FileSize = couch_util:get_value(file, SizeInfo, null),
-    ActiveSize = couch_util:get_value(active, SizeInfo, null),
-    ExternalSize = couch_util:get_value(external, SizeInfo, null),
     DiskVersion = couch_db_engine:get_disk_version(Db),
     Uuid = case get_uuid(Db) of
         undefined -> null;
@@ -619,14 +604,6 @@ get_db_info(Db) ->
         {purge_seq, couch_db_engine:get_purge_seq(Db)},
         {compact_running, Compactor /= nil},
         {sizes, {SizeInfo}},
-        % TODO: Remove this in 3.0
-        % These are legacy and have been duplicated under
-        % the sizes key since 2.0. We should make a note
-        % in our release notes that we'll remove these
-        % old versions in 3.0
-        {disk_size, FileSize}, % legacy
-        {data_size, ActiveSize},
-        {other, {[{data_size, ExternalSize}]}},
         {instance_start_time, StartTime},
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
@@ -764,9 +741,7 @@ get_security(?OLD_DB_REC = Db) ->
 set_security(#db{main_pid=Pid}=Db, {NewSecProps}) when is_list(NewSecProps) ->
     check_is_admin(Db),
     ok = validate_security_object(NewSecProps),
-    ok = gen_server:call(Pid, {set_security, NewSecProps}, infinity),
-    {ok, _} = ensure_full_commit(Db),
-    ok;
+    gen_server:call(Pid, {set_security, NewSecProps}, infinity);
 set_security(_, _) ->
     throw(bad_request).
 
@@ -1267,24 +1242,6 @@ make_first_doc_on_disk(Db, Id, Pos, [{_Rev, #leaf{deleted=IsDel, ptr=Sp}} |_]=Do
     Revs = [Rev || {Rev, _} <- DocPath],
     make_doc(Db, Id, IsDel, Sp, {Pos, Revs}).
 
-set_commit_option(Options) ->
-    CommitSettings = {
-        [true || O <- Options, O==full_commit orelse O==delay_commit],
-        config:get("couchdb", "delayed_commits", "false")
-    },
-    case CommitSettings of
-    {[true], _} ->
-        Options; % user requested explicit commit setting, do not change it
-    {_, "true"} ->
-        Options; % delayed commits are enabled, do nothing
-    {_, "false"} ->
-        [full_commit|Options];
-    {_, Else} ->
-        couch_log:error("[couchdb] delayed_commits setting must be true/false,"
-                        " not ~p", [Else]),
-        [full_commit|Options]
-    end.
-
 collect_results_with_metrics(Pid, MRef, []) ->
     Begin = os:timestamp(),
     try
@@ -1310,14 +1267,12 @@ collect_results(Pid, MRef, ResultsAcc) ->
     end.
 
 write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
-        NonRepDocs, Options0) ->
+        NonRepDocs, Options) ->
     DocBuckets = prepare_doc_summaries(Db, DocBuckets1),
-    Options = set_commit_option(Options0),
     MergeConflicts = lists:member(merge_conflicts, Options),
-    FullCommit = lists:member(full_commit, Options),
     MRef = erlang:monitor(process, Pid),
     try
-        Pid ! {update_docs, self(), DocBuckets, NonRepDocs, MergeConflicts, FullCommit},
+        Pid ! {update_docs, self(), DocBuckets, NonRepDocs, MergeConflicts},
         case collect_results_with_metrics(Pid, MRef, []) of
         {ok, Results} -> {ok, Results};
         retry ->
@@ -1331,7 +1286,7 @@ write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
             % We only retry once
             DocBuckets3 = prepare_doc_summaries(Db2, DocBuckets2),
             close(Db2),
-            Pid ! {update_docs, self(), DocBuckets3, NonRepDocs, MergeConflicts, FullCommit},
+            Pid ! {update_docs, self(), DocBuckets3, NonRepDocs, MergeConflicts},
             case collect_results_with_metrics(Pid, MRef, []) of
             {ok, Results} -> {ok, Results};
             retry -> throw({update_error, compaction_retry})
@@ -1915,13 +1870,19 @@ set_design_doc_end_key(Options, rev) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-setup() ->
+setup_all() ->
     ok = meck:new(couch_epi, [passthrough]),
     ok = meck:expect(couch_epi, decide, fun(_, _, _, _, _) -> no_decision end),
     ok.
 
+teardown_all(_) ->
+    meck:unload().
+
+setup() ->
+    meck:reset([couch_epi]).
+
 teardown(_) ->
-    (catch meck:unload(couch_epi)).
+    ok.
 
 validate_dbname_success_test_() ->
     Cases =
@@ -1931,8 +1892,15 @@ validate_dbname_success_test_() ->
             [generate_cases_with_shards(?b2l(SystemDb))
                 || SystemDb <- ?SYSTEM_DATABASES]),
     {
-        foreach, fun setup/0, fun teardown/1,
-        [should_pass_validate_dbname(A) || {_, A} <- Cases]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [should_pass_validate_dbname(A) || {_, A} <- Cases]
+        }
     }.
 
 validate_dbname_fail_test_() ->
@@ -1943,8 +1911,15 @@ validate_dbname_fail_test_() ->
        ++ generate_cases("!abcdefg/werwej/_users")
        ++ generate_cases_with_shards("!abcdefg/werwej/_users"),
     {
-        foreach, fun setup/0, fun teardown/1,
-        [should_fail_validate_dbname(A) || {_, A} <- Cases]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [should_fail_validate_dbname(A) || {_, A} <- Cases]
+        }
     }.
 
 normalize_dbname_test_() ->
@@ -1986,19 +1961,24 @@ should_fail_validate_dbname(DbName) ->
 
 calculate_start_seq_test_() ->
     {
-        foreach,
-        fun setup_start_seq/0,
-        fun teardown_start_seq/1,
-        [
-            t_calculate_start_seq_uuid_mismatch(),
-            t_calculate_start_seq_is_owner(),
-            t_calculate_start_seq_not_owner(),
-            t_calculate_start_seq_raw(),
-            t_calculate_start_seq_epoch_mismatch()
-        ]
+        setup,
+        fun setup_start_seq_all/0,
+        fun teardown_start_seq_all/1,
+        {
+            foreach,
+            fun setup_start_seq/0,
+            fun teardown_start_seq/1,
+            [
+                t_calculate_start_seq_uuid_mismatch(),
+                t_calculate_start_seq_is_owner(),
+                t_calculate_start_seq_not_owner(),
+                t_calculate_start_seq_raw(),
+                t_calculate_start_seq_epoch_mismatch()
+            ]
+        }
     }.
 
-setup_start_seq() ->
+setup_start_seq_all() ->
     meck:new(couch_db_engine, [passthrough]),
     meck:expect(couch_db_engine, get_uuid, fun(_) -> <<"foo">> end),
     ok = meck:expect(couch_log, warning, 2, ok),
@@ -2008,8 +1988,17 @@ setup_start_seq() ->
     ],
     meck:expect(couch_db_engine, get_epochs, fun(_) -> Epochs end).
 
-teardown_start_seq(_) ->
+teardown_start_seq_all(_) ->
     meck:unload().
+
+setup_start_seq() ->
+    meck:reset([
+        couch_db_engine,
+        couch_log
+    ]).
+
+teardown_start_seq(_) ->
+    ok.
 
 t_calculate_start_seq_uuid_mismatch() ->
     ?_test(begin

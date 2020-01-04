@@ -161,7 +161,7 @@ defmodule AttachmentsTest do
         body: bin_data
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     rev = resp.body["rev"]
 
@@ -213,7 +213,7 @@ defmodule AttachmentsTest do
         body: "This is a string"
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/bin_doc4/attachment.txt")
     assert resp.status_code == 200
@@ -315,7 +315,7 @@ defmodule AttachmentsTest do
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     rev = resp.body["rev"]
 
     resp =
@@ -326,7 +326,7 @@ defmodule AttachmentsTest do
         headers: ["Content-Type": "text/plain;charset=utf-8"]
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   @tag :with_db

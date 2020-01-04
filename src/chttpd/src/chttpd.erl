@@ -742,6 +742,8 @@ start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
     end,
     {ok, Resp}.
 
+send_chunk({remote, _Pid, _Ref} = Resp, Data) ->
+    couch_httpd:send_chunk(Resp, Data);
 send_chunk(Resp, Data) ->
     Resp:write_chunk(Data),
     {ok, Resp}.
@@ -1028,9 +1030,6 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
     end;
 error_headers(_, Code, _, _) ->
     {Code, []}.
-
-send_error(_Req, {already_sent, Resp, _Error}) ->
-    {ok, Resp};
 
 send_error(#httpd{} = Req, Error) ->
     update_timeout_stats(Error, Req),

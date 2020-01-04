@@ -16,8 +16,10 @@ couch_flags_config_test_() ->
     {
         "test couch_flags_config",
         {
-            setup, fun setup/0, fun teardown/1,
-            all_combinations_return_same_result()
+            setup,
+            fun setup/0,
+            fun teardown/1,
+                [fun all_combinations_return_same_result/0]
                 ++ latest_overide_wins()
                 ++ [
                     {"rules_are_sorted", fun rules_are_sorted/0}
@@ -41,8 +43,9 @@ all_combinations_return_same_result() ->
         {{<<"*">>},{<<"*">>, 1, [bar, foo]}}
     ],
     Combinations = couch_tests_combinatorics:permutations(Config),
-    [{test_id(Items), ?_assertEqual(Expected, couch_flags_config:data(Items))}
-        || Items <- Combinations].
+    lists:foreach(fun(Items) ->
+        ?assertEqual(Expected, couch_flags_config:data(Items))
+    end, Combinations).
 
 rules_are_sorted() ->
     Expected = [

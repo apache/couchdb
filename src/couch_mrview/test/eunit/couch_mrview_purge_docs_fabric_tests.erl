@@ -20,10 +20,21 @@
 -define(TIMEOUT, 60). % seconds
 
 
+setup_all() ->
+    Ctx = test_util:start_couch([fabric, mem3]),
+    meck:new(couch_mrview_index, [passthrough]),
+    Ctx.
+
+
+teardown_all(Ctx) ->
+    meck:unload(),
+    test_util:stop_couch(Ctx).
+
+
 setup() ->
     DbName = ?tempdb(),
     ok = fabric:create_db(DbName, [?ADMIN_CTX, {q, 1}]),
-    meck:new(couch_mrview_index, [passthrough]),
+    meck:reset([couch_mrview_index]),
     meck:expect(couch_mrview_index, ensure_local_purge_docs, fun(A, B) ->
         meck:passthrough([A, B])
     end),
@@ -31,7 +42,6 @@ setup() ->
 
 
 teardown(DbName) ->
-    meck:unload(),
     ok = fabric:delete_db(DbName, [?ADMIN_CTX]).
 
 
@@ -40,8 +50,8 @@ view_purge_fabric_test_() ->
         "Map views",
         {
             setup,
-            fun() -> test_util:start_couch([fabric, mem3]) end,
-            fun test_util:stop_couch/1,
+            fun setup_all/0,
+            fun teardown_all/1,
             {
                 foreach,
                 fun setup/0,

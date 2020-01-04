@@ -18,7 +18,7 @@
 -define(ADMIN_USERNAME, "admin").
 -define(ADMIN_PASSWORD, "secret").
 
--define(WAIT_FOR_USER_DELETE_TIMEOUT, 3000).
+-define(WAIT_FOR_USER_DELETE_TIMEOUT, 1000).
 
 setup_all() ->
     TestCtx = test_util:start_couch([chttpd]),
@@ -37,8 +37,8 @@ setup() ->
     do_request(put, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     do_request(put, get_cluster_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     set_config("couch_httpd_auth", "authentication_db", ?b2l(TestAuthDb)),
-    set_config("couch_peruser", "cluster_quiet_period", "1"),
-    set_config("couch_peruser", "cluster_start_period", "1"),
+    set_config("couch_peruser", "cluster_quiet_period", "0"),
+    set_config("couch_peruser", "cluster_start_period", "0"),
     set_config("couch_peruser", "enable", "true"),
     set_config("cluster", "n", "1"),
     TestAuthDb.
@@ -145,297 +145,316 @@ get_cluster_base_url() ->
 
 
 should_create_user_db_with_default(TestAuthDb) ->
-    create_user(TestAuthDb, "foo"),
-    wait_for_db_create(<<"userdb-666f6f">>),
-    {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f">>),
-    {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
-    [
-        ?_assert(lists:member(<<"userdb-666f6f">>, all_dbs())),
-        ?_assertEqual(1, couch_util:get_value(q, ClusterInfo))
-    ].
+    ?_test(begin
+        create_user(TestAuthDb, "foo"),
+        wait_for_db_create(<<"userdb-666f6f">>),
+        {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f">>),
+        {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
+        ?assert(lists:member(<<"userdb-666f6f">>, all_dbs())),
+        ?assertEqual(1, couch_util:get_value(q, ClusterInfo))
+    end).
 
 should_create_user_db_with_custom_prefix(TestAuthDb) ->
-    set_config("couch_peruser", "database_prefix", "newuserdb-"),
-    create_user(TestAuthDb, "fooo"),
-    wait_for_db_create(<<"newuserdb-666f6f6f">>),
-    delete_config("couch_peruser", "database_prefix"),
-    ?_assert(lists:member(<<"newuserdb-666f6f6f">>, all_dbs())).
+    ?_test(begin
+        set_config("couch_peruser", "database_prefix", "newuserdb-"),
+        create_user(TestAuthDb, "fooo"),
+        wait_for_db_create(<<"newuserdb-666f6f6f">>),
+        delete_config("couch_peruser", "database_prefix"),
+        ?assert(lists:member(<<"newuserdb-666f6f6f">>, all_dbs()))
+    end).
 
 should_create_user_db_with_custom_special_prefix(TestAuthDb) ->
-    set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
-    create_user(TestAuthDb, "fooo"),
-    wait_for_db_create(<<"userdb_$()+--/666f6f6f">>),
-    delete_config("couch_peruser", "database_prefix"),
-    ?_assert(lists:member(<<"userdb_$()+--/666f6f6f">>, all_dbs())).
+    ?_test(begin
+        set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+        create_user(TestAuthDb, "fooo"),
+        wait_for_db_create(<<"userdb_$()+--/666f6f6f">>),
+        delete_config("couch_peruser", "database_prefix"),
+        ?assert(lists:member(<<"userdb_$()+--/666f6f6f">>, all_dbs()))
+    end).
 
 should_create_anon_user_db_with_default(TestAuthDb) ->
-    create_anon_user(TestAuthDb, "fooo"),
-    wait_for_db_create(<<"userdb-666f6f6f">>),
-    {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f6f">>),
-    {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
-    [
-        ?_assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())),
-        ?_assertEqual(1, couch_util:get_value(q, ClusterInfo))
-    ].
+    ?_test(begin
+        create_anon_user(TestAuthDb, "fooo"),
+        wait_for_db_create(<<"userdb-666f6f6f">>),
+        {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f6f">>),
+        {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
+        ?assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())),
+        ?assertEqual(1, couch_util:get_value(q, ClusterInfo))
+    end).
 
 should_create_anon_user_db_with_custom_prefix(TestAuthDb) ->
-    set_config("couch_peruser", "database_prefix", "newuserdb-"),
-    create_anon_user(TestAuthDb, "fooo"),
-    wait_for_db_create(<<"newuserdb-666f6f6f">>),
-    delete_config("couch_peruser", "database_prefix"),
-    ?_assert(lists:member(<<"newuserdb-666f6f6f">>, all_dbs())).
+    ?_test(begin
+        set_config("couch_peruser", "database_prefix", "newuserdb-"),
+        create_anon_user(TestAuthDb, "fooo"),
+        wait_for_db_create(<<"newuserdb-666f6f6f">>),
+        delete_config("couch_peruser", "database_prefix"),
+        ?assert(lists:member(<<"newuserdb-666f6f6f">>, all_dbs()))
+    end).
 
 should_create_anon_user_db_with_custom_special_prefix(TestAuthDb) ->
-    set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
-    create_anon_user(TestAuthDb, "fooo"),
-    wait_for_db_create(<<"userdb_$()+--/666f6f6f">>),
-    delete_config("couch_peruser", "database_prefix"),
-    ?_assert(lists:member(<<"userdb_$()+--/666f6f6f">>, all_dbs())).
+    ?_test(begin
+        set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+        create_anon_user(TestAuthDb, "fooo"),
+        wait_for_db_create(<<"userdb_$()+--/666f6f6f">>),
+        delete_config("couch_peruser", "database_prefix"),
+        ?assert(lists:member(<<"userdb_$()+--/666f6f6f">>, all_dbs()))
+    end).
 
 should_create_user_db_with_q4(TestAuthDb) ->
-    set_config("couch_peruser", "q", "4"),
-    create_user(TestAuthDb, "foo"),
-    wait_for_db_create(<<"userdb-666f6f">>),
-    {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f">>),
-    {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
-    delete_config("couch_peruser", "q"),
-    [
-        ?_assert(lists:member(<<"userdb-666f6f">>, all_dbs())),
-        ?_assertEqual(4, couch_util:get_value(q, ClusterInfo))
-    ].
+    ?_test(begin
+        set_config("couch_peruser", "q", "4"),
+        create_user(TestAuthDb, "foo"),
+        wait_for_db_create(<<"userdb-666f6f">>),
+        {ok, DbInfo} = fabric:get_db_info(<<"userdb-666f6f">>),
+        {ClusterInfo} = couch_util:get_value(cluster, DbInfo),
+        delete_config("couch_peruser", "q"),
+        ?assert(lists:member(<<"userdb-666f6f">>, all_dbs())),
+        ?assertEqual(4, couch_util:get_value(q, ClusterInfo))
+    end).
 
 should_create_anon_user_db_with_q4(TestAuthDb) ->
-    set_config("couch_peruser", "q", "4"),
-    create_anon_user(TestAuthDb, "fooo"),
-    wait_for_db_create(<<"userdb-666f6f6f">>),
-    {ok, TargetInfo} = fabric:get_db_info(<<"userdb-666f6f6f">>),
-    {ClusterInfo} = couch_util:get_value(cluster, TargetInfo),
-    delete_config("couch_peruser", "q"),
-    [
-        ?_assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())),
-        ?_assertEqual(4, couch_util:get_value(q, ClusterInfo))
-    ].
+    ?_test(begin
+        set_config("couch_peruser", "q", "4"),
+        create_anon_user(TestAuthDb, "fooo"),
+        wait_for_db_create(<<"userdb-666f6f6f">>),
+        {ok, TargetInfo} = fabric:get_db_info(<<"userdb-666f6f6f">>),
+        {ClusterInfo} = couch_util:get_value(cluster, TargetInfo),
+        delete_config("couch_peruser", "q"),
+        ?assert(lists:member(<<"userdb-666f6f6f">>, all_dbs())),
+        ?assertEqual(4, couch_util:get_value(q, ClusterInfo))
+    end).
 
 should_not_delete_user_db(TestAuthDb) ->
-    User = "foo",
-    UserDbName = <<"userdb-666f6f">>,
-    create_user(TestAuthDb, User),
-    wait_for_db_create(<<"userdb-666f6f">>),
-    AfterCreate = lists:member(UserDbName, all_dbs()),
-    delete_user(TestAuthDb, User),
-    timer:sleep(?WAIT_FOR_USER_DELETE_TIMEOUT),
-    AfterDelete = lists:member(UserDbName, all_dbs()),
-    [?_assert(AfterCreate), ?_assert(AfterDelete)].
+    ?_test(begin
+        User = "foo",
+        UserDbName = <<"userdb-666f6f">>,
+        create_user(TestAuthDb, User),
+        wait_for_db_create(<<"userdb-666f6f">>),
+        AfterCreate = lists:member(UserDbName, all_dbs()),
+        delete_user(TestAuthDb, User),
+        timer:sleep(?WAIT_FOR_USER_DELETE_TIMEOUT),
+        AfterDelete = lists:member(UserDbName, all_dbs()),
+        ?assert(AfterCreate),
+        ?assert(AfterDelete)
+    end).
 
 should_delete_user_db(TestAuthDb) ->
-    User = "bar",
-    UserDbName = <<"userdb-626172">>,
-    set_config("couch_peruser", "delete_dbs", "true"),
-    create_user(TestAuthDb, User),
-    wait_for_db_create(UserDbName),
-    AfterCreate = lists:member(UserDbName, all_dbs()),
-    delete_user(TestAuthDb, User),
-    wait_for_db_delete(UserDbName),
-    AfterDelete = lists:member(UserDbName, all_dbs()),
-    [?_assert(AfterCreate), ?_assertNot(AfterDelete)].
+    ?_test(begin
+        User = "bar",
+        UserDbName = <<"userdb-626172">>,
+        set_config("couch_peruser", "delete_dbs", "true"),
+        create_user(TestAuthDb, User),
+        wait_for_db_create(UserDbName),
+        AfterCreate = lists:member(UserDbName, all_dbs()),
+        delete_user(TestAuthDb, User),
+        wait_for_db_delete(UserDbName),
+        AfterDelete = lists:member(UserDbName, all_dbs()),
+        ?assert(AfterCreate),
+        ?assertNot(AfterDelete)
+    end).
 
 should_delete_user_db_with_custom_prefix(TestAuthDb) ->
-    User = "bar",
-    UserDbName = <<"newuserdb-626172">>,
-    set_config("couch_peruser", "delete_dbs", "true"),
-    set_config("couch_peruser", "database_prefix", "newuserdb-"),
-    create_user(TestAuthDb, User),
-    wait_for_db_create(UserDbName),
-    AfterCreate = lists:member(UserDbName, all_dbs()),
-    delete_user(TestAuthDb, User),
-    wait_for_db_delete(UserDbName),
-    delete_config("couch_peruser", "database_prefix"),
-    AfterDelete = lists:member(UserDbName, all_dbs()),
-    [
-        ?_assert(AfterCreate),
-        ?_assertNot(AfterDelete)
-    ].
+    ?_test(begin
+        User = "bar",
+        UserDbName = <<"newuserdb-626172">>,
+        set_config("couch_peruser", "delete_dbs", "true"),
+        set_config("couch_peruser", "database_prefix", "newuserdb-"),
+        create_user(TestAuthDb, User),
+        wait_for_db_create(UserDbName),
+        AfterCreate = lists:member(UserDbName, all_dbs()),
+        delete_user(TestAuthDb, User),
+        wait_for_db_delete(UserDbName),
+        delete_config("couch_peruser", "database_prefix"),
+        AfterDelete = lists:member(UserDbName, all_dbs()),
+        ?assert(AfterCreate),
+        ?assertNot(AfterDelete)
+    end).
 
 should_delete_user_db_with_custom_special_prefix(TestAuthDb) ->
-    User = "bar",
-    UserDbName = <<"userdb_$()+--/626172">>,
-    set_config("couch_peruser", "delete_dbs", "true"),
-    set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
-    create_user(TestAuthDb, User),
-    wait_for_db_create(UserDbName),
-    AfterCreate = lists:member(UserDbName, all_dbs()),
-    delete_user(TestAuthDb, User),
-    wait_for_db_delete(UserDbName),
-    delete_config("couch_peruser", "database_prefix"),
-    AfterDelete = lists:member(UserDbName, all_dbs()),
-    [
-        ?_assert(AfterCreate),
-        ?_assertNot(AfterDelete)
-    ].
+    ?_test(begin
+        User = "bar",
+        UserDbName = <<"userdb_$()+--/626172">>,
+        set_config("couch_peruser", "delete_dbs", "true"),
+        set_config("couch_peruser", "database_prefix", "userdb_$()+--/"),
+        create_user(TestAuthDb, User),
+        wait_for_db_create(UserDbName),
+        AfterCreate = lists:member(UserDbName, all_dbs()),
+        delete_user(TestAuthDb, User),
+        wait_for_db_delete(UserDbName),
+        delete_config("couch_peruser", "database_prefix"),
+        AfterDelete = lists:member(UserDbName, all_dbs()),
+        ?assert(AfterCreate),
+        ?assertNot(AfterDelete)
+    end).
 
 should_reflect_config_changes(TestAuthDb) ->
-    User = "baz",
-    UserDbName = <<"userdb-62617a">>,
-    set_config("couch_peruser", "delete_dbs", "true"),
-    create_user(TestAuthDb, User),
-    wait_for_db_create(UserDbName),
-    AfterCreate1 = lists:member(UserDbName, all_dbs()),
-    delete_user(TestAuthDb, User),
-    timer:sleep(?WAIT_FOR_USER_DELETE_TIMEOUT),
-    wait_for_db_delete(UserDbName),
-    AfterDelete1 = lists:member(UserDbName, all_dbs()),
-    create_user(TestAuthDb, User),
-    wait_for_db_create(UserDbName),
-    AfterCreate2 = lists:member(UserDbName, all_dbs()),
-    set_config("couch_peruser", "delete_dbs", "false"),
-    delete_user(TestAuthDb, User),
-    timer:sleep(?WAIT_FOR_USER_DELETE_TIMEOUT),
-    AfterDelete2 = lists:member(UserDbName, all_dbs()),
-    create_user(TestAuthDb, User),
-    wait_for_db_create(UserDbName),
-    set_config("couch_peruser", "delete_dbs", "true"),
-    delete_user(TestAuthDb, User),
-    wait_for_db_delete(UserDbName),
-    AfterDelete3 = lists:member(UserDbName, all_dbs()),
-    set_config("couch_peruser", "enable", "false"),
-    create_user(TestAuthDb, User),
-    timer:sleep(?WAIT_FOR_USER_DELETE_TIMEOUT),
-    AfterCreate3 = lists:member(UserDbName, all_dbs()),
-    [
-        ?_assert(AfterCreate1),
-        ?_assertNot(AfterDelete1),
-        ?_assert(AfterCreate2),
-        ?_assert(AfterDelete2),
-        ?_assertNot(AfterDelete3),
-        ?_assertNot(AfterCreate3)
-    ].
+    {timeout, 10000, ?_test(begin
+        User = "baz",
+        UserDbName = <<"userdb-62617a">>,
+        set_config("couch_peruser", "delete_dbs", "true"),
+        create_user(TestAuthDb, User),
+        wait_for_db_create(UserDbName),
+        AfterCreate1 = lists:member(UserDbName, all_dbs()),
+        delete_user(TestAuthDb, User),
+        timer:sleep(?WAIT_FOR_USER_DELETE_TIMEOUT),
+        wait_for_db_delete(UserDbName),
+        AfterDelete1 = lists:member(UserDbName, all_dbs()),
+        create_user(TestAuthDb, User),
+        wait_for_db_create(UserDbName),
+        AfterCreate2 = lists:member(UserDbName, all_dbs()),
+        set_config("couch_peruser", "delete_dbs", "false"),
+        delete_user(TestAuthDb, User),
+        timer:sleep(?WAIT_FOR_USER_DELETE_TIMEOUT),
+        AfterDelete2 = lists:member(UserDbName, all_dbs()),
+        create_user(TestAuthDb, User),
+        wait_for_db_create(UserDbName),
+        set_config("couch_peruser", "delete_dbs", "true"),
+        delete_user(TestAuthDb, User),
+        wait_for_db_delete(UserDbName),
+        AfterDelete3 = lists:member(UserDbName, all_dbs()),
+        set_config("couch_peruser", "enable", "false"),
+        create_user(TestAuthDb, User),
+        timer:sleep(?WAIT_FOR_USER_DELETE_TIMEOUT),
+        AfterCreate3 = lists:member(UserDbName, all_dbs()),
+        ?assert(AfterCreate1),
+        ?assertNot(AfterDelete1),
+        ?assert(AfterCreate2),
+        ?assert(AfterDelete2),
+        ?assertNot(AfterDelete3),
+        ?assertNot(AfterCreate3)
+    end)}.
 
 
 should_add_user_to_db_admins(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
-    create_user(TestAuthDb, User),
-    wait_for_db_create(UserDbName),
-    ?_assertEqual(
-        {[{<<"names">>,[<<"qux">>]}]},
-        proplists:get_value(<<"admins">>, get_security(UserDbName))).
+    ?_test(begin
+        User = "qux",
+        UserDbName = <<"userdb-717578">>,
+        create_user(TestAuthDb, User),
+        wait_for_db_create(UserDbName),
+        ?assertEqual(
+            {[{<<"names">>,[<<"qux">>]}]},
+            proplists:get_value(<<"admins">>, get_security(UserDbName)))
+    end).
 
 should_add_user_to_db_members(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
-    create_user(TestAuthDb, User),
-    wait_for_db_create(UserDbName),
-    ?_assertEqual(
-        {[{<<"names">>,[<<"qux">>]}]},
-        proplists:get_value(<<"members">>, get_security(UserDbName))).
+    ?_test(begin
+        User = "qux",
+        UserDbName = <<"userdb-717578">>,
+        create_user(TestAuthDb, User),
+        wait_for_db_create(UserDbName),
+        ?assertEqual(
+            {[{<<"names">>,[<<"qux">>]}]},
+            proplists:get_value(<<"members">>, get_security(UserDbName)))
+    end).
 
 should_not_remove_existing_db_admins(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
-    SecurityProperties = [
-        {<<"admins">>,{[{<<"names">>,[<<"foo">>,<<"bar">>]}]}},
-        {<<"members">>,{[{<<"names">>,[<<"baz">>,<<"pow">>]}]}}
-    ],
-    create_db(UserDbName),
-    set_security(UserDbName, SecurityProperties),
-    create_user(TestAuthDb, User),
-    wait_for_security_create(<<"admins">>, User, UserDbName),
-    {AdminProperties} = proplists:get_value(<<"admins">>,
-        get_security(UserDbName)),
-    AdminNames = proplists:get_value(<<"names">>, AdminProperties),
-    [
-      ?_assert(lists:member(<<"foo">>, AdminNames)),
-      ?_assert(lists:member(<<"bar">>, AdminNames)),
-      ?_assert(lists:member(<<"qux">>, AdminNames))
-    ].
+    ?_test(begin
+        User = "qux",
+        UserDbName = <<"userdb-717578">>,
+        SecurityProperties = [
+            {<<"admins">>,{[{<<"names">>,[<<"foo">>,<<"bar">>]}]}},
+            {<<"members">>,{[{<<"names">>,[<<"baz">>,<<"pow">>]}]}}
+        ],
+        create_db(UserDbName),
+        set_security(UserDbName, SecurityProperties),
+        create_user(TestAuthDb, User),
+        wait_for_security_create(<<"admins">>, User, UserDbName),
+        {AdminProperties} = proplists:get_value(<<"admins">>,
+            get_security(UserDbName)),
+        AdminNames = proplists:get_value(<<"names">>, AdminProperties),
+        ?assert(lists:member(<<"foo">>, AdminNames)),
+        ?assert(lists:member(<<"bar">>, AdminNames)),
+        ?assert(lists:member(<<"qux">>, AdminNames))
+    end).
 
 should_not_remove_existing_db_members(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
-    SecurityProperties = [
-        {<<"admins">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}},
-        {<<"members">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}}
-    ],
-    create_db(UserDbName),
-    set_security(UserDbName, SecurityProperties),
-    create_user(TestAuthDb, User),
-    wait_for_security_create(<<"members">>, User, UserDbName),
-    {MemberProperties} = proplists:get_value(<<"members">>,
-        get_security(UserDbName)),
-    MemberNames = proplists:get_value(<<"names">>, MemberProperties),
-    [
-      ?_assert(lists:member(<<"pow">>, MemberNames)),
-      ?_assert(lists:member(<<"wow">>, MemberNames)),
-      ?_assert(lists:member(<<"qux">>, MemberNames))
-    ].
+    ?_test(begin
+        User = "qux",
+        UserDbName = <<"userdb-717578">>,
+        SecurityProperties = [
+            {<<"admins">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}},
+            {<<"members">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}}
+        ],
+        create_db(UserDbName),
+        set_security(UserDbName, SecurityProperties),
+        create_user(TestAuthDb, User),
+        wait_for_security_create(<<"members">>, User, UserDbName),
+        {MemberProperties} = proplists:get_value(<<"members">>,
+            get_security(UserDbName)),
+        MemberNames = proplists:get_value(<<"names">>, MemberProperties),
+        ?assert(lists:member(<<"pow">>, MemberNames)),
+        ?assert(lists:member(<<"wow">>, MemberNames)),
+        ?assert(lists:member(<<"qux">>, MemberNames))
+    end).
 
 should_remove_user_from_db_admins(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
-    SecurityProperties = [
-        {<<"admins">>,{[{<<"names">>,[<<"foo">>,<<"bar">>]}]}},
-        {<<"members">>,{[{<<"names">>,[<<"baz">>,<<"pow">>]}]}}
-    ],
-    create_db(UserDbName),
-    set_security(UserDbName, SecurityProperties),
-    create_user(TestAuthDb, User),
-    wait_for_security_create(<<"admins">>, User, UserDbName),
-    {AdminProperties} = proplists:get_value(<<"admins">>,
-        get_security(UserDbName)),
-    AdminNames = proplists:get_value(<<"names">>, AdminProperties),
-    FooBefore = lists:member(<<"foo">>, AdminNames),
-    BarBefore = lists:member(<<"bar">>, AdminNames),
-    QuxBefore = lists:member(<<"qux">>, AdminNames),
-    delete_user(TestAuthDb, User),
-    wait_for_security_delete(<<"admins">>, User, UserDbName),
-    {NewAdminProperties} = proplists:get_value(<<"admins">>,
-        get_security(UserDbName)),
-    NewAdminNames = proplists:get_value(<<"names">>, NewAdminProperties),
-    FooAfter = lists:member(<<"foo">>, NewAdminNames),
-    BarAfter = lists:member(<<"bar">>, NewAdminNames),
-    QuxAfter = lists:member(<<"qux">>, NewAdminNames),
-    [
-      ?_assert(FooBefore),
-      ?_assert(BarBefore),
-      ?_assert(QuxBefore),
-      ?_assert(FooAfter),
-      ?_assert(BarAfter),
-      ?_assertNot(QuxAfter)
-    ].
+    ?_test(begin
+        User = "qux",
+        UserDbName = <<"userdb-717578">>,
+        SecurityProperties = [
+            {<<"admins">>,{[{<<"names">>,[<<"foo">>,<<"bar">>]}]}},
+            {<<"members">>,{[{<<"names">>,[<<"baz">>,<<"pow">>]}]}}
+        ],
+        create_db(UserDbName),
+        set_security(UserDbName, SecurityProperties),
+        create_user(TestAuthDb, User),
+        wait_for_security_create(<<"admins">>, User, UserDbName),
+        {AdminProperties} = proplists:get_value(<<"admins">>,
+            get_security(UserDbName)),
+        AdminNames = proplists:get_value(<<"names">>, AdminProperties),
+        FooBefore = lists:member(<<"foo">>, AdminNames),
+        BarBefore = lists:member(<<"bar">>, AdminNames),
+        QuxBefore = lists:member(<<"qux">>, AdminNames),
+        delete_user(TestAuthDb, User),
+        wait_for_security_delete(<<"admins">>, User, UserDbName),
+        {NewAdminProperties} = proplists:get_value(<<"admins">>,
+            get_security(UserDbName)),
+        NewAdminNames = proplists:get_value(<<"names">>, NewAdminProperties),
+        FooAfter = lists:member(<<"foo">>, NewAdminNames),
+        BarAfter = lists:member(<<"bar">>, NewAdminNames),
+        QuxAfter = lists:member(<<"qux">>, NewAdminNames),
+        ?assert(FooBefore),
+        ?assert(BarBefore),
+        ?assert(QuxBefore),
+        ?assert(FooAfter),
+        ?assert(BarAfter),
+        ?assertNot(QuxAfter)
+    end).
 
 should_remove_user_from_db_members(TestAuthDb) ->
-    User = "qux",
-    UserDbName = <<"userdb-717578">>,
-    SecurityProperties = [
-        {<<"admins">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}},
-        {<<"members">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}}
-    ],
-    create_db(UserDbName),
-    set_security(UserDbName, SecurityProperties),
-    create_user(TestAuthDb, User),
-    wait_for_security_create(<<"members">>, User, UserDbName),
-    {MemberProperties} = proplists:get_value(<<"members">>,
-        get_security(UserDbName)),
-    MemberNames = proplists:get_value(<<"names">>, MemberProperties),
-    PowBefore = lists:member(<<"pow">>, MemberNames),
-    WowBefore = lists:member(<<"wow">>, MemberNames),
-    QuxBefore = lists:member(<<"qux">>, MemberNames),
-    delete_user(TestAuthDb, User),
-    wait_for_security_delete(<<"members">>, User, UserDbName),
-    {NewMemberProperties} = proplists:get_value(<<"members">>,
-        get_security(UserDbName)),
-    NewMemberNames = proplists:get_value(<<"names">>, NewMemberProperties),
-    PowAfter = lists:member(<<"pow">>, NewMemberNames),
-    WowAfter = lists:member(<<"wow">>, NewMemberNames),
-    QuxAfter = lists:member(<<"qux">>, NewMemberNames),
-    [
-      ?_assert(PowBefore),
-      ?_assert(WowBefore),
-      ?_assert(QuxBefore),
-      ?_assert(PowAfter),
-      ?_assert(WowAfter),
-      ?_assertNot(QuxAfter)
-    ].
+    ?_test(begin
+        User = "qux",
+        UserDbName = <<"userdb-717578">>,
+        SecurityProperties = [
+            {<<"admins">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}},
+            {<<"members">>,{[{<<"names">>,[<<"pow">>,<<"wow">>]}]}}
+        ],
+        create_db(UserDbName),
+        set_security(UserDbName, SecurityProperties),
+        create_user(TestAuthDb, User),
+        wait_for_security_create(<<"members">>, User, UserDbName),
+        {MemberProperties} = proplists:get_value(<<"members">>,
+            get_security(UserDbName)),
+        MemberNames = proplists:get_value(<<"names">>, MemberProperties),
+        PowBefore = lists:member(<<"pow">>, MemberNames),
+        WowBefore = lists:member(<<"wow">>, MemberNames),
+        QuxBefore = lists:member(<<"qux">>, MemberNames),
+        delete_user(TestAuthDb, User),
+        wait_for_security_delete(<<"members">>, User, UserDbName),
+        {NewMemberProperties} = proplists:get_value(<<"members">>,
+            get_security(UserDbName)),
+        NewMemberNames = proplists:get_value(<<"names">>, NewMemberProperties),
+        PowAfter = lists:member(<<"pow">>, NewMemberNames),
+        WowAfter = lists:member(<<"wow">>, NewMemberNames),
+        QuxAfter = lists:member(<<"qux">>, NewMemberNames),
+        ?assert(PowBefore),
+        ?assert(WowBefore),
+        ?assert(QuxBefore),
+        ?assert(PowAfter),
+        ?assert(WowAfter),
+        ?assertNot(QuxAfter)
+    end).
+
 
 
 wait_for_db_create(UserDbName) ->

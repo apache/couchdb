@@ -36,7 +36,6 @@ setup() ->
         save_doc(Db, {[{<<"_id">>, <<"doc5">>}]})
     ]],
     Rev = lists:nth(3, Revs),
-    couch_db:ensure_full_commit(Db),
     {ok, Db1} = couch_db:reopen(Db),
 
     {ok, Rev1} = save_doc(Db1, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev}]}),
@@ -155,7 +154,6 @@ filter_by_view() ->
             fun setup/0, fun teardown/1,
             [
                 fun should_filter_by_view/1,
-                fun should_filter_by_fast_view/1,
                 fun should_filter_by_erlang_view/1
             ]
         }
@@ -697,43 +695,6 @@ should_filter_by_view({DbName, _}) ->
             ?assertEqual(<<"doc3">>, Id),
             ?assertEqual(6, Seq),
             ?assertEqual(UpSeq, LastSeq)
-        end).
-
-should_filter_by_fast_view({DbName, _}) ->
-    ?_test(
-        begin
-            DDocId = <<"_design/app">>,
-            DDoc = couch_doc:from_json_obj({[
-                {<<"_id">>, DDocId},
-                {<<"language">>, <<"javascript">>},
-                {<<"options">>, {[{<<"seq_indexed">>, true}]}},
-                {<<"views">>, {[
-                    {<<"valid">>, {[
-                        {<<"map">>, <<"function(doc) {"
-                        " if (doc._id == 'doc3') {"
-                            " emit(doc); "
-                        "} }">>}
-                    ]}}
-                ]}}
-            ]}),
-            ChArgs = #changes_args{filter = "_view"},
-            Req = {json_req, {[{
-                <<"query">>, {[
-                    {<<"view">>, <<"app/valid">>}
-                ]}
-            }]}},
-            ok = update_ddoc(DbName, DDoc),
-            {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
-            {ok, Db} = couch_db:open_int(DbName, []),
-            {ok, ViewInfo} = couch_mrview:get_view_info(Db, DDoc, <<"valid">>),
-            {update_seq, ViewUpSeq} = lists:keyfind(update_seq, 1, ViewInfo),
-            couch_db:close(Db),
-            ?assertEqual(1, length(Rows)),
-            [#row{seq = Seq, id = Id}] = Rows,
-            ?assertEqual(<<"doc3">>, Id),
-            ?assertEqual(6, Seq),
-            ?assertEqual(LastSeq, Seq),
-            ?assertEqual(UpSeq, ViewUpSeq)
         end).
 
 should_filter_by_erlang_view({DbName, _}) ->

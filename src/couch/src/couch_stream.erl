@@ -145,7 +145,7 @@ foldl_length(Bin, {Length, UserFun, UserAcc}) ->
         true ->
             {Length - BinSize, UserFun, UserFun(Bin, UserAcc)};
         false ->
-            <<Trunc:BinSize/binary, _/binary>> = Bin,
+            <<Trunc:Length/binary, _/binary>> = Bin,
             throw({finished, UserFun(Trunc, UserAcc)})
     end.
 

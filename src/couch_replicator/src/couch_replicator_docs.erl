@@ -20,7 +20,6 @@
     parse_rep_doc_without_id/2,
     before_doc_update/3,
     after_doc_read/2,
-    ensure_rep_db_exists/0,
     ensure_rep_ddoc_exists/1,
     ensure_cluster_rep_ddoc_exists/1,
     remove_state_fields/2,
@@ -119,20 +118,6 @@ update_error(#rep{db_name = DbName, doc_id = DocId, id = RepId}, Error) ->
         {<<"_replication_stats">>, undefined},
         {<<"_replication_id">>, BinRepId}]),
     ok.
-
-
--spec ensure_rep_db_exists() -> {ok, Db::any()}.
-ensure_rep_db_exists() ->
-    Db = case couch_db:open_int(?REP_DB_NAME, [?CTX, sys_db,
-            nologifmissing]) of
-        {ok, Db0} ->
-            Db0;
-        _Error ->
-            {ok, Db0} = couch_db:create(?REP_DB_NAME, [?CTX, sys_db]),
-            Db0
-    end,
-    ok = ensure_rep_ddoc_exists(?REP_DB_NAME),
-    {ok, Db}.
 
 
 -spec ensure_rep_ddoc_exists(binary()) -> ok.
@@ -256,15 +241,15 @@ parse_rep_doc(Doc, UserCtx) ->
 
 -spec parse_rep_doc_without_id({[_]}, #user_ctx{}) -> {ok, #rep{}}.
 parse_rep_doc_without_id({Props}, UserCtx) ->
-    Proxy = get_value(<<"proxy">>, Props, <<>>),
+    {SrcProxy, TgtProxy} = parse_proxy_settings(Props),
     Opts = make_options(Props),
     case get_value(cancel, Opts, false) andalso
         (get_value(id, Opts, nil) =/= nil) of
     true ->
         {ok, #rep{options = Opts, user_ctx = UserCtx}};
     false ->
-        Source = parse_rep_db(get_value(<<"source">>, Props), Proxy, Opts),
-        Target = parse_rep_db(get_value(<<"target">>, Props), Proxy, Opts),
+        Source = parse_rep_db(get_value(<<"source">>, Props), SrcProxy, Opts),
+        Target = parse_rep_db(get_value(<<"target">>, Props), TgtProxy, Opts),
         {Type, View} = case couch_replicator_filters:view_type(Props, Opts) of
         {error, Error} ->
             throw({bad_request, Error});
@@ -288,6 +273,25 @@ parse_rep_doc_without_id({Props}, UserCtx) ->
              ok
         end,
         {ok, Rep}
+    end.
+
+
+parse_proxy_settings(Props) when is_list(Props) ->
+    Proxy = get_value(<<"proxy">>, Props, <<>>),
+    SrcProxy = get_value(<<"source_proxy">>, Props, <<>>),
+    TgtProxy = get_value(<<"target_proxy">>, Props, <<>>),
+
+    case Proxy =/= <<>> of
+        true when SrcProxy =/= <<>> ->
+            Error = "`proxy` is mutually exclusive with `source_proxy`",
+            throw({bad_request, Error});
+        true when  TgtProxy =/= <<>> ->
+            Error = "`proxy` is mutually exclusive with `target_proxy`",
+            throw({bad_request, Error});
+        true ->
+            {Proxy, Proxy};
+        false ->
+            {SrcProxy, TgtProxy}
     end.
 
 
@@ -683,8 +687,12 @@ strip_credentials(Url) when is_binary(Url) ->
         "http(s)?://(?:[^:]+):[^@]+@(.*)$",
         "http\\1://\\2",
         [{return, binary}]);
-strip_credentials({Props}) ->
-    {lists:keydelete(<<"headers">>, 1, Props)}.
+strip_credentials({Props0}) ->
+    Props1 = lists:keydelete(<<"headers">>, 1, Props0),
+    % Strip "auth" just like headers, for replication plugins it can be a place
+    % to stash credential that are not necessarily in headers
+    Props2 = lists:keydelete(<<"auth">>, 1, Props1),
+    {Props2}.
 
 
 error_reason({shutdown, Error}) ->
@@ -773,6 +781,10 @@ check_strip_credentials_test() ->
         {
             {[{<<"_id">>, <<"foo">>}]},
             {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"baz">>}]}
+        },
+        {
+            {[{<<"_id">>, <<"foo">>}]},
+            {[{<<"_id">>, <<"foo">>}, {<<"auth">>, <<"pluginsecret">>}]}
         }
     ]].
 
@@ -797,8 +809,7 @@ create_vdu(DbName) ->
             id = <<"_design/vdu">>,
             body = {[{<<"validate_doc_update">>, VduFun}]}
         },
-        {ok, _} = couch_db:update_docs(Db, [Doc]),
-        couch_db:ensure_full_commit(Db)
+        {ok, _} = couch_db:update_docs(Db, [Doc])
     end).
 
 

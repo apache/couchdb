@@ -15,9 +15,6 @@
 -export([validate/2]).
 -export([query_all_docs/2, query_all_docs/4]).
 -export([query_view/3, query_view/4, query_view/6, get_view_index_pid/4]).
--export([view_changes_since/5]).
--export([view_changes_since/6, view_changes_since/7]).
--export([count_view_changes_since/4, count_view_changes_since/5]).
 -export([get_info/2]).
 -export([trigger_update/2, trigger_update/3]).
 -export([get_view_info/3]).
@@ -224,7 +221,7 @@ validate(Db,  DDoc) ->
                 couch_query_servers:ret_os_process(Proc)
             end
     catch {unknown_query_language, _Lang} ->
-        %% Allow users to save ddocs written in uknown languages
+    %% Allow users to save ddocs written in unknown languages
         ok
     end.
 
@@ -288,68 +285,6 @@ query_view(Db, {Type, View, Ref}, Args, Callback, Acc) ->
         erlang:demonitor(Ref, [flush])
     end.
 
-view_changes_since(View, StartSeq, Fun, Opts0, Acc) ->
-    Wrapper = fun(KV, _, Acc1) ->
-        Fun(KV, Acc1)
-    end,
-    Opts = [{start_key, {StartSeq + 1, <<>>}}] ++ Opts0,
-    {ok, _LastRed, AccOut} = couch_btree:fold(View#mrview.seq_btree, Wrapper, Acc, Opts),
-    {ok, AccOut}.
-
-view_changes_since(Db, DDoc, VName, StartSeq, Fun, Acc) ->
-    view_changes_since(Db, DDoc, VName, StartSeq, Fun, [], Acc).
-
-view_changes_since(Db, DDoc, VName, StartSeq, Fun, Options, Acc) ->
-    Args0 = make_view_changes_args(Options),
-    {ok, {_, View, _}, _, Args} = couch_mrview_util:get_view(Db, DDoc, VName,
-                                                             Args0),
-    #mrview{seq_indexed=SIndexed, keyseq_indexed=KSIndexed} = View,
-    IsKSQuery = is_key_byseq(Options),
-    if (SIndexed andalso not IsKSQuery) orelse (KSIndexed andalso IsKSQuery) ->
-        OptList = make_view_changes_opts(StartSeq, Options, Args),
-        Btree = case IsKSQuery of
-            true -> View#mrview.key_byseq_btree;
-            _ -> View#mrview.seq_btree
-        end,
-        AccOut = lists:foldl(fun(Opts, Acc0) ->
-            {ok, _R, A} = couch_mrview_util:fold_changes(
-                Btree, Fun, Acc0, Opts),
-            A
-        end, Acc, OptList),
-        {ok, AccOut};
-    true ->
-        {error, seqs_not_indexed}
-    end.
-
-count_view_changes_since(Db, DDoc, VName, SinceSeq) ->
-    count_view_changes_since(Db, DDoc, VName, SinceSeq, []).
-
-count_view_changes_since(Db, DDoc, VName, SinceSeq, Options) ->
-    Args0 = make_view_changes_args(Options),
-    {ok, {_Type, View, _Ref}, _, Args} = couch_mrview_util:get_view(
-        Db, DDoc, VName, Args0),
-    case View#mrview.seq_indexed of
-        true ->
-            OptList = make_view_changes_opts(SinceSeq, Options, Args),
-            Btree = case is_key_byseq(Options) of
-                true -> View#mrview.key_byseq_btree;
-                _ -> View#mrview.seq_btree
-            end,
-            RedFun = fun(_SeqStart, PartialReds, 0) ->
-                {ok, couch_btree:final_reduce(Btree, PartialReds)}
-            end,
-            lists:foldl(fun(Opts, Acc0) ->
-                case couch_btree:fold_reduce(Btree, RedFun, 0, Opts) of
-                    {ok, N} when is_integer(N) ->
-                        Acc0 + N;
-                    {ok, N} when is_tuple(N) ->
-                        Acc0 + element(1, N)
-                end
-            end, 0, OptList);
-        _ ->
-            {error, seqs_not_indexed}
-    end.
-
 
 get_info(Db, DDoc) ->
     {ok, Pid} = couch_index_server:get_index(couch_mrview_index, Db, DDoc),
@@ -371,19 +306,9 @@ get_view_info(Db, DDoc, VName) ->
     %% get the total number of rows
     {ok, TotalRows} =  couch_mrview_util:get_row_count(View),
 
-    %% get the total number of sequence logged in this view
-    SeqBtree = View#mrview.seq_btree,
-    {ok, TotalSeqs} = case SeqBtree of
-        nil -> {ok, 0};
-        _ ->
-            couch_btree:full_reduce(SeqBtree)
-    end,
-
-    {ok, [{seq_indexed, View#mrview.seq_indexed},
-          {update_seq, View#mrview.update_seq},
+    {ok, [{update_seq, View#mrview.update_seq},
           {purge_seq, View#mrview.purge_seq},
-          {total_rows, TotalRows},
-          {total_seqs, TotalSeqs}]}.
+          {total_rows, TotalRows}]}.
 
 
 %% @doc refresh a view index
@@ -774,26 +699,3 @@ lookup_index(Key) ->
         record_info(fields, mrargs), lists:seq(2, record_info(size, mrargs))
     ),
     couch_util:get_value(Key, Index).
-
-
-is_key_byseq(Options) ->
-    lists:any(fun({K, _}) ->
-                lists:member(K, [start_key, end_key, start_key_docid,
-                                 end_key_docid, keys])
-        end, Options).
-
-make_view_changes_args(Options) ->
-    case is_key_byseq(Options) of
-        true ->
-            to_mrargs(Options);
-        false ->
-            #mrargs{}
-    end.
-
-make_view_changes_opts(StartSeq, Options, Args) ->
-    case is_key_byseq(Options) of
-        true ->
-            couch_mrview_util:changes_key_opts(StartSeq, Args);
-        false ->
-            [[{start_key, {StartSeq+1, <<>>}}] ++ Options]
-    end.

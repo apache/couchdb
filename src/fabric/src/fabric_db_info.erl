@@ -30,7 +30,7 @@ go(DbName) ->
 
             {ok, Acc} ->
                 {ok, Acc};
-            {timeout, {WorkersDict, _}} ->
+            {timeout, {WorkersDict, _, _}} ->
                 DefunctWorkers = fabric_util:remove_done_workers(
                     WorkersDict,
                     nil
@@ -99,14 +99,8 @@ merge_results(Info) ->
             [{doc_del_count, lists:sum(X)} | Acc];
         (compact_running, X, Acc) ->
             [{compact_running, lists:member(true, X)} | Acc];
-        (disk_size, X, Acc) -> % legacy
-            [{disk_size, lists:sum(X)} | Acc];
-        (data_size, X, Acc) -> % legacy
-            [{data_size, lists:sum(X)} | Acc];
         (sizes, X, Acc) ->
             [{sizes, {merge_object(X)}} | Acc];
-        (other, X, Acc) -> % legacy
-            [{other, {merge_other_results(X)}} | Acc];
         (disk_format_version, X, Acc) ->
             [{disk_format_version, lists:max(X)} | Acc];
         (cluster, [X], Acc) ->
@@ -116,17 +110,6 @@ merge_results(Info) ->
         (_K, _V, Acc) ->
             Acc
     end, [{instance_start_time, <<"0">>}], Dict).
-
-merge_other_results(Results) ->
-    Dict = lists:foldl(fun({Props}, D) ->
-        lists:foldl(fun({K,V},D0) -> orddict:append(K,V,D0) end, D, Props)
-    end, orddict:new(), Results),
-    orddict:fold(fun
-        (data_size, X, Acc) ->
-            [{data_size, lists:sum(X)} | Acc];
-        (_, _, Acc) ->
-            Acc
-    end, [], Dict).
 
 merge_object(Objects) ->
     Dict = lists:foldl(fun({Props}, D) ->

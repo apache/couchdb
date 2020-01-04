@@ -110,6 +110,11 @@ def setup_logging(ctx):
 
 
 def setup_argparse():
+    parser = get_args_parser()
+    return parser.parse_args()
+
+
+def get_args_parser():
     parser = optparse.OptionParser(description="Runs CouchDB 2.0 dev cluster")
     parser.add_option(
         "-a",
@@ -200,7 +205,13 @@ def setup_argparse():
         action="store_true",
         help="Select available ports for nodes automatically",
     )
-    return parser.parse_args()
+    parser.add_option(
+        "--extra_args",
+        dest="extra_args",
+        default=None,
+        help="Extra arguments to pass to beam process",
+    )
+    return parser
 
 
 def setup_context(opts, args):
@@ -223,6 +234,7 @@ def setup_context(opts, args):
         "haproxy_port": opts.haproxy_port,
         "config_overrides": opts.config_overrides,
         "no_eval": opts.no_eval,
+        "extra_args": opts.extra_args,
         "reset_logs": True,
         "procs": [],
         "auto_ports": opts.auto_ports,
@@ -387,6 +399,10 @@ def boot_haproxy(ctx):
 
 
 def hack_default_ini(ctx, node, contents):
+
+    contents = re.sub(
+        "^\[httpd\]$", "[httpd]\nenable = true", contents, flags=re.MULTILINE,
+    )
 
     if ctx["enable_erlang_views"]:
         contents = re.sub(
@@ -578,6 +594,8 @@ def boot_node(ctx, node):
         mode = "r+b"
     logfname = os.path.join(ctx["devdir"], "logs", "%s.log" % node)
     log = open(logfname, mode)
+    if "extra_args" in ctx and ctx["extra_args"]:
+        cmd += ctx["extra_args"].split(" ")
     cmd = [toposixpath(x) for x in cmd]
     return sp.Popen(cmd, stdin=sp.PIPE, stdout=log, stderr=sp.STDOUT, env=env)
 

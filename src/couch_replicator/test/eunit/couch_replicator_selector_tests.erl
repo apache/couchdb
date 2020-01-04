@@ -106,7 +106,6 @@ create_docs(DbName) ->
         {<<"_id">>, <<"doc2">>}
     ]}),
     {ok, _} = couch_db:update_docs(Db, [Doc1, Doc2]),
-    couch_db:ensure_full_commit(Db),
     couch_db:close(Db).
 
 delete_db(DbName) ->
