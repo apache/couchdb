@@ -91,7 +91,7 @@ handle_config_terminate(_Server, _Reason, _State) ->
 
 assert_admins() ->
     couch_log:info("Preflight check: Asserting Admin Account~n", []),
-    case {config:get("admins"), os:getenv("COUCH_TEST_ADMIN_PARTY_OVERRIDE")} of
+    case {config:get("admins"), os:getenv("COUCHDB_TEST_ADMIN_PARTY_OVERRIDE")} of
         {[], false} ->
             couch_log:info("~n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%~n"
                           ++ "  No Admin Account Found, aborting startup.                  ~n"
@@ -105,7 +105,7 @@ assert_admins() ->
 
 
 maybe_send_no_admin_account_error_message() ->
-    case os:getenv("COUCH_TEST_ADMIN_PARTY_OVERRIDE") of
+    case os:getenv("COUCHDB_TEST_ADMIN_PARTY_OVERRIDE") of
         false ->
             ok;
         _ ->
