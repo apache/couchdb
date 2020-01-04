@@ -185,38 +185,53 @@ format_reply(Else, _) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+-define(MECK_MODS, [
+    couch_log,
+    couch_stats,
+    fabric,
+    fabric_util,
+    mem3,
+    rexi,
+    rexi_monitor
+]).
+
+
+setup_all() ->
+    meck:new(?MECK_MODS, [passthrough]).
+
+
+teardown_all(_) ->
+    meck:unload().
+
 
 setup() ->
-    meck:new([
-        couch_log,
-        couch_stats,
-        fabric,
-        fabric_util,
-        mem3,
-        rexi,
-        rexi_monitor
-    ], [passthrough]).
+    meck:reset(?MECK_MODS).
 
 
 teardown(_) ->
-    meck:unload().
+    ok.
 
 
 open_doc_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_is_r_met(),
-            t_handle_message_down(),
-            t_handle_message_exit(),
-            t_handle_message_reply(),
-            t_store_node_revs(),
-            t_read_repair(),
-            t_handle_response_quorum_met(),
-            t_get_doc_info()
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_is_r_met(),
+                t_handle_message_down(),
+                t_handle_message_exit(),
+                t_handle_message_reply(),
+                t_store_node_revs(),
+                t_read_repair(),
+                t_handle_response_quorum_met(),
+                t_get_doc_info()
+            ]
+        }
     }.
 
 
@@ -322,7 +337,7 @@ t_handle_message_reply() ->
     Acc0 = #acc{workers=Workers, r=2, replies=[]},
 
     ?_test(begin
-        meck:expect(rexi, kill, fun(_, _) -> ok end),
+        meck:expect(rexi, kill_all, fun(_) -> ok end),
 
         % Test that we continue when we haven't met R yet
         ?assertMatch(
@@ -416,7 +431,7 @@ t_store_node_revs() ->
     InitAcc = #acc{workers = [W1, W2, W3], replies = [], r = 2},
 
     ?_test(begin
-        meck:expect(rexi, kill, fun(_, _) -> ok end),
+        meck:expect(rexi, kill_all, fun(_) -> ok end),
 
         % Simple case
         {ok, #acc{node_revs = NodeRevs1}} = handle_message(Foo1, W1, InitAcc),

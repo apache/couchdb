@@ -140,9 +140,20 @@ check: all
 eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
 eunit: export BUILDDIR = $(shell echo %cd%)
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
+eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
-	@$(REBAR) setup_eunit 2> nul
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
+	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) setup_eunit 2> nul
+	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) -r eunit $(EUNIT_OPTS)
+
+.PHONY: exunit
+# target: exunit - Run ExUnit tests
+exunit: export BUILDDIR = $(shell echo %cd%)
+exunit: export MIX_ENV=test
+exunit: export ERL_LIBS = $(shell echo %cd%)\src
+exunit: export ERL_AFLAGS = -config $(shell echo %cd%)/rel/files/eunit.config
+exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
+exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
+	@mix test --cover --trace $(EXUNIT_OPTS)
 
 setup-eunit: export BUILDDIR = $(shell pwd)
 setup-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
@@ -176,36 +187,38 @@ python-black-update: .venv/bin/black
 		. dev\run rel\overlay\bin\couchup test\javascript\run
 
 .PHONY: elixir
+elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev\run -a adm:pass --no-eval 'test\elixir\run.cmd --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev\run -a adm:pass --enable-erlang-views --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init:
-	@cd test/elixir && mix local.rebar --force && mix local.hex --force && mix deps.get
+	@mix local.rebar --force && mix local.hex --force && mix deps.get
 
 .PHONY: elixir-cluster-without-quorum
 elixir-cluster-without-quorum: elixir-check-formatted elixir-credo devclean
 	@dev\run -n 3 -q -a adm:pass \
 	         --degrade-cluster 2 \
-                 --no-eval 'test\elixir\run.cmd --only without_quorum_test $(EXUNIT_OPTS)'
+                 --no-eval 'mix test --trace --only without_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-cluster-with-quorum
 elixir-cluster-with-quorum: elixir-check-formatted elixir-credo devclean
 	@dev\run -n 3 -q -a adm:pass \
 	         --degrade-cluster 1 \
-		 --no-eval 'test\elixir\run.cmd --only with_quorum_test $(EXUNIT_OPTS)'
+		 --no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted:
-	@cd test\elixir && mix format --check-formatted
+	@mix format --check-formatted
 
 # Credo is a static code analysis tool for Elixir.
 # We use it in our tests
 .PHONY: elixir-credo
 elixir-credo:
-	@cd test/elixir/ && mix credo
+	@mix credo
 
 .PHONY: test-cluster-with-quorum
+test-cluster-with-quorum: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 test-cluster-with-quorum: devclean
 	-@mkdir share\www\script\test
 ifeq ($(IN_RELEASE), true)
@@ -222,6 +235,7 @@ endif
 		--path test\javascript\tests-cluster\with-quorum"
 
 .PHONY: test-cluster-without-quorum
+test-cluster-without-quorum: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 test-cluster-without-quorum: devclean
 	-@mkdir share\www\script\test
 ifeq ($(IN_RELEASE), true)
@@ -240,6 +254,7 @@ endif
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
+javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 javascript:
 	-@mkdir share\www\script\test
 ifeq ($(IN_RELEASE), true)
@@ -256,6 +271,7 @@ endif
 
 
 .PHONY: mango-test
+mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@cd src\mango && \
 		python.exe -m venv .venv && \

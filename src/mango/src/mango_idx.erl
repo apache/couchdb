@@ -72,9 +72,20 @@ get_usable_indexes(Db, Selector, Opts) ->
 
     case lists:filter(UsableFilter, UsableIndexes1) of
         [] ->
-            ?MANGO_ERROR({no_usable_index, missing_sort_index});
+            mango_sort_error(Db, Opts);
         UsableIndexes ->
             UsableIndexes
+    end.
+
+
+mango_sort_error(Db, Opts) ->
+    case {fabric_util:is_partitioned(Db), is_opts_partitioned(Opts)} of
+        {false, _} ->
+            ?MANGO_ERROR({no_usable_index, missing_sort_index});
+        {true, true} ->
+            ?MANGO_ERROR({no_usable_index, missing_sort_index_partitioned});
+        {true, false} ->
+            ?MANGO_ERROR({no_usable_index, missing_sort_index_global})
     end.
 
 
@@ -171,7 +182,7 @@ from_ddoc(Db, {Props}) ->
         _ ->
             ?MANGO_ERROR(invalid_query_ddoc_language)
     end,
-    IdxMods = case module_loaded(dreyfus_index) of
+    IdxMods = case clouseau_rpc:connected() of
         true ->
             [mango_idx_view, mango_idx_text];
         false ->
@@ -257,7 +268,7 @@ cursor_mod(#idx{type = <<"json">>}) ->
 cursor_mod(#idx{def = all_docs, type= <<"special">>}) ->
     mango_cursor_special;
 cursor_mod(#idx{type = <<"text">>}) ->
-    case module_loaded(dreyfus_index) of
+    case clouseau_rpc:connected() of
         true ->
             mango_cursor_text;
         false ->
@@ -270,7 +281,7 @@ idx_mod(#idx{type = <<"json">>}) ->
 idx_mod(#idx{type = <<"special">>}) ->
     mango_idx_special;
 idx_mod(#idx{type = <<"text">>}) ->
-    case module_loaded(dreyfus_index) of
+    case clouseau_rpc:connected() of
         true ->
             mango_idx_text;
         false ->
@@ -298,7 +309,7 @@ get_idx_def(Opts) ->
 get_idx_type(Opts) ->
     case proplists:get_value(type, Opts) of
         <<"json">> -> <<"json">>;
-        <<"text">> -> case module_loaded(dreyfus_index) of
+        <<"text">> -> case clouseau_rpc:connected() of
             true ->
                 <<"text">>;
             false ->
@@ -410,12 +421,20 @@ get_idx_partitioned(Db, DDocProps) ->
             Default
     end.
 
+is_opts_partitioned(Opts) ->
+    case couch_util:get_value(partition, Opts, <<>>) of
+        <<>> ->
+            false;
+        Partition when is_binary(Partition) ->
+            true
+    end.
+
 
 filter_partition_indexes(Indexes, Opts) ->
-    PFilt = case couch_util:get_value(partition, Opts) of
-        <<>> ->
+    PFilt = case is_opts_partitioned(Opts) of
+        false ->
             fun(#idx{partitioned = P}) -> not P end;
-        Partition when is_binary(Partition) ->
+        true ->
             fun(#idx{partitioned = P}) -> P end
     end,
     Filt = fun(Idx) -> type(Idx) == <<"special">> orelse PFilt(Idx) end,

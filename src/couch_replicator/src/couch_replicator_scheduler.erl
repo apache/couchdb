@@ -148,24 +148,25 @@ job_summary(JobId, HealthThreshold) ->
                         [{{crashed, Error}, _When} | _] ->
                             {crashing, crash_reason_json(Error)};
                         [_ | _] ->
-                            {pending, null}
+                            {pending, Rep#rep.stats}
                     end;
                 {undefined, ErrorCount} when ErrorCount > 0 ->
                      [{{crashed, Error}, _When} | _] = History,
                      {crashing, crash_reason_json(Error)};
                 {Pid, ErrorCount} when is_pid(Pid) ->
-                     {running, null}
+                     {running, Rep#rep.stats}
             end,
             [
                 {source, iolist_to_binary(ejson_url(Rep#rep.source))},
                 {target, iolist_to_binary(ejson_url(Rep#rep.target))},
                 {state, State},
-                {info, Info},
+                {info, couch_replicator_utils:ejson_state_info(Info)},
                 {error_count, ErrorCount},
                 {last_updated, last_updated(History)},
                 {start_time,
                     couch_replicator_utils:iso8601(Rep#rep.start_time)},
-                {proxy, job_proxy_url(Rep#rep.source)}
+                {source_proxy, job_proxy_url(Rep#rep.source)},
+                {target_proxy, job_proxy_url(Rep#rep.target)}
             ];
         {error, not_found} ->
             nil  % Job might have just completed
@@ -494,7 +495,10 @@ start_jobs(Count, State) ->
 
 
 -spec stop_jobs(non_neg_integer(), boolean(), #state{}) -> non_neg_integer().
-stop_jobs(Count, IsContinuous, State) ->
+stop_jobs(Count, _, _) when is_integer(Count), Count =< 0 ->
+    0;
+
+stop_jobs(Count, IsContinuous, State) when is_integer(Count) ->
     Running0 = running_jobs(),
     ContinuousPred = fun(Job) -> is_continuous(Job) =:= IsContinuous end,
     Running1 = lists:filter(ContinuousPred, Running0),
@@ -723,35 +727,25 @@ reset_job_process(#job{} = Job) ->
 
 -spec reschedule(#state{}) -> ok.
 reschedule(State) ->
-    Running = running_job_count(),
-    Pending = pending_job_count(),
-    stop_excess_jobs(State, Running),
-    start_pending_jobs(State, Running, Pending),
-    rotate_jobs(State, Running, Pending),
-    update_running_jobs_stats(State#state.stats_pid),
-    ok.
+    StopCount = stop_excess_jobs(State, running_job_count()),
+    rotate_jobs(State, StopCount),
+    update_running_jobs_stats(State#state.stats_pid).
 
 
--spec stop_excess_jobs(#state{}, non_neg_integer()) -> ok.
+-spec stop_excess_jobs(#state{}, non_neg_integer()) -> non_neg_integer().
 stop_excess_jobs(State, Running) ->
     #state{max_jobs=MaxJobs} = State,
-    StopCount = Running - MaxJobs,
-    if StopCount =< 0 -> ok; true ->
-        Stopped = stop_jobs(StopCount, true, State),
-        OneshotLeft = StopCount - Stopped,
-        if OneshotLeft =< 0 -> ok; true ->
-            stop_jobs(OneshotLeft, false, State),
-            ok
-        end
-    end.
+    StopCount = max(0, Running - MaxJobs),
+    Stopped = stop_jobs(StopCount, true, State),
+    OneshotLeft = StopCount - Stopped,
+    stop_jobs(OneshotLeft, false, State),
+    StopCount.
 
 
 start_pending_jobs(State) ->
-    start_pending_jobs(State, running_job_count(), pending_job_count()).
-
-
-start_pending_jobs(State, Running, Pending) ->
     #state{max_jobs=MaxJobs} = State,
+    Running = running_job_count(),
+    Pending = pending_job_count(),
     if Running < MaxJobs, Pending > 0 ->
         start_jobs(MaxJobs - Running, State);
     true ->
@@ -759,13 +753,23 @@ start_pending_jobs(State, Running, Pending) ->
     end.
 
 
--spec rotate_jobs(#state{}, non_neg_integer(), non_neg_integer()) -> ok.
-rotate_jobs(State, Running, Pending) ->
+-spec rotate_jobs(#state{}, non_neg_integer()) -> ok.
+rotate_jobs(State, ChurnSoFar) ->
     #state{max_jobs=MaxJobs, max_churn=MaxChurn} = State,
-    if Running == MaxJobs, Pending > 0 ->
-        RotateCount = lists:min([Pending, Running, MaxChurn]),
-        StopCount = stop_jobs(RotateCount, true, State),
-        start_jobs(StopCount, State);
+    Running = running_job_count(),
+    Pending = pending_job_count(),
+    % Reduce MaxChurn by the number of already stopped jobs in the
+    % current rescheduling cycle.
+    Churn = max(0, MaxChurn - ChurnSoFar),
+    SlotsAvailable = MaxJobs - Running,
+    if SlotsAvailable >= 0 ->
+        % If there is are enough SlotsAvailable reduce StopCount to avoid
+        % unnesessarily stopping jobs. `stop_jobs/3` ignores 0 or negative
+        % values so we don't worry about that here.
+        StopCount = lists:min([Pending - SlotsAvailable, Running, Churn]),
+        stop_jobs(StopCount, true, State),
+        StartCount = max(0, MaxJobs - running_job_count()),
+        start_jobs(StartCount, State);
     true ->
         ok
     end.
@@ -825,6 +829,7 @@ job_ejson(Job) ->
         {database, Rep#rep.db_name},
         {user, (Rep#rep.user_ctx)#user_ctx.name},
         {doc_id, Rep#rep.doc_id},
+        {info, couch_replicator_utils:ejson_state_info(Rep#rep.stats)},
         {history, History},
         {node, node()},
         {start_time, couch_replicator_utils:iso8601(Rep#rep.start_time)}
@@ -1032,38 +1037,47 @@ longest_running_test() ->
 
 scheduler_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_pending_jobs_simple(),
-            t_pending_jobs_skip_crashed(),
-            t_one_job_starts(),
-            t_no_jobs_start_if_max_is_0(),
-            t_one_job_starts_if_max_is_1(),
-            t_max_churn_does_not_throttle_initial_start(),
-            t_excess_oneshot_only_jobs(),
-            t_excess_continuous_only_jobs(),
-            t_excess_prefer_continuous_first(),
-            t_stop_oldest_first(),
-            t_start_oldest_first(),
-            t_dont_stop_if_nothing_pending(),
-            t_max_churn_limits_number_of_rotated_jobs(),
-            t_existing_jobs(),
-            t_if_pending_less_than_running_start_all_pending(),
-            t_running_less_than_pending_swap_all_running(),
-            t_oneshot_dont_get_rotated(),
-            t_rotate_continuous_only_if_mixed(),
-            t_oneshot_dont_get_starting_priority(),
-            t_oneshot_will_hog_the_scheduler(),
-            t_if_excess_is_trimmed_rotation_doesnt_happen(),
-            t_if_transient_job_crashes_it_gets_removed(),
-            t_if_permanent_job_crashes_it_stays_in_ets(),
-            t_job_summary_running(),
-            t_job_summary_pending(),
-            t_job_summary_crashing_once(),
-            t_job_summary_crashing_many_times()
-         ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_pending_jobs_simple(),
+                t_pending_jobs_skip_crashed(),
+                t_one_job_starts(),
+                t_no_jobs_start_if_max_is_0(),
+                t_one_job_starts_if_max_is_1(),
+                t_max_churn_does_not_throttle_initial_start(),
+                t_excess_oneshot_only_jobs(),
+                t_excess_continuous_only_jobs(),
+                t_excess_prefer_continuous_first(),
+                t_stop_oldest_first(),
+                t_start_oldest_first(),
+                t_jobs_churn_even_if_not_all_max_jobs_are_running(),
+                t_jobs_dont_churn_if_there_are_available_running_slots(),
+                t_start_only_pending_jobs_do_not_churn_existing_ones(),
+                t_dont_stop_if_nothing_pending(),
+                t_max_churn_limits_number_of_rotated_jobs(),
+                t_existing_jobs(),
+                t_if_pending_less_than_running_start_all_pending(),
+                t_running_less_than_pending_swap_all_running(),
+                t_oneshot_dont_get_rotated(),
+                t_rotate_continuous_only_if_mixed(),
+                t_oneshot_dont_get_starting_priority(),
+                t_oneshot_will_hog_the_scheduler(),
+                t_if_excess_is_trimmed_rotation_still_happens(),
+                t_if_transient_job_crashes_it_gets_removed(),
+                t_if_permanent_job_crashes_it_stays_in_ets(),
+                t_job_summary_running(),
+                t_job_summary_pending(),
+                t_job_summary_crashing_once(),
+                t_job_summary_crashing_many_times(),
+                t_job_summary_proxy_fields()
+            ]
+        }
     }.
 
 
@@ -1177,10 +1191,10 @@ t_stop_oldest_first() ->
             continuous_running(5)
         ],
         setup_jobs(Jobs),
-        reschedule(mock_state(2)),
+        reschedule(mock_state(2, 1)),
         ?assertEqual({2, 1}, run_stop_count()),
         ?assertEqual([4], jobs_stopped()),
-        reschedule(mock_state(1)),
+        reschedule(mock_state(1, 1)),
         ?assertEqual([7], jobs_running())
     end).
 
@@ -1192,7 +1206,49 @@ t_start_oldest_first() ->
         ?assertEqual({1, 2}, run_stop_count()),
         ?assertEqual([2], jobs_running()),
         reschedule(mock_state(2)),
+        ?assertEqual({2, 1}, run_stop_count()),
+        % After rescheduling with max_jobs = 2, 2 was stopped and 5, 7 should
+        % be running.
+        ?assertEqual([2], jobs_stopped())
+    end).
+
+
+t_jobs_churn_even_if_not_all_max_jobs_are_running() ->
+    ?_test(begin
+        setup_jobs([
+            continuous_running(7),
+            continuous(2),
+            continuous(5)
+        ]),
+        reschedule(mock_state(2, 2)),
+        ?assertEqual({2, 1}, run_stop_count()),
         ?assertEqual([7], jobs_stopped())
+    end).
+
+
+t_jobs_dont_churn_if_there_are_available_running_slots() ->
+     ?_test(begin
+        setup_jobs([
+            continuous_running(1),
+            continuous_running(2)
+        ]),
+        reschedule(mock_state(2, 2)),
+        ?assertEqual({2, 0}, run_stop_count()),
+        ?assertEqual([], jobs_stopped()),
+        ?assertEqual(0, meck:num_calls(couch_replicator_scheduler_sup, start_child, 1))
+    end).
+
+
+t_start_only_pending_jobs_do_not_churn_existing_ones() ->
+     ?_test(begin
+        setup_jobs([
+            continuous(1),
+            continuous_running(2)
+        ]),
+        reschedule(mock_state(2, 2)),
+        ?assertEqual(1, meck:num_calls(couch_replicator_scheduler_sup, start_child, 1)),
+        ?assertEqual([], jobs_stopped()),
+        ?assertEqual({2, 0}, run_stop_count())
     end).
 
 
@@ -1289,7 +1345,7 @@ t_oneshot_will_hog_the_scheduler() ->
     end).
 
 
-t_if_excess_is_trimmed_rotation_doesnt_happen() ->
+t_if_excess_is_trimmed_rotation_still_happens() ->
     ?_test(begin
         Jobs = [
             continuous(1),
@@ -1298,7 +1354,7 @@ t_if_excess_is_trimmed_rotation_doesnt_happen() ->
         ],
         setup_jobs(Jobs),
         reschedule(mock_state(1)),
-        ?assertEqual([3], jobs_running())
+        ?assertEqual([1], jobs_running())
     end).
 
 
@@ -1381,7 +1437,12 @@ t_job_summary_running() ->
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
         ?assertEqual(running, proplists:get_value(state, Summary)),
         ?assertEqual(null, proplists:get_value(info, Summary)),
-        ?assertEqual(0, proplists:get_value(error_count, Summary))
+        ?assertEqual(0, proplists:get_value(error_count, Summary)),
+
+        Stats = [{source_seq, <<"1-abc">>}],
+        handle_cast({update_job_stats, job1, Stats}, mock_state(1)),
+        Summary1 = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
+        ?assertEqual({Stats}, proplists:get_value(info, Summary1))
     end).
 
 
@@ -1397,7 +1458,12 @@ t_job_summary_pending() ->
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
         ?assertEqual(pending, proplists:get_value(state, Summary)),
         ?assertEqual(null, proplists:get_value(info, Summary)),
-        ?assertEqual(0, proplists:get_value(error_count, Summary))
+        ?assertEqual(0, proplists:get_value(error_count, Summary)),
+
+        Stats = [{doc_write_failures, 1}],
+        handle_cast({update_job_stats, job1, Stats}, mock_state(1)),
+        Summary1 = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
+        ?assertEqual({Stats}, proplists:get_value(info, Summary1))
     end).
 
 
@@ -1411,7 +1477,8 @@ t_job_summary_crashing_once() ->
         setup_jobs([Job]),
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
         ?assertEqual(crashing, proplists:get_value(state, Summary)),
-        ?assertEqual(<<"some_reason">>, proplists:get_value(info, Summary)),
+        Info = proplists:get_value(info, Summary),
+        ?assertEqual({[{<<"error">>, <<"some_reason">>}]}, Info),
         ?assertEqual(0, proplists:get_value(error_count, Summary))
     end).
 
@@ -1426,14 +1493,40 @@ t_job_summary_crashing_many_times() ->
         setup_jobs([Job]),
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
         ?assertEqual(crashing, proplists:get_value(state, Summary)),
-        ?assertEqual(<<"some_reason">>, proplists:get_value(info, Summary)),
+        Info = proplists:get_value(info, Summary),
+        ?assertEqual({[{<<"error">>, <<"some_reason">>}]}, Info),
         ?assertEqual(2, proplists:get_value(error_count, Summary))
+    end).
+
+
+t_job_summary_proxy_fields() ->
+    ?_test(begin
+        Job =  #job{
+            id = job1,
+            history = [started(10), added()],
+            rep = #rep{
+                source = #httpdb{
+                    url = "https://s",
+                    proxy_url = "http://u:p@sproxy:12"
+                },
+                target = #httpdb{
+                    url = "http://t",
+                    proxy_url = "socks5://u:p@tproxy:34"
+                }
+            }
+        },
+        setup_jobs([Job]),
+        Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
+        ?assertEqual(<<"http://u:*****@sproxy:12">>,
+            proplists:get_value(source_proxy, Summary)),
+        ?assertEqual(<<"socks5://u:*****@tproxy:34">>,
+            proplists:get_value(target_proxy, Summary))
     end).
 
 
 % Test helper functions
 
-setup() ->
+setup_all() ->
     catch ets:delete(?MODULE),
     meck:expect(couch_log, notice, 2, ok),
     meck:expect(couch_log, warning, 2, ok),
@@ -1445,9 +1538,21 @@ setup() ->
     meck:expect(couch_replicator_scheduler_sup, start_child, 1, {ok, Pid}).
 
 
-teardown(_) ->
+teardown_all(_) ->
     catch ets:delete(?MODULE),
     meck:unload().
+
+
+setup() ->
+    meck:reset([
+        couch_log,
+        couch_replicator_scheduler_sup,
+        couch_stats
+    ]).
+
+
+teardown(_) ->
+    ok.
 
 
 setup_jobs(Jobs) when is_list(Jobs) ->

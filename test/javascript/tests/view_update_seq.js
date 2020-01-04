@@ -26,6 +26,7 @@ couchTests.view_update_seq = function(debug) {
   var designDoc = {
     _id:"_design/test",
     language: "javascript",
+    autoupdate: false,
     views: {
       all_docs: {
         map: "function(doc) { emit(doc.integer, doc.string) }"

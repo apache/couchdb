@@ -25,6 +25,7 @@ function create_sandbox() {
     sandbox.send = Render.send;
     sandbox.getRow = Render.getRow;
     sandbox.isArray = isArray;
+    sandbox.index = Dreyfus.index;
   } catch (e) {
     var sandbox = {};
   }
@@ -114,6 +115,7 @@ var Loop = function() {
     "add_fun"  : State.addFun,
     "add_lib"  : State.addLib,
     "map_doc"  : Views.mapDoc,
+    "index_doc": Dreyfus.indexDoc,
     "reduce"   : Views.reduce,
     "rereduce" : Views.rereduce
   };

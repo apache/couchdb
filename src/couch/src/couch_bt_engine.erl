@@ -51,6 +51,8 @@
     set_security/2,
     set_props/2,
 
+    set_update_seq/2,
+
     open_docs/2,
     open_local_docs/2,
     read_doc_body/2,
@@ -60,6 +62,7 @@
     write_doc_body/2,
     write_doc_infos/3,
     purge_docs/3,
+    copy_purge_infos/2,
 
     commit_data/1,
 
@@ -105,7 +108,6 @@
 
 % Used by the compactor
 -export([
-    set_update_seq/2,
     update_header/2,
     copy_security/2,
     copy_props/2
@@ -548,10 +550,23 @@ purge_docs(#st{} = St, Pairs, PurgeInfos) ->
     }}.
 
 
+copy_purge_infos(#st{} = St, PurgeInfos) ->
+    #st{
+        purge_tree = PurgeTree,
+        purge_seq_tree = PurgeSeqTree
+    } = St,
+    {ok, PurgeTree2} = couch_btree:add(PurgeTree, PurgeInfos),
+    {ok, PurgeSeqTree2} = couch_btree:add(PurgeSeqTree, PurgeInfos),
+    {ok, St#st{
+       purge_tree = PurgeTree2,
+       purge_seq_tree = PurgeSeqTree2,
+       needs_commit = true
+    }}.
+
+
 commit_data(St) ->
     #st{
         fd = Fd,
-        fsync_options = FsyncOptions,
         header = OldHeader,
         needs_commit = NeedsCommit
     } = St,
@@ -560,13 +575,9 @@ commit_data(St) ->
 
     case NewHeader /= OldHeader orelse NeedsCommit of
         true ->
-            Before = lists:member(before_header, FsyncOptions),
-            After = lists:member(after_header, FsyncOptions),
-
-            if Before -> couch_file:sync(Fd); true -> ok end,
+            couch_file:sync(Fd),
             ok = couch_file:write_header(Fd, NewHeader),
-            if After -> couch_file:sync(Fd); true -> ok end,
-
+            couch_file:sync(Fd),
             {ok, St#st{
                 header = NewHeader,
                 needs_commit = false
@@ -856,14 +867,7 @@ open_db_file(FilePath, Options) ->
 
 
 init_state(FilePath, Fd, Header0, Options) ->
-    DefaultFSync = "[before_header, after_header, on_file_open]",
-    FsyncStr = config:get("couchdb", "fsync_options", DefaultFSync),
-    {ok, FsyncOptions} = couch_util:parse_term(FsyncStr),
-
-    case lists:member(on_file_open, FsyncOptions) of
-        true -> ok = couch_file:sync(Fd);
-        _ -> ok
-    end,
+    ok = couch_file:sync(Fd),
 
     Compression = couch_compress:get_compression_method(),
 
@@ -914,7 +918,6 @@ init_state(FilePath, Fd, Header0, Options) ->
         filepath = FilePath,
         fd = Fd,
         fd_monitor = erlang:monitor(process, Fd),
-        fsync_options = FsyncOptions,
         header = Header,
         needs_commit = false,
         id_tree = IdTree,

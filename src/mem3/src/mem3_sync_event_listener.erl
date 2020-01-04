@@ -192,7 +192,7 @@ maybe_push_shards(St) ->
     end.
 
 push_shard(ShardName) ->
-    try mem3_shards:for_shard_name(ShardName) of
+    try mem3_shards:for_shard_range(ShardName) of
     Shards ->
         Live = nodes(),
         lists:foreach(
@@ -217,7 +217,9 @@ subscribe_for_config() ->
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
 
-setup() ->
+setup_all() ->
+    application:start(config),
+
     ok = meck:new(couch_event, [passthrough]),
     ok = meck:expect(couch_event, register_all, ['_'], ok),
 
@@ -225,47 +227,55 @@ setup() ->
     ok = meck:expect(config_notifier, handle_event, [
         {[{'_', '_', '_', "error", '_'}, '_'], meck:raise(throw, raised_error)},
         {['_', '_'], meck:passthrough()}
-    ]),
+    ]).
 
-    application:start(config),
+teardown_all(_) ->
+    meck:unload(),
+    application:stop(config).
+
+setup() ->
     {ok, Pid} = ?MODULE:start_link(),
     erlang:unlink(Pid),
     meck:wait(config_notifier, subscribe, '_', 1000),
     Pid.
 
 teardown(Pid) ->
-    exit(Pid, shutdown),
-    application:stop(config),
-    (catch meck:unload(couch_event)),
-    (catch meck:unload(config_notifier)),
-    ok.
+    exit(Pid, shutdown).
 
 subscribe_for_config_test_() ->
     {
-        "Subscrive for configuration changes",
+        "Subscribe for configuration changes",
         {
-            foreach,
-            fun setup/0, fun teardown/1,
-            [
-                fun should_set_sync_delay/1,
-                fun should_set_sync_frequency/1,
-                fun should_restart_listener/1,
-                fun should_terminate/1
-            ]
+            setup,
+            fun setup_all/0,
+            fun teardown_all/1,
+            {
+                foreach,
+                fun setup/0,
+                fun teardown/1,
+                [
+                    fun should_set_sync_delay/1,
+                    fun should_set_sync_frequency/1,
+                    fun should_restart_listener/1,
+                    fun should_terminate/1
+                ]
+            }
         }
     }.
 
 should_set_sync_delay(Pid) ->
     ?_test(begin
         config:set("mem3", "sync_delay", "123", false),
-        ?assertMatch(#state{delay = 123}, capture(Pid)),
+        wait_state(Pid, #state.delay, 123),
+        ?assertMatch(#state{delay = 123}, get_state(Pid)),
         ok
     end).
 
 should_set_sync_frequency(Pid) ->
     ?_test(begin
         config:set("mem3", "sync_frequency", "456", false),
-        ?assertMatch(#state{frequency = 456}, capture(Pid)),
+        wait_state(Pid, #state.frequency, 456),
+        ?assertMatch(#state{frequency = 456}, get_state(Pid)),
         ok
     end).
 
@@ -284,26 +294,44 @@ should_terminate(Pid) ->
 
         EventMgr = whereis(config_event),
 
+        Ref = erlang:monitor(process, Pid),
+
         RestartFun = fun() -> exit(EventMgr, kill) end,
         test_util:with_process_restart(config_event, RestartFun),
 
         ?assertNot(is_process_alive(EventMgr)),
-        ?assertNot(is_process_alive(Pid)),
+
+        receive
+            {'DOWN', Ref, _, _, _} ->
+                ok
+        after 1000 ->
+            ?assert(false)
+        end,
+
         ?assert(is_process_alive(whereis(config_event))),
         ok
     end).
 
-capture(Pid) ->
+
+get_state(Pid) ->
     Ref = make_ref(),
+    Pid ! {get_state, Ref, self()},
+    receive
+        {Ref, State} -> State
+    after 500 ->
+        timeout
+    end.
+
+
+wait_state(Pid, Field, Val) when is_pid(Pid), is_integer(Field) ->
     WaitFun = fun() ->
-        Pid ! {get_state, Ref, self()},
-        receive
-            {Ref, State} -> State
-        after 0 ->
-            wait
+        case get_state(Pid) of
+            #state{} = S when element(Field, S) == Val ->
+                true;
+            _ ->
+                wait
         end
     end,
     test_util:wait(WaitFun).
-
 
 -endif.

@@ -96,7 +96,7 @@ defmodule PartitionViewUpdateTest do
 
     body = %{"foo:2" => [rev]}
     resp = Couch.post("/#{db_name}/_purge", query: [w: 3], body: body)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get(url)
     assert resp.status_code == 200
@@ -128,7 +128,7 @@ defmodule PartitionViewUpdateTest do
 
     doc = %{_id: "foo:2", _rev: rev1, value: 4096, some: "field"}
     resp = Couch.post("/#{db_name}", query: [w: 3], body: doc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     %{body: body} = resp
     rev2 = body["rev"]
 
@@ -136,7 +136,7 @@ defmodule PartitionViewUpdateTest do
     conflict_rev = "1-4a75b4efa0804859b3dfd327cbc1c2f9"
     doc = %{_id: "foo:2", _rev: conflict_rev, value: 8192, some: "field"}
     resp = Couch.put("/#{db_name}/foo:2", query: query, body: doc)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     # Check that our expected row exists
     resp = Couch.get(url, query: [key: 4096])
@@ -149,7 +149,7 @@ defmodule PartitionViewUpdateTest do
     # a row from the conflict
     body = %{"foo:2" => [rev2]}
     resp = Couch.post("/#{db_name}/_purge", query: [w: 3], body: body)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get(url, query: [key: 8192])
     assert resp.status_code == 200

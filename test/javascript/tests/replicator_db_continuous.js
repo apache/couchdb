@@ -10,9 +10,8 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.skip = true;
 couchTests.replicator_db_continuous = function(debug) {
-  return console.log('TODO');
-
   if (debug) debugger;
 
   var populate_db = replicator_db.populate_db;

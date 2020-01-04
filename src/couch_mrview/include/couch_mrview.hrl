@@ -18,13 +18,10 @@
     idx_name,
     language,
     design_opts=[],
-    seq_indexed=false,
-    keyseq_indexed=false,
     partitioned=false,
     lib,
     views,
     id_btree=nil,
-    log_btree=nil,
     update_seq=0,
     purge_seq=0,
     first_build,
@@ -44,10 +41,6 @@
     reduce_funs=[],
     def,
     btree=nil,
-    seq_btree=nil,
-    key_byseq_btree=nil,
-    seq_indexed=false,
-    keyseq_indexed=false,
     options=[]
 }).
 
@@ -56,7 +49,6 @@
     seq=0,
     purge_seq=0,
     id_btree_state=nil,
-    log_btree_state=nil,
     view_states=nil
 }).
 

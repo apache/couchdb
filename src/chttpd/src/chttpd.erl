@@ -693,9 +693,15 @@ etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->
     etag_match(Req, binary_to_list(CurrentEtag));
 
 etag_match(Req, CurrentEtag) ->
-    EtagsToMatch = string:tokens(
+    EtagsToMatch0 = string:tokens(
         chttpd:header_value(Req, "If-None-Match", ""), ", "),
+    EtagsToMatch = lists:map(fun strip_weak_prefix/1, EtagsToMatch0),
     lists:member(CurrentEtag, EtagsToMatch).
+
+strip_weak_prefix([$W, $/ | Etag]) ->
+    Etag;
+strip_weak_prefix(Etag) ->
+    Etag.
 
 etag_respond(Req, CurrentEtag, RespFun) ->
     case etag_match(Req, CurrentEtag) of
@@ -736,6 +742,8 @@ start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
     end,
     {ok, Resp}.
 
+send_chunk({remote, _Pid, _Ref} = Resp, Data) ->
+    couch_httpd:send_chunk(Resp, Data);
 send_chunk(Resp, Data) ->
     Resp:write_chunk(Data),
     {ok, Resp}.
@@ -810,7 +818,8 @@ send_delayed_error(#delayed_resp{req=Req,resp=nil}=DelayedResp, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
     {ok, Resp} = send_error(Req, Code, ErrorStr, ReasonStr),
     {ok, DelayedResp#delayed_resp{resp=Resp}};
-send_delayed_error(#delayed_resp{resp=Resp}, Reason) ->
+send_delayed_error(#delayed_resp{resp=Resp, req=Req}, Reason) ->
+    update_timeout_stats(Reason, Req),
     log_error_with_stack_trace(Reason),
     throw({http_abort, Resp, Reason}).
 
@@ -1022,15 +1031,15 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
 error_headers(_, Code, _, _) ->
     {Code, []}.
 
-send_error(_Req, {already_sent, Resp, _Error}) ->
-    {ok, Resp};
+send_error(#httpd{} = Req, Error) ->
+    update_timeout_stats(Error, Req),
 
-send_error(Req, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
     {Code1, Headers} = error_headers(Req, Code, ErrorStr, ReasonStr),
     send_error(Req, Code1, Headers, ErrorStr, ReasonStr, json_stack(Error)).
 
-send_error(Req, Code, ErrorStr, ReasonStr) ->
+send_error(#httpd{} = Req, Code, ErrorStr, ReasonStr) ->
+    update_timeout_stats(ErrorStr, Req),
     send_error(Req, Code, [], ErrorStr, ReasonStr, []).
 
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, []) ->
@@ -1044,6 +1053,33 @@ send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
         {<<"reason">>, ReasonStr} |
         case Stack of [] -> []; _ -> [{<<"ref">>, stack_hash(Stack)}] end
     ]}).
+
+update_timeout_stats(<<"timeout">>, #httpd{requested_path_parts = PathParts}) ->
+    update_timeout_stats(PathParts);
+update_timeout_stats(timeout, #httpd{requested_path_parts = PathParts}) ->
+    update_timeout_stats(PathParts);
+update_timeout_stats(_, _) ->
+    ok.
+
+update_timeout_stats([_, <<"_partition">>, _, <<"_design">>, _,
+        <<"_view">> | _]) ->
+    couch_stats:increment_counter([couchdb, httpd, partition_view_timeouts]);
+update_timeout_stats([_, <<"_partition">>, _, <<"_find">>| _]) ->
+    couch_stats:increment_counter([couchdb, httpd, partition_find_timeouts]);
+update_timeout_stats([_, <<"_partition">>, _, <<"_explain">>| _]) ->
+    couch_stats:increment_counter([couchdb, httpd, partition_explain_timeouts]);
+update_timeout_stats([_, <<"_partition">>, _, <<"_all_docs">> | _]) ->
+    couch_stats:increment_counter([couchdb, httpd, partition_all_docs_timeouts]);
+update_timeout_stats([_, <<"_design">>, _, <<"_view">> | _]) ->
+    couch_stats:increment_counter([couchdb, httpd, view_timeouts]);
+update_timeout_stats([_, <<"_find">>| _]) ->
+    couch_stats:increment_counter([couchdb, httpd, find_timeouts]);
+update_timeout_stats([_, <<"_explain">>| _]) ->
+    couch_stats:increment_counter([couchdb, httpd, explain_timeouts]);
+update_timeout_stats([_, <<"_all_docs">> | _]) ->
+    couch_stats:increment_counter([couchdb, httpd, all_docs_timeouts]);
+update_timeout_stats(_) ->
+    ok.
 
 % give the option for list functions to output html or other raw errors
 send_chunked_error(Resp, {_Error, {[{<<"body">>, Reason}]}}) ->

@@ -23,12 +23,12 @@
 go(Db, Options, #mrargs{keys=undefined} = QueryArgs, Callback, Acc) ->
     {CoordArgs, WorkerArgs} = fabric_view:fix_skip_and_limit(QueryArgs),
     DbName = fabric:dbname(Db),
-    Shards = shards(Db, QueryArgs),
+    {Shards, RingOpts} = shards(Db, QueryArgs),
     Workers0 = fabric_util:submit_jobs(
             Shards, fabric_rpc, all_docs, [Options, WorkerArgs]),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_streams:start(Workers0, #shard.ref) of
+        case fabric_streams:start(Workers0, #shard.ref, RingOpts) of
             {ok, Workers} ->
                 try
                     go(DbName, Options, Workers, CoordArgs, Callback, Acc)
@@ -104,14 +104,19 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
                     [{total, TotalRows}, {offset, null}, {update_seq, null}]
             end,
             {ok, Acc1} = Callback({meta, Meta}, Acc0),
-            {ok, Acc2} = doc_receive_loop(
+            Resp = doc_receive_loop(
                 Keys3, queue:new(), SpawnFun, MaxJobs, Callback, Acc1
             ),
-            Callback(complete, Acc2);
+            case Resp of
+                {ok, Acc2} ->
+                    Callback(complete, Acc2);
+                timeout ->
+                    Callback({error, timeout}, Acc0)
+            end;
         {'DOWN', Ref, _, _, Error} ->
             Callback({error, Error}, Acc0)
     after Timeout ->
-        Callback(timeout, Acc0)
+        Callback({error, timeout}, Acc0)
     end.
 
 go(DbName, _Options, Workers, QueryArgs, Callback, Acc0) ->

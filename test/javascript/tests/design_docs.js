@@ -45,6 +45,7 @@ couchTests.design_docs = function(debug) {
     var designDoc = {
       _id: "_design/test",
       language: "javascript",
+      autoupdate: false,
       whatever : {
         stringzone : "exports.string = 'plankton';",
         commonjs : {
@@ -247,7 +248,7 @@ couchTests.design_docs = function(debug) {
 
 
     var prev_view_sig = db.designInfo("_design/test").view_index.signature;
-    var prev_view_size = db.designInfo("_design/test").view_index.disk_size;
+    var prev_view_size = db.designInfo("_design/test").view_index.sizes.file;
 
     db.bulkSave(makeDocs(1, numDocs + 1));
     T(db.ensureFullCommit().ok);
@@ -260,7 +261,7 @@ couchTests.design_docs = function(debug) {
       var dinfo = db.designInfo("_design/test");
       TEquals("test", dinfo.name);
       var vinfo = dinfo.view_index;
-      TEquals(prev_view_size, vinfo.disk_size, "view group disk size didn't change");
+      TEquals(prev_view_size, vinfo.sizes.file, "view group disk size didn't change");
       TEquals(false, vinfo.compact_running);
       TEquals(prev_view_sig, vinfo.signature, 'ddoc sig');
       // wait some time (there were issues where an update

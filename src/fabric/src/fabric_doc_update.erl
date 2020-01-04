@@ -219,13 +219,36 @@ validate_atomic_update(_DbName, AllDocs, true) ->
     end, AllDocs),
     throw({aborted, PreCommitFailures}).
 
-% eunits
-doc_update1_test() ->
-    meck:new(couch_stats),
-    meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
-    meck:new(couch_log),
-    meck:expect(couch_log, warning, fun(_,_) -> ok end),
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+
+setup_all() ->
+    meck:new([couch_log, couch_stats]),
+    meck:expect(couch_log, warning, fun(_,_) -> ok end),
+    meck:expect(couch_stats, increment_counter, fun(_) -> ok end).
+
+
+teardown_all(_) ->
+    meck:unload().
+
+
+doc_update_test_() ->
+    {
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        [
+            fun doc_update1/0,
+            fun doc_update2/0,
+            fun doc_update3/0
+        ]
+    }.
+
+
+% eunits
+doc_update1() ->
     Doc1 = #doc{revs = {1,[<<"foo">>]}},
     Doc2 = #doc{revs = {1,[<<"bar">>]}},
     Docs = [Doc1],
@@ -294,17 +317,9 @@ doc_update1_test() ->
     ?assertEqual(
         {error, [{Doc1,{accepted,"A"}},{Doc2,{error,internal_server_error}}]},
         ReplyW5
-    ),
-    meck:unload(couch_log),
-    meck:unload(couch_stats).
+    ).
 
-
-doc_update2_test() ->
-    meck:new(couch_stats),
-    meck:expect(couch_stats, increment_counter, fun(_) -> ok end),
-    meck:new(couch_log),
-    meck:expect(couch_log, warning, fun(_,_) -> ok end),
-
+doc_update2() ->
     Doc1 = #doc{revs = {1,[<<"foo">>]}},
     Doc2 = #doc{revs = {1,[<<"bar">>]}},
     Docs = [Doc2, Doc1],
@@ -326,11 +341,9 @@ doc_update2_test() ->
         handle_message({rexi_EXIT, 1},lists:nth(3,Shards),Acc2),
 
     ?assertEqual({accepted, [{Doc1,{accepted,Doc2}}, {Doc2,{accepted,Doc1}}]},
-        Reply),
-    meck:unload(couch_log),
-    meck:unload(couch_stats).
+        Reply).
 
-doc_update3_test() ->
+doc_update3() ->
     Doc1 = #doc{revs = {1,[<<"foo">>]}},
     Doc2 = #doc{revs = {1,[<<"bar">>]}},
     Docs = [Doc2, Doc1],
@@ -360,3 +373,5 @@ group_docs_by_shard_hack(_DbName, Shards, Docs) ->
             dict:append(Shard, Doc, D1)
         end, D0, Shards)
     end, dict:new(), Docs)).
+
+-endif.

@@ -28,6 +28,8 @@
 
 
 start_link() ->
+    assert_admins(),
+    maybe_launch_admin_annoyance_reporter(),
     write_pidfile(),
     notify_starting(),
 
@@ -86,6 +88,34 @@ handle_config_change(_, _, _, _, _) ->
 
 handle_config_terminate(_Server, _Reason, _State) ->
     ok.
+
+assert_admins() ->
+    couch_log:info("Preflight check: Asserting Admin Account~n", []),
+    case {config:get("admins"), os:getenv("COUCHDB_TEST_ADMIN_PARTY_OVERRIDE")} of
+        {[], false} ->
+            couch_log:info("~n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%~n"
+                          ++ "  No Admin Account Found, aborting startup.                  ~n"
+                          ++ "  Please configure an admin account in your local.ini file.  ~n"
+                          ++ "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%~n", []),
+            % Wait a second so the log message can make it to the log
+            timer:sleep(500),
+            throw(admin_account_required);
+        _ -> ok
+    end.
+
+send_no_admin_account_error_message() ->
+    couch_log:error("No Admin Account configured."
+        ++ " Please configure an Admin Account in your local.ini file and restart CouchDB.~n", []),
+    FiveMinutes = 5 * 1000 * 60,
+    timer:sleep(FiveMinutes),
+    send_no_admin_account_error_message().
+    
+maybe_launch_admin_annoyance_reporter() ->
+    case os:getenv("COUCHDB_TEST_ADMIN_PARTY_OVERRIDE") of
+        false -> ok;
+        _ -> spawn_link(fun send_no_admin_account_error_message/0)
+    end.
+
 
 notify_starting() ->
     couch_log:info("Apache CouchDB ~s is starting.~n", [

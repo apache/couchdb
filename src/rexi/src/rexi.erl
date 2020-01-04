@@ -12,7 +12,7 @@
 
 -module(rexi).
 -export([start/0, stop/0, restart/0]).
--export([cast/2, cast/3, cast/4, kill/2]).
+-export([cast/2, cast/3, cast/4, kill/2, kill_all/1]).
 -export([reply/1, sync_reply/1, sync_reply/2]).
 -export([async_server_call/2, async_server_call/3]).
 -export([stream_init/0, stream_init/1]).
@@ -74,6 +74,30 @@ cast(Node, Caller, MFA, Options) ->
 -spec kill(node(), reference()) -> ok.
 kill(Node, Ref) ->
     rexi_utils:send(rexi_utils:server_pid(Node), cast_msg({kill, Ref})),
+    ok.
+
+%% @doc Sends an async kill signal to the remote processes associated with Refs.
+%% No rexi_EXIT message will be sent.
+-spec kill_all([{node(), reference()}]) -> ok.
+kill_all(NodeRefs) when is_list(NodeRefs) ->
+    %% Upgrade clause. Since kill_all is a new message, nodes in a mixed
+    %% cluster won't know how to process it. In that case, the default is to send
+    %% the individual kill messages. Once all the nodes have been upgraded, can
+    %% configure the cluster to send kill_all messages.
+    case config:get_boolean("rexi", "use_kill_all", false) of
+        true ->
+            PerNodeMap = lists:foldl(fun({Node, Ref}, Acc) ->
+                maps:update_with(Node, fun(Refs) ->
+                    [Ref | Refs]
+                end, [Ref], Acc)
+            end, #{}, NodeRefs),
+            maps:map(fun(Node, Refs) ->
+                ServerPid = rexi_utils:server_pid(Node),
+                rexi_utils:send(ServerPid, cast_msg({kill_all, Refs}))
+            end, PerNodeMap);
+        false ->
+            lists:foreach(fun({Node, Ref}) -> kill(Node, Ref) end, NodeRefs)
+    end,
     ok.
 
 %% @equiv async_server_call(Server, self(), Request)

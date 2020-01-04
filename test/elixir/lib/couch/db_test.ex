@@ -116,16 +116,17 @@ defmodule Couch.DBTest do
     end)
   end
 
-  def create_user(user) do
-    required = [:name, :password, :roles]
+  def prepare_user_doc(user) do
+    required = [:name, :password]
 
     Enum.each(required, fn key ->
       assert Keyword.has_key?(user, key), "User missing key: #{key}"
     end)
 
+    id = Keyword.get(user, :id)
     name = Keyword.get(user, :name)
     password = Keyword.get(user, :password)
-    roles = Keyword.get(user, :roles)
+    roles = Keyword.get(user, :roles, [])
 
     assert is_binary(name), "User name must be a string"
     assert is_binary(password), "User password must be a string"
@@ -135,14 +136,17 @@ defmodule Couch.DBTest do
       assert is_binary(role), "Roles must be a list of strings"
     end)
 
-    user_doc = %{
-      "_id" => "org.couchdb.user:" <> name,
+    %{
+      "_id" => id || "org.couchdb.user:" <> name,
       "type" => "user",
       "name" => name,
       "roles" => roles,
       "password" => password
     }
+  end
 
+  def create_user(user) do
+    user_doc = prepare_user_doc(user)
     resp = Couch.get("/_users/#{user_doc["_id"]}")
 
     user_doc =
@@ -171,8 +175,7 @@ defmodule Couch.DBTest do
 
   def delete_db(db_name) do
     resp = Couch.delete("/#{db_name}")
-    assert resp.status_code in [200, 202]
-    assert resp.body == %{"ok" => true}
+    assert resp.status_code in [200, 202, 404]
     {:ok, resp}
   end
 
@@ -181,6 +184,91 @@ defmodule Couch.DBTest do
     assert resp.status_code in [201, 202]
     assert resp.body["ok"]
     {:ok, resp}
+  end
+
+  def info(db_name) do
+    resp = Couch.get("/#{db_name}")
+    assert resp.status_code == 200
+    resp.body
+  end
+
+  def bulk_save(db_name, docs) do
+    resp =
+      Couch.post(
+        "/#{db_name}/_bulk_docs",
+        body: %{
+          docs: docs
+        }
+      )
+
+    assert resp.status_code in [201, 202]
+  end
+
+  def query(
+        db_name,
+        map_fun,
+        reduce_fun \\ nil,
+        options \\ nil,
+        keys \\ nil,
+        language \\ "javascript"
+      ) do
+    l_map_function =
+      if language == "javascript" do
+        "#{map_fun} /* avoid race cond #{now(:ms)} */"
+      else
+        map_fun
+      end
+
+    view = %{
+      :map => l_map_function
+    }
+
+    view =
+      if reduce_fun != nil do
+        Map.put(view, :reduce, reduce_fun)
+      else
+        view
+      end
+
+    {view, request_options} =
+      if options != nil and Map.has_key?(options, :options) do
+        {Map.put(view, :options, options.options), Map.delete(options, :options)}
+      else
+        {view, options}
+      end
+
+    ddoc_name = "_design/temp_#{now(:ms)}"
+
+    ddoc = %{
+      _id: ddoc_name,
+      language: language,
+      views: %{
+        view: view
+      }
+    }
+
+    request_options =
+      if keys != nil and is_list(keys) do
+        Map.merge(request_options || %{}, %{:keys => :jiffy.encode(keys)})
+      else
+        request_options
+      end
+
+    resp =
+      Couch.put(
+        "/#{db_name}/#{ddoc_name}",
+        headers: ["Content-Type": "application/json"],
+        body: ddoc
+      )
+
+    assert resp.status_code in [201, 202]
+
+    resp = Couch.get("/#{db_name}/#{ddoc_name}/_view/view", query: request_options)
+    assert resp.status_code == 200
+
+    Couch.delete("/#{db_name}/#{ddoc_name}")
+
+    resp.body
   end
 
   def sample_doc_foo do
@@ -197,6 +285,13 @@ defmodule Couch.DBTest do
     end
   end
 
+  # Generate range of docs based on a template
+  def make_docs(id_range, template_doc) do
+    for id <- id_range, str_id = Integer.to_string(id) do
+      Map.merge(template_doc, %{"_id" => str_id})
+    end
+  end
+
   # Generate range of docs with atoms as keys, which are more
   # idiomatic, and are encoded by jiffy to binaries
   def create_docs(id_range) do
@@ -205,7 +300,28 @@ defmodule Couch.DBTest do
     end
   end
 
-  def retry_until(condition, sleep \\ 100, timeout \\ 5000) do
+
+  def request_stats(path_steps, is_test) do
+    path =
+      List.foldl(
+        path_steps,
+        "/_node/_local/_stats",
+        fn p, acc ->
+          "#{acc}/#{p}"
+        end
+      )
+
+    path =
+      if is_test do
+        path <> "?flush=true"
+      else
+        path
+      end
+
+    Couch.get(path).body
+  end
+
+  def retry_until(condition, sleep \\ 100, timeout \\ 30_000) do
     retry_until(condition, now(:ms), sleep, timeout)
   end
 
@@ -246,6 +362,60 @@ defmodule Couch.DBTest do
   def pretty_inspect(resp) do
     opts = [pretty: true, width: 20, limit: :infinity, printable_limit: :infinity]
     inspect(resp, opts)
+  end
+
+  def run_on_modified_server(settings, fun) do
+    resp = Couch.get("/_membership")
+    assert resp.status_code == 200
+    nodes = resp.body["all_nodes"]
+
+    prev_settings =
+      Enum.map(settings, fn setting ->
+        prev_setting_node =
+          Enum.reduce(nodes, %{}, fn node, acc ->
+            resp =
+              Couch.put(
+                "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+                headers: ["X-Couch-Persist": false],
+                body: :jiffy.encode(setting.value)
+              )
+
+            assert resp.status_code == 200
+            Map.put(acc, node, resp.body)
+          end)
+
+        Map.put(setting, :nodes, Map.to_list(prev_setting_node))
+      end)
+
+    try do
+      fun.()
+    after
+      Enum.each(prev_settings, fn setting ->
+        Enum.each(setting.nodes, fn node_value ->
+          node = elem(node_value, 0)
+          value = elem(node_value, 1)
+
+          if value == ~s(""\\n) do
+            resp =
+              Couch.delete(
+                "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+                headers: ["X-Couch-Persist": false]
+              )
+
+            assert resp.status_code == 200
+          else
+            resp =
+              Couch.put(
+                "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+                headers: ["X-Couch-Persist": false],
+                body: :jiffy.encode(value)
+              )
+
+            assert resp.status_code == 200
+          end
+        end)
+      end)
+    end
   end
 
   def restart_cluster do

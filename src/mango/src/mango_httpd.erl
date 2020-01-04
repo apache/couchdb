@@ -186,8 +186,13 @@ handle_find_req(#httpd{method='POST'}=Req, Db) ->
     {ok, Opts0} = mango_opts:validate_find(Body),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     {ok, Resp0} = start_find_resp(Req),
-    {ok, AccOut} = run_find(Resp0, Db, Sel, Opts),
-    end_find_resp(AccOut);
+    case run_find(Resp0, Db, Sel, Opts) of
+        {ok, AccOut} ->
+            end_find_resp(AccOut);
+        {error, Error} ->
+            chttpd:send_error(Req, Error)
+    end;
+
 
 handle_find_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").

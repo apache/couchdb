@@ -11,7 +11,9 @@
 // the License.
 
 // Do DB creation under cluster with quorum conditions but overriding write quorum.
+couchTests.skip = true;
 couchTests.db_creation_overridden_quorum = function(debug) {
+  return console.log('done in test/elixir/test/cluster_with_quorum_test.exs');
 
   if (debug) debugger;
 
@@ -20,7 +22,7 @@ couchTests.db_creation_overridden_quorum = function(debug) {
 
   // DB Creation should return 202 - Accepted
   xhr = CouchDB.request("PUT", "/" + db_name + "/");
-  console.log("Skipped-TODO: Clarify correct behaviour. Is not considering overridden quorum. 202->"+xhr.status)
+  console.log("TODO: Clarify correct behaviour. Is not considering overridden quorum. 202->"+xhr.status)
   //T(xhr.status == 202,"Should return 202");
 
   // cleanup

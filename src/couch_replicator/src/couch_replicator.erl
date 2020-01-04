@@ -14,7 +14,6 @@
 
 -export([
     replicate/2,
-    ensure_rep_db_exists/0,
     replication_states/0,
     job/1,
     doc/3,
@@ -79,14 +78,6 @@ replicate(PostBody, Ctx) ->
     end.
 
 
-% This is called from supervisor. Must respect supervisor protocol so
-% it returns `ignore`.
--spec ensure_rep_db_exists() -> ignore.
-ensure_rep_db_exists() ->
-    {ok, _Db} = couch_replicator_docs:ensure_rep_db_exists(),
-    ignore.
-
-
 -spec do_replication_loop(#rep{}) ->
     {ok, {continuous, binary()}} | {ok, tuple()} | {error, any()}.
 do_replication_loop(#rep{id = {BaseId, Ext} = Id, options = Options} = Rep) ->
@@ -144,11 +135,13 @@ replication_states() ->
 
 -spec strip_url_creds(binary() | {[_]}) -> binary().
 strip_url_creds(Endpoint) ->
-    case couch_replicator_docs:parse_rep_db(Endpoint, [], []) of
-        #httpdb{url=Url} ->
-            iolist_to_binary(couch_util:url_strip_password(Url));
-        LocalDb when is_binary(LocalDb) ->
-            LocalDb
+    try
+        couch_replicator_docs:parse_rep_db(Endpoint, [], []) of
+            #httpdb{url = Url} ->
+                iolist_to_binary(couch_util:url_strip_password(Url))
+    catch
+        throw:{error, local_endpoints_not_supported} ->
+            Endpoint
     end.
 
 
@@ -257,8 +250,9 @@ info_from_doc(RepDb, {Props}) ->
                         end
             end;
         failed ->
-            Info = get_value(<<"_replication_state_reason">>, Props, null),
-            {State0, Info, 1, StateTime};
+            Info = get_value(<<"_replication_state_reason">>, Props, nil),
+            EJsonInfo = couch_replicator_utils:ejson_state_info(Info),
+            {State0, EJsonInfo, 1, StateTime};
         _OtherState ->
             {null, null, 0, null}
     end,
@@ -352,15 +346,17 @@ expect_rep_user_ctx(Name, Role) ->
 
 strip_url_creds_test_() ->
      {
-        foreach,
-        fun () -> meck:expect(config, get,
-            fun(_, _, Default) -> Default end)
+        setup,
+        fun() ->
+            meck:expect(config, get, fun(_, _, Default) -> Default end)
         end,
-        fun (_) -> meck:unload() end,
+        fun(_) ->
+            meck:unload()
+        end,
         [
-            t_strip_local_db_creds(),
             t_strip_http_basic_creds(),
-            t_strip_http_props_creds()
+            t_strip_http_props_creds(),
+            t_strip_local_db_creds()
         ]
     }.
 

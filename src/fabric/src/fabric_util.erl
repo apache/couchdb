@@ -22,6 +22,7 @@
 -export([is_partitioned/1]).
 -export([validate_all_docs_args/2, validate_args/3]).
 -export([upgrade_mrargs/1]).
+-export([worker_ranges/1]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
 
@@ -34,7 +35,7 @@
 remove_down_workers(Workers, BadNode) ->
     Filter = fun(#shard{node = Node}, _) -> Node =/= BadNode end,
     NewWorkers = fabric_dict:filter(Filter, Workers),
-    case fabric_view:is_progress_possible(NewWorkers) of
+    case fabric_ring:is_progress_possible(NewWorkers) of
     true ->
         {ok, NewWorkers};
     false ->
@@ -51,7 +52,7 @@ submit_jobs(Shards, Module, EndPoint, ExtraArgs) ->
     end, Shards).
 
 cleanup(Workers) ->
-    [rexi:kill(Node, Ref) || #shard{node=Node, ref=Ref} <- Workers].
+    rexi:kill_all([{Node, Ref} || #shard{node = Node, ref = Ref} <- Workers]).
 
 recv(Workers, Keypos, Fun, Acc0) ->
     rexi_utils:recv(Workers, Keypos, Fun, Acc0, request_timeout(), infinity).
@@ -334,3 +335,10 @@ upgrade_mrargs({mrargs,
         sorted = Sorted,
         extra = Extra
     }.
+
+
+worker_ranges(Workers) ->
+    Ranges = fabric_dict:fold(fun(#shard{range=[X, Y]}, _, Acc) ->
+        [{X, Y} | Acc]
+    end, [], Workers),
+    lists:usort(Ranges).
