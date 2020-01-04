@@ -31,7 +31,7 @@ X means done, - means partially
   - [X] Port attachments.js
   - [X] Port attachments_multipart.js
   - [X] Port attachment_views.js
-  - [ ] Port auth_cache.js
+  - [X] Port auth_cache.js
   - [X] Port basics.js
   - [X] Port batch_save.js
   - [X] Port bulk_docs.js
