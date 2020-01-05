@@ -141,21 +141,21 @@ b. Same as in a.
   _replicator and _metadata, _db_updates endpoints and
   whatever else is needed. // TBD: collect what else is needed.
 
-## Standalone auto setup
+## Single node auto setup
 
-Option `standalone` set to `true` in `[couchdb]` configuration executes single node configuration on startup so the node is ready for use immediately.
+Option `single_node` set to `true` in `[couchdb]` configuration executes single node configuration on startup so the node is ready for use immediately.
 
-### Testing standalone auto setup
+### Testing single_node auto setup
 
-Pass `--config-overrides standalone=true` and `-n 1` to `dev/run`
+Pass `--config-overrides single_node=true` and `-n 1` to `dev/run`
 
 
-    $ dev/run --no-join -n 1 --admin a:b --config-overrides standalone=true
+    $ dev/run --no-join -n 1 --admin a:b --config-overrides single_node=true
 
 
 Then, in a new terminal:
 
-    $ src/setup/test/t-standalone.sh
+    $ src/setup/test/t-single_node.sh
 
 The script should show that single node is enabled. 
 

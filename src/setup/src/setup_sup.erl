@@ -35,7 +35,7 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    case config:get_boolean("couchdb", "standalone", false) of 
+    case config:get_boolean("couchdb", "single_node", false) of 
         true -> 
             setup:finish_cluster([]);
         false ->
