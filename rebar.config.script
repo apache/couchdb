@@ -86,7 +86,7 @@ case VerList of
     [19 | _] -> NotSupported(VerString);
 
     [20 | _] = V20 when V20 < [20, 3, 8, 11] -> BadErlang(VerString);
-    [21, 2, N | _] when N < 3 -> BadErlang(VerString);
+    [21 | _] = V21 when V21 < [21, 2, 3] -> BadErlang(VerString);
     [22, 0, N | _] when N < 5 -> BadErlang(VerString);
 
     _ -> ok
