@@ -241,8 +241,11 @@ sync_admins() ->
 
 
 sync_admin(User, Pass) ->
+    sync_config("admins", User, Pass).
+
+sync_config(Section, Key, Value) ->
     {Results, Errors} = rpc:multicall(other_nodes(), config, set,
-        ["admins", User, Pass]),
+        [Section, Key, Value]),
     case validate_multicall(Results, Errors) of
         ok ->
             ok;
