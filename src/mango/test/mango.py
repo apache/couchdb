@@ -328,10 +328,7 @@ class UserDocsTestsNoIndexes(DbPerClass):
     @classmethod
     def setUpClass(klass):
         super(UserDocsTestsNoIndexes, klass).setUpClass()
-        user_docs.setup(
-                    klass.db,
-                    index_type=klass.INDEX_TYPE
-            )
+        user_docs.setup(klass.db, index_type=klass.INDEX_TYPE)
 
 
 class UserDocsTextTests(DbPerClass):
@@ -347,7 +344,7 @@ class UserDocsTextTests(DbPerClass):
                 klass.db,
                 index_type=klass.INDEX_TYPE,
                 default_field=klass.DEFAULT_FIELD,
-                fields=klass.FIELDS
+                fields=klass.FIELDS,
             )
 
 

@@ -20,14 +20,14 @@ import math
 def make_empty_selector_suite(klass):
     class EmptySelectorTestCase(klass):
         def test_empty(self):
-           resp = self.db.find({}, explain=True)
-           self.assertEqual(resp["index"]["type"], "special")
+            resp = self.db.find({}, explain=True)
+            self.assertEqual(resp["index"]["type"], "special")
 
         def test_empty_array_or(self):
-           resp = self.db.find({"$or": []}, explain=True)
-           self.assertEqual(resp["index"]["type"], klass.INDEX_TYPE)
-           docs = self.db.find({"$or": []})
-           assert len(docs) == 0
+            resp = self.db.find({"$or": []}, explain=True)
+            self.assertEqual(resp["index"]["type"], klass.INDEX_TYPE)
+            docs = self.db.find({"$or": []})
+            assert len(docs) == 0
 
         def test_empty_array_or_with_age(self):
             resp = self.db.find({"age": 22, "$or": []}, explain=True)
@@ -36,31 +36,37 @@ def make_empty_selector_suite(klass):
             assert len(docs) == 1
 
         def test_empty_array_and_with_age(self):
-            resp = self.db.find({"age": 22, "$and": [{"b": {"$all":[]}}]},
-                explain=True)
+            resp = self.db.find(
+                {"age": 22, "$and": [{"b": {"$all": []}}]}, explain=True
+            )
             self.assertEqual(resp["index"]["type"], klass.INDEX_TYPE)
             docs = self.db.find({"age": 22, "$and": []})
             assert len(docs) == 1
 
         def test_empty_arrays_complex(self):
-            resp = self.db.find({"$or": [], "a": {"$in" : []}}, explain=True)
+            resp = self.db.find({"$or": [], "a": {"$in": []}}, explain=True)
             self.assertEqual(resp["index"]["type"], klass.INDEX_TYPE)
-            docs = self.db.find({"$or": [], "a": {"$in" : []}})
+            docs = self.db.find({"$or": [], "a": {"$in": []}})
             assert len(docs) == 0
 
         def test_empty_nin(self):
-            resp = self.db.find({"favorites": {"$nin" : []}}, explain=True)
+            resp = self.db.find({"favorites": {"$nin": []}}, explain=True)
             self.assertEqual(resp["index"]["type"], klass.INDEX_TYPE)
-            docs = self.db.find({"favorites": {"$nin" : []}})
+            docs = self.db.find({"favorites": {"$nin": []}})
             assert len(docs) == len(user_docs.DOCS)
 
     return EmptySelectorTestCase
 
-class EmptySelectorNoIndexTests(make_empty_selector_suite(mango.UserDocsTestsNoIndexes)): 
+
+class EmptySelectorNoIndexTests(
+    make_empty_selector_suite(mango.UserDocsTestsNoIndexes)
+):
     pass
+
 
 class EmptySelectorTextTests(make_empty_selector_suite(mango.UserDocsTextTests)):
     pass
+
 
 class EmptySelectorUserDocTests(make_empty_selector_suite(mango.UserDocsTests)):
     pass
