@@ -182,6 +182,7 @@ maybe_add_warning_int(ok, _, UserAcc) ->
    UserAcc;
 
 maybe_add_warning_int(Warning, UserFun, UserAcc) ->
+    couch_stats:increment_counter([mango, unindexed_queries]),
     Arg = {add_key, warning, Warning},
     {_Go, UserAcc0} = UserFun(Arg, UserAcc),
     UserAcc0.
