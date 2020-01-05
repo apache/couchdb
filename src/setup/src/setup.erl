@@ -200,6 +200,8 @@ setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
 finish_cluster(Options) ->
     ok = wait_connected(),
     ok = sync_admins(),
+    ok = sync_uuid(),
+    ok = sync_auth_secret(),
     Dbs = proplists:get_value(ensure_dbs_exist, Options, cluster_system_dbs()),
     finish_cluster_int(Dbs, has_cluster_system_dbs(Dbs)).
 
@@ -242,6 +244,16 @@ sync_admins() ->
 
 sync_admin(User, Pass) ->
     sync_config("admins", User, Pass).
+
+
+sync_uuid() ->
+    Uuid = config:get("couchdb", "uuid"),
+    sync_config("couchdb", "uuid", Uuid).
+
+sync_auth_secret() ->
+    Secret = config:get("couch_httpd_auth", "secret"),
+    sync_config("couch_httpd_auth", "secret", Secret).
+
 
 sync_config(Section, Key, Value) ->
     {Results, Errors} = rpc:multicall(other_nodes(), config, set,
