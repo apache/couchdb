@@ -39,6 +39,7 @@
 -export([check_config_blacklist/1]).
 -export([check_md5/2]).
 -export([set_mqd_off_heap/1]).
+-export([set_process_priority/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -685,6 +686,16 @@ set_mqd_off_heap(Module) ->
             catch error:badarg ->
                     ok
             end;
+        false ->
+            ok
+    end.
+
+
+set_process_priority(Module, Level) ->
+    case config:get_boolean("process_priority", atom_to_list(Module), true) of
+        true ->
+            process_flag(priority, Level),
+            ok;
         false ->
             ok
     end.
