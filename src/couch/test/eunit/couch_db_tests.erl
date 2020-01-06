@@ -80,7 +80,8 @@ open_db_test_()->
                 fun() -> ?tempdb() end,
                 [
                     fun should_create_db_if_missing/1,
-                    fun should_open_db_if_exists/1
+                    fun should_open_db_if_exists/1,
+                    fun locking_should_work/1
                 ]
             }
         }
@@ -157,6 +158,32 @@ should_open_db_if_exists(DbName) ->
         ?assert(lists:member(DbName, After))
     end).
 
+locking_should_work(DbName) ->
+    ?_test(begin
+        ?assertEqual(ok, couch_server:lock(DbName, <<"x">>)),
+        ?assertEqual({error, {locked, <<"x">>}}, couch_db:create(DbName, [])),
+        ?assertEqual(ok, couch_server:unlock(DbName)),
+        {ok, Db} = couch_db:create(DbName, []),
+        ?assertEqual({error, already_opened},
+            couch_server:lock(DbName, <<>>)),
+
+        ok = couch_db:close(Db),
+        catch exit(couch_db:get_pid(Db), kill),
+        test_util:wait(fun() ->
+            case ets:lookup(couch_dbs, DbName) of
+                [] -> ok;
+                [_ | _] -> wait
+            end
+         end),
+
+        ?assertEqual(ok, couch_server:lock(DbName, <<"y">>)),
+        ?assertEqual({error, {locked, <<"y">>}},
+            couch_db:open(DbName, [])),
+
+        couch_server:unlock(DbName),
+        {ok, Db1} = couch_db:open(DbName, [{create_if_missing, true}]),
+        ok = couch_db:close(Db1)
+    end).
 
 create_db(DbName) ->
     create_db(DbName, []).

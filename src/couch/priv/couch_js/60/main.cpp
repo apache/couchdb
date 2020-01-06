@@ -487,8 +487,5 @@ main(int argc, const char* argv[])
         JS_MaybeGC(cx);
     }
 
-    JS_DestroyContext(cx);
-    JS_ShutDown();
-
     return 0;
 }
