@@ -145,7 +145,7 @@ couchTests.view_errors = function(debug) {
         _id:"_design/infinite",
         language: "javascript",
         views: {
-          "infinite_loop" :{map:"function(doc) {while(true){emit(doc,doc);}};"}
+          "infinite_loop" :{map:"function(doc) {while(true){};}"}
         }
       };
       T(db.save(designDoc3).ok);
@@ -154,7 +154,7 @@ couchTests.view_errors = function(debug) {
           db.view("infinite/infinite_loop");
           T(0 == 1);
       } catch(e) {
-          T(e.error == "os_process_error" || e.error == "unnamed_error");
+          T(e.error == "os_process_error");
       }
 
       // Check error responses for invalid multi-get bodies.

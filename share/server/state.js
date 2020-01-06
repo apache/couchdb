@@ -16,6 +16,7 @@ var State = {
     State.funs = [];
     State.lib = null;
     State.query_config = config || {};
+    Views.reset();
     gc();
     print("true"); // indicates success
   },

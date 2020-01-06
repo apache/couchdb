@@ -56,6 +56,7 @@ var Views = (function() {
   };
 
   function handleViewError(err, doc) {
+    map_results = [];
     if (err == "fatal_error") {
       // Only if it's a "fatal_error" do we exit. What's a fatal error?
       // That's for the query to decide.
@@ -82,6 +83,9 @@ var Views = (function() {
 
   return {
     // view helper functions
+    reset : function() {
+        map_results = [];
+    },
     emit : function(key, value) {
       map_results.push([key, value]);
     },
