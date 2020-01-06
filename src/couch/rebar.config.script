@@ -106,6 +106,11 @@ end,
             "/DXP_WIN /IC:\\relax\\js-60\\js\\src",
             "/LIBPATH:C:\\relax\\js-60\\js\\src mozjs-60.lib"
         };
+    {unix, darwin} when SMVsn == "60" ->
+        {
+            "-DXP_UNIX -I/usr/include/mozjs-60 -I/usr/local/include/mozjs-60 -std=c++14",
+            "-L/usr/local/lib -lmozjs-60 -lm -std=c++14 -lc++"
+        };
     {unix, _} when SMVsn == "60" ->
         {
             "-DXP_UNIX -I/usr/include/mozjs-60 -I/usr/local/include/mozjs-60 -std=c++14",
