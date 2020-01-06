@@ -19,7 +19,7 @@
     execute/3,
     maybe_filter_indexes_by_ddoc/2,
     remove_indexes_with_partial_filter_selector/1,
-    maybe_add_warning/3,
+    maybe_add_warning/4,
     maybe_noop_range/2
 ]).
 
@@ -124,6 +124,22 @@ remove_indexes_with_partial_filter_selector(Indexes) ->
     lists:filter(FiltFun, Indexes).
 
 
+maybe_add_warning(UserFun, #cursor{index = Index, opts = Opts}, Stats, UserAcc) ->
+    W0 = invalid_index_warning(Index, Opts),
+    W1 = no_index_warning(Index),
+    W2 = index_scan_warning(Stats),
+    Warnings = lists:append([W0, W1, W2]),
+    case Warnings of
+        [] ->
+            UserAcc;
+        _ ->
+            WarningStr = lists:join(<<"\n">>, Warnings),
+            Arg = {add_key, warning, WarningStr},
+            {_Go, UserAcc1} = UserFun(Arg, UserAcc),
+            UserAcc1
+    end.
+
+
 create_cursor(Db, Indexes, Selector, Opts) ->
     [{CursorMod, CursorModIndexes} | _] = group_indexes_by_type(Indexes),
     CursorMod:create(Db, CursorModIndexes, Selector, Opts).
@@ -151,6 +167,7 @@ group_indexes_by_type(Indexes) ->
 no_index_warning(#idx{type = Type}) when Type =:= <<"special">> ->
     couch_stats:increment_counter([mango, unindexed_queries]),
     [<<"No matching index found, create an index to optimize query time.">>];
+
 no_index_warning(_) ->
     [].
 
@@ -164,41 +181,44 @@ invalid_index_warning(Index, Opts) ->
 
 
 invalid_index_warning_int(Index, {use_index, [DesignId]}) ->
-    case filter_indexes([Index], DesignId) of
-        [] ->
-            couch_stats:increment_counter([mango, query_invalid_index]),
-            Reason = fmt("_design/~s was not used because it does not contain a valid index for this query.",
+    Filtered = filter_indexes([Index], DesignId),
+    if Filtered /= [] -> []; true ->
+        couch_stats:increment_counter([mango, query_invalid_index]),
+        Reason = fmt("_design/~s was not used because it does not contain a valid index for this query.",
                 [ddoc_name(DesignId)]),
-            [Reason];
-        _ ->
-            []
+        [Reason]
     end;
+
 invalid_index_warning_int(Index, {use_index, [DesignId, ViewName]}) ->
-    case filter_indexes([Index], DesignId, ViewName) of
-        [] ->
-            couch_stats:increment_counter([mango, query_invalid_index]),
-            Reason = fmt("_design/~s, ~s was not used because it is not a valid index for this query.",
-                [ddoc_name(DesignId), ViewName]),
-            [Reason];
-        _ ->
-            []
+    Filtered = filter_indexes([Index], DesignId, ViewName),
+    if Filtered /= [] -> []; true ->
+        couch_stats:increment_counter([mango, query_invalid_index]),
+        Reason = fmt("_design/~s, ~s was not used because it is not a valid index for this query.",
+            [ddoc_name(DesignId), ViewName]),
+        [Reason]
     end;
+
 invalid_index_warning_int(_, _) ->
     [].
 
 
-maybe_add_warning(UserFun, #cursor{index = Index, opts = Opts}, UserAcc) ->
-    W0 = invalid_index_warning(Index, Opts),
-    W1 = no_index_warning(Index),
-    Warnings = lists:append([W0, W1]),
-    case Warnings of
-        [] ->
-            UserAcc;
-        _ ->
-            WarningStr = lists:join(<<"\n">>, Warnings),
-            Arg = {add_key, warning, WarningStr},
-            {_Go, UserAcc1} = UserFun(Arg, UserAcc),
-            UserAcc1
+% warn if a large number of documents needed to be scanned per result
+% returned, implying a lot of in-memory filtering
+index_scan_warning(#execution_stats {
+                    totalDocsExamined = Docs,
+                    totalQuorumDocsExamined = DocsQuorum,
+                    resultsReturned = ResultCount
+                }) ->
+    % Docs and DocsQuorum are mutually exclusive so it's safe to sum them
+    DocsScanned = Docs + DocsQuorum,
+    Ratio = calculate_index_scan_ratio(DocsScanned, ResultCount),
+    Threshold = config:get_integer("mango", "index_scan_warning_threshold", 10),
+    case Threshold > 0 andalso Ratio > Threshold of
+        true ->
+            couch_stats:increment_counter([mango, too_many_docs_scanned]),
+            Reason = <<"The number of documents examined is high in proportion to the number of results returned. Consider adding a more specific index to improve this.">>,
+            [Reason];
+        false -> []
     end.
 
 % When there is an empty array for certain operators, we don't actually
@@ -216,6 +236,13 @@ maybe_noop_range({[{Op, []}]}, IndexRanges) ->
     end;
 maybe_noop_range(_, IndexRanges) ->
     IndexRanges.
+
+
+calculate_index_scan_ratio(DocsScanned, 0) ->
+    DocsScanned;
+
+calculate_index_scan_ratio(DocsScanned, ResultCount) ->
+    DocsScanned / ResultCount.
 
 
 fmt(Format, Args) ->
