@@ -166,6 +166,7 @@ invalid_index_warning(Index, Opts) ->
 invalid_index_warning_int(Index, {use_index, [DesignId]}) ->
     case filter_indexes([Index], DesignId) of
         [] ->
+            couch_stats:increment_counter([mango, query_invalid_index]),
             Reason = fmt("_design/~s was not used because it does not contain a valid index for this query.",
                 [ddoc_name(DesignId)]),
             [Reason];
@@ -175,6 +176,7 @@ invalid_index_warning_int(Index, {use_index, [DesignId]}) ->
 invalid_index_warning_int(Index, {use_index, [DesignId, ViewName]}) ->
     case filter_indexes([Index], DesignId, ViewName) of
         [] ->
+            couch_stats:increment_counter([mango, query_invalid_index]),
             Reason = fmt("_design/~s, ~s was not used because it is not a valid index for this query.",
                 [ddoc_name(DesignId), ViewName]),
             [Reason];
