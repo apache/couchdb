@@ -115,7 +115,7 @@ filter_indexes(Indexes0, DesignId, ViewName) ->
 
 
 remove_indexes_with_partial_filter_selector(Indexes) ->
-    FiltFun = fun(Idx) -> 
+    FiltFun = fun(Idx) ->
         case mango_idx:get_partial_filter_selector(Idx) of
             undefined -> true;
             _ -> false
@@ -147,46 +147,57 @@ group_indexes_by_type(Indexes) ->
     end, ?CURSOR_MODULES).
 
 
-maybe_add_warning(UserFun, #cursor{index = Index, opts = Opts}, UserAcc) ->
-    NoIndexWarning = case Index#idx.type of
-        <<"special">> ->
-            <<"no matching index found, create an index to optimize query time">>;
-        _ ->
-            ok
-    end,
-
-    UseIndexInvalidWarning = case lists:keyfind(use_index, 1, Opts) of
-        {use_index, []} ->
-            NoIndexWarning;
-        {use_index, [DesignId]} ->
-            case filter_indexes([Index], DesignId) of
-                [] ->
-                    fmt("_design/~s was not used because it does not contain a valid index for this query.", 
-                        [ddoc_name(DesignId)]);
-                _ ->
-                    NoIndexWarning
-            end;
-        {use_index, [DesignId, ViewName]} ->
-            case filter_indexes([Index], DesignId, ViewName) of
-                [] ->
-                    fmt("_design/~s, ~s was not used because it is not a valid index for this query.", 
-                        [ddoc_name(DesignId), ViewName]);
-                _ ->
-                    NoIndexWarning
-            end
-    end,
-
-    maybe_add_warning_int(UseIndexInvalidWarning, UserFun, UserAcc).
-
-
-maybe_add_warning_int(ok, _, UserAcc) ->
-   UserAcc;
-
-maybe_add_warning_int(Warning, UserFun, UserAcc) ->
+% warn if the _all_docs index was used to fulfil a query
+no_index_warning(#idx{type = Type}) when Type =:= <<"special">> ->
     couch_stats:increment_counter([mango, unindexed_queries]),
-    Arg = {add_key, warning, Warning},
-    {_Go, UserAcc0} = UserFun(Arg, UserAcc),
-    UserAcc0.
+    [<<"No matching index found, create an index to optimize query time.">>];
+no_index_warning(_) ->
+    [].
+
+
+% warn if user specified an index which doesn't exist or isn't valid
+% for the selector.
+% In this scenario, Mango will ignore the index hint and auto-select an index.
+invalid_index_warning(Index, Opts) ->
+    UseIndex = lists:keyfind(use_index, 1, Opts),
+    invalid_index_warning_int(Index, UseIndex).
+
+
+invalid_index_warning_int(Index, {use_index, [DesignId]}) ->
+    case filter_indexes([Index], DesignId) of
+        [] ->
+            Reason = fmt("_design/~s was not used because it does not contain a valid index for this query.",
+                [ddoc_name(DesignId)]),
+            [Reason];
+        _ ->
+            []
+    end;
+invalid_index_warning_int(Index, {use_index, [DesignId, ViewName]}) ->
+    case filter_indexes([Index], DesignId, ViewName) of
+        [] ->
+            Reason = fmt("_design/~s, ~s was not used because it is not a valid index for this query.",
+                [ddoc_name(DesignId), ViewName]),
+            [Reason];
+        _ ->
+            []
+    end;
+invalid_index_warning_int(_, _) ->
+    [].
+
+
+maybe_add_warning(UserFun, #cursor{index = Index, opts = Opts}, UserAcc) ->
+    W0 = invalid_index_warning(Index, Opts),
+    W1 = no_index_warning(Index),
+    Warnings = lists:append([W0, W1]),
+    case Warnings of
+        [] ->
+            UserAcc;
+        _ ->
+            WarningStr = lists:join(<<"\n">>, Warnings),
+            Arg = {add_key, warning, WarningStr},
+            {_Go, UserAcc1} = UserFun(Arg, UserAcc),
+            UserAcc1
+    end.
 
 % When there is an empty array for certain operators, we don't actually
 % want to execute the query so we deny it by making the range [empty].
