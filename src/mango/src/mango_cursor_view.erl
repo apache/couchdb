@@ -249,6 +249,7 @@ view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
         Doc ->
             put(mango_docs_examined, get(mango_docs_examined) + 1),
             Selector = couch_util:get_value(selector, Options),
+            couch_stats:increment_counter([mango, docs_examined]),
             case mango_selector:match(Selector, Doc) of
                 true ->
                     ok = rexi:stream2(ViewRow),
@@ -433,6 +434,7 @@ doc_member(Cursor, RowProps) ->
             % an undefined doc was returned, indicating we should
             % perform a quorum fetch
             ExecutionStats1 = mango_execution_stats:incr_quorum_docs_examined(ExecutionStats),
+            couch_stats:increment_counter([mango, quorum_docs_examined]),
             Id = couch_util:get_value(id, RowProps),
             case mango_util:defer(fabric, open_doc, [Db, Id, Opts]) of
                 {ok, #doc{}=DocProps} ->

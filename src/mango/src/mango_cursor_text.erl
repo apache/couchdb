@@ -184,6 +184,7 @@ handle_hit(CAcc0, Sort, Doc) ->
     } = CAcc0,
     CAcc1 = update_bookmark(CAcc0, Sort),
     Stats1 = mango_execution_stats:incr_docs_examined(Stats),
+    couch_stats:increment_counter([mango, docs_examined]),
     CAcc2 = CAcc1#cacc{execution_stats = Stats1},
     case mango_selector:match(CAcc2#cacc.selector, Doc) of
         true when Skip > 0 ->
