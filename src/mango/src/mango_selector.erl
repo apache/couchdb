@@ -52,15 +52,19 @@ normalize(Selector) ->
 % Match a selector against a #doc{} or EJSON value.
 % This assumes that the Selector has been normalized.
 % Returns true or false.
+match(Selector, D) ->
+    couch_stats:increment_counter([mango, evaluate_selector]),
+    match_int(Selector, D).
+
 
 % An empty selector matches any value.
-match({[]}, _) ->
+match_int({[]}, _) ->
     true;
 
-match(Selector, #doc{body=Body}) ->
+match_int(Selector, #doc{body=Body}) ->
     match(Selector, Body, fun mango_json:cmp/2);
 
-match(Selector, {Props}) ->
+match_int(Selector, {Props}) ->
     match(Selector, {Props}, fun mango_json:cmp/2).
 
 % Convert each operator into a normalized version as well
@@ -582,7 +586,7 @@ match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
     erlang:error({unnormalized_selector, Sel}).
 
 
-% Returns true if Selector requires all  
+% Returns true if Selector requires all
 % fields in RequiredFields to exist in any matching documents.
 
 % For each condition in the selector, check
@@ -612,13 +616,13 @@ has_required_fields_int(Selector, RequiredFields) when not is_list(Selector) ->
 
 % We can "see" through $and operator. Iterate
 % through the list of child operators.
-has_required_fields_int([{[{<<"$and">>, Args}]}], RequiredFields) 
+has_required_fields_int([{[{<<"$and">>, Args}]}], RequiredFields)
         when is_list(Args) ->
     has_required_fields_int(Args, RequiredFields);
 
 % We can "see" through $or operator. Required fields
 % must be covered by all children.
-has_required_fields_int([{[{<<"$or">>, Args}]} | Rest], RequiredFields) 
+has_required_fields_int([{[{<<"$or">>, Args}]} | Rest], RequiredFields)
         when is_list(Args) ->
     Remainder0 = lists:foldl(fun(Arg, Acc) ->
         % for each child test coverage against the full
@@ -635,7 +639,7 @@ has_required_fields_int([{[{<<"$or">>, Args}]} | Rest], RequiredFields)
 
 % Handle $and operator where it has peers. Required fields
 % can be covered by any child.
-has_required_fields_int([{[{<<"$and">>, Args}]} | Rest], RequiredFields) 
+has_required_fields_int([{[{<<"$and">>, Args}]} | Rest], RequiredFields)
         when is_list(Args) ->
     Remainder = has_required_fields_int(Args, RequiredFields),
     has_required_fields_int(Rest, Remainder);
