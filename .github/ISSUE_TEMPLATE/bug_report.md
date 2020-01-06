@@ -27,10 +27,10 @@ assignees: ''
 [TIP]:  # ( Include as many relevant details about your environment as possible. )
 [TIP]:  # ( You can paste the output of curl http://YOUR-COUCHDB:5984/ here. )
 
-* CouchDB Version used:
+* CouchDB version used:
 * Browser name and version:
-* Operating System and version:
+* Operating system and version:
 
-## Additional context
+## Additional Context
 
-[TIP]:  # ( Add any other context about the prbolem here. )
+[TIP]:  # ( Add any other context about the problem here. )

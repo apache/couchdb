@@ -114,16 +114,17 @@
 ]).
 
 
+-include_lib("kernel/include/file.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_bt_engine.hrl").
 
 
 exists(FilePath) ->
-    case filelib:is_file(FilePath) of
+    case is_file(FilePath) of
         true ->
             true;
         false ->
-            filelib:is_file(FilePath ++ ".compact")
+            is_file(FilePath ++ ".compact")
     end.
 
 
@@ -1235,3 +1236,11 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     {ok, NewSt2#st{
         filepath = FilePath
     }, undefined}.
+
+
+is_file(Path) ->
+    case file:read_file_info(Path, [raw]) of
+        {ok, #file_info{type = regular}} -> true;
+        {ok, #file_info{type = directory}} -> true;
+        _ -> false
+    end.

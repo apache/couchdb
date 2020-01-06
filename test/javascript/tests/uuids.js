@@ -12,6 +12,7 @@
 
 couchTests.elixir = true;
 couchTests.uuids = function(debug) {
+  return console.log('done in test/elixir/test/uuids_test.exs');
   var etags = [];
   var testHashBustingHeaders = function(xhr) {
     T(xhr.getResponseHeader("Cache-Control").match(/no-cache/));

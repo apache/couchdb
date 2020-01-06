@@ -411,7 +411,7 @@ def hack_default_ini(ctx, node, contents):
             contents,
             flags=re.MULTILINE,
         )
-
+    contents = re.sub("n=3", "n=%s" % ctx["N"], contents)
     return contents
 
 

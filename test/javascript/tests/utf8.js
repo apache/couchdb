@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.utf8 = function(debug) {
+  return console.log('done in test/elixir/test/utf8_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
