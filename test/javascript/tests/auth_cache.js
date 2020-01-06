@@ -10,8 +10,8 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.auth_cache = function(debug) {
-  return console.log('done in test/elixir/test/auth_cache_test.exs');
   if (debug) debugger;
 
   // Simple secret key generator
