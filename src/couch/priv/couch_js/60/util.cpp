@@ -309,6 +309,14 @@ couch_error(JSContext* cx, JSErrorReport* report)
 }
 
 
+void
+couch_handle_oom(JSContext* cx, void* data)
+{
+    fprintf(stdout, "[\"fatal\",\"oom\",\"out of memory\"]\n");
+    exit(37);
+}
+
+
 bool
 couch_load_funcs(JSContext* cx, JS::HandleObject obj, JSFunctionSpec* funcs)
 {
