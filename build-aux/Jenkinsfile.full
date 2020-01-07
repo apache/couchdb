@@ -80,6 +80,7 @@ pipeline {
     stage('Build Release Tarball') {
       agent {
         docker {
+          label 'docker'
           image 'couchdbdev/debian-stretch-erlang-20.3.8.24-1:latest'
           args "${DOCKER_ARGS}"
           alwaysPull true
@@ -124,7 +125,7 @@ pipeline {
 
         stage('FreeBSD') {
           agent {
-            label 'couchdb && freebsd'
+            label 'freebsd'
           }
           steps {
             // deleteDir is OK here because we're not inside of a Docker container!
@@ -160,6 +161,7 @@ pipeline {
           agent {
             docker {
               image 'couchdbdev/centos-6-erlang-20.3.8.24-1:latest'
+              label 'docker'
               args "${DOCKER_ARGS}"
               alwaysPull true
             }
@@ -203,6 +205,7 @@ pipeline {
           agent {
             docker {
               image 'couchdbdev/centos-7-erlang-20.3.8.24-1:latest'
+              label 'docker'
               args "${DOCKER_ARGS}"
               alwaysPull true
             }
@@ -247,6 +250,7 @@ pipeline {
           agent {
             docker {
               image 'couchdbdev/centos-8-erlang-20.3.8.24-1:latest'
+              label 'docker'
               args "${DOCKER_ARGS}"
               alwaysPull true
             }
@@ -291,6 +295,7 @@ pipeline {
           agent {
             docker {
               image 'couchdbdev/ubuntu-xenial-erlang-20.3.8.24-1:latest'
+              label 'docker'
               args "${DOCKER_ARGS}"
               alwaysPull true
             }
@@ -334,6 +339,7 @@ pipeline {
           agent {
             docker {
               image 'couchdbdev/ubuntu-bionic-erlang-20.3.8.24-1:latest'
+              label 'docker'
               alwaysPull true
               args "${DOCKER_ARGS}"
             }
@@ -377,6 +383,7 @@ pipeline {
           agent {
             docker {
               image 'couchdbdev/debian-stretch-erlang-20.3.8.24-1:latest'
+              label 'docker'
               alwaysPull true
               args "${DOCKER_ARGS}"
             }
@@ -420,6 +427,7 @@ pipeline {
           agent {
             docker {
               image 'couchdbdev/debian-buster-erlang-20.3.8.24-1:latest'
+              label 'docker'
               alwaysPull true
               args "${DOCKER_ARGS}"
             }
@@ -543,6 +551,7 @@ pipeline {
       agent {
         docker {
           image 'couchdbdev/debian-buster-erlang-20.3.8.24-1:latest'
+          label 'docker'
           alwaysPull true
           args "${DOCKER_ARGS}"
         }
