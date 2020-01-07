@@ -231,32 +231,26 @@ view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
     },
     case ViewRow#view_row.doc of
         null ->
-            put(mango_docs_examined, get(mango_docs_examined) + 1),
             maybe_send_mango_ping();
         undefined ->
-            ViewRow2 = ViewRow#view_row{
-                value = couch_util:get_value(value, Row)
-            },
-            ok = rexi:stream2(ViewRow2),
-            put(mango_docs_examined, 0),
+            % include_docs=false. Use quorum fetch at coordinator
+            ok = rexi:stream2(ViewRow),
             set_mango_msg_timestamp();
         Doc ->
+            put(mango_docs_examined, get(mango_docs_examined) + 1),
             Selector = couch_util:get_value(selector, Options),
             case mango_selector:match(Selector, Doc) of
                 true ->
-                    ViewRow2 = ViewRow#view_row{
-                        value = get(mango_docs_examined) + 1
-                    },
-                    ok = rexi:stream2(ViewRow2),
-                    put(mango_docs_examined, 0),
+                    ok = rexi:stream2(ViewRow),
                     set_mango_msg_timestamp();
                 false ->
-                    put(mango_docs_examined, get(mango_docs_examined) + 1),
                     maybe_send_mango_ping()
             end
         end,
     {ok, Acc};
 view_cb(complete, Acc) ->
+    % Send shard-level execution stats
+    ok = rexi:stream2({execution_stats, {docs_examined, get(mango_docs_examined)}}),
     % Finish view output
     ok = rexi:stream_last(complete),
     {ok, Acc};
@@ -286,16 +280,16 @@ handle_message({meta, _}, Cursor) ->
     {ok, Cursor};
 handle_message({row, Props}, Cursor) ->
     case doc_member(Cursor, Props) of
-        {ok, Doc, {execution_stats, ExecutionStats1}} ->
+        {ok, Doc, {execution_stats, Stats}} ->
             Cursor1 = Cursor#cursor {
-                execution_stats = ExecutionStats1
+                execution_stats = Stats
             },
             Cursor2 = update_bookmark_keys(Cursor1, Props),
             FinalDoc = mango_fields:extract(Doc, Cursor2#cursor.fields),
             handle_doc(Cursor2, FinalDoc);
-        {no_match, _, {execution_stats, ExecutionStats1}} ->
+        {no_match, _, {execution_stats, Stats}} ->
             Cursor1 = Cursor#cursor {
-                execution_stats = ExecutionStats1
+                execution_stats = Stats
             },
             {ok, Cursor1};
         Error ->
@@ -420,20 +414,14 @@ doc_member(Cursor, RowProps) ->
     Opts = Cursor#cursor.opts,
     ExecutionStats = Cursor#cursor.execution_stats,
     Selector = Cursor#cursor.selector,
-    {Matched, Incr} = case couch_util:get_value(value, RowProps) of
-        N when is_integer(N) -> {true, N};
-        _ -> {false, 1}
-    end,
     case couch_util:get_value(doc, RowProps) of
         {DocProps} ->
-            ExecutionStats1 = mango_execution_stats:incr_docs_examined(ExecutionStats, Incr),
-            case Matched of
-                true ->
-                    {ok, {DocProps}, {execution_stats, ExecutionStats1}};
-                false ->
-                    match_doc(Selector, {DocProps}, ExecutionStats1)
-                end;
+            % only matching documents are returned; the selector
+            % is evaluated at the shard level in view_cb({row, Row},
+            {ok, {DocProps}, {execution_stats, ExecutionStats}};
         undefined ->
+            % an undefined doc was returned, indicating we should
+            % perform a quorum fetch
             ExecutionStats1 = mango_execution_stats:incr_quorum_docs_examined(ExecutionStats),
             Id = couch_util:get_value(id, RowProps),
             case mango_util:defer(fabric, open_doc, [Db, Id, Opts]) of
@@ -443,9 +431,9 @@ doc_member(Cursor, RowProps) ->
                 Else ->
                     Else
             end;
-        null ->
-            ExecutionStats1 = mango_execution_stats:incr_docs_examined(ExecutionStats),
-            {no_match, null, {execution_stats, ExecutionStats1}}
+        _ ->
+            % no doc, no match
+            {no_match, null, {execution_stats, ExecutionStats}}
     end.
 
 
@@ -481,28 +469,8 @@ update_bookmark_keys(Cursor, _Props) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
-runs_match_on_doc_with_no_value_test() ->
-    Cursor = #cursor {
-        db = <<"db">>,
-        opts = [],
-        execution_stats = #execution_stats{},
-        selector = mango_selector:normalize({[{<<"user_id">>, <<"1234">>}]})
-    },
-    RowProps = [
-        {id,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
-        {key,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
-        {doc,{
-            [
-                {<<"_id">>,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
-                {<<"_rev">>,<<"1-a954fe2308f14307756067b0e18c2968">>},
-                {<<"user_id">>,11}
-            ]
-        }}
-    ],
-    {Match, _, _} = doc_member(Cursor, RowProps),
-    ?assertEqual(Match, no_match).
 
-does_not_run_match_on_doc_with_value_test() ->
+does_not_refetch_doc_with_value_test() ->
     Cursor = #cursor {
         db = <<"db">>,
         opts = [],
@@ -512,7 +480,6 @@ does_not_run_match_on_doc_with_value_test() ->
     RowProps = [
         {id,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
         {key,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
-        {value,1},
         {doc,{
             [
                 {<<"_id">>,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
