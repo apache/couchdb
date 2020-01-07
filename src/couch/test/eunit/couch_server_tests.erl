@@ -14,6 +14,8 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
+
+-include("../src/couch_db_int.hrl").
 -include("../src/couch_server_int.hrl").
 
 start() ->
@@ -192,10 +194,11 @@ make_interleaved_requests({_, TestDbName}) ->
 
 
 t_interleaved_create_delete_open(DbName) ->
-    {CrtRef, DelRef, OpenRef} = {make_ref(), make_ref(), make_ref()},
+    {CrtRef, OpenRef} = {make_ref(), make_ref()},
     CrtMsg = {'$gen_call', {self(), CrtRef}, {create, DbName, [?ADMIN_CTX]}},
-    DelMsg = {'$gen_call', {self(), DelRef}, {delete, DbName, [?ADMIN_CTX]}},
-    OpenMsg = {'$gen_call', {self(), OpenRef}, {open, DbName, [?ADMIN_CTX]}},
+    FakePid = spawn(fun() -> ok end),
+    OpenResult = {open_result, DbName, {ok, #db{main_pid = FakePid}}},
+    OpenResultMsg = {'$gen_call', {self(), OpenRef}, OpenResult},
 
     % Get the current couch_server pid so we're sure
     % to not end up messaging two different pids
@@ -215,48 +218,29 @@ t_interleaved_create_delete_open(DbName) ->
     % our next requests and let the opener finish processing.
     erlang:suspend_process(CouchServer),
 
-    % Since couch_server is suspend, this delete request won't
-    % be processed until after the opener has sent its
-    % successful open response via gen_server:call/3
-    CouchServer ! DelMsg,
+    % We queue a confused open_result message in front of
+    % the correct response from the opener.
+    CouchServer ! OpenResultMsg,
 
-    % This open request will be in the queue after the
-    % delete request but before the gen_server:call/3
-    % message which will establish the mixed up state
-    % in the couch_dbs ets table
-    CouchServer ! OpenMsg,
-
-    % First release the opener pid so it can continue
-    % working while we tweak meck
+    % Release the opener pid so it can continue
     Opener ! go,
-
-    % Replace our expect call to meck so that the OpenMsg
-    % isn't blocked on the receive
-    meck:expect(couch_db, start_link, fun(Engine, DbName1, Filename, Options) ->
-        meck:passthrough([Engine, DbName1, Filename, Options])
-    end),
 
     % Wait for the '$gen_call' message from OpenerPid to arrive
     % in couch_server's mailbox
     ok = wait_for_open_async_result(CouchServer, Opener),
 
     % Now monitor and resume the couch_server and assert that
-    % couch_server does not crash while processing OpenMsg
+    % couch_server does not crash while processing OpenResultMsg
     CSRef = erlang:monitor(process, CouchServer),
     erlang:resume_process(CouchServer),
     check_monitor_not_triggered(CSRef),
 
-    % The create response is expected to return not_found
-    % due to the delete request canceling the async opener
-    % pid and sending not_found to all waiters unconditionally
-    ?assertEqual({CrtRef, not_found}, get_next_message()),
+    % Our open_result message was processed and ignored
+    ?assertEqual({OpenRef, ok}, get_next_message()),
 
-    % Our delete request was processed normally
-    ?assertEqual({DelRef, ok}, get_next_message()),
-
-    % The db was deleted thus it should be not found
-    % when we try and open it.
-    ?assertMatch({OpenRef, {not_found, no_db_file}}, get_next_message()),
+    % Our create request was processed normally after we
+    % ignored the spurious open_result
+    ?assertMatch({CrtRef, {ok, _}}, get_next_message()),
 
     % And finally assert that couch_server is still
     % alive.
@@ -281,7 +265,7 @@ wait_for_open_async_result(CouchServer, Opener) ->
         {_, Messages} = erlang:process_info(CouchServer, messages),
         Found = lists:foldl(fun(Msg, Acc) ->
             case Msg of
-                {'$gen_call', {Opener, _}, {open_result, _, _, {ok, _}}} ->
+                {'$gen_call', {Opener, _}, {open_result, _, {ok, _}}} ->
                     true;
                 _ ->
                     Acc

@@ -2,7 +2,7 @@ defmodule ReplicationTest do
   use CouchTestCase
 
   @moduledoc """
-  Test CouchDB View Collation Behavior
+  Test CouchDB Replication Behavior
   This is a port of the view_collation.js suite
   """
 

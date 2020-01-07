@@ -420,6 +420,7 @@ main(int argc, const char* argv[])
         return 1;
 
     JS::SetWarningReporter(cx, couch_error);
+    JS::SetOutOfMemoryCallback(cx, couch_oom, NULL);
     JS_SetContextPrivate(cx, args);
     JS_SetSecurityCallbacks(cx, &security_callbacks);
 
@@ -486,9 +487,6 @@ main(int argc, const char* argv[])
         // Give the GC a chance to run.
         JS_MaybeGC(cx);
     }
-
-    JS_DestroyContext(cx);
-    JS_ShutDown();
 
     return 0;
 }

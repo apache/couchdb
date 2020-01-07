@@ -35,6 +35,7 @@ JSString* couch_readline(JSContext* cx, FILE* fp);
 size_t couch_readfile(const char* file, char** outbuf_p);
 void couch_print(JSContext* cx, unsigned int argc, JS::CallArgs argv);
 void couch_error(JSContext* cx, JSErrorReport* report);
+void couch_oom(JSContext* cx, void* data);
 bool couch_load_funcs(JSContext* cx, JS::HandleObject obj, JSFunctionSpec* funcs);
 
 
