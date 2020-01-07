@@ -131,6 +131,7 @@ SubDirs = [
     "src/dreyfus",
     "src/fabric",
     "src/global_changes",
+    "src/ioq",
     "src/ken",
     "src/mango",
     "src/rexi",
@@ -146,8 +147,6 @@ DepDescs = [
 {ets_lru,          "ets-lru",          {tag, "1.0.0"}},
 {khash,            "khash",            {tag, "1.0.1"}},
 {snappy,           "snappy",           {tag, "CouchDB-1.0.4"}},
-{ioq,              "ioq",              {tag, "2.1.2"}},
-{hqueue,           "hqueue",           {tag, "CouchDB-1.0.1-1"}},
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},

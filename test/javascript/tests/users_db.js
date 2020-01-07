@@ -10,8 +10,8 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.users_db = function(debug) {
-  return console.log('done in test/elixir/test/users_db_test.exs');
 
   // This tests the users db, especially validations
   // this should also test that you can log into the couch
