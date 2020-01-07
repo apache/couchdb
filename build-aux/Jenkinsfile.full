@@ -13,20 +13,20 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-// DRYing out the Jenkinsfile...
-
 build_and_test = '''
-mkdir -p ${COUCHDB_IO_LOG_DIR}
+mkdir -p ${COUCHDB_IO_LOG_DIR} ${platform}
+cd ${platform}
 rm -rf build
 mkdir build
 cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
-./configure --with-curl
+./configure --with-curl --spidermonkey-version ${sm_ver}
 make check || (build-aux/logfile-uploader.py && false)
 '''
 
 make_packages = '''
+cd ${platform}
 git clone https://github.com/apache/couchdb-pkg
 rm -rf couchdb
 mkdir couchdb
@@ -39,16 +39,18 @@ make ${platform} PLATFORM=${platform}
 cleanup_and_save = '''
 rm -rf ${WORKSPACE}/pkgs/${platform}
 mkdir -p ${WORKSPACE}/pkgs/${platform}
-mv ${WORKSPACE}/rpmbuild/RPMS/$(arch)/*rpm ${WORKSPACE}/pkgs/${platform} || true
-mv ${WORKSPACE}/couchdb/*.deb ${WORKSPACE}/pkgs/${platform} || true
+mv ${WORKSPACE}/${platform}/rpmbuild/RPMS/$(arch)/*rpm ${WORKSPACE}/pkgs/${platform} || true
+mv ${WORKSPACE}/${platform}/couchdb/*.deb ${WORKSPACE}/pkgs/${platform} || true
+'''
+
+update_qemu = '''
+docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
 '''
 
 pipeline {
 
   // no top-level agent; agents must be declared for each stage
-  agent {
-    label 'ubuntu'
-  }
+  agent none
 
   environment {
     COUCHAUTH = credentials('couchdb_vm2_couchdb')
@@ -58,6 +60,11 @@ pipeline {
     // name or email are present for reflog, required for git clone
     GIT_COMMITTER_NAME = 'Jenkins User'
     GIT_COMMITTER_EMAIL = 'couchdb@apache.org'
+    // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
+    // We need the jenkins user mapped inside of the image
+    // npm config cache below deals with /home/jenkins not mapping correctly
+    // inside the image
+    DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
   }
 
   options {
@@ -72,15 +79,10 @@ pipeline {
   stages {
     stage('Build Release Tarball') {
       agent {
-        // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
-        // We need the jenkins user mapped inside of the image
-        // npm config cache below is required because /home/jenkins doesn't
-        // ACTUALLY exist in the image
         docker {
-          image 'couchdbdev/debian-stretch-erlang-19.3.6:latest'
+          image 'couchdbdev/debian-stretch-erlang-20.3.8.24-1:latest'
+          args "${DOCKER_ARGS}"
           alwaysPull true
-          args '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
-          label 'ubuntu'
         }
       }
       options {
@@ -113,15 +115,16 @@ pipeline {
 
     stage('Test and Package') {
 
+      options {
+        skipDefaultCheckout()
+        timeout(time: 90, unit: "MINUTES")
+      }
+
       parallel {
 
         stage('FreeBSD') {
           agent {
             label 'couchdb && freebsd'
-          }
-          options {
-            skipDefaultCheckout()
-            timeout(time: 90, unit: "MINUTES")
           }
           steps {
             // deleteDir is OK here because we're not inside of a Docker container!
@@ -156,19 +159,14 @@ pipeline {
         stage('CentOS 6') {
           agent {
             docker {
-              image 'couchdbdev/centos-6-erlang-19.3.6:latest'
+              image 'couchdbdev/centos-6-erlang-20.3.8.24-1:latest'
+              args "${DOCKER_ARGS}"
               alwaysPull true
-              label 'ubuntu'
-              // this keeps builds landing on the same host from clashing with each other
-              customWorkspace pwd() + '/centos6'
             }
-          }
-          options {
-            skipDefaultCheckout()
-            timeout(time: 90, unit: "MINUTES")
           }
           environment {
             platform = 'centos6'
+            sm_ver = '1.8.5'
           }
           stages {
             stage('Build from tarball & test') {
@@ -204,18 +202,58 @@ pipeline {
         stage('CentOS 7') {
           agent {
             docker {
-              image 'couchdbdev/centos-7-erlang-19.3.6:latest'
+              image 'couchdbdev/centos-7-erlang-20.3.8.24-1:latest'
+              args "${DOCKER_ARGS}"
               alwaysPull true
-              label 'ubuntu'
-              customWorkspace pwd() + '/centos7'
             }
-          }
-          options {
-            skipDefaultCheckout()
-            timeout(time: 90, unit: "MINUTES")
           }
           environment {
             platform = 'centos7'
+            sm_ver = '1.8.5'
+          }
+          stages {
+            stage('Build from tarball & test') {
+              steps {
+                unstash 'tarball'
+                sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+                }
+              }
+            }
+            stage('Build CouchDB packages') {
+              steps {
+                unstash 'tarball'
+                sh( script: make_packages )
+                sh( script: cleanup_and_save )
+              }
+              post {
+                success {
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+                }
+              }
+            }
+          } // stages
+          post {
+            cleanup {
+              sh 'rm -rf ${WORKSPACE}/*'
+            }
+          } // post
+        } // stage
+
+        stage('CentOS 8') {
+          agent {
+            docker {
+              image 'couchdbdev/centos-8-erlang-20.3.8.24-1:latest'
+              args "${DOCKER_ARGS}"
+              alwaysPull true
+            }
+          }
+          environment {
+            platform = 'centos8'
+            sm_ver = '1.8.5'
           }
           stages {
             stage('Build from tarball & test') {
@@ -252,18 +290,14 @@ pipeline {
         stage('Ubuntu Xenial') {
           agent {
             docker {
-              image 'couchdbdev/ubuntu-xenial-erlang-19.3.6:latest'
+              image 'couchdbdev/ubuntu-xenial-erlang-20.3.8.24-1:latest'
+              args "${DOCKER_ARGS}"
               alwaysPull true
-              label 'ubuntu'
-              customWorkspace pwd() + '/xenial'
             }
-          }
-          options {
-            skipDefaultCheckout()
-            timeout(time: 90, unit: "MINUTES")
           }
           environment {
             platform = 'xenial'
+            sm_ver = '1.8.5'
           }
           stages {
             stage('Build from tarball & test') {
@@ -299,18 +333,14 @@ pipeline {
         stage('Ubuntu Bionic') {
           agent {
             docker {
-              image 'couchdbdev/ubuntu-bionic-erlang-19.3.6:latest'
+              image 'couchdbdev/ubuntu-bionic-erlang-20.3.8.24-1:latest'
               alwaysPull true
-              label 'ubuntu'
-              customWorkspace pwd() + '/bionic'
+              args "${DOCKER_ARGS}"
             }
-          }
-          options {
-            skipDefaultCheckout()
-            timeout(time: 90, unit: "MINUTES")
           }
           environment {
             platform = 'bionic'
+            sm_ver = '1.8.5'
           }
           stages {
             stage('Build from tarball & test') {
@@ -343,68 +373,17 @@ pipeline {
           } // post
         } // stage
 
-        stage('Debian Jessie') {
+        stage('Debian Stretch') {
           agent {
             docker {
-              image 'couchdbdev/debian-jessie-erlang-19.3.6:latest'
+              image 'couchdbdev/debian-stretch-erlang-20.3.8.24-1:latest'
               alwaysPull true
-              label 'ubuntu'
-              customWorkspace pwd() + '/jessie'
+              args "${DOCKER_ARGS}"
             }
-          }
-          options {
-            skipDefaultCheckout()
-            timeout(time: 90, unit: "MINUTES")
-          }
-          environment {
-            platform = 'jessie'
-          }
-          stages {
-            stage('Build from tarball & test') {
-              steps {
-                unstash 'tarball'
-                sh( script: build_and_test )
-              }
-              post {
-                always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
-                }
-              }
-            }
-            stage('Build CouchDB packages') {
-              steps {
-                sh( script: make_packages )
-                sh( script: cleanup_and_save )
-              }
-              post {
-                success {
-                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
-                }
-              }
-            }
-          } // stages
-          post {
-            cleanup {
-              sh 'rm -rf ${WORKSPACE}/*'
-            }
-          } // post
-        } // stage
-
-        stage('Debian Stretch x86_64') {
-          agent {
-            docker {
-              image 'couchdbdev/debian-stretch-erlang-19.3.6:latest'
-              alwaysPull true
-              label 'ubuntu'
-              customWorkspace pwd() + '/stretch'
-            }
-          }
-          options {
-            skipDefaultCheckout()
-            timeout(time: 90, unit: "MINUTES")
           }
           environment {
             platform = 'stretch'
+            sm_ver = '1.8.5'
           }
           stages {
             stage('Build from tarball & test') {
@@ -437,29 +416,23 @@ pipeline {
           } // post
         } // stage
 
-        stage('Debian Stretch aarch64') {
+        stage('Debian Buster amd64') {
           agent {
             docker {
-              image 'couchdbdev/aarch64-debian-stretch-erlang-20.3.8.20:latest'
+              image 'couchdbdev/debian-buster-erlang-20.3.8.24-1:latest'
               alwaysPull true
-              label 'arm'
-              customWorkspace pwd() + '/arm'
+              args "${DOCKER_ARGS}"
             }
           }
-          options {
-            skipDefaultCheckout()
-            timeout(time: 90, unit: "MINUTES")
-          }
           environment {
-            platform = 'aarch64-debian-stretch'
+            platform = 'buster'
+            sm_ver = '60'
           }
           stages {
             stage('Build from tarball & test') {
               steps {
                 unstash 'tarball'
-                withEnv(['MIX_HOME='+pwd(), 'HEX_HOME='+pwd()]) {
-                  sh( script: build_and_test )
-                }
+                sh( script: build_and_test )
               }
               post {
                 always {
@@ -486,21 +459,92 @@ pipeline {
           } // post
         } // stage
 
+	/*
+	 *
+	 * This is just taking too long to run. Right now, the khash tests are timing out
+	 * on the IBM servers:
+	 *
+         * [2019-12-31T20:58:48.704Z]   khash randomized test
+         * [2019-12-31T20:59:04.869Z]     khash_test:103: randomized_test_ (State matches dict implementation)...*timed out*
+	 * 
+	 * So, this is DISABLED until we get an actual arm builder machine.
+	 *
+	 * ppc64le is actually slower to emulate than arm, so we're not even going to try that.
+	 */
+
+/*
+        stage('Debian Buster arm64v8') {
+          // once we have an arm64v8 node again, can restore this to original form that is less ugly
+          // the process is convoluted to ensure we have the latest qemu static binaries on the node first
+          // before trying to run a foreign docker container type. Alternately ensuring the `update_qemu`
+          // container is run on every Jenkins agent *after every restart of the Docker daemon* would work.
+          agent {
+            any {
+            }
+          }
+          options {
+            timeout(time: 120, unit: "MINUTES")
+          }
+          environment {
+            platform = 'aarch64-debian-stretch'
+            sm_ver = '60'
+          }
+          stages {
+            stage('Install latest qemu binaries') {
+              steps {
+                sh( script: update_qemu )
+              }
+            }
+            stage('Pull latest docker image') {
+              steps {
+                sh "docker pull couchdbdev/arm64v8-debian-buster-erlang-20.3.8.24-1:latest"
+              }
+            }
+            stage('Build from tarball & test & packages') {
+              steps {
+                withDockerContainer(image: "couchdbdev/arm64v8-debian-buster-erlang-20.3.8.24-1:latest", args: "${DOCKER_ARGS}") {
+                  unstash 'tarball'
+                  withEnv(['MIX_HOME='+pwd(), 'HEX_HOME='+pwd()]) {
+                    sh( script: build_and_test )
+                    sh( script: make_packages )
+                    sh( script: cleanup_and_save )
+                  }
+                }
+              }
+              post {
+                always {
+*/
+//                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+/*
+                }
+                success {
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+                }
+              }
+            }
+          } // stages
+          post {
+            cleanup {
+              sh 'rm -rf ${WORKSPACE}/*'
+            }
+          } // post
+        } // stage
+*/
+
       } // parallel
-    } // stage "Make Check"
+    } // stage "Test and Package"
 
     stage('Publish') {
 
       when {
-        expression { return env.BRANCH_NAME ==~ /master|2.0.x|2.1.x|jenkins-.*/ }
+        expression { return env.BRANCH_NAME ==~ /master|2.*.x|3.*.x|4.*.x|jenkins-.*/ }
       }
 
       agent {
         docker {
-          image 'couchdbdev/debian-stretch-erlang-19.3.6:latest'
+          image 'couchdbdev/debian-buster-erlang-20.3.8.24-1:latest'
           alwaysPull true
-          args '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
-          label 'ubuntu'
+          args "${DOCKER_ARGS}"
         }
       }
       options {
@@ -509,7 +553,7 @@ pipeline {
       }
 
       steps {
-        withCredentials([file(credentialsId: 'jenkins-key', variable: 'KEY')]) {
+        withCredentials([sshUserPrivateKey(credentialsId: 'jenkins-key', keyFileVariable: 'KEY')]) {
           sh 'rm -rf ${WORKSPACE}/*'
           unstash 'tarball'
           unarchive mapping: ['pkgs/' : '.']
@@ -583,9 +627,6 @@ pipeline {
         replyTo: "${env.recipient}",
         subject: "[Jenkins] FAILURE: ${currentBuild.fullDisplayName}",
         body: "Boo, we failed. ${env.RUN_DISPLAY_URL}"
-    }
-    cleanup {
-      sh 'rm -rf ${COUCHDB_IO_LOG_DIR}'
     }
   }
 
