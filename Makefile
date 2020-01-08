@@ -173,16 +173,7 @@ eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
-            tries=0; \
-            while true; do \
-                COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir ; \
-                if [ $$? -eq 0 ]; then \
-                    break; \
-                else \
-                    tries=$$((tries+1)); \
-                    [ $$tries -gt 2 ] && exit 1; \
-                fi \
-            done \
+            COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
         done
 
 
