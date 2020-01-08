@@ -271,16 +271,28 @@ fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
     end.
 
 
-remote_doc_handler({ok, #doc{atts = []} = Doc}, {Parent, _} = Acc) ->
-    ok = gen_server:call(Parent, {batch_doc, Doc}, infinity),
-    {ok, Acc};
-remote_doc_handler({ok, Doc}, {Parent, Target} = Acc) ->
+remote_doc_handler({ok, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc},
+        Acc) ->
+    % Flush design docs in their own PUT requests to correctly process
+    % authorization failures for design doc updates.
+    couch_log:debug("Worker flushing design doc", []),
+    doc_handler_flush_doc(Doc, Acc);
+remote_doc_handler({ok, #doc{atts = [_ | _]} = Doc}, Acc) ->
     % Immediately flush documents with attachments received from a remote
     % source. The data property of each attachment is a function that starts
     % streaming the attachment data from the remote source, therefore it's
     % convenient to call it ASAP to avoid ibrowse inactivity timeouts.
-    Stats = couch_replicator_stats:new([{docs_read, 1}]),
     couch_log:debug("Worker flushing doc with attachments", []),
+    doc_handler_flush_doc(Doc, Acc);
+remote_doc_handler({ok, #doc{atts = []} = Doc}, {Parent, _} = Acc) ->
+    ok = gen_server:call(Parent, {batch_doc, Doc}, infinity),
+    {ok, Acc};
+remote_doc_handler({{not_found, missing}, _}, _Acc) ->
+    throw(missing_doc).
+
+
+doc_handler_flush_doc(#doc{} = Doc, {Parent, Target} = Acc) ->
+    Stats = couch_replicator_stats:new([{docs_read, 1}]),
     Success = (flush_doc(Target, Doc) =:= ok),
     {Result, Stats2} = case Success of
     true ->
@@ -289,9 +301,7 @@ remote_doc_handler({ok, Doc}, {Parent, Target} = Acc) ->
         {{skip, Acc}, couch_replicator_stats:increment(doc_write_failures, Stats)}
     end,
     ok = gen_server:call(Parent, {add_stats, Stats2}, infinity),
-    Result;
-remote_doc_handler({{not_found, missing}, _}, _Acc) ->
-    throw(missing_doc).
+    Result.
 
 
 spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
