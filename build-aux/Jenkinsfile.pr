@@ -67,6 +67,7 @@ pipeline {
       agent {
         docker {
           image "${DOCKER_IMAGE}"
+          label 'docker'
           args "${DOCKER_ARGS}"
           alwaysPull true
         }
@@ -114,6 +115,7 @@ pipeline {
             agent {
               docker {
                 image "${DOCKER_IMAGE}"
+                label 'docker'
                 args "${DOCKER_ARGS}"
                 alwaysPull true
               }

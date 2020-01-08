@@ -28,8 +28,6 @@
 
 % TODO: maybe make both buffer max sizes configurable
 -define(DOC_BUFFER_BYTE_SIZE, 512 * 1024).   % for remote targets
--define(MAX_BULK_ATT_SIZE, 64 * 1024).
--define(MAX_BULK_ATTS_PER_DOC, 8).
 -define(STATS_DELAY, 10000000).              % 10 seconds (in microseconds)
 -define(MISSING_DOC_RETRY_MSEC, 2000).
 
@@ -334,38 +332,16 @@ maybe_flush_docs(Doc,State) ->
 
 maybe_flush_docs(#httpdb{} = Target, Batch, Doc) ->
     #batch{docs = DocAcc, size = SizeAcc} = Batch,
-    case batch_doc(Doc) of
-    false ->
-        couch_log:debug("Worker flushing doc with attachments", []),
-        case flush_doc(Target, Doc) of
-        ok ->
-            {Batch, couch_replicator_stats:new([{docs_written, 1}])};
-        _ ->
-            {Batch, couch_replicator_stats:new([{doc_write_failures, 1}])}
-        end;
-    true ->
-        JsonDoc = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs, attachments])),
-        case SizeAcc + iolist_size(JsonDoc) of
-        SizeAcc2 when SizeAcc2 > ?DOC_BUFFER_BYTE_SIZE ->
-            couch_log:debug("Worker flushing doc batch of size ~p bytes", [SizeAcc2]),
-            Stats = flush_docs(Target, [JsonDoc | DocAcc]),
-            {#batch{}, Stats};
-        SizeAcc2 ->
-            Stats = couch_replicator_stats:new(),
-            {#batch{docs = [JsonDoc | DocAcc], size = SizeAcc2}, Stats}
-        end
+    JsonDoc = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs, attachments])),
+    case SizeAcc + iolist_size(JsonDoc) of
+    SizeAcc2 when SizeAcc2 > ?DOC_BUFFER_BYTE_SIZE ->
+        couch_log:debug("Worker flushing doc batch of size ~p bytes", [SizeAcc2]),
+        Stats = flush_docs(Target, [JsonDoc | DocAcc]),
+        {#batch{}, Stats};
+    SizeAcc2 ->
+        Stats = couch_replicator_stats:new(),
+        {#batch{docs = [JsonDoc | DocAcc], size = SizeAcc2}, Stats}
     end.
-
-
-batch_doc(#doc{atts = []}) ->
-    true;
-batch_doc(#doc{atts = Atts}) ->
-    (length(Atts) =< ?MAX_BULK_ATTS_PER_DOC) andalso
-        lists:all(
-            fun(Att) ->
-                [L, Data] = couch_att:fetch([disk_len, data], Att),
-                (L =< ?MAX_BULK_ATT_SIZE) andalso (Data =/= stub)
-            end, Atts).
 
 
 flush_docs(_Target, []) ->
