@@ -427,10 +427,12 @@ couchTests.design_docs = function(debug) {
   ddoc._deleted = true;
   TEquals(true, db.save(ddoc).ok);
 
+  var resp = db.save({_id: "doc1", value: 4})
   try {
-    TEquals(true, db.save({_id: "doc1", value: 4}).ok);
+    TEquals(true, resp.ok);
   } catch (x) {
-    T(false, "doc insertion should have succeeded");
+    resp = JSON.stringify(resp)
+    T(false, "doc insertion should have succeeded: " + resp);
   }
 
   doc = db.open("doc1");
