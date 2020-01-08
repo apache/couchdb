@@ -58,7 +58,7 @@ def mkformatter(tests):
         elif rval == 3:
             return green + "ported to elixir" + clear
         else:
-            return red + "fail" + clear
+            return red + ("fail: %d" % rval) + clear
 
     def _fmt(test):
         if isinstance(test, str):
