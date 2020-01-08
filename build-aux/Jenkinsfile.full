@@ -578,10 +578,10 @@ pipeline {
           echo 'Building Debian repo...'
           sh '''
             git clone https://github.com/apache/couchdb-pkg
-            cp js/debian-jessie/*.deb pkgs/jessie
-            reprepro -b couchdb-pkg/repo includedeb jessie pkgs/jessie/*.deb
             cp js/debian-stretch/*.deb pkgs/stretch
             reprepro -b couchdb-pkg/repo includedeb stretch pkgs/stretch/*.deb
+            cp js/debian-buster/*.deb pkgs/stretch
+            reprepro -b couchdb-pkg/repo includedeb stretch pkgs/buster/*.deb
             cp js/ubuntu-xenial/*.deb pkgs/xenial
             reprepro -b couchdb-pkg/repo includedeb xenial pkgs/xenial/*.deb
             cp js/ubuntu-bionic/*.deb pkgs/bionic
@@ -592,8 +592,10 @@ pipeline {
           sh '''
             cp js/centos-6/*rpm pkgs/centos6
             cp js/centos-7/*rpm pkgs/centos7
+            cp js/centos-8/*rpm pkgs/centos8
             cd pkgs/centos6 && createrepo --database .
             cd ../centos7 && createrepo --database .
+            cd ../centos8 && createrepo --database .
           '''
 
           echo 'Building tree to upload...'
@@ -602,6 +604,7 @@ pipeline {
             mv couchdb-pkg/repo/dists $BRANCH_NAME/debian
             mv pkgs/centos6/* $BRANCH_NAME/el6
             mv pkgs/centos7/* $BRANCH_NAME/el7
+            mv pkgs/centos8/* $BRANCH_NAME/el8
             mv apache-couchdb-*.tar.gz $BRANCH_NAME/source
             cd $BRANCH_NAME/source
             ls -1tr | head -n -10 | xargs -d '\n' rm -f --
