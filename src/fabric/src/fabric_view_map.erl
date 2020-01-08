@@ -180,6 +180,12 @@ handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
     fabric_view:maybe_send_row(State#collector{counters = Counters});
 
+handle_message({execution_stats, _} = Msg, {_,From}, St) ->
+    #collector{callback=Callback, user_acc=AccIn} = St,
+    {Go, Acc} = Callback(Msg, AccIn),
+    rexi:stream_ack(From),
+    {Go, St#collector{user_acc=Acc}};
+
 handle_message(ddoc_updated, _Worker, State) ->
     {stop, State}.
 

@@ -44,7 +44,7 @@ create(Db, Indexes, Selector, Opts) ->
     Limit = couch_util:get_value(limit, Opts, mango_opts:default_limit()),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
-    Bookmark = couch_util:get_value(bookmark, Opts), 
+    Bookmark = couch_util:get_value(bookmark, Opts),
 
     {ok, #cursor{
         db = Db,
@@ -124,7 +124,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             BaseArgs = base_args(Cursor),
             #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
             Args0 = apply_opts(Opts, BaseArgs),
-            Args = mango_json_bookmark:update_args(Bookmark, Args0), 
+            Args = mango_json_bookmark:update_args(Bookmark, Args0),
             UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
             DbOpts = [{user_ctx, UserCtx}],
             Result = case mango_idx:def(Idx) of
@@ -302,6 +302,12 @@ handle_message({row, Props}, Cursor) ->
             couch_log:error("~s :: Error loading doc: ~p", [?MODULE, Error]),
             {ok, Cursor}
     end;
+handle_message({execution_stats, ShardStats}, #cursor{execution_stats = Stats} = Cursor) ->
+    {docs_examined, DocsExamined} = ShardStats,
+    Cursor1 = Cursor#cursor{
+        execution_stats = mango_execution_stats:incr_docs_examined(Stats, DocsExamined)
+    },
+    {ok, Cursor1};
 handle_message(complete, Cursor) ->
     {ok, Cursor};
 handle_message({error, Reason}, _Cursor) ->
@@ -410,7 +416,7 @@ apply_opts([{_, _} | Rest], Args) ->
 
 
 doc_member(Cursor, RowProps) ->
-    Db = Cursor#cursor.db, 
+    Db = Cursor#cursor.db,
     Opts = Cursor#cursor.opts,
     ExecutionStats = Cursor#cursor.execution_stats,
     Selector = Cursor#cursor.selector,
@@ -460,8 +466,8 @@ is_design_doc(RowProps) ->
 
 
 update_bookmark_keys(#cursor{limit = Limit} = Cursor, Props) when Limit > 0 ->
-    Id = couch_util:get_value(id, Props), 
-    Key = couch_util:get_value(key, Props), 
+    Id = couch_util:get_value(id, Props),
+    Key = couch_util:get_value(key, Props),
     Cursor#cursor {
         bookmark_docid = Id,
         bookmark_key = Key
