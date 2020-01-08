@@ -289,13 +289,13 @@ defmodule RewriteTest do
                  "/#{db_name}/_bulk_docs",
                  body: %{:docs => docs1},
                  query: %{w: 3}
-               ).status_code == 201
+               ).status_code in [201, 202]
 
         assert Couch.post(
                  "/#{db_name}/_bulk_docs",
                  body: %{:docs => docs2},
                  query: %{w: 3}
-               ).status_code == 201
+               ).status_code in [201, 202]
 
         # Test simple rewriting
         resp = Couch.get("/#{db_name}/_design/test/_rewrite/foo")
@@ -315,7 +315,7 @@ defmodule RewriteTest do
         assert doc_id
 
         resp = Couch.put("/#{db_name}/_design/test/_rewrite/hello/#{doc_id}")
-        assert resp.status_code == 201
+        assert resp.status_code in [201, 202]
         assert resp.body == "hello doc"
         assert String.match?(resp.headers["Content-Type"], ~r/charset=utf-8/)
 
@@ -331,7 +331,7 @@ defmodule RewriteTest do
         assert resp.body == "Welcome user"
 
         resp = Couch.put("/#{db_name}/_design/test/_rewrite/welcome3/test")
-        assert resp.status_code == 201
+        assert resp.status_code in [201, 202]
         assert resp.body == "New World"
         assert String.match?(resp.headers["Content-Type"], ~r/charset=utf-8/)
 

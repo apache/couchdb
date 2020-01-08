@@ -11,8 +11,9 @@
 // the License.
 
 // Do some basic tests.
+couchTests.elixir = true;
 couchTests.basics = function(debug) {
-
+  return console.log('done in test/elixir/test/basics_test.exs');
   if (debug) debugger;
 
   var result = JSON.parse(CouchDB.request("GET", "/").responseText);

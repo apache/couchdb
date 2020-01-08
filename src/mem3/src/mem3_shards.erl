@@ -525,25 +525,30 @@ filter_shards_by_range(Range, Shards)->
 
 mem3_shards_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_maybe_spawn_shard_writer_already_exists(),
-            t_maybe_spawn_shard_writer_new(),
-            t_flush_writer_exists_normal(),
-            t_flush_writer_times_out(),
-            t_flush_writer_crashes(),
-            t_writer_deletes_itself_when_done(),
-            t_writer_does_not_delete_other_writers_for_same_shard(),
-            t_spawn_writer_in_load_shards_from_db(),
-            t_cache_insert_takes_new_update(),
-            t_cache_insert_ignores_stale_update_and_kills_worker()
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_maybe_spawn_shard_writer_already_exists(),
+                t_maybe_spawn_shard_writer_new(),
+                t_flush_writer_exists_normal(),
+                t_flush_writer_times_out(),
+                t_flush_writer_crashes(),
+                t_writer_deletes_itself_when_done(),
+                t_writer_does_not_delete_other_writers_for_same_shard(),
+                t_spawn_writer_in_load_shards_from_db(),
+                t_cache_insert_takes_new_update(),
+                t_cache_insert_ignores_stale_update_and_kills_worker()
+            ]
+        }
     }.
 
 
-setup() ->
+setup_all() ->
     ets:new(?SHARDS, [bag, public, named_table, {keypos, #shard.dbname}]),
     ets:new(?OPENERS, [bag, public, named_table]),
     ets:new(?DBS, [set, public, named_table]),
@@ -552,12 +557,23 @@ setup() ->
     ok.
 
 
-teardown(_) ->
+teardown_all(_) ->
     meck:unload(),
     ets:delete(?ATIMES),
     ets:delete(?DBS),
     ets:delete(?OPENERS),
     ets:delete(?SHARDS).
+
+
+setup() ->
+    ets:delete_all_objects(?ATIMES),
+    ets:delete_all_objects(?DBS),
+    ets:delete_all_objects(?OPENERS),
+    ets:delete_all_objects(?SHARDS).
+
+
+teardown(_) ->
+    ok.
 
 
 t_maybe_spawn_shard_writer_already_exists() ->
@@ -653,7 +669,9 @@ t_spawn_writer_in_load_shards_from_db() ->
         ?assertMatch({cache_insert, ?DB, Pid, 1} when is_pid(Pid), Cast),
         {cache_insert, _, WPid, _} = Cast,
         exit(WPid, kill),
-        ?assertEqual([{?DB, WPid}], ets:tab2list(?OPENERS))
+        ?assertEqual([{?DB, WPid}], ets:tab2list(?OPENERS)),
+        meck:unload(couch_db),
+        meck:unload(mem3_util)
     end).
 
 

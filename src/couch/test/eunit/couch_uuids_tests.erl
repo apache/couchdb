@@ -14,113 +14,79 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
--define(TIMEOUT_S, 20).
+-define(TIMEOUT, 20).
 
 
-setup() ->
-    Ctx = test_util:start(?MODULE, [], [{dont_mock, [config]}]),
-    couch_uuids:start(),
-    Ctx.
+setup_all() ->
+    test_util:start_applications([config]),
+    couch_uuids:start().
 
-setup(Opts) ->
-    Pid = setup(),
-    lists:foreach(
-        fun({Option, Value}) ->
-            config:set("uuids", Option, Value, false)
-        end, Opts),
-    Pid.
 
-teardown(Ctx) ->
+teardown_all(_) ->
     couch_uuids:stop(),
-    test_util:stop(Ctx).
-
-teardown(_, Ctx) ->
-    teardown(Ctx).
+    test_util:stop_applications([config]).
 
 
-default_test_() ->
+uuids_test_() ->
     {
-        "Default UUID algorithm",
-        {
-            setup,
-            fun setup/0, fun teardown/1,
-            fun should_be_unique/1
-        }
-    }.
-
-sequential_test_() ->
-    Opts = [{"algorithm", "sequential"}],
-    Cases = [
-        fun should_be_unique/2,
-        fun should_increment_monotonically/2,
-        fun should_rollover/2
-    ],
-    {
-        "UUID algorithm: sequential",
-        {
-            foreachx,
-            fun setup/1, fun teardown/2,
-            [{Opts, Fun} || Fun <- Cases]
-        }
-    }.
-
-utc_test_() ->
-    Opts = [{"algorithm", "utc_random"}],
-    Cases = [
-        fun should_be_unique/2,
-        fun should_increment_monotonically/2
-    ],
-    {
-        "UUID algorithm: utc_random",
-        {
-            foreachx,
-            fun setup/1, fun teardown/2,
-            [{Opts, Fun} || Fun <- Cases]
-        }
-    }.
-
-utc_id_suffix_test_() ->
-    Opts = [{"algorithm", "utc_id"}, {"utc_id_suffix", "bozo"}],
-    Cases = [
-        fun should_be_unique/2,
-        fun should_increment_monotonically/2,
-        fun should_preserve_suffix/2
-    ],
-    {
-        "UUID algorithm: utc_id",
-        {
-            foreachx,
-            fun setup/1, fun teardown/2,
-            [{Opts, Fun} || Fun <- Cases]
-        }
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        [
+            {timeout, ?TIMEOUT, fun default_algorithm/0},
+            {timeout, ?TIMEOUT, fun sequential_algorithm/0},
+            {timeout, ?TIMEOUT, fun utc_algorithm/0},
+            {timeout, ?TIMEOUT, fun utc_id_suffix_algorithm/0}
+        ]
     }.
 
 
-should_be_unique() ->
+default_algorithm() ->
+    config:delete("uuids", "algorithm", false),
+    check_unique().
+
+
+sequential_algorithm() ->
+    config:set("uuids", "algorithm", "sequential", false),
+    check_unique(),
+    check_increment_monotonically(),
+    check_rollover().
+
+
+utc_algorithm() ->
+    config:set("uuids", "algorithm", "utc_random", false),
+    check_unique(),
+    check_increment_monotonically().
+
+
+utc_id_suffix_algorithm() ->
+    config:set("uuids", "algorithm", "utc_id", false),
+    config:set("uuids", "utc_id_suffix", "bozo", false),
+    check_unique(),
+    check_increment_monotonically(),
+    check_preserve_suffix().
+
+
+check_unique() ->
     %% this one may really runs for too long on slow hosts
-    {timeout, ?TIMEOUT_S, ?_assert(test_unique(10000, [couch_uuids:new()]))}.
-should_be_unique(_) ->
-    should_be_unique().
-should_be_unique(_, _) ->
-    should_be_unique().
+    ?assert(test_unique(10000, [couch_uuids:new()])).
 
-should_increment_monotonically(_, _) ->
-    ?_assert(couch_uuids:new() < couch_uuids:new()).
 
-should_rollover(_, _) ->
-    ?_test(begin
-        UUID = binary_to_list(couch_uuids:new()),
-        Prefix = element(1, lists:split(26, UUID)),
-        N = gen_until_pref_change(Prefix, 0),
-        ?assert(N >= 5000 andalso N =< 11000)
-    end).
+check_increment_monotonically() ->
+    ?assert(couch_uuids:new() < couch_uuids:new()).
 
-should_preserve_suffix(_, _) ->
-    ?_test(begin
-        UUID = binary_to_list(couch_uuids:new()),
-        Suffix = get_suffix(UUID),
-        ?assert(test_same_suffix(10000, Suffix))
-    end).
+
+check_rollover() ->
+    UUID = binary_to_list(couch_uuids:new()),
+    Prefix = element(1, lists:split(26, UUID)),
+    N = gen_until_pref_change(Prefix, 0),
+    ?assert(N >= 5000 andalso N =< 11000).
+
+
+check_preserve_suffix() ->
+    UUID = binary_to_list(couch_uuids:new()),
+    Suffix = get_suffix(UUID),
+    ?assert(test_same_suffix(10000, Suffix)).
 
 
 test_unique(0, _) ->
@@ -130,8 +96,6 @@ test_unique(N, UUIDs) ->
     ?assertNot(lists:member(UUID, UUIDs)),
     test_unique(N - 1, [UUID| UUIDs]).
 
-get_prefix(UUID) ->
-    element(1, lists:split(26, binary_to_list(UUID))).
 
 gen_until_pref_change(_, Count) when Count > 8251 ->
     Count;
@@ -141,10 +105,6 @@ gen_until_pref_change(Prefix, N) ->
         _ -> N
     end.
 
-get_suffix(UUID) when is_binary(UUID) ->
-    get_suffix(binary_to_list(UUID));
-get_suffix(UUID) ->
-    element(2, lists:split(14, UUID)).
 
 test_same_suffix(0, _) ->
     true;
@@ -153,3 +113,13 @@ test_same_suffix(N, Suffix) ->
         Suffix -> test_same_suffix(N - 1, Suffix);
         _ -> false
     end.
+
+
+get_prefix(UUID) ->
+    element(1, lists:split(26, binary_to_list(UUID))).
+
+
+get_suffix(UUID) when is_binary(UUID) ->
+    get_suffix(binary_to_list(UUID));
+get_suffix(UUID) ->
+    element(2, lists:split(14, UUID)).

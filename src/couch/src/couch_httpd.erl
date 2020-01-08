@@ -1263,8 +1263,8 @@ maybe_add_default_headers_test_() ->
     {"Tests adding default headers", Tests}.
 
 log_request_test_() ->
-    {foreachx,
-        fun(_) ->
+    {setup,
+        fun() ->
             ok = meck:new([couch_log]),
             ok = meck:expect(couch_log, error, fun(Fmt, Args) ->
                 case catch io_lib_format:fwrite(Fmt, Args) of
@@ -1273,13 +1273,16 @@ log_request_test_() ->
                 end
             end)
         end,
-        fun(_, _) ->
-            meck:unload([couch_log])
+        fun(_) ->
+            meck:unload()
         end,
-        [{Flag, fun should_accept_code_and_message/2} || Flag <- [true, false]]
+        [
+            fun() -> should_accept_code_and_message(true) end,
+            fun() -> should_accept_code_and_message(false) end
+        ]
     }.
 
-should_accept_code_and_message(DontLogFlag, _) ->
+should_accept_code_and_message(DontLogFlag) ->
     erlang:put(dont_log_response, DontLogFlag),
     {"with dont_log_response = " ++ atom_to_list(DontLogFlag),
         [

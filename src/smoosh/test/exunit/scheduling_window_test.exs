@@ -1,8 +1,6 @@
 defmodule SmooshSchedulingWindowTest do
   use Couch.Test.ExUnit.Case
 
-  alias Couch.Test.Setup
-
   setup_all(context) do
     test_ctx = :test_util.start_couch([])
 

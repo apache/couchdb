@@ -470,18 +470,25 @@ get(idx_name, _, _) ->
 get(signature, _, _) ->
     <<61,237,157,230,136,93,96,201,204,17,137,186,50,249,44,135>>.
 
-setup(Settings) ->
+setup_all() ->
+    Ctx = test_util:start_couch(),
     ok = meck:new([config], [passthrough]),
     ok = meck:new([test_index], [non_strict]),
+    ok = meck:expect(test_index, get, fun get/3),
+    Ctx.
+
+teardown_all(Ctx) ->
+    meck:unload(),
+    test_util:stop_couch(Ctx).
+
+setup(Settings) ->
+    meck:reset([config, test_index]),
     ok = meck:expect(config, get, fun(Section, Key) ->
         configure(Section, Key, Settings)
     end),
-    ok = meck:expect(test_index, get, fun get/3),
     {undefined, #st{mod = {test_index}}}.
 
 teardown(_, _) ->
-    (catch meck:unload(config)),
-    (catch meck:unload(test_index)),
     ok.
 
 configure("view_compaction", "enabled_recompaction", [Global, _Db, _Index]) ->
@@ -498,10 +505,12 @@ recompaction_configuration_test_() ->
         "Compaction tests",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun setup_all/0,
+            fun teardown_all/1,
             {
                 foreachx,
-                fun setup/1, fun teardown/2,
+                fun setup/1,
+                fun teardown/2,
                 recompaction_configuration_tests()
             }
         }

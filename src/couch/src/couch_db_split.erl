@@ -132,6 +132,12 @@ split(SourceDb, Partitioned, Engine, Targets0, PickFun, {M, F, A} = HashFun) ->
             {error, E} ->
                 throw({target_create_error, DbName, E, Map})
         end,
+        case couch_server:lock(DbName, <<"shard splitting">>) of
+            ok ->
+                ok;
+            {error, Err} ->
+                throw({target_create_error, DbName, Err, Map})
+        end,
         {ok, Filepath} = couch_server:get_engine_path(DbName, Engine),
         Opts = [create, ?ADMIN_CTX] ++ case Partitioned of
             true -> [{props, [{partitioned, true}, {hash, [M, F, A]}]}];
@@ -164,7 +170,9 @@ split(SourceDb, Partitioned, Engine, Targets0, PickFun, {M, F, A} = HashFun) ->
 cleanup_targets(#{} = Targets, Engine) ->
     maps:map(fun(_, #target{db = Db} = T) ->
         ok = stop_target_db(Db),
-        delete_target(couch_db:name(Db), Engine),
+        DbName = couch_db:name(Db),
+        delete_target(DbName, Engine),
+        couch_server:unlock(DbName),
         T
     end, Targets).
 
@@ -182,6 +190,7 @@ stop_target_db(Db) ->
     Pid = couch_db:get_pid(Db),
     catch unlink(Pid),
     catch exit(Pid, kill),
+    couch_server:unlock(couch_db:name(Db)),
     ok.
 
 

@@ -10,7 +10,9 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.all_docs = function(debug) {
+  return console.log('done in test/elixir/test/all_docs_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"}, {w: 3});
   db.createDb();
@@ -79,7 +81,7 @@ couchTests.all_docs = function(debug) {
   })[0];
   TEquals("1", deleted_doc.id, "deletes");
 
-  // (remember old seq) 
+  // (remember old seq)
   var orig_doc = changes.results.filter(function(row) {
     return row.id == "3"
   })[0];

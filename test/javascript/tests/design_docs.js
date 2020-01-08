@@ -45,6 +45,7 @@ couchTests.design_docs = function(debug) {
     var designDoc = {
       _id: "_design/test",
       language: "javascript",
+      autoupdate: false,
       whatever : {
         stringzone : "exports.string = 'plankton';",
         commonjs : {
@@ -252,7 +253,9 @@ couchTests.design_docs = function(debug) {
     db.bulkSave(makeDocs(1, numDocs + 1));
     T(db.ensureFullCommit().ok);
 
-    // test that we get correct design doc info back.
+    // test that we get correct design doc info back,
+    // and also that GET /db/_design/test/_info
+    // hasn't triggered an update of the views
     db.view("test/summate", {stale: "ok"}); // make sure view group's open
     for (var i = 0; i < 2; i++) {
       var dinfo = db.designInfo("_design/test");
@@ -261,6 +264,13 @@ couchTests.design_docs = function(debug) {
       TEquals(prev_view_size, vinfo.sizes.file, "view group disk size didn't change");
       TEquals(false, vinfo.compact_running);
       TEquals(prev_view_sig, vinfo.signature, 'ddoc sig');
+      // wait some time (there were issues where an update
+      // of the views had been triggered in the background)
+      var start = new Date().getTime();
+      while (new Date().getTime() < start + 2000);
+      TEquals(0, db.view("test/all_docs_twice", {stale: "ok"}).total_rows, 'view info');
+      TEquals(0, db.view("test/single_doc", {stale: "ok"}).total_rows, 'view info');
+      TEquals(0, db.view("test/summate", {stale: "ok"}).rows.length, 'view info');
       T(db.ensureFullCommit().ok);
       // restartServer();
     };
@@ -273,6 +283,27 @@ couchTests.design_docs = function(debug) {
     // wait so the views can get initialized
     var start = new Date().getTime();
     while (new Date().getTime() < start + 2000);
+
+    // test that POST /db/_view_cleanup
+    // doesn't trigger an update of the views
+    var len1 = db.view("test/all_docs_twice", {stale: "ok"}).total_rows;
+    var len2 = db.view("test/single_doc", {stale: "ok"}).total_rows;
+    var len3 = db.view("test/summate", {stale: "ok"}).rows.length;
+    for (i = 0; i < 2; i++) {
+      T(db.viewCleanup().ok);
+      // wait some time (there were issues where an update
+      // of the views had been triggered in the background)
+      start = new Date().getTime();
+      while (new Date().getTime() < start + 2000);
+      TEquals(len1, db.view("test/all_docs_twice", {stale: "ok"}).total_rows, 'view cleanup');
+      TEquals(len2, db.view("test/single_doc", {stale: "ok"}).total_rows, 'view cleanup');
+      TEquals(len3, db.view("test/summate", {stale: "ok"}).rows.length, 'view cleanup');
+      T(db.ensureFullCommit().ok);
+      // restartServer();
+      // we'll test whether the view group stays closed
+      // and the views stay uninitialized (they should!)
+      len1 = len2 = len3 = 0;
+    };
 
     // test commonjs in map functions
     resp = db.view("test/commonjs", {limit:1});

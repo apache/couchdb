@@ -10,7 +10,9 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.attachments= function(debug) {
+  return console.log('done in test/elixir/test/attachment_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -301,7 +303,7 @@ couchTests.attachments= function(debug) {
   T(db.save(bin_doc6).ok == true);
 
   // wrong rev pos specified
-  
+
   // stub out the attachment with the wrong revpos
   bin_doc6._attachments["foo.txt"] = { stub: true, revpos: 10};
   try {
