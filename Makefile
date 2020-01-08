@@ -224,7 +224,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run rel/overlay/bin/couchup test/javascript/run
+		. dev/run test/javascript/run
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -232,7 +232,7 @@ python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run rel/overlay/bin/couchup test/javascript/run
+		. dev/run test/javascript/run
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration

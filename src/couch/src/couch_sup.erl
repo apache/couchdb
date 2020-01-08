@@ -99,7 +99,7 @@ assert_admins() ->
                           ++ "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%~n", []),
             % Wait a second so the log message can make it to the log
             timer:sleep(500),
-            throw(admin_account_required);
+            erlang:halt(1);
         _ -> ok
     end.
 

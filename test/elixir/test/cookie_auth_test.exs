@@ -95,12 +95,9 @@ defmodule CookieAuthTest do
     session = use_session || login_as(user)
 
     resp =
-      Couch.get(
-        "/#{db_name}/#{URI.encode(doc_id)}",
-        headers: [
-          Cookie: session.cookie,
-          "X-CouchDB-www-Authenticate": "Cookie"
-        ]
+      Couch.Session.get(
+        session,
+        "/#{db_name}/#{URI.encode(doc_id)}"
       )
 
     if use_session == nil do
@@ -125,12 +122,9 @@ defmodule CookieAuthTest do
     session = use_session || login_as(user)
 
     resp =
-      Couch.put(
+      Couch.Session.put(
+        session,
         "/#{db_name}/#{URI.encode(doc["_id"])}",
-        headers: [
-          Cookie: session.cookie,
-          "X-CouchDB-www-Authenticate": "Cookie"
-        ],
         body: doc
       )
 
@@ -160,12 +154,9 @@ defmodule CookieAuthTest do
     session = use_session || login_as(user)
 
     resp =
-      Couch.delete(
-        "/#{db_name}/#{URI.encode(doc["_id"])}",
-        headers: [
-          Cookie: session.cookie,
-          "X-CouchDB-www-Authenticate": "Cookie"
-        ]
+      Couch.Session.delete(
+        session,
+        "/#{db_name}/#{URI.encode(doc["_id"])}"
       )
 
     if use_session == nil do
