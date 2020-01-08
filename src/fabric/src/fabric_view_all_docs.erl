@@ -239,8 +239,13 @@ handle_message(#view_row{} = Row, {Worker, From}, State) ->
 
 handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
-    fabric_view:maybe_send_row(State#collector{counters = Counters}).
+    fabric_view:maybe_send_row(State#collector{counters = Counters});
 
+handle_message({execution_stats, _} = Msg, {_,From}, St) ->
+    #collector{callback=Callback, user_acc=AccIn} = St,
+    {Go, Acc} = Callback(Msg, AccIn),
+    rexi:stream_ack(From),
+    {Go, St#collector{user_acc=Acc}}.
 
 merge_row(fwd, Row, Rows) ->
     lists:keymerge(#view_row.id, [Row], Rows);
