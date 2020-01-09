@@ -65,7 +65,7 @@ def build_ci_doc():
         doc["commit"] = os.environ["TRAVIS_COMMIT"]
         doc["repo"] = "https://github.com/" + os.environ["TRAVIS_REPO_SLUG"]
     elif "JENKINS_URL" in os.environ:
-        doc["builder"] = "jenkins"
+        doc["builder"] = "jenk-ins"
         doc["build_id"] = os.environ["BUILD_NUMBER"]
         doc["url"] = os.environ["BUILD_URL"]
         doc["branch"] = os.environ["BRANCH_NAME"]
