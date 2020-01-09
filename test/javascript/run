@@ -17,7 +17,9 @@ import optparse as op
 import os
 import subprocess as sp
 import sys
+import time
 import re
+import xml.dom.minidom as md
 
 
 USAGE = "%prog [options] [command to run...]"
@@ -83,16 +85,66 @@ def run_couchjs(test, fmt):
         + SCRIPTS
         + [test, RUNNER]
     )
-    p = sp.Popen(cmd, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sys.stderr)
+    p = sp.Popen(cmd, stdin=sp.PIPE, stdout=sp.PIPE, stderr=sp.STDOUT)
+    output = []
     while True:
         line = p.stdout.readline()
         if not line:
             break
         line = line.decode()
+        output.append(line)
         sys.stderr.write(line)
     p.wait()
     fmt(p.returncode)
-    return p.returncode
+    return (p.returncode, "".join(output))
+
+
+def write_junit(filename, total_time, results):
+    failures = 0
+    skipped = 0
+    for (_, rc, _, _) in results:
+        if rc == 2 or rc == 3:
+            skipped += 1
+        else:
+            failures += 1
+
+    doc = md.Document()
+    root = doc.createElement("testsuite")
+    root.setAttribute("name", "JavaScript tests")
+    root.setAttribute("time", "%0.3f" % total_time)
+    root.setAttribute("tests", str(len(results)))
+    root.setAttribute("failures", str(failures))
+    root.setAttribute("errors", "0")
+    root.setAttribute("skipped", str(skipped))
+    doc.appendChild(root)
+
+    for (path, rc, output, test_time) in results:
+        sys.stderr.write("WHUT? %r\n" % output)
+        name = os.path.split(path)[-1]
+        tc = doc.createElement("testcase")
+        tc.setAttribute("name", name)
+        tc.setAttribute("time", "%0.3f" % test_time)
+        if rc == 0:
+            pass
+        elif rc == 2:
+            skipped = doc.createElement("skipped")
+            skipped.setAttribute("message", "disabled")
+            tc.appendChild(skipped)
+        elif rc == 3:
+            skipped = doc.createElement("skipped")
+            skipped.setAttribute("message", "ported to elixir")
+            tc.appendChild(skipped)
+        else:
+            failure = doc.createElement("failure")
+            failure.setAttribute("message", "failed: %d" % rc)
+            failure_text = "Exit Code: %d" % rc + "\n\n" + output
+            message = doc.createTextNode(failure_text)
+            failure.appendChild(message)
+            tc.appendChild(failure)
+        root.appendChild(tc)
+
+    with open(filename, "w") as handle:
+        doc.writexml(handle, addindent="  ", newl=os.linesep)
 
 
 def options():
@@ -102,7 +154,7 @@ def options():
             "--start",
             metavar="FILENAME",
             default=None,
-            help="Start from the given filename if multiple files " "are passed",
+            help="Start from the given filename if multiple files are passed",
         ),
         op.make_option(
             "-a",
@@ -139,6 +191,14 @@ def options():
             dest="test_path",
             help="Path where the tests are located",
         ),
+        op.make_option(
+            "-j",
+            "--junit-report",
+            type="string",
+            default="test/javascript/junit.xml",
+            dest="junit_report",
+            help="Write a JUnit compatible test report",
+        ),
     ]
 
 
@@ -162,18 +222,26 @@ def main():
                 tmp.append(name)
         tests = tmp
 
+    results = []
+    begin = time.time()
     passed = 0
     failed = 0
     if len(tests) > 0:
         fmt = mkformatter(tests)
         for test in tests:
-            result = run_couchjs(test, fmt)
+            tbefore = time.time()
+            (result, output) = run_couchjs(test, fmt)
+            results.append((test, result, output, time.time() - tbefore))
             if result == 0 or result == 2 or result == 3:
                 passed += 1
             else:
                 failed += 1
                 if not opts.all:
                     break
+
+    total_time = time.time() - begin
+    if opts.junit_report:
+        write_junit(opts.junit_report, total_time, results)
 
     sys.stderr.write(
         "=======================================================" + os.linesep
