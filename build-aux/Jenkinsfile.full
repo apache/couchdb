@@ -149,7 +149,7 @@ pipeline {
           } // steps
           post {
             always {
-              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
             }
             cleanup {
               sh 'rm -rf $COUCHDB_IO_LOG_DIR'
@@ -178,7 +178,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
                 }
               }
             }
@@ -222,7 +222,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
                 }
               }
             }
@@ -267,7 +267,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
                 }
               }
             }
@@ -312,7 +312,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
                 }
               }
             }
@@ -356,7 +356,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
                 }
               }
             }
@@ -400,7 +400,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
                 }
               }
             }
@@ -444,7 +444,7 @@ pipeline {
               }
               post {
                 always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
                 }
               }
             }
@@ -474,7 +474,7 @@ pipeline {
 	 *
          * [2019-12-31T20:58:48.704Z]   khash randomized test
          * [2019-12-31T20:59:04.869Z]     khash_test:103: randomized_test_ (State matches dict implementation)...*timed out*
-	 * 
+	 *
 	 * So, this is DISABLED until we get an actual arm builder machine.
 	 *
 	 * ppc64le is actually slower to emulate than arm, so we're not even going to try that.
@@ -522,7 +522,7 @@ pipeline {
               post {
                 always {
 */
-//                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+//                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
 /*
                 }
                 success {
@@ -566,7 +566,7 @@ pipeline {
           sh 'rm -rf ${WORKSPACE}/*'
           unstash 'tarball'
           unarchive mapping: ['pkgs/' : '.']
-  
+
           echo 'Retrieving & cleaning current couchdb-vm2 tree...'
           sh '''
             rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@couchdb-vm2.apache.org:/var/www/html/$BRANCH_NAME . || mkdir -p $BRANCH_NAME
