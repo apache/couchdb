@@ -23,7 +23,7 @@ tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
 . /usr/local/kerl/${KERL_VER}/activate
 ./configure --with-curl --spidermonkey-version 60
-make check || (build-aux/logfile-uploader.py && false)
+make check || (make build-report && false)
 '''
 
 pipeline {
