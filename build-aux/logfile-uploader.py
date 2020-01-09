@@ -36,6 +36,9 @@ def _tojson(req):
 def collect_logfiles():
     """ Find and tarball all logfiles """
     tb = tarfile.open(name=TARFILE, mode="w:gz")
+    # Test results
+    for log in glob.glob("test-results.log"):
+        tb.add(log)
     # EUnit
     for log in glob.glob("src/*/.eunit/couch.log"):
         tb.add(log)
