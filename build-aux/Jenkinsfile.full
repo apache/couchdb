@@ -22,7 +22,7 @@ cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
 ./configure --with-curl --spidermonkey-version ${sm_ver}
-make check || (build-aux/logfile-uploader.py && false)
+make check || (make build-report && false)
 '''
 
 make_packages = '''
