@@ -447,13 +447,16 @@ needs_upgrade(Props) ->
 
 
 setup_all() ->
+    Ctx = test_util:start_couch([couch_log]),
     meck:new([config, couch_index, couch_index_server], [passthrough]),
     Pid = list_to_pid("<0.0.0>"),
     meck:expect(couch_index_server, get_index, 3, {ok, Pid}),
-    meck:expect(config, get, fun(_, _, Default) -> Default end).
+    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    Ctx.
 
-teardown_all(_) ->
-    meck:unload().
+teardown_all(Ctx) ->
+    meck:unload(),
+    test_util:stop_couch(Ctx).
 
 setup() ->
     Shard = <<"shards/00000000-1fffffff/test.1529510412">>,
