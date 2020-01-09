@@ -72,7 +72,8 @@ mem3_reshard_db_test_() ->
                     fun couch_events_are_emitted/1,
                     fun retries_work/1,
                     fun target_reset_in_initial_copy/1,
-                    fun split_an_incomplete_shard_map/1
+                    fun split_an_incomplete_shard_map/1,
+                    fun target_shards_are_locked/1
                 ]
             }
         }
@@ -476,6 +477,38 @@ split_an_incomplete_shard_map(#{db1 := Db}) ->
         meck:expect(mem3_util, calculate_max_n, 1, 0),
         ?assertMatch({error, {not_enough_shard_copies, _}},
             mem3_reshard:start_split_job(Shard))
+    end)}.
+
+
+% Opening a db target db in initial copy phase will throw an error
+target_shards_are_locked(#{db1 := Db}) ->
+    {timeout, ?TIMEOUT, ?_test(begin
+        add_test_docs(Db, #{docs => 10}),
+
+        % Make the job stops right when it was about to copy the docs
+        TestPid = self(),
+        meck:new(couch_db, [passthrough]),
+        meck:expect(couch_db, start_link, fun(Engine, TName, FilePath, Opts) ->
+            TestPid ! {start_link, self(), TName},
+            receive
+                continue ->
+                    meck:passthrough([Engine, TName, FilePath, Opts])
+            end
+        end),
+
+        [#shard{name=Shard}] = lists:sort(mem3:local_shards(Db)),
+        {ok, JobId} = mem3_reshard:start_split_job(Shard),
+        {Target0, JobPid} = receive
+            {start_link, Pid, TName} -> {TName, Pid}
+        end,
+        ?assertEqual({error, {locked, <<"shard splitting">>}},
+            couch_db:open_int(Target0, [])),
+
+        % Send two continues for two targets
+        JobPid ! continue,
+        JobPid ! continue,
+
+        wait_state(JobId, completed)
     end)}.
 
 

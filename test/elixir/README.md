@@ -31,7 +31,7 @@ X means done, - means partially
   - [X] Port attachments.js
   - [X] Port attachments_multipart.js
   - [X] Port attachment_views.js
-  - [ ] Port auth_cache.js
+  - [X] Port auth_cache.js
   - [X] Port basics.js
   - [X] Port batch_save.js
   - [X] Port bulk_docs.js
@@ -40,13 +40,13 @@ X means done, - means partially
   - [X] Port compact.js
   - [X] Port config.js
   - [X] Port conflicts.js
-  - [ ] Port cookie_auth.js
+  - [X] Port cookie_auth.js
   - [X] Port copy_doc.js
   - [ ] Port design_docs.js
   - [ ] Port design_options.js
   - [ ] Port design_paths.js
-  - [ ] Port erlang_views.js
-  - [X] Port etags_head.js
+  - [X] Port erlang_views.js
+  - [ ] Port etags_head.js
   - [ ] Port etags_views.js
   - [ ] Port form_submit.js
   - [ ] Port http.js
@@ -54,11 +54,11 @@ X means done, - means partially
   - [ ] Port jsonp.js
   - [X] Port large_docs.js
   - [ ] Port list_views.js
-  - [ ] Port lorem_b64.txt
-  - [ ] Port lorem.txt
+  - [X] Port lorem_b64.txt
+  - [X] Port lorem.txt
   - [X] Port lots_of_docs.js
   - [ ] Port method_override.js
-  - [ ] Port multiple_rows.js
+  - [X] Port multiple_rows.js
   - [ ] Port proxyauth.js
   - [ ] Port purge.js
   - [ ] Port reader_acl.js
@@ -93,9 +93,9 @@ X means done, - means partially
   - [ ] Port show_documents.js
   - [ ] Port stats.js
   - [ ] Port update_documents.js
-  - [ ] Port users_db.js
+  - [X] Port users_db.js
   - [ ] Port users_db_security.js
-  - [ ] Port utf8.js
+  - [X] Port utf8.js
   - [X] Port uuids.js
   - [X] Port view_collation.js
   - [ ] Port view_collation_raw.js

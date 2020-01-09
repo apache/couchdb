@@ -39,9 +39,15 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
     chttpd:end_delayed_json_response(Resp1).
 
+design_doc_post_view(Req, Props, Db, DDoc, ViewName, Keys) ->
+    Args = couch_mrview_http:parse_body_and_query(Req, Props, Keys),
+    fabric_query_view(Db, Req, DDoc, ViewName, Args).
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Args = couch_mrview_http:parse_params(Req, Keys),
+    fabric_query_view(Db, Req, DDoc, ViewName, Args).
+
+fabric_query_view(Db, Req, DDoc, ViewName, Args) ->
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
@@ -89,16 +95,9 @@ handle_view_req(#httpd{method='POST',
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     assert_no_queries_param(couch_mrview_util:get_view_queries(Props)),
-    case couch_mrview_util:get_view_keys(Props) of
-        Keys when is_list(Keys) ->
-            couch_stats:increment_counter([couchdb, httpd, view_reads]),
-            design_doc_view(Req, Db, DDoc, ViewName, Keys);
-        _ ->
-            throw({
-                bad_request,
-                "POST body must contain an array called `keys`"
-            })
-    end;
+    Keys = couch_mrview_util:get_view_keys(Props),
+    couch_stats:increment_counter([couchdb, httpd, view_reads]),
+    design_doc_post_view(Req, Props, Db, DDoc, ViewName, Keys);
 
 handle_view_req(Req, _Db, _DDoc) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
@@ -124,13 +123,18 @@ assert_no_queries_param(_) ->
 
 check_multi_query_reduce_view_overrides_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_check_include_docs_throw_validation_error(),
-            t_check_user_can_override_individual_query_type()
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_check_include_docs_throw_validation_error(),
+                t_check_user_can_override_individual_query_type()
+            ]
+        }
     }.
 
 
@@ -154,7 +158,7 @@ t_check_user_can_override_individual_query_type() ->
     end).
 
 
-setup() ->
+setup_all() ->
     Views = [#mrview{reduce_funs = [{<<"v">>, <<"_count">>}]}],
     meck:expect(couch_mrview_util, ddoc_to_mrst, 2, {ok, #mrst{views = Views}}),
     meck:expect(chttpd, start_delayed_json_response, 4, {ok, resp}),
@@ -163,8 +167,20 @@ setup() ->
     meck:expect(chttpd, end_delayed_json_response, 1, ok).
 
 
-teardown(_) ->
+teardown_all(_) ->
     meck:unload().
+
+
+setup() ->
+    meck:reset([
+        chttpd,
+        couch_mrview_util,
+        fabric
+    ]).
+
+
+teardown(_) ->
+    ok.
 
 
 -endif.

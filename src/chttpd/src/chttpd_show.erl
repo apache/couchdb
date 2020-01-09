@@ -204,7 +204,7 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     DbName = couch_db:name(Db),
     {ok, VDoc} = ddoc_cache:open(DbName, <<"_design/", ViewDesignName/binary>>),
     CB = fun list_cb/2,
-    QueryArgs = couch_mrview_http:parse_params(Req, Keys),
+    QueryArgs = couch_mrview_http:parse_body_and_query(Req, Keys),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     couch_query_servers:with_ddoc_proc(DDoc, fun(QServer) ->
         Acc = #lacc{

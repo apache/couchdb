@@ -9,10 +9,20 @@
 % WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 % License for the specific language governing permissions and limitations under
 % the License.
-%
--module(couch_mrview_changes).
 
--export([handle_view_changes/5]).
+-module(ken_app).
 
-handle_view_changes(Args, Req, Db, DDocId, ViewName) ->
-    couch_changes:handle_changes(Args, Req, Db, {view, DDocId, ViewName}).
+-behaviour(application).
+
+%% Application callbacks
+-export([start/2, stop/1]).
+
+%% ===================================================================
+%% Application callbacks
+%% ===================================================================
+
+start(_StartType, _StartArgs) ->
+    ken_sup:start_link().
+
+stop(_State) ->
+    ok.

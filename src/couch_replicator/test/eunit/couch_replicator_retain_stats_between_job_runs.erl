@@ -23,7 +23,7 @@
 
 
 setup() ->
-    Ctx = test_util:start_couch([couch_replicator]),
+    Ctx = test_util:start_couch([couch_replicator, chttpd, mem3, fabric]),
     Source = setup_db(),
     Target = setup_db(),
     {Ctx, {Source, Target}}.
@@ -49,10 +49,17 @@ t_stats_retained({_Ctx, {Source, Target}}) ->
     ?_test(begin
         populate_db(Source, 42),
         {ok, RepPid, RepId} = replicate(Source, Target),
+
         wait_target_in_sync(Source, Target),
         check_active_tasks(42, 42),
-        reschedule_job(RepPid),
+        check_scheduler_jobs(42, 42),
+
+        stop_job(RepPid),
+        check_scheduler_jobs(42, 42),
+
+        start_job(),
         check_active_tasks(42, 42),
+        check_scheduler_jobs(42, 42),
         couch_replicator_scheduler:remove_job(RepId)
     end).
 
@@ -69,7 +76,7 @@ teardown_db(DbName) ->
     ok.
 
 
-reschedule_job(RepPid) ->
+stop_job(RepPid) ->
     Ref = erlang:monitor(process, RepPid),
     gen_server:cast(couch_replicator_scheduler, {set_max_jobs, 0}),
     couch_replicator_scheduler:reschedule(),
@@ -77,7 +84,10 @@ reschedule_job(RepPid) ->
         {'DOWN', Ref, _, _, _} -> ok
     after ?TIMEOUT ->
         erlang:error(timeout)
-    end,
+    end.
+
+
+start_job() ->
     gen_server:cast(couch_replicator_scheduler, {set_max_jobs, 500}),
     couch_replicator_scheduler:reschedule().
 
@@ -87,6 +97,20 @@ check_active_tasks(DocsRead, DocsWritten) ->
     ?assertNotEqual(timeout, RepTask),
     ?assertEqual(DocsRead, couch_util:get_value(docs_read, RepTask)),
     ?assertEqual(DocsWritten, couch_util:get_value(docs_written, RepTask)).
+
+
+check_scheduler_jobs(DocsRead, DocsWritten) ->
+    Info = wait_scheduler_info(),
+    ?assert(maps:is_key(<<"changes_pending">>, Info)),
+    ?assert(maps:is_key(<<"doc_write_failures">>, Info)),
+    ?assert(maps:is_key(<<"docs_read">>, Info)),
+    ?assert(maps:is_key(<<"docs_written">>, Info)),
+    ?assert(maps:is_key(<<"missing_revisions_found">>, Info)),
+    ?assert(maps:is_key(<<"checkpointed_source_seq">>, Info)),
+    ?assert(maps:is_key(<<"source_seq">>, Info)),
+    ?assert(maps:is_key(<<"revisions_checked">>, Info)),
+    ?assertMatch(#{<<"docs_read">> := DocsRead}, Info),
+    ?assertMatch(#{<<"docs_written">> := DocsWritten}, Info).
 
 
 replication_tasks() ->
@@ -100,6 +124,16 @@ wait_for_task_status() ->
         case replication_tasks() of
             [] -> wait;
             [RepTask] -> RepTask
+        end
+    end).
+
+
+wait_scheduler_info() ->
+    test_util:wait(fun() ->
+        case scheduler_jobs() of
+            [] -> wait;
+            [#{<<"info">> := null}] -> wait;
+            [#{<<"info">> := Info}] -> Info
         end
     end).
 
@@ -158,3 +192,12 @@ replicate(Source, Target) ->
     couch_replicator_scheduler:reschedule(),
     Pid = couch_replicator_test_helper:get_pid(Rep#rep.id),
     {ok, Pid, Rep#rep.id}.
+
+
+scheduler_jobs() ->
+    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+    Port = mochiweb_socket_server:get(chttpd, port),
+    Url = lists:flatten(io_lib:format("http://~s:~b/_scheduler/jobs", [Addr, Port])),
+    {ok, 200, _, Body} = test_request:get(Url, []),
+    Json = jiffy:decode(Body, [return_maps]),
+    maps:get(<<"jobs">>, Json).

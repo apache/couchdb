@@ -93,6 +93,8 @@ EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 #ignore javascript tests
 ignore_js_suites=
 
+TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
+
 ################################################################################
 # Main commands
 ################################################################################
@@ -145,8 +147,8 @@ fauxton: share/www
 .PHONY: check
 # target: check - Test everything
 check: all
-	@$(MAKE) test-cluster-with-quorum
-	@$(MAKE) test-cluster-without-quorum
+	# @$(MAKE) test-cluster-with-quorum
+	# @$(MAKE) test-cluster-without-quorum
 	@$(MAKE) python-black
 	@$(MAKE) eunit
 	@$(MAKE) javascript
@@ -167,6 +169,7 @@ endif
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
@@ -191,7 +194,7 @@ exunit: export ERL_LIBS = $(shell pwd)/src
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
-	@mix test --trace $(EXUNIT_OPTS)
+	@mix test --cover --trace $(EXUNIT_OPTS)
 
 setup-eunit: export BUILDDIR = $(shell pwd)
 setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
@@ -233,11 +236,13 @@ python-black-update: .venv/bin/black
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
+elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run -a adm:pass --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 --enable-erlang-views --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
-elixir-init:
+elixir-init: MIX_ENV=test
+elixir-init: config.erl
 	@mix local.rebar --force && mix local.hex --force && mix deps.get
 
 .PHONY: elixir-cluster-without-quorum
@@ -266,6 +271,7 @@ elixir-credo: elixir-init
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
+javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 javascript: devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
@@ -276,43 +282,13 @@ else
 endif
 	@dev/run -n 1 -q --with-admin-party-please \
             --enable-erlang-views \
-            -c 'startup_jitter=0' \
+            "$(TEST_OPTS)" \
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
 
-.PHONY: test-cluster-with-quorum
-test-cluster-with-quorum: devclean
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@dev/run -n 3 -q --with-admin-party-please \
-            --enable-erlang-views --degrade-cluster 1 \
-            -c 'startup_jitter=0' \
-            'test/javascript/run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)" \
-	    --path test/javascript/tests-cluster/with-quorum'
-
-.PHONY: test-cluster-without-quorum
-test-cluster-without-quorum: devclean
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@dev/run -n 3 -q --with-admin-party-please \
-            --enable-erlang-views --degrade-cluster 2 \
-            -c 'startup_jitter=0' \
-            'test/javascript/run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)" \
-            --path test/javascript/tests-cluster/without-quorum'
 
 .PHONY: soak-javascript
+soak-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 soak-javascript:
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
@@ -324,7 +300,7 @@ endif
 	@rm -rf dev/lib
 	while [ $$? -eq 0 ]; do \
 		dev/run -n 1 -q --with-admin-party-please \
-				-c 'startup_jitter=0' \
+				"$(TEST_OPTS)" \
 				'test/javascript/run --suites "$(suites)" \
 				--ignore "$(ignore_js_suites)"'  \
 	done
@@ -367,11 +343,12 @@ build-test:
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
+mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \
 		.venv/bin/python3 -m pip install -r requirements.txt
-	@cd src/mango && ../../dev/run -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose'
+	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose --with-xunit'
 
 ################################################################################
 # Developing

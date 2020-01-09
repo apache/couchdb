@@ -68,21 +68,12 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
 purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
     #mrst{
         id_btree=IdBtree,
-        log_btree=LogBtree,
         views=Views,
         partitioned=Partitioned
     } = State,
 
     Ids = [Id || {Id, _Revs} <- PurgedIdRevs],
-    {ok, Lookups, LLookups, LogBtree2, IdBtree2} = case LogBtree of
-        nil ->
-            {ok, L, Bt} = couch_btree:query_modify(IdBtree, Ids, [], Ids),
-            {ok, L, [], nil, Bt};
-        _ ->
-            {ok, L, Bt} = couch_btree:query_modify(IdBtree, Ids, [], Ids),
-            {ok, LL, LBt} = couch_btree:query_modify(LogBtree, Ids, [], Ids),
-            {ok, L, LL, LBt, Bt}
-    end,
+    {ok, Lookups, IdBtree2} = couch_btree:query_modify(IdBtree, Ids, [], Ids),
 
     MakeDictFun = fun
         ({ok, {DocId, ViewNumRowKeys}}, DictAcc) ->
@@ -101,48 +92,20 @@ purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
             DictAcc
     end,
     KeysToRemove = lists:foldl(MakeDictFun, dict:new(), Lookups),
-    SeqsToRemove = lists:foldl(MakeDictFun, dict:new(), LLookups),
 
     RemKeysFun = fun(#mrview{id_num=ViewId}=View) ->
-        #mrview{seq_indexed=SIndexed, keyseq_indexed=KSIndexed} = View,
         ToRem = couch_util:dict_find(ViewId, KeysToRemove, []),
         {ok, VBtree2} = couch_btree:add_remove(View#mrview.btree, [], ToRem),
         NewPurgeSeq = case VBtree2 =/= View#mrview.btree of
             true -> PurgeSeq;
             _ -> View#mrview.purge_seq
         end,
-        {SeqBtree3, KeyBySeqBtree3} = if SIndexed orelse KSIndexed ->
-            SToRem = couch_util:dict_find(ViewId, SeqsToRemove, []),
-            {ok, SeqBtree2} = if SIndexed ->
-                SKs = [{Seq, Key} || {Key, Seq, _} <- SToRem],
-                couch_btree:add_remove(View#mrview.seq_btree,
-                                       [], SKs);
-            true ->
-                {ok, nil}
-            end,
-            {ok, KeyBySeqBtree2} = if KSIndexed ->
-                KSs = [{[Seq, Key], DocId} || {Key, Seq, DocId} <- SToRem],
-                couch_btree:add_remove(View#mrview.key_byseq_btree,
-                                       [], KSs);
-            true ->
-                {ok, nil}
-            end,
-            {SeqBtree2, KeyBySeqBtree2};
-        true ->
-            {nil, nil}
-        end,
-
-        View#mrview{btree=VBtree2,
-                    seq_btree=SeqBtree3,
-                    key_byseq_btree=KeyBySeqBtree3,
-                    purge_seq=NewPurgeSeq}
-
+        View#mrview{btree=VBtree2, purge_seq=NewPurgeSeq}
     end,
 
     Views2 = lists:map(RemKeysFun, Views),
     {ok, State#mrst{
         id_btree=IdBtree2,
-        log_btree=LogBtree2,
         views=Views2,
         purge_seq=PurgeSeq
     }}.
@@ -152,18 +115,12 @@ process_doc(Doc, Seq, #mrst{doc_acc=Acc}=State) when length(Acc) > 100 ->
     couch_work_queue:queue(State#mrst.doc_queue, lists:reverse(Acc)),
     process_doc(Doc, Seq, State#mrst{doc_acc=[]});
 process_doc(nil, Seq, #mrst{doc_acc=Acc}=State) ->
-    {ok, State#mrst{doc_acc=[{nil, Seq, nil, nil} | Acc]}};
-process_doc(#doc{id=Id, deleted=true}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->
-    Rev= extract_rev(Doc#doc.revs),
-    {ok, State#mrst{doc_acc=[{Id, Seq, Rev, deleted} | Acc]}};
+    {ok, State#mrst{doc_acc=[{nil, Seq, nil} | Acc]}};
+process_doc(#doc{id=Id, deleted=true}, Seq, #mrst{doc_acc=Acc}=State) ->
+    {ok, State#mrst{doc_acc=[{Id, Seq, deleted} | Acc]}};
 process_doc(#doc{id=Id}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->
-    Rev = extract_rev(Doc#doc.revs),
-    {ok, State#mrst{doc_acc=[{Id, Seq, Rev, Doc} | Acc]}}.
+    {ok, State#mrst{doc_acc=[{Id, Seq, Doc} | Acc]}}.
 
-extract_rev({0, []}) ->
-    {0, []};
-extract_rev({RevPos, [Rev | _]}) ->
-    {RevPos, Rev}.
 
 finish_update(#mrst{doc_acc=Acc}=State) ->
     if Acc /= [] ->
@@ -199,14 +156,14 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
             end,
             QServer = State1#mrst.qserver,
             DocFun = fun
-                ({nil, Seq, _, _}, {SeqAcc, Results}) ->
+                ({nil, Seq, _}, {SeqAcc, Results}) ->
                     {erlang:max(Seq, SeqAcc), Results};
-                ({Id, Seq, Rev, deleted}, {SeqAcc, Results}) ->
-                    {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, []} | Results]};
-                ({Id, Seq, Rev, Doc}, {SeqAcc, Results}) ->
+                ({Id, Seq, deleted}, {SeqAcc, Results}) ->
+                    {erlang:max(Seq, SeqAcc), [{Id, []} | Results]};
+                ({Id, Seq, Doc}, {SeqAcc, Results}) ->
                     couch_stats:increment_counter([couchdb, mrview, map_doc]),
                     {ok, Res} = couch_query_servers:map_doc_raw(QServer, Doc),
-                    {erlang:max(Seq, SeqAcc), [{Id, Seq, Rev, Res} | Results]}
+                    {erlang:max(Seq, SeqAcc), [{Id, Res} | Results]}
             end,
             FoldFun = fun(Docs, Acc) ->
                 update_task(length(Docs)),
@@ -222,8 +179,8 @@ write_results(Parent, #mrst{} = State) ->
     case accumulate_writes(State, State#mrst.write_queue, nil) of
         stop ->
             Parent ! {new_state, State};
-        {Go, {Seq, ViewKVs, DocIdKeys, Seqs, Log}} ->
-            NewState = write_kvs(State, Seq, ViewKVs, DocIdKeys, Seqs, Log),
+        {Go, {Seq, ViewKVs, DocIdKeys}} ->
+            NewState = write_kvs(State, Seq, ViewKVs, DocIdKeys),
             if Go == stop ->
                 Parent ! {new_state, NewState};
             true ->
@@ -245,17 +202,17 @@ start_query_server(State) ->
 
 
 accumulate_writes(State, W, Acc0) ->
-    {Seq, ViewKVs, DocIdKVs, Seqs, Log} = case Acc0 of
-        nil -> {0, [{V#mrview.id_num, {[], []}} || V <- State#mrst.views], [], dict:new(), dict:new()};
+    {Seq, ViewKVs, DocIdKVs} = case Acc0 of
+        nil -> {0, [{V#mrview.id_num, []} || V <- State#mrst.views], []};
         _ -> Acc0
     end,
     case couch_work_queue:dequeue(W) of
         closed when Seq == 0 ->
             stop;
         closed ->
-            {stop, {Seq, ViewKVs, DocIdKVs, Seqs, Log}};
+            {stop, {Seq, ViewKVs, DocIdKVs}};
         {ok, Info} ->
-            {_, _, NewIds, _, _} = Acc = merge_results(Info, Seq, ViewKVs, DocIdKVs, Seqs, Log),
+            {_, _, NewIds} = Acc = merge_results(Info, Seq, ViewKVs, DocIdKVs),
             case accumulate_more(length(NewIds), Acc) of
                 true -> accumulate_writes(State, W, Acc);
                 false -> {ok, Acc}
@@ -272,77 +229,60 @@ accumulate_more(NumDocIds, Acc) ->
         andalso CurrMem < list_to_integer(MinSize).
 
 
-merge_results([], SeqAcc, ViewKVs, DocIdKeys, Seqs, Log) ->
-    {SeqAcc, ViewKVs, DocIdKeys, Seqs, Log};
-merge_results([{Seq, Results} | Rest], SeqAcc, ViewKVs, DocIdKeys, Seqs, Log) ->
-    Fun = fun(RawResults, {VKV, DIK, Seqs2, Log2}) ->
-        merge_results(RawResults, VKV, DIK, Seqs2, Log2)
+merge_results([], SeqAcc, ViewKVs, DocIdKeys) ->
+    {SeqAcc, ViewKVs, DocIdKeys};
+merge_results([{Seq, Results} | Rest], SeqAcc, ViewKVs, DocIdKeys) ->
+    Fun = fun(RawResults, {VKV, DIK}) ->
+        merge_results(RawResults, VKV, DIK)
     end,
-    {ViewKVs1, DocIdKeys1, Seqs1, Log1} = lists:foldl(Fun, {ViewKVs, DocIdKeys, Seqs, Log}, Results),
-    merge_results(Rest, erlang:max(Seq, SeqAcc), ViewKVs1, DocIdKeys1, Seqs1, Log1).
+    {ViewKVs1, DocIdKeys1} = lists:foldl(Fun, {ViewKVs, DocIdKeys}, Results),
+    merge_results(Rest, erlang:max(Seq, SeqAcc), ViewKVs1, DocIdKeys1).
 
 
-merge_results({DocId, Seq, Rev, []}, ViewKVs, DocIdKeys, Seqs, Log) ->
-    {ViewKVs, [{DocId, []} | DocIdKeys], dict:store(DocId, Seq, Seqs), dict:store({DocId, Rev}, [], Log)};
-merge_results({DocId, Seq, Rev, RawResults}, ViewKVs, DocIdKeys, Seqs, Log) ->
+merge_results({DocId, []}, ViewKVs, DocIdKeys) ->
+    {ViewKVs, [{DocId, []} | DocIdKeys]};
+merge_results({DocId, RawResults}, ViewKVs, DocIdKeys) ->
     JsonResults = couch_query_servers:raw_to_ejson(RawResults),
     Results = [[list_to_tuple(Res) || Res <- FunRs] || FunRs <- JsonResults],
     case lists:flatten(Results) of
         [] ->
-            {ViewKVs, [{DocId, []} | DocIdKeys], dict:store(DocId, Seq, Seqs), dict:store({DocId, Rev}, [], Log)};
+            {ViewKVs, [{DocId, []} | DocIdKeys]};
         _ ->
-            {ViewKVs1, ViewIdKeys, Log1} = insert_results(DocId, Seq, Rev, Results, ViewKVs, [], [], Log),
-            {ViewKVs1, [ViewIdKeys | DocIdKeys], dict:store(DocId, Seq, Seqs), Log1}
+            {ViewKVs1, ViewIdKeys} = insert_results(DocId, Results, ViewKVs, [], []),
+            {ViewKVs1, [ViewIdKeys | DocIdKeys]}
     end.
 
 
-insert_results(DocId, _Seq, _Rev, [], [], ViewKVs, ViewIdKeys, Log) ->
-    {lists:reverse(ViewKVs), {DocId, ViewIdKeys}, Log};
-insert_results(DocId, Seq, Rev, [KVs | RKVs], [{Id, {VKVs, SKVs}} | RVKVs], VKVAcc,
-               VIdKeys, Log) ->
+insert_results(DocId, [], [], ViewKVs, ViewIdKeys) ->
+    {lists:reverse(ViewKVs), {DocId, ViewIdKeys}};
+insert_results(DocId, [KVs | RKVs], [{Id, VKVs} | RVKVs], VKVAcc, VIdKeys) ->
     CombineDupesFun = fun
-        ({Key, Val}, {[{Key, {dups, Vals}} | Rest], IdKeys, Log2}) ->
-            {[{Key, {dups, [Val | Vals]}} | Rest], IdKeys, Log2};
-        ({Key, Val1}, {[{Key, Val2} | Rest], IdKeys, Log2}) ->
-            {[{Key, {dups, [Val1, Val2]}} | Rest], IdKeys, Log2};
-        ({Key, Value}, {Rest, IdKeys, Log2}) ->
-            {[{Key, Value} | Rest], [{Id, Key} | IdKeys],
-             dict:append({DocId, Rev}, {Id, {Key, Seq, add}}, Log2)}
+        ({Key, Val}, {[{Key, {dups, Vals}} | Rest], IdKeys}) ->
+            {[{Key, {dups, [Val | Vals]}} | Rest], IdKeys};
+        ({Key, Val1}, {[{Key, Val2} | Rest], IdKeys}) ->
+            {[{Key, {dups, [Val1, Val2]}} | Rest], IdKeys};
+        ({Key, Value}, {Rest, IdKeys}) ->
+            {[{Key, Value} | Rest], [{Id, Key} | IdKeys]}
     end,
-    InitAcc = {[], VIdKeys, Log},
+    InitAcc = {[], VIdKeys},
     couch_stats:increment_counter([couchdb, mrview, emits], length(KVs)),
-    {Duped, VIdKeys0, Log1} = lists:foldl(CombineDupesFun, InitAcc,
+    {Duped, VIdKeys0} = lists:foldl(CombineDupesFun, InitAcc,
                                           lists:sort(KVs)),
     FinalKVs = [{{Key, DocId}, Val} || {Key, Val} <- Duped] ++ VKVs,
-    FinalSKVs = [{{Seq, Key}, {DocId, Val, Rev}} || {Key, Val} <- Duped] ++ SKVs,
-    insert_results(DocId, Seq, Rev, RKVs, RVKVs,
-                  [{Id, {FinalKVs, FinalSKVs}} | VKVAcc], VIdKeys0, Log1).
+    insert_results(DocId, RKVs, RVKVs, [{Id, FinalKVs} | VKVAcc], VIdKeys0).
 
 
-write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
+write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys) ->
     #mrst{
         id_btree=IdBtree,
-        log_btree=LogBtree,
         first_build=FirstBuild,
         partitioned=Partitioned
     } = State,
 
-    Revs = dict:from_list(dict:fetch_keys(Log0)),
-
-    Log = dict:fold(fun({Id, _Rev}, DIKeys, Acc) ->
-        dict:store(Id, DIKeys, Acc)
-    end, dict:new(), Log0),
-
     {ok, ToRemove, IdBtree2} = update_id_btree(IdBtree, DocIdKeys, FirstBuild),
     ToRemByView = collapse_rem_keys(ToRemove, dict:new()),
 
-    {ok, SeqsToAdd, SeqsToRemove, LogBtree2} = case LogBtree of
-        nil -> {ok, undefined, undefined, nil};
-        _ -> update_log(LogBtree, Log, Revs, Seqs, FirstBuild)
-    end,
-
-    UpdateView = fun(#mrview{id_num=ViewId}=View, {ViewId, {KVs0, SKVs}}) ->
-        #mrview{seq_indexed=SIndexed, keyseq_indexed=KSIndexed} = View,
+    UpdateView = fun(#mrview{id_num=ViewId}=View, {ViewId, KVs0}) ->
         ToRem0 = couch_util:dict_find(ViewId, ToRemByView, []),
         {KVs, ToRem} = case Partitioned of
             true ->
@@ -358,36 +298,7 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
             _ -> View#mrview.update_seq
         end,
 
-        %% store the view changes.
-        {SeqBtree3, KeyBySeqBtree3} = if SIndexed orelse KSIndexed ->
-            SToRem = couch_util:dict_find(ViewId, SeqsToRemove, []),
-            SToAdd = couch_util:dict_find(ViewId, SeqsToAdd, []),
-            SKVs1 = SKVs ++ SToAdd,
-
-            {ok, SeqBtree2} = if SIndexed ->
-                RemSKs = lists:sort([{Seq, Key} || {Key, Seq, _} <- SToRem]),
-                couch_btree:add_remove(View#mrview.seq_btree,
-                                       SKVs1, RemSKs);
-            true ->
-                {ok, nil}
-            end,
-
-            {ok, KeyBySeqBtree2} = if KSIndexed ->
-                RemKSs = [{[Key, Seq], DocId} || {Key, Seq, DocId} <- SToRem],
-                couch_btree:add_remove(View#mrview.key_byseq_btree,
-                                       couch_mrview_util:to_key_seq(SKVs1),
-                                       RemKSs);
-            true ->
-                {ok, nil}
-            end,
-            {SeqBtree2, KeyBySeqBtree2};
-        true ->
-            {nil, nil}
-        end,
-        View2 = View#mrview{btree=VBtree2,
-                    seq_btree=SeqBtree3,
-                    key_byseq_btree=KeyBySeqBtree3,
-                    update_seq=NewUpdateSeq},
+        View2 = View#mrview{btree=VBtree2, update_seq=NewUpdateSeq},
         maybe_notify(State, View2, KVs, ToRem),
         View2
     end,
@@ -395,8 +306,7 @@ write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys, Seqs, Log0) ->
     State#mrst{
         views=lists:zipwith(UpdateView, State#mrst.views, ViewKVs),
         update_seq=UpdateSeq,
-        id_btree=IdBtree2,
-        log_btree=LogBtree2
+        id_btree=IdBtree2
     }.
 
 
@@ -422,64 +332,6 @@ update_id_btree(Btree, DocIdKeys, _) ->
     ToRem = [Id || {Id, DIKeys} <- DocIdKeys, DIKeys == []],
     couch_btree:query_modify(Btree, ToFind, ToAdd, ToRem).
 
-
-update_log(Btree, Log, _Revs, _Seqs, true) ->
-    ToAdd = [{Id, DIKeys} || {Id, DIKeys} <- dict:to_list(Log),
-                             DIKeys /= []],
-    {ok, LogBtree2} = couch_btree:add_remove(Btree, ToAdd, []),
-    {ok, dict:new(), dict:new(), LogBtree2};
-update_log(Btree, Log, Revs, Seqs, _) ->
-    %% build list of updated keys and Id
-    {ToLook, Updated, Removed} = dict:fold(
-        fun(Id, [], {IdsAcc, KeysAcc, RemAcc}) ->
-            {[Id | IdsAcc], KeysAcc, RemAcc};
-        (Id, DIKeys, {IdsAcc, KeysAcc, RemAcc}) ->
-            {KeysAcc1, RemAcc1} = lists:foldl(fun({ViewId, {Key, _Seq, Op}}, {KeysAcc2, RemAcc2}) ->
-                case Op of
-                    add -> {[{Id, ViewId, Key}|KeysAcc2], RemAcc2};
-                    del -> {KeysAcc2, [{Id, ViewId, Key}|RemAcc2]}
-                end
-            end, {KeysAcc, RemAcc}, DIKeys),
-            {[Id | IdsAcc], KeysAcc1, RemAcc1}
-        end, {[], [], []}, Log),
-
-    MapFun = fun({ok, KV}) -> [KV]; (not_found) -> [] end,
-    KVsToLook = lists:flatmap(MapFun, couch_btree:lookup(Btree, ToLook)),
-
-    {Log1, AddAcc, DelAcc} = lists:foldl(fun({DocId, VIdKeys}, Acc) ->
-        lists:foldl(fun({ViewId, {Key, OldSeq, _Op}}, {Log4, AddAcc4, DelAcc4}) ->
-
-            IsUpdated = lists:member({DocId, ViewId, Key}, Updated),
-            IsRemoved = lists:member({DocId, ViewId, Key}, Removed),
-
-            case IsUpdated of
-                true ->
-                    % the log is updated, deleted old record from the view
-                    DelAcc5 = dict:append(ViewId, {Key, OldSeq, DocId}, DelAcc4),
-                    {Log4, AddAcc4, DelAcc5};
-                false ->
-                    % an update operation has been logged for this key. We must
-                    % now record it as deleted in the log, remove the old record
-                    % in the view and update the view with a removed record.
-                    NewSeq = dict:fetch(DocId, Seqs),
-                    Log5 = case IsRemoved of
-                        false ->
-                            dict:append(DocId, {ViewId, {Key, NewSeq, del}}, Log4);
-                        true ->
-                            Log4
-                    end,
-                    Rev = dict:fetch(DocId, Revs),
-                    DelAcc5 = dict:append(ViewId, {Key, OldSeq, DocId}, DelAcc4),
-                    AddAcc5 = dict:append(ViewId, {{NewSeq, Key}, {DocId, ?REM_VAL, Rev}}, AddAcc4),
-                    {Log5, AddAcc5, DelAcc5}
-            end
-        end, Acc, VIdKeys)
-    end, {Log, dict:new(), dict:new()}, KVsToLook),
-
-    ToAdd = [{Id, DIKeys} || {Id, DIKeys} <- dict:to_list(Log1), DIKeys /= []],
-    % store the new logs
-    {ok, LogBtree2} = couch_btree:add_remove(Btree, ToAdd, []),
-    {ok, AddAcc, DelAcc, LogBtree2}.
 
 collapse_rem_keys([], Acc) ->
     Acc;

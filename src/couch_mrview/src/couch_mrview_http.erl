@@ -16,7 +16,6 @@
     handle_all_docs_req/2,
     handle_local_docs_req/2,
     handle_design_docs_req/2,
-    handle_view_changes_req/3,
     handle_reindex_req/3,
     handle_view_req/3,
     handle_temp_view_req/2,
@@ -30,6 +29,8 @@
     parse_int/1,
     parse_pos_int/1,
     prepend_val/1,
+    parse_body_and_query/2,
+    parse_body_and_query/3,
     parse_params/2,
     parse_params/3,
     parse_params/4,
@@ -79,25 +80,6 @@ handle_reindex_req(#httpd{method='POST',
     chttpd:send_json(Req, 201, {[{<<"ok">>, true}]});
 handle_reindex_req(Req, _Db, _DDoc) ->
     chttpd:send_method_not_allowed(Req, "POST").
-
-
-handle_view_changes_req(#httpd{path_parts=[_,<<"_design">>,DDocName,<<"_view_changes">>,ViewName]}=Req, Db, DDoc) ->
-    {DDocBody} = DDoc#doc.body,
-    case lists:keyfind(<<"options">>, 1, DDocBody) of
-        {<<"options">>, {Options}} when is_list(Options) ->
-            case lists:keyfind(<<"seq_indexed">>, 1, Options) of
-                {<<"seq_indexed">>, true} ->
-                    ok;
-                _ ->
-                    throw({bad_request, "view changes not enabled"})
-            end;
-        _ ->
-            throw({bad_request, "view changes not enabled"})
-    end,
-
-    ChangesArgs = couch_httpd_db:parse_changes_query(Req, Db),
-    ChangesFun = couch_mrview_changes:handle_view_changes(ChangesArgs, Req, Db, <<"_design/", DDocName/binary>>, ViewName),
-    couch_httpd_db:handle_changes_req(Req, Db, ChangesArgs, ChangesFun).
 
 
 handle_view_req(#httpd{method='GET',
@@ -228,7 +210,7 @@ is_public_fields_configured(Db) ->
     end.
 
 do_all_docs_req(Req, Db, Keys, NS) ->
-    Args0 = parse_params(Req, Keys),
+    Args0 = couch_mrview_http:parse_body_and_query(Req, Keys),
     Args1 = set_namespace(NS, Args0),
     ETagFun = fun(Sig, Acc0) ->
         check_view_etag(Sig, Acc0, Req)
@@ -473,12 +455,30 @@ parse_params(Props, Keys, Args) ->
 
 parse_params(Props, Keys, #mrargs{}=Args0, Options) ->
     IsDecoded = lists:member(decoded, Options),
-    % group_level set to undefined to detect if explicitly set by user
-    Args1 = Args0#mrargs{keys=Keys, group=undefined, group_level=undefined},
+    Args1 = case lists:member(keep_group_level, Options) of
+        true ->
+            Args0;
+        _ ->
+            % group_level set to undefined to detect if explicitly set by user
+            Args0#mrargs{keys=Keys, group=undefined, group_level=undefined}
+    end,
     lists:foldl(fun({K, V}, Acc) ->
         parse_param(K, V, Acc, IsDecoded)
     end, Args1, Props).
 
+
+parse_body_and_query(#httpd{method='POST'} = Req, Keys) ->
+    Props = chttpd:json_body_obj(Req),
+    parse_body_and_query(Req, Props, Keys);
+
+parse_body_and_query(Req, Keys) ->
+    parse_params(chttpd:qs(Req), Keys, #mrargs{keys=Keys, group=undefined,
+        group_level=undefined}, [keep_group_level]).
+
+parse_body_and_query(Req, {Props}, Keys) ->
+    Args = #mrargs{keys=Keys, group=undefined, group_level=undefined},
+    BodyArgs = parse_params(Props, Keys, Args, [decoded]),
+    parse_params(chttpd:qs(Req), Keys, BodyArgs, [keep_group_level]).
 
 parse_param(Key, Val, Args, IsDecoded) when is_binary(Key) ->
     parse_param(binary_to_list(Key), Val, Args, IsDecoded);

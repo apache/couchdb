@@ -111,12 +111,12 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
                 {ok, Acc2} ->
                     Callback(complete, Acc2);
                 timeout ->
-                    Callback(timeout, Acc0)
+                    Callback({error, timeout}, Acc0)
             end;
         {'DOWN', Ref, _, _, Error} ->
             Callback({error, Error}, Acc0)
     after Timeout ->
-        Callback(timeout, Acc0)
+        Callback({error, timeout}, Acc0)
     end.
 
 go(DbName, _Options, Workers, QueryArgs, Callback, Acc0) ->

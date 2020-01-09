@@ -116,16 +116,17 @@ defmodule Couch.DBTest do
     end)
   end
 
-  def create_user(user) do
-    required = [:name, :password, :roles]
+  def prepare_user_doc(user) do
+    required = [:name, :password]
 
     Enum.each(required, fn key ->
       assert Keyword.has_key?(user, key), "User missing key: #{key}"
     end)
 
+    id = Keyword.get(user, :id)
     name = Keyword.get(user, :name)
     password = Keyword.get(user, :password)
-    roles = Keyword.get(user, :roles)
+    roles = Keyword.get(user, :roles, [])
 
     assert is_binary(name), "User name must be a string"
     assert is_binary(password), "User password must be a string"
@@ -135,14 +136,17 @@ defmodule Couch.DBTest do
       assert is_binary(role), "Roles must be a list of strings"
     end)
 
-    user_doc = %{
-      "_id" => "org.couchdb.user:" <> name,
+    %{
+      "_id" => id || "org.couchdb.user:" <> name,
       "type" => "user",
       "name" => name,
       "roles" => roles,
       "password" => password
     }
+  end
 
+  def create_user(user) do
+    user_doc = prepare_user_doc(user)
     resp = Couch.get("/_users/#{user_doc["_id"]}")
 
     user_doc =
@@ -182,6 +186,12 @@ defmodule Couch.DBTest do
     {:ok, resp}
   end
 
+  def info(db_name) do
+    resp = Couch.get("/#{db_name}")
+    assert resp.status_code == 200
+    resp.body
+  end
+
   def bulk_save(db_name, docs) do
     resp =
       Couch.post(
@@ -191,7 +201,7 @@ defmodule Couch.DBTest do
         }
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
   end
 
   def query(
@@ -251,7 +261,7 @@ defmodule Couch.DBTest do
         body: ddoc
       )
 
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp = Couch.get("/#{db_name}/#{ddoc_name}/_view/view", query: request_options)
     assert resp.status_code == 200
@@ -288,6 +298,27 @@ defmodule Couch.DBTest do
     for id <- id_range, str_id = Integer.to_string(id) do
       %{_id: str_id, integer: id, string: str_id}
     end
+  end
+
+
+  def request_stats(path_steps, is_test) do
+    path =
+      List.foldl(
+        path_steps,
+        "/_node/_local/_stats",
+        fn p, acc ->
+          "#{acc}/#{p}"
+        end
+      )
+
+    path =
+      if is_test do
+        path <> "?flush=true"
+      else
+        path
+      end
+
+    Couch.get(path).body
   end
 
   def retry_until(condition, sleep \\ 100, timeout \\ 30_000) do
@@ -349,6 +380,7 @@ defmodule Couch.DBTest do
                 body: :jiffy.encode(setting.value)
               )
 
+            assert resp.status_code == 200
             Map.put(acc, node, resp.body)
           end)
 
@@ -364,16 +396,22 @@ defmodule Couch.DBTest do
           value = elem(node_value, 1)
 
           if value == ~s(""\\n) do
-            Couch.delete(
-              "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
-              headers: ["X-Couch-Persist": false]
-            )
+            resp =
+              Couch.delete(
+                "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+                headers: ["X-Couch-Persist": false]
+              )
+
+            assert resp.status_code == 200
           else
-            Couch.put(
-              "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
-              headers: ["X-Couch-Persist": false],
-              body: :jiffy.encode(value)
-            )
+            resp =
+              Couch.put(
+                "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
+                headers: ["X-Couch-Persist": false],
+                body: :jiffy.encode(value)
+              )
+
+            assert resp.status_code == 200
           end
         end)
       end)

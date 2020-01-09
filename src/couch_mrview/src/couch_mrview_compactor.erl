@@ -41,9 +41,6 @@ compact(State) ->
         sig=Sig,
         update_seq=Seq,
         id_btree=IdBtree,
-        log_btree=LogBtree,
-        seq_indexed=SeqIndexed,
-        keyseq_indexed=KeySeqIndexed,
         views=Views
     } = State,
     erlang:put(io_priority, {view_compact, DbName, IdxName}),
@@ -60,27 +57,15 @@ compact(State) ->
 
     #mrst{
         id_btree = EmptyIdBtree,
-        log_btree = EmptyLogBtree,
         views = EmptyViews
     } = EmptyState,
-
-    TotalChanges0 = case SeqIndexed orelse KeySeqIndexed of
-        true -> NumDocIds * 2;
-        _ -> NumDocIds
-    end,
 
     TotalChanges = lists:foldl(
         fun(View, Acc) ->
             {ok, Kvs} = couch_mrview_util:get_row_count(View),
-            case SeqIndexed orelse KeySeqIndexed of
-                true ->
-                    {ok, SKvs} = couch_mrview_util:get_view_changes_count(View),
-                    Acc + Kvs + SKvs;
-                false ->
-                    Acc + Kvs
-            end
+            Acc + Kvs
         end,
-        TotalChanges0, Views),
+        NumDocIds, Views),
 
     couch_task_status:add_task([
         {type, view_compaction},
@@ -126,24 +111,13 @@ compact(State) ->
     FinalAcc2 = update_task(FinalAcc, length(Uncopied)),
 
 
-    {NewLogBtree, FinalAcc3} = case SeqIndexed of
-        true ->
-            compact_log(LogBtree, BufferSize,
-                        FinalAcc2#acc{kvs=[],
-                                      kvs_size=0,
-                                      btree=EmptyLogBtree});
-        _ ->
-            {nil, FinalAcc2}
-    end,
-
     {NewViews, _} = lists:mapfoldl(fun({View, EmptyView}, Acc) ->
         compact_view(View, EmptyView, BufferSize, Acc)
-    end, FinalAcc3, lists:zip(Views, EmptyViews)),
+    end, FinalAcc2, lists:zip(Views, EmptyViews)),
 
     unlink(EmptyState#mrst.fd),
     {ok, EmptyState#mrst{
         id_btree=NewIdBtree,
-        log_btree=NewLogBtree,
         views=NewViews,
         update_seq=Seq
     }}.
@@ -186,58 +160,16 @@ recompact_retry_count() ->
     ).
 
 
-compact_log(LogBtree, BufferSize, Acc0) ->
-    FoldFun = fun(KV, Acc) ->
-        #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize} = Acc,
-        KvsSize2 = KvsSize + ?term_size(KV),
-        case KvsSize2 >= BufferSize of
-            true ->
-                {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV | Kvs])),
-                Acc2 = update_task(Acc, 1 + length(Kvs)),
-                {ok, Acc2#acc{
-                    btree = Bt2, kvs = [], kvs_size = 0}};
-            _ ->
-                {ok, Acc#acc{
-                    kvs = [KV | Kvs], kvs_size = KvsSize2}}
-        end
-    end,
-
-    {ok, _, FinalAcc} = couch_btree:foldl(LogBtree, FoldFun, Acc0),
-    #acc{btree = Bt3, kvs = Uncopied} = FinalAcc,
-    {ok, NewLogBtree} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
-    FinalAcc2 = update_task(FinalAcc, length(Uncopied)),
-    {NewLogBtree, FinalAcc2}.
-
 %% @spec compact_view(View, EmptyView, Retry, Acc) -> {CompactView, NewAcc}
 compact_view(#mrview{id_num=VID}=View, EmptyView, BufferSize, Acc0) ->
 
-    {NewBt, Acc1} = compact_view_btree(View#mrview.btree,
+    {NewBt, FinalAcc} = compact_view_btree(View#mrview.btree,
                                        EmptyView#mrview.btree,
                                        VID, BufferSize, Acc0),
 
-    %% are we indexing changes by sequences?
-    {NewSeqBt, Acc2} = case View#mrview.seq_indexed of
-        true ->
-            compact_view_btree(View#mrview.seq_btree,
-                               EmptyView#mrview.seq_btree,
-                               VID, BufferSize, Acc1);
-        _ ->
-            {nil, Acc1}
-    end,
-    {NewKeyBySeqBt, FinalAcc} = case View#mrview.keyseq_indexed of
-        true ->
-            compact_view_btree(View#mrview.key_byseq_btree,
-                               EmptyView#mrview.key_byseq_btree,
-                               VID, BufferSize, Acc2);
-        _ ->
-            {nil, Acc2}
-    end,
-
     {EmptyView#mrview{btree=NewBt,
-                      seq_btree=NewSeqBt,
                       update_seq=View#mrview.update_seq,
-                      purge_seq=View#mrview.purge_seq,
-                      key_byseq_btree=NewKeyBySeqBt}, FinalAcc}.
+                      purge_seq=View#mrview.purge_seq}, FinalAcc}.
 
 compact_view_btree(Btree, EmptyBtree, VID, BufferSize, Acc0) ->
     Fun = fun(KV, #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize} = Acc) ->
@@ -302,7 +234,7 @@ swap_compacted(OldState, NewState) ->
 
     unlink(OldState#mrst.fd),
     erlang:demonitor(OldState#mrst.fd_monitor, [flush]),
-    
+
     {ok, NewState#mrst{fd_monitor=Ref}}.
 
 
@@ -316,11 +248,23 @@ remove_compacted(#mrst{sig = Sig, db_name = DbName} = State) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+setup_all() ->
+    meck:new(couch_index_updater),
+    meck:new(couch_log).
+
+teardown_all(_) ->
+    meck:unload().
+
 recompact_test_() ->
-    [
-        recompact_success_after_progress(),
-        recompact_exceeded_retry_count()
-    ].
+    {
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        [
+            recompact_success_after_progress(),
+            recompact_exceeded_retry_count()
+        ]
+    }.
 
 recompact_success_after_progress() ->
     ?_test(begin
@@ -330,12 +274,8 @@ recompact_success_after_progress() ->
                 timer:sleep(100),
                 exit({updated, self(), State#mrst{update_seq = 2}})
         end),
-        try
-            State = #mrst{fd=self(), update_seq=0},
-            ?assertEqual({ok, State#mrst{update_seq = 2}}, recompact(State))
-        after
-            meck:unload(couch_index_updater)
-        end
+        State = #mrst{fd=self(), update_seq=0},
+        ?assertEqual({ok, State#mrst{update_seq = 2}}, recompact(State))
     end).
 
 recompact_exceeded_retry_count() ->
@@ -345,15 +285,10 @@ recompact_exceeded_retry_count() ->
                 exit(error)
         end),
         ok = meck:expect(couch_log, warning, fun(_, _) -> ok end),
-        try
-            State = #mrst{fd=self(), db_name=foo, idx_name=bar},
-            ExpectedError = {exceeded_recompact_retry_count,
-                [{db_name, foo}, {idx_name, bar}]},
-                ?assertError(ExpectedError, recompact(State))
-        after
-            meck:unload(couch_log),
-            meck:unload(couch_index_updater)
-        end
+        State = #mrst{fd=self(), db_name=foo, idx_name=bar},
+        ExpectedError = {exceeded_recompact_retry_count,
+            [{db_name, foo}, {idx_name, bar}]},
+            ?assertError(ExpectedError, recompact(State))
     end).
 
 -endif.

@@ -139,7 +139,7 @@ test_purge_partial(Db) ->
         FDI1 = couch_db:get_full_doc_info(Db, <<"1">>), Rev1 = get_rev(FDI1),
         Update = {[
             {'_id', <<"1">>},
-            {'_rev', couch_doc:rev_to_str({1, [crypto:hash(md5, <<"1.2">>)]})},
+            {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
             {'val', 1.2}
         ]},
         {ok, [_Rev2]} = save_docs(Db, [Update], [replicated_changes]),

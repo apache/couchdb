@@ -3,11 +3,10 @@ defmodule Couch.Session do
   CouchDB session helpers.
   """
 
-  @enforce_keys [:cookie]
-  defstruct [:cookie]
+  defstruct [:cookie, :error]
 
-  def new(cookie) do
-    %Couch.Session{cookie: cookie}
+  def new(cookie, error \\ "") do
+    %Couch.Session{cookie: cookie, error: error}
   end
 
   def logout(sess) do
@@ -18,6 +17,16 @@ defmodule Couch.Session do
     ]
 
     Couch.delete!("/_session", headers: headers)
+  end
+
+  def info(sess) do
+    headers = [
+      "Content-Type": "application/x-www-form-urlencoded",
+      "X-CouchDB-WWW-Authenticate": "Cookie",
+      Cookie: sess.cookie
+    ]
+
+    Couch.get("/_session", headers: headers).body
   end
 
   def get(sess, url, opts \\ []), do: go(sess, :get, url, opts)
@@ -152,11 +161,17 @@ defmodule Couch do
     login(user, pass)
   end
 
-  def login(user, pass) do
+  def login(user, pass, expect \\ :success) do
     resp = Couch.post("/_session", body: %{:username => user, :password => pass})
-    true = resp.body["ok"]
-    cookie = resp.headers[:"set-cookie"]
-    [token | _] = String.split(cookie, ";")
-    %Couch.Session{cookie: token}
+
+    if expect == :success do
+      true = resp.body["ok"]
+      cookie = resp.headers[:"set-cookie"]
+      [token | _] = String.split(cookie, ";")
+      %Couch.Session{cookie: token}
+    else
+      true = Map.has_key?(resp.body, "error")
+      %Couch.Session{error: resp.body["error"]}
+    end
   end
 end

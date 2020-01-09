@@ -10,7 +10,9 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.skip = true;
 couchTests.doc_copy_overriden_quorum = function(debug) {
+  return console.log('done in test/elixir/test/cluster_without_quorum_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"},{"w":1});
   db.createDb();
@@ -21,7 +23,7 @@ couchTests.doc_copy_overriden_quorum = function(debug) {
   var xhr = CouchDB.request("COPY", "/" + db_name + "/dummy", {
     headers: {"Destination":"dummy2"}
   });
-  console.log("Skipped-TODO: Clarify correct behaviour. Is not considering overridden quorum. 201->"+xhr.status);
+  console.log("TODO: Clarify correct behaviour. Is not considering overridden quorum. 201->"+xhr.status);
   //TODO Defie correct behaviour
   //T(xhr.status=="201","Should return 201");
 

@@ -16,10 +16,11 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(DDOC_ID, <<"_design/test">>).
--define(DOCS_COUNT, 5000).
--define(TIMEOUT, 60000).
+-define(DOCS_COUNT, 1000).
+-define(TIMEOUT, 60).
 
-setup() ->
+setup_all() ->
+    Ctx = test_util:start_couch(),
     config:set("couchdb", "file_compression", "none", false),
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
@@ -35,13 +36,13 @@ setup() ->
         }
     ]}),
     {ok, _} = couch_db:update_doc(Db, DDoc, []),
-    refresh_index(DbName),
     ok = couch_db:close(Db),
-    DbName.
+    {Ctx, DbName}.
 
-teardown(DbName) ->
+
+teardown_all({Ctx, DbName}) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]),
-    ok.
+    test_util:stop_couch(Ctx).
 
 
 couch_file_compression_test_() ->
@@ -49,75 +50,51 @@ couch_file_compression_test_() ->
         "CouchDB file compression tests",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
-            {
-                foreach,
-                fun setup/0, fun teardown/1,
-                [
-                    fun should_use_none/1,
-                    fun should_use_deflate_1/1,
-                    fun should_use_deflate_9/1,
-                    fun should_use_snappy/1,
-                    fun should_compare_compression_methods/1
-                ]
-            }
+            fun setup_all/0,
+            fun teardown_all/1,
+            {with, [
+                fun should_use_none/1,
+                fun should_use_deflate_1/1,
+                fun should_use_deflate_9/1,
+                fun should_use_snappy/1,
+                fun should_compare_compression_methods/1
+            ]}
         }
     }.
 
 
-should_use_none(DbName) ->
-    config:set("couchdb", "file_compression", "none", false),
-    {
-        "Use no compression",
-        [
-            {"compact database",
-             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_db(DbName))}},
-            {"compact view",
-             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_view(DbName))}}
-        ]
-    }.
+should_use_none({_, DbName}) -> run_test(DbName, "none").
+should_use_deflate_1({_, DbName}) -> run_test(DbName, "deflate_1").
+should_use_deflate_9({_, DbName}) -> run_test(DbName, "deflate_9").
+should_use_snappy({_, DbName}) -> run_test(DbName, "snappy").
 
-should_use_deflate_1(DbName) ->
-    config:set("couchdb", "file_compression", "deflate_1", false),
-    {
-        "Use deflate compression at level 1",
-        [
-            {"compact database",
-             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_db(DbName))}},
-            {"compact view",
-             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_view(DbName))}}
-        ]
-    }.
 
-should_use_deflate_9(DbName) ->
-    config:set("couchdb", "file_compression", "deflate_9", false),
-    {
-        "Use deflate compression at level 9",
-        [
-            {"compact database",
-             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_db(DbName))}},
-            {"compact view",
-             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_view(DbName))}}
-        ]
-    }.
+should_compare_compression_methods({_, DbName}) ->
+    TestDb = setup_db(DbName),
+    Name = "none > snappy > deflate_1 > deflate_9",
+    try
+        {Name, {timeout, ?TIMEOUT, ?_test(compare_methods(TestDb))}}
+    after
+        couch_server:delete(TestDb, [?ADMIN_CTX])
+    end.
 
-should_use_snappy(DbName) ->
-    config:set("couchdb", "file_compression", "snappy", false),
-    {
-        "Use snappy compression",
-        [
-            {"compact database",
-             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_db(DbName))}},
-            {"compact view",
-             {timeout, 5 + ?TIMEOUT div 1000, ?_test(compact_view(DbName))}}
-        ]
-    }.
 
-should_compare_compression_methods(DbName) ->
-    {"none > snappy > deflate_1 > deflate_9",
-     {timeout, ?TIMEOUT div 1000, ?_test(compare_compression_methods(DbName))}}.
+run_test(DbName, Comp) ->
+    config:set("couchdb", "file_compression", Comp, false),
+    Timeout = 5 + ?TIMEOUT,
+    TestDb = setup_db(DbName),
+    Tests = [
+        {"compact database", {timeout, Timeout, ?_test(compact_db(DbName))}},
+        {"compact view", {timeout, Timeout, ?_test(compact_view(DbName))}}
+    ],
+    try
+        {"Use compression: " ++ Comp, Tests}
+    after
+        ok = couch_server:delete(TestDb, [?ADMIN_CTX])
+    end.
 
-compare_compression_methods(DbName) ->
+
+compare_methods(DbName) ->
     config:set("couchdb", "file_compression", "none", false),
     ExternalSizePreCompact = db_external_size(DbName),
     compact_db(DbName),
@@ -177,6 +154,19 @@ populate_db(Db, NumDocs) ->
         lists:seq(1, 500)),
     {ok, _} = couch_db:update_docs(Db, Docs, []),
     populate_db(Db, NumDocs - 500).
+
+
+setup_db(SrcDbName) ->
+    TgtDbName = ?tempdb(),
+    TgtDbFileName = binary_to_list(TgtDbName) ++ ".couch",
+    couch_util:with_db(SrcDbName, fun(Db) ->
+        OldPath = couch_db:get_filepath(Db),
+        NewPath = filename:join(filename:dirname(OldPath), TgtDbFileName),
+        {ok, _} = file:copy(OldPath, NewPath)
+    end),
+    refresh_index(TgtDbName),
+    TgtDbName.
+
 
 refresh_index(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),

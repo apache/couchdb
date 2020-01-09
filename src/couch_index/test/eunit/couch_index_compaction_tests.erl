@@ -17,6 +17,16 @@
 
 -define(WAIT_TIMEOUT, 1000).
 
+
+setup_all() ->
+    Ctx = test_util:start_couch(),
+    meck:new([test_index], [non_strict]),
+    Ctx.
+
+teardown_all(Ctx) ->
+    meck:unload(),
+    test_util:stop_couch(Ctx).
+
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
@@ -27,7 +37,6 @@ setup() ->
     {Db, IndexerPid}.
 
 fake_index(DbName) ->
-    ok = meck:new([test_index], [non_strict]),
     ok = meck:expect(test_index, init, ['_', '_'], {ok, 10}),
     ok = meck:expect(test_index, open, fun(_Db, State) ->
         {ok, State}
@@ -51,17 +60,19 @@ fake_index(DbName) ->
     end).
 
 teardown(_) ->
-    meck:unload(test_index).
+    ok.
 
 compaction_test_() ->
     {
         "Check compaction",
         {
             setup,
-            fun() -> test_util:start_couch([]) end, fun test_util:stop_couch/1,
+            fun setup_all/0,
+            fun teardown_all/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun hold_db_for_recompaction/1
                 ]

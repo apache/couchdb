@@ -27,7 +27,7 @@ defmodule ReshardAllDocsTest do
     assert docs == before_split_all_docs
 
     resp = post_job_node(db, node1)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     jobid = hd(resp.body)["id"]
     wait_job_completed(jobid)
 
@@ -44,7 +44,7 @@ defmodule ReshardAllDocsTest do
     assert docs == before_split_all_docs
 
     resp = post_job_range(db, "00000000-7fffffff")
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
 
     resp.body
     |> Enum.map(fn j -> j["id"] end)
@@ -61,7 +61,7 @@ defmodule ReshardAllDocsTest do
     docs = create_docs(range)
     w3 = %{:w => 3}
     resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs}, query: w3)
-    assert resp.status_code == 201
+    assert resp.status_code in [201, 202]
     assert length(resp.body) == length(docs)
 
     docs
