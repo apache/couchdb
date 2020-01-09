@@ -12,6 +12,7 @@ TEST_COLLECTIONS = {
     "EUnit": "src/**/.eunit/*.xml",
     "EXUnit": "_build/integration/lib/couchdbtest/*.xml",
     "Mango": "src/mango/*.xml",
+    "JavaScript": "test/javascript/*.xml"
 }
 
 
@@ -377,7 +378,7 @@ def main():
     args = parse_args()
 
     if not args.collection:
-        args.collection = ["eunit", "exunit", "mango"]
+        args.collection = ["eunit", "exunit", "mango", "javascript"]
 
     collections = []
     for (name, pattern) in TEST_COLLECTIONS.items():
