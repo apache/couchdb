@@ -297,7 +297,7 @@ should_terminate(Pid) ->
         Ref = erlang:monitor(process, Pid),
 
         RestartFun = fun() -> exit(EventMgr, kill) end,
-        test_util:with_process_restart(config_event, RestartFun),
+        {_, _} = test_util:with_process_restart(config_event, RestartFun),
 
         ?assertNot(is_process_alive(EventMgr)),
 
