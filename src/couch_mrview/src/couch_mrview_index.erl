@@ -127,6 +127,12 @@ open(Db, State0) ->
                     NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt};
+                {ok, {WrongSig, _}} ->
+                    couch_log:error("~s has the wrong signature: expected: ~p but got ~p",
+                        [IndexFName, Sig, WrongSig]),
+                    NewSt = couch_mrview_util:reset_index(Db, Fd, State),
+                    ensure_local_purge_doc(Db, NewSt),
+                    {ok, NewSt};
                 no_valid_header ->
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
