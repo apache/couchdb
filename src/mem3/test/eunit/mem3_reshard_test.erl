@@ -453,19 +453,15 @@ target_reset_in_initial_copy(#{db1 := Db}) ->
             job_state = running,
             split_state = initial_copy
         },
-        BogusParent = spawn(fun() -> receive {ack, _, _} -> ok end end),
-        put('$ancestors', [BogusParent]), % make prock_lib:ack not blow up
-        meck:expect(mem3_reshard, checkpoint, 2, ok),
         meck:expect(couch_db_split, cleanup_target, 2, ok),
         meck:expect(couch_server, exists, fun
             (<<"t1">>) -> true;
             (<<"t2">>) -> true;
             (DbName) -> meck:passthrough([DbName])
         end),
-        JobPid = spawn(fun() -> mem3_reshard_job:init(Job) end),
+        JobPid = spawn(fun() -> mem3_reshard_job:initial_copy_impl(Job) end),
         meck:wait(2, couch_db_split, cleanup_target, ['_', '_'], 5000),
         exit(JobPid, kill),
-        exit(BogusParent, kill),
         ?assertEqual(2, meck:num_calls(couch_db_split, cleanup_target, 2))
     end)}.
 
