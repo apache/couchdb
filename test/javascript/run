@@ -119,7 +119,6 @@ def write_junit(filename, total_time, results):
     doc.appendChild(root)
 
     for (path, rc, output, test_time) in results:
-        sys.stderr.write("WHUT? %r\n" % output)
         name = os.path.split(path)[-1]
         tc = doc.createElement("testcase")
         tc.setAttribute("name", name)
