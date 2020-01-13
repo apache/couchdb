@@ -565,7 +565,7 @@ init_state(Rep) ->
         options = Options,
         type = Type, view = View,
         start_time = StartTime,
-        stats = Stats
+        stats = ArgStats0
     } = Rep,
     % Adjust minimum number of http source connections to 2 to avoid deadlock
     Src = adjust_maxconn(Src0, BaseId),
@@ -580,6 +580,14 @@ init_state(Rep) ->
     [SourceLog, TargetLog] = find_and_migrate_logs([Source, Target], Rep),
 
     {StartSeq0, History} = compare_replication_logs(SourceLog, TargetLog),
+
+    ArgStats1 = couch_replicator_stats:new(ArgStats0),
+    HistoryStats = case History of
+        [{[_ | _] = HProps} | _] -> couch_replicator_stats:new(HProps);
+        _ -> couch_replicator_stats:new()
+    end,
+    Stats = couch_replicator_stats:max_stats(ArgStats1, HistoryStats),
+
     StartSeq1 = get_value(since_seq, Options, StartSeq0),
     StartSeq = {0, StartSeq1},
 
@@ -609,7 +617,7 @@ init_state(Rep) ->
                                         ?DEFAULT_CHECKPOINT_INTERVAL),
         type = Type,
         view = View,
-        stats = couch_replicator_stats:new(Stats)
+        stats = Stats
     },
     State#rep_state{timer = start_timer(State)}.
 
