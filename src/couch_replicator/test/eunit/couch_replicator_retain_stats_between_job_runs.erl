@@ -18,48 +18,93 @@
 
 -define(DELAY, 500).
 -define(TIMEOUT, 60000).
--define(i2l(I), integer_to_list(I)).
--define(io2b(Io), iolist_to_binary(Io)).
+
+
+setup_all() ->
+    test_util:start_couch([couch_replicator, chttpd, mem3, fabric]).
+
+
+teardown_all(Ctx) ->
+    ok = test_util:stop_couch(Ctx).
 
 
 setup() ->
-    Ctx = test_util:start_couch([couch_replicator, chttpd, mem3, fabric]),
     Source = setup_db(),
     Target = setup_db(),
-    {Ctx, {Source, Target}}.
+    {Source, Target}.
 
 
-teardown({Ctx, {Source, Target}}) ->
+teardown({Source, Target}) ->
     teardown_db(Source),
     teardown_db(Target),
-    ok = application:stop(couch_replicator),
-    ok = test_util:stop_couch(Ctx).
+    ok.
 
 
 stats_retained_test_() ->
     {
         setup,
-        fun setup/0,
-        fun teardown/1,
-        fun t_stats_retained/1
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                fun t_stats_retained_by_scheduler/1,
+                fun t_stats_retained_on_job_removal/1
+            ]
+        }
     }.
 
 
-t_stats_retained({_Ctx, {Source, Target}}) ->
+t_stats_retained_by_scheduler({Source, Target}) ->
     ?_test(begin
-        populate_db(Source, 42),
+        {ok, _} = add_vdu(Target),
+        populate_db_reject_even_docs(Source, 1, 10),
         {ok, RepPid, RepId} = replicate(Source, Target),
+        wait_target_in_sync(6, Target),
 
-        wait_target_in_sync(Source, Target),
-        check_active_tasks(42, 42),
-        check_scheduler_jobs(42, 42),
+        check_active_tasks(10, 5, 5),
+        check_scheduler_jobs(10, 5, 5),
 
         stop_job(RepPid),
-        check_scheduler_jobs(42, 42),
+        check_scheduler_jobs(10, 5, 5),
 
         start_job(),
-        check_active_tasks(42, 42),
-        check_scheduler_jobs(42, 42),
+        check_active_tasks(10, 5, 5),
+        check_scheduler_jobs(10, 5, 5),
+        couch_replicator_scheduler:remove_job(RepId)
+    end).
+
+
+t_stats_retained_on_job_removal({Source, Target}) ->
+    ?_test(begin
+        {ok, _} = add_vdu(Target),
+        populate_db_reject_even_docs(Source, 1, 10),
+        {ok, _, RepId} = replicate(Source, Target),
+        wait_target_in_sync(6, Target),  % 5 + 1 vdu
+
+        check_active_tasks(10, 5, 5),
+        check_scheduler_jobs(10, 5, 5),
+
+        couch_replicator_scheduler:remove_job(RepId),
+
+        populate_db_reject_even_docs(Source, 11, 20),
+        {ok, _, RepId} = replicate(Source, Target),
+        wait_target_in_sync(11, Target),  % 6 + 5
+
+        check_scheduler_jobs(20, 10, 10),
+        check_active_tasks(20, 10, 10),
+
+        couch_replicator_scheduler:remove_job(RepId),
+
+        populate_db_reject_even_docs(Source, 21, 30),
+        {ok, _, RepId} = replicate(Source, Target),
+        wait_target_in_sync(16, Target),  % 11 + 5
+
+        check_scheduler_jobs(30, 15, 15),
+        check_active_tasks(30, 15, 15),
+
         couch_replicator_scheduler:remove_job(RepId)
     end).
 
@@ -92,14 +137,16 @@ start_job() ->
     couch_replicator_scheduler:reschedule().
 
 
-check_active_tasks(DocsRead, DocsWritten) ->
+check_active_tasks(DocsRead, DocsWritten, DocsFailed) ->
     RepTask = wait_for_task_status(),
     ?assertNotEqual(timeout, RepTask),
     ?assertEqual(DocsRead, couch_util:get_value(docs_read, RepTask)),
-    ?assertEqual(DocsWritten, couch_util:get_value(docs_written, RepTask)).
+    ?assertEqual(DocsWritten, couch_util:get_value(docs_written, RepTask)),
+    ?assertEqual(DocsFailed, couch_util:get_value(doc_write_failures,
+        RepTask)).
 
 
-check_scheduler_jobs(DocsRead, DocsWritten) ->
+check_scheduler_jobs(DocsRead, DocsWritten, DocFailed) ->
     Info = wait_scheduler_info(),
     ?assert(maps:is_key(<<"changes_pending">>, Info)),
     ?assert(maps:is_key(<<"doc_write_failures">>, Info)),
@@ -110,7 +157,8 @@ check_scheduler_jobs(DocsRead, DocsWritten) ->
     ?assert(maps:is_key(<<"source_seq">>, Info)),
     ?assert(maps:is_key(<<"revisions_checked">>, Info)),
     ?assertMatch(#{<<"docs_read">> := DocsRead}, Info),
-    ?assertMatch(#{<<"docs_written">> := DocsWritten}, Info).
+    ?assertMatch(#{<<"docs_written">> := DocsWritten}, Info),
+    ?assertMatch(#{<<"doc_write_failures">> := DocFailed}, Info).
 
 
 replication_tasks() ->
@@ -138,25 +186,31 @@ wait_scheduler_info() ->
     end).
 
 
-populate_db(DbName, DocCount) ->
+populate_db_reject_even_docs(DbName, Start, End) ->
+    BodyFun = fun(Id) ->
+        case Id rem 2 == 0 of
+            true -> {[{<<"nope">>, true}]};
+            false -> {[]}
+        end
+    end,
+    populate_db(DbName, Start, End, BodyFun).
+
+
+populate_db(DbName, Start, End, BodyFun) when is_function(BodyFun, 1) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     Docs = lists:foldl(
         fun(DocIdCounter, Acc) ->
-            Id = ?io2b(["doc", ?i2l(DocIdCounter)]),
-            Doc = #doc{id = Id, body = {[]}},
+            Id = integer_to_binary(DocIdCounter),
+            Doc = #doc{id = Id, body = BodyFun(DocIdCounter)},
             [Doc | Acc]
         end,
-        [], lists:seq(1, DocCount)),
+        [], lists:seq(Start, End)),
     {ok, _} = couch_db:update_docs(Db, Docs, []),
     ok = couch_db:close(Db).
 
 
-wait_target_in_sync(Source, Target) ->
-    {ok, SourceDb} = couch_db:open_int(Source, []),
-    {ok, SourceInfo} = couch_db:get_db_info(SourceDb),
-    ok = couch_db:close(SourceDb),
-    SourceDocCount = couch_util:get_value(doc_count, SourceInfo),
-    wait_target_in_sync_loop(SourceDocCount, Target, 300).
+wait_target_in_sync(DocCount, Target) when is_integer(DocCount) ->
+    wait_target_in_sync_loop(DocCount, Target, 300).
 
 
 wait_target_in_sync_loop(_DocCount, _TargetName, 0) ->
@@ -170,7 +224,7 @@ wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
     {ok, TargetInfo} = couch_db:get_db_info(Target),
     ok = couch_db:close(Target),
     TargetDocCount = couch_util:get_value(doc_count, TargetInfo),
-    case TargetDocCount == DocCount of
+    case TargetDocCount  == DocCount of
         true ->
             true;
         false ->
@@ -201,3 +255,28 @@ scheduler_jobs() ->
     {ok, 200, _, Body} = test_request:get(Url, []),
     Json = jiffy:decode(Body, [return_maps]),
     maps:get(<<"jobs">>, Json).
+
+
+vdu() ->
+    <<"function(newDoc, oldDoc, userCtx) {
+        if(newDoc.nope === true) {
+            throw({forbidden: 'nope'});
+        } else {
+            return;
+        }
+    }">>.
+
+
+add_vdu(DbName) ->
+    DocProps = [
+        {<<"_id">>, <<"_design/vdu">>},
+        {<<"language">>, <<"javascript">>},
+        {<<"validate_doc_update">>, vdu()}
+    ],
+    Doc = couch_doc:from_json_obj({DocProps}, []),
+    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+    try
+        {ok, _Rev} = couch_db:update_doc(Db, Doc, [])
+    after
+        couch_db:close(Db)
+    end.
