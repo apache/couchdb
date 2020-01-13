@@ -405,8 +405,9 @@ handle_flush_docs_result({error, request_body_too_large}, Target, DocList) ->
         " request body is too large. Splitting batch into 2 separate batches of"
         " sizes ~p and ~p", [Len, couch_replicator_api_wrap:db_uri(Target),
         length(DocList1), length(DocList2)]),
-    flush_docs(Target, DocList1),
-    flush_docs(Target, DocList2);
+    Stats1 = flush_docs(Target, DocList1),
+    Stats2 = flush_docs(Target, DocList2),
+    couch_replicator_stats:sum_stats(Stats1, Stats2);
 handle_flush_docs_result({ok, Errors}, Target, DocList) ->
     DbUri = couch_replicator_api_wrap:db_uri(Target),
     lists:foreach(
