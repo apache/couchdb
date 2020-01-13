@@ -171,6 +171,15 @@ handle_info({'EXIT', Pid, normal}, #state{writer = nil} = State) ->
 handle_info({'EXIT', _Pid, max_backoff}, State) ->
     {stop, {shutdown, max_backoff}, State};
 
+handle_info({'EXIT', _Pid, {bulk_docs_failed, _, _} = Err}, State) ->
+    {stop, {shutdown, Err}, State};
+
+handle_info({'EXIT', _Pid, {revs_diff_failed, _, _} = Err}, State) ->
+    {stop, {shutdown, Err}, State};
+
+handle_info({'EXIT', _Pid, {http_request_failed, _, _, _} = Err}, State) ->
+    {stop, {shutdown, Err}, State};
+
 handle_info({'EXIT', Pid, Reason}, State) ->
    {stop, {process_died, Pid, Reason}, State}.
 
@@ -410,7 +419,9 @@ handle_flush_docs_result({ok, Errors}, Target, DocList) ->
     couch_replicator_stats:new([
         {docs_written, length(DocList) - length(Errors)},
         {doc_write_failures, length(Errors)}
-    ]).
+    ]);
+handle_flush_docs_result({error, {bulk_docs_failed, _, _} = Err}, _, _) ->
+    exit(Err).
 
 
 flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
@@ -449,7 +460,10 @@ find_missing(DocInfos, Target) ->
             end, {[], 0}, DocInfos),
 
 
-    {ok, Missing} = couch_replicator_api_wrap:get_missing_revs(Target, IdRevs),
+    Missing = case couch_replicator_api_wrap:get_missing_revs(Target, IdRevs) of
+        {ok, Result} -> Result;
+        {error, Error} -> exit(Error)
+    end,
     MissingRevsCount = lists:foldl(
         fun({_Id, MissingRevs, _PAs}, Acc) -> Acc + length(MissingRevs) end,
         0, Missing),

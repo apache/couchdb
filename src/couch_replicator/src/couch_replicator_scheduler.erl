@@ -317,8 +317,12 @@ handle_info({'DOWN', _Ref, process, Pid, normal}, State) ->
     update_running_jobs_stats(State#state.stats_pid),
     {noreply, State};
 
-handle_info({'DOWN', _Ref, process, Pid, Reason}, State) ->
+handle_info({'DOWN', _Ref, process, Pid, Reason0}, State) ->
     {ok, Job} = job_by_pid(Pid),
+    Reason = case Reason0 of
+        {shutdown, ShutdownReason} -> ShutdownReason;
+        Other -> Other
+    end,
     ok = handle_crashed_job(Job, Reason, State),
     {noreply, State};
 
@@ -872,7 +876,7 @@ is_continuous(#job{rep = Rep}) ->
 % optimize some options to help the job make progress.
 -spec maybe_optimize_job_for_rate_limiting(#job{}) -> #job{}.
 maybe_optimize_job_for_rate_limiting(Job = #job{history =
-    [{{crashed, {shutdown, max_backoff}}, _} | _]}) ->
+    [{{crashed, max_backoff}, _} | _]}) ->
     Opts = [
         {checkpoint_interval, 5000},
         {worker_processes, 2},
