@@ -8,6 +8,7 @@
 *~
 .venv
 .DS_Store
+.vscode
 .rebar/
 .eunit/
 cover/
