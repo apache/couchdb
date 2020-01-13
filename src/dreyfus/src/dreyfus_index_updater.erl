@@ -59,7 +59,7 @@ update(IndexPid, Index) ->
             true = proc_prompt(Proc, [<<"add_fun">>, Index#index.def]),
             EnumFun = fun ?MODULE:load_docs/2,
             [Changes] = couch_task_status:get([changes_done]),
-            Acc0 = {Changes, IndexPid, Db, Proc, TotalChanges, now(), ExcludeIdRevs},
+            Acc0 = {Changes, IndexPid, Db, Proc, TotalChanges, erlang:timestamp(), ExcludeIdRevs},
             {ok, _} = couch_db:fold_changes(Db, CurSeq, EnumFun, Acc0, []),
             ok = clouseau_rpc:commit(IndexPid, NewCurSeq)
         after
@@ -80,7 +80,7 @@ load_docs(FDI, {I, IndexPid, Db, Proc, Total, LastCommitTime, ExcludeIdRevs}=Acc
         false -> update_or_delete_index(IndexPid, Db, DI, Proc)
     end,
     %% Force a commit every minute
-    case timer:now_diff(Now = now(), LastCommitTime) >= 60000000 of
+    case timer:now_diff(Now = erlang:timestamp(), LastCommitTime) >= 60000000 of
         true ->
             ok = clouseau_rpc:commit(IndexPid, Seq),
             {ok, {I+1, IndexPid, Db, Proc, Total, Now, ExcludeIdRevs}};

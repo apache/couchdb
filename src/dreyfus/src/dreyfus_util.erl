@@ -342,7 +342,7 @@ get_signature_from_idxdir(IdxDir) ->
         false -> undefined
     end.
 
-get_local_purge_doc_body(Db, LocalDocId, PurgeSeq, Index) ->
+get_local_purge_doc_body(_, LocalDocId, PurgeSeq, Index) ->
     #index{
         name = IdxName,
         ddoc_id = DDocId,

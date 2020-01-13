@@ -73,8 +73,6 @@ handle_search_req(#httpd{method=Method, path_parts=[_, _, _, _, IndexName]}=Req
             end;
         _ ->
             % ensure limit in group query >0
-            LimitValue = parse_positive_int_param("limit", QueryArgs#index_query_args.limit,
-                                                  "max_limit", "200"),
             UseNewApi = Grouping#grouping.new_api,
             case dreyfus_fabric_group1:go(DbName, DDoc, IndexName, QueryArgs) of
                 {ok, []} ->
