@@ -186,7 +186,9 @@ get_missing_revs(#httpdb{} = Db, IdRevs) ->
                 ),
                 {Id, MissingRevs, PossibleAncestors}
             end,
-            {ok, lists:map(ConvertToNativeFun, Props)}
+            {ok, lists:map(ConvertToNativeFun, Props)};
+        (ErrCode, _, ErrMsg) when is_integer(ErrCode) ->
+            {error, {revs_diff_failed, ErrCode, ErrMsg}}
         end).
 
 
@@ -408,7 +410,9 @@ update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
            (413, _, _) ->
                 {error, request_body_too_large};
            (417, _, Results) when is_list(Results) ->
-                {ok, bulk_results_to_errors(DocList, Results, remote)}
+                {ok, bulk_results_to_errors(DocList, Results, remote)};
+           (ErrCode, _, ErrMsg) when is_integer(ErrCode) ->
+                {error, {bulk_docs_failed, ErrCode, ErrMsg}}
         end).
 
 
@@ -466,7 +470,9 @@ changes_since(#httpdb{headers = Headers1, timeout = InactiveTimeout} = HttpDb,
                             end,
                             parse_changes_feed(Options, UserFun2,
                                 DataStreamFun2)
-                        end)
+                        end);
+                 (ErrCode, _, ErrMsg) when is_integer(ErrCode) ->
+                    throw({retry_limit, {changes_req_failed, ErrCode, ErrMsg}})
             end)
     catch
         exit:{http_request_failed, _, _, max_backoff} ->
