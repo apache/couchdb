@@ -416,6 +416,9 @@ main(int argc, const char* argv[])
     if(cx == NULL)
         return 1;
 
+    JS_SetGlobalJitCompilerOption(cx, JSJITCOMPILER_BASELINE_ENABLE, 0);
+    JS_SetGlobalJitCompilerOption(cx, JSJITCOMPILER_ION_ENABLE, 0);
+
     if (!JS::InitSelfHostedCode(cx))
         return 1;
 
