@@ -146,7 +146,10 @@ and logged.
 
 ```ini
 [tracing.filters]
+; trace all events
 ; all = (#{}) -> true
+; trace all events with X-B3-... headers
+; all = (#{external := External}) when External == true -> true
 ; database-info.read = (#{'http.method' := Method}) when Method == 'GET' -> true
 ; view.build = (#{'view.name' := Name}) when Name == "foo" -> 0.25
 ```
