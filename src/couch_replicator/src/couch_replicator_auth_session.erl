@@ -461,7 +461,7 @@ parse_cookie(Headers0) ->
             CaseInsKVs = mochiweb_headers:make(CookieKVs),
             case mochiweb_headers:get_value("AuthSession", CaseInsKVs) of
                 undefined ->
-                    {error, cookie_format_invalid};
+                    {error, cookie_not_found};
                 Cookie ->
                     MaxAge = parse_max_age(CaseInsKVs),
                     {ok, MaxAge, Cookie}
@@ -646,6 +646,7 @@ cookie_update_test_() ->
                 t_process_auth_failure_stale_epoch(),
                 t_process_auth_failure_too_frequent(),
                 t_process_ok_update_cookie(),
+                t_process_ok_ignore_other_cookies(),
                 t_process_ok_no_cookie(),
                 t_init_state_fails_on_401(),
                 t_init_state_401_with_require_valid_user(),
@@ -728,6 +729,17 @@ t_process_ok_update_cookie() ->
         State = #state{cookie = "xyz", refresh_tstamp = 42, epoch = 2},
         Res2 = process_response(200, Headers, 1, State),
         ?assertMatch({continue, #state{cookie = "xyz", epoch = 2}}, Res2)
+    end).
+
+
+t_process_ok_ignore_other_cookies() ->
+    ?_test(begin
+        Headers = [{"set-CookiE", "Other=xyz; Path=/;"}, {"X", "y"}],
+        Res = process_response(200, Headers, 1, #state{}),
+        ?assertMatch({continue, #state{cookie = undefined, epoch = 0}}, Res),
+        State = #state{cookie = "mycookie", epoch = 5},
+        Res2 = process_response(200, Headers, 1, State),
+        ?assertMatch({continue, #state{cookie = "mycookie", epoch = 5}}, Res2)
     end).
 
 
