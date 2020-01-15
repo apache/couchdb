@@ -19,7 +19,7 @@
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--export([get_shards/2, sort/2, upgrade/1, export/1, time/2]).
+-export([get_shards/2, get_ring_opts/2, sort/2, upgrade/1, export/1, time/2]).
 -export([in_black_list/1, in_black_list/3, maybe_deny_index/3]).
 -export([get_design_docid/1]).
 -export([
@@ -58,6 +58,15 @@ use_ushards(#index_query_args{stable=true}) ->
     true;
 use_ushards(#index_query_args{}) ->
     false.
+
+
+get_ring_opts(#index_query_args{partition = nil}, _Shards) ->
+    [];
+get_ring_opts(#index_query_args{}, Shards) ->
+    Shards1 = lists:map(fun(#shard{} = S) ->
+        S#shard{ref = undefined}
+    end, Shards),
+    [{any, Shards1}].
 
 -spec sort(Order :: relevance | [any()], [#sortable{}]) -> [#sortable{}].
 sort(Sort, List0) ->
@@ -417,5 +426,16 @@ stash_test() ->
     ?assert(is_reference(First#sortable.item)),
     Unstashed = hd(unstash_items(Stashed, Stash)),
     ?assertEqual(Unstashed#sortable.item, bar).
+
+
+ring_opts_test() ->
+    Shards = [#shard{name = foo, ref = make_ref()}],
+
+    QArgs1 = #index_query_args{partition = nil},
+    ?assertEqual([], get_ring_opts(QArgs1, Shards)),
+
+    QArgs2 = #index_query_args{partition = <<"x">>},
+    ?assertMatch([{any, [#shard{name = foo, ref = undefined}]}],
+        get_ring_opts(QArgs2, Shards)).
 
 -endif.

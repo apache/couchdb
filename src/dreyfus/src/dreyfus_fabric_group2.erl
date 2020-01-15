@@ -29,7 +29,8 @@
     top_groups,
     counters,
     start_args,
-    replacements
+    replacements,
+    ring_opts
 }).
 
 go(DbName, GroupId, IndexName, QueryArgs) when is_binary(GroupId) ->
@@ -41,6 +42,7 @@ go(DbName, DDoc, IndexName, #index_query_args{}=QueryArgs) ->
     DesignName = dreyfus_util:get_design_docid(DDoc),
     dreyfus_util:maybe_deny_index(DbName, DesignName, IndexName),
     Shards = dreyfus_util:get_shards(DbName, QueryArgs),
+    RingOpts = dreyfus_util:get_ring_opts(QueryArgs, Shards),
     Workers = fabric_util:submit_jobs(Shards, dreyfus_rpc, group2,
                           [DDoc, IndexName, dreyfus_util:export(QueryArgs)]),
     Replacements = fabric_view:get_shard_replacements(DbName, Workers),
@@ -54,7 +56,8 @@ go(DbName, DDoc, IndexName, #index_query_args{}=QueryArgs) ->
         top_groups = [],
         counters = Counters,
         start_args = [DDoc, IndexName, QueryArgs],
-        replacements = Replacements
+        replacements = Replacements,
+        ring_opts = RingOpts
     },
     try
         rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
@@ -102,7 +105,7 @@ handle_message(Error, Worker, State0) ->
     State = upgrade_state(State0),
     case dreyfus_fabric:handle_error_message(Error, Worker,
       State#state.counters, State#state.replacements,
-      group2, State#state.start_args) of
+      group2, State#state.start_args, State#state.ring_opts) of
         {ok, Counters} ->
             {ok, State#state{counters=Counters}};
         {new_refs, NewRefs, NewCounters, NewReplacements} ->
