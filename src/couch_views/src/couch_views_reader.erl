@@ -183,7 +183,7 @@ mrargs_to_fdb_options(Args) ->
 
     [
         {dir, Direction},
-        {limit, Limit * 2 + Skip * 2},
+        {limit, Limit + Skip},
         {streaming_mode, want_all}
     ] ++ StartKeyOpts ++ EndKeyOpts.
 

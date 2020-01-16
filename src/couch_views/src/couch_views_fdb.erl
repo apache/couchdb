@@ -95,31 +95,14 @@ fold_map_idx(TxDb, Sig, ViewId, Options, Callback, Acc0) ->
     MapIdxPrefix = map_idx_prefix(DbPrefix, Sig, ViewId),
     FoldAcc = #{
         prefix => MapIdxPrefix,
-        sort_key => undefined,
-        docid => undefined,
-        dupe_id => undefined,
         callback => Callback,
         acc => Acc0
-    },
-
-    {Fun, Acc} = case fabric2_util:get_value(dir, Options, fwd) of
-        fwd ->
-            FwdAcc = FoldAcc#{
-                next => key,
-                key => undefined
-            },
-            {fun fold_fwd/2, FwdAcc};
-        rev ->
-            RevAcc = FoldAcc#{
-                next => value,
-                value => undefined
-            },
-            {fun fold_rev/2, RevAcc}
-    end,
+        },
+    Fun = fun fold_fwd/2,
 
     #{
         acc := Acc1
-    } = fabric2_fdb:fold_range(TxDb, MapIdxPrefix, Fun, Acc, Options),
+    } = fabric2_fdb:fold_range(TxDb, MapIdxPrefix, Fun, FoldAcc, Options),
 
     Acc1.
 
@@ -169,110 +152,34 @@ write_doc(TxDb, Sig, ViewIds, Doc) ->
     end, lists:zip(ViewIds, Results)).
 
 
-% For each row in a map view there are two rows stored in
-% FoundationDB:
+% For each row in a map view we store the the key/value
+% in FoundationDB:
 %
-%   `(EncodedSortKey, EncodedKey)`
-%   `(EncodedSortKey, EncodedValue)`
+%   `(EncodedSortKey, (EncodedKey, EncodedValue))`
 %
 % The difference between `EncodedSortKey` and `EndcodedKey` is
 % the use of `couch_util:get_sort_key/1` which turns UTF-8
 % strings into binaries that are byte comparable. Given a sort
 % key binary we cannot recover the input so to return unmodified
 % user data we are forced to store the original.
-%
-% These two fold functions exist so that we can be fairly
-% forceful on our assertions about which rows to see. Since
-% when we're folding forward we'll see the key first. When
-% `descending=true` and we're folding in reverse we'll see
-% the value first.
 
-fold_fwd({RowKey, EncodedOriginalKey}, #{next := key} = Acc) ->
-    #{
-        prefix := Prefix
-    } = Acc,
-
-    {{SortKey, DocId}, DupeId, ?VIEW_ROW_KEY} =
-            erlfdb_tuple:unpack(RowKey, Prefix),
-    Acc#{
-        next := value,
-        key := couch_views_encoding:decode(EncodedOriginalKey),
-        sort_key := SortKey,
-        docid := DocId,
-        dupe_id := DupeId
-    };
-
-fold_fwd({RowKey, EncodedValue}, #{next := value} = Acc) ->
+fold_fwd({RowKey, PackedKeyValue}, Acc) ->
     #{
         prefix := Prefix,
-        key := Key,
-        sort_key := SortKey,
-        docid := DocId,
-        dupe_id := DupeId,
         callback := UserCallback,
         acc := UserAcc0
     } = Acc,
 
-    % We're asserting there that this row is paired
-    % correctly with the previous row by relying on
-    % a badmatch if any of these values don't match.
-    {{SortKey, DocId}, DupeId, ?VIEW_ROW_VALUE} =
+    {{_SortKey, DocId}, _DupeId} =
             erlfdb_tuple:unpack(RowKey, Prefix),
 
+    {EncodedOriginalKey, EncodedValue} = erlfdb_tuple:unpack(PackedKeyValue),
     Value = couch_views_encoding:decode(EncodedValue),
-    UserAcc1 = UserCallback(DocId, Key, Value, UserAcc0),
-
-    Acc#{
-        next := key,
-        key := undefined,
-        sort_key := undefined,
-        docid := undefined,
-        dupe_id := undefined,
-        acc := UserAcc1
-    }.
-
-
-fold_rev({RowKey, EncodedValue}, #{next := value} = Acc) ->
-    #{
-        prefix := Prefix
-    } = Acc,
-
-    {{SortKey, DocId}, DupeId, ?VIEW_ROW_VALUE} =
-            erlfdb_tuple:unpack(RowKey, Prefix),
-    Acc#{
-        next := key,
-        value := couch_views_encoding:decode(EncodedValue),
-        sort_key := SortKey,
-        docid := DocId,
-        dupe_id := DupeId
-    };
-
-fold_rev({RowKey, EncodedOriginalKey}, #{next := key} = Acc) ->
-    #{
-        prefix := Prefix,
-        value := Value,
-        sort_key := SortKey,
-        docid := DocId,
-        dupe_id := DupeId,
-        callback := UserCallback,
-        acc := UserAcc0
-    } = Acc,
-
-    % We're asserting there that this row is paired
-    % correctly with the previous row by relying on
-    % a badmatch if any of these values don't match.
-    {{SortKey, DocId}, DupeId, ?VIEW_ROW_KEY} =
-            erlfdb_tuple:unpack(RowKey, Prefix),
-
     Key = couch_views_encoding:decode(EncodedOriginalKey),
+
     UserAcc1 = UserCallback(DocId, Key, Value, UserAcc0),
 
     Acc#{
-        next := value,
-        value := undefined,
-        sort_key := undefined,
-        docid := undefined,
-        dupe_id := undefined,
         acc := UserAcc1
     }.
 
@@ -330,11 +237,10 @@ update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows) ->
     KVsToAdd = process_rows(NewRows),
     MapIdxPrefix = map_idx_prefix(DbPrefix, Sig, ViewId),
 
-    lists:foreach(fun({DupeId, Key1, Key2, Val}) ->
-        KK = map_idx_key(MapIdxPrefix, {Key1, DocId}, DupeId, ?VIEW_ROW_KEY),
-        VK = map_idx_key(MapIdxPrefix, {Key1, DocId}, DupeId, ?VIEW_ROW_VALUE),
-        ok = erlfdb:set(Tx, KK, Key2),
-        ok = erlfdb:set(Tx, VK, Val)
+    lists:foreach(fun({DupeId, Key1, Key2, EV}) ->
+        KK = map_idx_key(MapIdxPrefix, {Key1, DocId}, DupeId),
+        Val = erlfdb_tuple:pack({Key2, EV}),
+        ok = erlfdb:set(Tx, KK, Val)
     end, KVsToAdd).
 
 
@@ -400,8 +306,8 @@ map_idx_prefix(DbPrefix, Sig, ViewId) ->
     erlfdb_tuple:pack(Key, DbPrefix).
 
 
-map_idx_key(MapIdxPrefix, MapKey, DupeId, Type) ->
-    Key = {MapKey, DupeId, Type},
+map_idx_key(MapIdxPrefix, MapKey, DupeId) ->
+    Key = {MapKey, DupeId},
     erlfdb_tuple:pack(Key, MapIdxPrefix).
 
 

@@ -19,8 +19,5 @@
 -define(VIEW_ROW_COUNT, 0).
 -define(VIEW_KV_SIZE, 1).
 
--define(VIEW_ROW_KEY, 0).
--define(VIEW_ROW_VALUE, 1).
-
 % jobs api
 -define(INDEX_JOB_TYPE, <<"views">>).
