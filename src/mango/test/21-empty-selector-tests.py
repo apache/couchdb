@@ -63,7 +63,7 @@ class EmptySelectorNoIndexTests(
 ):
     pass
 
-
+@unittest.skipUnless(mango.has_text_service(), "requires text service")
 class EmptySelectorTextTests(make_empty_selector_suite(mango.UserDocsTextTests)):
     pass
 
