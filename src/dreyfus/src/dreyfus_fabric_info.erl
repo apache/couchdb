@@ -49,7 +49,7 @@ handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Worker, {Counters, Acc}) ->
 
 handle_message({rexi_EXIT, Reason}, Worker, {Counters, Acc}) ->
     NewCounters = fabric_dict:erase(Worker, Counters),
-    case fabric_view:is_progress_possible(NewCounters) of
+    case fabric_ring:is_progress_possible(NewCounters) of
     true ->
         {ok, {NewCounters, Acc}};
     false ->
@@ -74,7 +74,7 @@ handle_message({ok, Info}, Worker, {Counters, Acc}) ->
 
 handle_message({error, Reason}, Worker, {Counters, Acc}) ->
     NewCounters = fabric_dict:erase(Worker, Counters),
-    case fabric_view:is_progress_possible(NewCounters) of
+    case fabric_ring:is_progress_possible(NewCounters) of
     true ->
         {ok, {NewCounters, Acc}};
     false ->
@@ -82,7 +82,7 @@ handle_message({error, Reason}, Worker, {Counters, Acc}) ->
     end;
 handle_message({'EXIT', _}, Worker, {Counters, Acc}) ->
     NewCounters = fabric_dict:erase(Worker, Counters),
-    case fabric_view:is_progress_possible(NewCounters) of
+    case fabric_ring:is_progress_possible(NewCounters) of
     true ->
         {ok, {NewCounters, Acc}};
     false ->
