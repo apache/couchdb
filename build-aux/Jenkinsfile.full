@@ -478,7 +478,7 @@ pipeline {
           }
           environment {
             platform = 'buster'
-            sm_ver = '60'
+            sm_ver = '1.8.5'
           }
           stages {
             stage('Build from tarball & test') {
