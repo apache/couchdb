@@ -294,7 +294,7 @@ get_group_level_endkey(TxDb, GroupLevel, Level, StartKey, Reverse,
     wait_and_get_key(Future);
 
 get_group_level_endkey(_TxDb, _GroupLevel, _Level, Key, _Reverse,
-    _ReduceIdxPrefix) ->
+        _ReduceIdxPrefix) ->
     Key.
 
 

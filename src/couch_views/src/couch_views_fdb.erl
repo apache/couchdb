@@ -187,7 +187,7 @@ write_doc(TxDb, Sig, Views, Doc) ->
 
 
 update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ExistingKeys,
-    ViewReduceResult) ->
+        ViewReduceResult) ->
     lists:foreach(fun({ViewReduceFun, ReduceResult}) ->
         {_, ReduceFun} = ViewReduceFun,
         ReduceId = couch_views_util:reduce_id(ViewId, ReduceFun),

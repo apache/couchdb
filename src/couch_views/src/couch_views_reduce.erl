@@ -106,7 +106,8 @@ read_reduce_int(Db, Sig, ViewId, Reducer, GroupLevel, Acc0, Opts,
             callback := UserCallback,
             user_acc := UserAcc1
         } = Acc1,
-        {ok, maybe_stop(UserCallback(complete, UserAcc1))}
+        UserAcc2 = maybe_stop(UserCallback(complete, UserAcc1)),
+        {ok, UserAcc2}
     catch
         throw:reduce_transaction_ended ->
             {ContinueStartKey, Acc} = get(reduce_acc),
@@ -140,25 +141,19 @@ args_to_skiplist_opts(#mrargs{} = Args) ->
             StartKey
     end,
 
-    EndKey1 = case EndKey of
-        undefined ->
-            undefined;
-        EndKey ->
-            EndKey
-    end,
-
+    Reverse = Direction == rev,
     % CouchDB swaps the key meanings based on the direction
     % of the fold. FoundationDB does not so we have to
     % swap back here.
-    {StartKey2, EndKey2} = case Direction == rev of
-        true -> {EndKey1, StartKey1};
-        false -> {StartKey1, EndKey1}
+    {StartKey2, EndKey2} = case Reverse of
+        true -> {EndKey, StartKey1};
+        false -> {StartKey1, EndKey}
     end,
 
     #{
         startkey => StartKey2,
         endkey => EndKey2,
-        reverse => Direction == rev,
+        reverse => Reverse,
         inclusive_end => InclusiveEnd
     }.
 

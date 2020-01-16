@@ -40,9 +40,11 @@
 -define(BUILTIN_STATS, <<"_stats", _/binary>>).
 -define(BUILTIN_COUNT_DISTINCT, <<"_approx_count_distinct", _/binary>>).
 
+-define(HYPER_PRECISION, 11).
+
 
 start_value(<<"_approx_count_distinct">>) ->
-    hyper:new(11);
+    hyper:new(?HYPER_PRECISION);
 
 start_value(_) ->
     0.
@@ -105,7 +107,7 @@ reduce(?BUILTIN_COUNT_DISTINCT, Results) ->
             true ->
                 maps:get(Key, Acc);
             false ->
-                hyper:new(11)
+                hyper:new(?HYPER_PRECISION)
         end,
         Acc#{Key => hyper:insert(EK, Filter)}
     end, #{}, Results),

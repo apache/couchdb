@@ -1303,8 +1303,7 @@ get_fold_opts(RangePrefix, Options) ->
             <<RangePrefix/binary, 16#00>>;
         SK2 ->
             SK3 = if AddTuple == false -> SK2; true -> {SK2} end,
-            Out = erlfdb_tuple:pack(SK3, RangePrefix),
-            Out
+            erlfdb_tuple:pack(SK3, RangePrefix)
     end,
 
     EndKey2 = case EndKey1 of
