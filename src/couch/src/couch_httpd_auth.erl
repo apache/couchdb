@@ -88,6 +88,11 @@ basic_name_pw(Req) ->
 default_authentication_handler(Req) ->
     default_authentication_handler(Req, couch_auth_cache).
 
+default_authentication_handler(#httpd{path_parts=[<<"_up">>]}=Req, AuthModule) ->
+    case config:get_boolean("chttpd", "require_valid_user_except_for_up", false) of
+        true -> Req#httpd{user_ctx=?ADMIN_USER};
+        _False -> default_authentication_handler(Req, AuthModule)
+    end;
 default_authentication_handler(Req, AuthModule) ->
     case basic_name_pw(Req) of
     {User, Pass} ->
@@ -268,7 +273,7 @@ cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
     Hash = crypto:hmac(sha, Secret, SessionData),
     mochiweb_cookies:cookie("AuthSession",
         couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
-        [{path, "/"}] ++ cookie_scheme(Req) ++ max_age() ++ cookie_domain()).
+        [{path, "/"}] ++ cookie_scheme(Req) ++ max_age() ++ cookie_domain() ++ same_site()).
 
 ensure_cookie_auth_secret() ->
     case config:get("couch_httpd_auth", "secret", undefined) of
@@ -451,6 +456,20 @@ cookie_domain() ->
         "" -> [];
         _ -> [{domain, Domain}]
     end.
+
+
+same_site() ->
+    SameSite = config:get("couch_httpd_auth", "same_site", ""),
+    case string:to_lower(SameSite) of
+        "" -> [];
+        "none" -> [{same_site, none}];
+        "lax" -> [{same_site, lax}];
+        "strict" -> [{same_site, strict}];
+        _ ->
+            couch_log:error("invalid config value couch_httpd_auth.same_site: ~p ",[SameSite]),
+            []
+    end.
+
 
 reject_if_totp(User) ->
     case get_totp_config(User) of

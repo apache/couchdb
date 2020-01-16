@@ -994,7 +994,7 @@ upgrade_purge_info(Fd, Header) ->
                 _ ->
                     {ok, PurgedIdsRevs} = couch_file:pread_term(Fd, Ptr),
 
-                    {Infos, NewSeq} = lists:foldl(fun({Id, Revs}, {InfoAcc, PSeq}) ->
+                    {Infos, _} = lists:foldl(fun({Id, Revs}, {InfoAcc, PSeq}) ->
                         Info = {PSeq, couch_uuids:random(), Id, Revs},
                         {[Info | InfoAcc], PSeq + 1}
                     end, {[], PurgeSeq}, PurgedIdsRevs),

@@ -17,7 +17,8 @@
     new/1,
     get/2,
     increment/2,
-    sum_stats/2
+    sum_stats/2,
+    max_stats/2
 ]).
 
 -export([
@@ -64,14 +65,29 @@ increment(Field, Stats) ->
 sum_stats(S1, S2) ->
     orddict:merge(fun(_, V1, V2) -> V1+V2 end, S1, S2).
 
+max_stats(S1, S2) ->
+    orddict:merge(fun(_, V1, V2) -> max(V1, V2) end, S1, S2).
 
-% Handle initializing from a status object which uses same values but different
-% field names.
-fmap({revisions_checked, V})       -> {true, {missing_checked, V}};
-fmap({missing_revisions_found, V}) -> {true, {missing_found, V}};
-fmap({missing_checked, _})         -> true;
-fmap({missing_found, _})           -> true;
-fmap({docs_read, _})               -> true;
-fmap({docs_written, _})            -> true;
-fmap({doc_write_failures, _})      -> true;
-fmap({_, _})                       -> false.
+
+% Handle initializing from a status object, which uses same values but
+% different field names, as well as from ejson props from the checkpoint
+% history
+%
+fmap({missing_found, _})             -> true;
+fmap({missing_revisions_found, V})   -> {true, {missing_found, V}};
+fmap({<<"missing_found">>, V})       -> {true, {missing_found, V}};
+
+fmap({missing_checked, _})           -> true;
+fmap({revisions_checked, V})         -> {true, {missing_checked, V}};
+fmap({<<"missing_checked">>, V})     -> {true, {missing_checked, V}};
+
+fmap({docs_read, _})                 -> true;
+fmap({<<"docs_read">>, V})           -> {true, {docs_read, V}};
+
+fmap({docs_written, _})              -> true;
+fmap({<<"docs_written">>, V})        -> {true, {docs_written, V}};
+
+fmap({doc_write_failures, _})        -> true;
+fmap({<<"doc_write_failures">>, V})  -> {true, {doc_write_failures, V}};
+
+fmap({_, _})                         -> false.

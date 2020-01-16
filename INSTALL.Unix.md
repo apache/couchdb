@@ -39,7 +39,10 @@ You should have the following installed:
  * Erlang OTP (>=R16B03-1, =<19.x) (http://erlang.org/)
  * ICU                          (http://icu-project.org/)
  * OpenSSL                      (http://www.openssl.org/)
- * Mozilla SpiderMonkey (1.8.5) (https://developer.mozilla.org/en/docs/Mozilla/Projects/SpiderMonkey/Releases/1.8.5)
+ * Mozilla SpiderMonkey - either 1.8.5 or 60
+   * 60 is not supported on ARM 64-bit (aarch64) at this time.
+   * https://developer.mozilla.org/en/docs/Mozilla/Projects/SpiderMonkey/Releases/1.8.5
+   * https://archive.mozilla.org/pub/firefox/releases/60.9.0esr/source/ (src/js)
  * GNU Make                     (http://www.gnu.org/software/make/)
  * GNU Compiler Collection      (http://gcc.gnu.org/)
  * libcurl                      (http://curl.haxx.se/libcurl/)

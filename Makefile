@@ -173,16 +173,7 @@ eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
-            tries=0; \
-            while true; do \
-                COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir ; \
-                if [ $$? -eq 0 ]; then \
-                    break; \
-                else \
-                    tries=$$((tries+1)); \
-                    [ $$tries -gt 2 ] && exit 1; \
-                fi \
-            done \
+            COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
         done
 
 
@@ -224,7 +215,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run rel/overlay/bin/couchup test/javascript/run
+		. dev/run test/javascript/run
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -232,7 +223,7 @@ python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run rel/overlay/bin/couchup test/javascript/run
+		. dev/run test/javascript/run
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
@@ -304,6 +295,12 @@ endif
 				'test/javascript/run --suites "$(suites)" \
 				--ignore "$(ignore_js_suites)"'  \
 	done
+
+.PHONY: build-report
+# target: build-report - Generate and upload a build report
+build-report:
+	build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log
+	build-aux/logfile-uploader.py
 
 .PHONY: check-qs
 # target: check-qs - Run query server tests (ruby and rspec required!)

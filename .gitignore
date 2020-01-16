@@ -8,6 +8,7 @@
 *~
 .venv
 .DS_Store
+.vscode
 .rebar/
 .eunit/
 cover/
@@ -111,6 +112,7 @@ src/global_changes/ebin/
 src/mango/ebin/
 src/mango/test/*.pyc
 src/mango/venv/
+test/javascript/junit.xml
 
 /_build/
 /src/bunt

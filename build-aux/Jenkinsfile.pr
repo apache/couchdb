@@ -23,7 +23,7 @@ tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
 . /usr/local/kerl/${KERL_VER}/activate
 ./configure --with-curl --spidermonkey-version 60
-make check || (build-aux/logfile-uploader.py && false)
+make check || (make build-report && false)
 '''
 
 pipeline {
@@ -133,7 +133,7 @@ pipeline {
             }
             post {
               always {
-                junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml'
+                junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
               }
               cleanup {
                 sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR}'

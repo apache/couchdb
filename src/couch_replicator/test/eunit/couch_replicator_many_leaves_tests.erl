@@ -22,7 +22,8 @@
 
 -define(DOCS_CONFLICTS, [
     {<<"doc1">>, 10},
-    {<<"doc2">>, 100},
+    % use some _design docs as well to test the special handling for them
+    {<<"_design/doc2">>, 100},
     % a number > MaxURLlength (7000) / length(DocRevisionString)
     {<<"doc3">>, 210}
 ]).
@@ -111,13 +112,13 @@ should_add_attachments_to_source({remote, Source}) ->
     should_add_attachments_to_source(Source);
 should_add_attachments_to_source(Source) ->
     {timeout, ?TIMEOUT_EUNIT, ?_test(begin
-        {ok, SourceDb} = couch_db:open_int(Source, []),
+        {ok, SourceDb} = couch_db:open_int(Source, [?ADMIN_CTX]),
         add_attachments(SourceDb, ?NUM_ATTS, ?DOCS_CONFLICTS),
         ok = couch_db:close(SourceDb)
     end)}.
 
 populate_db(DbName) ->
-    {ok, Db} = couch_db:open_int(DbName, []),
+    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     lists:foreach(
        fun({DocId, NumConflicts}) ->
             Value = <<"0">>,
@@ -125,7 +126,7 @@ populate_db(DbName) ->
                 id = DocId,
                 body = {[ {<<"value">>, Value} ]}
             },
-            {ok, _} = couch_db:update_doc(Db, Doc, []),
+            {ok, _} = couch_db:update_doc(Db, Doc, [?ADMIN_CTX]),
             {ok, _} = add_doc_siblings(Db, DocId, NumConflicts)
         end, ?DOCS_CONFLICTS),
     couch_db:close(Db).

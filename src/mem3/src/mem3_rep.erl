@@ -749,7 +749,6 @@ targets_map(#shard{name = <<"shards/", _/binary>> = SrcName} = Src,
     Shards0 = mem3:shards(mem3:dbname(SrcName)),
     Shards1 = [S || S <- Shards0, not shard_eq(S, Src)],
     Shards2 = [S || S <- Shards1, check_overlap(SrcRange, TgtNode, S)],
-    TMap = maps:from_list([{R, S} || #shard{range = R} = S <- Shards2]),
     case [{R, S} || #shard{range = R} = S <- Shards2] of
         [] ->
             % If target map is empty, create a target map with just

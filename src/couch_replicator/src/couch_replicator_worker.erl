@@ -28,8 +28,6 @@
 
 % TODO: maybe make both buffer max sizes configurable
 -define(DOC_BUFFER_BYTE_SIZE, 512 * 1024).   % for remote targets
--define(MAX_BULK_ATT_SIZE, 64 * 1024).
--define(MAX_BULK_ATTS_PER_DOC, 8).
 -define(STATS_DELAY, 10000000).              % 10 seconds (in microseconds)
 -define(MISSING_DOC_RETRY_MSEC, 2000).
 
@@ -171,6 +169,15 @@ handle_info({'EXIT', Pid, normal}, #state{writer = nil} = State) ->
 handle_info({'EXIT', _Pid, max_backoff}, State) ->
     {stop, {shutdown, max_backoff}, State};
 
+handle_info({'EXIT', _Pid, {bulk_docs_failed, _, _} = Err}, State) ->
+    {stop, {shutdown, Err}, State};
+
+handle_info({'EXIT', _Pid, {revs_diff_failed, _, _} = Err}, State) ->
+    {stop, {shutdown, Err}, State};
+
+handle_info({'EXIT', _Pid, {http_request_failed, _, _, _} = Err}, State) ->
+    {stop, {shutdown, Err}, State};
+
 handle_info({'EXIT', Pid, Reason}, State) ->
    {stop, {process_died, Pid, Reason}, State}.
 
@@ -271,16 +278,28 @@ fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
     end.
 
 
-remote_doc_handler({ok, #doc{atts = []} = Doc}, {Parent, _} = Acc) ->
-    ok = gen_server:call(Parent, {batch_doc, Doc}, infinity),
-    {ok, Acc};
-remote_doc_handler({ok, Doc}, {Parent, Target} = Acc) ->
+remote_doc_handler({ok, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc},
+        Acc) ->
+    % Flush design docs in their own PUT requests to correctly process
+    % authorization failures for design doc updates.
+    couch_log:debug("Worker flushing design doc", []),
+    doc_handler_flush_doc(Doc, Acc);
+remote_doc_handler({ok, #doc{atts = [_ | _]} = Doc}, Acc) ->
     % Immediately flush documents with attachments received from a remote
     % source. The data property of each attachment is a function that starts
     % streaming the attachment data from the remote source, therefore it's
     % convenient to call it ASAP to avoid ibrowse inactivity timeouts.
-    Stats = couch_replicator_stats:new([{docs_read, 1}]),
     couch_log:debug("Worker flushing doc with attachments", []),
+    doc_handler_flush_doc(Doc, Acc);
+remote_doc_handler({ok, #doc{atts = []} = Doc}, {Parent, _} = Acc) ->
+    ok = gen_server:call(Parent, {batch_doc, Doc}, infinity),
+    {ok, Acc};
+remote_doc_handler({{not_found, missing}, _}, _Acc) ->
+    throw(missing_doc).
+
+
+doc_handler_flush_doc(#doc{} = Doc, {Parent, Target} = Acc) ->
+    Stats = couch_replicator_stats:new([{docs_read, 1}]),
     Success = (flush_doc(Target, Doc) =:= ok),
     {Result, Stats2} = case Success of
     true ->
@@ -289,9 +308,7 @@ remote_doc_handler({ok, Doc}, {Parent, Target} = Acc) ->
         {{skip, Acc}, couch_replicator_stats:increment(doc_write_failures, Stats)}
     end,
     ok = gen_server:call(Parent, {add_stats, Stats2}, infinity),
-    Result;
-remote_doc_handler({{not_found, missing}, _}, _Acc) ->
-    throw(missing_doc).
+    Result.
 
 
 spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
@@ -334,38 +351,16 @@ maybe_flush_docs(Doc,State) ->
 
 maybe_flush_docs(#httpdb{} = Target, Batch, Doc) ->
     #batch{docs = DocAcc, size = SizeAcc} = Batch,
-    case batch_doc(Doc) of
-    false ->
-        couch_log:debug("Worker flushing doc with attachments", []),
-        case flush_doc(Target, Doc) of
-        ok ->
-            {Batch, couch_replicator_stats:new([{docs_written, 1}])};
-        _ ->
-            {Batch, couch_replicator_stats:new([{doc_write_failures, 1}])}
-        end;
-    true ->
-        JsonDoc = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs, attachments])),
-        case SizeAcc + iolist_size(JsonDoc) of
-        SizeAcc2 when SizeAcc2 > ?DOC_BUFFER_BYTE_SIZE ->
-            couch_log:debug("Worker flushing doc batch of size ~p bytes", [SizeAcc2]),
-            Stats = flush_docs(Target, [JsonDoc | DocAcc]),
-            {#batch{}, Stats};
-        SizeAcc2 ->
-            Stats = couch_replicator_stats:new(),
-            {#batch{docs = [JsonDoc | DocAcc], size = SizeAcc2}, Stats}
-        end
+    JsonDoc = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs, attachments])),
+    case SizeAcc + iolist_size(JsonDoc) of
+    SizeAcc2 when SizeAcc2 > ?DOC_BUFFER_BYTE_SIZE ->
+        couch_log:debug("Worker flushing doc batch of size ~p bytes", [SizeAcc2]),
+        Stats = flush_docs(Target, [JsonDoc | DocAcc]),
+        {#batch{}, Stats};
+    SizeAcc2 ->
+        Stats = couch_replicator_stats:new(),
+        {#batch{docs = [JsonDoc | DocAcc], size = SizeAcc2}, Stats}
     end.
-
-
-batch_doc(#doc{atts = []}) ->
-    true;
-batch_doc(#doc{atts = Atts}) ->
-    (length(Atts) =< ?MAX_BULK_ATTS_PER_DOC) andalso
-        lists:all(
-            fun(Att) ->
-                [L, Data] = couch_att:fetch([disk_len, data], Att),
-                (L =< ?MAX_BULK_ATT_SIZE) andalso (Data =/= stub)
-            end, Atts).
 
 
 flush_docs(_Target, []) ->
@@ -386,8 +381,9 @@ handle_flush_docs_result({error, request_body_too_large}, Target, DocList) ->
         " request body is too large. Splitting batch into 2 separate batches of"
         " sizes ~p and ~p", [Len, couch_replicator_api_wrap:db_uri(Target),
         length(DocList1), length(DocList2)]),
-    flush_docs(Target, DocList1),
-    flush_docs(Target, DocList2);
+    Stats1 = flush_docs(Target, DocList1),
+    Stats2 = flush_docs(Target, DocList2),
+    couch_replicator_stats:sum_stats(Stats1, Stats2);
 handle_flush_docs_result({ok, Errors}, Target, DocList) ->
     DbUri = couch_replicator_api_wrap:db_uri(Target),
     lists:foreach(
@@ -400,7 +396,9 @@ handle_flush_docs_result({ok, Errors}, Target, DocList) ->
     couch_replicator_stats:new([
         {docs_written, length(DocList) - length(Errors)},
         {doc_write_failures, length(Errors)}
-    ]).
+    ]);
+handle_flush_docs_result({error, {bulk_docs_failed, _, _} = Err}, _, _) ->
+    exit(Err).
 
 
 flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
@@ -439,7 +437,10 @@ find_missing(DocInfos, Target) ->
             end, {[], 0}, DocInfos),
 
 
-    {ok, Missing} = couch_replicator_api_wrap:get_missing_revs(Target, IdRevs),
+    Missing = case couch_replicator_api_wrap:get_missing_revs(Target, IdRevs) of
+        {ok, Result} -> Result;
+        {error, Error} -> exit(Error)
+    end,
     MissingRevsCount = lists:foldl(
         fun({_Id, MissingRevs, _PAs}, Acc) -> Acc + length(MissingRevs) end,
         0, Missing),

@@ -184,19 +184,12 @@ run(#job{split_state = CurrState} = Job) ->
 
 
 set_start_state(#job{split_state = State} = Job) ->
-    case {State, maps:get(State, ?STATE_RESTART, undefined)} of
-        {_, undefined} ->
+    case maps:get(State, ?STATE_RESTART, undefined) of
+        undefined ->
             Fmt1 = "~p recover : unknown state ~s",
             couch_log:error(Fmt1, [?MODULE, jobfmt(Job)]),
             erlang:error({invalid_split_job_recover_state, Job});
-        {initial_copy, initial_copy} ->
-            % Since we recover from initial_copy to initial_copy, we need
-            % to reset the target state as initial_copy expects to
-            % create a new target
-            Fmt2 = "~p recover : resetting target ~s",
-            couch_log:notice(Fmt2, [?MODULE, jobfmt(Job)]),
-            reset_target(Job);
-        {_, StartState} ->
+        StartState->
             Job#job{split_state = StartState}
     end.
 
@@ -403,6 +396,7 @@ initial_copy_impl(#job{source = Source, target = Targets0} = Job) ->
     LogMsg1 = "~p initial_copy started ~s",
     LogArgs1 = [?MODULE, shardsstr(Source, Targets0)],
     couch_log:notice(LogMsg1, LogArgs1),
+    reset_target(Job),
     case couch_db_split:split(SourceName, TMap, fun pickfun/3) of
         {ok, Seq} ->
             LogMsg2 = "~p initial_copy of ~s finished @ seq:~p",
