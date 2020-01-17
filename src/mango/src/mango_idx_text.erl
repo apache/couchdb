@@ -126,6 +126,8 @@ columns(Idx) ->
     end.
 
 
+is_usable(_, Selector, _) when Selector =:= {[]} ->
+    false;
 is_usable(Idx, Selector, _) ->
     case columns(Idx) of
         all_fields ->
