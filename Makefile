@@ -140,7 +140,7 @@ couch: config.erl derived set_otp_vsn
 
 # target: set_otp_vsn - ensure that vsn field in OTP app is set appropriately
 set_otp_vsn:
-	@sed -i '' -e "s/{vsn, git}/${SUB_VSN}/" $(shell find ./src -type f -name \*.app.src)
+	@sed -i$(sed v < /dev/null 2> /dev/null || echo -n " ''")  -e "s/{vsn, git}/${SUB_VSN}/" $(shell find ./src -type f -name \*.app.src)
 
 .PHONY: docs
 # target: docs - Build documentation
