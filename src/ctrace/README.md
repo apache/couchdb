@@ -120,9 +120,23 @@ Configuration
 Traces are configured using standard CouchDB ini file based configuration.
 There is a global toggle `[tracing] enabled = true | false` that switches
 tracing on or off completely. The `[tracing]` section also includes
-configuration for where to send trace data.
+configuration for where to send trace data. There are two reporters which we
+support.
 
-An example `[tracing]` section
+The thrift over udp reporter (this is the default) has following configuration
+options:
+
+- protocol = udp
+- thrift_format = compact | binary
+- agent_host = 127.0.0.1
+- agent_port = 6831
+
+The thrift over http has following options
+
+- protocol = http
+- endpoint = http://127.0.0.1:14268
+
+An example of `[tracing]` section
 
 ```ini
 [tracing]
