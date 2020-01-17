@@ -97,9 +97,9 @@ defmodule Couch do
 
   def process_options(options) do
     options
-    |> set_auth_options()
-    |> set_inactivity_timeout()
-    |> set_request_timeout()
+     |> set_auth_options()
+     |> set_inactivity_timeout()
+     |> set_request_timeout()
   end
 
   def process_request_body(body) do
@@ -111,7 +111,7 @@ defmodule Couch do
   end
 
   def process_response_body(headers, body) when body == [] do
-    nil
+    ""
   end
 
   def process_response_body(headers, body) do
