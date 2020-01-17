@@ -98,17 +98,37 @@ maybe_start_main_tracer(TracerId) ->
 
 
 start_main_tracer(TracerId) ->
-    Sampler = passage_sampler_all:new(),
-    Options = [
-        {thrift_format,
-            list_to_atom(config:get("tracing", "thrift_format", "compact"))},
-        {agent_host, config:get("tracing", "agent_host", "127.0.0.1")},
-        {agent_port, config:get_integer("tracing", "agent_port", 6831)},
-        {default_service_name,
-            list_to_atom(config:get("tracing", "app_name", "couchdb"))}
-    ],
+    MaxQueueLen = config:get_integer("tracing", "max_queue_len", 1024),
+    Sampler = jaeger_passage_sampler_queue_limit:new(
+        passage_sampler_all:new(), TracerId, MaxQueueLen),
+    ServiceName = list_to_atom(config:get("tracing", "app_name", "couchdb")),
+
+    ProtocolOptions = case config:get("tracing", "protocol", "udp") of
+        "udp" ->
+            [
+                {thrift_format, list_to_atom(
+                    config:get("tracing", "thrift_format", "compact"))},
+                {agent_host,
+                    config:get("tracing", "agent_host", "127.0.0.1")},
+                {agent_port,
+                    config:get_integer("tracing", "agent_port", 6831)},
+                {protocol, udp},
+                {default_service_name, ServiceName}
+           ];
+        "http" ++ _ ->
+            [
+                {endpoint,
+                    config:get("tracing", "endpoint", "http://127.0.0.1:14268")},
+                {protocol, http},
+                {http_client, fun http_client/5},
+                {default_service_name, ServiceName}
+           ]
+    end,
+    Options = [{default_service_name, ServiceName}|ProtocolOptions],
     ok = jaeger_passage:start_tracer(TracerId, Sampler, Options).
 
+http_client(Endpoint, Method, Headers, Body, _ReporterOptions) ->
+    ibrowse:send_req(Endpoint, Headers, Method, Body, []).
 
 compile_filter(OperationId, FilterDef) ->
     try

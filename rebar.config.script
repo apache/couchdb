@@ -121,13 +121,13 @@ DepDescs = [
 {folsom,           "folsom",           {tag, "CouchDB-0.8.3"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-4"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1-1"}},
-{jaeger_passage,   "jaeger-passage",   {tag, "CouchDB-0.1.13-1"}},
+{jaeger_passage,   "jaeger-passage",   {tag, "CouchDB-0.1.14-1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-0.14.11-2"}},
 {local,            "local",            {tag, "0.2.1"}},
 {mochiweb,         "mochiweb",         {tag, "v2.19.0"}},
 {meck,             "meck",             {tag, "0.8.8"}},
 {passage,          "passage",          {tag, "0.2.6"}},
-{thrift_protocol,  "thrift-protocol",  {tag, "0.1.3"}},
+{thrift_protocol,  "thrift-protocol",  {tag, "0.1.5"}},
 
 %% TMP - Until this is moved to a proper Apache repo
 {erlfdb,           "erlfdb",           {branch, "master"}}
