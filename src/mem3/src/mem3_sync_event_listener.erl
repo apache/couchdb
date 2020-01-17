@@ -293,6 +293,7 @@ should_terminate(Pid) ->
         ?assert(is_process_alive(Pid)),
 
         EventMgr = whereis(config_event),
+        EventMgrWasAlive = (catch is_process_alive(EventMgr)),
 
         Ref = erlang:monitor(process, Pid),
 
@@ -305,6 +306,9 @@ should_terminate(Pid) ->
             {'DOWN', Ref, _, _, _} ->
                 ok
         after 1000 ->
+            ?debugFmt("~n XKCD should_terminate EventMgrWasAlive:~p MsgQueue:~p PInfo:~p ~n", [
+                EventMgrWasAlive, process_info(self(), messages), process_info(Pid)
+            ]),
             ?assert(false)
         end,
 

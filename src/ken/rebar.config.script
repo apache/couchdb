@@ -11,7 +11,9 @@
 % the License.
 
 HaveDreyfus = element(1, file:list_dir("../dreyfus")) == ok.
-HaveHastings = element(1, file:list_dir("../hastings")) == ok.
+
+HastingsHome = os:getenv("HASTINGS_HOME", "../hastings").
+HaveHastings = element(1, file:list_dir(HastingsHome)) == ok.
 
 CurrOpts = case lists:keyfind(erl_opts, 1, CONFIG) of
     {erl_opts, Opts} -> Opts;
