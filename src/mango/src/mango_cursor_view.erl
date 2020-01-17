@@ -46,10 +46,12 @@ create(Db, Indexes, Selector, Opts) ->
     Fields = couch_util:get_value(fields, Opts, all_fields),
     Bookmark = couch_util:get_value(bookmark, Opts),
 
+    IndexRanges1 = mango_cursor:maybe_noop_range(Selector, IndexRanges),
+
     {ok, #cursor{
         db = Db,
         index = Index,
-        ranges = IndexRanges,
+        ranges = IndexRanges1,
         selector = Selector,
         opts = Opts,
         limit = Limit,
@@ -99,12 +101,20 @@ maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
 maybe_replace_max_json(EndKey) ->
     EndKey.
 
+
 base_args(#cursor{index = Idx, selector = Selector} = Cursor) ->
+    {StartKey, EndKey} = case Cursor#cursor.ranges of
+        [empty] ->
+            {null, null};
+        _ ->
+            {mango_idx:start_key(Idx, Cursor#cursor.ranges),
+                mango_idx:end_key(Idx, Cursor#cursor.ranges)}
+    end,
     #mrargs{
         view_type = map,
         reduce = false,
-        start_key = mango_idx:start_key(Idx, Cursor#cursor.ranges),
-        end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
+        start_key = StartKey,
+        end_key = EndKey,
         include_docs = true,
         extra = [{callback, {?MODULE, view_cb}}, {selector, Selector}]
     }.

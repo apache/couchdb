@@ -92,8 +92,9 @@ execute(Cursor, UserFun, UserAcc) ->
         opts = Opts,
         execution_stats = Stats
     } = Cursor,
+    Query = mango_selector_text:convert(Selector),
     QueryArgs = #index_query_args{
-        q = mango_selector_text:convert(Selector),
+        q = Query,
         partition = get_partition(Opts, nil),
         sort = sort_query(Opts, Selector),
         raw_bookmark = true
@@ -113,7 +114,12 @@ execute(Cursor, UserFun, UserAcc) ->
         execution_stats = mango_execution_stats:log_start(Stats)
     },
     try
-        execute(CAcc)
+        case Query of
+            <<>> ->
+                throw({stop, CAcc});
+            _ ->
+                execute(CAcc)
+        end
     catch
         throw:{stop, FinalCAcc} ->
             #cacc{

@@ -399,10 +399,16 @@ negate({[{Field, Cond}]}) ->
     {[{Field, negate(Cond)}]}.
 
 
+% We need to treat an empty array as always true. This will be applied
+% for $or, $in, $all, $nin as well.
+match({[{<<"$and">>, []}]}, _, _) ->
+    true;
 match({[{<<"$and">>, Args}]}, Value, Cmp) ->
     Pred = fun(SubSel) -> match(SubSel, Value, Cmp) end,
     lists:all(Pred, Args);
 
+match({[{<<"$or">>, []}]}, _, _) ->
+    true;
 match({[{<<"$or">>, Args}]}, Value, Cmp) ->
     Pred = fun(SubSel) -> match(SubSel, Value, Cmp) end,
     lists:any(Pred, Args);
@@ -410,6 +416,8 @@ match({[{<<"$or">>, Args}]}, Value, Cmp) ->
 match({[{<<"$not">>, Arg}]}, Value, Cmp) ->
     not match(Arg, Value, Cmp);
 
+match({[{<<"$all">>, []}]}, _, _) ->
+    true;
 % All of the values in Args must exist in Values or
 % Values == hd(Args) if Args is a single element list
 % that contains a list.
@@ -493,6 +501,8 @@ match({[{<<"$gte">>, Arg}]}, Value, Cmp) ->
 match({[{<<"$gt">>, Arg}]}, Value, Cmp) ->
     Cmp(Value, Arg) > 0;
 
+match({[{<<"$in">>, []}]}, _, _) ->
+    true;
 match({[{<<"$in">>, Args}]}, Values, Cmp) when is_list(Values)->
     Pred = fun(Arg) ->
         lists:foldl(fun(Value,Match) ->
@@ -504,6 +514,8 @@ match({[{<<"$in">>, Args}]}, Value, Cmp) ->
     Pred = fun(Arg) -> Cmp(Value, Arg) == 0 end,
     lists:any(Pred, Args);
 
+match({[{<<"$nin">>, []}]}, _, _) ->
+    true;
 match({[{<<"$nin">>, Args}]}, Values, Cmp) when is_list(Values)->
     not match({[{<<"$in">>, Args}]}, Values, Cmp);
 match({[{<<"$nin">>, Args}]}, Value, Cmp) ->

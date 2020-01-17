@@ -205,15 +205,36 @@ convert(_Path, {Props} = Sel) when length(Props) > 1 ->
     erlang:error({unnormalized_selector, Sel}).
 
 
-to_query({op_and, Args}) when is_list(Args) ->
+to_query_nested(Args) ->
     QueryArgs = lists:map(fun to_query/1, Args),
-    ["(", mango_util:join(<<" AND ">>, QueryArgs), ")"];
+    % removes empty queries that result from selectors with empty arrays
+    FilterFun = fun(A) -> A =/= [] andalso A =/= "()" end,
+    lists:filter(FilterFun, QueryArgs).
+
+
+to_query({op_and, []}) ->
+    [];
+
+to_query({op_and, Args}) when is_list(Args) ->
+    case to_query_nested(Args) of
+        [] -> [];
+        QueryArgs  -> ["(", mango_util:join(<<" AND ">>, QueryArgs), ")"]
+    end;
+
+to_query({op_or, []}) ->
+    [];
 
 to_query({op_or, Args}) when is_list(Args) ->
-    ["(", mango_util:join(" OR ", lists:map(fun to_query/1, Args)), ")"];
+    case to_query_nested(Args) of
+        [] -> [];
+        QueryArgs -> ["(", mango_util:join(" OR ", QueryArgs), ")"]
+    end;
 
 to_query({op_not, {ExistsQuery, Arg}}) when is_tuple(Arg) ->
-    ["(", to_query(ExistsQuery), " AND NOT (", to_query(Arg), "))"];
+    case to_query(Arg) of
+        [] -> ["(", to_query(ExistsQuery), ")"];
+        Query -> ["(", to_query(ExistsQuery), " AND NOT (", Query, "))"]
+    end;
 
 %% For $exists:false
 to_query({op_not, {ExistsQuery, false}}) ->
