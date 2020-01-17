@@ -12,7 +12,7 @@
 
 {application, couch_tests, [
     {description, "Testing infrastructure for Apache CouchDB"},
-    {vsn, "2.3.0-f18d602"},{id, "f18d602"},
+    {vsn, git},
     {registered, []},
     {applications, [kernel, stdlib]}
 ]}.
