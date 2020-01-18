@@ -97,9 +97,9 @@ defmodule Couch do
 
   def process_options(options) do
     options
-      |> set_auth_options()
-      |> set_inactivity_timeout()
-      |> set_request_timeout()
+     |> set_auth_options()
+     |> set_inactivity_timeout()
+     |> set_request_timeout()
   end
 
   def process_request_body(body) do
@@ -108,6 +108,10 @@ defmodule Couch do
     else
       body
     end
+  end
+
+  def process_response_body(_headers, body) when body == [] do
+    ""
   end
 
   def process_response_body(headers, body) do
@@ -137,9 +141,14 @@ defmodule Couch do
   end
 
   def set_inactivity_timeout(options) do
-    Keyword.update(options, :ibrowse, [{:inactivity_timeout, @inactivity_timeout}], fn(ibrowse) ->
-      Keyword.put_new(ibrowse, :inactivity_timeout, @inactivity_timeout)
-    end)
+    Keyword.update(
+      options,
+      :ibrowse,
+      [{:inactivity_timeout, @inactivity_timeout}],
+      fn ibrowse ->
+        Keyword.put_new(ibrowse, :inactivity_timeout, @inactivity_timeout)
+      end
+    )
   end
 
   def set_request_timeout(options) do
@@ -165,5 +174,4 @@ defmodule Couch do
       %Couch.Session{error: resp.body["error"]}
     end
   end
-
 end
