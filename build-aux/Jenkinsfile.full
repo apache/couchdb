@@ -152,7 +152,8 @@ pipeline {
               junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
             }
             cleanup {
-              sh 'rm -rf $COUCHDB_IO_LOG_DIR'
+              sh 'killall -9 beam.smp || true'
+              sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR} || true'
             }
           } // post
         } // stage FreeBSD
