@@ -32,6 +32,8 @@
 -define(LIST_VALUE, 0).
 -define(JSON_VALUE, 1).
 -define(VALUE, 2).
+-define(MAX_KEY_SIZE_LIMIT, 8000).
+-define(MAX_VALUE_SIZE_LIMIT, 64000).
 
 
 -include("couch_views.hrl").
@@ -107,7 +109,7 @@ fold_map_idx(TxDb, Sig, ViewId, Options, Callback, Acc0) ->
     Acc1.
 
 
-write_doc(TxDb, Sig, _ViewIds, #{deleted := true} = Doc) ->
+write_doc(TxDb, Sig, _Views, #{deleted := true} = Doc) ->
     #{
         id := DocId
     } = Doc,
@@ -115,13 +117,11 @@ write_doc(TxDb, Sig, _ViewIds, #{deleted := true} = Doc) ->
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
 
     clear_id_idx(TxDb, Sig, DocId),
-    lists:foreach(fun({ViewId, TotalKeys, TotalSize, UniqueKeys}) ->
-        clear_map_idx(TxDb, Sig, ViewId, DocId, UniqueKeys),
-        update_row_count(TxDb, Sig, ViewId, -TotalKeys),
-        update_kv_size(TxDb, Sig, ViewId, -TotalSize)
+    lists:foreach(fun(ExistingViewKey) ->
+        remove_doc_from_idx(TxDb, Sig, DocId, ExistingViewKey)
     end, ExistingViewKeys);
 
-write_doc(TxDb, Sig, ViewIds, Doc) ->
+write_doc(TxDb, Sig, Views, Doc) ->
     #{
         id := DocId,
         results := Results
@@ -130,26 +130,54 @@ write_doc(TxDb, Sig, ViewIds, Doc) ->
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
 
     clear_id_idx(TxDb, Sig, DocId),
+    lists:foreach(fun({View, NewRows}) ->
+        #mrview{
+            map_names = MNames,
+            id_num = ViewId
+        } = View,
 
-    lists:foreach(fun({ViewId, NewRows}) ->
-        update_id_idx(TxDb, Sig, ViewId, DocId, NewRows),
+        try
+            NewRowSize = calculate_row_size(NewRows),
+            update_id_idx(TxDb, Sig, ViewId, DocId, NewRows),
 
-        ExistingKeys = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
-            {ViewId, TotalRows, TotalSize, EKeys} ->
-                RowChange = length(NewRows) - TotalRows,
-                SizeChange = calculate_row_size(NewRows) - TotalSize,
-                update_row_count(TxDb, Sig, ViewId, RowChange),
-                update_kv_size(TxDb, Sig, ViewId, SizeChange),
-                EKeys;
-            false ->
-                RowChange = length(NewRows),
-                SizeChange = calculate_row_size(NewRows),
-                update_row_count(TxDb, Sig, ViewId, RowChange),
-                update_kv_size(TxDb, Sig, ViewId, SizeChange),
-                []
-        end,
-        update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows)
-    end, lists:zip(ViewIds, Results)).
+            ExistingKeys = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
+                {ViewId, TotalRows, TotalSize, EKeys} ->
+                    RowChange = length(NewRows) - TotalRows,
+                    SizeChange = NewRowSize - TotalSize,
+                    update_row_count(TxDb, Sig, ViewId, RowChange),
+                    update_kv_size(TxDb, Sig, ViewId, SizeChange),
+                    EKeys;
+                false ->
+                    RowChange = length(NewRows),
+                    SizeChange = NewRowSize,
+                    update_row_count(TxDb, Sig, ViewId, RowChange),
+                    update_kv_size(TxDb, Sig, ViewId, SizeChange),
+                    []
+            end,
+            update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows)
+        catch
+            throw:{size_exceeded, Type}  ->
+                case lists:keyfind(ViewId, 1, ExistingViewKeys) of
+                    false ->
+                        ok;
+                    ExistingViewKey ->
+                        remove_doc_from_idx(TxDb, Sig, DocId, ExistingViewKey)
+                end,
+                #{
+                    name := DbName
+                } = TxDb,
+                couch_log:error("Db `~s` Doc `~s` exceeded the ~s size "
+                    "for view `~s` and was not indexed.",
+                    [DbName, DocId, Type, MNames])
+        end
+    end, lists:zip(Views, Results)).
+
+
+remove_doc_from_idx(TxDb, Sig, DocId, {ViewId, TotalKeys, TotalSize,
+    UniqueKeys}) ->
+    clear_map_idx(TxDb, Sig, ViewId, DocId, UniqueKeys),
+    update_row_count(TxDb, Sig, ViewId, -TotalKeys),
+    update_kv_size(TxDb, Sig, ViewId, -TotalSize).
 
 
 % For each row in a map view we store the the key/value
@@ -352,6 +380,28 @@ process_rows(Rows) ->
 
 
 calculate_row_size(Rows) ->
+    KeyLimit = key_size_limit(),
+    ValLimit = value_size_limit(),
+
     lists:foldl(fun({K, V}, Acc) ->
-        Acc + erlang:external_size(K) + erlang:external_size(V)
+        KeySize = erlang:external_size(K),
+        ValSize = erlang:external_size(V),
+
+        if KeySize =< KeyLimit -> ok; true ->
+            throw({size_exceeded, key})
+        end,
+
+        if ValSize =< ValLimit -> ok; true ->
+            throw({size_exceeded, value})
+        end,
+
+        Acc + KeySize + ValSize
     end, 0, Rows).
+
+
+key_size_limit() ->
+    config:get_integer("couch_views", "key_size_limit", ?MAX_KEY_SIZE_LIMIT).
+
+
+value_size_limit() ->
+    config:get_integer("couch_views", "value_size_limit", ?MAX_VALUE_SIZE_LIMIT).

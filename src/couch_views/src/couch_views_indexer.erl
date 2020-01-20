@@ -297,10 +297,8 @@ write_docs(TxDb, Mrst, Docs, State) ->
         last_seq := LastSeq
     } = State,
 
-    ViewIds = [View#mrview.id_num || View <- Views],
-
     lists:foreach(fun(Doc) ->
-        couch_views_fdb:write_doc(TxDb, Sig, ViewIds, Doc)
+        couch_views_fdb:write_doc(TxDb, Sig, Views, Doc)
     end, Docs),
 
     couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq).
