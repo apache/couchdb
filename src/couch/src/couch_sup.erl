@@ -157,7 +157,7 @@ write_uris() ->
 
 
 get_uris() ->
-    Ip = config:get("httpd", "bind_address"),
+    Ip = config:get("chttpd", "bind_address"),
     lists:flatmap(fun(Uri) ->
         case get_uri(Uri, Ip) of
             undefined -> [];
