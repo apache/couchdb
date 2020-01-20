@@ -38,7 +38,9 @@ indexer_test_() ->
                     with([?TDEF(deleted_docs_are_unindexed)]),
                     with([?TDEF(multipe_docs_with_same_key)]),
                     with([?TDEF(multipe_keys_from_same_doc)]),
-                    with([?TDEF(multipe_identical_keys_from_same_doc)])
+                    with([?TDEF(multipe_identical_keys_from_same_doc)]),
+                    with([?TDEF(handle_size_key_limits)]),
+                    with([?TDEF(handle_size_value_limits)])
                 ]
             }
         }
@@ -65,6 +67,7 @@ foreach_setup() ->
 
 
 foreach_teardown(Db) ->
+    meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
 
@@ -385,6 +388,142 @@ multipe_identical_keys_from_same_doc(Db) ->
         ], Out).
 
 
+handle_size_key_limits(Db) ->
+    ok = meck:new(config, [passthrough]),
+    ok = meck:expect(config, get_integer, fun(Section, _, Default) ->
+        case Section of
+            "couch_views" -> 15;
+            _ -> Default
+        end
+    end),
+
+    DDoc = create_ddoc(multi_emit_key_limit),
+    Docs = [doc(1)] ++ [doc(2)],
+
+    {ok, _} = fabric2_db:update_docs(Db, [DDoc | Docs], []),
+
+    {ok, Out} = couch_views:query(
+        Db,
+        DDoc,
+        <<"map_fun1">>,
+        fun fold_fun/2,
+        [],
+        #mrargs{}
+    ),
+
+    ?assertEqual([
+        {row, [
+            {id, <<"1">>},
+            {key, 1},
+            {value, 1}
+        ]}
+    ], Out),
+
+    {ok, Doc} = fabric2_db:open_doc(Db, <<"2">>),
+    Doc2 = Doc#doc {
+        body = {[{<<"val">>,3}]}
+    },
+    {ok, _} = fabric2_db:update_doc(Db, Doc2),
+
+    {ok, Out1} = couch_views:query(
+        Db,
+        DDoc,
+        <<"map_fun1">>,
+        fun fold_fun/2,
+        [],
+        #mrargs{}
+    ),
+
+    ?assertEqual([
+        {row, [
+            {id, <<"1">>},
+            {key, 1},
+            {value, 1}
+        ]},
+        {row, [
+            {id, <<"2">>},
+            {key, 3},
+            {value, 3}
+        ]}
+    ], Out1).
+
+
+handle_size_value_limits(Db) ->
+    ok = meck:new(config, [passthrough]),
+    ok = meck:expect(config, get_integer, fun(Section, _, Default) ->
+        case Section of
+            "couch_views" -> 15;
+            _ -> Default
+        end
+    end),
+
+    DDoc = create_ddoc(multi_emit_key_limit),
+    Docs = [doc(1, 2)] ++ [doc(2, 3)],
+
+    {ok, _} = fabric2_db:update_docs(Db, [DDoc | Docs], []),
+
+    {ok, Out} = couch_views:query(
+        Db,
+        DDoc,
+        <<"map_fun2">>,
+        fun fold_fun/2,
+        [],
+        #mrargs{}
+    ),
+
+    ?assertEqual([
+        {row, [
+            {id, <<"1">>},
+            {key, 2},
+            {value, 2}
+        ]},
+        {row, [
+            {id, <<"2">>},
+            {key, 3},
+            {value, 3}
+        ]},
+        {row, [
+            {id, <<"1">>},
+            {key, 22},
+            {value, 2}
+        ]},
+        {row, [
+            {id, <<"2">>},
+            {key, 23},
+            {value, 3}
+        ]}
+    ], Out),
+
+
+    {ok, Doc} = fabric2_db:open_doc(Db, <<"1">>),
+    Doc2 = Doc#doc {
+        body = {[{<<"val">>,1}]}
+    },
+    {ok, _} = fabric2_db:update_doc(Db, Doc2),
+
+    {ok, Out1} = couch_views:query(
+        Db,
+        DDoc,
+        <<"map_fun2">>,
+        fun fold_fun/2,
+        [],
+        #mrargs{}
+    ),
+
+    ?assertEqual([
+        {row, [
+            {id, <<"2">>},
+            {key, 3},
+            {value, 3}
+        ]},
+        {row, [
+            {id, <<"2">>},
+            {key, 23},
+            {value, 3}
+        ]}
+    ], Out1).
+
+
 fold_fun({meta, _Meta}, Acc) ->
     {ok, Acc};
 fold_fun({row, _} = Row, Acc) ->
@@ -438,6 +577,32 @@ create_ddoc(multi_emit_same) ->
             ]}},
             {<<"map_fun2">>, {[
                 {<<"map">>, <<"function(doc) {}">>}
+            ]}}
+        ]}}
+    ]});
+
+create_ddoc(multi_emit_key_limit) ->
+    couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/bar">>},
+        {<<"views">>, {[
+            {<<"map_fun1">>, {[
+                {<<"map">>, <<"function(doc) { "
+                    "if (doc.val === 2) { "
+                        "emit('a very long string to be limited', doc.val);"
+                    "} else {"
+                        "emit(doc.val, doc.val)"
+                    "}"
+                "}">>}
+            ]}},
+            {<<"map_fun2">>, {[
+                {<<"map">>, <<"function(doc) { "
+                    "emit(doc.val + 20, doc.val);"
+                    "if (doc.val === 1) { "
+                        "emit(doc.val, 'a very long string to be limited');"
+                    "} else {"
+                        "emit(doc.val, doc.val)"
+                    "}"
+                "}">>}
             ]}}
         ]}}
     ]}).
