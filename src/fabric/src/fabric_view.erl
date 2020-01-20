@@ -12,7 +12,7 @@
 
 -module(fabric_view).
 
--export([is_progress_possible/1, remove_overlapping_shards/2, maybe_send_row/1,
+-export([remove_overlapping_shards/2, maybe_send_row/1,
     transform_row/1, keydict/1, extract_view/4, get_shards/2,
     check_down_shards/2, handle_worker_exit/3,
     get_shard_replacements/2, maybe_update_others/5]).
@@ -46,10 +46,6 @@ handle_worker_exit(Collector, _Worker, Reason) ->
     {ok, Resp} = Callback({error, fabric_util:error_info(Reason)}, Acc),
     {error, Resp}.
 
-%% @doc looks for a fully covered keyrange in the list of counters
--spec is_progress_possible([{#shard{}, term()}]) -> boolean().
-is_progress_possible(Counters) ->
-    fabric_ring:is_progress_possible(Counters).
 
 -spec remove_overlapping_shards(#shard{}, [{#shard{}, any()}]) ->
     [{#shard{}, any()}].
@@ -416,28 +412,6 @@ fix_skip_and_limit(#mrargs{} = Args) ->
 remove_finalizer(Args) ->
     couch_mrview_util:set_extra(Args, finalizer, null).
 
-% unit test
-is_progress_possible_test() ->
-    EndPoint = 2 bsl 31,
-    T1 = [[0, EndPoint-1]],
-    ?assertEqual(is_progress_possible(mk_cnts(T1)),true),
-    T2 = [[0,10],[11,20],[21,EndPoint-1]],
-    ?assertEqual(is_progress_possible(mk_cnts(T2)),true),
-    % gap
-    T3 = [[0,10],[12,EndPoint-1]],
-    ?assertEqual(is_progress_possible(mk_cnts(T3)),false),
-    % outside range
-    T4 = [[1,10],[11,20],[21,EndPoint-1]],
-    ?assertEqual(is_progress_possible(mk_cnts(T4)),false),
-    % outside range
-    T5 = [[0,10],[11,20],[21,EndPoint]],
-    ?assertEqual(is_progress_possible(mk_cnts(T5)),false),
-    T6 = [[0, 10], [11, 20], [0, 5], [6, 21], [21, EndPoint - 1]],
-    ?assertEqual(is_progress_possible(mk_cnts(T6)), true),
-    % not possible, overlap is not exact
-    T7 = [[0, 10], [13, 20], [21, EndPoint - 1], [9, 12]],
-    ?assertEqual(is_progress_possible(mk_cnts(T7)), false).
-
 
 remove_overlapping_shards_test() ->
     Cb = undefined,
@@ -482,10 +456,6 @@ get_shard_replacements_test() ->
     ?assertEqual(Expect, Res).
 
 
-mk_cnts(Ranges) ->
-    Shards = lists:map(fun mk_shard/1, Ranges),
-    orddict:from_list([{Shard,nil} || Shard <- Shards]).
-
 mk_cnts(Ranges, NoNodes) ->
     orddict:from_list([{Shard,nil}
                        || Shard <-
@@ -500,10 +470,6 @@ mk_shards(0,_Range,Shards) ->
 mk_shards(NoNodes,Range,Shards) ->
     Name ="node-" ++ integer_to_list(NoNodes),
     mk_shards(NoNodes-1,Range, [mk_shard(Name, Range) | Shards]).
-
-
-mk_shard([B, E]) when is_integer(B), is_integer(E) ->
-    #shard{range = [B, E]}.
 
 
 mk_shard(Name, Range) ->

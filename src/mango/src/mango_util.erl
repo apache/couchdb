@@ -344,6 +344,8 @@ has_suffix(Bin, Suffix) when is_binary(Bin), is_binary(Suffix) ->
     end.
 
 
+join(_Sep, []) ->
+    [];
 join(_Sep, [Item]) ->
     [Item];
 join(Sep, [Item | Rest]) ->

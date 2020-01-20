@@ -31,6 +31,7 @@ SKIP_DEPS=0
 
 COUCHDB_USER="$(whoami 2>/dev/null || echo couchdb)"
 SM_VSN="1.8.5"
+ARCH="$(uname -m)"
 
 . ${rootdir}/version.mk
 COUCHDB_VERSION=${vsn_major}.${vsn_minor}.${vsn_patch}
@@ -176,6 +177,12 @@ parse_opts() {
 }
 
 parse_opts $@
+
+if [ "${ARCH}" = "aarch64" ] && [ "${SM_VSN}" != "1.8.5" ]
+then
+  echo "ERROR: SpiderMonkey 60 is known broken on ARM 64 (aarch64). Use 1.8.5 instead."
+  exit 1
+fi
 
 echo "==> configuring couchdb in rel/couchdb.config"
 cat > rel/couchdb.config << EOF

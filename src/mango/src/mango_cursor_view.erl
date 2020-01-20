@@ -46,10 +46,12 @@ create(Db, Indexes, Selector, Opts) ->
     Fields = couch_util:get_value(fields, Opts, all_fields),
     Bookmark = couch_util:get_value(bookmark, Opts),
 
+    IndexRanges1 = mango_cursor:maybe_noop_range(Selector, IndexRanges),
+
     {ok, #cursor{
         db = Db,
         index = Index,
-        ranges = IndexRanges,
+        ranges = IndexRanges1,
         selector = Selector,
         opts = Opts,
         limit = Limit,
@@ -99,12 +101,20 @@ maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
 maybe_replace_max_json(EndKey) ->
     EndKey.
 
+
 base_args(#cursor{index = Idx, selector = Selector} = Cursor) ->
+    {StartKey, EndKey} = case Cursor#cursor.ranges of
+        [empty] ->
+            {null, null};
+        _ ->
+            {mango_idx:start_key(Idx, Cursor#cursor.ranges),
+                mango_idx:end_key(Idx, Cursor#cursor.ranges)}
+    end,
     #mrargs{
         view_type = map,
         reduce = false,
-        start_key = mango_idx:start_key(Idx, Cursor#cursor.ranges),
-        end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
+        start_key = StartKey,
+        end_key = EndKey,
         include_docs = true,
         extra = [{callback, {?MODULE, view_cb}}, {selector, Selector}]
     }.
@@ -145,7 +155,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
                     {_Go, FinalUserAcc} = UserFun(Arg, LastCursor#cursor.user_acc),
                     Stats0 = LastCursor#cursor.execution_stats,
                     FinalUserAcc0 = mango_execution_stats:maybe_add_stats(Opts, UserFun, Stats0, FinalUserAcc),
-                    FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, FinalUserAcc0),
+                    FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, Stats0, FinalUserAcc0),
                     {ok, FinalUserAcc1};
                 {error, Reason} ->
                     {error, Reason}
@@ -239,6 +249,7 @@ view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
         Doc ->
             put(mango_docs_examined, get(mango_docs_examined) + 1),
             Selector = couch_util:get_value(selector, Options),
+            couch_stats:increment_counter([mango, docs_examined]),
             case mango_selector:match(Selector, Doc) of
                 true ->
                     ok = rexi:stream2(ViewRow),
@@ -423,6 +434,7 @@ doc_member(Cursor, RowProps) ->
             % an undefined doc was returned, indicating we should
             % perform a quorum fetch
             ExecutionStats1 = mango_execution_stats:incr_quorum_docs_examined(ExecutionStats),
+            couch_stats:increment_counter([mango, quorum_docs_examined]),
             Id = couch_util:get_value(id, RowProps),
             case mango_util:defer(fabric, open_doc, [Db, Id, Opts]) of
                 {ok, #doc{}=DocProps} ->
