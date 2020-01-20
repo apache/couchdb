@@ -46,6 +46,16 @@ handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>]}=Req) -
     send_json(Req, 200, {KVs});
 handle_node_req(#httpd{path_parts=[_, _Node, <<"_config">>]}=Req) ->
     send_method_not_allowed(Req, "GET");
+% POST /_node/$node/_config/_reload - Flushes unpersisted config values from RAM
+handle_node_req(#httpd{method='POST', path_parts=[_, Node, <<"_config">>, <<"_reload">>]}=Req) ->
+    case call_node(Node, config, reload, []) of
+        ok ->
+            send_json(Req, 200, {[{ok, true}]});
+        {error, Reason} ->
+            chttpd:send_error(Req, {bad_request, Reason})
+    end;
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_config">>, <<"_reload">>]}=Req) ->
+    send_method_not_allowed(Req, "POST");
 % GET /_node/$node/_config/Section
 handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>, Section]}=Req) ->
     KVs = [{list_to_binary(Key), list_to_binary(Value)}
