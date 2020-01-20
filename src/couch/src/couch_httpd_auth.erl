@@ -88,11 +88,6 @@ basic_name_pw(Req) ->
 default_authentication_handler(Req) ->
     default_authentication_handler(Req, couch_auth_cache).
 
-default_authentication_handler(#httpd{path_parts=[<<"_up">>]}=Req, AuthModule) ->
-    case config:get_boolean("chttpd", "require_valid_user_except_for_up", false) of
-        true -> Req#httpd{user_ctx=?ADMIN_USER};
-        _False -> default_authentication_handler(Req, AuthModule)
-    end;
 default_authentication_handler(Req, AuthModule) ->
     case basic_name_pw(Req) of
     {User, Pass} ->
