@@ -12,12 +12,19 @@
 
 -module(couch_key_tree_prop_tests).
 
--include_lib("triq/include/triq.hrl").
--triq(eunit).
+
+-ifdef(WITH_PROPER).
+
+-include_lib("couch/include/couch_eunit_proper.hrl").
+
 
 -define(SIZE_REDUCTION, 3).  % How much to reduce size with tree depth.
 -define(MAX_BRANCHES, 4).  % Maximum number of branches.
 -define(RAND_SIZE, 1 bsl 64).
+
+
+property_test_() ->
+    ?EUNIT_QUICKCHECK(60).
 
 
 %
@@ -116,10 +123,10 @@ prop_stemming_results_in_same_or_less_total_revs() ->
 prop_stem_path_expect_size_to_get_smaller() ->
     ?FORALL({RevTree, StemDepth},
         {
-            ?SIZED(Size, resize(Size * 10, g_revtree([], 1))),
-            choose(1,5)
+            ?SIZED(Size, g_revtree(Size * 10, [], 1)),
+            choose(1,3)
         },
-        ?IMPLIES(real_depth(RevTree) > 5,
+        ?IMPLIES(real_depth(RevTree) > 3,
             begin
                 Stemmed = couch_key_tree:stem(RevTree, StemDepth),
                 StemmedKeys = lists:usort(keylist(Stemmed)),
@@ -224,7 +231,7 @@ g_revtree(Size, ERevs, MaxBranches) ->
 g_treenode(0, Revs, _) ->
     {elements(Revs), x, []};
 g_treenode(Size, Revs, MaxBranches) ->
-    ?DELAY(?LET(N, int(0, MaxBranches),
+    ?LAZY(?LET(N, choose(0, MaxBranches),
         begin
             [Rev | ChildRevs] = Revs,
             {Rev, x, g_nodes(Size div ?SIZE_REDUCTION, N, ChildRevs, MaxBranches)}
@@ -261,17 +268,15 @@ g_stem_depth(Size) ->
 % Uses the shuffle/1 function to shuffle the input list. Unshuffled list is
 % used as the shrink value.
 %
+g_shuffle([]) -> [];
 g_shuffle(L) when is_list(L) ->
-    triq_dom:domain(g_shuffle,
-        fun(Self, _Size) -> {Self, shuffle(L)} end,
-        fun(Self, _Val) -> {Self, L} end
-     ).
+    ?LET(X, elements(L), [X | g_shuffle(lists:delete(X,L))]).
 
 
 % Wrapper to make a list shuffling generator that doesn't shrink
 %
 g_shuffle_noshrink(L) when is_list(L) ->
-    triq_dom:noshrink(g_shuffle(L)).
+    proper_types:noshrink(g_shuffle(L)).
 
 
 % Generate shuffled sublists up to N items long from a list.
@@ -297,7 +302,7 @@ g_revs(Size, Existing) when is_integer(Size), is_list(Existing) ->
         true -> % have extra, try various sublists
             g_shuffled_sublists(Revs, Expected);
         false ->
-            triq_dom:return(Revs)
+            proper_types:return(Revs)
     end.
 
 
@@ -319,19 +324,12 @@ same_keys(RevTree1, RevTree2) ->
 all(L) ->
     lists:all(fun(E) -> E end, L).
 
-% Shufle a list of items. Tag each item with a random number then sort
-% the list and remove the tags.
-%
-shuffle(L) ->
-    Tagged = [{triq_rnd:uniform(), X} || X <- L],
-    [X || {_, X} <- lists:sort(Tagged)].
-
 
 % Generate list of relateively unique large random numbers
 rand_list(N) when N =< 0 ->
     [];
 rand_list(N) ->
-    [triq_rnd:uniform(?RAND_SIZE) || _ <- lists:seq(1, N)].
+    [rand:uniform(?RAND_SIZE) || _ <- lists:seq(1, N)].
 
 
 % Generate a list of revisions to be used as key in revision trees. Expected
@@ -528,3 +526,5 @@ child_revs(ChildCount, Revs, Size, MaxBranches) ->
         false ->
             throw({not_enough_revisions, length(Revs), NeedKeys})
     end.
+
+-endif.
