@@ -13,8 +13,13 @@
 -module(mem3_ring_prop_tests).
 
 
--include_lib("triq/include/triq.hrl").
--triq(eunit).
+-ifdef(WITH_PROPER).
+
+-include_lib("couch/include/couch_eunit_proper.hrl").
+
+
+property_test_() ->
+    ?EUNIT_QUICKCHECK(60).
 
 
 % Properties
@@ -97,7 +102,7 @@ g_disconnected_intervals(Begin, End) ->
 g_disconnected_intervals(Begin, End, Split) when Begin =< End ->
     ?LET(Connected, g_non_trivial_connected_intervals(Begin, End, Split),
     begin
-        I = triq_rnd:uniform(length(Connected)) - 1,
+        I = rand:uniform(length(Connected)) - 1,
         {Before, [_ | After]} = lists:split(I, Connected),
         Before ++ After
     end).
@@ -131,14 +136,16 @@ rand_range(B, B) ->
     B;
 
 rand_range(B, E) ->
-    B + triq_rnd:uniform(E - B).
+    B + rand:uniform(E - B).
 
 
 shuffle(L) ->
-    Tagged = [{triq_rnd:uniform(), X} || X <- L],
+    Tagged = [{rand:uniform(), X} || X <- L],
     [X || {_, X} <- lists:sort(Tagged)].
 
 
 endpoints(Ranges) ->
     {Begins, Ends} = lists:unzip(Ranges),
     sets:from_list(Begins ++ Ends).
+
+-endif.

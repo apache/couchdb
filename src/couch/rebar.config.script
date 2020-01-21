@@ -92,6 +92,11 @@ MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
         []
 end,
 
+ProperConfig = case code:lib_dir(proper) of
+    {error, bad_name} -> [];
+    _ -> [{d, 'WITH_PROPER'}]
+end,
+
 {JS_CFLAGS, JS_LDFLAGS} = case os:type() of
     {win32, _} when SMVsn == "1.8.5" ->
         {
@@ -212,7 +217,7 @@ AddConfig = [
         {d, 'COUCHDB_VERSION', Version},
         {d, 'COUCHDB_GIT_SHA', GitSha},
         {i, "../"}
-    ] ++ MD5Config},
+    ] ++ MD5Config ++ ProperConfig},
     {eunit_compile_opts, PlatformDefines}
 ].
 
