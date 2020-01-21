@@ -35,8 +35,9 @@ insert(Db, {_}=Doc, Opts) ->
     insert(Db, [Doc], Opts);
 insert(Db, Docs, Opts0) when is_list(Docs) ->
     Opts1 = maybe_add_user_ctx(Db, Opts0),
+    % Todo: I dont think we need to support w = 3?
     Opts2 = maybe_int_to_str(w, Opts1),
-    case fabric:update_docs(Db, Docs, Opts2) of
+    case fabric2_db:update_docs(Db, Docs, Opts2) of
         {ok, Results0} ->
             {ok, lists:zipwith(fun result_to_json/2, Docs, Results0)};
         {accepted, Results0} ->
@@ -111,7 +112,8 @@ maybe_add_user_ctx(Db, Opts) ->
         {user_ctx, _} ->
             Opts;
         false ->
-            [{user_ctx, couch_db:get_user_ctx(Db)} | Opts]
+            UserCtx = maps:get(user_ctx, Db),
+            [{user_ctx, UserCtx} | Opts]
     end.
 
 

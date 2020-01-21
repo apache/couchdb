@@ -52,10 +52,40 @@
 -include("mango.hrl").
 -include("mango_idx.hrl").
 
-
 list(Db) ->
-    {ok, Indexes} = ddoc_cache:open(db_to_name(Db), ?MODULE),
-    Indexes.
+    Acc0 = #{
+        db => Db,
+        rows => []
+    },
+    {ok, Indexes} = fabric2_db:fold_design_docs(Db, fun ddoc_fold_cb/2, Acc0, []),
+    io:format("INDEXES ~p ~n", [Indexes]),
+    Indexes ++ special(Db).
+
+
+% Todo this should all be in fabric2_db
+ddoc_fold_cb({meta, _}, Acc) ->
+    {ok, Acc};
+
+ddoc_fold_cb(complete, Acc) ->
+    #{rows := Rows} = Acc,
+    {ok, Rows};
+
+ddoc_fold_cb({row, Row}, Acc) ->
+    #{
+        db := Db,
+        rows := Rows
+    } = Acc,
+    {_, Id} = lists:keyfind(id, 1, Row),
+    {ok, Doc} = fabric2_db:open_doc(Db, Id),
+    JSONDoc = couch_doc:to_json_obj(Doc, []),
+    try
+        Idx = from_ddoc(Db, JSONDoc),
+        {ok, Acc#{rows:= Rows ++ Idx}}
+    catch
+       throw:{mango_error, _, invalid_query_ddoc_language} ->
+           io:format("ERROR ~p ~n", [JSONDoc]),
+           {ok, Acc}
+    end.
 
 
 get_usable_indexes(Db, Selector, Opts) ->
@@ -294,7 +324,7 @@ db_to_name(Name) when is_binary(Name) ->
 db_to_name(Name) when is_list(Name) ->
     iolist_to_binary(Name);
 db_to_name(Db) ->
-    couch_db:name(Db).
+    maps:get(name, Db).
 
 
 get_idx_def(Opts) ->
@@ -407,8 +437,10 @@ set_ddoc_partitioned_option(DDoc, Partitioned) ->
     DDoc#doc{body = {NewProps}}.
 
 
-get_idx_partitioned(Db, DDocProps) ->
-    Default = fabric_util:is_partitioned(Db),
+get_idx_partitioned(_Db, DDocProps) ->
+    % TODO: Add in partition support
+%%    Default = fabric_util:is_partitioned(Db),
+    Default = false,
     case couch_util:get_value(<<"options">>, DDocProps) of
         {DesignOpts} ->
             case couch_util:get_value(<<"partitioned">>, DesignOpts) of

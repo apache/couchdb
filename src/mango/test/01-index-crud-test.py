@@ -113,6 +113,21 @@ class IndexCrudTests(mango.DbPerClass):
             return
         raise AssertionError("index not created")
 
+    def test_ignore_design_docs(self):
+        fields = ["baz", "foo"]
+        ret = self.db.create_index(fields, name="idx_02")
+        assert ret is True
+        self.db.save_doc({
+            "_id": "_design/ignore",
+            "views": {
+                "view1": {
+                    "map": "function (doc) { emit(doc._id, 1)}"
+                }
+            }
+        })
+        Indexes = self.db.list_indexes()
+        self.assertEqual(len(Indexes), 2)
+
     def test_read_idx_doc(self):
         self.db.create_index(["foo", "bar"], name="idx_01")
         self.db.create_index(["hello", "bar"])
