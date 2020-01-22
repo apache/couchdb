@@ -56,7 +56,7 @@ go(DbName, DDoc, IndexName, #index_query_args{}=QueryArgs) ->
     Shards = dreyfus_util:get_shards(DbName, QueryArgs),
     LiveNodes = [node() | nodes()],
     LiveShards = [S || #shard{node=Node} = S <- Shards, lists:member(Node, LiveNodes)],
-    RingOpts = dreyful_util:get_ring_opts(QueryArgs, LiveShards),
+    RingOpts = dreyfus_util:get_ring_opts(QueryArgs, LiveShards),
     Bookmark1 = dreyfus_bookmark:add_missing_shards(Bookmark0, LiveShards),
     Counters0 = lists:flatmap(fun({#shard{name=Name, node=N} = Shard, After}) ->
         QueryArgs1 = dreyfus_util:export(QueryArgs#index_query_args{
