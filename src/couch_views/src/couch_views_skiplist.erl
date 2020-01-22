@@ -86,11 +86,13 @@ fold(Db, Sig, ViewId, Reducer, GroupLevel, Opts, UserCallback, UserAcc0) ->
 rereduce_and_reply(_Reducer, [], _GroupLevel, _Callback, Acc) ->
     Acc;
 
-rereduce_and_reply(Reducer, Rows, GroupLevel, Callback, Acc) ->
-    {ReducedKey, ReducedVal} = couch_views_reducer:rereduce(Reducer, Rows,
+rereduce_and_reply(Reducer, Rows, GroupLevel, Callback, Acc0) ->
+    ReReduced = couch_views_reducer:rereduce(Reducer, Rows,
         GroupLevel),
-    {ok, FinalizedVal} = couch_views_reducer:finalize(Reducer, ReducedVal),
-    Callback(ReducedKey, FinalizedVal, Acc).
+    lists:foldl(fun ({ReducedKey, ReducedVal}, Acc) ->
+        {ok, FinalizedVal} = couch_views_reducer:finalize(Reducer, ReducedVal),
+        Callback(ReducedKey, FinalizedVal, Acc)
+    end, Acc0, ReReduced).
 
 
 % INSERTING INTO SKIPLIST
@@ -419,8 +421,10 @@ add_kv_to_skip_list(Db, ReduceIdxPrefix, MaxLevel, #{} = ViewOpts, Key, Val) ->
                     insert_new_level_key(TxDb, ReduceIdxPrefix, Key, Level,
                         Reducer, RangeOpts);
                 false ->
-                    {_, PrevVal1} = couch_views_reducer:rereduce(Reducer,
+                    Out = couch_views_reducer:rereduce(Reducer,
                         [{PrevKey, PrevVal}, {Key, Val}], 0),
+%%                    io:format("HIH ~p ~n", [Out]),
+                    [{_, PrevVal1}] = Out,
                     couch_views_reduce_fdb:add_kv(TxDb, ReduceIdxPrefix, Level,
                         PrevKey, PrevVal1)
             end
@@ -437,7 +441,7 @@ add_to_level0(TxDb, ReduceIdxPrefix, Key, Val, Reducer) ->
         not_found ->
             Val;
         ExistingVal ->
-            {_, NewReducedVal} = couch_views_reducer:rereduce(Reducer,
+            [{_, NewReducedVal}] = couch_views_reducer:rereduce(Reducer,
                 [{Key, ExistingVal}, {Key, Val}], group_true),
             NewReducedVal
     end,
@@ -451,7 +455,7 @@ update_previous_level_key(TxDb, ReduceIdxPrefix, PrevKey, PrevVal, Key, Level,
     NewPrevRange = couch_views_reduce_fdb:get_level_range(TxDb, PrevKey, Key,
         Level - 1, RangeOpts, ReduceIdxPrefix),
 
-    {_, NewPrevVal} = couch_views_reducer:rereduce(Reducer,
+    [{_, NewPrevVal}] = couch_views_reducer:rereduce(Reducer,
         NewPrevRange, 0),
 
     if NewPrevVal == PrevVal -> ok; true ->
@@ -467,7 +471,7 @@ insert_new_level_key(TxDb, ReduceIdxPrefix, Key, Level, Reducer, RangeOpts) ->
         ReduceIdxPrefix),
     KeyRange = couch_views_reduce_fdb:get_level_range(TxDb, Key, NextKey,
         Level - 1, RangeOpts, ReduceIdxPrefix),
-    {_, ReducedVal} = couch_views_reducer:rereduce(Reducer, KeyRange, 0),
+    [{_, ReducedVal}] = couch_views_reducer:rereduce(Reducer, KeyRange, 0),
     couch_views_reduce_fdb:add_kv(TxDb, ReduceIdxPrefix, Level,
         Key, ReducedVal).
 

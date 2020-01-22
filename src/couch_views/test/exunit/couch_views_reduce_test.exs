@@ -357,6 +357,24 @@ defmodule CouchViewsReduceTest do
     run_query(context, args1, "count", correct1)
   end
 
+  test "strings count reduce group_level=1", context do
+    args = %{
+      reduce: true,
+      group_level: 1,
+      start_key: "4"
+    }
+
+    correct = [
+      {:row, [key: "5", value: 1]},
+      {:row, [key: "6", value: 1]},
+      {:row, [key: "7", value: 1]},
+      {:row, [key: "8", value: 2]},
+      {:row, [key: "9", value: 1]}
+    ]
+
+    run_query(context, args, "count_strings", correct)
+  end
+
   test "_stats reduce works", context do
     args = %{
       reduce: true,
@@ -494,6 +512,13 @@ defmodule CouchViewsReduceTest do
 
       {date_key, date_val} = Enum.at(dates, i - 1)
 
+      val =
+        if i == 4 do
+          8
+        else
+          i
+        end
+
       :couch_doc.from_json_obj(
         {[
            {"_id", "doc-id-#{i}"},
@@ -501,7 +526,8 @@ defmodule CouchViewsReduceTest do
            {"some", "field"},
            {"group", group},
            {"date", date_key},
-           {"date_val", date_val}
+           {"date_val", date_val},
+           {"random_val", val}
          ]}
       )
     end
@@ -519,6 +545,14 @@ defmodule CouchViewsReduceTest do
             }
           """,
           "reduce" => "_sum"
+        },
+        "count_strings" => %{
+          "map" => """
+            function(doc) {
+              emit(doc.random_val.toString(), 1);
+            }
+          """,
+          "reduce" => "_count"
         },
         "count" => %{
           "map" => """

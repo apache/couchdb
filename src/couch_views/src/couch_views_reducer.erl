@@ -43,8 +43,11 @@
 -define(HYPER_PRECISION, 11).
 
 
-start_value(<<"_approx_count_distinct">>) ->
+start_value(?BUILTIN_COUNT_DISTINCT) ->
     hyper:new(?HYPER_PRECISION);
+
+start_value(?BUILTIN_STATS) ->
+    create_stats(0);
 
 start_value(_) ->
     0.
@@ -134,35 +137,34 @@ rereduce(_Reducer, [], _GroupLevel) ->
 rereduce(_Reducer, Rows, GroupLevel) when length(Rows) == 1 ->
     {Key, Val} = hd(Rows),
     GroupKey = couch_views_util:group_level_key(Key, GroupLevel),
-    {GroupKey, Val};
+    [{GroupKey, Val}];
 
-rereduce(?BUILTIN_SUM, Rows, GroupLevel) ->
-    Sum = lists:foldl(fun ({_, Val}, Acc) ->
-        builtin_sum_rows([Val], Acc)
-    end, 0, Rows),
-    {Key, _} = hd(Rows),
-    GroupKey = couch_views_util:group_level_key(Key, GroupLevel),
-    {GroupKey, Sum};
+rereduce(Reducer, Rows, GroupLevel) ->
+    ReReduceMap = lists:foldl(fun ({Key, Val}, Acc) ->
+        GroupKey = couch_views_util:group_level_key(Key, GroupLevel),
+        case maps:is_key(GroupKey, Acc) of
+            true ->
+                #{GroupKey := ValAcc} = Acc,
+                ValAcc1 = rereduce_int(Reducer, Val, ValAcc),
+                Acc#{GroupKey := ValAcc1};
+            false ->
+                Acc#{GroupKey => Val}
+        end
+    end, #{}, Rows),
+    maps:to_list(ReReduceMap).
 
-rereduce(?BUILTIN_COUNT, Rows, GroupLevel) ->
-    rereduce(<<"_sum">>, Rows, GroupLevel);
 
-rereduce(?BUILTIN_COUNT_DISTINCT, Rows, GroupLevel) ->
-    {Key, _} = hd(Rows),
-    GroupKey = couch_views_util:group_level_key(Key, GroupLevel),
-    Reduction = hyper:union([Filter || {_, Filter} <- Rows]),
-    {GroupKey, Reduction};
+rereduce_int(?BUILTIN_SUM, Val, Acc) ->
+    builtin_sum_rows([Val], Acc);
 
-rereduce(?BUILTIN_STATS, [{skip_start, 0} | Rows], GroupLevel) ->
-    rereduce(<<"_stats">>, Rows, GroupLevel);
+rereduce_int(?BUILTIN_COUNT, Val, Acc) ->
+    builtin_sum_rows([Val], Acc);
 
-rereduce(?BUILTIN_STATS, [Head | Rows], GroupLevel) ->
-    {Key, Stats0} = Head,
-    Stats = lists:foldl(fun ({_Key, KeyStats}, Acc) ->
-        aggregate_stats(KeyStats, Acc)
-    end, Stats0, Rows),
-    GroupKey = couch_views_util:group_level_key(Key, GroupLevel),
-    {GroupKey, Stats}.
+rereduce_int(?BUILTIN_COUNT_DISTINCT, Filter, Acc) ->
+    hyper:union([Acc, Filter]);
+
+rereduce_int(?BUILTIN_STATS, Val, Acc) ->
+    aggregate_stats(Val, Acc).
 
 
 finalize(?BUILTIN_COUNT_DISTINCT, Reduction) ->
@@ -299,7 +301,6 @@ create_stats(Val) when is_number(Val) ->
 
 create_stats(Val) ->
     throw({invalid_value, iolist_to_binary(io_lib:format(?STATERROR, [Val]))}).
-
 
 aggregate_stats(Stats1, Stats2) ->
     #{

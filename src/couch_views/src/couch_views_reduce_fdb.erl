@@ -293,9 +293,17 @@ get_group_level_endkey(TxDb, GroupLevel, Level, StartKey, Reverse,
     Future = erlfdb:get_range(Tx, StartKey2, EndKey1, Opts),
     wait_and_get_key(Future);
 
-get_group_level_endkey(_TxDb, _GroupLevel, _Level, Key, _Reverse,
-        _ReduceIdxPrefix) ->
-    Key.
+get_group_level_endkey(TxDb, _GroupLevel, Level, StartKey, Reverse,
+        ReduceIdxPrefix) ->
+    #{
+        tx := Tx
+    } = TxDb,
+    StartKey1 = create_key(ReduceIdxPrefix, Level, StartKey),
+    StartKey2 = erlfdb_key:first_greater_or_equal(StartKey1),
+    EndKey = create_key(ReduceIdxPrefix, Level, []),
+    Opts = [{reverse, not Reverse}, {limit, 1}],
+    Future = erlfdb:get_range(Tx, StartKey2, EndKey, Opts),
+    wait_and_get_key(Future).
 
 
 get_level_range(TxDb, StartKey, EndKey, Level, Opts, ReduceIdxPrefix) ->
