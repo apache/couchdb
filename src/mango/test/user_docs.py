@@ -61,33 +61,35 @@ def setup_users(db, **kwargs):
 
 def setup(db, index_type="view", **kwargs):
     db.recreate()
-    db.save_docs(copy.deepcopy(DOCS))
     if index_type == "view":
         add_view_indexes(db, kwargs)
     elif index_type == "text":
         add_text_indexes(db, kwargs)
+    copy_docs = copy.deepcopy(DOCS)
+    resp = db.save_doc(copy_docs[0])
+    # db.save_docs(copy.deepcopy(DOCS))
 
 
 def add_view_indexes(db, kwargs):
     indexes = [
-        (["user_id"], "user_id"),
-        (["name.last", "name.first"], "name"),
+        # (["user_id"], "user_id"),
+        # (["name.last", "name.first"], "name"),
         (["age"], "age"),
-        (
-            [
-                "location.state",
-                "location.city",
-                "location.address.street",
-                "location.address.number",
-            ],
-            "location",
-        ),
-        (["company", "manager"], "company_and_manager"),
-        (["manager"], "manager"),
-        (["favorites"], "favorites"),
-        (["favorites.3"], "favorites_3"),
-        (["twitter"], "twitter"),
-        (["ordered"], "ordered"),
+        # (
+        #     [
+        #         "location.state",
+        #         "location.city",
+        #         "location.address.street",
+        #         "location.address.number",
+        #     ],
+        #     "location",
+        # ),
+        # (["company", "manager"], "company_and_manager"),
+        # (["manager"], "manager"),
+        # (["favorites"], "favorites"),
+        # (["favorites.3"], "favorites_3"),
+        # (["twitter"], "twitter"),
+        # (["ordered"], "ordered"),
     ]
     for (idx, name) in indexes:
         assert db.create_index(idx, name=name, ddoc=name) is True

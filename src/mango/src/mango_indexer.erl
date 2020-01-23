@@ -19,59 +19,96 @@
 ]).
 
 
-update(Db, deleted, _, OldDoc) ->
+-include_lib("couch/include/couch_db.hrl").
+-include("mango_idx.hrl").
+
+% Design doc
+% Todo: Check if design doc is mango index and kick off background worker
+% to build new index
+update(Db, Change, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, OldDoc) ->
     ok;
+
+update(Db, deleted, _, OldDoc)  ->
+    ok;
+
 update(Db, updated, Doc, OldDoc) ->
     ok;
+
 update(Db, created, Doc, _) ->
-%%    Indexes = mango_idx:list(Db),
-%%    Fun = fun (DDoc, Acc) ->
-%%        io:format("DESIGN DOC ~p ~n", [DDoc]),
-%%        Acc
-%%    end,
-%%    fabric2_db:fold_design_docs(Db, Fun, [], []),
-%%    % maybe validate indexes here
-%%    JSONDoc = mango_json:to_binary(couch_doc:to_json_obj(Doc, [])),
-%%    io:format("Update ~p ~n, ~p ~n", [Doc, JSONDoc]),
-%%    Results = index_doc(Indexes, JSONDoc),
-    ok.
+    #doc{id = DocId} = Doc,
+    Indexes = mango_idx:list(Db),
+    Indexes1 = filter_and_to_json(Indexes),
+    io:format("UPDATE INDEXES ~p ~n filtered ~p ~n", [Indexes, Indexes1]),
+    JSONDoc = mango_json:to_binary(couch_doc:to_json_obj(Doc, [])),
+    io:format("DOC ~p ~n", [Doc]),
+    Results = index_doc(Indexes1, JSONDoc),
+    io:format("Update ~p ~n, ~p ~n Results ~p ~n", [Doc, JSONDoc, Results]),
+    mango_fdb:write_doc(Db, DocId, Results).
+
+
+filter_and_to_json(Indexes) ->
+    lists:filter(fun (Idx) ->
+        case Idx#idx.type == <<"special">> of
+            true -> false;
+            false -> true
+        end
+    end, Indexes).
 
 
 index_doc(Indexes, Doc) ->
-    lists:map(fun(Idx) -> get_index_entries(Idx, Doc) end, Indexes).
+    lists:foldl(fun(Idx, Acc) ->
+        io:format("II ~p ~n", [Idx]),
+        {IdxDef} = mango_idx:def(Idx),
+        Results = get_index_entries(IdxDef, Doc),
+        case lists:member(not_found, Results) of
+            true ->
+                Acc;
+            false ->
+                IdxResult = #{
+                    name => mango_idx:name(Idx),
+                    ddoc_id => mango_idx:ddoc(Idx),
+                    results => Results
+                },
+                [IdxResult | Acc]
+        end
+    end, [], Indexes).
 
 
-get_index_entries({IdxProps}, Doc) ->
-    {Fields} = couch_util:get_value(<<"fields">>, IdxProps),
-    Selector = get_index_partial_filter_selector(IdxProps),
+get_index_entries(IdxDef, Doc) ->
+    {Fields} = couch_util:get_value(<<"fields">>, IdxDef),
+    Selector = get_index_partial_filter_selector(IdxDef),
     case should_index(Selector, Doc) of
         false ->
-            [];
+            [not_found];
         true ->
             Values = get_index_values(Fields, Doc),
-            case lists:member(not_found, Values) of
-                true -> [];
-                false -> [[Values, null]]
-            end
+            Values
+%%            case lists:member(not_found, Values) of
+%%                true -> not_found;
+%%                false -> [Values]
+%%%%                false -> [[Values, null]]
+%%            end
     end.
 
 
 get_index_values(Fields, Doc) ->
-    lists:map(fun({Field, _Dir}) ->
+    Out1 = lists:map(fun({Field, _Dir}) ->
         case mango_doc:get_field(Doc, Field) of
             not_found -> not_found;
             bad_path -> not_found;
             Value -> Value
         end
-    end, Fields).
+    end, Fields),
+    io:format("OUT ~p ~p ~n", [Fields, Out1]),
+    Out1.
 
 
-get_index_partial_filter_selector(IdxProps) ->
-    case couch_util:get_value(<<"partial_filter_selector">>, IdxProps, {[]}) of
+get_index_partial_filter_selector(IdxDef) ->
+    case couch_util:get_value(<<"partial_filter_selector">>, IdxDef, {[]}) of
         {[]} ->
             % this is to support legacy text indexes that had the partial_filter_selector
             % set as selector
-            couch_util:get_value(<<"selector">>, IdxProps, {[]});
+            couch_util:get_value(<<"selector">>, IdxDef, {[]});
         Else ->
             Else
     end.
