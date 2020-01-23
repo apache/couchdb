@@ -78,13 +78,13 @@ ddoc_fold_cb({row, Row}, Acc) ->
     {_, Id} = lists:keyfind(id, 1, Row),
     {ok, Doc} = fabric2_db:open_doc(Db, Id),
     JSONDoc = couch_doc:to_json_obj(Doc, []),
-    try
-        Idx = from_ddoc(Db, JSONDoc),
-        {ok, Acc#{rows:= Rows ++ Idx}}
-    catch
-       throw:{mango_error, _, invalid_query_ddoc_language} ->
-           io:format("ERROR ~p ~n", [JSONDoc]),
-           {ok, Acc}
+    {Props} = JSONDoc,
+    case proplists:get_value(<<"language">>, Props) of
+        <<"query">> ->
+            Idx = from_ddoc(Db, JSONDoc),
+            {ok, Acc#{rows:= Rows ++ Idx}};
+        _ ->
+            {ok, Acc}
     end.
 
 
@@ -212,12 +212,13 @@ from_ddoc(Db, {Props}) ->
         _ ->
             ?MANGO_ERROR(invalid_query_ddoc_language)
     end,
-    IdxMods = case clouseau_rpc:connected() of
-        true ->
-            [mango_idx_view, mango_idx_text];
-        false ->
-            [mango_idx_view]
-    end,
+    IdxMods = [mango_idx_view],
+%%    IdxMods = case clouseau_rpc:connected() of
+%%        true ->
+%%            [mango_idx_view, mango_idx_text];
+%%        false ->
+%%            [mango_idx_view]
+%%    end,
     Idxs = lists:flatmap(fun(Mod) -> Mod:from_ddoc({Props}) end, IdxMods),
     lists:map(fun(Idx) ->
         Idx#idx{

@@ -11,3 +11,6 @@
 % the License.
 
 -define(MANGO_ERROR(R), throw({mango_error, ?MODULE, R})).
+
+-define(MANGO_IDX_BUILD_STATUS, 0).
+-define(MANGO_IDX_RANGE, 1).

@@ -136,7 +136,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
                     % Normal view
                     DDoc = ddocid(Idx),
                     Name = mango_idx:name(Idx),
-                    fabric:query_view(Db, DbOpts, DDoc, Name, CB, Cursor, Args)
+                    mango_fdb:query(Db, CB, Cursor, Args)
             end,
             case Result of
                 {ok, LastCursor} ->
@@ -217,65 +217,65 @@ choose_best_index(_DbName, IndexRanges) ->
     {SelectedIndex, SelectedIndexRanges}.
 
 
-view_cb({meta, Meta}, Acc) ->
-    % Map function starting
-    put(mango_docs_examined, 0),
-    set_mango_msg_timestamp(),
-    ok = rexi:stream2({meta, Meta}),
-    {ok, Acc};
-view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
-    ViewRow =  #view_row{
-        id = couch_util:get_value(id, Row),
-        key = couch_util:get_value(key, Row),
-        doc = couch_util:get_value(doc, Row)
-    },
-    case ViewRow#view_row.doc of
-        null ->
-            put(mango_docs_examined, get(mango_docs_examined) + 1),
-            maybe_send_mango_ping();
-        undefined ->
-            ViewRow2 = ViewRow#view_row{
-                value = couch_util:get_value(value, Row)
-            },
-            ok = rexi:stream2(ViewRow2),
-            put(mango_docs_examined, 0),
-            set_mango_msg_timestamp();
-        Doc ->
-            Selector = couch_util:get_value(selector, Options),
-            case mango_selector:match(Selector, Doc) of
-                true ->
-                    ViewRow2 = ViewRow#view_row{
-                        value = get(mango_docs_examined) + 1
-                    },
-                    ok = rexi:stream2(ViewRow2),
-                    put(mango_docs_examined, 0),
-                    set_mango_msg_timestamp();
-                false ->
-                    put(mango_docs_examined, get(mango_docs_examined) + 1),
-                    maybe_send_mango_ping()
-            end
-        end,
-    {ok, Acc};
-view_cb(complete, Acc) ->
-    % Finish view output
-    ok = rexi:stream_last(complete),
-    {ok, Acc};
-view_cb(ok, ddoc_updated) ->
-    rexi:reply({ok, ddoc_updated}).
+%%view_cb({meta, Meta}, Acc) ->
+%%    % Map function starting
+%%    put(mango_docs_examined, 0),
+%%    set_mango_msg_timestamp(),
+%%    ok = rexi:stream2({meta, Meta}),
+%%    {ok, Acc};
+%%view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
+%%    ViewRow =  #view_row{
+%%        id = couch_util:get_value(id, Row),
+%%        key = couch_util:get_value(key, Row),
+%%        doc = couch_util:get_value(doc, Row)
+%%    },
+%%    case ViewRow#view_row.doc of
+%%        null ->
+%%            put(mango_docs_examined, get(mango_docs_examined) + 1),
+%%            maybe_send_mango_ping();
+%%        undefined ->
+%%            ViewRow2 = ViewRow#view_row{
+%%                value = couch_util:get_value(value, Row)
+%%            },
+%%            ok = rexi:stream2(ViewRow2),
+%%            put(mango_docs_examined, 0),
+%%            set_mango_msg_timestamp();
+%%        Doc ->
+%%            Selector = couch_util:get_value(selector, Options),
+%%            case mango_selector:match(Selector, Doc) of
+%%                true ->
+%%                    ViewRow2 = ViewRow#view_row{
+%%                        value = get(mango_docs_examined) + 1
+%%                    },
+%%                    ok = rexi:stream2(ViewRow2),
+%%                    put(mango_docs_examined, 0),
+%%                    set_mango_msg_timestamp();
+%%                false ->
+%%                    put(mango_docs_examined, get(mango_docs_examined) + 1),
+%%                    maybe_send_mango_ping()
+%%            end
+%%        end,
+%%    {ok, Acc};
+%%view_cb(complete, Acc) ->
+%%    % Finish view output
+%%    ok = rexi:stream_last(complete),
+%%    {ok, Acc};
+%%view_cb(ok, ddoc_updated) ->
+%%    rexi:reply({ok, ddoc_updated}).
 
 
-maybe_send_mango_ping() ->
-    Current = os:timestamp(),
-    LastPing = get(mango_last_msg_timestamp),
-    % Fabric will timeout if it has not heard a response from a worker node
-    % after 5 seconds. Send a ping every 4 seconds so the timeout doesn't happen.
-    case timer:now_diff(Current, LastPing) > ?HEARTBEAT_INTERVAL_IN_USEC of
-        false ->
-            ok;
-        true ->
-            rexi:ping(),
-            set_mango_msg_timestamp()
-    end.
+%%maybe_send_mango_ping() ->
+%%    Current = os:timestamp(),
+%%    LastPing = get(mango_last_msg_timestamp),
+%%    % Fabric will timeout if it has not heard a response from a worker node
+%%    % after 5 seconds. Send a ping every 4 seconds so the timeout doesn't happen.
+%%    case timer:now_diff(Current, LastPing) > ?HEARTBEAT_INTERVAL_IN_USEC of
+%%        false ->
+%%            ok;
+%%        true ->
+%%            rexi:ping(),
+%%            set_mango_msg_timestamp()
+%%    end.
 
 
 set_mango_msg_timestamp() ->
@@ -284,14 +284,16 @@ set_mango_msg_timestamp() ->
 
 handle_message({meta, _}, Cursor) ->
     {ok, Cursor};
-handle_message({row, Props}, Cursor) ->
-    case doc_member(Cursor, Props) of
-        {ok, Doc, {execution_stats, ExecutionStats1}} ->
+handle_message(Doc, Cursor) ->
+    JSONDoc = couch_doc:to_json_obj(Doc, []),
+    case doc_member(Cursor, JSONDoc) of
+        {ok, JSONDoc, {execution_stats, ExecutionStats1}} ->
             Cursor1 = Cursor#cursor {
                 execution_stats = ExecutionStats1
             },
+            {Props} = JSONDoc,
             Cursor2 = update_bookmark_keys(Cursor1, Props),
-            FinalDoc = mango_fields:extract(Doc, Cursor2#cursor.fields),
+            FinalDoc = mango_fields:extract(JSONDoc, Cursor2#cursor.fields),
             handle_doc(Cursor2, FinalDoc);
         {no_match, _, {execution_stats, ExecutionStats1}} ->
             Cursor1 = Cursor#cursor {
@@ -409,47 +411,50 @@ apply_opts([{_, _} | Rest], Args) ->
     apply_opts(Rest, Args).
 
 
-doc_member(Cursor, RowProps) ->
-    Db = Cursor#cursor.db, 
-    Opts = Cursor#cursor.opts,
+doc_member(Cursor, DocProps) ->
+%%    Db = Cursor#cursor.db,
+%%    Opts = Cursor#cursor.opts,
     ExecutionStats = Cursor#cursor.execution_stats,
     Selector = Cursor#cursor.selector,
-    {Matched, Incr} = case couch_util:get_value(value, RowProps) of
-        N when is_integer(N) -> {true, N};
-        _ -> {false, 1}
-    end,
-    case couch_util:get_value(doc, RowProps) of
-        {DocProps} ->
-            ExecutionStats1 = mango_execution_stats:incr_docs_examined(ExecutionStats, Incr),
-            case Matched of
-                true ->
-                    {ok, {DocProps}, {execution_stats, ExecutionStats1}};
-                false ->
-                    match_doc(Selector, {DocProps}, ExecutionStats1)
-                end;
-        undefined ->
-            ExecutionStats1 = mango_execution_stats:incr_quorum_docs_examined(ExecutionStats),
-            Id = couch_util:get_value(id, RowProps),
-            case mango_util:defer(fabric, open_doc, [Db, Id, Opts]) of
-                {ok, #doc{}=DocProps} ->
-                    Doc = couch_doc:to_json_obj(DocProps, []),
-                    match_doc(Selector, Doc, ExecutionStats1);
-                Else ->
-                    Else
-            end;
-        null ->
-            ExecutionStats1 = mango_execution_stats:incr_docs_examined(ExecutionStats),
-            {no_match, null, {execution_stats, ExecutionStats1}}
-    end.
+    ExecutionStats1 = mango_execution_stats:incr_docs_examined(ExecutionStats, 1),
+    match_doc(Selector, DocProps, ExecutionStats1).
+    %%    {Matched, Incr} = case couch_util:get_value(value, RowProps) of
+%%        N when is_integer(N) -> {true, N};
+%%        _ -> {false, 1}
+%%    end,
+%%    case couch_util:get_value(doc, RowProps) of
+%%        {DocProps} ->
+%%            ExecutionStats1 = mango_execution_stats:incr_docs_examined(ExecutionStats, Incr),
+%%            case Matched of
+%%                true ->
+%%                    {ok, {DocProps}, {execution_stats, ExecutionStats1}};
+%%                false ->
+%%                    match_doc(Selector, {DocProps}, ExecutionStats1)
+%%                end
+%%        undefined ->
+%%            ExecutionStats1 = mango_execution_stats:incr_quorum_docs_examined(ExecutionStats),
+%%            Id = couch_util:get_value(id, RowProps),
+%%            case mango_util:defer(fabric, open_doc, [Db, Id, Opts]) of
+%%                {ok, #doc{}=DocProps} ->
+%%                    Doc = couch_doc:to_json_obj(DocProps, []),
+%%                    match_doc(Selector, Doc, ExecutionStats1);
+%%                Else ->
+%%                    Else
+%%            end;
+%%        null ->
+%%            ExecutionStats1 = mango_execution_stats:incr_docs_examined(ExecutionStats),
+%%            {no_match, null, {execution_stats, ExecutionStats1}}
+%%    end.
 
 
 match_doc(Selector, Doc, ExecutionStats) ->
-    case mango_selector:match(Selector, Doc) of
-        true ->
-            {ok, Doc, {execution_stats, ExecutionStats}};
-        false ->
-            {no_match, Doc, {execution_stats, ExecutionStats}}
-    end.
+    {ok, Doc, {execution_stats, ExecutionStats}}.
+%%    case mango_selector:match(Selector, Doc) of
+%%        true ->
+%%            {ok, Doc, {execution_stats, ExecutionStats}};
+%%        false ->
+%%            {no_match, Doc, {execution_stats, ExecutionStats}}
+%%    end.
 
 
 is_design_doc(RowProps) ->
