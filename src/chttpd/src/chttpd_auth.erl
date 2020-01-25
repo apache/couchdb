@@ -55,10 +55,12 @@ party_mode_handler(#httpd{method='POST', path_parts=[<<"_session">>]} = Req) ->
     % See #1947 - users should always be able to attempt a login
     Req#httpd{user_ctx=#user_ctx{}};
 party_mode_handler(Req) ->
-    case config:get("chttpd", "require_valid_user", "false") of
-    "true" ->
+    RequireValidUser = config:get_boolean("chttpd", "require_valid_user", false),
+    ExceptUp = config:get_boolean("chttpd", "require_valid_user_except_for_up", true),
+    case RequireValidUser andalso not ExceptUp of
+    true ->
         throw({unauthorized, <<"Authentication required.">>});
-    "false" ->
+    false ->
         case config:get("admins") of
         [] ->
             Req#httpd{user_ctx = ?ADMIN_USER};

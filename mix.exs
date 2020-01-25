@@ -109,7 +109,6 @@ defmodule CouchDBTest.Mixfile do
       "bear",
       "mochiweb",
       "snappy",
-      "triq",
       "rebar",
       "proper",
       "mochiweb",
