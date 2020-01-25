@@ -692,7 +692,7 @@ set_mqd_off_heap(Module) ->
 
 
 set_process_priority(Module, Level) ->
-    case config:get_boolean("process_priority", atom_to_list(Module), true) of
+    case config:get_boolean("process_priority", atom_to_list(Module), false) of
         true ->
             process_flag(priority, Level),
             ok;
