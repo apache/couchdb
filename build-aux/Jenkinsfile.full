@@ -81,7 +81,7 @@ pipeline {
       agent {
         docker {
           label 'docker'
-          image 'couchdbdev/debian-stretch-erlang-20.3.8.24-1:latest'
+          image 'couchdbdev/debian-stretch-erlang-20.3.8.25-1:latest'
           args "${DOCKER_ARGS}"
           alwaysPull true
         }
@@ -161,7 +161,7 @@ pipeline {
         stage('CentOS 6') {
           agent {
             docker {
-              image 'couchdbdev/centos-6-erlang-20.3.8.24-1:latest'
+              image 'couchdbdev/centos-6-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
               alwaysPull true
@@ -205,7 +205,7 @@ pipeline {
         stage('CentOS 7') {
           agent {
             docker {
-              image 'couchdbdev/centos-7-erlang-20.3.8.24-1:latest'
+              image 'couchdbdev/centos-7-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
               alwaysPull true
@@ -250,7 +250,7 @@ pipeline {
         stage('CentOS 8') {
           agent {
             docker {
-              image 'couchdbdev/centos-8-erlang-20.3.8.24-1:latest'
+              image 'couchdbdev/centos-8-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
               alwaysPull true
@@ -295,7 +295,7 @@ pipeline {
         stage('Ubuntu Xenial') {
           agent {
             docker {
-              image 'couchdbdev/ubuntu-xenial-erlang-20.3.8.24-1:latest'
+              image 'couchdbdev/ubuntu-xenial-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
               alwaysPull true
@@ -339,7 +339,7 @@ pipeline {
         stage('Ubuntu Bionic') {
           agent {
             docker {
-              image 'couchdbdev/ubuntu-bionic-erlang-20.3.8.24-1:latest'
+              image 'couchdbdev/ubuntu-bionic-erlang-20.3.8.25-1:latest'
               label 'docker'
               alwaysPull true
               args "${DOCKER_ARGS}"
@@ -383,7 +383,7 @@ pipeline {
         stage('Debian Stretch') {
           agent {
             docker {
-              image 'couchdbdev/debian-stretch-erlang-20.3.8.24-1:latest'
+              image 'couchdbdev/debian-stretch-erlang-20.3.8.25-1:latest'
               label 'docker'
               alwaysPull true
               args "${DOCKER_ARGS}"
@@ -427,7 +427,7 @@ pipeline {
         stage('Debian Buster amd64') {
           agent {
             docker {
-              image 'couchdbdev/debian-buster-erlang-20.3.8.24-1:latest'
+              image 'couchdbdev/debian-buster-erlang-20.3.8.25-1:latest'
               label 'docker'
               alwaysPull true
               args "${DOCKER_ARGS}"
@@ -471,7 +471,7 @@ pipeline {
         stage('Debian Buster arm64v8') {
           agent {
             docker {
-              image 'couchdbdev/arm64v8-debian-buster-erlang-20.3.8.24-1:latest'
+              image 'couchdbdev/arm64v8-debian-buster-erlang-20.3.8.25-1:latest'
               label 'arm64v8'
               alwaysPull true
               args "${DOCKER_ARGS}"
@@ -515,7 +515,7 @@ pipeline {
         stage('Debian Buster ppc64le') {
           agent {
             docker {
-              image 'couchdbdev/ppc64le-debian-buster-erlang-20.3.8.24-1:latest'
+              image 'couchdbdev/ppc64le-debian-buster-erlang-20.3.8.25-1:latest'
               label 'ppc64le'
               alwaysPull true
               args "${DOCKER_ARGS}"
@@ -584,12 +584,12 @@ pipeline {
             }
             stage('Pull latest docker image') {
               steps {
-                sh "docker pull couchdbdev/arm64v8-debian-buster-erlang-20.3.8.24-1:latest"
+                sh "docker pull couchdbdev/arm64v8-debian-buster-erlang-20.3.8.25-1:latest"
               }
             }
             stage('Build from tarball & test & packages') {
               steps {
-                withDockerContainer(image: "couchdbdev/arm64v8-debian-buster-erlang-20.3.8.24-1:latest", args: "${DOCKER_ARGS}") {
+                withDockerContainer(image: "couchdbdev/arm64v8-debian-buster-erlang-20.3.8.25-1:latest", args: "${DOCKER_ARGS}") {
                   unstash 'tarball'
                   withEnv(['MIX_HOME='+pwd(), 'HEX_HOME='+pwd()]) {
                     sh( script: build_and_test )
@@ -629,7 +629,7 @@ pipeline {
 
       agent {
         docker {
-          image 'couchdbdev/debian-buster-erlang-20.3.8.24-1:latest'
+          image 'couchdbdev/debian-buster-erlang-20.3.8.25-1:latest'
           label 'docker'
           alwaysPull true
           args "${DOCKER_ARGS}"
