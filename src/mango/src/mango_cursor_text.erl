@@ -176,6 +176,10 @@ handle_hits(CAcc0, [{Sort, Doc} | Rest]) ->
     handle_hits(CAcc1, Rest).
 
 
+handle_hit(CAcc0, Sort, not_found) ->
+    CAcc1 = update_bookmark(CAcc0, Sort),
+    CAcc1;
+
 handle_hit(CAcc0, Sort, Doc) ->
     #cacc{
         limit = Limit,
