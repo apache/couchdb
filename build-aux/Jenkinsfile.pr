@@ -12,7 +12,6 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-
 build_and_test = '''
 mkdir -p ${COUCHDB_IO_LOG_DIR} ${ERLANG_VERSION}
 cd ${ERLANG_VERSION}
@@ -46,11 +45,12 @@ pipeline {
     // npm config cache below deals with /home/jenkins not mapping correctly
     // inside the image
     DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
-    // Also be sure to change these values in the matrix below...
+    // *** BE SURE TO CHANGE THE ERLANG VERSION FARTHER DOWN S WELL ***
+    // Search for ERLANG_VERSION
     // see https://issues.jenkins-ci.org/browse/JENKINS-40986
     LOW_ERLANG_VER = '20.3.8.11'
-    MID_ERLANG_VER = '20.3.8.24'
-    HIGH_ERLANG_VER = '22.2'
+    MID_ERLANG_VER = '20.3.8.25'
+    HIGH_ERLANG_VER = '22.2.3'
   }
 
   options {
@@ -106,7 +106,7 @@ pipeline {
         axes {
           axis {
             name 'ERLANG_VERSION'
-            values "20.3.8.11", "20.3.8.24", "22.2"
+            values "20.3.8.11", "20.3.8.25", "22.2.3"
           }
         }
 
