@@ -366,7 +366,8 @@ value_str(Value) when is_binary(Value) ->
         true ->
             <<"\"", Value/binary, "\"">>;
         false ->
-            mango_util:lucene_escape_query_value(Value)
+            Escaped = mango_util:lucene_escape_query_value(Value),
+            <<"\"", Escaped/binary, "\"">>
     end;
 value_str(Value) when is_integer(Value) ->
     list_to_binary(integer_to_list(Value));
