@@ -10,4 +10,5 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--define(MAX_JSON_OBJ, {<<255, 255, 255, 255>>}).
+%%-define(MAX_JSON_OBJ, {<<255, 255, 255, 255>>}).
+-define(MAX_JSON_OBJ, less_than).

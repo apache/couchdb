@@ -118,16 +118,13 @@ class BasicFindTests(mango.UserDocsTests):
     #             assert e.response.status_code == 400
     #         else:
     #             raise AssertionError("bad find")
-    #
+
     def test_simple_find(self):
-        print("OK")
-        docs = self.db.find({"age": {"$lt": 45}})
-        print("DOC")
-        print(docs)
+        docs = self.db.find({"age": {"$lt": 35}})
         assert len(docs) == 3
-        # assert docs[0]["user_id"] == 9
-        # assert docs[1]["user_id"] == 1
-        # assert docs[2]["user_id"] == 7
+        assert docs[0]["user_id"] == 9
+        assert docs[1]["user_id"] == 1
+        assert docs[2]["user_id"] == 7
 
     # def test_multi_cond_and(self):
     #     docs = self.db.find({"manager": True, "location.city": "Longbranch"})

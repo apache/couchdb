@@ -37,7 +37,7 @@ update(Db, updated, Doc, OldDoc) ->
 update(Db, created, Doc, _) ->
     #doc{id = DocId} = Doc,
     Indexes = mango_idx:list(Db),
-    Indexes1 = filter_and_to_json(Indexes),
+    Indexes1 = filter_json_indexes(Indexes),
     io:format("UPDATE INDEXES ~p ~n filtered ~p ~n", [Indexes, Indexes1]),
     JSONDoc = mango_json:to_binary(couch_doc:to_json_obj(Doc, [])),
     io:format("DOC ~p ~n", [Doc]),
@@ -46,12 +46,9 @@ update(Db, created, Doc, _) ->
     mango_fdb:write_doc(Db, DocId, Results).
 
 
-filter_and_to_json(Indexes) ->
+filter_json_indexes(Indexes) ->
     lists:filter(fun (Idx) ->
-        case Idx#idx.type == <<"special">> of
-            true -> false;
-            false -> true
-        end
+        Idx#idx.type == <<"json">>
     end, Indexes).
 
 
