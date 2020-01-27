@@ -19,7 +19,7 @@
 ]).
 
 -export([
-    view_cb/2,
+%%    view_cb/2,
     handle_message/2,
     handle_all_docs_message/2,
     composite_indexes/2,
@@ -63,22 +63,23 @@ explain(Cursor) ->
     #cursor{
         opts = Opts
     } = Cursor,
+    [{marargs, {[]}}].
 
-    BaseArgs = base_args(Cursor),
-    Args = apply_opts(Opts, BaseArgs),
-
-    [{mrargs, {[
-        {include_docs, Args#mrargs.include_docs},
-        {view_type, Args#mrargs.view_type},
-        {reduce, Args#mrargs.reduce},
-        {partition, couch_mrview_util:get_extra(Args, partition, null)},
-        {start_key, maybe_replace_max_json(Args#mrargs.start_key)},
-        {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
-        {direction, Args#mrargs.direction},
-        {stable, Args#mrargs.stable},
-        {update, Args#mrargs.update},
-        {conflicts, Args#mrargs.conflicts}
-    ]}}].
+%%    BaseArgs = base_args(Cursor),
+%%    Args = apply_opts(Opts, BaseArgs),
+%%
+%%    [{mrargs, {[
+%%        {include_docs, Args#mrargs.include_docs},
+%%        {view_type, Args#mrargs.view_type},
+%%        {reduce, Args#mrargs.reduce},
+%%        {partition, couch_mrview_util:get_extra(Args, partition, null)},
+%%        {start_key, maybe_replace_max_json(Args#mrargs.start_key)},
+%%        {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
+%%        {direction, Args#mrargs.direction},
+%%        {stable, Args#mrargs.stable},
+%%        {update, Args#mrargs.update},
+%%        {conflicts, Args#mrargs.conflicts}
+%%    ]}}].
 
 
 % replace internal values that cannot
@@ -99,15 +100,31 @@ maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
 maybe_replace_max_json(EndKey) ->
     EndKey.
 
-base_args(#cursor{index = Idx, selector = Selector} = Cursor) ->
-    #mrargs{
-        view_type = map,
-        reduce = false,
-        start_key = mango_idx:start_key(Idx, Cursor#cursor.ranges),
-        end_key = mango_idx:end_key(Idx, Cursor#cursor.ranges),
-        include_docs = true,
-        extra = [{callback, {?MODULE, view_cb}}, {selector, Selector}]
-    }.
+index_args(#cursor{index = Idx} = Cursor) ->
+    #cursor{
+        index = Idx,
+        opts = Opts,
+        bookmark = Bookmark
+    } = Cursor,
+    Args0 = #{
+        start_key => mango_idx:start_key(Idx, Cursor#cursor.ranges),
+        start_key_docid => <<>>,
+        end_key => mango_idx:end_key(Idx, Cursor#cursor.ranges),
+        end_key_docid => <<>>,
+        skip => 0
+    },
+    Args = mango_json_bookmark:update_args(Bookmark, Args0),
+
+    Sort = couch_util:get_value(sort, Opts, [<<"asc">>]),
+    Args1 = case mango_sort:directions(Sort) of
+        [<<"desc">> | _] -> Args#{direction => rev};
+        _ -> Args#{direction => fwd}
+    end,
+
+    %% TODO: When supported, handle:
+    %% partitions
+    %% conflicts
+    Args1.
 
 
 execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFun, UserAcc) ->
@@ -121,21 +138,23 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             % empty indicates unsatisfiable ranges, so don't perform search
             {ok, UserAcc};
         _ ->
-            BaseArgs = base_args(Cursor),
+            Args = index_args(Cursor),
             #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
-            Args0 = apply_opts(Opts, BaseArgs),
-            Args = mango_json_bookmark:update_args(Bookmark, Args0), 
+%%            Args0 = BaseArgs,
+%%            Args0 = apply_opts(Opts, BaseArgs),
+%%            Args = mango_json_bookmark:update_args(Bookmark, Args0),
             UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
             DbOpts = [{user_ctx, UserCtx}],
             Result = case mango_idx:def(Idx) of
                 all_docs ->
                     CB = fun ?MODULE:handle_all_docs_message/2,
-                    fabric:all_docs(Db, DbOpts, CB, Cursor, Args);
+                    ok;
+%%                    fabric:all_docs(Db, DbOpts, CB, Cursor, Args);
                 _ ->
                     CB = fun ?MODULE:handle_message/2,
                     % Normal view
-                    DDoc = ddocid(Idx),
-                    Name = mango_idx:name(Idx),
+%%                    DDoc = ddocid(Idx),
+%%                    Name = mango_idx:name(Idx),
                     mango_fdb:query(Db, CB, Cursor, Args)
             end,
             case Result of
@@ -343,72 +362,72 @@ ddocid(Idx) ->
     end.
 
 
-apply_opts([], Args) ->
-    Args;
-apply_opts([{r, RStr} | Rest], Args) ->
-    IncludeDocs = case list_to_integer(RStr) of
-        1 ->
-            true;
-        R when R > 1 ->
-            % We don't load the doc in the view query because
-            % we have to do a quorum read in the coordinator
-            % so there's no point.
-            false
-    end,
-    NewArgs = Args#mrargs{include_docs = IncludeDocs},
-    apply_opts(Rest, NewArgs);
-apply_opts([{conflicts, true} | Rest], Args) ->
-    NewArgs = Args#mrargs{conflicts = true},
-    apply_opts(Rest, NewArgs);
-apply_opts([{conflicts, false} | Rest], Args) ->
-    % Ignored cause default
-    apply_opts(Rest, Args);
-apply_opts([{sort, Sort} | Rest], Args) ->
-    % We only support single direction sorts
-    % so nothing fancy here.
-    case mango_sort:directions(Sort) of
-        [] ->
-            apply_opts(Rest, Args);
-        [<<"asc">> | _] ->
-            apply_opts(Rest, Args);
-        [<<"desc">> | _] ->
-            SK = Args#mrargs.start_key,
-            SKDI = Args#mrargs.start_key_docid,
-            EK = Args#mrargs.end_key,
-            EKDI = Args#mrargs.end_key_docid,
-            NewArgs = Args#mrargs{
-                direction = rev,
-                start_key = EK,
-                start_key_docid = EKDI,
-                end_key = SK,
-                end_key_docid = SKDI
-            },
-            apply_opts(Rest, NewArgs)
-    end;
-apply_opts([{stale, ok} | Rest], Args) ->
-    NewArgs = Args#mrargs{
-        stable = true,
-        update = false
-    },
-    apply_opts(Rest, NewArgs);
-apply_opts([{stable, true} | Rest], Args) ->
-    NewArgs = Args#mrargs{
-        stable = true
-    },
-    apply_opts(Rest, NewArgs);
-apply_opts([{update, false} | Rest], Args) ->
-    NewArgs = Args#mrargs{
-        update = false
-    },
-    apply_opts(Rest, NewArgs);
-apply_opts([{partition, <<>>} | Rest], Args) ->
-    apply_opts(Rest, Args);
-apply_opts([{partition, Partition} | Rest], Args) when is_binary(Partition) ->
-    NewArgs = couch_mrview_util:set_extra(Args, partition, Partition),
-    apply_opts(Rest, NewArgs);
-apply_opts([{_, _} | Rest], Args) ->
-    % Ignore unknown options
-    apply_opts(Rest, Args).
+%%apply_opts([], Args) ->
+%%    Args;
+%%apply_opts([{r, RStr} | Rest], Args) ->
+%%    IncludeDocs = case list_to_integer(RStr) of
+%%        1 ->
+%%            true;
+%%        R when R > 1 ->
+%%            % We don't load the doc in the view query because
+%%            % we have to do a quorum read in the coordinator
+%%            % so there's no point.
+%%            false
+%%    end,
+%%    NewArgs = Args#mrargs{include_docs = IncludeDocs},
+%%    apply_opts(Rest, NewArgs);
+%%apply_opts([{conflicts, true} | Rest], Args) ->
+%%    NewArgs = Args#mrargs{conflicts = true},
+%%    apply_opts(Rest, NewArgs);
+%%apply_opts([{conflicts, false} | Rest], Args) ->
+%%    % Ignored cause default
+%%    apply_opts(Rest, Args);
+%%apply_opts([{sort, Sort} | Rest], Args) ->
+%%    % We only support single direction sorts
+%%    % so nothing fancy here.
+%%    case mango_sort:directions(Sort) of
+%%        [] ->
+%%            apply_opts(Rest, Args);
+%%        [<<"asc">> | _] ->
+%%            apply_opts(Rest, Args);
+%%        [<<"desc">> | _] ->
+%%            SK = Args#mrargs.start_key,
+%%            SKDI = Args#mrargs.start_key_docid,
+%%            EK = Args#mrargs.end_key,
+%%            EKDI = Args#mrargs.end_key_docid,
+%%            NewArgs = Args#mrargs{
+%%                direction = rev,
+%%                start_key = EK,
+%%                start_key_docid = EKDI,
+%%                end_key = SK,
+%%                end_key_docid = SKDI
+%%            },
+%%            apply_opts(Rest, NewArgs)
+%%    end;
+%%apply_opts([{stale, ok} | Rest], Args) ->
+%%    NewArgs = Args#mrargs{
+%%        stable = true,
+%%        update = false
+%%    },
+%%    apply_opts(Rest, NewArgs);
+%%apply_opts([{stable, true} | Rest], Args) ->
+%%    NewArgs = Args#mrargs{
+%%        stable = true
+%%    },
+%%    apply_opts(Rest, NewArgs);
+%%apply_opts([{update, false} | Rest], Args) ->
+%%    NewArgs = Args#mrargs{
+%%        update = false
+%%    },
+%%    apply_opts(Rest, NewArgs);
+%%apply_opts([{partition, <<>>} | Rest], Args) ->
+%%    apply_opts(Rest, Args);
+%%apply_opts([{partition, Partition} | Rest], Args) when is_binary(Partition) ->
+%%    NewArgs = couch_mrview_util:set_extra(Args, partition, Partition),
+%%    apply_opts(Rest, NewArgs);
+%%apply_opts([{_, _} | Rest], Args) ->
+%%    % Ignore unknown options
+%%    apply_opts(Rest, Args).
 
 
 doc_member(Cursor, DocProps) ->
@@ -448,13 +467,12 @@ doc_member(Cursor, DocProps) ->
 
 
 match_doc(Selector, Doc, ExecutionStats) ->
-    {ok, Doc, {execution_stats, ExecutionStats}}.
-%%    case mango_selector:match(Selector, Doc) of
-%%        true ->
-%%            {ok, Doc, {execution_stats, ExecutionStats}};
-%%        false ->
-%%            {no_match, Doc, {execution_stats, ExecutionStats}}
-%%    end.
+    case mango_selector:match(Selector, Doc) of
+        true ->
+            {ok, Doc, {execution_stats, ExecutionStats}};
+        false ->
+            {no_match, Doc, {execution_stats, ExecutionStats}}
+    end.
 
 
 is_design_doc(RowProps) ->

@@ -176,7 +176,8 @@ end_key([]) ->
 end_key([{_, _, '$lt', Key} | Rest]) ->
     case mango_json:special(Key) of
         true ->
-            [?MAX_JSON_OBJ];
+%%            [?MAX_JSON_OBJ];
+              [less_than];
         false ->
             [Key | end_key(Rest)]
     end;

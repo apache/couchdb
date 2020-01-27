@@ -65,9 +65,9 @@ def setup(db, index_type="view", **kwargs):
         add_view_indexes(db, kwargs)
     elif index_type == "text":
         add_text_indexes(db, kwargs)
-    copy_docs = copy.deepcopy(DOCS)
-    resp = db.save_doc(copy_docs[0])
-    # db.save_docs(copy.deepcopy(DOCS))
+    # copy_docs = copy.deepcopy(DOCS)
+    # resp = db.save_doc(copy_docs[0])
+    db.save_docs(copy.deepcopy(DOCS))
 
 
 def add_view_indexes(db, kwargs):
