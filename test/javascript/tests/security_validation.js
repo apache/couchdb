@@ -10,6 +10,8 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.skip = true;
+
 couchTests.security_validation = function(debug) {
 
   var db_name = get_random_db_name();
