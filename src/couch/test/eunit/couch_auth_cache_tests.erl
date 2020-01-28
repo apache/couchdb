@@ -33,31 +33,31 @@ teardown(DbName) ->
     ok.
 
 
-couch_auth_cache_test_() ->
-    {
-        "CouchDB auth cache tests",
-        {
-            setup,
-            fun start/0, fun test_util:stop_couch/1,
-            {
-                foreach,
-                fun setup/0, fun teardown/1,
-                [
-                    fun should_get_nil_on_missed_cache/1,
-                    fun should_get_right_password_hash/1,
-                    fun should_ensure_doc_hash_equals_cached_one/1,
-                    fun should_update_password/1,
-                    fun should_cleanup_cache_after_userdoc_deletion/1,
-                    fun should_restore_cache_after_userdoc_recreation/1,
-                    fun should_drop_cache_on_auth_db_change/1,
-                    fun should_restore_cache_on_auth_db_change/1,
-                    fun should_recover_cache_after_shutdown/1,
-                    fun should_close_old_db_on_auth_db_change/1,
-                    fun should_get_admin_from_config/1
-                ]
-            }
-        }
-    }.
+% couch_auth_cache_test_() ->
+%     {
+%         "CouchDB auth cache tests",
+%         {
+%             setup,
+%             fun start/0, fun test_util:stop_couch/1,
+%             {
+%                 foreach,
+%                 fun setup/0, fun teardown/1,
+%                 [
+%                     fun should_get_nil_on_missed_cache/1,
+%                     fun should_get_right_password_hash/1,
+%                     fun should_ensure_doc_hash_equals_cached_one/1,
+%                     fun should_update_password/1,
+%                     fun should_cleanup_cache_after_userdoc_deletion/1,
+%                     fun should_restore_cache_after_userdoc_recreation/1,
+%                     fun should_drop_cache_on_auth_db_change/1,
+%                     fun should_restore_cache_on_auth_db_change/1,
+%                     fun should_recover_cache_after_shutdown/1,
+%                     fun should_close_old_db_on_auth_db_change/1,
+%                     fun should_get_admin_from_config/1
+%                 ]
+%             }
+%         }
+%     }.
 
 auth_vdu_test_() ->
     Cases = [
