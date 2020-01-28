@@ -107,7 +107,7 @@ DepDescs = [
 {ets_lru,          "ets-lru",          {tag, "1.0.0"}},
 {khash,            "khash",            {tag, "1.0.1"}},
 {snappy,           "snappy",           {tag, "CouchDB-1.0.4"}},
-{ioq,              "ioq",              {tag, "2.1.2"}},
+{ioq,              "ioq",              {tag, "2.1.3"}},
 {hqueue,           "hqueue",           {tag, "1.0.1"}},
 {smoosh,           "smoosh",           {tag, "1.0.1"}},
 {ken,              "ken",              {tag, "1.0.3"}},
