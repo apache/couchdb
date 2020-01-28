@@ -92,8 +92,9 @@ execute(Cursor, UserFun, UserAcc) ->
         opts = Opts,
         execution_stats = Stats
     } = Cursor,
+    Query = mango_selector_text:convert(Selector),
     QueryArgs = #index_query_args{
-        q = mango_selector_text:convert(Selector),
+        q = Query,
         partition = get_partition(Opts, nil),
         sort = sort_query(Opts, Selector),
         raw_bookmark = true
@@ -113,7 +114,12 @@ execute(Cursor, UserFun, UserAcc) ->
         execution_stats = mango_execution_stats:log_start(Stats)
     },
     try
-        execute(CAcc)
+        case Query of
+            <<>> ->
+                throw({stop, CAcc});
+            _ ->
+                execute(CAcc)
+        end
     catch
         throw:{stop, FinalCAcc} ->
             #cacc{
@@ -126,7 +132,7 @@ execute(Cursor, UserFun, UserAcc) ->
             Arg = {add_key, bookmark, JsonBM},
             {_Go, FinalUserAcc} = UserFun(Arg, LastUserAcc),
             FinalUserAcc0 = mango_execution_stats:maybe_add_stats(Opts, UserFun, Stats0, FinalUserAcc),
-            FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, FinalUserAcc0),
+            FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, Stats0, FinalUserAcc0),
             {ok, FinalUserAcc1}
     end.
 
@@ -170,6 +176,10 @@ handle_hits(CAcc0, [{Sort, Doc} | Rest]) ->
     handle_hits(CAcc1, Rest).
 
 
+handle_hit(CAcc0, Sort, not_found) ->
+    CAcc1 = update_bookmark(CAcc0, Sort),
+    CAcc1;
+
 handle_hit(CAcc0, Sort, Doc) ->
     #cacc{
         limit = Limit,
@@ -178,6 +188,7 @@ handle_hit(CAcc0, Sort, Doc) ->
     } = CAcc0,
     CAcc1 = update_bookmark(CAcc0, Sort),
     Stats1 = mango_execution_stats:incr_docs_examined(Stats),
+    couch_stats:increment_counter([mango, docs_examined]),
     CAcc2 = CAcc1#cacc{execution_stats = Stats1},
     case mango_selector:match(CAcc2#cacc.selector, Doc) of
         true when Skip > 0 ->

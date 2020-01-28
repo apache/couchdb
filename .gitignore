@@ -111,6 +111,7 @@ src/couch_tests/ebin/
 src/global_changes/ebin/
 src/mango/ebin/
 src/mango/test/*.pyc
+src/mango/nosetests.xml
 src/mango/venv/
 test/javascript/junit.xml
 
