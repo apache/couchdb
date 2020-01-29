@@ -183,6 +183,7 @@ class IndexSelectionTests:
 
     # This doc will not be saved given the new ddoc validation code
     # in couch_mrview
+    @unittest.skip("need to add couch_mrview:validate_ddoc_fields")
     def test_manual_bad_view_idx01(self):
         design_doc = {
             "_id": "_design/bad_view_index",

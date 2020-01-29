@@ -76,6 +76,7 @@ ddoc_fold_cb({row, Row}, Acc) ->
         rows := Rows
     } = Acc,
     {_, Id} = lists:keyfind(id, 1, Row),
+    io:format("VIEW ~p ~n", [Row]),
     {ok, Doc} = fabric2_db:open_doc(Db, Id),
     JSONDoc = couch_doc:to_json_obj(Doc, []),
     {Props} = JSONDoc,

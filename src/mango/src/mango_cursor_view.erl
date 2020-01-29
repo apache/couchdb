@@ -44,7 +44,8 @@ create(Db, Indexes, Selector, Opts) ->
     Limit = couch_util:get_value(limit, Opts, mango_opts:default_limit()),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
-    Bookmark = couch_util:get_value(bookmark, Opts), 
+    Bookmark = couch_util:get_value(bookmark, Opts),
+    io:format("Index selected ~p Range ~p ~n", [Index, IndexRanges]),
 
     {ok, #cursor{
         db = Db,

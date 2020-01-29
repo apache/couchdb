@@ -110,7 +110,11 @@ class Database(object):
     def save_docs(self, docs, **kwargs):
         body = json.dumps({"docs": docs})
         r = self.sess.post(self.path("_bulk_docs"), data=body, params=kwargs)
+        print("DOC")
+        print(docs)
         r.raise_for_status()
+        print("RES")
+        print(r.json())
         for doc, result in zip(docs, r.json()):
             doc["_id"] = result["id"]
             doc["_rev"] = result["rev"]
