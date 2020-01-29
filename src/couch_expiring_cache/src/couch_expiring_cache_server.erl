@@ -43,7 +43,6 @@ start_link(Name, Opts) when is_atom(Name) ->
 
 
 init(Opts) ->
-    ?MODULE = ets:new(?MODULE, [named_table, public, {read_concurrency, true}]),
     DefaultCacheName = atom_to_binary(maps:get(name, Opts), utf8),
     Period = maps:get(period, Opts, ?DEFAULT_PERIOD_MSEC),
     MaxJitter = maps:get(max_jitter, Opts, ?DEFAULT_MAX_JITTER_MSEC),
