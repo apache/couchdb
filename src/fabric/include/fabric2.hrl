@@ -38,6 +38,7 @@
 -define(DB_VIEWS, 24).
 -define(DB_LOCAL_DOC_BODIES, 25).
 -define(DB_ATT_NAMES, 26).
+-define(DB_SEARCH, 27).
 
 
 % Versions
