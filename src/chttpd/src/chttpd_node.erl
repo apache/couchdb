@@ -154,12 +154,17 @@ recv_loop(Ref, ReqResp) ->
     receive
         {Ref, Code, Headers, _Args, start_response} ->
             recv_loop(Ref, ReqResp:start({Code, Headers}));
+        {Ref, Code, Headers, Len, start_response_length} ->
+            recv_loop(Ref, ReqResp:start_response_length({Code, Headers, Len}));
         {Ref, Code, Headers, chunked, respond} ->
             Resp = ReqResp:respond({Code, Headers, chunked}),
             recv_loop(Ref, Resp);
         {Ref, Code, Headers, Args, respond} ->
             Resp = ReqResp:respond({Code, Headers, Args}),
             {ok, Resp};
+        {Ref, send, Data} ->
+            ReqResp:send(Data),
+            {ok, ReqResp};
         {Ref, chunk, <<>>} ->
             ReqResp:write_chunk(<<>>),
             {ok, ReqResp};
