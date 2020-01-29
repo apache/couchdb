@@ -18,12 +18,19 @@
 -include("mango.hrl").
 -include("mango_idx.hrl").
 -include("mango_cursor.hrl").
+-include("mango_idx_view.hrl").
 
 
 -export([
+    query_all_docs/4,
     write_doc/3,
     query/4
 ]).
+
+
+query_all_docs(Db, CallBack, Cursor, Args) ->
+    Opts = args_to_fdb_opts(Args) ++ [{include_docs, true}],
+    fabric2_db:fold_docs(Db, CallBack, Cursor, Opts).
 
 
 query(Db, CallBack, Cursor, Args) ->
@@ -40,11 +47,17 @@ query(Db, CallBack, Cursor, Args) ->
         },
 
         Opts = args_to_fdb_opts(Args),
-        Acc1 = fabric2_fdb:fold_range(TxDb, MangoIdxPrefix, fun fold_cb/2, Acc0, Opts),
-        #{
-            cursor := Cursor1
-        } = Acc1,
-        {ok, Cursor1}
+        io:format("OPTS ~p ~n", [Opts]),
+        try
+            Acc1 = fabric2_fdb:fold_range(TxDb, MangoIdxPrefix, fun fold_cb/2, Acc0, Opts),
+            #{
+                cursor := Cursor1
+            } = Acc1,
+            {ok, Cursor1}
+        catch
+            throw:{stop, StopCursor}  ->
+                {ok, StopCursor}
+        end
     end).
 
 
@@ -54,63 +67,71 @@ args_to_fdb_opts(Args) ->
         start_key_docid := StartKeyDocId,
         end_key := EndKey0,
         end_key_docid := EndKeyDocId,
-        direction := Direction,
+        dir := Direction,
         skip := Skip
     } = Args,
 
-    StartKey1 = if StartKey0 == undefined -> undefined; true ->
-        couch_views_encoding:encode(StartKey0, key)
+    io:format("ARGS ~p ~n", [Args]),
+    io:format("START ~p ~n End ~p ~n", [StartKey0, EndKey0]),
+%%    StartKey1 = if StartKey0 == undefined -> undefined; true ->
+%%        couch_views_encoding:encode(StartKey0, key)
+%%    end,
+
+    % fabric2_fdb:fold_range switches keys around because map/reduce switches them
+    % but we do need to switch them. So we do this fun dance
+    {StartKeyName, EndKeyName} = case Direction of
+        rev -> {end_key, start_key};
+        _ -> {start_key, end_key}
     end,
 
-    StartKeyOpts = case {StartKey1, StartKeyDocId} of
-        {undefined, _} ->
+    StartKeyOpts = case {StartKey0, StartKeyDocId} of
+        {[], _} ->
             [];
-        {StartKey1, StartKeyDocId} ->
-            [{start_key, {StartKey1, StartKeyDocId}}]
-    end,
-
-    {EndKey1, InclusiveEnd} = get_endkey_inclusive(EndKey0),
-
-    EndKeyOpts = case {EndKey1, EndKeyDocId, Direction} of
-        {undefined, _, _} ->
+        {null, _} ->
+            %% all_docs no startkey
             [];
-        {EndKey1, <<>>, rev} when not InclusiveEnd ->
-            % When we iterate in reverse with
-            % inclusive_end=false we have to set the
-            % EndKeyDocId to <<255>> so that we don't
-            % include matching rows.
-            [{end_key_gt, {EndKey1, <<255>>}}];
-        {EndKey1, <<255>>, _} when not InclusiveEnd ->
-            % When inclusive_end=false we need to
-            % elide the default end_key_docid so as
-            % to not sort past the docids with the
-            % given end key.
-            [{end_key_gt, {EndKey1}}];
-        {EndKey1, EndKeyDocId, _} when not InclusiveEnd ->
-            [{end_key_gt, {EndKey1, EndKeyDocId}}];
-        {EndKey1, EndKeyDocId, _} when InclusiveEnd ->
-            [{end_key, {EndKey1, EndKeyDocId}}]
+%%        {undefined, _} ->
+%%            [];
+        {StartKey0, StartKeyDocId} ->
+            StartKey1 = couch_views_encoding:encode(StartKey0, key),
+            [{StartKeyName, {StartKey1, StartKeyDocId}}]
     end,
+
+    InclusiveEnd = true,
+
+    EndKeyOpts = case {EndKey0, EndKeyDocId, Direction} of
+        {<<255>>, _, _} ->
+            %% all_docs no endkey
+            [];
+        {[<<255>>], _, _} ->
+            %% mango index no endkey
+            [];
+%%        {undefined, _, _} ->
+%%            [];
+%%        {EndKey1, <<>>, rev} when not InclusiveEnd ->
+%%            % When we iterate in reverse with
+%%            % inclusive_end=false we have to set the
+%%            % EndKeyDocId to <<255>> so that we don't
+%%            % include matching rows.
+%%            [{end_key_gt, {EndKey1, <<255>>}}];
+%%        {EndKey1, <<255>>, _} when not InclusiveEnd ->
+%%            % When inclusive_end=false we need to
+%%            % elide the default end_key_docid so as
+%%            % to not sort past the docids with the
+%%            % given end key.
+%%            [{end_key_gt, {EndKey1}}];
+%%        {EndKey1, EndKeyDocId, _} when not InclusiveEnd ->
+%%            [{end_key_gt, {EndKey1, EndKeyDocId}}];
+        {EndKey0, EndKeyDocId, _} when InclusiveEnd ->
+            EndKey1 = couch_views_encoding:encode(EndKey0, key),
+            [{EndKeyName, {EndKey1, EndKeyDocId}}]
+    end,
+
     [
         {skip, Skip},
         {dir, Direction},
         {streaming_mode, want_all}
     ] ++ StartKeyOpts ++ EndKeyOpts.
-
-
-get_endkey_inclusive(undefined) ->
-    {undefined, true};
-
-get_endkey_inclusive(EndKey) when is_list(EndKey) ->
-    {EndKey1, InclusiveEnd} = case lists:member(less_than, EndKey) of
-        false ->
-            {EndKey, true};
-        true ->
-            Filtered = lists:filter(fun (Key) -> Key /= less_than end, EndKey),
-            io:format("FIL be ~p after ~p ~n", [EndKey, Filtered]),
-            {Filtered, false}
-    end,
-    {couch_views_encoding:encode(EndKey1, key), InclusiveEnd}.
 
 
 fold_cb({Key, _}, Acc) ->
@@ -123,11 +144,16 @@ fold_cb({Key, _}, Acc) ->
     } = Acc,
     {{_, DocId}} = erlfdb_tuple:unpack(Key, MangoIdxPrefix),
     {ok, Doc} = fabric2_db:open_doc(Db, DocId),
-    io:format("PRINT ~p ~p ~n", [DocId, Doc]),
-    {ok, Cursor1} = Callback(Doc, Cursor),
-    Acc#{
-        cursor := Cursor1
-    }.
+    JSONDoc = couch_doc:to_json_obj(Doc, []),
+    io:format("PRINT ~p ~p ~n", [DocId, JSONDoc]),
+    case Callback({doc, JSONDoc}, Cursor) of
+        {ok, Cursor1} ->
+            Acc#{
+                cursor := Cursor1
+            };
+        {stop, Cursor1} ->
+            throw({stop, Cursor1})
+    end.
 
 
 write_doc(TxDb, DocId, IdxResults) ->
