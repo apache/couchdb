@@ -172,12 +172,11 @@ start_key([{'$eq', Key, '$eq', Key} | Rest]) ->
 
 
 end_key([]) ->
-    [?MAX_JSON_OBJ];
+    [];
 end_key([{_, _, '$lt', Key} | Rest]) ->
     case mango_json:special(Key) of
         true ->
-%%            [?MAX_JSON_OBJ];
-              [less_than];
+            [?MAX_JSON_OBJ];
         false ->
             [Key | end_key(Rest)]
     end;

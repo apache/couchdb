@@ -63,23 +63,25 @@ explain(Cursor) ->
     #cursor{
         opts = Opts
     } = Cursor,
-    [{marargs, {[]}}].
 
-%%    BaseArgs = base_args(Cursor),
-%%    Args = apply_opts(Opts, BaseArgs),
-%%
-%%    [{mrargs, {[
-%%        {include_docs, Args#mrargs.include_docs},
-%%        {view_type, Args#mrargs.view_type},
-%%        {reduce, Args#mrargs.reduce},
-%%        {partition, couch_mrview_util:get_extra(Args, partition, null)},
-%%        {start_key, maybe_replace_max_json(Args#mrargs.start_key)},
-%%        {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
-%%        {direction, Args#mrargs.direction},
-%%        {stable, Args#mrargs.stable},
-%%        {update, Args#mrargs.update},
-%%        {conflicts, Args#mrargs.conflicts}
-%%    ]}}].
+    #{
+        start_key := StartKey,
+        end_key := EndKey,
+        dir := Direction
+    } = index_args(Cursor),
+
+    [{args, {[
+        {include_docs, true},
+        {view_type, <<"fdb">>},
+        {reduce, false},
+        {partition, false},
+        {start_key, maybe_replace_max_json(StartKey)},
+        {end_key, maybe_replace_max_json(EndKey)},
+        {direction, Direction},
+        {stable, false},
+        {update, true},
+        {conflicts, false}
+    ]}}].
 
 
 % replace internal values that cannot
@@ -100,25 +102,27 @@ maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
 maybe_replace_max_json(EndKey) ->
     EndKey.
 
-index_args(#cursor{index = Idx} = Cursor) ->
+index_args(#cursor{} = Cursor) ->
     #cursor{
         index = Idx,
         opts = Opts,
         bookmark = Bookmark
     } = Cursor,
+    io:format("SELE ~p ranges ~p ~n", [Cursor#cursor.selector, Cursor#cursor.ranges]),
     Args0 = #{
         start_key => mango_idx:start_key(Idx, Cursor#cursor.ranges),
         start_key_docid => <<>>,
         end_key => mango_idx:end_key(Idx, Cursor#cursor.ranges),
-        end_key_docid => <<>>,
+        end_key_docid => <<255>>,
         skip => 0
     },
     Args = mango_json_bookmark:update_args(Bookmark, Args0),
 
     Sort = couch_util:get_value(sort, Opts, [<<"asc">>]),
+    io:format("SORT ~p ~n", [Sort]),
     Args1 = case mango_sort:directions(Sort) of
-        [<<"desc">> | _] -> Args#{direction => rev};
-        _ -> Args#{direction => fwd}
+        [<<"desc">> | _] -> Args#{dir => rev};
+        _ -> Args#{dir => fwd}
     end,
 
     %% TODO: When supported, handle:
@@ -140,21 +144,16 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
         _ ->
             Args = index_args(Cursor),
             #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
-%%            Args0 = BaseArgs,
-%%            Args0 = apply_opts(Opts, BaseArgs),
-%%            Args = mango_json_bookmark:update_args(Bookmark, Args0),
             UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
             DbOpts = [{user_ctx, UserCtx}],
             Result = case mango_idx:def(Idx) of
                 all_docs ->
                     CB = fun ?MODULE:handle_all_docs_message/2,
-                    ok;
-%%                    fabric:all_docs(Db, DbOpts, CB, Cursor, Args);
+                    % all_docs
+                    mango_fdb:query_all_docs(Db, CB, Cursor, Args);
                 _ ->
                     CB = fun ?MODULE:handle_message/2,
                     % Normal view
-%%                    DDoc = ddocid(Idx),
-%%                    Name = mango_idx:name(Idx),
                     mango_fdb:query(Db, CB, Cursor, Args)
             end,
             case Result of
@@ -303,16 +302,15 @@ set_mango_msg_timestamp() ->
 
 handle_message({meta, _}, Cursor) ->
     {ok, Cursor};
-handle_message(Doc, Cursor) ->
-    JSONDoc = couch_doc:to_json_obj(Doc, []),
-    case doc_member(Cursor, JSONDoc) of
-        {ok, JSONDoc, {execution_stats, ExecutionStats1}} ->
+handle_message({doc, Doc}, Cursor) ->
+    case doc_member(Cursor, Doc) of
+        {ok, Doc, {execution_stats, ExecutionStats1}} ->
             Cursor1 = Cursor#cursor {
                 execution_stats = ExecutionStats1
             },
-            {Props} = JSONDoc,
+            {Props} = Doc,
             Cursor2 = update_bookmark_keys(Cursor1, Props),
-            FinalDoc = mango_fields:extract(JSONDoc, Cursor2#cursor.fields),
+            FinalDoc = mango_fields:extract(Doc, Cursor2#cursor.fields),
             handle_doc(Cursor2, FinalDoc);
         {no_match, _, {execution_stats, ExecutionStats1}} ->
             Cursor1 = Cursor#cursor {
@@ -330,9 +328,12 @@ handle_message({error, Reason}, _Cursor) ->
 
 
 handle_all_docs_message({row, Props}, Cursor) ->
+    io:format("ALL DOCS ~p ~n", [Props]),
     case is_design_doc(Props) of
         true -> {ok, Cursor};
-        false -> handle_message({row, Props}, Cursor)
+        false ->
+            {doc, Doc} = lists:keyfind(doc, 1, Props),
+            handle_message({doc, Doc}, Cursor)
     end;
 handle_all_docs_message(Message, Cursor) ->
     handle_message(Message, Cursor).

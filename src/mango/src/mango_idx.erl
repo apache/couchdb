@@ -109,14 +109,16 @@ get_usable_indexes(Db, Selector, Opts) ->
 
 
 mango_sort_error(Db, Opts) ->
-    case {fabric_util:is_partitioned(Db), is_opts_partitioned(Opts)} of
-        {false, _} ->
-            ?MANGO_ERROR({no_usable_index, missing_sort_index});
-        {true, true} ->
-            ?MANGO_ERROR({no_usable_index, missing_sort_index_partitioned});
-        {true, false} ->
-            ?MANGO_ERROR({no_usable_index, missing_sort_index_global})
-    end.
+    ?MANGO_ERROR({no_usable_index, missing_sort_index}).
+% TODO: add back in when partitions supported
+%%    case {fabric_util:is_partitioned(Db), is_opts_partitioned(Opts)} of
+%%        {false, _} ->
+%%            ?MANGO_ERROR({no_usable_index, missing_sort_index});
+%%        {true, true} ->
+%%            ?MANGO_ERROR({no_usable_index, missing_sort_index_partitioned});
+%%        {true, false} ->
+%%            ?MANGO_ERROR({no_usable_index, missing_sort_index_global})
+%%    end.
 
 
 recover(Db) ->
@@ -291,6 +293,7 @@ start_key(#idx{}=Idx, Ranges) ->
 
 end_key(#idx{}=Idx, Ranges) ->
     Mod = idx_mod(Idx),
+    io:format("END KEY ~p ~n", [Mod]),
     Mod:end_key(Ranges).
 
 
