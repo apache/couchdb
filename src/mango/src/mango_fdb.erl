@@ -103,25 +103,12 @@ args_to_fdb_opts(Args) ->
         {<<255>>, _, _} ->
             %% all_docs no endkey
             [];
-        {[<<255>>], _, _} ->
+        {[], _, _} ->
             %% mango index no endkey
             [];
-%%        {undefined, _, _} ->
-%%            [];
-%%        {EndKey1, <<>>, rev} when not InclusiveEnd ->
-%%            % When we iterate in reverse with
-%%            % inclusive_end=false we have to set the
-%%            % EndKeyDocId to <<255>> so that we don't
-%%            % include matching rows.
-%%            [{end_key_gt, {EndKey1, <<255>>}}];
-%%        {EndKey1, <<255>>, _} when not InclusiveEnd ->
-%%            % When inclusive_end=false we need to
-%%            % elide the default end_key_docid so as
-%%            % to not sort past the docids with the
-%%            % given end key.
-%%            [{end_key_gt, {EndKey1}}];
-%%        {EndKey1, EndKeyDocId, _} when not InclusiveEnd ->
-%%            [{end_key_gt, {EndKey1, EndKeyDocId}}];
+        {[<<255>>], _, _} ->
+            %% mango index no endkey with a $lt in selector
+            [];
         {EndKey0, EndKeyDocId, _} when InclusiveEnd ->
             EndKey1 = couch_views_encoding:encode(EndKey0, key),
             [{EndKeyName, {EndKey1, EndKeyDocId}}]

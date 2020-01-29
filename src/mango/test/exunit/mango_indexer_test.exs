@@ -26,7 +26,7 @@ defmodule MangoIndexerTest do
     idx_ddocs = create_indexes(db)
     docs = create_docs()
 
-    IO.inspect idx_ddocs
+    IO.inspect(idx_ddocs)
     {ok, _} = :fabric2_db.update_docs(db, ddocs ++ idx_ddocs)
     {ok, _} = :fabric2_db.update_docs(db, docs)
 
@@ -42,7 +42,7 @@ defmodule MangoIndexerTest do
     }
   end
 
-  test "create design doc through _index", context do
+  test "update doc", context do
     db = context[:db]
   end
 
@@ -59,29 +59,8 @@ defmodule MangoIndexerTest do
     {:ok, idx} = :mango_idx.new(db, opts)
     db_opts = [{:user_ctx, db["user_ctx"]}, :deleted, :ejson_body]
     {:ok, ddoc} = :mango_util.load_ddoc(db, :mango_idx.ddoc(idx), db_opts)
-    {:ok ,new_ddoc} = :mango_idx.add(ddoc, idx)
+    {:ok, new_ddoc} = :mango_idx.add(ddoc, idx)
     [new_ddoc]
-  end
-
-  #    Create 1 design doc that should be filtered out and ignored
-  defp create_ddocs() do
-    views = %{
-      "_id" => "_design/bar",
-      "views" => %{
-        "dates_sum" => %{
-          "map" => """
-                function(doc) {
-                    if (doc.date) {
-                        emit(doc.date, doc.date_val);
-                    }
-                }
-          """
-        }
-      }
-    }
-
-    ddoc1 = :couch_doc.from_json_obj(:jiffy.decode(:jiffy.encode(views)))
-    []
   end
 
   defp create_docs() do
@@ -95,12 +74,12 @@ defmodule MangoIndexerTest do
 
       :couch_doc.from_json_obj(
         {[
-          {"_id", "doc-id-#{i}"},
-          {"value", i},
-          {"val_str", Integer.to_string(i, 8)},
-          {"some", "field"},
-          {"group", group}
-        ]}
+           {"_id", "doc-id-#{i}"},
+           {"value", i},
+           {"val_str", Integer.to_string(i, 8)},
+           {"some", "field"},
+           {"group", group}
+         ]}
       )
     end
   end

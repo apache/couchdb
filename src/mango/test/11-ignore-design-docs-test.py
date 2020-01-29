@@ -19,6 +19,8 @@ DOCS = [
     {"_id": "54af50622071121b25402dc3", "user_id": 1, "age": 11, "name": "Eddie"},
 ]
 
+# [{erlfdb_nif,erlfdb_future_get,[#Ref<0.1264327726.2786983941.139980>],[]},{erlfdb,fold_range_int,4,[{file,"src/erlfdb.erl"},{line,675}]},{fabric2_fdb,get_winning_revs_wait,2,[{file,"src/fabric2_fdb.erl"},{line,474}]},{fabric2_db,'-open_doc/3-fun-1-',5,[{file,"src/fabric2_db.erl"},{line,503}]},{mango_idx,ddoc_fold_cb,2,[{file,"src/mango_idx.erl"},{line,80}]},{fabric2_db,'-fold_docs/4-fun-0-',6,[{file,"src/fabric2_db.erl"},{line,795}]},{fabric2_fdb,fold_range_cb,2,[{file,"src/fabric2_fdb.erl"},{line,1379}]},{lists,foldl,3,[{file,"lists.erl"},{line,1263}]}]
+
 
 class IgnoreDesignDocsForAllDocsIndexTests(mango.DbPerClass):
     def test_should_not_return_design_docs(self):

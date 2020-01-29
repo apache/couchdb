@@ -26,6 +26,7 @@
 % Todo: Check if design doc is mango index and kick off background worker
 % to build new index
 update(Db, Change, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, OldDoc) ->
+    io:format("DESIGN DOC SAVED ~p ~n", [Doc]),
     ok;
 
 update(Db, deleted, _, OldDoc)  ->
@@ -35,15 +36,23 @@ update(Db, updated, Doc, OldDoc) ->
     ok;
 
 update(Db, created, Doc, _) ->
-    #doc{id = DocId} = Doc,
-    Indexes = mango_idx:list(Db),
-    Indexes1 = filter_json_indexes(Indexes),
-    io:format("UPDATE INDEXES ~p ~n filtered ~p ~n", [Indexes, Indexes1]),
-    JSONDoc = mango_json:to_binary(couch_doc:to_json_obj(Doc, [])),
-    io:format("DOC ~p ~n", [Doc]),
-    Results = index_doc(Indexes1, JSONDoc),
-    io:format("Update ~p ~n, ~p ~n Results ~p ~n", [Doc, JSONDoc, Results]),
-    mango_fdb:write_doc(Db, DocId, Results).
+    try
+        io:format("CREATED ~p ~n", [Doc]),
+        #doc{id = DocId} = Doc,
+        Indexes = mango_idx:list(Db),
+        Indexes1 = filter_json_indexes(Indexes),
+        io:format("UPDATE INDEXES ~p ~n filtered ~p ~n", [Indexes, Indexes1]),
+        JSONDoc = mango_json:to_binary(couch_doc:to_json_obj(Doc, [])),
+        io:format("DOC ~p ~n", [Doc]),
+        Results = index_doc(Indexes1, JSONDoc),
+        io:format("Update ~p ~n, ~p ~n Results ~p ~n", [Doc, JSONDoc, Results]),
+        mango_fdb:write_doc(Db, DocId, Results)
+    catch
+        Error:Reason ->
+            io:format("ERROR ~p ~p ~p ~n", [Error, Reason, erlang:display(erlang:get_stacktrace())]),
+            ok
+    end,
+    ok.
 
 
 filter_json_indexes(Indexes) ->
@@ -54,7 +63,6 @@ filter_json_indexes(Indexes) ->
 
 index_doc(Indexes, Doc) ->
     lists:foldl(fun(Idx, Acc) ->
-        io:format("II ~p ~n", [Idx]),
         {IdxDef} = mango_idx:def(Idx),
         Results = get_index_entries(IdxDef, Doc),
         case lists:member(not_found, Results) of
