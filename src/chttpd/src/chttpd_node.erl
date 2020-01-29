@@ -132,7 +132,7 @@ handle_node_req(#httpd{path_parts=[_, Node | PathParts],
     % strip /_node/{node} from Req0 before descending further
     RawUri = MochiReq0:get(raw_path),
     {_, Query, Fragment} = mochiweb_util:urlsplit_path(RawUri),
-    NewPath0 = "/" ++ lists:join("/", [?b2l(P) || P <- PathParts]),
+    NewPath0 = "/" ++ lists:join("/", [couch_util:url_encode(P) || P <- PathParts]),
     NewRawPath = mochiweb_util:urlunsplit_path({NewPath0, Query, Fragment}),
     MaxSize =  config:get_integer("httpd", "max_http_request_size", 4294967296),
     NewOpts = [{body, MochiReq0:recv_body(MaxSize)} | MochiReq0:get(opts)],
