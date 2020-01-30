@@ -22,37 +22,69 @@
 -include_lib("couch/include/couch_db.hrl").
 -include("mango_idx.hrl").
 
-% Design doc
-% Todo: Check if design doc is mango index and kick off background worker
-% to build new index
-update(Db, Change, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, OldDoc) ->
-    io:format("DESIGN DOC SAVED ~p ~n", [Doc]),
-    ok;
 
-update(Db, deleted, _, OldDoc)  ->
-    ok;
-
-update(Db, updated, Doc, OldDoc) ->
-    ok;
-
-update(Db, created, Doc, _) ->
+update(Db, State, Doc, PrevDoc) ->
     try
-        io:format("CREATED ~p ~n", [Doc]),
-        #doc{id = DocId} = Doc,
-        Indexes = mango_idx:list(Db),
-        Indexes1 = filter_json_indexes(Indexes),
-        io:format("UPDATE INDEXES ~p ~n filtered ~p ~n", [Indexes, Indexes1]),
-        JSONDoc = mango_json:to_binary(couch_doc:to_json_obj(Doc, [])),
-        io:format("DOC ~p ~n", [Doc]),
-        Results = index_doc(Indexes1, JSONDoc),
-        io:format("Update ~p ~n, ~p ~n Results ~p ~n", [Doc, JSONDoc, Results]),
-        mango_fdb:write_doc(Db, DocId, Results)
+        update_int(Db, State, Doc, PrevDoc)
     catch
         Error:Reason ->
             io:format("ERROR ~p ~p ~p ~n", [Error, Reason, erlang:display(erlang:get_stacktrace())]),
-            ok
+            #{
+                name := DbName
+            } = Db,
+
+            Id = case Doc of
+                not_found when is_record(PrevDoc, doc) ->
+                    #doc{id = DocId} = PrevDoc,
+                    DocId;
+                not_found ->
+                    <<"unknown_doc_id">>;
+                #doc{} ->
+                    #doc{id = DocId} = Doc,
+                    DocId
+            end,
+
+            couch_log:error("Mango index error for Db ~s Doc ~p ~p ~p",
+                [DbName, Id, Error, Reason])
     end,
     ok.
+
+% Design doc
+% Todo: Check if design doc is mango index and kick off background worker
+% to build new index
+update_int(Db, State, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, PrevDoc) ->
+    io:format("DESIGN DOC SAVED ~p ~n", [Doc]),
+    ok;
+
+update_int(Db, deleted, _, PrevDoc)  ->
+    Indexes = mango_idx:list(Db),
+    Indexes1 = filter_json_indexes(Indexes),
+    remove_doc(Db, PrevDoc, Indexes1);
+
+update_int(Db, updated, Doc, PrevDoc) ->
+    Indexes = mango_idx:list(Db),
+    Indexes1 = filter_json_indexes(Indexes),
+    remove_doc(Db, PrevDoc, Indexes1),
+    write_doc(Db, Doc, Indexes1);
+
+update_int(Db, created, Doc, _) ->
+    Indexes = mango_idx:list(Db),
+    Indexes1 = filter_json_indexes(Indexes),
+    write_doc(Db, Doc, Indexes1).
+
+
+remove_doc(Db, #doc{} = Doc, Indexes) ->
+    #doc{id = DocId} = Doc,
+    PrevJSONDoc = mango_json:to_binary(couch_doc:to_json_obj(Doc, [])),
+    PrevResults = index_doc(Indexes, PrevJSONDoc),
+    mango_fdb:remove_doc(Db, DocId, PrevResults).
+
+
+write_doc(Db, #doc{} = Doc, Indexes) ->
+    #doc{id = DocId} = Doc,
+    JSONDoc = mango_json:to_binary(couch_doc:to_json_obj(Doc, [])),
+    Results = index_doc(Indexes, JSONDoc),
+    mango_fdb:write_doc(Db, DocId, Results).
 
 
 filter_json_indexes(Indexes) ->

@@ -588,7 +588,10 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     } = Doc,
 
     % Doc body
-
+    % Fetch the old doc body for the mango hooks later
+    PrevDoc = if OldWinner == not_found -> not_found; true ->
+        get_doc_body(Db, DocId, OldWinner)
+    end,
     ok = write_doc_body(Db, Doc),
 
     % Attachment bookkeeping
@@ -716,11 +719,9 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
             end,
             incr_stat(Db, <<"doc_count">>, -1),
             incr_stat(Db, <<"doc_del_count">>, 1),
-            OldDoc = get_doc_body(Db, DocId, OldWinner),
-            mango_indexer:update(Db, deleted, not_found, OldDoc);
+            mango_indexer:update(Db, deleted, not_found, PrevDoc);
         updated ->
-            OldDoc = get_doc_body(Db, DocId, OldWinner),
-            mango_indexer:update(Db, updated, Doc, OldDoc)
+            mango_indexer:update(Db, updated, Doc, PrevDoc)
     end,
 
     ok.
