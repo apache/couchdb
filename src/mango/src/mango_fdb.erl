@@ -23,6 +23,7 @@
 
 -export([
     query_all_docs/4,
+    remove_doc/3,
     write_doc/3,
     query/4
 ]).
@@ -143,6 +144,17 @@ fold_cb({Key, _}, Acc) ->
     end.
 
 
+remove_doc(TxDb, DocId, IdxResults) ->
+    lists:foreach(fun (IdxResult) ->
+        #{
+            ddoc_id := DDocId,
+            results := Results
+        } = IdxResult,
+        MangoIdxPrefix = mango_idx_prefix(TxDb, DDocId),
+        clear_key(TxDb, MangoIdxPrefix, Results, DocId)
+    end, IdxResults).
+
+
 write_doc(TxDb, DocId, IdxResults) ->
     lists:foreach(fun (IdxResult) ->
         #{
@@ -162,11 +174,23 @@ mango_idx_prefix(TxDb, Id) ->
     erlfdb_tuple:pack(Key, DbPrefix).
 
 
+create_key(MangoIdxPrefix, Results, DocId) ->
+    EncodedResults = couch_views_encoding:encode(Results, key),
+    erlfdb_tuple:pack({{EncodedResults, DocId}}, MangoIdxPrefix).
+
+
+clear_key(TxDb, MangoIdxPrefix, Results, DocId) ->
+    #{
+        tx := Tx
+    } = TxDb,
+    Key = create_key(MangoIdxPrefix, Results, DocId),
+    erlfdb:clear(Tx, Key).
+
+
 add_key(TxDb, MangoIdxPrefix, Results, DocId) ->
     #{
         tx := Tx
     } = TxDb,
-    EncodedResults = couch_views_encoding:encode(Results, key),
-    Key = erlfdb_tuple:pack({{EncodedResults, DocId}}, MangoIdxPrefix),
+    Key = create_key(MangoIdxPrefix, Results, DocId),
     erlfdb:set(Tx, Key, <<0>>).
 
