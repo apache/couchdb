@@ -49,7 +49,7 @@ ON_TAG = $(shell git describe --tags --always --first-parent \
 REL_TAG = $(shell git describe --tags --always --first-parent \
         | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+' 2>/dev/null)
 # DIRTY identifies if we're not on a commit
-DIRTY = $(shell git describe --dirty | grep -Eo -- '-dirty' 2>/dev/null)
+DIRTY := $(shell git describe --dirty | grep -Eo -- '-dirty' 2>/dev/null)
 # COUCHDB_GIT_SHA is our current git hash.
 COUCHDB_GIT_SHA=$(shell git rev-parse --short=7 --verify HEAD)
 
@@ -106,18 +106,6 @@ TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 # target: all - Build everything
 all: couch fauxton docs
 
-# target: derived - display all derived parameters used during build
-derived:
-	@echo "COUCHDB_GIT_SHA:        $(COUCHDB_GIT_SHA)"
-	@echo "COUCHDB_VERSION:        $(COUCHDB_VERSION)"
-	@echo "COUCHDB_VERSION_SUFFIX: $(COUCHDB_VERSION_SUFFIX)"
-	@echo "DIRTY:                  $(DIRTY)"
-	@echo "IN_RC:                  $(IN_RC)"
-	@echo "IN_RELEASE:             $(IN_RELEASE)"
-	@echo "ON_TAG:                 $(ON_TAG)"
-	@echo "REL_TAG:                $(REL_TAG)"
-	@echo "SUB_VSN:                $(SUB_VSN)"
-
 .PHONY: help
 # target: help - Print this help
 help:
@@ -134,13 +122,9 @@ help:
 
 .PHONY: couch
 # target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
-couch: config.erl derived set_otp_vsn
+couch: config.erl
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
 	@cp src/couch/priv/couchjs bin/
-
-# target: set_otp_vsn - ensure that vsn field in OTP app is set appropriately
-set_otp_vsn:
-	@sed -i$(sed v < /dev/null 2> /dev/null || echo -n " ''")  -e "s/{vsn, git}/${SUB_VSN}/" $(shell find ./src -type f -name \*.app.src)
 
 .PHONY: docs
 # target: docs - Build documentation
@@ -396,10 +380,29 @@ introspect:
 # Distributing
 ################################################################################
 
+.PHONY: set_otp_vsn
+# target: set_otp_vsn - ensure that vsn field in OTP app is set appropriately
+set_otp_vsn:
+	@sed -i$(sed v < /dev/null 2> /dev/null || echo -n " ''")  -e "s/{vsn, git}/${SUB_VSN}/" $(shell find ./src -type f -name \*.app.src)
+	@sed -i$(sed v < /dev/null 2> /dev/null || echo -n " ''")  -e "s/{vsn, git}/${SUB_VSN}/" $(shell find ./src -type f -name \*.app.src.script)
+
+.PHONY: derived
+# target: derived - display all derived parameters used during build
+derived:
+	@echo "COUCHDB_GIT_SHA:        $(COUCHDB_GIT_SHA)"
+	@echo "COUCHDB_VERSION:        $(COUCHDB_VERSION)"
+	@echo "COUCHDB_VERSION_SUFFIX: $(COUCHDB_VERSION_SUFFIX)"
+	@echo "DIRTY:                  $(DIRTY)"
+	@echo "IN_RC:                  $(IN_RC)"
+	@echo "IN_RELEASE:             $(IN_RELEASE)"
+	@echo "ON_TAG:                 $(ON_TAG)"
+	@echo "REL_TAG:                $(REL_TAG)"
+	@echo "SUB_VSN:                $(SUB_VSN)"
+
 
 .PHONY: dist
 # target: dist - Make release tarball
-dist: all
+dist: derived set_otp_vsn all
 	./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
