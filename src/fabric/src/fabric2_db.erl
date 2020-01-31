@@ -755,7 +755,7 @@ fold_docs(Db, UserFun, UserAcc) ->
 
 
 fold_docs(Db, UserFun, UserAcc0, Options) ->
-    fabric2_fdb:transactional(Db, fun(TxDb) ->
+    fabric2_fdb:with_iter(Db, fun(TxDb) ->
         try
             #{
                 db_prefix := DbPrefix

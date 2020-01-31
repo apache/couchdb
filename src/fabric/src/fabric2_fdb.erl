@@ -24,6 +24,11 @@
     delete/1,
     exists/1,
 
+    create_iter/1,
+    destroy_iter/1,
+    checkpoint_iter/1,
+    with_iter/2,
+
     get_dir/1,
 
     list_dbs/4,
@@ -304,6 +309,54 @@ exists(#{name := DbName} = Db) when is_binary(DbName) ->
     case erlfdb:wait(erlfdb:get(Tx, DbKey)) of
         Bin when is_binary(Bin) -> true;
         not_found -> false
+    end.
+
+
+create_iter(#{tx := undefined} = Db) ->
+    try
+        Db1 = refresh(Db),
+
+        Reopen = maps:get(reopen, Db1, false),
+        Db2 = maps:remove(reopen, Db1),
+
+        Fdb = get_db_handle(),
+        Tx = erlfdb:reate_read_only_transaction(Fdb),
+        Db3 = case Reopen of
+            true -> reopen(Db2#{tx => Tx});
+            false -> Db2#{tx => Tx}
+        end,
+
+        % Here we might throw `reopen`
+        Db4 = ensure_current(Db3),
+
+        % This part might update the Db cache
+        ok = run_on_commit_fun(Tx),
+        erase({?PDICT_ON_COMMIT_FUN, Tx}),
+
+        Db4#{tx => erlfdb:create_iter(Fdb, Tx)}
+    catch throw:{?MODULE, reopen} ->
+        create_iter(Db#{reopen => true})
+    end.
+
+
+destroy_iter(#{tx := {erfdb_transaction, _}} = Db) ->
+    #{tx := Tx} = Db,
+    erlfdb:destroy_iter(Tx),
+    Db#{tx := undefined}.
+
+
+checkpoint_iter(#{tx := {erlfdb_transaction, _}} = Db) ->
+    #{tx := Tx} = Db,
+    erlfdb:checkpoint_iter(Tx),
+    Db.
+
+
+with_iter(#{tx := undefined} = Db, Fun) when is_function(Fun, 1) ->
+    IterDb = create_iter(Db),
+    try
+        Fun(IterDb)
+    after
+        destroy_iter(IterDb)
     end.
 
 
