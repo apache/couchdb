@@ -343,7 +343,7 @@ DOCS = [
             "city": "Axis",
             "address": {"street": "Brightwater Avenue", "number": 1106},
         },
-        "foo" : "bar car apple",
+        "foo": "bar car apple",
         "company": "Pharmex",
         "email": "faithhess@pharmex.com",
         "favorites": ["Erlang", "Python", "Lisp"],

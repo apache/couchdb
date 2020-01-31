@@ -45,13 +45,13 @@ IN_RC = $(shell git describe --tags --always --first-parent \
 # ON_TAG matches *ONLY* if we are on a release or RC tag
 ON_TAG = $(shell git describe --tags --always --first-parent \
         | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$' 2>/dev/null)
-# RELTAG contains the #.#.# from git describe, which might be used
-RELTAG = $(shell git describe --tags --always --first-parent \
+# REL_TAG contains the #.#.# from git describe, which might be used
+REL_TAG = $(shell git describe --tags --always --first-parent \
         | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+' 2>/dev/null)
 # DIRTY identifies if we're not on a commit
 DIRTY = $(shell git describe --dirty | grep -Eo -- '-dirty' 2>/dev/null)
 # COUCHDB_GIT_SHA is our current git hash.
-COUCHDB_GIT_SHA=$(shell git rev-parse --short --verify HEAD)
+COUCHDB_GIT_SHA=$(shell git rev-parse --short=7 --verify HEAD)
 
 ifeq ($(ON_TAG),)
 # 4. Not on a tag.
@@ -59,7 +59,7 @@ COUCHDB_VERSION_SUFFIX = $(COUCHDB_GIT_SHA)$(DIRTY)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
 else
 # 2 and 3. On a tag.
-COUCHDB_VERSION = $(RELTAG)$(DIRTY)
+COUCHDB_VERSION = $(REL_TAG)$(DIRTY)
 endif
 endif
 
@@ -215,7 +215,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run
+		. dev/run test/javascript/run src/mango src/docs
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -223,7 +223,7 @@ python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run
+		. dev/run test/javascript/run src/mango src/docs
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
@@ -383,7 +383,7 @@ introspect:
 
 .PHONY: dist
 # target: dist - Make release tarball
-dist: all
+dist: all derived
 	@./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
@@ -523,3 +523,15 @@ ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
 	@cd src/fauxton && npm install --production && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
+
+
+derived:
+	@echo "COUCHDB_GIT_SHA:        $(COUCHDB_GIT_SHA)"
+	@echo "COUCHDB_VERSION:        $(COUCHDB_VERSION)"
+	@echo "COUCHDB_VERSION_SUFFIX: $(COUCHDB_VERSION_SUFFIX)"
+	@echo "DIRTY:                  $(DIRTY)"
+	@echo "IN_RC:                  $(IN_RC)"
+	@echo "IN_RELEASE:             $(IN_RELEASE)"
+	@echo "ON_TAG:                 $(ON_TAG)"
+	@echo "REL_TAG:                $(REL_TAG)"
+	@echo "SUB_VSN:                $(SUB_VSN)"

@@ -14,15 +14,15 @@
 
 canonical_readlink ()
   {
-  cd $(dirname $1);
-  FILE=$(basename $1);
+  FILE=$(dirname "$1")/$(basename "$1");
   if [ -h "$FILE" ]; then
-    canonical_readlink $(readlink $FILE);
+    cd $(dirname "$1")
+    canonical_readlink $(readlink "$FILE");
   else
-    echo "$(pwd -P)";
+    cd "${1%/*}" && pwd -P;
   fi
 }
-COUCHDB_BIN_DIR=$(canonical_readlink $0)
+COUCHDB_BIN_DIR=$(canonical_readlink "$0")
 ERTS_BIN_DIR=$COUCHDB_BIN_DIR/../
 cd "$COUCHDB_BIN_DIR/../"
 
