@@ -872,6 +872,11 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
                 _ -> fwd
             end,
 
+            RestartTx = case fabric2_util:get_value(restart_tx, Options) of
+                undefined -> [{restart_tx, true}];
+                _AlreadySet -> []
+            end,
+
             StartKey = get_since_seq(TxDb, Dir, SinceSeq),
             EndKey = case Dir of
                 rev -> fabric2_util:seq_zero_vs();
@@ -880,7 +885,7 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
             FoldOpts = [
                 {start_key, StartKey},
                 {end_key, EndKey}
-            ] ++ Options,
+            ] ++ RestartTx ++ Options,
 
             {ok, fabric2_fdb:fold_range(TxDb, Prefix, fun({K, V}, Acc) ->
                 {SeqVS} = erlfdb_tuple:unpack(K, Prefix),
