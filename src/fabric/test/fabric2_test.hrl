@@ -10,8 +10,16 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+
+% Some test modules do not use with, so squash the unused fun compiler warning
+-compile([{nowarn_unused_function, [{with, 1}]}]).
+
+
 -define(TDEF(Name), {atom_to_list(Name), fun Name/1}).
 -define(TDEF(Name, Timeout), {atom_to_list(Name), Timeout, fun Name/1}).
+
+-define(TDEF_FE(Name), fun(Arg) -> {atom_to_list(Name), ?_test(Name(Arg))} end).
+-define(TDEF_FE(Name, Timeout), fun(Arg) -> {atom_to_list(Name), {timeout, Timeout, ?_test(Name(Arg))}} end).
 
 
 with(Tests) ->
