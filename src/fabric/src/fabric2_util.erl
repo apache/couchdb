@@ -31,6 +31,7 @@
 
     get_value/2,
     get_value/3,
+    replace_value/3,
     to_hex/1,
     from_hex/1,
     uuid/0
@@ -158,6 +159,10 @@ get_value(Key, List, Default) ->
         false ->
             Default
     end.
+
+
+replace_value(Key, Val, List) ->
+    lists:keyreplace(Key, 1, List, {Key, Val}).
 
 
 to_hex(Bin) ->

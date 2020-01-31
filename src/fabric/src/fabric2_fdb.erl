@@ -24,6 +24,8 @@
     delete/1,
     exists/1,
 
+    with_iter/2,
+
     get_dir/1,
 
     list_dbs/4,
@@ -69,17 +71,31 @@
 -include("fabric2.hrl").
 
 
-transactional(Fun) ->
-    do_transaction(Fun, undefined).
+-record(fold_acc, {
+   start_key,
+   end_key,
+   skip,
+   opts,
+   ucallback,
+   uacc
+}).
+
+
+
+transactional(Fun) when is_function(Fun, 1) ->
+    transactional(Fun, []).
 
 
 transactional(DbName, Options, Fun) when is_binary(DbName) ->
     with_span(Fun, #{'db.name' => DbName}, fun() ->
         transactional(fun(Tx) ->
             Fun(init_db(Tx, DbName, Options))
-        end)
+        end, Options)
     end).
 
+transactional(Fun, Options) when is_function(Fun, 1), is_list(Options) ->
+    TxOptions = fabric2_util:get_value(tx_options, Options, []),
+    do_transaction(Fun, undefined, TxOptions);
 
 transactional(#{tx := undefined} = Db, Fun) ->
     DbName = maps:get(name, Db, undefined),
@@ -91,13 +107,14 @@ transactional(#{tx := undefined} = Db, Fun) ->
             true -> undefined;
             false -> maps:get(layer_prefix, Db2)
         end,
+        Options = maps:get(tx_options, Db2, []),
         with_span(Fun, #{'db.name' => DbName}, fun() ->
             do_transaction(fun(Tx) ->
                 case Reopen of
                     true -> Fun(reopen(Db2#{tx => Tx}));
                     false -> Fun(Db2#{tx => Tx})
                 end
-            end, LayerPrefix)
+            end, LayerPrefix, Options)
         end)
     catch throw:{?MODULE, reopen} ->
         with_span('db.reopen', #{'db.name' => DbName}, fun() ->
@@ -112,19 +129,20 @@ transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
     end).
 
 
-do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
+do_transaction(Fun, LayerPrefix, Options) when is_function(Fun, 1) ->
     Db = get_db_handle(),
     try
         erlfdb:transactional(Db, fun(Tx) ->
-            case get(erlfdb_trace) of
+            TraceOpts = case get(erlfdb_trace) of
                 Name when is_binary(Name) ->
                     UId = erlang:unique_integer([positive]),
                     UIdBin = integer_to_binary(UId, 36),
                     TxId = <<Name/binary, "_", UIdBin/binary>>,
-                    erlfdb:set_option(Tx, transaction_logging_enable, TxId);
+                    [{transaction_logging_enable, TxId}];
                 _ ->
-                    ok
+                    []
             end,
+            apply_tx_options(Tx, TraceOpts ++ Options),
             case is_transaction_applied(Tx) of
                 true ->
                     get_previous_transaction_result();
@@ -184,6 +202,9 @@ create(#{} = Db0, Options) ->
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
     Options1 = lists:keydelete(user_ctx, 1, Options),
 
+    TxOptions = fabric2_util:get_value(tx_options, Options1, []),
+    Options2 = lists:keydelete(tx_options, 1, Options1),
+
     Db#{
         uuid => UUID,
         db_prefix => DbPrefix,
@@ -198,7 +219,8 @@ create(#{} = Db0, Options) ->
         after_doc_read => undefined,
         % All other db things as we add features,
 
-        db_options => Options1
+        db_options => Options2,
+        tx_options => TxOptions
     }.
 
 
@@ -221,6 +243,9 @@ open(#{} = Db0, Options) ->
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
     Options1 = lists:keydelete(user_ctx, 1, Options),
 
+    TxOptions = fabric2_util:get_value(tx_options, Options1, []),
+    Options2 = lists:keydelete(tx_options, 1, Options1),
+
     Db2 = Db1#{
         db_prefix => DbPrefix,
         db_version => DbVersion,
@@ -237,7 +262,8 @@ open(#{} = Db0, Options) ->
         before_doc_update => undefined,
         after_doc_read => undefined,
 
-        db_options => Options1
+        db_options => Options2,
+        tx_options => TxOptions
     },
 
     Db3 = load_config(Db2),
@@ -304,6 +330,23 @@ exists(#{name := DbName} = Db) when is_binary(DbName) ->
     case erlfdb:wait(erlfdb:get(Tx, DbKey)) of
         Bin when is_binary(Bin) -> true;
         not_found -> false
+    end.
+
+
+with_iter(Fun, Options) when is_function(Fun, 1), is_list(Options) ->
+    Tx = create_iter(fabric2_util:get_value(tx_options, Options, [])),
+    try
+        Fun(Tx)
+    after
+        destroy_iter(Tx)
+    end;
+
+with_iter(#{tx := undefined} = Db, Fun) when is_function(Fun, 1) ->
+    IterDb = create_iter(Db),
+    try
+        Fun(IterDb)
+    after
+        destroy_iter(IterDb)
     end.
 
 
@@ -821,19 +864,50 @@ fold_range(#{} = Db, RangePrefix, Callback, Acc, Options) ->
     } = ensure_current(Db),
     fold_range({tx, Tx}, RangePrefix, Callback, Acc, Options);
 
-fold_range({tx, Tx}, RangePrefix, UserCallback, UserAcc, Options) ->
-    case fabric2_util:get_value(limit, Options) of
-        0 ->
+fold_range({tx, Tx}, RangePrefix, Callback, Acc, Options) ->
+    Iterator = fabric2_util:get_value(iterator, Options),
+    case {fabric2_util:get_value(limit, Options), Iterator} of
+        {0, _} ->
             % FoundationDB treats a limit of 0 as unlimited
             % so we have to guard for that here.
-            UserAcc;
-        _ ->
-            {Start, End, Skip, FoldOpts} = get_fold_opts(RangePrefix, Options),
-            Callback = fun fold_range_cb/2,
-            Acc = {skip, Skip, UserCallback, UserAcc},
-            {skip, _, UserCallback, OutAcc} =
-                    erlfdb:fold_range(Tx, Start, End, Callback, Acc, FoldOpts),
-            OutAcc
+            Acc;
+        {_, undefined} ->
+            FAcc = get_fold_acc(RangePrefix, Callback, Acc, Options),
+            fold_range_tx(Tx, FAcc);
+        {_, true} ->
+            FAcc = get_fold_acc(RangePrefix, Callback, Acc, Options),
+            fold_range_iter(Tx, FAcc)
+    end.
+
+
+fold_range_tx(Tx, #fold_acc{} = FAcc) ->
+    #fold_acc{
+        start_key = Start,
+        end_key = End,
+        opts = Opts
+    } = FAcc,
+    Callback = fun fold_range_tx_cb/2,
+    FAccOut = erlfdb:fold_range(Tx, Start, End, Callback, FAcc, Opts),
+    FAccOut#fold_acc.uacc.
+
+
+fold_range_iter(Tx, #fold_acc{} = FAcc) ->
+    #fold_acc{
+        start_key = Start,
+        end_key = End,
+        opts = Opts
+    } = FAcc,
+    Callback = fun fold_range_iter_cb/2,
+    put(?PDICT_ITER_CHECKPOINT, FAcc),
+    try erlfdb:fold_range(Tx, Start, End, Callback, FAcc, Opts) of
+        #fold_acc{uacc = UAccOut} -> UAccOut
+    catch
+        error:{erlfdb_error, ?TRANSACTION_TOO_OLD} ->
+            #fold_acc{} = FAcc1 = get(?PDICT_ITER_CHECKPOINT),
+            io:format(standard_error, "~n **** resetting Tx ~p FAcc1:~p~n", [Tx, FAcc1]),
+            couch_log:error("**** RESETTING Tx ~p FAcc1:~p~n", [Tx, FAcc1]),
+            ok = reset_iter_tx(Tx),
+            fold_range_iter(Tx, FAcc1)
     end.
 
 
@@ -1277,7 +1351,7 @@ chunkify_binary(Data) ->
     end.
 
 
-get_fold_opts(RangePrefix, Options) ->
+get_fold_acc(RangePrefix, UserCallback, UserAcc, Options) ->
     Reverse = case fabric2_util:get_value(dir, Options) of
         rev -> true;
         _ -> false
@@ -1367,15 +1441,75 @@ get_fold_opts(RangePrefix, Options) ->
             ++ StreamingMode
             ++ Snapshot,
 
-    {StartKey3, EndKey3, Skip, OutOpts}.
+    #fold_acc{
+        start_key = StartKey3,
+        end_key = EndKey3,
+        skip = Skip,
+        opts = OutOpts,
+        ucallback = UserCallback,
+        uacc = UserAcc
+    }.
 
 
-fold_range_cb(KV, {skip, 0, Callback, Acc}) ->
-    NewAcc = Callback(KV, Acc),
-    {skip, 0, Callback, NewAcc};
+fold_range_tx_cb(KV, #fold_acc{skip = 0} = FAcc) ->
+    #fold_acc{ucallback = UCallback, uacc = UAcc} = FAcc,
+    NewUAcc = UCallback(KV, UAcc),
+    FAcc#fold_acc{uacc = NewUAcc};
 
-fold_range_cb(_KV, {skip, N, Callback, Acc}) when is_integer(N), N > 0 ->
-    {skip, N - 1, Callback, Acc}.
+fold_range_tx_cb(_KV, #fold_acc{skip = N} = FAcc) when N > 0 ->
+    FAcc#fold_acc{skip = N - 1}.
+
+
+fold_range_iter_cb({K, V}, #fold_acc{skip = 0} = FAcc) ->
+    #fold_acc{ucallback = UCallback, uacc = UAcc} = FAcc,
+    NewUAcc = UCallback({K, V}, UAcc),
+    NewFAcc = next_iter_acc(K, FAcc),
+    put(?PDICT_ITER_CHECKPOINT, NewFAcc),
+    NewFAcc#fold_acc{uacc = NewUAcc};
+
+
+fold_range_iter_cb({K, _V}, #fold_acc{skip = N} = FAcc) when N > 0 ->
+    put(?PDICT_ITER_CHECKPOINT, FAcc),
+    next_iter_acc(K, FAcc).
+
+
+next_iter_acc(K, #fold_acc{} = FAcc) ->
+    #fold_acc{skip = Skip, opts = Opts} = FAcc,
+    Opts1 = case fabric2_util:get_value(limit, Opts) of
+        N when is_integer(N), N > 0 ->
+            fabric2_util:replace_value(limit, Opts, N - 1);
+        undefined ->
+            Opts
+    end,
+    FAcc1 = FAcc#fold_acc{opts = Opts1, skip = max(0, Skip - 1)},
+    case fabric2_util:get_value(reverse, Opts, false) of
+        true -> FAcc1#fold_acc{end_key = K};
+        false -> FAcc1#fold_acc{start_key = K}
+    end.
+
+
+reset_iter_tx({erlfdb_transaction, _} = Tx) ->
+    ok = erlfdb:reset(Tx),
+    erlfdb:set_option(Tx, retry_limit, 0),
+    erlfdb:set_option(Tx, max_retry_delay, 0),
+    ok = iterator_db_validate(Tx, get(?PDICT_ITER_VALIDATE_DB)).
+
+
+iterator_db_validate({erlfdb_transaction, _}, undefined) ->
+    ok;
+
+iterator_db_validate({erlfdb_transaction, _} = Tx, #{} = Db) ->
+    #{
+        uuid := UUID,
+        name := DbName,
+        layer_prefix := LayerPrefix
+    } = Db,
+    DbPrefix = erlfdb_tuple:pack({?DBS, DbName}, LayerPrefix),
+    UUIDKey = erlfdb_tuple:pack({?DB_CONFIG, <<"uuid">>}, DbPrefix),
+    case erlfdb:wait(erlfdb:get(Tx, UUIDKey)) of
+        UUID -> ok;
+        _ -> error(database_does_not_exist)
+    end.
 
 
 get_db_handle() ->
@@ -1512,3 +1646,68 @@ with_span(Operation, ExtraTags, Fun) ->
         false ->
             Fun()
     end.
+
+
+create_iter(Options) when is_list(Options)  ->
+    case get(?PDICT_ITER_CHECKPOINT) of
+        undefined -> ok;
+        _ -> error(iterator_already_created)
+    end,
+    Fdb = get_db_handle(),
+    Tx = erlfdb:create_transaction(Fdb),
+    apply_tx_options(Tx, Options ++ [
+        disallow_writes,
+        {retry_limit, 0},
+        {max_retry_delay, 0}
+    ]);
+
+create_iter(#{tx := undefined} = Db) ->
+    try
+        Db1 = refresh(Db),
+
+        Reopen = maps:get(reopen, Db1, false),
+        Db2 = maps:remove(reopen, Db1),
+
+        Options = maps:get(tx_options, Db2, []),
+        Tx = create_iter(Options),
+
+        Db3 = case Reopen of
+            true -> reopen(Db2#{tx => Tx});
+            false -> Db2#{tx => Tx}
+        end,
+
+        % Here we might throw `reopen`
+        Db4 = ensure_current(Db3),
+
+        % This part might update the Db cache
+        ok = run_on_commit_fun(Tx),
+        erase({?PDICT_ON_COMMIT_FUN, Tx}),
+
+        % Save the initial Db handle so we can validate
+        % that the same db was still running
+        put(?PDICT_ITER_VALIDATE_DB, Db4),
+
+        Db4#{tx := Tx}
+    catch throw:{?MODULE, reopen} ->
+        create_iter(Db#{reopen => true})
+    end.
+
+
+destroy_iter({erlfdb_transaction, _}) ->
+    erase(?PDICT_ITER_CHECKPOINT);
+
+destroy_iter(#{tx := {erfdb_transaction, _}} = Db) ->
+    #{tx := Tx} = Db,
+    erase(?PDICT_ITER_VALIDATE_DB),
+    destroy_iter(Tx),
+    Db#{tx := undefined}.
+
+
+apply_tx_options(Tx, Options) ->
+    lists:foreach(fun(Option) ->
+        case Option of
+            K when is_atom(K) -> erlfdb:set_option(Tx, K);
+            {K, V} -> erlfdb:set_option(Tx, K, V)
+        end
+    end, Options),
+    Tx.

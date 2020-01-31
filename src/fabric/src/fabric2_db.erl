@@ -175,7 +175,8 @@ open(DbName, Options) ->
     case fabric2_server:fetch(DbName) of
         #{} = Db ->
             Db1 = maybe_set_user_ctx(Db, Options),
-            {ok, require_member_check(Db1)};
+            Db2 = set_tx_options(Db1, Options),
+            {ok, require_member_check(Db2)};
         undefined ->
             Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
                 fabric2_fdb:open(TxDb, Options)
@@ -211,18 +212,20 @@ list_dbs() ->
 
 
 list_dbs(Options) ->
+    TxFun = tx_fun(Options),
     Callback = fun(DbName, Acc) -> [DbName | Acc] end,
-    DbNames = fabric2_fdb:transactional(fun(Tx) ->
+    DbNames = fabric2_fdb:TxFun(fun(Tx) ->
         fabric2_fdb:list_dbs(Tx, Callback, [], Options)
-    end),
+    end, Options),
     lists:reverse(DbNames).
 
 
 list_dbs(UserFun, UserAcc0, Options) ->
+    TxFun = tx_fun(Options),
     FoldFun = fun
         (DbName, Acc) -> maybe_stop(UserFun({row, [{id, DbName}]}, Acc))
     end,
-    fabric2_fdb:transactional(fun(Tx) ->
+    fabric2_fdb:TxFun(fun(Tx) ->
         try
             UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
             UserAcc2 = fabric2_fdb:list_dbs(
@@ -235,7 +238,7 @@ list_dbs(UserFun, UserAcc0, Options) ->
         catch throw:{stop, FinalUserAcc} ->
             {ok, FinalUserAcc}
         end
-    end).
+    end, Options).
 
 
 is_admin(Db, {SecProps}) when is_list(SecProps) ->
@@ -755,7 +758,8 @@ fold_docs(Db, UserFun, UserAcc) ->
 
 
 fold_docs(Db, UserFun, UserAcc0, Options) ->
-    fabric2_fdb:transactional(Db, fun(TxDb) ->
+    TxFun = tx_fun(Options),
+    fabric2_fdb:TxFun(Db, fun(TxDb) ->
         try
             #{
                 db_prefix := DbPrefix
@@ -780,7 +784,7 @@ fold_docs(Db, UserFun, UserAcc0, Options) ->
         catch throw:{stop, FinalUserAcc} ->
             {ok, FinalUserAcc}
         end
-    end).
+    end, Options).
 
 
 fold_design_docs(Db, UserFun, UserAcc0, Options1) ->
@@ -829,7 +833,8 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc) ->
 
 
 fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
-    fabric2_fdb:transactional(Db, fun(TxDb) ->
+    TxFun = tx_fun(Options),
+    fabric2_fdb:TxFun(Db, fun(TxDb) ->
         try
             #{
                 db_prefix := DbPrefix
@@ -868,7 +873,7 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
         catch throw:{stop, FinalUserAcc} ->
             {ok, FinalUserAcc}
         end
-    end).
+    end, Options).
 
 
 dbname_suffix(DbName) ->
@@ -999,6 +1004,11 @@ maybe_set_user_ctx(Db, Options) ->
         undefined ->
             Db
     end.
+
+
+set_tx_options(Db, Options) ->
+    TxOptions = fabric2_util:get_value(tx_options, Options, []),
+    Db#{tx_options := TxOptions}.
 
 
 is_member(Db, {SecProps}) when is_list(SecProps) ->
@@ -1764,4 +1774,11 @@ stem_revisions(#{} = Db, #doc{} = Doc) ->
     case RevPos >= RevsLimit of
         true -> Doc#doc{revs = {RevPos, lists:sublist(Revs, RevsLimit)}};
         false -> Doc
+    end.
+
+
+tx_fun(Options) when is_list(Options) ->
+    case fabric2_util:get_value(iterator, Options, true) of
+        true -> with_iter;
+        undefined -> transactional
     end.
