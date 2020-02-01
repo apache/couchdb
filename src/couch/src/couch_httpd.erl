@@ -720,6 +720,9 @@ start_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
     end,
     {ok, Resp}.
 
+send({remote, Pid, Ref} = Resp, Data) ->
+    Pid ! {Ref, send, Data},
+    {ok, Resp};
 send(Resp, Data) ->
     Resp:send(Data),
     {ok, Resp}.

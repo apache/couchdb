@@ -199,9 +199,15 @@ handle_design_req(#httpd{
     false -> ok
     end,
 
-    % load ddoc
+    % maybe load ddoc through fabric
     DesignId = <<"_design/", DesignName/binary>>,
-    DDoc = couch_httpd_db:couch_doc_open(Db, DesignId, nil, [ejson_body]),
+    case couch_httpd_db:couch_doc_open(Db, DesignId, nil, [ejson_body]) of
+        not_found ->
+            DbName = mem3:dbname(couch_db:name(Db)),
+            {ok, DDoc} = fabric:open_doc(DbName, DesignId, [?ADMIN_CTX]);
+        DDoc ->
+            ok
+    end,
     Handler = couch_util:dict_find(Action, DesignUrlHandlers, fun(_, _, _) ->
         throw({not_found, <<"missing handler: ", Action/binary>>})
     end),

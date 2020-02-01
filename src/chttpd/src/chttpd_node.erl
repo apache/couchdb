@@ -132,7 +132,7 @@ handle_node_req(#httpd{path_parts=[_, Node | PathParts],
     % strip /_node/{node} from Req0 before descending further
     RawUri = MochiReq0:get(raw_path),
     {_, Query, Fragment} = mochiweb_util:urlsplit_path(RawUri),
-    NewPath0 = "/" ++ lists:join("/", [?b2l(P) || P <- PathParts]),
+    NewPath0 = "/" ++ lists:join("/", [couch_util:url_encode(P) || P <- PathParts]),
     NewRawPath = mochiweb_util:urlunsplit_path({NewPath0, Query, Fragment}),
     MaxSize =  config:get_integer("httpd", "max_http_request_size", 4294967296),
     NewOpts = [{body, MochiReq0:recv_body(MaxSize)} | MochiReq0:get(opts)],
@@ -154,12 +154,17 @@ recv_loop(Ref, ReqResp) ->
     receive
         {Ref, Code, Headers, _Args, start_response} ->
             recv_loop(Ref, ReqResp:start({Code, Headers}));
+        {Ref, Code, Headers, Len, start_response_length} ->
+            recv_loop(Ref, ReqResp:start_response_length({Code, Headers, Len}));
         {Ref, Code, Headers, chunked, respond} ->
             Resp = ReqResp:respond({Code, Headers, chunked}),
             recv_loop(Ref, Resp);
         {Ref, Code, Headers, Args, respond} ->
             Resp = ReqResp:respond({Code, Headers, Args}),
             {ok, Resp};
+        {Ref, send, Data} ->
+            ReqResp:send(Data),
+            {ok, ReqResp};
         {Ref, chunk, <<>>} ->
             ReqResp:write_chunk(<<>>),
             {ok, ReqResp};
