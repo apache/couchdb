@@ -65,6 +65,7 @@ src/oauth/
 src/parse_trans/
 src/proper/
 src/rebar/
+src/recon/
 src/smoosh/
 src/snappy/
 src/ssl_verify_fun/
