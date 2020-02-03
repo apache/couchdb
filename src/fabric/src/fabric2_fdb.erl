@@ -701,14 +701,14 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
                 incr_stat(Db, <<"doc_design_count">>, 1)
             end,
             incr_stat(Db, <<"doc_count">>, 1),
-            mango_indexer:update(Db, created, Doc, not_found);
+            mango_indexer:create_doc(Db, Doc);
         recreated ->
             if not IsDDoc -> ok; true ->
                 incr_stat(Db, <<"doc_design_count">>, 1)
             end,
             incr_stat(Db, <<"doc_count">>, 1),
             incr_stat(Db, <<"doc_del_count">>, -1),
-            mango_indexer:update(Db, created, Doc, not_found);
+            mango_indexer:create_doc(Db, Doc);
         replicate_deleted ->
             incr_stat(Db, <<"doc_del_count">>, 1);
         ignore ->
@@ -719,9 +719,9 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
             end,
             incr_stat(Db, <<"doc_count">>, -1),
             incr_stat(Db, <<"doc_del_count">>, 1),
-            mango_indexer:update(Db, deleted, not_found, PrevDoc);
+            mango_indexer:delete_doc(Db, PrevDoc);
         updated ->
-            mango_indexer:update(Db, updated, Doc, PrevDoc)
+            mango_indexer:update_doc(Db, Doc, PrevDoc)
     end,
 
     ok.
