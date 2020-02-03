@@ -15,7 +15,9 @@
 
 
 -export([
-    update/4
+    create_doc/2,
+    update_doc/3,
+    delete_doc/2
 ]).
 
 
@@ -23,9 +25,21 @@
 -include("mango_idx.hrl").
 
 
-update(Db, State, Doc, PrevDoc) ->
+create_doc(Db, Doc) ->
+    modify(Db, create, Doc, undefined).
+
+
+update_doc(Db, Doc, PrevDoc) ->
+    modify(Db, update, Doc, PrevDoc).
+
+
+delete_doc(Db, PrevDoc) ->
+    modify(Db, delete, undefined, PrevDoc).
+
+
+modify(Db, Change, Doc, PrevDoc) ->
     try
-        update_int(Db, State, Doc, PrevDoc)
+        modify_int(Db, Change, Doc, PrevDoc)
     catch
         Error:Reason ->
             io:format("ERROR ~p ~p ~p ~n", [Error, Reason, erlang:display(erlang:get_stacktrace())]),
@@ -33,44 +47,40 @@ update(Db, State, Doc, PrevDoc) ->
                 name := DbName
             } = Db,
 
-            Id = case Doc of
-                not_found when is_record(PrevDoc, doc) ->
-                    #doc{id = DocId} = PrevDoc,
-                    DocId;
-                not_found ->
-                    <<"unknown_doc_id">>;
-                #doc{} ->
-                    #doc{id = DocId} = Doc,
-                    DocId
-            end,
+            Id = doc_id(Doc, PrevDoc),
 
             couch_log:error("Mango index error for Db ~s Doc ~p ~p ~p",
                 [DbName, Id, Error, Reason])
     end,
     ok.
 
+
+doc_id(undefined, #doc{id = DocId}) ->
+    DocId;
+doc_id(undefined, _) ->
+    <<"unknown_doc_id">>;
+doc_id(#doc{id = DocId}, _) ->
+    DocId.
+
+
 % Design doc
 % Todo: Check if design doc is mango index and kick off background worker
 % to build new index
-update_int(Db, State, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, PrevDoc) ->
+modify_int(_Db, _Change, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc,
+        _PrevDoc) ->
     io:format("DESIGN DOC SAVED ~p ~n", [Doc]),
     ok;
 
-update_int(Db, deleted, _, PrevDoc)  ->
-    Indexes = mango_idx:list(Db),
-    Indexes1 = filter_json_indexes(Indexes),
-    remove_doc(Db, PrevDoc, Indexes1);
+modify_int(Db, delete, _, PrevDoc)  ->
+    remove_doc(Db, PrevDoc, json_indexes(Db));
 
-update_int(Db, updated, Doc, PrevDoc) ->
-    Indexes = mango_idx:list(Db),
-    Indexes1 = filter_json_indexes(Indexes),
-    remove_doc(Db, PrevDoc, Indexes1),
-    write_doc(Db, Doc, Indexes1);
+modify_int(Db, update, Doc, PrevDoc) ->
+    Indexes = json_indexes(Db),
+    remove_doc(Db, PrevDoc, Indexes),
+    write_doc(Db, Doc, Indexes);
 
-update_int(Db, created, Doc, _) ->
-    Indexes = mango_idx:list(Db),
-    Indexes1 = filter_json_indexes(Indexes),
-    write_doc(Db, Doc, Indexes1).
+modify_int(Db, create, Doc, _) ->
+    write_doc(Db, Doc, json_indexes(Db)).
 
 
 remove_doc(Db, #doc{} = Doc, Indexes) ->
@@ -87,10 +97,10 @@ write_doc(Db, #doc{} = Doc, Indexes) ->
     mango_fdb:write_doc(Db, DocId, Results).
 
 
-filter_json_indexes(Indexes) ->
+json_indexes(Db) ->
     lists:filter(fun (Idx) ->
         Idx#idx.type == <<"json">>
-    end, Indexes).
+    end, mango_idx:list(Db)).
 
 
 index_doc(Indexes, Doc) ->
