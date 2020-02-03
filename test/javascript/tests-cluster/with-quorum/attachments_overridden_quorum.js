@@ -11,7 +11,9 @@
 // the License.
 
 //Test attachments operations with an overridden quorum parameter
+couchTests.skip = true;
 couchTests.attachments_overriden_quorum= function(debug) {
+  return console.log('done in test/elixir/test/cluster_with_quorum_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"},{"w":3});
   db.createDb();
@@ -32,7 +34,7 @@ couchTests.attachments_overriden_quorum= function(debug) {
     body:"This is no base64 encoded text-2",
     headers:{"Content-Type": "text/plain;charset=utf-8"}
   });
-  console.log("Skipped-TODO: Clarify correct behaviour. Is not considering overridden quorum. 202->"+xhr.status);
+  console.log("TODO: Clarify correct behaviour. Is not considering overridden quorum. 202->"+xhr.status);
   //TODO: Define correct behaviour
   //T(xhr.status == 202,"Should return 202");
 

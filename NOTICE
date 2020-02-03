@@ -1,5 +1,5 @@
 Apache CouchDB
-Copyright 2009-2019 The Apache Software Foundation
+Copyright 2009-2020 The Apache Software Foundation
 
 This product includes software developed at
 The Apache Software Foundation (http://www.apache.org/).
@@ -178,6 +178,18 @@ This product also includes the following third-party components:
 
   Copyright (c) 2015 Twitter, Inc.
 
+* esprima.js (https://github.com/jquery/esprima)
+
+  Copyright JS Foundation and other contributors, https://js.foundation/
+
+* escodegen.js (https://github.com/estools/escodegen)
+
+  Copyright (C) 2012 Yusuke Suzuki (twitter: @Constellation) and other contributors.
+
 * hyper
 
   Copyright (c) 2014 Game Analytics ApS
+
+* recon
+
+  Copyright (c) 2012-2017, Frédéric Trottier-Hébert

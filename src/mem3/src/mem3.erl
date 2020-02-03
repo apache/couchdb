@@ -22,6 +22,7 @@
 -export([belongs/2, owner/3]).
 -export([get_placement/1]).
 -export([ping/1, ping/2]).
+-export([db_is_current/1]).
 
 %% For mem3 use only.
 -export([name/1, node/1, range/1, engine/1]).
@@ -150,7 +151,8 @@ ushards(DbName, Shards0, ZoneMap) ->
     % but sort each zone separately to ensure a consistent choice between
     % nodes in the same zone.
     Shards = choose_ushards(DbName, L ++ S) ++ choose_ushards(DbName, D),
-    lists:ukeysort(#shard.range, Shards).
+    OverlappedShards = lists:ukeysort(#shard.range, Shards),
+    mem3_util:non_overlapping_shards(OverlappedShards).
 
 get_shard(DbName, Node, Range) ->
     mem3_shards:get(DbName, Node, Range).
@@ -365,6 +367,25 @@ ping(Node, Timeout) when is_atom(Node) ->
             erlang:disconnect_node(Node),
             pang
     end.
+
+
+db_is_current(#shard{name = Name}) ->
+    db_is_current(Name);
+
+db_is_current(<<"shards/", _/binary>> = Name) ->
+    try
+        Shards = mem3:shards(mem3:dbname(Name)),
+        lists:keyfind(Name, #shard.name, Shards) =/= false
+    catch
+        error:database_does_not_exist ->
+            false
+    end;
+
+db_is_current(Name) when is_binary(Name) ->
+    % This accounts for local (non-sharded) dbs, and is mostly
+    % for unit tests that either test or use mem3_rep logic
+    couch_server:exists(Name).
+
 
 -ifdef(TEST).
 

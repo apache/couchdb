@@ -374,10 +374,22 @@ couchTests.users_db_security = function(debug) {
   };
 
   run_on_modified_server(
-    [{section: "couch_httpd_auth",
-      key: "iterations", value: "1"},
-   {section: "admins",
-    key: "jan", value: "apple"}],
+    [
+        {
+          section:"couchdb",
+          key:"users_db_security_editable",
+          value:"true"
+        },
+        {
+          section: "couch_httpd_auth",
+          key: "iterations",
+          value: "1"
+        },
+        {
+          section: "admins",
+          key: "jan",
+          value: "apple"
+        }],
     function() {
       try {
         testFun();

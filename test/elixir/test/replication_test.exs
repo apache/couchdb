@@ -2,16 +2,13 @@ defmodule ReplicationTest do
   use CouchTestCase
 
   @moduledoc """
-  Test CouchDB View Collation Behavior
+  Test CouchDB Replication Behavior
   This is a port of the view_collation.js suite
   """
 
   # TODO: Parameterize these
   @admin_account "adm:pass"
   @db_pairs_prefixes [
-    {"local-to-local", "", ""},
-    {"remote-to-local", "http://127.0.0.1:15984/", ""},
-    {"local-to-remote", "", "http://127.0.0.1:15984/"},
     {"remote-to-remote", "http://127.0.0.1:15984/", "http://127.0.0.1:15984/"}
   ]
 
@@ -19,22 +16,11 @@ defmodule ReplicationTest do
   # happens for JavaScript tests.
   @moduletag config: [{"replicator", "startup_jitter", "0"}]
 
-  @moduletag :skip_on_jenkins
-
-  test "source database does not exist" do
-    name = random_db_name()
-    check_not_found(name <> "_src", name <> "_tgt")
-  end
-
-  test "source database not found with path - COUCHDB-317" do
-    name = random_db_name()
-    check_not_found(name <> "_src", name <> "_tgt")
-  end
-
   test "source database not found with host" do
     name = random_db_name()
-    url = "http://127.0.0.1:15984/" <> name <> "_src"
-    check_not_found(url, name <> "_tgt")
+    src_url = "http://127.0.0.1:15984/" <> name <> "_src"
+    tgt_url = "http://127.0.0.1:15984/" <> name <> "_tgt"
+    check_not_found(src_url, tgt_url)
   end
 
   def check_not_found(src, tgt) do
@@ -55,7 +41,9 @@ defmodule ReplicationTest do
     doc = %{"_id" => "doc1"}
     [doc] = save_docs(src_db_name, [doc])
 
-    result = replicate(src_db_name, "http://127.0.0.1:15984/" <> tgt_db_name)
+    repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
     assert result["ok"]
     assert is_list(result["history"])
     history = Enum.at(result["history"], 0)
@@ -79,14 +67,16 @@ defmodule ReplicationTest do
 
     [doc] = save_docs(src_db_name, [doc])
 
-    result = replicate(src_db_name, "http://127.0.0.1:15984/" <> tgt_db_name)
+    repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
 
     assert result["ok"]
     assert is_list(result["history"])
     assert length(result["history"]) == 2
     history = Enum.at(result["history"], 0)
-    assert history["docs_written"] == 1
-    assert history["docs_read"] == 1
+    assert history["docs_written"] == 2
+    assert history["docs_read"] == 2
     assert history["doc_write_failures"] == 0
 
     query = %{
@@ -127,7 +117,8 @@ defmodule ReplicationTest do
 
     repl_body = %{:continuous => true, :create_target => true}
     repl_src = "http://127.0.0.1:15984/" <> src_db_name
-    result = replicate(repl_src, tgt_db_name, body: repl_body)
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt, body: repl_body)
 
     assert result["ok"]
     assert is_binary(result["_local_id"])
@@ -167,8 +158,9 @@ defmodule ReplicationTest do
     save_docs(src_db_name, make_docs(1..6))
 
     repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
     repl_body = %{"continuous" => true}
-    result = replicate(repl_src, tgt_db_name, body: repl_body)
+    result = replicate(repl_src, repl_tgt, body: repl_body)
 
     assert result["ok"]
     assert is_binary(result["_local_id"])
@@ -282,7 +274,9 @@ defmodule ReplicationTest do
         end
       end
 
-    result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
+    repl_src = src_prefix <> src_db_name
+    repl_tgt = tgt_prefix <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
     assert result["ok"]
 
     src_info =
@@ -358,10 +352,10 @@ defmodule ReplicationTest do
     assert history["session_id"] == result["session_id"]
     assert is_binary(history["start_time"])
     assert is_binary(history["end_time"])
-    assert history["missing_checked"] == 6
-    assert history["missing_found"] == 6
-    assert history["docs_read"] == 6
-    assert history["docs_written"] == 6
+    assert history["missing_checked"] == 27
+    assert history["missing_found"] == 27
+    assert history["docs_read"] == 27
+    assert history["docs_written"] == 27
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/#{new_doc["_id"]}").body
@@ -420,10 +414,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 3
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 28
+    assert history["missing_found"] == 28
+    assert history["docs_read"] == 28
+    assert history["docs_written"] == 28
     assert history["doc_write_failures"] == 0
 
     resp = Couch.get("/#{tgt_db_name}/#{del_doc["_id"]}")
@@ -452,10 +446,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 4
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 29
+    assert history["missing_found"] == 29
+    assert history["docs_read"] == 29
+    assert history["docs_written"] == 29
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -479,10 +473,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 5
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 30
+    assert history["missing_found"] == 30
+    assert history["docs_read"] == 30
+    assert history["docs_written"] == 30
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -508,10 +502,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 6
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 31
+    assert history["missing_found"] == 31
+    assert history["docs_read"] == 31
+    assert history["docs_written"] == 31
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -540,10 +534,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 7
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 3
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 34
+    assert history["missing_found"] == 32
+    assert history["docs_read"] == 32
+    assert history["docs_written"] == 32
     assert history["doc_write_failures"] == 0
 
     docs = [
@@ -565,10 +559,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 8
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 2
-    assert history["missing_found"] == 0
-    assert history["docs_read"] == 0
-    assert history["docs_written"] == 0
+    assert history["missing_checked"] == 36
+    assert history["missing_found"] == 32
+    assert history["docs_read"] == 32
+    assert history["docs_written"] == 32
     assert history["doc_write_failures"] == 0
 
     # Test nothing to replicate
@@ -828,10 +822,10 @@ defmodule ReplicationTest do
     assert length(result["history"]) == 2
     history = Enum.at(result["history"], 0)
 
-    assert history["missing_checked"] == 3
-    assert history["missing_found"] == 3
-    assert history["docs_read"] == 3
-    assert history["docs_written"] == 3
+    assert history["missing_checked"] == 19
+    assert history["missing_found"] == 19
+    assert history["docs_read"] == 19
+    assert history["docs_written"] == 19
     assert history["doc_write_failures"] == 0
   end
 
@@ -1191,8 +1185,8 @@ defmodule ReplicationTest do
 
     result = replicate(repl_src, repl_tgt, body: repl_body)
     assert result["ok"]
-    assert result["docs_read"] == 1
-    assert result["docs_written"] == 1
+    assert result["docs_read"] == 2
+    assert result["docs_written"] == 2
     assert result["doc_write_failures"] == 0
 
     retry_until(fn ->
@@ -1757,11 +1751,11 @@ defmodule ReplicationTest do
   end
 
   def get_att1_data do
-    File.read!("test/data/lorem.txt")
+    File.read!(Path.expand("data/lorem.txt", __DIR__))
   end
 
   def get_att2_data do
-    File.read!("test/data/lorem_b64.txt")
+    File.read!(Path.expand("data/lorem_b64.txt", __DIR__))
   end
 
   def cmp_json(lhs, rhs) when is_map(lhs) and is_map(rhs) do

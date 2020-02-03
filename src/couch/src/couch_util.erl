@@ -39,6 +39,7 @@
 -export([check_config_blacklist/1]).
 -export([check_md5/2]).
 -export([set_mqd_off_heap/1]).
+-export([set_process_priority/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -500,7 +501,7 @@ json_decode(V) ->
     try
         jiffy:decode(V, [dedupe_keys])
     catch
-        throw:Error ->
+        error:Error ->
             throw({invalid_json, Error})
     end.
 
@@ -529,8 +530,8 @@ reorder_results(Keys, SortedResults) ->
 
 url_strip_password(Url) ->
     re:replace(Url,
-        "http(s)?://([^:]+):[^@]+@(.*)$",
-        "http\\1://\\2:*****@\\3",
+        "(http|https|socks5)://([^:]+):[^@]+@(.*)$",
+        "\\1://\\2:*****@\\3",
         [{return, list}]).
 
 encode_doc_id(#doc{id = Id}) ->
@@ -685,6 +686,16 @@ set_mqd_off_heap(Module) ->
             catch error:badarg ->
                     ok
             end;
+        false ->
+            ok
+    end.
+
+
+set_process_priority(Module, Level) ->
+    case config:get_boolean("process_priority", atom_to_list(Module), false) of
+        true ->
+            process_flag(priority, Level),
+            ok;
         false ->
             ok
     end.

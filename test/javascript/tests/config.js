@@ -10,7 +10,9 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.config = function(debug) {
+  return console.log('done in test/elixir/test/config_test.exs');
   if (debug) debugger;
 
   // test that /_config returns all the settings

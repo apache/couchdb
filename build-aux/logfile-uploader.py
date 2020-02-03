@@ -36,6 +36,9 @@ def _tojson(req):
 def collect_logfiles():
     """ Find and tarball all logfiles """
     tb = tarfile.open(name=TARFILE, mode="w:gz")
+    # Test results
+    for log in glob.glob("test-results.log"):
+        tb.add(log)
     # EUnit
     for log in glob.glob("src/*/.eunit/couch.log"):
         tb.add(log)
@@ -62,7 +65,7 @@ def build_ci_doc():
         doc["commit"] = os.environ["TRAVIS_COMMIT"]
         doc["repo"] = "https://github.com/" + os.environ["TRAVIS_REPO_SLUG"]
     elif "JENKINS_URL" in os.environ:
-        doc["builder"] = "jenkins"
+        doc["builder"] = "jenk-ins"
         doc["build_id"] = os.environ["BUILD_NUMBER"]
         doc["url"] = os.environ["BUILD_URL"]
         doc["branch"] = os.environ["BRANCH_NAME"]

@@ -1,0 +1,5 @@
+%{
+  "httpotion": {:hex, :httpotion, "3.1.0", "14d20d9b0ce4e86e253eb91e4af79e469ad949f57a5d23c0a51b2f86559f6589", [:mix], [{:ibrowse, "~> 4.4", [hex: :ibrowse, repo: "hexpm", optional: false]}], "hexpm"},
+  "ibrowse": {:hex, :ibrowse, "4.4.1", "2b7d0637b0f8b9b4182de4bd0f2e826a4da2c9b04898b6e15659ba921a8d6ec2", [:rebar3], [], "hexpm"},
+  "jiffy": {:hex, :jiffy, "0.14.13", "225a9a35e26417832c611526567194b4d3adc4f0dfa5f2f7008f4684076f2a01", [:rebar3], [], "hexpm"},
+}

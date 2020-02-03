@@ -38,13 +38,9 @@ get(purge_seq, #mrst{purge_seq = PurgeSeq}) ->
 get(update_options, #mrst{design_opts = Opts}) ->
     IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
     LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
-    SeqIndexed = couch_util:get_value(<<"seq_indexed">>, Opts, false),
-    KeySeqIndexed = couch_util:get_value(<<"keyseq_indexed">>, Opts, false),
     Partitioned = couch_util:get_value(<<"partitioned">>, Opts, false),
     if IncDesign -> [include_design]; true -> [] end
         ++ if LocalSeq -> [local_seq]; true -> [] end
-        ++ if KeySeqIndexed -> [keyseq_indexed]; true -> [] end
-        ++ if SeqIndexed -> [seq_indexed]; true -> [] end
         ++ if Partitioned -> [partitioned]; true -> [] end;
 get(fd, #mrst{fd = Fd}) ->
     Fd;
@@ -57,7 +53,6 @@ get(info, State) ->
         fd = Fd,
         sig = Sig,
         id_btree = IdBtree,
-        log_btree = LogBtree,
         language = Lang,
         update_seq = UpdateSeq,
         purge_seq = PurgeSeq,
@@ -66,13 +61,7 @@ get(info, State) ->
     {ok, FileSize} = couch_file:bytes(Fd),
     {ok, ExternalSize} = couch_mrview_util:calculate_external_size(Views),
     {ok, ActiveViewSize} = couch_mrview_util:calculate_active_size(Views),
-    LogBtSize = case LogBtree of
-        nil ->
-            0;
-        _ ->
-            couch_btree:size(LogBtree)
-    end,
-    ActiveSize = couch_btree:size(IdBtree) + LogBtSize + ActiveViewSize,
+    ActiveSize = couch_btree:size(IdBtree) + ActiveViewSize,
 
     UpdateOptions0 = get(update_options, State),
     UpdateOptions = [atom_to_binary(O, latin1) || O <- UpdateOptions0],
@@ -80,8 +69,6 @@ get(info, State) ->
     {ok, [
         {signature, list_to_binary(couch_index_util:hexsig(Sig))},
         {language, Lang},
-        {disk_size, FileSize}, % legacy
-        {data_size, ExternalSize}, % legacy
         {sizes, {[
             {file, FileSize},
             {active, ActiveSize},
@@ -107,35 +94,46 @@ open(Db, State0) ->
     } = State = set_partitioned(Db, State0),
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
 
-    % If we are upgrading from <=1.2.x, we upgrade the view
+    % If we are upgrading from <= 2.x, we upgrade the view
     % index file on the fly, avoiding an index reset.
+    % We are making commit with a new state
+    % right after the upgrade to ensure
+    % that we have a proper sig in the header
+    % when open the view next time
     %
     % OldSig is `ok` if no upgrade happened.
     %
-    % To remove suppport for 1.2.x auto-upgrades in the
+    % To remove support for 2.x auto-upgrades in the
     % future, just remove the next line and the code
-    % between "upgrade code for <= 1.2.x" and
-    % "end upgrade code for <= 1.2.x" and the corresponding
+    % between "upgrade code for <= 2.x" and
+    % "end of upgrade code for <= 2.x" and the corresponding
     % code in couch_mrview_util
 
     OldSig = couch_mrview_util:maybe_update_index_file(State),
 
     case couch_mrview_util:open_file(IndexFName) of
         {ok, Fd} ->
-            case (catch couch_file:read_header(Fd)) of
-                % upgrade code for <= 1.2.x
+            case couch_file:read_header(Fd) of
+                % upgrade code for <= 2.x
                 {ok, {OldSig, Header}} ->
                     % Matching view signatures.
                     NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
+                    ok = commit(NewSt),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt};
-                % end of upgrade code for <= 1.2.x
+                % end of upgrade code for <= 2.x
                 {ok, {Sig, Header}} ->
                     % Matching view signatures.
                     NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt};
-                _ ->
+                {ok, {WrongSig, _}} ->
+                    couch_log:error("~s has the wrong signature: expected: ~p but got ~p",
+                        [IndexFName, Sig, WrongSig]),
+                    NewSt = couch_mrview_util:reset_index(Db, Fd, State),
+                    ensure_local_purge_doc(Db, NewSt),
+                    {ok, NewSt};
+                no_valid_header ->
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt}

@@ -79,15 +79,13 @@ handle_cast({doit, {ClientPid, ClientRef} = From, Nonce, MFA}, State) ->
     {noreply, add_job(Job, State)};
 
 
-handle_cast({kill, FromRef}, #st{clients = Clients} = St) ->
-    case find_worker(FromRef, Clients) of
-    #job{worker = KeyRef, worker_pid = Pid} = Job ->
-        erlang:demonitor(KeyRef),
-        exit(Pid, kill),
-        {noreply, remove_job(Job, St)};
-    false ->
-        {noreply, St}
-    end;
+handle_cast({kill, FromRef}, St) ->
+    kill_worker(FromRef, St),
+    {noreply, St};
+
+handle_cast({kill_all, FromRefs}, St) ->
+    lists:foreach(fun(FromRef) -> kill_worker(FromRef, St) end, FromRefs),
+    {noreply, St};
 
 handle_cast(_, St) ->
     couch_log:notice("rexi_server ignored_cast", []),
@@ -181,3 +179,15 @@ find_worker(Ref, Tab) ->
 
 notify_caller({Caller, Ref}, Reason) ->
     rexi_utils:send(Caller, {Ref, {rexi_EXIT, Reason}}).
+
+
+kill_worker(FromRef, #st{clients = Clients} = St) ->
+    case find_worker(FromRef, Clients) of
+    #job{worker = KeyRef, worker_pid = Pid} = Job ->
+        erlang:demonitor(KeyRef),
+        exit(Pid, kill),
+        remove_job(Job, St),
+        ok;
+    false ->
+        ok
+    end.

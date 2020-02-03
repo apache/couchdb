@@ -14,7 +14,7 @@
 
 -export([submit_jobs/3, submit_jobs/4, cleanup/1, recv/4, get_db/1, get_db/2, error_info/1,
         update_counter/3, remove_ancestors/2, create_monitors/1, kv/2,
-        remove_down_workers/2, doc_id_and_rev/1]).
+        remove_down_workers/2, remove_down_workers/3, doc_id_and_rev/1]).
 -export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0, view_timeout/1]).
 -export([log_timeout/2, remove_done_workers/2]).
 -export([is_users_db/1, is_replicator_db/1]).
@@ -22,6 +22,7 @@
 -export([is_partitioned/1]).
 -export([validate_all_docs_args/2, validate_args/3]).
 -export([upgrade_mrargs/1]).
+-export([worker_ranges/1]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
 
@@ -32,9 +33,12 @@
 -include_lib("eunit/include/eunit.hrl").
 
 remove_down_workers(Workers, BadNode) ->
+    remove_down_workers(Workers, BadNode, []).
+
+remove_down_workers(Workers, BadNode, RingOpts) ->
     Filter = fun(#shard{node = Node}, _) -> Node =/= BadNode end,
     NewWorkers = fabric_dict:filter(Filter, Workers),
-    case fabric_view:is_progress_possible(NewWorkers) of
+    case fabric_ring:is_progress_possible(NewWorkers, RingOpts) of
     true ->
         {ok, NewWorkers};
     false ->
@@ -51,7 +55,7 @@ submit_jobs(Shards, Module, EndPoint, ExtraArgs) ->
     end, Shards).
 
 cleanup(Workers) ->
-    [rexi:kill(Node, Ref) || #shard{node=Node, ref=Ref} <- Workers].
+    rexi:kill_all([{Node, Ref} || #shard{node = Node, ref = Ref} <- Workers]).
 
 recv(Workers, Keypos, Fun, Acc0) ->
     rexi_utils:recv(Workers, Keypos, Fun, Acc0, request_timeout(), infinity).
@@ -334,3 +338,10 @@ upgrade_mrargs({mrargs,
         sorted = Sorted,
         extra = Extra
     }.
+
+
+worker_ranges(Workers) ->
+    Ranges = fabric_dict:fold(fun(#shard{range=[X, Y]}, _, Acc) ->
+        [{X, Y} | Acc]
+    end, [], Workers),
+    lists:usort(Ranges).

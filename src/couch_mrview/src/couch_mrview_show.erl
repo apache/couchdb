@@ -181,7 +181,7 @@ handle_view_list_req(Req, _Db, _DDoc) ->
 
 
 handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys) ->
-    Args0 = couch_mrview_http:parse_params(Req, Keys),
+    Args0 = couch_mrview_http:parse_body_and_query(Req, Keys),
     ETagFun = fun(BaseSig, Acc0) ->
         UserCtx = Req#httpd.user_ctx,
         Name = UserCtx#user_ctx.name,

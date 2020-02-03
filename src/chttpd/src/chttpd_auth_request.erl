@@ -50,6 +50,8 @@ authorize_request_int(#httpd{path_parts=[<<"_replicator">>,<<"_changes">>|_]}=Re
     require_admin(Req);
 authorize_request_int(#httpd{path_parts=[<<"_replicator">>|_]}=Req) ->
     db_authorization_check(Req);
+authorize_request_int(#httpd{path_parts=[<<"_reshard">>|_]}=Req) ->
+    require_admin(Req);
 authorize_request_int(#httpd{path_parts=[<<"_users">>], method='PUT'}=Req) ->
     require_admin(Req);
 authorize_request_int(#httpd{path_parts=[<<"_users">>], method='DELETE'}=Req) ->
@@ -97,12 +99,26 @@ server_authorization_check(#httpd{path_parts=[<<"_dbs_info">>]}=Req) ->
 server_authorization_check(#httpd{method=Method, path_parts=[<<"_utils">>|_]}=Req)
   when Method =:= 'HEAD' orelse Method =:= 'GET' ->
     Req;
+server_authorization_check(#httpd{path_parts=[<<"_node">>,_ , <<"_stats">>|_]}=Req) ->
+    require_metrics(Req);
+server_authorization_check(#httpd{path_parts=[<<"_node">>,_ , <<"_system">>|_]}=Req) ->
+    require_metrics(Req);
 server_authorization_check(#httpd{path_parts=[<<"_", _/binary>>|_]}=Req) ->
     require_admin(Req).
 
 db_authorization_check(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
     {_} = fabric:get_security(DbName, [{user_ctx, Ctx}]),
     Req.
+
+
+require_metrics(#httpd{user_ctx=#user_ctx{roles=UserRoles}}=Req) ->
+    IsAdmin = lists:member(<<"_admin">>, UserRoles),
+    IsMetrics = lists:member(<<"_metrics">>, UserRoles),
+    case {IsAdmin, IsMetrics} of
+        {true, _} -> Req;
+        {_, true} -> Req;
+        _ -> throw({unauthorized, <<"You are not a server admin or read-only metrics user">>})
+    end.
 
 require_admin(Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),

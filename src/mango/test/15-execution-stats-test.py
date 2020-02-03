@@ -53,6 +53,13 @@ class ExecutionStatsTests(mango.UserDocsTests):
         )
         self.assertEqual(resp["execution_stats"]["results_returned"], len(resp["docs"]))
 
+    def test_no_matches_index_scan(self):
+        resp = self.db.find(
+            {"age": {"$lt": 35}, "nomatch": "me"}, return_raw=True, executionStats=True
+        )
+        self.assertEqual(resp["execution_stats"]["total_docs_examined"], 3)
+        self.assertEqual(resp["execution_stats"]["results_returned"], 0)
+
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class ExecutionStatsTests_Text(mango.UserDocsTextTests):

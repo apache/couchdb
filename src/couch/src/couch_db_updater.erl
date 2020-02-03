@@ -67,15 +67,6 @@ terminate(Reason, Db) ->
 
 handle_call(get_db, _From, Db) ->
     {reply, {ok, Db}, Db, idle_limit()};
-handle_call(full_commit, _From, #db{waiting_delayed_commit=nil}=Db) ->
-    {reply, ok, Db, idle_limit()}; % no data waiting, return ok immediately
-handle_call(full_commit, _From,  Db) ->
-    {reply, ok, commit_data(Db), idle_limit()};
-handle_call({full_commit, RequiredSeq}, _From, Db)
-        when RequiredSeq =< Db#db.committed_update_seq ->
-    {reply, ok, Db, idle_limit()};
-handle_call({full_commit, _}, _, Db) ->
-    {reply, ok, commit_data(Db), idle_limit()}; % commit the data and return ok
 handle_call(start_compact, _From, Db) ->
     {noreply, NewDb, _Timeout} = handle_cast(start_compact, Db),
     {reply, {ok, NewDb#db.compactor_pid}, NewDb, idle_limit()};
@@ -171,20 +162,18 @@ handle_cast(Msg, #db{name = Name} = Db) ->
     {stop, Msg, Db}.
 
 
-handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
-        FullCommit}, Db) ->
+handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts},
+        Db) ->
     GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
     if NonRepDocs == [] ->
-        {GroupedDocs3, Clients, FullCommit2} = collect_updates(GroupedDocs2,
-                [Client], MergeConflicts, FullCommit);
+        {GroupedDocs3, Clients} = collect_updates(GroupedDocs2,
+                [Client], MergeConflicts);
     true ->
         GroupedDocs3 = GroupedDocs2,
-        FullCommit2 = FullCommit,
         Clients = [Client]
     end,
     NonRepDocs2 = [{Client, NRDoc} || NRDoc <- NonRepDocs],
-    try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts,
-                FullCommit2) of
+    try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts) of
     {ok, Db2, UpdatedDDocIds} ->
         ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
         case {couch_db:get_update_seq(Db), couch_db:get_update_seq(Db2)} of
@@ -216,17 +205,6 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
         throw: retry ->
             [catch(ClientPid ! {retry, self()}) || ClientPid <- Clients],
             {noreply, Db, hibernate_if_no_idle_limit()}
-    end;
-handle_info(delayed_commit, #db{waiting_delayed_commit=nil}=Db) ->
-    %no outstanding delayed commits, ignore
-    {noreply, Db, idle_limit()};
-handle_info(delayed_commit, Db) ->
-    case commit_data(Db) of
-        Db ->
-            {noreply, Db, idle_limit()};
-        Db2 ->
-            ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
-            {noreply, Db2, idle_limit()}
     end;
 handle_info({'EXIT', _Pid, normal}, Db) ->
     {noreply, Db, idle_limit()};
@@ -295,20 +273,20 @@ merge_updates([], RestB) ->
 merge_updates(RestA, []) ->
     RestA.
 
-collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
+collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts) ->
     receive
         % Only collect updates with the same MergeConflicts flag and without
         % local docs. It's easier to just avoid multiple _local doc
         % updaters than deal with their possible conflicts, and local docs
         % writes are relatively rare. Can be optmized later if really needed.
-        {update_docs, Client, GroupedDocs, [], MergeConflicts, FullCommit2} ->
+        {update_docs, Client, GroupedDocs, [], MergeConflicts} ->
             GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
             GroupedDocsAcc2 =
                 merge_updates(GroupedDocsAcc, GroupedDocs2),
             collect_updates(GroupedDocsAcc2, [Client | ClientsAcc],
-                    MergeConflicts, (FullCommit or FullCommit2))
+                    MergeConflicts)
     after 0 ->
-        {GroupedDocsAcc, ClientsAcc, FullCommit}
+        {GroupedDocsAcc, ClientsAcc}
     end.
 
 
@@ -633,7 +611,7 @@ maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
             Info
     end.
 
-update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
+update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
@@ -705,7 +683,7 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
         (_) -> []
     end, Ids),
 
-    {ok, commit_data(Db1, not FullCommit), UpdatedDDocIds}.
+    {ok, commit_data(Db1), UpdatedDDocIds}.
 
 
 update_local_doc_revs(Docs) ->
@@ -852,21 +830,8 @@ apply_purge_reqs([Req | RestReqs], IdFDIs, USeq, Replies) ->
 
 
 commit_data(Db) ->
-    commit_data(Db, false).
-
-commit_data(#db{waiting_delayed_commit=nil} = Db, true) ->
-    TRef = erlang:send_after(1000,self(),delayed_commit),
-    Db#db{waiting_delayed_commit=TRef};
-commit_data(Db, true) ->
-    Db;
-commit_data(Db, _) ->
-    #db{
-        waiting_delayed_commit = Timer
-    } = Db,
-    if is_reference(Timer) -> erlang:cancel_timer(Timer); true -> ok end,
     {ok, Db1} = couch_db_engine:commit_data(Db),
     Db1#db{
-        waiting_delayed_commit = nil,
         committed_update_seq = couch_db_engine:get_update_seq(Db)
     }.
 
@@ -886,7 +851,7 @@ get_meta_body_size(Meta) ->
 
 
 default_security_object(<<"shards/", _/binary>>) ->
-    case config:get("couchdb", "default_security", "everyone") of
+    case config:get("couchdb", "default_security", "admin_only") of
         "admin_only" ->
             [{<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
              {<<"admins">>,{[{<<"roles">>,[<<"_admin">>]}]}}];
@@ -894,7 +859,7 @@ default_security_object(<<"shards/", _/binary>>) ->
             []
     end;
 default_security_object(_DbName) ->
-    case config:get("couchdb", "default_security", "everyone") of
+    case config:get("couchdb", "default_security", "admin_only") of
         Admin when Admin == "admin_only"; Admin == "admin_local" ->
             [{<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
              {<<"admins">>,{[{<<"roles">>,[<<"_admin">>]}]}}];

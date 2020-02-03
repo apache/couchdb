@@ -52,10 +52,9 @@ changes(DbName, Options, StartVector, DbOptions) ->
             Args0#changes_args{
                 filter_fun={custom, Style, Req, DDoc, FName}
             };
-        {fetch, FilterType, Style, {DDocId, Rev}, VName}
-                when FilterType == view orelse FilterType == fast_view ->
+        {fetch, view, Style, {DDocId, Rev}, VName} ->
             {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
-            Args0#changes_args{filter_fun={FilterType, Style, DDoc, VName}};
+            Args0#changes_args{filter_fun={view, Style, DDoc, VName}};
         _ ->
             Args0
     end,

@@ -10,7 +10,9 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.attachments= function(debug) {
+  return console.log('done in test/elixir/test/attachment_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -218,7 +220,7 @@ couchTests.attachments= function(debug) {
   // re-create them
   var saved3 = db.bulkSave(docs);
 
-  var before = db.info().disk_size;
+  var before = db.info().sizes.file;
 
   // Compact it.
   /*T(db.compact().ok);
@@ -226,7 +228,7 @@ couchTests.attachments= function(debug) {
   // compaction isn't instantaneous, loop until done
   while (db.info().compact_running) {};
 
-  var after = db.info().disk_size;
+  var after = db.info().sizes.file;
 
   // Compaction should reduce the database slightly, but not
   // orders of magnitude (unless attachments introduce sparseness)
@@ -301,7 +303,7 @@ couchTests.attachments= function(debug) {
   T(db.save(bin_doc6).ok == true);
 
   // wrong rev pos specified
-  
+
   // stub out the attachment with the wrong revpos
   bin_doc6._attachments["foo.txt"] = { stub: true, revpos: 10};
   try {
