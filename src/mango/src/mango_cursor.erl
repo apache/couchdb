@@ -133,7 +133,7 @@ maybe_add_warning(UserFun, #cursor{index = Index, opts = Opts}, Stats, UserAcc) 
         [] ->
             UserAcc;
         _ ->
-            WarningStr = lists:join(<<"\n">>, Warnings),
+            WarningStr = iolist_to_binary(lists:join(<<"\n">>, Warnings)),
             Arg = {add_key, warning, WarningStr},
             {_Go, UserAcc1} = UserFun(Arg, UserAcc),
             UserAcc1
