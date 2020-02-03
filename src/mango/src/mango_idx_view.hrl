@@ -12,3 +12,4 @@
 
 %%-define(MAX_JSON_OBJ, {<<255, 255, 255, 255>>}).
 -define(MAX_JSON_OBJ, <<255>>).
+%%-define(MAX_JSON_OBJ, {[{<<"ZZZ">>, <<"ZZZ">>}]}).

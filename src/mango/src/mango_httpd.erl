@@ -34,7 +34,9 @@
 
 handle_req(#httpd{} = Req, Db) ->
     try
-        handle_req_int(Req, Db)
+        fabric2_fdb:transactional(Db, fun (TxDb) ->
+            handle_req_int(Req, TxDb)
+        end)
     catch
         throw:{mango_error, Module, Reason} ->
             case mango_error:info(Module, Reason) of

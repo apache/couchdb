@@ -117,7 +117,7 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.assertEqual(len(docs), 1)
         explain = self.db.find(selector, explain=True)
         self.assertEqual(explain["index"]["ddoc"], "_design/bbb")
-        self.assertEqual(explain["mrargs"]["end_key"], [10, "<MAX>"])
+        self.assertEqual(explain["args"]["end_key"], [10, "<MAX>"])
 
     # all documents contain an _id and _rev field they
     # should not be used to restrict indexes based on the

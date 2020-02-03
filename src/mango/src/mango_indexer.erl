@@ -68,7 +68,6 @@ doc_id(#doc{id = DocId}, _) ->
 % to build new index
 modify_int(_Db, _Change, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc,
         _PrevDoc) ->
-    io:format("DESIGN DOC SAVED ~p ~n", [Doc]),
     ok;
 
 modify_int(Db, delete, _, PrevDoc)  ->

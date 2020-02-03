@@ -75,11 +75,9 @@ ddoc_fold_cb({row, Row}, Acc) ->
         db := Db,
         rows := Rows
     } = Acc,
-    {_, Id} = lists:keyfind(id, 1, Row),
-    io:format("VIEW ~p ~n", [Row]),
-    {ok, Doc} = fabric2_db:open_doc(Db, Id),
-    JSONDoc = couch_doc:to_json_obj(Doc, []),
-    {Props} = JSONDoc,
+
+    {Props} = JSONDoc = get_doc(Db, Row),
+
     case proplists:get_value(<<"language">>, Props) of
         <<"query">> ->
             Idx = from_ddoc(Db, JSONDoc),
@@ -87,6 +85,22 @@ ddoc_fold_cb({row, Row}, Acc) ->
         _ ->
             {ok, Acc}
     end.
+
+
+get_doc(Db, Row) ->
+    {_, Id} = lists:keyfind(id, 1, Row),
+    RevInfo = get_rev_info(Row),
+    Doc = fabric2_fdb:get_doc_body(Db, Id, RevInfo),
+    couch_doc:to_json_obj(Doc, []).
+
+
+get_rev_info(Row) ->
+    {value, {[{rev, RevBin}]}} = lists:keyfind(value, 1, Row),
+    Rev = couch_doc:parse_rev(RevBin),
+    #{
+        rev_id => Rev,
+        rev_path => []
+    }.
 
 
 get_usable_indexes(Db, Selector, Opts) ->

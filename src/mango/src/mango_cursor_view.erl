@@ -61,10 +61,6 @@ create(Db, Indexes, Selector, Opts) ->
 
 
 explain(Cursor) ->
-    #cursor{
-        opts = Opts
-    } = Cursor,
-
     #{
         start_key := StartKey,
         end_key := EndKey,
