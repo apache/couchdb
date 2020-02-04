@@ -4,7 +4,7 @@ defmodule Couch.Session do
   """
 
   @enforce_keys [:cookie]
-  defstruct [:cookie]
+  defstruct [:cookie, :base_url]
 
   def new(cookie) do
     %Couch.Session{cookie: cookie}
@@ -34,6 +34,7 @@ defmodule Couch.Session do
 
   def go(%Couch.Session{} = sess, method, url, opts) do
     opts = Keyword.merge(opts, cookie: sess.cookie)
+    opts = Keyword.merge(opts, base_url: sess.base_url)
     Couch.request(method, url, opts)
   end
 
@@ -54,8 +55,13 @@ defmodule Couch do
     url
   end
 
-  def process_url(url) do
-    base_url = System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
+  def process_url(url, options) do
+    base_url = case Keyword.get(options, :base_url) do
+      nil ->
+        System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
+      base_url ->
+        base_url
+    end
     base_url <> url
   end
 
@@ -114,15 +120,16 @@ defmodule Couch do
 
   def login(userinfo) do
     [user, pass] = String.split(userinfo, ":", parts: 2)
-    login(user, pass)
+    login(nil, user, pass)
   end
 
-  def login(user, pass) do
-    resp = Couch.post("/_session", body: %{:username => user, :password => pass})
+  def login(base_url, user, pass) do
+    resp = Couch.post("/_session",
+      body: %{:username => user, :password => pass}, base_url: base_url)
     true = resp.body["ok"]
     cookie = resp.headers[:"set-cookie"]
     [token | _] = String.split(cookie, ";")
-    %Couch.Session{cookie: token}
+    %Couch.Session{cookie: token, base_url: base_url}
   end
 
 end
