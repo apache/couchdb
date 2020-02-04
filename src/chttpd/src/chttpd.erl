@@ -1304,7 +1304,7 @@ get_trace_headers(MochiReq) ->
                 parse_span_id(MochiReq:get_header_value("X-B3-ParentSpanId"))
             ];
         Value ->
-            case binary:split(Value, <<"-">>, [global]) of
+            case string:split(Value, "-", all) of
                 [TraceIdStr, SpanIdStr, _SampledStr, ParentSpanIdStr] ->
                     [
                         parse_trace_id(TraceIdStr),
