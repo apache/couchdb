@@ -154,6 +154,7 @@ couchTests.view_errors = function(debug) {
           db.view("infinite/infinite_loop");
           T(0 == 1);
       } catch(e) {
+        console.log("infinite sorrow: "  + e.error);
           T(e.error == "os_process_error");
       }
 

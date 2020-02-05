@@ -344,7 +344,7 @@ parse_json_index_param(<<"highlight_fields">>, Value) ->
     [{highlight_fields, Value}];
 parse_json_index_param(<<"highlight_pre_tag">>, Value) ->
     [{highlight_pre_tag, Value}];
-parse_json_index_param(<<"highlight_pos_tag">>, Value) ->
+parse_json_index_param(<<"highlight_post_tag">>, Value) ->
     [{highlight_post_tag, Value}];
 parse_json_index_param(<<"highlight_number">>, Value) ->
     [{highlight_number, parse_positive_int_param2("highlight_number", Value)}];
