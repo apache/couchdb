@@ -91,6 +91,7 @@ class IndexCrudTests(mango.DbPerClass):
         for idx in self.db.list_indexes():
             if idx["name"] != "idx_01":
                 continue
+            print(idx)
             self.assertEqual(idx["def"]["fields"], [{"foo": "asc"}, {"bar": "asc"}])
             return
         raise AssertionError("index not created")

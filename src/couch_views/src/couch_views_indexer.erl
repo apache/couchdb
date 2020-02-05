@@ -18,7 +18,8 @@
 
 
 -export([
-    init/0
+    init/0,
+    fetch_docs/2
 ]).
 
 -include("couch_views.hrl").
