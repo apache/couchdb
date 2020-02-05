@@ -154,8 +154,13 @@ couchTests.view_errors = function(debug) {
           db.view("infinite/infinite_loop");
           T(0 == 1);
       } catch(e) {
-        console.log("infinite sorrow: "  + e.error);
-          T(e.error == "os_process_error");
+          // This test has two different races. The first is whether
+          // the while loop exhausts the JavaScript RAM limits before
+          // timing. The second is a race between which of two timeouts
+          // fires first. The first timeout is the couch_os_process
+          // waiting for data back from couchjs. The second is the
+          // gen_server call to couch_os_process.
+          T(e.error == "os_process_error" || e.error == "timeout");
       }
 
       // Check error responses for invalid multi-get bodies.
