@@ -10,13 +10,15 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(mango_indexer_test).
+-module(mango_jobs_indexer_test).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
+-include_lib("mango/src/mango.hrl").
 -include_lib("mango/src/mango_cursor.hrl").
--include_lib("fabric/test/fabric2_test.hrl").
+-include_lib("mango/src/mango_idx.hrl").
 
+-include_lib("fabric/test/fabric2_test.hrl").
 
 indexer_test_() ->
     {
@@ -29,11 +31,11 @@ indexer_test_() ->
                 foreach,
                 fun foreach_setup/0,
                 fun foreach_teardown/1,
-                [with([
-                    ?TDEF(index_docs),
-                    ?TDEF(update_doc),
-                    ?TDEF(delete_doc)
-                ])]
+                [
+                    with([?TDEF(index_docs)]),
+                    with([?TDEF(index_lots_of_docs, 10)]),
+                    with([?TDEF(index_can_recover_from_crash, 60)])
+                ]
             }
         }
     }.
@@ -41,8 +43,11 @@ indexer_test_() ->
 
 setup() ->
     Ctx = test_util:start_couch([
-        fabric
+        fabric,
+        couch_jobs,
+        mango
     ]),
+%%    couch_jobs:set_type_timeout(?MANGO_INDEX_JOB_TYPE, 1),
     Ctx.
 
 
@@ -51,21 +56,51 @@ cleanup(Ctx) ->
 
 
 foreach_setup() ->
-    {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
-
-    DDoc = create_idx_ddoc(Db),
-    fabric2_db:update_docs(Db, [DDoc]),
-
-    Docs = make_docs(3),
-    fabric2_db:update_docs(Db, Docs),
-    {Db, couch_doc:to_json_obj(DDoc, [])}.
+    DbName = ?tempdb(),
+    {ok, Db} = fabric2_db:create(DbName, [{user_ctx, ?ADMIN_USER}]),
+    Db.
 
 
-foreach_teardown({Db, _}) ->
+foreach_teardown(Db) ->
+    meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
 
-index_docs({Db, DDoc}) ->
+index_docs(Db) ->
+    DDoc = generate_docs(Db, 5),
+    wait_while_ddoc_builds(Db),
+    Docs = run_query(Db, DDoc),
+    ?assertEqual([
+        [{id, <<"1">>}, {value, 1}],
+        [{id, <<"2">>}, {value, 2}],
+        [{id, <<"3">>}, {value, 3}],
+        [{id, <<"4">>}, {value, 4}],
+        [{id, <<"5">>}, {value, 5}]
+], Docs).
+
+
+index_lots_of_docs(Db) ->
+    DDoc = generate_docs(Db, 150),
+    wait_while_ddoc_builds(Db),
+    Docs = run_query(Db, DDoc),
+    ?assertEqual(length(Docs), 150).
+
+
+index_can_recover_from_crash(Db) ->
+    meck:new(mango_indexer, [passthrough]),
+    meck:expect(mango_indexer, write_doc, fun (Db, Doc, Idxs) ->
+        ?debugFmt("doc ~p ~p ~n", [Doc, Idxs]),
+        Id = Doc#doc.id,
+        case Id == <<"2">> of
+            true ->
+                meck:unload(mango_indexer),
+                throw({fake_crash, test_jobs_restart});
+            false ->
+                meck:passthrough([Db, Doc, Idxs])
+        end
+    end),
+    DDoc = generate_docs(Db, 3),
+    wait_while_ddoc_builds(Db),
     Docs = run_query(Db, DDoc),
     ?assertEqual([
         [{id, <<"1">>}, {value, 1}],
@@ -73,33 +108,16 @@ index_docs({Db, DDoc}) ->
         [{id, <<"3">>}, {value, 3}]
     ], Docs).
 
-update_doc({Db, DDoc}) ->
-    {ok, Doc} = fabric2_db:open_doc(Db, <<"2">>),
-    JsonDoc = couch_doc:to_json_obj(Doc, []),
-    JsonDoc2 = couch_util:json_apply_field({<<"value">>, 4}, JsonDoc),
-    Doc2 = couch_doc:from_json_obj(JsonDoc2),
-    fabric2_db:update_doc(Db, Doc2),
 
-    Docs = run_query(Db, DDoc),
-    ?assertEqual([
-        [{id, <<"1">>}, {value, 1}],
-        [{id, <<"3">>}, {value, 3}],
-        [{id, <<"2">>}, {value, 4}]
-    ], Docs).
-
-
-delete_doc({Db, DDoc}) ->
-    {ok, Doc} = fabric2_db:open_doc(Db, <<"2">>),
-    JsonDoc = couch_doc:to_json_obj(Doc, []),
-    JsonDoc2 = couch_util:json_apply_field({<<"_deleted">>, true}, JsonDoc),
-    Doc2 = couch_doc:from_json_obj(JsonDoc2),
-    fabric2_db:update_doc(Db, Doc2),
-
-    Docs = run_query(Db, DDoc),
-    ?assertEqual([
-        [{id, <<"1">>}, {value, 1}],
-        [{id, <<"3">>}, {value, 3}]
-    ], Docs).
+wait_while_ddoc_builds(Db) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        Idxs = mango_idx:list(TxDb),
+        [Idx] = lists:filter(fun (Idx) -> Idx#idx.type == <<"json">> end, Idxs),
+        if Idx#idx.build_status == ?MANGO_INDEX_READY -> ok; true ->
+            timer:sleep(100),
+            wait_while_ddoc_builds(Db)
+        end
+    end).
 
 
 run_query(Db, DDoc) ->
@@ -126,6 +144,16 @@ run_query(Db, DDoc) ->
         ]
 
     end, Acc).
+
+
+generate_docs(Db, Count) ->
+    Docs = make_docs(Count),
+    fabric2_db:update_docs(Db, Docs),
+
+
+    DDoc = create_idx_ddoc(Db),
+    fabric2_db:update_docs(Db, [DDoc]),
+    couch_doc:to_json_obj(DDoc, []).
 
 
 create_idx_ddoc(Db) ->
@@ -159,4 +187,3 @@ query_cb({doc, Doc}, #cursor{user_acc = Acc} = Cursor) ->
     {ok, Cursor#cursor{
         user_acc =  Acc ++ [Doc]
     }}.
-

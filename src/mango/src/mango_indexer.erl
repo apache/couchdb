@@ -17,11 +17,14 @@
 -export([
     create_doc/2,
     update_doc/3,
-    delete_doc/2
+    delete_doc/2,
+
+    write_doc/3
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include("mango.hrl").
 -include("mango_idx.hrl").
 
 
@@ -42,7 +45,7 @@ modify(Db, Change, Doc, PrevDoc) ->
         modify_int(Db, Change, Doc, PrevDoc)
     catch
         Error:Reason ->
-            io:format("ERROR ~p ~p ~p ~n", [Error, Reason, erlang:display(erlang:get_stacktrace())]),
+            io:format("ERROR INDEXER ~p ~p ~p ~n", [Error, Reason, erlang:display(erlang:get_stacktrace())]),
             #{
                 name := DbName
             } = Db,
@@ -66,9 +69,16 @@ doc_id(#doc{id = DocId}, _) ->
 % Design doc
 % Todo: Check if design doc is mango index and kick off background worker
 % to build new index
-modify_int(_Db, _Change, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc,
+modify_int(Db, _Change, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc,
         _PrevDoc) ->
-    ok;
+    {Props} = JSONDoc = couch_doc:to_json_obj(Doc, []),
+    case proplists:get_value(<<"language">>, Props) of
+        <<"query">> ->
+            [Idx] = mango_idx:from_ddoc(Db, JSONDoc),
+            {ok, _} = mango_jobs:build_index(Db, Idx);
+        _ ->
+            ok
+    end;
 
 modify_int(Db, delete, _, PrevDoc)  ->
     remove_doc(Db, PrevDoc, json_indexes(Db));
@@ -138,15 +148,13 @@ get_index_entries(IdxDef, Doc) ->
 
 
 get_index_values(Fields, Doc) ->
-    Out1 = lists:map(fun({Field, _Dir}) ->
+    lists:map(fun({Field, _Dir}) ->
         case mango_doc:get_field(Doc, Field) of
             not_found -> not_found;
             bad_path -> not_found;
             Value -> Value
         end
-    end, Fields),
-    io:format("OUT ~p ~p ~n", [Fields, Out1]),
-    Out1.
+    end, Fields).
 
 
 get_index_partial_filter_selector(IdxDef) ->

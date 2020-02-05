@@ -22,11 +22,102 @@
 
 
 -export([
-    query_all_docs/4,
+    create_build_vs/2,
+    set_build_vs/4,
+    get_build_vs/2,
+    get_build_status/2,
+    get_update_seq/2,
+    set_update_seq/3,
     remove_doc/3,
     write_doc/3,
+    query_all_docs/4,
     query/4
 ]).
+
+
+create_build_vs(TxDb, #idx{} = Idx) ->
+    #{
+        tx := Tx
+    } = TxDb,
+    Key = build_vs_key(TxDb, Idx#idx.ddoc),
+    VS = fabric2_fdb:new_versionstamp(Tx),
+    Value = erlfdb_tuple:pack_vs({VS, ?MANGO_INDEX_BUILDING}),
+    erlfdb:set_versionstamped_value(Tx, Key, Value).
+
+
+set_build_vs(TxDb, #idx{} = Idx, VS, State) ->
+    #{
+        tx := Tx
+    } = TxDb,
+
+    Key = build_vs_key(TxDb, Idx#idx.ddoc),
+    Value = erlfdb_tuple:pack({VS, State}),
+    ok = erlfdb:set(Tx, Key, Value).
+
+
+get_build_vs(TxDb, #idx{} = Idx) ->
+    get_build_vs(TxDb, Idx#idx.ddoc);
+
+get_build_vs(TxDb, DDoc) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = TxDb,
+    Key = build_vs_key(TxDb, DDoc),
+    EV = erlfdb:wait(erlfdb:get(Tx, Key)),
+    case EV of
+        not_found -> not_found;
+        EV -> erlfdb_tuple:unpack(EV)
+    end.
+
+
+get_build_status(TxDb, DDoc) ->
+    case get_build_vs(TxDb, DDoc) of
+        not_found -> ?MANGO_INDEX_BUILDING;
+        {_, BuildState} -> BuildState
+    end.
+
+
+get_update_seq(TxDb, #idx{ddoc = DDoc}) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = TxDb,
+
+    case erlfdb:wait(erlfdb:get(Tx, seq_key(DbPrefix, DDoc))) of
+        not_found -> <<>>;
+        UpdateSeq -> UpdateSeq
+    end.
+
+
+set_update_seq(TxDb, #idx{ddoc = DDoc}, Seq) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = TxDb,
+    ok = erlfdb:set(Tx, seq_key(DbPrefix, DDoc), Seq).
+
+
+remove_doc(TxDb, DocId, IdxResults) ->
+    lists:foreach(fun (IdxResult) ->
+        #{
+            ddoc_id := DDocId,
+            results := Results
+        } = IdxResult,
+        MangoIdxPrefix = mango_idx_prefix(TxDb, DDocId),
+        clear_key(TxDb, MangoIdxPrefix, Results, DocId)
+    end, IdxResults).
+
+
+write_doc(TxDb, DocId, IdxResults) ->
+    lists:foreach(fun (IdxResult) ->
+        #{
+            ddoc_id := DDocId,
+            results := Results
+        } = IdxResult,
+        MangoIdxPrefix = mango_idx_prefix(TxDb, DDocId),
+        add_key(TxDb, MangoIdxPrefix, Results, DocId)
+    end, IdxResults).
 
 
 query_all_docs(Db, CallBack, Cursor, Args) ->
@@ -133,7 +224,7 @@ fold_cb({Key, _}, Acc) ->
     {{_, DocId}} = erlfdb_tuple:unpack(Key, MangoIdxPrefix),
     {ok, Doc} = fabric2_db:open_doc(Db, DocId),
     JSONDoc = couch_doc:to_json_obj(Doc, []),
-    io:format("PRINT ~p ~p ~n", [DocId, JSONDoc]),
+%%    io:format("PRINT ~p ~p ~n", [DocId, JSONDoc]),
     case Callback({doc, JSONDoc}, Cursor) of
         {ok, Cursor1} ->
             Acc#{
@@ -144,33 +235,24 @@ fold_cb({Key, _}, Acc) ->
     end.
 
 
-remove_doc(TxDb, DocId, IdxResults) ->
-    lists:foreach(fun (IdxResult) ->
-        #{
-            ddoc_id := DDocId,
-            results := Results
-        } = IdxResult,
-        MangoIdxPrefix = mango_idx_prefix(TxDb, DDocId),
-        clear_key(TxDb, MangoIdxPrefix, Results, DocId)
-    end, IdxResults).
-
-
-write_doc(TxDb, DocId, IdxResults) ->
-    lists:foreach(fun (IdxResult) ->
-        #{
-            ddoc_id := DDocId,
-            results := Results
-        } = IdxResult,
-        MangoIdxPrefix = mango_idx_prefix(TxDb, DDocId),
-        add_key(TxDb, MangoIdxPrefix, Results, DocId)
-        end, IdxResults).
-
-
 mango_idx_prefix(TxDb, Id) ->
     #{
         db_prefix := DbPrefix
     } = TxDb,
     Key = {?DB_MANGO, Id, ?MANGO_IDX_RANGE},
+    erlfdb_tuple:pack(Key, DbPrefix).
+
+
+seq_key(DbPrefix, DDoc) ->
+    Key = {?DB_MANGO, DDoc, ?MANGO_UPDATE_SEQ},
+    erlfdb_tuple:pack(Key, DbPrefix).
+
+
+build_vs_key(Db, DDoc) ->
+    #{
+        db_prefix := DbPrefix
+    } = Db,
+    Key = {?DB_MANGO, DDoc, ?MANGO_IDX_BUILD_STATUS},
     erlfdb_tuple:pack(Key, DbPrefix).
 
 

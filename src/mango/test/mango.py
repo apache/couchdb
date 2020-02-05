@@ -161,8 +161,12 @@ class Database(object):
 
         created = r.json()["result"] == "created"
         if created:
-            # wait until the database reports the index as available
-            while len(self.get_index(r.json()["id"], r.json()["name"])) < 1:
+            # wait until the database reports the index as available and build
+            while len([
+                    i
+                    for i in self.get_index(r.json()["id"], r.json()["name"])
+                    if i["build_status"] == "ready"
+                    ]) < 1:
                 delay(t=0.1)
 
         return created

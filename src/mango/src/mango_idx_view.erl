@@ -105,7 +105,8 @@ to_json(Idx) ->
         {name, Idx#idx.name},
         {type, Idx#idx.type},
         {partitioned, Idx#idx.partitioned},
-        {def, {def_to_json(Idx#idx.def)}}
+        {def, {def_to_json(Idx#idx.def)}},
+        {build_status, Idx#idx.build_status}
     ]}.
 
 

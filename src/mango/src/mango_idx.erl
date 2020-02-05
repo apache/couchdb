@@ -58,7 +58,7 @@ list(Db) ->
         rows => []
     },
     {ok, Indexes} = fabric2_db:fold_design_docs(Db, fun ddoc_fold_cb/2, Acc0, []),
-    io:format("INDEXES ~p ~n", [Indexes]),
+%%    io:format("INDEXES ~p ~n", [Indexes]),
     Indexes ++ special(Db).
 
 
@@ -237,13 +237,16 @@ from_ddoc(Db, {Props}) ->
 %%            [mango_idx_view]
 %%    end,
     Idxs = lists:flatmap(fun(Mod) -> Mod:from_ddoc({Props}) end, IdxMods),
-    lists:map(fun(Idx) ->
-        Idx#idx{
-            dbname = DbName,
-            ddoc = DDoc,
-            partitioned = get_idx_partitioned(Db, Props)
-        }
-    end, Idxs).
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        lists:map(fun(Idx) ->
+            Idx#idx{
+                dbname = DbName,
+                ddoc = DDoc,
+                partitioned = get_idx_partitioned(Db, Props),
+                build_status = mango_fdb:get_build_status(TxDb, DDoc)
+            }
+        end, Idxs)
+    end).
 
 
 special(Db) ->
