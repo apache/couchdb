@@ -85,7 +85,7 @@ init(_) ->
             ClusterFileStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
             {ok, ConnectionStr} = file:read_file(ClusterFileStr),
             DbHandle = erlfdb:open(iolist_to_binary(ClusterFileStr)),
-            {string:trim(ConnectionStr), DbHandle}
+            {strip_creds(string:trim(ConnectionStr)), DbHandle}
     end,
     application:set_env(fabric, ?FDB_CLUSTER, Cluster),
     application:set_env(fabric, db, Db),
@@ -139,4 +139,13 @@ get_env(Key) ->
             end;
         Value ->
             Value
+    end.
+
+strip_creds(ConnectionString) ->
+    case binary:split(ConnectionString, <<"@">>) of
+        [ConnectionString] ->
+            ConnectionString;
+        [Creds, Server] ->
+            Identity = hd(binary:split(Creds, <<":">>)),
+            <<Identity/binary, ":****@", Server/binary>>
     end.
