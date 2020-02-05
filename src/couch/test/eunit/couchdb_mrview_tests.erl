@@ -75,8 +75,7 @@ mrview_show_test_() ->
             fun setup_all/0,
             fun teardown_all/1,
             [
-                make_test_case(clustered, [fun should_return_invalid_request_body/2]),
-                make_test_case(backdoor, [fun should_return_invalid_request_body/2])
+                make_test_case(clustered, [fun should_return_invalid_request_body/2])
             ]
         }
     }.
@@ -89,8 +88,7 @@ mrview_query_test_() ->
             fun setup_all/0,
             fun teardown_all/1,
             [
-                make_test_case(clustered, [fun should_return_400_for_wrong_order_of_keys/2]),
-                make_test_case(backdoor, [fun should_return_400_for_wrong_order_of_keys/2])
+                make_test_case(clustered, [fun should_return_400_for_wrong_order_of_keys/2])
             ]
         }
     }.
@@ -191,28 +189,17 @@ should_cleanup_index_files(_PortType, {Host, DbName}) ->
     end).
 
 
-create_doc(backdoor, DbName, Id, Body) ->
-    JsonDoc = couch_util:json_apply_field({<<"_id">>, Id}, Body),
-    Doc = couch_doc:from_json_obj(JsonDoc),
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
-    {ok, _} = couch_db:update_docs(Db, [Doc]),
-    couch_db:close(Db);
 create_doc(clustered, DbName, Id, Body) ->
     JsonDoc = couch_util:json_apply_field({<<"_id">>, Id}, Body),
     Doc = couch_doc:from_json_obj(JsonDoc),
     {ok, _} = fabric:update_docs(DbName, [Doc], [?ADMIN_CTX]),
     ok.
 
-create_db(backdoor, DbName) ->
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
-    couch_db:close(Db);
 create_db(clustered, DbName) ->
     {ok, Status, _, _} = test_request:put(db_url(DbName), [?AUTH], ""),
     assert_success(create_db, Status),
     ok.
 
-delete_db(backdoor, DbName) ->
-    couch_server:delete(DbName, [?ADMIN_CTX]);
 delete_db(clustered, DbName) ->
     {ok, Status, _, _} = test_request:delete(db_url(DbName), [?AUTH]),
     assert_success(delete_db, Status),
@@ -230,7 +217,6 @@ host_url(PortType) ->
 bind_address(PortType) ->
     config:get(section(PortType), "bind_address", "127.0.0.1").
 
-section(backdoor) -> "http";
 section(clustered) -> "chttpd".
 
 db_url(DbName) when is_binary(DbName) ->
@@ -239,9 +225,7 @@ db_url(DbName) when is_list(DbName) ->
     host_url(clustered) ++ "/" ++ DbName.
 
 port(clustered) ->
-    integer_to_list(mochiweb_socket_server:get(chttpd, port));
-port(backdoor) ->
-    integer_to_list(mochiweb_socket_server:get(couch_httpd, port)).
+    integer_to_list(mochiweb_socket_server:get(chttpd, port)).
 
 
 upload_ddoc(Host, DbName) ->

@@ -10,6 +10,8 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.skip = true;
+
 couchTests.reader_acl = function(debug) {
   // this tests read access control
 

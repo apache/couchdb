@@ -70,8 +70,7 @@ show_tests() ->
     {
         "Check CORS for show",
         [
-            make_test_case(clustered, [fun should_make_shows_request/2]),
-            make_test_case(backdoor, [fun should_make_shows_request/2])
+            make_test_case(clustered, [fun should_make_shows_request/2])
         ]
     }.
 
@@ -92,16 +91,11 @@ should_make_shows_request(_, {Host, DbName}) ->
          ?assertEqual(<<"<h1>wosh</h1>">>, Body)
     end).
 
-create_db(backdoor, DbName) ->
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
-    couch_db:close(Db);
 create_db(clustered, DbName) ->
     {ok, Status, _, _} = test_request:put(db_url(DbName), [?AUTH], ""),
     assert_success(create_db, Status),
     ok.
 
-delete_db(backdoor, DbName) ->
-    couch_server:delete(DbName, [?ADMIN_CTX]);
 delete_db(clustered, DbName) ->
     {ok, Status, _, _} = test_request:delete(db_url(DbName), [?AUTH]),
     assert_success(delete_db, Status),
@@ -119,7 +113,6 @@ host_url(PortType) ->
 bind_address(PortType) ->
     config:get(section(PortType), "bind_address", "127.0.0.1").
 
-section(backdoor) -> "http";
 section(clustered) -> "chttpd".
 
 db_url(DbName) when is_binary(DbName) ->
@@ -128,10 +121,7 @@ db_url(DbName) when is_list(DbName) ->
     host_url(clustered) ++ "/" ++ DbName.
 
 port(clustered) ->
-    integer_to_list(mochiweb_socket_server:get(chttpd, port));
-port(backdoor) ->
-    integer_to_list(mochiweb_socket_server:get(couch_httpd, port)).
-
+    integer_to_list(mochiweb_socket_server:get(chttpd, port)).
 
 upload_ddoc(Host, DbName) ->
     Url = Host ++ "/" ++ DbName ++ "/_design/foo",
