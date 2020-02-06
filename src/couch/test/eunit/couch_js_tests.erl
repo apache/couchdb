@@ -15,9 +15,12 @@
 
 
 -define(FUNC, <<
+  "var state = [];\n"
   "function(doc) {\n"
   "  var val = \"0123456789ABCDEF\";\n"
-  "  while(true) {emit(val, val);}\n"
+  "  for(var i = 0; i < 165535; i++) {\n"
+  "    state.push([val, val]);\n"
+  "  }\n"
   "}\n"
 >>).
 
@@ -30,7 +33,7 @@ couch_js_test_() ->
             fun test_util:start_couch/0,
             fun test_util:stop_couch/1,
             [
-                fun should_exit_on_oom/0
+                {timeout, 60000, fun should_exit_on_oom/0}
             ]
         }
     }.
@@ -39,7 +42,16 @@ couch_js_test_() ->
 should_exit_on_oom() ->
     Proc = couch_query_servers:get_os_process(<<"javascript">>),
     true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, ?FUNC]),
-    ?assertThrow(
-            {os_process_error, {exit_status, 1}},
-            couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, <<"{}">>])
-        ).
+    trigger_oom(Proc).
+
+trigger_oom(Proc) ->
+    Status = try
+        couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, <<"{}">>]),
+        continue
+    catch throw:{os_process_error, {exit_status, 1}} ->
+        done
+    end,
+    case Status of
+        continue -> trigger_oom(Proc);
+        done -> ok
+    end.
