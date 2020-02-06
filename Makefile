@@ -147,8 +147,6 @@ fauxton: share/www
 .PHONY: check
 # target: check - Test everything
 check: all
-	# @$(MAKE) test-cluster-with-quorum
-	# @$(MAKE) test-cluster-without-quorum
 	@$(MAKE) python-black
 	@$(MAKE) eunit
 	@$(MAKE) javascript
@@ -157,15 +155,14 @@ check: all
 #	@$(MAKE) build-test
 
 
-.PHONY: eunit
-# target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
-
 ifdef apps
 subdirs = $(apps)
 else
 subdirs=$(shell ls src)
 endif
 
+.PHONY: eunit
+# target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
@@ -432,9 +429,9 @@ endif
 
 .PHONY: install
 # target: install- install CouchDB :)
-install:
+install: release
 	@echo
-	@echo "Notice: There is no 'make install' command for CouchDB 2.x."
+	@echo "Notice: There is no 'make install' command for CouchDB 2.x+."
 	@echo
 	@echo "    To install CouchDB into your system, copy the rel/couchdb"
 	@echo "    to your desired installation location. For example:"
@@ -483,19 +480,6 @@ endif
 # target: devclean - Remove dev cluster artifacts
 devclean:
 	@rm -rf dev/lib/*/data
-
-
-.PHONY: uninstall
-# target: uninstall - Uninstall CouchDB :-(
-uninstall:
-	@rm -rf $(DESTDIR)/$(install_dir)
-	@rm -f $(DESTDIR)/$(bin_dir)/couchdb
-	@rm -f $(DESTDIR)/$(libexec_dir)
-	@rm -rf $(DESTDIR)/$(sysconf_dir)
-	@rm -rf $(DESTDIR)/$(data_dir)
-	@rm -rf $(DESTDIR)/$(doc_dir)
-	@rm -rf $(DESTDIR)/$(html_dir)
-	@rm -rf $(DESTDIR)/$(man_dir)
 
 
 ################################################################################
