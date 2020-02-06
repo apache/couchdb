@@ -224,7 +224,7 @@ fold_cb({Key, _}, Acc) ->
     {{_, DocId}} = erlfdb_tuple:unpack(Key, MangoIdxPrefix),
     {ok, Doc} = fabric2_db:open_doc(Db, DocId),
     JSONDoc = couch_doc:to_json_obj(Doc, []),
-%%    io:format("PRINT ~p ~p ~n", [DocId, JSONDoc]),
+    io:format("PRINT ~p ~p ~n", [DocId, JSONDoc]),
     case Callback({doc, JSONDoc}, Cursor) of
         {ok, Cursor1} ->
             Acc#{

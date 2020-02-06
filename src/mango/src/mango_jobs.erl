@@ -39,8 +39,9 @@ build_index(TxDb, #idx{} = Idx) ->
     {ok, JobId}.
 
 
-job_id(#{name := DbName}, #idx{ddoc = DDoc}) ->
-    <<DbName/binary, "-",DDoc/binary>>.
+job_id(#{name := DbName}, #idx{ddoc = DDoc} = Idx) ->
+    Cols = iolist_to_binary(mango_idx:columns(Idx)),
+    <<DbName/binary, "_",DDoc/binary, Cols/binary>>.
 
 
 job_data(Db, Idx) ->

@@ -108,7 +108,7 @@ init([]) ->
     ets:new(?SERVERS, [public, named_table, set]),
     ets:insert(?SERVERS, get_servers_from_env("COUCHDB_QUERY_SERVER_")),
     ets:insert(?SERVERS, get_servers_from_env("COUCHDB_NATIVE_QUERY_SERVER_")),
-    ets:insert(?SERVERS, [{"QUERY", {mango_native_proc, start_link, []}}]),
+%%    ets:insert(?SERVERS, [{"QUERY", {mango_native_proc, start_link, []}}]),
     maybe_configure_erlang_native_servers(),
 
     {ok, #state{

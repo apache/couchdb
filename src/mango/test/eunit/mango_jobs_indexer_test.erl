@@ -89,7 +89,6 @@ index_lots_of_docs(Db) ->
 index_can_recover_from_crash(Db) ->
     meck:new(mango_indexer, [passthrough]),
     meck:expect(mango_indexer, write_doc, fun (Db, Doc, Idxs) ->
-        ?debugFmt("doc ~p ~p ~n", [Doc, Idxs]),
         Id = Doc#doc.id,
         case Id == <<"2">> of
             true ->
@@ -112,8 +111,12 @@ index_can_recover_from_crash(Db) ->
 wait_while_ddoc_builds(Db) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
         Idxs = mango_idx:list(TxDb),
-        [Idx] = lists:filter(fun (Idx) -> Idx#idx.type == <<"json">> end, Idxs),
-        if Idx#idx.build_status == ?MANGO_INDEX_READY -> ok; true ->
+
+        Ready = lists:filter(fun (Idx) ->
+            Idx#idx.build_status == ?MANGO_INDEX_READY
+        end, mango_idx:add_build_status(TxDb, Idxs)),
+
+        if length(Ready) > 1 -> ok; true ->
             timer:sleep(100),
             wait_while_ddoc_builds(Db)
         end

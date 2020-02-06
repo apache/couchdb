@@ -62,7 +62,8 @@ handle_req_int(_, _) ->
 handle_index_req(#httpd{method='GET', path_parts=[_, _]}=Req, Db) ->
     Params = lists:flatmap(fun({K, V}) -> parse_index_param(K, V) end,
         chttpd:qs(Req)),
-    Idxs = lists:sort(mango_idx:list(Db)),
+    Idxs0 = mango_idx:add_build_status(Db, mango_idx:list(Db)),
+    Idxs = lists:sort(Idxs0),
     JsonIdxs0 = lists:map(fun mango_idx:to_json/1, Idxs),
     TotalRows = length(JsonIdxs0),
     Limit = case couch_util:get_value(limit, Params, TotalRows) of

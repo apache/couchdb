@@ -31,7 +31,7 @@
 ]).
 
 
--define(MAX_WORKERS, 1).
+-define(MAX_WORKERS, 100).
 
 
 start_link() ->
