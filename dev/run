@@ -422,6 +422,7 @@ def hack_local_ini(ctx, contents):
     contents = contents.replace(previous_line, previous_line + secret_line)
 
     if ctx["with_admin_party"]:
+        os.environ["COUCHDB_TEST_ADMIN_PARTY_OVERRIDE"] = "1"
         ctx["admin"] = ("Admin Party!", "You do not need any password.")
         return contents
 
