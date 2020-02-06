@@ -12,9 +12,10 @@
 # the License.
 
 
-import mango, requests
+import mango, requests, unittest
 
 
+@unittest.skip("this FDB doesn't support this")
 class UsersDbFindTests(mango.UsersDbTests):
     def test_simple_find(self):
         docs = self.db.find({"name": {"$eq": "demo02"}})
@@ -57,6 +58,7 @@ class UsersDbFindTests(mango.UsersDbTests):
         assert len(docs) == 3
 
 
+@unittest.skip("this FDB doesn't support this")
 class UsersDbIndexFindTests(UsersDbFindTests):
     def setUp(self):
         self.db.create_index(["name"])

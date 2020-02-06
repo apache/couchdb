@@ -110,11 +110,7 @@ class Database(object):
     def save_docs(self, docs, **kwargs):
         body = json.dumps({"docs": docs})
         r = self.sess.post(self.path("_bulk_docs"), data=body, params=kwargs)
-        print("DOC")
-        print(docs)
         r.raise_for_status()
-        print("RES")
-        print(r.json())
         for doc, result in zip(docs, r.json()):
             doc["_id"] = result["id"]
             doc["_rev"] = result["rev"]
@@ -142,7 +138,7 @@ class Database(object):
         name=None,
         ddoc=None,
         partial_filter_selector=None,
-        selector=None,
+        selector=None
     ):
         body = {"index": {"fields": fields}, "type": idx_type, "w": 3}
         if name is not None:
@@ -167,7 +163,7 @@ class Database(object):
                     for i in self.get_index(r.json()["id"], r.json()["name"])
                     if i["build_status"] == "ready"
                     ]) < 1:
-                delay(t=0.1)
+                delay(t=0.2)
 
         return created
 
@@ -285,7 +281,6 @@ class Database(object):
         else:
             path = self.path("_find")
         r = self.sess.post(path, data=body)
-        print(r.json())
         r.raise_for_status()
         if explain or return_raw:
             return r.json()

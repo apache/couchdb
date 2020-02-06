@@ -11,5 +11,4 @@
 % the License.
 
 %%-define(MAX_JSON_OBJ, {<<255, 255, 255, 255>>}).
--define(MAX_JSON_OBJ, <<255>>).
-%%-define(MAX_JSON_OBJ, {[{<<"ZZZ">>, <<"ZZZ">>}]}).
+-define(MAX_JSON_OBJ, {[{<<"\ufff0">>, <<"\ufff0">>}]}).

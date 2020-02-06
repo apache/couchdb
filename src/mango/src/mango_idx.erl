@@ -26,6 +26,7 @@
     add/2,
     remove/2,
     from_ddoc/2,
+    add_build_status/2,
     special/1,
 
     dbname/1,
@@ -58,11 +59,9 @@ list(Db) ->
         rows => []
     },
     {ok, Indexes} = fabric2_db:fold_design_docs(Db, fun ddoc_fold_cb/2, Acc0, []),
-%%    io:format("INDEXES ~p ~n", [Indexes]),
     Indexes ++ special(Db).
 
 
-% Todo this should all be in fabric2_db
 ddoc_fold_cb({meta, _}, Acc) ->
     {ok, Acc};
 
@@ -237,14 +236,25 @@ from_ddoc(Db, {Props}) ->
 %%            [mango_idx_view]
 %%    end,
     Idxs = lists:flatmap(fun(Mod) -> Mod:from_ddoc({Props}) end, IdxMods),
+    lists:map(fun(Idx) ->
+        Idx#idx{
+            dbname = DbName,
+            ddoc = DDoc,
+            partitioned = get_idx_partitioned(Db, Props)
+        }
+    end, Idxs).
+
+
+add_build_status(Db, Idxs) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        lists:map(fun(Idx) ->
-            Idx#idx{
-                dbname = DbName,
-                ddoc = DDoc,
-                partitioned = get_idx_partitioned(Db, Props),
-                build_status = mango_fdb:get_build_status(TxDb, DDoc)
-            }
+        lists:map(fun
+            (#idx{type = <<"special">>} = Idx) ->
+                Idx;
+            (Idx) ->
+                DDoc = mango_idx:ddoc(Idx),
+                Idx#idx{
+                    build_status = mango_fdb:get_build_status(TxDb, DDoc)
+                }
         end, Idxs)
     end).
 
@@ -255,7 +265,8 @@ special(Db) ->
         name = <<"_all_docs">>,
         type = <<"special">>,
         def = all_docs,
-        opts = []
+        opts = [],
+        build_status = ?MANGO_INDEX_READY
     },
     % Add one for _update_seq
     [AllDocs].

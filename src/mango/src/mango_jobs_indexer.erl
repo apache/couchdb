@@ -94,7 +94,6 @@ init() ->
         exit:normal ->
             ok;
         Error:Reason  ->
-            io:format("ERROR in index worker ~p ~p ~p ~n", [Error, Reason, erlang:display(erlang:get_stacktrace())]),
             NewRetry = Retries + 1,
             RetryLimit = retry_limit(),
 
