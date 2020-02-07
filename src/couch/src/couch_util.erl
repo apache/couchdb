@@ -22,6 +22,7 @@
 -export([proplist_apply_field/2, json_apply_field/2]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
 -export([json_encode/1, json_decode/1]).
+-export([json_explode/1, json_implode/1]).
 -export([verify/2,simple_call/2,shutdown_sync/1]).
 -export([get_value/2, get_value/3]).
 -export([reorder_results/2]).
@@ -514,6 +515,76 @@ json_decode(V) ->
         throw:Error ->
             throw({invalid_json, Error})
     end.
+
+
+json_explode({[]}) ->
+    {};
+json_explode({V}) ->
+    json_explode(V);
+json_explode(V) when is_list(V), length(V) > 0 ->
+    json_explode(V, []);
+json_explode(V) ->
+    V.
+
+json_explode([], Acc) ->
+    lists:reverse(Acc);
+json_explode([{K, V} | Rest], Acc) ->
+    Acc1 = json_explode(V, [K], []),
+    json_explode(Rest, lists:append(Acc1, Acc));
+json_explode(L, Acc) when is_list(L) ->
+    {_, Acc1} = lists:foldl(fun(V, {K, A}) ->
+        A1 = json_explode(V, [K], []),
+        {K+1, lists:append(A1, A)}
+    end, {0, Acc}, L),
+    lists:reverse(Acc1).
+
+json_explode({[]}, KAcc, []) ->
+    [{lists:reverse(KAcc), {}}];
+json_explode({[]}, _KAcc, Acc) ->
+    Acc;
+json_explode({[{K, V} | Rest]}, KAcc, Acc) ->
+    Acc1 = json_explode(V, [K | KAcc], Acc),
+    json_explode({Rest}, KAcc, Acc1);
+json_explode(L, KAcc, Acc) when is_list(L), length(L) > 0 ->
+    {_, Acc1} = lists:foldl(fun(V, {K, A}) ->
+        A1 = json_explode(V, [K | KAcc], []),
+        {K+1, lists:append(A1, A)}
+    end, {0, Acc}, L),
+    Acc1;
+json_explode(V, KAcc, Acc) ->
+    V1 = {lists:reverse(KAcc), V},
+    [V1 | Acc].
+
+
+json_implode([{[K | _], _} | _] = L) ->
+    V = json_implode(L, []),
+    if is_number(K) -> V; true -> {V} end;
+json_implode({}) ->
+    {[]};
+json_implode(V) ->
+    V.
+
+json_implode([], Acc) ->
+    lists:reverse(Acc);
+json_implode([{[K1 | K2] = K, V} | Rest], Acc) ->
+    {V1, Rest1} = json_implode(K, V, Rest),
+    %% try to put it at the end of Rest1?
+    V2 = json_implode(V1),
+    V3 = if is_number(K1) -> V2; true -> {K1, V2} end,
+    json_implode(Rest1, [V3 | Acc]).
+
+json_implode([_K], V, Rest) ->
+    {V, Rest};
+json_implode([K1 | K2], V, Rest) ->
+    json_implode(K1, Rest, [{K2, V}], []).
+
+json_implode(_K, [], KAcc, RestAcc) ->
+    {lists:reverse(KAcc), lists:reverse(RestAcc)};
+json_implode(K, [{[K | K1], V} | Rest], KAcc, RestAcc) ->
+    json_implode(K, Rest, [{K1, V} | KAcc], RestAcc);
+json_implode(K, [V | Rest], KAcc, RestAcc) ->
+    json_implode(K, Rest, KAcc, [V | RestAcc]).
+
 
 verify([X|RestX], [Y|RestY], Result) ->
     verify(RestX, RestY, (X bxor Y) bor Result);

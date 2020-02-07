@@ -308,3 +308,102 @@ random_unicode_char() ->
         BC ->
             BC
     end.
+
+
+json_explode_test_() ->
+    {
+        setup,
+        fun explode_implode_setup/0,
+        fun(Cases) ->
+            lists:map(fun({Description, Before0, After}) ->
+                Before = couch_util:json_decode(Before0),
+                {Description,
+                ?_assertEqual(After, couch_util:json_explode(Before))}
+            end, Cases)
+        end
+    }.
+
+json_implode_test_() ->
+    {
+        setup,
+        fun explode_implode_setup/0,
+        fun(Cases) ->
+            lists:map(fun({Description, Before0, After}) ->
+                Before = couch_util:json_decode(Before0),
+                {Description,
+                ?_assertEqual(Before, couch_util:json_implode(After))}
+            end, Cases)
+        end
+    }.
+
+explode_implode_setup() ->
+    [
+        {"null", <<"null">>, null},
+        {"integer", <<"1">>, 1},
+        {"bool", <<"true">>, true},
+        {"string", <<"\"a\"">>, <<"a">>},
+        {"empty list", <<"[]">>, []},
+        {"one element list", <<"[\"a\"]">>, [{[0], <<"a">>}]},
+        {"two elements list", <<"[\"a\", 1]">>,
+            [{[0], <<"a">>}, {[1], 1}]},
+        {"list of lists", <<"[[\"a\", \"b\"], [1, 2, 3], [true]]">>,
+            [{[0, 0], <<"a">>}, {[0, 1], <<"b">>},
+            {[1, 0], 1}, {[1, 1], 2}, {[1, 2], 3}, {[2, 0], true}]},
+        {"deep list of lists", <<"[[[1, 2], [3, 4]], [[5, 6], [7, 8]]]">>,
+            [{[0, 0, 0], 1}, {[0, 0, 1], 2}, {[0, 1, 0], 3}, {[0, 1, 1], 4},
+            {[1, 0, 0], 5}, {[1, 0, 1], 6}, {[1, 1, 0], 7}, {[1, 1, 1], 8}]},
+        {"empty object", <<"{}">>, {}},
+        {"one element simple object",
+            <<"{\"a\": 1}">>,
+            [{[<<"a">>], 1}]},
+        {"two elements simple object",
+            <<"{\"a\": 1, \"b\": 2}">>,
+            [{[<<"a">>], 1}, {[<<"b">>], 2}]},
+        {"one element deep object",
+            <<"{\"a\": {\"b\": {\"c\": 3, \"d\": 4}}}">>,
+            [{[<<"a">>, <<"b">>, <<"c">>], 3},
+                {[<<"a">>, <<"b">>, <<"d">>], 4}]},
+        {"two elements deep object",
+            <<"{\"a\": {\"b\": 2, \"c\": 3}, \"d\": {\"e\": 5, \"f\": 6}}">>,
+            [{[<<"a">>, <<"b">>], 2}, {[<<"a">>, <<"c">>], 3},
+                {[<<"d">>, <<"e">>], 5}, {[<<"d">>, <<"f">>], 6}]},
+        {"three elements mixed depth object",
+            <<"{\"a\": {\"b\": {\"c\": {\"d\": 4, \"e\": \"f\"}},"
+                "\"g\": 7}, \"h\": true, \"i\": {\"j\": null}}">>,
+            [{[<<"a">>, <<"b">>, <<"c">>, <<"d">>], 4},
+                {[<<"a">>, <<"b">>, <<"c">>, <<"e">>], <<"f">>},
+                {[<<"a">>, <<"g">>], 7}, {[<<"h">>], true},
+                {[<<"i">>, <<"j">>], null}]},
+        {"object of lists", <<"{\"a\": [1, 2], \"b\": [3, 4]}">>,
+            [{[<<"a">>, 0], 1}, {[<<"a">>, 1], 2},
+            {[<<"b">>, 0], 3}, {[<<"b">>, 1], 4}]},
+        {"list of objects",
+            <<"[{\"a\": 1, \"b\": 2}, {\"c\": 3, \"d\": 4}]">>,
+            [{[0, <<"a">>], 1}, {[0, <<"b">>], 2},
+            {[1, <<"c">>], 3}, {[1, <<"d">>], 4}]},
+        {"object of lists of objects",
+            <<"{\"a\": [{\"c\": 3, \"d\": 4}, {\"e\": 5, \"f\": 6}],"
+                "\"b\": [{\"g\": 7, \"h\": 8}, {\"i\": 9, \"j\": 10}]}">>,
+            [{[<<"a">>, 0, <<"c">>], 3}, {[<<"a">>, 0, <<"d">>], 4},
+            {[<<"a">>, 1, <<"e">>], 5}, {[<<"a">>, 1, <<"f">>], 6},
+            {[<<"b">>, 0, <<"g">>], 7}, {[<<"b">>, 0, <<"h">>], 8},
+            {[<<"b">>, 1, <<"i">>], 9}, {[<<"b">>, 1, <<"j">>], 10}]},
+        {"one element object with an empty list value",
+            <<"{\"a\": []}">>,
+            [{[<<"a">>], []}]},
+        {"two elements deep object with an empty list values",
+            <<"{\"a\": {\"b\": []}, \"c\": {\"d\": []}}">>,
+            [{[<<"a">>, <<"b">>], []}, {[<<"c">>, <<"d">>], []}]},
+        {"one element object with an empty object value",
+            <<"{\"a\": {}}">>,
+            [{[<<"a">>], {}}]},
+        {"two elements deep object with an empty object values",
+            <<"{\"a\": {\"b\": {}}, \"c\": {\"d\": {}}}">>,
+            [{[<<"a">>, <<"b">>], {}}, {[<<"c">>, <<"d">>], {}}]},
+        {"list with of empty lists", <<"[[], [], []]">>,
+            [{[0], []}, {[1], []}, {[2], []}]},
+        {"list with of empty objects", <<"[{}, {}, {}]">>,
+            [{[0], {}}, {[1], {}}, {[2], {}}]},
+        {"deep list of mixed values", <<"[1, [[], 2], [3, {}]]">>,
+            [{[0], 1}, {[1, 0], []}, {[1, 1], 2}, {[2, 0], 3}, {[2, 1], {}}]}
+    ].
