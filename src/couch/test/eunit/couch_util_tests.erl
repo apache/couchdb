@@ -168,3 +168,10 @@ to_hex_test_() ->
         ?_assertEqual("", couch_util:to_hex(<<>>)),
         ?_assertEqual("010203faff", couch_util:to_hex(<<1, 2, 3, 250, 255>>))
     ].
+
+json_decode_test_() ->
+    [
+        ?_assertEqual({[]}, couch_util:json_decode(<<"{}">>)),
+        ?_assertEqual({[]}, couch_util:json_decode(<<"{}">>, [])),
+        ?_assertEqual(#{}, couch_util:json_decode(<<"{}">>, [return_maps]))
+    ].
