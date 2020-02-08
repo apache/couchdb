@@ -100,8 +100,8 @@ end,
 {JS_CFLAGS, JS_LDFLAGS} = case os:type() of
     {win32, _} when SMVsn == "1.8.5" ->
         {
-            "/DXP_WIN /IC:\\relax\\js-1.8.5\\js\\src",
-            "/LIBPATH:C:\\relax\\js-1.8.5\\js\\src mozjs185-1.0.lib"
+            "/DXP_WIN",
+            "mozjs185-1.0.lib"
         };
     {unix, _} when SMVsn == "1.8.5" ->
         {
@@ -110,8 +110,8 @@ end,
         };
     {win32, _} when SMVsn == "60" ->
         {
-            "/DXP_WIN /IC:\\relax\\js-60\\js\\src",
-            "/LIBPATH:C:\\relax\\js-60\\js\\src mozjs-60.lib"
+            "/DXP_WIN",
+            "mozjs-60.lib"
         };
     {unix, darwin} when SMVsn == "60" ->
         {
@@ -130,8 +130,8 @@ end.
         case os:type() of
             {win32, _} ->
                 {
-                    "/DHAVE_CURL /IC:\\relax\\curl\\include",
-                    "/LIBPATH:C:\\Relax\\curl\\lib\\release-ssl libcurl_imp.lib"
+                    "/DHAVE_CURL",
+                    "/DHAVE_CURL libcurl.lib"
                 };
             {unix, freebsd} ->
                 {
@@ -174,8 +174,8 @@ IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include"},
                 {"LDFLAGS", "-L/usr/local/opt/icu4c/lib"}],
 IcuBsdEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/include"},
              {"LDFLAGS", "-L/usr/local/lib"}],
-IcuWinEnv = [{"CFLAGS", "/DXP_WIN /IC:\\relax\\icu\\include"},
-             {"LDFLAGS", "/LIBPATH:C:\\relax\\icu\\lib64 icuin.lib icudt.lib icuuc.lib"}],
+IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
+             {"LDFLAGS", "icuin.lib icudt.lib icuuc.lib"}],
 
 ComparePath = "priv/couch_ejson_compare.so",
 CompareSrc = ["priv/couch_ejson_compare/*.c"],
@@ -199,6 +199,12 @@ SpawnSpec = [
     {"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}
 ],
 
+%% hack required until switch to enc/rebar3
+PortEnvOverrides = [
+    {"win32", "EXE_LINK_CXX_TEMPLATE",
+    "$LINKER $PORT_IN_FILES $LDFLAGS $EXE_LDFLAGS /OUT:$PORT_OUT_FILE"}
+],
+
 PortSpecs = case os:type() of
     {win32, _} ->
         BaseSpecs ++ SpawnSpec;
@@ -218,6 +224,7 @@ AddConfig = [
         {d, 'COUCHDB_GIT_SHA', GitSha},
         {i, "../"}
     ] ++ MD5Config ++ ProperConfig},
+    {port_env, PortEnvOverrides},
     {eunit_compile_opts, PlatformDefines}
 ].
 

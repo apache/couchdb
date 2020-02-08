@@ -17,7 +17,9 @@
 include version.mk
 
 SHELL=cmd.exe
-REBAR?=$(shell where rebar.cmd)
+REBAR=bin\rebar.cmd
+MAKE=make -f Makefile.win
+# REBAR?=$(shell where rebar.cmd)
 
 # Handle the following scenarios:
 #   1. When building from a tarball, use version.mk.
@@ -87,7 +89,7 @@ EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 #ignore javascript tests
 ignore_js_suites=
 
-TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
+TEST_OPTS=-c startup_jitter=0 -c default_security=admin_local
 
 ################################################################################
 # Main commands
@@ -131,13 +133,11 @@ fauxton: share\www
 
 .PHONY: check
 # target: check - Test everything
-check: all
-	@$(MAKE) -f Makefile.win python-black
-	@$(MAKE) -f Makefile.win eunit
-	@$(MAKE) -f Makefile.win javascript
-	@$(MAKE) -f Makefile.win mango-test
-	@$(MAKE) -f Makefile.win elixir
-#	@$(MAKE) -f Makefile.win build-test
+check: all python-black
+	@$(MAKE) eunit
+	@$(MAKE) javascript
+	@$(MAKE) mango-test
+	@$(MAKE) elixir
 
 ifdef apps
 subdirs = $(apps)
@@ -153,7 +153,7 @@ eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
 	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) setup_eunit 2> nul
-	@FOR /F "tokens=*" %d IN ($(subdirs)) DO set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) -r eunit $(EUNIT_OPTS) apps=%dir
+	@cmd /c "FOR %d IN ($(subdirs)) DO set COUCHDB_VERSION=$(COUCHDB_VERSION) & set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) & $(REBAR) -r eunit $(EUNIT_OPTS) apps=%d"
 
 .PHONY: exunit
 # target: exunit - Run ExUnit tests
@@ -166,12 +166,12 @@ exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
 	@mix test --cover --trace $(EXUNIT_OPTS)
 
 setup-eunit: export BUILDDIR = $(shell pwd)
-setup-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
+setup-eunit: export ERL_AFLAGS = "-config $(shell echo %cd%)/rel/files/eunit.config")
 setup-eunit:
 	@$(REBAR) setup_eunit 2> nul
 
 just-eunit: export BUILDDIR = $(shell pwd)
-just-eunit: export ERL_AFLAGS = $(shell echo "-config rel/files/eunit.config")
+just-eunit: export ERL_AFLAGS = "-config $(shell echo %cd%)/rel/files/eunit.config")
 just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
@@ -182,7 +182,7 @@ just-eunit:
 # Python code formatter - only runs if we're on Python 3.6 or greater
 python-black: .venv/bin/black
 	@python.exe -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
-		echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
+		echo 'Python formatter not supported on Python < 3.6; check results on a newer platform'
 	@python.exe -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		.venv\Scripts\black.exe --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
@@ -190,7 +190,7 @@ python-black: .venv/bin/black
 
 python-black-update: .venv/bin/black
 	@python.exe -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
-		echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
+		echo 'Python formatter not supported on Python < 3.6; check results on a newer platform'
 	@python.exe -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		.venv\Scripts\black.exe \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
@@ -200,7 +200,7 @@ python-black-update: .venv/bin/black
 elixir: export MIX_ENV=integration
 elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev\run "$(TEST_OPTS)" -a adm:pass -n 1 --enable-erlang-views --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev\run $(TEST_OPTS) -a adm:pass -n 1 --enable-erlang-views --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
@@ -245,8 +245,8 @@ else
 endif
 	@python dev\run -n 1 -q --with-admin-party-please \
 		    --enable-erlang-views \
-            "$(TEST_OPTS)" \
-            'test/javascript/run --suites "$(suites)" \
+            $(TEST_OPTS) \
+            'python test\javascript\run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
 
 
@@ -313,14 +313,14 @@ dist: all derived
 	@copy src\docs\build\man\apachecouchdb.1 apache-couchdb-$(COUCHDB_VERSION)\share\docs\man
 
 	@tar czf apache-couchdb-$(COUCHDB_VERSION).tar.gz apache-couchdb-$(COUCHDB_VERSION)
-	@echo "Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz"
+	@echo 'Done: apache-couchdb-$(COUCHDB_VERSION).tar.gz'
 
 
 .PHONY: release
 # target: release - Create an Erlang release including CouchDB!
 -include install.mk
 release: all
-	@echo Installing CouchDB into rel\couchdb\ ...
+	@echo 'Installing CouchDB into rel\couchdb\ ...'
 	-@rmdir /s/q rel\couchdb
 	@$(REBAR) generate
 	@copy src\couch\priv\couchjs.exe rel\couchdb\bin
@@ -423,7 +423,7 @@ config.erl:
 
 
 src\docs\build:
-	@echo Building docs...
+	@echo 'Building docs...'
 ifeq ($(with_docs), 1)
 	@cd src\docs && make.bat html && make.bat man
 endif
@@ -431,7 +431,7 @@ endif
 
 share\www:
 ifeq ($(with_fauxton), 1)
-	@echo "Building Fauxton"
+	@echo 'Building Fauxton'
 	@cd src\fauxton && npm install --production && .\node_modules\.bin\grunt couchdb
 endif
 

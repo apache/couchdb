@@ -146,14 +146,11 @@ fauxton: share/www
 
 .PHONY: check
 # target: check - Test everything
-check: all
-	@$(MAKE) python-black
+check: all python-black
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
-#	@$(MAKE) build-test
-
 
 ifdef apps
 subdirs = $(apps)

@@ -5,6 +5,7 @@
 *.so
 *.pyc
 *.swp
+*.pdb
 *~
 .venv
 .DS_Store
