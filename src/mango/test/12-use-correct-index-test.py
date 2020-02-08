@@ -93,7 +93,7 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.assertEqual(explain_resp["index"]["type"], "special")
         resp = self.db.find(selector, return_raw=True)
         self.assertEqual(
-            resp["warning"].split('\n')[0].lower(),
+            resp["warning"].split("\n")[0].lower(),
             "no matching index found, create an index to optimize query time.",
         )
 

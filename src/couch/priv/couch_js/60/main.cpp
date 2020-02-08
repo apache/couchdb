@@ -15,6 +15,7 @@
 #include <string.h>
 
 #ifdef XP_WIN
+#define NOMINMAX
 #include <windows.h>
 #else
 #include <unistd.h>

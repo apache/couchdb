@@ -346,7 +346,12 @@ defmodule Couch.DBTest do
   end
 
   defp now(:ms) do
-    div(:erlang.system_time(), 1_000_000)
+    case elem(:os.type, 0) do
+      :win32 ->
+        div(:erlang.system_time(), 1_000)
+      _ ->
+        div(:erlang.system_time(), 1_000_000)
+    end
   end
 
   @spec rev(map(), map()) :: map()
