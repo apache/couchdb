@@ -254,12 +254,26 @@ setup() ->
         couch_stats,
         couch_replicator_notifier
     ]),
+    stop_clustering_process(),
     {ok, Pid} = start_link(),
     Pid.
 
 
 teardown(Pid) ->
+    stop_clustering_process(Pid).
+
+
+stop_clustering_process() ->
+    stop_clustering_process(whereis(?MODULE)).
+
+
+stop_clustering_process(undefined) ->
+    ok;
+
+stop_clustering_process(Pid) when is_pid(Pid) ->
+    Ref = erlang:monitor(process, Pid),
     unlink(Pid),
-    exit(Pid, kill).
+    exit(Pid, kill),
+    receive {'DOWN', Ref, _, _, _} -> ok end.
 
 -endif.
