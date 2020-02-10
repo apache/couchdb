@@ -158,6 +158,7 @@ class IndexSelectorJson(mango.DbPerClass):
     def test_old_selector_with_no_selector_still_supported(self):
         selector = {"location": {"$gte": "FRA"}}
         self.db.save_doc(oldschoolnoselectorddoc)
+        self.db.wait_for_built_indexes()
         resp = self.db.find(selector, explain=True, use_index="oldschoolnoselector")
         self.assertEqual(resp["index"]["name"], "oldschoolnoselector")
         docs = self.db.find(selector, use_index="oldschoolnoselector")
@@ -166,6 +167,7 @@ class IndexSelectorJson(mango.DbPerClass):
     def test_old_selector_still_supported(self):
         selector = {"location": {"$gte": "FRA"}}
         self.db.save_doc(oldschoolddoc)
+        self.db.wait_for_built_indexes()
         resp = self.db.find(selector, explain=True, use_index="oldschool")
         self.assertEqual(resp["index"]["name"], "oldschool")
         docs = self.db.find(selector, use_index="oldschool")

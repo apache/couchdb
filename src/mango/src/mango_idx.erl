@@ -103,12 +103,13 @@ get_rev_info(Row) ->
 
 
 get_usable_indexes(Db, Selector, Opts) ->
-    ExistingIndexes = mango_idx:list(Db),
+    ExistingIndexes = mango_idx:add_build_status(Db, mango_idx:list(Db)),
     GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(
             ExistingIndexes
         ),
+    GlobalIndexes1 = mango_cursor:remove_unbuilt_indexes(GlobalIndexes),
     UserSpecifiedIndex = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
-    UsableIndexes0 = lists:usort(GlobalIndexes ++ UserSpecifiedIndex),
+    UsableIndexes0 = lists:usort(GlobalIndexes1 ++ UserSpecifiedIndex),
     UsableIndexes1 = filter_partition_indexes(UsableIndexes0, Opts),
 
     SortFields = get_sort_fields(Opts),
