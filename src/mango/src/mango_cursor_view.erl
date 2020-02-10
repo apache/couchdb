@@ -99,6 +99,9 @@ maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
 maybe_replace_max_json(EndKey) ->
     EndKey.
 
+%% TODO: When supported, handle:
+%% partitions
+%% conflicts
 index_args(#cursor{} = Cursor) ->
     #cursor{
         index = Idx,
@@ -106,6 +109,7 @@ index_args(#cursor{} = Cursor) ->
         bookmark = Bookmark
     } = Cursor,
     io:format("SELE ~p ranges ~p ~n", [Cursor#cursor.selector, Cursor#cursor.ranges]),
+
     Args0 = #{
         start_key => mango_idx:start_key(Idx, Cursor#cursor.ranges),
         start_key_docid => <<>>,
@@ -113,19 +117,27 @@ index_args(#cursor{} = Cursor) ->
         end_key_docid => <<255>>,
         skip => 0
     },
-    Args = mango_json_bookmark:update_args(Bookmark, Args0),
 
     Sort = couch_util:get_value(sort, Opts, [<<"asc">>]),
-    io:format("SORT ~p ~n", [Sort]),
     Args1 = case mango_sort:directions(Sort) of
-        [<<"desc">> | _] -> Args#{dir => rev};
-        _ -> Args#{dir => fwd}
+        [<<"desc">> | _] ->
+            #{
+                start_key := SK,
+                start_key_docid := SKDI,
+                end_key := EK,
+                end_key_docid := EKDI
+            } = Args0,
+            Args0#{
+                dir => rev,
+                start_key => EK,
+                start_key_docid => EKDI,
+                end_key => SK,
+                end_key_docid => SKDI
+            };
+        _ ->
+            Args0#{dir => fwd}
     end,
-
-    %% TODO: When supported, handle:
-    %% partitions
-    %% conflicts
-    Args1.
+    mango_json_bookmark:update_args(Bookmark, Args1).
 
 
 execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFun, UserAcc) ->
@@ -299,14 +311,14 @@ set_mango_msg_timestamp() ->
 
 handle_message({meta, _}, Cursor) ->
     {ok, Cursor};
-handle_message({doc, Doc}, Cursor) ->
+handle_message({doc, Key, Doc}, Cursor) ->
     case doc_member(Cursor, Doc) of
         {ok, Doc, {execution_stats, ExecutionStats1}} ->
             Cursor1 = Cursor#cursor {
                 execution_stats = ExecutionStats1
             },
             {Props} = Doc,
-            Cursor2 = update_bookmark_keys(Cursor1, Props),
+            Cursor2 = update_bookmark_keys(Cursor1, {Key, Props}),
             FinalDoc = mango_fields:extract(Doc, Cursor2#cursor.fields),
             handle_doc(Cursor2, FinalDoc);
         {no_match, _, {execution_stats, ExecutionStats1}} ->
@@ -329,8 +341,10 @@ handle_all_docs_message({row, Props}, Cursor) ->
     case is_design_doc(Props) of
         true -> {ok, Cursor};
         false ->
-            {doc, Doc} = lists:keyfind(doc, 1, Props),
-            handle_message({doc, Doc}, Cursor)
+            Doc = couch_util:get_value(doc, Props),
+            Key = couch_util:get_value(key, Props),
+
+            handle_message({doc, Key, Doc}, Cursor)
     end;
 handle_all_docs_message(Message, Cursor) ->
     handle_message(Message, Cursor).
@@ -480,9 +494,11 @@ is_design_doc(RowProps) ->
     end.
 
 
-update_bookmark_keys(#cursor{limit = Limit} = Cursor, Props) when Limit > 0 ->
-    Id = couch_util:get_value(id, Props), 
-    Key = couch_util:get_value(key, Props), 
+update_bookmark_keys(#cursor{limit = Limit} = Cursor, {Key, Props}) when Limit > 0 ->
+    io:format("PROPS ~p ~n", [Props]),
+    Id = couch_util:get_value(<<"_id">>, Props),
+%%    Key = couch_util:get_value(<<"key">>, Props),
+    io:format("BOOMARK KEYS id ~p key ~p ~n", [Id, Key]),
     Cursor#cursor {
         bookmark_docid = Id,
         bookmark_key = Key
