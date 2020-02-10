@@ -194,6 +194,12 @@ SpawnSpec = [
     {"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}
 ],
 
+%% hack required until switch to enc/rebar3
+PortEnvOverrides = [
+    {"win32", "EXE_LINK_CXX_TEMPLATE",
+    "$LINKER $PORT_IN_FILES $LDFLAGS $EXE_LDFLAGS /OUT:$PORT_OUT_FILE"}
+],
+
 PortSpecs = case os:type() of
     {win32, _} ->
         BaseSpecs ++ SpawnSpec;
