@@ -896,7 +896,7 @@ local_doc_with_previous_encoding({Db, _}) ->
 before_doc_update_skips_local_docs({Db0, _}) ->
 
     BduFun = fun(Doc, _, _) ->
-        Doc#doc{body = {[<<"bdu_was_here">>, true]}}
+        Doc#doc{body = {[{<<"bdu_was_here">>, true}]}}
     end,
 
     Db = Db0#{before_doc_update := BduFun},
@@ -911,7 +911,7 @@ before_doc_update_skips_local_docs({Db0, _}) ->
     {ok, Doc2} = fabric2_db:open_doc(Db, Doc1#doc.id),
 
     ?assertEqual({[]}, LDoc2#doc.body),
-    ?assertEqual({[<<"bdu_was_here">>, true]}, Doc2#doc.body).
+    ?assertEqual({[{<<"bdu_was_here">>, true}]}, Doc2#doc.body).
 
 
 open_doc_opts({Db, _}) ->
@@ -1007,4 +1007,3 @@ open_doc_opts({Db, _}) ->
     {ok, OpenedDoc3} = fabric2_db:open_doc(Db, DocId, OpenOpts2),
     #doc{atts = [Att5]} = OpenedDoc3,
     ?assertNotEqual(stub, couch_att:fetch(data, Att5)).
-
