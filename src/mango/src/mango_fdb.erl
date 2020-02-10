@@ -226,7 +226,7 @@ fold_cb({Key, Val}, Acc) ->
     } = Acc,
     {{_, DocId}} = erlfdb_tuple:unpack(Key, MangoIdxPrefix),
     SortKeys = couch_views_encoding:decode(Val),
-    {ok, Doc} = fabric2_db:open_doc(Db, DocId),
+    {ok, Doc} = fabric2_db:open_doc(Db, DocId, [{conflicts, true}]),
     JSONDoc = couch_doc:to_json_obj(Doc, []),
     io:format("PRINT ~p ~p ~n", [DocId, JSONDoc]),
     case Callback({doc, SortKeys, JSONDoc}, Cursor) of

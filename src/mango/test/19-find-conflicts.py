@@ -25,7 +25,7 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.db.save_docs_with_conflicts(copy.deepcopy(CONFLICT))
 
     def test_retrieve_conflicts(self):
-        self.db.create_index(["_conflicts"])
+        self.db.create_index(["_conflicts"], wait_for_built_index=False)
         result = self.db.find({"_conflicts": {"$exists": True}}, conflicts=True)
         self.assertEqual(
             result[0]["_conflicts"][0], "1-23202479633c2b380f79507a776743d5"

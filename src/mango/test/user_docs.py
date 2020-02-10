@@ -90,7 +90,9 @@ def add_view_indexes(db, kwargs):
         (["ordered"], "ordered"),
     ]
     for (idx, name) in indexes:
-        assert db.create_index(idx, name=name, ddoc=name) is True
+        assert db.create_index(idx, name=name, ddoc=name,
+                               wait_for_built_index=False) is True
+    db.wait_for_built_indexes()
 
 
 def add_text_indexes(db, kwargs):

@@ -15,7 +15,7 @@ import copy
 import unittest
 
 DOCS = [
-    {"_id": "1", "name": "Jimi", "age": 10, "cars": 1},
+    {"_id": "aa", "name": "Jimi", "age": 10, "cars": 1},
     {"_id": "2", "name": "Eddie", "age": 20, "cars": 1},
     {"_id": "3", "name": "Jane", "age": 30, "cars": 2},
     {"_id": "4", "name": "Mary", "age": 40, "cars": 2},
@@ -33,7 +33,7 @@ class JSONIndexSortOptimisations(mango.DbPerClass):
         selector = {"cars": "2", "age": {"$gt": 10}}
         explain = self.db.find(selector, sort=["age"], explain=True)
         self.assertEqual(explain["index"]["name"], "cars-age")
-        self.assertEqual(explain["mrargs"]["direction"], "fwd")
+        self.assertEqual(explain["args"]["direction"], "fwd")
 
     def test_works_for_all_fields_specified(self):
         self.db.create_index(["cars", "age"], name="cars-age")
@@ -52,7 +52,7 @@ class JSONIndexSortOptimisations(mango.DbPerClass):
         selector = {"cars": "2", "age": {"$gt": 10}}
         explain = self.db.find(selector, sort=[{"age": "desc"}], explain=True)
         self.assertEqual(explain["index"]["name"], "cars-age")
-        self.assertEqual(explain["mrargs"]["direction"], "rev")
+        self.assertEqual(explain["args"]["direction"], "rev")
 
     def test_not_work_for_non_constant_field(self):
         self.db.create_index(["cars", "age"], name="cars-age")

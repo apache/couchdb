@@ -19,6 +19,7 @@
     execute/3,
     maybe_filter_indexes_by_ddoc/2,
     remove_indexes_with_partial_filter_selector/1,
+    remove_unbuilt_indexes/1,
     maybe_add_warning/3
 ]).
 
@@ -121,6 +122,12 @@ remove_indexes_with_partial_filter_selector(Indexes) ->
         end
     end,
     lists:filter(FiltFun, Indexes).
+
+
+remove_unbuilt_indexes(Indexes) ->
+    lists:filter(fun (Idx) ->
+        Idx#idx.build_status == ?MANGO_INDEX_READY
+    end, Indexes).
 
 
 create_cursor(Db, Indexes, Selector, Opts) ->
