@@ -322,7 +322,6 @@ start_key(#idx{}=Idx, Ranges) ->
 
 end_key(#idx{}=Idx, Ranges) ->
     Mod = idx_mod(Idx),
-    io:format("END KEY ~p ~n", [Mod]),
     Mod:end_key(Ranges).
 
 

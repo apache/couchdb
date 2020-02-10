@@ -138,7 +138,8 @@ class Database(object):
         name=None,
         ddoc=None,
         partial_filter_selector=None,
-        selector=None
+        selector=None,
+        wait_for_built_index=True
     ):
         body = {"index": {"fields": fields}, "type": idx_type, "w": 3}
         if name is not None:
@@ -156,7 +157,7 @@ class Database(object):
         assert r.json()["name"] is not None
 
         created = r.json()["result"] == "created"
-        if created:
+        if created and wait_for_built_index:
             # wait until the database reports the index as available and build
             while len([
                     i
@@ -166,6 +167,16 @@ class Database(object):
                 delay(t=0.2)
 
         return created
+
+    def wait_for_built_indexes(self):
+        indexes = self.list_indexes()
+        while len([
+            i
+            for i in self.list_indexes()
+            if i["build_status"] == "ready"
+        ]) < len(indexes):
+            delay(t=0.2)
+
 
     def create_text_index(
         self,
