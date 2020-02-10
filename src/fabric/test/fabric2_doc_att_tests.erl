@@ -175,9 +175,9 @@ large_att({Db, _}) ->
     AttData = iolist_to_binary([
         <<"foobar">> || _ <- lists:seq(1, 60000)
     ]),
-    Att1 = mk_att("long.txt", AttData),
+    Att1 = mk_att(<<"long.txt">>, AttData),
     {ok, _} = create_doc(Db, DocId, [Att1]),
-    ?assertEqual(#{"long.txt" => AttData}, read_atts(Db, DocId)),
+    ?assertEqual(#{<<"long.txt">> => AttData}, read_atts(Db, DocId)),
 
     {ok, Doc} = fabric2_db:open_doc(Db, DocId),
     #doc{atts = [Att2]} = Doc,
