@@ -559,18 +559,15 @@ get_doc_body_future(#{} = Db, DocId, RevInfo) ->
         db_prefix := DbPrefix
     } = ensure_current(Db),
 
-    #{
-        rev_id := {RevPos, Rev}
-    } = RevInfo,
-
-    Key = {?DB_DOCS, DocId, RevPos, Rev},
+    Key = {?DB_DOCS, DocId},
     {StartKey, EndKey} = erlfdb_tuple:range(Key, DbPrefix),
     erlfdb:fold_range_future(Tx, StartKey, EndKey, []).
 
 
 get_doc_body_wait(#{} = Db0, DocId, RevInfo, Future) ->
     #{
-        tx := Tx
+        tx := Tx,
+        db_prefix := DbPrefix
     } = Db = ensure_current(Db0),
 
     #{
@@ -578,12 +575,22 @@ get_doc_body_wait(#{} = Db0, DocId, RevInfo, Future) ->
         rev_path := RevPath
     } = RevInfo,
 
-    RevBodyRows = erlfdb:fold_range_wait(Tx, Future, fun({_K, V}, Acc) ->
-        [V | Acc]
-    end, []),
-    BodyRows = lists:reverse(RevBodyRows),
+    DocPrefix = erlfdb_tuple:pack({?DB_DOCS, DocId}, DbPrefix),
 
-    fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], BodyRows).
+    MetaBodyAcc = erlfdb:fold_range_wait(Tx, Future, fun({K, V}, Acc) ->
+        Tuple = erlfdb_tuple:unpack(K, DocPrefix),
+        case tuple_to_list(Tuple) of
+            [Deleted, RevPos, Rev] ->
+                {[], V, Deleted};
+            [_Deleted, RevPos, Rev | KeyPath] ->
+                {Body, DiskAtts, Deleted} = Acc,
+                {[{KeyPath, V} | Body], DiskAtts, Deleted};
+            _ ->
+                Acc
+        end
+    end, []),
+
+    fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], MetaBodyAcc).
 
 
 get_local_doc(#{} = Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
@@ -1144,10 +1151,11 @@ clear_doc_body(#{} = Db, DocId, #{} = RevInfo) ->
     } = Db,
 
     #{
-        rev_id := {RevPos, Rev}
+        rev_id := {RevPos, Rev},
+        deleted := Deleted
     } = RevInfo,
 
-    BaseKey = {?DB_DOCS, DocId, RevPos, Rev},
+    BaseKey = {?DB_DOCS, DocId, Deleted, RevPos, Rev},
     {StartKey, EndKey} = erlfdb_tuple:range(BaseKey, DbPrefix),
     ok = erlfdb:clear_range(Tx, StartKey, EndKey).
 
@@ -1300,23 +1308,33 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 
     DiskAtts = lists:map(fun couch_att:to_disk_term/1, Atts),
 
-    Value = term_to_binary({Body, DiskAtts, Deleted}, [{minor_version, 1}]),
-    Chunks = chunkify_binary(Value),
+    DocKey = {?DB_DOCS, Id, Deleted, Start, Rev},
+    DocPrefix = erlfdb_tuple:pack(DocKey, DbPrefix),
+    Meta = term_to_binary(DiskAtts, [{minor_version, 1}]),
+    Rows0 = [{DocPrefix, Meta}],
 
-    {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
-        Key = erlfdb_tuple:pack({?DB_DOCS, Id, Start, Rev, ChunkId}, DbPrefix),
-        {{Key, Chunk}, ChunkId + 1}
-    end, 0, Chunks),
-
-    Rows.
+    Body1 = case Body of
+        {[]} -> [];
+        _ -> couch_util:json_explode(Body)
+    end,
+    lists:foldl(fun({K, V}, Acc) ->
+        Key = erlfdb_tuple:pack(list_to_tuple(K), DocPrefix),
+        Value = encode_body_value(V),
+        [{Key, Value} | Acc]
+    end, Rows0, Body1).
 
 
 fdb_to_doc(_Db, _DocId, _Pos, _Path, []) ->
     {not_found, missing};
 
-fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
-    Bin = iolist_to_binary(BinRows),
-    {Body, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
+fdb_to_doc(Db, DocId, Pos, Path, MetaBodyAcc) ->
+    {Body0, DiskAtts0, Deleted} = MetaBodyAcc,
+    BodyRows = [{K, decode_body_value(V)} || {K, V} <- lists:reverse(Body0)],
+    Body = case BodyRows of
+        [] -> {[]};
+        _ -> couch_util:json_implode(BodyRows)
+    end,
+    DiskAtts = binary_to_term(DiskAtts0, [safe]),
     Atts = lists:map(fun(Att) ->
         couch_att:from_disk_term(Db, DocId, Att)
     end, DiskAtts),
@@ -1332,6 +1350,18 @@ fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
         #{after_doc_read := undefined} -> Doc0;
         #{after_doc_read := ADR} -> ADR(Doc0, Db)
     end.
+
+
+encode_body_value(V) when is_list(V); is_tuple(V) ->
+    term_to_binary(V, [{minor_version, 1}]);
+encode_body_value(V) ->
+    erlfdb_tuple:pack({V}).
+
+decode_body_value(<<131, _/binary>> = V) ->
+    binary_to_term(V, [safe]);
+decode_body_value(V) ->
+    {V1} = erlfdb_tuple:unpack(V),
+    V1.
 
 
 local_doc_to_fdb(Db, #doc{} = Doc) ->
