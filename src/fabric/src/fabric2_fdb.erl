@@ -577,20 +577,30 @@ get_doc_body_wait(#{} = Db0, DocId, RevInfo, Future) ->
 
     DocPrefix = erlfdb_tuple:pack({?DB_DOCS, DocId}, DbPrefix),
 
-    MetaBodyAcc = erlfdb:fold_range_wait(Tx, Future, fun({K, V}, Acc) ->
+    DocAcc = erlfdb:fold_range_wait(Tx, Future, fun({K, V}, Acc) ->
+        {NewAcc, OldAcc} = Acc,
         Tuple = erlfdb_tuple:unpack(K, DocPrefix),
         case tuple_to_list(Tuple) of
             [Deleted, RevPos, Rev] ->
-                {[], V, Deleted};
+                {{[], V, Deleted}, OldAcc};
             [_Deleted, RevPos, Rev | KeyPath] ->
-                {Body, DiskAtts, Deleted} = Acc,
-                {[{KeyPath, V} | Body], DiskAtts, Deleted};
+                {Body, DiskAtts, Deleted} = NewAcc,
+                {{[{KeyPath, V} | Body], DiskAtts, Deleted}, OldAcc};
+            %% migration from old format
+            [RevPos, Rev, _ChunkId] ->
+                {NewAcc, [V | OldAcc]};
             _ ->
                 Acc
         end
-    end, []),
+    end, {[], []}),
 
-    fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], MetaBodyAcc).
+    case DocAcc of
+        {[], RevBodyRows} ->
+            BodyRows = lists:reverse(RevBodyRows),
+            fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], BodyRows);
+        {MetaBodyAcc, _} ->
+            fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], MetaBodyAcc)
+    end.
 
 
 get_local_doc(#{} = Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
@@ -1156,6 +1166,15 @@ clear_doc_body(#{} = Db, DocId, #{} = RevInfo) ->
     } = RevInfo,
 
     BaseKey = {?DB_DOCS, DocId, Deleted, RevPos, Rev},
+
+    maybe_clean_old_doc_body(Tx, BaseKey, DbPrefix),
+
+    {StartKey, EndKey} = erlfdb_tuple:range(BaseKey, DbPrefix),
+    ok = erlfdb:clear_range(Tx, StartKey, EndKey).
+
+
+maybe_clean_old_doc_body(Tx, BaseKey0, DbPrefix) ->
+    BaseKey = erlang:delete_element(3, BaseKey0),
     {StartKey, EndKey} = erlfdb_tuple:range(BaseKey, DbPrefix),
     ok = erlfdb:clear_range(Tx, StartKey, EndKey).
 
@@ -1327,14 +1346,22 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 fdb_to_doc(_Db, _DocId, _Pos, _Path, []) ->
     {not_found, missing};
 
-fdb_to_doc(Db, DocId, Pos, Path, MetaBodyAcc) ->
-    {Body0, DiskAtts0, Deleted} = MetaBodyAcc,
+% This is an upgrade clause, the migration will happen on doc's update.
+fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
+    Bin = iolist_to_binary(BinRows),
+    {Body, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
+    fdb_to_doc(Db, DocId, Pos, Path, Body, DiskAtts, Deleted);
+
+fdb_to_doc(Db, DocId, Pos, Path, {Body0, DiskAtts0, Deleted}) ->
     BodyRows = [{K, decode_body_value(V)} || {K, V} <- lists:reverse(Body0)],
     Body = case BodyRows of
         [] -> {[]};
         _ -> couch_util:json_implode(BodyRows)
     end,
     DiskAtts = binary_to_term(DiskAtts0, [safe]),
+    fdb_to_doc(Db, DocId, Pos, Path, Body, DiskAtts, Deleted).
+
+fdb_to_doc(Db, DocId, Pos, Path, Body, DiskAtts, Deleted) ->
     Atts = lists:map(fun(Att) ->
         couch_att:from_disk_term(Db, DocId, Att)
     end, DiskAtts),
