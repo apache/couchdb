@@ -926,13 +926,13 @@ all_docs_view_opts(Args) ->
         EKey -> EKey
     end,
     StartKeyOpts = case StartKey of
-        <<_/binary>> -> [{start_key, StartKey}];
-        undefined -> []
+        undefined -> [];
+        _ -> [{start_key, fabric2_util:all_docs_encode(StartKey)}]
     end,
     EndKeyOpts = case {EndKey, Args#mrargs.inclusive_end} of
-        {<<_/binary>>, false} -> [{end_key_gt, EndKey}];
-        {<<_/binary>>, true} -> [{end_key, EndKey}];
-        {undefined, _} -> []
+        {undefined, _} -> [];
+        {_, false} -> [{end_key_gt, fabric2_util:all_docs_encode(EndKey)}];
+        {_, true} -> [{end_key, fabric2_util:all_docs_encode(EndKey)}]
     end,
     [
         {dir, Args#mrargs.direction},

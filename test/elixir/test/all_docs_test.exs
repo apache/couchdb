@@ -41,11 +41,9 @@ defmodule AllDocsTest do
     assert resp["total_rows"] == length(rows)
 
     # Check _all_docs offset
-    retry_until(fn ->
       resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "\"2\""}).body
       assert resp["offset"] == :null
       assert Enum.at(resp["rows"], 0)["key"] == "2"
-    end)
 
     # Confirm that queries may assume raw collation
     resp =
@@ -73,11 +71,9 @@ defmodule AllDocsTest do
     changes = Couch.get("/#{db_name}/_changes").body["results"]
     assert length(changes) == 4
 
-    retry_until(fn ->
-      deleted = Enum.filter(changes, fn row -> row["deleted"] end)
-      assert length(deleted) == 1
-      assert hd(deleted)["id"] == "1"
-    end)
+    deleted = Enum.filter(changes, fn row -> row["deleted"] end)
+    assert length(deleted) == 1
+    assert hd(deleted)["id"] == "1"
 
     # (remember old seq)
     orig_doc = Enum.find(changes, fn row -> row["id"] == "3" end)
@@ -186,5 +182,43 @@ defmodule AllDocsTest do
       ).body["rows"]
 
     assert length(rows) == 1
+  end
+
+  @tag :with_db
+  test "all_docs ordering", context do
+    db_name = context[:db_name]
+    docs = [
+      %{:_id => "a"},
+      %{:_id => "m"},
+      %{:_id => "z"}
+    ]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs})
+    Enum.each(resp.body, &assert(&1["ok"]))
+
+    resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => false}).body
+    rows = resp["rows"]
+    assert length(rows) === 3
+    assert get_ids(resp) == ["a", "m", "z"]
+
+    resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => 0}).body
+    rows = resp["rows"]
+    assert length(rows) === 3
+    assert get_ids(resp) == ["a", "m", "z"]
+
+    resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "[1,2]"}).body
+    rows = resp["rows"]
+    assert length(rows) === 0
+
+    resp = Couch.get("/#{db_name}/_all_docs", query: %{:end_key => 0}).body
+    rows = resp["rows"]
+    assert length(rows) === 0
+
+  end
+
+
+  defp get_ids(resp) do
+    %{"rows" => rows} = resp
+    Enum.map(rows, fn row -> row["id"] end)
   end
 end

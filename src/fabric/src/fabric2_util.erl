@@ -33,7 +33,9 @@
     get_value/3,
     to_hex/1,
     from_hex/1,
-    uuid/0
+    uuid/0,
+
+    all_docs_encode/1
 ]).
 
 
@@ -235,3 +237,12 @@ hex_to_nibble(N) ->
 
 uuid() ->
     to_hex(crypto:strong_rand_bytes(16)).
+
+
+all_docs_encode(null) -> <<>>;
+all_docs_encode(true) -> <<>>;
+all_docs_encode(false) -> <<>>;
+all_docs_encode(N) when is_number(N) -> <<>>;
+all_docs_encode(B) when is_binary(B) -> B;
+all_docs_encode(L) when is_list(L) -> <<255>>;
+all_docs_encode({O}) when is_list(O) -> <<255>>.
