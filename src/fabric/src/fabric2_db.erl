@@ -71,6 +71,7 @@
     open_doc/2,
     open_doc/3,
     open_doc_revs/4,
+    apply_open_doc_opts/3,
     %% open_doc_int/3,
     get_doc_info/2,
     get_full_doc_info/2,

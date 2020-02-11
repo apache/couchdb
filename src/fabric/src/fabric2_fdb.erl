@@ -723,10 +723,31 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
             incr_stat(Db, <<"doc_del_count">>, 1),
             mango_indexer:delete_doc(Db, PrevDoc);
         updated ->
-            mango_indexer:update_doc(Db, Doc, PrevDoc)
+            DocRev = extract_rev(Doc#doc.revs),
+            {WinnerRevPos, _} = WinnerRevId = maps:get(rev_id, NewWinner),
+            {WinnerDoc, OldWinnerDoc} = case WinnerRevId == DocRev of
+                true -> {Doc, PrevDoc};
+                false -> {PrevDoc, PrevDoc}
+            end,
+
+            RevConflicts = lists:foldl(fun (UpdateRev, Acc) ->
+                {RevPos, _} = maps:get(rev_id, UpdateRev),
+                case RevPos == WinnerRevPos of
+                    true ->
+                        Acc ++ [UpdateRev#{winner := false}];
+                    false ->
+                        Acc
+                 end
+            end, [], ToUpdate),
+
+            {ok, WinnerDoc1} = fabric2_db:apply_open_doc_opts(WinnerDoc, RevConflicts, [conflicts]),
+            mango_indexer:update_doc(Db, WinnerDoc1, OldWinnerDoc)
     end,
 
     ok.
+
+extract_rev({RevPos, [Rev | _]}) ->
+    {RevPos, Rev}.
 
 
 write_local_doc(#{} = Db0, Doc) ->
