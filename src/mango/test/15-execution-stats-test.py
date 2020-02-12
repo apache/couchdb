@@ -36,7 +36,6 @@ class ExecutionStatsTests(mango.UserDocsTests):
         resp = self.db.find(
             {"age": {"$lt": 35}}, return_raw=True, r=3, executionStats=True
         )
-        print(resp)
         self.assertEqual(len(resp["docs"]), 3)
         self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
         self.assertEqual(resp["execution_stats"]["total_docs_examined"], 3)
