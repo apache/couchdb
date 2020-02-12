@@ -1,4 +1,4 @@
-defmodule ReduceBultinTest do
+defmodule ReduceBuiltinTest do
   use CouchTestCase
 
   @moduletag :views
@@ -30,6 +30,7 @@ defmodule ReduceBultinTest do
     http_opts = if query, do: [query: query], else: []
     Couch.get("#{ddoc_url}/_view/builtin#{builtin_fun}", http_opts).body["rows"]
   end
+
   def query_value(ddoc_url, builtin_fun, query \\ nil) do
     hd(query_rows(ddoc_url, builtin_fun, query))["value"]
   end
@@ -40,24 +41,31 @@ defmodule ReduceBultinTest do
     num_docs = 500
 
     docs = make_docs(1..num_docs)
-    assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code in [
-             201,
-             202
-           ]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3})
+    assert resp.status_code in [201, 202]
 
     ddoc_url = random_ddoc(db_name)
+
     map = ~s"""
     function (doc) {
       emit(doc.integer, doc.integer);
       emit(doc.integer, doc.integer);
     };
     """
-    design_doc = %{:views => %{
-      :builtin_sum => %{:map => map, :reduce => "_sum"},
-      :builtin_count => %{:map => map, :reduce => "_count"},
-      :builtin_stats => %{:map => map, :reduce => "_stats"},
-      :builtin_approx_count_distinct => %{:map => map, :reduce => "_approx_count_distinct"}
-    }}
+
+    design_doc = %{
+      :views => %{
+        :builtin_sum => %{:map => map, :reduce => "_sum"},
+        :builtin_count => %{:map => map, :reduce => "_count"},
+        :builtin_stats => %{:map => map, :reduce => "_stats"},
+        :builtin_approx_count_distinct => %{
+          :map => map,
+          :reduce => "_approx_count_distinct"
+        }
+      }
+    }
+
     assert Couch.put(ddoc_url, body: design_doc).body["ok"]
 
     value = ddoc_url |> query_value("_sum")
@@ -99,12 +107,16 @@ defmodule ReduceBultinTest do
     assert row1["value"] == 4
     assert row2["value"] == 6
 
-    assert [row0, row1, row2] = ddoc_url |> query_rows("_approx_count_distinct", %{group: true, limit: 3})
+    assert [row0, row1, row2] =
+             ddoc_url |> query_rows("_approx_count_distinct", %{group: true, limit: 3})
+
     assert check_approx_distinct(1, row0["value"])
     assert check_approx_distinct(1, row1["value"])
     assert check_approx_distinct(1, row2["value"])
 
-    1..div(500, 2) |> Enum.take_every(30) |> Enum.each(fn i ->
+    1..div(500, 2)
+    |> Enum.take_every(30)
+    |> Enum.each(fn i ->
       value = ddoc_url |> query_value("_sum", %{startkey: i, endkey: num_docs - i})
       assert value == 2 * (summate(num_docs - i) - summate(i - 1))
     end)
@@ -117,29 +129,36 @@ defmodule ReduceBultinTest do
 
     docs = make_docs(1..num_docs)
 
-    assert Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3}).status_code in [
-      201,
-      202
-    ]
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3})
+    assert resp.status_code in [201, 202]
 
     # test for trailing characters after builtin functions, desired behaviour
     # is to disregard any trailing characters
     # I think the behavior should be a prefix test, so that even "_statsorama"
     # or "_stats\nare\awesome" should work just as "_stats" does. - JChris
-    ["\n", "orama", "\nare\nawesome", " ", "     \n  "] |> Enum.each(fn trailing ->
+    ["\n", "orama", "\nare\nawesome", " ", "     \n  "]
+    |> Enum.each(fn trailing ->
       ddoc_url = random_ddoc(db_name)
+
       map = ~s"""
       function (doc) {
         emit(doc.integer, doc.integer);
         emit(doc.integer, doc.integer);
       };
       """
-      design_doc = %{:views => %{
-        :builtin_sum => %{:map => map, :reduce => "_sum#{trailing}"},
-        :builtin_count => %{:map => map, :reduce => "_count#{trailing}"},
-        :builtin_stats => %{:map => map, :reduce => "_stats#{trailing}"},
-        :builtin_approx_count_distinct => %{:map => map, :reduce => "_approx_count_distinct#{trailing}"}
-      }}
+
+      design_doc = %{
+        :views => %{
+          :builtin_sum => %{:map => map, :reduce => "_sum#{trailing}"},
+          :builtin_count => %{:map => map, :reduce => "_count#{trailing}"},
+          :builtin_stats => %{:map => map, :reduce => "_stats#{trailing}"},
+          :builtin_approx_count_distinct => %{
+            :map => map,
+            :reduce => "_approx_count_distinct#{trailing}"
+          }
+        }
+      }
+
       assert Couch.put(ddoc_url, body: design_doc).body["ok"]
 
       value = ddoc_url |> query_value("_sum")
@@ -160,21 +179,27 @@ defmodule ReduceBultinTest do
     db_name = context[:db_name]
 
     ddoc_url = random_ddoc(db_name)
+
     map_one = ~s"""
     function (doc) {
       emit(doc.keys, 1);
     };
     """
+
     map_ones_array = ~s"""
     function (doc) {
       emit(doc.keys, [1, 1]);
     };
     """
-    design_doc = %{:views => %{
-      :builtin_one_sum => %{:map => map_one, :reduce => "_sum"},
-      :builtin_one_count => %{:map => map_one, :reduce => "_count"},
-      :builtin_ones_array_sum => %{:map => map_ones_array, :reduce => "_sum"}
-    }}
+
+    design_doc = %{
+      :views => %{
+        :builtin_one_sum => %{:map => map_one, :reduce => "_sum"},
+        :builtin_one_count => %{:map => map_one, :reduce => "_count"},
+        :builtin_ones_array_sum => %{:map => map_ones_array, :reduce => "_sum"}
+      }
+    }
+
     assert Couch.put(ddoc_url, body: design_doc).body["ok"]
 
     for i <- 1..5 do
@@ -193,16 +218,15 @@ defmodule ReduceBultinTest do
           %{keys: ["d", "c"]}
         ]
 
-        assert Couch.post("/#{db_name}/_bulk_docs", body: %{docs: docs}, query: %{w: 3}).status_code in [
-          201,
-          202
-        ]
+        resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: docs}, query: %{w: 3})
+        assert resp.status_code in [201, 202]
 
         total_docs = 1 + (i - 1) * 10 * 11 + (j + 1) * 11
         assert Couch.get("/#{db_name}").body["doc_count"] == total_docs
       end
 
-      ["_sum", "_count"] |> Enum.each(fn builtin ->
+      ["_sum", "_count"]
+      |> Enum.each(fn builtin ->
         builtin = "_one#{builtin}"
 
         # group by exact key match
@@ -255,5 +279,4 @@ defmodule ReduceBultinTest do
       assert Enum.at(rows, 6) == %{"key" => ["d", "c"], "value" => [10 * i, 10 * i]}
     end
   end
-
 end
