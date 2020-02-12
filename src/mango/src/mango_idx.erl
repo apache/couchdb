@@ -372,7 +372,7 @@ get_idx_def(Opts) ->
 get_idx_type(Opts) ->
     case proplists:get_value(type, Opts) of
         <<"json">> -> <<"json">>;
-        <<"text">> -> case clouseau_rpc:connected() of
+        <<"text">> -> case is_text_service_available() of
             true ->
                 <<"text">>;
             false ->
@@ -383,6 +383,11 @@ get_idx_type(Opts) ->
         BadType ->
             ?MANGO_ERROR({invalid_index_type, BadType})
     end.
+
+
+is_text_service_available() ->
+    erlang:function_exported(clouseau_rpc, connected, 0) andalso
+        clouseau_rpc:connected().
 
 
 get_idx_ddoc(Idx, Opts) ->
