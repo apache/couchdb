@@ -123,7 +123,7 @@ get_usable_indexes(Db, Selector, Opts) ->
     end.
 
 
-mango_sort_error(Db, Opts) ->
+mango_sort_error(_Db, _Opts) ->
     ?MANGO_ERROR({no_usable_index, missing_sort_index}).
 % TODO: add back in when partitions supported
 %%    case {fabric_util:is_partitioned(Db), is_opts_partitioned(Opts)} of
