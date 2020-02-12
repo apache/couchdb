@@ -927,12 +927,12 @@ all_docs_view_opts(Args) ->
     end,
     StartKeyOpts = case StartKey of
         undefined -> [];
-        _ -> [{start_key, fabric2_util:all_docs_encode(StartKey)}]
+        _ -> [{start_key, fabric2_util:encode_all_doc_key(StartKey)}]
     end,
     EndKeyOpts = case {EndKey, Args#mrargs.inclusive_end} of
         {undefined, _} -> [];
-        {_, false} -> [{end_key_gt, fabric2_util:all_docs_encode(EndKey)}];
-        {_, true} -> [{end_key, fabric2_util:all_docs_encode(EndKey)}]
+        {_, false} -> [{end_key_gt, fabric2_util:encode_all_doc_key(EndKey)}];
+        {_, true} -> [{end_key, fabric2_util:encode_all_doc_key(EndKey)}]
     end,
     [
         {dir, Args#mrargs.direction},

@@ -41,9 +41,9 @@ defmodule AllDocsTest do
     assert resp["total_rows"] == length(rows)
 
     # Check _all_docs offset
-      resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "\"2\""}).body
-      assert resp["offset"] == :null
-      assert Enum.at(resp["rows"], 0)["key"] == "2"
+    resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "\"2\""}).body
+    assert resp["offset"] == :null
+    assert Enum.at(resp["rows"], 0)["key"] == "2"
 
     # Confirm that queries may assume raw collation
     resp =
@@ -187,6 +187,7 @@ defmodule AllDocsTest do
   @tag :with_db
   test "all_docs ordering", context do
     db_name = context[:db_name]
+
     docs = [
       %{:_id => "a"},
       %{:_id => "m"},
@@ -213,9 +214,7 @@ defmodule AllDocsTest do
     resp = Couch.get("/#{db_name}/_all_docs", query: %{:end_key => 0}).body
     rows = resp["rows"]
     assert length(rows) === 0
-
   end
-
 
   defp get_ids(resp) do
     %{"rows" => rows} = resp
