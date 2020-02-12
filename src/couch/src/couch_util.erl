@@ -532,10 +532,7 @@ json_explode([{K, V} | Rest], Acc) ->
     Acc1 = json_explode(V, [K], []),
     json_explode(Rest, lists:append(Acc1, Acc));
 json_explode(L, Acc) when is_list(L) ->
-    {_, Acc1} = lists:foldl(fun(V, {K, A}) ->
-        A1 = json_explode(V, [K], []),
-        {K+1, lists:append(A1, A)}
-    end, {0, Acc}, L),
+    Acc1 = json_explode(L, 0, [], Acc),
     lists:reverse(Acc1).
 
 json_explode({[]}, KAcc, []) ->
@@ -546,14 +543,16 @@ json_explode({[{K, V} | Rest]}, KAcc, Acc) ->
     Acc1 = json_explode(V, [K | KAcc], Acc),
     json_explode({Rest}, KAcc, Acc1);
 json_explode(L, KAcc, Acc) when is_list(L), length(L) > 0 ->
-    {_, Acc1} = lists:foldl(fun(V, {K, A}) ->
-        A1 = json_explode(V, [K | KAcc], []),
-        {K+1, lists:append(A1, A)}
-    end, {0, Acc}, L),
-    Acc1;
+    json_explode(L, 0, KAcc, Acc);
 json_explode(V, KAcc, Acc) ->
     V1 = {lists:reverse(KAcc), V},
     [V1 | Acc].
+
+json_explode([], _N, _KAcc, Acc) ->
+    Acc;
+json_explode([V | Rest], N, KAcc, Acc) ->
+    Acc1 = json_explode(V, [N | KAcc], []),
+    json_explode(Rest, N+1, KAcc, lists:append(Acc1, Acc)).
 
 
 json_implode([{[K | _], _} | _] = L) ->
@@ -566,7 +565,7 @@ json_implode(V) ->
 
 json_implode([], Acc) ->
     lists:reverse(Acc);
-json_implode([{[K1 | K2] = K, V} | Rest], Acc) ->
+json_implode([{[K1 | _] = K, V} | Rest], Acc) ->
     {V1, Rest1} = json_implode(K, V, Rest),
     %% try to put it at the end of Rest1?
     V2 = json_implode(V1),
