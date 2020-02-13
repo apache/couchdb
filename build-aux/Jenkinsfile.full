@@ -258,7 +258,7 @@ pipeline {
           }
           environment {
             platform = 'centos8'
-            sm_ver = '1.8.5'
+            sm_ver = '60'
           }
           stages {
             stage('Build from tarball & test') {
