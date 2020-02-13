@@ -41,6 +41,7 @@
     start_key/2,
     end_key/2,
     cursor_mod/1,
+    fdb_mod/1,
     idx_mod/1,
     to_json/1,
     delete/4,
@@ -337,6 +338,11 @@ cursor_mod(#idx{type = <<"text">>}) ->
         false ->
             ?MANGO_ERROR({index_service_unavailable, <<"text">>})
     end.
+
+fdb_mod(#idx{type = <<"json">>}) ->
+    mango_fdb_view;
+fdb_mod(#idx{def = all_docs, type= <<"special">>}) ->
+    mango_fdb_special.
 
 
 idx_mod(#idx{type = <<"json">>}) ->

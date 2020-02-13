@@ -121,7 +121,10 @@ write_doc(TxDb, DocId, IdxResults) ->
 
 
 query_all_docs(Db, CallBack, Cursor, Args) ->
-    Opts = args_to_fdb_opts(Args, true) ++ [{include_docs, true}],
+    #cursor{
+        index = Idx
+    } = Cursor,
+    Opts = args_to_fdb_opts(Args, Idx) ++ [{include_docs, true}],
     io:format("ALL DOC OPTS ~p ~n", [Opts]),
     fabric2_db:fold_docs(Db, CallBack, Cursor, Opts).
 
@@ -139,7 +142,7 @@ query(Db, CallBack, Cursor, Args) ->
             callback => CallBack
         },
 
-        Opts = args_to_fdb_opts(Args, false),
+        Opts = args_to_fdb_opts(Args, Idx),
         io:format("OPTS ~p ~n", [Opts]),
         try
             Acc1 = fabric2_fdb:fold_range(TxDb, MangoIdxPrefix, fun fold_cb/2, Acc0, Opts),
@@ -154,60 +157,22 @@ query(Db, CallBack, Cursor, Args) ->
     end).
 
 
-args_to_fdb_opts(Args, AllDocs) ->
+args_to_fdb_opts(Args, Idx) ->
     #{
-        start_key := StartKey0,
+        start_key := StartKey,
         start_key_docid := StartKeyDocId,
-        end_key := EndKey0,
+        end_key := EndKey,
         end_key_docid := EndKeyDocId,
         dir := Direction,
         skip := Skip
     } = Args,
 
     io:format("ARGS ~p ~n", [Args]),
-    io:format("START ~p ~n End ~p ~n", [StartKey0, EndKey0]),
+    io:format("START ~p ~n End ~p ~n", [StartKey, EndKey]),
+    Mod = mango_idx:fdb_mod(Idx),
 
-    StartKeyOpts = case {StartKey0, StartKeyDocId} of
-        {[], _} ->
-            [];
-        {null, _} ->
-            %% all_docs no startkey
-            [];
-        {StartKey0, _} when AllDocs == true ->
-            StartKey1 = if is_binary(StartKey0) -> StartKey0; true ->
-                %% couch_views_encoding:encode(StartKey0, key)
-                couch_util:to_binary(StartKey0)
-            end,
-            io:format("START SEction ~p ~n", [StartKey1]),
-            [{start_key, StartKey1}];
-        {StartKey0, StartKeyDocId} ->
-            StartKey1 = couch_views_encoding:encode(StartKey0, key),
-            [{start_key, {StartKey1, StartKeyDocId}}]
-    end,
-
-    InclusiveEnd = true,
-
-    EndKeyOpts = case {EndKey0, EndKeyDocId, Direction} of
-        {<<255>>, _, _} ->
-            %% all_docs no endkey
-            [];
-        {[], _, _} ->
-            %% mango index no endkey
-            [];
-        {[<<255>>], _, _} ->
-            %% mango index no endkey with a $lt in selector
-            [];
-        {EndKey0, EndKeyDocId, _} when AllDocs == true ->
-            EndKey1 = if is_binary(EndKey0) -> EndKey0; true ->
-                couch_util:to_binary(EndKey0)
-                end,
-            io:format("ENDKEY ~p ~n", [EndKey1]),
-            [{end_key, EndKey1}];
-        {EndKey0, EndKeyDocId, _} when InclusiveEnd ->
-            EndKey1 = couch_views_encoding:encode(EndKey0, key),
-            [{end_key, {EndKey1, EndKeyDocId}}]
-    end,
-
+    StartKeyOpts = Mod:start_key_opts(StartKey, StartKeyDocId),
+    EndKeyOpts = Mod:end_key_opts(EndKey, EndKeyDocId),
 
     [
         {skip, Skip},

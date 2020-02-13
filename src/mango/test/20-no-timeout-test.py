@@ -15,6 +15,7 @@ import copy
 import unittest
 
 
+@unittest.skip("re-enable with multi-transaction iterators")
 class LongRunningMangoTest(mango.DbPerClass):
     def setUp(self):
         self.db.recreate()

@@ -152,9 +152,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             {ok, UserAcc};
         _ ->
             Args = index_args(Cursor),
-            #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
-            UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
-            DbOpts = [{user_ctx, UserCtx}],
+            #cursor{opts = Opts} = Cursor,
             Result = case mango_idx:def(Idx) of
                 all_docs ->
                     CB = fun ?MODULE:handle_all_docs_message/2,
@@ -162,7 +160,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
                     mango_fdb:query_all_docs(Db, CB, Cursor, Args);
                 _ ->
                     CB = fun ?MODULE:handle_message/2,
-                    % Normal view
+                    % json index
                     mango_fdb:query(Db, CB, Cursor, Args)
             end,
             case Result of
@@ -305,8 +303,8 @@ choose_best_index(_DbName, IndexRanges) ->
 %%    end.
 
 
-set_mango_msg_timestamp() ->
-    put(mango_last_msg_timestamp, os:timestamp()).
+%%set_mango_msg_timestamp() ->
+%%    put(mango_last_msg_timestamp, os:timestamp()).
 
 
 handle_message({meta, _}, Cursor) ->
@@ -365,13 +363,13 @@ handle_doc(C, _Doc) ->
     {stop, C}.
 
 
-ddocid(Idx) ->
-    case mango_idx:ddoc(Idx) of
-        <<"_design/", Rest/binary>> ->
-            Rest;
-        Else ->
-            Else
-    end.
+%%ddocid(Idx) ->
+%%    case mango_idx:ddoc(Idx) of
+%%        <<"_design/", Rest/binary>> ->
+%%            Rest;
+%%        Else ->
+%%            Else
+%%    end.
 
 
 %%apply_opts([], Args) ->
@@ -495,11 +493,9 @@ is_design_doc(RowProps) ->
 
 
 update_bookmark_keys(#cursor{limit = Limit} = Cursor, {Key, Props}) when Limit > 0 ->
-    io:format("PROPS ~p ~n", [Props]),
     Id = couch_util:get_value(<<"_id">>, Props),
 %%    Key = couch_util:get_value(<<"key">>, Props),
-    io:format("BOOMARK KEYS id ~p key ~p ~n", [Id, Key]),
-    Cursor#cursor {
+   Cursor#cursor {
         bookmark_docid = Id,
         bookmark_key = Key
     };
