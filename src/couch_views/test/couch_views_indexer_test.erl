@@ -50,7 +50,8 @@ indexer_test_() ->
                     ?TDEF_FE(handle_size_value_limits),
                     ?TDEF_FE(index_autoupdater_callback),
                     ?TDEF_FE(handle_db_recreated_when_running),
-                    ?TDEF_FE(handle_db_recreated_after_finished)
+                    ?TDEF_FE(handle_db_recreated_after_finished),
+                    ?TDEF_FE(index_budget_is_changing)
                 ]
             }
         }
@@ -375,6 +376,55 @@ index_autoupdater_callback(Db) ->
 
     ?assertEqual(ok, couch_views_jobs:wait_for_job(JobId, DbSeq)).
 
+index_budget_is_changing(Db) ->
+    ok = meck:new(couch_rate, [passthrough]),
+    ok = meck:expect(couch_rate, budget, fun(State) ->
+        meck:passthrough([State])
+    end),
+
+    LimiterOpts = #{
+        budget => 100,
+        sensitivity => 500,
+        target => 500,
+        timer => fun timer/0,
+        window => 2000
+    },
+
+    ok = meck:expect(couch_rate, create_if_missing, fun(Id, Module, Store, _Options) ->
+        meck:passthrough([Id, Module, Store, LimiterOpts])
+    end),
+
+    ok = meck:expect(couch_rate, wait, fun(State) ->
+       Delay = couch_rate:delay(State),
+       put(time, timer() + Delay - 1)
+    end),
+
+    DDoc = create_ddoc(),
+    Docs = lists:map(fun doc/1, lists:seq(1, 200)),
+
+    {ok, _} = fabric2_db:update_docs(Db, [DDoc | Docs], []),
+
+    {ok, _Out} = couch_views:query(
+        Db,
+        DDoc,
+        <<"map_fun2">>,
+        fun fold_fun/2,
+        [],
+        #mrargs{}
+    ),
+    ?assert(length(lists:usort(budget_history())) > 1).
+
+
+timer() ->
+    get(time) == undefined andalso put(time, 1),
+    Now = get(time),
+    put(time, Now + 1),
+    Now.
+
+
+budget_history() ->
+    [Result || {_Pid, {couch_rate, budget, _}, Result} <- meck:history(couch_rate)].
+
 
 handle_db_recreated_when_running(Db) ->
     DbName = fabric2_db:name(Db),
@@ -386,7 +436,8 @@ handle_db_recreated_when_running(Db) ->
 
     % To intercept job building while it is running ensure updates happen one
     % row at a time.
-    config:set("couch_views", "change_limit", "1", false),
+    ok = meck:new(couch_rate, [passthrough]),
+    ok = meck:expect(couch_rate, budget, ['_'], meck:val(1)),
 
     meck_intercept_job_update(self()),
 

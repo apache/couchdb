@@ -72,6 +72,8 @@ init() ->
         fail_job(Job, Data, sig_changed, "Design document was modified")
     end,
 
+    Limiter = couch_rate:create_if_missing({DbName, DDocId}, "views"),
+
     State = #{
         tx_db => undefined,
         db_uuid => DbUUID,
@@ -81,7 +83,7 @@ init() ->
         job => Job,
         job_data => Data,
         count => 0,
-        limit => num_changes(),
+        limiter => Limiter,
         doc_acc => [],
         design_opts => Mrst#mrst.design_opts
     },
@@ -94,6 +96,7 @@ init() ->
         error:database_does_not_exist ->
             fail_job(Job, Data, db_deleted, "Database was deleted");
         Error:Reason  ->
+            couch_rate:failure(Limiter),
             NewRetry = Retries + 1,
             RetryLimit = retry_limit(),
 
@@ -152,7 +155,25 @@ add_error(Error, Reason, Data) ->
 
 
 update(#{} = Db, Mrst0, State0) ->
-    {Mrst2, State4} = fabric2_fdb:transactional(Db, fun(TxDb) ->
+    Limiter = maps:get(limiter, State0),
+    case couch_rate:budget(Limiter) of
+        0 ->
+            couch_rate:wait(Limiter),
+            update(Db, Mrst0, State0);
+        Limit ->
+            {Mrst1, State1} = do_update(Db, Mrst0, State0#{limit => Limit, limiter => Limiter}),
+            case State1 of
+                finished ->
+                    couch_eval:release_map_context(Mrst1#mrst.qserver);
+                _ ->
+                    couch_rate:wait(Limiter),
+                    update(Db, Mrst1, State1)
+            end
+    end.
+
+
+do_update(Db, Mrst0, State0) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
         % In the first iteration of update we need
         % to populate our db and view sequences
         State1 = case State0 of
@@ -174,14 +195,18 @@ update(#{} = Db, Mrst0, State0) ->
 
         #{
             count := Count,
-            limit := Limit,
             doc_acc := DocAcc,
-            last_seq := LastSeq
+            last_seq := LastSeq,
+            limit := Limit,
+            limiter := Limiter
         } = State2,
-
         DocAcc1 = fetch_docs(TxDb, DocAcc),
+        couch_rate:in(Limiter, Count),
+
         {Mrst1, MappedDocs} = map_docs(Mrst0, DocAcc1),
-        write_docs(TxDb, Mrst1, MappedDocs, State2),
+        WrittenDocs = write_docs(TxDb, Mrst1, MappedDocs, State2),
+
+        couch_rate:success(Limiter, WrittenDocs),
 
         case Count < Limit of
             true ->
@@ -196,14 +221,7 @@ update(#{} = Db, Mrst0, State0) ->
                     view_seq := LastSeq
                 }}
         end
-    end),
-
-    case State4 of
-        finished ->
-            couch_eval:release_map_context(Mrst2#mrst.qserver);
-        _ ->
-            update(Db, Mrst2, State4)
-    end.
+    end).
 
 
 fold_changes(State) ->
@@ -304,12 +322,14 @@ write_docs(TxDb, Mrst, Docs, State) ->
     KeyLimit = key_size_limit(),
     ValLimit = value_size_limit(),
 
-    lists:foreach(fun(Doc0) ->
+    DocsNumber = lists:foldl(fun(Doc0, N) ->
         Doc1 = calculate_kv_sizes(Mrst, Doc0, KeyLimit, ValLimit),
-        couch_views_fdb:write_doc(TxDb, Sig, ViewIds, Doc1)
-    end, Docs),
+        couch_views_fdb:write_doc(TxDb, Sig, ViewIds, Doc1),
+        N + 1
+    end, 0, Docs),
 
-    couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq).
+    couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq),
+    DocsNumber.
 
 
 fetch_docs(Db, Changes) ->
@@ -470,10 +490,6 @@ fail_job(Job, Data, Error, Reason) ->
     NewData = add_error(Error, Reason, Data),
     couch_jobs:finish(undefined, Job, NewData),
     exit(normal).
-
-
-num_changes() ->
-    config:get_integer("couch_views", "change_limit", 100).
 
 
 retry_limit() ->
