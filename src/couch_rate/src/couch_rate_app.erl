@@ -10,24 +10,19 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, couch_views, [
-    {description, "CouchDB Views on FDB"},
-    {vsn, git},
-    {mod, {couch_views_app, []}},
-    {registered, [
-        couch_views_sup,
-        couch_views_server
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        erlfdb,
-        couch_log,
-        config,
-        couch_stats,
-        fabric,
-        couch_jobs,
-        couch_eval,
-        couch_rate
-    ]}
-]}.
+-module(couch_rate_app).
+
+-behaviour(application).
+
+-export([
+    start/2,
+    stop/1
+]).
+
+
+start(_StartType, _StartArgs) ->
+    couch_rate_sup:start_link().
+
+
+stop(_State) ->
+    ok.
