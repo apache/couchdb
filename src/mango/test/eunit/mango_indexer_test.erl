@@ -155,7 +155,7 @@ doc(Id) ->
     ]}).
 
 
-query_cb({doc, Doc}, #cursor{user_acc = Acc} = Cursor) ->
+query_cb({doc, _, Doc}, #cursor{user_acc = Acc} = Cursor) ->
     {ok, Cursor#cursor{
         user_acc =  Acc ++ [Doc]
     }}.
