@@ -178,15 +178,14 @@ should_index(Selector, Doc) ->
     Matches and not IsDesign.
 
 
-validate_index_info(IndexInfo) ->
-    IdxTypes = [mango_idx_view, mango_idx_text],
-    Results = lists:foldl(fun(IdxType, Results0) ->
-        try
-            IdxType:validate_index_def(IndexInfo),
-            [valid_index | Results0]
-        catch _:_ ->
-            [invalid_index | Results0]
-        end
-    end, [], IdxTypes),
-    lists:member(valid_index, Results).
-
+%% validate_index_info(IndexInfo) ->
+%%     IdxTypes = [mango_idx_view, mango_idx_text],
+%%     Results = lists:foldl(fun(IdxType, Results0) ->
+%%         try
+%%             IdxType:validate_index_def(IndexInfo),
+%%             [valid_index | Results0]
+%%         catch _:_ ->
+%%             [invalid_index | Results0]
+%%         end
+%%     end, [], IdxTypes),
+%%     lists:member(valid_index, Results).

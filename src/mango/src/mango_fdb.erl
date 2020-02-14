@@ -60,8 +60,7 @@ get_build_vs(TxDb, #idx{} = Idx) ->
 
 get_build_vs(TxDb, DDoc) ->
     #{
-        tx := Tx,
-        db_prefix := DbPrefix
+        tx := Tx
     } = TxDb,
     Key = build_vs_key(TxDb, DDoc),
     EV = erlfdb:wait(erlfdb:get(Tx, Key)),

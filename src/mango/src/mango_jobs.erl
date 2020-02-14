@@ -27,10 +27,6 @@ set_timeout() ->
 
 
 build_index(TxDb, #idx{} = Idx) ->
-    #{
-        tx := Tx
-    } = TxDb,
-
     mango_fdb:create_build_vs(TxDb, Idx),
 
     JobId = job_id(TxDb, Idx),
