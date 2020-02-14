@@ -33,6 +33,8 @@ misc_test_() ->
                 ?TDEF(set_revs_limit),
                 ?TDEF(set_security),
                 ?TDEF(is_system_db),
+                ?TDEF(validate_dbname),
+                ?TDEF(validate_doc_ids),
                 ?TDEF(get_doc_info),
                 ?TDEF(get_doc_info_not_found),
                 ?TDEF(get_full_doc_info),
@@ -54,6 +56,7 @@ setup() ->
 
 
 cleanup({_DbName, Db, Ctx}) ->
+    meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []),
     test_util:stop_couch(Ctx).
 
@@ -112,6 +115,78 @@ is_system_db({DbName, Db, _}) ->
     ?assertEqual(true, fabric2_db:is_system_db_name(<<"foo/_replicator">>)),
     ?assertEqual(false, fabric2_db:is_system_db_name(<<"f.o/_replicator">>)),
     ?assertEqual(false, fabric2_db:is_system_db_name(<<"foo/bar">>)).
+
+
+validate_dbname(_) ->
+    Tests = [
+        {ok, <<"foo">>},
+        {ok, "foo"},
+        {ok, <<"_replicator">>},
+        {error, illegal_database_name, <<"Foo">>},
+        {error, illegal_database_name, <<"foo|bar">>},
+        {error, illegal_database_name, <<"Foo">>},
+        {error, database_name_too_long, <<
+                "0123456789012345678901234567890123456789"
+                "0123456789012345678901234567890123456789"
+                "0123456789012345678901234567890123456789"
+                "0123456789012345678901234567890123456789"
+                "0123456789012345678901234567890123456789"
+                "0123456789012345678901234567890123456789"
+            >>}
+    ],
+    CheckFun = fun
+        ({ok, DbName}) ->
+            ?assertEqual(ok, fabric2_db:validate_dbname(DbName));
+        ({error, Reason, DbName}) ->
+            Expect = {error, {Reason, DbName}},
+            ?assertEqual(Expect, fabric2_db:validate_dbname(DbName))
+    end,
+    lists:foreach(CheckFun, Tests).
+
+
+validate_doc_ids(_) ->
+    % Basic test with default max infinity length
+    ?assertEqual(ok, fabric2_db:validate_docid(<<"foo">>)),
+
+    Tests = [
+        {ok, <<"_local/foo">>},
+        {ok, <<"_design/foo">>},
+        {ok, <<"0123456789012345">>},
+        {illegal_docid, <<"">>},
+        {illegal_docid, <<"_design/">>},
+        {illegal_docid, <<"_local/">>},
+        {illegal_docid, <<"01234567890123456">>},
+        {illegal_docid, <<16#FF>>},
+        {illegal_docid, <<"_bad">>},
+        {illegal_docid, null}
+    ],
+    CheckFun = fun
+        ({ok, DocId}) ->
+            ?assertEqual(ok, fabric2_db:validate_docid(DocId));
+        ({illegal_docid, DocId}) ->
+            ?assertThrow({illegal_docid, _}, fabric2_db:validate_docid(DocId))
+    end,
+
+    try
+        meck:new(config, [passthrough]),
+        meck:expect(
+                config,
+                get,
+                ["couchdb", "max_document_id_length", "infinity"],
+                "16"
+            ),
+        lists:foreach(CheckFun, Tests),
+
+        % Check that fabric2_db_plugin can't allow for
+        % underscore prefixed dbs
+        meck:new(fabric2_db_plugin, [passthrough]),
+        meck:expect(fabric2_db_plugin, validate_docid, ['_'], true),
+        ?assertEqual(ok, fabric2_db:validate_docid(<<"_wheee">>))
+    after
+        % Unloading within the test as the config mock
+        % interferes with the db version bump test.
+        meck:unload()
+    end.
 
 
 get_doc_info({_, Db, _}) ->
