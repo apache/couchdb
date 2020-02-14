@@ -526,8 +526,8 @@ runs_match_on_doc_with_no_value_test() ->
             ]
         }}
     ],
-    {Match, _, _} = doc_member(Cursor, RowProps),
-    ?assertEqual(Match, no_match).
+    {Match, _, _} = doc_member(Cursor, {RowProps}),
+    ?assertEqual(no_match, Match).
 
 does_not_run_match_on_doc_with_value_test() ->
     Cursor = #cursor {
@@ -548,8 +548,8 @@ does_not_run_match_on_doc_with_value_test() ->
             ]
         }}
     ],
-    {Match, _, _} = doc_member(Cursor, RowProps),
-    ?assertEqual(Match, ok).
+    {Match, _, _} = doc_member(Cursor, {RowProps}),
+    ?assertEqual(ok, Match).
 
 
 -endif.
