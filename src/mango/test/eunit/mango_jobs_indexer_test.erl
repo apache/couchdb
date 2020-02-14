@@ -76,7 +76,7 @@ index_docs(Db) ->
         [{id, <<"3">>}, {value, 3}],
         [{id, <<"4">>}, {value, 4}],
         [{id, <<"5">>}, {value, 5}]
-], Docs).
+    ], Docs).
 
 
 index_lots_of_docs(Db) ->
@@ -186,7 +186,7 @@ doc(Id) ->
     ]}).
 
 
-query_cb({doc, Doc}, #cursor{user_acc = Acc} = Cursor) ->
+query_cb({doc, _, Doc}, #cursor{user_acc = Acc} = Cursor) ->
     {ok, Cursor#cursor{
         user_acc =  Acc ++ [Doc]
     }}.
