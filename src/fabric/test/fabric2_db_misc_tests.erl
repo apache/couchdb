@@ -33,6 +33,11 @@ misc_test_() ->
                 ?TDEF(set_revs_limit),
                 ?TDEF(set_security),
                 ?TDEF(is_system_db),
+                ?TDEF(get_doc_info),
+                ?TDEF(get_doc_info_not_found),
+                ?TDEF(get_full_doc_info),
+                ?TDEF(get_full_doc_info_not_found),
+                ?TDEF(get_full_doc_infos),
                 ?TDEF(ensure_full_commit),
                 ?TDEF(metadata_bump),
                 ?TDEF(db_version_bump)
@@ -107,6 +112,88 @@ is_system_db({DbName, Db, _}) ->
     ?assertEqual(true, fabric2_db:is_system_db_name(<<"foo/_replicator">>)),
     ?assertEqual(false, fabric2_db:is_system_db_name(<<"f.o/_replicator">>)),
     ?assertEqual(false, fabric2_db:is_system_db_name(<<"foo/bar">>)).
+
+
+get_doc_info({_, Db, _}) ->
+    DocId = couch_uuids:random(),
+    InsertDoc = #doc{
+        id = DocId,
+        body = {[{<<"foo">>, true}]}
+    },
+    {ok, {Pos, Rev}} = fabric2_db:update_doc(Db, InsertDoc, []),
+
+    DI = fabric2_db:get_doc_info(Db, DocId),
+    ?assert(is_record(DI, doc_info)),
+    #doc_info{
+        id = DIDocId,
+        high_seq = HighSeq,
+        revs = Revs
+    } = DI,
+
+    ?assertEqual(DocId, DIDocId),
+    ?assert(is_binary(HighSeq)),
+    ?assertMatch([#rev_info{}], Revs),
+
+    [#rev_info{
+        rev = DIRev,
+        seq = Seq,
+        deleted = Deleted,
+        body_sp = BodySp
+    }] = Revs,
+
+    ?assertEqual({Pos, Rev}, DIRev),
+    ?assert(is_binary(Seq)),
+    ?assert(not Deleted),
+    ?assertMatch(undefined, BodySp).
+
+
+get_doc_info_not_found({_, Db, _}) ->
+    DocId = couch_uuids:random(),
+    ?assertEqual(not_found, fabric2_db:get_doc_info(Db, DocId)).
+
+
+get_full_doc_info({_, Db, _}) ->
+    DocId = couch_uuids:random(),
+    InsertDoc = #doc{
+        id = DocId,
+        body = {[{<<"foo">>, true}]}
+    },
+    {ok, {Pos, Rev}} = fabric2_db:update_doc(Db, InsertDoc, []),
+    FDI = fabric2_db:get_full_doc_info(Db, DocId),
+
+    ?assert(is_record(FDI, full_doc_info)),
+    #full_doc_info{
+        id = FDIDocId,
+        update_seq = UpdateSeq,
+        deleted = Deleted,
+        rev_tree = RevTree,
+        sizes = SizeInfo
+    } = FDI,
+
+    ?assertEqual(DocId, FDIDocId),
+    ?assert(is_binary(UpdateSeq)),
+    ?assert(not Deleted),
+    ?assertMatch([{Pos, {Rev, _, []}}], RevTree),
+    ?assertEqual(#size_info{}, SizeInfo).
+
+
+get_full_doc_info_not_found({_, Db, _}) ->
+    DocId = couch_uuids:random(),
+    ?assertEqual(not_found, fabric2_db:get_full_doc_info(Db, DocId)).
+
+
+get_full_doc_infos({_, Db, _}) ->
+    DocIds = lists:map(fun(_) ->
+        DocId = couch_uuids:random(),
+        Doc = #doc{id = DocId},
+        {ok, _} = fabric2_db:update_doc(Db, Doc, []),
+        DocId
+    end, lists:seq(1, 5)),
+
+    FDIs = fabric2_db:get_full_doc_infos(Db, DocIds),
+    lists:zipwith(fun(DocId, FDI) ->
+        ?assertEqual(DocId, FDI#full_doc_info.id)
+    end, DocIds, FDIs).
 
 
 ensure_full_commit({_, Db, _}) ->
