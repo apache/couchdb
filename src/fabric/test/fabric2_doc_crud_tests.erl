@@ -67,7 +67,8 @@ doc_crud_test_() ->
                 ?TDEF(create_a_large_local_doc),
                 ?TDEF(create_2_large_local_docs),
                 ?TDEF(local_doc_with_previous_encoding),
-                ?TDEF(before_doc_update_skips_local_docs)
+                ?TDEF(before_doc_update_skips_local_docs),
+                ?TDEF(open_doc_opts)
             ])
         }
     }.
@@ -911,3 +912,99 @@ before_doc_update_skips_local_docs({Db0, _}) ->
 
     ?assertEqual({[]}, LDoc2#doc.body),
     ?assertEqual({[<<"bdu_was_here">>, true]}, Doc2#doc.body).
+
+
+open_doc_opts({Db, _}) ->
+    % Build out state so that we can exercise each doc
+    % open option. This requires a live revision with
+    % an attachment, a conflict, and a deleted conflict.
+    DocId = couch_uuids:random(),
+    Att1 = couch_att:new([
+        {name, <<"foo.txt">>},
+        {type, <<"application/octet-stream">>},
+        {att_len, 6},
+        {data, <<"foobar">>},
+        {encoding, identity},
+        {md5, <<>>}
+    ]),
+    Doc1A = #doc{
+        id = DocId,
+        atts = [Att1]
+    },
+    {ok, {Pos1, Rev1A}} = fabric2_db:update_doc(Db, Doc1A),
+    Att2 = couch_att:store([
+            {data, stub},
+            {revpos, 1}
+        ], Att1),
+    Doc1B = Doc1A#doc{
+        revs = {Pos1, [Rev1A]},
+        atts = [Att2]
+    },
+    {ok, {Pos2, Rev1B}} = fabric2_db:update_doc(Db, Doc1B),
+
+    Rev2 = crypto:strong_rand_bytes(16),
+    Rev3 = crypto:strong_rand_bytes(16),
+    Rev4 = crypto:strong_rand_bytes(16),
+
+    % Create a live conflict
+    Doc2 = #doc{
+        id = DocId,
+        revs = {1, [Rev2]}
+    },
+    {ok, _} = fabric2_db:update_doc(Db, Doc2, [replicated_changes]),
+
+    % Create a deleted conflict
+    Doc3 = #doc{
+        id = DocId,
+        revs = {1, [Rev3]}
+    },
+    {ok, _} = fabric2_db:update_doc(Db, Doc3, [replicated_changes]),
+    Doc4 = #doc{
+        id = DocId,
+        revs = {2, [Rev4, Rev3]},
+        deleted = true
+    },
+    {ok, _} = fabric2_db:update_doc(Db, Doc4, [replicated_changes]),
+
+    OpenOpts1 = [
+        revs_info,
+        conflicts,
+        deleted_conflicts,
+        local_seq,
+        {atts_since, [{Pos1, Rev1A}]}
+    ],
+    {ok, OpenedDoc1} = fabric2_db:open_doc(Db, DocId, OpenOpts1),
+
+    #doc{
+        id = DocId,
+        revs = {2, [Rev1B, Rev1A]},
+        atts = [Att3],
+        meta = Meta
+    } = OpenedDoc1,
+    ?assertEqual(stub, couch_att:fetch(data, Att3)),
+    ?assertEqual(
+            {revs_info, Pos2, [{Rev1B, available}, {Rev1A, missing}]},
+            lists:keyfind(revs_info, 1, Meta)
+        ),
+    ?assertEqual(
+            {conflicts, [{1, Rev2}]},
+            lists:keyfind(conflicts, 1, Meta)
+        ),
+    ?assertEqual(
+            {deleted_conflicts, [{2, Rev4}]},
+            lists:keyfind(deleted_conflicts, 1, Meta)
+        ),
+    ?assertMatch({_, <<_/binary>>}, lists:keyfind(local_seq, 1, Meta)),
+
+    % Empty atts_since list
+    {ok, OpenedDoc2} = fabric2_db:open_doc(Db, DocId, [{atts_since, []}]),
+    #doc{atts = [Att4]} = OpenedDoc2,
+    ?assertNotEqual(stub, couch_att:fetch(data, Att4)),
+
+    % Missing ancestor
+    Rev5 = crypto:strong_rand_bytes(16),
+    OpenOpts2 = [{atts_since, [{5, Rev5}]}],
+    {ok, OpenedDoc3} = fabric2_db:open_doc(Db, DocId, OpenOpts2),
+    #doc{atts = [Att5]} = OpenedDoc3,
+    ?assertNotEqual(stub, couch_att:fetch(data, Att5)).
+
