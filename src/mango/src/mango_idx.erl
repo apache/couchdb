@@ -535,7 +535,8 @@ filter_opts([Opt | Rest]) ->
     [Opt | filter_opts(Rest)].
 
 
-get_partial_filter_selector(#idx{def = Def}) when Def =:= all_docs; Def =:= undefined ->
+get_partial_filter_selector(#idx{def = Def})
+        when Def =:= all_docs; Def =:= undefined ->
     undefined;
 get_partial_filter_selector(#idx{def = {Def}}) ->
     case proplists:get_value(<<"partial_filter_selector">>, Def) of
@@ -558,14 +559,18 @@ get_legacy_selector(Def) ->
 -include_lib("eunit/include/eunit.hrl").
 
 index(SelectorName, Selector) ->
-    {
-        idx,<<"mango_test_46418cd02081470d93290dc12306ebcb">>,
-           <<"_design/57e860dee471f40a2c74ea5b72997b81dda36a24">>,
-           <<"Selected">>,<<"json">>,
-           {[{<<"fields">>,{[{<<"location">>,<<"asc">>}]}},
-             {SelectorName,{Selector}}]},
-           false,
-           [{<<"def">>,{[{<<"fields">>,[<<"location">>]}]}}]
+    #idx{
+        dbname = <<"mango_test_46418cd02081470d93290dc12306ebcb">>,
+        ddoc = <<"_design/57e860dee471f40a2c74ea5b72997b81dda36a24">>,
+        name = <<"Selected">>,
+        type = <<"json">>,
+        def = {[
+            {<<"fields">>, {[{<<"location">>,<<"asc">>}]}},
+            {SelectorName, {Selector}}
+        ]},
+        partitioned = false,
+        opts = [{<<"def">>,{[{<<"fields">>,[<<"location">>]}]}}],
+        build_status = undefined
     }.
 
 get_partial_filter_all_docs_test() ->
