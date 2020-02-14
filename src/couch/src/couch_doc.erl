@@ -383,7 +383,7 @@ rev_info({#{} = RevInfo, {Pos, [RevId | _]}}) ->
     #rev_info{
         deleted = Deleted,
         body_sp = undefined,
-        seq = Sequence,
+        seq = fabric2_fdb:vs_to_seq(Sequence),
         rev = {Pos, RevId}
     }.
 
