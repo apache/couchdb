@@ -30,7 +30,10 @@ crud_test_() ->
                 ?TDEF(open_db),
                 ?TDEF(delete_db),
                 ?TDEF(list_dbs),
-                ?TDEF(list_dbs_info)
+                ?TDEF(list_dbs_user_fun),
+                ?TDEF(list_dbs_user_fun_partial),
+                ?TDEF(list_dbs_info),
+                ?TDEF(list_dbs_info_partial)
             ])
         }
     }.
@@ -87,6 +90,26 @@ list_dbs(_) ->
     ?assert(not lists:member(DbName, AllDbs3)).
 
 
+list_dbs_user_fun(_) ->
+    ?assertMatch({ok, _}, fabric2_db:create(?tempdb(), [])),
+
+    UserFun = fun(Row, Acc) -> {ok, [Row | Acc]} end,
+    {ok, UserAcc} = fabric2_db:list_dbs(UserFun, [], []),
+
+    Base = lists:foldl(fun(DbName, Acc) ->
+        [{row, [{id, DbName}]} | Acc]
+    end, [{meta, []}], fabric2_db:list_dbs()),
+    Expect = lists:reverse(Base, [complete]),
+
+    ?assertEqual(Expect, lists:reverse(UserAcc)).
+
+
+list_dbs_user_fun_partial(_) ->
+    UserFun = fun(Row, Acc) -> {stop, [Row | Acc]} end,
+    {ok, UserAcc} = fabric2_db:list_dbs(UserFun, [], []),
+    ?assertEqual([{meta, []}], UserAcc).
+
+
 list_dbs_info(_) ->
     DbName = ?tempdb(),
     {ok, AllDbInfos1} = fabric2_db:list_dbs_info(),
@@ -101,6 +124,12 @@ list_dbs_info(_) ->
     ?assertEqual(ok, fabric2_db:delete(DbName, [])),
     {ok, AllDbInfos3} = fabric2_db:list_dbs_info(),
     ?assert(not is_db_info_member(DbName, AllDbInfos3)).
+
+
+list_dbs_info_partial(_) ->
+    UserFun = fun(Row, Acc) -> {stop, [Row | Acc]} end,
+    {ok, UserAcc} = fabric2_db:list_dbs_info(UserFun, [], []),
+    ?assertEqual([{meta, []}], UserAcc).
 
 
 is_db_info_member(_, []) ->
