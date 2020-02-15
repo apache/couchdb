@@ -211,7 +211,8 @@ fold_changes(State) ->
     } = State,
 
     Fun = fun process_changes/2,
-    fabric2_db:fold_changes(TxDb, SinceSeq, Fun, State, [{limit, Limit}]).
+    Opts = [{limit, Limit}, {restart_tx, false}],
+    fabric2_db:fold_changes(TxDb, SinceSeq, Fun, State, Opts).
 
 
 process_changes(Change, Acc) ->
