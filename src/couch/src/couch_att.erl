@@ -88,8 +88,7 @@
     md5 := binary() | undefined,
     revpos := non_neg_integer(),
     data := data_prop_type(),
-    encoding := identity | gzip | undefined,
-    headers := [{binary(), binary()}] | undefined
+    encoding := identity | gzip | undefined
 }.
 
 
@@ -102,8 +101,7 @@ new() ->
         md5 => undefined,
         revpos => 0,
         data => undefined,
-        encoding => undefined,
-        headers => undefined
+        encoding => undefined
     }.
 
 
@@ -203,8 +201,7 @@ to_disk_term(Att) ->
         fetch(disk_len, Att),
         fetch(revpos, Att),
         fetch(md5, Att),
-        fetch(encoding, Att),
-        fetch(headers, Att)
+        fetch(encoding, Att)
     }}.
 
 
@@ -217,8 +214,7 @@ from_disk_term(#{} = Db, DocId, {?CURRENT_ATT_FORMAT, Props}) ->
         DiskLen,
         RevPos,
         Md5,
-        Encoding,
-        Headers
+        Encoding
     } = Props,
     new([
         {name, Name},
@@ -228,8 +224,7 @@ from_disk_term(#{} = Db, DocId, {?CURRENT_ATT_FORMAT, Props}) ->
         {disk_len, DiskLen},
         {revpos, RevPos},
         {md5, Md5},
-        {encoding, Encoding},
-        {headers, Headers}
+        {encoding, Encoding}
     ]).
 
 
@@ -329,8 +324,7 @@ to_json(Att, OutputData, DataToFollow, ShowEncoding) ->
         att_len := AttLen,
         revpos := RevPos,
         md5 := Md5,
-        encoding := Encoding,
-        headers := Headers
+        encoding := Encoding
     } = Att,
     Props = [
         {<<"content_type">>, Type},
@@ -361,11 +355,7 @@ to_json(Att, OutputData, DataToFollow, ShowEncoding) ->
         true ->
             []
     end,
-    HeadersProp = case Headers of
-        undefined -> [];
-        Headers -> [{<<"headers">>, Headers}]
-    end,
-    {Name, {Props ++ DigestProp ++ DataProps ++ EncodingProps ++ HeadersProp}}.
+    {Name, {Props ++ DigestProp ++ DataProps ++ EncodingProps}}.
 
 
 flush(Db, DocId, Att1) ->
