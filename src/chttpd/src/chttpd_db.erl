@@ -86,13 +86,17 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method}=Req)->
 
 handle_changes_req(#httpd{method='POST'}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
-    handle_changes_req1(Req, Db);
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        handle_changes_req_tx(Req, TxDb)
+    end);
 handle_changes_req(#httpd{method='GET'}=Req, Db) ->
-    handle_changes_req1(Req, Db);
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        handle_changes_req_tx(Req, TxDb)
+    end);
 handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET,POST,HEAD").
 
-handle_changes_req1(#httpd{}=Req, Db) ->
+handle_changes_req_tx(#httpd{}=Req, Db) ->
     ChangesArgs = parse_changes_query(Req),
     ChangesFun = chttpd_changes:handle_db_changes(ChangesArgs, Req, Db),
     Max = chttpd:chunked_response_buffer_size(),
