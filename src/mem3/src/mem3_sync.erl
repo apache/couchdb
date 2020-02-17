@@ -302,7 +302,12 @@ remove_entries(Dict, Entries) ->
     end, Dict, Entries).
 
 local_dbs() ->
-    [nodes_db(), shards_db(), users_db()].
+    UsersDb = users_db(),
+    % users db might not have been created so don't include it unless it exists
+    case couch_server:exists(UsersDb) of
+        true -> [nodes_db(), shards_db(), UsersDb];
+        false -> [nodes_db(), shards_db()]
+    end.
 
 nodes_db() ->
     ?l2b(config:get("mem3", "nodes_db", "_nodes")).

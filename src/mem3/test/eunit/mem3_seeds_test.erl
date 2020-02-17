@@ -18,7 +18,8 @@ a_test_() ->
     Tests = [
         {"empty seedlist should set status ok", fun empty_seedlist_status_ok/0},
         {"all seedlist nodes unreachable keeps status seeding", fun seedlist_misconfiguration/0},
-        {"seedlist entries should be present in _nodes", fun check_nodelist/0}
+        {"seedlist entries should be present in _nodes", fun check_nodelist/0},
+        {"optional local _users db in mem3_sync:local_dbs()", fun check_local_dbs/0}
     ],
     {setup, fun setup/0, fun teardown/1, Tests}.
 
@@ -57,10 +58,21 @@ check_nodelist() ->
         cleanup()
     end.
 
+check_local_dbs() ->
+    ?assertEqual([<<"_dbs">>, <<"_nodes">>],
+        lists:sort(mem3_sync:local_dbs())),
+    {ok, _} = couch_server:create(<<"_users">>, []),
+    ?assertEqual([<<"_dbs">>, <<"_nodes">>, <<"_users">>],
+        lists:sort(mem3_sync:local_dbs())).
+
 cleanup() ->
     application:stop(mem3),
     Filename = config:get("mem3", "nodes_db", "_nodes") ++ ".couch",
-    file:delete(filename:join([?BUILDDIR(), "tmp", "data", Filename])).
+    file:delete(filename:join([?BUILDDIR(), "tmp", "data", Filename])),
+    case config:get("couch_httpd_auth", "authentication_db") of
+        undefined -> ok;
+        DbName -> couch_server:delete(list_to_binary(DbName), [])
+    end.
 
 setup() ->
     test_util:start_couch([rexi]).
