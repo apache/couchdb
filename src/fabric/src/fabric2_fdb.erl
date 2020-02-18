@@ -582,7 +582,7 @@ get_doc_body_wait(#{} = Db0, DocId, RevInfo, Future) ->
         Tuple = erlfdb_tuple:unpack(K, DocPrefix),
         case tuple_to_list(Tuple) of
             [Deleted, RevPos, Rev] ->
-                {{[], V, Deleted}, OldAcc};
+                {{[], V, not Deleted}, OldAcc};
             [_Deleted, RevPos, Rev | KeyPath] ->
                 {Body, DiskAtts, Deleted} = NewAcc,
                 {{[{KeyPath, V} | Body], DiskAtts, Deleted}, OldAcc};
@@ -1165,7 +1165,7 @@ clear_doc_body(#{} = Db, DocId, #{} = RevInfo) ->
         deleted := Deleted
     } = RevInfo,
 
-    BaseKey = {?DB_DOCS, DocId, Deleted, RevPos, Rev},
+    BaseKey = {?DB_DOCS, DocId, not Deleted, RevPos, Rev},
 
     maybe_clean_old_doc_body(Tx, BaseKey, DbPrefix),
 
@@ -1327,7 +1327,7 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 
     DiskAtts = lists:map(fun couch_att:to_disk_term/1, Atts),
 
-    DocKey = {?DB_DOCS, Id, Deleted, Start, Rev},
+    DocKey = {?DB_DOCS, Id, not Deleted, Start, Rev},
     DocPrefix = erlfdb_tuple:pack(DocKey, DbPrefix),
     Meta = term_to_binary(DiskAtts, [{minor_version, 1}]),
     Rows0 = [{DocPrefix, Meta}],
