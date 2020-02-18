@@ -46,7 +46,10 @@
     tx/2,
 
     get_job/2,
-    get_jobs/0
+    get_jobs/0,
+
+    bump_metadata_version/0,
+    bump_metadata_version/1
 ]).
 
 
@@ -485,6 +488,19 @@ get_jobs() ->
     end).
 
 
+% Call this function if the top level "couchdb" FDB directory layer
+% changes.
+%
+bump_metadata_version() ->
+    fabric2_fdb:transactional(fun(Tx) ->
+        bump_metadata_version(Tx)
+    end).
+
+
+bump_metadata_version(Tx) ->
+    erlfdb:set_versionstamped_value(Tx, ?COUCH_JOBS_MD_VERSION, <<0:112>>).
+
+
 % Private helper functions
 
 maybe_enqueue(#{jtx := true} = JTx, Type, JobId, STime, Resubmit, Data) ->
@@ -617,7 +633,6 @@ init_jtx(undefined) ->
 init_jtx({erlfdb_transaction, _} = Tx) ->
     LayerPrefix = fabric2_fdb:get_dir(Tx),
     Jobs = erlfdb_tuple:pack({?JOBS}, LayerPrefix),
-    Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
     % layer_prefix, md_version and tx here match db map fields in fabric2_fdb
     % but we also assert that this is a job transaction using the jtx => true
     % field
@@ -626,7 +641,7 @@ init_jtx({erlfdb_transaction, _} = Tx) ->
         tx => Tx,
         layer_prefix => LayerPrefix,
         jobs_path => Jobs,
-        md_version => Version
+        md_version => get_metadata_version(Tx)
     }.
 
 
@@ -641,13 +656,17 @@ ensure_current(#{jtx := true, tx := Tx} = JTx) ->
     end.
 
 
+get_metadata_version({erlfdb_transaction, _} = Tx) ->
+    erlfdb:wait(erlfdb:get_ss(Tx, ?COUCH_JOBS_MD_VERSION)).
+
+
 update_current(#{tx := Tx, md_version := Version} = JTx) ->
     case get_md_version_age(Version) of
         Age when Age =< ?MD_VERSION_MAX_AGE_SEC ->
             % Looked it up not too long ago. Avoid looking it up to frequently
             JTx;
         _ ->
-            case erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)) of
+            case get_metadata_version(Tx) of
                 Version ->
                     update_md_version_timestamp(Version),
                     JTx;
