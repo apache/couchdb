@@ -45,13 +45,13 @@ IN_RC = $(shell git describe --tags --always --first-parent \
 # ON_TAG matches *ONLY* if we are on a release or RC tag
 ON_TAG = $(shell git describe --tags --always --first-parent \
         | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+(-RC[0-9]+)?$$' 2>/dev/null)
-# RELTAG contains the #.#.# from git describe, which might be used
-RELTAG = $(shell git describe --tags --always --first-parent \
+# REL_TAG contains the #.#.# from git describe, which might be used
+REL_TAG = $(shell git describe --tags --always --first-parent \
         | grep -Eo -- '^[0-9]+\.[0-9]\.[0-9]+' 2>/dev/null)
 # DIRTY identifies if we're not on a commit
 DIRTY = $(shell git describe --dirty | grep -Eo -- '-dirty' 2>/dev/null)
 # COUCHDB_GIT_SHA is our current git hash.
-COUCHDB_GIT_SHA=$(shell git rev-parse --short --verify HEAD)
+COUCHDB_GIT_SHA=$(shell git rev-parse --short=7 --verify HEAD)
 
 ifeq ($(ON_TAG),)
 # 4. Not on a tag.
@@ -59,7 +59,7 @@ COUCHDB_VERSION_SUFFIX = $(COUCHDB_GIT_SHA)$(DIRTY)
 COUCHDB_VERSION = $(vsn_major).$(vsn_minor).$(vsn_patch)-$(COUCHDB_VERSION_SUFFIX)
 else
 # 2 and 3. On a tag.
-COUCHDB_VERSION = $(RELTAG)$(DIRTY)
+COUCHDB_VERSION = $(REL_TAG)$(DIRTY)
 endif
 endif
 
@@ -92,6 +92,8 @@ EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
 #ignore javascript tests
 ignore_js_suites=
+
+TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 
 ################################################################################
 # Main commands
@@ -144,19 +146,11 @@ fauxton: share/www
 
 .PHONY: check
 # target: check - Test everything
-check: all
-	@$(MAKE) test-cluster-with-quorum
-	@$(MAKE) test-cluster-without-quorum
-	@$(MAKE) python-black
+check: all python-black
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
-#	@$(MAKE) build-test
-
-
-.PHONY: eunit
-# target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 
 ifdef apps
 subdirs = $(apps)
@@ -164,22 +158,16 @@ else
 subdirs=$(shell ls src)
 endif
 
+.PHONY: eunit
+# target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
-	@$(REBAR) setup_eunit 2> /dev/null
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
-            tries=0; \
-            while true; do \
-                $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir ; \
-                if [ $$? -eq 0 ]; then \
-                    break; \
-                else \
-                    let "tries=tries+1"; \
-                    [ $$tries -gt 2 ] && exit 1; \
-                fi \
-            done \
+            COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
         done
 
 
@@ -191,7 +179,7 @@ exunit: export ERL_LIBS = $(shell pwd)/src
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
-	@mix test --trace $(EXUNIT_OPTS)
+	@mix test --cover --trace $(EXUNIT_OPTS)
 
 setup-eunit: export BUILDDIR = $(shell pwd)
 setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
@@ -221,7 +209,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run rel/overlay/bin/couchup test/javascript/run
+		. dev/run test/javascript/run src/mango src/docs
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -229,19 +217,17 @@ python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run rel/overlay/bin/couchup test/javascript/run
+		. dev/run test/javascript/run src/mango src/docs
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
+elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run --erlang-config=rel/files/eunit.config -n 1 -a adm:pass --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
-
-.PHONY: elixir-only
-elixir-only: devclean
-	@dev/run --erlang-config=rel/files/eunit.config -n 1 -a adm:pass --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 --enable-erlang-views --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
-elixir-init:
+elixir-init: MIX_ENV=test
+elixir-init: config.erl
 	@mix local.rebar --force && mix local.hex --force && mix deps.get
 
 .PHONY: elixir-cluster-without-quorum
@@ -270,6 +256,7 @@ elixir-credo: elixir-init
 
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
+javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 javascript: devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
@@ -280,43 +267,13 @@ else
 endif
 	@dev/run -n 1 -q --with-admin-party-please \
             --enable-erlang-views \
-            -c 'startup_jitter=0' \
+            "$(TEST_OPTS)" \
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
 
-.PHONY: test-cluster-with-quorum
-test-cluster-with-quorum: devclean
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@dev/run -n 3 -q --with-admin-party-please \
-            --enable-erlang-views --degrade-cluster 1 \
-            -c 'startup_jitter=0' \
-            'test/javascript/run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)" \
-	    --path test/javascript/tests-cluster/with-quorum'
-
-.PHONY: test-cluster-without-quorum
-test-cluster-without-quorum: devclean
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@dev/run -n 3 -q --with-admin-party-please \
-            --enable-erlang-views --degrade-cluster 2 \
-            -c 'startup_jitter=0' \
-            'test/javascript/run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)" \
-            --path test/javascript/tests-cluster/without-quorum'
 
 .PHONY: soak-javascript
+soak-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 soak-javascript:
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
@@ -328,10 +285,16 @@ endif
 	@rm -rf dev/lib
 	while [ $$? -eq 0 ]; do \
 		dev/run -n 1 -q --with-admin-party-please \
-				-c 'startup_jitter=0' \
+				"$(TEST_OPTS)" \
 				'test/javascript/run --suites "$(suites)" \
 				--ignore "$(ignore_js_suites)"'  \
 	done
+
+.PHONY: build-report
+# target: build-report - Generate and upload a build report
+build-report:
+	build-aux/show-test-results.py --suites=10 --tests=10 > test-results.log
+	build-aux/logfile-uploader.py
 
 .PHONY: check-qs
 # target: check-qs - Run query server tests (ruby and rspec required!)
@@ -371,11 +334,12 @@ build-test:
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
+mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \
-		.venv/bin/pip3 install -r requirements.txt
-	@cd src/mango && ../../dev/run -n 1 --admin=testuser:testpass .venv/bin/nosetests
+		.venv/bin/python3 -m pip install -r requirements.txt
+	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose --with-xunit'
 
 ################################################################################
 # Developing
@@ -413,7 +377,7 @@ introspect:
 
 .PHONY: dist
 # target: dist - Make release tarball
-dist: all
+dist: all derived
 	@./build-aux/couchdb-build-release.sh $(COUCHDB_VERSION)
 
 	@cp -r share/www apache-couchdb-$(COUCHDB_VERSION)/share/
@@ -462,9 +426,9 @@ endif
 
 .PHONY: install
 # target: install- install CouchDB :)
-install:
+install: release
 	@echo
-	@echo "Notice: There is no 'make install' command for CouchDB 2.x."
+	@echo "Notice: There is no 'make install' command for CouchDB 2.x+."
 	@echo
 	@echo "    To install CouchDB into your system, copy the rel/couchdb"
 	@echo "    to your desired installation location. For example:"
@@ -515,19 +479,6 @@ devclean:
 	@rm -rf dev/lib/*/data
 
 
-.PHONY: uninstall
-# target: uninstall - Uninstall CouchDB :-(
-uninstall:
-	@rm -rf $(DESTDIR)/$(install_dir)
-	@rm -f $(DESTDIR)/$(bin_dir)/couchdb
-	@rm -f $(DESTDIR)/$(libexec_dir)
-	@rm -rf $(DESTDIR)/$(sysconf_dir)
-	@rm -rf $(DESTDIR)/$(data_dir)
-	@rm -rf $(DESTDIR)/$(doc_dir)
-	@rm -rf $(DESTDIR)/$(html_dir)
-	@rm -rf $(DESTDIR)/$(man_dir)
-
-
 ################################################################################
 # Misc
 ################################################################################
@@ -553,3 +504,15 @@ ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
 	@cd src/fauxton && npm install --production && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
+
+
+derived:
+	@echo "COUCHDB_GIT_SHA:        $(COUCHDB_GIT_SHA)"
+	@echo "COUCHDB_VERSION:        $(COUCHDB_VERSION)"
+	@echo "COUCHDB_VERSION_SUFFIX: $(COUCHDB_VERSION_SUFFIX)"
+	@echo "DIRTY:                  $(DIRTY)"
+	@echo "IN_RC:                  $(IN_RC)"
+	@echo "IN_RELEASE:             $(IN_RELEASE)"
+	@echo "ON_TAG:                 $(ON_TAG)"
+	@echo "REL_TAG:                $(REL_TAG)"
+	@echo "SUB_VSN:                $(SUB_VSN)"
