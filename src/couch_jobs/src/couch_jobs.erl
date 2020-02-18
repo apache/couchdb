@@ -296,6 +296,8 @@ accept_loop(Type, NoSched, MaxSchedTime, Timeout) ->
             case wait_pending(PendingWatch, MaxSchedTime, Timeout) of
                 {error, not_found} ->
                     {error, not_found};
+                retry ->
+                    accept_loop(Type, NoSched, MaxSchedTime, Timeout);
                 ok ->
                     accept_loop(Type, NoSched, MaxSchedTime, Timeout)
             end
@@ -318,6 +320,9 @@ wait_pending(PendingWatch, MaxSTime, UserTimeout) ->
         erlfdb:wait(PendingWatch, [{timeout, Timeout}]),
         ok
     catch
+        error:{erlfdb_error, ?FUTURE_VERSION} ->
+            erlfdb:cancel(PendingWatch, [flush]),
+            retry;
         error:{timeout, _} ->
             erlfdb:cancel(PendingWatch, [flush]),
             {error, not_found}

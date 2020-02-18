@@ -66,6 +66,7 @@
 
 % Let's keep these in ascending order
 -define(TRANSACTION_TOO_OLD, 1007).
+-define(FUTURE_VERSION, 1009).
 -define(COMMIT_UNKNOWN_RESULT, 1021).
 
 
