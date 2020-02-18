@@ -631,12 +631,12 @@ init_jtx({erlfdb_transaction, _} = Tx) ->
 
 
 ensure_current(#{jtx := true, tx := Tx} = JTx) ->
-    case get(?COUCH_JOBS_CURRENT) of
+    case get(?PDICT_CHECKED_MD_IS_CURRENT) of
         Tx ->
             JTx;
         _ ->
             JTx1 = update_current(JTx),
-            put(?COUCH_JOBS_CURRENT, Tx),
+            put(?PDICT_CHECKED_MD_IS_CURRENT, Tx),
             JTx1
     end.
 
