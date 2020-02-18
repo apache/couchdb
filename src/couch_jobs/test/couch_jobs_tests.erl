@@ -54,7 +54,8 @@ couch_jobs_basic_test_() ->
                     fun enqueue_inactive/1,
                     fun remove_running_job/1,
                     fun check_get_jobs/1,
-                    fun use_fabric_transaction_object/1
+                    fun use_fabric_transaction_object/1,
+                    fun metadata_version_bump/1
                 ]
             }
         }
@@ -603,4 +604,23 @@ use_fabric_transaction_object(#{t1 := T1, j1 := J1, dbname := DbName}) ->
         end)),
         ok = couch_jobs:remove(#{tx => undefined}, T1, J1),
         ok = fabric2_db:delete(DbName, [])
+    end).
+
+
+metadata_version_bump(_) ->
+    ?_test(begin
+        JTx1 = couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(Tx) -> Tx end),
+        ?assertMatch(#{md_version := not_found}, JTx1),
+
+        ets:delete_all_objects(couch_jobs_fdb),
+        couch_jobs_fdb:bump_metadata_version(),
+        JTx2 = couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(Tx) -> Tx end),
+        ?assertMatch(#{md_version := Bin} when is_binary(Bin), JTx2),
+
+        ets:delete_all_objects(couch_jobs_fdb),
+        couch_jobs_fdb:bump_metadata_version(),
+        JTx3 = couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(Tx) -> Tx end),
+        OldMdv = maps:get(md_version, JTx2),
+        NewMdv = maps:get(md_version, JTx3),
+        ?assert(NewMdv > OldMdv)
     end).
