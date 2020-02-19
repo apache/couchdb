@@ -31,24 +31,30 @@ handle_setup_req(#httpd{method='GET'}=Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     Dbs = chttpd:qs_json_value(Req, "ensure_dbs_exist", setup:cluster_system_dbs()),
     couch_log:notice("Dbs: ~p~n", [Dbs]),
-    case erlang:list_to_integer(config:get("cluster", "n", undefined)) of
-        1 ->
-            case setup:is_single_node_enabled(Dbs) of
-                false ->
-                    chttpd:send_json(Req, 200, {[{state, single_node_disabled}]});
-                true ->
-                    chttpd:send_json(Req, 200, {[{state, single_node_enabled}]})
-            end;
+    SingleNodeConfig = config:get_boolean("couchdb", "single_node", false),
+    case SingleNodeConfig of
+        true ->
+            chttpd:send_json(Req, 200, {[{state, single_node_enabled}]});
         _ ->
-            case setup:is_cluster_enabled() of
-                false ->
-                    chttpd:send_json(Req, 200, {[{state, cluster_disabled}]});
-                true ->
-                    case setup:has_cluster_system_dbs(Dbs) of
+            case erlang:list_to_integer(config:get("cluster", "n", undefined)) of
+                1 ->
+                    case setup:is_single_node_enabled(Dbs) of
                         false ->
-                            chttpd:send_json(Req, 200, {[{state, cluster_enabled}]});
+                            chttpd:send_json(Req, 200, {[{state, single_node_disabled}]});
                         true ->
-                            chttpd:send_json(Req, 200, {[{state, cluster_finished}]})
+                            chttpd:send_json(Req, 200, {[{state, single_node_enabled}]})
+                    end;
+                _ ->
+                    case setup:is_cluster_enabled() of
+                        false ->
+                            chttpd:send_json(Req, 200, {[{state, cluster_disabled}]});
+                        true ->
+                            case setup:has_cluster_system_dbs(Dbs) of
+                                false ->
+                                    chttpd:send_json(Req, 200, {[{state, cluster_enabled}]});
+                                true ->
+                                    chttpd:send_json(Req, 200, {[{state, cluster_finished}]})
+                            end
                     end
             end
     end;
