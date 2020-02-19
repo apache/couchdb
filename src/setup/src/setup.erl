@@ -65,15 +65,13 @@ is_cluster_enabled() ->
     end.
 
 is_single_node_enabled(Dbs) ->
-    % admins != empty AND dbs exist OR `[couchdb] single_node` is set to true
+    % admins != empty AND dbs exist
     Admins = config:get("admins"),
     HasDbs = has_cluster_system_dbs(Dbs),
-    SingleNodeConfig = config:get_boolean("couchdb", "single_node", false),
-    case {Admins, HasDbs, SingleNodeConfig} of
-        {_, _, true} -> true;
-        {[], _, _} -> false;
-        {_, false, _} -> false;
-        {_,_,_} -> true
+    case {Admins, HasDbs} of
+        {[], _} -> false;
+        {_, false} -> false;
+        {_,_} -> true
     end.
 
 cluster_system_dbs() ->
