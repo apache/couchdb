@@ -21,7 +21,7 @@
 -export([get_nested_json_value/2, json_user_ctx/1]).
 -export([proplist_apply_field/2, json_apply_field/2]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
--export([json_encode/1, json_decode/1]).
+-export([json_encode/1, json_decode/1, json_decode/2]).
 -export([verify/2,simple_call/2,shutdown_sync/1]).
 -export([get_value/2, get_value/3]).
 -export([reorder_results/2]).
@@ -498,8 +498,11 @@ json_encode(V) ->
     jiffy:encode(V, [force_utf8]).
 
 json_decode(V) ->
+    json_decode(V, []).
+
+json_decode(V, Opts) ->
     try
-        jiffy:decode(V, [dedupe_keys])
+        jiffy:decode(V, [dedupe_keys | Opts])
     catch
         error:Error ->
             throw({invalid_json, Error})
