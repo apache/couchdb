@@ -32,10 +32,11 @@
     threshold = 1490
 }).
 
-handle_req(#httpd{} = Req, Db0) ->
+handle_req(#httpd{} = Req, Db) ->
     try
-        Db = set_user_ctx(Req, Db0),
-        handle_req_int(Req, Db)
+        fabric2_fdb:transactional(Db, fun (TxDb) ->
+            handle_req_int(Req, TxDb)
+        end)
     catch
         throw:{mango_error, Module, Reason} ->
             case mango_error:info(Module, Reason) of
@@ -196,11 +197,6 @@ handle_find_req(#httpd{method='POST'}=Req, Db) ->
 
 handle_find_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
-
-
-set_user_ctx(#httpd{user_ctx=Ctx}, Db) ->
-    {ok, NewDb} = couch_db:set_user_ctx(Db, Ctx),
-    NewDb.
 
 
 get_idx_w_opts(Opts) ->

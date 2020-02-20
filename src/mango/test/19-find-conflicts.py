@@ -12,12 +12,13 @@
 
 import mango
 import copy
+import unittest
 
 DOC = [{"_id": "doc", "a": 2}]
 
 CONFLICT = [{"_id": "doc", "_rev": "1-23202479633c2b380f79507a776743d5", "a": 1}]
 
-
+@unittest.skip("re-enable once conflicts are supported")
 class ChooseCorrectIndexForDocs(mango.DbPerClass):
     def setUp(self):
         self.db.recreate()

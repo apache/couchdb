@@ -36,10 +36,11 @@ start_link() ->
 
 
 init(normal) ->
+    Args = [{worker, couch_views_indexer}],
     Children = [
         #{
             id => couch_views_server,
-            start => {couch_views_server, start_link, []}
+            start => {couch_views_server, start_link, [Args]}
         }
     ],
     {ok, {flags(), Children}};

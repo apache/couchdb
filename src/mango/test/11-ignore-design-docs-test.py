@@ -16,7 +16,7 @@ import unittest
 DOCS = [
     {"_id": "_design/my-design-doc"},
     {"_id": "54af50626de419f5109c962f", "user_id": 0, "age": 10, "name": "Jimi"},
-    {"_id": "54af50622071121b25402dc3", "user_id": 1, "age": 11, "name": "Eddie"},
+    {"_id": "54af50622071121b25402dc3", "user_id": 1, "age": 11, "name": "Eddie"}
 ]
 
 

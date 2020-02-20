@@ -17,7 +17,7 @@
 
 
 -export([
-    start_link/0
+    start_link/1
 ]).
 
 
@@ -34,16 +34,18 @@
 -define(MAX_WORKERS, 100).
 
 
-start_link() ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+start_link(Opts) ->
+    gen_server:start_link(?MODULE, Opts, []).
 
 
-init(_) ->
+init(Opts) ->
+    WorkerModule = couch_util:get_value(worker, Opts, couch_views_indexer),
     process_flag(trap_exit, true),
-    couch_views_jobs:set_timeout(),
+    WorkerModule:set_timeout(),
     St = #{
         workers => #{},
-        max_workers => max_workers()
+        max_workers => max_workers(),
+        worker_module => WorkerModule
     },
     {ok, spawn_workers(St)}.
 
@@ -87,11 +89,12 @@ code_change(_OldVsn, St, _Extra) ->
 spawn_workers(St) ->
     #{
         workers := Workers,
-        max_workers := MaxWorkers
+        max_workers := MaxWorkers,
+        worker_module := WorkerModule
     } = St,
     case maps:size(Workers) < MaxWorkers of
         true ->
-            Pid = couch_views_indexer:spawn_link(),
+            Pid = WorkerModule:spawn_link(),
             NewSt = St#{workers := Workers#{Pid => true}},
             spawn_workers(NewSt);
         false ->

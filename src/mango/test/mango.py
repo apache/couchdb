@@ -48,8 +48,8 @@ class Database(object):
         dbname,
         host="127.0.0.1",
         port="15984",
-        user="testuser",
-        password="testpass",
+        user="adm",
+        password="pass",
     ):
         root_url = get_from_environment("COUCH_HOST", "http://{}:{}".format(host, port))
         auth_header = get_from_environment("COUCH_AUTH_HEADER", None)
@@ -139,6 +139,7 @@ class Database(object):
         ddoc=None,
         partial_filter_selector=None,
         selector=None,
+        wait_for_built_index=True
     ):
         body = {"index": {"fields": fields}, "type": idx_type, "w": 3}
         if name is not None:
@@ -156,12 +157,26 @@ class Database(object):
         assert r.json()["name"] is not None
 
         created = r.json()["result"] == "created"
-        if created:
-            # wait until the database reports the index as available
-            while len(self.get_index(r.json()["id"], r.json()["name"])) < 1:
-                delay(t=0.1)
+        if created and wait_for_built_index:
+            # wait until the database reports the index as available and build
+            while len([
+                    i
+                    for i in self.get_index(r.json()["id"], r.json()["name"])
+                    if i["build_status"] == "ready"
+                    ]) < 1:
+                delay(t=0.2)
 
         return created
+
+    def wait_for_built_indexes(self):
+        indexes = self.list_indexes()
+        while len([
+            i
+            for i in self.list_indexes()
+            if i["build_status"] == "ready"
+        ]) < len(indexes):
+            delay(t=0.2)
+
 
     def create_text_index(
         self,

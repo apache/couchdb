@@ -11,3 +11,12 @@
 % the License.
 
 -define(MANGO_ERROR(R), throw({mango_error, ?MODULE, R})).
+
+-define(MANGO_IDX_BUILD_STATUS, 1).
+-define(MANGO_UPDATE_SEQ, 2).
+-define(MANGO_IDX_RANGE, 3).
+
+-define(MANGO_INDEX_JOB_TYPE, <<"mango">>).
+
+-define(MANGO_INDEX_BUILDING, <<"building">>).
+-define(MANGO_INDEX_READY, <<"ready">>).

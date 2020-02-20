@@ -23,23 +23,28 @@
 -include("mango_cursor.hrl").
 -include("mango.hrl").
 
-update_args(EncodedBookmark,  #mrargs{skip = Skip} = Args) ->
+update_args(EncodedBookmark, FdbOpts) ->
+    #{
+        skip := Skip
+    } = FdbOpts,
     Bookmark = unpack(EncodedBookmark),
     case is_list(Bookmark) of
         true -> 
             {startkey, Startkey} = lists:keyfind(startkey, 1, Bookmark),
-            {startkey_docid, StartkeyDocId} = lists:keyfind(startkey_docid, 1, Bookmark),
-            Args#mrargs{
-                start_key = Startkey,
-                start_key_docid = StartkeyDocId,
-                skip = 1 + Skip
+            {startkey_docid, StartkeyDocId} = lists:keyfind(startkey_docid, 1,
+                Bookmark),
+            FdbOpts#{
+                start_key => Startkey,
+                start_key_docid => StartkeyDocId,
+                skip => 1 + Skip
             };
         false ->
-            Args
+            FdbOpts
     end.
     
 
-create(#cursor{bookmark_docid = BookmarkDocId, bookmark_key = BookmarkKey}) when BookmarkKey =/= undefined ->
+create(#cursor{bookmark_docid = BookmarkDocId, bookmark_key = BookmarkKey})
+        when BookmarkKey =/= undefined ->
     QueryArgs = [
         {startkey_docid, BookmarkDocId},
         {startkey, BookmarkKey}
@@ -61,7 +66,8 @@ unpack(Packed) ->
     end.
 
 verify(Bookmark) when is_list(Bookmark) ->
-    case lists:keymember(startkey, 1, Bookmark) andalso lists:keymember(startkey_docid, 1, Bookmark) of
+    case lists:keymember(startkey, 1, Bookmark)
+            andalso lists:keymember(startkey_docid, 1, Bookmark) of
         true -> Bookmark;
         _ -> throw(invalid_bookmark)
     end;

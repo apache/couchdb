@@ -47,7 +47,8 @@
 
 
 start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+    throw({error, mango_native_proc_is_no_longer_needed}).
+%%    gen_server:start_link(?MODULE, [], []).
 
 
 set_timeout(Pid, TimeOut) when is_integer(TimeOut), TimeOut > 0 ->

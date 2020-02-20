@@ -21,4 +21,17 @@ start_link(Args) ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    {ok, {{one_for_one, 3, 10}, couch_epi:register_service(mango_epi, [])}}.
+    Flags = #{
+        strategy => one_for_one,
+        intensity => 3,
+        period => 10
+    },
+
+    Args = [{worker, mango_jobs_indexer}],
+    Children = [
+        #{
+            id => mango_indexer_server,
+            start => {couch_views_server, start_link, [Args]}
+        }
+    ] ++ couch_epi:register_service(mango_epi, []),
+    {ok, {Flags, Children}}.

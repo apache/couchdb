@@ -18,7 +18,9 @@
 
 
 -export([
-    init/0
+    set_timeout/0,
+    init/0,
+    fetch_docs/2
 ]).
 
 -include("couch_views.hrl").
@@ -32,6 +34,10 @@
 
 spawn_link() ->
     proc_lib:spawn_link(?MODULE, init, []).
+
+
+set_timeout() ->
+    couch_views_jobs:set_timeout().
 
 
 init() ->

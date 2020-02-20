@@ -18,15 +18,22 @@ import unittest
 class LongRunningMangoTest(mango.DbPerClass):
     def setUp(self):
         self.db.recreate()
+        self.db.create_index(["value"])
         docs = []
         for i in range(100000):
-            docs.append({"_id": str(i), "another": "field"})
-            if i % 20000 == 0:
+            docs.append({"_id": str(i), "another": "field", "value": i})
+            if i % 1000 == 0:
                 self.db.save_docs(docs)
                 docs = []
 
     # This test should run to completion and not timeout
     def test_query_does_not_time_out(self):
-        selector = {"_id": {"$gt": 0}, "another": "wrong"}
-        docs = self.db.find(selector)
+        # using _all_docs
+        selector1 = {"_id": {"$gt": 0}, "another": "wrong"}
+        docs = self.db.find(selector1)
+        self.assertEqual(len(docs), 0)
+
+        # using index
+        selector2 = {"value": {"$gt": 0}, "another": "wrong"}
+        docs = self.db.find(selector2)
         self.assertEqual(len(docs), 0)

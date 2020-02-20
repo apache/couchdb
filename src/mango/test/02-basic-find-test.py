@@ -287,12 +287,12 @@ class BasicFindTests(mango.UserDocsTests):
 
     def test_explain_view_args(self):
         explain = self.db.find({"age": {"$gt": 0}}, fields=["manager"], explain=True)
-        assert explain["mrargs"]["stable"] == False
-        assert explain["mrargs"]["update"] == True
-        assert explain["mrargs"]["reduce"] == False
-        assert explain["mrargs"]["start_key"] == [0]
-        assert explain["mrargs"]["end_key"] == ["<MAX>"]
-        assert explain["mrargs"]["include_docs"] == True
+        assert explain["args"]["stable"] == False
+        assert explain["args"]["update"] == True
+        assert explain["args"]["reduce"] == False
+        assert explain["args"]["start_key"] == [0]
+        assert explain["args"]["end_key"] == ["<MAX>"]
+        assert explain["args"]["include_docs"] == True
 
     def test_sort_with_all_docs(self):
         explain = self.db.find(

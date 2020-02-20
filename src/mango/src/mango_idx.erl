@@ -26,6 +26,7 @@
     add/2,
     remove/2,
     from_ddoc/2,
+%%    add_build_status/2,
     special/1,
 
     dbname/1,
@@ -40,6 +41,7 @@
     start_key/2,
     end_key/2,
     cursor_mod/1,
+    fdb_mod/1,
     idx_mod/1,
     to_json/1,
     delete/4,
@@ -52,10 +54,54 @@
 -include("mango.hrl").
 -include("mango_idx.hrl").
 
-
 list(Db) ->
-    {ok, Indexes} = ddoc_cache:open(db_to_name(Db), ?MODULE),
-    Indexes.
+    Acc0 = #{
+        db => Db,
+        rows => []
+    },
+    {ok, Indexes} = fabric2_db:fold_design_docs(Db, fun ddoc_fold_cb/2, Acc0, []),
+    Indexes ++ special(Db).
+
+
+ddoc_fold_cb({meta, _}, Acc) ->
+    {ok, Acc};
+
+ddoc_fold_cb(complete, Acc) ->
+    #{rows := Rows} = Acc,
+    {ok, Rows};
+
+ddoc_fold_cb({row, Row}, Acc) ->
+    #{
+        db := Db,
+        rows := Rows
+    } = Acc,
+
+    {Props} = JSONDoc = get_doc(Db, Row),
+
+    case proplists:get_value(<<"language">>, Props) of
+        <<"query">> ->
+            Idx = from_ddoc(Db, JSONDoc),
+            Idx1 = add_build_status(Db, Idx),
+            {ok, Acc#{rows:= Rows ++ Idx1}};
+        _ ->
+            {ok, Acc}
+    end.
+
+
+get_doc(Db, Row) ->
+    {_, Id} = lists:keyfind(id, 1, Row),
+    RevInfo = get_rev_info(Row),
+    Doc = fabric2_fdb:get_doc_body(Db, Id, RevInfo),
+    couch_doc:to_json_obj(Doc, []).
+
+
+get_rev_info(Row) ->
+    {value, {[{rev, RevBin}]}} = lists:keyfind(value, 1, Row),
+    Rev = couch_doc:parse_rev(RevBin),
+    #{
+        rev_id => Rev,
+        rev_path => []
+    }.
 
 
 get_usable_indexes(Db, Selector, Opts) ->
@@ -63,8 +109,9 @@ get_usable_indexes(Db, Selector, Opts) ->
     GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(
             ExistingIndexes
         ),
+    GlobalIndexes1 = mango_cursor:remove_unbuilt_indexes(GlobalIndexes),
     UserSpecifiedIndex = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
-    UsableIndexes0 = lists:usort(GlobalIndexes ++ UserSpecifiedIndex),
+    UsableIndexes0 = lists:usort(GlobalIndexes1 ++ UserSpecifiedIndex),
     UsableIndexes1 = filter_partition_indexes(UsableIndexes0, Opts),
 
     SortFields = get_sort_fields(Opts),
@@ -78,15 +125,17 @@ get_usable_indexes(Db, Selector, Opts) ->
     end.
 
 
-mango_sort_error(Db, Opts) ->
-    case {fabric_util:is_partitioned(Db), is_opts_partitioned(Opts)} of
-        {false, _} ->
-            ?MANGO_ERROR({no_usable_index, missing_sort_index});
-        {true, true} ->
-            ?MANGO_ERROR({no_usable_index, missing_sort_index_partitioned});
-        {true, false} ->
-            ?MANGO_ERROR({no_usable_index, missing_sort_index_global})
-    end.
+mango_sort_error(_Db, _Opts) ->
+    ?MANGO_ERROR({no_usable_index, missing_sort_index}).
+% TODO: add back in when partitions supported
+%%    case {fabric_util:is_partitioned(Db), is_opts_partitioned(Opts)} of
+%%        {false, _} ->
+%%            ?MANGO_ERROR({no_usable_index, missing_sort_index});
+%%        {true, true} ->
+%%            ?MANGO_ERROR({no_usable_index, missing_sort_index_partitioned});
+%%        {true, false} ->
+%%            ?MANGO_ERROR({no_usable_index, missing_sort_index_global})
+%%    end.
 
 
 recover(Db) ->
@@ -182,7 +231,7 @@ from_ddoc(Db, {Props}) ->
         _ ->
             ?MANGO_ERROR(invalid_query_ddoc_language)
     end,
-    IdxMods = case clouseau_rpc:connected() of
+    IdxMods = case is_text_service_available() of
         true ->
             [mango_idx_view, mango_idx_text];
         false ->
@@ -198,13 +247,26 @@ from_ddoc(Db, {Props}) ->
     end, Idxs).
 
 
+add_build_status(TxDb, Idxs) ->
+    lists:map(fun
+        (#idx{type = <<"special">>} = Idx) ->
+            Idx;
+        (Idx) ->
+            DDoc = mango_idx:ddoc(Idx),
+            Idx#idx{
+                build_status = mango_fdb:get_build_state(TxDb, DDoc)
+            }
+    end, Idxs).
+
+
 special(Db) ->
     AllDocs = #idx{
         dbname = db_to_name(Db),
         name = <<"_all_docs">>,
         type = <<"special">>,
         def = all_docs,
-        opts = []
+        opts = [],
+        build_status = ?MANGO_INDEX_READY
     },
     % Add one for _update_seq
     [AllDocs].
@@ -275,6 +337,11 @@ cursor_mod(#idx{type = <<"text">>}) ->
             ?MANGO_ERROR({index_service_unavailable, <<"text">>})
     end.
 
+fdb_mod(#idx{type = <<"json">>}) ->
+    mango_fdb_view;
+fdb_mod(#idx{def = all_docs, type= <<"special">>}) ->
+    mango_fdb_special.
+
 
 idx_mod(#idx{type = <<"json">>}) ->
     mango_idx_view;
@@ -294,7 +361,7 @@ db_to_name(Name) when is_binary(Name) ->
 db_to_name(Name) when is_list(Name) ->
     iolist_to_binary(Name);
 db_to_name(Db) ->
-    couch_db:name(Db).
+    maps:get(name, Db).
 
 
 get_idx_def(Opts) ->
@@ -309,7 +376,7 @@ get_idx_def(Opts) ->
 get_idx_type(Opts) ->
     case proplists:get_value(type, Opts) of
         <<"json">> -> <<"json">>;
-        <<"text">> -> case clouseau_rpc:connected() of
+        <<"text">> -> case is_text_service_available() of
             true ->
                 <<"text">>;
             false ->
@@ -320,6 +387,11 @@ get_idx_type(Opts) ->
         BadType ->
             ?MANGO_ERROR({invalid_index_type, BadType})
     end.
+
+
+is_text_service_available() ->
+    erlang:function_exported(clouseau_rpc, connected, 0) andalso
+        clouseau_rpc:connected().
 
 
 get_idx_ddoc(Idx, Opts) ->
@@ -407,8 +479,10 @@ set_ddoc_partitioned_option(DDoc, Partitioned) ->
     DDoc#doc{body = {NewProps}}.
 
 
-get_idx_partitioned(Db, DDocProps) ->
-    Default = fabric_util:is_partitioned(Db),
+get_idx_partitioned(_Db, DDocProps) ->
+    % TODO: Add in partition support
+%%    Default = fabric_util:is_partitioned(Db),
+    Default = false,
     case couch_util:get_value(<<"options">>, DDocProps) of
         {DesignOpts} ->
             case couch_util:get_value(<<"partitioned">>, DesignOpts) of
@@ -459,7 +533,8 @@ filter_opts([Opt | Rest]) ->
     [Opt | filter_opts(Rest)].
 
 
-get_partial_filter_selector(#idx{def = Def}) when Def =:= all_docs; Def =:= undefined ->
+get_partial_filter_selector(#idx{def = Def})
+        when Def =:= all_docs; Def =:= undefined ->
     undefined;
 get_partial_filter_selector(#idx{def = {Def}}) ->
     case proplists:get_value(<<"partial_filter_selector">>, Def) of
@@ -482,14 +557,18 @@ get_legacy_selector(Def) ->
 -include_lib("eunit/include/eunit.hrl").
 
 index(SelectorName, Selector) ->
-    {
-        idx,<<"mango_test_46418cd02081470d93290dc12306ebcb">>,
-           <<"_design/57e860dee471f40a2c74ea5b72997b81dda36a24">>,
-           <<"Selected">>,<<"json">>,
-           {[{<<"fields">>,{[{<<"location">>,<<"asc">>}]}},
-             {SelectorName,{Selector}}]},
-           false,
-           [{<<"def">>,{[{<<"fields">>,[<<"location">>]}]}}]
+    #idx{
+        dbname = <<"mango_test_46418cd02081470d93290dc12306ebcb">>,
+        ddoc = <<"_design/57e860dee471f40a2c74ea5b72997b81dda36a24">>,
+        name = <<"Selected">>,
+        type = <<"json">>,
+        def = {[
+            {<<"fields">>, {[{<<"location">>,<<"asc">>}]}},
+            {SelectorName, {Selector}}
+        ]},
+        partitioned = false,
+        opts = [{<<"def">>,{[{<<"fields">>,[<<"location">>]}]}}],
+        build_status = undefined
     }.
 
 get_partial_filter_all_docs_test() ->
