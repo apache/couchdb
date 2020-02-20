@@ -38,8 +38,6 @@
     incr_stat/3,
     incr_stat/4,
 
-    fdb_to_revinfo/2,
-
     get_all_revs/2,
     get_winning_revs/3,
     get_winning_revs_future/3,
@@ -1255,21 +1253,6 @@ fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _, _, _} = Val) ->
         rev_size => RevSize
     };
 
-fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _, _} = Val) ->
-    {?DB_REVS, _DocId, NotDeleted, RevPos, Rev} = Key,
-    {_RevFormat, Sequence, RevSize, RevPath, AttHash} = Val,
-    #{
-        winner => true,
-        exists => true,
-        deleted => not NotDeleted,
-        rev_id => {RevPos, Rev},
-        rev_path => tuple_to_list(RevPath),
-        sequence => Sequence,
-        branch_count => undefined,
-        att_hash => AttHash,
-        rev_size => RevSize
-    };
-
 fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _} = Val)  ->
     {?DB_REVS, _DocId, NotDeleted, RevPos, Rev} = Key,
     {_RevFormat, RevPath, AttHash, RevSize} = Val,
@@ -1286,27 +1269,22 @@ fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _} = Val)  ->
     };
 
 fdb_to_revinfo(Key, {0, Seq, BCount, RPath}) ->
-    Val = {?CURR_REV_FORMAT, Seq, BCount, RPath, <<>>},
+    Val = {1, Seq, BCount, RPath, <<>>},
     fdb_to_revinfo(Key, Val);
 
 fdb_to_revinfo(Key, {0, RPath}) ->
-    Val = {?CURR_REV_FORMAT, RPath, <<>>},
+    Val = {1, RPath, <<>>},
     fdb_to_revinfo(Key, Val);
 
 fdb_to_revinfo(Key, {1, Seq, BCount, RPath, AttHash}) ->
+    % Don't forget to change ?CURR_REV_FORMAT to 2 here when it increments
     Val = {?CURR_REV_FORMAT, Seq, BCount, RPath, AttHash, 0},
     fdb_to_revinfo(Key, Val);
 
 fdb_to_revinfo(Key, {1, RPath, AttHash}) ->
+    % Don't forget to change ?CURR_REV_FORMAT to 2 here when it increments
     Val = {?CURR_REV_FORMAT, RPath, AttHash, 0},
-    fdb_to_revinfo(Key, Val);
-
-fdb_to_revinfo(Key, Val) ->
-    couch_log:error(
-        "~p:fdb_to_revinfo unsupported val format "
-        "rev_format=~p key_size=~p val_size=~p",
-        [?MODULE, element(1, Val), tuple_size(Key), tuple_size(Val)]),
-    throw({unsupported_data_format, fdb_to_revinfo_val}).
+    fdb_to_revinfo(Key, Val).
 
 
 doc_to_fdb(Db, #doc{} = Doc) ->
