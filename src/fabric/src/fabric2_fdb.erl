@@ -1746,3 +1746,47 @@ with_span(Operation, ExtraTags, Fun) ->
         false ->
             Fun()
     end.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+fdb_to_revinfo_version_compatibility_test() ->
+    DocId = <<"doc_id">>,
+    FirstRevFormat = 0,
+    RevPos = 1,
+    Rev = <<60,84,174,140,210,120,192,18,100,148,9,181,129,165,248,92>>,
+    RevPath = {},
+    NotDeleted = true,
+    Sequence = {versionstamp, 10873034897377, 0, 0},
+    BranchCount = 1,
+
+    KeyWinner = {?DB_REVS, DocId, NotDeleted, RevPos, Rev},
+    ValWinner = {FirstRevFormat, Sequence, BranchCount, RevPath},
+    ExpectedWinner = expected(
+        true, BranchCount, NotDeleted, RevPos, Rev, RevPath, Sequence),
+    ?assertEqual(ExpectedWinner, fdb_to_revinfo(KeyWinner, ValWinner)),
+
+    KeyLoser = {?DB_REVS, DocId, NotDeleted, RevPos, Rev},
+    ValLoser = {FirstRevFormat, RevPath},
+    ExpectedLoser = expected(
+        false, undefined, NotDeleted, RevPos, Rev, RevPath, undefined),
+    ?assertEqual(ExpectedLoser, fdb_to_revinfo(KeyLoser, ValLoser)),
+    ok.
+
+
+expected(Winner, BranchCount, NotDeleted, RevPos, Rev, RevPath, Sequence) ->
+    #{
+        att_hash => <<>>,
+        branch_count => BranchCount,
+        deleted => not NotDeleted,
+        exists => true,
+        rev_id => {RevPos, Rev},
+        rev_path => tuple_to_list(RevPath),
+        rev_size => 0,
+        sequence => Sequence,
+        winner => Winner
+    }.
+
+
+-endif.
