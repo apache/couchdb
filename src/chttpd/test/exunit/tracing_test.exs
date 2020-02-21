@@ -29,7 +29,7 @@ defmodule Couch.Test.OpenTracing do
 
   setup context do
     db_name = Utils.random_name("db")
-    session = Couch.login(context.base_url, context.user, context.pass)
+    session = Couch.login(context.user, context.pass, base_url: context.base_url)
 
     on_exit(fn ->
       delete_db(session, db_name)
