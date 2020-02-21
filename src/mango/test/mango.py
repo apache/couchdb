@@ -324,6 +324,10 @@ class DbPerClass(unittest.TestCase):
         klass.db = Database(random_db_name())
         klass.db.create(q=1, n=1)
 
+    @classmethod
+    def tearDownClass(klass):
+        klass.db.delete()
+
     def setUp(self):
         self.db = self.__class__.db
 
