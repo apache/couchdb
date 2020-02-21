@@ -141,7 +141,15 @@ validate_dbname(_) ->
             Expect = {error, {Reason, DbName}},
             ?assertEqual(Expect, fabric2_db:validate_dbname(DbName))
     end,
-    lists:foreach(CheckFun, Tests).
+    try
+        % Don't allow epi plugins to interfere with test results
+        meck:new(couch_epi, [passthrough]),
+        meck:expect(couch_epi, decide, 5, no_decision),
+        lists:foreach(CheckFun, Tests)
+    after
+        % Unload within the test to minimize interference with other tests
+        meck:unload()
+    end.
 
 
 validate_doc_ids(_) ->
