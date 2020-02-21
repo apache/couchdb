@@ -3,7 +3,7 @@ defmodule Couch.Session do
   CouchDB session helpers.
   """
 
-  defstruct [:cookie, :error]
+  defstruct [:cookie, :error, :base_url]
 
   def new(cookie, error \\ "") do
     %Couch.Session{cookie: cookie, error: error}
@@ -42,12 +42,12 @@ defmodule Couch.Session do
   # if the need arises.
 
   def go(%Couch.Session{} = sess, method, url, opts) do
-    opts = Keyword.merge(opts, cookie: sess.cookie)
+    opts = Keyword.merge(opts, cookie: sess.cookie, base_url: sess.base_url)
     Couch.request(method, url, opts)
   end
 
   def go!(%Couch.Session{} = sess, method, url, opts) do
-    opts = Keyword.merge(opts, cookie: sess.cookie)
+    opts = Keyword.merge(opts, cookie: sess.cookie, base_url: sess.base_url)
     Couch.request!(method, url, opts)
   end
 end
@@ -71,9 +71,10 @@ defmodule Couch do
     url
   end
 
-  def process_url(url) do
-    base_url = System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
-    base_url <> url
+  def process_url(url, options) do
+    (Keyword.get(options, :base_url) <> url)
+    |> prepend_protocol
+    |> append_query_string(options)
   end
 
   def process_request_headers(headers, _body, options) do
@@ -96,10 +97,13 @@ defmodule Couch do
   end
 
   def process_options(options) do
+    base_url = System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
+    options = Keyword.put_new(options, :base_url, base_url)
+
     options
-     |> set_auth_options()
-     |> set_inactivity_timeout()
-     |> set_request_timeout()
+    |> set_auth_options()
+    |> set_inactivity_timeout()
+    |> set_request_timeout()
   end
 
   def process_request_body(body) do
@@ -161,17 +165,29 @@ defmodule Couch do
     login(user, pass)
   end
 
-  def login(user, pass, expect \\ :success) do
-    resp = Couch.post("/_session", body: %{:username => user, :password => pass})
+  def login(user, pass, options \\ []) do
+    options = options |> Enum.into(%{})
 
-    if expect == :success do
+    base_url =
+      Map.get_lazy(options, :base_url, fn ->
+        System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
+      end)
+
+    resp =
+      Couch.post(
+        "/_session",
+        body: %{:username => user, :password => pass},
+        base_url: base_url
+      )
+
+    if Map.get(options, :expect, :success) == :success do
       true = resp.body["ok"]
       cookie = resp.headers[:"set-cookie"]
       [token | _] = String.split(cookie, ";")
-      %Couch.Session{cookie: token}
+      %Couch.Session{cookie: token, base_url: base_url}
     else
       true = Map.has_key?(resp.body, "error")
-      %Couch.Session{error: resp.body["error"]}
+      %Couch.Session{error: resp.body["error"], base_url: base_url}
     end
   end
 end
