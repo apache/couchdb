@@ -922,8 +922,7 @@ validate_dbname(DbName) when is_list(DbName) ->
 
 validate_dbname(DbName) when is_binary(DbName) ->
     Normalized = normalize_dbname(DbName),
-    fabric2_db_plugin:validate_dbname(
-        DbName, Normalized, fun validate_dbname_int/2).
+    validate_dbname_int(DbName, Normalized).
 
 validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
     case validate_dbname_length(DbName) of
