@@ -309,7 +309,7 @@ check_fields(_Fields) ->
 
 
 open_ddoc(Db, DDocId) ->
-    case ddoc_cache:open_doc(Db, DDocId) of
+    case fabric2_db:open_doc(Db, DDocId, [ejson_body, ?ADMIN_CTX]) of
         {ok, _} = Resp -> Resp;
         Else -> throw(Else)
     end.
