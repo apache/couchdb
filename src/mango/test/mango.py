@@ -299,6 +299,10 @@ class UsersDbTests(unittest.TestCase):
         klass.db = Database("_users")
         user_docs.setup_users(klass.db)
 
+    @classmethod
+    def tearDownClass(klass):
+        user_docs.teardown_users(klass.db)
+
     def setUp(self):
         self.db = self.__class__.db
 
