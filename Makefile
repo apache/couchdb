@@ -95,6 +95,15 @@ ignore_js_suites=
 
 TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 
+# ulimit (the maximum number of open file descriptors) value
+# necessary in javascript test run
+INCREASE_ULIMIT_N=
+ulimit_n=$(shell ulimit -n)
+
+ifeq ($(shell expr $(ulimit_n) \< 512), 1)
+INCREASE_ULIMIT_N=true 
+endif
+
 ################################################################################
 # Main commands
 ################################################################################
@@ -254,10 +263,23 @@ elixir-check-formatted: elixir-init
 elixir-credo: elixir-init
 	@mix credo
 
+
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-javascript: devclean
+# and set an ulimit if necessary
+javascript:
+ifdef INCREASE_ULIMIT_N
+	@echo "Increasing the maximum number of open file descriptors limit to successful run the javascript tests."
+	@(ulimit -n 1024; $(MAKE) -s javascript-raw)
+else
+	@$(MAKE) javascript-raw
+endif
+
+
+.PHONY: javascript-raw
+# target: javascript-raw - Run JavaScript test suites or specific ones defined by suites option
+javascript-raw: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+javascript-raw: devclean couch
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
@@ -270,7 +292,6 @@ endif
             "$(TEST_OPTS)" \
             'test/javascript/run --suites "$(suites)" \
             --ignore "$(ignore_js_suites)"'
-
 
 .PHONY: soak-javascript
 soak-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
