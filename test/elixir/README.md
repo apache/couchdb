@@ -43,6 +43,7 @@ X means done, - means partially
   - [X] Port cookie_auth.js
   - [X] Port copy_doc.js
   - [ ] Port design_docs.js
+  - [X] Port design_docs_query.js
   - [ ] Port design_options.js
   - [ ] Port design_paths.js
   - [X] Port erlang_views.js
