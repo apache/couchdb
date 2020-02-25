@@ -1251,6 +1251,9 @@ start_span(Req) ->
         [_ | _] -> filename:join(PathParts)
     end,
     {IsExternalSpan, RootOptions} = root_span_options(MochiReq),
+
+    CouchTrace = header_value(Req, "X-Couch-Trace") /= undefined,
+
     Tags = maps:merge(#{
         peer => Peer,
         'http.method' => Method,
@@ -1259,7 +1262,7 @@ start_span(Req) ->
         path_parts => Path,
         'span.kind' => <<"server">>,
         component => <<"couchdb.chttpd">>,
-        external => IsExternalSpan
+        external => IsExternalSpan orelse CouchTrace
     }, ExtraTags),
 
     ctrace:start_span(OperationName, [
