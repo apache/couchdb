@@ -16,10 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
-
-
--define(I_HEART_EUNIT(Tests), [{with, [T]} || T <- Tests]).
-
+-include_lib("fabric/test/fabric2_test.hrl").
 
 indexer_test_() ->
     {
@@ -32,17 +29,17 @@ indexer_test_() ->
                 foreach,
                 fun foreach_setup/0,
                 fun foreach_teardown/1,
-                ?I_HEART_EUNIT([
-                    fun indexed_empty_db/1,
-                    fun indexed_single_doc/1,
-                    fun updated_docs_are_reindexed/1,
-                    fun updated_docs_without_changes_are_reindexed/1,
-                    fun deleted_docs_not_indexed/1,
-                    fun deleted_docs_are_unindexed/1,
-                    fun multipe_docs_with_same_key/1,
-                    fun multipe_keys_from_same_doc/1,
-                    fun multipe_identical_keys_from_same_doc/1
-                ])
+                [
+                    with([?TDEF(indexed_empty_db)]),
+                    with([?TDEF(indexed_single_doc)]),
+                    with([?TDEF(updated_docs_are_reindexed)]),
+                    with([?TDEF(updated_docs_without_changes_are_reindexed)]),
+                    with([?TDEF(deleted_docs_not_indexed)]),
+                    with([?TDEF(deleted_docs_are_unindexed)]),
+                    with([?TDEF(multipe_docs_with_same_key)]),
+                    with([?TDEF(multipe_keys_from_same_doc)]),
+                    with([?TDEF(multipe_identical_keys_from_same_doc)])
+                ]
             }
         }
     }.
