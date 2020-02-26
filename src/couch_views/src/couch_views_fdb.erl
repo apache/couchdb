@@ -164,7 +164,7 @@ write_doc(TxDb, Sig, Views, Doc) ->
                 #{
                     name := DbName
                 } = TxDb,
-                couch_log:error("Db `~s` Doc `~s` exceeded the ~s size"
+                couch_log:error("Db `~s` Doc `~s` exceeded the ~s size "
                     "for view `~s` and was not indexed.",
                     [DbName, DocId, Type, MNames])
         end
