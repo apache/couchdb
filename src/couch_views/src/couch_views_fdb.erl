@@ -32,6 +32,8 @@
 -define(LIST_VALUE, 0).
 -define(JSON_VALUE, 1).
 -define(VALUE, 2).
+-define(MAX_KEY_SIZE_LIMIT, 8000).
+-define(MAX_VALUE_SIZE_LIMIT, 64000).
 
 
 -include("couch_views.hrl").
@@ -398,8 +400,8 @@ calculate_row_size(Rows) ->
 
 
 key_size_limit() ->
-    config:get_integer("couch_views", "key_size_limit", 8000).
+    config:get_integer("couch_views", "key_size_limit", ?MAX_KEY_SIZE_LIMIT).
 
 
 value_size_limit() ->
-    config:get_integer("couch_views", "value_size_limit", 64000).
+    config:get_integer("couch_views", "value_size_limit", ?MAX_VALUE_SIZE_LIMIT).
