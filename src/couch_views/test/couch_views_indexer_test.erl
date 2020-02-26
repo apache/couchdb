@@ -30,17 +30,17 @@ indexer_test_() ->
                 fun foreach_setup/0,
                 fun foreach_teardown/1,
                 [
-                    with([?TDEF(indexed_empty_db)]),
-                    with([?TDEF(indexed_single_doc)]),
-                    with([?TDEF(updated_docs_are_reindexed)]),
-                    with([?TDEF(updated_docs_without_changes_are_reindexed)]),
-                    with([?TDEF(deleted_docs_not_indexed)]),
-                    with([?TDEF(deleted_docs_are_unindexed)]),
-                    with([?TDEF(multipe_docs_with_same_key)]),
-                    with([?TDEF(multipe_keys_from_same_doc)]),
-                    with([?TDEF(multipe_identical_keys_from_same_doc)]),
-                    with([?TDEF(handle_size_key_limits)]),
-                    with([?TDEF(handle_size_value_limits)])
+                    ?TDEF_FE(indexed_empty_db),
+                    ?TDEF_FE(indexed_single_doc),
+                    ?TDEF_FE(updated_docs_are_reindexed),
+                    ?TDEF_FE(updated_docs_without_changes_are_reindexed),
+                    ?TDEF_FE(deleted_docs_not_indexed),
+                    ?TDEF_FE(deleted_docs_are_unindexed),
+                    ?TDEF_FE(multipe_docs_with_same_key),
+                    ?TDEF_FE(multipe_keys_from_same_doc),
+                    ?TDEF_FE(multipe_identical_keys_from_same_doc),
+                    ?TDEF_FE(handle_size_key_limits),
+                    ?TDEF_FE(handle_size_value_limits)
                 ]
             }
         }
@@ -390,9 +390,9 @@ multipe_identical_keys_from_same_doc(Db) ->
 
 handle_size_key_limits(Db) ->
     ok = meck:new(config, [passthrough]),
-    ok = meck:expect(config, get_integer, fun(Section, _, Default) ->
-        case Section of
-            "couch_views" -> 15;
+    ok = meck:expect(config, get_integer, fun(Section, Key, Default) ->
+        case Section == "couch_views" andalso Key == "key_size_limit" of
+            true -> 15;
             _ -> Default
         end
     end),
@@ -412,11 +412,7 @@ handle_size_key_limits(Db) ->
     ),
 
     ?assertEqual([
-        {row, [
-            {id, <<"1">>},
-            {key, 1},
-            {value, 1}
-        ]}
+        row(<<"1">>, 1, 1)
     ], Out),
 
     {ok, Doc} = fabric2_db:open_doc(Db, <<"2">>),
@@ -435,16 +431,8 @@ handle_size_key_limits(Db) ->
     ),
 
     ?assertEqual([
-        {row, [
-            {id, <<"1">>},
-            {key, 1},
-            {value, 1}
-        ]},
-        {row, [
-            {id, <<"2">>},
-            {key, 3},
-            {value, 3}
-        ]}
+        row(<<"1">>, 1, 1),
+        row(<<"2">>, 3, 3)
     ], Out1).
 
 
@@ -472,26 +460,10 @@ handle_size_value_limits(Db) ->
     ),
 
     ?assertEqual([
-        {row, [
-            {id, <<"1">>},
-            {key, 2},
-            {value, 2}
-        ]},
-        {row, [
-            {id, <<"2">>},
-            {key, 3},
-            {value, 3}
-        ]},
-        {row, [
-            {id, <<"1">>},
-            {key, 22},
-            {value, 2}
-        ]},
-        {row, [
-            {id, <<"2">>},
-            {key, 23},
-            {value, 3}
-        ]}
+        row(<<"1">>, 2, 2),
+        row(<<"2">>, 3, 3),
+        row(<<"1">>, 22, 2),
+        row(<<"2">>, 23, 3)
     ], Out),
 
 
@@ -511,18 +483,17 @@ handle_size_value_limits(Db) ->
     ),
 
     ?assertEqual([
-        {row, [
-            {id, <<"2">>},
-            {key, 3},
-            {value, 3}
-        ]},
-        {row, [
-            {id, <<"2">>},
-            {key, 23},
-            {value, 3}
-        ]}
+        row(<<"2">>, 3, 3),
+        row(<<"2">>, 23, 3)
     ], Out1).
 
+
+row(Id, Key, Value) ->
+    {row, [
+        {id, Id},
+        {key, Key},
+        {value, Value}
+    ]}.
 
 fold_fun({meta, _Meta}, Acc) ->
     {ok, Acc};

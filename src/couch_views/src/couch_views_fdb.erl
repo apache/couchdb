@@ -161,8 +161,12 @@ write_doc(TxDb, Sig, Views, Doc) ->
                     ExistingViewKey ->
                         remove_doc_from_idx(TxDb, Sig, DocId, ExistingViewKey)
                 end,
-                couch_log:error("Doc `~s` exceeded the ~s size for view `~s`"
-                    " and was not indexed.", [DocId, Type, MNames])
+                #{
+                    name := DbName
+                } = TxDb,
+                couch_log:error("Db `~s` Doc `~s` exceeded the ~s size"
+                    "for view `~s` and was not indexed.",
+                    [DbName, DocId, Type, MNames])
         end
     end, lists:zip(Views, Results)).
 
