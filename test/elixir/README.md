@@ -44,8 +44,8 @@ X means done, - means partially
   - [X] Port copy_doc.js
   - [ ] Port design_docs.js
   - [X] Port design_docs_query.js
-  - [ ] Port design_options.js
-  - [ ] Port design_paths.js
+  - [X] Port design_options.js
+  - [X] Port design_paths.js
   - [X] Port erlang_views.js
   - [X] Port etags_head.js
   - [ ] ~~Port etags_views.js~~ (skipped in js test suite)
