@@ -184,12 +184,12 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 format_status(_Opt, [_PDict, State]) ->
-    [
+    {[
         {epoch, State#state.epoch},
         {user, State#state.user},
         {session_url, State#state.session_url},
         {refresh_tstamp, State#state.refresh_tstamp}
-    ].
+    ], #{sensitive => true}}.
 
 
 %% Private helper functions

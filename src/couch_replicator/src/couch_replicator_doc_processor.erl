@@ -25,7 +25,8 @@
    handle_call/3,
    handle_info/2,
    handle_cast/2,
-   code_change/3
+   code_change/3,
+   format_status/2
 ]).
 
 -export([
@@ -256,6 +257,8 @@ handle_info(_Msg, State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+format_status(_Opt, [_PDict, State]) ->
+    {State, #{sensitive => true}}.
 
 % Doc processor gen_server private helper functions
 

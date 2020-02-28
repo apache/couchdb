@@ -195,7 +195,7 @@ format_status(_Opt, [_PDict, State]) ->
         pending_fetch = PendingFetch,
         batch = #batch{size = BatchSize}
     } = State,
-    [
+    {[
         {main_pid, MainJobPid},
         {loop, LoopPid},
         {source, couch_replicator_api_wrap:db_uri(Source)},
@@ -203,7 +203,7 @@ format_status(_Opt, [_PDict, State]) ->
         {num_readers, length(Readers)},
         {pending_fetch, PendingFetch},
         {batch_size, BatchSize}
-    ].
+    ], #{sensitive => true}}.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
@@ -478,13 +478,14 @@ replication_worker_format_status_test() ->
         pending_fetch = nil,
         batch = #batch{size = 5}
     },
-    Format = format_status(opts_ignored, [pdict, State]),
+    {Format, Opts} = format_status(opts_ignored, [pdict, State]),
     ?assertEqual(self(), proplists:get_value(main_pid, Format)),
     ?assertEqual(self(), proplists:get_value(loop, Format)),
     ?assertEqual("http://u:*****@h/d1", proplists:get_value(source, Format)),
     ?assertEqual("http://u:*****@h/d2", proplists:get_value(target, Format)),
     ?assertEqual(3, proplists:get_value(num_readers, Format)),
     ?assertEqual(nil, proplists:get_value(pending_fetch, Format)),
-    ?assertEqual(5, proplists:get_value(batch_size, Format)).
+    ?assertEqual(5, proplists:get_value(batch_size, Format)),
+    ?assert(maps:get(sensitive, Opts)).
 
 -endif.

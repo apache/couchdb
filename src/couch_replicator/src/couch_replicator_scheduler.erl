@@ -344,11 +344,11 @@ terminate(_Reason, _State) ->
 
 
 format_status(_Opt, [_PDict, State]) ->
-    [
+    {[
          {max_jobs, State#state.max_jobs},
          {running_jobs, running_job_count()},
          {pending_jobs, pending_job_count()}
-    ].
+    ], #{sensitive => true}}.
 
 
 %% config listener functions

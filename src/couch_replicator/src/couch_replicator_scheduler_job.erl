@@ -430,7 +430,7 @@ format_status(_Opt, [_PDict, State]) ->
        doc_id = DocId,
        db_name = DbName
     } = RepDetails,
-    [
+    {[
         {rep_id, RepId},
         {source, couch_replicator_api_wrap:db_uri(Source)},
         {target, couch_replicator_api_wrap:db_uri(Target)},
@@ -443,7 +443,7 @@ format_status(_Opt, [_PDict, State]) ->
         {committed_seq, CommitedSeq},
         {current_through_seq, ThroughSeq},
         {highest_seq_done, HighestSeqDone}
-    ].
+    ], #{sensitive => true}}.
 
 
 startup_jitter() ->
@@ -1072,7 +1072,7 @@ scheduler_job_format_status_test() ->
         current_through_seq = <<"4">>,
         highest_seq_done = <<"5">>
     },
-    Format = format_status(opts_ignored, [pdict, State]),
+    {Format, Opts} = format_status(opts_ignored, [pdict, State]),
     ?assertEqual("http://u:*****@h1/d1/", proplists:get_value(source, Format)),
     ?assertEqual("http://u:*****@h2/d2/", proplists:get_value(target, Format)),
     ?assertEqual({"base", "+ext"}, proplists:get_value(rep_id, Format)),
@@ -1084,7 +1084,8 @@ scheduler_job_format_status_test() ->
     ?assertEqual(<<"2">>, proplists:get_value(source_seq, Format)),
     ?assertEqual(<<"3">>, proplists:get_value(committed_seq, Format)),
     ?assertEqual(<<"4">>, proplists:get_value(current_through_seq, Format)),
-    ?assertEqual(<<"5">>, proplists:get_value(highest_seq_done, Format)).
+    ?assertEqual(<<"5">>, proplists:get_value(highest_seq_done, Format)),
+    ?assert(maps:get(sensitive, Opts)).
 
 
 -endif.

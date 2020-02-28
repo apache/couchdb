@@ -69,10 +69,18 @@ format(Event) ->
 do_format({error, _GL, {Pid, "** Generic server " ++ _, Args}}) ->
     %% gen_server terminate
     [Name, LastMsg, State, Reason | Extra] = Args,
-    MsgFmt = "gen_server ~w terminated with reason: ~s~n" ++
+    case last_msg(LastMsg, State) of
+        nil ->
+            MsgFmt = "gen_server ~w terminated with reason: ~s~n" ++
+                "  state: ~p~n    extra: ~p",
+            MsgArgs = [Name, format_reason(Reason), element(1, State), Extra],
+            format(error, Pid, MsgFmt, MsgArgs);
+        Else ->
+            MsgFmt = "gen_server ~w terminated with reason: ~s~n" ++
                 "  last msg: ~p~n     state: ~p~n    extra: ~p",
-    MsgArgs = [Name, format_reason(Reason), LastMsg, State, Extra],
-    format(error, Pid, MsgFmt, MsgArgs);
+            MsgArgs = [Name, format_reason(Reason), Else, State, Extra],
+            format(error, Pid, MsgFmt, MsgArgs)
+    end;
 
 do_format({error, _GL, {Pid, "** State machine " ++ _, Args}}) ->
     %% gen_fsm terminate
@@ -85,10 +93,18 @@ do_format({error, _GL, {Pid, "** State machine " ++ _, Args}}) ->
 do_format({error, _GL, {Pid, "** gen_event handler" ++ _, Args}}) ->
     %% gen_event handler terminate
     [ID, Name, LastMsg, State, Reason] = Args,
-    MsgFmt = "gen_event ~w installed in ~w terminated with reason: ~s~n" ++
+    case last_msg(LastMsg, State) of
+        nil ->
+            MsgFmt = "gen_event ~w installed in ~w terminated with reason: ~s~n" ++
+                "  state: ~p",
+            MsgArgs = [ID, Name, format_reason(Reason), element(1, State)],
+            format(error, Pid, MsgFmt, MsgArgs);
+        Else ->
+            MsgFmt = "gen_event ~w installed in ~w terminated with reason: ~s~n" ++
                 "  last msg: ~p~n     state: ~p",
-    MsgArgs = [ID, Name, format_reason(Reason), LastMsg, State],
-    format(error, Pid, MsgFmt, MsgArgs);
+            MsgArgs = [ID, Name, format_reason(Reason), Else, State],
+            format(error, Pid, MsgFmt, MsgArgs)
+    end;
 
 do_format({error, _GL, {emulator, "~s~n", [Msg]}}) when is_list(Msg) ->
     % These messages are for whenever any process exits due
@@ -440,3 +456,13 @@ get_value(Key, List, Default) ->
 
 supervisor_name({local, Name}) -> Name;
 supervisor_name(Name) -> Name.
+
+last_msg(LastMsg, {_State, Options}) when is_map(Options) ->
+    case maps:get(strip_last_msg, Options, true) of
+        true ->
+            nil;
+        _ ->
+            LastMsg
+    end;
+last_msg(LastMsg, _) ->
+    LastMsg.

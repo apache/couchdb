@@ -113,6 +113,37 @@ gen_server_error_with_extra_args_test() ->
         "extra: \\[sad,args\\]"
     ]).
 
+gen_server_error_with_sensitive_test() ->
+    Pid = self(),
+    Event = {
+        error,
+        erlang:group_leader(),
+        {
+            Pid,
+            "** Generic server and some stuff",
+            [
+                a_gen_server,
+                {last, message},
+                {server_state, #{sensitive => true}},
+                some_reason,
+                sad,
+                args
+            ]
+        }
+    },
+    ?assertMatch(
+        #log_entry{
+            level = error,
+            pid = Pid
+        },
+        do_format(Event)
+    ),
+    do_matches(do_format(Event), [
+        "gen_server a_gen_server terminated",
+        "with reason: some_reason",
+        "state: server_state",
+        "extra: \\[sad,args\\]"
+    ]).
 
 gen_fsm_error_test() ->
     Pid = self(),
@@ -196,6 +227,37 @@ gen_event_error_test() ->
         "gen_event handler_id installed in a_gen_event",
         "reason: barf",
         "last msg: {ohai,there}",
+        "state: curr_state"
+    ]).
+
+
+gen_event_error_sensitive_test() ->
+    Pid = self(),
+    Event = {
+        error,
+        erlang:group_leader(),
+        {
+            Pid,
+            "** gen_event handler did a thing",
+            [
+                handler_id,
+                a_gen_event,
+                {last, message},
+                {curr_state, #{sensitive => true}},
+                barf
+            ]
+        }
+    },
+    ?assertMatch(
+        #log_entry{
+            level = error,
+            pid = Pid
+        },
+        do_format(Event)
+    ),
+    do_matches(do_format(Event), [
+        "gen_event handler_id installed in a_gen_event",
+        "reason: barf",
         "state: curr_state"
     ]).
 
