@@ -37,6 +37,12 @@ go(DbName, Options) ->
                 case {CreateShardResult, create_shard_db_doc(Doc)} of
                 {ok, {ok, Status}} ->
                     Status;
+                {ok, {error, conflict} = ShardDocError} ->
+                    % Check if it is just a race to create the shard doc
+                    case db_exists(DbName) of
+                        true -> {error, file_exists};
+                        false -> ShardDocError
+                    end;
                 {file_exists, {ok, _}} ->
                     {error, file_exists};
                 {_, Error} ->
