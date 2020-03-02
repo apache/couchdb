@@ -158,6 +158,11 @@ else
 subdirs=$(shell ls src)
 endif
 
+.PHONY: check-fdb
+check-fdb:
+	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric
+	make elixir tests=test/elixir/test/basics_test.exs,test/elixir/test/replication_test.exs,test/elixir/test/map_test.exs,test/elixir/test/all_docs_test.exs,test/elixir/test/bulk_docs_test.exs
+
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 eunit: export BUILDDIR = $(shell pwd)
