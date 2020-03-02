@@ -221,7 +221,12 @@ hash_admin_passwords(Persist) ->
     lists:foreach(
         fun({User, ClearPassword}) ->
             HashedPassword = couch_passwords:hash_admin_password(ClearPassword),
-            config:set("admins", User, ?b2l(HashedPassword), Persist)
+            config:set(
+                "admins",
+                User,
+                ?b2l(HashedPassword),
+                #{persist => Persist, sensitive => true}
+            )
         end, couch_passwords:get_unhashed_admins()).
 
 close_db_if_idle(DbName) ->
