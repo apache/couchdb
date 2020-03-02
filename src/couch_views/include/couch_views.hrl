@@ -10,14 +10,18 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-% indexing
--define(VIEW_UPDATE_SEQ, 0).
--define(VIEW_ID_INFO, 1).
--define(VIEW_ID_RANGE, 2).
--define(VIEW_MAP_RANGE, 3).
+% Index info/data subspaces
+-define(VIEW_INFO, 0).
+-define(VIEW_DATA, 1).
 
--define(VIEW_ROW_COUNT, 0).
--define(VIEW_KV_SIZE, 1).
+% Index info keys
+-define(VIEW_UPDATE_SEQ, 0).
+-define(VIEW_ROW_COUNT, 1).
+-define(VIEW_KV_SIZE, 2).
+
+% Data keys
+-define(VIEW_ID_RANGE, 0).
+-define(VIEW_MAP_RANGE, 1).
 
 % jobs api
 -define(INDEX_JOB_TYPE, <<"views">>).
