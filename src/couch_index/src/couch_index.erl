@@ -23,7 +23,7 @@
 -export([compact/1, compact/2, get_compactor_pid/1]).
 
 %% gen_server callbacks
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2, code_change/3, format_status/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 
@@ -374,6 +374,32 @@ handle_info({'DOWN', _, _, _Pid, _}, #st{mod=Mod, idx_state=IdxState}=State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+format_status(Opt, [PDict, State]) ->
+    #st{
+        mod = Mod,
+        idx_state = IdxState,
+        updater = Updater,
+        compactor = Compactor,
+        waiters = Waiters,
+        committed = Commited,
+        shutdown = Shutdown
+    } = State,
+    IdxSafeState = case erlang:function_exported(Mod, format_status, 2) of
+        true ->
+            %% we only support maps in return
+            Mod:format_status(Opt, [PDict, State]);
+        false ->
+            #{}
+    end,
+    {maps:merge(#{
+        mod => Mod,
+        updater => Updater,
+        compactor => Compactor,
+        number_fo_waiters => length(Waiters),
+        committed => Commited,
+        shutdown => Shutdown
+    }, IdxSafeState), #{sensitive => true}}.
 
 maybe_restart_updater(#st{waiters=[]}) ->
     ok;
