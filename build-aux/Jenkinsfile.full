@@ -158,6 +158,43 @@ pipeline {
           } // post
         } // stage FreeBSD
 
+        stage('macOS') {
+          agent {
+            label 'macos'
+          }
+          steps {
+            // deleteDir is OK here because we're not inside of a Docker container!
+            deleteDir()
+            unstash 'tarball'
+            withEnv(['HOME='+pwd()]) {
+              sh '''
+                PATH=/usr/local/bin:$PATH
+                export PATH
+                mkdir -p $COUCHDB_IO_LOG_DIR
+
+                # Build CouchDB from tarball & test
+                mkdir build
+                cd build
+                tar -xzf $WORKSPACE/apache-couchdb-*.tar.gz
+                cd apache-couchdb-*
+                ./configure --with-curl --spidermonkey-version 60
+                make check || (build-aux/logfile-uploader.py && false)
+
+                # No package build for macOS at this time because of notarization
+              '''
+            } // withEnv
+          } // steps
+          post {
+            always {
+              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+            }
+            cleanup {
+              sh 'killall -9 beam.smp || true'
+              sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR} || true'
+            }
+          } // post
+        } // stage macOS
+
         stage('CentOS 6') {
           agent {
             docker {
