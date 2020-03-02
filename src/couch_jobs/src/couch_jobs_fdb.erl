@@ -400,7 +400,7 @@ encode_data(#{} = JobData) ->
         throw:{error, Error} ->
             % legacy clause since new versions of jiffy raise error instead
             error({json_encoding_error, Error});
-        error:{error, Error} ->
+        error:Error ->
             error({json_encoding_error, Error})
     end.
 
