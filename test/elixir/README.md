@@ -48,7 +48,7 @@ X means done, - means partially
   - [X] Port erlang_views.js
   - [X] Port etags_head.js
   - [ ] ~~Port etags_views.js~~ (skipped in js test suite)
-  - [ ] Port form_submit.js
+  - [X] Port form_submit.js
   - [ ] Port http.js
   - [X] Port invalid_docids.js
   - [ ] Port jsonp.js
