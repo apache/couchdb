@@ -249,7 +249,7 @@ get_view_keys(TxDb, Sig, DocId) ->
     } = TxDb,
     {Start, End} = id_idx_range(DbPrefix, Sig, DocId),
     lists:map(fun({K, V}) ->
-        {?DB_VIEWS, Sig, ?VIEW_ID_RANGE, DocId, ViewId} =
+        {?DB_VIEWS, ?VIEW_DATA, Sig, ?VIEW_ID_RANGE, DocId, ViewId} =
                 erlfdb_tuple:unpack(K, DbPrefix),
         [TotalKeys, TotalSize, UniqueKeys] = couch_views_encoding:decode(V),
         {ViewId, TotalKeys, TotalSize, UniqueKeys}
@@ -283,17 +283,17 @@ update_kv_size(TxDb, Sig, ViewId, Increment) ->
 
 
 seq_key(DbPrefix, Sig) ->
-    Key = {?DB_VIEWS, Sig, ?VIEW_UPDATE_SEQ},
+    Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_UPDATE_SEQ, Sig},
     erlfdb_tuple:pack(Key, DbPrefix).
 
 
 row_count_key(DbPrefix, Sig, ViewId) ->
-    Key = {?DB_VIEWS, Sig, ?VIEW_ID_INFO, ViewId, ?VIEW_ROW_COUNT},
+    Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_ROW_COUNT, Sig, ViewId},
     erlfdb_tuple:pack(Key, DbPrefix).
 
 
 kv_size_key(DbPrefix, Sig, ViewId) ->
-    Key = {?DB_VIEWS, Sig, ?VIEW_ID_INFO, ViewId, ?VIEW_KV_SIZE},
+    Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_KV_SIZE, Sig, ViewId},
     erlfdb_tuple:pack(Key, DbPrefix).
 
 
@@ -303,17 +303,17 @@ db_kv_size_key(DbPrefix) ->
 
 
 id_idx_key(DbPrefix, Sig, DocId, ViewId) ->
-    Key = {?DB_VIEWS, Sig, ?VIEW_ID_RANGE, DocId, ViewId},
+    Key = {?DB_VIEWS, ?VIEW_DATA, Sig, ?VIEW_ID_RANGE, DocId, ViewId},
     erlfdb_tuple:pack(Key, DbPrefix).
 
 
 id_idx_range(DbPrefix, Sig, DocId) ->
-    Key = {?DB_VIEWS, Sig, ?VIEW_ID_RANGE, DocId},
+    Key = {?DB_VIEWS, ?VIEW_DATA, Sig, ?VIEW_ID_RANGE, DocId},
     erlfdb_tuple:range(Key, DbPrefix).
 
 
 map_idx_prefix(DbPrefix, Sig, ViewId) ->
-    Key = {?DB_VIEWS, Sig, ?VIEW_MAP_RANGE, ViewId},
+    Key = {?DB_VIEWS, ?VIEW_DATA, Sig, ?VIEW_MAP_RANGE, ViewId},
     erlfdb_tuple:pack(Key, DbPrefix).
 
 
@@ -324,7 +324,14 @@ map_idx_key(MapIdxPrefix, MapKey, DupeId) ->
 
 map_idx_range(DbPrefix, Sig, ViewId, MapKey, DocId) ->
     Encoded = couch_views_encoding:encode(MapKey, key),
-    Key = {?DB_VIEWS, Sig, ?VIEW_MAP_RANGE, ViewId, {Encoded, DocId}},
+    Key = {
+        ?DB_VIEWS,
+        ?VIEW_DATA,
+        Sig,
+        ?VIEW_MAP_RANGE,
+        ViewId,
+        {Encoded, DocId}
+    },
     erlfdb_tuple:range(Key, DbPrefix).
 
 
