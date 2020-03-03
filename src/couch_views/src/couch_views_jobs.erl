@@ -53,7 +53,7 @@ wait_for_job(JobId, UpdateSeq) ->
             wait_for_job(JobId, Subscription, UpdateSeq);
         {ok, finished, Data} ->
             case Data of
-                #{<<"view_sig">> := ViewSeq} when ViewSeq >= UpdateSeq ->
+                #{<<"view_seq">> := ViewSeq} when ViewSeq >= UpdateSeq ->
                     ok;
                 _ ->
                     retry
