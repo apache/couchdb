@@ -1353,6 +1353,7 @@ fdb_to_revinfo(Key, {1, RPath, AttHash}) ->
 
 doc_to_fdb(Db, #doc{} = Doc) ->
     #{
+        name := DbName,
         db_prefix := DbPrefix
     } = Db,
 
@@ -1366,7 +1367,11 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 
     DiskAtts = lists:map(fun couch_att:to_disk_term/1, Atts),
 
-    Value = term_to_binary({Body, DiskAtts, Deleted}, [{minor_version, 1}]),
+    BinRev = couch_doc:rev_to_str({Start, Rev}),
+    BinBody = term_to_binary(Body, [{compressed, 0}, {minor_version, 1}]),
+    {ok, Encoded} = fabric2_encryption:encode(DbName, Id, BinRev, BinBody),
+
+    Value = term_to_binary({Encoded, DiskAtts, Deleted}, [{minor_version, 1}]),
     Chunks = chunkify_binary(Value),
 
     {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
@@ -1380,9 +1385,18 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 fdb_to_doc(_Db, _DocId, _Pos, _Path, []) ->
     {not_found, missing};
 
-fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
+fdb_to_doc(Db, DocId, Pos, [Rev | _] = Path, BinRows) when is_list(BinRows) ->
+    #{
+        name := DbName
+    } = Db,
+
     Bin = iolist_to_binary(BinRows),
-    {Body, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
+    {Encoded, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
+
+    BinRev = couch_doc:rev_to_str({Pos, Rev}),
+    {ok, BinBody} = fabric2_encryption:decode(DbName, DocId, BinRev, Encoded),
+    Body = binary_to_term(BinBody, [safe]),
+
     Atts = lists:map(fun(Att) ->
         couch_att:from_disk_term(Db, DocId, Att)
     end, DiskAtts),
