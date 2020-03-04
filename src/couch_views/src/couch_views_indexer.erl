@@ -29,6 +29,8 @@
 % TODO:
 %  * Handle timeouts of transaction and other errors
 
+-define(KEY_SIZE_LIMIT, 8000).
+-define(VALUE_SIZE_LIMIT, 64000).
 
 spawn_link() ->
     proc_lib:spawn_link(?MODULE, init, []).
@@ -297,8 +299,13 @@ write_docs(TxDb, Mrst, Docs, State) ->
         last_seq := LastSeq
     } = State,
 
-    lists:foreach(fun(Doc) ->
-        couch_views_fdb:write_doc(TxDb, Sig, Views, Doc)
+    ViewIds = [View#mrview.id_num || View <- Views],
+    KeyLimit = key_size_limit(),
+    ValLimit = value_size_limit(),
+
+    lists:foreach(fun(Doc0) ->
+        Doc1 = calculate_kv_sizes(Mrst, Doc0, KeyLimit, ValLimit),
+        couch_views_fdb:write_doc(TxDb, Sig, ViewIds, Doc1)
     end, Docs),
 
     couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq).
@@ -368,6 +375,41 @@ start_query_server(#mrst{} = Mrst) ->
     Mrst.
 
 
+calculate_kv_sizes(Mrst, Doc, KeyLimit, ValLimit) ->
+    #mrst{
+        db_name = DbName,
+        idx_name = IdxName
+    } = Mrst,
+    #{
+        results := Results
+    } = Doc,
+    try
+        KVSizes = lists:map(fun(ViewRows) ->
+            lists:foldl(fun({K, V}, Acc) ->
+                KeySize = erlang:external_size(K),
+                ValSize = erlang:external_size(V),
+
+                if KeySize =< KeyLimit -> ok; true ->
+                    throw({size_error, key})
+                end,
+
+                if ValSize =< ValLimit -> ok; true ->
+                    throw({size_error, value})
+                end,
+
+                Acc + KeySize + ValSize
+            end, 0, ViewRows)
+        end, Results),
+        Doc#{kv_sizes => KVSizes}
+    catch throw:{size_error, Type} ->
+        #{id := DocId} = Doc,
+        Fmt = "View ~s size error for docid `~s`, excluded from indexing "
+            "in db `~s` for design doc `~s`",
+        couch_log:error(Fmt, [Type, DocId, DbName, IdxName]),
+        Doc#{deleted := true, results := [], kv_sizes => []}
+    end.
+
+
 report_progress(State, UpdateType) ->
     #{
         tx_db := TxDb,
@@ -419,3 +461,11 @@ num_changes() ->
 
 retry_limit() ->
     config:get_integer("couch_views", "retry_limit", 3).
+
+
+key_size_limit() ->
+    config:get_integer("couch_views", "key_size_limit", ?KEY_SIZE_LIMIT).
+
+
+value_size_limit() ->
+    config:get_integer("couch_views", "value_size_limit", ?VALUE_SIZE_LIMIT).
