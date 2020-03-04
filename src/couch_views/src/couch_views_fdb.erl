@@ -205,6 +205,14 @@ clear_map_idx(TxDb, Sig, ViewId, DocId, ViewKeys) ->
     end, ViewKeys).
 
 
+update_id_idx(TxDb, Sig, ViewId, DocId, [], _KVSize) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = TxDb,
+    Key = id_idx_key(DbPrefix, Sig, DocId, ViewId),
+    ok = erlfdb:clear(Tx, Key);
+
 update_id_idx(TxDb, Sig, ViewId, DocId, NewRows, KVSize) ->
     #{
         tx := Tx,
