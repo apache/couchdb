@@ -29,6 +29,7 @@ start_link(Args) ->
 
 
 init([]) ->
+    config:enable_feature(fdb),
     Flags = {one_for_one, 1, 5},
     Children = [
         {
