@@ -161,7 +161,7 @@ updated_docs_are_reindexed(Db) ->
     Sig = Mrst#mrst.sig,
     fabric2_fdb:transactional(Db, fun(TxDb) ->
         ?assertMatch(
-                [{0, 1, _, [1]}, {1, 0, 0, []}],
+                [{0, 1, _, [1]}],
                 couch_views_fdb:get_view_keys(TxDb, Sig, <<"0">>)
             )
     end).
@@ -217,7 +217,7 @@ updated_docs_without_changes_are_reindexed(Db) ->
     Sig = Mrst#mrst.sig,
     fabric2_fdb:transactional(Db, fun(TxDb) ->
         ?assertMatch(
-                [{0, 1, _, [0]}, {1, 0, 0, []}],
+                [{0, 1, _, [0]}],
                 couch_views_fdb:get_view_keys(TxDb, Sig, <<"0">>)
             )
     end).
