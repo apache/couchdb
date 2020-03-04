@@ -398,7 +398,7 @@ handle_size_key_limits(Db) ->
     end),
 
     DDoc = create_ddoc(multi_emit_key_limit),
-    Docs = [doc(1)] ++ [doc(2)],
+    Docs = [doc(1, 2)] ++ [doc(2, 1)],
 
     {ok, _} = fabric2_db:update_docs(Db, [DDoc | Docs], []),
 
@@ -412,12 +412,12 @@ handle_size_key_limits(Db) ->
     ),
 
     ?assertEqual([
-        row(<<"1">>, 1, 1)
+        row(<<"1">>, 2, 2)
     ], Out),
 
     {ok, Doc} = fabric2_db:open_doc(Db, <<"2">>),
     Doc2 = Doc#doc {
-        body = {[{<<"val">>,3}]}
+        body = {[{<<"val">>, 2}]}
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc2),
 
@@ -431,8 +431,8 @@ handle_size_key_limits(Db) ->
     ),
 
     ?assertEqual([
-        row(<<"1">>, 1, 1),
-        row(<<"2">>, 3, 3)
+        row(<<"1">>, 2, 2),
+        row(<<"2">>, 2, 2)
     ], Out1).
 
 
@@ -558,7 +558,7 @@ create_ddoc(multi_emit_key_limit) ->
         {<<"views">>, {[
             {<<"map_fun1">>, {[
                 {<<"map">>, <<"function(doc) { "
-                    "if (doc.val === 2) { "
+                    "if (doc.val === 1) { "
                         "emit('a very long string to be limited', doc.val);"
                     "} else {"
                         "emit(doc.val, doc.val)"
