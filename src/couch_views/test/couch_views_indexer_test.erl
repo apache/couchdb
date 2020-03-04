@@ -39,6 +39,7 @@ indexer_test_() ->
                     ?TDEF_FE(multipe_docs_with_same_key),
                     ?TDEF_FE(multipe_keys_from_same_doc),
                     ?TDEF_FE(multipe_identical_keys_from_same_doc),
+                    ?TDEF_FE(fewer_multipe_identical_keys_from_same_doc),
                     ?TDEF_FE(handle_size_key_limits),
                     ?TDEF_FE(handle_size_value_limits)
                 ]
@@ -388,6 +389,53 @@ multipe_identical_keys_from_same_doc(Db) ->
         ], Out).
 
 
+fewer_multipe_identical_keys_from_same_doc(Db) ->
+    DDoc = create_ddoc(multi_emit_same),
+    Doc0 = #doc{
+            id = <<"0">>,
+            body = {[{<<"val">>, 1}, {<<"extra">>, 3}]}
+    },
+
+    {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
+    {ok, {Pos, Rev}} = fabric2_db:update_doc(Db, Doc0, []),
+
+    {ok, Out1} = couch_views:query(
+            Db,
+            DDoc,
+            <<"map_fun1">>,
+            fun fold_fun/2,
+            [],
+            #mrargs{}
+        ),
+
+    ?assertEqual([
+            row(<<"0">>, 1, 1),
+            row(<<"0">>, 1, 2),
+            row(<<"0">>, 1, 3)
+        ], Out1),
+
+    Doc1 = #doc{
+        id = <<"0">>,
+        revs = {Pos, [Rev]},
+        body = {[{<<"val">>, 1}]}
+    },
+    {ok, _} = fabric2_db:update_doc(Db, Doc1, []),
+
+    {ok, Out2} = couch_views:query(
+            Db,
+            DDoc,
+            <<"map_fun1">>,
+            fun fold_fun/2,
+            [],
+            #mrargs{}
+        ),
+
+    ?assertEqual([
+            row(<<"0">>, 1, 1),
+            row(<<"0">>, 1, 2)
+        ], Out2).
+
+
 handle_size_key_limits(Db) ->
     ok = meck:new(config, [passthrough]),
     ok = meck:expect(config, get_integer, fun(Section, Key, Default) ->
@@ -495,6 +543,7 @@ row(Id, Key, Value) ->
         {value, Value}
     ]}.
 
+
 fold_fun({meta, _Meta}, Acc) ->
     {ok, Acc};
 fold_fun({row, _} = Row, Acc) ->
@@ -544,6 +593,9 @@ create_ddoc(multi_emit_same) ->
                 {<<"map">>, <<"function(doc) { "
                     "emit(doc.val, doc.val * 2); "
                     "emit(doc.val, doc.val); "
+                    "if(doc.extra) {"
+                    "  emit(doc.val, doc.extra);"
+                    "}"
                 "}">>}
             ]}},
             {<<"map_fun2">>, {[
