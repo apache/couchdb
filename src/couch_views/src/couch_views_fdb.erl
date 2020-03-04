@@ -224,13 +224,10 @@ update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows) ->
         db_prefix := DbPrefix
     } = TxDb,
 
-    Unique = lists:usort([K || {K, _V} <- NewRows]),
-
-    KeysToRem = ExistingKeys -- Unique,
     lists:foreach(fun(RemKey) ->
         {Start, End} = map_idx_range(DbPrefix, Sig, ViewId, RemKey, DocId),
         ok = erlfdb:clear_range(Tx, Start, End)
-    end, KeysToRem),
+    end, ExistingKeys),
 
     KVsToAdd = process_rows(NewRows),
     MapIdxPrefix = map_idx_prefix(DbPrefix, Sig, ViewId),
