@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.design_paths = function(debug) {
+  return console.log('done in test/elixir/test/design_paths.exs');
   if (debug) debugger;
   var db_name = get_random_db_name()
   var dbNames = [db_name, db_name + "/with_slashes"];
