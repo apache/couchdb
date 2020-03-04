@@ -11,6 +11,7 @@
 // the License.
 
 couchTests.design_options = function(debug) {
+  return console.log('done in test/elixir/test/design_options.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -36,7 +37,7 @@ couchTests.design_options = function(debug) {
   T(db.save(designDoc).ok);
 
   // should work for temp views
-  // no more there on cluster - pointless test 
+  // no more there on cluster - pointless test
   //var rows = db.query(map, null, {options:{include_design: true}}).rows;
   //T(rows.length == 1);
   //T(rows[0].value == "_design/fu");
