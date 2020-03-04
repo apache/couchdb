@@ -32,6 +32,12 @@
 ]).
 
 
+-export([
+    do_encode/5,
+    do_decode/5
+]).
+
+
 -define(INIT_TIMEOUT, 60000).
 -define(LABEL, "couchdb-aes256-gcm-encryption-key").
 
@@ -74,28 +80,50 @@ terminate(_, _St) ->
     ok.
 
 
-handle_call({encode, DbName, DocId, DocRev, DocBody}, _From, St) ->
-    #{iid := InstanceId} = St,
-    {ok, AAD} = get_aad(InstanceId, DbName),
-    {ok, DEK} = get_dek(DbName, DocId, DocRev),
-    {CipherText, CipherTag} = crypto:crypto_one_time_aead(
-        aes_256_gcm, DEK, <<0:96>>, DocBody, AAD, 16, true),
-    Encoded = <<CipherTag/binary, CipherText/binary>>,
-    {reply, {ok, Encoded}, St};
+handle_call({encode, DbName, DocId, DocRev, DocBody}, From, St) ->
+    #{
+        iid := InstanceId,
+        waiters := Waiters
+    } = St,
 
-handle_call({decode, DbName, DocId, DocRev, Encoded}, _From, St) ->
-    #{iid := InstanceId} = St,
-    {ok, AAD} = get_aad(InstanceId, DbName),
-    {ok, DEK} = get_dek(DbName, DocId, DocRev),
-    <<CipherTag:16/binary, CipherText/binary>> = Encoded,
-    DocBody = crypto:crypto_one_time_aead(
-        aes_256_gcm, DEK, <<0:96>>, CipherText, AAD, CipherTag, false),
-    {reply, {ok, DocBody}, St}.
+    {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
+        do_encode, [InstanceId, DbName, DocId, DocRev, DocBody]),
+
+    NewSt = St#{
+        waiters := dict:store(Pid, From, Waiters)
+    },
+    {noreply, NewSt};
+
+handle_call({decode, DbName, DocId, DocRev, Encoded}, From, St) ->
+    #{
+        iid := InstanceId,
+        waiters := Waiters
+    } = St,
+
+    {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
+        do_decode, [InstanceId, DbName, DocId, DocRev, Encoded]),
+
+    NewSt = St#{
+        waiters := dict:store(Pid, From, Waiters)
+    },
+    {noreply, NewSt}.
 
 
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
 
+
+handle_info({'DOWN', _, _, Pid, Resp}, #{waiters := Waiters} = St) ->
+    case dict:take(Pid, Waiters) of
+        {From, Waiters1} ->
+            gen_server:reply(From, Resp),
+            NewSt = St#{
+                waiters := Waiters1
+            },
+            {noreply, NewSt};
+        error ->
+            {noreply, St}
+    end;
 
 handle_info(timeout, St) ->
     {stop, normal, St}.
@@ -108,7 +136,42 @@ code_change(_OldVsn, St, _Extra) ->
 
 init_st() ->
     FdbDirs = fabric2_server:fdb_directory(),
-    {ok, #{iid => iolist_to_binary(FdbDirs)}}.
+    {ok, #{
+        iid => iolist_to_binary(FdbDirs),
+        waiters => dict:new()
+    }}.
+
+
+do_encode(InstanceId, DbName, DocId, DocRev, DocBody) ->
+    try
+        {ok, AAD} = get_aad(InstanceId, DbName),
+        {ok, DEK} = get_dek(DbName, DocId, DocRev),
+        {CipherText, CipherTag} = crypto:crypto_one_time_aead(
+            aes_256_gcm, DEK, <<0:96>>, DocBody, AAD, 16, true),
+        <<CipherTag/binary, CipherText/binary>>
+    of
+        Resp ->
+            exit({ok, Resp})
+    catch
+        _:Error ->
+            exit({error, Error})
+    end.
+
+
+do_decode(InstanceId, DbName, DocId, DocRev, Encoded) ->
+    try
+        <<CipherTag:16/binary, CipherText/binary>> = Encoded,
+        {ok, AAD} = get_aad(InstanceId, DbName),
+        {ok, DEK} = get_dek(DbName, DocId, DocRev),
+        crypto:crypto_one_time_aead(
+            aes_256_gcm, DEK, <<0:96>>, CipherText, AAD, CipherTag, false)
+    of
+        Resp ->
+            exit({ok, Resp})
+    catch
+        _:Error ->
+            exit({error, Error})
+    end.
 
 
 get_aad(InstanceId, DbName) when is_binary(InstanceId), is_binary(DbName) ->
