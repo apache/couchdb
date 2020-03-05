@@ -83,10 +83,11 @@ terminate(_, _St) ->
 handle_call({encode, DbName, DocId, DocRev, DocBody}, From, St) ->
     #{
         iid := InstanceId,
+        cache := Cache,
         waiters := Waiters
     } = St,
 
-    {ok, KEK} = get_kek(DbName),
+    {ok, KEK} = get_kek(Cache, DbName),
     {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
         do_encode, [KEK, InstanceId, DbName, DocId, DocRev, DocBody]),
 
@@ -98,10 +99,11 @@ handle_call({encode, DbName, DocId, DocRev, DocBody}, From, St) ->
 handle_call({decode, DbName, DocId, DocRev, Encoded}, From, St) ->
     #{
         iid := InstanceId,
+        cache := Cache,
         waiters := Waiters
     } = St,
 
-    {ok, KEK} = get_kek(DbName),
+    {ok, KEK} = get_kek(Cache, DbName),
     {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
         do_decode, [KEK, InstanceId, DbName, DocId, DocRev, Encoded]),
 
@@ -138,8 +140,10 @@ code_change(_OldVsn, St, _Extra) ->
 
 init_st() ->
     FdbDirs = fabric2_server:fdb_directory(),
+    Cache = ets:new(?MODULE, [set, private, compressed]),
     {ok, #{
         iid => iolist_to_binary(FdbDirs),
+        cache => Cache,
         waiters => dict:new()
     }}.
 
@@ -187,6 +191,12 @@ get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
     {ok, DEK}.
 
 
-get_kek(DbName) ->
-    KEK = crypto:hash(sha256, DbName),
-    {ok, KEK}.
+get_kek(Cache, DbName) ->
+    case ets:lookup(Cache, DbName) of
+        [{DbName, KEK}] ->
+            {ok, KEK};
+        [] ->
+            KEK = crypto:hash(sha256, DbName),
+            true = ets:insert(Cache, {DbName, KEK}),
+            {ok, KEK}
+    end.
