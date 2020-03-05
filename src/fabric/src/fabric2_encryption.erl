@@ -17,8 +17,9 @@
 
 -export([
     start_link/0,
-    encode/4,
-    decode/4
+    get_wrapped_kek/1,
+    encode/5,
+    decode/5
 ]).
 
 
@@ -41,25 +42,35 @@
 -define(INIT_TIMEOUT, 60000).
 -define(LABEL, "couchdb-aes256-gcm-encryption-key").
 
+%% Master encryption key. Obviously never known to this module in real life
+-define(MEK, <<246,83,186,200,242,183,138,51,2,193,181,37,156,130,190,209,181,69,206,157,69,154,112,158,141,158,196,132,81,253,187,67>>).
+-define(IV, <<0:128>>).
+
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 
-encode(DbName, DocId, DocRev, DocBody)
-    when is_binary(DbName),
+get_wrapped_kek(DbName) when is_binary(DbName) ->
+    gen_server:call(?MODULE, {get_wrapped_kek, DbName}).
+
+
+encode(WrappedKEK, DbName, DocId, DocRev, DocBody)
+    when is_binary(WrappedKEK),
+         is_binary(DbName),
          is_binary(DocId),
          is_binary(DocRev),
          is_binary(DocBody) ->
-    gen_server:call(?MODULE, {encode, DbName, DocId, DocRev, DocBody}).
+    gen_server:call(?MODULE, {encode, WrappedKEK, DbName, DocId, DocRev, DocBody}).
 
 
-decode(DbName, DocId, DocRev, DocBody)
-    when is_binary(DbName),
+decode(WrappedKEK, DbName, DocId, DocRev, DocBody)
+    when is_binary(WrappedKEK),
+         is_binary(DbName),
          is_binary(DocId),
          is_binary(DocRev),
          is_binary(DocBody) ->
-    gen_server:call(?MODULE, {decode, DbName, DocId, DocRev, DocBody}).
+    gen_server:call(?MODULE, {decode, WrappedKEK, DbName, DocId, DocRev, DocBody}).
 
 
 
@@ -80,14 +91,19 @@ terminate(_, _St) ->
     ok.
 
 
-handle_call({encode, DbName, DocId, DocRev, DocBody}, From, St) ->
+handle_call({get_wrapped_kek, _DbName}, _From, #{cache := Cache} = St) ->
+    {ok, KEK, WrappedKEK} = get_kek(),
+    true = ets:insert(Cache, {WrappedKEK, KEK}),
+    {reply, {ok, WrappedKEK}, St};
+
+handle_call({encode, WrappedKEK, DbName, DocId, DocRev, DocBody}, From, St) ->
     #{
         iid := InstanceId,
         cache := Cache,
         waiters := Waiters
     } = St,
 
-    {ok, KEK} = get_kek(Cache, DbName),
+    {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
     {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
         do_encode, [KEK, InstanceId, DbName, DocId, DocRev, DocBody]),
 
@@ -96,14 +112,14 @@ handle_call({encode, DbName, DocId, DocRev, DocBody}, From, St) ->
     },
     {noreply, NewSt};
 
-handle_call({decode, DbName, DocId, DocRev, Encoded}, From, St) ->
+handle_call({decode, WrappedKEK, DbName, DocId, DocRev, Encoded}, From, St) ->
     #{
         iid := InstanceId,
         cache := Cache,
         waiters := Waiters
     } = St,
 
-    {ok, KEK} = get_kek(Cache, DbName),
+    {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
     {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
         do_decode, [KEK, InstanceId, DbName, DocId, DocRev, Encoded]),
 
@@ -191,12 +207,25 @@ get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
     {ok, DEK}.
 
 
-get_kek(Cache, DbName) ->
-    case ets:lookup(Cache, DbName) of
-        [{DbName, KEK}] ->
+unwrap_kek(Cache, WrappedKEK) ->
+    case ets:lookup(Cache, WrappedKEK) of
+        [{WrappedKEK, KEK}] ->
             {ok, KEK};
         [] ->
-            KEK = crypto:hash(sha256, DbName),
-            true = ets:insert(Cache, {DbName, KEK}),
+            {ok, KEK, WrappedKEK} = unwrap_kek(WrappedKEK),
+            true = ets:insert(Cache, {WrappedKEK, KEK}),
             {ok, KEK}
     end.
+
+
+%% this mocks a call to an expernal system to aquire KEK
+get_kek() ->
+    KEK = crypto:strong_rand_bytes(32),
+    WrappedKEK = crypto:crypto_one_time(aes_256_ctr, ?MEK, ?IV, KEK, true),
+    {ok, KEK, WrappedKEK}.
+
+
+%% this mocks a call to an expernal system to unwrap KEK
+unwrap_kek(WrappedKEK) ->
+    KEK = crypto:crypto_one_time(aes_256_ctr, ?MEK, ?IV, WrappedKEK, true),
+    {ok, KEK, WrappedKEK}.
