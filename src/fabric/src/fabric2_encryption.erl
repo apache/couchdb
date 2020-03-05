@@ -33,8 +33,8 @@
 
 
 -export([
-    do_encode/5,
-    do_decode/5
+    do_encode/6,
+    do_decode/6
 ]).
 
 
@@ -86,8 +86,9 @@ handle_call({encode, DbName, DocId, DocRev, DocBody}, From, St) ->
         waiters := Waiters
     } = St,
 
+    {ok, KEK} = get_kek(DbName),
     {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
-        do_encode, [InstanceId, DbName, DocId, DocRev, DocBody]),
+        do_encode, [KEK, InstanceId, DbName, DocId, DocRev, DocBody]),
 
     NewSt = St#{
         waiters := dict:store(Pid, From, Waiters)
@@ -100,8 +101,9 @@ handle_call({decode, DbName, DocId, DocRev, Encoded}, From, St) ->
         waiters := Waiters
     } = St,
 
+    {ok, KEK} = get_kek(DbName),
     {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
-        do_decode, [InstanceId, DbName, DocId, DocRev, Encoded]),
+        do_decode, [KEK, InstanceId, DbName, DocId, DocRev, Encoded]),
 
     NewSt = St#{
         waiters := dict:store(Pid, From, Waiters)
@@ -142,10 +144,10 @@ init_st() ->
     }}.
 
 
-do_encode(InstanceId, DbName, DocId, DocRev, DocBody) ->
+do_encode(KEK, InstanceId, DbName, DocId, DocRev, DocBody) ->
     try
         {ok, AAD} = get_aad(InstanceId, DbName),
-        {ok, DEK} = get_dek(DbName, DocId, DocRev),
+        {ok, DEK} = get_dek(KEK, DocId, DocRev),
         {CipherText, CipherTag} = crypto:crypto_one_time_aead(
             aes_256_gcm, DEK, <<0:96>>, DocBody, AAD, 16, true),
         <<CipherTag/binary, CipherText/binary>>
@@ -158,11 +160,11 @@ do_encode(InstanceId, DbName, DocId, DocRev, DocBody) ->
     end.
 
 
-do_decode(InstanceId, DbName, DocId, DocRev, Encoded) ->
+do_decode(KEK, InstanceId, DbName, DocId, DocRev, Encoded) ->
     try
         <<CipherTag:16/binary, CipherText/binary>> = Encoded,
         {ok, AAD} = get_aad(InstanceId, DbName),
-        {ok, DEK} = get_dek(DbName, DocId, DocRev),
+        {ok, DEK} = get_dek(KEK, DocId, DocRev),
         crypto:crypto_one_time_aead(
             aes_256_gcm, DEK, <<0:96>>, CipherText, AAD, CipherTag, false)
     of
@@ -178,8 +180,7 @@ get_aad(InstanceId, DbName) when is_binary(InstanceId), is_binary(DbName) ->
     {ok, <<InstanceId/binary, 0:8, DbName/binary>>}.
 
 
-get_dek(DbName, DocId, DocRev) ->
-    {ok, KEK} = get_kek(DbName),
+get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
     Context = <<DocId/binary, 0:8, DocRev/binary>>,
     PlainText = <<1:16, ?LABEL, 0:8, Context/binary, 256:16>>,
     <<_:256>> = DEK = crypto:mac(hmac, sha256, KEK, PlainText),
