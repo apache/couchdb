@@ -229,3 +229,41 @@ get_kek() ->
 unwrap_kek(WrappedKEK) ->
     KEK = crypto:crypto_one_time(aes_256_ctr, ?MEK, ?IV, WrappedKEK, true),
     {ok, KEK, WrappedKEK}.
+
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+get_unwrap_kek_test() ->
+    {ok, KEK, WrappedKEK} = get_kek(),
+    ?assertNotEqual(KEK, WrappedKEK),
+    ?assertEqual({ok, KEK, WrappedKEK}, unwrap_kek(WrappedKEK)).
+
+get_dek_test() ->
+    KEK = crypto:strong_rand_bytes(32),
+    {ok, DEK} = get_dek(KEK, <<"0001">>, <<"1-abcdefgh">>),
+    ?assertNotEqual(KEK, DEK),
+    ?assertEqual(32, byte_size(DEK)).
+
+encode_decode_test() ->
+    KEK = crypto:strong_rand_bytes(32),
+    {IId, DbName, DocId, DocRev, DocBody}
+        = {<<"dev">>, <<"db">>, <<"0001">>, <<"1-abcdefgh">>, <<"[ohai]">>},
+
+    {ok, EncResult} = try
+        do_encode(KEK, IId, DbName, DocId, DocRev, DocBody)
+    catch
+        exit:ER -> ER
+    end,
+    ?assertNotEqual(DocBody, EncResult),
+
+    {ok, DecResult} = try
+        do_decode(KEK, IId, DbName, DocId, DocRev, EncResult)
+    catch
+        exit:DR -> DR
+    end,
+    ?assertEqual(DocBody, DecResult).
+
+
+-endif.
