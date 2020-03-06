@@ -31,7 +31,6 @@
 -export([cookie_auth_cookie/4, cookie_scheme/1]).
 -export([maybe_value/3]).
 
--import(jwt, [jwt/2]).
 -export([jwt_authentication_handler/1]).
 
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
@@ -196,27 +195,21 @@ jwt_authentication_handler(Req) ->
 
     case header_value(Req, "Authorization") of
         "Bearer " ++ Jwt ->
-            erlang:display(Jwt),
-            % todo: Not sure which is the correct one to use here?
-            % JwtBinary = list_to_bitstring(Jwt),
-            JwtBitstring = list_to_bitstring(Jwt),
-            %
-            case jwt:decode(JwtBitstring, Secret) of
-                {ok, Claims} -> 
-                    User = couch_util:get_value(<<UserClaim>>, Claims, <<"">>),
-                    erlang:display(User),
+            case jwt:decode(?l2b(Jwt), ?l2b(Secret)) of
+                {ok, Claims} ->
+		    User = maps:get(?l2b(UserClaim), Claims),
+                    couch_log:error("foo ~p", [User]),
 
                     Req#httpd{user_ctx=#user_ctx{
-                        name=User
+                        name=User,
+                        roles=[]
                     }};
-                {error, invalid_token} -> erlang:display("Invalid JWT.");
-                {error, invalid_signature} -> erlang:display("Invalid JWT signature.");
-                {error, expired} -> erlang:display("JWT expired.")
+                {error, Reason} ->
+		    throw({unauthorized, Reason})
             end;
-        undefined -> nil
-    end,
-
-    Req.
+        _ ->
+	    nil
+    end.
 
 cookie_authentication_handler(Req) ->
     cookie_authentication_handler(Req, couch_auth_cache).
