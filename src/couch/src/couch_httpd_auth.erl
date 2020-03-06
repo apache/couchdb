@@ -31,6 +31,9 @@
 -export([cookie_auth_cookie/4, cookie_scheme/1]).
 -export([maybe_value/3]).
 
+-import(jwt, [jwt/2]).
+-export([jwt_authentication_handler/1]).
+
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
 -compile({no_auto_import,[integer_to_binary/1, integer_to_binary/2]}).
@@ -186,6 +189,29 @@ proxy_auth_user(Req) ->
             end
     end.
 
+jwt_authentication_handler(Req) ->
+    {_, Now, _} = os:timestamp(),
+    Secret = config:get("couch_httpd_auth", "jwt_secret", ""),
+    ExpiryClaim = config:get("couch_httpd_auth", "jwt_expiry_claim", "exp"),
+    UserClaim = config:get("couch_httpd_auth", "jwt_user_claim", "sub"),
+
+    case header_value(Req, "Authorization") of
+        "Bearer " ++ Jwt ->
+            case jwt:decode(Jwt, Secret) of
+                {ok, Claims} -> 
+                    Expiry = couch_util:get_value(<<ExpiryClaim>>, Claims, <<"">>),
+                    User = couch_util:get_value(<<UserClaim>>, Claims, <<"">>),
+
+                    case Expiry > Now of
+                        true ->
+                            Req#httpd{user_ctx=#user_ctx{
+                                name=User
+                            }}
+                    end
+            end
+    end,
+
+    Req.
 
 cookie_authentication_handler(Req) ->
     cookie_authentication_handler(Req, couch_auth_cache).
