@@ -189,26 +189,31 @@ proxy_auth_user(Req) ->
             end
     end.
 
+
 jwt_authentication_handler(Req) ->
-    {_, Now, _} = os:timestamp(),
     Secret = config:get("couch_httpd_auth", "jwt_secret", ""),
+    SecretBitstring = list_to_binary(Secret),
     ExpiryClaim = config:get("couch_httpd_auth", "jwt_expiry_claim", "exp"),
     UserClaim = config:get("couch_httpd_auth", "jwt_user_claim", "sub"),
 
     case header_value(Req, "Authorization") of
         "Bearer " ++ Jwt ->
-            case jwt:decode(Jwt, Secret) of
+            JwtBitstring = list_to_binary(Jwt),
+            case jwt:decode(JwtBitstring, Secret) of
                 {ok, Claims} -> 
                     Expiry = couch_util:get_value(<<ExpiryClaim>>, Claims, <<"">>),
                     User = couch_util:get_value(<<UserClaim>>, Claims, <<"">>),
+                    erlang:display(Expiry),
+                    erlang:display(User),
 
-                    case Expiry > Now of
-                        true ->
-                            Req#httpd{user_ctx=#user_ctx{
-                                name=User
-                            }}
-                    end
-            end
+                    Req#httpd{user_ctx=#user_ctx{
+                        name=User
+                    }};
+                {error, invalid_token} -> erlang:display("Invalid JWT.");
+                {error, invalid_signature} -> erlang:display("Invalid JWT signature.");
+                {error, expired} -> erlang:display("JWT expired.")
+            end;
+        undefined -> nil
     end,
 
     Req.
