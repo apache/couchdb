@@ -168,8 +168,8 @@ do_encode(KEK, InstanceId, DbName, DocId, DocRev, DocBody) ->
     try
         {ok, AAD} = get_aad(InstanceId, DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
-        {CipherText, CipherTag} = crypto:crypto_one_time_aead(
-            aes_256_gcm, DEK, <<0:96>>, DocBody, AAD, 16, true),
+        {CipherText, CipherTag} = crypto:block_encrypt(
+            aes_gcm, DEK, <<0:96>>, {AAD, DocBody, 16}),
         <<CipherTag/binary, CipherText/binary>>
     of
         Resp ->
@@ -185,8 +185,8 @@ do_decode(KEK, InstanceId, DbName, DocId, DocRev, Encoded) ->
         <<CipherTag:16/binary, CipherText/binary>> = Encoded,
         {ok, AAD} = get_aad(InstanceId, DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
-        crypto:crypto_one_time_aead(
-            aes_256_gcm, DEK, <<0:96>>, CipherText, AAD, CipherTag, false)
+        crypto:block_decrypt(
+            aes_gcm, DEK, <<0:96>>, {AAD, CipherText, CipherTag})
     of
         Resp ->
             exit({ok, Resp})
@@ -203,7 +203,7 @@ get_aad(InstanceId, DbName) when is_binary(InstanceId), is_binary(DbName) ->
 get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
     Context = <<DocId/binary, 0:8, DocRev/binary>>,
     PlainText = <<1:16, ?LABEL, 0:8, Context/binary, 256:16>>,
-    <<_:256>> = DEK = crypto:mac(hmac, sha256, KEK, PlainText),
+    <<_:256>> = DEK = crypto:hmac(sha256, KEK, PlainText),
     {ok, DEK}.
 
 
@@ -221,13 +221,15 @@ unwrap_kek(Cache, WrappedKEK) ->
 %% this mocks a call to an expernal system to aquire KEK
 get_kek() ->
     KEK = crypto:strong_rand_bytes(32),
-    WrappedKEK = crypto:crypto_one_time(aes_256_ctr, ?MEK, ?IV, KEK, true),
+    Enc = crypto:stream_init(aes_ctr, ?MEK, ?IV),
+    {_, WrappedKEK} = crypto:stream_encrypt(Enc, KEK),
     {ok, KEK, WrappedKEK}.
 
 
 %% this mocks a call to an expernal system to unwrap KEK
 unwrap_kek(WrappedKEK) ->
-    KEK = crypto:crypto_one_time(aes_256_ctr, ?MEK, ?IV, WrappedKEK, true),
+    Enc = crypto:stream_init(aes_ctr, ?MEK, ?IV),
+    {_, KEK} = crypto:stream_decrypt(Enc, WrappedKEK),
     {ok, KEK, WrappedKEK}.
 
 
