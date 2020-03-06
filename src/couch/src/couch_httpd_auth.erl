@@ -192,18 +192,18 @@ proxy_auth_user(Req) ->
 
 jwt_authentication_handler(Req) ->
     Secret = config:get("couch_httpd_auth", "jwt_secret", ""),
-    SecretBitstring = list_to_binary(Secret),
-    ExpiryClaim = config:get("couch_httpd_auth", "jwt_expiry_claim", "exp"),
     UserClaim = config:get("couch_httpd_auth", "jwt_user_claim", "sub"),
 
     case header_value(Req, "Authorization") of
         "Bearer " ++ Jwt ->
-            JwtBitstring = list_to_binary(Jwt),
+            erlang:display(Jwt),
+            % todo: Not sure which is the correct one to use here?
+            % JwtBinary = list_to_bitstring(Jwt),
+            JwtBitstring = list_to_bitstring(Jwt),
+            %
             case jwt:decode(JwtBitstring, Secret) of
                 {ok, Claims} -> 
-                    Expiry = couch_util:get_value(<<ExpiryClaim>>, Claims, <<"">>),
                     User = couch_util:get_value(<<UserClaim>>, Claims, <<"">>),
-                    erlang:display(Expiry),
                     erlang:display(User),
 
                     Req#httpd{user_ctx=#user_ctx{
