@@ -197,7 +197,7 @@ jwt_authentication_handler(Req) ->
         "Bearer " ++ Jwt ->
             case jwt:decode(?l2b(Jwt), ?l2b(Secret)) of
                 {ok, Claims} ->
-		            User = maps:get(?l2b(UserClaim), Claims),
+                    User = maps:get(?l2b(UserClaim), Claims),
 
                     Req#httpd{user_ctx=#user_ctx{
                         name=User,
