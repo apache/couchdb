@@ -35,6 +35,7 @@ couch_jobs_basic_test_() ->
                 [
                     fun add_remove_pending/1,
                     fun add_remove_errors/1,
+                    fun add_with_the_same_scheduled_time/1,
                     fun get_job_data_and_state/1,
                     fun resubmit_as_job_creator/1,
                     fun type_timeouts_and_server/1,
@@ -156,6 +157,16 @@ add_remove_errors(#{t1 := T, j1 := J}) ->
         ?assertEqual(ok, couch_jobs:add(?TX, T, J, #{})),
         ?assertEqual(ok, couch_jobs:add(?TX, T, J, #{})),
         ?assertEqual(ok, couch_jobs:remove(?TX, T, J))
+    end).
+
+
+add_with_the_same_scheduled_time(#{t1 := T, j1 := J}) ->
+    ?_test(begin
+        ?assertEqual(ok, couch_jobs:add(?TX, T, J, #{})),
+        fabric2_fdb:transactional(fun(Tx) ->
+            ?assertEqual(ok, couch_jobs:add(Tx, T, J, #{})),
+            ?assert(erlfdb:is_read_only(Tx))
+        end)
     end).
 
 
