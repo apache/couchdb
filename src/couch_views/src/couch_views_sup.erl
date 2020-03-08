@@ -28,6 +28,7 @@
 
 
 start_link() ->
+    ok = register_views_index(),
     Arg = case fabric2_node_types:is_type(view_indexing) of
         true -> normal;
         false -> builds_disabled
@@ -48,6 +49,13 @@ init(builds_disabled) ->
     couch_log:notice("~p : view_indexing disabled", [?MODULE]),
     couch_views_jobs:set_timeout(),
     {ok, {flags(), []}}.
+
+
+register_views_index() ->
+    case fabric2_node_types:is_type(api_frontend) of
+        true -> fabric2_index:register_index(couch_views);
+        false -> ok
+    end.
 
 
 flags() ->

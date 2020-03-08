@@ -41,7 +41,8 @@ indexer_test_() ->
                     ?TDEF_FE(multipe_identical_keys_from_same_doc),
                     ?TDEF_FE(fewer_multipe_identical_keys_from_same_doc),
                     ?TDEF_FE(handle_size_key_limits),
-                    ?TDEF_FE(handle_size_value_limits)
+                    ?TDEF_FE(handle_size_value_limits),
+                    ?TDEF_FE(index_autoupdater_callback)
                 ]
             }
         }
@@ -534,6 +535,21 @@ handle_size_value_limits(Db) ->
         row(<<"2">>, 3, 3),
         row(<<"2">>, 23, 3)
     ], Out1).
+
+
+index_autoupdater_callback(Db) ->
+    DDoc = create_ddoc(),
+    Doc1 = doc(0),
+    {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
+    {ok, _} = fabric2_db:update_doc(Db, Doc1, []),
+
+    DbSeq = fabric2_db:get_update_seq(Db),
+
+    Result = couch_views:build_indices(Db, [DDoc]),
+    ?assertMatch([{ok, <<_/binary>>}], Result),
+    [{ok, JobId}] = Result,
+
+    ?assertEqual(ok, couch_views_jobs:wait_for_job(JobId, DbSeq)).
 
 
 row(Id, Key, Value) ->
