@@ -733,6 +733,10 @@ update_docs(Db, Docs0, Options) ->
                     end)
                 end, Docs1)
         end,
+
+        % Notify index builder
+        fabric2_index:db_updated(name(Db)),
+
         % Convert errors
         Resps1 = lists:map(fun(Resp) ->
             case Resp of
