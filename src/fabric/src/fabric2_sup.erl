@@ -47,6 +47,14 @@ init([]) ->
             5000,
             worker,
             [fabric2_server]
+        },
+        {
+            fabric2_index,
+            {fabric2_index, start_link, []},
+            permanent,
+            5000,
+            worker,
+            [fabric2_index]
         }
     ],
     ChildrenWithEpi = couch_epi:register_service(fabric2_epi, Children),
