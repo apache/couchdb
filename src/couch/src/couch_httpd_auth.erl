@@ -207,7 +207,7 @@ jwt_authentication_handler(Req) ->
 		    throw({unauthorized, Reason})
             end;
         _ ->
-	        nil
+    	    Req
     end.
 
 cookie_authentication_handler(Req) ->
