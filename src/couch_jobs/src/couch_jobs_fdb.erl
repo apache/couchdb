@@ -23,6 +23,7 @@
     accept/4,
     finish/3,
     resubmit/3,
+    resubmit/4,
     update/3,
 
     set_type_timeout/3,
@@ -98,7 +99,7 @@ add(#{jtx := true} = JTx0, Type, JobId, Data, STime) ->
             Key = job_key(JTx, Job),
             case erlfdb:wait(erlfdb:get(Tx, Key)) of
                 <<_/binary>> ->
-                    {ok, Job1} = resubmit(JTx, Job, STime),
+                    {ok, Job1} = resubmit(JTx, Job, Data, STime),
                     #{seq := Seq, state := State, data := Data1} = Job1,
                     {ok, State, Seq, Data1};
                 not_found ->
@@ -205,8 +206,11 @@ finish(#{jtx := true} = JTx0, #{jlock := <<_/binary>>} = Job, Data) when
             {error, halt}
     end.
 
+resubmit(JTx0, Job, NewSTime) ->
+    resubmit(JTx0, Job, undefined, NewSTime).
 
-resubmit(#{jtx := true} = JTx0, #{job := true} = Job, NewSTime) ->
+
+resubmit(#{jtx := true} = JTx0, #{job := true} = Job, NewData, NewSTime) ->
     #{tx := Tx} = JTx = get_jtx(JTx0),
     #{type := Type, id := JobId} = Job,
     Key = job_key(JTx, Job),
@@ -218,11 +222,12 @@ resubmit(#{jtx := true} = JTx0, #{job := true} = Job, NewSTime) ->
             end,
             case job_state(JLock, Seq) of
                 finished ->
-                    ok = maybe_enqueue(JTx, Type, JobId, STime, true, Data),
+                    ok = maybe_enqueue(JTx, Type, JobId, STime, true, NewData),
+                    NewData1 = update_job_data(Data, NewData),
                     Job1 = Job#{
                         seq => ?PENDING_SEQ,
                         state => pending,
-                        data => Data
+                        data => NewData1
                     },
                     {ok, Job1};
                 pending when STime == OldSTime ->
@@ -237,15 +242,16 @@ resubmit(#{jtx := true} = JTx0, #{job := true} = Job, NewSTime) ->
                     },
                     {ok, Job1};
                 pending ->
-                    JV1 = JV#jv{seq = ?PENDING_SEQ, stime = STime},
+                    JV1 = JV#jv{seq = ?PENDING_SEQ, stime = STime, data = NewData},
                     set_job_val(Tx, Key, JV1),
                     couch_jobs_pending:remove(JTx, Type, JobId, OldSTime),
                     couch_jobs_pending:enqueue(JTx, Type, STime, JobId),
+                    NewData1 = update_job_data(Data, NewData),
                     Job1 = Job#{
                         stime => STime,
                         seq => ?PENDING_SEQ,
                         state => pending,
-                        data => Data
+                        data => NewData1
                     },
                     {ok, Job1};
                 running ->
@@ -705,3 +711,10 @@ get_md_version_age(Version) ->
 update_md_version_timestamp(Version) ->
     Ts = erlang:system_time(second),
     ets:insert(?MODULE, {?MD_TIMESTAMP_ETS_KEY, Version, Ts}).
+
+
+update_job_data(Data, undefined) ->
+    Data;
+
+update_job_data(_Data, NewData) ->
+    NewData.
