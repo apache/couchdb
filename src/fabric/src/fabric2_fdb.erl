@@ -1470,6 +1470,9 @@ get_fold_acc(Db, RangePrefix, UserCallback, UserAcc, Options)
     EndKey2 = case EndKey1 of
         undefined ->
             <<RangePrefix/binary, 16#FF>>;
+        EK2 when Reverse ->
+            PackedEK = erlfdb_tuple:pack({EK2}, RangePrefix),
+            <<PackedEK/binary, 16#FF>>;
         EK2 ->
             erlfdb_tuple:pack({EK2}, RangePrefix)
     end,
