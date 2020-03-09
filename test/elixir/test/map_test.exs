@@ -535,6 +535,22 @@ defmodule ViewMapTest do
     assert error == "foundationdb_error"
   end
 
+  test "descending=true query with startkey_docid", context do
+    db_name = context[:db_name]
+
+    url = "/#{db_name}/_design/map/_view/some"
+
+    resp =
+      Couch.get(url,
+        query: %{descending: true, startkey: 8, startkey_docid: "doc-id-8", limit: 3}
+      )
+
+    ids = get_ids(resp)
+
+    assert resp.status_code == 200
+    assert ids == ["doc-id-8", "doc-id-7", "doc-id-6"]
+  end
+
   def update_doc_value(db_name, id, value) do
     resp = Couch.get("/#{db_name}/#{id}")
     doc = convert(resp.body)
