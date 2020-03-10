@@ -99,7 +99,7 @@ add(#{jtx := true} = JTx0, Type, JobId, Data, STime) ->
             Key = job_key(JTx, Job),
             case erlfdb:wait(erlfdb:get(Tx, Key)) of
                 <<_/binary>> ->
-                    {ok, Job1} = resubmit(JTx, Job, Data, STime),
+                    {ok, Job1} = resubmit(JTx, Job, STime, Data),
                     #{seq := Seq, state := State, data := Data1} = Job1,
                     {ok, State, Seq, Data1};
                 not_found ->
@@ -207,10 +207,10 @@ finish(#{jtx := true} = JTx0, #{jlock := <<_/binary>>} = Job, Data) when
     end.
 
 resubmit(JTx0, Job, NewSTime) ->
-    resubmit(JTx0, Job, undefined, NewSTime).
+    resubmit(JTx0, Job, NewSTime, undefined).
 
 
-resubmit(#{jtx := true} = JTx0, #{job := true} = Job, NewData, NewSTime) ->
+resubmit(#{jtx := true} = JTx0, #{job := true} = Job, NewSTime, NewData) ->
     #{tx := Tx} = JTx = get_jtx(JTx0),
     #{type := Type, id := JobId} = Job,
     Key = job_key(JTx, Job),
