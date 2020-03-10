@@ -189,24 +189,21 @@ proxy_auth_user(Req) ->
     end.
 
 jwt_authentication_handler(Req) ->
-    Secret = config:get("couch_httpd_auth", "jwt_secret", ""),
-    UserClaim = config:get("couch_httpd_auth", "jwt_user_claim", "sub"),
-
-    case header_value(Req, "Authorization") of
-        "Bearer " ++ Jwt ->
-            case jwt:decode(?l2b(Jwt), ?l2b(Secret)) of
-                {ok, Claims} ->
-                    User = maps:get(?l2b(UserClaim), Claims),
+    RequiredClaims = ["sub", "exp"],
+    case { config:get("chttpd", "jwt_secret"), header_value(Req, "Authorization") } of
+        { undefined, _ } -> Req;
+        { _, undefined } -> Req;
+        { Secret, "Bearer " ++ Jwt } ->
+            case jwtf:decode(?l2b(Jwt), RequiredClaims, fun(_,_) -> Secret end) of
+                {ok, { Claims } } ->
+                    { _, User} = lists:keyfind(<<"sub">>, 1, Claims),
 
                     Req#httpd{user_ctx=#user_ctx{
-                        name=User,
-                        roles=[]
+                        name=User
                     }};
                 {error, Reason} ->
-		            throw({unauthorized, Reason})
-                end;
-        _ ->
-    	    Req
+                    throw({unauthorized, Reason})
+            end
     end.
 
 cookie_authentication_handler(Req) ->

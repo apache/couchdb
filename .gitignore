@@ -33,6 +33,7 @@ rel/tmpdata
 share/server/main-coffee.js
 share/server/main.js
 share/www
+src/jwtf/
 src/b64url/
 src/bear/
 src/certifi/
