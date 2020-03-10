@@ -832,11 +832,23 @@ fold_docs(Db, UserFun, UserAcc0, Options) ->
             UserAcc2 = fabric2_fdb:fold_range(TxDb, Prefix, fun({K, V}, Acc) ->
                 {DocId} = erlfdb_tuple:unpack(K, Prefix),
                 RevId = erlfdb_tuple:unpack(V),
-                maybe_stop(UserFun({row, [
+                Row0 =  [
                     {id, DocId},
                     {key, DocId},
                     {value, {[{rev, couch_doc:rev_to_str(RevId)}]}}
-                ]}, Acc))
+                ],
+
+                DocOpts = couch_util:get_value(doc_opts, Options, []),
+                OpenOpts = [deleted | DocOpts],
+
+                Row1 = case lists:keyfind(include_docs, 1, Options) of
+                    {include_docs, true} ->
+                        Row0 ++ open_json_doc(Db, DocId, OpenOpts, DocOpts);
+                    _ ->
+                        Row0
+                end,
+
+                maybe_stop(UserFun({row, Row1}, Acc))
             end, UserAcc1, Options),
 
             {ok, maybe_stop(UserFun(complete, UserAcc2))}
@@ -1877,4 +1889,15 @@ stem_revisions(#{} = Db, #doc{} = Doc) ->
     case RevPos >= RevsLimit of
         true -> Doc#doc{revs = {RevPos, lists:sublist(Revs, RevsLimit)}};
         false -> Doc
+    end.
+
+
+open_json_doc(Db, DocId, OpenOpts, DocOpts) ->
+    case fabric2_db:open_doc(Db, DocId, OpenOpts) of
+        {not_found, missing} ->
+            [];
+        {ok, #doc{deleted = true}} ->
+            [{doc, null}];
+        {ok, #doc{} = Doc} ->
+            [{doc, couch_doc:to_json_obj(Doc, DocOpts)}]
     end.
