@@ -196,7 +196,7 @@ jwt_authentication_handler(Req) ->
         { Secret, "Bearer " ++ Jwt } ->
             case jwtf:decode(?l2b(Jwt), RequiredClaims, fun(_,_) -> Secret end) of
                 {ok, { Claims } } ->
-                    { _, User} = lists:keyfind(<<"sub">>, 1, Claims),
+                    { _, User } = lists:keyfind(<<"sub">>, 1, Claims),
 
                     Req#httpd{user_ctx=#user_ctx{
                         name=User
