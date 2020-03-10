@@ -188,7 +188,6 @@ proxy_auth_user(Req) ->
             end
     end.
 
-
 jwt_authentication_handler(Req) ->
     Secret = config:get("couch_httpd_auth", "jwt_secret", ""),
     UserClaim = config:get("couch_httpd_auth", "jwt_user_claim", "sub"),
@@ -204,8 +203,8 @@ jwt_authentication_handler(Req) ->
                         roles=[]
                     }};
                 {error, Reason} ->
-		    throw({unauthorized, Reason})
-            end;
+		            throw({unauthorized, Reason})
+                end;
         _ ->
     	    Req
     end.
