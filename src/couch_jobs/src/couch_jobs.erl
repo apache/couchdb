@@ -27,6 +27,7 @@
     finish/3,
     resubmit/2,
     resubmit/3,
+    resubmit/4,
     is_resubmitted/1,
     update/2,
     update/3,
@@ -148,6 +149,13 @@ resubmit(Tx, Job) ->
 resubmit(Tx, #{jlock := <<_/binary>>} = Job, SchedTime) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         couch_jobs_fdb:resubmit(JTx, Job, SchedTime)
+    end).
+
+
+-spec resubmit(jtx(), job(), scheduled_time(), job_data()) -> {ok, job()} | {error, any()}.
+resubmit(Tx, #{jlock := <<_/binary>>} = Job, SchedTime, Data) ->
+    couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
+        couch_jobs_fdb:resubmit(JTx, Job, SchedTime, Data)
     end).
 
 

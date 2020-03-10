@@ -47,7 +47,12 @@ couch_jobs_basic_test_() ->
                     fun accept_blocking/1,
                     fun job_processor_update/1,
                     fun resubmit_enqueues_job/1,
+                    fun resubmit_finished_updates_job_data/1,
+                    fun resubmit_running_does_not_update_job_data/1,
                     fun resubmit_custom_schedtime/1,
+                    fun add_pending_updates_job_data/1,
+                    fun add_finished_updates_job_data/1,
+                    fun add_running_does_not_update_job_data/1,
                     fun accept_max_schedtime/1,
                     fun accept_no_schedule/1,
                     fun subscribe/1,
@@ -426,6 +431,30 @@ resubmit_enqueues_job(#{t1 := T, j1 := J}) ->
     end).
 
 
+resubmit_finished_updates_job_data(#{t1 := T, j1 := J}) ->
+    ?_test(begin
+        Data1 = #{<<"test">> => 1},
+        Data2 = #{<<"test">> => 2},
+        ok = couch_jobs:add(?TX, T, J, Data1),
+        {ok, Job1, #{}} = couch_jobs:accept(T),
+        ?assertEqual(ok, couch_jobs:finish(?TX, Job1)),
+        ?assertMatch({ok, _}, couch_jobs:resubmit(?TX, Job1, 6, Data2)),
+        ?assertMatch({ok, _, Data2}, couch_jobs:accept(T))
+    end).
+
+
+resubmit_running_does_not_update_job_data(#{t1 := T, j1 := J}) ->
+    ?_test(begin
+        Data1 = #{<<"test">> => 1},
+        Data2 = #{<<"test">> => 2},
+        ok = couch_jobs:add(?TX, T, J, Data1),
+        {ok, Job1, #{}} = couch_jobs:accept(T),
+        ?assertMatch({ok, _}, couch_jobs:resubmit(?TX, Job1, 6, Data2)),
+        ?assertEqual(ok, couch_jobs:finish(?TX, Job1)),
+        ?assertMatch({ok, _, Data1}, couch_jobs:accept(T))
+    end).
+
+
 resubmit_custom_schedtime(#{t1 := T, j1 := J}) ->
     ?_test(begin
         ?assertEqual(ok, couch_jobs:add(?TX, T, J, #{}, 7)),
@@ -433,6 +462,40 @@ resubmit_custom_schedtime(#{t1 := T, j1 := J}) ->
         ?assertMatch({ok, _}, couch_jobs:resubmit(?TX, Job, 9)),
         ?assertEqual(ok, couch_jobs:finish(?TX, Job)),
         ?assertMatch(#{stime := 9, state := pending}, get_job(T, J))
+    end).
+
+
+add_pending_updates_job_data(#{t1 := T, j1 := J}) ->
+    ?_test(begin
+        Data1 = #{<<"test">> => 1},
+        Data2 = #{<<"test">> => 2},
+        ok = couch_jobs:add(?TX, T, J, Data1),
+        ?assertEqual(ok, couch_jobs:add(?TX, T, J, Data2, 6)),
+        ?assertMatch({ok, _, Data2}, couch_jobs:accept(T))
+    end).
+
+
+add_finished_updates_job_data(#{t1 := T, j1 := J}) ->
+    ?_test(begin
+        Data1 = #{<<"test">> => 1},
+        Data2 = #{<<"test">> => 2},
+        ok = couch_jobs:add(?TX, T, J, Data1),
+        {ok, Job1, #{}} = couch_jobs:accept(T),
+        ?assertEqual(ok, couch_jobs:finish(?TX, Job1)),
+        ?assertEqual(ok, couch_jobs:add(?TX, T, J, Data2, 6)),
+        ?assertMatch({ok, _, Data2}, couch_jobs:accept(T))
+    end).
+
+
+add_running_does_not_update_job_data(#{t1 := T, j1 := J}) ->
+    ?_test(begin
+        Data1 = #{<<"test">> => 1},
+        Data2 = #{<<"test">> => 2},
+        ok = couch_jobs:add(?TX, T, J, Data1),
+        {ok, Job1, #{}} = couch_jobs:accept(T),
+        ?assertEqual(ok, couch_jobs:add(?TX, T, J, Data2, 6)),
+        ?assertEqual(ok, couch_jobs:finish(?TX, Job1)),
+        ?assertMatch({ok, _, Data1}, couch_jobs:accept(T))
     end).
 
 
