@@ -169,7 +169,7 @@ configure_filter("_view", Style, Req, Db) ->
         [DName, VName] ->
             {ok, DDoc} = open_ddoc(Db, <<"_design/", DName/binary>>),
             check_member_exists(DDoc, [<<"views">>, VName]),
-            case couch_db:is_clustered(Db) of
+            case fabric2_db:is_clustered(Db) of
                 true ->
                     DIR = fabric_util:doc_id_and_rev(DDoc),
                     {fetch, view, Style, DIR, VName};
