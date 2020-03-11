@@ -110,6 +110,7 @@
         {Credo.Check.Readability.StringSigils, []},
         {Credo.Check.Readability.TrailingBlankLine, []},
         {Credo.Check.Readability.TrailingWhiteSpace, []},
+        {Credo.Check.Readability.UnnecessaryAliasExpansion, []},
         {Credo.Check.Readability.VariableNames, []},
 
         #
@@ -130,6 +131,7 @@
            excluded_functions: []
          ]},
         {Credo.Check.Refactor.UnlessWithElse, []},
+        {Credo.Check.Refactor.WithClauses, []},
 
         #
         ## Warnings
@@ -138,7 +140,8 @@
         {Credo.Check.Warning.ExpensiveEmptyEnumCheck, []},
         {Credo.Check.Warning.IExPry, []},
         {Credo.Check.Warning.IoInspect, []},
-        {Credo.Check.Warning.LazyLogging, false}, # Disabled since not compatible with Elixir > 1.9 
+        {Credo.Check.Warning.LazyLogging, false}, # Disabled since not compatible with Elixir > 1.9
+        {Credo.Check.Warning.MixEnv, []},
         {Credo.Check.Warning.OperationOnSameValues, []},
         {Credo.Check.Warning.OperationWithConstantResult, []},
         {Credo.Check.Warning.RaiseInsideRescue, []},
@@ -150,10 +153,12 @@
         {Credo.Check.Warning.UnusedRegexOperation, []},
         {Credo.Check.Warning.UnusedStringOperation, []},
         {Credo.Check.Warning.UnusedTupleOperation, []},
+        {Credo.Check.Warning.UnsafeExec, []},
 
         #
         # Controversial and experimental checks (opt-in, just remove `, false`)
         #
+        {Credo.Check.Readability.StrictModuleLayout, false},
         {Credo.Check.Consistency.MultiAliasImportRequireUse, false},
         {Credo.Check.Design.DuplicatedCode, false},
         {Credo.Check.Readability.Specs, false},
