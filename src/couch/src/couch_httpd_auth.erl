@@ -195,8 +195,7 @@ jwt_authentication_handler(Req) ->
         {Secret, "Bearer " ++ Jwt} ->
             RequiredClaims = re:split(config:get("jwt_auth", "required_claims", "sub, exp"), "\s*,\s*"),
             AllowedAlgorithms = re:split(config:get("jwt_auth", "allowed_algorithms", "HS256"), "\s*,\s*"),
-            TimestampLeniencyConfig = config:get("jwt_auth", "timestamp_leniency", "0"),
-            TimestampLeniency = couch_util:to_integer(TimestampLeniencyConfig),
+            TimestampLeniency = config:get_integer("jwt_auth", "timestamp_leniency", "0"),
             case jwtf:decode(?l2b(Jwt), RequiredClaims, fun(_,_) -> Secret end) of
                 {ok, {Claims}} ->
                     {_, User} = lists:keyfind(<<"sub">>, 1, Claims),
