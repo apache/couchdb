@@ -92,6 +92,14 @@ handle_info(remove_expired, St) ->
         largest_elapsed := max(Elapsed, LargestElapsed),
         lag := NowTS - OldestTS}};
 
+
+handle_info({Ref, ready}, St) when is_reference(Ref) ->
+    % Prevent crashing server and application
+    LogMsg = "~p : spurious erlfdb future ready message ~p",
+    couch_log:error(LogMsg, [?MODULE, Ref]),
+    {noreply, St};
+
+
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
