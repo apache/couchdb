@@ -68,7 +68,7 @@ defmodule CouchDBTest.Mixfile do
       {:jiffy, path: Path.expand("src/jiffy", __DIR__)},
       {:ibrowse,
        path: Path.expand("src/ibrowse", __DIR__), override: true, compile: false},
-      {:credo, "~> 1.2.0", only: [:dev, :test, :integration], runtime: false}
+      {:credo, "~> 1.3.0", only: [:dev, :test, :integration], runtime: false}
     ]
   end
 
