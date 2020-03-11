@@ -74,7 +74,7 @@ decode(EncodedToken, Checks, KS) ->
     try
         [Header, Payload, Signature] = split(EncodedToken),
         validate(Header, Payload, Signature, Checks, KS),
-        {ok, decode_json(Payload)}
+        {ok, decode_b64url_json(Payload)}
     catch
         throw:Error ->
             {error, Error}
@@ -102,10 +102,10 @@ verification_algorithm(Alg) ->
 
 
 validate(Header0, Payload0, Signature, Checks, KS) ->
-    Header1 = props(decode_json(Header0)),
+    Header1 = props(decode_b64url_json(Header0)),
     validate_header(Header1, Checks),
 
-    Payload1 = props(decode_json(Payload0)),
+    Payload1 = props(decode_b64url_json(Payload0)),
     validate_payload(Payload1, Checks),
 
     Alg = prop(<<"alg">>, Header1),
@@ -269,13 +269,19 @@ split(EncodedToken) ->
     end.
 
 
-decode_json(Encoded) ->
-    case b64url:decode(Encoded) of
-        {error, Reason} ->
-            throw({bad_request, Reason});
-        Decoded ->
-            jiffy:decode(Decoded)
+decode_b64url_json(B64UrlEncoded) ->
+    try
+        case b64url:decode(B64UrlEncoded) of
+            {error, Reason} ->
+                throw({bad_request, Reason});
+            JsonEncoded ->
+                jiffy:decode(JsonEncoded)
+        end
+    catch
+        error:Error ->
+            throw({bad_request, Error})
     end.
+
 
 props({Props}) ->
     Props;
