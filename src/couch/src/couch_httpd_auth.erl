@@ -189,13 +189,14 @@ proxy_auth_user(Req) ->
     end.
 
 jwt_authentication_handler(Req) ->
+    DefaultClaims = [<<"sub">>],
     case {config:get("jwt_auth", "secret"), header_value(Req, "Authorization")} of
-        {undefined, _} -> Req;
-        {_, undefined} -> Req;
-        {Secret, "Bearer " ++ Jwt} ->
-            RequiredClaims = re:split(config:get("jwt_auth", "required_claims", "sub, exp"), "\s*,\s*"),
-            AllowedAlgorithms = re:split(config:get("jwt_auth", "allowed_algorithms", "HS256"), "\s*,\s*"),
-            TimestampLeniency = config:get_integer("jwt_auth", "timestamp_leniency", 0),
+        {Secret, "Bearer " ++ Jwt} when Secret /= undefined ->
+            RequiredClaims = case re:split(config:get("jwt_auth", "required_claims", "sub"), "\s*,\s*") of
+                "" -> DefaultClaims;
+                ConfiguredClaims ->
+                    sets:to_list(sets:from_list(lists:merge(DefaultClaims, ConfiguredClaims)))
+            end,
             case jwtf:decode(?l2b(Jwt), RequiredClaims, fun(_,_) -> Secret end) of
                 {ok, {Claims}} ->
                     {_, User} = lists:keyfind(<<"sub">>, 1, Claims),
@@ -205,7 +206,7 @@ jwt_authentication_handler(Req) ->
                 {error, Reason} ->
                     throw({unauthorized, Reason})
             end;
-        {Secret, _} -> Req
+        {_, _} -> Req
     end.
 
 cookie_authentication_handler(Req) ->
