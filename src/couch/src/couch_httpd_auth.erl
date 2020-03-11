@@ -189,21 +189,24 @@ proxy_auth_user(Req) ->
     end.
 
 jwt_authentication_handler(Req) ->
-    RequiredClaims = ["sub", "exp"],
-    case { config:get("chttpd", "jwt_secret"), header_value(Req, "Authorization") } of
-        { undefined, _ } -> Req;
-        { _, undefined } -> Req;
-        { Secret, "Bearer " ++ Jwt } ->
+    case {config:get("jwt_auth", "secret"), header_value(Req, "Authorization")} of
+        {undefined, _} -> Req;
+        {_, undefined} -> Req;
+        {Secret, "Bearer " ++ Jwt} ->
+            RequiredClaims = re:split(config:get("jwt_auth", "required_claims", "sub, exp"), "\s*,\s*"),
+            AllowedAlgorithms = re:split(config:get("jwt_auth", "allowed_algorithms", "HS256"), "\s*,\s*"),
+            TimestampLeniencyConfig = config:get("jwt_auth", "timestamp_leniency", "0"),
+            TimestampLeniency = couch_util:to_integer(TimestampLeniencyConfig),
             case jwtf:decode(?l2b(Jwt), RequiredClaims, fun(_,_) -> Secret end) of
-                {ok, { Claims } } ->
-                    { _, User } = lists:keyfind(<<"sub">>, 1, Claims),
-
+                {ok, {Claims}} ->
+                    {_, User} = lists:keyfind(<<"sub">>, 1, Claims),
                     Req#httpd{user_ctx=#user_ctx{
                         name=User
                     }};
                 {error, Reason} ->
                     throw({unauthorized, Reason})
-            end
+            end;
+        {Secret, _} -> Req
     end.
 
 cookie_authentication_handler(Req) ->
