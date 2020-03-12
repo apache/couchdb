@@ -18,25 +18,59 @@
 -include("fabric2_test.hrl").
 
 
+-define(PDICT_ERROR_IN_FOLD_RANGE, '$fabric2_error_in_fold_range').
+-define(PDICT_ERROR_IN_USER_FUN, '$fabric2_error_throw_in_user_fun').
+
+
 crud_test_() ->
     {
         "Test database CRUD operations",
         {
             setup,
-            fun() -> test_util:start_couch([fabric]) end,
-            fun test_util:stop_couch/1,
-            with([
-                ?TDEF(create_db),
-                ?TDEF(open_db),
-                ?TDEF(delete_db),
-                ?TDEF(list_dbs),
-                ?TDEF(list_dbs_user_fun),
-                ?TDEF(list_dbs_user_fun_partial),
-                ?TDEF(list_dbs_info),
-                ?TDEF(list_dbs_info_partial)
-            ])
+            fun setup_all/0,
+            fun teardown_all/1,
+            {
+                foreach,
+                fun setup/0,
+                fun cleanup/1,
+                [
+                    ?TDEF_FE(create_db),
+                    ?TDEF_FE(open_db),
+                    ?TDEF_FE(delete_db),
+                    ?TDEF_FE(list_dbs),
+                    ?TDEF_FE(list_dbs_user_fun),
+                    ?TDEF_FE(list_dbs_user_fun_partial),
+                    ?TDEF_FE(list_dbs_info),
+                    ?TDEF_FE(list_dbs_info_partial),
+                    ?TDEF_FE(list_dbs_tx_too_long),
+                    ?TDEF_FE(list_dbs_info_tx_too_long)
+                ]
+            }
         }
     }.
+
+
+setup_all() ->
+    Ctx = test_util:start_couch([fabric]),
+    meck:new(erlfdb, [passthrough]),
+    Ctx.
+
+
+teardown_all(Ctx) ->
+    meck:unload(),
+    test_util:stop_couch(Ctx).
+
+
+setup() ->
+    meck:expect(erlfdb, fold_range, fun(Tx, Start, End, Callback, Acc, Opts) ->
+        maybe_tx_too_long(?PDICT_ERROR_IN_FOLD_RANGE),
+        meck:passthrough([Tx, Start, End, Callback, Acc, Opts])
+    end),
+    ok.
+
+
+cleanup(_) ->
+    reset_error_counts().
 
 
 create_db(_) ->
@@ -132,6 +166,81 @@ list_dbs_info_partial(_) ->
     ?assertEqual([{meta, []}], UserAcc).
 
 
+list_dbs_tx_too_long(_) ->
+    DbName1 = ?tempdb(),
+    DbName2 = ?tempdb(),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName1, [])),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName2, [])),
+
+    UserFun = fun(Row, Acc) ->
+        maybe_tx_too_long(?PDICT_ERROR_IN_USER_FUN),
+        {ok, [Row, Acc]}
+    end,
+
+    % Get get expected output without any transactions timing out
+    Dbs = fabric2_db:list_dbs(UserFun, [], []),
+
+    % Blow up in fold range
+    tx_too_long_errors(0, 1),
+    ?assertEqual(Dbs, fabric2_db:list_dbs(UserFun, [], [])),
+
+    % Blow up in fold_range after emitting one row
+    tx_too_long_errors(0, {1, 1}),
+    ?assertEqual(Dbs, fabric2_db:list_dbs(UserFun, [], [])),
+
+    % Blow up in user fun
+    tx_too_long_errors(1, 0),
+    ?assertEqual(Dbs, fabric2_db:list_dbs(UserFun, [], [])),
+
+    % Blow up in user fun after emitting one row
+    tx_too_long_errors({1, 1}, 0),
+    ?assertEqual(Dbs, fabric2_db:list_dbs(UserFun, [], [])),
+
+    % Blow up in in user fun and fold range
+    tx_too_long_errors(1, {1, 1}),
+    ?assertEqual(Dbs, fabric2_db:list_dbs(UserFun, [], [])),
+
+    ok = fabric2_db:delete(DbName1, []),
+    ok = fabric2_db:delete(DbName2, []).
+
+
+list_dbs_info_tx_too_long(_) ->
+    DbName1 = ?tempdb(),
+    DbName2 = ?tempdb(),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName1, [])),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName2, [])),
+
+    UserFun = fun(Row, Acc) ->
+        maybe_tx_too_long(?PDICT_ERROR_IN_USER_FUN),
+        {ok, [Row, Acc]}
+    end,
+
+    {ok, DbInfos} = fabric2_db:list_dbs_info(UserFun, [], []),
+
+    % Blow up in fold range
+    tx_too_long_errors(0, 1),
+    ?assertEqual({ok, DbInfos}, fabric2_db:list_dbs_info(UserFun, [], [])),
+
+    % Blow up in fold_range after emitting one row
+    tx_too_long_errors(0, {1, 1}),
+    ?assertEqual({ok, DbInfos}, fabric2_db:list_dbs_info(UserFun, [], [])),
+
+    % Blow up in user fun
+    tx_too_long_errors(1, 0),
+    ?assertEqual({ok, DbInfos}, fabric2_db:list_dbs_info(UserFun, [], [])),
+
+    % Blow up in user fun after emitting one row
+    tx_too_long_errors({1, 1}, 0),
+    ?assertEqual({ok, DbInfos}, fabric2_db:list_dbs_info(UserFun, [], [])),
+
+    % Blow up in in user fun and fold range
+    tx_too_long_errors(1, {1, 1}),
+    ?assertEqual({ok, DbInfos}, fabric2_db:list_dbs_info(UserFun, [], [])),
+
+    ok = fabric2_db:delete(DbName1, []),
+    ok = fabric2_db:delete(DbName2, []).
+
+
 is_db_info_member(_, []) ->
     false;
 
@@ -141,4 +250,35 @@ is_db_info_member(DbName, [DbInfo | RestInfos]) ->
             true;
         _E ->
             is_db_info_member(DbName, RestInfos)
+    end.
+
+
+tx_too_long_errors(UserFunCount, FoldErrors) when is_integer(UserFunCount) ->
+    tx_too_long_errors({0, UserFunCount}, FoldErrors);
+
+tx_too_long_errors(UserFunErrors, FoldCount) when is_integer(FoldCount) ->
+    tx_too_long_errors(UserFunErrors, {0, FoldCount});
+
+tx_too_long_errors({UserFunSkip, UserFunCount}, {FoldSkip, FoldCount}) ->
+    reset_error_counts(),
+    put(?PDICT_ERROR_IN_USER_FUN, {UserFunSkip, UserFunCount}),
+    put(?PDICT_ERROR_IN_FOLD_RANGE, {FoldSkip, FoldCount}).
+
+
+reset_error_counts() ->
+    erase(?PDICT_ERROR_IN_FOLD_RANGE),
+    erase(?PDICT_ERROR_IN_USER_FUN).
+
+
+maybe_tx_too_long(Key) ->
+    case get(Key) of
+        {Skip, Count} when is_integer(Skip), Skip > 0 ->
+            put(Key, {Skip - 1, Count});
+        {0, Count} when is_integer(Count), Count > 0 ->
+            put(Key, {0, Count - 1}),
+            error({erlfdb_error, 1007});
+        {0, 0} ->
+            ok;
+        undefined ->
+            ok
     end.
