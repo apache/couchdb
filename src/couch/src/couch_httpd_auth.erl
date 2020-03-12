@@ -211,7 +211,7 @@ jwt_default_claims(Claims) ->
     DefaultClaims = [<<"sub">>],
     case Claims of
         "" -> DefaultClaims;
-        ConfiguredClaims -> lists:usort([DefaultClaims, ConfiguredClaims])
+        _ -> lists:usort([DefaultClaims, Claims])
     end.
 
 cookie_authentication_handler(Req) ->
