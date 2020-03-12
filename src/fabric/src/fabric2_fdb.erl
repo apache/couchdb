@@ -340,7 +340,11 @@ get_dir(Tx) ->
     erlfdb_directory:get_name(CouchDB).
 
 
-list_dbs(Tx, Callback, AccIn, Options) ->
+list_dbs(Tx, Callback, AccIn, Options0) ->
+    Options = case fabric2_util:get_value(restart_tx, Options0) of
+        undefined -> [{restart_tx, true} | Options0];
+        _AlreadySet -> Options0
+    end,
     LayerPrefix = get_dir(Tx),
     Prefix = erlfdb_tuple:pack({?ALL_DBS}, LayerPrefix),
     fold_range({tx, Tx}, Prefix, fun({K, _V}, Acc) ->
@@ -349,7 +353,11 @@ list_dbs(Tx, Callback, AccIn, Options) ->
     end, AccIn, Options).
 
 
-list_dbs_info(Tx, Callback, AccIn, Options) ->
+list_dbs_info(Tx, Callback, AccIn, Options0) ->
+    Options = case fabric2_util:get_value(restart_tx, Options0) of
+        undefined -> [{restart_tx, true} | Options0];
+        _AlreadySet -> Options0
+    end,
     LayerPrefix = get_dir(Tx),
     Prefix = erlfdb_tuple:pack({?ALL_DBS}, LayerPrefix),
     fold_range({tx, Tx}, Prefix, fun({DbNameKey, DbPrefix}, Acc) ->
