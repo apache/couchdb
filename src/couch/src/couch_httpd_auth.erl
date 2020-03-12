@@ -387,7 +387,8 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req, _AuthModule) ->
     end;
 % logout by deleting the session
 handle_session_req(#httpd{method='DELETE'}=Req, _AuthModule) ->
-    Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)),
+    Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++
+        cookie_domain() ++ cookie_scheme(Req)),
     {Code, Headers} = case couch_httpd:qs_value(Req, "next", nil) of
         nil ->
             {200, [Cookie]};
