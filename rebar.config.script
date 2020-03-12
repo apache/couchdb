@@ -132,6 +132,7 @@ SubDirs = [
     "src/fabric",
     "src/global_changes",
     "src/ioq",
+    "src/jwtf",
     "src/ken",
     "src/mango",
     "src/rexi",
