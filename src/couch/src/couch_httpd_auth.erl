@@ -205,7 +205,7 @@ jwt_authentication_handler(Req) ->
     end.
 
 get_configured_claims() ->
-    jwt_default_claims(re:split(config:get("jwt_auth", "required_claims", "sub"), "\s*,\s*")).
+    jwt_default_claims(re:split(config:get("jwt_auth", "required_claims", "sub"), "\s*,\s*", [{return, binary}])).
 
 jwt_default_claims(Claims) when is_list(Claims) ->
     lists:usort([<<"sub">> | Claims]).
