@@ -37,7 +37,10 @@
     from_hex/1,
     uuid/0,
 
-    encode_all_doc_key/1
+    encode_all_doc_key/1,
+
+    pmap/2,
+    pmap/3
 ]).
 
 
@@ -298,3 +301,47 @@ encode_all_doc_key(N) when is_number(N) -> <<>>;
 encode_all_doc_key(B) when is_binary(B) -> B;
 encode_all_doc_key(L) when is_list(L) -> <<255>>;
 encode_all_doc_key({O}) when is_list(O) -> <<255>>.
+
+
+pmap(Fun, Args) ->
+    pmap(Fun, Args, []).
+
+
+pmap(Fun, Args, Opts) ->
+    Refs = lists:map(fun(Arg) ->
+        {_, Ref} = spawn_monitor(fun() -> exit(pmap_exec(Fun, Arg)) end),
+        Ref
+    end, Args),
+    Timeout = fabric2_util:get_value(timeout, Opts, 5000),
+    lists:map(fun(Ref) ->
+        receive
+            {'DOWN', Ref, _, _, {'$res', Res}} ->
+                Res;
+            {'DOWN', Ref, _, _, {'$err', Tag, Reason, Stack}} ->
+                erlang:raise(Tag, Reason, Stack)
+        after Timeout ->
+            error({pmap_timeout, Timeout})
+        end
+    end, Refs).
+
+
+% OTP_RELEASE is defined in OTP 21+ only
+-ifdef(OTP_RELEASE).
+
+pmap_exec(Fun, Arg) ->
+    try
+        {'$res', Fun(Arg)}
+    catch Tag:Reason:Stack ->
+        {'$err', Tag, Reason, Stack}
+    end.
+
+-else.
+
+pmap_exec(Fun, Arg) ->
+    try
+        {'$res', Fun(Arg)}
+    catch Tag:Reason ->
+        {'$err', Tag, Reason, erlang:get_stacktrace()}
+    end.
+
+-endif.

@@ -21,9 +21,6 @@
 
 -define(DOC_COUNT, 25).
 
--define(PDICT_ERROR_IN_FOLD_RANGE, '$fabric2_error_in_fold_range').
--define(PDICT_ERROR_IN_USER_FUN, '$fabric2_error_throw_in_user_fun').
-
 
 changes_fold_test_() ->
     {
@@ -43,10 +40,10 @@ changes_fold_test_() ->
                     ?TDEF_FE(fold_changes_basic_rev),
                     ?TDEF_FE(fold_changes_since_now_rev),
                     ?TDEF_FE(fold_changes_since_seq_rev),
-                    ?TDEF_FE(fold_changes_basic_tx_too_long),
-                    ?TDEF_FE(fold_changes_reverse_tx_too_long),
-                    ?TDEF_FE(fold_changes_tx_too_long_with_single_row_emits),
-                    ?TDEF_FE(fold_changes_since_seq_tx_too_long),
+                    ?TDEF_FE(fold_changes_basic_tx_too_old),
+                    ?TDEF_FE(fold_changes_reverse_tx_too_old),
+                    ?TDEF_FE(fold_changes_tx_too_old_with_single_row_emits),
+                    ?TDEF_FE(fold_changes_since_seq_tx_too_old),
                     ?TDEF_FE(fold_changes_not_progressing)
                 ]
             }
@@ -66,10 +63,7 @@ teardown_all(Ctx) ->
 
 
 setup() ->
-    meck:expect(erlfdb, fold_range, fun(Tx, Start, End, Callback, Acc, Opts) ->
-        maybe_tx_too_long(?PDICT_ERROR_IN_FOLD_RANGE),
-        meck:passthrough([Tx, Start, End, Callback, Acc, Opts])
-    end),
+    fabric2_test_util:tx_too_old_mock_erlfdb(),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     Rows = lists:map(fun(Val) ->
         DocId = fabric2_util:uuid(),
@@ -90,7 +84,7 @@ setup() ->
 
 
 cleanup({Db, _DocIdRevs}) ->
-    reset_error_counts(),
+    fabric2_test_util:tx_too_old_reset_errors(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
 
@@ -130,129 +124,112 @@ fold_changes_since_seq_rev({Db, DocRows}) ->
     fold_changes_since_seq_rev({Db, RestRows}).
 
 
-fold_changes_basic_tx_too_long({Db, DocRows0}) ->
+fold_changes_basic_tx_too_old({Db, DocRows0}) ->
     DocRows = lists:reverse(DocRows0),
 
-    tx_too_long_errors(0, 1),
+    fabric2_test_util:tx_too_old_setup_errors(0, 1),
     ?assertEqual(DocRows, changes(Db)),
 
-    tx_too_long_errors(1, 0),
+    fabric2_test_util:tx_too_old_setup_errors(1, 0),
     ?assertEqual(DocRows, changes(Db)),
 
     % Blow up in user fun but after emitting one row successfully.
-    tx_too_long_errors({1, 1}, 0),
+    fabric2_test_util:tx_too_old_setup_errors({1, 1}, 0),
     ?assertEqual(DocRows, changes(Db)),
 
     % Blow up before last document
-    tx_too_long_errors({?DOC_COUNT - 1, 1}, 0),
+    fabric2_test_util:tx_too_old_setup_errors({?DOC_COUNT - 1, 1}, 0),
     ?assertEqual(DocRows, changes(Db)),
 
     % Emit one value, then blow up in user function and then blow up twice in
     % fold_range. But it is not enough to stop the iteration.
-    tx_too_long_errors({1, 1}, {1, 2}),
+    fabric2_test_util:tx_too_old_setup_errors({1, 1}, {1, 2}),
     ?assertEqual(DocRows, changes(Db)).
 
 
-fold_changes_reverse_tx_too_long({Db, DocRows}) ->
+fold_changes_reverse_tx_too_old({Db, DocRows}) ->
     Opts = [{dir, rev}],
 
-    tx_too_long_errors(0, 1),
+    fabric2_test_util:tx_too_old_setup_errors(0, 1),
     ?assertEqual([], changes(Db, 0, Opts)),
 
-    tx_too_long_errors(1, 0),
+    fabric2_test_util:tx_too_old_setup_errors(1, 0),
     ?assertEqual([], changes(Db, 0, Opts)),
 
-    tx_too_long_errors(1, 0),
+    fabric2_test_util:tx_too_old_setup_errors(1, 0),
     ?assertEqual(DocRows, changes(Db, now, Opts)),
 
-    tx_too_long_errors(1, 0),
+    fabric2_test_util:tx_too_old_setup_errors(1, 0),
     ?assertEqual(DocRows, changes(Db, now, Opts)),
 
     % Blow up in user fun but after emitting one row successfully.
-    tx_too_long_errors({1, 1}, 0),
+    fabric2_test_util:tx_too_old_setup_errors({1, 1}, 0),
     ?assertEqual(DocRows, changes(Db, now, Opts)),
 
     % Blow up before last document
-    tx_too_long_errors({?DOC_COUNT - 1, 1}, 0),
+    fabric2_test_util:tx_too_old_setup_errors({?DOC_COUNT - 1, 1}, 0),
     ?assertEqual(DocRows, changes(Db, now, Opts)),
 
     % Emit value, blow up in user function, and twice in fold_range
-    tx_too_long_errors({1, 1}, {1, 2}),
+    fabric2_test_util:tx_too_old_setup_errors({1, 1}, {1, 2}),
     ?assertEqual(DocRows, changes(Db, now, Opts)).
 
 
-fold_changes_tx_too_long_with_single_row_emits({Db, DocRows0}) ->
+fold_changes_tx_too_old_with_single_row_emits({Db, DocRows0}) ->
     % This test does a few basic operations while forcing erlfdb range fold to
     % emit a single row at a time, thus forcing it to use continuations while
     % also inducing tx errors
     Opts = [{target_bytes, 1}],
     DocRows = lists:reverse(DocRows0),
 
-    tx_too_long_errors(0, 1),
+    fabric2_test_util:tx_too_old_setup_errors(0, 1),
     ?assertEqual(DocRows, changes(Db, 0, Opts)),
 
-    tx_too_long_errors(1, 0),
+    fabric2_test_util:tx_too_old_setup_errors(1, 0),
     ?assertEqual(DocRows, changes(Db, 0, Opts)),
 
     % Blow up in user fun but after emitting one row successfully.
-    tx_too_long_errors({1, 1}, 0),
+    fabric2_test_util:tx_too_old_setup_errors({1, 1}, 0),
     ?assertEqual(DocRows, changes(Db, 0, Opts)),
 
     % Blow up before last document
-    tx_too_long_errors({?DOC_COUNT - 1, 1}, 0),
+    fabric2_test_util:tx_too_old_setup_errors({?DOC_COUNT - 1, 1}, 0),
     ?assertEqual(DocRows, changes(Db, 0, Opts)).
 
 
-fold_changes_since_seq_tx_too_long({Db, Rows}) ->
+fold_changes_since_seq_tx_too_old({Db, Rows}) ->
     % Blow up after after a successful emit, then twice
     % in range fold call. Also re-use already existing basic
     % fold_changes_since_seq test function.
-    tx_too_long_errors({1, 1}, {1, 2}),
+    fabric2_test_util:tx_too_old_setup_errors({1, 1}, {1, 2}),
     fold_changes_since_seq({Db, Rows}).
 
 
 fold_changes_not_progressing({Db, _}) ->
     % Fail in first fold range call.
-    tx_too_long_errors(5, 0),
+    fabric2_test_util:tx_too_old_setup_errors(5, 0),
     ?assertError(fold_range_not_progressing, changes(Db)),
 
     % Fail in first user fun call.
-    tx_too_long_errors(0, 5),
+    fabric2_test_util:tx_too_old_setup_errors(0, 5),
     ?assertError(fold_range_not_progressing, changes(Db)),
 
     % Blow up in last user fun call
-    tx_too_long_errors({?DOC_COUNT - 1, 5}, 0),
+    fabric2_test_util:tx_too_old_setup_errors({?DOC_COUNT - 1, 5}, 0),
     ?assertError(fold_range_not_progressing, changes(Db)),
 
     % Blow up in user function after one success.
-    tx_too_long_errors({1, 5}, 0),
+    fabric2_test_util:tx_too_old_setup_errors({1, 5}, 0),
     ?assertError(fold_range_not_progressing, changes(Db)),
 
     % Emit value, blow up in user function, then keep blowing up in fold_range.
-    tx_too_long_errors({1, 1}, {1, 4}),
+    fabric2_test_util:tx_too_old_setup_errors({1, 1}, {1, 4}),
     ?assertError(fold_range_not_progressing, changes(Db)).
 
 
 fold_fun(#{} = Change, Acc) ->
-    maybe_tx_too_long(?PDICT_ERROR_IN_USER_FUN),
+    fabric2_test_util:tx_too_old_raise_in_user_fun(),
     {ok, [Change | Acc]}.
-
-
-tx_too_long_errors(UserFunCount, FoldErrors) when is_integer(UserFunCount) ->
-    tx_too_long_errors({0, UserFunCount}, FoldErrors);
-
-tx_too_long_errors(UserFunErrors, FoldCount) when is_integer(FoldCount) ->
-    tx_too_long_errors(UserFunErrors, {0, FoldCount});
-
-tx_too_long_errors({UserFunSkip, UserFunCount}, {FoldSkip, FoldCount}) ->
-    reset_error_counts(),
-    put(?PDICT_ERROR_IN_USER_FUN, {UserFunSkip, UserFunCount}),
-    put(?PDICT_ERROR_IN_FOLD_RANGE, {FoldSkip, FoldCount}).
-
-
-reset_error_counts() ->
-    erase(?PDICT_ERROR_IN_FOLD_RANGE),
-    erase(?PDICT_ERROR_IN_USER_FUN).
 
 
 changes(Db) ->
@@ -262,17 +239,3 @@ changes(Db) ->
 changes(Db, Since, Opts) ->
     {ok, Rows} = fabric2_db:fold_changes(Db, Since, fun fold_fun/2, [], Opts),
     Rows.
-
-
-maybe_tx_too_long(Key) ->
-    case get(Key) of
-        {Skip, Count} when is_integer(Skip), Skip > 0 ->
-            put(Key, {Skip - 1, Count});
-        {0, Count} when is_integer(Count), Count > 0 ->
-            put(Key, {0, Count - 1}),
-            error({erlfdb_error, 1007});
-        {0, 0} ->
-            ok;
-        undefined ->
-            ok
-    end.
