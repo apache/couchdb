@@ -207,12 +207,8 @@ jwt_authentication_handler(Req) ->
 get_configured_claims() ->
     jwt_default_claims(re:split(config:get("jwt_auth", "required_claims", "sub"), "\s*,\s*")).
 
-jwt_default_claims(Claims) ->
-    DefaultClaims = [<<"sub">>],
-    case Claims of
-        "" -> DefaultClaims;
-        _ -> lists:usort([DefaultClaims, Claims])
-    end.
+jwt_default_claims(Claims) when is_list(Claims) ->
+    lists:usort([<<"sub">> | Claims]).
 
 cookie_authentication_handler(Req) ->
     cookie_authentication_handler(Req, couch_auth_cache).
