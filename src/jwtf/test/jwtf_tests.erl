@@ -82,6 +82,16 @@ invalid_alg_test() ->
     ?assertEqual({error, {bad_request,<<"Invalid alg header parameter">>}},
         jwtf:decode(Encoded, [alg], nil)).
 
+not_allowed_alg_test() ->
+    Encoded = encode({[{<<"alg">>, <<"HS256">>}]}, []),
+    ?assertEqual({error, {bad_request,<<"Invalid alg header parameter">>}},
+        jwtf:decode(Encoded, [{alg, [<<"RS256">>]}], nil)).
+
+reject_unknown_alg_test() ->
+    Encoded = encode({[{<<"alg">>, <<"NOPE">>}]}, []),
+    ?assertEqual({error, {bad_request,<<"Invalid alg header parameter">>}},
+        jwtf:decode(Encoded, [{alg, [<<"NOPE">>]}], nil)).
+
 
 missing_iss_test() ->
     Encoded = encode(valid_header(), {[]}),
@@ -176,7 +186,7 @@ hs256_test() ->
                      "6MTAwMDAwMDAwMDAwMDAsImtpZCI6ImJhciJ9.iS8AH11QHHlczkBn"
                      "Hl9X119BYLOZyZPllOVhSBZ4RZs">>,
     KS = fun(<<"HS256">>, <<"123456">>) -> <<"secret">> end,
-    Checks = [{iss, <<"https://foo.com">>}, iat, exp, typ, alg, kid],
+    Checks = [{iss, <<"https://foo.com">>}, iat, exp, typ, {alg, [<<"HS256">>]}, kid],
     ?assertMatch({ok, _}, catch jwtf:decode(EncodedToken, Checks, KS)).
 
 

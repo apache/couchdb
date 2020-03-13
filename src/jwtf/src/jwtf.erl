@@ -139,10 +139,11 @@ validate_alg(Props, Checks) ->
     case {Required, Alg} of
         {undefined, _} ->
             ok;
-        {true, undefined} ->
+        {Required, undefined} when Required /= undefined ->
             throw({bad_request, <<"Missing alg header parameter">>});
-        {true, Alg} ->
-            case lists:member(Alg, valid_algorithms()) of
+        {Required, Alg} when Required == true; is_list(Required) ->
+            AllowedAlg = if Required == true -> true; true -> lists:member(Alg, Required) end,
+            case AllowedAlg andalso lists:member(Alg, valid_algorithms()) of
                 true ->
                     ok;
                 false ->
