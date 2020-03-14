@@ -192,7 +192,8 @@ jwt_authentication_handler(Req) ->
     case {config:get("jwt_auth", "secret"), header_value(Req, "Authorization")} of
         {Secret, "Bearer " ++ Jwt} when Secret /= undefined ->
             RequiredClaims = get_configured_claims(),
-            case jwtf:decode(?l2b(Jwt), RequiredClaims, fun(_,_) -> Secret end) of
+            AllowedAlgorithms = get_configured_algorithms(),
+            case jwtf:decode(?l2b(Jwt), [{alg, AllowedAlgorithms} | RequiredClaims], fun(_,_) -> Secret end) of
                 {ok, {Claims}} ->
                     {_, User} = lists:keyfind(<<"sub">>, 1, Claims),
                     Req#httpd{user_ctx=#user_ctx{
@@ -203,6 +204,9 @@ jwt_authentication_handler(Req) ->
             end;
         {_, _} -> Req
     end.
+
+get_configured_algorithms() ->
+    re:split(config:get("jwt_auth", "allowed_algorithms", "HS256"), "\s*,\s*", [{return, binary}]).
 
 get_configured_claims() ->
     jwt_default_claims(re:split(config:get("jwt_auth", "required_claims", ""), "\s*,\s*", [{return, binary}])).
