@@ -35,6 +35,16 @@
     {<<"HS384">>, {hmac, sha384}},
     {<<"HS512">>, {hmac, sha512}}]).
 
+-define(CHECKS, [
+    alg,
+    exp,
+    iat,
+    iss,
+    kid,
+    nbf,
+    sig,
+    typ]).
+
 
 % @doc encode
 % Encode the JSON Header and Claims using Key and Alg obtained from Header
@@ -102,6 +112,7 @@ verification_algorithm(Alg) ->
 
 
 validate(Header0, Payload0, Signature, Checks, KS) ->
+    validate_checks(Checks),
     Header1 = props(decode_b64url_json(Header0)),
     validate_header(Header1, Checks),
 
@@ -112,6 +123,14 @@ validate(Header0, Payload0, Signature, Checks, KS) ->
     Key = key(Header1, Checks, KS),
     verify(Alg, Header0, Payload0, Signature, Key).
 
+validate_checks(Checks) when is_list(Checks) ->
+    UnknownChecks = proplists:get_keys(Checks) -- ?CHECKS,
+    case UnknownChecks of
+        [] ->
+            ok;
+        UnknownChecks ->
+            error({unknown_checks, UnknownChecks})
+    end.
 
 validate_header(Props, Checks) ->
     validate_typ(Props, Checks),
