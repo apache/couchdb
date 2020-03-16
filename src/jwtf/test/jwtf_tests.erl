@@ -178,6 +178,10 @@ malformed_token_test() ->
     ?assertEqual({error, {bad_request, <<"Malformed token">>}},
         jwtf:decode(<<"a.b.c.d">>, [], nil)).
 
+unknown_check_test() ->
+    ?assertError({unknown_checks, [bar, foo]},
+        jwtf:decode(<<"a.b.c">>, [exp, foo, iss, bar, exp], nil)).
+
 
 %% jwt.io generated
 hs256_test() ->
