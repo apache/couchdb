@@ -60,7 +60,7 @@ def setup_users(db, **kwargs):
 
 
 def teardown_users(db):
-    [db.delete_doc(doc['_id']) for doc in USERS_DOCS]
+    [db.delete_doc(doc["_id"]) for doc in USERS_DOCS]
 
 
 def setup(db, index_type="view", **kwargs):

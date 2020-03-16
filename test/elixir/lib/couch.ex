@@ -127,8 +127,8 @@ defmodule Couch do
   def set_auth_options(options) do
     if Keyword.get(options, :cookie) == nil do
       headers = Keyword.get(options, :headers, [])
-
-      if headers[:basic_auth] != nil or headers[:authorization] != nil do
+      if headers[:basic_auth] != nil or headers[:authorization] != nil
+         or List.keymember?(headers, :"X-Auth-CouchDB-UserName", 0) do
         options
       else
         username = System.get_env("EX_USERNAME") || "adm"
