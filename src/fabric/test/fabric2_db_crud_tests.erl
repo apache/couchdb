@@ -166,7 +166,7 @@ list_dbs_tx_too_old(_) ->
 
     UserFun = fun(Row, Acc) ->
         fabric2_test_util:tx_too_old_raise_in_user_fun(),
-        {ok, [Row, Acc]}
+        {ok, [Row | Acc]}
     end,
 
     % Get get expected output without any transactions timing out
@@ -181,7 +181,7 @@ list_dbs_tx_too_old(_) ->
     ?assertEqual(Dbs, fabric2_db:list_dbs(UserFun, [], [])),
 
     % Blow up in user fun
-    fabric2_test_util:tx_too_old_setup_errors(2, 2),
+    fabric2_test_util:tx_too_old_setup_errors(1, 0),
     ?assertEqual(Dbs, fabric2_db:list_dbs(UserFun, [], [])),
 
     % Blow up in user fun after emitting one row
@@ -209,7 +209,7 @@ list_dbs_info_tx_too_old(_) ->
 
     UserFun = fun(Row, Acc) ->
         fabric2_test_util:tx_too_old_raise_in_user_fun(),
-        {ok, [Row, Acc]}
+        {ok, [Row | Acc]}
     end,
 
     % This is the expected return with no tx timeouts
