@@ -126,7 +126,9 @@
     validate_dbname/1,
 
     %% make_doc/5,
-    new_revid/2
+    new_revid/2,
+
+    apply_open_doc_opts/3
 ]).
 
 

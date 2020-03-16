@@ -348,7 +348,15 @@ fetch_docs(Db, Changes) ->
     ChangesWithDocs = lists:map(fun (BodyFuture) ->
         {Id, RevInfo, Change} = maps:get(BodyFuture, BodyState),
         Doc = fabric2_fdb:get_doc_body_wait(Db, Id, RevInfo, BodyFuture),
-        Change#{doc => Doc}
+
+        BranchCount = maps:get(branch_count, RevInfo, 1),
+        Doc1 = if BranchCount == 1 -> Doc; true ->
+            RevConflicts = fabric2_fdb:get_all_revs(Db, Id),
+            {ok, DocWithConflicts} = fabric2_db:apply_open_doc_opts(Doc,
+                RevConflicts, [conflicts]),
+            DocWithConflicts
+        end,
+        Change#{doc => Doc1}
     end, erlfdb:wait_for_all(BodyFutures)),
 
     % This combines the deleted changes with the changes that contain docs

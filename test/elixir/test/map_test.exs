@@ -551,6 +551,41 @@ defmodule ViewMapTest do
     assert ids == ["doc-id-8", "doc-id-7", "doc-id-6"]
   end
 
+  test "_conflict is supported", context do
+    db_name = context[:db_name]
+    conflict = %{
+      :_id => "doc-id-1",
+      :value => 10,
+      :some => "field",
+      :group => false,
+      :_rev => "1-7cc2eea421141064893681a1582148d8"
+    }
+    ddoc =  %{
+      _id: "_design/conflicts",
+      views: %{
+        view: %{
+          map: """
+              function (doc) {
+                if (!doc._conflicts) {
+                  return;
+                }
+                emit(doc._id, doc._conflicts);
+              }
+          """
+        }
+      }
+    }
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => [ddoc]})
+    assert resp.status_code == 201
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => [conflict], :new_edits => false})
+    assert resp.status_code == 201
+
+    url = "/#{db_name}/_design/conflicts/_view/view"
+    resp = Couch.get(url)
+    assert get_ids(resp) == ["doc-id-1"]
+  end
+
   def update_doc_value(db_name, id, value) do
     resp = Couch.get("/#{db_name}/#{id}")
     doc = convert(resp.body)
