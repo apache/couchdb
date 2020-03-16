@@ -18,6 +18,9 @@
 -include("fabric2_test.hrl").
 
 
+-define(PDICT_RAISE_IN_ERLFDB_WAIT, '$pdict_raise_in_erlfdb_wait').
+
+
 crud_test_() ->
     {
         "Test database CRUD operations",
@@ -39,7 +42,9 @@ crud_test_() ->
                     ?TDEF_FE(list_dbs_info),
                     ?TDEF_FE(list_dbs_info_partial),
                     ?TDEF_FE(list_dbs_tx_too_old),
-                    ?TDEF_FE(list_dbs_info_tx_too_old)
+                    ?TDEF_FE(list_dbs_info_tx_too_old),
+                    ?TDEF_FE(get_info_wait_retry_on_tx_too_old),
+                    ?TDEF_FE(get_info_wait_retry_on_tx_abort)
                 ]
             }
         }
@@ -62,7 +67,9 @@ setup() ->
 
 
 cleanup(_) ->
-    fabric2_test_util:tx_too_old_reset_errors().
+    fabric2_test_util:tx_too_old_reset_errors(),
+    reset_fail_erfdb_wait(),
+    meck:reset([erlfdb]).
 
 
 create_db(_) ->
@@ -254,6 +261,83 @@ list_dbs_info_tx_too_old(_) ->
     fabric2_util:pmap(fun(DbName) ->
         ?assertEqual(ok, fabric2_db:delete(DbName, []))
     end, DbNames).
+
+
+get_info_wait_retry_on_tx_too_old(_) ->
+    DbName = ?tempdb(),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+
+    {ok, Db} = fabric2_db:open(DbName, []),
+
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{
+            tx := Tx,
+            db_prefix := DbPrefix
+        } = TxDb,
+
+        % Simulate being in a list_dbs_info callback
+        ok = erlfdb:set_option(Tx, disallow_writes),
+
+        InfoF = fabric2_fdb:get_info_future(Tx, DbPrefix),
+        {info_future, _, _, ChangesF, _, _} = InfoF,
+
+        raise_in_erlfdb_wait(ChangesF, {erlfdb_error, 1007}, 3),
+        ?assertError({erlfdb_error, 1007}, fabric2_fdb:get_info_wait(InfoF)),
+
+        raise_in_erlfdb_wait(ChangesF, {erlfdb_error, 1007}, 2),
+        ?assertMatch([{_, _} | _], fabric2_fdb:get_info_wait(InfoF)),
+
+        ?assertEqual(ok, fabric2_db:delete(DbName, []))
+    end).
+
+
+get_info_wait_retry_on_tx_abort(_)->
+    DbName = ?tempdb(),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+
+    {ok, Db} = fabric2_db:open(DbName, []),
+
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{
+            tx := Tx,
+            db_prefix := DbPrefix
+        } = TxDb,
+
+        % Simulate being in a list_dbs_info callback
+        ok = erlfdb:set_option(Tx, disallow_writes),
+
+        InfoF = fabric2_fdb:get_info_future(Tx, DbPrefix),
+        {info_future, _, _, ChangesF, _, _} = InfoF,
+
+        raise_in_erlfdb_wait(ChangesF, {erlfdb_error, 1025}, 3),
+        ?assertError({erlfdb_error, 1025}, fabric2_fdb:get_info_wait(InfoF)),
+
+        raise_in_erlfdb_wait(ChangesF, {erlfdb_error, 1025}, 2),
+        ?assertMatch([{_, _} | _], fabric2_fdb:get_info_wait(InfoF)),
+
+        ?assertEqual(ok, fabric2_db:delete(DbName, []))
+    end).
+
+
+reset_fail_erfdb_wait() ->
+    erase(?PDICT_RAISE_IN_ERLFDB_WAIT),
+    meck:expect(erlfdb, wait, fun(F) -> meck:passthrough([F]) end).
+
+
+raise_in_erlfdb_wait(Future, Error, Count) ->
+    put(?PDICT_RAISE_IN_ERLFDB_WAIT, Count),
+    meck:expect(erlfdb, wait, fun
+        (F) when F =:= Future ->
+            case get(?PDICT_RAISE_IN_ERLFDB_WAIT) of
+                N when is_integer(N), N > 0 ->
+                    put(?PDICT_RAISE_IN_ERLFDB_WAIT, N - 1),
+                    error(Error);
+                _ ->
+                    meck:passthrough([F])
+            end;
+        (F) ->
+            meck:passthrough([F])
+    end).
 
 
 is_db_info_member(_, []) ->
