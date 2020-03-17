@@ -531,7 +531,7 @@ t_slack_view({ok, Shard, GroupId}) ->
         meck:expect(couch_index, get_info, fun(_) ->
             {ok, [{sizes, {[{file, 33554432}, {active, 16777215}]}}]}
         end),
-        ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
+        ?assertEqual(2.0000001192092967, get_priority("ratio_views", {Shard, GroupId})),
         ?assertEqual(16777217, get_priority("slack_views", {Shard, GroupId})),
         ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
     end).
@@ -551,7 +551,7 @@ t_below_min_priority_view({ok, Shard, GroupId}) ->
         meck:expect(couch_index, get_info, fun(_) ->
             {ok, [{sizes, {[{file, 5242880}, {active, 1048576}]}}]}
         end),
-        ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
+        ?assertEqual(5.0, get_priority("ratio_views", {Shard, GroupId})),
         ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
         ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
     end).
