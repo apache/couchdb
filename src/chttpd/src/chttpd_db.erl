@@ -867,7 +867,8 @@ all_docs_view(Req, Db, Keys, OP) ->
 
 
 send_all_docs(Db, #mrargs{keys = undefined} = Args, VAcc0) ->
-    Opts = all_docs_view_opts(Args),
+    Opts0 = all_docs_view_opts(Args),
+    Opts = Opts0 ++ [{restart_tx, true}],
     NS = couch_util:get_value(namespace, Opts),
     FoldFun = case NS of
         <<"_all_docs">> -> fold_docs;
