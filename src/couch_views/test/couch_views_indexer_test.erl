@@ -18,6 +18,11 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
+
+-define(MAP_FUN1, <<"map_fun1">>).
+-define(MAP_FUN2, <<"map_fun2">>).
+
+
 indexer_test_() ->
     {
         "Test view indexing",
@@ -75,18 +80,8 @@ foreach_teardown(Db) ->
 
 indexed_empty_db(Db) ->
     DDoc = create_ddoc(),
-
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
-    {ok, Out} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
-
-    ?assertEqual([], Out).
+    ?assertEqual({ok, []}, run_query(Db, DDoc, ?MAP_FUN1)).
 
 
 indexed_single_doc(Db) ->
@@ -96,20 +91,9 @@ indexed_single_doc(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
     {ok, _} = fabric2_db:update_doc(Db, Doc1, []),
 
-    {ok, Out} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
+    {ok, Out} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([{row, [
-            {id, <<"0">>},
-            {key, 0},
-            {value, 0}
-        ]}], Out).
+    ?assertEqual([row(<<"0">>, 0, 0)], Out).
 
 
 updated_docs_are_reindexed(Db) ->
@@ -119,20 +103,9 @@ updated_docs_are_reindexed(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
     {ok, {Pos, Rev}} = fabric2_db:update_doc(Db, Doc1, []),
 
-    {ok, Out1} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
+    {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([{row, [
-            {id, <<"0">>},
-            {key, 0},
-            {value, 0}
-        ]}], Out1),
+    ?assertEqual([row(<<"0">>, 0, 0)], Out1),
 
     Doc2 = Doc1#doc{
         revs = {Pos, [Rev]},
@@ -140,20 +113,9 @@ updated_docs_are_reindexed(Db) ->
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc2, []),
 
-    {ok, Out2} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
+    {ok, Out2} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([{row, [
-            {id, <<"0">>},
-            {key, 1},
-            {value, 1}
-        ]}], Out2),
+    ?assertEqual([row(<<"0">>, 1, 1)], Out2),
 
     % Check that our id index is updated properly
     % as well.
@@ -175,20 +137,9 @@ updated_docs_without_changes_are_reindexed(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
     {ok, {Pos, Rev}} = fabric2_db:update_doc(Db, Doc1, []),
 
-    {ok, Out1} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
+    {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([{row, [
-            {id, <<"0">>},
-            {key, 0},
-            {value, 0}
-        ]}], Out1),
+    ?assertEqual([row(<<"0">>, 0, 0)], Out1),
 
     Doc2 = Doc1#doc{
         revs = {Pos, [Rev]},
@@ -196,20 +147,9 @@ updated_docs_without_changes_are_reindexed(Db) ->
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc2, []),
 
-    {ok, Out2} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
+    {ok, Out2} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([{row, [
-            {id, <<"0">>},
-            {key, 0},
-            {value, 0}
-        ]}], Out2),
+    ?assertEqual([row(<<"0">>, 0, 0)], Out2),
 
     % Check fdb directly to make sure we've also
     % removed the id idx keys properly.
@@ -237,16 +177,7 @@ deleted_docs_not_indexed(Db) ->
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc2, []),
 
-    {ok, Out} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
-
-    ?assertEqual([], Out).
+    ?assertEqual({ok, []}, run_query(Db, DDoc, ?MAP_FUN1)).
 
 
 deleted_docs_are_unindexed(Db) ->
@@ -256,20 +187,8 @@ deleted_docs_are_unindexed(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
     {ok, {Pos, Rev}} = fabric2_db:update_doc(Db, Doc1, []),
 
-    {ok, Out1} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
-
-    ?assertEqual([{row, [
-            {id, <<"0">>},
-            {key, 0},
-            {value, 0}
-        ]}], Out1),
+    {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
+    ?assertEqual([row(<<"0">>, 0, 0)], Out1),
 
     Doc2 = Doc1#doc{
         revs = {Pos, [Rev]},
@@ -278,16 +197,7 @@ deleted_docs_are_unindexed(Db) ->
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc2, []),
 
-    {ok, Out2} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
-
-    ?assertEqual([], Out2),
+    ?assertEqual({ok, []}, run_query(Db, DDoc, ?MAP_FUN1)),
 
     % Check fdb directly to make sure we've also
     % removed the id idx keys properly.
@@ -307,27 +217,12 @@ multipe_docs_with_same_key(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
     {ok, _} = fabric2_db:update_docs(Db, [Doc1, Doc2], []),
 
-    {ok, Out} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
+    {ok, Out} = run_query(Db, DDoc, ?MAP_FUN1),
 
     ?assertEqual([
-            {row, [
-                {id, <<"0">>},
-                {key, 1},
-                {value, 1}
-            ]},
-            {row, [
-                {id, <<"1">>},
-                {key, 1},
-                {value, 1}
-            ]}
-        ], Out).
+        row(<<"0">>, 1, 1),
+        row(<<"1">>, 1, 1)
+    ], Out).
 
 
 multipe_keys_from_same_doc(Db) ->
@@ -337,27 +232,12 @@ multipe_keys_from_same_doc(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
     {ok, _} = fabric2_db:update_doc(Db, Doc, []),
 
-    {ok, Out} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
+    {ok, Out} = run_query(Db, DDoc, ?MAP_FUN1),
 
     ?assertEqual([
-            {row, [
-                {id, <<"0">>},
-                {key, 1},
-                {value, 1}
-            ]},
-            {row, [
-                {id, <<"0">>},
-                {key, <<"0">>},
-                {value, <<"0">>}
-            ]}
-        ], Out).
+            row(<<"0">>, 1, 1),
+            row(<<"0">>, <<"0">>, <<"0">>)
+    ], Out).
 
 
 multipe_identical_keys_from_same_doc(Db) ->
@@ -367,27 +247,12 @@ multipe_identical_keys_from_same_doc(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
     {ok, _} = fabric2_db:update_doc(Db, Doc, []),
 
-    {ok, Out} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
+    {ok, Out} = run_query(Db, DDoc, ?MAP_FUN1),
 
     ?assertEqual([
-            {row, [
-                {id, <<"0">>},
-                {key, 1},
-                {value, 1}
-            ]},
-            {row, [
-                {id, <<"0">>},
-                {key, 1},
-                {value, 2}
-            ]}
-        ], Out).
+        row(<<"0">>, 1, 1),
+        row(<<"0">>, 1, 2)
+    ], Out).
 
 
 fewer_multipe_identical_keys_from_same_doc(Db) ->
@@ -400,20 +265,13 @@ fewer_multipe_identical_keys_from_same_doc(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
     {ok, {Pos, Rev}} = fabric2_db:update_doc(Db, Doc0, []),
 
-    {ok, Out1} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
+    {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
 
     ?assertEqual([
-            row(<<"0">>, 1, 1),
-            row(<<"0">>, 1, 2),
-            row(<<"0">>, 1, 3)
-        ], Out1),
+        row(<<"0">>, 1, 1),
+        row(<<"0">>, 1, 2),
+        row(<<"0">>, 1, 3)
+    ], Out1),
 
     Doc1 = #doc{
         id = <<"0">>,
@@ -422,19 +280,12 @@ fewer_multipe_identical_keys_from_same_doc(Db) ->
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc1, []),
 
-    {ok, Out2} = couch_views:query(
-            Db,
-            DDoc,
-            <<"map_fun1">>,
-            fun fold_fun/2,
-            [],
-            #mrargs{}
-        ),
+    {ok, Out2} = run_query(Db, DDoc, ?MAP_FUN1),
 
     ?assertEqual([
-            row(<<"0">>, 1, 1),
-            row(<<"0">>, 1, 2)
-        ], Out2).
+        row(<<"0">>, 1, 1),
+        row(<<"0">>, 1, 2)
+    ], Out2).
 
 
 handle_size_key_limits(Db) ->
@@ -451,18 +302,9 @@ handle_size_key_limits(Db) ->
 
     {ok, _} = fabric2_db:update_docs(Db, [DDoc | Docs], []),
 
-    {ok, Out} = couch_views:query(
-        Db,
-        DDoc,
-        <<"map_fun1">>,
-        fun fold_fun/2,
-        [],
-        #mrargs{}
-    ),
+    {ok, Out} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([
-        row(<<"1">>, 2, 2)
-    ], Out),
+    ?assertEqual([row(<<"1">>, 2, 2)], Out),
 
     {ok, Doc} = fabric2_db:open_doc(Db, <<"2">>),
     Doc2 = Doc#doc {
@@ -470,14 +312,7 @@ handle_size_key_limits(Db) ->
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc2),
 
-    {ok, Out1} = couch_views:query(
-        Db,
-        DDoc,
-        <<"map_fun1">>,
-        fun fold_fun/2,
-        [],
-        #mrargs{}
-    ),
+    {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
 
     ?assertEqual([
         row(<<"1">>, 2, 2),
@@ -499,14 +334,7 @@ handle_size_value_limits(Db) ->
 
     {ok, _} = fabric2_db:update_docs(Db, [DDoc | Docs], []),
 
-    {ok, Out} = couch_views:query(
-        Db,
-        DDoc,
-        <<"map_fun2">>,
-        fun fold_fun/2,
-        [],
-        #mrargs{}
-    ),
+    {ok, Out} = run_query(Db, DDoc, ?MAP_FUN2),
 
     ?assertEqual([
         row(<<"1">>, 2, 2),
@@ -515,21 +343,13 @@ handle_size_value_limits(Db) ->
         row(<<"2">>, 23, 3)
     ], Out),
 
-
     {ok, Doc} = fabric2_db:open_doc(Db, <<"1">>),
-    Doc2 = Doc#doc {
-        body = {[{<<"val">>,1}]}
+    Doc2 = Doc#doc{
+        body = {[{<<"val">>, 1}]}
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc2),
 
-    {ok, Out1} = couch_views:query(
-        Db,
-        DDoc,
-        <<"map_fun2">>,
-        fun fold_fun/2,
-        [],
-        #mrargs{}
-    ),
+    {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN2),
 
     ?assertEqual([
         row(<<"2">>, 3, 3),
@@ -576,10 +396,10 @@ create_ddoc(simple) ->
     couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/bar">>},
         {<<"views">>, {[
-            {<<"map_fun1">>, {[
+            {?MAP_FUN1, {[
                 {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
             ]}},
-            {<<"map_fun2">>, {[
+            {?MAP_FUN2, {[
                 {<<"map">>, <<"function(doc) {}">>}
             ]}}
         ]}}
@@ -589,13 +409,13 @@ create_ddoc(multi_emit_different) ->
     couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/bar">>},
         {<<"views">>, {[
-            {<<"map_fun1">>, {[
+            {?MAP_FUN1, {[
                 {<<"map">>, <<"function(doc) { "
                     "emit(doc._id, doc._id); "
                     "emit(doc.val, doc.val); "
                 "}">>}
             ]}},
-            {<<"map_fun2">>, {[
+            {?MAP_FUN2, {[
                 {<<"map">>, <<"function(doc) {}">>}
             ]}}
         ]}}
@@ -605,7 +425,7 @@ create_ddoc(multi_emit_same) ->
     couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/bar">>},
         {<<"views">>, {[
-            {<<"map_fun1">>, {[
+            {?MAP_FUN1, {[
                 {<<"map">>, <<"function(doc) { "
                     "emit(doc.val, doc.val * 2); "
                     "emit(doc.val, doc.val); "
@@ -614,7 +434,7 @@ create_ddoc(multi_emit_same) ->
                     "}"
                 "}">>}
             ]}},
-            {<<"map_fun2">>, {[
+            {?MAP_FUN2, {[
                 {<<"map">>, <<"function(doc) {}">>}
             ]}}
         ]}}
@@ -624,7 +444,7 @@ create_ddoc(multi_emit_key_limit) ->
     couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/bar">>},
         {<<"views">>, {[
-            {<<"map_fun1">>, {[
+            {?MAP_FUN1, {[
                 {<<"map">>, <<"function(doc) { "
                     "if (doc.val === 1) { "
                         "emit('a very long string to be limited', doc.val);"
@@ -633,7 +453,7 @@ create_ddoc(multi_emit_key_limit) ->
                     "}"
                 "}">>}
             ]}},
-            {<<"map_fun2">>, {[
+            {?MAP_FUN2, {[
                 {<<"map">>, <<"function(doc) { "
                     "emit(doc.val + 20, doc.val);"
                     "if (doc.val === 1) { "
@@ -656,3 +476,7 @@ doc(Id, Val) ->
         {<<"_id">>, list_to_binary(integer_to_list(Id))},
         {<<"val">>, Val}
     ]}).
+
+
+run_query(#{} = Db, DDoc, <<_/binary>> = View) ->
+    couch_views:query(Db, DDoc, View, fun fold_fun/2, [], #mrargs{}).
