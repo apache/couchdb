@@ -60,7 +60,7 @@ X means done, - means partially
   - [X] Port lots_of_docs.js
   - [ ] Port method_override.js
   - [X] Port multiple_rows.js
-  - [ ] Port proxyauth.js
+  - [X] Port proxyauth.js
   - [ ] Port purge.js
   - [ ] Port reader_acl.js
   - [ ] Port recreate_doc.js
