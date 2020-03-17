@@ -364,7 +364,7 @@ get_priority(Channel, DiskSize, DataSize, NeedsUpgrade) ->
     Priority = get_priority(Channel),
     MinSize = to_number(Channel, "min_size", "1048576"),
     MaxSize = to_number(Channel, "max_size", "infinity"),
-    DefaultMinPriority = case Priority of "slack" -> "16777216"; _ -> "5.0" end,
+    DefaultMinPriority = case Priority of "slack" -> "16777216"; _ -> "2.0" end,
     MinPriority = to_number(Channel, "min_priority", DefaultMinPriority),
     MaxPriority = to_number(Channel, "max_priority", "infinity"),
     if Priority =:= "upgrade", NeedsUpgrade ->
@@ -531,7 +531,7 @@ t_slack_view({ok, Shard, GroupId}) ->
         meck:expect(couch_index, get_info, fun(_) ->
             {ok, [{sizes, {[{file, 33554432}, {active, 16777215}]}}]}
         end),
-        ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
+        ?assertEqual(2.0000001192092967, get_priority("ratio_views", {Shard, GroupId})),
         ?assertEqual(16777217, get_priority("slack_views", {Shard, GroupId})),
         ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
     end).
@@ -541,9 +541,9 @@ t_no_data_view({ok, Shard, GroupId}) ->
         meck:expect(couch_index, get_info, fun(_) ->
             {ok, [{sizes, {[{file, 5242880}, {active, 0}]}}]}
         end),
-        ?assertEqual(5.0, get_priority("ratio_views", {Shard, GroupId})),
+        ?assertEqual(2.0, get_priority("ratio_views", {Shard, GroupId})),
         ?assertEqual(16777216, get_priority("slack_views", {Shard, GroupId})),
-        ?assertEqual(5.0, get_priority("upgrade_views", {Shard, GroupId}))
+        ?assertEqual(2.0, get_priority("upgrade_views", {Shard, GroupId}))
     end).
 
 t_below_min_priority_view({ok, Shard, GroupId}) ->
@@ -551,7 +551,7 @@ t_below_min_priority_view({ok, Shard, GroupId}) ->
         meck:expect(couch_index, get_info, fun(_) ->
             {ok, [{sizes, {[{file, 5242880}, {active, 1048576}]}}]}
         end),
-        ?assertEqual(0, get_priority("ratio_views", {Shard, GroupId})),
+        ?assertEqual(5.0, get_priority("ratio_views", {Shard, GroupId})),
         ?assertEqual(0, get_priority("slack_views", {Shard, GroupId})),
         ?assertEqual(0, get_priority("upgrade_views", {Shard, GroupId}))
     end).
