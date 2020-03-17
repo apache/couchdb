@@ -195,10 +195,12 @@ jwt_authentication_handler(Req) ->
             AllowedAlgorithms = get_configured_algorithms(),
             case jwtf:decode(?l2b(Jwt), [{alg, AllowedAlgorithms} | RequiredClaims], fun(_,_) -> Secret end) of
                 {ok, {Claims}} ->
-                    {_, User} = lists:keyfind(<<"sub">>, 1, Claims),
-                    Req#httpd{user_ctx=#user_ctx{
-                        name=User
-                    }};
+                    case lists:keyfind(<<"sub">>, 1, Claims) of
+                        false -> throw({unauthorized, <<"Token missing sub claim.">>});
+                        {_, User} -> Req#httpd{user_ctx=#user_ctx{
+                            name=User
+                        }}
+                    end;
                 {error, Reason} ->
                     throw({unauthorized, Reason})
             end;
@@ -212,7 +214,7 @@ get_configured_claims() ->
     jwt_default_claims(re:split(config:get("jwt_auth", "required_claims", ""), "\s*,\s*", [{return, binary}])).
 
 jwt_default_claims(Claims) when is_list(Claims) ->
-    lists:usort([<<"sub">> | Claims]).
+    lists:usort(Claims).
 
 cookie_authentication_handler(Req) ->
     cookie_authentication_handler(Req, couch_auth_cache).
