@@ -27,25 +27,38 @@ doc_fold_test_() ->
         "Test document fold operations",
         {
             setup,
-            fun setup/0,
-            fun cleanup/1,
-            with([
-                ?TDEF(fold_docs_basic),
-                ?TDEF(fold_docs_rev),
-                ?TDEF(fold_docs_with_start_key),
-                ?TDEF(fold_docs_with_end_key),
-                ?TDEF(fold_docs_with_both_keys_the_same),
-                ?TDEF(fold_docs_with_different_keys, 10000),
-                ?TDEF(fold_docs_with_limit),
-                ?TDEF(fold_docs_with_skip),
-                ?TDEF(fold_docs_with_skip_and_limit)
-            ])
+            fun setup_all/0,
+            fun teardown_all/1,
+            {
+                foreach,
+                fun setup/0,
+                fun cleanup/1,
+                [
+                    ?TDEF_FE(fold_docs_basic),
+                    ?TDEF_FE(fold_docs_rev),
+                    ?TDEF_FE(fold_docs_with_start_key),
+                    ?TDEF_FE(fold_docs_with_end_key),
+                    ?TDEF_FE(fold_docs_with_both_keys_the_same),
+                    ?TDEF_FE(fold_docs_with_different_keys, 10000),
+                    ?TDEF_FE(fold_docs_with_limit),
+                    ?TDEF_FE(fold_docs_with_skip),
+                    ?TDEF_FE(fold_docs_with_skip_and_limit),
+                    ?TDEF_FE(fold_docs_tx_too_old)
+                ]
+            }
         }
     }.
 
 
+setup_all() ->
+    test_util:start_couch([fabric]).
+
+
+teardown_all(Ctx) ->
+    test_util:stop_couch(Ctx).
+
+
 setup() ->
-    Ctx = test_util:start_couch([fabric]),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     DocIdRevs = lists:map(fun(Val) ->
         DocId = fabric2_util:uuid(),
@@ -56,38 +69,39 @@ setup() ->
         {ok, Rev} = fabric2_db:update_doc(Db, Doc, []),
         {DocId, {[{rev, couch_doc:rev_to_str(Rev)}]}}
     end, lists:seq(1, ?DOC_COUNT)),
-    {Db, lists:sort(DocIdRevs), Ctx}.
+    fabric2_test_util:tx_too_old_mock_erlfdb(),
+    {Db, lists:sort(DocIdRevs)}.
 
 
-cleanup({Db, _DocIdRevs, Ctx}) ->
-    ok = fabric2_db:delete(fabric2_db:name(Db), []),
-    test_util:stop_couch(Ctx).
+cleanup({Db, _DocIdRevs}) ->
+    fabric2_test_util:tx_too_old_reset_errors(),
+    ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
 
-fold_docs_basic({Db, DocIdRevs, _}) ->
+fold_docs_basic({Db, DocIdRevs}) ->
     {ok, {?DOC_COUNT, Rows}} = fabric2_db:fold_docs(Db, fun fold_fun/2, []),
     ?assertEqual(DocIdRevs, lists:reverse(Rows)).
 
 
-fold_docs_rev({Db, DocIdRevs, _}) ->
+fold_docs_rev({Db, DocIdRevs}) ->
     Opts = [{dir, rev}],
     {ok, {?DOC_COUNT, Rows}} =
             fabric2_db:fold_docs(Db, fun fold_fun/2, [], Opts),
     ?assertEqual(DocIdRevs, Rows).
 
 
-fold_docs_with_start_key({Db, DocIdRevs, _}) ->
+fold_docs_with_start_key({Db, DocIdRevs}) ->
     {StartKey, _} = hd(DocIdRevs),
     Opts = [{start_key, StartKey}],
     {ok, {?DOC_COUNT, Rows}}
             = fabric2_db:fold_docs(Db, fun fold_fun/2, [], Opts),
     ?assertEqual(DocIdRevs, lists:reverse(Rows)),
     if length(DocIdRevs) == 1 -> ok; true ->
-        fold_docs_with_start_key({Db, tl(DocIdRevs), nil})
+        fold_docs_with_start_key({Db, tl(DocIdRevs)})
     end.
 
 
-fold_docs_with_end_key({Db, DocIdRevs, _}) ->
+fold_docs_with_end_key({Db, DocIdRevs}) ->
     RevDocIdRevs = lists:reverse(DocIdRevs),
     {EndKey, _} = hd(RevDocIdRevs),
     Opts = [{end_key, EndKey}],
@@ -95,24 +109,24 @@ fold_docs_with_end_key({Db, DocIdRevs, _}) ->
             fabric2_db:fold_docs(Db, fun fold_fun/2, [], Opts),
     ?assertEqual(RevDocIdRevs, Rows),
     if length(DocIdRevs) == 1 -> ok; true ->
-        fold_docs_with_end_key({Db, lists:reverse(tl(RevDocIdRevs)), nil})
+        fold_docs_with_end_key({Db, lists:reverse(tl(RevDocIdRevs))})
     end.
 
 
-fold_docs_with_both_keys_the_same({Db, DocIdRevs, _}) ->
+fold_docs_with_both_keys_the_same({Db, DocIdRevs}) ->
     lists:foreach(fun({DocId, _} = Row) ->
         check_all_combos(Db, DocId, DocId, [Row])
     end, DocIdRevs).
 
 
-fold_docs_with_different_keys({Db, DocIdRevs, _}) ->
+fold_docs_with_different_keys({Db, DocIdRevs}) ->
     lists:foreach(fun(_) ->
         {StartKey, EndKey, Rows} = pick_range(DocIdRevs),
         check_all_combos(Db, StartKey, EndKey, Rows)
     end, lists:seq(1, 500)).
 
 
-fold_docs_with_limit({Db, DocIdRevs, _}) ->
+fold_docs_with_limit({Db, DocIdRevs}) ->
     lists:foreach(fun(Limit) ->
         Opts1 = [{limit, Limit}],
         {ok, {?DOC_COUNT, Rows1}} =
@@ -129,7 +143,7 @@ fold_docs_with_limit({Db, DocIdRevs, _}) ->
     end, lists:seq(0, 51)).
 
 
-fold_docs_with_skip({Db, DocIdRevs, _}) ->
+fold_docs_with_skip({Db, DocIdRevs}) ->
     lists:foreach(fun(Skip) ->
         Opts1 = [{skip, Skip}],
         {ok, {?DOC_COUNT, Rows1}} =
@@ -151,11 +165,55 @@ fold_docs_with_skip({Db, DocIdRevs, _}) ->
     end, lists:seq(0, 51)).
 
 
-fold_docs_with_skip_and_limit({Db, DocIdRevs, _}) ->
+fold_docs_with_skip_and_limit({Db, DocIdRevs}) ->
     lists:foreach(fun(_) ->
         check_skip_and_limit(Db, [], DocIdRevs),
         check_skip_and_limit(Db, [{dir, rev}], lists:reverse(DocIdRevs))
     end, lists:seq(1, 100)).
+
+
+fold_docs_tx_too_old({Db, _DocIdRevs}) ->
+    {ok, Expected} = fabric2_db:fold_docs(Db, fun fold_fun/2, []),
+
+    FoldDocsFun = fun() ->
+        fabric2_db:fold_docs(Db, fun fold_fun/2, [], [{restart_tx, true}])
+    end,
+
+    % Blow up in fold range on the first call
+    fabric2_test_util:tx_too_old_setup_errors(0, 1),
+    ?assertEqual({ok, Expected}, FoldDocsFun()),
+
+    % Blow up in fold_range after emitting one row
+    fabric2_test_util:tx_too_old_setup_errors(0, {1, 1}),
+    ?assertEqual({ok, Expected}, FoldDocsFun()),
+
+    % Blow up in fold_range after emitting 48 rows
+    fabric2_test_util:tx_too_old_setup_errors(0, {?DOC_COUNT - 2, 1}),
+    ?assertEqual({ok, Expected}, FoldDocsFun()),
+
+    % Blow up in fold_range after emitting 49 rows
+    fabric2_test_util:tx_too_old_setup_errors(0, {?DOC_COUNT - 1, 1}),
+    ?assertEqual({ok, Expected}, FoldDocsFun()),
+
+    % Blow up in user fun
+    fabric2_test_util:tx_too_old_setup_errors(1, 0),
+    ?assertEqual({ok, Expected}, FoldDocsFun()),
+
+    % Blow up in user fun after emitting one row
+    fabric2_test_util:tx_too_old_setup_errors({1, 1}, 0),
+    ?assertEqual({ok, Expected}, FoldDocsFun()),
+
+    % Blow up in user fun after emitting 48 rows
+    fabric2_test_util:tx_too_old_setup_errors({?DOC_COUNT - 2, 1}, 0),
+    ?assertEqual({ok, Expected}, FoldDocsFun()),
+
+    % Blow up in user fun after emitting 49 rows
+    fabric2_test_util:tx_too_old_setup_errors({?DOC_COUNT - 1, 1}, 0),
+    ?assertEqual({ok, Expected}, FoldDocsFun()),
+
+    % Blow up in in user fun and fold range
+    fabric2_test_util:tx_too_old_setup_errors(1, {1, 1}),
+    ?assertEqual({ok, Expected}, FoldDocsFun()).
 
 
 check_all_combos(Db, StartKey, EndKey, Rows) ->
@@ -280,6 +338,7 @@ fold_fun({meta, Meta}, _Acc) ->
     Total = fabric2_util:get_value(total, Meta),
     {ok, {Total, []}};
 fold_fun({row, Row}, {Total, Rows}) ->
+    fabric2_test_util:tx_too_old_raise_in_user_fun(),
     RowId = fabric2_util:get_value(id, Row),
     RowId = fabric2_util:get_value(key, Row),
     RowRev = fabric2_util:get_value(value, Row),
