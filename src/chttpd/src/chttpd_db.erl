@@ -985,7 +985,8 @@ apply_args_to_keylist(Args, Keys0) ->
 view_cb({row, Row}, {iter, Db, Args, VAcc}) ->
     NewRow = case lists:keymember(doc, 1, Row) of
         true ->
-            chttpd_stats:incr_reads();
+            chttpd_stats:incr_reads(),
+            Row;
         false when Args#mrargs.include_docs ->
             {id, DocId} = lists:keyfind(id, 1, Row),
             chttpd_stats:incr_reads(),
