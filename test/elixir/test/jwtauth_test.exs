@@ -31,15 +31,6 @@ defmodule JwtAuthTest do
 
   test "jwt auth without secret", _context do
 
-    server_config = [
-    ]
-
-    run_on_modified_server(server_config, fn ->
-      test_fun_no_secret()
-    end)
-  end
-
-  def test_fun_no_secret() do
     resp = Couch.get("/_session")
 
     assert resp.body["userCtx"]["name"] == "adm"
