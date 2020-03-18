@@ -38,6 +38,7 @@
     uuid/0,
 
     encode_all_doc_key/1,
+    all_docs_view_opts/1,
 
     pmap/2,
     pmap/3
@@ -45,6 +46,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
 revinfo_to_revs(RevInfo) ->
@@ -297,6 +299,42 @@ uuid() ->
 encode_all_doc_key(B) when is_binary(B) -> B;
 encode_all_doc_key(Term) when Term < <<>> -> <<>>;
 encode_all_doc_key(_) -> <<255>>.
+
+
+all_docs_view_opts(#mrargs{} = Args) ->
+    NS = couch_util:get_value(namespace, Args#mrargs.extra),
+    StartKey = case Args#mrargs.start_key of
+        undefined -> Args#mrargs.start_key_docid;
+        SKey -> SKey
+    end,
+    EndKey = case Args#mrargs.end_key of
+        undefined -> Args#mrargs.end_key_docid;
+        EKey -> EKey
+    end,
+    StartKeyOpts = case StartKey of
+        undefined -> [];
+        _ -> [{start_key, encode_all_doc_key(StartKey)}]
+    end,
+    EndKeyOpts = case {EndKey, Args#mrargs.inclusive_end} of
+        {undefined, _} -> [];
+        {_, false} -> [{end_key_gt, encode_all_doc_key(EndKey)}];
+        {_, true} -> [{end_key, encode_all_doc_key(EndKey)}]
+    end,
+
+    DocOpts = case Args#mrargs.conflicts of
+        true -> [conflicts | Args#mrargs.doc_options];
+        _ -> Args#mrargs.doc_options
+    end,
+
+    [
+        {dir, Args#mrargs.direction},
+        {limit, Args#mrargs.limit},
+        {skip, Args#mrargs.skip},
+        {update_seq, Args#mrargs.update_seq},
+        {namespace, NS},
+        {include_docs, Args#mrargs.include_docs},
+        {doc_opts, DocOpts}
+    ] ++ StartKeyOpts ++ EndKeyOpts.
 
 
 pmap(Fun, Args) ->
