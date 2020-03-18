@@ -503,24 +503,30 @@ incr_stat(#{} = Db, Section, Key, Increment) when is_integer(Increment) ->
 
 
 get_all_revs(#{} = Db, DocId) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = ensure_current(Db),
+    DbName = maps:get(name, Db, undefined),
+    with_span('db.get_all_revs', #{'db.name' => DbName, 'doc.id' => DocId}, fun() ->
+        #{
+            tx := Tx,
+            db_prefix := DbPrefix
+        } = ensure_current(Db),
 
-    Prefix = erlfdb_tuple:pack({?DB_REVS, DocId}, DbPrefix),
-    Options = [{streaming_mode, want_all}],
-    Future = erlfdb:get_range_startswith(Tx, Prefix, Options),
-    lists:map(fun({K, V}) ->
-        Key = erlfdb_tuple:unpack(K, DbPrefix),
-        Val = erlfdb_tuple:unpack(V),
-        fdb_to_revinfo(Key, Val)
-    end, erlfdb:wait(Future)).
+        Prefix = erlfdb_tuple:pack({?DB_REVS, DocId}, DbPrefix),
+        Options = [{streaming_mode, want_all}],
+        Future = erlfdb:get_range_startswith(Tx, Prefix, Options),
+        lists:map(fun({K, V}) ->
+            Key = erlfdb_tuple:unpack(K, DbPrefix),
+            Val = erlfdb_tuple:unpack(V),
+            fdb_to_revinfo(Key, Val)
+        end, erlfdb:wait(Future))
+    end).
 
 
 get_winning_revs(Db, DocId, NumRevs) ->
-    Future = get_winning_revs_future(Db, DocId, NumRevs),
-    get_winning_revs_wait(Db, Future).
+    DbName = maps:get(name, Db, undefined),
+    with_span('db.get_winning_revs', #{'db.name' => DbName, 'doc.id' => DocId}, fun() ->
+        Future = get_winning_revs_future(Db, DocId, NumRevs),
+        get_winning_revs_wait(Db, Future)
+    end).
 
 
 get_winning_revs_future(#{} = Db, DocId, NumRevs) ->
@@ -566,8 +572,11 @@ get_non_deleted_rev(#{} = Db, DocId, RevId) ->
 
 
 get_doc_body(Db, DocId, RevInfo) ->
-    Future = get_doc_body_future(Db, DocId, RevInfo),
-    get_doc_body_wait(Db, DocId, RevInfo, Future).
+    DbName = maps:get(name, Db, undefined),
+    with_span('db.get_doc_body', #{'db.name' => DbName, 'doc.id' => DocId}, fun() ->
+        Future = get_doc_body_future(Db, DocId, RevInfo),
+        get_doc_body_wait(Db, DocId, RevInfo, Future)
+    end).
 
 
 get_doc_body_future(#{} = Db, DocId, RevInfo) ->
