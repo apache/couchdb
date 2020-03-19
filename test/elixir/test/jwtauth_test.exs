@@ -9,8 +9,8 @@ defmodule JwtAuthTest do
 
     server_config = [
       %{
-        :section => "jwt_auth",
-        :key => "secret",
+        :section => "jwt_keys",
+        :key => "_default",
         :value => secret
       },
       %{
@@ -25,8 +25,48 @@ defmodule JwtAuthTest do
     run_on_modified_server(server_config, fn -> test_fun("HS512", secret) end)
   end
 
+  defmodule RSA do
+    require Record
+    Record.defrecord :public, :RSAPublicKey,
+      Record.extract(:RSAPublicKey, from_lib: "public_key/include/public_key.hrl")
+    Record.defrecord :private, :RSAPrivateKey,
+      Record.extract(:RSAPrivateKey, from_lib: "public_key/include/public_key.hrl")
+  end
+
+  test "jwt auth with RSA secret", _context do
+    require JwtAuthTest.RSA
+
+    private_key = :public_key.generate_key({:rsa, 2048, 17})
+    public_key = RSA.public(
+      modulus: RSA.private(private_key, :modulus),
+      publicExponent: RSA.private(private_key, :publicExponent))
+
+    public_pem = :public_key.pem_encode(
+      [:public_key.pem_entry_encode(
+          :SubjectPublicKeyInfo, public_key)])
+    public_pem = String.replace(public_pem, "\n", "\\n")
+
+    server_config = [
+      %{
+        :section => "jwt_keys",
+        :key => "_default",
+        :value => public_pem
+      },
+      %{
+        :section => "jwt_auth",
+        :key => "allowed_algorithms",
+        :value => "RS256, RS384, RS512"
+      }
+    ]
+
+    run_on_modified_server(server_config, fn -> test_fun("RS256", private_key) end)
+    run_on_modified_server(server_config, fn -> test_fun("RS384", private_key) end)
+    run_on_modified_server(server_config, fn -> test_fun("RS512", private_key) end)
+  end
+
   def test_fun(alg, key) do
     {:ok, token} = :jwtf.encode({[{"alg", alg}, {"typ", "JWT"}]}, {[{"sub", "couch@apache.org"}]}, key)
+
     resp = Couch.get("/_session",
       headers: [authorization: "Bearer #{token}"]
     )
