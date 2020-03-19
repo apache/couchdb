@@ -3,7 +3,7 @@ defmodule JwtAuthTest do
 
   @moduletag :authentication
 
-  test "jwt auth with HS256 secret", _context do
+  test "jwt auth with HMAC secret", _context do
 
     secret = "zxczxc12zxczxc12"
 
@@ -12,12 +12,17 @@ defmodule JwtAuthTest do
         :section => "jwt_auth",
         :key => "secret",
         :value => secret
+      },
+      %{
+        :section => "jwt_auth",
+        :key => "allowed_algorithms",
+        :value => "HS256, HS384, HS512"
       }
     ]
 
-    run_on_modified_server(server_config, fn ->
-      test_fun("HS256", secret)
-    end)
+    run_on_modified_server(server_config, fn -> test_fun("HS256", secret) end)
+    run_on_modified_server(server_config, fn -> test_fun("HS384", secret) end)
+    run_on_modified_server(server_config, fn -> test_fun("HS512", secret) end)
   end
 
   def test_fun(alg, key) do
