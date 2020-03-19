@@ -42,7 +42,7 @@ X means done, - means partially
   - [X] Port conflicts.js
   - [X] Port cookie_auth.js
   - [X] Port copy_doc.js
-  - [ ] Port design_docs.js
+  - [X] Port design_docs.js
   - [X] Port design_docs_query.js
   - [X] Port design_options.js
   - [X] Port design_paths.js
