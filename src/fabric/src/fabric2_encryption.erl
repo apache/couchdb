@@ -42,10 +42,6 @@
 -define(INIT_TIMEOUT, 60000).
 -define(LABEL, "couchdb-aes256-gcm-encryption-key").
 
-%% Master encryption key. Obviously never known to this module in real life
--define(MEK, <<246,83,186,200,242,183,138,51,2,193,181,37,156,130,190,209,181,69,206,157,69,154,112,158,141,158,196,132,81,253,187,67>>).
--define(IV, <<0:128>>).
-
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -96,8 +92,8 @@ terminate(_, _St) ->
     ok.
 
 
-handle_call({get_wrapped_kek, _DbName}, _From, #{cache := Cache} = St) ->
-    {ok, KEK, WrappedKEK} = get_kek(),
+handle_call({get_wrapped_kek, DbName}, _From, #{cache := Cache} = St) ->
+    {ok, KEK, WrappedKEK} = fabric2_encryption_plugin:get_wrapped_kek(DbName),
     true = ets:insert(Cache, {WrappedKEK, KEK}),
     {reply, {ok, WrappedKEK}, St};
 
@@ -219,35 +215,16 @@ unwrap_kek(Cache, WrappedKEK) ->
         [{WrappedKEK, KEK}] ->
             {ok, KEK};
         [] ->
-            {ok, KEK, WrappedKEK} = unwrap_kek(WrappedKEK),
+            {ok, KEK, WrappedKEK} = fabric2_encryption_plugin:unwrap_kek(
+                WrappedKEK),
             true = ets:insert(Cache, {WrappedKEK, KEK}),
             {ok, KEK}
     end.
 
 
-%% this mocks a call to an expernal system to aquire KEK
-get_kek() ->
-    KEK = crypto:strong_rand_bytes(32),
-    Enc = crypto:stream_init(aes_ctr, ?MEK, ?IV),
-    {_, WrappedKEK} = crypto:stream_encrypt(Enc, KEK),
-    {ok, KEK, WrappedKEK}.
-
-
-%% this mocks a call to an expernal system to unwrap KEK
-unwrap_kek(WrappedKEK) ->
-    Enc = crypto:stream_init(aes_ctr, ?MEK, ?IV),
-    {_, KEK} = crypto:stream_decrypt(Enc, WrappedKEK),
-    {ok, KEK, WrappedKEK}.
-
-
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-
-get_unwrap_kek_test() ->
-    {ok, KEK, WrappedKEK} = get_kek(),
-    ?assertNotEqual(KEK, WrappedKEK),
-    ?assertEqual({ok, KEK, WrappedKEK}, unwrap_kek(WrappedKEK)).
 
 get_dek_test() ->
     KEK = crypto:strong_rand_bytes(32),

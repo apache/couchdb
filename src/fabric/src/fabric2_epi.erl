@@ -28,11 +28,14 @@ app() ->
     fabric.
 
 providers() ->
-    [].
+    [
+        {fabric2_encryption, fabric2_encryption_provider}
+    ].
 
 services() ->
     [
-        {fabric2_db, fabric2_db_plugin}
+        {fabric2_db, fabric2_db_plugin},
+        {fabric2_encryption, fabric2_encryption_plugin}
     ].
 
 data_subscriptions() ->
