@@ -211,7 +211,7 @@ get_configured_algorithms() ->
     re:split(config:get("jwt_auth", "allowed_algorithms", "HS256"), "\s*,\s*", [{return, binary}]).
 
 get_configured_claims() ->
-    lists:usort(re:split(config:get("jwt_auth", "required_claims", ""), "\s*,\s*", [{return, binary}])).
+    re:split(config:get("jwt_auth", "required_claims", ""), "\s*,\s*", [{return, binary}]).
 
 cookie_authentication_handler(Req) ->
     cookie_authentication_handler(Req, couch_auth_cache).
