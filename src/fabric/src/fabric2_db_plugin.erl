@@ -15,6 +15,7 @@
 -export([
     validate_dbname/3,
     before_doc_update/3,
+    after_doc_write/6,
     after_doc_read/2,
     validate_docid/1,
     check_is_admin/1,
@@ -47,6 +48,10 @@ before_doc_update(Db, Doc0, UpdateType) ->
         [Doc1, _Db, _UpdateType] ->
             Doc1
     end.
+
+
+after_doc_write(Db, Doc, NewWinner, OldWinner, NewRevId, Seq)->
+    with_pipe(after_doc_write, [Db, Doc, NewWinner, OldWinner, NewRevId, Seq]).
 
 
 after_doc_read(Db, Doc0) ->
