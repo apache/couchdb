@@ -18,6 +18,7 @@
 -export([default_authentication_handler/1]).
 -export([cookie_authentication_handler/1]).
 -export([proxy_authentication_handler/1]).
+-export([jwt_authentication_handler/1]).
 -export([party_mode_handler/1]).
 
 -export([handle_session_req/1]).
@@ -50,6 +51,9 @@ cookie_authentication_handler(Req) ->
 
 proxy_authentication_handler(Req) ->
     couch_httpd_auth:proxy_authentication_handler(Req).
+
+jwt_authentication_handler(Req) ->
+    couch_httpd_auth:jwt_authentication_handler(Req).
 
 party_mode_handler(#httpd{method='POST', path_parts=[<<"_session">>]} = Req) ->
     % See #1947 - users should always be able to attempt a login

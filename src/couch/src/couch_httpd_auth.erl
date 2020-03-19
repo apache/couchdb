@@ -31,6 +31,8 @@
 -export([cookie_auth_cookie/4, cookie_scheme/1]).
 -export([maybe_value/3]).
 
+-export([jwt_authentication_handler/1]).
+
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
 -compile({no_auto_import,[integer_to_binary/1, integer_to_binary/2]}).
@@ -186,6 +188,30 @@ proxy_auth_user(Req) ->
             end
     end.
 
+jwt_authentication_handler(Req) ->
+    case {config:get("jwt_auth", "secret"), header_value(Req, "Authorization")} of
+        {Secret, "Bearer " ++ Jwt} when Secret /= undefined ->
+            RequiredClaims = get_configured_claims(),
+            AllowedAlgorithms = get_configured_algorithms(),
+            case jwtf:decode(?l2b(Jwt), [{alg, AllowedAlgorithms} | RequiredClaims], fun(_,_) -> Secret end) of
+                {ok, {Claims}} ->
+                    case lists:keyfind(<<"sub">>, 1, Claims) of
+                        false -> throw({unauthorized, <<"Token missing sub claim.">>});
+                        {_, User} -> Req#httpd{user_ctx=#user_ctx{
+                            name=User
+                        }}
+                    end;
+                {error, Reason} ->
+                    throw({unauthorized, Reason})
+            end;
+        {_, _} -> Req
+    end.
+
+get_configured_algorithms() ->
+    re:split(config:get("jwt_auth", "allowed_algorithms", "HS256"), "\s*,\s*", [{return, binary}]).
+
+get_configured_claims() ->
+    lists:usort(re:split(config:get("jwt_auth", "required_claims", ""), "\s*,\s*", [{return, binary}])).
 
 cookie_authentication_handler(Req) ->
     cookie_authentication_handler(Req, couch_auth_cache).
