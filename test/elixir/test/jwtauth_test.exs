@@ -3,7 +3,7 @@ defmodule JwtAuthTest do
 
   @moduletag :authentication
 
-  test "jwt auth with secret", _context do
+  test "jwt auth with HS256 secret", _context do
 
     secret = "zxczxc12zxczxc12"
 
@@ -16,13 +16,14 @@ defmodule JwtAuthTest do
     ]
 
     run_on_modified_server(server_config, fn ->
-      test_fun()
+      test_fun("HS256", secret)
     end)
   end
 
-  def test_fun() do
+  def test_fun(alg, key) do
+    {:ok, token} = :jwtf.encode({[{"alg", alg}, {"typ", "JWT"}]}, {[{"sub", "couch@apache.org"}]}, key)
     resp = Couch.get("/_session",
-      headers: [authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjb3VjaEBhcGFjaGUub3JnIn0.KYHmGXWj0HNHzZCjfOfsIfZWdguEBSn31jUdDUA9118"]
+      headers: [authorization: "Bearer #{token}"]
     )
 
     assert resp.body["userCtx"]["name"] == "couch@apache.org"
