@@ -832,6 +832,9 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
             ok
     end,
 
+    fabric2_db_plugin:after_doc_write(Db, Doc, NewWinner, OldWinner,
+        NewRevId, WinnerVS),
+
     % Update database size
     AddSize = sum_add_rev_sizes([NewWinner | ToUpdate]),
     RemSize = sum_rem_rev_sizes(ToRemove),
