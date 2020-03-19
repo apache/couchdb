@@ -480,7 +480,7 @@ endif
 # target: devclean - Remove dev cluster artifacts
 devclean:
 	@rm -rf dev/lib/*/data
-
+	@rm -rf dev/lib/*/etc
 
 ################################################################################
 # Misc
