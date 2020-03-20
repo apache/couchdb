@@ -202,7 +202,7 @@ create(#{} = Db0, Options) ->
         {?DB_CONFIG, <<"uuid">>, UUID},
         {?DB_CONFIG, <<"revs_limit">>, ?uint2bin(1000)},
         {?DB_CONFIG, <<"security_doc">>, <<"{}">>},
-        {?DB_CONFIG, <<"wrapped_kek">>, WrappedKEK},
+        {?DB_CONFIG, <<"wrapped_kek">>, erlfdb_tuple:pack({WrappedKEK})},
         {?DB_STATS, <<"doc_count">>, ?uint2bin(0)},
         {?DB_STATS, <<"doc_del_count">>, ?uint2bin(0)},
         {?DB_STATS, <<"doc_design_count">>, ?uint2bin(0)},
@@ -271,7 +271,7 @@ open(#{} = Db0, Options) ->
         uuid => <<>>,
         revs_limit => 1000,
         security_doc => {[]},
-        wrapped_kek => <<>>,
+        wrapped_kek => false,
 
         user_ctx => UserCtx,
 
@@ -473,7 +473,9 @@ load_config(#{} = Db) ->
             <<"uuid">> ->  DbAcc#{uuid := V};
             <<"revs_limit">> -> DbAcc#{revs_limit := ?bin2uint(V)};
             <<"security_doc">> -> DbAcc#{security_doc := ?JSON_DECODE(V)};
-            <<"wrapped_kek">> -> DbAcc#{wrapped_kek := V}
+            <<"wrapped_kek">> ->
+                {WrappedKEK} = erlfdb_tuple:unpack(V),
+                DbAcc#{wrapped_kek := WrappedKEK}
         end
     end, Db, erlfdb:wait(Future)).
 
@@ -1375,13 +1377,20 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 
     DiskAtts = lists:map(fun couch_att:to_disk_term/1, Atts),
 
-    UpdateCounter = get_stat(Db, <<"update_count">>),
-    BinBody = term_to_binary(Body, [{compressed, 0}, {minor_version, 1}]),
-    {ok, Encoded} = fabric2_encryption:encode(
-        WrappedKEK, DbName, Id, UpdateCounter, BinBody),
+    ValueTerm = case WrappedKEK of
+        false ->
+            {Body, DiskAtts, Deleted};
+        _ ->
+            UpdateCounter = get_stat(Db, <<"update_count">>),
+            BinBody = term_to_binary(Body,
+                [{compressed, 0}, {minor_version, 1}]),
+            {ok, Encoded} = fabric2_encryption:encode(
+                WrappedKEK, DbName, Id, UpdateCounter, BinBody),
+            {UpdateCounter, Encoded, DiskAtts, Deleted}
+    end,
 
-    Value = term_to_binary({UpdateCounter, Encoded, DiskAtts, Deleted},
-        [{minor_version, 1}]),
+    Value = term_to_binary(ValueTerm, [{minor_version, 1}]),
+
     Chunks = chunkify_binary(Value),
 
     {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
@@ -1402,11 +1411,18 @@ fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
     } = Db,
 
     Bin = iolist_to_binary(BinRows),
-    {UpdateCounter, Encoded, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
+    ValueTerm = binary_to_term(Bin, [safe]),
 
-    {ok, BinBody} = fabric2_encryption:decode(
-        WrappedKEK, DbName, DocId, UpdateCounter, Encoded),
-    Body = binary_to_term(BinBody, [safe]),
+    {Body, DiskAtts, Deleted} = case WrappedKEK of
+        false ->
+            ValueTerm;
+        _ ->
+            {UpdateCounter, Encoded, DiskAtts0, Deleted0} = ValueTerm,
+            {ok, BinBody} = fabric2_encryption:decode(
+                WrappedKEK, DbName, DocId, UpdateCounter, Encoded),
+            Body0 = binary_to_term(BinBody, [safe]),
+            {Body0, DiskAtts0, Deleted0}
+    end,
 
     Atts = lists:map(fun(Att) ->
         couch_att:from_disk_term(Db, DocId, Att)

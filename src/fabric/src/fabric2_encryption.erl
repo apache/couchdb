@@ -52,7 +52,10 @@ start_link() ->
 
 
 get_wrapped_kek(DbName) when is_binary(DbName) ->
-    gen_server:call(?MODULE, {get_wrapped_kek, DbName}).
+    case config:get_boolean("encryption", "enabled", false) of
+        true -> gen_server:call(?MODULE, {get_wrapped_kek, DbName});
+        false -> {ok, false}
+    end.
 
 
 encode(WrappedKEK, DbName, DocId, UpdateCounter, DocBody)
