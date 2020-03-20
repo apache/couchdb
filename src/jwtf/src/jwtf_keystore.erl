@@ -109,7 +109,7 @@ get_from_config(Alg, KID) ->
         Key ->
             case jwtf:verification_algorithm(Alg) of
                 {hmac, _} ->
-                    list_to_binary(Key);
+                    base64:decode(Key);
                 {public_key, _} ->
                     BinKey = iolist_to_binary(string:replace(Key, "\\n", "\n", all)),
                     [PEMEntry] = public_key:pem_decode(BinKey),

@@ -11,7 +11,7 @@ defmodule JwtAuthTest do
       %{
         :section => "jwt_keys",
         :key => "_default",
-        :value => secret
+        :value => :base64.encode(secret)
       },
       %{
         :section => "jwt_auth",
