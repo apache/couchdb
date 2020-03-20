@@ -11,10 +11,10 @@
 // the License.
  
  
- 
+couchTests.elixir = true;
 couchTests.proxyauth = function(debug) {
   // this test proxy authentification handler
-
+  return console.log('done in test/elixir/test/proxyauth_test.exs');
   var users_db_name = get_random_db_name();
   var usersDb = new CouchDB(users_db_name, {"X-Couch-Full-Commit":"false"});
   usersDb.createDb();
