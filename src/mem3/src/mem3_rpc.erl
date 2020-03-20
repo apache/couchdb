@@ -401,7 +401,7 @@ rexi_call(Node, MFA, Timeout) ->
 
 
 get_or_create_db(DbName, Options) ->
-    couch_db:open_int(DbName, [{create_if_missing, true} | Options]).
+    mem3_util:get_or_create_db(DbName, Options).
 
 
 -ifdef(TEST).

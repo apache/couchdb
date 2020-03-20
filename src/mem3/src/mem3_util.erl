@@ -14,8 +14,9 @@
 
 -export([name_shard/2, create_partition_map/5, build_shards/2,
     n_val/2, q_val/1, to_atom/1, to_integer/1, write_db_doc/1, delete_db_doc/1,
-    shard_info/1, ensure_exists/1, open_db_doc/1]).
+    shard_info/1, ensure_exists/1, open_db_doc/1, get_or_create_db/2]).
 -export([is_deleted/1, rotate_list/2]).
+-export([get_shard_opts/1, get_engine_opt/1, get_props_opt/1]).
 -export([
     iso8601_timestamp/0,
     live_nodes/0,
@@ -504,6 +505,34 @@ sort_ranges_fun({B, E1}, {B, E2}) ->
 
 sort_ranges_fun({B1, _}, {B2, _}) ->
     B1 =< B2.
+
+
+get_or_create_db(DbName, Options) ->
+    case couch_db:open_int(DbName, Options) of
+        {ok, _} = OkDb ->
+            OkDb;
+        {not_found, no_db_file} ->
+            try
+                DbOpts = case mem3:dbname(DbName) of
+                    DbName  -> [];
+                    MDbName -> mem3_shards:opts_for_db(MDbName)
+                end,
+                Options1 = [{create_if_missing, true} | Options],
+                Options2 = merge_opts(DbOpts, Options1),
+                couch_db:open_int(DbName, Options2)
+            catch error:database_does_not_exist ->
+                throw({error, missing_target})
+            end;
+        Else ->
+            Else
+    end.
+
+
+%% merge two proplists, atom options only valid in Old
+merge_opts(New, Old) ->
+    lists:foldl(fun({Key, Val}, Acc) ->
+        lists:keystore(Key, 1, Acc, {Key, Val})
+    end, Old, New).
 
 
 -ifdef(TEST).
