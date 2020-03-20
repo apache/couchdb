@@ -64,6 +64,44 @@ defmodule JwtAuthTest do
     run_on_modified_server(server_config, fn -> test_fun("RS512", private_key) end)
   end
 
+  defmodule EC do
+    require Record
+    Record.defrecord :point, :ECPoint,
+      Record.extract(:ECPoint, from_lib: "public_key/include/public_key.hrl")
+    Record.defrecord :private, :ECPrivateKey,
+      Record.extract(:ECPrivateKey, from_lib: "public_key/include/public_key.hrl")
+  end
+
+  test "jwt auth with EC secret", _context do
+    require JwtAuthTest.EC
+
+    private_key = :public_key.generate_key({:namedCurve, :secp384r1})
+    point = EC.point(point: EC.private(private_key, :publicKey))
+    public_key = {point, EC.private(private_key, :parameters)}
+
+    public_pem = :public_key.pem_encode(
+      [:public_key.pem_entry_encode(
+          :SubjectPublicKeyInfo, public_key)])
+    public_pem = String.replace(public_pem, "\n", "\\n")
+
+    server_config = [
+      %{
+        :section => "jwt_keys",
+        :key => "_default",
+        :value => public_pem
+      },
+      %{
+        :section => "jwt_auth",
+        :key => "allowed_algorithms",
+        :value => "ES256, ES384, ES512"
+      }
+    ]
+
+    run_on_modified_server(server_config, fn -> test_fun("ES256", private_key) end)
+    run_on_modified_server(server_config, fn -> test_fun("ES384", private_key) end)
+    run_on_modified_server(server_config, fn -> test_fun("ES512", private_key) end)
+  end
+
   def test_fun(alg, key) do
     {:ok, token} = :jwtf.encode({[{"alg", alg}, {"typ", "JWT"}]}, {[{"sub", "couch@apache.org"}]}, key)
 
