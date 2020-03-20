@@ -28,9 +28,7 @@ app() ->
     fabric.
 
 providers() ->
-    [
-        {fabric2_encryption, fabric2_encryption_provider}
-    ].
+    [].
 
 services() ->
     [

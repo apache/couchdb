@@ -24,14 +24,14 @@
 -spec get_wrapped_kek(DbName :: binary()) ->
     {ok, KEK :: binary(), WrappedKEK :: binary()} | {error, Error :: term()}.
 get_wrapped_kek(DbName) ->
-    Default = boom,
+    Default = fun fabric2_encryption_provider:get_kek/1,
     maybe_handle(get_kek, [DbName], Default).
 
 
 -spec unwrap_kek(WrappedKEK :: binary()) ->
     {ok, KEK :: binary(), WrappedKEK :: binary()} | {error, Error :: term()}.
 unwrap_kek(WrappedKEK) ->
-    Default = boom,
+    Default = fun fabric2_encryption_provider:unwrap_kek/1,
     maybe_handle(unwrap_kek, [WrappedKEK], Default).
 
 

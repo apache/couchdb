@@ -24,9 +24,9 @@ get_kek(_DbName) ->
             KEK = crypto:strong_rand_bytes(32),
             Enc = crypto:stream_init(aes_ctr, MEK, IV),
             {_, WrappedKEK} = crypto:stream_encrypt(Enc, KEK),
-            {decided, {ok, KEK, WrappedKEK}};
+            {ok, KEK, WrappedKEK};
         {error, Error} ->
-            {decided, {error, Error}}
+            {error, Error}
     end.
 
 
@@ -35,17 +35,26 @@ unwrap_kek(WrappedKEK) ->
         {ok, MEK, IV} ->
             Enc = crypto:stream_init(aes_ctr, MEK, IV),
             {_, KEK} = crypto:stream_decrypt(Enc, WrappedKEK),
-            {decided, {ok, KEK, WrappedKEK}};
+            {ok, KEK, WrappedKEK};
         {error, Error} ->
-            {decided, {error, Error}}
+            {error, Error}
     end.
 
 
 
 get_mek_iv() ->
-    KeyFileReturn = file:read_file(config:get("encryption", "key_file")),
-    IVFileReturn = file:read_file(config:get("encryption", "iv_file")),
-    case {KeyFileReturn, IVFileReturn} of
+    case config:get_boolean("encryption", "enabled", false) of
+        false ->
+            {error, encryption_disabled};
+        true ->
+            KeyFile = config:get("encryption", "key_file"),
+            IVFile = config:get("encryption", "iv_file"),
+            get_mek_iv(KeyFile, IVFile)
+    end.
+
+
+get_mek_iv(KeyFile, IVFile) ->
+    case {file:read_file(KeyFile), file:read_file(IVFile)} of
         {{ok, MEK}, {ok, IV}}
                 when bit_size(MEK) == 512, bit_size(IV) == 256 ->
             {ok, <<<<I:4>> || <<I>> <= MEK>>, <<<<I:4>> || <<I>> <= IV>>};
