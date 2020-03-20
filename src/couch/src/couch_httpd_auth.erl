@@ -202,7 +202,7 @@ jwt_authentication_handler(Req) ->
                         }}
                     end;
                 {error, Reason} ->
-                    throw({unauthorized, Reason})
+                    throw(Reason)
             end;
         _ -> Req
     end.
