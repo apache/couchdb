@@ -147,7 +147,8 @@ defmodule UsersDbTest do
     assert resp.body["userCtx"]["name"] == "jchris@apache.org"
     assert resp.body["info"]["authenticated"] == "default"
     assert resp.body["info"]["authentication_db"] == @users_db_name
-    assert resp.body["info"]["authentication_handlers"] == ["cookie", "default"]
+    assert Enum.member?(resp.body["info"]["authentication_handlers"], "cookie")
+    assert Enum.member?(resp.body["info"]["authentication_handlers"], "default")
 
     resp =
       Couch.get(

@@ -211,6 +211,14 @@ def get_args_parser():
         default=None,
         help="Extra arguments to pass to beam process",
     )
+    parser.add_option(
+        "-l",
+        "--locald-config",
+        dest="locald_configs",
+        action="append",
+        default=[],
+        help="Path to config to place in 'local.d'. Can be repeated",
+    )
     return parser
 
 
@@ -238,6 +246,7 @@ def setup_context(opts, args):
         "reset_logs": True,
         "procs": [],
         "auto_ports": opts.auto_ports,
+        "locald_configs": opts.locald_configs,
     }
 
 
@@ -279,7 +288,22 @@ def setup_configs(ctx):
             "_default": "",
         }
         write_config(ctx, node, env)
+        write_locald_configs(ctx, node, env)
     generate_haproxy_config(ctx)
+
+
+def write_locald_configs(ctx, node, env):
+    for locald_config in ctx["locald_configs"]:
+        config_src = os.path.join(ctx["rootdir"], locald_config)
+        if os.path.exists(config_src):
+            config_filename = os.path.basename(config_src)
+            config_tgt = os.path.join(
+                ctx["devdir"], "lib", node, "etc", "local.d", config_filename
+            )
+            with open(config_src) as handle:
+                content = handle.read()
+            with open(config_tgt, "w") as handle:
+                handle.write(content)
 
 
 def generate_haproxy_config(ctx):
@@ -381,6 +405,8 @@ def write_config(ctx, node, env):
 
         with open(tgt, "w") as handle:
             handle.write(content)
+
+    ensure_dir_exists(etc_tgt, "local.d")
 
 
 def boot_haproxy(ctx):
@@ -580,6 +606,7 @@ def boot_node(ctx, node):
         "-couch_ini",
         os.path.join(node_etcdir, "default.ini"),
         os.path.join(node_etcdir, "local.ini"),
+        os.path.join(node_etcdir, "local.d"),
         "-reltool_config",
         os.path.join(reldir, "reltool.config"),
         "-parent_pid",
