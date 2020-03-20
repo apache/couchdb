@@ -193,7 +193,7 @@ jwt_authentication_handler(Req) ->
         "Bearer " ++ Jwt ->
             RequiredClaims = get_configured_claims(),
             AllowedAlgorithms = get_configured_algorithms(),
-            case jwtf:decode(?l2b(Jwt), [{alg, AllowedAlgorithms} | RequiredClaims], fun jwt_keystore/2) of
+            case jwtf:decode(?l2b(Jwt), [{alg, AllowedAlgorithms} | RequiredClaims], fun jwtf_keystore:get/2) of
                 {ok, {Claims}} ->
                     case lists:keyfind(<<"sub">>, 1, Claims) of
                         false -> throw({unauthorized, <<"Token missing sub claim.">>});
@@ -212,19 +212,6 @@ get_configured_algorithms() ->
 
 get_configured_claims() ->
     re:split(config:get("jwt_auth", "required_claims", ""), "\s*,\s*", [{return, binary}]).
-
-jwt_keystore(Alg, undefined) ->
-    jwt_keystore(Alg, "_default");
-jwt_keystore(Alg, KID) ->
-    Key = config:get("jwt_keys", KID),
-    case jwtf:verification_algorithm(Alg) of
-        {hmac, _} ->
-            Key;
-        {public_key, _} ->
-            BinKey = ?l2b(string:replace(Key, "\\n", "\n", all)),
-            [PEMEntry] = public_key:pem_decode(BinKey),
-            public_key:pem_entry_decode(PEMEntry)
-    end.
 
 cookie_authentication_handler(Req) ->
     cookie_authentication_handler(Req, couch_auth_cache).
