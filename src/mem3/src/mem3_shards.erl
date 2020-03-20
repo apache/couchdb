@@ -144,8 +144,7 @@ local(DbName) ->
     lists:filter(Pred, for_db(DbName)).
 
 fold(Fun, Acc) ->
-    DbName = config:get("mem3", "shards_db", "_dbs"),
-    {ok, Db} = mem3_util:ensure_exists(DbName),
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     FAcc = {Db, Fun, Acc},
     try
         {ok, LastAcc} = couch_db:fold_docs(Db, fun fold_fun/2, FAcc),
@@ -309,15 +308,13 @@ fold_fun(#doc_info{}=DI, {Db, UFun, UAcc}) ->
     end.
 
 get_update_seq() ->
-    DbName = config:get("mem3", "shards_db", "_dbs"),
-    {ok, Db} = mem3_util:ensure_exists(DbName),
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     Seq = couch_db:get_update_seq(Db),
     couch_db:close(Db),
     Seq.
 
 listen_for_changes(Since) ->
-    DbName = config:get("mem3", "shards_db", "_dbs"),
-    {ok, Db} = mem3_util:ensure_exists(DbName),
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     Args = #changes_args{
         feed = "continuous",
         since = Since,
@@ -362,8 +359,7 @@ changes_callback(timeout, _) ->
 
 load_shards_from_disk(DbName) when is_binary(DbName) ->
     couch_stats:increment_counter([mem3, shard_cache, miss]),
-    X = ?l2b(config:get("mem3", "shards_db", "_dbs")),
-    {ok, Db} = mem3_util:ensure_exists(X),
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     try
         load_shards_from_db(Db, DbName)
     after

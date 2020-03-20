@@ -87,13 +87,11 @@ attach_nodes([S | Rest], Acc, [Node | Nodes], UsedNodes) ->
     attach_nodes(Rest, [S#shard{node=Node} | Acc], Nodes, [Node | UsedNodes]).
 
 open_db_doc(DocId) ->
-    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
-    {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
+    {ok, Db} = couch_db:open(mem3_sync:shards_db(), [?ADMIN_CTX]),
     try couch_db:open_doc(Db, DocId, [ejson_body]) after couch_db:close(Db) end.
 
 write_db_doc(Doc) ->
-    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
-    write_db_doc(DbName, Doc, true).
+    write_db_doc(mem3_sync:shards_db(), Doc, true).
 
 write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
@@ -118,8 +116,7 @@ write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
 
 delete_db_doc(DocId) ->
     gen_server:cast(mem3_shards, {cache_remove, DocId}),
-    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
-    delete_db_doc(DbName, DocId, true).
+    delete_db_doc(mem3_sync:shards_db(), DocId, true).
 
 delete_db_doc(DbName, DocId, ShouldMutate) ->
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
@@ -324,7 +321,7 @@ live_nodes() ->
 % which could be a while.
 %
 replicate_dbs_to_all_nodes(Timeout) ->
-    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+    DbName = mem3_sync:shards_db(),
     Targets= mem3_util:live_nodes() -- [node()],
     Res =  [start_replication(node(), T, DbName, Timeout) || T <- Targets],
     collect_replication_results(Res, Timeout).
@@ -335,7 +332,7 @@ replicate_dbs_to_all_nodes(Timeout) ->
 % them until they are all done.
 %
 replicate_dbs_from_all_nodes(Timeout) ->
-    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
+    DbName = mem3_sync:shards_db(),
     Sources = mem3_util:live_nodes() -- [node()],
     Res = [start_replication(S, node(), DbName, Timeout) || S <- Sources],
     collect_replication_results(Res, Timeout).
