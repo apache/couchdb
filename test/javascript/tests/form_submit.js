@@ -11,6 +11,7 @@
 // the License.
 
 // Do some basic tests.
+couchTests.elixir = true;
 couchTests.form_submit = function(debug) {
     return console.log('done in test/elixir/test/form_summit_test.exs');
 
