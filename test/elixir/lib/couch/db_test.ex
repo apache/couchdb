@@ -399,8 +399,8 @@ defmodule Couch.DBTest do
         Enum.each(setting.nodes, fn node_value ->
           node = elem(node_value, 0)
           value = elem(node_value, 1)
-
-          if value == ~s(""\\n) do
+          
+          if value == ~s(""\\n) or value == "" or value == nil do
             resp =
               Couch.delete(
                 "/_node/#{node}/_config/#{setting.section}/#{setting.key}",
