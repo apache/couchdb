@@ -302,7 +302,8 @@ metadata_bump({DbName, _, _}) ->
     {ok, _} = fabric2_db:get_db_info(Db),
 
     % Check that db handle in the cache got the new metadata version
-    ?assertMatch(#{md_version := NewMDVersion}, fabric2_server:fetch(DbName)).
+    CachedDb = fabric2_server:fetch(DbName, undefined),
+    ?assertMatch(#{md_version := NewMDVersion}, CachedDb).
 
 
 db_version_bump({DbName, _, _}) ->
@@ -326,7 +327,7 @@ db_version_bump({DbName, _, _}) ->
     {ok, _} = fabric2_db:get_db_info(Db),
 
     % After previous operation, the cache should have been cleared
-    ?assertMatch(undefined, fabric2_server:fetch(DbName)),
+    ?assertMatch(undefined, fabric2_server:fetch(DbName, undefined)),
 
     % Call open again and check that we have the latest db version
     {ok, Db2} = fabric2_db:open(DbName, [{user_ctx, ?ADMIN_USER}]),
