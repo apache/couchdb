@@ -50,15 +50,15 @@ X means done, - means partially
   - [X] Port etags_head.js
   - [ ] ~~Port etags_views.js~~ (skipped in js test suite)
   - [X] Port form_submit.js
-  - [ ] Port http.js
+  - [X] Port http.js
   - [X] Port invalid_docids.js
-  - [ ] Port jsonp.js
+  - [X] Port jsonp.js
   - [X] Port large_docs.js
   - [ ] Port list_views.js
   - [X] Port lorem_b64.txt
   - [X] Port lorem.txt
   - [X] Port lots_of_docs.js
-  - [ ] Port method_override.js
+  - [X] Port method_override.js
   - [X] Port multiple_rows.js
   - [X] Port proxyauth.js
   - [ ] Port purge.js
