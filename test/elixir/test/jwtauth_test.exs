@@ -110,6 +110,7 @@ defmodule JwtAuthTest do
     )
 
     assert resp.body["userCtx"]["name"] == "couch@apache.org"
+    assert resp.body["userCtx"]["roles"] == [<<"_admin">>]
     assert resp.body["info"]["authenticated"] == "jwt"
   end
 
