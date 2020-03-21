@@ -36,6 +36,7 @@ crud_test_() ->
                     ?TDEF_FE(create_db),
                     ?TDEF_FE(open_db),
                     ?TDEF_FE(delete_db),
+                    ?TDEF_FE(recreate_db),
                     ?TDEF_FE(list_dbs),
                     ?TDEF_FE(list_dbs_user_fun),
                     ?TDEF_FE(list_dbs_user_fun_partial),
@@ -105,6 +106,37 @@ delete_db(_) ->
     ?assertEqual(false, ets:member(fabric2_server, DbName)),
 
     ?assertError(database_does_not_exist, fabric2_db:open(DbName, [])).
+
+
+recreate_db(_) ->
+    DbName = ?tempdb(),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+
+    {ok, Db1} = fabric2_db:open(DbName, []),
+
+    ?assertEqual(ok, fabric2_db:delete(DbName, [])),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+
+    ?assertError(database_does_not_exist, fabric2_db:get_db_info(Db1)),
+
+    ?assertEqual(ok, fabric2_db:delete(DbName, [])),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+
+    {ok, Db2} = fabric2_db:open(DbName, []),
+
+    CurOpts = [{uuid, fabric2_db:get_uuid(Db2)}],
+    ?assertMatch({ok, #{}}, fabric2_db:open(DbName, CurOpts)),
+
+    % Remove from cache to force it to open through fabric2_fdb:open
+    fabric2_server:remove(DbName),
+    ?assertMatch({ok, #{}}, fabric2_db:open(DbName, CurOpts)),
+
+    BadOpts = [{uuid, fabric2_util:uuid()}],
+    ?assertError(database_does_not_exist, fabric2_db:open(DbName, BadOpts)),
+
+    % Remove from cache to force it to open through fabric2_fdb:open
+    fabric2_server:remove(DbName),
+    ?assertError(database_does_not_exist, fabric2_db:open(DbName, BadOpts)).
 
 
 list_dbs(_) ->
