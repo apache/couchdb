@@ -43,7 +43,8 @@ doc_fold_test_() ->
                     ?TDEF_FE(fold_docs_with_limit),
                     ?TDEF_FE(fold_docs_with_skip),
                     ?TDEF_FE(fold_docs_with_skip_and_limit),
-                    ?TDEF_FE(fold_docs_tx_too_old)
+                    ?TDEF_FE(fold_docs_tx_too_old),
+                    ?TDEF_FE(fold_docs_db_recreated)
                 ]
             }
         }
@@ -69,12 +70,14 @@ setup() ->
         {ok, Rev} = fabric2_db:update_doc(Db, Doc, []),
         {DocId, {[{rev, couch_doc:rev_to_str(Rev)}]}}
     end, lists:seq(1, ?DOC_COUNT)),
+    meck:new(erlfdb, [passthrough]),
     fabric2_test_util:tx_too_old_mock_erlfdb(),
     {Db, lists:sort(DocIdRevs)}.
 
 
 cleanup({Db, _DocIdRevs}) ->
     fabric2_test_util:tx_too_old_reset_errors(),
+    meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
 
@@ -214,6 +217,34 @@ fold_docs_tx_too_old({Db, _DocIdRevs}) ->
     % Blow up in in user fun and fold range
     fabric2_test_util:tx_too_old_setup_errors(1, {1, 1}),
     ?assertEqual({ok, Expected}, FoldDocsFun()).
+
+
+fold_docs_db_recreated({Db, _DocIdRevs}) ->
+    DbName = fabric2_db:name(Db),
+
+    RecreateDb = fun() ->
+        ok = fabric2_db:delete(DbName, []),
+        {ok, _} = fabric2_db:create(DbName, [])
+    end,
+
+    FoldFun = fun
+        ({meta, _}, Acc) ->
+            {ok, Acc};
+        ({row, Row}, Acc) ->
+            fabric2_test_util:tx_too_old_raise_in_user_fun(),
+            % After meta and one row emitted, recreate the db
+            case length(Acc) =:= 1 of
+                true -> RecreateDb();
+                false -> ok
+            end,
+            {ok, [Row | Acc]};
+        (complete, Acc) ->
+            {ok, Acc}
+    end,
+    % Blow up in user fun after emitting two rows
+    fabric2_test_util:tx_too_old_setup_errors({2, 1}, 0),
+    ?assertError(database_does_not_exist, fabric2_db:fold_docs(Db, FoldFun,
+        [], [{restart_tx, true}])).
 
 
 check_all_combos(Db, StartKey, EndKey, Rows) ->
