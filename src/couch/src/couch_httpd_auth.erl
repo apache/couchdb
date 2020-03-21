@@ -198,7 +198,13 @@ jwt_authentication_handler(Req) ->
                     case lists:keyfind(<<"sub">>, 1, Claims) of
                         false -> throw({unauthorized, <<"Token missing sub claim.">>});
                         {_, User} -> Req#httpd{user_ctx=#user_ctx{
-                            name=User
+                            name=User,
+                            roles=case lists:keyfind(<<"roles">>, 1, Claims) of
+                                false -> [];
+                                {_, Roles} -> 
+                                    erlang:display(Roles),
+                                    re:split(Roles, "\s*,\s*", [{return, binary}])
+                            end
                         }}
                     end;
                 {error, Reason} ->
