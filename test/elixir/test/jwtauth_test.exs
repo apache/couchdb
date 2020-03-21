@@ -22,10 +22,11 @@ defmodule JwtAuthTest do
 
   def test_fun() do
     resp = Couch.get("/_session",
-      headers: [authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjb3VjaEBhcGFjaGUub3JnIn0.KYHmGXWj0HNHzZCjfOfsIfZWdguEBSn31jUdDUA9118"]
+      headers: [authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjb3VjaEBhcGFjaGUub3JnIiwicm9sZXMiOiJfYWRtaW4ifQ.hP_nxaHADCkx5cNzHGQUFm2j0OEbtYvL7c1fEdmBQSU"]
     )
 
     assert resp.body["userCtx"]["name"] == "couch@apache.org"
+    assert resp.body["userCtx"]["roles"] == [<<"_admin">>]
     assert resp.body["info"]["authenticated"] == "jwt"
   end
 
