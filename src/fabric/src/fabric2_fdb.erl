@@ -255,6 +255,9 @@ open(#{} = Db0, Options) ->
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
     Options1 = lists:keydelete(user_ctx, 1, Options),
 
+    UUID = fabric2_util:get_value(uuid, Options1),
+    Options2 = lists:keydelete(uuid, 1, Options1),
+
     Db2 = Db1#{
         db_prefix => DbPrefix,
         db_version => DbVersion,
@@ -271,16 +274,28 @@ open(#{} = Db0, Options) ->
         before_doc_update => undefined,
         after_doc_read => undefined,
 
-        db_options => Options1
+        db_options => Options2
     },
 
     Db3 = load_config(Db2),
 
+    case {UUID, Db3} of
+        {undefined, _} -> ok;
+        {<<_/binary>>, #{uuid := UUID}} -> ok;
+        {<<_/binary>>, #{uuid := _}} -> erlang:error(database_does_not_exist)
+    end,
+
     load_validate_doc_funs(Db3).
 
 
-refresh(#{tx := undefined, name := DbName, md_version := OldVer} = Db) ->
-    case fabric2_server:fetch(DbName) of
+refresh(#{tx := undefined} = Db) ->
+    #{
+        name := DbName,
+        uuid := UUID,
+        md_version := OldVer
+    } = Db,
+
+    case fabric2_server:fetch(DbName, UUID) of
         % Relying on these assumptions about the `md_version` value:
         %  - It is bumped every time `db_version` is bumped
         %  - Is a versionstamp, so we can check which one is newer
@@ -304,12 +319,20 @@ reopen(#{} = OldDb) ->
     #{
         tx := Tx,
         name := DbName,
+        uuid := UUID,
         db_options := Options,
         user_ctx := UserCtx,
         security_fun := SecurityFun
     } = OldDb,
     Options1 = lists:keystore(user_ctx, 1, Options, {user_ctx, UserCtx}),
     NewDb = open(init_db(Tx, DbName, Options1), Options1),
+
+    % Check if database was re-created
+    case maps:get(uuid, NewDb) of
+        UUID -> ok;
+        _OtherUUID -> error(database_does_not_exist)
+    end,
+
     NewDb#{security_fun := SecurityFun}.
 
 

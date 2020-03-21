@@ -17,7 +17,7 @@
 
 -export([
     start_link/0,
-    fetch/1,
+    fetch/2,
     store/1,
     remove/1,
     fdb_directory/0,
@@ -48,10 +48,12 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 
-fetch(DbName) when is_binary(DbName) ->
-    case ets:lookup(?MODULE, DbName) of
-        [{DbName, #{} = Db}] -> Db;
-        [] -> undefined
+fetch(DbName, UUID) when is_binary(DbName) ->
+    case {UUID, ets:lookup(?MODULE, DbName)} of
+        {_, []} -> undefined;
+        {undefined, [{DbName, #{} = Db}]} -> Db;
+        {<<_/binary>>, [{DbName, #{uuid := UUID} = Db}]} -> Db;
+        {<<_/binary>>, [{DbName, #{} = _Db}]} -> undefined
     end.
 
 

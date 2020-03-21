@@ -178,7 +178,8 @@ create(DbName, Options) ->
 
 
 open(DbName, Options) ->
-    case fabric2_server:fetch(DbName) of
+    UUID = fabric2_util:get_value(uuid, Options),
+    case fabric2_server:fetch(DbName, UUID) of
         #{} = Db ->
             Db1 = maybe_set_user_ctx(Db, Options),
             {ok, require_member_check(Db1)};
