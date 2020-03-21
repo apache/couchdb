@@ -201,9 +201,7 @@ jwt_authentication_handler(Req) ->
                             name=User,
                             roles=case lists:keyfind(<<"roles">>, 1, Claims) of
                                 false -> [];
-                                {_, Roles} -> 
-                                    erlang:display(Roles),
-                                    re:split(Roles, "\s*,\s*", [{return, binary}])
+                                {_, Roles} -> Roles
                             end
                         }}
                     end;
