@@ -288,9 +288,10 @@ open(#{} = Db0, Options) ->
     load_validate_doc_funs(Db3).
 
 
-refresh(#{tx := undefined} = Db) ->
+% Match on `name` in the function head since some non-fabric2 db
+% objects might not have names and so they don't get cached
+refresh(#{tx := undefined, name := DbName} = Db) ->
     #{
-        name := DbName,
         uuid := UUID,
         md_version := OldVer
     } = Db,
