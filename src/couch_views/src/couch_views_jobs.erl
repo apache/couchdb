@@ -43,7 +43,19 @@ build_view(TxDb, Mrst, UpdateSeq) ->
 build_view_async(TxDb, Mrst) ->
     JobId = job_id(TxDb, Mrst),
     JobData = job_data(TxDb, Mrst),
-    ok = couch_jobs:add(undefined, ?INDEX_JOB_TYPE, JobId, JobData),
+    DbUUID = fabric2_db:get_uuid(TxDb),
+    couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(JTx) ->
+        case couch_jobs:get_job_data(JTx, ?INDEX_JOB_TYPE, JobId) of
+            {error, not_found} ->
+                ok;
+            {ok, #{} = OldJobData} ->
+                case maps:get(<<"db_uuid">>, OldJobData, undefined) of
+                    DbUUID -> ok;
+                    _ -> couch_jobs:remove(JTx, ?INDEX_JOB_TYPE, JobId)
+                end
+        end,
+        ok = couch_jobs:add(JTx, ?INDEX_JOB_TYPE, JobId, JobData)
+    end),
     {ok, JobId}.
 
 
@@ -95,6 +107,7 @@ job_data(Db, Mrst) ->
 
     #{
         db_name => fabric2_db:name(Db),
+        db_uuid => fabric2_db:get_uuid(Db),
         ddoc_id => DDocId,
         sig => fabric2_util:to_hex(Sig),
         retries => 0
