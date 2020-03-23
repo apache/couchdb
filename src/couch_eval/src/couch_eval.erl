@@ -75,6 +75,9 @@ acquire_map_context(DbName, DDocId, Language, Sig, Lib, MapFuns) ->
 
 
 -spec release_map_context(context()) -> ok | {error, any()}.
+release_map_context(nil) ->
+    ok;
+
 release_map_context({ApiMod, Ctx}) ->
     ApiMod:release_map_context(Ctx).
 
