@@ -18,7 +18,9 @@
 
 
 -export([
-    init/0
+    init/0,
+    map_docs/2,
+    write_docs/4
 ]).
 
 -ifdef(TEST).
@@ -80,6 +82,7 @@ init() ->
         db_seq => undefined,
         view_seq => undefined,
         last_seq => undefined,
+        view_vs => undefined,
         job => Job,
         job_data => Data,
         count => 0,
@@ -174,22 +177,7 @@ update(#{} = Db, Mrst0, State0) ->
 
 do_update(Db, Mrst0, State0) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        % In the first iteration of update we need
-        % to populate our db and view sequences
-        State1 = case State0 of
-            #{db_seq := undefined} ->
-                ViewSeq = couch_views_fdb:get_update_seq(TxDb, Mrst0),
-                State0#{
-                    tx_db := TxDb,
-                    db_seq := fabric2_db:get_update_seq(TxDb),
-                    view_seq := ViewSeq,
-                    last_seq := ViewSeq
-                };
-            _ ->
-                State0#{
-                    tx_db := TxDb
-                }
-        end,
+        State1 = get_update_start_state(TxDb, Mrst0, State0),
 
         {ok, State2} = fold_changes(State1),
 
@@ -198,7 +186,8 @@ do_update(Db, Mrst0, State0) ->
             doc_acc := DocAcc,
             last_seq := LastSeq,
             limit := Limit,
-            limiter := Limiter
+            limiter := Limiter,
+            view_vs := ViewVS
         } = State2,
         DocAcc1 = fetch_docs(TxDb, DocAcc),
         couch_rate:in(Limiter, Count),
@@ -210,6 +199,8 @@ do_update(Db, Mrst0, State0) ->
 
         case Count < Limit of
             true ->
+                maybe_set_build_status(TxDb, Mrst1, ViewVS,
+                    ?INDEX_READY),
                 report_progress(State2, finished),
                 {Mrst1, finished};
             false ->
@@ -222,6 +213,33 @@ do_update(Db, Mrst0, State0) ->
                 }}
         end
     end).
+
+
+maybe_set_build_status(_TxDb, _Mrst1, not_found, _State) ->
+    ok;
+
+maybe_set_build_status(TxDb, Mrst1, _ViewVS, State) ->
+    couch_views_fdb:set_build_status(TxDb, Mrst1, State).
+
+
+% In the first iteration of update we need
+% to populate our db and view sequences
+get_update_start_state(TxDb, Mrst, #{db_seq := undefined} = State) ->
+    ViewVS = couch_views_fdb:get_creation_vs(TxDb, Mrst),
+    ViewSeq = couch_views_fdb:get_update_seq(TxDb, Mrst),
+
+    State#{
+        tx_db := TxDb,
+        db_seq := fabric2_db:get_update_seq(TxDb),
+        view_vs := ViewVS,
+        view_seq := ViewSeq,
+        last_seq := ViewSeq
+    };
+
+get_update_start_state(TxDb, _Idx, State) ->
+    State#{
+        tx_db := TxDb
+    }.
 
 
 fold_changes(State) ->
@@ -240,7 +258,8 @@ process_changes(Change, Acc) ->
     #{
         doc_acc := DocAcc,
         count := Count,
-        design_opts := DesignOpts
+        design_opts := DesignOpts,
+        view_vs := ViewVS
     } = Acc,
 
     #{
@@ -263,8 +282,22 @@ process_changes(Change, Acc) ->
                 last_seq := LastSeq
             }
     end,
-    {ok, Acc1}.
 
+    DocVS = fabric2_fdb:seq_to_vs(LastSeq),
+
+    Go = maybe_stop_at_vs(ViewVS, DocVS),
+    {Go, Acc1}.
+
+
+maybe_stop_at_vs({versionstamp, _} = ViewVS, DocVS) when DocVS >= ViewVS ->
+    stop;
+
+maybe_stop_at_vs(_, _) ->
+    ok.
+
+
+map_docs(Mrst, []) ->
+    {Mrst, []};
 
 map_docs(Mrst, Docs) ->
     % Run all the non deleted docs through the view engine and
@@ -328,7 +361,9 @@ write_docs(TxDb, Mrst, Docs, State) ->
         N + 1
     end, 0, Docs),
 
-    couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq),
+    if LastSeq == false -> ok; true ->
+        couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq)
+    end,
     DocsNumber.
 
 

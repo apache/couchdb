@@ -13,6 +13,12 @@
 -module(couch_views_fdb).
 
 -export([
+    new_interactive_index/3,
+    new_creation_vs/3,
+    get_creation_vs/2,
+    get_build_status/2,
+    set_build_status/3,
+
     get_update_seq/2,
     set_update_seq/3,
 
@@ -37,6 +43,60 @@
 -include("couch_views.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric2.hrl").
+
+
+new_interactive_index(Db, Mrst, VS) ->
+    couch_views_fdb:new_creation_vs(Db, Mrst, VS),
+    couch_views_fdb:set_build_status(Db, Mrst, ?INDEX_BUILDING).
+
+
+%Interactive View Creation Versionstamp
+%(<db>, ?DB_VIEWS, ?VIEW_INFO, ?VIEW_CREATION_VS, Sig) = VS
+
+new_creation_vs(TxDb, #mrst{} = Mrst, VS) ->
+    #{
+        tx := Tx
+    } = TxDb,
+    Key = creation_vs_key(TxDb, Mrst#mrst.sig),
+    Value = erlfdb_tuple:pack_vs({VS}),
+    ok = erlfdb:set_versionstamped_value(Tx, Key, Value).
+
+
+get_creation_vs(TxDb, #mrst{} = Mrst) ->
+    get_creation_vs(TxDb, Mrst#mrst.sig);
+
+get_creation_vs(TxDb, Sig) ->
+    #{
+        tx := Tx
+    } = TxDb,
+    Key = creation_vs_key(TxDb, Sig),
+    case erlfdb:wait(erlfdb:get(Tx, Key)) of
+        not_found ->
+            not_found;
+        EK ->
+            {VS} = erlfdb_tuple:unpack(EK),
+            VS
+    end.
+
+
+%Interactive View Build Status
+%(<db>, ?DB_VIEWS, ?VIEW_INFO, ?VIEW_BUILD_STATUS, Sig) = INDEX_BUILDING | INDEX_READY
+
+get_build_status(TxDb, #mrst{sig = Sig}) ->
+    #{
+        tx := Tx
+    } = TxDb,
+    Key = build_status_key(TxDb, Sig),
+    erlfdb:wait(erlfdb:get(Tx, Key)).
+
+
+set_build_status(TxDb, #mrst{sig = Sig}, State) ->
+    #{
+        tx := Tx
+    } = TxDb,
+
+    Key = build_status_key(TxDb, Sig),
+    ok = erlfdb:set(Tx, Key, State).
 
 
 % View Build Sequence Access
@@ -338,6 +398,22 @@ map_idx_range(DbPrefix, Sig, ViewId, MapKey, DocId) ->
         {Encoded, DocId}
     },
     erlfdb_tuple:range(Key, DbPrefix).
+
+
+creation_vs_key(Db, Sig) ->
+    #{
+        db_prefix := DbPrefix
+    } = Db,
+    Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_CREATION_VS, Sig},
+    erlfdb_tuple:pack(Key, DbPrefix).
+
+
+build_status_key(Db, Sig) ->
+    #{
+        db_prefix := DbPrefix
+    } = Db,
+    Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_BUILD_STATUS, Sig},
+    erlfdb_tuple:pack(Key, DbPrefix).
 
 
 process_rows(Rows) ->

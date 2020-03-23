@@ -18,6 +18,8 @@
 -define(VIEW_UPDATE_SEQ, 0).
 -define(VIEW_ROW_COUNT, 1).
 -define(VIEW_KV_SIZE, 2).
+-define(VIEW_BUILD_STATUS, 3).
+-define(VIEW_CREATION_VS, 4).
 
 % Data keys
 -define(VIEW_ID_RANGE, 0).
@@ -25,3 +27,7 @@
 
 % jobs api
 -define(INDEX_JOB_TYPE, <<"views">>).
+
+% indexing progress
+-define(INDEX_BUILDING, <<"building">>).
+-define(INDEX_READY, <<"ready">>).
