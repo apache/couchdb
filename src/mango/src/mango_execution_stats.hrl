@@ -13,7 +13,6 @@
 -record(execution_stats, {
     totalKeysExamined = 0,
     totalDocsExamined = 0,
-    totalQuorumDocsExamined = 0,
     resultsReturned = 0,
     executionStartTime,
     executionTimeMs
