@@ -189,11 +189,11 @@ proxy_auth_user(Req) ->
     end.
 
 jwt_authentication_handler(Req) ->
-    case {config:get("jwt_auth", "secret"), header_value(Req, "Authorization")} of
-        {Secret, "Bearer " ++ Jwt} when Secret /= undefined ->
+    case header_value(Req, "Authorization") of
+        "Bearer " ++ Jwt ->
             RequiredClaims = get_configured_claims(),
             AllowedAlgorithms = get_configured_algorithms(),
-            case jwtf:decode(?l2b(Jwt), [{alg, AllowedAlgorithms} | RequiredClaims], fun(_,_) -> Secret end) of
+            case jwtf:decode(?l2b(Jwt), [{alg, AllowedAlgorithms} | RequiredClaims], fun jwtf_keystore:get/2) of
                 {ok, {Claims}} ->
                     case lists:keyfind(<<"sub">>, 1, Claims) of
                         false -> throw({unauthorized, <<"Token missing sub claim.">>});
@@ -202,16 +202,16 @@ jwt_authentication_handler(Req) ->
                         }}
                     end;
                 {error, Reason} ->
-                    throw({unauthorized, Reason})
+                    throw(Reason)
             end;
-        {_, _} -> Req
+        _ -> Req
     end.
 
 get_configured_algorithms() ->
     re:split(config:get("jwt_auth", "allowed_algorithms", "HS256"), "\s*,\s*", [{return, binary}]).
 
 get_configured_claims() ->
-    lists:usort(re:split(config:get("jwt_auth", "required_claims", ""), "\s*,\s*", [{return, binary}])).
+    re:split(config:get("jwt_auth", "required_claims", ""), "\s*,\s*", [{return, binary}]).
 
 cookie_authentication_handler(Req) ->
     cookie_authentication_handler(Req, couch_auth_cache).
