@@ -93,13 +93,21 @@ defmodule JwtAuthTest do
       %{
         :section => "jwt_auth",
         :key => "allowed_algorithms",
-        :value => "ES256, ES384, ES512"
+        :value => "RS256, RS384, RS512"
       }
     ]
 
-    run_on_modified_server(server_config, fn -> test_fun("ES256", private_key) end)
-    run_on_modified_server(server_config, fn -> test_fun("ES384", private_key) end)
-    run_on_modified_server(server_config, fn -> test_fun("ES512", private_key) end)
+    run_on_modified_server(server_config, fn -> test_fun("RS256", private_key) end)
+    run_on_modified_server(server_config, fn -> test_fun("RS384", private_key) end)
+    run_on_modified_server(server_config, fn -> test_fun("RS512", private_key) end)
+  end
+
+  defmodule EC do
+    require Record
+    Record.defrecord :point, :ECPoint,
+      Record.extract(:ECPoint, from_lib: "public_key/include/public_key.hrl")
+    Record.defrecord :private, :ECPrivateKey,
+      Record.extract(:ECPrivateKey, from_lib: "public_key/include/public_key.hrl")
   end
 
   def test_fun(alg, key) do
