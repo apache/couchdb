@@ -205,6 +205,7 @@ view_cmp(SK, SKD, EK, EKD) ->
     PackedEK = erlfdb_tuple:pack({BinEK, EKD}),
     PackedSK =< PackedEK.
 
+
 get_update_options(#mrst{design_opts = Opts}) ->
     IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
     LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
