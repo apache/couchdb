@@ -64,6 +64,8 @@
     seq_to_vs/1,
     next_vs/1,
 
+    new_versionstamp/1,
+
     debug_cluster/0,
     debug_cluster/2
 ]).
@@ -1021,6 +1023,11 @@ next_vs({versionstamp, VS, Batch, TxId}) ->
     {versionstamp, V, B, T}.
 
 
+new_versionstamp(Tx) ->
+    TxId = erlfdb:get_next_tx_id(Tx),
+    {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF, TxId}.
+
+
 debug_cluster() ->
     debug_cluster(<<>>, <<16#FE, 16#FF, 16#FF>>).
 
@@ -1761,11 +1768,6 @@ get_transaction_id(Tx, LayerPrefix) ->
         TxId when is_binary(TxId) ->
             TxId
     end.
-
-
-new_versionstamp(Tx) ->
-    TxId = erlfdb:get_next_tx_id(Tx),
-    {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF, TxId}.
 
 
 on_commit(Tx, Fun) when is_function(Fun, 0) ->
