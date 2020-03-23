@@ -50,11 +50,35 @@
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 -include("mango_idx.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 
 list(Db) ->
-    {ok, Indexes} = ddoc_cache:open(db_to_name(Db), ?MODULE),
-    Indexes.
+    DDocs = couch_views_ddoc:get_mango_list(Db),
+    DbName = fabric2_db:name(Db),
+    Indexes = lists:foldl(fun(DDoc, Acc) ->
+        {Props} = couch_doc:to_json_obj(DDoc, []),
+
+        case proplists:get_value(<<"language">>, Props) == <<"query">> of
+            true ->
+                {ok, Mrst} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
+
+                IsInteractive = couch_views_ddoc:is_interactive(DDoc),
+                BuildState = couch_views_fdb:get_build_status(Db, Mrst),
+
+                Idxs = lists:map(fun(Idx) ->
+                    Idx#idx{
+                        build_status = BuildState,
+                        interactive = IsInteractive
+                    }
+                end, from_ddoc(Db, DDoc)),
+                Acc ++ Idxs;
+            false ->
+                Acc
+        end
+
+    end, [], DDocs),
+    Indexes ++ special(Db).
 
 
 get_usable_indexes(Db, Selector, Opts) ->
@@ -62,13 +86,14 @@ get_usable_indexes(Db, Selector, Opts) ->
     GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(
             ExistingIndexes
         ),
+    BuiltIndexes = mango_cursor:remove_unbuilt_indexes(GlobalIndexes),
     UserSpecifiedIndex = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
-    UsableIndexes = lists:usort(GlobalIndexes ++ UserSpecifiedIndex),
+    UsableIndexes0 = lists:usort(BuiltIndexes ++ UserSpecifiedIndex),
 
     SortFields = get_sort_fields(Opts),
     UsableFilter = fun(I) -> is_usable(I, Selector, SortFields) end,
 
-    case lists:filter(UsableFilter, UsableIndexes) of
+    case lists:filter(UsableFilter, UsableIndexes0) of
         [] ->
             mango_sort_error(Db, Opts);
         UsableIndexes ->
@@ -162,16 +187,17 @@ delete(Filt, Db, Indexes, DelOpts) ->
     end.
 
 
-from_ddoc(Db, {Props}) ->
+from_ddoc(Db, #doc{id = DDocId} = DDoc) ->
+    {Props} = couch_doc:to_json_obj(DDoc, []),
     DbName = db_to_name(Db),
-    DDoc = proplists:get_value(<<"_id">>, Props),
+    DDocId = proplists:get_value(<<"_id">>, Props),
 
     case proplists:get_value(<<"language">>, Props) of
         <<"query">> -> ok;
         _ ->
             ?MANGO_ERROR(invalid_query_ddoc_language)
     end,
-    IdxMods = case clouseau_rpc:connected() of
+    IdxMods = case is_text_service_available() of
         true ->
             [mango_idx_view, mango_idx_text];
         false ->
@@ -181,7 +207,7 @@ from_ddoc(Db, {Props}) ->
     lists:map(fun(Idx) ->
         Idx#idx{
             dbname = DbName,
-            ddoc = DDoc
+            ddoc = DDocId
         }
     end, Idxs).
 
@@ -192,7 +218,8 @@ special(Db) ->
         name = <<"_all_docs">>,
         type = <<"special">>,
         def = all_docs,
-        opts = []
+        opts = [],
+        build_status = ?INDEX_READY
     },
     % Add one for _update_seq
     [AllDocs].
@@ -278,7 +305,7 @@ db_to_name(Name) when is_binary(Name) ->
 db_to_name(Name) when is_list(Name) ->
     iolist_to_binary(Name);
 db_to_name(Db) ->
-    couch_db:name(Db).
+    fabric2_db:name(Db).
 
 
 get_idx_def(Opts) ->
@@ -293,7 +320,7 @@ get_idx_def(Opts) ->
 get_idx_type(Opts) ->
     case proplists:get_value(type, Opts) of
         <<"json">> -> <<"json">>;
-        <<"text">> -> case clouseau_rpc:connected() of
+        <<"text">> -> case is_text_service_available() of
             true ->
                 <<"text">>;
             false ->
@@ -304,6 +331,11 @@ get_idx_type(Opts) ->
         BadType ->
             ?MANGO_ERROR({invalid_index_type, BadType})
     end.
+
+
+is_text_service_available() ->
+    erlang:function_exported(clouseau_rpc, connected, 0) andalso
+        clouseau_rpc:connected().
 
 
 get_idx_ddoc(Idx, Opts) ->
@@ -377,7 +409,8 @@ index(SelectorName, Selector) ->
            <<"Selected">>,<<"json">>,
            {[{<<"fields">>,{[{<<"location">>,<<"asc">>}]}},
              {SelectorName,{Selector}}]},
-           [{<<"def">>,{[{<<"fields">>,[<<"location">>]}]}}]
+           [{<<"def">>,{[{<<"fields">>,[<<"location">>]}]}}],
+           <<"ready">>
     }.
 
 get_partial_filter_all_docs_test() ->

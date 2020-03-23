@@ -16,5 +16,7 @@
     name,
     type,
     def,
-    opts
+    opts,
+    build_status,
+    interactive
 }).
