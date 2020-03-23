@@ -177,10 +177,10 @@ create(#{} = Db0, Options) ->
         layer_prefix := LayerPrefix
     } = Db = ensure_current(Db0, false),
 
-    % Eventually DbPrefix will be HCA allocated. For now
-    % we're just using the DbName so that debugging is easier.
     DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
-    DbPrefix = erlfdb_tuple:pack({?DBS, DbName}, LayerPrefix),
+    HCA = erlfdb_hca:create(erlfdb_tuple:pack({?DB_HCA}, LayerPrefix)),
+    AllocPrefix = erlfdb_hca:allocate(HCA, Tx),
+    DbPrefix = erlfdb_tuple:pack({?DBS, AllocPrefix}, LayerPrefix),
     erlfdb:set(Tx, DbKey, DbPrefix),
 
     % This key is responsible for telling us when something in
