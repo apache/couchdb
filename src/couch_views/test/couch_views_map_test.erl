@@ -14,6 +14,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include("couch_views.hrl").
 
 
 -define(TDEF(A), {atom_to_list(A), fun A/0}).
@@ -56,7 +57,8 @@ map_views_test_() ->
                 ?TDEF(should_map_duplicate_keys),
                 ?TDEF(should_map_with_doc_emit),
                 ?TDEF(should_map_update_is_false),
-                ?TDEF(should_map_update_is_lazy)
+                ?TDEF(should_map_update_is_lazy),
+                ?TDEF(should_map_wait_for_interactive)
                 % fun should_give_ext_size_seq_indexed_test/1
             ]
         }
@@ -419,6 +421,25 @@ should_map_update_is_lazy() ->
     ?assertEqual(Expect, Result2).
 
 
+should_map_wait_for_interactive() ->
+    DbName = ?tempdb(),
+    {ok, Db} = fabric2_db:create(DbName, [{user_ctx, ?ADMIN_USER}]),
+
+    DDoc = create_interactive_ddoc(),
+    Docs = make_docs(101),
+
+    fabric2_db:update_docs(Db, Docs),
+    fabric2_db:update_docs(Db, [DDoc]),
+
+    Result = couch_views:query(Db, DDoc, <<"idx_01">>, fun default_cb/2, [],
+        #{limit => 3}),
+    ?assertEqual({ok, [
+        {row, [{id, <<"1">>}, {key, 1}, {value, 1}]},
+        {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
+        {row, [{id, <<"3">>}, {key, 3}, {value, 3}]}
+    ]}, Result).
+
+
 % should_give_ext_size_seq_indexed_test(Db) ->
 %     DDoc = couch_doc:from_json_obj({[
 %         {<<"_id">>, <<"_design/seqdoc">>},
@@ -508,6 +529,24 @@ create_ddoc() ->
                 >>}
             ]}}
         ]}}
+    ]}).
+
+create_interactive_ddoc() ->
+    couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/ddoc_interactive">>},
+        {<<"language">>, <<"javascript">>},
+        {<<"views">>, {[
+            {<<"idx_01">>, {[
+                {<<"map">>, <<
+                    "function(doc) {"
+                        "if (doc.val) {"
+                            "emit(doc.val, doc.val);"
+                        "}"
+                    "}">>}
+            ]}}
+        ]}},
+        {<<"autoupdate">>, false},
+        {<<"interactive">>, true}
     ]}).
 
 
