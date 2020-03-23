@@ -93,12 +93,18 @@ get_info(Db, DDoc) ->
         running -> true;
         _ -> false
     end,
+    UpdateOptions0 = couch_mrview_index:get(update_options, Mrst),
+    UpdateOptions = [atom_to_binary(O, latin1) || O <- UpdateOptions0],
     {ok, [
         {language, Mrst#mrst.language},
         {signature, Sig},
+        {sizes, {[
+            {active, DataSize}
+        ]}},
         {update_seq, UpdateSeq},
         {updater_running, Status1},
-        {data_size, DataSize}
+        {data_size, DataSize},
+        {update_options, UpdateOptions}
     ]}.
 
 get_total_view_size(TxDb, Mrst) ->
