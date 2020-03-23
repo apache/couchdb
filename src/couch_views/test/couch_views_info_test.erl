@@ -62,6 +62,7 @@ views_info_test_() ->
                     fun sig_is_binary/1,
                     fun language_is_js/1,
                     fun update_seq_is_binary/1,
+                    fun updater_running_is_boolean/1,
                     fun data_size_is_non_neg_int/1
                 ]
             }
@@ -76,6 +77,9 @@ language_is_js({_, Info}) ->
 
 data_size_is_non_neg_int({_, Info}) ->
     ?_assert(check_non_neg_int(data_size, Info)).
+
+updater_running_is_boolean({_, Info}) ->
+    ?_assert(is_boolean(prop(updater_running, Info))).
 
 update_seq_is_binary({_, Info}) ->
     ?_assert(is_binary(prop(update_seq, Info))).

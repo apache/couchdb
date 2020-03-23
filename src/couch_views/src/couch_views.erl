@@ -24,7 +24,7 @@
     get_views_info/2
 ]).
 
-
+-include("couch_views.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
@@ -78,15 +78,26 @@ get_views_info(Db, DDoc) ->
     DbName = fabric2_db:name(Db),
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     Sig = fabric2_util:to_hex(Mrst#mrst.sig),
-    {UpdateSeq, DataSize} = fabric2_fdb:transactional(Db, fun(TxDb) ->
+    JobId = <<DbName/binary, "-", Sig/binary>>,
+    {UpdateSeq, DataSize, Status0} = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{
+            tx := Tx
+        } = TxDb,
         Seq = couch_views_fdb:get_update_seq(TxDb, Mrst),
         DataSize = get_total_view_size(TxDb, Mrst),
-        {Seq, DataSize}
+        Status = couch_jobs:get_job_state(Tx, ?INDEX_JOB_TYPE, JobId),
+        {Seq, DataSize, Status}
     end),
+    Status1 = case Status0 of
+        pending -> true;
+        running -> true;
+        _ -> false
+    end,
     {ok, [
         {language, Mrst#mrst.language},
         {signature, Sig},
         {update_seq, UpdateSeq},
+        {updater_running, Status1},
         {data_size, DataSize}
     ]}.
 
