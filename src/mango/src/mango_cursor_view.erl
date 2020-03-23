@@ -31,9 +31,7 @@
 -include_lib("fabric/include/fabric.hrl").
 
 -include("mango_cursor.hrl").
--include("mango_idx_view.hrl").
 
--define(HEARTBEAT_INTERVAL_IN_USEC, 4000000).
 
 create(Db, Indexes, Selector, Opts) ->
     FieldRanges = mango_idx_view:field_ranges(Selector),
@@ -91,7 +89,8 @@ maybe_replace_max_json(?MAX_STR) ->
     <<"<MAX>">>;
 
 maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
-    H1 = if H == ?MAX_JSON_OBJ -> <<"<MAX>">>;
+    MAX_VAL = couch_views_encoding:max(),
+    H1 = if H == MAX_VAL  -> <<"<MAX>">>;
             true -> H
     end,
     [H1 | maybe_replace_max_json(T)];
@@ -100,7 +99,7 @@ maybe_replace_max_json(EndKey) ->
     EndKey.
 
 
-base_args(#cursor{index = Idx, selector = Selector} = Cursor) ->
+base_args(#cursor{index = Idx} = Cursor) ->
     {StartKey, EndKey} = case Cursor#cursor.ranges of
         [empty] ->
             {null, null};
@@ -132,18 +131,19 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
             Args0 = apply_opts(Opts, BaseArgs),
             Args = mango_json_bookmark:update_args(Bookmark, Args0),
-            UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
-            DbOpts = [{user_ctx, UserCtx}],
             Result = case mango_idx:def(Idx) of
                 all_docs ->
                     CB = fun ?MODULE:handle_all_docs_message/2,
-                    fabric:all_docs(Db, DbOpts, CB, Cursor, Args);
+                    AllDocOpts = fabric2_util:all_docs_view_opts(Args)
+                        ++ [{restart_tx, true}],
+                    fabric2_db:fold_docs(Db, CB, Cursor, AllDocOpts);
                 _ ->
                     CB = fun ?MODULE:handle_message/2,
                     % Normal view
-                    DDoc = ddocid(Idx),
+                    DDocId = mango_idx:ddoc(Idx),
+                    {ok, DDoc} = fabric2_db:open_doc(Db, DDocId),
                     Name = mango_idx:name(Idx),
-                    fabric:query_view(Db, DbOpts, DDoc, Name, CB, Cursor, Args)
+                    couch_views:query(Db, DDoc, Name, CB, Cursor, Args)
             end,
             case Result of
                 {ok, LastCursor} ->
@@ -227,7 +227,7 @@ choose_best_index(_DbName, IndexRanges) ->
 handle_message({meta, _}, Cursor) ->
     {ok, Cursor};
 handle_message({row, Props}, Cursor) ->
-    case doc_member(Cursor, Props) of
+    case match_doc(Cursor, Props) of
         {ok, Doc, {execution_stats, Stats}} ->
             Cursor1 = Cursor#cursor {
                 execution_stats = Stats
@@ -278,15 +278,6 @@ handle_doc(#cursor{limit = L, execution_stats = Stats} = C, Doc) when L > 0 ->
     }};
 handle_doc(C, _Doc) ->
     {stop, C}.
-
-
-ddocid(Idx) ->
-    case mango_idx:ddoc(Idx) of
-        <<"_design/", Rest/binary>> ->
-            Rest;
-        Else ->
-            Else
-    end.
 
 
 apply_opts([], Args) ->
@@ -340,41 +331,18 @@ apply_opts([{_, _} | Rest], Args) ->
     apply_opts(Rest, Args).
 
 
-doc_member(Cursor, RowProps) ->
-    Db = Cursor#cursor.db,
-    Opts = Cursor#cursor.opts,
-    ExecutionStats = Cursor#cursor.execution_stats,
-    Selector = Cursor#cursor.selector,
-    case couch_util:get_value(doc, RowProps) of
-        {DocProps} ->
-            % only matching documents are returned; the selector
-            % is evaluated at the shard level in view_cb({row, Row},
-            {ok, {DocProps}, {execution_stats, ExecutionStats}};
-        undefined ->
-            % an undefined doc was returned, indicating we should
-            % perform a quorum fetch
-            ExecutionStats1 = mango_execution_stats:incr_quorum_docs_examined(ExecutionStats),
-            couch_stats:increment_counter([mango, quorum_docs_examined]),
-            Id = couch_util:get_value(id, RowProps),
-            case mango_util:defer(fabric, open_doc, [Db, Id, Opts]) of
-                {ok, #doc{}=DocProps} ->
-                    Doc = couch_doc:to_json_obj(DocProps, []),
-                    match_doc(Selector, Doc, ExecutionStats1);
-                Else ->
-                    Else
-            end;
-        _ ->
-            % no doc, no match
-            {no_match, null, {execution_stats, ExecutionStats}}
-    end.
-
-
-match_doc(Selector, Doc, ExecutionStats) ->
+match_doc(Cursor, RowProps) ->
+    #cursor{
+        execution_stats = Stats0,
+        selector = Selector
+    } = Cursor,
+    Stats1 = mango_execution_stats:incr_docs_examined(Stats0, 1),
+    Doc = couch_util:get_value(doc, RowProps),
     case mango_selector:match(Selector, Doc) of
         true ->
-            {ok, Doc, {execution_stats, ExecutionStats}};
+            {ok, Doc, {execution_stats, Stats1}};
         false ->
-            {no_match, Doc, {execution_stats, ExecutionStats}}
+            {no_match, Doc, {execution_stats, Stats1}}
     end.
 
 

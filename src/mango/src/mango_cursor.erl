@@ -48,7 +48,9 @@
 
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
-    UsableIndexes = mango_idx:get_usable_indexes(Db, Selector, Opts),
+    UsableIndexes = fabric2_fdb:transactional(Db, fun (TxDb) ->
+        mango_idx:get_usable_indexes(TxDb, Selector, Opts)
+    end),
     case mango_cursor:maybe_filter_indexes_by_ddoc(UsableIndexes, Opts) of
         [] ->
             % use_index doesn't match a valid index - fall back to a valid one

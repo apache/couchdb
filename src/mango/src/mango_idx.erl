@@ -86,7 +86,7 @@ get_usable_indexes(Db, Selector, Opts) ->
     GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(
             ExistingIndexes
         ),
-    BuiltIndexes = mango_cursor:remove_unbuilt_indexes(GlobalIndexes),
+    BuiltIndexes = remove_unbuilt_indexes(GlobalIndexes),
     UserSpecifiedIndex = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
     UsableIndexes0 = lists:usort(BuiltIndexes ++ UserSpecifiedIndex),
 
@@ -398,6 +398,17 @@ get_legacy_selector(Def) ->
         {[]} -> undefined;
         Selector -> Selector
     end.
+
+% remove any interactive indexes that are not built. If an index is not
+% interactive than we do not remove it as it will be built when queried
+remove_unbuilt_indexes(Indexes) ->
+    lists:filter(fun(Idx) ->
+        case Idx#idx.interactive of
+            true -> Idx#idx.build_status == ?INDEX_READY;
+            _ -> true
+        end
+    end, Indexes).
+
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
