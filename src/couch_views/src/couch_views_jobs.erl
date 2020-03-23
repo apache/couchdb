@@ -40,11 +40,12 @@ build_view(TxDb, Mrst, UpdateSeq) ->
     end.
 
 
-build_view_async(TxDb, Mrst) ->
-    JobId = job_id(TxDb, Mrst),
-    JobData = job_data(TxDb, Mrst),
-    DbUUID = fabric2_db:get_uuid(TxDb),
-    couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(JTx) ->
+build_view_async(TxDb0, Mrst) ->
+    JobId = job_id(TxDb0, Mrst),
+    JobData = job_data(TxDb0, Mrst),
+    DbUUID = fabric2_db:get_uuid(TxDb0),
+    TxDb1 = ensure_correct_tx(TxDb0),
+    couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(TxDb1), fun(JTx) ->
         case couch_jobs:get_job_data(JTx, ?INDEX_JOB_TYPE, JobId) of
             {error, not_found} ->
                 ok;
@@ -57,6 +58,16 @@ build_view_async(TxDb, Mrst) ->
         ok = couch_jobs:add(JTx, ?INDEX_JOB_TYPE, JobId, JobData)
     end),
     {ok, JobId}.
+
+
+ensure_correct_tx(#{tx := undefined} = TxDb) ->
+    TxDb;
+
+ensure_correct_tx(#{tx := Tx} = TxDb) ->
+    case erlfdb:is_read_only(Tx) of
+        true -> TxDb#{tx := undefined};
+        false -> TxDb
+    end.
 
 
 wait_for_job(JobId, UpdateSeq) ->

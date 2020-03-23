@@ -77,10 +77,13 @@ trace_single_doc(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, Doc, []),
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
 
+    HexSig = fabric2_util:to_hex(Mrst#mrst.sig),
     JobData = #{
         <<"db_name">> => DbName,
+        <<"db_uuid">> => fabric2_db:get_uuid(Db),
         <<"ddoc_id">> => <<"_design/bar">>,
-        <<"sig">> => fabric2_util:to_hex(Mrst#mrst.sig)
+        <<"sig">> => HexSig,
+        <<"retries">> => 0
     },
     meck:expect(couch_jobs, accept, 2, {ok, job, JobData}),
     meck:expect(couch_jobs, update, 3, {ok, job}),
