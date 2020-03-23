@@ -93,8 +93,7 @@ get_info(Db, DDoc) ->
         running -> true;
         _ -> false
     end,
-    UpdateOptions0 = couch_mrview_index:get(update_options, Mrst),
-    UpdateOptions = [atom_to_binary(O, latin1) || O <- UpdateOptions0],
+    UpdateOptions = get_update_options(Mrst),
     {ok, [
         {language, Mrst#mrst.language},
         {signature, Sig},
@@ -202,3 +201,10 @@ view_cmp(SK, SKD, EK, EKD) ->
     PackedSK = erlfdb_tuple:pack({BinSK, SKD}),
     PackedEK = erlfdb_tuple:pack({BinEK, EKD}),
     PackedSK =< PackedEK.
+
+get_update_options(#mrst{design_opts = Opts}) ->
+    IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
+    LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
+    UpdateOptions = if IncDesign -> [include_design]; true -> [] end
+        ++ if LocalSeq -> [local_seq]; true -> [] end,
+    [atom_to_binary(O, latin1) || O <- UpdateOptions].
