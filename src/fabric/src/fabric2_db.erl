@@ -80,9 +80,7 @@
     get_full_doc_info/2,
     get_full_doc_infos/2,
     get_missing_revs/2,
-    %% get_design_doc/2,
-    %% get_design_docs/1,
-    %% get_design_doc_count/1,
+    get_design_docs/1,
     %% get_purge_infos/2,
 
     %% get_minimum_purge_seq/1,
@@ -655,6 +653,34 @@ get_missing_revs(Db, JsonIdRevs) ->
         end
     end, IdRevs),
     {ok, AllMissing}.
+
+
+get_design_docs(Db) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{
+            db_prefix := DbPrefix
+        } = TxDb,
+
+        Prefix = erlfdb_tuple:pack({?DB_ALL_DOCS}, DbPrefix),
+        Options = set_design_doc_keys([]),
+        FoldFun = fun({Key, Val}, Acc) ->
+            {DocId} = erlfdb_tuple:unpack(Key, Prefix),
+            RevId = erlfdb_tuple:unpack(Val),
+            Rev = #{
+                rev_id => RevId,
+                rev_path => []
+            },
+            Future = fabric2_fdb:get_doc_body_future(TxDb, DocId, Rev),
+            [{DocId, Rev, Future} | Acc]
+        end,
+        Futures = fabric2_fdb:fold_range(TxDb, Prefix, FoldFun, [], Options),
+
+        % Using foldl instead of map means that the design
+        % docs come out in sorted order.
+        lists:foldl(fun({DocId, Rev, Future}, Acc) ->
+            [fabric2_fdb:get_doc_body_wait(TxDb, DocId, Rev, Future) | Acc]
+        end, [], Futures)
+    end).
 
 
 validate_docid(<<"">>) ->
