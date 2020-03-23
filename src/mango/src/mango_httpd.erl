@@ -32,9 +32,8 @@
     threshold = 1490
 }).
 
-handle_req(#httpd{} = Req, Db0) ->
+handle_req(#httpd{} = Req, Db) ->
     try
-        Db = set_user_ctx(Req, Db0),
         handle_req_int(Req, Db)
     catch
         throw:{mango_error, Module, Reason} ->
@@ -61,7 +60,9 @@ handle_req_int(_, _) ->
 handle_index_req(#httpd{method='GET', path_parts=[_, _]}=Req, Db) ->
     Params = lists:flatmap(fun({K, V}) -> parse_index_param(K, V) end,
         chttpd:qs(Req)),
-    Idxs = lists:sort(mango_idx:list(Db)),
+    Idxs = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        lists:sort(mango_idx:list(TxDb))
+    end),
     JsonIdxs0 = lists:map(fun mango_idx:to_json/1, Idxs),
     TotalRows = length(JsonIdxs0),
     Limit = case couch_util:get_value(limit, Params, TotalRows) of
@@ -87,25 +88,27 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
     {ok, Idx0} = mango_idx:new(Db, Opts),
     {ok, Idx} = mango_idx:validate_new(Idx0, Db),
     DbOpts = [{user_ctx, Req#httpd.user_ctx}, deleted, ejson_body],
-    {ok, DDoc} = mango_util:load_ddoc(Db, mango_idx:ddoc(Idx), DbOpts),
-    Id = Idx#idx.ddoc,
-    Name = Idx#idx.name,
-    Status = case mango_idx:add(DDoc, Idx) of
-        {ok, DDoc} ->
-            <<"exists">>;
-        {ok, NewDDoc} ->
-            case mango_crud:insert(Db, NewDDoc, Opts) of
-                {ok, [{RespProps}]} ->
-                    case lists:keyfind(error, 1, RespProps) of
-                        {error, Reason} ->
-                            ?MANGO_ERROR({error_saving_ddoc, Reason});
-                        _ ->
-                            <<"created">>
-                    end;
-                _ ->
-                    ?MANGO_ERROR(error_saving_ddoc)
-            end
-    end,
+    Id = mango_idx:ddoc(Idx),
+    Name = mango_idx:name(Idx),
+    Status = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        {ok, DDoc} = mango_util:load_ddoc(TxDb, Id, DbOpts),
+        case mango_idx:add(DDoc, Idx) of
+            {ok, DDoc} ->
+                <<"exists">>;
+            {ok, NewDDoc} ->
+                case mango_crud:insert(TxDb, NewDDoc, Opts) of
+                    {ok, [{RespProps}]} ->
+                        case lists:keyfind(error, 1, RespProps) of
+                            {error, Reason} ->
+                                ?MANGO_ERROR({error_saving_ddoc, Reason});
+                            _ ->
+                                <<"created">>
+                        end;
+                    _ ->
+                        ?MANGO_ERROR(error_saving_ddoc)
+                end
+        end
+    end),
 	chttpd:send_json(Req, {[{result, Status}, {id, Id}, {name, Name}]});
 
 handle_index_req(#httpd{path_parts=[_, _]}=Req, _Db) ->
@@ -118,19 +121,21 @@ handle_index_req(#httpd{method='POST', path_parts=[_, <<"_index">>,
         <<"_bulk_delete">>]}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
     {ok, Opts} = mango_opts:validate_bulk_delete(chttpd:json_body_obj(Req)),
-    Idxs = mango_idx:list(Db),
-    DDocs = get_bulk_delete_ddocs(Opts),
-    {Success, Fail} = lists:foldl(fun(DDocId0, {Success0, Fail0}) ->
-        DDocId = convert_to_design_id(DDocId0),
-        Filt = fun(Idx) -> mango_idx:ddoc(Idx) == DDocId end,
-        Id = {<<"id">>, DDocId},
-        case mango_idx:delete(Filt, Db, Idxs, Opts) of
-            {ok, true} ->
-                {[{[Id, {<<"ok">>, true}]} | Success0], Fail0};
-            {error, Error} ->
-                {Success0, [{[Id, {<<"error">>, Error}]} | Fail0]}
-        end
-    end, {[], []}, DDocs),
+    {Success, Fail} = fabric2_fdb:transactional(Db, fun (TxDb) ->
+        Idxs = mango_idx:list(TxDb),
+        DDocs = get_bulk_delete_ddocs(Opts),
+        lists:foldl(fun(DDocId0, {Success0, Fail0}) ->
+            DDocId = convert_to_design_id(DDocId0),
+            Filt = fun(Idx) -> mango_idx:ddoc(Idx) == DDocId end,
+            Id = {<<"id">>, DDocId},
+            case mango_idx:delete(Filt, TxDb, Idxs, Opts) of
+                {ok, true} ->
+                    {[{[Id, {<<"ok">>, true}]} | Success0], Fail0};
+                {error, Error} ->
+                    {Success0, [{[Id, {<<"error">>, Error}]} | Fail0]}
+            end
+        end, {[], []}, DDocs)
+    end),
     chttpd:send_json(Req, {[{<<"success">>, Success}, {<<"fail">>, Fail}]});
 
 handle_index_req(#httpd{path_parts=[_, <<"_index">>,
@@ -144,15 +149,18 @@ handle_index_req(#httpd{method='DELETE',
 
 handle_index_req(#httpd{method='DELETE',
         path_parts=[_, _, DDocId0, Type, Name]}=Req, Db) ->
-    Idxs = mango_idx:list(Db),
-    DDocId = convert_to_design_id(DDocId0),
-    Filt = fun(Idx) ->
-        IsDDoc = mango_idx:ddoc(Idx) == DDocId,
-        IsType = mango_idx:type(Idx) == Type,
-        IsName = mango_idx:name(Idx) == Name,
-        IsDDoc andalso IsType andalso IsName
-    end,
-    case mango_idx:delete(Filt, Db, Idxs, []) of
+    Result = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        Idxs = mango_idx:list(TxDb),
+        DDocId = convert_to_design_id(DDocId0),
+        Filt = fun(Idx) ->
+            IsDDoc = mango_idx:ddoc(Idx) == DDocId,
+            IsType = mango_idx:type(Idx) == Type,
+            IsName = mango_idx:name(Idx) == Name,
+            IsDDoc andalso IsType andalso IsName
+        end,
+        mango_idx:delete(Filt, TxDb, Idxs, [])
+    end),
+    case Result of
         {ok, true} ->
             chttpd:send_json(Req, {[{ok, true}]});
         {error, not_found} ->
@@ -170,7 +178,9 @@ handle_explain_req(#httpd{method='POST'}=Req, Db) ->
     Body = chttpd:json_body_obj(Req),
     {ok, Opts0} = mango_opts:validate_find(Body),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
-    Resp = mango_crud:explain(Db, Sel, Opts),
+    Resp = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        mango_crud:explain(TxDb, Sel, Opts)
+    end),
     chttpd:send_json(Req, Resp);
 
 handle_explain_req(Req, _Db) ->
@@ -193,11 +203,6 @@ handle_find_req(#httpd{method='POST'}=Req, Db) ->
 
 handle_find_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
-
-
-set_user_ctx(#httpd{user_ctx=Ctx}, Db) ->
-    {ok, NewDb} = couch_db:set_user_ctx(Db, Ctx),
-    NewDb.
 
 
 get_bulk_delete_ddocs(Opts) ->

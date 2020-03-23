@@ -85,14 +85,7 @@ open_doc(Db, DocId) ->
 
 
 open_doc(Db, DocId, Options) ->
-    case mango_util:defer(fabric, open_doc, [Db, DocId, Options]) of
-        {ok, Doc} ->
-            {ok, Doc};
-        {not_found, _} ->
-            not_found;
-        _ ->
-            ?MANGO_ERROR({error_loading_doc, DocId})
-    end.
+    fabric2_db:open_doc(Db, DocId, Options).
 
 
 open_ddocs(Db) ->
@@ -111,7 +104,7 @@ load_ddoc(Db, DDocId, DbOpts) ->
     case open_doc(Db, DDocId, DbOpts) of
         {ok, Doc} ->
             {ok, check_lang(Doc)};
-        not_found ->
+        {not_found, missing} ->
             Body = {[
                 {<<"language">>, <<"query">>}
             ]},
