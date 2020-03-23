@@ -205,12 +205,9 @@ invalid_index_warning_int(_, _) ->
 % returned, implying a lot of in-memory filtering
 index_scan_warning(#execution_stats {
                     totalDocsExamined = Docs,
-                    totalQuorumDocsExamined = DocsQuorum,
                     resultsReturned = ResultCount
                 }) ->
-    % Docs and DocsQuorum are mutually exclusive so it's safe to sum them
-    DocsScanned = Docs + DocsQuorum,
-    Ratio = calculate_index_scan_ratio(DocsScanned, ResultCount),
+    Ratio = calculate_index_scan_ratio(Docs, ResultCount),
     Threshold = config:get_integer("mango", "index_scan_warning_threshold", 10),
     case Threshold > 0 andalso Ratio > Threshold of
         true ->

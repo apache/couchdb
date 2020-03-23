@@ -18,7 +18,6 @@
     incr_keys_examined/1,
     incr_docs_examined/1,
     incr_docs_examined/2,
-    incr_quorum_docs_examined/1,
     incr_results_returned/1,
     log_start/1,
     log_end/1,
@@ -33,7 +32,6 @@ to_json(Stats) ->
     {[
         {total_keys_examined, Stats#execution_stats.totalKeysExamined},
         {total_docs_examined, Stats#execution_stats.totalDocsExamined},
-        {total_quorum_docs_examined, Stats#execution_stats.totalQuorumDocsExamined},
         {results_returned, Stats#execution_stats.resultsReturned},
         {execution_time_ms, Stats#execution_stats.executionTimeMs}
     ]}.
@@ -52,12 +50,6 @@ incr_docs_examined(Stats) ->
 incr_docs_examined(Stats, N) ->
     Stats#execution_stats {
         totalDocsExamined = Stats#execution_stats.totalDocsExamined + N
-    }.
-
-
-incr_quorum_docs_examined(Stats) ->
-    Stats#execution_stats {
-        totalQuorumDocsExamined = Stats#execution_stats.totalQuorumDocsExamined + 1
     }.
 
 
