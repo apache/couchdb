@@ -70,7 +70,6 @@ views_info_test_() ->
                     fun language_is_js/1,
                     fun update_seq_is_binary/1,
                     fun updater_running_is_boolean/1,
-                    fun data_size_is_non_neg_int/1,
                     fun active_size_is_non_neg_int/1,
                     fun update_opts_is_bin_list/1
                 ]
@@ -85,10 +84,6 @@ sig_is_binary({_, Info}) ->
 
 language_is_js({_, Info}) ->
     ?_assertEqual(<<"javascript">>, prop(language, Info)).
-
-
-data_size_is_non_neg_int({_, Info}) ->
-    ?_assert(check_non_neg_int(data_size, Info)).
 
 
 active_size_is_non_neg_int({_, Info}) ->

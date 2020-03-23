@@ -103,7 +103,6 @@ get_info(Db, DDoc) ->
         ]}},
         {update_seq, UpdateSeq},
         {updater_running, Status1},
-        {data_size, DataSize},
         {update_options, UpdateOptions}
     ]}.
 
