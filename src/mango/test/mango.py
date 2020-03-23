@@ -244,7 +244,6 @@ class Database(object):
         skip=0,
         sort=None,
         fields=None,
-        r=1,
         conflicts=False,
         use_index=None,
         explain=False,
@@ -258,7 +257,6 @@ class Database(object):
             "use_index": use_index,
             "limit": limit,
             "skip": skip,
-            "r": r,
             "conflicts": conflicts,
         }
         if sort is not None:

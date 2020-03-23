@@ -35,8 +35,7 @@ insert(Db, {_}=Doc, Opts) ->
     insert(Db, [Doc], Opts);
 insert(Db, Docs, Opts0) when is_list(Docs) ->
     Opts1 = maybe_add_user_ctx(Db, Opts0),
-    Opts2 = maybe_int_to_str(w, Opts1),
-    case fabric:update_docs(Db, Docs, Opts2) of
+    case fabric:update_docs(Db, Docs, Opts1) of
         {ok, Results0} ->
             {ok, lists:zipwith(fun result_to_json/2, Docs, Results0)};
         {accepted, Results0} ->
@@ -48,8 +47,7 @@ insert(Db, Docs, Opts0) when is_list(Docs) ->
 
 find(Db, Selector, Callback, UserAcc, Opts0) ->
     Opts1 = maybe_add_user_ctx(Db, Opts0),
-    Opts2 = maybe_int_to_str(r, Opts1),
-    {ok, Cursor} = mango_cursor:create(Db, Selector, Opts2),
+    {ok, Cursor} = mango_cursor:create(Db, Selector, Opts1),
     mango_cursor:execute(Cursor, Callback, UserAcc).
 
 
@@ -101,8 +99,7 @@ delete(Db, Selector, Options) ->
 
 explain(Db, Selector, Opts0) ->
     Opts1 = maybe_add_user_ctx(Db, Opts0),
-    Opts2 = maybe_int_to_str(r, Opts1),
-    {ok, Cursor} = mango_cursor:create(Db, Selector, Opts2),
+    {ok, Cursor} = mango_cursor:create(Db, Selector, Opts1),
     mango_cursor:explain(Cursor).
 
 
@@ -113,14 +110,6 @@ maybe_add_user_ctx(Db, Opts) ->
         false ->
             [{user_ctx, couch_db:get_user_ctx(Db)} | Opts]
     end.
-
-
-maybe_int_to_str(_Key, []) ->
-    [];
-maybe_int_to_str(Key, [{Key, Val} | Rest]) when is_integer(Val) ->
-    [{Key, integer_to_list(Val)} | maybe_int_to_str(Key, Rest)];
-maybe_int_to_str(Key, [KV | Rest]) ->
-    [KV | maybe_int_to_str(Key, Rest)].
 
 
 result_to_json(#doc{id=Id}, Result) ->
