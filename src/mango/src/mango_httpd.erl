@@ -94,8 +94,7 @@ handle_index_req(#httpd{method='POST', path_parts=[_, _]}=Req, Db) ->
         {ok, DDoc} ->
             <<"exists">>;
         {ok, NewDDoc} ->
-            CreateOpts = get_idx_w_opts(Opts),
-            case mango_crud:insert(Db, NewDDoc, CreateOpts) of
+            case mango_crud:insert(Db, NewDDoc, Opts) of
                 {ok, [{RespProps}]} ->
                     case lists:keyfind(error, 1, RespProps) of
                         {error, Reason} ->
@@ -121,12 +120,11 @@ handle_index_req(#httpd{method='POST', path_parts=[_, <<"_index">>,
     {ok, Opts} = mango_opts:validate_bulk_delete(chttpd:json_body_obj(Req)),
     Idxs = mango_idx:list(Db),
     DDocs = get_bulk_delete_ddocs(Opts),
-    DelOpts = get_idx_w_opts(Opts),
     {Success, Fail} = lists:foldl(fun(DDocId0, {Success0, Fail0}) ->
         DDocId = convert_to_design_id(DDocId0),
         Filt = fun(Idx) -> mango_idx:ddoc(Idx) == DDocId end,
         Id = {<<"id">>, DDocId},
-        case mango_idx:delete(Filt, Db, Idxs, DelOpts) of
+        case mango_idx:delete(Filt, Db, Idxs, Opts) of
             {ok, true} ->
                 {[{[Id, {<<"ok">>, true}]} | Success0], Fail0};
             {error, Error} ->
@@ -148,14 +146,13 @@ handle_index_req(#httpd{method='DELETE',
         path_parts=[_, _, DDocId0, Type, Name]}=Req, Db) ->
     Idxs = mango_idx:list(Db),
     DDocId = convert_to_design_id(DDocId0),
-    DelOpts = get_idx_del_opts(Req),
     Filt = fun(Idx) ->
         IsDDoc = mango_idx:ddoc(Idx) == DDocId,
         IsType = mango_idx:type(Idx) == Type,
         IsName = mango_idx:name(Idx) == Name,
         IsDDoc andalso IsType andalso IsName
     end,
-    case mango_idx:delete(Filt, Db, Idxs, DelOpts) of
+    case mango_idx:delete(Filt, Db, Idxs, []) of
         {ok, true} ->
             chttpd:send_json(Req, {[{ok, true}]});
         {error, not_found} ->
@@ -203,31 +200,12 @@ set_user_ctx(#httpd{user_ctx=Ctx}, Db) ->
     NewDb.
 
 
-get_idx_w_opts(Opts) ->
-    case lists:keyfind(w, 1, Opts) of
-        {w, N} when is_integer(N), N > 0 ->
-            [{w, integer_to_list(N)}];
-        _ ->
-            [{w, "2"}]
-    end.
-
-
 get_bulk_delete_ddocs(Opts) ->
     case lists:keyfind(docids, 1, Opts) of
         {docids, DDocs} when is_list(DDocs) ->
             DDocs;
         _ ->
             []
-    end.
-
-
-get_idx_del_opts(Req) ->
-    try
-        WStr = chttpd:qs_value(Req, "w", "2"),
-        _ = list_to_integer(WStr),
-        [{w, WStr}]
-    catch _:_ ->
-        [{w, "2"}]
     end.
 
 
