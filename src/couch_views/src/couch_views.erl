@@ -20,7 +20,8 @@
     query/6,
 
     % fabric2_index behavior
-    build_indices/2
+    build_indices/2,
+    get_views_info/2
 ]).
 
 
@@ -73,6 +74,27 @@ build_indices(#{} = Db, DDocs) when is_list(DDocs) ->
         end
     end, DDocs).
 
+get_views_info(Db, DDoc) ->
+    DbName = fabric2_db:name(Db),
+    {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
+    Sig = fabric2_util:to_hex(Mrst#mrst.sig),
+    {UpdateSeq, DataSize} = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        Seq = couch_views_fdb:get_update_seq(TxDb, Mrst),
+        DataSize = get_total_view_size(TxDb, Mrst),
+        {Seq, DataSize}
+    end),
+    {ok, [
+        {language, Mrst#mrst.language},
+        {signature, Sig},
+        {update_seq, UpdateSeq},
+        {data_size, DataSize}
+    ]}.
+
+get_total_view_size(TxDb, Mrst) ->
+    ViewIds = [View#mrview.id_num || View <- Mrst#mrst.views],
+    lists:foldl(fun (ViewId, Total) ->
+        Total + couch_views_fdb:get_kv_size(TxDb, Mrst, ViewId)
+    end, 0, ViewIds).
 
 read_view(Db, Mrst, ViewName, Callback, Acc0, Args) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
