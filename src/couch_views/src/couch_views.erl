@@ -74,6 +74,7 @@ build_indices(#{} = Db, DDocs) when is_list(DDocs) ->
         end
     end, DDocs).
 
+
 get_info(Db, DDoc) ->
     DbName = fabric2_db:name(Db),
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
@@ -106,11 +107,13 @@ get_info(Db, DDoc) ->
         {update_options, UpdateOptions}
     ]}.
 
+
 get_total_view_size(TxDb, Mrst) ->
     ViewIds = [View#mrview.id_num || View <- Mrst#mrst.views],
     lists:foldl(fun (ViewId, Total) ->
         Total + couch_views_fdb:get_kv_size(TxDb, Mrst, ViewId)
     end, 0, ViewIds).
+
 
 read_view(Db, Mrst, ViewName, Callback, Acc0, Args) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
