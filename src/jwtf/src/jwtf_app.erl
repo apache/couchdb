@@ -10,23 +10,19 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, jwtf, [
-    {description, "JSON Web Token Functions"},
-    {vsn, git},
-    {registered, []},
-    {applications, [
-        kernel,
-        stdlib,
-        b64url,
-        config,
-        crypto,
-        jiffy,
-        public_key
-    ]},
-    {mod, {jwtf_app, []}},
-    {env,[]},
-    {modules, []},
-    {maintainers, []},
-    {licenses, []},
-    {links, []}
-]}.
+-module(jwtf_app).
+
+-behaviour(application).
+
+%% Application callbacks
+-export([start/2, stop/1]).
+
+%% ===================================================================
+%% Application callbacks
+%% ===================================================================
+
+start(_StartType, _StartArgs) ->
+    jwtf_sup:start_link().
+
+stop(_State) ->
+    ok.
