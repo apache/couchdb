@@ -46,45 +46,35 @@ init() ->
     Data = upgrade_data(Data0),
     #{
         <<"db_name">> := DbName,
+        <<"db_uuid">> := DbUUID,
         <<"ddoc_id">> := DDocId,
         <<"sig">> := JobSig,
         <<"retries">> := Retries
     } = Data,
 
     {ok, Db} = try
-        fabric2_db:open(DbName, [?ADMIN_CTX])
+        fabric2_db:open(DbName, [?ADMIN_CTX, {uuid, DbUUID}])
     catch error:database_does_not_exist ->
-        couch_jobs:finish(undefined, Job, Data#{
-            error => db_deleted,
-            reason => "Database was deleted"
-        }),
-        exit(normal)
+        fail_job(Job, Data, db_deleted, "Database was deleted")
     end,
 
     {ok, DDoc} = case fabric2_db:open_doc(Db, DDocId) of
         {ok, DDoc0} ->
             {ok, DDoc0};
         {not_found, _} ->
-            couch_jobs:finish(undefined, Job, Data#{
-                error => ddoc_deleted,
-                reason => "Design document was deleted"
-            }),
-            exit(normal)
+            fail_job(Job, Data, ddoc_deleted, "Design document was deleted")
     end,
 
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     HexSig = fabric2_util:to_hex(Mrst#mrst.sig),
 
-    if  HexSig == JobSig -> ok; true ->
-        couch_jobs:finish(undefined, Job, Data#{
-            error => sig_changed,
-            reason => <<"Design document was modified">>
-        }),
-        exit(normal)
+    if HexSig == JobSig -> ok; true ->
+        fail_job(Job, Data, sig_changed, "Design document was modified")
     end,
 
     State = #{
         tx_db => undefined,
+        db_uuid => DbUUID,
         db_seq => undefined,
         view_seq => undefined,
         last_seq => undefined,
@@ -101,6 +91,8 @@ init() ->
     catch
         exit:normal ->
             ok;
+        error:database_does_not_exist ->
+            fail_job(Job, Data, db_deleted, "Database was deleted");
         Error:Reason  ->
             NewRetry = Retries + 1,
             RetryLimit = retry_limit(),
@@ -115,18 +107,22 @@ init() ->
                     StateErr = State#{job_data := DataErr, last_seq := <<"0">>},
                     report_progress(StateErr, update);
                 false ->
-                    NewData = add_error(Error, Reason, Data),
-                    couch_jobs:finish(undefined, Job, NewData),
-                    exit(normal)
+                    fail_job(Job, Data, Error, Reason)
             end
     end.
 
 
 upgrade_data(Data) ->
-    case maps:is_key(<<"retries">>, Data) of
-        true -> Data;
-        false -> Data#{<<"retries">> =>0}
-    end.
+    Defaults = [
+        {<<"retries">>, 0},
+        {<<"db_uuid">>, undefined}
+    ],
+    lists:foldl(fun({Key, Default}, Acc) ->
+        case maps:is_key(Key, Acc) of
+            true -> Acc;
+            false -> maps:put(Key, Default, Acc)
+        end
+    end, Data, Defaults).
 
 
 % Transaction limit exceeded don't retry
@@ -433,6 +429,7 @@ report_progress(State, UpdateType) ->
 
     #{
         <<"db_name">> := DbName,
+        <<"db_uuid">> := DbUUID,
         <<"ddoc_id">> := DDocId,
         <<"sig">> := Sig,
         <<"retries">> := Retries
@@ -442,6 +439,7 @@ report_progress(State, UpdateType) ->
     % possible existing error state.
     NewData = #{
         <<"db_name">> => DbName,
+        <<"db_uuid">> => DbUUID,
         <<"ddoc_id">> => DDocId,
         <<"sig">> => Sig,
         <<"view_seq">> => LastSeq,
@@ -466,6 +464,12 @@ report_progress(State, UpdateType) ->
                     exit(normal)
             end
     end.
+
+
+fail_job(Job, Data, Error, Reason) ->
+    NewData = add_error(Error, Reason, Data),
+    couch_jobs:finish(undefined, Job, NewData),
+    exit(normal).
 
 
 num_changes() ->

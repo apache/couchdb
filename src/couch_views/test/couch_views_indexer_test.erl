@@ -16,6 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
 
@@ -47,7 +48,9 @@ indexer_test_() ->
                     ?TDEF_FE(fewer_multipe_identical_keys_from_same_doc),
                     ?TDEF_FE(handle_size_key_limits),
                     ?TDEF_FE(handle_size_value_limits),
-                    ?TDEF_FE(index_autoupdater_callback)
+                    ?TDEF_FE(index_autoupdater_callback),
+                    ?TDEF_FE(handle_db_recreated_when_running),
+                    ?TDEF_FE(handle_db_recreated_after_finished)
                 ]
             }
         }
@@ -75,6 +78,7 @@ foreach_setup() ->
 
 foreach_teardown(Db) ->
     meck:unload(),
+    config:delete("couch_views", "change_limit"),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
 
@@ -372,6 +376,87 @@ index_autoupdater_callback(Db) ->
     ?assertEqual(ok, couch_views_jobs:wait_for_job(JobId, DbSeq)).
 
 
+handle_db_recreated_when_running(Db) ->
+    DbName = fabric2_db:name(Db),
+
+    DDoc = create_ddoc(),
+    {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
+    {ok, _} = fabric2_db:update_doc(Db, doc(0), []),
+    {ok, _} = fabric2_db:update_doc(Db, doc(1), []),
+
+    % To intercept job building while it is running ensure updates happen one
+    % row at a time.
+    config:set("couch_views", "change_limit", "1", false),
+
+    meck_intercept_job_update(self()),
+
+    [{ok, JobId}] = couch_views:build_indices(Db, [DDoc]),
+
+    {Indexer, _Job, _Data} = wait_indexer_update(10000),
+
+    {ok, State} = couch_jobs:get_job_state(undefined, ?INDEX_JOB_TYPE, JobId),
+    ?assertEqual(running, State),
+
+    {ok, SubId, running, _} = couch_jobs:subscribe(?INDEX_JOB_TYPE, JobId),
+
+    ok = fabric2_db:delete(DbName, []),
+    {ok, Db1} = fabric2_db:create(DbName, [?ADMIN_CTX]),
+
+    Indexer ! continue,
+
+    ?assertMatch({
+        ?INDEX_JOB_TYPE,
+        JobId,
+        finished,
+        #{<<"error">> := <<"db_deleted">>}
+    }, couch_jobs:wait(SubId, infinity)),
+
+    {ok, _} = fabric2_db:update_doc(Db1, DDoc, []),
+    {ok, _} = fabric2_db:update_doc(Db1, doc(2), []),
+    {ok, _} = fabric2_db:update_doc(Db1, doc(3), []),
+
+    reset_intercept_job_update(Indexer),
+
+    {ok, Out2} = run_query(Db1, DDoc, ?MAP_FUN1),
+    ?assertEqual([
+        row(<<"2">>, 2, 2),
+        row(<<"3">>, 3, 3)
+    ], Out2).
+
+
+handle_db_recreated_after_finished(Db) ->
+    DbName = fabric2_db:name(Db),
+
+    DDoc = create_ddoc(),
+    {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
+    {ok, _} = fabric2_db:update_doc(Db, doc(0), []),
+    {ok, _} = fabric2_db:update_doc(Db, doc(1), []),
+
+    {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
+    ?assertEqual([
+        row(<<"0">>, 0, 0),
+        row(<<"1">>, 1, 1)
+    ], Out1),
+
+    ok = fabric2_db:delete(DbName, []),
+
+    ?assertError(database_does_not_exist, run_query(Db, DDoc, ?MAP_FUN1)),
+
+    {ok, Db1} = fabric2_db:create(DbName, [?ADMIN_CTX]),
+
+    {ok, _} = fabric2_db:update_doc(Db1, DDoc, []),
+    {ok, _} = fabric2_db:update_doc(Db1, doc(2), []),
+    {ok, _} = fabric2_db:update_doc(Db1, doc(3), []),
+
+    ?assertError(database_does_not_exist, run_query(Db, DDoc, ?MAP_FUN1)),
+
+    {ok, Out2} = run_query(Db1, DDoc, ?MAP_FUN1),
+    ?assertEqual([
+        row(<<"2">>, 2, 2),
+        row(<<"3">>, 3, 3)
+    ], Out2).
+
+
 row(Id, Key, Value) ->
     {row, [
         {id, Id},
@@ -480,3 +565,27 @@ doc(Id, Val) ->
 
 run_query(#{} = Db, DDoc, <<_/binary>> = View) ->
     couch_views:query(Db, DDoc, View, fun fold_fun/2, [], #mrargs{}).
+
+
+meck_intercept_job_update(ParentPid) ->
+    meck:new(couch_jobs, [passthrough]),
+    meck:expect(couch_jobs, update, fun(Db, Job, Data) ->
+        ParentPid ! {self(), Job, Data},
+        receive continue -> ok end,
+        meck:passthrough([Db, Job, Data])
+    end).
+
+
+reset_intercept_job_update(IndexerPid) ->
+    meck:expect(couch_jobs, update, fun(Db, Job, Data) ->
+        meck:passthrough([Db, Job, Data])
+    end),
+    IndexerPid ! continue.
+
+
+wait_indexer_update(Timeout) ->
+    receive
+        {Pid, Job, Data} when is_pid(Pid) -> {Pid, Job, Data}
+    after Timeout ->
+        error(timeout_in_wait_indexer_update)
+    end.
