@@ -19,7 +19,6 @@
 ]).
 
 -export([
-    view_cb/2,
     handle_message/2,
     handle_all_docs_message/2,
     composite_indexes/2,
@@ -114,8 +113,7 @@ base_args(#cursor{index = Idx, selector = Selector} = Cursor) ->
         reduce = false,
         start_key = StartKey,
         end_key = EndKey,
-        include_docs = true,
-        extra = [{callback, {?MODULE, view_cb}}, {selector, Selector}]
+        include_docs = true
     }.
 
 
@@ -224,66 +222,6 @@ choose_best_index(_DbName, IndexRanges) ->
     end,
     {SelectedIndex, SelectedIndexRanges, _} = hd(lists:sort(Cmp, IndexRanges)),
     {SelectedIndex, SelectedIndexRanges}.
-
-
-view_cb({meta, Meta}, Acc) ->
-    % Map function starting
-    put(mango_docs_examined, 0),
-    set_mango_msg_timestamp(),
-    ok = rexi:stream2({meta, Meta}),
-    {ok, Acc};
-view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
-    ViewRow =  #view_row{
-        id = couch_util:get_value(id, Row),
-        key = couch_util:get_value(key, Row),
-        doc = couch_util:get_value(doc, Row)
-    },
-    case ViewRow#view_row.doc of
-        null ->
-            maybe_send_mango_ping();
-        undefined ->
-            % include_docs=false. Use quorum fetch at coordinator
-            ok = rexi:stream2(ViewRow),
-            set_mango_msg_timestamp();
-        Doc ->
-            put(mango_docs_examined, get(mango_docs_examined) + 1),
-            Selector = couch_util:get_value(selector, Options),
-            couch_stats:increment_counter([mango, docs_examined]),
-            case mango_selector:match(Selector, Doc) of
-                true ->
-                    ok = rexi:stream2(ViewRow),
-                    set_mango_msg_timestamp();
-                false ->
-                    maybe_send_mango_ping()
-            end
-        end,
-    {ok, Acc};
-view_cb(complete, Acc) ->
-    % Send shard-level execution stats
-    ok = rexi:stream2({execution_stats, {docs_examined, get(mango_docs_examined)}}),
-    % Finish view output
-    ok = rexi:stream_last(complete),
-    {ok, Acc};
-view_cb(ok, ddoc_updated) ->
-    rexi:reply({ok, ddoc_updated}).
-
-
-maybe_send_mango_ping() ->
-    Current = os:timestamp(),
-    LastPing = get(mango_last_msg_timestamp),
-    % Fabric will timeout if it has not heard a response from a worker node
-    % after 5 seconds. Send a ping every 4 seconds so the timeout doesn't happen.
-    case timer:now_diff(Current, LastPing) > ?HEARTBEAT_INTERVAL_IN_USEC of
-        false ->
-            ok;
-        true ->
-            rexi:ping(),
-            set_mango_msg_timestamp()
-    end.
-
-
-set_mango_msg_timestamp() ->
-    put(mango_last_msg_timestamp, os:timestamp()).
 
 
 handle_message({meta, _}, Cursor) ->
@@ -456,34 +394,3 @@ update_bookmark_keys(#cursor{limit = Limit} = Cursor, Props) when Limit > 0 ->
     };
 update_bookmark_keys(Cursor, _Props) ->
     Cursor.
-
-
-%%%%%%%% module tests below %%%%%%%%
-
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-
-does_not_refetch_doc_with_value_test() ->
-    Cursor = #cursor {
-        db = <<"db">>,
-        opts = [],
-        execution_stats = #execution_stats{},
-        selector = mango_selector:normalize({[{<<"user_id">>, <<"1234">>}]})
-    },
-    RowProps = [
-        {id,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
-        {key,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
-        {doc,{
-            [
-                {<<"_id">>,<<"b06aadcf-cd0f-4ca6-9f7e-2c993e48d4c4">>},
-                {<<"_rev">>,<<"1-a954fe2308f14307756067b0e18c2968">>},
-                {<<"user_id">>,11}
-            ]
-        }}
-    ],
-    {Match, _, _} = doc_member(Cursor, RowProps),
-    ?assertEqual(Match, ok).
-
-
--endif.
