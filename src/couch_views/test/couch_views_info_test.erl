@@ -40,7 +40,7 @@ foreach_setup() ->
     {ok, _} = fabric2_db:update_doc(Db, Doc1, []),
 
     run_query(Db, DDoc, ?MAP_FUN1),
-    {ok, Info} = couch_views:get_views_info(Db, DDoc),
+    {ok, Info} = couch_views:get_info(Db, DDoc),
     {Db, Info}.
 
 foreach_teardown({Db, _}) ->

@@ -21,7 +21,7 @@
 
     % fabric2_index behavior
     build_indices/2,
-    get_views_info/2
+    get_info/2
 ]).
 
 -include("couch_views.hrl").
@@ -74,7 +74,7 @@ build_indices(#{} = Db, DDocs) when is_list(DDocs) ->
         end
     end, DDocs).
 
-get_views_info(Db, DDoc) ->
+get_info(Db, DDoc) ->
     DbName = fabric2_db:name(Db),
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     Sig = fabric2_util:to_hex(Mrst#mrst.sig),
