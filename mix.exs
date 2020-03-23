@@ -65,7 +65,9 @@ defmodule CouchDBTest.Mixfile do
       {:junit_formatter, "~> 3.0", only: [:dev, :test, :integration]},
       {:httpotion, ">= 3.1.3", only: [:dev, :test, :integration], runtime: false},
       {:excoveralls, "~> 0.12", only: :test},
+      {:b64url, path: Path.expand("src/b64url", __DIR__)},
       {:jiffy, path: Path.expand("src/jiffy", __DIR__)},
+      {:jwtf, path: Path.expand("src/jwtf", __DIR__)},
       {:ibrowse,
        path: Path.expand("src/ibrowse", __DIR__), override: true, compile: false},
       {:credo, "~> 1.3.1", only: [:dev, :test, :integration], runtime: false}
