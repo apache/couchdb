@@ -353,18 +353,6 @@ ddocid(Idx) ->
 
 apply_opts([], Args) ->
     Args;
-apply_opts([{r, RStr} | Rest], Args) ->
-    IncludeDocs = case list_to_integer(RStr) of
-        1 ->
-            true;
-        R when R > 1 ->
-            % We don't load the doc in the view query because
-            % we have to do a quorum read in the coordinator
-            % so there's no point.
-            false
-    end,
-    NewArgs = Args#mrargs{include_docs = IncludeDocs},
-    apply_opts(Rest, NewArgs);
 apply_opts([{conflicts, true} | Rest], Args) ->
     NewArgs = Args#mrargs{conflicts = true},
     apply_opts(Rest, NewArgs);

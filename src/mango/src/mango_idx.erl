@@ -344,8 +344,6 @@ filter_opts([{name, _} | Rest]) ->
     filter_opts(Rest);
 filter_opts([{type, _} | Rest]) ->
     filter_opts(Rest);
-filter_opts([{w, _} | Rest]) ->
-    filter_opts(Rest);
 filter_opts([Opt | Rest]) ->
     [Opt | filter_opts(Rest)].
 
