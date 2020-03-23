@@ -20,10 +20,11 @@
     query/6,
 
     % fabric2_index behavior
-    build_indices/2
+    build_indices/2,
+    get_info/2
 ]).
 
-
+-include("couch_views.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
@@ -72,6 +73,45 @@ build_indices(#{} = Db, DDocs) when is_list(DDocs) ->
             false
         end
     end, DDocs).
+
+
+get_info(Db, DDoc) ->
+    DbName = fabric2_db:name(Db),
+    {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
+    Sig = fabric2_util:to_hex(Mrst#mrst.sig),
+    JobId = <<DbName/binary, "-", Sig/binary>>,
+    {UpdateSeq, DataSize, Status0} = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{
+            tx := Tx
+        } = TxDb,
+        Seq = couch_views_fdb:get_update_seq(TxDb, Mrst),
+        DataSize = get_total_view_size(TxDb, Mrst),
+        Status = couch_jobs:get_job_state(Tx, ?INDEX_JOB_TYPE, JobId),
+        {Seq, DataSize, Status}
+    end),
+    Status1 = case Status0 of
+        pending -> true;
+        running -> true;
+        _ -> false
+    end,
+    UpdateOptions = get_update_options(Mrst),
+    {ok, [
+        {language, Mrst#mrst.language},
+        {signature, Sig},
+        {sizes, {[
+            {active, DataSize}
+        ]}},
+        {update_seq, UpdateSeq},
+        {updater_running, Status1},
+        {update_options, UpdateOptions}
+    ]}.
+
+
+get_total_view_size(TxDb, Mrst) ->
+    ViewIds = [View#mrview.id_num || View <- Mrst#mrst.views],
+    lists:foldl(fun (ViewId, Total) ->
+        Total + couch_views_fdb:get_kv_size(TxDb, Mrst, ViewId)
+    end, 0, ViewIds).
 
 
 read_view(Db, Mrst, ViewName, Callback, Acc0, Args) ->
@@ -163,3 +203,11 @@ view_cmp(SK, SKD, EK, EKD) ->
     PackedSK = erlfdb_tuple:pack({BinSK, SKD}),
     PackedEK = erlfdb_tuple:pack({BinEK, EKD}),
     PackedSK =< PackedEK.
+
+
+get_update_options(#mrst{design_opts = Opts}) ->
+    IncDesign = couch_util:get_value(<<"include_design">>, Opts, false),
+    LocalSeq = couch_util:get_value(<<"local_seq">>, Opts, false),
+    UpdateOptions = if IncDesign -> [include_design]; true -> [] end
+        ++ if LocalSeq -> [local_seq]; true -> [] end,
+    [atom_to_binary(O, latin1) || O <- UpdateOptions].
