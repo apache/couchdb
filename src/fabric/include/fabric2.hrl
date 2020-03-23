@@ -17,6 +17,8 @@
 
 % Prefix Definitions
 
+-define(DEFAULT_DB_PREFIX, <<16#FD>>).
+
 % Layer Level: (LayerPrefix, X, ...)
 
 -define(CLUSTER_CONFIG, 0).
