@@ -14,6 +14,7 @@
 
 
 -export([
+    max/0,
     encode/1,
     encode/2,
     decode/1
@@ -27,6 +28,11 @@
 -define(STRING, 4).
 -define(LIST, 5).
 -define(OBJECT, 6).
+-define(MAX, 255).
+
+
+max() ->
+    max_encoding_value.
 
 
 encode(X) ->
@@ -50,6 +56,9 @@ encode_int(false, _Type) ->
 
 encode_int(true, _Type) ->
     {?TRUE};
+
+encode_int(max_encoding_value, _Type) ->
+    {?MAX};
 
 encode_int(Num, key) when is_number(Num) ->
     {?NUMBER, float(Num)};
@@ -86,6 +95,9 @@ decode_int({?FALSE}) ->
 
 decode_int({?TRUE}) ->
     true;
+
+decode_int({?MAX}) ->
+    max_encoding_value;
 
 decode_int({?STRING, Bin}) ->
     Bin;
