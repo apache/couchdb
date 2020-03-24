@@ -198,7 +198,8 @@ jwt_authentication_handler(Req) ->
                     case lists:keyfind(<<"sub">>, 1, Claims) of
                         false -> throw({unauthorized, <<"Token missing sub claim.">>});
                         {_, User} -> Req#httpd{user_ctx=#user_ctx{
-                            name=User
+                            name = User,
+                            roles = couch_util:get_value(<<"_couchdb.roles">>, Claims, [])
                         }}
                     end;
                 {error, Reason} ->
