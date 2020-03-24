@@ -103,13 +103,14 @@ defmodule JwtAuthTest do
   end
 
   def test_fun(alg, key) do
-    {:ok, token} = :jwtf.encode({[{"alg", alg}, {"typ", "JWT"}]}, {[{"sub", "couch@apache.org"}]}, key)
+    {:ok, token} = :jwtf.encode({[{"alg", alg}, {"typ", "JWT"}]}, {[{"sub", "couch@apache.org"}, {"roles", ["testing"]}]}, key)
 
     resp = Couch.get("/_session",
       headers: [authorization: "Bearer #{token}"]
     )
 
     assert resp.body["userCtx"]["name"] == "couch@apache.org"
+    assert resp.body["userCtx"]["roles"] == ["testing"]
     assert resp.body["info"]["authenticated"] == "jwt"
   end
 
