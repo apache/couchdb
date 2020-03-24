@@ -13,6 +13,12 @@
 -module(fabric2_db_misc_tests).
 
 
+% Used in events_listener test
+-export([
+    event_listener_callback/3
+]).
+
+
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
@@ -42,7 +48,8 @@ misc_test_() ->
                 ?TDEF(get_full_doc_infos),
                 ?TDEF(ensure_full_commit),
                 ?TDEF(metadata_bump),
-                ?TDEF(db_version_bump)
+                ?TDEF(db_version_bump),
+                ?TDEF(events_listener)
             ])
         }
     }.
@@ -334,3 +341,53 @@ db_version_bump({DbName, _, _}) ->
 
     % Check that db handle in the cache got the new metadata version
     ?assertMatch(#{db_version := NewDbVersion}, Db2).
+
+
+events_listener({DbName, Db, _}) ->
+    Opts = [
+        {dbname, DbName},
+        {uuid, fabric2_db:get_uuid(Db)},
+        {timeout, 100}
+    ],
+
+    Fun = event_listener_callback,
+    {ok, Pid} = fabric2_events:link_listener(?MODULE, Fun, self(), Opts),
+    unlink(Pid),
+    Ref = monitor(process, Pid),
+
+    NextEvent = fun(Timeout) ->
+        receive
+            {Pid, Evt} when is_pid(Pid) -> Evt;
+            {'DOWN', Ref, _, _, normal} -> exited_normal
+        after Timeout ->
+            timeout
+        end
+    end,
+
+    Doc1 = #doc{id = couch_uuids:random()},
+    {ok, _} = fabric2_db:update_doc(Db, Doc1, []),
+    ?assertEqual(updated, NextEvent(1000)),
+
+    % Just one update, then expect a timeout
+    ?assertEqual(timeout, NextEvent(500)),
+
+    Doc2 = #doc{id = couch_uuids:random()},
+    {ok, _} = fabric2_db:update_doc(Db, Doc2, []),
+    ?assertEqual(updated, NextEvent(1000)),
+
+    % Process is still alive
+    ?assert(is_process_alive(Pid)),
+
+    % Recreate db
+    ok = fabric2_db:delete(DbName, [?ADMIN_CTX]),
+    {ok, _} = fabric2_db:create(DbName, [?ADMIN_CTX]),
+    ?assertEqual(deleted, NextEvent(1000)),
+
+    % After db is deleted or re-created listener should die
+    ?assertEqual(exited_normal, NextEvent(1000)).
+
+
+% Callback for event_listener function
+event_listener_callback(_DbName, Event, TestPid) ->
+    TestPid ! {self(), Event},
+    {ok, TestPid}.
