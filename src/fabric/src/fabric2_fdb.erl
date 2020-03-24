@@ -178,11 +178,8 @@ create(#{} = Db0, Options) ->
     } = Db = ensure_current(Db0, false),
 
     DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
-    DefDbPref = ?DEFAULT_DB_PREFIX,
-    AllDbPrefix = erlfdb_util:get(Options, db_prefix, DefDbPref),
-    DbId = erlfdb_tuple:pack({AllDbPrefix}, AllDbPrefix),
-    DbPrefixAllocator = erlfdb_hca:create(erlfdb_tuple:pack({DbId}, <<"hca">>)),
-    AllocPrefix = erlfdb_hca:allocate(DbPrefixAllocator, Tx),
+    HCA = erlfdb_hca:create(erlfdb_tuple:pack({?DB_HCA}, LayerPrefix)),
+    AllocPrefix = erlfdb_hca:allocate(HCA, Tx),
     DbPrefix = erlfdb_tuple:pack({?DBS, AllocPrefix}, LayerPrefix),
     erlfdb:set(Tx, DbKey, DbPrefix),
 
