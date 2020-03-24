@@ -77,7 +77,6 @@ explain(Cursor) ->
     } = Cursor,
     [
         {'query', mango_selector_text:convert(Selector)},
-        {partition, get_partition(Opts, null)},
         {sort, sort_query(Opts, Selector)}
     ].
 
@@ -95,7 +94,6 @@ execute(Cursor, UserFun, UserAcc) ->
     Query = mango_selector_text:convert(Selector),
     QueryArgs = #index_query_args{
         q = Query,
-        partition = get_partition(Opts, nil),
         sort = sort_query(Opts, Selector),
         raw_bookmark = true
     },
@@ -247,13 +245,6 @@ sort_query(Opts, Selector) ->
     case SortList of
         [] -> relevance;
         _ -> SortList
-    end.
-
-
-get_partition(Opts, Default) ->
-    case couch_util:get_value(partition, Opts) of
-        <<>> -> Default;
-        Else -> Else
     end.
 
 

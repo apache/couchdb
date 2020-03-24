@@ -16,6 +16,5 @@
     name,
     type,
     def,
-    partitioned,
     opts
 }).
