@@ -170,7 +170,7 @@ handle_index_req(#httpd{path_parts=[_, _, _DDocId0, _Type, _Name]}=Req, _Db) ->
 
 handle_explain_req(#httpd{method='POST'}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
-    Body = maybe_set_partition(Req),
+    Body = chttpd:json_body_obj(Req),
     {ok, Opts0} = mango_opts:validate_find(Body),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     Resp = mango_crud:explain(Db, Sel, Opts),
@@ -182,7 +182,7 @@ handle_explain_req(Req, _Db) ->
 
 handle_find_req(#httpd{method='POST'}=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
-    Body = maybe_set_partition(Req),
+    Body = chttpd:json_body_obj(Req),
     {ok, Opts0} = mango_opts:validate_find(Body),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
     {ok, Resp0} = start_find_resp(Req),
@@ -228,23 +228,6 @@ get_idx_del_opts(Req) ->
         [{w, WStr}]
     catch _:_ ->
         [{w, "2"}]
-    end.
-
-
-maybe_set_partition(Req) ->
-    {Props} = chttpd:json_body_obj(Req),
-    case chttpd:qs_value(Req, "partition", undefined) of
-        undefined ->
-            {Props};
-        Partition ->
-            case couch_util:get_value(<<"partition">>, Props) of
-                undefined ->
-                    {[{<<"partition">>, ?l2b(Partition)} | Props]};
-                Partition ->
-                    {Props};
-                OtherPartition ->
-                    ?MANGO_ERROR({bad_partition, OtherPartition})
-            end
     end.
 
 
