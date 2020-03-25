@@ -155,12 +155,12 @@ process_updates_iter([Db | Rest], Cont) ->
     process_updates_iter(Rest, Cont).
 
 
-build_indices(_Db, []) ->
+build_indices(_TxDb, []) ->
     [];
 
-build_indices(Db, DDocs) ->
+build_indices(TxDb, DDocs) ->
     lists:flatmap(fun(Mod) ->
-        Mod:build_indices(Db, DDocs)
+        Mod:build_indices(TxDb, DDocs)
     end, registrations()).
 
 
