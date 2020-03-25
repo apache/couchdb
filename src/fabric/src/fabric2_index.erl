@@ -158,7 +158,7 @@ process_updates_iter([Db | Rest], Cont) ->
 process_db(DbName) when is_binary(DbName) ->
     {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        DDocs1 = get_design_docs(TxDb),
+        DDocs1 = fabric2_db:get_design_docs(TxDb),
         DDocs2 = lists:filter(fun should_update/1, DDocs1),
         DDocs3 = shuffle(DDocs2),
         build_indices(TxDb, DDocs3)
@@ -176,22 +176,6 @@ build_indices(TxDb, DDocs) ->
 
 registrations() ->
     application:get_env(fabric, indices, []).
-
-
-get_design_docs(Db) ->
-    Callback = fun
-        ({meta, _}, Acc) ->  {ok, Acc};
-        (complete, Acc) ->  {ok, Acc};
-        ({row, Row}, Acc) -> {ok, [get_doc(Db, Row) | Acc]}
-    end,
-    {ok, DDocs} = fabric2_db:fold_design_docs(Db, Callback, [], []),
-    DDocs.
-
-
-get_doc(Db, Row) ->
-    {_, DocId} = lists:keyfind(id, 1, Row),
-    {ok, #doc{deleted = false} = Doc} = fabric2_db:open_doc(Db, DocId, []),
-    Doc.
 
 
 should_update(#doc{body = {Props}}) ->
