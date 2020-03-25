@@ -37,6 +37,7 @@ query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
     end,
 
     DbName = fabric2_db:name(Db),
+    IsInteractive = couch_views_ddoc:is_interactive(DDoc),
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
 
     #mrst{
@@ -54,7 +55,7 @@ query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
 
     try
         fabric2_fdb:transactional(Db, fun(TxDb) ->
-            ok = maybe_update_view(TxDb, Mrst, Args3),
+            ok = maybe_update_view(TxDb, Mrst, IsInteractive, Args3),
             read_view(TxDb, Mrst, ViewName, Callback, Acc0, Args3)
         end)
     catch throw:{build_view, WaitSeq} ->
@@ -127,13 +128,20 @@ read_view(Db, Mrst, ViewName, Callback, Acc0, Args) ->
     end).
 
 
-maybe_update_view(_Db, _Mrst, #mrargs{update = false}) ->
+maybe_update_view(_Db, _Mrst, _, #mrargs{update = false}) ->
     ok;
 
-maybe_update_view(_Db, _Mrst, #mrargs{update = lazy}) ->
+maybe_update_view(_Db, _Mrst, _, #mrargs{update = lazy}) ->
     ok;
 
-maybe_update_view(TxDb, Mrst, _Args) ->
+maybe_update_view(TxDb, Mrst, true, _Args) ->
+    BuildState = couch_views_fdb:get_build_status(TxDb, Mrst),
+    if BuildState == ?INDEX_READY -> ok; true ->
+        VS = couch_views_fdb:get_creation_vs(TxDb, Mrst),
+        throw({build_view, fabric2_fdb:vs_to_seq(VS)})
+    end;
+
+maybe_update_view(TxDb, Mrst, false, _Args) ->
     DbSeq = fabric2_db:get_update_seq(TxDb),
     ViewSeq = couch_views_fdb:get_update_seq(TxDb, Mrst),
     case DbSeq == ViewSeq of
