@@ -1715,6 +1715,7 @@ get_previous_transaction_result() ->
 
 
 execute_transaction(Tx, Fun, LayerPrefix) ->
+    put(?PDICT_CHECKED_MD_IS_CURRENT, false),
     put(?PDICT_CHECKED_DB_IS_CURRENT, false),
     Result = Fun(Tx),
     case erlfdb:is_read_only(Tx) of
