@@ -21,6 +21,7 @@
 
     % fabric2_index behavior
     build_indices/2,
+    cleanup_indices/2,
     get_info/2
 ]).
 
@@ -74,6 +75,23 @@ build_indices(#{} = Db, DDocs) when is_list(DDocs) ->
             false
         end
     end, DDocs).
+
+
+cleanup_indices(#{} = Db, DDocs) when is_list(DDocs) ->
+    DbName = fabric2_db:name(Db),
+    ActiveSigs = lists:filtermap(fun(DDoc) ->
+        try couch_views_util:ddoc_to_mrst(DbName, DDoc) of
+            {ok, #mrst{sig = Sig}} ->
+                {true, Sig}
+        catch _:_ ->
+            false
+        end
+    end, DDocs),
+    ExistingSigs = couch_views_fdb:list_signatures(Db),
+    StaleSigs = ExistingSigs -- ActiveSigs,
+    lists:foreach(fun(Sig) ->
+        couch_views_fdb:clear_index(Db, Sig)
+    end, StaleSigs).
 
 
 get_info(Db, DDoc) ->
