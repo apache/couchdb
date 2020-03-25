@@ -1382,9 +1382,10 @@ doc_to_fdb(Db, #doc{} = Doc) ->
             BinRev = couch_doc:rev_to_str({Start, Rev}),
             BinBody = term_to_binary(Body,
                 [{compressed, 0}, {minor_version, 1}]),
-            {ok, Encoded} = fabric2_encryption:encode(
+            {ok, Encrypted} = fabric2_encryption:encrypt(
                 WrappedKEK, DbName, Id, BinRev, BinBody),
-            term_to_binary({Encoded, DiskAtts, Deleted}, [{minor_version, 1}])
+            term_to_binary({Encrypted, DiskAtts, Deleted},
+                [{minor_version, 1}])
     end,
 
     Chunks = chunkify_binary(Value),
@@ -1407,15 +1408,15 @@ fdb_to_doc(Db, DocId, Pos, [Rev | _] = Path, BinRows) when is_list(BinRows) ->
     } = Db,
 
     Bin = iolist_to_binary(BinRows),
-    {Encoded, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
+    {Encrypted, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
 
     Body = case WrappedKEK of
         false ->
-            Encoded;
+            Encrypted;
         _ ->
             BinRev = couch_doc:rev_to_str({Pos, Rev}),
-            {ok, BinBody} = fabric2_encryption:decode(
-                WrappedKEK, DbName, DocId, BinRev, Encoded),
+            {ok, BinBody} = fabric2_encryption:decrypt(
+                WrappedKEK, DbName, DocId, BinRev, Encrypted),
             binary_to_term(BinBody, [safe])
     end,
 
