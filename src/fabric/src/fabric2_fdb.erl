@@ -1115,8 +1115,6 @@ bump_metadata_version(Tx) ->
 check_metadata_version(#{} = Db) ->
     #{
         tx := Tx,
-        layer_prefix := LayerPrefix,
-        name := DbName,
         md_version := Version
     } = Db,
 
@@ -1126,10 +1124,16 @@ check_metadata_version(#{} = Db) ->
             Version ->
                 put(?PDICT_CHECKED_MD_IS_CURRENT, true),
                 % We want to set a read conflict on the db version as we'd want
-                % to to conflict with any writes to this particular db
-                DbPrefix = erlfdb_tuple:pack({?DBS, DbName}, LayerPrefix),
-                DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
-                erlfdb:add_read_conflict_key(Tx, DbVersionKey),
+                % to conflict with any writes to this particular db. However
+                % during db creation db prefix might not exist yet so we don't
+                % add a read-conflict on it then.
+                case maps:get(db_prefix, Db, not_found) of
+                    not_found ->
+                        ok;
+                    <<_/binary>> = DbPrefix ->
+                        DbVerKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
+                        erlfdb:add_read_conflict_key(Tx, DbVerKey)
+                end,
                 {current, Db};
             NewVersion ->
                 {stale, Db#{md_version := NewVersion}}
@@ -1690,10 +1694,8 @@ check_db_instance(#{} = Db) ->
             #{
                 tx := Tx,
                 uuid := UUID,
-                name := DbName,
-                layer_prefix := LayerPrefix
+                db_prefix := DbPrefix
             } = Db1,
-            DbPrefix = erlfdb_tuple:pack({?DBS, DbName}, LayerPrefix),
             UUIDKey = erlfdb_tuple:pack({?DB_CONFIG, <<"uuid">>}, DbPrefix),
             case erlfdb:wait(erlfdb:get(Tx, UUIDKey)) of
                 UUID -> Db1;
