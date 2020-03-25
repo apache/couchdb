@@ -155,6 +155,16 @@ process_updates_iter([Db | Rest], Cont) ->
     process_updates_iter(Rest, Cont).
 
 
+process_db(DbName) when is_binary(DbName) ->
+    {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        DDocs1 = get_design_docs(TxDb),
+        DDocs2 = lists:filter(fun should_update/1, DDocs1),
+        DDocs3 = shuffle(DDocs2),
+        build_indices(TxDb, DDocs3)
+    end).
+
+
 build_indices(_TxDb, []) ->
     [];
 
@@ -166,16 +176,6 @@ build_indices(TxDb, DDocs) ->
 
 registrations() ->
     application:get_env(fabric, indices, []).
-
-
-process_db(DbName) when is_binary(DbName) ->
-    {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
-    fabric2_fdb:transactional(Db, fun(TxDb) ->
-        DDocs1 = get_design_docs(TxDb),
-        DDocs2 = lists:filter(fun should_update/1, DDocs1),
-        DDocs3 = shuffle(DDocs2),
-        build_indices(TxDb, DDocs3)
-    end).
 
 
 get_design_docs(Db) ->
