@@ -54,23 +54,23 @@ get_wrapped_kek(DbName) when is_binary(DbName) ->
     end.
 
 
-encrypt(WrappedKEK, DbName, DocId, DocRev, DocBody)
+encrypt(WrappedKEK, DbName, DocId, DocRev, Value)
     when is_binary(WrappedKEK),
          is_binary(DbName),
          is_binary(DocId),
          is_binary(DocRev),
-         is_binary(DocBody) ->
-    Request = {encrypt, WrappedKEK, DbName, DocId, DocRev, DocBody},
+         is_binary(Value) ->
+    Request = {encrypt, WrappedKEK, DbName, DocId, DocRev, Value},
     gen_server:call(?MODULE, Request).
 
 
-decrypt(WrappedKEK, DbName, DocId, DocRev, Encrypted)
+decrypt(WrappedKEK, DbName, DocId, DocRev, Value)
     when is_binary(WrappedKEK),
          is_binary(DbName),
          is_binary(DocId),
          is_binary(DocRev),
-         is_binary(Encrypted) ->
-    Request = {decrypt, WrappedKEK, DbName, DocId, DocRev, Encrypted},
+         is_binary(Value) ->
+    Request = {decrypt, WrappedKEK, DbName, DocId, DocRev, Value},
     gen_server:call(?MODULE, Request).
 
 
@@ -97,7 +97,7 @@ handle_call({get_wrapped_kek, DbName}, _From, #{cache := Cache} = St) ->
     true = ets:insert(Cache, {WrappedKEK, KEK}),
     {reply, {ok, WrappedKEK}, St};
 
-handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, DocBody}, From, St) ->
+handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
     #{
         iid := InstanceId,
         cache := Cache,
@@ -106,14 +106,14 @@ handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, DocBody}, From, St) ->
 
     {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
     {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
-        do_encrypt, [KEK, InstanceId, DbName, DocId, DocRev, DocBody]),
+        do_encrypt, [KEK, InstanceId, DbName, DocId, DocRev, Value]),
 
     NewSt = St#{
         waiters := dict:store(Pid, From, Waiters)
     },
     {noreply, NewSt};
 
-handle_call({decrypt, WrappedKEK, DbName, DocId, DocRev, Encrypted}, From, St) ->
+handle_call({decrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
     #{
         iid := InstanceId,
         cache := Cache,
@@ -122,7 +122,7 @@ handle_call({decrypt, WrappedKEK, DbName, DocId, DocRev, Encrypted}, From, St) -
 
     {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
     {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
-        do_decrypt, [KEK, InstanceId, DbName, DocId, DocRev, Encrypted]),
+        do_decrypt, [KEK, InstanceId, DbName, DocId, DocRev, Value]),
 
     NewSt = St#{
         waiters := dict:store(Pid, From, Waiters)
@@ -165,12 +165,12 @@ init_st() ->
     }}.
 
 
-do_encrypt(KEK, InstanceId, DbName, DocId, DocRev, DocBody) ->
+do_encrypt(KEK, InstanceId, DbName, DocId, DocRev, Value) ->
     try
         {ok, AAD} = get_aad(InstanceId, DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
         {CipherText, CipherTag} = crypto:block_encrypt(
-            aes_gcm, DEK, <<0:96>>, {AAD, DocBody, 16}),
+            aes_gcm, DEK, <<0:96>>, {AAD, Value, 16}),
         <<CipherTag/binary, CipherText/binary>>
     of
         Resp ->
@@ -181,9 +181,9 @@ do_encrypt(KEK, InstanceId, DbName, DocId, DocRev, DocBody) ->
     end.
 
 
-do_decrypt(KEK, InstanceId, DbName, DocId, DocRev, Encrypted) ->
+do_decrypt(KEK, InstanceId, DbName, DocId, DocRev, Value) ->
     try
-        <<CipherTag:16/binary, CipherText/binary>> = Encrypted,
+        <<CipherTag:16/binary, CipherText/binary>> = Value,
         {ok, AAD} = get_aad(InstanceId, DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
         crypto:block_decrypt(
@@ -232,22 +232,25 @@ get_dek_test() ->
 
 encrypt_decrypt_test() ->
     KEK = crypto:strong_rand_bytes(32),
-    {IId, DbName, DocId, DocRev, DocBody}
-        = {<<"dev">>, <<"db">>, <<"0001">>, <<"1-abcdefgh">>, <<"[ohai]">>},
+    IId = <<"dev">>,
+    DbName = <<"db">>,
+    DocId = <<"0001">>,
+    DocRev = <<"1-abcdefgh">>,
+    Value = term_to_binary({{{[{<<"text">>, <<"test">>}]}, [], false}}),
 
     {ok, EncResult} = try
-        do_encrypt(KEK, IId, DbName, DocId, DocRev, DocBody)
+        do_encrypt(KEK, IId, DbName, DocId, DocRev, Value)
     catch
         exit:ER -> ER
     end,
-    ?assertNotEqual(DocBody, EncResult),
+    ?assertNotEqual(Value, EncResult),
 
     {ok, DecResult} = try
         do_decrypt(KEK, IId, DbName, DocId, DocRev, EncResult)
     catch
         exit:DR -> DR
     end,
-    ?assertEqual(DocBody, DecResult).
+    ?assertEqual(Value, DecResult).
 
 
 -endif.

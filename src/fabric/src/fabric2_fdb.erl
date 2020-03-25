@@ -1375,20 +1375,17 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 
     DiskAtts = lists:map(fun couch_att:to_disk_term/1, Atts),
 
-    Value = case WrappedKEK of
+    Value = term_to_binary({Body, DiskAtts, Deleted}, [{minor_version, 1}]),
+
+    Chunks = case WrappedKEK of
         false ->
-            term_to_binary({Body, DiskAtts, Deleted}, [{minor_version, 1}]);
+            chunkify_binary(Value);
         _ ->
             BinRev = couch_doc:rev_to_str({Start, Rev}),
-            BinBody = term_to_binary(Body,
-                [{compressed, 0}, {minor_version, 1}]),
             {ok, Encrypted} = fabric2_encryption:encrypt(
-                WrappedKEK, DbName, Id, BinRev, BinBody),
-            term_to_binary({Encrypted, DiskAtts, Deleted},
-                [{minor_version, 1}])
+                WrappedKEK, DbName, Id, BinRev, Value),
+            chunkify_binary(Encrypted)
     end,
-
-    Chunks = chunkify_binary(Value),
 
     {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
         Key = erlfdb_tuple:pack({?DB_DOCS, Id, Start, Rev, ChunkId}, DbPrefix),
@@ -1408,16 +1405,15 @@ fdb_to_doc(Db, DocId, Pos, [Rev | _] = Path, BinRows) when is_list(BinRows) ->
     } = Db,
 
     Bin = iolist_to_binary(BinRows),
-    {Encrypted, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
 
-    Body = case WrappedKEK of
+    {Body, DiskAtts, Deleted} = case WrappedKEK of
         false ->
-            Encrypted;
+            binary_to_term(Bin, [safe]);
         _ ->
             BinRev = couch_doc:rev_to_str({Pos, Rev}),
-            {ok, BinBody} = fabric2_encryption:decrypt(
-                WrappedKEK, DbName, DocId, BinRev, Encrypted),
-            binary_to_term(BinBody, [safe])
+            {ok, Decrypted} = fabric2_encryption:decrypt(
+                WrappedKEK, DbName, DocId, BinRev, Bin),
+            binary_to_term(Decrypted, [safe])
     end,
 
     Atts = lists:map(fun(Att) ->
