@@ -207,7 +207,6 @@ create(#{} = Db0, Options) ->
         {?DB_STATS, <<"doc_del_count">>, ?uint2bin(0)},
         {?DB_STATS, <<"doc_design_count">>, ?uint2bin(0)},
         {?DB_STATS, <<"doc_local_count">>, ?uint2bin(0)},
-        {?DB_STATS, <<"update_count">>, ?uint2bin(1)},
         {?DB_STATS, <<"sizes">>, <<"external">>, ?uint2bin(2)},
         {?DB_STATS, <<"sizes">>, <<"views">>, ?uint2bin(0)}
     ],
@@ -849,7 +848,6 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     AddSize = sum_add_rev_sizes([NewWinner | ToUpdate]),
     RemSize = sum_rem_rev_sizes(ToRemove),
     incr_stat(Db, <<"sizes">>, <<"external">>, AddSize - RemSize),
-    incr_stat(Db, <<"update_count">>, 1),
 
     ok.
 
@@ -1377,19 +1375,17 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 
     DiskAtts = lists:map(fun couch_att:to_disk_term/1, Atts),
 
-    ValueTerm = case WrappedKEK of
+    Value = case WrappedKEK of
         false ->
-            {Body, DiskAtts, Deleted};
+            term_to_binary({Body, DiskAtts, Deleted}, [{minor_version, 1}]);
         _ ->
-            UpdateCounter = get_stat(Db, <<"update_count">>),
+            BinRev = couch_doc:rev_to_str({Start, Rev}),
             BinBody = term_to_binary(Body,
                 [{compressed, 0}, {minor_version, 1}]),
             {ok, Encoded} = fabric2_encryption:encode(
-                WrappedKEK, DbName, Id, UpdateCounter, BinBody),
-            {UpdateCounter, Encoded, DiskAtts, Deleted}
+                WrappedKEK, DbName, Id, BinRev, BinBody),
+            term_to_binary({Encoded, DiskAtts, Deleted}, [{minor_version, 1}])
     end,
-
-    Value = term_to_binary(ValueTerm, [{minor_version, 1}]),
 
     Chunks = chunkify_binary(Value),
 
@@ -1404,24 +1400,23 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 fdb_to_doc(_Db, _DocId, _Pos, _Path, []) ->
     {not_found, missing};
 
-fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
+fdb_to_doc(Db, DocId, Pos, [Rev | _] = Path, BinRows) when is_list(BinRows) ->
     #{
         name := DbName,
         wrapped_kek := WrappedKEK
     } = Db,
 
     Bin = iolist_to_binary(BinRows),
-    ValueTerm = binary_to_term(Bin, [safe]),
+    {Encoded, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
 
-    {Body, DiskAtts, Deleted} = case WrappedKEK of
+    Body = case WrappedKEK of
         false ->
-            ValueTerm;
+            Encoded;
         _ ->
-            {UpdateCounter, Encoded, DiskAtts0, Deleted0} = ValueTerm,
+            BinRev = couch_doc:rev_to_str({Pos, Rev}),
             {ok, BinBody} = fabric2_encryption:decode(
-                WrappedKEK, DbName, DocId, UpdateCounter, Encoded),
-            Body0 = binary_to_term(BinBody, [safe]),
-            {Body0, DiskAtts0, Deleted0}
+                WrappedKEK, DbName, DocId, BinRev, Encoded),
+            binary_to_term(BinBody, [safe])
     end,
 
     Atts = lists:map(fun(Att) ->

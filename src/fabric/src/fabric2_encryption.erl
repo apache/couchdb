@@ -54,24 +54,22 @@ get_wrapped_kek(DbName) when is_binary(DbName) ->
     end.
 
 
-encode(WrappedKEK, DbName, DocId, UpdateCounter, DocBody)
+encode(WrappedKEK, DbName, DocId, DocRev, DocBody)
     when is_binary(WrappedKEK),
          is_binary(DbName),
          is_binary(DocId),
-         is_integer(UpdateCounter), UpdateCounter > 0,
+         is_binary(DocRev),
          is_binary(DocBody) ->
-    gen_server:call(?MODULE,
-        {encode, WrappedKEK, DbName, DocId, UpdateCounter, DocBody}).
+    gen_server:call(?MODULE, {encode, WrappedKEK, DbName, DocId, DocRev, DocBody}).
 
 
-decode(WrappedKEK, DbName, DocId, UpdateCounter, DocBody)
+decode(WrappedKEK, DbName, DocId, DocRev, DocBody)
     when is_binary(WrappedKEK),
          is_binary(DbName),
          is_binary(DocId),
-         is_integer(UpdateCounter), UpdateCounter > 0,
+         is_binary(DocRev),
          is_binary(DocBody) ->
-    gen_server:call(?MODULE,
-        {decode, WrappedKEK, DbName, DocId, UpdateCounter, DocBody}).
+    gen_server:call(?MODULE, {decode, WrappedKEK, DbName, DocId, DocRev, DocBody}).
 
 
 
@@ -97,8 +95,7 @@ handle_call({get_wrapped_kek, DbName}, _From, #{cache := Cache} = St) ->
     true = ets:insert(Cache, {WrappedKEK, KEK}),
     {reply, {ok, WrappedKEK}, St};
 
-handle_call({encode, WrappedKEK, DbName, DocId, UpdateCounter, DocBody},
-        From, St) ->
+handle_call({encode, WrappedKEK, DbName, DocId, DocRev, DocBody}, From, St) ->
     #{
         iid := InstanceId,
         cache := Cache,
@@ -107,15 +104,14 @@ handle_call({encode, WrappedKEK, DbName, DocId, UpdateCounter, DocBody},
 
     {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
     {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
-        do_encode, [KEK, InstanceId, DbName, DocId, UpdateCounter, DocBody]),
+        do_encode, [KEK, InstanceId, DbName, DocId, DocRev, DocBody]),
 
     NewSt = St#{
         waiters := dict:store(Pid, From, Waiters)
     },
     {noreply, NewSt};
 
-handle_call({decode, WrappedKEK, DbName, DocId, UpdateCounter, Encoded},
-        From, St) ->
+handle_call({decode, WrappedKEK, DbName, DocId, DocRev, Encoded}, From, St) ->
     #{
         iid := InstanceId,
         cache := Cache,
@@ -124,7 +120,7 @@ handle_call({decode, WrappedKEK, DbName, DocId, UpdateCounter, Encoded},
 
     {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
     {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
-        do_decode, [KEK, InstanceId, DbName, DocId, UpdateCounter, Encoded]),
+        do_decode, [KEK, InstanceId, DbName, DocId, DocRev, Encoded]),
 
     NewSt = St#{
         waiters := dict:store(Pid, From, Waiters)
@@ -167,10 +163,10 @@ init_st() ->
     }}.
 
 
-do_encode(KEK, InstanceId, DbName, DocId, UpdateCounter, DocBody) ->
+do_encode(KEK, InstanceId, DbName, DocId, DocRev, DocBody) ->
     try
         {ok, AAD} = get_aad(InstanceId, DbName),
-        {ok, DEK} = get_dek(KEK, DocId, UpdateCounter),
+        {ok, DEK} = get_dek(KEK, DocId, DocRev),
         {CipherText, CipherTag} = crypto:block_encrypt(
             aes_gcm, DEK, <<0:96>>, {AAD, DocBody, 16}),
         <<CipherTag/binary, CipherText/binary>>
@@ -183,11 +179,11 @@ do_encode(KEK, InstanceId, DbName, DocId, UpdateCounter, DocBody) ->
     end.
 
 
-do_decode(KEK, InstanceId, DbName, DocId, UpdateCounter, Encoded) ->
+do_decode(KEK, InstanceId, DbName, DocId, DocRev, Encoded) ->
     try
         <<CipherTag:16/binary, CipherText/binary>> = Encoded,
         {ok, AAD} = get_aad(InstanceId, DbName),
-        {ok, DEK} = get_dek(KEK, DocId, UpdateCounter),
+        {ok, DEK} = get_dek(KEK, DocId, DocRev),
         crypto:block_decrypt(
             aes_gcm, DEK, <<0:96>>, {AAD, CipherText, CipherTag})
     of
@@ -203,8 +199,8 @@ get_aad(InstanceId, DbName) when is_binary(InstanceId), is_binary(DbName) ->
     {ok, <<InstanceId/binary, 0:8, DbName/binary>>}.
 
 
-get_dek(KEK, DocId, UpdateCounter) when bit_size(KEK) == 256 ->
-    Context = <<DocId/binary, 0:8, (integer_to_binary(UpdateCounter))/binary>>,
+get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
+    Context = <<DocId/binary, 0:8, DocRev/binary>>,
     PlainText = <<1:16, ?LABEL, 0:8, Context/binary, 256:16>>,
     <<_:256>> = DEK = crypto:hmac(sha256, KEK, PlainText),
     {ok, DEK}.
@@ -228,24 +224,24 @@ unwrap_kek(Cache, WrappedKEK) ->
 
 get_dek_test() ->
     KEK = crypto:strong_rand_bytes(32),
-    {ok, DEK} = get_dek(KEK, <<"0001">>, 1),
+    {ok, DEK} = get_dek(KEK, <<"0001">>, <<"1-abcdefgh">>),
     ?assertNotEqual(KEK, DEK),
     ?assertEqual(32, byte_size(DEK)).
 
 encode_decode_test() ->
     KEK = crypto:strong_rand_bytes(32),
-    {IId, DbName, DocId, UpdateCounter, DocBody}
-        = {<<"dev">>, <<"db">>, <<"0001">>, 1, <<"[ohai]">>},
+    {IId, DbName, DocId, DocRev, DocBody}
+        = {<<"dev">>, <<"db">>, <<"0001">>, <<"1-abcdefgh">>, <<"[ohai]">>},
 
     {ok, EncResult} = try
-        do_encode(KEK, IId, DbName, DocId, UpdateCounter, DocBody)
+        do_encode(KEK, IId, DbName, DocId, DocRev, DocBody)
     catch
         exit:ER -> ER
     end,
     ?assertNotEqual(DocBody, EncResult),
 
     {ok, DecResult} = try
-        do_decode(KEK, IId, DbName, DocId, UpdateCounter, EncResult)
+        do_decode(KEK, IId, DbName, DocId, DocRev, EncResult)
     catch
         exit:DR -> DR
     end,
