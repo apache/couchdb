@@ -42,7 +42,7 @@ init(normal) ->
             id => couch_views_server,
             start => {couch_views_server, start_link, []}
         }
-    ],
+    ] ++ couch_epi:register_service(couch_views_epi, []),
     {ok, {flags(), Children}};
 
 init(builds_disabled) ->
