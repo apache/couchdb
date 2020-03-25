@@ -40,7 +40,7 @@ url_handler(<<"_session">>)        -> fun chttpd_auth:handle_session_req/1;
 url_handler(<<"_up">>)             -> fun chttpd_misc:handle_up_req/1;
 url_handler(_) -> no_match.
 
-db_handler(<<"_view_cleanup">>) -> fun ?MODULE:not_implemented/2;
+db_handler(<<"_view_cleanup">>) -> fun chttpd_db:handle_view_cleanup_req/2;
 db_handler(<<"_compact">>)      -> fun chttpd_db:handle_compact_req/2;
 db_handler(<<"_design">>)       -> fun chttpd_db:handle_design_req/2;
 db_handler(<<"_partition">>)    -> fun chttpd_db:handle_partition_req/2;

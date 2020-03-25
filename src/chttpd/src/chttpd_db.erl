@@ -265,7 +265,7 @@ handle_compact_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
 
 handle_view_cleanup_req(Req, Db) ->
-    ok = fabric:cleanup_index_files_all_nodes(Db),
+    ok = fabric2_index:cleanup(Db),
     send_json(Req, 202, {[{ok, true}]}).
 
 
