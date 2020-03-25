@@ -40,6 +40,7 @@
 
 
 -define(INIT_TIMEOUT, 60000).
+-define(TIMEOUT, 10000).
 -define(LABEL, "couchdb-aes256-gcm-encryption-key").
 
 
@@ -77,25 +78,31 @@ decrypt(WrappedKEK, DbName, DocId, DocRev, Value)
 
 init(_) ->
     process_flag(sensitive, true),
-    process_flag(trap_exit, true),
 
-    case init_st() of
-        {ok, St} ->
-            proc_lib:init_ack({ok, self()}),
-            gen_server:enter_loop(?MODULE, [], St, ?INIT_TIMEOUT);
-        Error ->
-            proc_lib:init_ack(Error)
-    end.
+    FdbDirs = fabric2_server:fdb_directory(),
+    Cache = ets:new(?MODULE, [set, private]),
+    St = #{
+        iid => iolist_to_binary(FdbDirs),
+        cache => Cache,
+        waiters => dict:new()
+    },
+
+    proc_lib:init_ack({ok, self()}),
+    gen_server:enter_loop(?MODULE, [], St, ?INIT_TIMEOUT).
 
 
-terminate(_, _St) ->
-    ok.
+terminate(_, #{waiters := Waiters} = _St) ->
+    ok = dict:fold(fun(Ref, From, ok) ->
+        erlang:demonitor(Ref),
+        gen_server:reply(From, {error, encryption_server_terminated}),
+        ok
+    end, ok, Waiters).
 
 
 handle_call({get_wrapped_kek, DbName}, _From, #{cache := Cache} = St) ->
     {ok, KEK, WrappedKEK} = fabric2_encryption_plugin:get_wrapped_kek(DbName),
     true = ets:insert(Cache, {WrappedKEK, KEK}),
-    {reply, {ok, WrappedKEK}, St};
+    {reply, {ok, WrappedKEK}, St, ?TIMEOUT};
 
 handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
     #{
@@ -105,13 +112,13 @@ handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
     } = St,
 
     {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
-    {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
+    {_Pid, Ref} = erlang:spawn_monitor(?MODULE,
         do_encrypt, [KEK, InstanceId, DbName, DocId, DocRev, Value]),
 
     NewSt = St#{
-        waiters := dict:store(Pid, From, Waiters)
+        waiters := dict:store(Ref, From, Waiters)
     },
-    {noreply, NewSt};
+    {noreply, NewSt, ?TIMEOUT};
 
 handle_call({decrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
     #{
@@ -121,29 +128,29 @@ handle_call({decrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
     } = St,
 
     {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
-    {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
+    {_Pid, Ref} = erlang:spawn_monitor(?MODULE,
         do_decrypt, [KEK, InstanceId, DbName, DocId, DocRev, Value]),
 
     NewSt = St#{
-        waiters := dict:store(Pid, From, Waiters)
+        waiters := dict:store(Ref, From, Waiters)
     },
-    {noreply, NewSt}.
+    {noreply, NewSt, ?TIMEOUT}.
 
 
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
 
 
-handle_info({'DOWN', _, _, Pid, Resp}, #{waiters := Waiters} = St) ->
-    case dict:take(Pid, Waiters) of
+handle_info({'DOWN', Ref, process, _Pid, Resp}, #{waiters := Waiters} = St) ->
+    case dict:take(Ref, Waiters) of
         {From, Waiters1} ->
             gen_server:reply(From, Resp),
             NewSt = St#{
                 waiters := Waiters1
             },
-            {noreply, NewSt};
+            {noreply, NewSt, ?TIMEOUT};
         error ->
-            {noreply, St}
+            {noreply, St, ?TIMEOUT}
     end;
 
 handle_info(timeout, St) ->
@@ -155,17 +162,8 @@ code_change(_OldVsn, St, _Extra) ->
 
 
 
-init_st() ->
-    FdbDirs = fabric2_server:fdb_directory(),
-    Cache = ets:new(?MODULE, [set, private, compressed]),
-    {ok, #{
-        iid => iolist_to_binary(FdbDirs),
-        cache => Cache,
-        waiters => dict:new()
-    }}.
-
-
 do_encrypt(KEK, InstanceId, DbName, DocId, DocRev, Value) ->
+    process_flag(sensitive, true),
     try
         {ok, AAD} = get_aad(InstanceId, DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
@@ -182,6 +180,7 @@ do_encrypt(KEK, InstanceId, DbName, DocId, DocRev, Value) ->
 
 
 do_decrypt(KEK, InstanceId, DbName, DocId, DocRev, Value) ->
+    process_flag(sensitive, true),
     try
         <<CipherTag:16/binary, CipherText/binary>> = Value,
         {ok, AAD} = get_aad(InstanceId, DbName),
