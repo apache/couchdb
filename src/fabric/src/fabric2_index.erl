@@ -19,6 +19,7 @@
 -export([
     register_index/1,
     db_updated/1,
+    cleanup/1,
     start_link/0
 ]).
 
@@ -38,6 +39,9 @@
 -callback build_indices(Db :: map(), DDocs :: list(#doc{})) ->
     [{ok, JobId::binary()} | {error, any()}].
 
+-callback cleanup_indices(Db :: map(), DDocs :: list(#doc{})) ->
+    [ok | {error, any()}].
+
 
 -define(SHARDS, 32).
 -define(DEFAULT_DELAY_MSEC, 60000).
@@ -52,6 +56,25 @@ register_index(Mod) when is_atom(Mod) ->
 db_updated(DbName) when is_binary(DbName) ->
     Table = table(erlang:phash2(DbName) rem ?SHARDS),
     ets:insert_new(Table, {DbName, now_msec()}).
+
+
+cleanup(Db) ->
+    try
+        fabric2_fdb:transactional(Db, fun(TxDb) ->
+            DDocs = fabric2_db:get_design_docs(TxDb),
+            lists:foreach(fun(Mod) ->
+                Mod:cleanup_indices(TxDb, DDocs)
+            end, registrations())
+        end)
+    catch
+        error:database_does_not_exist ->
+            ok;
+        Tag:Reason ->
+            Stack = erlang:get_stacktrace(),
+            DbName = fabric2_db:name(Db),
+            LogMsg = "~p failed to cleanup indices for `~s` ~p:~p ~p",
+            couch_log:error(LogMsg, [?MODULE, DbName, Tag, Reason, Stack])
+    end.
 
 
 start_link() ->
