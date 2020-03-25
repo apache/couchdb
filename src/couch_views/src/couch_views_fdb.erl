@@ -27,7 +27,10 @@
 
     fold_map_idx/6,
 
-    write_doc/4
+    write_doc/4,
+
+    list_signatures/1,
+    clear_index/2
 ]).
 
 -ifdef(TEST).
@@ -209,6 +212,41 @@ write_doc(TxDb, Sig, ViewIds, Doc) ->
         end,
         update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows)
     end, lists:zip3(ViewIds, Results, KVSizes)).
+
+
+list_signatures(Db) ->
+    #{
+        db_prefix := DbPrefix
+    } = Db,
+    ViewSeqRange = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_UPDATE_SEQ},
+    RangePrefix = erlfdb_tuple:pack(ViewSeqRange, DbPrefix),
+    fabric2_fdb:fold_range(Db, RangePrefix, fun({Key, _Val}, Acc) ->
+        {Sig} = erlfdb_tuple:unpack(Key, RangePrefix),
+        [Sig | Acc]
+    end, [], []).
+
+
+clear_index(Db, Signature) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = Db,
+
+    % Clear index info keys
+    Keys = [
+        {?DB_VIEWS, ?VIEW_INFO, ?VIEW_UPDATE_SEQ, Signature},
+        {?DB_VIEWS, ?VIEW_INFO, ?VIEW_ROW_COUNT, Signature},
+        {?DB_VIEWS, ?VIEW_INFO, ?VIEW_KV_SIZE, Signature}
+    ],
+    lists:foreach(fun(Key) ->
+        FDBKey = erlfdb_tuple:pack(Key, DbPrefix),
+        erlfdb:clear(Tx, FDBKey)
+    end, Keys),
+
+    % Clear index data
+    RangeTuple = {?DB_VIEWS, ?VIEW_DATA, Signature},
+    RangePrefix = erlfdb_tuple:pack(RangeTuple, DbPrefix),
+    erlfdb:clear_range_startswith(Tx, RangePrefix).
 
 
 % For each row in a map view we store the the key/value
