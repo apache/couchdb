@@ -17,6 +17,7 @@
     shard_info/1, ensure_exists/1, open_db_doc/1, get_or_create_db/2]).
 -export([is_deleted/1, rotate_list/2]).
 -export([get_shard_opts/1, get_engine_opt/1, get_props_opt/1]).
+-export([get_shard_props/1, find_dirty_shards/0]).
 -export([
     iso8601_timestamp/0,
     live_nodes/0,
@@ -533,6 +534,47 @@ merge_opts(New, Old) ->
     lists:foldl(fun({Key, Val}, Acc) ->
         lists:keystore(Key, 1, Acc, {Key, Val})
     end, Old, New).
+
+
+get_shard_props(ShardName) ->
+    case couch_db:open_int(ShardName, []) of
+        {ok, Db} ->
+            Props = case couch_db_engine:get_props(Db) of
+                undefined -> [];
+                Else -> Else
+            end,
+            %% We don't normally store the default engine name
+            EngineProps = case couch_db_engine:get_engine(Db) of
+                couch_bt_engine ->
+                    [];
+                EngineName ->
+                    [{engine, EngineName}]
+            end,
+            [{props, Props} | EngineProps];
+        {not_found, _} ->
+            not_found;
+        Else ->
+            Else
+    end.
+
+
+find_dirty_shards() ->
+    mem3_shards:fold(fun(#shard{node=Node, name=Name, opts=Opts}=Shard, Acc) ->
+        case Opts of
+            [] ->
+                Acc;
+            [{props, []}] ->
+                Acc;
+            _ ->
+                Props = rpc:call(Node, ?MODULE, get_shard_props, [Name]),
+                case Props =:= Opts of
+                    true ->
+                        Acc;
+                    false ->
+                        [{Shard, Props} | Acc]
+                end
+        end
+    end, []).
 
 
 -ifdef(TEST).
