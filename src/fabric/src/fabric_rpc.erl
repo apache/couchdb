@@ -439,7 +439,7 @@ get_node_seqs(Db, Nodes) ->
 
 
 get_or_create_db(DbName, Options) ->
-    couch_db:open_int(DbName, [{create_if_missing, true} | Options]).
+    mem3_util:get_or_create_db(DbName, Options).
 
 
 get_view_cb(#mrargs{extra = Options}) ->

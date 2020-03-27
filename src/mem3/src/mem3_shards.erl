@@ -20,6 +20,7 @@
 -export([handle_config_change/5, handle_config_terminate/3]).
 
 -export([start_link/0]).
+-export([opts_for_db/1]).
 -export([for_db/1, for_db/2, for_docid/2, for_docid/3, get/3, local/1, fold/2]).
 -export([for_shard_range/1]).
 -export([set_max_size/1]).
@@ -44,6 +45,15 @@
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+opts_for_db(DbName) ->
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
+    case couch_db:open_doc(Db, DbName, [ejson_body]) of
+        {ok, #doc{body = {Props}}} ->
+            mem3_util:get_shard_opts(Props);
+        {not_found, _} ->
+            erlang:error(database_does_not_exist, ?b2l(DbName))
+    end.
 
 for_db(DbName) ->
     for_db(DbName, []).
@@ -144,8 +154,7 @@ local(DbName) ->
     lists:filter(Pred, for_db(DbName)).
 
 fold(Fun, Acc) ->
-    DbName = config:get("mem3", "shards_db", "_dbs"),
-    {ok, Db} = mem3_util:ensure_exists(DbName),
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     FAcc = {Db, Fun, Acc},
     try
         {ok, LastAcc} = couch_db:fold_docs(Db, fun fold_fun/2, FAcc),
@@ -309,15 +318,13 @@ fold_fun(#doc_info{}=DI, {Db, UFun, UAcc}) ->
     end.
 
 get_update_seq() ->
-    DbName = config:get("mem3", "shards_db", "_dbs"),
-    {ok, Db} = mem3_util:ensure_exists(DbName),
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     Seq = couch_db:get_update_seq(Db),
     couch_db:close(Db),
     Seq.
 
 listen_for_changes(Since) ->
-    DbName = config:get("mem3", "shards_db", "_dbs"),
-    {ok, Db} = mem3_util:ensure_exists(DbName),
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     Args = #changes_args{
         feed = "continuous",
         since = Since,
@@ -362,8 +369,7 @@ changes_callback(timeout, _) ->
 
 load_shards_from_disk(DbName) when is_binary(DbName) ->
     couch_stats:increment_counter([mem3, shard_cache, miss]),
-    X = ?l2b(config:get("mem3", "shards_db", "_dbs")),
-    {ok, Db} = mem3_util:ensure_exists(X),
+    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     try
         load_shards_from_db(Db, DbName)
     after
