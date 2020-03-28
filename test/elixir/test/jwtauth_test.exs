@@ -10,7 +10,7 @@ defmodule JwtAuthTest do
     server_config = [
       %{
         :section => "jwt_keys",
-        :key => "_default",
+        :key => "hmac:_default",
         :value => :base64.encode(secret)
       },
       %{
@@ -49,7 +49,7 @@ defmodule JwtAuthTest do
     server_config = [
       %{
         :section => "jwt_keys",
-        :key => "_default",
+        :key => "rsa:_default",
         :value => public_pem
       },
       %{
@@ -87,7 +87,7 @@ defmodule JwtAuthTest do
     server_config = [
       %{
         :section => "jwt_keys",
-        :key => "_default",
+        :key => "ec:_default",
         :value => public_pem
       },
       %{
