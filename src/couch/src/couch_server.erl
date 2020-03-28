@@ -237,12 +237,6 @@ init([]) ->
     couch_util:set_mqd_off_heap(?MODULE),
     couch_util:set_process_priority(?MODULE, high),
 
-    % Mark pluggable storage engines as a supported feature
-    config:enable_feature('pluggable-storage-engines'),
-
-    % Mark partitioned databases as a supported feature
-    config:enable_feature(partitioned),
-
     % Mark being able to receive documents with an _access property as a supported feature
     config:enable_feature('access-ready'),
 
