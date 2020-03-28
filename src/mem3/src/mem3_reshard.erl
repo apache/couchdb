@@ -213,11 +213,6 @@ reset_state() ->
 % Gen server functions
 
 init(_) ->
-    % Advertise resharding API feature only if it is not disabled
-    case is_disabled() of
-        true -> ok;
-        false -> config:enable_feature('reshard')
-    end,
     couch_log:notice("~p start init()", [?MODULE]),
     EtsOpts = [named_table, {keypos, #job.id}, {read_concurrency, true}],
     ?MODULE = ets:new(?MODULE, EtsOpts),
