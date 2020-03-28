@@ -225,7 +225,8 @@ update_job_stats(JobId, Stats) ->
 %% gen_server functions
 
 init(_) ->
-    config:enable_feature('scheduler'),
+    % Temporarily disable on FDB, as it's not fully implemented yet
+    % config:enable_feature('scheduler'),
     EtsOpts = [named_table, {keypos, #job.id}, {read_concurrency, true},
         {write_concurrency, true}],
     ?MODULE = ets:new(?MODULE, EtsOpts),
