@@ -319,7 +319,8 @@ defmodule AllDocsTest do
 
     resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "[1,2]"}).body
     rows = resp["rows"]
-    assert length(rows) === 0
+    assert length(rows) === 3
+    assert get_ids(resp) == ["a", "m", "z"]
 
     resp = Couch.get("/#{db_name}/_all_docs", query: %{:end_key => 0}).body
     rows = resp["rows"]

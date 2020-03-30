@@ -294,13 +294,9 @@ uuid() ->
     to_hex(crypto:strong_rand_bytes(16)).
 
 
-encode_all_doc_key(null) -> <<>>;
-encode_all_doc_key(true) -> <<>>;
-encode_all_doc_key(false) -> <<>>;
-encode_all_doc_key(N) when is_number(N) -> <<>>;
 encode_all_doc_key(B) when is_binary(B) -> B;
-encode_all_doc_key(L) when is_list(L) -> <<255>>;
-encode_all_doc_key({O}) when is_list(O) -> <<255>>.
+encode_all_doc_key(Term) when Term < <<>> -> <<>>;
+encode_all_doc_key(_) -> <<255>>.
 
 
 pmap(Fun, Args) ->
