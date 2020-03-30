@@ -159,11 +159,11 @@ validate_typ(Props, Checks) ->
     Required = prop(typ, Checks),
     TYP = prop(<<"typ">>, Props),
     case {Required, TYP} of
-        {undefined, _} ->
+        {undefined, undefined} ->
             ok;
         {true, undefined} ->
             throw({bad_request, <<"Missing typ header parameter">>});
-        {true, <<"JWT">>} ->
+        {_, <<"JWT">>} ->
             ok;
         {true, _} ->
             throw({bad_request, <<"Invalid typ header parameter">>})
@@ -174,11 +174,11 @@ validate_alg(Props, Checks) ->
     Required = prop(alg, Checks),
     Alg = prop(<<"alg">>, Props),
     case {Required, Alg} of
-        {undefined, _} ->
+        {undefined, undefined} ->
             ok;
         {true, undefined} ->
             throw({bad_request, <<"Missing alg header parameter">>});
-        {true, Alg} ->
+        {_, Alg} ->
             case lists:member(Alg, valid_algorithms()) of
                 true ->
                     ok;
@@ -202,9 +202,9 @@ validate_iss(Props, Checks) ->
     ActualISS = prop(<<"iss">>, Props),
 
     case {ExpectedISS, ActualISS} of
-        {undefined, _} ->
+        {undefined, undefined} ->
             ok;
-        {_ISS, undefined} ->
+        {ISS, undefined} when ISS /= undefined ->
             throw({bad_request, <<"Missing iss claim">>});
         {ISS, ISS} ->
             ok;
@@ -218,11 +218,11 @@ validate_iat(Props, Checks) ->
     IAT = prop(<<"iat">>, Props),
 
     case {Required, IAT} of
-        {undefined, _} ->
+        {undefined, undefined} ->
             ok;
         {true, undefined} ->
             throw({bad_request, <<"Missing iat claim">>});
-        {true, IAT} when is_integer(IAT) ->
+        {_, IAT} when is_integer(IAT) ->
             ok;
         {true, _} ->
             throw({bad_request, <<"Invalid iat claim">>})
@@ -234,11 +234,11 @@ validate_nbf(Props, Checks) ->
     NBF = prop(<<"nbf">>, Props),
 
     case {Required, NBF} of
-        {undefined, _} ->
+        {undefined, undefined} ->
             ok;
         {true, undefined} ->
             throw({bad_request, <<"Missing nbf claim">>});
-        {true, IAT} ->
+        {_, IAT} ->
             assert_past(<<"nbf">>, IAT)
     end.
 
@@ -248,11 +248,11 @@ validate_exp(Props, Checks) ->
     EXP = prop(<<"exp">>, Props),
 
     case {Required, EXP} of
-        {undefined, _} ->
+        {undefined, undefined} ->
             ok;
         {true, undefined} ->
             throw({bad_request, <<"Missing exp claim">>});
-        {true, EXP} ->
+        {_, EXP} ->
             assert_future(<<"exp">>, EXP)
     end.
 

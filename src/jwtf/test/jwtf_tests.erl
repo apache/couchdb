@@ -275,7 +275,7 @@ header(Alg) ->
 
 
 claims() ->
-    EpochSeconds = 1496205841,
+    EpochSeconds = os:system_time(second),
     {[
         {<<"iat">>, EpochSeconds},
         {<<"exp">>, EpochSeconds + 3600}
