@@ -123,14 +123,32 @@ validate(Header0, Payload0, Signature, Checks, KS) ->
     Key = key(Header1, Checks, KS),
     verify(Alg, Header0, Payload0, Signature, Key).
 
+
 validate_checks(Checks) when is_list(Checks) ->
-    UnknownChecks = proplists:get_keys(Checks) -- ?CHECKS,
+    case {lists:usort(Checks), lists:sort(Checks)} of
+        {L, L} ->
+            ok;
+        {L1, L2} ->
+            error({duplicate_checks, L2 -- L1})
+    end,
+    {_, UnknownChecks} = lists:partition(fun valid_check/1, Checks),
     case UnknownChecks of
         [] ->
             ok;
         UnknownChecks ->
             error({unknown_checks, UnknownChecks})
     end.
+
+
+valid_check(Check) when is_atom(Check) ->
+    lists:member(Check, ?CHECKS);
+
+valid_check({Check, _}) when is_atom(Check) ->
+    lists:member(Check, ?CHECKS);
+
+valid_check(_) ->
+    false.
+
 
 validate_header(Props, Checks) ->
     validate_typ(Props, Checks),

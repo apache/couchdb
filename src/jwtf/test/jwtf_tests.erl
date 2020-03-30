@@ -168,9 +168,17 @@ malformed_token_test() ->
     ?assertEqual({error, {bad_request, <<"Malformed token">>}},
         jwtf:decode(<<"a.b.c.d">>, [], nil)).
 
-unknown_check_test() ->
-    ?assertError({unknown_checks, [bar, foo]},
-        jwtf:decode(<<"a.b.c">>, [exp, foo, iss, bar, exp], nil)).
+unknown_atom_check_test() ->
+    ?assertError({unknown_checks, [foo, bar]},
+        jwtf:decode(<<"a.b.c">>, [exp, foo, iss, bar], nil)).
+
+unknown_binary_check_test() ->
+    ?assertError({unknown_checks, [<<"bar">>]},
+        jwtf:decode(<<"a.b.c">>, [exp, iss, <<"bar">>], nil)).
+
+duplicate_check_test() ->
+    ?assertError({duplicate_checks, [exp]},
+        jwtf:decode(<<"a.b.c">>, [exp, exp], nil)).
 
 
 %% jwt.io generated
