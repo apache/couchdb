@@ -20,7 +20,6 @@ mkdir build
 cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
-. /usr/local/kerl/${KERL_VER}/activate
 ./configure --with-curl --spidermonkey-version 60
 make check || (make build-report && false)
 '''
@@ -79,7 +78,6 @@ pipeline {
         sh '''
           set
           rm -rf apache-couchdb-*
-          . /usr/local/kerl/${LOW_ERLANG_VER}/activate
           ./configure --with-curl
           make dist
           chmod -R a+w * .
@@ -119,9 +117,6 @@ pipeline {
                 args "${DOCKER_ARGS}"
                 alwaysPull true
               }
-            }
-            environment {
-              KERL_VER = "${ERLANG_VERSION}"
             }
             options {
               skipDefaultCheckout()
