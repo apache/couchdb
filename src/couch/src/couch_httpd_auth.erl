@@ -192,8 +192,7 @@ jwt_authentication_handler(Req) ->
     case header_value(Req, "Authorization") of
         "Bearer " ++ Jwt ->
             RequiredClaims = get_configured_claims(),
-            AllowedAlgorithms = get_configured_algorithms(),
-            case jwtf:decode(?l2b(Jwt), [{alg, AllowedAlgorithms} | RequiredClaims], fun jwtf_keystore:get/2) of
+            case jwtf:decode(?l2b(Jwt), [alg | RequiredClaims], fun jwtf_keystore:get/2) of
                 {ok, {Claims}} ->
                     case lists:keyfind(<<"sub">>, 1, Claims) of
                         false -> throw({unauthorized, <<"Token missing sub claim.">>});
@@ -207,9 +206,6 @@ jwt_authentication_handler(Req) ->
             end;
         _ -> Req
     end.
-
-get_configured_algorithms() ->
-    re:split(config:get("jwt_auth", "allowed_algorithms", "HS256"), "\s*,\s*", [{return, binary}]).
 
 get_configured_claims() ->
     re:split(config:get("jwt_auth", "required_claims", ""), "\s*,\s*", [{return, binary}]).
