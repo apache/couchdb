@@ -48,8 +48,8 @@ class Database(object):
         dbname,
         host="127.0.0.1",
         port="15984",
-        user="testuser",
-        password="testpass",
+        user="adm",
+        password="pass",
     ):
         root_url = get_from_environment("COUCH_HOST", "http://{}:{}".format(host, port))
         auth_header = get_from_environment("COUCH_AUTH_HEADER", None)
