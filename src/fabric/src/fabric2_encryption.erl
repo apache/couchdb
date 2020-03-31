@@ -45,6 +45,9 @@
 -define(LABEL, "couchdb-aes256-gcm-encryption-key").
 
 
+-record(entry, {id, kek}).
+
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
@@ -80,7 +83,7 @@ decrypt(WrappedKEK, DbName, DocId, DocRev, Value)
 init(_) ->
     process_flag(sensitive, true),
 
-    Cache = ets:new(?MODULE, [set, private]),
+    Cache = ets:new(?MODULE, [set, private, {keypos, #entry.id}]),
     St = #{
         cache => Cache,
         waiters => dict:new()
@@ -155,7 +158,8 @@ handle_info({'DOWN', Ref, process, _Pid, Resp}, St) ->
         {From, Waiters1} ->
             case Resp of
                 {kek, {ok, KEK, WrappedKEK}} ->
-                    true = ets:insert(Cache, {WrappedKEK, KEK}),
+                    Entry = #entry{id = WrappedKEK, kek = KEK},
+                    true = ets:insert(Cache, Entry),
                     gen_server:reply(From, {ok, WrappedKEK});
                 _ ->
                     gen_server:reply(From, Resp)
@@ -235,12 +239,13 @@ get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
 
 unwrap_kek(Cache, WrappedKEK) ->
     case ets:lookup(Cache, WrappedKEK) of
-        [{WrappedKEK, KEK}] ->
+        [#entry{id = WrappedKEK, kek = KEK}] ->
             {ok, KEK};
         [] ->
             {ok, KEK, WrappedKEK} = fabric2_encryption_plugin:unwrap_kek(
                 WrappedKEK),
-            true = ets:insert(Cache, {WrappedKEK, KEK}),
+            Entry = #entry{id = WrappedKEK, kek = KEK},
+            true = ets:insert(Cache, Entry),
             {ok, KEK}
     end.
 
