@@ -100,16 +100,6 @@ class BasicFindTests(mango.UserDocsTests):
             else:
                 raise AssertionError("bad find")
 
-    def test_bad_r(self):
-        bad_rs = ([None, True, False, 1.2, "no limit!", {"foo": "bar"}, [2]],)
-        for br in bad_rs:
-            try:
-                self.db.find({"int": {"$gt": 2}}, r=br)
-            except Exception as e:
-                assert e.response.status_code == 400
-            else:
-                raise AssertionError("bad find")
-
     def test_bad_conflicts(self):
         bad_conflicts = ([None, 1.2, "no limit!", {"foo": "bar"}, [2]],)
         for bc in bad_conflicts:
@@ -261,11 +251,6 @@ class BasicFindTests(mango.UserDocsTests):
         for d in docs:
             assert sorted(d.keys()) == ["location", "user_id"]
             assert sorted(d["location"].keys()) == ["address"]
-
-    def test_r(self):
-        for r in [1, 2, 3]:
-            docs = self.db.find({"age": {"$gt": 0}}, r=r)
-            assert len(docs) == 15
 
     def test_empty(self):
         docs = self.db.find({})
