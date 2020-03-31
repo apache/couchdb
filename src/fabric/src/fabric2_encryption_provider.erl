@@ -13,9 +13,16 @@
 -module(fabric2_encryption_provider).
 
 -export([
+    get_aad/1,
     get_kek/1,
     unwrap_kek/1
 ]).
+
+
+get_aad(DbName) ->
+    FdbDirs = fabric2_server:fdb_directory(),
+    FdbDir = iolist_to_binary(FdbDirs),
+    {ok, <<FdbDir/binary, 0:8, DbName/binary>>}.
 
 
 get_kek(_DbName) ->

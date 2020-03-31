@@ -35,8 +35,8 @@
 
 -export([
     req_wrapped_kek/1,
-    do_encrypt/6,
-    do_decrypt/6
+    do_encrypt/5,
+    do_decrypt/5
 ]).
 
 
@@ -80,10 +80,8 @@ decrypt(WrappedKEK, DbName, DocId, DocRev, Value)
 init(_) ->
     process_flag(sensitive, true),
 
-    FdbDirs = fabric2_server:fdb_directory(),
     Cache = ets:new(?MODULE, [set, private]),
     St = #{
-        iid => iolist_to_binary(FdbDirs),
         cache => Cache,
         waiters => dict:new()
     },
@@ -114,14 +112,13 @@ handle_call({get_wrapped_kek, DbName}, From, St) ->
 
 handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
     #{
-        iid := InstanceId,
         cache := Cache,
         waiters := Waiters
     } = St,
 
     {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
     {_Pid, Ref} = erlang:spawn_monitor(?MODULE,
-        do_encrypt, [KEK, InstanceId, DbName, DocId, DocRev, Value]),
+        do_encrypt, [KEK, DbName, DocId, DocRev, Value]),
 
     NewSt = St#{
         waiters := dict:store(Ref, From, Waiters)
@@ -130,14 +127,13 @@ handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
 
 handle_call({decrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
     #{
-        iid := InstanceId,
         cache := Cache,
         waiters := Waiters
     } = St,
 
     {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
     {_Pid, Ref} = erlang:spawn_monitor(?MODULE,
-        do_decrypt, [KEK, InstanceId, DbName, DocId, DocRev, Value]),
+        do_decrypt, [KEK, DbName, DocId, DocRev, Value]),
 
     NewSt = St#{
         waiters := dict:store(Ref, From, Waiters)
@@ -195,10 +191,10 @@ req_wrapped_kek(DbName) ->
     end.
 
 
-do_encrypt(KEK, InstanceId, DbName, DocId, DocRev, Value) ->
+do_encrypt(KEK, DbName, DocId, DocRev, Value) ->
     process_flag(sensitive, true),
     try
-        {ok, AAD} = get_aad(InstanceId, DbName),
+        {ok, AAD} = fabric2_encryption_plugin:get_aad(DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
         {CipherText, CipherTag} = crypto:block_encrypt(
             aes_gcm, DEK, <<0:96>>, {AAD, Value, 16}),
@@ -212,11 +208,11 @@ do_encrypt(KEK, InstanceId, DbName, DocId, DocRev, Value) ->
     end.
 
 
-do_decrypt(KEK, InstanceId, DbName, DocId, DocRev, Value) ->
+do_decrypt(KEK, DbName, DocId, DocRev, Value) ->
     process_flag(sensitive, true),
     try
         <<CipherTag:16/binary, CipherText/binary>> = Value,
-        {ok, AAD} = get_aad(InstanceId, DbName),
+        {ok, AAD} = fabric2_encryption_plugin:get_aad(DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
         crypto:block_decrypt(
             aes_gcm, DEK, <<0:96>>, {AAD, CipherText, CipherTag})
@@ -228,9 +224,6 @@ do_decrypt(KEK, InstanceId, DbName, DocId, DocRev, Value) ->
             exit({error, Error})
     end.
 
-
-get_aad(InstanceId, DbName) when is_binary(InstanceId), is_binary(DbName) ->
-    {ok, <<InstanceId/binary, 0:8, DbName/binary>>}.
 
 
 get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
@@ -262,27 +255,41 @@ get_dek_test() ->
     ?assertNotEqual(KEK, DEK),
     ?assertEqual(32, byte_size(DEK)).
 
-encrypt_decrypt_test() ->
+encrypt_decrypt_test_() ->
+    {setup,
+        fun() ->
+            ok = meck:new([fabric2_server], [passthrough]),
+            ok = meck:expect(fabric2_server, fdb_directory, 0, ["couchdb"])
+        end,
+        fun(ok) ->
+            meck:unload()
+        end,
+        fun(ok) ->
+            [
+                fun test_do_encrypt_decrypt/0
+            ]
+        end
+    }.
+
+test_do_encrypt_decrypt() ->
     KEK = crypto:strong_rand_bytes(32),
-    IId = <<"dev">>,
     DbName = <<"db">>,
     DocId = <<"0001">>,
     DocRev = <<"1-abcdefgh">>,
     Value = term_to_binary({{{[{<<"text">>, <<"test">>}]}, [], false}}),
 
     {ok, EncResult} = try
-        do_encrypt(KEK, IId, DbName, DocId, DocRev, Value)
+        do_encrypt(KEK, DbName, DocId, DocRev, Value)
     catch
         exit:ER -> ER
     end,
     ?assertNotEqual(Value, EncResult),
 
     {ok, DecResult} = try
-        do_decrypt(KEK, IId, DbName, DocId, DocRev, EncResult)
+        do_decrypt(KEK, DbName, DocId, DocRev, EncResult)
     catch
         exit:DR -> DR
     end,
     ?assertEqual(Value, DecResult).
-
 
 -endif.

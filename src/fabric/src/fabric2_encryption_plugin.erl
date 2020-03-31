@@ -13,12 +13,19 @@
 -module(fabric2_encryption_plugin).
 
 -export([
+    get_aad/1,
     get_wrapped_kek/1,
     unwrap_kek/1
 ]).
 
 
 -define(SERVICE_ID, fabric2_encryption).
+
+
+-spec get_aad(DbName :: binary()) -> {ok, AAD :: binary()}.
+get_aad(DbName) ->
+    Default = fun fabric2_encryption_provider:get_aad/1,
+    maybe_handle(get_aad, [DbName], Default).
 
 
 -spec get_wrapped_kek(DbName :: binary()) ->
