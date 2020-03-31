@@ -14,6 +14,8 @@ import mango
 import user_docs
 import unittest
 
+import requests
+
 
 class IndexSelectionTests:
     def test_basic(self):
@@ -201,8 +203,11 @@ class IndexSelectionTests:
                 }
             },
         }
-        with self.assertRaises(KeyError):
+        try:
             self.db.save_doc(design_doc)
+            assert False, "Should not get here."
+        except requests.exceptions.HTTPError as e:
+            self.assertEqual(e.response.json()['error'], 'invalid_design_doc')
 
     def test_explain_sort_reverse(self):
         selector = {"manager": {"$gt": None}}

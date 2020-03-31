@@ -12,10 +12,15 @@
 # the License.
 
 
-import mango, requests
+import mango, requests, unittest
 
+# Re-enable once the _users db is implemented
 
 class UsersDbFindTests(mango.UsersDbTests):
+    @classmethod
+    def setUpClass(klass):
+        raise unittest.SkipTest("Re-enable once the _users db is implemented")
+
     def test_simple_find(self):
         docs = self.db.find({"name": {"$eq": "demo02"}})
         assert len(docs) == 1

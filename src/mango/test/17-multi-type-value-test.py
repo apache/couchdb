@@ -53,9 +53,9 @@ class MultiValueFieldTests:
 class MultiValueFieldJSONTests(mango.DbPerClass, MultiValueFieldTests):
     def setUp(self):
         self.db.recreate()
+        self.db.create_index(["name"], wait_for_built_index=False)
+        self.db.create_index(["age", "name"], wait_for_built_index=True)
         self.db.save_docs(copy.deepcopy(DOCS))
-        self.db.create_index(["name"])
-        self.db.create_index(["age", "name"])
 
 
 # @unittest.skipUnless(mango.has_text_service(), "requires text service")

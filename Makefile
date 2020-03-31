@@ -160,9 +160,10 @@ endif
 
 .PHONY: check-fdb
 check-fdb:
-	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric
+	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango
 	make elixir tests=test/elixir/test/basics_test.exs,test/elixir/test/replication_test.exs,test/elixir/test/map_test.exs,test/elixir/test/all_docs_test.exs,test/elixir/test/bulk_docs_test.exs
 	make exunit tests=src/couch_rate/test/exunit/
+	make mango-test
 
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
@@ -349,7 +350,7 @@ mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \
 		.venv/bin/python3 -m pip install -r requirements.txt
-	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=adm:pass '.venv/bin/python3 -m nose --with-xunit'
+	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=adm:pass --erlang-config=rel/files/eunit.config '.venv/bin/python3 -m nose -v --with-xunit'
 
 ################################################################################
 # Developing

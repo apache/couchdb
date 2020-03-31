@@ -22,7 +22,6 @@ class ExecutionStatsTests(mango.UserDocsTests):
         self.assertEqual(len(resp["docs"]), 3)
         self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
         self.assertEqual(resp["execution_stats"]["total_docs_examined"], 3)
-        self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 0)
         self.assertEqual(resp["execution_stats"]["results_returned"], 3)
         # See https://github.com/apache/couchdb/issues/1732
         # Erlang os:timestamp() only has ms accuracy on Windows!
@@ -35,12 +34,11 @@ class ExecutionStatsTests(mango.UserDocsTests):
 
     def test_quorum_json_index(self):
         resp = self.db.find(
-            {"age": {"$lt": 35}}, return_raw=True, r=3, executionStats=True
+            {"age": {"$lt": 35}}, return_raw=True, executionStats=True
         )
         self.assertEqual(len(resp["docs"]), 3)
         self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
-        self.assertEqual(resp["execution_stats"]["total_docs_examined"], 0)
-        self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 3)
+        self.assertEqual(resp["execution_stats"]["total_docs_examined"], 3)
         self.assertEqual(resp["execution_stats"]["results_returned"], 3)
         # See https://github.com/apache/couchdb/issues/1732
         # Erlang os:timestamp() only has ms accuracy on Windows!
@@ -70,7 +68,6 @@ class ExecutionStatsTests_Text(mango.UserDocsTextTests):
         self.assertEqual(len(resp["docs"]), 1)
         self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
         self.assertEqual(resp["execution_stats"]["total_docs_examined"], 1)
-        self.assertEqual(resp["execution_stats"]["total_quorum_docs_examined"], 0)
         self.assertEqual(resp["execution_stats"]["results_returned"], 1)
         self.assertGreater(resp["execution_stats"]["execution_time_ms"], 0)
 
