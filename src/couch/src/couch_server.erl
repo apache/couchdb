@@ -381,10 +381,13 @@ maybe_close_lru_db(#server{lru=Lru}=Server) ->
     end.
 
 open_async(Server, From, DbName, Options) ->
+    NoLRUServer = Server#server{
+        lru = redacted
+    },
     Parent = self(),
     T0 = os:timestamp(),
     Opener = spawn_link(fun() ->
-        Res = open_async_int(Server, DbName, Options),
+        Res = open_async_int(NoLRUServer, DbName, Options),
         IsSuccess = case Res of
             {ok, _} -> true;
             _ -> false
