@@ -65,12 +65,11 @@ def teardown_users(db):
 
 def setup(db, index_type="view", **kwargs):
     db.recreate()
-    db.save_docs(copy.deepcopy(DOCS))
     if index_type == "view":
         add_view_indexes(db, kwargs)
     elif index_type == "text":
         add_text_indexes(db, kwargs)
-
+    db.save_docs(copy.deepcopy(DOCS))
 
 def add_view_indexes(db, kwargs):
     indexes = [
@@ -94,7 +93,9 @@ def add_view_indexes(db, kwargs):
         (["ordered"], "ordered"),
     ]
     for (idx, name) in indexes:
-        assert db.create_index(idx, name=name, ddoc=name) is True
+        assert db.create_index(idx, name=name, ddoc=name,
+                               wait_for_built_index=False) is True
+    db.wait_for_built_indexes()
 
 
 def add_text_indexes(db, kwargs):
