@@ -34,6 +34,7 @@
 
 
 -export([
+    req_wrapped_kek/1,
     do_encrypt/6,
     do_decrypt/6
 ]).
@@ -99,10 +100,17 @@ terminate(_, #{waiters := Waiters} = _St) ->
     end, ok, Waiters).
 
 
-handle_call({get_wrapped_kek, DbName}, _From, #{cache := Cache} = St) ->
-    {ok, KEK, WrappedKEK} = fabric2_encryption_plugin:get_wrapped_kek(DbName),
-    true = ets:insert(Cache, {WrappedKEK, KEK}),
-    {reply, {ok, WrappedKEK}, St, ?TIMEOUT};
+handle_call({get_wrapped_kek, DbName}, From, St) ->
+    #{
+        waiters := Waiters
+    } = St,
+
+    {_Pid, Ref} = erlang:spawn_monitor(?MODULE, req_wrapped_kek, [DbName]),
+
+    NewSt = St#{
+        waiters := dict:store(Ref, From, Waiters)
+    },
+    {noreply, NewSt, ?TIMEOUT};
 
 handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
     #{
@@ -141,10 +149,22 @@ handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
 
 
-handle_info({'DOWN', Ref, process, _Pid, Resp}, #{waiters := Waiters} = St) ->
+handle_info({'DOWN', Ref, process, _Pid, Resp}, St) ->
+    #{
+        cache := Cache,
+        waiters := Waiters
+    } = St,
+
     case dict:take(Ref, Waiters) of
         {From, Waiters1} ->
-            gen_server:reply(From, Resp),
+            case Resp of
+                {kek, {ok, KEK, WrappedKEK}} ->
+                    true = ets:insert(Cache, {WrappedKEK, KEK}),
+                    gen_server:reply(From, {ok, WrappedKEK});
+                _ ->
+                    gen_server:reply(From, Resp)
+            end,
+
             NewSt = St#{
                 waiters := Waiters1
             },
@@ -160,6 +180,19 @@ handle_info(timeout, St) ->
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
+
+
+req_wrapped_kek(DbName) ->
+    process_flag(sensitive, true),
+    try
+        fabric2_encryption_plugin:get_wrapped_kek(DbName)
+    of
+        Resp ->
+            exit({kek, Resp})
+    catch
+        _:Error ->
+            exit({error, Error})
+    end.
 
 
 do_encrypt(KEK, InstanceId, DbName, DocId, DocRev, Value) ->
