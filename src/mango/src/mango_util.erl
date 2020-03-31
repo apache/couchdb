@@ -15,12 +15,8 @@
 
 -export([
     open_doc/2,
-    open_ddocs/1,
     load_ddoc/2,
     load_ddoc/3,
-
-    defer/3,
-    do_defer/3,
 
     assert_ejson/1,
 
@@ -88,15 +84,6 @@ open_doc(Db, DocId, Options) ->
     fabric2_db:open_doc(Db, DocId, Options).
 
 
-open_ddocs(Db) ->
-    case mango_util:defer(fabric, design_docs, [Db]) of
-        {ok, Docs} ->
-            {ok, Docs};
-        _ ->
-            ?MANGO_ERROR(error_loading_ddocs)
-    end.
-
-
 load_ddoc(Db, DDocId) ->
     load_ddoc(Db, DDocId, [deleted, ejson_body]).
 
@@ -109,40 +96,6 @@ load_ddoc(Db, DDocId, DbOpts) ->
                 {<<"language">>, <<"query">>}
             ]},
             {ok, #doc{id = DDocId, body = Body}}
-    end.
-
-
-defer(Mod, Fun, Args) ->
-    {Pid, Ref} = erlang:spawn_monitor(?MODULE, do_defer, [Mod, Fun, Args]),
-    receive
-        {'DOWN', Ref, process, Pid, {mango_defer_ok, Value}} ->
-            Value;
-        {'DOWN', Ref, process, Pid, {mango_defer_throw, Value}} ->
-            erlang:throw(Value);
-        {'DOWN', Ref, process, Pid, {mango_defer_error, Value}} ->
-            erlang:error(Value);
-        {'DOWN', Ref, process, Pid, {mango_defer_exit, Value}} ->
-            erlang:exit(Value)
-    end.
-
-
-do_defer(Mod, Fun, Args) ->
-    try erlang:apply(Mod, Fun, Args) of
-        Resp ->
-            erlang:exit({mango_defer_ok, Resp})
-    catch
-        throw:Error ->
-            Stack = erlang:get_stacktrace(),
-            couch_log:error("Defered error: ~w~n    ~p", [{throw, Error}, Stack]),
-            erlang:exit({mango_defer_throw, Error});
-        error:Error ->
-            Stack = erlang:get_stacktrace(),
-            couch_log:error("Defered error: ~w~n    ~p", [{error, Error}, Stack]),
-            erlang:exit({mango_defer_error, Error});
-        exit:Error ->
-            Stack = erlang:get_stacktrace(),
-            couch_log:error("Defered error: ~w~n    ~p", [{exit, Error}, Stack]),
-            erlang:exit({mango_defer_exit, Error})
     end.
 
 
