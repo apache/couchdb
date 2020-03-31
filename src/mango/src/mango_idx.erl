@@ -19,7 +19,6 @@
 
 -export([
     list/1,
-    recover/1,
 
     new/2,
     validate_new/2,
@@ -103,21 +102,6 @@ get_usable_indexes(Db, Selector, Opts) ->
 
 mango_sort_error(_Db, _Opts) ->
     ?MANGO_ERROR({no_usable_index, missing_sort_index}).
-
-
-recover(Db) ->
-    {ok, DDocs0} = mango_util:open_ddocs(Db),
-    Pred = fun({Props}) ->
-        case proplists:get_value(<<"language">>, Props) of
-            <<"query">> -> true;
-            _ -> false
-        end
-    end,
-    DDocs = lists:filter(Pred, DDocs0),
-    Special = special(Db),
-    {ok, Special ++ lists:flatmap(fun(Doc) ->
-        from_ddoc(Db, Doc)
-    end, DDocs)}.
 
 
 get_sort_fields(Opts) ->
