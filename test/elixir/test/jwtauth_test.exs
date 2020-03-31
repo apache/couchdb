@@ -103,7 +103,23 @@ defmodule JwtAuthTest do
   end
 
   def test_fun(alg, key) do
-    {:ok, token} = :jwtf.encode({[{"alg", alg}, {"typ", "JWT"}]}, {[{"sub", "couch@apache.org"}, {"_couchdb.roles", ["testing"]}]}, key)
+    now = DateTime.to_unix(DateTime.utc_now())
+    {:ok, token} = :jwtf.encode(
+      {
+        [
+          {"alg", alg},
+          {"typ", "JWT"}
+        ]
+      },
+      {
+        [
+          {"nbf", now - 60},
+          {"exp", now + 60},
+          {"sub", "couch@apache.org"},
+          {"_couchdb.roles", ["testing"]
+          }
+        ]
+      }, key)
 
     resp = Couch.get("/_session",
       headers: [authorization: "Bearer #{token}"]
