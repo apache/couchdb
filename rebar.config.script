@@ -150,6 +150,7 @@ DepDescs = [
 %% Independent Apps
 {config,           "config",           {tag, "2.1.7"}},
 {b64url,           "b64url",           {tag, "1.0.2"}},
+{erlfdb,           "erlfdb",           {tag, "v1.0.0"}},
 {ets_lru,          "ets-lru",          {tag, "1.1.0"}},
 {khash,            "khash",            {tag, "1.1.0"}},
 {snappy,           "snappy",           {tag, "CouchDB-1.0.4"}},
@@ -170,10 +171,7 @@ DepDescs = [
 {meck,             "meck",             {tag, "0.8.8"}},
 {recon,            "recon",            {tag, "2.5.0"}},
 {passage,          "passage",          {tag, "0.2.6"}},
-{thrift_protocol,  "thrift-protocol",  {tag, "0.1.5"}},
-
-%% TMP - Until this is moved to a proper Apache repo
-{erlfdb,           "erlfdb",           {branch, "master"}}
+{thrift_protocol,  "thrift-protocol",  {tag, "0.1.5"}}
 ],
 
 WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true},
@@ -188,8 +186,6 @@ end,
 BaseUrl = "https://github.com/apache/",
 
 MakeDep = fun
-    ({erlfdb, _, Version}) ->
-        {erlfdb, ".*", {git, "https://github.com/cloudant-labs/couchdb-erlfdb", {branch, "master"}}};
     ({AppName, {url, Url}, Version}) ->
         {AppName, ".*", {git, Url, Version}};
     ({AppName, {url, Url}, Version, Options}) ->
