@@ -9,7 +9,7 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-
+couchTests.elixir = true;
 couchTests.design_options = function(debug) {
   return console.log('done in test/elixir/test/design_options.exs');
   var db_name = get_random_db_name();
