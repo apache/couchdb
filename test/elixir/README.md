@@ -63,7 +63,7 @@ X means done, - means partially
   - [X] Port proxyauth.js
   - [X] Port purge.js
   - [ ] Port reader_acl.js
-  - [ ] Port recreate_doc.js
+  - [X] Port recreate_doc.js
   - [ ] Port reduce_builtin.js
   - [ ] Port reduce_false.js
   - [ ] Port reduce_false_temp.js
