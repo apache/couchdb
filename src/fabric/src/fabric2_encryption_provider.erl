@@ -93,6 +93,7 @@ get_mek_failure_test_() ->
     {
         setup,
         fun() ->
+            code:delete(?MEK_CACHE_MODULE),
             ok = meck:new([config], [passthrough]),
             ok = meck:expect(config, get, fun("encryption", "key_provider") ->
                 "echo 0"
