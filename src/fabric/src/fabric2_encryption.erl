@@ -43,6 +43,7 @@
 -define(INIT_TIMEOUT, 60000).
 -define(TIMEOUT, 10000).
 -define(LABEL, "couchdb-aes256-gcm-encryption-key").
+-define(PLUGIN, fabric2_encryption_plugin).
 
 
 %% Assume old crypto api
@@ -68,7 +69,7 @@
 -endif.
 
 
--record(entry, {id, kek}).
+-record(entry, {id, kek, aad}).
 
 
 start_link() ->
@@ -142,9 +143,9 @@ handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
         waiters := Waiters
     } = St,
 
-    {ok, KEK} = unwrap_kek(Cache, DbName, WrappedKEK),
+    {ok, KEK, AAD} = unwrap_kek(Cache, DbName, WrappedKEK),
     {_Pid, Ref} = erlang:spawn_monitor(?MODULE,
-        do_encrypt, [KEK, DbName, DocId, DocRev, Value]),
+        do_encrypt, [KEK, AAD, DocId, DocRev, Value]),
 
     NewSt = St#{
         waiters := dict:store(Ref, From, Waiters)
@@ -157,9 +158,9 @@ handle_call({decrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
         waiters := Waiters
     } = St,
 
-    {ok, KEK} = unwrap_kek(Cache, DbName, WrappedKEK),
+    {ok, KEK, AAD} = unwrap_kek(Cache, DbName, WrappedKEK),
     {_Pid, Ref} = erlang:spawn_monitor(?MODULE,
-        do_decrypt, [KEK, DbName, DocId, DocRev, Value]),
+        do_decrypt, [KEK, AAD, DocId, DocRev, Value]),
 
     NewSt = St#{
         waiters := dict:store(Ref, From, Waiters)
@@ -180,8 +181,8 @@ handle_info({'DOWN', Ref, process, _Pid, Resp}, St) ->
     case dict:take(Ref, Waiters) of
         {From, Waiters1} ->
             case Resp of
-                {kek, {ok, KEK, WrappedKEK}} ->
-                    Entry = #entry{id = WrappedKEK, kek = KEK},
+                {kek, {ok, KEK, WrappedKEK, AAD}} ->
+                    Entry = #entry{id = WrappedKEK, kek = KEK, aad = AAD},
                     true = ets:insert(Cache, Entry),
                     gen_server:reply(From, {ok, WrappedKEK});
                 _ ->
@@ -208,7 +209,9 @@ code_change(_OldVsn, St, _Extra) ->
 req_wrapped_kek(DbName) ->
     process_flag(sensitive, true),
     try
-        fabric2_encryption_plugin:get_wrapped_kek(DbName)
+        {ok, AAD} = ?PLUGIN:get_aad(DbName),
+        {ok, KEK, WrappedKEK} = ?PLUGIN:get_wrapped_kek(DbName),
+        {ok, KEK, WrappedKEK, AAD}
     of
         Resp ->
             exit({kek, Resp})
@@ -218,10 +221,9 @@ req_wrapped_kek(DbName) ->
     end.
 
 
-do_encrypt(KEK, DbName, DocId, DocRev, Value) ->
+do_encrypt(KEK, AAD, DocId, DocRev, Value) ->
     process_flag(sensitive, true),
     try
-        {ok, AAD} = fabric2_encryption_plugin:get_aad(DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
         {CipherText, CipherTag} = ?aes_gcm_encrypt(DEK, <<0:96>>, AAD, Value),
         <<CipherTag/binary, CipherText/binary>>
@@ -234,11 +236,10 @@ do_encrypt(KEK, DbName, DocId, DocRev, Value) ->
     end.
 
 
-do_decrypt(KEK, DbName, DocId, DocRev, Value) ->
+do_decrypt(KEK, AAD, DocId, DocRev, Value) ->
     process_flag(sensitive, true),
     try
         <<CipherTag:16/binary, CipherText/binary>> = Value,
-        {ok, AAD} = fabric2_encryption_plugin:get_aad(DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
         ?aes_gcm_decrypt(DEK, <<0:96>>, AAD, CipherText, CipherTag)
     of
@@ -260,14 +261,14 @@ get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
 
 unwrap_kek(Cache, DbName, WrappedKEK) ->
     case ets:lookup(Cache, WrappedKEK) of
-        [#entry{id = WrappedKEK, kek = KEK}] ->
-            {ok, KEK};
+        [#entry{id = WrappedKEK, kek = KEK, aad = AAD}] ->
+            {ok, KEK, AAD};
         [] ->
-            {ok, KEK, WrappedKEK} = fabric2_encryption_plugin:unwrap_kek(
-                DbName, WrappedKEK),
-            Entry = #entry{id = WrappedKEK, kek = KEK},
+            {ok, AAD} = ?PLUGIN:get_aad(DbName),
+            {ok, KEK, WrappedKEK} = ?PLUGIN:unwrap_kek(DbName, WrappedKEK),
+            Entry = #entry{id = WrappedKEK, kek = KEK, aad = AAD},
             true = ets:insert(Cache, Entry),
-            {ok, KEK}
+            {ok, KEK, AAD}
     end.
 
 
@@ -299,20 +300,20 @@ encrypt_decrypt_test_() ->
 
 test_do_encrypt_decrypt() ->
     KEK = crypto:strong_rand_bytes(32),
-    DbName = <<"db">>,
+    AAD = <<"couchdb", 0:8, "db">>,
     DocId = <<"0001">>,
     DocRev = <<"1-abcdefgh">>,
     Value = term_to_binary({{{[{<<"text">>, <<"test">>}]}, [], false}}),
 
     {ok, EncResult} = try
-        do_encrypt(KEK, DbName, DocId, DocRev, Value)
+        do_encrypt(KEK, AAD, DocId, DocRev, Value)
     catch
         exit:ER -> ER
     end,
     ?assertNotEqual(Value, EncResult),
 
     {ok, DecResult} = try
-        do_decrypt(KEK, DbName, DocId, DocRev, EncResult)
+        do_decrypt(KEK, AAD, DocId, DocRev, EncResult)
     catch
         exit:DR -> DR
     end,
