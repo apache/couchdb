@@ -15,7 +15,7 @@
 -export([
     get_aad/1,
     get_wrapped_kek/1,
-    unwrap_kek/1
+    unwrap_kek/2
 ]).
 
 
@@ -35,11 +35,11 @@ get_wrapped_kek(DbName) ->
     maybe_handle(get_kek, [DbName], Default).
 
 
--spec unwrap_kek(WrappedKEK :: binary()) ->
+-spec unwrap_kek(DbName :: binary(), WrappedKEK :: binary()) ->
     {ok, KEK :: binary(), WrappedKEK :: binary()} | {error, Error :: term()}.
-unwrap_kek(WrappedKEK) ->
-    Default = fun fabric2_encryption_provider:unwrap_kek/1,
-    maybe_handle(unwrap_kek, [WrappedKEK], Default).
+unwrap_kek(DbName, WrappedKEK) ->
+    Default = fun fabric2_encryption_provider:unwrap_kek/2,
+    maybe_handle(unwrap_kek, [DbName, WrappedKEK], Default).
 
 
 

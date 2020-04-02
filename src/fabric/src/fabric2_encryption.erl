@@ -142,7 +142,7 @@ handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
         waiters := Waiters
     } = St,
 
-    {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
+    {ok, KEK} = unwrap_kek(Cache, DbName, WrappedKEK),
     {_Pid, Ref} = erlang:spawn_monitor(?MODULE,
         do_encrypt, [KEK, DbName, DocId, DocRev, Value]),
 
@@ -157,7 +157,7 @@ handle_call({decrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
         waiters := Waiters
     } = St,
 
-    {ok, KEK} = unwrap_kek(Cache, WrappedKEK),
+    {ok, KEK} = unwrap_kek(Cache, DbName, WrappedKEK),
     {_Pid, Ref} = erlang:spawn_monitor(?MODULE,
         do_decrypt, [KEK, DbName, DocId, DocRev, Value]),
 
@@ -258,13 +258,13 @@ get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
     {ok, DEK}.
 
 
-unwrap_kek(Cache, WrappedKEK) ->
+unwrap_kek(Cache, DbName, WrappedKEK) ->
     case ets:lookup(Cache, WrappedKEK) of
         [#entry{id = WrappedKEK, kek = KEK}] ->
             {ok, KEK};
         [] ->
             {ok, KEK, WrappedKEK} = fabric2_encryption_plugin:unwrap_kek(
-                WrappedKEK),
+                DbName, WrappedKEK),
             Entry = #entry{id = WrappedKEK, kek = KEK},
             true = ets:insert(Cache, Entry),
             {ok, KEK}

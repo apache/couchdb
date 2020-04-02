@@ -15,7 +15,7 @@
 -export([
     get_aad/1,
     get_kek/1,
-    unwrap_kek/1
+    unwrap_kek/2
 ]).
 
 
@@ -42,7 +42,7 @@ get_kek(_DbName) ->
     end.
 
 
-unwrap_kek(WrappedKEK) ->
+unwrap_kek(_DbName, WrappedKEK) ->
     case get_mek() of
         {ok, MEK} ->
             case couch_keywrap:key_unwrap(MEK, WrappedKEK) of
@@ -132,7 +132,7 @@ get_unwrap_kek_test_() ->
                 {"should unwrap valid wrapped kek",
                 fun test_unwrap_kek/0},
                 {"should return error on invalid wrapped key",
-                ?_assertMatch({error, _}, unwrap_kek(<<0:320>>))}
+                ?_assertMatch({error, _}, unwrap_kek(<<"db">>, <<0:320>>))}
             ]
         end
     }.
@@ -156,7 +156,7 @@ test_get_kek() ->
 
 test_unwrap_kek() ->
     WrappedKEK = <<16#0c714838ba4b937fdde5a2ca8a318ead3c2c49ddfc77eef90e1a954f18962848f601d18f7cf32bb9:320>>,
-    Resp = unwrap_kek(WrappedKEK),
+    Resp = unwrap_kek(<<"db">>, WrappedKEK),
     ?assertMatch({ok, _, _}, Resp),
     {ok, KEK, WrappedKEK2} = Resp,
     ?assertEqual(256, bit_size(KEK)),
