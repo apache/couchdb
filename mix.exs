@@ -49,10 +49,13 @@ defmodule CouchDBTest.Mixfile do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: extra_applications(Mix.env()),
       applications: [:httpotion]
     ]
   end
+
+  defp extra_applications(:test), do: [:logger, :stream_data]
+  defp extra_applications(_), do: [:logger]
 
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["test/elixir/lib", "test/elixir/test/support"]
@@ -68,7 +71,8 @@ defmodule CouchDBTest.Mixfile do
       {:jiffy, path: Path.expand("src/jiffy", __DIR__)},
       {:ibrowse,
        path: Path.expand("src/ibrowse", __DIR__), override: true, compile: false},
-      {:credo, "~> 1.2.0", only: [:dev, :test, :integration], runtime: false}
+      {:credo, "~> 1.2.0", only: [:dev, :test, :integration], runtime: false},
+      {:stream_data, "~> 0.4.3", only: [:dev, :test, :integration], runtime: false}
     ]
   end
 

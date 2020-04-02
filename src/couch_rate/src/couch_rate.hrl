@@ -10,24 +10,10 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, couch_views, [
-    {description, "CouchDB Views on FDB"},
-    {vsn, git},
-    {mod, {couch_views_app, []}},
-    {registered, [
-        couch_views_sup,
-        couch_views_server
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        erlfdb,
-        couch_log,
-        config,
-        couch_stats,
-        fabric,
-        couch_jobs,
-        couch_eval,
-        couch_rate
-    ]}
-]}.
+-record(couch_rate,
+    {
+        id :: couch_rate:id(),
+        module = couch_rate_limiter :: module(),
+        store = couch_rate_ets :: module() | nil,
+        state  :: couch_rate:state()
+    }).

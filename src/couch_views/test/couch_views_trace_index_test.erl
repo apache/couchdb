@@ -51,7 +51,7 @@ indexer_test_() ->
 
 
 setup() ->
-    test_util:start_couch([fabric, couch_js]).
+    test_util:start_couch([fabric, couch_js, couch_rate]).
 
 
 cleanup(Ctx) ->

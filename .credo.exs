@@ -37,6 +37,7 @@
           ~r"/src/metrics",
           ~r"/src/minerl",
           ~r"/src/parse_trans",
+          ~r"/src/stream_data",
           ~r"/src/ssl_verify_fun",
           ~r"/test/elixir/deps/"
         ]
