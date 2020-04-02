@@ -45,6 +45,29 @@
 -define(LABEL, "couchdb-aes256-gcm-encryption-key").
 
 
+%% Assume old crypto api
+-define(hmac(Key, PlainText), crypto:hmac(sha256, Key, PlainText)).
+-define(aes_gcm_encrypt(Key, IV, AAD, Data),
+        crypto:block_encrypt(aes_gcm, Key, IV, {AAD, Data, 16})).
+-define(aes_gcm_decrypt(Key, IV, AAD, CipherText, CipherTag),
+        crypto:block_decrypt(aes_gcm, Key, IV, {AAD, CipherText, CipherTag})).
+
+%% Replace macros if new crypto api is available
+-ifdef(OTP_RELEASE).
+-if(?OTP_RELEASE >= 22).
+-undef(hmac).
+-define(hmac(Key, PlainText), crypto:mac(hmac, sha256, Key, PlainText)).
+-undef(aes_gcm_encrypt).
+-define(aes_gcm_encrypt(Key, IV, AAD, Data),
+        crypto:crypto_one_time_aead(aes_256_gcm, DEK, IV, Data, AAD, 16, true)).
+-undef(aes_gcm_decrypt).
+-define(aes_gcm_decrypt(Key, IV, AAD, CipherText, CipherTag),
+        crypto:crypto_one_time_aead(aes_256_gcm, Key, IV, CipherText,
+        AAD, CipherTag, false)).
+-endif.
+-endif.
+
+
 -record(entry, {id, kek}).
 
 
@@ -200,8 +223,7 @@ do_encrypt(KEK, DbName, DocId, DocRev, Value) ->
     try
         {ok, AAD} = fabric2_encryption_plugin:get_aad(DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
-        {CipherText, CipherTag} = crypto:block_encrypt(
-            aes_gcm, DEK, <<0:96>>, {AAD, Value, 16}),
+        {CipherText, CipherTag} = ?aes_gcm_encrypt(DEK, <<0:96>>, AAD, Value),
         <<CipherTag/binary, CipherText/binary>>
     of
         Resp ->
@@ -218,8 +240,7 @@ do_decrypt(KEK, DbName, DocId, DocRev, Value) ->
         <<CipherTag:16/binary, CipherText/binary>> = Value,
         {ok, AAD} = fabric2_encryption_plugin:get_aad(DbName),
         {ok, DEK} = get_dek(KEK, DocId, DocRev),
-        crypto:block_decrypt(
-            aes_gcm, DEK, <<0:96>>, {AAD, CipherText, CipherTag})
+        ?aes_gcm_decrypt(DEK, <<0:96>>, AAD, CipherText, CipherTag)
     of
         Resp ->
             exit({ok, Resp})
@@ -233,7 +254,7 @@ do_decrypt(KEK, DbName, DocId, DocRev, Value) ->
 get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
     Context = <<DocId/binary, 0:8, DocRev/binary>>,
     PlainText = <<1:16, ?LABEL, 0:8, Context/binary, 256:16>>,
-    <<_:256>> = DEK = crypto:hmac(sha256, KEK, PlainText),
+    <<_:256>> = DEK = ?hmac(KEK, PlainText),
     {ok, DEK}.
 
 
