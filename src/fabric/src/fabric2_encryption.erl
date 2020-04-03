@@ -35,8 +35,9 @@
 
 -export([
     req_wrapped_kek/1,
-    do_encrypt/5,
-    do_decrypt/5
+    req_unwrap_kek/2,
+    do_encrypt/4,
+    do_decrypt/4
 ]).
 
 
@@ -143,9 +144,9 @@ handle_call({encrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
         waiters := Waiters
     } = St,
 
-    {ok, KEK, AAD} = unwrap_kek(Cache, DbName, WrappedKEK),
+    {ok, Future} = unwrap_kek(Cache, DbName, WrappedKEK),
     {_Pid, Ref} = erlang:spawn_monitor(?MODULE,
-        do_encrypt, [KEK, AAD, DocId, DocRev, Value]),
+        do_encrypt, [Future, DocId, DocRev, Value]),
 
     NewSt = St#{
         waiters := dict:store(Ref, From, Waiters)
@@ -158,9 +159,9 @@ handle_call({decrypt, WrappedKEK, DbName, DocId, DocRev, Value}, From, St) ->
         waiters := Waiters
     } = St,
 
-    {ok, KEK, AAD} = unwrap_kek(Cache, DbName, WrappedKEK),
+    {ok, Future} = unwrap_kek(Cache, DbName, WrappedKEK),
     {_Pid, Ref} = erlang:spawn_monitor(?MODULE,
-        do_decrypt, [KEK, AAD, DocId, DocRev, Value]),
+        do_decrypt, [Future, DocId, DocRev, Value]),
 
     NewSt = St#{
         waiters := dict:store(Ref, From, Waiters)
@@ -172,26 +173,47 @@ handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
 
 
-handle_info({'DOWN', Ref, process, _Pid, Resp}, St) ->
+handle_info({'DOWN', Ref, process, Pid, Resp}, St) ->
     #{
         cache := Cache,
         waiters := Waiters
     } = St,
 
+    Reply = case Resp of
+        {kek, {ok, KEK, WrappedKEK, AAD}} ->
+            Entry = #entry{id = WrappedKEK, kek = KEK, aad = AAD},
+            true = ets:insert(Cache, Entry),
+            {ok, WrappedKEK};
+        {kek, {error, Error}} ->
+            ets:match_delete(Cache, #entry{kek = Pid, _ = '_'}),
+            {error, Error};
+        {retry, Fun, WrappedKEK, DocId, DocRev, Value} ->
+            case ets:lookup(Cache, WrappedKEK) of
+                [#entry{} = Entry] ->
+                    Future = get_future(Entry),
+                    {retry, Fun, Future, DocId, DocRev, Value};
+                [] ->
+                    {error, unable_to_unwrap_kek}
+            end;
+        _ ->
+            Resp
+    end,
+
     case dict:take(Ref, Waiters) of
         {From, Waiters1} ->
-            case Resp of
-                {kek, {ok, KEK, WrappedKEK, AAD}} ->
-                    Entry = #entry{id = WrappedKEK, kek = KEK, aad = AAD},
-                    true = ets:insert(Cache, Entry),
-                    gen_server:reply(From, {ok, WrappedKEK});
+            NewSt = case Reply of
+                {retry, Fun1, Future1, DocId1, DocRev1, Value1} ->
+                    {_, Ref1} = erlang:spawn_monitor(?MODULE,
+                        Fun1, [Future1, DocId1, DocRev1, Value1]),
+                    St#{
+                        waiters := dict:store(Ref1, From, Waiters1)
+                    };
                 _ ->
-                    gen_server:reply(From, Resp)
+                    gen_server:reply(From, Reply),
+                    St#{
+                        waiters := Waiters1
+                    }
             end,
-
-            NewSt = St#{
-                waiters := Waiters1
-            },
             {noreply, NewSt, ?TIMEOUT};
         error ->
             {noreply, St, ?TIMEOUT}
@@ -216,18 +238,47 @@ req_wrapped_kek(DbName) ->
         Resp ->
             exit({kek, Resp})
     catch
+        _:{badmatch, {error, Error}} ->
+            exit({kek, {error, Error}});
         _:Error ->
-            exit({error, Error})
+            exit({kek, {error, Error}})
     end.
 
 
-do_encrypt(KEK, AAD, DocId, DocRev, Value) ->
+req_unwrap_kek(DbName, WrappedKEK) ->
     process_flag(sensitive, true),
     try
-        {ok, DEK} = get_dek(KEK, DocId, DocRev),
-        {CipherText, CipherTag} = ?aes_gcm_encrypt(DEK, <<0:96>>, AAD, Value),
-        <<CipherTag/binary, CipherText/binary>>
+        {ok, AAD} = ?PLUGIN:get_aad(DbName),
+        {ok, KEK, WrappedKEK} = ?PLUGIN:unwrap_kek(DbName, WrappedKEK),
+        {ok, KEK, WrappedKEK, AAD}
     of
+        Resp ->
+            exit({kek, Resp})
+    catch
+        _:{badmatch, {error, Error}} ->
+            exit({kek, {error, Error}});
+        _:Error ->
+            exit({kek, {error, Error}})
+    end.
+
+
+do_encrypt(Future, DocId, DocRev, Value) ->
+    process_flag(sensitive, true),
+    try
+        case Future() of
+            {ok, KEK, AAD} ->
+                {ok, DEK} = get_dek(KEK, DocId, DocRev),
+                {CipherText, CipherTag} = ?aes_gcm_encrypt(DEK, <<0:96>>,
+                    AAD, Value),
+                <<CipherTag/binary, CipherText/binary>>;
+            Else ->
+                Else
+        end
+    of
+        {retry, WrappedKEK} ->
+            exit({retry, do_encrypt, WrappedKEK, DocId, DocRev, Value});
+        {error, Error} ->
+            exit({error, Error});
         Resp ->
             exit({ok, Resp})
     catch
@@ -236,13 +287,22 @@ do_encrypt(KEK, AAD, DocId, DocRev, Value) ->
     end.
 
 
-do_decrypt(KEK, AAD, DocId, DocRev, Value) ->
+do_decrypt(Future, DocId, DocRev, Value) ->
     process_flag(sensitive, true),
     try
-        <<CipherTag:16/binary, CipherText/binary>> = Value,
-        {ok, DEK} = get_dek(KEK, DocId, DocRev),
-        ?aes_gcm_decrypt(DEK, <<0:96>>, AAD, CipherText, CipherTag)
+        case Future() of
+            {ok, KEK, AAD} ->
+                <<CipherTag:16/binary, CipherText/binary>> = Value,
+                {ok, DEK} = get_dek(KEK, DocId, DocRev),
+                ?aes_gcm_decrypt(DEK, <<0:96>>, AAD, CipherText, CipherTag);
+            Else ->
+                Else
+        end
     of
+        {retry, WrappedKEK} ->
+            exit({retry, do_decrypt, WrappedKEK, DocId, DocRev, Value});
+        {error, Error} ->
+            exit({error, Error});
         Resp ->
             exit({ok, Resp})
     catch
@@ -261,14 +321,40 @@ get_dek(KEK, DocId, DocRev) when bit_size(KEK) == 256 ->
 
 unwrap_kek(Cache, DbName, WrappedKEK) ->
     case ets:lookup(Cache, WrappedKEK) of
-        [#entry{id = WrappedKEK, kek = KEK, aad = AAD}] ->
-            {ok, KEK, AAD};
+        [#entry{id = WrappedKEK} = Entry] ->
+            {ok, get_future(Entry)};
         [] ->
-            {ok, AAD} = ?PLUGIN:get_aad(DbName),
-            {ok, KEK, WrappedKEK} = ?PLUGIN:unwrap_kek(DbName, WrappedKEK),
-            Entry = #entry{id = WrappedKEK, kek = KEK, aad = AAD},
+            {Pid, _Ref} = erlang:spawn_monitor(?MODULE,
+                req_unwrap_kek, [DbName, WrappedKEK]),
+            Entry = #entry{id = WrappedKEK, kek = Pid},
             true = ets:insert(Cache, Entry),
-            {ok, KEK, AAD}
+            {ok, get_future(Entry)}
+    end.
+
+
+get_future(#entry{id = WrappedKEK, kek = Pid}) when is_pid(Pid) ->
+    fun() ->
+        Ref = erlang:monitor(process, Pid),
+        receive
+            {'DOWN', Ref, process, Pid, {kek, {ok, KEK, _, AAD}}} ->
+                {ok, KEK, AAD};
+            {'DOWN', Ref, process, Pid, {kek, {error, Error}}} ->
+                {error, Error};
+            {'DOWN', Ref, process, Pid,  noproc} ->
+                {retry, WrappedKEK};
+            {'DOWN', Ref, process, Pid,  {error, Error}} ->
+                {error, Error};
+            {'DOWN', Ref, process, Pid,  Else} ->
+                {error, Else}
+        after
+            ?TIMEOUT ->
+                {error, timeout}
+        end
+    end;
+
+get_future(#entry{kek = KEK, aad = AAD}) ->
+    fun() ->
+        {ok, KEK, AAD}
     end.
 
 
@@ -293,7 +379,8 @@ encrypt_decrypt_test_() ->
         end,
         fun(ok) ->
             [
-                fun test_do_encrypt_decrypt/0
+                fun test_do_encrypt_decrypt/0,
+                fun test_retry/0
             ]
         end
     }.
@@ -305,18 +392,43 @@ test_do_encrypt_decrypt() ->
     DocRev = <<"1-abcdefgh">>,
     Value = term_to_binary({{{[{<<"text">>, <<"test">>}]}, [], false}}),
 
+    Future = get_future(#entry{kek = KEK, aad = AAD}),
+
     {ok, EncResult} = try
-        do_encrypt(KEK, AAD, DocId, DocRev, Value)
+        do_encrypt(Future, DocId, DocRev, Value)
     catch
         exit:ER -> ER
     end,
     ?assertNotEqual(Value, EncResult),
 
     {ok, DecResult} = try
-        do_decrypt(KEK, AAD, DocId, DocRev, EncResult)
+        do_decrypt(Future, DocId, DocRev, EncResult)
     catch
         exit:DR -> DR
     end,
     ?assertEqual(Value, DecResult).
+
+test_retry() ->
+    WrappedKEK = crypto:strong_rand_bytes(32),
+    DocId = <<"0001">>,
+    DocRev = <<"1-abcdefgh">>,
+    Value = <<0:320>>,
+
+    DeadPid = erlang:spawn(fun() -> ok end),
+    Future = get_future(#entry{id = WrappedKEK, kek = DeadPid}),
+
+    EncResult = try
+        do_encrypt(Future, DocId, DocRev, Value)
+    catch
+        exit:ER -> ER
+    end,
+    ?assertMatch({retry, do_encrypt, _, _, _, _}, EncResult),
+
+    DecResult = try
+        do_decrypt(Future, DocId, DocRev, Value)
+    catch
+        exit:DR -> DR
+    end,
+    ?assertMatch({retry, do_decrypt, _, _, _, _}, DecResult).
 
 -endif.
