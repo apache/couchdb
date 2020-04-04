@@ -68,7 +68,7 @@ set_timeout(Pid, TimeOut) ->
     gen_server:call(Pid, {set_timeout, TimeOut}).
 
 prompt(Pid, Data) when is_list(Data) ->
-    gen_server:call(Pid, {prompt, Data}).
+    gen_server:call(Pid, {prompt, Data}, infinity).
 
 % gen_server callbacks
 init([]) ->
