@@ -809,7 +809,8 @@ read_attachment(Db, DocId, AttId) ->
 
 write_attachment(Db, DocId, Att) ->
     Data = couch_att:fetch(data, Att),
-    {ok, AttId} = fabric2_fdb:write_attachment(Db, DocId, Data),
+    Encoding = couch_att:fetch(encoding, Att),
+    {ok, AttId} = fabric2_fdb:write_attachment(Db, DocId, Data, Encoding),
     couch_att:store(data, {loc, Db, DocId, AttId}, Att).
 
 

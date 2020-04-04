@@ -54,7 +54,7 @@
     write_local_doc/2,
 
     read_attachment/3,
-    write_attachment/3,
+    write_attachment/4,
 
     get_last_change/1,
 
@@ -902,26 +902,53 @@ read_attachment(#{} = Db, DocId, AttId) ->
     } = ensure_current(Db),
 
     AttKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId}, DbPrefix),
-    case erlfdb:wait(erlfdb:get_range_startswith(Tx, AttKey)) of
+    Data = case erlfdb:wait(erlfdb:get_range_startswith(Tx, AttKey)) of
         not_found ->
             throw({not_found, missing});
         KVs ->
             Vs = [V || {_K, V} <- KVs],
             iolist_to_binary(Vs)
+    end,
+
+    IdKey = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId, AttId}, DbPrefix),
+    case erlfdb:wait(erlfdb:get(Tx, IdKey)) of
+        <<>> ->
+            Data; % Old format, before CURR_ATT_STORAGE_VER = 0
+        <<_/binary>> = InfoBin ->
+            {?CURR_ATT_STORAGE_VER, Compressed} = erlfdb_tuple:unpack(InfoBin),
+            case Compressed of
+                true -> binary_to_term(Data, [safe]);
+                false -> Data
+            end
     end.
 
 
-write_attachment(#{} = Db, DocId, Data) when is_binary(Data) ->
+write_attachment(#{} = Db, DocId, Data, Encoding)
+        when is_binary(Data), is_atom(Encoding) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = ensure_current(Db),
 
     AttId = fabric2_util:uuid(),
-    Chunks = chunkify_binary(Data),
+
+    {Data1, Compressed} = case Encoding of
+        gzip ->
+            {Data, false};
+        _ ->
+            Opts = [{minor_version, 1}, {compressed, 6}],
+            CompressedData = term_to_binary(Data, Opts),
+            case size(CompressedData) < Data of
+                true -> {CompressedData, true};
+                false -> {Data, false}
+            end
+    end,
 
     IdKey = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId, AttId}, DbPrefix),
-    ok = erlfdb:set(Tx, IdKey, <<>>),
+    InfoVal = erlfdb_tuple:pack({?CURR_ATT_STORAGE_VER, Compressed}),
+    ok = erlfdb:set(Tx, IdKey, InfoVal),
+
+    Chunks = chunkify_binary(Data1),
 
     lists:foldl(fun(Chunk, ChunkId) ->
         AttKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId, ChunkId}, DbPrefix),
@@ -1366,7 +1393,8 @@ doc_to_fdb(Db, #doc{} = Doc) ->
 
     DiskAtts = lists:map(fun couch_att:to_disk_term/1, Atts),
 
-    Value = term_to_binary({Body, DiskAtts, Deleted}, [{minor_version, 1}]),
+    Opts = [{minor_version, 1}, {compressed, 6}],
+    Value = term_to_binary({Body, DiskAtts, Deleted}, Opts),
     Chunks = chunkify_binary(Value),
 
     {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
@@ -1418,7 +1446,7 @@ local_doc_to_fdb(Db, #doc{} = Doc) ->
         _ when is_binary(Rev) -> Rev
     end,
 
-    BVal = term_to_binary(Body, [{minor_version, 1}]),
+    BVal = term_to_binary(Body, [{minor_version, 1}, {compressed, 6}]),
     {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
         K = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, Id, ChunkId}, DbPrefix),
         {{K, Chunk}, ChunkId + 1}

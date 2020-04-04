@@ -54,6 +54,10 @@
 
 -define(CURR_LDOC_FORMAT, 0).
 
+% 0 - Attachment storage version
+
+-define(CURR_ATT_STORAGE_VER, 0).
+
 % Misc constants
 
 -define(PDICT_DB_KEY, '$fabric_db_handle').
