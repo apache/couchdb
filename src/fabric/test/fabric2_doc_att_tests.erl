@@ -29,6 +29,7 @@ doc_crud_test_() ->
             fun cleanup/1,
             with([
                 ?TDEF(create_att),
+                ?TDEF(create_att_already_compressed),
                 ?TDEF(delete_att),
                 ?TDEF(multiple_atts),
                 ?TDEF(delete_one_att),
@@ -84,7 +85,48 @@ create_att({Db, _}) ->
         IdVal = erlfdb:wait(erlfdb:get(Tx, IdKey)),
         AttVals = erlfdb:wait(erlfdb:get_range_startswith(Tx, AttKey)),
 
-        ?assertEqual(<<>>, IdVal),
+        ?assertEqual(erlfdb_tuple:pack({0, true}), IdVal),
+        Opts = [{minor_version, 1}, {compressed, 6}],
+        Expect = term_to_binary(<<"foobar">>, Opts),
+        ?assertMatch([{_, Expect}], AttVals)
+    end).
+
+
+create_att_already_compressed({Db, _}) ->
+    DocId = fabric2_util:uuid(),
+    Att1 = couch_att:new([
+        {name, <<"foo.txt">>},
+        {type, <<"application/octet-stream">>},
+        {att_len, 6},
+        {data, <<"foobar">>},
+        {encoding, gzip},
+        {md5, <<>>}
+    ]),
+    Doc1 = #doc{
+        id = DocId,
+        atts = [Att1]
+    },
+    {ok, _} = fabric2_db:update_doc(Db, Doc1),
+    {ok, Doc2} = fabric2_db:open_doc(Db, DocId),
+    #doc{
+        atts = [Att2]
+    } = Doc2,
+    {loc, _Db, DocId, AttId} = couch_att:fetch(data, Att2),
+    AttData = fabric2_db:read_attachment(Db, DocId, AttId),
+    ?assertEqual(<<"foobar">>, AttData),
+
+    % Check that the raw keys exist
+    #{
+        db_prefix := DbPrefix
+    } = Db,
+    IdKey = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId, AttId}, DbPrefix),
+    AttKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId}, DbPrefix),
+
+    fabric2_fdb:transactional(fun(Tx) ->
+        IdVal = erlfdb:wait(erlfdb:get(Tx, IdKey)),
+        AttVals = erlfdb:wait(erlfdb:get_range_startswith(Tx, AttKey)),
+
+        ?assertEqual(erlfdb_tuple:pack({0, false}), IdVal),
         ?assertMatch([{_, <<"foobar">>}], AttVals)
     end).
 
@@ -175,7 +217,7 @@ large_att({Db, _}) ->
     AttData = iolist_to_binary([
         <<"foobar">> || _ <- lists:seq(1, 60000)
     ]),
-    Att1 = mk_att(<<"long.txt">>, AttData),
+    Att1 = mk_att(<<"long.txt">>, AttData, gzip),
     {ok, _} = create_doc(Db, DocId, [Att1]),
     ?assertEqual(#{<<"long.txt">> => AttData}, read_atts(Db, DocId)),
 
@@ -204,12 +246,16 @@ att_on_conflict_isolation({Db, _}) ->
 
 
 mk_att(Name, Data) ->
+    mk_att(Name, Data, identity).
+
+
+mk_att(Name, Data, Encoding) ->
     couch_att:new([
         {name, Name},
         {type, <<"application/octet-stream">>},
         {att_len, size(Data)},
         {data, Data},
-        {encoding, identity},
+        {encoding, Encoding},
         {md5, <<>>}
     ]).
 
