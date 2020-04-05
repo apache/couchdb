@@ -192,6 +192,13 @@ defmodule Couch.DBTest do
     resp.body
   end
 
+  def save(db_name, document) do
+    resp = Couch.put("/#{db_name}/#{document["_id"]}", body: document)
+    assert resp.status_code in [201, 202]
+    assert resp.body["ok"]
+    Map.put(document, "_rev", resp.body["rev"])
+  end
+
   def bulk_save(db_name, docs) do
     resp =
       Couch.post(
@@ -271,6 +278,24 @@ defmodule Couch.DBTest do
     resp.body
   end
 
+  def view(db_name, view_name, options \\ nil, keys \\ nil) do
+    [view_root, view_name] = String.split(view_name, "/")
+
+    resp =
+      case keys do
+        nil ->
+          Couch.get("/#{db_name}/_design/#{view_root}/_view/#{view_name}", query: options)
+
+        _ ->
+          Couch.post("/#{db_name}/_design/#{view_root}/_view/#{view_name}",
+            body: %{"keys" => keys}
+          )
+      end
+
+    assert resp.status_code in [200, 201]
+    resp
+  end
+
   def sample_doc_foo do
     %{
       _id: "foo",
@@ -299,7 +324,6 @@ defmodule Couch.DBTest do
       %{_id: str_id, integer: id, string: str_id}
     end
   end
-
 
   def request_stats(path_steps, is_test) do
     path =
