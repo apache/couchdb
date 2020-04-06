@@ -902,9 +902,10 @@ send_all_docs_keys(Db, #mrargs{} = Args, VAcc0) ->
         _ -> Args#mrargs.doc_options
     end,
     IncludeDocs = Args#mrargs.include_docs,
-    lists:foldl(fun(DocId, Acc) ->
-        OpenOpts = [deleted | DocOpts],
-        Row0 = case fabric2_db:open_doc(Db, DocId, OpenOpts) of
+    OpenOpts = [deleted | DocOpts],
+
+    CB = fun(DocId, Doc, Acc) ->
+        Row0 = case Doc of
             {not_found, missing} ->
                 #view_row{key = DocId};
             {ok, #doc{deleted = true, revs = Revs}} ->
@@ -938,9 +939,10 @@ send_all_docs_keys(Db, #mrargs{} = Args, VAcc0) ->
                 }
         end,
         Row1 = fabric_view:transform_row(Row0),
-        {ok, NewAcc} = view_cb(Row1, Acc),
-        NewAcc
-    end, VAcc1, Keys).
+        view_cb(Row1, Acc)
+    end,
+    {ok, VAcc2} = fabric2_db:fold_docs(Db, Keys, CB, VAcc1, OpenOpts),
+    VAcc2.
 
 
 apply_args_to_keylist(Args, Keys0) ->

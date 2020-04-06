@@ -233,6 +233,26 @@ defmodule AllDocsTest do
   end
 
   @tag :with_db
+  test "POST with missing keys", context do
+    db_name = context[:db_name]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
+    assert resp.status_code in [201, 202]
+
+    resp = Couch.post(
+      "/#{db_name}/_all_docs",
+      body: %{
+        :keys => [1]
+      }
+    )
+
+    assert resp.status_code == 200
+    rows = resp.body["rows"]
+    assert length(rows) == 1
+    assert hd(rows) == %{"error" => "not_found", "key" => 1}
+  end
+
+  @tag :with_db
   test "POST with keys and limit", context do
     db_name = context[:db_name]
 
@@ -242,13 +262,17 @@ defmodule AllDocsTest do
     resp = Couch.post(
       "/#{db_name}/_all_docs",
       body: %{
-        :keys => [1, 2],
-        :limit => 1
+        :keys => ["1", "2"],
+        :limit => 1,
+        :include_docs => true
       }
     )
 
     assert resp.status_code == 200
-    assert length(Map.get(resp, :body)["rows"]) == 1
+    rows = resp.body["rows"]
+    assert length(rows) == 1
+    doc = hd(rows)["doc"]
+    assert doc["string"] == "1"
   end
 
   @tag :with_db
