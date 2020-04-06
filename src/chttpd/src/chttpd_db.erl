@@ -1963,7 +1963,7 @@ extract_header_rev(Req, ExplicitRev) ->
     end.
 
 validate_security_can_be_edited(DbName) ->
-    UserDbName = config:get("chttpd_auth", "authentication_db", "_users"),
+    UserDbName = ?l2b(config:get("chttpd_auth", "authentication_db", "_users")),
     CanEditUserSecurityObject = config:get("couchdb","users_db_security_editable","false"),
     case {DbName,CanEditUserSecurityObject} of
         {UserDbName,"false"} ->
