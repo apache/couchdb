@@ -934,7 +934,16 @@ fold_docs(Db, UserFun, UserAcc0, Options) ->
 
             UserAcc1 = maybe_stop(UserFun({meta, Meta}, UserAcc0)),
 
-            UserAcc2 = fabric2_fdb:fold_range(TxDb, Prefix, fun({K, V}, Acc) ->
+            FoldState0 = #{
+                winning_revs => [],
+                bodies => [],
+                user_acc => UserAcc1,
+                user_fun => UserFun
+            },
+
+            IncludeDocs = fabric2_util:get_value(include_docs, Options, false),
+
+            FoldState1 = fabric2_fdb:fold_range(TxDb, Prefix, fun({K, V}, FoldState) ->
                 {DocId} = erlfdb_tuple:unpack(K, Prefix),
                 RevId = erlfdb_tuple:unpack(V),
                 Row0 =  [
@@ -946,21 +955,107 @@ fold_docs(Db, UserFun, UserAcc0, Options) ->
                 DocOpts = couch_util:get_value(doc_opts, Options, []),
                 OpenOpts = [deleted | DocOpts],
 
-                Row1 = case lists:keyfind(include_docs, 1, Options) of
-                    {include_docs, true} ->
-                        Row0 ++ open_json_doc(Db, DocId, OpenOpts, DocOpts);
-                    _ ->
-                        Row0
-                end,
+                case IncludeDocs of
+                    true ->
+%%                        Row0 ++ open_json_doc(Db, DocId, OpenOpts, DocOpts);
+                        async_fetch_and_stream_docs(Db, Row0, FoldState);
+                    false ->
+                        Acc = maps:get(user_acc, FoldState),
+                        Acc1 = maybe_stop(UserFun({row, Row0}, Acc)),
+                        FoldState#{user_acc := Acc1}
+                end
 
-                maybe_stop(UserFun({row, Row1}, Acc))
-            end, UserAcc1, Options),
+            end, FoldState0, Options),
+
+
+            FoldState2 = if IncludeDocs == false -> FoldState1; true ->
+                async_wait_on_docs(Db, FoldState1)
+            end,
+
+            UserAcc2 = maps:get(user_acc, FoldState2),
 
             {ok, maybe_stop(UserFun(complete, UserAcc2))}
         catch throw:{stop, FinalUserAcc} ->
             {ok, FinalUserAcc}
         end
     end).
+
+
+async_wait_on_docs(Db, State0) ->
+    #{
+        winning_revs := RevFutures,
+        bodies := BodyFutures0
+    } = State0,
+
+    NewBodyFutures = lists:foreach(fun ({_Row, RevFuture} = RowInfo) ->
+        ok = erlfdb:wait(RevFuture),
+        get_doc_future_from_rev(Db, RowInfo)
+    end, RevFutures),
+
+    BodyFutures1 = BodyFutures0 ++ NewBodyFutures,
+
+    lists:foreach(fun ({_Row, _RevInfo, BodyFuture}) ->
+        ok = erlfdb:wait(BodyFuture)
+    end, BodyFutures1),
+
+    async_doc_bodies(Db, BodyFutures1, State0).
+
+
+async_fetch_and_stream_docs(Db, Row0, State) ->
+    Id0 = fabric2_util:get_value(id, Row0),
+    RevFuture0 = fabric2_fdb:get_winning_revs_future(Db, Id0, 1),
+    RevFutures = maps:get(winning_revs, State) ++ [{Row0, RevFuture0}],
+    DocBodyFutures = maps:get(bodies, State),
+
+    {WinningRevFutures1, NewBodyFutures} =
+            lists:foldl(fun ({Row, RevFuture}, {NewRevs, NewBodies}) ->
+        case erlfdb:is_ready(RevFuture) of
+            true ->
+                DocFuture = get_doc_future_from_rev(Db, Row),
+                {NewRevs, NewBodies ++ DocFuture};
+            false ->
+                {NewRevs ++ {Row, RevFuture}, NewBodies}
+        end
+    end, {[], []}, RevFutures),
+
+    DocBodyFutures2 = async_doc_bodies(Db, DocBodyFutures ++ NewBodyFutures, State),
+    State#{
+        winning_revs => WinningRevFutures1,
+        bodies => DocBodyFutures2
+    }.
+
+
+get_doc_future_from_rev(Db, {Row, RevFuture}) ->
+    Id = fabric2_util:get_value(id, Row),
+    Revs = fabric2_fdb:get_winning_revs_wait(Db, RevFuture),
+    #{winner := true} = RevInfo = lists:last(Revs),
+    BodyFuture = fabric2_fdb:get_doc_body_future(Db, Id, RevInfo),
+    {Row, RevInfo, BodyFuture}.
+
+
+async_doc_bodies(Db, [{Row0, RevInfo, BodyFuture} = RowInfo | Rest], State) ->
+    #{
+        user_acc := UserAcc0,
+        user_fun := UserFun
+    } = State,
+    Id = fabric2_util:get_value(id, Row0),
+    case erlfdb:is_ready(BodyFuture) of
+        true ->
+            UserAcc1 = case fabric2_fdb:get_doc_body_wait(Db, Id, RevInfo, BodyFuture) of
+                #doc{deleted = true} ->
+                    UserAcc0;
+                Doc ->
+                    Row1 = Row0 ++ [{doc, couch_doc:to_json_obj(Doc, [])}],
+                    maybe_stop(UserFun({row, Row1}, UserAcc0))
+            end,
+
+            State1 = State#{
+                user_acc := UserAcc1
+            },
+            async_doc_bodies(Db, Rest, State1);
+        false ->
+           RowInfo ++ Rest
+    end.
 
 
 fold_design_docs(Db, UserFun, UserAcc0, Options1) ->
