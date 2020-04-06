@@ -831,7 +831,9 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
         (#mrargs{keys = undefined} = Args, Acc0) ->
             send_all_docs(Db, Args, Acc0);
         (#mrargs{keys = Keys} = Args, Acc0) when is_list(Keys) ->
-            send_all_docs_keys(Db, Args, Acc0)
+            Acc1 = send_all_docs_keys(Db, Args, Acc0),
+            {ok, Acc2} = view_cb(complete, Acc1),
+            Acc2
     end, VAcc0, ArgQueries),
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc1#vacc.resp, "\r\n]}"),
     chttpd:end_delayed_json_response(Resp1).
