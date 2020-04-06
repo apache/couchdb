@@ -212,6 +212,8 @@ is_db(_) ->
 is_system_db(#db{options = Options}) ->
     lists:member(sys_db, Options).
 
+is_clustered(#{}) ->
+    true;
 is_clustered(#db{main_pid = nil}) ->
     true;
 is_clustered(#db{}) ->

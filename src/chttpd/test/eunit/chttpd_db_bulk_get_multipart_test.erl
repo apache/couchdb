@@ -39,7 +39,7 @@ setup() ->
         couch_epi,
         couch_httpd,
         couch_stats,
-        fabric,
+        fabric2_db,
         mochireq
     ]),
     spawn_accumulator().
@@ -78,13 +78,13 @@ bulk_get_test_() ->
 
 should_require_docs_field(_) ->
     Req = fake_request({[{}]}),
-    Db  = test_util:fake_db([{name, <<"foo">>}]),
+    Db  = #{name => <<"foo">>},
     ?_assertThrow({bad_request, _}, chttpd_db:db_req(Req, Db)).
 
 
 should_not_accept_specific_query_params(_) ->
     Req = fake_request({[{<<"docs">>, []}]}),
-    Db  = test_util:fake_db([{name, <<"foo">>}]),
+    Db  = #{name => <<"foo">>},
     lists:map(fun (Param) ->
         {Param, ?_assertThrow({bad_request, _}, begin
             BadReq = Req#httpd{qs = [{Param, ""}]},
@@ -95,7 +95,7 @@ should_not_accept_specific_query_params(_) ->
 
 should_return_empty_results_on_no_docs(Pid) ->
     Req = fake_request({[{<<"docs">>, []}]}),
-    Db  = test_util:fake_db([{name, <<"foo">>}]),
+    Db  = #{name => <<"foo">>},
     chttpd_db:db_req(Req, Db),
     Results = get_results_from_response(Pid),
     ?_assertEqual([], Results).
@@ -104,7 +104,7 @@ should_return_empty_results_on_no_docs(Pid) ->
 should_get_doc_with_all_revs(Pid) ->
     DocId = <<"docudoc">>,
     Req = fake_request(DocId),
-    Db  = test_util:fake_db([{name, <<"foo">>}]),
+    Db  = #{name => <<"foo">>},
 
     DocRevA = #doc{id = DocId, body = {[{<<"_rev">>, <<"1-ABC">>}]}},
     DocRevB = #doc{id = DocId, body = {[{<<"_rev">>, <<"1-CDE">>}]}},
@@ -120,7 +120,7 @@ should_validate_doc_with_bad_id(Pid) ->
     DocId = <<"_docudoc">>,
 
     Req = fake_request(DocId),
-    Db  = test_util:fake_db([{name, <<"foo">>}]),
+    Db  = #{name => <<"foo">>},
     chttpd_db:db_req(Req, Db),
 
     Result = get_results_from_response(Pid),
@@ -137,7 +137,7 @@ should_validate_doc_with_bad_rev(Pid) ->
     Rev = <<"revorev">>,
 
     Req = fake_request(DocId, Rev),
-    Db  = test_util:fake_db([{name, <<"foo">>}]),
+    Db  = #{name => <<"foo">>},
     chttpd_db:db_req(Req, Db),
 
     Result = get_results_from_response(Pid),
@@ -154,7 +154,7 @@ should_validate_missing_doc(Pid) ->
     Rev = <<"1-revorev">>,
 
     Req = fake_request(DocId, Rev),
-    Db  = test_util:fake_db([{name, <<"foo">>}]),
+    Db  = #{name => <<"foo">>},
     mock_open_revs([{1,<<"revorev">>}], {ok, []}),
     chttpd_db:db_req(Req, Db),
 
@@ -172,7 +172,7 @@ should_validate_bad_atts_since(Pid) ->
     Rev = <<"1-revorev">>,
 
     Req = fake_request(DocId, Rev, <<"badattsince">>),
-    Db  = test_util:fake_db([{name, <<"foo">>}]),
+    Db  = #{name => <<"foo">>},
     mock_open_revs([{1,<<"revorev">>}], {ok, []}),
     chttpd_db:db_req(Req, Db),
 
@@ -190,14 +190,13 @@ should_include_attachments_when_atts_since_specified(_) ->
     Rev = <<"1-revorev">>,
 
     Req = fake_request(DocId, Rev, [<<"1-abc">>]),
-    Db  = test_util:fake_db([{name, <<"foo">>}]),
+    Db  = #{name => <<"foo">>},
     mock_open_revs([{1,<<"revorev">>}], {ok, []}),
     chttpd_db:db_req(Req, Db),
 
-    ?_assert(meck:called(fabric, open_revs,
-                         ['_', DocId, [{1, <<"revorev">>}],
-                         [{atts_since, [{1, <<"abc">>}]}, attachments,
-                          {user_ctx, undefined}]])).
+    Options = [{atts_since, [{1, <<"abc">>}]}, attachments],
+    ?_assert(meck:called(fabric2_db, open_doc_revs, ['_', DocId,
+        [{1, <<"revorev">>}], Options])).
 
 %% helpers
 
@@ -217,7 +216,7 @@ fake_request(DocId, Rev, AttsSince) ->
 
 
 mock_open_revs(RevsReq0, RevsResp) ->
-    ok = meck:expect(fabric, open_revs,
+    ok = meck:expect(fabric2_db, open_doc_revs,
                      fun(_, _, RevsReq1, _) ->
                          ?assertEqual(RevsReq0, RevsReq1),
                          RevsResp
@@ -259,7 +258,7 @@ mock(couch_stats) ->
     ok = meck:expect(couch_stats, update_gauge, fun(_, _) -> ok end),
     ok;
 mock(fabric) ->
-    ok = meck:new(fabric, [passthrough]),
+    ok = meck:new(fabric2_db, [passthrough]),
     ok;
 mock(config) ->
     ok = meck:new(config, [passthrough]),

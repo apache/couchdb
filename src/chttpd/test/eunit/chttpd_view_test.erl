@@ -99,7 +99,7 @@ should_succeed_on_view_with_queries_limit_skip(Url) ->
         {ResultJson} = ?JSON_DECODE(RespBody),
         ResultJsonBody = couch_util:get_value(<<"results">>, ResultJson),
         {InnerJson} = lists:nth(1, ResultJsonBody),
-        ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson)),
+        ?assertEqual(null, couch_util:get_value(<<"offset">>, InnerJson)),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson)))
     end)}.
 
@@ -119,6 +119,6 @@ should_succeed_on_view_with_multiple_queries(Url) ->
         {InnerJson1} = lists:nth(1, ResultJsonBody),
         ?assertEqual(2, length(couch_util:get_value(<<"rows">>, InnerJson1))),
         {InnerJson2} = lists:nth(2, ResultJsonBody),
-        ?assertEqual(2, couch_util:get_value(<<"offset">>, InnerJson2)),
+        ?assertEqual(null, couch_util:get_value(<<"offset">>, InnerJson2)),
         ?assertEqual(5, length(couch_util:get_value(<<"rows">>, InnerJson2)))
     end)}.
