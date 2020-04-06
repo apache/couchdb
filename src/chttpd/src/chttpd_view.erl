@@ -136,7 +136,7 @@ check_multi_query_reduce_view_overrides_test_() ->
 t_check_include_docs_throw_validation_error() ->
     ?_test(begin
         Req = #httpd{qs = []},
-        Db = test_util:fake_db([{name, <<"foo">>}]),
+        Db = #{name => <<"foo">>},
         Query = {[{<<"include_docs">>, true}]},
         Throw = {query_parse_error, <<"`include_docs` is invalid for reduce">>},
         ?assertThrow(Throw, multi_query_view(Req, Db, ddoc, <<"v">>, [Query]))
@@ -146,7 +146,7 @@ t_check_include_docs_throw_validation_error() ->
 t_check_user_can_override_individual_query_type() ->
     ?_test(begin
         Req = #httpd{qs = []},
-        Db = test_util:fake_db([{name, <<"foo">>}]),
+        Db = #{name => <<"foo">>},
         Query = {[{<<"include_docs">>, true}, {<<"reduce">>, false}]},
         multi_query_view(Req, Db, ddoc, <<"v">>, [Query]),
         ?assertEqual(1, meck:num_calls(chttpd, start_delayed_json_response, '_'))
@@ -157,7 +157,7 @@ setup_all() ->
     Views = [#mrview{reduce_funs = [{<<"v">>, <<"_count">>}]}],
     meck:expect(couch_mrview_util, ddoc_to_mrst, 2, {ok, #mrst{views = Views}}),
     meck:expect(chttpd, start_delayed_json_response, 4, {ok, resp}),
-    meck:expect(fabric, query_view, 7, {ok, #vacc{}}),
+    meck:expect(couch_views, query, 6, {ok, #vacc{}}),
     meck:expect(chttpd, send_delayed_chunk, 2, {ok, resp}),
     meck:expect(chttpd, end_delayed_json_response, 1, ok).
 
@@ -169,8 +169,8 @@ teardown_all(_) ->
 setup() ->
     meck:reset([
         chttpd,
-        couch_mrview_util,
-        fabric
+        couch_views,
+        couch_mrview_util
     ]).
 
 

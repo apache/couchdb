@@ -99,7 +99,8 @@ should_get_doc_with_all_revs(Pid) ->
     DocRevB = #doc{id = DocId, body = {[{<<"_rev">>, <<"1-CDE">>}]}},
 
     mock_open_revs(all, {ok, [{ok, DocRevA}, {ok, DocRevB}]}),
-    chttpd_db:db_req(Req, test_util:fake_db([{name, <<"foo">>}])),
+    Db = #{name => <<"foo">>},
+    chttpd_db:db_req(Req, Db),
 
     [{Result}] = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
@@ -119,7 +120,8 @@ should_validate_doc_with_bad_id(Pid) ->
     DocId = <<"_docudoc">>,
 
     Req = fake_request(DocId),
-    chttpd_db:db_req(Req, test_util:fake_db([{name, <<"foo">>}])),
+    Db = #{name => <<"foo">>},
+    chttpd_db:db_req(Req, Db),
 
     [{Result}] = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
@@ -142,7 +144,8 @@ should_validate_doc_with_bad_rev(Pid) ->
     Rev = <<"revorev">>,
 
     Req = fake_request(DocId, Rev),
-    chttpd_db:db_req(Req, test_util:fake_db([{name, <<"foo">>}])),
+    Db = #{name => <<"foo">>},
+    chttpd_db:db_req(Req, Db),
 
     [{Result}] = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
@@ -166,7 +169,8 @@ should_validate_missing_doc(Pid) ->
 
     Req = fake_request(DocId, Rev),
     mock_open_revs([{1,<<"revorev">>}], {ok, []}),
-    chttpd_db:db_req(Req, test_util:fake_db([{name, <<"foo">>}])),
+    Db = #{name => <<"foo">>},
+    chttpd_db:db_req(Req, Db),
 
     [{Result}] = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
@@ -190,7 +194,8 @@ should_validate_bad_atts_since(Pid) ->
 
     Req = fake_request(DocId, Rev, <<"badattsince">>),
     mock_open_revs([{1,<<"revorev">>}], {ok, []}),
-    chttpd_db:db_req(Req, test_util:fake_db([{name, <<"foo">>}])),
+    Db = #{name => <<"foo">>},
+    chttpd_db:db_req(Req, Db),
 
     [{Result}] = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
@@ -214,12 +219,13 @@ should_include_attachments_when_atts_since_specified(_) ->
 
     Req = fake_request(DocId, Rev, [<<"1-abc">>]),
     mock_open_revs([{1,<<"revorev">>}], {ok, []}),
-    chttpd_db:db_req(Req, test_util:fake_db([{name, <<"foo">>}])),
+    Db = #{name => <<"foo">>},
+    chttpd_db:db_req(Req, Db),
 
-    ?_assert(meck:called(fabric, open_revs,
-                         ['_', DocId, [{1, <<"revorev">>}],
-                          [{atts_since, [{1, <<"abc">>}]}, attachments,
-                           {user_ctx, undefined}]])).
+    Options = [{atts_since, [{1, <<"abc">>}]}, attachments],
+    ?_assert(meck:called(fabric2_db, open_doc_revs, ['_', DocId,
+        [{1, <<"revorev">>}], Options])).
+
 
 %% helpers
 
@@ -239,7 +245,7 @@ fake_request(DocId, Rev, AttsSince) ->
 
 
 mock_open_revs(RevsReq0, RevsResp) ->
-    ok = meck:expect(fabric, open_revs,
+    ok = meck:expect(fabric2_db, open_doc_revs,
                      fun(_, _, RevsReq1, _) ->
                          ?assertEqual(RevsReq0, RevsReq1),
                          RevsResp
@@ -276,7 +282,7 @@ mock(couch_stats) ->
     ok = meck:expect(couch_stats, update_gauge, fun(_, _) -> ok end),
     ok;
 mock(fabric) ->
-    ok = meck:new(fabric, [passthrough]),
+    ok = meck:new(fabric2_db, [passthrough]),
     ok;
 mock(config) ->
     ok = meck:new(config, [passthrough]),
