@@ -252,21 +252,14 @@ maybe_flush_changes_feed(Acc0, Data, Len) ->
     },
     {ok, Acc}.
 
-handle_compact_req(#httpd{method='POST'}=Req, Db) ->
+
+% Return the same response as if a compaction succeeded even though _compaction
+% isn't a valid operation in CouchDB >= 4.x anymore. This is mostly to not
+% break existing user script which maybe periodically call this endpoint. In
+% the future this endpoint will return a 410 response then it will be removed.
+handle_compact_req(#httpd{method='POST'}=Req, _Db) ->
     chttpd:validate_ctype(Req, "application/json"),
-    case Req#httpd.path_parts of
-        [_DbName, <<"_compact">>] ->
-            ok = fabric:compact(Db),
-            send_json(Req, 202, {[{ok, true}]});
-        [DbName, <<"_compact">>, DesignName | _] ->
-            case ddoc_cache:open(DbName, <<"_design/", DesignName/binary>>) of
-                {ok, _DDoc} ->
-                    ok = fabric:compact(Db, DesignName),
-                    send_json(Req, 202, {[{ok, true}]});
-                Error ->
-                    throw(Error)
-            end
-    end;
+    send_json(Req, 202, {[{ok, true}]});
 
 handle_compact_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
