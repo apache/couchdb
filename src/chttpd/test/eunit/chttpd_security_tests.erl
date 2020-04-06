@@ -12,6 +12,9 @@
 
 -module(chttpd_security_tests).
 
+% Remove when purge is implemented
+-compile(nowarn_unused_function).
+
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
@@ -38,14 +41,13 @@ setup() ->
     ok = config:set("admins", ?USER, ?b2l(Hashed), Persist),
     UserDb = ?tempdb(),
     TmpDb = ?tempdb(),
-    ok = config:set("chttpd_auth", "authentication_db", ?b2l(UserDb), Persist),
-
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
     BaseUrl = lists:concat(["http://", Addr, ":", Port, "/"]),
-    Url = lists:concat([BaseUrl, ?b2l(TmpDb)]),
     UsersUrl = lists:concat([BaseUrl, ?b2l(UserDb)]),
     create_db(UsersUrl),
+    ok = config:set("chttpd_auth", "authentication_db", ?b2l(UserDb), Persist),
+    Url = lists:concat([BaseUrl, ?b2l(TmpDb)]),
     create_db(Url),
     create_design_doc(Url),
     create_user(UsersUrl,?TEST_MEMBER,?TEST_MEMBER_PASS,[<<?TEST_MEMBER>>]),
@@ -56,6 +58,7 @@ setup() ->
 teardown([Url,UsersUrl]) ->
     delete_db(Url),
     delete_db(UsersUrl),
+    ok = config:delete("chttpd_auth", "authentication_db", _Persist=false),
     ok = config:delete("admins", ?USER, _Persist=false).
 
 create_db(Url) ->
@@ -108,15 +111,21 @@ all_test_() ->
                     fun should_disallow_db_member_db_compaction/1,
                     fun should_allow_db_admin_db_compaction/1,
                     fun should_allow_admin_view_compaction/1,
-                    fun should_disallow_anonymous_view_compaction/1,
-                    fun should_allow_admin_db_view_cleanup/1,
-                    fun should_disallow_anonymous_db_view_cleanup/1,
-                    fun should_allow_admin_purge/1,
-                    fun should_disallow_anonymous_purge/1,
-                    fun should_disallow_db_member_purge/1,
-                    fun should_allow_admin_purged_infos_limit/1,
-                    fun should_disallow_anonymous_purged_infos_limit/1,
-                    fun should_disallow_db_member_purged_infos_limit/1
+                    fun should_disallow_anonymous_view_compaction/1
+
+                    % Re-enable when _view_cleanup is implemented
+                    %
+                    %fun should_allow_admin_db_view_cleanup/1,
+                    %fun should_disallow_anonymous_db_view_cleanup/1,
+
+                    % Re-enable when purge is implemented
+                    %
+                    %fun should_allow_admin_purge/1,
+                    %fun should_disallow_anonymous_purge/1,
+                    %fun should_disallow_db_member_purge/1,
+                    %fun should_allow_admin_purged_infos_limit/1,
+                    %fun should_disallow_anonymous_purged_infos_limit/1,
+                    %fun should_disallow_db_member_purged_infos_limit/1
                 ]
             }
         }
@@ -337,13 +346,11 @@ should_return_error_for_sec_obj_with_incorrect_roles_and_names(
     Body = jiffy:encode({SecurityProperties}),
     {ok, Status, _, RespBody} = test_request:put(SecurityUrl,
         [?CONTENT_JSON, ?AUTH], Body),
-    ResultJson = ?JSON_DECODE(RespBody),
+    ResultJson = couch_util:json_decode(RespBody, [return_maps]),
+    ExpectReason = <<"names must be a JSON list of strings">>,
     [
         ?_assertEqual(500, Status),
-        ?_assertEqual({[
-            {<<"error">>,<<"error">>},
-            {<<"reason">>,<<"no_majority">>}
-        ]}, ResultJson)
+        ?_assertMatch(#{<<"reason">> := ExpectReason}, ResultJson)
     ].
 
 should_return_error_for_sec_obj_with_incorrect_roles([Url,_UsersUrl]) ->
@@ -356,13 +363,11 @@ should_return_error_for_sec_obj_with_incorrect_roles([Url,_UsersUrl]) ->
     Body = jiffy:encode({SecurityProperties}),
     {ok, Status, _, RespBody} = test_request:put(SecurityUrl,
         [?CONTENT_JSON, ?AUTH], Body),
-    ResultJson = ?JSON_DECODE(RespBody),
+    ResultJson = couch_util:json_decode(RespBody, [return_maps]),
+    ExpectReason = <<"roles must be a JSON list of strings">>,
     [
         ?_assertEqual(500, Status),
-        ?_assertEqual({[
-            {<<"error">>,<<"error">>},
-            {<<"reason">>,<<"no_majority">>}
-        ]}, ResultJson)
+        ?_assertMatch(#{<<"reason">> := ExpectReason}, ResultJson)
     ].
 
 should_return_error_for_sec_obj_with_incorrect_names([Url,_UsersUrl]) ->
@@ -375,13 +380,11 @@ should_return_error_for_sec_obj_with_incorrect_names([Url,_UsersUrl]) ->
     Body = jiffy:encode({SecurityProperties}),
     {ok, Status, _, RespBody} = test_request:put(SecurityUrl,
         [?CONTENT_JSON, ?AUTH], Body),
-    ResultJson = ?JSON_DECODE(RespBody),
+    ResultJson = couch_util:json_decode(RespBody, [return_maps]),
+    ExpectReason = <<"names must be a JSON list of strings">>,
     [
         ?_assertEqual(500, Status),
-        ?_assertEqual({[
-            {<<"error">>,<<"error">>},
-            {<<"reason">>,<<"no_majority">>}
-        ]}, ResultJson)
+        ?_assertMatch(#{<<"reason">> := ExpectReason}, ResultJson)
     ].
 
 should_return_error_for_sec_obj_in_user_db([_,_UsersUrl]) ->
