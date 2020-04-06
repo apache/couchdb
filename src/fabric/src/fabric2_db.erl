@@ -110,6 +110,7 @@
 
     fold_docs/3,
     fold_docs/4,
+    fold_docs/5,
     fold_design_docs/4,
     fold_local_docs/4,
     fold_changes/4,
@@ -969,6 +970,61 @@ fold_docs(Db, UserFun, UserAcc0, Options) ->
     end).
 
 
+fold_docs(Db, DocIds, UserFun, UserAcc0, Options) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        try
+            NeedsTreeOpts = [revs_info, conflicts, deleted_conflicts],
+            NeedsTree = (Options -- NeedsTreeOpts /= Options),
+
+            FetchRevs = case NeedsTree of
+                true ->
+                    fun(DocId) ->
+                        fabric2_fdb:get_all_revs_future(TxDb, DocId)
+                    end;
+                false ->
+                    fun(DocId) ->
+                        fabric2_fdb:get_winning_revs_future(TxDb, DocId, 1)
+                    end
+            end,
+            InitAcc = #{
+                revs_q => queue:new(),
+                revs_count => 0,
+                body_q => queue:new(),
+                body_count => 0,
+                doc_opts => Options,
+                user_acc => UserAcc0,
+                user_fun => UserFun
+            },
+
+            FinalAcc1 = lists:foldl(fun(DocId, Acc) ->
+                #{
+                    revs_q := RevsQ,
+                    revs_count := RevsCount
+                } = Acc,
+                Future = FetchRevs(DocId),
+                NewAcc = Acc#{
+                    revs_q := queue:in({DocId, Future}, RevsQ),
+                    revs_count := RevsCount + 1
+                },
+                drain_fold_docs_revs_futures(TxDb, NewAcc)
+            end, InitAcc, DocIds),
+
+            FinalAcc2 = drain_all_fold_docs_revs_futures(TxDb, FinalAcc1),
+            FinalAcc3 = drain_all_fold_docs_body_futures(TxDb, FinalAcc2),
+
+            #{
+                user_acc := FinalUserAcc
+            } = FinalAcc3,
+            {ok, FinalUserAcc}
+
+        catch throw:{stop, StopUserAcc} ->
+            {ok, StopUserAcc}
+        end
+    end).
+
+
+
+
 fold_design_docs(Db, UserFun, UserAcc0, Options1) ->
     Options2 = set_design_doc_keys(Options1),
     fold_docs(Db, UserFun, UserAcc0, Options2).
@@ -1204,6 +1260,92 @@ drain_all_deleted_info_futures(FutureQ, UserFun, Acc) ->
         {empty, _} ->
             Acc
     end.
+
+
+drain_fold_docs_revs_futures(_TxDb, #{revs_count := C} = Acc) when C < 100 ->
+    Acc;
+drain_fold_docs_revs_futures(TxDb, Acc) ->
+    drain_one_fold_docs_revs_future(TxDb, Acc).
+
+
+drain_all_fold_docs_revs_futures(_TxDb, #{revs_count := C} = Acc) when C =< 0 ->
+    Acc;
+drain_all_fold_docs_revs_futures(TxDb, #{revs_count := C} = Acc) when C > 0 ->
+    NewAcc = drain_one_fold_docs_revs_future(TxDb, Acc),
+    drain_all_fold_docs_revs_futures(TxDb, NewAcc).
+
+
+drain_one_fold_docs_revs_future(TxDb, Acc) ->
+    #{
+        revs_q := RevsQ,
+        revs_count := RevsCount,
+        body_q := BodyQ,
+        body_count := BodyCount
+    } = Acc,
+    {{value, {DocId, RevsFuture}}, RestRevsQ} = queue:out(RevsQ),
+
+    Revs = fabric2_fdb:get_revs_wait(TxDb, RevsFuture),
+    DocFuture = case Revs of
+        [] ->
+            {DocId, [], not_found};
+        [_ | _] ->
+            Winner = get_rev_winner(Revs),
+            BodyFuture = fabric2_fdb:get_doc_body_future(TxDb, DocId, Winner),
+            {DocId, Revs, BodyFuture}
+    end,
+    NewAcc = Acc#{
+        revs_q := RestRevsQ,
+        revs_count := RevsCount - 1,
+        body_q := queue:in(DocFuture, BodyQ),
+        body_count := BodyCount + 1
+    },
+    drain_fold_docs_body_futures(TxDb, NewAcc).
+
+
+drain_fold_docs_body_futures(_TxDb, #{body_count := C} = Acc) when C < 100 ->
+    Acc;
+drain_fold_docs_body_futures(TxDb, Acc) ->
+    drain_one_fold_docs_body_future(TxDb, Acc).
+
+
+drain_all_fold_docs_body_futures(_TxDb, #{body_count := C} = Acc) when C =< 0 ->
+    Acc;
+drain_all_fold_docs_body_futures(TxDb, #{body_count := C} = Acc) when C > 0 ->
+    NewAcc = drain_one_fold_docs_body_future(TxDb, Acc),
+    drain_all_fold_docs_body_futures(TxDb, NewAcc).
+
+
+drain_one_fold_docs_body_future(TxDb, Acc) ->
+    #{
+        body_q := BodyQ,
+        body_count := BodyCount,
+        doc_opts := DocOpts,
+        user_fun := UserFun,
+        user_acc := UserAcc
+    } = Acc,
+    {{value, {DocId, Revs, BodyFuture}}, RestBodyQ} = queue:out(BodyQ),
+    Doc = case BodyFuture of
+        not_found ->
+            {not_found, missing};
+        _ ->
+            RevInfo = get_rev_winner(Revs),
+            Base = fabric2_fdb:get_doc_body_wait(TxDb, DocId, RevInfo,
+                BodyFuture),
+            apply_open_doc_opts(Base, Revs, DocOpts)
+    end,
+    NewUserAcc = maybe_stop(UserFun(DocId, Doc, UserAcc)),
+    Acc#{
+        body_q := RestBodyQ,
+        body_count := BodyCount - 1,
+        user_acc := NewUserAcc
+    }.
+
+
+get_rev_winner(Revs) ->
+    [Winner] = lists:filter(fun(Rev) ->
+        maps:get(winner, Rev)
+    end, Revs),
+    Winner.
 
 
 new_revid(Db, Doc) ->
