@@ -14,7 +14,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
--export([handle_view_req/3, handle_temp_view_req/2]).
+-export([handle_view_req/3]).
 
 multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Args0 = couch_mrview_http:parse_params(Req, undefined),
@@ -101,9 +101,6 @@ handle_view_req(#httpd{method='POST',
 handle_view_req(Req, _Db, _DDoc) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
-handle_temp_view_req(Req, _Db) ->
-    Msg = <<"Temporary views are not supported in CouchDB">>,
-    chttpd:send_error(Req, 410, gone, Msg).
 
 % See https://github.com/apache/couchdb/issues/2168
 assert_no_queries_param(undefined) ->
