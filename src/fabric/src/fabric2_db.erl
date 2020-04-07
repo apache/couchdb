@@ -17,6 +17,7 @@
     create/2,
     open/2,
     delete/2,
+    undelete/4,
 
     list_dbs/0,
     list_dbs/1,
@@ -25,6 +26,10 @@
     list_dbs_info/0,
     list_dbs_info/1,
     list_dbs_info/3,
+
+    list_deleted_dbs_info/0,
+    list_deleted_dbs_info/1,
+    list_deleted_dbs_info/3,
 
     check_is_admin/1,
     check_is_member/1,
@@ -202,12 +207,30 @@ delete(DbName, Options) ->
     % Delete doesn't check user_ctx, that's done at the HTTP API level
     % here we just care to get the `database_does_not_exist` error thrown
     Options1 = lists:keystore(user_ctx, 1, Options, ?ADMIN_CTX),
-    {ok, Db} = open(DbName, Options1),
-    Resp = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:delete(TxDb)
-    end),
-    if Resp /= ok -> Resp; true ->
-        fabric2_server:remove(DbName)
+    case lists:keyfind(deleted_at, 1, Options1) of
+        {deleted_at, TimeStamp} ->
+            fabric2_fdb:transactional(DbName, Options1, fun(TxDb) ->
+                fabric2_fdb:remove_deleted_db(TxDb, TimeStamp)
+            end);
+        false ->
+            {ok, Db} = open(DbName, Options1),
+            Resp = fabric2_fdb:transactional(Db, fun(TxDb) ->
+                fabric2_fdb:delete(TxDb)
+            end),
+            if Resp /= ok -> Resp; true ->
+                fabric2_server:remove(DbName)
+            end
+    end.
+
+
+undelete(DbName, TgtDbName, TimeStamp, Options) ->
+    case validate_dbname(TgtDbName) of
+        ok ->
+            fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
+                fabric2_fdb:undelete(TxDb, TgtDbName, TimeStamp)
+            end);
+        Error ->
+            Error
     end.
 
 
@@ -276,6 +299,87 @@ list_dbs_info(UserFun, UserAcc0, Options) ->
                     Options
                 ),
             UserAcc3 = drain_all_info_futures(FinalFutureQ, UserFun, UserAcc2),
+            {ok, maybe_stop(UserFun(complete, UserAcc3))}
+        catch throw:{stop, FinalUserAcc} ->
+            {ok, FinalUserAcc}
+        end
+    end).
+
+
+list_deleted_dbs_info() ->
+    list_deleted_dbs_info([]).
+
+
+list_deleted_dbs_info(Options) ->
+    Callback = fun(Value, Acc) ->
+        NewAcc = case Value of
+            {meta, _} -> Acc;
+            {row, DbInfo} -> [DbInfo | Acc];
+            complete -> Acc
+        end,
+        {ok, NewAcc}
+    end,
+    {ok, DbInfos} = list_deleted_dbs_info(Callback, [], Options),
+    {ok, lists:reverse(DbInfos)}.
+
+
+list_deleted_dbs_info(UserFun, UserAcc0, Options0) ->
+    Dir = fabric2_util:get_value(dir, Options0, fwd),
+    StartKey0 = fabric2_util:get_value(start_key, Options0),
+    EndKey0 = fabric2_util:get_value(end_key, Options0),
+
+    {FirstBinary, LastBinary} = case Dir of
+        fwd -> {<<>>, <<255>>};
+        rev -> {<<255>>, <<>>}
+    end,
+
+    StartKey1 = case StartKey0 of
+        undefined ->
+            {FirstBinary};
+        DbName0 when is_binary(DbName0) ->
+            {DbName0, FirstBinary};
+        [DbName0, TimeStamp0] when is_binary(DbName0), is_binary(TimeStamp0) ->
+            {DbName0, TimeStamp0};
+        BadStartKey ->
+            erlang:error({invalid_start_key, BadStartKey})
+    end,
+    EndKey1 = case EndKey0 of
+        undefined ->
+            {LastBinary};
+        DbName1 when is_binary(DbName1) ->
+            {DbName1, LastBinary};
+        [DbName1, TimeStamp1] when is_binary(DbName1), is_binary(TimeStamp1) ->
+            {DbName1, TimeStamp1};
+        BadEndKey ->
+            erlang:error({invalid_end_key, BadEndKey})
+    end,
+
+    Options1 = Options0 -- [{start_key, StartKey0}, {end_key, EndKey0}],
+    Options2 = [
+        {start_key, StartKey1},
+        {end_key, EndKey1},
+        {wrap_keys, false}
+    ] ++ Options1,
+
+    FoldFun = fun(DbName, TimeStamp, InfoFuture, {FutureQ, Count, Acc}) ->
+        NewFutureQ = queue:in({DbName, TimeStamp, InfoFuture}, FutureQ),
+        drain_deleted_info_futures(NewFutureQ, Count + 1, UserFun, Acc)
+    end,
+    fabric2_fdb:transactional(fun(Tx) ->
+        try
+            UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
+            InitAcc = {queue:new(), 0, UserAcc1},
+            {FinalFutureQ, _, UserAcc2} = fabric2_fdb:list_deleted_dbs_info(
+                    Tx,
+                    FoldFun,
+                    InitAcc,
+                    Options2
+                ),
+            UserAcc3 = drain_all_deleted_info_futures(
+                    FinalFutureQ,
+                    UserFun,
+                    UserAcc2
+                ),
             {ok, maybe_stop(UserFun(complete, UserAcc3))}
         catch throw:{stop, FinalUserAcc} ->
             {ok, FinalUserAcc}
@@ -1059,6 +1163,37 @@ drain_all_info_futures(FutureQ, UserFun, Acc) ->
             DbInfo = make_db_info(DbName, InfoProps),
             NewAcc = maybe_stop(UserFun({row, DbInfo}, Acc)),
             drain_all_info_futures(RestQ, UserFun, NewAcc);
+        {empty, _} ->
+            Acc
+    end.
+
+
+drain_deleted_info_futures(FutureQ, Count, _UserFun, Acc) when Count < 100 ->
+    {FutureQ, Count, Acc};
+
+drain_deleted_info_futures(FutureQ, Count, UserFun, Acc) when Count >= 100 ->
+    {{value, {DbName, TimeStamp, Future}}, RestQ} = queue:out(FutureQ),
+    BaseProps = fabric2_fdb:get_info_wait(Future),
+    DeletedProps = BaseProps ++ [
+        {deleted, true},
+        {timestamp, TimeStamp}
+    ],
+    DbInfo = make_db_info(DbName, DeletedProps),
+    NewAcc = maybe_stop(UserFun({row, DbInfo}, Acc)),
+    {RestQ, Count - 1, NewAcc}.
+
+
+drain_all_deleted_info_futures(FutureQ, UserFun, Acc) ->
+    case queue:out(FutureQ) of
+        {{value, {DbName, TimeStamp, Future}}, RestQ} ->
+            BaseProps = fabric2_fdb:get_info_wait(Future),
+            DeletedProps = BaseProps ++ [
+                {deleted, true},
+                {timestamp, TimeStamp}
+            ],
+            DbInfo = make_db_info(DbName, DeletedProps),
+            NewAcc = maybe_stop(UserFun({row, DbInfo}, Acc)),
+            drain_all_deleted_info_futures(RestQ, UserFun, NewAcc);
         {empty, _} ->
             Acc
     end.

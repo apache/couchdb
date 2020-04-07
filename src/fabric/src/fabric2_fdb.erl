@@ -22,12 +22,15 @@
     open/2,
     ensure_current/1,
     delete/1,
+    undelete/3,
+    remove_deleted_db/2,
     exists/1,
 
     get_dir/1,
 
     list_dbs/4,
     list_dbs_info/4,
+    list_deleted_dbs_info/4,
 
     get_info/1,
     get_info_future/2,
@@ -340,18 +343,70 @@ reopen(#{} = OldDb) ->
 
 
 delete(#{} = Db) ->
+    DoRecovery = fabric2_util:do_recovery(),
+    case DoRecovery of
+        true -> soft_delete_db(Db);
+        false -> hard_delete_db(Db)
+    end.
+
+
+undelete(#{} = Db0, TgtDbName, TimeStamp) ->
     #{
         name := DbName,
         tx := Tx,
-        layer_prefix := LayerPrefix,
-        db_prefix := DbPrefix
-    } = ensure_current(Db),
+        layer_prefix := LayerPrefix
+    } = ensure_current(Db0, false),
+    DbKey = erlfdb_tuple:pack({?ALL_DBS, TgtDbName}, LayerPrefix),
+    case erlfdb:wait(erlfdb:get(Tx, DbKey)) of
+        Bin when is_binary(Bin) ->
+            file_exists;
+        not_found ->
+            DeletedDbTupleKey = {
+                ?DELETED_DBS,
+                DbName,
+                TimeStamp
+            },
+            DeleteDbKey = erlfdb_tuple:pack(DeletedDbTupleKey, LayerPrefix),
+            case erlfdb:wait(erlfdb:get(Tx, DeleteDbKey)) of
+                not_found ->
+                    not_found;
+                DbPrefix ->
+                    erlfdb:set(Tx, DbKey, DbPrefix),
+                    erlfdb:clear(Tx, DeleteDbKey),
+                    bump_db_version(#{
+                        tx => Tx,
+                        db_prefix => DbPrefix
+                    }),
+                    ok
+            end
+    end.
 
-    DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
-    erlfdb:clear(Tx, DbKey),
-    erlfdb:clear_range_startswith(Tx, DbPrefix),
-    bump_metadata_version(Tx),
-    ok.
+
+remove_deleted_db(#{} = Db0, TimeStamp) ->
+    #{
+        name := DbName,
+        tx := Tx,
+        layer_prefix := LayerPrefix
+    } = ensure_current(Db0, false),
+
+    DeletedDbTupleKey = {
+        ?DELETED_DBS,
+        DbName,
+        TimeStamp
+    },
+    DeletedDbKey = erlfdb_tuple:pack(DeletedDbTupleKey, LayerPrefix),
+    case erlfdb:wait(erlfdb:get(Tx, DeletedDbKey)) of
+        not_found ->
+            not_found;
+        DbPrefix ->
+            erlfdb:clear(Tx, DeletedDbKey),
+            erlfdb:clear_range_startswith(Tx, DbPrefix),
+            bump_db_version(#{
+                tx => Tx,
+                db_prefix => DbPrefix
+            }),
+            ok
+    end.
 
 
 exists(#{name := DbName} = Db) when is_binary(DbName) ->
@@ -398,6 +453,20 @@ list_dbs_info(Tx, Callback, AccIn, Options0) ->
         {DbName} = erlfdb_tuple:unpack(DbNameKey, Prefix),
         InfoFuture = get_info_future(Tx, DbPrefix),
         Callback(DbName, InfoFuture, Acc)
+    end, AccIn, Options).
+
+
+list_deleted_dbs_info(Tx, Callback, AccIn, Options0) ->
+    Options = case fabric2_util:get_value(restart_tx, Options0) of
+        undefined -> [{restart_tx, true} | Options0];
+        _AlreadySet -> Options0
+    end,
+    LayerPrefix = get_dir(Tx),
+    Prefix = erlfdb_tuple:pack({?DELETED_DBS}, LayerPrefix),
+    fold_range({tx, Tx}, Prefix, fun({DbKey, DbPrefix}, Acc) ->
+        {DbName, TimeStamp} = erlfdb_tuple:unpack(DbKey, Prefix),
+        InfoFuture = get_info_future(Tx, DbPrefix),
+        Callback(DbName, TimeStamp, InfoFuture, Acc)
     end, AccIn, Options).
 
 
@@ -1186,6 +1255,45 @@ check_db_version(#{} = Db, CheckDbVersion) ->
     end.
 
 
+soft_delete_db(Db) ->
+    #{
+        name := DbName,
+        tx := Tx,
+        layer_prefix := LayerPrefix,
+        db_prefix := DbPrefix
+    } = ensure_current(Db),
+
+    DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
+    Timestamp = list_to_binary(fabric2_util:iso8601_timestamp()),
+    DeletedDbKeyTuple = {?DELETED_DBS, DbName, Timestamp},
+    DeletedDbKey = erlfdb_tuple:pack(DeletedDbKeyTuple, LayerPrefix),
+    case erlfdb:wait(erlfdb:get(Tx, DeletedDbKey)) of
+        not_found ->
+            erlfdb:set(Tx, DeletedDbKey, DbPrefix),
+            erlfdb:clear(Tx, DbKey),
+            bump_db_version(Db),
+            ok;
+        _Val ->
+            {deletion_frequency_exceeded, DbName}
+    end.
+
+
+hard_delete_db(Db) ->
+    #{
+        name := DbName,
+        tx := Tx,
+        layer_prefix := LayerPrefix,
+        db_prefix := DbPrefix
+    } = ensure_current(Db),
+
+    DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
+
+    erlfdb:clear(Tx, DbKey),
+    erlfdb:clear_range_startswith(Tx, DbPrefix),
+    bump_metadata_version(Tx),
+    ok.
+
+
 write_doc_body(#{} = Db0, #doc{} = Doc) ->
     #{
         tx := Tx
@@ -1514,6 +1622,7 @@ get_fold_acc(Db, RangePrefix, UserCallback, UserAcc, Options)
     EndKeyGt = fabric2_util:get_value(end_key_gt, Options),
     EndKey0 = fabric2_util:get_value(end_key, Options, EndKeyGt),
     InclusiveEnd = EndKeyGt == undefined,
+    WrapKeys = fabric2_util:get_value(wrap_keys, Options) /= false,
 
     % CouchDB swaps the key meanings based on the direction
     % of the fold. FoundationDB does not so we have to
@@ -1527,6 +1636,8 @@ get_fold_acc(Db, RangePrefix, UserCallback, UserAcc, Options)
     StartKey2 = case StartKey1 of
         undefined ->
             <<RangePrefix/binary, 16#00>>;
+        SK2 when not WrapKeys ->
+            erlfdb_tuple:pack(SK2, RangePrefix);
         SK2 ->
             erlfdb_tuple:pack({SK2}, RangePrefix)
     end,
@@ -1534,9 +1645,14 @@ get_fold_acc(Db, RangePrefix, UserCallback, UserAcc, Options)
     EndKey2 = case EndKey1 of
         undefined ->
             <<RangePrefix/binary, 16#FF>>;
+        EK2 when Reverse andalso not WrapKeys ->
+            PackedEK = erlfdb_tuple:pack(EK2, RangePrefix),
+            <<PackedEK/binary, 16#FF>>;
         EK2 when Reverse ->
             PackedEK = erlfdb_tuple:pack({EK2}, RangePrefix),
             <<PackedEK/binary, 16#FF>>;
+        EK2 when not WrapKeys ->
+            erlfdb_tuple:pack(EK2, RangePrefix);
         EK2 ->
             erlfdb_tuple:pack({EK2}, RangePrefix)
     end,

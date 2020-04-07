@@ -40,6 +40,9 @@
     encode_all_doc_key/1,
     all_docs_view_opts/1,
 
+    iso8601_timestamp/0,
+    do_recovery/0,
+
     pmap/2,
     pmap/3
 ]).
@@ -335,6 +338,19 @@ all_docs_view_opts(#mrargs{} = Args) ->
         {include_docs, Args#mrargs.include_docs},
         {doc_opts, DocOpts}
     ] ++ StartKeyOpts ++ EndKeyOpts.
+
+
+iso8601_timestamp() ->
+    Now = os:timestamp(),
+    {{Year, Month, Date}, {Hour, Minute, Second}} =
+        calendar:now_to_datetime(Now),
+    Format = "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
+    io_lib:format(Format, [Year, Month, Date, Hour, Minute, Second]).
+
+
+do_recovery() ->
+    config:get_boolean("couchdb",
+        "enable_database_recovery", false).
 
 
 pmap(Fun, Args) ->
