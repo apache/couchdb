@@ -28,6 +28,7 @@ url_handler(<<>>)                  -> fun chttpd_misc:handle_welcome_req/1;
 url_handler(<<"favicon.ico">>)     -> fun chttpd_misc:handle_favicon_req/1;
 url_handler(<<"_utils">>)          -> fun chttpd_misc:handle_utils_dir_req/1;
 url_handler(<<"_all_dbs">>)        -> fun chttpd_misc:handle_all_dbs_req/1;
+url_handler(<<"_deleted_dbs">>)    -> fun chttpd_misc:handle_deleted_dbs_req/1;
 url_handler(<<"_dbs_info">>)       -> fun chttpd_misc:handle_dbs_info_req/1;
 url_handler(<<"_active_tasks">>)   -> fun chttpd_misc:handle_task_status_req/1;
 url_handler(<<"_scheduler">>)      -> fun couch_replicator_httpd:handle_scheduler_req/1;
@@ -66,6 +67,15 @@ handler_info('GET', [<<"_active_tasks">>], _) ->
 
 handler_info('GET', [<<"_all_dbs">>], _) ->
     {'all_dbs.read', #{}};
+
+handler_info('GET', [<<"_deleted_dbs">>], _) ->
+    {'account-deleted-dbs.read', #{}};
+
+handler_info('POST', [<<"_deleted_dbs">>], _) ->
+    {'account-deleted-dbs.undelete', #{}};
+
+handler_info('DELETE', [<<"_deleted_dbs">>, Db], _) ->
+    {'account-deleted-dbs.delete', #{'db.name' => Db}};
 
 handler_info('POST', [<<"_dbs_info">>], _) ->
     {'dbs_info.read', #{}};
