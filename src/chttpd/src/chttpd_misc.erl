@@ -15,6 +15,7 @@
 -export([
     handle_all_dbs_req/1,
     handle_dbs_info_req/1,
+    handle_deleted_dbs_req/1,
     handle_favicon_req/1,
     handle_favicon_req/2,
     handle_replicate_req/1,
@@ -164,35 +165,7 @@ all_dbs_callback({error, Reason}, #vacc{resp=Resp0}=Acc) ->
 
 handle_dbs_info_req(#httpd{method = 'GET'} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
-
-    #mrargs{
-        start_key = StartKey,
-        end_key = EndKey,
-        direction = Dir,
-        limit = Limit,
-        skip = Skip
-    } = couch_mrview_http:parse_params(Req, undefined),
-
-    Options = [
-        {start_key, StartKey},
-        {end_key, EndKey},
-        {dir, Dir},
-        {limit, Limit},
-        {skip, Skip}
-    ],
-
-    % TODO: Figure out if we can't calculate a valid
-    % ETag for this request. \xFFmetadataVersion won't
-    % work as we don't bump versions on size changes
-
-    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, []),
-    Callback = fun dbs_info_callback/2,
-    Acc = #vacc{req = Req, resp = Resp},
-    {ok, Resp} = fabric2_db:list_dbs_info(Callback, Acc, Options),
-    case is_record(Resp, vacc) of
-        true -> {ok, Resp#vacc.resp};
-        _ -> {ok, Resp}
-    end;
+    send_db_infos(Req, list_dbs_info);
 handle_dbs_info_req(#httpd{method='POST', user_ctx=UserCtx}=Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = chttpd:json_body_obj(Req),
@@ -225,6 +198,92 @@ handle_dbs_info_req(#httpd{method='POST', user_ctx=UserCtx}=Req) ->
     chttpd:end_json_response(Resp);
 handle_dbs_info_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST").
+
+handle_deleted_dbs_req(#httpd{method='GET', path_parts=[_]}=Req) ->
+    ok = chttpd:verify_is_server_admin(Req),
+    send_db_infos(Req, list_deleted_dbs_info);
+handle_deleted_dbs_req(#httpd{method='POST', user_ctx=Ctx, path_parts=[_]}=Req) ->
+    couch_httpd:verify_is_server_admin(Req),
+    chttpd:validate_ctype(Req, "application/json"),
+    GetJSON = fun(Key, Props, Default) ->
+        case couch_util:get_value(Key, Props) of
+            undefined when Default == error ->
+                Fmt = "POST body must include `~s` parameter.",
+                Msg = io_lib:format(Fmt, [Key]),
+                throw({bad_request, iolist_to_binary(Msg)});
+            undefined ->
+                Default;
+            Value ->
+                Value
+        end
+    end,
+    {BodyProps} = chttpd:json_body_obj(Req),
+    {UndeleteProps} = GetJSON(<<"undelete">>, BodyProps, error),
+    DbName = GetJSON(<<"source">>, UndeleteProps, error),
+    TimeStamp = GetJSON(<<"timestamp">>, UndeleteProps, error),
+    TgtDbName = GetJSON(<<"target">>, UndeleteProps, DbName),
+    case fabric2_db:undelete(DbName, TgtDbName, TimeStamp, [{user_ctx, Ctx}]) of
+        ok ->
+            send_json(Req, 200, {[{ok, true}]});
+        {error, file_exists} ->
+            chttpd:send_error(Req, file_exists);
+        {error, not_found} ->
+            chttpd:send_error(Req, not_found);
+        Error ->
+            throw(Error)
+    end;
+handle_deleted_dbs_req(#httpd{path_parts = PP}=Req) when length(PP) == 1 ->
+    send_method_not_allowed(Req, "GET,HEAD,POST");
+handle_deleted_dbs_req(#httpd{method='DELETE', user_ctx=Ctx, path_parts=[_, DbName]}=Req) ->
+    couch_httpd:verify_is_server_admin(Req),
+    TS = case ?JSON_DECODE(couch_httpd:qs_value(Req, "timestamp", "null")) of
+        null ->
+            throw({bad_request, "`timestamp` parameter is not provided."});
+        TS0 ->
+            TS0
+    end,
+    case fabric2_db:delete(DbName, [{user_ctx, Ctx}, {deleted_at, TS}]) of
+        ok ->
+            send_json(Req, 200, {[{ok, true}]});
+        {error, not_found} ->
+            chttpd:send_error(Req, not_found);
+        Error ->
+            throw(Error)
+    end;
+handle_deleted_dbs_req(#httpd{path_parts = PP}=Req) when length(PP) == 2 ->
+    send_method_not_allowed(Req, "HEAD,DELETE");
+handle_deleted_dbs_req(Req) ->
+    chttpd:send_error(Req, not_found).
+
+send_db_infos(Req, ListFunctionName) ->
+    #mrargs{
+        start_key = StartKey,
+        end_key = EndKey,
+        direction = Dir,
+        limit = Limit,
+        skip = Skip
+    } = couch_mrview_http:parse_params(Req, undefined),
+
+    Options = [
+        {start_key, StartKey},
+        {end_key, EndKey},
+        {dir, Dir},
+        {limit, Limit},
+        {skip, Skip}
+    ],
+
+    % TODO: Figure out if we can't calculate a valid
+    % ETag for this request. \xFFmetadataVersion won't
+    % work as we don't bump versions on size changes
+
+    {ok, Resp1} = chttpd:start_delayed_json_response(Req, 200, []),
+    Callback = fun dbs_info_callback/2,
+    Acc = #vacc{req = Req, resp = Resp1},
+    {ok, Resp2} = fabric2_db:ListFunctionName(Callback, Acc, Options),
+    case is_record(Resp2, vacc) of
+        true -> {ok, Resp2#vacc.resp};
+        _ -> {ok, Resp2}
+    end.
 
 dbs_info_callback({meta, _Meta}, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
