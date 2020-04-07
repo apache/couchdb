@@ -33,7 +33,9 @@ providers() ->
     ].
 
 services() ->
-    [].
+    [
+        {mango, mango_plugin}
+    ].
 
 data_subscriptions() ->
     [].

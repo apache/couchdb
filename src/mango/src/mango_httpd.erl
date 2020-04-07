@@ -187,17 +187,18 @@ handle_explain_req(Req, _Db) ->
     chttpd:send_method_not_allowed(Req, "POST").
 
 
-handle_find_req(#httpd{method='POST'}=Req, Db) ->
-    chttpd:validate_ctype(Req, "application/json"),
-    Body = chttpd:json_body_obj(Req),
+handle_find_req(#httpd{method='POST'}=Req0, Db) ->
+    {ok, Req1} = mango_plugin:before_find(Req0),
+    chttpd:validate_ctype(Req1, "application/json"),
+    Body = chttpd:json_body_obj(Req1),
     {ok, Opts0} = mango_opts:validate_find(Body),
     {value, {selector, Sel}, Opts} = lists:keytake(selector, 1, Opts0),
-    {ok, Resp0} = start_find_resp(Req),
+    {ok, Resp0} = start_find_resp(Req1),
     case run_find(Resp0, Db, Sel, Opts) of
         {ok, AccOut} ->
-            end_find_resp(AccOut);
+            end_find_resp(Req1, AccOut);
         {error, Error} ->
-            chttpd:send_error(Req, Error)
+            chttpd:send_error(Req1, Error)
     end;
 
 
@@ -225,14 +226,15 @@ start_find_resp(Req) ->
     chttpd:start_delayed_json_response(Req, 200, [], "{\"docs\":[").
 
 
-end_find_resp(Acc0) ->
-    #vacc{resp=Resp00, buffer=Buf, kvs=KVs, threshold=Max} = Acc0,
+end_find_resp(Req, Acc0) ->
+    #vacc{resp=Resp00, buffer=Buf, kvs=KVs0, threshold=Max} = Acc0,
     {ok, Resp0} = chttpd:close_delayed_json_object(Resp00, Buf, "\r\n]", Max),
+    {ok, KVs1} = mango_plugin:after_find(Req, Resp0, KVs0),
     FinalAcc = lists:foldl(fun({K, V}, Acc) ->
         JK = ?JSON_ENCODE(K),
         JV = ?JSON_ENCODE(V),
         [JV, ": ", JK, ",\r\n" | Acc]
-    end, [], KVs),
+    end, [], KVs1),
     Chunk = lists:reverse(FinalAcc, ["}\r\n"]),
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
     chttpd:end_delayed_json_response(Resp1).
