@@ -357,6 +357,10 @@ catch_error(HttpReq, throw, Error) ->
     send_error(HttpReq, Error);
 catch_error(HttpReq, error, database_does_not_exist) ->
     send_error(HttpReq, database_does_not_exist);
+catch_error(HttpReq, error, decryption_failed) ->
+    send_error(HttpReq, decryption_failed);
+catch_error(HttpReq, error, not_ciphertext) ->
+    send_error(HttpReq, not_ciphertext);
 catch_error(HttpReq, Tag, Error) ->
     Stack = erlang:get_stacktrace(),
     % TODO improve logging and metrics collection for client disconnects
@@ -965,6 +969,10 @@ error_info(not_implemented) ->
 error_info(timeout) ->
     {500, <<"timeout">>, <<"The request could not be processed in a reasonable"
         " amount of time.">>};
+error_info(decryption_failed) ->
+    {500, <<"decryption_failed">>, <<"Decryption failed">>};
+error_info(not_ciphertext) ->
+    {500, <<"not_ciphertext">>, <<"Not Ciphertext">>};
 error_info({service_unavailable, Reason}) ->
     {503, <<"service unavailable">>, Reason};
 error_info({timeout, _Reason}) ->
