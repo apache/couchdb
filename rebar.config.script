@@ -114,6 +114,7 @@ os:putenv("COUCHDB_APPS_CONFIG_DIR", filename:join([COUCHDB_ROOT, "rel/apps"])).
 SubDirs = [
     %% must be compiled first as it has a custom behavior
     "src/couch_epi",
+    "src/aegis",
     "src/couch_log",
     "src/chttpd",
     "src/couch",

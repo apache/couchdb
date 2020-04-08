@@ -92,6 +92,15 @@ MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
         []
 end,
 
+AegisConfig = case lists:keyfind(crypto_module, 1, CouchConfig) of
+    {aegis_key_manager, ""} ->
+        [];
+    {aegis_key_manager, Module} ->
+        [{d, 'AEGIS_KEY_MANAGER', list_to_existing_atom(Module)}];
+    _ ->
+        []
+end,
+
 ProperConfig = case code:lib_dir(proper) of
     {error, bad_name} -> [];
     _ -> [{d, 'WITH_PROPER'}]
@@ -223,7 +232,7 @@ AddConfig = [
         {d, 'COUCHDB_VERSION', Version},
         {d, 'COUCHDB_GIT_SHA', GitSha},
         {i, "../"}
-    ] ++ MD5Config ++ ProperConfig},
+    ] ++ MD5Config ++ AegisConfig ++ ProperConfig},
     {port_env, PortEnvOverrides},
     {eunit_compile_opts, PlatformDefines}
 ].

@@ -96,6 +96,24 @@ parse_opts() {
                 continue
                 ;;
 
+            --key-manager)
+                if [ -n "$2" ]; then
+                    eval AEGIS_KEY_MANAGER=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--key-manager" requires a non-empty argument.\n' >&2
+                    exit 1
+                fi
+                ;;
+            --key-manager=?*)
+                eval AEGIS_KEY_MANAGER=${1#*=}
+                ;;
+            --key-manager=)
+                printf 'ERROR: "--key-manager" requires a non-empty argument.\n' >&2
+                exit 1
+                ;;
+
             --dev)
                 WITH_DOCS=0
                 WITH_FAUXTON=0
@@ -241,6 +259,7 @@ cat > $rootdir/config.erl << EOF
 {with_curl, $WITH_CURL}.
 {with_proper, $WITH_PROPER}.
 {erlang_md5, $ERLANG_MD5}.
+{aegis_key_manager, "$AEGIS_KEY_MANAGER"},
 {spidermonkey_version, "$SM_VSN"}.
 EOF
 

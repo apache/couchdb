@@ -158,7 +158,7 @@ fold_map_idx(TxDb, Sig, ViewId, Options, Callback, Acc0) ->
         callback => Callback,
         acc => Acc0
         },
-    Fun = fun fold_fwd/2,
+    Fun = aegis:wrap_fold_fun(TxDb, fun fold_fwd/2),
 
     #{
         acc := Acc1
@@ -283,7 +283,7 @@ update_id_idx(TxDb, Sig, ViewId, DocId, NewRows, KVSize) ->
 
     Key = id_idx_key(DbPrefix, Sig, DocId, ViewId),
     Val = couch_views_encoding:encode([length(NewRows), KVSize, Unique]),
-    ok = erlfdb:set(Tx, Key, Val).
+    ok = erlfdb:set(Tx, Key, aegis:encrypt(TxDb, Key, Val)).
 
 
 update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows) ->
@@ -303,7 +303,7 @@ update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows) ->
     lists:foreach(fun({DupeId, Key1, Key2, EV}) ->
         KK = map_idx_key(MapIdxPrefix, {Key1, DocId}, DupeId),
         Val = erlfdb_tuple:pack({Key2, EV}),
-        ok = erlfdb:set(Tx, KK, Val)
+        ok = erlfdb:set(Tx, KK, aegis:encrypt(TxDb, KK, Val))
     end, KVsToAdd).
 
 
@@ -318,7 +318,7 @@ get_view_keys(TxDb, Sig, DocId) ->
                 erlfdb_tuple:unpack(K, DbPrefix),
         [TotalKeys, TotalSize, UniqueKeys] = couch_views_encoding:decode(V),
         {ViewId, TotalKeys, TotalSize, UniqueKeys}
-    end, erlfdb:get_range(Tx, Start, End, [])).
+    end, aegis:decrypt(TxDb, erlfdb:get_range(Tx, Start, End, []))).
 
 
 update_row_count(TxDb, Sig, ViewId, Increment) ->

@@ -177,7 +177,7 @@ create(#{} = Db0, Options) ->
         name := DbName,
         tx := Tx,
         layer_prefix := LayerPrefix
-    } = Db = ensure_current(Db0, false),
+    } = Db1 = ensure_current(Db0, false),
 
     DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
     HCA = erlfdb_hca:create(erlfdb_tuple:pack({?DB_HCA}, LayerPrefix)),
@@ -220,7 +220,7 @@ create(#{} = Db0, Options) ->
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
     Options1 = lists:keydelete(user_ctx, 1, Options),
 
-    Db#{
+    Db2 = Db1#{
         uuid => UUID,
         db_prefix => DbPrefix,
         db_version => DbVersion,
@@ -235,7 +235,8 @@ create(#{} = Db0, Options) ->
         % All other db things as we add features,
 
         db_options => Options1
-    }.
+    },
+    aegis:create(Db2, Options).
 
 
 open(#{} = Db0, Options) ->
@@ -280,14 +281,15 @@ open(#{} = Db0, Options) ->
     },
 
     Db3 = load_config(Db2),
+    Db4 = aegis:open(Db3, Options),
 
-    case {UUID, Db3} of
+    case {UUID, Db4} of
         {undefined, _} -> ok;
         {<<_/binary>>, #{uuid := UUID}} -> ok;
         {<<_/binary>>, #{uuid := _}} -> erlang:error(database_does_not_exist)
     end,
 
-    load_validate_doc_funs(Db3).
+    load_validate_doc_funs(Db4).
 
 
 % Match on `name` in the function head since some non-fabric2 db
@@ -630,9 +632,10 @@ get_doc_body_wait(#{} = Db0, DocId, RevInfo, Future) ->
         rev_path := RevPath
     } = RevInfo,
 
-    RevBodyRows = erlfdb:fold_range_wait(Tx, Future, fun({_K, V}, Acc) ->
+    FoldFun = aegis:wrap_fold_fun(Db, fun({_K, V}, Acc) ->
         [V | Acc]
-    end, []),
+    end),
+    RevBodyRows = erlfdb:fold_range_wait(Tx, Future, FoldFun, []),
     BodyRows = lists:reverse(RevBodyRows),
 
     fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], BodyRows).
@@ -649,7 +652,7 @@ get_local_doc(#{} = Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
 
     Prefix = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, DocId}, DbPrefix),
     Future = erlfdb:get_range_startswith(Tx, Prefix),
-    Chunks = lists:map(fun({_K, V}) -> V end, erlfdb:wait(Future)),
+    {_, Chunks} = lists:unzip(aegis:decrypt(Db, erlfdb:wait(Future))),
 
     fdb_to_local_doc(Db, DocId, Rev, Chunks).
 
@@ -878,7 +881,9 @@ write_local_doc(#{} = Db0, Doc) ->
             % Make sure to clear the whole range, in case there was a larger
             % document body there before.
             erlfdb:clear_range_startswith(Tx, BPrefix),
-            lists:foreach(fun({K, V}) -> erlfdb:set(Tx, K, V) end, Rows)
+            lists:foreach(fun({K, V}) ->
+                erlfdb:set(Tx, K, aegis:encrypt(Db, K, V))
+            end, Rows)
     end,
 
     case {WasDeleted, Doc#doc.deleted} of
@@ -906,8 +911,8 @@ read_attachment(#{} = Db, DocId, AttId) ->
         not_found ->
             throw({not_found, missing});
         KVs ->
-            Vs = [V || {_K, V} <- KVs],
-            iolist_to_binary(Vs)
+            {_, Chunks} = lists:unzip(aegis:decrypt(Db, KVs)),
+            iolist_to_binary(Chunks)
     end.
 
 
@@ -925,7 +930,7 @@ write_attachment(#{} = Db, DocId, Data) when is_binary(Data) ->
 
     lists:foldl(fun(Chunk, ChunkId) ->
         AttKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId, ChunkId}, DbPrefix),
-        ok = erlfdb:set(Tx, AttKey, Chunk),
+        ok = erlfdb:set(Tx, AttKey, aegis:encrypt(Db, AttKey, Chunk)),
         ChunkId + 1
     end, 0, Chunks),
     {ok, AttId}.
@@ -1193,7 +1198,7 @@ write_doc_body(#{} = Db0, #doc{} = Doc) ->
 
     Rows = doc_to_fdb(Db, Doc),
     lists:foreach(fun({Key, Value}) ->
-        ok = erlfdb:set(Tx, Key, Value)
+        ok = erlfdb:set(Tx, Key, aegis:encrypt(Db, Key, Value))
     end, Rows).
 
 
