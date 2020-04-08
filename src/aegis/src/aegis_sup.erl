@@ -10,25 +10,37 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, fabric, [
-    {description, "Routing and proxying layer for CouchDB cluster"},
-    {vsn, git},
-    {mod, {fabric2_app, []}},
-    {registered, [
-        fabric_server
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        config,
-        couch_epi,
-        couch,
-        ctrace,
-        rexi,
-        mem3,
-        couch_log,
-        couch_stats,
-        erlfdb,
-        aegis
-    ]}
-]}.
+-module(aegis_sup).
+
+-behaviour(supervisor).
+
+-vsn(1).
+
+
+-export([
+    start_link/0
+]).
+
+-export([
+    init/1
+]).
+
+
+start_link() ->
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
+
+init([]) ->
+    Flags = #{
+        strategy => one_for_one,
+        intensity => 5,
+        period => 10
+    },
+    Children = [
+        #{
+            id => aegis_server,
+            start => {aegis_server, start_link, []},
+            shutdown => 5000
+        }
+    ],
+    {ok, {Flags, Children}}.

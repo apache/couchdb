@@ -10,25 +10,8 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, fabric, [
-    {description, "Routing and proxying layer for CouchDB cluster"},
-    {vsn, git},
-    {mod, {fabric2_app, []}},
-    {registered, [
-        fabric_server
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        config,
-        couch_epi,
-        couch,
-        ctrace,
-        rexi,
-        mem3,
-        couch_log,
-        couch_stats,
-        erlfdb,
-        aegis
-    ]}
-]}.
+-module(aegis_basic_test).
+
+-include_lib("eunit/include/eunit.hrl").
+
+-define(DB, #{uuid => <<"foo">>}).

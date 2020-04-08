@@ -10,25 +10,25 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, fabric, [
-    {description, "Routing and proxying layer for CouchDB cluster"},
-    {vsn, git},
-    {mod, {fabric2_app, []}},
-    {registered, [
-        fabric_server
-    ]},
-    {applications, [
-        kernel,
-        stdlib,
-        config,
-        couch_epi,
-        couch,
-        ctrace,
-        rexi,
-        mem3,
-        couch_log,
-        couch_stats,
-        erlfdb,
-        aegis
-    ]}
-]}.
+{application, aegis,
+ [
+  {description, "If it's good enough for Zeus, it's good enough for CouchDB"},
+  {vsn, git},
+  {mod, {aegis_app, []}},
+  {registered, [
+    aegis_server
+  ]},
+  {applications,
+   [kernel,
+    stdlib,
+    crypto,
+    couch_log,
+    erlfdb
+   ]},
+  {env,[]},
+  {modules, []},
+  {maintainers, []},
+  {licenses, []},
+  {links, []}
+ ]
+}.
