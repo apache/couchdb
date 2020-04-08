@@ -136,7 +136,15 @@ defmodule DesignDocsTest do
           emit(null, require('views/lib/foo/boom').boom);
         }
         """
-      }
+      },
+      umlauts_regression_2756: %{
+        map: """
+        function(doc) {
+          const t = "Ä".toLowerCase();
+          emit(t, t);
+        }
+        """
+      },
     },
     shows: %{
       simple: """
@@ -279,6 +287,14 @@ defmodule DesignDocsTest do
     resp = Couch.get("/#{db_name}/_design/test/_view/commonjs", query: [limit: 1])
     assert resp.status_code == 200
     assert Enum.at(resp.body["rows"], 0)["value"] == "ok"
+  end
+
+  test "regression 2756 using toLowerCase with big umlauts", context do
+    db_name = context[:db_name]
+
+    resp = Couch.get("/#{db_name}/_design/test/_view/umlauts_regression_2756", query: [limit: 1])
+    assert resp.status_code == 200
+    assert Enum.at(resp.body["rows"], 0)["value"] == "ä"
   end
 
   test "_all_docs view returns correctly with keys", context do
