@@ -15,7 +15,8 @@
 -export([
     set_timeout/0,
     build_view/3,
-    build_view_async/2
+    build_view_async/2,
+    remove/2
 ]).
 
 -ifdef(TEST).
@@ -58,6 +59,12 @@ build_view_async(TxDb0, Mrst) ->
         ok = couch_jobs:add(JTx, ?INDEX_JOB_TYPE, JobId, JobData)
     end),
     {ok, JobId}.
+
+
+remove(TxDb, Sig) ->
+    DbName = fabric2_db:name(TxDb),
+    JobId = job_id(DbName, Sig),
+    couch_jobs:remove(TxDb, ?INDEX_JOB_TYPE, JobId).
 
 
 ensure_correct_tx(#{tx := undefined} = TxDb) ->
