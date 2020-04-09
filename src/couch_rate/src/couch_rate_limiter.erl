@@ -135,6 +135,8 @@ budget(Id, #?STATE{} = State) ->
         overloaded ->
             %% decrease budget
             {max(1, round(R * MultiplicativeFactor)), State};
+        underloaded when W == 0 orelse Latency == 0 ->
+            {max(1, round(MR)), State};
         underloaded ->
             ReadWriteRatio = min(1, MR / max(1, MW)),
             SingleWrite = Latency / W,
