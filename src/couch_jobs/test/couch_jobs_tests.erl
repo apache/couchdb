@@ -56,6 +56,8 @@ couch_jobs_basic_test_() ->
                     fun accept_max_schedtime/1,
                     fun accept_no_schedule/1,
                     fun subscribe/1,
+                    fun remove_when_subscribed_and_pending/1,
+                    fun remove_when_subscribed_and_running/1,
                     fun subscribe_wait_multiple/1,
                     fun enqueue_inactive/1,
                     fun remove_running_job/1,
@@ -568,6 +570,32 @@ subscribe(#{t1 := T, j1 := J}) ->
 
         ?assertEqual(ok, couch_jobs:remove(?TX, T, J)),
         ?assertEqual({error, not_found}, couch_jobs:subscribe(T, J))
+    end).
+
+
+remove_when_subscribed_and_pending(#{t1 := T, j1 := J}) ->
+    ?_test(begin
+        ok = couch_jobs:add(?TX, T, J, #{<<"x">> => 1}),
+        {ok, SId, pending, _} =  couch_jobs:subscribe(T, J),
+
+        couch_jobs:remove(?TX, T, J),
+
+        ?assertMatch({T, J, not_found, not_found}, couch_jobs:wait(SId, 5000)),
+        ?assertEqual(timeout, couch_jobs:wait(SId, 50))
+     end).
+
+
+remove_when_subscribed_and_running(#{t1 := T, j1 := J}) ->
+    ?_test(begin
+        ok = couch_jobs:add(?TX, T, J, #{<<"z">> => 2}),
+        {ok, SId, pending, _} = couch_jobs:subscribe(T, J),
+        {ok, #{}, _} = couch_jobs:accept(T),
+        ?assertMatch({_, _, running, _}, couch_jobs:wait(SId, 5000)),
+
+        couch_jobs:remove(?TX, T, J),
+
+        ?assertMatch({T, J, not_found, not_found}, couch_jobs:wait(SId, 5000)),
+        ?assertEqual(timeout, couch_jobs:wait(SId, 50))
     end).
 
 

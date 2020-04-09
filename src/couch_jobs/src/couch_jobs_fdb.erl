@@ -122,6 +122,7 @@ remove(#{jtx := true} = JTx0, #{job := true} = Job) ->
         #jv{stime = STime} ->
             couch_jobs_pending:remove(JTx, Type, JobId, STime),
             erlfdb:clear(Tx, Key),
+            update_watch(JTx, Type),
             ok;
         not_found ->
             {error, not_found}
@@ -421,6 +422,9 @@ encode_data(#{} = JobData) ->
             error({json_encoding_error, Error})
     end.
 
+
+decode_data(not_found) ->
+    not_found;
 
 decode_data(#{} = JobData) ->
     JobData;
