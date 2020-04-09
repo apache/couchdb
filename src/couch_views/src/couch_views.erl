@@ -90,6 +90,7 @@ cleanup_indices(#{} = Db, DDocs) when is_list(DDocs) ->
     ExistingSigs = couch_views_fdb:list_signatures(Db),
     StaleSigs = ExistingSigs -- ActiveSigs,
     lists:foreach(fun(Sig) ->
+        couch_views_jobs:remove(Db, Sig),
         couch_views_fdb:clear_index(Db, Sig)
     end, StaleSigs).
 
