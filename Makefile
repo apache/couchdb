@@ -144,9 +144,11 @@ fauxton: share/www
 ################################################################################
 
 
-.PHONY: check
+# When we can run all the tests with FDB switch this back to be the default
+# "make check" command
+.PHONY: check-all-tests
 # target: check - Test everything
-check: all python-black
+check-all-tests: all python-black
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
@@ -158,8 +160,8 @@ else
 subdirs=$(shell ls src)
 endif
 
-.PHONY: check-fdb
-check-fdb:
+.PHONY: check
+check:  all
 	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango,chttpd
 	make elixir tests=test/elixir/test/basics_test.exs,test/elixir/test/replication_test.exs,test/elixir/test/map_test.exs,test/elixir/test/all_docs_test.exs,test/elixir/test/bulk_docs_test.exs
 	make exunit tests=src/couch_rate/test/exunit/
