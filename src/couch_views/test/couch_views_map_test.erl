@@ -409,7 +409,7 @@ should_map_update_is_lazy() ->
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     JobId = couch_views_jobs:job_id(Db, Mrst),
     UpdateSeq = fabric2_db:get_update_seq(Db),
-    ok = couch_views_jobs:wait_for_job(JobId, UpdateSeq),
+    ok = couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, UpdateSeq),
 
     Args2 = #{
         start_key => 8,
