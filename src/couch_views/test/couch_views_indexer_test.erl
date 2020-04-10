@@ -375,7 +375,7 @@ index_autoupdater_callback(Db) ->
     ?assertMatch([{ok, <<_/binary>>}], Result),
     [{ok, JobId}] = Result,
 
-    ?assertEqual(ok, couch_views_jobs:wait_for_job(JobId, DbSeq)).
+    ?assertEqual(ok, couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, DbSeq)).
 
 index_budget_is_changing(Db) ->
     ok = meck:new(couch_rate, [passthrough]),
