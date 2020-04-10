@@ -14,8 +14,8 @@
 
 
 -export([
-    init/0,
-    report/2,
+    init/1,
+    report/1,
 
     incr_reads/0,
     incr_reads/1,
@@ -24,29 +24,38 @@
     incr_writes/1,
 
     incr_rows/0,
-    incr_rows/1
+    incr_rows/1,
+
+    update_interval/1
 ]).
 
 
 -record(st, {
     reads = 0,
     writes = 0,
-    rows = 0
+    rows = 0,
+    last_report_ts = 0,
+    interval,
+    request
 }).
 
 
 -define(KEY, chttpd_stats).
+-define(INTERVAL, 60).
+
+init(Request) ->
+    Time = erlang:monotonic_time(second),
+    Interval = config:get_integer("chttpd", "stats_reset_interval",
+        ?INTERVAL),
+    put(?KEY, #st{last_report_ts = Time, interval = Interval,
+        request = Request}).
 
 
-init() ->
-    put(?KEY, #st{}).
-
-
-report(HttpReq, HttpResp) ->
+report(HttpResp) ->
     try
         case get(?KEY) of
             #st{} = St ->
-                report(HttpReq, HttpResp, St);
+                report(HttpResp, St);
             _ ->
                 ok
         end
@@ -57,7 +66,7 @@ report(HttpReq, HttpResp) ->
     end.
 
 
-report(HttpReq, HttpResp, St) ->
+report(HttpResp, St) ->
     case config:get("chttpd", "stats_reporter") of
         undefined ->
             ok;
@@ -66,7 +75,8 @@ report(HttpReq, HttpResp, St) ->
             #st{
                 reads = Reads,
                 writes = Writes,
-                rows = Rows
+                rows = Rows,
+                request = HttpReq
             } = St,
             Mod:report(HttpReq, HttpResp, Reads, Writes, Rows)
     end.
@@ -101,7 +111,41 @@ incr(Idx, Count) ->
         #st{} = St ->
             Total = element(Idx, St) + Count,
             NewSt = setelement(Idx, St, Total),
-            put(?KEY, NewSt);
+            put(?KEY, NewSt),
+            maybe_report_intermittent(St);
         _ ->
             ok
     end.
+
+
+maybe_report_intermittent(State) ->
+    #st{last_report_ts = LastTime, interval = Interval} = State,
+    CurrentTime = erlang:monotonic_time(second),
+    case CurrentTime - LastTime of
+        Change when Change >= Interval ->
+            % Since response is not available during the request, we set
+            % this undefined. Modules that call:
+            % Mod:report(HttpReq, HttpResp, Reads, Writes, Rows) should
+            % be aware of this.
+            report(undefined),
+            reset_stats(State, CurrentTime);
+        _ ->
+            ok
+    end.
+
+update_interval(Interval) ->
+    case get(?KEY) of
+        #st{} = St ->
+            put(?KEY, St#st{interval = Interval});
+        _ ->
+            ok
+    end.
+
+
+reset_stats(State, NewTime) ->
+    put(?KEY, State#st{
+        reads = 0,
+        writes = 0,
+        rows = 0,
+        last_report_ts = NewTime
+    }).

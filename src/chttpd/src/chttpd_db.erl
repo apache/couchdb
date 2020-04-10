@@ -50,7 +50,8 @@
     chunks_sent = 0,
     buffer = [],
     bufsize = 0,
-    threshold
+    threshold,
+    include_docs
 }).
 
 -define(IS_ALL_DOCS(T), (
@@ -117,7 +118,8 @@ handle_changes_req_tx(#httpd{}=Req, Db) ->
         Acc0 = #cacc{
             feed = list_to_atom(Feed),
             mochi = Req,
-            threshold = Max
+            threshold = Max,
+            include_docs = ChangesArgs#changes_args.include_docs
         },
         try
             ChangesFun({fun changes_callback/2, Acc0})
@@ -133,8 +135,9 @@ handle_changes_req_tx(#httpd{}=Req, Db) ->
 changes_callback(start, #cacc{feed = continuous} = Acc) ->
     {ok, Resp} = chttpd:start_delayed_json_response(Acc#cacc.mochi, 200),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
-changes_callback({change, Change}, #cacc{feed = continuous} = Acc) ->
-    chttpd_stats:incr_rows(),
+changes_callback({change, Change}, #cacc{feed = continuous,
+        include_docs = IncludeDocs} = Acc) ->
+    incr_stats_changes_feed(IncludeDocs),
     Data = [?JSON_ENCODE(Change) | "\n"],
     Len = iolist_size(Data),
     maybe_flush_changes_feed(Acc, Data, Len);
@@ -157,8 +160,9 @@ changes_callback(start, #cacc{feed = eventsource} = Acc) ->
     ],
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, Headers),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
-changes_callback({change, {ChangeProp}=Change}, #cacc{feed = eventsource} = Acc) ->
-    chttpd_stats:incr_rows(),
+changes_callback({change, {ChangeProp}=Change},
+        #cacc{feed = eventsource, include_docs = IncludeDocs} = Acc) ->
+    incr_stats_changes_feed(IncludeDocs),
     Seq = proplists:get_value(seq, ChangeProp),
     Chunk = [
         "data: ", ?JSON_ENCODE(Change),
@@ -189,8 +193,8 @@ changes_callback(start, Acc) ->
     FirstChunk = "{\"results\":[\n",
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [], FirstChunk),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
-changes_callback({change, Change}, Acc) ->
-    chttpd_stats:incr_rows(),
+changes_callback({change, Change}, #cacc{include_docs = IncludeDocs} = Acc) ->
+    incr_stats_changes_feed(IncludeDocs),
     Data = [Acc#cacc.prepend, ?JSON_ENCODE(Change)],
     Len = iolist_size(Data),
     maybe_flush_changes_feed(Acc, Data, Len);
@@ -252,6 +256,11 @@ maybe_flush_changes_feed(Acc0, Data, Len) ->
     },
     {ok, Acc}.
 
+incr_stats_changes_feed(IncludeDocs) ->
+    chttpd_stats:incr_rows(),
+    if not IncludeDocs -> ok; true ->
+        chttpd_stats:incr_reads()
+    end.
 
 % Return the same response as if a compaction succeeded even though _compaction
 % isn't a valid operation in CouchDB >= 4.x anymore. This is mostly to not
