@@ -35,7 +35,7 @@ set_timeout() ->
 
 build_view(TxDb, Mrst, UpdateSeq) ->
     {ok, JobId} = build_view_async(TxDb, Mrst),
-    case wait_for_job(JobId, UpdateSeq) of
+    case wait_for_job(JobId, Mrst#mrst.idx_name, UpdateSeq) of
         ok -> ok;
         retry -> build_view(TxDb, Mrst, UpdateSeq)
     end.
@@ -77,10 +77,10 @@ ensure_correct_tx(#{tx := Tx} = TxDb) ->
     end.
 
 
-wait_for_job(JobId, UpdateSeq) ->
+wait_for_job(JobId, DDocId, UpdateSeq) ->
     case couch_jobs:subscribe(?INDEX_JOB_TYPE, JobId) of
         {ok, Subscription, _State, _Data} ->
-            wait_for_job(JobId, Subscription, UpdateSeq);
+            wait_for_job(JobId, Subscription, DDocId, UpdateSeq);
         {ok, finished, Data} ->
             case Data of
                 #{<<"view_seq">> := ViewSeq} when ViewSeq >= UpdateSeq ->
@@ -91,21 +91,35 @@ wait_for_job(JobId, UpdateSeq) ->
     end.
 
 
-wait_for_job(JobId, Subscription, UpdateSeq) ->
+wait_for_job(JobId, Subscription, DDocId, UpdateSeq) ->
     case wait(Subscription) of
+        {not_found, not_found} ->
+            erlang:error(index_not_found);
         {error, Error} ->
             erlang:error(Error);
+        {finished, #{<<"error">> := <<"ddoc_deleted">>} = Data} ->
+            case maps:get(<<"ddoc_id">>, Data) of
+                DDocId ->
+                    couch_jobs:remove(undefined, ?INDEX_JOB_TYPE, JobId),
+                    erlang:error({ddoc_deleted, maps:get(<<"reason">>, Data)});
+                _OtherDocId ->
+                    % A different design doc wiht the same signature
+                    % was deleted. Resubmit this job which will overwrite
+                    % the ddoc_id in the job.
+                    retry
+            end;
         {finished, #{<<"error">> := Error, <<"reason">> := Reason}} ->
+            couch_jobs:remove(undefined, ?INDEX_JOB_TYPE, JobId),
             erlang:error({binary_to_existing_atom(Error, latin1), Reason});
         {finished, #{<<"view_seq">> := ViewSeq}} when ViewSeq >= UpdateSeq ->
             ok;
         {finished, _} ->
-            wait_for_job(JobId, UpdateSeq);
+            wait_for_job(JobId, DDocId, UpdateSeq);
         {_State, #{<<"view_seq">> := ViewSeq}} when ViewSeq >= UpdateSeq ->
             couch_jobs:unsubscribe(Subscription),
             ok;
         {_, _} ->
-            wait_for_job(JobId, Subscription, UpdateSeq)
+            wait_for_job(JobId, Subscription, DDocId, UpdateSeq)
     end.
 
 
