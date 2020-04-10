@@ -213,13 +213,13 @@ updater_processes_stop(#{}) ->
 
 
 indexing_can_be_disabled(#{db1 := Db}) ->
-    Mod = fabric2_test_callback7,
-    setup_callback(Mod),
-
     meck:expect(config, get_boolean, fun
         ("fabric", "index_updater_enabled", _) -> false;
         (_, _, Default) -> Default
     end),
+
+    Mod = fabric2_test_callback7,
+    setup_callback(Mod),
 
     create_doc(Db),
     timer:sleep(500),
