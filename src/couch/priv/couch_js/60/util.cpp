@@ -37,19 +37,6 @@ js_to_string(JSContext* cx, JS::HandleValue val)
     return chars.get();
 }
 
-std::string
-js_to_string(JSContext* cx, JSString *str)
-{
-    JS::UniqueChars chars(JS_EncodeString(cx, str));
-    if(!chars) {
-        JS_ClearPendingException(cx);
-        fprintf(stderr, "Error converting  to string.\n");
-        exit(3);
-    }
-
-    return chars.get();
-}
-
 JSString*
 string_to_js(JSContext* cx, const std::string& s)
 {
