@@ -38,6 +38,7 @@ misc_test_() ->
                 ?TDEF(accessors),
                 ?TDEF(set_revs_limit),
                 ?TDEF(set_security),
+                ?TDEF(get_security_cached),
                 ?TDEF(is_system_db),
                 ?TDEF(validate_dbname),
                 ?TDEF(validate_doc_ids),
@@ -111,6 +112,30 @@ set_security({DbName, Db, _}) ->
     ?assertEqual(ok, fabric2_db:set_security(Db, SecObj)),
     {ok, Db2} = fabric2_db:open(DbName, []),
     ?assertEqual(SecObj, fabric2_db:get_security(Db2)).
+
+
+get_security_cached({DbName, Db, _}) ->
+    OldSecObj = fabric2_db:get_security(Db),
+    SecObj = {[
+        {<<"admins">>, {[
+            {<<"names">>, [<<"foo1">>]},
+            {<<"roles">>, []}
+        ]}}
+    ]},
+
+    % Set directly so we don't auto-update the local cache
+    {ok, Db1} = fabric2_db:open(DbName, [?ADMIN_CTX]),
+    ?assertMatch({ok, #{}}, fabric2_fdb:transactional(Db1, fun(TxDb) ->
+        fabric2_fdb:set_config(TxDb, security_doc, SecObj)
+    end)),
+
+    {ok, Db2} = fabric2_db:open(DbName, [?ADMIN_CTX]),
+    ?assertEqual(OldSecObj, fabric2_db:get_security(Db2, [{max_age, 1000}])),
+
+    timer:sleep(100),
+    ?assertEqual(SecObj, fabric2_db:get_security(Db2, [{max_age, 50}])),
+
+    ?assertEqual(ok, fabric2_db:set_security(Db2, OldSecObj)).
 
 
 is_system_db({DbName, Db, _}) ->
@@ -305,12 +330,19 @@ metadata_bump({DbName, _, _}) ->
         erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY))
     end),
 
+    % Save timetamp before ensure_current/1 is called
+    TsBeforeEnsureCurrent = erlang:monotonic_time(millisecond),
+
     % Perform a random operation which calls ensure_current
     {ok, _} = fabric2_db:get_db_info(Db),
 
     % Check that db handle in the cache got the new metadata version
+    % and that check_current_ts was updated
     CachedDb = fabric2_server:fetch(DbName, undefined),
-    ?assertMatch(#{md_version := NewMDVersion}, CachedDb).
+    ?assertMatch(#{
+        md_version := NewMDVersion,
+        check_current_ts := Ts
+    } when Ts >= TsBeforeEnsureCurrent, CachedDb).
 
 
 db_version_bump({DbName, _, _}) ->
