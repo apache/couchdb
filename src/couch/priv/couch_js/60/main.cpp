@@ -412,8 +412,10 @@ main(int argc, const char* argv[])
 
     couch_args* args = couch_parse_args(argc, argv);
 
-    JS_Init();
-    cx = JS_NewContext(args->stack_size, 8L * 1024L);
+    if(!JS_Init())
+        return 1;
+
+    cx = JS_NewContext(args->stack_size, 8L *1024L);
     if(cx == NULL)
         return 1;
 
@@ -432,6 +434,9 @@ main(int argc, const char* argv[])
     JS::CompartmentOptions options;
     JS::RootedObject global(cx, JS_NewGlobalObject(cx, &global_class, nullptr,
                                                    JS::FireOnNewGlobalHook, options));
+
+    JS_SetDefaultLocale(JS_GetRuntime(cx), "en");
+
     if (!global)
         return 1;
 
@@ -491,6 +496,9 @@ main(int argc, const char* argv[])
         // Give the GC a chance to run.
         JS_MaybeGC(cx);
     }
+
+    JS_DestroyContext(cx);
+    JS_ShutDown();
 
     return 0;
 }
