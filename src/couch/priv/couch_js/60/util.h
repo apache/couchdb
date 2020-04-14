@@ -26,6 +26,7 @@ typedef struct {
 } couch_args;
 
 std::string js_to_string(JSContext* cx, JS::HandleValue val);
+bool js_to_string(JSContext* cx, JS::HandleValue val, std::string& str);
 JSString* string_to_js(JSContext* cx, const std::string& s);
 
 couch_args* couch_parse_args(int argc, const char* argv[]);

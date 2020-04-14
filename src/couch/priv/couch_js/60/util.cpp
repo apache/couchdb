@@ -15,7 +15,9 @@
 
 #include <jsapi.h>
 #include <js/Initialization.h>
+#include <js/CharacterEncoding.h>
 #include <js/Conversions.h>
+#include <mozilla/Unused.h>
 
 #include "help.h"
 #include "util.h"
@@ -30,23 +32,55 @@ js_to_string(JSContext* cx, JS::HandleValue val)
     JS::UniqueChars chars(JS_EncodeStringToUTF8(cx, sval));
     if(!chars) {
         JS_ClearPendingException(cx);
-        fprintf(stderr, "Error converting value to string.\n");
-        exit(3);
+        return std::string();
     }
 
     return chars.get();
 }
 
-JSString*
-string_to_js(JSContext* cx, const std::string& s)
+bool
+js_to_string(JSContext* cx, JS::HandleValue val, std::string& str)
 {
-    JSString* ret = JS_NewStringCopyN(cx, s.c_str(), s.size());
-    if(ret != nullptr) {
-        return ret;
+    if(!val.isString()) {
+        return false;
     }
 
-    fprintf(stderr, "Unable to allocate string object.\n");
-    exit(3);
+    if(JS_GetStringLength(val.toString()) == 0) {
+        str = "";
+        return true;
+    }
+
+    std::string conv = js_to_string(cx, val);
+    if(!conv.size()) {
+        return false;
+    }
+
+    str = conv;
+    return true;
+}
+
+JSString*
+string_to_js(JSContext* cx, const std::string& raw)
+{
+    JS::UTF8Chars utf8(raw.c_str(), raw.size());
+    JS::UniqueTwoByteChars utf16;
+    size_t len;
+
+    utf16.reset(JS::UTF8CharsToNewTwoByteCharsZ(cx, utf8, &len).get());
+    if(!utf16) {
+        return nullptr;
+    }
+
+    JSString* ret = JS_NewUCString(cx, utf16.get(), len);
+
+    if(ret) {
+        // JS_NewUCString took ownership on success. We shift
+        // the resulting pointer into Unused to silence the
+        // compiler warning.
+        mozilla::Unused << utf16.release();
+    }
+
+    return ret;
 }
 
 size_t
