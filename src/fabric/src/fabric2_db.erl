@@ -50,7 +50,9 @@
     get_instance_start_time/1,
     get_pid/1,
     get_revs_limit/1,
+    get_revs_limit/2,
     get_security/1,
+    get_security/2,
     get_update_seq/1,
     get_user_ctx/1,
     get_uuid/1,
@@ -500,17 +502,21 @@ get_pid(#{}) ->
 
 
 get_revs_limit(#{} = Db) ->
-    #{revs_limit := RevsLimit} = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:ensure_current(TxDb)
-    end),
-    RevsLimit.
+    get_revs_limit(Db, []).
+
+
+get_revs_limit(#{} = Db, Opts) ->
+    CurrentDb = get_cached_db(Db, Opts),
+    maps:get(revs_limit, CurrentDb).
 
 
 get_security(#{} = Db) ->
-    #{security_doc := SecDoc} = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:ensure_current(TxDb)
-    end),
-    SecDoc.
+    get_security(Db, []).
+
+
+get_security(#{} = Db, Opts) ->
+    CurrentDb = get_cached_db(Db, Opts),
+    maps:get(security_doc, CurrentDb).
 
 
 get_update_seq(#{} = Db) ->
@@ -2036,4 +2042,18 @@ open_json_doc(Db, DocId, OpenOpts, DocOpts) ->
             [{doc, null}];
         {ok, #doc{} = Doc} ->
             [{doc, couch_doc:to_json_obj(Doc, DocOpts)}]
+    end.
+
+
+get_cached_db(#{} = Db, Opts) when is_list(Opts) ->
+    MaxAge = fabric2_util:get_value(max_age, Opts, 0),
+    Now = erlang:monotonic_time(millisecond),
+    Age = Now - maps:get(check_current_ts, Db),
+    case Age < MaxAge of
+        true ->
+            Db;
+        false ->
+            fabric2_fdb:transactional(Db, fun(TxDb) ->
+                fabric2_fdb:ensure_current(TxDb)
+            end)
     end.

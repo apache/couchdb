@@ -231,6 +231,7 @@ create(#{} = Db0, Options) ->
         revs_limit => 1000,
         security_doc => {[]},
         user_ctx => UserCtx,
+        check_current_ts => erlang:monotonic_time(millisecond),
 
         validate_doc_update_funs => [],
         before_doc_update => undefined,
@@ -272,6 +273,7 @@ open(#{} = Db0, Options) ->
         security_doc => {[]},
 
         user_ctx => UserCtx,
+        check_current_ts => erlang:monotonic_time(millisecond),
 
         % Place holders until we implement these
         % bits.
@@ -1273,8 +1275,10 @@ check_db_version(#{} = Db, CheckDbVersion) ->
         case erlfdb:wait(erlfdb:get(Tx, DbVersionKey)) of
             DbVersion ->
                 put(?PDICT_CHECKED_DB_IS_CURRENT, true),
-                on_commit(Tx, fun() -> fabric2_server:store(Db) end),
-                Db;
+                Now = erlang:monotonic_time(millisecond),
+                Db1 = Db#{check_current_ts := Now},
+                on_commit(Tx, fun() -> fabric2_server:store(Db1) end),
+                Db1;
             _NewDBVersion ->
                 fabric2_server:remove(maps:get(name, Db)),
                 throw({?MODULE, reopen})
