@@ -473,6 +473,7 @@ main(int argc, const char* argv[])
         // Compile and run
         JS::CompileOptions options(cx);
         options.setFileAndLine(args->scripts[i], 1);
+        options.setUTF8(true);
         JS::RootedScript script(cx);
 
         if(!JS_CompileScript(cx, scriptsrc, slen, options, &script)) {
