@@ -268,9 +268,8 @@ couch_print(JSContext* cx, unsigned int argc, JS::CallArgs argv)
         if (argc > 1 && argv[1].isTrue()) {
           stream = stderr;
         }
-        JSString* str = JS::ToString(cx, argv.get(0));
-        bytes = reinterpret_cast<uint8_t*>(JS_EncodeString(cx, str));
-        fprintf(stream, "%s", bytes);
+        std::string val = js_to_string(cx, argv.get(0));
+        fprintf(stream, "%s", val.c_str());
         JS_free(cx, bytes);
     }
 
