@@ -34,6 +34,7 @@
     reads = 0,
     writes = 0,
     rows = 0,
+    reporter,
     last_report_ts = 0,
     interval,
     request
@@ -41,14 +42,15 @@
 
 
 -define(KEY, chttpd_stats).
--define(INTERVAL, 60).
+-define(INTERVAL_IN_SEC, 60).
 
 init(Request) ->
+    Reporter = config:get("chttpd", "stats_reporter"),
     Time = erlang:monotonic_time(second),
-    Interval = config:get_integer("chttpd", "stats_reset_interval",
-        ?INTERVAL),
-    put(?KEY, #st{last_report_ts = Time, interval = Interval,
-        request = Request}).
+    Interval = config:get_integer("chttpd", "stats_reporting_interval",
+        ?INTERVAL_IN_SEC),
+    put(?KEY, #st{reporter = Reporter, last_report_ts = Time,
+        interval = Interval, request = Request}).
 
 
 report(HttpResp) ->
@@ -66,8 +68,8 @@ report(HttpResp) ->
     end.
 
 
-report(HttpResp, St) ->
-    case config:get("chttpd", "stats_reporter") of
+report(HttpResp, #st{reporter = Reporter} = St) ->
+    case Reporter of
         undefined ->
             ok;
         ModStr ->
@@ -126,12 +128,18 @@ maybe_report_intermittent(State) ->
             % Since response is not available during the request, we set
             % this undefined. Modules that call:
             % Mod:report(HttpReq, HttpResp, Reads, Writes, Rows) should
-            % be aware of this.
-            report(undefined),
-            reset_stats(State, CurrentTime);
+            % be aware of this. Mod:report should also return a boolean
+            % to indicate if reset should occur
+            case report(undefined) of
+                true ->
+                    reset_stats(State, CurrentTime);
+                _ ->
+                    ok
+            end;
         _ ->
             ok
     end.
+
 
 update_interval(Interval) ->
     case get(?KEY) of
