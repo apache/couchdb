@@ -259,21 +259,16 @@ couch_readline(JSContext* cx, FILE* fp)
 
 
 void
-couch_print(JSContext* cx, unsigned int argc, JS::CallArgs argv)
+couch_print(JSContext* cx, JS::HandleValue obj, bool use_stderr)
 {
-    uint8_t* bytes = nullptr;
-    FILE *stream = stdout;
+    FILE* stream = stdout;
 
-    if (argc) {
-        if (argc > 1 && argv[1].isTrue()) {
-          stream = stderr;
-        }
-        std::string val = js_to_string(cx, argv.get(0));
-        fprintf(stream, "%s", val.c_str());
-        JS_free(cx, bytes);
+    if(use_stderr) {
+        stream = stderr;
     }
 
-    fputc('\n', stream);
+    std::string val = js_to_string(cx, obj);
+    fprintf(stream, "%s\n", val.c_str());
     fflush(stream);
 }
 

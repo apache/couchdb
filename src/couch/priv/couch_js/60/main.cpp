@@ -283,7 +283,19 @@ static bool
 print(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    couch_print(cx, argc, args);
+
+    bool use_stderr = false;
+    if(argc > 1 && args[1].isTrue()) {
+        use_stderr = true;
+    }
+
+    if(!args[0].isString()) {
+        JS_ReportErrorUTF8(cx, "Unable to print non-string value.");
+        return false;
+    }
+
+    couch_print(cx, args[0], use_stderr);
+
     args.rval().setUndefined();
     return true;
 }
