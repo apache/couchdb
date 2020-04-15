@@ -68,20 +68,18 @@ report(HttpResp) ->
     end.
 
 
+report(HttpResp, #st{reporter = undefined}) ->
+    ok;
+
 report(HttpResp, #st{reporter = Reporter} = St) ->
-    case Reporter of
-        undefined ->
-            ok;
-        ModStr ->
-            Mod = list_to_existing_atom(ModStr),
-            #st{
-                reads = Reads,
-                writes = Writes,
-                rows = Rows,
-                request = HttpReq
-            } = St,
-            Mod:report(HttpReq, HttpResp, Reads, Writes, Rows)
-    end.
+    Mod = list_to_existing_atom(Reporter),
+    #st{
+        reads = Reads,
+        writes = Writes,
+        rows = Rows,
+        request = HttpReq
+    } = St,
+    Mod:report(HttpReq, HttpResp, Reads, Writes, Rows).
 
 
 incr_reads() ->
@@ -130,7 +128,7 @@ maybe_report_intermittent(State) ->
             % Mod:report(HttpReq, HttpResp, Reads, Writes, Rows) should
             % be aware of this. Mod:report should also return a boolean
             % to indicate if reset should occur
-            case report(undefined) of
+            case ?MODULE:report(undefined) of
                 true ->
                     reset_stats(State, CurrentTime);
                 _ ->
