@@ -134,6 +134,7 @@ fauxton: share\www
 .PHONY: check
 # target: check - Test everything
 check: all python-black
+	@$(MAKE) emilio
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
@@ -174,6 +175,9 @@ just-eunit: export BUILDDIR = $(shell pwd)
 just-eunit: export ERL_AFLAGS = "-config $(shell echo %cd%)/rel/files/eunit.config")
 just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
+
+emilio:
+	@bin\emilio -c emilio.config src\ | python.exe bin\warnings_in_scope -s 3
 
 .venv/bin/black:
 	@python.exe -m venv .venv
@@ -356,7 +360,7 @@ install: release
 	@echo .
 	@echo     To install CouchDB into your system, copy the rel\couchdb
 	@echo     to your desired installation location. For example:
-	@echo     xcopy /E rel\couchdb C:\CouchDB\ 
+	@echo     xcopy /E rel\couchdb C:\CouchDB\
 	@echo .
 
 ################################################################################
