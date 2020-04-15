@@ -23,7 +23,6 @@
 
 #include "help.h"
 #include "util.h"
-#include "utf8.h"
 
 std::string
 js_to_string(JSContext* cx, JS::HandleValue val)
