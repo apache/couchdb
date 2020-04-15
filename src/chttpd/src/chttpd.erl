@@ -269,8 +269,9 @@ handle_request_int(MochiReq) ->
 before_request(HttpReq) ->
     ctrace:is_enabled() andalso start_span(HttpReq),
     try
-        chttpd_stats:init(),
-        chttpd_plugin:before_request(HttpReq)
+        {ok, HttpReq1} = chttpd_plugin:before_request(HttpReq),
+        chttpd_stats:init(HttpReq1),
+        {ok, HttpReq1}
     catch Tag:Error ->
         {error, catch_error(HttpReq, Tag, Error)}
     end.
@@ -285,7 +286,7 @@ after_request(HttpReq, HttpResp0) ->
             {ok, HttpResp0#httpd_resp{status = aborted}}
         end,
     HttpResp2 = update_stats(HttpReq, HttpResp1),
-    chttpd_stats:report(HttpReq, HttpResp2),
+    chttpd_stats:report(HttpResp2),
     maybe_log(HttpReq, HttpResp2),
     HttpResp2.
 
