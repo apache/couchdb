@@ -14,7 +14,6 @@ stop(_) ->
     ok = application:stop(couch_log).
 
 
-
 setup() ->
     ok = meck:new(chttpd_stats, [passthrough]).
 
