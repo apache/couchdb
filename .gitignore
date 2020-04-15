@@ -13,6 +13,7 @@
 .rebar/
 .eunit/
 cover/
+core
 log
 apache-couchdb-*/
 bin/
