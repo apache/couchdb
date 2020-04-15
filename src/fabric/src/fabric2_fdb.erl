@@ -1628,12 +1628,16 @@ sum_rem_rev_sizes(RevInfos) ->
 
 
 chunkify_binary(Data) ->
+    chunkify_data(Data, binary_chunk_size()).
+
+
+chunkify_data(Data, Size) ->
     case Data of
         <<>> ->
             [];
-        <<Head:?BINARY_CHUNK_SIZE/binary, Rest/binary>> ->
-            [Head | chunkify_binary(Rest)];
-        <<_/binary>> when size(Data) < ?BINARY_CHUNK_SIZE ->
+        <<Head:Size/binary, Rest/binary>> ->
+            [Head | chunkify_data(Rest, Size)];
+        <<_/binary>> when size(Data) < Size ->
             [Data]
     end.
 
@@ -1986,6 +1990,11 @@ get_info_wait_int(#info_future{} = InfoFuture) ->
     end, [{sizes, {[]}}], erlfdb:wait(MetaFuture)),
 
     [CProp | MProps].
+
+
+binary_chunk_size() ->
+    config:get_integer(
+        "fabric", "binary_chunk_size", ?DEFAULT_BINARY_CHUNK_SIZE).
 
 
 -ifdef(TEST).
