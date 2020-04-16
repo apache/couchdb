@@ -28,6 +28,7 @@
         mem3,
         couch_log,
         couch_stats,
-        erlfdb
+        erlfdb,
+        aegis
     ]}
 ]}.
