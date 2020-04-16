@@ -229,5 +229,10 @@ AddConfig = [
 ].
 
 lists:foldl(fun({K, V}, CfgAcc) ->
-    lists:keystore(K, 1, CfgAcc, {K, V})
+    case lists:keyfind(K, 1, CfgAcc) of
+        {K, Existent} when is_list(Existent) andalso is_list(V) ->
+            lists:keystore(K, 1, CfgAcc, {K, Existent ++ V});
+        false ->
+            lists:keystore(K, 1, CfgAcc, {K, V})
+    end
 end, CONFIG, AddConfig).

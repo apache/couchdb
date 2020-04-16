@@ -28,6 +28,7 @@ ebin/
 erl_crash.dump
 erln8.config
 install.mk
+rebar.config
 rel/*.config
 rel/couchdb
 rel/dev*
