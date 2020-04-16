@@ -13,6 +13,7 @@
 -module(couch_expiring_cache_fdb).
 
 -export([
+    get_range_to/3,
     insert/6,
     lookup/3,
     clear_all/1,
@@ -40,6 +41,16 @@
 insert(#{jtx := true} = JTx, Name, Key, Val, StaleTS, ExpiresTS) ->
     #{tx := Tx, layer_prefix := LayerPrefix} = couch_jobs_fdb:get_jtx(JTx),
     PK = primary_key(Name, Key, LayerPrefix),
+    case get_val(Tx, PK) of
+        not_found ->
+            ok;
+        {_OldVal, _OldStaleTS, OldExpiresTS} ->
+            % Clean up current expiry key for this primary key. No
+            % need to clean up the existing primary key since it will
+            % be overwritten below.
+            OldXK = expiry_key(OldExpiresTS, Name, Key, LayerPrefix),
+            ok = erlfdb:clear(Tx, OldXK)
+    end,
     PV = erlfdb_tuple:pack({Val, StaleTS, ExpiresTS}),
     ok = erlfdb:set(Tx, PK, PV),
     XK = expiry_key(ExpiresTS, Name, Key, LayerPrefix),
@@ -85,6 +96,22 @@ clear_range_to(Name, EndTS, Limit) when Limit > 0 ->
             ok = erlfdb:clear(Tx, XK),
             oldest_ts(ExpiresTS, Acc)
         end, 0).
+
+
+-spec get_range_to(Name :: binary(), EndTS :: ?TIME_UNIT,
+    Limit :: non_neg_integer()) ->
+        [{Key :: binary(), Val :: binary()}].
+get_range_to(Name, EndTS, Limit) when Limit > 0 ->
+    fold_range(Name, EndTS, Limit,
+        fun(Tx, PK, _XK, Key, _ExpiresTS, Acc) ->
+            case get_val(Tx, PK) of
+                not_found ->
+                    couch_log:error("~p:entry missing Key: ~p", [?MODULE, Key]),
+                    Acc;
+                Val ->
+                    [{Key, Val} | Acc]
+            end
+        end, []).
 
 
 %% Private

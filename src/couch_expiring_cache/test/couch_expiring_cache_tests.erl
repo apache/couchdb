@@ -66,7 +66,7 @@ teardown(#{pid := Pid}) ->
 
 
 simple_lifecycle(_) ->
-    ?_test(begin
+    {timeout, 10, ?_test(begin
         Now = erlang:system_time(?TIME_UNIT),
         StaleTS = Now + 100,
         ExpiresTS = Now + 200,
@@ -76,14 +76,29 @@ simple_lifecycle(_) ->
 
         ?assertEqual(ok, couch_expiring_cache_fdb:clear_all(Name)),
         ?assertEqual(not_found, couch_expiring_cache:lookup(Name, Key)),
+        ?assertEqual([], entries(Name)),
         ?assertEqual(ok,
             couch_expiring_cache:insert(Name, Key, Val, StaleTS, ExpiresTS)),
         ?assertEqual({fresh, Val}, couch_expiring_cache:lookup(Name, Key)),
         ok = wait_lookup(Name, Key, {stale, Val}),
+
+        % Refresh the existing key with updated timestamps
+        ?assertEqual(ok,
+            couch_expiring_cache:insert(Name, Key, Val,
+                StaleTS + 100, ExpiresTS + 100)),
+        ?assertEqual({fresh, Val}, couch_expiring_cache:lookup(Name, Key)),
+        ?assertEqual(1, length(entries(Name))),
+        ok = wait_lookup(Name, Key, {stale, Val}),
         ok = wait_lookup(Name, Key, expired),
         ok = wait_lookup(Name, Key, not_found),
+        ?assertEqual([], entries(Name)),
         ?assertEqual(not_found, couch_expiring_cache:lookup(Name, Key))
-    end).
+    end)}.
+
+
+entries(Name) ->
+    FarFuture = erlang:system_time(?TIME_UNIT) * 2,
+    couch_expiring_cache_fdb:get_range_to(Name, FarFuture, _Limit=100).
 
 
 wait_lookup(Name, Key, Expect) ->
