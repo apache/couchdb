@@ -259,7 +259,7 @@ cat > $rootdir/config.erl << EOF
 {with_curl, $WITH_CURL}.
 {with_proper, $WITH_PROPER}.
 {erlang_md5, $ERLANG_MD5}.
-{aegis_key_manager, "$AEGIS_KEY_MANAGER"},
+{aegis_key_manager, "$AEGIS_KEY_MANAGER"}.
 {spidermonkey_version, "$SM_VSN"}.
 EOF
 
