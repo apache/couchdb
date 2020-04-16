@@ -10,25 +10,17 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, aegis,
- [
-  {description, "If it's good enough for Zeus, it's good enough for CouchDB"},
-  {vsn, git},
-  {mod, {aegis_app, []}},
-  {registered, [
-    aegis_key_cache
-  ]},
-  {applications,
-   [kernel,
-    stdlib,
-    crypto,
-    couch_log,
-    erlfdb
-   ]},
-  {env,[]},
-  {modules, []},
-  {maintainers, []},
-  {licenses, []},
-  {links, []}
- ]
-}.
+-module(aegis_app).
+
+-behaviour(application).
+
+
+-export([start/2, stop/1]).
+
+
+start(_StartType, _StartArgs) ->
+    aegis_sup:start_link().
+
+
+stop(_State) ->
+    ok.

@@ -14,8 +14,6 @@
 -include("aegis.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 
-%% TODO - get from key manager
--define(ROOT_KEY, <<1:256>>).
 
 -define(WRAPPED_KEY, {?DB_AEGIS, 1}).
 
@@ -26,32 +24,31 @@
 
     decrypt/2,
     decrypt/3,
+    decrypt/4,
     encrypt/3,
+    encrypt/4,
     wrap_fold_fun/2
 ]).
 
-create(#{} = Db, Options) ->
+create(#{} = Db, _Options) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = Db,
 
-    % Generate new key
-    DbKey = crypto:strong_rand_bytes(32),
-
-    % protect it with root key
-    WrappedKey = aegis_keywrap:key_wrap(?ROOT_KEY, DbKey),
+    % Fetch unwrapped key
+    WrappedKey = gen_server:call(aegis_key_cache, {get_wrapped_key, Db}),
 
     % And store it
     FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
     ok = erlfdb:set(Tx, FDBKey, WrappedKey),
 
     Db#{
-        aegis => DbKey
+        aegis => WrappedKey
     }.
 
 
-open(#{} = Db, Options) ->
+open(#{} = Db, _Options) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
@@ -61,11 +58,10 @@ open(#{} = Db, Options) ->
     FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
     WrappedKey = erlfdb:wait(erlfdb:get(Tx, FDBKey)),
 
-    % Unwrap it
-    DbKey = aegis_keywrap:key_unwrap(?ROOT_KEY, WrappedKey),
+    %% maybe ask to rewrap and store if updated?
 
     Db#{
-        aegis => DbKey
+        aegis => WrappedKey
     }.
 
 
@@ -73,11 +69,9 @@ encrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
 
 encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
-    #{
-        uuid := UUID,
-        aegis := DbKey
-    } = Db,
+    gen_server:call(aegis_key_cache, {encrypt, Db, Key, Value}).
 
+encrypt(DbKey, UUID, Key, Value) ->
     EncryptionKey = crypto:strong_rand_bytes(32),
     <<WrappedKey:320>> = aegis_keywrap:key_wrap(DbKey, EncryptionKey),
 
@@ -99,11 +93,9 @@ decrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
 
 decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
-    #{
-        uuid := UUID,
-        aegis := DbKey
-    } = Db,
+    gen_server:call(aegis_key_cache, {decrypt, Db, Key, Value}).
 
+decrypt(DbKey, UUID, Key, Value) ->
     case Value of
         <<1:8, WrappedKey:320, CipherTag:128, CipherText/binary>> ->
             case aegis_keywrap:key_unwrap(DbKey, <<WrappedKey:320>>) of
