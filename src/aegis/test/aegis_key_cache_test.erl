@@ -19,6 +19,7 @@
 -define(DB, #{aegis => <<0:320>>, uuid => <<0:64>>}).
 -define(VALUE, <<0:8192>>).
 -define(ENCRYPTED, <<1:8, 0:320, 0:4096>>).
+-define(TIMEOUT, 10000).
 
 
 
@@ -29,13 +30,13 @@ basic_test_() ->
         fun teardown/1,
         [
             {"cache unwrapped key on get_wrapped_key",
-            fun test_get_wrapped_key/0},
+            {timeout, ?TIMEOUT, fun test_get_wrapped_key/0}},
             {"cache unwrapped key on encrypt",
-            fun test_encrypt/0},
+            {timeout, ?TIMEOUT, fun test_encrypt/0}},
             {"cache unwrapped key on decrypt",
-            fun test_decrypt/0},
+            {timeout, ?TIMEOUT, fun test_decrypt/0}},
             {"cache unwrapped key per database",
-            fun test_multibase/0}
+            {timeout, ?TIMEOUT, fun test_multibase/0}}
         ]
     }.
 
@@ -47,7 +48,7 @@ setup() ->
     ok = meck:expect(aegis_keywrap, key_wrap, 2, <<0:320>>),
     ok = meck:expect(aegis_keywrap, key_unwrap, fun(_, _) ->
         %% build a line of the waiters
-        timer:sleep(50),
+        timer:sleep(20),
         <<0:256>>
     end),
     ok = meck:expect(aegis, encrypt, 4, ?ENCRYPTED),
