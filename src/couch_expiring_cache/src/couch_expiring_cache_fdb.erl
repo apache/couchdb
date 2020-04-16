@@ -16,15 +16,15 @@
     insert/6,
     lookup/3,
     clear_all/1,
-    clear_expired_range/3
+    clear_range_to/3
 ]).
 
 
--define(EXPIRING_CACHE, 53). % coordinate with fabric2.hrl
 -define(PK, 1).
 -define(EXP, 2).
 
 
+-include_lib("fabric/include/fabric2.hrl").
 -include_lib("couch_expiring_cache/include/couch_expiring_cache.hrl").
 
 
@@ -41,9 +41,9 @@ insert(#{jtx := true} = JTx, Name, Key, Val, StaleTS, ExpiresTS) ->
     #{tx := Tx, layer_prefix := LayerPrefix} = couch_jobs_fdb:get_jtx(JTx),
     PK = primary_key(Name, Key, LayerPrefix),
     PV = erlfdb_tuple:pack({Val, StaleTS, ExpiresTS}),
+    ok = erlfdb:set(Tx, PK, PV),
     XK = expiry_key(ExpiresTS, Name, Key, LayerPrefix),
     XV = erlfdb_tuple:pack({}),
-    ok = erlfdb:set(Tx, PK, PV),
     ok = erlfdb:set(Tx, XK, XV).
 
 
@@ -52,11 +52,10 @@ insert(#{jtx := true} = JTx, Name, Key, Val, StaleTS, ExpiresTS) ->
 lookup(#{jtx := true} = JTx, Name, Key) ->
     #{tx := Tx, layer_prefix := LayerPrefix} = couch_jobs_fdb:get_jtx(JTx),
     PK = primary_key(Name, Key, LayerPrefix),
-    case erlfdb:wait(erlfdb:get(Tx, PK)) of
+    case get_val(Tx, PK) of
         not_found ->
             not_found;
-        Bin when is_binary(Bin) ->
-            {Val, StaleTS, ExpiresTS} = erlfdb_tuple:unpack(Bin),
+        {Val, StaleTS, ExpiresTS} ->
             Now = erlang:system_time(?TIME_UNIT),
             if
                 Now < StaleTS -> {fresh, Val};
@@ -76,32 +75,30 @@ clear_all(Name) ->
     end).
 
 
--spec clear_expired_range(Name :: binary(), EndTS :: ?TIME_UNIT,
+-spec clear_range_to(Name :: binary(), EndTS :: ?TIME_UNIT,
     Limit :: non_neg_integer()) ->
         OldestTS :: ?TIME_UNIT.
-clear_expired_range(Name, EndTS, Limit) when Limit > 0 ->
-    fabric2_fdb:transactional(fun(Tx) ->
-        LayerPrefix = fabric2_fdb:get_dir(Tx),
-        ExpiresPrefix = erlfdb_tuple:pack(
-            {?EXPIRING_CACHE, Name, ?EXP}, LayerPrefix),
-        fabric2_fdb:fold_range({tx, Tx}, ExpiresPrefix, fun({K, _V}, Acc) ->
-            Unpacked = erlfdb_tuple:unpack(K, ExpiresPrefix),
-            couch_log:debug("~p clearing ~p", [?MODULE, Unpacked]),
-            {ExpiresTS, Key} = Unpacked,
-            clear_expired(Tx, ExpiresTS, Name, Key, LayerPrefix),
+clear_range_to(Name, EndTS, Limit) when Limit > 0 ->
+    fold_range(Name, EndTS, Limit,
+        fun(Tx, PK, XK, _Key, ExpiresTS, Acc) ->
+            ok = erlfdb:clear(Tx, PK),
+            ok = erlfdb:clear(Tx, XK),
             oldest_ts(ExpiresTS, Acc)
-        end, 0, [{end_key, EndTS}, {limit, Limit}])
-    end).
+        end, 0).
 
 
 %% Private
 
 
-clear_expired(Tx, ExpiresTS, Name, Key, Prefix) ->
-    PK = primary_key(Name, Key, Prefix),
-    XK = expiry_key(ExpiresTS, Name, Key, Prefix),
-    ok = erlfdb:clear(Tx, PK),
-    ok = erlfdb:clear(Tx, XK).
+fold_range(Name, EndTS, Limit, Fun, Acc0) when Limit > 0 ->
+    fabric2_fdb:transactional(fun(Tx) ->
+        {LayerPrefix, ExpiresPrefix} = prefixes(Tx, Name),
+        fabric2_fdb:fold_range({tx, Tx}, ExpiresPrefix, fun({XK, _XV}, Acc) ->
+            {ExpiresTS, Key} = erlfdb_tuple:unpack(XK, ExpiresPrefix),
+            PK = primary_key(Name, Key, LayerPrefix),
+            Fun(Tx, PK, XK, Key, ExpiresTS, Acc)
+        end, Acc0, [{end_key, EndTS}, {limit, Limit}])
+    end).
 
 
 oldest_ts(TS, 0) -> TS; % handle initial Acc = 0 case
@@ -114,3 +111,18 @@ primary_key(Name, Key, Prefix) ->
 
 expiry_key(ExpiresTS, Name, Key, Prefix) ->
     erlfdb_tuple:pack({?EXPIRING_CACHE, Name, ?EXP, ExpiresTS, Key}, Prefix).
+
+
+prefixes(Tx, Name) ->
+    Layer = fabric2_fdb:get_dir(Tx),
+    Expires = erlfdb_tuple:pack({?EXPIRING_CACHE, Name, ?EXP}, Layer),
+    {Layer, Expires}.
+
+
+get_val(Tx, PK) ->
+    case erlfdb:wait(erlfdb:get(Tx, PK)) of
+        not_found ->
+            not_found;
+        Bin when is_binary(Bin) ->
+            erlfdb_tuple:unpack(Bin)
+    end.
