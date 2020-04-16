@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sstream>
+
 #include <jsapi.h>
 #include <js/Initialization.h>
 #include <js/CharacterEncoding.h>
@@ -276,51 +278,63 @@ couch_print(JSContext* cx, JS::HandleValue obj, bool use_stderr)
 void
 couch_error(JSContext* cx, JSErrorReport* report)
 {
-    JS::RootedValue v(cx), stack(cx), replace(cx);
-    char* bytes;
-    JSObject* regexp;
-
-    if(!report || !JSREPORT_IS_WARNING(report->flags))
-    {
-        fprintf(stderr, "%s\n", report->message().c_str());
-
-        // Print a stack trace, if available.
-        if (JSREPORT_IS_EXCEPTION(report->flags) &&
-            JS_GetPendingException(cx, &v))
-        {
-            // Clear the exception before an JS method calls or the result is
-            // infinite, recursive error report generation.
-            JS_ClearPendingException(cx);
-
-            // Use JS regexp to indent the stack trace.
-            // If the regexp can't be created, don't JS_ReportErrorUTF8 since it is
-            // probably not productive to wind up here again.
-            JS::RootedObject vobj(cx, v.toObjectOrNull());
-
-            if(JS_GetProperty(cx, vobj, "stack", &stack) &&
-               (regexp = JS_NewRegExpObject(
-                   cx, "^(?=.)", 6, JSREG_GLOB | JSREG_MULTILINE)))
-            {
-                // Set up the arguments to ``String.replace()``
-                JS::AutoValueVector re_args(cx);
-                JS::RootedValue arg0(cx, JS::ObjectValue(*regexp));
-                auto arg1 = JS::StringValue(string_to_js(cx, "\t"));
-
-                if (re_args.append(arg0) && re_args.append(arg1)) {
-                    // Perform the replacement
-                    JS::RootedObject sobj(cx, stack.toObjectOrNull());
-                    if(JS_GetProperty(cx, sobj, "replace", &replace) &&
-                       JS_CallFunctionValue(cx, sobj, replace, re_args, &v))
-                    {
-                        // Print the result
-                        bytes = enc_string(cx, v, NULL);
-                        fprintf(stderr, "Stacktrace:\n%s", bytes);
-                        JS_free(cx, bytes);
-                    }
-                }
-            }
-        }
+    if(!report) {
+        return;
     }
+
+    if(JSREPORT_IS_WARNING(report->flags)) {
+        return;
+    }
+
+    std::ostringstream msg;
+    msg << "error: " << report->message().c_str();
+
+    mozilla::Maybe<JSAutoCompartment> ac;
+    JS::RootedValue exc(cx);
+    JS::RootedObject exc_obj(cx);
+    JS::RootedObject stack_obj(cx);
+    JS::RootedString stack_str(cx);
+    JS::RootedValue stack_val(cx);
+
+    if(!JS_GetPendingException(cx, &exc)) {
+        goto done;
+    }
+
+    // Clear the exception before an JS method calls or the result is
+    // infinite, recursive error report generation.
+    JS_ClearPendingException(cx);
+
+    exc_obj.set(exc.toObjectOrNull());
+    stack_obj.set(JS::ExceptionStackOrNull(exc_obj));
+
+    if(!stack_obj) {
+        // Compilation errors don't have a stack
+
+        msg << " at ";
+
+        if(report->filename) {
+            msg << report->filename;
+        } else {
+            msg << "<unknown>";
+        }
+
+        if(report->lineno) {
+            msg << ':' << report->lineno << ':' << report->column;
+        }
+
+        goto done;
+    }
+
+    if(!JS::BuildStackString(cx, stack_obj, &stack_str, 2)) {
+        goto done;
+    }
+
+    stack_val.set(JS::StringValue(stack_str));
+    msg << std::endl << std::endl << js_to_string(cx, stack_val).c_str();
+
+done:
+    msg << std::endl;
+    fprintf(stderr, "%s", msg.str().c_str());
 }
 
 
