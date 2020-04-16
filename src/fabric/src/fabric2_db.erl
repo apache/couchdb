@@ -935,8 +935,7 @@ fold_docs(Db, UserFun, UserAcc0, Options) ->
             UserAcc1 = maybe_stop(UserFun({meta, Meta}, UserAcc0)),
 
             FoldState0 = #{
-                winning_revs => [],
-                bodies => [],
+                rows => [],
                 user_acc => UserAcc1,
                 user_fun => UserFun
             },
@@ -989,9 +988,9 @@ async_wait_on_docs(Db, State0) ->
         bodies := BodyFutures0
     } = State0,
 
-    NewBodyFutures = lists:map(fun ({_Row, RevFoldFuture} = RowInfo) ->
+    NewBodyFutures = lists:map(fun (#{_Row, RevFoldFuture} = RowInfo) ->
         RevFuture = element(3, RevFoldFuture),
-        erlfdb:wait(RevFuture),
+        ok = erlfdb:block_until_ready(RevFuture),
         get_doc_future_from_rev(Db, RowInfo)
     end, RevFoldFutures),
 
@@ -999,59 +998,73 @@ async_wait_on_docs(Db, State0) ->
 
     lists:foreach(fun ({_Row, _RevInfo, BodyFoldFuture}) ->
         BodyFuture = element(3, BodyFoldFuture),
-        erlfdb:wait(BodyFuture)
+        ok = erlfdb:block_until_ready(BodyFuture)
     end, BodyFutures1),
 
     State1 = State0#{
-        winning_revs := [],
-        bodies := BodyFutures1
+        rows := BodyFutures1
     },
     send_ready_docs(Db, State1).
 
 
 async_fetch_and_stream_docs(Db, Row0, State0) ->
     Id0 = fabric2_util:get_value(id, Row0),
-    RevFuture0 = fabric2_fdb:get_winning_revs_future(Db, Id0, 1),
-    RevFutures = maps:get(winning_revs, State0) ++ [{Row0, RevFuture0}],
-    DocBodyFutures = maps:get(bodies, State0),
+    RevFuture = fabric2_fdb:get_winning_revs_future(Db, Id0, 1),
+    RowInfo = #{
+        row => Row0,
+        future => RevFuture,
+        state => rev,
+        rev_info => undefined
+    },
+    RowFutures0 = maps:get(rows, State0) ++ [RowInfo],
 
-    {WinningRevFutures1, NewBodyFutures} =
-            lists:foldl(fun ({Row, RevFoldFuture}, {NewRevs, NewBodies}) ->
-                RevFuture = element(3, RevFoldFuture),
-                case erlfdb:is_ready(RevFuture) of
-                    true ->
-                        DocFuture = get_doc_future_from_rev(Db, {Row, RevFoldFuture}),
-                        {NewRevs, NewBodies ++ [DocFuture]};
-                    false ->
-                        {NewRevs ++ [{Row, RevFoldFuture}], NewBodies}
-                end
-    end, {[], []}, RevFutures),
+     RowFutures1 = lists:map(fun (#{state := State, future := FoldFuture} = RowInfo) ->
+        Future = element(3, FoldFuture),
+        case {State, erlfdb:is_ready(Future)} of
+            {rev, true} ->
+                get_doc_future_from_rev(Db, RowInfo);
+            _ ->
+                RowInfo
+        end
+    end, RowFutures0),
 
     State1 = State0#{
-        winning_revs := WinningRevFutures1,
-        bodies := DocBodyFutures ++ NewBodyFutures
+        rows := RowFutures1
     },
     send_ready_docs(Db, State1).
 
 
-get_doc_future_from_rev(Db, {Row, RevFoldFuture}) ->
+get_doc_future_from_rev(Db, #{state := rev} = RowInfo) ->
+    #{
+        row := Row,
+        future := RevFoldFuture
+    } = RowInfo,
     Id = fabric2_util:get_value(id, Row),
     Revs = fabric2_fdb:get_winning_revs_wait(Db, RevFoldFuture),
     #{winner := true} = RevInfo = lists:last(Revs),
     BodyFuture = fabric2_fdb:get_doc_body_future(Db, Id, RevInfo),
-    {Row, RevInfo, BodyFuture}.
+    RowInfo#{
+        future := BodyFuture,
+        rev_info := RevInfo,
+        state := body
+    }.
 
 
-send_ready_docs(_Db, #{bodies := []} = State) ->
+send_ready_docs(_Db, #{rows := []} = State) ->
     State;
 
-send_ready_docs(Db, State) ->
+send_ready_docs(Db, #{rows := [#{state := body} = RowInfo | Rest]} = State) ->
     #{
         user_acc := UserAcc0,
         user_fun := UserFun,
-        bodies := [RowInfo | Rest]
+        rows := [RowInfo | Rest]
     } = State,
-    {Row0, RevInfo, BodyFoldFuture} = RowInfo,
+    #{
+        row := Row0,
+        rev_info := RevInfo,
+        future := BodyFoldFuture
+    } = RowInfo,
+
     BodyFuture = element(3, BodyFoldFuture),
     Id = fabric2_util:get_value(id, Row0),
     case erlfdb:is_ready(BodyFuture) of
@@ -1073,7 +1086,10 @@ send_ready_docs(Db, State) ->
             State#{
                 bodies := [RowInfo | Rest]
             }
-    end.
+    end;
+
+send_ready_docs(_Db, State) ->
+    State.
 
 
 fold_design_docs(Db, UserFun, UserAcc0, Options1) ->
