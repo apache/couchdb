@@ -93,6 +93,7 @@ test_decrypt() ->
     ?assertEqual(1, meck:num_calls(aegis_keywrap, key_unwrap, 2)),
     ?assertEqual(12, meck:num_calls(aegis, decrypt, 4)).
 
+
 test_multibase() ->
     ?assertEqual(0, meck:num_calls(aegis_keywrap, key_unwrap, 2)),
     ?assertEqual(0, meck:num_calls(aegis, encrypt, 4)),
@@ -111,3 +112,33 @@ test_multibase() ->
     ?assertEqual(12, meck:num_calls(aegis_keywrap, key_unwrap, 2)),
     ?assertEqual(120, meck:num_calls(aegis, encrypt, 4)),
     ?assertEqual(120, meck:num_calls(aegis, decrypt, 4)).
+
+
+
+error_test_() ->
+    {
+        foreach,
+        fun() ->
+            Ctx = setup(),
+            ok = meck:delete(aegis_keywrap, key_unwrap, 2),
+            ok = meck:expect(aegis_keywrap, key_unwrap, 2, fail),
+            Ctx
+        end,
+        fun teardown/1,
+        [
+            {"return error when unwrap fail on encrypt",
+            {timeout, ?TIMEOUT, fun test_encrypt_error/0}},
+            {"return error when unwrap fail on decrypt",
+            {timeout, ?TIMEOUT, fun test_decrypt_error/0}}
+        ]
+    }.
+
+
+test_encrypt_error() ->
+    Reply = gen_server:call(?SERVER, {encrypt, ?DB, <<1:64>>, ?VALUE}),
+    ?assertEqual({error, decryption_failed}, Reply).
+
+
+test_decrypt_error() ->
+    Reply = gen_server:call(?SERVER, {decrypt, ?DB, <<1:64>>, ?VALUE}),
+    ?assertEqual({error, decryption_failed}, Reply).

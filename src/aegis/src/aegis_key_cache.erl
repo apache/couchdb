@@ -196,6 +196,22 @@ maybe_spawn_worker(St, From, Action, #{aegis := WrappedKey} = Db, Key, Value) ->
      end.
 
 
+maybe_reply(St, Ref, {key, {error, WrappedKey, Error}}) ->
+    #{
+        waiters := Waiters
+    } = St,
+
+    Reply = {error, Error},
+
+    NewSt = case dict:take(WrappedKey, Waiters) of
+        {WaitList, Waiters1} ->
+            [ gen_server:reply(From, Reply) || #{from := From} <- WaitList ],
+            St#{waiters := Waiters1};
+        error ->
+            St
+    end,
+    maybe_reply(NewSt, Ref, Reply);
+
 maybe_reply(#{clients := Clients} = St, Ref, Resp) ->
     case dict:take(Ref, Clients) of
         {From, Clients1} ->
@@ -224,16 +240,18 @@ get_wrapped_key(#{} = _Db) ->
 unwrap_key(#{aegis := WrappedKey} = _Db) ->
     process_flag(sensitive, true),
     try
-        %% this could be atom fail, throw error is so !!
-        DbKey = aegis_keywrap:key_unwrap(?ROOT_KEY, WrappedKey),
-        {ok, DbKey, WrappedKey}
+        case aegis_keywrap:key_unwrap(?ROOT_KEY, WrappedKey) of
+            fail ->
+                error(decryption_failed);
+            DbKey ->
+                {ok, DbKey, WrappedKey}
+        end
     of
         Resp ->
             exit({key, Resp})
     catch
         _:Error ->
-            %% FIXME! add tag key and WrappedKey so we can respond to Waiters
-            exit({error, Error})
+            exit({key, {error, WrappedKey, Error}})
     end.
 
 
