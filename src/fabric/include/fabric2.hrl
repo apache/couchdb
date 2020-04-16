@@ -24,6 +24,7 @@
 -define(DB_HCA, 2).
 -define(DELETED_DBS, 3).
 -define(DBS, 15).
+-define(EXPIRING_CACHE, 53).
 -define(TX_IDS, 255).
 
 % Database Level: (LayerPrefix, ?DBS, DbPrefix, X, ...)

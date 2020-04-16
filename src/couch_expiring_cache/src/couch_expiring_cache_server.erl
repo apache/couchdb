@@ -82,7 +82,7 @@ handle_info(remove_expired, St) ->
 
     NowTS = erlang:system_time(?TIME_UNIT),
     OldestTS = max(OldestTS0,
-        couch_expiring_cache_fdb:clear_expired_range(Name, NowTS, BatchSize)),
+        couch_expiring_cache_fdb:clear_range_to(Name, NowTS, BatchSize)),
     Elapsed = erlang:system_time(?TIME_UNIT) - NowTS,
 
     {noreply, St#{
