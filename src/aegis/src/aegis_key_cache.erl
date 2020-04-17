@@ -229,8 +229,7 @@ do_decrypt(From, DbKey, #{uuid := UUID}, Key, Value) ->
 maybe_spawn_worker(St, From, Action, #{aegis := WrappedKey} = Db, Key, Value) ->
     #{
         cache := Cache,
-        waiters := Waiters,
-        unwrappers := Unwrappers
+        waiters := Waiters
     } = St,
 
     case lookup(Cache, WrappedKey) of
@@ -238,15 +237,7 @@ maybe_spawn_worker(St, From, Action, #{aegis := WrappedKey} = Db, Key, Value) ->
             erlang:spawn(?MODULE, Action, [From, DbKey, Db, Key, Value]),
             St;
         {error, not_found} ->
-            NewSt = case dict:is_key(WrappedKey, Unwrappers) of
-                true ->
-                    St;
-                false ->
-                    {_Pid, Ref} = erlang:spawn_monitor(
-                        ?MODULE, unwrap_key, [Db]),
-                    Unwrappers1 = dict:store(WrappedKey, Ref, Unwrappers),
-                    St#{unwrappers := Unwrappers1}
-            end,
+            NewSt = maybe_spawn_unwrapper(St, Db),
             Waiter = #{
                 from => From,
                 action => Action,
@@ -255,6 +246,21 @@ maybe_spawn_worker(St, From, Action, #{aegis := WrappedKey} = Db, Key, Value) ->
             Waiters1 = dict:append(WrappedKey, Waiter, Waiters),
             NewSt#{waiters := Waiters1}
      end.
+
+
+maybe_spawn_unwrapper(St, #{aegis := WrappedKey} = Db) ->
+    #{
+        unwrappers := Unwrappers
+    } = St,
+
+    case dict:is_key(WrappedKey, Unwrappers) of
+        true ->
+            St;
+        false ->
+            {_Pid, Ref} = erlang:spawn_monitor(?MODULE, unwrap_key, [Db]),
+            Unwrappers1 = dict:store(WrappedKey, Ref, Unwrappers),
+            St#{unwrappers := Unwrappers1}
+    end.
 
 
 maybe_reply(St, Ref, {key, {error, WrappedKey, Error}}) ->
