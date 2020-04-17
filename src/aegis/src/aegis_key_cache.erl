@@ -38,10 +38,7 @@
 ]).
 
 
--define(ROOT_KEY, <<1:256>>).
-
 -define(INIT_TIMEOUT, 60000).
-
 -define(TIMEOUT, 10000).
 
 
@@ -180,6 +177,60 @@ code_change(_OldVsn, St, _Extra) ->
 
 %% workers functions
 
+get_wrapped_key(#{} = Db) ->
+    process_flag(sensitive, true),
+    try
+        ?AEGIS_KEY_MANAGER:key_wrap(Db)
+    of
+        Resp ->
+            exit({key, Resp})
+    catch
+        _:Error ->
+            exit({error, Error})
+    end.
+
+
+unwrap_key(#{aegis := WrappedKey} = Db) ->
+    process_flag(sensitive, true),
+    try
+        ?AEGIS_KEY_MANAGER:key_unwrap(Db)
+    of
+        Resp ->
+            exit({key, Resp})
+    catch
+        _:Error ->
+            exit({key, {error, WrappedKey, Error}})
+    end.
+
+
+do_encrypt(DbKey, #{uuid := UUID}, Key, Value) ->
+    process_flag(sensitive, true),
+    try
+        aegis:encrypt(DbKey, UUID, Key, Value)
+    of
+        Resp ->
+            exit(Resp)
+    catch
+        _:Error ->
+            exit({error, Error})
+    end.
+
+
+do_decrypt(DbKey, #{uuid := UUID}, Key, Value) ->
+    process_flag(sensitive, true),
+    try
+        aegis:decrypt(DbKey, UUID, Key, Value)
+    of
+        Resp ->
+            exit(Resp)
+    catch
+        _:Error ->
+            exit({error, Error})
+    end.
+
+
+%% private functions
+
 maybe_spawn_worker(St, From, Action, #{aegis := WrappedKey} = Db, Key, Value) ->
     #{
         cache := Cache,
@@ -237,58 +288,6 @@ maybe_reply(#{clients := Clients} = St, Ref, Resp) ->
             St#{clients := Clients1};
         error ->
             St
-    end.
-
-
-get_wrapped_key(#{} = Db) ->
-    process_flag(sensitive, true),
-    try
-        ?AEGIS_KEY_MANAGER:key_wrap(Db)
-    of
-        Resp ->
-            exit({key, Resp})
-    catch
-        _:Error ->
-            exit({error, Error})
-    end.
-
-
-unwrap_key(#{aegis := WrappedKey} = Db) ->
-    process_flag(sensitive, true),
-    try
-        ?AEGIS_KEY_MANAGER:key_unwrap(Db)
-    of
-        Resp ->
-            exit({key, Resp})
-    catch
-        _:Error ->
-            exit({key, {error, WrappedKey, Error}})
-    end.
-
-
-do_encrypt(DbKey, #{uuid := UUID}, Key, Value) ->
-    process_flag(sensitive, true),
-    try
-        aegis:encrypt(DbKey, UUID, Key, Value)
-    of
-        Resp ->
-            exit(Resp)
-    catch
-        _:Error ->
-            exit({error, Error})
-    end.
-
-
-do_decrypt(DbKey, #{uuid := UUID}, Key, Value) ->
-    process_flag(sensitive, true),
-    try
-        aegis:decrypt(DbKey, UUID, Key, Value)
-    of
-        Resp ->
-            exit(Resp)
-    catch
-        _:Error ->
-            exit({error, Error})
     end.
 
 
