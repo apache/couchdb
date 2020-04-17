@@ -17,6 +17,8 @@
 
 -define(WRAPPED_KEY, {?DB_AEGIS, 1}).
 
+-define(CACHE, aegis_key_cache).
+
 
 -export([
     create/2,
@@ -37,7 +39,7 @@ create(#{} = Db, _Options) ->
     } = Db,
 
     % Fetch unwrapped key
-    WrappedKey = gen_server:call(aegis_key_cache, {get_wrapped_key, Db}),
+    WrappedKey = gen_server:call(?CACHE, {get_wrapped_key, Db}),
 
     % And store it
     FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
@@ -58,18 +60,23 @@ open(#{} = Db, _Options) ->
     FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
     WrappedKey = erlfdb:wait(erlfdb:get(Tx, FDBKey)),
 
-    %% maybe ask to rewrap and store if updated?
+    Db1 = Db#{aegis => WrappedKey},
 
-    Db#{
-        aegis => WrappedKey
-    }.
+    case gen_server:call(?CACHE, {unwrap_key, Db1}) of
+        WrappedKey ->
+            Db1;
+        NewWrappedKey ->
+            FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
+            ok = erlfdb:set(Tx, FDBKey, NewWrappedKey),
+            Db1#{aegis => NewWrappedKey}
+    end.
 
 
 encrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
 
 encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
-    gen_server:call(aegis_key_cache, {encrypt, Db, Key, Value}).
+    gen_server:call(?CACHE, {encrypt, Db, Key, Value}).
 
 encrypt(DbKey, UUID, Key, Value) ->
     EncryptionKey = crypto:strong_rand_bytes(32),
@@ -93,7 +100,7 @@ decrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
 
 decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
-    gen_server:call(aegis_key_cache, {decrypt, Db, Key, Value}).
+    gen_server:call(?CACHE, {decrypt, Db, Key, Value}).
 
 decrypt(DbKey, UUID, Key, Value) ->
     case Value of

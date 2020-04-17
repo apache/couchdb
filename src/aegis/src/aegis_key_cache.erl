@@ -91,6 +91,18 @@ handle_call({get_wrapped_key, Db}, From, #{clients := Clients} = St) ->
     Clients1 = dict:store(Ref, From, Clients),
     {noreply, St#{clients := Clients1}, ?TIMEOUT};
 
+handle_call({unwrap_key, #{aegis := WrappedKey} = Db}, From, St) ->
+    #{
+        clients := Clients,
+        unwrappers := Unwrappers
+    } = St,
+
+    {_Pid, Ref} = erlang:spawn_monitor(?MODULE, unwrap_key, [Db]),
+
+    Clients1 = dict:store(Ref, From, Clients),
+    Unwrappers1 = dict:store(WrappedKey, Ref, Unwrappers),
+    {noreply, St#{clients := Clients1, unwrappers := Unwrappers1}, ?TIMEOUT};
+
 handle_call({encrypt, Db, Key, Value}, From, St) ->
     NewSt = maybe_spawn_worker(St, From, do_encrypt, Db, Key, Value),
     {noreply, NewSt, ?TIMEOUT};
@@ -115,13 +127,19 @@ handle_info({'DOWN', Ref, _, _Pid, {key, {ok, DbKey, WrappedKey}}}, St) ->
         unwrappers := Unwrappers
     } = St,
 
+    IsGetWrappedKeyClient = dict:is_key(Ref, Clients),
+
     NewSt1 = case dict:take(WrappedKey, Unwrappers) of
         {Ref, Unwrappers1} ->
             ok = insert(Cache, WrappedKey, DbKey),
             St#{unwrappers := Unwrappers1};
+        error when IsGetWrappedKeyClient ->
+            ok = insert(Cache, WrappedKey, DbKey),
+            St;
         error ->
             %% FIXME! it might be new wrapped key != old wrapped key
-            %% fold here to search for it based on ref
+            %% fold over Unwrappers here to find waiters of old key
+            %% by Ref. also need way to store new wrapped key in fdb
             St
     end,
 
@@ -222,12 +240,10 @@ maybe_reply(#{clients := Clients} = St, Ref, Resp) ->
     end.
 
 
-get_wrapped_key(#{} = _Db) ->
+get_wrapped_key(#{} = Db) ->
     process_flag(sensitive, true),
     try
-        DbKey = crypto:strong_rand_bytes(32),
-        WrappedKey = aegis_keywrap:key_wrap(?ROOT_KEY, DbKey),
-        {ok, DbKey, WrappedKey}
+        ?AEGIS_KEY_MANAGER:key_wrap(Db)
     of
         Resp ->
             exit({key, Resp})
@@ -237,15 +253,10 @@ get_wrapped_key(#{} = _Db) ->
     end.
 
 
-unwrap_key(#{aegis := WrappedKey} = _Db) ->
+unwrap_key(#{aegis := WrappedKey} = Db) ->
     process_flag(sensitive, true),
     try
-        case aegis_keywrap:key_unwrap(?ROOT_KEY, WrappedKey) of
-            fail ->
-                error(decryption_failed);
-            DbKey ->
-                {ok, DbKey, WrappedKey}
-        end
+        ?AEGIS_KEY_MANAGER:key_unwrap(Db)
     of
         Resp ->
             exit({key, Resp})
