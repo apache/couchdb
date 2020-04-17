@@ -954,7 +954,7 @@ fold_docs(Db, UserFun, UserAcc0, Options) ->
 
                 Row1 = case lists:keyfind(include_docs, 1, Options) of
                     {include_docs, true} ->
-                        Row0 ++ open_json_doc(Db, DocId, OpenOpts, DocOpts);
+                        Row0 ++ open_json_doc(TxDb, DocId, OpenOpts, DocOpts);
                     _ ->
                         Row0
                 end,
