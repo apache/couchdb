@@ -33,8 +33,8 @@
 -export([
     get_wrapped_key/1,
     unwrap_key/1,
-    do_encrypt/4,
-    do_decrypt/4
+    do_encrypt/5,
+    do_decrypt/5
 ]).
 
 
@@ -142,20 +142,15 @@ handle_info({'DOWN', Ref, _, _Pid, {key, {ok, DbKey, WrappedKey}}}, St) ->
 
     NewSt2 = case dict:take(WrappedKey, Waiters) of
         {WaitList, Waiters1} ->
-            Clients1 = lists:foldl(fun(Waiter, Acc) ->
+            lists:foreach(fun(Waiter) ->
                 #{
                     from := From,
                     action := Action,
                     args := Args
                 } = Waiter,
-
-                {_Pid1, Ref1} = erlang:spawn_monitor(
-                    ?MODULE, Action, [DbKey | Args]),
-
-                dict:store(Ref1, From, Acc)
-            end, Clients, WaitList),
-
-            NewSt1#{clients := Clients1, waiters := Waiters1};
+                erlang:spawn(?MODULE, Action, [From, DbKey | Args])
+            end, WaitList),
+            NewSt1#{waiters := Waiters1};
         error ->
             NewSt1
     end,
@@ -203,29 +198,29 @@ unwrap_key(#{aegis := WrappedKey} = Db) ->
     end.
 
 
-do_encrypt(DbKey, #{uuid := UUID}, Key, Value) ->
+do_encrypt(From, DbKey, #{uuid := UUID}, Key, Value) ->
     process_flag(sensitive, true),
     try
         aegis:encrypt(DbKey, UUID, Key, Value)
     of
         Resp ->
-            exit(Resp)
+            gen_server:reply(From, Resp)
     catch
         _:Error ->
-            exit({error, Error})
+            gen_server:reply(From, {error, Error})
     end.
 
 
-do_decrypt(DbKey, #{uuid := UUID}, Key, Value) ->
+do_decrypt(From, DbKey, #{uuid := UUID}, Key, Value) ->
     process_flag(sensitive, true),
     try
         aegis:decrypt(DbKey, UUID, Key, Value)
     of
         Resp ->
-            exit(Resp)
+            gen_server:reply(From, Resp)
     catch
         _:Error ->
-            exit({error, Error})
+            gen_server:reply(From, {error, Error})
     end.
 
 
@@ -234,17 +229,14 @@ do_decrypt(DbKey, #{uuid := UUID}, Key, Value) ->
 maybe_spawn_worker(St, From, Action, #{aegis := WrappedKey} = Db, Key, Value) ->
     #{
         cache := Cache,
-        clients := Clients,
         waiters := Waiters,
         unwrappers := Unwrappers
     } = St,
 
     case lookup(Cache, WrappedKey) of
         {ok, DbKey} ->
-            {_Pid, Ref} = erlang:spawn_monitor(
-                ?MODULE, Action, [DbKey, Db, Key, Value]),
-            Clients1 = dict:store(Ref, From, Clients),
-            St#{clients := Clients1};
+            erlang:spawn(?MODULE, Action, [From, DbKey, Db, Key, Value]),
+            St;
         {error, not_found} ->
             NewSt = case dict:is_key(WrappedKey, Unwrappers) of
                 true ->
