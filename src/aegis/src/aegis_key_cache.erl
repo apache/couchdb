@@ -57,7 +57,7 @@ init([]) ->
 
     St = #{
         cache => Cache,
-        clients => dict:new(),
+        openers => dict:new(),
         waiters => dict:new(),
         unwrappers => dict:new()
     },
@@ -66,7 +66,7 @@ init([]) ->
 
 terminate(_Reason, St) ->
     #{
-        clients := Clients,
+        openers := Openers,
         waiters := Waiters
     } = St,
 
@@ -79,26 +79,26 @@ terminate(_Reason, St) ->
     dict:fold(fun(Ref, From, _) ->
         erlang:demonitor(Ref),
         gen_server:reply(From, {error, decryption_failed})
-    end, ok, Clients),
+    end, ok, Openers),
     ok.
 
 
-handle_call({get_wrapped_key, Db}, From, #{clients := Clients} = St) ->
+handle_call({get_wrapped_key, Db}, From, #{openers := Openers} = St) ->
     {_Pid, Ref} = erlang:spawn_monitor(?MODULE, get_wrapped_key, [Db]),
-    Clients1 = dict:store(Ref, From, Clients),
-    {noreply, St#{clients := Clients1}, ?TIMEOUT};
+    Openers1 = dict:store(Ref, From, Openers),
+    {noreply, St#{openers := Openers1}, ?TIMEOUT};
 
 handle_call({maybe_rewrap_key, #{aegis := WrappedKey} = Db}, From, St) ->
     #{
-        clients := Clients,
+        openers := Openers,
         unwrappers := Unwrappers
     } = St,
 
     {_Pid, Ref} = erlang:spawn_monitor(?MODULE, unwrap_key, [Db]),
 
-    Clients1 = dict:store(Ref, From, Clients),
+    Openers1 = dict:store(Ref, From, Openers),
     Unwrappers1 = dict:store(WrappedKey, Ref, Unwrappers),
-    {noreply, St#{clients := Clients1, unwrappers := Unwrappers1}, ?TIMEOUT};
+    {noreply, St#{openers := Openers1, unwrappers := Unwrappers1}, ?TIMEOUT};
 
 handle_call({encrypt, Db, Key, Value}, From, St) ->
     NewSt = maybe_spawn_worker(St, From, do_encrypt, Db, Key, Value),
@@ -119,18 +119,18 @@ handle_cast(_Msg, St) ->
 handle_info({'DOWN', Ref, _, _Pid, {key, {ok, DbKey, WrappedKey}}}, St) ->
     #{
         cache := Cache,
-        clients := Clients,
+        openers := Openers,
         waiters := Waiters,
         unwrappers := Unwrappers
     } = St,
 
-    IsGetWrappedKeyClient = dict:is_key(Ref, Clients),
+    IsOpener = dict:is_key(Ref, Openers),
 
     NewSt1 = case dict:take(WrappedKey, Unwrappers) of
         {Ref, Unwrappers1} ->
             ok = insert(Cache, WrappedKey, DbKey),
             St#{unwrappers := Unwrappers1};
-        error when IsGetWrappedKeyClient ->
+        error when IsOpener ->
             ok = insert(Cache, WrappedKey, DbKey),
             St;
         error ->
@@ -273,11 +273,11 @@ maybe_reply(St, Ref, {key, {error, WrappedKey, Error}}) ->
     end,
     maybe_reply(NewSt, Ref, Reply);
 
-maybe_reply(#{clients := Clients} = St, Ref, Resp) ->
-    case dict:take(Ref, Clients) of
-        {From, Clients1} ->
+maybe_reply(#{openers := Openers} = St, Ref, Resp) ->
+    case dict:take(Ref, Openers) of
+        {From, Openers1} ->
             gen_server:reply(From, Resp),
-            St#{clients := Clients1};
+            St#{openers := Openers1};
         error ->
             St
     end.
