@@ -27,6 +27,7 @@
 std::string
 js_to_string(JSContext* cx, JS::HandleValue val)
 {
+    JS::AutoSaveExceptionState exc_state(cx);
     JS::RootedString sval(cx);
     sval = val.toString();
 
@@ -106,21 +107,21 @@ couch_readfile(const char* file, char** outbuf_p)
 
     while((nread = fread(fbuf, 1, 16384, fp)) > 0) {
         if(buf == NULL) {
-            buf = (char*) malloc(nread + 1);
+            buf = new char[nread + 1];
             if(buf == NULL) {
                 fprintf(stderr, "Out of memory.\n");
                 exit(3);
             }
             memcpy(buf, fbuf, nread);
         } else {
-            tmp = (char*) malloc(buflen + nread + 1);
+            tmp = new char[buflen + nread + 1];
             if(tmp == NULL) {
                 fprintf(stderr, "Out of memory.\n");
                 exit(3);
             }
             memcpy(tmp, buf, buflen);
             memcpy(tmp+buflen, fbuf, nread);
-            free(buf);
+            delete buf;
             buf = tmp;
         }
         buflen += nread;
@@ -136,12 +137,17 @@ couch_parse_args(int argc, const char* argv[])
     couch_args* args;
     int i = 1;
 
-    args = (couch_args*) malloc(sizeof(couch_args));
+    args = new couch_args();
     if(args == NULL)
         return NULL;
 
-    memset(args, '\0', sizeof(couch_args));
+    args->eval = 0;
+    args->use_http = 0;
+    args->use_test_funs = 0;
     args->stack_size = 64L * 1024L * 1024L;
+    args->scripts = nullptr;
+    args->uri_file = nullptr;
+    args->uri = nullptr;
 
     while(i < argc) {
         if(strcmp("-h", argv[i]) == 0) {
@@ -215,7 +221,7 @@ couch_readline(JSContext* cx, FILE* fp)
     size_t oldbyteslen = 256;
     size_t readlen = 0;
 
-    bytes = (char *)JS_malloc(cx, byteslen);
+    bytes = static_cast<char*>(JS_malloc(cx, byteslen));
     if(bytes == NULL) return NULL;
     
     while((readlen = couch_fgets(bytes+used, byteslen-used, fp)) > 0) {
@@ -229,7 +235,7 @@ couch_readline(JSContext* cx, FILE* fp)
         // Double our buffer and read more.
         oldbyteslen = byteslen;
         byteslen *= 2;
-        tmp = (char *)JS_realloc(cx, bytes, oldbyteslen, byteslen);
+        tmp = static_cast<char*>(JS_realloc(cx, bytes, oldbyteslen, byteslen));
         if(!tmp) {
             JS_free(cx, bytes);
             return NULL;
@@ -244,8 +250,8 @@ couch_readline(JSContext* cx, FILE* fp)
         return JS_NewStringCopyZ(cx, nullptr);
     }
 
-    // Shring the buffer to the actual data size
-    tmp = (char *)JS_realloc(cx, bytes, byteslen, used);
+    // Shrink the buffer to the actual data size
+    tmp = static_cast<char*>(JS_realloc(cx, bytes, byteslen, used));
     if(!tmp) {
         JS_free(cx, bytes);
         return NULL;

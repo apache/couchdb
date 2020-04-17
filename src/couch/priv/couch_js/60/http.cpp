@@ -524,7 +524,7 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, std::string& body)
 static size_t
 send_body(void *ptr, size_t size, size_t nmem, void *data)
 {
-    CurlState* state = (CurlState*) data;
+    CurlState* state = static_cast<CurlState*>(data);
     size_t length = size * nmem;
     size_t towrite = state->sendlen - state->sent;
 
@@ -550,19 +550,19 @@ send_body(void *ptr, size_t size, size_t nmem, void *data)
 static int
 seek_body(void* ptr, curl_off_t offset, int origin)
 {
-    CurlState* state = (CurlState*) ptr;
+    CurlState* state = static_cast<CurlState*>(ptr);
     if(origin != SEEK_SET) return -1;
 
-    state->sent = (size_t) offset;
-    return (int) state->sent;
+    state->sent = static_cast<size_t>(offset);
+    return static_cast<int>(state->sent);
 }
 
 static size_t
 recv_header(void *ptr, size_t size, size_t nmem, void *data)
 {
-    CurlState* state = (CurlState*) data;
+    CurlState* state = static_cast<CurlState*>(data);
     char code[4];
-    char* header = (char*) ptr;
+    char* header = static_cast<char*>(ptr);
     size_t length = size * nmem;
     JSString* hdr = NULL;
     uint32_t hdrlen;
@@ -612,14 +612,17 @@ recv_header(void *ptr, size_t size, size_t nmem, void *data)
 static size_t
 recv_body(void *ptr, size_t size, size_t nmem, void *data)
 {
-    CurlState* state = (CurlState*) data;
+    CurlState* state = static_cast<CurlState*>(data);
     size_t length = size * nmem;
     char* tmp = NULL;
 
     if(!state->recvbuf) {
         state->recvlen = 4096;
         state->read = 0;
-        state->recvbuf = (char *)JS_malloc(state->cx, state->recvlen);
+        state->recvbuf = static_cast<char*>(JS_malloc(
+                state->cx,
+                state->recvlen
+            ));
     }
 
     if(!state->recvbuf) {
@@ -629,7 +632,12 @@ recv_body(void *ptr, size_t size, size_t nmem, void *data)
     // +1 so we can add '\0' back up in the go function.
     size_t oldlen = state->recvlen;
     while(length+1 > state->recvlen - state->read) state->recvlen *= 2;
-    tmp = (char *) JS_realloc(state->cx, state->recvbuf, oldlen, state->recvlen);
+    tmp = static_cast<char*>(JS_realloc(
+            state->cx,
+            state->recvbuf,
+            oldlen,
+            state->recvlen
+        ));
     if(!tmp) return CURLE_WRITE_ERROR;
     state->recvbuf = tmp;
 

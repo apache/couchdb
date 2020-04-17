@@ -98,8 +98,9 @@ req_ctor(JSContext* cx, unsigned int argc, JS::Value* vp)
 static bool
 req_open(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    JS::Value vobj = args.computeThis(cx);
+    JSObject* obj = vobj.toObjectOrNull();
     bool ret = false;
 
     if(argc == 2) {
@@ -118,8 +119,9 @@ req_open(JSContext* cx, unsigned int argc, JS::Value* vp)
 static bool
 req_set_hdr(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    JS::Value vobj = args.computeThis(cx);
+    JSObject* obj = vobj.toObjectOrNull();
     bool ret = false;
 
     if(argc == 2) {
@@ -136,8 +138,9 @@ req_set_hdr(JSContext* cx, unsigned int argc, JS::Value* vp)
 static bool
 req_send(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    JS::Value vobj = args.computeThis(cx);
+    JSObject* obj = vobj.toObjectOrNull();
     bool ret = false;
 
     if(argc == 1) {
@@ -154,7 +157,9 @@ static bool
 req_status(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
+    JS::Value vobj = args.computeThis(cx);
+    JSObject* obj = vobj.toObjectOrNull();
+
     int status = http_status(cx, obj);
 
     if(status < 0)
@@ -168,8 +173,10 @@ static bool
 base_url(JSContext *cx, unsigned int argc, JS::Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    couch_args *cargs = (couch_args*)JS_GetContextPrivate(cx);
+    JS::Value vobj = args.computeThis(cx);
+    JSObject* obj = vobj.toObjectOrNull();
+
+    couch_args *cargs = static_cast<couch_args*>(JS_GetContextPrivate(cx));
     JS::Value uri_val;
     bool rc = http_uri(cx, obj, cargs, &uri_val);
     args.rval().set(uri_val);
@@ -225,8 +232,14 @@ evalcx(JSContext *cx, unsigned int argc, JS::Value* vp)
         if (!sandbox)
             return false;
     }
-    JS_BeginRequest(cx);
+
     JSAutoRequest ar(cx);
+
+    if (!sandbox) {
+        sandbox = NewSandbox(cx, false);
+        if (!sandbox)
+            return false;
+    }
 
     js::AutoStableStringChars strChars(cx);
     if (!strChars.initTwoByte(cx, str))
@@ -235,12 +248,6 @@ evalcx(JSContext *cx, unsigned int argc, JS::Value* vp)
     mozilla::Range<const char16_t> chars = strChars.twoByteRange();
     size_t srclen = chars.length();
     const char16_t* src = chars.begin().get();
-
-    if (!sandbox) {
-        sandbox = NewSandbox(cx, false);
-        if (!sandbox)
-            return false;
-    }
 
     if(srclen == 0) {
         args.rval().setObject(*sandbox);
@@ -397,7 +404,7 @@ static JSFunctionSpec global_functions[] = {
 static bool
 csp_allows(JSContext* cx)
 {
-    couch_args *args = (couch_args*)JS_GetContextPrivate(cx);
+    couch_args* args = static_cast<couch_args*>(JS_GetContextPrivate(cx));
     if(args->eval) {
         return true;
     } else {
