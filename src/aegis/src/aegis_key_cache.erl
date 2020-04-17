@@ -88,7 +88,7 @@ handle_call({get_wrapped_key, Db}, From, #{clients := Clients} = St) ->
     Clients1 = dict:store(Ref, From, Clients),
     {noreply, St#{clients := Clients1}, ?TIMEOUT};
 
-handle_call({unwrap_key, #{aegis := WrappedKey} = Db}, From, St) ->
+handle_call({maybe_rewrap_key, #{aegis := WrappedKey} = Db}, From, St) ->
     #{
         clients := Clients,
         unwrappers := Unwrappers

@@ -62,7 +62,7 @@ open(#{} = Db, _Options) ->
 
     Db1 = Db#{aegis => WrappedKey},
 
-    case gen_server:call(?CACHE, {unwrap_key, Db1}) of
+    case gen_server:call(?CACHE, {maybe_rewrap_key, Db1}) of
         WrappedKey ->
             Db1;
         NewWrappedKey ->
