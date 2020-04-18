@@ -26,14 +26,14 @@ typedef struct {
 } couch_args;
 
 std::string js_to_string(JSContext* cx, JS::HandleValue val);
-std::string js_to_string(JSContext* cx, JSString *str);
+bool js_to_string(JSContext* cx, JS::HandleValue val, std::string& str);
 JSString* string_to_js(JSContext* cx, const std::string& s);
 
 couch_args* couch_parse_args(int argc, const char* argv[]);
 int couch_fgets(char* buf, int size, FILE* fp);
 JSString* couch_readline(JSContext* cx, FILE* fp);
 size_t couch_readfile(const char* file, char** outbuf_p);
-void couch_print(JSContext* cx, unsigned int argc, JS::CallArgs argv);
+void couch_print(JSContext* cx, JS::HandleValue str, bool use_stderr);
 void couch_error(JSContext* cx, JSErrorReport* report);
 void couch_oom(JSContext* cx, void* data);
 bool couch_load_funcs(JSContext* cx, JS::HandleObject obj, JSFunctionSpec* funcs);
