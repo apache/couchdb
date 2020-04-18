@@ -25,36 +25,17 @@ typedef struct {
     JSString*    uri;
 } couch_args;
 
-/*
 std::string js_to_string(JSContext* cx, JS::HandleValue val);
-std::string js_to_string(JSContext* cx, JSString *str);
+bool js_to_string(JSContext* cx, JS::HandleValue val, std::string& str);
 JSString* string_to_js(JSContext* cx, const std::string& s);
-*/
 
 couch_args* couch_parse_args(int argc, const char* argv[]);
 int couch_fgets(char* buf, int size, FILE* fp);
 JSString* couch_readline(JSContext* cx, FILE* fp);
 size_t couch_readfile(const char* file, char** outbuf_p);
-void couch_print(JSContext* cx, unsigned int argc, JS::CallArgs argv);
+void couch_print(JSContext* cx, JS::HandleValue str, bool use_stderr);
 void couch_error(JSContext* cx, JSErrorReport* report);
 void couch_oom(JSContext* cx, void* data);
 bool couch_load_funcs(JSContext* cx, JS::HandleObject obj, JSFunctionSpec* funcs);
-
-/*
- * GET_THIS:
- * @cx: JSContext pointer passed into JSNative function
- * @argc: Number of arguments passed into JSNative function
- * @vp: Argument value array passed into JSNative function
- * @args: Name for JS::CallArgs variable defined by this code snippet
- * @to: Name for JS::RootedObject variable referring to function's this
- *
- * A convenience macro for getting the 'this' object a function was called with.
- * Use in any JSNative function.
- */
-#define GET_THIS(cx, argc, vp, args, to)              \
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp); \
-    JS::RootedObject to(cx);                          \
-    if (!args.computeThis(cx, &to))                   \
-        return false;
 
 #endif // Included util.h
