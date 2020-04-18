@@ -31,7 +31,6 @@
 
 #include "config.h"
 #include "http.h"
-#include "utf8.h"
 #include "util.h"
 
 static bool enableSharedMemory = true;
@@ -102,7 +101,10 @@ req_ctor(JSContext* cx, unsigned int argc, JS::Value* vp)
 static bool
 req_open(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    GET_THIS(cx, argc, vp, args, obj)
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    JS::RootedObject obj(cx);
+    if (!args.computeThis(cx, &obj))
+        return false;
     bool ret = false;
 
     if(argc == 2) {
@@ -121,7 +123,10 @@ req_open(JSContext* cx, unsigned int argc, JS::Value* vp)
 static bool
 req_set_hdr(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    GET_THIS(cx, argc, vp, args, obj)
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    JS::RootedObject obj(cx);
+    if (!args.computeThis(cx, &obj))
+        return false;
     bool ret = false;
 
     if(argc == 2) {
@@ -138,7 +143,10 @@ req_set_hdr(JSContext* cx, unsigned int argc, JS::Value* vp)
 static bool
 req_send(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    GET_THIS(cx, argc, vp, args, obj)
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    JS::RootedObject obj(cx);
+    if (!args.computeThis(cx, &obj))
+        return false;
     bool ret = false;
 
     if(argc == 1) {
@@ -154,7 +162,11 @@ req_send(JSContext* cx, unsigned int argc, JS::Value* vp)
 static bool
 req_status(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
-    GET_THIS(cx, argc, vp, args, obj)
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    JS::RootedObject obj(cx);
+    if (!args.computeThis(cx, &obj))
+        return false;
+
     int status = http_status(cx, obj);
 
     if(status < 0)
@@ -167,8 +179,12 @@ req_status(JSContext* cx, unsigned int argc, JS::Value* vp)
 static bool
 base_url(JSContext *cx, unsigned int argc, JS::Value* vp)
 {
-    GET_THIS(cx, argc, vp, args, obj)
-    couch_args *cargs = (couch_args*)JS_GetContextPrivate(cx);
+    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
+    JS::RootedObject obj(cx);
+    if (!args.computeThis(cx, &obj))
+        return false;
+
+    couch_args *cargs = static_cast<couch_args*>(JS_GetContextPrivate(cx));
     JS::Value uri_val;
     bool rc = http_uri(cx, obj, cargs, &uri_val);
     args.rval().set(uri_val);
@@ -278,7 +294,19 @@ static bool
 print(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    couch_print(cx, argc, args);
+
+    bool use_stderr = false;
+    if(argc > 1 && args[1].isTrue()) {
+        use_stderr = true;
+    }
+
+    if(!args[0].isString()) {
+        JS_ReportErrorUTF8(cx, "Unable to print non-string value.");
+        return false;
+    }
+
+    couch_print(cx, args[0], use_stderr);
+
     args.rval().setUndefined();
     return true;
 }
@@ -381,7 +409,7 @@ static JSFunctionSpec global_functions[] = {
 static bool
 csp_allows(JSContext* cx, JS::HandleValue code)
 {
-    couch_args *args = (couch_args*)JS_GetContextPrivate(cx);
+    couch_args* args = static_cast<couch_args*>(JS_GetContextPrivate(cx));
     if(args->eval) {
         return true;
     } else {
@@ -476,14 +504,27 @@ main(int argc, const char* argv[])
         script = JS::CompileUtf8File(cx, options, fp);
         fclose(fp);
         if (!script) {
-            fprintf(stderr, "Failed to compile file: %s\n", filename);
+            JS::RootedValue exc(cx);
+            if(!JS_GetPendingException(cx, &exc)) {
+                fprintf(stderr, "Failed to compile file: %s\n", filename);
+            } else {
+                JS::RootedObject exc_obj(cx, &exc.toObject());
+                JSErrorReport* report = JS_ErrorFromException(cx, exc_obj);
+                couch_error(cx, report);
+            }
             return 1;
         }
 
         JS::RootedValue result(cx);
         if(JS_ExecuteScript(cx, script, &result) != true) {
-            fprintf(stderr, "Failed to execute script.\n");
-            return 1;
+            JS::RootedValue exc(cx);
+            if(!JS_GetPendingException(cx, &exc)) {
+                fprintf(stderr, "Failed to execute script.\n");
+            } else {
+                JS::RootedObject exc_obj(cx, &exc.toObject());
+                JSErrorReport* report = JS_ErrorFromException(cx, exc_obj);
+                couch_error(cx, report);
+            }
         }
 
         // Give the GC a chance to run.
