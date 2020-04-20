@@ -514,5 +514,5 @@ not_supported(#httpd{} = Req, _Db) ->
 
 
 not_implemented(#httpd{} = Req, _Db) ->
-    Msg = <<"resouce is not implemented">>,
+    Msg = <<"resource is not implemented">>,
     chttpd:send_error(Req, 501, not_implemented, Msg).
