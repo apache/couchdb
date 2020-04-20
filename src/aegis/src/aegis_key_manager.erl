@@ -14,24 +14,24 @@
 
 
 -type key() :: binary().
--type wrapped_key() :: binary().
+-type aegis_config() :: term().
 
--callback generate_key(Db :: #{}) ->
-    {ok, key(), wrapped_key()}.
+-callback generate_key(Db :: #{}, DbOptions :: list()) ->
+    {ok, key(), aegis_config()}.
 
--callback unwrap_key(Db :: #{}, WrappedKey :: wrapped_key()) ->
-    {ok, key(), wrapped_key()}.
+-callback unwrap_key(Db :: #{}, AegisConfig :: aegis_config()) ->
+    {ok, key(), aegis_config()}.
 
 
 -export([
-    generate_key/1,
+    generate_key/2,
     unwrap_key/2
 ]).
 
 
-generate_key(#{} = Db) ->
-    ?AEGIS_KEY_MANAGER:generate_key(Db).
+generate_key(#{} = Db, Options) ->
+    ?AEGIS_KEY_MANAGER:generate_key(Db, Options).
 
 
-unwrap_key(#{} = Db, WrappedKey) ->
-    ?AEGIS_KEY_MANAGER:unwrap_key(Db, WrappedKey).
+unwrap_key(#{} = Db, AegisConfig) ->
+    ?AEGIS_KEY_MANAGER:unwrap_key(Db, AegisConfig).

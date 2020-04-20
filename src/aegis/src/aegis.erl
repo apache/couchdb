@@ -27,34 +27,35 @@
     wrap_fold_fun/2
 ]).
 
-create(#{} = Db, _Options) ->
+create(#{} = Db, Options) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = Db,
 
-    {ok, WrappedKey} = aegis_server:generate_key(Db),
+    {ok, AegisConfig} = aegis_server:generate_key(Db, Options),
 
     FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
-    ok = erlfdb:set(Tx, FDBKey, WrappedKey),
+    Packed = erlfdb_tuple:pack({AegisConfig}),
+    ok = erlfdb:set(Tx, FDBKey, Packed),
 
     Db#{
-        aegis => WrappedKey
+        aegis => AegisConfig
     }.
 
 
-open(#{} = Db, Options) ->
+open(#{} = Db, _Options) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = Db,
 
-    % Fetch wrapped key
     FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
-    WrappedKey = erlfdb:wait(erlfdb:get(Tx, FDBKey)),
+    Packed = erlfdb:wait(erlfdb:get(Tx, FDBKey)),
+    {AegisConfig} = erlfdb_tuple:unpack(Packed),
 
     Db#{
-        aegis => WrappedKey
+        aegis => AegisConfig
     }.
 
 

@@ -17,7 +17,7 @@
 
 
 -export([
-    generate_key/1,
+    generate_key/2,
     unwrap_key/2
 ]).
 
@@ -25,16 +25,18 @@
 -define(ROOT_KEY, <<1:256>>).
 
 
-generate_key(#{} = _Db) ->
+generate_key(#{} = _Db, _Options) ->
     DbKey = crypto:strong_rand_bytes(32),
     WrappedKey = aegis_keywrap:key_wrap(?ROOT_KEY, DbKey),
-    {ok, DbKey, WrappedKey}.
+    %% just an example of how to represent the arbitrary options
+    AegisConfig = {<<"wrapped_key">>, WrappedKey},
+    {ok, DbKey, AegisConfig}.
 
 
-unwrap_key(#{} = _Db, WrappedKey) ->
+unwrap_key(#{} = _Db, {<<"wrapped_key">>, WrappedKey} = AegisConfig) ->
     case aegis_keywrap:key_unwrap(?ROOT_KEY, WrappedKey) of
         fail ->
             error(unwrap_failed);
         DbKey ->
-            {ok, DbKey, WrappedKey}
+            {ok, DbKey, AegisConfig}
     end.
