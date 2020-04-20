@@ -142,14 +142,17 @@ handle_info({'DOWN', Ref, _, _Pid, {ok, DbKey, AegisConfig}}, St) ->
         unwrappers := Unwrappers
     } = St,
 
-    ok = insert(Cache, AegisConfig, DbKey),
-
     case dict:take(Ref, Openers) of
         {From, Openers1} ->
+            ok = insert(Cache, AegisConfig, DbKey),
             gen_server:reply(From, {ok, AegisConfig}),
             {noreply, St#{openers := Openers1}, ?TIMEOUT};
         error ->
-            Unwrappers1 = dict:erase(AegisConfig, Unwrappers),
+            %% confirm we are receiving DbKey from known source
+            {AegisConfig, Unwrappers1} = dict:take(Ref, Unwrappers),
+            ok = insert(Cache, AegisConfig, DbKey),
+            Unwrappers2 = dict:erase(AegisConfig, Unwrappers1),
+
             {WaitList, Waiters1} = dict:take(AegisConfig, Waiters),
             lists:foreach(fun(Waiter) ->
                 #{
@@ -159,7 +162,7 @@ handle_info({'DOWN', Ref, _, _Pid, {ok, DbKey, AegisConfig}}, St) ->
                 } = Waiter,
                 erlang:spawn(?MODULE, Action, [From, DbKey | Args])
             end, WaitList),
-            NewSt = St#{waiters := Waiters1, unwrappers := Unwrappers1},
+            NewSt = St#{waiters := Waiters1, unwrappers := Unwrappers2},
             {noreply, NewSt, ?TIMEOUT}
     end;
 
@@ -175,16 +178,14 @@ handle_info({'DOWN', Ref, process, _Pid, {error, Error}}, St) ->
             gen_server:reply(From, {error, Error}),
             {noreply, St#{openers := Openers1}, ?TIMEOUT};
         error ->
-            {ok, AegisConfig} = dict:fold(fun
-                (K, V, _) when V == Ref -> {ok, K};
-                (_, _, Acc) -> Acc
-            end, not_found, Unwrappers),
-            Unwrappers1 = dict:erase(AegisConfig, Unwrappers),
+            {AegisConfig, Unwrappers1} = dict:take(Ref, Unwrappers),
+            Unwrappers2 = dict:erase(AegisConfig, Unwrappers1),
+
             {WaitList, Waiters1} = dict:take(AegisConfig, Waiters),
             lists:foreach(fun(#{from := From}) ->
                 gen_server:reply(From, {error, Error})
             end, WaitList),
-            NewSt = St#{waiters := Waiters1, unwrappers := Unwrappers1},
+            NewSt = St#{waiters := Waiters1, unwrappers := Unwrappers2},
             {noreply, NewSt, ?TIMEOUT}
     end;
 
@@ -315,7 +316,8 @@ maybe_spawn_unwrapper(St, #{aegis := AegisConfig} = Db) ->
         false ->
             {_Pid, Ref} = erlang:spawn_monitor(?MODULE, do_unwrap_key, [Db]),
             Unwrappers1 = dict:store(AegisConfig, Ref, Unwrappers),
-            St#{unwrappers := Unwrappers1}
+            Unwrappers2 = dict:store(Ref, AegisConfig, Unwrappers1),
+            St#{unwrappers := Unwrappers2}
     end.
 
 
