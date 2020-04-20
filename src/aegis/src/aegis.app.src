@@ -16,7 +16,7 @@
   {vsn, git},
   {mod, {aegis_app, []}},
   {registered, [
-    aegis_key_cache
+    aegis_server
   ]},
   {applications,
    [kernel,

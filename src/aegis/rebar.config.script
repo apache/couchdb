@@ -27,7 +27,7 @@ case lists:keyfind(aegis_key_manager, 1, CouchConfig) of
             {erl_opts, Opts} -> Opts;
             false -> []
         end,
-        AegisOpts = {d, 'AEGIS_KEY_MANAGER', list_to_existing_atom(Module)},
+        AegisOpts = {d, 'AEGIS_KEY_MANAGER', list_to_atom(Module)},
         NewOpts = [AegisOpts | CurrentOpts],
         lists:keystore(erl_opts, 1, CONFIG, {erl_opts, NewOpts});
     _ ->

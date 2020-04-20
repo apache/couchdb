@@ -11,13 +11,10 @@
 % the License.
 
 -module(aegis).
--include("aegis.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 
 
 -define(WRAPPED_KEY, {?DB_AEGIS, 1}).
-
--define(CACHE, aegis_key_cache).
 
 
 -export([
@@ -26,9 +23,7 @@
 
     decrypt/2,
     decrypt/3,
-    decrypt/4,
     encrypt/3,
-    encrypt/4,
     wrap_fold_fun/2
 ]).
 
@@ -38,10 +33,8 @@ create(#{} = Db, _Options) ->
         db_prefix := DbPrefix
     } = Db,
 
-    % Fetch unwrapped key
-    WrappedKey = gen_server:call(?CACHE, {get_wrapped_key, Db}),
+    {ok, WrappedKey} = aegis_server:generate_key(Db),
 
-    % And store it
     FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
     ok = erlfdb:set(Tx, FDBKey, WrappedKey),
 
@@ -50,7 +43,7 @@ create(#{} = Db, _Options) ->
     }.
 
 
-open(#{} = Db, _Options) ->
+open(#{} = Db, Options) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
@@ -60,35 +53,16 @@ open(#{} = Db, _Options) ->
     FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
     WrappedKey = erlfdb:wait(erlfdb:get(Tx, FDBKey)),
 
-    Db1 = Db#{aegis => WrappedKey},
-
-    case gen_server:call(?CACHE, {maybe_rewrap_key, Db1}) of
-        WrappedKey ->
-            Db1;
-        NewWrappedKey ->
-            FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
-            ok = erlfdb:set(Tx, FDBKey, NewWrappedKey),
-            Db1#{aegis => NewWrappedKey}
-    end.
+    Db#{
+        aegis => WrappedKey
+    }.
 
 
 encrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
 
 encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
-    gen_server:call(?CACHE, {encrypt, Db, Key, Value}).
-
-encrypt(DbKey, UUID, Key, Value) ->
-    EncryptionKey = crypto:strong_rand_bytes(32),
-    <<WrappedKey:320>> = aegis_keywrap:key_wrap(DbKey, EncryptionKey),
-
-    {CipherText, <<CipherTag:128>>} =
-        ?aes_gcm_encrypt(
-           EncryptionKey,
-           <<0:96>>,
-           <<UUID/binary, 0:8, Key/binary>>,
-           Value),
-    <<1:8, WrappedKey:320, CipherTag:128, CipherText/binary>>.
+    aegis_server:encrypt(Db, Key, Value).
 
 
 decrypt(#{} = Db, Rows) when is_list(Rows) ->
@@ -100,29 +74,7 @@ decrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
 
 decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
-    gen_server:call(?CACHE, {decrypt, Db, Key, Value}).
-
-decrypt(DbKey, UUID, Key, Value) ->
-    case Value of
-        <<1:8, WrappedKey:320, CipherTag:128, CipherText/binary>> ->
-            case aegis_keywrap:key_unwrap(DbKey, <<WrappedKey:320>>) of
-                fail ->
-                    erlang:error(decryption_failed);
-                DecryptionKey ->
-                    Decrypted =
-                    ?aes_gcm_decrypt(
-                        DecryptionKey,
-                        <<0:96>>,
-                        <<UUID/binary, 0:8, Key/binary>>,
-                        CipherText,
-                        <<CipherTag:128>>),
-                    if Decrypted /= error -> Decrypted; true ->
-                        erlang:error(decryption_failed)
-                    end
-            end;
-        _ ->
-            erlang:error(not_ciphertext)
-    end.
+    aegis_server:decrypt(Db, Key, Value).
 
 
 wrap_fold_fun(Db, Fun) when is_function(Fun, 2) ->

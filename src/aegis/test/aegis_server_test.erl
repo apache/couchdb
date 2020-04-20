@@ -10,12 +10,12 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(aegis_key_cache_test).
+-module(aegis_server_test).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 
--define(SERVER, aegis_key_cache).
+-define(SERVER, aegis_server).
 -define(DB, #{aegis => <<0:320>>, uuid => <<0:64>>}).
 -define(VALUE, <<0:8192>>).
 -define(ENCRYPTED, <<1:8, 0:320, 0:4096>>).
@@ -29,8 +29,8 @@ basic_test_() ->
         fun setup/0,
         fun teardown/1,
         [
-            {"cache unwrapped key on get_wrapped_key",
-            {timeout, ?TIMEOUT, fun test_get_wrapped_key/0}},
+            {"cache unwrapped key on generate_key",
+            {timeout, ?TIMEOUT, fun test_generate_key/0}},
             {"cache unwrapped key on encrypt",
             {timeout, ?TIMEOUT, fun test_encrypt/0}},
             {"cache unwrapped key on decrypt",
@@ -44,15 +44,19 @@ basic_test_() ->
 setup() ->
     Ctx = test_util:start_couch([fabric]),
     %% isolate aegis_key_cache from actual crypto
-    meck:new([aegis, aegis_keywrap], [passthrough]),
+    meck:new([aegis_server, aegis_keywrap], [passthrough]),
     ok = meck:expect(aegis_keywrap, key_wrap, 2, <<0:320>>),
     ok = meck:expect(aegis_keywrap, key_unwrap, fun(_, _) ->
         %% build a line of the waiters
         timer:sleep(20),
         <<0:256>>
     end),
-    ok = meck:expect(aegis, encrypt, 4, ?ENCRYPTED),
-    ok = meck:expect(aegis, decrypt, 4, ?VALUE),
+    ok = meck:expect(aegis_server, do_encrypt, fun(From, _, _, _, _) ->
+        gen_server:reply(From, ?ENCRYPTED)
+    end),
+    ok = meck:expect(aegis_server, do_decrypt, fun(From, _, _, _, _) ->
+        gen_server:reply(From, ?VALUE)
+    end),
     Ctx.
 
 
@@ -61,57 +65,56 @@ teardown(Ctx) ->
     test_util:stop_couch(Ctx).
 
 
-test_get_wrapped_key() ->
-    WrappedKey1 = gen_server:call(?SERVER, {get_wrapped_key, ?DB}),
+test_generate_key() ->
+    {ok, WrappedKey1} = aegis_server:generate_key(?DB),
     ?assertEqual(<<0:320>>, WrappedKey1),
     ?assertEqual(1, meck:num_calls(aegis_keywrap, key_wrap, 2)).
 
 
 test_encrypt() ->
     ?assertEqual(0, meck:num_calls(aegis_keywrap, key_unwrap, 2)),
-    ?assertEqual(0, meck:num_calls(aegis, encrypt, 4)),
+    ?assertEqual(0, meck:num_calls(aegis_server, do_encrypt, 5)),
 
     lists:foreach(fun(I) ->
-        Encrypted = gen_server:call(?SERVER, {encrypt, ?DB, <<I:64>>, ?VALUE}),
+        Encrypted = aegis_server:encrypt(?DB, <<I:64>>, ?VALUE),
         ?assertEqual(?ENCRYPTED, Encrypted)
     end, lists:seq(1, 12)),
 
     ?assertEqual(1, meck:num_calls(aegis_keywrap, key_unwrap, 2)),
-    ?assertEqual(12, meck:num_calls(aegis, encrypt, 4)).
+    ?assertEqual(12, meck:num_calls(aegis_server, do_encrypt, 5)).
 
 
 test_decrypt() ->
     ?assertEqual(0, meck:num_calls(aegis_keywrap, key_unwrap, 2)),
-    ?assertEqual(0, meck:num_calls(aegis, encrypt, 4)),
+    ?assertEqual(0, meck:num_calls(aegis_server, do_encrypt, 5)),
 
     lists:foreach(fun(I) ->
-        Decrypted = gen_server:call(
-            ?SERVER, {decrypt, ?DB, <<I:64>>, ?ENCRYPTED}),
+        Decrypted = aegis_server:decrypt(?DB, <<I:64>>, ?ENCRYPTED),
         ?assertEqual(?VALUE, Decrypted)
     end, lists:seq(1, 12)),
 
     ?assertEqual(1, meck:num_calls(aegis_keywrap, key_unwrap, 2)),
-    ?assertEqual(12, meck:num_calls(aegis, decrypt, 4)).
+    ?assertEqual(12, meck:num_calls(aegis_server, do_decrypt, 5)).
 
 
 test_multibase() ->
     ?assertEqual(0, meck:num_calls(aegis_keywrap, key_unwrap, 2)),
-    ?assertEqual(0, meck:num_calls(aegis, encrypt, 4)),
+    ?assertEqual(0, meck:num_calls(aegis_server, do_encrypt, 5)),
 
     lists:foreach(fun(I) ->
         Db = ?DB#{aegis => <<I:320>>},
         lists:foreach(fun(J) ->
             Key = <<J:64>>,
-            Out = gen_server:call(?SERVER, {encrypt, Db, Key, ?VALUE}),
+            Out = aegis_server:encrypt(Db, Key, ?VALUE),
             ?assertEqual(?ENCRYPTED, Out),
-            In = gen_server:call(?SERVER, {decrypt, Db, Key, Out}),
+            In = aegis_server:decrypt(Db, Key, Out),
             ?assertEqual(?VALUE, In)
         end, lists:seq(1, 10))
     end, lists:seq(1, 12)),
 
     ?assertEqual(12, meck:num_calls(aegis_keywrap, key_unwrap, 2)),
-    ?assertEqual(120, meck:num_calls(aegis, encrypt, 4)),
-    ?assertEqual(120, meck:num_calls(aegis, decrypt, 4)).
+    ?assertEqual(120, meck:num_calls(aegis_server, do_encrypt, 5)),
+    ?assertEqual(120, meck:num_calls(aegis_server, do_decrypt, 5)).
 
 
 
@@ -135,10 +138,10 @@ error_test_() ->
 
 
 test_encrypt_error() ->
-    Reply = gen_server:call(?SERVER, {encrypt, ?DB, <<1:64>>, ?VALUE}),
-    ?assertEqual({error, decryption_failed}, Reply).
+    Reply = aegis_server:encrypt(?DB, <<1:64>>, ?VALUE),
+    ?assertEqual({error, unwrap_failed}, Reply).
 
 
 test_decrypt_error() ->
-    Reply = gen_server:call(?SERVER, {decrypt, ?DB, <<1:64>>, ?VALUE}),
-    ?assertEqual({error, decryption_failed}, Reply).
+    Reply = aegis_server:decrypt(?DB, <<1:64>>, ?ENCRYPTED),
+    ?assertEqual({error, unwrap_failed}, Reply).

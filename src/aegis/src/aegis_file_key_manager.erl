@@ -10,37 +10,31 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(aegis_sup).
+-module(aegis_file_key_manager).
 
--behaviour(supervisor).
 
--vsn(1).
+-behaviour(aegis_key_manager).
 
 
 -export([
-    start_link/0
-]).
-
--export([
-    init/1
+    generate_key/1,
+    unwrap_key/2
 ]).
 
 
-start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+-define(ROOT_KEY, <<1:256>>).
 
 
-init([]) ->
-    Flags = #{
-        strategy => one_for_one,
-        intensity => 5,
-        period => 10
-    },
-    Children = [
-        #{
-            id => aegis_server,
-            start => {aegis_server, start_link, []},
-            shutdown => 5000
-        }
-    ],
-    {ok, {Flags, Children}}.
+generate_key(#{} = _Db) ->
+    DbKey = crypto:strong_rand_bytes(32),
+    WrappedKey = aegis_keywrap:key_wrap(?ROOT_KEY, DbKey),
+    {ok, DbKey, WrappedKey}.
+
+
+unwrap_key(#{} = _Db, WrappedKey) ->
+    case aegis_keywrap:key_unwrap(?ROOT_KEY, WrappedKey) of
+        fail ->
+            error(unwrap_failed);
+        DbKey ->
+            {ok, DbKey, WrappedKey}
+    end.

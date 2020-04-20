@@ -13,25 +13,25 @@
 -module(aegis_key_manager).
 
 
+-type key() :: binary().
+-type wrapped_key() :: binary().
+
+-callback generate_key(Db :: #{}) ->
+    {ok, key(), wrapped_key()}.
+
+-callback unwrap_key(Db :: #{}, WrappedKey :: wrapped_key()) ->
+    {ok, key(), wrapped_key()}.
+
+
 -export([
-    key_wrap/1,
-    key_unwrap/1
+    generate_key/1,
+    unwrap_key/2
 ]).
 
 
--define(ROOT_KEY, <<1:256>>).
+generate_key(#{} = Db) ->
+    ?AEGIS_KEY_MANAGER:generate_key(Db).
 
 
-key_wrap(#{} = _Db) ->
-    DbKey = crypto:strong_rand_bytes(32),
-    WrappedKey = aegis_keywrap:key_wrap(?ROOT_KEY, DbKey),
-    {ok, DbKey, WrappedKey}.
-
-
-key_unwrap(#{aegis := WrappedKey} = _Db) ->
-    case aegis_keywrap:key_unwrap(?ROOT_KEY, WrappedKey) of
-        fail ->
-            error(decryption_failed);
-        DbKey ->
-            {ok, DbKey, WrappedKey}
-    end.
+unwrap_key(#{} = Db, WrappedKey) ->
+    ?AEGIS_KEY_MANAGER:unwrap_key(Db, WrappedKey).

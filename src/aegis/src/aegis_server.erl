@@ -10,15 +10,21 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(aegis_key_cache).
+-module(aegis_server).
 
 -behaviour(gen_server).
 
 -vsn(1).
 
 
+-include("aegis.hrl").
+
+
 -export([
-    start_link/0
+    start_link/0,
+    generate_key/1,
+    encrypt/3,
+    decrypt/3
 ]).
 
 -export([
@@ -31,8 +37,8 @@
 ]).
 
 -export([
-    get_wrapped_key/1,
-    unwrap_key/1,
+    do_generate_key/1,
+    do_unwrap_key/1,
     do_encrypt/5,
     do_decrypt/5
 ]).
@@ -47,6 +53,21 @@
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+
+-spec generate_key(Db :: #{}) -> {ok, binary()} | {error, atom()}.
+generate_key(#{} = Db) ->
+    gen_server:call(?MODULE, {generate_key, Db}).
+
+
+-spec encrypt(Db :: #{}, Key :: binary(), Value :: binary()) -> binary().
+encrypt(#{} = Db, Key, Value)  when is_binary(Key), is_binary(Value) ->
+    gen_server:call(?MODULE, {encrypt, Db, Key, Value}).
+
+
+-spec decrypt(Db :: #{}, Key :: binary(), Value :: binary()) -> binary().
+decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
+    gen_server:call(?MODULE, {decrypt, Db, Key, Value}).
 
 
 %% gen_server functions
@@ -72,33 +93,21 @@ terminate(_Reason, St) ->
 
     dict:fold(fun(_WrappedKey, WaitList, _) ->
         lists:foreach(fun(#{from := From}) ->
-            gen_server:reply(From, {error, decryption_failed})
+            gen_server:reply(From, {error, decryption_aborted})
         end, WaitList)
     end, ok, Waiters),
 
     dict:fold(fun(Ref, From, _) ->
         erlang:demonitor(Ref),
-        gen_server:reply(From, {error, decryption_failed})
+        gen_server:reply(From, {error, decryption_aborted})
     end, ok, Openers),
     ok.
 
 
-handle_call({get_wrapped_key, Db}, From, #{openers := Openers} = St) ->
-    {_Pid, Ref} = erlang:spawn_monitor(?MODULE, get_wrapped_key, [Db]),
+handle_call({generate_key, Db}, From, #{openers := Openers} = St) ->
+    {_Pid, Ref} = erlang:spawn_monitor(?MODULE, do_generate_key, [Db]),
     Openers1 = dict:store(Ref, From, Openers),
     {noreply, St#{openers := Openers1}, ?TIMEOUT};
-
-handle_call({maybe_rewrap_key, #{aegis := WrappedKey} = Db}, From, St) ->
-    #{
-        openers := Openers,
-        unwrappers := Unwrappers
-    } = St,
-
-    {_Pid, Ref} = erlang:spawn_monitor(?MODULE, unwrap_key, [Db]),
-
-    Openers1 = dict:store(Ref, From, Openers),
-    Unwrappers1 = dict:store(WrappedKey, Ref, Unwrappers),
-    {noreply, St#{openers := Openers1, unwrappers := Unwrappers1}, ?TIMEOUT};
 
 handle_call({encrypt, Db, Key, Value}, From, St) ->
     NewSt = maybe_spawn_worker(St, From, do_encrypt, Db, Key, Value),
@@ -116,7 +125,7 @@ handle_cast(_Msg, St) ->
     {noreply, St}.
 
 
-handle_info({'DOWN', Ref, _, _Pid, {key, {ok, DbKey, WrappedKey}}}, St) ->
+handle_info({'DOWN', Ref, _, _Pid, {ok, DbKey, WrappedKey}}, St) ->
     #{
         cache := Cache,
         openers := Openers,
@@ -124,24 +133,15 @@ handle_info({'DOWN', Ref, _, _Pid, {key, {ok, DbKey, WrappedKey}}}, St) ->
         unwrappers := Unwrappers
     } = St,
 
-    IsOpener = dict:is_key(Ref, Openers),
+    ok = insert(Cache, WrappedKey, DbKey),
 
-    NewSt1 = case dict:take(WrappedKey, Unwrappers) of
-        {Ref, Unwrappers1} ->
-            ok = insert(Cache, WrappedKey, DbKey),
-            St#{unwrappers := Unwrappers1};
-        error when IsOpener ->
-            ok = insert(Cache, WrappedKey, DbKey),
-            St;
+    case dict:take(Ref, Openers) of
+        {From, Openers1} ->
+            gen_server:reply(From, {ok, WrappedKey}),
+            {noreply, St#{openers := Openers1}, ?TIMEOUT};
         error ->
-            %% FIXME! it might be new wrapped key != old wrapped key
-            %% fold over Unwrappers here to find waiters of old key
-            %% by Ref. also need way to store new wrapped key in fdb
-            St
-    end,
-
-    NewSt2 = case dict:take(WrappedKey, Waiters) of
-        {WaitList, Waiters1} ->
+            Unwrappers1 = dict:erase(WrappedKey, Unwrappers),
+            {WaitList, Waiters1} = dict:take(WrappedKey, Waiters),
             lists:foreach(fun(Waiter) ->
                 #{
                     from := From,
@@ -150,17 +150,34 @@ handle_info({'DOWN', Ref, _, _Pid, {key, {ok, DbKey, WrappedKey}}}, St) ->
                 } = Waiter,
                 erlang:spawn(?MODULE, Action, [From, DbKey | Args])
             end, WaitList),
-            NewSt1#{waiters := Waiters1};
+            NewSt = St#{waiters := Waiters1, unwrappers := Unwrappers1},
+            {noreply, NewSt, ?TIMEOUT}
+    end;
+
+handle_info({'DOWN', Ref, process, _Pid, {error, Error}}, St) ->
+    #{
+        openers := Openers,
+        waiters := Waiters,
+        unwrappers := Unwrappers
+    } = St,
+
+    case dict:take(Ref, Openers) of
+        {From, Openers1} ->
+            gen_server:reply(From, {error, Error}),
+            {noreply, St#{openers := Openers1}, ?TIMEOUT};
         error ->
-            NewSt1
-    end,
-
-    NewSt3 = maybe_reply(NewSt2, Ref, WrappedKey),
-    {noreply, NewSt3, ?TIMEOUT};
-
-handle_info({'DOWN', Ref, process, _Pid, Resp}, St) ->
-    NewSt = maybe_reply(St, Ref, Resp),
-    {noreply, NewSt, ?TIMEOUT};
+            {ok, WrappedKey} = dict:fold(fun
+                (K, V, _) when V == Ref -> {ok, K};
+                (_, _, Acc) -> Acc
+            end, not_found, Unwrappers),
+            Unwrappers1 = dict:erase(WrappedKey, Unwrappers),
+            {WaitList, Waiters1} = dict:take(WrappedKey, Waiters),
+            lists:foreach(fun(#{from := From}) ->
+                gen_server:reply(From, {error, Error})
+            end, WaitList),
+            NewSt = St#{waiters := Waiters1, unwrappers := Unwrappers1},
+            {noreply, NewSt, ?TIMEOUT}
+    end;
 
 handle_info(_Msg, St) ->
     {noreply, St}.
@@ -172,36 +189,45 @@ code_change(_OldVsn, St, _Extra) ->
 
 %% workers functions
 
-get_wrapped_key(#{} = Db) ->
+do_generate_key(#{} = Db) ->
     process_flag(sensitive, true),
     try
-        ?AEGIS_KEY_MANAGER:key_wrap(Db)
+        aegis_key_manager:generate_key(Db)
     of
         Resp ->
-            exit({key, Resp})
+            exit(Resp)
     catch
         _:Error ->
             exit({error, Error})
     end.
 
 
-unwrap_key(#{aegis := WrappedKey} = Db) ->
+do_unwrap_key(#{aegis := WrappedKey} = Db) ->
     process_flag(sensitive, true),
     try
-        ?AEGIS_KEY_MANAGER:key_unwrap(Db)
+        aegis_key_manager:unwrap_key(Db, WrappedKey)
     of
         Resp ->
-            exit({key, Resp})
+            exit(Resp)
     catch
         _:Error ->
-            exit({key, {error, WrappedKey, Error}})
+            exit({error, Error})
     end.
 
 
 do_encrypt(From, DbKey, #{uuid := UUID}, Key, Value) ->
     process_flag(sensitive, true),
     try
-        aegis:encrypt(DbKey, UUID, Key, Value)
+        EncryptionKey = crypto:strong_rand_bytes(32),
+        <<WrappedKey:320>> = aegis_keywrap:key_wrap(DbKey, EncryptionKey),
+
+        {CipherText, <<CipherTag:128>>} =
+            ?aes_gcm_encrypt(
+               EncryptionKey,
+               <<0:96>>,
+               <<UUID/binary, 0:8, Key/binary>>,
+               Value),
+        <<1:8, WrappedKey:320, CipherTag:128, CipherText/binary>>
     of
         Resp ->
             gen_server:reply(From, Resp)
@@ -214,7 +240,26 @@ do_encrypt(From, DbKey, #{uuid := UUID}, Key, Value) ->
 do_decrypt(From, DbKey, #{uuid := UUID}, Key, Value) ->
     process_flag(sensitive, true),
     try
-        aegis:decrypt(DbKey, UUID, Key, Value)
+        case Value of
+            <<1:8, WrappedKey:320, CipherTag:128, CipherText/binary>> ->
+                case aegis_keywrap:key_unwrap(DbKey, <<WrappedKey:320>>) of
+                    fail ->
+                        erlang:error(decryption_failed);
+                    DecryptionKey ->
+                        Decrypted =
+                        ?aes_gcm_decrypt(
+                            DecryptionKey,
+                            <<0:96>>,
+                            <<UUID/binary, 0:8, Key/binary>>,
+                            CipherText,
+                            <<CipherTag:128>>),
+                        if Decrypted /= error -> Decrypted; true ->
+                            erlang:error(decryption_failed)
+                        end
+                end;
+            _ ->
+                erlang:error(not_ciphertext)
+        end
     of
         Resp ->
             gen_server:reply(From, Resp)
@@ -257,35 +302,9 @@ maybe_spawn_unwrapper(St, #{aegis := WrappedKey} = Db) ->
         true ->
             St;
         false ->
-            {_Pid, Ref} = erlang:spawn_monitor(?MODULE, unwrap_key, [Db]),
+            {_Pid, Ref} = erlang:spawn_monitor(?MODULE, do_unwrap_key, [Db]),
             Unwrappers1 = dict:store(WrappedKey, Ref, Unwrappers),
             St#{unwrappers := Unwrappers1}
-    end.
-
-
-maybe_reply(St, Ref, {key, {error, WrappedKey, Error}}) ->
-    #{
-        waiters := Waiters
-    } = St,
-
-    Reply = {error, Error},
-
-    NewSt = case dict:take(WrappedKey, Waiters) of
-        {WaitList, Waiters1} ->
-            [ gen_server:reply(From, Reply) || #{from := From} <- WaitList ],
-            St#{waiters := Waiters1};
-        error ->
-            St
-    end,
-    maybe_reply(NewSt, Ref, Reply);
-
-maybe_reply(#{openers := Openers} = St, Ref, Resp) ->
-    case dict:take(Ref, Openers) of
-        {From, Openers1} ->
-            gen_server:reply(From, Resp),
-            St#{openers := Openers1};
-        error ->
-            St
     end.
 
 
