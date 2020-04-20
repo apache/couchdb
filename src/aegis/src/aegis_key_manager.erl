@@ -17,7 +17,7 @@
 -type aegis_config() :: term().
 
 -callback generate_key(Db :: #{}, DbOptions :: list()) ->
-    {ok, key(), aegis_config()}.
+    {ok, key(), aegis_config()} | {ok, false}.
 
 -callback unwrap_key(Db :: #{}, AegisConfig :: aegis_config()) ->
     {ok, key(), aegis_config()}.

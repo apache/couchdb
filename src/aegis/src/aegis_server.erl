@@ -59,7 +59,7 @@ start_link() ->
 
 
 -spec generate_key(Db :: #{}, Options :: list()) ->
-        {ok, term()} | {error, term()}.
+        {ok, term() | false} | {error, term()}.
 generate_key(#{} = Db, Options) ->
     gen_server:call(?MODULE, {generate_key, Db, Options}).
 
@@ -128,6 +128,11 @@ handle_call(_Msg, _From, St) ->
 handle_cast(_Msg, St) ->
     {noreply, St}.
 
+
+handle_info({'DOWN', Ref, _, _Pid, {ok, false}}, #{openers := Openers} = St) ->
+    {From, Openers1} = dict:take(Ref, Openers),
+    gen_server:reply(From, {ok, false}),
+    {noreply, St#{openers := Openers1}, ?TIMEOUT};
 
 handle_info({'DOWN', Ref, _, _Pid, {ok, DbKey, AegisConfig}}, St) ->
     #{

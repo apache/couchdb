@@ -153,3 +153,54 @@ test_encrypt_error() ->
 test_decrypt_error() ->
     Reply = aegis_server:decrypt(?DB, <<1:64>>, ?ENCRYPTED),
     ?assertEqual({error, unwrap_failed}, Reply).
+
+
+
+disabled_test_() ->
+    {
+        foreach,
+        fun() ->
+            Ctx = setup(),
+            ok = meck:delete(aegis_key_manager, generate_key, 2),
+            ok = meck:expect(aegis_key_manager, generate_key, fun(_, _) ->
+                {ok, false}
+            end),
+            Ctx
+        end,
+        fun teardown/1,
+        [
+            {"accept {ok, false} from key managers",
+            {timeout, ?TIMEOUT, fun test_disabled_generate_key/0}},
+            {"pass through on encrypt when encryption disabled",
+            {timeout, ?TIMEOUT, fun test_disabled_encrypt/0}},
+            {"pass through on decrypt when encryption disabled",
+            {timeout, ?TIMEOUT, fun test_disabled_decrypt/0}}
+        ]
+    }.
+
+
+test_disabled_generate_key() ->
+    ?assertEqual({ok, false}, aegis_server:generate_key(?DB, [])),
+    ?assertEqual(1, meck:num_calls(aegis_key_manager, generate_key, 2)).
+
+
+test_disabled_encrypt() ->
+    ?assertEqual(0, meck:num_calls(aegis_key_manager, unwrap_key, 2)),
+    ?assertEqual(0, meck:num_calls(aegis_server, do_encrypt, 5)),
+
+    Encrypted = aegis:encrypt(?DB#{aegis => false}, <<1:64>>, ?VALUE),
+    ?assertEqual(?VALUE, Encrypted),
+
+    ?assertEqual(0, meck:num_calls(aegis_key_manager, unwrap_key, 2)),
+    ?assertEqual(0, meck:num_calls(aegis_server, do_encrypt, 5)).
+
+
+test_disabled_decrypt() ->
+    ?assertEqual(0, meck:num_calls(aegis_key_manager, unwrap_key, 2)),
+    ?assertEqual(0, meck:num_calls(aegis_server, do_decrypt, 5)),
+
+    Decrypted = aegis:decrypt(?DB#{aegis => false}, <<1:64>>, ?VALUE),
+    ?assertEqual(?VALUE, Decrypted),
+
+    ?assertEqual(0, meck:num_calls(aegis_key_manager, unwrap_key, 2)),
+    ?assertEqual(0, meck:num_calls(aegis_server, do_decrypt, 5)).

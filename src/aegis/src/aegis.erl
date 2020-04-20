@@ -62,6 +62,9 @@ open(#{} = Db, _Options) ->
 encrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
 
+encrypt(#{aegis := false}, _Key, Value) when is_binary(Value) ->
+    Value;
+
 encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
     aegis_server:encrypt(Db, Key, Value).
 
@@ -73,6 +76,9 @@ decrypt(#{} = Db, Rows) when is_list(Rows) ->
 
 decrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
+
+decrypt(#{aegis := false}, _Key, Value) when is_binary(Value) ->
+    Value;
 
 decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
     aegis_server:decrypt(Db, Key, Value).
