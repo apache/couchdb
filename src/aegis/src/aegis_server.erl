@@ -109,8 +109,12 @@ terminate(_Reason, St) ->
 
 
 handle_call({generate_key, Db, Options}, From, #{openers := Openers} = St) ->
+    #{
+        uuid := UUID
+    } = Db,
+
     {_, Ref} = erlang:spawn_monitor(?MODULE, do_generate_key, [Db, Options]),
-    Openers1 = dict:store(Ref, From, Openers),
+    Openers1 = dict:store(Ref, {UUID, From}, Openers),
     {noreply, St#{openers := Openers1}, ?TIMEOUT};
 
 handle_call({encrypt, Db, Key, Value}, From, St) ->
@@ -130,7 +134,7 @@ handle_cast(_Msg, St) ->
 
 
 handle_info({'DOWN', Ref, _, _Pid, false}, #{openers := Openers} = St) ->
-    {From, Openers1} = dict:take(Ref, Openers),
+    {{_UUID, From}, Openers1} = dict:take(Ref, Openers),
     gen_server:reply(From, {ok, false}),
     {noreply, St#{openers := Openers1}, ?TIMEOUT};
 
@@ -143,17 +147,16 @@ handle_info({'DOWN', Ref, _, _Pid, {ok, DbKey, AegisConfig}}, St) ->
     } = St,
 
     case dict:take(Ref, Openers) of
-        {From, Openers1} ->
-            ok = insert(Cache, AegisConfig, DbKey),
+        {{UUID, From}, Openers1} ->
+            ok = insert(Cache, UUID, DbKey),
             gen_server:reply(From, {ok, AegisConfig}),
             {noreply, St#{openers := Openers1}, ?TIMEOUT};
         error ->
-            %% confirm we are receiving DbKey from known source
-            {AegisConfig, Unwrappers1} = dict:take(Ref, Unwrappers),
-            ok = insert(Cache, AegisConfig, DbKey),
-            Unwrappers2 = dict:erase(AegisConfig, Unwrappers1),
+            {UUID, Unwrappers1} = dict:take(Ref, Unwrappers),
+            ok = insert(Cache, UUID, DbKey),
+            Unwrappers2 = dict:erase(UUID, Unwrappers1),
 
-            {WaitList, Waiters1} = dict:take(AegisConfig, Waiters),
+            {WaitList, Waiters1} = dict:take(UUID, Waiters),
             lists:foreach(fun(Waiter) ->
                 #{
                     from := From,
@@ -178,10 +181,10 @@ handle_info({'DOWN', Ref, process, _Pid, {error, Error}}, St) ->
             gen_server:reply(From, {error, Error}),
             {noreply, St#{openers := Openers1}, ?TIMEOUT};
         error ->
-            {AegisConfig, Unwrappers1} = dict:take(Ref, Unwrappers),
-            Unwrappers2 = dict:erase(AegisConfig, Unwrappers1),
+            {UUID, Unwrappers1} = dict:take(Ref, Unwrappers),
+            Unwrappers2 = dict:erase(UUID, Unwrappers1),
 
-            {WaitList, Waiters1} = dict:take(AegisConfig, Waiters),
+            {WaitList, Waiters1} = dict:take(UUID, Waiters),
             lists:foreach(fun(#{from := From}) ->
                 gen_server:reply(From, {error, Error})
             end, WaitList),
@@ -281,15 +284,13 @@ do_decrypt(From, DbKey, #{uuid := UUID}, Key, Value) ->
 
 %% private functions
 
-maybe_spawn_worker(St, From, Action, Db, Key, Value) ->
+maybe_spawn_worker(St, From, Action, #{uuid := UUID} = Db, Key, Value) ->
     #{
         cache := Cache,
         waiters := Waiters
     } = St,
 
-    #{aegis := AegisConfig} = Db,
-
-    case lookup(Cache, AegisConfig) of
+    case lookup(Cache, UUID) of
         {ok, DbKey} ->
             erlang:spawn(?MODULE, Action, [From, DbKey, Db, Key, Value]),
             St;
@@ -300,38 +301,38 @@ maybe_spawn_worker(St, From, Action, Db, Key, Value) ->
                 action => Action,
                 args => [Db, Key, Value]
             },
-            Waiters1 = dict:append(AegisConfig, Waiter, Waiters),
+            Waiters1 = dict:append(UUID, Waiter, Waiters),
             NewSt#{waiters := Waiters1}
      end.
 
 
-maybe_spawn_unwrapper(St, #{aegis := AegisConfig} = Db) ->
+maybe_spawn_unwrapper(St, #{uuid := UUID} = Db) ->
     #{
         unwrappers := Unwrappers
     } = St,
 
-    case dict:is_key(AegisConfig, Unwrappers) of
+    case dict:is_key(UUID, Unwrappers) of
         true ->
             St;
         false ->
             {_Pid, Ref} = erlang:spawn_monitor(?MODULE, do_unwrap_key, [Db]),
-            Unwrappers1 = dict:store(AegisConfig, Ref, Unwrappers),
-            Unwrappers2 = dict:store(Ref, AegisConfig, Unwrappers1),
+            Unwrappers1 = dict:store(UUID, Ref, Unwrappers),
+            Unwrappers2 = dict:store(Ref, UUID, Unwrappers1),
             St#{unwrappers := Unwrappers2}
     end.
 
 
 %% cache functions
 
-insert(Cache, AegisConfig, DbKey) ->
-    Entry = #entry{id = AegisConfig, key = DbKey},
+insert(Cache, UUID, DbKey) ->
+    Entry = #entry{id = UUID, key = DbKey},
     true = ets:insert(Cache, Entry),
     ok.
 
 
-lookup(Cache, AegisConfig) ->
-    case ets:lookup(Cache, AegisConfig) of
-        [#entry{id = AegisConfig, key = DbKey}] ->
+lookup(Cache, UUID) ->
+    case ets:lookup(Cache, UUID) of
+        [#entry{id = UUID, key = DbKey}] ->
             {ok, DbKey};
         [] ->
             {error, not_found}

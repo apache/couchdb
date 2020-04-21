@@ -108,7 +108,7 @@ test_multibase() ->
     ?assertEqual(0, meck:num_calls(aegis_server, do_decrypt, 5)),
 
     lists:foreach(fun(I) ->
-        Db = ?DB#{aegis => {<<"wrapped_key">>, <<I:320>>}},
+        Db = ?DB#{aegis => {<<"wrapped_key">>, <<I:320>>}, uuid => <<I:64>>},
         lists:foreach(fun(J) ->
             Key = <<J:64>>,
             Out = aegis_server:encrypt(Db, Key, ?VALUE),
