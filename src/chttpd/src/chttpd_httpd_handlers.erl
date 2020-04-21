@@ -455,10 +455,10 @@ handler_info('GET', [Db, DocId], _) ->
     {'db.doc.read', #{'db.name' => Db, 'doc.id' => DocId}};
 
 handler_info('POST', [Db, DocId], _) ->
-    {'db.doc.write', #{'db.name' => Db, 'design.id' => DocId}};
+    {'db.doc.write', #{'db.name' => Db, 'doc.id' => DocId}};
 
 handler_info('PUT', [Db, DocId], _) ->
-    {'db.doc.write', #{'db.name' => Db, 'design.id' => DocId}};
+    {'db.doc.write', #{'db.name' => Db, 'doc.id' => DocId}};
 
 handler_info('COPY', [Db, DocId], Req) ->
     {'db.doc.write', #{
