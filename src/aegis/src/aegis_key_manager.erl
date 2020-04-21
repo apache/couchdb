@@ -12,26 +12,104 @@
 
 -module(aegis_key_manager).
 
+-behaviour(gen_server).
+
+-vsn(1).
+
 
 -type key() :: binary().
 -type aegis_config() :: term().
-
--callback generate_key(Db :: #{}, DbOptions :: list()) ->
-    {ok, key(), aegis_config()} | {ok, false}.
-
--callback unwrap_key(Db :: #{}, AegisConfig :: aegis_config()) ->
-    {ok, key(), aegis_config()}.
+-type key_manager_state() :: term().
 
 
+-callback init() -> key_manager_state().
+
+
+-callback generate_key(
+    St :: key_manager_state(),
+    Db :: #{},
+    DbOptions :: list()) ->
+        {ok, key(), aegis_config()} | {ok, false}.
+
+
+-callback unwrap_key(
+    St :: key_manager_state(),
+    Db :: #{},
+    AegisConfig :: aegis_config()) ->
+        {ok, key(), aegis_config()}.
+
+
+%% aegis_key_manager API
 -export([
+    start_link/0,
     generate_key/2,
     unwrap_key/2
 ]).
 
 
+%% gen_server callbacks
+-export([
+    init/1,
+    terminate/2,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    code_change/3
+]).
+
+
+
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
+
 generate_key(#{} = Db, Options) ->
-    ?AEGIS_KEY_MANAGER:generate_key(Db, Options).
+    gen_server:call(?MODULE, {generate_key, Db, Options}).
 
 
 unwrap_key(#{} = Db, AegisConfig) ->
-    ?AEGIS_KEY_MANAGER:unwrap_key(Db, AegisConfig).
+    gen_server:call(?MODULE, {unwrap_key, Db, AegisConfig}).
+
+
+
+
+init([]) ->
+    process_flag(sensitive, true),
+    Store = ets:new(?MODULE, [set, private]),
+    State = ?AEGIS_KEY_MANAGER:init(),
+    true = ets:insert(Store, {?AEGIS_KEY_MANAGER, State}),
+    {ok, Store}.
+
+
+terminate(_Reason, _Store) ->
+    ok.
+
+
+handle_call({Method, Db, Opts}, From, Store)
+        when Method == generate_key; Method == unwrap_key ->
+    [{?AEGIS_KEY_MANAGER, State}] = ets:lookup(Store, ?AEGIS_KEY_MANAGER),
+    erlang:spawn(fun() ->
+        process_flag(sensitive, true),
+        try
+           ?AEGIS_KEY_MANAGER:Method(State, Db, Opts)
+        of
+            Resp ->
+                gen_server:reply(From, Resp)
+        catch
+            _:Error ->
+                gen_server:reply(From, {error, Error})
+        end
+    end),
+    {noreply, Store}.
+
+
+handle_cast(_Msg, Store) ->
+    {noreply, Store}.
+
+
+handle_info(_Msg, Store) ->
+    {noreply, Store}.
+
+
+code_change(_OldVsn, Store, _Extra) ->
+    {ok, Store}.

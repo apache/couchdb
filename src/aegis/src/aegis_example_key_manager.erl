@@ -10,31 +10,36 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(aegis_file_key_manager).
+-module(aegis_example_key_manager).
 
 
 -behaviour(aegis_key_manager).
 
 
 -export([
-    generate_key/2,
-    unwrap_key/2
+    init/0,
+    generate_key/3,
+    unwrap_key/3
 ]).
 
 
--define(ROOT_KEY, <<1:256>>).
+
+init() ->
+    <<1:256>>.
 
 
-generate_key(#{} = _Db, _Options) ->
+generate_key(RootKey, #{} = _Db, _Options) ->
     DbKey = crypto:strong_rand_bytes(32),
-    WrappedKey = aegis_keywrap:key_wrap(?ROOT_KEY, DbKey),
+    WrappedKey = aegis_keywrap:key_wrap(RootKey, DbKey),
+
     %% just an example of how to represent the arbitrary options
     AegisConfig = {<<"wrapped_key">>, WrappedKey},
     {ok, DbKey, AegisConfig}.
 
 
-unwrap_key(#{} = _Db, {<<"wrapped_key">>, WrappedKey} = AegisConfig) ->
-    case aegis_keywrap:key_unwrap(?ROOT_KEY, WrappedKey) of
+unwrap_key(RootKey, #{} = _Db, AegisConfig) ->
+    {<<"wrapped_key">>, WrappedKey} = AegisConfig,
+    case aegis_keywrap:key_unwrap(RootKey, WrappedKey) of
         fail ->
             error(unwrap_failed);
         DbKey ->
