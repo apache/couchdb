@@ -50,8 +50,6 @@ setup() ->
         {ok, DbKey, AegisConfig}
     end),
     ok = meck:expect(aegis_key_manager, unwrap_key, fun(Db, _) ->
-        %% build a line of the waiters
-        timer:sleep(20),
         DbKey = <<0:256>>,
         #{aegis := AegisConfig} = Db,
         {ok, DbKey, AegisConfig}
@@ -107,20 +105,35 @@ test_multibase() ->
     ?assertEqual(0, meck:num_calls(aegis_server, do_encrypt, 5)),
     ?assertEqual(0, meck:num_calls(aegis_server, do_decrypt, 5)),
 
-    lists:foreach(fun(I) ->
+    WaitList = lists:foldl(fun(I, MainAcc) ->
         Db = ?DB#{aegis => {<<"wrapped_key">>, <<I:320>>}, uuid => <<I:64>>},
-        lists:foreach(fun(J) ->
-            Key = <<J:64>>,
-            Out = aegis_server:encrypt(Db, Key, ?VALUE),
-            ?assertEqual(?ENCRYPTED, Out),
-            In = aegis_server:decrypt(Db, Key, Out),
-            ?assertEqual(?VALUE, In)
-        end, lists:seq(1, 10))
-    end, lists:seq(1, 12)),
+        DbAcc = lists:foldl(fun(J, Acc) ->
+            {Pid, Ref} = spawn_monitor(fun() ->
+                Key = <<J:64>>,
+                Out = aegis_server:encrypt(Db, Key, ?VALUE),
+                ?assertEqual(?ENCRYPTED, Out),
+                In = aegis_server:decrypt(Db, Key, Out),
+                ?assertEqual(?VALUE, In)
+            end),
+            [{Ref, Pid} | Acc]
+        end, [], lists:seq(1, 10)),
+        lists:append(MainAcc, DbAcc)
+    end, [], lists:seq(1, 12)),
+
+    drain_waiters(WaitList),
 
     ?assertEqual(12, meck:num_calls(aegis_key_manager, unwrap_key, 2)),
     ?assertEqual(120, meck:num_calls(aegis_server, do_encrypt, 5)),
     ?assertEqual(120, meck:num_calls(aegis_server, do_decrypt, 5)).
+
+
+drain_waiters([]) ->
+    ok;
+drain_waiters(WaitList) ->
+    receive {'DOWN', Ref, _, Pid, _} ->
+        {value, {Ref, Pid}, WaitList1} = lists:keytake(Ref, 1, WaitList),
+        drain_waiters(WaitList1)
+    end.
 
 
 
