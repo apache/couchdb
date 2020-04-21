@@ -162,14 +162,12 @@ disabled_test_() ->
         fun() ->
             Ctx = setup(),
             ok = meck:delete(aegis_key_manager, generate_key, 2),
-            ok = meck:expect(aegis_key_manager, generate_key, fun(_, _) ->
-                {ok, false}
-            end),
+            ok = meck:expect(aegis_key_manager, generate_key, 2, false),
             Ctx
         end,
         fun teardown/1,
         [
-            {"accept {ok, false} from key managers",
+            {"accept false from key managers",
             {timeout, ?TIMEOUT, fun test_disabled_generate_key/0}},
             {"pass through on encrypt when encryption disabled",
             {timeout, ?TIMEOUT, fun test_disabled_encrypt/0}},

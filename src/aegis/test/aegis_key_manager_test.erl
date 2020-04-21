@@ -63,9 +63,9 @@ generate_key() ->
 generate_key_encryption_disabled() ->
     ok = meck:expect(?AEGIS_KEY_MANAGER, generate_key, fun(St, _, _) ->
         ?assertEqual(?ROOT_KEY, St),
-        {ok, false}
+        false
     end),
-    ?assertEqual({ok, false}, aegis_key_manager:generate_key(#{}, [])).
+    ?assertEqual(false, aegis_key_manager:generate_key(#{}, [])).
 
 
 unwrap_key() ->

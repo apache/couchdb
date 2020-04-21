@@ -29,7 +29,7 @@
     St :: key_manager_state(),
     Db :: #{},
     DbOptions :: list()) ->
-        {ok, key(), aegis_config()} | {ok, false}.
+        {ok, key(), aegis_config()} | false.
 
 
 -callback unwrap_key(

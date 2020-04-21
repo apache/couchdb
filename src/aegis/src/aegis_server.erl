@@ -129,7 +129,7 @@ handle_cast(_Msg, St) ->
     {noreply, St}.
 
 
-handle_info({'DOWN', Ref, _, _Pid, {ok, false}}, #{openers := Openers} = St) ->
+handle_info({'DOWN', Ref, _, _Pid, false}, #{openers := Openers} = St) ->
     {From, Openers1} = dict:take(Ref, Openers),
     gen_server:reply(From, {ok, false}),
     {noreply, St#{openers := Openers1}, ?TIMEOUT};
