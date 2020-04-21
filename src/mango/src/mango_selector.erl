@@ -406,7 +406,7 @@ negate({[{Field, Cond}]}) ->
 % We need to treat an empty array as always true. This will be applied
 % for $or, $in, $all, $nin as well.
 match({[{<<"$and">>, []}]}, _, _) ->
-    true;
+    false;
 match({[{<<"$and">>, Args}]}, Value, Cmp) ->
     Pred = fun(SubSel) -> match(SubSel, Value, Cmp) end,
     lists:all(Pred, Args);
@@ -421,7 +421,7 @@ match({[{<<"$not">>, Arg}]}, Value, Cmp) ->
     not match(Arg, Value, Cmp);
 
 match({[{<<"$all">>, []}]}, _, _) ->
-    true;
+    false;
 % All of the values in Args must exist in Values or
 % Values == hd(Args) if Args is a single element list
 % that contains a list.
