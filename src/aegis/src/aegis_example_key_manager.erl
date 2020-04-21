@@ -25,7 +25,15 @@
 
 
 init() ->
-    <<1:256>>.
+    case config:get("aegis_example_key_manager", "key_provider") of
+        undefined ->
+            erlang:error(misconfigured_key_provider);
+        KeyProvider ->
+            PassPhrase = os:cmd(KeyProvider),
+            {ok, RootKey} = couch_passwords:pbkdf2(
+                iolist_to_binary(PassPhrase), <<0:256>>, 10000, 32),
+            <<(binary_to_integer(RootKey, 16)):256>>
+    end.
 
 
 generate_key(RootKey, #{} = _Db, _Options) ->
@@ -41,7 +49,7 @@ unwrap_key(RootKey, #{} = _Db, AegisConfig) ->
     {<<"wrapped_key">>, WrappedKey} = AegisConfig,
     case aegis_keywrap:key_unwrap(RootKey, WrappedKey) of
         fail ->
-            error(unwrap_failed);
+            erlang:error(unwrap_failed);
         DbKey ->
             {ok, DbKey, AegisConfig}
     end.
