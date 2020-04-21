@@ -19,17 +19,17 @@ CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
         []
 end.
 
-case lists:keyfind(aegis_key_manager, 1, CouchConfig) of
-    {aegis_key_manager, ""} ->
-        CONFIG;
-    {aegis_key_manager, Module} ->
-        CurrentOpts = case lists:keyfind(erl_opts, 1, CONFIG) of
-            {erl_opts, Opts} -> Opts;
-            false -> []
-        end,
-        AegisOpts = {d, 'AEGIS_KEY_MANAGER', list_to_atom(Module)},
-        NewOpts = [AegisOpts | CurrentOpts],
-        lists:keystore(erl_opts, 1, CONFIG, {erl_opts, NewOpts});
+AegisKeyManager = case lists:keyfind(aegis_key_manager, 1, CouchConfig) of
+    {aegis_key_manager, Module} when Module /= "" ->
+        list_to_atom(Module);
     _ ->
-        CONFIG
-end.
+        aegis_noop_key_manager
+end,
+
+CurrentOpts = case lists:keyfind(erl_opts, 1, CONFIG) of
+    {erl_opts, Opts} -> Opts;
+    false -> []
+end,
+
+AegisOpts = {d, 'AEGIS_KEY_MANAGER', AegisKeyManager},
+lists:keystore(erl_opts, 1, CONFIG, {erl_opts, [AegisOpts | CurrentOpts]}).
