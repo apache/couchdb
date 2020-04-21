@@ -9,8 +9,9 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-
+couchTests.elixir = true;
 couchTests.http = function(debug) {
+  return console.log('done in test/elixir/test/http_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
 

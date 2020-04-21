@@ -60,7 +60,9 @@ Run a basic test suite for CouchDB by browsing here:
 Getting started with developing
 -------------------------------
 
-For more detail, read the README-DEV.rst file in this directory.
+For more detail, read the README-DEV.rst_ file in this directory.
+
+.. _README-DEV.rst: https://github.com/apache/couchdb/blob/master/README-DEV.rst
 
 Basically you just have to install the needed dependencies which are
 documented in the install docs and then run ``./configure && make``.

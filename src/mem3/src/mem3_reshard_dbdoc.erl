@@ -146,9 +146,8 @@ replicate_to_all_nodes(TimeoutMSec) ->
 
 
 write_shard_doc(#doc{id = Id} = Doc, Body) ->
-    DbName = ?l2b(config:get("mem3", "shards_db", "_dbs")),
     UpdatedDoc = Doc#doc{body = Body},
-    couch_util:with_db(DbName, fun(Db) ->
+    couch_util:with_db(mem3_sync:shards_db(), fun(Db) ->
         try
             {ok, _} = couch_db:update_doc(Db, UpdatedDoc, [])
         catch

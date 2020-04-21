@@ -133,6 +133,12 @@ open(Db, State0) ->
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt};
+                {ok, Else} ->
+                    couch_log:error("~s has a bad header: got ~p",
+                        [IndexFName, Else]),
+                    NewSt = couch_mrview_util:reset_index(Db, Fd, State),
+                    ensure_local_purge_doc(Db, NewSt),
+                    {ok, NewSt};
                 no_valid_header ->
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),

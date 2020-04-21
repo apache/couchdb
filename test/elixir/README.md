@@ -42,29 +42,30 @@ X means done, - means partially
   - [X] Port conflicts.js
   - [X] Port cookie_auth.js
   - [X] Port copy_doc.js
-  - [ ] Port design_docs.js
-  - [ ] Port design_options.js
-  - [ ] Port design_paths.js
+  - [X] Port design_docs.js
+  - [X] Port design_docs_query.js
+  - [X] Port design_options.js
+  - [X] Port design_paths.js
   - [X] Port erlang_views.js
   - [X] Port etags_head.js
   - [ ] ~~Port etags_views.js~~ (skipped in js test suite)
-  - [ ] Port form_submit.js
-  - [ ] Port http.js
+  - [X] Port form_submit.js
+  - [X] Port http.js
   - [X] Port invalid_docids.js
-  - [ ] Port jsonp.js
+  - [X] Port jsonp.js
   - [X] Port large_docs.js
   - [ ] Port list_views.js
   - [X] Port lorem_b64.txt
   - [X] Port lorem.txt
   - [X] Port lots_of_docs.js
-  - [ ] Port method_override.js
+  - [X] Port method_override.js
   - [X] Port multiple_rows.js
-  - [ ] Port proxyauth.js
-  - [ ] Port purge.js
+  - [X] Port proxyauth.js
+  - [X] Port purge.js
   - [ ] Port reader_acl.js
-  - [ ] Port recreate_doc.js
-  - [ ] Port reduce_builtin.js
-  - [ ] Port reduce_false.js
+  - [X] Port recreate_doc.js
+  - [X] Port reduce_builtin.js
+  - [X] Port reduce_false.js
   - [ ] Port reduce_false_temp.js
   - [X] Port reduce.js
   - [X] Port replication.js
@@ -106,8 +107,8 @@ X means done, - means partially
   - [ ] Port view_multi_key_all_docs.js
   - [ ] Port view_multi_key_design.js
   - [ ] Port view_multi_key_temp.js
-  - [ ] Port view_offsets.js
-  - [ ] Port view_pagination.js
+  - [X] Port view_offsets.js
+  - [X] Port view_pagination.js
   - [ ] Port view_sandboxing.js
   - [ ] Port view_update_seq.js
 
@@ -119,8 +120,8 @@ Bellow we present a few use cases where code-generation is really helpful.
 
 ## How to write ExUnit tests
 
-1. Create new file in test/exunit/ directory (the file name should match *_test.exs)
-2. In case it is a first file in the directory create test_helper.exs (look at src/couch/test/exunit/test_helper.exs to get an idea)
+1. Create new file in test/exunit/ directory (the file name should match `*_test.exs`)
+2. In case it is a first file in the directory create `test_helper.exs` (look at `src/couch/test/exunit/test_helper.exs` to get an idea)
 3. define test module which does `use Couch.Test.ExUnit.Case`
 4. Define test cases in the module
 
