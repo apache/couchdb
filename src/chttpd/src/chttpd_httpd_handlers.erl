@@ -339,11 +339,11 @@ handler_info('GET', [Db, <<"_design">>, Name | Path], _) ->
     }};
 
 handler_info('PUT', [Db, <<"_design">>, Name | Path], Req) ->
-    ActionName = case chttpd:qs_value(Req, "rev") of
-        undefined ->
-            'db.design.doc.attachment.write';
-        _ ->
-            'db.design.doc.attachment.update'
+    ActionName = case has_rev(Req) of
+        true ->
+            'db.design.doc.attachment.update';
+        false ->
+            'db.design.doc.attachment.write'
     end,
     {ActionName, #{
         'db.name' => Db,
@@ -377,20 +377,20 @@ handler_info('GET', [Db, <<"_local">>, Name], _) ->
     {'db.local.doc.read', #{'db.name' => Db, 'local.id' => Name}};
 
 handler_info('POST', [Db, <<"_local">>, Name], Req) ->
-    ActionName = case chttpd:qs_value(Req, "rev") of
-        undefined ->
-            'db.local.doc.write';
-        _ ->
-            'db.local.doc.update'
+    ActionName = case has_rev(Req) of
+        true ->
+            'db.local.doc.update';
+        false ->
+            'db.local.doc.write'
     end,
     {ActionName, #{'db.name' => Db, 'local.id' => Name}};
 
 handler_info('PUT', [Db, <<"_local">>, Name], Req) ->
-    ActionName = case chttpd:qs_value(Req, "rev") of
-        undefined ->
-            'db.local.doc.write';
-        _ ->
-            'db.local.doc.update'
+    ActionName = case has_rev(Req) of
+        true ->
+            'db.local.doc.update';
+        false ->
+            'db.local.doc.write'
     end,
     {ActionName, #{'db.name' => Db, 'local.id' => Name}};
 
@@ -483,19 +483,19 @@ handler_info('GET', [Db, DocId], _) ->
     {'db.doc.read', #{'db.name' => Db, 'doc.id' => DocId}};
 
 handler_info('POST', [Db, DocId], Req) ->
-    case chttpd:qs_value(Req, "rev") of
-        undefined ->
-            {'db.doc.write', #{'db.name' => Db, 'doc.id' => DocId}};
-        _ ->
-            {'db.doc.update', #{'db.name' => Db, 'doc.id' => DocId}}
+    case has_rev(Req) of
+        true ->
+            {'db.doc.update', #{'db.name' => Db, 'doc.id' => DocId}};
+        false ->
+            {'db.doc.write', #{'db.name' => Db, 'doc.id' => DocId}}
     end;
 
 handler_info('PUT', [Db, DocId], Req) ->
-    case chttpd:qs_value(Req, "rev") of
-        undefined ->
-            {'db.doc.write', #{'db.name' => Db, 'doc.id' => DocId}};
-        _ ->
-            {'db.doc.update', #{'db.name' => Db, 'doc.id' => DocId}}
+    case has_rev(Req) of
+        true ->
+            {'db.doc.update', #{'db.name' => Db, 'doc.id' => DocId}};
+        false ->
+            {'db.doc.write', #{'db.name' => Db, 'doc.id' => DocId}}
     end;
 
 handler_info('COPY', [Db, DocId], Req) ->
@@ -560,3 +560,16 @@ not_supported(#httpd{} = Req, _Db) ->
 not_implemented(#httpd{} = Req, _Db) ->
     Msg = <<"resource is not implemented">>,
     chttpd:send_error(Req, 501, not_implemented, Msg).
+
+has_rev(Req) ->
+    case chttpd:qs_value(Req, "rev") of
+        undefined ->
+            case chttpd:json_body_obj(Req) of
+                {Props} ->
+                    lists:keymember(<<"_rev">>, 1, Props);
+                _ ->
+                    false
+            end;
+        _ ->
+            true
+    end.
