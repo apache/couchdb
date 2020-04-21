@@ -132,6 +132,7 @@ SubDirs = [
     "src/fabric",
     "src/global_changes",
     "src/ioq",
+    "src/jwtf",
     "src/ken",
     "src/mango",
     "src/rexi",
@@ -150,14 +151,14 @@ DepDescs = [
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
-                   {tag, "2.3.0"}, [raw]},
+                   {tag, "3.0.0"}, [raw]},
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
                    {tag, "v1.2.3"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.3"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-6"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1-1"}},
-{jiffy,            "jiffy",            {tag, "CouchDB-1.0.1-1"}},
+{jiffy,            "jiffy",            {tag, "CouchDB-1.0.4-1"}},
 {mochiweb,         "mochiweb",         {tag, "v2.20.0"}},
 {meck,             "meck",             {tag, "0.8.8"}},
 {recon,            "recon",            {tag, "2.5.0"}}

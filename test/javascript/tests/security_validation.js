@@ -325,9 +325,6 @@ couchTests.security_validation = function(debug) {
     adminDbB.deleteDb();
   }
   authDb.deleteDb();
-  // have to clean up authDb on the backside :(
-  var req = CouchDB.newXhr();
-  req.open("DELETE", "/_node/node1@127.0.0.1/" + authDb_name, false);
-  req.send("");
-  CouchDB.maybeThrowError(req);
+  // don't have to clean the backend authDb since this test only calls
+  // couch_auth_cache:get_admin/1 which doesn't auto-create the users db
 };

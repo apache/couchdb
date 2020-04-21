@@ -190,6 +190,35 @@ $ConfigERL = @"
 "@
 $ConfigERL | Out-File "$rootdir\config.erl" -encoding ascii
 
+# check for rebar; if not found, build it and add it to our path
+if ((Get-Command "rebar.cmd" -ErrorAction SilentlyContinue) -eq $null)
+{
+   Write-Verbose "==> rebar.cmd not found; bootstrapping..."
+   if (-Not (Test-Path "src\rebar"))
+   {
+      git clone --depth 1 https://github.com/apache/couchdb-rebar.git $rootdir\src\rebar
+   }
+   cmd /c "cd src\rebar && $rootdir\src\rebar\bootstrap.bat"
+   cp $rootdir\src\rebar\rebar $rootdir\bin\rebar
+   cp $rootdir\src\rebar\rebar.cmd $rootdir\bin\rebar.cmd
+   make -C $rootdir\src\rebar clean
+   $env:Path += ";$rootdir\bin"
+}
+
+# check for emilio; if not found, get it and build it
+if ((Get-Command "emilio.cmd" -ErrorAction SilentlyContinue) -eq $null)
+{
+   Write-Verbose "==> emilio.cmd not found; bootstrapping..."
+   if (-Not (Test-Path "src\emilio"))
+   {
+      git clone --depth 1 https://github.com/wohali/emilio $rootdir\src\emilio
+   }
+   cmd /c "cd $rootdir\src\emilio && rebar compile escriptize; cd $rootdir"
+   cp $rootdir\src\emilio\emilio $rootdir\bin\emilio
+   cp $rootdir\src\emilio\bin\emilio.cmd $rootdir\bin\emilio.cmd
+   cmd /c "cd $rootdir\src\emilio && rebar clean; cd $rootdir"
+}
+
 # only update dependencies, when we are not in a release tarball
 if ( (Test-Path .git -PathType Container) -and (-not $SkipDeps) ) {
     Write-Verbose "==> updating dependencies"

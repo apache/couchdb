@@ -5,6 +5,7 @@
 *.so
 *.pyc
 *.swp
+*.pdb
 *~
 .venv
 .DS_Store
@@ -44,6 +45,7 @@ src/couch/priv/couch_js/**/*.d
 src/couch/priv/icu_driver/couch_icu_driver.d
 src/mango/src/mango_cursor_text.nocompile
 src/docs/
+src/emilio/
 src/ets_lru/
 src/excoveralls/
 src/fauxton/

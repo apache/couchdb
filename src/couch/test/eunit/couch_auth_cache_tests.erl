@@ -52,7 +52,6 @@ couch_auth_cache_test_() ->
                     fun should_drop_cache_on_auth_db_change/1,
                     fun should_restore_cache_on_auth_db_change/1,
                     fun should_recover_cache_after_shutdown/1,
-                    fun should_close_old_db_on_auth_db_change/1,
                     fun should_get_admin_from_config/1
                 ]
             }
@@ -226,13 +225,6 @@ should_recover_cache_after_shutdown(DbName) ->
         ?assertEqual(PasswordHash, get_user_doc_password_sha(DbName, "joe"))
     end).
 
-should_close_old_db_on_auth_db_change(DbName) ->
-    {timeout, ?DB_TIMEOUT, ?_test(begin
-        ?assertEqual(ok, wait_db(DbName, fun is_opened/1)),
-        config:set("couch_httpd_auth", "authentication_db",
-                         ?b2l(?tempdb()), false),
-        ?assertEqual(ok, wait_db(DbName, fun is_closed/1))
-    end)}.
 
 should_get_admin_from_config(_DbName) ->
     ?_test(begin
@@ -251,6 +243,7 @@ update_user_doc(DbName, UserName, Password) ->
     update_user_doc(DbName, UserName, Password, nil).
 
 update_user_doc(DbName, UserName, Password, Rev) ->
+    ok = couch_auth_cache:ensure_users_db_exists(),
     User = iolist_to_binary(UserName),
     Doc = couch_doc:from_json_obj({[
         {<<"_id">>, <<"org.couchdb.user:", User/binary>>},
@@ -268,17 +261,6 @@ update_user_doc(DbName, UserName, Password, Rev) ->
     {ok, NewRev} = couch_db:update_doc(AuthDb, Doc, []),
     ok = couch_db:close(AuthDb),
     {ok, couch_doc:rev_to_str(NewRev)}.
-
-wait_db(Db, DbFun) ->
-    test_util:wait(fun() ->
-        case DbFun(Db) of
-            true ->
-                ok;
-            false ->
-                wait
-        end
-   end, ?DB_TIMEOUT, 500).
-
 
 hash_password(Password) ->
     ?l2b(couch_util:to_hex(crypto:hash(sha, iolist_to_binary([Password, ?SALT])))).
@@ -324,14 +306,6 @@ delete_user_doc(DbName, UserName) ->
     {ok, _} = couch_db:update_doc(AuthDb, DeletedDoc, []),
     ok = couch_db:close(AuthDb).
 
-is_opened(DbName) ->
-    {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
-    Monitors = couch_db:monitored_by(AuthDb) -- [self()],
-    ok = couch_db:close(AuthDb),
-    Monitors /= [].
-
-is_closed(DbName) ->
-    not is_opened(DbName).
 
 make_validate_test({Old, New, "ok"} = Case) ->
     {test_id(Case), ?_assertEqual(ok, validate(doc(Old), doc(New)))};
