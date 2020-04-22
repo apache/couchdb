@@ -1534,7 +1534,7 @@ update_doc_interactive(Db, Doc0, Options) ->
 
 
 update_doc_interactive(Db, Doc0, Future, _Options) ->
-    RevInfos = fabric2_fdb:get_winning_revs_wait(Db, Future),
+    RevInfos = fabric2_fdb:get_revs_wait(Db, Future),
     {Winner, SecondPlace} = case RevInfos of
         [] -> {not_found, not_found};
         [WRI] -> {WRI, not_found};

@@ -42,9 +42,10 @@
     incr_stat/4,
 
     get_all_revs/2,
+    get_all_revs_future/2,
     get_winning_revs/3,
     get_winning_revs_future/3,
-    get_winning_revs_wait/2,
+    get_revs_wait/2,
     get_non_deleted_rev/3,
 
     get_doc_body/3,
@@ -602,46 +603,45 @@ incr_stat(#{} = Db, Section, Key, Increment) when is_integer(Increment) ->
 get_all_revs(#{} = Db, DocId) ->
     DbName = maps:get(name, Db, undefined),
     with_span('db.get_all_revs', #{'db.name' => DbName, 'doc.id' => DocId}, fun() ->
-        #{
-            tx := Tx,
-            db_prefix := DbPrefix
-        } = ensure_current(Db),
-
-        Prefix = erlfdb_tuple:pack({?DB_REVS, DocId}, DbPrefix),
-        Options = [{streaming_mode, want_all}],
-        Future = erlfdb:get_range_startswith(Tx, Prefix, Options),
-        lists:map(fun({K, V}) ->
-            Key = erlfdb_tuple:unpack(K, DbPrefix),
-            Val = erlfdb_tuple:unpack(V),
-            fdb_to_revinfo(Key, Val)
-        end, erlfdb:wait(Future))
+        Future = get_all_revs_future(Db, DocId),
+        get_revs_wait(Db, Future)
     end).
+
+
+get_all_revs_future(#{} = Db, DocId) ->
+    Options = [{streaming_mode, want_all}],
+    get_revs_future(Db, DocId, Options).
 
 
 get_winning_revs(Db, DocId, NumRevs) ->
     DbName = maps:get(name, Db, undefined),
     with_span('db.get_winning_revs', #{'db.name' => DbName, 'doc.id' => DocId}, fun() ->
         Future = get_winning_revs_future(Db, DocId, NumRevs),
-        get_winning_revs_wait(Db, Future)
+        get_revs_wait(Db, Future)
     end).
 
 
 get_winning_revs_future(#{} = Db, DocId, NumRevs) ->
+    Options = [{reverse, true}, {limit, NumRevs}],
+    get_revs_future(Db, DocId, Options).
+
+
+get_revs_future(#{} = Db, DocId, Options) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = ensure_current(Db),
 
     {StartKey, EndKey} = erlfdb_tuple:range({?DB_REVS, DocId}, DbPrefix),
-    Options = [{reverse, true}, {limit, NumRevs}],
     erlfdb:fold_range_future(Tx, StartKey, EndKey, Options).
 
 
-get_winning_revs_wait(#{} = Db, RangeFuture) ->
+get_revs_wait(#{} = Db, RangeFuture) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = ensure_current(Db),
+
     RevRows = erlfdb:fold_range_wait(Tx, RangeFuture, fun({K, V}, Acc) ->
         Key = erlfdb_tuple:unpack(K, DbPrefix),
         Val = erlfdb_tuple:unpack(V),
@@ -1185,7 +1185,7 @@ load_validate_doc_funs(#{} = Db) ->
             id := DDocId,
             rev_info := RevInfoFuture
         } = Info,
-        [RevInfo] = get_winning_revs_wait(Db, RevInfoFuture),
+        [RevInfo] = get_revs_wait(Db, RevInfoFuture),
         #{deleted := Deleted} = RevInfo,
         if Deleted -> []; true ->
             [Info#{

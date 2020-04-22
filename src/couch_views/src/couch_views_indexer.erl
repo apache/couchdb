@@ -384,7 +384,7 @@ fetch_docs(Db, Changes) ->
     RevFutures = maps:keys(RevState),
     BodyState = lists:foldl(fun(RevFuture, Acc) ->
         {Id, Change} = maps:get(RevFuture, RevState),
-        Revs = fabric2_fdb:get_winning_revs_wait(Db, RevFuture),
+        Revs = fabric2_fdb:get_revs_wait(Db, RevFuture),
 
         % I'm assuming that in this changes transaction that the winning
         % doc body exists since it is listed in the changes feed as not deleted
