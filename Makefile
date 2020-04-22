@@ -147,6 +147,7 @@ fauxton: share/www
 .PHONY: check
 # target: check - Test everything
 check: all python-black
+	@$(MAKE) emilio
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
@@ -197,6 +198,9 @@ soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
+
+emilio:
+	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3
 
 .venv/bin/black:
 	@python3 -m venv .venv
@@ -260,7 +264,7 @@ elixir-credo: elixir-init
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
 javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-javascript: 
+javascript:
 
 	@$(MAKE) devclean
 	@mkdir -p share/www/script/test
