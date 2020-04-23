@@ -46,6 +46,7 @@ indexer_test_() ->
                     ?TDEF_FE(multipe_keys_from_same_doc),
                     ?TDEF_FE(multipe_identical_keys_from_same_doc),
                     ?TDEF_FE(fewer_multipe_identical_keys_from_same_doc),
+                    ?TDEF_FE(multiple_design_docs),
                     ?TDEF_FE(handle_size_key_limits),
                     ?TDEF_FE(handle_size_value_limits),
                     ?TDEF_FE(index_autoupdater_callback),
@@ -427,6 +428,55 @@ budget_history() ->
     [Result || {_Pid, {couch_rate, budget, _}, Result} <- meck:history(couch_rate)].
 
 
+multiple_design_docs(Db) ->
+    Cleanup = fun() ->
+        fabric2_fdb:transactional(Db, fun(TxDb) ->
+            DDocs = fabric2_db:get_design_docs(Db),
+            ok = couch_views:cleanup_indices(TxDb, DDocs)
+        end)
+    end,
+
+    % This is how we check that no index updates took place
+    meck:new(couch_views_fdb, [passthrough]),
+    meck:expect(couch_views_fdb, write_doc, fun(TxDb, Sig, ViewIds, Doc) ->
+        meck:passthrough([TxDb, Sig, ViewIds, Doc])
+    end),
+
+    DDoc1 = create_ddoc(simple, <<"_design/bar1">>),
+    DDoc2 = create_ddoc(simple, <<"_design/bar2">>),
+
+    {ok, _} = fabric2_db:update_doc(Db, doc(0), []),
+    {ok, {Pos1, Rev1}} = fabric2_db:update_doc(Db, DDoc1, []),
+    ?assertEqual({ok, [row(<<"0">>, 0, 0)]}, run_query(Db, DDoc1, ?MAP_FUN1)),
+
+    % Because run_query/3 can return, and unsurbscribe from the job,
+    % before it actually finishes, ensure we wait for the job to
+    % finish so we get a deterministic setup every time.
+    JobId = get_job_id(Db, DDoc1),
+    ?assertEqual(ok, wait_job_finished(JobId, 5000)),
+
+    % Add the second ddoc with same view as first one.
+    {ok, {Pos2, Rev2}} = fabric2_db:update_doc(Db, DDoc2, []),
+
+    DDoc1Del = DDoc1#doc{revs = {Pos1, [Rev1]}, deleted = true},
+    {ok, _} = fabric2_db:update_doc(Db, DDoc1Del, []),
+
+    Cleanup(),
+
+    meck:reset(couch_views_fdb),
+    ?assertEqual({ok, [row(<<"0">>, 0, 0)]}, run_query(Db, DDoc2, ?MAP_FUN1)),
+    ?assertEqual(ok, wait_job_finished(JobId, 5000)),
+    ?assertEqual(0, meck:num_calls(couch_views_fdb, write_doc, 4)),
+
+    DDoc2Del = DDoc2#doc{revs = {Pos2, [Rev2]}, deleted = true},
+    {ok, _} = fabric2_db:update_doc(Db, DDoc2Del, []),
+
+    Cleanup(),
+
+    % After the last ddoc is deleted we should get an error
+    ?assertError({ddoc_deleted, _}, run_query(Db, DDoc2, ?MAP_FUN1)).
+
+
 handle_db_recreated_when_running(Db) ->
     DbName = fabric2_db:name(Db),
 
@@ -564,9 +614,13 @@ create_ddoc() ->
     create_ddoc(simple).
 
 
-create_ddoc(simple) ->
+create_ddoc(Type) ->
+    create_ddoc(Type, <<"_design/bar">>).
+
+
+create_ddoc(simple, DocId) when is_binary(DocId) ->
     couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
+        {<<"_id">>, DocId},
         {<<"views">>, {[
             {?MAP_FUN1, {[
                 {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
@@ -577,9 +631,9 @@ create_ddoc(simple) ->
         ]}}
     ]});
 
-create_ddoc(multi_emit_different) ->
+create_ddoc(multi_emit_different, DocId) when is_binary(DocId) ->
     couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
+        {<<"_id">>, DocId},
         {<<"views">>, {[
             {?MAP_FUN1, {[
                 {<<"map">>, <<"function(doc) { "
@@ -593,9 +647,9 @@ create_ddoc(multi_emit_different) ->
         ]}}
     ]});
 
-create_ddoc(multi_emit_same) ->
+create_ddoc(multi_emit_same, DocId) when is_binary(DocId) ->
     couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
+        {<<"_id">>, DocId},
         {<<"views">>, {[
             {?MAP_FUN1, {[
                 {<<"map">>, <<"function(doc) { "
@@ -612,9 +666,9 @@ create_ddoc(multi_emit_same) ->
         ]}}
     ]});
 
-create_ddoc(multi_emit_key_limit) ->
+create_ddoc(multi_emit_key_limit, DocId) when is_binary(DocId)  ->
     couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
+        {<<"_id">>, DocId},
         {<<"views">>, {[
             {?MAP_FUN1, {[
                 {<<"map">>, <<"function(doc) { "
@@ -656,6 +710,24 @@ doc(Id, Val) ->
 
 run_query(#{} = Db, DDoc, <<_/binary>> = View) ->
     couch_views:query(Db, DDoc, View, fun fold_fun/2, [], #mrargs{}).
+
+
+get_job_id(#{} = Db, DDoc) ->
+    DbName = fabric2_db:name(Db),
+    {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
+    couch_views_jobs:job_id(Db, Mrst).
+
+
+wait_job_finished(JobId, Timeout) ->
+    case couch_jobs:subscribe(?INDEX_JOB_TYPE, JobId) of
+        {ok, Sub, _, _} ->
+            case couch_jobs:wait(Sub, finished, Timeout) of
+                {?INDEX_JOB_TYPE, _, _, _} -> ok;
+                timeout -> timeout
+            end;
+        {ok, finished, _} ->
+            ok
+    end.
 
 
 meck_intercept_job_update(ParentPid) ->
