@@ -23,7 +23,8 @@
 %% aegis_server API
 -export([
     start_link/0,
-    generate_key/2,
+    init_db/2,
+    open_db/2,
     encrypt/3,
     decrypt/3
 ]).
@@ -38,92 +39,149 @@
     code_change/3
 ]).
 
-%% workers callbacks
--export([
-    do_generate_key/2,
-    do_unwrap_key/1,
-    do_encrypt/5,
-    do_decrypt/5
-]).
 
 
 -define(INIT_TIMEOUT, 60000).
 -define(TIMEOUT, 10000).
 
 
--record(entry, {id, key}).
+-record(entry, {uuid, encryption_key}).
 
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 
--spec generate_key(Db :: #{}, Options :: list()) ->
-        {ok, term() | false} | {error, term()}.
-generate_key(#{} = Db, Options) ->
-    gen_server:call(?MODULE, {generate_key, Db, Options}).
+-spec init_db(Db :: #{}, Options :: list()) -> boolean().
+init_db(#{uuid := UUID} = Db, Options) ->
+    process_flag(sensitive, true),
+
+    case ?AEGIS_KEY_MANAGER:init_db(Db, Options) of
+        {ok, DbKey} ->
+            gen_server:call(?MODULE, {insert_key, UUID, DbKey}),
+            true;
+        false ->
+            false
+    end.
+
+
+-spec open_db(Db :: #{}, Options :: list()) -> boolean().
+open_db(#{} = Db, Options) ->
+    process_flag(sensitive, true),
+
+    case do_open_db(Db, Options) of
+        {ok, _DbKey} ->
+            true;
+        false ->
+            false
+    end.
 
 
 -spec encrypt(Db :: #{}, Key :: binary(), Value :: binary()) -> binary().
-encrypt(#{} = Db, Key, Value)  when is_binary(Key), is_binary(Value) ->
-    gen_server:call(?MODULE, {encrypt, Db, Key, Value}).
+encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
+    #{
+        uuid := UUID
+    } = Db,
+
+    case gen_server:call(?MODULE, {has_key, UUID}) of
+        true ->
+            gen_server:call(?MODULE, {encrypt, Db, Key, Value});
+        false ->
+            process_flag(sensitive, true),
+
+            {ok, DbKey} = do_open_db(Db),
+            do_encrypt(DbKey, Db, Key, Value)
+    end.
 
 
 -spec decrypt(Db :: #{}, Key :: binary(), Value :: binary()) -> binary().
 decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
-    gen_server:call(?MODULE, {decrypt, Db, Key, Value}).
+    #{
+        uuid := UUID
+    } = Db,
+
+    case gen_server:call(?MODULE, {has_key, UUID}) of
+        true ->
+            gen_server:call(?MODULE, {decrypt, Db, Key, Value});
+        false ->
+            process_flag(sensitive, true),
+
+            {ok, DbKey} = do_open_db(Db),
+            do_decrypt(DbKey, Db, Key, Value)
+    end.
 
 
 %% gen_server functions
 
 init([]) ->
     process_flag(sensitive, true),
-    Cache = ets:new(?MODULE, [set, private, {keypos, #entry.id}]),
+    Cache = ets:new(?MODULE, [set, private, {keypos, #entry.uuid}]),
 
     St = #{
-        cache => Cache,
-        openers => dict:new(),
-        waiters => dict:new(),
-        unwrappers => dict:new()
+        cache => Cache
     },
     {ok, St, ?INIT_TIMEOUT}.
 
 
-terminate(_Reason, St) ->
-    #{
-        openers := Openers,
-        waiters := Waiters
-    } = St,
-
-    dict:fold(fun(_AegisConfig, WaitList, _) ->
-        lists:foreach(fun(#{from := From}) ->
-            gen_server:reply(From, {error, decryption_aborted})
-        end, WaitList)
-    end, ok, Waiters),
-
-    dict:fold(fun(Ref, From, _) ->
-        erlang:demonitor(Ref),
-        gen_server:reply(From, {error, decryption_aborted})
-    end, ok, Openers),
+terminate(_Reason, _St) ->
     ok.
 
 
-handle_call({generate_key, Db, Options}, From, #{openers := Openers} = St) ->
+handle_call({insert_key, UUID, DbKey}, _From, #{cache := Cache} = St) ->
+    ok = insert(Cache, UUID, DbKey),
+    {reply, ok, St, ?TIMEOUT};
+
+handle_call({has_key, UUID}, _From, #{cache := Cache} = St) ->
+    case lookup(Cache, UUID) of
+        {ok, _DbKey} ->
+            {reply, true, St, ?TIMEOUT};
+        {error, not_found} ->
+            {reply, false, St, ?TIMEOUT}
+    end;
+
+handle_call({encrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
     #{
-        uuid := UUID
-    } = Db,
+        cache := Cache
+    } = St,
 
-    {_, Ref} = erlang:spawn_monitor(?MODULE, do_generate_key, [Db, Options]),
-    Openers1 = dict:store(Ref, {UUID, From}, Openers),
-    {noreply, St#{openers := Openers1}, ?TIMEOUT};
+    {ok, DbKey} = lookup(Cache, UUID),
 
-handle_call({encrypt, Db, Key, Value}, From, St) ->
-    NewSt = maybe_spawn_worker(St, From, do_encrypt, Db, Key, Value),
-    {noreply, NewSt, ?TIMEOUT};
+    erlang:spawn(fun() ->
+        process_flag(sensitive, true),
+        try
+            do_encrypt(DbKey, Db, Key, Value)
+        of
+            Resp ->
+                gen_server:reply(From, Resp)
+        catch
+            _:Error ->
+                gen_server:reply(From, {error, Error})
+        end
+    end),
 
-handle_call({decrypt, Db, Key, Value}, From, St) ->
-    NewSt = maybe_spawn_worker(St, From, do_decrypt, Db, Key, Value),
-    {noreply, NewSt, ?TIMEOUT};
+    {noreply, St, ?TIMEOUT};
+
+handle_call({decrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
+    #{
+        cache := Cache
+    } = St,
+
+    {ok, DbKey} = lookup(Cache, UUID),
+
+    erlang:spawn(fun() ->
+        process_flag(sensitive, true),
+        try
+            do_decrypt(DbKey, Db, Key, Value)
+        of
+            Resp ->
+                gen_server:reply(From, Resp)
+        catch
+            _:Error ->
+                gen_server:reply(From, {error, Error})
+        end
+    end),
+
+    {noreply, St, ?TIMEOUT};
 
 handle_call(_Msg, _From, St) ->
     {noreply, St}.
@@ -133,65 +191,6 @@ handle_cast(_Msg, St) ->
     {noreply, St}.
 
 
-handle_info({'DOWN', Ref, _, _Pid, false}, #{openers := Openers} = St) ->
-    {{_UUID, From}, Openers1} = dict:take(Ref, Openers),
-    gen_server:reply(From, {ok, false}),
-    {noreply, St#{openers := Openers1}, ?TIMEOUT};
-
-handle_info({'DOWN', Ref, _, _Pid, {ok, DbKey, AegisConfig}}, St) ->
-    #{
-        cache := Cache,
-        openers := Openers,
-        waiters := Waiters,
-        unwrappers := Unwrappers
-    } = St,
-
-    case dict:take(Ref, Openers) of
-        {{UUID, From}, Openers1} ->
-            ok = insert(Cache, UUID, DbKey),
-            gen_server:reply(From, {ok, AegisConfig}),
-            {noreply, St#{openers := Openers1}, ?TIMEOUT};
-        error ->
-            {UUID, Unwrappers1} = dict:take(Ref, Unwrappers),
-            ok = insert(Cache, UUID, DbKey),
-            Unwrappers2 = dict:erase(UUID, Unwrappers1),
-
-            {WaitList, Waiters1} = dict:take(UUID, Waiters),
-            lists:foreach(fun(Waiter) ->
-                #{
-                    from := From,
-                    action := Action,
-                    args := Args
-                } = Waiter,
-                erlang:spawn(?MODULE, Action, [From, DbKey | Args])
-            end, WaitList),
-            NewSt = St#{waiters := Waiters1, unwrappers := Unwrappers2},
-            {noreply, NewSt, ?TIMEOUT}
-    end;
-
-handle_info({'DOWN', Ref, process, _Pid, {error, Error}}, St) ->
-    #{
-        openers := Openers,
-        waiters := Waiters,
-        unwrappers := Unwrappers
-    } = St,
-
-    case dict:take(Ref, Openers) of
-        {From, Openers1} ->
-            gen_server:reply(From, {error, Error}),
-            {noreply, St#{openers := Openers1}, ?TIMEOUT};
-        error ->
-            {UUID, Unwrappers1} = dict:take(Ref, Unwrappers),
-            Unwrappers2 = dict:erase(UUID, Unwrappers1),
-
-            {WaitList, Waiters1} = dict:take(UUID, Waiters),
-            lists:foreach(fun(#{from := From}) ->
-                gen_server:reply(From, {error, Error})
-            end, WaitList),
-            NewSt = St#{waiters := Waiters1, unwrappers := Unwrappers2},
-            {noreply, NewSt, ?TIMEOUT}
-    end;
-
 handle_info(_Msg, St) ->
     {noreply, St}.
 
@@ -200,139 +199,77 @@ code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
 
-%% workers functions
-
-do_generate_key(#{} = Db, Options) ->
-    process_flag(sensitive, true),
-    try
-        aegis_key_manager:generate_key(Db, Options)
-    of
-        Resp ->
-            exit(Resp)
-    catch
-        _:Error ->
-            exit({error, Error})
-    end.
-
-
-do_unwrap_key(#{aegis := AegisConfig} = Db) ->
-    process_flag(sensitive, true),
-    try
-        aegis_key_manager:unwrap_key(Db, AegisConfig)
-    of
-        Resp ->
-            exit(Resp)
-    catch
-        _:Error ->
-            exit({error, Error})
-    end.
-
-
-do_encrypt(From, DbKey, #{uuid := UUID}, Key, Value) ->
-    process_flag(sensitive, true),
-    try
-        EncryptionKey = crypto:strong_rand_bytes(32),
-        <<WrappedKey:320>> = aegis_keywrap:key_wrap(DbKey, EncryptionKey),
-
-        {CipherText, <<CipherTag:128>>} =
-            ?aes_gcm_encrypt(
-               EncryptionKey,
-               <<0:96>>,
-               <<UUID/binary, 0:8, Key/binary>>,
-               Value),
-        <<1:8, WrappedKey:320, CipherTag:128, CipherText/binary>>
-    of
-        Resp ->
-            gen_server:reply(From, Resp)
-    catch
-        _:Error ->
-            gen_server:reply(From, {error, Error})
-    end.
-
-
-do_decrypt(From, DbKey, #{uuid := UUID}, Key, Value) ->
-    process_flag(sensitive, true),
-    try
-        case Value of
-            <<1:8, WrappedKey:320, CipherTag:128, CipherText/binary>> ->
-                case aegis_keywrap:key_unwrap(DbKey, <<WrappedKey:320>>) of
-                    fail ->
-                        erlang:error(decryption_failed);
-                    DecryptionKey ->
-                        Decrypted =
-                        ?aes_gcm_decrypt(
-                            DecryptionKey,
-                            <<0:96>>,
-                            <<UUID/binary, 0:8, Key/binary>>,
-                            CipherText,
-                            <<CipherTag:128>>),
-                        if Decrypted /= error -> Decrypted; true ->
-                            erlang:error(decryption_failed)
-                        end
-                end;
-            _ ->
-                erlang:error(not_ciphertext)
-        end
-    of
-        Resp ->
-            gen_server:reply(From, Resp)
-    catch
-        _:Error ->
-            gen_server:reply(From, {error, Error})
-    end.
-
-
 %% private functions
 
-maybe_spawn_worker(St, From, Action, #{uuid := UUID} = Db, Key, Value) ->
+do_open_db(#{} = Db) ->
     #{
-        cache := Cache,
-        waiters := Waiters
-    } = St,
+        uuid := UUID,
+        user_ctx := UserCtx,
+        db_options := Options0
+    } = Db,
 
-    case lookup(Cache, UUID) of
+    %% put back elements removed in fabric2_fdb:open/2
+    Options = [{uuid, UUID}, {user_ctx, UserCtx} | Options0],
+    do_open_db(Db, Options).
+
+
+do_open_db(#{uuid := UUID} = Db, Options) ->
+    case ?AEGIS_KEY_MANAGER:open_db(Db, Options) of
         {ok, DbKey} ->
-            erlang:spawn(?MODULE, Action, [From, DbKey, Db, Key, Value]),
-            St;
-        {error, not_found} ->
-            NewSt = maybe_spawn_unwrapper(St, Db),
-            Waiter = #{
-                from => From,
-                action => Action,
-                args => [Db, Key, Value]
-            },
-            Waiters1 = dict:append(UUID, Waiter, Waiters),
-            NewSt#{waiters := Waiters1}
-     end.
-
-
-maybe_spawn_unwrapper(St, #{uuid := UUID} = Db) ->
-    #{
-        unwrappers := Unwrappers
-    } = St,
-
-    case dict:is_key(UUID, Unwrappers) of
-        true ->
-            St;
+            gen_server:call(?MODULE, {insert_key, UUID, DbKey}),
+            {ok, DbKey};
         false ->
-            {_Pid, Ref} = erlang:spawn_monitor(?MODULE, do_unwrap_key, [Db]),
-            Unwrappers1 = dict:store(UUID, Ref, Unwrappers),
-            Unwrappers2 = dict:store(Ref, UUID, Unwrappers1),
-            St#{unwrappers := Unwrappers2}
+            false
+    end.
+
+
+do_encrypt(DbKey, #{uuid := UUID}, Key, Value) ->
+    EncryptionKey = crypto:strong_rand_bytes(32),
+    <<WrappedKey:320>> = aegis_keywrap:key_wrap(DbKey, EncryptionKey),
+
+    {CipherText, <<CipherTag:128>>} =
+        ?aes_gcm_encrypt(
+           EncryptionKey,
+           <<0:96>>,
+           <<UUID/binary, 0:8, Key/binary>>,
+           Value),
+    <<1:8, WrappedKey:320, CipherTag:128, CipherText/binary>>.
+
+
+do_decrypt(DbKey, #{uuid := UUID}, Key, Value) ->
+    case Value of
+        <<1:8, WrappedKey:320, CipherTag:128, CipherText/binary>> ->
+            case aegis_keywrap:key_unwrap(DbKey, <<WrappedKey:320>>) of
+                fail ->
+                    erlang:error(decryption_failed);
+                DecryptionKey ->
+                    Decrypted =
+                    ?aes_gcm_decrypt(
+                        DecryptionKey,
+                        <<0:96>>,
+                        <<UUID/binary, 0:8, Key/binary>>,
+                        CipherText,
+                        <<CipherTag:128>>),
+                    if Decrypted /= error -> Decrypted; true ->
+                        erlang:error(decryption_failed)
+                    end
+            end;
+        _ ->
+            erlang:error(not_ciphertext)
     end.
 
 
 %% cache functions
 
 insert(Cache, UUID, DbKey) ->
-    Entry = #entry{id = UUID, key = DbKey},
+    Entry = #entry{uuid = UUID, encryption_key = DbKey},
     true = ets:insert(Cache, Entry),
     ok.
 
 
 lookup(Cache, UUID) ->
     case ets:lookup(Cache, UUID) of
-        [#entry{id = UUID, key = DbKey}] ->
+        [#entry{uuid = UUID, encryption_key = DbKey}] ->
             {ok, DbKey};
         [] ->
             {error, not_found}

@@ -38,11 +38,6 @@ init([]) ->
     },
     Children = [
         #{
-            id => aegis_key_manager,
-            start => {aegis_key_manager, start_link, []},
-            shutdown => 5000
-        },
-        #{
             id => aegis_server,
             start => {aegis_server, start_link, []},
             shutdown => 5000

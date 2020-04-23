@@ -18,8 +18,8 @@
 
 
 -export([
-    create/2,
-    open/2,
+    init_db/2,
+    open_db/2,
 
     decrypt/2,
     decrypt/3,
@@ -27,45 +27,26 @@
     wrap_fold_fun/2
 ]).
 
-create(#{} = Db, Options) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = Db,
-
-    {ok, AegisConfig} = aegis_server:generate_key(Db, Options),
-
-    FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
-    Packed = erlfdb_tuple:pack({AegisConfig}),
-    ok = erlfdb:set(Tx, FDBKey, Packed),
-
+init_db(#{} = Db, Options) ->
     Db#{
-        aegis => AegisConfig
+        is_encrypted => aegis_server:init_db(Db, Options)
     }.
 
 
-open(#{} = Db, _Options) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = Db,
-
-    FDBKey = erlfdb_tuple:pack(?WRAPPED_KEY, DbPrefix),
-    Packed = erlfdb:wait(erlfdb:get(Tx, FDBKey)),
-    {AegisConfig} = erlfdb_tuple:unpack(Packed),
-
+open_db(#{} = Db, Options) ->
     Db#{
-        aegis => AegisConfig
+        is_encrypted => aegis_server:open_db(Db, Options)
     }.
 
 
 encrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
 
-encrypt(#{aegis := false}, _Key, Value) when is_binary(Value) ->
+encrypt(#{is_encrypted := false}, _Key, Value) when is_binary(Value) ->
     Value;
 
-encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
+encrypt(#{is_encrypted := true} = Db, Key, Value)
+        when is_binary(Key), is_binary(Value) ->
     aegis_server:encrypt(Db, Key, Value).
 
 
@@ -77,10 +58,11 @@ decrypt(#{} = Db, Rows) when is_list(Rows) ->
 decrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
 
-decrypt(#{aegis := false}, _Key, Value) when is_binary(Value) ->
+decrypt(#{is_encrypted := false}, _Key, Value) when is_binary(Value) ->
     Value;
 
-decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
+decrypt(#{is_encrypted := true} = Db, Key, Value)
+        when is_binary(Key), is_binary(Value) ->
     aegis_server:decrypt(Db, Key, Value).
 
 

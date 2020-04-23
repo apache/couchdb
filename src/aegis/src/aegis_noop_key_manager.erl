@@ -17,20 +17,15 @@
 
 
 -export([
-    init/0,
-    generate_key/3,
-    unwrap_key/3
+    init_db/2,
+    open_db/2
 ]).
 
 
 
-init() ->
-    [].
-
-
-generate_key([], #{} = _Db, _Options) ->
+init_db(#{} = _Db, _Options) ->
     false.
 
 
-unwrap_key([], #{} = _Db, _AegisConfig) ->
-    erlang:error(invalid_operation).
+open_db(#{} = _Db, _Options) ->
+    false.

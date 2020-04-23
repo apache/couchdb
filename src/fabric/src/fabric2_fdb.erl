@@ -236,7 +236,7 @@ create(#{} = Db0, Options) ->
 
         db_options => Options1
     },
-    aegis:create(Db2, Options).
+    aegis:init_db(Db2, Options).
 
 
 open(#{} = Db0, Options) ->
@@ -281,7 +281,7 @@ open(#{} = Db0, Options) ->
     },
 
     Db3 = load_config(Db2),
-    Db4 = aegis:open(Db3, Options),
+    Db4 = aegis:open_db(Db3, Options),
 
     case {UUID, Db4} of
         {undefined, _} -> ok;
