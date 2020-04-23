@@ -13,6 +13,7 @@
 -module(fabric2_db_crud_tests).
 
 
+-include_lib("fabric/include/fabric2.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2_test.hrl").
@@ -39,6 +40,8 @@ crud_test_() ->
                     ?TDEF_FE(recreate_db),
                     ?TDEF_FE(undelete_db),
                     ?TDEF_FE(remove_deleted_db),
+                    ?TDEF_FE(scheduled_remove_deleted_db),
+                    ?TDEF_FE(scheduled_remove_deleted_dbs),
                     ?TDEF_FE(old_db_handle),
                     ?TDEF_FE(list_dbs),
                     ?TDEF_FE(list_dbs_user_fun),
@@ -59,14 +62,42 @@ crud_test_() ->
     }.
 
 
+scheduled_db_remove_error_test_() ->
+    {
+        "Test scheduled database remove operations",
+        {
+            setup,
+            fun setup_all/0,
+            fun teardown_all/1,
+            {
+                foreach,
+                fun setup/0,
+                fun cleanup/1,
+                [
+                    ?TDEF_FE(scheduled_remove_deleted_dbs_with_error)
+                ]
+            }
+        }
+    }.
+
+
 setup_all() ->
-    Ctx = test_util:start_couch([fabric]),
+    meck:new(config, [passthrough]),
+    meck:expect(config, get_integer, fun
+        ("couchdb", "db_expiration_schedule_sec", _) -> 2;
+        ("couchdb", "db_expiration_retention_sec", _) -> 0;
+        (_, _, Default) -> Default
+    end),
+    Ctx = test_util:start_couch([fabric, couch_jobs]),
     meck:new(erlfdb, [passthrough]),
+    meck:new(fabric2_db_expiration, [passthrough]),
     Ctx.
 
 
 teardown_all(Ctx) ->
-    meck:unload(),
+    meck:unload(erlfdb),
+    meck:unload(config),
+    meck:unload(fabric2_db_expiration),
     test_util:stop_couch(Ctx).
 
 
@@ -75,9 +106,12 @@ setup() ->
 
 
 cleanup(_) ->
+    ok = config:set("couchdb", "db_expiration_enabled", "false", false),
     ok = config:set("couchdb", "enable_database_recovery", "false", false),
     fabric2_test_util:tx_too_old_reset_errors(),
     reset_fail_erfdb_wait(),
+    meck:reset([fabric2_db_expiration]),
+    meck:reset([config]),
     meck:reset([erlfdb]).
 
 
@@ -203,6 +237,60 @@ remove_deleted_db(_) ->
     {ok, Infos2} = fabric2_db:list_deleted_dbs_info(),
     DeletedDbs = [proplists:get_value(db_name, Info) || Info <- Infos2],
     ?assert(not lists:member(DbName, DeletedDbs)).
+
+
+scheduled_remove_deleted_db(_) ->
+    ok = config:set("couchdb", "db_expiration_enabled", "true", false),
+    ok = config:set("couchdb", "enable_database_recovery", "true", false),
+    DbName = ?tempdb(),
+    ?assertError(database_does_not_exist, fabric2_db:delete(DbName, [])),
+
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+    ?assertEqual(true, ets:member(fabric2_server, DbName)),
+
+    ?assertEqual(ok, fabric2_db:delete(DbName, [])),
+    ?assertEqual(false, ets:member(fabric2_server, DbName)),
+
+    meck:wait(fabric2_db_expiration, process_expirations, '_', 5000),
+
+    {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
+    DeletedDbs = [proplists:get_value(db_name, Info) || Info <- Infos],
+    ?assert(not lists:member(DbName, DeletedDbs)).
+
+
+scheduled_remove_deleted_dbs(_) ->
+    ok = config:set("couchdb", "db_expiration_enabled", "true", false),
+    ok = config:set("couchdb", "db_expiration_batch", "2", false),
+    ok = config:set("couchdb", "enable_database_recovery", "true", false),
+    DbNameList = [create_and_delete_db() || _I <- lists:seq(1, 5)],
+    meck:wait(fabric2_db_expiration, process_expirations, '_', 5000),
+
+    {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
+    DeletedDbs = [proplists:get_value(db_name, Info) || Info <- Infos],
+    lists:map(fun(DbName) ->
+        ?assert(not lists:member(DbName, DeletedDbs))
+    end, DbNameList).
+
+
+scheduled_remove_deleted_dbs_with_error(_) ->
+    meck:expect(fabric2_db_expiration, process_expirations, fun(_, _) ->
+        throw(process_expirations_error)
+    end),
+
+    {Pid, Ref} = spawn_monitor(fun() ->
+        fabric2_db_expiration:cleanup(true)
+    end),
+    receive
+        {'DOWN', Ref, process, Pid, Error} ->
+            ?assertMatch({job_error, process_expirations_error, _}, Error)
+    end,
+    JobType = <<"db_expiration">>,
+    JobId = <<"db_expiration_job">>,
+    FQJobId = <<JobId/binary, "-", 1:16/integer>>,
+
+    ?assertMatch({ok, _}, couch_jobs:get_job_data(undefined, JobType, FQJobId)),
+    {ok, JobState} = couch_jobs:get_job_state(undefined, JobType, FQJobId),
+    ?assert(lists:member(JobState, [pending, running])).
 
 
 old_db_handle(_) ->
@@ -615,3 +703,15 @@ get_deleted_dbs(DeletedDbInfos)  ->
         DbName = fabric2_util:get_value(db_name, DbInfo),
         [DbName | Acc]
     end, [], DeletedDbInfos).
+
+
+create_and_delete_db() ->
+    DbName = ?tempdb(),
+    ?assertError(database_does_not_exist, fabric2_db:delete(DbName, [])),
+
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+    ?assertEqual(true, ets:member(fabric2_server, DbName)),
+
+    ?assertEqual(ok, fabric2_db:delete(DbName, [])),
+    ?assertEqual(false, ets:member(fabric2_server, DbName)),
+    DbName.
