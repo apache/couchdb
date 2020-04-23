@@ -86,7 +86,10 @@ write_doc(Db, #doc{deleted = Deleted} = Doc) ->
         case should_index_doc(Doc, Mrst) of
             true ->
                 {Mrst1, Result1} = couch_views_indexer:map_docs(Mrst, Result0),
-                couch_views_indexer:write_docs(Db, Mrst1, Result1, State),
+                DocNumber = couch_views_indexer:write_docs(Db, Mrst1,
+                    Result1, State),
+                couch_views_plugin:after_interactive_write(Db, Mrst1,
+                    Result1, DocNumber),
                 couch_eval:release_map_context(Mrst1#mrst.qserver);
             false ->
                 ok

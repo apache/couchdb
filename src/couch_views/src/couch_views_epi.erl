@@ -39,7 +39,9 @@ providers() ->
 
 
 services() ->
-    [].
+    [
+        {couch_views, couch_views_plugin}
+    ].
 
 
 data_subscriptions() ->
