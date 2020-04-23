@@ -13,6 +13,7 @@
 
 -define(uint2bin(I), binary:encode_unsigned(I, little)).
 -define(bin2uint(I), binary:decode_unsigned(I, little)).
+-define(bin2int(V), binary_to_integer(V)).
 -define(METADATA_VERSION_KEY, <<16#FF, "/metadataVersion">>).
 
 % Prefix Definitions

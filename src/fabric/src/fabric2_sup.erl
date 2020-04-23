@@ -30,7 +30,7 @@ start_link(Args) ->
 
 init([]) ->
     config:enable_feature(fdb),
-    Flags = {one_for_one, 1, 5},
+    Flags = {rest_for_one, 1, 5},
     Children = [
         {
             fabric2_server,
@@ -55,6 +55,14 @@ init([]) ->
             5000,
             worker,
             [fabric2_index]
+        },
+        {
+            fabric2_db_expiration,
+            {fabric2_db_expiration, start_link, []},
+            permanent,
+            5000,
+            worker,
+            [fabric2_db_expiration]
         }
     ],
     ChildrenWithEpi = couch_epi:register_service(fabric2_epi, Children),
