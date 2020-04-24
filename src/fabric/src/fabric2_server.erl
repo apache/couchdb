@@ -42,6 +42,21 @@
 -define(FDB_DIRECTORY, fdb_directory).
 -define(FDB_CLUSTER, fdb_cluster).
 -define(DEFAULT_FDB_DIRECTORY, <<"couchdb">>).
+-define(TX_OPTIONS_SECTION, "fdb_tx_options").
+-define(RELISTEN_DELAY, 1000).
+
+-define(DEFAULT_TIMEOUT_MSEC, "60000").
+-define(DEFAULT_RETRY_LIMIT, "100").
+
+-define(TX_OPTIONS, #{
+    machine_id                           => {binary,  undefined},
+    datacenter_id                        => {binary,  undefined},
+    transaction_logging_max_field_length => {integer, undefined},
+    timeout                              => {integer, ?DEFAULT_TIMEOUT_MSEC},
+    retry_limit                          => {integer, ?DEFAULT_RETRY_LIMIT},
+    max_retry_delay                      => {integer, undefined},
+    size_limit                           => {integer, undefined}
+}).
 
 
 start_link() ->
@@ -79,16 +94,7 @@ init(_) ->
             {read_concurrency, true},
             {write_concurrency, true}
         ]),
-
-    {Cluster, Db} = case application:get_env(fabric, eunit_run) of
-        {ok, true} ->
-            {<<"eunit_test">>, erlfdb_util:get_test_db([empty])};
-        undefined ->
-            ClusterFileStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
-            {ok, ConnectionStr} = file:read_file(ClusterFileStr),
-            DbHandle = erlfdb:open(iolist_to_binary(ClusterFileStr)),
-            {string:trim(ConnectionStr), DbHandle}
-    end,
+    {Cluster, Db} = get_db_and_cluster([empty]),
     application:set_env(fabric, ?FDB_CLUSTER, Cluster),
     application:set_env(fabric, db, Db),
 
@@ -99,7 +105,7 @@ init(_) ->
             [?DEFAULT_FDB_DIRECTORY]
     end,
     application:set_env(fabric, ?FDB_DIRECTORY, Dir),
-
+    config:subscribe_for_changes([?TX_OPTIONS_SECTION]),
     {ok, nil}.
 
 
@@ -114,6 +120,27 @@ handle_call(Msg, _From, St) ->
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
 
+
+handle_info({config_change, ?TX_OPTIONS_SECTION, _K, deleted, _}, St) ->
+    % Since we don't know the exact default values to reset the options
+    % to we recreate the db handle instead which will start with a default
+    % handle and re-apply all the options
+    {_Cluster, NewDb} = get_db_and_cluster([]),
+    application:set_env(fabric, db, NewDb),
+    {noreply, St};
+
+handle_info({config_change, ?TX_OPTIONS_SECTION, K, V, _}, St) ->
+    {ok, Db} = application:get_env(fabric, db),
+    apply_tx_options(Db, [{K, V}]),
+    {noreply, St};
+
+handle_info({gen_event_EXIT, _Handler, _Reason}, St) ->
+    erlang:send_after(?RELISTEN_DELAY, self(), restart_config_listener),
+    {noreply, St};
+
+handle_info(restart_config_listener, St) ->
+    config:subscribe_for_changes([?TX_OPTIONS_SECTION]),
+    {noreply, St};
 
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
@@ -141,4 +168,52 @@ get_env(Key) ->
             end;
         Value ->
             Value
+    end.
+
+
+get_db_and_cluster(EunitDbOpts) ->
+     {Cluster, Db} = case application:get_env(fabric, eunit_run) of
+        {ok, true} ->
+            {<<"eunit_test">>, erlfdb_util:get_test_db(EunitDbOpts)};
+        undefined ->
+            ClusterFileStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
+            {ok, ConnectionStr} = file:read_file(ClusterFileStr),
+            DbHandle = erlfdb:open(iolist_to_binary(ClusterFileStr)),
+            {string:trim(ConnectionStr), DbHandle}
+    end,
+    apply_tx_options(Db, config:get(?TX_OPTIONS_SECTION)),
+    {Cluster, Db}.
+
+
+apply_tx_options(Db, Cfg) ->
+    maps:map(fun(Option, {Type, Default}) ->
+        case lists:keyfind(atom_to_list(Option), 1, Cfg) of
+            false ->
+                case Default of
+                    undefined -> ok;
+                    _Defined -> apply_tx_option(Db, Option, Default, Type)
+                end;
+            {_K, Val} ->
+                apply_tx_option(Db, Option, Val, Type)
+        end
+    end, ?TX_OPTIONS).
+
+
+apply_tx_option(Db, Option, Val, integer) ->
+    try
+        erlfdb:set_option(Db, Option, list_to_integer(Val))
+    catch
+        error:badarg ->
+            Msg = "~p : Invalid integer tx option ~p = ~p",
+            couch_log:error(Msg, [?MODULE, Option, Val])
+    end;
+
+apply_tx_option(Db, Option, Val, binary) ->
+    BinVal = list_to_binary(Val),
+    case size(BinVal) < 16 of
+        true ->
+            erlfdb:set_option(Db, Option, BinVal);
+        false ->
+            Msg = "~p : String tx option ~p is larger than 16 bytes",
+            couch_log:error(Msg, [?MODULE, Option])
     end.
