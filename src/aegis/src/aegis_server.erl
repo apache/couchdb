@@ -86,7 +86,15 @@ encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
 
     case ets:member(?KEY_CHECK, UUID) of
         true ->
-            gen_server:call(?MODULE, {encrypt, Db, Key, Value});
+            case gen_server:call(?MODULE, {encrypt, Db, Key, Value}) of
+                CipherText when is_binary(CipherText) ->
+                    CipherText;
+                {error, {_Tag, {_C_FileName,_LineNumber}, _Desc} = Reason} ->
+                    couch_log:error("aegis encryption failure: ~p ", [Reason]),
+                    erlang:error(decryption_failed);
+                {error, Reason} ->
+                    erlang:error(Reason)
+            end;
         false ->
             process_flag(sensitive, true),
 
@@ -103,7 +111,15 @@ decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
 
     case ets:member(?KEY_CHECK, UUID) of
         true ->
-            gen_server:call(?MODULE, {decrypt, Db, Key, Value});
+            case gen_server:call(?MODULE, {decrypt, Db, Key, Value}) of
+                PlainText when is_binary(PlainText) ->
+                    PlainText;
+                {error, {_Tag, {_C_FileName,_LineNumber}, _Desc} = Reason} ->
+                    couch_log:error("aegis decryption failure: ~p ", [Reason]),
+                    erlang:error(decryption_failed);
+                {error, Reason} ->
+                    erlang:error(Reason)
+            end;
         false ->
             process_flag(sensitive, true),
 
