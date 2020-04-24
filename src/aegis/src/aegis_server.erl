@@ -41,6 +41,7 @@
 
 
 
+-define(KEY_CHECK, aegis_key_check).
 -define(INIT_TIMEOUT, 60000).
 -define(TIMEOUT, 10000).
 
@@ -83,7 +84,7 @@ encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
         uuid := UUID
     } = Db,
 
-    case gen_server:call(?MODULE, {has_key, UUID}) of
+    case ets:member(?KEY_CHECK, UUID) of
         true ->
             gen_server:call(?MODULE, {encrypt, Db, Key, Value});
         false ->
@@ -100,7 +101,7 @@ decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
         uuid := UUID
     } = Db,
 
-    case gen_server:call(?MODULE, {has_key, UUID}) of
+    case ets:member(?KEY_CHECK, UUID) of
         true ->
             gen_server:call(?MODULE, {decrypt, Db, Key, Value});
         false ->
@@ -116,6 +117,7 @@ decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
 init([]) ->
     process_flag(sensitive, true),
     Cache = ets:new(?MODULE, [set, private, {keypos, #entry.uuid}]),
+    ets:new(?KEY_CHECK, [named_table, protected, {read_concurrency, true}]),
 
     St = #{
         cache => Cache
@@ -130,14 +132,6 @@ terminate(_Reason, _St) ->
 handle_call({insert_key, UUID, DbKey}, _From, #{cache := Cache} = St) ->
     ok = insert(Cache, UUID, DbKey),
     {reply, ok, St, ?TIMEOUT};
-
-handle_call({has_key, UUID}, _From, #{cache := Cache} = St) ->
-    case lookup(Cache, UUID) of
-        {ok, _DbKey} ->
-            {reply, true, St, ?TIMEOUT};
-        {error, not_found} ->
-            {reply, false, St, ?TIMEOUT}
-    end;
 
 handle_call({encrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
     #{
@@ -264,6 +258,7 @@ do_decrypt(DbKey, #{uuid := UUID}, Key, Value) ->
 insert(Cache, UUID, DbKey) ->
     Entry = #entry{uuid = UUID, encryption_key = DbKey},
     true = ets:insert(Cache, Entry),
+    true = ets:insert(?KEY_CHECK, {UUID, true}),
     ok.
 
 
