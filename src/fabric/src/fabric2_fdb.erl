@@ -281,7 +281,7 @@ open(#{} = Db0, Options) ->
     },
 
     Db3 = load_config(Db2),
-    Db4 = aegis:open_db(Db3, Options),
+    Db4 = aegis:open_db(Db3),
 
     case {UUID, Db4} of
         {undefined, _} -> ok;

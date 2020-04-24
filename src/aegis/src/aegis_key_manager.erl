@@ -19,6 +19,4 @@
     DbOptions :: list()) -> {ok, binary()} | false.
 
 
--callback open_db(
-    Db :: #{},
-    DbOptions :: list()) -> {ok, binary()} | false.
+-callback open_db(Db :: #{}) -> {ok, binary()} | false.

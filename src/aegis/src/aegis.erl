@@ -19,7 +19,7 @@
 
 -export([
     init_db/2,
-    open_db/2,
+    open_db/1,
 
     decrypt/2,
     decrypt/3,
@@ -33,9 +33,9 @@ init_db(#{} = Db, Options) ->
     }.
 
 
-open_db(#{} = Db, Options) ->
+open_db(#{} = Db) ->
     Db#{
-        is_encrypted => aegis_server:open_db(Db, Options)
+        is_encrypted => aegis_server:open_db(Db)
     }.
 
 

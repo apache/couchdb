@@ -18,7 +18,7 @@
 
 -export([
     init_db/2,
-    open_db/2
+    open_db/1
 ]).
 
 
@@ -27,5 +27,5 @@ init_db(#{} = _Db, _Options) ->
     false.
 
 
-open_db(#{} = _Db, _Options) ->
+open_db(#{} = _Db) ->
     false.

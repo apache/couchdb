@@ -15,7 +15,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 
--define(DB, #{uuid => <<0:64>>, db_options => [], user_ctx => []}).
+-define(DB, #{uuid => <<0:64>>}).
 -define(VALUE, <<0:8>>).
 -define(ENCRYPTED, <<1,155,242,89,190,54,112,151,18,145,25,251,217,
     49,147,125,14,162,146,201,189,100,232,38,239,111,163,84,25,60,
@@ -51,7 +51,7 @@ setup() ->
     Ctx = test_util:start_couch([fabric]),
     meck:new([?AEGIS_KEY_MANAGER], [passthrough]),
     ok = meck:expect(?AEGIS_KEY_MANAGER, init_db, 2, {ok, <<0:256>>}),
-    ok = meck:expect(?AEGIS_KEY_MANAGER, open_db, 2, {ok, <<0:256>>}),
+    ok = meck:expect(?AEGIS_KEY_MANAGER, open_db, 1, {ok, <<0:256>>}),
     Ctx.
 
 
@@ -66,8 +66,8 @@ test_init_db() ->
 
 
 test_open_db() ->
-    ?assert(aegis_server:open_db(?DB, [])),
-    ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 2)).
+    ?assert(aegis_server:open_db(?DB)),
+    ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
 
 
 test_init_db_cache() ->
@@ -85,9 +85,9 @@ test_init_db_cache() ->
 
 
 test_open_db_cache() ->
-    ?assertEqual(0, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 2)),
+    ?assertEqual(0, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
 
-    ?assert(aegis_server:open_db(?DB, [])),
+    ?assert(aegis_server:open_db(?DB)),
 
     lists:foreach(fun(I) ->
         Encrypted = aegis_server:encrypt(?DB, <<I:64>>, ?VALUE),
@@ -95,26 +95,26 @@ test_open_db_cache() ->
         ?assertMatch(<<1:8, _/binary>>, Encrypted)
     end, lists:seq(1, 12)),
 
-    ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 2)).
+    ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
 
 
 test_encrypt_cache() ->
-    ?assertEqual(0, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 2)),
+    ?assertEqual(0, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
 
     Encrypted = aegis_server:encrypt(?DB, <<1:64>>, ?VALUE),
     ?assertNotEqual(?VALUE, Encrypted),
     ?assertMatch(<<1:8, _/binary>>, Encrypted),
 
-    ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 2)).
+    ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
 
 
 test_decrypt_cache() ->
-    ?assertEqual(0, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 2)),
+    ?assertEqual(0, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
 
     Decrypted = aegis_server:decrypt(?DB, <<1:64>>, ?ENCRYPTED),
     ?assertEqual(<<0>>, Decrypted),
 
-    ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 2)).
+    ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
 
 
 
@@ -125,8 +125,8 @@ disabled_test_() ->
             Ctx = setup(),
             ok = meck:delete(?AEGIS_KEY_MANAGER, init_db, 2),
             ok = meck:expect(?AEGIS_KEY_MANAGER, init_db, 2, false),
-            ok = meck:delete(?AEGIS_KEY_MANAGER, open_db, 2),
-            ok = meck:expect(?AEGIS_KEY_MANAGER, open_db, 2, false),
+            ok = meck:delete(?AEGIS_KEY_MANAGER, open_db, 1),
+            ok = meck:expect(?AEGIS_KEY_MANAGER, open_db, 1, false),
             Ctx
         end,
         fun teardown/1,
@@ -149,17 +149,17 @@ test_disabled_init_db() ->
 
 
 test_disabled_open_db() ->
-    ?assertNot(aegis_server:open_db(?DB, [])),
-    ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 2)).
+    ?assertNot(aegis_server:open_db(?DB)),
+    ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
 
 
 test_disabled_encrypt() ->
-    Db = ?DB#{is_encrypted => aegis_server:open_db(?DB, [])},
+    Db = ?DB#{is_encrypted => aegis_server:open_db(?DB)},
     Encrypted = aegis:encrypt(Db, <<1:64>>, ?VALUE),
     ?assertEqual(?VALUE, Encrypted).
 
 
 test_disabled_decrypt() ->
-    Db = ?DB#{is_encrypted => aegis_server:open_db(?DB, [])},
+    Db = ?DB#{is_encrypted => aegis_server:open_db(?DB)},
     Decrypted = aegis:decrypt(Db, <<1:64>>, ?ENCRYPTED),
     ?assertEqual(?ENCRYPTED, Decrypted).

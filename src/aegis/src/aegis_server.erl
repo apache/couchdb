@@ -24,7 +24,7 @@
 -export([
     start_link/0,
     init_db/2,
-    open_db/2,
+    open_db/1,
     encrypt/3,
     decrypt/3
 ]).
@@ -66,11 +66,11 @@ init_db(#{uuid := UUID} = Db, Options) ->
     end.
 
 
--spec open_db(Db :: #{}, Options :: list()) -> boolean().
-open_db(#{} = Db, Options) ->
+-spec open_db(Db :: #{}) -> boolean().
+open_db(#{} = Db) ->
     process_flag(sensitive, true),
 
-    case do_open_db(Db, Options) of
+    case do_open_db(Db) of
         {ok, _DbKey} ->
             true;
         false ->
@@ -211,20 +211,8 @@ code_change(_OldVsn, St, _Extra) ->
 
 %% private functions
 
-do_open_db(#{} = Db) ->
-    #{
-        uuid := UUID,
-        user_ctx := UserCtx,
-        db_options := Options0
-    } = Db,
-
-    %% put back elements removed in fabric2_fdb:open/2
-    Options = [{uuid, UUID}, {user_ctx, UserCtx} | Options0],
-    do_open_db(Db, Options).
-
-
-do_open_db(#{uuid := UUID} = Db, Options) ->
-    case ?AEGIS_KEY_MANAGER:open_db(Db, Options) of
+do_open_db(#{uuid := UUID} = Db) ->
+    case ?AEGIS_KEY_MANAGER:open_db(Db) of
         {ok, DbKey} ->
             gen_server:call(?MODULE, {insert_key, UUID, DbKey}),
             {ok, DbKey};
