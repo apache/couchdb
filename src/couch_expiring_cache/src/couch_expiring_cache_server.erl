@@ -17,6 +17,7 @@
 -callback start_link() -> {ok, pid()} | ignore | {error, term()}.
 
 -export([
+    now_ts/0,
     start_link/2
 ]).
 
@@ -80,10 +81,10 @@ handle_info(remove_expired, St) ->
         largest_elapsed := LargestElapsed
     } = St,
 
-    NowTS = erlang:system_time(?TIME_UNIT),
+    NowTS = now_ts(),
     OldestTS = max(OldestTS0,
         couch_expiring_cache_fdb:clear_range_to(Name, NowTS, BatchSize)),
-    Elapsed = erlang:system_time(?TIME_UNIT) - NowTS,
+    Elapsed = now_ts() - NowTS,
 
     {noreply, St#{
         timer_ref := schedule_remove_expired(Period, MaxJitter),
@@ -106,6 +107,11 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+now_ts() ->
+    {Mega, Sec, Micro} = os:timestamp(),
+    ((Mega * 1000000) + Sec) * 1000 + Micro div 1000.
 
 
 %% Private
