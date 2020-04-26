@@ -69,8 +69,8 @@ X means done, - means partially
   - [ ] Port reduce_false_temp.js
   - [X] Port reduce.js
   - [X] Port replication.js
-  - [ ] Port replicator_db_bad_rep_id.js
-  - [ ] Port replicator_db_by_doc_id.js
+  - [X] Port replicator_db_bad_rep_id.js
+  - [X] Port replicator_db_by_doc_id.js
   - [ ] Port replicator_db_compact_rep_db.js
   - [ ] Port replicator_db_continuous.js
   - [ ] Port replicator_db_credential_delegation.js
