@@ -384,11 +384,12 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req, _AuthModule) ->
                     {roles, UserCtx#user_ctx.roles}
                 ]}},
                 {info, {[
-                    {authentication_db, ?l2b(config:get("couch_httpd_auth", "authentication_db"))},
                     {authentication_handlers, [
                        N || {N, _Fun} <- Req#httpd.authentication_handlers]}
                 ] ++ maybe_value(authenticated, UserCtx#user_ctx.handler, fun(Handler) ->
                         Handler
+                    end) ++ maybe_value(authentication_db, config:get("chttpd_auth", "authentication_db"), fun(Val) ->
+                        ?l2b(Val)
                     end)}}
             ]})
     end;
