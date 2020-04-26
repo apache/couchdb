@@ -18,16 +18,9 @@
 -include_lib("couch_expiring_cache/include/couch_expiring_cache.hrl").
 
 
--define(CACHE_NAME, <<"test">>).
+-define(CACHE_NAME, atom_to_binary(?MODULE, utf8)).
 
-
-start_link() ->
-    Opts = #{
-        cache_name => ?CACHE_NAME,
-        period => 20,
-        max_jitter => 0
-    },
-    couch_expiring_cache_server:start_link(?MODULE, Opts).
+-define(FOREVER, 576460752303423488). % max int 64 bit
 
 
 couch_expiring_cache_basic_test_() ->
@@ -56,7 +49,11 @@ teardown_couch(Ctx) ->
 
 
 setup() ->
-    {ok, Pid} = start_link(),
+    Opts = #{
+        cache_name => ?CACHE_NAME,
+        period => 10,
+        max_jitter => 0},
+    {ok, Pid} = couch_expiring_cache_server:start_link(?MODULE, Opts),
     true = unlink(Pid),
     #{pid => Pid}.
 
@@ -66,10 +63,18 @@ teardown(#{pid := Pid}) ->
 
 
 simple_lifecycle(_) ->
-    {timeout, 10, ?_test(begin
-        Now = erlang:system_time(?TIME_UNIT),
-        StaleTS = Now + 100,
-        ExpiresTS = Now + 200,
+    % The entire test is racing against FDB being faster than timeout seconds
+    {timeout, 20, ?_test(begin
+        Start = couch_expiring_cache_server:now_ts(),
+        % Race Alert!
+        % We're betting on FDB returning a lookup faster than these:
+        Stale = 500,
+        Expires = 1000,
+        Timeout = 5000,
+        Interval = 5,
+
+        StaleTS = Start + Stale,
+        ExpiresTS = Start + Expires,
         Name = ?CACHE_NAME,
         Key = <<"key">>,
         Val = <<"val">>,
@@ -77,34 +82,66 @@ simple_lifecycle(_) ->
         ?assertEqual(ok, couch_expiring_cache_fdb:clear_all(Name)),
         ?assertEqual(not_found, couch_expiring_cache:lookup(Name, Key)),
         ?assertEqual([], entries(Name)),
-        ?assertEqual(ok,
-            couch_expiring_cache:insert(Name, Key, Val, StaleTS, ExpiresTS)),
-        ?assertEqual({fresh, Val}, couch_expiring_cache:lookup(Name, Key)),
-        ok = wait_lookup(Name, Key, {stale, Val}),
+        ?assertEqual(ok, couch_expiring_cache:insert(Name, Key, Val,
+            StaleTS, ExpiresTS)),
+        ok = attempt_fresh_and_stale_lookups(Name, Key, Timeout, Interval),
 
         % Refresh the existing key with updated timestamps
-        ?assertEqual(ok,
-            couch_expiring_cache:insert(Name, Key, Val,
-                StaleTS + 100, ExpiresTS + 100)),
-        ?assertEqual({fresh, Val}, couch_expiring_cache:lookup(Name, Key)),
+        Refresh = couch_expiring_cache_server:now_ts(),
+        ?assertEqual(ok, couch_expiring_cache:insert(Name, Key, Val,
+            Refresh + Stale, Refresh + Expires)),
+        ok = attempt_fresh_and_stale_lookups(Name, Key, Timeout, Interval),
         ?assertEqual(1, length(entries(Name))),
-        ok = wait_lookup(Name, Key, {stale, Val}),
-        ok = wait_lookup(Name, Key, expired),
-        ok = wait_lookup(Name, Key, not_found),
-        ?assertEqual([], entries(Name)),
-        ?assertEqual(not_found, couch_expiring_cache:lookup(Name, Key))
+        % These last 2 are also races, betting on FDB to be reasonably
+        % fast on the home stretch
+        ok = wait_lookup(Name, Key, expired, Timeout, Interval),
+        ok = wait_lookup(Name, Key, not_found, Timeout, Interval),
+        ?assertEqual([], entries(Name))
     end)}.
 
 
+% In this race we're betting on FDB to take less than `Stale` and then
+% `Expired` milliseconds to respond
+attempt_fresh_and_stale_lookups(Name, Key, Timeout, Interval) ->
+    case couch_expiring_cache:lookup(Name, Key) of
+        {fresh, Val} ->
+            % We won that race, let's bet on another!
+            ok = wait_lookup(Name, Key, {stale, Val}, Timeout, Interval);
+        _ ->
+            % Unlucky! But don't fail the test just yet...
+            ok
+    end.
+
+
 entries(Name) ->
-    FarFuture = erlang:system_time(?TIME_UNIT) * 2,
-    couch_expiring_cache_fdb:get_range_to(Name, FarFuture, _Limit=100).
+    couch_expiring_cache_fdb:get_range_to(Name, ?FOREVER, _Limit=100).
 
 
-wait_lookup(Name, Key, Expect) ->
-    test_util:wait(fun() ->
+% This lookup races against Timeout
+wait_lookup(Name, Key, Expect, Timeout, Interval) ->
+    wait(fun() ->
         case couch_expiring_cache:lookup(Name, Key) of
             Expect -> ok;
             _ -> wait
         end
-    end, _Timeout = 1000, _PollingInterval = 10).
+    end, Timeout, Interval).
+
+
+wait(Fun, Timeout, Delay) ->
+    Now = couch_expiring_cache_server:now_ts(),
+    wait(Fun, Timeout, Delay, Now, Now).
+
+
+wait(_Fun, Timeout, _Delay, Started, Prev) when Prev - Started > Timeout ->
+    timeout;
+
+wait(Fun, Timeout, Delay, Started, _Prev) ->
+    case Fun() of
+        wait ->
+            % http://erlang.org/doc/man/timer.html#sleep-1
+            ok = timer:sleep(Delay), % always millisecond
+            wait(Fun, Timeout, Delay, Started,
+                couch_expiring_cache_server:now_ts());
+        Else ->
+            Else
+    end.
