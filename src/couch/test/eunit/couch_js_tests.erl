@@ -137,7 +137,6 @@ should_allow_js_string_mutations() ->
     true = couch_query_servers:proc_prompt(Proc, [<<"add_fun">>, Src3]),
     Doc = {[{<<"value">>, MomWashedTheFrame}]},
     Result = couch_query_servers:proc_prompt(Proc, [<<"map_doc">>, Doc]),
-    io:format(standard_error, "~w~n~w~n", [MomWashedTheFrame, Result]),
     Expect = [
         [[<<"length">>, 14]],
         [[<<"substring">>, Washed]],
