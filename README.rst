@@ -74,9 +74,11 @@ layer in front of this cluster by running ``./dev/run --with-haproxy
 listening on port 5984.
 
 For Fauxton developers fixing the admin-party does not work via the button in
-Fauxton. To fix the admin party you have to run ``./dev/run`` with the ``admin``
-flag, e.g. ``./dev/run --admin=username:password``. If you want to have an
-admin-party, just omit the flag.
+Fauxton. If you run ``./dev/run``, an admin user ``root`` with a random password
+is generated (see the output of the script). If you want to set an admin user, 
+start with the admin flag, e.g. ``./dev/run --admin=username:password``. If you 
+want to have an admin-party, run ``./dev/run --with-admin-party-please``. To see
+all available options, please check ``./dev/run --help``.
 
 Contributing to CouchDB
 -----------------------
