@@ -240,11 +240,13 @@ handle_request_int(MochiReq) ->
 
     maybe_trace_fdb(MochiReq:get_header_value("x-couchdb-fdb-trace")),
 
-    {HttpReq2, Response} = case before_request(HttpReq0) of
-        {ok, HttpReq1} ->
-            process_request(HttpReq1);
+    HttpReq1 = set_api_version(HttpReq0),
+
+    {HttpReq3, Response} = case before_request(HttpReq1) of
+        {ok, HttpReq2} ->
+            process_request(HttpReq2);
         {error, Response0} ->
-            {HttpReq0, Response0}
+            {HttpReq1, Response0}
     end,
 
     {Status, Code, Reason, Resp} = split_response(Response),
@@ -253,11 +255,11 @@ handle_request_int(MochiReq) ->
         code = Code,
         status = Status,
         response = Resp,
-        nonce = HttpReq2#httpd.nonce,
+        nonce = HttpReq3#httpd.nonce,
         reason = Reason
     },
 
-    case after_request(HttpReq2, HttpResp) of
+    case after_request(HttpReq3, HttpResp) of
         #httpd_resp{status = ok, response = Resp} ->
             span_ok(HttpResp),
             {ok, Resp};
@@ -319,10 +321,10 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
     end.
 
 handle_req_after_auth(HandlerKey, HttpReq) ->
-    #httpd{user_ctx = #user_ctx{name = User}} = HttpReq,
+    #httpd{user_ctx = #user_ctx{name = User}, version = Version} = HttpReq,
     ctrace:tag(#{user => User}),
     try
-        HandlerFun = chttpd_handlers:url_handler(HandlerKey,
+        HandlerFun = chttpd_handlers:url_handler(HandlerKey, Version,
             fun chttpd_db:handle_request/1),
         AuthorizedReq = chttpd_auth:authorize(possibly_hack(HttpReq),
             fun chttpd_auth_request:authorize_request/1),
@@ -1357,6 +1359,72 @@ span_error(Code, ErrorStr, ReasonStr, Stack) ->
         stack => Stack
     }),
     ctrace:finish_span().
+
+
+-spec set_api_version(#httpd{}) -> #httpd{}.
+
+set_api_version(#httpd{path_parts=Parts} = Req) ->
+    VersionHeader = header_value(Req, "X-Couch-API", undefined),
+    VersionAccept = case header_value(Req, "Accept", undefined) of
+        undefined ->
+            undefined;
+        AcceptStr ->
+            case lists:keyfind("application/couchdb", 1, content_types(AcceptStr)) of
+                {"application/couchdb", Parameters} ->
+                    couch_util:get_value("_v", Parameters);
+                _ ->
+                    undefined
+            end
+    end,
+
+    QS0 = qs(Req),
+    {QS, VersionQuery} = case lists:keytake("_v", 1, QS0) of
+        false ->
+            {QS0, undefined};
+        {value, {"_v", Version}, QS1} ->
+            {QS1, Version}
+    end,
+
+    {Path, VersionPath} = case Parts of
+        [<<"_v", VersionBin/binary>> | Rest] ->
+            {Rest, binary_to_list(VersionBin)};
+        ["_v" ++ VersionStr | Rest] -> %% probably not needed
+            {Rest, VersionStr};
+        Parts ->
+            {Parts, undefined}
+    end,
+    case lists:usort([VersionHeader,VersionAccept,VersionQuery,VersionPath]) -- [undefined] of
+        [] ->
+            Req#httpd{version = 1};
+        [SelectedVersion] ->
+            Req#httpd{
+                path_parts = Path,
+                qs = QS,
+                version = list_to_integer(SelectedVersion) %% TODO Handle errors
+            };
+        _ ->
+            throw({error, "conflicted API versions"})
+    end.
+
+-spec content_types(Header :: string()) ->
+    undefined
+    | string()
+    | {string(), [Parameters :: {Name :: string(), Value :: string()}]}.
+
+content_types(Value) ->
+    lists:map(fun(Type) ->
+        case string:split(Type, ";") of
+            [BaseType] ->
+                BaseType;
+            [BaseType | Parameters] ->
+                KVs = lists:map(fun(String) ->
+                    [K, V] = string:split(String, "=", all),
+                    {string:trim(K), string:trim(V)}
+                end, Parameters),
+                {BaseType, KVs}
+        end
+    end, string:split(Value, ",")).
+
 
 -ifdef(TEST).
 

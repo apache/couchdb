@@ -64,7 +64,8 @@
     orelse T == <<"_explain">>)).
 
 % Database request handlers
-handle_request(#httpd{path_parts=[DbName|RestParts],method=Method}=Req)->
+handle_request(#httpd{
+        path_parts=[DbName|RestParts],method=Method,version=Version}=Req)->
     case {Method, RestParts} of
     {'PUT', []} ->
         create_db_req(Req, DbName);
@@ -80,7 +81,7 @@ handle_request(#httpd{path_parts=[DbName|RestParts],method=Method}=Req)->
     {_, []} ->
         do_db_req(Req, fun db_req/2);
     {_, [SecondPart|_]} ->
-        Handler = chttpd_handlers:db_handler(SecondPart, fun db_req/2),
+        Handler = chttpd_handlers:db_handler(SecondPart, Version, fun db_req/2),
         do_db_req(Req, Handler)
     end.
 
@@ -294,6 +295,7 @@ handle_partition_req(#httpd{path_parts = [_, _, _]}=Req, _Db) ->
     send_method_not_allowed(Req, "GET");
 
 handle_partition_req(#httpd{path_parts=[DbName, _, PartId | Rest]}=Req, Db) ->
+    #httpd{version = Version} = Req,
     case couch_db:is_partitioned(Db) of
         true ->
             couch_partition:validate_partition(PartId),
@@ -312,7 +314,7 @@ handle_partition_req(#httpd{path_parts=[DbName, _, PartId | Rest]}=Req, Db) ->
             update_partition_stats(Rest),
             case Rest of
                 [OP | _] when OP == <<"_all_docs">> orelse ?IS_MANGO(OP) ->
-                    case chttpd_handlers:db_handler(OP, fun db_req/2) of
+                    case chttpd_handlers:db_handler(OP, Version, fun db_req/2) of
                         Handler when is_function(Handler, 2) ->
                             Handler(NewReq, Db);
                         _ ->
@@ -346,11 +348,12 @@ update_partition_stats(PathParts) ->
 
 
 handle_design_req(#httpd{
-        path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
+        path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest],
+        version = Version
     }=Req, Db) ->
     case fabric2_db:open_doc(Db, <<"_design/", Name/binary>>) of
     {ok, DDoc} ->
-        Handler = chttpd_handlers:design_handler(Action, fun bad_action_req/3),
+        Handler = chttpd_handlers:design_handler(Action, Version, fun bad_action_req/3),
         Handler(Req, Db, DDoc);
     Error ->
         throw(Error)

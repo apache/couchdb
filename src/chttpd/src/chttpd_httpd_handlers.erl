@@ -12,7 +12,7 @@
 
 -module(chttpd_httpd_handlers).
 
--export([url_handler/1, db_handler/1, design_handler/1, handler_info/3]).
+-export([url_handler/2, db_handler/2, design_handler/2, handler_info/3]).
 
 -export([
     not_supported/2,
@@ -24,39 +24,40 @@
 -include_lib("couch/include/couch_db.hrl").
 
 
-url_handler(<<>>)                  -> fun chttpd_misc:handle_welcome_req/1;
-url_handler(<<"favicon.ico">>)     -> fun chttpd_misc:handle_favicon_req/1;
-url_handler(<<"_utils">>)          -> fun chttpd_misc:handle_utils_dir_req/1;
-url_handler(<<"_all_dbs">>)        -> fun chttpd_misc:handle_all_dbs_req/1;
-url_handler(<<"_deleted_dbs">>)    -> fun chttpd_misc:handle_deleted_dbs_req/1;
-url_handler(<<"_dbs_info">>)       -> fun chttpd_misc:handle_dbs_info_req/1;
-url_handler(<<"_active_tasks">>)   -> fun chttpd_misc:handle_task_status_req/1;
-url_handler(<<"_scheduler">>)      -> fun couch_replicator_httpd:handle_scheduler_req/1;
-url_handler(<<"_node">>)           -> fun chttpd_node:handle_node_req/1;
-url_handler(<<"_reload_query_servers">>) -> fun chttpd_misc:handle_reload_query_servers_req/1;
-url_handler(<<"_replicate">>)      -> fun chttpd_misc:handle_replicate_req/1;
-url_handler(<<"_uuids">>)          -> fun chttpd_misc:handle_uuids_req/1;
-url_handler(<<"_session">>)        -> fun chttpd_auth:handle_session_req/1;
-url_handler(<<"_up">>)             -> fun chttpd_misc:handle_up_req/1;
-url_handler(_) -> no_match.
+url_handler(<<>>, _)                  -> fun chttpd_misc:handle_welcome_req/1;
+url_handler(<<"favicon.ico">>, _)     -> fun chttpd_misc:handle_favicon_req/1;
+url_handler(<<"_utils">>, _)          -> fun chttpd_misc:handle_utils_dir_req/1;
+url_handler(<<"_all_dbs">>, 1)        -> fun chttpd_misc:handle_all_dbs_req/1;
+url_handler(<<"_all_dbs">>, 2)        -> fun handle_all_dbs_req/1;
+url_handler(<<"_deleted_dbs">>, _)    -> fun chttpd_misc:handle_deleted_dbs_req/1;
+url_handler(<<"_dbs_info">>, _)       -> fun chttpd_misc:handle_dbs_info_req/1;
+url_handler(<<"_active_tasks">>, _)   -> fun chttpd_misc:handle_task_status_req/1;
+url_handler(<<"_scheduler">>, _)      -> fun couch_replicator_httpd:handle_scheduler_req/1;
+url_handler(<<"_node">>, _)           -> fun chttpd_node:handle_node_req/1;
+url_handler(<<"_reload_query_servers">>, _) -> fun chttpd_misc:handle_reload_query_servers_req/1;
+url_handler(<<"_replicate">>, _)      -> fun chttpd_misc:handle_replicate_req/1;
+url_handler(<<"_uuids">>, _)          -> fun chttpd_misc:handle_uuids_req/1;
+url_handler(<<"_session">>, _)        -> fun chttpd_auth:handle_session_req/1;
+url_handler(<<"_up">>, _)             -> fun chttpd_misc:handle_up_req/1;
+url_handler(_, _) -> no_match.
 
-db_handler(<<"_view_cleanup">>) -> fun chttpd_db:handle_view_cleanup_req/2;
-db_handler(<<"_compact">>)      -> fun chttpd_db:handle_compact_req/2;
-db_handler(<<"_design">>)       -> fun chttpd_db:handle_design_req/2;
-db_handler(<<"_partition">>)    -> fun chttpd_db:handle_partition_req/2;
-db_handler(<<"_temp_view">>)    -> fun ?MODULE:not_supported/2;
-db_handler(<<"_changes">>)      -> fun chttpd_db:handle_changes_req/2;
-db_handler(<<"_purge">>)        -> fun ?MODULE:not_implemented/2;
-db_handler(<<"_purged_infos_limit">>) -> fun ?MODULE:not_implemented/2;
-db_handler(_) -> no_match.
+db_handler(<<"_view_cleanup">>, _) -> fun chttpd_db:handle_view_cleanup_req/2;
+db_handler(<<"_compact">>, _)      -> fun chttpd_db:handle_compact_req/2;
+db_handler(<<"_design">>, _)       -> fun chttpd_db:handle_design_req/2;
+db_handler(<<"_partition">>, _)    -> fun chttpd_db:handle_partition_req/2;
+db_handler(<<"_temp_view">>, _)    -> fun ?MODULE:not_supported/2;
+db_handler(<<"_changes">>, _)      -> fun chttpd_db:handle_changes_req/2;
+db_handler(<<"_purge">>, _)        -> fun ?MODULE:not_implemented/2;
+db_handler(<<"_purged_infos_limit">>, _) -> fun ?MODULE:not_implemented/2;
+db_handler(_, _) -> no_match.
 
-design_handler(<<"_view">>)    -> fun chttpd_view:handle_view_req/3;
-design_handler(<<"_show">>)    -> fun ?MODULE:not_supported/3;
-design_handler(<<"_list">>)    -> fun ?MODULE:not_supported/3;
-design_handler(<<"_update">>)  -> fun chttpd_show:handle_doc_update_req/3;
-design_handler(<<"_info">>)    -> fun chttpd_db:handle_design_info_req/3;
-design_handler(<<"_rewrite">>) -> fun ?MODULE:not_supported/3;
-design_handler(_) -> no_match.
+design_handler(<<"_view">>, _)    -> fun chttpd_view:handle_view_req/3;
+design_handler(<<"_show">>, _)    -> fun ?MODULE:not_supported/3;
+design_handler(<<"_list">>, _)    -> fun ?MODULE:not_supported/3;
+design_handler(<<"_update">>, _)  -> fun chttpd_show:handle_doc_update_req/3;
+design_handler(<<"_info">>, _)    -> fun chttpd_db:handle_design_info_req/3;
+design_handler(<<"_rewrite">>, _) -> fun ?MODULE:not_supported/3;
+design_handler(_, _) -> no_match.
 
 
 handler_info('GET', [], _) ->
@@ -516,3 +517,9 @@ not_supported(#httpd{} = Req, _Db) ->
 not_implemented(#httpd{} = Req, _Db) ->
     Msg = <<"resource is not implemented">>,
     chttpd:send_error(Req, 501, not_implemented, Msg).
+
+handle_all_dbs_req(Req) ->
+    chttpd:send_json(Req, {[
+        {<<"bookmark">>, <<"123456">>},
+        {<<"items">>, [<<"foo">>, <<"bar">>, <<"baz">>]}
+    ]}).

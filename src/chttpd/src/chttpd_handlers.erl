@@ -13,9 +13,9 @@
 -module(chttpd_handlers).
 
 -export([
-    url_handler/2,
-    db_handler/2,
-    design_handler/2,
+    url_handler/3,
+    db_handler/3,
+    design_handler/3,
     handler_info/1
 ]).
 
@@ -27,14 +27,14 @@
 %% API Function Definitions
 %% ------------------------------------------------------------------
 
-url_handler(HandlerKey, DefaultFun) ->
-    select(collect(url_handler, [HandlerKey]), DefaultFun).
+url_handler(HandlerKey, Version, DefaultFun) ->
+    select(collect(url_handler, [HandlerKey, Version]), DefaultFun).
 
-db_handler(HandlerKey, DefaultFun) ->
-    select(collect(db_handler, [HandlerKey]), DefaultFun).
+db_handler(HandlerKey, Version, DefaultFun) ->
+    select(collect(db_handler, [HandlerKey, Version]), DefaultFun).
 
-design_handler(HandlerKey, DefaultFun) ->
-    select(collect(design_handler, [HandlerKey]), DefaultFun).
+design_handler(HandlerKey, Version, DefaultFun) ->
+    select(collect(design_handler, [HandlerKey, Version]), DefaultFun).
 
 handler_info(HttpReq) ->
     #httpd{
