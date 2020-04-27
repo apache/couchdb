@@ -777,8 +777,9 @@ force_utf8_test() ->
             ?assertNotEqual(Case, force_utf8(Case)),
             ?assertThrow(_, ?JSON_DECODE(ToJSON(Case))),
             ?assertMatch(<<_/binary>>, ?JSON_DECODE(ToJSON(force_utf8(Case))))
-        catch T:R:S ->
-            io:format(standard_error, "~p~n~p~n~p~n", [T, R, S])
+        catch
+          T:R ->
+            io:format(standard_error, "~p~n~p~n", [T, R])
         end
     end, NotOk).
 
