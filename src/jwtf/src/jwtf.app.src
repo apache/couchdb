@@ -18,10 +18,12 @@
         kernel,
         stdlib,
         b64url,
+        config,
         crypto,
         jiffy,
         public_key
     ]},
+    {mod, {jwtf_app, []}},
     {env,[]},
     {modules, []},
     {maintainers, []},

@@ -82,16 +82,6 @@ invalid_alg_test() ->
     ?assertEqual({error, {bad_request,<<"Invalid alg header parameter">>}},
         jwtf:decode(Encoded, [alg], nil)).
 
-not_allowed_alg_test() ->
-    Encoded = encode({[{<<"alg">>, <<"HS256">>}]}, []),
-    ?assertEqual({error, {bad_request,<<"Invalid alg header parameter">>}},
-        jwtf:decode(Encoded, [{alg, [<<"RS256">>]}], nil)).
-
-reject_unknown_alg_test() ->
-    Encoded = encode({[{<<"alg">>, <<"NOPE">>}]}, []),
-    ?assertEqual({error, {bad_request,<<"Invalid alg header parameter">>}},
-        jwtf:decode(Encoded, [{alg, [<<"NOPE">>]}], nil)).
-
 
 missing_iss_test() ->
     Encoded = encode(valid_header(), {[]}),
@@ -178,9 +168,17 @@ malformed_token_test() ->
     ?assertEqual({error, {bad_request, <<"Malformed token">>}},
         jwtf:decode(<<"a.b.c.d">>, [], nil)).
 
-unknown_check_test() ->
-    ?assertError({unknown_checks, [bar, foo]},
-        jwtf:decode(<<"a.b.c">>, [exp, foo, iss, bar, exp], nil)).
+unknown_atom_check_test() ->
+    ?assertError({unknown_checks, [foo, bar]},
+        jwtf:decode(<<"a.b.c">>, [exp, foo, iss, bar], nil)).
+
+unknown_binary_check_test() ->
+    ?assertError({unknown_checks, [<<"bar">>]},
+        jwtf:decode(<<"a.b.c">>, [exp, iss, <<"bar">>], nil)).
+
+duplicate_check_test() ->
+    ?assertError({duplicate_checks, [exp]},
+        jwtf:decode(<<"a.b.c">>, [exp, exp], nil)).
 
 
 %% jwt.io generated
@@ -190,7 +188,7 @@ hs256_test() ->
                      "6MTAwMDAwMDAwMDAwMDAsImtpZCI6ImJhciJ9.iS8AH11QHHlczkBn"
                      "Hl9X119BYLOZyZPllOVhSBZ4RZs">>,
     KS = fun(<<"HS256">>, <<"123456">>) -> <<"secret">> end,
-    Checks = [{iss, <<"https://foo.com">>}, iat, exp, typ, {alg, [<<"HS256">>]}, kid],
+    Checks = [{iss, <<"https://foo.com">>}, iat, exp, typ, alg, kid],
     ?assertMatch({ok, _}, catch jwtf:decode(EncodedToken, Checks, KS)).
 
 
@@ -277,7 +275,7 @@ header(Alg) ->
 
 
 claims() ->
-    EpochSeconds = 1496205841,
+    EpochSeconds = os:system_time(second),
     {[
         {<<"iat">>, EpochSeconds},
         {<<"exp">>, EpochSeconds + 3600}
