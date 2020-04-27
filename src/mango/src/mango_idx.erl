@@ -405,7 +405,8 @@ index(SelectorName, Selector) ->
            {[{<<"fields">>,{[{<<"location">>,<<"asc">>}]}},
              {SelectorName,{Selector}}]},
            [{<<"def">>,{[{<<"fields">>,[<<"location">>]}]}}],
-           <<"ready">>
+           <<"ready">>,
+           false
     }.
 
 get_partial_filter_all_docs_test() ->
