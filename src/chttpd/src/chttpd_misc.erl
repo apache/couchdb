@@ -130,20 +130,11 @@ handle_all_dbs_req(#httpd{method='GET'}=Req) ->
         {skip, Skip}
     ],
 
-    % Eventually the Etag for this request will be derived
-    % from the \xFFmetadataVersion key in fdb
-    Etag = <<"foo">>,
-
-    {ok, Resp} = chttpd:etag_respond(Req, Etag, fun() ->
-        {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"ETag",Etag}]),
-        Callback = fun all_dbs_callback/2,
-        Acc = #vacc{req=Req,resp=Resp},
-        fabric2_db:list_dbs(Callback, Acc, Options)
-    end),
-    case is_record(Resp, vacc) of
-        true -> {ok, Resp#vacc.resp};
-        _ -> {ok, Resp}
-    end;
+    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, []),
+    Callback = fun all_dbs_callback/2,
+    Acc = #vacc{req=Req,resp=Resp},
+    {ok, Acc1} = fabric2_db:list_dbs(Callback, Acc, Options),
+    {ok, Acc1#vacc.resp};
 handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
