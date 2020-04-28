@@ -201,7 +201,7 @@ apply_tx_options(Db, Cfg) ->
 
 apply_tx_option(Db, Option, Val, integer) ->
     try
-        erlfdb:set_option(Db, Option, list_to_integer(Val))
+        set_option(Db, Option, list_to_integer(Val))
     catch
         error:badarg ->
             Msg = "~p : Invalid integer tx option ~p = ~p",
@@ -212,8 +212,20 @@ apply_tx_option(Db, Option, Val, binary) ->
     BinVal = list_to_binary(Val),
     case size(BinVal) < 16 of
         true ->
-            erlfdb:set_option(Db, Option, BinVal);
+            set_option(Db, Option, BinVal);
         false ->
             Msg = "~p : String tx option ~p is larger than 16 bytes",
             couch_log:error(Msg, [?MODULE, Option])
+    end.
+
+
+set_option(Db, Option, Val) ->
+    try
+        erlfdb:set_option(Db, Option, Val)
+    catch
+        % This could happen if the option is not supported by erlfdb or
+        % fdbsever.
+        error:badarg ->
+            Msg = "~p : Could not set fdb tx option ~p = ~p",
+            couch_log:error(Msg, [?MODULE, Option, Val])
     end.

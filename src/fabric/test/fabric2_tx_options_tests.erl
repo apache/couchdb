@@ -20,7 +20,7 @@
 -include("fabric2.hrl").
 
 
-fdb_tx_options_test_DISABLE() ->
+fdb_tx_options_test_() ->
     {
         "Test setting default transaction options",
         setup,
