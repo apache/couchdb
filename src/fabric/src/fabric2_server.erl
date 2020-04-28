@@ -45,8 +45,8 @@
 -define(TX_OPTIONS_SECTION, "fdb_tx_options").
 -define(RELISTEN_DELAY, 1000).
 
--define(DEFAULT_TIMEOUT_MSEC, "60000").
--define(DEFAULT_RETRY_LIMIT, "100").
+-define(DEFAULT_TIMEOUT_MSEC, 60000).
+-define(DEFAULT_RETRY_LIMIT, 100).
 
 -define(TX_OPTIONS, #{
     machine_id                           => {binary,  undefined},
