@@ -42,7 +42,6 @@
 
 % Accumulator for changes_callback function
 -record(cacc, {
-    etag,
     feed,
     mochi,
     prepend = "",
@@ -103,16 +102,12 @@ handle_changes_req_tx(#httpd{}=Req, Db) ->
     Max = chttpd:chunked_response_buffer_size(),
     case ChangesArgs#changes_args.feed of
     "normal" ->
-        Etag = <<"foo">>,
-        chttpd:etag_respond(Req, Etag, fun() ->
-            Acc0 = #cacc{
-                feed = normal,
-                etag = Etag,
-                mochi = Req,
-                threshold = Max
-            },
-            ChangesFun({fun changes_callback/2, Acc0})
-        end);
+        Acc0 = #cacc{
+            feed = normal,
+            mochi = Req,
+            threshold = Max
+        },
+        ChangesFun({fun changes_callback/2, Acc0});
     Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource"  ->
         couch_stats:increment_counter([couchdb, httpd, clients_requesting_changes]),
         Acc0 = #cacc{
@@ -183,10 +178,9 @@ changes_callback({stop, _EndSeq}, #cacc{feed = eventsource} = Acc) ->
 
 % callbacks for longpoll and normal (single JSON Object)
 changes_callback(start, #cacc{feed = normal} = Acc) ->
-    #cacc{etag = Etag, mochi = Req} = Acc,
+    #cacc{mochi = Req} = Acc,
     FirstChunk = "{\"results\":[\n",
-    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200,
-        [{"ETag",Etag}], FirstChunk),
+    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [], FirstChunk),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback(start, Acc) ->
     #cacc{mochi = Req} = Acc,
