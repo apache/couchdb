@@ -35,7 +35,7 @@ index_test_() ->
                 ?TDEF(single_update),
                 ?TDEF(multiple_updates),
                 ?TDEF(skip_db_if_no_ddocs),
-                ?TDEF(ignore_deleted_dbs),
+                ?TDEF(ignore_deleted_dbs, 10),
                 ?TDEF(check_gen_server_messages)
             ])
         }
@@ -163,7 +163,7 @@ ignore_deleted_dbs(#{}) ->
     lists:foreach(fun(_) ->
         RandomDbName = fabric2_util:uuid(),
         fabric2_index:db_updated(RandomDbName)
-    end, lists:seq(1, 10000)),
+    end, lists:seq(1, 1000)),
 
     test_util:wait(fun() ->
         case table_sizes() =:= 0 of
