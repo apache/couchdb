@@ -46,7 +46,7 @@ crud_test_() ->
                     ?TDEF_FE(list_dbs_info),
                     ?TDEF_FE(list_dbs_info_partial),
                     ?TDEF_FE(list_dbs_tx_too_old),
-                    ?TDEF_FE(list_dbs_info_tx_too_old),
+                    ?TDEF_FE(list_dbs_info_tx_too_old, 15),
                     ?TDEF_FE(list_deleted_dbs_info),
                     ?TDEF_FE(list_deleted_dbs_info_user_fun),
                     ?TDEF_FE(list_deleted_dbs_info_user_fun_partial),
