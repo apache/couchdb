@@ -260,7 +260,9 @@ elixir-credo: elixir-init
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
 javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-javascript: devclean
+javascript: 
+
+	@$(MAKE) devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
