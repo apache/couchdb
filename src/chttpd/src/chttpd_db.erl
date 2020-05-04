@@ -812,14 +812,20 @@ db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
 multi_all_docs_view(Req, Db, OP, Queries) ->
-    Args0 = couch_mrview_http:parse_params(Req, undefined),
+    Args = couch_views_http:parse_params(Req, undefined),
+    case couch_views_util:is_paginated(Args) of
+        false ->
+            stream_multi_all_docs_view(Req, Db, OP, Args, Queries);
+        true ->
+            paginate_multi_all_docs_view(Req, Db, OP, Args, Queries)
+    end.
+
+
+stream_multi_all_docs_view(Req, Db, OP, Args0, Queries) ->
     Args1 = Args0#mrargs{view_type=map},
-    ArgQueries = lists:map(fun({Query}) ->
-        QueryArg1 = couch_mrview_http:parse_params(Query, undefined,
-            Args1, [decoded]),
-        QueryArgs2 = couch_views_util:validate_args(QueryArg1),
-        set_namespace(OP, QueryArgs2)
-    end, Queries),
+    ArgQueries = chttpd_view:parse_queries(Req, Args1, Queries, fun(QArgs) ->
+        set_namespace(OP, QArgs)
+    end),
     Max = chttpd:chunked_response_buffer_size(),
     First = "{\"results\":[",
     {ok, Resp0} = chttpd:start_delayed_json_response(Req, 200, [], First),
@@ -842,8 +848,34 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     chttpd:end_delayed_json_response(Resp1).
 
 
+paginate_multi_all_docs_view(Req, Db, OP, Args0, Queries) ->
+    Args1 = Args0#mrargs{view_type=map},
+    ArgQueries = chttpd_view:parse_queries(Req, Args1, Queries, fun(QArgs) ->
+        set_namespace(OP, QArgs)
+    end),
+    KeyFun = fun({Props}) -> couch_util:get_value(id, Props) end,
+    #mrargs{page_size = PageSize} = Args0,
+    #httpd{path_parts = Parts} = Req,
+    UpdateSeq = fabric2_db:get_update_seq(Db),
+    EtagTerm = {Parts, UpdateSeq, Args0},
+    Response = couch_views_http:paginated(
+        Req, EtagTerm, PageSize, ArgQueries, KeyFun,
+        fun(Args) ->
+            all_docs_paginated_cb(Db, Args)
+        end),
+    chttpd:send_json(Req, Response).
+
+
 all_docs_view(Req, Db, Keys, OP) ->
-    Args0 = couch_mrview_http:parse_body_and_query(Req, Keys),
+    Args = couch_views_http:parse_body_and_query(Req, Keys),
+    case couch_views_util:is_paginated(Args) of
+        false ->
+            stream_all_docs_view(Req, Db, Args, OP);
+        true ->
+            paginate_all_docs_view(Req, Db, Args, OP)
+    end.
+
+stream_all_docs_view(Req, Db, Args0, OP) ->
     Args1 = Args0#mrargs{view_type=map},
     Args2 = couch_views_util:validate_args(Args1),
     Args3 = set_namespace(OP, Args2),
@@ -864,14 +896,45 @@ all_docs_view(Req, Db, Keys, OP) ->
     end.
 
 
+paginate_all_docs_view(Req, Db, Args0, OP) ->
+    Args1 = Args0#mrargs{view_type=map},
+    Args2 = chttpd_view:validate_args(Req, Args1),
+    Args3 = set_namespace(OP, Args2),
+    KeyFun = fun({Props}) -> couch_util:get_value(id, Props) end,
+    #httpd{path_parts = Parts} = Req,
+    UpdateSeq = fabric2_db:get_update_seq(Db),
+    EtagTerm = {Parts, UpdateSeq, Args3},
+    Response = couch_views_http:paginated(
+        Req, EtagTerm, Args3, KeyFun,
+        fun(Args) ->
+            all_docs_paginated_cb(Db, Args)
+        end),
+    chttpd:send_json(Req, Response).
+
+
+all_docs_paginated_cb(Db, Args) ->
+    #vacc{meta=MetaMap, buffer=Items} = case Args#mrargs.keys of
+        undefined ->
+            send_all_docs(Db, Args, #vacc{paginated=true});
+        Keys when is_list(Keys) ->
+            send_all_docs_keys(Db, Args, #vacc{paginated=true})
+    end,
+    {MetaMap, Items}.
+
+
 send_all_docs(Db, #mrargs{keys = undefined} = Args, VAcc0) ->
     Opts0 = fabric2_util:all_docs_view_opts(Args),
-    Opts = Opts0 ++ [{restart_tx, true}],
-    NS = couch_util:get_value(namespace, Opts),
+    NS = couch_util:get_value(namespace, Opts0),
     FoldFun = case NS of
         <<"_all_docs">> -> fold_docs;
         <<"_design">> -> fold_design_docs;
         <<"_local">> -> fold_local_docs
+    end,
+    Opts = case couch_views_util:is_paginated(Args) of
+        false ->
+            Opts0 ++ [{restart_tx, true}];
+        true ->
+            Opts0
     end,
     ViewCb = fun view_cb/2,
     Acc = {iter, Db, Args, VAcc0},
@@ -980,25 +1043,15 @@ view_cb({row, Row}, {iter, Db, Args, VAcc}) ->
             Row
     end,
     chttpd_stats:incr_rows(),
-    {Go, NewVAcc} = couch_mrview_http:view_cb({row, NewRow}, VAcc),
+    {Go, NewVAcc} = couch_views_http:view_cb({row, NewRow}, VAcc),
     {Go, {iter, Db, Args, NewVAcc}};
 
 view_cb(Msg, {iter, Db, Args, VAcc}) ->
-    {Go, NewVAcc} = couch_mrview_http:view_cb(Msg, VAcc),
+    {Go, NewVAcc} = couch_views_http:view_cb(Msg, VAcc),
     {Go, {iter, Db, Args, NewVAcc}};
 
-view_cb({row, Row} = Msg, Acc) ->
-    case lists:keymember(doc, 1, Row) of
-        true ->
-            chttpd_stats:incr_reads();
-        false ->
-            ok
-    end,
-    chttpd_stats:incr_rows(),
-    couch_mrview_http:view_cb(Msg, Acc);
-
 view_cb(Msg, Acc) ->
-    couch_mrview_http:view_cb(Msg, Acc).
+    couch_views_http:view_cb(Msg, Acc).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
