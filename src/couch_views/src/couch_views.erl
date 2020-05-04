@@ -50,7 +50,7 @@ query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
     Args3 = couch_mrview_util:validate_args(Args2),
     ok = check_range(Args3),
     case is_reduce_view(Args3) of
-        true -> throw({not_implemented});
+        true -> throw(not_implemented);
         false -> ok
     end,
 
