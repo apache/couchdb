@@ -246,6 +246,14 @@ class IndexSelectorJson(mango.DbPerClass):
         docs = self.db.find(selector, use_index="oldschooltext")
         self.assertEqual(len(docs), 3)
 
+    def test_text_old_index_not_used(self):
+        selector = {"location": {"$gte": "FRA"}}
+        self.db.save_doc(oldschoolddoctext)
+        resp = self.db.find(selector, explain=True)
+        self.assertEqual(resp["index"]["name"], "_all_docs")
+        docs = self.db.find(selector)
+        self.assertEqual(len(docs), 3)
+
     @unittest.skipUnless(mango.has_text_service(), "requires text service")
     def test_text_old_selector_still_supported_via_api(self):
         selector = {"location": {"$gte": "FRA"}}
