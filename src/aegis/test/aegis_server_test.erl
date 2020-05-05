@@ -163,3 +163,152 @@ test_disabled_decrypt() ->
     Db = ?DB#{is_encrypted => aegis_server:open_db(?DB)},
     Decrypted = aegis:decrypt(Db, <<1:64>>, ?ENCRYPTED),
     ?assertEqual(?ENCRYPTED, Decrypted).
+
+
+
+lru_cache_with_expiration_test_() ->
+    {
+        foreach,
+        fun() ->
+            %% this has to be be set before start of aegis server
+            %% for config param "cache_expiration_check_sec" to be picked up
+            meck:new([config, aegis_server, fabric2_util], [passthrough]),
+            ok = meck:expect(config, get_integer, fun
+                ("aegis", "cache_limit", _) -> 5;
+                ("aegis", "cache_max_age_sec", _) -> 130;
+                ("aegis", "cache_expiration_check_sec", _) -> 1;
+                (_, _, Default) -> Default
+            end),
+            Ctx = setup(),
+            ok = meck:expect(fabric2_util, now, fun(sec) ->
+                get(time) == undefined andalso put(time, 10),
+                Now = get(time),
+                put(time, Now + 10),
+                Now
+            end),
+            Ctx
+        end,
+        fun teardown/1,
+        [
+            {"counter moves forward on access bump",
+            {timeout, ?TIMEOUT, fun test_advance_counter/0}},
+            {"oldest entries evicted",
+            {timeout, ?TIMEOUT, fun test_evict_old_entries/0}},
+            {"access bump preserves entries",
+            {timeout, ?TIMEOUT, fun test_bump_accessed/0}},
+            {"expired entries removed",
+            {timeout, ?TIMEOUT, fun test_remove_expired/0}}
+        ]
+    }.
+
+
+test_advance_counter() ->
+    ?assertEqual(0, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    ok = meck:expect(aegis_server, handle_cast, fun({accessed, _} = Msg, St) ->
+        #{counter := Counter} = St,
+        get(counter) == undefined andalso put(counter, 0),
+        OldCounter = get(counter),
+        put(counter, Counter),
+        ?assert(Counter > OldCounter),
+        meck:passthrough([Msg, St])
+    end),
+
+    lists:foreach(fun(I) ->
+        Db = ?DB#{uuid => <<I:64>>},
+        aegis_server:encrypt(Db, <<I:64>>, ?VALUE),
+        aegis_server:encrypt(Db, <<(I+1):64>>, ?VALUE)
+    end, lists:seq(1, 10)),
+
+    ?assertEqual(10, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
+
+
+test_evict_old_entries() ->
+    ?assertEqual(0, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    %% overflow cache
+    lists:foreach(fun(I) ->
+        Db = ?DB#{uuid => <<I:64>>},
+        aegis_server:encrypt(Db, <<I:64>>, ?VALUE)
+    end, lists:seq(1, 10)),
+
+    ?assertEqual(10, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    %% confirm that newest keys are still in cache
+    lists:foreach(fun(I) ->
+        Db = ?DB#{uuid => <<I:64>>},
+        aegis_server:encrypt(Db, <<(I+1):64>>, ?VALUE)
+    end, lists:seq(6, 10)),
+
+    ?assertEqual(10, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    %% confirm that oldest keys been eviced and needed re-fetch
+    lists:foreach(fun(I) ->
+        Db = ?DB#{uuid => <<I:64>>},
+        aegis_server:encrypt(Db, <<(I+1):64>>, ?VALUE)
+    end, lists:seq(1, 5)),
+
+    ?assertEqual(15, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
+
+
+test_bump_accessed() ->
+    ?assertEqual(0, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    %% fill the cache
+    lists:foreach(fun(I) ->
+        Db = ?DB#{uuid => <<I:64>>},
+        aegis_server:encrypt(Db, <<I:64>>, ?VALUE)
+    end, lists:seq(1, 5)),
+
+    ?assertEqual(5, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    %% bump oldest key and then insert a new key to trigger eviction
+    aegis_server:encrypt(?DB#{uuid => <<1:64>>}, <<1:64>>, ?VALUE),
+    aegis_server:encrypt(?DB#{uuid => <<6:64>>}, <<6:64>>, ?VALUE),
+    ?assertEqual(6, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    %% confirm that former oldest key is still in cache
+    aegis_server:encrypt(?DB#{uuid => <<1:64>>}, <<2:64>>, ?VALUE),
+    ?assertEqual(6, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    %% confirm that the second oldest key been evicted by the new insert
+    aegis_server:encrypt(?DB#{uuid => <<2:64>>}, <<3:64>>, ?VALUE),
+    ?assertEqual(7, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
+
+
+test_remove_expired() ->
+    ?assertEqual(0, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    %% to detect when maybe_remove_expired called
+    ok = meck:expect(aegis_server, handle_info,fun
+        (maybe_remove_expired, St) ->
+            meck:passthrough([maybe_remove_expired, St])
+    end),
+
+    %% fill the cache. first key expires a 140, last at 180 of "our" time
+    lists:foreach(fun(I) ->
+        Db = ?DB#{uuid => <<I:64>>},
+        aegis_server:encrypt(Db, <<I:64>>, ?VALUE)
+    end, lists:seq(1, 5)),
+
+    ?assertEqual(5, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    %% confirm enties are still in cache and wind up our "clock" to 160
+    lists:foreach(fun(I) ->
+        Db = ?DB#{uuid => <<I:64>>},
+        aegis_server:encrypt(Db, <<I:64>>, ?VALUE)
+    end, lists:seq(1, 5)),
+
+    ?assertEqual(5, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)),
+
+    %% wait for remove_expired_entries to be triggered
+    meck:reset(aegis_server),
+    meck:wait(aegis_server, handle_info, [maybe_remove_expired, '_'], 2500),
+
+    %% 3 "oldest" entries should be removed, 2 yet to expire still in cache
+    lists:foreach(fun(I) ->
+        Db = ?DB#{uuid => <<I:64>>},
+        aegis_server:encrypt(Db, <<I:64>>, ?VALUE)
+    end, lists:seq(1, 5)),
+
+    ?assertEqual(8, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
