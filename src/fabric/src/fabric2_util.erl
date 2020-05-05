@@ -41,6 +41,7 @@
     all_docs_view_opts/1,
 
     iso8601_timestamp/0,
+    now/1,
     do_recovery/0,
 
     pmap/2,
@@ -346,6 +347,13 @@ iso8601_timestamp() ->
         calendar:now_to_datetime(Now),
     Format = "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
     io_lib:format(Format, [Year, Month, Date, Hour, Minute, Second]).
+
+
+now(ms) ->
+    {Mega, Sec, Micro} = os:timestamp(),
+    (Mega * 1000000 + Sec) * 1000 + round(Micro / 1000);
+now(sec) ->
+    now(ms) div 1000.
 
 
 do_recovery() ->
