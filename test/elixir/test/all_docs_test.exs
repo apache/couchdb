@@ -188,33 +188,35 @@ defmodule AllDocsTest do
   test "GET with one key", context do
     db_name = context[:db_name]
 
-    {:ok, _} = create_doc(
-      db_name,
-      %{
-        _id: "foo",
-        bar: "baz"
-      }
-    )
+    {:ok, _} =
+      create_doc(
+        db_name,
+        %{
+          _id: "foo",
+          bar: "baz"
+        }
+      )
 
-    {:ok, _} = create_doc(
-      db_name,
-      %{
-        _id: "foo2",
-        bar: "baz2"
-      }
-    )
+    {:ok, _} =
+      create_doc(
+        db_name,
+        %{
+          _id: "foo2",
+          bar: "baz2"
+        }
+      )
 
-    resp = Couch.get(
-      "/#{db_name}/_all_docs",
-      query: %{
-        :key => "\"foo\"",
-      }
-    )
+    resp =
+      Couch.get(
+        "/#{db_name}/_all_docs",
+        query: %{
+          :key => "\"foo\""
+        }
+      )
 
     assert resp.status_code == 200
     assert length(Map.get(resp, :body)["rows"]) == 1
   end
-
 
   @tag :with_db
   test "POST with empty body", context do
@@ -223,10 +225,11 @@ defmodule AllDocsTest do
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..2)})
     assert resp.status_code in [201, 202]
 
-    resp = Couch.post(
-      "/#{db_name}/_all_docs",
-      body: %{}
-    )
+    resp =
+      Couch.post(
+        "/#{db_name}/_all_docs",
+        body: %{}
+      )
 
     assert resp.status_code == 200
     assert length(Map.get(resp, :body)["rows"]) == 3
@@ -239,12 +242,13 @@ defmodule AllDocsTest do
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
     assert resp.status_code in [201, 202]
 
-    resp = Couch.post(
-      "/#{db_name}/_all_docs",
-      body: %{
-        :keys => [1]
-      }
-    )
+    resp =
+      Couch.post(
+        "/#{db_name}/_all_docs",
+        body: %{
+          :keys => [1]
+        }
+      )
 
     assert resp.status_code == 200
     rows = resp.body["rows"]
@@ -259,14 +263,15 @@ defmodule AllDocsTest do
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
     assert resp.status_code in [201, 202]
 
-    resp = Couch.post(
-      "/#{db_name}/_all_docs",
-      body: %{
-        :keys => ["1", "2"],
-        :limit => 1,
-        :include_docs => true
-      }
-    )
+    resp =
+      Couch.post(
+        "/#{db_name}/_all_docs",
+        body: %{
+          :keys => ["1", "2"],
+          :limit => 1,
+          :include_docs => true
+        }
+      )
 
     assert resp.status_code == 200
     rows = resp.body["rows"]
@@ -346,15 +351,16 @@ defmodule AllDocsTest do
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
     assert resp.status_code in [201, 202]
 
-    resp = Couch.post(
-      "/#{db_name}/_all_docs",
-      query: %{
-        :limit => 1
-      },
-      body: %{
-        :keys => [1, 2]
-      }
-    )
+    resp =
+      Couch.post(
+        "/#{db_name}/_all_docs",
+        query: %{
+          :limit => 1
+        },
+        body: %{
+          :keys => [1, 2]
+        }
+      )
 
     assert resp.status_code == 200
     assert length(Map.get(resp, :body)["rows"]) == 1
@@ -367,16 +373,17 @@ defmodule AllDocsTest do
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
     assert resp.status_code in [201, 202]
 
-    resp = Couch.post(
-      "/#{db_name}/_all_docs",
-      query: %{
-        :limit => 1
-      },
-      body: %{
-        :keys => [1, 2],
-        :limit => 2
-      }
-    )
+    resp =
+      Couch.post(
+        "/#{db_name}/_all_docs",
+        query: %{
+          :limit => 1
+        },
+        body: %{
+          :keys => [1, 2],
+          :limit => 2
+        }
+      )
 
     assert resp.status_code == 200
     assert length(Map.get(resp, :body)["rows"]) == 1
