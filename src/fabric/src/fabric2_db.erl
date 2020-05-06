@@ -976,16 +976,6 @@ fold_docs(Db, DocIds, UserFun, UserAcc0, Options) ->
             NeedsTreeOpts = [revs_info, conflicts, deleted_conflicts],
             NeedsTree = (Options -- NeedsTreeOpts /= Options),
 
-            FetchRevs = case NeedsTree of
-                true ->
-                    fun(DocId) ->
-                        fabric2_fdb:get_all_revs_future(TxDb, DocId)
-                    end;
-                false ->
-                    fun(DocId) ->
-                        fabric2_fdb:get_winning_revs_future(TxDb, DocId, 1)
-                    end
-            end,
             InitAcc = #{
                 revs_q => queue:new(),
                 revs_count => 0,
@@ -1001,7 +991,7 @@ fold_docs(Db, DocIds, UserFun, UserAcc0, Options) ->
                     revs_q := RevsQ,
                     revs_count := RevsCount
                 } = Acc,
-                Future = FetchRevs(DocId),
+                Future = fold_docs_get_revs(TxDb, DocId, NeedsTree),
                 NewAcc = Acc#{
                     revs_q := queue:in({DocId, Future}, RevsQ),
                     revs_count := RevsCount + 1
@@ -1262,6 +1252,47 @@ drain_all_deleted_info_futures(FutureQ, UserFun, Acc) ->
     end.
 
 
+fold_docs_get_revs(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, _) ->
+    fabric2_fdb:get_local_doc_rev_future(Db, DocId);
+
+fold_docs_get_revs(Db, DocId, true) ->
+    fabric2_fdb:get_all_revs_future(Db, DocId);
+
+fold_docs_get_revs(Db, DocId, false) ->
+    fabric2_fdb:get_winning_revs_future(Db, DocId, 1).
+
+
+fold_docs_get_revs_wait(_Db, <<?LOCAL_DOC_PREFIX, _/binary>>, RevsFuture) ->
+    Rev = fabric2_fdb:get_local_doc_rev_wait(RevsFuture),
+    [Rev];
+
+fold_docs_get_revs_wait(Db, _DocId, RevsFuture) ->
+    fabric2_fdb:get_revs_wait(Db, RevsFuture).
+
+
+fold_docs_get_doc_body_future(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId,
+        [Rev]) ->
+    fabric2_fdb:get_local_doc_body_future(Db, DocId, Rev);
+
+fold_docs_get_doc_body_future(Db, DocId, Revs) ->
+    Winner = get_rev_winner(Revs),
+    fabric2_fdb:get_doc_body_future(Db, DocId, Winner).
+
+
+fold_docs_get_doc_body_wait(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, [Rev],
+        _DocOpts, BodyFuture) ->
+    case fabric2_fdb:get_local_doc_body_wait(Db, DocId, Rev, BodyFuture) of
+        {not_found, missing} -> {not_found, missing};
+        Doc -> {ok, Doc}
+    end;
+
+fold_docs_get_doc_body_wait(Db, DocId, Revs, DocOpts, BodyFuture) ->
+    RevInfo = get_rev_winner(Revs),
+    Base = fabric2_fdb:get_doc_body_wait(Db, DocId, RevInfo,
+        BodyFuture),
+    apply_open_doc_opts(Base, Revs, DocOpts).
+
+
 drain_fold_docs_revs_futures(_TxDb, #{revs_count := C} = Acc) when C < 100 ->
     Acc;
 drain_fold_docs_revs_futures(TxDb, Acc) ->
@@ -1284,13 +1315,12 @@ drain_one_fold_docs_revs_future(TxDb, Acc) ->
     } = Acc,
     {{value, {DocId, RevsFuture}}, RestRevsQ} = queue:out(RevsQ),
 
-    Revs = fabric2_fdb:get_revs_wait(TxDb, RevsFuture),
+    Revs = fold_docs_get_revs_wait(TxDb, DocId, RevsFuture),
     DocFuture = case Revs of
         [] ->
             {DocId, [], not_found};
         [_ | _] ->
-            Winner = get_rev_winner(Revs),
-            BodyFuture = fabric2_fdb:get_doc_body_future(TxDb, DocId, Winner),
+            BodyFuture = fold_docs_get_doc_body_future(TxDb, DocId, Revs),
             {DocId, Revs, BodyFuture}
     end,
     NewAcc = Acc#{
@@ -1328,10 +1358,7 @@ drain_one_fold_docs_body_future(TxDb, Acc) ->
         not_found ->
             {not_found, missing};
         _ ->
-            RevInfo = get_rev_winner(Revs),
-            Base = fabric2_fdb:get_doc_body_wait(TxDb, DocId, RevInfo,
-                BodyFuture),
-            apply_open_doc_opts(Base, Revs, DocOpts)
+            fold_docs_get_doc_body_wait(TxDb, DocId, Revs, DocOpts, BodyFuture)
     end,
     NewUserAcc = maybe_stop(UserFun(DocId, Doc, UserAcc)),
     Acc#{
