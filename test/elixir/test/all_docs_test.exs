@@ -276,6 +276,70 @@ defmodule AllDocsTest do
   end
 
   @tag :with_db
+  test "_local_docs POST with keys and limit", context do
+    expected = [
+      %{
+        "doc" => %{"_id" => "_local/one", "_rev" => "0-1", "value" => "one"},
+        "id" => "_local/one",
+        "key" => "_local/one",
+        "value" => %{"rev" => "0-1"}
+      },
+      %{
+        "doc" => %{"_id" => "_local/two", "_rev" => "0-1", "value" => "two"},
+        "id" => "_local/two",
+        "key" => "_local/two",
+        "value" => %{"rev" => "0-1"}
+      },
+      %{
+        "doc" => %{
+          "_id" => "three",
+          "_rev" => "1-878d3724976748bc881841046a276ceb",
+          "value" => "three"
+        },
+        "id" => "three",
+        "key" => "three",
+        "value" => %{"rev" => "1-878d3724976748bc881841046a276ceb"}
+      },
+      %{"error" => "not_found", "key" => "missing"},
+      %{"error" => "not_found", "key" => "_local/missing"}
+    ]
+
+    db_name = context[:db_name]
+
+    docs = [
+      %{
+        _id: "_local/one",
+        value: "one"
+      },
+      %{
+        _id: "_local/two",
+        value: "two"
+      },
+      %{
+        _id: "three",
+        value: "three"
+      }
+    ]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: docs})
+    assert resp.status_code in [201, 202]
+
+    resp =
+      Couch.post(
+        "/#{db_name}/_all_docs",
+        body: %{
+          :keys => ["_local/one", "_local/two", "three", "missing", "_local/missing"],
+          :include_docs => true
+        }
+      )
+
+    assert resp.status_code == 200
+    rows = resp.body["rows"]
+    assert length(rows) == 5
+    assert rows == expected
+  end
+
+  @tag :with_db
   test "POST with query parameter and JSON body", context do
     db_name = context[:db_name]
 
