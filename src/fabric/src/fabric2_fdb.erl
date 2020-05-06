@@ -51,6 +51,11 @@
     get_doc_body/3,
     get_doc_body_future/3,
     get_doc_body_wait/4,
+
+    get_local_doc_rev_future/2,
+    get_local_doc_rev_wait/1,
+    get_local_doc_body_future/3,
+    get_local_doc_body_wait/4,
     get_local_doc/2,
     get_local_doc_rev/3,
 
@@ -712,20 +717,43 @@ get_doc_body_wait(#{} = Db0, DocId, RevInfo, Future) ->
     fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], BodyRows).
 
 
-get_local_doc(#{} = Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
+get_local_doc_rev_future(Db, DocId) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
-    } = Db = ensure_current(Db0),
+    } = ensure_current(Db),
 
     Key = erlfdb_tuple:pack({?DB_LOCAL_DOCS, DocId}, DbPrefix),
-    Rev = erlfdb:wait(erlfdb:get(Tx, Key)),
+    erlfdb:get(Tx, Key).
+
+
+get_local_doc_rev_wait(Future) ->
+    erlfdb:wait(Future).
+
+
+get_local_doc_body_future(#{} = Db, DocId, Rev) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = ensure_current(Db),
 
     Prefix = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, DocId}, DbPrefix),
-    Future = erlfdb:get_range_startswith(Tx, Prefix),
-    {_, Chunks} = lists:unzip(aegis:decrypt(Db, erlfdb:wait(Future))),
+    erlfdb:get_range_startswith(Tx, Prefix).
 
+
+get_local_doc_body_wait(#{} = Db0, DocId, Rev, Future) ->
+    Db = ensure_current(Db0),
+
+    {_, Chunks} = lists:unzip(aegis:decrypt(Db, erlfdb:wait(Future))),
     fdb_to_local_doc(Db, DocId, Rev, Chunks).
+
+
+get_local_doc(#{} = Db, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
+    RevFuture = get_local_doc_rev_future(Db, DocId),
+    Rev = get_local_doc_rev_wait(RevFuture),
+
+    BodyFuture = get_local_doc_body_future(Db, DocId, Rev),
+    get_local_doc_body_wait(Db, DocId, Rev, BodyFuture).
 
 
 get_local_doc_rev(_Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, Val) ->
