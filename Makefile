@@ -165,7 +165,7 @@ check:  all
 	@$(MAKE) emilio
 	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango,chttpd
 	make elixir tests=test/elixir/test/basics_test.exs,test/elixir/test/replication_test.exs,test/elixir/test/map_test.exs,test/elixir/test/all_docs_test.exs,test/elixir/test/bulk_docs_test.exs
-	make exunit tests=src/couch_rate/test/exunit/
+	make exunit apps=couch_rate,chttpd
 	make mango-test
 
 .PHONY: eunit
@@ -188,6 +188,7 @@ exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell pwd)/src
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
 	@mix test --cover --trace $(EXUNIT_OPTS)
 

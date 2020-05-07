@@ -163,6 +163,7 @@ exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell echo %cd%)\src
 exunit: export ERL_AFLAGS = -config $(shell echo %cd%)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell echo %cd%)/bin/couchjs $(shell echo %cd%)/share/server/main.js
+exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
 	@mix test --cover --trace $(EXUNIT_OPTS)
 
