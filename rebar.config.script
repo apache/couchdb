@@ -152,7 +152,7 @@ DepDescs = [
 %% Independent Apps
 {config,           "config",           {tag, "2.1.7"}},
 {b64url,           "b64url",           {tag, "1.0.2"}},
-{erlfdb,           "erlfdb",           {tag, "v1.1.0"}},
+{erlfdb,           "erlfdb",           {tag, "v1.2.0"}},
 {ets_lru,          "ets-lru",          {tag, "1.1.0"}},
 {khash,            "khash",            {tag, "1.1.0"}},
 {snappy,           "snappy",           {tag, "CouchDB-1.0.4"}},
