@@ -16,7 +16,8 @@
     set_timeout/0,
     build_view/3,
     build_view_async/2,
-    remove/2
+    remove/2,
+    job_state/2
 ]).
 
 -ifdef(TEST).
@@ -65,6 +66,11 @@ remove(TxDb, Sig) ->
     DbName = fabric2_db:name(TxDb),
     JobId = job_id(DbName, Sig),
     couch_jobs:remove(TxDb, ?INDEX_JOB_TYPE, JobId).
+
+
+job_state(#{} = TxDb, #mrst{} = Mrst) ->
+    JobId = job_id(TxDb, Mrst),
+    couch_jobs:get_job_state(TxDb, ?INDEX_JOB_TYPE, JobId).
 
 
 ensure_correct_tx(#{tx := undefined} = TxDb) ->
