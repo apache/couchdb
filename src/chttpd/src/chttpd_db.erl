@@ -831,10 +831,10 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
         prepend = "\r\n"
     },
     VAcc1 = lists:foldl(fun
-        (#mrargs{keys = undefined} = Args, Acc0) ->
-            send_all_docs(Db, Args, Acc0);
-        (#mrargs{keys = Keys} = Args, Acc0) when is_list(Keys) ->
-            Acc1 = send_all_docs_keys(Db, Args, Acc0),
+        (#mrargs{keys = undefined} = ArgsIn, Acc0) ->
+            send_all_docs(Db, ArgsIn, Acc0);
+        (#mrargs{keys = Keys} = ArgsIn, Acc0) when is_list(Keys) ->
+            Acc1 = send_all_docs_keys(Db, ArgsIn, Acc0),
             {ok, Acc2} = view_cb(complete, Acc1),
             Acc2
     end, VAcc0, ArgQueries),
