@@ -45,8 +45,7 @@ foreach_setup() ->
     {ok, _} = fabric2_db:update_doc(Db, Doc1, []),
 
     run_query(Db, DDoc, ?MAP_FUN1),
-    {ok, Info} = couch_views:get_info(Db, DDoc),
-    {Db, Info}.
+    {Db, DDoc}.
 
 
 foreach_teardown({Db, _}) ->
@@ -66,41 +65,62 @@ views_info_test_() ->
                 fun foreach_setup/0,
                 fun foreach_teardown/1,
                 [
-                    fun sig_is_binary/1,
-                    fun language_is_js/1,
-                    fun update_seq_is_binary/1,
-                    fun updater_running_is_boolean/1,
-                    fun active_size_is_non_neg_int/1,
-                    fun update_opts_is_bin_list/1
+                    ?TDEF_FE(sig_is_binary),
+                    ?TDEF_FE(language_is_js),
+                    ?TDEF_FE(update_seq_is_binary),
+                    ?TDEF_FE(updater_running_is_boolean),
+                    ?TDEF_FE(active_size_is_non_neg_int),
+                    ?TDEF_FE(update_opts_is_bin_list)
                 ]
             }
         }
     }.
 
 
-sig_is_binary({_, Info}) ->
-    ?_assert(is_binary(prop(signature, Info))).
+sig_is_binary({Db, DDoc}) ->
+    {ok, Info} = couch_views:get_info(Db, DDoc),
+    ?assert(is_binary(prop(signature, Info))).
 
 
-language_is_js({_, Info}) ->
-    ?_assertEqual(<<"javascript">>, prop(language, Info)).
+language_is_js({Db, DDoc}) ->
+    {ok, Info} = couch_views:get_info(Db, DDoc),
+    ?assertEqual(<<"javascript">>, prop(language, Info)).
 
 
-active_size_is_non_neg_int({_, Info}) ->
-    ?_assert(check_non_neg_int([sizes, active], Info)).
+active_size_is_non_neg_int({Db, DDoc}) ->
+    {ok, Info} = couch_views:get_info(Db, DDoc),
+    ?assert(check_non_neg_int([sizes, active], Info)).
 
 
-updater_running_is_boolean({_, Info}) ->
-    ?_assert(is_boolean(prop(updater_running, Info))).
+updater_running_is_boolean({Db, DDoc}) ->
+    meck:new(couch_jobs, [passthrough]),
+
+    meck:expect(couch_jobs, get_job_state, 3, meck:val({ok, running})),
+    {ok, Info1} = couch_views:get_info(Db, DDoc),
+    ?assert(prop(updater_running, Info1)),
+
+    meck:expect(couch_jobs, get_job_state, 3, meck:val({ok, pending})),
+    {ok, Info2} = couch_views:get_info(Db, DDoc),
+    ?assert(prop(updater_running, Info2)),
+
+    meck:expect(couch_jobs, get_job_state, 3, meck:val({ok, finished})),
+    {ok, Info3} = couch_views:get_info(Db, DDoc),
+    ?assert(not prop(updater_running, Info3)),
+
+    meck:expect(couch_jobs, get_job_state, 3, meck:val({error, not_found})),
+    {ok, Info4} = couch_views:get_info(Db, DDoc),
+    ?assert(not prop(updater_running, Info4)).
 
 
-update_seq_is_binary({_, Info}) ->
-    ?_assert(is_binary(prop(update_seq, Info))).
+update_seq_is_binary({Db, DDoc}) ->
+    {ok, Info} = couch_views:get_info(Db, DDoc),
+    ?assert(is_binary(prop(update_seq, Info))).
 
 
-update_opts_is_bin_list({_, Info}) ->
+update_opts_is_bin_list({Db, DDoc}) ->
+    {ok, Info} = couch_views:get_info(Db, DDoc),
     Opts = prop(update_options, Info),
-    ?_assert(is_list(Opts) andalso
+    ?assert(is_list(Opts) andalso
             (Opts == [] orelse lists:all([is_binary(B) || B <- Opts]))).
 
 
