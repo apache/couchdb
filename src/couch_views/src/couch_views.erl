@@ -99,21 +99,17 @@ get_info(Db, DDoc) ->
     DbName = fabric2_db:name(Db),
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     Sig = fabric2_util:to_hex(Mrst#mrst.sig),
-    JobId = <<DbName/binary, "-", Sig/binary>>,
-    {UpdateSeq, DataSize, Status0} = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        #{
-            tx := Tx
-        } = TxDb,
+    {UpdateSeq, DataSize, Status} = fabric2_fdb:transactional(Db, fun(TxDb) ->
         Seq = couch_views_fdb:get_update_seq(TxDb, Mrst),
         DataSize = get_total_view_size(TxDb, Mrst),
-        Status = couch_jobs:get_job_state(Tx, ?INDEX_JOB_TYPE, JobId),
-        {Seq, DataSize, Status}
+        JobStatus = case couch_views_jobs:job_state(TxDb, Mrst) of
+            {ok, pending} -> true;
+            {ok, running} -> true;
+            {ok, finished} -> false;
+            {error, not_found} -> false
+        end,
+        {Seq, DataSize, JobStatus}
     end),
-    Status1 = case Status0 of
-        pending -> true;
-        running -> true;
-        _ -> false
-    end,
     UpdateOptions = get_update_options(Mrst),
     {ok, [
         {language, Mrst#mrst.language},
@@ -122,7 +118,7 @@ get_info(Db, DDoc) ->
             {active, DataSize}
         ]}},
         {update_seq, UpdateSeq},
-        {updater_running, Status1},
+        {updater_running, Status},
         {update_options, UpdateOptions}
     ]}.
 
