@@ -10,6 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.rev_stemming = function(debug) {
 
   var db_name_orig = get_random_db_name();
