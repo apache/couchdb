@@ -33,8 +33,8 @@ dir_prefix_test_() ->
             test_util:stop_couch(Ctx)
         end,
         with([
-            ?TDEF(default_prefix),
-            ?TDEF(custom_prefix)
+            ?TDEF(default_prefix, 15),
+            ?TDEF(custom_prefix, 15)
         ])
     }.
 

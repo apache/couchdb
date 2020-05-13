@@ -40,8 +40,8 @@ crud_test_() ->
                     ?TDEF_FE(recreate_db),
                     ?TDEF_FE(undelete_db),
                     ?TDEF_FE(remove_deleted_db),
-                    ?TDEF_FE(scheduled_remove_deleted_db),
-                    ?TDEF_FE(scheduled_remove_deleted_dbs),
+                    ?TDEF_FE(scheduled_remove_deleted_db, 15),
+                    ?TDEF_FE(scheduled_remove_deleted_dbs, 15),
                     ?TDEF_FE(old_db_handle),
                     ?TDEF_FE(list_dbs),
                     ?TDEF_FE(list_dbs_user_fun),
@@ -95,9 +95,7 @@ setup_all() ->
 
 
 teardown_all(Ctx) ->
-    meck:unload(erlfdb),
-    meck:unload(config),
-    meck:unload(fabric2_db_expiration),
+    meck:unload(),
     test_util:stop_couch(Ctx).
 
 
@@ -251,11 +249,17 @@ scheduled_remove_deleted_db(_) ->
     ?assertEqual(ok, fabric2_db:delete(DbName, [])),
     ?assertEqual(false, ets:member(fabric2_server, DbName)),
 
-    meck:wait(fabric2_db_expiration, process_expirations, '_', 5000),
+    meck:reset(fabric2_db_expiration),
+    meck:wait(fabric2_db_expiration, process_expirations, '_', 7000),
 
-    {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
-    DeletedDbs = [proplists:get_value(db_name, Info) || Info <- Infos],
-    ?assert(not lists:member(DbName, DeletedDbs)).
+    ?assertEqual(ok, test_util:wait(fun() ->
+        {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
+        DeletedDbs = [proplists:get_value(db_name, Info) || Info <- Infos],
+        case lists:member(DbName, DeletedDbs) of
+            true -> wait;
+            false -> ok
+        end
+    end)).
 
 
 scheduled_remove_deleted_dbs(_) ->
@@ -263,7 +267,8 @@ scheduled_remove_deleted_dbs(_) ->
     ok = config:set("couchdb", "db_expiration_batch", "2", false),
     ok = config:set("couchdb", "enable_database_recovery", "true", false),
     DbNameList = [create_and_delete_db() || _I <- lists:seq(1, 5)],
-    meck:wait(fabric2_db_expiration, process_expirations, '_', 5000),
+    meck:reset(fabric2_db_expiration),
+    meck:wait(fabric2_db_expiration, process_expirations, '_', 7000),
 
     {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
     DeletedDbs = [proplists:get_value(db_name, Info) || Info <- Infos],
