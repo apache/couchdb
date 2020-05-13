@@ -50,8 +50,8 @@ index_process_cleanup_test_() ->
             fun setup/0,
             fun cleanup/1,
             [
-                ?TDEF_FE(updater_processes_start),
-                ?TDEF_FE(updater_processes_stop),
+                ?TDEF_FE(updater_processes_start, 15),
+                ?TDEF_FE(updater_processes_stop, 15),
                 ?TDEF_FE(indexing_can_be_disabled),
                 ?TDEF_FE(handle_indexer_blowing_up)
             ]
@@ -206,7 +206,7 @@ updater_processes_stop(#{}) ->
     lists:foreach(fun(Ref) ->
         receive
             {'DOWN', Ref, _, _, _} -> ok
-        after 3000 ->
+        after 5000 ->
             ?assert(false)
         end
     end, Refs).

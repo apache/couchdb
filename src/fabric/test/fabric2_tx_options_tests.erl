@@ -42,8 +42,8 @@ fdb_tx_options_test_() ->
             test_util:stop_couch(Ctx)
         end,
         with([
-            ?TDEF(options_take_effect),
-            ?TDEF(can_configure_options_at_runtime)
+            ?TDEF(options_take_effect, 15),
+            ?TDEF(can_configure_options_at_runtime, 15)
         ])
     }.
 
