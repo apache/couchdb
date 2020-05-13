@@ -731,7 +731,7 @@ get_local_doc_rev_wait(Future) ->
     erlfdb:wait(Future).
 
 
-get_local_doc_body_future(#{} = Db, DocId, Rev) ->
+get_local_doc_body_future(#{} = Db, DocId, _Rev) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
