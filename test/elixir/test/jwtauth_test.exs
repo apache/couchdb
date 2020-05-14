@@ -137,4 +137,81 @@ defmodule JwtAuthTest do
     assert resp.body["userCtx"]["name"] == "adm"
     assert resp.body["info"]["authenticated"] == "default"
   end
+
+  test "jwt auth with required iss claim", _context do
+
+    secret = "zxczxc12zxczxc12"
+
+    server_config = [
+      %{
+        :section => "jwt_auth",
+        :key => "required_claims",
+        :value => "{iss, \"hello\"}"
+      },
+      %{
+        :section => "jwt_keys",
+        :key => "hmac:_default",
+        :value => :base64.encode(secret)
+      },
+      %{
+        :section => "jwt_auth",
+        :key => "allowed_algorithms",
+        :value => "HS256, HS384, HS512"
+      }
+    ]
+
+    run_on_modified_server(server_config, fn -> good_iss("HS256", secret) end)
+    run_on_modified_server(server_config, fn -> bad_iss("HS256", secret) end)
+  end
+
+  def good_iss(alg, key) do
+    {:ok, token} = :jwtf.encode(
+      {
+        [
+          {"alg", alg},
+          {"typ", "JWT"}
+        ]
+      },
+      {
+        [
+          {"iss", "hello"},
+          {"sub", "couch@apache.org"},
+          {"_couchdb.roles", ["testing"]
+          }
+        ]
+      }, key)
+
+    resp = Couch.get("/_session",
+      headers: [authorization: "Bearer #{token}"]
+    )
+
+    assert resp.body["userCtx"]["name"] == "couch@apache.org"
+    assert resp.body["userCtx"]["roles"] == ["testing"]
+    assert resp.body["info"]["authenticated"] == "jwt"
+  end
+
+  def bad_iss(alg, key) do
+    {:ok, token} = :jwtf.encode(
+      {
+        [
+          {"alg", alg},
+          {"typ", "JWT"}
+        ]
+      },
+      {
+        [
+          {"iss", "goodbye"},
+          {"sub", "couch@apache.org"},
+          {"_couchdb.roles", ["testing"]
+          }
+        ]
+      }, key)
+
+    resp = Couch.get("/_session",
+      headers: [authorization: "Bearer #{token}"]
+    )
+
+    assert resp.status_code == 400
+  end
+
 end
