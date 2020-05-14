@@ -86,11 +86,6 @@ validate_args(#mrargs{} = Args) ->
     GroupLevel = determine_group_level(Args),
     Reduce = Args#mrargs.reduce,
 
-    case Reduce =/= undefined orelse Args#mrargs.view_type == red of
-        true -> throw(not_implemented);
-        false -> ok
-    end,
-
     case Reduce == undefined orelse is_boolean(Reduce) of
         true -> ok;
         _ -> mrverror(<<"Invalid `reduce` value.">>)
@@ -196,6 +191,12 @@ validate_args(#mrargs{} = Args) ->
     case is_boolean(Args#mrargs.sorted) of
         true -> ok;
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
+    end,
+
+    case {Reduce, Args#mrargs.view_type} of
+        {false, _} -> ok;
+        {_, red} -> throw(not_implemented);
+        _ -> ok
     end,
 
     Args#mrargs{group_level=GroupLevel}.
