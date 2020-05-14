@@ -105,6 +105,7 @@
     db_prefix,
     changes_future,
     meta_future,
+    aegis_future,
     retries = 0
 }).
 
@@ -499,6 +500,8 @@ get_info_future(Tx, DbPrefix) ->
     StatsPrefix = erlfdb_tuple:pack({?DB_STATS}, DbPrefix),
     MetaFuture = erlfdb:get_range_startswith(Tx, StatsPrefix),
 
+    AegisFuture = aegis:get_db_info(#{tx => Tx, db_prefix => DbPrefix}),
+
     % Save the tx object only if it's read-only as we might retry to get the
     % future again after the tx was reset
     SaveTx = case erlfdb:get_writes_allowed(Tx) of
@@ -510,7 +513,8 @@ get_info_future(Tx, DbPrefix) ->
         tx = SaveTx,
         db_prefix = DbPrefix,
         changes_future = ChangesFuture,
-        meta_future = MetaFuture
+        meta_future = MetaFuture,
+        aegis_future = AegisFuture
     }.
 
 
@@ -1998,7 +2002,8 @@ get_info_wait_int(#info_future{} = InfoFuture) ->
     #info_future{
         db_prefix = DbPrefix,
         changes_future = ChangesFuture,
-        meta_future = MetaFuture
+        meta_future = MetaFuture,
+        aegis_future = AegisFuture
     } = InfoFuture,
 
     RawSeq = case erlfdb:wait(ChangesFuture) of
@@ -2009,6 +2014,8 @@ get_info_wait_int(#info_future{} = InfoFuture) ->
             vs_to_seq(SeqVS)
     end,
     CProp = {update_seq, RawSeq},
+
+    AProps = erlfdb:wait(AegisFuture),
 
     MProps = lists:foldl(fun({K, V}, Acc) ->
         case erlfdb_tuple:unpack(K, DbPrefix) of
@@ -2026,7 +2033,7 @@ get_info_wait_int(#info_future{} = InfoFuture) ->
         end
     end, [{sizes, {[]}}], erlfdb:wait(MetaFuture)),
 
-    [CProp | MProps].
+    lists:append(AProps, [CProp | MProps]).
 
 
 binary_chunk_size() ->

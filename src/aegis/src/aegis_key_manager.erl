@@ -20,3 +20,6 @@
 
 
 -callback open_db(Db :: #{}) -> {ok, binary()} | false.
+
+
+-callback get_db_info(Db :: #{}) -> list().

@@ -18,7 +18,8 @@
 
 -export([
     init_db/2,
-    open_db/1
+    open_db/1,
+    get_db_info/1
 ]).
 
 
@@ -29,3 +30,7 @@ init_db(#{} = _Db, _Options) ->
 
 open_db(#{} = _Db) ->
     false.
+
+
+get_db_info(#{} = _Db) ->
+    [{encrypted, false}].

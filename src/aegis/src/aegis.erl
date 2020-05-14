@@ -20,6 +20,7 @@
 -export([
     init_db/2,
     open_db/1,
+    get_db_info/1,
 
     decrypt/2,
     decrypt/3,
@@ -37,6 +38,10 @@ open_db(#{} = Db) ->
     Db#{
         is_encrypted => aegis_server:open_db(Db)
     }.
+
+
+get_db_info(#{} = Db) ->
+    ?AEGIS_KEY_MANAGER:get_db_info(Db).
 
 
 encrypt(#{} = _Db, _Key, <<>>) ->
