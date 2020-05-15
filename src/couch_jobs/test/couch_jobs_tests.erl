@@ -207,33 +207,67 @@ resubmit_as_job_creator(#{t1 := T, j1 := J}) ->
 
 
 type_timeouts_and_server(#{t1 := T, t1_timeout := T1Timeout}) ->
-    ?_test(begin
+    {timeout, 15, ?_test(begin
+
+        WaitForActivityMonitors = fun(N) ->
+            test_util:wait(fun() ->
+                Pids = couch_jobs_activity_monitor_sup:get_child_pids(),
+                case length(Pids) == N of
+                    true -> ok;
+                    false -> wait
+                end
+            end)
+        end,
+
+        WaitForNotifiers = fun(N) ->
+            test_util:wait(fun() ->
+                Pids = couch_jobs_notifier_sup:get_child_pids(),
+                case length(Pids) == N of
+                    true -> ok;
+                    false -> wait
+                end
+            end)
+        end,
+
         couch_jobs_server:force_check_types(),
 
         ?assertEqual(T1Timeout, couch_jobs:get_type_timeout(T)),
 
+        WaitForActivityMonitors(2),
         ?assertEqual(2,
             length(couch_jobs_activity_monitor_sup:get_child_pids())),
+
+        WaitForNotifiers(2),
         ?assertEqual(2, length(couch_jobs_notifier_sup:get_child_pids())),
+
         ?assertMatch({ok, _}, couch_jobs_server:get_notifier_server(T)),
 
         ?assertEqual(ok, couch_jobs:set_type_timeout(<<"t3">>, 8)),
         couch_jobs_server:force_check_types(),
+
+        WaitForActivityMonitors(3),
         ?assertEqual(3,
             length(couch_jobs_activity_monitor_sup:get_child_pids())),
+
+        WaitForNotifiers(3),
         ?assertEqual(3, length(couch_jobs_notifier_sup:get_child_pids())),
 
         ?assertEqual(ok, couch_jobs:clear_type_timeout(<<"t3">>)),
         couch_jobs_server:force_check_types(),
+
+        WaitForActivityMonitors(2),
         ?assertEqual(2,
             length(couch_jobs_activity_monitor_sup:get_child_pids())),
+
+        WaitForNotifiers(2),
         ?assertEqual(2,
             length(couch_jobs_notifier_sup:get_child_pids())),
+
         ?assertMatch({error, _},
             couch_jobs_server:get_notifier_server(<<"t3">>)),
 
         ?assertEqual(not_found, couch_jobs:get_type_timeout(<<"t3">>))
-    end).
+    end)}.
 
 
 dead_notifier_restarts_jobs_server(#{}) ->
