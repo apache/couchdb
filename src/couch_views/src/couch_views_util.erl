@@ -15,7 +15,9 @@
 
 -export([
     ddoc_to_mrst/2,
-    validate_args/1
+    validate_args/1,
+    validate_args/2,
+    is_paginated/1
 ]).
 
 
@@ -79,17 +81,16 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
     {ok, IdxState#mrst{sig=couch_hash:md5_hash(term_to_binary(SigInfo))}}.
 
 
+validate_args(Args) ->
+    validate_args(Args, []).
+
+
 % This is mostly a copy of couch_mrview_util:validate_args/1 but it doesn't
 % update start / end keys and also throws a not_implemented error for reduce
 %
-validate_args(#mrargs{} = Args) ->
+validate_args(#mrargs{} = Args, Opts) ->
     GroupLevel = determine_group_level(Args),
     Reduce = Args#mrargs.reduce,
-
-    case Reduce =/= undefined orelse Args#mrargs.view_type == red of
-        true -> throw(not_implemented);
-        false -> ok
-    end,
 
     case Reduce == undefined orelse is_boolean(Reduce) of
         true -> ok;
@@ -198,7 +199,56 @@ validate_args(#mrargs{} = Args) ->
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
     end,
 
+    MaxPageSize = couch_util:get_value(page_size, Opts, 0),
+    case {Args#mrargs.page_size, MaxPageSize} of
+        {_, 0} -> ok;
+        {Value, _} -> validate_limit(<<"page_size">>, Value, 1, MaxPageSize)
+    end,
+
+    case {Args#mrargs.skip, MaxPageSize} of
+        {_, 0} -> ok;
+        {Skip, _} -> validate_limit(<<"skip">>, Skip, 0, MaxPageSize)
+    end,
+
+    case {is_list(Args#mrargs.keys), is_integer(Args#mrargs.page_size)} of
+        {true, true} ->
+            mrverror(<<"`page_size` is incompatible with `keys`">>);
+        _ ->
+            ok
+    end,
+
+    case {Reduce, Args#mrargs.view_type} of
+        {false, _} -> ok;
+        {_, red} -> throw(not_implemented);
+        _ -> ok
+    end,
+
     Args#mrargs{group_level=GroupLevel}.
+
+validate_limit(Name, Value, _Min, _Max) when not is_integer(Value) ->
+    mrverror(<<"`", Name/binary, "` should be an integer">>);
+
+validate_limit(Name, Value, Min, Max) when Value > Max ->
+    range_error_msg(Name, Min, Max);
+
+validate_limit(Name, Value, Min, Max) when Value < Min ->
+    range_error_msg(Name, Min, Max);
+
+validate_limit(_Name, _Value, _Min, _Max) ->
+    ok.
+
+range_error_msg(Name, Min, Max) ->
+    MinBin = list_to_binary(integer_to_list(Min)),
+    MaxBin = list_to_binary(integer_to_list(Max)),
+    mrverror(<<
+        "`",
+        Name/binary,
+        "` should be an integer in range [",
+        MinBin/binary,
+        " .. ",
+        MaxBin/binary,
+        "]"
+    >>).
 
 
 determine_group_level(#mrargs{group=undefined, group_level=undefined}) ->
@@ -219,3 +269,10 @@ determine_group_level(#mrargs{group_level=GroupLevel}) ->
 
 mrverror(Mesg) ->
     throw({query_parse_error, Mesg}).
+
+
+is_paginated(#mrargs{page_size = PageSize}) when is_integer(PageSize) ->
+    true;
+
+is_paginated(_) ->
+    false.

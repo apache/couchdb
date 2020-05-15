@@ -35,6 +35,8 @@
     parse_params/3,
     parse_params/4,
     view_cb/2,
+    row_to_obj/1,
+    row_to_obj/2,
     row_to_json/1,
     row_to_json/2,
     check_view_etag/3
@@ -413,11 +415,19 @@ prepend_val(#vacc{prepend=Prepend}) ->
 
 
 row_to_json(Row) ->
+    ?JSON_ENCODE(row_to_obj(Row)).
+
+
+row_to_json(Kind, Row) ->
+    ?JSON_ENCODE(row_to_obj(Kind, Row)).
+
+
+row_to_obj(Row) ->
     Id = couch_util:get_value(id, Row),
-    row_to_json(Id, Row).
+    row_to_obj(Id, Row).
 
 
-row_to_json(error, Row) ->
+row_to_obj(error, Row) ->
     % Special case for _all_docs request with KEYS to
     % match prior behavior.
     Key = couch_util:get_value(key, Row),
@@ -426,9 +436,8 @@ row_to_json(error, Row) ->
     ReasonProp = if Reason == undefined -> []; true ->
         [{reason, Reason}]
     end,
-    Obj = {[{key, Key}, {error, Val}] ++ ReasonProp},
-    ?JSON_ENCODE(Obj);
-row_to_json(Id0, Row) ->
+    {[{key, Key}, {error, Val}] ++ ReasonProp};
+row_to_obj(Id0, Row) ->
     Id = case Id0 of
         undefined -> [];
         Id0 -> [{id, Id0}]
@@ -439,8 +448,7 @@ row_to_json(Id0, Row) ->
         undefined -> [];
         Doc0 -> [{doc, Doc0}]
     end,
-    Obj = {Id ++ [{key, Key}, {value, Val}] ++ Doc},
-    ?JSON_ENCODE(Obj).
+    {Id ++ [{key, Key}, {value, Val}] ++ Doc}.
 
 
 parse_params(#httpd{}=Req, Keys) ->
@@ -523,6 +531,8 @@ parse_param(Key, Val, Args, IsDecoded) ->
             Args#mrargs{end_key_docid=couch_util:to_binary(Val)};
         "limit" ->
             Args#mrargs{limit=parse_pos_int(Val)};
+        "page_size" ->
+            Args#mrargs{page_size=parse_pos_int(Val)};
         "stale" when Val == "ok" orelse Val == <<"ok">> ->
             Args#mrargs{stable=true, update=false};
         "stale" when Val == "update_after" orelse Val == <<"update_after">> ->
