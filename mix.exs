@@ -70,7 +70,7 @@ defmodule CouchDBTest.Mixfile do
       {:jwtf, path: Path.expand("src/jwtf", __DIR__)},
       {:ibrowse,
        path: Path.expand("src/ibrowse", __DIR__), override: true, compile: false},
-      {:credo, "~> 1.3.1", only: [:dev, :test, :integration], runtime: false}
+      {:credo, "~> 1.4.0", only: [:dev, :test, :integration], runtime: false}
     ]
   end
 
