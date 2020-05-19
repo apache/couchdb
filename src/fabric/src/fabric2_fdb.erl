@@ -75,6 +75,8 @@
 
     new_versionstamp/1,
 
+    get_approximate_tx_size/1,
+
     debug_cluster/0,
     debug_cluster/2
 ]).
@@ -1157,6 +1159,12 @@ next_vs({versionstamp, VS, Batch, TxId}) ->
 new_versionstamp(Tx) ->
     TxId = erlfdb:get_next_tx_id(Tx),
     {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF, TxId}.
+
+
+get_approximate_tx_size(#{} = TxDb) ->
+    require_transaction(TxDb),
+    #{tx := Tx} = TxDb,
+    erlfdb:wait(erlfdb:get_approximate_size(Tx)).
 
 
 debug_cluster() ->
