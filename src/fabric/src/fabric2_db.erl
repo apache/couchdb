@@ -156,6 +156,19 @@
 
 -define(RETURN(Term), throw({?MODULE, Term})).
 
+-define(DEFAULT_UPDATE_DOCS_BATCH_SIZE, 5000000).
+
+
+-record(bacc, {
+    db,
+    docs,
+    batch_size,
+    options,
+    rev_futures,
+    seen,
+    results
+}).
+
 
 create(DbName, Options) ->
     case validate_dbname(DbName) of
@@ -861,18 +874,8 @@ update_docs(Db, Docs0, Options) ->
     Docs1 = apply_before_doc_update(Db, Docs0, Options),
     try
         validate_atomic_update(Docs0, lists:member(all_or_nothing, Options)),
-        Resps0 = case lists:member(replicated_changes, Options) of
-            false ->
-                fabric2_fdb:transactional(Db, fun(TxDb) ->
-                    update_docs_interactive(TxDb, Docs1, Options)
-                end);
-            true ->
-                lists:map(fun(Doc) ->
-                    fabric2_fdb:transactional(Db, fun(TxDb) ->
-                        update_doc_int(TxDb, Doc, Options)
-                    end)
-                end, Docs1)
-        end,
+
+        Resps0 = batch_update_docs(Db, Docs1, Options),
 
         % Notify index builder
         fabric2_index:db_updated(name(Db)),
@@ -895,7 +898,7 @@ update_docs(Db, Docs0, Options) ->
                     Else
             end
         end, Resps0),
-        case lists:member(replicated_changes, Options) of
+        case is_replicated(Options) of
             true ->
                 {ok, lists:flatmap(fun(R) ->
                     case R of
@@ -1647,9 +1650,8 @@ update_doc_int(#{} = Db, #doc{} = Doc, Options) ->
         <<?LOCAL_DOC_PREFIX, _/binary>> -> true;
         _ -> false
     end,
-    IsReplicated = lists:member(replicated_changes, Options),
     try
-        case {IsLocal, IsReplicated} of
+        case {IsLocal, is_replicated(Options)} of
             {false, false} -> update_doc_interactive(Db, Doc, Options);
             {false, true} -> update_doc_replicated(Db, Doc, Options);
             {true, _} -> update_local_doc(Db, Doc, Options)
@@ -1659,17 +1661,119 @@ update_doc_int(#{} = Db, #doc{} = Doc, Options) ->
     end.
 
 
-update_docs_interactive(Db, Docs0, Options) ->
-    Docs = tag_docs(Docs0),
-    Futures = get_winning_rev_futures(Db, Docs),
-    {Result, _} = lists:mapfoldl(fun(Doc, SeenIds) ->
-        try
-            update_docs_interactive(Db, Doc, Options, Futures, SeenIds)
-        catch throw:{?MODULE, Return} ->
-            {Return, SeenIds}
+batch_update_docs(Db, Docs, Options) ->
+    BAcc = #bacc{
+        db = Db,
+        docs = Docs,
+        batch_size = get_batch_size(Options),
+        options = Options,
+        rev_futures = #{},
+        seen = [],
+        results = []
+    },
+    #bacc{results = Res} = batch_update_docs(BAcc),
+    lists:reverse(Res).
+
+
+batch_update_docs(#bacc{docs = []} = BAcc) ->
+    BAcc;
+
+batch_update_docs(#bacc{db = Db} = BAcc) ->
+    #bacc{
+        db = Db,
+        docs = Docs,
+        options = Options
+    } = BAcc,
+
+    BAccTx2 = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        BAccTx = BAcc#bacc{db = TxDb},
+        case is_replicated(Options) of
+            false ->
+                Tagged = tag_docs(Docs),
+                RevFutures = get_winning_rev_futures(TxDb, Tagged),
+                BAccTx1 = BAccTx#bacc{
+                    docs = Tagged,
+                    rev_futures = RevFutures
+                },
+                batch_update_interactive_tx(BAccTx1);
+            true ->
+                BAccTx1 = batch_update_replicated_tx(BAccTx),
+                % For replicated updates reset `seen` after every transaction
+                BAccTx1#bacc{seen = []}
         end
-    end, [], Docs),
-    Result.
+    end),
+
+    % Clean up after the transaction ends so we can recurse with a clean state
+    maps:map(fun(Tag, RangeFuture) when is_reference(Tag) ->
+        ok = erlfdb:cancel(RangeFuture, [flush])
+    end, BAccTx2#bacc.rev_futures),
+
+    BAcc1 = BAccTx2#bacc{
+        db = Db,
+        rev_futures = #{}
+    },
+
+    batch_update_docs(BAcc1).
+
+
+batch_update_interactive_tx(#bacc{docs = []} = BAcc) ->
+    BAcc;
+
+batch_update_interactive_tx(#bacc{} = BAcc) ->
+    #bacc{
+        db = TxDb,
+        docs = [Doc | Docs],
+        options = Options,
+        batch_size = MaxSize,
+        rev_futures = RevFutures,
+        seen = Seen,
+        results = Results
+    } = BAcc,
+    {Res, Seen1} = try
+        update_docs_interactive(TxDb, Doc, Options, RevFutures, Seen)
+    catch throw:{?MODULE, Return} ->
+        {Return, Seen}
+    end,
+    BAcc1 = BAcc#bacc{
+        docs = Docs,
+        results = [Res | Results],
+        seen = Seen1
+    },
+    case fabric2_fdb:get_approximate_tx_size(TxDb) > MaxSize of
+        true -> BAcc1;
+        false -> batch_update_interactive_tx(BAcc1)
+    end.
+
+
+batch_update_replicated_tx(#bacc{docs = []} = BAcc) ->
+    BAcc;
+
+batch_update_replicated_tx(#bacc{} = BAcc) ->
+    #bacc{
+        db = TxDb,
+        docs = [Doc | Docs],
+        options = Options,
+        batch_size = MaxSize,
+        seen = Seen,
+        results = Results
+    } = BAcc,
+    case lists:member(Doc#doc.id, Seen) of
+        true ->
+            % If we already updated this doc in the current transaction, wait
+            % till the next transaction to update it again.
+            BAcc;
+        false ->
+            Res = update_doc_int(TxDb, Doc, Options),
+            BAcc1 = BAcc#bacc{
+                docs = Docs,
+                results = [Res | Results],
+                seen = [Doc#doc.id | Seen]
+            },
+            case fabric2_fdb:get_approximate_tx_size(TxDb) > MaxSize of
+                true -> BAcc1;
+                false -> batch_update_replicated_tx(BAcc1)
+            end
+    end.
 
 
 update_docs_interactive(Db, #doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} = Doc,
@@ -2122,9 +2226,8 @@ doc_to_revid(#doc{revs = Revs}) ->
 tag_docs([]) ->
     [];
 tag_docs([#doc{meta = Meta} = Doc | Rest]) ->
-    NewDoc = Doc#doc{
-        meta = [{ref, make_ref()} | Meta]
-    },
+    Meta1 = lists:keystore(ref, 1, Meta, {ref, make_ref()}),
+    NewDoc = Doc#doc{meta = Meta1},
     [NewDoc | tag_docs(Rest)].
 
 
@@ -2225,4 +2328,18 @@ get_cached_db(#{} = Db, Opts) when is_list(Opts) ->
             fabric2_fdb:transactional(Db, fun(TxDb) ->
                 fabric2_fdb:ensure_current(TxDb)
             end)
+    end.
+
+
+is_replicated(Options) when is_list(Options) ->
+    lists:member(replicated_changes, Options).
+
+
+get_batch_size(Options) ->
+    case fabric2_util:get_value(batch_size, Options) of
+        undefined ->
+            config:get_integer("fabric", "update_docs_batch_size",
+                ?DEFAULT_UPDATE_DOCS_BATCH_SIZE);
+        Val when is_integer(Val) ->
+            Val
     end.
