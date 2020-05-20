@@ -108,7 +108,7 @@ paginated_cb({meta, Meta}, #vacc{}=VAcc) ->
 paginated(Req, EtagTerm, #mrargs{page_size = PageSize} = Args, KeyFun, Fun) ->
     Etag = couch_httpd:make_etag(EtagTerm),
     chttpd:etag_respond(Req, Etag, fun() ->
-        hd(do_paginated(PageSize, [set_limit(Args)], KeyFun, Fun))
+        hd(do_paginated(PageSize, [Args], KeyFun, Fun))
     end).
 
 
@@ -124,10 +124,10 @@ do_paginated(PageSize, QueriesArgs, KeyFun, Fun) when is_list(QueriesArgs) ->
     {_N, Results} = lists:foldl(fun(Args0, {Limit, Acc}) ->
         case Limit > 0 of
             true ->
-                Args = set_limit(Args0#mrargs{page_size = Limit}),
+                {OriginalLimit, Args} = set_limit(Args0#mrargs{page_size = Limit}),
                 {Meta, Items} = Fun(Args),
                 Result = maybe_add_bookmark(
-                    PageSize, Args, Meta, Items, KeyFun),
+                    OriginalLimit, PageSize, Args, Meta, Items, KeyFun),
                 #{total_rows := Total} = Result,
                 {Limit - Total, [Result | Acc]};
             false ->
@@ -143,10 +143,9 @@ do_paginated(PageSize, QueriesArgs, KeyFun, Fun) when is_list(QueriesArgs) ->
     lists:reverse(Results).
 
 
-maybe_add_bookmark(PageSize, Args0, Response, Items, KeyFun) ->
-    #mrargs{page_size = Limit} = Args0,
-    Args = Args0#mrargs{page_size = PageSize},
-    case check_completion(Limit, Items) of
+maybe_add_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun) ->
+    #mrargs{page_size = RequestedLimit} = Args0,
+    case check_completion(OriginalLimit, RequestedLimit, Items) of
         {Rows, nil} ->
             maps:merge(Response, #{
                 rows => Rows,
@@ -157,6 +156,7 @@ maybe_add_bookmark(PageSize, Args0, Response, Items, KeyFun) ->
             if is_binary(NextKey) -> ok; true ->
                 throw("Provided KeyFun should return binary")
             end,
+            Args = Args0#mrargs{page_size = PageSize},
             Bookmark = bookmark_encode(Args#mrargs{start_key=NextKey}),
             maps:merge(Response, #{
                 rows => Rows,
@@ -168,14 +168,23 @@ maybe_add_bookmark(PageSize, Args0, Response, Items, KeyFun) ->
 
 set_limit(#mrargs{page_size = PageSize, limit = Limit} = Args)
         when is_integer(PageSize) andalso Limit > PageSize ->
-    Args#mrargs{limit = PageSize + 1};
+    {Limit, Args#mrargs{limit = PageSize + 1}};
 
 set_limit(#mrargs{page_size = PageSize, limit = Limit} = Args)
         when is_integer(PageSize)  ->
-    Args#mrargs{limit = Limit + 1}.
+    {Limit, Args#mrargs{limit = Limit + 1}}.
 
 
-check_completion(Limit, Items) when length(Items) > Limit ->
+check_completion(OriginalLimit, RequestedLimit, Items)
+        when is_integer(OriginalLimit) andalso OriginalLimit =< RequestedLimit ->
+    {Rows, _} = split(OriginalLimit, Items),
+    {Rows, nil};
+
+check_completion(_OriginalLimit, RequestedLimit, Items) ->
+    split(RequestedLimit, Items).
+
+
+split(Limit, Items) when length(Items) > Limit ->
     case lists:split(Limit, Items) of
         {Head, [NextItem | _]} ->
             {Head, NextItem};
@@ -183,7 +192,7 @@ check_completion(Limit, Items) when length(Items) > Limit ->
             {Head, nil}
     end;
 
-check_completion(_Limit, Items) ->
+split(_Limit, Items) ->
     {Items, nil}.
 
 
@@ -258,35 +267,51 @@ bookmark_encode_decode_test() ->
 check_completion_test() ->
     ?assertEqual(
         {[], nil},
-        check_completion(1, [])
+        check_completion(100, 1, [])
     ),
     ?assertEqual(
         {[1], nil},
-        check_completion(1, [1])
+        check_completion(100, 1, [1])
     ),
     ?assertEqual(
         {[1], 2},
-        check_completion(1, [1, 2])
+        check_completion(100, 1, [1, 2])
     ),
     ?assertEqual(
         {[1], 2},
-        check_completion(1, [1, 2, 3])
+        check_completion(100, 1, [1, 2, 3])
     ),
     ?assertEqual(
         {[1, 2], nil},
-        check_completion(3, [1, 2])
+        check_completion(100, 3, [1, 2])
     ),
     ?assertEqual(
         {[1, 2, 3], nil},
-        check_completion(3, [1, 2, 3])
+        check_completion(100, 3, [1, 2, 3])
     ),
     ?assertEqual(
         {[1, 2, 3], 4},
-        check_completion(3, [1, 2, 3, 4])
+        check_completion(100, 3, [1, 2, 3, 4])
     ),
     ?assertEqual(
         {[1, 2, 3], 4},
-        check_completion(3, [1, 2, 3, 4, 5])
+        check_completion(100, 3, [1, 2, 3, 4, 5])
+    ),
+    ?assertEqual(
+        {[1], nil},
+        check_completion(1, 1, [1])
+    ),
+    ?assertEqual(
+        {[1, 2], nil},
+        check_completion(2, 3, [1, 2])
+    ),
+    ?assertEqual(
+        {[1, 2], nil},
+        check_completion(2, 3, [1, 2, 3])
+    ),
+    ?assertEqual(
+        {[1, 2], nil},
+        check_completion(2, 3, [1, 2, 3, 4, 5])
     ),
     ok.
 -endif.
