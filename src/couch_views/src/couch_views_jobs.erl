@@ -31,7 +31,7 @@
 
 
 set_timeout() ->
-    couch_jobs:set_type_timeout(?INDEX_JOB_TYPE, 6).
+    couch_jobs:set_type_timeout(?INDEX_JOB_TYPE, 26).
 
 
 build_view(TxDb, Mrst, UpdateSeq) ->
