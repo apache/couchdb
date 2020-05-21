@@ -180,8 +180,8 @@ process_row(DbInfo) ->
     Since = Now - Retention,
     case Since >= timestamp_to_sec(TimeStamp)  of
         true ->
-            couch_log:notice("Permanently deleting ~p database with"
-                "  timestamp ~p", [DbName, TimeStamp]),
+            couch_log:notice("Permanently deleting ~s database with"
+                " timestamp ~s", [DbName, TimeStamp]),
             ok = fabric2_db:delete(DbName, [{deleted_at, TimeStamp}]);
         false ->
             ok
