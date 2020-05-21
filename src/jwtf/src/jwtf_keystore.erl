@@ -140,7 +140,7 @@ get_from_config(Kty, KID) ->
     end.
 
 pem_decode(PEM) ->
-    BinPEM = iolist_to_binary(lists:join("\n", string:split(PEM, "\\n", all))),
+    BinPEM = re:replace(PEM, "\\\\n", "\n", [global, {return, binary}]),
     case public_key:pem_decode(BinPEM) of
         [PEMEntry] ->
             public_key:pem_entry_decode(PEMEntry);
