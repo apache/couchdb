@@ -384,6 +384,55 @@ defmodule Couch.Test.Pagination do
       assert resp.status_code == 200, "got error #{inspect(resp.body)}"
     end
 
+    test ": _all_docs?page_size=4 should respect limit", ctx do
+      %{session: session, db_name: db_name} = ctx
+
+      resp =
+        Couch.Session.get(session, "/#{db_name}/_all_docs",
+          query: %{page_size: ctx.page_size, limit: ctx.page_size - 2}
+        )
+
+      assert resp.status_code == 200, "got error #{inspect(resp.body)}"
+      assert length(resp.body["rows"]) == ctx.page_size - 2
+      assert not Map.has_key?(resp.body, "next")
+
+      resp =
+        Couch.Session.get(session, "/#{db_name}/_all_docs",
+          query: %{page_size: ctx.page_size, limit: ctx.page_size - 1}
+        )
+
+      assert resp.status_code == 200, "got error #{inspect(resp.body)}"
+      assert length(resp.body["rows"]) == ctx.page_size - 1
+      assert not Map.has_key?(resp.body, "next")
+
+      resp =
+        Couch.Session.get(session, "/#{db_name}/_all_docs",
+          query: %{page_size: ctx.page_size, limit: ctx.page_size}
+        )
+
+      assert resp.status_code == 200, "got error #{inspect(resp.body)}"
+      assert length(resp.body["rows"]) == ctx.page_size
+      assert not Map.has_key?(resp.body, "next")
+
+      resp =
+        Couch.Session.get(session, "/#{db_name}/_all_docs",
+          query: %{page_size: ctx.page_size, limit: ctx.page_size + 1}
+        )
+
+      assert resp.status_code == 200, "got error #{inspect(resp.body)}"
+      assert length(resp.body["rows"]) == ctx.page_size
+      assert Map.has_key?(resp.body, "next")
+
+      resp =
+        Couch.Session.get(session, "/#{db_name}/_all_docs",
+          query: %{page_size: ctx.page_size, limit: ctx.page_size + 2}
+        )
+
+      assert resp.status_code == 200, "got error #{inspect(resp.body)}"
+      assert length(resp.body["rows"]) == ctx.page_size
+      assert Map.has_key?(resp.body, "next")
+    end
+
     test ": _all_docs/queries should limit number of queries", ctx do
       queries = %{
         queries: [%{}, %{}, %{}, %{}, %{}]
