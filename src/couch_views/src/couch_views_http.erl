@@ -126,8 +126,9 @@ do_paginated(PageSize, QueriesArgs, KeyFun, Fun) when is_list(QueriesArgs) ->
             true ->
                 {OriginalLimit, Args} = set_limit(Args0#mrargs{page_size = Limit}),
                 {Meta, Items} = Fun(Args),
-                Result = maybe_add_bookmark(
+                Result0 = maybe_add_next_bookmark(
                     OriginalLimit, PageSize, Args, Meta, Items, KeyFun),
+                Result = maybe_add_previous_bookmark(Args, Result0, KeyFun),
                 #{total_rows := Total} = Result,
                 {Limit - Total, [Result | Acc]};
             false ->
@@ -143,8 +144,11 @@ do_paginated(PageSize, QueriesArgs, KeyFun, Fun) when is_list(QueriesArgs) ->
     lists:reverse(Results).
 
 
-maybe_add_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun) ->
-    #mrargs{page_size = RequestedLimit} = Args0,
+maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun) ->
+    #mrargs{
+        page_size = RequestedLimit,
+        extra = Extra
+    } = Args0,
     case check_completion(OriginalLimit, RequestedLimit, Items) of
         {Rows, nil} ->
             maps:merge(Response, #{
@@ -152,18 +156,47 @@ maybe_add_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun) ->
                 total_rows => length(Rows)
             });
         {Rows, Next} ->
+            FirstKey = first_key(KeyFun, Rows),
             NextKey = KeyFun(Next),
             if is_binary(NextKey) -> ok; true ->
                 throw("Provided KeyFun should return binary")
             end,
-            Args = Args0#mrargs{page_size = PageSize},
-            Bookmark = bookmark_encode(Args#mrargs{start_key=NextKey}),
+            Args = Args0#mrargs{
+                page_size = PageSize,
+                start_key = NextKey,
+                extra = lists:keystore(fk, 1, Extra, {fk, FirstKey})
+            },
+            Bookmark = bookmark_encode(Args),
             maps:merge(Response, #{
                 rows => Rows,
                 next => Bookmark,
                 total_rows => length(Rows)
             })
     end.
+
+
+maybe_add_previous_bookmark(#mrargs{extra = Extra} = Args, #{rows := Rows} = Result, KeyFun) ->
+    StartKey = couch_util:get_value(fk, Extra),
+    case first_key(KeyFun, Rows) of
+        undefined ->
+            Result;
+        EndKey ->
+            Bookmark = bookmark_encode(
+                Args#mrargs{
+                    start_key = StartKey,
+                    end_key = EndKey,
+                    inclusive_end = false
+                }
+            ),
+            maps:put(previous, Bookmark, Result)
+    end.
+
+
+first_key(_KeyFun, []) ->
+    undefined;
+
+first_key(KeyFun, [First | _]) ->
+    KeyFun(First).
 
 
 set_limit(#mrargs{page_size = PageSize, limit = Limit} = Args)

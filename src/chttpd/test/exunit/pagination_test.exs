@@ -872,6 +872,18 @@ defmodule Couch.Test.Pagination do
           assert Map.has_key?(resp.body, "next")
         end
 
+        test "first page should not return 'previous' bookmark", ctx do
+          resp =
+            Couch.Session.get(
+              ctx.session,
+              "/#{ctx.db_name}/_design/#{ctx.ddoc_id}/_view/#{ctx.view_name}",
+              query: %{page_size: ctx.page_size, descending: ctx.descending}
+            )
+
+          assert resp.status_code == 200, "got error #{inspect(resp.body)}"
+          assert not Map.has_key?(resp.body, "previous")
+        end
+
         test "total_rows matches the length of rows array", ctx do
           resp =
             Couch.Session.get(
@@ -918,6 +930,41 @@ defmodule Couch.Test.Pagination do
           body = resp.body
           assert body["total_rows"] == length(body["rows"])
           assert body["total_rows"] <= ctx.page_size
+        end
+
+        test "can use 'previous' bookmark", ctx do
+          resp =
+            Couch.Session.get(
+              ctx.session,
+              "/#{ctx.db_name}/_design/#{ctx.ddoc_id}/_view/#{ctx.view_name}",
+              query: %{page_size: ctx.page_size, descending: ctx.descending}
+            )
+
+          assert resp.status_code == 200, "got error #{inspect(resp.body)}"
+          next_bookmark = resp.body["next"]
+
+          first_page_ids = Enum.map(resp.body["rows"], fn row -> row["id"] end)
+
+          resp =
+            Couch.Session.get(
+              ctx.session,
+              "/#{ctx.db_name}/_design/#{ctx.ddoc_id}/_view/#{ctx.view_name}",
+              query: %{bookmark: next_bookmark}
+            )
+
+          assert resp.status_code == 200, "got error #{inspect(resp.body)}"
+          assert Map.has_key?(resp.body, "previous")
+
+          resp =
+            Couch.Session.get(
+              ctx.session,
+              "/#{ctx.db_name}/_design/#{ctx.ddoc_id}/_view/#{ctx.view_name}",
+              query: %{bookmark: resp.body["previous"]}
+            )
+
+          assert resp.status_code == 200, "got error #{inspect(resp.body)}"
+          ids = Enum.map(resp.body["rows"], fn row -> row["id"] end)
+          assert first_page_ids == ids
         end
       end
     end
