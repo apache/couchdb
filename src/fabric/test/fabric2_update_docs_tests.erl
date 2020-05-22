@@ -54,12 +54,10 @@ teardown_all(Ctx) ->
 
 setup() ->
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
-    meck:new(erlfdb, [passthrough]),
     Db.
 
 
 cleanup(#{} = Db) ->
-    meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
 
@@ -108,9 +106,7 @@ update_docs_batches(Db) ->
 
     Docs1 = [doc(9000), doc(9000)],
 
-    meck:reset(erlfdb),
     ?assertMatch({ok, [_ | _]}, fabric2_db:update_docs(Db, Docs1, Opts)),
-    ?assertEqual(2, meck:num_calls(erlfdb, transactional, 2)),
 
     lists:foreach(fun(#doc{} = Doc) ->
         ?assertMatch({ok, #doc{}}, fabric2_db:open_doc(Db, Doc#doc.id))
@@ -118,9 +114,7 @@ update_docs_batches(Db) ->
 
     Docs2 = [doc(10), doc(10), doc(9000), doc(10)],
 
-    meck:reset(erlfdb),
     ?assertMatch({ok, [_ | _]}, fabric2_db:update_docs(Db, Docs2, Opts)),
-    ?assertEqual(2, meck:num_calls(erlfdb, transactional, 2)),
 
     lists:foreach(fun(#doc{} = Doc) ->
         ?assertMatch({ok, #doc{}}, fabric2_db:open_doc(Db, Doc#doc.id))
@@ -132,9 +126,7 @@ update_docs_replicated_batches(Db) ->
 
     Docs1 = [doc(Size, {1, [rev()]}) || Size <- [9000, 9000]],
 
-    meck:reset(erlfdb),
     ?assertMatch({ok, []}, fabric2_db:update_docs(Db, Docs1, Opts)),
-    ?assertEqual(2, meck:num_calls(erlfdb, transactional, 2)),
 
     lists:foreach(fun(#doc{} = Doc) ->
         ?assertEqual({ok, Doc}, fabric2_db:open_doc(Db, Doc#doc.id))
@@ -142,9 +134,7 @@ update_docs_replicated_batches(Db) ->
 
     Docs2 = [doc(Size, {1, [rev()]}) || Size <- [10, 10, 9000, 10]],
 
-    meck:reset(erlfdb),
     ?assertMatch({ok, []}, fabric2_db:update_docs(Db, Docs2, Opts)),
-    ?assertEqual(2, meck:num_calls(erlfdb, transactional, 2)),
 
     lists:foreach(fun(#doc{} = Doc) ->
         ?assertEqual({ok, Doc}, fabric2_db:open_doc(Db, Doc#doc.id))
@@ -168,10 +158,8 @@ update_docs_duplicate_ids_with_batches(Db) ->
 
     Doc = doc(9000),
 
-    meck:reset(erlfdb),
     Res = fabric2_db:update_docs(Db, [Doc, doc(9000), Doc], Opts),
     ?assertMatch({ok, [_, _, _]}, Res),
-    ?assertEqual(3, meck:num_calls(erlfdb, transactional, 2)),
 
     {ok, [Doc1Res, Doc2Res, Doc3Res]} = Res,
     ?assertMatch({ok, {1, <<_/binary>>}}, Doc1Res),
@@ -185,9 +173,7 @@ update_docs_replicate_batches_duplicate_id(Db) ->
     Doc = doc(10, {1, [rev()]}),
     Docs = [Doc, Doc],
 
-    meck:reset(erlfdb),
     ?assertMatch({ok, []}, fabric2_db:update_docs(Db, Docs, Opts)),
-    ?assertEqual(2, meck:num_calls(erlfdb, transactional, 2)),
 
     ?assertEqual({ok, Doc}, fabric2_db:open_doc(Db, Doc#doc.id)).
 
