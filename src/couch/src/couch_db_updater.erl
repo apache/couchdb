@@ -198,11 +198,11 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
                     couch_event:notify(Db2#db.name, {ddoc_updated, DDocId})
                 end, UpdatedDDocIds),
                 couch_event:notify(Db2#db.name, ddoc_updated),
-                couch_log:info("~n--------~nupdating ddoc cache with ids: ~p", [UpdatedDDocIds]),
+                % couch_log:info("~n--------~nupdating ddoc cache with ids: ~p", [UpdatedDDocIds]),
                 ddoc_cache:refresh(Db2#db.name, UpdatedDDocIds),
                 refresh_validate_doc_funs(Db2);
             false ->
-                couch_log:info("~n--------~nupdating ddoc cache NOPE", []),
+                % couch_log:info("~n--------~nupdating ddoc cache NOPE", []),
                 
                 Db2
         end,

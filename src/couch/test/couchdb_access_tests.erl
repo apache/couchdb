@@ -34,13 +34,14 @@ before_each(_) ->
 
 after_each(_, Url) ->
     {ok, 200, _, _} = test_request:delete(Url ++ "/db", ?ADMIN_REQ_HEADERS),
+    {_, _, _, _} = test_request:delete(Url ++ "/db2", ?ADMIN_REQ_HEADERS),
     ok.
 
 before_all() ->
-    Couch = test_util:start_couch([chttpd]),
+    Couch = test_util:start_couch([chttpd, couch_replicator]),
     Hashed = couch_passwords:hash_admin_password("a"),
     ok = config:set("admins", "a", binary_to_list(Hashed), _Persist=false),
-    % ok = config:set("log", "level", "debug", _Persist=false),
+    ok = config:set("log", "level", "debug", _Persist=false),
 
     % cleanup and setup
     {ok, _, _, _} = test_request:delete(url() ++ "/db", ?ADMIN_REQ_HEADERS),
@@ -66,49 +67,50 @@ after_all(_) ->
 access_test_() ->
     Tests = [
         % Doc creation
-        fun should_not_let_anonymous_user_create_doc/2,
-        fun should_let_admin_create_doc_with_access/2,
-        fun should_let_admin_create_doc_without_access/2,
-        fun should_let_user_create_doc_for_themselves/2,
-        fun should_not_let_user_create_doc_for_someone_else/2,
-        fun should_let_user_create_access_ddoc/2,
-        fun access_ddoc_should_have_no_effects/2,
-
-        % Doc updates
-        fun users_with_access_can_update_doc/2,
-        fun users_with_access_can_not_change_access/2,
-        fun users_with_access_can_not_remove_access/2,
-
-        % Doc reads
-        fun should_let_admin_read_doc_with_access/2,
-        fun user_with_access_can_read_doc/2,
-        fun user_without_access_can_not_read_doc/2,
-        fun user_can_not_read_doc_without_access/2,
-        fun admin_with_access_can_read_conflicted_doc/2,
-        fun user_with_access_can_not_read_conflicted_doc/2,
-
-        % Doc deletes
-        fun should_let_admin_delete_doc_with_access/2,
-        fun should_let_user_delete_doc_for_themselves/2,
-        fun should_not_let_user_delete_doc_for_someone_else/2,
-
-        % _all_docs with include_docs
-        fun should_let_admin_fetch_all_docs/2,
-        fun should_let_user_fetch_their_own_all_docs/2,
-        % % potential future feature
-        % % fun should_let_user_fetch_their_own_all_docs_plus_users_ddocs/2%,
-
-        % _changes
-        fun should_let_admin_fetch_changes/2,
-        fun should_let_user_fetch_their_own_changes/2,
-
-        % views
-        fun should_not_allow_admin_access_ddoc_view_request/2,
-        fun should_not_allow_user_access_ddoc_view_request/2,
-        fun should_allow_admin_users_access_ddoc_view_request/2,
-        fun should_allow_user_users_access_ddoc_view_request/2
+        % fun should_not_let_anonymous_user_create_doc/2,
+        % fun should_let_admin_create_doc_with_access/2,
+        % fun should_let_admin_create_doc_without_access/2,
+        % fun should_let_user_create_doc_for_themselves/2,
+        % fun should_not_let_user_create_doc_for_someone_else/2,
+        % fun should_let_user_create_access_ddoc/2,
+        % fun access_ddoc_should_have_no_effects/2,
+        %
+        % % Doc updates
+        % fun users_with_access_can_update_doc/2,
+        % fun users_with_access_can_not_change_access/2,
+        % fun users_with_access_can_not_remove_access/2,
+        %
+        % % Doc reads
+        % fun should_let_admin_read_doc_with_access/2,
+        % fun user_with_access_can_read_doc/2,
+        % fun user_without_access_can_not_read_doc/2,
+        % fun user_can_not_read_doc_without_access/2,
+        % fun admin_with_access_can_read_conflicted_doc/2,
+        % fun user_with_access_can_not_read_conflicted_doc/2,
+        %
+        % % Doc deletes
+        % fun should_let_admin_delete_doc_with_access/2,
+        % fun should_let_user_delete_doc_for_themselves/2,
+        % fun should_not_let_user_delete_doc_for_someone_else/2,
+        %
+        % % _all_docs with include_docs
+        % fun should_let_admin_fetch_all_docs/2,
+        % fun should_let_user_fetch_their_own_all_docs/2,
+        % % % potential future feature
+        % % % fun should_let_user_fetch_their_own_all_docs_plus_users_ddocs/2%,
+        %
+        % % _changes
+        % fun should_let_admin_fetch_changes/2,
+        % fun should_let_user_fetch_their_own_changes/2,
+        %
+        % % views
+        % fun should_not_allow_admin_access_ddoc_view_request/2,
+        % fun should_not_allow_user_access_ddoc_view_request/2,
+        % fun should_allow_admin_users_access_ddoc_view_request/2,
+        % fun should_allow_user_users_access_ddoc_view_request/2,
 
         % replication
+        fun should_allow_admin_to_replicate_from_access_to_access/2
         % admin should be able to replicate all docs
         %  - from access to access
         %  - from no-access to access
@@ -466,6 +468,59 @@ should_allow_user_users_access_ddoc_view_request(_PortType, Url) ->
     {ok, Code1, _, _} = test_request:get(Url ++ "/db/_design/a/_view/foo",
         ?USERX_REQ_HEADERS),
     ?_assertEqual(200, Code1).
+
+% replication
+
+should_allow_admin_to_replicate_from_access_to_access(_PortType, Url) ->
+    ?_test(begin
+        % create target db
+        {ok, 201, _, _} = test_request:put(url() ++ "/db2?q=1&n=1&access=true",
+          ?ADMIN_REQ_HEADERS, ""),
+        % set target db security
+        {ok, _, _, _} = test_request:put(url() ++ "/db2/_security",
+          ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
+
+        % create source docs
+        {ok, _, _, _} = test_request:put(Url ++ "/db/a",
+            ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db/b",
+            ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db/c",
+            ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"x\"]}"),
+
+        % replicate
+        AdminUrl = string:replace(Url, "http://", "http://a:a@"),
+        EJRequestBody = {[
+          {<<"source">>, list_to_binary(AdminUrl ++ "/db")},
+          {<<"target">>, list_to_binary(AdminUrl ++ "/db2")}
+        ]},
+        {ok, ResponseCode, _, ResponseBody} = test_request:post(Url ++ "/_replicate",
+            ?ADMIN_REQ_HEADERS, jiffy:encode(EJRequestBody)),
+
+        % assert replication status
+        {EJResponseBody} = jiffy:decode(ResponseBody),
+        ?assertEqual(ResponseCode, 200),
+        ?assertEqual(true, couch_util:get_value(<<"ok">>, EJResponseBody)),
+        [{History}] = couch_util:get_value(<<"history">>, EJResponseBody),
+
+        MissingChecked = couch_util:get_value(<<"missing_checked">>, History),
+        MissingFound = couch_util:get_value(<<"missing_found">>, History),
+        DocsReard = couch_util:get_value(<<"docs_read">>, History),
+        DocsWritten = couch_util:get_value(<<"docs_written">>, History),
+        DocWriteFailures = couch_util:get_value(<<"doc_write_failures">>, History),
+     
+        ?assertEqual(3, MissingChecked),
+        ?assertEqual(3, MissingFound),
+        ?assertEqual(3, DocsReard),
+        ?assertEqual(3, DocsWritten),
+        ?assertEqual(0, DocWriteFailures),
+      
+        % assert docs in target db
+        {ok, 200, _, ADBody} = test_request:get(Url ++ "/db/_all_docs?include_docs=true",
+            ?ADMIN_REQ_HEADERS),
+        {Json} = jiffy:decode(ADBody),
+        ?assertEqual(3, proplists:get_value(<<"total_rows">>, Json))
+    end).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
