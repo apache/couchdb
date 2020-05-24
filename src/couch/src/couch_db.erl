@@ -1729,7 +1729,7 @@ open_doc_revs_int(Db, IdRevs, Options) ->
     lists:zipwith(
         fun({Id, Revs}, Lookup) ->
             case Lookup of
-            #full_doc_info{rev_tree=RevTree} ->
+            #full_doc_info{rev_tree=RevTree, access=Access} ->
                 {FoundRevs, MissingRevs} =
                 case Revs of
                 all ->
@@ -1749,7 +1749,7 @@ open_doc_revs_int(Db, IdRevs, Options) ->
                         % we have the rev in our list but know nothing about it
                         {{not_found, missing}, {Pos, Rev}};
                     #leaf{deleted=IsDeleted, ptr=SummaryPtr} ->
-                        {ok, make_doc(Db, Id, IsDeleted, SummaryPtr, FoundRevPath)}
+                        {ok, make_doc(Db, Id, IsDeleted, SummaryPtr, FoundRevPath, Access)}
                     end
                 end, FoundRevs),
                 Results = FoundResults ++ [{{not_found, missing}, MissingRev} || MissingRev <- MissingRevs],

@@ -35,6 +35,7 @@ before_each(_) ->
 after_each(_, Url) ->
     {ok, 200, _, _} = test_request:delete(Url ++ "/db", ?ADMIN_REQ_HEADERS),
     {_, _, _, _} = test_request:delete(Url ++ "/db2", ?ADMIN_REQ_HEADERS),
+    {_, _, _, _} = test_request:delete(Url ++ "/db3", ?ADMIN_REQ_HEADERS),
     ok.
 
 before_all() ->
@@ -110,18 +111,19 @@ access_test_() ->
         % fun should_allow_user_users_access_ddoc_view_request/2,
 
         % replication
-        fun should_allow_admin_to_replicate_from_access_to_access/2
-        % admin should be able to replicate all docs
-        %  - from access to access
-        %  - from no-access to access
-        %  - from access to no-access
-        %  - from no-access to no-access while retainting _access for docs
-        % user should be able to replicate:
-        %  - access to access
-        %  - access to no-access
-        %  - no-access (w/ _access docs) to _access
-        
-        
+        % fun should_allow_admin_to_replicate_from_access_to_access/2,
+        % fun should_allow_admin_to_replicate_from_no_access_to_access/2,
+        % fun should_allow_admin_to_replicate_from_access_to_no_access/2,
+        % fun should_allow_admin_to_replicate_from_no_access_to_no_access/2
+
+        % fun should_allow_user_to_replicate_from_access_to_access/2,
+        % fun should_allow_user_to_replicate_from_access_to_no_access/2,
+        % fun should_allow_user_to_replicate_from_no_access_to_access/2,
+        % fun should_allow_user_to_replicate_from_no_access_to_no_access/2
+
+        % TODO: try getting _revs_diff for docs you don’t have access to
+        fun should_not_allow_user_to_revs_diff_other_docs/2
+
 
         % TODO: create test db with role and not _users in _security.members
         % and make sure a user in that group can access while a user not
@@ -145,6 +147,17 @@ make_test_cases(Mod, Funs) ->
     }.
 
 % Doc creation
+ % http://127.0.0.1:64903/db/a?revs=true&open_revs=%5B%221-23202479633c2b380f79507a776743d5%22%5D&latest=true
+
+% should_do_the_thing(_PortType, Url) ->
+%   ?_test(begin
+%       {ok, _, _, _} = test_request:put(Url ++ "/db/a",
+%           ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+%       {ok, Code, _, _} = test_request:get(Url ++ "/db/a?revs=true&open_revs=%5B%221-23202479633c2b380f79507a776743d5%22%5D&latest=true",
+%           ?USERX_REQ_HEADERS),
+%       ?assertEqual(200, Code)
+%   end).
+%
 
 should_not_let_anonymous_user_create_doc(_PortType, Url) ->
     {ok, Code, _, _} = test_request:put(Url ++ "/db/a", "{\"a\":1,\"_access\":[\"x\"]}"),
@@ -516,12 +529,434 @@ should_allow_admin_to_replicate_from_access_to_access(_PortType, Url) ->
         ?assertEqual(0, DocWriteFailures),
       
         % assert docs in target db
+        {ok, 200, _, ADBody} = test_request:get(Url ++ "/db2/_all_docs?include_docs=true",
+            ?ADMIN_REQ_HEADERS),
+        {Json} = jiffy:decode(ADBody),
+        ?assertEqual(3, proplists:get_value(<<"total_rows">>, Json))
+    end).
+
+should_allow_admin_to_replicate_from_no_access_to_access(_PortType, Url) ->
+    ?_test(begin
+        % create target db
+        {ok, 201, _, _} = test_request:put(url() ++ "/db2?q=1&n=1",
+          ?ADMIN_REQ_HEADERS, ""),
+        % set target db security
+        {ok, _, _, _} = test_request:put(url() ++ "/db2/_security",
+          ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
+
+        % create source docs
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/a",
+            ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/b",
+            ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/c",
+            ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"x\"]}"),
+
+        % replicate
+        AdminUrl = string:replace(Url, "http://", "http://a:a@"),
+        EJRequestBody = {[
+          {<<"source">>, list_to_binary(AdminUrl ++ "/db2")},
+          {<<"target">>, list_to_binary(AdminUrl ++ "/db")}
+        ]},
+        {ok, ResponseCode, _, ResponseBody} = test_request:post(Url ++ "/_replicate",
+            ?ADMIN_REQ_HEADERS, jiffy:encode(EJRequestBody)),
+
+        % assert replication status
+        {EJResponseBody} = jiffy:decode(ResponseBody),
+        ?assertEqual(ResponseCode, 200),
+        ?assertEqual(true, couch_util:get_value(<<"ok">>, EJResponseBody)),
+        [{History}] = couch_util:get_value(<<"history">>, EJResponseBody),
+
+        MissingChecked = couch_util:get_value(<<"missing_checked">>, History),
+        MissingFound = couch_util:get_value(<<"missing_found">>, History),
+        DocsReard = couch_util:get_value(<<"docs_read">>, History),
+        DocsWritten = couch_util:get_value(<<"docs_written">>, History),
+        DocWriteFailures = couch_util:get_value(<<"doc_write_failures">>, History),
+     
+        ?assertEqual(3, MissingChecked),
+        ?assertEqual(3, MissingFound),
+        ?assertEqual(3, DocsReard),
+        ?assertEqual(3, DocsWritten),
+        ?assertEqual(0, DocWriteFailures),
+      
+        % assert docs in target db
         {ok, 200, _, ADBody} = test_request:get(Url ++ "/db/_all_docs?include_docs=true",
             ?ADMIN_REQ_HEADERS),
         {Json} = jiffy:decode(ADBody),
         ?assertEqual(3, proplists:get_value(<<"total_rows">>, Json))
     end).
 
+should_allow_admin_to_replicate_from_access_to_no_access(_PortType, Url) ->
+    ?_test(begin
+        % create target db
+        {ok, 201, _, _} = test_request:put(url() ++ "/db2?q=1&n=1",
+          ?ADMIN_REQ_HEADERS, ""),
+        % set target db security
+        {ok, _, _, _} = test_request:put(url() ++ "/db2/_security",
+          ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
+
+        % create source docs
+        {ok, _, _, _} = test_request:put(Url ++ "/db/a",
+            ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db/b",
+            ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db/c",
+            ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"x\"]}"),
+
+        % replicate
+        AdminUrl = string:replace(Url, "http://", "http://a:a@"),
+        EJRequestBody = {[
+          {<<"source">>, list_to_binary(AdminUrl ++ "/db")},
+          {<<"target">>, list_to_binary(AdminUrl ++ "/db2")}
+        ]},
+        {ok, ResponseCode, _, ResponseBody} = test_request:post(Url ++ "/_replicate",
+            ?ADMIN_REQ_HEADERS, jiffy:encode(EJRequestBody)),
+
+        % assert replication status
+        {EJResponseBody} = jiffy:decode(ResponseBody),
+        ?assertEqual(ResponseCode, 200),
+        ?assertEqual(true, couch_util:get_value(<<"ok">>, EJResponseBody)),
+        [{History}] = couch_util:get_value(<<"history">>, EJResponseBody),
+
+        MissingChecked = couch_util:get_value(<<"missing_checked">>, History),
+        MissingFound = couch_util:get_value(<<"missing_found">>, History),
+        DocsReard = couch_util:get_value(<<"docs_read">>, History),
+        DocsWritten = couch_util:get_value(<<"docs_written">>, History),
+        DocWriteFailures = couch_util:get_value(<<"doc_write_failures">>, History),
+     
+        ?assertEqual(3, MissingChecked),
+        ?assertEqual(3, MissingFound),
+        ?assertEqual(3, DocsReard),
+        ?assertEqual(3, DocsWritten),
+        ?assertEqual(0, DocWriteFailures),
+      
+        % assert docs in target db
+        {ok, 200, _, ADBody} = test_request:get(Url ++ "/db2/_all_docs?include_docs=true",
+            ?ADMIN_REQ_HEADERS),
+        {Json} = jiffy:decode(ADBody),
+        ?assertEqual(3, proplists:get_value(<<"total_rows">>, Json))
+    end).
+
+should_allow_admin_to_replicate_from_no_access_to_no_access(_PortType, Url) ->
+    ?_test(begin
+        % create source and target dbs
+        {ok, 201, _, _} = test_request:put(url() ++ "/db2?q=1&n=1",
+          ?ADMIN_REQ_HEADERS, ""),
+        % set target db security
+        {ok, _, _, _} = test_request:put(url() ++ "/db2/_security",
+          ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
+
+        {ok, 201, _, _} = test_request:put(url() ++ "/db3?q=1&n=1",
+          ?ADMIN_REQ_HEADERS, ""),
+        % set target db security
+        {ok, _, _, _} = test_request:put(url() ++ "/db3/_security",
+          ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
+
+        % create source docs
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/a",
+            ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/b",
+            ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/c",
+            ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"x\"]}"),
+
+        % replicate
+        AdminUrl = string:replace(Url, "http://", "http://a:a@"),
+        EJRequestBody = {[
+          {<<"source">>, list_to_binary(AdminUrl ++ "/db2")},
+          {<<"target">>, list_to_binary(AdminUrl ++ "/db3")}
+        ]},
+        {ok, ResponseCode, _, ResponseBody} = test_request:post(Url ++ "/_replicate",
+            ?ADMIN_REQ_HEADERS, jiffy:encode(EJRequestBody)),
+
+        % assert replication status
+        {EJResponseBody} = jiffy:decode(ResponseBody),
+        ?assertEqual(ResponseCode, 200),
+        ?assertEqual(true, couch_util:get_value(<<"ok">>, EJResponseBody)),
+        [{History}] = couch_util:get_value(<<"history">>, EJResponseBody),
+
+        MissingChecked = couch_util:get_value(<<"missing_checked">>, History),
+        MissingFound = couch_util:get_value(<<"missing_found">>, History),
+        DocsReard = couch_util:get_value(<<"docs_read">>, History),
+        DocsWritten = couch_util:get_value(<<"docs_written">>, History),
+        DocWriteFailures = couch_util:get_value(<<"doc_write_failures">>, History),
+     
+        ?assertEqual(3, MissingChecked),
+        ?assertEqual(3, MissingFound),
+        ?assertEqual(3, DocsReard),
+        ?assertEqual(3, DocsWritten),
+        ?assertEqual(0, DocWriteFailures),
+      
+        % assert docs in target db
+        {ok, 200, _, ADBody} = test_request:get(Url ++ "/db3/_all_docs?include_docs=true",
+            ?ADMIN_REQ_HEADERS),
+        {Json} = jiffy:decode(ADBody),
+        ?assertEqual(3, proplists:get_value(<<"total_rows">>, Json))
+    end).
+
+should_allow_user_to_replicate_from_access_to_access(_PortType, Url) ->
+    ?_test(begin
+        % create source and target dbs
+        {ok, 201, _, _} = test_request:put(url() ++ "/db2?q=1&n=1&access=true",
+          ?ADMIN_REQ_HEADERS, ""),
+        % set target db security
+        {ok, _, _, _} = test_request:put(url() ++ "/db2/_security",
+          ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
+
+        % create source docs
+        {ok, _, _, _} = test_request:put(Url ++ "/db/a",
+            ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db/b",
+            ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db/c",
+            ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"y\"]}"),
+
+        % replicate
+        UserXUrl = string:replace(Url, "http://", "http://x:x@"),
+        EJRequestBody = {[
+          {<<"source">>, list_to_binary(UserXUrl ++ "/db")},
+          {<<"target">>, list_to_binary(UserXUrl ++ "/db2")}
+        ]},
+        {ok, ResponseCode, _, ResponseBody} = test_request:post(Url ++ "/_replicate",
+            ?USERX_REQ_HEADERS, jiffy:encode(EJRequestBody)),
+
+        % assert replication status
+        {EJResponseBody} = jiffy:decode(ResponseBody),
+        ?assertEqual(ResponseCode, 200),
+        ?assertEqual(true, couch_util:get_value(<<"ok">>, EJResponseBody)),
+        [{History}] = couch_util:get_value(<<"history">>, EJResponseBody),
+
+        MissingChecked = couch_util:get_value(<<"missing_checked">>, History),
+        MissingFound = couch_util:get_value(<<"missing_found">>, History),
+        DocsReard = couch_util:get_value(<<"docs_read">>, History),
+        DocsWritten = couch_util:get_value(<<"docs_written">>, History),
+        DocWriteFailures = couch_util:get_value(<<"doc_write_failures">>, History),
+     
+        ?assertEqual(2, MissingChecked),
+        ?assertEqual(2, MissingFound),
+        ?assertEqual(2, DocsReard),
+        ?assertEqual(2, DocsWritten),
+        ?assertEqual(0, DocWriteFailures),
+      
+        % assert docs in target db
+        {ok, 200, _, ADBody} = test_request:get(Url ++ "/db2/_all_docs?include_docs=true",
+            ?ADMIN_REQ_HEADERS),
+        {Json} = jiffy:decode(ADBody),
+        ?assertEqual(2, proplists:get_value(<<"total_rows">>, Json))
+    end).
+
+should_allow_user_to_replicate_from_access_to_no_access(_PortType, Url) ->
+    ?_test(begin
+        % create source and target dbs
+        {ok, 201, _, _} = test_request:put(url() ++ "/db2?q=1&n=1",
+          ?ADMIN_REQ_HEADERS, ""),
+        % set target db security
+        {ok, _, _, _} = test_request:put(url() ++ "/db2/_security",
+          ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
+
+        % create source docs
+        {ok, _, _, _} = test_request:put(Url ++ "/db/a",
+            ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db/b",
+            ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db/c",
+            ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"y\"]}"),
+
+        % replicate
+        UserXUrl = string:replace(Url, "http://", "http://x:x@"),
+        EJRequestBody = {[
+          {<<"source">>, list_to_binary(UserXUrl ++ "/db")},
+          {<<"target">>, list_to_binary(UserXUrl ++ "/db2")}
+        ]},
+        {ok, ResponseCode, _, ResponseBody} = test_request:post(Url ++ "/_replicate",
+            ?USERX_REQ_HEADERS, jiffy:encode(EJRequestBody)),
+
+        % assert replication status
+        {EJResponseBody} = jiffy:decode(ResponseBody),
+        ?assertEqual(ResponseCode, 200),
+        ?assertEqual(true, couch_util:get_value(<<"ok">>, EJResponseBody)),
+        [{History}] = couch_util:get_value(<<"history">>, EJResponseBody),
+
+        MissingChecked = couch_util:get_value(<<"missing_checked">>, History),
+        MissingFound = couch_util:get_value(<<"missing_found">>, History),
+        DocsReard = couch_util:get_value(<<"docs_read">>, History),
+        DocsWritten = couch_util:get_value(<<"docs_written">>, History),
+        DocWriteFailures = couch_util:get_value(<<"doc_write_failures">>, History),
+     
+        ?assertEqual(2, MissingChecked),
+        ?assertEqual(2, MissingFound),
+        ?assertEqual(2, DocsReard),
+        ?assertEqual(2, DocsWritten),
+        ?assertEqual(0, DocWriteFailures),
+      
+        % assert docs in target db
+        {ok, 200, _, ADBody} = test_request:get(Url ++ "/db2/_all_docs?include_docs=true",
+            ?ADMIN_REQ_HEADERS),
+        {Json} = jiffy:decode(ADBody),
+        ?assertEqual(2, proplists:get_value(<<"total_rows">>, Json))
+    end).
+
+should_allow_user_to_replicate_from_no_access_to_access(_PortType, Url) ->
+    ?_test(begin
+        % create source and target dbs
+        {ok, 201, _, _} = test_request:put(url() ++ "/db2?q=1&n=1",
+          ?ADMIN_REQ_HEADERS, ""),
+        % set target db security
+        {ok, _, _, _} = test_request:put(url() ++ "/db2/_security",
+          ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
+
+        % create source docs
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/a",
+            ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/b",
+            ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/c",
+            ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"y\"]}"),
+
+        % replicate
+        UserXUrl = string:replace(Url, "http://", "http://x:x@"),
+        EJRequestBody = {[
+          {<<"source">>, list_to_binary(UserXUrl ++ "/db2")},
+          {<<"target">>, list_to_binary(UserXUrl ++ "/db")}
+        ]},
+        {ok, ResponseCode, _, ResponseBody} = test_request:post(Url ++ "/_replicate",
+            ?USERX_REQ_HEADERS, jiffy:encode(EJRequestBody)),
+
+        % assert replication status
+        {EJResponseBody} = jiffy:decode(ResponseBody),
+        ?assertEqual(ResponseCode, 200),
+        ?assertEqual(true, couch_util:get_value(<<"ok">>, EJResponseBody)),
+        [{History}] = couch_util:get_value(<<"history">>, EJResponseBody),
+
+        MissingChecked = couch_util:get_value(<<"missing_checked">>, History),
+        MissingFound = couch_util:get_value(<<"missing_found">>, History),
+        DocsReard = couch_util:get_value(<<"docs_read">>, History),
+        DocsWritten = couch_util:get_value(<<"docs_written">>, History),
+        DocWriteFailures = couch_util:get_value(<<"doc_write_failures">>, History),
+     
+        ?assertEqual(2, MissingChecked),
+        ?assertEqual(2, MissingFound),
+        ?assertEqual(2, DocsReard),
+        ?assertEqual(2, DocsWritten),
+        ?assertEqual(0, DocWriteFailures),
+      
+        % assert docs in target db
+        {ok, 200, _, ADBody} = test_request:get(Url ++ "/db/_all_docs?include_docs=true",
+            ?ADMIN_REQ_HEADERS),
+        {Json} = jiffy:decode(ADBody),
+        ?assertEqual(2, proplists:get_value(<<"total_rows">>, Json))
+    end).
+
+should_allow_user_to_replicate_from_no_access_to_no_access(_PortType, Url) ->
+    ?_test(begin
+        % create source and target dbs
+        {ok, 201, _, _} = test_request:put(url() ++ "/db2?q=1&n=1",
+          ?ADMIN_REQ_HEADERS, ""),
+        % set target db security
+        {ok, _, _, _} = test_request:put(url() ++ "/db2/_security",
+          ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
+
+        {ok, 201, _, _} = test_request:put(url() ++ "/db3?q=1&n=1",
+          ?ADMIN_REQ_HEADERS, ""),
+        % set target db security
+        {ok, _, _, _} = test_request:put(url() ++ "/db3/_security",
+          ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
+        % create source docs
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/a",
+            ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/b",
+            ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+        {ok, _, _, _} = test_request:put(Url ++ "/db2/c",
+            ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"y\"]}"),
+
+        % replicate
+        UserXUrl = string:replace(Url, "http://", "http://x:x@"),
+        EJRequestBody = {[
+          {<<"source">>, list_to_binary(UserXUrl ++ "/db2")},
+          {<<"target">>, list_to_binary(UserXUrl ++ "/db3")}
+        ]},
+        {ok, ResponseCode, _, ResponseBody} = test_request:post(Url ++ "/_replicate",
+            ?USERX_REQ_HEADERS, jiffy:encode(EJRequestBody)),
+
+        % assert replication status
+        {EJResponseBody} = jiffy:decode(ResponseBody),
+        ?assertEqual(ResponseCode, 200),
+        ?assertEqual(true, couch_util:get_value(<<"ok">>, EJResponseBody)),
+        [{History}] = couch_util:get_value(<<"history">>, EJResponseBody),
+
+        MissingChecked = couch_util:get_value(<<"missing_checked">>, History),
+        MissingFound = couch_util:get_value(<<"missing_found">>, History),
+        DocsReard = couch_util:get_value(<<"docs_read">>, History),
+        DocsWritten = couch_util:get_value(<<"docs_written">>, History),
+        DocWriteFailures = couch_util:get_value(<<"doc_write_failures">>, History),
+     
+        ?assertEqual(2, MissingChecked),
+        ?assertEqual(2, MissingFound),
+        ?assertEqual(2, DocsReard),
+        ?assertEqual(2, DocsWritten),
+        ?assertEqual(0, DocWriteFailures),
+      
+        % assert docs in target db
+        {ok, 200, _, ADBody} = test_request:get(Url ++ "/db3/_all_docs?include_docs=true",
+            ?ADMIN_REQ_HEADERS),
+        {Json} = jiffy:decode(ADBody),
+        ?assertEqual(2, proplists:get_value(<<"total_rows">>, Json))
+    end).
+    
+    
+
+% revs_diff
+should_not_allow_user_to_revs_diff_other_docs(_PortType, Url) ->
+  ?_test(begin
+      % create test docs
+      {ok, _, _, _} = test_request:put(Url ++ "/db/a",
+          ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+      {ok, _, _, _} = test_request:put(Url ++ "/db/b",
+          ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
+      {ok, _, _, V} = test_request:put(Url ++ "/db/c",
+          ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"y\"]}"),
+
+      % nothing missing
+      RevsDiff = {[
+          {<<"a">>, [
+              <<"1-23202479633c2b380f79507a776743d5">>
+          ]}
+      ]},
+      {ok, GoodCode, _, GoodBody} = test_request:post(Url ++ "/db/_revs_diff",
+          ?USERX_REQ_HEADERS, jiffy:encode(RevsDiff)),
+      EJGoodBody = jiffy:decode(GoodBody),
+      ?assertEqual(200, GoodCode),
+      ?assertEqual({[]}, EJGoodBody),
+
+      % something missing
+      MissingRevsDiff = {[
+          {<<"a">>, [
+              <<"1-missing">>
+          ]}
+      ]},
+      {ok, MissingCode, _, MissingBody} = test_request:post(Url ++ "/db/_revs_diff",
+          ?USERX_REQ_HEADERS, jiffy:encode(MissingRevsDiff)),
+      EJMissingBody = jiffy:decode(MissingBody),
+      ?assertEqual(200, MissingCode),
+      MissingExpect = {[
+          {<<"a">>, {[
+              {<<"missing">>, [<<"1-missing">>]}
+          ]}}
+      ]},
+      ?assertEqual(MissingExpect, EJMissingBody),
+
+      % other doc
+      OtherRevsDiff = {[
+          {<<"c">>, [
+              <<"1-92aef5b0e4a3f4db0aba1320869bc95d">>
+          ]}
+      ]},
+      {ok, OtherCode, _, OtherBody} = test_request:post(Url ++ "/db/_revs_diff",
+          ?USERX_REQ_HEADERS, jiffy:encode(OtherRevsDiff)),
+      EJOtherBody = jiffy:decode(OtherBody),
+      ?assertEqual(200, OtherCode),
+      ?assertEqual({[]}, EJOtherBody)
+  end).
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------

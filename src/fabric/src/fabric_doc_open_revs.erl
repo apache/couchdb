@@ -56,8 +56,10 @@ go(DbName, Id, Revs, Options) ->
         fabric_util:log_timeout(DefunctWorkers, "open_revs"),
         {error, timeout};
     Else ->
+        couch_log:debug("~nopen revs result: ~p", [Else]),
         Else
     after
+        couch_log:debug("~nopen revs result timeout", []),
         rexi_monitor:stop(RexiMon)
     end.
 
@@ -143,7 +145,11 @@ handle_message({ok, RawReplies}, Worker, State) ->
                 workers = lists:delete(Worker, Workers),
                 repair = InRepair orelse Repair
             }}
-    end.
+    end;
+handle_message(Message, Worker, State) ->
+  couch_log:debug("~nMessage: ~p", [Message]),
+  couch_log:debug("~nWorker: ~p", [Worker]),
+  couch_log:debug("~nState: ~p", [State]).
 
 
 tree_replies(RevTree, []) ->

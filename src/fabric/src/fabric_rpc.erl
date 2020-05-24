@@ -238,7 +238,9 @@ open_doc(DbName, DocId, Options) ->
     with_db(DbName, Options, {couch_db, open_doc, [DocId, Options]}).
 
 open_revs(DbName, Id, Revs, Options) ->
-    with_db(DbName, Options, {couch_db, open_doc_revs, [Id, Revs, Options]}).
+    R = with_db(DbName, Options, {couch_db, open_doc_revs, [Id, Revs, Options]}),
+    couch_log:debug("~nfabric_rpc:open_revs -> ~p~n", [R]),
+    R.
 
 get_full_doc_info(DbName, DocId, Options) ->
     with_db(DbName, Options, {couch_db, get_full_doc_info, [DocId]}).

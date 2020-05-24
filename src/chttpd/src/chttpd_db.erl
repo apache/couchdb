@@ -831,7 +831,10 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
                     send_docs_multipart(Req, Results, Options)
                 end;
             {error, Error} ->
-                chttpd:send_error(Req, Error)
+                chttpd:send_error(Req, Error);
+            Else ->
+                couch_log:debug("~n open_revs Else: ~p~n", [Else]),
+                chttpd:send_error(Req, Else)
         end
     end;
 
