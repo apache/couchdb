@@ -112,6 +112,8 @@ merge_results(Info) ->
             [{disk_format_version, lists:max(X)} | Acc];
         (cluster, [X], Acc) ->
             [{cluster, {X}} | Acc];
+        (access, [X], Acc) ->
+            [{access, X} | Acc];
         (_, _, Acc) ->
             Acc
     end, [{instance_start_time, <<"0">>}], Dict).

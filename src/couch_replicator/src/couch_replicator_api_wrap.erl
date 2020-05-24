@@ -362,7 +362,6 @@ open_doc(Db, Id, Options) ->
         {error, <<"not_found">>}
     end.
 
-
 update_doc(Db, Doc, Options) ->
     update_doc(Db, Doc, Options, interactive_edit).
 
@@ -386,6 +385,7 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
         []
     end ++ [{"Content-Type", ?b2l(ContentType)}, {"Content-Length", Len}],
     Body = {fun stream_doc/1, {JsonBytes, Doc#doc.atts, Boundary, Len}},
+    couch_log:debug("~nBody: ~p~n", [Body]),
     send_req(
         % A crash here bubbles all the way back up to run_user_fun inside
         % open_doc_revs, which will retry the whole thing.  That's the

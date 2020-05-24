@@ -585,7 +585,8 @@ get_db_info(Db) ->
         name = Name,
         compactor_pid = Compactor,
         instance_start_time = StartTime,
-        committed_update_seq = CommittedUpdateSeq
+        committed_update_seq = CommittedUpdateSeq,
+        access = Access
     } = Db,
     {ok, DocCount} = get_doc_count(Db),
     {ok, DelDocCount} = get_del_doc_count(Db),
@@ -624,7 +625,8 @@ get_db_info(Db) ->
         {disk_format_version, DiskVersion},
         {committed_update_seq, CommittedUpdateSeq},
         {compacted_seq, CompactedSeq},
-        {uuid, Uuid}
+        {uuid, Uuid},
+        {access, Access}
     ],
     {ok, InfoList}.
 
@@ -1765,7 +1767,10 @@ open_doc_revs_int(Db, IdRevs, Options) ->
 open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, Options) ->
     case couch_db_engine:open_local_docs(Db, [Id]) of
     [#doc{} = Doc] ->
-        apply_open_options(Db, {ok, Doc}, Options);
+        couch_log:debug("~n===========================Doc: ~p~n", [Doc]),
+        { Body } = Doc#doc.body,
+        Access = couch_util:get_value(<<"_access">>, Body),
+        apply_open_options(Db, {ok, Doc#doc{access = Access}}, Options);
     [not_found] ->
         {not_found, missing}
     end;

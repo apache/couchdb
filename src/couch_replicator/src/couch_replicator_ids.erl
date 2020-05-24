@@ -41,6 +41,7 @@ replication_id(#rep{options = Options} = Rep) ->
 
 replication_id(#rep{user_ctx = UserCtx} = Rep, 4) ->
     UUID = couch_server:get_uuid(),
+    couch_log:debug("~nUUID: ~p~n", [UUID]),
     SrcInfo = get_v4_endpoint(UserCtx, Rep#rep.source),
     TgtInfo = get_v4_endpoint(UserCtx, Rep#rep.target),
     maybe_append_filters([UUID, SrcInfo, TgtInfo], Rep);

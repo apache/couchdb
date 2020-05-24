@@ -614,7 +614,8 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
     % the trees, the attachments are already written to disk)
     {ok, IndexFDIs} = flush_trees(Db, NewFullDocInfos, []),
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
-    LocalDocs2 = update_local_doc_revs(LocalDocs),
+    LocalDocs1 = apply_local_docs_access(LocalDocs),
+    LocalDocs2 = update_local_doc_revs(LocalDocs1),
     {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
 
     WriteCount = length(IndexFDIs),
@@ -636,7 +637,12 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
 
     {ok, commit_data(Db1, not FullCommit), UpdatedDDocIds}.
 
-
+apply_local_docs_access(Docs) ->
+    lists:map(fun({Client, #doc{access = Access, body = {Body}} = Doc}) ->
+        Doc1 = Doc#doc{body = {[{<<"_access">>, Access} | Body]}},
+        {Client, Doc1}
+    end, Docs).
+    
 update_local_doc_revs(Docs) ->
     lists:foldl(fun({Client, Doc}, Acc) ->
         case increment_local_doc_revs(Doc) of

@@ -68,6 +68,8 @@
     rep_starttime,
     src_starttime,
     tgt_starttime,
+    src_access,
+    tgt_access,
     timer, % checkpoint timer
     changes_queue,
     changes_manager,
@@ -587,6 +589,9 @@ init_state(Rep) ->
     {ok, SourceInfo} = couch_replicator_api_wrap:get_db_info(Source),
     {ok, TargetInfo} = couch_replicator_api_wrap:get_db_info(Target),
 
+    couch_log:debug("~nSourceInfo: ~p~n", [SourceInfo]),
+    couch_log:debug("~nTargetInfo: ~p~n", [TargetInfo]),
+
     [SourceLog, TargetLog] = find_and_migrate_logs([Source, Target], Rep),
 
     {StartSeq0, History} = compare_replication_logs(SourceLog, TargetLog),
@@ -612,6 +617,8 @@ init_state(Rep) ->
         rep_starttime = StartTime,
         src_starttime = get_value(<<"instance_start_time">>, SourceInfo),
         tgt_starttime = get_value(<<"instance_start_time">>, TargetInfo),
+        src_access = get_value(<<"access">>, SourceInfo),
+        tgt_access = get_value(<<"access">>, TargetInfo),
         session_id = couch_uuids:random(),
         source_db_compaction_notifier =
             start_db_compaction_notifier(Source, self()),
@@ -721,8 +728,10 @@ do_checkpoint(State) ->
         rep_starttime = ReplicationStartTime,
         src_starttime = SrcInstanceStartTime,
         tgt_starttime = TgtInstanceStartTime,
+        src_access = SrcAccess,
+        tgt_access = TgtAccess,
         stats = Stats,
-        rep_details = #rep{options = Options},
+        rep_details = #rep{options = Options, user_ctx = UserCtx},
         session_id = SessionId
     } = State,
     case commit_to_both(Source, Target) of
@@ -778,9 +787,9 @@ do_checkpoint(State) ->
 
         try
             {SrcRevPos, SrcRevId} = update_checkpoint(
-                Source, SourceLog#doc{body = NewRepHistory}, source),
+                Source, SourceLog#doc{body = NewRepHistory}, SrcAccess, UserCtx, source),
             {TgtRevPos, TgtRevId} = update_checkpoint(
-                Target, TargetLog#doc{body = NewRepHistory}, target),
+                Target, TargetLog#doc{body = NewRepHistory}, TgtAccess, UserCtx, target),
             NewState = State#rep_state{
                 checkpoint_history = NewRepHistory,
                 committed_seq = NewTsSeq,
@@ -805,16 +814,34 @@ do_checkpoint(State) ->
 
 
 update_checkpoint(Db, Doc, DbType) ->
+    update_checkpoint(Db, Doc, false, #user_ctx{}, DbType).
+
+update_checkpoint(Db, Doc) ->
+    update_checkpoint(Db, Doc, false, #user_ctx{}).
+
+update_checkpoint(Db, Doc, Access, UserCtx, DbType) ->
     try
-        update_checkpoint(Db, Doc)
+        update_checkpoint(Db, Doc, Access, UserCtx)
     catch throw:{checkpoint_commit_failure, Reason} ->
         throw({checkpoint_commit_failure,
             <<"Error updating the ", (to_binary(DbType))/binary,
                 " checkpoint document: ", (to_binary(Reason))/binary>>})
     end.
 
+update_checkpoint(Db, #doc{id = LogId} = Doc0, Access, UserCtx) ->
+    % UserCtx = couch_db:get_user_ctx(Db),
+    % couch_log:debug("~n~n~n~nUserCtx: ~p~n", [UserCtx]),
+    % if db has _access, then:
+    %    get userCtx from replication and splice into doc _access
+    Doc = case Access of
+        true -> Doc0#doc{access = [UserCtx#user_ctx.name]};
+        _False -> Doc0
+    end,
+    couch_log:debug("~n++++++++++++++++:~n", []),
+    couch_log:debug("~nAccess: ~p~n", [Access]),
+    couch_log:debug("~nUserCtx: ~p~n", [UserCtx]),
 
-update_checkpoint(Db, #doc{id = LogId, body = LogBody} = Doc) ->
+    couch_log:debug("~nDoc: ~p~n", [Doc]),
     try
         case couch_replicator_api_wrap:update_doc(Db, Doc, [delay_commit]) of
         {ok, PosRevId} ->
@@ -822,7 +849,7 @@ update_checkpoint(Db, #doc{id = LogId, body = LogBody} = Doc) ->
         {error, Reason} ->
             throw({checkpoint_commit_failure, Reason})
         end
-    catch throw:conflict ->
+    catch throw:conflict -> %TODO: splice in access
         case (catch couch_replicator_api_wrap:open_doc(Db, LogId, [ejson_body])) of
         {ok, #doc{body = LogBody, revs = {Pos, [RevId | _]}}} ->
             % This means that we were able to update successfully the
