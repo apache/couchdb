@@ -82,18 +82,6 @@ defmodule CompactTest do
     assert Couch.post("/#{db}/_ensure_full_commit").body["ok"] == true
   end
 
-  defp compact(db) do
-    assert Couch.post("/#{db}/_compact").status_code == 202
-
-    retry_until(
-      fn ->
-        Couch.get("/#{db}").body["compact_running"] == false
-      end,
-      200,
-      20_000
-    )
-  end
-
   defp get_info(db) do
     Couch.get("/#{db}").body
   end

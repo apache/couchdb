@@ -7,7 +7,6 @@ defmodule ReplicationTest do
   """
 
   # TODO: Parameterize these
-  @admin_account "adm:pass"
   @db_pairs_prefixes [
     {"remote-to-remote", "http://127.0.0.1:15984/", "http://127.0.0.1:15984/"}
   ]
@@ -1584,30 +1583,6 @@ defmodule ReplicationTest do
     resp.body
   end
 
-  def replicate(src, tgt, options \\ []) do
-    {userinfo, options} = Keyword.pop(options, :userinfo)
-
-    userinfo =
-      if userinfo == nil do
-        @admin_account
-      else
-        userinfo
-      end
-
-    src = set_user(src, userinfo)
-    tgt = set_user(tgt, userinfo)
-
-    defaults = [headers: [], body: %{}, timeout: 30_000]
-    options = defaults |> Keyword.merge(options) |> Enum.into(%{})
-
-    %{body: body} = options
-    body = [source: src, target: tgt] |> Enum.into(body)
-    options = Map.put(options, :body, body)
-
-    resp = Couch.post("/_replicate", Enum.to_list(options))
-    assert HTTPotion.Response.success?(resp), "#{inspect(resp)}"
-    resp.body
-  end
 
   def cancel_replication(src, tgt) do
     body = %{:cancel => true}
@@ -1735,19 +1710,6 @@ defmodule ReplicationTest do
     Enum.find(resp.body, nil, fn task ->
       task["replication_id"] == repl_id
     end)
-  end
-
-  def set_user(uri, userinfo) do
-    case URI.parse(uri) do
-      %{scheme: nil} ->
-        uri
-
-      %{userinfo: nil} = uri ->
-        URI.to_string(Map.put(uri, :userinfo, userinfo))
-
-      _ ->
-        uri
-    end
   end
 
   def get_att1_data do
