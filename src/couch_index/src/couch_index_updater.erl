@@ -135,8 +135,8 @@ update(Idx, Mod, IdxState) ->
     CommittedOnly = lists:member(committed_only, UpdateOpts),
     IncludeDesign = lists:member(include_design, UpdateOpts),
     DocOpts = case lists:member(local_seq, UpdateOpts) of
-        true -> [conflicts, deleted_conflicts, local_seq];
-        _ -> [conflicts, deleted_conflicts]
+        true -> [conflicts, deleted_conflicts, local_seq, deleted];
+        _ -> [conflicts, deleted_conflicts, local_seq, deleted]
     end,
 
     couch_util:with_db(DbName, fun(Db) ->
@@ -154,23 +154,28 @@ update(Idx, Mod, IdxState) ->
         end,
 
         GetInfo = fun
-            (#full_doc_info{id=Id, update_seq=Seq, deleted=Del}=FDI) ->
-                {Id, Seq, Del, couch_doc:to_doc_info(FDI)};
-            (#doc_info{id=Id, high_seq=Seq, revs=[RI|_]}=DI) ->
-                {Id, Seq, RI#rev_info.deleted, DI}
+            (#full_doc_info{id=Id, update_seq=Seq, deleted=Del,access=Access}=FDI) ->
+                {Id, Seq, Del, couch_doc:to_doc_info(FDI), Access};
+            (#doc_info{id=Id, high_seq=Seq, revs=[RI|_],access=Access}=DI) ->
+                {Id, Seq, RI#rev_info.deleted, DI, Access}
         end,
 
         LoadDoc = fun(DI) ->
-            {DocId, Seq, Deleted, DocInfo} = GetInfo(DI),
+            {DocId, Seq, Deleted, DocInfo, Access} = GetInfo(DI),
 
             case {IncludeDesign, DocId} of
                 {false, <<"_design/", _/binary>>} ->
                     {nil, Seq};
-                _ when Deleted ->
-                    {#doc{id=DocId, deleted=true}, Seq};
+                % _ when Deleted ->
+                %     {#doc{id=DocId, deleted=true}, Seq};
                 _ ->
                     {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
-                    {Doc, Seq}
+                    [RevInfo] = DocInfo#doc_info.revs,
+                    Doc1 = Doc#doc{
+                        meta = [{body_sp, RevInfo#rev_info.body_sp}],
+                        access = Access
+                    },
+                    {Doc1, Seq}
             end
         end,
 

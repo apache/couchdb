@@ -81,10 +81,9 @@ handle_reindex_req(#httpd{method='POST',
 handle_reindex_req(Req, _Db, _DDoc) ->
     chttpd:send_method_not_allowed(Req, "POST").
 
-
 handle_view_req(#httpd{method='GET',
                       path_parts=[_, _, DDocName, _, VName, <<"_info">>]}=Req,
-                Db, _DDoc) ->
+                Db, DDoc) ->
     DbName = couch_db:name(Db),
     DDocId = <<"_design/", DDocName/binary >>,
     {ok, Info} = couch_mrview:get_view_info(DbName, DDocId, VName),
@@ -254,7 +253,6 @@ get_view_callback(_DbName, _DbName, false) ->
 % non _users databases get all fields
 get_view_callback(_, _, _) ->
     fun view_cb/2.
-
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Args0 = parse_params(Req, Keys),

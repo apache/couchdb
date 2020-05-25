@@ -168,6 +168,7 @@ configure_filter("_view", Style, Req, Db) ->
     case [?l2b(couch_httpd:unquote(Part)) || Part <- ViewNameParts] of
         [DName, VName] ->
             {ok, DDoc} = open_ddoc(Db, <<"_design/", DName/binary>>),
+            ok =  couch_util:validate_design_access(DDoc),
             check_member_exists(DDoc, [<<"views">>, VName]),
             case couch_db:is_clustered(Db) of
                 true ->
@@ -191,6 +192,7 @@ configure_filter(FilterName, Style, Req, Db) ->
     case [?l2b(couch_httpd:unquote(Part)) || Part <- FilterNameParts] of
         [DName, FName] ->
             {ok, DDoc} = open_ddoc(Db, <<"_design/", DName/binary>>),
+            ok =  couch_util:validate_design_access(DDoc),
             check_member_exists(DDoc, [<<"filters">>, FName]),
             case couch_db:is_clustered(Db) of
                 true ->

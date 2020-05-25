@@ -70,6 +70,7 @@ view_cb(Msg, Acc) ->
 
 handle_view_req(#httpd{method='POST',
     path_parts=[_, _, _, _, ViewName, <<"queries">>]}=Req, Db, DDoc) ->
+    ok =  couch_util:validate_design_access(DDoc),
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     case couch_mrview_util:get_view_queries(Props) of
@@ -86,12 +87,14 @@ handle_view_req(#httpd{path_parts=[_, _, _, _, _, <<"queries">>]}=Req,
 
 handle_view_req(#httpd{method='GET',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
+    ok =  couch_util:validate_design_access(DDoc),
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
     design_doc_view(Req, Db, DDoc, ViewName, Keys);
 
 handle_view_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
+    ok =  couch_util:validate_design_access(DDoc),
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     assert_no_queries_param(couch_mrview_util:get_view_queries(Props)),

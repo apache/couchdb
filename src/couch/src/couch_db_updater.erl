@@ -22,7 +22,10 @@
 
 -define(IDLE_LIMIT_DEFAULT, 61000).
 -define(DEFAULT_MAX_PARTITION_SIZE, 16#280000000). % 10 GiB
-
+-define(DEFAULT_SECURITY_OBJECT, [
+ {<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
+ {<<"admins">>, {[{<<"roles">>,[<<"_admin">>]}]}}
+]).
 
 -record(merge_acc, {
     revs_limit,
@@ -37,7 +40,7 @@
 init({Engine, DbName, FilePath, Options0}) ->
     erlang:put(io_priority, {db_update, DbName}),
     update_idle_limit_from_config(),
-    DefaultSecObj = default_security_object(DbName),
+    DefaultSecObj = default_security_object(DbName, Options0),
     Options = [{default_security_object, DefaultSecObj} | Options0],
     try
         {ok, EngineState} = couch_db_engine:init(Engine, FilePath, Options),
@@ -298,6 +301,7 @@ init_db(DbName, FilePath, EngineState, Options) ->
 
     BDU = couch_util:get_value(before_doc_update, Options, nil),
     ADR = couch_util:get_value(after_doc_read, Options, nil),
+    Access = couch_util:get_value(access, Options, false),
 
     NonCreateOpts = [Opt || Opt <- Options, Opt /= create],
 
@@ -308,7 +312,8 @@ init_db(DbName, FilePath, EngineState, Options) ->
         instance_start_time = StartTime,
         options = NonCreateOpts,
         before_doc_update = BDU,
-        after_doc_read = ADR
+        after_doc_read = ADR,
+        access = Access
     },
 
     DbProps = couch_db_engine:get_props(InitDb),
@@ -616,14 +621,16 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
     Ids = [Id || [{_Client, #doc{id=Id}}|_] <- DocsList],
+    Accesses = [Access || [{_Client, #doc{access=Access}}|_] <- DocsList],
+
     % lookup up the old documents, if they exist.
     OldDocLookups = couch_db_engine:open_docs(Db, Ids),
-    OldDocInfos = lists:zipwith(fun
-        (_Id, #full_doc_info{} = FDI) ->
-            FDI;
-        (Id, not_found) ->
-            #full_doc_info{id=Id}
-    end, Ids, OldDocLookups),
+    OldDocInfos = lists:zipwith3(fun
+        (_Id, #full_doc_info{} = FDI, Access) ->
+            FDI#full_doc_info{access=Access};
+        (Id, not_found, Access) ->
+            #full_doc_info{id=Id,access=Access}
+    end, Ids, OldDocLookups, Accesses),
 
     %% Get the list of full partitions
     FullPartitions = case couch_db:is_partitioned(Db) of
@@ -663,7 +670,8 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
     % the trees, the attachments are already written to disk)
     {ok, IndexFDIs} = flush_trees(Db, NewFullDocInfos, []),
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
-    LocalDocs2 = update_local_doc_revs(LocalDocs),
+    LocalDocs1 = apply_local_docs_access(LocalDocs),
+    LocalDocs2 = update_local_doc_revs(LocalDocs1),
 
     {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
 
@@ -676,15 +684,21 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
         length(LocalDocs2)
     ),
 
-    % Check if we just updated any design documents, and update the validation
-    % funs if we did.
+    % Check if we just updated any non-access design documents,
+    % and update the validation funs if we did.
+    NonAccessIds = [Id || [{_Client, #doc{id=Id,access=[]}}|_] <- DocsList],
     UpdatedDDocIds = lists:flatmap(fun
         (<<"_design/", _/binary>> = Id) -> [Id];
         (_) -> []
-    end, Ids),
+    end, NonAccessIds),
 
     {ok, commit_data(Db1), UpdatedDDocIds}.
 
+apply_local_docs_access(Docs) ->
+    lists:map(fun({Client, #doc{access = Access, body = {Body}} = Doc}) ->
+        Doc1 = Doc#doc{body = {[{<<"_access">>, Access} | Body]}},
+        {Client, Doc1}
+    end, Docs).
 
 update_local_doc_revs(Docs) ->
     lists:foldl(fun({Client, Doc}, Acc) ->
@@ -849,20 +863,23 @@ get_meta_body_size(Meta) ->
     {ejson_size, ExternalSize} = lists:keyfind(ejson_size, 1, Meta),
     ExternalSize.
 
-
+default_security_object(DbName, []) ->
+    default_security_object(DbName);
+default_security_object(DbName, Options) ->
+    case lists:member({access, true}, Options) of
+        false -> default_security_object(DbName);
+        true -> ?DEFAULT_SECURITY_OBJECT
+    end.
 default_security_object(<<"shards/", _/binary>>) ->
     case config:get("couchdb", "default_security", "admin_only") of
-        "admin_only" ->
-            [{<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
-             {<<"admins">>,{[{<<"roles">>,[<<"_admin">>]}]}}];
+        "admin_only" -> ?DEFAULT_SECURITY_OBJECT;
         Everyone when Everyone == "everyone"; Everyone == "admin_local" ->
             []
     end;
 default_security_object(_DbName) ->
     case config:get("couchdb", "default_security", "admin_only") of
         Admin when Admin == "admin_only"; Admin == "admin_local" ->
-            [{<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
-             {<<"admins">>,{[{<<"roles">>,[<<"_admin">>]}]}}];
+            ?DEFAULT_SECURITY_OBJECT;
         "everyone" ->
             []
     end.

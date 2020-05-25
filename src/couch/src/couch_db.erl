@@ -30,6 +30,9 @@
     is_admin/1,
     check_is_admin/1,
     check_is_member/1,
+    validate_access/2,
+    check_access/2,
+    has_access_enabled/1,
 
     name/1,
     get_after_doc_read_fun/1,
@@ -135,6 +138,8 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
+
 -include("couch_db_int.hrl").
 
 -define(DBNAME_REGEX,
@@ -276,6 +281,9 @@ wait_for_compaction(#db{main_pid=Pid}=Db, Timeout) ->
             ok
     end.
 
+has_access_enabled(#db{access=false}) -> false;
+has_access_enabled(_) -> true.
+
 delete_doc(Db, Id, Revisions) ->
     DeletedDocs = [#doc{id=Id, revs=[Rev], deleted=true} || Rev <- Revisions],
     {ok, [Result]} = update_docs(Db, DeletedDocs, []),
@@ -284,23 +292,33 @@ delete_doc(Db, Id, Revisions) ->
 open_doc(Db, IdOrDocInfo) ->
     open_doc(Db, IdOrDocInfo, []).
 
-open_doc(Db, Id, Options) ->
+open_doc(Db, Id, Options0) ->
     increment_stat(Db, [couchdb, database_reads]),
+    Options = case has_access_enabled(Db) of
+        true -> Options0 ++ [conflicts];
+        _Else -> Options0
+    end,
     case open_doc_int(Db, Id, Options) of
     {ok, #doc{deleted=true}=Doc} ->
         case lists:member(deleted, Options) of
         true ->
-            apply_open_options({ok, Doc},Options);
+            apply_open_options(Db, {ok, Doc},Options);
         false ->
             {not_found, deleted}
         end;
     Else ->
-        apply_open_options(Else,Options)
+        apply_open_options(Db, Else,Options)
     end.
 
-apply_open_options({ok, Doc},Options) ->
+apply_open_options(Db, {ok, Doc}, Options) ->
+    ok = validate_access(Db, Doc),
+    apply_open_options1({ok, Doc}, Options);
+apply_open_options(_Db, Else, _Options) ->
+    Else.
+
+apply_open_options1({ok, Doc},Options) ->
     apply_open_options2(Doc,Options);
-apply_open_options(Else,_Options) ->
+apply_open_options1(Else,_Options) ->
     Else.
 
 apply_open_options2(Doc,[]) ->
@@ -336,7 +354,7 @@ find_ancestor_rev_pos({RevPos, [RevId|Rest]}, AttsSinceRevs) ->
 open_doc_revs(Db, Id, Revs, Options) ->
     increment_stat(Db, [couchdb, database_reads]),
     [{ok, Results}] = open_doc_revs_int(Db, [{Id, Revs}], Options),
-    {ok, [apply_open_options(Result, Options) || Result <- Results]}.
+    {ok, [apply_open_options(Db, Result, Options) || Result <- Results]}.
 
 % Each returned result is a list of tuples:
 % {Id, MissingRevs, PossibleAncestors}
@@ -577,7 +595,8 @@ get_db_info(Db) ->
         name = Name,
         compactor_pid = Compactor,
         instance_start_time = StartTime,
-        committed_update_seq = CommittedUpdateSeq
+        committed_update_seq = CommittedUpdateSeq,
+        access = Access
     } = Db,
     {ok, DocCount} = get_doc_count(Db),
     {ok, DelDocCount} = get_del_doc_count(Db),
@@ -609,7 +628,8 @@ get_db_info(Db) ->
         {committed_update_seq, CommittedUpdateSeq},
         {compacted_seq, CompactedSeq},
         {props, Props},
-        {uuid, Uuid}
+        {uuid, Uuid},
+        {access, Access}
     ],
     {ok, InfoList}.
 
@@ -723,6 +743,59 @@ security_error_type(#user_ctx{name=null}) ->
     unauthorized;
 security_error_type(#user_ctx{name=_}) ->
     forbidden.
+
+validate_access(Db, #doc{meta=Meta}=Doc) ->
+    case proplists:get_value(conflicts, Meta) of
+        undefined -> % no conflicts
+            validate_access1(Db, Doc);
+        _Else -> % only admins can read conflicted docs in _access dbs
+            case is_admin(Db) of
+                true -> ok;
+                _Else2 -> throw({forbidden, <<"document is in conflict">>})
+            end
+    end.
+validate_access1(Db, Doc) ->
+    validate_access2(check_access(Db, Doc)).
+
+validate_access2(true) -> ok;
+validate_access2(_) -> throw({forbidden, <<"can't touch this">>}).
+
+check_access(Db, #doc{access=Access}=Doc) ->
+    % couch_log:info("~ncheck da access, Doc: ~p, Db: ~p~n", [Doc, Db]),
+    check_access(Db, Access);
+check_access(Db, Access) ->
+    #user_ctx{
+        name=UserName,
+        roles=UserRoles
+    } = Db#db.user_ctx,
+    case Access of
+    [] ->
+        % if doc has no _access, userCtX must be admin
+        is_admin(Db);
+    Access ->
+        % if doc has _access, userCtx must be admin OR matching user or role
+        % _access = ["a", "b", ]
+        case is_admin(Db) of
+        true ->
+            true;
+        _ ->
+            case {check_name(UserName, Access), check_roles(UserRoles, Access)} of
+            {true, _} -> true;
+            {_, true} -> true;
+            _ -> false
+            end
+        end
+    end.
+
+check_name(null, _Access) -> true;
+check_name(UserName, Access) ->
+    lists:member(UserName, Access).
+% nicked from couch_db:check_security
+
+check_roles(Roles, Access) ->
+    UserRolesSet = ordsets:from_list(Roles),
+    RolesSet = ordsets:from_list(Access ++ ["_users"]),
+    not ordsets:is_disjoint(UserRolesSet, RolesSet).
 
 
 get_admins(#db{security=SecProps}) ->
@@ -863,9 +936,14 @@ group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
     end.
 
 validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
-    case catch check_is_admin(Db) of
-        ok -> validate_ddoc(Db, Doc);
-        Error -> Error
+    case couch_doc:has_access(Doc) of
+        true ->
+            validate_ddoc(Db, Doc);
+        _Else ->
+            case catch check_is_admin(Db) of
+                ok -> validate_ddoc(Db, Doc);
+                Error -> Error
+            end
     end;
 validate_doc_update(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
     ValidationFuns = load_validation_funs(Db),
@@ -1172,6 +1250,32 @@ doc_tag(#doc{meta=Meta}) ->
         Else -> throw({invalid_doc_tag, Else})
     end.
 
+validate_update(Db, Doc) ->
+    case catch validate_access(Db, Doc) of
+        ok -> Doc;
+        Error -> Error
+    end.
+
+
+validate_docs_access(Db, DocBuckets, DocErrors) ->
+    validate_docs_access1(Db, DocBuckets, {[], DocErrors}).
+
+validate_docs_access1(_Db, [], {DocBuckets0, DocErrors}) ->
+    DocBuckets1 = lists:reverse(lists:map(fun lists:reverse/1, DocBuckets0)),
+    DocBuckets = case DocBuckets1 of
+        [[]] -> [];
+        Else -> Else
+    end,
+    {ok, DocBuckets, DocErrors};
+validate_docs_access1(Db, [DocBucket|RestBuckets], {DocAcc, ErrorAcc}) ->
+    {NewBuckets, NewErrors} = lists:foldl(fun(Doc, {Acc, ErrAcc}) ->
+        case catch validate_access(Db, Doc) of
+            ok -> {[Doc|Acc], ErrAcc};
+            Error -> {Acc, [{doc_tag(Doc), Error}|ErrAcc]}
+        end
+    end, {[], ErrorAcc}, DocBucket),
+    validate_docs_access1(Db, RestBuckets, {[NewBuckets|DocAcc], NewErrors}).
+
 update_docs(Db, Docs0, Options, replicated_changes) ->
     Docs = tag_docs(Docs0),
 
@@ -1180,8 +1284,13 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
             ExistingDocInfos, [], [])
     end,
 
-    {ok, DocBuckets, NonRepDocs, DocErrors}
+    {ok, DocBuckets0, NonRepDocs, DocErrors0}
         = before_docs_update(Db, Docs, PrepValidateFun, replicated_changes),
+
+    % TODO:
+    %   - this shuld really happen before before_docs_update()
+    %   - look into NonRepDocs access validation
+    {ok, DocBuckets, DocErrors} = validate_docs_access(Db, DocBuckets0, DocErrors0),
 
     DocBuckets2 = [[doc_flush_atts(Db, check_dup_atts(Doc))
             || Doc <- Bucket] || Bucket <- DocBuckets],
@@ -1198,8 +1307,11 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
             AllOrNothing, [], [])
     end,
 
-    {ok, DocBuckets, NonRepDocs, DocErrors}
+    {ok, DocBuckets0, NonRepDocs, DocErrors0}
         = before_docs_update(Db, Docs, PrepValidateFun, interactive_edit),
+
+    % TODO: this shuld really happen before before_docs_update()
+    {ok, DocBuckets, DocErrors} = validate_docs_access(Db, DocBuckets0, DocErrors0),
 
     if (AllOrNothing) and (DocErrors /= []) ->
         RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),
@@ -1475,6 +1587,29 @@ open_read_stream(Db, AttState) ->
 is_active_stream(Db, StreamEngine) ->
     couch_db_engine:is_active_stream(Db, StreamEngine).
 
+changes_since(Db, StartSeq, Fun, Options, Acc) when is_record(Db, db) ->
+    case couch_db:is_admin(Db) of
+        true -> couch_db_engine:fold_changes(Db, StartSeq, Fun, Options, Acc);
+        false -> couch_mrview:query_changes_access(Db, StartSeq, Fun, Options, Acc)
+    end.
+
+% TODO: nicked from couch_mrview, maybe move to couch_mrview.hrl
+-record(mracc, {
+    db,
+    meta_sent=false,
+    total_rows,
+    offset,
+    limit,
+    skip,
+    group_level,
+    doc_info,
+    callback,
+    user_acc,
+    last_go=ok,
+    reduce_fun,
+    update_seq,
+    args
+}).
 
 calculate_start_seq(_Db, _Node, Seq) when is_integer(Seq) ->
     Seq;
@@ -1592,10 +1727,11 @@ fold_design_docs(Db, UserFun, UserAcc, Options1) ->
 fold_changes(Db, StartSeq, UserFun, UserAcc) ->
     fold_changes(Db, StartSeq, UserFun, UserAcc, []).
 
-
 fold_changes(Db, StartSeq, UserFun, UserAcc, Opts) ->
-    couch_db_engine:fold_changes(Db, StartSeq, UserFun, UserAcc, Opts).
-
+    case couch_db:is_admin(Db) of
+        true -> couch_db_engine:fold_changes(Db, StartSeq, UserFun, UserAcc, Opts);
+        false -> couch_mrview:query_changes_access(Db, StartSeq, UserFun, Opts, UserAcc)
+    end.
 
 fold_purge_infos(Db, StartPurgeSeq, Fun, Acc) ->
     fold_purge_infos(Db, StartPurgeSeq, Fun, Acc, []).
@@ -1616,7 +1752,7 @@ open_doc_revs_int(Db, IdRevs, Options) ->
     lists:zipwith(
         fun({Id, Revs}, Lookup) ->
             case Lookup of
-            #full_doc_info{rev_tree=RevTree} ->
+            #full_doc_info{rev_tree=RevTree, access=Access} ->
                 {FoundRevs, MissingRevs} =
                 case Revs of
                 all ->
@@ -1636,7 +1772,7 @@ open_doc_revs_int(Db, IdRevs, Options) ->
                         % we have the rev in our list but know nothing about it
                         {{not_found, missing}, {Pos, Rev}};
                     #leaf{deleted=IsDeleted, ptr=SummaryPtr} ->
-                        {ok, make_doc(Db, Id, IsDeleted, SummaryPtr, FoundRevPath)}
+                        {ok, make_doc(Db, Id, IsDeleted, SummaryPtr, FoundRevPath, Access)}
                     end
                 end, FoundRevs),
                 Results = FoundResults ++ [{{not_found, missing}, MissingRev} || MissingRev <- MissingRevs],
@@ -1652,21 +1788,23 @@ open_doc_revs_int(Db, IdRevs, Options) ->
 open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, Options) ->
     case couch_db_engine:open_local_docs(Db, [Id]) of
     [#doc{} = Doc] ->
-        apply_open_options({ok, Doc}, Options);
+        { Body } = Doc#doc.body,
+        Access = couch_util:get_value(<<"_access">>, Body),
+        apply_open_options(Db, {ok, Doc#doc{access = Access}}, Options);
     [not_found] ->
         {not_found, missing}
     end;
-open_doc_int(Db, #doc_info{id=Id,revs=[RevInfo|_]}=DocInfo, Options) ->
+open_doc_int(Db, #doc_info{id=Id,revs=[RevInfo|_],access=Access}=DocInfo, Options) ->
     #rev_info{deleted=IsDeleted,rev={Pos,RevId},body_sp=Bp} = RevInfo,
-    Doc = make_doc(Db, Id, IsDeleted, Bp, {Pos,[RevId]}),
-    apply_open_options(
+    Doc = make_doc(Db, Id, IsDeleted, Bp, {Pos,[RevId]}, Access),
+    apply_open_options(Db,
        {ok, Doc#doc{meta=doc_meta_info(DocInfo, [], Options)}}, Options);
-open_doc_int(Db, #full_doc_info{id=Id,rev_tree=RevTree}=FullDocInfo, Options) ->
+open_doc_int(Db, #full_doc_info{id=Id,rev_tree=RevTree,access=Access}=FullDocInfo, Options) ->
     #doc_info{revs=[#rev_info{deleted=IsDeleted,rev=Rev,body_sp=Bp}|_]} =
         DocInfo = couch_doc:to_doc_info(FullDocInfo),
     {[{_, RevPath}], []} = couch_key_tree:get(RevTree, [Rev]),
-    Doc = make_doc(Db, Id, IsDeleted, Bp, RevPath),
-    apply_open_options(
+    Doc = make_doc(Db, Id, IsDeleted, Bp, RevPath, Access),
+    apply_open_options(Db,
         {ok, Doc#doc{meta=doc_meta_info(DocInfo, RevTree, Options)}}, Options);
 open_doc_int(Db, Id, Options) ->
     case get_full_doc_info(Db, Id) of
@@ -1716,22 +1854,28 @@ doc_meta_info(#doc_info{high_seq=Seq,revs=[#rev_info{rev=Rev}|RestInfo]}, RevTre
     true -> [{local_seq, Seq}]
     end.
 
+make_doc(Db, Id, Deleted, Bp, RevisionPath) ->
+    make_doc(Db, Id, Deleted, Bp, RevisionPath, []);
+make_doc(Db, Id, Deleted, Bp, {Pos, Revs}) ->
+    make_doc(Db, Id, Deleted, Bp, {Pos, Revs}, []).
 
-make_doc(_Db, Id, Deleted, nil = _Bp, RevisionPath) ->
+make_doc(_Db, Id, Deleted, nil = _Bp, RevisionPath, Access) ->
     #doc{
         id = Id,
         revs = RevisionPath,
         body = [],
         atts = [],
-        deleted = Deleted
+        deleted = Deleted,
+        access = Access
     };
-make_doc(#db{} = Db, Id, Deleted, Bp, {Pos, Revs}) ->
+make_doc(#db{} = Db, Id, Deleted, Bp, {Pos, Revs}, Access) ->
     RevsLimit = get_revs_limit(Db),
     Doc0 = couch_db_engine:read_doc_body(Db, #doc{
         id = Id,
         revs = {Pos, lists:sublist(Revs, 1, RevsLimit)},
         body = Bp,
-        deleted = Deleted
+        deleted = Deleted,
+        access = Access
     }),
     Doc1 = case Doc0#doc.atts of
         BinAtts when is_binary(BinAtts) ->

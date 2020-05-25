@@ -386,6 +386,7 @@ create_db_req(#httpd{}=Req, DbName) ->
     N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
     Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
     P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
+    Access = chttpd:qs_value(Req, "access", false),
     EngineOpt = parse_engine_opt(Req),
     DbProps = parse_partitioned_opt(Req),
     Options = [
@@ -394,8 +395,12 @@ create_db_req(#httpd{}=Req, DbName) ->
         {placement, P},
         {props, DbProps}
     ] ++ EngineOpt,
+    Options1 = case Access of
+        "true" -> [{access, true} | Options];
+        _ -> Options
+    end,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-    case fabric:create_db(DbName, Options) of
+    case fabric:create_db(DbName, Options1) of
     ok ->
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
     accepted ->
@@ -907,15 +912,11 @@ view_cb(Msg, Acc) ->
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
-    couch_doc_open(Db, DocId, nil, []),
-    case chttpd:qs_value(Req, "rev") of
-    undefined ->
-        Body = {[{<<"_deleted">>,true}]};
-    Rev ->
-        Body = {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}
-    end,
-    Doc = couch_doc_from_req(Req, Db, DocId, Body),
-    send_updated_doc(Req, Db, DocId, Doc);
+    OldDoc = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
+    NewRevs = couch_doc:parse_rev(chttpd:qs_value(Req, "rev")),
+    NewBody = {[{<<"_deleted">>}, true]},
+    NewDoc = OldDoc#doc{revs=NewRevs, body=NewBody},
+    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, NewDoc));
 
 db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
     #doc_query_args{
