@@ -50,28 +50,6 @@ defmodule UsersDbTest do
     create_db(@users_db_name)
   end
 
-  defp replicate(source, target, rep_options \\ []) do
-    headers = Keyword.get(rep_options, :headers, [])
-    body = Keyword.get(rep_options, :body, %{})
-
-    body =
-      body
-      |> Map.put("source", source)
-      |> Map.put("target", target)
-
-    retry_until(
-      fn ->
-        resp = Couch.post("/_replicate", headers: headers, body: body, timeout: 10_000)
-        assert HTTPotion.Response.success?(resp)
-        assert resp.status_code == 200
-        assert resp.body["ok"]
-        resp
-      end,
-      500,
-      20_000
-    )
-  end
-
   defp save_as(db_name, doc, options) do
     session = Keyword.get(options, :use_session)
     expect_response = Keyword.get(options, :expect_response, [201, 202])
