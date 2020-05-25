@@ -22,8 +22,11 @@
 #endif
 
 #include <jsapi.h>
-#include <js/Initialization.h>
+#include <js/CompilationAndEvaluation.h>
 #include <js/Conversions.h>
+#include <js/Initialization.h>
+#include <js/SourceText.h>
+#include <js/Warnings.h>
 #include <js/Wrapper.h>
 
 #include "config.h"
@@ -99,8 +102,9 @@ static bool
 req_open(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::Value vobj = args.computeThis(cx);
-    JSObject* obj = vobj.toObjectOrNull();
+    JS::RootedObject obj(cx);
+    if (!args.computeThis(cx, &obj))
+        return false;
     bool ret = false;
 
     if(argc == 2) {
@@ -120,8 +124,9 @@ static bool
 req_set_hdr(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::Value vobj = args.computeThis(cx);
-    JSObject* obj = vobj.toObjectOrNull();
+    JS::RootedObject obj(cx);
+    if (!args.computeThis(cx, &obj))
+        return false;
     bool ret = false;
 
     if(argc == 2) {
@@ -139,8 +144,9 @@ static bool
 req_send(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::Value vobj = args.computeThis(cx);
-    JSObject* obj = vobj.toObjectOrNull();
+    JS::RootedObject obj(cx);
+    if (!args.computeThis(cx, &obj))
+        return false;
     bool ret = false;
 
     if(argc == 1) {
@@ -157,8 +163,9 @@ static bool
 req_status(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::Value vobj = args.computeThis(cx);
-    JSObject* obj = vobj.toObjectOrNull();
+    JS::RootedObject obj(cx);
+    if (!args.computeThis(cx, &obj))
+        return false;
 
     int status = http_status(cx, obj);
 
@@ -173,8 +180,9 @@ static bool
 base_url(JSContext *cx, unsigned int argc, JS::Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::Value vobj = args.computeThis(cx);
-    JSObject* obj = vobj.toObjectOrNull();
+    JS::RootedObject obj(cx);
+    if (!args.computeThis(cx, &obj))
+        return false;
 
     couch_args *cargs = static_cast<couch_args*>(JS_GetContextPrivate(cx));
     JS::Value uri_val;
@@ -183,25 +191,20 @@ base_url(JSContext *cx, unsigned int argc, JS::Value* vp)
     return rc;
 }
 
-static void
-SetStandardCompartmentOptions(JS::CompartmentOptions& options)
-{
-    options.creationOptions().setSharedMemoryAndAtomicsEnabled(enableSharedMemory);
-}
-
 static JSObject*
 NewSandbox(JSContext* cx, bool lazy)
 {
-    JS::CompartmentOptions options;
-    SetStandardCompartmentOptions(options);
+    JS::RealmOptions options;
+    options.creationOptions().setSharedMemoryAndAtomicsEnabled(enableSharedMemory);
+    options.creationOptions().setNewCompartmentAndZone();
     JS::RootedObject obj(cx, JS_NewGlobalObject(cx, &global_class, nullptr,
                                             JS::DontFireOnNewGlobalHook, options));
     if (!obj)
         return nullptr;
 
     {
-        JSAutoCompartment ac(cx, obj);
-        if (!lazy && !JS_InitStandardClasses(cx, obj))
+        JSAutoRealm ac(cx, obj);
+        if (!lazy && !JS::InitRealmStandardClasses(cx))
             return nullptr;
 
         JS::RootedValue value(cx, JS::BooleanValue(lazy));
@@ -222,7 +225,7 @@ evalcx(JSContext *cx, unsigned int argc, JS::Value* vp)
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
     bool ret = false;
 
-    JS::RootedString str(cx, JS::ToString(cx, args[0]));
+    JS::RootedString str(cx, args[0].toString());
     if (!str)
         return false;
 
@@ -233,37 +236,39 @@ evalcx(JSContext *cx, unsigned int argc, JS::Value* vp)
             return false;
     }
 
-    JSAutoRequest ar(cx);
-
     if (!sandbox) {
         sandbox = NewSandbox(cx, false);
         if (!sandbox)
             return false;
     }
 
-    js::AutoStableStringChars strChars(cx);
+    JS::AutoStableStringChars strChars(cx);
     if (!strChars.initTwoByte(cx, str))
         return false;
 
     mozilla::Range<const char16_t> chars = strChars.twoByteRange();
-    size_t srclen = chars.length();
-    const char16_t* src = chars.begin().get();
+    JS::SourceText<char16_t> srcBuf;
+    if (!srcBuf.init(cx, chars.begin().get(), chars.length(),
+                     JS::SourceOwnership::Borrowed)) {
+        return false;
+    }
 
-    if(srclen == 0) {
+    if(srcBuf.length() == 0) {
         args.rval().setObject(*sandbox);
     } else {
-        mozilla::Maybe<JSAutoCompartment> ac;
+        mozilla::Maybe<JSAutoRealm> ar;
         unsigned flags;
         JSObject* unwrapped = UncheckedUnwrap(sandbox, true, &flags);
         if (flags & js::Wrapper::CROSS_COMPARTMENT) {
             sandbox = unwrapped;
-            ac.emplace(cx, sandbox);
+            ar.emplace(cx, sandbox);
         }
 
         JS::CompileOptions opts(cx);
         JS::RootedValue rval(cx);
         opts.setFileAndLine("<unknown>", 1);
-        if (!JS::Evaluate(cx, opts, src, srclen, args.rval())) {
+
+        if (!JS::Evaluate(cx, opts, srcBuf, args.rval())) {
              return false;
          }
     }
@@ -402,7 +407,7 @@ static JSFunctionSpec global_functions[] = {
 
 
 static bool
-csp_allows(JSContext* cx)
+csp_allows(JSContext* cx, JS::HandleValue code)
 {
     couch_args* args = static_cast<couch_args*>(JS_GetContextPrivate(cx));
     if(args->eval) {
@@ -424,8 +429,6 @@ main(int argc, const char* argv[])
 {
     JSContext* cx = NULL;
     JSObject* klass = NULL;
-    char* scriptsrc;
-    size_t slen;
     int i;
 
     couch_args* args = couch_parse_args(argc, argv);
@@ -446,16 +449,15 @@ main(int argc, const char* argv[])
     JS_SetContextPrivate(cx, args);
     JS_SetSecurityCallbacks(cx, &security_callbacks);
 
-    JSAutoRequest ar(cx);
-    JS::CompartmentOptions options;
+    JS::RealmOptions options;
     JS::RootedObject global(cx, JS_NewGlobalObject(cx, &global_class, nullptr,
                                                    JS::FireOnNewGlobalHook, options));
     if (!global)
         return 1;
 
-    JSAutoCompartment ac(cx, global);
+    JSAutoRealm ar(cx, global);
 
-    if(!JS_InitStandardClasses(cx, global))
+    if(!JS::InitRealmStandardClasses(cx))
         return 1;
 
     if(couch_load_funcs(cx, global, global_functions) != true)
@@ -486,18 +488,25 @@ main(int argc, const char* argv[])
     }
 
     for(i = 0 ; args->scripts[i] ; i++) {
-        slen = couch_readfile(args->scripts[i], &scriptsrc);
+        const char* filename = args->scripts[i];
 
         // Compile and run
         JS::CompileOptions options(cx);
-        options.setFileAndLine(args->scripts[i], 1);
-        options.setUTF8(true);
+        options.setFileAndLine(filename, 1);
         JS::RootedScript script(cx);
+        FILE* fp;
 
-        if(!JS_CompileScript(cx, scriptsrc, slen, options, &script)) {
+        fp = fopen(args->scripts[i], "r");
+        if(fp == NULL) {
+            fprintf(stderr, "Failed to read file: %s\n", filename);
+            return 3;
+        }
+        script = JS::CompileUtf8File(cx, options, fp);
+        fclose(fp);
+        if (!script) {
             JS::RootedValue exc(cx);
             if(!JS_GetPendingException(cx, &exc)) {
-                fprintf(stderr, "Failed to compile script.\n");
+                fprintf(stderr, "Failed to compile file: %s\n", filename);
             } else {
                 JS::RootedObject exc_obj(cx, &exc.toObject());
                 JSErrorReport* report = JS_ErrorFromException(cx, exc_obj);
@@ -505,8 +514,6 @@ main(int argc, const char* argv[])
             }
             return 1;
         }
-
-        free(scriptsrc);
 
         JS::RootedValue result(cx);
         if(JS_ExecuteScript(cx, script, &result) != true) {
@@ -518,7 +525,6 @@ main(int argc, const char* argv[])
                 JSErrorReport* report = JS_ErrorFromException(cx, exc_obj);
                 couch_error(cx, report);
             }
-            return 1;
         }
 
         // Give the GC a chance to run.

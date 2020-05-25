@@ -70,6 +70,12 @@ main([]) ->
                 "share/server/60/esprima.js",
                 "share/server/60/escodegen.js",
                 "share/server/60/rewrite_fun.js"
+            ];
+        "68" ->
+            [
+                "share/server/60/esprima.js",
+                "share/server/60/escodegen.js",
+                "share/server/60/rewrite_fun.js"
             ]
     end,
 

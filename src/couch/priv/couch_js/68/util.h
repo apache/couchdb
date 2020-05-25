@@ -38,5 +38,4 @@ void couch_error(JSContext* cx, JSErrorReport* report);
 void couch_oom(JSContext* cx, void* data);
 bool couch_load_funcs(JSContext* cx, JS::HandleObject obj, JSFunctionSpec* funcs);
 
-
 #endif // Included util.h

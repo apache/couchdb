@@ -17,6 +17,7 @@
 #include <sys/stat.h>
 #include <jsapi.h>
 #include <js/Initialization.h>
+#include <js/MemoryFunctions.h>
 #include "config.h"
 #include "util.h"
 
@@ -382,7 +383,7 @@ go(JSContext* cx, JSObject* obj, HTTPData* http, std::string& body)
     state.cx = cx;
     state.http = http;
 
-    state.sendbuf = body.c_str();
+    state.sendbuf = body.c_str();;
     state.sendlen = body.size();
     state.sent = 0;
     state.sent_once = 0;

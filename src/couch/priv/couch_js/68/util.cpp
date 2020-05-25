@@ -16,10 +16,12 @@
 #include <sstream>
 
 #include <jsapi.h>
-#include <js/Initialization.h>
+#include <jsfriendapi.h>
 #include <js/CharacterEncoding.h>
 #include <js/Conversions.h>
-#include <mozilla/Unused.h>
+#include <js/Initialization.h>
+#include <js/MemoryFunctions.h>
+#include <js/RegExp.h>
 
 #include "help.h"
 #include "util.h"
@@ -68,21 +70,12 @@ string_to_js(JSContext* cx, const std::string& raw)
     JS::UniqueTwoByteChars utf16;
     size_t len;
 
-    utf16.reset(JS::UTF8CharsToNewTwoByteCharsZ(cx, utf8, &len).get());
+    utf16.reset(JS::UTF8CharsToNewTwoByteCharsZ(cx, utf8, &len, js::MallocArena).get());
     if(!utf16) {
         return nullptr;
     }
 
-    JSString* ret = JS_NewUCString(cx, utf16.get(), len);
-
-    if(ret) {
-        // JS_NewUCString took ownership on success. We shift
-        // the resulting pointer into Unused to silence the
-        // compiler warning.
-        mozilla::Unused << utf16.release();
-    }
-
-    return ret;
+    return JS_NewUCString(cx, std::move(utf16), len);
 }
 
 size_t
@@ -223,15 +216,15 @@ couch_readline(JSContext* cx, FILE* fp)
 
     bytes = static_cast<char*>(JS_malloc(cx, byteslen));
     if(bytes == NULL) return NULL;
-    
+
     while((readlen = couch_fgets(bytes+used, byteslen-used, fp)) > 0) {
         used += readlen;
-        
+
         if(bytes[used-1] == '\n') {
             bytes[used-1] = '\0';
             break;
         }
-        
+
         // Double our buffer and read more.
         oldbyteslen = byteslen;
         byteslen *= 2;
@@ -240,7 +233,7 @@ couch_readline(JSContext* cx, FILE* fp)
             JS_free(cx, bytes);
             return NULL;
         }
-        
+
         bytes = tmp;
     }
 
@@ -268,12 +261,11 @@ couch_readline(JSContext* cx, FILE* fp)
 void
 couch_print(JSContext* cx, JS::HandleValue obj, bool use_stderr)
 {
-    FILE* stream = stdout;
+    FILE *stream = stdout;
 
-    if(use_stderr) {
+    if (use_stderr) {
         stream = stderr;
     }
-
     std::string val = js_to_string(cx, obj);
     fprintf(stream, "%s\n", val.c_str());
     fflush(stream);
@@ -294,12 +286,13 @@ couch_error(JSContext* cx, JSErrorReport* report)
     std::ostringstream msg;
     msg << "error: " << report->message().c_str();
 
-    mozilla::Maybe<JSAutoCompartment> ac;
+    mozilla::Maybe<JSAutoRealm> ar;
     JS::RootedValue exc(cx);
     JS::RootedObject exc_obj(cx);
     JS::RootedObject stack_obj(cx);
     JS::RootedString stack_str(cx);
     JS::RootedValue stack_val(cx);
+    JSPrincipals* principals = GetRealmPrincipals(js::GetContextRealm(cx));
 
     if(!JS_GetPendingException(cx, &exc)) {
         goto done;
@@ -330,7 +323,7 @@ couch_error(JSContext* cx, JSErrorReport* report)
         goto done;
     }
 
-    if(!JS::BuildStackString(cx, stack_obj, &stack_str, 2)) {
+    if(!JS::BuildStackString(cx, principals, stack_obj, &stack_str, 2)) {
         goto done;
     }
 
@@ -355,9 +348,9 @@ bool
 couch_load_funcs(JSContext* cx, JS::HandleObject obj, JSFunctionSpec* funcs)
 {
     JSFunctionSpec* f;
-    for(f = funcs; f->name != NULL; f++) {
-        if(!JS_DefineFunction(cx, obj, f->name, f->call.op, f->nargs, f->flags)) {
-            fprintf(stderr, "Failed to create function: %s\n", f->name);
+    for(f = funcs; f->name; f++) {
+        if(!JS_DefineFunction(cx, obj, f->name.string(), f->call.op, f->nargs, f->flags)) {
+            fprintf(stderr, "Failed to create function: %s\n", f->name.string());
             return false;
         }
     }

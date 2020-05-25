@@ -63,14 +63,14 @@ X means done, - means partially
   - [X] Port proxyauth.js
   - [X] Port purge.js
   - [ ] Port reader_acl.js
-  - [ ] Port recreate_doc.js
+  - [X] Port recreate_doc.js
   - [X] Port reduce_builtin.js
   - [X] Port reduce_false.js
   - [ ] Port reduce_false_temp.js
   - [X] Port reduce.js
   - [X] Port replication.js
-  - [ ] Port replicator_db_bad_rep_id.js
-  - [ ] Port replicator_db_by_doc_id.js
+  - [X] Port replicator_db_bad_rep_id.js
+  - [X] Port replicator_db_by_doc_id.js
   - [ ] Port replicator_db_compact_rep_db.js
   - [ ] Port replicator_db_continuous.js
   - [ ] Port replicator_db_credential_delegation.js
@@ -107,7 +107,7 @@ X means done, - means partially
   - [ ] Port view_multi_key_all_docs.js
   - [ ] Port view_multi_key_design.js
   - [ ] Port view_multi_key_temp.js
-  - [ ] Port view_offsets.js
+  - [X] Port view_offsets.js
   - [X] Port view_pagination.js
   - [ ] Port view_sandboxing.js
   - [ ] Port view_update_seq.js

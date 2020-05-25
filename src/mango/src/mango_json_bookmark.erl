@@ -54,7 +54,7 @@ unpack(nil) ->
     nil;
 unpack(Packed) ->
     try
-        Bookmark = binary_to_term(couch_util:decodeBase64Url(Packed)),
+        Bookmark = binary_to_term(couch_util:decodeBase64Url(Packed), [safe]),
         verify(Bookmark)
     catch _:_ ->
         ?MANGO_ERROR({invalid_bookmark, Packed})
