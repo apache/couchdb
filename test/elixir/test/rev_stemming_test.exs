@@ -105,7 +105,6 @@ defmodule RevStemmingTest do
     assert length(resp.body["_revisions"]["ids"]) == @new_limit
 
     compact(db_name)
-    wait_until_compact_complete(db_name)
 
     # force reload because ETags don't honour compaction
     resp =
@@ -147,28 +146,6 @@ defmodule RevStemmingTest do
     end
   end
 
-  defp build_uri(db_name) do
-    username = System.get_env("EX_USERNAME") || "adm"
-    password = System.get_env("EX_PASSWORD") || "pass"
-
-    "/#{db_name}"
-    |> Couch.process_url()
-    |> URI.parse()
-    |> Map.put(:userinfo, "#{username}:#{password}")
-    |> URI.to_string()
-  end
-
-  defp replicate(src, tgt) do
-    src_uri = build_uri(src)
-    tgt_uri = build_uri(tgt)
-
-    body = %{source: src_uri, target: tgt_uri}
-
-    resp = Couch.post("/_replicate", body: body)
-    assert resp.status_code == 200
-    resp.body
-  end
-
   def delete_db_on_exit(db_names) when is_list(db_names) do
     on_exit(fn ->
       Enum.each(db_names, fn name ->
@@ -177,17 +154,4 @@ defmodule RevStemmingTest do
     end)
   end
 
-  defp compact(db_name) do
-    resp = Couch.post("/#{db_name}/_compact")
-    assert resp.status_code == 202
-    resp.body
-  end
-
-  defp wait_until_compact_complete(db_name) do
-    retry_until(
-      fn -> Map.get(info(db_name), "compact_running") == false end,
-      200,
-      10_000
-    )
-  end
 end
