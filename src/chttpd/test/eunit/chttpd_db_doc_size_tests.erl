@@ -29,6 +29,7 @@ setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
     ok = config:set("couchdb", "max_document_size", "50"),
+    ok = config:set("couchdb", "max_bulk_docs_count", "2"),
     TmpDb = ?tempdb(),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
@@ -39,7 +40,8 @@ setup() ->
 teardown(Url) ->
     delete_db(Url),
     ok = config:delete("admins", ?USER, _Persist=false),
-    ok = config:delete("couchdb", "max_document_size").
+    ok = config:delete("couchdb", "max_document_size"),
+    ok = config:delete("couchdb", "max_bulk_docs_count").
 
 create_db(Url) ->
     {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
@@ -67,6 +69,7 @@ all_test_() ->
                     fun post_single_doc/1,
                     fun put_single_doc/1,
                     fun bulk_doc/1,
+                    fun bulk_docs_too_many_docs/1,
                     fun put_post_doc_attach_inline/1,
                     fun put_multi_part_related/1,
                     fun post_multi_part_form/1
@@ -99,6 +102,23 @@ bulk_doc(Url) ->
     ResultJson = ?JSON_DECODE(ResultBody),
     Expect = {[{<<"error">>,<<"document_too_large">>},{<<"reason">>,<<>>}]},
     ?_assertEqual(Expect, ResultJson).
+
+
+bulk_docs_too_many_docs(Url) ->
+    Docs = "{\"docs\": ["
+        "{\"doc1\": \"{}\"}, "
+        "{\"doc2\": \"{}\"}, "
+        "{\"doc3\": \"{}\"}"
+    "]}",
+    {ok, Code, _, ResultBody} = test_request:post(Url ++ "/_bulk_docs/",
+        [?CONTENT_JSON, ?AUTH], Docs),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    ExpectJson = {[
+        {<<"error">>,<<"max_bulk_docs_count_exceeded">>},
+        {<<"reason">>,<<"2">>}
+    ]},
+    ?_assertEqual({413, ExpectJson}, {Code, ResultJson}).
+
 
 put_post_doc_attach_inline(Url) ->
     Body1 = "{\"body\":\"This is a body.\",",
