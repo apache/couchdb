@@ -484,6 +484,11 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
     DocsArray0 ->
         DocsArray0
     end,
+    MaxDocs = config:get_integer("couchdb", "max_bulk_docs_count", 10000),
+    case length(DocsArray) =< MaxDocs of
+        true -> ok;
+        false -> throw({request_entity_too_large, {bulk_docs, MaxDocs}})
+    end,
     couch_stats:update_histogram([couchdb, httpd, bulk_docs], length(DocsArray)),
     Options = case chttpd:header_value(Req, "X-Couch-Full-Commit") of
     "true" ->
