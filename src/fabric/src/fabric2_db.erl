@@ -156,7 +156,7 @@
 
 -define(RETURN(Term), throw({?MODULE, Term})).
 
--define(DEFAULT_UPDATE_DOCS_BATCH_SIZE, 5000000).
+-define(DEFAULT_UPDATE_DOCS_BATCH_SIZE, 2500000).
 
 
 -record(bacc, {
