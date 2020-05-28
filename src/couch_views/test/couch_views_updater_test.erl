@@ -35,7 +35,8 @@ indexer_test_() ->
                     ?TDEF_FE(index_docs),
                     ?TDEF_FE(update_doc),
                     ?TDEF_FE(delete_doc),
-                    ?TDEF_FE(includes_design_docs)
+                    ?TDEF_FE(includes_design_docs),
+                    ?TDEF_FE(handle_erlfdb_errors)
                 ]
             }
         }
@@ -68,10 +69,12 @@ foreach_setup() ->
 
     Docs = make_docs(3),
     fabric2_db:update_docs(Db, Docs),
+    meck:new(couch_views_fdb, [passthrough]),
     {Db, DDoc}.
 
 
 foreach_teardown({Db, _}) ->
+    meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
 
@@ -129,6 +132,13 @@ includes_design_docs({Db, _}) ->
         [{id, <<"_design/ddoc_that_indexes_ddocs">>}, {value, 1}],
         [{id, <<"_design/to_be_indexed">>}, {value, 1}]
     ], Docs).
+
+
+handle_erlfdb_errors({Db, _}) ->
+    meck:expect(couch_views_fdb, write_doc, fun(_, _, _, _) ->
+        error({erlfdb, 1009})
+    end),
+    ?assertError({erlfdb, 1009}, fabric2_db:update_docs(Db, [doc(4)])).
 
 
 run_query(Db, DDoc) ->
