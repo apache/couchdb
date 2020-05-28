@@ -278,6 +278,60 @@ defmodule Couch.DBTest do
     resp.body
   end
 
+  def compact(db_name) do
+    resp = Couch.post("/#{db_name}/_compact")
+    assert resp.status_code == 202
+
+    retry_until(
+      fn -> Map.get(info(db_name), "compact_running") == false end,
+      200,
+      10_000
+    )
+
+    resp.body
+  end
+
+  def replicate(src, tgt, options \\ []) do
+    username = System.get_env("EX_USERNAME") || "adm"
+    password = System.get_env("EX_PASSWORD") || "pass"
+
+    {userinfo, options} = Keyword.pop(options, :userinfo)
+
+    userinfo =
+      if userinfo == nil do
+        "#{username}:#{password}"
+      else
+        userinfo
+      end
+
+    src = set_user(src, userinfo)
+    tgt = set_user(tgt, userinfo)
+
+    defaults = [headers: [], body: %{}, timeout: 30_000]
+    options = defaults |> Keyword.merge(options) |> Enum.into(%{})
+
+    %{body: body} = options
+    body = [source: src, target: tgt] |> Enum.into(body)
+    options = Map.put(options, :body, body)
+
+    resp = Couch.post("/_replicate", Enum.to_list(options))
+    assert HTTPotion.Response.success?(resp), "#{inspect(resp)}"
+    resp.body
+  end
+
+  defp set_user(uri, userinfo) do
+    case URI.parse(uri) do
+      %{scheme: nil} ->
+        uri
+
+      %{userinfo: nil} = uri ->
+        URI.to_string(Map.put(uri, :userinfo, userinfo))
+
+      _ ->
+        uri
+    end
+  end
+
   def view(db_name, view_name, options \\ nil, keys \\ nil) do
     [view_root, view_name] = String.split(view_name, "/")
 
@@ -423,7 +477,7 @@ defmodule Couch.DBTest do
         Enum.each(setting.nodes, fn node_value ->
           node = elem(node_value, 0)
           value = elem(node_value, 1)
-          
+
           if value == ~s(""\\n) or value == "" or value == nil do
             resp =
               Couch.delete(

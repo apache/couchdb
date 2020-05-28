@@ -53,12 +53,7 @@ defmodule PurgeTest do
     test_all_docs_twice(db_name, num_docs, 0, 2)
 
     # purge sequences are preserved after compaction (COUCHDB-1021)
-    resp = Couch.post("/#{db_name}/_compact")
-    assert resp.status_code == 202
-
-    retry_until(fn ->
-      info(db_name)["compact_running"] == false
-    end)
+    compact(db_name)
 
     compacted_info = info(db_name)
     assert compacted_info["purge_seq"] == purged_info["purge_seq"]
@@ -125,19 +120,6 @@ defmodule PurgeTest do
     assert resp.status_code == 201
 
     delete_db(db_name_b)
-  end
-
-  def replicate(src, tgt, options \\ []) do
-    defaults = [headers: [], body: %{}, timeout: 30_000]
-    options = defaults |> Keyword.merge(options) |> Enum.into(%{})
-
-    %{body: body} = options
-    body = [source: src, target: tgt] |> Enum.into(body)
-    options = Map.put(options, :body, body)
-
-    resp = Couch.post("/_replicate", Enum.to_list(options))
-    assert HTTPotion.Response.success?(resp), "#{inspect(resp)}"
-    resp.body
   end
 
   defp open_doc(db_name, id, expect \\ 200) do
