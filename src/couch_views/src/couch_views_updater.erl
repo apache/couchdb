@@ -31,11 +31,12 @@ index(Db, #doc{id = Id, revs = Revs} = Doc, _NewWinner, _OldWinner, NewRevId,
             index_int(Db, Doc, Seq)
         end
     catch
-        error:{erlfdb, ErrCode} when is_integer(ErrCode) ->
+        error:{erlfdb_error, ErrCode} when is_integer(ErrCode) ->
+            Stack = erlang:get_stacktrace(),
             DbName = fabric2_db:name(Db),
             couch_log:error("Mango index erlfdb error Db ~s Doc ~p ~p",
                 [DbName, Id, ErrCode]),
-            erlang:raise(error, {erlfdb, ErrCode}, erlang:get_stacktrace());
+            erlang:raise(error, {erlfdb_error, ErrCode}, Stack);
         Error:Reason ->
             DbName = fabric2_db:name(Db),
             couch_log:error("Mango index error for Db ~s Doc ~p ~p ~p",

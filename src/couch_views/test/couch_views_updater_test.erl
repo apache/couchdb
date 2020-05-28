@@ -36,7 +36,7 @@ indexer_test_() ->
                     ?TDEF_FE(update_doc),
                     ?TDEF_FE(delete_doc),
                     ?TDEF_FE(includes_design_docs),
-                    ?TDEF_FE(handle_erlfdb_errors)
+                    ?TDEF_FE(handle_erlfdb_errors, 15)
                 ]
             }
         }
@@ -136,9 +136,9 @@ includes_design_docs({Db, _}) ->
 
 handle_erlfdb_errors({Db, _}) ->
     meck:expect(couch_views_fdb, write_doc, fun(_, _, _, _) ->
-        error({erlfdb, 1009})
+        error({erlfdb_error, 1009})
     end),
-    ?assertError({erlfdb, 1009}, fabric2_db:update_docs(Db, [doc(4)])).
+    ?assertError({erlfdb_error, 1009}, fabric2_db:update_docs(Db, [doc(4)])).
 
 
 run_query(Db, DDoc) ->
