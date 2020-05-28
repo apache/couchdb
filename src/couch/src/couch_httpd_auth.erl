@@ -198,7 +198,7 @@ jwt_authentication_handler(Req) ->
                         false -> throw({unauthorized, <<"Token missing sub claim.">>});
                         {_, User} -> Req#httpd{user_ctx=#user_ctx{
                             name = User,
-                            roles = couch_util:get_value(<<"_couchdb.roles">>, Claims, [])
+                            roles = couch_util:get_value(?l2b(config:get("jwt_auth", "roles_claim_name", "_couchdb.roles")), Claims, [])
                         }}
                     end;
                 {error, Reason} ->
