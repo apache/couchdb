@@ -297,9 +297,17 @@ accept_loop(Type, NoSched, MaxSchedTime, Timeout) ->
     TxFun =  fun(JTx) ->
         couch_jobs_fdb:accept(JTx, Type, MaxSchedTime, NoSched)
     end,
-    case couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), TxFun) of
+    AcceptResult = try
+        couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), TxFun)
+    catch
+        error:{erlfdb_error, Err} when Err =:= 1020 orelse Err =:= 1031 ->
+            retry
+    end,
+    case AcceptResult of
         {ok, Job, Data} ->
             {ok, Job, Data};
+        retry ->
+            accept_loop(Type, NoSched, MaxSchedTime, Timeout);
         {not_found, PendingWatch} ->
             case wait_pending(PendingWatch, MaxSchedTime, Timeout) of
                 {error, not_found} ->
