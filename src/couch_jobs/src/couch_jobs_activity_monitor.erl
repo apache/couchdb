@@ -68,9 +68,9 @@ handle_info(check_activity, St) ->
     St1 = try
         check_activity(St)
     catch
-        error:{erlfdb_error, 1020} ->
-            LogMsg = "~p : type:~p got 1020 error, possibly from overload",
-            couch_log:error(LogMsg, [?MODULE, St#st.type]),
+        error:{erlfdb_error, Err} when Err =:= 1020 orelse Err =:= 1031 ->
+            LogMsg = "~p : type:~p got ~p error, possibly from overload",
+            couch_log:error(LogMsg, [?MODULE, St#st.type, Err]),
             St
     end,
     St2 = schedule_check(St1),
