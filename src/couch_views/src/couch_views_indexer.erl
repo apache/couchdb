@@ -44,7 +44,8 @@ spawn_link() ->
 
 
 init() ->
-    {ok, Job, Data0} = couch_jobs:accept(?INDEX_JOB_TYPE, #{}),
+    Opts = #{no_schedule => true},
+    {ok, Job, Data0} = couch_jobs:accept(?INDEX_JOB_TYPE, Opts),
     Data = upgrade_data(Data0),
     #{
         <<"db_name">> := DbName,
