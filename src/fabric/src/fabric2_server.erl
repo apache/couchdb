@@ -17,9 +17,15 @@
 
 -export([
     start_link/0,
+
     fetch/2,
+
     store/1,
+    maybe_update/1,
+
     remove/1,
+    maybe_remove/1,
+
     fdb_directory/0,
     fdb_cluster/0
 ]).
@@ -66,25 +72,55 @@ start_link() ->
 fetch(DbName, UUID) when is_binary(DbName) ->
     case {UUID, ets:lookup(?MODULE, DbName)} of
         {_, []} -> undefined;
-        {undefined, [{DbName, #{} = Db}]} -> Db;
-        {<<_/binary>>, [{DbName, #{uuid := UUID} = Db}]} -> Db;
-        {<<_/binary>>, [{DbName, #{} = _Db}]} -> undefined
+        {undefined, [{DbName, _UUID, _, #{} = Db}]} -> Db;
+        {<<_/binary>>, [{DbName, UUID, _, #{} = Db}]} -> Db;
+        {<<_/binary>>, [{DbName, _UUID, _, #{} = _Db}]} -> undefined
     end.
 
 
 store(#{name := DbName} = Db0) when is_binary(DbName) ->
-    Db1 = Db0#{
-        tx := undefined,
-        user_ctx := #user_ctx{},
-        security_fun := undefined
-    },
-    true = ets:insert(?MODULE, {DbName, Db1}),
+    #{
+        uuid := UUID,
+        md_version := MDVer
+    } = Db0,
+    Db1 = sanitize(Db0),
+    case ets:insert_new(?MODULE, {DbName, UUID, MDVer, Db1}) of
+        true -> ok;
+        false -> maybe_update(Db1)
+    end,
     ok.
+
+
+maybe_update(#{name := DbName} = Db0) when is_binary(DbName) ->
+    #{
+        uuid := UUID,
+        md_version := MDVer
+    } = Db0,
+    Db1 = sanitize(Db0),
+    Head = {DbName, UUID,  '$1', '_'},
+    Guard = {'=<', '$1', MDVer},
+    Body = {DbName, UUID, MDVer, {const, Db1}},
+    try
+        1 =:= ets:select_replace(?MODULE, [{Head, [Guard], [{Body}]}])
+    catch
+        error:badarg ->
+            false
+    end.
 
 
 remove(DbName) when is_binary(DbName) ->
     true = ets:delete(?MODULE, DbName),
     ok.
+
+
+maybe_remove(#{name := DbName} = Db) when is_binary(DbName) ->
+    #{
+        uuid := UUID,
+        md_version := MDVer
+    } = Db,
+    Head = {DbName, UUID, '$1', '_'},
+    Guard = {'=<', '$1', MDVer},
+    1 =:= ets:select_delete(?MODULE, [{Head, [Guard], [true]}]).
 
 
 init(_) ->
@@ -229,3 +265,11 @@ set_option(Db, Option, Val) ->
             Msg = "~p : Could not set fdb tx option ~p = ~p",
             couch_log:error(Msg, [?MODULE, Option, Val])
     end.
+
+
+sanitize(#{} = Db) ->
+    Db#{
+        tx := undefined,
+        user_ctx := #user_ctx{},
+        security_fun := undefined
+    }.

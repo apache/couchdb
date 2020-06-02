@@ -50,6 +50,7 @@ misc_test_() ->
                 ?TDEF(ensure_full_commit),
                 ?TDEF(metadata_bump),
                 ?TDEF(db_version_bump),
+                ?TDEF(db_cache_doesnt_evict_newer_handles),
                 ?TDEF(events_listener)
             ])
         }
@@ -373,6 +374,22 @@ db_version_bump({DbName, _, _}) ->
 
     % Check that db handle in the cache got the new metadata version
     ?assertMatch(#{db_version := NewDbVersion}, Db2).
+
+
+db_cache_doesnt_evict_newer_handles({DbName, _, _}) ->
+    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, ?ADMIN_USER}]),
+    CachedDb = fabric2_server:fetch(DbName, undefined),
+
+    StaleDb = Db#{md_version := <<0>>},
+
+    ok = fabric2_server:store(StaleDb),
+    ?assertEqual(CachedDb, fabric2_server:fetch(DbName, undefined)),
+
+    ?assert(not fabric2_server:maybe_update(StaleDb)),
+    ?assertEqual(CachedDb, fabric2_server:fetch(DbName, undefined)),
+
+    ?assert(not fabric2_server:maybe_remove(StaleDb)),
+    ?assertEqual(CachedDb, fabric2_server:fetch(DbName, undefined)).
 
 
 events_listener({DbName, Db, _}) ->
