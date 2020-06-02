@@ -300,6 +300,8 @@ accept_loop(Type, NoSched, MaxSchedTime, Timeout) ->
     AcceptResult = try
         couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), TxFun)
     catch
+        error:{timeout, _} ->
+            retry;
         error:{erlfdb_error, Err} when Err =:= 1020 orelse Err =:= 1031 ->
             retry
     end,
