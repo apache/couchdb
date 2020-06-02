@@ -171,11 +171,7 @@ do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
                 true ->
                     get_previous_transaction_result();
                 false ->
-                    try
-                        execute_transaction(Tx, Fun, LayerPrefix)
-                    after
-                        erase({?PDICT_ON_COMMIT_FUN, Tx})
-                    end
+                    execute_transaction(Tx, Fun, LayerPrefix)
             end
         end)
     after
@@ -1311,18 +1307,14 @@ check_db_version(#{} = Db, CheckDbVersion) ->
     } = Db,
 
     AlreadyChecked = get(?PDICT_CHECKED_DB_IS_CURRENT),
-    if not CheckDbVersion orelse AlreadyChecked == true -> Db; true ->
+    if not CheckDbVersion orelse AlreadyChecked == true -> current; true ->
         DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
         case erlfdb:wait(erlfdb:get(Tx, DbVersionKey)) of
             DbVersion ->
                 put(?PDICT_CHECKED_DB_IS_CURRENT, true),
-                Now = erlang:monotonic_time(millisecond),
-                Db1 = Db#{check_current_ts := Now},
-                on_commit(Tx, fun() -> fabric2_server:store(Db1) end),
-                Db1;
+                current;
             _NewDBVersion ->
-                fabric2_server:remove(maps:get(name, Db)),
-                throw({?MODULE, reopen})
+                stale
         end
     end.
 
@@ -1830,10 +1822,6 @@ fold_range_cb({K, V}, #fold_acc{} = Acc) ->
 
 restart_fold(Tx, #fold_acc{} = Acc) ->
     erase(?PDICT_CHECKED_MD_IS_CURRENT),
-    % Not actually committing anyting so we skip on-commit handlers here. Those
-    % are usually to refresh db handles in the cache. If the iterator runs for
-    % a while it might be inserting a stale handle in there anyway.
-    erase({?PDICT_ON_COMMIT_FUN, Tx}),
 
     ok = erlfdb:reset(Tx),
 
@@ -1871,17 +1859,31 @@ ensure_current(Db) ->
 
 ensure_current(#{} = Db0, CheckDbVersion) ->
     require_transaction(Db0),
-    Db2 = case check_metadata_version(Db0) of
-        {current, Db1} -> Db1;
-        {stale, Db1} -> check_db_version(Db1, CheckDbVersion)
+    Db3 = case check_metadata_version(Db0) of
+        {current, Db1} ->
+            Db1;
+        {stale, Db1} ->
+            case check_db_version(Db1, CheckDbVersion) of
+                current ->
+                    % If db version is current, update cache with the latest
+                    % metadata so other requests can immediately see the
+                    % refreshed db handle.
+                    Now = erlang:monotonic_time(millisecond),
+                    Db2 = Db1#{check_current_ts := Now},
+                    fabric2_server:maybe_update(Db2),
+                    Db2;
+                stale ->
+                    fabric2_server:maybe_remove(Db1),
+                    throw({?MODULE, reopen})
+            end
     end,
-    case maps:get(security_fun, Db2) of
+    case maps:get(security_fun, Db3) of
         SecurityFun when is_function(SecurityFun, 2) ->
-            #{security_doc := SecDoc} = Db2,
-            ok = SecurityFun(Db2, SecDoc),
-            Db2#{security_fun := undefined};
+            #{security_doc := SecDoc} = Db3,
+            ok = SecurityFun(Db3, SecDoc),
+            Db3#{security_fun := undefined};
         undefined ->
-            Db2
+            Db3
     end.
 
 
@@ -1928,7 +1930,6 @@ execute_transaction(Tx, Fun, LayerPrefix) ->
             erlfdb:set(Tx, get_transaction_id(Tx, LayerPrefix), <<>>),
             put(?PDICT_TX_RES_KEY, Result)
     end,
-    ok = run_on_commit_fun(Tx),
     Result.
 
 
@@ -1962,27 +1963,6 @@ get_transaction_id(Tx, LayerPrefix) ->
             TxId
     end.
 
-
-on_commit(Tx, Fun) when is_function(Fun, 0) ->
-    % Here we rely on Tx objects matching. However they contain a nif resource
-    % object. Before Erlang 20.0 those would have been represented as empty
-    % binaries and would have compared equal to each other. See
-    % http://erlang.org/doc/man/erl_nif.html for more info. We assume we run on
-    % Erlang 20+ here and don't worry about that anymore.
-    case get({?PDICT_ON_COMMIT_FUN, Tx}) of
-        undefined -> put({?PDICT_ON_COMMIT_FUN, Tx}, Fun);
-        _ -> error({?MODULE, on_commit_function_already_set})
-    end.
-
-
-run_on_commit_fun(Tx) ->
-    case get({?PDICT_ON_COMMIT_FUN, Tx}) of
-        undefined ->
-            ok;
-        Fun when is_function(Fun, 0) ->
-            Fun(),
-            ok
-    end.
 
 with_span(Operation, ExtraTags, Fun) ->
     case ctrace:has_span() of

@@ -70,7 +70,6 @@
 -define(PDICT_CHECKED_MD_IS_CURRENT, '$fabric_checked_md_is_current').
 -define(PDICT_TX_ID_KEY, '$fabric_tx_id').
 -define(PDICT_TX_RES_KEY, '$fabric_tx_result').
--define(PDICT_ON_COMMIT_FUN, '$fabric_on_commit_fun').
 -define(PDICT_FOLD_ACC_STATE, '$fabric_fold_acc_state').
 
 % Let's keep these in ascending order
