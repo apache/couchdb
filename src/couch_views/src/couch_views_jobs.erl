@@ -134,7 +134,9 @@ job_id(#{name := DbName}, #mrst{sig = Sig}) ->
 
 job_id(DbName, Sig) ->
     HexSig = fabric2_util:to_hex(Sig),
-    <<DbName/binary, "-", HexSig/binary>>.
+    % Put signature first in order to be able to use the no_schedule
+    % couch_jobs:accept/2 option
+    <<HexSig/binary, "-", DbName/binary>>.
 
 
 job_data(Db, Mrst) ->
