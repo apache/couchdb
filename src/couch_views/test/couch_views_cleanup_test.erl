@@ -408,4 +408,4 @@ job_id(Db, DDoc) ->
     DbName = fabric2_db:name(Db),
     {ok, #mrst{sig = Sig}} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     HexSig = fabric2_util:to_hex(Sig),
-    <<DbName/binary, "-", HexSig/binary>>.
+    <<HexSig/binary, "-", DbName/binary>>.
