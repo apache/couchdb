@@ -311,7 +311,7 @@ accept_loop(Type, NoSched, MaxSchedTime, Timeout) ->
         retry ->
             accept_loop(Type, NoSched, MaxSchedTime, Timeout);
         {not_found, PendingWatch} ->
-            case wait_pending(PendingWatch, MaxSchedTime, Timeout) of
+            case wait_pending(PendingWatch, MaxSchedTime, Timeout, NoSched) of
                 {error, not_found} ->
                     {error, not_found};
                 retry ->
@@ -326,14 +326,14 @@ job(Type, JobId) ->
     #{job => true, type => Type, id => JobId}.
 
 
-wait_pending(PendingWatch, _MaxSTime, 0) ->
+wait_pending(PendingWatch, _MaxSTime, _UserTimeout = 0, _NoSched) ->
     erlfdb:cancel(PendingWatch, [flush]),
     {error, not_found};
 
-wait_pending(PendingWatch, MaxSTime, UserTimeout) ->
+wait_pending(PendingWatch, MaxSTime, UserTimeout, NoSched) ->
     NowMSec = erlang:system_time(millisecond),
     Timeout0 = max(?MIN_ACCEPT_WAIT_MSEC, MaxSTime * 1000 - NowMSec),
-    Timeout = min(limit_timeout(Timeout0), UserTimeout),
+    Timeout = min(limit_timeout(Timeout0, NoSched), UserTimeout),
     try
         erlfdb:wait(PendingWatch, [{timeout, Timeout}]),
         ok
@@ -348,7 +348,7 @@ wait_pending(PendingWatch, MaxSTime, UserTimeout) ->
 
 
 wait_any(Subs, Timeout0, ResendQ) when is_list(Subs) ->
-    Timeout = limit_timeout(Timeout0),
+    Timeout = limit_timeout(Timeout0, false),
     receive
         {?COUCH_JOBS_EVENT, Ref, Type, Id, State, Data0} = Msg ->
             case lists:keyfind(Ref, 2, Subs) of
@@ -365,7 +365,7 @@ wait_any(Subs, Timeout0, ResendQ) when is_list(Subs) ->
 
 wait_any(Subs, State, Timeout0, ResendQ) when
         is_list(Subs) ->
-    Timeout = limit_timeout(Timeout0),
+    Timeout = limit_timeout(Timeout0, false),
     receive
         {?COUCH_JOBS_EVENT, Ref, Type, Id, MsgState, Data0} = Msg ->
             case lists:keyfind(Ref, 2, Subs) of
@@ -385,10 +385,13 @@ wait_any(Subs, State, Timeout0, ResendQ) when
     end.
 
 
-limit_timeout(Timeout) when is_integer(Timeout), Timeout < 16#FFFFFFFF ->
+limit_timeout(_Timeout, true) ->
+    infinity;
+
+limit_timeout(Timeout, false) when is_integer(Timeout), Timeout < 16#FFFFFFFF ->
     Timeout;
 
-limit_timeout(_Timeout) ->
+limit_timeout(_Timeout, false) ->
     infinity.
 
 
