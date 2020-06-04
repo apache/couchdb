@@ -46,6 +46,9 @@ spawn_link() ->
 init() ->
     Opts = #{no_schedule => true},
     {ok, Job, Data0} = couch_jobs:accept(?INDEX_JOB_TYPE, Opts),
+
+    couch_views_server:accepted(self()),
+
     Data = upgrade_data(Data0),
     #{
         <<"db_name">> := DbName,
