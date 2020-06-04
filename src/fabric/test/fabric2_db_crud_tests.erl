@@ -631,7 +631,7 @@ get_info_wait_retry_on_tx_too_old(_) ->
         ok = erlfdb:set_option(Tx, disallow_writes),
 
         InfoF = fabric2_fdb:get_info_future(Tx, DbPrefix),
-        {info_future, _, _, ChangesF, _, _} = InfoF,
+        {info_future, _, _, ChangesF, _, _, _} = InfoF,
 
         raise_in_erlfdb_wait(ChangesF, {erlfdb_error, 1007}, 3),
         ?assertError({erlfdb_error, 1007}, fabric2_fdb:get_info_wait(InfoF)),
@@ -659,7 +659,7 @@ get_info_wait_retry_on_tx_abort(_)->
         ok = erlfdb:set_option(Tx, disallow_writes),
 
         InfoF = fabric2_fdb:get_info_future(Tx, DbPrefix),
-        {info_future, _, _, ChangesF, _, _} = InfoF,
+        {info_future, _, _, ChangesF, _, _, _} = InfoF,
 
         raise_in_erlfdb_wait(ChangesF, {erlfdb_error, 1025}, 3),
         ?assertError({erlfdb_error, 1025}, fabric2_fdb:get_info_wait(InfoF)),
