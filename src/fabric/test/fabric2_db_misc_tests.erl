@@ -129,7 +129,7 @@ get_security_cached({DbName, Db, _}) ->
 
     % Set directly so we don't auto-update the local cache
     {ok, Db1} = fabric2_db:open(DbName, [?ADMIN_CTX]),
-    ?assertMatch({ok, #{}}, fabric2_fdb:transactional(Db1, fun(TxDb) ->
+    ?assertEqual(ok, fabric2_fdb:transactional(Db1, fun(TxDb) ->
         fabric2_fdb:set_config(TxDb, security_doc, SecObj)
     end)),
 

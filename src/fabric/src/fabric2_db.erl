@@ -603,25 +603,19 @@ is_users_db(DbName) when is_binary(DbName) ->
 
 set_revs_limit(#{} = Db0, RevsLimit) when is_integer(RevsLimit) ->
     Db1 = require_admin_check(Db0),
-    Resp = fabric2_fdb:transactional(Db1, fun(TxDb) ->
+    fabric2_fdb:transactional(Db1, fun(TxDb) ->
         fabric2_fdb:set_config(TxDb, revs_limit, RevsLimit)
     end),
-    case Resp of
-        {ok, #{} = Db2} -> fabric2_server:store(Db2);
-        Err -> Err
-    end.
+    fabric2_server:remove(name(Db0)).
 
 
 set_security(#{} = Db0, Security) ->
     Db1 = require_admin_check(Db0),
     ok = fabric2_util:validate_security_object(Security),
-    Resp = fabric2_fdb:transactional(Db1, fun(TxDb) ->
+    fabric2_fdb:transactional(Db1, fun(TxDb) ->
         fabric2_fdb:set_config(TxDb, security_doc, Security)
     end),
-    case Resp of
-        {ok, #{} = Db2} -> fabric2_server:store(Db2);
-        Err -> Err
-    end.
+    fabric2_server:remove(name(Db0)).
 
 
 set_user_ctx(#{} = Db, UserCtx) ->
