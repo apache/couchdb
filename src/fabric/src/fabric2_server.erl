@@ -94,12 +94,12 @@ store(#{name := DbName} = Db0) when is_binary(DbName) ->
 maybe_update(#{name := DbName} = Db0) when is_binary(DbName) ->
     #{
         uuid := UUID,
-        md_version := MDVer
+        db_version := DBVer
     } = Db0,
     Db1 = sanitize(Db0),
     Head = {DbName, UUID,  '$1', '_'},
-    Guard = {'=<', '$1', MDVer},
-    Body = {DbName, UUID, MDVer, {const, Db1}},
+    Guard = {'=<', '$1', DBVer},
+    Body = {DbName, UUID, DBVer, {const, Db1}},
     try
         1 =:= ets:select_replace(?MODULE, [{Head, [Guard], [{Body}]}])
     catch
@@ -116,10 +116,10 @@ remove(DbName) when is_binary(DbName) ->
 maybe_remove(#{name := DbName} = Db) when is_binary(DbName) ->
     #{
         uuid := UUID,
-        md_version := MDVer
+        db_version := DBVer
     } = Db,
     Head = {DbName, UUID, '$1', '_'},
-    Guard = {'=<', '$1', MDVer},
+    Guard = {'=<', '$1', DBVer},
     1 =:= ets:select_delete(?MODULE, [{Head, [Guard], [true]}]).
 
 

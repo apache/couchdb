@@ -340,13 +340,18 @@ metadata_bump({DbName, _, _}) ->
     % Perform a random operation which calls ensure_current
     {ok, _} = fabric2_db:get_db_info(Db),
 
+    % After previous operation, the cache should have been cleared
+    ?assertMatch(undefined, fabric2_server:fetch(DbName, undefined)),
+
+    % Call open again and check that we have the latest db version
+    {ok, Db2} = fabric2_db:open(DbName, [{user_ctx, ?ADMIN_USER}]),
+
     % Check that db handle in the cache got the new metadata version
     % and that check_current_ts was updated
-    CachedDb = fabric2_server:fetch(DbName, undefined),
     ?assertMatch(#{
         md_version := NewMDVersion,
         check_current_ts := Ts
-    } when Ts >= TsBeforeEnsureCurrent, CachedDb).
+    } when Ts >= TsBeforeEnsureCurrent, Db2).
 
 
 db_version_bump({DbName, _, _}) ->
@@ -358,12 +363,12 @@ db_version_bump({DbName, _, _}) ->
     % regular db open + update security doc or something like that to make sure
     % we don't touch the local cache
     #{db_prefix := DbPrefix} = Db,
-    DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
     {ok, Fdb} = application:get_env(fabric, db),
-    NewDbVersion = fabric2_util:uuid(),
     erlfdb:transactional(Fdb, fun(Tx) ->
-        erlfdb:set(Tx, DbVersionKey, NewDbVersion),
-        erlfdb:set_versionstamped_value(Tx, ?METADATA_VERSION_KEY, <<0:112>>)
+        DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
+        DbVersion = fabric2_fdb:new_versionstamp(Tx),
+        DbVersionVal = erlfdb_tuple:pack_vs({DbVersion}),
+        ok = erlfdb:set_versionstamped_value(Tx, DbVersionKey, DbVersionVal)
     end),
 
     % Perform a random operation which calls ensure_current
@@ -375,15 +380,15 @@ db_version_bump({DbName, _, _}) ->
     % Call open again and check that we have the latest db version
     {ok, Db2} = fabric2_db:open(DbName, [{user_ctx, ?ADMIN_USER}]),
 
-    % Check that db handle in the cache got the new metadata version
-    ?assertMatch(#{db_version := NewDbVersion}, Db2).
+    % Check that db handle in the cache got a newer version
+    ?assert(maps:get(db_version, Db) < maps:get(db_version, Db2)).
 
 
 db_cache_doesnt_evict_newer_handles({DbName, _, _}) ->
     {ok, Db} = fabric2_db:open(DbName, [{user_ctx, ?ADMIN_USER}]),
     CachedDb = fabric2_server:fetch(DbName, undefined),
 
-    StaleDb = Db#{md_version := <<0>>},
+    StaleDb = Db#{db_version := <<0>>},
 
     ok = fabric2_server:store(StaleDb),
     ?assertEqual(CachedDb, fabric2_server:fetch(DbName, undefined)),
