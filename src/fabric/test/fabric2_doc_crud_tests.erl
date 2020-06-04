@@ -31,6 +31,7 @@ doc_crud_test_() ->
                 ?TDEF(open_missing_doc),
                 ?TDEF(create_new_doc),
                 ?TDEF(create_ddoc_basic),
+                ?TDEF(create_ddoc_multi),
                 ?TDEF(create_ddoc_requires_admin),
                 ?TDEF(create_ddoc_requires_validation),
                 ?TDEF(create_ddoc_requires_compilation),
@@ -109,6 +110,22 @@ create_ddoc_basic({Db, _}) ->
     {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Doc),
     NewDoc = Doc#doc{revs = {RevPos, [Rev]}},
     ?assertEqual({ok, NewDoc}, fabric2_db:open_doc(Db, Doc#doc.id)).
+
+
+create_ddoc_multi({Db, _}) ->
+    UUID1 = fabric2_util:uuid(),
+    Doc1 = #doc{
+        id = <<"_design/", UUID1/binary>>,
+        body = {[{<<"foo">>, <<"bar">>}]}
+    },
+    UUID2 = fabric2_util:uuid(),
+    Doc2 = #doc{
+        id = <<"_design/", UUID2/binary>>,
+        body = {[{<<"foo">>, <<"bar">>}]}
+    },
+    {ok, _} = fabric2_db:update_docs(Db, [Doc1, Doc2]),
+    ?assertMatch({ok, #doc{}}, fabric2_db:open_doc(Db, Doc1#doc.id)),
+    ?assertMatch({ok, #doc{}}, fabric2_db:open_doc(Db, Doc2#doc.id)).
 
 
 can_create_a_partitioned_ddoc({Db, _}) ->

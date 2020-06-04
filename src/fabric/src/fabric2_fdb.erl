@@ -189,7 +189,8 @@ create(#{} = Db0, Options) ->
     #{
         name := DbName,
         tx := Tx,
-        layer_prefix := LayerPrefix
+        layer_prefix := LayerPrefix,
+        md_version := MDVersion
     } = Db1 = ensure_current(Db0, false),
 
     DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
@@ -198,14 +199,20 @@ create(#{} = Db0, Options) ->
     DbPrefix = erlfdb_tuple:pack({?DBS, AllocPrefix}, LayerPrefix),
     erlfdb:set(Tx, DbKey, DbPrefix),
 
-    % This key is responsible for telling us when something in
-    % the database cache (i.e., fabric2_server's ets table) has
-    % changed and requires re-loading. This currently includes
-    % revs_limit and validate_doc_update functions. There's
-    % no order to versioning here. Its just a value that changes
-    % that is used in the ensure_current check.
+    % This is the key used by fabric2  to determine when we
+    % need to reopen a database. Currently setting db config
+    % values or updating design documents triggers a change
+    % to this value.
+    %
+    % On creation we're setting this to the current MDVersion
+    % because it is a valid versionstamp on the current cluster
+    % and also so that we don't have to use two transactions
+    % when creating a database. The addition of the 51 prefix
+    % and two trailing zeros changes the metadataVersion from
+    % a raw 80 bit versionstamp into a tuple encoded 96 bit
+    % versionstamp
     DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
-    DbVersion = fabric2_util:uuid(),
+    DbVersion = <<51, MDVersion/binary, 0, 0>>,
     erlfdb:set(Tx, DbVersionKey, DbVersion),
 
     UUID = fabric2_util:uuid(),
@@ -315,15 +322,14 @@ open(#{} = Db0, Options) ->
 refresh(#{tx := undefined, name := DbName} = Db) ->
     #{
         uuid := UUID,
-        md_version := OldVer
+        db_version := OldVer
     } = Db,
 
     case fabric2_server:fetch(DbName, UUID) of
-        % Relying on these assumptions about the `md_version` value:
-        %  - It is bumped every time `db_version` is bumped
+        % Relying on these assumptions about the `db_version` value:
         %  - Is a versionstamp, so we can check which one is newer
         %  - If it is `not_found`, it would sort less than a binary value
-        #{md_version := Ver} = Db1 when Ver > OldVer ->
+        #{db_version := Ver} = Db1 when Ver > OldVer ->
             Db1#{
                 user_ctx := maps:get(user_ctx, Db),
                 security_fun := maps:get(security_fun, Db)
@@ -574,8 +580,7 @@ set_config(#{} = Db0, Key, Val) when is_atom(Key) ->
     end,
     DbKey = erlfdb_tuple:pack({?DB_CONFIG, BinKey}, DbPrefix),
     erlfdb:set(Tx, DbKey, BinVal),
-    {ok, DbVersion} = bump_db_version(Db),
-    {ok, Db#{db_version := DbVersion, Key := Val}}.
+    bump_db_version(Db).
 
 
 get_stat(#{} = Db, StatKey) ->
@@ -1193,16 +1198,22 @@ debug_cluster(Start, End) ->
 
 init_db(Tx, DbName, Options) ->
     Prefix = get_dir(Tx),
-    Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
     #{
         name => DbName,
         tx => Tx,
         layer_prefix => Prefix,
-        md_version => Version,
+        md_version => get_md_version(Tx),
 
         security_fun => undefined,
         db_options => Options
     }.
+
+
+get_md_version(Tx) ->
+    case erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)) of
+        not_found -> <<0:80>>;
+        Version -> Version
+    end.
 
 
 maybe_add_sys_db_callbacks(Db) ->
@@ -1290,31 +1301,57 @@ load_validate_doc_funs(#{} = Db) ->
 
 ensure_current(#{} = Db0, CheckDbVersion) ->
     require_transaction(Db0),
-    Db3 = case check_metadata_version(Db0) of
-        {current, Db1} ->
-            Db1;
-        {stale, Db1} ->
-            case check_db_version(Db1, CheckDbVersion) of
-                current ->
-                    % If db version is current, update cache with the latest
-                    % metadata so other requests can immediately see the
-                    % refreshed db handle.
+    MDVersionChanged = check_metadata_version(Db0),
+
+    Db2 = case {MDVersionChanged, CheckDbVersion} of
+        {true, true} ->
+            ok = check_db_version(Db0),
+
+            % Don't update check_current_ts if it doesn't exist
+            case maps:is_key(check_current_ts, Db0) of
+                true ->
                     Now = erlang:monotonic_time(millisecond),
-                    Db2 = Db1#{check_current_ts := Now},
-                    fabric2_server:maybe_update(Db2),
-                    Db2;
-                stale ->
-                    fabric2_server:maybe_remove(Db1),
-                    throw({?MODULE, reopen})
+                    Db1 = Db0#{check_current_ts := Now},
+                    fabric2_server:maybe_update(Db1),
+                    Db1;
+                false ->
+                    Db0
+            end;
+        {true, false} ->
+            % This means we've only been asked to check that the
+            % MDVersion has changed when operating at the database
+            % level for creation and deletion operations.
+            ok;
+        {false, _} ->
+            % The MDVersion hasn't changed which means we can
+            % skip the db version check. However, we want to
+            % ensure that we set a read conflict in case its
+            % changed during this transaction.
+            %
+            % TODO: Is this necessary? Wouldn't metadtaVersion
+            % already have a conflict in place? Though does
+            % that mean that we're saving a key lookup for
+            % some cases but then retrying ~every transaction
+            % in flight when a ddoc is updated?
+            case maps:get(db_prefix, Db, not_found) of
+                not_found ->
+                    % There are a few cases like database creation
+                    % when the db version doesn't exist which means
+                    % there's nothing to conflict on.
+                    ok;
+                <<_/binary>> = DbPrefix ->
+                    DbVerKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
+                    erlfdb:add_read_conflict_key(Tx, DbVerKey)
             end
     end,
-    case maps:get(security_fun, Db3) of
+
+    case maps:get(security_fun, Db2) of
         SecurityFun when is_function(SecurityFun, 2) ->
-            #{security_doc := SecDoc} = Db3,
-            ok = SecurityFun(Db3, SecDoc),
-            Db3#{security_fun := undefined};
+            #{security_doc := SecDoc} = Db2,
+            ok = SecurityFun(Db2, SecDoc),
+            Db2#{security_fun := undefined};
         undefined ->
-            Db3
+            Db2
     end.
 
 
@@ -1332,24 +1369,13 @@ check_metadata_version(#{} = Db) ->
     } = Db,
 
     AlreadyChecked = get(?PDICT_CHECKED_MD_IS_CURRENT),
-    if AlreadyChecked == true -> {current, Db}; true ->
-        case erlfdb:wait(erlfdb:get_ss(Tx, ?METADATA_VERSION_KEY)) of
-            Version ->
+    if AlreadyChecked -> false; true ->
+        case Version == get_md_version(Tx) of
+            true ->
                 put(?PDICT_CHECKED_MD_IS_CURRENT, true),
-                % We want to set a read conflict on the db version as we'd want
-                % to conflict with any writes to this particular db. However
-                % during db creation db prefix might not exist yet so we don't
-                % add a read-conflict on it then.
-                case maps:get(db_prefix, Db, not_found) of
-                    not_found ->
-                        ok;
-                    <<_/binary>> = DbPrefix ->
-                        DbVerKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
-                        erlfdb:add_read_conflict_key(Tx, DbVerKey)
-                end,
-                {current, Db};
-            NewVersion ->
-                {stale, Db#{md_version := NewVersion}}
+                false;
+            false ->
+                true
         end
     end.
 
@@ -1361,13 +1387,15 @@ bump_db_version(#{} = Db) ->
     } = Db,
 
     DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
-    DbVersion = fabric2_util:uuid(),
-    ok = erlfdb:set(Tx, DbVersionKey, DbVersion),
+    DbVersion = new_versionstamp(Tx),
+    DbVersionVal = erlfdb_tuple:pack_vs({DbVersion}),
+
+    ok = erlfdb:set_versionstamped_value(Tx, DbVersionKey, DbVersionVal),
     ok = bump_metadata_version(Tx),
-    {ok, DbVersion}.
+    ok.
 
 
-check_db_version(#{} = Db, CheckDbVersion) ->
+check_db_version(#{} = Db) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix,
@@ -1375,16 +1403,16 @@ check_db_version(#{} = Db, CheckDbVersion) ->
     } = Db,
 
     AlreadyChecked = get(?PDICT_CHECKED_DB_IS_CURRENT),
-    if not CheckDbVersion orelse AlreadyChecked == true -> current; true ->
+    if AlreadyChecked -> ok; true ->
         DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
-        case erlfdb:wait(erlfdb:get(Tx, DbVersionKey)) of
-            DbVersion ->
-                put(?PDICT_CHECKED_DB_IS_CURRENT, true),
-                current;
-            _NewDBVersion ->
-                stale
-        end
-    end.
+        CurrVersion = erlfdb:wait(erlfdb:get(Tx, DbVersionKey)),
+        if CurrVersion == DbVersion -> ok; true ->
+            fabric2_server:maybe_remove(Db),
+            throw({?MODULE, reopen})
+        end,
+        put(?PDICT_CHECKED_DB_IS_CURRENT, true)
+    end,
+    ok.
 
 
 soft_delete_db(Db) ->
@@ -1926,20 +1954,20 @@ check_db_instance(undefined) ->
 
 check_db_instance(#{} = Db) ->
     require_transaction(Db),
-    case check_metadata_version(Db) of
-        {current, Db1} ->
-            Db1;
-        {stale, Db1} ->
-            #{
-                tx := Tx,
-                uuid := UUID,
-                db_prefix := DbPrefix
-            } = Db1,
-            UUIDKey = erlfdb_tuple:pack({?DB_CONFIG, <<"uuid">>}, DbPrefix),
-            case erlfdb:wait(erlfdb:get(Tx, UUIDKey)) of
-                UUID -> Db1;
-                _ -> error(database_does_not_exist)
-            end
+    try check_metadata_version(Db) of
+        ok ->
+            Db
+    catch throw:{?MODULE, reopen} ->
+        #{
+            tx := Tx,
+            uuid := UUID,
+            db_prefix := DbPrefix
+        } = Db,
+        UUIDKey = erlfdb_tuple:pack({?DB_CONFIG, <<"uuid">>}, DbPrefix),
+        case erlfdb:wait(erlfdb:get(Tx, UUIDKey)) of
+            UUID -> Db;
+            _ -> error(database_does_not_exist)
+        end
     end.
 
 
