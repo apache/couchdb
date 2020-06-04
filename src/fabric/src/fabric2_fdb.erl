@@ -107,6 +107,7 @@
     db_prefix,
     changes_future,
     meta_future,
+    uuid_future,
     retries = 0
 }).
 
@@ -494,6 +495,9 @@ get_info_future(Tx, DbPrefix) ->
         {reverse, true}
     ]),
 
+    UUIDKey = erlfdb_tuple:pack({?DB_CONFIG, <<"uuid">>}, DbPrefix),
+    UUIDFuture = erlfdb:get(Tx, UUIDKey),
+
     StatsPrefix = erlfdb_tuple:pack({?DB_STATS}, DbPrefix),
     MetaFuture = erlfdb:get_range_startswith(Tx, StatsPrefix),
 
@@ -508,7 +512,8 @@ get_info_future(Tx, DbPrefix) ->
         tx = SaveTx,
         db_prefix = DbPrefix,
         changes_future = ChangesFuture,
-        meta_future = MetaFuture
+        meta_future = MetaFuture,
+        uuid_future = UUIDFuture
     }.
 
 
@@ -1986,6 +1991,7 @@ get_info_wait_int(#info_future{} = InfoFuture) ->
     #info_future{
         db_prefix = DbPrefix,
         changes_future = ChangesFuture,
+        uuid_future = UUIDFuture,
         meta_future = MetaFuture
     } = InfoFuture,
 
@@ -1997,6 +2003,8 @@ get_info_wait_int(#info_future{} = InfoFuture) ->
             vs_to_seq(SeqVS)
     end,
     CProp = {update_seq, RawSeq},
+
+    UUIDProp = {uuid, erlfdb:wait(UUIDFuture)},
 
     MProps = lists:foldl(fun({K, V}, Acc) ->
         case erlfdb_tuple:unpack(K, DbPrefix) of
@@ -2014,7 +2022,7 @@ get_info_wait_int(#info_future{} = InfoFuture) ->
         end
     end, [{sizes, {[]}}], erlfdb:wait(MetaFuture)),
 
-    [CProp | MProps].
+    [CProp, UUIDProp | MProps].
 
 
 binary_chunk_size() ->

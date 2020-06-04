@@ -75,7 +75,10 @@ empty_db_info({DbName, Db, _}) ->
     ?assertEqual(DbName, fabric2_util:get_value(db_name, Info)),
     ?assertEqual(0, fabric2_util:get_value(doc_count, Info)),
     ?assertEqual(0, fabric2_util:get_value(doc_del_count, Info)),
-    ?assert(is_binary(fabric2_util:get_value(update_seq, Info))).
+    ?assert(is_binary(fabric2_util:get_value(update_seq, Info))),
+    InfoUUID = fabric2_util:get_value(uuid, Info),
+    UUID = fabric2_db:get_uuid(Db),
+    ?assertEqual(UUID, InfoUUID).
 
 
 accessors({DbName, Db, _}) ->
