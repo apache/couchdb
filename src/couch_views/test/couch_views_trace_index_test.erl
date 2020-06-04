@@ -88,6 +88,8 @@ trace_single_doc(Db) ->
     meck:expect(couch_jobs, accept, 2, {ok, job, JobData}),
     meck:expect(couch_jobs, update, 3, {ok, job}),
     meck:expect(couch_jobs, finish, 3, ok),
+    meck:expect(couch_views_server, accepted, 1, ok),
+
     put(erlfdb_trace, <<"views_write_one_doc">>),
     couch_views_indexer:init(),
 
