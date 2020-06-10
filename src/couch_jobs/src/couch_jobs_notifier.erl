@@ -115,7 +115,7 @@ handle_cast(Msg, St) ->
 
 handle_info({type_updated, VS}, St) ->
     VSMax = flush_type_updated_messages(VS),
-    {noreply, notify_subscribers(VSMax, St)};
+    {noreply, try_notify_subscribers(VSMax, St)};
 
 handle_info({Ref, ready}, St) when is_reference(Ref) ->
     % Don't crash out couch_jobs_server and the whole application would need to
@@ -226,6 +226,15 @@ get_active_since(#st{jtx = JTx, type = Type, subs = Subs}, VS) ->
     maps:map(fun(_JobId, Data) ->
         {VS, running, Data}
     end, maps:with(maps:keys(Subs), AllUpdated)).
+
+
+try_notify_subscribers(ActiveVS, #st{} = St) ->
+    try
+        notify_subscribers(ActiveVS, St)
+    catch
+        error:{timeout, _} -> try_notify_subscribers(ActiveVS, St);
+        error:{erlfdb_error, 1031} -> try_notify_subscribers(ActiveVS, St)
+    end.
 
 
 notify_subscribers(_, #st{subs = Subs} = St) when map_size(Subs) =:= 0 ->
