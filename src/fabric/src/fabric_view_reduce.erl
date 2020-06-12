@@ -57,6 +57,8 @@ go(Db, DDoc, VName, Args, Callback, Acc, VInfo) ->
                     "reduce_view"
                 ),
                 Callback({error, timeout}, Acc);
+            {error, {forbidden, Error, _Stacktrace}} ->
+                {error, {forbidden, Error}};
             {error, Error} ->
                 Callback({error, Error}, Acc)
         end

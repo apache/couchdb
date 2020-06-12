@@ -376,6 +376,7 @@ query_view(Db, DDoc, VName, Args) ->
 query_view(Db, DDoc, VName, Args, Callback, Acc) when is_list(Args) ->
     query_view(Db, DDoc, VName, to_mrargs(Args), Callback, Acc);
 query_view(Db, DDoc, VName, Args0, Callback, Acc0) ->
+    ok = couch_util:validate_design_access(Db, DDoc),
     case couch_mrview_util:get_view(Db, DDoc, VName, Args0) of
         {ok, VInfo, Sig, Args} ->
             {ok, Acc1} = case Args#mrargs.preflight_fun of

@@ -52,6 +52,10 @@ to_json_rev(Start, [FirstRevId|_]) ->
 to_json_body(Del, Body) ->
     to_json_body(Del, Body, []).
 
+to_json_body(true, {Body}, []) ->
+    Body ++ [{<<"_deleted">>, true}];
+to_json_body(false, {Body}, []) ->
+    Body;
 to_json_body(true, {Body}, Access0) ->
     Access = reduce_access(Access0),
     Body ++ [{<<"_deleted">>, true}] ++ [{<<"_access">>, {Access}}];

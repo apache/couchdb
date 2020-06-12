@@ -251,7 +251,10 @@ sort_and_tag_grouped_docs(Client, GroupedDocs) ->
     % The merge_updates function will fail and the database can end up with
     % duplicate documents if the incoming groups are not sorted, so as a sanity
     % check we sort them again here. See COUCHDB-2735.
-    Cmp = fun([#doc{id=A}|_], [#doc{id=B}|_]) -> A < B end,
+    Cmp = fun
+        ([], []) -> false;
+        ([#doc{id=A}|_], [#doc{id=B}|_]) -> A < B
+     end,
     lists:map(fun(DocGroup) ->
         [{Client, maybe_tag_doc(D)} || D <- DocGroup]
     end, lists:sort(Cmp, GroupedDocs)).
@@ -302,7 +305,6 @@ init_db(DbName, FilePath, EngineState, Options) ->
     BDU = couch_util:get_value(before_doc_update, Options, nil),
     ADR = couch_util:get_value(after_doc_read, Options, nil),
     Access = couch_util:get_value(access, Options, false),
-
     NonCreateOpts = [Opt || Opt <- Options, Opt /= create],
 
     InitDb = #db{
@@ -444,11 +446,18 @@ doc_tag(#doc{meta=Meta}) ->
         Else -> throw({invalid_doc_tag, Else})
     end.
 
+% couch_db_updater:merge_rev_trees([[],[]] = NewDocs,[] = OldDocs,{merge_acc,1000,false,[],[],0,[]}=Acc]
+
 merge_rev_trees([], [], Acc) ->
     {ok, Acc#merge_acc{
         add_infos = lists:reverse(Acc#merge_acc.add_infos)
     }};
 merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
+    couch_log:info("~nNewDocs: ~p~n", [NewDocs]),
+    couch_log:info("~nRestDocsList: ~p~n", [RestDocsList]),
+    couch_log:info("~nOldDocInfo: ~p~n", [OldDocInfo]),
+    couch_log:info("~nRestOldInfo: ~p~n", [RestOldInfo]),
+    couch_log:info("~nAcc: ~p~n", [Acc]),
     #merge_acc{
         revs_limit = Limit,
         merge_conflicts = MergeConflicts,
@@ -660,6 +669,9 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
         cur_seq = UpdateSeq,
         full_partitions = FullPartitions
     },
+    couch_log:info("~nDocsList: ~p~n", [DocsList]),
+    couch_log:info("~nOldDocInfos: ~p~n", [OldDocInfos]),
+    couch_log:info("~nAccIn: ~p~n", [AccIn]),
     {ok, AccOut} = merge_rev_trees(DocsList, OldDocInfos, AccIn),
     #merge_acc{
         add_infos = NewFullDocInfos,
@@ -670,7 +682,7 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
     % the trees, the attachments are already written to disk)
     {ok, IndexFDIs} = flush_trees(Db, NewFullDocInfos, []),
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
-    LocalDocs1 = apply_local_docs_access(LocalDocs),
+    LocalDocs1 = apply_local_docs_access(Db, LocalDocs),
     LocalDocs2 = update_local_doc_revs(LocalDocs1),
 
     {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
@@ -694,7 +706,12 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
 
     {ok, commit_data(Db1), UpdatedDDocIds}.
 
-apply_local_docs_access(Docs) ->
+apply_local_docs_access(Db, Docs) ->
+    apply_local_docs_access1(couch_db:has_access_enabled(Db), Docs).
+
+apply_local_docs_access1(false, Docs) ->
+    Docs;
+apply_local_docs_access1(true, Docs) ->
     lists:map(fun({Client, #doc{access = Access, body = {Body}} = Doc}) ->
         Doc1 = Doc#doc{body = {[{<<"_access">>, Access} | Body]}},
         {Client, Doc1}

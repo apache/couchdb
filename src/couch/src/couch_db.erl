@@ -281,8 +281,8 @@ wait_for_compaction(#db{main_pid=Pid}=Db, Timeout) ->
             ok
     end.
 
-has_access_enabled(#db{access=false}) -> false;
-has_access_enabled(_) -> true.
+has_access_enabled(#db{access=true}) -> true;
+has_access_enabled(_) -> false.
 
 delete_doc(Db, Id, Revisions) ->
     DeletedDocs = [#doc{id=Id, revs=[Rev], deleted=true} || Rev <- Revisions],
@@ -1788,9 +1788,14 @@ open_doc_revs_int(Db, IdRevs, Options) ->
 open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, Options) ->
     case couch_db_engine:open_local_docs(Db, [Id]) of
     [#doc{} = Doc] ->
-        { Body } = Doc#doc.body,
-        Access = couch_util:get_value(<<"_access">>, Body),
-        apply_open_options(Db, {ok, Doc#doc{access = Access}}, Options);
+        couch_log:info("~nopen_doc_int: Doc: ~p~n", [Doc]),
+        case Doc#doc.body of
+            { Body } ->
+                Access = couch_util:get_value(<<"_access">>, Body),
+                apply_open_options(Db, {ok, Doc#doc{access = Access}}, Options);
+            _Else ->
+                apply_open_options(Db, {ok, Doc}, Options)
+        end;
     [not_found] ->
         {not_found, missing}
     end;

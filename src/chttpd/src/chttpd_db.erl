@@ -106,7 +106,8 @@ handle_changes_req1(#httpd{}=Req, Db) ->
         Etag = chttpd:make_etag({Info, Suffix}),
         DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
         couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
-        chttpd:etag_respond(Req, Etag, fun() ->
+        couch_log:debug("~nhuhu: ~p~n", [huhu]),
+        case chttpd:etag_respond(Req, Etag, fun() ->
             Acc0 = #cacc{
                 feed = normal,
                 etag = Etag,
@@ -114,7 +115,12 @@ handle_changes_req1(#httpd{}=Req, Db) ->
                 threshold = Max
             },
             fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
-        end);
+        end) of
+            {error, {forbidden, Message, _Stacktrace}} ->
+                throw({forbidden, Message});
+            Response ->
+                Response
+        end;
     Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource"  ->
         couch_stats:increment_counter([couchdb, httpd, clients_requesting_changes]),
         Acc0 = #cacc{
@@ -123,7 +129,12 @@ handle_changes_req1(#httpd{}=Req, Db) ->
             threshold = Max
         },
         try
-            fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
+            case fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs) of
+                {error, {forbidden, Message, _Stacktrace}} ->
+                    throw({forbidden, Message});
+                Response ->
+                    Response
+            end
         after
             couch_stats:decrement_counter([couchdb, httpd, clients_requesting_changes])
         end;

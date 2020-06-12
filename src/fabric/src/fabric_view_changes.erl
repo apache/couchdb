@@ -63,16 +63,20 @@ go(DbName, "normal", Options, Callback, Acc0) ->
     case validate_start_seq(DbName, Since) of
     ok ->
         {ok, Acc} = Callback(start, Acc0),
-        {ok, Collector} = send_changes(
+        catch case send_changes(
             DbName,
             Args,
             Callback,
             Since,
             Acc,
             5000
-        ),
-        #collector{counters=Seqs, user_acc=AccOut, offset=Offset} = Collector,
-        Callback({stop, pack_seqs(Seqs), pending_count(Offset)}, AccOut);
+        ) of
+            {ok, Collector} ->
+                #collector{counters=Seqs, user_acc=AccOut, offset=Offset} = Collector,
+                Callback({stop, pack_seqs(Seqs), pending_count(Offset)}, AccOut);
+            {error, Error} ->
+                throw(Error)
+        end;       
     Error ->
         Callback(Error, Acc0)
     end.

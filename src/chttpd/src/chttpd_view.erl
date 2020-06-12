@@ -51,9 +51,13 @@ fabric_query_view(Db, Req, DDoc, ViewName, Args) ->
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
-    {ok, Resp} = fabric:query_view(Db, Options, DDoc, ViewName,
-            fun view_cb/2, VAcc, Args),
-    {ok, Resp#vacc.resp}.
+    case fabric:query_view(Db, Options, DDoc, ViewName,
+            fun view_cb/2, VAcc, Args) of
+        {ok, Resp} ->
+            {ok, Resp#vacc.resp};
+        {error, Error} ->
+            throw(Error)
+    end.
 
 
 view_cb({row, Row} = Msg, Acc) ->
@@ -70,7 +74,6 @@ view_cb(Msg, Acc) ->
 
 handle_view_req(#httpd{method='POST',
     path_parts=[_, _, _, _, ViewName, <<"queries">>]}=Req, Db, DDoc) ->
-    ok =  couch_util:validate_design_access(DDoc),
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     case couch_mrview_util:get_view_queries(Props) of
@@ -87,14 +90,12 @@ handle_view_req(#httpd{path_parts=[_, _, _, _, _, <<"queries">>]}=Req,
 
 handle_view_req(#httpd{method='GET',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
-    ok =  couch_util:validate_design_access(DDoc),
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
     design_doc_view(Req, Db, DDoc, ViewName, Keys);
 
 handle_view_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
-    ok =  couch_util:validate_design_access(DDoc),
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     assert_no_queries_param(couch_mrview_util:get_view_queries(Props)),
