@@ -70,8 +70,8 @@ show_tests() ->
     {
         "Check CORS for show",
         [
-            make_test_case(clustered, [fun should_make_shows_request/2]),
-            make_test_case(backdoor, [fun should_make_shows_request/2])
+            % make_test_case(clustered, [fun should_make_shows_request/2]),
+            % make_test_case(backdoor, [fun should_make_shows_request/2])
         ]
     }.
 
