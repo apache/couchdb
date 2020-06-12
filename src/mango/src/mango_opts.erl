@@ -64,6 +64,12 @@ validate_idx_create({Props}) ->
             {optional, true},
             {default, auto_name},
             {validator, fun validate_idx_name/1}
+        ]},
+        {<<"w">>, [
+            {tag, w},
+            {optional, true},
+            {default, 2},
+            {validator, fun is_pos_integer/1}
         ]}
     ],
     validate(Props, Opts).
@@ -110,6 +116,12 @@ validate_find({Props}) ->
             {optional, true},
             {default, []},
             {validator, fun validate_fields/1}
+        ]},
+        {<<"r">>, [
+            {tag, r},
+            {optional, true},
+            {default, 1},
+            {validator, fun mango_opts:is_pos_integer/1}
         ]},
         {<<"conflicts">>, [
             {tag, conflicts},
