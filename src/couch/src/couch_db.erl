@@ -744,21 +744,25 @@ security_error_type(#user_ctx{name=null}) ->
 security_error_type(#user_ctx{name=_}) ->
     forbidden.
 
-validate_access(Db, #doc{meta=Meta}=Doc) ->
+validate_access(Db, Doc) ->
+    validate_access1(has_access_enabled(Db), Db, Doc).
+
+validate_access1(false, _Db, _Doc) -> ok;
+validate_access1(true, Db, #doc{meta=Meta}=Doc) ->
     case proplists:get_value(conflicts, Meta) of
         undefined -> % no conflicts
-            validate_access1(Db, Doc);
+            validate_access2(Db, Doc);
         _Else -> % only admins can read conflicted docs in _access dbs
             case is_admin(Db) of
                 true -> ok;
                 _Else2 -> throw({forbidden, <<"document is in conflict">>})
             end
     end.
-validate_access1(Db, Doc) ->
-    validate_access2(check_access(Db, Doc)).
+validate_access2(Db, Doc) ->
+    validate_access3(check_access(Db, Doc)).
 
-validate_access2(true) -> ok;
-validate_access2(_) -> throw({forbidden, <<"can't touch this">>}).
+validate_access3(true) -> ok;
+validate_access3(_) -> throw({forbidden, <<"can't touch this">>}).
 
 check_access(Db, #doc{access=Access}=Doc) ->
     % couch_log:info("~ncheck da access, Doc: ~p, Db: ~p~n", [Doc, Db]),
@@ -1588,9 +1592,9 @@ is_active_stream(Db, StreamEngine) ->
     couch_db_engine:is_active_stream(Db, StreamEngine).
 
 changes_since(Db, StartSeq, Fun, Options, Acc) when is_record(Db, db) ->
-    case couch_db:is_admin(Db) of
-        true -> couch_db_engine:fold_changes(Db, StartSeq, Fun, Options, Acc);
-        false -> couch_mrview:query_changes_access(Db, StartSeq, Fun, Options, Acc)
+    case couch_db:has_access_enabled(Db) and not couch_db:is_admin(Db) of
+        true -> couch_mrview:query_changes_access(Db, StartSeq, Fun, Options, Acc);
+        false -> couch_db_engine:fold_changes(Db, StartSeq, Fun, Options, Acc)
     end.
 
 % TODO: nicked from couch_mrview, maybe move to couch_mrview.hrl
@@ -1728,9 +1732,9 @@ fold_changes(Db, StartSeq, UserFun, UserAcc) ->
     fold_changes(Db, StartSeq, UserFun, UserAcc, []).
 
 fold_changes(Db, StartSeq, UserFun, UserAcc, Opts) ->
-    case couch_db:is_admin(Db) of
-        true -> couch_db_engine:fold_changes(Db, StartSeq, UserFun, UserAcc, Opts);
-        false -> couch_mrview:query_changes_access(Db, StartSeq, UserFun, Opts, UserAcc)
+    case couch_db:has_access_enabled(Db) and not couch_db:is_admin(Db) of
+        true -> couch_mrview:query_changes_access(Db, StartSeq, UserFun, Opts, UserAcc);
+        false -> couch_db_engine:fold_changes(Db, StartSeq, UserFun, UserAcc, Opts)
     end.
 
 fold_purge_infos(Db, StartPurgeSeq, Fun, Acc) ->

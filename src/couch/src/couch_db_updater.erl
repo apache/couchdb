@@ -453,11 +453,11 @@ merge_rev_trees([], [], Acc) ->
         add_infos = lists:reverse(Acc#merge_acc.add_infos)
     }};
 merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
-    couch_log:info("~nNewDocs: ~p~n", [NewDocs]),
-    couch_log:info("~nRestDocsList: ~p~n", [RestDocsList]),
-    couch_log:info("~nOldDocInfo: ~p~n", [OldDocInfo]),
-    couch_log:info("~nRestOldInfo: ~p~n", [RestOldInfo]),
-    couch_log:info("~nAcc: ~p~n", [Acc]),
+    % couch_log:info("~nNewDocs: ~p~n", [NewDocs]),
+    % couch_log:info("~nRestDocsList: ~p~n", [RestDocsList]),
+    % couch_log:info("~nOldDocInfo: ~p~n", [OldDocInfo]),
+    % couch_log:info("~nRestOldInfo: ~p~n", [RestOldInfo]),
+    % couch_log:info("~nAcc: ~p~n", [Acc]),
     #merge_acc{
         revs_limit = Limit,
         merge_conflicts = MergeConflicts,
@@ -669,9 +669,9 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
         cur_seq = UpdateSeq,
         full_partitions = FullPartitions
     },
-    couch_log:info("~nDocsList: ~p~n", [DocsList]),
-    couch_log:info("~nOldDocInfos: ~p~n", [OldDocInfos]),
-    couch_log:info("~nAccIn: ~p~n", [AccIn]),
+    % couch_log:info("~nDocsList: ~p~n", [DocsList]),
+    % couch_log:info("~nOldDocInfos: ~p~n", [OldDocInfos]),
+    % couch_log:info("~nAccIn: ~p~n", [AccIn]),
     {ok, AccOut} = merge_rev_trees(DocsList, OldDocInfos, AccIn),
     #merge_acc{
         add_infos = NewFullDocInfos,
