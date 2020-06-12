@@ -922,12 +922,21 @@ view_cb(Msg, Acc) ->
     couch_mrview_http:view_cb(Msg, Acc).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
-    % check for the existence of the doc to handle the 404 case.
-    OldDoc = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
-    NewRevs = couch_doc:parse_rev(chttpd:qs_value(Req, "rev")),
-    NewBody = {[{<<"_deleted">>}, true]},
-    NewDoc = OldDoc#doc{revs=NewRevs, body=NewBody},
-    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, NewDoc));
+    couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
+    case chttpd:qs_value(Req, "rev") of
+    undefined ->
+       Body = {[{<<"_deleted">>,true}]};
+    Rev ->
+       Body = {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}
+    end,
+    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, Body));
+
+    % % check for the existence of the doc to handle the 404 case.
+    % OldDoc = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
+    % NewRevs = couch_doc:parse_rev(chttpd:qs_value(Req, "rev")),
+    % NewBody = {[{<<"_deleted">>}, true]},
+    % NewDoc = OldDoc#doc{revs=NewRevs, body=NewBody},
+    % send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, NewDoc));
 
 db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
     #doc_query_args{
