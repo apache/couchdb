@@ -170,12 +170,20 @@ update(Idx, Mod, IdxState) ->
                 %     {#doc{id=DocId, deleted=true}, Seq};
                 _ ->
                     {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
-                    [RevInfo] = DocInfo#doc_info.revs,
-                    Doc1 = Doc#doc{
-                        meta = [{body_sp, RevInfo#rev_info.body_sp}],
-                        access = Access
-                    },
-                    {Doc1, Seq}
+                    couch_log:info("~nindexx updateder: ~p~n", [DocInfo#doc_info.revs]),
+                    case IndexName of
+                        <<"_design/_access">> ->
+                            % TODO: hande conflicted docs in _access index
+                            % probably remove
+                            [RevInfo|_] = DocInfo#doc_info.revs,
+                            Doc1 = Doc#doc{
+                                meta = [{body_sp, RevInfo#rev_info.body_sp}],
+                                access = Access
+                            },
+                            {Doc1, Seq};
+                        _Else ->
+                            {Doc, Seq}
+                    end
             end
         end,
 
