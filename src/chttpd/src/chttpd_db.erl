@@ -921,14 +921,21 @@ view_cb(Msg, Acc) ->
     couch_mrview_http:view_cb(Msg, Acc).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
-    couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
-    case chttpd:qs_value(Req, "rev") of
+    couch_log:info("~nDb: ~p~n", [Db]),
+    couch_log:info("~nDocId: ~p~n", [DocId]),
+    Doc0 = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
+    couch_log:info("~nRes: ~p~n", [Doc0]),
+    Revs = chttpd:qs_value(Req, "rev"),
+    case Revs of
     undefined ->
        Body = {[{<<"_deleted">>,true}]};
     Rev ->
-       Body = {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}
+       Body = {[{<<"_rev">>, ?l2b(Revs)},{<<"_deleted">>,true}]}
     end,
-    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, Body));
+    % Doc0 = couch_doc_from_req(Req, Db, DocId, Body),
+    Doc = Doc0#doc{revs=Revs},
+    couch_log:info("~nDoc: ~p~n", [Doc]),
+    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, Doc));
 
     % % check for the existence of the doc to handle the 404 case.
     % OldDoc = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
