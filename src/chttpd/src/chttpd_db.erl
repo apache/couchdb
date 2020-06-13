@@ -106,7 +106,6 @@ handle_changes_req1(#httpd{}=Req, Db) ->
         Etag = chttpd:make_etag({Info, Suffix}),
         DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
         couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
-        couch_log:debug("~nhuhu: ~p~n", [huhu]),
         case chttpd:etag_respond(Req, Etag, fun() ->
             Acc0 = #cacc{
                 feed = normal,
