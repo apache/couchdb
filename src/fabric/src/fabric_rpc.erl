@@ -49,13 +49,13 @@ changes(DbName, Options, StartVector, DbOptions) ->
     Args = case Filter of
         {fetch, custom, Style, Req, {DDocId, Rev}, FName} ->
             {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
-            ok = couch_util:validate_design_access(DDoc),
+            % ok = couch_util:validate_design_access(DDoc),
             Args0#changes_args{
                 filter_fun={custom, Style, Req, DDoc, FName}
             };
         {fetch, view, Style, {DDocId, Rev}, VName} ->
             {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
-            ok = couch_util:validate_design_access(DDoc),
+            % ok = couch_util:validate_design_access(DDoc),
             Args0#changes_args{filter_fun={view, Style, DDoc, VName}};
         _ ->
             Args0
