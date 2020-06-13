@@ -73,7 +73,6 @@ handle_doc_show(Req, Db, DDoc, ShowName, Doc) ->
     handle_doc_show(Req, Db, DDoc, ShowName, Doc, null).
 
 handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
-    ok = couch_util:validate_design_access(DDoc),
     %% Will throw an exception if the _show handler is missing
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"shows">>, ShowName]),
     % get responder for ddoc/showname
@@ -123,8 +122,6 @@ handle_doc_update_req(Req, _Db, _DDoc) ->
     chttpd:send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
 
 send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
-    couch_log:info("~nDDoc: ~p~n", [DDoc]),
-    ok = couch_util:validate_design_access(DDoc),
     %% Will throw an exception if the _update handler is missing
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"updates">>, UpdateName]),
     JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
@@ -206,7 +203,6 @@ handle_view_list_req(Req, _Db, _DDoc) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
 handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
-    ok = couch_util:validate_design_access(DDoc),
     %% Will throw an exception if the _list handler is missing
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"lists">>, LName]),
     DbName = couch_db:name(Db),

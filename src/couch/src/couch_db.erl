@@ -284,6 +284,9 @@ wait_for_compaction(#db{main_pid=Pid}=Db, Timeout) ->
 has_access_enabled(#db{access=true}) -> true;
 has_access_enabled(_) -> false.
 
+is_read_from_ddoc_cache(Options) ->
+    lists:member(ddoc_cache, Options).
+
 delete_doc(Db, Id, Revisions) ->
     DeletedDocs = [#doc{id=Id, revs=[Rev], deleted=true} || Rev <- Revisions],
     {ok, [Result]} = update_docs(Db, DeletedDocs, []),
@@ -302,26 +305,26 @@ open_doc(Db, Id, Options0) ->
     {ok, #doc{deleted=true}=Doc} ->
         case lists:member(deleted, Options) of
         true ->
-            apply_open_options(Db, {ok, Doc},Options);
+            {ok, Doc};
         false ->
             {not_found, deleted}
         end;
     Else ->
-        apply_open_options(Db, Else,Options)
+        Else
     end.
 
 apply_open_options(Db, {ok, Doc}, Options) ->
-    ok = validate_access(Db, Doc),
+    ok = validate_access(Db, Doc, Options),
     apply_open_options1({ok, Doc}, Options);
 apply_open_options(_Db, Else, _Options) ->
     Else.
 
-apply_open_options1({ok, Doc},Options) ->
-    apply_open_options2(Doc,Options);
-apply_open_options1(Else,_Options) ->
+apply_open_options1({ok, Doc}, Options) ->
+    apply_open_options2(Doc, Options);
+apply_open_options1(Else, _Options) ->
     Else.
 
-apply_open_options2(Doc,[]) ->
+apply_open_options2(Doc, []) ->
     {ok, Doc};
 apply_open_options2(#doc{atts=Atts0,revs=Revs}=Doc,
         [{atts_since, PossibleAncestors}|Rest]) ->
@@ -335,8 +338,8 @@ apply_open_options2(#doc{atts=Atts0,revs=Revs}=Doc,
     apply_open_options2(Doc#doc{atts=Atts}, Rest);
 apply_open_options2(Doc, [ejson_body | Rest]) ->
     apply_open_options2(couch_doc:with_ejson_body(Doc), Rest);
-apply_open_options2(Doc,[_|Rest]) ->
-    apply_open_options2(Doc,Rest).
+apply_open_options2(Doc, [_|Rest]) ->
+    apply_open_options2(Doc, Rest).
 
 
 find_ancestor_rev_pos({_, []}, _AttsSinceRevs) ->
@@ -745,13 +748,19 @@ security_error_type(#user_ctx{name=_}) ->
     forbidden.
 
 validate_access(Db, Doc) ->
-    validate_access1(has_access_enabled(Db), Db, Doc).
+    validate_access(Db, Doc, []).
 
-validate_access1(false, _Db, _Doc) -> ok;
-validate_access1(true, Db, #doc{meta=Meta}=Doc) ->
+validate_access(Db, Doc, Options) ->
+    validate_access1(has_access_enabled(Db), Db, Doc, Options).
+
+validate_access1(false, _Db, _Doc, _Options) -> ok;
+validate_access1(true, Db, #doc{meta=Meta}=Doc, Options) ->
     case proplists:get_value(conflicts, Meta) of
         undefined -> % no conflicts
-            validate_access2(Db, Doc);
+            case is_read_from_ddoc_cache(Options) of
+                true -> throw({not_found, missing});
+                _False -> validate_access2(Db, Doc)
+            end;
         _Else -> % only admins can read conflicted docs in _access dbs
             case is_admin(Db) of
                 true -> ok;
