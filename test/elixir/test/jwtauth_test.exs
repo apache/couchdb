@@ -138,6 +138,26 @@ defmodule JwtAuthTest do
     assert resp.body["info"]["authenticated"] == "default"
   end
 
+  test "jwt auth with not required but present (in token) iss claim", _context do
+
+    secret = "zxczxc12zxczxc12"
+
+    server_config = [
+      %{
+        :section => "jwt_keys",
+        :key => "hmac:_default",
+        :value => :base64.encode(secret)
+      },
+      %{
+        :section => "jwt_auth",
+        :key => "allowed_algorithms",
+        :value => "HS256, HS384, HS512"
+      }
+    ]
+
+    run_on_modified_server(server_config, fn -> good_iss("HS256", secret) end)
+  end
+
   test "jwt auth with required iss claim", _context do
 
     secret = "zxczxc12zxczxc12"

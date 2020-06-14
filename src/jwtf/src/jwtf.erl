@@ -204,6 +204,8 @@ validate_iss(Props, Checks) ->
     case {ExpectedISS, ActualISS} of
         {undefined, undefined} ->
             ok;
+        {undefined, ISS} when ISS /= undefined ->
+            ok;
         {ISS, undefined} when ISS /= undefined ->
             throw({bad_request, <<"Missing iss claim">>});
         {ISS, ISS} ->
