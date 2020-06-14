@@ -747,6 +747,11 @@ security_error_type(#user_ctx{name=null}) ->
 security_error_type(#user_ctx{name=_}) ->
     forbidden.
 
+is_per_user_ddoc(#doc{access=[]}) -> false;
+is_per_user_ddoc(#doc{access=[<<"_users">>]}) -> false;
+is_per_user_ddoc(_) -> true;
+    
+
 validate_access(Db, Doc) ->
     validate_access(Db, Doc, []).
 
@@ -757,7 +762,7 @@ validate_access1(false, _Db, _Doc, _Options) -> ok;
 validate_access1(true, Db, #doc{meta=Meta}=Doc, Options) ->
     case proplists:get_value(conflicts, Meta) of
         undefined -> % no conflicts
-            case is_read_from_ddoc_cache(Options) of
+            case is_read_from_ddoc_cache(Options) andalso is_per_user_ddoc(Doc) of
                 true -> throw({not_found, missing});
                 _False -> validate_access2(Db, Doc)
             end;
