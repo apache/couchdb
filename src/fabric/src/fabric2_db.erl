@@ -184,10 +184,9 @@ create(DbName, Options) ->
             % We cache outside of the transaction so that we're sure
             % that the transaction was committed.
             case Result of
-                #{} = Db0 ->
-                    Db1 = maybe_add_sys_db_callbacks(Db0),
-                    ok = fabric2_server:store(Db1),
-                    {ok, Db1#{tx := undefined}};
+                #{} = Db ->
+                    ok = fabric2_server:store(Db),
+                    {ok, Db#{tx := undefined}};
                 Error ->
                     Error
             end;
@@ -209,10 +208,9 @@ open(DbName, Options) ->
             % Cache outside the transaction retry loop
             case Result of
                 #{} = Db0 ->
-                    Db1 = maybe_add_sys_db_callbacks(Db0),
-                    ok = fabric2_server:store(Db1),
-                    Db2 = Db1#{tx := undefined},
-                    {ok, require_member_check(Db2)};
+                    ok = fabric2_server:store(Db0),
+                    Db1 = Db0#{tx := undefined},
+                    {ok, require_member_check(Db1)};
                 Error ->
                     Error
             end
@@ -1151,31 +1149,6 @@ validate_dbname_pat(DbName, Normalized) ->
                 false -> {error, {illegal_database_name, DbName}}
             end
     end.
-
-
-maybe_add_sys_db_callbacks(Db) ->
-    IsReplicatorDb = is_replicator_db(Db),
-    IsUsersDb = is_users_db(Db),
-
-    {BDU, ADR} = if
-        IsReplicatorDb ->
-            {
-                fun couch_replicator_docs:before_doc_update/3,
-                fun couch_replicator_docs:after_doc_read/2
-            };
-        IsUsersDb ->
-            {
-                fun fabric2_users_db:before_doc_update/3,
-                fun fabric2_users_db:after_doc_read/2
-            };
-        true ->
-            {undefined, undefined}
-    end,
-
-    Db#{
-        before_doc_update := BDU,
-        after_doc_read := ADR
-    }.
 
 
 make_db_info(DbName, Props) ->

@@ -250,7 +250,9 @@ create(#{} = Db0, Options) ->
 
         db_options => Options1
     },
-    aegis:init_db(Db2, Options).
+
+    Db3 = maybe_add_sys_db_callbacks(Db2),
+    aegis:init_db(Db3, Options).
 
 
 open(#{} = Db0, Options) ->
@@ -296,15 +298,16 @@ open(#{} = Db0, Options) ->
     },
 
     Db3 = load_config(Db2),
-    Db4 = aegis:open_db(Db3),
+    Db4 = maybe_add_sys_db_callbacks(Db3),
+    Db5 = aegis:open_db(Db4),
 
-    case {UUID, Db4} of
+    case {UUID, Db5} of
         {undefined, _} -> ok;
         {<<_/binary>>, #{uuid := UUID}} -> ok;
         {<<_/binary>>, #{uuid := _}} -> erlang:error(database_does_not_exist)
     end,
 
-    load_validate_doc_funs(Db4).
+    load_validate_doc_funs(Db5).
 
 
 % Match on `name` in the function head since some non-fabric2 db
@@ -1199,6 +1202,31 @@ init_db(Tx, DbName, Options) ->
 
         security_fun => undefined,
         db_options => Options
+    }.
+
+
+maybe_add_sys_db_callbacks(Db) ->
+    IsReplicatorDb = fabric2_db:is_replicator_db(Db),
+    IsUsersDb = fabric2_db:is_users_db(Db),
+
+    {BDU, ADR} = if
+        IsReplicatorDb ->
+            {
+                fun couch_replicator_docs:before_doc_update/3,
+                fun couch_replicator_docs:after_doc_read/2
+            };
+        IsUsersDb ->
+            {
+                fun fabric2_users_db:before_doc_update/3,
+                fun fabric2_users_db:after_doc_read/2
+            };
+        true ->
+            {undefined, undefined}
+    end,
+
+    Db#{
+        before_doc_update := BDU,
+        after_doc_read := ADR
     }.
 
 
