@@ -54,19 +54,59 @@ write_doc_reduce(TxDb, Sig, Views, Doc, ExistingViewKeys) ->
             false ->
                 []
         end,
-        update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId,
+        update_indexes(TxDb, Sig, ViewId, ViewReduceFuns, DocId,
             ExistingKeys, ViewReduceResult)
     end, lists:zip(Views, ReduceResults)).
 
 
-update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ExistingKeys,
+update_indexes(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ExistingKeys,
     ViewReduceResult) ->
     lists:foreach(fun({ViewReduceFun, ReduceResult}) ->
         {_, ReduceFun} = ViewReduceFun,
         ReduceId = couch_views_util:reduce_id(ViewId, ReduceFun),
-        couch_views_skiplist:update_idx(TxDb, Sig, ReduceId,
-            ReduceFun, DocId, ExistingKeys, ReduceResult)
+        update_index(TxDb, Sig, ReduceId, ReduceFun, DocId,
+            ExistingKeys, ReduceResult)
     end, lists:zip(ViewReduceFuns, ViewReduceResult)).
+
+
+update_index(TxDb, Sig, ViewId, Reducer, _DocId, _ExistingKeys, ReduceResult) ->
+    #{
+        db_prefix := DbPrefix
+    } = TxDb,
+
+    ViewOpts = #{
+        db_prefix => DbPrefix,
+        sig => Sig,
+        view_id => ViewId,
+        reducer => Reducer
+    },
+    ReduceIdxPrefix = couch_views_reduce_fdb:idx_prefix(DbPrefix, Sig, ViewId),
+    lists:foreach(fun ({Key, Val}) ->
+        add_kv_to_group_level(TxDb, ReduceIdxPrefix, ViewOpts, Key, Val)
+    end, ReduceResult).
+
+
+% The insert algorithm
+% Adding a key involves first checking if that key already exists
+% and rereduce the two k/v's together and then save.
+add_kv_to_group_level(Db, ReduceIdxPrefix, #{} = ViewOpts, Key, Val) ->
+    #{
+        reducer := Reducer
+    } = ViewOpts,
+
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        Val1 = case couch_views_reduce_fdb:get_value(TxDb,
+            ReduceIdxPrefix, Key) of
+            not_found ->
+                Val;
+            ExistingVal ->
+                [{_, NewReducedVal}] = couch_views_reducer:rereduce(Reducer,
+                    [{Key, ExistingVal}, {Key, Val}], group_true),
+                NewReducedVal
+        end,
+        couch_views_reduce_fdb:add_kv(TxDb, ReduceIdxPrefix, Key, Val1)
+    end).
+
 
 
 idx_prefix(DbPrefix, Sig, ViewId) ->
@@ -102,7 +142,7 @@ fold_level0(Db, Sig, ViewId, Reducer, GroupLevel, Opts, UserCallback,
                 rows := Rows
             } = fabric2_fdb:fold_range(TxDb, ReduceIdxPrefix, Fun, Acc, Opts),
 
-            couch_views_skiplist:rereduce_and_reply(Reducer, Rows, GroupLevel,
+            rereduce_and_reply(Reducer, Rows, GroupLevel,
                 UserCallback, UserAcc1)
         end)
     catch
@@ -113,6 +153,18 @@ fold_level0(Db, Sig, ViewId, Reducer, GroupLevel, Opts, UserCallback,
             % from where we left off
             throw(reduce_transaction_ended)
     end.
+
+
+rereduce_and_reply(_Reducer, [], _GroupLevel, _Callback, Acc) ->
+    Acc;
+
+rereduce_and_reply(Reducer, Rows, GroupLevel, Callback, Acc0) ->
+    ReReduced = couch_views_reducer:rereduce(Reducer, Rows,
+        GroupLevel),
+    lists:foldl(fun ({ReducedKey, ReducedVal}, Acc) ->
+        {ok, FinalizedVal} = couch_views_reducer:finalize(Reducer, ReducedVal),
+        Callback(ReducedKey, FinalizedVal, Acc)
+    end, Acc0, ReReduced).
 
 
 add_kv(TxDb, ReduceIdxPrefix, Key, Val) ->
@@ -187,7 +239,7 @@ fold_level0_cb({_FullEncodedKey, EV}, Acc) ->
                 rows := Rows ++ GroupKV
             };
         false ->
-            UserAcc1 = couch_views_skiplist:rereduce_and_reply(Reducer, Rows,
+            UserAcc1 = rereduce_and_reply(Reducer, Rows,
                 GroupLevel, Callback, UserAcc),
             put(reduce_acc, {Key, UserAcc1}),
             Acc#{

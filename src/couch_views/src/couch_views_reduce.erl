@@ -113,7 +113,6 @@ args_to_fdb_opts(#mrargs{} = Args) ->
         inclusive_end = InclusiveEnd
     } = Args,
 
-    io:format("BOOM st ~p ~n", [StartKey]),
     StartKeyOpts = case {StartKey, Direction} of
         {undefined, _}  ->
             [];
@@ -131,6 +130,7 @@ args_to_fdb_opts(#mrargs{} = Args) ->
     end,
 
     [
+        {restart_tx, true},
         {dir, Direction},
         {streaming_mode, want_all}
     ] ++ StartKeyOpts ++ EndKeyOpts.

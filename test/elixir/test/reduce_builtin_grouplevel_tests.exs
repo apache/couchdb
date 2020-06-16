@@ -1,4 +1,4 @@
-defmodule CouchViewsReduceTest do
+defmodule ReduceBuiltinGroupLevelTests do
   use CouchTestCase
 
   setup do
@@ -231,7 +231,7 @@ defmodule CouchViewsReduceTest do
       group_level: 2,
       start_key: [3, 1],
       end_key: [1, 1],
-      direction: :rev
+      descending: true
     }
 
     correct = [
@@ -248,7 +248,7 @@ defmodule CouchViewsReduceTest do
       reduce: true,
       group_level: 2,
       start_key: [3, 1],
-      direction: :rev
+      descending: true
     }
 
     correct1 = [
@@ -268,7 +268,7 @@ defmodule CouchViewsReduceTest do
       reduce: true,
       group_level: 2,
       end_key: [1, 1],
-      direction: :rev
+      descending: true
     }
 
     correct2 = [
@@ -325,7 +325,7 @@ defmodule CouchViewsReduceTest do
       group_level: 2,
       start_key: [3, 1],
       end_key: [1, 1],
-      direction: :rev,
+      descending: true,
       inclusive_end: false
     }
 
@@ -401,11 +401,8 @@ defmodule CouchViewsReduceTest do
     db_name = context[:db_name]
 
     resp = Couch.post("/#{db_name}/_design/bar/_view/#{view}/", body: args)
-    IO.inspect resp
     assert resp.status_code == 200
     rows = resp.body["rows"]
-    IO.inspect rows
-    IO.inspect correct_resp
 
     assert(rows == correct_resp, "failed for fold level 0")
   end
