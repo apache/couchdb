@@ -18,9 +18,10 @@
     transactional/3,
     transactional/2,
 
+    ensure_current/1,
+
     create/2,
     open/2,
-    ensure_current/1,
     delete/1,
     undelete/3,
     remove_deleted_db/2,
@@ -178,6 +179,10 @@ do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
     after
         clear_transaction()
     end.
+
+
+ensure_current(Db) ->
+    ensure_current(Db, true).
 
 
 create(#{} = Db0, Options) ->
@@ -1255,6 +1260,36 @@ load_validate_doc_funs(#{} = Db) ->
     }.
 
 
+ensure_current(#{} = Db0, CheckDbVersion) ->
+    require_transaction(Db0),
+    Db3 = case check_metadata_version(Db0) of
+        {current, Db1} ->
+            Db1;
+        {stale, Db1} ->
+            case check_db_version(Db1, CheckDbVersion) of
+                current ->
+                    % If db version is current, update cache with the latest
+                    % metadata so other requests can immediately see the
+                    % refreshed db handle.
+                    Now = erlang:monotonic_time(millisecond),
+                    Db2 = Db1#{check_current_ts := Now},
+                    fabric2_server:maybe_update(Db2),
+                    Db2;
+                stale ->
+                    fabric2_server:maybe_remove(Db1),
+                    throw({?MODULE, reopen})
+            end
+    end,
+    case maps:get(security_fun, Db3) of
+        SecurityFun when is_function(SecurityFun, 2) ->
+            #{security_doc := SecDoc} = Db3,
+            ok = SecurityFun(Db3, SecDoc),
+            Db3#{security_fun := undefined};
+        undefined ->
+            Db3
+    end.
+
+
 bump_metadata_version(Tx) ->
     % The 14 zero bytes is pulled from the PR for adding the
     % metadata version key. Not sure why 14 bytes when version
@@ -1856,40 +1891,6 @@ require_transaction(#{tx := {erlfdb_transaction, _}} = _Db) ->
     ok;
 require_transaction(#{} = _Db) ->
     erlang:error(transaction_required).
-
-
-ensure_current(Db) ->
-    ensure_current(Db, true).
-
-
-ensure_current(#{} = Db0, CheckDbVersion) ->
-    require_transaction(Db0),
-    Db3 = case check_metadata_version(Db0) of
-        {current, Db1} ->
-            Db1;
-        {stale, Db1} ->
-            case check_db_version(Db1, CheckDbVersion) of
-                current ->
-                    % If db version is current, update cache with the latest
-                    % metadata so other requests can immediately see the
-                    % refreshed db handle.
-                    Now = erlang:monotonic_time(millisecond),
-                    Db2 = Db1#{check_current_ts := Now},
-                    fabric2_server:maybe_update(Db2),
-                    Db2;
-                stale ->
-                    fabric2_server:maybe_remove(Db1),
-                    throw({?MODULE, reopen})
-            end
-    end,
-    case maps:get(security_fun, Db3) of
-        SecurityFun when is_function(SecurityFun, 2) ->
-            #{security_doc := SecDoc} = Db3,
-            ok = SecurityFun(Db3, SecDoc),
-            Db3#{security_fun := undefined};
-        undefined ->
-            Db3
-    end.
 
 
 check_db_instance(undefined) ->
