@@ -53,7 +53,6 @@ read_reduce(Db, Sig, ViewId, Reducer, UserCallback, UserAcc0, Args) ->
     #{
         db_prefix := DbPrefix
     } = Db,
-    io:format("READING ~n"),
 
     ReduceIdxPrefix = couch_views_reduce_fdb:idx_prefix(
         DbPrefix, Sig, ViewId),

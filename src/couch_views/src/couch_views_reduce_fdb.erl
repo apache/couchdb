@@ -33,12 +33,11 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 
+-include_lib("couch/include/couch_eunit.hrl").
 
 write_doc_reduce(TxDb, Sig, Views, Doc, ExistingViewKeys) ->
     #{
         id := DocId,
-%%        results := Results,
-%%        kv_sizes := KVSizes,
         reduce_results := ReduceResults
     } = Doc,
 
@@ -54,22 +53,60 @@ write_doc_reduce(TxDb, Sig, Views, Doc, ExistingViewKeys) ->
             false ->
                 []
         end,
-        update_indexes(TxDb, Sig, ViewId, ViewReduceFuns, DocId,
+        update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId,
             ExistingKeys, ViewReduceResult)
     end, lists:zip(Views, ReduceResults)).
 
-
-update_indexes(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ExistingKeys,
+update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId, [],
     ViewReduceResult) ->
+
     lists:foreach(fun({ViewReduceFun, ReduceResult}) ->
         {_, ReduceFun} = ViewReduceFun,
         ReduceId = couch_views_util:reduce_id(ViewId, ReduceFun),
-        update_index(TxDb, Sig, ReduceId, ReduceFun, DocId,
-            ExistingKeys, ReduceResult)
-    end, lists:zip(ViewReduceFuns, ViewReduceResult)).
+        update_index(TxDb, Sig, ReduceId, ReduceFun, DocId, ReduceResult)
+    end, lists:zip(ViewReduceFuns, ViewReduceResult));
+
+update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ExistingKeys,
+    ViewReduceResult) ->
+
+    CB = fun(_DocId, Key, Value, Acc) ->
+            Acc ++ [{Key, Value}]
+        end,
+
+    ?debugFmt("existing ~p ~n results ~p ~n funs ~p ~n", [ExistingKeys, ViewReduceResult, ViewReduceFuns]),
+
+    ExistingReduceResult = lists:map(fun (Key) ->
+        EK = couch_views_encoding:encode(Key, key),
+        Opts = [
+            {start_key, {EK, DocId}},
+            {end_key, {EK, DocId, <<255>>}}
+        ],
+
+        Rows = couch_views_fdb:fold_map_idx(TxDb, Sig, ViewId,  Opts, CB, []),
+        lists:map(fun ({_, Reducer}) ->
+            Reduce = couch_views_reducer:rereduce(Reducer, Rows, group_true),
+            hd(Reduce)
+        end, ViewReduceFuns)
+    end, ExistingKeys),
+
+    lists:foreach(fun({{_, ReduceFun}, ReduceResult, ExistingResult}) ->
+        Diff = create_diff(ReduceResult, ExistingResult),
+        ?debugFmt("updating ~p ~n ~p ~n diff ~p ~n", [ReduceResult, ExistingResult, Diff]),
+        ReduceId = couch_views_util:reduce_id(ViewId, ReduceFun),
+        update_index(TxDb, Sig, ReduceId, ReduceFun, DocId, Diff)
+    end, lists:zip3(ViewReduceFuns, ViewReduceResult, ExistingReduceResult)).
+
+create_diff(ViewReduceResult, []) ->
+    ViewReduceResult;
+
+create_diff(NewResult, ExistingResult) ->
+
+    lists:map(fun ({{Key, New}, {Key, Old}}) ->
+        {Key, New - Old}
+    end, lists:zip(NewResult, ExistingResult)).
 
 
-update_index(TxDb, Sig, ViewId, Reducer, _DocId, _ExistingKeys, ReduceResult) ->
+update_index(TxDb, Sig, ViewId, Reducer, _DocId, ReduceResult) ->
     #{
         db_prefix := DbPrefix
     } = TxDb,
@@ -86,9 +123,6 @@ update_index(TxDb, Sig, ViewId, Reducer, _DocId, _ExistingKeys, ReduceResult) ->
     end, ReduceResult).
 
 
-% The insert algorithm
-% Adding a key involves first checking if that key already exists
-% and rereduce the two k/v's together and then save.
 add_kv_to_group_level(Db, ReduceIdxPrefix, #{} = ViewOpts, Key, Val) ->
     #{
         reducer := Reducer
@@ -100,9 +134,10 @@ add_kv_to_group_level(Db, ReduceIdxPrefix, #{} = ViewOpts, Key, Val) ->
             not_found ->
                 Val;
             ExistingVal ->
-                [{_, NewReducedVal}] = couch_views_reducer:rereduce(Reducer,
-                    [{Key, ExistingVal}, {Key, Val}], group_true),
-                NewReducedVal
+                ExistingVal + Val
+%%                [{_, NewReducedVal}] = couch_views_reducer:rereduce(Reducer,
+%%                    [{Key, ExistingVal}, {Key, Val}], group_true),
+%%                NewReducedVal
         end,
         couch_views_reduce_fdb:add_kv(TxDb, ReduceIdxPrefix, Key, Val1)
     end).

@@ -30,7 +30,9 @@
     write_doc/4,
 
     list_signatures/1,
-    clear_index/2
+    clear_index/2,
+
+    map_idx_range/5
 ]).
 
 -ifdef(TEST).
@@ -194,6 +196,8 @@ write_doc(TxDb, Sig, Views, Doc) ->
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
 
+    couch_views_reduce_fdb:write_doc_reduce(TxDb, Sig, Views, Doc, ExistingViewKeys),
+
     clear_id_idx(TxDb, Sig, DocId),
 
     lists:foreach(fun({#mrview{id_num = ViewId}, NewRows, KVSize}) ->
@@ -212,9 +216,7 @@ write_doc(TxDb, Sig, Views, Doc) ->
                 []
         end,
         update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows)
-    end, lists:zip3(Views, Results, KVSizes)),
-
-    couch_views_reduce_fdb:write_doc_reduce(TxDb, Sig, Views, Doc, ExistingViewKeys).
+    end, lists:zip3(Views, Results, KVSizes)).
 
 
 list_signatures(Db) ->
