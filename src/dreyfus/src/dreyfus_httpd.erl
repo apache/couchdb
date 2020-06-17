@@ -447,10 +447,15 @@ validate_search_restrictions(Db, DDoc, Args) ->
         q = Query,
         partition = Partition,
         grouping = Grouping,
-        limit = Limit
+        limit = Limit,
+        counts = Counts,
+        drilldown = Drilldown,
+        ranges = Ranges
     } = Args,
     #grouping{
-        by = GroupBy
+        by = GroupBy,
+        limit = GroupLimit,
+        sort = GroupSort
     } = Grouping,
 
     case Query of
@@ -496,9 +501,18 @@ validate_search_restrictions(Db, DDoc, Args) ->
             parse_non_negative_int_param("limit", Limit, "max_limit", MaxLimit)
     end,
 
-    case GroupBy /= nil andalso is_binary(Partition) of
+    DefaultArgs = #index_query_args{},
+
+    case is_binary(Partition) andalso (
+        Counts /= DefaultArgs#index_query_args.counts
+            orelse Drilldown /= DefaultArgs#index_query_args.drilldown
+            orelse Ranges /= DefaultArgs#index_query_args.ranges
+            orelse GroupSort /= DefaultArgs#index_query_args.grouping#grouping.sort
+            orelse GroupBy /= DefaultArgs#index_query_args.grouping#grouping.by
+            orelse GroupLimit /= DefaultArgs#index_query_args.grouping#grouping.limit
+    ) of
         true ->
-            Msg5 = <<"`group_by` and `partition` are incompatible">>,
+            Msg5 = <<"`partition` and any of `drilldown`, `ranges`, `group_field`, `group_sort`, `group_limit` or `group_by` are incompatible">>,
             throw({bad_request, Msg5});
         false ->
             ok
