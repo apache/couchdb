@@ -28,6 +28,10 @@
 -define(EXPIRING_CACHE, 53).
 -define(TX_IDS, 255).
 
+% Cluster Level: (LayerPrefix, ?CLUSTER_CONFIG, X, ...)
+
+-define(AEGIS, 0).
+
 % Database Level: (LayerPrefix, ?DBS, DbPrefix, X, ...)
 
 -define(DB_VERSION, 0).
