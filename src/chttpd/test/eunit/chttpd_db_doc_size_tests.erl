@@ -30,6 +30,7 @@ setup() ->
     ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
     ok = config:set("couchdb", "max_document_size", "50"),
     ok = config:set("couchdb", "max_bulk_docs_count", "2"),
+    ok = config:set("couchdb", "max_bulk_get_count", "2"),
     TmpDb = ?tempdb(),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
@@ -41,7 +42,9 @@ teardown(Url) ->
     delete_db(Url),
     ok = config:delete("admins", ?USER, _Persist=false),
     ok = config:delete("couchdb", "max_document_size"),
-    ok = config:delete("couchdb", "max_bulk_docs_count").
+    ok = config:delete("couchdb", "max_bulk_docs_count"),
+    ok = config:delete("couchdb", "max_bulk_get_count"),
+    ok.
 
 create_db(Url) ->
     {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
@@ -70,6 +73,7 @@ all_test_() ->
                     fun put_single_doc/1,
                     fun bulk_doc/1,
                     fun bulk_docs_too_many_docs/1,
+                    fun bulk_get_too_many_docs/1,
                     fun put_post_doc_attach_inline/1,
                     fun put_multi_part_related/1,
                     fun post_multi_part_form/1
@@ -115,6 +119,24 @@ bulk_docs_too_many_docs(Url) ->
     ResultJson = ?JSON_DECODE(ResultBody),
     ExpectJson = {[
         {<<"error">>,<<"max_bulk_docs_count_exceeded">>},
+        {<<"reason">>,<<"2">>}
+    ]},
+    ?_assertEqual({413, ExpectJson}, {Code, ResultJson}).
+
+
+bulk_get_too_many_docs(Url) ->
+    Docs = lists:map(fun(_) ->
+       {ok, 201, _, Body} = test_request:post(Url,
+          [?CONTENT_JSON, ?AUTH], "{}"),
+          {Props} = ?JSON_DECODE(Body),
+          {lists:keydelete(<<"ok">>, 1, Props)}
+    end, [1, 2, 3, 4]),
+
+    {ok, Code, _, ResultBody} = test_request:post(Url ++ "/_bulk_get/",
+        [?CONTENT_JSON, ?AUTH], ?JSON_ENCODE({[{<<"docs">>, Docs}]})),
+    ResultJson = ?JSON_DECODE(ResultBody),
+    ExpectJson = {[
+        {<<"error">>,<<"max_bulk_get_count_exceeded">>},
         {<<"reason">>,<<"2">>}
     ]},
     ?_assertEqual({413, ExpectJson}, {Code, ResultJson}).

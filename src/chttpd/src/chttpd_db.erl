@@ -560,6 +560,11 @@ db_req(#httpd{method='POST', path_parts=[_, <<"_bulk_get">>],
         undefined ->
             throw({bad_request, <<"Missing JSON list of 'docs'.">>});
         Docs ->
+            MaxDocs = config:get_integer("couchdb", "max_bulk_get_count", 10000),
+            case length(Docs) =< MaxDocs of
+                true -> ok;
+                false -> throw({request_entity_too_large, {bulk_get, MaxDocs}})
+            end,
             #doc_query_args{
                 options = Options
             } = bulk_get_parse_doc_query(Req),
