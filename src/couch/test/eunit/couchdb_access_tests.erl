@@ -68,7 +68,7 @@ after_all(_) ->
 
 access_test_() ->
     Tests = [
-        % Doc creation
+        % % Doc creation
         % fun should_not_let_anonymous_user_create_doc/2,
         % fun should_let_admin_create_doc_with_access/2,
         % fun should_let_admin_create_doc_without_access/2,
@@ -79,6 +79,7 @@ access_test_() ->
         %
         % % Doc updates
         % fun users_with_access_can_update_doc/2,
+        fun users_without_access_can_not_update_doc/2
         % fun users_with_access_can_not_change_access/2,
         % fun users_with_access_can_not_remove_access/2,
         %
@@ -89,41 +90,41 @@ access_test_() ->
         % fun user_can_not_read_doc_without_access/2,
         % fun admin_with_access_can_read_conflicted_doc/2,
         % fun user_with_access_can_not_read_conflicted_doc/2,
-
-        % Doc deletes
+        %
+        % % Doc deletes
         % fun should_let_admin_delete_doc_with_access/2,
         % fun should_let_user_delete_doc_for_themselves/2,
         % fun should_not_let_user_delete_doc_for_someone_else/2,
         %
         % % _all_docs with include_docs
         % fun should_let_admin_fetch_all_docs/2,
-        fun should_let_user_fetch_their_own_all_docs/2,
-        % % potential future feature
-        % % fun should_let_user_fetch_their_own_all_docs_plus_users_ddocs/2%,
-
-        % _changes
-        fun should_let_admin_fetch_changes/2,
-        fun should_let_user_fetch_their_own_changes/2,
-
-        % views
-        fun should_not_allow_admin_access_ddoc_view_request/2,
-        fun should_not_allow_user_access_ddoc_view_request/2,
-        fun should_allow_admin_users_access_ddoc_view_request/2,
-        fun should_allow_user_users_access_ddoc_view_request/2,
-
-        % replication
-        fun should_allow_admin_to_replicate_from_access_to_access/2,
-        fun should_allow_admin_to_replicate_from_no_access_to_access/2,
-        fun should_allow_admin_to_replicate_from_access_to_no_access/2,
-        fun should_allow_admin_to_replicate_from_no_access_to_no_access/2,
-
-        fun should_allow_user_to_replicate_from_access_to_access/2,
-        fun should_allow_user_to_replicate_from_access_to_no_access/2,
-        fun should_allow_user_to_replicate_from_no_access_to_access/2,
-        fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
-
-        % TODO: try getting _revs_diff for docs you don’t have access to
-        fun should_not_allow_user_to_revs_diff_other_docs/2
+        % fun should_let_user_fetch_their_own_all_docs/2,
+        % % % potential future feature
+        % % % fun should_let_user_fetch_their_own_all_docs_plus_users_ddocs/2%,
+        %
+        % % _changes
+        % fun should_let_admin_fetch_changes/2,
+        % fun should_let_user_fetch_their_own_changes/2,
+        %
+        % % views
+        % fun should_not_allow_admin_access_ddoc_view_request/2,
+        % fun should_not_allow_user_access_ddoc_view_request/2,
+        % fun should_allow_admin_users_access_ddoc_view_request/2,
+        % fun should_allow_user_users_access_ddoc_view_request/2,
+        %
+        % % replication
+        % fun should_allow_admin_to_replicate_from_access_to_access/2,
+        % fun should_allow_admin_to_replicate_from_no_access_to_access/2,
+        % fun should_allow_admin_to_replicate_from_access_to_no_access/2,
+        % fun should_allow_admin_to_replicate_from_no_access_to_no_access/2,
+        % %
+        % fun should_allow_user_to_replicate_from_access_to_access/2,
+        % fun should_allow_user_to_replicate_from_access_to_no_access/2,
+        % fun should_allow_user_to_replicate_from_no_access_to_access/2,
+        % fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
+        %
+        % % _revs_diff for docs you don’t have access to
+        % fun should_not_allow_user_to_revs_diff_other_docs/2
 
 
         % TODO: create test db with role and not _users in _security.members
@@ -230,6 +231,16 @@ users_with_access_can_update_doc(_PortType, Url) ->
         "{\"a\":2,\"_access\":[\"x\"],\"_rev\":\"" ++ binary_to_list(Rev) ++ "\"}"),
     ?_assertEqual(201, Code).
 
+users_without_access_can_not_update_doc(_PortType, Url) ->
+    {ok, _, _, Body} = test_request:put(Url ++ "/db/b",
+        ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
+    {Json} = jiffy:decode(Body),
+    Rev = couch_util:get_value(<<"rev">>, Json),
+    {ok, Code, _, _} = test_request:put(Url ++ "/db/b",
+        ?USERY_REQ_HEADERS,
+        "{\"a\":2,\"_access\":[\"y\"],\"_rev\":\"" ++ binary_to_list(Rev) ++ "\"}"),
+    ?_assertEqual(404, Code).
+
 users_with_access_can_not_change_access(_PortType, Url) ->
     {ok, _, _, Body} = test_request:put(Url ++ "/db/b",
         ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
@@ -305,7 +316,7 @@ should_let_admin_delete_doc_with_access(_PortType, Url) ->
         ?USERX_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
     {ok, Code, _, _} = test_request:delete(Url ++ "/db/a?rev=1-23202479633c2b380f79507a776743d5",
         ?ADMIN_REQ_HEADERS),
-    ?_assertEqual(200, Code).
+    ?_assertEqual(201, Code).
 
 should_let_user_delete_doc_for_themselves(_PortType, Url) ->
     {ok, 201, _, _} = test_request:put(Url ++ "/db/a",
@@ -820,6 +831,14 @@ should_allow_user_to_replicate_from_no_access_to_access(_PortType, Url) ->
         {ok, _, _, _} = test_request:put(url() ++ "/db2/_security",
           ?ADMIN_REQ_HEADERS, jiffy:encode(?SECURITY_OBJECT)),
 
+        % leave for easier debugging
+        % VduFun = <<"function(newdoc, olddoc, userctx) {if(newdoc._id == \"b\") throw({'forbidden':'fail'})}">>,
+        % DDoc = {[
+        %    {<<"_id">>, <<"_design/vdu">>},
+        %    {<<"validate_doc_update">>, VduFun}
+        % ]},
+        % {ok, _, _, _} = test_request:put(Url ++ "/db/_design/vdu",
+        %     ?ADMIN_REQ_HEADERS, jiffy:encode(DDoc)),
         % create source docs
         {ok, _, _, _} = test_request:put(Url ++ "/db2/a",
             ?ADMIN_REQ_HEADERS, "{\"a\":1,\"_access\":[\"x\"]}"),
@@ -827,6 +846,7 @@ should_allow_user_to_replicate_from_no_access_to_access(_PortType, Url) ->
             ?ADMIN_REQ_HEADERS, "{\"b\":2,\"_access\":[\"x\"]}"),
         {ok, _, _, _} = test_request:put(Url ++ "/db2/c",
             ?ADMIN_REQ_HEADERS, "{\"c\":3,\"_access\":[\"y\"]}"),
+
 
         % replicate
         UserXUrl = string:replace(Url, "http://", "http://x:x@"),
@@ -849,11 +869,11 @@ should_allow_user_to_replicate_from_no_access_to_access(_PortType, Url) ->
         DocsWritten = couch_util:get_value(<<"docs_written">>, History),
         DocWriteFailures = couch_util:get_value(<<"doc_write_failures">>, History),
      
-        ?assertEqual(2, MissingChecked),
-        ?assertEqual(2, MissingFound),
-        ?assertEqual(2, DocsReard),
+        ?assertEqual(3, MissingChecked),
+        ?assertEqual(3, MissingFound),
+        ?assertEqual(3, DocsReard),
         ?assertEqual(2, DocsWritten),
-        ?assertEqual(0, DocWriteFailures),
+        ?assertEqual(1, DocWriteFailures),
       
         % assert docs in target db
         {ok, 200, _, ADBody} = test_request:get(Url ++ "/db/_all_docs?include_docs=true",
@@ -905,17 +925,17 @@ should_allow_user_to_replicate_from_no_access_to_no_access(_PortType, Url) ->
         DocsWritten = couch_util:get_value(<<"docs_written">>, History),
         DocWriteFailures = couch_util:get_value(<<"doc_write_failures">>, History),
      
-        ?assertEqual(2, MissingChecked),
-        ?assertEqual(2, MissingFound),
-        ?assertEqual(2, DocsReard),
-        ?assertEqual(2, DocsWritten),
+        ?assertEqual(3, MissingChecked),
+        ?assertEqual(3, MissingFound),
+        ?assertEqual(3, DocsReard),
+        ?assertEqual(3, DocsWritten),
         ?assertEqual(0, DocWriteFailures),
       
         % assert docs in target db
         {ok, 200, _, ADBody} = test_request:get(Url ++ "/db3/_all_docs?include_docs=true",
             ?ADMIN_REQ_HEADERS),
         {Json} = jiffy:decode(ADBody),
-        ?assertEqual(2, proplists:get_value(<<"total_rows">>, Json))
+        ?assertEqual(3, proplists:get_value(<<"total_rows">>, Json))
     end).
 
 % revs_diff

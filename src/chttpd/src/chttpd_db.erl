@@ -587,6 +587,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         case fabric:update_docs(Db, Docs, [replicated_changes|Options]) of
         {ok, Errors} ->
             chttpd_stats:incr_writes(length(Docs)),
+            couch_log:info("~nErrors: ~p~n", [Errors]),
             ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
             send_json(Req, 201, ErrorsJson);
         {accepted, Errors} ->

@@ -749,7 +749,7 @@ security_error_type(#user_ctx{name=_}) ->
 
 is_per_user_ddoc(#doc{access=[]}) -> false;
 is_per_user_ddoc(#doc{access=[<<"_users">>]}) -> false;
-is_per_user_ddoc(_) -> true;
+is_per_user_ddoc(_) -> true.
     
 
 validate_access(Db, Doc) ->
@@ -807,6 +807,8 @@ check_access(Db, Access) ->
 
 check_name(null, _Access) -> true;
 check_name(UserName, Access) ->
+    couch_log:info("~nUserName: ~p~n", [UserName]),
+    couch_log:info("~nAccess: ~p~n", [Access]),
     lists:member(UserName, Access).
 % nicked from couch_db:check_security
 
@@ -1276,15 +1278,19 @@ validate_update(Db, Doc) ->
 
 
 validate_docs_access(Db, DocBuckets, DocErrors) ->
+    couch_log:info("~nin DocBuckets: ~p~n", [DocBuckets]),
+    couch_log:info("~nin DocErrors: ~p~n", [DocErrors]),
     validate_docs_access1(Db, DocBuckets, {[], DocErrors}).
 
 validate_docs_access1(_Db, [], {DocBuckets0, DocErrors}) ->
+    couch_log:info("~nDocBuckets0: ~p~n", [DocBuckets0]),
+    couch_log:info("~nDocErrors: ~p~n", [DocErrors]),
     DocBuckets1 = lists:reverse(lists:map(fun lists:reverse/1, DocBuckets0)),
     DocBuckets = case DocBuckets1 of
         [[]] -> [];
         Else -> Else
     end,
-    {ok, DocBuckets, DocErrors};
+    {ok, DocBuckets, lists:reverse(DocErrors)};
 validate_docs_access1(Db, [DocBucket|RestBuckets], {DocAcc, ErrorAcc}) ->
     {NewBuckets, NewErrors} = lists:foldl(fun(Doc, {Acc, ErrAcc}) ->
         case catch validate_access(Db, Doc) of
@@ -1292,7 +1298,7 @@ validate_docs_access1(Db, [DocBucket|RestBuckets], {DocAcc, ErrorAcc}) ->
             Error -> {Acc, [{doc_tag(Doc), Error}|ErrAcc]}
         end
     end, {[], ErrorAcc}, DocBucket),
-    validate_docs_access1(Db, RestBuckets, {[NewBuckets|DocAcc], NewErrors}).
+    validate_docs_access1(Db, RestBuckets, {[NewBuckets | DocAcc], NewErrors}).
 
 update_docs(Db, Docs0, Options, replicated_changes) ->
     Docs = tag_docs(Docs0),
@@ -1302,18 +1308,14 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
             ExistingDocInfos, [], [])
     end,
 
-    {ok, DocBuckets0, NonRepDocs, DocErrors0}
+    {ok, DocBuckets, NonRepDocs, DocErrors}
         = before_docs_update(Db, Docs, PrepValidateFun, replicated_changes),
-
-    % TODO:
-    %   - this shuld really happen before before_docs_update()
-    %   - look into NonRepDocs access validation
-    {ok, DocBuckets, DocErrors} = validate_docs_access(Db, DocBuckets0, DocErrors0),
 
     DocBuckets2 = [[doc_flush_atts(Db, check_dup_atts(Doc))
             || Doc <- Bucket] || Bucket <- DocBuckets],
     {ok, _} = write_and_commit(Db, DocBuckets2,
         NonRepDocs, [merge_conflicts | Options]),
+    couch_log:info("~nreplicated doc errors: ~p~n", [DocErrors]),
     {ok, DocErrors};
 
 update_docs(Db, Docs0, Options, interactive_edit) ->
@@ -1325,11 +1327,8 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
             AllOrNothing, [], [])
     end,
 
-    {ok, DocBuckets0, NonRepDocs, DocErrors0}
+    {ok, DocBuckets, NonRepDocs, DocErrors}
         = before_docs_update(Db, Docs, PrepValidateFun, interactive_edit),
-
-    % TODO: this shuld really happen before before_docs_update()
-    {ok, DocBuckets, DocErrors} = validate_docs_access(Db, DocBuckets0, DocErrors0),
 
     if (AllOrNothing) and (DocErrors /= []) ->
         RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),
@@ -1352,6 +1351,7 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
         {ok, CommitResults} = write_and_commit(Db, DocBuckets3,
             NonRepDocs, Options2),
 
+        couch_log:info("~ninteractive doc errors: ~p~n", [DocErrors]),
         ResultsDict = lists:foldl(fun({Key, Resp}, ResultsAcc) ->
             dict:store(Key, Resp, ResultsAcc)
         end, dict:from_list(IdRevs), CommitResults ++ DocErrors),
