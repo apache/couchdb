@@ -958,6 +958,8 @@ error_info({request_entity_too_large, {attachment, AttName}}) ->
     {413, <<"attachment_too_large">>, AttName};
 error_info({request_entity_too_large, {bulk_docs, Max}}) when is_integer(Max) ->
     {413, <<"max_bulk_docs_count_exceeded">>, integer_to_binary(Max)};
+error_info({request_entity_too_large, {bulk_get, Max}}) when is_integer(Max) ->
+    {413, <<"max_bulk_get_count_exceeded">>, integer_to_binary(Max)};
 error_info({request_entity_too_large, DocID}) ->
     {413, <<"document_too_large">>, DocID};
 error_info({error, security_migration_updates_disabled}) ->
