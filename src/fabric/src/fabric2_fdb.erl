@@ -1305,6 +1305,7 @@ ensure_current(#{} = Db0, CheckDbVersion) ->
 
     Db2 = case {MDVersionChanged, CheckDbVersion} of
         {true, true} ->
+            ok = check_layer_prefix(Db0),
             ok = check_db_version(Db0),
 
             % Don't update check_current_ts if it doesn't exist
@@ -1321,7 +1322,7 @@ ensure_current(#{} = Db0, CheckDbVersion) ->
             % This means we've only been asked to check that the
             % MDVersion has changed when operating at the database
             % level for creation and deletion operations.
-            ok;
+            ok = check_layer_prefix(Db0);
         {false, _} ->
             % The MDVersion hasn't changed which means we can
             % skip the db version check. However, we want to
@@ -1377,6 +1378,22 @@ check_metadata_version(#{} = Db) ->
             false ->
                 true
         end
+    end.
+
+
+check_layer_prefix(#{} = Db) ->
+    #{
+        tx := Tx,
+        layer_prefix := OldLayerPrefix
+    } = Db,
+
+    Root = erlfdb_directory:root(),
+    Dir = fabric2_server:fdb_directory(),
+    CouchDB = erlfdb_directory:create_or_open(Tx, Root, Dir),
+    CurrLayerPrefix = erlfdb_directory:get_name(CouchDB),
+
+    if OldLayerPrefix == CurrLayerPrefix -> ok; true ->
+        throw({?MODULE, reopen})
     end.
 
 
