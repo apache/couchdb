@@ -169,7 +169,11 @@ handle_request_int(MochiReq) ->
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
-    {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
+    {"/" ++ Path, QS, Version} = try
+        split_api_version(MochiReq)
+    catch Tag:Error ->
+        catch_error(#httpd{mochi_req = MochiReq}, Tag, Error)
+    end,
 
     % get requested path
     RequestedPath = case MochiReq:get_header_value("x-couchdb-vhost-path") of
@@ -228,7 +232,9 @@ handle_request_int(MochiReq) ->
         path_parts = [list_to_binary(chttpd:unquote(Part))
                 || Part <- string:tokens(Path, "/")],
         requested_path_parts = [?l2b(unquote(Part))
-                || Part <- string:tokens(RequestedPath, "/")]
+                || Part <- string:tokens(RequestedPath, "/")],
+        version = Version,
+        qs = QS
     },
 
     % put small token on heap to keep requests synced to backend calls
@@ -240,13 +246,11 @@ handle_request_int(MochiReq) ->
 
     maybe_trace_fdb(MochiReq:get_header_value("x-couchdb-fdb-trace")),
 
-    HttpReq1 = set_api_version(HttpReq0),
-
-    {HttpReq3, Response} = case before_request(HttpReq1) of
-        {ok, HttpReq2} ->
-            process_request(HttpReq2);
+    {HttpReq2, Response} = case before_request(HttpReq0) of
+        {ok, HttpReq1} ->
+            process_request(HttpReq1);
         {error, Response0} ->
-            {HttpReq1, Response0}
+            {HttpReq0, Response0}
     end,
 
     {Status, Code, Reason, Resp} = split_response(Response),
@@ -255,11 +259,11 @@ handle_request_int(MochiReq) ->
         code = Code,
         status = Status,
         response = Resp,
-        nonce = HttpReq3#httpd.nonce,
+        nonce = HttpReq2#httpd.nonce,
         reason = Reason
     },
 
-    case after_request(HttpReq3, HttpResp) of
+    case after_request(HttpReq2, HttpResp) of
         #httpd_resp{status = ok, response = Resp} ->
             span_ok(HttpResp),
             {ok, Resp};
@@ -1361,11 +1365,16 @@ span_error(Code, ErrorStr, ReasonStr, Stack) ->
     ctrace:finish_span().
 
 
--spec set_api_version(#httpd{}) -> #httpd{}.
-
-set_api_version(#httpd{path_parts=Parts} = Req) ->
-    VersionHeader = header_value(Req, "X-Couch-API", undefined),
-    VersionAccept = case header_value(Req, "Accept", undefined) of
+split_api_version(MochiReq) ->
+    RawUri = MochiReq:get(raw_path),
+    {VersionPath, Path} = case mochiweb_util:urlsplit_path(RawUri) of
+        {"/_v" ++ RestPath, _, _} ->
+            string:take(RestPath, "/", true);
+        {FullPath, _, _} ->
+            {undefined, FullPath}
+    end,
+    VersionHeader = MochiReq:get_header_value("X-Couch-API"),
+    VersionAccept = case MochiReq:get_header_value("Accept") of
         undefined ->
             undefined;
         AcceptStr ->
@@ -1376,35 +1385,26 @@ set_api_version(#httpd{path_parts=Parts} = Req) ->
                     undefined
             end
     end,
-
-    QS0 = qs(Req),
+    QS0 = MochiReq:parse_qs(),
     {QS, VersionQuery} = case lists:keytake("_v", 1, QS0) of
         false ->
             {QS0, undefined};
-        {value, {"_v", Version}, QS1} ->
-            {QS1, Version}
+        {value, {"_v", VersionStr}, QS1} ->
+            {QS1, VersionStr}
     end,
-
-    {Path, VersionPath} = case Parts of
-        [<<"_v", VersionBin/binary>> | Rest] ->
-            {Rest, binary_to_list(VersionBin)};
-        ["_v" ++ VersionStr | Rest] -> %% probably not needed
-            {Rest, VersionStr};
-        Parts ->
-            {Parts, undefined}
-    end,
-    case lists:usort([VersionHeader,VersionAccept,VersionQuery,VersionPath]) -- [undefined] of
+    Version = case lists:usort([VersionHeader,VersionAccept,VersionQuery,VersionPath]) -- [undefined] of
         [] ->
-            Req#httpd{version = 1};
+            1;
         [SelectedVersion] ->
-            Req#httpd{
-                path_parts = Path,
-                qs = QS,
-                version = list_to_integer(SelectedVersion) %% TODO Handle errors
-            };
+            try
+                list_to_integer(SelectedVersion)
+            catch error:badarg ->
+                throw({bad_request, "Cannot parse API version"})
+            end;
         _ ->
-            throw({error, "conflicted API versions"})
-    end.
+            throw({bad_request, "conflicted API versions"})
+    end,
+    {Path, QS, Version}.
 
 -spec content_types(Header :: string()) ->
     undefined
