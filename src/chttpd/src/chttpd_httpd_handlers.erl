@@ -17,7 +17,10 @@
 -export([
     not_supported/2,
     not_supported/3,
-    not_implemented/2
+    not_implemented/2,
+    unknown_api_version/1,
+    unknown_api_version/2,
+    unknown_api_version/3
 ]).
 
 
@@ -517,6 +520,25 @@ not_supported(#httpd{} = Req, _Db) ->
 not_implemented(#httpd{} = Req, _Db) ->
     Msg = <<"resource is not implemented">>,
     chttpd:send_error(Req, 501, not_implemented, Msg).
+
+
+unknown_api_version(#httpd{version = Version} = Req, _Db, _DDoc) ->
+    VersionStr = integer_to_binary(Version),
+    Msg = <<"unknown API version (", VersionStr/binary, ")">>,
+    chttpd:send_error(Req, 404, not_found, Msg).
+
+
+unknown_api_version(#httpd{version = Version} = Req, _Db) ->
+    VersionStr = integer_to_binary(Version),
+    Msg = <<"unknown API version (", VersionStr/binary, ")">>,
+    chttpd:send_error(Req, 404, not_found, Msg).
+
+
+unknown_api_version(#httpd{version = Version} = Req) ->
+    VersionStr = integer_to_binary(Version),
+    Msg = <<"unknown API version (", VersionStr/binary, ")">>,
+    chttpd:send_error(Req, 404, not_found, Msg).
+
 
 handle_all_dbs_req(Req) ->
     chttpd:send_json(Req, {[

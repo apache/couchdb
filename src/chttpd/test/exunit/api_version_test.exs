@@ -15,6 +15,7 @@ defmodule :api_version_test do
   # chttpd_handlers callbacks
   def url_handler("_test_api", 1), do: &handle_test_v1/1
   def url_handler("_test_api", 2), do: &handle_test_v2/1
+  def url_handler("_test_api", _), do: &:chttpd_httpd_handlers.unknown_api_version/1
 
   def url_handler(path, _), do: :no_match
 
@@ -162,6 +163,31 @@ defmodule Couch.Test.APIVersioning do
       assert resp.status_code == 400, "got error #{inspect(resp.body)}"
       assert "bad_request" == resp.body["error"]
       assert "conflicted API versions" == resp.body["reason"]
+    end
+
+    test "non-integer versions", ctx do
+      resp =
+        Couch.Session.get(
+          ctx.session,
+          "/_vsomething/_test_api"
+        )
+
+      assert resp.status_code == 400, "got error #{inspect(resp.body)}"
+      assert "bad_request" == resp.body["error"]
+      assert "Cannot parse API version" == resp.body["reason"]
+    end
+
+    test "non existent version", ctx do
+      resp =
+        Couch.Session.get(
+          ctx.session,
+          "/_v5/_test_api"
+        )
+
+      IO.puts("resp.status_code: #{resp.status_code}")
+      assert resp.status_code == 404, "got error #{inspect(resp.body)}"
+      assert "not_found" == resp.body["error"]
+      assert "unknown API version (5)" == resp.body["reason"]
     end
   end
 end
