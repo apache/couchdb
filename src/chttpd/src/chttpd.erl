@@ -1540,7 +1540,7 @@ handle_req_after_auth_test() ->
     AuthorizedReq = Req#httpd{user_ctx = AuthorizedCtx},
     ok = meck:new(chttpd_handlers, [passthrough]),
     ok = meck:new(chttpd_auth, [passthrough]),
-    ok = meck:expect(chttpd_handlers, url_handler, fun(_Key, _Fun) ->
+    ok = meck:expect(chttpd_handlers, url_handler, fun(_Key, _Fun, _) ->
          fun(_Req) -> handled_authorized_req end
     end),
     ok = meck:expect(chttpd_auth, authorize, fun(_Req, _Fun) ->
