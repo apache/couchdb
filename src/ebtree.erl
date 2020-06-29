@@ -35,7 +35,6 @@
 -define(at_min(Tree, Node), Tree#tree.min == length(Node#node.members)).
 -define(is_full(Tree, Node), Tree#tree.max == length(Node#node.members)).
 
--compile(export_all).
 
 init(Db, Prefix, Order) when is_binary(Prefix), is_integer(Order), Order > 2, Order rem 2 == 0 ->
     erlfdb:transactional(Db, fun(Tx) ->
@@ -231,7 +230,7 @@ delete(Db, #tree{} = Tree, Key) ->
     Tree.
 
 
-delete(Tx, #tree{} = Tree, #node{level = 0} = Node, Key) ->
+delete(_Tx, #tree{} = _Tree, #node{level = 0} = Node, Key) ->
     Node#node{
         members = lists:keydelete(Key, 1, Node#node.members)
     };
@@ -357,11 +356,6 @@ meta_key(Prefix, MetaKey) when is_binary(Prefix) ->
     erlfdb_tuple:pack({?META, MetaKey}, Prefix).
 
 %% node persistence functions
-
-get_nodes(Tx, #tree{} = Tree, [Ids]) ->
-    Futures = lists:map(fun(Id) -> {Id, get_node_future(Tx, Tree, Id)} end, Ids),
-    lists:map(fun({Id, Future}) -> get_node(Id, Future) end, Futures).
-
 
 get_node_wait(Tx, #tree{} = Tree, Id) ->
     get_node(Id, get_node_future(Tx, Tree, Id)).
@@ -494,13 +488,6 @@ last_key(Members) when is_list(Members) ->
 
 new_node_id() ->
     crypto:strong_rand_bytes(16).
-
-
-new_node_id_unless_root(#node{id = ?NODE_ROOT_ID} = Node) ->
-    Node;
-
-new_node_id_unless_root(#node{} = Node) ->
-    Node#node{id = new_node_id()}.
 
 
 %% remove prev/next pointers for nonleaf nodes
