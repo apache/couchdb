@@ -14,3 +14,4 @@ TODO
 2. Store reduction values on inner nodes.
 3. Chunkify large values over multiple rows?
 4. Sequential node ids?
+5. encode values in a non-erlang way?
