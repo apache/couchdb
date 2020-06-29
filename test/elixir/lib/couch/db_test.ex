@@ -341,7 +341,7 @@ defmodule Couch.DBTest do
           Couch.get("/#{db_name}/_design/#{view_root}/_view/#{view_name}", query: options)
 
         _ ->
-          Couch.post("/#{db_name}/_design/#{view_root}/_view/#{view_name}",
+          Couch.post("/#{db_name}/_design/#{view_root}/_view/#{view_name}", query: options,
             body: %{"keys" => keys}
           )
       end
