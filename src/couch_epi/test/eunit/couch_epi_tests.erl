@@ -162,7 +162,8 @@ start_epi(Plugins) ->
         Module
     end, Plugins),
     application:set_env(couch_epi, plugins, PluginsModules),
-    application:start(couch_epi).
+    {ok, _} = application:ensure_all_started(couch_epi),
+    ok.
 
 setup(data_file) ->
     error_logger:tty(false),
