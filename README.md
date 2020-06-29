@@ -3,7 +3,8 @@ all data is stored in FoundationDB.
 
 The tree is balanced at all times. A bidirectional linked list is
 maintained between leaf nodes for efficient range queries in either
-direction.
+direction. You can pass in an fdb Db or open Tx, the latter is vastly
+efficient for multiple inserts, so batch if you can.
 
 The FoundationDB keys are currently random UUID's.
 
