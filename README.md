@@ -12,7 +12,6 @@ TODO
 
 1. Rewrite inner node ids (non-root, non-leaf) so we can safely cache
     them outside of a transaction.
-2. Store reduction values on inner nodes.
-3. Chunkify large values over multiple rows?
-4. Sequential node ids?
-5. encode values in a non-erlang way?
+2. Chunkify large values over multiple rows?
+3. Sequential node ids?
+4. encode values in a non-erlang way?
