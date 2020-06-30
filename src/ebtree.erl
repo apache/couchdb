@@ -32,6 +32,7 @@
     prefix,
     min,
     max,
+    collate_fun,
     reduce_fun
 }).
 
@@ -50,18 +51,25 @@ init(Db, Prefix, Order) when is_binary(Prefix), is_integer(Order), Order > 2, Or
     erlfdb:transactional(Db, fun(Tx) ->
         erlfdb:clear_range_startswith(Tx, Prefix),
         set_meta(Tx, Prefix, ?META_ORDER, Order),
-        set_node(Tx, to_tree(Prefix, Order, undefined), #node{id = ?NODE_ROOT_ID}),
+        set_node(Tx, init_tree(Prefix, Order), #node{id = ?NODE_ROOT_ID}),
         ok
     end).
 
 
 open(Db, Prefix) ->
-    open(Db, Prefix, fun reduce_noop/2).
+    open(Db, Prefix, []).
 
-open(Db, Prefix, ReduceFun) when is_function(ReduceFun, 2) ->
-     erlfdb:transactional(Db, fun(Tx) ->
+open(Db, Prefix, Options) ->
+    ReduceFun = proplists:get_value(reduce_fun, Options, fun reduce_noop/2),
+    CollateFun = proplists:get_value(collate_fun, Options, fun collate_raw/2),
+
+    erlfdb:transactional(Db, fun(Tx) ->
         Order = get_meta(Tx, Prefix, ?META_ORDER),
-        to_tree(Prefix, Order, ReduceFun)
+        Tree = init_tree(Prefix, Order),
+        Tree#tree{
+            reduce_fun = ReduceFun,
+            collate_fun = CollateFun
+        }
     end).
 
 
@@ -76,7 +84,7 @@ lookup(_Tx, #tree{} = _Tree, #node{level = 0} = Node, Key) ->
      find_value(Node, Key);
 
 lookup(Tx, #tree{} = Tree, #node{} = Node, Key) ->
-    ChildId = find_child_id(Node, Key),
+    ChildId = find_child_id(Tree, Node, Key),
     lookup(Tx, Tree, get_node_wait(Tx, Tree, ChildId), Key).
 
 %% reduce lookup
@@ -107,7 +115,7 @@ range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun, Acc0) 
     end;
 
 range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, Fun, Acc) ->
-    ChildId = find_child_id(Node, StartKey),
+    ChildId = find_child_id(Tree, Node, StartKey),
     range(Tx, Tree, get_node_wait(Tx, Tree, ChildId), StartKey, EndKey, Fun, Acc).
 
 %% reverse range (inclusive of both ends)
@@ -129,7 +137,7 @@ reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun
     end;
 
 reverse_range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, Fun, Acc) ->
-    ChildId = find_child_id(Node, EndKey),
+    ChildId = find_child_id(Tree, Node, EndKey),
     reverse_range(Tx, Tree, get_node_wait(Tx, Tree, ChildId), StartKey, EndKey, Fun, Acc).
 
 
@@ -188,8 +196,10 @@ split_child(Tx, #tree{} = Tree, #node{} = Parent0, #node{} = Child) ->
     RightReduction = reduce_node(Tree, RightChild),
 
     Parent1 = Parent0#node{
-        members = lists:keymerge(1, [{LastLeftKey, LeftId, LeftReduction}, {LastRightKey, RightId, RightReduction}],
-            lists:keydelete(Child#node.id, 2, Parent0#node.members))
+        members =
+            merge(Tree, [{LastLeftKey, LeftId, LeftReduction}],
+                merge(Tree, [{LastRightKey, RightId, RightReduction}],
+                    lists:keydelete(Child#node.id, 2, Parent0#node.members)))
     },
     clear_node(Tx, Tree, Child),
     set_nodes(Tx, Tree, [LeftChild, RightChild, Parent1]),
@@ -214,13 +224,13 @@ update_next_neighbour(Tx, #tree{} = Tree, #node{} = Node) ->
 
 insert_nonfull(Tx, #tree{} = Tree, #node{level = 0} = Node0, Key, Value) ->
     Node1 = Node0#node{
-        members = lists:ukeymerge(1, [{Key, Value}], Node0#node.members)
+        members = merge(Tree, [{Key, Value}], Node0#node.members)
     },
     set_node(Tx, Tree, Node1),
     reduce_node(Tree, Node1);
 
 insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
-    ChildId0 = find_child_id(Node0, Key),
+    ChildId0 = find_child_id(Tree, Node0, Key),
     Child0 = get_node_wait(Tx, Tree, ChildId0),
     Node1 = case ?is_full(Tree, Child0) of
         true ->
@@ -228,13 +238,14 @@ insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
         false ->
             Node0
     end,
-    ChildId1 = find_child_id(Node1, Key),
+    ChildId1 = find_child_id(Tree, Node1, Key),
     Child1 = get_node_wait(Tx, Tree, ChildId1),
     NewReduction = insert_nonfull(Tx, Tree, Child1, Key, Value),
     {CurrentKey, ChildId1, _OldReduction} = lists:keyfind(ChildId1, 2, Node1#node.members),
+    [_, NewKey] = sort(Tree, [Key, CurrentKey]),
     Node2 = Node1#node{
         members = lists:keyreplace(ChildId1, 2, Node1#node.members,
-            {erlang:max(Key, CurrentKey), ChildId1, NewReduction})
+            {NewKey, ChildId1, NewReduction})
     },
     set_node(Tx, Tree, Node2),
     reduce_node(Tree, Node2).
@@ -265,12 +276,12 @@ delete(_Tx, #tree{} = _Tree, #node{level = 0} = Node, Key) ->
     };
 
 delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
-    ChildId0 = find_child_id(Parent0, Key),
+    ChildId0 = find_child_id(Tree, Parent0, Key),
     Child0 = get_node_wait(Tx, Tree, ChildId0),
     Child1 = delete(Tx, Tree, Child0, Key),
     case ?underflow(Tree, Child1) of
         true ->
-            SiblingId = find_sibling_id(Parent0, ChildId0, Key),
+            SiblingId = find_sibling_id(Tree, Parent0, ChildId0, Key),
             Sibling = get_node_wait(Tx, Tree, SiblingId),
             NewNodes = case ?at_min(Tree, Sibling) of
                 true ->
@@ -290,7 +301,7 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
             Members1 = lists:keydelete(ChildId0, 2, Members0),
             Members2 = lists:keydelete(Sibling#node.id, 2, Members1),
             Members3 = lists:foldl(fun(N, Acc) ->
-                lists:merge([{last_key(N), N#node.id, reduce_node(Tree, N)}], Acc)
+                merge(Tree, [{last_key(N), N#node.id, reduce_node(Tree, N)}], Acc)
             end, Members2, NewNodes),
 
             Parent1 = Parent0#node{
@@ -353,22 +364,25 @@ find_value(#node{level = 0} = Node, Key) ->
     lists:keyfind(Key, 1, Node#node.members).
 
 
-find_child_id(#node{level = L} = Node, Key) when L > 0 ->
-    find_child_id_int(Node#node.members, Key).
+find_child_id(#tree{} = Tree, #node{level = L} = Node, Key) when L > 0 ->
+    find_child_id_int(Tree, Node#node.members, Key).
 
-find_child_id_int([{K, V, _R}], Key) when Key > K ->
+find_child_id_int(#tree{} = _Tree, [{_K, V, _R}], _Key) ->
     V;
 
-find_child_id_int([{K, V, _R} | _Rest], Key) when Key =< K ->
-    V;
+find_child_id_int(#tree{} = Tree, [{K, V, _R} | Rest], Key) ->
+    #tree{collate_fun = CollateFun} = Tree,
+    case CollateFun(Key, K) of
+        true ->
+            V;
+        false ->
+            find_child_id_int(Tree, Rest, Key)
+    end.
 
-find_child_id_int([_ | Rest], Key) ->
-    find_child_id_int(Rest, Key).
 
-
-find_sibling_id(#node{level = L} = Node0, Id, Key) when L > 0 ->
+find_sibling_id(#tree{} = Tree, #node{level = L} = Node0, Id, Key) when L > 0 ->
     Node1 = Node0#node{members = lists:keydelete(Id, 2, Node0#node.members)},
-    find_child_id(Node1, Key).
+    find_child_id(Tree, Node1, Key).
 
 %% metadata functions
 
@@ -558,15 +572,40 @@ reduce_node(#tree{} = Tree, #node{} = Node) ->
     ReduceFun(Rs, true).
 
 
+%% collation functions
+
+merge(#tree{} = Tree, List1, List2) ->
+    #tree{collate_fun = CollateFun} = Tree,
+    lists:merge(collation_wrapper_fun(CollateFun), List1, List2).
+
+sort(#tree{} = Tree, List) ->
+    #tree{collate_fun = CollateFun} = Tree,
+    lists:sort(collation_wrapper_fun(CollateFun), List).
+
+
+collation_wrapper_fun(CollateFun) ->
+    fun
+        ({K1, _V1}, {K2, _V2}) ->
+            CollateFun(K1, K2);
+        ({K1, _V1, _R1}, {K2, _V2, _R2}) ->
+            CollateFun(K1, K2);
+        (K1, K2) ->
+            CollateFun(K1, K2)
+    end.
+
+
+collate_raw(K1, K2) ->
+    K1 =< K2.
+
+
 %% private functions
 
-to_tree(Prefix, Order, ReduceFun)
+init_tree(Prefix, Order)
   when is_binary(Prefix), is_integer(Order), Order > 2, Order rem 2 == 0 ->
     #tree{
         prefix = Prefix,
         min = Order div 2,
-        max = Order,
-        reduce_fun = ReduceFun
+        max = Order
     }.
 
 
@@ -646,7 +685,7 @@ range_after_delete_test() ->
 reduce_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     ?MODULE:init(Db, <<1,2,3>>, 4),
-    Tree = ?MODULE:open(Db, <<1,2,3>>, fun reduce_sum/2),
+    Tree = ?MODULE:open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
     Max = 100,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
     lists:foreach(fun(Key) -> ?MODULE:insert(Db, Tree, Key, Key) end, Keys),
@@ -656,13 +695,38 @@ reduce_test() ->
 reduce_after_delete_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     ?MODULE:init(Db, <<1,2,3>>, 4),
-    Tree = ?MODULE:open(Db, <<1,2,3>>, fun reduce_sum/2),
+    Tree = ?MODULE:open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
     Max = 100,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
     lists:foreach(fun(Key) -> ?MODULE:insert(Db, Tree, Key, Key) end, Keys),
     ?assertEqual(round(Max * ((1 + Max) / 2)), ?MODULE:reduce(Db, Tree)),
     lists:foreach(fun(Key) -> ?MODULE:delete(Db, Tree, Key) end, Keys),
     ?assertEqual(0, ?MODULE:reduce(Db, Tree)).
+
+
+raw_collation_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    ?MODULE:init(Db, <<1,2,3>>, 4),
+    Tree = ?MODULE:open(Db, <<1,2,3>>),
+    ?MODULE:insert(Db, Tree, null, null),
+    ?MODULE:insert(Db, Tree, 1, 1),
+    ?assertEqual([{1, 1}, {null, null}], ?MODULE:range(Db, Tree, 1, null, fun(E, A) -> A ++ E end, [])).
+
+
+custom_collation_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    ?MODULE:init(Db, <<1,2,3>>, 4),
+    CollateFun = fun
+        (null, 1) ->
+            true;
+        (1, null) ->
+            false
+    end,
+    Tree = ?MODULE:open(Db, <<1,2,3>>, [{collate_fun, CollateFun}]),
+    ?MODULE:insert(Db, Tree, null, null),
+    ?MODULE:insert(Db, Tree, 1, 1),
+    ?assertEqual([{null, null}, {1, 1}], ?MODULE:range(Db, Tree, 1, null, fun(E, A) -> A ++ E end, [])).
+
 
 intense_lookup_test_() ->
     [
