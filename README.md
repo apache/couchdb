@@ -14,4 +14,4 @@ TODO
     them outside of a transaction.
 2. Chunkify large values over multiple rows?
 3. Sequential node ids?
-4. encode values in a non-erlang way?
+
