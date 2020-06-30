@@ -15,3 +15,4 @@ TODO
 2. Chunkify large values over multiple rows?
 3. Sequential node ids?
 4. encode values in a non-erlang way?
+5. custom ordering (couch_ejson_compare:less_json_ids etc)
