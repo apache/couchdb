@@ -305,7 +305,7 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
             set_node(Tx, Tree, Child1),
             {ChildKey, ChildId0, _OldReduction} = lists:keyfind(ChildId0, 2, Parent0#node.members),
             Parent0#node{
-                members = lists:keyreplace(ChildId0, 1, Parent0#node.members,
+                members = lists:keyreplace(ChildId0, 2, Parent0#node.members,
                     {ChildKey, Child1#node.id, reduce_node(Tree, Child1)})
             }
     end.
