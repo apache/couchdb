@@ -759,8 +759,8 @@ range_test_() ->
         lists:foreach(
             fun(_) ->
                 [StartKey, EndKey] = lists:sort([rand:uniform(Max), rand:uniform(Max)]),
-                ?assertEqual(EndKey - StartKey + 1,
-                    range(Db, Tree, StartKey, EndKey, fun(E, A) -> length(E) + A end, 0)
+                ?assertEqual([{K, K + 1} || K <- lists:seq(StartKey, EndKey)],
+                    range(Db, Tree, StartKey, EndKey, fun(E, A) -> A ++ E end, [])
                 ) end,
         lists:seq(1, 1000))
     end}.
@@ -776,8 +776,8 @@ reverse_range_test_() ->
         lists:foreach(
             fun(_) ->
                 [StartKey, EndKey] = lists:sort([rand:uniform(Max), rand:uniform(Max)]),
-                ?assertEqual(EndKey - StartKey + 1,
-                    reverse_range(Db, Tree, StartKey, EndKey, fun(E, A) -> length(E) + A end, 0)
+                ?assertEqual([{K, K + 1} || K <- lists:seq(EndKey, StartKey, -1)],
+                    reverse_range(Db, Tree, StartKey, EndKey, fun(E, A) -> A ++ E end, [])
                 ) end,
         lists:seq(1, 1000))
     end}.
