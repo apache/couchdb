@@ -34,9 +34,10 @@ indexer_test_() ->
                 fun foreach_setup/0,
                 fun foreach_teardown/1,
                 [
-%%                    ?TDEF_FE(index_docs),
-                    ?TDEF_FE(update_doc)
-%%                    ?TDEF_FE(delete_doc),
+                    ?TDEF_FE(index_docs),
+                    ?TDEF_FE(update_doc),
+                    ?TDEF_FE(update_doc_key_changes),
+                    ?TDEF_FE(delete_doc)
                 ]
             }
         }
@@ -59,22 +60,20 @@ cleanup(Ctx) ->
 
 foreach_setup() ->
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
-
-    DDoc = create_ddoc(),
-    fabric2_db:update_docs(Db, [DDoc]),
-    {Db, DDoc}.
+    Db.
 
 
-foreach_teardown({Db, _}) ->
+foreach_teardown(Db) ->
     meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
 
-index_docs({Db, DDoc}) ->
+index_docs(Db) ->
     Doc1 = doc(1, [1, 1], 1),
     Doc2 = doc(2, [1, 2], 2),
+    DDoc = create_ddoc(simple),
 
-    fabric2_db:update_docs(Db, [Doc1, Doc2]),
+    fabric2_db:update_docs(Db, [Doc1, Doc2, DDoc]),
 
     Res = run_query(Db, DDoc, ?IDX1),
     ?assertEqual([
@@ -83,7 +82,6 @@ index_docs({Db, DDoc}) ->
     ], Res),
 
     Doc3 = doc(3, [1, 1], 1),
-
     fabric2_db:update_docs(Db, [Doc3]),
 
     Res2 = run_query(Db, DDoc, ?IDX1),
@@ -93,22 +91,90 @@ index_docs({Db, DDoc}) ->
     ], Res2).
 
 
-update_doc({Db, DDoc}) ->
+update_doc(Db) ->
     Doc1 = doc(1, [1, 1], 1),
+    Doc2 = doc(2, [1, 1], 1),
 
     {ok, RevInfo} =fabric2_db:update_doc(Db, Doc1),
 
+    DDoc = create_ddoc(simple),
+    fabric2_db:update_docs(Db, [DDoc, Doc2]),
+
     Res = run_query(Db, DDoc, ?IDX1),
     ?assertEqual([
-        {key, [1, 1]}, {value, 1}
+        {key, [1, 1]}, {value, 2}
     ], Res),
 
-    Doc2 = update_doc(Doc1, RevInfo, [1, 1], 3),
-    {ok, _} = fabric2_db:update_doc(Db, Doc2, []),
+    NewDoc1 = update_doc(Doc1, RevInfo, [1, 1], 3),
+    {ok, _} = fabric2_db:update_doc(Db, NewDoc1, []),
 
     Res2 = run_query(Db, DDoc, ?IDX1),
     ?assertEqual([
-        {key, [1, 1]}, {value, 3}
+        {key, [1, 1]}, {value, 4}
+    ], Res2),
+
+    Res3 = run_query(Db, DDoc, ?IDX2),
+    ?debugFmt("OUT ~p ~n", [Res3]),
+    ?assertEqual([
+        {key, [1, 1]}, {value, 2}
+    ], Res3).
+
+
+update_doc_key_changes(Db) ->
+    Doc1 = doc(1, [1, 1], 2),
+    Doc2 = doc(2, [1, 1], 2),
+
+    {ok, RevInfo} =fabric2_db:update_doc(Db, Doc1),
+
+    DDoc = create_ddoc(complex),
+    fabric2_db:update_docs(Db, [DDoc, Doc2]),
+
+    Res = run_query(Db, DDoc, ?IDX1),
+    ?debugFmt("OUT 1 ~p ~n", [Res]),
+    ?assertEqual([
+        {key, [1, 1]}, {value, 4},
+        {key, [3, 4]}, {value, 40}
+    ], Res),
+
+    NewDoc1 = update_doc(Doc1, RevInfo, [1, 1], 3),
+    {ok, _} = fabric2_db:update_doc(Db, NewDoc1, []),
+
+    Res2 = run_query(Db, DDoc, ?IDX1),
+    ?debugFmt("OUT ~p ~n", [Res2]),
+    ?assertEqual([
+        {key, [1, 1]}, {value, 5},
+        {key, [3, 4]}, {value, 20},
+        {key, [4, 4]}, {value, 8}
+    ], Res2).
+
+
+delete_doc(Db) ->
+    Doc1 = doc(1, [1, 1], 2),
+    Doc2 = doc(2, [1, 1], 2),
+
+    {ok, RevInfo} =fabric2_db:update_doc(Db, Doc1),
+
+    DDoc = create_ddoc(complex),
+    fabric2_db:update_docs(Db, [DDoc, Doc2]),
+
+    Res = run_query(Db, DDoc, ?IDX1),
+    ?assertEqual([
+        {key, [1, 1]}, {value, 4},
+        {key, [3, 4]}, {value, 40}
+    ], Res),
+
+    {ok, Doc} = fabric2_db:open_doc(Db, <<"1">>),
+    JsonDoc = couch_doc:to_json_obj(Doc, []),
+    JsonDoc2 = couch_util:json_apply_field({<<"_deleted">>, true}, JsonDoc),
+    NewDoc1 = couch_doc:from_json_obj(JsonDoc2),
+
+    {ok, _} = fabric2_db:update_doc(Db, NewDoc1, []),
+
+    Res2 = run_query(Db, DDoc, ?IDX1),
+    ?debugFmt("OUT ~p ~n", [Res2]),
+    ?assertEqual([
+        {key, [1, 1]}, {value, 2},
+        {key, [3, 4]}, {value, 20}
     ], Res2).
 
 
@@ -123,18 +189,41 @@ run_query(Db, DDoc, Idx) ->
     Acc.
 
 
-create_ddoc() ->
+create_ddoc(simple) ->
     couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/ddoc1">>},
         {<<"views">>, {[
             {?IDX1, {[
                 {<<"map">>, <<"function(doc) {emit(doc.key, doc.value);}">>},
                 {<<"reduce">>, <<"_sum">>}
+            ]}},
+            {?IDX2, {[
+                {<<"map">>, <<"function(doc) {emit(doc.key, doc.value);}">>},
+                {<<"reduce">>, <<"_count">>}
             ]}}
-%%            {?IDX2, {[
-%%                {<<"map">>, <<"function(doc) {emit(doc.key, doc.value);}">>},
-%%                {<<"reduce">>, <<"_count">>}
-%%            ]}}
+        ]}}
+    ]});
+
+
+create_ddoc(complex) ->
+    couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/ddoc1">>},
+        {<<"views">>, {[
+            {?IDX1, {[
+                {<<"map">>, <<"function(doc) {"
+                    "emit(doc.key, doc.value);"
+                    "if (doc.value % 2 === 0) {"
+                    "   emit([doc.value + 1, doc.value + 2], doc.value * 10);"
+                    "} else {"
+                    "   emit([doc.value + 1, doc.value + 1], doc.value + 5);"
+                    "}"
+                    "}">>},
+                {<<"reduce">>, <<"_sum">>}
+            ]}},
+            {?IDX2, {[
+                {<<"map">>, <<"function(doc) {emit(doc.key, doc.value);}">>},
+                {<<"reduce">>, <<"_count">>}
+            ]}}
         ]}}
     ]}).
 

@@ -172,17 +172,23 @@ fold_map_idx(TxDb, Sig, ViewId, Options, Callback, Acc0) ->
     Acc1.
 
 
-write_doc(TxDb, Sig, _ViewIds, #{deleted := true} = Doc) ->
+write_doc(TxDb, Sig, Views, #{deleted := true} = Doc) ->
     #{
         id := DocId
     } = Doc,
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
+    try
+        couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys)
+    catch
+        Error:Reason ->
+            io:format("ERROR ~p ~p ~p ~n", [Error, Reason, erlang:display(erlang:get_stacktrace())]),
+            ok
+    end,
 
     clear_id_idx(TxDb, Sig, DocId),
     lists:foreach(fun({ViewId, TotalKeys, TotalSize, UniqueKeys}) ->
         clear_map_idx(TxDb, Sig, ViewId, DocId, UniqueKeys),
-        %clear_reduce_idx
         update_row_count(TxDb, Sig, ViewId, -TotalKeys),
         update_kv_size(TxDb, Sig, ViewId, -TotalSize)
     end, ExistingViewKeys);
@@ -196,7 +202,14 @@ write_doc(TxDb, Sig, Views, Doc) ->
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
 
-    couch_views_reduce_fdb:write_doc_reduce(TxDb, Sig, Views, Doc, ExistingViewKeys),
+    try
+
+        couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys)
+    catch
+        Error:Reason ->
+            io:format("ERROR ~p ~p ~p ~n", [Error, Reason, erlang:display(erlang:get_stacktrace())]),
+            ok
+    end,
 
     clear_id_idx(TxDb, Sig, DocId),
 

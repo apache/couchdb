@@ -15,7 +15,7 @@
 
 
 -export([
-    write_doc_reduce/5,
+    write_doc/5,
 
 
     idx_prefix/3,
@@ -35,99 +35,122 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
-write_doc_reduce(TxDb, Sig, Views, Doc, ExistingViewKeys) ->
+write_doc(TxDb, Sig, Views, #{deleted := true} = Doc, ExistingViewKeys) ->
+    #{
+        id := DocId
+    } = Doc,
+
+    lists:foreach(fun(View) ->
+        #mrview{
+            reduce_funs = ViewReduceFuns,
+            id_num = ViewId
+        } = View,
+        ?debugFmt("DELETING ~p ~n", [ExistingViewKeys]),
+
+        ReduceResults = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
+            {ViewId, _TotalRows, _TotalSize, EKeys} ->
+                ExistingResults = fetch_existing_results(TxDb, Sig, ViewId,
+                    ViewReduceFuns, DocId, EKeys),
+                lists:map(fun (ExistingResult) ->
+                    create_delta([], ExistingResult)
+                end, ExistingResults);
+            false ->
+                []
+        end,
+        ?debugFmt("delete delta ~p ~n", [ReduceResults]),
+        update_indexes(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ReduceResults)
+    end, Views);
+
+write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys) ->
     #{
         id := DocId,
         reduce_results := ReduceResults
     } = Doc,
 
-    lists:foreach(fun({View, ViewReduceResult}) ->
+    lists:foreach(fun({View, NewReduceResult}) ->
         #mrview{
             reduce_funs = ViewReduceFuns,
             id_num = ViewId
         } = View,
 
-        ExistingKeys = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
+        ?debugFmt("SS ~p ~n", [ExistingViewKeys]),
+        ReduceDelta = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
             {_ViewId, _TotalRows, _TotalSize, EKeys} ->
-                EKeys;
+                ExistingResults = fetch_existing_results(TxDb, Sig, ViewId,
+                    ViewReduceFuns, DocId, EKeys),
+                create_view_deltas(NewReduceResult, ExistingResults);
             false ->
-                []
+                NewReduceResult
         end,
-        update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId,
-            ExistingKeys, ViewReduceResult)
+        update_indexes(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ReduceDelta)
     end, lists:zip(Views, ReduceResults)).
 
-update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId, [],
-    ViewReduceResult) ->
 
+update_indexes(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ViewReduceResult) ->
     lists:foreach(fun({ViewReduceFun, ReduceResult}) ->
-        {_, ReduceFun} = ViewReduceFun,
-        ReduceId = couch_views_util:reduce_id(ViewId, ReduceFun),
-        update_index(TxDb, Sig, ReduceId, ReduceFun, DocId, ReduceResult)
-    end, lists:zip(ViewReduceFuns, ViewReduceResult));
+        ReduceId = couch_views_util:reduce_id(ViewId, ViewReduceFun),
+        ?debugFmt("UPDATING ~p ~p ~n", [ViewId, ReduceResult]),
+        update_index(TxDb, Sig, ReduceId, DocId, ReduceResult)
+    end, lists:zip(ViewReduceFuns, ViewReduceResult)).
 
-update_reduce_idx(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ExistingKeys,
-    ViewReduceResult) ->
+create_view_deltas(ViewReduceResults, ExistingResults) ->
+    ?debugFmt("~n existing ~p ~n results ~p ~n", [ExistingResults, ViewReduceResults]),
 
+    lists:map(fun({ReduceResult, ExistingResult}) ->
+        Diff = create_delta(ReduceResult, ExistingResult),
+        ?debugFmt("updating ~p ~n ~p ~n diff ~p ~n", [ReduceResult, ExistingResult, Diff]),
+        Diff
+    end, lists:zip(ViewReduceResults, ExistingResults)).
+
+
+fetch_existing_results(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ExistingKeys) ->
     CB = fun(_DocId, Key, Value, Acc) ->
-            Acc ++ [{Key, Value}]
-        end,
+        Acc ++ [{Key, Value}]
+    end,
 
-    ?debugFmt("existing ~p ~n results ~p ~n funs ~p ~n", [ExistingKeys, ViewReduceResult, ViewReduceFuns]),
-
-    ExistingReduceResult = lists:map(fun (Key) ->
+    Rows = lists:foldl(fun (Key, Acc) ->
         EK = couch_views_encoding:encode(Key, key),
         Opts = [
             {start_key, {EK, DocId}},
             {end_key, {EK, DocId, <<255>>}}
         ],
-
-        Rows = couch_views_fdb:fold_map_idx(TxDb, Sig, ViewId,  Opts, CB, []),
-        lists:map(fun ({_, Reducer}) ->
-            Reduce = couch_views_reducer:rereduce(Reducer, Rows, group_true),
-            hd(Reduce)
-        end, ViewReduceFuns)
-    end, ExistingKeys),
-
-    lists:foreach(fun({{_, ReduceFun}, ReduceResult, ExistingResult}) ->
-        Diff = create_diff(ReduceResult, ExistingResult),
-        ?debugFmt("updating ~p ~n ~p ~n diff ~p ~n", [ReduceResult, ExistingResult, Diff]),
-        ReduceId = couch_views_util:reduce_id(ViewId, ReduceFun),
-        update_index(TxDb, Sig, ReduceId, ReduceFun, DocId, Diff)
-    end, lists:zip3(ViewReduceFuns, ViewReduceResult, ExistingReduceResult)).
-
-create_diff(ViewReduceResult, []) ->
-    ViewReduceResult;
-
-create_diff(NewResult, ExistingResult) ->
-
-    lists:map(fun ({{Key, New}, {Key, Old}}) ->
-        {Key, New - Old}
-    end, lists:zip(NewResult, ExistingResult)).
+        Rows = couch_views_fdb:fold_map_idx(TxDb, Sig, ViewId, Opts, CB, []),
+        Acc ++ Rows
+    end, [], ExistingKeys),
+    ?debugFmt("RROWS Row ~p ~n", [Rows]),
+    Out = lists:map(fun ({_, Reducer}) ->
+        ExistingResult = couch_views_reducer:rereduce(Reducer, Rows, group_true),
+        ?debugFmt("EXISTING MAP ~p ~n", [ExistingResult]),
+        ExistingResult
+    end, ViewReduceFuns),
+    ?debugFmt("FETCHED RESULTS ~p ~n", [Out]),
+    Out.
 
 
-update_index(TxDb, Sig, ViewId, Reducer, _DocId, ReduceResult) ->
+create_delta(NewResults, ExistingResults) ->
+    ?debugFmt("Existing Results ~p ~n", [ExistingResults]),
+    {NewResults2, DeltaResults} = lists:foldl(fun ({Key, ExistingVal}, {NewResults0, Acc}) ->
+        {RemainingNew, DeltaResult} = case lists:keytake(Key, 1, NewResults0) of
+            false -> {NewResults0, -ExistingVal};
+            {value, {Key, NewVal}, NewResult1} -> {NewResult1, NewVal - ExistingVal}
+        end,
+        {RemainingNew, Acc ++ [{Key, DeltaResult}]}
+    end, {NewResults, []}, ExistingResults),
+    DeltaResults ++ NewResults2.
+
+
+update_index(TxDb, Sig, ViewId, _DocId, ReduceResult) ->
     #{
         db_prefix := DbPrefix
     } = TxDb,
 
-    ViewOpts = #{
-        db_prefix => DbPrefix,
-        sig => Sig,
-        view_id => ViewId,
-        reducer => Reducer
-    },
     ReduceIdxPrefix = couch_views_reduce_fdb:idx_prefix(DbPrefix, Sig, ViewId),
     lists:foreach(fun ({Key, Val}) ->
-        add_kv_to_group_level(TxDb, ReduceIdxPrefix, ViewOpts, Key, Val)
+        add_kv_to_group_level(TxDb, ReduceIdxPrefix, Key, Val)
     end, ReduceResult).
 
 
-add_kv_to_group_level(Db, ReduceIdxPrefix, #{} = ViewOpts, Key, Val) ->
-    #{
-        reducer := Reducer
-    } = ViewOpts,
-
+add_kv_to_group_level(Db, ReduceIdxPrefix, Key, Val) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
         Val1 = case couch_views_reduce_fdb:get_value(TxDb,
             ReduceIdxPrefix, Key) of
@@ -135,9 +158,6 @@ add_kv_to_group_level(Db, ReduceIdxPrefix, #{} = ViewOpts, Key, Val) ->
                 Val;
             ExistingVal ->
                 ExistingVal + Val
-%%                [{_, NewReducedVal}] = couch_views_reducer:rereduce(Reducer,
-%%                    [{Key, ExistingVal}, {Key, Val}], group_true),
-%%                NewReducedVal
         end,
         couch_views_reduce_fdb:add_kv(TxDb, ReduceIdxPrefix, Key, Val1)
     end).
@@ -147,7 +167,6 @@ add_kv_to_group_level(Db, ReduceIdxPrefix, #{} = ViewOpts, Key, Val) ->
 idx_prefix(DbPrefix, Sig, ViewId) ->
     Key = {?DB_VIEWS, ?VIEW_DATA, Sig, ?VIEW_REDUCE_RANGE, ViewId},
     erlfdb_tuple:pack(Key, DbPrefix).
-
 
 
 % Folds over level 0 and reduces all keys in memory

@@ -21,7 +21,6 @@
 
     % reduce
     reduce_id/2,
-    hash_key/1,
     group_level_equal/3,
     group_level_key/2
 ]).
@@ -257,13 +256,11 @@ range_error_msg(Name, Min, Max) ->
     >>).
 
 
+reduce_id(ViewId, {_, ReduceFun}) ->
+    reduce_id(ViewId, ReduceFun);
+
 reduce_id(ViewId, ReduceFun) ->
     <<ViewId, ReduceFun/binary>>.
-
-
-hash_key(Key) ->
-    % TODO: look at alternatives like murmur3 here
-    erlang:phash2(Key).
 
 
 determine_group_level(#mrargs{group=undefined, group_level=undefined}) ->
