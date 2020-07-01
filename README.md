@@ -6,6 +6,9 @@ maintained between leaf nodes for efficient range queries in either
 direction. You can pass in an fdb Db or open Tx, the latter is vastly
 more efficient for multiple inserts, so batch if you can.
 
+A reduction function can be specified, the B+Tree calculates and stores
+intermediate reduction values on the inner nodes for performance.
+
 The FoundationDB keys are currently random UUID's.
 
 TODO
