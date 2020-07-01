@@ -652,80 +652,80 @@ b64(Bin) ->
 
 lookup_test() ->
     Db = erlfdb_util:get_test_db([empty]),
-    ?MODULE:init(Db, <<1,2,3>>, 4),
-    Tree = ?MODULE:open(Db, <<1,2,3>>),
+    init(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>),
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 100)])],
-    lists:foreach(fun(Key) -> ?MODULE:insert(Db, Tree, Key, Key + 1) end, Keys),
-    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, ?MODULE:lookup(Db, Tree, Key)) end, Keys).
+    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key + 1) end, Keys),
+    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys).
 
 
 delete_test() ->
     Db = erlfdb_util:get_test_db([empty]),
-    ?MODULE:init(Db, <<1,2,3>>, 4),
-    Tree = ?MODULE:open(Db, <<1,2,3>>),
+    init(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>),
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 100)])],
-    lists:foreach(fun(Key) -> ?MODULE:insert(Db, Tree, Key, Key + 1) end, Keys),
-    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, ?MODULE:lookup(Db, Tree, Key)) end, Keys),
-    lists:foreach(fun(Key) -> ?MODULE:delete(Db, Tree, Key) end, Keys),
-    lists:foreach(fun(Key) -> ?assertEqual(false, ?MODULE:lookup(Db, Tree, Key)) end, Keys).
+    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key + 1) end, Keys),
+    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
+    lists:foreach(fun(Key) -> delete(Db, Tree, Key) end, Keys),
+    lists:foreach(fun(Key) -> ?assertEqual(false, lookup(Db, Tree, Key)) end, Keys).
 
 
 range_after_delete_test() ->
     Db = erlfdb_util:get_test_db([empty]),
-    ?MODULE:init(Db, <<1,2,3>>, 4),
-    Tree = ?MODULE:open(Db, <<1,2,3>>),
+    init(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>),
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 100)])],
-    lists:foreach(fun(Key) -> ?MODULE:insert(Db, Tree, Key, Key + 1) end, Keys),
-    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, ?MODULE:lookup(Db, Tree, Key)) end, Keys),
-    lists:foreach(fun(Key) -> ?MODULE:delete(Db, Tree, Key) end, lists:seq(1, 100, 2)),
-    ?assertEqual(50, ?MODULE:range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)),
-    ?assertEqual(50, ?MODULE:reverse_range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)).
+    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key + 1) end, Keys),
+    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
+    lists:foreach(fun(Key) -> delete(Db, Tree, Key) end, lists:seq(1, 100, 2)),
+    ?assertEqual(50, range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)),
+    ?assertEqual(50, reverse_range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)).
 
 
 reduce_test() ->
     Db = erlfdb_util:get_test_db([empty]),
-    ?MODULE:init(Db, <<1,2,3>>, 4),
-    Tree = ?MODULE:open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
+    init(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
     Max = 100,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
-    lists:foreach(fun(Key) -> ?MODULE:insert(Db, Tree, Key, Key) end, Keys),
-    ?assertEqual(round(Max * ((1 + Max) / 2)), ?MODULE:reduce(Db, Tree)).
+    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
+    ?assertEqual(round(Max * ((1 + Max) / 2)), reduce(Db, Tree)).
 
 
 reduce_after_delete_test() ->
     Db = erlfdb_util:get_test_db([empty]),
-    ?MODULE:init(Db, <<1,2,3>>, 4),
-    Tree = ?MODULE:open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
+    init(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
     Max = 100,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
-    lists:foreach(fun(Key) -> ?MODULE:insert(Db, Tree, Key, Key) end, Keys),
-    ?assertEqual(round(Max * ((1 + Max) / 2)), ?MODULE:reduce(Db, Tree)),
-    lists:foreach(fun(Key) -> ?MODULE:delete(Db, Tree, Key) end, Keys),
-    ?assertEqual(0, ?MODULE:reduce(Db, Tree)).
+    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
+    ?assertEqual(round(Max * ((1 + Max) / 2)), reduce(Db, Tree)),
+    lists:foreach(fun(Key) -> delete(Db, Tree, Key) end, Keys),
+    ?assertEqual(0, reduce(Db, Tree)).
 
 
 raw_collation_test() ->
     Db = erlfdb_util:get_test_db([empty]),
-    ?MODULE:init(Db, <<1,2,3>>, 4),
-    Tree = ?MODULE:open(Db, <<1,2,3>>),
-    ?MODULE:insert(Db, Tree, null, null),
-    ?MODULE:insert(Db, Tree, 1, 1),
-    ?assertEqual([{1, 1}, {null, null}], ?MODULE:range(Db, Tree, 1, null, fun(E, A) -> A ++ E end, [])).
+    init(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>),
+    insert(Db, Tree, null, null),
+    insert(Db, Tree, 1, 1),
+    ?assertEqual([{1, 1}, {null, null}], range(Db, Tree, 1, null, fun(E, A) -> A ++ E end, [])).
 
 
 custom_collation_test() ->
     Db = erlfdb_util:get_test_db([empty]),
-    ?MODULE:init(Db, <<1,2,3>>, 4),
+    init(Db, <<1,2,3>>, 4),
     CollateFun = fun
         (null, 1) ->
             true;
         (1, null) ->
             false
     end,
-    Tree = ?MODULE:open(Db, <<1,2,3>>, [{collate_fun, CollateFun}]),
-    ?MODULE:insert(Db, Tree, null, null),
-    ?MODULE:insert(Db, Tree, 1, 1),
-    ?assertEqual([{null, null}, {1, 1}], ?MODULE:range(Db, Tree, 1, null, fun(E, A) -> A ++ E end, [])).
+    Tree = open(Db, <<1,2,3>>, [{collate_fun, CollateFun}]),
+    insert(Db, Tree, null, null),
+    insert(Db, Tree, 1, 1),
+    ?assertEqual([{null, null}, {1, 1}], range(Db, Tree, 1, null, fun(E, A) -> A ++ E end, [])).
 
 
 intense_lookup_test_() ->
@@ -738,12 +738,12 @@ intense_lookup_test_() ->
 
 lookup_test_fun(Max, Order) ->
     Db = erlfdb_util:get_test_db([empty]),
-    ?MODULE:init(Db, <<1,2,3>>, Order),
+    init(Db, <<1,2,3>>, Order),
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max, 2)])],
     T0 = erlang:monotonic_time(),
-    Tree = lists:foldl(fun(Key, T) -> ?MODULE:insert(Db, T, Key, Key + 1) end, ?MODULE:open(Db, <<1,2,3>>), Keys),
+    Tree = lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, open(Db, <<1,2,3>>), Keys),
     T1 = erlang:monotonic_time(),
-    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, ?MODULE:lookup(Db, Tree, Key)) end, Keys),
+    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
     T2 = erlang:monotonic_time(),
     ?debugFmt("~B order. ~B iterations. insert rate: ~.2f/s, lookup rate: ~.2f/s",
         [Order, Max, Max / sec(T1 - T0), Max / sec(T2 - T1)]).
@@ -752,15 +752,15 @@ lookup_test_fun(Max, Order) ->
 range_test_() ->
     {timeout, 1000, fun() ->
         Db = erlfdb_util:get_test_db([empty]),
-        ?MODULE:init(Db, <<1,2,3>>, 10),
+        init(Db, <<1,2,3>>, 10),
         Max = 1000,
         Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
-        Tree = lists:foldl(fun(Key, T) -> ?MODULE:insert(Db, T, Key, Key + 1) end, ?MODULE:open(Db, <<1,2,3>>), Keys),
+        Tree = lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, open(Db, <<1,2,3>>), Keys),
         lists:foreach(
             fun(_) ->
                 [StartKey, EndKey] = lists:sort([rand:uniform(Max), rand:uniform(Max)]),
                 ?assertEqual(EndKey - StartKey + 1,
-                    ?MODULE:range(Db, Tree, StartKey, EndKey, fun(E, A) -> length(E) + A end, 0)
+                    range(Db, Tree, StartKey, EndKey, fun(E, A) -> length(E) + A end, 0)
                 ) end,
         lists:seq(1, 1000))
     end}.
@@ -769,15 +769,15 @@ range_test_() ->
 reverse_range_test_() ->
     {timeout, 1000, fun() ->
         Db = erlfdb_util:get_test_db([empty]),
-        ?MODULE:init(Db, <<1,2,3>>, 10),
+        init(Db, <<1,2,3>>, 10),
         Max = 1000,
         Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
-        Tree = lists:foldl(fun(Key, T) -> ?MODULE:insert(Db, T, Key, Key + 1) end, ?MODULE:open(Db, <<1,2,3>>), Keys),
+        Tree = lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, open(Db, <<1,2,3>>), Keys),
         lists:foreach(
             fun(_) ->
                 [StartKey, EndKey] = lists:sort([rand:uniform(Max), rand:uniform(Max)]),
                 ?assertEqual(EndKey - StartKey + 1,
-                    ?MODULE:reverse_range(Db, Tree, StartKey, EndKey, fun(E, A) -> length(E) + A end, 0)
+                    reverse_range(Db, Tree, StartKey, EndKey, fun(E, A) -> length(E) + A end, 0)
                 ) end,
         lists:seq(1, 1000))
     end}.
