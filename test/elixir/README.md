@@ -99,7 +99,7 @@ X means done, - means partially
   - [X] Port utf8.js
   - [X] Port uuids.js
   - [X] Port view_collation.js
-  - [ ] Port view_collation_raw.js
+  - [X] Port view_collation_raw.js
   - [ ] Port view_compaction.js
   - [ ] Port view_conflicts.js
   - [ ] Port view_errors.js
