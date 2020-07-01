@@ -104,10 +104,11 @@ range(Db, #tree{} = Tree, StartKey, EndKey, Fun, Acc0) ->
     end).
 
 range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun, Acc0) ->
-    InRange = [{K, V} || {K, V} <- Node#node.members, K >= StartKey, K =< EndKey],
+    InRange = [{K, V} || {K, V} <- Node#node.members,
+        less_than_or_equal(Tree, StartKey, K), less_than_or_equal(Tree, K, EndKey)],
     Acc1 = Fun(InRange, Acc0),
     LastKey = last_key(Node),
-    case Node#node.next /= undefined andalso EndKey >= LastKey of
+    case Node#node.next /= undefined andalso less_than_or_equal(Tree, LastKey, EndKey) of
         true ->
             range(Tx, Tree, get_node_wait(Tx, Tree, Node#node.next), StartKey, EndKey, Fun, Acc1);
         false ->
@@ -574,6 +575,11 @@ reduce_node(#tree{} = Tree, #node{} = Node) ->
 
 %% collation functions
 
+less_than_or_equal(#tree{} = Tree, A, B) ->
+    #tree{collate_fun = CollateFun} = Tree,
+    CollateFun(A, B).
+
+
 merge(#tree{} = Tree, List1, List2) ->
     #tree{collate_fun = CollateFun} = Tree,
     lists:merge(collation_wrapper_fun(CollateFun), List1, List2).
@@ -716,16 +722,11 @@ raw_collation_test() ->
 custom_collation_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     init(Db, <<1,2,3>>, 4),
-    CollateFun = fun
-        (null, 1) ->
-            true;
-        (1, null) ->
-            false
-    end,
+    CollateFun = fun(A, B) -> B =< A end,
     Tree = open(Db, <<1,2,3>>, [{collate_fun, CollateFun}]),
-    insert(Db, Tree, null, null),
     insert(Db, Tree, 1, 1),
-    ?assertEqual([{null, null}, {1, 1}], range(Db, Tree, 1, null, fun(E, A) -> A ++ E end, [])).
+    insert(Db, Tree, 2, 2),
+    ?assertEqual([{2, 2}, {1, 1}], range(Db, Tree, 3, 0, fun(E, A) -> A ++ E end, [])).
 
 
 intense_lookup_test_() ->
@@ -781,6 +782,32 @@ reverse_range_test_() ->
                 ) end,
         lists:seq(1, 1000))
     end}.
+
+
+custom_collation_range_test_() ->
+    {timeout, 1000, fun() ->
+        Db = erlfdb_util:get_test_db([empty]),
+        init(Db, <<1,2,3>>, 10),
+        Max = 1000,
+        Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
+        CollateFun = fun(A, B) -> B =< A end,
+        Tree = open(Db, <<1,2,3>>, [{collate_fun, CollateFun}]),
+        lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, Tree, Keys),
+        lists:foreach(
+            fun(_) ->
+                [StartKey, EndKey] = sort(Tree, [rand:uniform(Max), rand:uniform(Max)]),
+                Seq = if
+                    StartKey < EndKey ->
+                        lists:seq(StartKey, EndKey);
+                    true ->
+                        lists:seq(StartKey, EndKey, -1)
+                end,
+                ?assertEqual([{K, K + 1} || K <- Seq],
+                    range(Db, Tree, StartKey, EndKey, fun(E, A) -> A ++ E end, [])
+                ) end,
+        lists:seq(1, 1000))
+    end}.
+
 
 
 sec(Native) ->
