@@ -9,7 +9,7 @@
      lookup/3,
      range/6,
      reverse_range/6,
-     reduce/2,
+     full_reduce/2,
      validate_tree/2
 ]).
 
@@ -87,9 +87,9 @@ lookup(Tx, #tree{} = Tree, #node{} = Node, Key) ->
     ChildId = find_child_id(Tree, Node, Key),
     lookup(Tx, Tree, get_node_wait(Tx, Tree, ChildId), Key).
 
-%% reduce lookup
+%% full reduce
 
-reduce(Db, #tree{} = Tree) ->
+full_reduce(Db, #tree{} = Tree) ->
     erlfdb:transactional(Db, fun(Tx) ->
         Root = get_node_wait(Tx, Tree, ?NODE_ROOT_ID),
         reduce_node(Tree, Root)
@@ -716,26 +716,26 @@ range_after_delete_test() ->
     ?assertEqual(50, reverse_range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)).
 
 
-reduce_test() ->
+full_reduce_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     init(Db, <<1,2,3>>, 4),
     Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
     Max = 100,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
-    ?assertEqual(round(Max * ((1 + Max) / 2)), reduce(Db, Tree)).
+    ?assertEqual(round(Max * ((1 + Max) / 2)), full_reduce(Db, Tree)).
 
 
-reduce_after_delete_test() ->
+full_reduce_after_delete_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     init(Db, <<1,2,3>>, 4),
     Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
     Max = 100,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
-    ?assertEqual(round(Max * ((1 + Max) / 2)), reduce(Db, Tree)),
+    ?assertEqual(round(Max * ((1 + Max) / 2)), full_reduce(Db, Tree)),
     lists:foreach(fun(Key) -> delete(Db, Tree, Key) end, Keys),
-    ?assertEqual(0, reduce(Db, Tree)).
+    ?assertEqual(0, full_reduce(Db, Tree)).
 
 
 raw_collation_test() ->
