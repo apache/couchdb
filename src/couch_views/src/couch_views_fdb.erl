@@ -178,13 +178,7 @@ write_doc(TxDb, Sig, Views, #{deleted := true} = Doc) ->
     } = Doc,
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
-    try
-        couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys)
-    catch
-        Error:Reason ->
-            io:format("ERROR ~p ~p ~p ~n", [Error, Reason, erlang:display(erlang:get_stacktrace())]),
-            ok
-    end,
+    couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys),
 
     clear_id_idx(TxDb, Sig, DocId),
     lists:foreach(fun({ViewId, TotalKeys, TotalSize, UniqueKeys}) ->
@@ -201,16 +195,8 @@ write_doc(TxDb, Sig, Views, Doc) ->
     } = Doc,
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
-
-    try
-
-        couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys)
-    catch
-        Error:Reason ->
-            io:format("ERROR ~p ~p ~p ~n", [Error, Reason, erlang:display(erlang:get_stacktrace())]),
-            ok
-    end,
-
+    couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys),
+    
     clear_id_idx(TxDb, Sig, DocId),
 
     lists:foreach(fun({#mrview{id_num = ViewId}, NewRows, KVSize}) ->
