@@ -196,7 +196,7 @@ write_doc(TxDb, Sig, Views, Doc) ->
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
     couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys),
-    
+
     clear_id_idx(TxDb, Sig, DocId),
 
     lists:foreach(fun({#mrview{id_num = ViewId}, NewRows, KVSize}) ->

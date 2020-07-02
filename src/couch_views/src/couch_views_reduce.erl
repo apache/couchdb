@@ -49,31 +49,35 @@ run_reduce(#mrst{views = Views}, MappedResults) ->
     end, MappedResults).
 
 
-read_reduce(Db, Sig, ViewId, Reducer, UserCallback, UserAcc0, Args) ->
+read_reduce(Db, Sig, ReduceId, Reducer, UserCallback, UserAcc0, Args) ->
     #{
         db_prefix := DbPrefix
     } = Db,
 
     ReduceIdxPrefix = couch_views_reduce_fdb:idx_prefix(
-        DbPrefix, Sig, ViewId),
-
+        DbPrefix, Sig, ReduceId),
     #mrargs{
         limit = Limit,
         group = Group,
         group_level = GroupLevel,
-        skip = Skip
+        skip = Skip,
+        start_key = StartKey,
+        end_key = EndKey
     } = Args,
 
-    GroupLevel1 = case Group of
-        true -> group_true;
-        _ -> GroupLevel
+    {GroupLevel1, GroupLevelIndex} = case Group of
+        true ->
+            {?GROUP_TRUE, ?GROUP_TRUE};
+        _ ->
+            {GroupLevel,
+                determine_group_level_index(GroupLevel, StartKey, EndKey)}
     end,
 
-    Opts = args_to_fdb_opts(Args),
+    Opts = args_to_fdb_opts(Args, GroupLevelIndex),
 
     Acc0 = #{
         sig => Sig,
-        view_id => ViewId,
+        view_id => ReduceId,
         user_acc => UserAcc0,
         args => Args,
         callback => UserCallback,
@@ -82,14 +86,14 @@ read_reduce(Db, Sig, ViewId, Reducer, UserCallback, UserAcc0, Args) ->
         row_count => 0,
         skip => Skip
     },
-    read_reduce_int(Db, Sig, ViewId, Reducer, GroupLevel1, Acc0, Opts).
+    read_reduce_int(Db, Sig, ReduceId, Reducer, GroupLevel1, Acc0, Opts).
 
 
-read_reduce_int(Db, Sig, ViewId, Reducer, GroupLevel, Acc0, Opts ) ->
+read_reduce_int(Db, Sig, ReduceId, Reducer, GroupLevel, Acc0, Opts ) ->
     try
         Fun = fun handle_row/3,
         Acc1 = fabric2_fdb:transactional(Db, fun(TxDb) ->
-            couch_views_reduce_fdb:fold_level0(TxDb, Sig, ViewId,
+            couch_views_reduce_fdb:fold_level(TxDb, Sig, ReduceId,
                 Reducer, GroupLevel, Opts, Fun, Acc0)
         end),
         #{
@@ -104,7 +108,25 @@ read_reduce_int(Db, Sig, ViewId, Reducer, GroupLevel, Acc0, Opts ) ->
     end.
 
 
-args_to_fdb_opts(#mrargs{} = Args) ->
+determine_group_level_index(GroupLevel, undefined, undefined) ->
+    GroupLevel;
+
+determine_group_level_index(GroupLevel, undefined, EndKey) ->
+    EndKeyGroupLevel = couch_views_util:key_group_level(EndKey),
+    case GroupLevel <  EndKeyGroupLevel of
+        true -> EndKeyGroupLevel;
+        false -> GroupLevel
+    end;
+
+determine_group_level_index(GroupLevel, StartKey, _EndKey) ->
+    StartKeyGroupLevel = couch_views_util:key_group_level(StartKey),
+    case GroupLevel <  StartKeyGroupLevel of
+        true -> StartKeyGroupLevel;
+        false -> GroupLevel
+    end.
+
+
+args_to_fdb_opts(#mrargs{} = Args, GroupLevelIndex) ->
     #mrargs{
         start_key = StartKey,
         end_key = EndKey,
@@ -113,19 +135,26 @@ args_to_fdb_opts(#mrargs{} = Args) ->
     } = Args,
 
     StartKeyOpts = case {StartKey, Direction} of
-        {undefined, _}  ->
-            [];
+        {undefined, rev}  ->
+            [{start_key, {GroupLevelIndex, <<255>>}}];
+        {undefined, fwd}  ->
+            [{start_key, {GroupLevelIndex}}];
         {StartKey, _} ->
-            [{start_key, couch_views_encoding:encode(StartKey, key)}]
+            [{start_key, {GroupLevelIndex,
+                couch_views_encoding:encode(StartKey, key)}}]
     end,
 
     EndKeyOpts = case {EndKey, Direction} of
-        {undefined, _} ->
-            [];
+        {undefined, rev} ->
+            [{end_key, {GroupLevelIndex}}];
+        {undefined, fwd} ->
+            [{end_key, {GroupLevelIndex, <<255>>}}];
         {EndKey, _} when InclusiveEnd ->
-            [{end_key, couch_views_encoding:encode(EndKey, key)}];
+            [{end_key, {GroupLevelIndex,
+                couch_views_encoding:encode(EndKey, key)}}];
         {EndKey, _} when not InclusiveEnd ->
-            [{end_key_gt, couch_views_encoding:encode(EndKey, key)}]
+            [{end_key_gt, {GroupLevelIndex,
+                couch_views_encoding:encode(EndKey, key)}}]
     end,
 
     [

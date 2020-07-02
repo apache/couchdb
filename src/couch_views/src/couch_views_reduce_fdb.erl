@@ -18,11 +18,7 @@
     write_doc/5,
 
     idx_prefix/3,
-    fold_level0/8,
-    add_kv/4,
-
-    create_key/2,
-    get_value/3
+    fold_level/8
 ]).
 
 
@@ -30,7 +26,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric2.hrl").
-
 
 write_doc(TxDb, Sig, Views, #{deleted := true} = Doc, ExistingViewKeys) ->
     #{
@@ -136,31 +131,34 @@ fetch_existing_results(TxDb, Sig, ViewId, ViewReduceFuns, DocId,
     end, [], ExistingKeys),
 
     lists:map(fun ({_, Reducer}) ->
-        couch_views_reducer:rereduce(Reducer, Rows, group_true)
+        couch_views_reducer:rereduce(Reducer, Rows, ?GROUP_TRUE)
     end, ViewReduceFuns).
 
 
-update_index(TxDb, Sig, ViewId, _DocId, ReduceResult) ->
+update_index(TxDb, Sig, ReduceId, _DocId, ReduceResult) ->
     #{
         db_prefix := DbPrefix
     } = TxDb,
 
-    ReduceIdxPrefix = couch_views_reduce_fdb:idx_prefix(DbPrefix, Sig, ViewId),
+    ReduceIdxPrefix = idx_prefix(DbPrefix, Sig, ReduceId),
     lists:foreach(fun ({Key, Val}) ->
-        add_kv_to_group_level(TxDb, ReduceIdxPrefix, Key, Val)
+        GroupLevels = couch_views_util:key_group_levels(Key),
+        lists:foreach(fun (GroupLevel) ->
+            GroupKey = couch_views_util:group_level_key(Key, GroupLevel),
+            add_kv_to_group_level(TxDb, ReduceIdxPrefix, GroupLevel, GroupKey, Val)
+        end, GroupLevels)
     end, ReduceResult).
 
 
-add_kv_to_group_level(Db, ReduceIdxPrefix, Key, Val) ->
+add_kv_to_group_level(Db, ReduceIdxPrefix, GroupLevel, Key, Val) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        Val1 = case couch_views_reduce_fdb:get_value(TxDb,
-            ReduceIdxPrefix, Key) of
+        Val1 = case get_value(TxDb, ReduceIdxPrefix, GroupLevel, Key) of
             not_found ->
                 Val;
             ExistingVal ->
                 ExistingVal + Val
         end,
-        couch_views_reduce_fdb:add_kv(TxDb, ReduceIdxPrefix, Key, Val1)
+        add_kv(TxDb, ReduceIdxPrefix, GroupLevel, Key, Val1)
     end).
 
 
@@ -169,8 +167,7 @@ idx_prefix(DbPrefix, Sig, ViewId) ->
     erlfdb_tuple:pack(Key, DbPrefix).
 
 
-% Folds over level 0 and reduces all keys in memory
-fold_level0(Db, Sig, ViewId, Reducer, GroupLevel, Opts, UserCallback,
+fold_level(Db, Sig, ViewId, Reducer, GroupLevel, Opts, UserCallback,
     UserAcc0) ->
     #{
         db_prefix := DbPrefix
@@ -221,27 +218,27 @@ rereduce_and_reply(Reducer, Rows, GroupLevel, Callback, Acc0) ->
     end, Acc0, ReReduced).
 
 
-add_kv(TxDb, ReduceIdxPrefix, Key, Val) ->
+add_kv(TxDb, ReduceIdxPrefix, GroupLevel, Key, Val) ->
     #{
         tx := Tx
     } = TxDb,
 
-    LevelKey = create_key(ReduceIdxPrefix, Key),
+    LevelKey = create_key(ReduceIdxPrefix, GroupLevel, Key),
     EV = create_value(Key, Val),
 
     ok = erlfdb:set(Tx, LevelKey, EV).
 
 
-create_key(ReduceIdxPrefix, Key) ->
+create_key(ReduceIdxPrefix, GroupLevel, Key) ->
     EK = couch_views_encoding:encode(Key, key),
-    erlfdb_tuple:pack({EK}, ReduceIdxPrefix).
+    erlfdb_tuple:pack({{GroupLevel, EK}}, ReduceIdxPrefix).
 
 
-get_value(TxDb, ReduceIdxPrefix, Key) ->
+get_value(TxDb, ReduceIdxPrefix, GroupLevel, Key) ->
     #{
         tx := Tx
     } = TxDb,
-    EK = create_key(ReduceIdxPrefix, Key),
+    EK = create_key(ReduceIdxPrefix, GroupLevel, Key),
     case erlfdb:wait(erlfdb:get(Tx, EK)) of
         not_found ->
             not_found;

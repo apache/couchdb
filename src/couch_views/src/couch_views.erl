@@ -47,7 +47,7 @@ query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
 
     Args1 = to_mrargs(Args0),
     Args2 = couch_mrview_util:set_view_type(Args1, ViewName, Views),
-    Args3 = couch_mrview_util:validate_args(Args2),
+    Args3 = couch_views_util:validate_args(Args2),
 
     ok = check_range(Args3),
 

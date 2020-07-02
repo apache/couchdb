@@ -32,3 +32,6 @@
 % indexing progress
 -define(INDEX_BUILDING, <<"building">>).
 -define(INDEX_READY, <<"ready">>).
+
+% Reduce
+-define(GROUP_TRUE, <<"gt">>).

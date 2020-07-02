@@ -171,7 +171,6 @@ delete_doc(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, NewDoc1, []),
 
     Res2 = run_query(Db, DDoc, ?IDX1),
-    ?debugFmt("OUT ~p ~n", [Res2]),
     ?assertEqual([
         {key, [1, 1]}, {value, 2},
         {key, [3, 4]}, {value, 20}
