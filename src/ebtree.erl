@@ -9,6 +9,7 @@
      lookup/3,
      range/6,
      reverse_range/6,
+     fold/4,
      reduce/4,
      full_reduce/2,
      validate_tree/2
@@ -96,7 +97,47 @@ full_reduce(Db, #tree{} = Tree) ->
         reduce_node(Tree, Root)
     end).
 
-%% arbitrary range reduce
+%% fold
+
+fold(Db, #tree{} = Tree, Fun, Acc) ->
+    {_, Reduce} = erlfdb:transactional(Db, fun(Tx) ->
+        Root = get_node_wait(Tx, Tree, ?NODE_ROOT_ID),
+        fold(Db, Tree, Root, Fun, Acc)
+    end),
+    Reduce.
+
+fold(Db, #tree{} = Tree, #node{} = Node, Fun, Acc) ->
+    fold(Db, #tree{} = Tree, Node#node.members, Fun, Acc);
+
+
+fold(_Db, #tree{} = _Tree, [], _Fun, Acc) ->
+    {ok, Acc};
+
+fold(Db, #tree{} = Tree, [{K, V} | Rest], Fun, Acc0) ->
+    case Fun({visit, K, V}, Acc0) of
+        {ok, Acc1} ->
+            fold(Db, Tree, Rest, Fun, Acc1);
+        {stop, Acc1} ->
+            {stop, Acc1}
+    end;
+
+fold(Db, #tree{} = Tree, [{F, L, P, R} | Rest], Fun, Acc0) ->
+    case Fun({traverse, F, L, R}, Acc0) of
+        {ok, Acc1} ->
+            Node = get_node_wait(Db, Tree, P),
+            case fold(Db, Tree, Node, Fun, Acc1) of
+                {ok, Acc2} ->
+                    fold(Db, Tree, Rest, Fun, Acc2);
+                {stop, Acc2} ->
+                    {stop, Acc2}
+            end;
+        {skip, Acc1} ->
+            fold(Db, Tree, Rest, Fun, Acc1);
+        {stop, Acc1} ->
+            {stop, Acc1}
+    end.
+
+%% reduce
 
 reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
     erlfdb:transactional(Db, fun(Tx) ->
@@ -114,9 +155,9 @@ reduce(_Db, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey) ->
 reduce(Db, #tree{} = Tree, #node{} = Node, StartKey, EndKey) ->
     StartChildKey = find_child_key(Tree, Node, StartKey),
     EndChildKey = find_child_key(Tree, Node, EndKey),
-    InRange = [{K, P, R} || {K, P, R} <- Node#node.members,
-        less_than_or_equal(Tree, StartChildKey, K), less_than_or_equal(Tree, K, EndChildKey)],
-    {_K, P, _R} = hd(InRange),
+    InRange = [{F, L, P, R} || {F, L, P, R} <- Node#node.members,
+        less_than_or_equal(Tree, StartChildKey, L), less_than_or_equal(Tree, L, EndChildKey)],
+    {_F, _L, P, _R} = hd(InRange),
     FirstNode = get_node_wait(Db, Tree, P),
     FirstReduce = reduce(Db, Tree, FirstNode, StartKey, EndKey),
     Reductions = reduce_inner(Db, Tree, StartKey, EndKey, tl(InRange), []),
@@ -127,8 +168,8 @@ reduce_inner(_Db, #tree{} = _Tree, _StartKey, _EndKey, [], Acc) ->
     Acc;
 
 %% maybe descend into last item
-reduce_inner(Db, #tree{} = Tree, StartKey, EndKey, [{K, P, R}], Acc) ->
-    case less_than_or_equal(Tree, EndKey, K) of
+reduce_inner(Db, #tree{} = Tree, StartKey, EndKey, [{_F, L, P, R}], Acc) ->
+    case less_than_or_equal(Tree, EndKey, L) of
         true ->
             Node = get_node_wait(Db, Tree, P),
             [reduce(Db, Tree, Node, StartKey, EndKey) | Acc];
@@ -138,7 +179,7 @@ reduce_inner(Db, #tree{} = Tree, StartKey, EndKey, [{K, P, R}], Acc) ->
 
 
 %% use the reduction for any fully-spanned node
-reduce_inner(Db, #tree{} = Tree, StartKey, EndKey, [{_K, _P, R} | Rest], Acc) ->
+reduce_inner(Db, #tree{} = Tree, StartKey, EndKey, [{_F, _L, _P, R} | Rest], Acc) ->
     reduce_inner(Db, Tree, StartKey, EndKey, Rest, [R | Acc]).
 
 
@@ -415,13 +456,11 @@ find_value(#node{level = 0} = Node, Key) ->
 
 
 find_child_id(#tree{} = Tree, #node{} = Node, Key) ->
-    {_F, _L, P, _R} = find_child(Tree, Node, Key),
-    P.
+    element(3, find_child(Tree, Node, Key)).
 
 
 find_child_key(#tree{} = Tree, #node{} = Node, Key) ->
-    {_F, L, _P, _R} = find_child(Tree, Node, Key),
-    L.
+    element(2, find_child(Tree, Node, Key)).
 
 
 find_sibling_id(#tree{} = Tree, #node{level = L} = Node0, Id, Key) when L > 0 ->
@@ -436,7 +475,7 @@ find_child(#tree{} = Tree, #node{level = L} = Node, Key) when L > 0 ->
 find_child_int(#tree{} = _Tree, [Child], _Key) ->
     Child;
 
-find_child_int(#tree{} = Tree, [{_F, L, P, _R} = Child| Rest], Key) ->
+find_child_int(#tree{} = Tree, [{_F, L, _P, _R} = Child| Rest], Key) ->
     #tree{collate_fun = CollateFun} = Tree,
     case CollateFun(Key, L) of
         true ->
