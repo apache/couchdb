@@ -92,10 +92,14 @@ lookup(Tx, #tree{} = Tree, #node{} = Node, Key) ->
 %% full reduce
 
 full_reduce(Db, #tree{} = Tree) ->
-    erlfdb:transactional(Db, fun(Tx) ->
-        Root = get_node_wait(Tx, Tree, ?NODE_ROOT_ID),
-        reduce_node(Tree, Root)
-    end).
+    Fun = fun
+        ({visit, _K, V}, {Acc, _}) ->
+            {ok, {[V | Acc], false}};
+        ({traverse, _F, _L, R}, {Acc, _}) ->
+            {skip, {[R | Acc], true}}
+    end,
+    {Values, Rereduce} = fold(Db, Tree, Fun, {[], false}),
+    reduce_values(Tree, Values, Rereduce).
 
 %% fold
 
