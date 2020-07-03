@@ -688,6 +688,24 @@ reduce_values(#tree{} = Tree, Values, Rereduce) when is_list(Values) ->
 
 %% collation functions
 
+greater_than(#tree{} = Tree, A, B) ->
+    not less_than_or_equal(Tree, A, B).
+
+
+greater_than_or_equal(#tree{} = Tree, A, A) ->
+    true;
+
+greater_than_or_equal(#tree{} = Tree, A, B) ->
+    greater_than(Tree, A, B).
+
+
+less_than(#tree{} = Tree, A, A) ->
+    false;
+
+less_than(#tree{} = Tree, A, B) ->
+    less_than_or_equal(Tree, A, B).
+
+
 less_than_or_equal(#tree{} = Tree, A, B) ->
     #tree{collate_fun = CollateFun} = Tree,
     CollateFun(A, B).
