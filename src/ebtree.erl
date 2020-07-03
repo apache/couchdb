@@ -25,7 +25,7 @@
     level = 0,
     prev,
     next,
-    members = [] %% [{Key0, Value0} | {Key0, Pointer0, Reduction0}, ...]
+    members = [] %% [{Key0, Value0} | {FirstKey0, LastKey0, Pointer0, Reduction0}, ...]
 }).
 
 -record(tree, {
@@ -130,7 +130,7 @@ reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun
     InRange = [{K, V} || {K, V} <- Node#node.members,
         less_than_or_equal(Tree, StartKey, K), less_than_or_equal(Tree, K, EndKey)],
     Acc1 = Fun(lists:reverse(InRange), Acc0),
-    {FirstKey, _} = hd(Node#node.members),
+    FirstKey = first_key(Node),
     case Node#node.prev /= undefined andalso less_than_or_equal(Tree, StartKey, FirstKey) of
         true ->
             reverse_range(Tx, Tree, get_node_wait(Tx, Tree, Node#node.prev), StartKey, EndKey, Fun, Acc1);
@@ -151,11 +151,12 @@ insert(Db, #tree{} = Tree, Key, Value) ->
         case ?is_full(Tree, Root0) of
             true ->
                 OldRoot = Root0#node{id = new_node_id()},
+                FirstKey = first_key(OldRoot),
                 LastKey = last_key(OldRoot),
                 Root1 = #node{
                     id = ?NODE_ROOT_ID,
                     level = Root0#node.level + 1,
-                    members = [{LastKey, OldRoot#node.id}]},
+                    members = [{FirstKey, LastKey, OldRoot#node.id, []}]},
                 Root2 = split_child(Tx, Tree, Root1, OldRoot),
                 insert_nonfull(Tx, Tree, Root2, Key, Value);
             false ->
@@ -190,7 +191,9 @@ split_child(Tx, #tree{} = Tree, #node{} = Parent0, #node{} = Child) ->
     update_next_neighbour(Tx, Tree, RightChild),
 
     %% adjust parent members
+    FirstLeftKey = first_key(LeftMembers),
     LastLeftKey = last_key(LeftMembers),
+    FirstRightKey = first_key(RightMembers),
     LastRightKey = last_key(RightMembers),
 
     %% adjust parent reductions
@@ -199,9 +202,9 @@ split_child(Tx, #tree{} = Tree, #node{} = Parent0, #node{} = Child) ->
 
     Parent1 = Parent0#node{
         members =
-            umerge(Tree, [{LastLeftKey, LeftId, LeftReduction}],
-                umerge(Tree, [{LastRightKey, RightId, RightReduction}],
-                    lists:keydelete(Child#node.id, 2, Parent0#node.members)))
+            umerge(Tree, [{FirstLeftKey, LastLeftKey, LeftId, LeftReduction}],
+                umerge(Tree, [{FirstRightKey, LastRightKey, RightId, RightReduction}],
+                    lists:keydelete(Child#node.id, 3, Parent0#node.members)))
     },
     clear_node(Tx, Tree, Child),
     set_nodes(Tx, Tree, [LeftChild, RightChild, Parent1]),
@@ -243,11 +246,12 @@ insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
     ChildId1 = find_child_id(Tree, Node1, Key),
     Child1 = get_node_wait(Tx, Tree, ChildId1),
     NewReduction = insert_nonfull(Tx, Tree, Child1, Key, Value),
-    {CurrentKey, ChildId1, _OldReduction} = lists:keyfind(ChildId1, 2, Node1#node.members),
-    [_, NewKey] = sort(Tree, [Key, CurrentKey]),
+    {CurrentFirstKey, CurrentLastKey, ChildId1, _OldReduction} = lists:keyfind(ChildId1, 3, Node1#node.members),
+    [NewFirstKey, _] = sort(Tree, [Key, CurrentFirstKey]),
+    [_, NewLastKey] = sort(Tree, [Key, CurrentLastKey]),
     Node2 = Node1#node{
-        members = lists:keyreplace(ChildId1, 2, Node1#node.members,
-            {NewKey, ChildId1, NewReduction})
+        members = lists:keyreplace(ChildId1, 3, Node1#node.members,
+            {NewFirstKey, NewLastKey, ChildId1, NewReduction})
     },
     set_node(Tx, Tree, Node2),
     reduce_node(Tree, Node2).
@@ -261,7 +265,7 @@ delete(Db, #tree{} = Tree, Key) ->
         case delete(Tx, Tree, Root0, Key) of
             % if only one child, make it the new root.
             #node{level = L, members = [_]} = Root1 when L > 0 ->
-                [{_, ChildId, _}] = Root1#node.members,
+                [{_, _, ChildId, _}] = Root1#node.members,
                 Root2 = get_node_wait(Tx, Tree, ChildId),
                 clear_node(Tx, Tree, Root2),
                 set_node(Tx, Tree, Root2#node{id = ?NODE_ROOT_ID});
@@ -300,10 +304,10 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
 
             %% remove old members and insert new members
             Members0 = Parent0#node.members,
-            Members1 = lists:keydelete(ChildId0, 2, Members0),
-            Members2 = lists:keydelete(Sibling#node.id, 2, Members1),
+            Members1 = lists:keydelete(ChildId0, 3, Members0),
+            Members2 = lists:keydelete(Sibling#node.id, 3, Members1),
             Members3 = lists:foldl(fun(N, Acc) ->
-                umerge(Tree, [{last_key(N), N#node.id, reduce_node(Tree, N)}], Acc)
+                umerge(Tree, [{first_key(N), last_key(N), N#node.id, reduce_node(Tree, N)}], Acc)
             end, Members2, NewNodes),
 
             Parent1 = Parent0#node{
@@ -316,10 +320,10 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
             Parent1;
         false ->
             set_node(Tx, Tree, Child1),
-            {ChildKey, ChildId0, _OldReduction} = lists:keyfind(ChildId0, 2, Parent0#node.members),
+            {_OldFirstKey, _OldLastKey, ChildId0, _OldReduction} = lists:keyfind(ChildId0, 3, Parent0#node.members),
             Parent0#node{
-                members = lists:keyreplace(ChildId0, 2, Parent0#node.members,
-                    {ChildKey, Child1#node.id, reduce_node(Tree, Child1)})
+                members = lists:keyreplace(ChildId0, 3, Parent0#node.members,
+                    {first_key(Child1), last_key(Child1), Child1#node.id, reduce_node(Tree, Child1)})
             }
     end.
 
@@ -367,21 +371,21 @@ find_value(#node{level = 0} = Node, Key) ->
 find_child_id(#tree{} = Tree, #node{level = L} = Node, Key) when L > 0 ->
     find_child_id_int(Tree, Node#node.members, Key).
 
-find_child_id_int(#tree{} = _Tree, [{_K, V, _R}], _Key) ->
-    V;
+find_child_id_int(#tree{} = _Tree, [{_F, _L, P, _R}], _Key) ->
+    P;
 
-find_child_id_int(#tree{} = Tree, [{K, V, _R} | Rest], Key) ->
+find_child_id_int(#tree{} = Tree, [{_F, L, P, _R} | Rest], Key) ->
     #tree{collate_fun = CollateFun} = Tree,
-    case CollateFun(Key, K) of
+    case CollateFun(Key, L) of
         true ->
-            V;
+            P;
         false ->
             find_child_id_int(Tree, Rest, Key)
     end.
 
 
 find_sibling_id(#tree{} = Tree, #node{level = L} = Node0, Id, Key) when L > 0 ->
-    Node1 = Node0#node{members = lists:keydelete(Id, 2, Node0#node.members)},
+    Node1 = Node0#node{members = lists:keydelete(Id, 3, Node0#node.members)},
     find_child_id(Tree, Node1, Key).
 
 %% metadata functions
@@ -464,8 +468,8 @@ validate_tree(Tx, #tree{} = Tree, #node{} = Node) ->
 validate_tree(_Tx, #tree{} = _Tree, []) ->
     ok;
 
-validate_tree(Tx, #tree{} = Tree, [NodeTuple | Rest]) ->
-    Node = get_node_wait(Tx, Tree, element(2, NodeTuple)),
+validate_tree(Tx, #tree{} = Tree, [{_F, _L, P, _R} | Rest]) ->
+    Node = get_node_wait(Tx, Tree, P),
     validate_tree(Tx, Tree, Node),
     validate_tree(Tx, Tree, Rest).
 
@@ -574,7 +578,7 @@ reduce_node(#tree{} = Tree, #node{level = 0} = Node) ->
 
 reduce_node(#tree{} = Tree, #node{} = Node) ->
     #tree{reduce_fun = ReduceFun} = Tree,
-    Rs = [R || {_K, _V, R} <- Node#node.members],
+    Rs = [R || {_F, _L, _V, R} <- Node#node.members],
     ReduceFun(Rs, true).
 
 
@@ -605,8 +609,8 @@ collation_wrapper_fun(CollateFun) ->
             CollateFun(first_key(N1), first_key(N2));
         ({K1, _V1}, {K2, _V2}) ->
             CollateFun(K1, K2);
-        ({K1, _V1, _R1}, {K2, _V2, _R2}) ->
-            CollateFun(K1, K2);
+        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) ->
+            CollateFun(L1, L2);
         (K1, K2) ->
             CollateFun(K1, K2)
     end.
@@ -638,7 +642,12 @@ last_key(#node{} = Node) ->
     last_key(Node#node.members);
 
 last_key(Members) when is_list(Members) ->
-    element(1, lists:last(Members)).
+    case lists:last(Members) of
+        {K, _V} ->
+            K;
+        {_F, L, _P, _R} ->
+            L
+    end.
 
 
 new_node_id() ->
@@ -661,7 +670,7 @@ print_node(#node{level = 0} = Node) ->
 print_node(#node{} = Node) ->
     io:format("#node{id = ~s, level = ~w, prev = ~s, next = ~s, members = ~s}~n~n",
         [base64:encode(Node#node.id), Node#node.level, b64(Node#node.prev), b64(Node#node.next),
-        [io_lib:format("{~w, ~s, ~w}, ", [K, b64(V), R]) || {K, V, R} <- Node#node.members]]).
+        [io_lib:format("{~w, ~w, ~s, ~w}, ", [F, L, b64(V), R]) || {F, L, V, R} <- Node#node.members]]).
 
 
 b64(undefined) ->
