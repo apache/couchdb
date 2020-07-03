@@ -199,8 +199,8 @@ split_child(Tx, #tree{} = Tree, #node{} = Parent0, #node{} = Child) ->
 
     Parent1 = Parent0#node{
         members =
-            merge(Tree, [{LastLeftKey, LeftId, LeftReduction}],
-                merge(Tree, [{LastRightKey, RightId, RightReduction}],
+            umerge(Tree, [{LastLeftKey, LeftId, LeftReduction}],
+                umerge(Tree, [{LastRightKey, RightId, RightReduction}],
                     lists:keydelete(Child#node.id, 2, Parent0#node.members)))
     },
     clear_node(Tx, Tree, Child),
@@ -226,7 +226,7 @@ update_next_neighbour(Tx, #tree{} = Tree, #node{} = Node) ->
 
 insert_nonfull(Tx, #tree{} = Tree, #node{level = 0} = Node0, Key, Value) ->
     Node1 = Node0#node{
-        members = merge(Tree, [{Key, Value}], Node0#node.members)
+        members = umerge(Tree, [{Key, Value}], Node0#node.members)
     },
     set_node(Tx, Tree, Node1),
     reduce_node(Tree, Node1);
@@ -303,7 +303,7 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
             Members1 = lists:keydelete(ChildId0, 2, Members0),
             Members2 = lists:keydelete(Sibling#node.id, 2, Members1),
             Members3 = lists:foldl(fun(N, Acc) ->
-                merge(Tree, [{last_key(N), N#node.id, reduce_node(Tree, N)}], Acc)
+                umerge(Tree, [{last_key(N), N#node.id, reduce_node(Tree, N)}], Acc)
             end, Members2, NewNodes),
 
             Parent1 = Parent0#node{
@@ -475,6 +475,8 @@ validate_tree(Tx, #tree{} = Tree, [NodeTuple | Rest]) ->
 validate_node(#tree{} = Tree, #node{} = Node) ->
     NumKeys = length(Node#node.members),
     IsRoot = ?NODE_ROOT_ID == Node#node.id,
+    OutOfOrder = Node#node.members /= sort(Tree, Node#node.members),
+    Duplicates = Node#node.members /= usort(Tree, Node#node.members),
     if
         Node#node.id == undefined ->
             erlang:error({node_without_id, Node});
@@ -482,6 +484,10 @@ validate_node(#tree{} = Tree, #node{} = Node) ->
             erlang:error({too_few_keys, Node});
         NumKeys > Tree#tree.max ->
             erlang:error({too_many_keys, Node});
+        OutOfOrder ->
+            erlang:error({out_of_order, Node});
+        Duplicates ->
+            erlang:error({duplicates, Node});
         true ->
             ok
     end.
@@ -581,14 +587,19 @@ less_than_or_equal(#tree{} = Tree, A, B) ->
     CollateFun(A, B).
 
 
-merge(#tree{} = Tree, List1, List2) ->
+umerge(#tree{} = Tree, List1, List2) ->
     #tree{collate_fun = CollateFun} = Tree,
-    lists:merge(collation_wrapper_fun(CollateFun), List1, List2).
+    lists:umerge(collation_wrapper_fun(CollateFun), List1, List2).
+
 
 sort(#tree{} = Tree, List) ->
     #tree{collate_fun = CollateFun} = Tree,
     lists:sort(collation_wrapper_fun(CollateFun), List).
 
+
+usort(#tree{} = Tree, List) ->
+    #tree{collate_fun = CollateFun} = Tree,
+    lists:usort(collation_wrapper_fun(CollateFun), List).
 
 collation_wrapper_fun(CollateFun) ->
     fun
