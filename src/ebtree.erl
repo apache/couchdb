@@ -287,12 +287,12 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
             Sibling = get_node_wait(Tx, Tree, SiblingId),
             NewNodes = case ?at_min(Tree, Sibling) of
                 true ->
-                    Merged = merge(Child1, Sibling),
+                    Merged = merge(Tree, Child1, Sibling),
                     update_prev_neighbour(Tx, Tree, Merged),
                     update_next_neighbour(Tx, Tree, Merged),
                     [Merged];
                 false ->
-                    {Left, Right} = rebalance(Child1, Sibling),
+                    {Left, Right} = rebalance(Tree, Child1, Sibling),
                     update_prev_neighbour(Tx, Tree, Left),
                     update_next_neighbour(Tx, Tree, Right),
                     [Left, Right]
@@ -324,10 +324,9 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
     end.
 
 
-merge(#node{members = RightM} = Right, #node{members = LeftM} = Left) when RightM > LeftM ->
-    merge(Left, Right);
+merge(#tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = Node2) ->
+    [Left, Right] = sort(Tree, [Node1, Node2]),
 
-merge(#node{level = Level} = Left, #node{level = Level} = Right) ->
     #node{
         id = new_node_id(),
         level = Level,
@@ -337,10 +336,9 @@ merge(#node{level = Level} = Left, #node{level = Level} = Right) ->
     }.
 
 
-rebalance(#node{members = RightM} = Right, #node{members = LeftM} = Left) when RightM > LeftM ->
-    rebalance(Left, Right);
+rebalance(#tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = Node2) ->
+    [Left0, Right0] = sort(Tree, [Node1, Node2]),
 
-rebalance(#node{level = Level} = Left0, #node{level = Level} = Right0) ->
     Members = lists:append(Left0#node.members, Right0#node.members),
     {LeftMembers, RightMembers} = lists:split(length(Members) div 2, Members),
 
@@ -603,6 +601,8 @@ usort(#tree{} = Tree, List) ->
 
 collation_wrapper_fun(CollateFun) ->
     fun
+        (#node{} = N1, #node{} = N2) ->
+            CollateFun(first_key(N1), first_key(N2));
         ({K1, _V1}, {K2, _V2}) ->
             CollateFun(K1, K2);
         ({K1, _V1, _R1}, {K2, _V2, _R2}) ->
@@ -625,6 +625,13 @@ init_tree(Prefix, Order)
         min = Order div 2,
         max = Order
     }.
+
+
+first_key(#node{} = Node) ->
+    first_key(Node#node.members);
+
+first_key(Members) when is_list(Members) ->
+    element(1, hd(Members)).
 
 
 last_key(#node{} = Node) ->
