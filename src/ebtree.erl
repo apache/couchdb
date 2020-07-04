@@ -9,7 +9,9 @@
      lookup/3,
      range/6,
      reverse_range/6,
-     reduce/2,
+     fold/4,
+     reduce/4,
+     full_reduce/2,
      validate_tree/2
 ]).
 
@@ -76,24 +78,115 @@ open(Db, Prefix, Options) ->
 %% lookup
 
 lookup(Db, #tree{} = Tree, Key) ->
-    erlfdb:transactional(Db, fun(Tx) ->
-        lookup(Tx, Tree, get_node_wait(Tx, Tree, ?NODE_ROOT_ID), Key)
-    end).
+    Fun = fun
+        ({visit, K, V}, _Acc) when K =:= Key ->
+            {stop, {K, V}};
+        ({visit, K, _V}, Acc) ->
+            case greater_than(Tree, K, Key) of
+                true ->
+                    {stop, Acc};
+                false ->
+                    {ok, Acc}
+            end;
+        ({traverse, F, L, _R}, Acc) ->
+            case {greater_than(Tree, F, Key), less_than_or_equal(Tree, Key, L)} of
+                {true, _} ->
+                    {stop, Acc};
+                {false, true} ->
+                    {ok, Acc};
+                {false, false} ->
+                    {skip, Acc}
+            end
+    end,
+    fold(Db, Tree, Fun, false).
 
-lookup(_Tx, #tree{} = _Tree, #node{level = 0} = Node, Key) ->
-     find_value(Node, Key);
+%% full reduce
 
-lookup(Tx, #tree{} = Tree, #node{} = Node, Key) ->
-    ChildId = find_child_id(Tree, Node, Key),
-    lookup(Tx, Tree, get_node_wait(Tx, Tree, ChildId), Key).
+full_reduce(Db, #tree{} = Tree) ->
+    Fun = fun
+        ({visit, _K, V}, {Acc, _}) ->
+            {ok, {[V | Acc], false}};
+        ({traverse, _F, _L, R}, {Acc, _}) ->
+            {skip, {[R | Acc], true}}
+    end,
+    {Values, Rereduce} = fold(Db, Tree, Fun, {[], false}),
+    reduce_values(Tree, Values, Rereduce).
 
-%% reduce lookup
+%% fold
 
-reduce(Db, #tree{} = Tree) ->
-    erlfdb:transactional(Db, fun(Tx) ->
+fold(Db, #tree{} = Tree, Fun, Acc) ->
+    {_, Reduce} = erlfdb:transactional(Db, fun(Tx) ->
         Root = get_node_wait(Tx, Tree, ?NODE_ROOT_ID),
-        reduce_node(Tree, Root)
-    end).
+        fold(Db, Tree, Root, Fun, Acc)
+    end),
+    Reduce.
+
+fold(Db, #tree{} = Tree, #node{} = Node, Fun, Acc) ->
+    fold(Db, #tree{} = Tree, Node#node.members, Fun, Acc);
+
+
+fold(_Db, #tree{} = _Tree, [], _Fun, Acc) ->
+    {ok, Acc};
+
+fold(Db, #tree{} = Tree, [{K, V} | Rest], Fun, Acc0) ->
+    case Fun({visit, K, V}, Acc0) of
+        {ok, Acc1} ->
+            fold(Db, Tree, Rest, Fun, Acc1);
+        {stop, Acc1} ->
+            {stop, Acc1}
+    end;
+
+fold(Db, #tree{} = Tree, [{F, L, P, R} | Rest], Fun, Acc0) ->
+    case Fun({traverse, F, L, R}, Acc0) of
+        {ok, Acc1} ->
+            Node = get_node_wait(Db, Tree, P),
+            case fold(Db, Tree, Node, Fun, Acc1) of
+                {ok, Acc2} ->
+                    fold(Db, Tree, Rest, Fun, Acc2);
+                {stop, Acc2} ->
+                    {stop, Acc2}
+            end;
+        {skip, Acc1} ->
+            fold(Db, Tree, Rest, Fun, Acc1);
+        {stop, Acc1} ->
+            {stop, Acc1}
+    end.
+
+%% reduce
+
+reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
+    Fun = fun
+        ({visit, Key, Value}, {MapAcc, ReduceAcc}) ->
+            InRange = greater_than_or_equal(Tree, Key, StartKey) andalso less_than_or_equal(Tree, Key, EndKey),
+            case InRange of
+                true ->
+                    {ok, {[{Key, Value} | MapAcc], ReduceAcc}};
+                false ->
+                    {ok, {MapAcc, ReduceAcc}}
+            end;
+        ({traverse, FirstKey, LastKey, Reduction}, {MapAcc, ReduceAcc}) ->
+            BeforeStart = less_than(Tree, LastKey, StartKey),
+            AfterEnd = greater_than(Tree, FirstKey, EndKey),
+            Whole = greater_than_or_equal(Tree, FirstKey, StartKey) andalso less_than_or_equal(Tree, LastKey, EndKey),
+            if
+                BeforeStart ->
+                    {skip, {MapAcc, ReduceAcc}};
+                AfterEnd ->
+                    {stop, {MapAcc, ReduceAcc}};
+                Whole ->
+                    {skip, {MapAcc, [Reduction | ReduceAcc]}};
+                true ->
+                    {ok, {MapAcc, ReduceAcc}}
+            end
+    end,
+    {MapValues, ReduceValues} = fold(Db, Tree, Fun, {[], []}),
+    if
+        MapValues /= [] ->
+            MapReduction = reduce_values(Tree, MapValues, false),
+            reduce_values(Tree, [MapReduction | ReduceValues], true);
+        true ->
+            reduce_values(Tree, ReduceValues, true)
+    end.
 
 
 %% range (inclusive of both ends)
@@ -364,29 +457,31 @@ rebalance(#tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = N
 
 %% lookup functions
 
-find_value(#node{level = 0} = Node, Key) ->
-    lists:keyfind(Key, 1, Node#node.members).
-
-
-find_child_id(#tree{} = Tree, #node{level = L} = Node, Key) when L > 0 ->
-    find_child_id_int(Tree, Node#node.members, Key).
-
-find_child_id_int(#tree{} = _Tree, [{_F, _L, P, _R}], _Key) ->
-    P;
-
-find_child_id_int(#tree{} = Tree, [{_F, L, P, _R} | Rest], Key) ->
-    #tree{collate_fun = CollateFun} = Tree,
-    case CollateFun(Key, L) of
-        true ->
-            P;
-        false ->
-            find_child_id_int(Tree, Rest, Key)
-    end.
+find_child_id(#tree{} = Tree, #node{} = Node, Key) ->
+    element(3, find_child(Tree, Node, Key)).
 
 
 find_sibling_id(#tree{} = Tree, #node{level = L} = Node0, Id, Key) when L > 0 ->
     Node1 = Node0#node{members = lists:keydelete(Id, 3, Node0#node.members)},
     find_child_id(Tree, Node1, Key).
+
+
+find_child(#tree{} = Tree, #node{level = L} = Node, Key) when L > 0 ->
+    find_child_int(Tree, Node#node.members, Key).
+
+
+find_child_int(#tree{} = _Tree, [Child], _Key) ->
+    Child;
+
+find_child_int(#tree{} = Tree, [{_F, L, _P, _R} = Child| Rest], Key) ->
+    #tree{collate_fun = CollateFun} = Tree,
+    case CollateFun(Key, L) of
+        true ->
+            Child;
+        false ->
+            find_child_int(Tree, Rest, Key)
+    end.
+
 
 %% metadata functions
 
@@ -573,16 +668,37 @@ reduce_stats(Rs, true) ->
 
 
 reduce_node(#tree{} = Tree, #node{level = 0} = Node) ->
-    #tree{reduce_fun = ReduceFun} = Tree,
-    ReduceFun(Node#node.members, false);
+    reduce_values(Tree, Node#node.members, false);
 
 reduce_node(#tree{} = Tree, #node{} = Node) ->
+    Rs = [R || {_F, _L, _P, R} <- Node#node.members],
+    reduce_values(Tree, Rs, true).
+
+
+reduce_values(#tree{} = Tree, Values, Rereduce) when is_list(Values) ->
     #tree{reduce_fun = ReduceFun} = Tree,
-    Rs = [R || {_F, _L, _V, R} <- Node#node.members],
-    ReduceFun(Rs, true).
+    ReduceFun(Values, Rereduce).
 
 
 %% collation functions
+
+greater_than(#tree{} = Tree, A, B) ->
+    not less_than_or_equal(Tree, A, B).
+
+
+greater_than_or_equal(#tree{} = _Tree, A, A) ->
+    true;
+
+greater_than_or_equal(#tree{} = Tree, A, B) ->
+    greater_than(Tree, A, B).
+
+
+less_than(#tree{} = _Tree, A, A) ->
+    false;
+
+less_than(#tree{} = Tree, A, B) ->
+    less_than_or_equal(Tree, A, B).
+
 
 less_than_or_equal(#tree{} = Tree, A, B) ->
     #tree{collate_fun = CollateFun} = Tree,
@@ -684,6 +800,22 @@ b64(Bin) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+collation_fun_test_() ->
+    Tree = #tree{collate_fun = fun collate_raw/2},
+    [
+        ?_test(?assert(greater_than(Tree, 4, 3))),
+        ?_test(?assertNot(greater_than(Tree, 3, 4))),
+        ?_test(?assert(greater_than_or_equal(Tree, 3, 3))),
+        ?_test(?assert(greater_than_or_equal(Tree, 3, 3))),
+        ?_test(?assert(less_than(Tree, 3, 4))),
+        ?_test(?assertNot(less_than(Tree, 3, 3))),
+        ?_test(?assertNot(less_than(Tree, 4, 3))),
+        ?_test(?assert(less_than_or_equal(Tree, 3, 3))),
+        ?_test(?assert(less_than_or_equal(Tree, 3, 4))),
+        ?_test(?assertNot(less_than_or_equal(Tree, 4, 3)))
+    ].
+
+
 lookup_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     init(Db, <<1,2,3>>, 4),
@@ -716,26 +848,44 @@ range_after_delete_test() ->
     ?assertEqual(50, reverse_range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)).
 
 
-reduce_test() ->
+full_reduce_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     init(Db, <<1,2,3>>, 4),
     Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
     Max = 100,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
-    ?assertEqual(round(Max * ((1 + Max) / 2)), reduce(Db, Tree)).
+    ?assertEqual(round(Max * ((1 + Max) / 2)), full_reduce(Db, Tree)).
 
 
-reduce_after_delete_test() ->
+full_reduce_after_delete_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     init(Db, <<1,2,3>>, 4),
     Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
     Max = 100,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
-    ?assertEqual(round(Max * ((1 + Max) / 2)), reduce(Db, Tree)),
+    ?assertEqual(round(Max * ((1 + Max) / 2)), full_reduce(Db, Tree)),
     lists:foreach(fun(Key) -> delete(Db, Tree, Key) end, Keys),
-    ?assertEqual(0, reduce(Db, Tree)).
+    ?assertEqual(0, full_reduce(Db, Tree)).
+
+
+reduce_test_() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    init(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
+    Max = 100,
+    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
+    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
+    Expected = fun(S, E) -> lists:sum(lists:seq(S, E)) end,
+    [
+        ?_test(?assertEqual(Expected(1, 5), reduce(Db, Tree, 1, 5))),
+        ?_test(?assertEqual(Expected(50, 60), reduce(Db, Tree, 50, 60))),
+        ?_test(?assertEqual(Expected(21, 83), reduce(Db, Tree, 21, 83))),
+        ?_test(?assertEqual(Expected(1, 1), reduce(Db, Tree, 1, 1))),
+        ?_test(?assertEqual(Expected(1, 100), reduce(Db, Tree, 0, 200))),
+        ?_test(?assertEqual(Expected(5, 7), reduce(Db, Tree, 5, 7)))
+    ].
 
 
 raw_collation_test() ->
