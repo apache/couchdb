@@ -457,16 +457,8 @@ rebalance(#tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = N
 
 %% lookup functions
 
-find_value(#node{level = 0} = Node, Key) ->
-    lists:keyfind(Key, 1, Node#node.members).
-
-
 find_child_id(#tree{} = Tree, #node{} = Node, Key) ->
     element(3, find_child(Tree, Node, Key)).
-
-
-find_child_key(#tree{} = Tree, #node{} = Node, Key) ->
-    element(2, find_child(Tree, Node, Key)).
 
 
 find_sibling_id(#tree{} = Tree, #node{level = L} = Node0, Id, Key) when L > 0 ->
