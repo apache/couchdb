@@ -703,14 +703,14 @@ greater_than(#tree{} = Tree, A, B) ->
     not less_than_or_equal(Tree, A, B).
 
 
-greater_than_or_equal(#tree{} = Tree, A, A) ->
+greater_than_or_equal(#tree{} = _Tree, A, A) ->
     true;
 
 greater_than_or_equal(#tree{} = Tree, A, B) ->
     greater_than(Tree, A, B).
 
 
-less_than(#tree{} = Tree, A, A) ->
+less_than(#tree{} = _Tree, A, A) ->
     false;
 
 less_than(#tree{} = Tree, A, B) ->
