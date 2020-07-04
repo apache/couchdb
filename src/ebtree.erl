@@ -189,11 +189,11 @@ reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
     end.
 
 
-maybe_reduce(#tree{} = Tree, {MapAcc, ReduceAcc}) when length(MapAcc) > 100 ->
+maybe_reduce(#tree{} = Tree, {MapAcc, ReduceAcc}) when length(MapAcc) > Tree#tree.max ->
     Reduction = reduce_values(Tree, MapAcc, false),
     maybe_reduce(Tree, {[], [Reduction | ReduceAcc]});
 
-maybe_reduce(#tree{} = Tree, {MapAcc, ReduceAcc}) when length(ReduceAcc) > 100 ->
+maybe_reduce(#tree{} = Tree, {MapAcc, ReduceAcc}) when length(ReduceAcc) > Tree#tree.max ->
     Reduction = reduce_values(Tree, ReduceAcc, true),
     {MapAcc, [Reduction]};
 
