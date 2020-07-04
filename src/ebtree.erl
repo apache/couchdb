@@ -808,6 +808,22 @@ b64(Bin) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+collation_fun_test_() ->
+    Tree = #tree{collate_fun = fun collate_raw/2},
+    [
+        ?_test(?assert(greater_than(Tree, 4, 3))),
+        ?_test(?assertNot(greater_than(Tree, 3, 4))),
+        ?_test(?assert(greater_than_or_equal(Tree, 3, 3))),
+        ?_test(?assert(greater_than_or_equal(Tree, 3, 3))),
+        ?_test(?assert(less_than(Tree, 3, 4))),
+        ?_test(?assertNot(less_than(Tree, 3, 3))),
+        ?_test(?assertNot(less_than(Tree, 4, 3))),
+        ?_test(?assert(less_than_or_equal(Tree, 3, 3))),
+        ?_test(?assert(less_than_or_equal(Tree, 3, 4))),
+        ?_test(?assertNot(less_than_or_equal(Tree, 4, 3)))
+    ].
+
+
 lookup_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     init(Db, <<1,2,3>>, 4),
