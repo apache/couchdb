@@ -78,16 +78,27 @@ open(Db, Prefix, Options) ->
 %% lookup
 
 lookup(Db, #tree{} = Tree, Key) ->
-    erlfdb:transactional(Db, fun(Tx) ->
-        lookup(Tx, Tree, get_node_wait(Tx, Tree, ?NODE_ROOT_ID), Key)
-    end).
-
-lookup(_Tx, #tree{} = _Tree, #node{level = 0} = Node, Key) ->
-     find_value(Node, Key);
-
-lookup(Tx, #tree{} = Tree, #node{} = Node, Key) ->
-    ChildId = find_child_id(Tree, Node, Key),
-    lookup(Tx, Tree, get_node_wait(Tx, Tree, ChildId), Key).
+    Fun = fun
+        ({visit, K, V}, Acc) when K =:= Key ->
+            {stop, {K, V}};
+        ({visit, K, V}, Acc) ->
+            case greater_than(Tree, K, Key) of
+                true ->
+                    {stop, Acc};
+                false ->
+                    {ok, Acc}
+            end;
+        ({traverse, F, L, R}, Acc) ->
+            case {greater_than(Tree, F, Key), less_than_or_equal(Tree, Key, L)} of
+                {true, _} ->
+                    {stop, Acc};
+                {false, true} ->
+                    {ok, Acc};
+                {false, false} ->
+                    {skip, Acc}
+            end
+    end,
+    fold(Db, Tree, Fun, false).
 
 %% full reduce
 
