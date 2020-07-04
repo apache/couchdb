@@ -79,16 +79,16 @@ open(Db, Prefix, Options) ->
 
 lookup(Db, #tree{} = Tree, Key) ->
     Fun = fun
-        ({visit, K, V}, Acc) when K =:= Key ->
+        ({visit, K, V}, _Acc) when K =:= Key ->
             {stop, {K, V}};
-        ({visit, K, V}, Acc) ->
+        ({visit, K, _V}, Acc) ->
             case greater_than(Tree, K, Key) of
                 true ->
                     {stop, Acc};
                 false ->
                     {ok, Acc}
             end;
-        ({traverse, F, L, R}, Acc) ->
+        ({traverse, F, L, _R}, Acc) ->
             case {greater_than(Tree, F, Key), less_than_or_equal(Tree, Key, L)} of
                 {true, _} ->
                     {stop, Acc};
@@ -155,47 +155,38 @@ fold(Db, #tree{} = Tree, [{F, L, P, R} | Rest], Fun, Acc0) ->
 %% reduce
 
 reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
-    erlfdb:transactional(Db, fun(Tx) ->
-        Root = get_node_wait(Tx, Tree, ?NODE_ROOT_ID),
-        reduce(Db, Tree, Root, StartKey, EndKey)
-    end).
-
-
-reduce(_Db, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey) ->
-    %% calculate the partial reduce for in-range members.
-    InRange = [{K, V} || {K, V} <- Node#node.members,
-        less_than_or_equal(Tree, StartKey, K), less_than_or_equal(Tree, K, EndKey)],
-    reduce_values(Tree, InRange, false);
-
-reduce(Db, #tree{} = Tree, #node{} = Node, StartKey, EndKey) ->
-    StartChildKey = find_child_key(Tree, Node, StartKey),
-    EndChildKey = find_child_key(Tree, Node, EndKey),
-    InRange = [{F, L, P, R} || {F, L, P, R} <- Node#node.members,
-        less_than_or_equal(Tree, StartChildKey, L), less_than_or_equal(Tree, L, EndChildKey)],
-    {_F, _L, P, _R} = hd(InRange),
-    FirstNode = get_node_wait(Db, Tree, P),
-    FirstReduce = reduce(Db, Tree, FirstNode, StartKey, EndKey),
-    Reductions = reduce_inner(Db, Tree, StartKey, EndKey, tl(InRange), []),
-    reduce_values(Tree, [FirstReduce | Reductions], true).
-
-
-reduce_inner(_Db, #tree{} = _Tree, _StartKey, _EndKey, [], Acc) ->
-    Acc;
-
-%% maybe descend into last item
-reduce_inner(Db, #tree{} = Tree, StartKey, EndKey, [{_F, L, P, R}], Acc) ->
-    case less_than_or_equal(Tree, EndKey, L) of
+    Fun = fun
+        ({visit, Key, Value}, {MapAcc, ReduceAcc}) ->
+            InRange = greater_than_or_equal(Tree, Key, StartKey) andalso less_than_or_equal(Tree, Key, EndKey),
+            case InRange of
+                true ->
+                    {ok, {[{Key, Value} | MapAcc], ReduceAcc}};
+                false ->
+                    {ok, {MapAcc, ReduceAcc}}
+            end;
+        ({traverse, FirstKey, LastKey, Reduction}, {MapAcc, ReduceAcc}) ->
+            BeforeStart = less_than(Tree, LastKey, StartKey),
+            AfterEnd = greater_than(Tree, FirstKey, EndKey),
+            Whole = greater_than_or_equal(Tree, FirstKey, StartKey) andalso less_than_or_equal(Tree, LastKey, EndKey),
+            if
+                BeforeStart ->
+                    {skip, {MapAcc, ReduceAcc}};
+                AfterEnd ->
+                    {stop, {MapAcc, ReduceAcc}};
+                Whole ->
+                    {skip, {MapAcc, [Reduction | ReduceAcc]}};
+                true ->
+                    {ok, {MapAcc, ReduceAcc}}
+            end
+    end,
+    {MapValues, ReduceValues} = fold(Db, Tree, Fun, {[], []}),
+    if
+        MapValues /= [] ->
+            MapReduction = reduce_values(Tree, MapValues, false),
+            reduce_values(Tree, [MapReduction | ReduceValues], true);
         true ->
-            Node = get_node_wait(Db, Tree, P),
-            [reduce(Db, Tree, Node, StartKey, EndKey) | Acc];
-        false ->
-            [R | Acc]
-    end;
-
-
-%% use the reduction for any fully-spanned node
-reduce_inner(Db, #tree{} = Tree, StartKey, EndKey, [{_F, _L, _P, R} | Rest], Acc) ->
-    reduce_inner(Db, Tree, StartKey, EndKey, Rest, [R | Acc]).
+            reduce_values(Tree, ReduceValues, true)
+    end.
 
 
 %% range (inclusive of both ends)
