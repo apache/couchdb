@@ -833,7 +833,8 @@ lookup_test() ->
     Tree = open(Db, <<1,2,3>>),
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 100)])],
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key + 1) end, Keys),
-    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys).
+    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
+    ?assertEqual(false, lookup(Db, Tree, 101)).
 
 
 delete_test() ->
@@ -859,14 +860,19 @@ range_after_delete_test() ->
     ?assertEqual(50, reverse_range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)).
 
 
-full_reduce_test() ->
+full_reduce_test_() ->
     Db = erlfdb_util:get_test_db([empty]),
     init(Db, <<1,2,3>>, 4),
     Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
-    Max = 100,
-    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
-    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
-    ?assertEqual(round(Max * ((1 + Max) / 2)), full_reduce(Db, Tree)).
+    TestFun = fun(Max) ->
+        Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
+        lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
+        ?assertEqual(round(Max * ((1 + Max) / 2)), full_reduce(Db, Tree))
+    end,
+    [
+        ?_test(TestFun(4)),
+        ?_test(TestFun(8))
+    ].
 
 
 full_reduce_after_delete_test() ->
