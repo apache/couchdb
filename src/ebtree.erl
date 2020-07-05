@@ -165,7 +165,7 @@ reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
             InRange = greater_than_or_equal(Tree, Key, StartKey) andalso less_than_or_equal(Tree, Key, EndKey),
             case InRange of
                 true ->
-                    {ok, maybe_reduce(Tree, {[{Key, Value} | MapAcc], ReduceAcc})};
+                    {ok, {[{Key, Value} | MapAcc], ReduceAcc}};
                 false ->
                     {ok, {MapAcc, ReduceAcc}}
             end;
@@ -179,7 +179,7 @@ reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
                 AfterEnd ->
                     {stop, {MapAcc, ReduceAcc}};
                 Whole ->
-                    {skip, maybe_reduce(Tree, {MapAcc, [Reduction | ReduceAcc]})};
+                    {skip, {MapAcc, [Reduction | ReduceAcc]}};
                 true ->
                     {ok, {MapAcc, ReduceAcc}}
             end
@@ -193,17 +193,6 @@ reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
             reduce_values(Tree, ReduceValues, true)
     end.
 
-
-maybe_reduce(#tree{} = Tree, {MapAcc, ReduceAcc}) when length(MapAcc) > 50 ->
-    Reduction = reduce_values(Tree, MapAcc, false),
-    maybe_reduce(Tree, {[], [Reduction | ReduceAcc]});
-
-maybe_reduce(#tree{} = Tree, {MapAcc, ReduceAcc}) when length(ReduceAcc) > 50 ->
-    Reduction = reduce_values(Tree, ReduceAcc, true),
-    {MapAcc, [Reduction]};
-
-maybe_reduce(#tree{} = _Tree, Acc) ->
-    Acc.
 
 %% range (inclusive of both ends)
 
