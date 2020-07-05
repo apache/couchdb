@@ -144,13 +144,18 @@ fold(Db, #tree{} = Tree, [{F, L, P, R} | Rest], Fun, Acc0) ->
 
 full_reduce(Db, #tree{} = Tree) ->
     Fun = fun
-        ({visit, K, V}, {Acc, _}) ->
-            {ok, {[{K, V} | Acc], false}};
-        ({traverse, _F, _L, R}, {Acc, _}) ->
-            {skip, {[R | Acc], true}}
+        ({visit, K, V}, {MapAcc, ReduceAcc}) ->
+            {ok, {[{K, V} | MapAcc], ReduceAcc}};
+        ({traverse, _F, _L, R}, {MapAcc, ReduceAcc}) ->
+            {skip, {MapAcc, [R | ReduceAcc]}}
     end,
-    {Values, Rereduce} = fold(Db, Tree, Fun, {[], false}),
-    reduce_values(Tree, Values, Rereduce).
+    case fold(Db, Tree, Fun, {[], []}) of
+        {MapAcc, []} ->
+            reduce_values(Tree, MapAcc, false);
+        {[], ReduceAcc} ->
+            reduce_values(Tree, ReduceAcc, true)
+    end.
+
 
 %% reduce
 
