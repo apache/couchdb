@@ -144,8 +144,8 @@ fold(Db, #tree{} = Tree, [{F, L, P, R} | Rest], Fun, Acc0) ->
 
 full_reduce(Db, #tree{} = Tree) ->
     Fun = fun
-        ({visit, _K, V}, {Acc, _}) ->
-            {ok, {[V | Acc], false}};
+        ({visit, K, V}, {Acc, _}) ->
+            {ok, {[{K, V} | Acc], false}};
         ({traverse, _F, _L, R}, {Acc, _}) ->
             {skip, {[R | Acc], true}}
     end,
