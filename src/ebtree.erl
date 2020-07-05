@@ -100,18 +100,6 @@ lookup(Db, #tree{} = Tree, Key) ->
     end,
     fold(Db, Tree, Fun, false).
 
-%% full reduce
-
-full_reduce(Db, #tree{} = Tree) ->
-    Fun = fun
-        ({visit, _K, V}, {Acc, _}) ->
-            {ok, {[V | Acc], false}};
-        ({traverse, _F, _L, R}, {Acc, _}) ->
-            {skip, {[R | Acc], true}}
-    end,
-    {Values, Rereduce} = fold(Db, Tree, Fun, {[], false}),
-    reduce_values(Tree, Values, Rereduce).
-
 %% fold
 
 fold(Db, #tree{} = Tree, Fun, Acc) ->
@@ -151,6 +139,18 @@ fold(Db, #tree{} = Tree, [{F, L, P, R} | Rest], Fun, Acc0) ->
         {stop, Acc1} ->
             {stop, Acc1}
     end.
+
+%% full reduce
+
+full_reduce(Db, #tree{} = Tree) ->
+    Fun = fun
+        ({visit, _K, V}, {Acc, _}) ->
+            {ok, {[V | Acc], false}};
+        ({traverse, _F, _L, R}, {Acc, _}) ->
+            {skip, {[R | Acc], true}}
+    end,
+    {Values, Rereduce} = fold(Db, Tree, Fun, {[], false}),
+    reduce_values(Tree, Values, Rereduce).
 
 %% reduce
 
