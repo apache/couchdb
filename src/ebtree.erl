@@ -887,7 +887,24 @@ full_reduce_after_delete_test() ->
     ?assertEqual(0, full_reduce(Db, Tree)).
 
 
-reduce_test_() ->
+count_reduce_test_() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    init(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_count/2}]),
+    Max = 100,
+    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
+    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
+    Expected = fun(S, E) -> E - S + 1 end,
+    [
+        ?_test(?assertEqual(Expected(1, 5), reduce(Db, Tree, 1, 5))),
+        ?_test(?assertEqual(Expected(50, 60), reduce(Db, Tree, 50, 60))),
+        ?_test(?assertEqual(Expected(21, 83), reduce(Db, Tree, 21, 83))),
+        ?_test(?assertEqual(Expected(1, 1), reduce(Db, Tree, 1, 1))),
+        ?_test(?assertEqual(Expected(1, 100), reduce(Db, Tree, 0, 200))),
+        ?_test(?assertEqual(Expected(5, 7), reduce(Db, Tree, 5, 7)))
+    ].
+
+sum_reduce_test_() ->
     Db = erlfdb_util:get_test_db([empty]),
     init(Db, <<1,2,3>>, 4),
     Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
@@ -902,6 +919,23 @@ reduce_test_() ->
         ?_test(?assertEqual(Expected(1, 1), reduce(Db, Tree, 1, 1))),
         ?_test(?assertEqual(Expected(1, 100), reduce(Db, Tree, 0, 200))),
         ?_test(?assertEqual(Expected(5, 7), reduce(Db, Tree, 5, 7)))
+    ].
+
+
+stats_reduce_test_() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    init(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_stats/2}]),
+    Max = 100,
+    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
+    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
+    [
+        ?_test(?assertEqual({15,1,5,5,55}, reduce(Db, Tree, 1, 5))),
+        ?_test(?assertEqual({605,50,60,11,33385}, reduce(Db, Tree, 50, 60))),
+        ?_test(?assertEqual({3276,21,83,63,191184}, reduce(Db, Tree, 21, 83))),
+        ?_test(?assertEqual({1,1,1,1,1}, reduce(Db, Tree, 1, 1))),
+        ?_test(?assertEqual({5050,1,100,100,338350}, reduce(Db, Tree, 0, 200))),
+        ?_test(?assertEqual({18,5,7,3,110}, reduce(Db, Tree, 5, 7)))
     ].
 
 
