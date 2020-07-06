@@ -188,13 +188,15 @@ reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
             end
     end,
     {MapValues, ReduceValues} = fold(Db, Tree, Fun, {[], []}),
-    if
-        MapValues /= [] ->
-            MapReduction = reduce_values(Tree, MapValues, false),
-            reduce_values(Tree, [MapReduction | ReduceValues], true);
-        true ->
-            reduce_values(Tree, ReduceValues, true)
-    end.
+    final_reduce(Tree, MapValues, ReduceValues).
+
+
+final_reduce(#tree{} = Tree, [], ReduceValues) when is_list(ReduceValues) ->
+    reduce_values(Tree, ReduceValues, true);
+
+final_reduce(#tree{} = Tree, MapValues, ReduceValues) when is_list(MapValues), is_list(ReduceValues) ->
+    final_reduce(Tree, [], [reduce_values(Tree, MapValues, false) | ReduceValues]).
+
 
 
 %% range (inclusive of both ends)
