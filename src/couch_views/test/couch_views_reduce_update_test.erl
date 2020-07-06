@@ -114,7 +114,6 @@ update_doc(Db) ->
     ], Res2),
 
     Res3 = run_query(Db, DDoc, ?IDX2),
-    ?debugFmt("OUT ~p ~n", [Res3]),
     ?assertEqual([
         {key, [1, 1]}, {value, 2}
     ], Res3).
@@ -130,7 +129,6 @@ update_doc_key_changes(Db) ->
     fabric2_db:update_docs(Db, [DDoc, Doc2]),
 
     Res = run_query(Db, DDoc, ?IDX1),
-    ?debugFmt("OUT 1 ~p ~n", [Res]),
     ?assertEqual([
         {key, [1, 1]}, {value, 4},
         {key, [3, 4]}, {value, 40}
@@ -140,7 +138,6 @@ update_doc_key_changes(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, NewDoc1, []),
 
     Res2 = run_query(Db, DDoc, ?IDX1),
-    ?debugFmt("OUT ~p ~n", [Res2]),
     ?assertEqual([
         {key, [1, 1]}, {value, 5},
         {key, [3, 4]}, {value, 20},

@@ -49,11 +49,8 @@ write_doc(TxDb, Sig, Views, #{deleted := true} = Doc, ExistingViewKeys) ->
         update_indexes(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ReduceResults)
     end, Views);
 
-write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys) ->
-    #{
-        id := DocId,
-        reduce_results := ReduceResults
-    } = Doc,
+write_doc(TxDb, Sig, Views, #{reduce_results := ReduceResults, id := DocId},
+        ExistingViewKeys) ->
 
     lists:foreach(fun({View, NewResult}) ->
         #mrview{
@@ -70,7 +67,10 @@ write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys) ->
                 NewResult
         end,
         update_indexes(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ReduceDelta)
-    end, lists:zip(Views, ReduceResults)).
+    end, lists:zip(Views, ReduceResults));
+
+write_doc(_TxDb, _Sig, _Views, _Doc, _ExistingViewKeys) ->
+    ok.
 
 
 update_indexes(TxDb, Sig, ViewId, ViewReduceFuns, DocId, ViewReduceResult) ->
@@ -98,9 +98,9 @@ create_reduce_fun_delta(NewResults, ExistingResults) ->
 
         {RemainingNew, DeltaResult} = case lists:keytake(Key, 1, NewResults0) of
             false ->
-                {NewResults0, [{Key, -ExistingVal}]};
+                {NewResults0, [{Key, subtract_values(0, ExistingVal)}]};
             {value, {Key, NewVal}, NewResult1} ->
-                Delta = NewVal - ExistingVal,
+                Delta = subtract_values(NewVal, ExistingVal),
 
                 % If the difference is 0 not need to update the reduce
                 case Delta of
@@ -112,6 +112,14 @@ create_reduce_fun_delta(NewResults, ExistingResults) ->
         {RemainingNew, Acc ++ DeltaResult}
     end, {NewResults, []}, ExistingResults),
     [DeltaResults ++ NewResults2].
+
+
+% add support for subtracting objects and lists
+subtract_values(Val1, Val2) when is_number(Val1), is_number(Val2) ->
+    Val1 - Val2;
+
+subtract_values(Val1, _Val2) ->
+    Val1.
 
 
 fetch_existing_results(TxDb, Sig, ViewId, ViewReduceFuns, DocId,

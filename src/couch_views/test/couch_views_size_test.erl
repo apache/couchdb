@@ -396,20 +396,23 @@ make_doc(DocId, []) ->
             #{
                 id => DocId,
                 deleted => true,
-                results => [[]]
+                results => [[]],
+                reduce_results => [[]]
             };
         false ->
             #{
                 id => DocId,
                 deleted => false,
-                results => [[]]
+                results => [[]],
+                reduce_results => [[]]
             }
     end;
 make_doc(DocId, Results) ->
     #{
         id => DocId,
         deleted => false,
-        results => [Results]
+        results => [Results],
+        reduce_results => [[]]
     }.
 
 
