@@ -12,6 +12,7 @@
      fold/4,
      reduce/4,
      full_reduce/2,
+     group_reduce/5,
      validate_tree/2
 ]).
 
@@ -188,13 +189,64 @@ reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
             end
     end,
     {MapValues, ReduceValues} = fold(Db, Tree, Fun, {[], []}),
-    if
-        MapValues /= [] ->
-            MapReduction = reduce_values(Tree, MapValues, false),
-            reduce_values(Tree, [MapReduction | ReduceValues], true);
+    do_reduce(Tree, MapValues, ReduceValues).
+
+
+do_reduce(#tree{} = Tree, [], ReduceValues) when is_list(ReduceValues) ->
+    reduce_values(Tree, ReduceValues, true);
+
+do_reduce(#tree{} = Tree, MapValues, ReduceValues) when is_list(MapValues), is_list(ReduceValues) ->
+    do_reduce(Tree, [], [reduce_values(Tree, MapValues, false) | ReduceValues]).
+
+
+%% group reduce - produces reductions for contiguous keys in the same group.
+
+group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun) ->
+    NoGroupYet = erlang:make_ref(),
+    Fun = fun
+        ({visit, Key, Value}, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}) ->
+            AfterEnd = greater_than(Tree, Key, EndKey),
+            InRange = greater_than_or_equal(Tree, Key, StartKey) andalso less_than_or_equal(Tree, Key, EndKey),
+            KeyGroup = GroupKeyFun(Key),
+            SameGroup = CurrentGroup =:= KeyGroup,
+            if
+                AfterEnd ->
+                    {stop, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}};
+                SameGroup ->
+                    {ok, {CurrentGroup, GroupAcc, [{Key, Value} | MapAcc], ReduceAcc}};
+                InRange andalso CurrentGroup =:= NoGroupYet ->
+                    {ok, {KeyGroup, GroupAcc, [{Key, Value}], []}};
+                InRange ->
+                    %% implicit end of current group and start of a new one
+                    GroupValue = do_reduce(Tree, MapAcc, ReduceAcc),
+                    {ok, {KeyGroup, [{CurrentGroup, GroupValue} | GroupAcc], [{Key, Value}], []}};
+                true ->
+                    {ok, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}}
+            end;
+        ({traverse, FirstKey, LastKey, Reduction}, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}) ->
+            BeforeStart = less_than(Tree, LastKey, StartKey),
+            AfterEnd = greater_than(Tree, FirstKey, EndKey),
+            Whole = CurrentGroup =:= GroupKeyFun(FirstKey) andalso CurrentGroup =:= GroupKeyFun(LastKey),
+            if
+                BeforeStart ->
+                    {skip, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}};
+                AfterEnd ->
+                    {stop, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}};
+                Whole ->
+                    {skip, {CurrentGroup, GroupAcc, MapAcc, [Reduction | ReduceAcc]}};
+                true ->
+                    {ok, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}}
+            end
+    end,
+    {CurrentGroup, GroupAcc0, MapValues, ReduceValues} = fold(Db, Tree, Fun, {NoGroupYet, [], [], []}),
+    GroupAcc1 = if
+        MapValues /= [] orelse ReduceValues /= [] ->
+            FinalGroup = do_reduce(Tree, MapValues, ReduceValues),
+            [{CurrentGroup, FinalGroup} | GroupAcc0];
         true ->
-            reduce_values(Tree, ReduceValues, true)
-    end.
+            GroupAcc0
+    end,
+    lists:reverse(GroupAcc1).
 
 
 %% range (inclusive of both ends)
@@ -933,6 +985,20 @@ stats_reduce_test_() ->
         ?_test(?assertEqual({1,1,1,1,1}, reduce(Db, Tree, 1, 1))),
         ?_test(?assertEqual({5050,1,100,100,338350}, reduce(Db, Tree, 0, 200))),
         ?_test(?assertEqual({18,5,7,3,110}, reduce(Db, Tree, 5, 7)))
+    ].
+
+
+group_reduce_test_() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    init(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>, [{reduce_fun, fun reduce_sum/2}]),
+    Max = 100,
+    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
+    GroupKeyFun = fun(Key) -> lists:sublist(Key, 2) end,
+    lists:foreach(fun(Key) -> insert(Db, Tree, [Key rem 4, Key rem 3, Key], Key) end, Keys),
+    [
+        ?_test(?assertEqual([{[1, 0], 408}, {[1, 1], 441}, {[1, 2], 376}],
+            group_reduce(Db, Tree, [1], [2], GroupKeyFun)))
     ].
 
 
