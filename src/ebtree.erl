@@ -162,11 +162,14 @@ full_reduce(Db, #tree{} = Tree) ->
 reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
     Fun = fun
         ({visit, Key, Value}, {MapAcc, ReduceAcc}) ->
+            AfterEnd = greater_than(Tree, Key, EndKey),
             InRange = greater_than_or_equal(Tree, Key, StartKey) andalso less_than_or_equal(Tree, Key, EndKey),
-            case InRange of
+            if
+                AfterEnd ->
+                    {stop, {MapAcc, ReduceAcc}};
+                InRange ->
+                     {ok, {[{Key, Value} | MapAcc], ReduceAcc}};
                 true ->
-                    {ok, {[{Key, Value} | MapAcc], ReduceAcc}};
-                false ->
                     {ok, {MapAcc, ReduceAcc}}
             end;
         ({traverse, FirstKey, LastKey, Reduction}, {MapAcc, ReduceAcc}) ->
