@@ -9,7 +9,8 @@ more efficient for multiple inserts, so batch if you can.
 A reduction function can be specified, the B+Tree calculates and stores
 intermediate reduction values on the inner nodes for performance.
 
-The FoundationDB keys are currently random UUID's.
+The FoundationDB keys start with a user defined prefix and the opaque
+node id.
 
 TODO
 
