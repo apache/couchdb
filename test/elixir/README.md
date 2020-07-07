@@ -100,7 +100,7 @@ X means done, - means partially
   - [X] Port uuids.js
   - [X] Port view_collation.js
   - [X] Port view_collation_raw.js
-  - [ ] Port view_compaction.js
+  - [X] Port view_compaction.js
   - [ ] Port view_conflicts.js
   - [ ] Port view_errors.js
   - [ ] Port view_include_docs.js
@@ -110,7 +110,7 @@ X means done, - means partially
   - [X] Port view_offsets.js
   - [X] Port view_pagination.js
   - [ ] Port view_sandboxing.js
-  - [ ] Port view_update_seq.js
+  - [X] Port view_update_seq.js
 
 # Using ExUnit to write unit tests
 
