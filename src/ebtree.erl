@@ -312,7 +312,7 @@ insert(Db, #tree{} = Tree, Key, Value) ->
                     id = ?NODE_ROOT_ID,
                     level = Root0#node.level + 1,
                     members = [{FirstKey, LastKey, OldRoot#node.id, []}]},
-                Root2 = split_child(Tx, Tree, Root1, OldRoot),
+                {Root2, _, _} = split_child(Tx, Tree, Root1, OldRoot),
                 insert_nonfull(Tx, Tree, Root2, Key, Value);
             false ->
                 insert_nonfull(Tx, Tree, Root0, Key, Value)
@@ -363,7 +363,7 @@ split_child(Tx, #tree{} = Tree, #node{} = Parent0, #node{} = Child) ->
     },
     clear_node(Tx, Tree, Child),
     set_nodes(Tx, Tree, [LeftChild, RightChild, Parent1]),
-    Parent1.
+    {Parent1, LeftChild, RightChild}.
 
 
 update_prev_neighbour(_Tx, #tree{} = _Tree, #node{prev = undefined} = _Node) ->
@@ -392,14 +392,21 @@ insert_nonfull(Tx, #tree{} = Tree, #node{level = 0} = Node0, Key, Value) ->
 insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
     ChildId0 = find_child_id(Tree, Node0, Key),
     Child0 = get_node_wait(Tx, Tree, ChildId0),
-    Node1 = case ?is_full(Tree, Child0) of
+    {Node1, Child1} = case ?is_full(Tree, Child0) of
         true ->
-            split_child(Tx, Tree, Node0, Child0);
+            {Parent, LeftChild, RightChild} = split_child(Tx, Tree, Node0, Child0),
+            ChildId = find_child_id(Tree, Parent, Key),
+            Child = if
+                ChildId =:= LeftChild#node.id ->
+                    LeftChild;
+                ChildId =:= RightChild#node.id ->
+                    RightChild
+            end,
+            {Parent, Child};
         false ->
-            Node0
+            {Node0, Child0}
     end,
-    ChildId1 = find_child_id(Tree, Node1, Key),
-    Child1 = get_node_wait(Tx, Tree, ChildId1),
+    ChildId1 = Child1#node.id,
     NewReduction = insert_nonfull(Tx, Tree, Child1, Key, Value),
     {CurrentFirstKey, CurrentLastKey, ChildId1, _OldReduction} = lists:keyfind(ChildId1, 3, Node1#node.members),
     [NewFirstKey, _] = sort(Tree, [Key, CurrentFirstKey]),
