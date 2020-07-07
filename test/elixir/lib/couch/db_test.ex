@@ -209,6 +209,7 @@ defmodule Couch.DBTest do
       )
 
     assert resp.status_code in [201, 202]
+    resp
   end
 
   def query(
