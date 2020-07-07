@@ -3,6 +3,8 @@
 -export([
      open/3,
      open/4,
+     min/0,
+     max/0,
      insert/4,
      delete/3,
      lookup/3,
@@ -49,6 +51,10 @@
 -define(at_min(Tree, Node), Tree#tree.min == length(Node#node.members)).
 -define(is_full(Tree, Node), Tree#tree.max == length(Node#node.members)).
 
+%% two special 1-bit bitstrings that cannot appear in valid keys.
+-define(MIN, <<0:1>>).
+-define(MAX, <<1:1>>).
+
 
 open(Db, Prefix, Order) ->
     open(Db, Prefix, Order, []).
@@ -76,6 +82,13 @@ open(Db, Prefix, Order, Options) when is_binary(Prefix), is_integer(Order), Orde
         collate_fun = CollateFun
     }.
 
+
+min() ->
+    ?MIN.
+
+
+max() ->
+    ?MAX.
 
 %% lookup
 
@@ -203,7 +216,7 @@ do_reduce(#tree{} = Tree, MapValues, ReduceValues) when is_list(MapValues), is_l
 %% group reduce - produces reductions for contiguous keys in the same group.
 
 group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun) ->
-    NoGroupYet = erlang:make_ref(),
+    NoGroupYet = ?MIN,
     Fun = fun
         ({visit, Key, Value}, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}) ->
             AfterEnd = greater_than(Tree, Key, EndKey),
@@ -298,6 +311,12 @@ reverse_range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, Fun, Acc) ->
 
 
 %% insert
+
+insert(_Db, #tree{} = _Tree, ?MIN, _Value) ->
+    erlang:error(min_not_allowed);
+
+insert(_Db, #tree{} = _Tree, ?MAX, _Value) ->
+    erlang:error(max_not_allowed);
 
 insert(Db, #tree{} = Tree, Key, Value) ->
     erlfdb:transactional(Db, fun(Tx) ->
@@ -779,6 +798,18 @@ less_than(#tree{} = Tree, A, B) ->
     less_than_or_equal(Tree, A, B).
 
 
+less_than_or_equal(#tree{} = _Tree, ?MIN, _B) ->
+    true;
+
+less_than_or_equal(#tree{} = _Tree, _A, ?MIN) ->
+    false;
+
+less_than_or_equal(#tree{} = _Tree, ?MAX, _B) ->
+    false;
+
+less_than_or_equal(#tree{} = _Tree, _A, ?MAX) ->
+    true;
+
 less_than_or_equal(#tree{} = Tree, A, B) ->
     #tree{collate_fun = CollateFun} = Tree,
     CollateFun(A, B).
@@ -998,7 +1029,11 @@ group_reduce_test_() ->
     lists:foreach(fun(Key) -> insert(Db, Tree, [Key rem 4, Key rem 3, Key], Key) end, Keys),
     [
         ?_test(?assertEqual([{[1, 0], 408}, {[1, 1], 441}, {[1, 2], 376}],
-            group_reduce(Db, Tree, [1], [2], GroupKeyFun)))
+            group_reduce(Db, Tree, [1], [2], GroupKeyFun))),
+
+        ?_test(?assertEqual([{[0,0],432}, {[0,1],468}, {[0,2],400}, {[1,0],408}, {[1,1],441}, {[1,2],376},
+            {[2,0],384}, {[2,1],416}, {[2,2],450}, {[3,0],459}, {[3,1],392}, {[3,2],424}],
+            group_reduce(Db, Tree, ebtree:min(), ebtree:max(), GroupKeyFun)))
     ].
 
 
