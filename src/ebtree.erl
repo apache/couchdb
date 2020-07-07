@@ -107,7 +107,7 @@ lookup(Db, #tree{} = Tree, Key) ->
 
 fold(Db, #tree{} = Tree, Fun, Acc) ->
     {_, Reduce} = erlfdb:transactional(Db, fun(Tx) ->
-        Root = get_node_wait(Tx, Tree, ?NODE_ROOT_ID),
+        Root = get_node(Tx, Tree, ?NODE_ROOT_ID),
         fold(Db, Tree, Root, Fun, Acc)
     end),
     Reduce.
@@ -130,7 +130,7 @@ fold(Db, #tree{} = Tree, [{K, V} | Rest], Fun, Acc0) ->
 fold(Db, #tree{} = Tree, [{F, L, P, R} | Rest], Fun, Acc0) ->
     case Fun({traverse, F, L, R}, Acc0) of
         {ok, Acc1} ->
-            Node = get_node_wait(Db, Tree, P),
+            Node = get_node(Db, Tree, P),
             case fold(Db, Tree, Node, Fun, Acc1) of
                 {ok, Acc2} ->
                     fold(Db, Tree, Rest, Fun, Acc2);
@@ -255,7 +255,7 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun) ->
 
 range(Db, #tree{} = Tree, StartKey, EndKey, Fun, Acc0) ->
     erlfdb:transactional(Db, fun(Tx) ->
-        range(Tx, Tree, get_node_wait(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, Fun, Acc0)
+        range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, Fun, Acc0)
     end).
 
 range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun, Acc0) ->
@@ -265,20 +265,20 @@ range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun, Acc0) 
     LastKey = last_key(Node),
     case Node#node.next /= undefined andalso less_than_or_equal(Tree, LastKey, EndKey) of
         true ->
-            range(Tx, Tree, get_node_wait(Tx, Tree, Node#node.next), StartKey, EndKey, Fun, Acc1);
+            range(Tx, Tree, get_node(Tx, Tree, Node#node.next), StartKey, EndKey, Fun, Acc1);
         false ->
             Acc1
     end;
 
 range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, Fun, Acc) ->
     ChildId = find_child_id(Tree, Node, StartKey),
-    range(Tx, Tree, get_node_wait(Tx, Tree, ChildId), StartKey, EndKey, Fun, Acc).
+    range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, Fun, Acc).
 
 %% reverse range (inclusive of both ends)
 
 reverse_range(Db, #tree{} = Tree, StartKey, EndKey, Fun, Acc0) ->
     erlfdb:transactional(Db, fun(Tx) ->
-        reverse_range(Tx, Tree, get_node_wait(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, Fun, Acc0)
+        reverse_range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, Fun, Acc0)
     end).
 
 reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun, Acc0) ->
@@ -288,21 +288,21 @@ reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun
     FirstKey = first_key(Node),
     case Node#node.prev /= undefined andalso less_than_or_equal(Tree, StartKey, FirstKey) of
         true ->
-            reverse_range(Tx, Tree, get_node_wait(Tx, Tree, Node#node.prev), StartKey, EndKey, Fun, Acc1);
+            reverse_range(Tx, Tree, get_node(Tx, Tree, Node#node.prev), StartKey, EndKey, Fun, Acc1);
         false ->
             Acc1
     end;
 
 reverse_range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, Fun, Acc) ->
     ChildId = find_child_id(Tree, Node, EndKey),
-    reverse_range(Tx, Tree, get_node_wait(Tx, Tree, ChildId), StartKey, EndKey, Fun, Acc).
+    reverse_range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, Fun, Acc).
 
 
 %% insert
 
 insert(Db, #tree{} = Tree, Key, Value) ->
     erlfdb:transactional(Db, fun(Tx) ->
-        Root0 = get_node_wait(Tx, Tree, ?NODE_ROOT_ID),
+        Root0 = get_node(Tx, Tree, ?NODE_ROOT_ID),
         case ?is_full(Tree, Root0) of
             true ->
                 OldRoot = Root0#node{id = new_node_id(Tx, Tree)},
@@ -370,7 +370,7 @@ update_prev_neighbour(_Tx, #tree{} = _Tree, #node{prev = undefined} = _Node) ->
     ok;
 
 update_prev_neighbour(Tx, #tree{} = Tree, #node{} = Node) ->
-    Left = get_node_wait(Tx, Tree, Node#node.prev),
+    Left = get_node(Tx, Tree, Node#node.prev),
     set_node(Tx, Tree, Left#node{next = Node#node.id}).
 
 
@@ -378,7 +378,7 @@ update_next_neighbour(_Tx, #tree{} = _Tree, #node{next = undefined} = _Node) ->
     ok;
 
 update_next_neighbour(Tx, #tree{} = Tree, #node{} = Node) ->
-    Left = get_node_wait(Tx, Tree, Node#node.next),
+    Left = get_node(Tx, Tree, Node#node.next),
     set_node(Tx, Tree, Left#node{prev = Node#node.id}).
 
 
@@ -391,7 +391,7 @@ insert_nonfull(Tx, #tree{} = Tree, #node{level = 0} = Node0, Key, Value) ->
 
 insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
     ChildId0 = find_child_id(Tree, Node0, Key),
-    Child0 = get_node_wait(Tx, Tree, ChildId0),
+    Child0 = get_node(Tx, Tree, ChildId0),
     {Node1, Child1} = case ?is_full(Tree, Child0) of
         true ->
             {Parent, LeftChild, RightChild} = split_child(Tx, Tree, Node0, Child0),
@@ -423,12 +423,12 @@ insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
 
 delete(Db, #tree{} = Tree, Key) ->
     erlfdb:transactional(Db, fun(Tx) ->
-        Root0 = get_node_wait(Tx, Tree, ?NODE_ROOT_ID),
+        Root0 = get_node(Tx, Tree, ?NODE_ROOT_ID),
         case delete(Tx, Tree, Root0, Key) of
             % if only one child, make it the new root.
             #node{level = L, members = [_]} = Root1 when L > 0 ->
                 [{_, _, ChildId, _}] = Root1#node.members,
-                Root2 = get_node_wait(Tx, Tree, ChildId),
+                Root2 = get_node(Tx, Tree, ChildId),
                 clear_node(Tx, Tree, Root2),
                 set_node(Tx, Tree, Root2#node{id = ?NODE_ROOT_ID});
             Root1 ->
@@ -445,12 +445,12 @@ delete(_Tx, #tree{} = _Tree, #node{level = 0} = Node, Key) ->
 
 delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
     ChildId0 = find_child_id(Tree, Parent0, Key),
-    Child0 = get_node_wait(Tx, Tree, ChildId0),
+    Child0 = get_node(Tx, Tree, ChildId0),
     Child1 = delete(Tx, Tree, Child0, Key),
     case ?underflow(Tree, Child1) of
         true ->
             SiblingId = find_sibling_id(Tree, Parent0, ChildId0, Key),
-            Sibling = get_node_wait(Tx, Tree, SiblingId),
+            Sibling = get_node(Tx, Tree, SiblingId),
             NewNodes = case ?at_min(Tree, Sibling) of
                 true ->
                     Merged = merge(Tx, Tree, Child1, Sibling),
@@ -573,11 +573,11 @@ meta_key(Prefix, MetaKey) when is_binary(Prefix) ->
 
 %% node persistence functions
 
-get_node_wait(Tx, #tree{} = Tree, Id) ->
-    get_node(Id, get_node_future(Tx, Tree, Id)).
+get_node(Tx, #tree{} = Tree, Id) ->
+    get_node_wait(Id, get_node_future(Tx, Tree, Id)).
 
 
-get_node(Id, Future) ->
+get_node_wait(Id, Future) ->
     decode_node(Id, erlfdb:wait(Future)).
 
 
@@ -616,7 +616,7 @@ node_key(Prefix, Id) when is_binary(Prefix), is_integer(Id) ->
 
 validate_tree(Db, #tree{} = Tree) ->
     erlfdb:transactional(Db, fun(Tx) ->
-        Root = get_node_wait(Db, Tree, ?NODE_ROOT_ID),
+        Root = get_node(Db, Tree, ?NODE_ROOT_ID),
         validate_tree(Tx, Tree, Root)
     end).
 
@@ -633,7 +633,7 @@ validate_tree(_Tx, #tree{} = _Tree, []) ->
     ok;
 
 validate_tree(Tx, #tree{} = Tree, [{_F, _L, P, _R} | Rest]) ->
-    Node = get_node_wait(Tx, Tree, P),
+    Node = get_node(Tx, Tree, P),
     validate_tree(Tx, Tree, Node),
     validate_tree(Tx, Tree, Rest).
 
