@@ -13,7 +13,7 @@
      fold/4,
      reduce/4,
      full_reduce/2,
-     group_reduce/5,
+     group_reduce/7,
      validate_tree/2
 ]).
 
@@ -211,52 +211,51 @@ do_reduce(#tree{} = Tree, MapValues, ReduceValues) when is_list(MapValues), is_l
 
 %% group reduce - produces reductions for contiguous keys in the same group.
 
-group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun) ->
+group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0) ->
     NoGroupYet = ?MIN,
     Fun = fun
-        ({visit, Key, Value}, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}) ->
+        ({visit, Key, Value}, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}) ->
             AfterEnd = greater_than(Tree, Key, EndKey),
             InRange = greater_than_or_equal(Tree, Key, StartKey) andalso less_than_or_equal(Tree, Key, EndKey),
             KeyGroup = GroupKeyFun(Key),
             SameGroup = CurrentGroup =:= KeyGroup,
             if
                 AfterEnd ->
-                    {stop, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}};
+                    {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 SameGroup ->
-                    {ok, {CurrentGroup, GroupAcc, [{Key, Value} | MapAcc], ReduceAcc}};
+                    {ok, {CurrentGroup, UserAcc, [{Key, Value} | MapAcc], ReduceAcc}};
                 InRange andalso CurrentGroup =:= NoGroupYet ->
-                    {ok, {KeyGroup, GroupAcc, [{Key, Value}], []}};
+                    {ok, {KeyGroup, UserAcc, [{Key, Value}], []}};
                 InRange ->
                     %% implicit end of current group and start of a new one
                     GroupValue = do_reduce(Tree, MapAcc, ReduceAcc),
-                    {ok, {KeyGroup, [{CurrentGroup, GroupValue} | GroupAcc], [{Key, Value}], []}};
+                    {ok, {KeyGroup, UserAccFun({CurrentGroup, GroupValue}, UserAcc), [{Key, Value}], []}};
                 true ->
-                    {ok, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}}
+                    {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}}
             end;
-        ({traverse, FirstKey, LastKey, Reduction}, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}) ->
+        ({traverse, FirstKey, LastKey, Reduction}, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}) ->
             BeforeStart = less_than(Tree, LastKey, StartKey),
             AfterEnd = greater_than(Tree, FirstKey, EndKey),
             Whole = CurrentGroup =:= GroupKeyFun(FirstKey) andalso CurrentGroup =:= GroupKeyFun(LastKey),
             if
                 BeforeStart ->
-                    {skip, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}};
+                    {skip, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 AfterEnd ->
-                    {stop, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}};
+                    {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 Whole ->
-                    {skip, {CurrentGroup, GroupAcc, MapAcc, [Reduction | ReduceAcc]}};
+                    {skip, {CurrentGroup, UserAcc, MapAcc, [Reduction | ReduceAcc]}};
                 true ->
-                    {ok, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}}
+                    {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}}
             end
     end,
-    {CurrentGroup, GroupAcc0, MapValues, ReduceValues} = fold(Db, Tree, Fun, {NoGroupYet, [], [], []}),
-    GroupAcc1 = if
+    {CurrentGroup, UserAcc1, MapValues, ReduceValues} = fold(Db, Tree, Fun, {NoGroupYet, UserAcc0, [], []}),
+    if
         MapValues /= [] orelse ReduceValues /= [] ->
             FinalGroup = do_reduce(Tree, MapValues, ReduceValues),
-            [{CurrentGroup, FinalGroup} | GroupAcc0];
+            UserAccFun({CurrentGroup, FinalGroup}, UserAcc1);
         true ->
-            GroupAcc0
-    end,
-    lists:reverse(GroupAcc1).
+            UserAcc1
+    end.
 
 
 %% range (inclusive of both ends)
@@ -1022,14 +1021,15 @@ group_reduce_test_() ->
     Max = 100,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
     GroupKeyFun = fun(Key) -> lists:sublist(Key, 2) end,
+    UserAccFun = fun({K,V}, Acc) -> Acc ++ [{K, V}] end,
     lists:foreach(fun(Key) -> insert(Db, Tree, [Key rem 4, Key rem 3, Key], Key) end, Keys),
     [
         ?_test(?assertEqual([{[1, 0], 408}, {[1, 1], 441}, {[1, 2], 376}],
-            group_reduce(Db, Tree, [1], [2], GroupKeyFun))),
+            group_reduce(Db, Tree, [1], [2], GroupKeyFun, UserAccFun, []))),
 
         ?_test(?assertEqual([{[0,0],432}, {[0,1],468}, {[0,2],400}, {[1,0],408}, {[1,1],441}, {[1,2],376},
             {[2,0],384}, {[2,1],416}, {[2,2],450}, {[3,0],459}, {[3,1],392}, {[3,2],424}],
-            group_reduce(Db, Tree, ebtree:min(), ebtree:max(), GroupKeyFun)))
+            group_reduce(Db, Tree, ebtree:min(), ebtree:max(), GroupKeyFun, UserAccFun, [])))
     ].
 
 
