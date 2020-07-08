@@ -261,49 +261,49 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun) ->
 
 %% range (inclusive of both ends)
 
-range(Db, #tree{} = Tree, StartKey, EndKey, Fun, Acc0) ->
+range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
     erlfdb:transactional(Db, fun(Tx) ->
-        range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, Fun, Acc0)
+        range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, AccFun, Acc0)
     end).
 
-range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun, Acc0) ->
+range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, AccFun, Acc0) ->
     InRange = [{K, V} || {K, V} <- Node#node.members,
         less_than_or_equal(Tree, StartKey, K), less_than_or_equal(Tree, K, EndKey)],
-    Acc1 = Fun(InRange, Acc0),
+    Acc1 = AccFun(InRange, Acc0),
     LastKey = last_key(Node),
     case Node#node.next /= undefined andalso less_than_or_equal(Tree, LastKey, EndKey) of
         true ->
-            range(Tx, Tree, get_node(Tx, Tree, Node#node.next), StartKey, EndKey, Fun, Acc1);
+            range(Tx, Tree, get_node(Tx, Tree, Node#node.next), StartKey, EndKey, AccFun, Acc1);
         false ->
             Acc1
     end;
 
-range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, Fun, Acc) ->
+range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, AccFun, Acc) ->
     ChildId = find_child_id(Tree, Node, StartKey),
-    range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, Fun, Acc).
+    range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, AccFun, Acc).
 
 %% reverse range (inclusive of both ends)
 
-reverse_range(Db, #tree{} = Tree, StartKey, EndKey, Fun, Acc0) ->
+reverse_range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
     erlfdb:transactional(Db, fun(Tx) ->
-        reverse_range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, Fun, Acc0)
+        reverse_range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, AccFun, Acc0)
     end).
 
-reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun, Acc0) ->
+reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, AccFun, Acc0) ->
     InRange = [{K, V} || {K, V} <- Node#node.members,
         less_than_or_equal(Tree, StartKey, K), less_than_or_equal(Tree, K, EndKey)],
-    Acc1 = Fun(lists:reverse(InRange), Acc0),
+    Acc1 = AccFun(lists:reverse(InRange), Acc0),
     FirstKey = first_key(Node),
     case Node#node.prev /= undefined andalso less_than_or_equal(Tree, StartKey, FirstKey) of
         true ->
-            reverse_range(Tx, Tree, get_node(Tx, Tree, Node#node.prev), StartKey, EndKey, Fun, Acc1);
+            reverse_range(Tx, Tree, get_node(Tx, Tree, Node#node.prev), StartKey, EndKey, AccFun, Acc1);
         false ->
             Acc1
     end;
 
-reverse_range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, Fun, Acc) ->
+reverse_range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, AccFun, Acc) ->
     ChildId = find_child_id(Tree, Node, EndKey),
-    reverse_range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, Fun, Acc).
+    reverse_range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, AccFun, Acc).
 
 
 %% insert
