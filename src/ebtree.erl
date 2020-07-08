@@ -13,7 +13,7 @@
      fold/4,
      reduce/4,
      full_reduce/2,
-     group_reduce/5,
+     group_reduce/7,
      validate_tree/2
 ]).
 
@@ -211,99 +211,98 @@ do_reduce(#tree{} = Tree, MapValues, ReduceValues) when is_list(MapValues), is_l
 
 %% group reduce - produces reductions for contiguous keys in the same group.
 
-group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun) ->
+group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0) ->
     NoGroupYet = ?MIN,
     Fun = fun
-        ({visit, Key, Value}, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}) ->
+        ({visit, Key, Value}, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}) ->
             AfterEnd = greater_than(Tree, Key, EndKey),
             InRange = greater_than_or_equal(Tree, Key, StartKey) andalso less_than_or_equal(Tree, Key, EndKey),
             KeyGroup = GroupKeyFun(Key),
             SameGroup = CurrentGroup =:= KeyGroup,
             if
                 AfterEnd ->
-                    {stop, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}};
+                    {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 SameGroup ->
-                    {ok, {CurrentGroup, GroupAcc, [{Key, Value} | MapAcc], ReduceAcc}};
+                    {ok, {CurrentGroup, UserAcc, [{Key, Value} | MapAcc], ReduceAcc}};
                 InRange andalso CurrentGroup =:= NoGroupYet ->
-                    {ok, {KeyGroup, GroupAcc, [{Key, Value}], []}};
+                    {ok, {KeyGroup, UserAcc, [{Key, Value}], []}};
                 InRange ->
                     %% implicit end of current group and start of a new one
                     GroupValue = do_reduce(Tree, MapAcc, ReduceAcc),
-                    {ok, {KeyGroup, [{CurrentGroup, GroupValue} | GroupAcc], [{Key, Value}], []}};
+                    {ok, {KeyGroup, UserAccFun({CurrentGroup, GroupValue}, UserAcc), [{Key, Value}], []}};
                 true ->
-                    {ok, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}}
+                    {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}}
             end;
-        ({traverse, FirstKey, LastKey, Reduction}, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}) ->
+        ({traverse, FirstKey, LastKey, Reduction}, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}) ->
             BeforeStart = less_than(Tree, LastKey, StartKey),
             AfterEnd = greater_than(Tree, FirstKey, EndKey),
             Whole = CurrentGroup =:= GroupKeyFun(FirstKey) andalso CurrentGroup =:= GroupKeyFun(LastKey),
             if
                 BeforeStart ->
-                    {skip, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}};
+                    {skip, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 AfterEnd ->
-                    {stop, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}};
+                    {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 Whole ->
-                    {skip, {CurrentGroup, GroupAcc, MapAcc, [Reduction | ReduceAcc]}};
+                    {skip, {CurrentGroup, UserAcc, MapAcc, [Reduction | ReduceAcc]}};
                 true ->
-                    {ok, {CurrentGroup, GroupAcc, MapAcc, ReduceAcc}}
+                    {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}}
             end
     end,
-    {CurrentGroup, GroupAcc0, MapValues, ReduceValues} = fold(Db, Tree, Fun, {NoGroupYet, [], [], []}),
-    GroupAcc1 = if
+    {CurrentGroup, UserAcc1, MapValues, ReduceValues} = fold(Db, Tree, Fun, {NoGroupYet, UserAcc0, [], []}),
+    if
         MapValues /= [] orelse ReduceValues /= [] ->
             FinalGroup = do_reduce(Tree, MapValues, ReduceValues),
-            [{CurrentGroup, FinalGroup} | GroupAcc0];
+            UserAccFun({CurrentGroup, FinalGroup}, UserAcc1);
         true ->
-            GroupAcc0
-    end,
-    lists:reverse(GroupAcc1).
+            UserAcc1
+    end.
 
 
 %% range (inclusive of both ends)
 
-range(Db, #tree{} = Tree, StartKey, EndKey, Fun, Acc0) ->
+range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
     erlfdb:transactional(Db, fun(Tx) ->
-        range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, Fun, Acc0)
+        range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, AccFun, Acc0)
     end).
 
-range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun, Acc0) ->
+range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, AccFun, Acc0) ->
     InRange = [{K, V} || {K, V} <- Node#node.members,
         less_than_or_equal(Tree, StartKey, K), less_than_or_equal(Tree, K, EndKey)],
-    Acc1 = Fun(InRange, Acc0),
+    Acc1 = AccFun(InRange, Acc0),
     LastKey = last_key(Node),
     case Node#node.next /= undefined andalso less_than_or_equal(Tree, LastKey, EndKey) of
         true ->
-            range(Tx, Tree, get_node(Tx, Tree, Node#node.next), StartKey, EndKey, Fun, Acc1);
+            range(Tx, Tree, get_node(Tx, Tree, Node#node.next), StartKey, EndKey, AccFun, Acc1);
         false ->
             Acc1
     end;
 
-range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, Fun, Acc) ->
+range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, AccFun, Acc) ->
     ChildId = find_child_id(Tree, Node, StartKey),
-    range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, Fun, Acc).
+    range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, AccFun, Acc).
 
 %% reverse range (inclusive of both ends)
 
-reverse_range(Db, #tree{} = Tree, StartKey, EndKey, Fun, Acc0) ->
+reverse_range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
     erlfdb:transactional(Db, fun(Tx) ->
-        reverse_range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, Fun, Acc0)
+        reverse_range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, AccFun, Acc0)
     end).
 
-reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, Fun, Acc0) ->
+reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, AccFun, Acc0) ->
     InRange = [{K, V} || {K, V} <- Node#node.members,
         less_than_or_equal(Tree, StartKey, K), less_than_or_equal(Tree, K, EndKey)],
-    Acc1 = Fun(lists:reverse(InRange), Acc0),
+    Acc1 = AccFun(lists:reverse(InRange), Acc0),
     FirstKey = first_key(Node),
     case Node#node.prev /= undefined andalso less_than_or_equal(Tree, StartKey, FirstKey) of
         true ->
-            reverse_range(Tx, Tree, get_node(Tx, Tree, Node#node.prev), StartKey, EndKey, Fun, Acc1);
+            reverse_range(Tx, Tree, get_node(Tx, Tree, Node#node.prev), StartKey, EndKey, AccFun, Acc1);
         false ->
             Acc1
     end;
 
-reverse_range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, Fun, Acc) ->
+reverse_range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, AccFun, Acc) ->
     ChildId = find_child_id(Tree, Node, EndKey),
-    reverse_range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, Fun, Acc).
+    reverse_range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, AccFun, Acc).
 
 
 %% insert
@@ -1022,14 +1021,15 @@ group_reduce_test_() ->
     Max = 100,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
     GroupKeyFun = fun(Key) -> lists:sublist(Key, 2) end,
+    UserAccFun = fun({K,V}, Acc) -> Acc ++ [{K, V}] end,
     lists:foreach(fun(Key) -> insert(Db, Tree, [Key rem 4, Key rem 3, Key], Key) end, Keys),
     [
         ?_test(?assertEqual([{[1, 0], 408}, {[1, 1], 441}, {[1, 2], 376}],
-            group_reduce(Db, Tree, [1], [2], GroupKeyFun))),
+            group_reduce(Db, Tree, [1], [2], GroupKeyFun, UserAccFun, []))),
 
         ?_test(?assertEqual([{[0,0],432}, {[0,1],468}, {[0,2],400}, {[1,0],408}, {[1,1],441}, {[1,2],376},
             {[2,0],384}, {[2,1],416}, {[2,2],450}, {[3,0],459}, {[3,1],392}, {[3,2],424}],
-            group_reduce(Db, Tree, ebtree:min(), ebtree:max(), GroupKeyFun)))
+            group_reduce(Db, Tree, ebtree:min(), ebtree:max(), GroupKeyFun, UserAccFun, [])))
     ].
 
 
