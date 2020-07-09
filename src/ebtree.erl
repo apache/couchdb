@@ -526,16 +526,16 @@ rebalance(Tx, #tree{} = Tree, #node{level = Level} = Node1, #node{level = Level}
     Left1Id = new_node_id(Tx, Tree),
     Right1Id = new_node_id(Tx, Tree),
 
-    Left1 = Left0#node{
+    Left1 = remove_pointers_if_not_leaf(Left0#node{
         id = Left1Id,
         next = Right1Id,
         members = LeftMembers
-    },
-    Right1 = Right0#node{
+    }),
+    Right1 = remove_pointers_if_not_leaf(Right0#node{
         id = Right1Id,
         prev = Left1Id,
         members = RightMembers
-    },
+    }),
     {Left1, Right1}.
 
 
