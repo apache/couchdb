@@ -666,6 +666,7 @@ validate_tree(Tx, #tree{} = Tree, [{_F, _L, P, _R} | Rest]) ->
 
 validate_node(#tree{} = Tree, #node{} = Node) ->
     NumKeys = length(Node#node.members),
+    IsLeaf = Node#node.level =:= 0,
     IsRoot = ?NODE_ROOT_ID == Node#node.id,
     OutOfOrder = Node#node.members /= sort(Tree, Node#node.members),
     Duplicates = Node#node.members /= usort(Tree, Node#node.members),
@@ -676,6 +677,10 @@ validate_node(#tree{} = Tree, #node{} = Node) ->
             erlang:error({too_few_keys, Node});
         NumKeys > Tree#tree.max ->
             erlang:error({too_many_keys, Node});
+        not IsLeaf andalso Node#node.prev /= undefined ->
+            erlang:error({non_leaf_with_prev, Node});
+        not IsLeaf andalso Node#node.next /= undefined ->
+            erlang:error({non_leaf_with_next, Node});
         OutOfOrder ->
             erlang:error({out_of_order, Node});
         Duplicates ->
