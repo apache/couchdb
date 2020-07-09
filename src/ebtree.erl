@@ -216,7 +216,7 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
     Fun = fun
         ({visit, Key, Value}, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}) ->
             AfterEnd = greater_than(Tree, Key, EndKey),
-            InRange = greater_than_or_equal(Tree, Key, StartKey) andalso less_than_or_equal(Tree, Key, EndKey),
+            InRange = in_range(Tree, StartKey, Key, EndKey),
             KeyGroup = GroupKeyFun(Key),
             SameGroup = CurrentGroup =:= KeyGroup,
             if
@@ -237,12 +237,14 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
             BeforeStart = less_than(Tree, LastKey, StartKey),
             AfterEnd = greater_than(Tree, FirstKey, EndKey),
             Whole = CurrentGroup =:= GroupKeyFun(FirstKey) andalso CurrentGroup =:= GroupKeyFun(LastKey),
+            FirstInRange = in_range(Tree, StartKey, FirstKey, EndKey),
+            LastInRange = in_range(Tree, StartKey, LastKey, EndKey),
             if
                 BeforeStart ->
                     {skip, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 AfterEnd ->
                     {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
-                Whole ->
+                Whole andalso FirstInRange andalso LastInRange ->
                     {skip, {CurrentGroup, UserAcc, MapAcc, [Reduction | ReduceAcc]}};
                 true ->
                     {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}}
@@ -775,6 +777,10 @@ reduce_values(#tree{} = Tree, Values, Rereduce) when is_list(Values) ->
 
 %% collation functions
 
+in_range(#tree{} = Tree, StartOfRange, Key, EndOfRange) ->
+    greater_than_or_equal(Tree, Key, StartOfRange) andalso less_than_or_equal(Tree, Key, EndOfRange).
+
+
 greater_than(#tree{} = Tree, A, B) ->
     not less_than_or_equal(Tree, A, B).
 
@@ -1015,7 +1021,7 @@ stats_reduce_test_() ->
     ].
 
 
-group_reduce_test_() ->
+group_reduce_level_test_() ->
     Db = erlfdb_util:get_test_db([empty]),
     Tree = open(Db, <<1,2,3>>, 4, [{reduce_fun, fun reduce_sum/2}]),
     Max = 100,
@@ -1030,6 +1036,22 @@ group_reduce_test_() ->
         ?_test(?assertEqual([{[0,0],432}, {[0,1],468}, {[0,2],400}, {[1,0],408}, {[1,1],441}, {[1,2],376},
             {[2,0],384}, {[2,1],416}, {[2,2],450}, {[3,0],459}, {[3,1],392}, {[3,2],424}],
             group_reduce(Db, Tree, ebtree:min(), ebtree:max(), GroupKeyFun, UserAccFun, [])))
+    ].
+
+
+group_reduce_int_test_() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1,2,3>>, 4, [{reduce_fun, fun reduce_count/2}]),
+    Max = 100,
+    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
+    GroupKeyFun = fun(_Key) -> null end,
+    UserAccFun = fun({K,V}, Acc) -> Acc ++ [{K, V}] end,
+    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
+    [
+        ?_test(?assertEqual([{null, 100}], group_reduce(Db, Tree,
+            ebtree:min(), ebtree:max(), GroupKeyFun, UserAccFun, []))),
+        ?_test(?assertEqual([{null, 99}], group_reduce(Db, Tree, 2, ebtree:max(), GroupKeyFun, UserAccFun, []))),
+        ?_test(?assertEqual([{null, 96}], group_reduce(Db, Tree, 3, 98, GroupKeyFun, UserAccFun, [])))
     ].
 
 
