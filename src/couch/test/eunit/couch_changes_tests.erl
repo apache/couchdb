@@ -896,7 +896,7 @@ spawn_consumer(DbName, ChangesArgs0, Req) ->
             FeedFun({Callback, []})
         catch
             throw:{stop, _} -> ok;
-            _:Error -> couch_log:info("~nError: ~p~n", [Error]), exit(Error)
+            _:Error -> exit(Error)
         after
             couch_db:close(Db)
         end

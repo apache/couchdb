@@ -41,6 +41,7 @@ setup() ->
     set_config("couch_peruser", "cluster_start_period", "0"),
     set_config("couch_peruser", "enable", "true"),
     set_config("cluster", "n", "1"),
+    set_config("log", "level", "debug"),
     TestAuthDb.
 
 teardown(TestAuthDb) ->

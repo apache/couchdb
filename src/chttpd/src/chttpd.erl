@@ -860,6 +860,8 @@ start_delayed_response(#delayed_resp{}=DelayedResp) ->
 
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});
+error_info(access) ->
+    {403, <<"forbidden">>, <<"access">>};
 error_info(bad_request) ->
     {400, <<"bad_request">>, <<>>};
 error_info({bad_request, Reason}) ->

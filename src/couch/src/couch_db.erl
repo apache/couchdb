@@ -779,7 +779,6 @@ validate_access3(true) -> ok;
 validate_access3(_) -> throw({forbidden, <<"can't touch this">>}).
 
 check_access(Db, #doc{access=Access}=Doc) ->
-    % couch_log:info("~ncheck da access, Doc: ~p, Db: ~p~n", [Doc, Db]),
     check_access(Db, Access);
 check_access(Db, Access) ->
     #user_ctx{
@@ -807,9 +806,7 @@ check_access(Db, Access) ->
 
 check_name(null, _Access) -> true;
 check_name(UserName, Access) ->
-    couch_log:info("~nUserName: ~p~n", [UserName]),
-    couch_log:info("~nAccess: ~p~n", [Access]),
-    lists:member(UserName, Access).
+            lists:member(UserName, Access).
 % nicked from couch_db:check_security
 
 check_roles(Roles, Access) ->
@@ -1278,14 +1275,10 @@ validate_update(Db, Doc) ->
 
 
 validate_docs_access(Db, DocBuckets, DocErrors) ->
-    couch_log:info("~nin DocBuckets: ~p~n", [DocBuckets]),
-    couch_log:info("~nin DocErrors: ~p~n", [DocErrors]),
-    validate_docs_access1(Db, DocBuckets, {[], DocErrors}).
+            validate_docs_access1(Db, DocBuckets, {[], DocErrors}).
 
 validate_docs_access1(_Db, [], {DocBuckets0, DocErrors}) ->
-    couch_log:info("~nDocBuckets0: ~p~n", [DocBuckets0]),
-    couch_log:info("~nDocErrors: ~p~n", [DocErrors]),
-    DocBuckets1 = lists:reverse(lists:map(fun lists:reverse/1, DocBuckets0)),
+            DocBuckets1 = lists:reverse(lists:map(fun lists:reverse/1, DocBuckets0)),
     DocBuckets = case DocBuckets1 of
         [[]] -> [];
         Else -> Else
@@ -1313,13 +1306,34 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
 
     DocBuckets2 = [[doc_flush_atts(Db, check_dup_atts(Doc))
             || Doc <- Bucket] || Bucket <- DocBuckets],
-    {ok, _} = write_and_commit(Db, DocBuckets2,
+    {ok, Results} = write_and_commit(Db, DocBuckets2,
         NonRepDocs, [merge_conflicts | Options]),
-    couch_log:info("~nreplicated doc errors: ~p~n", [DocErrors]),
-    {ok, DocErrors};
+
+    case couch_db:has_access_enabled(Db) of
+        false ->
+            % we’re done here
+            {ok, DocErrors};
+        _ ->
+            AccessViolations = lists:filter(fun({_Ref, Tag}) -> Tag =:= access end, Results),
+            case length(AccessViolations) of
+                0 ->
+                    % we’re done here
+                    {ok, DocErrors};
+                _ ->
+                    % dig out FDIs from Docs matching our tags/refs
+                    DocsDict = lists:foldl(fun(Doc, Dict) ->
+                        Tag = doc_tag(Doc),
+                        dict:store(Tag, Doc, Dict)
+                    end, dict:new(), Docs),
+                    AccessResults = lists:map(fun({Ref, Access}) ->
+                        { dict:fetch(Ref, DocsDict), Access }
+                    end, AccessViolations),
+                    {ok, AccessResults}
+            end
+    end;
 
 update_docs(Db, Docs0, Options, interactive_edit) ->
-    Docs = tag_docs(Docs0),
+        Docs = tag_docs(Docs0),
 
     AllOrNothing = lists:member(all_or_nothing, Options),
     PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
@@ -1351,13 +1365,13 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
         {ok, CommitResults} = write_and_commit(Db, DocBuckets3,
             NonRepDocs, Options2),
 
-        couch_log:info("~ninteractive doc errors: ~p~n", [DocErrors]),
-        ResultsDict = lists:foldl(fun({Key, Resp}, ResultsAcc) ->
+                        ResultsDict = lists:foldl(fun({Key, Resp}, ResultsAcc) ->
             dict:store(Key, Resp, ResultsAcc)
         end, dict:from_list(IdRevs), CommitResults ++ DocErrors),
-        {ok, lists:map(fun(Doc) ->
+        R = {ok, lists:map(fun(Doc) ->
             dict:fetch(doc_tag(Doc), ResultsDict)
-        end, Docs)}
+        end, Docs)},
+                R
     end.
 
 % Returns the first available document on disk. Input list is a full rev path
@@ -1402,7 +1416,7 @@ write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
     MergeConflicts = lists:member(merge_conflicts, Options),
     MRef = erlang:monitor(process, Pid),
     try
-        Pid ! {update_docs, self(), DocBuckets, NonRepDocs, MergeConflicts},
+        Pid ! {update_docs, self(), DocBuckets, NonRepDocs, MergeConflicts, Ctx},
         case collect_results_with_metrics(Pid, MRef, []) of
         {ok, Results} -> {ok, Results};
         retry ->
@@ -1416,7 +1430,7 @@ write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
             % We only retry once
             DocBuckets3 = prepare_doc_summaries(Db2, DocBuckets2),
             close(Db2),
-            Pid ! {update_docs, self(), DocBuckets3, NonRepDocs, MergeConflicts},
+            Pid ! {update_docs, self(), DocBuckets3, NonRepDocs, MergeConflicts, Ctx},
             case collect_results_with_metrics(Pid, MRef, []) of
             {ok, Results} -> {ok, Results};
             retry -> throw({update_error, compaction_retry})

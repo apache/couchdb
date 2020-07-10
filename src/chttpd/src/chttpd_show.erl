@@ -113,9 +113,7 @@ handle_doc_update_req(#httpd{
     }=Req, Db, DDoc) ->
     DocId = ?l2b(string:join([?b2l(P) || P <- DocIdParts], "/")),
     Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
-    couch_log:info("~nOptions: ~p~n", [Options]),
     Doc = maybe_open_doc(Db, DocId, Options),
-    couch_log:info("~nDoc: ~p~n", [Doc]),
     send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId);
 
 handle_doc_update_req(Req, _Db, _DDoc) ->

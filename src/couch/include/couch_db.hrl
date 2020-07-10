@@ -204,7 +204,8 @@
     ptr,
     seq,
     sizes = #size_info{},
-    atts = []
+    atts = [],
+    access = []
 }).
 
 -record (fabric_changes_acc, {

@@ -587,7 +587,6 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         case fabric:update_docs(Db, Docs, [replicated_changes|Options]) of
         {ok, Errors} ->
             chttpd_stats:incr_writes(length(Docs)),
-            couch_log:info("~nErrors: ~p~n", [Errors]),
             ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
             send_json(Req, 201, ErrorsJson);
         {accepted, Errors} ->
@@ -922,10 +921,7 @@ view_cb(Msg, Acc) ->
     couch_mrview_http:view_cb(Msg, Acc).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
-    couch_log:info("~nDb: ~p~n", [Db]),
-    couch_log:info("~nDocId: ~p~n", [DocId]),
     Doc0 = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
-    couch_log:info("~nRes: ~p~n", [Doc0]),
     Revs = chttpd:qs_value(Req, "rev"),
     case Revs of
     undefined ->
@@ -934,8 +930,7 @@ db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
        Body = {[{<<"_rev">>, ?l2b(Revs)},{<<"_deleted">>,true}]}
     end,
     % Doc0 = couch_doc_from_req(Req, Db, DocId, Body),
-    Doc = Doc0#doc{revs=Revs},
-    couch_log:info("~nDoc: ~p~n", [Doc]),
+    Doc = Doc0#doc{revs=Revs,body=Body,deleted=true},
     send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, Doc));
 
     % % check for the existence of the doc to handle the 404 case.
@@ -1283,10 +1278,14 @@ receive_request_data(Req, LenLeft) when LenLeft > 0 ->
 receive_request_data(_Req, _) ->
     throw(<<"expected more data">>).
 
+
+
+update_doc_result_to_json({#doc{id=Id,revs=Rev}, access}) ->
+    update_doc_result_to_json({{Id, Rev}, access});
 update_doc_result_to_json({{Id, Rev}, Error}) ->
-        {_Code, Err, Msg} = chttpd:error_info(Error),
-        {[{id, Id}, {rev, couch_doc:rev_to_str(Rev)},
-            {error, Err}, {reason, Msg}]}.
+    {_Code, Err, Msg} = chttpd:error_info(Error),
+    {[{id, Id}, {rev, couch_doc:rev_to_str(Rev)},
+        {error, Err}, {reason, Msg}]}.
 
 update_doc_result_to_json(#doc{id=DocId}, Result) ->
     update_doc_result_to_json(DocId, Result);
@@ -1374,7 +1373,6 @@ update_doc(Db, DocId, #doc{deleted=Deleted, body=DocBody}=Doc, Options) ->
         {'DOWN', Ref, _, _, {exit_exit, Reason}} ->
             erlang:exit(Reason)
     end,
-
     case Result of
     {ok, NewRev} ->
         Accepted = false;

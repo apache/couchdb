@@ -184,7 +184,7 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
                         end;
                 ({Id, Seq, Doc}, {SeqAcc, Results}) ->
                     couch_stats:increment_counter([couchdb, mrview, map_doc]),
-                    % couch_log:info("~nIdxName: ~p, Doc: ~p~n~n", [IdxName, Doc]),
+                    % IdxName: ~p, Doc: ~p~n~n", [IdxName, Doc]),
                     Doc0 = case IdxName of
                         <<"_design/_access">> ->
                             % splice in seq

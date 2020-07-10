@@ -165,7 +165,7 @@ handle_cast(Msg, #db{name = Name} = Db) ->
     {stop, Msg, Db}.
 
 
-handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts},
+handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts, UserCtx},
         Db) ->
     GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
     if NonRepDocs == [] ->
@@ -176,7 +176,7 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts},
         Clients = [Client]
     end,
     NonRepDocs2 = [{Client, NRDoc} || NRDoc <- NonRepDocs],
-    try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts) of
+    try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts, UserCtx) of
     {ok, Db2, UpdatedDDocIds} ->
         ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
         case {couch_db:get_update_seq(Db), couch_db:get_update_seq(Db2)} of
@@ -371,7 +371,8 @@ flush_trees(#db{} = Db,
                             active = WrittenSize,
                             external = ExternalSize
                         },
-                        atts = AttSizeInfo
+                        atts = AttSizeInfo,
+                        access = NewDoc#doc.access
                     },
                     {Leaf, add_sizes(Type, Leaf, SizesAcc)};
                 #leaf{} ->
@@ -437,6 +438,11 @@ upgrade_sizes(S) when is_integer(S) ->
 
 send_result(Client, Doc, NewResult) ->
     % used to send a result to the client
+    
+    
+    
+    
+    
     catch(Client ! {result, self(), {doc_tag(Doc), NewResult}}).
 
 doc_tag(#doc{meta=Meta}) ->
@@ -448,16 +454,13 @@ doc_tag(#doc{meta=Meta}) ->
 
 % couch_db_updater:merge_rev_trees([[],[]] = NewDocs,[] = OldDocs,{merge_acc,1000,false,[],[],0,[]}=Acc]
 
+merge_rev_trees([[]], [], Acc) -> % validate_docs_access left us with no docs to merge
+    {ok, Acc};
 merge_rev_trees([], [], Acc) ->
     {ok, Acc#merge_acc{
         add_infos = lists:reverse(Acc#merge_acc.add_infos)
     }};
 merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
-    % couch_log:info("~nNewDocs: ~p~n", [NewDocs]),
-    % couch_log:info("~nRestDocsList: ~p~n", [RestDocsList]),
-    % couch_log:info("~nOldDocInfo: ~p~n", [OldDocInfo]),
-    % couch_log:info("~nRestOldInfo: ~p~n", [RestOldInfo]),
-    % couch_log:info("~nAcc: ~p~n", [Acc]),
     #merge_acc{
         revs_limit = Limit,
         merge_conflicts = MergeConflicts,
@@ -625,7 +628,7 @@ maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
             Info
     end.
 
-update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
+update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
@@ -634,9 +637,10 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
 
     % lookup up the old documents, if they exist.
     OldDocLookups = couch_db_engine:open_docs(Db, Ids),
+    
     OldDocInfos = lists:zipwith3(fun
-        (_Id, #full_doc_info{} = FDI, Access) ->
-            FDI#full_doc_info{access=Access};
+        (_Id, #full_doc_info{} = FDI, _Access) ->
+            FDI;
         (Id, not_found, Access) ->
             #full_doc_info{id=Id,access=Access}
     end, Ids, OldDocLookups, Accesses),
@@ -669,10 +673,18 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
         cur_seq = UpdateSeq,
         full_partitions = FullPartitions
     },
-    % couch_log:info("~nDocsList: ~p~n", [DocsList]),
-    % couch_log:info("~nOldDocInfos: ~p~n", [OldDocInfos]),
-    % couch_log:info("~nAccIn: ~p~n", [AccIn]),
-    {ok, AccOut} = merge_rev_trees(DocsList, OldDocInfos, AccIn),
+    % 
+    % 
+    % 
+
+    % Loop over DocsList, validate_access for each OldDocInfo on Db,
+    %.  if no OldDocInfo, then send to DocsListValidated, keep OldDocsInfo
+    %   if valid, then send to DocsListValidated, OldDocsInfo
+    %.  if invalid, then send_result tagged `access`(c.f. `conflict)
+    %.    and don’t add to DLV, nor ODI
+
+    { DocsListValidated, OldDocInfosValidated } = validate_docs_access(Db, UserCtx, DocsList, OldDocInfos),
+    {ok, AccOut} = merge_rev_trees(DocsListValidated, OldDocInfosValidated, AccIn),
     #merge_acc{
         add_infos = NewFullDocInfos,
         rem_seqs = RemSeqs
@@ -681,10 +693,12 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
     % Write out the document summaries (the bodies are stored in the nodes of
     % the trees, the attachments are already written to disk)
     {ok, IndexFDIs} = flush_trees(Db, NewFullDocInfos, []),
+
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
     LocalDocs1 = apply_local_docs_access(Db, LocalDocs),
     LocalDocs2 = update_local_doc_revs(LocalDocs1),
 
+    
     {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
 
     WriteCount = length(IndexFDIs),
@@ -705,6 +719,65 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
     end, NonAccessIds),
 
     {ok, commit_data(Db1), UpdatedDDocIds}.
+
+check_access(Db, UserCtx, Access) ->
+    
+    
+    
+    check_access(Db, UserCtx, couch_db:has_access_enabled(Db), Access).
+
+check_access(_Db, UserCtx, false, _Access) ->
+    true;
+check_access(Db, UserCtx, true, Access) -> couch_db:check_access(Db#db{user_ctx=UserCtx}, Access).
+
+validate_docs_access(Db, UserCtx, DocsList, OldDocInfos) ->
+    
+    
+    validate_docs_access(Db, UserCtx, DocsList, OldDocInfos, [], []).
+
+validate_docs_access(_Db, UserCtx, [], [], DocsListValidated, OldDocInfosValidated) ->
+    
+    
+    { lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated) };
+validate_docs_access(Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], DocsListValidated, OldDocInfosValidated) ->
+    % loop over Docs as {Client,  NewDoc}
+    %   validate Doc
+    %   if valid, then put back in Docs
+    %   if not, then send_result and skip
+    NewDocs = lists:foldl(fun({ Client, Doc }, Acc) ->
+        % check if we are allowed to update the doc, skip when new doc
+        OldDocMatchesAccess = case OldInfo#full_doc_info.rev_tree of
+            [] -> true;
+            _ -> check_access(Db, UserCtx, OldInfo#full_doc_info.access)
+        end,
+        
+        NewDocMatchesAccess = check_access(Db, UserCtx, Doc#doc.access),
+        
+        
+        case OldDocMatchesAccess andalso NewDocMatchesAccess of
+            true -> % if valid, then send to DocsListValidated, OldDocsInfo
+                    % and store the access context on the new doc
+                [{Client, Doc} | Acc];
+            _Else2 -> % if invalid, then send_result tagged `access`(c.f. `conflict)
+                      %   and don’t add to DLV, nor ODI
+                      
+                send_result(Client, Doc, access),
+                Acc
+        end
+    end, [], Docs),
+    
+    
+    { NewDocsListValidated, NewOldDocInfosValidated } = case length(NewDocs) of
+        0 -> % we sent out all docs as invalid access, drop the old doc info associated with it
+            { [NewDocs | DocsListValidated], OldDocInfosValidated };
+        _ ->
+            { [NewDocs | DocsListValidated], [OldInfo | OldDocInfosValidated] }
+    end,
+    validate_docs_access(Db, UserCtx, DocRest, OldInfoRest, NewDocsListValidated, NewOldDocInfosValidated).
+
+
+%{ DocsListValidated, OldDocInfosValidated } = 
+
 
 apply_local_docs_access(Db, Docs) ->
     apply_local_docs_access1(couch_db:has_access_enabled(Db), Docs).

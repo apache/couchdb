@@ -39,9 +39,7 @@ go(DbName, AllDocs0, Opts) ->
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc0, infinity, Timeout) of
     {ok, {Health, Results}}
             when Health =:= ok; Health =:= accepted; Health =:= error ->
-                couch_log:info("~n1 Results: ~p~n", [Results]),
         R = {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]},
-        couch_log:info("~nR: ~p~n", [R]),
         R;
     {timeout, Acc} ->
         {_, _, W1, GroupedDocs1, DocReplDict} = Acc,
@@ -73,7 +71,6 @@ handle_message(internal_server_error, Worker, Acc0) ->
 handle_message(attachment_chunk_received, _Worker, Acc0) ->
     {ok, Acc0};
 handle_message({ok, Replies}, Worker, Acc0) ->
-    couch_log:info("~nReplies: ~p~n", [Replies]),
     {WaitingCount, DocCount, W, GroupedDocs, DocReplyDict0} = Acc0,
     {value, {_, Docs}, NewGrpDocs} = lists:keytake(Worker, 1, GroupedDocs),
     DocReplyDict = append_update_replies(Docs, Replies, DocReplyDict0),

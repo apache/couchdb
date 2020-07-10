@@ -129,7 +129,6 @@ code_change(_OldVsn, State, _Extra) ->
 update(Idx, Mod, IdxState) ->
     DbName = Mod:get(db_name, IdxState),
     IndexName = Mod:get(idx_name, IdxState),
-    couch_log:info("~nIndexName: ~p~n", [IndexName]),
     erlang:put(io_priority, {view_update, DbName, IndexName}),
     CurrSeq = Mod:get(update_seq, IdxState),
     UpdateOpts = Mod:get(update_options, IdxState),
@@ -171,7 +170,6 @@ update(Idx, Mod, IdxState) ->
                 %     {#doc{id=DocId, deleted=true}, Seq};
                 _ ->
                     {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
-                    couch_log:info("~nindexx updateder: ~p~n", [Doc]),
                     case IndexName of
                         <<"_design/_access">> ->
                             % TODO: hande conflicted docs in _access index
@@ -181,7 +179,6 @@ update(Idx, Mod, IdxState) ->
                                 meta = [{body_sp, RevInfo#rev_info.body_sp}],
                                 access = Access
                             },
-                            couch_log:info("~nDoc1: ~p~n", [Doc1]),
                             {Doc1, Seq};
                         _Else ->
                             {Doc, Seq}
