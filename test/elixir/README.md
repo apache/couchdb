@@ -109,7 +109,7 @@ X means done, - means partially
   - [ ] Port view_multi_key_temp.js
   - [X] Port view_offsets.js
   - [X] Port view_pagination.js
-  - [ ] Port view_sandboxing.js
+  - [X] Port view_sandboxing.js
   - [X] Port view_update_seq.js
 
 # Using ExUnit to write unit tests
