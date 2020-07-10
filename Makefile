@@ -210,7 +210,7 @@ soak-eunit: couch
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
 emilio:
-	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3
+	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3 || exit 0
 
 .venv/bin/black:
 	@python3 -m venv .venv
