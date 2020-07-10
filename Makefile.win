@@ -178,7 +178,7 @@ just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
 emilio:
-	@bin\emilio -c emilio.config src\ | python.exe bin\warnings_in_scope -s 3
+	@bin\emilio -c emilio.config src\ | python.exe bin\warnings_in_scope -s 3 || exit 0
 
 .venv/bin/black:
 	@python.exe -m venv .venv
