@@ -818,8 +818,6 @@ update_checkpoint(Db, Doc, Access, UserCtx, DbType) ->
     end.
 
 update_checkpoint(Db, #doc{id = LogId} = Doc0, Access, UserCtx) ->
-    % UserCtx = couch_db:get_user_ctx(Db),
-    % couch_log:debug("~n~n~n~nUserCtx: ~p~n", [UserCtx]),
     % if db has _access, then:
     %    get userCtx from replication and splice into doc _access
     Doc = case Access of
@@ -834,7 +832,9 @@ update_checkpoint(Db, #doc{id = LogId} = Doc0, Access, UserCtx) ->
         {error, Reason} ->
             throw({checkpoint_commit_failure, Reason})
         end
-    catch throw:conflict -> %TODO: splice in access
+    catch throw:conflict ->
+        % TODO: An admin could have changed the access on the checkpoint doc.
+        %       However unlikely, we can handle this gracefully here.
         case (catch couch_replicator_api_wrap:open_doc(Db, LogId, [ejson_body])) of
         {ok, #doc{body = LogBody, revs = {Pos, [RevId | _]}}} ->
             % This means that we were able to update successfully the

@@ -1333,7 +1333,7 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
     end;
 
 update_docs(Db, Docs0, Options, interactive_edit) ->
-        Docs = tag_docs(Docs0),
+    Docs = tag_docs(Docs0),
 
     AllOrNothing = lists:member(all_or_nothing, Options),
     PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
@@ -1365,13 +1365,12 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
         {ok, CommitResults} = write_and_commit(Db, DocBuckets3,
             NonRepDocs, Options2),
 
-                        ResultsDict = lists:foldl(fun({Key, Resp}, ResultsAcc) ->
+        ResultsDict = lists:foldl(fun({Key, Resp}, ResultsAcc) ->
             dict:store(Key, Resp, ResultsAcc)
         end, dict:from_list(IdRevs), CommitResults ++ DocErrors),
-        R = {ok, lists:map(fun(Doc) ->
+        {ok, lists:map(fun(Doc) ->
             dict:fetch(doc_tag(Doc), ResultsDict)
-        end, Docs)},
-                R
+        end, Docs)}
     end.
 
 % Returns the first available document on disk. Input list is a full rev path
@@ -1625,24 +1624,6 @@ changes_since(Db, StartSeq, Fun, Options, Acc) when is_record(Db, db) ->
         false -> couch_db_engine:fold_changes(Db, StartSeq, Fun, Options, Acc)
     end.
 
-% TODO: nicked from couch_mrview, maybe move to couch_mrview.hrl
--record(mracc, {
-    db,
-    meta_sent=false,
-    total_rows,
-    offset,
-    limit,
-    skip,
-    group_level,
-    doc_info,
-    callback,
-    user_acc,
-    last_go=ok,
-    reduce_fun,
-    update_seq,
-    args
-}).
-
 calculate_start_seq(_Db, _Node, Seq) when is_integer(Seq) ->
     Seq;
 calculate_start_seq(Db, Node, {Seq, Uuid}) ->
@@ -1758,6 +1739,7 @@ fold_design_docs(Db, UserFun, UserAcc, Options1) ->
 
 fold_changes(Db, StartSeq, UserFun, UserAcc) ->
     fold_changes(Db, StartSeq, UserFun, UserAcc, []).
+
 
 fold_changes(Db, StartSeq, UserFun, UserAcc, Opts) ->
     case couch_db:has_access_enabled(Db) and not couch_db:is_admin(Db) of

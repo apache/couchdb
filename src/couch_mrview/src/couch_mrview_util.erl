@@ -409,6 +409,7 @@ validate_args(Db, DDoc, Args0) ->
 
 validate_args(#mrst{} = State, Args0) ->
     Args = validate_args(Args0),
+
     ViewPartitioned = State#mrst.partitioned,
     Partition = get_extra(Args, partition),
     AllDocsAccess = get_extra(Args, all_docs_access, false),

@@ -35,7 +35,6 @@ handle_doc_show_req(#httpd{
         path_parts=[_, _, _, _, ShowName, DocId]
     }=Req, Db, DDoc) ->
 
-
     % open the doc
     Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
     Doc = maybe_open_doc(Db, DocId, Options),
@@ -47,7 +46,6 @@ handle_doc_show_req(#httpd{
 handle_doc_show_req(#httpd{
         path_parts=[_, _, _, _, ShowName, DocId|Rest]
     }=Req, Db, DDoc) ->
-
 
     DocParts = [DocId|Rest],
     DocId1 = ?l2b(string:join([?b2l(P)|| P <- DocParts], "/")),

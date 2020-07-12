@@ -51,8 +51,8 @@ view_indexes_cleanup_test_() ->
             setup,
             fun start/0, fun test_util:stop_couch/1,
             [
-                concurrent_updates()
-                % bulk_docs_updates()
+                concurrent_updates(),
+                bulk_docs_updates()
             ]
         }
     }.

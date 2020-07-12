@@ -77,18 +77,10 @@ handle_call({prompt, [<<"rereduce">>, _, _]}, _From, St) ->
     {reply, null, St};
 
 handle_call({prompt, [<<"index_doc">>, Doc]}, _From, St) ->
-    % Vals = case index_doc(St, mango_json:to_binary(Doc)) of
-    %     [] ->
-    %         [[]];
-    %     Else ->
-    %         Else
-    % end,
     {reply, [[]], St};
-
 
 handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
-
 
 handle_cast(garbage_collect, St) ->
     erlang:garbage_collect(),
@@ -145,5 +137,7 @@ map_doc(_St, {Doc}) ->
             ] end, Access),
             ById ++ BySeq;
         Else ->
-            [[],[]] % no comprende: should not be needed once we implement _access field validation
+            % TODO: no comprende: should not be needed once we implement
+            % _access field validation
+            [[],[]]
     end.

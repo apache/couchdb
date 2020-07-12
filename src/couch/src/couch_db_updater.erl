@@ -252,7 +252,8 @@ sort_and_tag_grouped_docs(Client, GroupedDocs) ->
     % duplicate documents if the incoming groups are not sorted, so as a sanity
     % check we sort them again here. See COUCHDB-2735.
     Cmp = fun
-        ([], []) -> false;
+        ([], []) -> false; % TODO: re-evaluate this addition, might be a
+                           %       superflous now
         ([#doc{id=A}|_], [#doc{id=B}|_]) -> A < B
      end,
     lists:map(fun(DocGroup) ->
@@ -438,11 +439,6 @@ upgrade_sizes(S) when is_integer(S) ->
 
 send_result(Client, Doc, NewResult) ->
     % used to send a result to the client
-    
-    
-    
-    
-    
     catch(Client ! {result, self(), {doc_tag(Doc), NewResult}}).
 
 doc_tag(#doc{meta=Meta}) ->
@@ -452,9 +448,8 @@ doc_tag(#doc{meta=Meta}) ->
         Else -> throw({invalid_doc_tag, Else})
     end.
 
-% couch_db_updater:merge_rev_trees([[],[]] = NewDocs,[] = OldDocs,{merge_acc,1000,false,[],[],0,[]}=Acc]
-
-merge_rev_trees([[]], [], Acc) -> % validate_docs_access left us with no docs to merge
+merge_rev_trees([[]], [], Acc) ->
+    % validate_docs_access left us with no docs to merge
     {ok, Acc};
 merge_rev_trees([], [], Acc) ->
     {ok, Acc#merge_acc{
@@ -633,6 +628,10 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
     Ids = [Id || [{_Client, #doc{id=Id}}|_] <- DocsList],
+    % TODO: maybe a perf hit, instead of zip3-ing existin Accesses into
+    %       our doc lists, maybe find 404 docs differently down in
+    %       validate_docs_access (revs is [], which we can then use
+    %       to skip validation as we know it is the first doc rev)
     Accesses = [Access || [{_Client, #doc{access=Access}}|_] <- DocsList],
 
     % lookup up the old documents, if they exist.
@@ -673,10 +672,6 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
         cur_seq = UpdateSeq,
         full_partitions = FullPartitions
     },
-    % 
-    % 
-    % 
-
     % Loop over DocsList, validate_access for each OldDocInfo on Db,
     %.  if no OldDocInfo, then send to DocsListValidated, keep OldDocsInfo
     %   if valid, then send to DocsListValidated, OldDocsInfo
@@ -693,12 +688,10 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
     % Write out the document summaries (the bodies are stored in the nodes of
     % the trees, the attachments are already written to disk)
     {ok, IndexFDIs} = flush_trees(Db, NewFullDocInfos, []),
-
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
     LocalDocs1 = apply_local_docs_access(Db, LocalDocs),
     LocalDocs2 = update_local_doc_revs(LocalDocs1),
 
-    
     {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
 
     WriteCount = length(IndexFDIs),
@@ -721,23 +714,21 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
     {ok, commit_data(Db1), UpdatedDDocIds}.
 
 check_access(Db, UserCtx, Access) ->
-    
-    
-    
     check_access(Db, UserCtx, couch_db:has_access_enabled(Db), Access).
 
 check_access(_Db, UserCtx, false, _Access) ->
     true;
 check_access(Db, UserCtx, true, Access) -> couch_db:check_access(Db#db{user_ctx=UserCtx}, Access).
 
+% TODO: looks like we go into validation here unconditionally and only check in
+%       check_access() whether the Db has_access_enabled(), we should do this
+%       here on the outside. Might be our perf issue.
+%       However, if it is, that means we have to speed this up as it would still
+%       be too slow for when access is enabled.
 validate_docs_access(Db, UserCtx, DocsList, OldDocInfos) ->
-    
-    
     validate_docs_access(Db, UserCtx, DocsList, OldDocInfos, [], []).
 
 validate_docs_access(_Db, UserCtx, [], [], DocsListValidated, OldDocInfosValidated) ->
-    
-    
     { lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated) };
 validate_docs_access(Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], DocsListValidated, OldDocInfosValidated) ->
     % loop over Docs as {Client,  NewDoc}
@@ -752,21 +743,17 @@ validate_docs_access(Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], Doc
         end,
         
         NewDocMatchesAccess = check_access(Db, UserCtx, Doc#doc.access),
-        
-        
         case OldDocMatchesAccess andalso NewDocMatchesAccess of
             true -> % if valid, then send to DocsListValidated, OldDocsInfo
                     % and store the access context on the new doc
                 [{Client, Doc} | Acc];
             _Else2 -> % if invalid, then send_result tagged `access`(c.f. `conflict)
-                      %   and don’t add to DLV, nor ODI
-                      
+                      % and don’t add to DLV, nor ODI
                 send_result(Client, Doc, access),
                 Acc
         end
     end, [], Docs),
-    
-    
+
     { NewDocsListValidated, NewOldDocInfosValidated } = case length(NewDocs) of
         0 -> % we sent out all docs as invalid access, drop the old doc info associated with it
             { [NewDocs | DocsListValidated], OldDocInfosValidated };
@@ -774,10 +761,6 @@ validate_docs_access(Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], Doc
             { [NewDocs | DocsListValidated], [OldInfo | OldDocInfosValidated] }
     end,
     validate_docs_access(Db, UserCtx, DocRest, OldInfoRest, NewDocsListValidated, NewOldDocInfosValidated).
-
-
-%{ DocsListValidated, OldDocInfosValidated } = 
-
 
 apply_local_docs_access(Db, Docs) ->
     apply_local_docs_access1(couch_db:has_access_enabled(Db), Docs).
@@ -952,6 +935,7 @@ pair_write_info(Old, New) ->
 get_meta_body_size(Meta) ->
     {ejson_size, ExternalSize} = lists:keyfind(ejson_size, 1, Meta),
     ExternalSize.
+
 
 default_security_object(DbName, []) ->
     default_security_object(DbName);

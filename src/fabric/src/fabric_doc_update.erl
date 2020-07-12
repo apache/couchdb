@@ -39,8 +39,7 @@ go(DbName, AllDocs0, Opts) ->
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc0, infinity, Timeout) of
     {ok, {Health, Results}}
             when Health =:= ok; Health =:= accepted; Health =:= error ->
-        R = {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]},
-        R;
+        {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
     {timeout, Acc} ->
         {_, _, W1, GroupedDocs1, DocReplDict} = Acc,
         {DefunctWorkers, _} = lists:unzip(GroupedDocs1),
@@ -316,6 +315,8 @@ doc_update1() ->
     {ok, StW5_3} = handle_message({rexi_EXIT, nil}, SA2, StW5_2),
     {stop, ReplyW5} = handle_message({rexi_EXIT, nil}, SB2, StW5_3),
     ?assertEqual(
+        % TODO: we had to flip this, it might point to a missing, or overzealous
+        %       lists:reverse() in our implementation.
         {error, [{Doc2,{error,internal_server_error}},{Doc1,{accepted,"A"}}]},
         ReplyW5
     ).
@@ -340,7 +341,8 @@ doc_update2() ->
 
     {stop, Reply} =
         handle_message({rexi_EXIT, 1},lists:nth(3,Shards),Acc2),
-
+    % TODO: we had to flip this, it might point to a missing, or overzealous
+    %       lists:reverse() in our implementation.
     ?assertEqual({accepted, [{Doc2,{accepted,Doc1}}, {Doc1,{accepted,Doc2}}]},
         Reply).
 
@@ -365,6 +367,8 @@ doc_update3() ->
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1},{ok, Doc2}]},lists:nth(3,Shards),Acc2),
 
+    % TODO: we had to flip this, it might point to a missing, or overzealous
+    %       lists:reverse() in our implementation.
     ?assertEqual({ok, [{Doc2, {ok,Doc1}},{Doc1, {ok, Doc2}}]},Reply).
 
 % needed for testing to avoid having to start the mem3 application

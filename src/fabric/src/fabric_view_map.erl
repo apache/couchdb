@@ -58,6 +58,8 @@ go(Db, Options, DDoc, View, Args, Callback, Acc, VInfo) ->
                     "map_view"
                 ),
                 Callback({error, timeout}, Acc);
+            % TODO: this might be a debugging leftover, revert by deleting the
+            %       next two lines
             {error, {forbidden, Error, _Stacktrace}} ->
                 {error, {forbidden, Error}};
             {error, Error} ->

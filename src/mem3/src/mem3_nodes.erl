@@ -124,7 +124,6 @@ changes_callback(start, _) ->
 changes_callback({stop, EndSeq}, _) ->
     exit({seq, EndSeq});
 changes_callback({change, {Change}, _}, _) ->
-    % Change: ~p~n", [Change]),
     Node = couch_util:get_value(<<"id">>, Change),
     case Node of <<"_design/", _/binary>> -> ok; _ ->
         case mem3_util:is_deleted(Change) of

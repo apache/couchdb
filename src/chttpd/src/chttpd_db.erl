@@ -115,6 +115,8 @@ handle_changes_req1(#httpd{}=Req, Db) ->
             },
             fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
         end) of
+            % TODO: This may be a debugging leftover, undo by just returning
+            %       chttpd:etag_respond()
             {error, {forbidden, Message, _Stacktrace}} ->
                 throw({forbidden, Message});
             Response ->
@@ -128,6 +130,8 @@ handle_changes_req1(#httpd{}=Req, Db) ->
             threshold = Max
         },
         try
+            % TODO: This may be a debugging leftover, undo by just returning
+            %       fabric:changes()
             case fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs) of
                 {error, {forbidden, Message, _Stacktrace}} ->
                     throw({forbidden, Message});
@@ -921,24 +925,18 @@ view_cb(Msg, Acc) ->
     couch_mrview_http:view_cb(Msg, Acc).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
+    % fetch the old doc revision, so we can compare access control
+    % in send_update_doc() later.
     Doc0 = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
     Revs = chttpd:qs_value(Req, "rev"),
     case Revs of
     undefined ->
-       Body = {[{<<"_deleted">>,true}]};
+        Body = {[{<<"_deleted">>,true}]};
     Rev ->
-       Body = {[{<<"_rev">>, ?l2b(Revs)},{<<"_deleted">>,true}]}
+        Body = {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}
     end,
-    % Doc0 = couch_doc_from_req(Req, Db, DocId, Body),
     Doc = Doc0#doc{revs=Revs,body=Body,deleted=true},
     send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, Doc));
-
-    % % check for the existence of the doc to handle the 404 case.
-    % OldDoc = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
-    % NewRevs = couch_doc:parse_rev(chttpd:qs_value(Req, "rev")),
-    % NewBody = {[{<<"_deleted">>}, true]},
-    % NewDoc = OldDoc#doc{revs=NewRevs, body=NewBody},
-    % send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, NewDoc));
 
 db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
     #doc_query_args{
@@ -1278,8 +1276,6 @@ receive_request_data(Req, LenLeft) when LenLeft > 0 ->
 receive_request_data(_Req, _) ->
     throw(<<"expected more data">>).
 
-
-
 update_doc_result_to_json({#doc{id=Id,revs=Rev}, access}) ->
     update_doc_result_to_json({{Id, Rev}, access});
 update_doc_result_to_json({{Id, Rev}, Error}) ->
@@ -1373,6 +1369,7 @@ update_doc(Db, DocId, #doc{deleted=Deleted, body=DocBody}=Doc, Options) ->
         {'DOWN', Ref, _, _, {exit_exit, Reason}} ->
             erlang:exit(Reason)
     end,
+
     case Result of
     {ok, NewRev} ->
         Accepted = false;

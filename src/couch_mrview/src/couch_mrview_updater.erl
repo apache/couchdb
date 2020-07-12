@@ -116,6 +116,7 @@ process_doc(Doc, Seq, #mrst{doc_acc=Acc}=State) when length(Acc) > 100 ->
     process_doc(Doc, Seq, State#mrst{doc_acc=[]});
 process_doc(nil, Seq, #mrst{doc_acc=Acc}=State) ->
     {ok, State#mrst{doc_acc=[{nil, Seq, nil} | Acc]}};
+% TODO: re-evaluate why this is commented out
 % process_doc(#doc{id=Id, deleted=true}, Seq, #mrst{doc_acc=Acc}=State) ->
 %     {ok, State#mrst{doc_acc=[{Id, Seq, deleted} | Acc]}};
 process_doc(#doc{id=Id}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->

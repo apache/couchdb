@@ -820,7 +820,7 @@ bulk_results_to_errors(Docs, {ok, Results}, interactive_edit) ->
 bulk_results_to_errors(Docs, {ok, Results}, replicated_changes) ->
     bulk_results_to_errors(Docs, {aborted, Results}, interactive_edit);
 
-bulk_results_to_errors(Docs, {aborted, Results}, interactive_edit) ->
+bulk_results_to_errors(_Docs, {aborted, Results}, interactive_edit) ->
     lists:map(
         fun({{Id, Rev}, Err}) ->
             {_, Error, Reason} = couch_httpd:error_info(Err),
@@ -828,7 +828,7 @@ bulk_results_to_errors(Docs, {aborted, Results}, interactive_edit) ->
         end,
         Results);
 
-bulk_results_to_errors(Docs, Results, remote) ->
+bulk_results_to_errors(_Docs, Results, remote) ->
     lists:reverse(lists:foldl(
         fun({Props}, Acc) ->
             case get_value(<<"error">>, Props, get_value(error, Props)) of

@@ -71,6 +71,8 @@ go(DbName, "normal", Options, Callback, Acc0) ->
             Acc,
             5000
         ) of
+            % TODO: This may be a debugging leftover, undo by just returning
+            %       Callback({stop, pack_seqs…
             {ok, Collector} ->
                 #collector{counters=Seqs, user_acc=AccOut, offset=Offset} = Collector,
                 Callback({stop, pack_seqs(Seqs), pending_count(Offset)}, AccOut);

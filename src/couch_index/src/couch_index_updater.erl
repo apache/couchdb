@@ -166,12 +166,10 @@ update(Idx, Mod, IdxState) ->
             case {IncludeDesign, DocId} of
                 {false, <<"_design/", _/binary>>} ->
                     {nil, Seq};
-                % _ when Deleted ->
-                %     {#doc{id=DocId, deleted=true}, Seq};
                 _ ->
-                    {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
-                    case IndexName of
+                    case IndexName of % TODO: move into outer case statement
                         <<"_design/_access">> ->
+                            {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
                             % TODO: hande conflicted docs in _access index
                             % probably remove
                             [RevInfo|_] = DocInfo#doc_info.revs,
@@ -180,7 +178,10 @@ update(Idx, Mod, IdxState) ->
                                 access = Access
                             },
                             {Doc1, Seq};
-                        _Else ->
+                        _ when Deleted ->
+                            {#doc{id=DocId, deleted=true}, Seq};
+                        _ ->
+                            {ok, Doc} = couch_db:open_doc_int(Db, DocInfo, DocOpts),
                             {Doc, Seq}
                     end
             end
