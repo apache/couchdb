@@ -628,8 +628,9 @@ commit_compaction_data(#st{header = OldHeader} = St0, Fd) ->
 bind_emsort(St, Fd, nil) ->
     {ok, Ems} = couch_emsort:open(Fd),
     St#st{id_tree=Ems};
-bind_emsort(St, Fd, State) when is_integer(State) ->
-    bind_emsort(St, Fd, [{root, State}]);
+bind_emsort(St, Fd, {BB, _} = Root) when is_list(BB) ->
+    % Upgrade clause when we find old compaction files
+    bind_emsort(St, Fd, [{root, Root}]);
 bind_emsort(St, Fd, State) ->
     {ok, Ems} = couch_emsort:open(Fd, State),
     St#st{id_tree=Ems}.
