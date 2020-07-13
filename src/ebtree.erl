@@ -1094,7 +1094,7 @@ lookup_test_fun(Max, Order) ->
     lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
     T2 = erlang:monotonic_time(),
     ?debugFmt("~B order. ~B iterations. insert rate: ~.2f/s, lookup rate: ~.2f/s",
-        [Order, Max, Max / sec(T1 - T0), Max / sec(T2 - T1)]).
+        [Order, Max, 1000 * (Max / msec(T1 - T0)), 1000 * (Max / msec(T2 - T1))]).
 
 
 range_test_() ->
@@ -1177,7 +1177,7 @@ custom_collation_reverse_range_test_() ->
     end}.
 
 
-sec(Native) ->
-    erlang:max(1, erlang:convert_time_unit(Native, native, second)).
+msec(Native) ->
+    erlang:max(1, erlang:convert_time_unit(Native, native, millisecond)).
 
 -endif.
