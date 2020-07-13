@@ -129,7 +129,12 @@ defmodule Couch do
   end
 
   def set_auth_options(options) do
-    if Keyword.get(options, :cookie) == nil do
+    no_auth? = Keyword.get(options, :no_auth) == true
+    cookie? = Keyword.has_key?(options, :cookie)
+    basic_auth? = Keyword.has_key?(options, :basic_auth)
+    if cookie? or no_auth? or basic_auth? do
+      Keyword.delete(options, :no_auth)
+    else
       headers = Keyword.get(options, :headers, [])
 
       if headers[:basic_auth] != nil or headers[:authorization] != nil do
@@ -139,8 +144,6 @@ defmodule Couch do
         password = System.get_env("EX_PASSWORD") || "pass"
         Keyword.put(options, :basic_auth, {username, password})
       end
-    else
-      options
     end
   end
 
@@ -177,7 +180,8 @@ defmodule Couch do
       Couch.post(
         "/_session",
         body: %{:username => user, :password => pass},
-        base_url: base_url
+        base_url: base_url,
+        no_auth: true
       )
 
     if Map.get(options, :expect, :success) == :success do
