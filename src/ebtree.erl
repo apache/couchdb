@@ -11,6 +11,7 @@
      range/6,
      reverse_range/6,
      fold/4,
+     fold/5,
      reduce/4,
      full_reduce/2,
      group_reduce/7,
@@ -126,47 +127,60 @@ lookup(Db, #tree{} = Tree, Key) ->
     fold(Db, Tree, Fun, false).
 
 
+%% @equiv fold(Db, Tree, Fun, Acc, [])
+-spec fold(Db :: term(), Tree :: #tree{}, Fun :: fun(), Acc :: term()) -> term().
+fold(Db, #tree{} = Tree, Fun, Acc) ->
+    fold(Db, Tree, Fun, Acc, []).
+
+
 %% @doc Custom traversal of the ebtree.
 %% @param Db An erlfdb database or transaction.
 %% @param Tree the ebtree.
 %% @param Fun A callback function as nodes are loaded that directs the traversal.
 %% @param Acc The initial accumulator.
+%% @param Options Currently supported options are [{dir, fwd}] and [{dir, rev}]
 %% @returns the final accumulator.
--spec fold(Db :: term(), Tree :: #tree{}, Fun :: fun(), Acc :: term()) -> term().
-fold(Db, #tree{} = Tree, Fun, Acc) ->
+-spec fold(Db :: term(), Tree :: #tree{}, Fun :: fun(), Acc :: term(), Options :: list()) -> term().
+fold(Db, #tree{} = Tree, Fun, Acc, Options) ->
     {_, Reduce} = erlfdb:transactional(Db, fun(Tx) ->
         Root = get_node(Tx, Tree, ?NODE_ROOT_ID),
-        fold(Db, Tree, Root, Fun, Acc)
+        fold(Db, Tree, Root, Fun, Acc, Options)
     end),
     Reduce.
 
-fold(Db, #tree{} = Tree, #node{} = Node, Fun, Acc) ->
-    fold(Db, #tree{} = Tree, Node#node.members, Fun, Acc);
+
+fold(Db, #tree{} = Tree, #node{} = Node, Fun, Acc, Options) ->
+    Dir = proplists:get_value(dir, Options, fwd),
+    Members = case Dir of
+        fwd -> Node#node.members;
+        rev -> lists:reverse(Node#node.members)
+    end,
+    fold(Db, #tree{} = Tree, Members, Fun, Acc, Options);
 
 
-fold(_Db, #tree{} = _Tree, [], _Fun, Acc) ->
+fold(_Db, #tree{} = _Tree, [], _Fun, Acc, _Options) ->
     {ok, Acc};
 
-fold(Db, #tree{} = Tree, [{K, V} | Rest], Fun, Acc0) ->
+fold(Db, #tree{} = Tree, [{K, V} | Rest], Fun, Acc0, Options) ->
     case Fun({visit, K, V}, Acc0) of
         {ok, Acc1} ->
-            fold(Db, Tree, Rest, Fun, Acc1);
+            fold(Db, Tree, Rest, Fun, Acc1, Options);
         {stop, Acc1} ->
             {stop, Acc1}
     end;
 
-fold(Db, #tree{} = Tree, [{F, L, P, R} | Rest], Fun, Acc0) ->
+fold(Db, #tree{} = Tree, [{F, L, P, R} | Rest], Fun, Acc0, Options) ->
     case Fun({traverse, F, L, R}, Acc0) of
         {ok, Acc1} ->
             Node = get_node(Db, Tree, P),
-            case fold(Db, Tree, Node, Fun, Acc1) of
+            case fold(Db, Tree, Node, Fun, Acc1, Options) of
                 {ok, Acc2} ->
-                    fold(Db, Tree, Rest, Fun, Acc2);
+                    fold(Db, Tree, Rest, Fun, Acc2, Options);
                 {stop, Acc2} ->
                     {stop, Acc2}
             end;
         {skip, Acc1} ->
-            fold(Db, Tree, Rest, Fun, Acc1);
+            fold(Db, Tree, Rest, Fun, Acc1, Options);
         {stop, Acc1} ->
             {stop, Acc1}
     end.
