@@ -49,9 +49,19 @@
 -define(MAX, <<1:1>>).
 
 
+%% @equiv open(Db, Prefix, Order, [])
+-spec open(term(), binary(), pos_integer()) -> #tree{}.
 open(Db, Prefix, Order) ->
     open(Db, Prefix, Order, []).
 
+
+%% @doc Open a new ebtree, initialising it if doesn't already exist.
+%% @param Db An erlfdb database or transaction.
+%% @param Prefix The key prefix applied to all ebtree keys.
+%% @param Order The maximum number of items allowed in an ebtree node (must be an even number).
+%% @param Options Supported options are {reduce_fun, Fun} and {collate_fun, Fun}.
+%% @returns A data structure representing the ebtree, to be passed to all other functions.
+-spec open(term(), binary(), pos_integer(), list()) -> #tree{}.
 open(Db, Prefix, Order, Options) when is_binary(Prefix), is_integer(Order), Order > 2, Order rem 2 == 0 ->
     ReduceFun = proplists:get_value(reduce_fun, Options, fun reduce_noop/2),
     CollateFun = proplists:get_value(collate_fun, Options, fun collate_raw/2),
@@ -76,15 +86,22 @@ open(Db, Prefix, Order, Options) when is_binary(Prefix), is_integer(Order), Orde
     }.
 
 
+%% @doc a special value guaranteed to be smaller than any value in an ebtree.
 min() ->
     ?MIN.
 
 
+%% @doc a special value guaranteed to be larger than any value in an ebtree.
 max() ->
     ?MAX.
 
-%% lookup
-
+%% @doc Lookup a specific key in the ebtree.
+%% @param Db An erlfdb database or transaction.
+%% @param Tree the ebtree.
+%% @param Key the key to lookup
+%% @returns A key-value tuple if found, false if not present in the ebtree.
+-spec lookup(Db :: term(), Tree :: #tree{}, Key :: term()) ->
+    {Key :: term(), Value :: term()} | false.
 lookup(Db, #tree{} = Tree, Key) ->
     Fun = fun
         ({visit, K, V}, _Acc) when K =:= Key ->
@@ -108,8 +125,14 @@ lookup(Db, #tree{} = Tree, Key) ->
     end,
     fold(Db, Tree, Fun, false).
 
-%% fold
 
+%% @doc Custom traversal of the ebtree.
+%% @param Db An erlfdb database or transaction.
+%% @param Tree the ebtree.
+%% @param Fun A callback function as nodes are loaded that directs the traversal.
+%% @param Acc The initial accumulator.
+%% @returns the final accumulator.
+-spec fold(Db :: term(), Tree :: #tree{}, Fun :: fun(), Acc :: term()) -> term().
 fold(Db, #tree{} = Tree, Fun, Acc) ->
     {_, Reduce} = erlfdb:transactional(Db, fun(Tx) ->
         Root = get_node(Tx, Tree, ?NODE_ROOT_ID),
@@ -148,8 +171,12 @@ fold(Db, #tree{} = Tree, [{F, L, P, R} | Rest], Fun, Acc0) ->
             {stop, Acc1}
     end.
 
-%% full reduce
 
+%% @doc Calculate the final reduce value for the whole ebtree.
+%% @param Db An erlfdb database or transaction.
+%% @param Tree the ebtree.
+%% @returns the final reduce value
+-spec full_reduce(Db :: term(), Tree :: #tree{}) -> term().
 full_reduce(Db, #tree{} = Tree) ->
     Fun = fun
         ({visit, K, V}, {MapAcc, ReduceAcc}) ->
@@ -161,8 +188,13 @@ full_reduce(Db, #tree{} = Tree) ->
     do_reduce(Tree, MapValues, ReduceValues).
 
 
-%% reduce
-
+%% @doc Calculate the reduce value for all keys in the specified range.
+%% @param Db An erlfdb database or transaction.
+%% @param Tree The ebtree.
+%% @param StartKey The beginning of the range
+%% @param EndKey The end of the range
+%% @returns the reduce value for the specified range
+-spec reduce(Db :: term(), Tree :: #tree{}, StartKey :: term(), EndKey :: term()) -> term().
 reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
     Fun = fun
         ({visit, Key, Value}, {MapAcc, ReduceAcc}) ->
@@ -202,8 +234,17 @@ do_reduce(#tree{} = Tree, MapValues, ReduceValues) when is_list(MapValues), is_l
     do_reduce(Tree, [], [reduce_values(Tree, MapValues, false) | ReduceValues]).
 
 
-%% group reduce - produces reductions for contiguous keys in the same group.
-
+%% @doc Calculate the reduce value for all groups in the specified range.
+%% @param Db An erlfdb database or transaction.
+%% @param Tree The ebtree.
+%% @param StartKey The beginning of the range
+%% @param EndKey The end of the range
+%% @param GroupKeyFun A function that takes a key as a parameter and returns the group key.
+%% @param UserAccFun A function called when a new group reduction is calculated and returns an acc.
+%% @param UserAcc0 The initial accumulator.
+%% @returns the final accumulator.
+-spec group_reduce(Db :: term(), Tree :: #tree{}, StartKey :: term(), EndKey :: term(),
+    GroupKeyFun :: fun(), UserAccFun :: fun(), UserAcc0 :: term()) -> term().
 group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0) ->
     NoGroupYet = ?MIN,
     Fun = fun
@@ -253,8 +294,16 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
     end.
 
 
-%% range (inclusive of both ends)
-
+%% @doc Finds all key-value pairs for the specified range in forward order.
+%% @param Db An erlfdb database or transaction.
+%% @param Tree The ebtree.
+%% @param StartKey The beginning of the range
+%% @param EndKey The end of the range
+%% @param AccFun A function that is called when a key-value pair is found, returning an accumulator.
+%% @param Acc0 The initial accumulator
+%% @returns the final accumulator
+-spec range(Db :: term(), Tree :: #tree{}, StartKey :: term(), EndKey :: term(),
+    AccFun :: fun(), Acc0 :: term()) -> term().
 range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
     erlfdb:transactional(Db, fun(Tx) ->
         range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, AccFun, Acc0)
@@ -276,8 +325,17 @@ range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, AccFun, Acc) ->
     ChildId = find_child_id(Tree, Node, StartKey),
     range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, AccFun, Acc).
 
-%% reverse range (inclusive of both ends)
 
+%% @doc Finds all key-value pairs for the specified range in reverse order.
+%% @param Db An erlfdb database or transaction.
+%% @param Tree The ebtree.
+%% @param StartKey The beginning of the range
+%% @param EndKey The end of the range
+%% @param AccFun A function that is called when a key-value pair is found, returning an accumulator.
+%% @param Acc0 The initial accumulator
+%% @returns the final accumulator
+-spec reverse_range(Db :: term(), Tree :: #tree{}, StartKey :: term(), EndKey :: term(),
+    AccFun :: fun(), Acc0 :: term()) -> term().
 reverse_range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
     erlfdb:transactional(Db, fun(Tx) ->
         reverse_range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, AccFun, Acc0)
@@ -300,8 +358,13 @@ reverse_range(Tx, #tree{} = Tree, #node{} = Node, StartKey, EndKey, AccFun, Acc)
     reverse_range(Tx, Tree, get_node(Tx, Tree, ChildId), StartKey, EndKey, AccFun, Acc).
 
 
-%% insert
-
+%% @doc Inserts or updates a value in the ebtree
+%% @param Db An erlfdb database or transaction.
+%% @param Tree The ebtree.
+%% @param Key The key to store the value under.
+%% @param Value The value to store.
+%% @returns the tree.
+-spec insert(Db :: term(), Tree :: #tree{}, Key :: term(), Value :: term()) -> #tree{}.
 insert(_Db, #tree{} = _Tree, ?MIN, _Value) ->
     erlang:error(min_not_allowed);
 
@@ -427,8 +490,12 @@ insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
     reduce_node(Tree, Node2).
 
 
-%% delete
-
+%% @doc Deletes an entry from the ebtree
+%% @param Db An erlfdb database or transaction.
+%% @param Tree The ebtree.
+%% @param Key The key of the entry to delete.
+%% @returns the tree.
+-spec delete(Db :: term(), Tree :: #tree{}, Key :: term()) -> #tree{}.
 delete(Db, #tree{} = Tree, Key) ->
     erlfdb:transactional(Db, fun(Tx) ->
         Root0 = get_node(Tx, Tree, ?NODE_ROOT_ID),
@@ -632,6 +699,8 @@ node_key(Prefix, Id) when is_binary(Prefix), is_integer(Id) ->
     erlfdb_tuple:pack({?NODE, Id}, Prefix).
 
 
+%% @doc Walks the whole tree and checks it for consistency.
+%% It also prints it to screen.
 validate_tree(Db, #tree{} = Tree) ->
     erlfdb:transactional(Db, fun(Tx) ->
         Root = get_node(Db, Tree, ?NODE_ROOT_ID),
