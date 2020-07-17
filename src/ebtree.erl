@@ -17,13 +17,6 @@
      validate_tree/2
 ]).
 
-%% built-in reduce functions
--export([
-    reduce_sum/2,
-    reduce_count/2,
-    reduce_stats/2
-]).
-
 -record(node, {
     id,
     level = 0,
@@ -728,44 +721,6 @@ reduce_noop(_KVs, _Rereduce) ->
     [].
 
 
-reduce_sum(KVs, false) ->
-    {_, Vs} = lists:unzip(KVs),
-    lists:sum(Vs);
-
-reduce_sum(Rs, true) ->
-    lists:sum(Rs).
-
-
-reduce_count(KVs, false) ->
-    length(KVs);
-
-reduce_count(Rs, true) ->
-    lists:sum(Rs).
-
-
-reduce_stats(KVs, false) ->
-    {_, Vs} = lists:unzip(KVs),
-    {
-        lists:sum(Vs),
-        lists:min(Vs),
-        lists:max(Vs),
-        length(Vs),
-        lists:sum([V * V || V <- Vs])
-    };
-
-reduce_stats(Rs, true) ->
-    lists:foldl(
-        fun({Sum, Min, Max, Count, SumSqr},
-            {SumAcc, MinAcc, MaxAcc, CountAcc, SumSqrAcc}) ->
-        {
-            Sum + SumAcc,
-            erlang:min(Min, MinAcc),
-            erlang:max(Max, MaxAcc),
-            Count + CountAcc,
-            SumSqr + SumSqrAcc
-        } end, hd(Rs), tl(Rs)).
-
-
 reduce_node(#tree{} = Tree, #node{level = 0} = Node) ->
     reduce_values(Tree, Node#node.members, false);
 
@@ -904,6 +859,44 @@ print_node(#node{} = Node) ->
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+
+reduce_sum(KVs, false) ->
+    {_, Vs} = lists:unzip(KVs),
+    lists:sum(Vs);
+
+reduce_sum(Rs, true) ->
+    lists:sum(Rs).
+
+
+reduce_count(KVs, false) ->
+    length(KVs);
+
+reduce_count(Rs, true) ->
+    lists:sum(Rs).
+
+
+reduce_stats(KVs, false) ->
+    {_, Vs} = lists:unzip(KVs),
+    {
+        lists:sum(Vs),
+        lists:min(Vs),
+        lists:max(Vs),
+        length(Vs),
+        lists:sum([V * V || V <- Vs])
+    };
+
+reduce_stats(Rs, true) ->
+    lists:foldl(
+        fun({Sum, Min, Max, Count, SumSqr},
+            {SumAcc, MinAcc, MaxAcc, CountAcc, SumSqrAcc}) ->
+        {
+            Sum + SumAcc,
+            erlang:min(Min, MinAcc),
+            erlang:max(Max, MaxAcc),
+            Count + CountAcc,
+            SumSqr + SumSqrAcc
+        } end, hd(Rs), tl(Rs)).
+
 
 collation_fun_test_() ->
     Tree = #tree{collate_fun = fun collate_raw/2},
