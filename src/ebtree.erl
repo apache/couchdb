@@ -558,8 +558,7 @@ find_child_int(#tree{} = _Tree, [Child], _Key) ->
     Child;
 
 find_child_int(#tree{} = Tree, [{_F, L, _P, _R} = Child| Rest], Key) ->
-    #tree{collate_fun = CollateFun} = Tree,
-    case CollateFun(Key, L) of
+    case less_than_or_equal(Tree, Key, L) of
         true ->
             Child;
         false ->
