@@ -15,7 +15,5 @@ node id.
 TODO
 
 1. Rewrite inner node ids (non-root, non-leaf) so we can safely cache
-    them outside of a transaction.
+    them outside of a transaction. (see "immutable" branch)
 2. Chunkify large values over multiple rows?
-3. Sequential node ids?
-
