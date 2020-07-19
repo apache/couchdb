@@ -68,18 +68,6 @@ defmodule PartitionSizeLimitTest do
     assert resp.status_code in [201, 202]
   end
 
-  defp compact(db) do
-    assert Couch.post("/#{db}/_compact").status_code == 202
-
-    retry_until(
-      fn ->
-        Couch.get("/#{db}").body["compact_running"] == false
-      end,
-      200,
-      20_000
-    )
-  end
-
   test "fill partition manually", context do
     db_name = context[:db_name]
     partition = "foo"

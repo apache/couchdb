@@ -134,6 +134,7 @@ fauxton: share\www
 .PHONY: check
 # target: check - Test everything
 check: all python-black
+	@$(MAKE) emilio
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
@@ -175,6 +176,9 @@ just-eunit: export ERL_AFLAGS = "-config $(shell echo %cd%)/rel/files/eunit.conf
 just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
+emilio:
+	@bin\emilio -c emilio.config src\ | python.exe bin\warnings_in_scope -s 3
+
 .venv/bin/black:
 	@python.exe -m venv .venv
 	@.venv\Scripts\pip3.exe install black || copy /b .venv\Scripts\black.exe +,,
@@ -186,7 +190,7 @@ python-black: .venv/bin/black
 	@python.exe -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		.venv\Scripts\black.exe --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev\run test\javascript\run src\mango src\docs
+		build-aux dev\run test\javascript\run src\mango\test src\docs\src\conf.py src\docs\ext .
 
 python-black-update: .venv/bin/black
 	@python.exe -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -194,7 +198,7 @@ python-black-update: .venv/bin/black
 	@python.exe -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		.venv\Scripts\black.exe \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev\run test\javascript\run src\mango src\docs
+		build-aux dev\run test\javascript\run src\mango\test src\docs\src\conf.py src\docs\ext .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
@@ -359,7 +363,7 @@ install: release
 	@echo .
 	@echo     To install CouchDB into your system, copy the rel\couchdb
 	@echo     to your desired installation location. For example:
-	@echo     xcopy /E rel\couchdb C:\CouchDB\ 
+	@echo     xcopy /E rel\couchdb C:\CouchDB\
 	@echo .
 
 ################################################################################

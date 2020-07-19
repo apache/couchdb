@@ -12,6 +12,19 @@
 //
 
 /*
+ * Quit current test execution if it is tagged as skipped or ported to elixir
+ */
+function quitIfSkippedOrPorted() {
+  if(couchTests.skip) {
+    quit(2);
+  }
+
+  if(couchTests.elixir) {
+    quit(3);
+  }
+}
+
+/*
  * Futon test suite was designed to be able to run all tests populated into
  * couchTests. Here we should only be loading one test, so we'll pop the first
  * test off the list and run the test. If more than one item is loaded in the
@@ -21,14 +34,6 @@ function runTest() {
   CouchDB.reloadConfig();
   var count = 0;
   var start = new Date().getTime();
-
-  if(couchTests.skip) {
-      quit(2);
-  }
-
-  if(couchTests.elixir) {
-      quit(3);
-  }
 
   for(var name in couchTests) {
       count++;
@@ -50,6 +55,8 @@ function runTest() {
     quit(1)
   }
 }
+
+quitIfSkippedOrPorted();
 
 waitForSuccess(CouchDB.isRunning, 'isRunning');
 

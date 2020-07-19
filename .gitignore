@@ -13,6 +13,8 @@
 .rebar/
 .eunit/
 cover/
+core
+debian/
 log
 apache-couchdb-*/
 bin/
@@ -45,6 +47,7 @@ src/couch/priv/couch_js/**/*.d
 src/couch/priv/icu_driver/couch_icu_driver.d
 src/mango/src/mango_cursor_text.nocompile
 src/docs/
+src/emilio/
 src/ets_lru/
 src/excoveralls/
 src/fauxton/
@@ -115,6 +118,7 @@ src/mango/ebin/
 src/mango/test/*.pyc
 src/mango/nosetests.xml
 src/mango/venv/
+src/jwtf/.rebar3/
 test/javascript/junit.xml
 
 /_build/

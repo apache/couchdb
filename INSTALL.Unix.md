@@ -90,7 +90,7 @@ You can install the dependencies by running:
 
     sudo yum install autoconf autoconf-archive automake \
         curl-devel erlang-asn1 erlang-erts erlang-eunit \
-        erlang-os_mon erlang-xmerl help2man \
+        erlang-xmerl help2man \
         js-devel-1.8.5 libicu-devel libtool perl-Test-Harness
 
 You can install the Node.JS dependencies via [NodeSource](https://github.com/nodesource/distributions#rpminstall).

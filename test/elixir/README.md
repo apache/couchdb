@@ -62,15 +62,15 @@ X means done, - means partially
   - [X] Port multiple_rows.js
   - [X] Port proxyauth.js
   - [X] Port purge.js
-  - [ ] Port reader_acl.js
-  - [ ] Port recreate_doc.js
+  - [X] Port reader_acl.js
+  - [X] Port recreate_doc.js
   - [X] Port reduce_builtin.js
   - [X] Port reduce_false.js
-  - [ ] Port reduce_false_temp.js
+  - [ ] ~~Port reduce_false_temp.js~~
   - [X] Port reduce.js
   - [X] Port replication.js
-  - [ ] Port replicator_db_bad_rep_id.js
-  - [ ] Port replicator_db_by_doc_id.js
+  - [X] Port replicator_db_bad_rep_id.js
+  - [X] Port replicator_db_by_doc_id.js
   - [ ] Port replicator_db_compact_rep_db.js
   - [ ] Port replicator_db_continuous.js
   - [ ] Port replicator_db_credential_delegation.js
@@ -87,7 +87,7 @@ X means done, - means partially
   - [ ] Port replicator_db_update_security.js
   - [ ] Port replicator_db_user_ctx.js
   - [ ] Port replicator_db_write_auth.js
-  - [ ] Port rev_stemming.js
+  - [X] Port rev_stemming.js
   - [X] Port rewrite.js
   - [ ] Port rewrite_js.js
   - [X] Port security_validation.js
@@ -99,8 +99,8 @@ X means done, - means partially
   - [X] Port utf8.js
   - [X] Port uuids.js
   - [X] Port view_collation.js
-  - [ ] Port view_collation_raw.js
-  - [ ] Port view_compaction.js
+  - [X] Port view_collation_raw.js
+  - [X] Port view_compaction.js
   - [ ] Port view_conflicts.js
   - [ ] Port view_errors.js
   - [ ] Port view_include_docs.js
@@ -110,7 +110,7 @@ X means done, - means partially
   - [X] Port view_offsets.js
   - [X] Port view_pagination.js
   - [ ] Port view_sandboxing.js
-  - [ ] Port view_update_seq.js
+  - [X] Port view_update_seq.js
 
 # Using ExUnit to write unit tests
 

@@ -198,7 +198,7 @@ jwt_authentication_handler(Req) ->
                         false -> throw({unauthorized, <<"Token missing sub claim.">>});
                         {_, User} -> Req#httpd{user_ctx=#user_ctx{
                             name = User,
-                            roles = couch_util:get_value(<<"_couchdb.roles">>, Claims, [])
+                            roles = couch_util:get_value(?l2b(config:get("jwt_auth", "roles_claim_name", "_couchdb.roles")), Claims, [])
                         }}
                     end;
                 {error, Reason} ->
@@ -209,12 +209,21 @@ jwt_authentication_handler(Req) ->
 
 get_configured_claims() ->
     Claims = config:get("jwt_auth", "required_claims", ""),
-    case re:split(Claims, "\s*,\s*", [{return, list}]) of
-        [[]] ->
-            []; %% if required_claims is the empty string.
-        List ->
-            [list_to_existing_atom(C) || C <- List]
+    Re = "((?<key1>[a-z]+)|{(?<key2>[a-z]+)\s*,\s*\"(?<val>[^\"]+)\"})",
+    case re:run(Claims, Re, [global, {capture,  [key1, key2, val], binary}]) of
+        nomatch when Claims /= "" ->
+            couch_log:error("[jwt_auth] required_claims is set to an invalid value.", []),
+            throw({misconfigured_server, <<"JWT is not configured correctly">>});
+        nomatch ->
+            [];
+        {match, Matches} ->
+            lists:map(fun to_claim/1, Matches)
     end.
+
+to_claim([Key, <<>>, <<>>]) ->
+    binary_to_atom(Key, latin1);
+to_claim([<<>>, Key, Value]) ->
+    {binary_to_atom(Key, latin1), Value}.
 
 cookie_authentication_handler(Req) ->
     cookie_authentication_handler(Req, couch_auth_cache).
