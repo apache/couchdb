@@ -125,11 +125,10 @@ lookup(Db, #tree{} = Tree, Key) ->
                     {skip, Acc}
             end
     end,
-    fold(Db, Tree, Fun, false).
+    fold(Db, Tree, Fun, false, []).
 
 
 %% @equiv fold(Db, Tree, Fun, Acc, [])
--spec fold(Db :: term(), Tree :: #tree{}, Fun :: fun(), Acc :: term()) -> term().
 fold(Db, #tree{} = Tree, Fun, Acc) ->
     fold(Db, Tree, Fun, Acc, []).
 
@@ -139,9 +138,22 @@ fold(Db, #tree{} = Tree, Fun, Acc) ->
 %% @param Tree the ebtree.
 %% @param Fun A callback function as nodes are loaded that directs the traversal.
 %% @param Acc The initial accumulator.
-%% @param Options Currently supported options are [{dir, fwd}] and [{dir, rev}]
+%% @param Options Options that control how the fold is executed.
 %% @returns the final accumulator.
--spec fold(Db :: term(), Tree :: #tree{}, Fun :: fun(), Acc :: term(), Options :: list()) -> term().
+
+-type fold_args() ::
+    {visit, Key :: term(), Value :: term()} |
+    {traverse, First :: term(), Last :: term(), Reduction :: term()}.
+
+-type fold_option() :: [{dir, fwd | rev}].
+
+-spec fold(Db, Tree, Fun, Acc0, Options) -> Acc1 when
+    Db :: term(),
+    Tree :: #tree{},
+    Fun :: fun((fold_args(), Acc0) -> {ok | skip | stop, Acc1}),
+    Acc0 :: term(),
+    Options :: [fold_option()],
+    Acc1 :: term().
 fold(Db, #tree{} = Tree, Fun, Acc, Options) ->
     {_, Reduce} = erlfdb:transactional(Db, fun(Tx) ->
         Root = get_node(Tx, Tree, ?NODE_ROOT_ID),
@@ -199,7 +211,7 @@ full_reduce(Db, #tree{} = Tree) ->
         ({traverse, _F, _L, R}, {MapAcc, ReduceAcc}) ->
             {skip, {MapAcc, [R | ReduceAcc]}}
     end,
-    {MapValues, ReduceValues} = fold(Db, Tree, Fun, {[], []}),
+    {MapValues, ReduceValues} = fold(Db, Tree, Fun, {[], []}, []),
     do_reduce(Tree, MapValues, ReduceValues).
 
 
@@ -238,7 +250,7 @@ reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
                     {ok, {MapAcc, ReduceAcc}}
             end
     end,
-    {MapValues, ReduceValues} = fold(Db, Tree, Fun, {[], []}),
+    {MapValues, ReduceValues} = fold(Db, Tree, Fun, {[], []}, []),
     do_reduce(Tree, MapValues, ReduceValues).
 
 
@@ -250,8 +262,14 @@ do_reduce(#tree{} = Tree, MapValues, ReduceValues) when is_list(MapValues), is_l
 
 
 %% @equiv group_reduce(Db, Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0, [])
--spec group_reduce(Db :: term(), Tree :: #tree{}, StartKey :: term(), EndKey :: term(),
-    GroupKeyFun :: fun(), UserAccFun :: fun(), UserAcc0 :: term()) -> term().
+-spec group_reduce(
+    Db :: term(),
+    Tree :: #tree{},
+    StartKey :: term(),
+    EndKey :: term(),
+    GroupKeyFun :: fun((term()) -> group_key()),
+    UserAccFun :: fun(({group_key(), GroupValue :: term()}, Acc0 :: term()) -> Acc1 :: term()),
+    UserAcc0 :: term()) -> Acc1 :: term().
 group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0) ->
     group_reduce(Db, Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0, []).
 
@@ -266,8 +284,17 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
 %% @param UserAcc0 The initial accumulator.
 %% @param Options Currently supported options are [{dir, fwd}] and [{dir, rev}]
 %% @returns the final accumulator.
--spec group_reduce(Db :: term(), Tree :: #tree{}, StartKey :: term(), EndKey :: term(),
-    GroupKeyFun :: fun(), UserAccFun :: fun(), UserAcc0 :: term(), Options :: list()) -> term().
+-type group_key() :: term().
+
+-spec group_reduce(
+    Db :: term(),
+    Tree :: #tree{},
+    StartKey :: term(),
+    EndKey :: term(),
+    GroupKeyFun :: fun((term()) -> group_key()),
+    UserAccFun :: fun(({group_key(), GroupValue :: term()}, Acc0 :: term()) -> Acc1 :: term()),
+    UserAcc0 :: term(),
+    Options :: [fold_option()]) -> Acc1 :: term().
 group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0, Options) ->
     Dir = proplists:get_value(dir, Options, fwd),
     NoGroupYet = ?MIN,
