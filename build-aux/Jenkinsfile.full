@@ -727,12 +727,12 @@ pipeline {
           unstash 'tarball'
           unarchive mapping: ['pkgs/' : '.']
 
-          echo 'Retrieving & cleaning current couchdb-vm2 tree...'
+          echo 'Retrieving & cleaning current repo-nightly tree...'
           sh '''
-            rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@couchdb-vm2.apache.org:/var/www/html/$BRANCH_NAME . || mkdir -p $BRANCH_NAME
+            rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@repo-nightly.couchdb.org:/var/www/html/$BRANCH_NAME . || mkdir -p $BRANCH_NAME
             rm -rf $BRANCH_NAME/debian/* $BRANCH_NAME/el6/* $BRANCH_NAME/el7/* $BRANCH_NAME/el8/*
             mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el6 $BRANCH_NAME/el7 $BRANCH_NAME/el8 $BRANCH_NAME/source
-            rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@couchdb-vm2.apache.org:/var/www/html/js .
+            rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@repo-nightly.couchdb.org:/var/www/html/js .
           '''
 
           echo 'Building Debian repo...'
@@ -772,9 +772,9 @@ pipeline {
             cd ../..
           '''
 
-          echo 'rsyncing tree to couchdb-vm2...'
+          echo 'rsyncing tree to repo-nightly...'
           sh '''
-            rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no -i $KEY" $BRANCH_NAME jenkins@couchdb-vm2.apache.org:/var/www/html
+            rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no -i $KEY" $BRANCH_NAME jenkins@repo-nightly.couchdb.org:/var/www/html
             rm -rf $BRANCH_NAME couchdb-pkg *.tar.gz
           '''
         } // withCredentials
