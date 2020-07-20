@@ -49,7 +49,8 @@ entries() ->
     [
         {level, "level", "info"},
         {level_int, "level", "info"},
-        {max_message_size, "max_message_size", "16000"}
+        {max_message_size, "max_message_size", "16000"},
+        {strip_last_msg, "strip_last_msg", "true"}
      ].
 
 
@@ -97,4 +98,10 @@ transform(max_message_size, SizeStr) ->
         Size -> Size
     catch _:_ ->
         16000
-    end.
+    end;
+
+transform(strip_last_msg, "false") ->
+    false;
+
+transform(strip_last_msg, _) ->
+    true.

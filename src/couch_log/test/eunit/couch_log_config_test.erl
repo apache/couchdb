@@ -25,7 +25,9 @@ couch_log_config_test_() ->
             fun check_level/0,
             fun check_max_message_size/0,
             fun check_bad_level/0,
-            fun check_bad_max_message_size/0
+            fun check_bad_max_message_size/0,
+            fun check_strip_last_msg/0,
+            fun check_bad_strip_last_msg/0
         ]
     }.
 
@@ -107,4 +109,37 @@ check_bad_max_message_size() ->
         config:delete("log", "max_message_size"),
         couch_log_test_util:wait_for_config(),
         ?assertEqual(16000, couch_log_config:get(max_message_size))
+    end).
+
+
+check_strip_last_msg() ->
+    % Default is true
+    ?assertEqual(true, couch_log_config:get(strip_last_msg)),
+
+    couch_log_test_util:with_config_listener(fun() ->
+        config:set("log", "strip_last_msg", "false"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(false, couch_log_config:get(strip_last_msg)),
+
+        config:delete("log", "strip_last_msg"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(true, couch_log_config:get(strip_last_msg))
+    end).
+
+check_bad_strip_last_msg() ->
+    % Default is true
+    ?assertEqual(true, couch_log_config:get(strip_last_msg)),
+
+    couch_log_test_util:with_config_listener(fun() ->
+        config:set("log", "strip_last_msg", "false"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(false, couch_log_config:get(strip_last_msg)),
+
+        config:set("log", "strip_last_msg", "this is not a boolean"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(true, couch_log_config:get(strip_last_msg)),
+
+        config:delete("log", "strip_last_msg"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(true, couch_log_config:get(strip_last_msg))
     end).
