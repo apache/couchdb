@@ -340,6 +340,7 @@ range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
         range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, AccFun, Acc0)
     end).
 
+
 range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, AccFun, Acc0) ->
     InRange = [{K, V} || {K, V} <- Node#node.members,
         less_than_or_equal(Tree, StartKey, K), less_than_or_equal(Tree, K, EndKey)],
@@ -371,6 +372,7 @@ reverse_range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
     erlfdb:transactional(Db, fun(Tx) ->
         reverse_range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, AccFun, Acc0)
     end).
+
 
 reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, AccFun, Acc0) ->
     InRange = [{K, V} || {K, V} <- Node#node.members,
@@ -421,6 +423,7 @@ insert(Db, #tree{} = Tree, Key, Value) ->
         end
     end),
     Tree.
+
 
 split_child(Tx, #tree{} = Tree, #node{} = Parent0, #node{} = Child) ->
     {LeftMembers, RightMembers} = lists:split(Tree#tree.min, Child#node.members),
@@ -738,6 +741,7 @@ validate_tree(Db, #tree{} = Tree) ->
         validate_tree(Tx, Tree, Root)
     end).
 
+
 validate_tree(_Tx, #tree{} = Tree, #node{level = 0} = Node) ->
     print_node(Node),
     validate_node(Tree, Node);
@@ -888,6 +892,7 @@ sort(#tree{} = Tree, List) ->
 usort(#tree{} = Tree, List) ->
     #tree{collate_fun = CollateFun} = Tree,
     lists:usort(collation_wrapper_fun(CollateFun), List).
+
 
 collation_wrapper_fun(CollateFun) ->
     fun
