@@ -63,6 +63,8 @@ handle_config_change("log", Key, _, _, S) ->
             couch_log_config:reconfigure();
         "max_message_size" ->
             couch_log_config:reconfigure();
+        "strip_last_msg" ->
+            couch_log_config:reconfigure();
         _ ->
             % Someone may have changed the config for
             % the writer so we need to re-initialize.
