@@ -15,6 +15,7 @@
      reduce/4,
      full_reduce/2,
      group_reduce/7,
+     group_reduce/8,
      validate_tree/2
 ]).
 
@@ -248,6 +249,13 @@ do_reduce(#tree{} = Tree, MapValues, ReduceValues) when is_list(MapValues), is_l
     do_reduce(Tree, [], [reduce_values(Tree, MapValues, false) | ReduceValues]).
 
 
+%% @equiv group_reduce(Db, Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0, [])
+-spec group_reduce(Db :: term(), Tree :: #tree{}, StartKey :: term(), EndKey :: term(),
+    GroupKeyFun :: fun(), UserAccFun :: fun(), UserAcc0 :: term()) -> term().
+group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0) ->
+    group_reduce(Db, Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0, []).
+
+
 %% @doc Calculate the reduce value for all groups in the specified range.
 %% @param Db An erlfdb database or transaction.
 %% @param Tree The ebtree.
@@ -256,19 +264,24 @@ do_reduce(#tree{} = Tree, MapValues, ReduceValues) when is_list(MapValues), is_l
 %% @param GroupKeyFun A function that takes a key as a parameter and returns the group key.
 %% @param UserAccFun A function called when a new group reduction is calculated and returns an acc.
 %% @param UserAcc0 The initial accumulator.
+%% @param Options Currently supported options are [{dir, fwd}] and [{dir, rev}]
 %% @returns the final accumulator.
 -spec group_reduce(Db :: term(), Tree :: #tree{}, StartKey :: term(), EndKey :: term(),
-    GroupKeyFun :: fun(), UserAccFun :: fun(), UserAcc0 :: term()) -> term().
-group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0) ->
+    GroupKeyFun :: fun(), UserAccFun :: fun(), UserAcc0 :: term(), Options :: list()) -> term().
+group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0, Options) ->
+    Dir = proplists:get_value(dir, Options, fwd),
     NoGroupYet = ?MIN,
     Fun = fun
         ({visit, Key, Value}, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}) ->
+            BeforeStart = less_than(Tree, Key, StartKey),
             AfterEnd = greater_than(Tree, Key, EndKey),
             InRange = in_range(Tree, StartKey, Key, EndKey),
             KeyGroup = GroupKeyFun(Key),
             SameGroup = CurrentGroup =:= KeyGroup,
             if
-                AfterEnd ->
+                Dir == fwd andalso AfterEnd ->
+                    {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
+                Dir == rev andalso BeforeStart ->
                     {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 SameGroup ->
                     {ok, {CurrentGroup, UserAcc, [{Key, Value} | MapAcc], ReduceAcc}};
@@ -288,9 +301,13 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
             FirstInRange = in_range(Tree, StartKey, FirstKey, EndKey),
             LastInRange = in_range(Tree, StartKey, LastKey, EndKey),
             if
-                BeforeStart ->
+                Dir == fwd andalso BeforeStart ->
                     {skip, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
-                AfterEnd ->
+                Dir == rev andalso AfterEnd ->
+                    {skip, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
+                Dir == fwd andalso AfterEnd ->
+                    {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
+                Dir == rev andalso BeforeStart ->
                     {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 Whole andalso FirstInRange andalso LastInRange ->
                     {skip, {CurrentGroup, UserAcc, MapAcc, [Reduction | ReduceAcc]}};
@@ -298,7 +315,7 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
                     {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}}
             end
     end,
-    {CurrentGroup, UserAcc1, MapValues, ReduceValues} = fold(Db, Tree, Fun, {NoGroupYet, UserAcc0, [], []}),
+    {CurrentGroup, UserAcc1, MapValues, ReduceValues} = fold(Db, Tree, Fun, {NoGroupYet, UserAcc0, [], []}, Options),
     if
         MapValues /= [] orelse ReduceValues /= [] ->
             FinalGroup = do_reduce(Tree, MapValues, ReduceValues),
@@ -1112,6 +1129,12 @@ group_reduce_level_test_() ->
     [
         ?_test(?assertEqual([{[1, 0], 408}, {[1, 1], 441}, {[1, 2], 376}],
             group_reduce(Db, Tree, [1], [2], GroupKeyFun, UserAccFun, []))),
+
+        ?_test(?assertEqual([{[1, 0], 408}, {[1, 1], 441}, {[1, 2], 376}],
+            group_reduce(Db, Tree, [1], [2], GroupKeyFun, UserAccFun, [], [{dir, fwd}]))),
+
+        ?_test(?assertEqual([{[1, 2], 376}, {[1, 1], 441}, {[1, 0], 408}],
+            group_reduce(Db, Tree, [1], [2], GroupKeyFun, UserAccFun, [], [{dir, rev}]))),
 
         ?_test(?assertEqual([{[0,0],432}, {[0,1],468}, {[0,2],400}, {[1,0],408}, {[1,1],441}, {[1,2],376},
             {[2,0],384}, {[2,1],416}, {[2,2],450}, {[3,0],459}, {[3,1],392}, {[3,2],424}],
