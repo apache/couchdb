@@ -68,7 +68,13 @@ format(Event) ->
 
 do_format({error, _GL, {Pid, "** Generic server " ++ _, Args}}) ->
     %% gen_server terminate
-    [Name, LastMsg, State, Reason | Extra] = Args,
+    [Name, LastMsg0, State, Reason | Extra] = Args,
+    LastMsg = case couch_log_config:get(strip_last_msg) of
+        true ->
+            redacted;
+        false ->
+            LastMsg0
+    end,
     MsgFmt = "gen_server ~w terminated with reason: ~s~n" ++
                 "  last msg: ~p~n     state: ~p~n    extra: ~p",
     MsgArgs = [Name, format_reason(Reason), LastMsg, State, Extra],
@@ -76,7 +82,13 @@ do_format({error, _GL, {Pid, "** Generic server " ++ _, Args}}) ->
 
 do_format({error, _GL, {Pid, "** State machine " ++ _, Args}}) ->
     %% gen_fsm terminate
-    [Name, LastMsg, StateName, State, Reason | Extra] = Args,
+    [Name, LastMsg0, StateName, State, Reason | Extra] = Args,
+    LastMsg = case couch_log_config:get(strip_last_msg) of
+        true ->
+            redacted;
+        false ->
+            LastMsg0
+    end,
     MsgFmt = "gen_fsm ~w in state ~w terminated with reason: ~s~n" ++
                 " last msg: ~p~n     state: ~p~n    extra: ~p",
     MsgArgs = [Name, StateName, format_reason(Reason), LastMsg, State, Extra],
@@ -84,7 +96,13 @@ do_format({error, _GL, {Pid, "** State machine " ++ _, Args}}) ->
 
 do_format({error, _GL, {Pid, "** gen_event handler" ++ _, Args}}) ->
     %% gen_event handler terminate
-    [ID, Name, LastMsg, State, Reason] = Args,
+    [ID, Name, LastMsg0, State, Reason] = Args,
+    LastMsg = case couch_log_config:get(strip_last_msg) of
+        true ->
+            redacted;
+        false ->
+            LastMsg0
+    end,
     MsgFmt = "gen_event ~w installed in ~w terminated with reason: ~s~n" ++
                 "  last msg: ~p~n     state: ~p",
     MsgArgs = [ID, Name, format_reason(Reason), LastMsg, State],
