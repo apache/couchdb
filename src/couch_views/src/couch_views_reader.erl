@@ -13,6 +13,7 @@
 -module(couch_views_reader).
 
 -export([
+    read_reduce/6,
     read/6
 ]).
 
@@ -21,6 +22,20 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric2.hrl").
+
+
+read_reduce(Db, Mrst, ViewName, UserCallback, UserAcc0, Args) ->
+    #mrst{
+        language = Lang,
+        sig = Sig,
+        views = Views
+    } = Mrst,
+
+    ViewId = get_view_id(Lang, Args, ViewName, Views),
+    Reducer = get_view_reducer(Lang, Args, ViewName, Views),
+    ReduceId = couch_views_util:reduce_id(ViewId, Reducer),
+    couch_views_reduce:read_reduce(Db, Sig, ReduceId, Reducer, UserCallback,
+        UserAcc0, Args).
 
 
 read(Db, Mrst, ViewName, UserCallback, UserAcc0, Args) ->
@@ -74,7 +89,7 @@ read(Db, Mrst, ViewName, UserCallback, UserAcc0, Args) ->
 get_meta(TxDb, Mrst, ViewId, #mrargs{update_seq = true}) ->
     TotalRows = couch_views_fdb:get_row_count(TxDb, Mrst, ViewId),
     ViewSeq = couch_views_fdb:get_update_seq(TxDb, Mrst),
-    {meta,  [{update_seq, ViewSeq}, {total, TotalRows}, {offset, null}]};
+    {meta, [{update_seq, ViewSeq}, {total, TotalRows}, {offset, null}]};
 
 get_meta(TxDb, Mrst, ViewId, #mrargs{}) ->
     TotalRows = couch_views_fdb:get_row_count(TxDb, Mrst, ViewId),
@@ -117,7 +132,14 @@ handle_row(DocId, Key, Value, Acc) ->
 get_view_id(Lang, Args, ViewName, Views) ->
     case couch_mrview_util:extract_view(Lang, Args, ViewName, Views) of
         {map, View, _Args} -> View#mrview.id_num;
-        {red, {_Idx, _Lang, View}} -> View#mrview.id_num
+        {red, {_Idx, _Lang, View}, _Args} -> View#mrview.id_num
+    end.
+
+
+get_view_reducer(Lang, Args, ViewName, Views) ->
+    case couch_mrview_util:extract_view(Lang, Args, ViewName, Views) of
+        {map, _View, _Args} -> throw(no_reduce);
+        View -> couch_mrview_util:extract_view_reduce(View)
     end.
 
 

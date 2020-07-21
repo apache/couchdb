@@ -30,7 +30,9 @@
     write_doc/4,
 
     list_signatures/1,
-    clear_index/2
+    clear_index/2,
+
+    map_idx_range/5
 ]).
 
 -ifdef(TEST).
@@ -170,12 +172,13 @@ fold_map_idx(TxDb, Sig, ViewId, Options, Callback, Acc0) ->
     Acc1.
 
 
-write_doc(TxDb, Sig, _ViewIds, #{deleted := true} = Doc) ->
+write_doc(TxDb, Sig, Views, #{deleted := true} = Doc) ->
     #{
         id := DocId
     } = Doc,
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
+    couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys),
 
     clear_id_idx(TxDb, Sig, DocId),
     lists:foreach(fun({ViewId, TotalKeys, TotalSize, UniqueKeys}) ->
@@ -184,7 +187,7 @@ write_doc(TxDb, Sig, _ViewIds, #{deleted := true} = Doc) ->
         update_kv_size(TxDb, Sig, ViewId, -TotalSize)
     end, ExistingViewKeys);
 
-write_doc(TxDb, Sig, ViewIds, Doc) ->
+write_doc(TxDb, Sig, Views, Doc) ->
     #{
         id := DocId,
         results := Results,
@@ -192,10 +195,11 @@ write_doc(TxDb, Sig, ViewIds, Doc) ->
     } = Doc,
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
+    couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys),
 
     clear_id_idx(TxDb, Sig, DocId),
 
-    lists:foreach(fun({ViewId, NewRows, KVSize}) ->
+    lists:foreach(fun({#mrview{id_num = ViewId}, NewRows, KVSize}) ->
         update_id_idx(TxDb, Sig, ViewId, DocId, NewRows, KVSize),
 
         ExistingKeys = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
@@ -211,7 +215,7 @@ write_doc(TxDb, Sig, ViewIds, Doc) ->
                 []
         end,
         update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows)
-    end, lists:zip3(ViewIds, Results, KVSizes)).
+    end, lists:zip3(Views, Results, KVSizes)).
 
 
 list_signatures(Db) ->
