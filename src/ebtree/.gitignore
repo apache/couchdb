@@ -1,0 +1,3 @@
+.erlfdb/
+_build/
+rebar.lock
