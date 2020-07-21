@@ -145,6 +145,7 @@ SubDirs = [
     "src/rexi",
     "src/setup",
     "src/smoosh",
+    "src/ebtree",
     "rel"
 ],
 
