@@ -29,6 +29,7 @@
         fabric,
         couch_jobs,
         couch_eval,
-        couch_rate
+        couch_rate,
+        ebtree
     ]}
 ]}.

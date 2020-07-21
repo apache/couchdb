@@ -47,7 +47,8 @@ setup() ->
             couch_jobs,
             couch_rate,
             couch_js,
-            couch_eval
+            couch_eval,
+            ebtree
         ]),
     Ctx.
 

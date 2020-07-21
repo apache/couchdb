@@ -17,7 +17,11 @@
     ddoc_to_mrst/2,
     validate_args/1,
     validate_args/2,
-    is_paginated/1
+    is_paginated/1,
+
+    % reduce
+    reduce_id/2,
+    group_level_key/2
 ]).
 
 
@@ -85,12 +89,14 @@ validate_args(Args) ->
     validate_args(Args, []).
 
 
-% This is mostly a copy of couch_mrview_util:validate_args/1 but it doesn't
-% update start / end keys and also throws a not_implemented error for reduce
-%
+% This is mostly a copy of couch_mrview_util:validate_args/1
 validate_args(#mrargs{} = Args, Opts) ->
     GroupLevel = determine_group_level(Args),
-    Reduce = Args#mrargs.reduce,
+    #mrargs{
+        reduce = Reduce,
+        start_key = StartKey,
+        end_key = EndKey
+    } = Args,
 
     case Reduce == undefined orelse is_boolean(Reduce) of
         true -> ok;
@@ -116,8 +122,7 @@ validate_args(#mrargs{} = Args, Opts) ->
         _ -> mrverror(<<"`keys` must be an array of strings.">>)
     end,
 
-    case {Args#mrargs.keys, Args#mrargs.start_key,
-          Args#mrargs.end_key} of
+    case {Args#mrargs.keys, StartKey, EndKey} of
         {undefined, _, _} -> ok;
         {[], _, _} -> ok;
         {[_|_], undefined, undefined} -> ok;
@@ -199,6 +204,18 @@ validate_args(#mrargs{} = Args, Opts) ->
         _ -> mrverror(<<"Invalid value for `sorted`.">>)
     end,
 
+    SKDocId = case {Args#mrargs.direction, Args#mrargs.start_key_docid} of
+        {fwd, undefined} -> <<>>;
+        {rev, undefined} -> <<255>>;
+        {_, SKDocId1} -> SKDocId1
+    end,
+
+    EKDocId = case {Args#mrargs.direction, Args#mrargs.end_key_docid} of
+        {fwd, undefined} -> <<255>>;
+        {rev, undefined} -> <<>>;
+        {_, EKDocId1} -> EKDocId1
+    end,
+
     MaxPageSize = couch_util:get_value(page_size, Opts, 0),
     case {Args#mrargs.page_size, MaxPageSize} of
         {_, 0} -> ok;
@@ -217,13 +234,11 @@ validate_args(#mrargs{} = Args, Opts) ->
             ok
     end,
 
-    case {Reduce, Args#mrargs.view_type} of
-        {false, _} -> ok;
-        {_, red} -> throw(not_implemented);
-        _ -> ok
-    end,
-
-    Args#mrargs{group_level=GroupLevel}.
+    Args#mrargs{
+        start_key_docid=SKDocId,
+        end_key_docid=EKDocId,
+        group_level=GroupLevel
+    }.
 
 validate_limit(Name, Value, _Min, _Max) when not is_integer(Value) ->
     mrverror(<<"`", Name/binary, "` should be an integer">>);
@@ -251,6 +266,26 @@ range_error_msg(Name, Min, Max) ->
     >>).
 
 
+reduce_id(ViewId, {_, ReduceFun}) ->
+    reduce_id(ViewId, ReduceFun);
+
+reduce_id(ViewId, ReduceFun) ->
+    <<ViewId, ReduceFun/binary>>.
+
+
+group_level_key(_Key, 0) ->
+    null;
+
+group_level_key(Key, ?GROUP_TRUE) ->
+    Key;
+
+group_level_key(Key, GroupLevel) when is_list(Key) ->
+    lists:sublist(Key, GroupLevel);
+
+group_level_key(Key, _GroupLevel) ->
+    Key.
+
+
 determine_group_level(#mrargs{group=undefined, group_level=undefined}) ->
     0;
 
@@ -261,7 +296,7 @@ determine_group_level(#mrargs{group=false, group_level=Level}) when Level > 0 ->
     mrverror(<<"Can't specify group=false and group_level>0 at the same time">>);
 
 determine_group_level(#mrargs{group=true, group_level=undefined}) ->
-    exact;
+    ?GROUP_TRUE;
 
 determine_group_level(#mrargs{group_level=GroupLevel}) ->
     GroupLevel.

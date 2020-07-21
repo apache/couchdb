@@ -154,7 +154,7 @@ defmodule BasicsTest do
   test "Simple map functions", context do
     db_name = context[:db_name]
     map_fun = "function(doc) { if (doc.a==4) { emit(null, doc.b); } }"
-    red_fun = "function(keys, values) { return sum(values); }"
+    red_fun = "_sum"
     map_doc = %{:views => %{:baz => %{:map => map_fun}}}
     red_doc = %{:views => %{:baz => %{:map => map_fun, :reduce => red_fun}}}
 

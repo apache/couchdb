@@ -30,7 +30,9 @@
     write_doc/4,
 
     list_signatures/1,
-    clear_index/2
+    clear_index/2,
+
+    map_idx_range/5
 ]).
 
 -ifdef(TEST).
@@ -138,16 +140,19 @@ get_row_count(TxDb, #mrst{sig = Sig}, ViewId) ->
     end.
 
 
-get_kv_size(TxDb, #mrst{sig = Sig}, ViewId) ->
+get_kv_size(TxDb, #mrst{sig = Sig} = Mrst, ViewId) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = TxDb,
 
-    case erlfdb:wait(erlfdb:get(Tx, kv_size_key(DbPrefix, Sig, ViewId))) of
+    MapSize = case erlfdb:wait(erlfdb:get(Tx, kv_size_key(DbPrefix, Sig, ViewId))) of
         not_found -> 0; % Can this happen?
         SizeBin -> ?bin2uint(SizeBin)
-    end.
+    end,
+    ReduceSize = couch_views_reduce_fdb:get_kv_size(TxDb, Mrst, ViewId),
+    MapSize + ReduceSize.
+
 
 
 fold_map_idx(TxDb, Sig, ViewId, Options, Callback, Acc0) ->
@@ -170,12 +175,13 @@ fold_map_idx(TxDb, Sig, ViewId, Options, Callback, Acc0) ->
     Acc1.
 
 
-write_doc(TxDb, Sig, _ViewIds, #{deleted := true} = Doc) ->
+write_doc(TxDb, Sig, Views, #{deleted := true} = Doc) ->
     #{
         id := DocId
     } = Doc,
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
+    couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys),
 
     clear_id_idx(TxDb, Sig, DocId),
     lists:foreach(fun({ViewId, TotalKeys, TotalSize, UniqueKeys}) ->
@@ -184,7 +190,7 @@ write_doc(TxDb, Sig, _ViewIds, #{deleted := true} = Doc) ->
         update_kv_size(TxDb, Sig, ViewId, -TotalSize)
     end, ExistingViewKeys);
 
-write_doc(TxDb, Sig, ViewIds, Doc) ->
+write_doc(TxDb, Sig, Views, Doc) ->
     #{
         id := DocId,
         results := Results,
@@ -192,10 +198,11 @@ write_doc(TxDb, Sig, ViewIds, Doc) ->
     } = Doc,
 
     ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
+    couch_views_reduce_fdb:write_doc(TxDb, Sig, Views, Doc, ExistingViewKeys),
 
     clear_id_idx(TxDb, Sig, DocId),
 
-    lists:foreach(fun({ViewId, NewRows, KVSize}) ->
+    lists:foreach(fun({#mrview{id_num = ViewId}, NewRows, KVSize}) ->
         update_id_idx(TxDb, Sig, ViewId, DocId, NewRows, KVSize),
 
         ExistingKeys = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
@@ -211,7 +218,7 @@ write_doc(TxDb, Sig, ViewIds, Doc) ->
                 []
         end,
         update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows)
-    end, lists:zip3(ViewIds, Results, KVSizes)).
+    end, lists:zip3(Views, Results, KVSizes)).
 
 
 list_signatures(Db) ->

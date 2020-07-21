@@ -24,6 +24,7 @@
 % Data keys
 -define(VIEW_ID_RANGE, 0).
 -define(VIEW_MAP_RANGE, 1).
+-define(VIEW_REDUCE_RANGE, 2).
 
 % jobs api
 -define(INDEX_JOB_TYPE, <<"views">>).
@@ -31,3 +32,6 @@
 % indexing progress
 -define(INDEX_BUILDING, <<"building">>).
 -define(INDEX_READY, <<"ready">>).
+
+% Reduce
+-define(GROUP_TRUE, exact).
