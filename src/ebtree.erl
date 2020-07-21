@@ -44,7 +44,8 @@
     min,
     max,
     collate_fun,
-    reduce_fun
+    reduce_fun,
+    encode_fun
 }).
 
 -define(META, 0).
@@ -79,26 +80,29 @@ open(Db, Prefix, Order) ->
 open(Db, Prefix, Order, Options) when is_binary(Prefix), is_integer(Order), Order > 2, Order rem 2 == 0 ->
     ReduceFun = proplists:get_value(reduce_fun, Options, fun reduce_noop/2),
     CollateFun = proplists:get_value(collate_fun, Options, fun collate_raw/2),
+    EncodeFun = proplists:get_value(encode_fun, Options, fun encode_erlang/2),
+
+    Tree0 = init_tree(Prefix, Order),
+    Tree1 = Tree0#tree{
+        reduce_fun = ReduceFun,
+        collate_fun = CollateFun,
+        encode_fun = EncodeFun
+    },
 
     erlfdb:transactional(Db, fun(Tx) ->
-        case get_meta(Tx, Prefix, ?META_ORDER) of
+        case get_meta(Tx, Tree1, ?META_ORDER) of
             not_found ->
                 erlfdb:clear_range_startswith(Tx, Prefix),
-                set_meta(Tx, Prefix, ?META_ORDER, Order),
-                set_meta(Tx, Prefix, ?META_NEXT_ID, 1),
-                set_node(Tx, init_tree(Prefix, Order), #node{id = ?NODE_ROOT_ID});
+                set_meta(Tx, Tree1, ?META_ORDER, Order),
+                set_meta(Tx, Tree1, ?META_NEXT_ID, 1),
+                set_node(Tx, Tree1, #node{id = ?NODE_ROOT_ID});
             Order ->
                 ok;
             Else ->
                 erlang:error({order_mismatch, Else})
         end
     end),
-    Tree = init_tree(Prefix, Order),
-    Tree#tree{
-        reduce_fun = ReduceFun,
-        collate_fun = CollateFun
-    }.
-
+    Tree1.
 
 %% @doc a special value guaranteed to be smaller than any value in an ebtree.
 min() ->
@@ -702,16 +706,13 @@ find_child_int(#tree{} = Tree, [{_F, L, _P, _R} = Child| Rest], Key) ->
 %% metadata functions
 
 get_meta(Tx, #tree{} = Tree, MetaKey) ->
-    get_meta(Tx, Tree#tree.prefix, MetaKey);
-
-
-get_meta(Tx, Prefix, MetaKey) when is_binary(Prefix) ->
+    #tree{prefix = Prefix, encode_fun = EncodeFun} = Tree,
     Future = get_meta_future(Tx, Prefix, MetaKey),
     case erlfdb:wait(Future) of
         not_found ->
             not_found;
-        Value ->
-            decode_value(Value)
+        Bin when is_binary(Bin) ->
+            EncodeFun(decode, Bin)
     end.
 
 
@@ -719,12 +720,14 @@ get_meta_future(Tx, Prefix, MetaKey) ->
     erlfdb:get(Tx, meta_key(Prefix, MetaKey)).
 
 
-set_meta(Tx, Prefix, MetaKey, MetaValue) ->
+set_meta(Tx, #tree{} = Tree, MetaKey, MetaValue) ->
+    #tree{prefix = Prefix, encode_fun = EncodeFun} = Tree,
     erlfdb:set(
         Tx,
         meta_key(Prefix, MetaKey),
-        encode_value(MetaValue)
+        EncodeFun(encode, MetaValue)
     ).
+
 
 meta_key(Prefix, MetaKey) when is_binary(Prefix) ->
     erlfdb_tuple:pack({?META, MetaKey}, Prefix).
@@ -732,11 +735,11 @@ meta_key(Prefix, MetaKey) when is_binary(Prefix) ->
 %% node persistence functions
 
 get_node(Tx, #tree{} = Tree, Id) ->
-    get_node_wait(Id, get_node_future(Tx, Tree, Id)).
+    get_node_wait(Tree, Id, get_node_future(Tx, Tree, Id)).
 
 
-get_node_wait(Id, Future) ->
-    decode_node(Id, erlfdb:wait(Future)).
+get_node_wait(#tree{} = Tree, Id, Future) ->
+    decode_node(Tree, Id, erlfdb:wait(Future)).
 
 
 get_node_future(Tx, #tree{} = Tree, Id) ->
@@ -764,7 +767,7 @@ set_nodes(Tx, #tree{} = Tree, Nodes) ->
 set_node(Tx, #tree{} = Tree, #node{} = Node) ->
     validate_node(Tree, Node),
     Key = node_key(Tree#tree.prefix, Node#node.id),
-    Value = encode_node(Node),
+    Value = encode_node(Tree, Node),
     erlfdb:set(Tx, Key, Value).
 
 
@@ -827,18 +830,22 @@ validate_node(#tree{} = Tree, #node{} = Node) ->
 
 %% data marshalling functions (encodes unnecesary fields as a NIL_REF)
 
-encode_node(#node{prev = undefined} = Node) ->
-    encode_node(Node#node{prev = []});
+encode_node(#tree{} = Tree, #node{prev = undefined} = Node) ->
+    encode_node(Tree, Node#node{prev = []});
 
-encode_node(#node{next = undefined} = Node) ->
-    encode_node(Node#node{next = []});
+encode_node(#tree{} = Tree, #node{next = undefined} = Node) ->
+    encode_node(Tree, Node#node{next = []});
 
-encode_node(#node{} = Node) ->
-    encode_value(Node#node{id = []}).
+encode_node(#tree{} = Tree, #node{} = Node) ->
+    #tree{encode_fun = EncodeFun} = Tree,
+    EncodeFun(encode, Node#node{id = []}).
 
 
-decode_node(Id, Bin) when is_binary(Bin) ->
-    decode_node(Id, decode_value(Bin));
+decode_node(#tree{} = Tree, Id, Bin) when is_binary(Bin) ->
+    #tree{encode_fun = EncodeFun} = Tree,
+    Term = EncodeFun(decode, Bin),
+    decode_node(Id, Term).
+
 
 decode_node(Id, #node{prev = []} = Node) ->
     decode_node(Id, Node#node{prev = undefined});
@@ -848,15 +855,6 @@ decode_node(Id, #node{next = []} = Node) ->
 
 decode_node(Id, #node{} = Node) ->
     Node#node{id = Id}.
-
-
-encode_value(Value) ->
-    term_to_binary(Value, [compressed, {minor_version, 2}]).
-
-
-decode_value(Bin) when is_binary(Bin) ->
-    binary_to_term(Bin, [safe]).
-
 
 %% built-in reduce functions.
 
@@ -949,6 +947,14 @@ collation_wrapper_fun(CollateFun) ->
 collate_raw(K1, K2) ->
     K1 =< K2.
 
+%% encoding function
+
+encode_erlang(encode, Term) ->
+    term_to_binary(Term, [compressed, {minor_version, 2}]);
+
+
+encode_erlang(decode, Bin) ->
+    binary_to_term(Bin, [safe]).
 
 %% private functions
 
@@ -982,7 +988,7 @@ last_key(Members) when is_list(Members) ->
 
 new_node_id(Tx, Tree) ->
     NextId = get_meta(Tx, Tree, ?META_NEXT_ID),
-    set_meta(Tx, Tree#tree.prefix, ?META_NEXT_ID, NextId + 1),
+    set_meta(Tx, Tree, ?META_NEXT_ID, NextId + 1),
     NextId.
 
 
