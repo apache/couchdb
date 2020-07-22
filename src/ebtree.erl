@@ -81,7 +81,7 @@ open(Db, Prefix, Order) ->
 open(Db, Prefix, Order, Options) when is_binary(Prefix), is_integer(Order), Order > 2, Order rem 2 == 0 ->
     ReduceFun = proplists:get_value(reduce_fun, Options, fun reduce_noop/2),
     CollateFun = proplists:get_value(collate_fun, Options, fun collate_raw/2),
-    EncodeFun = proplists:get_value(encode_fun, Options, fun encode_erlang/2),
+    EncodeFun = proplists:get_value(encode_fun, Options, fun encode_erlang/3),
 
     Tree = #tree{
         prefix = Prefix,
@@ -707,25 +707,23 @@ find_child_int(#tree{} = Tree, [{_F, L, _P, _R} = Child| Rest], Key) ->
 
 get_meta(Tx, #tree{} = Tree, MetaKey) ->
     #tree{prefix = Prefix, encode_fun = EncodeFun} = Tree,
-    Future = get_meta_future(Tx, Prefix, MetaKey),
+    Key = meta_key(Prefix, MetaKey),
+    Future = erlfdb:get(Tx, Key),
     case erlfdb:wait(Future) of
         not_found ->
             not_found;
         Bin when is_binary(Bin) ->
-            EncodeFun(decode, Bin)
+            EncodeFun(decode, Key, Bin)
     end.
-
-
-get_meta_future(Tx, Prefix, MetaKey) ->
-    erlfdb:get(Tx, meta_key(Prefix, MetaKey)).
 
 
 set_meta(Tx, #tree{} = Tree, MetaKey, MetaValue) ->
     #tree{prefix = Prefix, encode_fun = EncodeFun} = Tree,
+    Key = meta_key(Prefix, MetaKey),
     erlfdb:set(
         Tx,
-        meta_key(Prefix, MetaKey),
-        EncodeFun(encode, MetaValue)
+        Key,
+        EncodeFun(encode, Key, MetaValue)
     ).
 
 
@@ -735,16 +733,10 @@ meta_key(Prefix, MetaKey) when is_binary(Prefix) ->
 %% node persistence functions
 
 get_node(Tx, #tree{} = Tree, Id) ->
-    get_node_wait(Tree, Id, get_node_future(Tx, Tree, Id)).
-
-
-get_node_wait(#tree{} = Tree, Id, Future) ->
-    decode_node(Tree, Id, erlfdb:wait(Future)).
-
-
-get_node_future(Tx, #tree{} = Tree, Id) ->
     Key = node_key(Tree#tree.prefix, Id),
-    erlfdb:get(Tx, Key).
+    Future = erlfdb:get(Tx, Key),
+    Value = erlfdb:wait(Future),
+    decode_node(Tree, Id, Key, Value).
 
 
 clear_nodes(Tx, #tree{} = Tree, Nodes) ->
@@ -767,7 +759,7 @@ set_nodes(Tx, #tree{} = Tree, Nodes) ->
 set_node(Tx, #tree{} = Tree, #node{} = Node) ->
     validate_node(Tree, Node),
     Key = node_key(Tree#tree.prefix, Node#node.id),
-    Value = encode_node(Tree, Node),
+    Value = encode_node(Tree, Key, Node),
     erlfdb:set(Tx, Key, Value).
 
 
@@ -830,20 +822,20 @@ validate_node(#tree{} = Tree, #node{} = Node) ->
 
 %% data marshalling functions (encodes unnecesary fields as a NIL_REF)
 
-encode_node(#tree{} = Tree, #node{prev = undefined} = Node) ->
-    encode_node(Tree, Node#node{prev = []});
+encode_node(#tree{} = Tree, Key, #node{prev = undefined} = Node) ->
+    encode_node(Tree, Key, Node#node{prev = []});
 
-encode_node(#tree{} = Tree, #node{next = undefined} = Node) ->
-    encode_node(Tree, Node#node{next = []});
+encode_node(#tree{} = Tree, Key, #node{next = undefined} = Node) ->
+    encode_node(Tree, Key, Node#node{next = []});
 
-encode_node(#tree{} = Tree, #node{} = Node) ->
+encode_node(#tree{} = Tree, Key, #node{} = Node) ->
     #tree{encode_fun = EncodeFun} = Tree,
-    EncodeFun(encode, Node#node{id = []}).
+    EncodeFun(encode, Key, Node#node{id = []}).
 
 
-decode_node(#tree{} = Tree, Id, Bin) when is_binary(Bin) ->
+decode_node(#tree{} = Tree, Id, Key, Value) when is_binary(Value) ->
     #tree{encode_fun = EncodeFun} = Tree,
-    Term = EncodeFun(decode, Bin),
+    Term = EncodeFun(decode, Key, Value),
     decode_node(Id, Term).
 
 
@@ -949,12 +941,12 @@ collate_raw(K1, K2) ->
 
 %% encoding function
 
-encode_erlang(encode, Term) ->
-    term_to_binary(Term, [compressed, {minor_version, 2}]);
+encode_erlang(encode, _Key, Value) ->
+    term_to_binary(Value, [compressed, {minor_version, 2}]);
 
 
-encode_erlang(decode, Bin) ->
-    binary_to_term(Bin, [safe]).
+encode_erlang(decode, _Key, Value) ->
+    binary_to_term(Value, [safe]).
 
 %% private functions
 
