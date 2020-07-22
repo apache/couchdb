@@ -73,7 +73,8 @@ open(Db, Prefix, Order) ->
 %% @doc Open a new ebtree, initialising it if doesn't already exist.
 %% @param Db An erlfdb database or transaction.
 %% @param Prefix The key prefix applied to all ebtree keys.
-%% @param Order The maximum number of items allowed in an ebtree node (must be an even number).
+%% @param Order The maximum number of items allowed in an ebtree node (must be an even number). Ignored
+%% if ebtree is already initialised.
 %% @param Options Supported options are {reduce_fun, Fun} and {collate_fun, Fun}.
 %% @returns A data structure representing the ebtree, to be passed to all other functions.
 -spec open(term(), binary(), pos_integer(), list()) -> #tree{}.
@@ -82,27 +83,26 @@ open(Db, Prefix, Order, Options) when is_binary(Prefix), is_integer(Order), Orde
     CollateFun = proplists:get_value(collate_fun, Options, fun collate_raw/2),
     EncodeFun = proplists:get_value(encode_fun, Options, fun encode_erlang/2),
 
-    Tree0 = init_tree(Prefix, Order),
-    Tree1 = Tree0#tree{
+    Tree = #tree{
+        prefix = Prefix,
         reduce_fun = ReduceFun,
         collate_fun = CollateFun,
         encode_fun = EncodeFun
     },
 
     erlfdb:transactional(Db, fun(Tx) ->
-        case get_meta(Tx, Tree1, ?META_ORDER) of
+        case get_meta(Tx, Tree, ?META_ORDER) of
             not_found ->
                 erlfdb:clear_range_startswith(Tx, Prefix),
-                set_meta(Tx, Tree1, ?META_ORDER, Order),
-                set_meta(Tx, Tree1, ?META_NEXT_ID, 1),
-                set_node(Tx, Tree1, #node{id = ?NODE_ROOT_ID});
-            Order ->
-                ok;
-            Else ->
-                erlang:error({order_mismatch, Else})
+                set_meta(Tx, Tree, ?META_ORDER, Order),
+                set_meta(Tx, Tree, ?META_NEXT_ID, 1),
+                set_node(Tx, Tree, #node{id = ?NODE_ROOT_ID}),
+                init_order(Tree, Order);
+            ActualOrder when is_integer(ActualOrder) ->
+                init_order(Tree, ActualOrder)
         end
-    end),
-    Tree1.
+    end).
+
 
 %% @doc a special value guaranteed to be smaller than any value in an ebtree.
 min() ->
@@ -958,10 +958,9 @@ encode_erlang(decode, Bin) ->
 
 %% private functions
 
-init_tree(Prefix, Order)
-  when is_binary(Prefix), is_integer(Order), Order > 2, Order rem 2 == 0 ->
-    #tree{
-        prefix = Prefix,
+init_order(#tree{} = Tree, Order)
+  when is_integer(Order), Order > 2, Order rem 2 == 0 ->
+    Tree#tree{
         min = Order div 2,
         max = Order
     }.
