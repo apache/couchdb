@@ -89,7 +89,7 @@ X means done, - means partially
   - [ ] Port replicator_db_write_auth.js
   - [X] Port rev_stemming.js
   - [X] Port rewrite.js
-  - [ ] Port rewrite_js.js
+  - [X] Port rewrite_js.js
   - [X] Port security_validation.js
   - [ ] Port show_documents.js
   - [ ] Port stats.js

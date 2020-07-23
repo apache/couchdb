@@ -11,7 +11,7 @@
 // the License.
  
  
- 
+couchTests.elixir = true;
 couchTests.rewrite = function(debug) {
   if (debug) debugger;
   var dbNames = [get_random_db_name(), get_random_db_name() + "test_suite_db/with_slashes"];
@@ -116,7 +116,6 @@ couchTests.rewrite = function(debug) {
       }),
       lists: {
         simpleForm: stringFun(function(head, req) {
-          log("simpleForm");
           send('<ul>');
           var row, row_number = 0, prevKey, firstKey = null;
           while (row = getRow()) {
