@@ -28,7 +28,8 @@
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    code_change/3
+    code_change/3,
+    format_status/2
 ]).
 
 
@@ -108,6 +109,18 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+format_status(_Opt, [_PDict, State]) ->
+    #{
+        txids := TxIds
+    } = State,
+    Scrubbed = State#{
+        txids => {length, length(TxIds)}
+    },
+    [{data, [{"State",
+        Scrubbed
+    }]}].
 
 
 clean(St, NeedsSweep) ->

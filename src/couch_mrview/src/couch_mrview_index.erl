@@ -20,6 +20,7 @@
 -export([index_file_exists/1]).
 -export([update_local_purge_doc/2, verify_index_exists/2]).
 -export([ensure_local_purge_docs/2]).
+-export([format_status/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -324,3 +325,14 @@ update_local_purge_doc(Db, State, PSeq) ->
             BaseDoc
     end,
     couch_db:update_doc(Db, Doc, []).
+
+format_status(_Opt, [_PDict, State]) ->
+    Scrubbed = State#mrst{
+        lib = nil,
+        views = nil,
+        id_btree = nil,
+        doc_acc = nil,
+        doc_queue = nil,
+        write_queue = nil
+    },
+    ?record_to_keyval(mrst, Scrubbed).

@@ -219,3 +219,6 @@
 -type sec_props() :: [tuple()].
 -type sec_obj() :: {sec_props()}.
 
+
+-define(record_to_keyval(Name, Record),
+    lists:zip(record_info(fields, Name), tl(tuple_to_list(Record)))).

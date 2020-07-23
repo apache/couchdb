@@ -29,7 +29,7 @@
 
 % gen_server api.
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-    code_change/3]).
+    code_change/3, format_status/2]).
 
 % private definitions.
 -record(state, {
@@ -243,6 +243,30 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+format_status(_Opt, [_PDict, #state{index = #index{} = Index} = State]) ->
+    #index{
+        ddoc_id=Id,
+        name=IndexName,
+        sig=Sig
+    } = Index,
+    IndexScrubbed = [{
+        {ddoc_id, Id},
+        {name, IndexName},
+        {sig, Sig}
+    }],
+    Scrubbed = State#state{
+        index = IndexScrubbed,
+        waiting_list = {length, length(State#state.waiting_list)}
+    },
+    ?record_to_keyval(state, Scrubbed);
+
+format_status(_Opt, [_PDict, #state{} = State]) ->
+    Scrubbed = State#state{
+        index = nil,
+        waiting_list = {length, length(State#state.waiting_list)}
+    },
+    ?record_to_keyval(state, Scrubbed).
 
 % private functions.
 
