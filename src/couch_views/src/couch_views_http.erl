@@ -177,10 +177,14 @@ maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun)
 
 maybe_add_previous_bookmark(#mrargs{extra = Extra} = Args, #{rows := Rows} = Result, KeyFun) ->
     StartKey = couch_util:get_value(fk, Extra),
-    case first_key(KeyFun, Rows) of
-        undefined ->
+    case {StartKey, first_key(KeyFun, Rows)} of
+        {undefined, _} ->
             Result;
-        EndKey ->
+        {_, undefined} ->
+            Result;
+        {StartKey, StartKey} ->
+            Result;
+        {StartKey, EndKey} ->
             Bookmark = bookmark_encode(
                 Args#mrargs{
                     start_key = StartKey,
