@@ -348,15 +348,178 @@ defmodule RewriteTest do
         assert resp.status_code == 200
         assert resp.body["total_rows"] == 9
 
-        # TODO: port _list function tests and everything below in rewrite.js
-        # This is currently broken because _list funcitons default to application/json
-        # response bodies and my attempts to change the content-type from within the
-        # _list function have not yet succeeded.
-        #
-        # Test GET with query params
-        # resp = Couch.get("/#{db_name}/_design/test/_rewrite/simpleForm/basicView", query: %{startkey: 3, endkey: 8})
-        # Logger.error("GOT RESP: #{inspect resp.body}")
-        # assert resp.status_code == 200
+        resp =
+          Rawresp.get(
+            "/#{db_name}/_design/test/_rewrite/simpleForm/basicView?startkey=3&endkey=8"
+          )
+
+        assert resp.status_code == 200
+        assert not String.match?(resp.body, ~r/Key: 1/)
+        assert String.match?(resp.body, ~r/FirstKey: 3/)
+        assert String.match?(resp.body, ~r/LastKey: 8/)
+
+        resp = Rawresp.get("/#{db_name}/_design/test/_rewrite/simpleForm/basicViewFixed")
+        assert resp.status_code == 200
+        assert not String.match?(resp.body, ~r/Key: 1/)
+        assert String.match?(resp.body, ~r/FirstKey: 3/)
+        assert String.match?(resp.body, ~r/LastKey: 8/)
+
+        resp =
+          Rawresp.get(
+            "/#{db_name}/_design/test/_rewrite/simpleForm/basicViewFixed?startkey=4"
+          )
+
+        assert resp.status_code == 200
+        assert not String.match?(resp.body, ~r/Key: 1/)
+        assert String.match?(resp.body, ~r/FirstKey: 3/)
+        assert String.match?(resp.body, ~r/LastKey: 8/)
+
+        resp =
+          Rawresp.get("/#{db_name}/_design/test/_rewrite/simpleForm/basicViewPath/3/8")
+
+        assert resp.status_code == 200
+        assert not String.match?(resp.body, ~r/Key: 1/)
+        assert String.match?(resp.body, ~r/FirstKey: 3/)
+        assert String.match?(resp.body, ~r/LastKey: 8/)
+
+        resp = Rawresp.get("/#{db_name}/_design/test/_rewrite/simpleForm/complexView")
+        assert resp.status_code == 200
+        assert String.match?(resp.body, ~r/FirstKey: [1, 2]/)
+
+        resp = Rawresp.get("/#{db_name}/_design/test/_rewrite/simpleForm/complexView2")
+        assert resp.status_code == 200
+        assert String.match?(resp.body, ~r/Value: doc 3/)
+
+        resp = Rawresp.get("/#{db_name}/_design/test/_rewrite/simpleForm/complexView3")
+        assert resp.status_code == 200
+        assert String.match?(resp.body, ~r/Value: doc 4/)
+
+        resp = Rawresp.get("/#{db_name}/_design/test/_rewrite/simpleForm/complexView4")
+        assert resp.status_code == 200
+        assert String.match?(resp.body, ~r/Value: doc 5/)
+
+        resp =
+          Rawresp.get(
+            "/#{db_name}/_design/test/_rewrite/simpleForm/complexView5/test/essai"
+          )
+
+        assert resp.status_code == 200
+        assert String.match?(resp.body, ~r/Value: doc 4/)
+
+        resp =
+          Rawresp.get(
+            "/#{db_name}/_design/test/_rewrite/simpleForm/complexView6?a=test&b=essai"
+          )
+
+        assert resp.status_code == 200
+        assert String.match?(resp.body, ~r/Value: doc 4/)
+
+        resp =
+          Rawresp.get(
+            "/#{db_name}/_design/test/_rewrite/simpleForm/complexView7/test/essai?doc=true"
+          )
+
+        assert resp.status_code == 200
+        result = resp.body |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps])
+        first_row = Enum.at(result["rows"], 0)
+        assert Map.has_key?(first_row, "doc")
+
+        # COUCHDB-2031 - path normalization versus qs params
+        resp = Rawresp.get("/#{db_name}/_design/test/_rewrite/db/_design/test?meta=true")
+        assert resp.status_code == 200
+        result = resp.body |> IO.iodata_to_binary() |> :jiffy.decode([:return_maps])
+        assert result["_id"] == "_design/test"
+        assert Map.has_key?(result, "_revs_info")
+
+        ddoc2 = %{
+          _id: "_design/test2",
+          rewrites: [
+            %{
+              from: "uuids",
+              to: "../../../_uuids"
+            }
+          ]
+        }
+
+        create_doc(db_name, ddoc2)
+        resp = Couch.get("/#{db_name}/_design/test2/_rewrite/uuids")
+        assert resp.status_code == 500
+        assert resp.body["error"] == "insecure_rewrite_rule"
+      end
+
+      @tag with_random_db: db_name
+      @tag config: [
+             {"httpd", "secure_rewrites", "false"}
+           ]
+      test "path relative to server on #{db_name}", context do
+        db_name = context[:db_name]
+
+        ddoc = %{
+          _id: "_design/test2",
+          rewrites: [
+            %{
+              from: "uuids",
+              to: "../../../_uuids"
+            }
+          ]
+        }
+
+        create_doc(db_name, ddoc)
+
+        resp = Couch.get("/#{db_name}/_design/test2/_rewrite/uuids")
+        assert resp.status_code == 200
+        assert length(resp.body["uuids"]) == 1
+      end
+
+      @tag with_random_db: db_name
+      @tag config: [
+             {"httpd", "rewrite_limit", "2"}
+           ]
+      test "loop detection on #{db_name}", context do
+        db_name = context[:db_name]
+
+        ddoc_loop = %{
+          _id: "_design/loop",
+          rewrites: [%{from: "loop", to: "_rewrite/loop"}]
+        }
+
+        create_doc(db_name, ddoc_loop)
+
+        resp = Couch.get("/#{db_name}/_design/loop/_rewrite/loop")
+        assert resp.status_code == 400
+      end
+
+      @tag with_random_db: db_name
+      @tag config: [
+             {"httpd", "rewrite_limit", "2"},
+             {"httpd", "secure_rewrites", "false"}
+           ]
+      test "serial execution is not spuriously counted as loop on #{db_name}", context do
+        db_name = context[:db_name]
+
+        ddoc = %{
+          _id: "_design/test",
+          language: "javascript",
+          _attachments: %{
+            "foo.txt": %{
+              content_type: "text/plain",
+              data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
+            }
+          },
+          rewrites: [
+            %{
+              from: "foo",
+              to: "foo.txt"
+            }
+          ]
+        }
+
+        create_doc(db_name, ddoc)
+
+        for _i <- 0..4 do
+          resp = Couch.get("/#{db_name}/_design/test/_rewrite/foo")
+          assert resp.status_code == 200
+        end
       end
     end
   )
