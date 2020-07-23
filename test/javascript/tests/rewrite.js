@@ -10,7 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
  
- 
+couchTests.elixir = true;
  
 couchTests.rewrite = function(debug) {
   if (debug) debugger;
