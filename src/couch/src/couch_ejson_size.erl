@@ -15,6 +15,11 @@
 -export([encoded_size/1]).
 
 
+%% View rows
+
+encoded_size({EJson, DocId}) when is_binary(DocId) ->
+    encoded_size(EJson) + encoded_size(DocId);
+
 %% Compound objects
 
 encoded_size({[]}) ->
