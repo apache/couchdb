@@ -19,6 +19,8 @@
     remove/3,
     get_job_data/3,
     get_job_state/3,
+    get_active_jobs_ids/2,
+    get_types/1,
 
     % Job processing
     accept/1,
@@ -101,6 +103,23 @@ get_job_state(Tx, Type, JobId) when is_binary(JobId) ->
             {error, Error} ->
                 {error, Error}
         end
+    end).
+
+
+-spec get_active_jobs_ids(jtx(), job_type()) -> [job_id()] | {error,
+    any()}.
+get_active_jobs_ids(Tx, Type) ->
+    couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
+        Since = couch_jobs_fdb:get_active_since(JTx, Type,
+            {versionstamp, 0, 0}),
+        maps:keys(Since)
+    end).
+
+
+-spec get_types(jtx()) -> [job_type()] | {error, any()}.
+get_types(Tx) ->
+    couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
+        couch_jobs_fdb:get_types(JTx)
     end).
 
 
