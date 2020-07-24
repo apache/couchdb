@@ -90,6 +90,7 @@ init() ->
         job => Job,
         job_data => Data,
         count => 0,
+        changes_done => 0,
         limiter => Limiter,
         doc_acc => [],
         design_opts => Mrst#mrst.design_opts
@@ -132,7 +133,9 @@ upgrade_data(Data) ->
             true -> Acc;
             false -> maps:put(Key, Default, Acc)
         end
-    end, Data, Defaults).
+    end, Data, Defaults),
+    % initialize active task
+    fabric2_active_tasks:update_active_task_info(Data, #{}).
 
 
 % Transaction limit exceeded don't retry
@@ -191,7 +194,8 @@ do_update(Db, Mrst0, State0) ->
             last_seq := LastSeq,
             limit := Limit,
             limiter := Limiter,
-            view_vs := ViewVS
+            view_vs := ViewVS,
+            changes_done := ChangesDone0
         } = State2,
         DocAcc1 = fetch_docs(TxDb, DocAcc),
         couch_rate:in(Limiter, Count),
@@ -199,13 +203,16 @@ do_update(Db, Mrst0, State0) ->
         {Mrst1, MappedDocs} = map_docs(Mrst0, DocAcc1),
         WrittenDocs = write_docs(TxDb, Mrst1, MappedDocs, State2),
 
+        ChangesDone = ChangesDone0 + WrittenDocs,
+
         couch_rate:success(Limiter, WrittenDocs),
 
         case Count < Limit of
             true ->
                 maybe_set_build_status(TxDb, Mrst1, ViewVS,
                     ?INDEX_READY),
-                report_progress(State2, finished),
+                report_progress(State2#{changes_done := ChangesDone},
+                    finished),
                 {Mrst1, finished};
             false ->
                 State3 = report_progress(State2, update),
@@ -213,6 +220,7 @@ do_update(Db, Mrst0, State0) ->
                     tx_db := undefined,
                     count := 0,
                     doc_acc := [],
+                    changes_done := ChangesDone,
                     view_seq := LastSeq
                 }}
         end
@@ -483,7 +491,9 @@ report_progress(State, UpdateType) ->
         tx_db := TxDb,
         job := Job1,
         job_data := JobData,
-        last_seq := LastSeq
+        last_seq := LastSeq,
+        db_seq := DBSeq,
+        changes_done := ChangesDone
     } = State,
 
     #{
@@ -494,9 +504,18 @@ report_progress(State, UpdateType) ->
         <<"retries">> := Retries
     } = JobData,
 
+    ActiveTasks = fabric2_active_tasks:get_active_task_info(JobData),
+    TotalDone = case maps:get(<<"changes_done">>, ActiveTasks, 0) of
+        0 -> ChangesDone;
+        N -> N + ChangesDone
+    end,
+
+    NewActiveTasks = couch_views_util:active_tasks_info(TotalDone,
+        DbName, DDocId, LastSeq, DBSeq),
+
     % Reconstruct from scratch to remove any
     % possible existing error state.
-    NewData = #{
+    NewData0 = #{
         <<"db_name">> => DbName,
         <<"db_uuid">> => DbUUID,
         <<"ddoc_id">> => DDocId,
@@ -504,6 +523,8 @@ report_progress(State, UpdateType) ->
         <<"view_seq">> => LastSeq,
         <<"retries">> => Retries
     },
+    NewData = fabric2_active_tasks:update_active_task_info(NewData0,
+        NewActiveTasks),
 
     case UpdateType of
         update ->
