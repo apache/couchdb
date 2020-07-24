@@ -534,7 +534,7 @@ insert_nonfull(Tx, #tree{} = Tree, #node{level = 0} = Node0, Key, Value) ->
     Node1 = Node0#node{
         members = umerge(Tree, [{Key, Value}], Node0#node.members)
     },
-    set_node(Tx, Tree, Node1),
+    set_node(Tx, Tree, Node0, Node1),
     reduce_node(Tree, Node1);
 
 insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
@@ -563,7 +563,7 @@ insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
         members = lists:keyreplace(ChildId1, 3, Node1#node.members,
             {NewFirstKey, NewLastKey, ChildId1, NewReduction})
     },
-    set_node(Tx, Tree, Node2),
+    set_node(Tx, Tree, Node0, Node2),
     reduce_node(Tree, Node2).
 
 
@@ -584,7 +584,7 @@ delete(Db, #tree{} = Tree, Key) ->
                 clear_node(Tx, Tree, Root2),
                 set_node(Tx, Tree, Root2#node{id = ?NODE_ROOT_ID});
             Root1 ->
-                set_node(Tx, Tree, Root1)
+                set_node(Tx, Tree, Root0, Root1)
         end
     end),
     Tree.
@@ -633,7 +633,7 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
             set_nodes(Tx, Tree, NewNodes),
             Parent1;
         false ->
-            set_node(Tx, Tree, Child1),
+            set_node(Tx, Tree, Child0, Child1),
             {_OldFirstKey, _OldLastKey, ChildId0, _OldReduction} = lists:keyfind(ChildId0, 3, Parent0#node.members),
             Parent0#node{
                 members = lists:keyreplace(ChildId0, 3, Parent0#node.members,
@@ -754,6 +754,13 @@ set_nodes(Tx, #tree{} = Tree, Nodes) ->
     lists:foreach(fun(Node) ->
         set_node(Tx, Tree, Node)
     end, Nodes).
+
+
+set_node(_Tx, #tree{} = _Tree, #node{} = Same, #node{} = Same) ->
+    ok;
+
+set_node(Tx, #tree{} = Tree, #node{} = _From, #node{} = To) ->
+    set_node(Tx, Tree, To).
 
 
 set_node(Tx, #tree{} = Tree, #node{} = Node) ->
