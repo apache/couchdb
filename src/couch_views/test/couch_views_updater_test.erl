@@ -135,7 +135,7 @@ includes_design_docs({Db, _}) ->
 
 
 handle_erlfdb_errors({Db, _}) ->
-    meck:expect(couch_views_fdb, write_doc, fun(_, _, _, _) ->
+    meck:expect(couch_views_fdb, write_doc, fun(_, _, _) ->
         error({erlfdb_error, 1009})
     end),
     ?assertError({erlfdb_error, 1009}, fabric2_db:update_docs(Db, [doc(4)])).

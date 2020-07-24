@@ -23,24 +23,24 @@
 -include_lib("fabric/include/fabric2.hrl").
 
 
-read(Db, Mrst, ViewName, UserCallback, UserAcc0, Args) ->
-    #mrst{
-        language = Lang,
-        sig = Sig,
-        views = Views
-    } = Mrst,
-
-    ViewId = get_view_id(Lang, Args, ViewName, Views),
-    Fun = fun handle_row/4,
-
+read(Db, Mrst0, ViewName, UserCallback, UserAcc0, Args) ->
     try
         fabric2_fdb:transactional(Db, fun(TxDb) ->
-            Meta = get_meta(TxDb, Mrst, ViewId, Args),
+            #mrst{
+                language = Lang,
+                views = Views
+            } = Mrst = couch_views_fdb:set_trees(TxDb, Mrst0),
+
+            View = get_map_view(Lang, Args, ViewName, Views),
+            Fun = fun handle_map_row/4,
+
+            Meta = get_map_meta(TxDb, Mrst, View, Args),
             UserAcc1 = maybe_stop(UserCallback(Meta, UserAcc0)),
 
             Acc0 = #{
                 db => TxDb,
                 skip => Args#mrargs.skip,
+                limit => Args#mrargs.limit,
                 mrargs => undefined,
                 callback => UserCallback,
                 acc => UserAcc1
@@ -51,14 +51,7 @@ read(Db, Mrst, ViewName, UserCallback, UserAcc0, Args) ->
                 KeyAcc1 = KeyAcc0#{
                     mrargs := KeyArgs
                 },
-                couch_views_fdb:fold_map_idx(
-                        TxDb,
-                        Sig,
-                        ViewId,
-                        Opts,
-                        Fun,
-                        KeyAcc1
-                    )
+                couch_views_fdb:fold_map_idx(TxDb, View, Opts, Fun, KeyAcc1)
             end, Acc0, expand_keys_args(Args)),
 
             #{
@@ -66,27 +59,35 @@ read(Db, Mrst, ViewName, UserCallback, UserAcc0, Args) ->
             } = Acc1,
             {ok, maybe_stop(UserCallback(complete, UserAcc2))}
         end)
-    catch throw:{done, Out} ->
-        {ok, Out}
+    catch
+        throw:{complete, Out} ->
+            {_, Final} = UserCallback(complete, Out),
+            {ok, Final};
+        throw:{done, Out} ->
+            {ok, Out}
     end.
 
 
-get_meta(TxDb, Mrst, ViewId, #mrargs{update_seq = true}) ->
-    TotalRows = couch_views_fdb:get_row_count(TxDb, Mrst, ViewId),
+get_map_meta(TxDb, Mrst, View, #mrargs{update_seq = true}) ->
+    TotalRows = couch_views_fdb:get_row_count(TxDb, View),
     ViewSeq = couch_views_fdb:get_update_seq(TxDb, Mrst),
     {meta,  [{update_seq, ViewSeq}, {total, TotalRows}, {offset, null}]};
 
-get_meta(TxDb, Mrst, ViewId, #mrargs{}) ->
-    TotalRows = couch_views_fdb:get_row_count(TxDb, Mrst, ViewId),
+get_map_meta(TxDb, _Mrst, View, #mrargs{}) ->
+    TotalRows = couch_views_fdb:get_row_count(TxDb, View),
     {meta, [{total, TotalRows}, {offset, null}]}.
 
 
-handle_row(_DocId, _Key, _Value, #{skip := Skip} = Acc) when Skip > 0 ->
+handle_map_row(_DocId, _Key, _Value, #{skip := Skip} = Acc) when Skip > 0 ->
     Acc#{skip := Skip - 1};
 
-handle_row(DocId, Key, Value, Acc) ->
+handle_map_row(_DocID, _Key, _Value, #{limit := 0, acc := UserAcc}) ->
+    throw({complete, UserAcc});
+
+handle_map_row(DocId, Key, Value, Acc) ->
     #{
         db := TxDb,
+        limit := Limit,
         mrargs := Args,
         callback := UserCallback,
         acc := UserAcc0
@@ -111,13 +112,13 @@ handle_row(DocId, Key, Value, Acc) ->
     end,
 
     UserAcc1 = maybe_stop(UserCallback({row, Row}, UserAcc0)),
-    Acc#{acc := UserAcc1}.
+    Acc#{limit := Limit - 1, acc := UserAcc1}.
 
 
-get_view_id(Lang, Args, ViewName, Views) ->
+get_map_view(Lang, Args, ViewName, Views) ->
     case couch_mrview_util:extract_view(Lang, Args, ViewName, Views) of
-        {map, View, _Args} -> View#mrview.id_num;
-        {red, {_Idx, _Lang, View}} -> View#mrview.id_num
+        {map, View, _Args} -> View;
+        {red, {_Idx, _Lang, View}, _} -> View
     end.
 
 
@@ -135,57 +136,33 @@ expand_keys_args(#mrargs{keys = Keys} = Args) ->
 
 mrargs_to_fdb_options(Args) ->
     #mrargs{
-        start_key = StartKey0,
+        start_key = StartKey,
         start_key_docid = StartKeyDocId,
-        end_key = EndKey0,
-        end_key_docid = EndKeyDocId,
+        end_key = EndKey,
+        end_key_docid = EndKeyDocId0,
         direction = Direction,
-        limit = Limit,
-        skip = Skip,
         inclusive_end = InclusiveEnd
     } = Args,
 
-    StartKey1 = if StartKey0 == undefined -> undefined; true ->
-        couch_views_encoding:encode(StartKey0, key)
+    StartKeyOpts = if StartKey == undefined -> []; true ->
+        [{start_key, {StartKey, StartKeyDocId}}]
     end,
 
-    StartKeyOpts = case {StartKey1, StartKeyDocId} of
-        {undefined, _} ->
-            [];
-        {StartKey1, StartKeyDocId} ->
-            [{start_key, {StartKey1, StartKeyDocId}}]
+    EndKeyDocId = case {Direction, EndKeyDocId0} of
+        {fwd, <<255>>} when InclusiveEnd -> <<255>>;
+        {fwd, <<255>>} when not InclusiveEnd -> <<>>;
+        {rev, <<>>} when InclusiveEnd -> <<>>;
+        {rev, <<>>} when not InclusiveEnd -> <<255>>;
+        _ -> EndKeyDocId0
     end,
 
-    EndKey1 = if EndKey0 == undefined -> undefined; true ->
-        couch_views_encoding:encode(EndKey0, key)
-    end,
-
-    EndKeyOpts = case {EndKey1, EndKeyDocId, Direction} of
-        {undefined, _, _} ->
-            [];
-        {EndKey1, <<>>, rev} when not InclusiveEnd ->
-            % When we iterate in reverse with
-            % inclusive_end=false we have to set the
-            % EndKeyDocId to <<255>> so that we don't
-            % include matching rows.
-            [{end_key_gt, {EndKey1, <<255>>}}];
-        {EndKey1, <<255>>, _} when not InclusiveEnd ->
-            % When inclusive_end=false we need to
-            % elide the default end_key_docid so as
-            % to not sort past the docids with the
-            % given end key.
-            [{end_key_gt, {EndKey1}}];
-        {EndKey1, EndKeyDocId, _} when not InclusiveEnd ->
-            [{end_key_gt, {EndKey1, EndKeyDocId}}];
-        {EndKey1, EndKeyDocId, _} when InclusiveEnd ->
-            [{end_key, {EndKey1, EndKeyDocId}}]
+    EndKeyOpts = if EndKey == undefined -> []; true ->
+        [{end_key, {EndKey, EndKeyDocId}}]
     end,
 
     [
         {dir, Direction},
-        {limit, Limit + Skip},
-        {streaming_mode, want_all},
-        {restart_tx, true}
+        {inclusive_end, InclusiveEnd}
     ] ++ StartKeyOpts ++ EndKeyOpts.
 
 

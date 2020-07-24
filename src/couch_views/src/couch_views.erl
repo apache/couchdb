@@ -48,11 +48,7 @@ query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
     Args1 = to_mrargs(Args0),
     Args2 = couch_mrview_util:set_view_type(Args1, ViewName, Views),
     Args3 = couch_mrview_util:validate_args(Args2),
-    ok = check_range(Args3),
-    case is_reduce_view(Args3) of
-        true -> throw(not_implemented);
-        false -> ok
-    end,
+    ok = check_range(Mrst, ViewName, Args3),
 
     try
         fabric2_fdb:transactional(Db, fun(TxDb) ->
@@ -100,9 +96,10 @@ get_info(Db, DDoc) ->
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     Sig = fabric2_util:to_hex(Mrst#mrst.sig),
     {UpdateSeq, DataSize, Status} = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        Seq = couch_views_fdb:get_update_seq(TxDb, Mrst),
-        DataSize = get_total_view_size(TxDb, Mrst),
-        JobStatus = case couch_views_jobs:job_state(TxDb, Mrst) of
+        Mrst1 = couch_views_fdb:set_trees(TxDb, Mrst),
+        Seq = couch_views_fdb:get_update_seq(TxDb, Mrst1),
+        DataSize = get_total_view_size(TxDb, Mrst1),
+        JobStatus = case couch_views_jobs:job_state(TxDb, Mrst1) of
             {ok, pending} -> true;
             {ok, running} -> true;
             {ok, finished} -> false;
@@ -124,10 +121,9 @@ get_info(Db, DDoc) ->
 
 
 get_total_view_size(TxDb, Mrst) ->
-    ViewIds = [View#mrview.id_num || View <- Mrst#mrst.views],
-    lists:foldl(fun (ViewId, Total) ->
-        Total + couch_views_fdb:get_kv_size(TxDb, Mrst, ViewId)
-    end, 0, ViewIds).
+    lists:foldl(fun(View, Total) ->
+        Total + couch_views_fdb:get_kv_size(TxDb, View)
+    end, 0, Mrst#mrst.views).
 
 
 read_view(Db, Mrst, ViewName, Callback, Acc0, Args) ->
@@ -185,16 +181,29 @@ to_mrargs(#{} = Args) ->
     end, #mrargs{}, Args).
 
 
-check_range(#mrargs{start_key = undefined}) ->
+check_range(Mrst, ViewName, Args) ->
+    #mrst{
+        language = Lang,
+        views = Views
+    } = Mrst,
+    View = case couch_mrview_util:extract_view(Lang, Args, ViewName, Views) of
+        {map, V, _} -> V;
+        {red, {_, _, V}, _} -> V
+    end,
+    Cmp = couch_views_util:collate_fun(View),
+    check_range(Args, Cmp).
+
+
+check_range(#mrargs{start_key = undefined}, _Cmp) ->
     ok;
 
-check_range(#mrargs{end_key = undefined}) ->
+check_range(#mrargs{end_key = undefined}, _Cmp) ->
     ok;
 
-check_range(#mrargs{start_key = K, end_key = K}) ->
+check_range(#mrargs{start_key = K, end_key = K}, _Cmp) ->
     ok;
 
-check_range(Args) ->
+check_range(Args, Cmp) ->
     #mrargs{
         direction = Dir,
         start_key = SK,
@@ -203,10 +212,10 @@ check_range(Args) ->
         end_key_docid = EKD
     } = Args,
 
-    case {Dir, view_cmp(SK, SKD, EK, EKD)} of
-        {fwd, false} ->
+    case {Dir, Cmp({SK, SKD}, {EK, EKD})} of
+        {fwd, gt} ->
             throw(check_range_error(<<"true">>));
-        {rev, true} ->
+        {rev, lt} ->
             throw(check_range_error(<<"false">>));
         _ ->
             ok
@@ -218,14 +227,6 @@ check_range_error(Descending) ->
         <<"No rows can match your key range, reverse your ",
             "start_key and end_key or set descending=",
             Descending/binary>>}.
-
-
-view_cmp(SK, SKD, EK, EKD) ->
-    BinSK = couch_views_encoding:encode(SK, key),
-    BinEK = couch_views_encoding:encode(EK, key),
-    PackedSK = erlfdb_tuple:pack({BinSK, SKD}),
-    PackedEK = erlfdb_tuple:pack({BinEK, EKD}),
-    PackedSK =< PackedEK.
 
 
 get_update_options(#mrst{design_opts = Opts}) ->

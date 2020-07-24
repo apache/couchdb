@@ -15,6 +15,7 @@
 
 -export([
     ddoc_to_mrst/2,
+    collate_fun/1,
     validate_args/1,
     validate_args/2,
     is_paginated/1,
@@ -80,6 +81,40 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
     },
     SigInfo = {Views, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
     {ok, IdxState#mrst{sig=couch_hash:md5_hash(term_to_binary(SigInfo))}}.
+
+
+collate_fun(View) ->
+    #mrview{
+        options = Options
+    } = View,
+    case couch_util:get_value(<<"collation">>, Options) of
+        <<"raw">> -> fun collate_raw/2;
+        _ -> fun collate_rows/2
+    end.
+
+
+collate_raw(A, A) -> eq;
+collate_raw(A, B) when A < B -> lt;
+collate_raw(A, B) when A > B -> gt.
+
+
+collate_rows({KeyA, DocIdA}, {KeyB, DocIdB}) ->
+    case couch_ejson_compare:less(KeyA, KeyB) of
+        N when N < 0 -> lt;
+        0 when DocIdA < DocIdB -> lt;
+        0 when DocIdA == DocIdB -> eq;
+        0 -> gt; % when DocIdA > DocIdB
+        N when N > 0 -> gt
+    end;
+
+collate_rows(KeyA, KeyB) ->
+    % When collating reduce group keys they don't
+    % come with a docid.
+    case couch_ejson_compare:less(KeyA, KeyB) of
+        N when N < 0 -> lt;
+        0 -> eq;
+        N when N > 0 -> gt
+    end.
 
 
 validate_args(Args) ->

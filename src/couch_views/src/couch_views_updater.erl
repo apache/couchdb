@@ -87,16 +87,17 @@ write_doc(Db, #doc{deleted = Deleted} = Doc) ->
     },
 
     lists:foreach(fun(DDoc) ->
-        {ok, Mrst} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
+        {ok, Mrst0} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
+        Mrst1 = couch_views_fdb:set_trees(Db, Mrst0),
 
-        case should_index_doc(Doc, Mrst) of
+        case should_index_doc(Doc, Mrst1) of
             true ->
-                {Mrst1, Result1} = couch_views_indexer:map_docs(Mrst, Result0),
-                DocNumber = couch_views_indexer:write_docs(Db, Mrst1,
+                {Mrst2, Result1} = couch_views_indexer:map_docs(Mrst1, Result0),
+                DocNumber = couch_views_indexer:write_docs(Db, Mrst2,
                     Result1, State),
-                couch_views_plugin:after_interactive_write(Db, Mrst1,
+                couch_views_plugin:after_interactive_write(Db, Mrst2,
                     Result1, DocNumber),
-                couch_eval:release_map_context(Mrst1#mrst.qserver);
+                couch_eval:release_map_context(Mrst2#mrst.qserver);
             false ->
                 ok
         end
