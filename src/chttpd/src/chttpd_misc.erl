@@ -294,11 +294,8 @@ dbs_info_callback({error, Reason}, #vacc{resp = Resp0} = Acc) ->
 
 handle_task_status_req(#httpd{method='GET'}=Req) ->
     ok = chttpd:verify_is_server_admin(Req),
-    {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),
-    Response = lists:flatmap(fun({Node, Tasks}) ->
-        [{[{node,Node} | Task]} || Task <- Tasks]
-    end, Replies),
-    send_json(Req, lists:sort(Response));
+    ActiveTasks = fabric2_active_tasks:get_active_tasks(),
+    send_json(Req, ActiveTasks);
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
