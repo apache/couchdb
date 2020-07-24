@@ -17,7 +17,8 @@
     ddoc_to_mrst/2,
     validate_args/1,
     validate_args/2,
-    is_paginated/1
+    is_paginated/1,
+    active_tasks_info/5
 ]).
 
 
@@ -276,3 +277,27 @@ is_paginated(#mrargs{page_size = PageSize}) when is_integer(PageSize) ->
 
 is_paginated(_) ->
     false.
+
+
+active_tasks_info(ChangesDone, DbName, DDocId, LastSeq, DBSeq) ->
+    #{
+        <<"type">> => <<"indexer">>,
+        <<"database">> => DbName,
+        <<"changes_done">> => ChangesDone,
+        <<"design_document">> => DDocId,
+        <<"current_version_stamp">> => convert_seq_to_stamp(LastSeq),
+        <<"db_version_stamp">> => convert_seq_to_stamp(DBSeq)
+    }.
+
+
+convert_seq_to_stamp(<<"0">>) ->
+    <<"0-0-0">>;
+
+convert_seq_to_stamp(undefined) ->
+    <<"0-0-0">>;
+
+convert_seq_to_stamp(Seq) ->
+    {_, Stamp, Batch, DocNumber} = fabric2_fdb:seq_to_vs(Seq),
+    VS = integer_to_list(Stamp) ++ "-" ++ integer_to_list(Batch) ++ "-"
+            ++ integer_to_list(DocNumber),
+    list_to_binary(VS).
