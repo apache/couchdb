@@ -302,7 +302,7 @@ view_has_data(Db, DDoc) ->
         SigKey = erlfdb_tuple:pack(SigKeyTuple, DbPrefix),
         SigVal = erlfdb:wait(erlfdb:get(Tx, SigKey)),
 
-        RangeKeyTuple = {?DB_VIEWS, ?VIEW_DATA, Sig},
+        RangeKeyTuple = {?DB_VIEWS, ?VIEW_TREES, Sig},
         RangeKey = erlfdb_tuple:pack(RangeKeyTuple, DbPrefix),
         Range = erlfdb:wait(erlfdb:get_range_startswith(Tx, RangeKey)),
 
