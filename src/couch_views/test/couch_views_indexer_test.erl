@@ -126,13 +126,12 @@ updated_docs_are_reindexed(Db) ->
     % Check that our id index is updated properly
     % as well.
     DbName = fabric2_db:name(Db),
-    {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
-    Sig = Mrst#mrst.sig,
+    {ok, Mrst0} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        ?assertMatch(
-                [{0, 1, _, [1]}],
-                couch_views_fdb:get_view_keys(TxDb, Sig, <<"0">>)
-            )
+        #{tx := Tx} = TxDb,
+        Mrst1 = couch_views_trees:open(TxDb, Mrst0),
+        IdRow = ebtree:lookup(Tx, Mrst1#mrst.id_btree, <<"0">>),
+        ?assertEqual({<<"0">>, [{1, []}, {0, [1]}]}, IdRow)
     end).
 
 
@@ -160,13 +159,12 @@ updated_docs_without_changes_are_reindexed(Db) ->
     % Check fdb directly to make sure we've also
     % removed the id idx keys properly.
     DbName = fabric2_db:name(Db),
-    {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
-    Sig = Mrst#mrst.sig,
+    {ok, Mrst0} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        ?assertMatch(
-                [{0, 1, _, [0]}],
-                couch_views_fdb:get_view_keys(TxDb, Sig, <<"0">>)
-            )
+        #{tx := Tx} = TxDb,
+        Mrst1 = couch_views_trees:open(TxDb, Mrst0),
+        IdRow = ebtree:lookup(Tx, Mrst1#mrst.id_btree, <<"0">>),
+        ?assertEqual({<<"0">>, [{1, []}, {0, [0]}]}, IdRow)
     end).
 
 
@@ -208,10 +206,12 @@ deleted_docs_are_unindexed(Db) ->
     % Check fdb directly to make sure we've also
     % removed the id idx keys properly.
     DbName = fabric2_db:name(Db),
-    {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
-    Sig = Mrst#mrst.sig,
+    {ok, Mrst0} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        ?assertEqual([], couch_views_fdb:get_view_keys(TxDb, Sig, <<"0">>))
+        #{tx := Tx} = TxDb,
+        Mrst1 = couch_views_trees:open(TxDb, Mrst0),
+        IdRow = ebtree:lookup(Tx, Mrst1#mrst.id_btree, <<"0">>),
+        ?assertEqual(false, IdRow)
     end).
 
 
@@ -296,11 +296,9 @@ fewer_multipe_identical_keys_from_same_doc(Db) ->
 
 handle_size_key_limits(Db) ->
     ok = meck:new(config, [passthrough]),
-    ok = meck:expect(config, get_integer, fun(Section, Key, Default) ->
-        case Section == "couch_views" andalso Key == "key_size_limit" of
-            true -> 15;
-            _ -> Default
-        end
+    ok = meck:expect(config, get_integer, fun
+        ("couch_views", "key_size_limit", _Default) -> 15;
+        (_Section, _Key, Default) -> Default
     end),
 
     DDoc = create_ddoc(multi_emit_key_limit),
@@ -328,11 +326,9 @@ handle_size_key_limits(Db) ->
 
 handle_size_value_limits(Db) ->
     ok = meck:new(config, [passthrough]),
-    ok = meck:expect(config, get_integer, fun(Section, _, Default) ->
-        case Section of
-            "couch_views" -> 15;
-            _ -> Default
-        end
+    ok = meck:expect(config, get_integer, fun
+        ("couch_views", "value_size_limit", _Default) -> 15;
+        (_Section, _Key, Default) -> Default
     end),
 
     DDoc = create_ddoc(multi_emit_key_limit),
@@ -386,12 +382,6 @@ multiple_design_docs(Db) ->
         end)
     end,
 
-    % This is how we check that no index updates took place
-    meck:new(couch_views_fdb, [passthrough]),
-    meck:expect(couch_views_fdb, write_doc, fun(TxDb, Sig, ViewIds, Doc) ->
-        meck:passthrough([TxDb, Sig, ViewIds, Doc])
-    end),
-
     DDoc1 = create_ddoc(simple, <<"_design/bar1">>),
     DDoc2 = create_ddoc(simple, <<"_design/bar2">>),
 
@@ -399,7 +389,7 @@ multiple_design_docs(Db) ->
     {ok, {Pos1, Rev1}} = fabric2_db:update_doc(Db, DDoc1, []),
     ?assertEqual({ok, [row(<<"0">>, 0, 0)]}, run_query(Db, DDoc1, ?MAP_FUN1)),
 
-    % Because run_query/3 can return, and unsurbscribe from the job,
+    % Because run_query/3 can return, and unsubscribe from the job,
     % before it actually finishes, ensure we wait for the job to
     % finish so we get a deterministic setup every time.
     JobId = get_job_id(Db, DDoc1),
@@ -413,10 +403,16 @@ multiple_design_docs(Db) ->
 
     Cleanup(),
 
-    meck:reset(couch_views_fdb),
+    % Assert that no updates are applied
+    meck:new(couch_views_fdb, [passthrough]),
+    meck:expect(couch_views_trees, update_views, fun(TxDb, Mrst, Docs) ->
+        case Docs of
+            [] -> meck:passthrough([TxDb, Mrst, Docs]);
+            [_ | _] -> erlang:error(update_triggered)
+        end
+    end),
     ?assertEqual({ok, [row(<<"0">>, 0, 0)]}, run_query(Db, DDoc2, ?MAP_FUN1)),
     ?assertEqual(ok, wait_job_finished(JobId, 5000)),
-    ?assertEqual(0, meck:num_calls(couch_views_fdb, write_doc, 4)),
 
     DDoc2Del = DDoc2#doc{revs = {Pos2, [Rev2]}, deleted = true},
     {ok, _} = fabric2_db:update_doc(Db, DDoc2Del, []),

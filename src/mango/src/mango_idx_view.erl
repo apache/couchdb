@@ -34,6 +34,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 -include("mango_idx.hrl").
+-include("mango_idx_view.hrl").
 
 
 validate_new(#idx{}=Idx, _Db) ->
@@ -131,7 +132,7 @@ is_usable(Idx, Selector, SortFields) ->
     % and the selector is not a text search (so requires a text index)
     RequiredFields = columns(Idx),
 
-    % sort fields are required to exist in the results so 
+    % sort fields are required to exist in the results so
     % we don't need to check the selector for these
     RequiredFields1 = ordsets:subtract(lists:usort(RequiredFields), lists:usort(SortFields)),
 
@@ -182,11 +183,11 @@ start_key([{'$eq', Key, '$eq', Key} | Rest]) ->
 
 
 end_key([]) ->
-    [couch_views_encoding:max()];
+    [?MAX_JSON_OBJ];
 end_key([{_, _, '$lt', Key} | Rest]) ->
     case mango_json:special(Key) of
         true ->
-            [couch_views_encoding:max()];
+            [?MAX_JSON_OBJ];
         false ->
             [Key | end_key(Rest)]
     end;

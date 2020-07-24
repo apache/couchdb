@@ -193,16 +193,21 @@ cleanup({Ctx, Db}) ->
 
 
 create_transition_tests({_Ctx, Db}) ->
-    Transitions = generate_transitions(),
-    Single = lists:flatmap(fun(T) ->
-        Name = lists:flatten(io_lib:format("single ~s", [tname(T)])),
-        [{Name, fun() -> check_single_transition(Db, T) end}]
-    end, lists:sort(Transitions)),
-    Multi = lists:flatmap(fun(T) ->
-        Name = lists:flatten(io_lib:format("multi ~s", [tname(T)])),
-        [{Name, fun() -> check_multi_transition(Db, T) end}]
-    end, lists:sort(group(shuffle(Transitions)))),
-    subset(?NUM_SINGLE_TESTS, Single) ++ subset(?NUM_MULTI_TESTS, Multi).
+    try
+        throw(disabled),
+        Transitions = generate_transitions(),
+        Single = lists:flatmap(fun(T) ->
+            Name = lists:flatten(io_lib:format("single ~s", [tname(T)])),
+            [{Name, fun() -> check_single_transition(Db, T) end}]
+        end, lists:sort(Transitions)),
+        Multi = lists:flatmap(fun(T) ->
+            Name = lists:flatten(io_lib:format("multi ~s", [tname(T)])),
+            [{Name, fun() -> check_multi_transition(Db, T) end}]
+        end, lists:sort(group(shuffle(Transitions)))),
+        subset(?NUM_SINGLE_TESTS, Single) ++ subset(?NUM_MULTI_TESTS, Multi)
+    catch throw:disabled ->
+        [{"Disabled", fun() -> ok end}]
+    end.
 
 
 check_single_transition(Db, {Set1, Set2, Transition}) ->

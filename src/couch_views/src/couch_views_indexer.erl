@@ -110,6 +110,10 @@ init() ->
         error:database_does_not_exist ->
             fail_job(Job, Data, db_deleted, "Database was deleted");
         Error:Reason  ->
+            Stack = erlang:get_stacktrace(),
+            Fmt = "Error building view for ddoc ~s in ~s: ~p:~p ~p",
+            couch_log:error(Fmt, [DbName, DDocId, Error, Reason, Stack]),
+
             NewRetry = Retries + 1,
             RetryLimit = retry_limit(),
 
@@ -196,6 +200,7 @@ do_update(Db, Mrst0, State0) ->
             tx := Tx
         } = TxDb,
 
+        Mrst1 = couch_views_trees:open(TxDb, Mrst0),
         State1 = get_update_start_state(TxDb, Mrst0, State0),
 
         {ok, State2} = fold_changes(State1),
@@ -212,7 +217,7 @@ do_update(Db, Mrst0, State0) ->
 
         DocAcc1 = fetch_docs(TxDb, DesignOpts, DocAcc),
 
-        {Mrst1, MappedDocs} = map_docs(Mrst0, DocAcc1),
+        {Mrst2, MappedDocs} = map_docs(Mrst0, DocAcc1),
         TotalKVs = write_docs(TxDb, Mrst1, MappedDocs, State2),
 
         ChangesDone = ChangesDone0 + length(DocAcc),
@@ -225,14 +230,14 @@ do_update(Db, Mrst0, State0) ->
 
         case Count < Limit of
             true ->
-                maybe_set_build_status(TxDb, Mrst1, ViewVS,
+                maybe_set_build_status(TxDb, Mrst2, ViewVS,
                     ?INDEX_READY),
                 report_progress(State2#{changes_done := ChangesDone},
                     finished),
-                {Mrst1, finished};
+                {Mrst2, finished};
             false ->
                 State3 = report_progress(State2, update),
-                {Mrst1, State3#{
+                {Mrst2, State3#{
                     tx_db := undefined,
                     count := 0,
                     doc_acc := [],
@@ -339,7 +344,7 @@ map_docs(Mrst, Docs) ->
     end, Docs),
 
     Deleted1 = lists:map(fun(Doc) ->
-        Doc#{results => []}
+        Doc#{results => [[] || _ <- Mrst1#mrst.views]}
     end, Deleted0),
 
     DocsToMap = lists:map(fun(Doc) ->
@@ -370,9 +375,8 @@ map_docs(Mrst, Docs) ->
     {Mrst1, MappedDocs}.
 
 
-write_docs(TxDb, Mrst, Docs, State) ->
+write_docs(TxDb, Mrst, Docs0, State) ->
     #mrst{
-        views = Views,
         sig = Sig
     } = Mrst,
 
@@ -380,15 +384,15 @@ write_docs(TxDb, Mrst, Docs, State) ->
         last_seq := LastSeq
     } = State,
 
-    ViewIds = [View#mrview.id_num || View <- Views],
     KeyLimit = key_size_limit(),
     ValLimit = value_size_limit(),
 
-    TotalKVCount = lists:foldl(fun(Doc0, KVCount) ->
-        Doc1 = calculate_kv_sizes(Mrst, Doc0, KeyLimit, ValLimit),
-        couch_views_fdb:write_doc(TxDb, Sig, ViewIds, Doc1),
-        KVCount + count_kvs(Doc1)
-    end, 0, Docs),
+    {Docs1, TotalKVCount} = lists:mapfoldl(fun(Doc0, KVCount) ->
+        Doc1 = check_kv_size_limit(Mrst, Doc0, KeyLimit, ValLimit),
+        {Doc1, KVCount + count_kvs(Doc1)}
+    end, 0, Docs0),
+
+    couch_views_trees:update_views(TxDb, Mrst, Docs1),
 
     if LastSeq == false -> ok; true ->
         couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq)
@@ -479,7 +483,7 @@ start_query_server(#mrst{} = Mrst) ->
     Mrst.
 
 
-calculate_kv_sizes(Mrst, Doc, KeyLimit, ValLimit) ->
+check_kv_size_limit(Mrst, Doc, KeyLimit, ValLimit) ->
     #mrst{
         db_name = DbName,
         idx_name = IdxName
@@ -488,10 +492,10 @@ calculate_kv_sizes(Mrst, Doc, KeyLimit, ValLimit) ->
         results := Results
     } = Doc,
     try
-        KVSizes = lists:map(fun(ViewRows) ->
-            lists:foldl(fun({K, V}, Acc) ->
-                KeySize = erlang:external_size(K),
-                ValSize = erlang:external_size(V),
+        lists:foreach(fun(ViewRows) ->
+            lists:foreach(fun({K, V}) ->
+                KeySize = couch_ejson_size:encoded_size(K),
+                ValSize = couch_ejson_size:encoded_size(V),
 
                 if KeySize =< KeyLimit -> ok; true ->
                     throw({size_error, key})
@@ -499,18 +503,20 @@ calculate_kv_sizes(Mrst, Doc, KeyLimit, ValLimit) ->
 
                 if ValSize =< ValLimit -> ok; true ->
                     throw({size_error, value})
-                end,
-
-                Acc + KeySize + ValSize
-            end, 0, ViewRows)
+                end
+            end, ViewRows)
         end, Results),
-        Doc#{kv_sizes => KVSizes}
+        Doc
     catch throw:{size_error, Type} ->
         #{id := DocId} = Doc,
         Fmt = "View ~s size error for docid `~s`, excluded from indexing "
             "in db `~s` for design doc `~s`",
         couch_log:error(Fmt, [Type, DocId, DbName, IdxName]),
-        Doc#{deleted := true, results := [], kv_sizes => []}
+        Doc#{
+            deleted := true,
+            results := [[] || _ <- Mrst#mrst.views],
+            kv_sizes => []
+        }
     end.
 
 
