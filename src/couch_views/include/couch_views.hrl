@@ -13,6 +13,7 @@
 % Index info/data subspaces
 -define(VIEW_INFO, 0).
 -define(VIEW_DATA, 1).
+-define(VIEW_TREES, 3).
 
 % Index info keys
 -define(VIEW_UPDATE_SEQ, 0).
@@ -24,6 +25,10 @@
 % Data keys
 -define(VIEW_ID_RANGE, 0).
 -define(VIEW_MAP_RANGE, 1).
+
+% Tree keys
+-define(VIEW_ID_TREE, 0).
+-define(VIEW_ROW_TREES, 1).
 
 % jobs api
 -define(INDEX_JOB_TYPE, <<"views">>).

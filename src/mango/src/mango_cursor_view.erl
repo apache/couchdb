@@ -31,6 +31,7 @@
 -include_lib("fabric/include/fabric.hrl").
 
 -include("mango_cursor.hrl").
+-include("mango_idx_view.hrl").
 
 
 create(Db, Indexes, Selector, Opts) ->
@@ -85,15 +86,14 @@ explain(Cursor) ->
 maybe_replace_max_json([]) ->
     [];
 
+maybe_replace_max_json([?MAX_JSON_OBJ | T]) ->
+    [<<"<MAX>">> | maybe_replace_max_json(T)];
+
+maybe_replace_max_json([H | T]) ->
+    [H | maybe_replace_max_json(T)];
+
 maybe_replace_max_json(?MAX_STR) ->
     <<"<MAX>">>;
-
-maybe_replace_max_json([H | T] = EndKey) when is_list(EndKey) ->
-    MAX_VAL = couch_views_encoding:max(),
-    H1 = if H == MAX_VAL  -> <<"<MAX>">>;
-            true -> H
-    end,
-    [H1 | maybe_replace_max_json(T)];
 
 maybe_replace_max_json(EndKey) ->
     EndKey.

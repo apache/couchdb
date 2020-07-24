@@ -69,7 +69,7 @@ foreach_setup() ->
 
     Docs = make_docs(3),
     fabric2_db:update_docs(Db, Docs),
-    meck:new(couch_views_fdb, [passthrough]),
+    meck:new(couch_views_trees, [passthrough]),
     {Db, DDoc}.
 
 
@@ -135,7 +135,7 @@ includes_design_docs({Db, _}) ->
 
 
 handle_erlfdb_errors({Db, _}) ->
-    meck:expect(couch_views_fdb, write_doc, fun(_, _, _, _) ->
+    meck:expect(couch_views_trees, update_views, fun(_, _, _) ->
         error({erlfdb_error, 1009})
     end),
     ?assertError({erlfdb_error, 1009}, fabric2_db:update_docs(Db, [doc(4)])).

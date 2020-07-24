@@ -22,25 +22,16 @@
     get_update_seq/2,
     set_update_seq/3,
 
-    get_row_count/3,
-    get_kv_size/3,
-
-    fold_map_idx/6,
-
-    write_doc/4,
-
     list_signatures/1,
-    clear_index/2
+    clear_index/2,
+
+    persist_chunks/3
 ]).
 
 -ifdef(TEST).
 -compile(export_all).
 -compile(nowarn_export_all).
 -endif.
-
--define(LIST_VALUE, 0).
--define(JSON_VALUE, 1).
--define(VALUE, 2).
 
 
 -include("couch_views.hrl").
@@ -126,94 +117,6 @@ set_update_seq(TxDb, Sig, Seq) ->
     ok = erlfdb:set(Tx, seq_key(DbPrefix, Sig), Seq).
 
 
-get_row_count(TxDb, #mrst{sig = Sig}, ViewId) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-
-    case erlfdb:wait(erlfdb:get(Tx, row_count_key(DbPrefix, Sig, ViewId))) of
-        not_found -> 0; % Can this happen?
-        CountBin -> ?bin2uint(CountBin)
-    end.
-
-
-get_kv_size(TxDb, #mrst{sig = Sig}, ViewId) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-
-    case erlfdb:wait(erlfdb:get(Tx, kv_size_key(DbPrefix, Sig, ViewId))) of
-        not_found -> 0; % Can this happen?
-        SizeBin -> ?bin2uint(SizeBin)
-    end.
-
-
-fold_map_idx(TxDb, Sig, ViewId, Options, Callback, Acc0) ->
-    #{
-        db_prefix := DbPrefix
-    } = TxDb,
-
-    MapIdxPrefix = map_idx_prefix(DbPrefix, Sig, ViewId),
-    FoldAcc = #{
-        prefix => MapIdxPrefix,
-        callback => Callback,
-        acc => Acc0
-        },
-    Fun = aegis:wrap_fold_fun(TxDb, fun fold_fwd/2),
-
-    #{
-        acc := Acc1
-    } = fabric2_fdb:fold_range(TxDb, MapIdxPrefix, Fun, FoldAcc, Options),
-
-    Acc1.
-
-
-write_doc(TxDb, Sig, _ViewIds, #{deleted := true} = Doc) ->
-    #{
-        id := DocId
-    } = Doc,
-
-    ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
-
-    clear_id_idx(TxDb, Sig, DocId),
-    lists:foreach(fun({ViewId, TotalKeys, TotalSize, UniqueKeys}) ->
-        clear_map_idx(TxDb, Sig, ViewId, DocId, UniqueKeys),
-        update_row_count(TxDb, Sig, ViewId, -TotalKeys),
-        update_kv_size(TxDb, Sig, ViewId, -TotalSize)
-    end, ExistingViewKeys);
-
-write_doc(TxDb, Sig, ViewIds, Doc) ->
-    #{
-        id := DocId,
-        results := Results,
-        kv_sizes := KVSizes
-    } = Doc,
-
-    ExistingViewKeys = get_view_keys(TxDb, Sig, DocId),
-
-    clear_id_idx(TxDb, Sig, DocId),
-
-    lists:foreach(fun({ViewId, NewRows, KVSize}) ->
-        update_id_idx(TxDb, Sig, ViewId, DocId, NewRows, KVSize),
-
-        ExistingKeys = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
-            {ViewId, TotalRows, TotalSize, EKeys} ->
-                RowChange = length(NewRows) - TotalRows,
-                update_row_count(TxDb, Sig, ViewId, RowChange),
-                update_kv_size(TxDb, Sig, ViewId, KVSize - TotalSize),
-                EKeys;
-            false ->
-                RowChange = length(NewRows),
-                update_row_count(TxDb, Sig, ViewId, RowChange),
-                update_kv_size(TxDb, Sig, ViewId, KVSize),
-                []
-        end,
-        update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows)
-    end, lists:zip3(ViewIds, Results, KVSizes)).
-
-
 list_signatures(Db) ->
     #{
         db_prefix := DbPrefix
@@ -244,198 +147,43 @@ clear_index(Db, Signature) ->
     end, Keys),
 
     % Clear index data
-    RangeTuple = {?DB_VIEWS, ?VIEW_DATA, Signature},
-    RangePrefix = erlfdb_tuple:pack(RangeTuple, DbPrefix),
-    erlfdb:clear_range_startswith(Tx, RangePrefix).
+    DataTuple = {?DB_VIEWS, ?VIEW_DATA, Signature},
+    DataPrefix = erlfdb_tuple:pack(DataTuple, DbPrefix),
+    erlfdb:clear_range_startswith(Tx, DataPrefix),
+
+    % Clear tree data
+    TreeTuple = {?DB_VIEWS, ?VIEW_TREES, Signature},
+    TreePrefix = erlfdb_tuple:pack(TreeTuple, DbPrefix),
+    erlfdb:clear_range_startswith(Tx, TreePrefix).
 
 
-% For each row in a map view we store the the key/value
-% in FoundationDB:
-%
-%   `(EncodedSortKey, (EncodedKey, EncodedValue))`
-%
-% The difference between `EncodedSortKey` and `EndcodedKey` is
-% the use of `couch_util:get_sort_key/1` which turns UTF-8
-% strings into binaries that are byte comparable. Given a sort
-% key binary we cannot recover the input so to return unmodified
-% user data we are forced to store the original.
+persist_chunks(Tx, set, [Key, Value]) ->
+    Chunks = fabric2_fdb:chunkify_binary(Value),
+    LastId = lists:foldl(fun(Chunk, Id) ->
+        ChunkKey = erlfdb_tuple:pack({Id}, Key),
+        erlfdb:set(Tx, ChunkKey, Chunk),
+        Id + 1
+    end, 0, Chunks),
 
-fold_fwd({RowKey, PackedKeyValue}, Acc) ->
-    #{
-        prefix := Prefix,
-        callback := UserCallback,
-        acc := UserAcc0
-    } = Acc,
+    % We update nodes in place, so its possible that
+    % a node shrank. This clears any keys that we haven't
+    % just overwritten for the provided key.
+    LastIdKey = erlfdb_tuple:pack({LastId}, Key),
+    EndRange = <<Key/binary, 16#FF>>,
+    erlfdb:clear_range(Tx, LastIdKey, EndRange);
 
-    {{_SortKey, DocId}, _DupeId} =
-            erlfdb_tuple:unpack(RowKey, Prefix),
+persist_chunks(Tx, get, Key) ->
+    Rows = erlfdb:get_range_startswith(Tx, Key),
+    Values = [V || {_K, V} <- Rows],
+    iolist_to_binary(Values);
 
-    {EncodedOriginalKey, EncodedValue} = erlfdb_tuple:unpack(PackedKeyValue),
-    Value = couch_views_encoding:decode(EncodedValue),
-    Key = couch_views_encoding:decode(EncodedOriginalKey),
-
-    UserAcc1 = UserCallback(DocId, Key, Value, UserAcc0),
-
-    Acc#{
-        acc := UserAcc1
-    }.
-
-
-clear_id_idx(TxDb, Sig, DocId) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-
-    {Start, End} = id_idx_range(DbPrefix, Sig, DocId),
-    ok = erlfdb:clear_range(Tx, Start, End).
-
-
-clear_map_idx(TxDb, Sig, ViewId, DocId, ViewKeys) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-
-    lists:foreach(fun(ViewKey) ->
-        {Start, End} = map_idx_range(DbPrefix, Sig, ViewId, ViewKey, DocId),
-        ok = erlfdb:clear_range(Tx, Start, End)
-    end, ViewKeys).
-
-
-update_id_idx(TxDb, Sig, ViewId, DocId, [], _KVSize) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-    Key = id_idx_key(DbPrefix, Sig, DocId, ViewId),
-    ok = erlfdb:clear(Tx, Key);
-
-update_id_idx(TxDb, Sig, ViewId, DocId, NewRows, KVSize) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-
-    Unique = lists:usort([K || {K, _V} <- NewRows]),
-
-    Key = id_idx_key(DbPrefix, Sig, DocId, ViewId),
-    Val = couch_views_encoding:encode([length(NewRows), KVSize, Unique]),
-    ok = erlfdb:set(Tx, Key, aegis:encrypt(TxDb, Key, Val)).
-
-
-update_map_idx(TxDb, Sig, ViewId, DocId, ExistingKeys, NewRows) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-
-    lists:foreach(fun(RemKey) ->
-        {Start, End} = map_idx_range(DbPrefix, Sig, ViewId, RemKey, DocId),
-        ok = erlfdb:clear_range(Tx, Start, End)
-    end, ExistingKeys),
-
-    KVsToAdd = process_rows(NewRows),
-    MapIdxPrefix = map_idx_prefix(DbPrefix, Sig, ViewId),
-
-    lists:foreach(fun({DupeId, Key1, Key2, EV}) ->
-        KK = map_idx_key(MapIdxPrefix, {Key1, DocId}, DupeId),
-        Val = erlfdb_tuple:pack({Key2, EV}),
-        ok = erlfdb:set(Tx, KK, aegis:encrypt(TxDb, KK, Val))
-    end, KVsToAdd).
-
-
-get_view_keys(TxDb, Sig, DocId) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-    {Start, End} = id_idx_range(DbPrefix, Sig, DocId),
-    lists:map(fun({K, V}) ->
-        {?DB_VIEWS, ?VIEW_DATA, Sig, ?VIEW_ID_RANGE, DocId, ViewId} =
-                erlfdb_tuple:unpack(K, DbPrefix),
-        [TotalKeys, TotalSize, UniqueKeys] = couch_views_encoding:decode(V),
-        {ViewId, TotalKeys, TotalSize, UniqueKeys}
-    end, aegis:decrypt(TxDb, erlfdb:get_range(Tx, Start, End, []))).
-
-
-update_row_count(TxDb, Sig, ViewId, Increment) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-    Key = row_count_key(DbPrefix, Sig, ViewId),
-    erlfdb:add(Tx, Key, Increment).
-
-
-update_kv_size(TxDb, Sig, ViewId, Increment) ->
-    #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-
-    % Track a view specific size for calls to
-    % GET /dbname/_design/doc/_info`
-    IdxKey = kv_size_key(DbPrefix, Sig, ViewId),
-    erlfdb:add(Tx, IdxKey, Increment),
-
-    % Track a database level rollup for calls to
-    % GET /dbname
-    DbKey = db_kv_size_key(DbPrefix),
-    erlfdb:add(Tx, DbKey, Increment).
+persist_chunks(Tx, clear, Key) ->
+    erlfdb:clear_range_startswith(Tx, Key).
 
 
 seq_key(DbPrefix, Sig) ->
     Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_UPDATE_SEQ, Sig},
     erlfdb_tuple:pack(Key, DbPrefix).
-
-
-row_count_key(DbPrefix, Sig, ViewId) ->
-    Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_ROW_COUNT, Sig, ViewId},
-    erlfdb_tuple:pack(Key, DbPrefix).
-
-
-kv_size_key(DbPrefix, Sig, ViewId) ->
-    Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_KV_SIZE, Sig, ViewId},
-    erlfdb_tuple:pack(Key, DbPrefix).
-
-
-db_kv_size_key(DbPrefix) ->
-    Key = {?DB_STATS, <<"sizes">>, <<"views">>},
-    erlfdb_tuple:pack(Key, DbPrefix).
-
-
-id_idx_key(DbPrefix, Sig, DocId, ViewId) ->
-    Key = {?DB_VIEWS, ?VIEW_DATA, Sig, ?VIEW_ID_RANGE, DocId, ViewId},
-    erlfdb_tuple:pack(Key, DbPrefix).
-
-
-id_idx_range(DbPrefix, Sig, DocId) ->
-    Key = {?DB_VIEWS, ?VIEW_DATA, Sig, ?VIEW_ID_RANGE, DocId},
-    erlfdb_tuple:range(Key, DbPrefix).
-
-
-map_idx_prefix(DbPrefix, Sig, ViewId) ->
-    Key = {?DB_VIEWS, ?VIEW_DATA, Sig, ?VIEW_MAP_RANGE, ViewId},
-    erlfdb_tuple:pack(Key, DbPrefix).
-
-
-map_idx_key(MapIdxPrefix, MapKey, DupeId) ->
-    Key = {MapKey, DupeId},
-    erlfdb_tuple:pack(Key, MapIdxPrefix).
-
-
-map_idx_range(DbPrefix, Sig, ViewId, MapKey, DocId) ->
-    Encoded = couch_views_encoding:encode(MapKey, key),
-    Key = {
-        ?DB_VIEWS,
-        ?VIEW_DATA,
-        Sig,
-        ?VIEW_MAP_RANGE,
-        ViewId,
-        {Encoded, DocId}
-    },
-    erlfdb_tuple:range(Key, DbPrefix).
 
 
 creation_vs_key(Db, Sig) ->
@@ -452,24 +200,3 @@ build_status_key(Db, Sig) ->
     } = Db,
     Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_BUILD_STATUS, Sig},
     erlfdb_tuple:pack(Key, DbPrefix).
-
-
-process_rows(Rows) ->
-    Encoded = lists:map(fun({K, V}) ->
-        EK1 = couch_views_encoding:encode(K, key),
-        EK2 = couch_views_encoding:encode(K, value),
-        EV = couch_views_encoding:encode(V, value),
-        {EK1, EK2, EV}
-    end, Rows),
-
-    Grouped = lists:foldl(fun({K1, K2, V}, Acc) ->
-        dict:append(K1, {K2, V}, Acc)
-    end, dict:new(), Encoded),
-
-    dict:fold(fun(K1, Vals, DAcc) ->
-        Vals1 = lists:keysort(2, Vals),
-        {_, Labeled} = lists:foldl(fun({K2, V}, {Count, Acc}) ->
-            {Count + 1, [{Count, K1, K2, V} | Acc]}
-        end, {0, []}, Vals1),
-        Labeled ++ DAcc
-    end, [], Grouped).
