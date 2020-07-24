@@ -505,8 +505,8 @@ split_child(Tx, #tree{} = Tree, #node{} = Parent0, #node{} = Child) ->
 
     Parent1 = Parent0#node{
         members =
-            umerge(Tree, [{FirstLeftKey, LastLeftKey, LeftId, LeftReduction}],
-                umerge(Tree, [{FirstRightKey, LastRightKey, RightId, RightReduction}],
+            umerge_members(Tree, [{FirstLeftKey, LastLeftKey, LeftId, LeftReduction}],
+                umerge_members(Tree, [{FirstRightKey, LastRightKey, RightId, RightReduction}],
                     lists:keydelete(Child#node.id, 3, Parent0#node.members)))
     },
     clear_node(Tx, Tree, Child),
@@ -532,7 +532,7 @@ update_next_neighbour(Tx, #tree{} = Tree, #node{} = Node) ->
 
 insert_nonfull(Tx, #tree{} = Tree, #node{level = 0} = Node0, Key, Value) ->
     Node1 = Node0#node{
-        members = umerge(Tree, [{Key, Value}], Node0#node.members)
+        members = umerge_members(Tree, [{Key, Value}], Node0#node.members)
     },
     set_node(Tx, Tree, Node0, Node1),
     reduce_node(Tree, Node1);
@@ -557,8 +557,8 @@ insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
     ChildId1 = Child1#node.id,
     NewReduction = insert_nonfull(Tx, Tree, Child1, Key, Value),
     {CurrentFirstKey, CurrentLastKey, ChildId1, _OldReduction} = lists:keyfind(ChildId1, 3, Node1#node.members),
-    [NewFirstKey, _] = sort(Tree, [Key, CurrentFirstKey]),
-    [_, NewLastKey] = sort(Tree, [Key, CurrentLastKey]),
+    [NewFirstKey, _] = sort_keys(Tree, [Key, CurrentFirstKey]),
+    [_, NewLastKey] = sort_keys(Tree, [Key, CurrentLastKey]),
     Node2 = Node1#node{
         members = lists:keyreplace(ChildId1, 3, Node1#node.members,
             {NewFirstKey, NewLastKey, ChildId1, NewReduction})
@@ -621,7 +621,7 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
             Members1 = lists:keydelete(ChildId0, 3, Members0),
             Members2 = lists:keydelete(Sibling#node.id, 3, Members1),
             Members3 = lists:foldl(fun(N, Acc) ->
-                umerge(Tree, [{first_key(N), last_key(N), N#node.id, reduce_node(Tree, N)}], Acc)
+                umerge_members(Tree, [{first_key(N), last_key(N), N#node.id, reduce_node(Tree, N)}], Acc)
             end, Members2, NewNodes),
 
             Parent1 = Parent0#node{
@@ -643,7 +643,7 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
 
 
 merge(Tx, #tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = Node2) ->
-    [Left, Right] = sort(Tree, [Node1, Node2]),
+    [Left, Right] = sort_nodes(Tree, [Node1, Node2]),
 
     #node{
         id = new_node_id(Tx, Tree),
@@ -655,7 +655,7 @@ merge(Tx, #tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = N
 
 
 rebalance(Tx, #tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = Node2) ->
-    [Left0, Right0] = sort(Tree, [Node1, Node2]),
+    [Left0, Right0] = sort_nodes(Tree, [Node1, Node2]),
 
     Members = lists:append(Left0#node.members, Right0#node.members),
     {LeftMembers, RightMembers} = lists:split(length(Members) div 2, Members),
@@ -805,8 +805,8 @@ validate_node(#tree{} = Tree, #node{} = Node) ->
     NumKeys = length(Node#node.members),
     IsLeaf = Node#node.level =:= 0,
     IsRoot = ?NODE_ROOT_ID == Node#node.id,
-    OutOfOrder = Node#node.members /= sort(Tree, Node#node.members),
-    Duplicates = Node#node.members /= usort(Tree, Node#node.members),
+    OutOfOrder = Node#node.members /= sort_members(Tree, Node#node.members),
+    Duplicates = Node#node.members /= usort_members(Tree, Node#node.members),
     if
         Node#node.id == undefined ->
             erlang:error({node_without_id, Node});
@@ -915,32 +915,51 @@ less_than_or_equal(#tree{} = Tree, A, B) ->
     CollateFun(A, B).
 
 
-umerge(#tree{} = Tree, List1, List2) ->
+umerge_members(#tree{} = Tree, List1, List2) ->
     #tree{collate_fun = CollateFun} = Tree,
-    lists:umerge(collation_wrapper_fun(CollateFun), List1, List2).
-
-
-sort(#tree{} = Tree, List) ->
-    #tree{collate_fun = CollateFun} = Tree,
-    lists:sort(collation_wrapper_fun(CollateFun), List).
-
-
-usort(#tree{} = Tree, List) ->
-    #tree{collate_fun = CollateFun} = Tree,
-    lists:usort(collation_wrapper_fun(CollateFun), List).
-
-
-collation_wrapper_fun(CollateFun) ->
-    fun
-        (#node{} = N1, #node{} = N2) ->
-            CollateFun(first_key(N1), first_key(N2));
+    CollateWrapper = fun
         ({K1, _V1}, {K2, _V2}) ->
             CollateFun(K1, K2);
         ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) ->
-            CollateFun(L1, L2);
-        (K1, K2) ->
-            CollateFun(K1, K2)
-    end.
+            CollateFun(L1, L2)
+    end,
+    lists:umerge(CollateWrapper, List1, List2).
+
+
+sort_keys(#tree{} = Tree, List) ->
+    #tree{collate_fun = CollateFun} = Tree,
+    lists:sort(CollateFun, List).
+
+
+sort_nodes(#tree{} = Tree, List) ->
+    #tree{collate_fun = CollateFun} = Tree,
+    CollateWrapper = fun
+        (#node{} = N1, #node{} = N2) ->
+            CollateFun(first_key(N1), first_key(N2))
+    end,
+    lists:sort(CollateWrapper, List).
+
+
+sort_members(#tree{} = Tree, List) ->
+    #tree{collate_fun = CollateFun} = Tree,
+    CollateWrapper = fun
+        ({K1, _V1}, {K2, _V2}) ->
+            CollateFun(K1, K2);
+        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) ->
+            CollateFun(L1, L2)
+    end,
+    lists:sort(CollateWrapper, List).
+
+
+usort_members(#tree{} = Tree, List) ->
+    #tree{collate_fun = CollateFun} = Tree,
+    CollateWrapper = fun
+        ({K1, _V1}, {K2, _V2}) ->
+            CollateFun(K1, K2);
+        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) ->
+            CollateFun(L1, L2)
+    end,
+    lists:usort(CollateWrapper, List).
 
 
 collate_raw(K1, K2) ->
@@ -1285,7 +1304,7 @@ custom_collation_range_test_() ->
         lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, Tree, Keys),
         lists:foreach(
             fun(_) ->
-                [StartKey, EndKey] = sort(Tree, [rand:uniform(Max), rand:uniform(Max)]),
+                [StartKey, EndKey] = sort_keys(Tree, [rand:uniform(Max), rand:uniform(Max)]),
                 Seq = if
                     StartKey < EndKey ->
                         lists:seq(StartKey, EndKey);
@@ -1309,7 +1328,7 @@ custom_collation_reverse_range_test_() ->
         lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, Tree, Keys),
         lists:foreach(
             fun(_) ->
-                [StartKey, EndKey] = sort(Tree, [rand:uniform(Max), rand:uniform(Max)]),
+                [StartKey, EndKey] = sort_keys(Tree, [rand:uniform(Max), rand:uniform(Max)]),
                 Seq = if
                     StartKey < EndKey ->
                         lists:seq(StartKey, EndKey);
