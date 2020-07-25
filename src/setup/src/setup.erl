@@ -198,6 +198,9 @@ setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
 
 
 finish_cluster(Options) ->
+    % ensure that uuid is set
+    couch_server:get_uuid(),
+
     ok = wait_connected(),
     ok = sync_admins(),
     ok = sync_uuid(),
