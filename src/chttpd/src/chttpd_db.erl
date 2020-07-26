@@ -106,7 +106,7 @@ handle_changes_req1(#httpd{}=Req, Db) ->
         Etag = chttpd:make_etag({Info, Suffix}),
         DeltaT = timer:now_diff(os:timestamp(), T0) / 1000,
         couch_stats:update_histogram([couchdb, dbinfo], DeltaT),
-        chttpd:etag_respond(Req, Etag, fun() ->
+        case chttpd:etag_respond(Req, Etag, fun() ->
             Acc0 = #cacc{
                 feed = normal,
                 etag = Etag,
@@ -114,7 +114,14 @@ handle_changes_req1(#httpd{}=Req, Db) ->
                 threshold = Max
             },
             fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
-        end);
+        end) of
+            % TODO: This may be a debugging leftover, undo by just returning
+            %       chttpd:etag_respond()
+            {error, {forbidden, Message, _Stacktrace}} ->
+                throw({forbidden, Message});
+            Response ->
+                Response
+        end;
     Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource"  ->
         couch_stats:increment_counter([couchdb, httpd, clients_requesting_changes]),
         Acc0 = #cacc{
@@ -123,7 +130,14 @@ handle_changes_req1(#httpd{}=Req, Db) ->
             threshold = Max
         },
         try
-            fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs)
+            % TODO: This may be a debugging leftover, undo by just returning
+            %       fabric:changes()
+            case fabric:changes(Db, fun changes_callback/2, Acc0, ChangesArgs) of
+                {error, {forbidden, Message, _Stacktrace}} ->
+                    throw({forbidden, Message});
+                Response ->
+                    Response
+            end
         after
             couch_stats:decrement_counter([couchdb, httpd, clients_requesting_changes])
         end;
@@ -386,6 +400,7 @@ create_db_req(#httpd{}=Req, DbName) ->
     N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
     Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
     P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
+    Access = chttpd:qs_value(Req, "access", false),
     EngineOpt = parse_engine_opt(Req),
     DbProps = parse_partitioned_opt(Req),
     Options = [
@@ -394,8 +409,12 @@ create_db_req(#httpd{}=Req, DbName) ->
         {placement, P},
         {props, DbProps}
     ] ++ EngineOpt,
+    Options1 = case Access of
+        "true" -> [{access, true} | Options];
+        _ -> Options
+    end,
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
-    case fabric:create_db(DbName, Options) of
+    case fabric:create_db(DbName, Options1) of
     ok ->
         send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
     accepted ->
@@ -906,16 +925,18 @@ view_cb(Msg, Acc) ->
     couch_mrview_http:view_cb(Msg, Acc).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
-    % check for the existence of the doc to handle the 404 case.
-    couch_doc_open(Db, DocId, nil, []),
-    case chttpd:qs_value(Req, "rev") of
+    % fetch the old doc revision, so we can compare access control
+    % in send_update_doc() later.
+    Doc0 = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
+    Revs = chttpd:qs_value(Req, "rev"),
+    case Revs of
     undefined ->
         Body = {[{<<"_deleted">>,true}]};
     Rev ->
         Body = {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}
     end,
-    Doc = couch_doc_from_req(Req, Db, DocId, Body),
-    send_updated_doc(Req, Db, DocId, Doc);
+    Doc = Doc0#doc{revs=Revs,body=Body,deleted=true},
+    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, Doc));
 
 db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
     #doc_query_args{
@@ -1255,10 +1276,12 @@ receive_request_data(Req, LenLeft) when LenLeft > 0 ->
 receive_request_data(_Req, _) ->
     throw(<<"expected more data">>).
 
+update_doc_result_to_json({#doc{id=Id,revs=Rev}, access}) ->
+    update_doc_result_to_json({{Id, Rev}, access});
 update_doc_result_to_json({{Id, Rev}, Error}) ->
-        {_Code, Err, Msg} = chttpd:error_info(Error),
-        {[{id, Id}, {rev, couch_doc:rev_to_str(Rev)},
-            {error, Err}, {reason, Msg}]}.
+    {_Code, Err, Msg} = chttpd:error_info(Error),
+    {[{id, Id}, {rev, couch_doc:rev_to_str(Rev)},
+        {error, Err}, {reason, Msg}]}.
 
 update_doc_result_to_json(#doc{id=DocId}, Result) ->
     update_doc_result_to_json(DocId, Result);
