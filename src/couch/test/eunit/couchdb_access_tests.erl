@@ -69,61 +69,61 @@ after_all(_) ->
 access_test_() ->
     Tests = [
         % Doc creation
-        fun should_not_let_anonymous_user_create_doc/2
-        % fun should_let_admin_create_doc_with_access/2,
-   %      fun should_let_admin_create_doc_without_access/2,
-   %      fun should_let_user_create_doc_for_themselves/2,
-   %      fun should_not_let_user_create_doc_for_someone_else/2,
-   %      fun should_let_user_create_access_ddoc/2,
-   %      fun access_ddoc_should_have_no_effects/2,
-   %
-   %      % Doc updates
-   %      fun users_with_access_can_update_doc/2,
-   %      fun users_without_access_can_not_update_doc/2,
-   %      fun users_with_access_can_not_change_access/2,
-   %      fun users_with_access_can_not_remove_access/2,
-   %
-   %      % Doc reads
-   %      fun should_let_admin_read_doc_with_access/2,
-   %      fun user_with_access_can_read_doc/2,
-   %      fun user_without_access_can_not_read_doc/2,
-   %      fun user_can_not_read_doc_without_access/2,
-   %      fun admin_with_access_can_read_conflicted_doc/2,
-   %      fun user_with_access_can_not_read_conflicted_doc/2,
-   %
-   %      % Doc deletes
-   %      fun should_let_admin_delete_doc_with_access/2,
-   %      fun should_let_user_delete_doc_for_themselves/2,
-   %      fun should_not_let_user_delete_doc_for_someone_else/2,
-   %
-   %      % _all_docs with include_docs
-   %      fun should_let_admin_fetch_all_docs/2,
-   %      fun should_let_user_fetch_their_own_all_docs/2,
-   %
-   %
-   %      % _changes
-   %      fun should_let_admin_fetch_changes/2,
-   %      fun should_let_user_fetch_their_own_changes/2,
-   %
-   %      % views
-   %      fun should_not_allow_admin_access_ddoc_view_request/2,
-   %      fun should_not_allow_user_access_ddoc_view_request/2,
-   %      fun should_allow_admin_users_access_ddoc_view_request/2,
-   %      fun should_allow_user_users_access_ddoc_view_request/2,
-   %
-   %      % replication
-   %      fun should_allow_admin_to_replicate_from_access_to_access/2,
-   %      fun should_allow_admin_to_replicate_from_no_access_to_access/2,
-   %      fun should_allow_admin_to_replicate_from_access_to_no_access/2,
-   %      fun should_allow_admin_to_replicate_from_no_access_to_no_access/2,
-   %      %
-   %      fun should_allow_user_to_replicate_from_access_to_access/2,
-   %      fun should_allow_user_to_replicate_from_access_to_no_access/2,
-   %      fun should_allow_user_to_replicate_from_no_access_to_access/2,
-   %      fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
-   %
-   %      % _revs_diff for docs you don’t have access to
-   %      fun should_not_allow_user_to_revs_diff_other_docs/2
+        fun should_not_let_anonymous_user_create_doc/2,
+        fun should_let_admin_create_doc_with_access/2,
+        fun should_let_admin_create_doc_without_access/2,
+        fun should_let_user_create_doc_for_themselves/2,
+        fun should_not_let_user_create_doc_for_someone_else/2,
+        fun should_let_user_create_access_ddoc/2,
+        fun access_ddoc_should_have_no_effects/2,
+
+        % Doc updates
+        fun users_with_access_can_update_doc/2,
+        fun users_without_access_can_not_update_doc/2,
+        fun users_with_access_can_not_change_access/2,
+        fun users_with_access_can_not_remove_access/2,
+
+        % Doc reads
+        fun should_let_admin_read_doc_with_access/2,
+        fun user_with_access_can_read_doc/2,
+        fun user_without_access_can_not_read_doc/2,
+        fun user_can_not_read_doc_without_access/2,
+        fun admin_with_access_can_read_conflicted_doc/2,
+        fun user_with_access_can_not_read_conflicted_doc/2,
+
+        % Doc deletes
+        fun should_let_admin_delete_doc_with_access/2,
+        fun should_let_user_delete_doc_for_themselves/2,
+        fun should_not_let_user_delete_doc_for_someone_else/2,
+
+        % _all_docs with include_docs
+        fun should_let_admin_fetch_all_docs/2,
+        fun should_let_user_fetch_their_own_all_docs/2,
+
+
+        % _changes
+        fun should_let_admin_fetch_changes/2,
+        fun should_let_user_fetch_their_own_changes/2,
+
+        % views
+        fun should_not_allow_admin_access_ddoc_view_request/2,
+        fun should_not_allow_user_access_ddoc_view_request/2,
+        fun should_allow_admin_users_access_ddoc_view_request/2,
+        fun should_allow_user_users_access_ddoc_view_request/2,
+
+        % replication
+        fun should_allow_admin_to_replicate_from_access_to_access/2,
+        fun should_allow_admin_to_replicate_from_no_access_to_access/2,
+        fun should_allow_admin_to_replicate_from_access_to_no_access/2,
+        fun should_allow_admin_to_replicate_from_no_access_to_no_access/2,
+        %
+        fun should_allow_user_to_replicate_from_access_to_access/2,
+        fun should_allow_user_to_replicate_from_access_to_no_access/2,
+        fun should_allow_user_to_replicate_from_no_access_to_access/2,
+        fun should_allow_user_to_replicate_from_no_access_to_no_access/2,
+
+        % _revs_diff for docs you don’t have access to
+        fun should_not_allow_user_to_revs_diff_other_docs/2
 
 
         % TODO: create test db with role and not _users in _security.members
