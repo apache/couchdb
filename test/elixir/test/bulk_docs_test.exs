@@ -125,11 +125,9 @@ defmodule BulkDocsTest do
     docs = [%{_id: "0", a: 0}, %{_id: "1", a: 1}, %{_id: "1", a: 2}, %{_id: "3", a: 3}]
     rows = bulk_post(docs, ctx[:db_name]).body
 
-    # TODO: we had to change the order here, this might point to the same
-    #       missing, or overzealous application of lists:reverse() as elsewhere.
-    assert Enum.at(rows, 2)["id"] == "1"
-    assert Enum.at(rows, 2)["ok"]
-    assert Enum.at(rows, 1)["error"] == "conflict"
+    assert Enum.at(rows, 1)["id"] == "1"
+    assert Enum.at(rows, 1)["ok"]
+    assert Enum.at(rows, 2)["error"] == "conflict"
   end
 
   defp bulk_post(docs, db) do
