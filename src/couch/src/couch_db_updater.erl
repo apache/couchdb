@@ -713,12 +713,14 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, UserCtx) ->
 
     {ok, commit_data(Db1), UpdatedDDocIds}.
 
-check_access(Db, UserCtx, Access) ->
-    check_access(Db, UserCtx, couch_db:has_access_enabled(Db), Access).
+% check_access(Db, UserCtx, Access) ->
+%     check_access(Db, UserCtx, couch_db:has_access_enabled(Db), Access).
+%
+% check_access(_Db, UserCtx, false, _Access) ->
+%     true;
 
-check_access(_Db, UserCtx, false, _Access) ->
-    true;
-check_access(Db, UserCtx, true, Access) -> couch_db:check_access(Db#db{user_ctx=UserCtx}, Access).
+% at this point, we already validated this Db is access enabled, so do the checks right away.
+check_access(Db, UserCtx, Access) -> couch_db:check_access(Db#db{user_ctx=UserCtx}, Access).
 
 % TODO: looks like we go into validation here unconditionally and only check in
 %       check_access() whether the Db has_access_enabled(), we should do this
@@ -726,6 +728,12 @@ check_access(Db, UserCtx, true, Access) -> couch_db:check_access(Db#db{user_ctx=
 %       However, if it is, that means we have to speed this up as it would still
 %       be too slow for when access is enabled.
 validate_docs_access(Db, UserCtx, DocsList, OldDocInfos) ->
+    case couch_db:has_access_enabled(Db) of
+        true -> validate_docs_access_int(Db, UserCtx, DocsList, OldDocInfos);
+        _Else -> { DocsList, OldDocInfos }
+    end.
+
+validate_docs_access_int(Db, UserCtx, DocsList, OldDocInfos) ->
     validate_docs_access(Db, UserCtx, DocsList, OldDocInfos, [], []).
 
 validate_docs_access(_Db, UserCtx, [], [], DocsListValidated, OldDocInfosValidated) ->
