@@ -19,7 +19,7 @@
 -define(DOC_ID, <<"foobar">>).
 -define(LOCAL_DOC_ID, <<"_local/foobar">>).
 -define(NUM_CLIENTS, [100, 500, 1000, 2000, 5000, 10000]).
--define(TIMEOUT, 20000).
+-define(TIMEOUT, 100000).
 
 start() ->
     test_util:start_couch().

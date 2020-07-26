@@ -124,6 +124,7 @@ defmodule BulkDocsTest do
   test "bulk docs emits conflict error for duplicate doc `_id`s", ctx do
     docs = [%{_id: "0", a: 0}, %{_id: "1", a: 1}, %{_id: "1", a: 2}, %{_id: "3", a: 3}]
     rows = bulk_post(docs, ctx[:db_name]).body
+
     assert Enum.at(rows, 1)["id"] == "1"
     assert Enum.at(rows, 1)["ok"]
     assert Enum.at(rows, 2)["error"] == "conflict"
