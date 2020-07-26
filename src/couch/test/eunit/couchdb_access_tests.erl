@@ -163,16 +163,17 @@ make_test_cases(Mod, Funs) ->
 %
 
 should_not_let_anonymous_user_create_doc(_PortType, Url) ->
-    BulkDocsBody = {[
-      {<<"docs">>, [
-          {[{<<"_id">>, <<"a">>}]},
-          {[{<<"_id">>, <<"a">>}]},
-          {[{<<"_id">>, <<"b">>}]},
-          {[{<<"_id">>, <<"c">>}]}
-      ]}
-    ]},
-    Resp = test_request:post(Url ++ "/db/_bulk_docs", ?ADMIN_REQ_HEADERS, jiffy:encode(BulkDocsBody)),
-    ?debugFmt("~nResp: ~p~n", [Resp]),
+    % TODO: debugging leftover
+    % BulkDocsBody = {[
+    %   {<<"docs">>, [
+    %       {[{<<"_id">>, <<"a">>}]},
+    %       {[{<<"_id">>, <<"a">>}]},
+    %       {[{<<"_id">>, <<"b">>}]},
+    %       {[{<<"_id">>, <<"c">>}]}
+    %   ]}
+    % ]},
+    % Resp = test_request:post(Url ++ "/db/_bulk_docs", ?ADMIN_REQ_HEADERS, jiffy:encode(BulkDocsBody)),
+    % ?debugFmt("~nResp: ~p~n", [Resp]),
     {ok, Code, _, _} = test_request:put(Url ++ "/db/a", "{\"a\":1,\"_access\":[\"x\"]}"),
     ?_assertEqual(401, Code).
 
