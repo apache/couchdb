@@ -66,6 +66,15 @@ class OperatorTests:
         docs = self.db.find({"emptybang": {"$allMatch": {"foo": {"$eq": 2}}}})
         self.assertEqual(len(docs), 0)
 
+    def test_keymap_match(self):
+        amdocs = [
+            {"foo": {"aa": "bar", "bb": "bang"}},
+            {"foo": {"cc": "bar", "bb": "bang"}},
+        ]
+        self.db.save_docs(amdocs, w=3)
+        docs = self.db.find({"foo": {"$keyMapMatch": {"$eq": "aa"}}})
+        self.assertEqual(len(docs), 1)
+
     def test_in_operator_array(self):
         docs = self.db.find({"manager": True, "favorites": {"$in": ["Ruby", "Python"]}})
         self.assertUserIds([2, 6, 7, 9, 11, 12], docs)
