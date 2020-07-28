@@ -414,15 +414,14 @@ fetch_docs(Db, DesignOpts ,Changes) ->
         {Id, RevInfo, Change} = maps:get(BodyFuture, BodyState),
         Doc = fabric2_fdb:get_doc_body_wait(Db, Id, RevInfo, BodyFuture),
 
-        BranchCount = maps:get(branch_count, RevInfo, 1),
-        Doc1 = case BranchCount == 1 of
-            true when AddLocalSeq ->
+        Doc1 = case maps:get(branch_count, RevInfo, 1) of
+            1 when AddLocalSeq ->
                 {ok, DocWithLocalSeq} = fabric2_db:apply_open_doc_opts(Doc,
                     [RevInfo], [local_seq]),
                 DocWithLocalSeq;
-            true ->
+            1 ->
                 Doc;
-            false ->
+            _ ->
                 RevConflicts = fabric2_fdb:get_all_revs(Db, Id),
                 DocOpts = if not AddLocalSeq -> []; true -> [local_seq] end,
 
