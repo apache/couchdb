@@ -241,15 +241,16 @@ full_reduce(Db, #tree{} = Tree) ->
 reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
     Fun = fun
         ({visit, Key, Value}, {MapAcc, ReduceAcc}) ->
+            BeforeStart = less_than(Tree, Key, StartKey),
             AfterEnd = greater_than(Tree, Key, EndKey),
             InRange = greater_than_or_equal(Tree, Key, StartKey) andalso less_than_or_equal(Tree, Key, EndKey),
             if
+                BeforeStart ->
+                    {ok, {MapAcc, ReduceAcc}};
                 AfterEnd ->
                     {stop, {MapAcc, ReduceAcc}};
                 InRange ->
-                     {ok, {[{Key, Value} | MapAcc], ReduceAcc}};
-                true ->
-                    {ok, {MapAcc, ReduceAcc}}
+                     {ok, {[{Key, Value} | MapAcc], ReduceAcc}}
             end;
         ({traverse, FirstKey, LastKey, Reduction}, {MapAcc, ReduceAcc}) ->
             BeforeStart = less_than(Tree, LastKey, StartKey),
@@ -322,6 +323,10 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
             KeyGroup = GroupKeyFun(Key),
             SameGroup = CurrentGroup =:= KeyGroup,
             if
+                Dir == fwd andalso BeforeStart ->
+                    {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
+                Dir == rev andalso AfterEnd ->
+                    {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 Dir == fwd andalso AfterEnd ->
                     {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 Dir == rev andalso BeforeStart ->
@@ -333,9 +338,7 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
                 InRange ->
                     %% implicit end of current group and start of a new one
                     GroupValue = do_reduce(Tree, MapAcc, ReduceAcc),
-                    {ok, {KeyGroup, UserAccFun({CurrentGroup, GroupValue}, UserAcc), [{Key, Value}], []}};
-                true ->
-                    {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}}
+                    {ok, {KeyGroup, UserAccFun({CurrentGroup, GroupValue}, UserAcc), [{Key, Value}], []}}
             end;
         ({traverse, FirstKey, LastKey, Reduction}, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}) ->
             BeforeStart = less_than(Tree, LastKey, StartKey),
