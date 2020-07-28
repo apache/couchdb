@@ -380,7 +380,7 @@ write_docs(TxDb, Mrst, Docs, State) ->
     DocsNumber.
 
 
-fetch_docs(Db, DesignOpts ,Changes) ->
+fetch_docs(Db, DesignOpts, Changes) ->
     {Deleted, NotDeleted} = lists:partition(fun(Doc) ->
         #{deleted := Deleted} = Doc,
         Deleted
