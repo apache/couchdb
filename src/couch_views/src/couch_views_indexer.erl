@@ -195,9 +195,10 @@ do_update(Db, Mrst0, State0) ->
             limit := Limit,
             limiter := Limiter,
             view_vs := ViewVS,
-            changes_done := ChangesDone0
+            changes_done := ChangesDone0,
+            design_opts := DesignOpts
         } = State2,
-        DocAcc1 = fetch_docs(TxDb, DocAcc),
+        DocAcc1 = fetch_docs(TxDb, DesignOpts, DocAcc),
         couch_rate:in(Limiter, Count),
 
         {Mrst1, MappedDocs} = map_docs(Mrst0, DocAcc1),
@@ -379,7 +380,7 @@ write_docs(TxDb, Mrst, Docs, State) ->
     DocsNumber.
 
 
-fetch_docs(Db, Changes) ->
+fetch_docs(Db, DesignOpts ,Changes) ->
     {Deleted, NotDeleted} = lists:partition(fun(Doc) ->
         #{deleted := Deleted} = Doc,
         Deleted
@@ -407,17 +408,27 @@ fetch_docs(Db, Changes) ->
         }
     end, #{}, erlfdb:wait_for_all(RevFutures)),
 
+    AddLocalSeq = lists:keymember(<<"local_seq">>, 1, DesignOpts),
     BodyFutures = maps:keys(BodyState),
     ChangesWithDocs = lists:map(fun (BodyFuture) ->
         {Id, RevInfo, Change} = maps:get(BodyFuture, BodyState),
         Doc = fabric2_fdb:get_doc_body_wait(Db, Id, RevInfo, BodyFuture),
 
         BranchCount = maps:get(branch_count, RevInfo, 1),
-        Doc1 = if BranchCount == 1 -> Doc; true ->
-            RevConflicts = fabric2_fdb:get_all_revs(Db, Id),
-            {ok, DocWithConflicts} = fabric2_db:apply_open_doc_opts(Doc,
-                RevConflicts, [conflicts]),
-            DocWithConflicts
+        Doc1 = case BranchCount == 1 of
+            true when AddLocalSeq ->
+                {ok, DocWithLocalSeq} = fabric2_db:apply_open_doc_opts(Doc,
+                    [RevInfo], [local_seq]),
+                DocWithLocalSeq;
+            true ->
+                Doc;
+            false ->
+                RevConflicts = fabric2_fdb:get_all_revs(Db, Id),
+                DocOpts = if not AddLocalSeq -> []; true -> [local_seq] end,
+
+                {ok, DocWithConflicts} = fabric2_db:apply_open_doc_opts(Doc,
+                    RevConflicts, [conflicts | DocOpts]),
+                DocWithConflicts
         end,
         Change#{doc => Doc1}
     end, erlfdb:wait_for_all(BodyFutures)),
