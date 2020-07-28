@@ -127,7 +127,7 @@ defmodule ReplicationTest do
     task = get_task(repl_id, 3_000)
     assert is_map(task)
 
-    assert task["replication_id"] == repl_id
+    assert task["id"] == repl_id
 
     repl_body = %{
       "replication_id" => repl_id,
@@ -1749,8 +1749,13 @@ defmodule ReplicationTest do
 
   def wait_for_repl(src_db_name, repl_id, expect_revs_checked, wait_left) do
     task = get_task(repl_id, 0)
-    through_seq = task["through_seq"] || "0"
-    revs_checked = task["revisions_checked"]
+    info = if task["info"] == :null do
+        %{"through_seq" => "0", "revisions_checked" => "0"}
+    else
+        task["info"]
+    end
+    through_seq = info["through_seq"] || "0"
+    revs_checked = info["revisions_checked"] || "0"
     changes = get_db_changes(src_db_name, %{:since => through_seq})
 
     if length(changes["results"]) > 0 or revs_checked < expect_revs_checked do
@@ -1799,13 +1804,14 @@ defmodule ReplicationTest do
   end
 
   def try_get_task(repl_id) do
-    resp = Couch.get("/_active_tasks")
-    assert HTTPotion.Response.success?(resp)
-    assert is_list(resp.body)
+    resp = Couch.get("/_scheduler/jobs/#{repl_id}")
 
-    Enum.find(resp.body, nil, fn task ->
-      task["replication_id"] == repl_id
-    end)
+    if HTTPotion.Response.success?(resp) do
+        assert is_map(resp.body)
+        resp.body
+    else
+        nil
+    end
   end
 
   def set_user(uri, userinfo) do
