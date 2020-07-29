@@ -28,6 +28,7 @@
     get_kv_size/2,
 
     fold_map_idx/5,
+    fold_red_idx/6,
 
     write_doc/3,
 
@@ -144,7 +145,7 @@ get_row_count(TxDb, View) ->
     #{
         tx := Tx
     } = TxDb,
-    {Count, _} = ebtree:full_reduce(Tx, View#mrview.btree),
+    {Count, _, _} = ebtree:full_reduce(Tx, View#mrview.btree),
     Count.
 
 
@@ -152,7 +153,7 @@ get_kv_size(TxDb, View) ->
     #{
         tx := Tx
     } = TxDb,
-    {_, TotalSize} = ebtree:full_reduce(Tx, View#mrview.btree),
+    {_, TotalSize, _} = ebtree:full_reduce(Tx, View#mrview.btree),
     TotalSize.
 
 
@@ -213,6 +214,74 @@ fold_map_idx(TxDb, View, Options, Callback, Acc0) ->
         rev ->
             % Start/End keys swapped on purpose because ebtree
             ebtree:reverse_range(Tx, Btree, EndKey, StartKey, Wrapper, Acc0)
+    end.
+
+
+fold_red_idx(TxDb, View, Idx, Options, Callback, Acc0) ->
+    #{
+        tx := Tx
+    } = TxDb,
+    #mrview{
+        btree = Btree
+    } = View,
+
+    {Dir, StartKey, EndKey, InclusiveEnd, GroupKeyFun} = to_red_opts(Options),
+
+    Wrapper = fun({GroupKey, Reduction}, WAcc) ->
+        {_RowCount, _RowSize, UserReds} = Reduction,
+        RedValue = lists:nth(Idx, UserReds),
+        Callback(GroupKey, RedValue, WAcc)
+    end,
+
+    case {GroupKeyFun, Dir} of
+        {group_all, fwd} ->
+            EBtreeOpts = [
+                {dir, fwd},
+                {inclusive_end, InclusiveEnd}
+            ],
+            Reduction = ebtree:reduce(Tx, Btree, StartKey, EndKey, EBtreeOpts),
+            Wrapper({null, Reduction}, Acc0);
+        {F, fwd} when is_function(F) ->
+            EBtreeOpts = [
+                {dir, fwd},
+                {inclusive_end, InclusiveEnd}
+            ],
+            ebtree:group_reduce(
+                    Tx,
+                    Btree,
+                    StartKey,
+                    EndKey,
+                    GroupKeyFun,
+                    Wrapper,
+                    Acc0,
+                    EBtreeOpts
+                );
+        {group_all, rev} ->
+            % Start/End keys swapped on purpose because ebtree. Also
+            % inclusive_start for same reason.
+            EBtreeOpts = [
+                {dir, rev},
+                {inclusive_start, InclusiveEnd}
+            ],
+            Reduction = ebtree:reduce(Tx, Btree, EndKey, StartKey, EBtreeOpts),
+            Wrapper({null, Reduction}, Acc0);
+        {F, rev} when is_function(F) ->
+            % Start/End keys swapped on purpose because ebtree. Also
+            % inclusive_start for same reason.
+            EBtreeOpts = [
+                {dir, rev},
+                {inclusive_start, InclusiveEnd}
+            ],
+            ebtree:group_reduce(
+                    Tx,
+                    Btree,
+                    EndKey,
+                    StartKey,
+                    GroupKeyFun,
+                    Wrapper,
+                    Acc0,
+                    EBtreeOpts
+                )
     end.
 
 
@@ -339,7 +408,7 @@ open_id_tree(TxDb, Sig) ->
     ebtree:open(Tx, Prefix, get_order(id_btree), TreeOpts).
 
 
-open_view_tree(TxDb, Sig, _Lang, View) ->
+open_view_tree(TxDb, Sig, Lang, View) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
@@ -350,7 +419,7 @@ open_view_tree(TxDb, Sig, _Lang, View) ->
     Prefix = view_tree_prefix(DbPrefix, Sig, ViewId),
     TreeOpts = [
         {collate_fun, couch_views_util:collate_fun(View)},
-        {reduce_fun, make_reduce_fun(View)}
+        {reduce_fun, make_reduce_fun(Lang, View)},
         {persist_fun, fun persist_chunks/3}
     ],
     View#mrview{
@@ -372,26 +441,30 @@ min_order(V) ->
     V + 1.
 
 
-make_reduce_fun(#mrview{}) ->
+make_reduce_fun(Lang, #mrview{} = View) ->
+    RedFuns = [Src || {_, Src} <- View#mrview.reduce_funs],
     fun
-        (KVs, _ReReduce = false) ->
-            TotalSize = lists:foldl(fun({K, V}, Acc) ->
+        (KVs0, _ReReduce = false) ->
+            KVs1 = detuple_kvs(expand_dupes(KVs0)),
+            TotalSize = lists:foldl(fun([K, V], Acc) ->
                 KSize = couch_ejson_size:encoded_size(K),
-                VSize = case V of
-                    {dups, Dups} ->
-                        lists:foldl(fun(D, DAcc) ->
-                            DAcc + couch_ejson_size:encoded_size(D)
-                        end, 0, Dups);
-                    _ ->
-                        couch_ejson_size:encoded_size(V)
-                end,
+                VSize = couch_ejson_size:encoded_size(V),
                 KSize + VSize + Acc
-            end, 0, KVs),
-            {length(KVs), TotalSize};
-        (KRs, _ReReduce = true) ->
-            lists:foldl(fun({Count, Size}, {CountAcc, SizeAcc}) ->
-                {Count + CountAcc, Size + SizeAcc}
-            end, {0, 0}, KRs)
+            end, 0, KVs1),
+            {ok, UserReds} = couch_query_servers:reduce(Lang, RedFuns, KVs1),
+            {length(KVs1), TotalSize, UserReds};
+        (Reductions, _ReReduce = true) ->
+            FoldFun = fun({Count, Size, UserReds}, {CAcc, SAcc, URedAcc}) ->
+                NewCAcc = Count + CAcc,
+                NewSAcc = Size + SAcc,
+                NewURedAcc = [UserReds | URedAcc],
+                {NewCAcc, NewSAcc, NewURedAcc}
+            end,
+            InitAcc = {0, 0, []},
+            FinalAcc = lists:foldl(FoldFun, InitAcc, Reductions),
+            {FinalCount, FinalSize, UReds} = FinalAcc,
+            {ok, Result} = couch_query_servers:rereduce(Lang, RedFuns, UReds),
+            {FinalCount, FinalSize, Result}
     end.
 
 
@@ -438,6 +511,17 @@ to_map_opts(Options) ->
     {Dir, StartKey, EndKey, InclusiveEnd}.
 
 
+to_red_opts(Options) ->
+    {Dir, StartKey, EndKey, InclusiveEnd} = to_map_opts(Options),
+
+    GroupKeyFun = case lists:keyfind(group_key_fun, 1, Options) of
+        {group_key_fun, GKF} -> GKF;
+        false -> fun({_Key, _DocId}) -> global_group end
+    end,
+
+    {Dir, StartKey, EndKey, InclusiveEnd, GroupKeyFun}.
+
+
 dedupe_rows(View, KVs0) ->
     CollateFun = couch_views_util:collate_fun(View),
     KVs1 = lists:sort(fun({KeyA, ValA}, {KeyB, ValB}) ->
@@ -473,6 +557,22 @@ combine_vals(V1, {dups, V2}) ->
     {dups, [V1 | V2]};
 combine_vals(V1, V2) ->
     {dups, [V1, V2]}.
+
+
+expand_dupes([]) ->
+    [];
+expand_dupes([{K, {dups, Dups}} | Rest]) ->
+    Expanded = [{K, D} || D <- Dups],
+    Expanded ++ expand_dupes(Rest);
+expand_dupes([{K, V} | Rest]) ->
+    [{K, V} | expand_dupes(Rest)].
+
+
+detuple_kvs([]) ->
+    [];
+detuple_kvs([KV | Rest]) ->
+    {{Key, Id}, Value} = KV,
+    [[[Key, Id], Value] | detuple_kvs(Rest)].
 
 
 id_tree_prefix(DbPrefix, Sig) ->
