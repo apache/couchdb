@@ -125,14 +125,14 @@ lookup(Db, #tree{} = Tree, Key) ->
         ({visit, K, V}, _Acc) when K =:= Key ->
             {stop, {K, V}};
         ({visit, K, _V}, Acc) ->
-            case greater_than(Tree, K, Key) of
+            case collate(Tree, K, Key, [gt]) of
                 true ->
                     {stop, Acc};
                 false ->
                     {ok, Acc}
             end;
         ({traverse, F, L, _R}, Acc) ->
-            case {greater_than(Tree, F, Key), less_than_or_equal(Tree, Key, L)} of
+            case {collate(Tree, F, Key, [gt]), collate(Tree, Key, L, [lt, eq])} of
                 {true, _} ->
                     {stop, Acc};
                 {false, true} ->
@@ -231,30 +231,42 @@ full_reduce(Db, #tree{} = Tree) ->
     do_reduce(Tree, MapValues, ReduceValues).
 
 
+%% @equiv reduce(Db, Tree, StartKey, EndKey, [])
+-spec reduce(Db :: term(), Tree :: #tree{}, StartKey :: term(), EndKey :: term()) -> term().
+reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
+    reduce(Db, Tree, StartKey, EndKey, []).
+
 %% @doc Calculate the reduce value for all keys in the specified range.
 %% @param Db An erlfdb database or transaction.
 %% @param Tree The ebtree.
 %% @param StartKey The beginning of the range
 %% @param EndKey The end of the range
 %% @returns the reduce value for the specified range
--spec reduce(Db :: term(), Tree :: #tree{}, StartKey :: term(), EndKey :: term()) -> term().
-reduce(Db, #tree{} = Tree, StartKey, EndKey) ->
+-spec reduce(Db :: term(), Tree :: #tree{}, StartKey :: term(),
+    EndKey :: term(), Options :: [reduce_option()]) -> term().
+reduce(Db, #tree{} = Tree, StartKey, EndKey, Options) ->
+    InclusiveStart = proplists:get_value(inclusive_start, Options, true),
+    InclusiveEnd = proplists:get_value(inclusive_end, Options, true),
+
     Fun = fun
         ({visit, Key, Value}, {MapAcc, ReduceAcc}) ->
-            AfterEnd = greater_than(Tree, Key, EndKey),
-            InRange = greater_than_or_equal(Tree, Key, StartKey) andalso less_than_or_equal(Tree, Key, EndKey),
+            BeforeStart = collate(Tree, Key, StartKey, if InclusiveStart -> [lt]; true -> [lt, eq] end),
+            AfterEnd = collate(Tree, Key, EndKey, if InclusiveEnd -> [gt]; true -> [gt, eq] end),
+            InRange = collate(Tree, Key, StartKey, if InclusiveStart -> [gt, eq]; true -> [gt] end)
+                andalso collate(Tree, Key, EndKey, if InclusiveEnd -> [lt, eq]; true -> [lt] end),
             if
+                BeforeStart ->
+                    {ok, {MapAcc, ReduceAcc}};
                 AfterEnd ->
                     {stop, {MapAcc, ReduceAcc}};
                 InRange ->
-                     {ok, {[{Key, Value} | MapAcc], ReduceAcc}};
-                true ->
-                    {ok, {MapAcc, ReduceAcc}}
+                     {ok, {[{Key, Value} | MapAcc], ReduceAcc}}
             end;
         ({traverse, FirstKey, LastKey, Reduction}, {MapAcc, ReduceAcc}) ->
-            BeforeStart = less_than(Tree, LastKey, StartKey),
-            AfterEnd = greater_than(Tree, FirstKey, EndKey),
-            Whole = greater_than_or_equal(Tree, FirstKey, StartKey) andalso less_than_or_equal(Tree, LastKey, EndKey),
+            BeforeStart = collate(Tree, LastKey, StartKey, if InclusiveStart -> [lt]; true -> [lt, eq] end),
+            AfterEnd = collate(Tree, FirstKey, EndKey, if InclusiveEnd -> [gt]; true -> [gt, eq] end),
+            Whole = collate(Tree, FirstKey, StartKey, if InclusiveStart -> [gt, eq]; true -> [gt] end)
+                andalso collate(Tree, LastKey, EndKey, if InclusiveEnd -> [lt, eq]; true -> [lt] end),
             if
                 BeforeStart ->
                     {skip, {MapAcc, ReduceAcc}};
@@ -298,9 +310,12 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
 %% @param GroupKeyFun A function that takes a key as a parameter and returns the group key.
 %% @param UserAccFun A function called when a new group reduction is calculated and returns an acc.
 %% @param UserAcc0 The initial accumulator.
-%% @param Options Currently supported options are [{dir, fwd}] and [{dir, rev}]
+%% @param Options Currently supported options are {dir, fwd | rev}
+%% and {inclusive_start | inclusive_end, true | false}
 %% @returns the final accumulator.
 -type group_key() :: term().
+
+-type reduce_option() :: [{inclusive_start, boolean()} | {inclusive_end, boolean()}].
 
 -spec group_reduce(
     Db :: term(),
@@ -310,18 +325,26 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
     GroupKeyFun :: fun((term()) -> group_key()),
     UserAccFun :: fun(({group_key(), GroupValue :: term()}, Acc0 :: term()) -> Acc1 :: term()),
     UserAcc0 :: term(),
-    Options :: [fold_option()]) -> Acc1 :: term().
+    Options :: [fold_option() | reduce_option()]) -> Acc1 :: term().
 group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, UserAcc0, Options) ->
     Dir = proplists:get_value(dir, Options, fwd),
+    InclusiveStart = proplists:get_value(inclusive_start, Options, true),
+    InclusiveEnd = proplists:get_value(inclusive_end, Options, true),
     NoGroupYet = ?MIN,
     Fun = fun
         ({visit, Key, Value}, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}) ->
-            BeforeStart = less_than(Tree, Key, StartKey),
-            AfterEnd = greater_than(Tree, Key, EndKey),
-            InRange = in_range(Tree, StartKey, Key, EndKey),
+            BeforeStart = collate(Tree, Key, StartKey, if InclusiveStart -> [lt]; true -> [lt, eq] end),
+            AfterEnd = collate(Tree, Key, EndKey, if InclusiveEnd -> [gt]; true -> [gt, eq] end),
+            InRange =
+                collate(Tree, Key, StartKey, if InclusiveStart -> [gt, eq]; true -> [gt] end) andalso
+                collate(Tree, Key, EndKey, if InclusiveEnd -> [lt, eq]; true -> [lt] end),
             KeyGroup = GroupKeyFun(Key),
             SameGroup = CurrentGroup =:= KeyGroup,
             if
+                Dir == fwd andalso BeforeStart ->
+                    {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
+                Dir == rev andalso AfterEnd ->
+                    {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 Dir == fwd andalso AfterEnd ->
                     {stop, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
                 Dir == rev andalso BeforeStart ->
@@ -333,16 +356,18 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
                 InRange ->
                     %% implicit end of current group and start of a new one
                     GroupValue = do_reduce(Tree, MapAcc, ReduceAcc),
-                    {ok, {KeyGroup, UserAccFun({CurrentGroup, GroupValue}, UserAcc), [{Key, Value}], []}};
-                true ->
-                    {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}}
+                    {ok, {KeyGroup, UserAccFun({CurrentGroup, GroupValue}, UserAcc), [{Key, Value}], []}}
             end;
         ({traverse, FirstKey, LastKey, Reduction}, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}) ->
-            BeforeStart = less_than(Tree, LastKey, StartKey),
-            AfterEnd = greater_than(Tree, FirstKey, EndKey),
+            BeforeStart = collate(Tree, LastKey, StartKey, if InclusiveStart -> [lt]; true -> [lt, eq] end),
+            AfterEnd = collate(Tree, FirstKey, EndKey, if InclusiveEnd -> [gt]; true -> [gt, eq] end),
             Whole = CurrentGroup =:= GroupKeyFun(FirstKey) andalso CurrentGroup =:= GroupKeyFun(LastKey),
-            FirstInRange = in_range(Tree, StartKey, FirstKey, EndKey),
-            LastInRange = in_range(Tree, StartKey, LastKey, EndKey),
+            FirstInRange =
+                collate(Tree, FirstKey, StartKey, if InclusiveStart -> [gt, eq]; true -> [gt] end) andalso
+                collate(Tree, FirstKey, EndKey, if InclusiveEnd -> [lt, eq]; true -> [lt] end),
+            LastInRange =
+                collate(Tree, LastKey, StartKey, if InclusiveStart -> [gt, eq]; true -> [gt] end) andalso
+                collate(Tree, LastKey, EndKey, if InclusiveEnd -> [lt, eq]; true -> [lt] end),
             if
                 Dir == fwd andalso BeforeStart ->
                     {skip, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
@@ -386,10 +411,10 @@ range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
 
 range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, AccFun, Acc0) ->
     InRange = [{K, V} || {K, V} <- Node#node.members,
-        less_than_or_equal(Tree, StartKey, K), less_than_or_equal(Tree, K, EndKey)],
+        collate(Tree, StartKey, K, [lt, eq]), collate(Tree, K, EndKey, [lt, eq])],
     Acc1 = AccFun(InRange, Acc0),
     LastKey = last_key(Node),
-    case Node#node.next /= undefined andalso less_than_or_equal(Tree, LastKey, EndKey) of
+    case Node#node.next /= undefined andalso collate(Tree, LastKey, EndKey, [lt, eq]) of
         true ->
             range(Tx, Tree, get_node(Tx, Tree, Node#node.next), StartKey, EndKey, AccFun, Acc1);
         false ->
@@ -419,10 +444,10 @@ reverse_range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
 
 reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, AccFun, Acc0) ->
     InRange = [{K, V} || {K, V} <- Node#node.members,
-        less_than_or_equal(Tree, StartKey, K), less_than_or_equal(Tree, K, EndKey)],
+        collate(Tree, StartKey, K, [lt, eq]), collate(Tree, K, EndKey, [lt, eq])],
     Acc1 = AccFun(lists:reverse(InRange), Acc0),
     FirstKey = first_key(Node),
-    case Node#node.prev /= undefined andalso less_than_or_equal(Tree, StartKey, FirstKey) of
+    case Node#node.prev /= undefined andalso collate(Tree, StartKey, FirstKey, [lt, eq]) of
         true ->
             reverse_range(Tx, Tree, get_node(Tx, Tree, Node#node.prev), StartKey, EndKey, AccFun, Acc1);
         false ->
@@ -695,7 +720,7 @@ find_child_int(#tree{} = _Tree, [Child], _Key) ->
     Child;
 
 find_child_int(#tree{} = Tree, [{_F, L, _P, _R} = Child| Rest], Key) ->
-    case less_than_or_equal(Tree, Key, L) of
+    case collate(Tree, Key, L, [lt, eq]) of
         true ->
             Child;
         false ->
@@ -876,94 +901,83 @@ reduce_values(#tree{} = Tree, Values, Rereduce) when is_list(Values) ->
 
 %% collation functions
 
-in_range(#tree{} = Tree, StartOfRange, Key, EndOfRange) ->
-    greater_than_or_equal(Tree, Key, StartOfRange) andalso less_than_or_equal(Tree, Key, EndOfRange).
 
+collate(#tree{} = _Tree, ?MIN, _B) ->
+    lt;
 
-greater_than(#tree{} = Tree, A, B) ->
-    not less_than_or_equal(Tree, A, B).
+collate(#tree{} = _Tree, _A, ?MIN) ->
+    gt;
 
+collate(#tree{} = _Tree, ?MAX, _B) ->
+    gt;
 
-greater_than_or_equal(#tree{} = _Tree, A, A) ->
-    true;
+collate(#tree{} = _Tree, _A, ?MAX) ->
+    lt;
 
-greater_than_or_equal(#tree{} = Tree, A, B) ->
-    greater_than(Tree, A, B).
-
-
-less_than(#tree{} = _Tree, A, A) ->
-    false;
-
-less_than(#tree{} = Tree, A, B) ->
-    less_than_or_equal(Tree, A, B).
-
-
-less_than_or_equal(#tree{} = _Tree, ?MIN, _B) ->
-    true;
-
-less_than_or_equal(#tree{} = _Tree, _A, ?MIN) ->
-    false;
-
-less_than_or_equal(#tree{} = _Tree, ?MAX, _B) ->
-    false;
-
-less_than_or_equal(#tree{} = _Tree, _A, ?MAX) ->
-    true;
-
-less_than_or_equal(#tree{} = Tree, A, B) ->
+collate(#tree{} = Tree, A, B) ->
     #tree{collate_fun = CollateFun} = Tree,
     CollateFun(A, B).
 
 
+collate(#tree{} = Tree, A, B, Allowed) ->
+    lists:member(collate(Tree, A, B), Allowed).
+
+
 umerge_members(#tree{} = Tree, List1, List2) ->
-    #tree{collate_fun = CollateFun} = Tree,
     CollateWrapper = fun
         ({K1, _V1}, {K2, _V2}) ->
-            CollateFun(K1, K2);
+            collate(Tree, K1, K2, [lt, eq]);
         ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) ->
-            CollateFun(L1, L2)
+            collate(Tree, L1, L2, [lt, eq])
     end,
     lists:umerge(CollateWrapper, List1, List2).
 
 
 sort_keys(#tree{} = Tree, List) ->
-    #tree{collate_fun = CollateFun} = Tree,
-    lists:sort(CollateFun, List).
+    CollateWrapper = fun
+        (K1, K2) ->
+            collate(Tree, K1, K2, [lt, eq])
+    end,
+    lists:sort(CollateWrapper, List).
 
 
 sort_nodes(#tree{} = Tree, List) ->
-    #tree{collate_fun = CollateFun} = Tree,
     CollateWrapper = fun
         (#node{} = N1, #node{} = N2) ->
-            CollateFun(first_key(N1), first_key(N2))
+            collate(Tree, first_key(N1), first_key(N2), [lt, eq])
     end,
     lists:sort(CollateWrapper, List).
 
 
 sort_members(#tree{} = Tree, List) ->
-    #tree{collate_fun = CollateFun} = Tree,
     CollateWrapper = fun
         ({K1, _V1}, {K2, _V2}) ->
-            CollateFun(K1, K2);
+            collate(Tree, K1, K2, [lt, eq]);
         ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) ->
-            CollateFun(L1, L2)
+            collate(Tree, L1, L2, [lt, eq])
     end,
     lists:sort(CollateWrapper, List).
 
 
 usort_members(#tree{} = Tree, List) ->
-    #tree{collate_fun = CollateFun} = Tree,
     CollateWrapper = fun
         ({K1, _V1}, {K2, _V2}) ->
-            CollateFun(K1, K2);
+            collate(Tree, K1, K2, [lt, eq]);
         ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) ->
-            CollateFun(L1, L2)
+            collate(Tree, L1, L2, [lt, eq])
     end,
     lists:usort(CollateWrapper, List).
 
 
-collate_raw(K1, K2) ->
-    K1 =< K2.
+collate_raw(A, B) when A < B ->
+    lt;
+
+collate_raw(A, B) when A > B ->
+    gt;
+
+collate_raw(A, A) ->
+    eq.
+
 
 %% encoding function
 
@@ -1068,16 +1082,9 @@ reduce_stats(Rs, true) ->
 collation_fun_test_() ->
     Tree = #tree{collate_fun = fun collate_raw/2},
     [
-        ?_test(?assert(greater_than(Tree, 4, 3))),
-        ?_test(?assertNot(greater_than(Tree, 3, 4))),
-        ?_test(?assert(greater_than_or_equal(Tree, 3, 3))),
-        ?_test(?assert(greater_than_or_equal(Tree, 3, 3))),
-        ?_test(?assert(less_than(Tree, 3, 4))),
-        ?_test(?assertNot(less_than(Tree, 3, 3))),
-        ?_test(?assertNot(less_than(Tree, 4, 3))),
-        ?_test(?assert(less_than_or_equal(Tree, 3, 3))),
-        ?_test(?assert(less_than_or_equal(Tree, 3, 4))),
-        ?_test(?assertNot(less_than_or_equal(Tree, 4, 3)))
+        ?_test(?assertEqual(gt, collate(Tree, 4, 3))),
+        ?_test(?assertEqual(lt, collate(Tree, 3, 4))),
+        ?_test(?assertEqual(eq, collate(Tree, 3, 3)))
     ].
 
 
@@ -1149,7 +1156,13 @@ count_reduce_test_() ->
         ?_test(?assertEqual(Expected(21, 83), reduce(Db, Tree, 21, 83))),
         ?_test(?assertEqual(Expected(1, 1), reduce(Db, Tree, 1, 1))),
         ?_test(?assertEqual(Expected(1, 100), reduce(Db, Tree, 0, 200))),
-        ?_test(?assertEqual(Expected(5, 7), reduce(Db, Tree, 5, 7)))
+        ?_test(?assertEqual(Expected(5, 7), reduce(Db, Tree, 5, 7))),
+        ?_test(?assertEqual(Expected(6, 7), reduce(Db, Tree, 5, 7,
+            [{inclusive_start, false}]))),
+        ?_test(?assertEqual(Expected(5, 6), reduce(Db, Tree, 5, 7,
+            [{inclusive_end, false}]))),
+        ?_test(?assertEqual(Expected(6, 6), reduce(Db, Tree, 5, 7,
+            [{inclusive_start, false}, {inclusive_end, false}])))
     ].
 
 sum_reduce_test_() ->
@@ -1221,7 +1234,11 @@ group_reduce_int_test_() ->
         ?_test(?assertEqual([{null, 100}], group_reduce(Db, Tree,
             ebtree:min(), ebtree:max(), GroupKeyFun, UserAccFun, []))),
         ?_test(?assertEqual([{null, 99}], group_reduce(Db, Tree, 2, ebtree:max(), GroupKeyFun, UserAccFun, []))),
-        ?_test(?assertEqual([{null, 96}], group_reduce(Db, Tree, 3, 98, GroupKeyFun, UserAccFun, [])))
+        ?_test(?assertEqual([{null, 96}], group_reduce(Db, Tree, 3, 98, GroupKeyFun, UserAccFun, []))),
+        ?_test(?assertEqual([{null, 95}], group_reduce(Db, Tree, 3, 98, GroupKeyFun, UserAccFun, [], [{inclusive_start, false}]))),
+        ?_test(?assertEqual([{null, 95}], group_reduce(Db, Tree, 3, 98, GroupKeyFun, UserAccFun, [], [{inclusive_end, false}]))),
+        ?_test(?assertEqual([{null, 94}], group_reduce(Db, Tree, 3, 98, GroupKeyFun, UserAccFun, [],
+            [{inclusive_start, false}, {inclusive_end, false}])))
     ].
 
 
@@ -1235,7 +1252,7 @@ raw_collation_test() ->
 
 custom_collation_test() ->
     Db = erlfdb_util:get_test_db([empty]),
-    CollateFun = fun(A, B) -> B =< A end,
+    CollateFun = fun(A, B) -> collate_raw(B, A) end,
     Tree = open(Db, <<1,2,3>>, 4, [{collate_fun, CollateFun}]),
     insert(Db, Tree, 1, 1),
     insert(Db, Tree, 2, 2),
@@ -1299,7 +1316,7 @@ custom_collation_range_test_() ->
         Db = erlfdb_util:get_test_db([empty]),
         Max = 1000,
         Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
-        CollateFun = fun(A, B) -> B =< A end,
+        CollateFun = fun(A, B) -> collate_raw(B, A) end,
         Tree = open(Db, <<1,2,3>>, 10, [{collate_fun, CollateFun}]),
         lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, Tree, Keys),
         lists:foreach(
@@ -1323,7 +1340,7 @@ custom_collation_reverse_range_test_() ->
         Db = erlfdb_util:get_test_db([empty]),
         Max = 1000,
         Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
-        CollateFun = fun(A, B) -> B =< A end,
+        CollateFun = fun(A, B) -> collate_raw(B, A) end,
         Tree = open(Db, <<1,2,3>>, 10, [{collate_fun, CollateFun}]),
         lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, Tree, Keys),
         lists:foreach(
