@@ -299,7 +299,6 @@ reset_interactive_index(Db, Sig, _St) ->
     {VS, ?INDEX_BUILDING}.
 
 
-
 version_key(Db, Sig) ->
     #{
         db_prefix := DbPrefix
