@@ -339,7 +339,7 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
                 collate(Tree, Key, StartKey, if InclusiveStart -> [gt, eq]; true -> [gt] end) andalso
                 collate(Tree, Key, EndKey, if InclusiveEnd -> [lt, eq]; true -> [lt] end),
             KeyGroup = GroupKeyFun(Key),
-            SameGroup = CurrentGroup =:= KeyGroup,
+            SameGroup = collate(Tree, CurrentGroup, KeyGroup, [eq]),
             if
                 Dir == fwd andalso BeforeStart ->
                     {ok, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}};
@@ -361,7 +361,9 @@ group_reduce(Db, #tree{} = Tree, StartKey, EndKey, GroupKeyFun, UserAccFun, User
         ({traverse, FirstKey, LastKey, Reduction}, {CurrentGroup, UserAcc, MapAcc, ReduceAcc}) ->
             BeforeStart = collate(Tree, LastKey, StartKey, if InclusiveStart -> [lt]; true -> [lt, eq] end),
             AfterEnd = collate(Tree, FirstKey, EndKey, if InclusiveEnd -> [gt]; true -> [gt, eq] end),
-            Whole = CurrentGroup =:= GroupKeyFun(FirstKey) andalso CurrentGroup =:= GroupKeyFun(LastKey),
+            Whole =
+                collate(Tree, CurrentGroup, GroupKeyFun(FirstKey), [eq]) andalso
+                collate(Tree, CurrentGroup, GroupKeyFun(LastKey), [eq]),
             FirstInRange =
                 collate(Tree, FirstKey, StartKey, if InclusiveStart -> [gt, eq]; true -> [gt] end) andalso
                 collate(Tree, FirstKey, EndKey, if InclusiveEnd -> [lt, eq]; true -> [lt] end),
