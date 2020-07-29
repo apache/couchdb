@@ -408,7 +408,8 @@ fetch_docs(Db, DesignOpts, Changes) ->
         }
     end, #{}, erlfdb:wait_for_all(RevFutures)),
 
-    AddLocalSeq = lists:keymember(<<"local_seq">>, 1, DesignOpts),
+    AddLocalSeq = fabric2_util:get_value(<<"local_seq">>, DesignOpts, false),
+
     BodyFutures = maps:keys(BodyState),
     ChangesWithDocs = lists:map(fun (BodyFuture) ->
         {Id, RevInfo, Change} = maps:get(BodyFuture, BodyState),
