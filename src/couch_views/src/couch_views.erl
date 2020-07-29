@@ -161,12 +161,6 @@ maybe_update_view(TxDb, Mrst, false, _Args) ->
     end.
 
 
-is_reduce_view(#mrargs{view_type = ViewType}) ->
-    ViewType =:= red;
-is_reduce_view({Reduce, _, _}) ->
-    Reduce =:= red.
-
-
 to_mrargs(#mrargs{} = Args) ->
     Args;
 
