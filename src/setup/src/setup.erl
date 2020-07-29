@@ -165,7 +165,7 @@ enable_cluster_int(Options, false) ->
     couch_log:debug("Enable Cluster: ~p~n", [Options]).
 
 set_admin(Username, Password) ->
-    config:set("admins", binary_to_list(Username), binary_to_list(Password)).
+    config:set("admins", binary_to_list(Username), binary_to_list(Password), #{sensitive => true}).
 
 setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
     case NewCredentials of
