@@ -14,11 +14,13 @@
 
 -export([
     open/2,
+    open/3,
 
     get_row_count/2,
     get_kv_size/2,
 
     fold_map_idx/5,
+    fold_red_idx/6,
 
     update_views/3
 ]).
@@ -35,6 +37,10 @@
 
 
 open(TxDb, Mrst) ->
+    open(TxDb, Mrst, []).
+
+
+open(TxDb, Mrst, Options) ->
     #mrst{
         sig = Sig,
         language = Lang,
@@ -42,7 +48,7 @@ open(TxDb, Mrst) ->
     } = Mrst,
     Mrst#mrst{
         id_btree = open_id_tree(TxDb, Sig),
-        views = [open_view_tree(TxDb, Sig, Lang, V) || V <- Views]
+        views = [open_view_tree(TxDb, Sig, Lang, V, Options) || V <- Views]
     }.
 
 
@@ -50,7 +56,7 @@ get_row_count(TxDb, View) ->
     #{
         tx := Tx
     } = TxDb,
-    {Count, _} = ebtree:full_reduce(Tx, View#mrview.btree),
+    {Count, _, _} = ebtree:full_reduce(Tx, View#mrview.btree),
     Count.
 
 
@@ -58,7 +64,7 @@ get_kv_size(TxDb, View) ->
     #{
         tx := Tx
     } = TxDb,
-    {_, TotalSize} = ebtree:full_reduce(Tx, View#mrview.btree),
+    {_, TotalSize, _} = ebtree:full_reduce(Tx, View#mrview.btree),
     TotalSize.
 
 
@@ -122,6 +128,74 @@ fold_map_idx(TxDb, View, Options, Callback, Acc0) ->
     end.
 
 
+fold_red_idx(TxDb, View, Idx, Options, Callback, Acc0) ->
+    #{
+        tx := Tx
+    } = TxDb,
+    #mrview{
+        btree = Btree
+    } = View,
+
+    {Dir, StartKey, EndKey, InclusiveEnd, GroupKeyFun} = to_red_opts(Options),
+
+    Wrapper = fun({GroupKey, Reduction}, WAcc) ->
+        {_RowCount, _RowSize, UserReds} = Reduction,
+        RedValue = lists:nth(Idx, UserReds),
+        Callback(GroupKey, RedValue, WAcc)
+    end,
+
+    case {GroupKeyFun, Dir} of
+        {group_all, fwd} ->
+            EBtreeOpts = [
+                {dir, fwd},
+                {inclusive_end, InclusiveEnd}
+            ],
+            Reduction = ebtree:reduce(Tx, Btree, StartKey, EndKey, EBtreeOpts),
+            Wrapper({null, Reduction}, Acc0);
+        {F, fwd} when is_function(F) ->
+            EBtreeOpts = [
+                {dir, fwd},
+                {inclusive_end, InclusiveEnd}
+            ],
+            ebtree:group_reduce(
+                    Tx,
+                    Btree,
+                    StartKey,
+                    EndKey,
+                    GroupKeyFun,
+                    Wrapper,
+                    Acc0,
+                    EBtreeOpts
+                );
+        {group_all, rev} ->
+            % Start/End keys swapped on purpose because ebtree. Also
+            % inclusive_start for same reason.
+            EBtreeOpts = [
+                {dir, rev},
+                {inclusive_start, InclusiveEnd}
+            ],
+            Reduction = ebtree:reduce(Tx, Btree, EndKey, StartKey, EBtreeOpts),
+            Wrapper({null, Reduction}, Acc0);
+        {F, rev} when is_function(F) ->
+            % Start/End keys swapped on purpose because ebtree. Also
+            % inclusive_start for same reason.
+            EBtreeOpts = [
+                {dir, rev},
+                {inclusive_start, InclusiveEnd}
+            ],
+            ebtree:group_reduce(
+                    Tx,
+                    Btree,
+                    EndKey,
+                    StartKey,
+                    GroupKeyFun,
+                    Wrapper,
+                    Acc0,
+                    EBtreeOpts
+                )
+    end.
+
+
 update_views(TxDb, Mrst, Docs) ->
     #{
         tx := Tx
@@ -129,7 +203,7 @@ update_views(TxDb, Mrst, Docs) ->
 
     % Get initial KV size
     OldKVSize = lists:foldl(fun(View, SizeAcc) ->
-        {_, Size} = ebtree:full_reduce(Tx, View#mrview.btree),
+        {_, Size, _} = ebtree:full_reduce(Tx, View#mrview.btree),
         SizeAcc + Size
     end, 0, Mrst#mrst.views),
 
@@ -156,7 +230,7 @@ update_views(TxDb, Mrst, Docs) ->
 
     % Get new KV size after update
     NewKVSize = lists:foldl(fun(View, SizeAcc) ->
-        {_, Size} = ebtree:full_reduce(Tx, View#mrview.btree),
+        {_, Size, _} = ebtree:full_reduce(Tx, View#mrview.btree),
         SizeAcc + Size
     end, 0, Mrst#mrst.views),
 
@@ -176,7 +250,7 @@ open_id_tree(TxDb, Sig) ->
     ebtree:open(Tx, Prefix, get_order(id_btree), TreeOpts).
 
 
-open_view_tree(TxDb, Sig, Lang, View) ->
+open_view_tree(TxDb, Sig, Lang, View, Options) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
@@ -185,12 +259,21 @@ open_view_tree(TxDb, Sig, Lang, View) ->
         id_num = ViewId
     } = View,
     Prefix = view_tree_prefix(DbPrefix, Sig, ViewId),
-    TreeOpts = [
+    BaseOpts = [
         {collate_fun, couch_views_util:collate_fun(View)},
-        {reduce_fun, make_reduce_fun(Lang, View)},
-        {persist_fun, fun couch_views_fdb:persist_chunks/3},
-        {cache_fun, create_cache_fun({view, ViewId})}
+        {persist_fun, fun couch_views_fdb:persist_chunks/3}
     ],
+    ExtraOpts = case lists:keyfind(read_only, 1, Options) of
+        {read_only, Idx} ->
+            RedFun = make_read_only_reduce_fun(Lang, View, Idx),
+            [{reduce_fun, RedFun}];
+        false ->
+            [
+                {reduce_fun, make_reduce_fun(Lang, View)},
+                {cache_fun, create_cache_fun({view, ViewId})}
+            ]
+    end,
+    TreeOpts = BaseOpts ++ ExtraOpts,
     View#mrview{
         btree = ebtree:open(Tx, Prefix, get_order(view_btree), TreeOpts)
     }.
@@ -210,27 +293,60 @@ min_order(V) ->
     V + 1.
 
 
-make_reduce_fun(_Lang, #mrview{}) ->
+make_read_only_reduce_fun(Lang, View, NthRed) ->
+    RedFuns = [Src || {_, Src} <- View#mrview.reduce_funs],
+    if RedFuns /= [] -> ok; true ->
+        io:format(standard_error, "~p~n", [process_info(self(), current_stacktrace)])
+    end,
+    LPad = lists:duplicate(NthRed - 1, []),
+    RPad = lists:duplicate(length(RedFuns) - NthRed, []),
+    FunSrc = lists:nth(NthRed, RedFuns),
     fun
-        (KVs, _ReReduce = false) ->
+        (KVs0, _ReReduce = false) ->
+            KVs1 = detuple_kvs(expand_dupes(KVs0)),
+            {ok, Result} = couch_query_servers:reduce(Lang, [FunSrc], KVs1),
+            {0, 0, LPad ++ Result ++ RPad};
+        (Reductions, _ReReduce = true) ->
+            ExtractFun = fun(Reds) ->
+                {_Count, _Size, UReds} = Reds,
+                [lists:nth(NthRed, UReds)]
+            end,
+            UReds = lists:map(ExtractFun, Reductions),
+            {ok, Result} = case UReds of
+                [RedVal] ->
+                    {ok, RedVal};
+                _ ->
+                    couch_query_servers:rereduce(Lang, [FunSrc], UReds)
+            end,
+            {0, 0, LPad ++ Result ++ RPad}
+    end.
+
+
+make_reduce_fun(Lang, #mrview{} = View) ->
+    RedFuns = [Src || {_, Src} <- View#mrview.reduce_funs],
+    fun
+        (KVs0, _ReReduce = false) ->
+            KVs1 = expand_dupes(KVs0),
             TotalSize = lists:foldl(fun({{K, _DocId}, V}, Acc) ->
                 KSize = couch_ejson_size:encoded_size(K),
-                Acc + case V of
-                    {dups, Dups} ->
-                        lists:foldl(fun(D, DAcc) ->
-                            VSize = couch_ejson_size:encoded_size(D),
-                            DAcc + KSize + VSize
-                        end, 0, Dups);
-                    _ ->
-                        VSize = couch_ejson_size:encoded_size(V),
-                        KSize + VSize
-                end
-            end, 0, KVs),
-            {length(KVs), TotalSize};
-        (KRs, _ReReduce = true) ->
-            lists:foldl(fun({Count, Size}, {CountAcc, SizeAcc}) ->
-                {Count + CountAcc, Size + SizeAcc}
-            end, {0, 0}, KRs)
+                VSize = couch_ejson_size:encoded_size(V),
+                KSize + VSize + Acc
+            end, 0, KVs1),
+            KVs2 = detuple_kvs(KVs1),
+            {ok, UserReds} = couch_query_servers:reduce(Lang, RedFuns, KVs2),
+            {length(KVs1), TotalSize, UserReds};
+        (Reductions, _ReReduce = true) ->
+            FoldFun = fun({Count, Size, UserReds}, {CAcc, SAcc, URedAcc}) ->
+                NewCAcc = Count + CAcc,
+                NewSAcc = Size + SAcc,
+                NewURedAcc = [UserReds | URedAcc],
+                {NewCAcc, NewSAcc, NewURedAcc}
+            end,
+            InitAcc = {0, 0, []},
+            FinalAcc = lists:foldl(FoldFun, InitAcc, Reductions),
+            {FinalCount, FinalSize, UReds} = FinalAcc,
+            {ok, Result} = couch_query_servers:rereduce(Lang, RedFuns, UReds),
+            {FinalCount, FinalSize, Result}
     end.
 
 
@@ -282,6 +398,17 @@ to_map_opts(Options) ->
     end,
 
     {Dir, StartKey, EndKey, InclusiveEnd}.
+
+
+to_red_opts(Options) ->
+    {Dir, StartKey, EndKey, InclusiveEnd} = to_map_opts(Options),
+
+    GroupKeyFun = case lists:keyfind(group_key_fun, 1, Options) of
+        {group_key_fun, GKF} -> GKF;
+        false -> fun({_Key, _DocId}) -> global_group end
+    end,
+
+    {Dir, StartKey, EndKey, InclusiveEnd, GroupKeyFun}.
 
 
 gather_update_info(Tx, Mrst, Docs) ->
@@ -418,6 +545,22 @@ combine_vals(V1, {dups, V2}) ->
     {dups, [V1 | V2]};
 combine_vals(V1, V2) ->
     {dups, [V1, V2]}.
+
+
+expand_dupes([]) ->
+    [];
+expand_dupes([{K, {dups, Dups}} | Rest]) ->
+    Expanded = [{K, D} || D <- Dups],
+    Expanded ++ expand_dupes(Rest);
+expand_dupes([{K, V} | Rest]) ->
+    [{K, V} | expand_dupes(Rest)].
+
+
+detuple_kvs([]) ->
+    [];
+detuple_kvs([KV | Rest]) ->
+    {{Key, Id}, Value} = KV,
+    [[[Key, Id], Value] | detuple_kvs(Rest)].
 
 
 id_tree_prefix(DbPrefix, Sig) ->
