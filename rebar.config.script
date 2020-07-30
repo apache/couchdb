@@ -166,7 +166,7 @@ DepDescs = [
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.3"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-6"}},
-{ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1-1"}},
+{ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1-2"}},
 {jaeger_passage,   "jaeger-passage",   {tag, "CouchDB-0.1.14-1"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-1.0.4-1"}},
 {local,            "local",            {tag, "0.2.1"}},
