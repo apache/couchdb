@@ -38,6 +38,8 @@ crud_test_() ->
                     ?TDEF_FE(open_db),
                     ?TDEF_FE(delete_db),
                     ?TDEF_FE(recreate_db),
+                    ?TDEF_FE(recreate_db_interactive),
+                    ?TDEF_FE(recreate_db_non_interactive),
                     ?TDEF_FE(undelete_db),
                     ?TDEF_FE(remove_deleted_db),
                     ?TDEF_FE(scheduled_remove_deleted_db, 15),
@@ -177,6 +179,32 @@ recreate_db(_) ->
     % Remove from cache to force it to open through fabric2_fdb:open
     fabric2_server:remove(DbName),
     ?assertError(database_does_not_exist, fabric2_db:open(DbName, BadOpts)).
+
+
+recreate_db_interactive(_) ->
+    DbName = ?tempdb(),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+
+    {ok, Db1} = fabric2_db:open(DbName, [{interactive, true}]),
+
+    ?assertEqual(ok, fabric2_db:delete(DbName, [])),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+
+    ?assertMatch({ok, _}, fabric2_db:get_db_info(Db1)).
+
+
+recreate_db_non_interactive(_) ->
+    % This is also the default case, but we check that parsing the `false` open
+    % value works correctly.
+    DbName = ?tempdb(),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+
+    {ok, Db1} = fabric2_db:open(DbName, [{interactive, false}]),
+
+    ?assertEqual(ok, fabric2_db:delete(DbName, [])),
+    ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+
+    ?assertError(database_does_not_exist, fabric2_db:get_db_info(Db1)).
 
 
 undelete_db(_) ->
