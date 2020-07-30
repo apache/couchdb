@@ -19,7 +19,7 @@
 
 % gen_server callbacks
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+         terminate/2, code_change/3, format_status/2]).
 
 -export([init_changes_handler/1, changes_handler/3]).
 
@@ -410,3 +410,14 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+    format_status(_Opt, [_PDict, State]) ->
+        #state{
+            states = States
+        } = State,
+        Scrubbed = State#state{
+            states = {length, length(States)}
+        },
+        [{data, [{"State",
+            ?record_to_keyval(state, Scrubbed)
+        }]}].

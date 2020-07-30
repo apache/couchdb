@@ -27,7 +27,8 @@
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    code_change/3
+    code_change/3,
+    format_status/2
 ]).
 
 
@@ -133,6 +134,25 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+format_status(_Opt, [_PDict, State]) ->
+    #st{
+        jtx=JTx,
+        type=Type,
+        monitor_pid=MonitorPid,
+        subs=Subs,
+        pidmap=PidMap,
+        refmap=RefMap
+    } = State,
+    [{data, [{"State", [
+        {jtx, JTx},
+        {type, Type},
+        {monitor_pid, MonitorPid},
+        {subs, {map_size, maps:size(Subs)}},
+        {pidmap, {map_size, maps:size(PidMap)}},
+        {refmap, {map_size, maps:size(RefMap)}}
+    ]}]}].
 
 
 update_subs(JobId, Refs, #st{subs = Subs} = St) when map_size(Refs) =:= 0 ->

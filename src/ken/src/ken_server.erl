@@ -16,7 +16,9 @@
 -behaviour(gen_server).
 -vsn(1).
 -export([init/1, terminate/2]).
--export([handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
+-export([
+    handle_call/3, handle_cast/2, handle_info/2, code_change/3,format_status/2
+]).
 
 % Public interface
 -export([start_link/0]).
@@ -227,6 +229,18 @@ handle_info(Msg, State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
+format_status(_Opt, [_PDict, State]) ->
+    #state{
+        q = Queue
+    } = State,
+    Scrubbed = State#state{
+        q = {queue_length, queue:len(Queue)}
+    },
+    [{data, [{"State",
+        ?record_to_keyval(state, Scrubbed)
+    }]}].
 
 %% private functions
 

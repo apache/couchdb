@@ -81,7 +81,7 @@ gen_server_error_test() ->
     do_matches(do_format(Event), [
         "gen_server a_gen_server terminated",
         "with reason: some_reason",
-        "last msg: {foo,bar}",
+        "last msg: redacted",
         "state: server_state",
         "extra: \\[\\]"
     ]).
@@ -108,7 +108,7 @@ gen_server_error_with_extra_args_test() ->
     do_matches(do_format(Event), [
         "gen_server a_gen_server terminated",
         "with reason: some_reason",
-        "last msg: {foo,bar}",
+        "last msg: redacted",
         "state: server_state",
         "extra: \\[sad,args\\]"
     ]).
@@ -135,7 +135,7 @@ gen_fsm_error_test() ->
     do_matches(do_format(Event), [
         "gen_fsm a_gen_fsm in state state_name",
         "with reason: barf",
-        "last msg: {ohai,there}",
+        "last msg: redacted",
         "state: curr_state",
         "extra: \\[\\]"
     ]).
@@ -162,7 +162,7 @@ gen_fsm_error_with_extra_args_test() ->
     do_matches(do_format(Event), [
         "gen_fsm a_gen_fsm in state state_name",
         "with reason: barf",
-        "last msg: {ohai,there}",
+        "last msg: redacted",
         "state: curr_state",
         "extra: \\[sad,args\\]"
     ]).
@@ -195,7 +195,7 @@ gen_event_error_test() ->
     do_matches(do_format(Event), [
         "gen_event handler_id installed in a_gen_event",
         "reason: barf",
-        "last msg: {ohai,there}",
+        "last msg: redacted",
         "state: curr_state"
     ]).
 
@@ -850,6 +850,110 @@ coverage_test() ->
         })
     ).
 
+gen_server_error_with_last_msg_test() ->
+    Pid = self(),
+    Event = {
+        error,
+        erlang:group_leader(),
+        {
+            Pid,
+            "** Generic server and some stuff",
+            [a_gen_server, {foo, bar}, server_state, some_reason]
+        }
+    },
+    ?assertMatch(
+        #log_entry{
+            level = error,
+            pid = Pid
+        },
+        do_format(Event)
+    ),
+    with_last(fun() ->
+        do_matches(do_format(Event), [
+            "gen_server a_gen_server terminated",
+            "with reason: some_reason",
+            "last msg: {foo,bar}",
+            "state: server_state",
+            "extra: \\[\\]"
+        ])
+    end).
+
+gen_event_error_with_last_msg_test() ->
+    Pid = self(),
+    Event = {
+        error,
+        erlang:group_leader(),
+        {
+            Pid,
+            "** gen_event handler did a thing",
+            [
+                handler_id,
+                a_gen_event,
+                {ohai,there},
+                curr_state,
+                barf
+            ]
+        }
+    },
+    ?assertMatch(
+        #log_entry{
+            level = error,
+            pid = Pid
+        },
+        do_format(Event)
+    ),
+    with_last(fun() ->
+        do_matches(do_format(Event), [
+            "gen_event handler_id installed in a_gen_event",
+            "reason: barf",
+            "last msg: {ohai,there}",
+            "state: curr_state"
+        ])
+    end).
+
+
+gen_fsm_error_with_last_msg_test() ->
+    Pid = self(),
+    Event = {
+        error,
+        erlang:group_leader(),
+        {
+            Pid,
+            "** State machine did a thing",
+            [a_gen_fsm, {ohai,there}, state_name, curr_state, barf]
+        }
+    },
+    ?assertMatch(
+        #log_entry{
+            level = error,
+            pid = Pid
+        },
+        do_format(Event)
+    ),
+    with_last(fun() ->
+        do_matches(do_format(Event), [
+            "gen_fsm a_gen_fsm in state state_name",
+            "with reason: barf",
+            "last msg: {ohai,there}",
+            "state: curr_state",
+            "extra: \\[\\]"
+        ])
+    end).
+
+
+with_last(Fun) ->
+    meck:new(couch_log_config_dyn, [passthrough]),
+    try
+        meck:expect(couch_log_config_dyn, get, fun(Case) ->
+            case Case of
+                strip_last_msg -> false;
+                Case -> meck:passthrough([Case])
+            end
+        end),
+        Fun()
+    after
+        meck:unload(couch_log_config_dyn)
+    end.
 
 do_format(Event) ->
     E = couch_log_formatter:format(Event),

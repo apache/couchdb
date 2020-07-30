@@ -30,7 +30,8 @@
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    code_change/3
+    code_change/3,
+    format_status/2
 ]).
 
 -define(MAX_ACCEPTORS, 5).
@@ -106,6 +107,20 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+format_status(_Opt, [_PDict, State]) ->
+    #{
+        workers := Workers,
+        acceptors := Acceptors
+    } = State,
+    Scrubbed = State#{
+        workers => {map_size, maps:size(Workers)},
+        acceptors => {map_size, maps:size(Acceptors)}
+    },
+    [{data, [{"State",
+        Scrubbed
+    }]}].
 
 
 % Worker process exit handlers
