@@ -40,7 +40,8 @@ security_test_() ->
                 ?TDEF(check_set_user_ctx),
                 ?TDEF(check_forbidden),
                 ?TDEF(check_fail_no_opts),
-                ?TDEF(check_fail_name_null)
+                ?TDEF(check_fail_name_null),
+                ?TDEF(check_forbidden_with_interactive_reopen)
             ])
         }
     }.
@@ -51,6 +52,18 @@ setup() ->
     DbName = ?tempdb(),
     PubDbName = ?tempdb(),
     {ok, Db1} = fabric2_db:create(DbName, [?ADMIN_CTX]),
+    ok = set_test_security(Db1),
+    {ok, _} = fabric2_db:create(PubDbName, [?ADMIN_CTX]),
+    {DbName, PubDbName, Ctx}.
+
+
+cleanup({DbName, PubDbName, Ctx}) ->
+    ok = fabric2_db:delete(DbName, []),
+    ok = fabric2_db:delete(PubDbName, []),
+    test_util:stop_couch(Ctx).
+
+
+set_test_security(Db) ->
     SecProps = {[
         {<<"admins">>, {[
             {<<"names">>, [<<"admin_name1">>, <<"admin_name2">>]},
@@ -61,16 +74,7 @@ setup() ->
             {<<"roles">>, [<<"member_role1">>, <<"member_role2">>]}
         ]}}
     ]},
-    ok = fabric2_db:set_security(Db1, SecProps),
-    {ok, _} = fabric2_db:create(PubDbName, [?ADMIN_CTX]),
-    {DbName, PubDbName, Ctx}.
-
-
-cleanup({DbName, PubDbName, Ctx}) ->
-    ok = fabric2_db:delete(DbName, []),
-    ok = fabric2_db:delete(PubDbName, []),
-    test_util:stop_couch(Ctx).
-
+    ok = fabric2_db:set_security(Db, SecProps).
 
 
 check_is_admin({DbName, _, _}) ->
@@ -184,3 +188,32 @@ check_fail_name_null({DbName, _, _}) ->
     UserCtx = #user_ctx{name = null},
     {ok, Db} = fabric2_db:open(DbName, [{user_ctx, UserCtx}]),
     ?assertThrow({unauthorized, _}, fabric2_db:get_db_info(Db)).
+
+
+check_forbidden_with_interactive_reopen({DbName, _, _}) ->
+    UserCtx = #user_ctx{name = <<"foo">>},
+    Options = [{user_ctx, UserCtx}, {interactive, true}],
+
+    {ok, Db1} = fabric2_db:open(DbName, Options),
+
+    % Verify foo is forbidden by default
+    ?assertThrow({forbidden, _}, fabric2_db:get_db_info(Db1)),
+
+    % Allow foo
+    {ok, Db2} = fabric2_db:open(DbName, [?ADMIN_CTX]),
+    AllowFoo = {[
+        {<<"members">>, {[
+           {<<"names">>, [<<"foo">>]}
+        ]}}
+    ]},
+    ok = fabric2_db:set_security(Db2, AllowFoo),
+
+    ?assertMatch({ok, _}, fabric2_db:get_db_info(Db1)),
+
+    % Recreate test db instance with the default security
+    ok = fabric2_db:delete(DbName, [?ADMIN_CTX]),
+    {ok, Db3} = fabric2_db:create(DbName, [?ADMIN_CTX]),
+    ok = set_test_security(Db3),
+
+    % Original handle is forbidden to again
+    ?assertThrow({forbidden, _}, fabric2_db:get_db_info(Db1)).

@@ -395,7 +395,8 @@ delete_db_req(#httpd{user_ctx=Ctx}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
-    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, Ctx}]),
+    Options = [{user_ctx, Ctx}, {interactive, true}],
+    {ok, Db} = fabric2_db:open(DbName, Options),
     Fun(Req, Db).
 
 db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->

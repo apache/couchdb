@@ -271,5 +271,6 @@ sanitize(#{} = Db) ->
     Db#{
         tx := undefined,
         user_ctx := #user_ctx{},
-        security_fun := undefined
+        security_fun := undefined,
+        interactive := false
     }.

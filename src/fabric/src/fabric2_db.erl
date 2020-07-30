@@ -201,7 +201,8 @@ open(DbName, Options) ->
     case fabric2_server:fetch(DbName, UUID) of
         #{} = Db ->
             Db1 = maybe_set_user_ctx(Db, Options),
-            {ok, require_member_check(Db1)};
+            Db2 = maybe_set_interactive(Db1, Options),
+            {ok, require_member_check(Db2)};
         undefined ->
             Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
                 fabric2_fdb:open(TxDb, Options)
@@ -1424,6 +1425,11 @@ get_all_docs_meta(TxDb, Options) ->
         _ ->
             []
     end ++ [{total, DocCount}, {offset, null}].
+
+
+maybe_set_interactive(#{} = Db, Options) ->
+    Interactive = fabric2_util:get_value(interactive, Options, false),
+    Db#{interactive := Interactive}.
 
 
 maybe_set_user_ctx(Db, Options) ->

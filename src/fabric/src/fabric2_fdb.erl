@@ -243,7 +243,8 @@ create(#{} = Db0, Options) ->
         after_doc_read => undefined,
         % All other db things as we add features,
 
-        db_options => Options1
+        db_options => Options1,
+        interactive => false
     },
     aegis:init_db(Db2, Options).
 
@@ -270,6 +271,9 @@ open(#{} = Db0, Options) ->
     UUID = fabric2_util:get_value(uuid, Options1),
     Options2 = lists:keydelete(uuid, 1, Options1),
 
+    Interactive = fabric2_util:get_value(interactive, Options2, false),
+    Options3 = lists:keydelete(interactive, 1, Options2),
+
     Db2 = Db1#{
         db_prefix => DbPrefix,
         db_version => DbVersion,
@@ -287,7 +291,8 @@ open(#{} = Db0, Options) ->
         before_doc_update => undefined,
         after_doc_read => undefined,
 
-        db_options => Options2
+        db_options => Options3,
+        interactive => Interactive
     },
 
     Db3 = load_config(Db2),
@@ -318,7 +323,8 @@ refresh(#{tx := undefined, name := DbName} = Db) ->
         #{md_version := Ver} = Db1 when Ver > OldVer ->
             Db1#{
                 user_ctx := maps:get(user_ctx, Db),
-                security_fun := maps:get(security_fun, Db)
+                security_fun := maps:get(security_fun, Db),
+                interactive := maps:get(interactive, Db)
             };
         _ ->
             Db
@@ -337,18 +343,20 @@ reopen(#{} = OldDb) ->
         uuid := UUID,
         db_options := Options,
         user_ctx := UserCtx,
-        security_fun := SecurityFun
+        security_fun := SecurityFun,
+        interactive := Interactive
     } = OldDb,
     Options1 = lists:keystore(user_ctx, 1, Options, {user_ctx, UserCtx}),
     NewDb = open(init_db(Tx, DbName, Options1), Options1),
 
     % Check if database was re-created
-    case maps:get(uuid, NewDb) of
-        UUID -> ok;
-        _OtherUUID -> error(database_does_not_exist)
+    case {Interactive, maps:get(uuid, NewDb)} of
+        {true, _} -> ok;
+        {false, UUID} -> ok;
+        {false, _OtherUUID} -> error(database_does_not_exist)
     end,
 
-    NewDb#{security_fun := SecurityFun}.
+    NewDb#{security_fun := SecurityFun, interactive := Interactive}.
 
 
 delete(#{} = Db) ->
