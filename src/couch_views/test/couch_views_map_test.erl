@@ -58,7 +58,8 @@ map_views_test_() ->
                 ?TDEF(should_map_with_doc_emit),
                 ?TDEF(should_map_update_is_false),
                 ?TDEF(should_map_update_is_lazy),
-                ?TDEF(should_map_wait_for_interactive)
+                ?TDEF(should_map_wait_for_interactive),
+                ?TDEF(should_map_local_seq)
                 % fun should_give_ext_size_seq_indexed_test/1
             ]
         }
@@ -440,6 +441,36 @@ should_map_wait_for_interactive() ->
     ]}, Result).
 
 
+should_map_local_seq() ->
+    ExpectedTrue = [
+        {row, [{id, <<"1">>}, {key, 1}, {value, 1}]},
+        {row, [{id, <<"2">>}, {key, 2}, {value, 2}]},
+        {row, [{id, <<"3">>}, {key, 3}, {value, 3}]}
+    ],
+    check_local_seq(true, ExpectedTrue),
+
+    ExpectedFalse = [],
+    check_local_seq(false, ExpectedFalse),
+
+    Error = {bad_request,invalid_design_doc,
+        <<"`options.local_seq` field must have boolean type">>},
+    ?assertThrow(Error, check_local_seq(something_else, null)).
+
+
+check_local_seq(Val, Expected) ->
+    DbName = ?tempdb(),
+    {ok, Db} = fabric2_db:create(DbName, [{user_ctx, ?ADMIN_USER}]),
+
+    DDoc = create_local_seq_ddoc(Val),
+    Docs = make_docs(5),
+    fabric2_db:update_docs(Db, [DDoc | Docs]),
+
+    {ok, Result} = couch_views:query(Db, DDoc, <<"idx_01">>, fun default_cb/2, [],
+        #{limit => 3}),
+
+    ?assertEqual(Expected, Result).
+
+
 % should_give_ext_size_seq_indexed_test(Db) ->
 %     DDoc = couch_doc:from_json_obj({[
 %         {<<"_id">>, <<"_design/seqdoc">>},
@@ -547,6 +578,24 @@ create_interactive_ddoc() ->
         ]}},
         {<<"autoupdate">>, false},
         {<<"interactive">>, true}
+    ]}).
+
+
+create_local_seq_ddoc(Val) ->
+    couch_doc:from_json_obj({[
+        {<<"_id">>, <<"_design/ddoc_local_seq">>},
+        {<<"options">>, {[{<<"local_seq">>, Val}]}},
+        {<<"language">>, <<"javascript">>},
+        {<<"views">>, {[
+            {<<"idx_01">>, {[
+                {<<"map">>, <<
+                    "function(doc) {"
+                        "if (doc._local_seq) {"
+                            "emit(doc.val, doc.val);"
+                        "}"
+                    "}">>}
+            ]}}
+        ]}}
     ]}).
 
 
