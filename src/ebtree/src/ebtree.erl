@@ -918,7 +918,12 @@ collate(#tree{} = _Tree, _A, ?MAX) ->
 
 collate(#tree{} = Tree, A, B) ->
     #tree{collate_fun = CollateFun} = Tree,
-    CollateFun(A, B).
+    case CollateFun(A, B) of
+        lt -> lt;
+        eq -> eq;
+        gt -> gt;
+        _ -> error(invalid_collation_result)
+    end.
 
 
 collate(#tree{} = Tree, A, B, Allowed) ->
@@ -1088,6 +1093,11 @@ collation_fun_test_() ->
         ?_test(?assertEqual(lt, collate(Tree, 3, 4))),
         ?_test(?assertEqual(eq, collate(Tree, 3, 3)))
     ].
+
+
+collate_validation_test() ->
+    Tree = #tree{collate_fun = fun(_A, _B) -> foo end},
+    ?assertError(invalid_collation_result, collate(Tree, 1, 2)).
 
 
 lookup_test() ->
