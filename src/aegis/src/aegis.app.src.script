@@ -10,6 +10,31 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
+    true ->
+        {ok, Result} = file:consult(os:getenv("COUCHDB_CONFIG")),
+        Result;
+    false ->
+        []
+end.
+
+AegisKeyManagerApp = case lists:keyfind(aegis_key_manager_app, 1, CouchConfig) of
+    {aegis_key_manager_app, AppName} when AppName /= "" ->
+        [list_to_atom(AppName)];
+    _ ->
+        []
+end.
+
+BaseApplications = [
+    kernel,
+    stdlib,
+    crypto,
+    couch_log,
+    erlfdb
+].
+
+Applications = AegisKeyManagerApp ++ BaseApplications.
+
 {application, aegis,
  [
   {description, "If it's good enough for Zeus, it's good enough for CouchDB"},
@@ -18,13 +43,7 @@
   {registered, [
     aegis_server
   ]},
-  {applications,
-   [kernel,
-    stdlib,
-    crypto,
-    couch_log,
-    erlfdb
-   ]},
+  {applications, Applications},
   {env,[]},
   {modules, []},
   {maintainers, []},
