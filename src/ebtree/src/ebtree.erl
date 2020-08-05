@@ -283,6 +283,9 @@ reduce(Db, #tree{} = Tree, StartKey, EndKey, Options) ->
     do_reduce(Tree, MapValues, ReduceValues).
 
 
+do_reduce(#tree{} = Tree, [], []) ->
+    reduce_values(Tree, [], false);
+
 do_reduce(#tree{} = Tree, [], ReduceValues) when is_list(ReduceValues) ->
     reduce_values(Tree, ReduceValues, true);
 
@@ -1129,6 +1132,12 @@ range_after_delete_test() ->
     lists:foreach(fun(Key) -> delete(Db, Tree, Key) end, lists:seq(1, 100, 2)),
     ?assertEqual(50, range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)),
     ?assertEqual(50, reverse_range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)).
+
+
+full_reduce_empty_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1,2,3>>, 4, [{reduce_fun, fun reduce_sum/2}]),
+    ?assertEqual(0, full_reduce(Db, Tree)).
 
 
 full_reduce_test_() ->
