@@ -586,6 +586,33 @@ defmodule ViewMapTest do
     assert get_ids(resp) == ["doc-id-1"]
   end
 
+  test "_local_seq is supported", context do
+    db_name = context[:db_name]
+    ddoc =  %{
+      _id: "_design/local_seq",
+      views: %{
+        view: %{
+          map: """
+              function (doc) {
+                emit(doc._local_seq, doc._id);
+              }
+          """
+        }
+      },
+      options: %{
+        local_seq: true
+      }
+    }
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => [ddoc]})
+    assert resp.status_code == 201
+
+    url = "/#{db_name}/_design/local_seq/_view/view"
+    resp = Couch.get(url, query: %{limit: 1})
+    key = Enum.at(resp.body["rows"], 0)["key"]
+    assert key != :null
+  end
+
   def update_doc_value(db_name, id, value) do
     resp = Couch.get("/#{db_name}/#{id}")
     doc = convert(resp.body)
