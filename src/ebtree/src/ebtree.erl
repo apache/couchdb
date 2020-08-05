@@ -25,6 +25,7 @@
      fold/4,
      fold/5,
      reduce/4,
+     reduce/5,
      full_reduce/2,
      group_reduce/7,
      group_reduce/8,
