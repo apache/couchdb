@@ -1113,7 +1113,7 @@ collate_validation_test() ->
 lookup_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     Tree = open(Db, <<1,2,3>>, 4),
-    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 100)])],
+    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 16)])],
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key + 1) end, Keys),
     lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
     ?assertEqual(false, lookup(Db, Tree, 101)).
@@ -1122,7 +1122,7 @@ lookup_test() ->
 delete_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     Tree = open(Db, <<1,2,3>>, 4),
-    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 100)])],
+    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 16)])],
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key + 1) end, Keys),
     lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
     lists:foreach(fun(Key) -> delete(Db, Tree, Key) end, Keys),
@@ -1132,12 +1132,12 @@ delete_test() ->
 range_after_delete_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     Tree = open(Db, <<1,2,3>>, 4),
-    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 100)])],
+    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 16)])],
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key + 1) end, Keys),
     lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
-    lists:foreach(fun(Key) -> delete(Db, Tree, Key) end, lists:seq(1, 100, 2)),
-    ?assertEqual(50, range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)),
-    ?assertEqual(50, reverse_range(Db, Tree, 1, 100, fun(E, A) -> length(E) + A end, 0)).
+    lists:foreach(fun(Key) -> delete(Db, Tree, Key) end, lists:seq(1, 16, 2)),
+    ?assertEqual(8, range(Db, Tree, 1, 16, fun(E, A) -> length(E) + A end, 0)),
+    ?assertEqual(8, reverse_range(Db, Tree, 1, 16, fun(E, A) -> length(E) + A end, 0)).
 
 
 full_reduce_empty_test() ->
@@ -1163,7 +1163,7 @@ full_reduce_test_() ->
 full_reduce_after_delete_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     Tree = open(Db, <<1,2,3>>, 4, [{reduce_fun, fun reduce_sum/2}]),
-    Max = 100,
+    Max = 16,
     Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key) end, Keys),
     ?assertEqual(round(Max * ((1 + Max) / 2)), full_reduce(Db, Tree)),
@@ -1287,26 +1287,6 @@ custom_collation_test() ->
     ?assertEqual([{2, 2}, {1, 1}], range(Db, Tree, 3, 0, fun(E, A) -> A ++ E end, [])).
 
 
-intense_lookup_test_() ->
-    [
-        {timeout, 1000, fun() -> lookup_test_fun(1000, 20) end},
-        {timeout, 1000, fun() -> lookup_test_fun(1000, 50) end},
-        {timeout, 1000, fun() -> lookup_test_fun(1000, 500) end}
-    ].
-
-
-lookup_test_fun(Max, Order) ->
-    Db = erlfdb_util:get_test_db([empty]),
-    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max, 2)])],
-    T0 = erlang:monotonic_time(),
-    Tree = lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, open(Db, <<1,2,3>>, Order), Keys),
-    T1 = erlang:monotonic_time(),
-    lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
-    T2 = erlang:monotonic_time(),
-    ?debugFmt("~B order. ~B iterations. insert rate: ~.2f/s, lookup rate: ~.2f/s",
-        [Order, Max, 1000 * (Max / msec(T1 - T0)), 1000 * (Max / msec(T2 - T1))]).
-
-
 empty_range_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     Tree = open(Db, <<1, 2, 3>>, 10),
@@ -1319,7 +1299,7 @@ empty_range_test() ->
 range_test_() ->
     {timeout, 1000, fun() ->
         Db = erlfdb_util:get_test_db([empty]),
-        Max = 1000,
+        Max = 100,
         Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
         Tree = lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, open(Db, <<1,2,3>>, 10), Keys),
         lists:foreach(
@@ -1328,7 +1308,7 @@ range_test_() ->
                 ?assertEqual([{K, K + 1} || K <- lists:seq(StartKey, EndKey)],
                     range(Db, Tree, StartKey, EndKey, fun(E, A) -> A ++ E end, [])
                 ) end,
-        lists:seq(1, 1000))
+        lists:seq(1, 100))
     end}.
 
 
@@ -1344,26 +1324,26 @@ empty_reverse_range_test() ->
 reverse_range_test_() ->
     {timeout, 1000, fun() ->
         Db = erlfdb_util:get_test_db([empty]),
-        Max = 1000,
+        Max = 100,
         Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
-        Tree = lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, open(Db, <<1,2,3>>, 10), Keys),
+        Tree = lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, open(Db, <<1,2,3>>, 8), Keys),
         lists:foreach(
             fun(_) ->
                 [StartKey, EndKey] = lists:sort([rand:uniform(Max), rand:uniform(Max)]),
                 ?assertEqual([{K, K + 1} || K <- lists:seq(EndKey, StartKey, -1)],
                     reverse_range(Db, Tree, StartKey, EndKey, fun(E, A) -> A ++ E end, [])
                 ) end,
-        lists:seq(1, 1000))
+        lists:seq(1, 100))
     end}.
 
 
 custom_collation_range_test_() ->
     {timeout, 1000, fun() ->
         Db = erlfdb_util:get_test_db([empty]),
-        Max = 1000,
+        Max = 100,
         Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
         CollateFun = fun(A, B) -> collate_raw(B, A) end,
-        Tree = open(Db, <<1,2,3>>, 10, [{collate_fun, CollateFun}]),
+        Tree = open(Db, <<1,2,3>>, 6, [{collate_fun, CollateFun}]),
         lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, Tree, Keys),
         lists:foreach(
             fun(_) ->
@@ -1377,17 +1357,17 @@ custom_collation_range_test_() ->
                 ?assertEqual([{K, K + 1} || K <- Seq],
                     range(Db, Tree, StartKey, EndKey, fun(E, A) -> A ++ E end, [])
                 ) end,
-        lists:seq(1, 1000))
+        lists:seq(1, 100))
     end}.
 
 
 custom_collation_reverse_range_test_() ->
     {timeout, 1000, fun() ->
         Db = erlfdb_util:get_test_db([empty]),
-        Max = 1000,
+        Max = 100,
         Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, Max)])],
         CollateFun = fun(A, B) -> collate_raw(B, A) end,
-        Tree = open(Db, <<1,2,3>>, 10, [{collate_fun, CollateFun}]),
+        Tree = open(Db, <<1,2,3>>, 6, [{collate_fun, CollateFun}]),
         lists:foldl(fun(Key, T) -> insert(Db, T, Key, Key + 1) end, Tree, Keys),
         lists:foreach(
             fun(_) ->
@@ -1401,11 +1381,8 @@ custom_collation_reverse_range_test_() ->
                 ?assertEqual([{K, K + 1} || K <- lists:reverse(Seq)],
                     reverse_range(Db, Tree, StartKey, EndKey, fun(E, A) -> A ++ E end, [])
                 ) end,
-        lists:seq(1, 1000))
+        lists:seq(1, 100))
     end}.
 
-
-msec(Native) ->
-    erlang:max(1, erlang:convert_time_unit(Native, native, millisecond)).
 
 -endif.
