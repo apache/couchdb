@@ -415,6 +415,9 @@ range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
     end).
 
 
+range(_Tx, #tree{}, #node{id = ?NODE_ROOT_ID, members = []}, _StartKey, _EndKey, _AccFun, Acc0) ->
+    Acc0;
+
 range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, AccFun, Acc0) ->
     InRange = [{K, V} || {K, V} <- Node#node.members,
         collate(Tree, StartKey, K, [lt, eq]), collate(Tree, K, EndKey, [lt, eq])],
@@ -447,6 +450,9 @@ reverse_range(Db, #tree{} = Tree, StartKey, EndKey, AccFun, Acc0) ->
         reverse_range(Tx, Tree, get_node(Tx, Tree, ?NODE_ROOT_ID), StartKey, EndKey, AccFun, Acc0)
     end).
 
+
+reverse_range(_Tx, #tree{}, #node{id = ?NODE_ROOT_ID, members = []}, _StartKey, _EndKey, _AccFun, Acc0) ->
+    Acc0;
 
 reverse_range(Tx, #tree{} = Tree, #node{level = 0} = Node, StartKey, EndKey, AccFun, Acc0) ->
     InRange = [{K, V} || {K, V} <- Node#node.members,
@@ -1301,6 +1307,15 @@ lookup_test_fun(Max, Order) ->
         [Order, Max, 1000 * (Max / msec(T1 - T0)), 1000 * (Max / msec(T2 - T1))]).
 
 
+empty_range_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1, 2, 3>>, 10),
+    ?assertEqual(
+        blah,
+        range(Db, Tree, min(), max(), fun(_, A) -> A end, blah)
+    ).
+
+
 range_test_() ->
     {timeout, 1000, fun() ->
         Db = erlfdb_util:get_test_db([empty]),
@@ -1315,6 +1330,15 @@ range_test_() ->
                 ) end,
         lists:seq(1, 1000))
     end}.
+
+
+empty_reverse_range_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1, 2, 3>>, 10),
+    ?assertEqual(
+        blah,
+        reverse_range(Db, Tree, min(), max(), fun(_, A) -> A end, blah)
+    ).
 
 
 reverse_range_test_() ->
