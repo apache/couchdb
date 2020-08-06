@@ -503,6 +503,10 @@ defmodule ViewMapTest do
     assert keys == ["bar"]
   end
 
+  # Unfortunately, I'm not able to create a test that fails
+  # as quickly as the previous view implementations. Apparently
+  # the new ebtree approach uses fewer bytes in the transaction.
+  @tag config: [{"couch_views", "retry_limit", "0"}]
   test "send error for failed indexing", context do
     db_name = context[:db_name]
 
@@ -515,7 +519,7 @@ defmodule ViewMapTest do
             map: """
                 function (doc) {
                   for (var i=0; i<10000; i++) {
-                  emit({doc: doc._id + 1}, doc._id);
+                  emit({doc: doc._id + i}, doc._id);
                 }
               }
             """
@@ -529,7 +533,8 @@ defmodule ViewMapTest do
 
     url = "/#{db_name}/_design/view1/_view/view"
 
-    resp = Couch.get(url, timeout: 500_000)
+    options = [timeout: 500_000, ibrowse: [inactivity_timeout: 500_000]]
+    resp = Couch.get(url, options)
     assert resp.status_code == 500
     %{:body => %{"error" => error}} = resp
     assert error == "foundationdb_error"
