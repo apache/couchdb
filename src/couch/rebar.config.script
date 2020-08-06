@@ -121,7 +121,7 @@ end,
     {unix, _} when SMVsn == "60" ->
         {
             "-DXP_UNIX -I/usr/include/mozjs-60 -I/usr/local/include/mozjs-60 -std=c++14",
-            "-L/usr/local/lib -std=c++14 -lmozjs-60 -lm"
+            "-L/usr/local/lib -std=c++14 -lmozjs-60 -lm -lstdc++"
         }
 end.
 
