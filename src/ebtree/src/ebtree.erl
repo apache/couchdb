@@ -772,9 +772,9 @@ meta_key(Prefix, MetaKey) when is_binary(Prefix) ->
 
 get_node(Tx, #tree{} = Tree, Id) ->
     Key = node_key(Tree#tree.prefix, Id),
-    Future = erlfdb:get(Tx, Key),
-    Value = erlfdb:wait(Future),
-    decode_node(Tree, Id, Key, Value).
+    Rows = erlfdb:get_range_startswith(Tx, Key),
+    Values = [V || {_K, V} <- Rows],
+    decode_node(Tree, Id, Key, iolist_to_binary(Values)).
 
 
 clear_nodes(Tx, #tree{} = Tree, Nodes) ->
@@ -785,7 +785,7 @@ clear_nodes(Tx, #tree{} = Tree, Nodes) ->
 
 clear_node(Tx, #tree{} = Tree, #node{} = Node) ->
      Key = node_key(Tree#tree.prefix, Node#node.id),
-     erlfdb:clear(Tx, Key).
+     erlfdb:clear_range_startswith(Tx, Key).
 
 
 set_nodes(Tx, #tree{} = Tree, Nodes) ->
@@ -803,9 +803,14 @@ set_node(Tx, #tree{} = Tree, #node{} = _From, #node{} = To) ->
 
 set_node(Tx, #tree{} = Tree, #node{} = Node) ->
     validate_node(Tree, Node),
-    Key = node_key(Tree#tree.prefix, Node#node.id),
-    Value = encode_node(Tree, Key, Node),
-    erlfdb:set(Tx, Key, Value).
+    BaseKey = node_key(Tree#tree.prefix, Node#node.id),
+    WholeValue = encode_node(Tree, BaseKey, Node),
+    Values = fabric2_fdb:chunkify_binary(WholeValue),
+    lists:foldl(fun(Val, Id) ->
+        Key = erlfdb_tuple:pack({Id}, BaseKey),
+        erlfdb:set(Tx, Key, Val),
+        Id + 1
+    end, 0, Values).
 
 
 node_key(Prefix, Id) when is_binary(Prefix), is_integer(Id) ->
