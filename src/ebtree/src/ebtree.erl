@@ -46,7 +46,8 @@
     max,
     collate_fun,
     reduce_fun,
-    encode_fun
+    encode_fun,
+    persist_fun
 }).
 
 -define(META, 0).
@@ -83,12 +84,14 @@ open(Db, Prefix, Order, Options) when is_binary(Prefix), is_integer(Order), Orde
     ReduceFun = proplists:get_value(reduce_fun, Options, fun reduce_noop/2),
     CollateFun = proplists:get_value(collate_fun, Options, fun collate_raw/2),
     EncodeFun = proplists:get_value(encode_fun, Options, fun encode_erlang/3),
+    PersistFun = proplists:get_value(persist_fun, Options, fun simple_persist/3),
 
     Tree = #tree{
         prefix = Prefix,
         reduce_fun = ReduceFun,
         collate_fun = CollateFun,
-        encode_fun = EncodeFun
+        encode_fun = EncodeFun,
+        persist_fun = PersistFun
     },
 
     erlfdb:transactional(Db, fun(Tx) ->
@@ -772,8 +775,7 @@ meta_key(Prefix, MetaKey) when is_binary(Prefix) ->
 
 get_node(Tx, #tree{} = Tree, Id) ->
     Key = node_key(Tree#tree.prefix, Id),
-    Future = erlfdb:get(Tx, Key),
-    Value = erlfdb:wait(Future),
+    Value = persist(Tree, Tx, get, Key),
     decode_node(Tree, Id, Key, Value).
 
 
@@ -785,7 +787,7 @@ clear_nodes(Tx, #tree{} = Tree, Nodes) ->
 
 clear_node(Tx, #tree{} = Tree, #node{} = Node) ->
      Key = node_key(Tree#tree.prefix, Node#node.id),
-     erlfdb:clear(Tx, Key).
+     persist(Tree, Tx, clear, Key).
 
 
 set_nodes(Tx, #tree{} = Tree, Nodes) ->
@@ -805,7 +807,7 @@ set_node(Tx, #tree{} = Tree, #node{} = Node) ->
     validate_node(Tree, Node),
     Key = node_key(Tree#tree.prefix, Node#node.id),
     Value = encode_node(Tree, Key, Node),
-    erlfdb:set(Tx, Key, Value).
+    persist(Tree, Tx, set, [Key, Value]).
 
 
 node_key(Prefix, Id) when is_binary(Prefix), is_integer(Id) ->
@@ -1005,6 +1007,23 @@ encode_erlang(encode, _Key, Value) ->
 
 encode_erlang(decode, _Key, Value) ->
     binary_to_term(Value, [safe]).
+
+%% persist function
+
+persist(#tree{} = Tree, Tx, Action, Args) ->
+    #tree{persist_fun = PersistFun} = Tree,
+    PersistFun(Tx, Action, Args).
+
+
+simple_persist(Tx, set, [Key, Value]) ->
+    erlfdb:set(Tx, Key, Value);
+
+simple_persist(Tx, get, Key) ->
+    erlfdb:wait(erlfdb:get(Tx, Key));
+
+simple_persist(Tx, clear, Key) ->
+    erlfdb:clear(Tx, Key).
+
 
 %% private functions
 
