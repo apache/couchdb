@@ -542,8 +542,8 @@ split_child(Tx, #tree{} = Tree, #node{} = Parent0, #node{} = Child) ->
 
     Parent1 = Parent0#node{
         members =
-            umerge_members(Tree, [{FirstLeftKey, LastLeftKey, LeftId, LeftReduction}],
-                umerge_members(Tree, [{FirstRightKey, LastRightKey, RightId, RightReduction}],
+            umerge_members(Tree, Parent0#node.level, [{FirstLeftKey, LastLeftKey, LeftId, LeftReduction}],
+                umerge_members(Tree, Parent0#node.level, [{FirstRightKey, LastRightKey, RightId, RightReduction}],
                     lists:keydelete(Child#node.id, 3, Parent0#node.members)))
     },
     clear_node(Tx, Tree, Child),
@@ -569,7 +569,7 @@ update_next_neighbour(Tx, #tree{} = Tree, #node{} = Node) ->
 
 insert_nonfull(Tx, #tree{} = Tree, #node{level = 0} = Node0, Key, Value) ->
     Node1 = Node0#node{
-        members = umerge_members(Tree, [{Key, Value}], Node0#node.members)
+        members = umerge_members(Tree, 0, [{Key, Value}], Node0#node.members)
     },
     set_node(Tx, Tree, Node0, Node1),
     reduce_node(Tree, Node1);
@@ -658,7 +658,8 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
             Members1 = lists:keydelete(ChildId0, 3, Members0),
             Members2 = lists:keydelete(Sibling#node.id, 3, Members1),
             Members3 = lists:foldl(fun(N, Acc) ->
-                umerge_members(Tree, [{first_key(N), last_key(N), N#node.id, reduce_node(Tree, N)}], Acc)
+                umerge_members(Tree, Parent0#node.level,
+                    [{first_key(N), last_key(N), N#node.id, reduce_node(Tree, N)}], Acc)
             end, Members2, NewNodes),
 
             Parent1 = Parent0#node{
@@ -842,8 +843,8 @@ validate_node(#tree{} = Tree, #node{} = Node) ->
     NumKeys = length(Node#node.members),
     IsLeaf = Node#node.level =:= 0,
     IsRoot = ?NODE_ROOT_ID == Node#node.id,
-    OutOfOrder = Node#node.members /= sort_members(Tree, Node#node.members),
-    Duplicates = Node#node.members /= usort_members(Tree, Node#node.members),
+    OutOfOrder = Node#node.members /= sort_members(Tree, Node#node.level, Node#node.members),
+    Duplicates = Node#node.members /= usort_members(Tree, Node#node.level, Node#node.members),
     if
         Node#node.id == undefined ->
             erlang:error({node_without_id, Node});
@@ -940,11 +941,11 @@ collate(#tree{} = Tree, A, B, Allowed) ->
     lists:member(collate(Tree, A, B), Allowed).
 
 
-umerge_members(#tree{} = Tree, List1, List2) ->
+umerge_members(#tree{} = Tree, Level, List1, List2) ->
     CollateWrapper = fun
-        ({K1, _V1}, {K2, _V2}) ->
+        ({K1, _V1}, {K2, _V2}) when Level == 0 ->
             collate(Tree, K1, K2, [lt, eq]);
-        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) ->
+        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) when Level > 0 ->
             collate(Tree, L1, L2, [lt, eq])
     end,
     lists:umerge(CollateWrapper, List1, List2).
@@ -966,21 +967,21 @@ sort_nodes(#tree{} = Tree, List) ->
     lists:sort(CollateWrapper, List).
 
 
-sort_members(#tree{} = Tree, List) ->
+sort_members(#tree{} = Tree, Level, List) ->
     CollateWrapper = fun
-        ({K1, _V1}, {K2, _V2}) ->
+        ({K1, _V1}, {K2, _V2}) when Level == 0 ->
             collate(Tree, K1, K2, [lt, eq]);
-        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) ->
+        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) when Level > 0 ->
             collate(Tree, L1, L2, [lt, eq])
     end,
     lists:sort(CollateWrapper, List).
 
 
-usort_members(#tree{} = Tree, List) ->
+usort_members(#tree{} = Tree, Level, List) ->
     CollateWrapper = fun
-        ({K1, _V1}, {K2, _V2}) ->
+        ({K1, _V1}, {K2, _V2}) when Level == 0 ->
             collate(Tree, K1, K2, [lt, eq]);
-        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) ->
+        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) when Level > 0 ->
             collate(Tree, L1, L2, [lt, eq])
     end,
     lists:usort(CollateWrapper, List).
@@ -1108,6 +1109,25 @@ collation_fun_test_() ->
 collate_validation_test() ->
     Tree = #tree{collate_fun = fun(_A, _B) -> foo end},
     ?assertError(invalid_collation_result, collate(Tree, 1, 2)).
+
+
+order_is_preserved_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    open(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>, 8),
+    ?assertEqual(4, Tree#tree.max).
+
+
+min_not_allowed_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1,2,3>>, 4),
+    ?assertError(min_not_allowed, ebtree:insert(Db, Tree, ebtree:min(), foo)).
+
+
+max_not_allowed_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1,2,3>>, 4),
+    ?assertError(max_not_allowed, ebtree:insert(Db, Tree, ebtree:max(), foo)).
 
 
 lookup_test() ->
@@ -1383,6 +1403,36 @@ custom_collation_reverse_range_test_() ->
                 ) end,
         lists:seq(1, 100))
     end}.
+
+
+validate_tree_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1,2,3>>, 4),
+    [ebtree:insert(Db, Tree, I, I) || I <- lists:seq(1, 16)],
+    validate_tree(Db, Tree).
+
+
+validate_node_test_() ->
+    [
+        ?_test(?assertError({node_without_id, _}, validate_node(
+            #tree{}, #node{id = undefined}))),
+        ?_test(?assertError({too_few_keys, _}, validate_node(
+            #tree{collate_fun = fun collate_raw/2, min = 2},
+            #node{id = 1, members = [{1, 1}]}))),
+        ?_test(?assertError({too_many_keys, _}, validate_node(
+            #tree{collate_fun = fun collate_raw/2, min = 2, max = 2},
+            #node{id = 1, members = [{1, 1}, {2, 2}, {3, 3}]}))),
+        ?_test(?assertError({non_leaf_with_prev, _}, validate_node(
+            #tree{min = 0}, #node{id = 1, level = 1, prev = 1}))),
+        ?_test(?assertError({non_leaf_with_next, _}, validate_node(
+            #tree{min = 0}, #node{id = 1, level = 1, next = 1}))),
+        ?_test(?assertError({out_of_order, _}, validate_node(
+            #tree{min = 0, collate_fun = fun collate_raw/2},
+            #node{id = 1, members = [{2, 2}, {1, 1}]}))),
+        ?_test(?assertError({duplicates, _}, validate_node(
+            #tree{min = 0, collate_fun = fun collate_raw/2},
+            #node{id = 1, members = [{1, 1}, {1, 1}]})))
+    ].
 
 
 -endif.
