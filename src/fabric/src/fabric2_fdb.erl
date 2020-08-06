@@ -77,6 +77,9 @@
 
     get_approximate_tx_size/1,
 
+    chunkify_binary/1,
+    chunkify_binary/2,
+
     debug_cluster/0,
     debug_cluster/2
 ]).
@@ -1176,6 +1179,21 @@ get_approximate_tx_size(#{} = TxDb) ->
     erlfdb:wait(erlfdb:get_approximate_size(Tx)).
 
 
+chunkify_binary(Data) ->
+    chunkify_binary(Data, binary_chunk_size()).
+
+
+chunkify_binary(Data, Size) ->
+    case Data of
+        <<>> ->
+            [];
+        <<Head:Size/binary, Rest/binary>> ->
+            [Head | chunkify_binary(Rest, Size)];
+        <<_/binary>> when size(Data) < Size ->
+            [Data]
+    end.
+
+
 debug_cluster() ->
     debug_cluster(<<>>, <<16#FE, 16#FF, 16#FF>>).
 
@@ -1675,21 +1693,6 @@ sum_rem_rev_sizes(RevInfos) ->
         } = RI,
         Size + Acc
     end, 0, RevInfos).
-
-
-chunkify_binary(Data) ->
-    chunkify_data(Data, binary_chunk_size()).
-
-
-chunkify_data(Data, Size) ->
-    case Data of
-        <<>> ->
-            [];
-        <<Head:Size/binary, Rest/binary>> ->
-            [Head | chunkify_data(Rest, Size)];
-        <<_/binary>> when size(Data) < Size ->
-            [Data]
-    end.
 
 
 get_fold_acc(Db, RangePrefix, UserCallback, UserAcc, Options)
