@@ -1111,6 +1111,25 @@ collate_validation_test() ->
     ?assertError(invalid_collation_result, collate(Tree, 1, 2)).
 
 
+order_is_preserved_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    open(Db, <<1,2,3>>, 4),
+    Tree = open(Db, <<1,2,3>>, 8),
+    ?assertEqual(4, Tree#tree.max).
+
+
+min_not_allowed_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1,2,3>>, 4),
+    ?assertError(min_not_allowed, ebtree:insert(Db, Tree, ebtree:min(), foo)).
+
+
+max_not_allowed_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1,2,3>>, 4),
+    ?assertError(max_not_allowed, ebtree:insert(Db, Tree, ebtree:max(), foo)).
+
+
 lookup_test() ->
     Db = erlfdb_util:get_test_db([empty]),
     Tree = open(Db, <<1,2,3>>, 4),
@@ -1384,6 +1403,36 @@ custom_collation_reverse_range_test_() ->
                 ) end,
         lists:seq(1, 100))
     end}.
+
+
+validate_tree_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1,2,3>>, 4),
+    [ebtree:insert(Db, Tree, I, I) || I <- lists:seq(1, 16)],
+    validate_tree(Db, Tree).
+
+
+validate_node_test_() ->
+    [
+        ?_test(?assertError({node_without_id, _}, validate_node(
+            #tree{}, #node{id = undefined}))),
+        ?_test(?assertError({too_few_keys, _}, validate_node(
+            #tree{collate_fun = fun collate_raw/2, min = 2},
+            #node{id = 1, members = [{1, 1}]}))),
+        ?_test(?assertError({too_many_keys, _}, validate_node(
+            #tree{collate_fun = fun collate_raw/2, min = 2, max = 2},
+            #node{id = 1, members = [{1, 1}, {2, 2}, {3, 3}]}))),
+        ?_test(?assertError({non_leaf_with_prev, _}, validate_node(
+            #tree{min = 0}, #node{id = 1, level = 1, prev = 1}))),
+        ?_test(?assertError({non_leaf_with_next, _}, validate_node(
+            #tree{min = 0}, #node{id = 1, level = 1, next = 1}))),
+        ?_test(?assertError({out_of_order, _}, validate_node(
+            #tree{min = 0, collate_fun = fun collate_raw/2},
+            #node{id = 1, members = [{2, 2}, {1, 1}]}))),
+        ?_test(?assertError({duplicates, _}, validate_node(
+            #tree{min = 0, collate_fun = fun collate_raw/2},
+            #node{id = 1, members = [{1, 1}, {1, 1}]})))
+    ].
 
 
 -endif.
