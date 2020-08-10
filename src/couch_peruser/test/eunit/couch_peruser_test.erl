@@ -53,8 +53,8 @@ teardown(TestAuthDb) ->
     do_request(delete, get_cluster_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     do_request(delete, get_base_url() ++ "/" ++ ?b2l(TestAuthDb)),
     lists:foreach(fun(DbName) ->
-        case binary:part(DbName, 0, 7) of
-            <<"userdb-">> -> delete_db(DbName);
+        case binary:part(DbName, 0, 6) of
+            <<"userdb">> -> delete_db(DbName);
             _ -> ok
         end
     end, all_dbs()).

@@ -160,7 +160,7 @@ flush_updates(State) ->
         end, [], GroupedIds),
 
         spawn(fun() ->
-            fabric:update_docs(State#state.dbname, Docs, [])
+            fabric:update_docs(State#state.dbname, Docs, [?ADMIN_CTX])
         end),
 
         Count = State#state.pending_update_count,

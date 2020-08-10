@@ -389,6 +389,7 @@ clean:
 	-@rmdir /s/q src\mango\.venv
 	-@del /f/q src\couch\priv\couch_js\config.h
 	-@del /f/q dev\boot_node.beam dev\pbkdf2.pyc log\crash.log
+	-@rmdir /s/q .venv
 
 
 .PHONY: distclean

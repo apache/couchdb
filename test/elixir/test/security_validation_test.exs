@@ -145,7 +145,7 @@ defmodule SecurityValidationTest do
     headers = @auth_headers[:jerry]
     resp = Couch.get("/_session", headers: headers)
     assert resp.body["userCtx"]["name"] == "jerry"
-    assert resp.body["userCtx"]["roles"] == []
+    assert resp.body["userCtx"]["roles"] == ["_users"]
   end
 
   @tag :with_db

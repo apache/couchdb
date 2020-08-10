@@ -40,6 +40,7 @@
 -export([check_md5/2]).
 -export([set_mqd_off_heap/1]).
 -export([set_process_priority/2]).
+-export([validate_design_access/1, validate_design_access/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -763,3 +764,16 @@ check_config_blacklist(Section) ->
     _ ->
         ok
     end.
+
+validate_design_access(DDoc) ->
+    validate_design_access1(DDoc, true).
+
+validate_design_access(Db, DDoc) ->
+    validate_design_access1(DDoc, couch_db:has_access_enabled(Db)).
+
+validate_design_access1(_DDoc, false) -> ok;
+validate_design_access1(DDoc, true) ->
+    is_users_ddoc(DDoc).
+
+is_users_ddoc(#doc{access=[<<"_users">>]}) -> ok;
+is_users_ddoc(_) -> throw({forbidden, <<"per-user ddoc access">>}).
