@@ -131,7 +131,7 @@ couchTests.security_validation = function(debug) {
       var user = JSON.parse(resp.responseText).userCtx;
       T(user.name == "jerry");
       // test that the roles are listed properly
-      TEquals(user.roles, []);
+      TEquals(["_users"], user.roles);
 
 
       // update the document

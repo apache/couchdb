@@ -119,7 +119,7 @@ t_fail_changes_queue({Source, Target}) ->
 
         RepPid = couch_replicator_test_helper:get_pid(RepId),
         State = sys:get_state(RepPid),
-        ChangesQueue = element(20, State),
+        ChangesQueue = element(22, State),
         ?assert(is_process_alive(ChangesQueue)),
 
         {ok, Listener} = rep_result_listener(RepId),
@@ -139,7 +139,7 @@ t_fail_changes_manager({Source, Target}) ->
 
         RepPid = couch_replicator_test_helper:get_pid(RepId),
         State = sys:get_state(RepPid),
-        ChangesManager = element(21, State),
+        ChangesManager = element(23, State),
         ?assert(is_process_alive(ChangesManager)),
 
         {ok, Listener} = rep_result_listener(RepId),
@@ -159,7 +159,7 @@ t_fail_changes_reader_proc({Source, Target}) ->
 
         RepPid = couch_replicator_test_helper:get_pid(RepId),
         State = sys:get_state(RepPid),
-        ChangesReader = element(22, State),
+        ChangesReader = element(24, State),
         ?assert(is_process_alive(ChangesReader)),
 
         {ok, Listener} = rep_result_listener(RepId),

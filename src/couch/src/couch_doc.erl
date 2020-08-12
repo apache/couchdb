@@ -25,7 +25,7 @@
 
 -export([with_ejson_body/1]).
 -export([is_deleted/1]).
-
+-export([has_access/1, has_no_access/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -41,15 +41,27 @@ to_branch(Doc, [RevId | Rest]) ->
     [{RevId, ?REV_MISSING, to_branch(Doc, Rest)}].
 
 % helpers used by to_json_obj
+reduce_access({Access}) -> Access;
+reduce_access(Access) -> Access.
+
 to_json_rev(0, []) ->
     [];
 to_json_rev(Start, [FirstRevId|_]) ->
     [{<<"_rev">>, ?l2b([integer_to_list(Start),"-",revid_to_str(FirstRevId)])}].
 
-to_json_body(true, {Body}) ->
+to_json_body(Del, Body) ->
+    to_json_body(Del, Body, []).
+
+to_json_body(true, {Body}, []) ->
     Body ++ [{<<"_deleted">>, true}];
-to_json_body(false, {Body}) ->
-    Body.
+to_json_body(false, {Body}, []) ->
+    Body;
+to_json_body(true, {Body}, Access0) ->
+    Access = reduce_access(Access0),
+    Body ++ [{<<"_deleted">>, true}] ++ [{<<"_access">>, {Access}}];
+to_json_body(false, {Body}, Access0) ->
+    Access = reduce_access(Access0),
+    Body ++ [{<<"_access">>, Access}].
 
 to_json_revisions(Options, Start, RevIds0) ->
     RevIds = case proplists:get_value(revs, Options) of
@@ -118,10 +130,10 @@ to_json_obj(Doc, Options) ->
     doc_to_json_obj(with_ejson_body(Doc), Options).
 
 doc_to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
-            meta=Meta}=Doc,Options)->
+            meta=Meta,access=Access}=Doc,Options)->
     {[{<<"_id">>, Id}]
         ++ to_json_rev(Start, RevIds)
-        ++ to_json_body(Del, Body)
+        ++ to_json_body(Del, Body, Access)
         ++ to_json_revisions(Options, Start, RevIds)
         ++ to_json_meta(Meta)
         ++ to_json_attachments(Doc#doc.atts, Options)
@@ -252,6 +264,10 @@ transfer_fields([{<<"_id">>, Id} | Rest], Doc, DbName) ->
     validate_docid(Id, DbName),
     transfer_fields(Rest, Doc#doc{id=Id}, DbName);
 
+transfer_fields([{<<"_access">>, Access} = Field | Rest], Doc, DbName) ->
+    % TODO: validate access as array strings, and optional arrays of strings
+    transfer_fields(Rest, Doc#doc{access=Access}, DbName);
+
 transfer_fields([{<<"_rev">>, Rev} | Rest], #doc{revs={0, []}}=Doc, DbName) ->
     {Pos, RevId} = parse_rev(Rev),
     transfer_fields(Rest,
@@ -351,7 +367,7 @@ max_seq(Tree, UpdateSeq) ->
     end,
     couch_key_tree:fold(FoldFun, UpdateSeq, Tree).
 
-to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree,update_seq=FDISeq}) ->
+to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree,update_seq=FDISeq,access=Access}) ->
     RevInfosAndPath = [
         {rev_info(Node), Path} || {_Leaf, Path} = Node <-
             couch_key_tree:get_all_leafs(Tree)
@@ -364,7 +380,7 @@ to_doc_info_path(#full_doc_info{id=Id,rev_tree=Tree,update_seq=FDISeq}) ->
         end, RevInfosAndPath),
     [{_RevInfo, WinPath}|_] = SortedRevInfosAndPath,
     RevInfos = [RevInfo || {RevInfo, _Path} <- SortedRevInfosAndPath],
-    {#doc_info{id=Id, high_seq=max_seq(Tree, FDISeq), revs=RevInfos}, WinPath}.
+    {#doc_info{id=Id, high_seq=max_seq(Tree, FDISeq), revs=RevInfos,access=Access}, WinPath}.
 
 rev_info({#leaf{} = Leaf, {Pos, [RevId | _]}}) ->
     #rev_info{
@@ -399,6 +415,19 @@ is_deleted(Tree) ->
         false
     end.
 
+get_access({Props}) ->
+    get_access(couch_doc:from_json_obj({Props}));
+get_access(#doc{access=Access}) ->
+    Access.
+
+has_access(Doc) ->
+    has_access1(get_access(Doc)).
+
+has_no_access(Doc) ->
+    not has_access1(get_access(Doc)).
+
+has_access1([]) -> false;
+has_access1(_) -> true.
 
 get_validate_doc_fun({Props}) ->
     get_validate_doc_fun(couch_doc:from_json_obj({Props}));

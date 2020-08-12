@@ -318,7 +318,7 @@ defmodule CookieAuthTest do
     session = login("jchris", "funnybone")
     info = Couch.Session.info(session)
     assert info["userCtx"]["name"] == "jchris"
-    assert Enum.empty?(info["userCtx"]["roles"])
+    assert info["userCtx"]["roles"] == ["_users"]
 
     jason_user_doc =
       jason_user_doc

@@ -37,7 +37,8 @@
     waiting_delayed_commit_deprecated,
 
     options = [],
-    compression
+    compression,
+    access = false
 }).
 
 
