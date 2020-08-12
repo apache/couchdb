@@ -243,9 +243,15 @@ reset_indexes(DbName, Root) ->
     end, dict:new(), ets:lookup(?BY_DB, DbName)),
     Fun = fun({Sig, DDocIds}) ->
         [{_, Pid}] = ets:lookup(?BY_SIG, {DbName, Sig}),
-        MRef = erlang:monitor(process, Pid),
+        unlink(Pid),
         gen_server:cast(Pid, delete),
-        receive {'DOWN', MRef, _, _, _} -> ok end,
+        receive
+            {'EXIT', Pid, _} ->
+                ok
+        after
+            0 ->
+                ok
+        end,
         rem_from_ets(DbName, Sig, DDocIds, Pid)
     end,
     lists:foreach(Fun, dict:to_list(SigDDocIds)),
