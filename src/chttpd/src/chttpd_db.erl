@@ -383,17 +383,10 @@ handle_design_info_req(Req, _Db, _DDoc) ->
 
 create_db_req(#httpd{}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
-    N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
-    Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
-    P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
+    ShardsOpt = parse_shards_opt(Req),
     EngineOpt = parse_engine_opt(Req),
     DbProps = parse_partitioned_opt(Req),
-    Options = [
-        {n, N},
-        {q, Q},
-        {placement, P},
-        {props, DbProps}
-    ] ++ EngineOpt,
+    Options = lists:append([ShardsOpt, [{props, DbProps}], EngineOpt]),
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
     case fabric:create_db(DbName, Options) of
     ok ->
@@ -1702,6 +1695,40 @@ get_md5_header(Req) ->
 parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
 
+parse_shards_opt(Req) ->
+    [
+        {n, parse_shards_opt("n", Req, config:get("cluster", "n", "3"))},
+        {q, parse_shards_opt("q", Req, config:get("cluster", "q", "8"))},
+        {placement, parse_shards_opt(
+            "placement", Req, config:get("cluster", "placement"))}
+    ].
+
+parse_shards_opt("placement", Req, Default) ->
+    Err = <<"The `placement` value should be in a format `zone:n`.">>,
+    case chttpd:qs_value(Req, "placement", Default) of
+        Default -> Default;
+        [] -> throw({bad_request, Err});
+        Val ->
+            try
+                true = lists:all(fun(Rule) ->
+                    [_, N] = string:tokens(Rule, ":"),
+                    couch_util:validate_positive_int(N)
+                end, string:tokens(Val, ",")),
+                Val
+            catch _:_ ->
+                throw({bad_request, Err})
+            end
+    end;
+
+parse_shards_opt(Param, Req, Default) ->
+    Val = chttpd:qs_value(Req, Param, Default),
+    Err = ?l2b(["The `", Param, "` value should be a positive integer."]),
+    case couch_util:validate_positive_int(Val) of
+        true -> Val;
+        false -> throw({bad_request, Err})
+    end.
+
+
 parse_engine_opt(Req) ->
     case chttpd:qs_value(Req, "engine") of
         undefined ->
@@ -2118,8 +2145,26 @@ parse_partitioned_opt_test_() ->
         ]
     }.
 
+parse_shards_opt_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            t_should_allow_valid_q(),
+            t_should_default_on_missing_q(),
+            t_should_throw_on_invalid_q(),
+            t_should_allow_valid_n(),
+            t_should_default_on_missing_n(),
+            t_should_throw_on_invalid_n(),
+            t_should_allow_valid_placement(),
+            t_should_default_on_missing_placement(),
+            t_should_throw_on_invalid_placement()
+        ]
+    }.
 
 setup() ->
+    meck:expect(config, get, fun(_, _, Default) -> Default end),
     ok.
 
 teardown(_) ->
@@ -2157,5 +2202,104 @@ t_returns_empty_array_for_no_partitioned_qs() ->
         Req = mock_request("/all-test21"),
         ?assertEqual(parse_partitioned_opt(Req), [])
     end).
+
+t_should_allow_valid_q() ->
+    ?_test(begin
+        Req = mock_request("/all-test21?q=1"),
+        Opts = parse_shards_opt(Req),
+        ?assertEqual("1", couch_util:get_value(q, Opts))
+    end).
+
+t_should_default_on_missing_q() ->
+    ?_test(begin
+        Req = mock_request("/all-test21"),
+        Opts = parse_shards_opt(Req),
+        ?assertEqual("8", couch_util:get_value(q, Opts))
+    end).
+
+t_should_throw_on_invalid_q() ->
+    ?_test(begin
+        Req = mock_request("/all-test21?q="),
+        Err = <<"The `q` value should be a positive integer.">>,
+        ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+    end).
+
+t_should_allow_valid_n() ->
+    ?_test(begin
+        Req = mock_request("/all-test21?n=1"),
+        Opts = parse_shards_opt(Req),
+        ?assertEqual("1", couch_util:get_value(n, Opts))
+    end).
+
+t_should_default_on_missing_n() ->
+    ?_test(begin
+        Req = mock_request("/all-test21"),
+        Opts = parse_shards_opt(Req),
+        ?assertEqual("3", couch_util:get_value(n, Opts))
+    end).
+
+t_should_throw_on_invalid_n() ->
+    ?_test(begin
+        Req = mock_request("/all-test21?n="),
+        Err = <<"The `n` value should be a positive integer.">>,
+        ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+    end).
+
+t_should_allow_valid_placement() ->
+    {
+        foreach,
+        fun() -> ok end,
+        [
+            {"single zone",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement=az:1"),
+                Opts = parse_shards_opt(Req),
+                ?assertEqual("az:1", couch_util:get_value(placement, Opts))
+            end)},
+            {"multi zone",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement=az:1,co:3"),
+                Opts = parse_shards_opt(Req),
+                ?assertEqual("az:1,co:3",
+                    couch_util:get_value(placement, Opts))
+            end)}
+        ]
+    }.
+
+t_should_default_on_missing_placement() ->
+    ?_test(begin
+        Req = mock_request("/all-test21"),
+        Opts = parse_shards_opt(Req),
+        ?assertEqual(undefined, couch_util:get_value(placement, Opts))
+    end).
+
+t_should_throw_on_invalid_placement() ->
+    Err = <<"The `placement` value should be in a format `zone:n`.">>,
+    {
+        foreach,
+        fun() -> ok end,
+        [
+            {"empty placement",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement="),
+                ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+            end)},
+            {"invalid format",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement=moon"),
+                ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+            end)},
+            {"invalid n",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement=moon:eagle"),
+                ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+            end)},
+            {"one invalid zone",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement=az:1,co:moon"),
+                ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+            end)}
+        ]
+    }.
 
 -endif.
