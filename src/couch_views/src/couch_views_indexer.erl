@@ -168,18 +168,27 @@ add_error(Error, Reason, Data) ->
 
 
 update(#{} = Db, Mrst0, State0) ->
+    stat_incr(update_loop, 1),
     Limiter = maps:get(limiter, State0),
     case couch_rate:budget(Limiter) of
         0 ->
-            couch_rate:wait(Limiter),
+            time_span(rate_wait_1, fun() ->
+                couch_rate:wait(Limiter)
+            end),
             update(Db, Mrst0, State0);
         Limit ->
-            {Mrst1, State1} = do_update(Db, Mrst0, State0#{limit => Limit, limiter => Limiter}),
+            stat_store(rate_limit, Limit),
+
+            {Mrst1, State1} = time_span(do_update, fun() ->
+                do_update(Db, Mrst0, State0#{limit => Limit, limiter => Limiter})
+            end),
             case State1 of
                 finished ->
                     couch_eval:release_map_context(Mrst1#mrst.qserver);
                 _ ->
-                    couch_rate:wait(Limiter),
+                    time_span(rate_wait_2, fun() ->
+                        couch_rate:wait(Limiter)
+                    end),
                     update(Db, Mrst1, State1)
             end
     end.
@@ -187,10 +196,15 @@ update(#{} = Db, Mrst0, State0) ->
 
 do_update(Db, Mrst0, State0) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
-        Mrst1 = couch_views_fdb:set_trees(TxDb, Mrst0),
-        State1 = get_update_start_state(TxDb, Mrst0, State0),
+        {Mrst1, State1} = time_span(init_update, fun() ->
+            M = couch_views_fdb:set_trees(TxDb, Mrst0),
+            S = get_update_start_state(TxDb, Mrst0, State0),
+            {M, S}
+        end),
 
-        {ok, State2} = fold_changes(State1),
+        {ok, State2} = time_span(fold_changes, fun() ->
+            fold_changes(State1)
+        end),
 
         #{
             count := Count,
@@ -202,15 +216,29 @@ do_update(Db, Mrst0, State0) ->
             changes_done := ChangesDone0,
             design_opts := DesignOpts
         } = State2,
-        DocAcc1 = fetch_docs(TxDb, DesignOpts, DocAcc),
-        couch_rate:in(Limiter, Count),
 
-        {Mrst2, MappedDocs} = map_docs(Mrst1, DocAcc1),
-        WrittenDocs = write_docs(TxDb, Mrst2, MappedDocs, State2),
+        stat_incr(changes_read, length(DocAcc)),
+
+        DocAcc1 = time_span(fetch_docs, fun() ->
+            fetch_docs(TxDb, DesignOpts, DocAcc)
+        end),
+
+        time_span(rate_in, fun() ->
+            couch_rate:in(Limiter, Count)
+        end),
+
+        {Mrst2, MappedDocs} = time_span(map_docs, fun() ->
+            map_docs(Mrst1, DocAcc1)
+        end),
+        WrittenDocs = time_span(write_docs, fun() ->
+            write_docs(TxDb, Mrst2, MappedDocs, State2)
+        end),
 
         ChangesDone = ChangesDone0 + WrittenDocs,
 
-        couch_rate:success(Limiter, WrittenDocs),
+        time_span(rate_success, fun() ->
+            couch_rate:success(Limiter, WrittenDocs)
+        end),
 
         case Count < Limit of
             true ->
@@ -218,9 +246,11 @@ do_update(Db, Mrst0, State0) ->
                     ?INDEX_READY),
                 report_progress(State2#{changes_done := ChangesDone},
                     finished),
+                stat_dump(),
                 {Mrst2, finished};
             false ->
                 State3 = report_progress(State2, update),
+                stat_dump(),
                 {Mrst2, State3#{
                     tx_db := undefined,
                     count := 0,
@@ -561,6 +591,51 @@ fail_job(Job, Data, Error, Reason) ->
     NewData = add_error(Error, Reason, Data),
     couch_jobs:finish(undefined, Job, NewData),
     exit(normal).
+
+
+time_span(Id, Fun) ->
+    Start = erlang:system_time(microsecond),
+    try
+        Fun()
+    after
+        Diff = erlang:system_time(microsecond) - Start,
+        stat_store(Id, Diff / 1000000)
+    end.
+
+
+stat_incr(Id, Count) ->
+    case get('$view_stats') of
+        #{Id := OldCount} ->
+            stat_store(Id, OldCount + Count);
+        _ ->
+            stat_store(Id, Count)
+    end.
+
+
+stat_store(Id, Value) ->
+    NewStats = case get('$view_stats') of
+        #{} = Stats ->
+            maps:put(Id, Value, Stats);
+        undefined ->
+            #{Id => Value}
+    end,
+    put('$view_stats', NewStats).
+
+
+stat_dump() ->
+    case get('$view_stats') of
+        #{} = Stats ->
+            KVs = lists:sort(maps:to_list(Stats)),
+            Strs = lists:foldl(fun({Id, Value}, Acc) ->
+                Str = io_lib:format("~s:~w", [Id, Value]),
+                [Str | Acc]
+            end, [], KVs),
+            Msg = "XKCD VIEW STATS: " ++ string:join(lists:reverse(Strs),  " "),
+            couch_log:error(Msg, []),
+            put('$view_stats', #{});
+        _ ->
+            ok
+    end.
 
 
 retry_limit() ->
