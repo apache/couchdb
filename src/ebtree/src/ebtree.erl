@@ -18,6 +18,7 @@
      min/0,
      max/0,
      insert/4,
+     insert_multi/3,
      delete/3,
      lookup/3,
      range/6,
@@ -607,6 +608,155 @@ insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
     reduce_node(Tree, Node2).
 
 
+%% @doc Inserts or updates multiple values in the ebtree
+%% @param Db An erlfdb database or transaction.
+%% @param Tree The ebtree.
+%% @param KeyValues A list of two-tuples representing the key/values to insert
+%% @returns the tree.
+-spec insert_multi(Db :: term(), Tree :: #tree{}, KeyValues :: [{term(), term()}]) -> #tree{}.
+insert_multi(_Db, #tree{} = Tree, []) ->
+    Tree;
+
+insert_multi(Db, #tree{} = Tree, KeyValues) when is_list(KeyValues) ->
+    % Sort our KeyValues so that we can insert in order
+    SortedKeyValues = usort_members(Tree, 0, KeyValues),
+    erlfdb:transactional(Db, fun(Tx) ->
+        Root0 = get_node(Tx, Tree, ?NODE_ROOT_ID),
+        Members = insert_multi(Tx, Tree, Root0, SortedKeyValues),
+        Root1 = grow_tree(Tx, Tree, Root0#node{members = Members}),
+        set_node(Tx, Tree, Root1)
+    end),
+    Tree.
+
+
+insert_multi(Tx, #tree{} = Tree, #node{level = L} = Node, KeyValues) when L > 0 ->
+    ChildKVsPairs = assign_kvs(Tree, Node#node.members, KeyValues),
+    NewMembers = lists:flatmap(fun({{_F, _L, P, _R} = Child, KVs}) ->
+        case KVs of
+            [] ->
+                [Child];
+            _ ->
+                ChildNode = get_node(Tx, Tree, P),
+                insert_multi(Tx, Tree, ChildNode, KVs)
+        end
+    end, ChildKVsPairs),
+    split_node_multi(Tx, Tree, Node#node{members = NewMembers});
+
+insert_multi(Tx, #tree{} = Tree, #node{level = 0} = Node, KeyValues) ->
+    NewMembers = umerge_members(Tree, 0, KeyValues, Node#node.members),
+    split_node_multi(Tx, Tree, Node#node{members = NewMembers}).
+
+
+assign_kvs(_Tree, [Child], KeyValues) ->
+    [{Child, KeyValues}];
+
+assign_kvs(Tree, [{_F, L, _P, _R} = Child | RestChildren], KeyValues) ->
+    {KVsInChild, RestKVs} = lists:splitwith(fun({Key, _}) ->
+        collate(Tree, Key, L, [lt, eq])
+    end, KeyValues),
+    [{Child, KVsInChild} | assign_kvs(Tree, RestChildren, RestKVs)].
+
+
+split_node_multi(Tx, Tree, Node) ->
+    NumMembers = length(Node#node.members),
+    % Not =< so that we don't leave full nodes
+    % in the tree after update.
+    case NumMembers < Tree#tree.max of
+        true when Node#node.id == ?NODE_ROOT_ID ->
+            Node#node.members;
+        true ->
+            set_node(Tx, Tree, Node),
+            [to_member(Tree, Node)];
+        false ->
+            clear_node(Tx, Tree, Node),
+            Nodes0 = create_nodes(Tx, Tree, Node),
+            Nodes1 = if Node#node.level > 0 -> Nodes0; true ->
+                Nodes2 = update_next_ptrs(Nodes0),
+                Nodes3 = update_prev_ptrs(Nodes2),
+                Nodes4 = set_first_prev_ptr(Tx, Tree, Node#node.prev, Nodes3),
+                set_last_next_ptr(Tx, Tree, Node#node.next, Nodes4)
+            end,
+            set_nodes(Tx, Tree, Nodes1),
+            [to_member(Tree, N) || N <- Nodes1]
+    end.
+
+
+grow_tree(_Tx, _Tree, #node{level = 0, members = [{_, _} | _]} = Root) ->
+    Root;
+
+grow_tree(Tx, Tree, #node{level = 0, members = [{_, _, _, _} | _]} = Root) ->
+    grow_tree(Tx, Tree, Root#node{level = 1});
+
+grow_tree(Tx, Tree, Root) ->
+    case length(Root#node.members) < Tree#tree.max of
+        true ->
+            Root;
+        false ->
+            NewMembers = split_node_multi(Tx, Tree, Root),
+            NewRoot = Root#node{
+                level = Root#node.level + 1,
+                members = NewMembers
+            },
+            grow_tree(Tx, Tree, NewRoot)
+    end.
+
+
+to_member(Tree, Node) ->
+    FirstKey = first_key(Node#node.members),
+    LastKey = last_key(Node#node.members),
+    Reds = reduce_node(Tree, Node),
+    {FirstKey, LastKey, Node#node.id, Reds}.
+
+
+create_nodes(Tx, #tree{} = Tree, Node) ->
+    case length(Node#node.members) >= Tree#tree.max of
+        true ->
+            {Members, Rest} = lists:split(Tree#tree.min, Node#node.members),
+            NewNode = #node{
+                id = new_node_id(Tx, Tree),
+                level = Node#node.level,
+                members = Members
+            },
+            [NewNode | create_nodes(Tx, Tree, Node#node{members = Rest})];
+        false ->
+            NewNode = #node{
+                id = new_node_id(Tx, Tree),
+                level = Node#node.level,
+                members = Node#node.members
+            },
+            [NewNode]
+    end.
+
+
+update_next_ptrs([_] = Nodes) ->
+    Nodes;
+
+update_next_ptrs([N1, N2 | Rest]) ->
+    [N1#node{next = N2#node.id} | update_next_ptrs([N2 | Rest])].
+
+
+update_prev_ptrs([_] = Nodes) ->
+    Nodes;
+
+update_prev_ptrs([N1, N2 | Rest]) ->
+    [N1 | update_prev_ptrs([N2#node{prev = N1#node.id} | Rest])].
+
+
+set_first_prev_ptr(Tx, Tree, Prev, [Node | Rest]) ->
+    NewNode = Node#node{prev = Prev},
+    update_prev_neighbour(Tx, Tree, NewNode),
+    [NewNode | Rest].
+
+
+set_last_next_ptr(Tx, Tree, Next, [Node0]) ->
+    Node1 = Node0#node{next = Next},
+    update_next_neighbour(Tx, Tree, Node1),
+    [Node1];
+
+set_last_next_ptr(Tx, Tree, Next, [N | Rest]) ->
+    [N | set_last_next_ptr(Tx, Tree, Next, Rest)].
+
+
 %% @doc Deletes an entry from the ebtree
 %% @param Db An erlfdb database or transaction.
 %% @param Tree The ebtree.
@@ -1156,6 +1306,20 @@ lookup_test() ->
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key + 1) end, Keys),
     lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
     ?assertEqual(false, lookup(Db, Tree, 101)).
+
+
+insert_multi_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1, 2, 3>>, 4),
+    AllKVs = lists:foldl(fun(_Seq, Acc) ->
+        KVs = [{rand:uniform(), rand:uniform()} || _ <- lists:seq(1, 16)],
+        insert_multi(Db, Tree, KVs),
+        KVs ++ Acc
+    end, [], lists:seq(1, 16)),
+    lists:foreach(fun({K, V}) ->
+        ?assertEqual({K, V}, lookup(Db, Tree, K))
+    end, AllKVs),
+    validate_tree(Db, Tree).
 
 
 delete_test() ->
