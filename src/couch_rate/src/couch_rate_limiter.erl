@@ -80,7 +80,8 @@
     regular_delay = 100 :: timeout(),
     congested_delay = 5000 :: timeout(),
     initial_budget = 100,
-    latency = 0
+    latency = 0,
+    has_failures = false
 }).
 
 -type state() :: #?STATE{}.
@@ -199,7 +200,8 @@ success(_Id, #?STATE{} = State, Writes) ->
         writes = Writes,
         mean_writes = average(MeanWrites, WinSize, Writes),
         mean_reads = average(MeanReads, WinSize, Reads),
-        latency = TimerFun() - TS
+        latency = TimerFun() - TS,
+        has_failures = false
     })}.
 
 
@@ -215,7 +217,8 @@ failure(_Id, #?STATE{} = State) ->
     } = State,
     {ok, update_min(State#?STATE{
         writes = 0,
-        latency = TimerFun() - TS
+        latency = TimerFun() - TS,
+        has_failures = true
     })}.
 
 
@@ -266,18 +269,18 @@ pattern(Id, #?STATE{} = State) ->
     #?STATE{
         underload_threshold = UnderloadThreshold,
         overload_threshold = OverloadThreshold,
-        writes = W,
-        mean_writes = MW
+        mean_writes = MW,
+        has_failures = HasFailures
     } = State,
     case min_latency(Id, State) of
         MinRollingLatency when MinRollingLatency > OverloadThreshold ->
             overloaded;
         MinRollingLatency when MinRollingLatency > UnderloadThreshold ->
             optimal;
-        MinRollingLatency when MinRollingLatency > 0 andalso W == 0 ->
-            failed;
         MinRollingLatency when MinRollingLatency == 0 andalso MW == 0.0 ->
             init;
+        _ when HasFailures ->
+            failed;
         _ ->
             underloaded
     end.
