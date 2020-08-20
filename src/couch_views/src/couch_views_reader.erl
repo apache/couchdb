@@ -210,8 +210,7 @@ load_doc(TxDb, Id, null, DocOpts) ->
 
 load_doc(TxDb, Id, Rev, DocOpts) ->
     Rev1 = couch_doc:parse_rev(Rev),
-    case (catch fabric2_db:open_doc_revs(TxDb, Id, [Rev1], DocOpts)) of
+    case fabric2_db:open_doc_revs(TxDb, Id, [Rev1], DocOpts) of
         {ok, [{ok, Doc}]} -> couch_doc:to_json_obj(Doc, DocOpts);
-        {ok, [{{not_found, missing}, Rev}]} -> null;
         {ok, [_Else]} -> null
     end.
