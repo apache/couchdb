@@ -546,7 +546,7 @@ options_to_query_args(HttpDb, Path, Options0) ->
             length("GET " ++ FullUrl ++ " HTTP/1.1\r\n") +
             length("&atts_since=") + 6,  % +6 = % encoded [ and ]
             PAs, MaxLen, []),
-        [{"atts_since", ?JSON_ENCODE(RevList)} | QueryArgs1]
+        [{"atts_since", ?b2l(iolist_to_binary(?JSON_ENCODE(RevList)))} | QueryArgs1]
     end.
 
 
