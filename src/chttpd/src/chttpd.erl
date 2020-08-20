@@ -1000,6 +1000,8 @@ maybe_handle_error(Error) ->
             Result;
         {Err, Reason} ->
             {500, couch_util:to_binary(Err), couch_util:to_binary(Reason)};
+        normal ->
+            exit(normal);
         Error ->
             {500, <<"unknown_error">>, couch_util:to_binary(Error)}
     end.
