@@ -21,6 +21,7 @@
      insert_multi/3,
      delete/3,
      lookup/3,
+     lookup_multi/3,
      range/6,
      reverse_range/6,
      fold/4,
@@ -147,6 +148,55 @@ lookup(Db, #tree{} = Tree, Key) ->
             end
     end,
     fold(Db, Tree, Fun, false, []).
+
+
+%% @doc Lookup a list of keys in the ebtree.
+%% @param Db An erlfdb database or transaction.
+%% @param Tree the ebtree.
+%% @param Keys the list of keys to lookup
+%% @returns A list containing key/value tuples for keys that were found
+-spec lookup_multi(Db :: term(), Tree :: #tree{}, Key :: [term()]) ->
+    [{Key :: term(), Value :: term()}].
+lookup_multi(Db, #tree{} = Tree, Keys) ->
+    FoldFun = fun lookup_multi_fold/2,
+    Acc = {Tree, sort_keys(Tree, Keys), []},
+    {_, _, FoundKeys} = fold(Db, Tree, FoldFun, Acc, []),
+    FoundKeys.
+
+
+lookup_multi_fold(_, {_, [], _} = Acc) ->
+    % No more keys to find
+    {stop, Acc};
+
+lookup_multi_fold({visit, Key1, Value}, {Tree, [Key2 | Rest], Acc}) ->
+    {NewKeys, NewAcc} = case collate(Tree, Key1, Key2) of
+        lt ->
+            % Still looking for the next user key
+            {[Key2 | Rest], Acc};
+        eq ->
+            % Found a requested key
+            {Rest, [{Key2, Value} | Acc]};
+        gt ->
+            % The user key wasn't found so we drop it
+            {Rest, Acc}
+    end,
+    {ok, {Tree, NewKeys, NewAcc}};
+
+lookup_multi_fold({traverse, FKey, LKey, R}, {Tree, [UKey | Rest], Acc}) ->
+    case collate(Tree, FKey, UKey, [gt]) of
+        true ->
+            % We've passed by our first user key
+            lookup_multi_fold({traverse, FKey, LKey, R}, {Tree, Rest, Acc});
+        false ->
+            case collate(Tree, UKey, LKey, [lt, eq]) of
+                true ->
+                    % Key might be in this range
+                    {ok, {Tree, [UKey | Rest], Acc}};
+                false ->
+                    % Next key is not in range
+                    {skip, {Tree, [UKey | Rest], Acc}}
+            end
+    end.
 
 
 %% @equiv fold(Db, Tree, Fun, Acc, [])
@@ -1307,6 +1357,17 @@ lookup_test() ->
     lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key + 1) end, Keys),
     lists:foreach(fun(Key) -> ?assertEqual({Key, Key + 1}, lookup(Db, Tree, Key)) end, Keys),
     ?assertEqual(false, lookup(Db, Tree, 101)).
+
+
+lookup_multi_test() ->
+    Db = erlfdb_util:get_test_db([empty]),
+    Tree = open(Db, <<1,2,3>>, 4),
+    Keys = [X || {_, X} <- lists:sort([ {rand:uniform(), N} || N <- lists:seq(1, 16)])],
+    lists:foreach(fun(Key) -> insert(Db, Tree, Key, Key + 1) end, Keys),
+    validate_tree(Db, Tree),
+    ?assertEqual([{1, 2}], lookup_multi(Db, Tree, [1])),
+    ?assertEqual([{15, 16}, {2, 3}], lookup_multi(Db, Tree, [2, 15])),
+    ?assertEqual([{15, 16}, {4, 5}, {2, 3}], lookup_multi(Db, Tree, [2, 101, 15, 4, -3])).
 
 
 insert_multi_test() ->
