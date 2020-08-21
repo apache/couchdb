@@ -96,6 +96,8 @@ init() ->
         design_opts => Mrst#mrst.design_opts
     },
 
+    process_flag(sensitive, false),
+
     try
         update(Db, Mrst, State)
     catch
@@ -176,19 +178,21 @@ update(#{} = Db, Mrst0, State0) ->
                 couch_rate:wait(Limiter)
             end),
             update(Db, Mrst0, State0);
-        Limit ->
+        _ ->
+            Limit = 1000,
             stat_store(rate_limit, Limit),
 
             {Mrst1, State1} = time_span(do_update, fun() ->
                 do_update(Db, Mrst0, State0#{limit => Limit, limiter => Limiter})
             end),
+            stat_dump(),
             case State1 of
                 finished ->
                     couch_eval:release_map_context(Mrst1#mrst.qserver);
                 _ ->
-                    time_span(rate_wait_2, fun() ->
-                        couch_rate:wait(Limiter)
-                    end),
+                    %% time_span(rate_wait_2, fun() ->
+                    %%     couch_rate:wait(Limiter)
+                    %% end),
                     update(Db, Mrst1, State1)
             end
     end.
@@ -246,11 +250,9 @@ do_update(Db, Mrst0, State0) ->
                     ?INDEX_READY),
                 report_progress(State2#{changes_done := ChangesDone},
                     finished),
-                stat_dump(),
                 {Mrst2, finished};
             false ->
                 State3 = report_progress(State2, update),
-                stat_dump(),
                 {Mrst2, State3#{
                     tx_db := undefined,
                     count := 0,
@@ -357,7 +359,7 @@ map_docs(Mrst, Docs) ->
     end, Docs),
 
     Deleted1 = lists:map(fun(Doc) ->
-        Doc#{results => []}
+        Doc#{results => [[] || _ <- Mrst1#mrst.views]}
     end, Deleted0),
 
     DocsToMap = lists:map(fun(Doc) ->
@@ -388,7 +390,7 @@ map_docs(Mrst, Docs) ->
     {Mrst1, MappedDocs}.
 
 
-write_docs(TxDb, Mrst, Docs, State) ->
+write_docs(TxDb, Mrst, Docs0, State) ->
     #mrst{
         sig = Sig
     } = Mrst,
@@ -400,16 +402,17 @@ write_docs(TxDb, Mrst, Docs, State) ->
     KeyLimit = key_size_limit(),
     ValLimit = value_size_limit(),
 
-    lists:foreach(fun(Doc0) ->
-        Doc1 = check_kv_size_limit(Mrst, Doc0, KeyLimit, ValLimit),
-        couch_views_fdb:write_doc(TxDb, Mrst, Doc1)
-    end, Docs),
+    Docs1 = lists:map(fun(Doc) ->
+        check_kv_size_limit(Mrst, Doc, KeyLimit, ValLimit)
+    end, Docs0),
+
+    couch_views_fdb:update_views(TxDb, Mrst, Docs1),
 
     if LastSeq == false -> ok; true ->
         couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq)
     end,
 
-    length(Docs).
+    length(Docs1).
 
 
 fetch_docs(Db, DesignOpts, Changes) ->
@@ -523,7 +526,11 @@ check_kv_size_limit(Mrst, Doc, KeyLimit, ValLimit) ->
         Fmt = "View ~s size error for docid `~s`, excluded from indexing "
             "in db `~s` for design doc `~s`",
         couch_log:error(Fmt, [Type, DocId, DbName, IdxName]),
-        Doc#{deleted := true, results := [], kv_sizes => []}
+        Doc#{
+            deleted := true,
+            results := [[] || _ <- Mrst#mrst.views],
+            kv_sizes => []
+        }
     end.
 
 

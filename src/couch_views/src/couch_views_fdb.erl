@@ -30,7 +30,7 @@
     fold_map_idx/5,
     fold_red_idx/6,
 
-    write_doc/3,
+    update_views/3,
 
     list_signatures/1,
     clear_index/2
@@ -285,62 +285,67 @@ fold_red_idx(TxDb, View, Idx, Options, Callback, Acc0) ->
     end.
 
 
-write_doc(TxDb, Mrst, #{deleted := true} = Doc) ->
+update_views(TxDb, Mrst, Docs) ->
     #{
         tx := Tx
     } = TxDb,
+
+    % Collect update information
+
     #{
-        id := DocId
-    } = Doc,
+        id_keys_to_remove := IdKeysToRemove,
+        id_rows_to_insert := IdRowsToInsert,
+        view_keys_to_remove := ViewKeysToRemove,
+        view_rows_to_insert := ViewRowsToInsert
+    } = gather_update_info(Tx, Mrst, Docs),
 
-    ExistingViewKeys = get_view_keys(TxDb, Mrst, DocId),
+    % Remove any Key from Keys that appears in Rows as a Key
+    DeleteKeys = fun(Keys, Rows) ->
+        lists:foldl(fun({Key, _Val}, KeyAcc) ->
+            lists:delete(Key, KeyAcc)
+        end, Keys, Rows)
+    end,
 
-    ebtree:delete(Tx, Mrst#mrst.id_btree, DocId),
-    lists:foreach(fun(#mrview{id_num = ViewId, btree = Btree}) ->
-        ViewKeys = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
-            {ViewId, Keys} -> Keys;
-            false -> []
-        end,
-        lists:foreach(fun(Key) ->
-            ebtree:delete(Tx, Btree, {Key, DocId})
-        end, ViewKeys)
-    end, Mrst#mrst.views);
+    %% couch_log:error("XKCD: IdKeysToRemove: ~p", [IdKeysToRemove]),
+    %% couch_log:error("XKCD: Removing id rows: ~p", [DeleteKeys(IdKeysToRemove, IdRowsToInsert)]),
 
-write_doc(TxDb, Mrst, Doc) ->
-    #{
-        tx := Tx
-    } = TxDb,
-    #{
-        id := DocId,
-        results := Results
-    } = Doc,
+    % Delete any id rows that won't be overwritten
+    lists:foreach(fun(DocId) ->
+        ebtree:delete(Tx, Mrst#mrst.id_btree, DocId)
+    end, DeleteKeys(IdKeysToRemove, IdRowsToInsert)),
 
-    ExistingViewKeys = get_view_keys(TxDb, Mrst, DocId),
-
-    NewIdKeys = lists:foldl(fun({View, RawNewRows}, IdKeyAcc) ->
+    % Delete all views rows that won't be overwritten
+    lists:foreach(fun(View) ->
         #mrview{
-            id_num = ViewId
+            id_num = ViewId,
+            btree = BTree
         } = View,
 
-        % Remove old keys in the view
-        ExistingKeys = case lists:keyfind(ViewId, 1, ExistingViewKeys) of
-            {ViewId, Keys} -> Keys;
-            false -> []
-        end,
-        lists:foreach(fun(K) ->
-            ebtree:delete(Tx, View#mrview.btree, {K, DocId})
-        end, ExistingKeys),
+        Keys = maps:get(ViewId, ViewKeysToRemove, []),
+        Rows = maps:get(ViewId, ViewRowsToInsert, []),
 
-        % Insert new rows
-        NewRows = dedupe_rows(View, RawNewRows),
-        lists:foreach(fun({K, V}) ->
-            ebtree:insert(Tx, View#mrview.btree, {K, DocId}, V)
-        end, NewRows),
-        ViewKeys = {View#mrview.id_num, lists:usort([K || {K, _V} <- NewRows])},
-        [ViewKeys | IdKeyAcc]
-    end, [], lists:zip(Mrst#mrst.views, Results)),
+        %% couch_log:error("XKCD: ViewKeysToRemove: ~p -> ~p", [ViewId, Keys]),
+        %% couch_log:error("XKCD: Removing view rows: ~p -> ~p", [ViewId, DeleteKeys(Keys, Rows)]),
 
-    ebtree:insert(Tx, Mrst#mrst.id_btree, DocId, NewIdKeys).
+        lists:foreach(fun(IdKey) ->
+            ebtree:delete(Tx, BTree, IdKey)
+        end, DeleteKeys(Keys, Rows))
+    end, Mrst#mrst.views),
+
+    % Insert our new id_btree rows
+    %% couch_log:error("XKCD: Inserting id rows: ~p", [IdRowsToInsert]),
+    ebtree:insert_multi(Tx, Mrst#mrst.id_btree, IdRowsToInsert),
+
+    % Update each view
+    lists:foreach(fun(View) ->
+        #mrview{
+            id_num = ViewId,
+            btree = BTree
+        } = View,
+        Rows = maps:get(ViewId, ViewRowsToInsert, []),
+        %% couch_log:error("XKCD: Inserting view rows: ~p -> ~p", [ViewId, Rows]),
+        ebtree:insert_multi(Tx, BTree, Rows)
+    end, Mrst#mrst.views).
 
 
 list_signatures(Db) ->
@@ -381,19 +386,6 @@ clear_index(Db, Signature) ->
     TreeTuple = {?DB_VIEWS, ?VIEW_TREES, Signature},
     TreePrefix = erlfdb_tuple:pack(TreeTuple, DbPrefix),
     erlfdb:clear_range_startswith(Tx, TreePrefix).
-
-
-get_view_keys(TxDb, Mrst, DocId) ->
-    #{
-        tx := Tx
-    } = TxDb,
-    #mrst{
-        id_btree = IdTree
-    } = Mrst,
-    case ebtree:lookup(Tx, IdTree, DocId) of
-        {DocId, ViewKeys} -> ViewKeys;
-        false -> []
-    end.
 
 
 open_id_tree(TxDb, Sig) ->
@@ -470,11 +462,18 @@ make_reduce_fun(Lang, #mrview{} = View) ->
 
 persist_chunks(Tx, set, [Key, Value]) ->
     Chunks = fabric2_fdb:chunkify_binary(Value),
-    lists:foldl(fun(Chunk, Id) ->
+    LastId = lists:foldl(fun(Chunk, Id) ->
         ChunkKey = erlfdb_tuple:pack({Id}, Key),
         erlfdb:set(Tx, ChunkKey, Chunk),
         Id + 1
-    end, 0, Chunks);
+    end, 0, Chunks),
+
+    % We update nodes in place, so its possible that
+    % a node shrank. This clears any keys that we haven't
+    % just overwritten for the provided key.
+    LastIdKey = erlfdb_tuple:pack({LastId}, Key),
+    EndRange = <<Key/binary, 16#FF>>,
+    erlfdb:clear_range(Tx, LastIdKey, EndRange);
 
 persist_chunks(Tx, get, Key) ->
     Rows = erlfdb:get_range_startswith(Tx, Key),
@@ -520,6 +519,72 @@ to_red_opts(Options) ->
     end,
 
     {Dir, StartKey, EndKey, InclusiveEnd, GroupKeyFun}.
+
+
+gather_update_info(Tx, Mrst, Docs) ->
+    DocIds = [DocId || #{id := DocId} <- Docs],
+
+    % ExistingViewKeys is a list of `[{DocId, [{ViewId, [Keys]} | _]} | _]`
+    % This conversion is to a map of `#{ViewId => [{Key, DocId} | _]}`
+    ExistingViewKeys = ebtree:lookup_multi(Tx, Mrst#mrst.id_btree, DocIds),
+    ViewKeysToRemove1 = lists:foldl(fun({DocId, ViewIdKeys}, EVKAcc1) ->
+        lists:foldl(fun({ViewId, Keys}, EVKAcc2) ->
+            ViewKeys = [{Key, DocId} || Key <- Keys],
+            maps:update_with(ViewId, fun(RestViewKeys) ->
+                ViewKeys ++ RestViewKeys
+            end, ViewKeys, EVKAcc2)
+        end, EVKAcc1, ViewIdKeys)
+    end, #{}, ExistingViewKeys),
+
+    % Build our base accumulator
+    InfoAcc1 = #{
+        id_keys_to_remove => DocIds,
+        id_rows_to_insert => [],
+        view_keys_to_remove => ViewKeysToRemove1,
+        view_rows_to_insert => #{}
+    },
+
+    lists:foldl(fun(Doc, InfoAcc2) ->
+        #{
+            id := DocId,
+            deleted := Deleted,
+            results := Results
+        } = Doc,
+
+        if Deleted -> InfoAcc2; true ->
+            Out = lists:foldl(fun({View, RawNewRows}, {IdKeyAcc, InfoAcc3}) ->
+                #mrview{
+                    id_num = ViewId
+                } = View,
+                DedupedRows = dedupe_rows(View, RawNewRows),
+
+                IdKeys = lists:usort([K || {K, _V} <- DedupedRows]),
+                ViewRows = [{{K, DocId}, V} || {K, V} <- DedupedRows],
+
+                #{
+                    view_rows_to_insert := ViewRowsToInsert2
+                } = InfoAcc3,
+                ViewRowsToInsert3 = maps:update_with(ViewId, fun(Rows) ->
+                    ViewRows ++ Rows
+                end, ViewRows, ViewRowsToInsert2),
+
+                {[{ViewId, IdKeys} | IdKeyAcc], InfoAcc3#{
+                    view_rows_to_insert := ViewRowsToInsert3
+                }}
+            end, {[], InfoAcc2}, lists:zip(Mrst#mrst.views, Results)),
+
+            {IdRows, InfoAcc4} = Out,
+
+            % Don't store a row in the id_btree if it hasn't got any
+            % keys that will need to be deleted.
+            NonEmptyRows = [1 || {_ViewId, Rows} <- IdRows, Rows /= []],
+            if length(NonEmptyRows) == 0 -> InfoAcc4; true ->
+                maps:update_with(id_rows_to_insert, fun(OtherIdRows) ->
+                    [{DocId, IdRows} | OtherIdRows]
+                end, [{DocId, IdRows}], InfoAcc4)
+            end
+        end
+    end, InfoAcc1, Docs).
 
 
 dedupe_rows(View, KVs0) ->
