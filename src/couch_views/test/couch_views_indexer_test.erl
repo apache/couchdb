@@ -129,11 +129,10 @@ updated_docs_are_reindexed(Db) ->
     DbName = fabric2_db:name(Db),
     {ok, Mrst0} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{tx := Tx} = TxDb,
         Mrst1 = couch_views_fdb:set_trees(TxDb, Mrst0),
-        ?assertEqual(
-                [{0, [1]}, {1, []}],
-                lists:sort(couch_views_fdb:get_view_keys(TxDb, Mrst1, <<"0">>))
-            )
+        IdRow = ebtree:lookup(Tx, Mrst1#mrst.id_btree, <<"0">>),
+        ?assertEqual({<<"0">>, [{1, []}, {0, [1]}]}, IdRow)
     end).
 
 
@@ -163,11 +162,10 @@ updated_docs_without_changes_are_reindexed(Db) ->
     DbName = fabric2_db:name(Db),
     {ok, Mrst0} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{tx := Tx} = TxDb,
         Mrst1 = couch_views_fdb:set_trees(TxDb, Mrst0),
-        ?assertMatch(
-                [{0, [0]}, {1, []}],
-                lists:sort(couch_views_fdb:get_view_keys(TxDb, Mrst1, <<"0">>))
-            )
+        IdRow = ebtree:lookup(Tx, Mrst1#mrst.id_btree, <<"0">>),
+        ?assertEqual({<<"0">>, [{1, []}, {0, [0]}]}, IdRow)
     end).
 
 
@@ -211,8 +209,10 @@ deleted_docs_are_unindexed(Db) ->
     DbName = fabric2_db:name(Db),
     {ok, Mrst0} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{tx := Tx} = TxDb,
         Mrst1 = couch_views_fdb:set_trees(TxDb, Mrst0),
-        ?assertEqual([], couch_views_fdb:get_view_keys(TxDb, Mrst1, <<"0">>))
+        IdRow = ebtree:lookup(Tx, Mrst1#mrst.id_btree, <<"0">>),
+        ?assertEqual(false, IdRow)
     end).
 
 
@@ -434,8 +434,8 @@ multiple_design_docs(Db) ->
 
     % This is how we check that no index updates took place
     meck:new(couch_views_fdb, [passthrough]),
-    meck:expect(couch_views_fdb, write_doc, fun(TxDb, Mrst, Doc) ->
-        meck:passthrough([TxDb, Mrst, Doc])
+    meck:expect(couch_views_fdb, update_views, fun(TxDb, Mrst, Docs) ->
+        meck:passthrough([TxDb, Mrst, Docs])
     end),
 
     DDoc1 = create_ddoc(simple, <<"_design/bar1">>),
