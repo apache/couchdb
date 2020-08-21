@@ -68,6 +68,25 @@ defmodule Couch.Test.Pagination do
     %{view_name: "all", ddoc_id: ddoc_id}
   end
 
+  defp with_same_key_docs(context) do
+    assert Map.has_key?(context, :n_docs), "Please define '@describetag n_docs: 10'"
+
+    docs =
+      for id <- 1..context.n_docs do
+        str_id = docid(id)
+        %{"_id" => str_id, "integer" => id, "string" => docid(div(id, context.page_size))}
+      end
+
+    docs =
+      docs
+      |> Enum.map(fn doc ->
+        created_doc = create_doc(context.session, context.db_name, doc)
+        Map.merge(doc, created_doc)
+      end)
+
+    %{docs: docs}
+  end
+
   defp all_docs(context) do
     assert Map.has_key?(context, :page_size), "Please define '@describetag page_size: 4'"
 
@@ -84,6 +103,50 @@ defmodule Couch.Test.Pagination do
     %{
       response: resp.body
     }
+  end
+
+  defp paginate_queries(context, opts) do
+    paginate_queries(context, [], opts)
+  end
+
+  defp paginate_queries(context, acc, opts) do
+    {paginate_opts, client_opts} = Keyword.split(opts, [:url, :direction])
+
+    resp =
+      Couch.Session.post(context.session, Keyword.get(paginate_opts, :url), client_opts)
+
+    results = resp.body["results"]
+    view_url = String.replace_suffix(Keyword.get(paginate_opts, :url), "/queries", "")
+
+    opts =
+      opts
+      |> Keyword.replace!(:url, view_url)
+      |> Keyword.delete(:body)
+
+    final =
+      Enum.map(results, fn result ->
+        paginate(context, result, [Map.get(result, "rows")], opts)
+      end)
+
+    final
+  end
+
+  defp paginate(context, current, acc, opts) do
+    {paginate_opts, client_opts} = Keyword.split(opts, [:url, :direction])
+    direction_key = Keyword.get(paginate_opts, :direction, "next")
+
+    if Map.has_key?(current, direction_key) do
+      bookmark = current[direction_key]
+      client_opts = Keyword.replace!(client_opts, :query, %{bookmark: bookmark})
+
+      resp =
+        Couch.Session.get(context.session, Keyword.get(paginate_opts, :url), client_opts)
+
+      result = resp.body
+      paginate(context, result, [Map.get(result, "rows") | acc], opts)
+    else
+      Enum.reverse(acc)
+    end
   end
 
   defp paginate(context) do
@@ -148,7 +211,8 @@ defmodule Couch.Test.Pagination do
 
     docs
     |> Enum.map(fn doc ->
-      create_doc(session, db_name, doc)
+      created_doc = create_doc(session, db_name, doc)
+      Map.merge(doc, created_doc)
     end)
   end
 
@@ -157,9 +221,11 @@ defmodule Couch.Test.Pagination do
   end
 
   defp make_docs(id_range) do
+    max = Enum.max(id_range)
+
     for id <- id_range do
       str_id = docid(id)
-      %{"_id" => str_id, "integer" => id, "string" => str_id}
+      %{"_id" => str_id, "integer" => id, "string" => docid(max - id)}
     end
   end
 
@@ -339,8 +405,8 @@ defmodule Couch.Test.Pagination do
       assert resp.status_code == 200, "got error #{inspect(resp.body)}"
 
       [q1, q2] = resp.body["results"]
-      q1 = Enum.map(q1["rows"], fn row -> row["id"] end)
-      q2 = Enum.map(q2["rows"], fn row -> row["id"] end)
+      q1 = Enum.map(q1["rows"], fn row -> row["key"] end)
+      q2 = Enum.map(q2["rows"], fn row -> row["key"] end)
       assert q1 == Enum.reverse(q2)
       assert q1 == Enum.sort(q1)
     end
@@ -361,8 +427,8 @@ defmodule Couch.Test.Pagination do
       assert resp.status_code == 200, "got error #{inspect(resp.body)}"
 
       [q1, q2] = resp.body["results"]
-      q1 = Enum.map(q1["rows"], fn row -> row["id"] end)
-      q2 = Enum.map(q2["rows"], fn row -> row["id"] end)
+      q1 = Enum.map(q1["rows"], fn row -> row["key"] end)
+      q2 = Enum.map(q2["rows"], fn row -> row["key"] end)
       assert ctx.page_size == length(q1)
       assert q2 == []
     end
@@ -943,7 +1009,7 @@ defmodule Couch.Test.Pagination do
           assert resp.status_code == 200, "got error #{inspect(resp.body)}"
           next_bookmark = resp.body["next"]
 
-          first_page_ids = Enum.map(resp.body["rows"], fn row -> row["id"] end)
+          first_page_keys = Enum.map(resp.body["rows"], fn row -> row["key"] end)
 
           resp =
             Couch.Session.get(
@@ -963,8 +1029,8 @@ defmodule Couch.Test.Pagination do
             )
 
           assert resp.status_code == 200, "got error #{inspect(resp.body)}"
-          ids = Enum.map(resp.body["rows"], fn row -> row["id"] end)
-          assert first_page_ids == ids
+          keys = Enum.map(resp.body["rows"], fn row -> row["key"] end)
+          assert first_page_keys == keys
         end
       end
     end
@@ -1163,7 +1229,165 @@ defmodule Couch.Test.Pagination do
             assert length(result["rows"]) > ctx.page_size
           end)
         end
+
+        test "can retrieve all pages", ctx do
+          [descending_query, limit_query] =
+            paginate_queries(
+              ctx,
+              url:
+                "/#{ctx.db_name}/_design/#{ctx.ddoc_id}/_view/#{ctx.view_name}/queries",
+              query: %{page_size: ctx.page_size, descending: ctx.descending},
+              body: :jiffy.encode(ctx.queries)
+            )
+
+          results = List.flatten(descending_query)
+          assert ctx.n_docs == length(results)
+          expected_key_order = :descending
+          expected_ids_order = :ascending
+
+          assert expected_key_order == ordering?(results, "key"),
+                 "expecting keys in #{expected_key_order} order, got: #{
+                   inspect(field(results, "key"))
+                 }"
+
+          assert expected_ids_order == ordering?(results, "id"),
+                 "expecting ids in #{expected_ids_order} order, got: #{
+                   inspect(field(results, "id"))
+                 }"
+
+          results = List.flatten(limit_query)
+          [_descendiing_query, query] = ctx.queries[:queries]
+
+          expected_length =
+            if ctx.n_docs - query.skip > query.limit do
+              query.limit
+            else
+              query.limit - query.skip
+            end
+
+          assert expected_length == length(results)
+
+          {expected_key_order, expected_ids_order} =
+            if ctx.descending do
+              {:descending, :ascending}
+            else
+              {:ascending, :descending}
+            end
+
+          assert expected_key_order == ordering?(results, "key"),
+                 ~s(expecting keys in #{expected_key_order} order, got: #{
+                   inspect(field(results, "key"))
+                 })
+
+          assert expected_ids_order == ordering?(results, "id"),
+                 ~s(expecting keys in #{expected_ids_order} order, got: #{
+                   inspect(field(results, "id"))
+                 })
+
+          keys = Enum.map(results, &Map.get(&1, "key"))
+        end
       end
     end
+  end
+
+  for descending <- [false, true] do
+    for n <- [4, 9] do
+      describe "Pagination API (10 docs) : /{db}/_design/{ddoc}/_view/queries?page_size=#{
+                 n
+               }&descending=#{descending} : pages with same key" do
+        @describetag descending: descending
+        @describetag n_docs: 10
+        @describetag page_size: n
+
+        @describetag queries: %{
+                       queries: [
+                         %{
+                           descending: true
+                         },
+                         %{
+                           limit: n + 1,
+                           skip: 2
+                         }
+                       ]
+                     }
+        setup [:with_session, :random_db, :with_view, :with_same_key_docs]
+
+        test "handle same key", ctx do
+          '''
+          make sure the results are first sorted by key and then by id
+          '''
+
+          [descending_query, limit_query] =
+            paginate_queries(
+              ctx,
+              url:
+                "/#{ctx.db_name}/_design/#{ctx.ddoc_id}/_view/#{ctx.view_name}/queries",
+              query: %{page_size: ctx.page_size, descending: ctx.descending},
+              body: :jiffy.encode(ctx.queries)
+            )
+
+          aggregate = fn pages ->
+            Enum.reduce(pages, {[], %{}}, fn page, acc ->
+              Enum.reduce(page, acc, fn row, {keys, in_acc} ->
+                id = Map.get(row, "id")
+                key = Map.get(row, "key")
+                {keys ++ [key], Map.update(in_acc, key, [id], &(&1 ++ [id]))}
+              end)
+            end)
+          end
+
+          {keys, aggregated} = aggregate.(descending_query)
+
+          # keys are sorted in reverse order
+          assert :descending == ordering?(keys),
+                 ~s(expecting keys in descending order, got: #{inspect(keys)})
+
+          Enum.each(Map.values(aggregated), fn ids ->
+            # keys are sorted in reverse order by id
+            assert :descending == ordering?(ids),
+                   ~s(expecting ids in descending order, got: #{inspect(ids)})
+          end)
+
+          {keys, aggregated} = aggregate.(limit_query)
+
+          {expected_key_order, expected_ids_order} =
+            if ctx.descending do
+              {:descending, :descending}
+            else
+              {:ascending, :ascending}
+            end
+
+          # keys are sorted
+          assert expected_key_order == ordering?(keys) or :equal == ordering?(keys),
+                 ~s(expecting keys in #{expected_key_order} order, got: #{inspect(keys)})
+
+          Enum.each(Map.values(aggregated), fn ids ->
+            # Keys are sorted by id
+            assert expected_ids_order == ordering?(ids) or :equal == ordering?(ids),
+                   ~s(expecting ids in #{expected_ids_order} order, got: #{inspect(ids)})
+          end)
+        end
+      end
+    end
+  end
+
+  defp ordering?(maps, key) do
+    ordering?(field(maps, key))
+  end
+
+  defp ordering?(elements) do
+    ascending = Enum.sort(elements)
+    descending = Enum.reverse(Enum.sort(elements))
+
+    case {ascending, descending} do
+      {^elements, ^elements} -> :equal
+      {^elements, _} -> :ascending
+      {_, ^descending} -> :descending
+      _ -> :unordered
+    end
+  end
+
+  defp field(maps, key) do
+    Enum.map(maps, &Map.get(&1, key))
   end
 end

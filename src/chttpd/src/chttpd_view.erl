@@ -58,7 +58,9 @@ paginate_multi_query_view(Req, Db, DDoc, ViewName, Args0, Queries) ->
     ArgQueries = parse_queries(Req, Args0, Queries, fun(QueryArg) ->
         couch_mrview_util:set_view_type(QueryArg, ViewName, Views)
     end),
-    KeyFun = fun({Props}) -> couch_util:get_value(id, Props) end,
+    KeyFun = fun({Props}) ->
+        {couch_util:get_value(id, Props), couch_util:get_value(key, Props)}
+    end,
     #mrargs{page_size = PageSize} = Args0,
     #httpd{path_parts = Parts} = Req,
     UpdateSeq = fabric2_db:get_update_seq(Db),
@@ -100,7 +102,9 @@ stream_fabric_query_view(Db, Req, DDoc, ViewName, Args) ->
 
 
 paginate_fabric_query_view(Db, Req, DDoc, ViewName, Args0) ->
-    KeyFun = fun({Props}) -> couch_util:get_value(id, Props) end,
+    KeyFun = fun({Props}) ->
+        {couch_util:get_value(id, Props), couch_util:get_value(key, Props)}
+    end,
     #httpd{path_parts = Parts} = Req,
     UpdateSeq = fabric2_db:get_update_seq(Db),
     ETagTerm = {Parts, UpdateSeq, Args0},
