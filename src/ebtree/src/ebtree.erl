@@ -1005,7 +1005,7 @@ set_node(Tx, #tree{} = Tree, #node{} = _From, #node{} = To) ->
 
 
 set_node(Tx, #tree{} = Tree, #node{} = Node) ->
-    validate_node(Tree, Node),
+    %validate_node(Tree, Node),
     Key = node_key(Tree#tree.prefix, Node#node.id),
     Value = encode_node(Tree, Key, Node),
     persist(Tree, Tx, set, [Key, Value]).
@@ -1046,8 +1046,7 @@ validate_node(#tree{} = Tree, #node{} = Node) ->
     NumKeys = length(Node#node.members),
     IsLeaf = Node#node.level =:= 0,
     IsRoot = ?NODE_ROOT_ID == Node#node.id,
-    OutOfOrder = Node#node.members /= sort_members(Tree, Node#node.level, Node#node.members),
-    Duplicates = Node#node.members /= usort_members(Tree, Node#node.level, Node#node.members),
+    validate_members(Tree, Node, Node#node.members),
     if
         Node#node.id == undefined ->
             erlang:error({node_without_id, Node});
@@ -1059,13 +1058,28 @@ validate_node(#tree{} = Tree, #node{} = Node) ->
             erlang:error({non_leaf_with_prev, Node});
         not IsLeaf andalso Node#node.next /= undefined ->
             erlang:error({non_leaf_with_next, Node});
-        OutOfOrder ->
-            erlang:error({out_of_order, Node});
-        Duplicates ->
-            erlang:error({duplicates, Node});
         true ->
             ok
     end.
+
+
+validate_members(_Tree, _Node, []) ->
+    ok;
+validate_members(_Tree, _Node, [_]) ->
+    ok;
+validate_members(Tree, #node{level = Level} = Node, [A, B | Rest]) ->
+    CollateWrapper = fun
+        ({K1, _V1}, {K2, _V2}) when Level == 0 ->
+            collate(Tree, K1, K2);
+        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) when Level > 0 ->
+            collate(Tree, L1, L2)
+    end,
+    case CollateWrapper(A, B) of
+        lt -> ok;
+        eq -> erlang:error({duplicates, Node});
+        gt -> erlang:error({out_of_order, Node})
+    end,
+    validate_members(Tree, Node, [B | Rest]).
 
 
 %% data marshalling functions (encodes unnecesary fields as a NIL_REF)
@@ -1166,16 +1180,6 @@ sort_nodes(#tree{} = Tree, List) ->
     CollateWrapper = fun
         (#node{} = N1, #node{} = N2) ->
             collate(Tree, first_key(N1), first_key(N2), [lt, eq])
-    end,
-    lists:sort(CollateWrapper, List).
-
-
-sort_members(#tree{} = Tree, Level, List) ->
-    CollateWrapper = fun
-        ({K1, _V1}, {K2, _V2}) when Level == 0 ->
-            collate(Tree, K1, K2, [lt, eq]);
-        ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) when Level > 0 ->
-            collate(Tree, L1, L2, [lt, eq])
     end,
     lists:sort(CollateWrapper, List).
 
