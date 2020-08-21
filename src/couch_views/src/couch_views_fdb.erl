@@ -293,58 +293,39 @@ update_views(TxDb, Mrst, Docs) ->
     % Collect update information
 
     #{
-        id_keys_to_remove := IdKeysToRemove,
-        id_rows_to_insert := IdRowsToInsert,
-        view_keys_to_remove := ViewKeysToRemove,
-        view_rows_to_insert := ViewRowsToInsert
+        ids := IdMap,
+        views := ViewMaps,
+        delete_ref := DeleteRef
     } = gather_update_info(Tx, Mrst, Docs),
 
-    % Remove any Key from Keys that appears in Rows as a Key
-    DeleteKeys = fun(Keys, Rows) ->
-        lists:foldl(fun({Key, _Val}, KeyAcc) ->
-            lists:delete(Key, KeyAcc)
-        end, Keys, Rows)
+    % Generate a list of Keys to delete and Rows to insert from a map
+    UpdateBTree = fun(BTree, Map) ->
+        {ToRemove, ToInsert} = maps:fold(fun(Key, Value, {Keys, Rows}) ->
+            case Value of
+                DeleteRef -> {[Key | Keys], Rows};
+                _ -> {Keys, [{Key, Value} | Rows]}
+            end
+        end, {[], []}, Map),
+
+        lists:foreach(fun(Key) ->
+            ebtree:delete(Tx, BTree, Key)
+        end, ToRemove),
+
+        ebtree:insert_multi(Tx, BTree, ToInsert)
     end,
 
-    %% couch_log:error("XKCD: IdKeysToRemove: ~p", [IdKeysToRemove]),
-    %% couch_log:error("XKCD: Removing id rows: ~p", [DeleteKeys(IdKeysToRemove, IdRowsToInsert)]),
+    % Update the IdBtree
+    UpdateBTree(Mrst#mrst.id_btree, IdMap),
 
-    % Delete any id rows that won't be overwritten
-    lists:foreach(fun(DocId) ->
-        ebtree:delete(Tx, Mrst#mrst.id_btree, DocId)
-    end, DeleteKeys(IdKeysToRemove, IdRowsToInsert)),
-
-    % Delete all views rows that won't be overwritten
+    % Update each view's BTree
     lists:foreach(fun(View) ->
         #mrview{
             id_num = ViewId,
             btree = BTree
         } = View,
 
-        Keys = maps:get(ViewId, ViewKeysToRemove, []),
-        Rows = maps:get(ViewId, ViewRowsToInsert, []),
-
-        %% couch_log:error("XKCD: ViewKeysToRemove: ~p -> ~p", [ViewId, Keys]),
-        %% couch_log:error("XKCD: Removing view rows: ~p -> ~p", [ViewId, DeleteKeys(Keys, Rows)]),
-
-        lists:foreach(fun(IdKey) ->
-            ebtree:delete(Tx, BTree, IdKey)
-        end, DeleteKeys(Keys, Rows))
-    end, Mrst#mrst.views),
-
-    % Insert our new id_btree rows
-    %% couch_log:error("XKCD: Inserting id rows: ~p", [IdRowsToInsert]),
-    ebtree:insert_multi(Tx, Mrst#mrst.id_btree, IdRowsToInsert),
-
-    % Update each view
-    lists:foreach(fun(View) ->
-        #mrview{
-            id_num = ViewId,
-            btree = BTree
-        } = View,
-        Rows = maps:get(ViewId, ViewRowsToInsert, []),
-        %% couch_log:error("XKCD: Inserting view rows: ~p -> ~p", [ViewId, Rows]),
-        ebtree:insert_multi(Tx, BTree, Rows)
+        ViewMap = maps:get(ViewId, ViewMaps, #{}),
+        UpdateBTree(BTree, ViewMap)
     end, Mrst#mrst.views).
 
 
@@ -522,26 +503,34 @@ to_red_opts(Options) ->
 
 
 gather_update_info(Tx, Mrst, Docs) ->
-    DocIds = [DocId || #{id := DocId} <- Docs],
+    % A special token used to indicate that the row should be deleted
+    DeleteRef = erlang:make_ref(),
 
-    % ExistingViewKeys is a list of `[{DocId, [{ViewId, [Keys]} | _]} | _]`
-    % This conversion is to a map of `#{ViewId => [{Key, DocId} | _]}`
-    ExistingViewKeys = ebtree:lookup_multi(Tx, Mrst#mrst.id_btree, DocIds),
-    ViewKeysToRemove1 = lists:foldl(fun({DocId, ViewIdKeys}, EVKAcc1) ->
-        lists:foldl(fun({ViewId, Keys}, EVKAcc2) ->
-            ViewKeys = [{Key, DocId} || Key <- Keys],
-            maps:update_with(ViewId, fun(RestViewKeys) ->
-                ViewKeys ++ RestViewKeys
-            end, ViewKeys, EVKAcc2)
-        end, EVKAcc1, ViewIdKeys)
+    AllDocIds = [DocId || #{id := DocId} <- Docs],
+
+    BaseIdMap = lists:foldl(fun(DocId, Acc) ->
+        maps:put(DocId, DeleteRef, Acc)
+    end, #{}, AllDocIds),
+
+    % Build the initial set of rows to delete
+    % ExistingViewKeys is a list of {DocId, [{ViewId, [Key | _]} | _]}
+    ExistingViewKeys = ebtree:lookup_multi(Tx, Mrst#mrst.id_btree, AllDocIds),
+
+    BaseViewMaps = lists:foldl(fun({DocId, ViewIdKeys}, ViewIdAcc1) ->
+        lists:foldl(fun({ViewId, Keys}, ViewIdAcc2) ->
+            OldViewMap = maps:get(ViewId, ViewIdAcc2, #{}),
+            NewViewMap = lists:foldl(fun(Key, ViewMapAcc) ->
+                maps:put({Key, DocId}, DeleteRef, ViewMapAcc)
+            end, OldViewMap, Keys),
+            maps:put(ViewId, NewViewMap, ViewIdAcc2)
+        end, ViewIdAcc1, ViewIdKeys)
     end, #{}, ExistingViewKeys),
 
     % Build our base accumulator
     InfoAcc1 = #{
-        id_keys_to_remove => DocIds,
-        id_rows_to_insert => [],
-        view_keys_to_remove => ViewKeysToRemove1,
-        view_rows_to_insert => #{}
+        ids => BaseIdMap,
+        views => BaseViewMaps,
+        delete_ref => DeleteRef
     },
 
     lists:foldl(fun(Doc, InfoAcc2) ->
@@ -556,32 +545,30 @@ gather_update_info(Tx, Mrst, Docs) ->
                 #mrview{
                     id_num = ViewId
                 } = View,
-                DedupedRows = dedupe_rows(View, RawNewRows),
-
-                IdKeys = lists:usort([K || {K, _V} <- DedupedRows]),
-                ViewRows = [{{K, DocId}, V} || {K, V} <- DedupedRows],
-
                 #{
-                    view_rows_to_insert := ViewRowsToInsert2
+                    views := ViewMaps
                 } = InfoAcc3,
-                ViewRowsToInsert3 = maps:update_with(ViewId, fun(Rows) ->
-                    ViewRows ++ Rows
-                end, ViewRows, ViewRowsToInsert2),
+
+                DedupedRows = dedupe_rows(View, RawNewRows),
+                IdKeys = lists:usort([K || {K, _V} <- DedupedRows]),
+
+                OldViewMap = maps:get(ViewId, ViewMaps, #{}),
+                NewViewMap = lists:foldl(fun({K, V}, ViewMapAcc) ->
+                    maps:put({K, DocId}, V, ViewMapAcc)
+                end, OldViewMap, DedupedRows),
 
                 {[{ViewId, IdKeys} | IdKeyAcc], InfoAcc3#{
-                    view_rows_to_insert := ViewRowsToInsert3
+                    views := maps:put(ViewId, NewViewMap, ViewMaps)
                 }}
             end, {[], InfoAcc2}, lists:zip(Mrst#mrst.views, Results)),
 
-            {IdRows, InfoAcc4} = Out,
+            {IdRows, #{ids := IdMap} = InfoAcc4} = Out,
 
             % Don't store a row in the id_btree if it hasn't got any
             % keys that will need to be deleted.
             NonEmptyRows = [1 || {_ViewId, Rows} <- IdRows, Rows /= []],
             if length(NonEmptyRows) == 0 -> InfoAcc4; true ->
-                maps:update_with(id_rows_to_insert, fun(OtherIdRows) ->
-                    [{DocId, IdRows} | OtherIdRows]
-                end, [{DocId, IdRows}], InfoAcc4)
+                InfoAcc4#{ids := maps:put(DocId, IdRows, IdMap)}
             end
         end
     end, InfoAcc1, Docs).
