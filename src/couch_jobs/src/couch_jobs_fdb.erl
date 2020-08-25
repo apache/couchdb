@@ -119,8 +119,9 @@ remove(#{jtx := true} = JTx0, #{job := true} = Job) ->
     #{type := Type, id := JobId} = Job,
     Key = job_key(JTx, Job),
     case get_job_val(Tx, Key) of
-        #jv{stime = STime} ->
+        #jv{stime = STime, seq = Seq} ->
             couch_jobs_pending:remove(JTx, Type, JobId, STime),
+            clear_activity(JTx, Type, Seq),
             erlfdb:clear(Tx, Key),
             update_watch(JTx, Type),
             ok;
