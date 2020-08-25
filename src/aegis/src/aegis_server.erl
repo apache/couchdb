@@ -59,27 +59,27 @@ start_link() ->
 
 -spec init_db(Db :: #{}, Options :: list()) -> boolean().
 init_db(#{uuid := UUID} = Db, Options) ->
-    process_flag(sensitive, true),
-
-    case ?AEGIS_KEY_MANAGER:init_db(Db, Options) of
-        {ok, DbKey} ->
-            gen_server:call(?MODULE, {insert_key, UUID, DbKey}),
-            true;
-        false ->
-            false
-    end.
+    sensitive(fun() ->
+        case ?AEGIS_KEY_MANAGER:init_db(Db, Options) of
+            {ok, DbKey} ->
+                gen_server:call(?MODULE, {insert_key, UUID, DbKey}),
+                true;
+            false ->
+                false
+        end
+    end).
 
 
 -spec open_db(Db :: #{}) -> boolean().
 open_db(#{} = Db) ->
-    process_flag(sensitive, true),
-
-    case do_open_db(Db) of
-        {ok, _DbKey} ->
-            true;
-        false ->
-            false
-    end.
+    sensitive(fun() ->
+        case do_open_db(Db) of
+            {ok, _DbKey} ->
+                true;
+            false ->
+                false
+        end
+    end).
 
 
 -spec encrypt(Db :: #{}, Key :: binary(), Value :: binary()) -> binary().
@@ -100,10 +100,10 @@ encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
                     erlang:error(Reason)
             end;
         false ->
-            process_flag(sensitive, true),
-
-            {ok, DbKey} = do_open_db(Db),
-            do_encrypt(DbKey, Db, Key, Value)
+            sensitive(fun() ->
+                {ok, DbKey} = do_open_db(Db),
+                do_encrypt(DbKey, Db, Key, Value)
+            end)
     end.
 
 
@@ -125,10 +125,10 @@ decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
                     erlang:error(Reason)
             end;
         false ->
-            process_flag(sensitive, true),
-
-            {ok, DbKey} = do_open_db(Db),
-            do_decrypt(DbKey, Db, Key, Value)
+            sensitive(fun() ->
+                {ok, DbKey} = do_open_db(Db),
+                do_decrypt(DbKey, Db, Key, Value)
+            end)
     end.
 
 
@@ -410,3 +410,12 @@ expiration_check_interval() ->
 
 cache_limit() ->
     config:get_integer("aegis", "cache_limit", ?CACHE_LIMIT).
+
+
+sensitive(Fun) when is_function(Fun, 0) ->
+    OldValue = process_flag(sensitive, true),
+    try
+        Fun()
+    after
+        process_flag(sensitive, OldValue)
+    end.
