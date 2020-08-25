@@ -178,7 +178,8 @@ update(#{} = Db, Mrst0, State0) ->
                 couch_rate:wait(Limiter)
             end),
             update(Db, Mrst0, State0);
-        Limit ->
+        _ ->
+            Limit = 2000,
             stat_store(rate_limit, Limit),
 
             {Mrst1, State1} = time_span(do_update, fun() ->
