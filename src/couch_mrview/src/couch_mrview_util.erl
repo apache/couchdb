@@ -425,9 +425,12 @@ validate_args(#mrst{} = State, Args0) ->
 
 
 apply_limit(ViewPartitioned, Args) ->
-    LimitType = case ViewPartitioned of
-        true -> "partition_query_limit";
-        false -> "query_limit"
+    Options = Args#mrargs.extra,
+    IgnorePQLimit = lists:keyfind(ignore_partition_query_limit, 1, Options),
+    LimitType = case {ViewPartitioned, IgnorePQLimit} of
+        {true, false} -> "partition_query_limit";
+        {true, _} -> "query_limit";
+        {false, _} -> "query_limit"
     end,
 
     MaxLimit = config:get_integer("query_server_config",
