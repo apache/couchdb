@@ -1161,13 +1161,29 @@ collate(#tree{} = Tree, A, B, Allowed) ->
 
 
 umerge_members(#tree{} = Tree, Level, List1, List2) ->
-    CollateWrapper = fun
+    Collate = fun
         ({K1, _V1}, {K2, _V2}) when Level == 0 ->
-            collate(Tree, K1, K2, [lt, eq]);
+            collate(Tree, K1, K2);
         ({_F1, L1, _V1, _R1}, {_F2, L2, _V2, _R2}) when Level > 0 ->
-            collate(Tree, L1, L2, [lt, eq])
+            collate(Tree, L1, L2)
     end,
-    lists:umerge(CollateWrapper, List1, List2).
+    umerge_members_int(Collate, List1, List2, []).
+
+
+umerge_members_int(Collate, [], [H2 | T2], [HAcc | _] = Acc) ->
+    case Collate(H2, HAcc) of
+        lt -> erlang:error(unsorted_members);
+        eq -> lists:reverse(Acc, T2);
+        gt -> lists:reverse(Acc, [H2 | T2])
+    end;
+umerge_members_int(_Collate, List1, [], Acc) ->
+    lists:reverse(Acc, List1);
+umerge_members_int(Collate, [H1 | T1], [H2 | T2], Acc) ->
+    case Collate(H1, H2) of
+        lt -> umerge_members_int(Collate, T1, [H2 | T2], [H1 | Acc]);
+        eq -> umerge_members_int(Collate, T1, [H2 | T2], [H1 | Acc]);
+        gt -> umerge_members_int(Collate, [H1 | T1], T2, [H2 | Acc])
+    end.
 
 
 sort_keys(#tree{} = Tree, List) ->
