@@ -14,7 +14,10 @@ defmodule ReplicationTest do
 
   # This should probably go into `make elixir` like what
   # happens for JavaScript tests.
-  @moduletag config: [{"replicator", "startup_jitter", "0"}]
+  @moduletag config: [
+      {"replicator", "startup_jitter", "0"},
+      {"replicator", "stats_update_interval_sec", "0"}
+  ]
 
   test "source database not found with host" do
     name = random_db_name()

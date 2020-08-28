@@ -12,17 +12,13 @@
 
 -module(couch_replicator_httpc_pool_tests).
 
+
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("fabric/test/fabric2_test.hrl").
+
 
 -define(TIMEOUT, 1000).
-
-
-setup() ->
-    spawn_pool().
-
-teardown(Pool) ->
-    stop_pool(Pool).
 
 
 httpc_pool_test_() ->
@@ -30,75 +26,81 @@ httpc_pool_test_() ->
         "httpc pool tests",
         {
             setup,
-            fun() -> test_util:start_couch([couch_replicator]) end, fun test_util:stop_couch/1,
+            fun couch_replicator_test_helper:start_couch/0,
+            fun couch_replicator_test_helper:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
-                    fun should_block_new_clients_when_full/1,
-                    fun should_replace_worker_on_death/1
+                    ?TDEF_FE(should_block_new_clients_when_full),
+                    ?TDEF_FE(should_replace_worker_on_death)
                 ]
             }
         }
     }.
 
 
+setup() ->
+    spawn_pool().
+
+
+teardown(Pool) ->
+    stop_pool(Pool).
+
+
 should_block_new_clients_when_full(Pool) ->
-    ?_test(begin
-        Client1 = spawn_client(Pool),
-        Client2 = spawn_client(Pool),
-        Client3 = spawn_client(Pool),
+    Client1 = spawn_client(Pool),
+    Client2 = spawn_client(Pool),
+    Client3 = spawn_client(Pool),
 
-        ?assertEqual(ok, ping_client(Client1)),
-        ?assertEqual(ok, ping_client(Client2)),
-        ?assertEqual(ok, ping_client(Client3)),
+    ?assertEqual(ok, ping_client(Client1)),
+    ?assertEqual(ok, ping_client(Client2)),
+    ?assertEqual(ok, ping_client(Client3)),
 
-        Worker1 = get_client_worker(Client1, "1"),
-        Worker2 = get_client_worker(Client2, "2"),
-        Worker3 = get_client_worker(Client3, "3"),
+    Worker1 = get_client_worker(Client1, "1"),
+    Worker2 = get_client_worker(Client2, "2"),
+    Worker3 = get_client_worker(Client3, "3"),
 
-        ?assert(is_process_alive(Worker1)),
-        ?assert(is_process_alive(Worker2)),
-        ?assert(is_process_alive(Worker3)),
+    ?assert(is_process_alive(Worker1)),
+    ?assert(is_process_alive(Worker2)),
+    ?assert(is_process_alive(Worker3)),
 
-        ?assertNotEqual(Worker1, Worker2),
-        ?assertNotEqual(Worker2, Worker3),
-        ?assertNotEqual(Worker3, Worker1),
+    ?assertNotEqual(Worker1, Worker2),
+    ?assertNotEqual(Worker2, Worker3),
+    ?assertNotEqual(Worker3, Worker1),
 
-        Client4 = spawn_client(Pool),
-        ?assertEqual(timeout, ping_client(Client4)),
+    Client4 = spawn_client(Pool),
+    ?assertEqual(timeout, ping_client(Client4)),
 
-        ?assertEqual(ok, stop_client(Client1)),
-        ?assertEqual(ok, ping_client(Client4)),
+    ?assertEqual(ok, stop_client(Client1)),
+    ?assertEqual(ok, ping_client(Client4)),
 
-        Worker4 = get_client_worker(Client4, "4"),
-        ?assertEqual(Worker1, Worker4),
+    Worker4 = get_client_worker(Client4, "4"),
+    ?assertEqual(Worker1, Worker4),
 
-        lists:foreach(
-            fun(C) ->
-                ?assertEqual(ok, stop_client(C))
-            end, [Client2, Client3, Client4])
-    end).
+    lists:foreach(fun(C) ->
+            ?assertEqual(ok, stop_client(C))
+    end, [Client2, Client3, Client4]).
+
 
 should_replace_worker_on_death(Pool) ->
-    ?_test(begin
-        Client1 = spawn_client(Pool),
-        ?assertEqual(ok, ping_client(Client1)),
-        Worker1 = get_client_worker(Client1, "1"),
-        ?assert(is_process_alive(Worker1)),
+    Client1 = spawn_client(Pool),
+    ?assertEqual(ok, ping_client(Client1)),
+    Worker1 = get_client_worker(Client1, "1"),
+    ?assert(is_process_alive(Worker1)),
 
-        ?assertEqual(ok, kill_client_worker(Client1)),
-        ?assertNot(is_process_alive(Worker1)),
-        ?assertEqual(ok, stop_client(Client1)),
+    ?assertEqual(ok, kill_client_worker(Client1)),
+    ?assertNot(is_process_alive(Worker1)),
+    ?assertEqual(ok, stop_client(Client1)),
 
-        Client2 = spawn_client(Pool),
-        ?assertEqual(ok, ping_client(Client2)),
-        Worker2 = get_client_worker(Client2, "2"),
-        ?assert(is_process_alive(Worker2)),
+    Client2 = spawn_client(Pool),
+    ?assertEqual(ok, ping_client(Client2)),
+    Worker2 = get_client_worker(Client2, "2"),
+    ?assert(is_process_alive(Worker2)),
 
-        ?assertNotEqual(Worker1, Worker2),
-        ?assertEqual(ok, stop_client(Client2))
-    end).
+    ?assertNotEqual(Worker1, Worker2),
+    ?assertEqual(ok, stop_client(Client2)).
 
 
 spawn_client(Pool) ->
@@ -110,6 +112,7 @@ spawn_client(Pool) ->
     end),
     {Pid, Ref}.
 
+
 ping_client({Pid, Ref}) ->
     Pid ! ping,
     receive
@@ -119,17 +122,17 @@ ping_client({Pid, Ref}) ->
         timeout
     end.
 
+
 get_client_worker({Pid, Ref}, ClientName) ->
     Pid ! get_worker,
     receive
         {worker, Ref, Worker} ->
             Worker
     after ?TIMEOUT ->
-        erlang:error(
-            {assertion_failed,
-             [{module, ?MODULE}, {line, ?LINE},
-              {reason, "Timeout getting client " ++ ClientName ++ " worker"}]})
+        erlang:error({assertion_failed, [{module, ?MODULE}, {line, ?LINE},
+            {reason, "Timeout getting client " ++ ClientName ++ " worker"}]})
     end.
+
 
 stop_client({Pid, Ref}) ->
     Pid ! stop,
@@ -140,6 +143,7 @@ stop_client({Pid, Ref}) ->
         timeout
     end.
 
+
 kill_client_worker({Pid, Ref}) ->
     Pid ! get_worker,
     receive
@@ -149,6 +153,7 @@ kill_client_worker({Pid, Ref}) ->
     after ?TIMEOUT ->
         timeout
     end.
+
 
 loop(Parent, Ref, Worker, Pool) ->
     receive
@@ -163,12 +168,14 @@ loop(Parent, Ref, Worker, Pool) ->
             Parent ! {stop, Ref}
     end.
 
+
 spawn_pool() ->
-    Host = config:get("httpd", "bind_address", "127.0.0.1"),
-    Port = config:get("httpd", "port", "5984"),
+    Host = config:get("chttpd", "bind_address", "127.0.0.1"),
+    Port = config:get("chttpd", "port", "5984"),
     {ok, Pool} = couch_replicator_httpc_pool:start_link(
         "http://" ++ Host ++ ":" ++ Port, [{max_connections, 3}]),
     Pool.
+
 
 stop_pool(Pool) ->
     ok = couch_replicator_httpc_pool:stop(Pool).
