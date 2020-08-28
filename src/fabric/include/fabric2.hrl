@@ -26,6 +26,7 @@
 -define(DELETED_DBS, 3).
 -define(DBS, 15).
 -define(EXPIRING_CACHE, 53).
+-define(REPLICATION_IDS, 54).
 -define(TX_IDS, 255).
 
 % Cluster Level: (LayerPrefix, ?CLUSTER_CONFIG, X, ...)
