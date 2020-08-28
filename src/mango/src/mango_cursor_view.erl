@@ -116,7 +116,11 @@ base_args(#cursor{index = Idx, selector = Selector} = Cursor) ->
         start_key = StartKey,
         end_key = EndKey,
         include_docs = true,
-        extra = [{callback, {?MODULE, view_cb}}, {selector, Selector}]
+        extra = [
+            {callback, {?MODULE, view_cb}},
+            {selector, Selector},
+            {ignore_partition_query_limit, true}
+        ]
     }.
 
 
