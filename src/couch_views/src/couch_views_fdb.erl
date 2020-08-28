@@ -376,7 +376,8 @@ open_id_tree(TxDb, Sig) ->
     } = TxDb,
     Prefix = id_tree_prefix(DbPrefix, Sig),
     TreeOpts = [
-        {persist_fun, fun persist_chunks/3}
+        {persist_fun, fun persist_chunks/3},
+        {cache_fun, create_cache_fun(id_tree)}
     ],
     ebtree:open(Tx, Prefix, get_order(id_btree), TreeOpts).
 
@@ -393,7 +394,8 @@ open_view_tree(TxDb, Sig, Lang, View) ->
     TreeOpts = [
         {collate_fun, couch_views_util:collate_fun(View)},
         {reduce_fun, make_reduce_fun(Lang, View)},
-        {persist_fun, fun persist_chunks/3}
+        {persist_fun, fun persist_chunks/3},
+        {cache_fun, create_cache_fun({view, ViewId})}
     ],
     View#mrview{
         btree = ebtree:open(Tx, Prefix, get_order(view_btree), TreeOpts)
@@ -463,6 +465,30 @@ persist_chunks(Tx, get, Key) ->
 
 persist_chunks(Tx, clear, Key) ->
     erlfdb:clear_range_startswith(Tx, Key).
+
+
+create_cache_fun(TreeId) ->
+    CacheTid = case get(TreeId) of
+        undefined ->
+            Tid = ets:new(?MODULE, [protected, set]),
+            put(TreeId, {ebtree_cache, Tid}),
+            Tid;
+        {ebtree_cache, Tid} ->
+            Tid
+    end,
+    fun
+        (set, [Id, Node]) ->
+            true = ets:insert_new(CacheTid, {Id, Node}),
+            ok;
+        (clear, Id) ->
+            ets:delete(CacheTid, Id),
+            ok;
+        (get, Id) ->
+            case ets:lookup(CacheTid, Id) of
+                [{Id, Node}] -> Node;
+                [] -> undefined
+            end
+    end.
 
 
 to_map_opts(Options) ->
