@@ -103,7 +103,7 @@ handle_call({batch_doc, Doc}, From, State) ->
 
 handle_call({add_stats, IncStats}, From, #state{stats = Stats} = State) ->
     gen_server:reply(From, ok),
-    NewStats = couch_replicator_utils:sum_stats(Stats, IncStats),
+    NewStats = couch_replicator_stats:sum_stats(Stats, IncStats),
     NewStats2 = maybe_report_stats(State#state.cp, NewStats),
     {noreply, State#state{stats = NewStats2}};
 
