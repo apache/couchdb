@@ -18,20 +18,15 @@
         couch_replicator_sup,
         couch_replicator_rate_limiter,
         couch_replicator_connection,
-        couch_replication,  % couch_replication_event gen_event
-        couch_replicator_clustering,
-        couch_replicator_scheduler,
-        couch_replicator_scheduler_sup,
-        couch_replicator_doc_processor
+        couch_replicator_job_server
     ]},
     {applications, [
         kernel,
         stdlib,
         couch_log,
-        mem3,
         config,
         couch,
-        couch_event,
-        couch_stats
+        couch_stats,
+        couch_jobs
     ]}
 ]}.

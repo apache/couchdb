@@ -12,61 +12,66 @@
 % the License.
 
 -module(couch_replicator_sup).
+
+
 -behaviour(supervisor).
--export([start_link/0, init/1]).
+
+
+-export([
+    start_link/0
+]).
+
+-export([
+    init/1
+]).
+
 
 start_link() ->
-    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+    Backend = fabric2_node_types:is_type(replication),
+    Frontend = fabric2_node_types:is_type(api_frontend),
+    Arg = {Backend, Frontend},
+    supervisor:start_link({local, ?MODULE}, ?MODULE, Arg).
 
-init(_Args) ->
-    Children = [
-        {couch_replication_event,
-            {gen_event, start_link, [{local, couch_replication}]},
-            permanent,
-            brutal_kill,
-            worker,
-            dynamic},
-       {couch_replicator_clustering,
-            {couch_replicator_clustering, start_link, []},
-            permanent,
-            brutal_kill,
-            worker,
-            [couch_replicator_clustering]},
-       {couch_replicator_connection,
-            {couch_replicator_connection, start_link, []},
-            permanent,
-            brutal_kill,
-            worker,
-            [couch_replicator_connection]},
-       {couch_replicator_rate_limiter,
-            {couch_replicator_rate_limiter, start_link, []},
-            permanent,
-            brutal_kill,
-            worker,
-            [couch_replicator_rate_limiter]},
-        {couch_replicator_scheduler_sup,
-            {couch_replicator_scheduler_sup, start_link, []},
-            permanent,
-            infinity,
-            supervisor,
-            [couch_replicator_scheduler_sup]},
-        {couch_replicator_scheduler,
-            {couch_replicator_scheduler, start_link, []},
-            permanent,
-            brutal_kill,
-            worker,
-            [couch_replicator_scheduler]},
-        {couch_replicator_doc_processor,
-            {couch_replicator_doc_processor, start_link, []},
-            permanent,
-            brutal_kill,
-            worker,
-            [couch_replicator_doc_processor]},
-        {couch_replicator_db_changes,
-            {couch_replicator_db_changes, start_link, []},
-            permanent,
-            brutal_kill,
-            worker,
-            [couch_multidb_changes]}
-    ],
-    {ok, {{rest_for_one,10,1}, Children}}.
+
+init({Backend, Frontend}) ->
+    Children = case {Backend, Frontend} of
+        {true, true} -> backend() ++ frontend();
+        {true, false} -> backend();
+        {false, true} -> frontend();
+        {false, false} -> []
+    end,
+    Flags =  #{
+        strategy => rest_for_one,
+        intensity => 1,
+        period => 5
+    },
+    {ok, {Flags, Children}}.
+
+
+backend() ->
+    Timeout = 5000,
+    [
+        #{
+            id => couch_replicator_connection,
+            start => {couch_replicator_connection, start_link, []}
+        },
+        #{
+            id => couch_replicator_rate_limiter,
+            start => {couch_replicator_rate_limiter, start_link, []}
+        },
+        #{
+            id => couch_replicator_job_server,
+            start => {couch_replicator_job_server, start_link, [Timeout]},
+            shutdown => Timeout
+        }
+    ].
+
+
+frontend() ->
+    [
+        #{
+            id => couch_replicator,
+            start => {couch_replicator, ensure_rep_db_exists, []},
+            restart => transient
+        }
+    ] ++ couch_epi:register_service(couch_replicator_epi, []).

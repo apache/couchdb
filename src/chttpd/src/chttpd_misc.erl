@@ -302,17 +302,22 @@ handle_task_status_req(Req) ->
 handle_replicate_req(#httpd{method='POST', user_ctx=Ctx, req_body=PostBody} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     %% see HACK in chttpd.erl about replication
-    case replicate(PostBody, Ctx) of
+    case couch_replicator:replicate(PostBody, Ctx) of
         {ok, {continuous, RepId}} ->
             send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
         {ok, {cancelled, RepId}} ->
             send_json(Req, 200, {[{ok, true}, {<<"_local_id">>, RepId}]});
-        {ok, {JsonResults}} ->
-            send_json(Req, {[{ok, true} | JsonResults]});
+        {ok, #{} = JsonResults} ->
+            send_json(Req, maps:merge(#{<<"ok">> => true}, JsonResults));
         {ok, stopped} ->
             send_json(Req, 200, {[{ok, stopped}]});
         {error, not_found=Error} ->
             chttpd:send_error(Req, Error);
+        {error, #{<<"error">> := Err, <<"reason">> := Reason}} when
+                is_binary(Err), is_binary(Reason) ->
+            % Safe to use binary_to_atom since this is only built
+            % from couch_replicator_jobs:error_info/1
+            chttpd:send_error(Req, {binary_to_atom(Err, utf8), Reason});
         {error, {_, _}=Error} ->
             chttpd:send_error(Req, Error);
         {_, _}=Error ->
@@ -321,50 +326,6 @@ handle_replicate_req(#httpd{method='POST', user_ctx=Ctx, req_body=PostBody} = Re
 handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
-replicate({Props} = PostBody, Ctx) ->
-    case couch_util:get_value(<<"cancel">>, Props) of
-    true ->
-        cancel_replication(PostBody, Ctx);
-    _ ->
-        Node = choose_node([
-            couch_util:get_value(<<"source">>, Props),
-            couch_util:get_value(<<"target">>, Props)
-        ]),
-        case rpc:call(Node, couch_replicator, replicate, [PostBody, Ctx]) of
-        {badrpc, Reason} ->
-            erlang:error(Reason);
-        Res ->
-            Res
-        end
-    end.
-
-cancel_replication(PostBody, Ctx) ->
-    {Res, _Bad} = rpc:multicall(couch_replicator, replicate, [PostBody, Ctx]),
-    case [X || {ok, {cancelled, _}} = X <- Res] of
-    [Success|_] ->
-        % Report success if at least one node canceled the replication
-        Success;
-    [] ->
-        case lists:usort(Res) of
-        [UniqueReply] ->
-            % Report a universally agreed-upon reply
-            UniqueReply;
-        [] ->
-            {error, badrpc};
-        Else ->
-            % Unclear what to do here -- pick the first error?
-            % Except try ignoring any {error, not_found} responses
-            % because we'll always get two of those
-            hd(Else -- [{error, not_found}])
-        end
-    end.
-
-choose_node(Key) when is_binary(Key) ->
-    Checksum = erlang:crc32(Key),
-    Nodes = lists:sort([node()|erlang:nodes()]),
-    lists:nth(1 + Checksum rem length(Nodes), Nodes);
-choose_node(Key) ->
-    choose_node(term_to_binary(Key)).
 
 handle_reload_query_servers_req(#httpd{method='POST'}=Req) ->
     chttpd:validate_ctype(Req, "application/json"),
