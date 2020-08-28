@@ -187,6 +187,7 @@ create(DbName, Options) ->
                 #{} = Db0 ->
                     Db1 = maybe_add_sys_db_callbacks(Db0),
                     ok = fabric2_server:store(Db1),
+                    fabric2_db_plugin:after_db_create(DbName, get_uuid(Db1)),
                     {ok, Db1#{tx := undefined}};
                 Error ->
                     Error
@@ -235,6 +236,7 @@ delete(DbName, Options) ->
                 fabric2_fdb:delete(TxDb)
             end),
             if Resp /= ok -> Resp; true ->
+                fabric2_db_plugin:after_db_delete(DbName, get_uuid(Db)),
                 fabric2_server:remove(DbName)
             end
     end.
@@ -243,9 +245,16 @@ delete(DbName, Options) ->
 undelete(DbName, TgtDbName, TimeStamp, Options) ->
     case validate_dbname(TgtDbName) of
         ok ->
-            fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
-                fabric2_fdb:undelete(TxDb, TgtDbName, TimeStamp)
-            end);
+            Resp = fabric2_fdb:transactional(DbName, Options,
+                fun(TxDb) ->
+                    fabric2_fdb:undelete(TxDb, TgtDbName, TimeStamp)
+                end
+            ),
+            if Resp /= ok -> ok; true ->
+                {ok, Db} = open(TgtDbName, Options),
+                fabric2_db_plugin:after_db_create(TgtDbName, get_uuid(Db))
+            end,
+            Resp;
         Error ->
             Error
     end.
