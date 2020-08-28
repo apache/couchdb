@@ -17,10 +17,15 @@
     add/4,
     add/5,
     remove/3,
+
+    % Job monitoring
+    get_types/1,
     get_job_data/3,
     get_job_state/3,
     get_active_jobs_ids/2,
-    get_types/1,
+    fold_jobs/4,
+    pending_count/2,
+    pending_count/3,
 
     % Job processing
     accept/1,
@@ -80,6 +85,13 @@ remove(Tx, Type, JobId) when is_binary(JobId) ->
     end).
 
 
+-spec get_types(jtx()) -> [job_type()] | {error, any()}.
+get_types(Tx) ->
+    couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
+        couch_jobs_fdb:get_types(JTx)
+    end).
+
+
 -spec get_job_data(jtx(), job_type(), job_id()) -> {ok, job_data()} | {error,
     any()}.
 get_job_data(Tx, Type, JobId) when is_binary(JobId) ->
@@ -116,10 +128,27 @@ get_active_jobs_ids(Tx, Type) ->
     end).
 
 
--spec get_types(jtx()) -> [job_type()] | {error, any()}.
-get_types(Tx) ->
+-spec fold_jobs(jtx(), job_type(), fun(), any()) -> any().
+fold_jobs(Tx, Type, Fun, UserAcc) when is_function(Fun, 5) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
-        couch_jobs_fdb:get_types(JTx)
+        maps:fold(fun(JobId, {_Seq, JobState, DataEnc}, Acc) ->
+            Data = couch_jobs_fdb:decode_data(DataEnc),
+            Fun(JTx, JobId, JobState, Data, Acc)
+        end, UserAcc, couch_jobs_fdb:get_jobs(JTx, Type))
+    end).
+
+
+-spec pending_count(jtx(), job_type()) -> integer().
+pending_count(Tx, Type) ->
+    pending_count(Tx, Type, #{}).
+
+
+-spec pending_count(jtx(), job_type(), #{}) -> integer().
+pending_count(Tx, Type, Opts) ->
+    MaxSTime = maps:get(max_sched_time, Opts, ?UNDEFINED_MAX_SCHEDULED_TIME),
+    Limit = maps:get(limit, Opts, 1024),
+    couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
+        couch_jobs_pending:pending_count(JTx, Type, MaxSTime, Limit)
     end).
 
 
