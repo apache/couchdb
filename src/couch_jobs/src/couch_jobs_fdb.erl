@@ -414,7 +414,7 @@ init_cache() ->
 %
 encode_data(#{} = JobData) ->
     try
-        jiffy:encode(JobData)
+        iolist_to_binary(jiffy:encode(JobData, [force_utf8]))
     catch
         throw:{error, Error} ->
             % legacy clause since new versions of jiffy raise error instead
@@ -431,7 +431,7 @@ decode_data(#{} = JobData) ->
     JobData;
 
 decode_data(<<_/binary>> = JobData) ->
-    jiffy:decode(JobData, [return_maps]).
+    jiffy:decode(JobData, [dedupe_keys, return_maps]).
 
 
 % Cached job transaction object. This object wraps a transaction, caches the
