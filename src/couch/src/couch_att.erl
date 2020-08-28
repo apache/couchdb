@@ -40,6 +40,7 @@
 
 -export([
     flush/3,
+    read_data/1,
     foldl/3,
     range_foldl/5,
     foldl_decode/3,
@@ -374,7 +375,14 @@ to_json(Att, OutputData, DataToFollow, ShowEncoding) ->
 
 
 flush(Db, DocId, Att1) ->
-    Att2 = read_data(fetch(data, Att1), Att1),
+    Data0 = fetch(data, Att1),
+    case {Data0, Db} of
+        {{follows, _, _}, #{tx := Tx}} when Tx =/= undefined ->
+            error(follows_cannot_be_used_in_a_transaction);
+        {_, #{}} ->
+            ok
+    end,
+    Att2 = read_data(Data0, Att1),
     [
         Data,
         AttLen,
@@ -419,6 +427,11 @@ flush(Db, DocId, Att1) ->
     end.
 
 
+read_data(Att) ->
+    Data = fetch(data, Att),
+    read_data(Data, Att).
+
+
 read_data({loc, #{}, _DocId, _AttId}, Att) ->
     % Attachment already written to fdb
     Att;
@@ -443,7 +456,10 @@ read_data({follows, Parser, Ref}, Att) ->
     end;
 
 read_data(Data, Att) when is_binary(Data) ->
-    Att;
+    case fetch(att_len, Att) of
+        undefined -> store(att_len, size(Data), Att);
+        Int when is_integer(Int) ->  Att
+    end;
 
 read_data(Fun, Att) when is_function(Fun) ->
     [AttName, AttLen, InMd5] = fetch([name, att_len, md5], Att),
