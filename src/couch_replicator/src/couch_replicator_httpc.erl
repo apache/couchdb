@@ -327,7 +327,7 @@ total_error_time_exceeded(#httpdb{first_error_timestamp = nil}) ->
     false;
 
 total_error_time_exceeded(#httpdb{first_error_timestamp = ErrorTimestamp}) ->
-    HealthThresholdSec = couch_replicator_scheduler:health_threshold(),
+    HealthThresholdSec = couch_replicator_job:health_threshold(),
     % Theshold value is halved because in the calling code the next step
     % is a doubling. Not halving here could mean sleeping too long and
     % exceeding the health threshold.
