@@ -14,6 +14,8 @@
 
 -export([
     validate_dbname/3,
+    after_db_create/2,
+    after_db_delete/2,
     before_doc_update/3,
     after_doc_write/6,
     after_doc_read/2,
@@ -35,6 +37,14 @@
 
 validate_dbname(DbName, Normalized, Default) ->
     maybe_handle(validate_dbname, [DbName, Normalized], Default).
+
+
+after_db_create(DbName, DbUUID) when is_binary(DbName), is_binary(DbUUID) ->
+    with_pipe(after_db_create, [DbName, DbUUID]).
+
+
+after_db_delete(DbName, DbUUID) when is_binary(DbName), is_binary(DbUUID) ->
+    with_pipe(after_db_delete, [DbName, DbUUID]).
 
 
 before_doc_update(_, #doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} = Doc, _) ->
