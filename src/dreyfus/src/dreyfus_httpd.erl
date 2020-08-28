@@ -239,6 +239,8 @@ validate_index_query(counts, Value, Args) ->
     Args#index_query_args{counts=Value};
 validate_index_query(ranges, Value, Args) ->
     Args#index_query_args{ranges=Value};
+validate_index_query(drilldown, [[_|_]|_] = Value, Args) ->
+    Args#index_query_args{drilldown=Value};
 validate_index_query(drilldown, Value, Args) ->
     DrillDown = Args#index_query_args.drilldown,
     Args#index_query_args{drilldown=[Value|DrillDown]};
