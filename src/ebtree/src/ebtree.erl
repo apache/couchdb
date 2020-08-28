@@ -49,15 +49,15 @@
     collate_fun,
     reduce_fun,
     encode_fun,
-    persist_fun
+    persist_fun,
+    cache_fun
 }).
 
 -define(META, 0).
 -define(META_ORDER, 0).
--define(META_NEXT_ID, 1).
 
 -define(NODE, 1).
--define(NODE_ROOT_ID, 0).
+-define(NODE_ROOT_ID, <<0>>).
 
 -define(underflow(Tree, Node), Tree#tree.min > length(Node#node.members)).
 -define(at_min(Tree, Node), Tree#tree.min == length(Node#node.members)).
@@ -87,13 +87,15 @@ open(Db, Prefix, Order, Options) when is_binary(Prefix), is_integer(Order), Orde
     CollateFun = proplists:get_value(collate_fun, Options, fun collate_raw/2),
     EncodeFun = proplists:get_value(encode_fun, Options, fun encode_erlang/3),
     PersistFun = proplists:get_value(persist_fun, Options, fun simple_persist/3),
+    CacheFun = proplists:get_value(cache_fun, Options, fun cache_noop/2),
 
     Tree = #tree{
         prefix = Prefix,
         reduce_fun = ReduceFun,
         collate_fun = CollateFun,
         encode_fun = EncodeFun,
-        persist_fun = PersistFun
+        persist_fun = PersistFun,
+        cache_fun = CacheFun
     },
 
     erlfdb:transactional(Db, fun(Tx) ->
@@ -101,7 +103,6 @@ open(Db, Prefix, Order, Options) when is_binary(Prefix), is_integer(Order), Orde
             not_found ->
                 erlfdb:clear_range_startswith(Tx, Prefix),
                 set_meta(Tx, Tree, ?META_ORDER, Order),
-                set_meta(Tx, Tree, ?META_NEXT_ID, 1),
                 set_node(Tx, Tree, #node{id = ?NODE_ROOT_ID}),
                 init_order(Tree, Order);
             ActualOrder when is_integer(ActualOrder) ->
@@ -543,7 +544,7 @@ insert(Db, #tree{} = Tree, Key, Value) ->
         Root0 = get_node(Tx, Tree, ?NODE_ROOT_ID),
         case ?is_full(Tree, Root0) of
             true ->
-                OldRoot = Root0#node{id = new_node_id(Tx, Tree)},
+                OldRoot = Root0#node{id = new_node_id()},
                 FirstKey = first_key(OldRoot),
                 LastKey = last_key(OldRoot),
                 Root1 = #node{
@@ -562,8 +563,8 @@ insert(Db, #tree{} = Tree, Key, Value) ->
 split_child(Tx, #tree{} = Tree, #node{} = Parent0, #node{} = Child) ->
     {LeftMembers, RightMembers} = lists:split(Tree#tree.min, Child#node.members),
 
-    LeftId = new_node_id(Tx, Tree),
-    RightId = new_node_id(Tx, Tree),
+    LeftId = new_node_id(),
+    RightId = new_node_id(),
 
     LeftChild = remove_pointers_if_not_leaf(#node{
         id = LeftId,
@@ -600,9 +601,10 @@ split_child(Tx, #tree{} = Tree, #node{} = Parent0, #node{} = Child) ->
                 umerge_members(Tree, Parent0#node.level, [{FirstRightKey, LastRightKey, RightId, RightReduction}],
                     lists:keydelete(Child#node.id, 3, Parent0#node.members)))
     },
+    Parent2 = new_node_id_if_cacheable(Tx, Tree, Parent0, Parent1),
     clear_node(Tx, Tree, Child),
-    set_nodes(Tx, Tree, [LeftChild, RightChild, Parent1]),
-    {Parent1, LeftChild, RightChild}.
+    set_nodes(Tx, Tree, [LeftChild, RightChild, Parent2]),
+    {Parent2, LeftChild, RightChild}.
 
 
 update_prev_neighbour(_Tx, #tree{} = _Tree, #node{prev = undefined} = _Node) ->
@@ -626,7 +628,7 @@ insert_nonfull(Tx, #tree{} = Tree, #node{level = 0} = Node0, Key, Value) ->
         members = umerge_members(Tree, 0, [{Key, Value}], Node0#node.members)
     },
     set_node(Tx, Tree, Node0, Node1),
-    reduce_node(Tree, Node1);
+    {Node1#node.id, reduce_node(Tree, Node1)};
 
 insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
     ChildId0 = find_child_id(Tree, Node0, Key),
@@ -646,16 +648,17 @@ insert_nonfull(Tx, #tree{} = Tree, #node{} = Node0, Key, Value) ->
             {Node0, Child0}
     end,
     ChildId1 = Child1#node.id,
-    NewReduction = insert_nonfull(Tx, Tree, Child1, Key, Value),
+    {ChildId2, NewReduction} = insert_nonfull(Tx, Tree, Child1, Key, Value),
     {CurrentFirstKey, CurrentLastKey, ChildId1, _OldReduction} = lists:keyfind(ChildId1, 3, Node1#node.members),
     [NewFirstKey, _] = sort_keys(Tree, [Key, CurrentFirstKey]),
     [_, NewLastKey] = sort_keys(Tree, [Key, CurrentLastKey]),
     Node2 = Node1#node{
         members = lists:keyreplace(ChildId1, 3, Node1#node.members,
-            {NewFirstKey, NewLastKey, ChildId1, NewReduction})
+            {NewFirstKey, NewLastKey, ChildId2, NewReduction})
     },
-    set_node(Tx, Tree, Node0, Node2),
-    reduce_node(Tree, Node2).
+    Node3 = new_node_id_if_cacheable(Tx, Tree, Node0, Node2),
+    set_node(Tx, Tree, Node0, Node3),
+    {Node3#node.id, reduce_node(Tree, Node2)}.
 
 
 %% @doc Inserts or updates multiple values in the ebtree
@@ -715,8 +718,14 @@ split_node_multi(Tx, Tree, Node) ->
         true when Node#node.id == ?NODE_ROOT_ID ->
             Node#node.members;
         true ->
-            set_node(Tx, Tree, Node),
-            [to_member(Tree, Node)];
+            NewNode = case node_is_cacheable(Node) of
+                true ->
+                    Node#node{id = new_node_id()};
+                false ->
+                    Node
+            end,
+            set_node(Tx, Tree, NewNode),
+            [to_member(Tree, NewNode)];
         false ->
             clear_node(Tx, Tree, Node),
             Nodes0 = create_nodes(Tx, Tree, Node),
@@ -763,14 +772,14 @@ create_nodes(Tx, #tree{} = Tree, Node) ->
         true ->
             {Members, Rest} = lists:split(Tree#tree.min, Node#node.members),
             NewNode = #node{
-                id = new_node_id(Tx, Tree),
+                id = new_node_id(),
                 level = Node#node.level,
                 members = Members
             },
             [NewNode | create_nodes(Tx, Tree, Node#node{members = Rest})];
         false ->
             NewNode = #node{
-                id = new_node_id(Tx, Tree),
+                id = new_node_id(),
                 level = Node#node.level,
                 members = Node#node.members
             },
@@ -846,12 +855,12 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
             Sibling = get_node(Tx, Tree, SiblingId),
             NewNodes = case ?at_min(Tree, Sibling) of
                 true ->
-                    Merged = merge(Tx, Tree, Child1, Sibling),
+                    Merged = merge(Tree, Child1, Sibling),
                     update_prev_neighbour(Tx, Tree, Merged),
                     update_next_neighbour(Tx, Tree, Merged),
                     [Merged];
                 false ->
-                    {Left, Right} = rebalance(Tx, Tree, Child1, Sibling),
+                    {Left, Right} = rebalance(Tree, Child1, Sibling),
                     update_prev_neighbour(Tx, Tree, Left),
                     update_next_neighbour(Tx, Tree, Right),
                     [Left, Right]
@@ -867,28 +876,28 @@ delete(Tx, #tree{} = Tree, #node{} = Parent0, Key) ->
             end, Members2, NewNodes),
 
             Parent1 = Parent0#node{
-                %% TODO change id
                 members = Members3
             },
-
+            Parent2 = new_node_id_if_cacheable(Tx, Tree, Parent0, Parent1),
             clear_nodes(Tx, Tree, [Child0, Sibling]),
             set_nodes(Tx, Tree, NewNodes),
-            Parent1;
+            Parent2;
         false ->
             set_node(Tx, Tree, Child0, Child1),
             {_OldFirstKey, _OldLastKey, ChildId0, _OldReduction} = lists:keyfind(ChildId0, 3, Parent0#node.members),
-            Parent0#node{
+            Parent1 = Parent0#node{
                 members = lists:keyreplace(ChildId0, 3, Parent0#node.members,
                     {first_key(Child1), last_key(Child1), Child1#node.id, reduce_node(Tree, Child1)})
-            }
+            },
+            new_node_id_if_cacheable(Tx, Tree, Parent0, Parent1)
     end.
 
 
-merge(Tx, #tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = Node2) ->
+merge(#tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = Node2) ->
     [Left, Right] = sort_nodes(Tree, [Node1, Node2]),
 
     #node{
-        id = new_node_id(Tx, Tree),
+        id = new_node_id(),
         level = Level,
         prev = Left#node.prev,
         next = Right#node.next,
@@ -896,14 +905,14 @@ merge(Tx, #tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = N
     }.
 
 
-rebalance(Tx, #tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = Node2) ->
+rebalance(#tree{} = Tree, #node{level = Level} = Node1, #node{level = Level} = Node2) ->
     [Left0, Right0] = sort_nodes(Tree, [Node1, Node2]),
 
     Members = lists:append(Left0#node.members, Right0#node.members),
     {LeftMembers, RightMembers} = lists:split(length(Members) div 2, Members),
 
-    Left1Id = new_node_id(Tx, Tree),
-    Right1Id = new_node_id(Tx, Tree),
+    Left1Id = new_node_id(),
+    Right1Id = new_node_id(),
 
     Left1 = remove_pointers_if_not_leaf(Left0#node{
         id = Left1Id,
@@ -975,10 +984,16 @@ meta_key(Prefix, MetaKey) when is_binary(Prefix) ->
 %% node persistence functions
 
 get_node(Tx, #tree{} = Tree, Id) ->
-    Key = node_key(Tree#tree.prefix, Id),
-    Value = persist(Tree, Tx, get, Key),
-    decode_node(Tree, Id, Key, Value).
-
+    case cache(Tree, get, Id) of
+        undefined ->
+            Key = node_key(Tree#tree.prefix, Id),
+            Value = persist(Tree, Tx, get, Key),
+            Node = decode_node(Tree, Id, Key, Value),
+            cache(Tree, set, [Id, Node]),
+            Node;
+        #node{} = Node ->
+            Node
+    end.
 
 clear_nodes(Tx, #tree{} = Tree, Nodes) ->
     lists:foreach(fun(Node) ->
@@ -988,6 +1003,7 @@ clear_nodes(Tx, #tree{} = Tree, Nodes) ->
 
 clear_node(Tx, #tree{} = Tree, #node{} = Node) ->
      Key = node_key(Tree#tree.prefix, Node#node.id),
+     cache(Tree, clear, Node#node.id),
      persist(Tree, Tx, clear, Key).
 
 
@@ -1008,10 +1024,11 @@ set_node(Tx, #tree{} = Tree, #node{} = Node) ->
     validate_node(Tree, Node),
     Key = node_key(Tree#tree.prefix, Node#node.id),
     Value = encode_node(Tree, Key, Node),
+    cache(Tree, set, [Node#node.id, Node]),
     persist(Tree, Tx, set, [Key, Value]).
 
 
-node_key(Prefix, Id) when is_binary(Prefix), is_integer(Id) ->
+node_key(Prefix, Id) when is_binary(Prefix), is_binary(Id) ->
     erlfdb_tuple:pack({?NODE, Id}, Prefix).
 
 
@@ -1223,7 +1240,7 @@ collate_raw(A, A) ->
 %% encoding function
 
 encode_erlang(encode, _Key, Value) ->
-    term_to_binary(Value, [compressed, {minor_version, 2}]);
+    term_to_binary(Value, [{minor_version, 2}]);
 
 
 encode_erlang(decode, _Key, Value) ->
@@ -1244,6 +1261,37 @@ simple_persist(Tx, get, Key) ->
 
 simple_persist(Tx, clear, Key) ->
     erlfdb:clear(Tx, Key).
+
+
+%% cache functions
+
+cache_noop(set, _) ->
+    ok;
+cache_noop(clear, _) ->
+    ok;
+cache_noop(get, _) ->
+    undefined.
+
+
+cache(#tree{} = Tree, set, [Id, #node{} = Node]) ->
+    #tree{cache_fun = CacheFun} = Tree,
+    case node_is_cacheable(Node) of
+        true ->
+            CacheFun(set, [Id, Node]);
+        false ->
+            ok
+    end;
+
+cache(#tree{} = Tree, clear, Id) ->
+    #tree{cache_fun = CacheFun} = Tree,
+    CacheFun(clear, Id);
+
+cache(#tree{} = _Tree, get, ?NODE_ROOT_ID) ->
+    undefined;
+
+cache(#tree{} = Tree, get, Id) ->
+    #tree{cache_fun = CacheFun} = Tree,
+    CacheFun(get, Id).
 
 
 %% private functions
@@ -1275,10 +1323,30 @@ last_key(Members) when is_list(Members) ->
     end.
 
 
-new_node_id(Tx, Tree) ->
-    NextId = get_meta(Tx, Tree, ?META_NEXT_ID),
-    set_meta(Tx, Tree, ?META_NEXT_ID, NextId + 1),
-    NextId.
+new_node_id_if_cacheable(Tx, #tree{} = Tree, #node{} = Old, #node{} = New) ->
+    MembersChanged = Old#node.members /= New#node.members,
+    NodeIsCacheable = node_is_cacheable(New),
+    if
+        MembersChanged andalso NodeIsCacheable ->
+            clear_node(Tx, Tree, New),
+            New#node{id = new_node_id()};
+        true ->
+            New
+    end.
+
+
+node_is_cacheable(#node{id = ?NODE_ROOT_ID}) ->
+    false;
+
+node_is_cacheable(#node{level = 0}) ->
+    false;
+
+node_is_cacheable(#node{}) ->
+    true.
+
+
+new_node_id() ->
+    crypto:strong_rand_bytes(16).
 
 
 %% remove prev/next pointers for nonleaf nodes
@@ -1289,10 +1357,23 @@ remove_pointers_if_not_leaf(#node{} = Node) ->
     Node#node{prev = undefined, next = undefined}.
 
 
-print_node(#node{} = Node) ->
-    io:format("#node{id = ~w, level = ~w, prev = ~w, next = ~w, members = ~w}~n~n",
-        [Node#node.id, Node#node.level, Node#node.prev, Node#node.next, Node#node.members]).
 
+print_node(#node{level = 0} = Node) ->
+    io:format("#node{id = ~s, level = ~w, prev = ~s, next = ~s, members = ~w}~n~n",
+        [b64(Node#node.id), Node#node.level, b64(Node#node.prev), b64(Node#node.next),
+        Node#node.members]);
+
+print_node(#node{} = Node) ->
+    io:format("#node{id = ~s, level = ~w, prev = ~s, next = ~s, members = ~s}~n~n",
+        [base64:encode(Node#node.id), Node#node.level, b64(Node#node.prev), b64(Node#node.next),
+        [io_lib:format("{~w, ~w, ~s, ~w}, ", [F, L, b64(P), R]) || {F, L, P, R} <- Node#node.members]]).
+
+
+b64(undefined) ->
+    undefined;
+
+b64(Bin) ->
+    base64:encode(Bin).
 
 %% tests
 
@@ -1699,5 +1780,23 @@ validate_node_test_() ->
             #node{id = 1, members = [{1, 1}, {1, 1}]})))
     ].
 
+
+cache_test_() ->
+    {spawn, [fun() ->
+        Db = erlfdb_util:get_test_db([empty]),
+        CacheFun = fun
+            (set, [Id, Node]) ->
+                erlang:put(Id, Node);
+            (clear, Id) ->
+                erlang:erase(Id);
+            (get, Id) ->
+                erlang:get(Id)
+        end,
+        Tree = open(Db, <<1,2,3>>, 4, [{cache_fun, CacheFun}]),
+        [ebtree:insert(Db, Tree, I, I) || I <- lists:seq(1, 16)],
+        ?assertEqual({1, 1}, ebtree:lookup(Db, Tree, 1)),
+        NodeCache = [V || {_K, V} <- erlang:get(), is_record(V, node)],
+        ?assertEqual(3, length(NodeCache))
+    end]}.
 
 -endif.
