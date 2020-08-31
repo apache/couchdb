@@ -2,6 +2,7 @@ defmodule ReduceTest do
   use CouchTestCase
 
   @moduletag :views
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB view reduces

@@ -6,6 +6,9 @@ defmodule UUIDsTest do
   This is a port of the uuids.js suite
   """
 
+  @moduletag :docs
+  @moduletag kind: :single_node
+
   test "cache busting headers are set" do
     resp = Couch.get("/_uuids")
     assert resp.status_code == 200

@@ -1,5 +1,7 @@
 defmodule ViewMultiKeyDesignTest do
   use CouchTestCase
+  
+  @moduletag kind: :single_node
 
   @keys [10, 15, 30, 37, 50]
 

@@ -6,6 +6,9 @@ defmodule PartitionAllDocsTest do
   Test Partition functionality for for all_docs
   """
 
+  @moduletag :partition
+  @moduletag kind: :cluster
+
   setup_all do
     db_name = random_db_name()
     {:ok, _} = create_db(db_name, query: %{partitioned: true, q: 1})

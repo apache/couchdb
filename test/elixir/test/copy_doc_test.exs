@@ -2,6 +2,7 @@ defmodule CopyDocTest do
   use CouchTestCase
 
   @moduletag :copy_doc
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB Copy Doc

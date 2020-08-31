@@ -2,6 +2,7 @@ defmodule CoffeeTest do
   use CouchTestCase
 
   @moduletag :coffee
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test basic coffeescript functionality.

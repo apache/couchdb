@@ -2,6 +2,7 @@ defmodule ViewOffsetTest do
   use CouchTestCase
 
   @moduletag :view_offsets
+  @moduletag kind: :single_node
 
   @moduledoc """
   Tests about view offsets.

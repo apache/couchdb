@@ -2,6 +2,7 @@ defmodule ChangesAsyncTest do
   use CouchTestCase
 
   @moduletag :changes
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB /{db}/_changes

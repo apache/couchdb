@@ -5,6 +5,10 @@ defmodule PartitionMangoTest do
   @moduledoc """
   Test Partition functionality for mango
   """
+
+  @moduletag :partition
+  @moduletag kind: :cluster
+
   def create_index(db_name, fields \\ ["some"], opts \\ %{}) do
     default_index = %{
       index: %{

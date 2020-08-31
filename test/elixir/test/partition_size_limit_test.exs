@@ -5,6 +5,9 @@ defmodule PartitionSizeLimitTest do
   Test Partition size limit functionality
   """
 
+  @moduletag :partition
+  @moduletag kind: :cluster
+
   @max_size 10_240
 
   setup do

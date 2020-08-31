@@ -2,6 +2,8 @@ defmodule LotsOfDocsTest do
   use CouchTestCase
 
   @moduletag :lots_of_docs
+  @moduletag kind: :performance
+  
   @docs_range 0..499
 
   @moduledoc """

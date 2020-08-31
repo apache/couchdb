@@ -2,6 +2,7 @@ defmodule ConfigTest do
   use CouchTestCase
 
   @moduletag :config
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB config API

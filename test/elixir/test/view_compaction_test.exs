@@ -5,6 +5,9 @@ defmodule ViewCompactionTest do
   Test CouchDB View Compaction Behavior
   This is a port of the view_compaction.js suite
   """
+  
+  @moduletag kind: :single_node
+  
   @num_docs 1000
 
   @ddoc %{

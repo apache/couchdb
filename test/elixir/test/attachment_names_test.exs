@@ -2,6 +2,7 @@ defmodule AttachmentNamesTest do
   use CouchTestCase
 
   @moduletag :attachments
+  @moduletag kind: :single_node
 
   @good_doc """
    {
