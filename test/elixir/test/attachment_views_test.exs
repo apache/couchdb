@@ -2,6 +2,7 @@ defmodule AttachmentViewTest do
   use CouchTestCase
 
   @moduletag :attachments
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB attachment views requests

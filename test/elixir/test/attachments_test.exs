@@ -2,6 +2,7 @@ defmodule AttachmentsTest do
   use CouchTestCase
 
   @moduletag :attachments
+  @moduletag kind: :single_node
 
   #  MD5 Digests of compressible attachments and therefore Etags
   #  will vary depending on platform gzip implementation.

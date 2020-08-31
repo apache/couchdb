@@ -2,6 +2,7 @@ defmodule BatchSaveTest do
   use CouchTestCase
 
   @moduletag :batch_save
+  @moduletag kind: :performance
 
   @moduledoc """
   Test CouchDB batch save

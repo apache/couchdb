@@ -2,6 +2,7 @@ defmodule InvalidDocIDsTest do
   use CouchTestCase
 
   @moduletag :invalid_doc_ids
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test invalid document ids

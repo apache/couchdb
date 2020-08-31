@@ -2,6 +2,7 @@ defmodule JwtAuthTest do
   use CouchTestCase
 
   @moduletag :authentication
+  @moduletag kind: :single_node
 
   test "jwt auth with HMAC secret", _context do
 

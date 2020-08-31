@@ -5,6 +5,9 @@ defmodule ReplicationTest do
   Test CouchDB Replication Behavior
   This is a port of the view_collation.js suite
   """
+  
+  @moduletag kind: :cluster
+  @moduletag :replication
 
   # TODO: Parameterize these
   @db_pairs_prefixes [

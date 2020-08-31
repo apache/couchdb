@@ -2,6 +2,7 @@ defmodule RewriteTest do
   use CouchTestCase
 
   @moduletag :js_engine
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB rewrites

@@ -5,6 +5,8 @@ defmodule ReshardBasicTest do
   @moduledoc """
   Test resharding basic functionality
   """
+  
+  @moduletag kind: :cluster
 
   setup_all do
     db1 = random_db_name()

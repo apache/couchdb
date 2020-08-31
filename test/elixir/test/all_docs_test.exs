@@ -2,6 +2,7 @@ defmodule AllDocsTest do
   use CouchTestCase
 
   @moduletag :all_docs
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB _all_docs

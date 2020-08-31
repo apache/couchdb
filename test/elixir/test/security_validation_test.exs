@@ -2,6 +2,7 @@ defmodule SecurityValidationTest do
   use CouchTestCase
 
   @moduletag :security
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB Security Validations

@@ -5,6 +5,9 @@ defmodule ReplicatorDBByDocIdTest do
   This is a port of the replicator_db_by_doc_id.js suite
   """
 
+  @moduletag :replication
+  @moduletag kind: :cluster
+
   @docs [
     %{
       _id: "foo1",

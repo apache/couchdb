@@ -5,6 +5,9 @@ defmodule PartitionDesignDocsTest do
   Test Partition functionality for partition design docs
   """
 
+  @moduletag :partition
+  @moduletag kind: :cluster
+
   @tag :with_partitioned_db
   test "/_partition/:pk/_design/doc 404", context do
     db_name = context[:db_name]

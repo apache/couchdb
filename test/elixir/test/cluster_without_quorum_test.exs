@@ -2,6 +2,7 @@ defmodule WithoutQuorumTest do
   use CouchTestCase
 
   @moduletag :without_quorum_test
+  @moduletag kind: :degraded_cluster
 
   @moduledoc """
   Test CouchDB API in a cluster without quorum.

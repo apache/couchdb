@@ -4,6 +4,9 @@ defmodule PartitionSizeTest do
   @moduledoc """
   Test Partition size functionality
   """
+  
+  @moduletag :partition
+  @moduletag kind: :cluster
 
   setup do
     db_name = random_db_name()

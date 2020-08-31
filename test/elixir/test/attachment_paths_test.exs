@@ -2,6 +2,7 @@ defmodule AttachmentPathsTest do
   use CouchTestCase
 
   @moduletag :attachments
+  @moduletag kind: :single_node
 
   @bin_att_doc """
   {

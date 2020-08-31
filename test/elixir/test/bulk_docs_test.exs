@@ -2,6 +2,7 @@ defmodule BulkDocsTest do
   use CouchTestCase
 
   @moduletag :bulk_docs
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB bulk docs

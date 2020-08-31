@@ -5,6 +5,9 @@ defmodule ViewPartitionTest do
   @moduledoc """
   Test Partition functionality for views
   """
+  
+  @moduletag :partition
+  @moduletag kind: :cluster
 
   setup_all do
     db_name = random_db_name()

@@ -2,6 +2,7 @@ defmodule CompactTest do
   use CouchTestCase
 
   @moduletag :compact
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB compaction
