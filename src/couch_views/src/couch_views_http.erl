@@ -147,7 +147,7 @@ do_paginated(PageSize, QueriesArgs, KeyFun, Fun) when is_list(QueriesArgs) ->
 maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun) ->
     #mrargs{
         page_size = RequestedLimit,
-        extra = Extra
+        extra = Extra0
     } = Args0,
     case check_completion(OriginalLimit, RequestedLimit, Items) of
         {Rows, nil} ->
@@ -156,15 +156,15 @@ maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun)
                 total_rows => length(Rows)
             });
         {Rows, Next} ->
-            FirstKey = first_key(KeyFun, Rows),
-            NextKey = KeyFun(Next),
-            if is_binary(NextKey) -> ok; true ->
-                throw("Provided KeyFun should return binary")
-            end,
+            {FirstId, FirstKey} = first_key(KeyFun, Rows),
+            {NextId, NextKey} = KeyFun(Next),
+            Extra1 = lists:keystore(fid, 1, Extra0, {fid, FirstId}),
+            Extra2 = lists:keystore(fk, 1, Extra1, {fk, FirstKey}),
             Args = Args0#mrargs{
                 page_size = PageSize,
                 start_key = NextKey,
-                extra = lists:keystore(fk, 1, Extra, {fk, FirstKey})
+                start_key_docid = NextId,
+                extra = Extra2
             },
             Bookmark = bookmark_encode(Args),
             maps:merge(Response, #{
@@ -177,18 +177,23 @@ maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun)
 
 maybe_add_previous_bookmark(#mrargs{extra = Extra} = Args, #{rows := Rows} = Result, KeyFun) ->
     StartKey = couch_util:get_value(fk, Extra),
-    case {StartKey, first_key(KeyFun, Rows)} of
-        {undefined, _} ->
+    StartId = couch_util:get_value(fid, Extra),
+    case {{StartId, StartKey}, first_key(KeyFun, Rows)} of
+        {{undefined, undefined}, {_, _}} ->
             Result;
-        {_, undefined} ->
+        {{_, _}, {undefined, undefined}} ->
             Result;
-        {StartKey, StartKey} ->
+        {{StartId, _}, {StartId, _}} ->
             Result;
-        {StartKey, EndKey} ->
+        {{undefined, StartKey}, {undefined, StartKey}} ->
+            Result;
+        {{StartId, StartKey}, {EndId, EndKey}} ->
             Bookmark = bookmark_encode(
                 Args#mrargs{
                     start_key = StartKey,
+                    start_key_docid = StartId,
                     end_key = EndKey,
+                    end_key_docid = EndId,
                     inclusive_end = false
                 }
             ),
@@ -197,7 +202,7 @@ maybe_add_previous_bookmark(#mrargs{extra = Extra} = Args, #{rows := Rows} = Res
 
 
 first_key(_KeyFun, []) ->
-    undefined;
+    {undefined, undefined};
 
 first_key(KeyFun, [First | _]) ->
     KeyFun(First).

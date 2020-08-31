@@ -864,7 +864,9 @@ paginate_multi_all_docs_view(Req, Db, OP, Args0, Queries) ->
     ArgQueries = chttpd_view:parse_queries(Req, Args1, Queries, fun(QArgs) ->
         set_namespace(OP, QArgs)
     end),
-    KeyFun = fun({Props}) -> couch_util:get_value(id, Props) end,
+    KeyFun = fun({Props}) ->
+        {couch_util:get_value(id, Props), undefined}
+    end,
     #mrargs{page_size = PageSize} = Args0,
     #httpd{path_parts = Parts} = Req,
     UpdateSeq = fabric2_db:get_update_seq(Db),
@@ -911,7 +913,9 @@ paginate_all_docs_view(Req, Db, Args0, OP) ->
     Args1 = Args0#mrargs{view_type=map},
     Args2 = chttpd_view:validate_args(Req, Args1),
     Args3 = set_namespace(OP, Args2),
-    KeyFun = fun({Props}) -> couch_util:get_value(id, Props) end,
+    KeyFun = fun({Props}) ->
+        {couch_util:get_value(id, Props), undefined}
+    end,
     #httpd{path_parts = Parts} = Req,
     UpdateSeq = fabric2_db:get_update_seq(Db),
     EtagTerm = {Parts, UpdateSeq, Args3},
