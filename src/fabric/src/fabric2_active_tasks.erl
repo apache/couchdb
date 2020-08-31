@@ -34,7 +34,8 @@ get_active_tasks() ->
                 {ok, Data} = couch_jobs:get_job_data(JTx, Type, JobId),
                 case maps:get(?ACTIVE_TASK_INFO, Data, not_found) of
                     not_found -> false;
-                    Info -> {true, Info}
+                    #{} = Map when map_size(Map) == 0 -> false;
+                    #{} = Info -> {true, Info}
                 end
             end, JobIds),
             TaskAcc ++ Tasks
