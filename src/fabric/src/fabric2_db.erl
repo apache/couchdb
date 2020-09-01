@@ -1831,13 +1831,16 @@ update_doc_interactive(Db, Doc0, Future, _Options) ->
 
     % Check that a revision was specified if required
     Doc0RevId = doc_to_revid(Doc0),
-    if Doc0RevId /= {0, <<>>} orelse WinnerRevId == {0, <<>>} -> ok; true ->
+    HasRev = Doc0RevId =/= {0, <<>>},
+    if HasRev orelse WinnerRevId == {0, <<>>} -> ok; true ->
         ?RETURN({Doc0, conflict})
     end,
 
-    % Check that we're not trying to create a deleted doc
-    if Doc0RevId /= {0, <<>>} orelse not Doc0#doc.deleted -> ok; true ->
-        ?RETURN({Doc0, conflict})
+    % Allow inserting new deleted documents. Only works when the document has
+    % never existed to match CouchDB 3.x
+    case not HasRev andalso Doc0#doc.deleted andalso is_map(Winner) of
+        true -> ?RETURN({Doc0, conflict});
+        false -> ok
     end,
 
     % Get the target revision to update
