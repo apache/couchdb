@@ -49,7 +49,7 @@ doc_crud_test_() ->
                 ?TDEF(recreate_doc_basic),
                 ?TDEF(conflict_on_create_new_with_rev),
                 ?TDEF(conflict_on_update_with_no_rev),
-                ?TDEF(conflict_on_create_as_deleted),
+                ?TDEF(allow_create_new_as_deleted),
                 ?TDEF(conflict_on_recreate_as_deleted),
                 ?TDEF(conflict_on_extend_deleted),
                 ?TDEF(open_doc_revs_basic),
@@ -449,12 +449,20 @@ conflict_on_update_with_no_rev({Db, _}) ->
     ?assertThrow(conflict, fabric2_db:update_doc(Db, Doc2)).
 
 
-conflict_on_create_as_deleted({Db, _}) ->
+allow_create_new_as_deleted({Db, _}) ->
     Doc = #doc{
         id = fabric2_util:uuid(),
         deleted = true,
         body = {[{<<"foo">>, <<"bar">>}]}
     },
+    {ok, {1, Rev}} = fabric2_db:update_doc(Db, Doc),
+    ?assertEqual({not_found, deleted}, fabric2_db:open_doc(Db, Doc#doc.id)),
+    Doc1 = Doc#doc{
+        revs = {1, [Rev]}
+    },
+    ?assertEqual({ok, Doc1}, fabric2_db:open_doc(Db, Doc#doc.id, [deleted])),
+    % Only works when the document has never existed to match CouchDB 3.x
+    % behavior
     ?assertThrow(conflict, fabric2_db:update_doc(Db, Doc)).
 
 
