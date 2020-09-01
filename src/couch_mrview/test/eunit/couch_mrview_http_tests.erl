@@ -24,5 +24,17 @@ mrview_http_test_() ->
 
          ?_assertEqual(#mrargs{group_level=1, group=undefined},
                        couch_mrview_http:parse_params([{"group_level", "1"}],
+                                            undefined, #mrargs{})),
+
+         ?_assertEqual(#mrargs{stable=true, update=false, group_level=undefined, group=undefined},
+                       couch_mrview_http:parse_params([{"stale", "ok"}],
+                                            undefined, #mrargs{})),
+
+         ?_assertEqual(#mrargs{stable=true, update=lazy, group_level=undefined, group=undefined},
+                       couch_mrview_http:parse_params([{"stale", "update_after"}],
+                                            undefined, #mrargs{})),
+
+         ?_assertEqual(#mrargs{stable=false, update=true, group_level=undefined, group=undefined},
+                       couch_mrview_http:parse_params([{"stale", "false"}],
                                             undefined, #mrargs{}))
     ].

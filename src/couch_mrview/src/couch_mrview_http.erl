@@ -527,6 +527,8 @@ parse_param(Key, Val, Args, IsDecoded) ->
             Args#mrargs{stable=true, update=false};
         "stale" when Val == "update_after" orelse Val == <<"update_after">> ->
             Args#mrargs{stable=true, update=lazy};
+        "stale" when Val == "false" orelse Val == <<"false">> ->
+            Args#mrargs{stable=false, update=true};
         "stale" ->
             throw({query_parse_error, <<"Invalid value for `stale`.">>});
         "stable" when Val == "true" orelse Val == <<"true">> ->
