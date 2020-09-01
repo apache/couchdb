@@ -246,6 +246,16 @@ init([]) ->
     % Mark being able to receive documents with an _access property as a supported feature
     config:enable_feature('access-ready'),
 
+    % Mark if fips is enabled
+    case
+        erlang:function_exported(crypto, info_fips, 0) andalso
+          crypto:info_fips() == enabled of
+        true ->
+            config:enable_feature('fips');
+        false ->
+            ok
+    end,
+
     % read config and register for configuration changes
 
     % just stop if one of the config settings change. couch_server_sup
