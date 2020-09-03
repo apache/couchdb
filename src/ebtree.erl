@@ -63,6 +63,12 @@
 -define(at_min(Tree, Node), Tree#tree.min == length(Node#node.members)).
 -define(is_full(Tree, Node), Tree#tree.max == length(Node#node.members)).
 
+-ifdef(TEST).
+-define(validate_node(Tree, Node), validate_node(Tree, Node)).
+-else.
+-define(validate_node(Tree, Node), ignore).
+-endif.
+
 %% two special 1-bit bitstrings that cannot appear in valid keys.
 -define(MIN, <<0:1>>).
 -define(MAX, <<1:1>>).
@@ -1020,7 +1026,7 @@ set_node(Tx, #tree{} = Tree, #node{} = _From, #node{} = To) ->
 
 
 set_node(Tx, #tree{} = Tree, #node{} = Node) ->
-    validate_node(Tree, Node),
+    ?validate_node(Tree, Node),
     Key = node_key(Tree#tree.prefix, Node#node.id),
     Value = encode_node(Tree, Key, Node),
     cache(Tree, set, [Node#node.id, Node]),
