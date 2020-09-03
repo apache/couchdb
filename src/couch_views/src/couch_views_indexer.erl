@@ -33,11 +33,19 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 
-% TODO:
-%  * Handle timeouts of transaction and other errors
 
 -define(KEY_SIZE_LIMIT, 8000).
 -define(VALUE_SIZE_LIMIT, 64000).
+
+% These are all of the errors that we can fix by using
+% a smaller batch size.
+-define(IS_RECOVERABLE_ERROR(Code), (
+    (Code == 1004) % timed_out
+    orelse (Code == 1007) % transaction_too_old
+    orelse (Code == 1031) % transaction_timed_out
+    orelse (Code == 2101) % transaction_too_large
+)).
+
 
 spawn_link() ->
     proc_lib:spawn_link(?MODULE, init, []).
@@ -88,10 +96,10 @@ init() ->
         job => Job,
         job_data => Data,
         count => 0,
-        limit => num_changes(),
         changes_done => 0,
         doc_acc => [],
-        design_opts => Mrst#mrst.design_opts
+        design_opts => Mrst#mrst.design_opts,
+        update_stats => #{}
     },
 
     try
@@ -162,7 +170,32 @@ add_error(Error, Reason, Data) ->
 
 
 update(#{} = Db, Mrst0, State0) ->
-    {Mrst2, State4} = fabric2_fdb:transactional(Db, fun(TxDb) ->
+    Limit = couch_views_batch:start(Mrst0),
+    {Mrst1, State1} = try
+        do_update(Db, Mrst0, State0#{limit => Limit})
+    catch
+        error:{erlfdb_error, Error} when ?IS_RECOVERABLE_ERROR(Error) ->
+            couch_views_batch:failure(Mrst0),
+            update(Db, Mrst0, State0)
+    end,
+    case State1 of
+        finished ->
+            couch_eval:release_map_context(Mrst1#mrst.qserver);
+        _ ->
+            #{
+                update_stats := UpdateStats
+            } = State1,
+            couch_views_batch:success(Mrst1, UpdateStats),
+            update(Db, Mrst1, State1)
+    end.
+
+
+do_update(Db, Mrst0, State0) ->
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{
+            tx := Tx
+        } = TxDb,
+
         State1 = get_update_start_state(TxDb, Mrst0, State0),
 
         {ok, State2} = fold_changes(State1),
@@ -180,9 +213,15 @@ update(#{} = Db, Mrst0, State0) ->
         DocAcc1 = fetch_docs(TxDb, DesignOpts, DocAcc),
 
         {Mrst1, MappedDocs} = map_docs(Mrst0, DocAcc1),
-        write_docs(TxDb, Mrst1, MappedDocs, State2),
+        TotalKVs = write_docs(TxDb, Mrst1, MappedDocs, State2),
 
         ChangesDone = ChangesDone0 + length(DocAcc),
+
+        UpdateStats = #{
+            docs_read => length(DocAcc),
+            tx_size => erlfdb:wait(erlfdb:get_approximate_size(Tx)),
+            total_kvs => TotalKVs
+        },
 
         case Count < Limit of
             true ->
@@ -198,17 +237,11 @@ update(#{} = Db, Mrst0, State0) ->
                     count := 0,
                     doc_acc := [],
                     changes_done := ChangesDone,
-                    view_seq := LastSeq
+                    view_seq := LastSeq,
+                    update_stats := UpdateStats
                 }}
         end
-    end),
-
-    case State4 of
-        finished ->
-            couch_eval:release_map_context(Mrst2#mrst.qserver);
-        _ ->
-        update(Db, Mrst2, State4)
-    end.
+    end).
 
 
 maybe_set_build_status(_TxDb, _Mrst1, not_found, _State) ->
@@ -351,14 +384,17 @@ write_docs(TxDb, Mrst, Docs, State) ->
     KeyLimit = key_size_limit(),
     ValLimit = value_size_limit(),
 
-    lists:foreach(fun(Doc0) ->
+    TotalKVCount = lists:foldl(fun(Doc0, KVCount) ->
         Doc1 = calculate_kv_sizes(Mrst, Doc0, KeyLimit, ValLimit),
-        couch_views_fdb:write_doc(TxDb, Sig, ViewIds, Doc1)
-    end, Docs),
+        couch_views_fdb:write_doc(TxDb, Sig, ViewIds, Doc1),
+        KVCount + count_kvs(Doc1)
+    end, 0, Docs),
 
     if LastSeq == false -> ok; true ->
         couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq)
-    end.
+    end,
+
+    TotalKVCount.
 
 
 fetch_docs(Db, DesignOpts, Changes) ->
@@ -478,6 +514,15 @@ calculate_kv_sizes(Mrst, Doc, KeyLimit, ValLimit) ->
     end.
 
 
+count_kvs(Doc) ->
+    #{
+        results := Results
+    } = Doc,
+    lists:foldl(fun(ViewRows, Count) ->
+        Count + length(ViewRows)
+    end, 0, Results).
+
+
 report_progress(State, UpdateType) ->
     #{
         tx_db := TxDb,
@@ -542,10 +587,6 @@ fail_job(Job, Data, Error, Reason) ->
     NewData = add_error(Error, Reason, Data),
     couch_jobs:finish(undefined, Job, NewData),
     exit(normal).
-
-
-num_changes() ->
-    config:get_integer("couch_views", "change_limit", 100).
 
 
 retry_limit() ->
