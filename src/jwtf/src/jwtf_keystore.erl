@@ -141,12 +141,17 @@ get_from_config(Kty, KID) ->
 
 pem_decode(PEM) ->
     BinPEM = re:replace(PEM, "\\\\n", "\n", [global, {return, binary}]),
-    case public_key:pem_decode(BinPEM) of
-        [PEMEntry] ->
-            public_key:pem_entry_decode(PEMEntry);
-        [] ->
-            throw({bad_request, <<"Not a valid key">>})
-    end.
+    try
+        case public_key:pem_decode(BinPEM) of
+            [PEMEntry] ->
+                public_key:pem_entry_decode(PEMEntry);
+            _ ->
+                throw({bad_request, <<"Not a valid key">>})
+        end
+   catch
+       error:_ ->
+           throw({bad_request, <<"Not a valid key">>})
+   end.
 
 kty(<<"HS", _/binary>>) ->
     "hmac";
