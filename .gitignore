@@ -78,7 +78,6 @@ src/rebar/
 src/recon/
 src/smoosh/
 src/snappy/
-src/stream_data/
 src/ssl_verify_fun/
 src/thrift_protocol/
 src/triq/
