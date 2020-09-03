@@ -127,6 +127,12 @@ update_views(TxDb, Mrst, Docs) ->
         tx := Tx
     } = TxDb,
 
+    % Get initial KV size
+    OldKVSize = lists:foldl(fun(View, SizeAcc) ->
+        {_, Size} = ebtree:full_reduce(Tx, View#mrview.btree),
+        SizeAcc + Size
+    end, 0, Mrst#mrst.views),
+
     % Collect update information
     #{
         ids := IdMap,
@@ -146,7 +152,15 @@ update_views(TxDb, Mrst, Docs) ->
 
         ViewMap = maps:get(ViewId, ViewMaps, #{}),
         update_btree(Tx, BTree, ViewMap, DeleteRef)
-    end, Mrst#mrst.views).
+    end, Mrst#mrst.views),
+
+    % Get new KV size after update
+    NewKVSize = lists:foldl(fun(View, SizeAcc) ->
+        {_, Size} = ebtree:full_reduce(Tx, View#mrview.btree),
+        SizeAcc + Size
+    end, 0, Mrst#mrst.views),
+
+    couch_views_fdb:update_kv_size(TxDb, Mrst#mrst.sig, OldKVSize, NewKVSize).
 
 
 open_id_tree(TxDb, Sig) ->
@@ -201,15 +215,16 @@ make_reduce_fun(_Lang, #mrview{}) ->
         (KVs, _ReReduce = false) ->
             TotalSize = lists:foldl(fun({{K, _DocId}, V}, Acc) ->
                 KSize = couch_ejson_size:encoded_size(K),
-                VSize = case V of
+                Acc + case V of
                     {dups, Dups} ->
                         lists:foldl(fun(D, DAcc) ->
-                            DAcc + couch_ejson_size:encoded_size(D)
+                            VSize = couch_ejson_size:encoded_size(D),
+                            DAcc + KSize + VSize
                         end, 0, Dups);
                     _ ->
-                        couch_ejson_size:encoded_size(V)
-                end,
-                KSize + VSize + Acc
+                        VSize = couch_ejson_size:encoded_size(V),
+                        KSize + VSize
+                end
             end, 0, KVs),
             {length(KVs), TotalSize};
         (KRs, _ReReduce = true) ->

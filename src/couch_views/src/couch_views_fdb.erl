@@ -25,7 +25,8 @@
     list_signatures/1,
     clear_index/2,
 
-    persist_chunks/3
+    persist_chunks/3,
+    update_kv_size/4
 ]).
 
 -ifdef(TEST).
@@ -135,6 +136,11 @@ clear_index(Db, Signature) ->
         db_prefix := DbPrefix
     } = Db,
 
+    % Get view size to remove from global counter
+    SizeTuple = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_KV_SIZE, Signature},
+    SizeKey = erlfdb_tuple:pack(SizeTuple, DbPrefix),
+    ViewSize = ?bin2uint(erlfdb:wait(erlfdb:get(Tx, SizeKey))),
+
     % Clear index info keys
     Keys = [
         {?DB_VIEWS, ?VIEW_INFO, ?VIEW_UPDATE_SEQ, Signature},
@@ -154,7 +160,12 @@ clear_index(Db, Signature) ->
     % Clear tree data
     TreeTuple = {?DB_VIEWS, ?VIEW_TREES, Signature},
     TreePrefix = erlfdb_tuple:pack(TreeTuple, DbPrefix),
-    erlfdb:clear_range_startswith(Tx, TreePrefix).
+    erlfdb:clear_range_startswith(Tx, TreePrefix),
+
+    % Decrement db wide view size counter
+    DbSizeTuple = {?DB_STATS, <<"sizes">>, <<"views">>},
+    DbSizeKey = erlfdb_tuple:pack(DbSizeTuple, DbPrefix),
+    erlfdb:add(Tx, DbSizeKey, -ViewSize).
 
 
 persist_chunks(Tx, set, [Key, Value]) ->
@@ -179,6 +190,21 @@ persist_chunks(Tx, get, Key) ->
 
 persist_chunks(Tx, clear, Key) ->
     erlfdb:clear_range_startswith(Tx, Key).
+
+
+update_kv_size(TxDb, Sig, OldSize, NewSize) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = TxDb,
+
+    ViewTuple = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_KV_SIZE, Sig},
+    ViewKey = erlfdb_tuple:pack(ViewTuple, DbPrefix),
+    erlfdb:set(Tx, ViewKey, ?uint2bin(NewSize)),
+
+    DbTuple = {?DB_STATS, <<"sizes">>, <<"views">>},
+    DbKey = erlfdb_tuple:pack(DbTuple, DbPrefix),
+    erlfdb:add(Tx, DbKey, NewSize - OldSize).
 
 
 seq_key(DbPrefix, Sig) ->
