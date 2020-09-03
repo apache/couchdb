@@ -47,8 +47,8 @@ foreach_setup() ->
     Docs = make_docs(?TOTAL_DOCS),
     fabric2_db:update_docs(Db, [DDoc | Docs]),
 
-    meck:new(couch_rate, [passthrough]),
-    meck:expect(couch_rate, budget, fun(_) -> 100 end),
+    meck:new(couch_views_batch, [passthrough]),
+    meck:expect(couch_views_batch, success, fun(_, _) -> 100 end),
 
     {Db, DDoc}.
 

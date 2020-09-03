@@ -437,7 +437,7 @@ handle_db_recreated_when_running(Db) ->
 
     % To intercept job building while it is running ensure updates happen one
     % row at a time.
-    config:set("couch_view", "change_limit", "1", false),
+    config:set("couch_views", "batch_initial_size", "1", false),
 
     meck_intercept_job_update(self()),
 
