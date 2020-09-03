@@ -28,7 +28,6 @@
         couch_stats,
         fabric,
         couch_jobs,
-        couch_eval,
-        couch_rate
+        couch_eval
     ]}
 ]}.
