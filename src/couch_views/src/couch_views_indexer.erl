@@ -33,11 +33,19 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 
-% TODO:
-%  * Handle timeouts of transaction and other errors
 
 -define(KEY_SIZE_LIMIT, 8000).
 -define(VALUE_SIZE_LIMIT, 64000).
+
+% These are all of the errors that we can fix by using
+% a smaller batch size.
+-define(RETRY_FAILURES, [
+    1004, % timed_out
+    1007, % transaction_too_old
+    1031, % transaction_timed_out
+    2101 % transaction_too_large
+]).
+
 
 spawn_link() ->
     proc_lib:spawn_link(?MODULE, init, []).
@@ -78,10 +86,10 @@ init() ->
         fail_job(Job, Data, sig_changed, "Design document was modified")
     end,
 
-    Limiter = couch_rate:create_if_missing({DbName, DDocId}, "views"),
-
     State = #{
         tx_db => undefined,
+        docs_read => 0,
+        tx_size => 0,
         db_uuid => DbUUID,
         db_seq => undefined,
         view_seq => undefined,
@@ -91,7 +99,6 @@ init() ->
         job_data => Data,
         count => 0,
         changes_done => 0,
-        limiter => Limiter,
         doc_acc => [],
         design_opts => Mrst#mrst.design_opts
     },
@@ -109,7 +116,6 @@ init() ->
             Stack = erlang:get_stacktrace(),
             Fmt = "Error building view for ddoc ~s in ~s: ~p:~p ~p",
             couch_log:error(Fmt, [DbName, DDocId, Error, Reason, Stack]),
-            couch_rate:failure(Limiter),
             NewRetry = Retries + 1,
             RetryLimit = retry_limit(),
 
@@ -170,36 +176,43 @@ add_error(Error, Reason, Data) ->
 
 
 update(#{} = Db, Mrst0, State0) ->
-    stat_incr(update_loop, 1),
-    Limiter = maps:get(limiter, State0),
-    case couch_rate:budget(Limiter) of
-        0 ->
-            time_span(rate_wait_1, fun() ->
-                couch_rate:wait(Limiter)
-            end),
-            update(Db, Mrst0, State0);
-        _ ->
-            Limit = 2000,
-            stat_store(rate_limit, Limit),
-
-            {Mrst1, State1} = time_span(do_update, fun() ->
-                do_update(Db, Mrst0, State0#{limit => Limit, limiter => Limiter})
-            end),
-            stat_dump(),
-            case State1 of
-                finished ->
-                    couch_eval:release_map_context(Mrst1#mrst.qserver);
-                _ ->
-                    %% time_span(rate_wait_2, fun() ->
-                    %%     couch_rate:wait(Limiter)
-                    %% end),
-                    update(Db, Mrst1, State1)
+    Limit = couch_views_batch:start(),
+    try
+        {Mrst1, State1} = time_span(do_update, fun() ->
+            do_update(Db, Mrst0, State0#{limit => Limit})
+        end),
+        stat_dump(),
+        case State1 of
+            finished ->
+                couch_eval:release_map_context(Mrst1#mrst.qserver);
+            _ ->
+                #{
+                    docs_read := DocsRead,
+                    tx_size := TxSize
+                } = State1,
+                couch_views_batch:success(DocsRead, TxSize),
+                update(Db, Mrst1, State1)
+        end
+    catch
+        error:{erlfdb_error, Error} ->
+            case lists:member(Error, ?RETRY_FAILURES) of
+                true ->
+                    couch_views_batch:failure(),
+                    update(Db, Mrst0, State0);
+                false ->
+                    erlang:error({erlfdb_error, Error})
             end
     end.
 
 
 do_update(Db, Mrst0, State0) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
+        #{
+            tx := Tx
+        } = TxDb,
+
+        stat_incr(tx_tries, 1),
+
         {Mrst1, State1} = time_span(init_update, fun() ->
             M = couch_views_fdb:set_trees(TxDb, Mrst0),
             S = get_update_start_state(TxDb, Mrst0, State0),
@@ -215,7 +228,6 @@ do_update(Db, Mrst0, State0) ->
             doc_acc := DocAcc,
             last_seq := LastSeq,
             limit := Limit,
-            limiter := Limiter,
             view_vs := ViewVS,
             changes_done := ChangesDone0,
             design_opts := DesignOpts
@@ -227,34 +239,28 @@ do_update(Db, Mrst0, State0) ->
             fetch_docs(TxDb, DesignOpts, DocAcc)
         end),
 
-        time_span(rate_in, fun() ->
-            couch_rate:in(Limiter, Count)
-        end),
-
         {Mrst2, MappedDocs} = time_span(map_docs, fun() ->
             map_docs(Mrst1, DocAcc1)
         end),
-        WrittenDocs = time_span(write_docs, fun() ->
+        time_span(write_docs, fun() ->
             write_docs(TxDb, Mrst2, MappedDocs, State2)
         end),
 
-        ChangesDone = ChangesDone0 + WrittenDocs,
+        ChangesDone = ChangesDone0 + length(DocAcc),
 
-        time_span(rate_success, fun() ->
-            couch_rate:success(Limiter, WrittenDocs)
-        end),
+        TxSize = erlfdb:wait(erlfdb:get_approximate_size(Tx)),
 
         case Count < Limit of
             true ->
-                maybe_set_build_status(TxDb, Mrst2, ViewVS,
-                    ?INDEX_READY),
-                report_progress(State2#{changes_done := ChangesDone},
-                    finished),
+                maybe_set_build_status(TxDb, Mrst2, ViewVS, ?INDEX_READY),
+                report_progress(State2#{changes_done := ChangesDone}, finished),
                 {Mrst2, finished};
             false ->
                 State3 = report_progress(State2, update),
                 {Mrst2, State3#{
                     tx_db := undefined,
+                    docs_read := length(DocAcc),
+                    tx_size := TxSize,
                     count := 0,
                     doc_acc := [],
                     changes_done := ChangesDone,
@@ -410,9 +416,7 @@ write_docs(TxDb, Mrst, Docs0, State) ->
 
     if LastSeq == false -> ok; true ->
         couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq)
-    end,
-
-    length(Docs1).
+    end.
 
 
 fetch_docs(Db, DesignOpts, Changes) ->
