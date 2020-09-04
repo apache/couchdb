@@ -52,8 +52,9 @@
     req,
     code,
     headers,
-    first_chunk,
-    resp=nil
+    chunks,
+    resp=nil,
+    buffer_response=false
 }).
 
 start_link() ->
@@ -800,11 +801,14 @@ start_json_response(Req, Code, Headers0) ->
 end_json_response(Resp) ->
     couch_httpd:end_json_response(Resp).
 
+
 start_delayed_json_response(Req, Code) ->
     start_delayed_json_response(Req, Code, []).
 
+
 start_delayed_json_response(Req, Code, Headers) ->
     start_delayed_json_response(Req, Code, Headers, "").
+
 
 start_delayed_json_response(Req, Code, Headers, FirstChunk) ->
     {ok, #delayed_resp{
@@ -812,10 +816,13 @@ start_delayed_json_response(Req, Code, Headers, FirstChunk) ->
         req = Req,
         code = Code,
         headers = Headers,
-        first_chunk = FirstChunk}}.
+        chunks = [FirstChunk],
+        buffer_response = buffer_response(Req)}}.
+
 
 start_delayed_chunked_response(Req, Code, Headers) ->
     start_delayed_chunked_response(Req, Code, Headers, "").
+
 
 start_delayed_chunked_response(Req, Code, Headers, FirstChunk) ->
     {ok, #delayed_resp{
@@ -823,16 +830,24 @@ start_delayed_chunked_response(Req, Code, Headers, FirstChunk) ->
         req = Req,
         code = Code,
         headers = Headers,
-        first_chunk = FirstChunk}}.
+        chunks = [FirstChunk],
+        buffer_response = buffer_response(Req)}}.
 
-send_delayed_chunk(#delayed_resp{}=DelayedResp, Chunk) ->
+
+send_delayed_chunk(#delayed_resp{buffer_response=false}=DelayedResp, Chunk) ->
     {ok, #delayed_resp{resp=Resp}=DelayedResp1} =
         start_delayed_response(DelayedResp),
     {ok, Resp} = send_chunk(Resp, Chunk),
-    {ok, DelayedResp1}.
+    {ok, DelayedResp1};
+
+send_delayed_chunk(#delayed_resp{buffer_response=true}=DelayedResp, Chunk) ->
+    #delayed_resp{chunks = Chunks} = DelayedResp,
+    {ok, DelayedResp#delayed_resp{chunks = [Chunk | Chunks]}}.
+
 
 send_delayed_last_chunk(Req) ->
     send_delayed_chunk(Req, []).
+
 
 send_delayed_error(#delayed_resp{req=Req,resp=nil}=DelayedResp, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
@@ -843,6 +858,7 @@ send_delayed_error(#delayed_resp{resp=Resp, req=Req}, Reason) ->
     log_error_with_stack_trace(Reason),
     throw({http_abort, Resp, Reason}).
 
+
 close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
     % Use a separate chunk to close the streamed array to maintain strict
     % compatibility with earlier versions. See COUCHDB-2724
@@ -851,10 +867,22 @@ close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
 close_delayed_json_object(Resp, Buffer, Terminator, _Threshold) ->
     send_delayed_chunk(Resp, [Buffer | Terminator]).
 
-end_delayed_json_response(#delayed_resp{}=DelayedResp) ->
+
+end_delayed_json_response(#delayed_resp{buffer_response=false}=DelayedResp) ->
     {ok, #delayed_resp{resp=Resp}} =
         start_delayed_response(DelayedResp),
-    end_json_response(Resp).
+    end_json_response(Resp);
+
+end_delayed_json_response(#delayed_resp{buffer_response=true}=DelayedResp) ->
+    #delayed_resp{
+        req = Req,
+        code = Code,
+        headers = Headers,
+        chunks = Chunks
+    } = DelayedResp,
+    {ok, Resp} = start_response_length(Req, Code, Headers, iolist_size(Chunks)),
+    send(Resp, lists:reverse(Chunks)).
+
 
 get_delayed_req(#delayed_resp{req=#httpd{mochi_req=MochiReq}}) ->
     MochiReq;
@@ -867,7 +895,7 @@ start_delayed_response(#delayed_resp{resp=nil}=DelayedResp) ->
         req=Req,
         code=Code,
         headers=Headers,
-        first_chunk=FirstChunk
+        chunks=[FirstChunk]
     }=DelayedResp,
     {ok, Resp} = StartFun(Req, Code, Headers),
     case FirstChunk of
@@ -877,6 +905,18 @@ start_delayed_response(#delayed_resp{resp=nil}=DelayedResp) ->
     {ok, DelayedResp#delayed_resp{resp=Resp}};
 start_delayed_response(#delayed_resp{}=DelayedResp) ->
     {ok, DelayedResp}.
+
+
+buffer_response(Req) ->
+    case chttpd:qs_value(Req, "buffer_response") of
+        "false" ->
+            false;
+        "true" ->
+            true;
+        _ ->
+            config:get_boolean("chttpd", "buffer_response", false)
+    end.
+
 
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});
