@@ -1271,7 +1271,7 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
     send_json(Req, HttpCode,
         [{"Location", Loc},
         {"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
-        {[{ok, true}] ++ PartRes});
+        {PartRes});
 
 db_doc_req(Req, _Db, _DocId) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST,PUT,COPY").
