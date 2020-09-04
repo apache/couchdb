@@ -75,6 +75,7 @@ all_test_() ->
                     fun should_return_correct_id_on_doc_copy/1,
                     fun should_return_only_one_ok_on_doc_copy/1,
                     fun should_ignore_engine_parameter/1,
+                    fun should_return_only_one_ok_on_doc_copy/1,
                     fun should_succeed_on_all_docs_with_queries_keys/1,
                     fun should_succeed_on_all_docs_with_queries_limit_skip/1,
                     fun should_succeed_on_all_docs_with_multiple_queries/1,
