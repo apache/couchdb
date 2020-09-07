@@ -74,6 +74,7 @@ all_test_() ->
                     fun should_not_return_update_seq_when_unset_on_all_docs/1,
                     fun should_return_correct_id_on_doc_copy/1,
                     fun should_ignore_engine_parameter/1,
+                    fun should_return_only_one_ok_on_doc_copy/1,
                     fun should_succeed_on_all_docs_with_queries_keys/1,
                     fun should_succeed_on_all_docs_with_queries_limit_skip/1,
                     fun should_succeed_on_all_docs_with_multiple_queries/1,
@@ -268,6 +269,17 @@ should_return_correct_id_on_doc_copy(Url) ->
         ]
     end)}.
 
+should_return_only_one_ok_on_doc_copy(Url) ->
+    {timeout, ?TIMEOUT, ?_test(begin
+       {ok, _, _, _} = create_doc(Url, "testdoc"),
+       {_, _, _, ResultBody} = test_request:copy(Url ++ "/testdoc",
+           [?CONTENT_JSON, ?AUTH, ?DESTHEADER1]),
+       {ResultJson} = jiffy:decode(ResultBody),
+       NumOks = length(lists:filter(fun({Key, Value}) -> Key == <<"ok">> end, ResultJson)),
+       [
+           ?assertEqual(1, NumOks)
+       ]
+    end)}.
 
 attachment_doc() ->
     {ok, Data} = file:read_file(?FIXTURE_TXT),
