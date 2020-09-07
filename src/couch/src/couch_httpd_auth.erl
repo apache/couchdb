@@ -497,6 +497,7 @@ same_site() ->
     case string:to_lower(SameSite) of
         "" -> [];
         "none" -> [{same_site, none}];
+        "none_secure" -> [{same_site, none}, secure];
         "lax" -> [{same_site, lax}];
         "strict" -> [{same_site, strict}];
         _ ->
