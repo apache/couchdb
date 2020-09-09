@@ -293,7 +293,8 @@ wait(Subs, State, Timeout) when is_list(Subs),
 set_type_timeout(Type, Timeout) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(JTx) ->
         couch_jobs_fdb:set_type_timeout(JTx, Type, Timeout)
-    end).
+    end),
+    ok = couch_jobs_server:force_check_types().
 
 
 -spec clear_type_timeout(job_type()) -> ok.
