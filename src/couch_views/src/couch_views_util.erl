@@ -286,7 +286,9 @@ active_tasks_info(ChangesDone, DbName, DDocId, LastSeq, DBSeq) ->
         <<"changes_done">> => ChangesDone,
         <<"design_document">> => DDocId,
         <<"current_version_stamp">> => convert_seq_to_stamp(LastSeq),
-        <<"db_version_stamp">> => convert_seq_to_stamp(DBSeq)
+        <<"db_version_stamp">> => convert_seq_to_stamp(DBSeq),
+        <<"node">> => erlang:atom_to_binary(node(), utf8),
+        <<"pid">> => list_to_binary(pid_to_list(self()))
     }.
 
 
