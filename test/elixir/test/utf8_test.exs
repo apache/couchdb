@@ -29,7 +29,7 @@ defmodule UTF8Test do
 
     texts
     |> Enum.with_index()
-    |> Enum.each(fn {string, index} ->
+    |> Enum.each(fn {_, index} ->
       resp = Couch.get("/#{db_name}/#{index}")
       %{"_id" => id, "text" => text} = resp.body
       assert resp.status_code == 200

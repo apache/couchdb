@@ -22,7 +22,7 @@ import time
 
 import requests
 
-COUCH_URL = "https://couchdb-vm2.apache.org/ci_errorlogs"
+COUCH_URL = "https://logs.couchdb.org/ci_errorlogs"
 TARFILE = "couchlog.tar.gz"
 
 

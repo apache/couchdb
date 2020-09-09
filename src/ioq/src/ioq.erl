@@ -45,7 +45,7 @@ call(Fd, Msg, Metadata) ->
     Priority = io_class(Msg, Metadata),
     case bypass(Priority) of
         true ->
-            gen_server:call(Fd, Msg);
+            gen_server:call(Fd, Msg, infinity);
         false ->
             queued_call(Fd, Msg, Priority)
     end.

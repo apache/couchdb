@@ -43,7 +43,8 @@ cookie_test_() ->
             fun({ok, Url, ContentType, Payload, _}) ->
                 [
                     should_set_cookie_domain(Url, ContentType, Payload),
-                    should_not_set_cookie_domain(Url, ContentType, Payload)
+                    should_not_set_cookie_domain(Url, ContentType, Payload),
+                    should_delete_cookie_domain(Url, ContentType, Payload)
                 ]
             end
         }
@@ -66,4 +67,14 @@ should_not_set_cookie_domain(Url, ContentType, Payload) ->
         ?assertEqual(200, Code),
         Cookie = proplists:get_value("Set-Cookie", Headers),
         ?assertEqual(0, string:str(Cookie, "; Domain="))
+    end).
+
+should_delete_cookie_domain(Url, ContentType, Payload) ->
+    ?_test(begin
+        ok = config:set("couch_httpd_auth", "cookie_domain",
+            "example.com", false),
+        {ok, Code, Headers, _} = test_request:delete(Url, ContentType, Payload),
+        ?assertEqual(200, Code),
+        Cookie = proplists:get_value("Set-Cookie", Headers),
+        ?assert(string:str(Cookie, "; Domain=example.com") > 0)
     end).

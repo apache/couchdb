@@ -457,6 +457,9 @@ pending_jobs(Count) when is_integer(Count), Count > 0 ->
     [Job || {_Started, Job} <- gb_sets:to_list(Set1)].
 
 
+pending_fold(#job{pid = Pid}, Acc) when is_pid(Pid) ->
+    Acc;
+
 pending_fold(Job, {Set, Now, Count, HealthThreshold}) ->
     Set1 = case {not_recently_crashed(Job, Now, HealthThreshold),
         gb_sets:size(Set) >= Count} of
@@ -1052,6 +1055,7 @@ scheduler_test_() ->
             [
                 t_pending_jobs_simple(),
                 t_pending_jobs_skip_crashed(),
+                t_pending_jobs_skip_running(),
                 t_one_job_starts(),
                 t_no_jobs_start_if_max_is_0(),
                 t_one_job_starts_if_max_is_1(),
@@ -1110,6 +1114,18 @@ t_pending_jobs_skip_crashed() ->
         ?assertEqual([Job2], pending_jobs(1)),
         ?assertEqual([Job2, Job3], pending_jobs(2)),
         ?assertEqual([Job2, Job3], pending_jobs(3))
+    end).
+
+
+t_pending_jobs_skip_running() ->
+   ?_test(begin
+        Job1 = continuous(1),
+        Job2 = continuous_running(2),
+        Job3 = oneshot(3),
+        Job4 = oneshot_running(4),
+        Jobs = [Job1, Job2, Job3, Job4],
+        setup_jobs(Jobs),
+        ?assertEqual([Job1, Job3], pending_jobs(4))
     end).
 
 

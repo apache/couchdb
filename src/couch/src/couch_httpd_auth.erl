@@ -31,6 +31,8 @@
 -export([cookie_auth_cookie/4, cookie_scheme/1]).
 -export([maybe_value/3]).
 
+-export([jwt_authentication_handler/1]).
+
 -import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
 
 -compile({no_auto_import,[integer_to_binary/1, integer_to_binary/2]}).
@@ -186,6 +188,42 @@ proxy_auth_user(Req) ->
             end
     end.
 
+jwt_authentication_handler(Req) ->
+    case header_value(Req, "Authorization") of
+        "Bearer " ++ Jwt ->
+            RequiredClaims = get_configured_claims(),
+            case jwtf:decode(?l2b(Jwt), [alg | RequiredClaims], fun jwtf_keystore:get/2) of
+                {ok, {Claims}} ->
+                    case lists:keyfind(<<"sub">>, 1, Claims) of
+                        false -> throw({unauthorized, <<"Token missing sub claim.">>});
+                        {_, User} -> Req#httpd{user_ctx=#user_ctx{
+                            name = User,
+                            roles = couch_util:get_value(?l2b(config:get("jwt_auth", "roles_claim_name", "_couchdb.roles")), Claims, [])
+                        }}
+                    end;
+                {error, Reason} ->
+                    throw(Reason)
+            end;
+        _ -> Req
+    end.
+
+get_configured_claims() ->
+    Claims = config:get("jwt_auth", "required_claims", ""),
+    Re = "((?<key1>[a-z]+)|{(?<key2>[a-z]+)\s*,\s*\"(?<val>[^\"]+)\"})",
+    case re:run(Claims, Re, [global, {capture,  [key1, key2, val], binary}]) of
+        nomatch when Claims /= "" ->
+            couch_log:error("[jwt_auth] required_claims is set to an invalid value.", []),
+            throw({misconfigured_server, <<"JWT is not configured correctly">>});
+        nomatch ->
+            [];
+        {match, Matches} ->
+            lists:map(fun to_claim/1, Matches)
+    end.
+
+to_claim([Key, <<>>, <<>>]) ->
+    binary_to_atom(Key, latin1);
+to_claim([<<>>, Key, Value]) ->
+    {binary_to_atom(Key, latin1), Value}.
 
 cookie_authentication_handler(Req) ->
     cookie_authentication_handler(Req, couch_auth_cache).
@@ -366,7 +404,8 @@ handle_session_req(#httpd{method='GET', user_ctx=UserCtx}=Req, _AuthModule) ->
     end;
 % logout by deleting the session
 handle_session_req(#httpd{method='DELETE'}=Req, _AuthModule) ->
-    Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)),
+    Cookie = mochiweb_cookies:cookie("AuthSession", "", [{path, "/"}] ++
+        cookie_domain() ++ cookie_scheme(Req)),
     {Code, Headers} = case couch_httpd:qs_value(Req, "next", nil) of
         nil ->
             {200, [Cookie]};

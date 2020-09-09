@@ -262,7 +262,7 @@ sync_config(Section, Key, Value) ->
         ok ->
             ok;
         error ->
-            log:error("~p sync_admin results ~p errors ~p",
+            couch_log:error("~p sync_admin results ~p errors ~p",
                 [?MODULE, Results, Errors]),
             Reason = "Cluster setup unable to sync admin passwords",
             throw({setup_error, Reason})

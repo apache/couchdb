@@ -10,7 +10,9 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.design_docs = function(debug) {
+  return console.log('done in test/elixir/test/design_docs.exs');
   var db_name = get_random_db_name();
   var db_name_a = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});

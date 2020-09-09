@@ -10,10 +10,18 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-#ifndef COUCH_JS_UTF_8_H
-#define COUCH_JS_UTF_8_H
+#ifndef COUCH_JS_HTTP_H
+#define COUCH_JS_HTTP_H
 
-char* enc_string(JSContext* cx, JS::Value arg, size_t* buflen);
-JSString* dec_string(JSContext* cx, const char* buf, size_t buflen);
+#include "util.h"
+
+void http_check_enabled();
+bool http_ctor(JSContext* cx, JSObject* req);
+void http_dtor(JSFreeOp* fop, JSObject* req);
+bool http_open(JSContext* cx, JSObject* req, JS::Value mth, JS::Value url, JS::Value snc);
+bool http_set_hdr(JSContext* cx, JSObject* req, JS::Value name, JS::Value val);
+bool http_send(JSContext* cx, JSObject* req, JS::Value body);
+int http_status(JSContext* cx, JSObject* req);
+bool http_uri(JSContext* cx, JSObject *req, couch_args* args, JS::Value* uri);
 
 #endif

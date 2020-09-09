@@ -15,6 +15,8 @@
 .erlfdb/
 .eunit/
 cover/
+core
+debian/
 log
 apache-couchdb-*/
 bin/
@@ -126,6 +128,7 @@ src/mango/ebin/
 src/mango/test/*.pyc
 src/mango/nosetests.xml
 src/mango/venv/
+src/jwtf/.rebar3/
 test/javascript/junit.xml
 
 /_build/

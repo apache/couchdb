@@ -307,6 +307,10 @@ class UsersDbTests(unittest.TestCase):
         klass.db = Database("_users")
         user_docs.setup_users(klass.db)
 
+    @classmethod
+    def tearDownClass(klass):
+        user_docs.teardown_users(klass.db)
+
     def setUp(self):
         self.db = self.__class__.db
 
@@ -316,6 +320,10 @@ class DbPerClass(unittest.TestCase):
     def setUpClass(klass):
         klass.db = Database(random_db_name())
         klass.db.create(q=1, n=1)
+
+    @classmethod
+    def tearDownClass(klass):
+        klass.db.delete()
 
     def setUp(self):
         self.db = self.__class__.db

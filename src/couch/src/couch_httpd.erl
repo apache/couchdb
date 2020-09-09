@@ -931,6 +931,8 @@ error_info({error, {illegal_database_name, Name}}) ->
     {400, <<"illegal_database_name">>, Message};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
+error_info({misconfigured_server, Reason}) ->
+    {500, <<"misconfigured_server">>, couch_util:to_binary(Reason)};
 error_info({Error, Reason}) ->
     {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
 error_info(Error) ->

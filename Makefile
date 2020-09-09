@@ -149,6 +149,7 @@ fauxton: share/www
 .PHONY: check-all-tests
 # target: check - Test everything
 check-all-tests: all python-black
+	@$(MAKE) emilio
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
@@ -223,7 +224,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run src/mango src/docs
+		build-aux/*.py dev/run test/javascript/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -231,7 +232,7 @@ python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run src/mango src/docs
+		build-aux/*.py dev/run test/javascript/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
@@ -275,7 +276,9 @@ elixir-credo: elixir-init
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
 javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-javascript: devclean
+javascript:
+
+	@$(MAKE) devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
@@ -495,7 +498,7 @@ endif
 # target: devclean - Remove dev cluster artifacts
 devclean:
 	@rm -rf dev/lib/*/data
-
+	@rm -rf dev/lib/*/etc
 
 ################################################################################
 # Misc

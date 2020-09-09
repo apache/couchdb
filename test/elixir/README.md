@@ -42,34 +42,35 @@ X means done, - means partially
   - [X] Port conflicts.js
   - [X] Port cookie_auth.js
   - [X] Port copy_doc.js
-  - [ ] Port design_docs.js
-  - [ ] Port design_options.js
-  - [ ] Port design_paths.js
+  - [X] Port design_docs.js
+  - [X] Port design_docs_query.js
+  - [X] Port design_options.js
+  - [X] Port design_paths.js
   - [X] Port erlang_views.js
   - [X] Port etags_head.js
   - [ ] ~~Port etags_views.js~~ (skipped in js test suite)
   - [X] Port form_submit.js
-  - [ ] Port http.js
+  - [X] Port http.js
   - [X] Port invalid_docids.js
-  - [ ] Port jsonp.js
+  - [X] Port jsonp.js
   - [X] Port large_docs.js
   - [ ] Port list_views.js
   - [X] Port lorem_b64.txt
   - [X] Port lorem.txt
   - [X] Port lots_of_docs.js
-  - [ ] Port method_override.js
+  - [X] Port method_override.js
   - [X] Port multiple_rows.js
-  - [ ] Port proxyauth.js
-  - [ ] Port purge.js
-  - [ ] Port reader_acl.js
-  - [ ] Port recreate_doc.js
+  - [X] Port proxyauth.js
+  - [X] Port purge.js
+  - [X] Port reader_acl.js
+  - [X] Port recreate_doc.js
   - [X] Port reduce_builtin.js
   - [X] Port reduce_false.js
-  - [ ] Port reduce_false_temp.js
+  - [ ] ~~Port reduce_false_temp.js~~
   - [X] Port reduce.js
   - [X] Port replication.js
-  - [ ] Port replicator_db_bad_rep_id.js
-  - [ ] Port replicator_db_by_doc_id.js
+  - [X] Port replicator_db_bad_rep_id.js
+  - [X] Port replicator_db_by_doc_id.js
   - [ ] Port replicator_db_compact_rep_db.js
   - [ ] Port replicator_db_continuous.js
   - [ ] Port replicator_db_credential_delegation.js
@@ -86,30 +87,30 @@ X means done, - means partially
   - [ ] Port replicator_db_update_security.js
   - [ ] Port replicator_db_user_ctx.js
   - [ ] Port replicator_db_write_auth.js
-  - [ ] Port rev_stemming.js
+  - [X] Port rev_stemming.js
   - [X] Port rewrite.js
   - [ ] Port rewrite_js.js
   - [X] Port security_validation.js
   - [ ] Port show_documents.js
   - [ ] Port stats.js
-  - [ ] Port update_documents.js
+  - [X] Port update_documents.js
   - [X] Port users_db.js
   - [ ] Port users_db_security.js
   - [X] Port utf8.js
   - [X] Port uuids.js
   - [X] Port view_collation.js
-  - [ ] Port view_collation_raw.js
-  - [ ] Port view_compaction.js
+  - [X] Port view_collation_raw.js
+  - [X] Port view_compaction.js
   - [ ] Port view_conflicts.js
   - [ ] Port view_errors.js
   - [ ] Port view_include_docs.js
-  - [ ] Port view_multi_key_all_docs.js
-  - [ ] Port view_multi_key_design.js
-  - [ ] Port view_multi_key_temp.js
-  - [ ] Port view_offsets.js
-  - [ ] Port view_pagination.js
-  - [ ] Port view_sandboxing.js
-  - [ ] Port view_update_seq.js
+  - [X] Port view_multi_key_all_docs.js
+  - [X] Port view_multi_key_design.js
+  - [ ] ~~Port view_multi_key_temp.js~~
+  - [X] Port view_offsets.js
+  - [X] Port view_pagination.js
+  - [X] Port view_sandboxing.js
+  - [X] Port view_update_seq.js
 
 # Using ExUnit to write unit tests
 
@@ -119,8 +120,8 @@ Bellow we present a few use cases where code-generation is really helpful.
 
 ## How to write ExUnit tests
 
-1. Create new file in test/exunit/ directory (the file name should match *_test.exs)
-2. In case it is a first file in the directory create test_helper.exs (look at src/couch/test/exunit/test_helper.exs to get an idea)
+1. Create new file in test/exunit/ directory (the file name should match `*_test.exs`)
+2. In case it is a first file in the directory create `test_helper.exs` (look at `src/couch/test/exunit/test_helper.exs` to get an idea)
 3. define test module which does `use Couch.Test.ExUnit.Case`
 4. Define test cases in the module
 

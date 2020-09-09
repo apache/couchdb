@@ -59,6 +59,10 @@ def setup_users(db, **kwargs):
     db.save_docs(copy.deepcopy(USERS_DOCS))
 
 
+def teardown_users(db):
+    [db.delete_doc(doc["_id"]) for doc in USERS_DOCS]
+
+
 def setup(db, index_type="view", **kwargs):
     db.recreate()
     if index_type == "view":

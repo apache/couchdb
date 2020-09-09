@@ -259,16 +259,7 @@ set_partitioned(Db, State) ->
     DbPartitioned = couch_db:is_partitioned(Db),
     ViewPartitioned = couch_util:get_value(
             <<"partitioned">>, DesignOpts, DbPartitioned),
-    IsPartitioned = case {DbPartitioned, ViewPartitioned} of
-        {true, true} ->
-            true;
-        {true, false} ->
-            false;
-        {false, false} ->
-            false;
-        _ ->
-            throw({bad_request, <<"invalid partition option">>})
-    end,
+    IsPartitioned = DbPartitioned andalso ViewPartitioned,
     State#mrst{partitioned = IsPartitioned}.
 
 

@@ -421,7 +421,7 @@ match({[{<<"$not">>, Arg}]}, Value, Cmp) ->
     not match(Arg, Value, Cmp);
 
 match({[{<<"$all">>, []}]}, _, _) ->
-    true;
+    false;
 % All of the values in Args must exist in Values or
 % Values == hd(Args) if Args is a single element list
 % that contains a list.
@@ -506,7 +506,7 @@ match({[{<<"$gt">>, Arg}]}, Value, Cmp) ->
     Cmp(Value, Arg) > 0;
 
 match({[{<<"$in">>, []}]}, _, _) ->
-    true;
+    false;
 match({[{<<"$in">>, Args}]}, Values, Cmp) when is_list(Values)->
     Pred = fun(Arg) ->
         lists:foldl(fun(Value,Match) ->

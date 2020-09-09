@@ -33,7 +33,7 @@ mkdir couchdb
 cp ${WORKSPACE}/apache-couchdb-*.tar.gz couchdb
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz -C couchdb
 cd couchdb-pkg
-make ${platform} PLATFORM=${platform}
+make
 '''
 
 cleanup_and_save = '''
@@ -417,6 +417,50 @@ pipeline {
           } // post
         } // stage
 
+        stage('Ubuntu Focal') {
+          agent {
+            docker {
+              image 'couchdbdev/ubuntu-focal-erlang-20.3.8.25-1:latest'
+              label 'docker'
+              alwaysPull true
+              args "${DOCKER_ARGS}"
+            }
+          }
+          environment {
+            platform = 'focal'
+            sm_ver = '68'
+          }
+          stages {
+            stage('Build from tarball & test') {
+              steps {
+                unstash 'tarball'
+                sh( script: build_and_test )
+              }
+              post {
+                always {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+                }
+              }
+            }
+            stage('Build CouchDB packages') {
+              steps {
+                sh( script: make_packages )
+                sh( script: cleanup_and_save )
+              }
+              post {
+                success {
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
+                }
+              }
+            }
+          } // stages
+          post {
+            cleanup {
+              sh 'rm -rf ${WORKSPACE}/*'
+            }
+          } // post
+        } // stage
+
         stage('Debian Stretch') {
           agent {
             docker {
@@ -683,12 +727,12 @@ pipeline {
           unstash 'tarball'
           unarchive mapping: ['pkgs/' : '.']
 
-          echo 'Retrieving & cleaning current couchdb-vm2 tree...'
+          echo 'Retrieving & cleaning current repo-nightly tree...'
           sh '''
-            rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@couchdb-vm2.apache.org:/var/www/html/$BRANCH_NAME . || mkdir -p $BRANCH_NAME
+            rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@repo-nightly.couchdb.org:/var/www/html/$BRANCH_NAME . || mkdir -p $BRANCH_NAME
             rm -rf $BRANCH_NAME/debian/* $BRANCH_NAME/el6/* $BRANCH_NAME/el7/* $BRANCH_NAME/el8/*
             mkdir -p $BRANCH_NAME/debian $BRANCH_NAME/el6 $BRANCH_NAME/el7 $BRANCH_NAME/el8 $BRANCH_NAME/source
-            rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@couchdb-vm2.apache.org:/var/www/html/js .
+            rsync -avz -e "ssh -o StrictHostKeyChecking=no -i $KEY" jenkins@repo-nightly.couchdb.org:/var/www/html/js .
           '''
 
           echo 'Building Debian repo...'
@@ -697,11 +741,12 @@ pipeline {
             cp js/debian-stretch/*.deb pkgs/stretch
             reprepro -b couchdb-pkg/repo includedeb stretch pkgs/stretch/*.deb
             cp js/debian-buster/*.deb pkgs/stretch
-            reprepro -b couchdb-pkg/repo includedeb stretch pkgs/buster/*.deb
+            reprepro -b couchdb-pkg/repo includedeb buster pkgs/buster/*.deb
             cp js/ubuntu-xenial/*.deb pkgs/xenial
             reprepro -b couchdb-pkg/repo includedeb xenial pkgs/xenial/*.deb
             cp js/ubuntu-bionic/*.deb pkgs/bionic
             reprepro -b couchdb-pkg/repo includedeb bionic pkgs/bionic/*.deb
+            reprepro -b couchdb-pkg/repo includedeb focal pkgs/focal/*.deb
           '''
 
           echo 'Building CentOS repos...'
@@ -727,9 +772,9 @@ pipeline {
             cd ../..
           '''
 
-          echo 'rsyncing tree to couchdb-vm2...'
+          echo 'rsyncing tree to repo-nightly...'
           sh '''
-            rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no -i $KEY" $BRANCH_NAME jenkins@couchdb-vm2.apache.org:/var/www/html
+            rsync -avz --delete -e "ssh -o StrictHostKeyChecking=no -i $KEY" $BRANCH_NAME jenkins@repo-nightly.couchdb.org:/var/www/html
             rm -rf $BRANCH_NAME couchdb-pkg *.tar.gz
           '''
         } // withCredentials
