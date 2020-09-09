@@ -13,15 +13,22 @@
 {application, fabric, [
     {description, "Routing and proxying layer for CouchDB cluster"},
     {vsn, git},
-    {registered, []},
+    {mod, {fabric2_app, []}},
+    {registered, [
+        fabric_server
+    ]},
     {applications, [
         kernel,
         stdlib,
         config,
+        couch_epi,
         couch,
+        ctrace,
         rexi,
         mem3,
         couch_log,
-        couch_stats
+        couch_stats,
+        erlfdb,
+        aegis
     ]}
 ]}.

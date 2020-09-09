@@ -11,12 +11,15 @@
 % the License.
 
 -module(couch_lru).
--export([new/0, insert/2, update/2, close/1]).
+-export([new/0, sizes/1, insert/2, update/2, close/1]).
 
 -include("couch_server_int.hrl").
 
 new() ->
     {gb_trees:empty(), dict:new()}.
+
+sizes({Tree, Dict}) ->
+    {gb_trees:size(Tree), dict:size(Dict)}.
 
 insert(DbName, {Tree0, Dict0}) ->
     Lru = couch_util:unique_monotonic_integer(),

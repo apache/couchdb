@@ -21,7 +21,7 @@
 
 % gen_server callbacks
 -export([init/1, terminate/2]).
--export([handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
+-export([handle_call/3, handle_cast/2, code_change/3, handle_info/2, format_status/2]).
 
 -record(q, {
     queue = queue:new(),
@@ -49,7 +49,7 @@ queue(Wq, Item) ->
 dequeue(Wq) ->
     dequeue(Wq, all).
 
-    
+
 dequeue(Wq, MaxItems) ->
     try
         gen_server:call(Wq, {dequeue, MaxItems}, infinity)
@@ -76,7 +76,7 @@ size(Wq) ->
 
 close(Wq) ->
     gen_server:cast(Wq, close).
-    
+
 
 init(Options) ->
     Q = #q{
@@ -90,7 +90,7 @@ init(Options) ->
 terminate(_Reason, #q{work_waiters=Workers}) ->
     lists:foreach(fun({W, _}) -> gen_server:reply(W, closed) end, Workers).
 
-    
+
 handle_call({queue, Item, Size}, From, #q{work_waiters = []} = Q0) ->
     Q = Q0#q{size = Q0#q.size + Size,
                 items = Q0#q.items + 1,
@@ -172,7 +172,7 @@ dequeue_items(NumItems, Size, Queue, Blocked, DequeuedAcc) ->
     end,
     dequeue_items(
         NumItems - 1, Size - ItemSize, Queue2, Blocked2, [Item | DequeuedAcc]).
-    
+
 
 handle_cast(close, #q{items = 0} = Q) ->
     {stop, normal, Q};
@@ -186,3 +186,18 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_info(X, Q) ->
     {stop, X, Q}.
+
+format_status(_Opt, [_PDict, Queue]) ->
+    #q{
+        queue = Q,
+        blocked = Blocked,
+        work_waiters = Waiters
+    } = Queue,
+    Scrubbed = Queue#q{
+        queue = {queue_length, queue:len(Q)},
+        blocked = {length, length(Blocked)},
+        work_waiters = {length, length(Waiters)}
+    },
+    [{data, [{"State",
+        ?record_to_keyval(q, Scrubbed)
+    }]}].

@@ -81,7 +81,9 @@
     conflicts,
     callback,
     sorted = true,
-    extra = []
+    extra = [],
+    page_size = undefined,
+    bookmark=nil
 }).
 
 -record(vacc, {
@@ -95,7 +97,9 @@
     bufsize = 0,
     threshold = 1490,
     row_sent = false,
-    meta_sent = false
+    meta_sent = false,
+    paginated = false,
+    meta = #{}
 }).
 
 -record(lacc, {

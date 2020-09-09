@@ -27,7 +27,8 @@
     handle_cast/2,
     handle_info/2,
     code_change/3,
-    terminate/2
+    terminate/2,
+    format_status/2
 ]).
 
 
@@ -87,6 +88,20 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+format_status(_Opt, [_PDict, State]) ->
+    #st{
+        descriptions=Descs,
+        stats=Stats,
+        collect_timer=CollectT,
+        reload_timer=ReloadT
+    } = State,
+    [{data, [{"State", [
+        {descriptions, {set_size, sets:size(Descs)}},
+        {stats, {length, length(Stats)}},
+        {collect_timer,CollectT},
+        {reload_timer,ReloadT}
+    ]}]}].
 
 comparison_set(Metrics) ->
     sets:from_list(

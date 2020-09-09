@@ -18,7 +18,7 @@
 -export([open/2,create/2,delete/2,get_version/0,get_version/1,get_git_sha/0,get_uuid/0]).
 -export([all_databases/0, all_databases/2]).
 -export([init/1, handle_call/3,sup_start_link/0]).
--export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
+-export([handle_cast/2,code_change/3,handle_info/2,terminate/2,format_status/2]).
 -export([dev_start/0,is_admin/2,has_admins/0,get_stats/0]).
 -export([close_lru/0]).
 -export([close_db_if_idle/1]).
@@ -237,12 +237,6 @@ init([]) ->
     couch_util:set_mqd_off_heap(?MODULE),
     couch_util:set_process_priority(?MODULE, high),
 
-    % Mark pluggable storage engines as a supported feature
-    config:enable_feature('pluggable-storage-engines'),
-
-    % Mark partitioned databases as a supported feature
-    config:enable_feature(partitioned),
-
     % Mark being able to receive documents with an _access property as a supported feature
     config:enable_feature('access-ready'),
 
@@ -303,6 +297,10 @@ terminate(Reason, Srv) ->
         end
     end, nil, couch_dbs),
     ok.
+
+format_status(_Opt, [_PDict, Srv]) ->
+    Scrubbed = Srv#server{lru=couch_lru:sizes(Srv#server.lru)},
+    [{data, [{"State", ?record_to_keyval(server, Scrubbed)}]}].
 
 handle_config_change("couchdb", "database_dir", _, _, _) ->
     exit(whereis(couch_server), config_change),

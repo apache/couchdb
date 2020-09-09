@@ -15,7 +15,8 @@
 -export([
     url_handler/2,
     db_handler/2,
-    design_handler/2
+    design_handler/2,
+    handler_info/1
 ]).
 
 -define(SERVICE_ID, chttpd_handlers).
@@ -34,6 +35,26 @@ db_handler(HandlerKey, DefaultFun) ->
 
 design_handler(HandlerKey, DefaultFun) ->
     select(collect(design_handler, [HandlerKey]), DefaultFun).
+
+handler_info(HttpReq) ->
+    #httpd{
+        method = Method,
+        path_parts = PathParts
+    } = HttpReq,
+    Default = {'unknown.unknown', #{}},
+    try
+        select(collect(handler_info, [Method, PathParts, HttpReq]), Default)
+    catch Type:Reason ->
+        Stack = erlang:get_stacktrace(),
+        couch_log:error("~s :: handler_info failure for ~p : ~p:~p :: ~p", [
+                ?MODULE,
+                get(nonce),
+                Type,
+                Reason,
+                Stack
+            ]),
+        Default
+    end.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

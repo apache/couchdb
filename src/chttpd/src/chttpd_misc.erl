@@ -15,6 +15,7 @@
 -export([
     handle_all_dbs_req/1,
     handle_dbs_info_req/1,
+    handle_deleted_dbs_req/1,
     handle_favicon_req/1,
     handle_favicon_req/2,
     handle_replicate_req/1,
@@ -113,22 +114,27 @@ maybe_add_csp_headers(Headers, _) ->
     Headers.
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
-    Args = couch_mrview_http:parse_params(Req, undefined),
-    ShardDbName = config:get("mem3", "shards_db", "_dbs"),
-    %% shard_db is not sharded but mem3:shards treats it as an edge case
-    %% so it can be pushed thru fabric
-    {ok, Info} = fabric:get_db_info(ShardDbName),
-    Etag = couch_httpd:make_etag({Info}),
-    Options = [{user_ctx, Req#httpd.user_ctx}],
-    {ok, Resp} = chttpd:etag_respond(Req, Etag, fun() ->
-        {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"ETag",Etag}]),
-        VAcc = #vacc{req=Req,resp=Resp},
-        fabric:all_docs(ShardDbName, Options, fun all_dbs_callback/2, VAcc, Args)
-    end),
-    case is_record(Resp, vacc) of
-        true -> {ok, Resp#vacc.resp};
-        _ -> {ok, Resp}
-    end;
+    #mrargs{
+        start_key = StartKey,
+        end_key = EndKey,
+        direction = Dir,
+        limit = Limit,
+        skip = Skip
+    } = couch_mrview_http:parse_params(Req, undefined),
+
+    Options = [
+        {start_key, StartKey},
+        {end_key, EndKey},
+        {dir, Dir},
+        {limit, Limit},
+        {skip, Skip}
+    ],
+
+    {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, []),
+    Callback = fun all_dbs_callback/2,
+    Acc = #vacc{req=Req,resp=Resp},
+    {ok, Acc1} = fabric2_db:list_dbs(Callback, Acc, Options),
+    {ok, Acc1#vacc.resp};
 handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
@@ -137,12 +143,9 @@ all_dbs_callback({meta, _Meta}, #vacc{resp=Resp0}=Acc) ->
     {ok, Acc#vacc{resp=Resp1}};
 all_dbs_callback({row, Row}, #vacc{resp=Resp0}=Acc) ->
     Prepend = couch_mrview_http:prepend_val(Acc),
-    case couch_util:get_value(id, Row) of <<"_design", _/binary>> ->
-        {ok, Acc};
-    DbName ->
-        {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
-        {ok, Acc#vacc{prepend=",", resp=Resp1}}
-    end;
+    DbName = couch_util:get_value(id, Row),
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
+    {ok, Acc#vacc{prepend=",", resp=Resp1}};
 all_dbs_callback(complete, #vacc{resp=Resp0}=Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "]"),
     {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
@@ -151,7 +154,10 @@ all_dbs_callback({error, Reason}, #vacc{resp=Resp0}=Acc) ->
     {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
     {ok, Acc#vacc{resp=Resp1}}.
 
-handle_dbs_info_req(#httpd{method='POST'}=Req) ->
+handle_dbs_info_req(#httpd{method = 'GET'} = Req) ->
+    ok = chttpd:verify_is_server_admin(Req),
+    send_db_infos(Req, list_dbs_info);
+handle_dbs_info_req(#httpd{method='POST', user_ctx=UserCtx}=Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = chttpd:json_body_obj(Req),
     Keys = couch_mrview_util:get_view_keys(Props),
@@ -168,35 +174,134 @@ handle_dbs_info_req(#httpd{method='POST'}=Req) ->
     {ok, Resp} = chttpd:start_json_response(Req, 200),
     send_chunk(Resp, "["),
     lists:foldl(fun(DbName, AccSeparator) ->
-        case catch fabric:get_db_info(DbName) of
-            {ok, Result} ->
-                Json = ?JSON_ENCODE({[{key, DbName}, {info, {Result}}]}),
-                send_chunk(Resp, AccSeparator ++ Json);
-            _ ->
-                Json = ?JSON_ENCODE({[{key, DbName}, {error, not_found}]}),
-                send_chunk(Resp, AccSeparator ++ Json)
+        try
+            {ok, Db} = fabric2_db:open(DbName, [{user_ctx, UserCtx}]),
+            {ok, Info} = fabric2_db:get_db_info(Db),
+            Json = ?JSON_ENCODE({[{key, DbName}, {info, {Info}}]}),
+            send_chunk(Resp, AccSeparator ++ Json)
+        catch error:database_does_not_exist ->
+            ErrJson = ?JSON_ENCODE({[{key, DbName}, {error, not_found}]}),
+            send_chunk(Resp, AccSeparator ++ ErrJson)
         end,
         "," % AccSeparator now has a comma
     end, "", Keys),
     send_chunk(Resp, "]"),
     chttpd:end_json_response(Resp);
 handle_dbs_info_req(Req) ->
-    send_method_not_allowed(Req, "POST").
+    send_method_not_allowed(Req, "GET,HEAD,POST").
+
+handle_deleted_dbs_req(#httpd{method='GET', path_parts=[_]}=Req) ->
+    ok = chttpd:verify_is_server_admin(Req),
+    send_db_infos(Req, list_deleted_dbs_info);
+handle_deleted_dbs_req(#httpd{method='POST', user_ctx=Ctx, path_parts=[_]}=Req) ->
+    couch_httpd:verify_is_server_admin(Req),
+    chttpd:validate_ctype(Req, "application/json"),
+    GetJSON = fun(Key, Props, Default) ->
+        case couch_util:get_value(Key, Props) of
+            undefined when Default == error ->
+                Fmt = "POST body must include `~s` parameter.",
+                Msg = io_lib:format(Fmt, [Key]),
+                throw({bad_request, iolist_to_binary(Msg)});
+            undefined ->
+                Default;
+            Value ->
+                Value
+        end
+    end,
+    {BodyProps} = chttpd:json_body_obj(Req),
+    {UndeleteProps} = GetJSON(<<"undelete">>, BodyProps, error),
+    DbName = GetJSON(<<"source">>, UndeleteProps, error),
+    TimeStamp = GetJSON(<<"timestamp">>, UndeleteProps, error),
+    TgtDbName = GetJSON(<<"target">>, UndeleteProps, DbName),
+    case fabric2_db:undelete(DbName, TgtDbName, TimeStamp, [{user_ctx, Ctx}]) of
+        ok ->
+            send_json(Req, 200, {[{ok, true}]});
+        {error, file_exists} ->
+            chttpd:send_error(Req, file_exists);
+        {error, not_found} ->
+            chttpd:send_error(Req, not_found);
+        Error ->
+            throw(Error)
+    end;
+handle_deleted_dbs_req(#httpd{path_parts = PP}=Req) when length(PP) == 1 ->
+    send_method_not_allowed(Req, "GET,HEAD,POST");
+handle_deleted_dbs_req(#httpd{method='DELETE', user_ctx=Ctx, path_parts=[_, DbName]}=Req) ->
+    couch_httpd:verify_is_server_admin(Req),
+    TS = case ?JSON_DECODE(couch_httpd:qs_value(Req, "timestamp", "null")) of
+        null ->
+            throw({bad_request, "`timestamp` parameter is not provided."});
+        TS0 ->
+            TS0
+    end,
+    case fabric2_db:delete(DbName, [{user_ctx, Ctx}, {deleted_at, TS}]) of
+        ok ->
+            send_json(Req, 200, {[{ok, true}]});
+        {error, not_found} ->
+            chttpd:send_error(Req, not_found);
+        Error ->
+            throw(Error)
+    end;
+handle_deleted_dbs_req(#httpd{path_parts = PP}=Req) when length(PP) == 2 ->
+    send_method_not_allowed(Req, "HEAD,DELETE");
+handle_deleted_dbs_req(Req) ->
+    chttpd:send_error(Req, not_found).
+
+send_db_infos(Req, ListFunctionName) ->
+    #mrargs{
+        start_key = StartKey,
+        end_key = EndKey,
+        direction = Dir,
+        limit = Limit,
+        skip = Skip
+    } = couch_mrview_http:parse_params(Req, undefined),
+
+    Options = [
+        {start_key, StartKey},
+        {end_key, EndKey},
+        {dir, Dir},
+        {limit, Limit},
+        {skip, Skip}
+    ],
+
+    % TODO: Figure out if we can't calculate a valid
+    % ETag for this request. \xFFmetadataVersion won't
+    % work as we don't bump versions on size changes
+
+    {ok, Resp1} = chttpd:start_delayed_json_response(Req, 200, []),
+    Callback = fun dbs_info_callback/2,
+    Acc = #vacc{req = Req, resp = Resp1},
+    {ok, Resp2} = fabric2_db:ListFunctionName(Callback, Acc, Options),
+    case is_record(Resp2, vacc) of
+        true -> {ok, Resp2#vacc.resp};
+        _ -> {ok, Resp2}
+    end.
+
+dbs_info_callback({meta, _Meta}, #vacc{resp = Resp0} = Acc) ->
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
+    {ok, Acc#vacc{resp = Resp1}};
+dbs_info_callback({row, Props}, #vacc{resp = Resp0} = Acc) ->
+    Prepend = couch_mrview_http:prepend_val(Acc),
+    Chunk = [Prepend, ?JSON_ENCODE({Props})],
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
+    {ok, Acc#vacc{prepend = ",", resp = Resp1}};
+dbs_info_callback(complete, #vacc{resp = Resp0} = Acc) ->
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "]"),
+    {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
+    {ok, Acc#vacc{resp = Resp2}};
+dbs_info_callback({error, Reason}, #vacc{resp = Resp0} = Acc) ->
+    {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
+    {ok, Acc#vacc{resp = Resp1}}.
 
 handle_task_status_req(#httpd{method='GET'}=Req) ->
     ok = chttpd:verify_is_server_admin(Req),
-    {Replies, _BadNodes} = gen_server:multi_call(couch_task_status, all),
-    Response = lists:flatmap(fun({Node, Tasks}) ->
-        [{[{node,Node} | Task]} || Task <- Tasks]
-    end, Replies),
-    send_json(Req, lists:sort(Response));
+    ActiveTasks = fabric2_active_tasks:get_active_tasks(),
+    send_json(Req, ActiveTasks);
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
+handle_replicate_req(#httpd{method='POST', user_ctx=Ctx, req_body=PostBody} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     %% see HACK in chttpd.erl about replication
-    PostBody = get(post_body),
     case replicate(PostBody, Ctx) of
         {ok, {continuous, RepId}} ->
             send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});
@@ -279,12 +384,11 @@ handle_up_req(#httpd{method='GET'} = Req) ->
     "nolb" ->
         send_json(Req, 404, {[{status, nolb}]});
     _ ->
-        {ok, {Status}} = mem3_seeds:get_status(),
-        case couch_util:get_value(status, Status) of
-            ok ->
-                send_json(Req, 200, {Status});
-            seeding ->
-                send_json(Req, 404, {Status})
+        try
+            fabric2_db:list_dbs([{limit, 0}]),
+            send_json(Req, 200, {[{status, ok}]})
+        catch error:{timeout, _} ->
+            send_json(Req, 404, {[{status, backend_unavailable}]})
         end
     end;
 

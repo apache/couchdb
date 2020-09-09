@@ -144,9 +144,11 @@ fauxton: share/www
 ################################################################################
 
 
-.PHONY: check
+# When we can run all the tests with FDB switch this back to be the default
+# "make check" command
+.PHONY: check-all-tests
 # target: check - Test everything
-check: all python-black
+check-all-tests: all python-black
 	@$(MAKE) emilio
 	@$(MAKE) eunit
 	@$(MAKE) javascript
@@ -158,6 +160,14 @@ subdirs = $(apps)
 else
 subdirs=$(shell ls src)
 endif
+
+.PHONY: check
+check:  all
+	@$(MAKE) emilio
+	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango,chttpd
+	make elixir tests=test/elixir/test/basics_test.exs,test/elixir/test/replication_test.exs,test/elixir/test/map_test.exs,test/elixir/test/all_docs_test.exs,test/elixir/test/bulk_docs_test.exs
+	make exunit apps=couch_rate,chttpd
+	make mango-test
 
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
@@ -179,6 +189,7 @@ exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell pwd)/src
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
 	@mix test --cover --trace $(EXUNIT_OPTS)
 
@@ -200,7 +211,7 @@ soak-eunit: couch
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
 emilio:
-	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3
+	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3 || exit 0
 
 .venv/bin/black:
 	@python3 -m venv .venv
@@ -227,10 +238,25 @@ python-black-update: .venv/bin/black
 elixir: export MIX_ENV=integration
 elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 \
+	@dev/run "$(TEST_OPTS)" \
+		-a adm:pass \
+		-n 1 \
 		--enable-erlang-views \
 		--locald-config test/elixir/test/config/test-config.ini \
-		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+		--erlang-config rel/files/eunit.config \
+		--no-eval \
+		'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+
+.PHONY: elixir-only
+elixir-only: devclean
+	@dev/run "$(TEST_OPTS)" \
+		-a adm:pass \
+		-n 1 \
+		--enable-erlang-views \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--erlang-config rel/files/eunit.config \
+		--no-eval \
+		'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
@@ -348,7 +374,7 @@ mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \
 		.venv/bin/python3 -m pip install -r requirements.txt
-	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose --with-xunit'
+	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=adm:pass --erlang-config=rel/files/eunit.config '.venv/bin/python3 -m nose -v --with-xunit'
 
 ################################################################################
 # Developing

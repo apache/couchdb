@@ -21,7 +21,7 @@ start_couch() ->
     start_couch(?CONFIG_CHAIN).
 
 start_couch(IniFiles) ->
-    test_util:start_couch(IniFiles, [chttpd]).
+    test_util:start_couch(IniFiles, [couch_js, couch_views, chttpd]).
 
 stop_couch(Ctx) ->
     test_util:stop_couch(Ctx).

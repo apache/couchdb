@@ -16,6 +16,7 @@
     name,
     type,
     def,
-    partitioned,
-    opts
+    opts,
+    build_status,
+    interactive
 }).

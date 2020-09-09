@@ -19,6 +19,12 @@ defmodule BasicsTest do
     assert Couch.get("/").body["couchdb"] == "Welcome", "Should say welcome"
   end
 
+  test "Ready endpoint" do
+    resp = Couch.get("/_up")
+    assert resp.status_code == 200
+    assert resp.body["status"] == "ok"
+  end
+
   @tag :with_db
   test "PUT on existing DB should return 412 instead of 500", context do
     db_name = context[:db_name]
@@ -44,6 +50,13 @@ defmodule BasicsTest do
     msg = "Should return Location header for new db"
     assert String.ends_with?(resp.headers["location"], db_name), msg
     {:ok, _} = delete_db(db_name)
+  end
+
+  test "Exceeding configured DB name size limit returns an error" do
+    db_name = String.duplicate("x", 239)
+    resp = Couch.put("/#{db_name}")
+    assert resp.status_code == 400
+    assert resp.body["error"] == "database_name_too_long"
   end
 
   @tag :with_db
@@ -101,7 +114,7 @@ defmodule BasicsTest do
     db_name = context[:db_name]
     {:ok, _} = create_doc(db_name, sample_doc_foo())
     resp = Couch.get("/#{db_name}/foo", query: %{:local_seq => true})
-    assert resp.body["_local_seq"] == 1, "Local seq value == 1"
+    assert is_binary(resp.body["_local_seq"]), "Local seq value is a binary"
   end
 
   @tag :with_db
@@ -179,21 +192,33 @@ defmodule BasicsTest do
 
     assert Couch.get("/#{db_name}").body["doc_count"] == 8
 
+    # Disabling until we figure out reduce functions
+    # # Test reduce function
+    # resp = Couch.get("/#{db_name}/_design/bar/_view/baz")
+    # assert hd(resp.body["rows"])["value"] == 33
+
     # Test reduce function
-    resp = Couch.get("/#{db_name}/_design/bar/_view/baz")
-    assert hd(resp.body["rows"])["value"] == 33
+    resp = Couch.get("/#{db_name}/_design/bar/_view/baz", query: %{:reduce => false})
+    assert resp.body["total_rows"] == 3
 
     # Delete doc and test for updated view results
     doc0 = Couch.get("/#{db_name}/0").body
     assert Couch.delete("/#{db_name}/0?rev=#{doc0["_rev"]}").body["ok"]
 
-    retry_until(fn ->
-      Couch.get("/#{db_name}/_design/foo/_view/baz").body["total_rows"] == 2
-    end)
+    # Disabling until we figure out reduce functions
+    # retry_until(fn ->
+    #  Couch.get("/#{db_name}/_design/foo/_view/baz").body["total_rows"] == 2
+    # end)
+
+    resp = Couch.get("/#{db_name}/_design/bar/_view/baz", query: %{:reduce => false})
+    assert resp.body["total_rows"] == 2
 
     assert Couch.get("/#{db_name}").body["doc_count"] == 7
     assert Couch.get("/#{db_name}/0").status_code == 404
-    refute Couch.get("/#{db_name}/0?rev=#{doc0["_rev"]}").status_code == 404
+
+    # No longer true. Old revisions are not stored after
+    # an update.
+    # refute Couch.get("/#{db_name}/0?rev=#{doc0["_rev"]}").status_code == 404
   end
 
   @tag :with_db
@@ -304,5 +329,193 @@ defmodule BasicsTest do
        _context do
     # TODO
     assert true
+  end
+
+  @tag :with_db
+  test "_all_docs/queries works", context do
+    db_name = context[:db_name]
+
+    resp = Couch.post("/#{db_name}/_all_docs/queries", body: %{:queries => []})
+    assert resp.status_code == 200
+    assert resp.body["results"] == []
+
+    assert Couch.put("/#{db_name}/doc1", body: %{:a => 1}).body["ok"]
+
+    body = %{
+        :queries => [
+            %{:limit => 1},
+            %{:limit => 0}
+        ]
+    }
+    resp = Couch.post("/#{db_name}/_all_docs/queries", body: body)
+    assert resp.status_code == 200
+
+    assert Map.has_key?(resp.body, "results")
+    results = Enum.sort(resp.body["results"])
+    assert length(results) == 2
+    [res1, res2] = results
+
+    assert res1 == %{"offset" => :null, "rows" => [], "total_rows" => 1}
+
+    assert res2["offset"] == :null
+    assert res2["total_rows"] == 1
+    rows = res2["rows"]
+
+    assert length(rows) == 1
+    [row] = rows
+    assert row["id"] == "doc1"
+    assert row["key"] == "doc1"
+
+    val = row["value"]
+    assert Map.has_key?(val, "rev")
+  end
+
+  @tag :with_db
+  test "_design_docs works", context do
+    db_name = context[:db_name]
+    body = %{:a => 1}
+
+    resp = Couch.get("/#{db_name}/_design_docs")
+    assert resp.status_code == 200
+    assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 0}
+
+    assert Couch.put("/#{db_name}/doc1", body: body).body["ok"]
+
+    # Make sure regular documents didn't get picked up
+    resp = Couch.get("/#{db_name}/_design_docs")
+    assert resp.status_code == 200
+    assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 0}
+
+    # Add _design/doc1
+    assert Couch.put("/#{db_name}/_design/doc1", body: body).body["ok"]
+    resp = Couch.get("/#{db_name}/_design_docs")
+    assert resp.status_code == 200
+    assert resp.body["total_rows"] == 1
+    [row] = resp.body["rows"]
+
+    assert row["id"] == "_design/doc1"
+    assert row["key"] == "_design/doc1"
+
+    val = row["value"]
+    assert Map.has_key?(val, "rev")
+
+    # Add _design/doc5
+    assert Couch.put("/#{db_name}/_design/doc5", body: body).body["ok"]
+    resp = Couch.get("/#{db_name}/_design_docs")
+    assert resp.status_code == 200
+    [row1, row2] = resp.body["rows"]
+    assert row1["id"] == "_design/doc1"
+    assert row2["id"] == "_design/doc5"
+
+    # descending=true
+    resp = Couch.get("/#{db_name}/_design_docs?descending=true")
+    assert resp.status_code == 200
+    [row1, row2] = resp.body["rows"]
+    assert row1["id"] == "_design/doc5"
+    assert row2["id"] == "_design/doc1"
+
+    # start_key=doc2
+    resp = Couch.get("/#{db_name}/_design_docs?start_key=\"_design/doc2\"")
+    assert resp.status_code == 200
+    [row] = resp.body["rows"]
+    assert row["id"] == "_design/doc5"
+
+    # end_key=doc2
+    resp = Couch.get("/#{db_name}/_design_docs?end_key=\"_design/doc2\"")
+    assert resp.status_code == 200
+    [row] = resp.body["rows"]
+    assert row["id"] == "_design/doc1"
+
+    # inclusive_end=false
+    qstr = "start_key=\"_design/doc2\"&end_key=\"_design/doc5\"&inclusive_end=false"
+    resp = Couch.get("/#{db_name}/_design_docs?" <> qstr)
+    assert resp.status_code == 200
+    assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 2}
+
+    # update_seq=true
+    resp = Couch.get("/#{db_name}/_design_docs?update_seq=true")
+    assert resp.status_code == 200
+    assert Map.has_key?(resp.body, "update_seq")
+  end
+
+  @tag :with_db
+  test "_local_docs works", context do
+    db_name = context[:db_name]
+    body = %{:a => 1}
+
+    resp = Couch.get("/#{db_name}/_local_docs")
+    assert resp.status_code == 200
+    assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 0}
+
+    # Add _local/doc1
+    assert Couch.put("/#{db_name}/_local/doc1", body: body).body["ok"]
+    resp = Couch.get("/#{db_name}/_local_docs")
+    assert resp.status_code == 200
+    assert resp.body["total_rows"] == 1
+    [row] = resp.body["rows"]
+
+    assert row["id"] == "_local/doc1"
+    assert row["key"] == "_local/doc1"
+
+    val = row["value"]
+    assert Map.has_key?(val, "rev")
+
+    # Add _local/doc5
+    # Use a body > 100Kb to tests local docs chunkifier
+    body = %{:b => String.duplicate("b", 110_000)}
+    assert Couch.put("/#{db_name}/_local/doc5", body: body).body["ok"]
+    resp = Couch.get("/#{db_name}/_local_docs")
+    assert resp.status_code == 200
+    [row1, row2] = resp.body["rows"]
+    assert row1["id"] == "_local/doc1"
+    assert row2["id"] == "_local/doc5"
+
+    # descending=true
+    resp = Couch.get("/#{db_name}/_local_docs?descending=true")
+    assert resp.status_code == 200
+    [row1, row2] = resp.body["rows"]
+    assert row1["id"] == "_local/doc5"
+    assert row2["id"] == "_local/doc1"
+
+    # start_key=doc2
+    resp = Couch.get("/#{db_name}/_local_docs?start_key=\"_local/doc2\"")
+    assert resp.status_code == 200
+    [row] = resp.body["rows"]
+    assert row["id"] == "_local/doc5"
+
+    # end_key=doc2
+    resp = Couch.get("/#{db_name}/_local_docs?end_key=\"_local/doc2\"")
+    assert resp.status_code == 200
+    [row] = resp.body["rows"]
+    assert row["id"] == "_local/doc1"
+
+    # inclusive_end=false
+    qstr = "start_key=\"_local/doc2\"&end_key=\"_local/doc5\"&inclusive_end=false"
+    resp = Couch.get("/#{db_name}/_local_docs?" <> qstr)
+    assert resp.status_code == 200
+    assert resp.body == %{"offset" => :null, "rows" => [], "total_rows" => 2}
+
+    # update_seq=true
+    resp = Couch.get("/#{db_name}/_local_docs?update_seq=true")
+    assert resp.status_code == 200
+    assert Map.has_key?(resp.body, "update_seq")
+  end
+
+  @tag :with_db
+  test "Check _revs_limit", context do
+    db_name = context[:db_name]
+
+    resp = Couch.get("/#{db_name}/_revs_limit")
+    assert resp.status_code == 200
+    assert resp.body == 1000
+
+    body = "999"
+    resp = Couch.put("/#{db_name}/_revs_limit", body: "999")
+    assert resp.status_code == 200
+    assert resp.body["ok"] == true
+
+    resp = Couch.get("/#{db_name}/_revs_limit")
+    assert resp.status_code == 200
+    assert resp.body == 999
   end
 end
