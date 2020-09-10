@@ -2,6 +2,7 @@ defmodule ViewPaginationTest do
   use CouchTestCase
 
   @moduletag :view_pagination
+  @moduletag kind: :single_node
 
   @moduledoc """
   Integration tests for pagination.

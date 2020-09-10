@@ -2,6 +2,7 @@ defmodule HttpTest do
   use CouchTestCase
 
   @moduletag :http
+  @moduletag kind: :single_node
 
   @tag :with_db
   test "location header", context do

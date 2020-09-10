@@ -2,6 +2,7 @@ defmodule ProxyAuthTest do
   use CouchTestCase
 
   @moduletag :authentication
+  @moduletag kind: :single_node
 
   @tag :with_db
   test "proxy auth with secret", context do

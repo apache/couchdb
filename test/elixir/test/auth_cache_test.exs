@@ -2,6 +2,7 @@ defmodule AuthCacheTest do
   use CouchTestCase
 
   @moduletag :authentication
+  @moduletag kind: :single_node
 
   @tag :pending
   @tag :with_db

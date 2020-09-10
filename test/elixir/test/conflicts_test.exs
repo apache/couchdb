@@ -2,6 +2,7 @@ defmodule RevisionTest do
   use CouchTestCase
 
   @moduletag :conflicts
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB conflicts

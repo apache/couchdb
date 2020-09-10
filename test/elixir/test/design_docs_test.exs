@@ -2,6 +2,7 @@ defmodule DesignDocsTest do
   use CouchTestCase
 
   @moduletag :design_docs
+  @moduletag kind: :single_node
 
   @design_doc %{
     _id: "_design/test",

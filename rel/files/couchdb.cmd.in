@@ -31,6 +31,7 @@ IF NOT DEFINED COUCHDB_FAUXTON_DOCROOT SET COUCHDB_FAUXTON_DOCROOT={{fauxton_roo
 
 "%BINDIR%\erl" -boot "%ROOTDIR%\releases\%APP_VSN%\couchdb" ^
 -args_file "%ROOTDIR%\etc\vm.args" ^
+-epmd "%BINDIR%\epmd.exe" ^
 -config "%ROOTDIR%\releases\%APP_VSN%\sys.config" %*
 
 :: EXIT /B

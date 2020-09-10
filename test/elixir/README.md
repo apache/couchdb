@@ -104,9 +104,9 @@ X means done, - means partially
   - [ ] Port view_conflicts.js
   - [ ] Port view_errors.js
   - [ ] Port view_include_docs.js
-  - [ ] Port view_multi_key_all_docs.js
-  - [ ] Port view_multi_key_design.js
-  - [ ] Port view_multi_key_temp.js
+  - [X] Port view_multi_key_all_docs.js
+  - [X] Port view_multi_key_design.js
+  - [ ] ~~Port view_multi_key_temp.js~~
   - [X] Port view_offsets.js
   - [X] Port view_pagination.js
   - [X] Port view_sandboxing.js

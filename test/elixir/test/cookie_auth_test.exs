@@ -2,6 +2,7 @@ defmodule CookieAuthTest do
   use CouchTestCase
 
   @moduletag :authentication
+  @moduletag kind: :single_node
 
   @users_db "_users"
 

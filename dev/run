@@ -427,7 +427,10 @@ def boot_haproxy(ctx):
 def hack_default_ini(ctx, node, contents):
 
     contents = re.sub(
-        "^\[httpd\]$", "[httpd]\nenable = true", contents, flags=re.MULTILINE,
+        "^\[httpd\]$",
+        "[httpd]\nenable = true",
+        contents,
+        flags=re.MULTILINE,
     )
 
     if ctx["enable_erlang_views"]:

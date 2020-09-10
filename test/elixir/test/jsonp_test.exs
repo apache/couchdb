@@ -2,6 +2,7 @@ defmodule JsonpTest do
   use CouchTestCase
 
   @moduletag :jsonp
+  @moduletag kind: :single_node
 
   @tag :with_db
   test "jsonp not configured callbacks", context do

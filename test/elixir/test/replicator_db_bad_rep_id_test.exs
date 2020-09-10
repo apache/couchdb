@@ -5,6 +5,9 @@ defmodule ReplicationBadIdTest do
   This is a port of the replicator_db_bad_rep_id.js suite
   """
 
+  @moduletag :replication
+  @moduletag kind: :cluster
+
   @docs [
     %{
       _id: "foo1",

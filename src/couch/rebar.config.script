@@ -123,12 +123,12 @@ end.
     {unix, _} when SMVsn == "60" ->
         {
             "-DXP_UNIX -I/usr/include/mozjs-60 -I/usr/local/include/mozjs-60 -std=c++14 -Wno-invalid-offsetof",
-            "-L/usr/local/lib -std=c++14 -lmozjs-60 -lm"
+            "-L/usr/local/lib -std=c++14 -lmozjs-60 -lm -lstdc++"
         };
     {unix, _} when SMVsn == "68" ->
         {
             "-DXP_UNIX -I/usr/include/mozjs-68 -I/usr/local/include/mozjs-68 -std=c++14 -Wno-invalid-offsetof",
-            "-L/usr/local/lib -std=c++14 -lmozjs-68 -lm"
+            "-L/usr/local/lib -std=c++14 -lmozjs-68 -lm -lstdc++"
         }
 end.
 

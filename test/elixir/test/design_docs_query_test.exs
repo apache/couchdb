@@ -2,6 +2,7 @@ defmodule DesignDocsQueryTest do
   use CouchTestCase
 
   @moduletag :design_docs
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB /{db}/_design_docs

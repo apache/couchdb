@@ -2,6 +2,7 @@ defmodule ErlangViewsTest do
   use CouchTestCase
 
   @moduletag :erlang_views
+  @moduletag kind: :single_node
 
   @moduledoc """
   basic 'smoke tests' of erlang views.

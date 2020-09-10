@@ -37,6 +37,20 @@ defmodule SearchTest do
     assert Map.has_key?(resp.body, "ok") == true
   end
 
+  def create_invalid_ddoc(db_name, opts \\ %{}) do
+    invalid_ddoc = %{
+      :indexes => [
+        %{"name" => "foo",  "ddoc" => "bar", "type" => "text"},
+      ]
+    }
+
+    ddoc = Enum.into(opts, invalid_ddoc)
+
+    resp = Couch.put("/#{db_name}/_design/search", body: ddoc)
+    assert resp.status_code in [201, 202]
+    assert Map.has_key?(resp.body, "ok") == true
+  end
+
   def get_items (resp) do
     %{:body => %{"rows" => rows}} = resp
     Enum.map(rows, fn row -> row["doc"]["item"] end)
@@ -197,5 +211,16 @@ defmodule SearchTest do
     assert resp.status_code == 200
     ids = get_items(resp)
     assert Enum.sort(ids) == ["apple"]
+  end
+
+  @tag :with_db
+  test "clean up search index with invalid design document", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+    create_invalid_ddoc(db_name)
+
+    resp = Couch.post("/#{db_name}/_search_cleanup")
+    assert resp.status_code in [201, 202]
   end
 end

@@ -2,6 +2,7 @@ defmodule MethodOverrideTest do
   use CouchTestCase
 
   @moduletag :http
+  @moduletag kind: :single_node
 
   @moduledoc """
    Allow broken HTTP clients to fake a full method vocabulary with an

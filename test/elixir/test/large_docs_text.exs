@@ -2,6 +2,8 @@ defmodule LargeDocsTest do
   use CouchTestCase
 
   @moduletag :large_docs
+  @moduletag kind: :single_node
+
   @long_string "0123456789\n"
 
   @moduledoc """

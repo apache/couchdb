@@ -6,6 +6,8 @@ defmodule ViewCollationRawTest do
   This is a port of the view_collation_raw.js suite
   """
 
+  @moduletag kind: :single_node
+
   @values [
     # Then numbers
     1,

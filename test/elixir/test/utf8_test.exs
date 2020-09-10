@@ -2,6 +2,7 @@ defmodule UTF8Test do
   use CouchTestCase
 
   @moduletag :utf8
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB UTF8 support

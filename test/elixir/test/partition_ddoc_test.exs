@@ -4,6 +4,9 @@ defmodule PartitionDDocTest do
   @moduledoc """
   Test partition design doc interactions
   """
+  
+  @moduletag :partition
+  @moduletag kind: :cluster
 
   setup do
     db_name = random_db_name()
