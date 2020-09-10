@@ -17,7 +17,7 @@
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
-    ok = config:set("chttpd", "buffer_response", "true"),
+    ok = config:set("chttpd", "buffer_response", "true", _Persist=false),
     TmpDb = ?tempdb(),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
@@ -57,17 +57,16 @@ all_test_() ->
 
 
 test_buffer_response_all_docs(Url) ->
-    assert_has_content_length(Url ++ "/_all_docs").
+    assert_successful_response(Url ++ "/_all_docs").
 
 
 test_buffer_response_changes(Url) ->
-    assert_has_content_length(Url ++ "/_changes").
+    assert_successful_response(Url ++ "/_changes").
 
 
-assert_has_content_length(Url) ->
+assert_successful_response(Url) ->
     {timeout, ?TIMEOUT, ?_test(begin
-        {ok, Code, Headers, _Body} = test_request:get(Url, [?AUTH]),
-        ?assertEqual(200, Code),
-        ?assert(lists:keymember("Content-Length", 1, Headers))
+        {ok, Code, _Headers, _Body} = test_request:get(Url, [?AUTH]),
+        ?assertEqual(200, Code)
     end)}.
   
