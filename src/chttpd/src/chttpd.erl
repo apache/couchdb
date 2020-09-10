@@ -855,13 +855,18 @@ end_delayed_json_response(#delayed_resp{buffer_response=false}=DelayedResp) ->
 
 end_delayed_json_response(#delayed_resp{buffer_response=true}=DelayedResp) ->
     #delayed_resp{
+        start_fun = StartFun,
         req = Req,
         code = Code,
         headers = Headers,
         chunks = Chunks
     } = DelayedResp,
-    {ok, Resp} = start_response_length(Req, Code, Headers, iolist_size(Chunks)),
-    send(Resp, lists:reverse(Chunks)).
+    {ok, Resp} = StartFun(Req, Code, Headers),
+    lists:foreach(fun
+        ([]) -> ok;
+        (Chunk) -> send_chunk(Resp, Chunk)
+    end, lists:reverse(Chunks)),
+    end_json_response(Resp).
 
 
 get_delayed_req(#delayed_resp{req=#httpd{mochi_req=MochiReq}}) ->
