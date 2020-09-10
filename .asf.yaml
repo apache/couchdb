@@ -1,0 +1,32 @@
+# see https://cwiki.apache.org/confluence/display/INFRA/git+-+.asf.yaml+features#git.asf.yamlfeatures-GitHubsettings
+
+github:
+  description: "Seamless multi-master syncing database with an intuitive HTTP/JSON API, designed for reliability"
+  homepage: https://couchdb.apache.org/
+  labels:
+    - database
+    - content
+    - network-server
+    - http
+    - cloud
+    - erlang
+    - javascript
+    - couchdb
+    - big-data
+    - network-client
+  features:
+    issues: true
+    projects: true
+  enabled_merge_buttons:
+    squash: true
+    rebase: true
+    merge: false
+
+notifications:
+  commits: commits@couchdb.apache.org
+  issues: notifications@couchdb.apache.org
+  pullrequests: notifications@couchdb.apache.org
+  # This would send new/closed PR notifications to dev@
+  #pullrequests_status: dev@couchdb.apache.org
+  # This would send individual PR comments/reviews to notifications@
+  #pullrequests_comment: notifications@couchdb.apache.org
