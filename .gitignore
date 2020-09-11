@@ -1,4 +1,5 @@
 *.o
+*.asc
 *.sha256
 *.sha512
 *.snap

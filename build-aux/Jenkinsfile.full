@@ -180,7 +180,7 @@ pipeline {
                 ./configure --with-curl --spidermonkey-version 60
                 make check || (build-aux/logfile-uploader.py && false)
 
-                # No package build for macOS at this time because of notarization
+                # No package build for macOS at this time
               '''
             } // withEnv
           } // steps
@@ -593,6 +593,10 @@ pipeline {
           } // post
         } // stage
 
+/*
+
+  - Removed 2020.09.15 - VMs are offline
+
         stage('Debian Buster ppc64le') {
           agent {
             docker {
@@ -636,6 +640,7 @@ pipeline {
             }
           } // post
         } // stage
+*/
 
 	/*
 	 * Example of how to do a qemu-based run, please leave here
