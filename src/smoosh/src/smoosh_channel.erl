@@ -293,7 +293,7 @@ start_compact(State, Db) ->
 
 maybe_remonitor_cpid(State, DbName, Reason) when is_binary(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
-    case couch_db:get_compactor_pid(Db) of
+    case couch_db:get_compactor_pid_sync(Db) of
         nil ->
             couch_log:warning("exit for compaction of ~p: ~p",
                 [smoosh_utils:stringify(DbName), Reason]),
