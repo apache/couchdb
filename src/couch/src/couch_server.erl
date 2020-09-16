@@ -240,6 +240,16 @@ init([]) ->
     % Mark being able to receive documents with an _access property as a supported feature
     config:enable_feature('access-ready'),
 
+    % Mark if fips is enabled
+    case
+        erlang:function_exported(crypto, info_fips, 0) andalso
+          crypto:info_fips() == enabled of
+        true ->
+            config:enable_feature('fips');
+        false ->
+            ok
+    end,
+
     % read config and register for configuration changes
 
     % just stop if one of the config settings change. couch_server_sup
@@ -379,10 +389,13 @@ maybe_close_lru_db(#server{lru=Lru}=Server) ->
     end.
 
 open_async(Server, From, DbName, Options) ->
+    NoLRUServer = Server#server{
+        lru = redacted
+    },
     Parent = self(),
     T0 = os:timestamp(),
     Opener = spawn_link(fun() ->
-        Res = open_async_int(Server, DbName, Options),
+        Res = open_async_int(NoLRUServer, DbName, Options),
         IsSuccess = case Res of
             {ok, _} -> true;
             _ -> false

@@ -112,7 +112,10 @@ base_args(#cursor{index = Idx} = Cursor) ->
         reduce = false,
         start_key = StartKey,
         end_key = EndKey,
-        include_docs = true
+        include_docs = true,
+        extra = [
+            {ignore_partition_query_limit, true}
+        ]
     }.
 
 

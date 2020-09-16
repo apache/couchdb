@@ -11,7 +11,9 @@
 // the License.
 
 // Allow broken HTTP clients to fake a full method vocabulary with an X-HTTP-METHOD-OVERRIDE header
+couchTests.elixir = true;
 couchTests.method_override = function(debug) {
+  return console.log('done in test/elixir/test/method_override_test.exs');
   var result = JSON.parse(CouchDB.request("GET", "/").responseText);
   T(result.couchdb == "Welcome");
 

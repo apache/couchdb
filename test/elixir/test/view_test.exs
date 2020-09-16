@@ -2,6 +2,7 @@ defmodule ViewTest do
   use CouchTestCase
 
   @moduletag :view
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB /{db}/_design/{ddoc}/_view/{view}

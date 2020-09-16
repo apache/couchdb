@@ -22,7 +22,7 @@ CopyIfDifferent = fun(Path, Contents) ->
         false ->
             file:write_file(Path, Contents)
     end
-end,
+end.
 
 
 CouchJSName = case os:type() of
@@ -30,21 +30,21 @@ CouchJSName = case os:type() of
         "couchjs.exe";
     _ ->
         "couchjs"
-end,
-CouchJSPath = filename:join(["priv", CouchJSName]),
+end.
+CouchJSPath = filename:join(["priv", CouchJSName]).
 Version = case os:getenv("COUCHDB_VERSION") of
     false ->
         string:strip(os:cmd("git describe --always"), right, $\n);
     Version0 ->
         string:strip(Version0, right)
-end,
+end.
 
 GitSha = case os:getenv("COUCHDB_GIT_SHA") of
     false ->
-        ""; % release builds won’t get a fallback
+        ""; % release builds won't get a fallback
     GitSha0 ->
         string:strip(GitSha0, right)
-end,
+end.
 
 CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
     true ->
@@ -59,6 +59,8 @@ SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
         "1.8.5";
     {_, "60"} ->
         "60";
+    {_, "68"} ->
+        "68";
     undefined ->
         "1.8.5";
     {_, Unsupported} ->
@@ -74,28 +76,28 @@ ConfigH = [
     {"JSSCRIPT_TYPE", "JSObject*"},
     {"COUCHJS_NAME", "\"" ++ CouchJSName++ "\""},
     {"PACKAGE", "\"apache-couchdb\""},
-    {"PACKAGE_BUGREPORT", "\"https://issues.apache.org/jira/browse/COUCHDB\""},
+    {"PACKAGE_BUGREPORT", "\"https://github.com/apache/couchdb/issues\""},
     {"PACKAGE_NAME", "\"Apache CouchDB\""},
     {"PACKAGE_STRING", "\"Apache CouchDB " ++ Version ++ "\""},
     {"PACKAGE_VERSION", "\"" ++ Version ++ "\""}
-],
+].
 
-CouchJSConfig = "priv/couch_js/" ++ SMVsn ++ "/config.h",
-ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH],
-ConfigBin = iolist_to_binary(ConfigSrc),
-ok = CopyIfDifferent(CouchJSConfig, ConfigBin),
+CouchJSConfig = "priv/couch_js/" ++ SMVsn ++ "/config.h".
+ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH].
+ConfigBin = iolist_to_binary(ConfigSrc).
+ok = CopyIfDifferent(CouchJSConfig, ConfigBin).
 
 MD5Config = case lists:keyfind(erlang_md5, 1, CouchConfig) of
     {erlang_md5, true} ->
         [{d, 'ERLANG_MD5', true}];
     _ ->
         []
-end,
+end.
 
 ProperConfig = case code:lib_dir(proper) of
     {error, bad_name} -> [];
     _ -> [{d, 'WITH_PROPER'}]
-end,
+end.
 
 {JS_CFLAGS, JS_LDFLAGS} = case os:type() of
     {win32, _} when SMVsn == "1.8.5" ->
@@ -120,8 +122,13 @@ end,
         };
     {unix, _} when SMVsn == "60" ->
         {
-            "-DXP_UNIX -I/usr/include/mozjs-60 -I/usr/local/include/mozjs-60 -std=c++14",
+            "-DXP_UNIX -I/usr/include/mozjs-60 -I/usr/local/include/mozjs-60 -std=c++14 -Wno-invalid-offsetof",
             "-L/usr/local/lib -std=c++14 -lmozjs-60 -lm -lstdc++"
+        };
+    {unix, _} when SMVsn == "68" ->
+        {
+            "-DXP_UNIX -I/usr/include/mozjs-68 -I/usr/local/include/mozjs-68 -std=c++14 -Wno-invalid-offsetof",
+            "-L/usr/local/lib -std=c++14 -lmozjs-68 -lm -lstdc++"
         }
 end.
 
@@ -146,11 +153,12 @@ end.
         end;
     _ ->
         {"", ""}
-end,
+end.
 
 CouchJSSrc = case SMVsn of
     "1.8.5" -> ["priv/couch_js/1.8.5/*.c"];
-    "60" -> ["priv/couch_js/60/*.cpp"]
+    "60" -> ["priv/couch_js/60/*.cpp"];
+    "68" -> ["priv/couch_js/68/*.cpp"]
 end.
 
 CouchJSEnv = case SMVsn of
@@ -159,26 +167,26 @@ CouchJSEnv = case SMVsn of
             {"CFLAGS", JS_CFLAGS ++ " " ++ CURL_CFLAGS},
             {"LDFLAGS", JS_LDFLAGS ++ " " ++ CURL_LDFLAGS}
         ];
-    "60" ->
+    _ ->
         [
             {"CXXFLAGS", JS_CFLAGS ++ " " ++ CURL_CFLAGS},
             {"LDFLAGS", JS_LDFLAGS ++ " " ++ CURL_LDFLAGS}
         ]
-end,
+end.
 
-IcuPath = "priv/couch_icu_driver.so",
-IcuSrc = ["priv/icu_driver/*.c"],
+IcuPath = "priv/couch_icu_driver.so".
+IcuSrc = ["priv/icu_driver/*.c"].
 IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
-          {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"}],
+          {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"}].
 IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include"},
-                {"LDFLAGS", "-L/usr/local/opt/icu4c/lib"}],
+                {"LDFLAGS", "-L/usr/local/opt/icu4c/lib"}].
 IcuBsdEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/include"},
-             {"LDFLAGS", "-L/usr/local/lib"}],
+             {"LDFLAGS", "-L/usr/local/lib"}].
 IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
-             {"LDFLAGS", "icuin.lib icudt.lib icuuc.lib"}],
+             {"LDFLAGS", "icuin.lib icudt.lib icuuc.lib"}].
 
-ComparePath = "priv/couch_ejson_compare.so",
-CompareSrc = ["priv/couch_ejson_compare/*.c"],
+ComparePath = "priv/couch_ejson_compare.so".
+CompareSrc = ["priv/couch_ejson_compare/*.c"].
 
 BaseSpecs = [
         %% couchjs
@@ -193,17 +201,17 @@ BaseSpecs = [
         {"linux",  ComparePath, CompareSrc, [{env, IcuEnv}]},
         {"bsd",   ComparePath, CompareSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
         {"win32",  ComparePath, CompareSrc, [{env, IcuWinEnv}]}
-],
+].
 
 SpawnSpec = [
     {"priv/couchspawnkillable", ["priv/spawnkillable/*.c"]}
-],
+].
 
 %% hack required until switch to enc/rebar3
 PortEnvOverrides = [
     {"win32", "EXE_LINK_CXX_TEMPLATE",
     "$LINKER $PORT_IN_FILES $LDFLAGS $EXE_LDFLAGS /OUT:$PORT_OUT_FILE"}
-],
+].
 
 PortSpecs = case os:type() of
     {win32, _} ->
@@ -213,10 +221,10 @@ PortSpecs = case os:type() of
         ok = CopyIfDifferent("priv/couchspawnkillable", CSK),
         os:cmd("chmod +x priv/couchspawnkillable"),
         BaseSpecs
-end,
+end.
 PlatformDefines = [
    {platform_define, "win32", 'WINDOWS'}
-],
+].
 AddConfig = [
     {port_specs, PortSpecs},
     {erl_opts, PlatformDefines ++ [

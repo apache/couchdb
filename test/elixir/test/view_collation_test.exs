@@ -6,6 +6,8 @@ defmodule ViewCollationTest do
   This is a port of the view_collation.js suite
   """
 
+  @moduletag kind: :single_node
+
   @values [
     # Special values sort before all other types
     :null,

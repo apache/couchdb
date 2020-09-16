@@ -2,6 +2,7 @@ defmodule FormSubmitTest do
   use CouchTestCase
 
   @moduletag :form_submit
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test that form submission is invalid

@@ -474,10 +474,22 @@ job_ejson(#{} = JobData) ->
 
 
 ejson_url(Url) when is_binary(Url) ->
-    list_to_binary(couch_util:url_strip_password(Url));
+    strip_url_creds(Url);
 
 ejson_url(null) ->
     null.
+
+
+-spec strip_url_creds(binary()) -> binary() | null.
+strip_url_creds(Url) ->
+    try
+        iolist_to_binary(couch_util:url_strip_password(Url))
+    catch
+        error:_ ->
+            % Avoid exposing any part of the URL in case there is a password in
+            % the malformed endpoint URL
+            null
+    end.
 
 
 -spec check_authorization(rep_id(), #user_ctx{}) -> ok | not_found.
@@ -543,6 +555,39 @@ t_replication_not_found() ->
 
 expect_job_data(JobDataRes) ->
     meck:expect(couch_replicator_jobs, get_job_data, 2, JobDataRes).
+
+
+strip_url_creds_test_() ->
+     {
+        setup,
+        fun() ->
+            meck:expect(config, get, fun(_, _, Default) -> Default end)
+        end,
+        fun(_) ->
+            meck:unload()
+        end,
+        [
+            t_strip_url_creds_errors()
+        ]
+    }.
+
+
+t_strip_url_creds_errors() ->
+    ?_test(begin
+        Bad1 = <<"http://adm:pass/bad">>,
+        ?assertEqual(null, strip_url_creds(Bad1)),
+        Bad2 = <<"more garbage">>,
+        ?assertEqual(null, strip_url_creds(Bad2)),
+        Bad3 = <<"http://a:b:c">>,
+        ?assertEqual(null, strip_url_creds(Bad3)),
+        Bad4 = <<"http://adm:pass:pass/bad">>,
+        ?assertEqual(null, strip_url_creds(Bad4)),
+        ?assertEqual(null, strip_url_creds(null)),
+        ?assertEqual(null, strip_url_creds(42)),
+        ?assertEqual(null, strip_url_creds([<<"a">>, <<"b">>])),
+        Bad5 = <<"http://adm:pass/bad">>,
+        ?assertEqual(null, strip_url_creds(Bad5))
+    end).
 
 
 -endif.

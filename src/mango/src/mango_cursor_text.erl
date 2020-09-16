@@ -43,7 +43,7 @@
 }).
 
 
-create(Db, Indexes, Selector, Opts0) ->
+create(Db, Indexes, Selector, Opts) ->
     Index = case Indexes of
         [Index0] ->
             Index0;
@@ -51,7 +51,7 @@ create(Db, Indexes, Selector, Opts0) ->
             ?MANGO_ERROR(multiple_text_indexes)
     end,
 
-    Opts = unpack_bookmark(couch_db:name(Db), Opts0),
+    Bookmark = unpack_bookmark(couch_db:name(Db), Opts),
 
     DreyfusLimit = get_dreyfus_limit(),
     Limit = erlang:min(DreyfusLimit, couch_util:get_value(limit, Opts, mango_opts:default_limit())),
@@ -66,7 +66,8 @@ create(Db, Indexes, Selector, Opts0) ->
         opts = Opts,
         limit = Limit,
         skip = Skip,
-        fields = Fields
+        fields = Fields,
+        bookmark = Bookmark
     }}.
 
 
@@ -89,7 +90,8 @@ execute(Cursor, UserFun, UserAcc) ->
         skip = Skip,
         selector = Selector,
         opts = Opts,
-        execution_stats = Stats
+        execution_stats = Stats,
+        bookmark = Bookmark
     } = Cursor,
     Query = mango_selector_text:convert(Selector),
     QueryArgs = #index_query_args{
@@ -102,7 +104,7 @@ execute(Cursor, UserFun, UserAcc) ->
         dbname = couch_db:name(Db),
         ddocid = ddocid(Idx),
         idx_name = mango_idx:name(Idx),
-        bookmark = get_bookmark(Opts),
+        bookmark = Bookmark,
         limit = Limit,
         skip = Skip,
         query_args = QueryArgs,
@@ -273,7 +275,7 @@ pack_bookmark(Bookmark) ->
 
 
 unpack_bookmark(DbName, Opts) ->
-    NewBM = case lists:keyfind(bookmark, 1, Opts) of
+    case lists:keyfind(bookmark, 1, Opts) of
         {_, nil} ->
             [];
         {_, Bin} ->
@@ -282,8 +284,7 @@ unpack_bookmark(DbName, Opts) ->
             catch _:_ ->
                 ?MANGO_ERROR({invalid_bookmark, Bin})
             end
-    end,
-    lists:keystore(bookmark, 1, Opts, {bookmark, NewBM}).
+    end.
 
 
 ddocid(Idx) ->

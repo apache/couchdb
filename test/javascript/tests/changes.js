@@ -9,15 +9,17 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-
+couchTests.elixir = true;
+ 
 function jsonp(obj) {
-  return console.log('done in test/elixir/test/changes_test.exs and changes_async_test.exs');
   T(jsonp_flag == 0);
   T(obj.results.length == 1 && obj.last_seq == 1, "jsonp");
   jsonp_flag = 1;
 }
 
 couchTests.changes = function(debug) {
+  return console.log('done in test/elixir/test/changes_test.exs and changes_async_test.exs');
+  
   var db;
   if (debug) debugger;
 

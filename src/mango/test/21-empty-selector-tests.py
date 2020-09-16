@@ -35,13 +35,31 @@ def make_empty_selector_suite(klass):
             docs = self.db.find({"age": 22, "$or": []})
             assert len(docs) == 1
 
+        def test_empty_array_in_with_age(self):
+            resp = self.db.find({"age": 22, "company": {"$in": []}}, explain=True)
+            self.assertEqual(resp["index"]["type"], klass.INDEX_TYPE)
+            docs = self.db.find({"age": 22, "company": {"$in": []}})
+            assert len(docs) == 0
+
         def test_empty_array_and_with_age(self):
-            resp = self.db.find(
-                {"age": 22, "$and": [{"b": {"$all": []}}]}, explain=True
-            )
+            resp = self.db.find({"age": 22, "$and": []}, explain=True)
             self.assertEqual(resp["index"]["type"], klass.INDEX_TYPE)
             docs = self.db.find({"age": 22, "$and": []})
             assert len(docs) == 1
+
+        def test_empty_array_all_age(self):
+            resp = self.db.find({"age": 22, "company": {"$all": []}}, explain=True)
+            self.assertEqual(resp["index"]["type"], klass.INDEX_TYPE)
+            docs = self.db.find({"age": 22, "company": {"$all": []}})
+            assert len(docs) == 0
+
+        def test_empty_array_nested_all_with_age(self):
+            resp = self.db.find(
+                {"age": 22, "$and": [{"company": {"$all": []}}]}, explain=True
+            )
+            self.assertEqual(resp["index"]["type"], klass.INDEX_TYPE)
+            docs = self.db.find({"age": 22, "$and": [{"company": {"$all": []}}]})
+            assert len(docs) == 0
 
         def test_empty_arrays_complex(self):
             resp = self.db.find({"$or": [], "a": {"$in": []}}, explain=True)

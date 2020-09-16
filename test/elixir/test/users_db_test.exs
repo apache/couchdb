@@ -2,6 +2,7 @@ defmodule UsersDbTest do
   use CouchTestCase
 
   @moduletag :authentication
+  @moduletag kind: :single_node
 
   @users_db_name "_users"
 
@@ -48,28 +49,6 @@ defmodule UsersDbTest do
   defp tear_down do
     delete_db(@users_db_name)
     create_db(@users_db_name)
-  end
-
-  defp replicate(source, target, rep_options \\ []) do
-    headers = Keyword.get(rep_options, :headers, [])
-    body = Keyword.get(rep_options, :body, %{})
-
-    body =
-      body
-      |> Map.put("source", source)
-      |> Map.put("target", target)
-
-    retry_until(
-      fn ->
-        resp = Couch.post("/_replicate", headers: headers, body: body, timeout: 10_000)
-        assert HTTPotion.Response.success?(resp)
-        assert resp.status_code == 200
-        assert resp.body["ok"]
-        resp
-      end,
-      500,
-      20_000
-    )
   end
 
   defp save_as(db_name, doc, options) do
@@ -147,7 +126,8 @@ defmodule UsersDbTest do
     assert resp.body["userCtx"]["name"] == "jchris@apache.org"
     assert resp.body["info"]["authenticated"] == "default"
     assert resp.body["info"]["authentication_db"] == @users_db_name
-    assert resp.body["info"]["authentication_handlers"] == ["cookie", "default"]
+    assert Enum.member?(resp.body["info"]["authentication_handlers"], "cookie")
+    assert Enum.member?(resp.body["info"]["authentication_handlers"], "default")
 
     resp =
       Couch.get(

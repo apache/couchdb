@@ -2,6 +2,7 @@ defmodule BasicsTest do
   use CouchTestCase
 
   @moduletag :basics
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB basics.

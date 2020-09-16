@@ -1869,7 +1869,6 @@ get_md5_header(Req) ->
 parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
 
-
 parse_doc_query({Key, Value}, Args) ->
     case {Key, Value} of
         {"attachments", "true"} ->

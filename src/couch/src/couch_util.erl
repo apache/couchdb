@@ -31,6 +31,7 @@
 -export([with_db/2]).
 -export([rfc1123_date/0, rfc1123_date/1]).
 -export([integer_to_boolean/1, boolean_to_integer/1]).
+-export([validate_positive_int/1]).
 -export([find_in_binary/2]).
 -export([callback_exists/3, validate_callback_exists/3]).
 -export([with_proc/4]).
@@ -633,6 +634,17 @@ boolean_to_integer(true) ->
     1;
 boolean_to_integer(false) ->
     0.
+
+
+validate_positive_int(N) when is_list(N) ->
+    try
+        I = list_to_integer(N),
+        validate_positive_int(I)
+    catch error:badarg ->
+        false
+    end;
+validate_positive_int(N) when is_integer(N), N > 0 -> true;
+validate_positive_int(_) -> false.
 
 
 find_in_binary(_B, <<>>) ->

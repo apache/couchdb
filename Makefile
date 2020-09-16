@@ -149,6 +149,7 @@ fauxton: share/www
 .PHONY: check-all-tests
 # target: check - Test everything
 check-all-tests: all python-black
+	@$(MAKE) emilio
 	@$(MAKE) eunit
 	@$(MAKE) javascript
 	@$(MAKE) mango-test
@@ -223,7 +224,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run src/mango src/docs
+		build-aux/*.py dev/run test/javascript/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -231,17 +232,29 @@ python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run src/mango src/docs
+		build-aux/*.py dev/run test/javascript/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
 elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 --enable-erlang-views --no-eval --erlang-config=rel/files/eunit.config 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run "$(TEST_OPTS)" \
+		-a adm:pass \
+		-n 1 \
+		--enable-erlang-views \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--erlang-config rel/files/eunit.config \
+		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-only
 elixir-only: devclean
-	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 --enable-erlang-views --no-eval --erlang-config=rel/files/eunit.config 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run "$(TEST_OPTS)" \
+		-a adm:pass \
+		-n 1 \
+		--enable-erlang-views \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--erlang-config rel/files/eunit.config \
+		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
@@ -275,7 +288,9 @@ elixir-credo: elixir-init
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
 javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-javascript: devclean
+javascript:
+
+	@$(MAKE) devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
@@ -495,7 +510,7 @@ endif
 # target: devclean - Remove dev cluster artifacts
 devclean:
 	@rm -rf dev/lib/*/data
-
+	@rm -rf dev/lib/*/etc
 
 ################################################################################
 # Misc
