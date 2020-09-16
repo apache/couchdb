@@ -1187,7 +1187,7 @@ umerge_members_int(_Collate, List1, [], Acc) ->
 umerge_members_int(Collate, [H1 | T1], [H2 | T2], Acc) ->
     case Collate(H1, H2) of
         lt -> umerge_members_int(Collate, T1, [H2 | T2], [H1 | Acc]);
-        eq -> umerge_members_int(Collate, T1, [H2 | T2], [H1 | Acc]);
+        eq -> umerge_members_int(Collate, T1, T2, [H1 | Acc]);
         gt -> umerge_members_int(Collate, [H1 | T1], T2, [H2 | Acc])
     end.
 
@@ -1799,5 +1799,21 @@ cache_test_() ->
         NodeCache = [V || {_K, V} <- erlang:get(), is_record(V, node)],
         ?assertEqual(3, length(NodeCache))
     end]}.
+
+
+umerge_members_test() ->
+    Tree = #tree{collate_fun = fun collate_raw/2},
+    NewList = fun() ->
+        Raw = [{rand:uniform(100), rand:uniform()} || _ <- lists:seq(1, 100)],
+        lists:ukeysort(1, Raw)
+    end,
+    lists:foreach(fun(_) ->
+        A = NewList(),
+        B = NewList(),
+        Stdlib = lists:ukeymerge(1, A, B),
+        Custom = umerge_members(Tree, 0, A, B),
+        ?assertEqual(Stdlib, Custom)
+    end, lists:seq(1, 100)).
+
 
 -endif.
