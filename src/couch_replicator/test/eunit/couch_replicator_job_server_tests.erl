@@ -213,7 +213,7 @@ acceptors_spawned_on_acceptor_exit(_) ->
     [A1] = acceptors(),
 
     exit(A1, kill),
-    meck:wait(?JOB_SERVER, handle_info, [{'EXIT', A1, killed}, '_'], 2000),
+    wait_job_exit(A1, killed),
 
     ?assertEqual(3, length(acceptors())).
 
@@ -248,8 +248,9 @@ acceptors_spawned_on_worker_exit(_) ->
     % Same acceptor process is now a worker
     ?assertEqual([A1], workers()),
 
+    meck:reset(couch_replicator_job_server),
     exit(A1, shutdown),
-    meck:wait(?JOB_SERVER, handle_info, [{'EXIT', A1, shutdown}, '_'], 2000),
+    wait_job_exit(A1, shutdown),
 
     % New acceptor process started
     ?assertEqual(1, length(acceptors())),
@@ -330,7 +331,9 @@ excess_workers_trimmed_on_reschedule(_) ->
 
     % Running with an excess number of workers. These should be trimmed on the
     % during the next cycle
+    meck:reset(couch_replicator_job_server),
     ?JOB_SERVER:reschedule(),
+    wait_jobs_exit([A2, A3, A6], shutdown),
 
     Workers = workers(),
     ?assertEqual(4, length(Workers)),
@@ -383,8 +386,10 @@ recent_workers_are_not_stopped(_) ->
     ?assertEqual(0, length(acceptors())),
 
     config_set("min_run_time_sec", "0"),
-   
+
+    meck:reset(couch_replicator_job_server),
     ?JOB_SERVER:reschedule(),
+    wait_jobs_exit([A2, A3, A6], shutdown),
 
     ?assertEqual(4, length(workers())),
     ?assertEqual(0, length(acceptors())).
@@ -431,7 +436,14 @@ start_job() ->
         {accept_job, Normal, From} ->
             ok = ?JOB_SERVER:accepted(self(), Normal),
             From ! {job_accepted, self()},
-            start_job();
-        {exit_job, ExitSig} ->
-            exit(ExitSig)
+            start_job()
     end.
+
+
+wait_jobs_exit(PidList, Signal) when is_list(PidList) ->
+    [wait_job_exit(Pid, Signal) || Pid <- PidList],
+    ok.
+
+
+wait_job_exit(Pid, Signal) when is_pid(Pid) ->
+    meck:wait(?JOB_SERVER, handle_info, [{'EXIT', Pid, Signal}, '_'], 2000).
