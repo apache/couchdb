@@ -15,7 +15,8 @@
 
 -export([
     handle_node_req/1,
-    get_stats/0
+    get_stats/0,
+    run_queues/0
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
@@ -210,10 +211,12 @@ get_stats() ->
     {CF, CDU} = db_pid_stats(),
     MessageQueues0 = [{couch_file, {CF}}, {couch_db_updater, {CDU}}],
     MessageQueues = MessageQueues0 ++ message_queues(registered()),
+    {SQ, DCQ} = run_queues(),
     [
         {uptime, couch_app:uptime() div 1000},
         {memory, {Memory}},
-        {run_queue, statistics(run_queue)},
+        {run_queue, SQ},
+        {run_queue_dirty_cpu, DCQ},
         {ets_table_count, length(ets:all())},
         {context_switches, element(1, statistics(context_switches))},
         {reductions, element(1, statistics(reductions))},
@@ -285,3 +288,13 @@ message_queues(Registered) ->
         {Type, Length} = process_info(whereis(Name), Type),
         {Name, Length}
     end, Registered).
+
+%% Workaround for https://bugs.erlang.org/browse/ERL-1355
+run_queues() ->
+    case erlang:system_info(dirty_cpu_schedulers) > 0 of
+        false ->
+            {statistics(run_queue), 0};
+        true ->
+            [DCQ | SQs] = lists:reverse(statistics(run_queue_lengths)),
+            {lists:sum(SQs), DCQ}
+    end.
