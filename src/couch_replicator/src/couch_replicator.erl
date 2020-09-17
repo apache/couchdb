@@ -35,6 +35,7 @@
 ]).
 
 
+-include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
 
@@ -483,6 +484,10 @@ ejson_url(null) ->
 -spec strip_url_creds(binary()) -> binary() | null.
 strip_url_creds(Url) ->
     try
+        case ibrowse_lib:parse_url(binary_to_list(Url)) of
+            #url{} -> ok;
+            {error, Error} -> error(Error)
+        end,
         iolist_to_binary(couch_util:url_strip_password(Url))
     catch
         error:_ ->
@@ -510,6 +515,8 @@ check_authorization(JobId, #user_ctx{} = Ctx) when is_binary(JobId) ->
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("fabric/test/fabric2_test.hrl").
+
 
 authorization_test_() ->
     {
@@ -517,40 +524,34 @@ authorization_test_() ->
         fun () -> ok end,
         fun (_) -> meck:unload() end,
         [
-            t_admin_is_always_authorized(),
-            t_username_must_match(),
-            t_replication_not_found()
+            ?TDEF_FE(t_admin_is_always_authorized),
+            ?TDEF_FE(t_username_must_match),
+            ?TDEF_FE(t_replication_not_found)
         ]
     }.
 
 
-t_admin_is_always_authorized() ->
-    ?_test(begin
-        expect_job_data({ok, #{?REP => #{?REP_USER => <<"someuser">>}}}),
-        UserCtx = #user_ctx{name = <<"adm">>, roles = [<<"_admin">>]},
-        ?assertEqual(ok, check_authorization(<<"RepId">>, UserCtx))
-    end).
+t_admin_is_always_authorized(_) ->
+    expect_job_data({ok, #{?REP => #{?REP_USER => <<"someuser">>}}}),
+    UserCtx = #user_ctx{name = <<"adm">>, roles = [<<"_admin">>]},
+    ?assertEqual(ok, check_authorization(<<"RepId">>, UserCtx)).
 
 
-t_username_must_match() ->
-    ?_test(begin
-        expect_job_data({ok, #{?REP => #{?REP_USER => <<"user1">>}}}),
-        UserCtx1 = #user_ctx{name = <<"user1">>, roles = [<<"somerole">>]},
-        ?assertEqual(ok, check_authorization(<<"RepId">>, UserCtx1)),
-        UserCtx2 = #user_ctx{name = <<"other">>, roles = [<<"somerole">>]},
-        ?assertThrow({unauthorized, _}, check_authorization(<<"RepId">>,
-            UserCtx2))
-    end).
+t_username_must_match(_) ->
+    expect_job_data({ok, #{?REP => #{?REP_USER => <<"user1">>}}}),
+    UserCtx1 = #user_ctx{name = <<"user1">>, roles = [<<"somerole">>]},
+    ?assertEqual(ok, check_authorization(<<"RepId">>, UserCtx1)),
+    UserCtx2 = #user_ctx{name = <<"other">>, roles = [<<"somerole">>]},
+    ?assertThrow({unauthorized, _}, check_authorization(<<"RepId">>,
+        UserCtx2)).
 
 
-t_replication_not_found() ->
-    ?_test(begin
-        expect_job_data({error, not_found}),
-        UserCtx1 = #user_ctx{name = <<"user">>, roles = [<<"somerole">>]},
-        ?assertEqual(not_found, check_authorization(<<"RepId">>, UserCtx1)),
-        UserCtx2 = #user_ctx{name = <<"adm">>, roles = [<<"_admin">>]},
-        ?assertEqual(not_found, check_authorization(<<"RepId">>, UserCtx2))
-    end).
+t_replication_not_found(_) ->
+    expect_job_data({error, not_found}),
+    UserCtx1 = #user_ctx{name = <<"user">>, roles = [<<"somerole">>]},
+    ?assertEqual(not_found, check_authorization(<<"RepId">>, UserCtx1)),
+    UserCtx2 = #user_ctx{name = <<"adm">>, roles = [<<"_admin">>]},
+    ?assertEqual(not_found, check_authorization(<<"RepId">>, UserCtx2)).
 
 
 expect_job_data(JobDataRes) ->
@@ -558,7 +559,7 @@ expect_job_data(JobDataRes) ->
 
 
 strip_url_creds_test_() ->
-     {
+    {
         setup,
         fun() ->
             meck:expect(config, get, fun(_, _, Default) -> Default end)
@@ -566,28 +567,39 @@ strip_url_creds_test_() ->
         fun(_) ->
             meck:unload()
         end,
-        [
-            t_strip_url_creds_errors()
-        ]
+        with([
+            ?TDEF(t_strip_http_basic_creds),
+            ?TDEF(t_strip_url_creds_errors)
+        ])
     }.
 
 
-t_strip_url_creds_errors() ->
-    ?_test(begin
-        Bad1 = <<"http://adm:pass/bad">>,
-        ?assertEqual(null, strip_url_creds(Bad1)),
-        Bad2 = <<"more garbage">>,
-        ?assertEqual(null, strip_url_creds(Bad2)),
-        Bad3 = <<"http://a:b:c">>,
-        ?assertEqual(null, strip_url_creds(Bad3)),
-        Bad4 = <<"http://adm:pass:pass/bad">>,
-        ?assertEqual(null, strip_url_creds(Bad4)),
-        ?assertEqual(null, strip_url_creds(null)),
-        ?assertEqual(null, strip_url_creds(42)),
-        ?assertEqual(null, strip_url_creds([<<"a">>, <<"b">>])),
-        Bad5 = <<"http://adm:pass/bad">>,
-        ?assertEqual(null, strip_url_creds(Bad5))
-    end).
+t_strip_http_basic_creds(_) ->
+    Url1 = <<"http://adm:pass@host/db/">>,
+    ?assertEqual(<<"http://adm:*****@host/db/">>, strip_url_creds(Url1)),
+    Url2 = <<"https://adm:pass@host/db/">>,
+    ?assertEqual(<<"https://adm:*****@host/db/">>, strip_url_creds(Url2)),
+    Url3 = <<"http://adm:pass@host:80/db/">>,
+    ?assertEqual(<<"http://adm:*****@host:80/db/">>, strip_url_creds(Url3)),
+    Url4 = <<"http://adm:pass@host/db?a=b&c=d">>,
+    ?assertEqual(<<"http://adm:*****@host/db?a=b&c=d">>,
+        strip_url_creds(Url4)).
+
+
+t_strip_url_creds_errors(_) ->
+    Bad1 = <<"http://adm:pass/bad">>,
+    ?assertEqual(null, strip_url_creds(Bad1)),
+    Bad2 = <<"more garbage">>,
+    ?assertEqual(null, strip_url_creds(Bad2)),
+    Bad3 = <<"http://a:b:c">>,
+    ?assertEqual(null, strip_url_creds(Bad3)),
+    Bad4 = <<"http://adm:pass:pass/bad">>,
+    ?assertEqual(null, strip_url_creds(Bad4)),
+    ?assertEqual(null, strip_url_creds(null)),
+    ?assertEqual(null, strip_url_creds(42)),
+    ?assertEqual(null, strip_url_creds([<<"a">>, <<"b">>])),
+    Bad5 = <<"http://adm:pass/bad">>,
+    ?assertEqual(null, strip_url_creds(Bad5)).
 
 
 -endif.
