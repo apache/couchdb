@@ -13,6 +13,8 @@
 -module(couch_views_fdb).
 
 -export([
+    get_view_state/2,
+
     new_interactive_index/3,
     new_creation_vs/3,
     get_creation_vs/2,
@@ -40,52 +42,89 @@
 -include_lib("fabric/include/fabric2.hrl").
 
 
-new_interactive_index(Db, Mrst, VS) ->
-    couch_views_fdb:new_creation_vs(Db, Mrst, VS),
-    couch_views_fdb:set_build_status(Db, Mrst, ?INDEX_BUILDING).
+get_view_state(Db, #mrst{} = Mrst) ->
+    get_view_state(Db, Mrst#mrst.sig);
+
+get_view_state(Db, Sig) when is_binary(Sig) ->
+    #{
+        tx := Tx
+    } = Db,
+
+    VersionF = erlfdb:get(Tx, version_key(Db, Sig)),
+    ViewSeqF = erlfdb:get(Tx, seq_key(Db, Sig)),
+    ViewVSF = erlfdb:get(Tx, creation_vs_key(Db, Sig)),
+    BuildStatusF = erlfdb:get(Tx, build_status_key(Db, Sig)),
+
+    Version = case erlfdb:wait(VersionF) of
+        not_found -> not_found;
+        VsnVal -> element(1, erlfdb_tuple:unpack(VsnVal))
+    end,
+
+    ViewSeq = case erlfdb:wait(ViewSeqF) of
+        not_found -> <<>>;
+        SeqVal -> SeqVal
+    end,
+
+    ViewVS = case erlfdb:wait(ViewVSF) of
+        not_found -> not_found;
+        VSVal -> element(1, erlfdb_tuple:unpack(VSVal))
+    end,
+
+    State = #{
+        version => Version,
+        view_seq => ViewSeq,
+        view_vs => ViewVS,
+        build_status => erlfdb:wait(BuildStatusF)
+    },
+
+    maybe_upgrade_view(Db, Sig, State).
+
+
+new_interactive_index(Db, #mrst{} = Mrst, VS) ->
+    new_interactive_index(Db, Mrst#mrst.sig, VS);
+
+new_interactive_index(Db, Sig, VS) ->
+    set_version(Db, Sig),
+    new_creation_vs(Db, Sig, VS),
+    set_build_status(Db, Sig, ?INDEX_BUILDING).
 
 
 %Interactive View Creation Versionstamp
 %(<db>, ?DB_VIEWS, ?VIEW_INFO, ?VIEW_CREATION_VS, Sig) = VS
 
 new_creation_vs(TxDb, #mrst{} = Mrst, VS) ->
-    #{
-        tx := Tx
-    } = TxDb,
-    Key = creation_vs_key(TxDb, Mrst#mrst.sig),
-    Value = erlfdb_tuple:pack_vs({VS}),
-    ok = erlfdb:set_versionstamped_value(Tx, Key, Value).
+    new_creation_vs(TxDb, Mrst#mrst.sig, VS);
 
-
-get_creation_vs(TxDb, #mrst{} = Mrst) ->
-    get_creation_vs(TxDb, Mrst#mrst.sig);
-
-get_creation_vs(TxDb, Sig) ->
+new_creation_vs(TxDb, Sig, VS) ->
     #{
         tx := Tx
     } = TxDb,
     Key = creation_vs_key(TxDb, Sig),
-    case erlfdb:wait(erlfdb:get(Tx, Key)) of
-        not_found ->
-            not_found;
-        EK ->
-            {VS} = erlfdb_tuple:unpack(EK),
-            VS
-    end.
+    Value = erlfdb_tuple:pack_vs({VS}),
+    ok = erlfdb:set_versionstamped_value(Tx, Key, Value).
+
+
+get_creation_vs(TxDb, MrstOrSig) ->
+    #{
+        view_vs := ViewVS
+    } = get_view_state(TxDb, MrstOrSig),
+    ViewVS.
 
 
 %Interactive View Build Status
 %(<db>, ?DB_VIEWS, ?VIEW_INFO, ?VIEW_BUILD_STATUS, Sig) = INDEX_BUILDING | INDEX_READY
 
-get_build_status(TxDb, #mrst{sig = Sig}) ->
+get_build_status(TxDb, MrstOrSig) ->
     #{
-        tx := Tx
-    } = TxDb,
-    Key = build_status_key(TxDb, Sig),
-    erlfdb:wait(erlfdb:get(Tx, Key)).
+        build_status := BuildStatus
+    } = get_view_state(TxDb, MrstOrSig),
+    BuildStatus.
 
 
-set_build_status(TxDb, #mrst{sig = Sig}, State) ->
+set_build_status(TxDb, #mrst{} = Mrst, State) ->
+    set_build_status(TxDb, Mrst#mrst.sig, State);
+
+set_build_status(TxDb, Sig, State) ->
     #{
         tx := Tx
     } = TxDb,
@@ -98,24 +137,18 @@ set_build_status(TxDb, #mrst{sig = Sig}, State) ->
 % (<db>, ?DB_VIEWS, Sig, ?VIEW_UPDATE_SEQ) = Sequence
 
 
-get_update_seq(TxDb, #mrst{sig = Sig}) ->
+get_update_seq(TxDb, MrstOrSig) ->
     #{
-        tx := Tx,
-        db_prefix := DbPrefix
-    } = TxDb,
-
-    case erlfdb:wait(erlfdb:get(Tx, seq_key(DbPrefix, Sig))) of
-        not_found -> <<>>;
-        UpdateSeq -> UpdateSeq
-    end.
+        view_seq := ViewSeq
+    } = get_view_state(TxDb, MrstOrSig),
+    ViewSeq.
 
 
 set_update_seq(TxDb, Sig, Seq) ->
     #{
-        tx := Tx,
-        db_prefix := DbPrefix
+        tx := Tx
     } = TxDb,
-    ok = erlfdb:set(Tx, seq_key(DbPrefix, Sig), Seq).
+    ok = erlfdb:set(Tx, seq_key(TxDb, Sig), Seq).
 
 
 list_signatures(Db) ->
@@ -139,7 +172,10 @@ clear_index(Db, Signature) ->
     % Get view size to remove from global counter
     SizeTuple = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_KV_SIZE, Signature},
     SizeKey = erlfdb_tuple:pack(SizeTuple, DbPrefix),
-    ViewSize = ?bin2uint(erlfdb:wait(erlfdb:get(Tx, SizeKey))),
+    ViewSize = case erlfdb:wait(erlfdb:get(Tx, SizeKey)) of
+        not_found -> 0;
+        SizeVal -> ?bin2uint(SizeVal)
+    end,
 
     % Clear index info keys
     Keys = [
@@ -207,7 +243,75 @@ update_kv_size(TxDb, Sig, OldSize, NewSize) ->
     erlfdb:add(Tx, DbKey, NewSize - OldSize).
 
 
-seq_key(DbPrefix, Sig) ->
+maybe_upgrade_view(_Db, _Sig, #{version := ?CURRENT_VIEW_IMPL_VERSION} = St) ->
+    St;
+maybe_upgrade_view(Db, Sig, #{version := not_found, view_seq := <<>>} = St) ->
+    % If we haven't started building the view yet
+    % then we don't change view_vs and build_status
+    % as they're still correct.
+    set_version(Db, Sig),
+    St#{
+        version => ?CURRENT_VIEW_IMPL_VERSION,
+        view_seq => <<>>
+    };
+maybe_upgrade_view(Db, Sig, #{version := not_found} = St) ->
+    clear_index(Db, Sig),
+    set_version(Db, Sig),
+    {ViewVS, BuildStatus} = reset_interactive_index(Db, Sig, St),
+    #{
+        version => ?CURRENT_VIEW_IMPL_VERSION,
+        view_seq => <<>>,
+        view_vs => ViewVS,
+        build_status => BuildStatus
+    }.
+
+
+set_version(Db, Sig) ->
+    #{
+        tx := Tx
+    } = Db,
+    Key = version_key(Db, Sig),
+    Val = erlfdb_tuple:pack({?CURRENT_VIEW_IMPL_VERSION}),
+    erlfdb:set(Tx, Key, Val).
+
+
+reset_interactive_index(_Db, _Sig, #{view_vs := not_found}) ->
+    % Not an interactive index
+    {not_found, not_found};
+reset_interactive_index(Db, Sig, _St) ->
+    % We have to reset the creation versionstamp
+    % to the current update seq of the database
+    % or else we'll not have indexed any documents
+    % inserted since the creation of the interactive
+    % index.
+    #{
+        tx := Tx
+    } = Db,
+
+    DbSeq = fabric2_db:get_update_seq(Db),
+    VS = fabric2_fdb:seq_to_vs(DbSeq),
+    Key = creation_vs_key(Db, Sig),
+    Val = erlfdb_tuple:pack({VS}),
+    ok = erlfdb:set(Tx, Key, Val),
+
+    set_build_status(Db, Sig, ?INDEX_BUILDING),
+
+    {VS, ?INDEX_BUILDING}.
+
+
+
+version_key(Db, Sig) ->
+    #{
+        db_prefix := DbPrefix
+    } = Db,
+    Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_IMPL_VERSION, Sig},
+    erlfdb_tuple:pack(Key, DbPrefix).
+
+
+seq_key(Db, Sig) ->
+    #{
+        db_prefix := DbPrefix
+    } = Db,
     Key = {?DB_VIEWS, ?VIEW_INFO, ?VIEW_UPDATE_SEQ, Sig},
     erlfdb_tuple:pack(Key, DbPrefix).
 
