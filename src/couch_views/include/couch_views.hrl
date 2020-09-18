@@ -10,6 +10,9 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+% Current implementation version
+-define(CURRENT_VIEW_IMPL_VERSION, 1).
+
 % Index info/data subspaces
 -define(VIEW_INFO, 0).
 -define(VIEW_DATA, 1).
@@ -21,6 +24,7 @@
 -define(VIEW_KV_SIZE, 2).
 -define(VIEW_BUILD_STATUS, 3).
 -define(VIEW_CREATION_VS, 4).
+-define(VIEW_IMPL_VERSION, 5).
 
 % Data keys
 -define(VIEW_ID_RANGE, 0).

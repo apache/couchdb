@@ -200,8 +200,8 @@ do_update(Db, Mrst0, State0) ->
             tx := Tx
         } = TxDb,
 
-        Mrst1 = couch_views_trees:open(TxDb, Mrst0),
         State1 = get_update_start_state(TxDb, Mrst0, State0),
+        Mrst1 = couch_views_trees:open(TxDb, Mrst0),
 
         {ok, State2} = fold_changes(State1),
 
@@ -259,8 +259,10 @@ maybe_set_build_status(TxDb, Mrst1, _ViewVS, State) ->
 % In the first iteration of update we need
 % to populate our db and view sequences
 get_update_start_state(TxDb, Mrst, #{db_seq := undefined} = State) ->
-    ViewVS = couch_views_fdb:get_creation_vs(TxDb, Mrst),
-    ViewSeq = couch_views_fdb:get_update_seq(TxDb, Mrst),
+    #{
+        view_vs := ViewVS,
+        view_seq := ViewSeq
+    } = couch_views_fdb:get_view_state(TxDb, Mrst),
 
     State#{
         tx_db := TxDb,
