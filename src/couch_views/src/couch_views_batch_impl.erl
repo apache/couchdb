@@ -22,7 +22,7 @@
 ]).
 
 
--include("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
 -record(batch_st, {
