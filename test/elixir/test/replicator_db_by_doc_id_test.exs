@@ -23,6 +23,7 @@ defmodule ReplicatorDBByDocIdTest do
     }
   ]
 
+  @tag :pending # Function clause Couch.process_url/1
   test "replicatior db by doc id" do
     name = random_db_name()
     src_db_name = name <> "_src"

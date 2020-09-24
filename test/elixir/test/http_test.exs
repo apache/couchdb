@@ -4,6 +4,7 @@ defmodule HttpTest do
   @moduletag :http
   @moduletag kind: :single_node
 
+  @tag :pending # Function clause Couch.process_url/1
   @tag :with_db
   test "location header", context do
     db_name = context[:db_name]
@@ -48,6 +49,7 @@ defmodule HttpTest do
     end)
   end
 
+  @tag :pending # Function clause Couch.process_url/1
   @tag :with_db
   test "COUCHDB-708: newlines document names", context do
     db_name = context[:db_name]

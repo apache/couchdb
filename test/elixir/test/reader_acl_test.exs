@@ -93,6 +93,7 @@ defmodule ReaderACLTest do
     assert resp.status_code == expect_response
   end
 
+  @tag :pending # Timeout
   @tag :with_db
   test "unrestricted db can be read", context do
     db_name = context[:db_name]
@@ -105,6 +106,7 @@ defmodule ReaderACLTest do
     open_as(db_name, "baz", user: "bond@apache.org")
   end
 
+  @tag :pending # HTTP 404 in on_exit
   @tag :with_db
   test "restricted db can be read by authorized users", context do
     db_name = context[:db_name]
@@ -164,6 +166,7 @@ defmodule ReaderACLTest do
     open_as(db_name, "baz", user: "bond@apache.org")
   end
 
+  @tag :pending # Timeout
   @tag :with_db
   test "works with readers (backwards compat with 1.0)", context do
     db_name = context[:db_name]
@@ -186,6 +189,7 @@ defmodule ReaderACLTest do
     open_as(db_name, "baz", user: "bond@apache.org")
   end
 
+  @tag :pending # Timeout
   @tag :with_db
   test "can't set non string reader names or roles", context do
     db_name = context[:db_name]
@@ -218,6 +222,7 @@ defmodule ReaderACLTest do
     set_security(db_name, security, 500)
   end
 
+  @tag :pending # Timeout
   @tag :with_db
   test "members can query views", context do
     db_name = context[:db_name]

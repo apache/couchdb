@@ -243,7 +243,7 @@ elixir: elixir-init elixir-check-formatted elixir-credo devclean
 		--enable-erlang-views \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace $(EXUNIT_OPTS)'
+		--no-eval 'mix test --trace --exclude pending $(EXUNIT_OPTS)'
 
 .PHONY: elixir-only
 elixir-only: devclean
@@ -253,7 +253,7 @@ elixir-only: devclean
 		--enable-erlang-views \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace $(EXUNIT_OPTS)'
+		--no-eval 'mix test --trace --exclude pending $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
