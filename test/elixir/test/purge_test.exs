@@ -4,6 +4,7 @@ defmodule PurgeTest do
   @moduletag :purge
   @moduletag kind: :single_node
 
+  @tag :pending # HTTP 501
   @tag :with_db
   test "purge documents", context do
     db_name = context[:db_name]
@@ -82,6 +83,7 @@ defmodule PurgeTest do
     test_all_docs_twice(db_name, num_docs, 0, 4)
   end
 
+  @tag :pending # HTTP 501
   @tag :with_db
   test "COUCHDB-1065", context do
     db_name_a = context[:db_name]

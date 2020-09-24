@@ -176,6 +176,7 @@ defmodule ConfigTest do
     end)
   end
 
+  @tag :pending # Causes unrelated tests to fail
   test "Reload config", context do
     url = "#{context[:config_url]}/_reload"
     resp = Couch.post(url)

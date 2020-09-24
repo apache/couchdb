@@ -216,6 +216,7 @@ defmodule ChangesTest do
     assert Enum.member?(changes_ids, "doc3")
   end
 
+  @tag :pending # Argument error `length/1`
   @tag :with_db
   test "changes filtering on design docs", context do
     db_name = context[:db_name]

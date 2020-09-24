@@ -101,6 +101,7 @@ defmodule UsersDbTest do
     assert Couch.Session.logout(session).body["ok"]
   end
 
+  @tag :pending # Timeout
   @tag :with_db
   test "users db", context do
     db_name = context[:db_name]

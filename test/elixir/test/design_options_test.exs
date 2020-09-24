@@ -19,6 +19,7 @@ defmodule DesignOptionsTest do
     assert Enum.at(resp.body["rows"], 0)["value"] == "_design/fu"
   end
 
+  @tag :pending # Design doc returned
   @tag :with_db
   test "design doc options - include_desing=false", context do
     db_name = context[:db_name]

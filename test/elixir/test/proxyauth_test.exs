@@ -4,6 +4,7 @@ defmodule ProxyAuthTest do
   @moduletag :authentication
   @moduletag kind: :single_node
 
+  @tag :pending # Not supported on 4.x
   @tag :with_db
   test "proxy auth with secret", context do
     db_name = context[:db_name]
@@ -92,6 +93,7 @@ defmodule ProxyAuthTest do
     assert resp.body == "test"
   end
 
+  @tag :pending # Not supported on 4.x
   @tag :with_db
   test "proxy auth without secret", context do
     db_name = context[:db_name]
