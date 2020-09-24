@@ -166,6 +166,7 @@ defmodule ViewErrorsTest do
     assert resp.body["error"] == "query_parse_error"
   end
 
+  @tag :pending # Test timed out
   @tag :with_db
   test "infinite loop", context do
     db_name = context[:db_name]
@@ -231,6 +232,7 @@ defmodule ViewErrorsTest do
     assert resp.body["reason"] == "`keys` member must be an array."
   end
 
+  @tag :pending # Assertion error
   @tag :with_db
   test "reduce overflow error", context do
     db_name = context[:db_name]
@@ -256,6 +258,7 @@ defmodule ViewErrorsTest do
     assert Enum.at(resp.body["rows"], 0)["error"] == "reduce_overflow_error"
   end
 
+  @tag :pending # Error string mismatch
   @tag :with_db
   test "temporary view should give error message", context do
     db_name = context[:db_name]

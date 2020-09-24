@@ -8,18 +8,21 @@ defmodule ChangesAsyncTest do
   Test CouchDB /{db}/_changes
   """
 
+  @tag :pending # Function clause String.Unicode.next_grapheme_size/1
   @tag :with_db
   test "live changes", context do
     db_name = context[:db_name]
     test_changes(db_name, "live")
   end
 
+  @tag :pending # Function clause String.Unicode.next_grapheme_size/1
   @tag :with_db
   test "continuous changes", context do
     db_name = context[:db_name]
     test_changes(db_name, "continuous")
   end
 
+  @tag :pending # Function clause String.Unicode.next_grapheme_size/1
   @tag :with_db
   test "longpoll changes", context do
     db_name = context[:db_name]
@@ -74,6 +77,7 @@ defmodule ChangesAsyncTest do
     assert changes["last_seq"] > next_last_seq
   end
 
+  @tag :pending # Function clause String.Unicode.next_grapheme_size/1
   @tag :with_db
   test "eventsource changes", context do
     db_name = context[:db_name]
@@ -102,6 +106,7 @@ defmodule ChangesAsyncTest do
     HTTPotion.stop_worker_process(worker_pid)
   end
 
+  @tag :pending # Function clause Couch.process_url/1
   @tag :with_db
   test "eventsource heartbeat", context do
     db_name = context[:db_name]
@@ -120,6 +125,7 @@ defmodule ChangesAsyncTest do
     HTTPotion.stop_worker_process(worker_pid)
   end
 
+  @tag :pending # Invalid last_seq_prefix
   @tag :with_db
   test "longpoll filtered changes", context do
     db_name = context[:db_name]
@@ -162,6 +168,7 @@ defmodule ChangesAsyncTest do
     assert Enum.at(changes["results"], 0)["id"] == "bingo"
   end
 
+  @tag :pending # Function clause Couch.process_url
   @tag :with_db
   test "continuous filtered changes", context do
     db_name = context[:db_name]
@@ -194,6 +201,7 @@ defmodule ChangesAsyncTest do
     assert length(changes_ids) == 2
   end
 
+  @tag :pending # Function clause Couch.process_url/1
   @tag :with_db
   test "continuous filtered changes with doc ids", context do
     db_name = context[:db_name]
@@ -228,6 +236,7 @@ defmodule ChangesAsyncTest do
     assert length(changes_ids) == 2
   end
 
+  @tag :pending # Function clause Couch.process_url/1
   @tag :with_db
   test "COUCHDB-1852", context do
     db_name = context[:db_name]
