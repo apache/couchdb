@@ -243,7 +243,7 @@ elixir: elixir-init elixir-check-formatted elixir-credo devclean
 		--enable-erlang-views \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+		--no-eval 'mix test --trace $(EXUNIT_OPTS)'
 
 .PHONY: elixir-only
 elixir-only: devclean
@@ -253,26 +253,12 @@ elixir-only: devclean
 		--enable-erlang-views \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+		--no-eval 'mix test --trace $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
 elixir-init: config.erl
 	@mix local.rebar --force && mix local.hex --force && mix deps.get
-
-.PHONY: elixir-cluster-without-quorum
-elixir-cluster-without-quorum: export MIX_ENV=integration
-elixir-cluster-without-quorum: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run -n 3 -q -a adm:pass \
-		--degrade-cluster 2 \
-		--no-eval 'mix test --trace --only without_quorum_test $(EXUNIT_OPTS)'
-
-.PHONY: elixir-cluster-with-quorum
-elixir-cluster-with-quorum: export MIX_ENV=integration
-elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run -n 3 -q -a adm:pass \
-		--degrade-cluster 1 \
-		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-suite
 elixir-suite: export MIX_ENV=integration
