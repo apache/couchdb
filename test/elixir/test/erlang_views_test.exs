@@ -42,6 +42,7 @@ defmodule ErlangViewsTest do
 
   @word_list ["foo", "bar", "abc", "def", "baz", "xxyz"]
 
+  @tag :pending # Timeout, add couch_eval.languages config
   @tag :with_db
   test "Erlang map function", context do
     db_name = context[:db_name]
@@ -62,6 +63,7 @@ defmodule ErlangViewsTest do
     assert List.first(results["rows"])["value"] == "str1"
   end
 
+  @tag :pending # Timeout, add couch_eval.languages config
   @tag :with_db
   test "Erlang reduce function", context do
     db_name = context[:db_name]
@@ -82,6 +84,7 @@ defmodule ErlangViewsTest do
     assert List.first(results["rows"])["value"] == 2
   end
 
+  @tag :pending # Timeout, add couch_eval.languages config
   @tag :with_db
   test "Erlang reduce function larger dataset", context do
     db_name = context[:db_name]

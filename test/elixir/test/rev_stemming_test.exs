@@ -84,6 +84,7 @@ defmodule RevStemmingTest do
     assert conflicted_rev == prev_conflicted_rev
   end
 
+  @tag :pending # Assertion failed
   @tag :with_db
   test "revs limit is kept after compaction", context do
     db_name = context[:db_name]

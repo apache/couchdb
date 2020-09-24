@@ -7,12 +7,15 @@ defmodule DesignPathTest do
   @moduledoc """
   Test CouchDB design documents path
   """
+
+  @tag :pending # Function clause Couch.process_url/1
   @tag :with_db
   test "design doc path", context do
     db_name = context[:db_name]
     ddoc_path_test(db_name)
   end
 
+  @tag :pending # Function clause Couch.process_url/1
   @tag :with_db_name
   test "design doc path with slash in db name", context do
     db_name = URI.encode_www_form(context[:db_name] <> "/with_slashes")

@@ -9,6 +9,7 @@ defmodule CoffeeTest do
   This is a port of the coffee.js test suite.
   """
 
+  @tag :pending # Timeout, check couch_eval config
   @tag :with_db
   test "CoffeeScript basic functionality", context do
     db_name = context[:db_name]

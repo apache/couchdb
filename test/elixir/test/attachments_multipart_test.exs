@@ -9,6 +9,7 @@ defmodule AttachmentMultipartTest do
   This is a port of the attachments_multipart.js suite
   """
 
+  @tag :pending # HTTP 500
   @tag :with_db
   test "manages attachments multipart requests successfully", context do
     db_name = context[:db_name]

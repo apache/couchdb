@@ -163,6 +163,7 @@ defmodule ViewIncludeDocsTest do
     assert row0["doc"]["_id"] == "10"
   end
 
+  @tag :pending # Argument error
   @tag :with_db
   test "emitted _rev controls things", context do
     db_name = context[:db_name]

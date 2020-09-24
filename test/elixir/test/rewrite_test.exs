@@ -12,6 +12,7 @@ defmodule RewriteTest do
   Enum.each(
     ["test_rewrite_suite_db", "test_rewrite_suite_db%2Fwith_slashes"],
     fn db_name ->
+      @tag :pending # Not supported on 4.x
       @tag with_random_db: db_name
       @tag config: [
              {"httpd", "authentication_handlers",
