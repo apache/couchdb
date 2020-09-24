@@ -345,6 +345,22 @@ couchTests.rewrite = function(debug) {
     var xhr = CouchDB.request("GET", url);
     TEquals(400, xhr.status);
 
+    // test requests with body preserve the query string rewrite
+    var ddoc_qs = {
+      "_id": "_design/qs", 
+      "rewrites": "function (r) { return {path: '../../_changes', query: {'filter': '_doc_ids'}};};"
+    }
+    db.save(ddoc_qs);
+    db.save({"_id": "qs1", "foo": "bar"});
+    db.save({"_id": "qs2", "foo": "bar"});
+
+    var url = "/"+dbName+"/_design/qs/_rewrite";
+
+    var xhr = CouchDB.request("POST", url, {body: JSON.stringify({"doc_ids": ["qs2"]})});
+    var result = JSON.parse(xhr.responseText);
+    T(xhr.status == 200);
+    T(result.results.length == 1, "Only one doc is expected");
+    TEquals(result.results[0].id, "qs2");
     // cleanup
     db.deleteDb();
   }
