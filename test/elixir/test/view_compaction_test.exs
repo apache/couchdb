@@ -6,6 +6,7 @@ defmodule ViewCompactionTest do
   This is a port of the view_compaction.js suite
   """
   
+  @moduletag :view_compaction
   @moduletag kind: :single_node
   
   @num_docs 1000
