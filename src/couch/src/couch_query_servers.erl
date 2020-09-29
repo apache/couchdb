@@ -111,6 +111,8 @@ rereduce(Lang, RedSrcs, ReducedValues) ->
 
 reduce(_Lang, [], _KVs) ->
     {ok, []};
+reduce(Lang, [<<"_", _/binary>>] = RedSrcs, KVs) ->
+    builtin_reduce(reduce, RedSrcs, KVs, []);
 reduce(Lang, RedSrcs, KVs) ->
     {OsRedSrcs, BuiltinReds} = lists:partition(fun
         (<<"_", _/binary>>) -> false;
@@ -171,7 +173,10 @@ builtin_reduce(_Re, [], _KVs, Acc) ->
     {ok, lists:reverse(Acc)};
 builtin_reduce(Re, [<<"_sum",_/binary>>|BuiltinReds], KVs, Acc) ->
     Sum = builtin_sum_rows(KVs, 0),
-    Red = check_sum_overflow(?term_size(KVs), ?term_size(Sum), Sum),
+    Red = case is_number(Sum) of
+        true -> Sum;
+        false -> check_sum_overflow(?term_size(KVs), ?term_size(Sum), Sum)
+    end,
     builtin_reduce(Re, BuiltinReds, KVs, [Red|Acc]);
 builtin_reduce(reduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
     Count = length(KVs),
