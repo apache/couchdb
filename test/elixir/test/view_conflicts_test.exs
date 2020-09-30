@@ -1,6 +1,7 @@
 defmodule ViewConflictsTest do
   use CouchTestCase
 
+  @moduletag :view_conflicts
   @moduletag kind: :single_node
 
   setup_all do
