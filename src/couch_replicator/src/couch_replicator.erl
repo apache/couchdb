@@ -438,7 +438,9 @@ job_ejson(#{} = JobData) ->
         ?STATE := State,
         ?STATE_INFO := Info0,
         ?JOB_HISTORY := History,
-        ?REP_STATS := Stats
+        ?REP_STATS := Stats,
+        ?REP_NODE := Node,
+        ?REP_PID := Pid
     } = JobData,
 
     #{
@@ -470,7 +472,9 @@ job_ejson(#{} = JobData) ->
         <<"info">> => Info,
         <<"user">> => User,
         <<"history">> => History1,
-        <<"start_time">> => StartISO8601
+        <<"start_time">> => StartISO8601,
+        <<"node">> => Node,
+        <<"pid">> => Pid
     }.
 
 
