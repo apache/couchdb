@@ -146,47 +146,35 @@ along with the other defaults.
 
 ```bash
 # Define the new channel
-(couchdb@db1.foo.bar)3> s:set_config("smoosh.big_dbs", "min_size", "20000000000", global).
+(couchdb@db1.foo.bar)3> rpc:multicall(config, set, ["smoosh.big_dbs", "min_size", "20000000000"]).
 {[ok,ok,ok],[]}
-(couchdb@db1.foo.bar)3> s:set_config("smoosh.big_dbs", "concurrency", "2", global).
+(couchdb@db1.foo.bar)3> rpc:multicall(config, set, ["smoosh.big_dbs", "concurrency", "2"]).
 {[ok,ok,ok],[]}
 
 # Add the channel to the db_channels set -- note we need to get the original
 # value first so we can add the new one to the existing list!
-(couchdb@db1.foo.bar)5> s:get_config("smoosh", "db_channels", global).
-{[{'couchdb@db1.foo.bar',"ratio_dbs"},
-{'couchdb@db3.foo.bar',"ratio_dbs"},
-{'couchdb@db2.foo.bar',"ratio_dbs"}],
-[]}
-(couchdb@db1.foo.bar)6> s:set_config("smoosh", "db_channels", "ratio_dbs,big_dbs", global).
+(couchdb@db1.foo.bar)5> rpc:multicall(config, get, ["smoosh", "db_channels"]).
+{["ratio_dbs","ratio_dbs","ratio_dbs"],[]}
+(couchdb@db1.foo.bar)6> rpc:multicall(config, set, ["smoosh", "db_channels", "ratio_dbs,big_dbs"]).
 {[ok,ok,ok],[]}
 ```
 
 ### Viewing active channels
 
 ```bash
-(couchdb@db3.foo.bar)3> s:get_config("smoosh", "db_channels", global).
-{[{'couchdb@db3.foo.bar',"ratio_dbs,big_dbs"},
-  {'couchdb@db1.foo.bar',"ratio_dbs,big_dbs"},
-  {'couchdb@db2.foo.bar',"ratio_dbs,big_dbs"}],
- []}
-(couchdb@db3.foo.bar)4> s:get_config("smoosh", "view_channels", global).
-{[{'couchdb@db3.foo.bar',"ratio_views"},
-  {'couchdb@db1.foo.bar',"ratio_views"},
-  {'couchdb@db2.foo.bar',"ratio_views"}],
- []}
+(couchdb@db3.foo.bar)3> rpc:multicall(config, get, ["smoosh", "db_channels"]).
+{["ratio_dbs,big_dbs","ratio_dbs,big_dbs","ratio_dbs,big_dbs"],[]}
+(couchdb@db3.foo.bar)4> rpc:multicall(config, get, ["smoosh", "view_channels"]).
+{["ratio_views","ratio_views","ratio_views"],[]}
 ```
 
 ### Removing a channel
 
 ```bash
 # Remove it from the active set
-(couchdb@db1.foo.bar)5> s:get_config("smoosh", "db_channels", global).
-{[{'couchdb@db1.foo.bar',"ratio_dbs,big_dbs"},
-{'couchdb@db3.foo.bar',"ratio_dbs,big_dbs"},
-{'couchdb@db2.foo.bar',"ratio_dbs,big_dbs"}],
-[]}
-(couchdb@db1.foo.bar)6> s:set_config("smoosh", "db_channels", "ratio_dbs", global).
+(couchdb@db1.foo.bar)5> rpc:multicall(config, get, ["smoosh", "db_channels"]).
+{["ratio_dbs,big_dbs", "ratio_dbs,big_dbs", "ratio_dbs,big_dbs"],[]}
+(couchdb@db1.foo.bar)6> rpc:multicall(config, set, ["smoosh", "db_channels", "ratio_dbs"]).
 {[ok,ok,ok],[]}
 
 # Delete the config -- you need to do each value
@@ -201,11 +189,8 @@ along with the other defaults.
 As far as I know, you have to get each setting separately:
 
 ```
-(couchdb@db1.foo.bar)1> s:get_config("smoosh.big_dbs", "concurrency", global).
-{[{'couchdb@db3.foo.bar',"2"},
-  {'couchdb@db1.foo.bar',"2"},
-  {'couchdb@db2.foo.bar',"2"}],
- []}
+(couchdb@db1.foo.bar)1> rpc:multicall(config, get, ["smoosh.big_dbs", "concurrency"]).
+{["2","2","2"],[]}
 
 ```
 
@@ -214,7 +199,7 @@ As far as I know, you have to get each setting separately:
 The same as defining a channel, you just need to set the new value:
 
 ```
-(couchdb@db1.foo.bar)2> s:set_config("smoosh.ratio_dbs", "concurrency", "1", global).
+(couchdb@db1.foo.bar)2> rpc:multicall(config, set, ["smoosh.ratio_dbs", "concurrency", "1"]).
 {[ok,ok,ok],[]}
 ```
 
@@ -298,11 +283,8 @@ If it's falling behind (big queues), try increasing compaction priority.
 Smoosh's IOQ priority is controlled via the `ioq` -> `compaction` queue.
 
 ```
-> s:get_config("ioq", "compaction", global).
-{[{'couchdb@db1.foo.bar',undefined},
-  {'couchdb@db2.foo.bar',undefined},
-  {'couchdb@db3.foo.bar',undefined}],
- []}
+> rpc:multicall(config, get, ["ioq", "compaction"]).
+{[undefined,undefined,undefined],[]}
 
 ```
 
@@ -315,7 +297,7 @@ doesn't adversely impact the customer experience. If it will, and
 it's urgent, at least drop them a warning.
 
 ```
-> s:set_config("ioq", "compaction", "0.5", global).
+> rpc:multicall(config, set, ["ioq", "compaction", "0.5"]).
 {[ok,ok,ok],[]}
 ```
 
@@ -338,11 +320,8 @@ higher concurrency.
 The current setting can be seen for a channel like so:
 
 ```
-> s:get_config("smoosh.ratio_dbs", "concurrency", global).
-{[{'couchdb@db1.foo.bar',undefined},
-  {'couchdb@db2.foo.bar',undefined},
-  {'couchdb@db3.foo.bar',undefined}],
- []}
+> rpc:multicall(config, get, ["smoosh.ratio_dbs", "concurrency"]).
+{["2","2","2"], []}
 ```
 
 `undefined` means the default is used.
@@ -354,7 +333,7 @@ but evaluate this based on the current status.
 If we want to increase the ratio_dbs setting:
 
 ```
-> s:set_config("smoosh.ratio_dbs", "concurrency", "2", global).
+> rpc:multicall(config, set, ["smoosh.ratio_dbs", "concurrency", "2"]).
 {[ok,ok,ok],[]}
 ```
 
