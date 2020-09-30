@@ -31,7 +31,8 @@ transient_jobs_test_() ->
                 fun teardown/1,
                 [
                     ?TDEF_FE(transient_job_is_removed, 10),
-                    ?TDEF_FE(posting_same_job_is_a_noop, 10)
+                    ?TDEF_FE(posting_same_job_is_a_noop, 10),
+                    ?TDEF_FE(transient_job_with_a_bad_filter, 10)
                 ]
             }
         }
@@ -79,7 +80,19 @@ posting_same_job_is_a_noop({Source, Target}) ->
     ?assertEqual(Pid1, Pid2),
     couch_replicator_test_helper:cancel(RepId1).
 
-   
+
+transient_job_with_a_bad_filter({Source, Target}) ->
+    DDoc = #{<<"_id">> => <<"_design/myddoc">>},
+    couch_replicator_test_helper:create_docs(Source, [DDoc]),
+    Result = couch_replicator:replicate(#{
+        <<"source">> => couch_replicator_test_helper:db_url(Source),
+        <<"target">> => couch_replicator_test_helper:db_url(Target),
+        <<"continuous">> => true,
+        <<"filter">> => <<"myddoc/myfilter">>
+    }, ?ADMIN_USER),
+    ?assertMatch({error, #{<<"error">> := <<"filter_fetch_error">>}}, Result).
+
+
 get_rep_id(Source, Target) ->
     {ok, Id, _} = couch_replicator_parse:parse_transient_rep(#{
         <<"source">> => couch_replicator_test_helper:db_url(Source),

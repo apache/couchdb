@@ -150,7 +150,7 @@ fetch_internal(DDocName, FilterName, Source) ->
                      couch_replicator_api_wrap:db_uri(Source),
                      couch_util:to_binary(CodeError)]
                  ),
-                 throw({fetch_error, CodeErrorMsg})
+                 throw({fetch_error, iolist_to_binary(CodeErrorMsg)})
          end
     after
         couch_replicator_api_wrap:db_close(Db)
