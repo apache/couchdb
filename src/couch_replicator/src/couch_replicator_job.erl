@@ -810,9 +810,8 @@ get_rep_id(JTx, Job, #{} = JobData) ->
     try
         couch_replicator_ids:replication_id(Rep)
     catch
-        throw:{filter_fetch_error, Error} ->
-            Error1 = io_lib:format("Filter fetch error ~p", [Error]),
-            reschedule_on_error(JTx, Job, JobData, Error1),
+        throw:{filter_fetch_error, _} = Error ->
+            reschedule_on_error(JTx, Job, JobData, {error, Error}),
             exit({shutdown, finished})
     end.
 
