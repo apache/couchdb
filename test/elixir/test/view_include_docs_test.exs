@@ -1,6 +1,7 @@
 defmodule ViewIncludeDocsTest do
   use CouchTestCase
 
+  @moduletag :view_include_docs
   @moduletag kind: :single_node
 
   @ddoc %{

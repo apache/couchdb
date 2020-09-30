@@ -1,6 +1,7 @@
 defmodule UpdateDocumentsTest do
   use CouchTestCase
 
+  @moduletag :docs
   @moduletag kind: :single_node
 
   @ddoc %{
