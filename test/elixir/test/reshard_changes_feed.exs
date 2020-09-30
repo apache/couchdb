@@ -6,6 +6,7 @@ defmodule ReshardChangesFeedTest do
   Test _changes interaction with resharding
   """
 
+  @moduletag :reshard_changes_feed
   @moduletag kind: :cluster
 
   setup do

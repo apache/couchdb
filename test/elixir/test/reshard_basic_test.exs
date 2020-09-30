@@ -6,6 +6,7 @@ defmodule ReshardBasicTest do
   Test resharding basic functionality
   """
   
+  @moduletag :reshard_basic
   @moduletag kind: :cluster
 
   setup_all do

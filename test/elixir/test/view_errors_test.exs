@@ -1,6 +1,7 @@
 defmodule ViewErrorsTest do
   use CouchTestCase
 
+  @moduletag :view_errors
   @moduletag kind: :single_node
 
   @document %{integer: 1, string: "1", array: [1, 2, 3]}
