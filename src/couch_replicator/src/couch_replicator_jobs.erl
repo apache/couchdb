@@ -170,12 +170,14 @@ wait_running(JobId) ->
 
 
 wait_running(JobId, SubId) ->
-    case couch_jobs:wait(SubId, running, infinity) of
+    case couch_jobs:wait(SubId, infinity) of
         {?REP_JOBS, _, running, #{?STATE := ?ST_PENDING}} ->
             wait_running(JobId, SubId);
         {?REP_JOBS, _, running, JobData} ->
             ok = couch_jobs:unsubscribe(SubId),
             {ok, JobData};
+        {?REP_JOBS, _, pending, _} ->
+            wait_running(JobId, SubId);
         {?REP_JOBS, _, finished, JobData} ->
             ok = couch_jobs:unsubscribe(SubId),
             {ok, JobData}
