@@ -33,6 +33,10 @@
 # Do not rely on tricks with /etc/hosts or libresolv to handle anything
 # other than the above 3 approaches correctly. They will not work reliably.
 #
+# Changing the name later is somewhat cumbersome, so if there is a possibility that you
+# want to add a cluster later:
+# - Do your future self a favor by NOT using option 1), prefer option 2) if possible.
+#
 # Multiple CouchDBs running on the same machine can use couchdb1@, couchdb2@,
 # etc.
 {{node_name}}
