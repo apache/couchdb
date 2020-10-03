@@ -95,7 +95,7 @@ X means done, - means partially
   - [ ] Port stats.js
   - [X] Port update_documents.js
   - [X] Port users_db.js
-  - [ ] Port users_db_security.js
+  - [X] Port users_db_security.js
   - [X] Port utf8.js
   - [X] Port uuids.js
   - [X] Port view_collation.js
