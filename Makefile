@@ -233,43 +233,52 @@ python-black-update: .venv/bin/black
 .PHONY: elixir
 elixir: export MIX_ENV=integration
 elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run "$(TEST_OPTS)" \
-		-a adm:pass \
-		-n 1 \
-		--enable-erlang-views \
-		--locald-config test/elixir/test/config/test-config.ini \
-		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+elixir: elixir-init elixir-check-formatted elixir-credo elixir-single-node elixir-performance elixir-degraded-cluster elixir-cluster devclean
 
-.PHONY: elixir-only
-elixir-only: devclean
-	@dev/run "$(TEST_OPTS)" \
-		-a adm:pass \
-		-n 1 \
+.PHONY: elixir-single-node
+elixir-single-node: export MIX_ENV=integration
+elixir-single-node: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+elixir-single-node: devclean
+	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 \
 		--enable-erlang-views \
-		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+		--locald-config test/elixir/test/config/test-config.ini \
+		--no-eval 'mix test --trace --only kind:single_node $(EXUNIT_OPTS)'
+
+.PHONY: elixir-performance
+elixir-performance: export MIX_ENV=integration
+elixir-performance: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+elixir-performance: devclean
+	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 \
+		--enable-erlang-views \
+		--erlang-config rel/files/eunit.config \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--no-eval 'mix test --trace --only kind:performance $(EXUNIT_OPTS)'
+
+.PHONY: elixir-cluster
+elixir-cluster: export MIX_ENV=integration
+elixir-cluster: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+elixir-cluster: devclean
+	@dev/run "$(TEST_OPTS)" -a adm:pass -n 3 \
+		--enable-erlang-views \
+		--erlang-config rel/files/eunit.config \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--no-eval 'mix test --trace --only kind:cluster $(EXUNIT_OPTS)'
+
+.PHONY: elixir-degraded-cluster
+elixir-degraded-cluster: export MIX_ENV=integration
+elixir-degraded-cluster: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+elixir-degraded-cluster: devclean
+	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 \
+		--enable-erlang-views \
+		--erlang-config rel/files/eunit.config \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--no-eval 'mix test --trace --only kind:degraded_cluster $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
 elixir-init: config.erl
 	@mix local.rebar --force && mix local.hex --force && mix deps.get
-
-.PHONY: elixir-cluster-without-quorum
-elixir-cluster-without-quorum: export MIX_ENV=integration
-elixir-cluster-without-quorum: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run -n 3 -q -a adm:pass \
-		--degrade-cluster 2 \
-		--no-eval 'mix test --trace --only without_quorum_test $(EXUNIT_OPTS)'
-
-.PHONY: elixir-cluster-with-quorum
-elixir-cluster-with-quorum: export MIX_ENV=integration
-elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run -n 3 -q -a adm:pass \
-		--degrade-cluster 1 \
-		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted: elixir-init
