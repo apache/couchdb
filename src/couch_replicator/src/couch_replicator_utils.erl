@@ -281,7 +281,10 @@ normalize_rep_test_() ->
 normalize_endpoint() ->
     HttpDb =  #httpdb{
         url = "http://host/db",
-        auth_props = [{"key", "val"}],
+        auth_props = #{
+            "key" => "val",
+            "nested" => #{<<"other_key">> => "other_val"}
+        },
         headers = [{"k2","v2"}, {"k1","v1"}],
         timeout = 30000,
         ibrowse_options = [{k2, v2}, {k1, v1}],

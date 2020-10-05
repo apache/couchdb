@@ -917,7 +917,7 @@ db_from_json(#{} = DbMap) ->
     end,
     #httpdb{
         url = binary_to_list(Url),
-        auth_props = maps:to_list(Auth),
+        auth_props = Auth,
         headers = Headers,
         ibrowse_options = IBrowseOptions,
         timeout = Timeout,
