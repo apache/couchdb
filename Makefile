@@ -149,7 +149,6 @@ fauxton: share/www
 check: all python-black
 	@$(MAKE) emilio
 	@$(MAKE) eunit
-	@$(MAKE) javascript
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
 
