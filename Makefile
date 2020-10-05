@@ -148,7 +148,6 @@ fauxton: share/www
 # target: check - Test everything
 check: all python-black
 	@$(MAKE) eunit
-	@$(MAKE) javascript
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
 
