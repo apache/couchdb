@@ -20,7 +20,7 @@ github:
   enabled_merge_buttons:
     squash: true
     rebase: true
-    merge: false
+    merge: true
 
 notifications:
   commits: commits@couchdb.apache.org
