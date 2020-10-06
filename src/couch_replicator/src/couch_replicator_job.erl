@@ -947,7 +947,8 @@ init_state(#{} = Job, #{} = JobData) ->
         ?SOURCE := Src0,
         ?TARGET := Tgt,
         ?START_TIME := StartTime,
-        ?OPTIONS := Options0
+        ?OPTIONS := Options0,
+        ?REP_USER := User
     } = Rep,
 
     % Optimize replication parameters if last time the jobs crashed because it
@@ -1013,7 +1014,8 @@ init_state(#{} = Job, #{} = JobData) ->
         stats_timer = nil,
         doc_id = DocId,
         db_name = DbName,
-        db_uuid = DbUUID
+        db_uuid = DbUUID,
+        user = User
     },
     start_checkpoint_timer(State).
 
