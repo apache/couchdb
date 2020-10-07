@@ -21,7 +21,7 @@ mkdir build
 cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
-./configure --with-curl --spidermonkey-version ${sm_ver}
+./configure --spidermonkey-version ${sm_ver}
 make check || (make build-report && false)
 '''
 
@@ -93,7 +93,7 @@ pipeline {
         sh '''
           set
           rm -rf apache-couchdb-*
-          ./configure --with-curl
+          ./configure
           make dist
           chmod -R a+w * .
         '''
@@ -140,7 +140,7 @@ pipeline {
                 cd build
                 tar -xf $WORKSPACE/apache-couchdb-*.tar.gz
                 cd apache-couchdb-*
-                ./configure --with-curl
+                ./configure
                 gmake check || (build-aux/logfile-uploader.py && false)
 
                 # No package build for FreeBSD at this time
@@ -177,7 +177,7 @@ pipeline {
                 cd build
                 tar -xzf $WORKSPACE/apache-couchdb-*.tar.gz
                 cd apache-couchdb-*
-                ./configure --with-curl --spidermonkey-version 60
+                ./configure --spidermonkey-version 60
                 make check || (build-aux/logfile-uploader.py && false)
 
                 # No package build for macOS at this time

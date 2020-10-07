@@ -5,7 +5,6 @@
     This command is responsible for generating the build
     system for Apache CouchDB.
 
-  -WithCurl                  request that couchjs is linked to cURL (default false)
   -DisableFauxton            request build process skip building Fauxton (default false)
   -DisableDocs               request build process skip building documentation (default false)
   -SkipDeps                  do not update Erlang dependencies (default false)
@@ -42,7 +41,6 @@
 
 Param(
     [switch]$Test = $false,
-    [switch]$WithCurl = $false, # request that couchjs is linked to cURL (default false)
     [switch]$DisableFauxton = $false, # do not build Fauxton
     [switch]$DisableDocs = $false, # do not build any documentation or manpages
     [switch]$SkipDeps = $false, # do not update erlang dependencies
@@ -183,9 +181,7 @@ spidermonkey_version = $SpiderMonkeyVersion
 "@
 $InstallMk | Out-File "$rootdir\install.mk" -encoding ascii
 
-$lowercurl = "$WithCurl".ToLower()
 $ConfigERL = @"
-{with_curl, $lowercurl}.
 {spidermonkey_version, "$SpiderMonkeyVersion"}.
 "@
 $ConfigERL | Out-File "$rootdir\config.erl" -encoding ascii

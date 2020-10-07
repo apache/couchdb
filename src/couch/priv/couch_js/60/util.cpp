@@ -142,12 +142,8 @@ couch_parse_args(int argc, const char* argv[])
         return NULL;
 
     args->eval = 0;
-    args->use_http = 0;
-    args->use_test_funs = 0;
     args->stack_size = 64L * 1024L * 1024L;
     args->scripts = nullptr;
-    args->uri_file = nullptr;
-    args->uri = nullptr;
 
     while(i < argc) {
         if(strcmp("-h", argv[i]) == 0) {
@@ -156,18 +152,12 @@ couch_parse_args(int argc, const char* argv[])
         } else if(strcmp("-V", argv[i]) == 0) {
             DISPLAY_VERSION;
             exit(0);
-        } else if(strcmp("-H", argv[i]) == 0) {
-            args->use_http = 1;
-        } else if(strcmp("-T", argv[i]) == 0) {
-            args->use_test_funs = 1;
         } else if(strcmp("-S", argv[i]) == 0) {
             args->stack_size = atoi(argv[++i]);
             if(args->stack_size <= 0) {
                 fprintf(stderr, "Invalid stack size.\n");
                 exit(2);
             }
-        } else if(strcmp("-u", argv[i]) == 0) {
-            args->uri_file = argv[++i];
         } else if(strcmp("--eval", argv[i]) == 0) {
             args->eval = 1;
         } else if(strcmp("--", argv[i]) == 0) {
