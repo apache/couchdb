@@ -45,8 +45,6 @@ You should have the following installed:
    * https://archive.mozilla.org/pub/firefox/releases/60.9.0esr/source/ (src/js)
  * GNU Make                     (http://www.gnu.org/software/make/)
  * GNU Compiler Collection      (http://gcc.gnu.org/)
- * libcurl                      (http://curl.haxx.se/libcurl/)
- * help2man                     (http://www.gnu.org/s/help2man/)
  * Python (>=2.7)               (http://python.org/)
 
 To build Fauxton, you should have the following installed:
@@ -56,12 +54,10 @@ To build Fauxton, you should have the following installed:
 To build the documentation, you should have the following installed:
  * Python Sphinx (>=1.5)        (http://pypi.python.org/pypi/Sphinx)
 
-It is recommended that you install Erlang OTP R16B03-1 or above where
-possible.  You will only need libcurl if you plan to run the
-JavaScript test suite. And help2man is only need if you plan on
-installing the CouchDB man pages.  Python and Sphinx are only required
-for building the online documentation. Documentation build can be disabled
-by adding the `--disable-docs` flag to the `configure` script.
+It is recommended that you install Erlang OTP R16B03-1 or above where possible.
+Python and Sphinx are only required for building the online documentation.
+Documentation build can be disabled by adding the `--disable-docs` flag to the
+`configure` script.
 
 ### Debian-based Systems
 
@@ -69,7 +65,9 @@ You can install the dependencies by running:
 
     sudo apt-get --no-install-recommends -y install \
         build-essential pkg-config erlang erlang-reltool \
-        libicu-dev libmozjs185-dev libcurl4-openssl-dev
+        libicu-dev libmozjs-60-dev
+
+Your distribution may have libmozjs-68-dev instead of 60. Both are supported.
 
 You can install the Node.JS dependencies via [NodeSource](https://github.com/nodesource/distributions#installation-instructions).
 
@@ -89,9 +87,8 @@ packages.
 You can install the dependencies by running:
 
     sudo yum install autoconf autoconf-archive automake \
-        curl-devel erlang-asn1 erlang-erts erlang-eunit \
-        erlang-xmerl help2man \
-        js-devel-1.8.5 libicu-devel libtool perl-Test-Harness
+        erlang-asn1 erlang-erts erlang-eunit erlang-xmerl \
+        libmozjs-60-dev libicu-devel libtool perl-Test-Harness
 
 You can install the Node.JS dependencies via [NodeSource](https://github.com/nodesource/distributions#rpminstall).
 
@@ -111,7 +108,7 @@ the Command Line Tools:
 You can then install the other dependencies by running:
 
     brew install autoconf autoconf-archive automake libtool \
-        erlang icu4c spidermonkey curl pkg-config
+        erlang icu4c spidermonkey pkg-config
 
 You can install the Node.JS dependencies via the
 [official Macintosh installer](https://nodejs.org/en/download/).
@@ -143,8 +140,8 @@ You can install this by running:
 
 You can install the remaining dependencies by running:
 
-    pkg install help2man openssl icu curl git bash \
-        autoconf automake libtool node spidermonkey185 \
+    pkg install openssl icu git bash \
+        autoconf automake libtool node spidermonkey60 \
         erlang node8 npm-node8 lang/python py27-sphinx py27-pip
     pip install --upgrade sphinx_rtd_theme nose requests hypothesis
 

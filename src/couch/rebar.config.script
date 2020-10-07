@@ -132,29 +132,6 @@ end.
         }
 end.
 
-{CURL_CFLAGS, CURL_LDFLAGS} = case lists:keyfind(with_curl, 1, CouchConfig) of
-    {with_curl, true} ->
-        case os:type() of
-            {win32, _} ->
-                {
-                    "/DHAVE_CURL",
-                    "/DHAVE_CURL libcurl.lib"
-                };
-            {unix, freebsd} ->
-                {
-                    "-DHAVE_CURL -I/usr/local/include",
-                    "-DHAVE_CURL -lcurl"
-                };
-            _ ->
-                {
-                    "-DHAVE_CURL",
-                    "-DHAVE_CURL -lcurl"
-                }
-        end;
-    _ ->
-        {"", ""}
-end.
-
 CouchJSSrc = case SMVsn of
     "1.8.5" -> ["priv/couch_js/1.8.5/*.c"];
     "60" -> ["priv/couch_js/60/*.cpp"];
@@ -164,13 +141,13 @@ end.
 CouchJSEnv = case SMVsn of
     "1.8.5" ->
         [
-            {"CFLAGS", JS_CFLAGS ++ " " ++ CURL_CFLAGS},
-            {"LDFLAGS", JS_LDFLAGS ++ " " ++ CURL_LDFLAGS}
+            {"CFLAGS", JS_CFLAGS},
+            {"LDFLAGS", JS_LDFLAGS}
         ];
     _ ->
         [
-            {"CXXFLAGS", JS_CFLAGS ++ " " ++ CURL_CFLAGS},
-            {"LDFLAGS", JS_LDFLAGS ++ " " ++ CURL_LDFLAGS}
+            {"CXXFLAGS", JS_CFLAGS},
+            {"LDFLAGS", JS_LDFLAGS}
         ]
 end.
 
