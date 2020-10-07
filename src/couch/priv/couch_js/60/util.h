@@ -17,12 +17,8 @@
 
 typedef struct {
     int          eval;
-    int          use_http;
-    int          use_test_funs;
     int          stack_size;
     const char** scripts;
-    const char*  uri_file;
-    JSString*    uri;
 } couch_args;
 
 std::string js_to_string(JSContext* cx, JS::HandleValue val);

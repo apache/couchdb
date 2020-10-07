@@ -22,7 +22,6 @@ basename=`basename $0`
 PACKAGE_AUTHOR_NAME="The Apache Software Foundation"
 
 # TEST=0
-WITH_CURL="false"
 WITH_PROPER="true"
 WITH_FAUXTON=1
 WITH_DOCS=1
@@ -47,11 +46,10 @@ Options:
 
   -h | --help                 display a short help message and exit
   -u | --user USER            set the username to run as (defaults to $COUCHDB_USER)
-  -c | --with-curl            request that couchjs is linked to cURL (default false)
   --disable-fauxton           do not build Fauxton
   --disable-docs              do not build any documentation or manpages
   --erlang-md5                use erlang for md5 hash operations
-  --dev                       alias for --with-curl --disable-docs --disable-fauxton
+  --dev                       alias for --disable-docs --disable-fauxton
   --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
   --skip-deps                 do not update erlang dependencies
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
@@ -64,12 +62,6 @@ parse_opts() {
             -h|--help)
                 display_help
                 exit
-                ;;
-
-            --with-curl|-c)
-                WITH_CURL="true"
-                shift
-                continue
                 ;;
 
             --without-proper)
@@ -117,7 +109,6 @@ parse_opts() {
             --dev)
                 WITH_DOCS=0
                 WITH_FAUXTON=0
-                WITH_CURL="true"
                 shift
                 continue
                 ;;
@@ -256,7 +247,6 @@ spidermonkey_version = $SM_VSN
 EOF
 
 cat > $rootdir/config.erl << EOF
-{with_curl, $WITH_CURL}.
 {with_proper, $WITH_PROPER}.
 {erlang_md5, $ERLANG_MD5}.
 {aegis_key_manager, "$AEGIS_KEY_MANAGER"}.

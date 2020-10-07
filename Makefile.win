@@ -86,9 +86,6 @@ DIALYZE_OPTS=skip_deps=$(skip_deps)
 
 EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
-#ignore javascript tests
-ignore_js_suites=
-
 TEST_OPTS=-c startup_jitter=0 -c default_security=admin_local
 
 ################################################################################
@@ -190,7 +187,7 @@ python-black: .venv/bin/black
 	@python.exe -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		.venv\Scripts\black.exe --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		build-aux dev\run test\javascript\run src\mango\test src\docs\src\conf.py src\docs\ext .
+		build-aux dev\run src\mango\test src\docs\src\conf.py src\docs\ext .
 
 python-black-update: .venv/bin/black
 	@python.exe -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -198,7 +195,7 @@ python-black-update: .venv/bin/black
 	@python.exe -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		.venv\Scripts\black.exe \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		build-aux dev\run test\javascript\run src\mango\test src\docs\src\conf.py src\docs\ext .
+		build-aux dev\run src\mango\test src\docs\src\conf.py src\docs\ext .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
@@ -236,26 +233,6 @@ elixir-check-formatted: elixir-init
 .PHONY: elixir-credo
 elixir-credo: elixir-init
 	@mix credo
-
-
-.PHONY: javascript
-# target: javascript - Run JavaScript test suites or specific ones defined by suites option
-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-javascript:
-	@$(MAKE) devclean
-	-@mkdir share\www\script\test
-ifeq ($(IN_RELEASE), true)
-	@copy test\javascript\tests\lorem*.txt share\www\script\test
-else
-	-@mkdir src\fauxton\dist\release\test
-	@copy test\javascript\tests\lorem*.txt src\fauxton\dist\release\test
-endif
-	@python dev\run -n 1 -q --with-admin-party-please \
-		    --enable-erlang-views \
-            $(TEST_OPTS) \
-            'python test\javascript\run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)"'
-
 
 .PHONY: check-qs
 # target: check-qs - Run query server tests (ruby and rspec required!)
@@ -427,7 +404,7 @@ devclean:
 config.erl:
 	@echo Apache CouchDB has not been configured.
 	@echo Try "powershell -ExecutionPolicy Bypass .\configure.ps1 -?" for help.
-	@echo You probably want "powershell -ExecutionPolicy Bypass .\configure.ps1 -WithCurl".
+	@echo You probably want "powershell -ExecutionPolicy Bypass .\configure.ps1".
 	@echo.
 	@false
 

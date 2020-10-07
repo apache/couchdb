@@ -13,9 +13,9 @@ Build & Test
 Once all dependencies are built and installed per the documentation in
 couchdb-glazier, these commands will configure and build CouchDB:
 
-    powershell -ExecutionPolicy Bypass .\configure.ps1 -WithCurl
+    powershell -ExecutionPolicy Bypass .\configure.ps1
     make -f Makefile.win check
 
 This will build couchdb, as well as run the eunit and javascript tests.
 
-As of CouchDB 2.0 RC1, all eunit and javascript tests should pass.
+As of CouchDB 2.0 RC1, all tests should pass.

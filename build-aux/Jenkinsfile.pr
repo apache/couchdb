@@ -21,7 +21,7 @@ cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
 . /usr/local/kerl/${KERL_VER}/activate
-./configure --with-curl
+./configure
 make check || (make build-report && false)
 '''
 
@@ -80,7 +80,7 @@ pipeline {
           set
           rm -rf apache-couchdb-*
           . /usr/local/kerl/${LOW_ERLANG_VER}/activate
-          ./configure --with-curl
+          ./configure
           make dist
           chmod -R a+w * .
         '''
