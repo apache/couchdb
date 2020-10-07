@@ -30,7 +30,6 @@
 #include <js/Wrapper.h>
 
 #include "config.h"
-#include "http.h"
 #include "util.h"
 
 static bool enableSharedMemory = true;
@@ -55,141 +54,6 @@ static JSClass global_class = {
     JSCLASS_GLOBAL_FLAGS,
     &global_ops
 };
-
-
-static void
-req_dtor(JSFreeOp* fop, JSObject* obj)
-{
-    http_dtor(fop, obj);
-}
-
-// With JSClass.construct.
-static const JSClassOps clsOps = {
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    req_dtor,
-    nullptr,
-    nullptr,
-    nullptr
-};
-
-static const JSClass CouchHTTPClass = {
-    "CouchHTTP",  /* name */
-    JSCLASS_HAS_PRIVATE | JSCLASS_HAS_RESERVED_SLOTS(2),        /* flags */
-    &clsOps
-};
-
-static bool
-req_ctor(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    bool ret;
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JSObject* obj = JS_NewObjectForConstructor(cx, &CouchHTTPClass, args);
-    if(!obj) {
-        JS_ReportErrorUTF8(cx, "Failed to create CouchHTTP instance");
-        return false;
-    }
-    ret = http_ctor(cx, obj);
-    args.rval().setObject(*obj);
-    return ret;
-}
-
-static bool
-req_open(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject obj(cx);
-    if (!args.computeThis(cx, &obj))
-        return false;
-    bool ret = false;
-
-    if(argc == 2) {
-        ret = http_open(cx, obj, args[0], args[1], JS::BooleanValue(false));
-    } else if(argc == 3) {
-        ret = http_open(cx, obj, args[0], args[1], args[2]);
-    } else {
-        JS_ReportErrorUTF8(cx, "Invalid call to CouchHTTP.open");
-    }
-
-    args.rval().setUndefined();
-    return ret;
-}
-
-
-static bool
-req_set_hdr(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject obj(cx);
-    if (!args.computeThis(cx, &obj))
-        return false;
-    bool ret = false;
-
-    if(argc == 2) {
-        ret = http_set_hdr(cx, obj, args[0], args[1]);
-    } else {
-        JS_ReportErrorUTF8(cx, "Invalid call to CouchHTTP.set_header");
-    }
-
-    args.rval().setUndefined();
-    return ret;
-}
-
-
-static bool
-req_send(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject obj(cx);
-    if (!args.computeThis(cx, &obj))
-        return false;
-    bool ret = false;
-
-    if(argc == 1) {
-        ret = http_send(cx, obj, args[0]);
-    } else {
-        JS_ReportErrorUTF8(cx, "Invalid call to CouchHTTP.send");
-    }
-
-    args.rval().setUndefined();
-    return ret;
-}
-
-static bool
-req_status(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject obj(cx);
-    if (!args.computeThis(cx, &obj))
-        return false;
-
-    int status = http_status(cx, obj);
-
-    if(status < 0)
-        return false;
-
-    args.rval().set(JS::Int32Value(status));
-    return true;
-}
-
-static bool
-base_url(JSContext *cx, unsigned int argc, JS::Value* vp)
-{
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JS::RootedObject obj(cx);
-    if (!args.computeThis(cx, &obj))
-        return false;
-
-    couch_args *cargs = static_cast<couch_args*>(JS_GetContextPrivate(cx));
-    JS::Value uri_val;
-    bool rc = http_uri(cx, obj, cargs, &uri_val);
-    args.rval().set(uri_val);
-    return rc;
-}
 
 static JSObject*
 NewSandbox(JSContext* cx, bool lazy)
@@ -358,43 +222,6 @@ seal(JSContext* cx, unsigned int argc, JS::Value* vp)
 }
 
 
-static bool
-js_sleep(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-
-    int duration = args[0].toInt32();
-
-#ifdef XP_WIN
-    Sleep(duration);
-#else
-    usleep(duration * 1000);
-#endif
-
-    return true;
-}
-
-JSPropertySpec CouchHTTPProperties[] = {
-    JS_PSG("status", req_status, 0),
-    JS_PSG("base_url", base_url, 0),
-    JS_PS_END
-};
-
-
-JSFunctionSpec CouchHTTPFunctions[] = {
-    JS_FN("_open", req_open, 3, 0),
-    JS_FN("_setRequestHeader", req_set_hdr, 2, 0),
-    JS_FN("_send", req_send, 1, 0),
-    JS_FS_END
-};
-
-
-JSFunctionSpec TestSuiteFunctions[] = {
-    JS_FN("sleep", js_sleep, 1, 0),
-    JS_FS_END
-};
-
-
 static JSFunctionSpec global_functions[] = {
     JS_FN("evalcx", evalcx, 0, 0),
     JS_FN("gc", gc, 0, 0),
@@ -428,7 +255,6 @@ int
 main(int argc, const char* argv[])
 {
     JSContext* cx = NULL;
-    JSObject* klass = NULL;
     int i;
 
     couch_args* args = couch_parse_args(argc, argv);
@@ -462,30 +288,6 @@ main(int argc, const char* argv[])
 
     if(couch_load_funcs(cx, global, global_functions) != true)
         return 1;
-
-    if(args->use_http) {
-        http_check_enabled();
-
-        klass = JS_InitClass(
-            cx, global,
-            NULL,
-            &CouchHTTPClass, req_ctor,
-            0,
-            CouchHTTPProperties, CouchHTTPFunctions,
-            NULL, NULL
-        );
-
-        if(!klass)
-        {
-            fprintf(stderr, "Failed to initialize CouchHTTP class.\n");
-            exit(2);
-        }
-    }
-
-    if(args->use_test_funs) {
-        if(couch_load_funcs(cx, global, TestSuiteFunctions) != true)
-            return 1;
-    }
 
     for(i = 0 ; args->scripts[i] ; i++) {
         const char* filename = args->scripts[i];

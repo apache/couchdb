@@ -22,7 +22,6 @@
 
 #include <jsapi.h>
 #include "config.h"
-#include "http.h"
 #include "utf8.h"
 #include "util.h"
 
@@ -48,105 +47,6 @@ static JSClass global_class = {
     JS_FinalizeStub,
     JSCLASS_NO_OPTIONAL_MEMBERS
 };
-
-
-static JSBool
-req_ctor(JSContext* cx, uintN argc, jsval* vp)
-{
-    JSBool ret;
-    JSObject* obj = JS_NewObjectForConstructor(cx, vp);
-    if(!obj) {
-        JS_ReportError(cx, "Failed to create CouchHTTP instance.\n");
-        return JS_FALSE;
-    }
-    ret = http_ctor(cx, obj);
-    JS_SET_RVAL(cx, vp, OBJECT_TO_JSVAL(obj));
-    return ret;
-}
-
-
-static void 
-req_dtor(JSContext* cx, JSObject* obj)
-{
-    http_dtor(cx, obj);
-}
-
-
-static JSBool
-req_open(JSContext* cx, uintN argc, jsval* vp)
-{
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    jsval* argv = JS_ARGV(cx, vp);
-    JSBool ret = JS_FALSE;
-
-    if(argc == 2) {
-        ret = http_open(cx, obj, argv[0], argv[1], JSVAL_FALSE);
-    } else if(argc == 3) {
-        ret = http_open(cx, obj, argv[0], argv[1], argv[2]);
-    } else {
-        JS_ReportError(cx, "Invalid call to CouchHTTP.open");
-    }
-
-    JS_SET_RVAL(cx, vp, JSVAL_VOID);
-    return ret;
-}
-
-
-static JSBool
-req_set_hdr(JSContext* cx, uintN argc, jsval* vp)
-{
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    jsval* argv = JS_ARGV(cx, vp);
-    JSBool ret = JS_FALSE;
-
-    if(argc == 2) {
-        ret = http_set_hdr(cx, obj, argv[0], argv[1]);
-    } else {
-        JS_ReportError(cx, "Invalid call to CouchHTTP.set_header");
-    }
-
-    JS_SET_RVAL(cx, vp, JSVAL_VOID);
-    return ret;
-}
-
-
-static JSBool
-req_send(JSContext* cx, uintN argc, jsval* vp)
-{
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    jsval* argv = JS_ARGV(cx, vp);
-    JSBool ret = JS_FALSE;
-
-    if(argc == 1) {
-        ret = http_send(cx, obj, argv[0]);
-    } else {
-        JS_ReportError(cx, "Invalid call to CouchHTTP.send");
-    }
-
-    JS_SET_RVAL(cx, vp, JSVAL_VOID);
-    return ret;
-}
-
-
-static JSBool
-req_status(JSContext* cx, JSObject* obj, jsid pid, jsval* vp)
-{
-    int status = http_status(cx, obj);
-    if(status < 0)
-        return JS_FALSE;
-
-    JS_SET_RVAL(cx, vp, INT_TO_JSVAL(status));
-    return JS_TRUE;
-}
-
-
-static JSBool
-base_url(JSContext *cx, JSObject* obj, jsid pid, jsval* vp)
-{
-    couch_args *args = (couch_args*)JS_GetContextPrivate(cx);
-    return http_uri(cx, obj, args, &JS_RVAL(cx, vp));
-}
-
 
 static JSBool
 evalcx(JSContext *cx, uintN argc, jsval* vp)
@@ -281,63 +181,6 @@ seal(JSContext* cx, uintN argc, jsval* vp)
 }
 
 
-static JSBool
-js_sleep(JSContext* cx, uintN argc, jsval* vp)
-{
-    jsval* argv = JS_ARGV(cx, vp);
-    int duration = 0;
-    if(!JS_ConvertArguments(cx, argc, argv, "/i", &duration)) {
-        return JS_FALSE;
-    }
-
-#ifdef XP_WIN
-    Sleep(duration);
-#else
-    usleep(duration * 1000);
-#endif
-
-    return JS_TRUE;
-}
-
-
-JSClass CouchHTTPClass = {
-    "CouchHTTP",
-    JSCLASS_HAS_PRIVATE
-        | JSCLASS_CONSTRUCT_PROTOTYPE
-        | JSCLASS_HAS_RESERVED_SLOTS(2),
-    JS_PropertyStub,
-    JS_PropertyStub,
-    JS_PropertyStub,
-    JS_StrictPropertyStub,
-    JS_EnumerateStub,
-    JS_ResolveStub,
-    JS_ConvertStub,
-    req_dtor,
-    JSCLASS_NO_OPTIONAL_MEMBERS
-};
-
-
-JSPropertySpec CouchHTTPProperties[] = {
-    {"status", 0, JSPROP_READONLY, req_status, NULL},
-    {"base_url", 0, JSPROP_READONLY | JSPROP_SHARED, base_url, NULL},
-    {0, 0, 0, 0, 0}
-};
-
-
-JSFunctionSpec CouchHTTPFunctions[] = {
-    JS_FS("_open", req_open, 3, 0),
-    JS_FS("_setRequestHeader", req_set_hdr, 2, 0),
-    JS_FS("_send", req_send, 1, 0),
-    JS_FS_END
-};
-
-
-JSFunctionSpec TestSuiteFunctions[] = {
-    JS_FS("sleep", js_sleep, 1, 0),
-    JS_FS_END
-};
-
-
 static JSFunctionSpec global_functions[] = {
     JS_FS("evalcx", evalcx, 0, 0),
     JS_FS("gc", gc, 0, 0),
@@ -376,7 +219,6 @@ main(int argc, const char* argv[])
     JSContext* cx = NULL;
     JSObject* global = NULL;
     JSCrossCompartmentCall *call = NULL;
-    JSObject* klass = NULL;
     JSSCRIPT_TYPE script;
     JSString* scriptsrc;
     const jschar* schars;
@@ -420,30 +262,6 @@ main(int argc, const char* argv[])
     if(couch_load_funcs(cx, global, global_functions) != JS_TRUE)
         return 1;
  
-    if(args->use_http) {
-        http_check_enabled();
-
-        klass = JS_InitClass(
-            cx, global,
-            NULL,
-            &CouchHTTPClass, req_ctor,
-            0,
-            CouchHTTPProperties, CouchHTTPFunctions,
-            NULL, NULL
-        );
-
-        if(!klass)
-        {
-            fprintf(stderr, "Failed to initialize CouchHTTP class.\n");
-            exit(2);
-        }
-    } 
-
-    if(args->use_test_funs) {
-        if(couch_load_funcs(cx, global, TestSuiteFunctions) != JS_TRUE)
-            return 1;
-    }
-
     for(i = 0 ; args->scripts[i] ; i++) {
         // Convert script source to jschars.
         scriptsrc = couch_readfile(cx, args->scripts[i]);
