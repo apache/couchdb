@@ -505,10 +505,6 @@ do_init(Job, #{} = JobData) ->
     update_job_state(State1).
 
 
-init_job_data(#{jtx := true} = JTx, Job, #{?REP_ID := RepId} = JobData, RepId,
-        _BaseId) ->
-    {Job, JobData, check_ownership(JTx, Job, JobData)};
-
 init_job_data(#{jtx := true} = JTx, Job, #{} = JobData, RepId, BaseId) ->
     #{
         ?REP := Rep,
