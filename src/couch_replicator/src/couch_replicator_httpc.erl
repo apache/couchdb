@@ -97,8 +97,8 @@ send_req(HttpDb, Params1, Callback) ->
 
 send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
     Method = get_value(method, Params, get),
-    UserHeaders = lists:keysort(1, get_value(headers, Params, [])),
-    Headers1 = lists:ukeymerge(1, UserHeaders, BaseHeaders),
+    UserHeaders = get_value(headers, Params, []),
+    Headers1 = merge_headers(BaseHeaders, UserHeaders),
     {Headers2, HttpDb} = couch_replicator_auth:update_headers(HttpDb0, Headers1),
     Url = full_url(HttpDb, Params),
     Body = get_value(body, Params, []),
@@ -493,3 +493,28 @@ backoff_before_request(Worker, HttpDb, Params) ->
         Sleep when Sleep == 0 ->
             ok
     end.
+
+
+merge_headers(Headers1, Headers2) when is_list(Headers1), is_list(Headers2) ->
+    Empty = mochiweb_headers:empty(),
+    Merged = mochiweb_headers:enter_from_list(Headers1 ++ Headers2, Empty),
+    mochiweb_headers:to_list(Merged).
+
+
+-ifdef(TEST).
+
+-include_lib("couch/include/couch_eunit.hrl").
+
+
+merge_headers_test() ->
+    Headers1 = [{"a", "x"}, {"a", "y"}, {"A", "z"}],
+    ?assertEqual([], merge_headers([], [])),
+    ?assertEqual([{"a", "x"}], merge_headers([], [{"a", "x"}])),
+    ?assertEqual([{"a", "x"}], merge_headers([{"a", "x"}], [])),
+    ?assertEqual([{"a", "y"}], merge_headers([{"A", "x"}], [{"a", "y"}])),
+    ?assertEqual([{"a", "y"}, {"B", "x"}], merge_headers([{"B", "x"}],
+        [{"a", "y"}])),
+    ?assertEqual([{"a", "y"}], merge_headers([{"A", "z"}, {"a", "y"}], [])),
+    ?assertEqual([{"a", "y"}], merge_headers([], [{"A", "z"}, {"a", "y"}])).
+
+-endif.
