@@ -32,6 +32,7 @@
 -export([with_process_restart/1, with_process_restart/2, with_process_restart/3]).
 -export([wait_process/1, wait_process/2]).
 -export([wait/1, wait/2, wait/3]).
+-export([wait_value/2, wait_other_value/2]).
 
 -export([start/1, start/2, start/3, stop/1]).
 
@@ -97,6 +98,8 @@ start_applications([App|Apps], Acc) when App == kernel; App == stdlib ->
     start_applications(Apps, Acc);
 start_applications([App|Apps], Acc) ->
     case application:start(App) of
+    {error, {already_started, crypto}} ->
+        start_applications(Apps, [crypto | Acc]);
     {error, {already_started, App}} ->
         io:format(standard_error, "Application ~s was left running!~n", [App]),
         application:stop(App),
@@ -221,6 +224,22 @@ wait(Fun, Timeout, Delay, Started, _Prev) ->
     Else ->
         Else
     end.
+
+wait_value(Fun, Value) ->
+    wait(fun() ->
+        case Fun() of
+            Value -> Value;
+            _ -> wait
+        end
+    end).
+
+wait_other_value(Fun, Value) ->
+    wait(fun() ->
+        case Fun() of
+            Value -> wait;
+            Other -> Other
+        end
+    end).
 
 start(Module) ->
     start(Module, [], []).

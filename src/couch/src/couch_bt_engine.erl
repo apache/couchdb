@@ -40,13 +40,18 @@
     get_purge_infos_limit/1,
     get_revs_limit/1,
     get_security/1,
+    get_props/1,
     get_size_info/1,
+    get_partition_info/2,
     get_update_seq/1,
     get_uuid/1,
 
     set_revs_limit/2,
     set_purge_infos_limit/2,
     set_security/2,
+    set_props/2,
+
+    set_update_seq/2,
 
     open_docs/2,
     open_local_docs/2,
@@ -57,6 +62,7 @@
     write_doc_body/2,
     write_doc_infos/3,
     purge_docs/3,
+    copy_purge_infos/2,
 
     commit_data/1,
 
@@ -102,22 +108,23 @@
 
 % Used by the compactor
 -export([
-    set_update_seq/2,
     update_header/2,
-    copy_security/2
+    copy_security/2,
+    copy_props/2
 ]).
 
 
+-include_lib("kernel/include/file.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_bt_engine.hrl").
 
 
 exists(FilePath) ->
-    case filelib:is_file(FilePath) of
+    case is_file(FilePath) of
         true ->
             true;
         false ->
-            filelib:is_file(FilePath ++ ".compact")
+            is_file(FilePath ++ ".compact")
     end.
 
 
@@ -143,8 +150,9 @@ init(FilePath, Options) ->
         true ->
             delete_compaction_files(FilePath),
             Header0 = couch_bt_engine_header:new(),
-            ok = couch_file:write_header(Fd, Header0),
-            Header0;
+            Header1 = init_set_props(Fd, Header0, Options),
+            ok = couch_file:write_header(Fd, Header1),
+            Header1;
         false ->
             case couch_file:read_header(Fd) of
                 {ok, Header0} ->
@@ -273,6 +281,48 @@ get_size_info(#st{} = St) ->
     ].
 
 
+partition_size_cb(traverse, Key, {DC, DDC, Sizes}, {Partition, DCAcc, DDCAcc, SizesAcc}) ->
+    case couch_partition:is_member(Key, Partition) of
+        true ->
+            {skip, {Partition, DC + DCAcc, DDC + DDCAcc, reduce_sizes(Sizes, SizesAcc)}};
+        false ->
+            {ok, {Partition, DCAcc, DDCAcc, SizesAcc}}
+    end;
+
+partition_size_cb(visit, FDI, _PrevReds, {Partition, DCAcc, DDCAcc, Acc}) ->
+    InPartition = couch_partition:is_member(FDI#full_doc_info.id, Partition),
+    Deleted = FDI#full_doc_info.deleted,
+    case {InPartition, Deleted} of
+        {true, true} ->
+            {ok, {Partition, DCAcc, DDCAcc + 1,
+                reduce_sizes(FDI#full_doc_info.sizes, Acc)}};
+        {true, false} ->
+            {ok, {Partition, DCAcc + 1, DDCAcc,
+                reduce_sizes(FDI#full_doc_info.sizes, Acc)}};
+        {false, _} ->
+            {ok, {Partition, DCAcc, DDCAcc, Acc}}
+    end.
+
+
+get_partition_info(#st{} = St, Partition) ->
+    StartKey = couch_partition:start_key(Partition),
+    EndKey = couch_partition:end_key(Partition),
+    Fun = fun partition_size_cb/4,
+    InitAcc = {Partition, 0, 0, #size_info{}},
+    Options = [{start_key, StartKey}, {end_key, EndKey}],
+    {ok, _, OutAcc} = couch_btree:fold(St#st.id_tree, Fun, InitAcc, Options),
+    {Partition, DocCount, DocDelCount, SizeInfo} = OutAcc,
+    [
+        {partition, Partition},
+        {doc_count, DocCount},
+        {doc_del_count, DocDelCount},
+        {sizes, [
+            {active, SizeInfo#size_info.active},
+            {external, SizeInfo#size_info.external}
+        ]}
+    ].
+
+
 get_security(#st{header = Header} = St) ->
     case couch_bt_engine_header:get(Header, security_ptr) of
         undefined ->
@@ -280,6 +330,16 @@ get_security(#st{header = Header} = St) ->
         Pointer ->
             {ok, SecProps} = couch_file:pread_term(St#st.fd, Pointer),
             SecProps
+    end.
+
+
+get_props(#st{header = Header} = St) ->
+    case couch_bt_engine_header:get(Header, props_ptr) of
+        undefined ->
+            [];
+        Pointer ->
+            {ok, Props} = couch_file:pread_term(St#st.fd, Pointer),
+            Props
     end.
 
 
@@ -317,6 +377,18 @@ set_security(#st{header = Header} = St, NewSecurity) ->
     NewSt = St#st{
         header = couch_bt_engine_header:set(Header, [
             {security_ptr, Ptr}
+        ]),
+        needs_commit = true
+    },
+    {ok, increment_update_seq(NewSt)}.
+
+
+set_props(#st{header = Header} = St, Props) ->
+    Options = [{compression, St#st.compression}],
+    {ok, Ptr, _} = couch_file:append_term(St#st.fd, Props, Options),
+    NewSt = St#st{
+        header = couch_bt_engine_header:set(Header, [
+            {props_ptr, Ptr}
         ]),
         needs_commit = true
     },
@@ -479,10 +551,23 @@ purge_docs(#st{} = St, Pairs, PurgeInfos) ->
     }}.
 
 
+copy_purge_infos(#st{} = St, PurgeInfos) ->
+    #st{
+        purge_tree = PurgeTree,
+        purge_seq_tree = PurgeSeqTree
+    } = St,
+    {ok, PurgeTree2} = couch_btree:add(PurgeTree, PurgeInfos),
+    {ok, PurgeSeqTree2} = couch_btree:add(PurgeSeqTree, PurgeInfos),
+    {ok, St#st{
+       purge_tree = PurgeTree2,
+       purge_seq_tree = PurgeSeqTree2,
+       needs_commit = true
+    }}.
+
+
 commit_data(St) ->
     #st{
         fd = Fd,
-        fsync_options = FsyncOptions,
         header = OldHeader,
         needs_commit = NeedsCommit
     } = St,
@@ -491,13 +576,9 @@ commit_data(St) ->
 
     case NewHeader /= OldHeader orelse NeedsCommit of
         true ->
-            Before = lists:member(before_header, FsyncOptions),
-            After = lists:member(after_header, FsyncOptions),
-
-            if Before -> couch_file:sync(Fd); true -> ok end,
+            couch_file:sync(Fd),
             ok = couch_file:write_header(Fd, NewHeader),
-            if After -> couch_file:sync(Fd); true -> ok end,
-
+            couch_file:sync(Fd),
             {ok, St#st{
                 header = NewHeader,
                 needs_commit = false
@@ -753,6 +834,17 @@ copy_security(#st{header = Header} = St, SecProps) ->
     }}.
 
 
+copy_props(#st{header = Header} = St, Props) ->
+    Options = [{compression, St#st.compression}],
+    {ok, Ptr, _} = couch_file:append_term(St#st.fd, Props, Options),
+    {ok, St#st{
+        header = couch_bt_engine_header:set(Header, [
+            {props_ptr, Ptr}
+        ]),
+        needs_commit = true
+    }}.
+
+
 open_db_file(FilePath, Options) ->
     case couch_file:open(FilePath, Options) of
         {ok, Fd} ->
@@ -776,14 +868,7 @@ open_db_file(FilePath, Options) ->
 
 
 init_state(FilePath, Fd, Header0, Options) ->
-    DefaultFSync = "[before_header, after_header, on_file_open]",
-    FsyncStr = config:get("couchdb", "fsync_options", DefaultFSync),
-    {ok, FsyncOptions} = couch_util:parse_term(FsyncStr),
-
-    case lists:member(on_file_open, FsyncOptions) of
-        true -> ok = couch_file:sync(Fd);
-        _ -> ok
-    end,
+    ok = couch_file:sync(Fd),
 
     Compression = couch_compress:get_compression_method(),
 
@@ -834,7 +919,6 @@ init_state(FilePath, Fd, Header0, Options) ->
         filepath = FilePath,
         fd = Fd,
         fd_monitor = erlang:monitor(process, Fd),
-        fsync_options = FsyncOptions,
         header = Header,
         needs_commit = false,
         id_tree = IdTree,
@@ -910,7 +994,7 @@ upgrade_purge_info(Fd, Header) ->
                 _ ->
                     {ok, PurgedIdsRevs} = couch_file:pread_term(Fd, Ptr),
 
-                    {Infos, NewSeq} = lists:foldl(fun({Id, Revs}, {InfoAcc, PSeq}) ->
+                    {Infos, _} = lists:foldl(fun({Id, Revs}, {InfoAcc, PSeq}) ->
                         Info = {PSeq, couch_uuids:random(), Id, Revs},
                         {[Info | InfoAcc], PSeq + 1}
                     end, {[], PurgeSeq}, PurgedIdsRevs),
@@ -936,6 +1020,18 @@ upgrade_purge_info(Fd, Header) ->
                         {purge_seq_tree_state, PurgeSeqTreeSt}
                     ])
             end
+    end.
+
+
+init_set_props(Fd, Header, Options) ->
+    case couch_util:get_value(props, Options) of
+        undefined ->
+            Header;
+        InitialProps ->
+            Compression = couch_compress:get_compression_method(),
+            AppendOpts = [{compression, Compression}],
+            {ok, Ptr, _} = couch_file:append_term(Fd, InitialProps, AppendOpts),
+            couch_bt_engine_header:set(Header, props_ptr, Ptr)
     end.
 
 
@@ -1140,3 +1236,11 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     {ok, NewSt2#st{
         filepath = FilePath
     }, undefined}.
+
+
+is_file(Path) ->
+    case file:read_file_info(Path, [raw]) of
+        {ok, #file_info{type = regular}} -> true;
+        {ok, #file_info{type = directory}} -> true;
+        _ -> false
+    end.

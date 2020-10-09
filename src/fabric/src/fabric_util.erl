@@ -14,11 +14,15 @@
 
 -export([submit_jobs/3, submit_jobs/4, cleanup/1, recv/4, get_db/1, get_db/2, error_info/1,
         update_counter/3, remove_ancestors/2, create_monitors/1, kv/2,
-        remove_down_workers/2, doc_id_and_rev/1]).
--export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0]).
+        remove_down_workers/2, remove_down_workers/3, doc_id_and_rev/1]).
+-export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0, view_timeout/1]).
 -export([log_timeout/2, remove_done_workers/2]).
--export([is_users_db/1, is_replicator_db/1, fake_db/2]).
+-export([is_users_db/1, is_replicator_db/1]).
+-export([open_cluster_db/1, open_cluster_db/2]).
+-export([is_partitioned/1]).
+-export([validate_all_docs_args/2, validate_args/3]).
 -export([upgrade_mrargs/1]).
+-export([worker_ranges/1]).
 
 -compile({inline, [{doc_id_and_rev,1}]}).
 
@@ -29,9 +33,12 @@
 -include_lib("eunit/include/eunit.hrl").
 
 remove_down_workers(Workers, BadNode) ->
+    remove_down_workers(Workers, BadNode, []).
+
+remove_down_workers(Workers, BadNode, RingOpts) ->
     Filter = fun(#shard{node = Node}, _) -> Node =/= BadNode end,
     NewWorkers = fabric_dict:filter(Filter, Workers),
-    case fabric_view:is_progress_possible(NewWorkers) of
+    case fabric_ring:is_progress_possible(NewWorkers, RingOpts) of
     true ->
         {ok, NewWorkers};
     false ->
@@ -48,7 +55,7 @@ submit_jobs(Shards, Module, EndPoint, ExtraArgs) ->
     end, Shards).
 
 cleanup(Workers) ->
-    [rexi:kill(Node, Ref) || #shard{node=Node, ref=Ref} <- Workers].
+    rexi:kill_all([{Node, Ref} || #shard{node = Node, ref = Ref} <- Workers]).
 
 recv(Workers, Keypos, Fun, Acc0) ->
     rexi_utils:recv(Workers, Keypos, Fun, Acc0, request_timeout(), infinity).
@@ -61,6 +68,13 @@ all_docs_timeout() ->
 
 attachments_timeout() ->
     timeout("attachments", "600000").
+
+view_timeout(Args) ->
+    PartitionQuery = couch_mrview_util:get_extra(Args, partition, false),
+    case PartitionQuery of
+        false -> timeout("view", "infinity");
+        _ -> timeout("partition_view", "infinity")
+    end.
 
 timeout(Type, Default) ->
     case config:get("fabric", Type ++ "_timeout", Default) of
@@ -214,7 +228,17 @@ is_users_db(DbName) ->
 path_ends_with(Path, Suffix) ->
     Suffix =:= couch_db:dbname_suffix(Path).
 
-fake_db(DbName, Opts) ->
+open_cluster_db(#shard{dbname = DbName, opts = Options}) ->
+    case couch_util:get_value(props, Options) of
+        Props when is_list(Props) ->
+            {ok, Db} = couch_db:clustered_db(DbName, [{props, Props}]),
+            Db;
+        _ ->
+            {ok, Db} = couch_db:clustered_db(DbName, []),
+            Db
+    end.
+
+open_cluster_db(DbName, Opts) ->
     {SecProps} = fabric:get_security(DbName), % as admin
     UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
     {ok, Db} = couch_db:clustered_db(DbName, UserCtx, SecProps),
@@ -226,6 +250,34 @@ kv(Item, Count) ->
 
 doc_id_and_rev(#doc{id=DocId, revs={RevNum, [RevHash|_]}}) ->
     {DocId, {RevNum, RevHash}}.
+
+
+is_partitioned(DbName0) when is_binary(DbName0) ->
+    Shards = mem3:shards(fabric:dbname(DbName0)),
+    is_partitioned(open_cluster_db(hd(Shards)));
+
+is_partitioned(Db) ->
+    couch_db:is_partitioned(Db).
+
+
+validate_all_docs_args(DbName, Args) when is_binary(DbName) ->
+    Shards = mem3:shards(fabric:dbname(DbName)),
+    Db = open_cluster_db(hd(Shards)),
+    validate_all_docs_args(Db, Args);
+
+validate_all_docs_args(Db, Args) ->
+    true = couch_db:is_clustered(Db),
+    couch_mrview_util:validate_all_docs_args(Db, Args).
+
+
+validate_args(DbName, DDoc, Args) when is_binary(DbName) ->
+    Shards = mem3:shards(fabric:dbname(DbName)),
+    Db = open_cluster_db(hd(Shards)),
+    validate_args(Db, DDoc, Args);
+
+validate_args(Db, DDoc, Args) ->
+    true = couch_db:is_clustered(Db),
+    couch_mrview_util:validate_args(Db, DDoc, Args).
 
 
 upgrade_mrargs(#mrargs{} = Args) ->
@@ -286,3 +338,10 @@ upgrade_mrargs({mrargs,
         sorted = Sorted,
         extra = Extra
     }.
+
+
+worker_ranges(Workers) ->
+    Ranges = fabric_dict:fold(fun(#shard{range=[X, Y]}, _, Acc) ->
+        [{X, Y} | Acc]
+    end, [], Workers),
+    lists:usort(Ranges).

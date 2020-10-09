@@ -32,7 +32,9 @@
     before_doc_update = nil, % nil | fun(Doc, Db) -> NewDoc
     after_doc_read = nil,    % nil | fun(Doc, Db) -> NewDoc
 
-    waiting_delayed_commit = nil,
+    % feature removed in 3.x, but field kept to avoid changing db record size
+    % and breaking rolling cluster upgrade
+    waiting_delayed_commit_deprecated,
 
     options = [],
     compression

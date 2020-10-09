@@ -35,6 +35,7 @@
     validate_sort/1,
     validate_fields/1,
     validate_bulk_delete/1,
+    validate_partitioned/1,
 
     default_limit/0
 ]).
@@ -71,6 +72,12 @@ validate_idx_create({Props}) ->
             {optional, true},
             {default, 2},
             {validator, fun is_pos_integer/1}
+        ]},
+        {<<"partitioned">>, [
+            {tag, partitioned},
+            {optional, true},
+            {default, db_default},
+            {validator, fun validate_partitioned/1}
         ]}
     ],
     validate(Props, Opts).
@@ -117,6 +124,12 @@ validate_find({Props}) ->
             {optional, true},
             {default, []},
             {validator, fun validate_fields/1}
+        ]},
+        {<<"partition">>, [
+            {tag, partition},
+            {optional, true},
+            {default, <<>>},
+            {validator, fun validate_partition/1}
         ]},
         {<<"r">>, [
             {tag, r},
@@ -299,6 +312,23 @@ validate_sort(Value) ->
 
 validate_fields(Value) ->
     mango_fields:new(Value).
+
+
+validate_partitioned(true) ->
+    {ok, true};
+validate_partitioned(false) ->
+    {ok, false};
+validate_partitioned(db_default) ->
+    {ok, db_default};
+validate_partitioned(Else) ->
+    ?MANGO_ERROR({invalid_partitioned_value, Else}).
+
+
+validate_partition(<<>>) ->
+    {ok, <<>>};
+validate_partition(Partition) ->
+    couch_partition:validate_partition(Partition),
+    {ok, Partition}.
 
 
 validate_opts([], Props, Acc) ->

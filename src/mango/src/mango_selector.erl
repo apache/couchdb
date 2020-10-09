@@ -52,15 +52,19 @@ normalize(Selector) ->
 % Match a selector against a #doc{} or EJSON value.
 % This assumes that the Selector has been normalized.
 % Returns true or false.
+match(Selector, D) ->
+    couch_stats:increment_counter([mango, evaluate_selector]),
+    match_int(Selector, D).
+
 
 % An empty selector matches any value.
-match({[]}, _) ->
+match_int({[]}, _) ->
     true;
 
-match(Selector, #doc{body=Body}) ->
+match_int(Selector, #doc{body=Body}) ->
     match(Selector, Body, fun mango_json:cmp/2);
 
-match(Selector, {Props}) ->
+match_int(Selector, {Props}) ->
     match(Selector, {Props}, fun mango_json:cmp/2).
 
 % Convert each operator into a normalized version as well
@@ -133,6 +137,11 @@ norm_ops({[{<<"$allMatch">>, {_}=Arg}]}) ->
     {[{<<"$allMatch">>, norm_ops(Arg)}]};
 norm_ops({[{<<"$allMatch">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$allMatch', Arg});
+
+norm_ops({[{<<"$keyMapMatch">>, {_}=Arg}]}) ->
+    {[{<<"$keyMapMatch">>, norm_ops(Arg)}]};
+norm_ops({[{<<"$keyMapMatch">>, Arg}]}) ->
+    ?MANGO_ERROR({bad_arg, '$keyMapMatch', Arg});
 
 norm_ops({[{<<"$size">>, Arg}]}) when is_integer(Arg), Arg >= 0 ->
     {[{<<"$size">>, Arg}]};
@@ -249,6 +258,10 @@ norm_fields({[{<<"$allMatch">>, Arg}]}, Path) ->
     Cond = {[{<<"$allMatch">>, norm_fields(Arg)}]},
     {[{Path, Cond}]};
 
+norm_fields({[{<<"$keyMapMatch">>, Arg}]}, Path) ->
+    Cond = {[{<<"$keyMapMatch">>, norm_fields(Arg)}]},
+    {[{Path, Cond}]};
+
 
 % The text operator operates against the internal
 % $default field. This also asserts that the $default
@@ -330,6 +343,9 @@ norm_negations({[{<<"$elemMatch">>, Arg}]}) ->
 norm_negations({[{<<"$allMatch">>, Arg}]}) ->
     {[{<<"$allMatch">>, norm_negations(Arg)}]};
 
+norm_negations({[{<<"$keyMapMatch">>, Arg}]}) ->
+    {[{<<"$keyMapMatch">>, norm_negations(Arg)}]};
+
 % All other conditions can't introduce negations anywhere
 % further down the operator tree.
 norm_negations(Cond) ->
@@ -399,10 +415,16 @@ negate({[{Field, Cond}]}) ->
     {[{Field, negate(Cond)}]}.
 
 
+% We need to treat an empty array as always true. This will be applied
+% for $or, $in, $all, $nin as well.
+match({[{<<"$and">>, []}]}, _, _) ->
+    true;
 match({[{<<"$and">>, Args}]}, Value, Cmp) ->
     Pred = fun(SubSel) -> match(SubSel, Value, Cmp) end,
     lists:all(Pred, Args);
 
+match({[{<<"$or">>, []}]}, _, _) ->
+    true;
 match({[{<<"$or">>, Args}]}, Value, Cmp) ->
     Pred = fun(SubSel) -> match(SubSel, Value, Cmp) end,
     lists:any(Pred, Args);
@@ -410,6 +432,8 @@ match({[{<<"$or">>, Args}]}, Value, Cmp) ->
 match({[{<<"$not">>, Arg}]}, Value, Cmp) ->
     not match(Arg, Value, Cmp);
 
+match({[{<<"$all">>, []}]}, _, _) ->
+    false;
 % All of the values in Args must exist in Values or
 % Values == hd(Args) if Args is a single element list
 % that contains a list.
@@ -479,6 +503,26 @@ match({[{<<"$allMatch">>, Arg}]}, [_ | _] = Values, Cmp) ->
 match({[{<<"$allMatch">>, _Arg}]}, _Value, _Cmp) ->
     false;
 
+% Matches when any key in the map value matches the
+% sub-selector Arg.
+match({[{<<"$keyMapMatch">>, Arg}]}, Value, Cmp) when is_tuple(Value) ->
+    try
+        lists:foreach(fun(V) ->
+            case match(Arg, V, Cmp) of
+                true -> throw(matched);
+                _ -> ok
+            end
+        end, [Key || {Key, _} <- element(1, Value)]),
+        false
+    catch
+        throw:matched ->
+            true;
+        _:_ ->
+            false
+    end;
+match({[{<<"$keyMapMatch">>, _Arg}]}, _Value, _Cmp) ->
+    false;
+
 % Our comparison operators are fairly straight forward
 match({[{<<"$lt">>, Arg}]}, Value, Cmp) ->
     Cmp(Value, Arg) < 0;
@@ -493,6 +537,8 @@ match({[{<<"$gte">>, Arg}]}, Value, Cmp) ->
 match({[{<<"$gt">>, Arg}]}, Value, Cmp) ->
     Cmp(Value, Arg) > 0;
 
+match({[{<<"$in">>, []}]}, _, _) ->
+    false;
 match({[{<<"$in">>, Args}]}, Values, Cmp) when is_list(Values)->
     Pred = fun(Arg) ->
         lists:foldl(fun(Value,Match) ->
@@ -504,6 +550,8 @@ match({[{<<"$in">>, Args}]}, Value, Cmp) ->
     Pred = fun(Arg) -> Cmp(Value, Arg) == 0 end,
     lists:any(Pred, Args);
 
+match({[{<<"$nin">>, []}]}, _, _) ->
+    true;
 match({[{<<"$nin">>, Args}]}, Values, Cmp) when is_list(Values)->
     not match({[{<<"$in">>, Args}]}, Values, Cmp);
 match({[{<<"$nin">>, Args}]}, Value, Cmp) ->
@@ -570,7 +618,7 @@ match({[_, _ | _] = _Props} = Sel, _Value, _Cmp) ->
     erlang:error({unnormalized_selector, Sel}).
 
 
-% Returns true if Selector requires all  
+% Returns true if Selector requires all
 % fields in RequiredFields to exist in any matching documents.
 
 % For each condition in the selector, check
@@ -600,13 +648,13 @@ has_required_fields_int(Selector, RequiredFields) when not is_list(Selector) ->
 
 % We can "see" through $and operator. Iterate
 % through the list of child operators.
-has_required_fields_int([{[{<<"$and">>, Args}]}], RequiredFields) 
+has_required_fields_int([{[{<<"$and">>, Args}]}], RequiredFields)
         when is_list(Args) ->
     has_required_fields_int(Args, RequiredFields);
 
 % We can "see" through $or operator. Required fields
 % must be covered by all children.
-has_required_fields_int([{[{<<"$or">>, Args}]} | Rest], RequiredFields) 
+has_required_fields_int([{[{<<"$or">>, Args}]} | Rest], RequiredFields)
         when is_list(Args) ->
     Remainder0 = lists:foldl(fun(Arg, Acc) ->
         % for each child test coverage against the full
@@ -623,7 +671,7 @@ has_required_fields_int([{[{<<"$or">>, Args}]} | Rest], RequiredFields)
 
 % Handle $and operator where it has peers. Required fields
 % can be covered by any child.
-has_required_fields_int([{[{<<"$and">>, Args}]} | Rest], RequiredFields) 
+has_required_fields_int([{[{<<"$and">>, Args}]} | Rest], RequiredFields)
         when is_list(Args) ->
     Remainder = has_required_fields_int(Args, RequiredFields),
     has_required_fields_int(Rest, Remainder);

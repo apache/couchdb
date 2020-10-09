@@ -13,6 +13,7 @@
 
 
 import mango
+import user_docs
 
 
 class BasicFindTests(mango.UserDocsTests):

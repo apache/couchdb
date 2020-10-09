@@ -225,12 +225,11 @@ has_quorum(Resps, Count, W) ->
 
 
 -ifdef(TEST).
-
 -include_lib("eunit/include/eunit.hrl").
 
 purge_test_() ->
     {
-        foreach,
+        setup,
         fun setup/0,
         fun teardown/1,
         [

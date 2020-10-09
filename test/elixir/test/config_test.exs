@@ -2,6 +2,7 @@ defmodule ConfigTest do
   use CouchTestCase
 
   @moduletag :config
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB config API
@@ -173,5 +174,12 @@ defmodule ConfigTest do
     Enum.each(sections, fn section ->
       set_config(context, section, "wohali", "rules", 403)
     end)
+  end
+
+  test "Reload config", context do
+    url = "#{context[:config_url]}/_reload"
+    resp = Couch.post(url)
+
+    assert resp.status_code == 200
   end
 end

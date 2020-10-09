@@ -2,16 +2,15 @@ defmodule ReplicationTest do
   use CouchTestCase
 
   @moduledoc """
-  Test CouchDB View Collation Behavior
+  Test CouchDB Replication Behavior
   This is a port of the view_collation.js suite
   """
+  
+  @moduletag kind: :cluster
+  @moduletag :replication
 
   # TODO: Parameterize these
-  @admin_account "adm:pass"
   @db_pairs_prefixes [
-    {"local-to-local", "", ""},
-    {"remote-to-local", "http://127.0.0.1:15984/", ""},
-    {"local-to-remote", "", "http://127.0.0.1:15984/"},
     {"remote-to-remote", "http://127.0.0.1:15984/", "http://127.0.0.1:15984/"}
   ]
 
@@ -19,20 +18,11 @@ defmodule ReplicationTest do
   # happens for JavaScript tests.
   @moduletag config: [{"replicator", "startup_jitter", "0"}]
 
-  test "source database does not exist" do
-    name = random_db_name()
-    check_not_found(name <> "_src", name <> "_tgt")
-  end
-
-  test "source database not found with path - COUCHDB-317" do
-    name = random_db_name()
-    check_not_found(name <> "_src", name <> "_tgt")
-  end
-
   test "source database not found with host" do
     name = random_db_name()
-    url = "http://127.0.0.1:15984/" <> name <> "_src"
-    check_not_found(url, name <> "_tgt")
+    src_url = "http://127.0.0.1:15984/" <> name <> "_src"
+    tgt_url = "http://127.0.0.1:15984/" <> name <> "_tgt"
+    check_not_found(src_url, tgt_url)
   end
 
   def check_not_found(src, tgt) do
@@ -53,7 +43,9 @@ defmodule ReplicationTest do
     doc = %{"_id" => "doc1"}
     [doc] = save_docs(src_db_name, [doc])
 
-    result = replicate(src_db_name, "http://127.0.0.1:15984/" <> tgt_db_name)
+    repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
     assert result["ok"]
     assert is_list(result["history"])
     history = Enum.at(result["history"], 0)
@@ -77,14 +69,16 @@ defmodule ReplicationTest do
 
     [doc] = save_docs(src_db_name, [doc])
 
-    result = replicate(src_db_name, "http://127.0.0.1:15984/" <> tgt_db_name)
+    repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
 
     assert result["ok"]
     assert is_list(result["history"])
     assert length(result["history"]) == 2
     history = Enum.at(result["history"], 0)
-    assert history["docs_written"] == 1
-    assert history["docs_read"] == 1
+    assert history["docs_written"] == 2
+    assert history["docs_read"] == 2
     assert history["doc_write_failures"] == 0
 
     query = %{
@@ -125,7 +119,8 @@ defmodule ReplicationTest do
 
     repl_body = %{:continuous => true, :create_target => true}
     repl_src = "http://127.0.0.1:15984/" <> src_db_name
-    result = replicate(repl_src, tgt_db_name, body: repl_body)
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt, body: repl_body)
 
     assert result["ok"]
     assert is_binary(result["_local_id"])
@@ -165,8 +160,9 @@ defmodule ReplicationTest do
     save_docs(src_db_name, make_docs(1..6))
 
     repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
     repl_body = %{"continuous" => true}
-    result = replicate(repl_src, tgt_db_name, body: repl_body)
+    result = replicate(repl_src, repl_tgt, body: repl_body)
 
     assert result["ok"]
     assert is_binary(result["_local_id"])
@@ -280,13 +276,19 @@ defmodule ReplicationTest do
         end
       end
 
-    result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
+    repl_src = src_prefix <> src_db_name
+    repl_tgt = tgt_prefix <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
     assert result["ok"]
 
-    src_info = get_db_info(src_db_name)
-    tgt_info = get_db_info(tgt_db_name)
+    src_info =
+      retry_until(fn ->
+        src_info = get_db_info(src_db_name)
+        tgt_info = get_db_info(tgt_db_name)
 
-    assert src_info["doc_count"] == tgt_info["doc_count"]
+        assert src_info["doc_count"] == tgt_info["doc_count"]
+        src_info
+      end)
 
     assert is_binary(result["session_id"])
     assert is_list(result["history"])
@@ -338,10 +340,12 @@ defmodule ReplicationTest do
     result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
     assert result["ok"]
 
-    src_info = get_db_info(src_db_name)
-    tgt_info = get_db_info(tgt_db_name)
+    retry_until(fn ->
+      src_info = get_db_info(src_db_name)
+      tgt_info = get_db_info(tgt_db_name)
 
-    assert tgt_info["doc_count"] == src_info["doc_count"]
+      assert tgt_info["doc_count"] == src_info["doc_count"]
+    end)
 
     assert is_binary(result["session_id"])
     assert is_list(result["history"])
@@ -350,10 +354,10 @@ defmodule ReplicationTest do
     assert history["session_id"] == result["session_id"]
     assert is_binary(history["start_time"])
     assert is_binary(history["end_time"])
-    assert history["missing_checked"] == 6
-    assert history["missing_found"] == 6
-    assert history["docs_read"] == 6
-    assert history["docs_written"] == 6
+    assert history["missing_checked"] == 27
+    assert history["missing_found"] == 27
+    assert history["docs_read"] == 27
+    assert history["docs_written"] == 27
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/#{new_doc["_id"]}").body
@@ -400,20 +404,22 @@ defmodule ReplicationTest do
     result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
     assert result["ok"]
 
-    src_info = get_db_info(src_db_name)
-    tgt_info = get_db_info(tgt_db_name)
+    retry_until(fn ->
+      src_info = get_db_info(src_db_name)
+      tgt_info = get_db_info(tgt_db_name)
 
-    assert tgt_info["doc_count"] == src_info["doc_count"]
-    assert tgt_info["doc_del_count"] == src_info["doc_del_count"]
-    assert tgt_info["doc_del_count"] == 1
+      assert tgt_info["doc_count"] == src_info["doc_count"]
+      assert tgt_info["doc_del_count"] == src_info["doc_del_count"]
+      assert tgt_info["doc_del_count"] == 1
+    end)
 
     assert is_list(result["history"])
     assert length(result["history"]) == 3
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 28
+    assert history["missing_found"] == 28
+    assert history["docs_read"] == 28
+    assert history["docs_written"] == 28
     assert history["doc_write_failures"] == 0
 
     resp = Couch.get("/#{tgt_db_name}/#{del_doc["_id"]}")
@@ -442,10 +448,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 4
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 29
+    assert history["missing_found"] == 29
+    assert history["docs_read"] == 29
+    assert history["docs_written"] == 29
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -469,10 +475,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 5
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 30
+    assert history["missing_found"] == 30
+    assert history["docs_read"] == 30
+    assert history["docs_written"] == 30
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -498,10 +504,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 6
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 31
+    assert history["missing_found"] == 31
+    assert history["docs_read"] == 31
+    assert history["docs_written"] == 31
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -530,10 +536,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 7
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 3
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 34
+    assert history["missing_found"] == 32
+    assert history["docs_read"] == 32
+    assert history["docs_written"] == 32
     assert history["doc_write_failures"] == 0
 
     docs = [
@@ -555,10 +561,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 8
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 2
-    assert history["missing_found"] == 0
-    assert history["docs_read"] == 0
-    assert history["docs_written"] == 0
+    assert history["missing_checked"] == 36
+    assert history["missing_found"] == 32
+    assert history["docs_read"] == 32
+    assert history["docs_written"] == 32
     assert history["doc_write_failures"] == 0
 
     # Test nothing to replicate
@@ -701,14 +707,16 @@ defmodule ReplicationTest do
 
     replicate(repl_src, repl_tgt, body: %{:create_target => true})
 
-    src_info = get_db_info(src_db_name)
-    tgt_info = get_db_info(tgt_db_name)
+    retry_until(fn ->
+      src_info = get_db_info(src_db_name)
+      tgt_info = get_db_info(tgt_db_name)
 
-    assert tgt_info["doc_count"] == src_info["doc_count"]
+      assert tgt_info["doc_count"] == src_info["doc_count"]
 
-    src_shards = seq_to_shards(src_info["update_seq"])
-    tgt_shards = seq_to_shards(tgt_info["update_seq"])
-    assert tgt_shards == src_shards
+      src_shards = seq_to_shards(src_info["update_seq"])
+      tgt_shards = seq_to_shards(tgt_info["update_seq"])
+      assert tgt_shards == src_shards
+    end)
   end
 
   def run_filtered_repl(src_prefix, tgt_prefix) do
@@ -816,10 +824,10 @@ defmodule ReplicationTest do
     assert length(result["history"]) == 2
     history = Enum.at(result["history"], 0)
 
-    assert history["missing_checked"] == 3
-    assert history["missing_found"] == 3
-    assert history["docs_read"] == 3
-    assert history["docs_written"] == 3
+    assert history["missing_checked"] == 19
+    assert history["missing_found"] == 19
+    assert history["docs_read"] == 19
+    assert history["docs_written"] == 19
     assert history["doc_write_failures"] == 0
   end
 
@@ -978,8 +986,11 @@ defmodule ReplicationTest do
     repl_src = src_prefix <> src_db_name
     repl_tgt = tgt_prefix <> tgt_db_name
 
-    create_db(src_db_name)
-    create_db(tgt_db_name)
+    retry_until(fn ->
+      create_db(src_db_name)
+      create_db(tgt_db_name)
+    end)
+
     delete_on_exit([src_db_name, tgt_db_name])
 
     docs = make_docs(1..10)
@@ -1043,8 +1054,10 @@ defmodule ReplicationTest do
       end
     end)
 
-    tgt_info = get_db_info(tgt_db_name)
-    assert tgt_info["doc_count"] == total_replicated
+    retry_until(fn ->
+      tgt_info = get_db_info(tgt_db_name)
+      assert tgt_info["doc_count"] == total_replicated
+    end)
 
     doc_ids_after = test_data[:after]
 
@@ -1098,10 +1111,12 @@ defmodule ReplicationTest do
       end
     end)
 
-    tgt_info = get_db_info(tgt_db_name)
+    retry_until(fn ->
+      tgt_info = get_db_info(tgt_db_name)
 
-    assert tgt_info["doc_count"] == total_replicated + total_replicated_after,
-           "#{inspect(test_data)}"
+      assert tgt_info["doc_count"] == total_replicated + total_replicated_after,
+             "#{inspect(test_data)}"
+    end)
 
     # Update a source document and re-replicate (no conflict introduced)
     conflict_id = test_data[:conflict_id]
@@ -1172,16 +1187,18 @@ defmodule ReplicationTest do
 
     result = replicate(repl_src, repl_tgt, body: repl_body)
     assert result["ok"]
-    assert result["docs_read"] == 1
-    assert result["docs_written"] == 1
+    assert result["docs_read"] == 2
+    assert result["docs_written"] == 2
     assert result["doc_write_failures"] == 0
 
-    copy = Couch.get!("/#{tgt_db_name}/#{conflict_id}", query: query).body
-    assert String.match?(copy["_rev"], ~r/^5-/)
-    assert is_list(copy["_conflicts"])
-    assert length(copy["_conflicts"]) == 1
-    conflict_rev = Enum.at(copy["_conflicts"], 0)
-    assert String.match?(conflict_rev, ~r/^5-/)
+    retry_until(fn ->
+      copy = Couch.get!("/#{tgt_db_name}/#{conflict_id}", query: query).body
+      assert String.match?(copy["_rev"], ~r/^5-/)
+      assert is_list(copy["_conflicts"])
+      assert length(copy["_conflicts"]) == 1
+      conflict_rev = Enum.at(copy["_conflicts"], 0)
+      assert String.match?(conflict_rev, ~r/^5-/)
+    end)
   end
 
   def run_continuous_repl(src_prefix, tgt_prefix) do
@@ -1569,30 +1586,6 @@ defmodule ReplicationTest do
     resp.body
   end
 
-  def replicate(src, tgt, options \\ []) do
-    {userinfo, options} = Keyword.pop(options, :userinfo)
-
-    userinfo =
-      if userinfo == nil do
-        @admin_account
-      else
-        userinfo
-      end
-
-    src = set_user(src, userinfo)
-    tgt = set_user(tgt, userinfo)
-
-    defaults = [headers: [], body: %{}, timeout: 30_000]
-    options = defaults |> Keyword.merge(options) |> Enum.into(%{})
-
-    %{body: body} = options
-    body = [source: src, target: tgt] |> Enum.into(body)
-    options = Map.put(options, :body, body)
-
-    resp = Couch.post("/_replicate", Enum.to_list(options))
-    assert HTTPotion.Response.success?(resp), "#{inspect(resp)}"
-    resp.body
-  end
 
   def cancel_replication(src, tgt) do
     body = %{:cancel => true}
@@ -1606,7 +1599,7 @@ defmodule ReplicationTest do
 
   def get_db_changes(db_name, query \\ %{}) do
     resp = Couch.get("/#{db_name}/_changes", query: query)
-    assert HTTPotion.Response.success?(resp), "#{inspect(resp)}"
+    assert HTTPotion.Response.success?(resp), "#{inspect(resp)} #{inspect(query)}"
     resp.body
   end
 
@@ -1646,9 +1639,11 @@ defmodule ReplicationTest do
         %{:w => 3}
       end
 
-    resp = Couch.put(uri, headers: headers, query: params, body: att[:body])
-    assert HTTPotion.Response.success?(resp)
-    Map.put(doc, "_rev", resp.body["rev"])
+    retry_until(fn ->
+      resp = Couch.put(uri, headers: headers, query: params, body: att[:body])
+      assert HTTPotion.Response.success?(resp)
+      Map.put(doc, "_rev", resp.body["rev"])
+    end)
   end
 
   def wait_for_repl(src_db_name, repl_id, expect_revs_checked) do
@@ -1661,7 +1656,7 @@ defmodule ReplicationTest do
 
   def wait_for_repl(src_db_name, repl_id, expect_revs_checked, wait_left) do
     task = get_task(repl_id, 0)
-    through_seq = task["through_seq"]
+    through_seq = task["through_seq"] || "0"
     revs_checked = task["revisions_checked"]
     changes = get_db_changes(src_db_name, %{:since => through_seq})
 
@@ -1720,25 +1715,12 @@ defmodule ReplicationTest do
     end)
   end
 
-  def set_user(uri, userinfo) do
-    case URI.parse(uri) do
-      %{scheme: nil} ->
-        uri
-
-      %{userinfo: nil} = uri ->
-        URI.to_string(Map.put(uri, :userinfo, userinfo))
-
-      _ ->
-        uri
-    end
-  end
-
   def get_att1_data do
-    File.read!("test/data/lorem.txt")
+    File.read!(Path.expand("data/lorem.txt", __DIR__))
   end
 
   def get_att2_data do
-    File.read!("test/data/lorem_b64.txt")
+    File.read!(Path.expand("data/lorem_b64.txt", __DIR__))
   end
 
   def cmp_json(lhs, rhs) when is_map(lhs) and is_map(rhs) do

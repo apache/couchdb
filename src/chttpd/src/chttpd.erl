@@ -52,8 +52,9 @@
     req,
     code,
     headers,
-    first_chunk,
-    resp=nil
+    chunks,
+    resp=nil,
+    buffer_response=false
 }).
 
 start_link() ->
@@ -265,6 +266,7 @@ handle_request_int(MochiReq) ->
 
 before_request(HttpReq) ->
     try
+        chttpd_stats:init(),
         chttpd_plugin:before_request(HttpReq)
     catch Tag:Error ->
         {error, catch_error(HttpReq, Tag, Error)}
@@ -280,6 +282,7 @@ after_request(HttpReq, HttpResp0) ->
             {ok, HttpResp0#httpd_resp{status = aborted}}
         end,
     HttpResp2 = update_stats(HttpReq, HttpResp1),
+    chttpd_stats:report(HttpReq, HttpResp2),
     maybe_log(HttpReq, HttpResp2),
     HttpResp2.
 
@@ -691,9 +694,15 @@ etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->
     etag_match(Req, binary_to_list(CurrentEtag));
 
 etag_match(Req, CurrentEtag) ->
-    EtagsToMatch = string:tokens(
+    EtagsToMatch0 = string:tokens(
         chttpd:header_value(Req, "If-None-Match", ""), ", "),
+    EtagsToMatch = lists:map(fun strip_weak_prefix/1, EtagsToMatch0),
     lists:member(CurrentEtag, EtagsToMatch).
+
+strip_weak_prefix([$W, $/ | Etag]) ->
+    Etag;
+strip_weak_prefix(Etag) ->
+    Etag.
 
 etag_respond(Req, CurrentEtag, RespFun) ->
     case etag_match(Req, CurrentEtag) of
@@ -734,6 +743,8 @@ start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
     end,
     {ok, Resp}.
 
+send_chunk({remote, _Pid, _Ref} = Resp, Data) ->
+    couch_httpd:send_chunk(Resp, Data);
 send_chunk(Resp, Data) ->
     Resp:write_chunk(Data),
     {ok, Resp}.
@@ -770,11 +781,14 @@ start_json_response(Req, Code, Headers0) ->
 end_json_response(Resp) ->
     couch_httpd:end_json_response(Resp).
 
+
 start_delayed_json_response(Req, Code) ->
     start_delayed_json_response(Req, Code, []).
 
+
 start_delayed_json_response(Req, Code, Headers) ->
     start_delayed_json_response(Req, Code, Headers, "").
+
 
 start_delayed_json_response(Req, Code, Headers, FirstChunk) ->
     {ok, #delayed_resp{
@@ -782,10 +796,13 @@ start_delayed_json_response(Req, Code, Headers, FirstChunk) ->
         req = Req,
         code = Code,
         headers = Headers,
-        first_chunk = FirstChunk}}.
+        chunks = [FirstChunk],
+        buffer_response = buffer_response(Req)}}.
+
 
 start_delayed_chunked_response(Req, Code, Headers) ->
     start_delayed_chunked_response(Req, Code, Headers, "").
+
 
 start_delayed_chunked_response(Req, Code, Headers, FirstChunk) ->
     {ok, #delayed_resp{
@@ -793,24 +810,34 @@ start_delayed_chunked_response(Req, Code, Headers, FirstChunk) ->
         req = Req,
         code = Code,
         headers = Headers,
-        first_chunk = FirstChunk}}.
+        chunks = [FirstChunk],
+        buffer_response = buffer_response(Req)}}.
 
-send_delayed_chunk(#delayed_resp{}=DelayedResp, Chunk) ->
+
+send_delayed_chunk(#delayed_resp{buffer_response=false}=DelayedResp, Chunk) ->
     {ok, #delayed_resp{resp=Resp}=DelayedResp1} =
         start_delayed_response(DelayedResp),
     {ok, Resp} = send_chunk(Resp, Chunk),
-    {ok, DelayedResp1}.
+    {ok, DelayedResp1};
+
+send_delayed_chunk(#delayed_resp{buffer_response=true}=DelayedResp, Chunk) ->
+    #delayed_resp{chunks = Chunks} = DelayedResp,
+    {ok, DelayedResp#delayed_resp{chunks = [Chunk | Chunks]}}.
+
 
 send_delayed_last_chunk(Req) ->
     send_delayed_chunk(Req, []).
+
 
 send_delayed_error(#delayed_resp{req=Req,resp=nil}=DelayedResp, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
     {ok, Resp} = send_error(Req, Code, ErrorStr, ReasonStr),
     {ok, DelayedResp#delayed_resp{resp=Resp}};
-send_delayed_error(#delayed_resp{resp=Resp}, Reason) ->
+send_delayed_error(#delayed_resp{resp=Resp, req=Req}, Reason) ->
+    update_timeout_stats(Reason, Req),
     log_error_with_stack_trace(Reason),
     throw({http_abort, Resp, Reason}).
+
 
 close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
     % Use a separate chunk to close the streamed array to maintain strict
@@ -820,10 +847,27 @@ close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
 close_delayed_json_object(Resp, Buffer, Terminator, _Threshold) ->
     send_delayed_chunk(Resp, [Buffer | Terminator]).
 
-end_delayed_json_response(#delayed_resp{}=DelayedResp) ->
+
+end_delayed_json_response(#delayed_resp{buffer_response=false}=DelayedResp) ->
     {ok, #delayed_resp{resp=Resp}} =
         start_delayed_response(DelayedResp),
+    end_json_response(Resp);
+
+end_delayed_json_response(#delayed_resp{buffer_response=true}=DelayedResp) ->
+    #delayed_resp{
+        start_fun = StartFun,
+        req = Req,
+        code = Code,
+        headers = Headers,
+        chunks = Chunks
+    } = DelayedResp,
+    {ok, Resp} = StartFun(Req, Code, Headers),
+    lists:foreach(fun
+        ([]) -> ok;
+        (Chunk) -> send_chunk(Resp, Chunk)
+    end, lists:reverse(Chunks)),
     end_json_response(Resp).
+
 
 get_delayed_req(#delayed_resp{req=#httpd{mochi_req=MochiReq}}) ->
     MochiReq;
@@ -836,7 +880,7 @@ start_delayed_response(#delayed_resp{resp=nil}=DelayedResp) ->
         req=Req,
         code=Code,
         headers=Headers,
-        first_chunk=FirstChunk
+        chunks=[FirstChunk]
     }=DelayedResp,
     {ok, Resp} = StartFun(Req, Code, Headers),
     case FirstChunk of
@@ -846,6 +890,18 @@ start_delayed_response(#delayed_resp{resp=nil}=DelayedResp) ->
     {ok, DelayedResp#delayed_resp{resp=Resp}};
 start_delayed_response(#delayed_resp{}=DelayedResp) ->
     {ok, DelayedResp}.
+
+
+buffer_response(Req) ->
+    case chttpd:qs_value(Req, "buffer_response") of
+        "false" ->
+            false;
+        "true" ->
+            true;
+        _ ->
+            config:get_boolean("chttpd", "buffer_response", false)
+    end.
+
 
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});
@@ -873,6 +929,11 @@ error_info(conflict) ->
     {409, <<"conflict">>, <<"Document update conflict.">>};
 error_info({conflict, _}) ->
     {409, <<"conflict">>, <<"Document update conflict.">>};
+error_info({partition_overflow, DocId}) ->
+    Descr = <<
+            "Partition limit exceeded due to update on '", DocId/binary, "'"
+        >>,
+    {403, <<"partition_overflow">>, Descr};
 error_info({{not_found, missing}, {_, _}}) ->
     {409, <<"not_found">>, <<"missing_rev">>};
 error_info({forbidden, Error, Msg}) ->
@@ -905,6 +966,8 @@ error_info({error, {illegal_database_name, Name}}) ->
     {400, <<"illegal_database_name">>, Message};
 error_info({illegal_docid, Reason}) ->
     {400, <<"illegal_docid">>, Reason};
+error_info({illegal_partition, Reason}) ->
+    {400, <<"illegal_partition">>, Reason};
 error_info({_DocID,{illegal_docid,DocID}}) ->
     {400, <<"illegal_docid">>,DocID};
 error_info({error, {database_name_too_long, DbName}}) ->
@@ -1013,15 +1076,15 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
 error_headers(_, Code, _, _) ->
     {Code, []}.
 
-send_error(_Req, {already_sent, Resp, _Error}) ->
-    {ok, Resp};
+send_error(#httpd{} = Req, Error) ->
+    update_timeout_stats(Error, Req),
 
-send_error(Req, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
     {Code1, Headers} = error_headers(Req, Code, ErrorStr, ReasonStr),
     send_error(Req, Code1, Headers, ErrorStr, ReasonStr, json_stack(Error)).
 
-send_error(Req, Code, ErrorStr, ReasonStr) ->
+send_error(#httpd{} = Req, Code, ErrorStr, ReasonStr) ->
+    update_timeout_stats(ErrorStr, Req),
     send_error(Req, Code, [], ErrorStr, ReasonStr, []).
 
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, []) ->
@@ -1035,6 +1098,33 @@ send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
         {<<"reason">>, ReasonStr} |
         case Stack of [] -> []; _ -> [{<<"ref">>, stack_hash(Stack)}] end
     ]}).
+
+update_timeout_stats(<<"timeout">>, #httpd{requested_path_parts = PathParts}) ->
+    update_timeout_stats(PathParts);
+update_timeout_stats(timeout, #httpd{requested_path_parts = PathParts}) ->
+    update_timeout_stats(PathParts);
+update_timeout_stats(_, _) ->
+    ok.
+
+update_timeout_stats([_, <<"_partition">>, _, <<"_design">>, _,
+        <<"_view">> | _]) ->
+    couch_stats:increment_counter([couchdb, httpd, partition_view_timeouts]);
+update_timeout_stats([_, <<"_partition">>, _, <<"_find">>| _]) ->
+    couch_stats:increment_counter([couchdb, httpd, partition_find_timeouts]);
+update_timeout_stats([_, <<"_partition">>, _, <<"_explain">>| _]) ->
+    couch_stats:increment_counter([couchdb, httpd, partition_explain_timeouts]);
+update_timeout_stats([_, <<"_partition">>, _, <<"_all_docs">> | _]) ->
+    couch_stats:increment_counter([couchdb, httpd, partition_all_docs_timeouts]);
+update_timeout_stats([_, <<"_design">>, _, <<"_view">> | _]) ->
+    couch_stats:increment_counter([couchdb, httpd, view_timeouts]);
+update_timeout_stats([_, <<"_find">>| _]) ->
+    couch_stats:increment_counter([couchdb, httpd, find_timeouts]);
+update_timeout_stats([_, <<"_explain">>| _]) ->
+    couch_stats:increment_counter([couchdb, httpd, explain_timeouts]);
+update_timeout_stats([_, <<"_all_docs">> | _]) ->
+    couch_stats:increment_counter([couchdb, httpd, all_docs_timeouts]);
+update_timeout_stats(_) ->
+    ok.
 
 % give the option for list functions to output html or other raw errors
 send_chunked_error(Resp, {_Error, {[{<<"body">>, Reason}]}}) ->

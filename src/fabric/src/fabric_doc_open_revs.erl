@@ -317,7 +317,7 @@ collapse_duplicate_revs_int([Reply | Rest]) ->
 -include_lib("eunit/include/eunit.hrl").
 
 
-setup() ->
+setup_all() ->
     config:start_link([]),
     meck:new([fabric, couch_stats, couch_log]),
     meck:new(fabric_util, [passthrough]),
@@ -328,9 +328,22 @@ setup() ->
 
 
 
-teardown(_) ->
-    (catch meck:unload([fabric, couch_stats, couch_log, fabric_util])),
+teardown_all(_) ->
+    meck:unload(),
     config:stop().
+
+
+setup() ->
+    meck:reset([
+        couch_log,
+        couch_stats,
+        fabric,
+        fabric_util
+    ]).
+
+
+teardown(_) ->
+    ok.
 
 
 state0(Revs, Latest) ->
@@ -361,39 +374,44 @@ baz1() -> {ok, #doc{revs = {1, [<<"baz">>]}}}.
 
 open_doc_revs_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            check_empty_response_not_quorum(),
-            check_basic_response(),
-            check_finish_quorum(),
-            check_finish_quorum_newer(),
-            check_no_quorum_on_second(),
-            check_done_on_third(),
-            check_specific_revs_first_msg(),
-            check_revs_done_on_agreement(),
-            check_latest_true(),
-            check_ancestor_counted_in_quorum(),
-            check_not_found_counts_for_descendant(),
-            check_worker_error_skipped(),
-            check_quorum_only_counts_valid_responses(),
-            check_empty_list_when_no_workers_reply(),
-            check_node_rev_stored(),
-            check_node_rev_store_head_only(),
-            check_node_rev_store_multiple(),
-            check_node_rev_dont_store_errors(),
-            check_node_rev_store_non_errors(),
-            check_node_rev_store_concatenate(),
-            check_node_rev_store_concantenate_multiple(),
-            check_node_rev_unmodified_on_down_or_exit(),
-            check_not_found_replies_are_removed_when_doc_found(),
-            check_not_found_returned_when_one_of_docs_not_found(),
-            check_not_found_returned_when_doc_not_found(),
-            check_longer_rev_list_returned(),
-            check_longer_rev_list_not_combined(),
-            check_not_found_removed_and_longer_rev_list()
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                check_empty_response_not_quorum(),
+                check_basic_response(),
+                check_finish_quorum(),
+                check_finish_quorum_newer(),
+                check_no_quorum_on_second(),
+                check_done_on_third(),
+                check_specific_revs_first_msg(),
+                check_revs_done_on_agreement(),
+                check_latest_true(),
+                check_ancestor_counted_in_quorum(),
+                check_not_found_counts_for_descendant(),
+                check_worker_error_skipped(),
+                check_quorum_only_counts_valid_responses(),
+                check_empty_list_when_no_workers_reply(),
+                check_node_rev_stored(),
+                check_node_rev_store_head_only(),
+                check_node_rev_store_multiple(),
+                check_node_rev_dont_store_errors(),
+                check_node_rev_store_non_errors(),
+                check_node_rev_store_concatenate(),
+                check_node_rev_store_concantenate_multiple(),
+                check_node_rev_unmodified_on_down_or_exit(),
+                check_not_found_replies_are_removed_when_doc_found(),
+                check_not_found_returned_when_one_of_docs_not_found(),
+                check_not_found_returned_when_doc_not_found(),
+                check_longer_rev_list_returned(),
+                check_longer_rev_list_not_combined(),
+                check_not_found_removed_and_longer_rev_list()
+            ]
+        }
     }.
 
 

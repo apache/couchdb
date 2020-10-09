@@ -10,7 +10,9 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.compact = function(debug) {
+  return console.log('done in test/elixir/test/coffee_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -30,19 +32,19 @@ couchTests.compact = function(debug) {
 
   T(db.save(binAttDoc).ok);
 
-  var originalsize = db.info().disk_size;
-  var originaldatasize = db.info().data_size;
+  var originalsize = db.info().sizes.file;
+  var originaldatasize = db.info().sizes.active;
   var start_time = db.info().instance_start_time;
 
-  TEquals("number", typeof originaldatasize, "data_size is a number");
+  TEquals("number", typeof originaldatasize, "data size is a number");
   T(originaldatasize < originalsize, "data size is < then db file size");
 
   for(var i in docs) {
       db.deleteDoc(docs[i]);
   }
   T(db.ensureFullCommit().ok);
-  var deletesize = db.info().disk_size;
-  var deletedatasize = db.info().data_size;
+  var deletesize = db.info().sizes.file;
+  var deletedatasize = db.info().sizes.active;
   T(deletesize > originalsize);
   T(db.setDbProperty("_revs_limit", 666).ok);
 
@@ -59,9 +61,9 @@ couchTests.compact = function(debug) {
   T(xhr.responseText == "This is a base64 encoded text");
   T(xhr.getResponseHeader("Content-Type") == "text/plain");
   T(db.info().doc_count == 1);
-  // XXX BUGGED! T(db.info().data_size < deletedatasize);
-  TEquals("number", typeof db.info().data_size, "data_size is a number");
-  T(db.info().data_size < db.info().disk_size, "data size is < then db file size");
+  // XXX BUGGED! T(db.info().sizes.active < deletedatasize);
+  TEquals("number", typeof db.info().sizes.active, "data size is a number");
+  T(db.info().sizes.active < db.info().sizes.file, "data size is < then db file size");
 
   // cleanup
   db.deleteDb();

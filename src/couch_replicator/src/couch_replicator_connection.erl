@@ -30,6 +30,7 @@
 
 -export([
    acquire/1,
+   acquire/2,
    release/1
 ]).
 
@@ -53,6 +54,8 @@
     worker,
     host,
     port,
+    proxy_host,
+    proxy_port,
     mref
 }).
 
@@ -72,19 +75,28 @@ init([]) ->
     ibrowse:add_config([{inactivity_timeout, Interval}]),
     {ok, #state{close_interval=Interval, timer=Timer}}.
 
+acquire(Url) ->
+    acquire(Url, undefined).
 
-acquire(URL) when is_binary(URL) ->
-    acquire(binary_to_list(URL));
+acquire(Url, ProxyUrl) when is_binary(Url) ->
+    acquire(binary_to_list(Url), ProxyUrl);
 
-acquire(URL0) ->
-    URL = couch_util:url_strip_password(URL0),
-    case gen_server:call(?MODULE, {acquire, URL}) of
+acquire(Url, ProxyUrl) when is_binary(ProxyUrl) ->
+    acquire(Url, binary_to_list(ProxyUrl));
+
+acquire(Url0, ProxyUrl0) ->
+    Url = couch_util:url_strip_password(Url0),
+    ProxyUrl = case ProxyUrl0 of
+        undefined -> undefined;
+        _ -> couch_util:url_strip_password(ProxyUrl0)
+    end,
+    case gen_server:call(?MODULE, {acquire, Url, ProxyUrl}) of
         {ok, Worker} ->
             link(Worker),
             {ok, Worker};
         {error, all_allocated} ->
-            {ok, Pid} = ibrowse:spawn_link_worker_process(URL),
-            ok = gen_server:call(?MODULE, {create, URL, Pid}),
+            {ok, Pid} = ibrowse:spawn_link_worker_process(Url),
+            ok = gen_server:call(?MODULE, {create, Url, ProxyUrl, Pid}),
             {ok, Pid};
         {error, Reason} ->
             {error, Reason}
@@ -96,11 +108,14 @@ release(Worker) ->
     gen_server:cast(?MODULE, {release, Worker}).
 
 
-handle_call({acquire, URL}, From, State) ->
+handle_call({acquire, Url, ProxyUrl}, From, State) ->
     {Pid, _Ref} = From,
-    case ibrowse_lib:parse_url(URL) of
-        #url{host=Host, port=Port} ->
-            Pat = #connection{host=Host, port=Port, mref=undefined, _='_'},
+    case {ibrowse_lib:parse_url(Url), parse_proxy_url(ProxyUrl)} of
+        {#url{host=Host, port=Port}, #url{host=ProxyHost, port=ProxyPort}} ->
+            Pat = #connection{
+            host=Host, port=Port,
+            proxy_host=ProxyHost, proxy_port=ProxyPort,
+            mref=undefined, _='_'},
             case ets:match_object(?MODULE, Pat, 1) of
                 '$end_of_table' ->
                     {reply, {error, all_allocated}, State};
@@ -111,20 +126,25 @@ handle_call({acquire, URL}, From, State) ->
                         Pid)}),
                     {reply, {ok, Worker#connection.worker}, State}
             end;
-        {error, invalid_uri} ->
+        {{error, invalid_uri}, _} ->
+            {reply, {error, invalid_uri}, State};
+        {_, {error, invalid_uri}} ->
             {reply, {error, invalid_uri}, State}
     end;
 
-handle_call({create, URL, Worker}, From, State) ->
+handle_call({create, Url, ProxyUrl, Worker}, From, State) ->
     {Pid, _Ref} = From,
-    case ibrowse_lib:parse_url(URL) of
-        #url{host=Host, port=Port} ->
+    case {ibrowse_lib:parse_url(Url), parse_proxy_url(ProxyUrl)} of
+        {#url{host=Host, port=Port}, #url{host=ProxyHost, port=ProxyPort}} ->
             link(Worker),
             couch_stats:increment_counter([couch_replicator, connection,
                 creates]),
             true = ets:insert_new(
                 ?MODULE,
-                #connection{host=Host, port=Port, worker=Worker,
+                #connection{
+                    host=Host, port=Port,
+                    proxy_host=ProxyHost, proxy_port=ProxyPort,
+                    worker=Worker,
                     mref=monitor(process, Pid)}
             ),
             {reply, ok, State}
@@ -239,3 +259,9 @@ handle_config_terminate(_, stop, _) ->
 handle_config_terminate(_, _, _) ->
     Pid = whereis(?MODULE),
     erlang:send_after(?RELISTEN_DELAY, Pid, restart_config_listener).
+
+
+parse_proxy_url(undefined) ->
+    #url{host=undefined, port=undefined};
+parse_proxy_url(ProxyUrl) ->
+    ibrowse_lib:parse_url(ProxyUrl).

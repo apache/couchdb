@@ -48,9 +48,11 @@ typedef struct {
 } ctx_t;
 
 static threadlocal UCollator* collator = NULL;
+static threadlocal int64_t threadEpoch = 0;
 static UCollator** collators = NULL;
 static int numCollators = 0;
 static int numSchedulers = 0;
+static int64_t loadEpoch = 0;
 static ErlNifMutex* collMutex = NULL;
 
 static ERL_NIF_TERM less_json_nif(ErlNifEnv*, int, const ERL_NIF_TERM []);
@@ -69,7 +71,7 @@ get_collator()
 {
     UErrorCode status = U_ZERO_ERROR;
 
-    if(collator != NULL) {
+    if(collator != NULL && threadEpoch == loadEpoch) {
         return collator;
     }
 
@@ -86,6 +88,8 @@ get_collator()
     enif_mutex_unlock(collMutex);
 
     assert(numCollators <= numSchedulers && "Number of schedulers shrank.");
+
+    threadEpoch = loadEpoch;
 
     return collator;
 }
@@ -387,6 +391,8 @@ on_load(ErlNifEnv* env, void** priv, ERL_NIF_TERM info)
         return 2;
     }
 
+    loadEpoch += 1;
+
     collMutex = enif_mutex_create("coll_mutex");
 
     if (collMutex == NULL) {
@@ -420,6 +426,8 @@ on_unload(ErlNifEnv* env, void* priv_data)
 
         enif_free(collators);
     }
+
+    numCollators = 0;
 
     if (collMutex != NULL) {
         enif_mutex_destroy(collMutex);

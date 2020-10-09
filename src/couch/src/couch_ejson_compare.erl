@@ -22,6 +22,10 @@ init() ->
     Dir = code:priv_dir(couch),
     ok = erlang:load_nif(filename:join(Dir, ?MODULE), NumScheds).
 
+% partitioned row comparison
+less({p, PA, A}, {p, PB, B}) ->
+    less([PA, A], [PB, B]);
+
 less(A, B) ->
     try
         less_nif(A, B)

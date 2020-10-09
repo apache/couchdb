@@ -10,9 +10,8 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.skip = true;
 couchTests.replicator_db_security = function(debug) {
-  return console.log('TODO');
-
   var reset_dbs = function(dbs) {
     dbs.forEach(function(db) {
       db.deleteDb();
@@ -166,7 +165,7 @@ couchTests.replicator_db_security = function(debug) {
         names : ["benoitc"]
       }
     }).ok);
-    
+
     run_on_modified_server([
         {
           section: "admins",

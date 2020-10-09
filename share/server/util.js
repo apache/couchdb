@@ -71,7 +71,7 @@ var Couch = {
         // create empty exports object before executing the module,
         // stops circular requires from filling the stack
         ddoc._module_cache[newModule.id] = {};
-        var s = "function (module, exports, require) { " + newModule.current + "\n }";
+        var s = "(function (module, exports, require) { " + newModule.current + "\n });";
         try {
           var func = sandbox ? evalcx(s, sandbox, newModule.id) : eval(s);
           func.apply(sandbox, [newModule, newModule.exports, function(name) {
@@ -97,7 +97,8 @@ var Couch = {
 
     try {
       if(typeof CoffeeScript === "undefined") {
-        functionObject = evalcx(source, sandbox, name);
+        var rewrittenFun = rewriteFunInt(source);
+        functionObject = evalcx(rewrittenFun, sandbox, name);
       } else {
         var transpiled = CoffeeScript.compile(source, {bare: true});
         functionObject = evalcx(transpiled, sandbox, name);

@@ -22,7 +22,7 @@ go(DbName) ->
     Shards = mem3:shards(DbName),
     Workers = fabric_util:submit_jobs(Shards, get_design_doc_count, []),
     RexiMon = fabric_util:create_monitors(Shards),
-    Acc0 = {fabric_dict:init(Workers, nil), 0},
+    Acc0 = {fabric_dict:init(Workers, nil), []},
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
         {timeout, {WorkersDict, _}} ->
             DefunctWorkers = fabric_util:remove_done_workers(WorkersDict, nil),
@@ -34,36 +34,29 @@ go(DbName) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Acc}) ->
-    case fabric_util:remove_down_workers(Counters, NodeRef) of
-        {ok, NewCounters} ->
-            {ok, {NewCounters, Acc}};
-        error ->
-            {error, {nodedown, <<"progress not possible">>}}
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Resps}) ->
+    case fabric_ring:node_down(NodeRef, Counters, Resps) of
+        {ok, Counters1} -> {ok, {Counters1, Resps}};
+        error -> {error, {nodedown, <<"progress not possible">>}}
     end;
 
-handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc}) ->
-    NewCounters = lists:keydelete(Shard, #shard.ref, Counters),
-    case fabric_view:is_progress_possible(NewCounters) of
-        true ->
-            {ok, {NewCounters, Acc}};
-        false ->
-            {error, Reason}
+handle_message({rexi_EXIT, Reason}, Shard, {Counters, Resps}) ->
+    case fabric_ring:handle_error(Shard, Counters, Resps) of
+        {ok, Counters1} -> {ok, {Counters1, Resps}};
+        error -> {error, Reason}
     end;
 
-handle_message({ok, Count}, Shard, {Counters, Acc}) ->
-    case fabric_dict:lookup_element(Shard, Counters) of
-        undefined ->
-            {ok, {Counters, Acc}};
-        nil ->
-            C1 = fabric_dict:store(Shard, ok, Counters),
-            C2 = fabric_view:remove_overlapping_shards(Shard, C1),
-            case fabric_dict:any(nil, C2) of
-            true ->
-                {ok, {C2, Count+Acc}};
-            false ->
-                {stop, Count+Acc}
-            end
+handle_message({ok, Count}, Shard, {Counters, Resps}) ->
+    case fabric_ring:handle_response(Shard, Count, Counters, Resps) of
+        {ok, {Counters1, Resps1}} ->
+            {ok, {Counters1, Resps1}};
+        {stop, Resps1} ->
+            Total = fabric_dict:fold(fun(_, C, A) -> A + C end, 0, Resps1),
+            {stop, Total}
     end;
-handle_message(_, _, Acc) ->
-    {ok, Acc}.
+
+handle_message(Reason, Shard, {Counters, Resps}) ->
+    case fabric_ring:handle_error(Shard, Counters, Resps) of
+        {ok, Counters1} -> {ok, {Counters1, Resps}};
+        error -> {error, Reason}
+    end.

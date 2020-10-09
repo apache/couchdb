@@ -55,18 +55,19 @@ start_link() ->
 
 init([]) ->
     {ok, Descs} = reload_metrics(),
-    Interval = config:get_integer("stats", "interval", ?DEFAULT_INTERVAL),
-    {ok, CT} = timer:send_interval(Interval * 1000, self(), collect),
-    {ok, RT} = timer:send_interval(?RELOAD_INTERVAL * 1000, self(), reload),
+    CT = erlang:send_after(get_interval(collect), self(), collect),
+    RT = erlang:send_after(get_interval(reload), self(), reload),
     {ok, #st{descriptions=Descs, stats=[], collect_timer=CT, reload_timer=RT}}.
 
 handle_call(fetch, _from, #st{stats = Stats}=State) ->
     {reply, {ok, Stats}, State};
 handle_call(flush, _From, State) ->
     {reply, ok, collect(State)};
-handle_call(reload, _from, State) ->
+handle_call(reload, _from, #st{reload_timer=OldRT} = State) ->
+    timer:cancel(OldRT),
     {ok, Descriptions} = reload_metrics(),
-    {reply, ok, State#st{descriptions=Descriptions}};
+    RT = update_timer(reload),
+    {reply, ok, State#st{descriptions=Descriptions, reload_timer=RT}};
 handle_call(Msg, _From, State) ->
     {stop, {unknown_call, Msg}, error, State}.
 
@@ -140,11 +141,20 @@ load_metrics_for_application(AppName) ->
             end
     end.
 
-collect(State) ->
+collect(#st{collect_timer=OldCT} = State) ->
+    timer:cancel(OldCT),
     Stats = lists:map(
         fun({Name, Props}) ->
             {Name, [{value, couch_stats:sample(Name)}|Props]}
         end,
         State#st.descriptions
     ),
-    State#st{stats=Stats}.
+    CT = update_timer(collect),
+    State#st{stats=Stats, collect_timer=CT}.
+
+update_timer(Type) ->
+    Interval = get_interval(Type),
+    erlang:send_after(Interval, self(), Type).
+
+get_interval(reload) -> 1000 * ?RELOAD_INTERVAL;
+get_interval(collect) -> 1000 * config:get_integer("stats", "interval", ?DEFAULT_INTERVAL).

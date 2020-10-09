@@ -41,12 +41,14 @@ create(Db, Indexes, Selector, Opts) ->
     Limit = couch_util:get_value(limit, Opts, mango_opts:default_limit()),
     Skip = couch_util:get_value(skip, Opts, 0),
     Fields = couch_util:get_value(fields, Opts, all_fields),
-    Bookmark = couch_util:get_value(bookmark, Opts), 
+    Bookmark = couch_util:get_value(bookmark, Opts),
+
+    IndexRanges1 = mango_cursor:maybe_noop_range(Selector, IndexRanges),
 
     {ok, #cursor{
         db = Db,
         index = Index,
-        ranges = IndexRanges,
+        ranges = IndexRanges1,
         selector = Selector,
         opts = Opts,
         limit = Limit,
@@ -54,7 +56,6 @@ create(Db, Indexes, Selector, Opts) ->
         fields = Fields,
         bookmark = Bookmark
     }}.
-
 
 explain(Cursor) ->
     mango_cursor_view:explain(Cursor).

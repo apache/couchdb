@@ -10,6 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true; 
 couchTests.reader_acl = function(debug) {
   // this tests read access control
 
@@ -215,11 +216,7 @@ couchTests.reader_acl = function(debug) {
   );
         
   usersDb.deleteDb();
-  // have to delete the backside version now too :(
-  var req = CouchDB.newXhr();
-  req.open("DELETE", "http://127.0.0.1:15986/" + users_db_name, false);
-  req.send("");
-  CouchDB.maybeThrowError(req);
-
+  // don't have to delete the backside db since in this case couch_auth_cache only read
+  // admin from the config section and so it never auto-created the node local db
   secretDb.deleteDb();
 }

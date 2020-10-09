@@ -631,24 +631,29 @@ extract_creds_success_test_() ->
 
 cookie_update_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_do_refresh_without_max_age(),
-            t_do_refresh_with_max_age(),
-            t_dont_refresh(),
-            t_process_auth_failure(),
-            t_process_auth_failure_stale_epoch(),
-            t_process_auth_failure_too_frequent(),
-            t_process_ok_update_cookie(),
-            t_process_ok_no_cookie(),
-            t_init_state_fails_on_401(),
-            t_init_state_401_with_require_valid_user(),
-            t_init_state_404(),
-            t_init_state_no_creds(),
-            t_init_state_http_error()
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_do_refresh_without_max_age(),
+                t_do_refresh_with_max_age(),
+                t_dont_refresh(),
+                t_process_auth_failure(),
+                t_process_auth_failure_stale_epoch(),
+                t_process_auth_failure_too_frequent(),
+                t_process_ok_update_cookie(),
+                t_process_ok_no_cookie(),
+                t_init_state_fails_on_401(),
+                t_init_state_401_with_require_valid_user(),
+                t_init_state_404(),
+                t_init_state_no_creds(),
+                t_init_state_http_error()
+            ]
+        }
     }.
 
 
@@ -774,7 +779,7 @@ t_init_state_http_error() ->
     end).
 
 
-setup() ->
+setup_all() ->
     meck:expect(couch_replicator_httpc_pool, get_worker, 1, {ok, worker}),
     meck:expect(couch_replicator_httpc_pool, release_worker_sync, 2, ok),
     meck:expect(config, get, fun(_, _, Default) -> Default end),
@@ -782,8 +787,20 @@ setup() ->
     ok.
 
 
-teardown(_) ->
+teardown_all(_) ->
     meck:unload().
+
+
+setup() ->
+    meck:reset([
+        config,
+        couch_replicator_httpc_pool,
+        ibrowse
+    ]).
+
+
+teardown(_) ->
+    ok.
 
 
 mock_http_cookie_response(Cookie) ->

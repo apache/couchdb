@@ -140,11 +140,12 @@ handle_info({'EXIT', Active, Reason}, State) ->
         case Reason of {pending_changes, Count} ->
             maybe_resubmit(State, Job#job{pid = nil, count = Count});
         _ ->
-            try mem3:shards(mem3:dbname(Job#job.name)) of _ ->
-                timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}])
-            catch error:database_does_not_exist ->
-                % no need to retry
-                ok
+            case mem3:db_is_current(Job#job.name) of
+                true ->
+                    timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}]);
+                false ->
+                    % no need to retry (db deleted or recreated)
+                    ok
             end,
             State
         end;

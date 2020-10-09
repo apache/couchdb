@@ -43,7 +43,7 @@
 }).
 
 
-create(Db, Indexes, Selector, Opts0) ->
+create(Db, Indexes, Selector, Opts) ->
     Index = case Indexes of
         [Index0] ->
             Index0;
@@ -51,7 +51,7 @@ create(Db, Indexes, Selector, Opts0) ->
             ?MANGO_ERROR(multiple_text_indexes)
     end,
 
-    Opts = unpack_bookmark(couch_db:name(Db), Opts0),
+    Bookmark = unpack_bookmark(couch_db:name(Db), Opts),
 
     DreyfusLimit = get_dreyfus_limit(),
     Limit = erlang:min(DreyfusLimit, couch_util:get_value(limit, Opts, mango_opts:default_limit())),
@@ -66,7 +66,8 @@ create(Db, Indexes, Selector, Opts0) ->
         opts = Opts,
         limit = Limit,
         skip = Skip,
-        fields = Fields
+        fields = Fields,
+        bookmark = Bookmark
     }}.
 
 
@@ -77,6 +78,7 @@ explain(Cursor) ->
     } = Cursor,
     [
         {'query', mango_selector_text:convert(Selector)},
+        {partition, get_partition(Opts, null)},
         {sort, sort_query(Opts, Selector)}
     ].
 
@@ -89,10 +91,13 @@ execute(Cursor, UserFun, UserAcc) ->
         skip = Skip,
         selector = Selector,
         opts = Opts,
-        execution_stats = Stats
+        execution_stats = Stats,
+        bookmark = Bookmark
     } = Cursor,
+    Query = mango_selector_text:convert(Selector),
     QueryArgs = #index_query_args{
-        q = mango_selector_text:convert(Selector),
+        q = Query,
+        partition = get_partition(Opts, nil),
         sort = sort_query(Opts, Selector),
         raw_bookmark = true
     },
@@ -101,7 +106,7 @@ execute(Cursor, UserFun, UserAcc) ->
         dbname = couch_db:name(Db),
         ddocid = ddocid(Idx),
         idx_name = mango_idx:name(Idx),
-        bookmark = get_bookmark(Opts),
+        bookmark = Bookmark,
         limit = Limit,
         skip = Skip,
         query_args = QueryArgs,
@@ -111,7 +116,12 @@ execute(Cursor, UserFun, UserAcc) ->
         execution_stats = mango_execution_stats:log_start(Stats)
     },
     try
-        execute(CAcc)
+        case Query of
+            <<>> ->
+                throw({stop, CAcc});
+            _ ->
+                execute(CAcc)
+        end
     catch
         throw:{stop, FinalCAcc} ->
             #cacc{
@@ -124,7 +134,7 @@ execute(Cursor, UserFun, UserAcc) ->
             Arg = {add_key, bookmark, JsonBM},
             {_Go, FinalUserAcc} = UserFun(Arg, LastUserAcc),
             FinalUserAcc0 = mango_execution_stats:maybe_add_stats(Opts, UserFun, Stats0, FinalUserAcc),
-            FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, FinalUserAcc0),
+            FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, Stats0, FinalUserAcc0),
             {ok, FinalUserAcc1}
     end.
 
@@ -168,6 +178,10 @@ handle_hits(CAcc0, [{Sort, Doc} | Rest]) ->
     handle_hits(CAcc1, Rest).
 
 
+handle_hit(CAcc0, Sort, not_found) ->
+    CAcc1 = update_bookmark(CAcc0, Sort),
+    CAcc1;
+
 handle_hit(CAcc0, Sort, Doc) ->
     #cacc{
         limit = Limit,
@@ -176,6 +190,7 @@ handle_hit(CAcc0, Sort, Doc) ->
     } = CAcc0,
     CAcc1 = update_bookmark(CAcc0, Sort),
     Stats1 = mango_execution_stats:incr_docs_examined(Stats),
+    couch_stats:increment_counter([mango, docs_examined]),
     CAcc2 = CAcc1#cacc{execution_stats = Stats1},
     case mango_selector:match(CAcc2#cacc.selector, Doc) of
         true when Skip > 0 ->
@@ -237,6 +252,13 @@ sort_query(Opts, Selector) ->
     end.
 
 
+get_partition(Opts, Default) ->
+    case couch_util:get_value(partition, Opts) of
+        <<>> -> Default;
+        Else -> Else
+    end.
+
+
 get_bookmark(Opts) ->
     case lists:keyfind(bookmark, 1, Opts) of
         {_, BM} when is_list(BM), BM /= [] ->
@@ -262,7 +284,7 @@ pack_bookmark(Bookmark) ->
 
 
 unpack_bookmark(DbName, Opts) ->
-    NewBM = case lists:keyfind(bookmark, 1, Opts) of
+    case lists:keyfind(bookmark, 1, Opts) of
         {_, nil} ->
             [];
         {_, Bin} ->
@@ -271,8 +293,7 @@ unpack_bookmark(DbName, Opts) ->
             catch _:_ ->
                 ?MANGO_ERROR({invalid_bookmark, Bin})
             end
-    end,
-    lists:keystore(bookmark, 1, Opts, {bookmark, NewBM}).
+    end.
 
 
 ddocid(Idx) ->

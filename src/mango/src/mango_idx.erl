@@ -33,6 +33,7 @@
     name/1,
     type/1,
     def/1,
+    partitioned/1,
     opts/1,
     columns/1,
     is_usable/3,
@@ -59,19 +60,32 @@ list(Db) ->
 
 get_usable_indexes(Db, Selector, Opts) ->
     ExistingIndexes = mango_idx:list(Db),
-
-    GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(ExistingIndexes),
+    GlobalIndexes = mango_cursor:remove_indexes_with_partial_filter_selector(
+            ExistingIndexes
+        ),
     UserSpecifiedIndex = mango_cursor:maybe_filter_indexes_by_ddoc(ExistingIndexes, Opts),
     UsableIndexes0 = lists:usort(GlobalIndexes ++ UserSpecifiedIndex),
+    UsableIndexes1 = filter_partition_indexes(UsableIndexes0, Opts),
 
     SortFields = get_sort_fields(Opts),
     UsableFilter = fun(I) -> is_usable(I, Selector, SortFields) end,
 
-    case lists:filter(UsableFilter, UsableIndexes0) of
-        [] -> 
-            ?MANGO_ERROR({no_usable_index, missing_sort_index});
-        UsableIndexes -> 
+    case lists:filter(UsableFilter, UsableIndexes1) of
+        [] ->
+            mango_sort_error(Db, Opts);
+        UsableIndexes ->
             UsableIndexes
+    end.
+
+
+mango_sort_error(Db, Opts) ->
+    case {fabric_util:is_partitioned(Db), is_opts_partitioned(Opts)} of
+        {false, _} ->
+            ?MANGO_ERROR({no_usable_index, missing_sort_index});
+        {true, true} ->
+            ?MANGO_ERROR({no_usable_index, missing_sort_index_partitioned});
+        {true, false} ->
+            ?MANGO_ERROR({no_usable_index, missing_sort_index_global})
     end.
 
 
@@ -110,6 +124,7 @@ new(Db, Opts) ->
         name = IdxName,
         type = Type,
         def = Def,
+        partitioned = get_idx_partitioned(Opts),
         opts = filter_opts(Opts)
     }}.
 
@@ -121,10 +136,11 @@ validate_new(Idx, Db) ->
 
 add(DDoc, Idx) ->
     Mod = idx_mod(Idx),
-    {ok, NewDDoc} = Mod:add(DDoc, Idx),
+    {ok, NewDDoc1} = Mod:add(DDoc, Idx),
+    NewDDoc2 = set_ddoc_partitioned(NewDDoc1, Idx),
     % Round trip through JSON for normalization
-    Body = ?JSON_DECODE(?JSON_ENCODE(NewDDoc#doc.body)),
-    {ok, NewDDoc#doc{body = Body}}.
+    Body = ?JSON_DECODE(?JSON_ENCODE(NewDDoc2#doc.body)),
+    {ok, NewDDoc2#doc{body = Body}}.
 
 
 remove(DDoc, Idx) ->
@@ -166,7 +182,7 @@ from_ddoc(Db, {Props}) ->
         _ ->
             ?MANGO_ERROR(invalid_query_ddoc_language)
     end,
-    IdxMods = case module_loaded(dreyfus_index) of
+    IdxMods = case clouseau_rpc:connected() of
         true ->
             [mango_idx_view, mango_idx_text];
         false ->
@@ -176,7 +192,8 @@ from_ddoc(Db, {Props}) ->
     lists:map(fun(Idx) ->
         Idx#idx{
             dbname = DbName,
-            ddoc = DDoc
+            ddoc = DDoc,
+            partitioned = get_idx_partitioned(Db, Props)
         }
     end, Idxs).
 
@@ -213,6 +230,10 @@ def(#idx{def=Def}) ->
     Def.
 
 
+partitioned(#idx{partitioned=Partitioned}) ->
+    Partitioned.
+
+
 opts(#idx{opts=Opts}) ->
     Opts.
 
@@ -247,7 +268,7 @@ cursor_mod(#idx{type = <<"json">>}) ->
 cursor_mod(#idx{def = all_docs, type= <<"special">>}) ->
     mango_cursor_special;
 cursor_mod(#idx{type = <<"text">>}) ->
-    case module_loaded(dreyfus_index) of
+    case clouseau_rpc:connected() of
         true ->
             mango_cursor_text;
         false ->
@@ -260,7 +281,7 @@ idx_mod(#idx{type = <<"json">>}) ->
 idx_mod(#idx{type = <<"special">>}) ->
     mango_idx_special;
 idx_mod(#idx{type = <<"text">>}) ->
-    case module_loaded(dreyfus_index) of
+    case clouseau_rpc:connected() of
         true ->
             mango_idx_text;
         false ->
@@ -288,7 +309,7 @@ get_idx_def(Opts) ->
 get_idx_type(Opts) ->
     case proplists:get_value(type, Opts) of
         <<"json">> -> <<"json">>;
-        <<"text">> -> case module_loaded(dreyfus_index) of
+        <<"text">> -> case clouseau_rpc:connected() of
             true ->
                 <<"text">>;
             false ->
@@ -329,6 +350,97 @@ gen_name(Idx, Opts0) ->
     mango_util:enc_hex(Sha).
 
 
+get_idx_partitioned(Opts) ->
+    case proplists:get_value(partitioned, Opts) of
+        B when is_boolean(B) ->
+            B;
+        db_default ->
+            % Default to the partitioned setting on
+            % the database.
+            undefined
+    end.
+
+
+set_ddoc_partitioned(DDoc, Idx) ->
+    % We have to verify that the new index being added
+    % to this design document either matches the current
+    % ddoc's design options *or* this is a new design doc
+    #doc{
+        id = DDocId,
+        revs = Revs,
+        body = {BodyProps}
+    } = DDoc,
+    OldDOpts = couch_util:get_value(<<"options">>, BodyProps),
+    OldOpt = case OldDOpts of
+        {OldDOptProps} when is_list(OldDOptProps) ->
+            couch_util:get_value(<<"partitioned">>, OldDOptProps);
+        _ ->
+            undefined
+    end,
+    % If new matches old we're done
+    if Idx#idx.partitioned == OldOpt -> DDoc; true ->
+        % If we're creating a ddoc then we can set the options
+        case Revs == {0, []} of
+            true when Idx#idx.partitioned /= undefined ->
+                set_ddoc_partitioned_option(DDoc, Idx#idx.partitioned);
+            true when Idx#idx.partitioned == undefined ->
+                DDoc;
+            false ->
+                ?MANGO_ERROR({partitioned_option_mismatch, DDocId})
+        end
+    end.
+
+
+set_ddoc_partitioned_option(DDoc, Partitioned) ->
+    #doc{
+        body = {BodyProps}
+    } = DDoc,
+    NewProps = case couch_util:get_value(<<"options">>, BodyProps) of
+        {Existing} when is_list(Existing) ->
+            Opt = {<<"partitioned">>, Partitioned},
+            New = lists:keystore(<<"partitioned">>, 1, Existing, Opt),
+            lists:keystore(<<"options">>, 1, BodyProps, {<<"options">>, New});
+        undefined ->
+            New = {<<"options">>, {[{<<"partitioned">>, Partitioned}]}},
+            lists:keystore(<<"options">>, 1, BodyProps, New)
+    end,
+    DDoc#doc{body = {NewProps}}.
+
+
+get_idx_partitioned(Db, DDocProps) ->
+    Default = fabric_util:is_partitioned(Db),
+    case couch_util:get_value(<<"options">>, DDocProps) of
+        {DesignOpts} ->
+            case couch_util:get_value(<<"partitioned">>, DesignOpts) of
+                P when is_boolean(P) ->
+                    P;
+                undefined ->
+                    Default
+            end;
+        undefined ->
+            Default
+    end.
+
+is_opts_partitioned(Opts) ->
+    case couch_util:get_value(partition, Opts, <<>>) of
+        <<>> ->
+            false;
+        Partition when is_binary(Partition) ->
+            true
+    end.
+
+
+filter_partition_indexes(Indexes, Opts) ->
+    PFilt = case is_opts_partitioned(Opts) of
+        false ->
+            fun(#idx{partitioned = P}) -> not P end;
+        true ->
+            fun(#idx{partitioned = P}) -> P end
+    end,
+    Filt = fun(Idx) -> type(Idx) == <<"special">> orelse PFilt(Idx) end,
+    lists:filter(Filt, Indexes).
+
+
 filter_opts([]) ->
     [];
 filter_opts([{user_ctx, _} | Rest]) ->
@@ -340,6 +452,8 @@ filter_opts([{name, _} | Rest]) ->
 filter_opts([{type, _} | Rest]) ->
     filter_opts(Rest);
 filter_opts([{w, _} | Rest]) ->
+    filter_opts(Rest);
+filter_opts([{partitioned, _} | Rest]) ->
     filter_opts(Rest);
 filter_opts([Opt | Rest]) ->
     [Opt | filter_opts(Rest)].
@@ -374,6 +488,7 @@ index(SelectorName, Selector) ->
            <<"Selected">>,<<"json">>,
            {[{<<"fields">>,{[{<<"location">>,<<"asc">>}]}},
              {SelectorName,{Selector}}]},
+           false,
            [{<<"def">>,{[{<<"fields">>,[<<"location">>]}]}}]
     }.
 

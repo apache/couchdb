@@ -10,6 +10,7 @@
   -DisableDocs               request build process skip building documentation (default false)
   -SkipDeps                  do not update Erlang dependencies (default false)
   -CouchDBUser USER          set the username to run as (defaults to current user)
+  -SpiderMonkeyVersion VSN   select the version of SpiderMonkey to use (defaults to 1.8.5)
 
   Installation directories:
   -Prefix PREFIX             install architecture-independent files in PREFIX
@@ -48,6 +49,8 @@ Param(
 
     [ValidateNotNullOrEmpty()]
     [string]$CouchDBUser = [Environment]::UserName, # set the username to run as (defaults to current user)
+    [ValidateNotNullOrEmpty()]
+    [string]$SpiderMonkeyVersion = "1.8.5", # select the version of SpiderMonkey to use (default 1.8.5)
     [ValidateNotNullOrEmpty()]
     [string]$Prefix = "C:\Program Files\Apache\CouchDB", # install architecture-independent file location (default C:\Program Files\Apache\CouchDB)
     [ValidateNotNullOrEmpty()]
@@ -133,6 +136,7 @@ $CouchDBConfig = @"
 {log_file, ""}.
 {fauxton_root, "./share/www"}.
 {user, "$CouchDBUser"}.
+{spidermonkey_version, "$SpiderMonkeyVersion"}.
 {node_name, "-name couchdb@localhost"}.
 {cluster_port, 5984}.
 {backend_port, 5986}.
@@ -144,7 +148,7 @@ $InstallMk = @"
 # Licensed under the Apache License, Version 2.0 (the "License"); you may not
 # use this file except in compliance with the License. You may obtain a copy of
 # the License at
-# 
+#
 #   http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
@@ -175,14 +179,45 @@ with_fauxton = $BuildFauxton
 with_docs = $BuildDocs
 
 user = $CouchDBUser
+spidermonkey_version = $SpiderMonkeyVersion
 "@
 $InstallMk | Out-File "$rootdir\install.mk" -encoding ascii
 
 $lowercurl = "$WithCurl".ToLower()
 $ConfigERL = @"
 {with_curl, $lowercurl}.
+{spidermonkey_version, "$SpiderMonkeyVersion"}.
 "@
 $ConfigERL | Out-File "$rootdir\config.erl" -encoding ascii
+
+# check for rebar; if not found, build it and add it to our path
+if ((Get-Command "rebar.cmd" -ErrorAction SilentlyContinue) -eq $null)
+{
+   Write-Verbose "==> rebar.cmd not found; bootstrapping..."
+   if (-Not (Test-Path "src\rebar"))
+   {
+      git clone --depth 1 https://github.com/apache/couchdb-rebar.git $rootdir\src\rebar
+   }
+   cmd /c "cd src\rebar && $rootdir\src\rebar\bootstrap.bat"
+   cp $rootdir\src\rebar\rebar $rootdir\bin\rebar
+   cp $rootdir\src\rebar\rebar.cmd $rootdir\bin\rebar.cmd
+   make -C $rootdir\src\rebar clean
+   $env:Path += ";$rootdir\bin"
+}
+
+# check for emilio; if not found, get it and build it
+if ((Get-Command "emilio.cmd" -ErrorAction SilentlyContinue) -eq $null)
+{
+   Write-Verbose "==> emilio.cmd not found; bootstrapping..."
+   if (-Not (Test-Path "src\emilio"))
+   {
+      git clone --depth 1 https://github.com/wohali/emilio $rootdir\src\emilio
+   }
+   cmd /c "cd $rootdir\src\emilio && rebar compile escriptize; cd $rootdir"
+   cp $rootdir\src\emilio\emilio $rootdir\bin\emilio
+   cp $rootdir\src\emilio\bin\emilio.cmd $rootdir\bin\emilio.cmd
+   cmd /c "cd $rootdir\src\emilio && rebar clean; cd $rootdir"
+}
 
 # only update dependencies, when we are not in a release tarball
 if ( (Test-Path .git -PathType Container) -and (-not $SkipDeps) ) {

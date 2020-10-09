@@ -2,6 +2,7 @@ defmodule AllDocsTest do
   use CouchTestCase
 
   @moduletag :all_docs
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB _all_docs
@@ -41,8 +42,10 @@ defmodule AllDocsTest do
     assert resp["total_rows"] == length(rows)
 
     # Check _all_docs offset
-    resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "\"2\""}).body
-    assert resp["offset"] == 2
+    retry_until(fn ->
+      resp = Couch.get("/#{db_name}/_all_docs", query: %{:startkey => "\"2\""}).body
+      assert resp["offset"] == 2
+    end)
 
     # Confirm that queries may assume raw collation
     resp =
@@ -183,5 +186,115 @@ defmodule AllDocsTest do
       ).body["rows"]
 
     assert length(rows) == 1
+  end
+
+  @tag :with_db
+  test "GET with one key", context do
+    db_name = context[:db_name]
+
+    {:ok, _} = create_doc(
+      db_name,
+      %{
+        _id: "foo",
+        bar: "baz"
+      }
+    )
+
+    {:ok, _} = create_doc(
+      db_name,
+      %{
+        _id: "foo2",
+        bar: "baz2"
+      }
+    )
+
+    resp = Couch.get(
+      "/#{db_name}/_all_docs",
+      query: %{
+        :key => "\"foo\"",
+      }
+    )
+
+    assert resp.status_code == 200
+    assert length(Map.get(resp, :body)["rows"]) == 1
+  end
+
+
+  @tag :with_db
+  test "POST with empty body", context do
+    db_name = context[:db_name]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..2)})
+    assert resp.status_code in [201, 202]
+
+    resp = Couch.post(
+      "/#{db_name}/_all_docs",
+      body: %{}
+    )
+
+    assert resp.status_code == 200
+    assert length(Map.get(resp, :body)["rows"]) == 3
+  end
+
+  @tag :with_db
+  test "POST with keys and limit", context do
+    db_name = context[:db_name]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
+    assert resp.status_code in [201, 202]
+
+    resp = Couch.post(
+      "/#{db_name}/_all_docs",
+      body: %{
+        :keys => [1, 2],
+        :limit => 1
+      }
+    )
+
+    assert resp.status_code == 200
+    assert length(Map.get(resp, :body)["rows"]) == 1
+  end
+
+  @tag :with_db
+  test "POST with query parameter and JSON body", context do
+    db_name = context[:db_name]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
+    assert resp.status_code in [201, 202]
+
+    resp = Couch.post(
+      "/#{db_name}/_all_docs",
+      query: %{
+        :limit => 1
+      },
+      body: %{
+        :keys => [1, 2]
+      }
+    )
+
+    assert resp.status_code == 200
+    assert length(Map.get(resp, :body)["rows"]) == 1
+  end
+
+  @tag :with_db
+  test "POST edge case with colliding parameters - query takes precedence", context do
+    db_name = context[:db_name]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
+    assert resp.status_code in [201, 202]
+
+    resp = Couch.post(
+      "/#{db_name}/_all_docs",
+      query: %{
+        :limit => 1
+      },
+      body: %{
+        :keys => [1, 2],
+        :limit => 2
+      }
+    )
+
+    assert resp.status_code == 200
+    assert length(Map.get(resp, :body)["rows"]) == 1
   end
 end

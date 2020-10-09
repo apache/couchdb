@@ -2,6 +2,8 @@ defmodule LotsOfDocsTest do
   use CouchTestCase
 
   @moduletag :lots_of_docs
+  @moduletag kind: :performance
+  
   @docs_range 0..499
 
   @moduledoc """
@@ -32,25 +34,28 @@ defmodule LotsOfDocsTest do
       assert Map.fetch!(Enum.at(rows, index), "key") === value
     end)
 
-    %{"rows" => desc_rows, "total_rows" => desc_total_rows} =
-      Couch.get(
-        "/#{db_name}/_all_docs",
-        query: %{:descending => true}
-      ).body
+    retry_until(fn ->
+      %{"rows" => desc_rows, "total_rows" => desc_total_rows} =
+        Couch.get(
+          "/#{db_name}/_all_docs",
+          query: %{:descending => true}
+        ).body
 
-    assert desc_total_rows === Enum.count(@docs_range)
-    assert desc_total_rows === Enum.count(desc_rows)
+      assert desc_total_rows === Enum.count(@docs_range)
+      assert desc_total_rows === Enum.count(desc_rows)
 
-    @docs_range
-    |> Enum.map(fn i -> Integer.to_string(i) end)
-    |> Enum.sort()
-    |> Enum.reverse()
-    |> Enum.with_index()
-    |> Enum.each(fn {value, index} ->
-      assert Map.fetch!(Enum.at(desc_rows, index), "key") === value
+      @docs_range
+      |> Enum.map(fn i -> Integer.to_string(i) end)
+      |> Enum.sort()
+      |> Enum.reverse()
+      |> Enum.with_index()
+      |> Enum.each(fn {value, index} ->
+        assert Map.fetch!(Enum.at(desc_rows, index), "key") === value
+      end)
     end)
   end
 
+  @tag :skip_on_jenkins
   @tag :with_db
   test "lots of docs with a regular view", context do
     db_name = context[:db_name]
@@ -68,17 +73,19 @@ defmodule LotsOfDocsTest do
       assert Map.fetch!(Enum.at(rows, i), "key") === i
     end)
 
-    %{"rows" => desc_rows, "total_rows" => desc_total_rows} =
-      query_view(db_name, "descending")
+    retry_until(fn ->
+      %{"rows" => desc_rows, "total_rows" => desc_total_rows} =
+        query_view(db_name, "descending")
 
-    assert desc_total_rows === Enum.count(desc_rows)
-    assert desc_total_rows === Enum.count(@docs_range)
+      assert desc_total_rows === Enum.count(desc_rows)
+      assert desc_total_rows === Enum.count(@docs_range)
 
-    @docs_range
-    |> Enum.reverse()
-    |> Enum.with_index()
-    |> Enum.each(fn {value, index} ->
-      assert Map.fetch!(Enum.at(desc_rows, index), "key") === value
+      @docs_range
+      |> Enum.reverse()
+      |> Enum.with_index()
+      |> Enum.each(fn {value, index} ->
+        assert Map.fetch!(Enum.at(desc_rows, index), "key") === value
+      end)
     end)
   end
 
@@ -99,13 +106,12 @@ defmodule LotsOfDocsTest do
   end
 
   defp bulk_post(docs, db) do
-    resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs})
+    resp = Couch.post("/#{db}/_bulk_docs", query: [w: 3], body: %{docs: docs})
 
-    assert resp.status_code == 201 and length(resp.body) == length(docs),
-           """
-           Expected 201 and the same number of response rows as in request, but got
-           #{pretty_inspect(resp)}
-           """
+    assert resp.status_code in [201, 202] and length(resp.body) == length(docs), """
+    Expected 201 and the same number of response rows as in request, but got
+    #{pretty_inspect(resp)}
+    """
 
     resp
   end

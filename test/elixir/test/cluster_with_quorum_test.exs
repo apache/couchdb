@@ -2,6 +2,7 @@ defmodule WithQuorumTest do
   use CouchTestCase
 
   @moduletag :with_quorum_test
+  @moduletag kind: :cluster
 
   @moduledoc """
   Test CouchDB API in a cluster without quorum.
@@ -11,7 +12,7 @@ defmodule WithQuorumTest do
     db_name = context[:db_name]
     resp = Couch.put("/#{db_name}")
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
     resp = Couch.delete("/#{db_name}")
     msg = "Should return 202-Acepted"
     assert resp.status_code == 202, msg
@@ -24,7 +25,7 @@ defmodule WithQuorumTest do
 
     resp = Couch.post("/#{context[:db_name]}", body: %{:_id => "0", :a => 1})
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
 
     resp = Couch.get("/#{context[:db_name]}/0")
     rev = resp.body["_rev"]
@@ -33,7 +34,7 @@ defmodule WithQuorumTest do
       Couch.put("/#{context[:db_name]}/0", body: %{:_id => "0", :_rev => rev, :a => 2})
 
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
 
     resp = Couch.get("/#{context[:db_name]}/0")
     rev = resp.body["_rev"]
@@ -95,7 +96,7 @@ defmodule WithQuorumTest do
     headers = [Destination: "1"]
     resp = Couch.request(:copy, "/#{context[:db_name]}/0", headers: headers)
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
     Couch.delete("/#{db_name}")
   end
 
@@ -108,7 +109,7 @@ defmodule WithQuorumTest do
     docs = create_docs(@doc_range)
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: docs})
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
 
     Couch.delete("/#{db_name}")
   end
@@ -141,7 +142,7 @@ defmodule WithQuorumTest do
       )
 
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
 
     rev = resp.body["rev"]
     resp = Couch.delete("/#{context[:db_name]}/0/foo.txt", query: %{:rev => rev})

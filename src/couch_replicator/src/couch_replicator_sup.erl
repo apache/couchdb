@@ -62,15 +62,6 @@ init(_Args) ->
             brutal_kill,
             worker,
             [couch_replicator_doc_processor]},
-        {couch_replicator,
-            % This is a simple function call which does not create a process
-            % but returns `ignore`. It is used to make sure each node
-            % has a local `_replicator` database.
-            {couch_replicator, ensure_rep_db_exists, []},
-            transient,
-            brutal_kill,
-            worker,
-            [couch_replicator]},
         {couch_replicator_db_changes,
             {couch_replicator_db_changes, start_link, []},
             permanent,

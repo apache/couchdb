@@ -12,7 +12,17 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
-COUCHDB_BIN_DIR=$(cd "${0%/*}" && pwd)
+canonical_readlink ()
+  {
+  FILE=$(dirname "$1")/$(basename "$1");
+  if [ -h "$FILE" ]; then
+    cd $(dirname "$1")
+    canonical_readlink $(readlink "$FILE");
+  else
+    cd "${1%/*}" && pwd -P;
+  fi
+}
+COUCHDB_BIN_DIR=$(canonical_readlink "$0")
 ERTS_BIN_DIR=$COUCHDB_BIN_DIR/../
 cd "$COUCHDB_BIN_DIR/../"
 
@@ -26,12 +36,15 @@ export BINDIR="$ROOTDIR/erts-$ERTS_VSN/bin"
 export EMU=beam
 export PROGNAME=`echo $0 | sed 's/.*\///'`
 
-export COUCHDB_QUERY_SERVER_JAVASCRIPT="{{prefix}}/bin/couchjs {{prefix}}/share/server/main.js"
-export COUCHDB_QUERY_SERVER_COFFEESCRIPT="{{prefix}}/bin/couchjs {{prefix}}/share/server/main-coffee.js"
+export COUCHDB_QUERY_SERVER_JAVASCRIPT="${COUCHDB_QUERY_SERVER_JAVASCRIPT:-{{prefix}}/bin/couchjs {{prefix}}/share/server/main.js}"
+export COUCHDB_QUERY_SERVER_COFFEESCRIPT="${COUCHDB_QUERY_SERVER_COFFEESCRIPT:-{{prefix}}/bin/couchjs {{prefix}}/share/server/main-coffee.js}"
+export COUCHDB_FAUXTON_DOCROOT={{fauxton_root}}
 
 ARGS_FILE="${COUCHDB_ARGS_FILE:-$ROOTDIR/etc/vm.args}"
+[ -n "${COUCHDB_INI_FILES:-}" ] && INI_ARGS="-couch_ini $COUCHDB_INI_FILES"
 SYSCONFIG_FILE="${COUCHDB_SYSCONFIG_FILE:-$ROOTDIR/releases/$APP_VSN/sys.config}"
 
 exec "$BINDIR/erlexec" -boot "$ROOTDIR/releases/$APP_VSN/couchdb" \
      -args_file "${ARGS_FILE}" \
+     ${INI_ARGS:-} \
      -config "${SYSCONFIG_FILE}" "$@"

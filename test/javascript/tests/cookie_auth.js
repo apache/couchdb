@@ -10,6 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.cookie_auth = function(debug) {
   // This tests cookie-based authentication.
 

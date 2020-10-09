@@ -2,6 +2,7 @@ defmodule RevisionTest do
   use CouchTestCase
 
   @moduletag :conflicts
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB conflicts
@@ -24,13 +25,16 @@ defmodule RevisionTest do
     doc2 = %{doc | a: 2, b: 2}
     # doc updated with new _rev
     _doc = rev(doc, put(db, doc))
-    assert_conflict(Couch.put("/#{db}/#{doc2._id}", body: doc2))
 
-    resp = Couch.get("/#{db}/_changes")
-    assert length(resp.body["results"]) == 1
+    retry_until(fn ->
+      assert_conflict(Couch.put("/#{db}/#{doc2._id}", body: doc2))
 
-    doc2 = Map.delete(doc2, :_rev)
-    assert_conflict(Couch.put("/#{db}/#{doc2._id}", body: doc2))
+      resp = Couch.get("/#{db}/_changes")
+      assert length(resp.body["results"]) == 1
+
+      doc2 = Map.delete(doc2, :_rev)
+      assert_conflict(Couch.put("/#{db}/#{doc2._id}", body: doc2))
+    end)
   end
 
   @tag :with_db

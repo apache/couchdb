@@ -10,8 +10,9 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+// TODO: https://issues.apache.org/jira/browse/COUCHDB-2859
+couchTests.skip = true;
 couchTests.etags_views = function(debug) {
-  return console.log('TODO: see https://issues.apache.org/jira/browse/COUCHDB-2859');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"});
   db.createDb();
@@ -79,7 +80,7 @@ couchTests.etags_views = function(debug) {
   xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/basicView?include_docs=true");
   var etag2 = xhr.getResponseHeader("etag");
   T(etag1 != etag2);
- 
+
   // Verify that purges affect etags
   xhr = CouchDB.request("GET", "/" + db_name + "/_design/etags/_view/fooView");
   var foo_etag = xhr.getResponseHeader("etag");
@@ -180,7 +181,7 @@ couchTests.etags_views = function(debug) {
   );
   etag2 = xhr.getResponseHeader("etag");
   T(etag1 != etag2, "POST to reduce view generates key-depdendent ETags");
-  
+
   // all docs
   xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs");
   T(xhr.status == 200);
@@ -201,21 +202,21 @@ couchTests.etags_views = function(debug) {
 
   // list etag
   // in the list test for now
-  
-  // A new database should have unique _all_docs etags. 
-  db.deleteDb(); 
+
+  // A new database should have unique _all_docs etags.
+  db.deleteDb();
   db.createDb(); // TODO: when re-activating try having a new DB name
-  db.save({a: 1}); 
-  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs"); 
-  var etag = xhr.getResponseHeader("etag"); 
-  db.deleteDb(); 
+  db.save({a: 1});
+  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs");
+  var etag = xhr.getResponseHeader("etag");
+  db.deleteDb();
   db.createDb(); // TODO: when re-activating try having a new DB name
-  db.save({a: 2}); 
-  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs"); 
+  db.save({a: 2});
+  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs");
   var new_etag = xhr.getResponseHeader("etag");
   T(etag != new_etag);
   // but still be cacheable
-  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs"); 
+  xhr = CouchDB.request("GET", "/" + db_name + "/_all_docs");
   T(new_etag == xhr.getResponseHeader("etag"));
 
   // cleanup

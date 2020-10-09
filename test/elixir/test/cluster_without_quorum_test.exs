@@ -2,6 +2,7 @@ defmodule WithoutQuorumTest do
   use CouchTestCase
 
   @moduletag :without_quorum_test
+  @moduletag kind: :degraded_cluster
 
   @moduledoc """
   Test CouchDB API in a cluster without quorum.
@@ -57,7 +58,7 @@ defmodule WithoutQuorumTest do
       )
 
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
 
     resp = Couch.get("/#{context[:db_name]}/0")
     rev = resp.body["_rev"]
@@ -70,7 +71,7 @@ defmodule WithoutQuorumTest do
       )
 
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
 
     resp = Couch.get("/#{context[:db_name]}/0")
     rev = resp.body["_rev"]
@@ -119,7 +120,7 @@ defmodule WithoutQuorumTest do
     docs = create_docs(@doc_range)
     resp = Couch.post("/#{db_name}/_bulk_docs", query: %{:w => 1}, body: %{docs: docs})
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
 
     Couch.delete("/#{db_name}")
   end
@@ -166,7 +167,7 @@ defmodule WithoutQuorumTest do
       )
 
     msg = "Should return 201-Created"
-    assert resp.status_code == 201, msg
+    assert resp.status_code in [201, 202], msg
 
     rev = resp.body["rev"]
 

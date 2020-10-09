@@ -16,12 +16,14 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("mem3/include/mem3.hrl").
 
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
     db_req/2, couch_doc_open/4,handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
     handle_design_info_req/3, handle_view_cleanup_req/2,
-    update_doc/4, http_code_from_status/1]).
+    update_doc/4, http_code_from_status/1,
+    handle_partition_req/2]).
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -44,6 +46,7 @@
     mochi,
     prepend = "",
     responding = false,
+    chunks_sent = 0,
     buffer = [],
     bufsize = 0,
     threshold
@@ -53,6 +56,11 @@
     T == <<"_all_docs">>
     orelse T == <<"_local_docs">>
     orelse T == <<"_design_docs">>)).
+
+-define(IS_MANGO(T), (
+    T == <<"_index">>
+    orelse T == <<"_find">>
+    orelse T == <<"_explain">>)).
 
 % Database request handlers
 handle_request(#httpd{path_parts=[DbName|RestParts],method=Method}=Req)->
@@ -129,6 +137,7 @@ changes_callback(start, #cacc{feed = continuous} = Acc) ->
     {ok, Resp} = chttpd:start_delayed_json_response(Acc#cacc.mochi, 200),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback({change, Change}, #cacc{feed = continuous} = Acc) ->
+    chttpd_stats:incr_rows(),
     Data = [?JSON_ENCODE(Change) | "\n"],
     Len = iolist_size(Data),
     maybe_flush_changes_feed(Acc, Data, Len);
@@ -152,6 +161,7 @@ changes_callback(start, #cacc{feed = eventsource} = Acc) ->
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, Headers),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback({change, {ChangeProp}=Change}, #cacc{feed = eventsource} = Acc) ->
+    chttpd_stats:incr_rows(),
     Seq = proplists:get_value(seq, ChangeProp),
     Chunk = [
         "data: ", ?JSON_ENCODE(Change),
@@ -161,10 +171,10 @@ changes_callback({change, {ChangeProp}=Change}, #cacc{feed = eventsource} = Acc)
     Len = iolist_size(Chunk),
     maybe_flush_changes_feed(Acc, Chunk, Len);
 changes_callback(timeout, #cacc{feed = eventsource} = Acc) ->
-    #cacc{mochi = Resp} = Acc,
+    #cacc{mochi = Resp, chunks_sent = ChunksSet} = Acc,
     Chunk = "event: heartbeat\ndata: \n\n",
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
-    {ok, Acc#cacc{mochi = Resp1}};
+    {ok, Acc#cacc{mochi = Resp1, chunks_sent = ChunksSet + 1}};
 changes_callback({stop, _EndSeq}, #cacc{feed = eventsource} = Acc) ->
     #cacc{mochi = Resp, buffer = Buf} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
@@ -183,6 +193,7 @@ changes_callback(start, Acc) ->
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [], FirstChunk),
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback({change, Change}, Acc) ->
+    chttpd_stats:incr_rows(),
     Data = [Acc#cacc.prepend, ?JSON_ENCODE(Change)],
     Len = iolist_size(Data),
     maybe_flush_changes_feed(Acc, Data, Len);
@@ -199,14 +210,27 @@ changes_callback({stop, EndSeq, Pending}, Acc) ->
     chttpd:end_delayed_json_response(Resp1);
 
 changes_callback(waiting_for_updates, #cacc{buffer = []} = Acc) ->
-    {ok, Acc};
+    #cacc{mochi = Resp, chunks_sent = ChunksSent} = Acc,
+    case ChunksSent > 0 of
+        true ->
+            {ok, Acc};
+        false ->
+            {ok, Resp1} = chttpd:send_delayed_chunk(Resp, <<"\n">>),
+            {ok, Acc#cacc{mochi = Resp1, chunks_sent = 1}}
+    end;
 changes_callback(waiting_for_updates, Acc) ->
-    #cacc{buffer = Buf, mochi = Resp} = Acc,
+    #cacc{buffer = Buf, mochi = Resp, chunks_sent = ChunksSent} = Acc,
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Buf),
-    {ok, Acc#cacc{buffer = [], bufsize = 0, mochi = Resp1}};
+    {ok, Acc#cacc{
+        buffer = [],
+        bufsize = 0,
+        mochi = Resp1,
+        chunks_sent = ChunksSent + 1
+    }};
 changes_callback(timeout, Acc) ->
-    {ok, Resp1} = chttpd:send_delayed_chunk(Acc#cacc.mochi, "\n"),
-    {ok, Acc#cacc{mochi = Resp1}};
+    #cacc{mochi = Resp, chunks_sent = ChunksSent} = Acc,
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\n"),
+    {ok, Acc#cacc{mochi = Resp1, chunks_sent = ChunksSent + 1}};
 changes_callback({error, Reason}, #cacc{mochi = #httpd{}} = Acc) ->
     #cacc{mochi = Req} = Acc,
     chttpd:send_error(Req, Reason);
@@ -222,11 +246,12 @@ maybe_flush_changes_feed(#cacc{bufsize=Size, threshold=Max} = Acc, Data, Len)
     {ok, R1} = chttpd:send_delayed_chunk(Resp, Buffer),
     {ok, Acc#cacc{prepend = ",\r\n", buffer = Data, bufsize=Len, mochi = R1}};
 maybe_flush_changes_feed(Acc0, Data, Len) ->
-    #cacc{buffer = Buf, bufsize = Size} = Acc0,
+    #cacc{buffer = Buf, bufsize = Size, chunks_sent = ChunksSent} = Acc0,
     Acc = Acc0#cacc{
         prepend = ",\r\n",
         buffer = [Buf | Data],
-        bufsize = Size + Len
+        bufsize = Size + Len,
+        chunks_sent = ChunksSent + 1
     },
     {ok, Acc}.
 
@@ -252,6 +277,80 @@ handle_compact_req(Req, _Db) ->
 handle_view_cleanup_req(Req, Db) ->
     ok = fabric:cleanup_index_files_all_nodes(Db),
     send_json(Req, 202, {[{ok, true}]}).
+
+
+handle_partition_req(#httpd{path_parts=[_,_]}=_Req, _Db) ->
+    throw({bad_request, invalid_partition_req});
+
+handle_partition_req(#httpd{method='GET', path_parts=[_,_,PartId]}=Req, Db) ->
+    couch_partition:validate_partition(PartId),
+    case couch_db:is_partitioned(Db) of
+        true ->
+            {ok, PartitionInfo} = fabric:get_partition_info(Db, PartId),
+            send_json(Req, {PartitionInfo});
+        false ->
+            throw({bad_request, <<"database is not partitioned">>})
+    end;
+
+handle_partition_req(#httpd{method='POST',
+    path_parts=[_, <<"_partition">>, <<"_", _/binary>>]}, _Db) ->
+    Msg = <<"Partition must not start with an underscore">>,
+    throw({illegal_partition, Msg});
+
+handle_partition_req(#httpd{path_parts = [_, _, _]}=Req, _Db) ->
+    send_method_not_allowed(Req, "GET");
+
+handle_partition_req(#httpd{path_parts=[DbName, _, PartId | Rest]}=Req, Db) ->
+    case couch_db:is_partitioned(Db) of
+        true ->
+            couch_partition:validate_partition(PartId),
+            QS = chttpd:qs(Req),
+            PartIdStr = ?b2l(PartId),
+            QSPartIdStr = couch_util:get_value("partition", QS, PartIdStr),
+            if QSPartIdStr == PartIdStr -> ok; true ->
+                Msg = <<"Conflicting value for `partition` in query string">>,
+                throw({bad_request, Msg})
+            end,
+            NewQS = lists:ukeysort(1, [{"partition", PartIdStr} | QS]),
+            NewReq = Req#httpd{
+                path_parts = [DbName | Rest],
+                qs = NewQS
+            },
+            update_partition_stats(Rest),
+            case Rest of
+                [OP | _] when OP == <<"_all_docs">> orelse ?IS_MANGO(OP) ->
+                    case chttpd_handlers:db_handler(OP, fun db_req/2) of
+                        Handler when is_function(Handler, 2) ->
+                            Handler(NewReq, Db);
+                        _ ->
+                            chttpd:send_error(Req, not_found)
+                    end;
+                [<<"_design">>, _Name, <<"_", _/binary>> | _] ->
+                    handle_design_req(NewReq, Db);
+                _ ->
+                    chttpd:send_error(Req, not_found)
+            end;
+        false ->
+            throw({bad_request, <<"database is not partitioned">>})
+    end;
+
+handle_partition_req(Req, _Db) ->
+    chttpd:send_error(Req, not_found).
+
+update_partition_stats(PathParts) ->
+    case PathParts of
+            [<<"_design">> | _] ->
+                couch_stats:increment_counter([couchdb, httpd, partition_view_requests]);
+            [<<"_all_docs">> | _] ->
+                couch_stats:increment_counter([couchdb, httpd, partition_all_docs_requests]);
+            [<<"_find">> | _] ->
+                couch_stats:increment_counter([couchdb, httpd, partition_find_requests]);
+            [<<"_explain">> | _] ->
+                couch_stats:increment_counter([couchdb, httpd, partition_explain_requests]);
+            _ ->
+                ok % ignore path that do not match
+        end.
+
 
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
@@ -284,15 +383,10 @@ handle_design_info_req(Req, _Db, _DDoc) ->
 
 create_db_req(#httpd{}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
-    N = chttpd:qs_value(Req, "n", config:get("cluster", "n", "3")),
-    Q = chttpd:qs_value(Req, "q", config:get("cluster", "q", "8")),
-    P = chttpd:qs_value(Req, "placement", config:get("cluster", "placement")),
+    ShardsOpt = parse_shards_opt(Req),
     EngineOpt = parse_engine_opt(Req),
-    Options = [
-        {n, N},
-        {q, Q},
-        {placement, P}
-    ] ++ EngineOpt,
+    DbProps = parse_partitioned_opt(Req),
+    Options = lists:append([ShardsOpt, [{props, DbProps}], EngineOpt]),
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
     case fabric:create_db(DbName, Options) of
     ok ->
@@ -317,7 +411,15 @@ delete_db_req(#httpd{}=Req, DbName) ->
     end.
 
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
-    {ok, Db} = couch_db:clustered_db(DbName, Ctx),
+    Shard = hd(mem3:shards(DbName)),
+    Props = couch_util:get_value(props, Shard#shard.opts, []),
+    Opts = case Ctx of
+        undefined ->
+            [{props, Props}];
+        #user_ctx{} ->
+            [{user_ctx, Ctx}, {props, Props}]
+    end,
+    {ok, Db} = couch_db:clustered_db(DbName, Opts),
     Fun(Req, Db).
 
 db_req(#httpd{method='GET',path_parts=[DbName]}=Req, _Db) ->
@@ -334,7 +436,7 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
 
-    Doc = couch_doc:from_json_obj_validate(chttpd:json_body(Req)),
+    Doc = couch_db:doc_from_json_obj_validate(Db, chttpd:json_body(Req)),
     Doc2 = case Doc#doc.id of
         <<"">> ->
             Doc#doc{id=couch_uuids:new(), revs={0, []}};
@@ -347,8 +449,12 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
         % async_batching
         spawn(fun() ->
                 case catch(fabric:update_doc(Db, Doc2, Options)) of
-                {ok, _} -> ok;
-                {accepted, _} -> ok;
+                {ok, _} ->
+                    chttpd_stats:incr_writes(),
+                    ok;
+                {accepted, _} ->
+                    chttpd_stats:incr_writes(),
+                    ok;
                 Error ->
                     couch_log:debug("Batch doc error (~s): ~p",[DocId, Error])
                 end
@@ -364,8 +470,10 @@ db_req(#httpd{method='POST', path_parts=[DbName], user_ctx=Ctx}=Req, Db) ->
             $/, couch_util:url_encode(DocId)]),
         case fabric:update_doc(Db, Doc2, Options) of
         {ok, NewRev} ->
+            chttpd_stats:incr_writes(),
             HttpCode = 201;
         {accepted, NewRev} ->
+            chttpd_stats:incr_writes(),
             HttpCode = 202
         end,
         send_json(Req, HttpCode, [{"Location", DocUrl}], {[
@@ -421,7 +529,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         Options = [{user_ctx,Ctx}, {w,W}]
     end,
     Docs = lists:map(fun(JsonObj) ->
-        Doc = couch_doc:from_json_obj_validate(JsonObj),
+        Doc = couch_db:doc_from_json_obj_validate(Db, JsonObj),
         validate_attachment_names(Doc),
         case Doc#doc.id of
             <<>> -> Doc#doc{id = couch_uuids:new()};
@@ -438,11 +546,13 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         case fabric:update_docs(Db, Docs, Options2) of
         {ok, Results} ->
             % output the results
+            chttpd_stats:incr_writes(length(Results)),
             DocResults = lists:zipwith(fun update_doc_result_to_json/2,
                 Docs, Results),
             send_json(Req, 201, DocResults);
         {accepted, Results} ->
             % output the results
+            chttpd_stats:incr_writes(length(Results)),
             DocResults = lists:zipwith(fun update_doc_result_to_json/2,
                 Docs, Results),
             send_json(Req, 202, DocResults);
@@ -454,9 +564,11 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     false ->
         case fabric:update_docs(Db, Docs, [replicated_changes|Options]) of
         {ok, Errors} ->
+            chttpd_stats:incr_writes(length(Docs)),
             ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
             send_json(Req, 201, ErrorsJson);
         {accepted, Errors} ->
+            chttpd_stats:incr_writes(length(Docs)),
             ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
             send_json(Req, 202, ErrorsJson)
         end;
@@ -565,8 +677,12 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
     end,
     couch_stats:increment_counter([couchdb, document_purges, total], length(IdsRevs2)),
     Results2 = case fabric:purge_docs(Db, IdsRevs2, Options) of
-        {ok, Results} -> Results;
-        {accepted, Results} -> Results
+        {ok, Results} ->
+            chttpd_stats:incr_writes(length(Results)),
+            Results;
+        {accepted, Results} ->
+            chttpd_stats:incr_writes(length(Results)),
+            Results
     end,
     {Code, Json} = purge_results_to_json(IdsRevs2, Results2),
     send_json(Req, Code, {[{<<"purge_seq">>, null}, {<<"purged">>, {Json}}]});
@@ -658,6 +774,8 @@ db_req(#httpd{path_parts=[_,<<"_revs_diff">>]}=Req, _Db) ->
 
 db_req(#httpd{method='PUT',path_parts=[_,<<"_security">>],user_ctx=Ctx}=Req,
         Db) ->
+    DbName = ?b2l(couch_db:name(Db)),
+    validate_security_can_be_edited(DbName),
     SecObj = chttpd:json_body(Req),
     case fabric:set_security(Db, SecObj, [{user_ctx, Ctx}]) of
         ok ->
@@ -741,7 +859,7 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     ArgQueries = lists:map(fun({Query}) ->
         QueryArg1 = couch_mrview_http:parse_params(Query, undefined,
             Args1, [decoded]),
-        QueryArgs2 = couch_mrview_util:validate_args(QueryArg1),
+        QueryArgs2 = fabric_util:validate_all_docs_args(Db, QueryArg1),
         set_namespace(OP, QueryArgs2)
     end, Queries),
     Options = [{user_ctx, Req#httpd.user_ctx}],
@@ -752,22 +870,33 @@ multi_all_docs_view(Req, Db, OP, Queries) ->
     VAcc1 = VAcc0#vacc{resp=Resp0},
     VAcc2 = lists:foldl(fun(Args, Acc0) ->
         {ok, Acc1} = fabric:all_docs(Db, Options,
-            fun couch_mrview_http:view_cb/2, Acc0, Args),
+            fun view_cb/2, Acc0, Args),
         Acc1
     end, VAcc1, ArgQueries),
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
     chttpd:end_delayed_json_response(Resp1).
 
 all_docs_view(Req, Db, Keys, OP) ->
-    Args0 = couch_mrview_http:parse_params(Req, Keys),
+    Args0 = couch_mrview_http:parse_body_and_query(Req, Keys),
     Args1 = Args0#mrargs{view_type=map},
-    Args2 = couch_mrview_util:validate_args(Args1),
+    Args2 = fabric_util:validate_all_docs_args(Db, Args1),
     Args3 = set_namespace(OP, Args2),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
-    {ok, Resp} = fabric:all_docs(Db, Options, fun couch_mrview_http:view_cb/2, VAcc, Args3),
+    {ok, Resp} = fabric:all_docs(Db, Options, fun view_cb/2, VAcc, Args3),
     {ok, Resp#vacc.resp}.
+
+view_cb({row, Row} = Msg, Acc) ->
+    case lists:keymember(doc, 1, Row) of
+        true -> chttpd_stats:incr_reads();
+        false -> ok
+    end,
+    chttpd_stats:incr_rows(),
+    couch_mrview_http:view_cb(Msg, Acc);
+
+view_cb(Msg, Acc) ->
+    couch_mrview_http:view_cb(Msg, Acc).
 
 db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     % check for the existence of the doc to handle the 404 case.
@@ -778,7 +907,8 @@ db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
     Rev ->
         Body = {[{<<"_rev">>, ?l2b(Rev)},{<<"_deleted">>,true}]}
     end,
-    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, DocId, Body));
+    Doc = couch_doc_from_req(Req, Db, DocId, Body),
+    send_updated_doc(Req, Db, DocId, Doc);
 
 db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
     #doc_query_args{
@@ -802,6 +932,7 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
             {ok, []} when Revs == all ->
                 chttpd:send_error(Req, {not_found, missing});
             {ok, Results} ->
+                chttpd_stats:incr_reads(length(Results)),
                 case MochiReq:accepts_content_type("multipart/mixed") of
                 false ->
                     {ok, Resp} = start_json_response(Req, 200),
@@ -835,7 +966,7 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
 
 db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     couch_httpd:validate_referer(Req),
-    couch_doc:validate_docid(DocId, couch_db:name(Db)),
+    couch_db:validate_docid(Db, DocId),
     chttpd:validate_ctype(Req, "multipart/form-data"),
 
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
@@ -845,12 +976,15 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     case proplists:is_defined("_doc", Form) of
     true ->
         Json = ?JSON_DECODE(couch_util:get_value("_doc", Form)),
-        Doc = couch_doc_from_req(Req, DocId, Json);
+        Doc = couch_doc_from_req(Req, Db, DocId, Json);
     false ->
         Rev = couch_doc:parse_rev(list_to_binary(couch_util:get_value("_rev", Form))),
         Doc = case fabric:open_revs(Db, DocId, [Rev], []) of
-            {ok, [{ok, Doc0}]} -> Doc0;
-            {error, Error} -> throw(Error)
+            {ok, [{ok, Doc0}]} ->
+                chttpd_stats:incr_reads(),
+                Doc0;
+            {error, Error} ->
+                throw(Error)
         end
     end,
     UpdatedAtts = [
@@ -876,8 +1010,10 @@ db_doc_req(#httpd{method='POST', user_ctx=Ctx}=Req, Db, DocId) ->
     },
     case fabric:update_doc(Db, NewDoc, Options) of
     {ok, NewRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 201;
     {accepted, NewRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 202
     end,
     send_json(Req, HttpCode, [{"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewRev)) ++ "\""}], {[
@@ -891,7 +1027,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         update_type = UpdateType
     } = parse_doc_query(Req),
     DbName = couch_db:name(Db),
-    couch_doc:validate_docid(DocId, DbName),
+    couch_db:validate_docid(Db, DocId),
 
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options = [{user_ctx,Ctx}, {w,W}],
@@ -905,7 +1041,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         couch_httpd_multipart:num_mp_writers(mem3:n(mem3:dbname(DbName), DocId)),
         {ok, Doc0, WaitFun, Parser} = couch_doc:doc_from_multi_part_stream(ContentType,
                 fun() -> receive_request_data(Req) end),
-        Doc = couch_doc_from_req(Req, DocId, Doc0),
+        Doc = couch_doc_from_req(Req, Db, DocId, Doc0),
         try
             Result = send_updated_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
             WaitFun(),
@@ -919,12 +1055,16 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         case chttpd:qs_value(Req, "batch") of
         "ok" ->
             % batch
-            Doc = couch_doc_from_req(Req, DocId, chttpd:json_body(Req)),
+            Doc = couch_doc_from_req(Req, Db, DocId, chttpd:json_body(Req)),
 
             spawn(fun() ->
                     case catch(fabric:update_doc(Db, Doc, Options)) of
-                    {ok, _} -> ok;
-                    {accepted, _} -> ok;
+                    {ok, _} ->
+                        chttpd_stats:incr_writes(),
+                        ok;
+                    {accepted, _} ->
+                        chttpd_stats:incr_writes(),
+                        ok;
                     Error ->
                         couch_log:notice("Batch doc error (~s): ~p",[DocId, Error])
                     end
@@ -936,7 +1076,7 @@ db_doc_req(#httpd{method='PUT', user_ctx=Ctx}=Req, Db, DocId) ->
         _Normal ->
             % normal
             Body = chttpd:json_body(Req),
-            Doc = couch_doc_from_req(Req, DocId, Body),
+            Doc = couch_doc_from_req(Req, Db, DocId, Body),
             send_updated_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType)
         end
     end;
@@ -955,8 +1095,10 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     case fabric:update_doc(Db,
         Doc#doc{id=TargetDocId, revs=TargetRevs}, [{user_ctx,Ctx}]) of
     {ok, NewTargetRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 201;
     {accepted, NewTargetRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 202
     end,
     % respond
@@ -966,7 +1108,7 @@ db_doc_req(#httpd{method='COPY', user_ctx=Ctx}=Req, Db, SourceDocId) ->
     send_json(Req, HttpCode,
         [{"Location", Loc},
         {"ETag", "\"" ++ ?b2l(couch_doc:rev_to_str(NewTargetRev)) ++ "\""}],
-        {[{ok, true}] ++ PartRes});
+        {PartRes});
 
 db_doc_req(Req, _Db, _DocId) ->
     send_method_not_allowed(Req, "DELETE,GET,HEAD,POST,PUT,COPY").
@@ -1217,7 +1359,7 @@ update_doc(Db, DocId, #doc{deleted=Deleted, body=DocBody}=Doc, Options) ->
     Body = {[{ok, true}, {id, DocId}, {rev, NewRevStr}]},
     {Status, {etag, Etag}, Body}.
 
-couch_doc_from_req(Req, DocId, #doc{revs=Revs} = Doc) ->
+couch_doc_from_req(Req, _Db, DocId, #doc{revs=Revs} = Doc) ->
     validate_attachment_names(Doc),
     Rev = case chttpd:qs_value(Req, "rev") of
     undefined ->
@@ -1244,8 +1386,9 @@ couch_doc_from_req(Req, DocId, #doc{revs=Revs} = Doc) ->
         end
     end,
     Doc#doc{id=DocId, revs=Revs2};
-couch_doc_from_req(Req, DocId, Json) ->
-    couch_doc_from_req(Req, DocId, couch_doc:from_json_obj_validate(Json)).
+couch_doc_from_req(Req, Db, DocId, Json) ->
+    Doc = couch_db:doc_from_json_obj_validate(Db, Json),
+    couch_doc_from_req(Req, Db, DocId, Doc).
 
 
 % Useful for debugging
@@ -1258,6 +1401,7 @@ couch_doc_open(Db, DocId, Rev, Options0) ->
     nil -> % open most recent rev
         case fabric:open_doc(Db, DocId, Options) of
         {ok, Doc} ->
+            chttpd_stats:incr_reads(),
             Doc;
          Error ->
              throw(Error)
@@ -1265,6 +1409,7 @@ couch_doc_open(Db, DocId, Rev, Options0) ->
     _ -> % open a specific rev (deletions come back as stubs)
         case fabric:open_revs(Db, DocId, [Rev], Options) of
         {ok, [{ok, Doc}]} ->
+            chttpd_stats:incr_reads(),
             Doc;
         {ok, [{{not_found, missing}, Rev}]} ->
             throw(not_found);
@@ -1435,13 +1580,17 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
                 % check for the existence of the doc to handle the 404 case.
                 couch_doc_open(Db, DocId, nil, [])
             end,
-            couch_doc:validate_docid(DocId, couch_db:name(Db)),
+            couch_db:validate_docid(Db, DocId),
             #doc{id=DocId};
         Rev ->
             case fabric:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
-            {ok, [{ok, Doc0}]}  -> Doc0;
-            {ok, [Error]}       -> throw(Error);
-            {error, Error}      -> throw(Error)
+            {ok, [{ok, Doc0}]} ->
+                chttpd_stats:incr_reads(),
+                Doc0;
+            {ok, [Error]} ->
+                throw(Error);
+            {error, Error} ->
+                throw(Error)
             end
     end,
 
@@ -1452,8 +1601,10 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     case fabric:update_doc(Db, DocEdited, [{user_ctx,Ctx}, {w,W}]) of
     {ok, UpdatedRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 201;
     {accepted, UpdatedRev} ->
+        chttpd_stats:incr_writes(),
         HttpCode = 202
     end,
     erlang:put(mochiweb_request_recv, true),
@@ -1544,6 +1695,40 @@ get_md5_header(Req) ->
 parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
 
+parse_shards_opt(Req) ->
+    [
+        {n, parse_shards_opt("n", Req, config:get("cluster", "n", "3"))},
+        {q, parse_shards_opt("q", Req, config:get("cluster", "q", "8"))},
+        {placement, parse_shards_opt(
+            "placement", Req, config:get("cluster", "placement"))}
+    ].
+
+parse_shards_opt("placement", Req, Default) ->
+    Err = <<"The `placement` value should be in a format `zone:n`.">>,
+    case chttpd:qs_value(Req, "placement", Default) of
+        Default -> Default;
+        [] -> throw({bad_request, Err});
+        Val ->
+            try
+                true = lists:all(fun(Rule) ->
+                    [_, N] = string:tokens(Rule, ":"),
+                    couch_util:validate_positive_int(N)
+                end, string:tokens(Val, ",")),
+                Val
+            catch _:_ ->
+                throw({bad_request, Err})
+            end
+    end;
+
+parse_shards_opt(Param, Req, Default) ->
+    Val = chttpd:qs_value(Req, Param, Default),
+    Err = ?l2b(["The `", Param, "` value should be a positive integer."]),
+    case couch_util:validate_positive_int(Val) of
+        true -> Val;
+        false -> throw({bad_request, Err})
+    end.
+
+
 parse_engine_opt(Req) ->
     case chttpd:qs_value(Req, "engine") of
         undefined ->
@@ -1557,6 +1742,33 @@ parse_engine_opt(Req) ->
                     throw({bad_request, invalid_engine_extension})
             end
     end.
+
+
+parse_partitioned_opt(Req) ->
+    case chttpd:qs_value(Req, "partitioned") of
+        undefined ->
+            [];
+        "false" ->
+            [];
+        "true" ->
+            ok = validate_partitioned_db_enabled(Req),
+            [
+                {partitioned, true},
+                {hash, [couch_partition, hash, []]}
+            ];
+        _ ->
+            throw({bad_request, <<"Invalid `partitioned` parameter">>})
+    end.
+
+
+validate_partitioned_db_enabled(Req) ->
+    case couch_flags:is_enabled(partitioned, Req) of
+        true -> 
+            ok;
+        false ->
+            throw({bad_request, <<"Partitioned feature is not enabled.">>})
+    end.
+
 
 parse_doc_query({Key, Value}, Args) ->
     case {Key, Value} of
@@ -1636,7 +1848,14 @@ parse_changes_query(Req) ->
         {"heartbeat", "true"} ->
             Args#changes_args{heartbeat=true};
         {"heartbeat", _} ->
-            Args#changes_args{heartbeat=list_to_integer(Value)};
+            try list_to_integer(Value) of
+                HeartbeatInteger when HeartbeatInteger > 0 ->
+                    Args#changes_args{heartbeat=HeartbeatInteger};
+                _ ->
+                    throw({bad_request, <<"The heartbeat value should be a positive integer (in milliseconds).">>})
+            catch error:badarg ->
+                throw({bad_request, <<"Invalid heartbeat value. Expecting a positive integer value (in milliseconds).">>})
+            end;
         {"timeout", _} ->
             Args#changes_args{timeout=list_to_integer(Value)};
         {"include_docs", "true"} ->
@@ -1696,6 +1915,15 @@ extract_header_rev(Req, ExplicitRev) ->
         throw({bad_request, "Document rev and etag have different values"})
     end.
 
+validate_security_can_be_edited(DbName) ->
+    UserDbName = config:get("chttpd_auth", "authentication_db", "_users"),
+    CanEditUserSecurityObject = config:get("couchdb","users_db_security_editable","false"),
+    case {DbName,CanEditUserSecurityObject} of
+        {UserDbName,"false"} ->
+            Msg = "You can't edit the security object of the user database.",
+            throw({forbidden, Msg});
+        {_,_} -> ok
+    end.
 
 validate_attachment_names(Doc) ->
     lists:foreach(fun(Att) ->
@@ -1739,8 +1967,8 @@ set_namespace(<<"_local_docs">>, Args) ->
     set_namespace(<<"_local">>, Args);
 set_namespace(<<"_design_docs">>, Args) ->
     set_namespace(<<"_design">>, Args);
-set_namespace(NS, #mrargs{extra = Extra} = Args) ->
-    Args#mrargs{extra = [{namespace, NS} | Extra]}.
+set_namespace(NS, #mrargs{} = Args) ->
+    couch_mrview_util:set_extra(Args, namespace, NS).
 
 
 %% /db/_bulk_get stuff
@@ -1777,16 +2005,17 @@ bulk_get_open_doc_revs(Db, {Props}, Options) ->
 
 
 bulk_get_open_doc_revs1(Db, Props, Options, {}) ->
-    case parse_field(<<"id">>, couch_util:get_value(<<"id">>, Props)) of
-        {error, {DocId, Error, Reason}} ->
-            {DocId, {error, {null, Error, Reason}}, Options};
-
-        {ok, undefined} ->
+    case couch_util:get_value(<<"id">>, Props) of
+        undefined ->
             Error = {null, bad_request, <<"document id missed">>},
             {null, {error, Error}, Options};
-
-        {ok, DocId} ->
-            bulk_get_open_doc_revs1(Db, Props, Options, {DocId})
+        DocId ->
+            try
+                couch_db:validate_docid(Db, DocId),
+                bulk_get_open_doc_revs1(Db, Props, Options, {DocId})
+            catch throw:{Error, Reason} ->
+                {DocId, {error, {null, Error, Reason}}, Options}
+            end
     end;
 bulk_get_open_doc_revs1(Db, Props, Options, {DocId}) ->
     RevStr = couch_util:get_value(<<"rev">>, Props),
@@ -1821,21 +2050,14 @@ bulk_get_open_doc_revs1(Db, Props, _, {DocId, Revs, Options}) ->
             RevStr = couch_util:get_value(<<"rev">>, Props),
             Error = {RevStr, <<"not_found">>, <<"missing">>},
             {DocId, {error, Error}, Options};
-        Results ->
-            {DocId, Results, Options}
+        {ok, Resps} = Results ->
+            chttpd_stats:incr_reads(length(Resps)),
+            {DocId, Results, Options};
+        Else ->
+            {DocId, Else, Options}
     end.
 
 
-parse_field(<<"id">>, undefined) ->
-    {ok, undefined};
-parse_field(<<"id">>, Value) ->
-    try
-        ok = couch_doc:validate_docid(Value),
-        {ok, Value}
-    catch
-        throw:{Error, Reason} ->
-            {error, {Value, Error, Reason}}
-    end;
 parse_field(<<"rev">>, undefined) ->
     {ok, undefined};
 parse_field(<<"rev">>, Value) ->
@@ -1908,6 +2130,176 @@ monitor_attachments_test_() ->
             Atts = [couch_att:new([{data, stub}])],
             ?_assertEqual([], monitor_attachments(Atts))
         end
+    }.
+
+parse_partitioned_opt_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            t_should_allow_partitioned_db(),
+            t_should_throw_on_not_allowed_partitioned_db(),
+            t_returns_empty_array_for_partitioned_false(),
+            t_returns_empty_array_for_no_partitioned_qs()
+        ]
+    }.
+
+parse_shards_opt_test_() ->
+    {
+        foreach,
+        fun setup/0,
+        fun teardown/1,
+        [
+            t_should_allow_valid_q(),
+            t_should_default_on_missing_q(),
+            t_should_throw_on_invalid_q(),
+            t_should_allow_valid_n(),
+            t_should_default_on_missing_n(),
+            t_should_throw_on_invalid_n(),
+            t_should_allow_valid_placement(),
+            t_should_default_on_missing_placement(),
+            t_should_throw_on_invalid_placement()
+        ]
+    }.
+
+setup() ->
+    meck:expect(config, get, fun(_, _, Default) -> Default end),
+    ok.
+
+teardown(_) ->
+    meck:unload().
+
+mock_request(Url) ->
+    Headers = mochiweb_headers:make([{"Host", "examples.com"}]),
+    MochiReq = mochiweb_request:new(nil, 'PUT', Url, {1, 1}, Headers),
+    #httpd{mochi_req = MochiReq}.
+
+t_should_allow_partitioned_db() ->
+    ?_test(begin
+        meck:expect(couch_flags, is_enabled, 2, true),
+        Req = mock_request("/all-test21?partitioned=true"),
+        [Partitioned, _] = parse_partitioned_opt(Req),
+        ?assertEqual(Partitioned, {partitioned, true})
+    end).
+
+t_should_throw_on_not_allowed_partitioned_db() ->
+    ?_test(begin
+        meck:expect(couch_flags, is_enabled, 2, false),
+        Req = mock_request("/all-test21?partitioned=true"),
+        Throw = {bad_request, <<"Partitioned feature is not enabled.">>},
+        ?assertThrow(Throw, parse_partitioned_opt(Req))
+    end).
+
+t_returns_empty_array_for_partitioned_false() ->
+    ?_test(begin
+        Req = mock_request("/all-test21?partitioned=false"),
+        ?assertEqual(parse_partitioned_opt(Req), [])
+    end).
+
+t_returns_empty_array_for_no_partitioned_qs() ->
+    ?_test(begin
+        Req = mock_request("/all-test21"),
+        ?assertEqual(parse_partitioned_opt(Req), [])
+    end).
+
+t_should_allow_valid_q() ->
+    ?_test(begin
+        Req = mock_request("/all-test21?q=1"),
+        Opts = parse_shards_opt(Req),
+        ?assertEqual("1", couch_util:get_value(q, Opts))
+    end).
+
+t_should_default_on_missing_q() ->
+    ?_test(begin
+        Req = mock_request("/all-test21"),
+        Opts = parse_shards_opt(Req),
+        ?assertEqual("8", couch_util:get_value(q, Opts))
+    end).
+
+t_should_throw_on_invalid_q() ->
+    ?_test(begin
+        Req = mock_request("/all-test21?q="),
+        Err = <<"The `q` value should be a positive integer.">>,
+        ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+    end).
+
+t_should_allow_valid_n() ->
+    ?_test(begin
+        Req = mock_request("/all-test21?n=1"),
+        Opts = parse_shards_opt(Req),
+        ?assertEqual("1", couch_util:get_value(n, Opts))
+    end).
+
+t_should_default_on_missing_n() ->
+    ?_test(begin
+        Req = mock_request("/all-test21"),
+        Opts = parse_shards_opt(Req),
+        ?assertEqual("3", couch_util:get_value(n, Opts))
+    end).
+
+t_should_throw_on_invalid_n() ->
+    ?_test(begin
+        Req = mock_request("/all-test21?n="),
+        Err = <<"The `n` value should be a positive integer.">>,
+        ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+    end).
+
+t_should_allow_valid_placement() ->
+    {
+        foreach,
+        fun() -> ok end,
+        [
+            {"single zone",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement=az:1"),
+                Opts = parse_shards_opt(Req),
+                ?assertEqual("az:1", couch_util:get_value(placement, Opts))
+            end)},
+            {"multi zone",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement=az:1,co:3"),
+                Opts = parse_shards_opt(Req),
+                ?assertEqual("az:1,co:3",
+                    couch_util:get_value(placement, Opts))
+            end)}
+        ]
+    }.
+
+t_should_default_on_missing_placement() ->
+    ?_test(begin
+        Req = mock_request("/all-test21"),
+        Opts = parse_shards_opt(Req),
+        ?assertEqual(undefined, couch_util:get_value(placement, Opts))
+    end).
+
+t_should_throw_on_invalid_placement() ->
+    Err = <<"The `placement` value should be in a format `zone:n`.">>,
+    {
+        foreach,
+        fun() -> ok end,
+        [
+            {"empty placement",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement="),
+                ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+            end)},
+            {"invalid format",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement=moon"),
+                ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+            end)},
+            {"invalid n",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement=moon:eagle"),
+                ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+            end)},
+            {"one invalid zone",
+            ?_test(begin
+                Req = mock_request("/all-test21?placement=az:1,co:moon"),
+                ?assertThrow({bad_request, Err}, parse_shards_opt(Req))
+            end)}
+        ]
     }.
 
 -endif.

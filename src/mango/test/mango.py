@@ -299,6 +299,10 @@ class UsersDbTests(unittest.TestCase):
         klass.db = Database("_users")
         user_docs.setup_users(klass.db)
 
+    @classmethod
+    def tearDownClass(klass):
+        user_docs.teardown_users(klass.db)
+
     def setUp(self):
         self.db = self.__class__.db
 
@@ -309,11 +313,17 @@ class DbPerClass(unittest.TestCase):
         klass.db = Database(random_db_name())
         klass.db.create(q=1, n=1)
 
+    @classmethod
+    def tearDownClass(klass):
+        klass.db.delete()
+
     def setUp(self):
         self.db = self.__class__.db
 
 
 class UserDocsTests(DbPerClass):
+    INDEX_TYPE = "json"
+
     @classmethod
     def setUpClass(klass):
         super(UserDocsTests, klass).setUpClass()
@@ -321,14 +331,16 @@ class UserDocsTests(DbPerClass):
 
 
 class UserDocsTestsNoIndexes(DbPerClass):
+    INDEX_TYPE = "special"
+
     @classmethod
     def setUpClass(klass):
         super(UserDocsTestsNoIndexes, klass).setUpClass()
-        user_docs.setup(klass.db, index_type="_all_docs")
+        user_docs.setup(klass.db, index_type=klass.INDEX_TYPE)
 
 
 class UserDocsTextTests(DbPerClass):
-
+    INDEX_TYPE = "text"
     DEFAULT_FIELD = None
     FIELDS = None
 
@@ -338,7 +350,7 @@ class UserDocsTextTests(DbPerClass):
         if has_text_service():
             user_docs.setup(
                 klass.db,
-                index_type="text",
+                index_type=klass.INDEX_TYPE,
                 default_field=klass.DEFAULT_FIELD,
                 fields=klass.FIELDS,
             )

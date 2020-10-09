@@ -12,6 +12,7 @@
 
 // Do DB creation under cluster without quorum conditions.
 couchTests.db_creation = function(debug) {
+  return console.log('done in test/elixir/test/cluster_without_quorum_test.exs');
 
   if (debug) debugger;
 

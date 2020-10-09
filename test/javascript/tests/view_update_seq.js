@@ -10,6 +10,7 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.view_update_seq = function(debug) {
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
@@ -26,6 +27,7 @@ couchTests.view_update_seq = function(debug) {
   var designDoc = {
     _id:"_design/test",
     language: "javascript",
+    autoupdate: false,
     views: {
       all_docs: {
         map: "function(doc) { emit(doc.integer, doc.string) }"

@@ -10,6 +10,11 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+
+% The last element in the ring
+-define(RING_END, 2 bsl 31 - 1).
+
+
 % type specification hacked to suppress dialyzer warning re: match spec
 -record(shard, {
     name :: binary() | '_' | 'undefined',

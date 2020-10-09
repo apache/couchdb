@@ -2,6 +2,7 @@ defmodule CoffeeTest do
   use CouchTestCase
 
   @moduletag :coffee
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test basic coffeescript functionality.
@@ -53,9 +54,10 @@ defmodule CoffeeTest do
 
     assert resp.status_code === 201 and length(resp.body) === length(docs)
 
-    %{"rows" => values} = Couch.get("/#{db_name}/_design/coffee/_view/myview").body
-
-    assert 5 === hd(values)["value"]
+    retry_until(fn ->
+      %{"rows" => values} = Couch.get("/#{db_name}/_design/coffee/_view/myview").body
+      assert 5 === hd(values)["value"]
+    end)
 
     assert Couch.get("/#{db_name}/_design/coffee/_show/myshow/a").body === "Foo 100"
 

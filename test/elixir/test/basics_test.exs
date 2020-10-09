@@ -2,6 +2,7 @@ defmodule BasicsTest do
   use CouchTestCase
 
   @moduletag :basics
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB basics.
@@ -67,7 +68,7 @@ defmodule BasicsTest do
   @tag :with_db
   test "Create a document and save it to the database", context do
     resp = Couch.post("/#{context[:db_name]}", body: %{:_id => "0", :a => 1, :b => 1})
-    assert resp.status_code == 201, "Should be 201 created"
+    assert resp.status_code in [201, 202], "Should be 201 created"
     assert resp.body["id"], "Id should be present"
     assert resp.body["rev"], "Rev should be present"
 
@@ -82,6 +83,17 @@ defmodule BasicsTest do
     {:ok, _} = create_doc(db_name, sample_doc_foo())
     resp = Couch.get("/#{db_name}/foo", query: %{:revs_info => true})
     assert hd(resp.body["_revs_info"])["status"] == "available", "Revs info is available"
+  end
+
+  @tag :with_db
+  test "A document read with etag works", context do
+    db_name = context[:db_name]
+    {:ok, resp} = create_doc(db_name, sample_doc_foo())
+    etag = ~s("#{resp.body["rev"]}")
+    resp = Couch.get("/#{db_name}/foo", headers: ["If-None-Match": etag])
+    assert resp.status_code == 304, "Should be 304 Not Modified"
+    assert resp.headers[:"Content-Length"] == "0", "Should have zero content length"
+    assert resp.body == "", "Should have an empty body"
   end
 
   @tag :with_db
@@ -140,7 +152,7 @@ defmodule BasicsTest do
     assert Couch.post("/#{db_name}", body: %{:_id => "2", :a => 3, :b => 9}).body["ok"]
     assert Couch.post("/#{db_name}", body: %{:_id => "3", :a => 4, :b => 16}).body["ok"]
     assert Couch.put("/#{db_name}/_design/foo", body: map_doc).body["ok"]
-    assert Couch.put("/#{db_name}/_design/bar", body: red_doc).body["ok"]
+    assert Couch.put("/#{db_name}/_design/bar", body: red_doc, query: [w: 3]).body["ok"]
     assert Couch.get("/#{db_name}").body["doc_count"] == 6
 
     # Initial view query test

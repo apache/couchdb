@@ -56,3 +56,6 @@ fold(Fun, Acc0, Dict) ->
 
 to_list(Dict) ->
     orddict:to_list(Dict).
+
+from_list(KVList) when is_list(KVList) ->
+    orddict:from_list(KVList).

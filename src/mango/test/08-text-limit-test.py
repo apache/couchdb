@@ -133,3 +133,13 @@ class LimitTests(mango.LimitDocsTextTests):
             assert json["bookmark"] != bm
             bm = json["bookmark"]
         assert len(seen_docs) == len(limit_docs.DOCS)
+
+    def run_explain_check(self, size):
+        q = {"age": {"$gt": 0}}
+        seen_docs = set()
+        bm = None
+        results1 = self.db.find(q, limit=size, bookmark=bm, return_raw=True)
+        assert results1["bookmark"] != bm
+        bm = results1["bookmark"]
+        results2 = self.db.find(q, limit=size, bookmark=bm, explain=True)
+        assert results2["bookmark"] == bm

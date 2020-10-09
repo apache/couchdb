@@ -27,7 +27,8 @@ go(DbName, #doc{id=DDocId}) ->
     Ushards = mem3:ushards(DbName),
     Workers = fabric_util:submit_jobs(Shards, group_info, [DDocId]),
     RexiMon = fabric_util:create_monitors(Shards),
-    Acc = acc_init(Workers, Ushards),
+    USet = sets:from_list([{Id, N} || #shard{name = Id, node = N} <- Ushards]),
+    Acc = {fabric_dict:init(Workers, nil), [], USet},
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc) of
     {timeout, {WorkersDict, _, _}} ->
         DefunctWorkers = fabric_util:remove_done_workers(WorkersDict, nil),
@@ -39,56 +40,42 @@ go(DbName, #doc{id=DDocId}) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard,
-        {Counters, Acc, Ushards}) ->
-    case fabric_util:remove_down_workers(Counters, NodeRef) of
-    {ok, NewCounters} ->
-        {ok, {NewCounters, Acc, Ushards}};
-    error ->
-        {error, {nodedown, <<"progress not possible">>}}
+handle_message({rexi_DOWN, _, {_,NodeRef},_}, _, {Counters, Resps, USet}) ->
+    case fabric_ring:node_down(NodeRef, Counters, Resps) of
+        {ok, Counters1} -> {ok, {Counters1, Resps, USet}};
+        error -> {error, {nodedown, <<"progress not possible">>}}
     end;
 
-handle_message({rexi_EXIT, Reason}, Shard, {Counters, Acc, Ushards}) ->
-    NewCounters = lists:keydelete(Shard, #shard.ref, Counters),
-    case fabric_view:is_progress_possible(NewCounters) of
-    true ->
-        {ok, {NewCounters, Acc, Ushards}};
-    false ->
-        {error, Reason}
+handle_message({rexi_EXIT, Reason}, Shard, {Counters, Resps, USet}) ->
+    case fabric_ring:handle_error(Shard, Counters, Resps) of
+        {ok, Counters1} -> {ok, {Counters1, Resps, USet}};
+        error -> {error, Reason}
     end;
 
-handle_message({ok, Info}, Shard, {Counters0, Acc, Ushards}) ->
-    case fabric_dict:lookup_element(Shard, Counters0) of
-    undefined ->
-        % already heard from other node in this range
-        {ok, {Counters0, Acc, Ushards}};
-    nil ->
-        NewAcc = append_result(Info, Shard, Acc, Ushards),
-        Counters1 = fabric_dict:store(Shard, ok, Counters0),
-        Counters = fabric_view:remove_overlapping_shards(Shard, Counters1),
-        case is_complete(Counters) of
-        false ->
-            {ok, {Counters, NewAcc, Ushards}};
-        true ->
-            Pending = aggregate_pending(NewAcc),
-            Infos = get_infos(NewAcc),
-            Results = [{updates_pending, {Pending}} | merge_results(Infos)],
-            {stop, Results}
-        end
+handle_message({ok, Info}, Shard, {Counters, Resps, USet}) ->
+   case fabric_ring:handle_response(Shard, Info, Counters, Resps) of
+        {ok, {Counters1, Resps1}} ->
+            {ok, {Counters1, Resps1, USet}};
+        {stop, Resps1} ->
+            {stop, build_final_response(USet, Resps1)}
     end;
-handle_message(_, _, Acc) ->
-    {ok, Acc}.
 
-acc_init(Workers, Ushards) ->
-    Set = sets:from_list([{Id, N} || #shard{name = Id, node = N} <- Ushards]),
-    {fabric_dict:init(Workers, nil), dict:new(), Set}.
+handle_message(Reason, Shard, {Counters, Resps, USet}) ->
+    case fabric_ring:handle_error(Shard, Counters, Resps) of
+        {ok, Counters1} -> {ok, {Counters1, Resps, USet}};
+        error -> {error, Reason}
+    end.
 
-is_complete(Counters) ->
-    not fabric_dict:any(nil, Counters).
 
-append_result(Info, #shard{name = Name, node = Node}, Acc, Ushards) ->
-    IsPreferred = sets:is_element({Name, Node}, Ushards),
-    dict:append(Name, {Node, IsPreferred, Info}, Acc).
+build_final_response(USet, Responses) ->
+    AccF = fabric_dict:fold(fun(#shard{name = Id, node = Node}, Info, Acc) ->
+        IsPreferred = sets:is_element({Id, Node}, USet),
+        dict:append(Id, {Node, IsPreferred, Info}, Acc)
+    end, dict:new(), Responses),
+    Pending = aggregate_pending(AccF),
+    Infos = get_infos(AccF),
+    [{updates_pending, {Pending}} | merge_results(Infos)].
+
 
 get_infos(Acc) ->
     Values = [V || {_, V} <- dict:to_list(Acc)],
@@ -124,10 +111,6 @@ merge_results(Info) ->
             [{signature, X} | Acc];
         (language, [X | _], Acc) ->
             [{language, X} | Acc];
-        (disk_size, X, Acc) -> % legacy
-            [{disk_size, lists:sum(X)} | Acc];
-        (data_size, X, Acc) -> % legacy
-            [{data_size, lists:sum(X)} | Acc];
         (sizes, X, Acc) ->
             [{sizes, {merge_object(X)}} | Acc];
         (compact_running, X, Acc) ->

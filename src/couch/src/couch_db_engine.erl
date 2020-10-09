@@ -44,6 +44,12 @@
 -type purge_info() :: {purge_seq(), uuid(), docid(), revs()}.
 -type epochs() :: [{Node::atom(), UpdateSeq::non_neg_integer()}].
 -type size_info() :: [{Name::atom(), Size::non_neg_integer()}].
+-type partition_info() :: [
+    {partition, Partition::binary()} |
+    {doc_count, DocCount::non_neg_integer()} |
+    {doc_del_count, DocDelCount::non_neg_integer()} |
+    {sizes, size_info()}
+].
 
 -type write_stream_options() :: [
         {buffer_size, Size::pos_integer()} |
@@ -243,6 +249,10 @@
 -callback get_security(DbHandle::db_handle()) -> SecProps::any().
 
 
+% Get the current properties.
+-callback get_props(DbHandle::db_handle()) -> Props::[any()].
+
+
 % This information is displayed in the database info poperties. It
 % should just be a list of {Name::atom(), Size::non_neg_integer()}
 % tuples that will then be combined across shards. Currently,
@@ -257,6 +267,18 @@
 %              contents outside of the database (for capacity and backup
 %              planning)
 -callback get_size_info(DbHandle::db_handle()) -> SizeInfo::size_info().
+
+
+% This returns the information for the given partition.
+% It should just be a list of {Name::atom(), Size::non_neg_integer()}
+% It returns the partition name, doc count, deleted doc count and two sizes:
+%
+%   active   - Theoretical minimum number of bytes to store this partition on disk
+%
+%   external - Number of bytes that would be required to represent the
+%              contents of this partition outside of the database
+-callback get_partition_info(DbHandle::db_handle(), Partition::binary()) ->
+    partition_info().
 
 
 % The current update sequence of the database. The update
@@ -286,6 +308,24 @@
 
 -callback set_security(DbHandle::db_handle(), SecProps::any()) ->
         {ok, NewDbHandle::db_handle()}.
+
+
+% This function is only called by couch_db_updater and
+% as such is guaranteed to be single threaded calls. The
+% database should simply store provided property list
+% unaltered.
+
+-callback set_props(DbHandle::db_handle(), Props::any()) ->
+        {ok, NewDbHandle::db_handle()}.
+
+
+% Set the current update sequence of the database. The intention is to use this
+% when copying a database such that the destination update sequence should
+% match exactly the source update sequence.
+-callback set_update_seq(
+    DbHandle::db_handle(),
+    UpdateSeq::non_neg_integer()) ->
+    {ok, NewDbHandle::db_handle()}.
 
 
 % This function will be called by many processes concurrently.
@@ -431,6 +471,13 @@
 % in such a way that we can efficiently load purge_info() by its UUID
 % as well as iterate over purge_info() entries in order of their PurgeSeq.
 -callback purge_docs(DbHandle::db_handle(), [doc_pair()], [purge_info()]) ->
+        {ok, NewDbHandle::db_handle()}.
+
+
+% This function should be called from a single threaded context and
+% should be used to copy purge infos from on database to another
+% when copying a database
+-callback copy_purge_infos(DbHandle::db_handle(), [purge_info()]) ->
         {ok, NewDbHandle::db_handle()}.
 
 
@@ -670,13 +717,18 @@
     get_purge_infos_limit/1,
     get_revs_limit/1,
     get_security/1,
+    get_props/1,
     get_size_info/1,
+    get_partition_info/2,
     get_update_seq/1,
     get_uuid/1,
 
     set_revs_limit/2,
     set_security/2,
     set_purge_infos_limit/2,
+    set_props/2,
+
+    set_update_seq/2,
 
     open_docs/2,
     open_local_docs/2,
@@ -687,6 +739,7 @@
     write_doc_body/2,
     write_doc_infos/3,
     purge_docs/3,
+    copy_purge_infos/2,
     commit_data/1,
 
     open_write_stream/2,
@@ -836,9 +889,19 @@ get_security(#db{} = Db) ->
     Engine:get_security(EngineState).
 
 
+get_props(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_props(EngineState).
+
+
 get_size_info(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_size_info(EngineState).
+
+
+get_partition_info(#db{} = Db, Partition) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_partition_info(EngineState, Partition).
 
 
 get_update_seq(#db{} = Db) ->
@@ -865,6 +928,18 @@ set_purge_infos_limit(#db{} = Db, PurgedDocsLimit) ->
 set_security(#db{} = Db, SecProps) ->
     #db{engine = {Engine, EngineState}} = Db,
     {ok, NewSt} = Engine:set_security(EngineState, SecProps),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+
+set_props(#db{} = Db, Props) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:set_props(EngineState, Props),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+
+set_update_seq(#db{} = Db, UpdateSeq) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:set_update_seq(EngineState, UpdateSeq),
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 
@@ -908,6 +983,13 @@ purge_docs(#db{} = Db, DocUpdates, Purges) ->
     #db{engine = {Engine, EngineState}} = Db,
     {ok, NewSt} = Engine:purge_docs(
         EngineState, DocUpdates, Purges),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+
+copy_purge_infos(#db{} = Db, Purges) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:copy_purge_infos(
+        EngineState, Purges),
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 

@@ -113,6 +113,9 @@ handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
     Seq = case Reason of
         {seq, EndSeq} ->
             EndSeq;
+    {database_does_not_exist, _} ->
+            couch_log:notice("~p changes listener died because the _users database does not exist. Create the database to silence this notice.", [?MODULE]),
+            0;
         _ ->
             couch_log:notice("~p changes listener died ~r", [?MODULE, Reason]),
             0

@@ -1,0 +1,147 @@
+#!groovy
+//
+//
+// Licensed under the Apache License, Version 2.0 (the "License"); you may not
+// use this file except in compliance with the License. You may obtain a copy of
+// the License at
+//
+// http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
+// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
+// License for the specific language governing permissions and limitations under
+// the License.
+build_and_test = '''
+mkdir -p ${COUCHDB_IO_LOG_DIR} ${ERLANG_VERSION}
+cd ${ERLANG_VERSION}
+rm -rf build
+mkdir build
+cd build
+tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
+cd apache-couchdb-*
+. /usr/local/kerl/${KERL_VER}/activate
+./configure --with-curl --spidermonkey-version 60
+make check || (make build-report && false)
+'''
+
+pipeline {
+
+  // no top-level agent; agents must be declared for each stage
+  agent none
+
+  environment {
+    COUCHAUTH = credentials('couchdb_vm2_couchdb')
+    recipient = 'notifications@couchdb.apache.org'
+    COUCHDB_IO_LOG_DIR = '/tmp/couchjslogs'
+    // Following fix an issue with git <= 2.6.5 where no committer
+    // name or email are present for reflog, required for git clone
+    GIT_COMMITTER_NAME = 'Jenkins User'
+    GIT_COMMITTER_EMAIL = 'couchdb@apache.org'
+    // Parameters for the matrix build
+    DOCKER_IMAGE = 'couchdbdev/debian-buster-erlang-all:latest'
+    // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
+    // We need the jenkins user mapped inside of the image
+    // npm config cache below deals with /home/jenkins not mapping correctly
+    // inside the image
+    DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
+    // *** BE SURE TO CHANGE THE ERLANG VERSION FARTHER DOWN S WELL ***
+    // Search for ERLANG_VERSION
+    // see https://issues.jenkins-ci.org/browse/JENKINS-40986
+    LOW_ERLANG_VER = '20.3.8.11'
+    MID_ERLANG_VER = '20.3.8.25'
+    HIGH_ERLANG_VER = '22.2.3'
+  }
+
+  options {
+    buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '10'))
+    // This fails the build immediately if any parallel step fails
+    parallelsAlwaysFailFast()
+    preserveStashes(buildCount: 10)
+    timeout(time: 3, unit: 'HOURS')
+    timestamps()
+  }
+
+  stages {
+    stage('Build Release Tarball') {
+      agent {
+        docker {
+          image "${DOCKER_IMAGE}"
+          label 'docker'
+          args "${DOCKER_ARGS}"
+          alwaysPull true
+        }
+      }
+      options {
+        timeout(time: 15, unit: "MINUTES")
+      }
+      steps {
+        sh '''
+          set
+          rm -rf apache-couchdb-*
+          . /usr/local/kerl/${LOW_ERLANG_VER}/activate
+          ./configure --with-curl
+          make dist
+          chmod -R a+w * .
+        '''
+      }
+      post {
+        success {
+          stash includes: 'apache-couchdb-*.tar.gz', name: 'tarball'
+        }
+        cleanup {
+          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+          sh 'rm -rf ${WORKSPACE}/*'
+        }
+      }
+    } // stage Build Release Tarball
+
+    // TODO Rework once Improved Docker Pipeline Engine is released
+    // https://issues.jenkins-ci.org/browse/JENKINS-47962
+    // https://issues.jenkins-ci.org/browse/JENKINS-48050
+
+    stage('Make Check') {
+
+      matrix {
+        axes {
+          axis {
+            name 'ERLANG_VERSION'
+            values "20.3.8.11", "20.3.8.25", "22.2.3"
+          }
+        }
+
+        stages {
+          stage('Build and Test') {
+            agent {
+              docker {
+                image "${DOCKER_IMAGE}"
+                label 'docker'
+                args "${DOCKER_ARGS}"
+                alwaysPull true
+              }
+            }
+            environment {
+              KERL_VER = "${ERLANG_VERSION}"
+            }
+            options {
+              skipDefaultCheckout()
+              timeout(time: 90, unit: "MINUTES")
+            }
+            steps {
+              unstash 'tarball'
+              sh( script: build_and_test )
+            }
+            post {
+              always {
+                junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+              }
+              cleanup {
+                sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR}'
+              }
+            }
+          } // stage
+        } // stages
+      } // matrix
+    } // stage "Make Check"
+  } // stages
+} // pipeline

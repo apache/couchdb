@@ -40,8 +40,6 @@
 ]).
 
 -import(couch_replicator_utils, [
-    start_db_compaction_notifier/2,
-    stop_db_compaction_notifier/1,
     pp_rep_id/1
 ]).
 
@@ -75,10 +73,6 @@
     workers,
     stats = couch_replicator_stats:new(),
     session_id,
-    source_db_compaction_notifier = nil,
-    target_db_compaction_notifier = nil,
-    source_monitor = nil,
-    target_monitor = nil,
     source_seq = nil,
     use_checkpoints = true,
     checkpoint_interval = ?DEFAULT_CHECKPOINT_INTERVAL,
@@ -226,21 +220,6 @@ handle_call({report_seq_done, Seq, StatsInc}, From,
     update_task(NewState),
     {noreply, NewState}.
 
-handle_cast({db_compacted, DbName}, State) ->
-    #rep_state{
-        source = Source,
-        target = Target
-    } = State,
-    SourceName = couch_replicator_utils:local_db_name(Source),
-    TargetName = couch_replicator_utils:local_db_name(Target),
-    case DbName of
-        SourceName ->
-            {ok, NewSource} = couch_db:reopen(Source),
-            {noreply, State#rep_state{source = NewSource}};
-        TargetName ->
-            {ok, NewTarget} = couch_db:reopen(Target),
-            {noreply, State#rep_state{target = NewTarget}}
-    end;
 
 handle_cast(checkpoint, State) ->
     case do_checkpoint(State) of
@@ -261,14 +240,6 @@ handle_cast({report_seq, Seq},
 handle_info(shutdown, St) ->
     {stop, shutdown, St};
 
-handle_info({'DOWN', Ref, _, _, Why}, #rep_state{source_monitor = Ref} = St) ->
-    couch_log:error("Source database is down. Reason: ~p", [Why]),
-    {stop, source_db_down, St};
-
-handle_info({'DOWN', Ref, _, _, Why}, #rep_state{target_monitor = Ref} = St) ->
-    couch_log:error("Target database is down. Reason: ~p", [Why]),
-    {stop, target_db_down, St};
-
 handle_info({'EXIT', Pid, max_backoff}, State) ->
     couch_log:error("Max backoff reached child process ~p", [Pid]),
     {stop, {shutdown, max_backoff}, State};
@@ -280,10 +251,20 @@ handle_info({'EXIT', Pid, {shutdown, max_backoff}}, State) ->
 handle_info({'EXIT', Pid, normal}, #rep_state{changes_reader=Pid} = State) ->
     {noreply, State};
 
-handle_info({'EXIT', Pid, Reason}, #rep_state{changes_reader=Pid} = State) ->
+handle_info({'EXIT', Pid, Reason0}, #rep_state{changes_reader=Pid} = State) ->
     couch_stats:increment_counter([couch_replicator, changes_reader_deaths]),
+    Reason = case Reason0 of
+        {changes_req_failed, _, _} = HttpFail ->
+            HttpFail;
+        {http_request_failed, _, _, {error, {code, Code}}} ->
+            {changes_req_failed, Code};
+        {http_request_failed, _, _, {error, Err}} ->
+            {changes_req_failed, Err};
+        Other ->
+            {changes_reader_died, Other}
+    end,
     couch_log:error("ChangesReader process died with reason: ~p", [Reason]),
-    {stop, changes_reader_died, cancel_timer(State)};
+    {stop, {shutdown, Reason}, cancel_timer(State)};
 
 handle_info({'EXIT', Pid, normal}, #rep_state{changes_manager = Pid} = State) ->
     {noreply, State};
@@ -291,7 +272,7 @@ handle_info({'EXIT', Pid, normal}, #rep_state{changes_manager = Pid} = State) ->
 handle_info({'EXIT', Pid, Reason}, #rep_state{changes_manager = Pid} = State) ->
     couch_stats:increment_counter([couch_replicator, changes_manager_deaths]),
     couch_log:error("ChangesManager process died with reason: ~p", [Reason]),
-    {stop, changes_manager_died, cancel_timer(State)};
+    {stop, {shutdown, {changes_manager_died, Reason}}, cancel_timer(State)};
 
 handle_info({'EXIT', Pid, normal}, #rep_state{changes_queue=Pid} = State) ->
     {noreply, State};
@@ -299,7 +280,7 @@ handle_info({'EXIT', Pid, normal}, #rep_state{changes_queue=Pid} = State) ->
 handle_info({'EXIT', Pid, Reason}, #rep_state{changes_queue=Pid} = State) ->
     couch_stats:increment_counter([couch_replicator, changes_queue_deaths]),
     couch_log:error("ChangesQueue process died with reason: ~p", [Reason]),
-    {stop, changes_queue_died, cancel_timer(State)};
+    {stop, {shutdown, {changes_queue_died, Reason}}, cancel_timer(State)};
 
 handle_info({'EXIT', Pid, normal}, #rep_state{workers = Workers} = State) ->
     case Workers -- [Pid] of
@@ -323,8 +304,14 @@ handle_info({'EXIT', Pid, Reason}, #rep_state{workers = Workers} = State) ->
         {stop, {unknown_process_died, Pid, Reason}, State2};
     true ->
         couch_stats:increment_counter([couch_replicator, worker_deaths]),
-        couch_log:error("Worker ~p died with reason: ~p", [Pid, Reason]),
-        {stop, {worker_died, Pid, Reason}, State2}
+        StopReason = case Reason of
+            {shutdown, _} = Err ->
+                Err;
+            Other ->
+                couch_log:error("Worker ~p died with reason: ~p", [Pid, Reason]),
+                {worker_died, Pid, Other}
+         end,
+        {stop, StopReason, State2}
     end;
 
 handle_info(timeout, InitArgs) ->
@@ -399,6 +386,11 @@ terminate({shutdown, max_backoff}, State) ->
     terminate_cleanup(State),
     couch_replicator_notifier:notify({error, RepId, max_backoff});
 
+terminate({shutdown, Reason}, State) ->
+    % Unwrap so when reporting we don't have an extra {shutdown, ...} tuple
+    % wrapped around the message
+    terminate(Reason, State);
+
 terminate(Reason, State) ->
 #rep_state{
         source_name = Source,
@@ -412,8 +404,6 @@ terminate(Reason, State) ->
 
 terminate_cleanup(State) ->
     update_task(State),
-    stop_db_compaction_notifier(State#rep_state.source_db_compaction_notifier),
-    stop_db_compaction_notifier(State#rep_state.target_db_compaction_notifier),
     couch_replicator_api_wrap:db_close(State#rep_state.source),
     couch_replicator_api_wrap:db_close(State#rep_state.target).
 
@@ -572,16 +562,16 @@ init_state(Rep) ->
     #rep{
         id = {BaseId, _Ext},
         source = Src0, target = Tgt,
-        options = Options, user_ctx = UserCtx,
+        options = Options,
         type = Type, view = View,
         start_time = StartTime,
-        stats = Stats
+        stats = ArgStats0
     } = Rep,
     % Adjust minimum number of http source connections to 2 to avoid deadlock
     Src = adjust_maxconn(Src0, BaseId),
-    {ok, Source} = couch_replicator_api_wrap:db_open(Src, [{user_ctx, UserCtx}]),
+    {ok, Source} = couch_replicator_api_wrap:db_open(Src),
     {CreateTargetParams} = get_value(create_target_params, Options, {[]}),
-    {ok, Target} = couch_replicator_api_wrap:db_open(Tgt, [{user_ctx, UserCtx}],
+    {ok, Target} = couch_replicator_api_wrap:db_open(Tgt,
         get_value(create_target, Options, false), CreateTargetParams),
 
     {ok, SourceInfo} = couch_replicator_api_wrap:get_db_info(Source),
@@ -590,6 +580,14 @@ init_state(Rep) ->
     [SourceLog, TargetLog] = find_and_migrate_logs([Source, Target], Rep),
 
     {StartSeq0, History} = compare_replication_logs(SourceLog, TargetLog),
+
+    ArgStats1 = couch_replicator_stats:new(ArgStats0),
+    HistoryStats = case History of
+        [{[_ | _] = HProps} | _] -> couch_replicator_stats:new(HProps);
+        _ -> couch_replicator_stats:new()
+    end,
+    Stats = couch_replicator_stats:max_stats(ArgStats1, HistoryStats),
+
     StartSeq1 = get_value(since_seq, Options, StartSeq0),
     StartSeq = {0, StartSeq1},
 
@@ -613,12 +611,6 @@ init_state(Rep) ->
         src_starttime = get_value(<<"instance_start_time">>, SourceInfo),
         tgt_starttime = get_value(<<"instance_start_time">>, TargetInfo),
         session_id = couch_uuids:random(),
-        source_db_compaction_notifier =
-            start_db_compaction_notifier(Source, self()),
-        target_db_compaction_notifier =
-            start_db_compaction_notifier(Target, self()),
-        source_monitor = db_monitor(Source),
-        target_monitor = db_monitor(Target),
         source_seq = SourceSeq,
         use_checkpoints = get_value(use_checkpoints, Options, true),
         checkpoint_interval = get_value(checkpoint_interval, Options,
@@ -930,12 +922,6 @@ has_session_id(SessionId, [{Props} | Rest]) ->
     end.
 
 
-db_monitor(#httpdb{}) ->
-	nil;
-db_monitor(Db) ->
-	couch_db:monitor(Db).
-
-
 get_pending_count(St) ->
     Rep = St#rep_state.rep_details,
     Timeout = get_value(connection_timeout, Rep#rep.options),
@@ -974,20 +960,16 @@ get_pending_count_int(#rep_state{source = Db}=St) ->
 
 update_task(State) ->
     #rep_state{
+        rep_details = #rep{id = JobId},
         current_through_seq = {_, ThroughSeq},
         highest_seq_done = {_, HighestSeq}
     } = State,
-    update_scheduler_job_stats(State),
-    couch_task_status:update(
-        rep_stats(State) ++ [
+    Status = rep_stats(State) ++ [
         {source_seq, HighestSeq},
         {through_seq, ThroughSeq}
-    ]).
-
-
-update_scheduler_job_stats(#rep_state{rep_details = Rep, stats = Stats}) ->
-    JobId = Rep#rep.id,
-    couch_replicator_scheduler:update_job_stats(JobId, Stats).
+    ],
+    couch_replicator_scheduler:update_job_stats(JobId, Status),
+    couch_task_status:update(Status).
 
 
 rep_stats(State) ->

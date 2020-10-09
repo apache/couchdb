@@ -12,6 +12,7 @@
 
 // Do DB deletion under cluster with quorum conditions.
 couchTests.db_deletion = function(debug) {
+  return console.log('done in test/elixir/test/cluster_with_quorum_test.exs');
 
   if (debug) debugger;
 

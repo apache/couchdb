@@ -25,7 +25,21 @@ info(mango_idx, {no_usable_index, missing_sort_index}) ->
     {
         400,
         <<"no_usable_index">>,
-        <<"No index exists for this sort, try indexing by the sort fields.">>
+        <<"No index exists for this sort, "
+            "try indexing by the sort fields.">>
+    };
+info(mango_idx, {no_usable_index, missing_sort_index_partitioned}) ->
+    {
+        400,
+        <<"no_usable_index">>,
+        <<"No partitioned index exists for this sort, "
+            "try indexing by the sort fields.">>
+    };
+info(mango_idx, {no_usable_index, missing_sort_index_global}) ->
+    {
+        400,
+        <<"no_usable_index">>,
+        <<"No global index exists for this sort, try indexing by the sort fields.">>
     };
 info(mango_json_bookmark, {invalid_bookmark, BadBookmark}) ->
     {
@@ -55,7 +69,7 @@ info(mango_cursor_text, {text_search_error, {error, {bad_request, Msg}}})
     };
 info(mango_cursor_text, {text_search_error, {error, Error}}) ->
     {
-        400,
+        500,
         <<"text_search_error">>,
         fmt("~p", [Error])
     };
@@ -103,6 +117,13 @@ info(mango_idx, {invalid_index_type, BadType}) ->
         400,
         <<"invalid_index">>,
         fmt("Invalid type for index: ~s", [BadType])
+    };
+info(mango_idx, {partitioned_option_mismatch, BadDDoc}) ->
+    {
+        400,
+        <<"invalid_partitioned_option">>,
+        fmt("Requested partitioned option does not match existing value on"
+            " design document ~s", [BadDDoc])
     };
 info(mango_idx, invalid_query_ddoc_language) ->
     {

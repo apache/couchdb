@@ -11,6 +11,8 @@
 # License for the specific language governing permissions and limitations under
 # the License.
 
+echo "To test, comment out the fake_uuid line in dev/run"
+
 HEADERS="-HContent-Type:application/json"
 # show cluster state:
 curl a:b@127.0.0.1:15986/_nodes/_all_docs
@@ -48,16 +50,22 @@ curl a:b@127.0.0.1:15984/_cluster_setup -d '{"action":"finish_cluster"}' $HEADER
 # Show system dbs exist on node A
 curl a:b@127.0.0.1:15984/_users
 curl a:b@127.0.0.1:15984/_replicator
-curl a:b@127.0.0.1:15984/_metadata
 curl a:b@127.0.0.1:15984/_global_changes
 
 # Show system dbs exist on node B
 curl a:b@127.0.0.1:25984/_users
 curl a:b@127.0.0.1:25984/_replicator
-curl a:b@127.0.0.1:25984/_metadata
 curl a:b@127.0.0.1:25984/_global_changes
 
 # Number of nodes is set to 2
 curl a:b@127.0.0.1:25984/_node/node2@127.0.0.1/_config/cluster/n
+
+# uuid and auth secret are the same
+curl a:b@127.0.0.1:15984/_node/node1@127.0.0.1/_config/couchdb/uuid
+curl a:b@127.0.0.1:15984/_node/node2@127.0.0.1/_config/couchdb/uuid
+
+curl a:b@127.0.0.1:15984/_node/node1@127.0.0.1/_config/couch_httpd_auth/secret
+curl a:b@127.0.0.1:15984/_node/node2@127.0.0.1/_config/couch_httpd_auth/secret
+
 
 echo "YAY ALL GOOD"

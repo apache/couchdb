@@ -203,13 +203,18 @@ owner_int(ShardName, DocId) ->
 
 replicator_clustering_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_stable_callback(),
-            t_unstable_callback()
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_stable_callback(),
+                t_unstable_callback()
+            ]
+        }
     }.
 
 
@@ -230,19 +235,45 @@ t_unstable_callback() ->
     end).
 
 
-setup() ->
+setup_all() ->
     meck:expect(couch_log, notice, 2, ok),
     meck:expect(config, get, fun(_, _, Default) -> Default end),
     meck:expect(config, listen_for_changes, 2, ok),
     meck:expect(couch_stats, update_gauge, 2, ok),
-    meck:expect(couch_replicator_notifier, notify, 1, ok),
+    meck:expect(couch_replicator_notifier, notify, 1, ok).
+
+
+teardown_all(_) ->
+    meck:unload().
+
+
+setup() ->
+    meck:reset([
+        config,
+        couch_log,
+        couch_stats,
+        couch_replicator_notifier
+    ]),
+    stop_clustering_process(),
     {ok, Pid} = start_link(),
     Pid.
 
 
 teardown(Pid) ->
+    stop_clustering_process(Pid).
+
+
+stop_clustering_process() ->
+    stop_clustering_process(whereis(?MODULE)).
+
+
+stop_clustering_process(undefined) ->
+    ok;
+
+stop_clustering_process(Pid) when is_pid(Pid) ->
+    Ref = erlang:monitor(process, Pid),
     unlink(Pid),
     exit(Pid, kill),
-    meck:unload().
+    receive {'DOWN', Ref, _, _, _} -> ok end.
 
 -endif.

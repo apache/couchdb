@@ -10,7 +10,9 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+couchTests.elixir = true;
 couchTests.view_collation = function(debug) {
+  return console.log('done in test/elixir/test/view_collation_test.exs');
   var db_name = get_random_db_name();
   var db = new CouchDB(db_name, {"X-Couch-Full-Commit":"false"});
   db.createDb();
@@ -103,12 +105,12 @@ couchTests.view_collation = function(debug) {
   var rows = db.query(queryFun, null, {endkey : "b",
     descending:true, inclusive_end:false}).rows;
   T(rows[rows.length-1].key == "B");
-  
+
   var rows = db.query(queryFun, null, {
     endkey : "b", endkey_docid: "10",
     inclusive_end:false}).rows;
   T(rows[rows.length-1].key == "aa");
-  
+
   var rows = db.query(queryFun, null, {
     endkey : "b", endkey_docid: "11",
     inclusive_end:false}).rows;
