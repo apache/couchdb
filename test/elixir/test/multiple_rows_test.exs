@@ -2,6 +2,7 @@ defmodule MultipleRowsTest do
   use CouchTestCase
 
   @moduletag :multiple_rows
+  @moduletag kind: :single_node
 
   @north_carolina_cities ["Charlotte", "Raleigh"]
   @massachussets_cities ["Boston", "Lowell", "Worcester", "Cambridge", "Springfield"]

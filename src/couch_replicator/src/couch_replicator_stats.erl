@@ -32,6 +32,8 @@
 new() ->
     orddict:new().
 
+new(#{} = Map) ->
+    new(maps:to_list(Map));
 new(Initializers0) when is_list(Initializers0) ->
     Initializers1 = lists:filtermap(fun fmap/1, Initializers0),
     orddict:from_list(Initializers1).

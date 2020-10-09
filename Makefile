@@ -90,9 +90,6 @@ DIALYZE_OPTS=$(shell echo "\
 	" | sed -e 's/[a-z]\{1,\}= / /g')
 EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
-#ignore javascript tests
-ignore_js_suites=
-
 TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 
 ################################################################################
@@ -144,11 +141,13 @@ fauxton: share/www
 ################################################################################
 
 
-.PHONY: check
+# When we can run all the tests with FDB switch this back to be the default
+# "make check" command
+.PHONY: check-all-tests
 # target: check - Test everything
-check: all python-black
+check-all-tests: all python-black
+	@$(MAKE) emilio
 	@$(MAKE) eunit
-	@$(MAKE) javascript
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
 
@@ -157,6 +156,14 @@ subdirs = $(apps)
 else
 subdirs=$(shell ls src)
 endif
+
+.PHONY: check
+check:  all
+	@$(MAKE) emilio
+	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango,chttpd,couch_replicator
+	make elixir tests=test/elixir/test/basics_test.exs,test/elixir/test/replication_test.exs,test/elixir/test/map_test.exs,test/elixir/test/all_docs_test.exs,test/elixir/test/bulk_docs_test.exs
+	make exunit apps=chttpd
+	make mango-test
 
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
@@ -178,6 +185,7 @@ exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell pwd)/src
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
 	@mix test --cover --trace $(EXUNIT_OPTS)
 
@@ -198,6 +206,9 @@ soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
+emilio:
+	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3 || exit 0
+
 .venv/bin/black:
 	@python3 -m venv .venv
 	@.venv/bin/pip3 install black || touch .venv/bin/black
@@ -209,7 +220,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run src/mango src/docs
+		build-aux/*.py dev/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -217,13 +228,29 @@ python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run src/mango src/docs
+		build-aux/*.py dev/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
 elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 --enable-erlang-views --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run "$(TEST_OPTS)" \
+		-a adm:pass \
+		-n 1 \
+		--enable-erlang-views \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--erlang-config rel/files/eunit.config \
+		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+
+.PHONY: elixir-only
+elixir-only: devclean
+	@dev/run "$(TEST_OPTS)" \
+		-a adm:pass \
+		-n 1 \
+		--enable-erlang-views \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--erlang-config rel/files/eunit.config \
+		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
@@ -254,42 +281,6 @@ elixir-check-formatted: elixir-init
 elixir-credo: elixir-init
 	@mix credo
 
-.PHONY: javascript
-# target: javascript - Run JavaScript test suites or specific ones defined by suites option
-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-javascript: devclean
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@dev/run -n 1 -q --with-admin-party-please \
-            --enable-erlang-views \
-            "$(TEST_OPTS)" \
-            'test/javascript/run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)"'
-
-
-.PHONY: soak-javascript
-soak-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-soak-javascript:
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script.test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@rm -rf dev/lib
-	while [ $$? -eq 0 ]; do \
-		dev/run -n 1 -q --with-admin-party-please \
-				"$(TEST_OPTS)" \
-				'test/javascript/run --suites "$(suites)" \
-				--ignore "$(ignore_js_suites)"'  \
-	done
-
 .PHONY: build-report
 # target: build-report - Generate and upload a build report
 build-report:
@@ -318,14 +309,6 @@ list-eunit-suites:
 		| sort
 
 
-.PHONY: list-js-suites
-# target: list-js-suites - List JavaScript test suites
-list-js-suites:
-	@find ./test/javascript/tests/ -type f -name *.js -exec basename {} \; \
-		| cut -d '.' -f -1 \
-		| sort
-
-
 .PHONY: build-test
 # target: build-test - Test build script
 build-test:
@@ -339,7 +322,7 @@ mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \
 		.venv/bin/python3 -m pip install -r requirements.txt
-	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose --with-xunit'
+	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=adm:pass --erlang-config=rel/files/eunit.config '.venv/bin/python3 -m nose -v --with-xunit'
 
 ################################################################################
 # Developing
@@ -477,7 +460,7 @@ endif
 # target: devclean - Remove dev cluster artifacts
 devclean:
 	@rm -rf dev/lib/*/data
-
+	@rm -rf dev/lib/*/etc
 
 ################################################################################
 # Misc

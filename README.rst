@@ -5,8 +5,8 @@ Apache CouchDB README
 | |1| |
 +-----+
 
-.. |1| image:: https://ci-couchdb.apache.org/job/jenkins-cm1/job/FullPlatformMatrix/job/master/badge/icon?subject=master%20build
-    :target: https://ci-couchdb.apache.org/blue/organizations/jenkins/jenkins-cm1%2FFullPlatformMatrix/activity?branch=master
+.. |1| image:: https://ci-couchdb.apache.org/job/jenkins-cm1/job/FullPlatformMatrix/job/main/badge/icon?subject=main%20build
+    :target: https://ci-couchdb.apache.org/blue/organizations/jenkins/jenkins-cm1%2FFullPlatformMatrix/activity?branch=main
 
 Installation
 ------------
@@ -60,7 +60,9 @@ Run a basic test suite for CouchDB by browsing here:
 Getting started with developing
 -------------------------------
 
-For more detail, read the README-DEV.rst file in this directory.
+For more detail, read the README-DEV.rst_ file in this directory.
+
+.. _README-DEV.rst: https://github.com/apache/couchdb/blob/master/README-DEV.rst
 
 Basically you just have to install the needed dependencies which are
 documented in the install docs and then run ``./configure && make``.
@@ -72,9 +74,11 @@ layer in front of this cluster by running ``./dev/run --with-haproxy
 listening on port 5984.
 
 For Fauxton developers fixing the admin-party does not work via the button in
-Fauxton. To fix the admin party you have to run ``./dev/run`` with the ``admin``
-flag, e.g. ``./dev/run --admin=username:password``. If you want to have an
-admin-party, just omit the flag.
+Fauxton. If you run ``./dev/run``, an admin user ``root`` with a random password
+is generated (see the output of the script). If you want to set an admin user, 
+start with the admin flag, e.g. ``./dev/run --admin=username:password``. If you 
+want to have an admin-party, run ``./dev/run --with-admin-party-please``. To see
+all available options, please check ``./dev/run --help``.
 
 Contributing to CouchDB
 -----------------------

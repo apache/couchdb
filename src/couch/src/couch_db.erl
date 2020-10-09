@@ -37,6 +37,7 @@
     get_committed_update_seq/1,
     get_compacted_seq/1,
     get_compactor_pid/1,
+    get_compactor_pid_sync/1,
     get_db_info/1,
     get_partition_info/2,
     get_del_doc_count/1,
@@ -212,6 +213,8 @@ is_db(_) ->
 is_system_db(#db{options = Options}) ->
     lists:member(sys_db, Options).
 
+is_clustered(#{}) ->
+    true;
 is_clustered(#db{main_pid = nil}) ->
     true;
 is_clustered(#db{}) ->
@@ -571,6 +574,14 @@ get_compacted_seq(#db{}=Db) ->
 
 get_compactor_pid(#db{compactor_pid = Pid}) ->
     Pid.
+
+get_compactor_pid_sync(#db{main_pid=Pid}=Db) ->
+    case gen_server:call(Pid, compactor_pid, infinity) of
+        CPid when is_pid(CPid) ->
+            CPid;
+        _ ->
+            nil
+    end.
 
 get_db_info(Db) ->
     #db{

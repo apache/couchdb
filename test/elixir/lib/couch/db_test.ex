@@ -192,6 +192,13 @@ defmodule Couch.DBTest do
     resp.body
   end
 
+  def save(db_name, document) do
+    resp = Couch.put("/#{db_name}/#{document["_id"]}", body: document)
+    assert resp.status_code in [201, 202]
+    assert resp.body["ok"]
+    Map.put(document, "_rev", resp.body["rev"])
+  end
+
   def bulk_save(db_name, docs) do
     resp =
       Couch.post(
@@ -202,6 +209,7 @@ defmodule Couch.DBTest do
       )
 
     assert resp.status_code in [201, 202]
+    resp
   end
 
   def query(
@@ -271,6 +279,78 @@ defmodule Couch.DBTest do
     resp.body
   end
 
+  def compact(db_name) do
+    resp = Couch.post("/#{db_name}/_compact")
+    assert resp.status_code == 202
+
+    retry_until(
+      fn -> Map.get(info(db_name), "compact_running") == false end,
+      200,
+      10_000
+    )
+
+    resp.body
+  end
+
+  def replicate(src, tgt, options \\ []) do
+    username = System.get_env("EX_USERNAME") || "adm"
+    password = System.get_env("EX_PASSWORD") || "pass"
+
+    {userinfo, options} = Keyword.pop(options, :userinfo)
+
+    userinfo =
+      if userinfo == nil do
+        "#{username}:#{password}"
+      else
+        userinfo
+      end
+
+    src = set_user(src, userinfo)
+    tgt = set_user(tgt, userinfo)
+
+    defaults = [headers: [], body: %{}, timeout: 30_000]
+    options = defaults |> Keyword.merge(options) |> Enum.into(%{})
+
+    %{body: body} = options
+    body = [source: src, target: tgt] |> Enum.into(body)
+    options = Map.put(options, :body, body)
+
+    resp = Couch.post("/_replicate", Enum.to_list(options))
+    assert HTTPotion.Response.success?(resp), "#{inspect(resp)}"
+    resp.body
+  end
+
+  defp set_user(uri, userinfo) do
+    case URI.parse(uri) do
+      %{scheme: nil} ->
+        uri
+
+      %{userinfo: nil} = uri ->
+        URI.to_string(Map.put(uri, :userinfo, userinfo))
+
+      _ ->
+        uri
+    end
+  end
+
+  def view(db_name, view_name, options \\ nil, keys \\ nil) do
+    [view_root, view_name] = String.split(view_name, "/")
+
+    resp =
+      case keys do
+        nil ->
+          Couch.get("/#{db_name}/_design/#{view_root}/_view/#{view_name}", query: options)
+
+        _ ->
+          Couch.post("/#{db_name}/_design/#{view_root}/_view/#{view_name}", query: options,
+            body: %{"keys" => keys}
+          )
+      end
+
+    assert resp.status_code in [200, 201]
+    resp
+  end
+
   def sample_doc_foo do
     %{
       _id: "foo",
@@ -299,7 +379,6 @@ defmodule Couch.DBTest do
       %{_id: str_id, integer: id, string: str_id}
     end
   end
-
 
   def request_stats(path_steps, is_test) do
     path =
@@ -400,7 +479,7 @@ defmodule Couch.DBTest do
           node = elem(node_value, 0)
           value = elem(node_value, 1)
 
-          if value == ~s(""\\n) do
+          if value == ~s(""\\n) or value == "" or value == nil do
             resp =
               Couch.delete(
                 "/_node/#{node}/_config/#{setting.section}/#{setting.key}",

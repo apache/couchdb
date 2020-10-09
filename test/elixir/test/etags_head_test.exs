@@ -2,6 +2,7 @@ defmodule EtagsHeadTest do
   use CouchTestCase
 
   @moduletag :etags
+  @moduletag kind: :single_node
 
   @tag :with_db
   test "etag header on creation", context do

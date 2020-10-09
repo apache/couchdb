@@ -13,6 +13,10 @@
 -module(chttpd_purge_tests).
 
 
+% Remove when purge is implemented
+-compile(nowarn_unused_function).
+
+
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
@@ -62,7 +66,7 @@ delete_db(Url) ->
     {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
 
 
-purge_test_() ->
+purge_test_disabled() ->
     {
         "chttpd db tests",
         {

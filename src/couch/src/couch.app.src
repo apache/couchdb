@@ -33,7 +33,6 @@
         sasl,
         inets,
         ssl,
-        os_mon,
 
         % Upstream deps
         ibrowse,

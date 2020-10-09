@@ -439,7 +439,7 @@ get_node_seqs(Db, Nodes) ->
 
 
 get_or_create_db(DbName, Options) ->
-    couch_db:open_int(DbName, [{create_if_missing, true} | Options]).
+    mem3_util:get_or_create_db(DbName, Options).
 
 
 get_view_cb(#mrargs{extra = Options}) ->
@@ -515,7 +515,8 @@ changes_enumerator(DocInfo, Acc) ->
     [] ->
         ChangesRow = {no_pass, [
             {pending, Pending-1},
-            {seq, Seq}]};
+            {seq, {Seq, uuid(Db), couch_db:owner_of(Epochs, Seq)}}
+        ]};
     Results ->
         Opts = if Conflicts -> [conflicts | DocOptions]; true -> DocOptions end,
         ChangesRow = {change, [
@@ -642,22 +643,22 @@ uuid(Db) ->
 uuid_prefix_len() ->
     list_to_integer(config:get("fabric", "uuid_prefix_len", "7")).
 
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
-
-maybe_filtered_json_doc_no_filter_test() ->
-    Body = {[{<<"a">>, 1}]},
-    Doc = #doc{id = <<"1">>, revs = {1, [<<"r1">>]}, body = Body},
-    {JDocProps} = maybe_filtered_json_doc(Doc, [], x),
-    ExpectedProps = [{<<"_id">>, <<"1">>}, {<<"_rev">>, <<"1-r1">>}, {<<"a">>, 1}],
-    ?assertEqual(lists:keysort(1, JDocProps), ExpectedProps).
-
-maybe_filtered_json_doc_with_filter_test() ->
-    Body = {[{<<"a">>, 1}]},
-    Doc = #doc{id = <<"1">>, revs = {1, [<<"r1">>]}, body = Body},
-    Fields = [<<"a">>, <<"nonexistent">>],
-    Filter = {selector, main_only, {some_selector, Fields}},
-    {JDocProps} = maybe_filtered_json_doc(Doc, [], Filter),
-    ?assertEqual(JDocProps, [{<<"a">>, 1}]).
-
--endif.
+%% -ifdef(TEST).
+%% -include_lib("eunit/include/eunit.hrl").
+%%
+%% maybe_filtered_json_doc_no_filter_test() ->
+%%     Body = {[{<<"a">>, 1}]},
+%%     Doc = #doc{id = <<"1">>, revs = {1, [<<"r1">>]}, body = Body},
+%%     {JDocProps} = maybe_filtered_json_doc(Doc, [], x),
+%%     ExpectedProps = [{<<"_id">>, <<"1">>}, {<<"_rev">>, <<"1-r1">>}, {<<"a">>, 1}],
+%%     ?assertEqual(lists:keysort(1, JDocProps), ExpectedProps).
+%%
+%% maybe_filtered_json_doc_with_filter_test() ->
+%%     Body = {[{<<"a">>, 1}]},
+%%     Doc = #doc{id = <<"1">>, revs = {1, [<<"r1">>]}, body = Body},
+%%     Fields = [<<"a">>, <<"nonexistent">>],
+%%     Filter = {selector, main_only, {some_selector, Fields}},
+%%     {JDocProps} = maybe_filtered_json_doc(Doc, [], Filter),
+%%     ?assertEqual(JDocProps, [{<<"a">>, 1}]).
+%%
+%% -endif.

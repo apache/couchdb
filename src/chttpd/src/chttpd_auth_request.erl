@@ -34,7 +34,7 @@ authorize_request_int(#httpd{path_parts=[]}=Req) ->
 authorize_request_int(#httpd{path_parts=[<<"favicon.ico">>|_]}=Req) ->
     Req;
 authorize_request_int(#httpd{path_parts=[<<"_all_dbs">>|_]}=Req) ->
-   case config:get_boolean("chttpd", "admin_only_all_dbs", false) of
+   case config:get_boolean("chttpd", "admin_only_all_dbs", true) of
        true -> require_admin(Req);
        false -> Req
    end;
@@ -106,8 +106,8 @@ server_authorization_check(#httpd{path_parts=[<<"_node">>,_ , <<"_system">>|_]}=
 server_authorization_check(#httpd{path_parts=[<<"_", _/binary>>|_]}=Req) ->
     require_admin(Req).
 
-db_authorization_check(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
-    {_} = fabric:get_security(DbName, [{user_ctx, Ctx}]),
+db_authorization_check(#httpd{path_parts=[_DbName|_]}=Req) ->
+    % Db authorization checks are performed in fabric before every FDB operation
     Req.
 
 
@@ -125,8 +125,8 @@ require_admin(Req) ->
     Req.
 
 require_db_admin(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
-    Sec = fabric:get_security(DbName, [{user_ctx, Ctx}]),
-
+    {ok, Db} = fabric2_db:open(DbName, [{user_ctx, Ctx}]),
+    Sec = fabric2_db:get_security(Db),
     case is_db_admin(Ctx,Sec) of
         true -> Req;
         false ->  throw({unauthorized, <<"You are not a server or db admin.">>})

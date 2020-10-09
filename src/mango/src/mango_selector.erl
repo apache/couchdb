@@ -138,6 +138,11 @@ norm_ops({[{<<"$allMatch">>, {_}=Arg}]}) ->
 norm_ops({[{<<"$allMatch">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$allMatch', Arg});
 
+norm_ops({[{<<"$keyMapMatch">>, {_}=Arg}]}) ->
+    {[{<<"$keyMapMatch">>, norm_ops(Arg)}]};
+norm_ops({[{<<"$keyMapMatch">>, Arg}]}) ->
+    ?MANGO_ERROR({bad_arg, '$keyMapMatch', Arg});
+
 norm_ops({[{<<"$size">>, Arg}]}) when is_integer(Arg), Arg >= 0 ->
     {[{<<"$size">>, Arg}]};
 norm_ops({[{<<"$size">>, Arg}]}) ->
@@ -253,6 +258,10 @@ norm_fields({[{<<"$allMatch">>, Arg}]}, Path) ->
     Cond = {[{<<"$allMatch">>, norm_fields(Arg)}]},
     {[{Path, Cond}]};
 
+norm_fields({[{<<"$keyMapMatch">>, Arg}]}, Path) ->
+    Cond = {[{<<"$keyMapMatch">>, norm_fields(Arg)}]},
+    {[{Path, Cond}]};
+
 
 % The text operator operates against the internal
 % $default field. This also asserts that the $default
@@ -333,6 +342,9 @@ norm_negations({[{<<"$elemMatch">>, Arg}]}) ->
 
 norm_negations({[{<<"$allMatch">>, Arg}]}) ->
     {[{<<"$allMatch">>, norm_negations(Arg)}]};
+
+norm_negations({[{<<"$keyMapMatch">>, Arg}]}) ->
+    {[{<<"$keyMapMatch">>, norm_negations(Arg)}]};
 
 % All other conditions can't introduce negations anywhere
 % further down the operator tree.
@@ -421,7 +433,7 @@ match({[{<<"$not">>, Arg}]}, Value, Cmp) ->
     not match(Arg, Value, Cmp);
 
 match({[{<<"$all">>, []}]}, _, _) ->
-    true;
+    false;
 % All of the values in Args must exist in Values or
 % Values == hd(Args) if Args is a single element list
 % that contains a list.
@@ -491,6 +503,26 @@ match({[{<<"$allMatch">>, Arg}]}, [_ | _] = Values, Cmp) ->
 match({[{<<"$allMatch">>, _Arg}]}, _Value, _Cmp) ->
     false;
 
+% Matches when any key in the map value matches the
+% sub-selector Arg.
+match({[{<<"$keyMapMatch">>, Arg}]}, Value, Cmp) when is_tuple(Value) ->
+    try
+        lists:foreach(fun(V) ->
+            case match(Arg, V, Cmp) of
+                true -> throw(matched);
+                _ -> ok
+            end
+        end, [Key || {Key, _} <- element(1, Value)]),
+        false
+    catch
+        throw:matched ->
+            true;
+        _:_ ->
+            false
+    end;
+match({[{<<"$keyMapMatch">>, _Arg}]}, _Value, _Cmp) ->
+    false;
+
 % Our comparison operators are fairly straight forward
 match({[{<<"$lt">>, Arg}]}, Value, Cmp) ->
     Cmp(Value, Arg) < 0;
@@ -506,7 +538,7 @@ match({[{<<"$gt">>, Arg}]}, Value, Cmp) ->
     Cmp(Value, Arg) > 0;
 
 match({[{<<"$in">>, []}]}, _, _) ->
-    true;
+    false;
 match({[{<<"$in">>, Args}]}, Values, Cmp) when is_list(Values)->
     Pred = fun(Arg) ->
         lists:foldl(fun(Value,Match) ->

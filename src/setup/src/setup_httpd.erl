@@ -19,7 +19,7 @@ handle_setup_req(#httpd{method='POST'}=Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     couch_httpd:validate_ctype(Req, "application/json"),
     Setup = get_body(Req),
-    couch_log:notice("Setup: ~p~n", [Setup]),
+    couch_log:notice("Setup: ~p~n", [remove_sensitive(Setup)]),
     Action = binary_to_list(couch_util:get_value(<<"action">>, Setup, <<"missing">>)),
     case handle_action(Action, Setup) of
     ok ->
@@ -31,24 +31,30 @@ handle_setup_req(#httpd{method='GET'}=Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     Dbs = chttpd:qs_json_value(Req, "ensure_dbs_exist", setup:cluster_system_dbs()),
     couch_log:notice("Dbs: ~p~n", [Dbs]),
-    case erlang:list_to_integer(config:get("cluster", "n", undefined)) of
-        1 ->
-            case setup:is_single_node_enabled(Dbs) of
-                false ->
-                    chttpd:send_json(Req, 200, {[{state, single_node_disabled}]});
-                true ->
-                    chttpd:send_json(Req, 200, {[{state, single_node_enabled}]})
-            end;
+    SingleNodeConfig = config:get_boolean("couchdb", "single_node", false),
+    case SingleNodeConfig of
+        true ->
+            chttpd:send_json(Req, 200, {[{state, single_node_enabled}]});
         _ ->
-            case setup:is_cluster_enabled() of
-                false ->
-                    chttpd:send_json(Req, 200, {[{state, cluster_disabled}]});
-                true ->
-                    case setup:has_cluster_system_dbs(Dbs) of
+            case config:get("cluster", "n", undefined) of
+                "1" ->
+                    case setup:is_single_node_enabled(Dbs) of
                         false ->
-                            chttpd:send_json(Req, 200, {[{state, cluster_enabled}]});
+                            chttpd:send_json(Req, 200, {[{state, single_node_disabled}]});
                         true ->
-                            chttpd:send_json(Req, 200, {[{state, cluster_finished}]})
+                            chttpd:send_json(Req, 200, {[{state, single_node_enabled}]})
+                    end;
+                _ ->
+                    case setup:is_cluster_enabled() of
+                        false ->
+                            chttpd:send_json(Req, 200, {[{state, cluster_disabled}]});
+                        true ->
+                            case setup:has_cluster_system_dbs(Dbs) of
+                                false ->
+                                    chttpd:send_json(Req, 200, {[{state, cluster_enabled}]});
+                                true ->
+                                    chttpd:send_json(Req, 200, {[{state, cluster_finished}]})
+                            end
                     end
             end
     end;
@@ -85,7 +91,7 @@ handle_action("enable_cluster", Setup) ->
 
 
 handle_action("finish_cluster", Setup) ->
-    couch_log:notice("finish_cluster: ~p~n", [Setup]),
+    couch_log:notice("finish_cluster: ~p~n", [remove_sensitive(Setup)]),
 
     Options = get_options([
         {ensure_dbs_exist, <<"ensure_dbs_exist">>}
@@ -99,7 +105,7 @@ handle_action("finish_cluster", Setup) ->
     end;
 
 handle_action("enable_single_node", Setup) ->
-    couch_log:notice("enable_single_node: ~p~n", [Setup]),
+    couch_log:notice("enable_single_node: ~p~n", [remove_sensitive(Setup)]),
 
     Options = get_options([
         {ensure_dbs_exist, <<"ensure_dbs_exist">>},
@@ -119,7 +125,7 @@ handle_action("enable_single_node", Setup) ->
 
 
 handle_action("add_node", Setup) ->
-    couch_log:notice("add_node: ~p~n", [Setup]),
+    couch_log:notice("add_node: ~p~n", [remove_sensitive(Setup)]),
 
     Options = get_options([
         {username, <<"username">>},
@@ -141,10 +147,10 @@ handle_action("add_node", Setup) ->
     end;
 
 handle_action("remove_node", Setup) ->
-    couch_log:notice("remove_node: ~p~n", [Setup]);
+    couch_log:notice("remove_node: ~p~n", [remove_sensitive(Setup)]);
 
 handle_action("receive_cookie", Setup) ->
-    couch_log:notice("receive_cookie: ~p~n", [Setup]),
+    couch_log:notice("receive_cookie: ~p~n", [remove_sensitive(Setup)]),
     Options = get_options([
        {cookie, <<"cookie">>}
     ], Setup),
@@ -167,3 +173,8 @@ get_body(Req) ->
         couch_log:notice("Body Fail: ~p~n", [Else]),
         couch_httpd:send_error(Req, 400, <<"bad_request">>, <<"Missing JSON body'">>)
     end.
+
+remove_sensitive(KVList0) ->
+    KVList1 = lists:keyreplace(<<"username">>, 1, KVList0, {<<"username">>, <<"****">>}),
+    KVList2 = lists:keyreplace(<<"password">>, 1, KVList1, {<<"password">>, <<"****">>}),
+    KVList2.

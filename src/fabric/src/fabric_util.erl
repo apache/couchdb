@@ -192,30 +192,30 @@ create_monitors(Shards) ->
     ]),
     rexi_monitor:start(MonRefs).
 
-%% verify only id and rev are used in key.
-update_counter_test() ->
-    Reply = {ok, #doc{id = <<"id">>, revs = <<"rev">>,
-                    body = <<"body">>, atts = <<"atts">>}},
-    ?assertEqual([{{<<"id">>,<<"rev">>}, {Reply, 1}}],
-        update_counter(Reply, 1, [])).
-
-remove_ancestors_test() ->
-    Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
-    Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
-    Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
-    Bar2 = {not_found, {1,<<"bar">>}},
-    ?assertEqual(
-        [kv(Bar1,1), kv(Foo1,1)],
-        remove_ancestors([kv(Bar1,1), kv(Foo1,1)], [])
-    ),
-    ?assertEqual(
-        [kv(Bar1,1), kv(Foo2,2)],
-        remove_ancestors([kv(Bar1,1), kv(Foo1,1), kv(Foo2,1)], [])
-    ),
-    ?assertEqual(
-        [kv(Bar1,2)],
-        remove_ancestors([kv(Bar2,1), kv(Bar1,1)], [])
-    ).
+%% %% verify only id and rev are used in key.
+%% update_counter_test() ->
+%%     Reply = {ok, #doc{id = <<"id">>, revs = <<"rev">>,
+%%                     body = <<"body">>, atts = <<"atts">>}},
+%%     ?assertEqual([{{<<"id">>,<<"rev">>}, {Reply, 1}}],
+%%         update_counter(Reply, 1, [])).
+%%
+%% remove_ancestors_test() ->
+%%     Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
+%%     Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
+%%     Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
+%%     Bar2 = {not_found, {1,<<"bar">>}},
+%%     ?assertEqual(
+%%         [kv(Bar1,1), kv(Foo1,1)],
+%%         remove_ancestors([kv(Bar1,1), kv(Foo1,1)], [])
+%%     ),
+%%     ?assertEqual(
+%%         [kv(Bar1,1), kv(Foo2,2)],
+%%         remove_ancestors([kv(Bar1,1), kv(Foo1,1), kv(Foo2,1)], [])
+%%     ),
+%%     ?assertEqual(
+%%         [kv(Bar1,2)],
+%%         remove_ancestors([kv(Bar2,1), kv(Bar1,1)], [])
+%%     ).
 
 is_replicator_db(DbName) ->
     path_ends_with(DbName, <<"_replicator">>).

@@ -23,7 +23,7 @@
 -export([compact/1, compact/2, get_compactor_pid/1]).
 
 %% gen_server callbacks
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2, code_change/3, format_status/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 
@@ -374,6 +374,23 @@ handle_info({'DOWN', _, _, _Pid, _}, #st{mod=Mod, idx_state=IdxState}=State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+format_status(Opt, [PDict, State]) ->
+    #st{
+        mod = Mod,
+        waiters = Waiters,
+        idx_state = IdxState
+    } = State,
+    Scrubbed = State#st{waiters = {length, length(Waiters)}},
+    IdxSafeState = case erlang:function_exported(Mod, format_status, 2) of
+        true ->
+            Mod:format_status(Opt, [PDict, IdxState]);
+        false ->
+            []
+    end,
+    [{data, [{"State",
+        ?record_to_keyval(st, Scrubbed) ++ IdxSafeState
+    }]}].
 
 maybe_restart_updater(#st{waiters=[]}) ->
     ok;

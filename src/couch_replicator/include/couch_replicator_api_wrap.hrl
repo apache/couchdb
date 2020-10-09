@@ -14,7 +14,7 @@
 
 -record(httpdb, {
     url,
-    auth_props = [],
+    auth_props = #{},
     headers = [
         {"Accept", "application/json"},
         {"User-Agent", "CouchDB-Replicator/" ++ couch_server:get_version()}

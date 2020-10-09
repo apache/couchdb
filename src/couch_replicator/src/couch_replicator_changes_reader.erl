@@ -22,11 +22,8 @@
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
 
--import(couch_util, [
-    get_value/2
-]).
 
-start_link(StartSeq, #httpdb{} = Db, ChangesQueue, Options) ->
+start_link(StartSeq, #httpdb{} = Db, ChangesQueue, #{} = Options) ->
     Parent = self(),
     {ok, spawn_link(fun() ->
         put(last_seq, StartSeq),
@@ -41,12 +38,12 @@ start_link(StartSeq, Db, ChangesQueue, Options) ->
     end)}.
 
 read_changes(Parent, StartSeq, Db, ChangesQueue, Options) ->
-    Continuous = couch_util:get_value(continuous, Options),
+    Continuous = maps:get(<<"continuous">>, Options, false),
     try
         couch_replicator_api_wrap:changes_since(Db, all_docs, StartSeq,
             fun(Item) ->
                 process_change(Item, {Parent, Db, ChangesQueue, Continuous})
-            end, Options),
+            end, couch_replicator_utils:proplist_options(Options)),
         couch_work_queue:close(ChangesQueue)
     catch
         throw:recurse ->

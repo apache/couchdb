@@ -12,7 +12,7 @@
 
 -module(global_changes_httpd_handlers).
 
--export([url_handler/1, db_handler/1, design_handler/1]).
+-export([url_handler/1, db_handler/1, design_handler/1, handler_info/3]).
 
 url_handler(<<"_db_updates">>) -> fun global_changes_httpd:handle_global_changes_req/1;
 url_handler(_) -> no_match.
@@ -20,3 +20,9 @@ url_handler(_) -> no_match.
 db_handler(_) -> no_match.
 
 design_handler(_) -> no_match.
+
+handler_info('GET', [<<"_db_updates">>], _) ->
+    {'db_updates.read', #{}};
+
+handler_info(_, _, _) ->
+    no_match.

@@ -9,7 +9,7 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-
+couchTests.elixir = true;
 couchTests.list_views = function(debug) {
 
   var db_name = get_random_db_name();

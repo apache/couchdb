@@ -48,7 +48,9 @@
 
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
-    UsableIndexes = mango_idx:get_usable_indexes(Db, Selector, Opts),
+    UsableIndexes = fabric2_fdb:transactional(Db, fun (TxDb) ->
+        mango_idx:get_usable_indexes(TxDb, Selector, Opts)
+    end),
     case mango_cursor:maybe_filter_indexes_by_ddoc(UsableIndexes, Opts) of
         [] ->
             % use_index doesn't match a valid index - fall back to a valid one
@@ -72,7 +74,6 @@ explain(#cursor{}=Cursor) ->
     {[
         {dbname, mango_idx:dbname(Idx)},
         {index, mango_idx:to_json(Idx)},
-        {partitioned, mango_idx:partitioned(Idx)},
         {selector, Selector},
         {opts, {Opts}},
         {limit, Limit},
@@ -206,12 +207,9 @@ invalid_index_warning_int(_, _) ->
 % returned, implying a lot of in-memory filtering
 index_scan_warning(#execution_stats {
                     totalDocsExamined = Docs,
-                    totalQuorumDocsExamined = DocsQuorum,
                     resultsReturned = ResultCount
                 }) ->
-    % Docs and DocsQuorum are mutually exclusive so it's safe to sum them
-    DocsScanned = Docs + DocsQuorum,
-    Ratio = calculate_index_scan_ratio(DocsScanned, ResultCount),
+    Ratio = calculate_index_scan_ratio(Docs, ResultCount),
     Threshold = config:get_integer("mango", "index_scan_warning_threshold", 10),
     case Threshold > 0 andalso Ratio > Threshold of
         true ->

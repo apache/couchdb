@@ -18,6 +18,7 @@
 -export([default_authentication_handler/1]).
 -export([cookie_authentication_handler/1]).
 -export([proxy_authentication_handler/1]).
+-export([jwt_authentication_handler/1]).
 -export([party_mode_handler/1]).
 
 -export([handle_session_req/1]).
@@ -51,22 +52,30 @@ cookie_authentication_handler(Req) ->
 proxy_authentication_handler(Req) ->
     couch_httpd_auth:proxy_authentication_handler(Req).
 
+jwt_authentication_handler(Req) ->
+    couch_httpd_auth:jwt_authentication_handler(Req).
+
 party_mode_handler(#httpd{method='POST', path_parts=[<<"_session">>]} = Req) ->
     % See #1947 - users should always be able to attempt a login
     Req#httpd{user_ctx=#user_ctx{}};
+party_mode_handler(#httpd{path_parts=[<<"_up">>]} = Req) ->
+    RequireValidUser = config:get_boolean("chttpd", "require_valid_user", false),
+    RequireValidUserExceptUp = config:get_boolean("chttpd", "require_valid_user_except_for_up", false),
+    require_valid_user(Req, RequireValidUser andalso not RequireValidUserExceptUp);
+
 party_mode_handler(Req) ->
     RequireValidUser = config:get_boolean("chttpd", "require_valid_user", false),
-    ExceptUp = config:get_boolean("chttpd", "require_valid_user_except_for_up", true),
-    case RequireValidUser andalso not ExceptUp of
-    true ->
-        throw({unauthorized, <<"Authentication required.">>});
-    false ->
-        case config:get("admins") of
+    RequireValidUserExceptUp = config:get_boolean("chttpd", "require_valid_user_except_for_up", false),
+    require_valid_user(Req, RequireValidUser orelse RequireValidUserExceptUp).
+
+require_valid_user(_Req, true) ->
+    throw({unauthorized, <<"Authentication required.">>});
+require_valid_user(Req, false) ->
+    case config:get("admins") of
         [] ->
             Req#httpd{user_ctx = ?ADMIN_USER};
         _ ->
             Req#httpd{user_ctx=#user_ctx{}}
-        end
     end.
 
 handle_session_req(Req) ->

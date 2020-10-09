@@ -6,6 +6,9 @@ defmodule ViewCollationTest do
   This is a port of the view_collation.js suite
   """
 
+  @moduletag :view_collation
+  @moduletag kind: :single_node
+
   @values [
     # Special values sort before all other types
     :null,
@@ -70,34 +73,28 @@ defmodule ViewCollationTest do
   end
 
   test "ascending collation order", context do
-    retry_until(fn ->
-      resp = Couch.get(url(context))
-      pairs = Enum.zip(resp.body["rows"], @values)
+    resp = Couch.get(url(context))
+    pairs = Enum.zip(resp.body["rows"], @values)
 
-      Enum.each(pairs, fn {row, value} ->
-        assert row["key"] == convert(value)
-      end)
+    Enum.each(pairs, fn {row, value} ->
+      assert row["key"] == convert(value)
     end)
   end
 
   test "descending collation order", context do
-    retry_until(fn ->
-      resp = Couch.get(url(context), query: %{"descending" => "true"})
-      pairs = Enum.zip(resp.body["rows"], Enum.reverse(@values))
+    resp = Couch.get(url(context), query: %{"descending" => "true"})
+    pairs = Enum.zip(resp.body["rows"], Enum.reverse(@values))
 
-      Enum.each(pairs, fn {row, value} ->
-        assert row["key"] == convert(value)
-      end)
+    Enum.each(pairs, fn {row, value} ->
+      assert row["key"] == convert(value)
     end)
   end
 
   test "key query option", context do
     Enum.each(@values, fn value ->
-      retry_until(fn ->
-        resp = Couch.get(url(context), query: %{:key => :jiffy.encode(value)})
-        assert length(resp.body["rows"]) == 1
-        assert Enum.at(resp.body["rows"], 0)["key"] == convert(value)
-      end)
+      resp = Couch.get(url(context), query: %{:key => :jiffy.encode(value)})
+      assert length(resp.body["rows"]) == 1
+      assert Enum.at(resp.body["rows"], 0)["key"] == convert(value)
     end)
   end
 

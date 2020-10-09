@@ -23,7 +23,7 @@ FOR /F "tokens=2" %%G IN ("%START_ERL%") DO SET APP_VSN=%%G
 set BINDIR=%ROOTDIR%/erts-%ERTS_VSN%/bin
 set EMU=beam
 set PROGNAME=%~n0
-set PATH=%PATH%;%COUCHDB_BIN_DIR%
+set PATH=%COUCHDB_BIN_DIR%;%SystemRoot%\system32;%SystemRoot%;%SystemRoot%\System32\Wbem;%SYSTEMROOT%\System32\WindowsPowerShell\v1.0\
 
 IF NOT DEFINED COUCHDB_QUERY_SERVER_JAVASCRIPT SET COUCHDB_QUERY_SERVER_JAVASCRIPT={{prefix}}/bin/couchjs {{prefix}}/share/server/main.js
 IF NOT DEFINED COUCHDB_QUERY_SERVER_COFFEESCRIPT SET COUCHDB_QUERY_SERVER_COFFEESCRIPT={{prefix}}/bin/couchjs {{prefix}}/share/server/main-coffee.js
@@ -31,6 +31,7 @@ IF NOT DEFINED COUCHDB_FAUXTON_DOCROOT SET COUCHDB_FAUXTON_DOCROOT={{fauxton_roo
 
 "%BINDIR%\erl" -boot "%ROOTDIR%\releases\%APP_VSN%\couchdb" ^
 -args_file "%ROOTDIR%\etc\vm.args" ^
+-epmd "%BINDIR%\epmd.exe" ^
 -config "%ROOTDIR%\releases\%APP_VSN%\sys.config" %*
 
 :: EXIT /B

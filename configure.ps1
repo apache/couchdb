@@ -5,7 +5,6 @@
     This command is responsible for generating the build
     system for Apache CouchDB.
 
-  -WithCurl                  request that couchjs is linked to cURL (default false)
   -DisableFauxton            request build process skip building Fauxton (default false)
   -DisableDocs               request build process skip building documentation (default false)
   -SkipDeps                  do not update Erlang dependencies (default false)
@@ -42,7 +41,6 @@
 
 Param(
     [switch]$Test = $false,
-    [switch]$WithCurl = $false, # request that couchjs is linked to cURL (default false)
     [switch]$DisableFauxton = $false, # do not build Fauxton
     [switch]$DisableDocs = $false, # do not build any documentation or manpages
     [switch]$SkipDeps = $false, # do not update erlang dependencies
@@ -183,9 +181,7 @@ spidermonkey_version = $SpiderMonkeyVersion
 "@
 $InstallMk | Out-File "$rootdir\install.mk" -encoding ascii
 
-$lowercurl = "$WithCurl".ToLower()
 $ConfigERL = @"
-{with_curl, $lowercurl}.
 {spidermonkey_version, "$SpiderMonkeyVersion"}.
 "@
 $ConfigERL | Out-File "$rootdir\config.erl" -encoding ascii
@@ -203,6 +199,20 @@ if ((Get-Command "rebar.cmd" -ErrorAction SilentlyContinue) -eq $null)
    cp $rootdir\src\rebar\rebar.cmd $rootdir\bin\rebar.cmd
    make -C $rootdir\src\rebar clean
    $env:Path += ";$rootdir\bin"
+}
+
+# check for emilio; if not found, get it and build it
+if ((Get-Command "emilio.cmd" -ErrorAction SilentlyContinue) -eq $null)
+{
+   Write-Verbose "==> emilio.cmd not found; bootstrapping..."
+   if (-Not (Test-Path "src\emilio"))
+   {
+      git clone --depth 1 https://github.com/wohali/emilio $rootdir\src\emilio
+   }
+   cmd /c "cd $rootdir\src\emilio && rebar compile escriptize; cd $rootdir"
+   cp $rootdir\src\emilio\emilio $rootdir\bin\emilio
+   cp $rootdir\src\emilio\bin\emilio.cmd $rootdir\bin\emilio.cmd
+   cmd /c "cd $rootdir\src\emilio && rebar clean; cd $rootdir"
 }
 
 # only update dependencies, when we are not in a release tarball

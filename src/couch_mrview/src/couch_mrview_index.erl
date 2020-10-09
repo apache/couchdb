@@ -20,6 +20,7 @@
 -export([index_file_exists/1]).
 -export([update_local_purge_doc/2, verify_index_exists/2]).
 -export([ensure_local_purge_docs/2]).
+-export([format_status/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
@@ -130,6 +131,12 @@ open(Db, State0) ->
                 {ok, {WrongSig, _}} ->
                     couch_log:error("~s has the wrong signature: expected: ~p but got ~p",
                         [IndexFName, Sig, WrongSig]),
+                    NewSt = couch_mrview_util:reset_index(Db, Fd, State),
+                    ensure_local_purge_doc(Db, NewSt),
+                    {ok, NewSt};
+                {ok, Else} ->
+                    couch_log:error("~s has a bad header: got ~p",
+                        [IndexFName, Else]),
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt};
@@ -252,16 +259,7 @@ set_partitioned(Db, State) ->
     DbPartitioned = couch_db:is_partitioned(Db),
     ViewPartitioned = couch_util:get_value(
             <<"partitioned">>, DesignOpts, DbPartitioned),
-    IsPartitioned = case {DbPartitioned, ViewPartitioned} of
-        {true, true} ->
-            true;
-        {true, false} ->
-            false;
-        {false, false} ->
-            false;
-        _ ->
-            throw({bad_request, <<"invalid partition option">>})
-    end,
+    IsPartitioned = DbPartitioned andalso ViewPartitioned,
     State#mrst{partitioned = IsPartitioned}.
 
 
@@ -318,3 +316,14 @@ update_local_purge_doc(Db, State, PSeq) ->
             BaseDoc
     end,
     couch_db:update_doc(Db, Doc, []).
+
+format_status(_Opt, [_PDict, State]) ->
+    Scrubbed = State#mrst{
+        lib = nil,
+        views = nil,
+        id_btree = nil,
+        doc_acc = nil,
+        doc_queue = nil,
+        write_queue = nil
+    },
+    ?record_to_keyval(mrst, Scrubbed).

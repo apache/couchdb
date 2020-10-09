@@ -57,7 +57,7 @@ dbs_info_test_() ->
                 foreach,
                 fun setup/0, fun teardown/1,
                 [
-                    fun should_return_error_for_get_db_info/1,
+                    fun should_return_for_get_db_info/1,
                     fun should_return_dbs_info_for_single_db/1,
                     fun should_return_dbs_info_for_multiple_dbs/1,
                     fun should_return_error_for_exceeded_keys/1,
@@ -69,15 +69,14 @@ dbs_info_test_() ->
     }.
 
 
-should_return_error_for_get_db_info(Url) ->
+should_return_for_get_db_info(Url) ->
     ?_test(begin
         {ok, Code, _, ResultBody} = test_request:get(Url ++ "/_dbs_info?"
-            ++ "keys=[\"db1\"]", [?CONTENT_JSON, ?AUTH]),
-        {Body} = jiffy:decode(ResultBody),
+            ++ "start_key=\"db1\"&end_key=\"db1\"", [?CONTENT_JSON, ?AUTH]),
+        Body = jiffy:decode(ResultBody, [return_maps]),
         [
-            ?assertEqual(<<"method_not_allowed">>,
-                couch_util:get_value(<<"error">>, Body)),
-            ?assertEqual(405, Code)
+            ?assertEqual(200, Code),
+            ?assertMatch([#{<<"db_name">> := <<"db1">>}], Body)
         ]
     end).
 

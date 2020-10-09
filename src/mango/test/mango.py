@@ -48,8 +48,8 @@ class Database(object):
         dbname,
         host="127.0.0.1",
         port="15984",
-        user="testuser",
-        password="testpass",
+        user="adm",
+        password="pass",
     ):
         root_url = get_from_environment("COUCH_HOST", "http://{}:{}".format(host, port))
         auth_header = get_from_environment("COUCH_AUTH_HEADER", None)
@@ -139,8 +139,9 @@ class Database(object):
         ddoc=None,
         partial_filter_selector=None,
         selector=None,
+        wait_for_built_index=True,
     ):
-        body = {"index": {"fields": fields}, "type": idx_type, "w": 3}
+        body = {"index": {"fields": fields}, "type": idx_type}
         if name is not None:
             body["name"] = name
         if ddoc is not None:
@@ -156,12 +157,21 @@ class Database(object):
         assert r.json()["name"] is not None
 
         created = r.json()["result"] == "created"
-        if created:
-            # wait until the database reports the index as available
-            while len(self.get_index(r.json()["id"], r.json()["name"])) < 1:
-                delay(t=0.1)
+        if created and wait_for_built_index:
+            # wait until the database reports the index as available and build
+            while True:
+                idx = self.get_index(r.json()["id"], r.json()["name"])[0]
+                if idx["build_status"] == "ready":
+                    break
+                delay(t=0.2)
 
         return created
+
+    def wait_for_built_indexes(self):
+        while True:
+            if all(idx["build_status"] == "ready" for idx in self.list_indexes()):
+                break
+            delay(t=0.2)
 
     def create_text_index(
         self,
@@ -244,7 +254,6 @@ class Database(object):
         skip=0,
         sort=None,
         fields=None,
-        r=1,
         conflicts=False,
         use_index=None,
         explain=False,
@@ -258,7 +267,6 @@ class Database(object):
             "use_index": use_index,
             "limit": limit,
             "skip": skip,
-            "r": r,
             "conflicts": conflicts,
         }
         if sort is not None:
@@ -299,6 +307,10 @@ class UsersDbTests(unittest.TestCase):
         klass.db = Database("_users")
         user_docs.setup_users(klass.db)
 
+    @classmethod
+    def tearDownClass(klass):
+        user_docs.teardown_users(klass.db)
+
     def setUp(self):
         self.db = self.__class__.db
 
@@ -308,6 +320,10 @@ class DbPerClass(unittest.TestCase):
     def setUpClass(klass):
         klass.db = Database(random_db_name())
         klass.db.create(q=1, n=1)
+
+    @classmethod
+    def tearDownClass(klass):
+        klass.db.delete()
 
     def setUp(self):
         self.db = self.__class__.db

@@ -2,6 +2,7 @@ defmodule CompactTest do
   use CouchTestCase
 
   @moduletag :compact
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB compaction
@@ -80,18 +81,6 @@ defmodule CompactTest do
     resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs})
     assert resp.status_code in [201, 202]
     assert Couch.post("/#{db}/_ensure_full_commit").body["ok"] == true
-  end
-
-  defp compact(db) do
-    assert Couch.post("/#{db}/_compact").status_code == 202
-
-    retry_until(
-      fn ->
-        Couch.get("/#{db}").body["compact_running"] == false
-      end,
-      200,
-      20_000
-    )
   end
 
   defp get_info(db) do

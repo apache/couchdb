@@ -25,7 +25,7 @@
     error_info/1, parse_form/1, json_body/1, json_body_obj/1, body/1,
     doc_etag/1, make_etag/1, etag_respond/3, etag_match/2,
     partition/1, serve_file/3, serve_file/4,
-    server_header/0, start_chunked_response/3,send_chunk/2,
+    server_header/0, start_chunked_response/3,send_chunk/2,last_chunk/1,
     start_response_length/4, send/2, start_json_response/2,
     start_json_response/3, end_json_response/1, send_response/4,
     send_response_no_cors/4,
@@ -52,8 +52,9 @@
     req,
     code,
     headers,
-    first_chunk,
-    resp=nil
+    chunks,
+    resp=nil,
+    buffer_response=false
 }).
 
 start_link() ->
@@ -238,6 +239,8 @@ handle_request_int(MochiReq) ->
     erlang:put(dont_log_request, true),
     erlang:put(dont_log_response, true),
 
+    maybe_trace_fdb(MochiReq:get_header_value("x-couchdb-fdb-trace")),
+
     {HttpReq2, Response} = case before_request(HttpReq0) of
         {ok, HttpReq1} ->
             process_request(HttpReq1);
@@ -257,6 +260,7 @@ handle_request_int(MochiReq) ->
 
     case after_request(HttpReq2, HttpResp) of
         #httpd_resp{status = ok, response = Resp} ->
+            span_ok(HttpResp),
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
             couch_log:error("Response abnormally terminated: ~p", [Reason]),
@@ -264,9 +268,11 @@ handle_request_int(MochiReq) ->
     end.
 
 before_request(HttpReq) ->
+    ctrace:is_enabled() andalso start_span(HttpReq),
     try
-        chttpd_stats:init(),
-        chttpd_plugin:before_request(HttpReq)
+        {ok, HttpReq1} = chttpd_plugin:before_request(HttpReq),
+        chttpd_stats:init(HttpReq1),
+        {ok, HttpReq1}
     catch Tag:Error ->
         {error, catch_error(HttpReq, Tag, Error)}
     end.
@@ -281,7 +287,7 @@ after_request(HttpReq, HttpResp0) ->
             {ok, HttpResp0#httpd_resp{status = aborted}}
         end,
     HttpResp2 = update_stats(HttpReq, HttpResp1),
-    chttpd_stats:report(HttpReq, HttpResp2),
+    chttpd_stats:report(HttpResp2),
     maybe_log(HttpReq, HttpResp2),
     HttpResp2.
 
@@ -314,6 +320,8 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
     end.
 
 handle_req_after_auth(HandlerKey, HttpReq) ->
+    #httpd{user_ctx = #user_ctx{name = User}} = HttpReq,
+    ctrace:tag(#{user => User}),
     try
         HandlerFun = chttpd_handlers:url_handler(HandlerKey,
             fun chttpd_db:handle_request/1),
@@ -350,6 +358,10 @@ catch_error(HttpReq, throw, Error) ->
     send_error(HttpReq, Error);
 catch_error(HttpReq, error, database_does_not_exist) ->
     send_error(HttpReq, database_does_not_exist);
+catch_error(HttpReq, error, decryption_failed) ->
+    send_error(HttpReq, decryption_failed);
+catch_error(HttpReq, error, not_ciphertext) ->
+    send_error(HttpReq, not_ciphertext);
 catch_error(HttpReq, Tag, Error) ->
     Stack = erlang:get_stacktrace(),
     % TODO improve logging and metrics collection for client disconnects
@@ -412,8 +424,7 @@ possibly_hack(#httpd{path_parts=[<<"_replicate">>]}=Req) ->
     {Props0} = chttpd:json_body_obj(Req),
     Props1 = fix_uri(Req, Props0, <<"source">>),
     Props2 = fix_uri(Req, Props1, <<"target">>),
-    put(post_body, {Props2}),
-    Req;
+    Req#httpd{req_body={Props2}};
 possibly_hack(Req) ->
     Req.
 
@@ -666,13 +677,16 @@ body(#httpd{mochi_req=MochiReq, req_body=ReqBody}) ->
 validate_ctype(Req, Ctype) ->
     couch_httpd:validate_ctype(Req, Ctype).
 
-json_body(Httpd) ->
+json_body(#httpd{req_body=undefined} = Httpd) ->
     case body(Httpd) of
         undefined ->
             throw({bad_request, "Missing request body"});
         Body ->
             ?JSON_DECODE(maybe_decompress(Httpd, Body))
-    end.
+    end;
+
+json_body(#httpd{req_body=ReqBody}) ->
+    ReqBody.
 
 json_body_obj(Httpd) ->
     case json_body(Httpd) of
@@ -745,7 +759,14 @@ start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
 send_chunk({remote, _Pid, _Ref} = Resp, Data) ->
     couch_httpd:send_chunk(Resp, Data);
 send_chunk(Resp, Data) ->
-    Resp:write_chunk(Data),
+    case iolist_size(Data) of
+        0 -> ok; % do nothing
+        _ -> Resp:write_chunk(Data)
+    end,
+    {ok, Resp}.
+
+last_chunk(Resp) ->
+    Resp:write_chunk([]),
     {ok, Resp}.
 
 send_response(Req, Code, Headers0, Body) ->
@@ -780,11 +801,14 @@ start_json_response(Req, Code, Headers0) ->
 end_json_response(Resp) ->
     couch_httpd:end_json_response(Resp).
 
+
 start_delayed_json_response(Req, Code) ->
     start_delayed_json_response(Req, Code, []).
 
+
 start_delayed_json_response(Req, Code, Headers) ->
     start_delayed_json_response(Req, Code, Headers, "").
+
 
 start_delayed_json_response(Req, Code, Headers, FirstChunk) ->
     {ok, #delayed_resp{
@@ -792,10 +816,13 @@ start_delayed_json_response(Req, Code, Headers, FirstChunk) ->
         req = Req,
         code = Code,
         headers = Headers,
-        first_chunk = FirstChunk}}.
+        chunks = [FirstChunk],
+        buffer_response = buffer_response(Req)}}.
+
 
 start_delayed_chunked_response(Req, Code, Headers) ->
     start_delayed_chunked_response(Req, Code, Headers, "").
+
 
 start_delayed_chunked_response(Req, Code, Headers, FirstChunk) ->
     {ok, #delayed_resp{
@@ -803,16 +830,24 @@ start_delayed_chunked_response(Req, Code, Headers, FirstChunk) ->
         req = Req,
         code = Code,
         headers = Headers,
-        first_chunk = FirstChunk}}.
+        chunks = [FirstChunk],
+        buffer_response = buffer_response(Req)}}.
 
-send_delayed_chunk(#delayed_resp{}=DelayedResp, Chunk) ->
+
+send_delayed_chunk(#delayed_resp{buffer_response=false}=DelayedResp, Chunk) ->
     {ok, #delayed_resp{resp=Resp}=DelayedResp1} =
         start_delayed_response(DelayedResp),
     {ok, Resp} = send_chunk(Resp, Chunk),
-    {ok, DelayedResp1}.
+    {ok, DelayedResp1};
+
+send_delayed_chunk(#delayed_resp{buffer_response=true}=DelayedResp, Chunk) ->
+    #delayed_resp{chunks = Chunks} = DelayedResp,
+    {ok, DelayedResp#delayed_resp{chunks = [Chunk | Chunks]}}.
+
 
 send_delayed_last_chunk(Req) ->
     send_delayed_chunk(Req, []).
+
 
 send_delayed_error(#delayed_resp{req=Req,resp=nil}=DelayedResp, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
@@ -823,6 +858,7 @@ send_delayed_error(#delayed_resp{resp=Resp, req=Req}, Reason) ->
     log_error_with_stack_trace(Reason),
     throw({http_abort, Resp, Reason}).
 
+
 close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
     % Use a separate chunk to close the streamed array to maintain strict
     % compatibility with earlier versions. See COUCHDB-2724
@@ -831,10 +867,27 @@ close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
 close_delayed_json_object(Resp, Buffer, Terminator, _Threshold) ->
     send_delayed_chunk(Resp, [Buffer | Terminator]).
 
-end_delayed_json_response(#delayed_resp{}=DelayedResp) ->
+
+end_delayed_json_response(#delayed_resp{buffer_response=false}=DelayedResp) ->
     {ok, #delayed_resp{resp=Resp}} =
         start_delayed_response(DelayedResp),
+    end_json_response(Resp);
+
+end_delayed_json_response(#delayed_resp{buffer_response=true}=DelayedResp) ->
+    #delayed_resp{
+        start_fun = StartFun,
+        req = Req,
+        code = Code,
+        headers = Headers,
+        chunks = Chunks
+    } = DelayedResp,
+    {ok, Resp} = StartFun(Req, Code, Headers),
+    lists:foreach(fun
+        ([]) -> ok;
+        (Chunk) -> send_chunk(Resp, Chunk)
+    end, lists:reverse(Chunks)),
     end_json_response(Resp).
+
 
 get_delayed_req(#delayed_resp{req=#httpd{mochi_req=MochiReq}}) ->
     MochiReq;
@@ -847,7 +900,7 @@ start_delayed_response(#delayed_resp{resp=nil}=DelayedResp) ->
         req=Req,
         code=Code,
         headers=Headers,
-        first_chunk=FirstChunk
+        chunks=[FirstChunk]
     }=DelayedResp,
     {ok, Resp} = StartFun(Req, Code, Headers),
     case FirstChunk of
@@ -857,6 +910,18 @@ start_delayed_response(#delayed_resp{resp=nil}=DelayedResp) ->
     {ok, DelayedResp#delayed_resp{resp=Resp}};
 start_delayed_response(#delayed_resp{}=DelayedResp) ->
     {ok, DelayedResp}.
+
+
+buffer_response(Req) ->
+    case chttpd:qs_value(Req, "buffer_response") of
+        "false" ->
+            false;
+        "true" ->
+            true;
+        _ ->
+            config:get_boolean("chttpd", "buffer_response", false)
+    end.
+
 
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});
@@ -930,12 +995,18 @@ error_info({error, {database_name_too_long, DbName}}) ->
         <<"At least one path segment of `", DbName/binary, "` is too long.">>};
 error_info({doc_validation, Reason}) ->
     {400, <<"doc_validation">>, Reason};
+error_info({invalid_since_seq, Reason}) ->
+    {400, <<"invalid_since_seq">>, Reason};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
     {413, <<"too_large">>, <<"the request entity is too large">>};
 error_info({request_entity_too_large, {attachment, AttName}}) ->
     {413, <<"attachment_too_large">>, AttName};
+error_info({request_entity_too_large, {bulk_docs, Max}}) when is_integer(Max) ->
+    {413, <<"max_bulk_docs_count_exceeded">>, integer_to_binary(Max)};
+error_info({request_entity_too_large, {bulk_get, Max}}) when is_integer(Max) ->
+    {413, <<"max_bulk_get_count_exceeded">>, integer_to_binary(Max)};
 error_info({request_entity_too_large, DocID}) ->
     {413, <<"document_too_large">>, DocID};
 error_info({error, security_migration_updates_disabled}) ->
@@ -949,6 +1020,10 @@ error_info(not_implemented) ->
 error_info(timeout) ->
     {500, <<"timeout">>, <<"The request could not be processed in a reasonable"
         " amount of time.">>};
+error_info(decryption_failed) ->
+    {500, <<"decryption_failed">>, <<"Decryption failed">>};
+error_info(not_ciphertext) ->
+    {500, <<"not_ciphertext">>, <<"Not Ciphertext">>};
 error_info({service_unavailable, Reason}) ->
     {503, <<"service unavailable">>, Reason};
 error_info({timeout, _Reason}) ->
@@ -970,6 +1045,8 @@ maybe_handle_error(Error) ->
             Result;
         {Err, Reason} ->
             {500, couch_util:to_binary(Err), couch_util:to_binary(Reason)};
+        normal ->
+            exit(normal);
         Error ->
             {500, <<"unknown_error">>, couch_util:to_binary(Error)}
     end.
@@ -1043,16 +1120,20 @@ send_error(#httpd{} = Req, Code, ErrorStr, ReasonStr) ->
     send_error(Req, Code, [], ErrorStr, ReasonStr, []).
 
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, []) ->
-    send_json(Req, Code, Headers,
+    Return = send_json(Req, Code, Headers,
         {[{<<"error">>,  ErrorStr},
-        {<<"reason">>, ReasonStr}]});
+        {<<"reason">>, ReasonStr}]}),
+    span_error(Code, ErrorStr, ReasonStr, []),
+    Return;
 send_error(Req, Code, Headers, ErrorStr, ReasonStr, Stack) ->
     log_error_with_stack_trace({ErrorStr, ReasonStr, Stack}),
-    send_json(Req, Code, [stack_trace_id(Stack) | Headers],
+    Return = send_json(Req, Code, [stack_trace_id(Stack) | Headers],
         {[{<<"error">>,  ErrorStr},
         {<<"reason">>, ReasonStr} |
         case Stack of [] -> []; _ -> [{<<"ref">>, stack_hash(Stack)}] end
-    ]}).
+    ]}),
+    span_error(Code, ErrorStr, ReasonStr, Stack),
+    Return.
 
 update_timeout_stats(<<"timeout">>, #httpd{requested_path_parts = PathParts}) ->
     update_timeout_stats(PathParts);
@@ -1205,6 +1286,126 @@ get_user(#httpd{user_ctx = #user_ctx{name = User}}) ->
     couch_util:url_encode(User);
 get_user(#httpd{user_ctx = undefined}) ->
     "undefined".
+
+maybe_trace_fdb("true") ->
+    % Remember to also enable tracing in erlfdb application environment:
+    %   network_options = [{trace_enable, ...}]
+    % Or via the OS environment variable:
+    %   FDB_NETWORK_OPTION_TRACE_ENABLE = ""
+    case config:get_boolean("fabric", "fdb_trace", false) of
+        true ->
+            Nonce = erlang:get(nonce),
+            erlang:put(erlfdb_trace, list_to_binary(Nonce));
+        false ->
+            ok
+    end;
+maybe_trace_fdb(_) ->
+    ok.
+
+start_span(Req) ->
+    #httpd{
+        mochi_req = MochiReq,
+        begin_ts = Begin,
+        peer = Peer,
+        nonce = Nonce,
+        method = Method,
+        path_parts = PathParts
+    } = Req,
+    {OperationName, ExtraTags} = get_action(Req),
+    Path = case PathParts of
+        [] -> <<"">>;
+        [_ | _] -> filename:join(PathParts)
+    end,
+    {IsExternalSpan, RootOptions} = root_span_options(MochiReq),
+    Tags = maps:merge(#{
+        peer => Peer,
+        'http.method' => Method,
+        nonce => Nonce,
+        'http.url' => MochiReq:get(raw_path),
+        path_parts => Path,
+        'span.kind' => <<"server">>,
+        component => <<"couchdb.chttpd">>,
+        external => IsExternalSpan
+    }, ExtraTags),
+
+    ctrace:start_span(OperationName, [
+        {tags, Tags},
+        {time, Begin}
+    ] ++ RootOptions).
+
+root_span_options(MochiReq) ->
+    case get_trace_headers(MochiReq) of
+        [undefined, _, _] ->
+            {false, []};
+        [TraceId, SpanId, ParentSpanId] ->
+            Span = ctrace:external_span(TraceId, SpanId, ParentSpanId),
+            {true, [{root, Span}]}
+    end.
+
+parse_trace_id(undefined) ->
+    undefined;
+parse_trace_id(Hex) ->
+    to_int(Hex, 32).
+
+parse_span_id(undefined) ->
+    undefined;
+parse_span_id(Hex) ->
+    to_int(Hex, 16).
+
+to_int(Hex, N) when length(Hex) =:= N ->
+    try
+        list_to_integer(Hex, 16)
+    catch error:badarg ->
+        undefined
+    end.
+
+get_trace_headers(MochiReq) ->
+    case MochiReq:get_header_value("b3") of
+        undefined ->
+            [
+                parse_trace_id(MochiReq:get_header_value("X-B3-TraceId")),
+                parse_span_id(MochiReq:get_header_value("X-B3-SpanId")),
+                parse_span_id(MochiReq:get_header_value("X-B3-ParentSpanId"))
+            ];
+        Value ->
+            case string:split(Value, "-", all) of
+                [TraceIdStr, SpanIdStr, _SampledStr, ParentSpanIdStr] ->
+                    [
+                        parse_trace_id(TraceIdStr),
+                        parse_span_id(SpanIdStr),
+                        parse_span_id(ParentSpanIdStr)
+                    ];
+                _ ->
+                    [undefined, undefined, undefined]
+             end
+    end.
+
+get_action(#httpd{} = Req) ->
+    try
+        chttpd_handlers:handler_info(Req)
+    catch Tag:Error ->
+        couch_log:error("Cannot set tracing action ~p:~p", [Tag, Error]),
+        {undefind, #{}}
+    end.
+
+span_ok(#httpd_resp{code = Code}) ->
+    ctrace:tag(#{
+        error => false,
+        'http.status_code' => Code
+    }),
+    ctrace:finish_span().
+
+span_error(Code, ErrorStr, ReasonStr, Stack) ->
+    ctrace:tag(#{
+        error => true,
+        'http.status_code' => Code
+    }),
+    ctrace:log(#{
+        'error.kind' => ErrorStr,
+        message => ReasonStr,
+        stack => Stack
+    }),
+    ctrace:finish_span().
 
 -ifdef(TEST).
 

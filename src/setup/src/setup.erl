@@ -165,7 +165,7 @@ enable_cluster_int(Options, false) ->
     couch_log:debug("Enable Cluster: ~p~n", [Options]).
 
 set_admin(Username, Password) ->
-    config:set("admins", binary_to_list(Username), binary_to_list(Password)).
+    config:set("admins", binary_to_list(Username), binary_to_list(Password), #{sensitive => true}).
 
 setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
     case NewCredentials of
@@ -198,6 +198,9 @@ setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
 
 
 finish_cluster(Options) ->
+    % ensure that uuid is set
+    couch_server:get_uuid(),
+
     ok = wait_connected(),
     ok = sync_admins(),
     ok = sync_uuid(),
@@ -262,7 +265,7 @@ sync_config(Section, Key, Value) ->
         ok ->
             ok;
         error ->
-            log:error("~p sync_admin results ~p errors ~p",
+            couch_log:error("~p sync_admin results ~p errors ~p",
                 [?MODULE, Results, Errors]),
             Reason = "Cluster setup unable to sync admin passwords",
             throw({setup_error, Reason})
