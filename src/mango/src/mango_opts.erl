@@ -14,7 +14,8 @@
 
 -export([
     validate_idx_create/1,
-    validate_find/1
+    validate_find/1,
+    validate_update/3
 ]).
 
 -export([
@@ -168,6 +169,10 @@ validate_find({Props}) ->
         ]}
     ],
     validate(Props, Opts).
+
+
+validate_update(Req, Db, Doc) ->
+    ok. % TODO actually validate
 
 
 validate_bulk_delete({Props}) ->
