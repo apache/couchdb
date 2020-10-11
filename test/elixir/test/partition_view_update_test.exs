@@ -5,6 +5,10 @@ defmodule PartitionViewUpdateTest do
   @moduledoc """
   Test Partition view update functionality
   """
+  
+  @moduletag :partition
+  @moduletag kind: :cluster
+
   @tag :with_partitioned_db
   test "view updates properly remove old keys", context do
     db_name = context[:db_name]

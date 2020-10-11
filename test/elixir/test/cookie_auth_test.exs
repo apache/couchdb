@@ -2,6 +2,7 @@ defmodule CookieAuthTest do
   use CouchTestCase
 
   @moduletag :authentication
+  @moduletag kind: :single_node
 
   @users_db "_users"
 
@@ -34,13 +35,14 @@ defmodule CookieAuthTest do
     # Create db if not exists
     Couch.put("/#{@users_db}")
 
-    resp =
-      Couch.get(
-        "/#{@users_db}/_changes",
-        query: [feed: "longpoll", timeout: 5000, filter: "_design"]
-      )
-
-    assert resp.body
+    retry_until(fn ->
+      resp =
+        Couch.get(
+          "/#{@users_db}/_changes",
+          query: [feed: "longpoll", timeout: 5000, filter: "_design"]
+        )
+        length(resp.body["results"]) > 0
+    end)
 
     on_exit(&tear_down/0)
 

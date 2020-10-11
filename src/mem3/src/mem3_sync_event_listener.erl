@@ -236,7 +236,7 @@ teardown_all(_) ->
 setup() ->
     {ok, Pid} = ?MODULE:start_link(),
     erlang:unlink(Pid),
-    meck:wait(config_notifier, subscribe, '_', 1000),
+    wait_config_subscribed(Pid),
     Pid.
 
 teardown(Pid) ->
@@ -334,6 +334,18 @@ wait_state(Pid, Field, Val) when is_pid(Pid), is_integer(Field) ->
                 true;
             _ ->
                 wait
+        end
+    end,
+    test_util:wait(WaitFun).
+
+
+wait_config_subscribed(Pid) ->
+    WaitFun = fun() ->
+        Handlers = gen_event:which_handlers(config_event),
+        Pids = [Id || {config_notifier, Id} <- Handlers],
+        case lists:member(Pid, Pids) of
+            true -> true;
+            false -> wait
         end
     end,
     test_util:wait(WaitFun).

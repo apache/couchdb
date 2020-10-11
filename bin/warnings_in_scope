@@ -1,0 +1,125 @@
+#!/usr/bin/env python3
+import os
+import subprocess
+from pathlib import Path
+import optparse
+import sys
+import re
+
+def run(command, cwd=None):
+    try:
+        return subprocess.Popen(
+            command, shell=True, cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+    except OSError as err:
+        raise OSError("Error in command '{0}': {1}".format(command, err))
+
+def parse_location(line):
+    # take substring between @@
+    # take second part of it
+    location = line.split(b'@@')[1].strip().split(b' ')[1]
+    tokens = location.split(b',')
+    if len(tokens) == 1:
+        return (int(tokens[0][1:]), 1)
+    elif len(tokens) == 2:
+        return (int(tokens[0][1:]), int(tokens[1]))
+
+def changed_files(directory, scope):
+    result = {}
+    proc = run('git diff --no-prefix --unified={0}'.format(scope), cwd=str(directory))
+    file_path = None
+    for line in iter(proc.stdout.readline, b''):
+        if line.startswith(b'diff --git '):
+            # this would be problematic if directory has space in the name
+            file_name = line.split(b' ')[3].strip()
+            file_path = str(directory.joinpath(str(file_name, 'utf-8')))
+            result[file_path] = set()
+            continue
+        if line.startswith(b'@@'):
+            start_pos, number_of_lines = parse_location(line)
+            for line_number in range(start_pos, start_pos + number_of_lines):
+                result[file_path].add(line_number)
+    return result
+
+def print_changed(file_name, line_number):
+    print('{0}:{1}'.format(str(file_name), str(line_number)))
+
+def changes(dirs, scope):
+    result = {}
+    for directory in dirs:
+        result.update(changed_files(directory, scope))
+    return result
+
+def repositories(root):
+    for directory in Path(root).rglob('.git'):
+        if not directory.is_dir():
+            continue
+        yield directory.parent
+
+def setup_argparse():
+    parser = optparse.OptionParser(description="Filter output to remove unrelated warning")
+    parser.add_option(
+        "-r",
+        "--regexp",
+        dest="regexp",
+        default='(?P<file_name>[^:]+):(?P<line>\d+).*',
+        help="Regexp used to extract file_name and line number",
+    )
+    parser.add_option(
+        "-s",
+        "--scope",
+        dest="scope",
+        default=0,
+        help="Number of lines surrounding the change we consider relevant",
+    )
+    parser.add_option(
+        "-p",
+        "--print-only",
+        action="store_true",
+        dest="print_only",
+        default=False,
+        help="Print changed lines only",
+    )
+    return parser.parse_args()
+
+def filter_stdin(regexp, changes):
+    any_matches = False
+    for line in iter(sys.stdin.readline, ''):
+        matches = re.match(regexp, line)
+        if matches:
+            file_name = matches.group('file_name')
+            line_number = int(matches.group('line'))
+            if file_name in changes and line_number in changes[file_name]:
+                print(line, end='')
+                any_matches = True
+    return any_matches
+
+def validate_regexp(regexp):
+    index = regexp.groupindex
+    if 'file_name' in index and 'line' in index:
+        return True
+    else:
+        raise TypeError("Regexp must define following groups:\n  - file_name\n  - line")
+
+def main():
+    opts, args = setup_argparse()
+    if opts.print_only:
+        for file_name, changed_lines in changes(repositories('.'), opts.scope).items():
+            for line_number in changed_lines:
+                print_changed(file_name, line_number)
+        return 0
+    else:
+        regexp = re.compile(opts.regexp)
+        validate_regexp(regexp)
+        if filter_stdin(regexp, changes(repositories('.'), opts.scope)):
+            return 1
+        else:
+            return 0
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except KeyboardInterrupt:
+        pass
+

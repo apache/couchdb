@@ -6,6 +6,9 @@ defmodule ReshardChangesFeedTest do
   Test _changes interaction with resharding
   """
 
+  @moduletag :reshard_changes_feed
+  @moduletag kind: :cluster
+
   setup do
     db = random_db_name()
     {:ok, _} = create_db(db, query: %{q: 2})

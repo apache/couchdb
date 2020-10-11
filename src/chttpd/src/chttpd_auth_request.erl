@@ -34,7 +34,7 @@ authorize_request_int(#httpd{path_parts=[]}=Req) ->
 authorize_request_int(#httpd{path_parts=[<<"favicon.ico">>|_]}=Req) ->
     Req;
 authorize_request_int(#httpd{path_parts=[<<"_all_dbs">>|_]}=Req) ->
-   case config:get_boolean("chttpd", "admin_only_all_dbs", false) of
+   case config:get_boolean("chttpd", "admin_only_all_dbs", true) of
        true -> require_admin(Req);
        false -> Req
    end;

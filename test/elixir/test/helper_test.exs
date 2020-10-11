@@ -5,6 +5,9 @@ defmodule HelperTest do
   Test helper code
   """
 
+  @moduletag :helper
+  @moduletag kind: :single_node
+
   test "retry_until handles boolean conditions", _context do
     retry_until(fn ->
       true

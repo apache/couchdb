@@ -13,53 +13,76 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <sstream>
+
 #include <jsapi.h>
 #include <js/Initialization.h>
+#include <js/CharacterEncoding.h>
 #include <js/Conversions.h>
+#include <mozilla/Unused.h>
 
 #include "help.h"
 #include "util.h"
-#include "utf8.h"
 
 std::string
 js_to_string(JSContext* cx, JS::HandleValue val)
 {
+    JS::AutoSaveExceptionState exc_state(cx);
     JS::RootedString sval(cx);
     sval = val.toString();
 
     JS::UniqueChars chars(JS_EncodeStringToUTF8(cx, sval));
     if(!chars) {
         JS_ClearPendingException(cx);
-        fprintf(stderr, "Error converting value to string.\n");
-        exit(3);
+        return std::string();
     }
 
     return chars.get();
 }
 
-std::string
-js_to_string(JSContext* cx, JSString *str)
+bool
+js_to_string(JSContext* cx, JS::HandleValue val, std::string& str)
 {
-    JS::UniqueChars chars(JS_EncodeString(cx, str));
-    if(!chars) {
-        JS_ClearPendingException(cx);
-        fprintf(stderr, "Error converting  to string.\n");
-        exit(3);
+    if(!val.isString()) {
+        return false;
     }
 
-    return chars.get();
+    if(JS_GetStringLength(val.toString()) == 0) {
+        str = "";
+        return true;
+    }
+
+    std::string conv = js_to_string(cx, val);
+    if(!conv.size()) {
+        return false;
+    }
+
+    str = conv;
+    return true;
 }
 
 JSString*
-string_to_js(JSContext* cx, const std::string& s)
+string_to_js(JSContext* cx, const std::string& raw)
 {
-    JSString* ret = JS_NewStringCopyN(cx, s.c_str(), s.size());
-    if(ret != nullptr) {
-        return ret;
+    JS::UTF8Chars utf8(raw.c_str(), raw.size());
+    JS::UniqueTwoByteChars utf16;
+    size_t len;
+
+    utf16.reset(JS::UTF8CharsToNewTwoByteCharsZ(cx, utf8, &len).get());
+    if(!utf16) {
+        return nullptr;
     }
 
-    fprintf(stderr, "Unable to allocate string object.\n");
-    exit(3);
+    JSString* ret = JS_NewUCString(cx, utf16.get(), len);
+
+    if(ret) {
+        // JS_NewUCString took ownership on success. We shift
+        // the resulting pointer into Unused to silence the
+        // compiler warning.
+        mozilla::Unused << utf16.release();
+    }
+
+    return ret;
 }
 
 size_t
@@ -84,21 +107,21 @@ couch_readfile(const char* file, char** outbuf_p)
 
     while((nread = fread(fbuf, 1, 16384, fp)) > 0) {
         if(buf == NULL) {
-            buf = (char*) malloc(nread + 1);
+            buf = new char[nread + 1];
             if(buf == NULL) {
                 fprintf(stderr, "Out of memory.\n");
                 exit(3);
             }
             memcpy(buf, fbuf, nread);
         } else {
-            tmp = (char*) malloc(buflen + nread + 1);
+            tmp = new char[buflen + nread + 1];
             if(tmp == NULL) {
                 fprintf(stderr, "Out of memory.\n");
                 exit(3);
             }
             memcpy(tmp, buf, buflen);
             memcpy(tmp+buflen, fbuf, nread);
-            free(buf);
+            delete buf;
             buf = tmp;
         }
         buflen += nread;
@@ -114,12 +137,17 @@ couch_parse_args(int argc, const char* argv[])
     couch_args* args;
     int i = 1;
 
-    args = (couch_args*) malloc(sizeof(couch_args));
+    args = new couch_args();
     if(args == NULL)
         return NULL;
 
-    memset(args, '\0', sizeof(couch_args));
+    args->eval = 0;
+    args->use_http = 0;
+    args->use_test_funs = 0;
     args->stack_size = 64L * 1024L * 1024L;
+    args->scripts = nullptr;
+    args->uri_file = nullptr;
+    args->uri = nullptr;
 
     while(i < argc) {
         if(strcmp("-h", argv[i]) == 0) {
@@ -193,7 +221,7 @@ couch_readline(JSContext* cx, FILE* fp)
     size_t oldbyteslen = 256;
     size_t readlen = 0;
 
-    bytes = (char *)JS_malloc(cx, byteslen);
+    bytes = static_cast<char*>(JS_malloc(cx, byteslen));
     if(bytes == NULL) return NULL;
     
     while((readlen = couch_fgets(bytes+used, byteslen-used, fp)) > 0) {
@@ -207,7 +235,7 @@ couch_readline(JSContext* cx, FILE* fp)
         // Double our buffer and read more.
         oldbyteslen = byteslen;
         byteslen *= 2;
-        tmp = (char *)JS_realloc(cx, bytes, oldbyteslen, byteslen);
+        tmp = static_cast<char*>(JS_realloc(cx, bytes, oldbyteslen, byteslen));
         if(!tmp) {
             JS_free(cx, bytes);
             return NULL;
@@ -222,8 +250,8 @@ couch_readline(JSContext* cx, FILE* fp)
         return JS_NewStringCopyZ(cx, nullptr);
     }
 
-    // Shring the buffer to the actual data size
-    tmp = (char *)JS_realloc(cx, bytes, byteslen, used);
+    // Shrink the buffer to the actual data size
+    tmp = static_cast<char*>(JS_realloc(cx, bytes, byteslen, used));
     if(!tmp) {
         JS_free(cx, bytes);
         return NULL;
@@ -238,22 +266,16 @@ couch_readline(JSContext* cx, FILE* fp)
 
 
 void
-couch_print(JSContext* cx, unsigned int argc, JS::CallArgs argv)
+couch_print(JSContext* cx, JS::HandleValue obj, bool use_stderr)
 {
-    uint8_t* bytes = nullptr;
-    FILE *stream = stdout;
+    FILE* stream = stdout;
 
-    if (argc) {
-        if (argc > 1 && argv[1].isTrue()) {
-          stream = stderr;
-        }
-        JSString* str = JS::ToString(cx, argv.get(0));
-        bytes = reinterpret_cast<uint8_t*>(JS_EncodeString(cx, str));
-        fprintf(stream, "%s", bytes);
-        JS_free(cx, bytes);
+    if(use_stderr) {
+        stream = stderr;
     }
 
-    fputc('\n', stream);
+    std::string val = js_to_string(cx, obj);
+    fprintf(stream, "%s\n", val.c_str());
     fflush(stream);
 }
 
@@ -261,51 +283,63 @@ couch_print(JSContext* cx, unsigned int argc, JS::CallArgs argv)
 void
 couch_error(JSContext* cx, JSErrorReport* report)
 {
-    JS::RootedValue v(cx), stack(cx), replace(cx);
-    char* bytes;
-    JSObject* regexp;
-
-    if(!report || !JSREPORT_IS_WARNING(report->flags))
-    {
-        fprintf(stderr, "%s\n", report->message().c_str());
-
-        // Print a stack trace, if available.
-        if (JSREPORT_IS_EXCEPTION(report->flags) &&
-            JS_GetPendingException(cx, &v))
-        {
-            // Clear the exception before an JS method calls or the result is
-            // infinite, recursive error report generation.
-            JS_ClearPendingException(cx);
-
-            // Use JS regexp to indent the stack trace.
-            // If the regexp can't be created, don't JS_ReportErrorUTF8 since it is
-            // probably not productive to wind up here again.
-            JS::RootedObject vobj(cx, v.toObjectOrNull());
-
-            if(JS_GetProperty(cx, vobj, "stack", &stack) &&
-               (regexp = JS_NewRegExpObject(
-                   cx, "^(?=.)", 6, JSREG_GLOB | JSREG_MULTILINE)))
-            {
-                // Set up the arguments to ``String.replace()``
-                JS::AutoValueVector re_args(cx);
-                JS::RootedValue arg0(cx, JS::ObjectValue(*regexp));
-                auto arg1 = JS::StringValue(string_to_js(cx, "\t"));
-
-                if (re_args.append(arg0) && re_args.append(arg1)) {
-                    // Perform the replacement
-                    JS::RootedObject sobj(cx, stack.toObjectOrNull());
-                    if(JS_GetProperty(cx, sobj, "replace", &replace) &&
-                       JS_CallFunctionValue(cx, sobj, replace, re_args, &v))
-                    {
-                        // Print the result
-                        bytes = enc_string(cx, v, NULL);
-                        fprintf(stderr, "Stacktrace:\n%s", bytes);
-                        JS_free(cx, bytes);
-                    }
-                }
-            }
-        }
+    if(!report) {
+        return;
     }
+
+    if(JSREPORT_IS_WARNING(report->flags)) {
+        return;
+    }
+
+    std::ostringstream msg;
+    msg << "error: " << report->message().c_str();
+
+    mozilla::Maybe<JSAutoCompartment> ac;
+    JS::RootedValue exc(cx);
+    JS::RootedObject exc_obj(cx);
+    JS::RootedObject stack_obj(cx);
+    JS::RootedString stack_str(cx);
+    JS::RootedValue stack_val(cx);
+
+    if(!JS_GetPendingException(cx, &exc)) {
+        goto done;
+    }
+
+    // Clear the exception before an JS method calls or the result is
+    // infinite, recursive error report generation.
+    JS_ClearPendingException(cx);
+
+    exc_obj.set(exc.toObjectOrNull());
+    stack_obj.set(JS::ExceptionStackOrNull(exc_obj));
+
+    if(!stack_obj) {
+        // Compilation errors don't have a stack
+
+        msg << " at ";
+
+        if(report->filename) {
+            msg << report->filename;
+        } else {
+            msg << "<unknown>";
+        }
+
+        if(report->lineno) {
+            msg << ':' << report->lineno << ':' << report->column;
+        }
+
+        goto done;
+    }
+
+    if(!JS::BuildStackString(cx, stack_obj, &stack_str, 2)) {
+        goto done;
+    }
+
+    stack_val.set(JS::StringValue(stack_str));
+    msg << std::endl << std::endl << js_to_string(cx, stack_val).c_str();
+
+done:
+    msg << std::endl;
+    fprintf(stderr, "%s", msg.str().c_str());
 }
 
 

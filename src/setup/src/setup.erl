@@ -198,6 +198,9 @@ setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
 
 
 finish_cluster(Options) ->
+    % ensure that uuid is set
+    couch_server:get_uuid(),
+
     ok = wait_connected(),
     ok = sync_admins(),
     ok = sync_uuid(),
@@ -262,7 +265,7 @@ sync_config(Section, Key, Value) ->
         ok ->
             ok;
         error ->
-            log:error("~p sync_admin results ~p errors ~p",
+            couch_log:error("~p sync_admin results ~p errors ~p",
                 [?MODULE, Results, Errors]),
             Reason = "Cluster setup unable to sync admin passwords",
             throw({setup_error, Reason})

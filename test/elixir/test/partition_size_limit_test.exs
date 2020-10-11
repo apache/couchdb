@@ -5,6 +5,9 @@ defmodule PartitionSizeLimitTest do
   Test Partition size limit functionality
   """
 
+  @moduletag :partition
+  @moduletag kind: :cluster
+
   @max_size 10_240
 
   setup do
@@ -66,18 +69,6 @@ defmodule PartitionSizeLimitTest do
     body = %{:w => 3, :docs => docs}
     resp = Couch.post("/#{db_name}/_bulk_docs", body: body)
     assert resp.status_code in [201, 202]
-  end
-
-  defp compact(db) do
-    assert Couch.post("/#{db}/_compact").status_code == 202
-
-    retry_until(
-      fn ->
-        Couch.get("/#{db}").body["compact_running"] == false
-      end,
-      200,
-      20_000
-    )
   end
 
   test "fill partition manually", context do

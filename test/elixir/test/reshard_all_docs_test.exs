@@ -6,6 +6,9 @@ defmodule ReshardAllDocsTest do
   Test _all_docs interaction with resharding
   """
 
+  @moduletag :reshard_all_docs
+  @moduletag kind: :cluster
+
   setup do
     db = random_db_name()
     {:ok, _} = create_db(db, query: %{q: 2})

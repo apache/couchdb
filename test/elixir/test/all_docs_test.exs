@@ -2,6 +2,7 @@ defmodule AllDocsTest do
   use CouchTestCase
 
   @moduletag :all_docs
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB _all_docs
@@ -295,5 +296,23 @@ defmodule AllDocsTest do
 
     assert resp.status_code == 200
     assert length(Map.get(resp, :body)["rows"]) == 1
+  end
+
+  @tag :with_db
+  test "POST boolean", context do
+    db_name = context[:db_name]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
+    assert resp.status_code in [201, 202]
+
+    resp = Couch.post(
+      "/#{db_name}/_all_docs",
+      body: %{
+        :stable => true,
+        :update => true
+      }
+    )
+
+    assert resp.status_code == 200
   end
 end

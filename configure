@@ -255,11 +255,24 @@ install_local_rebar() {
     fi
 }
 
+install_local_emilio() {
+    if [ ! -x "${rootdir}/bin/emilio" ]; then
+        if [ ! -d "${rootdir}/src/emilio" ]; then
+            git clone --depth 1 https://github.com/cloudant-labs/emilio ${rootdir}/src/emilio
+        fi
+        cd ${rootdir}/src/emilio && ${REBAR} compile escriptize; cd ${rootdir}
+        mv ${rootdir}/src/emilio/emilio ${rootdir}/bin/emilio
+        chmod +x ${rootdir}/bin/emilio
+        cd ${rootdir}/src/emilio && ${REBAR} clean; cd ${rootdir}
+    fi
+}
 
 if [ -z "${REBAR}" ]; then
     install_local_rebar
     REBAR=${rootdir}/bin/rebar
 fi
+
+install_local_emilio
 
 # only update dependencies, when we are not in a release tarball
 if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then

@@ -21,7 +21,7 @@ defmodule PartitionSearchTest do
       }
     end
 
-    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs}, query: %{w: 3})
+    resp = Couch.post("/#{db_name}/_bulk_docs", headers: ["Content-Type": "application/json"], body: %{:docs => docs}, query: %{w: 3})
     assert resp.status_code in [201, 202]
   end
 
@@ -166,7 +166,7 @@ defmodule PartitionSearchTest do
     resp = Couch.get(url, query: %{q: "some:field"})
     assert resp.status_code == 200
     ids = get_ids(resp)
-    assert ids == ["bar:1", "bar:5", "bar:9", "foo:2", "bar:3", "foo:4", "foo:6", "bar:7", "foo:8", "foo:10"]
+    assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9", "foo:2", "bar:3", "foo:4", "foo:6", "bar:7", "foo:8", "foo:10"])
   end
 
   @tag :with_db
@@ -179,7 +179,7 @@ defmodule PartitionSearchTest do
     resp = Couch.get(url, query: %{q: "some:field"})
     assert resp.status_code == 200
     ids = get_ids(resp)
-    assert ids == ["bar:1", "bar:5", "bar:9", "foo:2", "bar:3", "foo:4", "foo:6", "bar:7", "foo:8", "foo:10"]
+    assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9", "foo:2", "bar:3", "foo:4", "foo:6", "bar:7", "foo:8", "foo:10"])
   end
 
   @tag :with_db
@@ -192,7 +192,7 @@ defmodule PartitionSearchTest do
     resp = Couch.get(url, query: %{q: "some:field", limit: 3})
     assert resp.status_code == 200
     ids = get_ids(resp)
-    assert ids == ["bar:1", "bar:5", "bar:9"]
+    assert Enum.sort(ids) == Enum.sort(["bar:1", "bar:5", "bar:9"])
   end
 
   @tag :with_db
@@ -215,5 +215,33 @@ defmodule PartitionSearchTest do
     url = "/#{db_name}/_partition/foo/_design/library/_search/books"
     resp = Couch.post(url, body: %{q: "some:field", partition: "bar"})
     assert resp.status_code == 400
+  end
+
+  @tag :with_partitioned_db
+  test "restricted parameters are not allowed in query or body", context do
+    db_name = context[:db_name]
+    create_search_docs(db_name)
+    create_ddoc(db_name)
+
+    body = %{q: "some:field", partition: "foo"}
+
+    Enum.each(
+      [
+        {:counts, "[\"type\"]"},
+        {:group_field, "some"},
+        {:ranges, :jiffy.encode(%{price: %{cheap: "[0 TO 100]"}})},
+        {:drilldown, "[\"key\",\"a\"]"},
+      ],
+      fn {key, value} ->
+        url = "/#{db_name}/_partition/foo/_design/library/_search/books"
+        bannedparam = Map.put(body, key, value)
+        get_resp = Couch.get(url, query: bannedparam)
+        %{:body => %{"reason" => get_reason}} = get_resp
+        assert Regex.match?(~r/are incompatible/, get_reason)
+        post_resp = Couch.post(url, body: bannedparam)
+        %{:body => %{"reason" => post_reason}} = post_resp
+        assert Regex.match?(~r/are incompatible/, post_reason)
+      end
+    )
   end
 end

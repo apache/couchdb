@@ -122,10 +122,9 @@ handle_info({'DOWN', Ref, _, Job, Reason}, State0) ->
     #state{active=Active0, starting=Starting0} = State,
     case lists:keytake(Job, 2, Active0) of
         {value, {Key, _Pid}, Active1} ->
-            couch_log:warning("exit for compaction of ~p: ~p", [
-                smoosh_utils:stringify(Key), Reason]),
-            {ok, _} = timer:apply_after(5000, smoosh_server, enqueue, [Key]),
-            {noreply, maybe_start_compaction(State#state{active=Active1})};
+            State1 = maybe_remonitor_cpid(State#state{active=Active1}, Key,
+                Reason),
+            {noreply, maybe_start_compaction(State1)};
         false ->
             case lists:keytake(Ref, 1, Starting0) of
                 {value, {_, Key}, Starting1} ->
@@ -281,8 +280,7 @@ start_compact(State, Db) ->
                 Ref = erlang:monitor(process, DbPid),
                 DbPid ! {'$gen_call', {self(), Ref}, start_compact},
                 State#state{starting=[{Ref, Key}|State#state.starting]};
-            % database is still compacting so we can just monitor the existing
-            % compaction pid
+            % Compaction is already running, so monitor existing compaction pid.
             CPid ->
                 couch_log:notice("Db ~s continuing compaction",
                     [smoosh_utils:stringify(Key)]),
@@ -292,6 +290,27 @@ start_compact(State, Db) ->
     _ ->
         false
     end.
+
+maybe_remonitor_cpid(State, DbName, Reason) when is_binary(DbName) ->
+    {ok, Db} = couch_db:open_int(DbName, []),
+    case couch_db:get_compactor_pid_sync(Db) of
+        nil ->
+            couch_log:warning("exit for compaction of ~p: ~p",
+                [smoosh_utils:stringify(DbName), Reason]),
+            {ok, _} = timer:apply_after(5000, smoosh_server, enqueue, [DbName]),
+            State;
+        CPid ->
+            couch_log:notice("~s compaction already running. Re-monitor Pid ~p",
+                [smoosh_utils:stringify(DbName), CPid]),
+            erlang:monitor(process, CPid),
+            State#state{active=[{DbName, CPid}|State#state.active]}
+    end;
+% not a database compaction, so ignore the pid check
+maybe_remonitor_cpid(State, Key, Reason) ->
+    couch_log:warning("exit for compaction of ~p: ~p",
+        [smoosh_utils:stringify(Key), Reason]),
+    {ok, _} = timer:apply_after(5000, smoosh_server, enqueue, [Key]),
+    State.
 
 schedule_unpause() ->
     WaitSecs = list_to_integer(config:get("smoosh", "wait_secs", "30")),

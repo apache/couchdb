@@ -9,7 +9,8 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-
+couchTests.elixir = true;
+ 
 function jsonp(obj) {
   T(jsonp_flag == 0);
   T(obj.results.length == 1 && obj.last_seq == 1, "jsonp");
@@ -17,6 +18,8 @@ function jsonp(obj) {
 }
 
 couchTests.changes = function(debug) {
+  return console.log('done in test/elixir/test/changes_test.exs and changes_async_test.exs');
+  
   var db;
   if (debug) debugger;
 
@@ -359,7 +362,7 @@ couchTests.changes = function(debug) {
   resp = JSON.parse(req.responseText);
   T(resp.results.length == 1, "changes_filter/dynamic&field=bop");
   T(resp.results[0].changes[0].rev == docres1.rev, "filtered/dynamic&field=bop rev");
- 
+
   // these will NEVER run as we're always in navigator == undefined
   if (!is_safari && xhr) { // full test requires parallel connections
     // filter with longpoll
@@ -708,7 +711,7 @@ couchTests.changes = function(debug) {
   db = new CouchDB(db_name, {"X-Couch-Full-Commit":"true"}, {"w": 3});
   T(db.createDb());
 
-  // create 4 documents... this assumes the update sequnce will start from 0 and then do sth in the cluster 
+  // create 4 documents... this assumes the update sequnce will start from 0 and then do sth in the cluster
   db.save({"bop" : "foom"});
   db.save({"bop" : "foom"});
   db.save({"bop" : "foom"});
@@ -717,7 +720,7 @@ couchTests.changes = function(debug) {
   req = CouchDB.request("GET", "/" + db_name + "/_changes");
 
   // simulate an EventSource request with a Last-Event-ID header
-  // increase timeout to 100 to have enough time 2 assemble (seems like too little timeouts kill  
+  // increase timeout to 100 to have enough time 2 assemble (seems like too little timeouts kill
   req = CouchDB.request("GET", "/" + db_name + "/_changes?feed=eventsource&timeout=100&since=0",
         {"headers": {"Accept": "text/event-stream", "Last-Event-ID": JSON.parse(req.responseText).results[1].seq}});
 

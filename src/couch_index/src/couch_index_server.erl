@@ -243,9 +243,15 @@ reset_indexes(DbName, Root) ->
     end, dict:new(), ets:lookup(?BY_DB, DbName)),
     Fun = fun({Sig, DDocIds}) ->
         [{_, Pid}] = ets:lookup(?BY_SIG, {DbName, Sig}),
-        MRef = erlang:monitor(process, Pid),
+        unlink(Pid),
         gen_server:cast(Pid, delete),
-        receive {'DOWN', MRef, _, _, _} -> ok end,
+        receive
+            {'EXIT', Pid, _} ->
+                ok
+        after
+            0 ->
+                ok
+        end,
         rem_from_ets(DbName, Sig, DDocIds, Pid)
     end,
     lists:foreach(Fun, dict:to_list(SigDDocIds)),
@@ -278,7 +284,11 @@ handle_db_event(<<"shards/", _/binary>> = DbName, {ddoc_updated,
     DDocResult = couch_util:with_db(DbName, fun(Db) ->
         couch_db:open_doc(Db, DDocId, [ejson_body, ?ADMIN_CTX])
     end),
-    DbShards = [mem3:name(Sh) || Sh <- mem3:local_shards(mem3:dbname(DbName))],
+    LocalShards = try mem3:local_shards(mem3:dbname(DbName))
+        catch error:database_does_not_exist ->
+            []
+    end,
+    DbShards = [mem3:name(Sh) || Sh <- LocalShards],
     lists:foreach(fun(DbShard) ->
         lists:foreach(fun({_DbShard, {_DDocId, Sig}}) ->
             % check if there are other ddocs with the same Sig for the same db

@@ -519,7 +519,7 @@ with_ddoc_proc(#doc{id=DDocId,revs={Start, [DiskRev|_]}}=DDoc, Fun) ->
 proc_prompt(Proc, Args) ->
      case proc_prompt_raw(Proc, Args) of
      {json, Json} ->
-         ?JSON_DECODE(Json);
+         raw_to_ejson({json, Json});
      EJson ->
          EJson
      end.
@@ -528,9 +528,75 @@ proc_prompt_raw(#proc{prompt_fun = {Mod, Func}} = Proc, Args) ->
     apply(Mod, Func, [Proc#proc.pid, Args]).
 
 raw_to_ejson({json, Json}) ->
-    ?JSON_DECODE(Json);
+    try
+        ?JSON_DECODE(Json)
+    catch throw:{invalid_json, {_, invalid_string}} ->
+        Forced = try
+            force_utf8(Json)
+        catch _:_ ->
+            Json
+        end,
+        ?JSON_DECODE(Forced)
+    end;
 raw_to_ejson(EJson) ->
     EJson.
+
+force_utf8(Bin) ->
+    case binary:match(Bin, <<"\\u">>) of
+        {Start, 2} ->
+            <<Prefix:Start/binary, Rest1/binary>> = Bin,
+            {Insert, Rest3} = case check_uescape(Rest1) of
+                {ok, Skip} ->
+                    <<Skipped:Skip/binary, Rest2/binary>> = Rest1,
+                    {Skipped, Rest2};
+                {error, Skip} ->
+                    <<_:Skip/binary, Rest2/binary>> = Rest1,
+                    {<<16#EF, 16#BF, 16#BD>>, Rest2}
+            end,
+            RestForced = force_utf8(Rest3),
+            <<Prefix/binary, Insert/binary, RestForced/binary>>;
+        nomatch ->
+            Bin
+    end.
+
+check_uescape(Data) ->
+    case extract_uescape(Data) of
+        {Hi, Rest} when Hi >= 16#D800, Hi < 16#DC00 ->
+            case extract_uescape(Rest) of
+                {Lo, _} when Lo >= 16#DC00, Lo =< 16#DFFF ->
+                    % A low surrogate pair
+                    UTF16 = <<
+                        Hi:16/big-unsigned-integer,
+                        Lo:16/big-unsigned-integer
+                    >>,
+                    try
+                        [_] = xmerl_ucs:from_utf16be(UTF16),
+                        {ok, 12}
+                    catch _:_ ->
+                        {error, 6}
+                    end;
+                {_, _} ->
+                    % Found a uescape that's not a low half
+                    {error, 6};
+                false ->
+                    % No hex escape found
+                    {error, 6}
+            end;
+        {Hi, _} when Hi >= 16#DC00, Hi =< 16#DFFF ->
+            % Found a low surrogate half without a high half
+            {error, 6};
+        {_, _} ->
+            % Found a uescape we don't care about
+            {ok, 6};
+        false ->
+            % Incomplete uescape which we don't care about
+            {ok, 2}
+    end.
+
+extract_uescape(<<"\\u", Code:4/binary, Rest/binary>>) ->
+    {binary_to_integer(Code, 16), Rest};
+extract_uescape(_) ->
+    false.
 
 proc_stop(Proc) ->
     {Mod, Func} = Proc#proc.stop_fun,
@@ -679,5 +745,42 @@ test_reduce(Reducer, KVs) ->
     {ok, Reduced} = reduce(<<"javascript">>, [Reducer], KVs),
     {ok, Finalized} = finalize(Reducer, Reduced),
     Finalized.
+
+force_utf8_test() ->
+    % "\uDCA5\uD83D"
+    Ok = [
+        <<"foo">>,
+        <<"\\u00A0">>,
+        <<"\\u0032">>,
+        <<"\\uD83D\\uDCA5">>,
+        <<"foo\\uD83D\\uDCA5bar">>,
+        % Truncated but we doesn't break replacements
+        <<"\\u0FA">>
+    ],
+    lists:foreach(fun(Case) ->
+        ?assertEqual(Case, force_utf8(Case))
+    end, Ok),
+
+    NotOk = [
+        <<"\\uDCA5">>,
+        <<"\\uD83D">>,
+        <<"fo\\uDCA5bar">>,
+        <<"foo\\uD83Dbar">>,
+        <<"\\uDCA5\\uD83D">>,
+        <<"\\uD83Df\\uDCA5">>,
+        <<"\\uDCA5\\u00A0">>,
+        <<"\\uD83D\\u00A0">>
+    ],
+    ToJSON = fun(Bin) -> <<34, Bin/binary, 34>> end,
+    lists:foreach(fun(Case) ->
+        try
+            ?assertNotEqual(Case, force_utf8(Case)),
+            ?assertThrow(_, ?JSON_DECODE(ToJSON(Case))),
+            ?assertMatch(<<_/binary>>, ?JSON_DECODE(ToJSON(force_utf8(Case))))
+        catch
+          T:R ->
+            io:format(standard_error, "~p~n~p~n", [T, R])
+        end
+    end, NotOk).
 
 -endif.

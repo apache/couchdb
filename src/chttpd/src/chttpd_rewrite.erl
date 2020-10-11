@@ -71,8 +71,9 @@ do_rewrite(#httpd{mochi_req=MochiReq}=Req, {Props}=Rewrite) when is_list(Props) 
                 undefined -> erlang:get(mochiweb_request_body);
                 B -> B
             end,
+            NewMochiReq:cleanup(),
             case Body of
-                undefined -> NewMochiReq:cleanup();
+                undefined -> [];
                 _ -> erlang:put(mochiweb_request_body, Body)
             end,
             couch_log:debug("rewrite to ~p", [Path]),

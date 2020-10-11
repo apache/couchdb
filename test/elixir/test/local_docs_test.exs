@@ -2,6 +2,7 @@ defmodule LocalDocsTest do
   use CouchTestCase
 
   @moduletag :local_docs
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB _local_docs

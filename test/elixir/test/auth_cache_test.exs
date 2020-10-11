@@ -2,6 +2,7 @@ defmodule AuthCacheTest do
   use CouchTestCase
 
   @moduletag :authentication
+  @moduletag kind: :single_node
 
   @tag :pending
   @tag :with_db
@@ -66,14 +67,6 @@ defmodule AuthCacheTest do
     sess
   end
 
-  defp wait_until_compact_complete(db_name) do
-    retry_until(
-      fn -> Map.get(info(db_name), "compact_running") == false end,
-      200,
-      10_000
-    )
-  end
-
   defp assert_cache(event, user, password, expect \\ :expect_login_success) do
     hits_before = hits()
     misses_before = misses()
@@ -110,12 +103,6 @@ defmodule AuthCacheTest do
       _ ->
         assert false
     end
-  end
-
-  defp compact(db_name) do
-    resp = Couch.post("/#{db_name}/_compact")
-    assert resp.status_code == 202
-    resp.body
   end
 
   def save_doc(db_name, body) do
@@ -206,7 +193,6 @@ defmodule AuthCacheTest do
     # there was a cache hit
     assert_cache(:expect_hit, "johndoe", "123456")
     compact(db_name)
-    wait_until_compact_complete(db_name)
     assert_cache(:expect_hit, "johndoe", "123456")
   end
 end

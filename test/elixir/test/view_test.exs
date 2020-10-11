@@ -2,6 +2,7 @@ defmodule ViewTest do
   use CouchTestCase
 
   @moduletag :view
+  @moduletag kind: :single_node
 
   @moduledoc """
   Test CouchDB /{db}/_design/{ddoc}/_view/{view}
@@ -139,5 +140,17 @@ defmodule ViewTest do
 
     assert resp.status_code == 200
     assert length(Map.get(resp, :body)["rows"]) == 1
+  end
+
+  test "POST with boolean parameter", context do
+    resp = Couch.post(
+      "/#{context[:db_name]}/_design/map/_view/some",
+      body: %{
+        :stable => true,
+        :update => true
+      }
+    )
+
+    assert resp.status_code == 200
   end
 end

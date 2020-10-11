@@ -146,19 +146,11 @@ fauxton: share/www
 
 .PHONY: check
 # target: check - Test everything
-check: all
-	# @$(MAKE) test-cluster-with-quorum
-	# @$(MAKE) test-cluster-without-quorum
-	@$(MAKE) python-black
+check: all python-black
+	@$(MAKE) emilio
 	@$(MAKE) eunit
-	@$(MAKE) javascript
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
-#	@$(MAKE) build-test
-
-
-.PHONY: eunit
-# target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 
 ifdef apps
 subdirs = $(apps)
@@ -166,6 +158,8 @@ else
 subdirs=$(shell ls src)
 endif
 
+.PHONY: eunit
+# target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
 eunit: export BUILDDIR = $(shell pwd)
 eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
@@ -204,6 +198,9 @@ soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
 
+emilio:
+	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3
+
 .venv/bin/black:
 	@python3 -m venv .venv
 	@.venv/bin/pip3 install black || touch .venv/bin/black
@@ -215,7 +212,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run src/mango src/docs
+		build-aux/*.py dev/run test/javascript/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -223,13 +220,16 @@ python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run src/mango src/docs
+		build-aux/*.py dev/run test/javascript/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
 elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 --enable-erlang-views --no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
+	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 \
+		--enable-erlang-views \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--no-eval 'mix test --trace --exclude without_quorum_test --exclude with_quorum_test $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
@@ -263,7 +263,9 @@ elixir-credo: elixir-init
 .PHONY: javascript
 # target: javascript - Run JavaScript test suites or specific ones defined by suites option
 javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-javascript: devclean
+javascript:
+
+	@$(MAKE) devclean
 	@mkdir -p share/www/script/test
 ifeq ($(IN_RELEASE), true)
 	@cp test/javascript/tests/lorem*.txt share/www/script/test/
@@ -432,9 +434,9 @@ endif
 
 .PHONY: install
 # target: install- install CouchDB :)
-install:
+install: release
 	@echo
-	@echo "Notice: There is no 'make install' command for CouchDB 2.x."
+	@echo "Notice: There is no 'make install' command for CouchDB 2.x+."
 	@echo
 	@echo "    To install CouchDB into your system, copy the rel/couchdb"
 	@echo "    to your desired installation location. For example:"
@@ -483,20 +485,7 @@ endif
 # target: devclean - Remove dev cluster artifacts
 devclean:
 	@rm -rf dev/lib/*/data
-
-
-.PHONY: uninstall
-# target: uninstall - Uninstall CouchDB :-(
-uninstall:
-	@rm -rf $(DESTDIR)/$(install_dir)
-	@rm -f $(DESTDIR)/$(bin_dir)/couchdb
-	@rm -f $(DESTDIR)/$(libexec_dir)
-	@rm -rf $(DESTDIR)/$(sysconf_dir)
-	@rm -rf $(DESTDIR)/$(data_dir)
-	@rm -rf $(DESTDIR)/$(doc_dir)
-	@rm -rf $(DESTDIR)/$(html_dir)
-	@rm -rf $(DESTDIR)/$(man_dir)
-
+	@rm -rf dev/lib/*/etc
 
 ################################################################################
 # Misc
