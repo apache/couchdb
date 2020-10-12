@@ -507,7 +507,6 @@ merge_headers(Headers1, Headers2) when is_list(Headers1), is_list(Headers2) ->
 
 
 merge_headers_test() ->
-    Headers1 = [{"a", "x"}, {"a", "y"}, {"A", "z"}],
     ?assertEqual([], merge_headers([], [])),
     ?assertEqual([{"a", "x"}], merge_headers([], [{"a", "x"}])),
     ?assertEqual([{"a", "x"}], merge_headers([{"a", "x"}], [])),
