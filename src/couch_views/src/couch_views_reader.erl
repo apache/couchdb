@@ -245,10 +245,18 @@ get_map_view(Lang, Args, ViewName, Views) ->
 
 get_red_view(Lang, Args, ViewName, Views) ->
     case couch_mrview_util:extract_view(Lang, Args, ViewName, Views) of
-        {red, {Idx, Lang, View}, _} -> {Idx, Lang, View};
+        {red, {Idx, Lang, View}, _} -> check_red_enabled({Idx, Lang, View});
         _ -> throw({not_found, missing_named_view})
     end.
 
+
+check_red_enabled({Idx, _Lang, View} = Resp) ->
+    case lists:nth(Idx, View#mrview.reduce_funs) of
+        {_, disabled} ->
+            throw({disabled, <<"Custom reduce functions are disabled.">>});
+        _ ->
+            Resp
+    end.
 
 expand_keys_args(#mrargs{keys = undefined} = Args) ->
     [Args];
