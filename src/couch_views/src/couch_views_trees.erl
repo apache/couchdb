@@ -323,7 +323,7 @@ make_read_only_reduce_fun(Lang, View, NthRed) ->
 
 
 make_reduce_fun(Lang, #mrview{} = View) ->
-    RedFuns = [Src || {_, Src} <- View#mrview.reduce_funs],
+    RedFuns = [Src || {_, Src} <- View#mrview.reduce_funs, Src /= disabled],
     fun
         (KVs0, _ReReduce = false) ->
             KVs1 = expand_dupes(KVs0),

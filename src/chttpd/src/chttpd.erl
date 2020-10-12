@@ -1017,6 +1017,8 @@ error_info(all_workers_died) ->
         "request due to overloading or maintenance mode.">>};
 error_info(not_implemented) ->
     {501, <<"not_implemented">>, <<"this feature is not yet implemented">>};
+error_info({disabled, Reason}) ->
+    {501, <<"disabled">>, Reason};
 error_info(timeout) ->
     {500, <<"timeout">>, <<"The request could not be processed in a reasonable"
         " amount of time.">>};

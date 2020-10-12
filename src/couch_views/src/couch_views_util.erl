@@ -65,7 +65,8 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
     NumViews = fun({_, View}, N) ->
             {View#mrview{id_num = N}, N+1}
     end,
-    {Views, _} = lists:mapfoldl(NumViews, 0, lists:sort(dict:to_list(BySrc))),
+    {Views0, _} = lists:mapfoldl(NumViews, 0, lists:sort(dict:to_list(BySrc))),
+    Views1 = maybe_disable_custom_reduce_funs(Views0),
 
     Language = couch_util:get_value(<<"language">>, Fields, <<"javascript">>),
     Lib = couch_util:get_value(<<"lib">>, RawViews, {[]}),
@@ -74,12 +75,12 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
         db_name=DbName,
         idx_name=Id,
         lib=Lib,
-        views=Views,
+        views=Views1,
         language=Language,
         design_opts=DesignOpts,
         partitioned=Partitioned
     },
-    SigInfo = {Views, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
+    SigInfo = {Views1, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
     {ok, IdxState#mrst{sig=couch_hash:md5_hash(term_to_binary(SigInfo))}}.
 
 
@@ -325,6 +326,33 @@ active_tasks_info(ChangesDone, DbName, DDocId, LastSeq, DBSeq) ->
         <<"node">> => erlang:atom_to_binary(node(), utf8),
         <<"pid">> => list_to_binary(pid_to_list(self()))
     }.
+
+
+maybe_disable_custom_reduce_funs(Views) ->
+    case config:get_boolean("couch_views", "custom_reduce_enabled", true) of
+        true ->
+            Views;
+        false ->
+            disable_custom_reduce_funs(Views)
+    end.
+
+
+disable_custom_reduce_funs(Views) ->
+    lists:map(fun(View) ->
+        #mrview{
+            reduce_funs = ReduceFuns
+        } = View,
+        {Builtin, Custom} = lists:partition(fun({_Name, RedSrc}) ->
+            case RedSrc of
+                <<"_", _/binary>> -> true;
+                <<_/binary>> -> false
+            end
+        end, ReduceFuns),
+        DisabledCustom = [{Name, disabled} || {Name, _Src} <- Custom],
+        View#mrview{
+            reduce_funs = Builtin ++ DisabledCustom
+        }
+    end, Views).
 
 
 convert_seq_to_stamp(<<"0">>) ->
