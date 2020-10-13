@@ -362,6 +362,8 @@ catch_error(HttpReq, error, decryption_failed) ->
     send_error(HttpReq, decryption_failed);
 catch_error(HttpReq, error, not_ciphertext) ->
     send_error(HttpReq, not_ciphertext);
+catch_error(HttpReq, error, {erlfdb_error, 2101}) ->
+    send_error(HttpReq, transaction_too_large);
 catch_error(HttpReq, Tag, Error) ->
     Stack = erlang:get_stacktrace(),
     % TODO improve logging and metrics collection for client disconnects
@@ -1009,6 +1011,9 @@ error_info({request_entity_too_large, {bulk_get, Max}}) when is_integer(Max) ->
     {413, <<"max_bulk_get_count_exceeded">>, integer_to_binary(Max)};
 error_info({request_entity_too_large, DocID}) ->
     {413, <<"document_too_large">>, DocID};
+error_info(transaction_too_large) ->
+    {413, <<"transaction_too_large">>,
+        <<"The request transaction is larger than 10MB" >>};
 error_info({error, security_migration_updates_disabled}) ->
     {503, <<"security_migration">>, <<"Updates to security docs are disabled during "
         "security migration.">>};
