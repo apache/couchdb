@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+    - name: File a Fauxton bug
+      url: https://github.com/apache/couchdb-fauxton/issues/new
+      about: Any web UI bugs should be filed in the Fauxton repo.
+    - name: File a documentation bug
+      url: https://github.com/apache/couchdb-documentation/issues/new
+      about: Any documentation bugs should be filed in our docs repo.
+    - name: Ask a Question
+      url: https://github.com/apache/couchdb/discussions/category_choices
+      about: If you're not specifically reporting a bug, please ask your question here.
+    - name: Read the Documentation
+      url: https://docs.couchdb.org/
+      about: You can also check out our excellent documentation here.
