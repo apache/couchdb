@@ -279,9 +279,6 @@ min_order(V) ->
 
 make_read_only_reduce_fun(Lang, View, NthRed) ->
     RedFuns = [Src || {_, Src} <- View#mrview.reduce_funs],
-    if RedFuns /= [] -> ok; true ->
-        io:format(standard_error, "~p~n", [process_info(self(), current_stacktrace)])
-    end,
     LPad = lists:duplicate(NthRed - 1, []),
     RPad = lists:duplicate(length(RedFuns) - NthRed, []),
     FunSrc = lists:nth(NthRed, RedFuns),
