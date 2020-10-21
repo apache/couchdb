@@ -213,7 +213,7 @@ should_reduce_empty_range({Db, _}) ->
         end_key => 100001
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [row(null, 0)]},
+    Expect = {ok, []},
     ?assertEqual(Expect, Result).
 
 
@@ -224,7 +224,7 @@ should_reduce_empty_range_rev({Db, _}) ->
         end_key => 100000
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [row(null, 0)]},
+    Expect = {ok, []},
     ?assertEqual(Expect, Result).
 
 

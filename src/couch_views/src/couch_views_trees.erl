@@ -144,15 +144,8 @@ fold_red_idx(TxDb, View, Idx, Options, Callback, Acc0) ->
         Callback(GroupKey, RedValue, WAcc)
     end,
 
-    case {GroupKeyFun, Dir} of
-        {group_all, fwd} ->
-            EBtreeOpts = [
-                {dir, fwd},
-                {inclusive_end, InclusiveEnd}
-            ],
-            Reduction = ebtree:reduce(Tx, Btree, StartKey, EndKey, EBtreeOpts),
-            Wrapper({null, Reduction}, Acc0);
-        {F, fwd} when is_function(F) ->
+    case Dir of
+        fwd ->
             EBtreeOpts = [
                 {dir, fwd},
                 {inclusive_end, InclusiveEnd}
@@ -167,16 +160,7 @@ fold_red_idx(TxDb, View, Idx, Options, Callback, Acc0) ->
                     Acc0,
                     EBtreeOpts
                 );
-        {group_all, rev} ->
-            % Start/End keys swapped on purpose because ebtree. Also
-            % inclusive_start for same reason.
-            EBtreeOpts = [
-                {dir, rev},
-                {inclusive_start, InclusiveEnd}
-            ],
-            Reduction = ebtree:reduce(Tx, Btree, EndKey, StartKey, EBtreeOpts),
-            Wrapper({null, Reduction}, Acc0);
-        {F, rev} when is_function(F) ->
+        rev ->
             % Start/End keys swapped on purpose because ebtree. Also
             % inclusive_start for same reason.
             EBtreeOpts = [
@@ -404,8 +388,9 @@ to_red_opts(Options) ->
     {Dir, StartKey, EndKey, InclusiveEnd} = to_map_opts(Options),
 
     GroupKeyFun = case lists:keyfind(group_key_fun, 1, Options) of
+        {group_key_fun, group_all} -> fun({_Key, _DocId}) -> null end;
         {group_key_fun, GKF} -> GKF;
-        false -> fun({_Key, _DocId}) -> global_group end
+        false -> fun({_Key, _DocId}) -> null end
     end,
 
     {Dir, StartKey, EndKey, InclusiveEnd, GroupKeyFun}.
