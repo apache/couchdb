@@ -45,11 +45,12 @@ defmodule UUIDsTest do
   end
 
   @tag config: [
-    {"uuids", "algorithm", "sequential"}
-  ]
+         {"uuids", "algorithm", "sequential"}
+       ]
   test "sequential uuids are sequential" do
     resp = Couch.get("/_uuids", query: %{:count => 1000})
     assert resp.status_code == 200
+
     Enum.reduce(resp.body["uuids"], fn curr, acc ->
       assert String.length(curr) == 32
       assert acc < curr
@@ -58,8 +59,8 @@ defmodule UUIDsTest do
   end
 
   @tag config: [
-    {"uuids", "algorithm", "utc_random"}
-  ]
+         {"uuids", "algorithm", "utc_random"}
+       ]
   test "utc_random uuids are roughly random" do
     resp = Couch.get("/_uuids", query: %{:count => 1000})
     assert resp.status_code == 200
@@ -78,12 +79,13 @@ defmodule UUIDsTest do
 
   @utc_id_suffix "frog"
   @tag config: [
-    {"uuids", "algorithm", "utc_id"},
-    {"uuids", "utc_id_suffix", @utc_id_suffix}
-  ]
+         {"uuids", "algorithm", "utc_id"},
+         {"uuids", "utc_id_suffix", @utc_id_suffix}
+       ]
   test "utc_id uuids are correct" do
     resp = Couch.get("/_uuids", query: %{:count => 10})
     assert resp.status_code == 200
+
     Enum.reduce(resp.body["uuids"], fn curr, acc ->
       assert String.length(curr) == 14 + String.length(@utc_id_suffix)
       assert String.slice(curr, 14..-1) == @utc_id_suffix

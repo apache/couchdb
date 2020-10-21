@@ -191,7 +191,7 @@ format_resps(UUIDs, #acc{} = Acc) ->
                 [{UUID, {Health, AllRevs}} | ReplyAcc]
         end
     end,
-    FinalReplies = dict:fold(FoldFun, {ok, []}, Resps),
+    FinalReplies = dict:fold(FoldFun, [], Resps),
     couch_util:reorder_results(UUIDs, FinalReplies);
 
 format_resps(_UUIDs, Else) ->
@@ -225,12 +225,11 @@ has_quorum(Resps, Count, W) ->
 
 
 -ifdef(TEST).
-
 -include_lib("eunit/include/eunit.hrl").
 
 purge_test_() ->
     {
-        foreach,
+        setup,
         fun setup/0,
         fun teardown/1,
         [

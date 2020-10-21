@@ -35,14 +35,15 @@ providers() ->
 
 services() ->
     [
-        {couch_db, couch_db_plugin}
+        {couch_db, couch_db_plugin},
+        {feature_flags, couch_flags}
     ].
 
 data_subscriptions() ->
     [].
 
 data_providers() ->
-    [].
+    [couch_flags_config:data_provider()].
 
 processes() ->
     [].

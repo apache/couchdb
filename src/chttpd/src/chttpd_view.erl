@@ -24,7 +24,7 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
         QueryArg = couch_mrview_http:parse_params(Query, undefined,
             Args1, [decoded]),
         QueryArg1 = couch_mrview_util:set_view_type(QueryArg, ViewName, Views),
-        couch_mrview_util:validate_args(QueryArg1)
+        fabric_util:validate_args(Db, DDoc, QueryArg1)
     end, Queries),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
@@ -33,21 +33,40 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     VAcc1 = VAcc0#vacc{resp=Resp0},
     VAcc2 = lists:foldl(fun(Args, Acc0) ->
         {ok, Acc1} = fabric:query_view(Db, Options, DDoc, ViewName,
-            fun couch_mrview_http:view_cb/2, Acc0, Args),
+            fun view_cb/2, Acc0, Args),
         Acc1
     end, VAcc1, ArgQueries),
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
     chttpd:end_delayed_json_response(Resp1).
 
+design_doc_post_view(Req, Props, Db, DDoc, ViewName, Keys) ->
+    Args = couch_mrview_http:parse_body_and_query(Req, Props, Keys),
+    fabric_query_view(Db, Req, DDoc, ViewName, Args).
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Args = couch_mrview_http:parse_params(Req, Keys),
+    fabric_query_view(Db, Req, DDoc, ViewName, Args).
+
+fabric_query_view(Db, Req, DDoc, ViewName, Args) ->
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db=Db, req=Req, threshold=Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
     {ok, Resp} = fabric:query_view(Db, Options, DDoc, ViewName,
-        fun couch_mrview_http:view_cb/2, VAcc, Args),
+            fun view_cb/2, VAcc, Args),
     {ok, Resp#vacc.resp}.
+
+
+view_cb({row, Row} = Msg, Acc) ->
+    case lists:keymember(doc, 1, Row) of
+        true -> chttpd_stats:incr_reads();
+        false -> ok
+    end,
+    chttpd_stats:incr_rows(),
+    couch_mrview_http:view_cb(Msg, Acc);
+
+view_cb(Msg, Acc) ->
+    couch_mrview_http:view_cb(Msg, Acc).
+
 
 handle_view_req(#httpd{method='POST',
     path_parts=[_, _, _, _, ViewName, <<"queries">>]}=Req, Db, DDoc) ->
@@ -75,23 +94,10 @@ handle_view_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
+    assert_no_queries_param(couch_mrview_util:get_view_queries(Props)),
     Keys = couch_mrview_util:get_view_keys(Props),
-    Queries = couch_mrview_util:get_view_queries(Props),
-    case {Queries, Keys} of
-        {Queries, undefined} when is_list(Queries) ->
-            [couch_stats:increment_counter([couchdb, httpd, view_reads]) || _I <- Queries],
-            multi_query_view(Req, Db, DDoc, ViewName, Queries);
-        {undefined, Keys} when is_list(Keys) ->
-            couch_stats:increment_counter([couchdb, httpd, view_reads]),
-            design_doc_view(Req, Db, DDoc, ViewName, Keys);
-        {undefined, undefined} ->
-            throw({
-                bad_request,
-                "POST body must contain `keys` or `queries` field"
-            });
-        {_, _} ->
-            throw({bad_request, "`keys` and `queries` are mutually exclusive"})
-    end;
+    couch_stats:increment_counter([couchdb, httpd, view_reads]),
+    design_doc_post_view(Req, Props, Db, DDoc, ViewName, Keys);
 
 handle_view_req(Req, _Db, _DDoc) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
@@ -100,6 +106,14 @@ handle_temp_view_req(Req, _Db) ->
     Msg = <<"Temporary views are not supported in CouchDB">>,
     chttpd:send_error(Req, 410, gone, Msg).
 
+% See https://github.com/apache/couchdb/issues/2168
+assert_no_queries_param(undefined) ->
+    ok;
+assert_no_queries_param(_) ->
+    throw({
+        bad_request,
+        "The `queries` parameter is no longer supported at this endpoint"
+    }).
 
 
 -ifdef(TEST).
@@ -109,35 +123,42 @@ handle_temp_view_req(Req, _Db) ->
 
 check_multi_query_reduce_view_overrides_test_() ->
     {
-        foreach,
-        fun setup/0,
-        fun teardown/1,
-        [
-            t_check_include_docs_throw_validation_error(),
-            t_check_user_can_override_individual_query_type()
-        ]
+        setup,
+        fun setup_all/0,
+        fun teardown_all/1,
+        {
+            foreach,
+            fun setup/0,
+            fun teardown/1,
+            [
+                t_check_include_docs_throw_validation_error(),
+                t_check_user_can_override_individual_query_type()
+            ]
+        }
     }.
 
 
 t_check_include_docs_throw_validation_error() ->
     ?_test(begin
         Req = #httpd{qs = []},
+        Db = test_util:fake_db([{name, <<"foo">>}]),
         Query = {[{<<"include_docs">>, true}]},
         Throw = {query_parse_error, <<"`include_docs` is invalid for reduce">>},
-        ?assertThrow(Throw, multi_query_view(Req, db, ddoc, <<"v">>, [Query]))
+        ?assertThrow(Throw, multi_query_view(Req, Db, ddoc, <<"v">>, [Query]))
     end).
 
 
 t_check_user_can_override_individual_query_type() ->
     ?_test(begin
         Req = #httpd{qs = []},
+        Db = test_util:fake_db([{name, <<"foo">>}]),
         Query = {[{<<"include_docs">>, true}, {<<"reduce">>, false}]},
-        multi_query_view(Req, db, ddoc, <<"v">>, [Query]),
+        multi_query_view(Req, Db, ddoc, <<"v">>, [Query]),
         ?assertEqual(1, meck:num_calls(chttpd, start_delayed_json_response, '_'))
     end).
 
 
-setup() ->
+setup_all() ->
     Views = [#mrview{reduce_funs = [{<<"v">>, <<"_count">>}]}],
     meck:expect(couch_mrview_util, ddoc_to_mrst, 2, {ok, #mrst{views = Views}}),
     meck:expect(chttpd, start_delayed_json_response, 4, {ok, resp}),
@@ -146,8 +167,20 @@ setup() ->
     meck:expect(chttpd, end_delayed_json_response, 1, ok).
 
 
-teardown(_) ->
+teardown_all(_) ->
     meck:unload().
+
+
+setup() ->
+    meck:reset([
+        chttpd,
+        couch_mrview_util,
+        fabric
+    ]).
+
+
+teardown(_) ->
+    ok.
 
 
 -endif.

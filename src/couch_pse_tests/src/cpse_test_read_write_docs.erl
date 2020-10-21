@@ -12,6 +12,7 @@
 
 -module(cpse_test_read_write_docs).
 -compile(export_all).
+-compile(nowarn_export_all).
 
 
 -include_lib("eunit/include/eunit.hrl").
@@ -55,7 +56,6 @@ cpse_write_one_doc(Db1) ->
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
     ?assertEqual(1, couch_db_engine:get_doc_count(Db2)),
 
-    {ok, _} = couch_db:ensure_full_commit(Db2),
     cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
@@ -95,7 +95,6 @@ cpse_write_two_docs(Db1) ->
         {create, {<<"bar">>, {[{<<"stuff">>, true}]}}}
     ],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
-    {ok, _} = couch_db:ensure_full_commit(Db2),
     cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
@@ -121,7 +120,6 @@ cpse_write_three_doc_batch(Db1) ->
         ]}
     ],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
-    {ok, _} = couch_db:ensure_full_commit(Db2),
     cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
@@ -144,7 +142,7 @@ cpse_update_doc(Db1) ->
         {update, {<<"foo">>, {[{<<"vsn">>, 2}]}}}
     ],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
-    {ok, _} = couch_db:ensure_full_commit(Db2),
+
     cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
@@ -186,7 +184,6 @@ cpse_delete_doc(Db1) ->
         {delete, {<<"foo">>, {[]}}}
     ],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
-    {ok, _} = couch_db:ensure_full_commit(Db2),
     cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
@@ -226,7 +223,6 @@ cpse_write_local_doc(Db1) ->
         {create, {<<"_local/foo">>, {[{<<"yay">>, false}]}}}
     ],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
-    {ok, _} = couch_db:ensure_full_commit(Db2),
     cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
@@ -252,7 +248,6 @@ cpse_write_mixed_batch(Db1) ->
         ]}
     ],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
-    {ok, _} = couch_db:ensure_full_commit(Db2),
     cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
@@ -278,7 +273,6 @@ cpse_update_local_doc(Db1) ->
         {update, {<<"_local/foo">>, {[{<<"stuff">>, null}]}}}
     ],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
-    {ok, _} = couch_db:ensure_full_commit(Db1),
     cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),
@@ -302,7 +296,6 @@ cpse_delete_local_doc(Db1) ->
         {delete, {<<"_local/foo">>, []}}
     ],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
-    {ok, _} = couch_db:ensure_full_commit(Db2),
     cpse_util:shutdown_db(Db2),
 
     {ok, Db3} = couch_db:reopen(Db2),

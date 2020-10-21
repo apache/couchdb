@@ -25,6 +25,7 @@
 maybe_open_doc(Db, DocId, Options) ->
     case fabric:open_doc(Db, DocId, Options) of
     {ok, Doc} ->
+        chttpd_stats:incr_reads(),
         Doc;
     {not_found, _} ->
         nil
@@ -132,9 +133,10 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
             _ ->
                 Options = [{user_ctx, Req#httpd.user_ctx}, {w, W}]
             end,
-            NewDoc = couch_doc:from_json_obj_validate({NewJsonDoc}),
+            NewDoc = couch_db:doc_from_json_obj_validate(Db, {NewJsonDoc}),
             couch_doc:validate_docid(NewDoc#doc.id),
             {UpdateResult, NewRev} = fabric:update_doc(Db, NewDoc, Options),
+            chttpd_stats:incr_writes(),
             NewRevStr = couch_doc:rev_to_str(NewRev),
             case {UpdateResult, NewRev} of
             {ok, _} ->
@@ -201,8 +203,8 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
     couch_util:get_nested_json_value(DDoc#doc.body, [<<"lists">>, LName]),
     DbName = couch_db:name(Db),
     {ok, VDoc} = ddoc_cache:open(DbName, <<"_design/", ViewDesignName/binary>>),
-    CB = fun couch_mrview_show:list_cb/2,
-    QueryArgs = couch_mrview_http:parse_params(Req, Keys),
+    CB = fun list_cb/2,
+    QueryArgs = couch_mrview_http:parse_body_and_query(Req, Keys),
     Options = [{user_ctx, Req#httpd.user_ctx}],
     couch_query_servers:with_ddoc_proc(DDoc, fun(QServer) ->
         Acc = #lacc{
@@ -219,6 +221,19 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
                     CB, Acc, QueryArgs)
         end
     end).
+
+
+list_cb({row, Row} = Msg, Acc) ->
+    case lists:keymember(doc, 1, Row) of
+        true -> chttpd_stats:incr_reads();
+        false -> ok
+    end,
+    chttpd_stats:incr_rows(),
+    couch_mrview_show:list_cb(Msg, Acc);
+
+list_cb(Msg, Acc) ->
+    couch_mrview_show:list_cb(Msg, Acc).
+
 
 % Maybe this is in the proplists API
 % todo move to couch_util

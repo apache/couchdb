@@ -49,6 +49,7 @@
 
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.
+-type update_type() :: replicated_changes | interactive_edit.
 
 -record(rev_info, {
     rev,
@@ -203,6 +204,14 @@
     atts = []
 }).
 
+-record (fabric_changes_acc, {
+    db,
+    seq,
+    args,
+    options,
+    pending,
+    epochs
+}).
 
 -type doc() :: #doc{}.
 -type ddoc() :: #doc{}.

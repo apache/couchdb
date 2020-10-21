@@ -36,8 +36,10 @@
 
 -record(stream_acc, {
     workers,
+    ready,
     start_fun,
-    replacements
+    replacements,
+    ring_opts
 }).
 
 -record(view_row, {key, id, value, doc, worker}).

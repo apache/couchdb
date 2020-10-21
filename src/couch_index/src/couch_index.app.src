@@ -13,10 +13,6 @@
 {application, couch_index, [
     {description, "CouchDB Secondary Index Manager"},
     {vsn, git},
-    {modules, [
-        couch_index,
-        couch_index_server
-    ]},
     {registered, [couch_index_server]},
     {applications, [kernel, stdlib, couch_epi]},
     {mod, {couch_index_app, []}}

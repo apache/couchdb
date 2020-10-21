@@ -10,6 +10,7 @@ priv/*.lib
 priv/*.dll
 priv/*.exe
 vc120.pdb
+compile_commands.json
 
 test/engines/coverage/
 test/engines/data/

@@ -128,6 +128,8 @@ code_change(_OldVsn, State, _Extra) ->
 
 update(Idx, Mod, IdxState) ->
     DbName = Mod:get(db_name, IdxState),
+    IndexName = Mod:get(idx_name, IdxState),
+    erlang:put(io_priority, {view_update, DbName, IndexName}),
     CurrSeq = Mod:get(update_seq, IdxState),
     UpdateOpts = Mod:get(update_options, IdxState),
     CommittedOnly = lists:member(committed_only, UpdateOpts),

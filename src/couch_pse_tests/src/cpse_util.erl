@@ -12,6 +12,7 @@
 
 -module(cpse_util).
 -compile(export_all).
+-compile(nowarn_export_all).
 
 
 -include_lib("eunit/include/eunit.hrl").
@@ -26,11 +27,13 @@
     cpse_test_fold_docs,
     cpse_test_fold_changes,
     cpse_test_fold_purge_infos,
+    cpse_test_copy_purge_infos,
     cpse_test_purge_docs,
     cpse_test_purge_replication,
     cpse_test_purge_bad_checkpoints,
     cpse_test_compaction,
-    cpse_test_ref_counting
+    cpse_test_ref_counting,
+    cpse_test_purge_seqs
 ]).
 
 
@@ -368,11 +371,11 @@ gen_write(Db, {Action, {DocId, Body, Atts}}) ->
 
 
 gen_rev(A, DocId, {Pos, Rev}, Body, Atts) when A == update; A == delete ->
-    NewRev = crypto:hash(md5, term_to_binary({DocId, Rev, Body, Atts})),
+    NewRev = couch_hash:md5_hash(term_to_binary({DocId, Rev, Body, Atts})),
     {Pos + 1, [NewRev, Rev]};
 gen_rev(conflict, DocId, _, Body, Atts) ->
     UUID = couch_uuids:random(),
-    NewRev = crypto:hash(md5, term_to_binary({DocId, UUID, Body, Atts})),
+    NewRev = couch_hash:md5_hash(term_to_binary({DocId, UUID, Body, Atts})),
     {1, [NewRev]}.
 
 

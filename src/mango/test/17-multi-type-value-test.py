@@ -15,36 +15,15 @@ import mango
 import unittest
 
 DOCS = [
-    {
-        "_id": "1",
-        "name": "Jimi",
-        "age": 10
-    },
-    {
-        "_id": "2",
-        "name": {"forename":"Eddie"},
-        "age": 20
-    },
-    {
-        "_id": "3",
-        "name": None,
-        "age": 30
-    },
-    {
-        "_id": "4",
-        "name": 1,
-        "age": 40
-    },
-    {
-        "_id": "5",
-        "forename": "Sam",
-        "age": 50
-    }
+    {"_id": "1", "name": "Jimi", "age": 10},
+    {"_id": "2", "name": {"forename": "Eddie"}, "age": 20},
+    {"_id": "3", "name": None, "age": 30},
+    {"_id": "4", "name": 1, "age": 40},
+    {"_id": "5", "forename": "Sam", "age": 50},
 ]
 
 
 class MultiValueFieldTests:
-
     def test_can_query_with_name(self):
         docs = self.db.find({"name": {"$exists": True}})
         self.assertEqual(len(docs), 4)
@@ -71,13 +50,13 @@ class MultiValueFieldTests:
             self.assertIn("name", d)
 
 
-
 class MultiValueFieldJSONTests(mango.DbPerClass, MultiValueFieldTests):
     def setUp(self):
         self.db.recreate()
         self.db.save_docs(copy.deepcopy(DOCS))
         self.db.create_index(["name"])
         self.db.create_index(["age", "name"])
+
 
 # @unittest.skipUnless(mango.has_text_service(), "requires text service")
 # class MultiValueFieldTextTests(MultiValueFieldDocsNoIndexes, OperatorTests):

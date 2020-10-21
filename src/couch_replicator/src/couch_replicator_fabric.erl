@@ -27,12 +27,12 @@ docs(DbName, Options, QueryArgs, Callback, Acc) ->
            Shards, couch_replicator_fabric_rpc, docs, [Options, QueryArgs]),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_util:stream_start(Workers0, #shard.ref) of
+        case fabric_streams:start(Workers0, #shard.ref) of
             {ok, Workers} ->
                 try
                     docs_int(DbName, Workers, QueryArgs, Callback, Acc)
                 after
-                    fabric_util:cleanup(Workers)
+                    fabric_streams:cleanup(Workers)
                 end;
             {timeout, NewState} ->
                 DefunctWorkers = fabric_util:remove_done_workers(

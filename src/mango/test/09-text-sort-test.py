@@ -13,9 +13,9 @@
 import mango
 import unittest
 
+
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class SortTests(mango.UserDocsTextTests):
-
     def test_number_sort(self):
         q = {"age": {"$gt": 0}}
         docs = self.db.find(q, sort=["age:number"])
@@ -58,25 +58,29 @@ class SortTests(mango.UserDocsTextTests):
         q = {"name": {"$exists": True}}
         docs = self.db.find(q, sort=["name.last:string", "age:number"])
         self.assertEqual(len(docs), 15)
-        self.assertEqual(docs[0]["name"], {"last":"Ewing","first":"Shelly"})
+        self.assertEqual(docs[0]["name"], {"last": "Ewing", "first": "Shelly"})
         self.assertEqual(docs[1]["age"], 22)
 
     def test_guess_type_sort(self):
-        q = {"$or": [{"age":{"$gt": 0}}, {"email": {"$gt": None}}]}
+        q = {"$or": [{"age": {"$gt": 0}}, {"email": {"$gt": None}}]}
         docs = self.db.find(q, sort=["age"])
         self.assertEqual(len(docs), 15)
         self.assertEqual(docs[0]["age"], 22)
 
     def test_guess_dup_type_sort(self):
-        q = {"$and": [{"age":{"$gt": 0}}, {"email": {"$gt": None}},
-            {"age":{"$lte": 100}}]}
+        q = {
+            "$and": [
+                {"age": {"$gt": 0}},
+                {"email": {"$gt": None}},
+                {"age": {"$lte": 100}},
+            ]
+        }
         docs = self.db.find(q, sort=["age"])
         self.assertEqual(len(docs), 15)
         self.assertEqual(docs[0]["age"], 22)
 
     def test_ambiguous_type_sort(self):
-        q = {"$or": [{"age":{"$gt": 0}}, {"email": {"$gt": None}},
-            {"age": "34"}]}
+        q = {"$or": [{"age": {"$gt": 0}}, {"email": {"$gt": None}}, {"age": "34"}]}
         try:
             self.db.find(q, sort=["age"])
         except Exception as e:
@@ -85,17 +89,27 @@ class SortTests(mango.UserDocsTextTests):
             raise AssertionError("Should have thrown error for sort")
 
     def test_guess_multi_sort(self):
-        q = {"$or": [{"age":{"$gt": 0}}, {"email": {"$gt": None}},
-            {"name.last": "Harvey"}]}
+        q = {
+            "$or": [
+                {"age": {"$gt": 0}},
+                {"email": {"$gt": None}},
+                {"name.last": "Harvey"},
+            ]
+        }
         docs = self.db.find(q, sort=["name.last", "age"])
         self.assertEqual(len(docs), 15)
-        self.assertEqual(docs[0]["name"], {"last":"Ewing","first":"Shelly"})
+        self.assertEqual(docs[0]["name"], {"last": "Ewing", "first": "Shelly"})
         self.assertEqual(docs[1]["age"], 22)
 
     def test_guess_mix_sort(self):
-        q = {"$or": [{"age":{"$gt": 0}}, {"email": {"$gt": None}},
-            {"name.last": "Harvey"}]}
+        q = {
+            "$or": [
+                {"age": {"$gt": 0}},
+                {"email": {"$gt": None}},
+                {"name.last": "Harvey"},
+            ]
+        }
         docs = self.db.find(q, sort=["name.last:string", "age"])
         self.assertEqual(len(docs), 15)
-        self.assertEqual(docs[0]["name"], {"last":"Ewing","first":"Shelly"})
+        self.assertEqual(docs[0]["name"], {"last": "Ewing", "first": "Shelly"})
         self.assertEqual(docs[1]["age"], 22)

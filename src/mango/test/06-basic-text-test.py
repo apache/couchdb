@@ -18,21 +18,17 @@ import math
 from hypothesis import given, assume, example
 import hypothesis.strategies as st
 
+
 @unittest.skipIf(mango.has_text_service(), "text service exists")
 class TextIndexCheckTests(mango.DbPerClass):
-
     def test_create_text_index(self):
-        body = json.dumps({
-            'index': {
-            },
-            'type': 'text'
-        })
+        body = json.dumps({"index": {}, "type": "text"})
         resp = self.db.sess.post(self.db.path("_index"), data=body)
         assert resp.status_code == 503, resp
 
+
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class BasicTextTests(mango.UserDocsTextTests):
-
     def test_simple(self):
         docs = self.db.find({"$text": "Stephanie"})
         assert len(docs) == 1
@@ -99,6 +95,9 @@ class BasicTextTests(mango.UserDocsTextTests):
         assert len(docs) == 1
         assert docs[0]["company"] == "Affluex"
 
+        docs = self.db.find({"foo": {"$lt": "bar car apple"}})
+        assert len(docs) == 0
+
     def test_lte(self):
         docs = self.db.find({"age": {"$lte": 21}})
         assert len(docs) == 0
@@ -116,6 +115,10 @@ class BasicTextTests(mango.UserDocsTextTests):
         assert len(docs) == 2
         for d in docs:
             assert d["user_id"] in (0, 11)
+
+        docs = self.db.find({"foo": {"$lte": "bar car apple"}})
+        assert len(docs) == 1
+        assert docs[0]["user_id"] == 14
 
     def test_eq(self):
         docs = self.db.find({"age": 21})
@@ -160,6 +163,13 @@ class BasicTextTests(mango.UserDocsTextTests):
         docs = self.db.find({"company": {"$gt": "Zialactic"}})
         assert len(docs) == 0
 
+        docs = self.db.find({"foo": {"$gt": "bar car apple"}})
+        assert len(docs) == 0
+
+        docs = self.db.find({"foo": {"$gt": "bar car"}})
+        assert len(docs) == 1
+        assert docs[0]["user_id"] == 14
+
     def test_gte(self):
         docs = self.db.find({"age": {"$gte": 77}})
         assert len(docs) == 2
@@ -181,6 +191,10 @@ class BasicTextTests(mango.UserDocsTextTests):
         docs = self.db.find({"company": {"$gte": "Zialactic"}})
         assert len(docs) == 1
         assert docs[0]["company"] == "Zialactic"
+
+        docs = self.db.find({"foo": {"$gte": "bar car apple"}})
+        assert len(docs) == 1
+        assert docs[0]["user_id"] == 14
 
     def test_and(self):
         docs = self.db.find({"age": 22, "manager": True})
@@ -227,34 +241,18 @@ class BasicTextTests(mango.UserDocsTextTests):
         assert docs[0]["user_id"] == 9
 
     def test_and_or(self):
-        q = {
-            "age": 22,
-            "$or": [
-                {"manager": False},
-                {"location.state": "Missouri"}
-            ]
-        }
+        q = {"age": 22, "$or": [{"manager": False}, {"location.state": "Missouri"}]}
         docs = self.db.find(q)
         assert len(docs) == 1
         assert docs[0]["user_id"] == 9
 
-        q = {
-            "$or": [
-                {"age": 22},
-                {"age": 43, "manager": True}
-            ]
-        }
+        q = {"$or": [{"age": 22}, {"age": 43, "manager": True}]}
         docs = self.db.find(q)
         assert len(docs) == 2
         for d in docs:
             assert d["user_id"] in (9, 10)
 
-        q = {
-            "$or": [
-                {"$text": "Ramona"},
-                {"age": 43, "manager": True}
-            ]
-        }
+        q = {"$or": [{"$text": "Ramona"}, {"age": 43, "manager": True}]}
         docs = self.db.find(q)
         assert len(docs) == 2
         for d in docs:
@@ -285,7 +283,7 @@ class BasicTextTests(mango.UserDocsTextTests):
             assert d["user_id"] in (1, 9)
 
         # Limits on boolean clauses?
-        docs = self.db.find({"age": {"$in": range(1000)}})
+        docs = self.db.find({"age": {"$in": list(range(1000))}})
         assert len(docs) == 15
 
     def test_in_with_array(self):
@@ -323,7 +321,7 @@ class BasicTextTests(mango.UserDocsTextTests):
             assert d["user_id"] not in (1, 9)
 
         # Limits on boolean clauses?
-        docs = self.db.find({"age": {"$nin": range(1000)}})
+        docs = self.db.find({"age": {"$nin": list(range(1000))}})
         assert len(docs) == 0
 
     def test_nin_with_array(self):
@@ -403,18 +401,22 @@ class BasicTextTests(mango.UserDocsTextTests):
             assert d["user_id"] != 11
 
     def test_exists_and(self):
-        q = {"$and": [
-            {"manager": {"$exists": True}},
-            {"exists_object.should": {"$exists": True}}
-        ]}
+        q = {
+            "$and": [
+                {"manager": {"$exists": True}},
+                {"exists_object.should": {"$exists": True}},
+            ]
+        }
         docs = self.db.find(q)
         assert len(docs) == 1
         assert docs[0]["user_id"] == 11
 
-        q = {"$and": [
-            {"manager": {"$exists": False}},
-            {"exists_object.should": {"$exists": True}}
-        ]}
+        q = {
+            "$and": [
+                {"manager": {"$exists": False}},
+                {"exists_object.should": {"$exists": True}},
+            ]
+        }
         docs = self.db.find(q)
         assert len(docs) == 0
 
@@ -425,30 +427,25 @@ class BasicTextTests(mango.UserDocsTextTests):
         assert len(docs) == len(user_docs.DOCS)
 
     def test_value_chars(self):
-        q = {"complex_field_value": "+-(){}[]^~&&*||\"\\/?:!"}
+        q = {"complex_field_value": '+-(){}[]^~&&*||"\\/?:!'}
         docs = self.db.find(q)
         assert len(docs) == 1
 
     def test_regex(self):
-        docs = self.db.find({
-                "age": {"$gt": 40},
-                "location.state": {"$regex": "(?i)new.*"}
-            })
+        docs = self.db.find(
+            {"age": {"$gt": 40}, "location.state": {"$regex": "(?i)new.*"}}
+        )
         assert len(docs) == 2
         assert docs[0]["user_id"] == 2
         assert docs[1]["user_id"] == 10
 
     # test lucene syntax in $text
 
+
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class ElemMatchTests(mango.FriendDocsTextTests):
-
     def test_elem_match_non_object(self):
-        q = {"bestfriends":{
-                "$elemMatch":
-                    {"$eq":"Wolverine", "$eq":"Cyclops"}
-            }
-        }
+        q = {"bestfriends": {"$elemMatch": {"$eq": "Wolverine", "$eq": "Cyclops"}}}
         docs = self.db.find(q)
         self.assertEqual(len(docs), 1)
         self.assertEqual(docs[0]["bestfriends"], ["Wolverine", "Cyclops"])
@@ -460,35 +457,19 @@ class ElemMatchTests(mango.FriendDocsTextTests):
         self.assertEqual(docs[0]["results"], [82, 85, 88])
 
     def test_elem_match(self):
-        q = {"friends": {
-                "$elemMatch":
-                    {"name.first": "Vargas"}
-            }
-        }
+        q = {"friends": {"$elemMatch": {"name.first": "Vargas"}}}
         docs = self.db.find(q)
         self.assertEqual(len(docs), 2)
         for d in docs:
             self.assertIn(d["user_id"], (0, 1))
 
-        q = {
-            "friends": {
-                "$elemMatch": {
-                    "name.first": "Ochoa",
-                    "name.last": "Burch"
-                }
-            }
-        }
+        q = {"friends": {"$elemMatch": {"name.first": "Ochoa", "name.last": "Burch"}}}
         docs = self.db.find(q)
         self.assertEqual(len(docs), 1)
         self.assertEqual(docs[0]["user_id"], 4)
 
-
         # Check that we can do logic in elemMatch
-        q = {
-            "friends": {"$elemMatch": {
-                "name.first": "Ochoa", "type": "work"
-            }}
-        }
+        q = {"friends": {"$elemMatch": {"name.first": "Ochoa", "type": "work"}}}
         docs = self.db.find(q)
         self.assertEqual(len(docs), 2)
         for d in docs:
@@ -498,10 +479,7 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             "friends": {
                 "$elemMatch": {
                     "name.first": "Ochoa",
-                    "$or": [
-                        {"type": "work"},
-                        {"type": "personal"}
-                    ]
+                    "$or": [{"type": "work"}, {"type": "personal"}],
                 }
             }
         }
@@ -515,7 +493,7 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             "friends": {
                 "$elemMatch": {
                     "name.first": "Ochoa",
-                    "type": {"$in": ["work", "personal"]}
+                    "type": {"$in": ["work", "personal"]},
                 }
             }
         }
@@ -525,59 +503,37 @@ class ElemMatchTests(mango.FriendDocsTextTests):
             self.assertIn(d["user_id"], (1, 4, 15))
 
         q = {
-            "$and": [{
-                "friends": {
-                    "$elemMatch": {
-                        "id": 0,
-                        "name": {
-                            "$exists": True
-                            }
-                        }
-                    }
-                },
+            "$and": [
+                {"friends": {"$elemMatch": {"id": 0, "name": {"$exists": True}}}},
                 {
-                "friends": {
-                    "$elemMatch": {
-                        "$or": [
-                            {
-                            "name": {
-                                "first": "Campos",
-                                "last": "Freeman"
-                                }
-                            },
-                            {
-                            "name": {
-                                "$in": [{
-                                    "first": "Gibbs",
-                                    "last": "Mccarty"
-                                    },
-                                    {
-                                    "first": "Wilkins",
-                                    "last": "Chang"
-                                     }
-                                    ]
+                    "friends": {
+                        "$elemMatch": {
+                            "$or": [
+                                {"name": {"first": "Campos", "last": "Freeman"}},
+                                {
+                                    "name": {
+                                        "$in": [
+                                            {"first": "Gibbs", "last": "Mccarty"},
+                                            {"first": "Wilkins", "last": "Chang"},
+                                        ]
                                     }
-                                }
+                                },
                             ]
                         }
                     }
-                }
+                },
             ]
         }
         docs = self.db.find(q)
         self.assertEqual(len(docs), 3)
         for d in docs:
-            self.assertIn(d["user_id"], (10, 11,12))
+            self.assertIn(d["user_id"], (10, 11, 12))
+
 
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class AllMatchTests(mango.FriendDocsTextTests):
-
     def test_all_match(self):
-        q = {"friends": {
-                "$allMatch":
-                    {"type": "personal"}
-            }
-        }
+        q = {"friends": {"$allMatch": {"type": "personal"}}}
         docs = self.db.find(q)
         assert len(docs) == 2
         for d in docs:
@@ -588,10 +544,7 @@ class AllMatchTests(mango.FriendDocsTextTests):
             "friends": {
                 "$allMatch": {
                     "name.first": "Ochoa",
-                    "$or": [
-                        {"type": "work"},
-                        {"type": "personal"}
-                    ]
+                    "$or": [{"type": "work"}, {"type": "personal"}],
                 }
             }
         }
@@ -604,7 +557,7 @@ class AllMatchTests(mango.FriendDocsTextTests):
             "friends": {
                 "$allMatch": {
                     "name.first": "Ochoa",
-                    "type": {"$in": ["work", "personal"]}
+                    "type": {"$in": ["work", "personal"]},
                 }
             }
         }
@@ -616,7 +569,6 @@ class AllMatchTests(mango.FriendDocsTextTests):
 # Test numeric strings for $text
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class NumStringTests(mango.DbPerClass):
-
     @classmethod
     def setUpClass(klass):
         super(NumStringTests, klass).setUpClass()
@@ -628,11 +580,10 @@ class NumStringTests(mango.DbPerClass):
     def isFinite(num):
         not (math.isinf(num) or math.isnan(num))
 
-    @given(f=st.floats().filter(isFinite).map(str)
-        | st.floats().map(lambda f: f.hex()))
-    @example('NaN')
-    @example('Infinity')
-    def test_floating_point_val(self,f):
+    @given(f=st.floats().filter(isFinite).map(str) | st.floats().map(lambda f: f.hex()))
+    @example("NaN")
+    @example("Infinity")
+    def test_floating_point_val(self, f):
         doc = {"number_string": f}
         self.db.save_doc(doc)
         q = {"$text": f}

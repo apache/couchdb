@@ -9,8 +9,8 @@ defmodule ViewCollationTest do
   @values [
     # Special values sort before all other types
     :null,
-    :false,
-    :true,
+    false,
+    true,
 
     # Then numbers
     1,
@@ -52,12 +52,14 @@ defmodule ViewCollationTest do
     {:ok, _} = create_db(db_name)
     on_exit(fn -> delete_db(db_name) end)
 
-    {docs, _} = Enum.flat_map_reduce(@values, 1, fn value, idx ->
-      doc = %{:_id => Integer.to_string(idx), :foo => value}
-      {[doc], idx + 1}
-    end)
+    {docs, _} =
+      Enum.flat_map_reduce(@values, 1, fn value, idx ->
+        doc = %{:_id => Integer.to_string(idx), :foo => value}
+        {[doc], idx + 1}
+      end)
+
     resp = Couch.post("/#{db_name}/_bulk_docs", body: %{:docs => docs})
-    Enum.each(resp.body, &(assert &1["ok"]))
+    Enum.each(resp.body, &assert(&1["ok"]))
 
     map_fun = "function(doc) { emit(doc.foo, null); }"
     map_doc = %{:views => %{:foo => %{:map => map_fun}}}
@@ -68,26 +70,34 @@ defmodule ViewCollationTest do
   end
 
   test "ascending collation order", context do
-    resp = Couch.get(url(context))
-    pairs = Enum.zip(resp.body["rows"], @values)
-    Enum.each(pairs, fn {row, value} ->
-      assert row["key"] == convert(value)
+    retry_until(fn ->
+      resp = Couch.get(url(context))
+      pairs = Enum.zip(resp.body["rows"], @values)
+
+      Enum.each(pairs, fn {row, value} ->
+        assert row["key"] == convert(value)
+      end)
     end)
   end
 
   test "descending collation order", context do
-    resp = Couch.get(url(context), query: %{"descending" => "true"})
-    pairs = Enum.zip(resp.body["rows"], Enum.reverse(@values))
-    Enum.each(pairs, fn {row, value} ->
-      assert row["key"] == convert(value)
+    retry_until(fn ->
+      resp = Couch.get(url(context), query: %{"descending" => "true"})
+      pairs = Enum.zip(resp.body["rows"], Enum.reverse(@values))
+
+      Enum.each(pairs, fn {row, value} ->
+        assert row["key"] == convert(value)
+      end)
     end)
   end
 
   test "key query option", context do
     Enum.each(@values, fn value ->
-      resp = Couch.get(url(context), query: %{:key => :jiffy.encode(value)})
-      assert length(resp.body["rows"]) == 1
-      assert Enum.at(resp.body["rows"], 0)["key"] == convert(value)
+      retry_until(fn ->
+        resp = Couch.get(url(context), query: %{:key => :jiffy.encode(value)})
+        assert length(resp.body["rows"]) == 1
+        assert Enum.at(resp.body["rows"], 0)["key"] == convert(value)
+      end)
     end)
   end
 
@@ -115,6 +125,7 @@ defmodule ViewCollationTest do
       :endkey_docid => 11,
       :inclusive_end => false
     }
+
     resp = Couch.get(url(context), query: query)
     assert Enum.at(resp.body["rows"], -1)["key"] == "aa"
 

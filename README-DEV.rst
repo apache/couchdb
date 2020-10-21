@@ -14,10 +14,7 @@ Dependencies
 
 You need the following to run tests:
 
-* `Python                 <https://www.python.org/>`_
-* `nose                   <https://nose.readthedocs.io/en/latest/>`_
-* `requests               <http://docs.python-requests.org/>`_
-* `hypothesis             <https://pypi.python.org/pypi/hypothesis>`_
+* `Python 3               <https://www.python.org/>`_
 
 You need the following optionally to build documentation:
 
@@ -60,7 +57,7 @@ Debian-based (inc. Ubuntu) Systems
 ::
 
     sudo apt-get install help2man python-sphinx gnupg nodejs npm \
-         python-hypothesis python-requests python-nose
+         python3 python3-venv
 
 Gentoo-based Systems
 ~~~~~~~~~~~~~~~~~~~~
@@ -70,14 +67,14 @@ Gentoo-based Systems
     sudo emerge gnupg coreutils pkgconfig help2man sphinx python
     sudo pip install hypothesis requests nose
 
-RedHat-based (Fedora, Centos, RHEL) Systems
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Centos 7 and RHEL 7
+~~~~~~~~~~~~~~~~~~~
 
 ::
 
     sudo yum install help2man python-sphinx python-docutils \
-        python-pygments gnupg nodejs npm python-nose python-requests \
-        python-hypothesis
+        python-pygments gnupg nodejs npm
+
 
 Mac OS X
 ~~~~~~~~
@@ -89,7 +86,7 @@ Unless you want to install the optional dependencies, skip to the next section.
 
 Install what else we can with Homebrew::
 
-    brew install help2man gnupg md5sha1sum node
+    brew install help2man gnupg md5sha1sum node python
 
 If you don't already have pip installed, install it::
 
@@ -97,7 +94,7 @@ If you don't already have pip installed, install it::
 
 Now, install the required Python packages::
 
-    sudo pip install sphinx docutils pygments nose requests hypothesis sphinx_rtd_theme
+    sudo pip install sphinx docutils pygments sphinx_rtd_theme
 
 FreeBSD
 ~~~~~~~

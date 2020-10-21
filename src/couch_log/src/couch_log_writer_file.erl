@@ -37,7 +37,9 @@
 
 
 -ifdef(TEST).
--compile(export_all).
+-export([
+    maybe_reopen/1
+]).
 -endif.
 
 

@@ -88,7 +88,7 @@ lru_opts() ->
 
 append_if_set({Key, Value}, Opts) when Value > 0 ->
     [{Key, Value} | Opts];
-append_if_set({Key, 0}, Opts) ->
+append_if_set({_Key, 0}, Opts) ->
     Opts;
 append_if_set({Key, Value}, Opts) ->
     couch_log:error(

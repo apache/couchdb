@@ -13,6 +13,7 @@
 -module(couch_mrview_test_util).
 
 -compile(export_all).
+-compile(nowarn_export_all).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
@@ -28,7 +29,7 @@ init_db(Name, Type, Count) ->
     save_docs(Db, Docs).
 
 
-new_db(Name, local) ->
+new_db(Name, Type) when Type == local; Type == design ->
     couch_server:delete(Name, [?ADMIN_CTX]),
     couch_db:create(Name, [?ADMIN_CTX]);
 new_db(Name, Type) ->
@@ -46,38 +47,18 @@ save_docs(Db, Docs) ->
 
 make_docs(local, Count) ->
     [local_doc(I) || I <- lists:seq(1, Count)];
+make_docs(design, Count) ->
+    lists:foldl(fun(I, Acc) ->
+        [doc(I), ddoc(I) | Acc]
+    end, [], lists:seq(1, Count));
 make_docs(_, Count) ->
     [doc(I) || I <- lists:seq(1, Count)].
 
 
 make_docs(_, Since, Count) ->
     [doc(I) || I <- lists:seq(Since, Count)].
-        
 
-ddoc({changes, Opts}) ->
-    ViewOpts = case Opts of
-        seq_indexed ->
-            [{<<"seq_indexed">>, true}];
-        keyseq_indexed ->
-            [{<<"keyseq_indexed">>, true}];
-        seq_indexed_keyseq_indexed ->
-            [
-                {<<"seq_indexed">>, true},
-                {<<"keyseq_indexed">>, true}
-            ]
-    end,
-    couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
-        {<<"options">>, {ViewOpts}},
-        {<<"views">>, {[
-            {<<"baz">>, {[
-                {
-                    <<"map">>,
-                    <<"function(doc) {emit(doc.val.toString(), doc.val);}">>
-                }
-            ]}}
-        ]}}
-    ]});
+
 ddoc(map) ->
     couch_doc:from_json_obj({[
         {<<"_id">>, <<"_design/bar">>},
@@ -120,6 +101,11 @@ ddoc(red) ->
                 {<<"reduce">>, <<"_count">>}
             ]}}
         ]}}
+    ]});
+ddoc(Id) ->
+    couch_doc:from_json_obj({[
+        {<<"_id">>, list_to_binary(io_lib:format("_design/bar~2..0b", [Id]))},
+        {<<"views">>, {[]}}
     ]}).
 
 

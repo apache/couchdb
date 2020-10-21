@@ -13,7 +13,7 @@
 -module(mem3).
 
 -export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
-    choose_shards/2, n/1, n/2, dbname/1, ushards/1]).
+    choose_shards/2, n/1, n/2, dbname/1, ushards/1, ushards/2]).
 -export([get_shard/3, local_shards/1, shard_suffix/1, fold_shards/2]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
@@ -22,6 +22,7 @@
 -export([belongs/2, owner/3]).
 -export([get_placement/1]).
 -export([ping/1, ping/2]).
+-export([db_is_current/1]).
 
 %% For mem3 use only.
 -export([name/1, node/1, range/1, engine/1]).
@@ -71,7 +72,9 @@ compare_shards(DbName) ->
 
 -spec n(DbName::iodata()) -> integer().
 n(DbName) ->
-    n(DbName, <<"foo">>).
+    % Use _design to avoid issues with
+    % partition validation
+    n(DbName, <<"_design/foo">>).
 
 n(DbName, DocId) ->
     length(mem3:shards(DbName, DocId)).
@@ -136,13 +139,20 @@ ushards(DbName) ->
     Shards = ushards(DbName, live_shards(DbName, Nodes, [ordered]), ZoneMap),
     mem3_util:downcast(Shards).
 
+-spec ushards(DbName::iodata(), DocId::binary()) -> [#shard{}].
+ushards(DbName, DocId) ->
+    Shards = shards_int(DbName, DocId, [ordered]),
+    Shard = hd(Shards),
+    mem3_util:downcast([Shard]).
+
 ushards(DbName, Shards0, ZoneMap) ->
     {L,S,D} = group_by_proximity(Shards0, ZoneMap),
     % Prefer shards in the local zone over shards in a different zone,
     % but sort each zone separately to ensure a consistent choice between
     % nodes in the same zone.
     Shards = choose_ushards(DbName, L ++ S) ++ choose_ushards(DbName, D),
-    lists:ukeysort(#shard.range, Shards).
+    OverlappedShards = lists:ukeysort(#shard.range, Shards),
+    mem3_util:non_overlapping_shards(OverlappedShards).
 
 get_shard(DbName, Node, Range) ->
     mem3_shards:get(DbName, Node, Range).
@@ -196,9 +206,12 @@ choose_shards(DbName, Nodes, Options) ->
     Q = mem3_util:q_val(couch_util:get_value(q, Options,
         config:get("cluster", "q", "8"))),
     %% rotate to a random entry in the nodelist for even distribution
-    {A, B} = lists:split(crypto:rand_uniform(1,length(Nodes)+1), Nodes),
-    RotatedNodes = B ++ A,
+    RotatedNodes = rotate_rand(Nodes),
     mem3_util:create_partition_map(DbName, N, Q, RotatedNodes, Suffix).
+
+rotate_rand(Nodes) ->
+    {A, B} = lists:split(couch_rand:uniform(length(Nodes)), Nodes),
+    B ++ A.
 
 get_placement(Options) ->
     case couch_util:get_value(placement, Options) of
@@ -234,15 +247,15 @@ dbname(_) ->
 %% @doc Determine if DocId belongs in shard (identified by record or filename)
 belongs(#shard{}=Shard, DocId) when is_binary(DocId) ->
     [Begin, End] = range(Shard),
-    belongs(Begin, End, DocId);
+    belongs(Begin, End, Shard, DocId);
 belongs(<<"shards/", _/binary>> = ShardName, DocId) when is_binary(DocId) ->
     [Begin, End] = range(ShardName),
-    belongs(Begin, End, DocId);
+    belongs(Begin, End, ShardName, DocId);
 belongs(DbName, DocId) when is_binary(DbName), is_binary(DocId) ->
     true.
 
-belongs(Begin, End, DocId) ->
-    HashKey = mem3_util:hash(DocId),
+belongs(Begin, End, Shard, DocId) ->
+    HashKey = mem3_hash:calculate(Shard, DocId),
     Begin =< HashKey andalso HashKey =< End.
 
 range(#shard{range = Range}) ->
@@ -355,6 +368,25 @@ ping(Node, Timeout) when is_atom(Node) ->
             pang
     end.
 
+
+db_is_current(#shard{name = Name}) ->
+    db_is_current(Name);
+
+db_is_current(<<"shards/", _/binary>> = Name) ->
+    try
+        Shards = mem3:shards(mem3:dbname(Name)),
+        lists:keyfind(Name, #shard.name, Shards) =/= false
+    catch
+        error:database_does_not_exist ->
+            false
+    end;
+
+db_is_current(Name) when is_binary(Name) ->
+    % This accounts for local (non-sharded) dbs, and is mostly
+    % for unit tests that either test or use mem3_rep logic
+    couch_server:exists(Name).
+
+
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -381,5 +413,12 @@ allowed_nodes_test_() ->
             ?_assertMatch([?ALLOWED_NODE], allowed_nodes())
         ]
     }]}.
+
+rotate_rand_degenerate_test() ->
+    ?assertEqual([1], rotate_rand([1])).
+
+rotate_rand_distribution_test() ->
+    Cases = [rotate_rand([1, 2, 3]) || _ <- lists:seq(1, 100)],
+    ?assertEqual(3, length(lists:usort(Cases))).
 
 -endif.

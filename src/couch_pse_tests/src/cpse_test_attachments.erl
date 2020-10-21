@@ -12,6 +12,7 @@
 
 -module(cpse_test_attachments).
 -compile(export_all).
+-compile(nowarn_export_all).
 
 
 -include_lib("eunit/include/eunit.hrl").
@@ -40,7 +41,6 @@ cpse_write_attachment(Db1) ->
 
         Actions = [{create, {<<"first">>, {[]}, [Att0]}}],
         {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
-        {ok, _} = couch_db:ensure_full_commit(Db2),
         cpse_util:shutdown_db(Db2),
 
         {ok, Db3} = couch_db:reopen(Db2),

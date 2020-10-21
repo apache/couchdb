@@ -24,26 +24,29 @@ go(DbName, Options, GroupId, View, Args, Callback, Acc, VInfo)
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
     go(DbName, Options, DDoc, View, Args, Callback, Acc, VInfo);
 
-go(DbName, Options, DDoc, View, Args, Callback, Acc, VInfo) ->
-    Shards = fabric_view:get_shards(DbName, Args),
+go(Db, Options, DDoc, View, Args, Callback, Acc, VInfo) ->
+    DbName = fabric:dbname(Db),
+    {Shards, RingOpts} = fabric_view:get_shards(Db, Args),
+    {CoordArgs, WorkerArgs} = fabric_view:fix_skip_and_limit(Args),
     DocIdAndRev = fabric_util:doc_id_and_rev(DDoc),
     fabric_view:maybe_update_others(DbName, DocIdAndRev, Shards, View, Args),
-    Repls = fabric_view:get_shard_replacements(DbName, Shards),
-    RPCArgs = [DocIdAndRev, View, Args, Options],
+    Repls = fabric_ring:get_shard_replacements(DbName, Shards),
+    RPCArgs = [DocIdAndRev, View, WorkerArgs, Options],
     StartFun = fun(Shard) ->
         hd(fabric_util:submit_jobs([Shard], fabric_rpc, map_view, RPCArgs))
     end,
     Workers0 = fabric_util:submit_jobs(Shards, fabric_rpc, map_view, RPCArgs),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_util:stream_start(Workers0, #shard.ref, StartFun, Repls) of
+        case fabric_streams:start(Workers0, #shard.ref, StartFun, Repls,
+                RingOpts) of
             {ok, ddoc_updated} ->
                 Callback({error, ddoc_updated}, Acc);
             {ok, Workers} ->
                 try
-                    go(DbName, Workers, VInfo, Args, Callback, Acc)
+                    go(DbName, Workers, VInfo, CoordArgs, Callback, Acc)
                 after
-                    fabric_util:cleanup(Workers)
+                    fabric_streams:cleanup(Workers)
                 end;
             {timeout, NewState} ->
                 DefunctWorkers = fabric_util:remove_done_workers(
@@ -79,7 +82,7 @@ go(DbName, Workers, {map, View, _}, Args, Callback, Acc0) ->
         update_seq = case UpdateSeq of true -> []; false -> nil end
     },
     case rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
-        State, infinity, 1000 * 60 * 60) of
+        State, fabric_util:view_timeout(Args), 1000 * 60 * 60) of
     {ok, NewState} ->
         {ok, NewState#collector.user_acc};
     {timeout, NewState} ->
@@ -176,6 +179,12 @@ handle_message(#view_row{} = Row, {Worker, From}, State) ->
 handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
     fabric_view:maybe_send_row(State#collector{counters = Counters});
+
+handle_message({execution_stats, _} = Msg, {_,From}, St) ->
+    #collector{callback=Callback, user_acc=AccIn} = St,
+    {Go, Acc} = Callback(Msg, AccIn),
+    rexi:stream_ack(From),
+    {Go, St#collector{user_acc=Acc}};
 
 handle_message(ddoc_updated, _Worker, State) ->
     {stop, State}.

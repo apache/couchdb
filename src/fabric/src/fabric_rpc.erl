@@ -12,32 +12,25 @@
 
 -module(fabric_rpc).
 
--export([get_db_info/1, get_doc_count/1, get_update_seq/1]).
+-export([get_db_info/1, get_doc_count/1, get_design_doc_count/1,
+         get_update_seq/1]).
 -export([open_doc/3, open_revs/4, get_doc_info/3, get_full_doc_info/3,
     get_missing_revs/2, get_missing_revs/3, update_docs/3]).
 -export([all_docs/3, changes/3, map_view/4, reduce_view/4, group_info/2]).
 -export([create_db/1, create_db/2, delete_db/1, reset_validation_funs/1,
     set_security/3, set_revs_limit/3, create_shard_db_doc/2,
-    delete_shard_db_doc/2]).
+    delete_shard_db_doc/2, get_partition_info/2]).
 -export([get_all_security/2, open_shard/2]).
 -export([compact/1, compact/2]).
 -export([get_purge_seq/2, purge_docs/3, set_purge_infos_limit/3]).
 
--export([get_db_info/2, get_doc_count/2, get_update_seq/2,
-         changes/4, map_view/5, reduce_view/5, group_info/3, update_mrview/4]).
+-export([get_db_info/2, get_doc_count/2, get_design_doc_count/2,
+         get_update_seq/2, changes/4, map_view/5, reduce_view/5,
+         group_info/3, update_mrview/4]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
-
--record (cacc, {
-    db,
-    seq,
-    args,
-    options,
-    pending,
-    epochs
-}).
 
 %% rpc endpoints
 %%  call to with_db will supply your M:F with a Db instance
@@ -59,10 +52,9 @@ changes(DbName, Options, StartVector, DbOptions) ->
             Args0#changes_args{
                 filter_fun={custom, Style, Req, DDoc, FName}
             };
-        {fetch, FilterType, Style, {DDocId, Rev}, VName}
-                when FilterType == view orelse FilterType == fast_view ->
+        {fetch, view, Style, {DDocId, Rev}, VName} ->
             {ok, DDoc} = ddoc_cache:open_doc(mem3:dbname(DbName), DDocId, Rev),
-            Args0#changes_args{filter_fun={FilterType, Style, DDoc, VName}};
+            Args0#changes_args{filter_fun={view, Style, DDoc, VName}};
         _ ->
             Args0
     end,
@@ -73,7 +65,7 @@ changes(DbName, Options, StartVector, DbOptions) ->
         StartSeq = calculate_start_seq(Db, node(), StartVector),
         Enum = fun changes_enumerator/2,
         Opts = [{dir,Dir}],
-        Acc0 = #cacc{
+        Acc0 = #fabric_changes_acc{
           db = Db,
           seq = StartSeq,
           args = Args,
@@ -82,8 +74,8 @@ changes(DbName, Options, StartVector, DbOptions) ->
           epochs = couch_db:get_epochs(Db)
         },
         try
-            {ok, #cacc{seq=LastSeq, pending=Pending, epochs=Epochs}} =
-                couch_db:fold_changes(Db, StartSeq, Enum, Acc0, Opts),
+            {ok, #fabric_changes_acc{seq=LastSeq, pending=Pending, epochs=Epochs}} =
+                do_changes(Db, StartSeq, Enum, Acc0, Opts),
             rexi:stream_last({complete, [
                 {seq, {LastSeq, uuid(Db), couch_db:owner_of(Epochs, LastSeq)}},
                 {pending, Pending}
@@ -95,11 +87,38 @@ changes(DbName, Options, StartVector, DbOptions) ->
         rexi:stream_last(Error)
     end.
 
+do_changes(Db, StartSeq, Enum, Acc0, Opts) ->
+    #fabric_changes_acc {
+        args = Args
+    } = Acc0,
+    #changes_args {
+        filter = Filter
+    } = Args,
+    case Filter of
+        "_doc_ids" ->
+            % optimised code path, we’re looking up all doc_ids in the by-id instead of filtering
+            % the entire by-seq tree to find the doc_ids one by one
+            #changes_args {
+                filter_fun = {doc_ids, Style, DocIds},
+                dir = Dir
+            } = Args,
+            couch_changes:send_changes_doc_ids(Db, StartSeq, Dir, Enum, Acc0, {doc_ids, Style, DocIds});
+        "_design_docs" ->
+            % optimised code path, we’re looking up all design_docs in the by-id instead of
+            % filtering the entire by-seq tree to find the design_docs one by one
+            #changes_args {
+                filter_fun = {design_docs, Style},
+                dir = Dir
+            } = Args,
+            couch_changes:send_changes_design_docs(Db, StartSeq, Dir, Enum, Acc0, {design_docs, Style});
+        _ ->
+            couch_db:fold_changes(Db, StartSeq, Enum, Acc0, Opts)
+    end.
+
 all_docs(DbName, Options, Args0) ->
     case fabric_util:upgrade_mrargs(Args0) of
-        #mrargs{keys=undefined} = Args1 ->
+        #mrargs{keys=undefined} = Args ->
             set_io_priority(DbName, Options),
-            Args = fix_skip_and_limit(Args1),
             {ok, Db} = get_or_create_db(DbName, Options),
             CB = get_view_cb(Args),
             couch_mrview:query_all_docs(Db, Args, CB, Args)
@@ -123,7 +142,7 @@ map_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
     map_view(DbName, DDoc, ViewName, Args0, DbOptions);
 map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
-    Args = fix_skip_and_limit(fabric_util:upgrade_mrargs(Args0)),
+    Args = fabric_util:upgrade_mrargs(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     CB = get_view_cb(Args),
     couch_mrview:query_view(Db, DDoc, ViewName, Args, CB, Args).
@@ -137,15 +156,10 @@ reduce_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
     reduce_view(DbName, DDoc, ViewName, Args0, DbOptions);
 reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
-    Args = fix_skip_and_limit(fabric_util:upgrade_mrargs(Args0)),
+    Args = fabric_util:upgrade_mrargs(Args0),
     {ok, Db} = get_or_create_db(DbName, DbOptions),
     VAcc0 = #vacc{db=Db},
     couch_mrview:query_view(Db, DDoc, ViewName, Args, fun reduce_cb/2, VAcc0).
-
-fix_skip_and_limit(Args) ->
-    #mrargs{skip=Skip, limit=Limit, extra=Extra}=Args,
-    % the coordinator needs to finalize each row, so make sure the shards don't
-    Args#mrargs{skip=0, limit=Skip+Limit, extra=[{finalizer,null} | Extra]}.
 
 create_db(DbName) ->
     create_db(DbName, []).
@@ -174,12 +188,22 @@ get_db_info(DbName) ->
 get_db_info(DbName, DbOptions) ->
     with_db(DbName, DbOptions, {couch_db, get_db_info, []}).
 
+get_partition_info(DbName, Partition) ->
+    with_db(DbName, [], {couch_db, get_partition_info, [Partition]}).
+
 %% equiv get_doc_count(DbName, [])
 get_doc_count(DbName) ->
     get_doc_count(DbName, []).
 
 get_doc_count(DbName, DbOptions) ->
     with_db(DbName, DbOptions, {couch_db, get_doc_count, []}).
+
+%% equiv get_design_doc_count(DbName, [])
+get_design_doc_count(DbName) ->
+    get_design_doc_count(DbName, []).
+
+get_design_doc_count(DbName, DbOptions) ->
+    with_db(DbName, DbOptions, {couch_db, get_design_doc_count, []}).
 
 %% equiv get_update_seq(DbName, [])
 get_update_seq(DbName) ->
@@ -415,7 +439,7 @@ get_node_seqs(Db, Nodes) ->
 
 
 get_or_create_db(DbName, Options) ->
-    couch_db:open_int(DbName, [{create_if_missing, true} | Options]).
+    mem3_util:get_or_create_db(DbName, Options).
 
 
 get_view_cb(#mrargs{extra = Options}) ->
@@ -473,9 +497,9 @@ reduce_cb(ok, ddoc_updated) ->
 changes_enumerator(#full_doc_info{} = FDI, Acc) ->
     changes_enumerator(couch_doc:to_doc_info(FDI), Acc);
 changes_enumerator(#doc_info{id= <<"_local/", _/binary>>, high_seq=Seq}, Acc) ->
-    {ok, Acc#cacc{seq = Seq, pending = Acc#cacc.pending-1}};
+    {ok, Acc#fabric_changes_acc{seq = Seq, pending = Acc#fabric_changes_acc.pending-1}};
 changes_enumerator(DocInfo, Acc) ->
-    #cacc{
+    #fabric_changes_acc{
         db = Db,
         args = #changes_args{
             include_docs = IncludeDocs,
@@ -491,7 +515,8 @@ changes_enumerator(DocInfo, Acc) ->
     [] ->
         ChangesRow = {no_pass, [
             {pending, Pending-1},
-            {seq, Seq}]};
+            {seq, {Seq, uuid(Db), couch_db:owner_of(Epochs, Seq)}}
+        ]};
     Results ->
         Opts = if Conflicts -> [conflicts | DocOptions]; true -> DocOptions end,
         ChangesRow = {change, [
@@ -504,7 +529,7 @@ changes_enumerator(DocInfo, Acc) ->
         ]}
     end,
     ok = rexi:stream2(ChangesRow),
-    {ok, Acc#cacc{seq = Seq, pending = Pending-1}}.
+    {ok, Acc#fabric_changes_acc{seq = Seq, pending = Pending-1}}.
 
 doc_member(Shard, DocInfo, Opts, Filter) ->
     case couch_db:open_doc(Shard, DocInfo, [deleted | Opts]) of

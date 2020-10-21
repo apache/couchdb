@@ -59,7 +59,8 @@
 -type apply_opts() :: [apply_opt()].
 
 -type data_spec()
-    :: {module, module()}
+    :: {static_module, module()}
+        | {callback_module, module()}
         | {priv_file, FileName :: string()}
         | {file, FileName :: string()}.
 
@@ -81,7 +82,7 @@ get(Handle, Key) when Handle /= undefined ->
     couch_epi_data_gen:get(Handle, Key).
 
 -spec get_value(Handle :: handle(), Subscriber :: app(), Key :: key()) ->
-    properties().
+    term().
 
 get_value(Handle, Subscriber, Key) when Handle /= undefined ->
     couch_epi_data_gen:get(Handle, Subscriber, Key).

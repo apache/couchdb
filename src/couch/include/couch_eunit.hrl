@@ -28,7 +28,7 @@
     filename:join([?BUILDDIR(), "tmp", "etc", "local_eunit.ini"]),
     filename:join([?BUILDDIR(), "tmp", "etc", "eunit.ini"])]).
 -define(FIXTURESDIR,
-    filename:join([?BUILDDIR(), "src", "couch", "test", "fixtures"])).
+    filename:join([?BUILDDIR(), "src", "couch", "test", "eunit", "fixtures"])).
 -define(TEMPDIR,
     filename:join([?BUILDDIR(), "tmp", "tmp_data"])).
 
@@ -48,6 +48,11 @@
     fun() ->
         Suffix = couch_uuids:random(),
         iolist_to_binary(["eunit-test-db-", Suffix])
+    end).
+-define(tempshard,
+    fun() ->
+        Suffix = couch_uuids:random(),
+        iolist_to_binary(["shards/80000000-ffffffff/eunit-test-db-", Suffix])
     end).
 -define(docid,
     fun() ->

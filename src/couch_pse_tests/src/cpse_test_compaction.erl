@@ -12,6 +12,7 @@
 
 -module(cpse_test_compaction).
 -compile(export_all).
+-compile(nowarn_export_all).
 
 
 -include_lib("eunit/include/eunit.hrl").
@@ -130,7 +131,6 @@ cpse_compact_with_everything(Db1) ->
     catch throw:not_supported ->
         {ok, Db4}
     end,
-    {ok, _} = couch_db:ensure_full_commit(Db5),
     {ok, Db6} = couch_db:reopen(Db5),
 
     Term1 = cpse_util:db_as_term(Db6),

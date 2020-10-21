@@ -21,6 +21,17 @@
 -include("couch_db_int.hrl").
 
 -define(IDLE_LIMIT_DEFAULT, 61000).
+-define(DEFAULT_MAX_PARTITION_SIZE, 16#280000000). % 10 GiB
+
+
+-record(merge_acc, {
+    revs_limit,
+    merge_conflicts,
+    add_infos = [],
+    rem_seqs = [],
+    cur_seq,
+    full_partitions = []
+}).
 
 
 init({Engine, DbName, FilePath, Options0}) ->
@@ -56,15 +67,6 @@ terminate(Reason, Db) ->
 
 handle_call(get_db, _From, Db) ->
     {reply, {ok, Db}, Db, idle_limit()};
-handle_call(full_commit, _From, #db{waiting_delayed_commit=nil}=Db) ->
-    {reply, ok, Db, idle_limit()}; % no data waiting, return ok immediately
-handle_call(full_commit, _From,  Db) ->
-    {reply, ok, commit_data(Db), idle_limit()};
-handle_call({full_commit, RequiredSeq}, _From, Db)
-        when RequiredSeq =< Db#db.committed_update_seq ->
-    {reply, ok, Db, idle_limit()};
-handle_call({full_commit, _}, _, Db) ->
-    {reply, ok, commit_data(Db), idle_limit()}; % commit the data and return ok
 handle_call(start_compact, _From, Db) ->
     {noreply, NewDb, _Timeout} = handle_cast(start_compact, Db),
     {reply, {ok, NewDb#db.compactor_pid}, NewDb, idle_limit()};
@@ -160,20 +162,18 @@ handle_cast(Msg, #db{name = Name} = Db) ->
     {stop, Msg, Db}.
 
 
-handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
-        FullCommit}, Db) ->
+handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts},
+        Db) ->
     GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
     if NonRepDocs == [] ->
-        {GroupedDocs3, Clients, FullCommit2} = collect_updates(GroupedDocs2,
-                [Client], MergeConflicts, FullCommit);
+        {GroupedDocs3, Clients} = collect_updates(GroupedDocs2,
+                [Client], MergeConflicts);
     true ->
         GroupedDocs3 = GroupedDocs2,
-        FullCommit2 = FullCommit,
         Clients = [Client]
     end,
     NonRepDocs2 = [{Client, NRDoc} || NRDoc <- NonRepDocs],
-    try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts,
-                FullCommit2) of
+    try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts) of
     {ok, Db2, UpdatedDDocIds} ->
         ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
         case {couch_db:get_update_seq(Db), couch_db:get_update_seq(Db2)} of
@@ -205,17 +205,6 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts,
         throw: retry ->
             [catch(ClientPid ! {retry, self()}) || ClientPid <- Clients],
             {noreply, Db, hibernate_if_no_idle_limit()}
-    end;
-handle_info(delayed_commit, #db{waiting_delayed_commit=nil}=Db) ->
-    %no outstanding delayed commits, ignore
-    {noreply, Db, idle_limit()};
-handle_info(delayed_commit, Db) ->
-    case commit_data(Db) of
-        Db ->
-            {noreply, Db, idle_limit()};
-        Db2 ->
-            ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
-            {noreply, Db2, idle_limit()}
     end;
 handle_info({'EXIT', _Pid, normal}, Db) ->
     {noreply, Db, idle_limit()};
@@ -286,20 +275,20 @@ merge_updates([], RestB) ->
 merge_updates(RestA, []) ->
     RestA.
 
-collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts, FullCommit) ->
+collect_updates(GroupedDocsAcc, ClientsAcc, MergeConflicts) ->
     receive
         % Only collect updates with the same MergeConflicts flag and without
         % local docs. It's easier to just avoid multiple _local doc
         % updaters than deal with their possible conflicts, and local docs
         % writes are relatively rare. Can be optmized later if really needed.
-        {update_docs, Client, GroupedDocs, [], MergeConflicts, FullCommit2} ->
+        {update_docs, Client, GroupedDocs, [], MergeConflicts} ->
             GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
             GroupedDocsAcc2 =
                 merge_updates(GroupedDocsAcc, GroupedDocs2),
             collect_updates(GroupedDocsAcc2, [Client | ClientsAcc],
-                    MergeConflicts, (FullCommit or FullCommit2))
+                    MergeConflicts)
     after 0 ->
-        {GroupedDocsAcc, ClientsAcc, FullCommit}
+        {GroupedDocsAcc, ClientsAcc}
     end.
 
 
@@ -312,21 +301,24 @@ init_db(DbName, FilePath, EngineState, Options) ->
     BDU = couch_util:get_value(before_doc_update, Options, nil),
     ADR = couch_util:get_value(after_doc_read, Options, nil),
 
-    CleanedOpts = [Opt || Opt <- Options, Opt /= create],
+    NonCreateOpts = [Opt || Opt <- Options, Opt /= create],
 
     InitDb = #db{
         name = DbName,
         filepath = FilePath,
         engine = EngineState,
         instance_start_time = StartTime,
-        options = CleanedOpts,
+        options = NonCreateOpts,
         before_doc_update = BDU,
         after_doc_read = ADR
     },
 
+    DbProps = couch_db_engine:get_props(InitDb),
+
     InitDb#db{
         committed_update_seq = couch_db_engine:get_update_seq(InitDb),
-        security = couch_db_engine:get_security(InitDb)
+        security = couch_db_engine:get_security(InitDb),
+        options = lists:keystore(props, 1, NonCreateOpts, {props, DbProps})
     }.
 
 
@@ -449,13 +441,29 @@ doc_tag(#doc{meta=Meta}) ->
         Else -> throw({invalid_doc_tag, Else})
     end.
 
-merge_rev_trees(_Limit, _Merge, [], [], AccNewInfos, AccRemoveSeqs, AccSeq) ->
-    {ok, lists:reverse(AccNewInfos), AccRemoveSeqs, AccSeq};
-merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
-        [OldDocInfo|RestOldInfo], AccNewInfos, AccRemoveSeqs, AccSeq) ->
-    erlang:put(last_id_merged, OldDocInfo#full_doc_info.id), % for debugging
+merge_rev_trees([], [], Acc) ->
+    {ok, Acc#merge_acc{
+        add_infos = lists:reverse(Acc#merge_acc.add_infos)
+    }};
+merge_rev_trees([NewDocs | RestDocsList], [OldDocInfo | RestOldInfo], Acc) ->
+    #merge_acc{
+        revs_limit = Limit,
+        merge_conflicts = MergeConflicts,
+        full_partitions = FullPartitions
+    } = Acc,
+
+    % Track doc ids so we can debug large revision trees
+    erlang:put(last_id_merged, OldDocInfo#full_doc_info.id),
     NewDocInfo0 = lists:foldl(fun({Client, NewDoc}, OldInfoAcc) ->
-        merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts)
+        NewInfo = merge_rev_tree(OldInfoAcc, NewDoc, Client, MergeConflicts),
+        case is_overflowed(NewInfo, OldInfoAcc, FullPartitions) of
+            true when not MergeConflicts ->
+                DocId = NewInfo#full_doc_info.id,
+                send_result(Client, NewDoc, {partition_overflow, DocId}),
+                OldInfoAcc;
+            _ ->
+                NewInfo
+        end
     end, OldDocInfo, NewDocs),
     NewDocInfo1 = maybe_stem_full_doc_info(NewDocInfo0, Limit),
     % When MergeConflicts is false, we updated #full_doc_info.deleted on every
@@ -474,22 +482,25 @@ merge_rev_trees(Limit, MergeConflicts, [NewDocs|RestDocsList],
     end,
     if NewDocInfo2 == OldDocInfo ->
         % nothing changed
-        merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
-            AccNewInfos, AccRemoveSeqs, AccSeq);
+        merge_rev_trees(RestDocsList, RestOldInfo, Acc);
     true ->
         % We have updated the document, give it a new update_seq. Its
         % important to note that the update_seq on OldDocInfo should
         % be identical to the value on NewDocInfo1.
         OldSeq = OldDocInfo#full_doc_info.update_seq,
         NewDocInfo3 = NewDocInfo2#full_doc_info{
-            update_seq = AccSeq + 1
+            update_seq = Acc#merge_acc.cur_seq + 1
         },
         RemoveSeqs = case OldSeq of
-            0 -> AccRemoveSeqs;
-            _ -> [OldSeq | AccRemoveSeqs]
+            0 -> Acc#merge_acc.rem_seqs;
+            _ -> [OldSeq | Acc#merge_acc.rem_seqs]
         end,
-        merge_rev_trees(Limit, MergeConflicts, RestDocsList, RestOldInfo,
-            [NewDocInfo3|AccNewInfos], RemoveSeqs, AccSeq+1)
+        NewAcc = Acc#merge_acc{
+            add_infos = [NewDocInfo3 | Acc#merge_acc.add_infos],
+            rem_seqs = RemoveSeqs,
+            cur_seq = Acc#merge_acc.cur_seq + 1
+        },
+        merge_rev_trees(RestDocsList, RestOldInfo, NewAcc)
     end.
 
 merge_rev_tree(OldInfo, NewDoc, Client, false)
@@ -575,6 +586,24 @@ merge_rev_tree(OldInfo, NewDoc, _Client, true) ->
     {NewTree, _} = couch_key_tree:merge(OldTree, NewTree0),
     OldInfo#full_doc_info{rev_tree = NewTree}.
 
+is_overflowed(_New, _Old, []) ->
+    false;
+is_overflowed(Old, Old, _FullPartitions) ->
+    false;
+is_overflowed(New, Old, FullPartitions) ->
+    case New#full_doc_info.id of
+        <<"_design/", _/binary>> ->
+            false;
+        DDocId ->
+            Partition = couch_partition:from_docid(DDocId),
+            case lists:member(Partition, FullPartitions) of
+                true ->
+                    estimate_size(New) > estimate_size(Old);
+                false ->
+                    false
+            end
+    end.
+
 maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
     case config:get_boolean("couchdb", "stem_interactive_updates", true) of
         true ->
@@ -584,7 +613,7 @@ maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
             Info
     end.
 
-update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
+update_docs_int(Db, DocsList, LocalDocs, MergeConflicts) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
@@ -597,9 +626,40 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
         (Id, not_found) ->
             #full_doc_info{id=Id}
     end, Ids, OldDocLookups),
+
+    %% Get the list of full partitions
+    FullPartitions = case couch_db:is_partitioned(Db) of
+        true ->
+            case max_partition_size() of
+                N when N =< 0 ->
+                    [];
+                Max ->
+                    Partitions = lists:usort(lists:flatmap(fun(Id) ->
+                        case couch_partition:extract(Id) of
+                            undefined -> [];
+                            {Partition, _} -> [Partition]
+                        end
+                    end, Ids)),
+                    [P || P <- Partitions, partition_size(Db, P) >= Max]
+            end;
+        false ->
+            []
+    end,
+
     % Merge the new docs into the revision trees.
-    {ok, NewFullDocInfos, RemSeqs, _} = merge_rev_trees(RevsLimit,
-            MergeConflicts, DocsList, OldDocInfos, [], [], UpdateSeq),
+    AccIn = #merge_acc{
+        revs_limit = RevsLimit,
+        merge_conflicts = MergeConflicts,
+        add_infos = [],
+        rem_seqs = [],
+        cur_seq = UpdateSeq,
+        full_partitions = FullPartitions
+    },
+    {ok, AccOut} = merge_rev_trees(DocsList, OldDocInfos, AccIn),
+    #merge_acc{
+        add_infos = NewFullDocInfos,
+        rem_seqs = RemSeqs
+    } = AccOut,
 
     % Write out the document summaries (the bodies are stored in the nodes of
     % the trees, the attachments are already written to disk)
@@ -625,7 +685,7 @@ update_docs_int(Db, DocsList, LocalDocs, MergeConflicts, FullCommit) ->
         (_) -> []
     end, Ids),
 
-    {ok, commit_data(Db1, not FullCommit), UpdatedDDocIds}.
+    {ok, commit_data(Db1), UpdatedDDocIds}.
 
 
 update_local_doc_revs(Docs) ->
@@ -655,6 +715,40 @@ increment_local_doc_revs(#doc{revs = {0, [RevStr | _]}} = Doc) ->
 increment_local_doc_revs(#doc{}) ->
     {error, <<"Invalid rev format">>}.
 
+max_partition_size() ->
+    config:get_integer("couchdb", "max_partition_size",
+            ?DEFAULT_MAX_PARTITION_SIZE).
+
+partition_size(Db, Partition) ->
+    {ok, Info} = couch_db:get_partition_info(Db, Partition),
+    Sizes = couch_util:get_value(sizes, Info),
+    couch_util:get_value(external, Sizes).
+
+estimate_size(#full_doc_info{} = FDI) ->
+    #full_doc_info{rev_tree = RevTree} = FDI,
+    Fun = fun
+        (_Rev, Value, leaf, SizesAcc) ->
+            case Value of
+                #doc{} = Doc ->
+                    ExternalSize = get_meta_body_size(Value#doc.meta),
+                    {size_info, AttSizeInfo} =
+                        lists:keyfind(size_info, 1, Doc#doc.meta),
+                    Leaf = #leaf{
+                        sizes = #size_info{
+                            external = ExternalSize
+                        },
+                        atts = AttSizeInfo
+                    },
+                    add_sizes(leaf, Leaf, SizesAcc);
+                #leaf{} ->
+                    add_sizes(leaf, Value, SizesAcc)
+            end;
+        (_Rev, _Value, branch, SizesAcc) ->
+            SizesAcc
+    end,
+    {_, FinalES, FinalAtts} = couch_key_tree:fold(Fun, {0, 0, []}, RevTree),
+    TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
+    FinalES + TotalAttSize.
 
 purge_docs(Db, []) ->
     {ok, Db, []};
@@ -738,21 +832,8 @@ apply_purge_reqs([Req | RestReqs], IdFDIs, USeq, Replies) ->
 
 
 commit_data(Db) ->
-    commit_data(Db, false).
-
-commit_data(#db{waiting_delayed_commit=nil} = Db, true) ->
-    TRef = erlang:send_after(1000,self(),delayed_commit),
-    Db#db{waiting_delayed_commit=TRef};
-commit_data(Db, true) ->
-    Db;
-commit_data(Db, _) ->
-    #db{
-        waiting_delayed_commit = Timer
-    } = Db,
-    if is_reference(Timer) -> erlang:cancel_timer(Timer); true -> ok end,
     {ok, Db1} = couch_db_engine:commit_data(Db),
     Db1#db{
-        waiting_delayed_commit = nil,
         committed_update_seq = couch_db_engine:get_update_seq(Db)
     }.
 
@@ -772,7 +853,7 @@ get_meta_body_size(Meta) ->
 
 
 default_security_object(<<"shards/", _/binary>>) ->
-    case config:get("couchdb", "default_security", "everyone") of
+    case config:get("couchdb", "default_security", "admin_only") of
         "admin_only" ->
             [{<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
              {<<"admins">>,{[{<<"roles">>,[<<"_admin">>]}]}}];
@@ -780,7 +861,7 @@ default_security_object(<<"shards/", _/binary>>) ->
             []
     end;
 default_security_object(_DbName) ->
-    case config:get("couchdb", "default_security", "everyone") of
+    case config:get("couchdb", "default_security", "admin_only") of
         Admin when Admin == "admin_only"; Admin == "admin_local" ->
             [{<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
              {<<"admins">>,{[{<<"roles">>,[<<"_admin">>]}]}}];

@@ -11,10 +11,10 @@
 // the License.
  
  
- 
+couchTests.elixir = true;
 couchTests.proxyauth = function(debug) {
   // this test proxy authentification handler
-
+  return console.log('done in test/elixir/test/proxyauth_test.exs');
   var users_db_name = get_random_db_name();
   var usersDb = new CouchDB(users_db_name, {"X-Couch-Full-Commit":"false"});
   usersDb.createDb();
@@ -108,7 +108,7 @@ couchTests.proxyauth = function(debug) {
   run_on_modified_server(
     [{section: "httpd",
       key: "authentication_handlers",
-      value:"{chttpd_auth, proxy_authentification_handler}, {chttpd_auth, default_authentication_handler}"},
+      value:"{chttpd_auth, proxy_authentication_handler}, {chttpd_auth, default_authentication_handler}"},
       {section: "chttpd_auth",
         key: "authentication_db", 
         value: users_db_name},

@@ -133,7 +133,9 @@ make_group_fun(Bt, exact) ->
     end;
 make_group_fun(Bt, GroupLevel) when is_integer(GroupLevel), GroupLevel > 0 ->
     fun
-        ({[_|_] = Key1, _}, {[_|_] = Key2, _}) ->
+        GF({{p, Partition, Key1}, Val1}, {{p, Partition, Key2}, Val2}) ->
+            GF({Key1, Val1}, {Key2, Val2});
+        GF({[_|_] = Key1, _}, {[_|_] = Key2, _}) ->
             SL1 = lists:sublist(Key1, GroupLevel),
             SL2 = lists:sublist(Key2, GroupLevel),
             case less(Bt, {SL1, nil}, {SL2, nil}) of
@@ -147,7 +149,7 @@ make_group_fun(Bt, GroupLevel) when is_integer(GroupLevel), GroupLevel > 0 ->
                 _ ->
                     false
             end;
-        ({Key1, _}, {Key2, _}) ->
+        GF({Key1, _}, {Key2, _}) ->
             case less(Bt, {Key1, nil}, {Key2, nil}) of
                 false ->
                     case less(Bt, {Key2, nil}, {Key1, nil}) of
@@ -378,13 +380,12 @@ get_chunk_size() ->
     end.
 
 modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
-    case RootPointerInfo of
+    {NodeType, NodeList} = case RootPointerInfo of
     nil ->
-        NodeType = kv_node,
-        NodeList = [];
+        {kv_node, []};
     _Tuple ->
         Pointer = element(1, RootPointerInfo),
-        {NodeType, NodeList} = get_node(Bt, Pointer)
+        get_node(Bt, Pointer)
     end,
     NodeTuple = list_to_tuple(NodeList),
 
@@ -436,20 +437,22 @@ get_node(#btree{fd = Fd}, NodePos) ->
 
 write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
     % split up nodes into smaller sizes
-    NodeListList = chunkify(NodeList),
+    Chunks = chunkify(NodeList),
     % now write out each chunk and return the KeyPointer pairs for those nodes
-    ResultList = [
-        begin
-            {ok, Pointer, Size} = couch_file:append_term(
-                Fd, {NodeType, ANodeList}, [{compression, Comp}]),
-            {LastKey, _} = lists:last(ANodeList),
-            SubTreeSize = reduce_tree_size(NodeType, Size, ANodeList),
-            {LastKey, {Pointer, reduce_node(Bt, NodeType, ANodeList), SubTreeSize}}
-        end
-    ||
-        ANodeList <- NodeListList
-    ],
-    {ok, ResultList}.
+    ToWrite = [{NodeType, Chunk} || Chunk <- Chunks],
+    WriteOpts = [{compression, Comp}],
+    {ok, PtrSizes} = couch_file:append_terms(Fd, ToWrite, WriteOpts),
+    {ok, group_kps(Bt, NodeType, Chunks, PtrSizes)}.
+
+
+group_kps(_Bt, _NodeType, [], []) ->
+    [];
+
+group_kps(Bt, NodeType, [Chunk | RestChunks], [{Ptr, Size} | RestPtrSizes]) ->
+    {LastKey, _} = lists:last(Chunk),
+    SubTreeSize = reduce_tree_size(NodeType, Size, Chunk),
+    KP = {LastKey, {Ptr, reduce_node(Bt, NodeType, Chunk), SubTreeSize}},
+    [KP | group_kps(Bt, NodeType, RestChunks, RestPtrSizes)].
 
 
 write_node(Bt, _OldNode, NodeType, [], NewList) ->

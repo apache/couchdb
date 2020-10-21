@@ -12,7 +12,7 @@
 
 -module(couch_users_db).
 
--export([before_doc_update/2, after_doc_read/2, strip_non_public_fields/1]).
+-export([before_doc_update/3, after_doc_read/2, strip_non_public_fields/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -39,7 +39,7 @@
 %   -> 404 // Not Found
 % Else
 %   -> save_doc
-before_doc_update(Doc, Db) ->
+before_doc_update(Doc, Db, _UpdateType) ->
     #user_ctx{name=Name} = couch_db:get_user_ctx(Db),
     DocName = get_doc_name(Doc),
     case (catch couch_db:check_is_admin(Db)) of

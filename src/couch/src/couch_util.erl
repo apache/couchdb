@@ -27,9 +27,11 @@
 -export([reorder_results/2]).
 -export([url_strip_password/1]).
 -export([encode_doc_id/1]).
+-export([normalize_ddoc_id/1]).
 -export([with_db/2]).
 -export([rfc1123_date/0, rfc1123_date/1]).
 -export([integer_to_boolean/1, boolean_to_integer/1]).
+-export([validate_positive_int/1]).
 -export([find_in_binary/2]).
 -export([callback_exists/3, validate_callback_exists/3]).
 -export([with_proc/4]).
@@ -38,6 +40,7 @@
 -export([check_config_blacklist/1]).
 -export([check_md5/2]).
 -export([set_mqd_off_heap/1]).
+-export([set_process_priority/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -52,7 +55,8 @@
     <<"httpd_global_handlers">>,
     <<"native_query_servers">>,
     <<"os_daemons">>,
-    <<"query_servers">>
+    <<"query_servers">>,
+    <<"feature_flags">>
 ]).
 
 
@@ -498,7 +502,7 @@ json_decode(V) ->
     try
         jiffy:decode(V, [dedupe_keys])
     catch
-        throw:Error ->
+        error:Error ->
             throw({invalid_json, Error})
     end.
 
@@ -527,8 +531,8 @@ reorder_results(Keys, SortedResults) ->
 
 url_strip_password(Url) ->
     re:replace(Url,
-        "http(s)?://([^:]+):[^@]+@(.*)$",
-        "http\\1://\\2:*****@\\3",
+        "(http|https|socks5)://([^:]+):[^@]+@(.*)$",
+        "\\1://\\2:*****@\\3",
         [{return, list}]).
 
 encode_doc_id(#doc{id = Id}) ->
@@ -542,6 +546,10 @@ encode_doc_id(<<"_local/", Rest/binary>>) ->
 encode_doc_id(Id) ->
     url_encode(Id).
 
+normalize_ddoc_id(<<"_design/", _/binary>> = DDocId) ->
+    DDocId;
+normalize_ddoc_id(DDocId) when is_binary(DDocId) ->
+    <<"_design/", DDocId/binary>>.
 
 with_db(DbName, Fun)  when is_binary(DbName) ->
     case couch_db:open_int(DbName, [?ADMIN_CTX]) of
@@ -614,6 +622,17 @@ boolean_to_integer(false) ->
     0.
 
 
+validate_positive_int(N) when is_list(N) ->
+    try
+        I = list_to_integer(N),
+        validate_positive_int(I)
+    catch error:badarg ->
+        false
+    end;
+validate_positive_int(N) when is_integer(N), N > 0 -> true;
+validate_positive_int(_) -> false.
+
+
 find_in_binary(_B, <<>>) ->
     not_found;
 
@@ -684,6 +703,16 @@ set_mqd_off_heap(Module) ->
     end.
 
 
+set_process_priority(Module, Level) ->
+    case config:get_boolean("process_priority", atom_to_list(Module), false) of
+        true ->
+            process_flag(priority, Level),
+            ok;
+        false ->
+            ok
+    end.
+
+
 ensure_loaded(Module) when is_atom(Module) ->
     case code:ensure_loaded(Module) of
     {module, Module} ->
@@ -731,18 +760,9 @@ process_dict_get(Pid, Key, DefaultValue) ->
     end.
 
 
--ifdef(PRE18TIMEFEATURES).
-
-unique_monotonic_integer() ->
-    {Ms, S, Us} = erlang:now(),
-    (Ms * 1000000 + S) * 1000000 + Us.
-
--else.
-
 unique_monotonic_integer() ->
     erlang:unique_integer([monotonic, positive]).
 
--endif.
 
 check_config_blacklist(Section) ->
     case lists:member(Section, ?BLACKLIST_CONFIG_SECTIONS) of

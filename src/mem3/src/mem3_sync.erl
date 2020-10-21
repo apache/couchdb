@@ -140,11 +140,12 @@ handle_info({'EXIT', Active, Reason}, State) ->
         case Reason of {pending_changes, Count} ->
             maybe_resubmit(State, Job#job{pid = nil, count = Count});
         _ ->
-            try mem3:shards(mem3:dbname(Job#job.name)) of _ ->
-                timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}])
-            catch error:database_does_not_exist ->
-                % no need to retry
-                ok
+            case mem3:db_is_current(Job#job.name) of
+                true ->
+                    timer:apply_after(5000, ?MODULE, push, [Job#job{pid=nil}]);
+                false ->
+                    % no need to retry (db deleted or recreated)
+                    ok
             end,
             State
         end;
@@ -301,7 +302,12 @@ remove_entries(Dict, Entries) ->
     end, Dict, Entries).
 
 local_dbs() ->
-    [nodes_db(), shards_db(), users_db()].
+    UsersDb = users_db(),
+    % users db might not have been created so don't include it unless it exists
+    case couch_server:exists(UsersDb) of
+        true -> [nodes_db(), shards_db(), UsersDb];
+        false -> [nodes_db(), shards_db()]
+    end.
 
 nodes_db() ->
     ?l2b(config:get("mem3", "nodes_db", "_nodes")).

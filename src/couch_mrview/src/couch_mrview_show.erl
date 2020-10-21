@@ -132,8 +132,7 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
                 _ ->
                     Options = [{user_ctx, Req#httpd.user_ctx}]
             end,
-            NewDoc = couch_doc:from_json_obj_validate({NewJsonDoc}),
-            couch_doc:validate_docid(NewDoc#doc.id),
+            NewDoc = couch_db:doc_from_json_obj_validate(Db, {NewJsonDoc}),
             {ok, NewRev} = couch_db:update_doc(Db, NewDoc, Options),
             NewRevStr = couch_doc:rev_to_str(NewRev),
             {JsonResp1} = apply_headers(JsonResp0, [
@@ -182,7 +181,7 @@ handle_view_list_req(Req, _Db, _DDoc) ->
 
 
 handle_view_list(Req, Db, DDoc, LName, VDDoc, VName, Keys) ->
-    Args0 = couch_mrview_http:parse_params(Req, Keys),
+    Args0 = couch_mrview_http:parse_body_and_query(Req, Keys),
     ETagFun = fun(BaseSig, Acc0) ->
         UserCtx = Req#httpd.user_ctx,
         Name = UserCtx#user_ctx.name,

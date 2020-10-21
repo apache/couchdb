@@ -26,6 +26,7 @@
 
 -export([
     disk_version/1,
+    latest_disk_version/0,
     update_seq/1,
     id_tree_state/1,
     seq_tree_state/1,
@@ -52,7 +53,7 @@
 % if the disk revision is incremented, then new upgrade logic will need to be
 % added to couch_db_updater:init_db.
 
--define(LATEST_DISK_VERSION, 7).
+-define(LATEST_DISK_VERSION, 8).
 
 -record(db_header, {
     disk_version = ?LATEST_DISK_VERSION,
@@ -68,8 +69,12 @@
     uuid,
     epochs,
     compacted_seq,
-    purge_infos_limit = 1000
+    purge_infos_limit = 1000,
+    props_ptr
 }).
+
+
+-define(PARTITION_DISK_VERSION, 8).
 
 
 new() ->
@@ -134,6 +139,10 @@ set(Header0, Fields) ->
 
 disk_version(Header) ->
     get_field(Header, disk_version).
+
+
+latest_disk_version() ->
+        ?LATEST_DISK_VERSION.
 
 
 update_seq(Header) ->
@@ -236,6 +245,7 @@ upgrade_disk_version(#db_header{}=Header) ->
         4 -> Header#db_header{security_ptr = nil}; % [0.10 - 0.11)
         5 -> Header#db_header{disk_version = ?LATEST_DISK_VERSION}; % pre 1.2
         6 -> Header#db_header{disk_version = ?LATEST_DISK_VERSION}; % pre clustered purge
+        7 -> Header#db_header{disk_version = ?LATEST_DISK_VERSION}; % pre partitioned dbs
         ?LATEST_DISK_VERSION -> Header;
         _ ->
             Reason = "Incorrect disk header version",
@@ -368,12 +378,12 @@ upgrade_v3_test() ->
 
 -endif.
 
-upgrade_v5_to_v7_test() ->
+upgrade_v5_to_v8_test() ->
     Vsn5Header = mk_header(5),
     NewHeader = upgrade_disk_version(upgrade_tuple(Vsn5Header)),
 
     ?assert(is_record(NewHeader, db_header)),
-    ?assertEqual(7, disk_version(NewHeader)),
+    ?assertEqual(8, disk_version(NewHeader)),
 
     % Security ptr isn't changed for v5 headers
     ?assertEqual(bang, security_ptr(NewHeader)).

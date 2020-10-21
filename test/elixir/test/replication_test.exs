@@ -2,37 +2,24 @@ defmodule ReplicationTest do
   use CouchTestCase
 
   @moduledoc """
-  Test CouchDB View Collation Behavior
+  Test CouchDB Replication Behavior
   This is a port of the view_collation.js suite
   """
 
   # TODO: Parameterize these
-  @admin_account "adm:pass"
   @db_pairs_prefixes [
-    {"local-to-local", "", ""},
-    {"remote-to-local", "http://localhost:15984/", ""},
-    {"local-to-remote", "", "http://localhost:15984/"},
-    {"remote-to-remote", "http://localhost:15984/", "http://localhost:15984/"}
+    {"remote-to-remote", "http://127.0.0.1:15984/", "http://127.0.0.1:15984/"}
   ]
 
   # This should probably go into `make elixir` like what
   # happens for JavaScript tests.
   @moduletag config: [{"replicator", "startup_jitter", "0"}]
 
-  test "source database does not exist" do
-    name = random_db_name()
-    check_not_found(name <> "_src", name <> "_tgt")
-  end
-
-  test "source database not found with path - COUCHDB-317" do
-    name = random_db_name()
-    check_not_found(name <> "_src", name <> "_tgt")
-  end
-
   test "source database not found with host" do
     name = random_db_name()
-    url = "http://localhost:15984/" <> name <> "_src"
-    check_not_found(url, name <> "_tgt")
+    src_url = "http://127.0.0.1:15984/" <> name <> "_src"
+    tgt_url = "http://127.0.0.1:15984/" <> name <> "_tgt"
+    check_not_found(src_url, tgt_url)
   end
 
   def check_not_found(src, tgt) do
@@ -48,12 +35,14 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     doc = %{"_id" => "doc1"}
     [doc] = save_docs(src_db_name, [doc])
 
-    result = replicate(src_db_name, "http://localhost:15984/" <> tgt_db_name)
+    repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
     assert result["ok"]
     assert is_list(result["history"])
     history = Enum.at(result["history"], 0)
@@ -61,26 +50,32 @@ defmodule ReplicationTest do
     assert history["docs_read"] == 1
     assert history["doc_write_failures"] == 0
 
-    doc = Map.put(doc, "_attachments", %{
-      "hello.txt" => %{
-        "content_type" => "text/plain",
-        "data" => "aGVsbG8gd29ybGQ=" # base64:encode("hello world")
-      },
-      "foo.dat" => %{
-        "content_type" => "not/compressible",
-        "data" => "aSBhbSBub3QgZ3ppcGVk" # base64:encode("i am not gziped")
-      }
-    })
+    doc =
+      Map.put(doc, "_attachments", %{
+        "hello.txt" => %{
+          "content_type" => "text/plain",
+          # base64:encode("hello world")
+          "data" => "aGVsbG8gd29ybGQ="
+        },
+        "foo.dat" => %{
+          "content_type" => "not/compressible",
+          # base64:encode("i am not gziped")
+          "data" => "aSBhbSBub3QgZ3ppcGVk"
+        }
+      })
+
     [doc] = save_docs(src_db_name, [doc])
 
-    result = replicate(src_db_name, "http://localhost:15984/" <> tgt_db_name)
+    repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
 
     assert result["ok"]
     assert is_list(result["history"])
     assert length(result["history"]) == 2
     history = Enum.at(result["history"], 0)
-    assert history["docs_written"] == 1
-    assert history["docs_read"] == 1
+    assert history["docs_written"] == 2
+    assert history["docs_read"] == 2
     assert history["doc_write_failures"] == 0
 
     query = %{
@@ -89,12 +84,13 @@ defmodule ReplicationTest do
       :attachments => true,
       :att_encoding_info => true
     }
-    opts = [headers: ["Accept": "application/json"], query: query]
+
+    opts = [headers: [Accept: "application/json"], query: query]
     resp = Couch.get("/#{tgt_db_name}/#{doc["_id"]}", opts)
-    assert HTTPotion.Response.success? resp
+    assert HTTPotion.Response.success?(resp)
     assert is_map(resp.body)
-    refute Map.has_key? resp.body, "_conflicts"
-    refute Map.has_key? resp.body, "_deleted_conflicts"
+    refute Map.has_key?(resp.body, "_conflicts")
+    refute Map.has_key?(resp.body, "_deleted_conflicts")
 
     atts = resp.body["_attachments"]
 
@@ -104,7 +100,7 @@ defmodule ReplicationTest do
 
     assert atts["foo.dat"]["content_type"] == "not/compressible"
     assert atts["foo.dat"]["data"] == "aSBhbSBub3QgZ3ppcGVk"
-    refute Map.has_key? atts["foo.dat"], "encoding"
+    refute Map.has_key?(atts["foo.dat"], "encoding")
   end
 
   test "replication cancellation" do
@@ -114,13 +110,14 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     save_docs(src_db_name, make_docs(1..6))
 
     repl_body = %{:continuous => true, :create_target => true}
     repl_src = "http://127.0.0.1:15984/" <> src_db_name
-    result = replicate(repl_src, tgt_db_name, body: repl_body)
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
+    result = replicate(repl_src, repl_tgt, body: repl_body)
 
     assert result["ok"]
     assert is_binary(result["_local_id"])
@@ -130,16 +127,18 @@ defmodule ReplicationTest do
     assert is_map(task)
 
     assert task["replication_id"] == repl_id
+
     repl_body = %{
       "replication_id" => repl_id,
-      "cancel": true
+      cancel: true
     }
+
     result = Couch.post("/_replicate", body: repl_body)
     assert result.status_code == 200
 
     wait_for_repl_stop(repl_id)
 
-    assert get_task(repl_id, 0) == :nil
+    assert get_task(repl_id, 0) == nil
 
     result = Couch.post("/_replicate", body: repl_body)
     assert result.status_code == 404
@@ -153,13 +152,14 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     save_docs(src_db_name, make_docs(1..6))
 
-    repl_src = "http://localhost:15984/" <> src_db_name
+    repl_src = "http://127.0.0.1:15984/" <> src_db_name
+    repl_tgt = "http://127.0.0.1:15984/" <> tgt_db_name
     repl_body = %{"continuous" => true}
-    result = replicate(repl_src, tgt_db_name, body: repl_body)
+    result = replicate(repl_src, repl_tgt, body: repl_body)
 
     assert result["ok"]
     assert is_binary(result["_local_id"])
@@ -175,8 +175,9 @@ defmodule ReplicationTest do
 
     repl_body = %{
       "replication_id" => repl_id,
-      "cancel": true
+      cancel: true
     }
+
     resp = Couch.Session.post(sess, "/_replicate", body: repl_body)
     assert resp.status_code == 401
     assert resp.body["error"] == "unauthorized"
@@ -224,9 +225,9 @@ defmodule ReplicationTest do
     end
 
     @tag config: [
-      {"attachments", "compression_level", "8"},
-      {"attachments", "compressible_types", "text/*"}
-    ]
+           {"attachments", "compression_level", "8"},
+           {"attachments", "compressible_types", "text/*"}
+         ]
     test "compressed attachment replication - #{name}" do
       run_compressed_att_repl(@src_prefix, @tgt_prefix)
     end
@@ -249,7 +250,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     att1_data = get_att1_data()
     att2_data = get_att2_data()
@@ -259,24 +260,32 @@ defmodule ReplicationTest do
       "language" => "javascript",
       "value" => "ddoc"
     }
+
     docs = make_docs(1..20) ++ [ddoc]
     docs = save_docs(src_db_name, docs)
 
-    docs = for doc <- docs do
-      if doc["integer"] >= 10 and doc["integer"] < 15 do
-        add_attachment(src_db_name, doc, body: att1_data)
-      else
-        doc
+    docs =
+      for doc <- docs do
+        if doc["integer"] >= 10 and doc["integer"] < 15 do
+          add_attachment(src_db_name, doc, body: att1_data)
+        else
+          doc
+        end
       end
-    end
 
-    result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
+    repl_src = src_prefix <> src_db_name
+    repl_tgt = tgt_prefix <> tgt_db_name
+    result = replicate(repl_src, repl_tgt)
     assert result["ok"]
 
-    src_info = get_db_info(src_db_name)
-    tgt_info = get_db_info(tgt_db_name)
+    src_info =
+      retry_until(fn ->
+        src_info = get_db_info(src_db_name)
+        tgt_info = get_db_info(tgt_db_name)
 
-    assert src_info["doc_count"] == tgt_info["doc_count"]
+        assert src_info["doc_count"] == tgt_info["doc_count"]
+        src_info
+      end)
 
     assert is_binary(result["session_id"])
     assert is_list(result["history"])
@@ -314,23 +323,26 @@ defmodule ReplicationTest do
     new_doc = %{"_id" => "foo666", "value" => "d"}
     [new_doc] = save_docs(src_db_name, [new_doc])
 
-    docs = for doc <- docs do
-      if doc["integer"] >= 10 and doc["integer"] < 15 do
-        ctype = "application/binary"
-        opts = [name: "data.dat", body: att2_data, content_type: ctype]
-        add_attachment(src_db_name, doc, opts)
-      else
-        doc
+    docs =
+      for doc <- docs do
+        if doc["integer"] >= 10 and doc["integer"] < 15 do
+          ctype = "application/binary"
+          opts = [name: "data.dat", body: att2_data, content_type: ctype]
+          add_attachment(src_db_name, doc, opts)
+        else
+          doc
+        end
       end
-    end
 
     result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
     assert result["ok"]
 
-    src_info = get_db_info(src_db_name)
-    tgt_info = get_db_info(tgt_db_name)
+    retry_until(fn ->
+      src_info = get_db_info(src_db_name)
+      tgt_info = get_db_info(tgt_db_name)
 
-    assert tgt_info["doc_count"] == src_info["doc_count"]
+      assert tgt_info["doc_count"] == src_info["doc_count"]
+    end)
 
     assert is_binary(result["session_id"])
     assert is_list(result["history"])
@@ -339,10 +351,10 @@ defmodule ReplicationTest do
     assert history["session_id"] == result["session_id"]
     assert is_binary(history["start_time"])
     assert is_binary(history["end_time"])
-    assert history["missing_checked"] == 6
-    assert history["missing_found"] == 6
-    assert history["docs_read"] == 6
-    assert history["docs_written"] == 6
+    assert history["missing_checked"] == 27
+    assert history["missing_found"] == 27
+    assert history["docs_read"] == 27
+    assert history["docs_written"] == 27
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/#{new_doc["_id"]}").body
@@ -383,25 +395,28 @@ defmodule ReplicationTest do
       "_rev" => Enum.at(docs, 0)["_rev"],
       "_deleted" => true
     }
+
     [del_doc] = save_docs(src_db_name, [del_doc])
 
     result = replicate(src_prefix <> src_db_name, tgt_prefix <> tgt_db_name)
     assert result["ok"]
 
-    src_info = get_db_info(src_db_name)
-    tgt_info = get_db_info(tgt_db_name)
+    retry_until(fn ->
+      src_info = get_db_info(src_db_name)
+      tgt_info = get_db_info(tgt_db_name)
 
-    assert tgt_info["doc_count"] == src_info["doc_count"]
-    assert tgt_info["doc_del_count"] == src_info["doc_del_count"]
-    assert tgt_info["doc_del_count"] == 1
+      assert tgt_info["doc_count"] == src_info["doc_count"]
+      assert tgt_info["doc_del_count"] == src_info["doc_del_count"]
+      assert tgt_info["doc_del_count"] == 1
+    end)
 
     assert is_list(result["history"])
     assert length(result["history"]) == 3
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 28
+    assert history["missing_found"] == 28
+    assert history["docs_read"] == 28
+    assert history["docs_written"] == 28
     assert history["doc_write_failures"] == 0
 
     resp = Couch.get("/#{tgt_db_name}/#{del_doc["_id"]}")
@@ -430,10 +445,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 4
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 29
+    assert history["missing_found"] == 29
+    assert history["docs_read"] == 29
+    assert history["docs_written"] == 29
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -457,10 +472,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 5
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 30
+    assert history["missing_found"] == 30
+    assert history["docs_read"] == 30
+    assert history["docs_written"] == 30
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -486,10 +501,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 6
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 1
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 31
+    assert history["missing_found"] == 31
+    assert history["docs_read"] == 31
+    assert history["docs_written"] == 31
     assert history["doc_write_failures"] == 0
 
     copy = Couch.get!("/#{tgt_db_name}/2", query: %{:conflicts => true}).body
@@ -503,6 +518,7 @@ defmodule ReplicationTest do
       %{"_id" => "foo2", "value" => 222},
       %{"_id" => "foo3", "value" => 333}
     ]
+
     save_docs(src_db_name, src_docs)
     save_docs(tgt_db_name, Enum.filter(src_docs, &(&1["_id"] != "foo2")))
 
@@ -517,16 +533,17 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 7
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 3
-    assert history["missing_found"] == 1
-    assert history["docs_read"] == 1
-    assert history["docs_written"] == 1
+    assert history["missing_checked"] == 34
+    assert history["missing_found"] == 32
+    assert history["docs_read"] == 32
+    assert history["docs_written"] == 32
     assert history["doc_write_failures"] == 0
 
     docs = [
       %{"_id" => "foo4", "value" => 444},
       %{"_id" => "foo5", "value" => 555}
     ]
+
     save_docs(src_db_name, docs)
     save_docs(tgt_db_name, docs)
 
@@ -541,10 +558,10 @@ defmodule ReplicationTest do
     assert is_list(result["history"])
     assert length(result["history"]) == 8
     history = Enum.at(result["history"], 0)
-    assert history["missing_checked"] == 2
-    assert history["missing_found"] == 0
-    assert history["docs_read"] == 0
-    assert history["docs_written"] == 0
+    assert history["missing_checked"] == 36
+    assert history["missing_found"] == 32
+    assert history["docs_read"] == 32
+    assert history["docs_written"] == 32
     assert history["doc_write_failures"] == 0
 
     # Test nothing to replicate
@@ -562,7 +579,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     docs = make_docs(1..5)
     docs = save_docs(src_db_name, docs)
@@ -572,9 +589,11 @@ defmodule ReplicationTest do
 
     # TODO: In JS we re-fetch _changes with since_seq, is that
     # really necessary?
-    expected_ids = for change <- Enum.drop(changes, 3) do
-      change["id"]
-    end
+    expected_ids =
+      for change <- Enum.drop(changes, 3) do
+        change["id"]
+      end
+
     assert length(expected_ids) == 2
 
     cancel_replication(repl_src, repl_tgt)
@@ -592,6 +611,7 @@ defmodule ReplicationTest do
 
     Enum.each(docs, fn doc ->
       result = Couch.get("/#{tgt_db_name}/#{doc["_id"]}")
+
       if Enum.member?(expected_ids, doc["_id"]) do
         assert result.status_code < 300
         assert cmp_json(doc, result.body)
@@ -610,21 +630,25 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     docs = make_docs(1..7)
-    docs = for doc <- docs do
-      if doc["integer"] == 2 do
-        Map.put(doc, "_attachments", %{
-          "hello.txt" => %{
-            :content_type => "text/plain",
-            :data => "aGVsbG8gd29ybGQ=" # base64:encode("hello world")
-          }
-        })
-      else
-        doc
+
+    docs =
+      for doc <- docs do
+        if doc["integer"] == 2 do
+          Map.put(doc, "_attachments", %{
+            "hello.txt" => %{
+              :content_type => "text/plain",
+              # base64:encode("hello world")
+              :data => "aGVsbG8gd29ybGQ="
+            }
+          })
+        else
+          doc
+        end
       end
-    end
+
     docs = save_docs(src_db_name, docs)
 
     ddoc = %{
@@ -638,6 +662,7 @@ defmodule ReplicationTest do
         }
       """
     }
+
     [_] = save_docs(tgt_db_name, [ddoc])
 
     result = replicate(repl_src, repl_tgt)
@@ -653,6 +678,7 @@ defmodule ReplicationTest do
 
     for doc <- docs do
       result = Couch.get("/#{tgt_db_name}/#{doc["_id"]}")
+
       if rem(doc["integer"], 2) == 0 do
         assert result.status_code < 300
         assert result.body["integer"] == doc["integer"]
@@ -670,7 +696,7 @@ defmodule ReplicationTest do
     repl_tgt = tgt_prefix <> tgt_db_name
 
     create_db(src_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
     # tgt_db_name is created by the replication
 
     docs = make_docs(1..2)
@@ -678,14 +704,16 @@ defmodule ReplicationTest do
 
     replicate(repl_src, repl_tgt, body: %{:create_target => true})
 
-    src_info = get_db_info(src_db_name)
-    tgt_info = get_db_info(tgt_db_name)
+    retry_until(fn ->
+      src_info = get_db_info(src_db_name)
+      tgt_info = get_db_info(tgt_db_name)
 
-    assert tgt_info["doc_count"] == src_info["doc_count"]
+      assert tgt_info["doc_count"] == src_info["doc_count"]
 
-    src_shards = seq_to_shards(src_info["update_seq"])
-    tgt_shards = seq_to_shards(tgt_info["update_seq"])
-    assert tgt_shards == src_shards
+      src_shards = seq_to_shards(src_info["update_seq"])
+      tgt_shards = seq_to_shards(tgt_info["update_seq"])
+      assert tgt_shards == src_shards
+    end)
   end
 
   def run_filtered_repl(src_prefix, tgt_prefix) do
@@ -697,9 +725,10 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     docs = make_docs(1..30)
+
     ddoc = %{
       "_id" => "_design/mydesign",
       "language" => "javascript",
@@ -729,7 +758,8 @@ defmodule ReplicationTest do
 
     Enum.each(docs, fn doc ->
       resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
-      if(rem(doc["integer"], 2) == 0 || doc["string"] == "7") do
+
+      if rem(doc["integer"], 2) == 0 || doc["string"] == "7" do
         assert resp.status_code < 300
         assert cmp_json(doc, resp.body)
       else
@@ -778,7 +808,8 @@ defmodule ReplicationTest do
 
     Enum.each(new_docs, fn doc ->
       resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
-      if(rem(doc["integer"], 2) == 0) do
+
+      if rem(doc["integer"], 2) == 0 do
         assert resp.status_code < 300
         assert cmp_json(doc, resp.body)
       else
@@ -790,10 +821,10 @@ defmodule ReplicationTest do
     assert length(result["history"]) == 2
     history = Enum.at(result["history"], 0)
 
-    assert history["missing_checked"] == 3
-    assert history["missing_found"] == 3
-    assert history["docs_read"] == 3
-    assert history["docs_written"] == 3
+    assert history["missing_checked"] == 19
+    assert history["missing_found"] == 19
+    assert history["docs_read"] == 19
+    assert history["docs_written"] == 19
     assert history["doc_write_failures"] == 0
   end
 
@@ -806,7 +837,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     filter_fun_1 = """
       function(doc, req) {
@@ -830,6 +861,7 @@ defmodule ReplicationTest do
       %{"_id" => "foo3", :value => 3},
       %{"_id" => "foo4", :value => 4}
     ]
+
     ddoc = %{
       "_id" => "_design/mydesign",
       :language => "javascript",
@@ -846,6 +878,7 @@ defmodule ReplicationTest do
         :maxvalue => "3"
       }
     }
+
     result = replicate(repl_src, repl_tgt, body: repl_body)
     assert result["ok"]
 
@@ -950,11 +983,15 @@ defmodule ReplicationTest do
     repl_src = src_prefix <> src_db_name
     repl_tgt = tgt_prefix <> tgt_db_name
 
-    create_db(src_db_name)
-    create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    retry_until(fn ->
+      create_db(src_db_name)
+      create_db(tgt_db_name)
+    end)
+
+    delete_on_exit([src_db_name, tgt_db_name])
 
     docs = make_docs(1..10)
+
     ddoc = %{
       "_id" => "_design/foo",
       :language => "javascript",
@@ -962,9 +999,12 @@ defmodule ReplicationTest do
     }
 
     doc_ids = test_data[:initial]
-    num_missing = Enum.count(doc_ids, fn doc_id ->
-      String.starts_with?(doc_id, "foo_")
-    end)
+
+    num_missing =
+      Enum.count(doc_ids, fn doc_id ->
+        String.starts_with?(doc_id, "foo_")
+      end)
+
     total_replicated = length(doc_ids) - num_missing
 
     [_ | docs] = save_docs(src_db_name, [ddoc | docs])
@@ -973,7 +1013,7 @@ defmodule ReplicationTest do
     result = replicate(repl_src, repl_tgt, body: repl_body)
     assert result["ok"]
 
-    if(total_replicated == 0) do
+    if total_replicated == 0 do
       assert result["no_changes"]
     else
       assert is_binary(result["start_time"])
@@ -988,7 +1028,7 @@ defmodule ReplicationTest do
       orig = Couch.get!("/#{src_db_name}/#{doc_id}")
       copy = Couch.get!("/#{tgt_db_name}/#{doc_id}")
 
-      if(String.starts_with?(doc_id, "foo_")) do
+      if String.starts_with?(doc_id, "foo_") do
         assert orig.status_code == 404
         assert copy.status_code == 404
       else
@@ -1002,28 +1042,34 @@ defmodule ReplicationTest do
     Enum.each(docs, fn doc ->
       encoded_id = URI.encode_www_form(doc["_id"])
       copy = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
-      is_doc_id = &(Enum.member?(doc_ids, &1))
-      if(is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id)) do
+      is_doc_id = &Enum.member?(doc_ids, &1)
+
+      if is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id) do
         assert HTTPotion.Response.success?(copy)
       else
         assert copy.status_code == 404
       end
     end)
 
-    tgt_info = get_db_info(tgt_db_name)
-    assert tgt_info["doc_count"] == total_replicated
+    retry_until(fn ->
+      tgt_info = get_db_info(tgt_db_name)
+      assert tgt_info["doc_count"] == total_replicated
+    end)
 
     doc_ids_after = test_data[:after]
-    num_missing_after = Enum.count(doc_ids_after, fn doc_id ->
-      String.starts_with?(doc_id, "foo_")
-    end)
+
+    num_missing_after =
+      Enum.count(doc_ids_after, fn doc_id ->
+        String.starts_with?(doc_id, "foo_")
+      end)
 
     repl_body = %{:doc_ids => doc_ids_after}
     result = replicate(repl_src, repl_tgt, body: repl_body)
     assert result["ok"]
 
     total_replicated_after = length(doc_ids_after) - num_missing_after
-    if(total_replicated_after == 0) do
+
+    if total_replicated_after == 0 do
       assert result["no_changes"]
     else
       assert is_binary(result["start_time"])
@@ -1037,7 +1083,7 @@ defmodule ReplicationTest do
       orig = Couch.get!("/#{src_db_name}/#{doc_id}")
       copy = Couch.get!("/#{tgt_db_name}/#{doc_id}")
 
-      if(String.starts_with?(doc_id, "foo_")) do
+      if String.starts_with?(doc_id, "foo_") do
         assert orig.status_code == 404
         assert copy.status_code == 404
       else
@@ -1049,20 +1095,25 @@ defmodule ReplicationTest do
 
     # Be absolutely sure that other docs were not replicated
     all_doc_ids = doc_ids ++ doc_ids_after
+
     Enum.each(docs, fn doc ->
       encoded_id = URI.encode_www_form(doc["_id"])
       copy = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
-      is_doc_id = &(Enum.member?(all_doc_ids, &1))
-      if(is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id)) do
+      is_doc_id = &Enum.member?(all_doc_ids, &1)
+
+      if is_doc_id.(doc["_id"]) or is_doc_id.(encoded_id) do
         assert HTTPotion.Response.success?(copy)
       else
         assert copy.status_code == 404
       end
     end)
 
-    tgt_info = get_db_info(tgt_db_name)
-    assert tgt_info["doc_count"] == total_replicated + total_replicated_after,
-        "#{inspect test_data}"
+    retry_until(fn ->
+      tgt_info = get_db_info(tgt_db_name)
+
+      assert tgt_info["doc_count"] == total_replicated + total_replicated_after,
+             "#{inspect(test_data)}"
+    end)
 
     # Update a source document and re-replicate (no conflict introduced)
     conflict_id = test_data[:conflict_id]
@@ -1076,11 +1127,13 @@ defmodule ReplicationTest do
       body: get_att1_data(),
       content_type: "text/plain"
     ]
+
     att2 = [
       name: "data.dat",
       body: get_att2_data(),
       content_type: "application/binary"
     ]
+
     doc = add_attachment(src_db_name, doc, att1)
     doc = add_attachment(src_db_name, doc, att2)
 
@@ -1131,16 +1184,18 @@ defmodule ReplicationTest do
 
     result = replicate(repl_src, repl_tgt, body: repl_body)
     assert result["ok"]
-    assert result["docs_read"] == 1
-    assert result["docs_written"] == 1
+    assert result["docs_read"] == 2
+    assert result["docs_written"] == 2
     assert result["doc_write_failures"] == 0
 
-    copy = Couch.get!("/#{tgt_db_name}/#{conflict_id}", query: query).body
-    assert String.match?(copy["_rev"], ~r/^5-/)
-    assert is_list(copy["_conflicts"])
-    assert length(copy["_conflicts"]) == 1
-    conflict_rev = Enum.at(copy["_conflicts"], 0)
-    assert String.match?(conflict_rev, ~r/^5-/)
+    retry_until(fn ->
+      copy = Couch.get!("/#{tgt_db_name}/#{conflict_id}", query: query).body
+      assert String.match?(copy["_rev"], ~r/^5-/)
+      assert is_list(copy["_conflicts"])
+      assert length(copy["_conflicts"]) == 1
+      conflict_rev = Enum.at(copy["_conflicts"], 0)
+      assert String.match?(conflict_rev, ~r/^5-/)
+    end)
   end
 
   def run_continuous_repl(src_prefix, tgt_prefix) do
@@ -1152,7 +1207,7 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     ddoc = %{
       "_id" => "_design/mydesign",
@@ -1161,18 +1216,20 @@ defmodule ReplicationTest do
         "myfilter" => "function(doc, req) { return true; }"
       }
     }
+
     docs = make_docs(1..25)
     docs = save_docs(src_db_name, docs ++ [ddoc])
 
     att1_data = get_att1_data()
 
-    docs = for doc <- docs do
-      if doc["integer"] >= 10 and doc["integer"] < 15 do
-        add_attachment(src_db_name, doc)
-      else
-        doc
+    docs =
+      for doc <- docs do
+        if doc["integer"] >= 10 and doc["integer"] < 15 do
+          add_attachment(src_db_name, doc)
+        else
+          doc
+        end
       end
-    end
 
     repl_body = %{:continuous => true}
     result = replicate(repl_src, repl_tgt, body: repl_body)
@@ -1181,7 +1238,7 @@ defmodule ReplicationTest do
     assert is_binary(result["_local_id"])
 
     repl_id = result["_local_id"]
-    task = get_task(repl_id, 30000)
+    task = get_task(repl_id, 30_000)
     assert is_map(task), "Error waiting for replication to start"
 
     wait_for_repl(src_db_name, repl_id, 26)
@@ -1212,26 +1269,31 @@ defmodule ReplicationTest do
     assert tgt_info["doc_count"] == src_info["doc_count"]
 
     # Add attachments to more source docs
-    docs = for doc <- docs do
-      is_ddoc = String.starts_with?(doc["_id"], "_design/")
-      case doc["integer"] do
-        n when n >= 10 and n < 15 ->
-          ctype = "application/binary"
-          opts = [name: "data.dat", body: att1_data, content_type: ctype]
-          add_attachment(src_db_name, doc, opts)
-        _ when is_ddoc ->
-          add_attachment(src_db_name, doc)
-        _ ->
-          doc
+    docs =
+      for doc <- docs do
+        is_ddoc = String.starts_with?(doc["_id"], "_design/")
+
+        case doc["integer"] do
+          n when n >= 10 and n < 15 ->
+            ctype = "application/binary"
+            opts = [name: "data.dat", body: att1_data, content_type: ctype]
+            add_attachment(src_db_name, doc, opts)
+
+          _ when is_ddoc ->
+            add_attachment(src_db_name, doc)
+
+          _ ->
+            doc
+        end
       end
-    end
 
     wait_for_repl(src_db_name, repl_id, 32)
 
     Enum.each(docs, fn doc ->
       is_ddoc = String.starts_with?(doc["_id"], "_design/")
+
       case doc["integer"] do
-        N when N >= 10 and N < 15 or is_ddoc ->
+        N when (N >= 10 and N < 15) or is_ddoc ->
           resp = Couch.get!("/#{tgt_db_name}/#{doc["_id"]}")
           atts = resp.body["_attachments"]
           assert is_map(atts)
@@ -1256,6 +1318,7 @@ defmodule ReplicationTest do
             assert String.length(resp.body) == String.length(att1_data)
             assert resp.body == att1_data
           end
+
         _ ->
           :ok
       end
@@ -1338,9 +1401,11 @@ defmodule ReplicationTest do
     changes = get_db_changes(tgt_db_name, %{:since => tgt_info["update_seq"]})
     # quite unfortunately, there is no way on relying on ordering in a cluster
     # but we can assume a length of 2
-    changes = for change <- changes["results"] do
-      {change["id"], change["deleted"]}
-    end
+    changes =
+      for change <- changes["results"] do
+        {change["id"], change["deleted"]}
+      end
+
     assert Enum.sort(changes) == [{doc1["_id"], true}, {doc2["_id"], true}]
 
     # Cancel the replication
@@ -1349,10 +1414,10 @@ defmodule ReplicationTest do
     assert resp["ok"]
     assert resp["_local_id"] == repl_id
 
-    doc = %{"_id" => "foobar", "value": 666}
+    doc = %{"_id" => "foobar", "value" => 666}
     [doc] = save_docs(src_db_name, [doc])
 
-    wait_for_repl_stop(repl_id, 30000)
+    wait_for_repl_stop(repl_id, 30_000)
 
     resp = Couch.get("/#{tgt_db_name}/#{doc["_id"]}")
     assert resp.status_code == 404
@@ -1367,18 +1432,20 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     doc = %{"_id" => "foobar"}
     [doc] = save_docs(src_db_name, [doc])
 
     att1_data = get_att1_data()
     num_copies = 1 + round(128 * 1024 / String.length(att1_data))
-    big_att = List.foldl(Enum.to_list(1..num_copies), "", fn _, acc ->
-      acc <> att1_data
-    end)
 
-    doc = add_attachment(src_db_name, doc, [body: big_att])
+    big_att =
+      List.foldl(Enum.to_list(1..num_copies), "", fn _, acc ->
+        acc <> att1_data
+      end)
+
+    doc = add_attachment(src_db_name, doc, body: big_att)
 
     # Disable attachment compression
     set_config_raw("attachments", "compression_level", "0")
@@ -1395,7 +1462,7 @@ defmodule ReplicationTest do
     assert history["doc_write_failures"] == 0
 
     token = Enum.random(1..1_000_000)
-    query = %{"att_encoding_info": "true", "bypass_cache": token}
+    query = %{att_encoding_info: true, bypass_cache: token}
     resp = Couch.get("/#{tgt_db_name}/#{doc["_id"]}", query: query)
     assert resp.status_code < 300
     assert is_map(resp.body["_attachments"])
@@ -1415,13 +1482,14 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     set_security(tgt_db_name, %{
-        :admins => %{
-          :names => ["superman"],
-          :roles => ["god"]
-      }})
+      :admins => %{
+        :names => ["superman"],
+        :roles => ["god"]
+      }
+    })
 
     docs = make_docs(1..6)
     ddoc = %{"_id" => "_design/foo", "language" => "javascript"}
@@ -1436,6 +1504,7 @@ defmodule ReplicationTest do
       userinfo: ctx[:userinfo],
       headers: [cookie: sess.cookie]
     ]
+
     result = replicate(repl_src, repl_tgt, opts)
 
     assert Couch.Session.logout(sess).body["ok"]
@@ -1443,11 +1512,14 @@ defmodule ReplicationTest do
     assert result["ok"]
     history = Enum.at(result["history"], 0)
     assert history["docs_read"] == length(docs)
-    assert history["docs_written"] == length(docs) - 1 # ddoc write failed
-    assert history["doc_write_failures"] == 1 # ddoc write failed
+    # ddoc write failed
+    assert history["docs_written"] == length(docs) - 1
+    # ddoc write failed
+    assert history["doc_write_failures"] == 1
 
     Enum.each(docs, fn doc ->
       resp = Couch.get("/#{tgt_db_name}/#{doc["_id"]}")
+
       if String.starts_with?(doc["_id"], "_design/") do
         assert resp.status_code == 404
       else
@@ -1466,18 +1538,18 @@ defmodule ReplicationTest do
 
     create_db(src_db_name)
     create_db(tgt_db_name)
-    delete_on_exit [src_db_name, tgt_db_name]
+    delete_on_exit([src_db_name, tgt_db_name])
 
     set_security(tgt_db_name, %{
-        :admins => %{
-          :names => ["superman"],
-          :roles => ["god"]
-        },
-        :readers => %{
-          :names => ["john"],
-          :roles => ["secret"]
-        }
-      })
+      :admins => %{
+        :names => ["superman"],
+        :roles => ["god"]
+      },
+      :readers => %{
+        :names => ["john"],
+        :roles => ["secret"]
+      }
+    })
 
     docs = make_docs(1..6)
     ddoc = %{"_id" => "_design/foo", "language" => "javascript"}
@@ -1492,7 +1564,8 @@ defmodule ReplicationTest do
       userinfo: ctx[:userinfo],
       headers: [cookie: sess.cookie]
     ]
-    assert_raise(ExUnit.AssertionError, fn() ->
+
+    assert_raise(ExUnit.AssertionError, fn ->
       replicate(repl_src, repl_tgt, opts)
     end)
 
@@ -1510,31 +1583,10 @@ defmodule ReplicationTest do
     resp.body
   end
 
-  def replicate(src, tgt, options \\ []) do
-    {userinfo, options} = Keyword.pop(options, :userinfo)
-    userinfo = if userinfo == nil do
-      @admin_account
-    else
-      userinfo
-    end
-
-    src = set_user(src, userinfo)
-    tgt = set_user(tgt, userinfo)
-
-    defaults = [headers: [], body: %{}, timeout: 30_000]
-    options = Keyword.merge(defaults, options) |> Enum.into(%{})
-
-    %{body: body} = options
-    body = [source: src, target: tgt] |> Enum.into(body)
-    options = Map.put(options, :body, body)
-
-    resp = Couch.post("/_replicate", Enum.to_list options)
-    assert HTTPotion.Response.success?(resp), "#{inspect resp}"
-    resp.body
-  end
 
   def cancel_replication(src, tgt) do
     body = %{:cancel => true}
+
     try do
       replicate(src, tgt, body: body)
     rescue
@@ -1544,7 +1596,7 @@ defmodule ReplicationTest do
 
   def get_db_changes(db_name, query \\ %{}) do
     resp = Couch.get("/#{db_name}/_changes", query: query)
-    assert HTTPotion.Response.success?(resp), "#{inspect resp}"
+    assert HTTPotion.Response.success?(resp), "#{inspect(resp)} #{inspect(query)}"
     resp.body
   end
 
@@ -1553,6 +1605,7 @@ defmodule ReplicationTest do
     body = %{docs: docs}
     resp = Couch.post("/#{db_name}/_bulk_docs", query: query, body: body)
     assert HTTPotion.Response.success?(resp)
+
     for {doc, resp} <- Enum.zip(docs, resp.body) do
       assert resp["ok"], "Error saving doc: #{doc["_id"]}"
       Map.put(doc, "_rev", resp["rev"])
@@ -1571,21 +1624,27 @@ defmodule ReplicationTest do
       body: <<"some text">>,
       content_type: "text/plain"
     ]
-    att = Keyword.merge(defaults, att) |> Enum.into(%{})
+
+    att = defaults |> Keyword.merge(att) |> Enum.into(%{})
     uri = "/#{db_name}/#{URI.encode(doc["_id"])}/#{att[:name]}"
     headers = ["Content-Type": att[:content_type]]
-    params = if doc["_rev"] do
-      %{:w => 3, :rev => doc["_rev"]}
-    else
-      %{:w => 3}
-    end
-    resp = Couch.put(uri, headers: headers, query: params, body: att[:body])
-    assert HTTPotion.Response.success?(resp)
-    Map.put(doc, "_rev", resp.body["rev"])
+
+    params =
+      if doc["_rev"] do
+        %{:w => 3, :rev => doc["_rev"]}
+      else
+        %{:w => 3}
+      end
+
+    retry_until(fn ->
+      resp = Couch.put(uri, headers: headers, query: params, body: att[:body])
+      assert HTTPotion.Response.success?(resp)
+      Map.put(doc, "_rev", resp.body["rev"])
+    end)
   end
 
   def wait_for_repl(src_db_name, repl_id, expect_revs_checked) do
-    wait_for_repl(src_db_name, repl_id, expect_revs_checked, 30000)
+    wait_for_repl(src_db_name, repl_id, expect_revs_checked, 30_000)
   end
 
   def wait_for_repl(_, _, _, wait_left) when wait_left <= 0 do
@@ -1594,18 +1653,20 @@ defmodule ReplicationTest do
 
   def wait_for_repl(src_db_name, repl_id, expect_revs_checked, wait_left) do
     task = get_task(repl_id, 0)
-    through_seq = task["through_seq"]
+    through_seq = task["through_seq"] || "0"
     revs_checked = task["revisions_checked"]
     changes = get_db_changes(src_db_name, %{:since => through_seq})
+
     if length(changes["results"]) > 0 or revs_checked < expect_revs_checked do
       :timer.sleep(500)
       wait_for_repl(src_db_name, repl_id, expect_revs_checked, wait_left - 500)
     end
+
     task
   end
 
   def wait_for_repl_stop(repl_id) do
-    wait_for_repl_stop(repl_id, 30000)
+    wait_for_repl_stop(repl_id, 30_000)
   end
 
   def wait_for_repl_stop(repl_id, wait_left) when wait_left <= 0 do
@@ -1614,6 +1675,7 @@ defmodule ReplicationTest do
 
   def wait_for_repl_stop(repl_id, wait_left) do
     task = get_task(repl_id, 0)
+
     if is_map(task) do
       :timer.sleep(500)
       wait_for_repl_stop(repl_id, wait_left - 500)
@@ -1633,6 +1695,7 @@ defmodule ReplicationTest do
     case try_get_task(repl_id) do
       result when is_map(result) ->
         result
+
       _ ->
         :timer.sleep(500)
         get_task(repl_id, delay - 500)
@@ -1643,28 +1706,18 @@ defmodule ReplicationTest do
     resp = Couch.get("/_active_tasks")
     assert HTTPotion.Response.success?(resp)
     assert is_list(resp.body)
-    Enum.find(resp.body, :nil, fn task ->
+
+    Enum.find(resp.body, nil, fn task ->
       task["replication_id"] == repl_id
     end)
   end
 
-  def set_user(uri, userinfo) do
-    case URI.parse(uri) do
-      %{scheme: nil} ->
-        uri
-      %{userinfo: nil} = uri ->
-        URI.to_string(Map.put(uri, :userinfo, userinfo))
-      _ ->
-        uri
-    end
-  end
-
   def get_att1_data do
-    File.read!("test/data/lorem.txt")
+    File.read!(Path.expand("data/lorem.txt", __DIR__))
   end
 
   def get_att2_data do
-    File.read!("test/data/lorem_b64.txt")
+    File.read!(Path.expand("data/lorem_b64.txt", __DIR__))
   end
 
   def cmp_json(lhs, rhs) when is_map(lhs) and is_map(rhs) do
@@ -1673,11 +1726,11 @@ defmodule ReplicationTest do
         if cmp_json(v, rhs[k]) do
           {:cont, true}
         else
-          Logger.error "#{inspect lhs} != #{inspect rhs}"
+          Logger.error("#{inspect(lhs)} != #{inspect(rhs)}")
           {:halt, false}
         end
       else
-        Logger.error "#{inspect lhs} != #{inspect rhs}"
+        Logger.error("#{inspect(lhs)} != #{inspect(rhs)}")
         {:halt, false}
       end
     end)
@@ -1698,8 +1751,8 @@ defmodule ReplicationTest do
 
   def delete_on_exit(db_names) when is_list(db_names) do
     on_exit(fn ->
-      Enum.each(db_names, fn(name) ->
-        delete_db name
+      Enum.each(db_names, fn name ->
+        delete_db(name)
       end)
     end)
   end

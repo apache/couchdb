@@ -13,26 +13,32 @@
 import mango
 import unittest
 
+
 @unittest.skipUnless(mango.has_text_service(), "requires text service")
 class DisableIndexArrayLengthsTest(mango.UserDocsTextTests):
-
     def setUp(self):
         self.db.recreate()
-        self.db.create_text_index(ddoc="disable_index_array_lengths",
-                                       analyzer="keyword",
-                                       index_array_lengths=False)
-        self.db.create_text_index(ddoc="explicit_enable_index_array_lengths",
-                                       analyzer="keyword",
-                                       index_array_lengths=True)
+        self.db.create_text_index(
+            ddoc="disable_index_array_lengths",
+            analyzer="keyword",
+            index_array_lengths=False,
+        )
+        self.db.create_text_index(
+            ddoc="explicit_enable_index_array_lengths",
+            analyzer="keyword",
+            index_array_lengths=True,
+        )
 
     def test_disable_index_array_length(self):
-        docs = self.db.find({"favorites": {"$size": 4}},
-                            use_index="disable_index_array_lengths")
+        docs = self.db.find(
+            {"favorites": {"$size": 4}}, use_index="disable_index_array_lengths"
+        )
         for d in docs:
             assert len(d["favorites"]) == 0
 
     def test_enable_index_array_length(self):
-        docs = self.db.find({"favorites": {"$size": 4}},
-                            use_index="explicit_enable_index_array_lengths")
+        docs = self.db.find(
+            {"favorites": {"$size": 4}}, use_index="explicit_enable_index_array_lengths"
+        )
         for d in docs:
             assert len(d["favorites"]) == 4

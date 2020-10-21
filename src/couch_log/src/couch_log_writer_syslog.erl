@@ -39,7 +39,10 @@
 
 
 -ifdef(TEST).
--compile(export_all).
+-export([
+    get_facility/1,
+    get_level/1
+]).
 -endif.
 
 
