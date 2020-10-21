@@ -130,6 +130,17 @@ defmodule BulkDocsTest do
     assert Enum.at(rows, 2)["error"] == "conflict"
   end
 
+  @tag :with_db
+  test "bulk docs raises transaction_too_large error for transaction larger than 10MB", ctx do
+    docs = [%{_id: "0", a: random_string(16_000_000)}]
+    old_size = Couch.get("/_node/node1@127.0.0.1/_config/couchdb/max_document_size").body
+    set_config_raw("couchdb", "max_document_size", "67108864") # 64M
+    resp = Couch.post("/#{ctx[:db_name]}/_bulk_docs", body: %{docs: docs})
+    set_config_raw("couchdb", "max_document_size", old_size) # set back
+    assert resp.status_code == 413
+    assert resp.body["error"] == "transaction_too_large"
+  end
+
   defp bulk_post(docs, db) do
     retry_until(fn ->
       resp = Couch.post("/#{db}/_bulk_docs", body: %{docs: docs})
@@ -151,5 +162,12 @@ defmodule BulkDocsTest do
     assert resp.status_code == 400
     assert resp.body["error"] == "bad_request"
     assert resp.body["reason"] == reason
+  end
+
+  defp random_string(length) do
+    raw = :crypto.strong_rand_bytes(length)
+    raw
+    |> Base.url_encode64
+    |> binary_part(0, length)
   end
 end
