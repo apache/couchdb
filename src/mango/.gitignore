@@ -1,5 +1,0 @@
-.rebar/
-ebin/
-test/*.pyc
-venv/
-.eunit
