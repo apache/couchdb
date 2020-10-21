@@ -1,6 +1,0 @@
-*.o
-*.so
-ebin/
-
-.rebar/
-.eunit
