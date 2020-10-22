@@ -95,9 +95,8 @@ paginated_cb({meta, Meta}, #vacc{}=VAcc) ->
         case MetaData of
             {_Key, undefined} ->
                 Acc;
-            {total, _Value} ->
-                %% We set total_rows elsewere
-                Acc;
+            {total, Value} ->
+                maps:put(total_rows, Value, Acc);
             {Key, Value} ->
                 maps:put(list_to_binary(atom_to_list(Key)), Value, Acc)
         end
@@ -129,14 +128,12 @@ do_paginated(PageSize, QueriesArgs, KeyFun, Fun) when is_list(QueriesArgs) ->
                 Result0 = maybe_add_next_bookmark(
                     OriginalLimit, PageSize, Args, Meta, Items, KeyFun),
                 Result = maybe_add_previous_bookmark(Args, Result0, KeyFun),
-                #{total_rows := Total} = Result,
-                {Limit - Total, [Result | Acc]};
+                {Limit - length(maps:get(rows, Result)), [Result | Acc]};
             false ->
                 Bookmark = bookmark_encode(Args0),
                 Result = #{
                     rows => [],
-                    next => Bookmark,
-                    total_rows => 0
+                    next => Bookmark
                 },
                 {Limit, [Result | Acc]}
         end
@@ -152,8 +149,7 @@ maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun)
     case check_completion(OriginalLimit, RequestedLimit, Items) of
         {Rows, nil} ->
             maps:merge(Response, #{
-                rows => Rows,
-                total_rows => length(Rows)
+                rows => Rows
             });
         {Rows, Next} ->
             {FirstId, FirstKey} = first_key(KeyFun, Rows),
@@ -169,8 +165,7 @@ maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun)
             Bookmark = bookmark_encode(Args),
             maps:merge(Response, #{
                 rows => Rows,
-                next => Bookmark,
-                total_rows => length(Rows)
+                next => Bookmark
             })
     end.
 
