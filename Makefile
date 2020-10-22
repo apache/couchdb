@@ -260,6 +260,7 @@ elixir-cluster: export MIX_ENV=integration
 elixir-cluster: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir-cluster: devclean
 	@dev/run "$(TEST_OPTS)" -a adm:pass -n 3 \
+		--degrade-cluster 2 \
 		--enable-erlang-views \
 		--erlang-config rel/files/eunit.config \
 		--locald-config test/elixir/test/config/test-config.ini \
@@ -270,6 +271,7 @@ elixir-degraded-cluster: export MIX_ENV=integration
 elixir-degraded-cluster: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 elixir-degraded-cluster: devclean
 	@dev/run "$(TEST_OPTS)" -a adm:pass -n 1 \
+		--degrade-cluster 1 \
 		--enable-erlang-views \
 		--erlang-config rel/files/eunit.config \
 		--locald-config test/elixir/test/config/test-config.ini \
