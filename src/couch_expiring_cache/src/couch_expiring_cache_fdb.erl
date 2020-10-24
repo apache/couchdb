@@ -37,7 +37,7 @@
 
 
 -spec insert(JTx :: jtx(), Name :: binary(), Key :: binary(), Value :: binary(),
-    StaleTS :: ?TIME_UNIT, ExpiresTS :: ?TIME_UNIT) -> ok.
+    StaleTS :: millisecond(), ExpiresTS :: millisecond()) -> ok.
 insert(#{jtx := true} = JTx, Name, Key, Val, StaleTS, ExpiresTS) ->
     #{tx := Tx, layer_prefix := LayerPrefix} = couch_jobs_fdb:get_jtx(JTx),
     PK = primary_key(Name, Key, LayerPrefix),
@@ -86,7 +86,7 @@ clear_all(Name) ->
     end).
 
 
--spec clear_range_to(Name :: binary(), EndTS :: ?TIME_UNIT,
+-spec clear_range_to(Name :: binary(), EndTS :: millisecond(),
     Limit :: non_neg_integer()) ->
         OldestTS :: ?TIME_UNIT.
 clear_range_to(Name, EndTS, Limit) when Limit > 0 ->
@@ -98,7 +98,7 @@ clear_range_to(Name, EndTS, Limit) when Limit > 0 ->
         end, 0).
 
 
--spec get_range_to(Name :: binary(), EndTS :: ?TIME_UNIT,
+-spec get_range_to(Name :: binary(), EndTS :: millisecond(),
     Limit :: non_neg_integer()) ->
         [{Key :: binary(), Val :: binary()}].
 get_range_to(Name, EndTS, Limit) when Limit > 0 ->
