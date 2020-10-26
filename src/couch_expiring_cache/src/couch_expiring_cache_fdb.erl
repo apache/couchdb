@@ -41,7 +41,8 @@
 insert(#{jtx := true} = JTx, Name, Key, Val, StaleTS, ExpiresTS) ->
     #{tx := Tx, layer_prefix := LayerPrefix} = couch_jobs_fdb:get_jtx(JTx),
     PK = primary_key(Name, Key, LayerPrefix),
-    case get_val(Tx, PK) of
+    % Use snapshot here to minimize conflicts on parallel inserts
+    case get_val(erlfdb:snapshot(Tx), PK) of
         not_found ->
             ok;
         {_OldVal, _OldStaleTS, OldExpiresTS} ->
