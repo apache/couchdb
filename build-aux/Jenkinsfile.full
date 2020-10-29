@@ -83,7 +83,6 @@ pipeline {
           label 'docker'
           image 'couchdbdev/debian-stretch-erlang-20.3.8.25-1:latest'
           args "${DOCKER_ARGS}"
-          alwaysPull true
         }
       }
       options {
@@ -201,7 +200,6 @@ pipeline {
               image 'couchdbdev/centos-6-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
-              alwaysPull true
             }
           }
           environment {
@@ -245,7 +243,6 @@ pipeline {
               image 'couchdbdev/centos-7-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
-              alwaysPull true
             }
           }
           environment {
@@ -290,7 +287,6 @@ pipeline {
               image 'couchdbdev/centos-8-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
-              alwaysPull true
             }
           }
           environment {
@@ -335,7 +331,6 @@ pipeline {
               image 'couchdbdev/ubuntu-xenial-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
-              alwaysPull true
             }
           }
           environment {
@@ -378,7 +373,6 @@ pipeline {
             docker {
               image 'couchdbdev/ubuntu-bionic-erlang-20.3.8.25-1:latest'
               label 'docker'
-              alwaysPull true
               args "${DOCKER_ARGS}"
             }
           }
@@ -422,7 +416,6 @@ pipeline {
             docker {
               image 'couchdbdev/ubuntu-focal-erlang-20.3.8.25-1:latest'
               label 'docker'
-              alwaysPull true
               args "${DOCKER_ARGS}"
             }
           }
@@ -466,7 +459,6 @@ pipeline {
             docker {
               image 'couchdbdev/debian-stretch-erlang-20.3.8.25-1:latest'
               label 'docker'
-              alwaysPull true
               args "${DOCKER_ARGS}"
             }
           }
@@ -510,7 +502,6 @@ pipeline {
             docker {
               image 'couchdbdev/debian-buster-erlang-20.3.8.25-1:latest'
               label 'docker'
-              alwaysPull true
               args "${DOCKER_ARGS}"
             }
           }
@@ -554,7 +545,6 @@ pipeline {
             docker {
               image 'couchdbdev/arm64v8-debian-buster-erlang-20.3.8.25-1:latest'
               label 'arm64v8'
-              alwaysPull true
               args "${DOCKER_ARGS}"
             }
           }
@@ -602,7 +592,6 @@ pipeline {
 //            docker {
 //              image 'couchdbdev/ppc64le-debian-buster-erlang-20.3.8.25-1:latest'
 //              label 'ppc64le'
-//              alwaysPull true
 //              args "${DOCKER_ARGS}"
 //            }
 //          }
@@ -716,7 +705,6 @@ pipeline {
         docker {
           image 'couchdbdev/debian-buster-erlang-20.3.8.25-1:latest'
           label 'docker'
-          alwaysPull true
           args "${DOCKER_ARGS}"
         }
       }
