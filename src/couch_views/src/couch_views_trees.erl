@@ -229,7 +229,8 @@ open_id_tree(TxDb, Sig) ->
     Prefix = id_tree_prefix(DbPrefix, Sig),
     TreeOpts = [
         {persist_fun, fun couch_views_fdb:persist_chunks/3},
-        {cache_fun, create_cache_fun(id_tree)}
+        {cache_fun, create_cache_fun(id_tree)},
+        {encode_fun, create_encode_fun(TxDb)}
     ],
     ebtree:open(Tx, Prefix, get_order(id_btree), TreeOpts).
 
@@ -245,7 +246,8 @@ open_view_tree(TxDb, Sig, Lang, View, Options) ->
     Prefix = view_tree_prefix(DbPrefix, Sig, ViewId),
     BaseOpts = [
         {collate_fun, couch_views_util:collate_fun(View)},
-        {persist_fun, fun couch_views_fdb:persist_chunks/3}
+        {persist_fun, fun couch_views_fdb:persist_chunks/3},
+        {encode_fun, create_encode_fun(TxDb)}
     ],
     ExtraOpts = case lists:keyfind(read_only, 1, Options) of
         {read_only, Idx} ->
@@ -352,6 +354,17 @@ create_cache_fun(TreeId) ->
                 [{Id, Node}] -> Node;
                 [] -> undefined
             end
+    end.
+
+
+create_encode_fun(TxDb) ->
+    fun
+        (encode, Key, Term) ->
+            Bin = term_to_binary(Term, [compressed, {minor_version, 2}]),
+            aegis:encrypt(TxDb, Key, Bin);
+        (decode, Key, Ciphertext) ->
+            Bin = aegis:decrypt(TxDb, Key, Ciphertext),
+            binary_to_term(Bin, [safe])
     end.
 
 
