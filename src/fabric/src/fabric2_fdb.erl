@@ -495,7 +495,9 @@ get_info(#{} = Db) ->
         tx := Tx,
         db_prefix := DbPrefix
     } = ensure_current(Db),
-    get_info_wait(get_info_future(Tx, DbPrefix)).
+    DbInfo = get_info_wait(get_info_future(Tx, DbPrefix)),
+    AegisProps = aegis:get_db_info(Db),
+    [{encryption, {AegisProps}} | DbInfo].
 
 
 get_info_future(Tx, DbPrefix) ->

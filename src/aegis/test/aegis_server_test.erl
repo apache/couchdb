@@ -35,6 +35,8 @@ basic_test_() ->
             {timeout, ?TIMEOUT, fun test_init_db/0}},
             {"open_db returns true when encryption enabled",
             {timeout, ?TIMEOUT, fun test_open_db/0}},
+            {"get_db_info returns encryption enabled true",
+            {timeout, ?TIMEOUT, fun test_get_db_info/0}},
             {"init_db caches key",
             {timeout, ?TIMEOUT, fun test_init_db_cache/0}},
             {"open_db caches key",
@@ -68,6 +70,11 @@ test_init_db() ->
 test_open_db() ->
     ?assert(aegis_server:open_db(?DB)),
     ?assertEqual(1, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
+
+
+test_get_db_info() ->
+    ?assertEqual([{enabled,true},{key_manager,{[]}}],
+        aegis:get_db_info(#{is_encrypted => true})).
 
 
 test_init_db_cache() ->
