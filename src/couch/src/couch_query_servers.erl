@@ -495,9 +495,21 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
     end,
     Options = json_doc_options(),
     JsonDocs = [json_doc(Doc, Options) || Doc <- Docs],
+    try
+        {ok, filter_docs_int(DDoc, FName, JsonReq, JsonDocs)}
+    catch
+        throw:{os_process_error,{exit_status,1}} ->
+            %% batch used too much memory, retry sequentially.
+            Fun = fun(JsonDoc) ->
+                filter_docs_int(DDoc, FName, JsonReq, [JsonDoc])
+            end,
+            {ok, lists:flatmap(Fun, JsonDocs)}
+    end.
+
+filter_docs_int(DDoc, FName, JsonReq, JsonDocs) ->
     [true, Passes] = ddoc_prompt(DDoc, [<<"filters">>, FName],
         [JsonDocs, JsonReq]),
-    {ok, Passes}.
+    Passes.
 
 ddoc_proc_prompt({Proc, DDocId}, FunPath, Args) ->
     proc_prompt(Proc, [<<"ddoc">>, DDocId, FunPath, Args]).
