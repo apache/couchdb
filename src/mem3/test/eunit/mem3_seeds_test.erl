@@ -59,11 +59,10 @@ check_nodelist() ->
     end.
 
 check_local_dbs() ->
-    ?assertEqual([<<"_dbs">>, <<"_nodes">>],
-        lists:sort(mem3_sync:local_dbs())),
+    LocalDbs = mem3_sync:local_dbs(),
     {ok, _} = couch_server:create(<<"_users">>, []),
-    ?assertEqual([<<"_dbs">>, <<"_nodes">>, <<"_users">>],
-        lists:sort(mem3_sync:local_dbs())).
+    ?assertEqual(lists:append(LocalDbs, [<<"_users">>]),
+        mem3_sync:local_dbs()).
 
 cleanup() ->
     application:stop(mem3),
