@@ -84,9 +84,15 @@ can_configure_options_at_runtime(_) ->
 
     meck:reset(erlfdb),
 
+    % Wait until after fabric2_server has updated the new fdb handle
+    OldDbHandle = get(?PDICT_DB_KEY),
     config:delete("fdb_tx_options", "size_limit", false),
-    % Assert that we get a new handle and are setting our default values
-    meck:wait(erlfdb, set_option, ['_', timeout, '_'], 4000),
+    test_util:wait(fun() ->
+        case application:get_env(fabric, db) of
+            {ok, OldDbHandle} -> wait;
+            {ok, _} -> ok
+        end
+    end),
     erase(?PDICT_DB_KEY),
 
     {ok, Db1} = fabric2_db:open(DbName, [?ADMIN_CTX]),
