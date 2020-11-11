@@ -154,6 +154,7 @@ stop() ->
 
 handle_request(MochiReq0) ->
     erlang:put(?REWRITE_COUNT, 0),
+    couch_httpd:response_not_started(),
     MochiReq = couch_httpd_vhost:dispatch_host(MochiReq0),
     handle_request_int(MochiReq).
 
@@ -1282,8 +1283,10 @@ handle_response(Req0, Code0, Headers0, Args0, Type) ->
     respond_(Req1, Code1, Headers1, Args1, Type).
 
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
+    couch_httpd:abort_if_response_already_started(),
     MochiReq:start_response({Code, Headers});
 respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
+    couch_httpd:abort_if_response_already_started(),
     MochiReq:Type({Code, Headers, Args}).
 
 get_user(#httpd{user_ctx = #user_ctx{name = null}}) ->

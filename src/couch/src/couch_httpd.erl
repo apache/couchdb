@@ -39,6 +39,7 @@
 -export([check_max_request_length/1]).
 -export([handle_request/1]).
 -export([set_auth_handlers/0]).
+-export([response_not_started/0, abort_if_response_already_started/0]).
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 -define(MAX_DRAIN_BYTES, 1048576).
@@ -229,6 +230,7 @@ handle_request(MochiReq, DefaultFun, UrlHandlers, DbUrlHandlers,
     DesignUrlHandlers) ->
     %% reset rewrite count for new request
     erlang:put(?REWRITE_COUNT, 0),
+    response_not_started(),
 
     MochiReq1 = couch_httpd_vhost:dispatch_host(MochiReq),
 
@@ -1204,6 +1206,7 @@ respond_(#httpd{mochi_req = MochiReq} = Req, Code, Headers, Args, Type) ->
     end.
 
 http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response) ->
+    abort_if_response_already_started(),
     MochiReq:start_response({Code, Headers});
 http_respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
     % Special handling for the 413 response. Make sure the socket is closed as
@@ -1218,6 +1221,7 @@ http_respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
     mochiweb_socket:recv(Socket, ?MAX_DRAIN_BYTES, ?MAX_DRAIN_TIME_MSEC),
     Result;
 http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
+    abort_if_response_already_started(),
     MochiReq:Type({Code, Headers, Args}).
 
 peer(MochiReq) ->
@@ -1227,6 +1231,20 @@ peer(MochiReq) ->
         _ ->
             MochiReq:get(peer)
     end.
+
+
+response_not_started() ->
+    erase(http_response_started).
+
+
+abort_if_response_already_started() ->
+    case get(http_response_started) of
+        undefined ->
+            put(http_response_started, true);
+        true ->
+            throw({http_abort, mochiweb_response:new(nil, 500, []), multiple_responses_attempted})
+    end.
+
 
 %%%%%%%% module tests below %%%%%%%%
 
