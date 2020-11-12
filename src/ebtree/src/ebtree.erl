@@ -56,7 +56,7 @@
 -define(META_ORDER, 0).
 
 -define(NODE, 1).
--define(NODE_ROOT_ID, <<0>>).
+-define(NODE_ROOT_ID, <<0:128>>).
 
 -define(underflow(Tree, Node), Tree#tree.min > length(Node#node.members)).
 -define(at_min(Tree, Node), Tree#tree.min == length(Node#node.members)).
@@ -1012,7 +1012,7 @@ set_node(Tx, #tree{} = Tree, #node{} = Node) ->
     persist(Tree, Tx, set, [Key, Value]).
 
 
-node_key(Prefix, Id) when is_binary(Prefix), is_binary(Id) ->
+node_key(Prefix, Id) when is_binary(Prefix), is_binary(Id), bit_size(Id) =:= 128 ->
     erlfdb_tuple:pack({?NODE, Id}, Prefix).
 
 
