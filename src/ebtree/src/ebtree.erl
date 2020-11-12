@@ -1012,7 +1012,7 @@ set_node(Tx, #tree{} = Tree, #node{} = Node) ->
     persist(Tree, Tx, set, [Key, Value]).
 
 
-node_key(Prefix, Id) when is_binary(Prefix), is_binary(Id) ->
+node_key(Prefix, Id) when is_binary(Prefix), is_binary(Id), bit_size(Id) =:= 128 ->
     erlfdb_tuple:pack({?NODE, Id}, Prefix).
 
 
