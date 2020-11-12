@@ -56,7 +56,7 @@
 -define(META_ORDER, 0).
 
 -define(NODE, 1).
--define(NODE_ROOT_ID, <<0>>).
+-define(NODE_ROOT_ID, <<0:128>>).
 
 -define(underflow(Tree, Node), Tree#tree.min > length(Node#node.members)).
 -define(at_min(Tree, Node), Tree#tree.min == length(Node#node.members)).
