@@ -264,13 +264,15 @@ get_update_start_state(TxDb, Mrst, #{db_seq := undefined} = State) ->
         view_seq := ViewSeq
     } = couch_views_fdb:get_view_state(TxDb, Mrst),
 
-    State#{
-        tx_db := TxDb,
-        db_seq := fabric2_db:get_update_seq(TxDb),
-        view_vs := ViewVS,
-        view_seq := ViewSeq,
-        last_seq := ViewSeq
-    };
+    fabric2_fdb:with_snapshot(TxDb, fun(SSDb) ->
+        State#{
+            tx_db := TxDb,
+            db_seq := fabric2_db:get_update_seq(SSDb),
+            view_vs := ViewVS,
+            view_seq := ViewSeq,
+            last_seq := ViewSeq
+        }
+    end);
 
 get_update_start_state(TxDb, _Idx, State) ->
     State#{
@@ -287,7 +289,16 @@ fold_changes(State) ->
 
     Fun = fun process_changes/2,
     Opts = [{limit, Limit}, {restart_tx, false}],
-    fabric2_db:fold_changes(TxDb, SinceSeq, Fun, State, Opts).
+    Result = fabric2_fdb:with_snapshot(TxDb, fun(SSDb) ->
+        fabric2_db:fold_changes(SSDb, SinceSeq, Fun, State, Opts)
+    end),
+    case Result of
+        {ok, #{last_seq := LastSeq}} ->
+            set_changes_conflict(TxDb, SinceSeq, fabric2_fdb:seq_to_vs(LastSeq));
+        _ ->
+            ok
+    end,
+    Result.
 
 
 process_changes(Change, Acc) ->
@@ -595,6 +606,16 @@ fail_job(Job, Data, Error, Reason) ->
     NewData = add_error(Error, Reason, Data),
     couch_jobs:finish(undefined, Job, NewData),
     exit(normal).
+
+
+set_changes_conflict(TxDb, StartVS, EndVS) ->
+    #{
+        tx := Tx,
+        db_prefix := DbPrefix
+    } = TxDb,
+    StartKey = erlfdb_tuple:pack({?DB_CHANGES, StartVS}, DbPrefix),
+    EndKey = erlfdb_tuple:pack({?DB_CHANGES, EndVS}, DbPrefix),
+    erlfdb:add_read_conflict_range(Tx, StartKey, EndKey).
 
 
 retry_limit() ->
