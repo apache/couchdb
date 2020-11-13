@@ -1093,14 +1093,18 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
             end,
 
             StartKey = get_since_seq(TxDb, Dir, SinceSeq),
-            EndKey = case Dir of
-                rev -> fabric2_util:seq_zero_vs();
-                _ -> fabric2_util:seq_max_vs()
+            EndKey = case fabric2_util:get_value(end_key, Options) of
+                undefined when Dir == rev ->
+                    fabric2_util:seq_zero_vs();
+                undefined ->
+                    fabric2_util:seq_max_vs();
+                EK when is_binary(EK) ->
+                    fabric2_fdb:seq_to_vs(EK);
+                EK when is_tuple(EK), element(1, EK) == versionstamp ->
+                    EK
             end,
-            FoldOpts = [
-                {start_key, StartKey},
-                {end_key, EndKey}
-            ] ++ RestartTx ++ Options,
+            BaseOpts = [{start_key, StartKey}] ++ RestartTx ++ Options,
+            FoldOpts = lists:keystore(end_key, 1, BaseOpts, {end_key, EndKey}),
 
             {ok, fabric2_fdb:fold_range(TxDb, Prefix, fun({K, V}, Acc) ->
                 {SeqVS} = erlfdb_tuple:unpack(K, Prefix),
