@@ -18,6 +18,8 @@
     transactional/3,
     transactional/2,
 
+    with_snapshot/2,
+
     create/2,
     open/2,
     ensure_current/1,
@@ -150,6 +152,11 @@ transactional(#{tx := undefined} = Db, Fun) ->
             transactional(Db#{reopen => true}, Fun)
         end)
     end;
+transactional(#{tx := {erlfdb_snapshot, _}} = Db, Fun) ->
+    DbName = maps:get(name, Db, undefined),
+    with_span(Fun, #{'db.name' => DbName}, fun() ->
+        Fun(Db)
+    end);
 
 transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
     DbName = maps:get(name, Db, undefined),
@@ -181,6 +188,14 @@ do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
     after
         clear_transaction()
     end.
+
+
+with_snapshot(#{tx := {erlfdb_transaction, _} = Tx} = TxDb, Fun) ->
+    SSDb = TxDb#{tx := erlfdb:snapshot(Tx)},
+    Fun(SSDb);
+
+with_snapshot(#{tx := {erlfdb_snapshot, _}} = SSDb, Fun) ->
+    Fun(SSDb).
 
 
 create(#{} = Db0, Options) ->
@@ -1865,6 +1880,8 @@ get_db_handle() ->
     end.
 
 
+require_transaction(#{tx := {erlfdb_snapshot, _}} = _Db) ->
+    ok;
 require_transaction(#{tx := {erlfdb_transaction, _}} = _Db) ->
     ok;
 require_transaction(#{} = _Db) ->
