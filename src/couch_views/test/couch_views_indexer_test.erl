@@ -52,6 +52,7 @@ indexer_test_() ->
                     ?TDEF_FE(index_autoupdater_callback),
                     ?TDEF_FE(handle_db_recreated_when_running),
                     ?TDEF_FE(handle_db_recreated_after_finished),
+                    ?TDEF_FE(handle_doc_updated_when_running),
                     ?TDEF_FE(index_can_recover_from_crash, 60)
                 ]
             }
@@ -501,6 +502,50 @@ handle_db_recreated_after_finished(Db) ->
     ?assertEqual([
         row(<<"2">>, 2, 2),
         row(<<"3">>, 3, 3)
+    ], Out2).
+
+
+handle_doc_updated_when_running(Db) ->
+    DDoc = create_ddoc(),
+    {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
+    {ok, _} = fabric2_db:update_doc(Db, doc(0), []),
+    {ok, _} = fabric2_db:update_doc(Db, doc(1), []),
+
+    % To intercept job building while it is running ensure updates happen one
+    % row at a time.
+    config:set("couch_views", "batch_initial_size", "1", false),
+
+    meck_intercept_job_update(self()),
+
+    [{ok, JobId}] = couch_views:build_indices(Db, [DDoc]),
+
+    {Indexer, _Job, _Data} = wait_indexer_update(10000),
+
+    {ok, State} = couch_jobs:get_job_state(undefined, ?INDEX_JOB_TYPE, JobId),
+    ?assertEqual(running, State),
+
+    {ok, SubId, running, _} = couch_jobs:subscribe(?INDEX_JOB_TYPE, JobId),
+
+    {ok, Doc} = fabric2_db:open_doc(Db, <<"1">>),
+    Doc2 = Doc#doc {
+        body = {[{<<"val">>, 2}]}
+    },
+    {ok, _} = fabric2_db:update_doc(Db, Doc2),
+
+    reset_intercept_job_update(Indexer),
+    Indexer ! continue,
+
+    ?assertMatch({
+        ?INDEX_JOB_TYPE,
+        JobId,
+        finished,
+        #{<<"active_task_info">> := #{<<"changes_done">> := 1}}
+    }, couch_jobs:wait(SubId, finished, infinity)),
+
+    Args = #mrargs{update = false},
+    {ok, Out2} = couch_views:query(Db, DDoc, ?MAP_FUN1, fun fold_fun/2, [], Args),
+    ?assertEqual([
+        row(<<"0">>, 0, 0)
     ], Out2).
 
 
