@@ -40,6 +40,7 @@ changes_fold_test_() ->
                     ?TDEF_FE(fold_changes_basic_rev),
                     ?TDEF_FE(fold_changes_since_now_rev),
                     ?TDEF_FE(fold_changes_since_seq_rev),
+                    ?TDEF_FE(fold_changes_with_end_key),
                     ?TDEF_FE(fold_changes_basic_tx_too_old),
                     ?TDEF_FE(fold_changes_reverse_tx_too_old),
                     ?TDEF_FE(fold_changes_tx_too_old_with_single_row_emits),
@@ -122,6 +123,16 @@ fold_changes_since_seq_rev({Db, DocRows}) ->
     ?assertEqual(DocRows, changes(Db, Since, Opts)),
     RestRows = lists:sublist(DocRows, length(DocRows) - 1),
     fold_changes_since_seq_rev({Db, RestRows}).
+
+
+fold_changes_with_end_key({Db, DocRows}) ->
+    lists:foldl(fun(DocRow, Acc) ->
+        EndSeq = maps:get(sequence, DocRow),
+        Changes = changes(Db, 0, [{end_key, EndSeq}]),
+        NewAcc = [DocRow | Acc],
+        ?assertEqual(Changes, NewAcc),
+        NewAcc
+    end, [], DocRows).
 
 
 fold_changes_basic_tx_too_old({Db, DocRows0}) ->
