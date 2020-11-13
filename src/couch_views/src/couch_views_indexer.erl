@@ -86,15 +86,22 @@ init() ->
         fail_job(Job, Data, sig_changed, "Design document was modified")
     end,
 
+    DbSeq = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        fabric2_fdb:with_snapshot(TxDb, fun(SSDb) ->
+            fabric2_db:get_update_seq(SSDb)
+        end)
+    end),
+
     State = #{
         tx_db => undefined,
         db_uuid => DbUUID,
-        db_seq => undefined,
+        db_seq => DbSeq,
         view_seq => undefined,
         last_seq => undefined,
         view_vs => undefined,
         job => Job,
         job_data => Data,
+        rows_processed => 0,
         count => 0,
         changes_done => 0,
         doc_acc => [],
@@ -206,8 +213,6 @@ do_update(Db, Mrst0, State0) ->
         {ok, State2} = fold_changes(State1),
 
         #{
-            count := Count,
-            limit := Limit,
             doc_acc := DocAcc,
             last_seq := LastSeq,
             view_vs := ViewVS,
@@ -228,7 +233,7 @@ do_update(Db, Mrst0, State0) ->
             total_kvs => TotalKVs
         },
 
-        case Count < Limit of
+        case is_update_finished(State2) of
             true ->
                 maybe_set_build_status(TxDb, Mrst2, ViewVS,
                     ?INDEX_READY),
@@ -249,6 +254,20 @@ do_update(Db, Mrst0, State0) ->
     end).
 
 
+is_update_finished(State) ->
+    #{
+        db_seq := DbSeq,
+        last_seq := LastSeq,
+        view_vs := ViewVs
+    } = State,
+    AtDbSeq = LastSeq == DbSeq,
+    AtViewVs = case ViewVs of
+        not_found -> false;
+        _ -> LastSeq == fabric2_fdb:vs_to_seq(ViewVs)
+    end,
+    AtDbSeq orelse AtViewVs.
+
+
 maybe_set_build_status(_TxDb, _Mrst1, not_found, _State) ->
     ok;
 
@@ -258,7 +277,7 @@ maybe_set_build_status(TxDb, Mrst1, _ViewVS, State) ->
 
 % In the first iteration of update we need
 % to populate our db and view sequences
-get_update_start_state(TxDb, Mrst, #{db_seq := undefined} = State) ->
+get_update_start_state(TxDb, Mrst, #{view_seq := undefined} = State) ->
     #{
         view_vs := ViewVS,
         view_seq := ViewSeq
@@ -266,7 +285,6 @@ get_update_start_state(TxDb, Mrst, #{db_seq := undefined} = State) ->
 
     State#{
         tx_db := TxDb,
-        db_seq := fabric2_db:get_update_seq(TxDb),
         view_vs := ViewVS,
         view_seq := ViewSeq,
         last_seq := ViewSeq
@@ -281,18 +299,36 @@ get_update_start_state(TxDb, _Idx, State) ->
 fold_changes(State) ->
     #{
         view_seq := SinceSeq,
+        db_seq := DbSeq,
         limit := Limit,
         tx_db := TxDb
     } = State,
 
+    FoldState = State#{
+        rows_processed := 0
+    },
+
     Fun = fun process_changes/2,
-    Opts = [{limit, Limit}, {restart_tx, false}],
-    fabric2_db:fold_changes(TxDb, SinceSeq, Fun, State, Opts).
+    Opts = [
+        {end_key, fabric2_fdb:seq_to_vs(DbSeq)},
+        {limit, Limit},
+        {restart_tx, false}
+    ],
+    case fabric2_db:fold_changes(TxDb, SinceSeq, Fun, FoldState, Opts) of
+        {ok, #{rows_processed := 0} = FinalState} when Limit > 0 ->
+            % If we read zero rows with a non-zero limit
+            % it means we've caught up to the DbSeq as our
+            % last_seq.
+            {ok, FinalState#{last_seq := DbSeq}};
+        Result ->
+            Result
+    end.
 
 
 process_changes(Change, Acc) ->
     #{
         doc_acc := DocAcc,
+        rows_processed := RowsProcessed,
         count := Count,
         design_opts := DesignOpts,
         view_vs := ViewVS
@@ -308,12 +344,14 @@ process_changes(Change, Acc) ->
     Acc1 = case {Id, IncludeDesign} of
         {<<?DESIGN_DOC_PREFIX, _/binary>>, false} ->
             maps:merge(Acc, #{
+                rows_processed => RowsProcessed + 1,
                 count => Count + 1,
                 last_seq => LastSeq
             });
         _ ->
             Acc#{
                 doc_acc := DocAcc ++ [Change],
+                rows_processed := RowsProcessed + 1,
                 count := Count + 1,
                 last_seq := LastSeq
             }
