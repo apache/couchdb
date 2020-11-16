@@ -21,6 +21,8 @@ github:
     squash: true
     rebase: true
     merge: true
+  protected_branches:
+    main
 
 notifications:
   commits: commits@couchdb.apache.org
