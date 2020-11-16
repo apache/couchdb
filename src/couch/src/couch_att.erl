@@ -593,13 +593,9 @@ flush_data(Db, {stream, StreamEngine}, Att) ->
             % Already written
             Att;
         false ->
-            NewAtt = couch_db:with_stream(Db, Att, fun(OutputStream) ->
+            couch_db:with_stream(Db, Att, fun(OutputStream) ->
                 couch_stream:copy(StreamEngine, OutputStream)
-            end),
-            InMd5 = fetch(md5, Att),
-            OutMd5 = fetch(md5, NewAtt),
-            couch_util:check_md5(OutMd5, InMd5),
-            NewAtt
+            end)
     end.
 
 
