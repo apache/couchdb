@@ -235,10 +235,8 @@ do_update(Db, Mrst0, State0) ->
 
         case is_update_finished(State2) of
             true ->
-                maybe_set_build_status(TxDb, Mrst2, ViewVS,
-                    ?INDEX_READY),
-                report_progress(State2#{changes_done := ChangesDone},
-                    finished),
+                maybe_set_build_status(TxDb, Mrst2, ViewVS, ?INDEX_READY),
+                report_progress(State2#{changes_done := ChangesDone}, finished),
                 {Mrst2, finished};
             false ->
                 State3 = report_progress(State2, update),
