@@ -81,7 +81,7 @@ class Database(object):
     def create(self, q=1, n=1):
         r = self.sess.get(self.url)
         if r.status_code == 404:
-            r = self.sess.put(self.url, params={"q": q, "n": n})
+            r = self.sess.put(self.url, params={})
             r.raise_for_status()
 
     def delete(self):
