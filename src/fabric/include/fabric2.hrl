@@ -76,6 +76,8 @@
 -define(PDICT_TX_ID_KEY, '$fabric_tx_id').
 -define(PDICT_TX_RES_KEY, '$fabric_tx_result').
 -define(PDICT_FOLD_ACC_STATE, '$fabric_fold_acc_state').
+-define(PDICT_GRV_CACHE_ENABLED, '$fabric_grv_cache_enabled').
+-define(PDICT_GRV_CACHE, '$fabric_grv_cache').
 
 % Let's keep these in ascending order
 -define(TRANSACTION_TOO_OLD, 1007).

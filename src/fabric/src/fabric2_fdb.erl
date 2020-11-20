@@ -19,6 +19,7 @@
     transactional/2,
 
     with_snapshot/2,
+    init_grv_cache/0,
 
     create/2,
     open/2,
@@ -163,6 +164,43 @@ transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
     with_span(Fun, #{'db.name' => DbName}, fun() ->
         Fun(Db)
     end).
+
+
+init_grv_cache() ->
+    clear_grv_cache(),
+    enable_grv_cache().
+
+
+enable_grv_cache() ->
+    put(?PDICT_GRV_CACHE_ENABLED, true).
+
+
+clear_grv_cache() ->
+    erase(?PDICT_GRV_CACHE).
+
+
+get_grv_cache() ->
+    get(?PDICT_GRV_CACHE).
+
+
+maybe_cache_grv(Tx) ->
+    case get(?PDICT_GRV_CACHE_ENABLED) of
+        undefined ->
+            ok;
+        true ->
+            GRV = erlfdb:wait(erlfdb:get_read_version(Tx)),
+            put(?PDICT_GRV_CACHE, GRV)
+    end.
+
+
+apply_then_clear_grv_cache(Tx) ->
+    case get_grv_cache() of
+        undefined ->
+            ok;
+        GRV ->
+            erlfdb:set_read_version(Tx, GRV),
+            clear_grv_cache()
+    end.
 
 
 do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
@@ -557,6 +595,7 @@ get_info_wait(#info_future{tx = Tx, retries = Retries} = Future) ->
             Future1 = get_info_future(Tx, Future#info_future.db_prefix),
             get_info_wait(Future1#info_future{retries = Retries + 1});
         error:{erlfdb_error, ?TRANSACTION_TOO_OLD} ->
+            clear_grv_cache(),
             ok = erlfdb:reset(Tx),
             Future1 = get_info_future(Tx, Future#info_future.db_prefix),
             get_info_wait(Future1#info_future{retries = Retries + 1})
@@ -1856,6 +1895,7 @@ fold_range_cb({K, V}, #fold_acc{} = Acc) ->
 restart_fold(Tx, #fold_acc{} = Acc) ->
     erase(?PDICT_CHECKED_MD_IS_CURRENT),
 
+    clear_grv_cache(),
     ok = erlfdb:reset(Tx),
 
     case {erase(?PDICT_FOLD_ACC_STATE), Acc#fold_acc.retries} of
@@ -1957,9 +1997,11 @@ get_previous_transaction_result() ->
 execute_transaction(Tx, Fun, LayerPrefix) ->
     put(?PDICT_CHECKED_MD_IS_CURRENT, false),
     put(?PDICT_CHECKED_DB_IS_CURRENT, false),
+    apply_then_clear_grv_cache(Tx),
     Result = Fun(Tx),
     case erlfdb:is_read_only(Tx) of
         true ->
+            maybe_cache_grv(Tx),
             ok;
         false ->
             erlfdb:set(Tx, get_transaction_id(Tx, LayerPrefix), <<>>),
