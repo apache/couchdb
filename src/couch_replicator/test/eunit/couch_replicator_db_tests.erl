@@ -36,6 +36,7 @@ couch_replicator_db_test_() ->
                     ?TDEF_FE(replicator_db_deleted, 15),
                     ?TDEF_FE(replicator_db_recreated, 15),
                     ?TDEF_FE(invalid_replication_docs),
+                    ?TDEF_FE(scheduler_default_headers_returned),
                     ?TDEF_FE(duplicate_persistent_replication, 15),
                     ?TDEF_FE(duplicate_transient_replication, 30)
                 ]
@@ -248,6 +249,14 @@ duplicate_transient_replication({Source, Target, RepDb}) ->
 
     delete_doc(RepDb, DocId),
     wait_scheduler_docs_not_found(RepDb, DocId).
+
+
+scheduler_default_headers_returned({_, _, _}) ->
+    SUrl = couch_replicator_test_helper:server_url(),
+    Url = lists:flatten(io_lib:format("~s/_scheduler/jobs", [SUrl])),
+    {ok, _, Headers, _} = test_request:get(Url, []),
+    ?assertEqual(true, lists:keymember("X-Couch-Request-ID", 1, Headers)),
+    ?assertEqual(true, lists:keymember("X-CouchDB-Body-Time", 1, Headers)).
 
 
 scheduler_jobs(Id) ->
