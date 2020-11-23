@@ -1270,12 +1270,11 @@ chunked_response_buffer_size() ->
 basic_headers(Req, Headers0) ->
     Headers = Headers0
         ++ server_header()
-        ++ couch_httpd_auth:cookie_auth_header(Req, Headers0)
-        ++ [timing()]
-        ++ [reqid()],
+        ++ couch_httpd_auth:cookie_auth_header(Req, Headers0),
     Headers1 = chttpd_cors:headers(Req, Headers),
 	  Headers2 = chttpd_xframe_options:header(Req, Headers1),
-    chttpd_prefer_header:maybe_return_minimal(Req, Headers2).
+    Headers3 = [reqid(), timing() | Headers2],
+    chttpd_prefer_header:maybe_return_minimal(Req, Headers3).
 
 handle_response(Req0, Code0, Headers0, Args0, Type) ->
     {ok, {Req1, Code1, Headers1, Args1}} =
