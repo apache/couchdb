@@ -177,19 +177,17 @@ handle_view_list_req(#httpd{method=Method}=Req, _Db, _DDoc)
 handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
     chttpd:validate_ctype(Req, "application/json"),
-    ReqBody = chttpd:body(Req),
-    {Props2} = ?JSON_DECODE(ReqBody),
-    Keys = proplists:get_value(<<"keys">>, Props2, undefined),
-    handle_view_list(Req#httpd{req_body=ReqBody}, Db, DDoc, ListName,
+    {Props} = chttpd:json_body(Req),
+    Keys = proplists:get_value(<<"keys">>, Props, undefined),
+    handle_view_list(Req#httpd{req_body={Props}}, Db, DDoc, ListName,
         {DesignName, ViewName}, Keys);
 
 handle_view_list_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ListName, DesignName, ViewName]}=Req, Db, DDoc) ->
     chttpd:validate_ctype(Req, "application/json"),
-    ReqBody = chttpd:body(Req),
-    {Props2} = ?JSON_DECODE(ReqBody),
-    Keys = proplists:get_value(<<"keys">>, Props2, undefined),
-    handle_view_list(Req#httpd{req_body=ReqBody}, Db, DDoc, ListName,
+    {Props} = chttpd:json_body(Req),
+    Keys = proplists:get_value(<<"keys">>, Props, undefined),
+    handle_view_list(Req#httpd{req_body={Props}}, Db, DDoc, ListName,
         {DesignName, ViewName}, Keys);
 
 handle_view_list_req(#httpd{method='POST'}=Req, _Db, _DDoc) ->
