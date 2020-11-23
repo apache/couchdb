@@ -188,6 +188,20 @@ defmodule ReplicationTest do
     assert resp.status_code == 200
   end
 
+  test "default headers returned for _scheduler/jobs" do
+    resp = Couch.get("/_scheduler/jobs")
+    assert resp.headers["Content-Type"] == "application/json"
+    assert resp.headers["X-Couch-Request-ID"]
+    assert resp.headers["X-CouchDB-Body-Time"]
+  end
+
+  test "default headers returned for _scheduler/docs " do
+    resp = Couch.get("/_scheduler/docs")
+    assert resp.headers["Content-Type"] == "application/json"
+    assert resp.headers["X-Couch-Request-ID"]
+    assert resp.headers["X-CouchDB-Body-Time"]
+  end
+
   Enum.each(@db_pairs_prefixes, fn {name, src_prefix, tgt_prefix} ->
     @src_prefix src_prefix
     @tgt_prefix tgt_prefix
