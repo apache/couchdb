@@ -73,6 +73,7 @@ defmodule ConfigTest do
 
   # TODO: port sever_port tests from config.js
   @tag :pending
+  @tag kind: :pending
   test "CouchDB respects configured protocols"
 
   test "Standard config options are present", context do
@@ -101,6 +102,7 @@ defmodule ConfigTest do
   end
 
   @tag :pending
+  @tag kind: :pending
   test "PORT `BUGGED` ?raw tests from config.js"
 
   test "Non-term whitelist values allow further modification of the whitelist", context do

@@ -8,6 +8,7 @@ defmodule WithQuorumTest do
   Test CouchDB API in a cluster without quorum.
   """
   @tag :with_db_name
+  @tag kind: :pending
   test "Creating/Deleting DB should return 201-Created/202-Acepted", context do
     db_name = context[:db_name]
     resp = Couch.put("/#{db_name}")
@@ -46,6 +47,7 @@ defmodule WithQuorumTest do
   end
 
   @tag :with_db_name
+  @tag kind: :pending
   test "Creating-Updating/Deleting doc with overriden quorum should return 202-Acepted/200-OK",
        context do
     db_name = context[:db_name]
@@ -115,6 +117,7 @@ defmodule WithQuorumTest do
   end
 
   @tag :with_db_name
+  @tag kind: :pending
   test "Bulk docs overriden quorum should return 202-Acepted", context do
     db_name = context[:db_name]
     Couch.put("/#{db_name}")
@@ -153,6 +156,7 @@ defmodule WithQuorumTest do
   end
 
   @tag :with_db_name
+  @tag kind: :pending
   test "Attachments overriden quorum should return 202-Acepted", context do
     db_name = context[:db_name]
     Couch.put("/#{db_name}")
