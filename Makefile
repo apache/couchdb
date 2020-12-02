@@ -153,7 +153,7 @@ escriptize: couch
 check: all python-black
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
-	@$(MAKE) elixir
+	@$(MAKE) elixir-suite
 	@$(MAKE) weatherreport-test
 
 ifdef apps
