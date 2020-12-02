@@ -20,6 +20,29 @@ defmodule CoverTool do
   end
 end
 
+defmodule Mix.Tasks.Suite do
+  @moduledoc """
+  Helper task to create `suites.elixir` file. It suppose to be used as follows
+  ```
+  MIX_ENV=integration mix suite > test/elixir/test/config/suite.elixir
+  ```
+  """
+  use Mix.Task
+  @shortdoc "Outputs all availabe integration tests"
+  def run(_) do
+    Path.wildcard(Path.join(Mix.Project.build_path(), "/**/ebin"))
+    |> Enum.filter(&File.dir?/1)
+    |> Enum.map(&Code.append_path/1)
+
+    tests =
+      Couch.Test.Suite.list()
+      |> Enum.sort()
+      |> Couch.Test.Suite.group_by()
+
+    IO.puts(Couch.Test.Suite.pretty_print(tests))
+  end
+end
+
 defmodule CouchDBTest.Mixfile do
   use Mix.Project
 
