@@ -161,7 +161,7 @@ endif
 check:  all
 	@$(MAKE) emilio
 	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango,chttpd,couch_replicator
-	make elixir tests=test/elixir/test/basics_test.exs,test/elixir/test/replication_test.exs,test/elixir/test/map_test.exs,test/elixir/test/all_docs_test.exs,test/elixir/test/bulk_docs_test.exs
+	make elixir-suite
 	make exunit apps=chttpd
 	make mango-test
 
@@ -270,6 +270,17 @@ elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devc
 	@dev/run -n 3 -q -a adm:pass \
 		--degrade-cluster 1 \
 		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
+
+.PHONY: elixir-suite
+elixir-suite: export MIX_ENV=integration
+elixir-suite: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+elixir-suite: elixir-init elixir-check-formatted elixir-credo devclean
+	@dev/run -n 1 -q -a adm:pass \
+		--enable-erlang-views \
+		--no-join \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--erlang-config rel/files/eunit.config \
+		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir'
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted: elixir-init
