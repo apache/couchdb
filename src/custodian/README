@@ -1,0 +1,8 @@
+Custodian is responsible for the data stored in Cloudant databases.
+
+Custodian scans the "dbs" database, which details the location of
+every shard of every database and ensures that operators are aware of
+any shard that is under-replicated (has less than N copies).
+
+Custodian accounts for data in transit (as indicated by the
+mem3.redirects section) as well as nodes not recently known to be up.
