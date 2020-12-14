@@ -76,7 +76,7 @@ ConfigH = [
     {"JSSCRIPT_TYPE", "JSObject*"},
     {"COUCHJS_NAME", "\"" ++ CouchJSName++ "\""},
     {"PACKAGE", "\"apache-couchdb\""},
-    {"PACKAGE_BUGREPORT", "\"https://issues.apache.org/jira/browse/COUCHDB\""},
+    {"PACKAGE_BUGREPORT", "\"https://github.com/apache/couchdb/issues\""},
     {"PACKAGE_NAME", "\"Apache CouchDB\""},
     {"PACKAGE_STRING", "\"Apache CouchDB " ++ Version ++ "\""},
     {"PACKAGE_VERSION", "\"" ++ Version ++ "\""}
