@@ -1,4 +1,4 @@
-Custodian is responsible for the data stored in Cloudant databases.
+Custodian is responsible for the data stored in CouchDB databases.
 
 Custodian scans the "dbs" database, which details the location of
 every shard of every database and ensures that operators are aware of
