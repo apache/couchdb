@@ -143,28 +143,22 @@ handle_db_event(_DbName, _Event, _St) ->
     {ok, nil}.
 
 check_shards() ->
-    [send_sensu_event(Item) || Item <- custodian:summary()].
+    [send_event(Item) || Item <- custodian:summary()].
 
-send_sensu_event({_, Count} = Item) ->
-    Level = case Count of
+
+send_event({_, Count} = Item) ->
+    Description = describe(Item),
+    Name = check_name(Item),
+    case Count of
         0 ->
-            "--ok";
+            ok;
         1 ->
-            couch_log:critical("~s", [describe(Item)]),
-            "--critical";
+            couch_log:critical("~s", [Description]);
         _ ->
-            couch_log:warning("~s", [describe(Item)]),
-            "--warning"
+            couch_log:warning("~s", [Description])
     end,
-    Cmd = lists:concat([
-        "send-sensu-event --standalone ",
-        Level,
-        " --output=\"",
-        describe(Item),
-        "\" ",
-        check_name(Item)
-    ]),
-    os:cmd(Cmd).
+    ?CUSTODIAN_MONITOR:send_event(Name, Count, Description).
+
 
 describe({{safe, N}, Count}) ->
     lists:concat([Count, " ", shards(Count), " in cluster with only ", N,
