@@ -149,17 +149,9 @@ get_stats_db() ->
 
 send_missing_db_alert(DbName) ->
     couch_log:notice("Missing system database ~s", [DbName]),
-    Command = [
-        "send-sensu-event --standalone --critical",
-        " --output=\"Missing system database ",
-        binary_to_list(DbName),
-        "\" --handler=default custodian-missing-db-check"],
-    os:cmd(lists:concat(Command)).
+    ?CUSTODIAN_MONITOR:send_missing_db_alert(DbName).
+
 
 clear_missing_dbs_alert() ->
     couch_log:notice("All system databases exist.", []),
-    Command = [
-        "send-sensu-event --standalone --ok",
-        " --output=\"All system databases exist\"",
-        " --handler=default custodian-missing-db-check"],
-    os:cmd(lists:concat(Command)).
+    ?CUSTODIAN_MONITOR:clear_missing_dbs_alert().

@@ -10,20 +10,19 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, custodian,
- [
-  {description, "in your cluster, looking after your stuff"},
-  {vsn, git},
-  {registered, []},
-  {applications, [
-                  kernel,
-                  stdlib,
-                  couch_log,
-                  config,
-                  couch_event,
-                  couch,
-                  mem3
-                 ]},
-  {mod, { custodian_app, []}},
-  {env, []}
- ]}.
+-module(custodian_monitor).
+
+
+% N.B. that callback return values are ignored
+
+-callback send_missing_db_alert(DbName :: binary()) ->
+    Ignored :: any().
+
+
+-callback clear_missing_dbs_alert() ->
+    Ignored :: any().
+
+
+-callback send_event(
+    Name :: string(), Count :: non_neg_integer(), Description :: string()) ->
+    Ignored :: any().
