@@ -420,7 +420,7 @@ defmodule AllDocsTest do
 
     resp = Couch.get("/#{db_name}/_all_docs", query: %{:end_key => 0}).body
     rows = resp["rows"]
-    assert length(rows) === 0
+    assert Enum.empty?(rows)
   end
 
   defp get_ids(resp) do
