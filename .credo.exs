@@ -30,6 +30,7 @@
           ~r"/src/jason",
           ~r"/src/hackney",
           ~r"/src/httpotion",
+          ~r"/src/file_system",
           ~r"/src/credo",
           ~r"/src/idna",
           ~r"/src/junit_formatter",
