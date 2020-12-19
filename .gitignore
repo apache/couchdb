@@ -84,6 +84,7 @@ src/ssl_verify_fun/
 src/thrift_protocol/
 src/triq/
 src/unicode_util_compat/
+src/file_system/
 tmp/
 
 src/couch/*.o
