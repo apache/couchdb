@@ -155,9 +155,15 @@ process_response({ibrowse_req_id, ReqId}, Worker, HttpDb, Params, Callback) ->
 
 process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
     case list_to_integer(Code) of
+    R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
+        backoff_success(HttpDb, Params),
+        do_redirect(Worker, R, Headers, HttpDb, Params, Callback);
     429 ->
         backoff(HttpDb, Params);
-    Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
+    Error when Error =:= 408 ; Error >= 500 ->
+        couch_stats:increment_counter([couch_replicator, responses, failure]),
+        maybe_retry({code, Error}, Worker, HttpDb, Params);
+    Ok when Ok >= 200 , Ok < 500 ->
         backoff_success(HttpDb, Params),
         couch_stats:increment_counter([couch_replicator, responses, success]),
         EJson = case Body of
@@ -168,13 +174,7 @@ process_response({ok, Code, Headers, Body}, Worker, HttpDb, Params, Callback) ->
         end,
         process_auth_response(HttpDb, Ok, Headers, Params),
         if Ok =:= 413 -> put(?STOP_HTTP_WORKER, stop); true -> ok end,
-        Callback(Ok, Headers, EJson);
-    R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
-        backoff_success(HttpDb, Params),
-        do_redirect(Worker, R, Headers, HttpDb, Params, Callback);
-    Error ->
-        couch_stats:increment_counter([couch_replicator, responses, failure]),
-        maybe_retry({code, Error}, Worker, HttpDb, Params)
+        Callback(Ok, Headers, EJson)
     end;
 
 process_response(Error, Worker, HttpDb, Params, _Callback) ->
@@ -185,10 +185,18 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
     receive
     {ibrowse_async_headers, ReqId, Code, Headers} ->
         case list_to_integer(Code) of
+        R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
+            backoff_success(HttpDb, Params),
+            do_redirect(Worker, R, Headers, HttpDb, Params, Callback);
         429 ->
             Timeout = couch_replicator_rate_limiter:max_interval(),
             backoff(HttpDb#httpdb{timeout = Timeout}, Params);
-        Ok when (Ok >= 200 andalso Ok < 300) ; (Ok >= 400 andalso Ok < 500) ->
+        Error when Error =:= 408 ; Error >= 500 ->
+            couch_stats:increment_counter(
+                [couch_replicator, stream_responses, failure]
+            ),
+            report_error(Worker, HttpDb, Params, {code, Error});
+        Ok when Ok >= 200 , Ok < 500 ->
             backoff_success(HttpDb, Params),
             HttpDb1 = process_auth_response(HttpDb, Ok, Headers, Params),
             StreamDataFun = fun() ->
@@ -206,15 +214,7 @@ process_stream_response(ReqId, Worker, HttpDb, Params, Callback) ->
                         Worker, HttpDb1, Params);
                 throw:{maybe_retry_req, Err} ->
                     maybe_retry(Err, Worker, HttpDb1, Params)
-            end;
-        R when R =:= 301 ; R =:= 302 ; R =:= 303 ->
-            backoff_success(HttpDb, Params),
-            do_redirect(Worker, R, Headers, HttpDb, Params, Callback);
-        Error ->
-            couch_stats:increment_counter(
-                [couch_replicator, stream_responses, failure]
-            ),
-            report_error(Worker, HttpDb, Params, {code, Error})
+            end
         end;
     {ibrowse_async_response, ReqId, {error, _} = Error} ->
         couch_stats:increment_counter(
