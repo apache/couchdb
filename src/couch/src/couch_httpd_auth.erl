@@ -33,7 +33,7 @@
 
 -export([jwt_authentication_handler/1]).
 
--import(couch_httpd, [header_value/2, send_json/2,send_json/4, send_method_not_allowed/2]).
+-import(couch_httpd, [header_value/2, send_json/2, send_json/4, send_method_not_allowed/2, maybe_decompress/2]).
 
 -compile({no_auto_import,[integer_to_binary/1, integer_to_binary/2]}).
 
@@ -329,7 +329,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
         "application/x-www-form-urlencoded" ++ _ ->
             mochiweb_util:parse_qs(ReqBody);
         "application/json" ++ _ ->
-            {Pairs} = ?JSON_DECODE(ReqBody),
+            {Pairs} = ?JSON_DECODE(maybe_decompress(Req, ReqBody)),
             lists:map(fun({Key, Value}) ->
               {?b2l(Key), ?b2l(Value)}
             end, Pairs);
