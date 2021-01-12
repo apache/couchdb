@@ -329,7 +329,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
         "application/x-www-form-urlencoded" ++ _ ->
             mochiweb_util:parse_qs(ReqBody);
         "application/json" ++ _ ->
-            {Pairs} = ?JSON_DECODE(couch_httpd:maybe_decompress(Req, ReqBody)),
+            {Pairs} = ?JSON_DECODE(maybe_decompress(Req, ReqBody)),
             lists:map(fun({Key, Value}) ->
               {?b2l(Key), ?b2l(Value)}
             end, Pairs);
