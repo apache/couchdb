@@ -20,9 +20,11 @@
 
 setup() ->
     ok = couch_proc_manager:reload(),
+    meck:new(couch_os_process, [passthrough]),
     ok = setup_config().
 
 teardown(_) ->
+    meck:unload(),
     ok.
 
 os_proc_pool_test_() ->
@@ -39,7 +41,8 @@ os_proc_pool_test_() ->
                     should_free_slot_on_proc_unexpected_exit(),
                     should_reuse_known_proc(),
 %                    should_process_waiting_queue_as_fifo(),
-                    should_reduce_pool_on_idle_os_procs()
+                    should_reduce_pool_on_idle_os_procs(),
+                    should_not_return_broken_process_to_the_pool()
                 ]
             }
         }
@@ -204,6 +207,63 @@ should_reduce_pool_on_idle_os_procs() ->
         ?assertEqual(1, couch_proc_manager:get_proc_count())
     end).
 
+
+should_not_return_broken_process_to_the_pool() ->
+    ?_test(begin
+        config:set("query_server_config",
+            "os_process_soft_limit", "1", false),
+        ok = confirm_config("os_process_soft_limit", "1"),
+
+        config:set("query_server_config",
+            "os_process_limit", "1", false),
+        ok = confirm_config("os_process_limit", "1"),
+
+        DDoc1 = ddoc(<<"_design/ddoc1">>),
+
+        meck:reset(couch_os_process),
+
+        ?assertEqual(0, couch_proc_manager:get_proc_count()),
+        ok = couch_query_servers:with_ddoc_proc(DDoc1, fun(_) -> ok end),
+        ?assertEqual(0, meck:num_calls(couch_os_process, stop, 1)),
+        ?assertEqual(1, couch_proc_manager:get_proc_count()),
+
+        ?assertError(bad, couch_query_servers:with_ddoc_proc(DDoc1, fun(_) ->
+            error(bad)
+        end)),
+        ?assertEqual(1, meck:num_calls(couch_os_process, stop, 1)),
+
+        WaitFun = fun() ->
+            case couch_proc_manager:get_proc_count() of
+                0 -> ok;
+                N when is_integer(N), N > 0 -> wait
+            end
+        end,
+        case test_util:wait(WaitFun, 5000) of
+            timeout -> error(timeout);
+            _ -> ok
+        end,
+        ?assertEqual(0, couch_proc_manager:get_proc_count()),
+
+        DDoc2 = ddoc(<<"_design/ddoc2">>),
+        ok = couch_query_servers:with_ddoc_proc(DDoc2, fun(_) -> ok end),
+        ?assertEqual(1, meck:num_calls(couch_os_process, stop, 1)),
+        ?assertEqual(1, couch_proc_manager:get_proc_count())
+    end).
+
+
+ddoc(DDocId) ->
+    #doc{
+        id = DDocId,
+        revs = {1, [<<"abc">>]},
+        body = {[
+            {<<"language">>, <<"javascript">>},
+            {<<"views">>, {[
+                {<<"v1">>, {[
+                    {<<"map">>, <<"function(doc) {emit(doc.value,1);}">>}
+                ]}}
+            ]}}
+        ]}
+    }.
 
 setup_config() ->
     config:set("native_query_servers", "enable_erlang_query_server", "true", false),
