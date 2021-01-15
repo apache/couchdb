@@ -523,9 +523,14 @@ with_ddoc_proc(#doc{id=DDocId,revs={Start, [DiskRev|_]}}=DDoc, Fun) ->
     Rev = couch_doc:rev_to_str({Start, DiskRev}),
     DDocKey = {DDocId, Rev},
     Proc = get_ddoc_process(DDoc, DDocKey),
-    try Fun({Proc, DDocId})
-    after
-        ok = ret_os_process(Proc)
+    try Fun({Proc, DDocId}) of
+        Resp ->
+            ok = ret_os_process(Proc),
+            Resp
+    catch Tag:Err ->
+        Stack = erlang:get_stacktrace(),
+        catch proc_stop(Proc),
+        erlang:raise(Tag, Err, Stack)
     end.
 
 proc_prompt(Proc, Args) ->
