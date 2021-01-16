@@ -1,0 +1,8 @@
+{
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
+    "extensions": [
+        "erlang-ls.erlang-ls"
+    ]
+}
