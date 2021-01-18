@@ -137,8 +137,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             Result = case mango_idx:def(Idx) of
                 all_docs ->
                     CB = fun ?MODULE:handle_all_docs_message/2,
-                    AllDocOpts = fabric2_util:all_docs_view_opts(Args)
-                        ++ [{restart_tx, true}],
+                    AllDocOpts = fabric2_util:all_docs_view_opts(Args),
                     fabric2_db:fold_docs(Db, CB, Cursor, AllDocOpts);
                 _ ->
                     CB = fun ?MODULE:handle_message/2,
