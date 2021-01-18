@@ -364,6 +364,8 @@ catch_error(HttpReq, error, not_ciphertext) ->
     send_error(HttpReq, not_ciphertext);
 catch_error(HttpReq, error, {erlfdb_error, 2101}) ->
     send_error(HttpReq, transaction_too_large);
+catch_error(HttpReq, error, {erlfdb_error, 1031}) ->
+    send_error(HttpReq, transaction_timeout);
 catch_error(HttpReq, Tag, Error) ->
     Stack = erlang:get_stacktrace(),
     % TODO improve logging and metrics collection for client disconnects
@@ -999,6 +1001,9 @@ error_info({doc_validation, Reason}) ->
     {400, <<"doc_validation">>, Reason};
 error_info({invalid_since_seq, Reason}) ->
     {400, <<"invalid_since_seq">>, Reason};
+error_info(transaction_timeout) ->
+    {408, <<"transaction_timeout">>,
+        <<"The request transaction timed out" >>};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
