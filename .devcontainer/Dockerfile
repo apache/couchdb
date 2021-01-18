@@ -1,5 +1,5 @@
-# Based on erlang:22 (we need elixir for the test suite)
-FROM elixir:1.10
+ARG ELIXIR_VERSION
+FROM elixir:${ELIXIR_VERSION}
 
 # Use NodeSource binaries for Node.js (Fauxton dependency)
 RUN set -ex; \
