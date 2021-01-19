@@ -1,0 +1,19 @@
+{
+    "build": {
+        "dockerfile": "Dockerfile",
+        "args": {
+            // Useful choices include:
+            // 1.11 -> Erlang 23, Debian Buster
+            // 1.10 -> Erlang 22, Debian Buster
+            // 1.9  -> Erlang 22, Debian Buster
+            //
+            // Older versions based on Debian Stretch will not include
+            // SpiderMonkey 60, which the Dockerfile expects to be able
+            // to install via apt-get.
+            "ELIXIR_VERSION": "1.10"
+        }
+    },
+    "extensions": [
+        "erlang-ls.erlang-ls"
+    ]
+}
