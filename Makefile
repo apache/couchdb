@@ -449,7 +449,7 @@ clean:
 	@rm -rf src/mango/.venv
 	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
-	@rm -f dev/boot_node.beam dev/pbkdf2.pyc log/crash.log
+	@rm -f dev/boot_node.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 
 
 .PHONY: distclean
