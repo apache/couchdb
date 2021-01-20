@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(boot_node).
+-module(monitor_parent).
 
 -export([start/0]).
 

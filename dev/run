@@ -624,8 +624,8 @@ def boot_node(ctx, node):
         os.path.join(ctx["devdir"], "devnode"),
         "-pa",
         ctx["devdir"],
+        "-s monitor_parent"
     ]
-    cmd += ["-s", "boot_node"]
     if ctx["reset_logs"]:
         mode = "wb"
     else:
