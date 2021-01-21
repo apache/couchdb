@@ -22,7 +22,8 @@ bin/
 config.erl
 *.tar.gz
 *.tar.bz2
-dev/boot_node.beam
+dev/*.beam
+dev/devnode.*
 dev/lib/
 dev/logs/
 ebin/
