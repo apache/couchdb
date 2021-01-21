@@ -1242,6 +1242,14 @@ bulk_get_multipart_boundary() ->
 receive_request_data(Req) ->
     receive_request_data(Req, chttpd:body_length(Req)).
 
+receive_request_data(Req, Len) when Len == chunked ->
+    ChunkFun = fun({_Length, Binary}, _State) ->
+        self() ! {chunk, Binary}
+    end,
+    couch_httpd:recv_chunked(Req, 4096, ChunkFun, ok),
+    GetChunk = fun() -> receive {chunk, Binary} -> Binary end end,
+    {GetChunk(), GetChunk};
+
 receive_request_data(Req, LenLeft) when LenLeft > 0 ->
     Len = erlang:min(4096, LenLeft),
     Data = chttpd:recv(Req, Len),

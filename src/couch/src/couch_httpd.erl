@@ -589,7 +589,8 @@ recv_chunked(#httpd{mochi_req=MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
     % Fun is called once with each chunk
     % Fun({Length, Binary}, State)
     % called with Length == 0 on the last time.
-    MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState).
+    MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState,
+        config:get_integer("httpd", "max_http_request_size", 4294967296)).
 
 body_length(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(body_length).
