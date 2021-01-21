@@ -190,7 +190,7 @@ def get_args_parser():
         "--erlang-config",
         dest="erlang_config",
         default="rel/files/sys.config",
-        help="Specify an alternative Erlang application configuration"
+        help="Specify an alternative Erlang application configuration",
     )
     parser.add_option(
         "--degrade-cluster",
@@ -275,12 +275,14 @@ def check_beams(ctx):
     for fname in glob.glob(os.path.join(ctx["devdir"], "*.erl")):
         sp.check_call(["erlc", "-o", ctx["devdir"] + os.sep, fname])
 
+
 @log("Ensure Erlang boot script exists")
 def check_boot_script(ctx):
     if not os.path.exists(os.path.join(ctx["devdir"], "devnode.boot")):
         env = os.environ.copy()
         env["ERL_LIBS"] = os.path.join(ctx["rootdir"], "src")
         sp.check_call(["escript", "make_boot_script"], env=env, cwd=ctx["devdir"])
+
 
 @log("Prepare configuration files")
 def setup_configs(ctx):
@@ -631,7 +633,7 @@ def boot_node(ctx, node):
         os.path.join(ctx["devdir"], "devnode"),
         "-pa",
         ctx["devdir"],
-        "-s monitor_parent"
+        "-s monitor_parent",
     ]
     if ctx["reset_logs"]:
         mode = "wb"
