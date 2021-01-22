@@ -1244,11 +1244,11 @@ receive_request_data(Req) ->
 
 receive_request_data(Req, Len) when Len == chunked ->
     ChunkFun = fun({_Length, Binary}, _State) ->
-        self() ! {chunk, Binary}
+        self() ! {chunk, Req, Binary}
     end,
     couch_httpd:recv_chunked(Req, 4096, ChunkFun, ok),
-    GetChunk = fun() -> receive {chunk, Binary} -> Binary end end,
-    {GetChunk(), GetChunk};
+    GetChunk = fun GC() -> receive {chunk, Req, Binary} -> {Binary, GC} end end,
+    {receive {chunk, _Req, Binary} -> Binary end, GetChunk};
 
 receive_request_data(Req, LenLeft) when LenLeft > 0 ->
     Len = erlang:min(4096, LenLeft),
