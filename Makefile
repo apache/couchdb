@@ -152,7 +152,7 @@ check-all-tests: all python-black
 	@$(MAKE) elixir
 
 ifdef apps
-subdirs = $(apps)
+subdirs=$(shell echo $(apps) | sed 's/,/ /g')
 else
 subdirs=$(shell ls src)
 endif
