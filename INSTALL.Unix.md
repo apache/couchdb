@@ -256,9 +256,9 @@ Naturally, you can configure systemd, launchd or SysV-init daemons to
 launch CouchDB and keep it running using standard configuration files.
 Sample scripts are in the couchdb-pkg repository:
 
-* SysV-init (Debian-style): https://github.com/apache/couchdb-pkg/blob/master/debian/couchdb.init
-* SysV-init (RHEL-style): https://github.com/apache/couchdb-pkg/blob/master/rpm/SOURCES/couchdb.init
+* SysV-init (Debian-style): https://github.com/apache/couchdb-pkg/blob/main/debian/couchdb.init
+* SysV-init (RHEL-style): https://github.com/apache/couchdb-pkg/blob/main/rpm/SOURCES/couchdb.init
 * upstart: Use the Debian-style sysvinit script instead.
-* systemd: https://github.com/apache/couchdb-pkg/blob/master/debian/couchdb.service
+* systemd: https://github.com/apache/couchdb-pkg/blob/main/debian/couchdb.service
 
 Consult your system documentation for more information.

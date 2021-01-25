@@ -109,7 +109,7 @@ Instrumentation guide
 - Extend `<app>_httpd_handlers:handler_info/1` as needed to
   have operation ids. (We as community might need to work on
   naming conventions)
-- Use [span conventions](https://github.com/apache/couchdb-documentation/blob/master/rfcs/011-opentracing.md#conventions) https://github.com/opentracing/specification/blob/master/semantic_conventions.md
+- Use [span conventions](https://github.com/apache/couchdb-documentation/blob/main/rfcs/011-opentracing.md#conventions) https://github.com/opentracing/specification/blob/master/semantic_conventions.md
 - When in doubt consult open tracing spec
   - [spec overview](https://github.com/opentracing/specification/blob/master/specification.md)
   - [conventions](https://github.com/opentracing/specification/blob/master/semantic_conventions.md#standard-span-tags-and-log-fields)
