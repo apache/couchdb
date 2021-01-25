@@ -62,7 +62,7 @@ Getting started with developing
 
 For more detail, read the README-DEV.rst_ file in this directory.
 
-.. _README-DEV.rst: https://github.com/apache/couchdb/blob/master/README-DEV.rst
+.. _README-DEV.rst: https://github.com/apache/couchdb/blob/main/README-DEV.rst
 
 Basically you just have to install the needed dependencies which are
 documented in the install docs and then run ``./configure && make``.
@@ -85,7 +85,7 @@ Contributing to CouchDB
 
 You can learn more about our contributing process here:
 
-    https://github.com/apache/couchdb/blob/master/CONTRIBUTING.md
+    https://github.com/apache/couchdb/blob/main/CONTRIBUTING.md
 
 Cryptographic Software Notice
 -----------------------------
