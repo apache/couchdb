@@ -45,7 +45,8 @@
         couch_event,
         ioq,
         couch_stats,
-        hyper
+        hyper,
+        prometheus
     ]},
     {env, [
         { httpd_global_handlers, [

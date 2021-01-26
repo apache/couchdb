@@ -174,7 +174,8 @@ DepDescs = [
 {meck,             "meck",             {tag, "0.8.8"}},
 {recon,            "recon",            {tag, "2.5.0"}},
 {passage,          "passage",          {tag, "0.2.6"}},
-{thrift_protocol,  "thrift-protocol",  {tag, "0.1.5"}}
+{thrift_protocol,  "thrift-protocol",  {tag, "0.1.5"}},
+{prometheus,  "prometheus",  {tag, "master"}}
 ].
 
 WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true}.

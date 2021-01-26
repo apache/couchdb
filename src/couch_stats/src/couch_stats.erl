@@ -58,18 +58,33 @@ new(counter, Name) ->
     case folsom_metrics:new_counter(Name) of
         ok -> ok;
         {error, Name, metric_already_exists} -> {error, metric_exists}
-    end;
+    end,
+    FlatName = lists:foldl(fun(NamePart, Acc) ->
+        atom_to_list(NamePart) ++ "_"  ++  Acc
+    end, "", Name),
+    prometheus_counter:new([{name, list_to_atom(FlatName)}, {help, FlatName}]);
 new(histogram, Name) ->
     Time = config:get_integer("stats", "interval", ?DEFAULT_INTERVAL),
     case folsom_metrics:new_histogram(Name, slide_uniform, {Time, 1024}) of
         ok -> ok;
         {error, Name, metric_already_exists} -> {error, metric_exists}
-    end;
+    end,
+    FlatName = lists:foldl(fun(NamePart, Acc) ->
+        atom_to_list(NamePart) ++ "_"  ++  Acc
+    end, "", Name),
+    prometheus_histogram:new([{name, list_to_atom(FlatName)},
+        {labels, [method]},
+        {buckets, [50, 75, 90, 95, 99, 999]},
+        {help, FlatName}]);
 new(gauge, Name) ->
     case folsom_metrics:new_gauge(Name) of
         ok -> ok;
         {error, Name, metric_already_exists} -> {error, metric_exists}
-    end;
+    end,
+    FlatName = lists:foldl(fun(NamePart, Acc) ->
+        atom_to_list(NamePart) ++ "_"  ++  Acc
+    end, "", Name),
+    prometheus_gauge:new([{name, list_to_atom(FlatName)}, {help, FlatName}]);
 new(_, _) ->
     {error, unsupported_type}.
 
