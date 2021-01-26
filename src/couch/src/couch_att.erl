@@ -734,7 +734,7 @@ upgrade_encoding(Encoding) -> Encoding.
 
 
 max_attachment_size() ->
-    case config:get("couchdb", "max_attachment_size", "infinity") of
+    case config:get("couchdb", "max_attachment_size", 1024 * 1024 * 1024) of
         "infinity" ->
             infinity;
         MaxAttSize ->
