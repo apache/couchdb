@@ -743,11 +743,17 @@ max_attachment_size(MaxAttSizeConfig) ->
         "infinity" ->
             infinity;
         MaxAttSize when is_list(MaxAttSize) ->
-            list_to_integer(MaxAttSize);
+            try list_to_integer(MaxAttSize) of
+                Result -> Result
+            catch _:_ ->
+                couch_log:error("invalid config value for max attachment size: ~p ", [MaxAttSize]),
+                throw(internal_server_error)
+            end;
         MaxAttSize when is_integer(MaxAttSize) ->
             MaxAttSize;
         MaxAttSize ->
-            erlang:error({invalid_max_attachment_size, MaxAttSize})
+            couch_log:error("invalid config value for max attachment size: ~p ", [MaxAttSize]),
+            throw(internal_server_error)
     end.
 
 
