@@ -960,7 +960,7 @@ test_transform() ->
 
 max_attachment_size_test_() ->
     {"Max attachment size tests", [
-        ?_assertEqual(infinity, max_attachment_size(infinity)),
+        ?_assertEqual(infinity, max_attachment_size("infinity")),
         ?_assertEqual(5, max_attachment_size(5)),
         ?_assertEqual(5, max_attachment_size("5"))
     ]}.
