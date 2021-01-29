@@ -119,6 +119,7 @@ SubDirs = [
     "src/couch_event",
     "src/mem3",
     "src/couch_index",
+    "src/couch_lib",
     "src/couch_mrview",
     "src/couch_replicator",
     "src/couch_plugins",
