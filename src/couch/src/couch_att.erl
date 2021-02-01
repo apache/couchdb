@@ -178,8 +178,7 @@
 
 -type att() :: #att{} | attachment() | disk_att().
 
-% 1024 * 1024 * 1024
--define(GB, 1073741824).
+-define(GB, (1024*1024*1024)).
 
 new() ->
     %% We construct a record by default for compatability. This will be
