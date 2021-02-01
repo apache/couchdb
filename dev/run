@@ -101,6 +101,7 @@ def setup():
     setup_logging(ctx)
     setup_dirs(ctx)
     check_beams(ctx)
+    check_boot_script(ctx)
     setup_configs(ctx)
     return ctx
 
@@ -266,6 +267,14 @@ def ensure_dir_exists(root, *segments):
 def check_beams(ctx):
     for fname in glob.glob(os.path.join(ctx["devdir"], "*.erl")):
         sp.check_call(["erlc", "-o", ctx["devdir"] + os.sep, fname])
+
+
+@log("Ensure Erlang boot script exists")
+def check_boot_script(ctx):
+    if not os.path.exists(os.path.join(ctx["devdir"], "devnode.boot")):
+        env = os.environ.copy()
+        env["ERL_LIBS"] = os.path.join(ctx["rootdir"], "src")
+        sp.check_call(["escript", "make_boot_script"], env=env, cwd=ctx["devdir"])
 
 
 @log("Prepare configuration files")
@@ -592,10 +601,9 @@ def set_boot_env(ctx):
 
 @log("Start node {node}")
 def boot_node(ctx, node):
-    erl_libs = os.path.join(ctx["rootdir"], "src")
     set_boot_env(ctx)
     env = os.environ.copy()
-    env["ERL_LIBS"] = os.pathsep.join([erl_libs])
+    env["ERL_LIBS"] = os.path.join(ctx["rootdir"], "src")
 
     node_etcdir = os.path.join(ctx["devdir"], "lib", node, "etc")
     reldir = os.path.join(ctx["rootdir"], "rel")
@@ -614,11 +622,12 @@ def boot_node(ctx, node):
         os.path.join(reldir, "reltool.config"),
         "-parent_pid",
         str(os.getpid()),
+        "-boot",
+        os.path.join(ctx["devdir"], "devnode"),
         "-pa",
         ctx["devdir"],
+        "-s monitor_parent",
     ]
-    cmd += [p[:-1] for p in glob.glob(erl_libs + "/*/")]
-    cmd += ["-s", "boot_node"]
     if ctx["reset_logs"]:
         mode = "wb"
     else:

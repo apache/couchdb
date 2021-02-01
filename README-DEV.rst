@@ -15,6 +15,7 @@ Dependencies
 You need the following to run tests:
 
 * `Python 3               <https://www.python.org/>`_
+* `Elixir                 <https://elixir-lang.org/>`_
 
 You need the following optionally to build documentation:
 
@@ -50,6 +51,18 @@ sufficient to enable a Fauxton build.
 
 Here is a list of *optional* dependencies for various operating systems.
 Installation will be easiest, when you install them all.
+
+Docker
+~~~~~~
+
+CouchDB maintains a ``Dockerfile`` based on Debian that includes all
+the dependencies noted above in the `.devcontainer <https://github.com/apache/couchdb/tree/main/.devcontainer>`_
+folder.
+
+The ``Dockerfile`` can be used on its own, or together with the
+associated ``devcontainer.json`` file to quickly provision a
+development environment using `GitHub Codespaces <https://github.com/features/codespaces>`_
+or `Visual Studio Code <https://code.visualstudio.com/docs/remote/containers>`_.
 
 Debian-based (inc. Ubuntu) Systems
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
