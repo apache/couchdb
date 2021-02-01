@@ -178,6 +178,8 @@
 
 -type att() :: #att{} | attachment() | disk_att().
 
+-define(GB, (1024*1024*1024)).
+
 new() ->
     %% We construct a record by default for compatability. This will be
     %% upgraded on demand. A subtle effect this has on all attachments
@@ -732,13 +734,25 @@ upgrade_encoding(true) -> gzip;
 upgrade_encoding(false) -> identity;
 upgrade_encoding(Encoding) -> Encoding.
 
-
 max_attachment_size() ->
-    case config:get("couchdb", "max_attachment_size", "infinity") of
+    max_attachment_size(config:get("couchdb", "max_attachment_size", ?GB)).
+
+max_attachment_size(MaxAttSizeConfig) ->
+    case MaxAttSizeConfig of
         "infinity" ->
             infinity;
+        MaxAttSize when is_list(MaxAttSize) ->
+            try list_to_integer(MaxAttSize) of
+                Result -> Result
+            catch _:_ ->
+                couch_log:error("invalid config value for max attachment size: ~p ", [MaxAttSize]),
+                throw(internal_server_error)
+            end;
+        MaxAttSize when is_integer(MaxAttSize) ->
+            MaxAttSize;
         MaxAttSize ->
-            list_to_integer(MaxAttSize)
+            couch_log:error("invalid config value for max attachment size: ~p ", [MaxAttSize]),
+            throw(internal_server_error)
     end.
 
 
@@ -948,5 +962,12 @@ test_transform() ->
     Transformed = transform(counter, fun(Count) -> Count + 1 end, Attachment),
     ?assertEqual(1, fetch(counter, Transformed)).
 
+
+max_attachment_size_test_() ->
+    {"Max attachment size tests", [
+        ?_assertEqual(infinity, max_attachment_size("infinity")),
+        ?_assertEqual(5, max_attachment_size(5)),
+        ?_assertEqual(5, max_attachment_size("5"))
+    ]}.
 
 -endif.
