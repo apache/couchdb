@@ -139,6 +139,7 @@ mock_config() ->
     meck:expect(config, get,
         fun("couchdb", "max_document_id_length", "infinity") -> "1024";
            ("couchdb", "max_attachment_size", "infinity") -> "infinity";
+           ("couchdb", "max_attachment_size", 1073741824) -> 1073741824;
            ("mem3", "shards_db", "_dbs") -> "_dbs";
             (Key, Val, Default) -> meck:passthrough([Key, Val, Default])
         end
