@@ -56,7 +56,8 @@ attachment_size_test_() ->
                     fun put_inline/1,
                     fun put_simple/1,
                     fun put_simple_chunked/1,
-                    fun put_mp_related/1
+                    fun put_mp_related/1,
+                    fun put_chunked_mp_related/1
                 ]
             }
         }
@@ -108,6 +109,15 @@ put_mp_related(Url) ->
         Body2 = mp_body(51),
         Status2 = put_req(Url ++ "/doc3", Headers, Body2),
         ?assertEqual(413, Status2)
+    end).
+
+
+put_chunked_mp_related(Url) ->
+    ?_test(begin
+       Headers = [?CONTENT_MULTI_RELATED],
+       Body = mp_body(50),
+       Status = put_req_chunked(Url ++ "/doc4", Headers, Body),
+       ?assert(Status =:= 201 orelse Status =:= 202)
     end).
 
 
