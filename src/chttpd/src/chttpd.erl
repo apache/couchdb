@@ -362,10 +362,8 @@ catch_error(HttpReq, error, decryption_failed) ->
     send_error(HttpReq, decryption_failed);
 catch_error(HttpReq, error, not_ciphertext) ->
     send_error(HttpReq, not_ciphertext);
-catch_error(HttpReq, error, {erlfdb_error, 2101}) ->
-    send_error(HttpReq, transaction_too_large);
-catch_error(HttpReq, error, {erlfdb_error, 1031}) ->
-    send_error(HttpReq, transaction_timeout);
+catch_error(HttpReq, error, {erlfdb_error, _} = Error) ->
+    send_error(HttpReq, Error);
 catch_error(HttpReq, Tag, Error) ->
     Stack = erlang:get_stacktrace(),
     % TODO improve logging and metrics collection for client disconnects
@@ -927,6 +925,10 @@ buffer_response(Req) ->
     end.
 
 
+error_info({erlfdb_error, ErrorCode}) ->
+    ErrorDesc =  erlfdb:get_error_string(ErrorCode),
+    Reason = ?l2b(io_lib:format("code: ~B, desc: ~s", [ErrorCode, ErrorDesc])),
+    {500, erlfdb_error, Reason};
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});
 error_info(bad_request) ->
@@ -1001,9 +1003,6 @@ error_info({doc_validation, Reason}) ->
     {400, <<"doc_validation">>, Reason};
 error_info({invalid_since_seq, Reason}) ->
     {400, <<"invalid_since_seq">>, Reason};
-error_info(transaction_timeout) ->
-    {408, <<"transaction_timeout">>,
-        <<"The request transaction timed out" >>};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
 error_info(request_entity_too_large) ->
@@ -1016,9 +1015,6 @@ error_info({request_entity_too_large, {bulk_get, Max}}) when is_integer(Max) ->
     {413, <<"max_bulk_get_count_exceeded">>, integer_to_binary(Max)};
 error_info({request_entity_too_large, DocID}) ->
     {413, <<"document_too_large">>, DocID};
-error_info(transaction_too_large) ->
-    {413, <<"transaction_too_large">>,
-        <<"The request transaction is larger than 10MB" >>};
 error_info({error, security_migration_updates_disabled}) ->
     {503, <<"security_migration">>, <<"Updates to security docs are disabled during "
         "security migration.">>};
