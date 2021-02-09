@@ -27,6 +27,7 @@
 -export([get_engine_extensions/0]).
 -export([get_engine_path/2]).
 -export([lock/2, unlock/1]).
+-export([db_updated/1]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -871,6 +872,10 @@ lock(DbName, Reason) when is_binary(DbName), is_binary(Reason) ->
 unlock(DbName) when is_binary(DbName) ->
     true = ets:delete(couch_dbs_locks, DbName),
     ok.
+
+
+db_updated(Db) ->
+    gen_server:call(couch_server, {db_updated, Db}, infinity).
 
 
 -ifdef(TEST).
