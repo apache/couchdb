@@ -113,7 +113,7 @@ should_fail_on_existing_target(DbName) ->
         ok = couch_db:close(Db),
         exit(Pid, kill),
         test_util:wait(fun() ->
-            case ets:lookup(couch_dbs, TName) of
+            case ets:lookup(couch_server:couch_dbs(DbName), TName) of
                 [] -> ok;
                 [_ | _] -> wait
             end
