@@ -169,7 +169,7 @@ start_interleaved() ->
                         DbPid = couch_db:get_pid(Db),
                         unlink(DbPid),
                         Msg = {'EXIT', DbPid, killed},
-                        erlang:send_after(2000, whereis(couch_server), Msg);
+                        erlang:send_after(2000, whereis(couch_server:couch_server(DbName)), Msg);
                     _ ->
                         ok
                 end,
@@ -202,7 +202,7 @@ t_interleaved_create_delete_open(DbName) ->
 
     % Get the current couch_server pid so we're sure
     % to not end up messaging two different pids
-    CouchServer = whereis(couch_server),
+    CouchServer = whereis(couch_server:couch_server(DbName)),
 
     % Start our first instance that will succeed in
     % an invalid state. Notice that the opener pid
@@ -250,7 +250,7 @@ t_interleaved_create_delete_open(DbName) ->
 
 get_opener_pid(DbName) ->
     WaitFun = fun() ->
-        case ets:lookup(couch_dbs, DbName) of
+        case ets:lookup(couch_server:couch_dbs(DbName), DbName) of
             [#entry{pid = Pid}] ->
                 {ok, Pid};
             [] ->

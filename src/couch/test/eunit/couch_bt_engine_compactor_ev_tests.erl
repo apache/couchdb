@@ -283,7 +283,8 @@ wait_db_cleared(Db, N) when N < 0 ->
     erlang:error({db_clear_timeout, couch_db:name(Db)});
 
 wait_db_cleared(Db, N) ->
-    case ets:lookup(couch_dbs, couch_db:name(Db)) of
+    Tab = couch_server:couch_dbs(couch_db:name(Db)),
+    case ets:lookup(Tab, couch_db:name(Db)) of
         [] ->
             ok;
         [#entry{db = NewDb}] ->
