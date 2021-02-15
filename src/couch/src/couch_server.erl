@@ -293,7 +293,7 @@ init([N]) ->
     process_flag(trap_exit, true),
     {ok, #server{root_dir=RootDir,
                 engines = Engines,
-                max_dbs_open=MaxDbsOpen div couch_server:num_servers(),
+                max_dbs_open=per_couch_server(MaxDbsOpen),
                 update_lru_on_read=UpdateLruOnRead,
                 start_time=couch_util:rfc1123_date(),
                 couch_dbs=couch_dbs(N),
@@ -322,11 +322,13 @@ handle_config_change("couchdb", "update_lru_on_read", "true", _, N) ->
 handle_config_change("couchdb", "update_lru_on_read", _, _, N) ->
     gen_server:call(couch_server(N),{set_update_lru_on_read,false}),
     {ok, N};
-handle_config_change("couchdb", "max_dbs_open", Max, _, N) when is_list(Max) ->
-    gen_server:call(couch_server(N),{set_max_dbs_open,list_to_integer(Max)}),
+handle_config_change("couchdb", "max_dbs_open", Max0, _, N) when is_list(Max0) ->
+    Max1 = per_couch_server(list_to_integer(Max0)),
+    gen_server:call(couch_server(N),{set_max_dbs_open,Max1}),
     {ok, N};
 handle_config_change("couchdb", "max_dbs_open", _, _, N) ->
-    gen_server:call(couch_server(N),{set_max_dbs_open,?MAX_DBS_OPEN}),
+    Max = per_couch_server(?MAX_DBS_OPEN),
+    gen_server:call(couch_server(N),{set_max_dbs_open,Max}),
     {ok, N};
 handle_config_change("couchdb_engines", _, _, _, N) ->
     gen_server:call(couch_server(N), reload_engines),
@@ -354,6 +356,10 @@ handle_config_terminate(_, stop, _) ->
     ok;
 handle_config_terminate(_Server, _Reason, N) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), {restart_config_listener, N}).
+
+
+per_couch_server(X) ->
+    erlang:max(1, X div couch_server:num_servers()).
 
 
 all_databases() ->
