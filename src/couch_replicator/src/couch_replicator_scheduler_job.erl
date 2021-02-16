@@ -30,7 +30,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
--include("couch_replicator_scheduler.hrl").
 -include("couch_replicator.hrl").
 
 -import(couch_util, [

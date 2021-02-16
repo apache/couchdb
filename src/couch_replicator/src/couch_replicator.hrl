@@ -41,3 +41,19 @@
     wref :: reference(),
     result :: rep_start_result()
 }).
+
+
+-type job_id() :: term().
+-type job_args() :: term().
+-type event_type() :: added | started | stopped | {crashed, any()}.
+-type event() :: {Type:: event_type(), When :: erlang:timestamp()}.
+-type history() :: nonempty_list(event()).
+
+
+-record(job, {
+    id :: job_id() | '$1' | '_',
+    rep :: #rep{} | '_',
+    pid :: undefined | pid() | '$1' | '_',
+    monitor :: undefined | reference() | '_',
+    history :: history() | '_'
+}).
