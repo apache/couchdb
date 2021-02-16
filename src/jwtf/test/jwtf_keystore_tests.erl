@@ -22,7 +22,7 @@
 -define(EC_SECRET, "-----BEGIN PUBLIC KEY-----\\nMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEDsr0lz/Dg3luarb+Kua0Wcj9WrfR23os\\nwHzakglb8GhWRDn+oZT0Bt/26sX8uB4/ij9PEOLHPo+IHBtX4ELFFVr5GTzlqcJe\\nyctaTDd1OOAPXYuc67EWtGZ3pDAzztRs\\n-----END PUBLIC KEY-----\\n").
 
 setup() ->
-    test_util:start_applications([config, jwtf]),
+    test_util:start_applications([couch_log, config, jwtf]),
     config:set("jwt_keys", "hmac:hmac", ?HMAC_SECRET),
     config:set("jwt_keys", "rsa:hmac", ?HMAC_SECRET),
     config:set("jwt_keys", "ec:hmac", ?HMAC_SECRET),
@@ -39,7 +39,7 @@ setup() ->
 
 
 teardown(_) ->
-    test_util:stop_applications([config, jwtf]).
+    test_util:stop_applications([couch_log, config, jwtf]).
 
 jwtf_keystore_test_() ->
     {
