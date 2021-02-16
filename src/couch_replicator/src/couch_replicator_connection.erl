@@ -25,7 +25,8 @@
    handle_call/3,
    handle_info/2,
    handle_cast/2,
-   code_change/3
+   code_change/3,
+   format_status/2
 ]).
 
 -export([
@@ -226,6 +227,17 @@ code_change(_OldVsn, State, _Extra) ->
 
 terminate(_Reason, _State) ->
     ok.
+
+
+format_status(_Opt, [_PDict, #state{} = State]) ->
+    #state{
+        close_interval = CloseInterval,
+        timer = Timer
+    } = State,
+    [{data, [{"State", #{
+        close_interval => CloseInterval,
+        timer => Timer
+    }}]}].
 
 
 maybe_log_worker_death(_Host, _Port, normal) ->

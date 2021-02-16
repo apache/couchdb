@@ -34,7 +34,8 @@
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    code_change/3
+    code_change/3,
+    format_status/2
 ]).
 
 -export([
@@ -280,6 +281,17 @@ handle_info(Msg, St) ->
 
 code_change(_, St, _) ->
     {ok, St}.
+
+
+format_status(_Opt, [_PDict, #st{waiters = undefined} = State]) ->
+    MapState = maps:put(number_of_waiters, 0,
+        ?record_without(st, State, [waiters])),
+    [{data, [{"State", MapState}]}];
+
+format_status(_Opt, [_PDict, #st{waiters = Waiters} = State]) ->
+    MapState = maps:put(number_of_waiters, length(Waiters),
+        ?record_without(st, State, [waiters])),
+    [{data, [{"State", MapState}]}].
 
 
 spawn_opener(Key) ->

@@ -36,7 +36,8 @@
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    code_change/3
+    code_change/3,
+    format_status/2
 ]).
 
 
@@ -293,6 +294,9 @@ handle_info({'DOWN', Ref, _, _, _}, #stream{opener_monitor=Ref} = State) ->
 handle_info(_Info, State) ->
     {noreply, State}.
 
+
+format_status(_Opt, [_PDict, #stream{} = State]) ->
+    [{data, [{"State", ?record_without(stream, State, [buffer_list])}]}].
 
 do_seek({Engine, EngineState}, Offset) ->
     {ok, NewState} = Engine:seek(EngineState, Offset),

@@ -23,6 +23,7 @@
     terminate/2,
     handle_db_updater_call/2,
     handle_db_updater_info/2,
+    format_status/2,
 
     incref/1,
     decref/1,
@@ -77,7 +78,8 @@
     count_changes_since/2,
 
     start_compaction/4,
-    finish_compaction/4
+    finish_compaction/4,
+    format_record/1
 ]).
 
 
@@ -190,6 +192,10 @@ handle_db_updater_call(Msg, St) ->
 
 handle_db_updater_info({'DOWN', Ref, _, _, _}, #st{fd_monitor=Ref} = St) ->
     {stop, normal, St#st{fd=undefined, fd_monitor=closed}}.
+
+
+format_status(_Opt, [_PDict, #st{} = St]) ->
+    [{data, [{"State", format_record(St)}]}].
 
 
 incref(St) ->
@@ -1244,3 +1250,66 @@ is_file(Path) ->
         {ok, #file_info{type = directory}} -> true;
         _ -> false
     end.
+
+
+format_record(#st{} = St) ->
+    #st{
+        filepath = FilePath,
+        fd = Fd,
+        fd_monitor = FdMonitor,
+        header = Header,
+        needs_commit = NeedsCommit,
+        id_tree = IdTree,
+        seq_tree = SeqTree,
+        local_tree = LocalTree,
+        compression = Compression,
+        purge_tree = PurgeTree,
+        purge_seq_tree = PurgeSeqTree
+    } = St,
+    #{
+        filepath => FilePath,
+        fd => couch_term:format_pid(Fd),
+        fd_monitor => couch_term:format_ref(FdMonitor),
+        header => format_record(Header),
+        needs_commit => NeedsCommit,
+        id_tree => format_record(IdTree),
+        seq_tree => format_record(SeqTree),
+        local_tree => format_record(LocalTree),
+        compression => Compression,
+        purge_tree => format_record(PurgeTree),
+        purge_seq_tree => format_record(PurgeSeqTree)
+    };
+
+format_record(Header) when element(1, Header) =:= db_header ->
+    TreeSize = fun(TreeState) ->
+        %% We just need a correctly shaped btree record,
+        %% so we can pass Fd = nil
+        {ok, Tree} = couch_btree:open(TreeState, nil),
+        couch_btree:size(Tree)
+    end,
+    #{
+        disk_version => couch_bt_engine_header:disk_version(Header),
+        update_seq => couch_bt_engine_header:update_seq(Header),
+        id_tree_state => TreeSize(
+            couch_bt_engine_header:id_tree_state(Header)),
+        seq_tree_state => TreeSize(
+            couch_bt_engine_header:seq_tree_state(Header)),
+        local_tree_state => TreeSize(
+            couch_bt_engine_header:local_tree_state(Header)),
+        purge_tree_state => TreeSize(
+            couch_bt_engine_header:purge_tree_state(Header)),
+        purge_seq_tree_state => TreeSize(
+            couch_bt_engine_header:purge_seq_tree_state(Header)),
+        security_ptr => couch_bt_engine_header:security_ptr(Header),
+        revs_limit => couch_bt_engine_header:revs_limit(Header),
+        uuid => couch_bt_engine_header:uuid(Header),
+        epochs => couch_bt_engine_header:epochs(Header),
+        compacted_seq => couch_bt_engine_header:compacted_seq(Header),
+        purge_infos_limit => couch_bt_engine_header:purge_infos_limit(Header)
+    };
+
+format_record(Tree) when element(1, Tree) =:= btree ->
+    couch_btree:size(Tree);
+
+format_record(_) ->
+    nil.

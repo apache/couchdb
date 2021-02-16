@@ -24,7 +24,8 @@
    handle_call/3,
    handle_info/2,
    handle_cast/2,
-   code_change/3
+   code_change/3,
+   format_status/2
 ]).
 
 -export([
@@ -173,6 +174,12 @@ handle_info(_Msg, State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
+
+format_status(_Opt, [_PDict, #state{} = State]) ->
+    #state{pids = Pids} = State,
+    StateMap = maps:put(number_of_pids, length(Pids),
+        ?record_without(state, State, [pids])),
+    [{data, [{"State", StateMap}]}].
 
 % Private functions
 

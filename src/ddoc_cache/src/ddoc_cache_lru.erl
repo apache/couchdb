@@ -28,7 +28,8 @@
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    code_change/3
+    code_change/3,
+    format_status/2
 ]).
 
 -export([
@@ -225,6 +226,10 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
+
+
+format_status(_Opt, [_PDict, #st{} = State]) ->
+    [{data, [{"State", ?record_to_map(st, State)}]}].
 
 
 handle_db_event(ShardDbName, created, St) ->

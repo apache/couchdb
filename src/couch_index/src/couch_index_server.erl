@@ -18,7 +18,7 @@
 
 -export([start_link/0, validate/2, get_index/4, get_index/3, get_index/2]).
 
--export([init/1, terminate/2, code_change/3]).
+-export([init/1, terminate/2, code_change/3, format_status/2]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
 
 % Exported for callbacks
@@ -202,6 +202,10 @@ handle_info(Msg, State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
+format_status(_Opt, [_PDict, #st{} = State]) ->
+    [{data, [{"State", ?record_to_map(st, State)}]}].
 
 
 handle_config_change("couchdb", "index_dir", RootDir, _, RootDir) ->

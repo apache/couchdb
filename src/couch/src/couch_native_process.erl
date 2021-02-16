@@ -42,7 +42,7 @@
 -vsn(1).
 
 -export([start_link/0,init/1,terminate/2,handle_call/3,handle_cast/2,code_change/3,
-         handle_info/2]).
+         handle_info/2, format_status/2]).
 -export([set_timeout/2, prompt/2]).
 
 -define(STATE, native_proc_state).
@@ -124,6 +124,25 @@ handle_info({'EXIT',_,Reason}, State) ->
     {stop, Reason, State}.
 terminate(_Reason, _State) -> ok.
 code_change(_OldVersion, State, _Extra) -> {ok, State}.
+
+format_status(_Opt, [_PDict, State]) ->
+    #evstate{
+        ddocs = DDocs,
+        funs = Funs,
+        list_pid = ListPid,
+        query_config = QueryConfig,
+        timeout = TimeOut,
+        idle = Idle
+    } = State,
+    MapState = #{
+        number_of_ddocs => dict:size(DDocs),
+        number_of_funs => length(Funs),
+        list_pid => couch_term:format_pid(ListPid),
+        query_config => QueryConfig,
+        timeout => TimeOut,
+        idle => Idle
+    },
+    [{data, [{"State", MapState}]}].
 
 run(#evstate{list_pid=Pid}=State, [<<"list_row">>, Row]) when is_pid(Pid) ->
     Pid ! {self(), list_row, Row},

@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 -vsn(1).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-    code_change/3]).
+    code_change/3, format_status/2]).
 
 -export([start_link/1, init_p/2, init_p/3]).
 
@@ -124,6 +124,17 @@ terminate(_Reason, St) ->
 
 code_change(_OldVsn, #st{}=State, _Extra) ->
     {ok, State}.
+
+format_status(_Opt, [_PDict, #st{} = State]) ->
+    #st{
+        error_limit = ErrorLimit,
+        error_count = ErrorCount
+    } = State,
+    %% We don't return ets tables because they are gone anyway
+    [{data, [{"State", #{
+        error_limit => ErrorLimit,
+        error_count => ErrorCount
+    }}]}].
 
 init_p(From, MFA) ->
     init_p(From, MFA, undefined).

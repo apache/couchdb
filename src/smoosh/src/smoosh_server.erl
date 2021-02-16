@@ -32,7 +32,7 @@
 
 % gen_server api.
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-    code_change/3, terminate/2]).
+    code_change/3, terminate/2, format_status/2]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -221,6 +221,27 @@ code_change(_OldVsn, {state, DbChannels, ViewChannels, Tab,
             waiting=Waiting}};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
+format_status(_Opt, [_PDict, #state{} = State]) ->
+    #state{
+        db_channels = DbChannels,
+        view_channels = ViewChannels,
+        schema_channels = SchemaChannels,
+        tab = Tab,
+        event_listener = EventListener,
+        waiting = Waiters
+    } = State,
+    MapState = #{
+        number_of_db_channels => length(DbChannels),
+        number_of_view_channels => length(ViewChannels),
+        number_of_schema_channels => length(SchemaChannels),
+        tab => Tab,
+        event_listener => EventListener,
+        number_of_waiters => dict:size(Waiters)
+    },
+    [{data, [{"State", MapState}]}].
+
 
 % private functions.
 

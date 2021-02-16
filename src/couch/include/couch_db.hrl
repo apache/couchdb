@@ -219,3 +219,16 @@
 -type sec_props() :: [tuple()].
 -type sec_obj() :: {sec_props()}.
 
+-define(record_to_keyval(Name, Record),
+    lists:zip(record_info(fields, Name), tl(tuple_to_list(Record)))).
+
+-define(record_to_map(RecordName, Record),
+    element(1, lists:foldl(fun(Field, {Map, Idx}) ->
+        {
+            maps:put(Field, element(Idx, Record), Map),
+            Idx + 1
+        }
+    end, {#{}, 2}, record_info(fields, RecordName)))).
+
+-define(record_without(RecordName, Record, Keys),
+    maps:without(Keys, ?record_to_map(RecordName, Record))).

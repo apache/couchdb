@@ -19,7 +19,7 @@
 
 % gen_server callbacks
 -export([start_link/0, init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+         terminate/2, code_change/3, format_status/2]).
 
 -export([init_changes_handler/1, changes_handler/3]).
 
@@ -410,3 +410,31 @@ terminate(_Reason, _State) ->
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+
+format_status(_Opt, [_PDict, #state{} = State]) ->
+    #state{
+        parent = Parent,
+        db_name = DbName,
+        delete_dbs = DeleteDbs,
+        states = States,
+        mem3_cluster_pid = Mem3Cluster,
+        cluster_stable = ClusterStable,
+        q_for_peruser_db = Q,
+        peruser_dbname_prefix = PerUserDbPrefix
+    } = State,
+    Length = fun
+        (undefined) -> 0;
+        (List) -> length(List)
+    end,
+    MapState = #{
+        parent => Parent,
+        db_name => DbName,
+        delete_dbs => DeleteDbs,
+        states => Length(States),
+        mem3_cluster_pid => Mem3Cluster,
+        cluster_stable => ClusterStable,
+        q_for_peruser_db => Q,
+        peruser_dbname_prefix => PerUserDbPrefix
+    },
+    [{data, [{"State", MapState}]}].

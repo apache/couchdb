@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 -vsn(1).
 
--export([start_link/1, start_link/2, start_link/3, stop/1]).
+-export([start_link/1, start_link/2, start_link/3, stop/1, format_status/2]).
 -export([set_timeout/2, prompt/2, killer/1]).
 -export([send/2, writeline/2, readline/1, writejson/2, readjson/1]).
 -export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
@@ -255,6 +255,24 @@ code_change(_, {os_proc, Cmd, Port, W, R, Timeout} , _) ->
     {ok, State};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+format_status(_Opt, [_PDict, #os_proc{} = State]) ->
+    % command field can potentially contain secrets
+    #os_proc{
+        port = Port,
+        writer = Writer,
+        reader = Reader,
+        timeout = TimeOut,
+        idle = Idle
+    } = State,
+    MapState = #{
+        port => couch_term:format_port(Port),
+        writer => couch_term:format_fun(Writer),
+        reader => couch_term:format_fun(Reader),
+        timeout => TimeOut,
+        idle => Idle
+    },
+    [{data, [{"State", MapState}]}].
 
 killer(KillCmd) ->
     receive _ ->

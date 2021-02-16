@@ -126,7 +126,10 @@
     validate_dbname/1,
 
     make_doc/5,
-    new_revid/1
+    new_revid/1,
+
+    format_record/1,
+    format_security_object/1
 ]).
 
 
@@ -757,6 +760,13 @@ set_security(_, _) ->
 set_user_ctx(#db{} = Db, UserCtx) ->
     {ok, Db#db{user_ctx = UserCtx}}.
 
+format_security_object(SecProps) when is_list(SecProps) ->
+    lists:map(fun({Key, {Props}}) ->
+        {Key, Props}
+    end, SecProps);
+format_security_object(Term) ->
+    couch_term:format_term(Term).
+
 validate_security_object(SecProps) ->
     Admins = couch_util:get_value(<<"admins">>, SecProps, {[]}),
     % we fallback to readers here for backwards compatibility
@@ -1147,6 +1157,35 @@ new_revid(#doc{body=Body, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted}) 
             OldRev = case OldRevs of [] -> 0; [OldRev0|_] -> OldRev0 end,
             couch_hash:md5_hash(term_to_binary([Deleted, OldStart, OldRev, Body, Atts2], [{minor_version, 1}]))
     end.
+
+
+format_record(#db{} = Db) ->
+    #db{
+        engine = {Engine, _},
+        before_doc_update = BeforeDocUpdate,
+        after_doc_read = AfterDocRead,
+        main_pid = Pid,
+        user_ctx = UserCtx,
+        options = Options,
+        security = Security
+    } = Db,
+    FormattedOptions = lists:map(fun
+        ({default_security_object, SecProps}) ->
+            {default_security_object, format_security_object(SecProps)};
+        ({user_ctx, #user_ctx{} = Ctx}) ->
+            {user_ctx, couch_term:format_record(Ctx)};
+        (Else) -> Else
+    end, Options),
+    maps:merge(?record_without(db, Db, [waiting_delayed_commit_deprecated]), #{
+        engine => {Engine, couch_db_engine:format_record(Db)},
+        before_doc_update => couch_term:format_fun(BeforeDocUpdate),
+        after_doc_read => couch_term:format_fun(AfterDocRead),
+        main_pid => couch_term:format_pid(Pid),
+        user_ctx => couch_term:format_record(UserCtx),
+        options => FormattedOptions,
+        security => format_security_object(Security)
+    }).
+
 
 new_revs([], OutBuckets, IdRevsAcc) ->
     {lists:reverse(OutBuckets), IdRevsAcc};

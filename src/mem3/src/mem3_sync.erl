@@ -14,7 +14,7 @@
 -behaviour(gen_server).
 -vsn(1).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-    code_change/3]).
+    code_change/3, format_status/2]).
 
 -export([start_link/0, get_active/0, get_queue/0, push/1, push/2,
     remove_node/1, remove_shard/1, initial_sync/1, get_backlog/0, nodes_db/0,
@@ -165,6 +165,22 @@ code_change(_, #state{waiting = WaitingList} = State, _) when is_list(WaitingLis
 
 code_change(_, State, _) ->
     {ok, State}.
+
+
+format_status(_Opt, [_PDict, #state{} = State]) ->
+    #state{
+        active = Active,
+        dict = Dict
+    } = State,
+    MapState = maps:merge(
+        %% We don't call queue:len(State#state.waiting) because it is O(n)
+        ?record_without(state, State, [active, dict, waiting]), #{
+            active => length(Active),
+            dict_size => dict:size(Dict)
+        }
+    ),
+    [{data, [{"State", MapState}]}].
+
 
 maybe_resubmit(State, #job{name=DbName, node=Node} = Job) ->
     case lists:member(DbName, local_dbs()) of

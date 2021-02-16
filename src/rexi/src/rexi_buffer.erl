@@ -16,7 +16,7 @@
 
 %  gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+         terminate/2, code_change/3, format_status/2]).
 
 -export ([
     send/2,
@@ -94,6 +94,19 @@ code_change(_OldVsn, {state, Buffer, Sender, Count}, _Extra) ->
     {ok, #state{buffer=Buffer, sender=Sender, count=Count, max_count=Max}};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
+
+format_status(_Opt, [_PDict, #state{} = State]) ->
+    %% We don't include queue:len(State#state.buffer), because it is O(n)
+    #state{
+        sender = Sender,
+        count = Count,
+        max_count = MaxCount
+    } = State,
+    [{data, [{"State", #{
+            sender => Sender,
+            count => Count,
+            max_count => MaxCount
+    }}]}].
 
 should_drop(#state{count = Count, max_count = Max}) ->
     Count >= Max.

@@ -172,6 +172,13 @@
     {stop, Reason::any(), NewDbHandle::db_handle()}.
 
 
+% This is called in the context of couch_db_updater:format_status/2
+% This function is used to clean up its internal state to reduce
+% amount of data we log and to remove sensitive data
+% (see http://erlang.org/doc/man/gen_server.html#Module:format_status-2)
+-callback format_status(Opt :: normal | terminate, State :: term()) ->
+    Status :: term().
+
 % These functions are called by any process opening or closing
 % a database. As such they need to be able to handle being
 % called concurrently. For example, the legacy engine uses these
@@ -689,6 +696,9 @@
     CompactInfo::any()) ->
         {ok, CompactedDbHandle::db_handle(), CompactorPid::pid() | undefined}.
 
+% This function is used for debugging and logging purposes
+-callback format_record(db_handle()) ->
+    term().
 
 -export([
     exists/2,
@@ -699,6 +709,7 @@
     terminate/2,
     handle_db_updater_call/3,
     handle_db_updater_info/2,
+    format_status/2,
 
     incref/1,
     decref/1,
@@ -754,7 +765,9 @@
 
     start_compaction/1,
     finish_compaction/2,
-    trigger_on_compact/1
+    trigger_on_compact/1,
+
+    format_record/1
 ]).
 
 
@@ -783,6 +796,11 @@ init(Engine, DbPath, Options) ->
 terminate(Reason, #db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:terminate(Reason, EngineState).
+
+
+format_status(Opt, [PDict, #db{} = Db]) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:format_status(Opt, [PDict, EngineState]).
 
 
 handle_db_updater_call(Msg, _From, #db{} = Db) ->
@@ -1080,6 +1098,11 @@ finish_compaction(Db, CompactInfo) ->
 trigger_on_compact(DbName) ->
     {ok, DDocs} = get_ddocs(DbName),
     couch_db_plugin:on_compact(DbName, DDocs).
+
+
+format_record(Db) ->
+    #db{engine = {Engine, St}} = Db,
+    Engine:format_record(St).
 
 
 get_ddocs(<<"shards/", _/binary>> = DbName) ->

@@ -32,6 +32,16 @@
     clients
 }).
 
+-define(record_to_map(RecordName, Record),
+    element(1, lists:foldl(fun(Field, {Map, Idx}) ->
+        {
+            maps:put(Field, element(Idx, Record), Map),
+            Idx + 1
+        }
+    end, {#{}, 2}, record_info(fields, RecordName)))).
+
+-define(record_without(RecordName, Record, Keys),
+    maps:without(Keys, ?record_to_map(RecordName, Record))).
 
 -ifdef(TEST).
 -define(EVENT(Name, Arg), ddoc_cache_ev:event(Name, Arg)).

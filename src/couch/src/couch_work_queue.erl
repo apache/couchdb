@@ -20,7 +20,7 @@
 -export([new/1, queue/2, dequeue/1, dequeue/2, close/1, item_count/1, size/1]).
 
 % gen_server callbacks
--export([init/1, terminate/2]).
+-export([init/1, terminate/2, format_status/2]).
 -export([handle_call/3, handle_cast/2, code_change/3, handle_info/2]).
 
 -record(q, {
@@ -186,3 +186,15 @@ code_change(_OldVsn, State, _Extra) ->
 
 handle_info(X, Q) ->
     {stop, X, Q}.
+
+
+format_status(_Opt, [_PDict, #q{} = State]) ->
+    #q{
+        blocked = Blocked,
+        work_waiters = WorkerWaiters
+    } = State,
+    MapState = maps:merge(?record_without(q, State, [queue]), #{
+        number_of_blocked => length(Blocked),
+        number_of_work_waiters => length(WorkerWaiters)
+    }),
+    [{data, [{"State", MapState}]}].

@@ -20,7 +20,7 @@
 
 % gen_server api.
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-    code_change/3, terminate/2]).
+    code_change/3, terminate/2, format_status/2]).
 
 % exported for callback.
 -export([
@@ -118,6 +118,19 @@ code_change(?VSN_0_2_7, State, _Extra) ->
     {ok, State};
 code_change(_OldVsn, #state{}=State, _Extra) ->
     {ok, State}.
+
+
+format_status(_Opt, [_PDict, #state{} = State]) ->
+    #state{
+        event_listener = EventListener,
+        shard_checker = ShardChecker,
+        rescan = Rescan
+    } = State,
+    [{data, [{"State", #{
+        event_listener => EventListener,
+        shard_checker => ShardChecker,
+        rescan => Rescan
+    }}]}].
 
 % private functions
 
