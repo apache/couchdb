@@ -228,6 +228,64 @@ defmodule ChangesTest do
   end
 
   @tag :with_db
+  test "changes filtering on custom filter", context do
+    db_name = context[:db_name]
+    create_filters_view(db_name)
+
+    resp = Couch.post("/#{db_name}/_changes?filter=changes_filter/bop")
+    assert Enum.empty?(resp.body["results"]), "db must be empty"
+
+    {:ok, doc_resp} = create_doc(db_name, %{bop: "foom"})
+    rev = doc_resp.body["rev"]
+    create_doc(db_name, %{bop: false})
+
+    resp = Couch.post("/#{db_name}/_changes?filter=changes_filter/bop")
+    assert length(resp.body["results"]) == 1
+    change_rev = get_change_rev_at(resp.body["results"], 0)
+    assert change_rev == rev
+
+    resp = Couch.post("/#{db_name}/_changes?filter=changes_filter/bop",
+      body: %{doc_ids: ["doc1", "doc3", "doc4"]},
+      headers: ["Content-Type": "application/json"]
+    )
+    assert length(resp.body["results"]) == 1
+    change_rev = get_change_rev_at(resp.body["results"], 0)
+    assert change_rev == rev
+  end
+
+  @tag :with_db
+  test "changes fail on invalid payload", context do
+    db_name = context[:db_name]
+    create_filters_view(db_name)
+
+    resp = Couch.post("/#{db_name}/_changes?filter=changes_filter/bop",
+      body: "[\"doc1\"]",
+      headers: ["Content-Type": "application/json"]
+    )
+    assert resp.status_code == 400
+    assert resp.body["error"] == "bad_request"
+    assert resp.body["reason"] == "Request body must be a JSON object"
+
+    resp = Couch.post("/#{db_name}/_changes?filter=changes_filter/bop",
+      body: "{\"doc_ids\": [\"doc1\",",
+      headers: ["Content-Type": "application/json"]
+    )
+    assert resp.status_code == 400
+    assert resp.body["error"] == "bad_request"
+    assert resp.body["reason"] == "invalid UTF-8 JSON"
+
+    set_config({"httpd", "max_http_request_size", "16"})
+
+    resp = Couch.post("/#{db_name}/_changes?filter=changes_filter/bop",
+      body: %{doc_ids: ["doc1", "doc3", "doc4"]},
+      headers: ["Content-Type": "application/json"]
+    )
+    assert resp.status_code == 413
+    assert resp.body["error"] == "too_large"
+    assert resp.body["reason"] == "the request entity is too large"
+  end
+
+  @tag :with_db
   test "COUCHDB-1037-empty result for ?limit=1&filter=foo/bar in some cases",
        context do
     db_name = context[:db_name]
