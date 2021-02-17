@@ -491,7 +491,7 @@ filter_docs(Req, Db, DDoc, FName, Docs) ->
         {json_req, JsonObj} ->
             JsonObj;
         #httpd{} = HttpReq ->
-            couch_httpd_external:json_req_obj(HttpReq, Db)
+            chttpd_external:json_req_obj(HttpReq, Db)
     end,
     Options = json_doc_options(),
     JsonDocs = [json_doc(Doc, Options) || Doc <- Docs],
