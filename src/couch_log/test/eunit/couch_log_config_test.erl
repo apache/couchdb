@@ -28,7 +28,9 @@ couch_log_config_test_() ->
             ?T(check_bad_level),
             ?T(check_bad_max_message_size),
             ?T(check_strip_last_msg),
-            ?T(check_bad_strip_last_msg)
+            ?T(check_bad_strip_last_msg),
+            ?T(check_filter_fields),
+            ?T(check_bad_filter_fields)
         ]
     }.
 
@@ -143,4 +145,37 @@ check_bad_strip_last_msg() ->
         config:delete("log", "strip_last_msg"),
         couch_log_test_util:wait_for_config(),
         ?assertEqual(true, couch_log_config:get(strip_last_msg))
+    end).
+
+
+check_filter_fields() ->
+    Default = [pid, registered_name, error_info, messages],
+    ?assertEqual(Default, couch_log_config:get(filter_fields)),
+
+    couch_log_test_util:with_config_listener(fun() ->
+        config:set("log", "filter_fields", "[foo, bar, baz]"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual([foo, bar, baz], couch_log_config:get(filter_fields)),
+
+        config:delete("log", "filter_fields"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(Default, couch_log_config:get(filter_fields))
+    end).
+
+check_bad_filter_fields() ->
+    Default = [pid, registered_name, error_info, messages],
+    ?assertEqual(Default, couch_log_config:get(filter_fields)),
+
+    couch_log_test_util:with_config_listener(fun() ->
+        config:set("log", "filter_fields", "[foo, bar, baz]"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual([foo, bar, baz], couch_log_config:get(filter_fields)),
+
+        config:set("log", "filter_fields", "not a list of atoms"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(Default, couch_log_config:get(filter_fields)),
+
+        config:delete("log", "filter_fields"),
+        couch_log_test_util:wait_for_config(),
+        ?assertEqual(Default, couch_log_config:get(filter_fields))
     end).
