@@ -26,4 +26,5 @@
 get(level) -> info;
 get(level_int) -> 2;
 get(max_message_size) -> 16000;
-get(strip_last_msg) -> true.
+get(strip_last_msg) -> true;
+get(filter_fields) -> [pid, registered_name, error_info, messages].
