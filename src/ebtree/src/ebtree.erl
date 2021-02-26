@@ -1394,7 +1394,8 @@ lookup_multi_test() ->
     validate_tree(Db, Tree),
     ?assertEqual([{1, 2}], lookup_multi(Db, Tree, [1])),
     ?assertEqual([{15, 16}, {2, 3}], lookup_multi(Db, Tree, [2, 15])),
-    ?assertEqual([{15, 16}, {4, 5}, {2, 3}], lookup_multi(Db, Tree, [2, 101, 15, 4, -3])).
+    ?assertEqual([{15, 16}, {4, 5}, {2, 3}], lookup_multi(Db, Tree, [2, 101, 15, 4, -3])),
+    ?assertEqual([{2, 3}], lookup_multi(Db, Tree, [1.5, 2])).
 
 
 insert_multi_test() ->
