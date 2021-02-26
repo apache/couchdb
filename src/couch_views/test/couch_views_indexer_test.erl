@@ -42,10 +42,10 @@ indexer_test_() ->
                     ?TDEF_FE(updated_docs_without_changes_are_reindexed),
                     ?TDEF_FE(deleted_docs_not_indexed),
                     ?TDEF_FE(deleted_docs_are_unindexed),
-                    ?TDEF_FE(multipe_docs_with_same_key),
-                    ?TDEF_FE(multipe_keys_from_same_doc),
-                    ?TDEF_FE(multipe_identical_keys_from_same_doc),
-                    ?TDEF_FE(fewer_multipe_identical_keys_from_same_doc),
+                    ?TDEF_FE(multiple_docs_with_same_key),
+                    ?TDEF_FE(multiple_keys_from_same_doc),
+                    ?TDEF_FE(multiple_identical_keys_from_same_doc),
+                    ?TDEF_FE(fewer_multiple_identical_keys_from_same_doc),
                     ?TDEF_FE(multiple_design_docs),
                     ?TDEF_FE(handle_size_key_limits),
                     ?TDEF_FE(handle_size_value_limits),
@@ -216,7 +216,7 @@ deleted_docs_are_unindexed(Db) ->
     end).
 
 
-multipe_docs_with_same_key(Db) ->
+multiple_docs_with_same_key(Db) ->
     DDoc = create_ddoc(),
     Doc1 = doc(0, 1),
     Doc2 = doc(1, 1),
@@ -232,7 +232,7 @@ multipe_docs_with_same_key(Db) ->
     ], Out).
 
 
-multipe_keys_from_same_doc(Db) ->
+multiple_keys_from_same_doc(Db) ->
     DDoc = create_ddoc(multi_emit_different),
     Doc = doc(0, 1),
 
@@ -247,7 +247,7 @@ multipe_keys_from_same_doc(Db) ->
     ], Out).
 
 
-multipe_identical_keys_from_same_doc(Db) ->
+multiple_identical_keys_from_same_doc(Db) ->
     DDoc = create_ddoc(multi_emit_same),
     Doc = doc(0, 1),
 
@@ -262,7 +262,7 @@ multipe_identical_keys_from_same_doc(Db) ->
     ], Out).
 
 
-fewer_multipe_identical_keys_from_same_doc(Db) ->
+fewer_multiple_identical_keys_from_same_doc(Db) ->
     DDoc = create_ddoc(multi_emit_same),
     Doc0 = #doc{
             id = <<"0">>,
