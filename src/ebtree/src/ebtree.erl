@@ -173,18 +173,17 @@ lookup_multi_fold(_, {_, [], _} = Acc) ->
     {stop, Acc};
 
 lookup_multi_fold({visit, Key1, Value}, {Tree, [Key2 | Rest], Acc}) ->
-    {NewKeys, NewAcc} = case collate(Tree, Key1, Key2) of
+    case collate(Tree, Key1, Key2) of
         lt ->
             % Still looking for the next user key
-            {[Key2 | Rest], Acc};
+            {ok, {Tree, [Key2 | Rest], Acc}};
         eq ->
             % Found a requested key
-            {Rest, [{Key2, Value} | Acc]};
+            {ok, {Tree, Rest, [{Key2, Value} | Acc]}};
         gt ->
             % The user key wasn't found so we drop it
-            {Rest, Acc}
-    end,
-    {ok, {Tree, NewKeys, NewAcc}};
+            lookup_multi_fold({visit, Key1, Value}, {Tree, Rest, Acc})
+    end;
 
 lookup_multi_fold({traverse, FKey, LKey, R}, {Tree, [UKey | Rest], Acc}) ->
     case collate(Tree, FKey, UKey, [gt]) of
