@@ -132,13 +132,13 @@ max() ->
     {Key :: term(), Value :: term()} | false.
 lookup(Db, #tree{} = Tree, Key) ->
     Fun = fun
-        ({visit, K, V}, _Acc) when K =:= Key ->
-            {stop, {K, V}};
-        ({visit, K, _V}, Acc) ->
-            case collate(Tree, K, Key, [gt]) of
-                true ->
+        ({visit, K, V}, Acc) ->
+            case {collate(Tree, K, Key, [eq]), collate(Tree, K, Key, [gt])} of
+                {true, _} ->
+                    {stop, {K, V}};
+                {false, true} ->
                     {stop, Acc};
-                false ->
+                {false, false} ->
                     {ok, Acc}
             end;
         ({traverse, F, L, _R}, Acc) ->
