@@ -47,6 +47,7 @@ indexer_test_() ->
                     ?TDEF_FE(multiple_identical_keys_from_same_doc),
                     ?TDEF_FE(fewer_multiple_identical_keys_from_same_doc),
                     ?TDEF_FE(multiple_design_docs),
+                    ?TDEF_FE(multiple_doc_update_with_existing_rows),
                     ?TDEF_FE(handle_size_key_limits),
                     ?TDEF_FE(handle_size_value_limits),
                     ?TDEF_FE(index_autoupdater_callback),
@@ -423,6 +424,31 @@ multiple_design_docs(Db) ->
     % After the last ddoc is deleted we should get an error
     ?assertError({ddoc_deleted, _}, run_query(Db, DDoc2, ?MAP_FUN1)).
 
+
+multiple_doc_update_with_existing_rows(Db) ->
+    DDoc = create_ddoc(),
+    Doc0 = doc(0),
+    Doc1 = doc(1),
+
+    {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
+    {ok, {Pos, Rev}} = fabric2_db:update_doc(Db, Doc1, []),
+
+    {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
+
+    ?assertEqual([row(<<"1">>, 1, 1)], Out1),
+
+    Doc2 = Doc1#doc{
+        revs = {Pos, [Rev]},
+        body = {[{<<"val">>, 2}]}
+    },
+    {ok, _} = fabric2_db:update_docs(Db, [Doc0, Doc2], []),
+
+    {ok, Out2} = run_query(Db, DDoc, ?MAP_FUN1),
+
+    ?assertEqual([
+        row(<<"0">>, 0, 0),
+        row(<<"1">>, 2, 2)
+    ], Out2).    
 
 handle_db_recreated_when_running(Db) ->
     DbName = fabric2_db:name(Db),
