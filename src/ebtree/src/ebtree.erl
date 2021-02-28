@@ -133,12 +133,12 @@ max() ->
 lookup(Db, #tree{} = Tree, Key) ->
     Fun = fun
         ({visit, K, V}, Acc) ->
-            case {collate(Tree, K, Key, [eq]), collate(Tree, K, Key, [gt])} of
-                {true, _} ->
+            case collate(Tree, K, Key) of
+                eq ->
                     {stop, {K, V}};
-                {false, true} ->
+                gt ->
                     {stop, Acc};
-                {false, false} ->
+                lt ->
                     {ok, Acc}
             end;
         ({traverse, F, L, _R}, Acc) ->
