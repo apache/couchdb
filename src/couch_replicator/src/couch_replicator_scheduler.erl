@@ -1680,7 +1680,6 @@ continuous_rep(Src, Tgt) ->
     Rep#rep{source = Src, target = Tgt}.
 
 
-
 continuous(Id) when is_integer(Id) ->
     Started = Id,
     Hist = [stopped(Started+1), started(Started), added()],
