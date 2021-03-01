@@ -12,7 +12,7 @@ defmodule BasicsTest do
   test "Session contains adm context" do
     user_ctx = Couch.get("/_session").body["userCtx"]
     assert user_ctx["name"] == "adm", "Should have adm user context"
-    assert user_ctx["roles"] == ["_admin"], "Should have _admin role"
+    assert "_admin" in user_ctx["roles"], "Should have _admin role"
   end
 
   test "Welcome endpoint" do
