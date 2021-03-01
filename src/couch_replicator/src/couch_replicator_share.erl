@@ -265,10 +265,7 @@ decay(Ets, Coeff) when is_atom(Ets) ->
 
 
 clear_zero(Ets) when is_atom(Ets) ->
-    % Coefficents bound to the [0.0, 1.0] range, and the `trunc` call in
-    % decay/2 ensures we can directly match on 0, as opposed needing to do =< 0
-    % with a guard.
-    ets:select_delete(Ets, [{{'_', 0}, [], [true]}]).
+    ets:select_delete(Ets, [{{'_', '$1'}, [{'=<', '$1', 0}], [true]}]).
 
 
 key(#job{} = Job) ->
