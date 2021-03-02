@@ -173,7 +173,7 @@
 create(DbName, Options) ->
     case validate_dbname(DbName) of
         ok ->
-            Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
+            Result = fabric2_fdb:transactional(DbName, fun(TxDb) ->
                 case fabric2_fdb:exists(TxDb) of
                     true ->
                         {error, file_exists};
@@ -205,7 +205,7 @@ open(DbName, Options) ->
             Db2 = maybe_set_interactive(Db1, Options),
             {ok, require_member_check(Db2)};
         undefined ->
-            Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
+            Result = fabric2_fdb:transactional(DbName, fun(TxDb) ->
                 fabric2_fdb:open(TxDb, Options)
             end),
             % Cache outside the transaction retry loop
@@ -227,7 +227,7 @@ delete(DbName, Options) ->
     Options1 = lists:keystore(user_ctx, 1, Options, ?ADMIN_CTX),
     case lists:keyfind(deleted_at, 1, Options1) of
         {deleted_at, TimeStamp} ->
-            fabric2_fdb:transactional(DbName, Options1, fun(TxDb) ->
+            fabric2_fdb:transactional(DbName, fun(TxDb) ->
                 fabric2_fdb:remove_deleted_db(TxDb, TimeStamp)
             end);
         false ->
@@ -245,7 +245,7 @@ delete(DbName, Options) ->
 undelete(DbName, TgtDbName, TimeStamp, Options) ->
     case validate_dbname(TgtDbName) of
         ok ->
-            Resp = fabric2_fdb:transactional(DbName, Options,
+            Resp = fabric2_fdb:transactional(DbName,
                 fun(TxDb) ->
                     fabric2_fdb:undelete(TxDb, TgtDbName, TimeStamp)
                 end

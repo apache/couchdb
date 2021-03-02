@@ -15,8 +15,8 @@
 
 -export([
     transactional/1,
-    transactional/3,
     transactional/2,
+    transactional/3,
 
     with_snapshot/2,
 
@@ -118,18 +118,25 @@
 
 
 transactional(Fun) ->
-    do_transaction(Fun, undefined).
+    do_transaction(Fun, undefined, #{}).
 
 
-transactional(DbName, Options, Fun) when is_binary(DbName) ->
+transactional(DbName, Fun) when is_binary(DbName), is_function(Fun) ->
+    transactional(DbName, #{}, Fun);
+
+transactional(#{} = Db, Fun) when is_function(Fun) ->
+    transactional(Db, #{}, Fun).
+
+
+
+transactional(DbName, #{} = TxOptions, Fun) when is_binary(DbName) ->
     with_span(Fun, #{'db.name' => DbName}, fun() ->
-        transactional(fun(Tx) ->
-            Fun(init_db(Tx, DbName, Options))
-        end)
-    end).
+        do_transaction(fun(Tx) ->
+            Fun(init_db(Tx, DbName))
+        end, undefined, TxOptions)
+    end);
 
-
-transactional(#{tx := undefined} = Db, Fun) ->
+transactional(#{tx := undefined} = Db, #{} = TxOptions, Fun) ->
     DbName = maps:get(name, Db, undefined),
     try
         Db1 = refresh(Db),
@@ -145,30 +152,31 @@ transactional(#{tx := undefined} = Db, Fun) ->
                     true -> Fun(reopen(Db2#{tx => Tx}));
                     false -> Fun(Db2#{tx => Tx})
                 end
-            end, LayerPrefix)
+            end, LayerPrefix, TxOptions)
         end)
     catch throw:{?MODULE, reopen} ->
         with_span('db.reopen', #{'db.name' => DbName}, fun() ->
             transactional(Db#{reopen => true}, Fun)
         end)
     end;
-transactional(#{tx := {erlfdb_snapshot, _}} = Db, Fun) ->
+transactional(#{tx := {erlfdb_snapshot, _}} = Db, #{} = _TxOptions, Fun) ->
     DbName = maps:get(name, Db, undefined),
     with_span(Fun, #{'db.name' => DbName}, fun() ->
         Fun(Db)
     end);
 
-transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
+transactional(#{tx := {erlfdb_transaction, _}} = Db, #{} = _TxOptions, Fun) ->
     DbName = maps:get(name, Db, undefined),
     with_span(Fun, #{'db.name' => DbName}, fun() ->
         Fun(Db)
     end).
 
 
-do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
+do_transaction(Fun, LayerPrefix, #{} = TxOptions) when is_function(Fun, 1) ->
     Db = get_db_handle(),
     try
         erlfdb:transactional(Db, fun(Tx) ->
+            apply_tx_options(Tx, TxOptions),
             case get(erlfdb_trace) of
                 Name when is_binary(Name) ->
                     UId = erlang:unique_integer([positive]),
@@ -188,6 +196,12 @@ do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
     after
         clear_transaction()
     end.
+
+
+apply_tx_options(Tx, #{} = TxOptions) ->
+    maps:map(fun(K, V) ->
+        erlfdb:set_option(Tx, K, V)
+    end, TxOptions).
 
 
 with_snapshot(#{tx := {erlfdb_transaction, _} = Tx} = TxDb, Fun) ->
@@ -365,7 +379,7 @@ reopen(#{} = OldDb) ->
         interactive := Interactive
     } = OldDb,
     Options1 = lists:keystore(user_ctx, 1, Options, {user_ctx, UserCtx}),
-    NewDb = open(init_db(Tx, DbName, Options1), Options1),
+    NewDb = open(init_db(Tx, DbName), Options1),
 
     % Check if database was re-created
     case {Interactive, maps:get(uuid, NewDb)} of
@@ -1226,7 +1240,7 @@ debug_cluster(Start, End) ->
     end).
 
 
-init_db(Tx, DbName, Options) ->
+init_db(Tx, DbName) ->
     Prefix = get_dir(Tx),
     Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
     #{
@@ -1236,7 +1250,7 @@ init_db(Tx, DbName, Options) ->
         md_version => Version,
 
         security_fun => undefined,
-        db_options => Options
+        db_options => []
     }.
 
 
