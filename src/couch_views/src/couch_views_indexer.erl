@@ -86,16 +86,10 @@ init() ->
         fail_job(Job, Data, sig_changed, "Design document was modified")
     end,
 
-    DbSeq = fabric2_fdb:transactional(Db, fun(TxDb) ->
-        fabric2_fdb:with_snapshot(TxDb, fun(SSDb) ->
-            fabric2_db:get_update_seq(SSDb)
-        end)
-    end),
-
     State = #{
         tx_db => undefined,
         db_uuid => DbUUID,
-        db_seq => DbSeq,
+        db_seq => undefined,
         view_seq => undefined,
         last_seq => undefined,
         view_vs => undefined,
@@ -280,6 +274,10 @@ maybe_set_build_status(TxDb, Mrst1, _ViewVS, State) ->
 % In the first iteration of update we need
 % to populate our db and view sequences
 get_update_start_state(TxDb, Mrst, #{view_seq := undefined} = State) ->
+    DbSeq = fabric2_fdb:with_snapshot(TxDb, fun(SSDb) ->
+        fabric2_db:get_update_seq(SSDb)
+    end),
+
     #{
         view_vs := ViewVS,
         view_seq := ViewSeq
@@ -287,14 +285,20 @@ get_update_start_state(TxDb, Mrst, #{view_seq := undefined} = State) ->
 
     State#{
         tx_db := TxDb,
+        db_seq := DbSeq,
         view_vs := ViewVS,
         view_seq := ViewSeq,
         last_seq := ViewSeq
     };
 
 get_update_start_state(TxDb, _Idx, State) ->
+    DbSeq = fabric2_fdb:with_snapshot(TxDb, fun(SSDb) ->
+        fabric2_db:get_update_seq(SSDb)
+    end),
+
     State#{
-        tx_db := TxDb
+        tx_db := TxDb,
+        db_seq := DbSeq
     }.
 
 
