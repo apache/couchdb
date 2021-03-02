@@ -43,7 +43,9 @@ fdb_tx_options_test_() ->
         end,
         with([
             ?TDEF(options_take_effect, 15),
-            ?TDEF(can_configure_options_at_runtime, 15)
+            ?TDEF(can_configure_options_at_runtime, 15),
+            ?TDEF(can_apply_options_to_db_name_transactions),
+            ?TDEF(can_apply_options_to_db_handle_transactions)
         ])
     }.
 
@@ -101,9 +103,40 @@ can_configure_options_at_runtime(_) ->
     ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
 
 
+can_apply_options_to_db_name_transactions(_) ->
+    DbName = ?tempdb(),
+
+    TxFun = fun(TxDb) ->
+        #{tx := Tx} = TxDb,
+        fabric2_fdb:create(TxDb, [?ADMIN_CTX]),
+        erlfdb:wait(erlfdb:get(Tx, <<16#FF, "/primaryDatacenter">>))
+    end,
+    TxOpts = #{read_system_keys => <<>>},
+    ?assertEqual(<<>>, fabric2_fdb:transactional(DbName, TxOpts, TxFun)),
+
+    ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
+
+
+can_apply_options_to_db_handle_transactions(_) ->
+    DbName = ?tempdb(),
+    {ok, Db} = fabric2_db:create(DbName, [?ADMIN_CTX]),
+
+    TxFun = fun(TxDb) ->
+        fabric2_db:update_doc(TxDb, large_doc(200000))
+    end,
+    TxOpts = #{size_limit => 150000},
+    ?assertError({erlfdb_error, ?TRANSACTION_TOO_LARGE},
+        fabric2_fdb:transactional(Db, TxOpts, TxFun)),
+
+    ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
+
+
 add_large_doc(Db, Size) ->
-    Doc = #doc{
+    fabric2_db:update_doc(Db, large_doc(Size)).
+
+
+large_doc(Size) ->
+    #doc{
         id = fabric2_util:uuid(),
         body = {[{<<"x">>, crypto:strong_rand_bytes(Size)}]}
-    },
-    fabric2_db:update_doc(Db, Doc).
+    }.
