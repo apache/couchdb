@@ -182,17 +182,19 @@ add_error(Error, Reason, Data) ->
 
 update(#{} = Db, Mrst0, State0) ->
     Limit = couch_views_batch:start(Mrst0),
-    {Mrst1, State1} = try
+    Result = try
         do_update(Db, Mrst0, State0#{limit => Limit})
     catch
         error:{erlfdb_error, Error} when ?IS_RECOVERABLE_ERROR(Error) ->
             couch_views_batch:failure(Mrst0),
             update(Db, Mrst0, State0)
     end,
-    case State1 of
-        finished ->
+    case Result of
+        ok ->
+            ok; % Already finished and released map context
+        {Mrst1, finished} ->
             couch_eval:release_map_context(Mrst1#mrst.qserver);
-        _ ->
+        {Mrst1, State1} ->
             #{
                 update_stats := UpdateStats
             } = State1,
