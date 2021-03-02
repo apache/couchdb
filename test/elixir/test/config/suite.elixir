@@ -95,7 +95,7 @@
     "bulk docs raises error for invlaid `docs` parameter",
     "bulk docs raises error for invlaid `new_edits` parameter",
     "bulk docs raises error for missing `docs` parameter",
-    "bulk docs raises transaction_too_large error for transaction larger than 10MB",
+    "bulk docs raises error for transaction larger than 10MB",
     "bulk docs supplies `id` if not provided in doc"
   ],
   "ChangesAsyncTest": [
