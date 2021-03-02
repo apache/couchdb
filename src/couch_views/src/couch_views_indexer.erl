@@ -209,10 +209,12 @@ do_update(Db, Mrst0, State0) ->
             tx := Tx
         } = TxDb,
 
+        Snapshot = TxDb#{ tx := erlfdb:snapshot(Tx) },
+
         State1 = get_update_start_state(TxDb, Mrst0, State0),
         Mrst1 = couch_views_trees:open(TxDb, Mrst0),
 
-        {ok, State2} = fold_changes(State1),
+        {ok, State2} = fold_changes(Snapshot, State1),
 
         #{
             doc_acc := DocAcc,
@@ -222,7 +224,7 @@ do_update(Db, Mrst0, State0) ->
             design_opts := DesignOpts
         } = State2,
 
-        DocAcc1 = fetch_docs(TxDb, DesignOpts, DocAcc),
+        DocAcc1 = fetch_docs(Snapshot, DesignOpts, DocAcc),
 
         {Mrst2, MappedDocs} = map_docs(Mrst0, DocAcc1),
         TotalKVs = write_docs(TxDb, Mrst1, MappedDocs, State2),
@@ -296,12 +298,11 @@ get_update_start_state(TxDb, _Idx, State) ->
     }.
 
 
-fold_changes(State) ->
+fold_changes(Snapshot, State) ->
     #{
         view_seq := SinceSeq,
         db_seq := DbSeq,
-        limit := Limit,
-        tx_db := TxDb
+        limit := Limit
     } = State,
 
     FoldState = State#{
@@ -314,7 +315,8 @@ fold_changes(State) ->
         {limit, Limit},
         {restart_tx, false}
     ],
-    case fabric2_db:fold_changes(TxDb, SinceSeq, Fun, FoldState, Opts) of
+
+    case fabric2_db:fold_changes(Snapshot, SinceSeq, Fun, FoldState, Opts) of
         {ok, #{rows_processed := 0} = FinalState} when Limit > 0 ->
             % If we read zero rows with a non-zero limit
             % it means we've caught up to the DbSeq as our
