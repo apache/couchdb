@@ -160,10 +160,10 @@ endif
 .PHONY: check
 check:  all
 	@$(MAKE) emilio
-	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango,chttpd,couch_replicator
-	make elixir-suite
-	make exunit apps=chttpd
-	make mango-test
+	@$(MAKE) eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango,chttpd,couch_replicator
+	@$(MAKE) elixir-suite
+	@$(MAKE) exunit apps=chttpd
+	@$(MAKE) mango-test
 
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
