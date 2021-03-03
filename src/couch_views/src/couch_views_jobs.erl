@@ -122,10 +122,6 @@ wait_for_job(JobId, Subscription, DDocId, UpdateSeq) ->
             {ok, idx_vstamps(JobData)};
         {finished, _} ->
             wait_for_job(JobId, DDocId, UpdateSeq);
-        {_State, #{<<"view_seq">> := ViewSeq} = JobData}
-                when ViewSeq >= UpdateSeq ->
-            couch_jobs:unsubscribe(Subscription),
-            {ok, idx_vstamps(JobData)};
         {_, _} ->
             wait_for_job(JobId, Subscription, DDocId, UpdateSeq)
     end.
