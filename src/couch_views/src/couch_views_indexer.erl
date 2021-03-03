@@ -37,6 +37,9 @@
 -define(KEY_SIZE_LIMIT, 8000).
 -define(VALUE_SIZE_LIMIT, 64000).
 
+-define(DEFAULT_TX_RETRY_LIMIT, 5).
+
+
 % These are all of the errors that we can fix by using
 % a smaller batch size.
 -define(IS_RECOVERABLE_ERROR(Code), (
@@ -106,7 +109,8 @@ init() ->
         changes_done => 0,
         doc_acc => [],
         design_opts => Mrst#mrst.design_opts,
-        update_stats => #{}
+        update_stats => #{},
+        tx_retry_limit => tx_retry_limit()
     },
 
     try
@@ -204,7 +208,8 @@ update(#{} = Db, Mrst0, State0) ->
 
 
 do_update(Db, Mrst0, State0) ->
-    fabric2_fdb:transactional(Db, fun(TxDb) ->
+    TxOpts = #{retry_limit => maps:get(tx_retry_limit, State0)},
+    fabric2_fdb:transactional(Db, TxOpts, fun(TxDb) ->
         #{
             tx := Tx
         } = TxDb,
@@ -647,3 +652,8 @@ key_size_limit() ->
 
 value_size_limit() ->
     config:get_integer("couch_views", "value_size_limit", ?VALUE_SIZE_LIMIT).
+
+
+tx_retry_limit() ->
+    config:get_integer("couch_views", "indexer_tx_retry_limit",
+        ?DEFAULT_TX_RETRY_LIMIT).
