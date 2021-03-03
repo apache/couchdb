@@ -121,9 +121,6 @@ wait_for_job(JobId, Subscription, DDocId, UpdateSeq) ->
             ok;
         {finished, _} ->
             wait_for_job(JobId, DDocId, UpdateSeq);
-        {_State, #{<<"view_seq">> := ViewSeq}} when ViewSeq >= UpdateSeq ->
-            couch_jobs:unsubscribe(Subscription),
-            ok;
         {_, _} ->
             wait_for_job(JobId, Subscription, DDocId, UpdateSeq)
     end.
