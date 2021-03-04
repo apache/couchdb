@@ -84,6 +84,8 @@ authorize_request_int(#httpd{path_parts=[_DbName|_]}=Req) ->
 
 server_authorization_check(#httpd{path_parts=[<<"_up">>]}=Req) ->
     Req;
+server_authorization_check(#httpd{path_parts=[<<"_fdb_up">>]}=Req) ->
+    Req;
 server_authorization_check(#httpd{path_parts=[<<"_uuids">>]}=Req) ->
     Req;
 server_authorization_check(#httpd{path_parts=[<<"_session">>]}=Req) ->

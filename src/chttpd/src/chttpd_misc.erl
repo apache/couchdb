@@ -22,6 +22,7 @@
     handle_reload_query_servers_req/1,
     handle_task_status_req/1,
     handle_up_req/1,
+    handle_fdb_up_req/1,
     handle_utils_dir_req/1,
     handle_utils_dir_req/2,
     handle_uuids_req/1,
@@ -354,6 +355,24 @@ handle_up_req(#httpd{method='GET'} = Req) ->
     end;
 
 handle_up_req(Req) ->
+    send_method_not_allowed(Req, "GET,HEAD").
+
+handle_fdb_up_req(#httpd{method='GET'} = Req) ->
+    try
+        % TODO
+        % Write to DB
+        % Read from DB
+        % Measure query time
+
+        send_json(Req, 200, {[{status, ok}]})
+    catch
+        error:{timeout, _} ->
+            send_json(Req, 404, {[{status, backend_unavailable}]});
+        _Error ->       % TODO Log this error
+            send_json(Req, 404, {[{status, backend_error}]})
+    end;
+
+handle_fdb_up_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 get_docroot() ->

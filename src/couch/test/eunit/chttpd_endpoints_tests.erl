@@ -48,6 +48,7 @@ url_handlers() ->
         {<<"_uuids">>, chttpd_misc, handle_uuids_req},
         {<<"_session">>, chttpd_auth, handle_session_req},
         {<<"_up">>, chttpd_misc, handle_up_req},
+        {<<"_fdb_up">>, chttpd_misc, handle_fdb_up_req},
         {<<"_membership">>, mem3_httpd, handle_membership_req},
         {<<"_db_updates">>, global_changes_httpd, handle_global_changes_req},
         {<<"_cluster_setup">>, setup_httpd, handle_setup_req}

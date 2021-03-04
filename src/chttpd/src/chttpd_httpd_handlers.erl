@@ -38,6 +38,7 @@ url_handler(<<"_replicate">>)      -> fun chttpd_misc:handle_replicate_req/1;
 url_handler(<<"_uuids">>)          -> fun chttpd_misc:handle_uuids_req/1;
 url_handler(<<"_session">>)        -> fun chttpd_auth:handle_session_req/1;
 url_handler(<<"_up">>)             -> fun chttpd_misc:handle_up_req/1;
+url_handler(<<"_fdb_up">>)         -> fun chttpd_misc:handle_fdb_up_req/1;
 url_handler(_) -> no_match.
 
 db_handler(<<"_view_cleanup">>) -> fun chttpd_db:handle_view_cleanup_req/2;
@@ -168,6 +169,9 @@ handler_info('DELETE', [<<"_session">>], _) ->
     {'session.delete', #{}};
 
 handler_info('GET', [<<"_up">>], _) ->
+    {'health.read', #{}};
+
+handler_info('GET', [<<"_fdb_up">>], _) ->
     {'health.read', #{}};
 
 handler_info('GET', [<<"_utils">> | Path], _) ->
