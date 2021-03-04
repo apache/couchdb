@@ -1037,7 +1037,7 @@ error_info({service_unavailable, Reason}) ->
 error_info({timeout, _Reason}) ->
     error_info(timeout);
 error_info({'EXIT', {Error, Stack}}) ->
-    error_info({Error, nil, Stack});
+    error_info(Error);
 error_info({Error, null}) ->
     error_info(Error);
 error_info({_Error, _Reason} = Error) ->
