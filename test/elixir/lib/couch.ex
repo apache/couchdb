@@ -80,6 +80,10 @@ defmodule Couch do
   @request_timeout 60_000
   @inactivity_timeout 55_000
 
+  def base_url() do
+    System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
+  end
+
   def process_url("http://" <> _ = url) do
     url
   end
@@ -110,7 +114,7 @@ defmodule Couch do
   end
 
   def process_options(options) do
-    base_url = System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
+    base_url = base_url()
     options = Keyword.put_new(options, :base_url, base_url)
 
     options

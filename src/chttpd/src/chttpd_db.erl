@@ -222,9 +222,13 @@ changes_callback(waiting_for_updates, Acc) ->
         mochi = Resp1,
         chunks_sent = ChunksSent + 1
     }};
-changes_callback({timeout, _ResponseType}, Acc) ->
+changes_callback({timeout, ResponseType}, Acc) ->
     #cacc{mochi = Resp, chunks_sent = ChunksSent} = Acc,
-    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, "\n"),
+    Chunk = case ResponseType of
+        "eventsource" -> "event: heartbeat\ndata: \n\n";
+        _ -> "\n"
+    end,
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp, Chunk),
     {ok, Acc#cacc{mochi = Resp1, chunks_sent = ChunksSent + 1}};
 changes_callback({error, Reason}, #cacc{mochi = #httpd{}} = Acc) ->
     #cacc{mochi = Req} = Acc,

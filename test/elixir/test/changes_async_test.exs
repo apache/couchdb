@@ -34,12 +34,11 @@ defmodule ChangesAsyncTest do
       )
 
     changes = process_response(req_id.id, &parse_chunk/1)
-    {changes_length, last_seq_prefix} = parse_changes_response(changes)
-    assert changes_length == 1, "db should not be empty"
-    assert last_seq_prefix == "1-", "seq must start with 1-"
-
+    assert length(changes["results"]) == 1, "db should not be empty"
     last_seq = changes["last_seq"]
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+    assert last_seq != 0
+
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.base_url())
 
     req_id =
       Couch.get("/#{db_name}/_changes?feed=longpoll&since=#{last_seq}",
@@ -51,13 +50,13 @@ defmodule ChangesAsyncTest do
 
     create_doc_bar(db_name, "bar")
 
-    {changes_length, last_seq_prefix} =
+    changes =
       req_id.id
       |> process_response(&parse_chunk/1)
-      |> parse_changes_response()
 
-    assert changes_length == 1, "should return one change"
-    assert last_seq_prefix == "2-", "seq must start with 2-"
+    assert length(changes["results"]) == 1, "should return one change"
+    next_last_seq = changes["last_seq"]
+    assert next_last_seq > last_seq
 
     req_id =
       Couch.get("/#{db_name}/_changes?feed=longpoll&since=now",
@@ -70,10 +69,9 @@ defmodule ChangesAsyncTest do
     create_doc_bar(db_name, "barzzzz")
 
     changes = process_response(req_id.id, &parse_chunk/1)
-    {changes_length, last_seq_prefix} = parse_changes_response(changes)
-    assert changes_length == 1, "should return one change"
+    assert length(changes["results"]) == 1, "should return one change"
     assert Enum.at(changes["results"], 0)["id"] == "barzzzz"
-    assert last_seq_prefix == "3-", "seq must start with 3-"
+    assert changes["last_seq"] > next_last_seq
   end
 
   @tag :with_db
@@ -83,10 +81,10 @@ defmodule ChangesAsyncTest do
     check_empty_db(db_name)
 
     create_doc(db_name, sample_doc_foo())
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.base_url())
 
     req_id =
-      Rawresp.get("/#{db_name}/_changes?feed=eventsource&timeout=500",
+      Rawresp.get("/#{db_name}/_changes?feed=eventsource&timeout=2000",
         stream_to: self(),
         direct: worker_pid
       )
@@ -95,7 +93,7 @@ defmodule ChangesAsyncTest do
 
     create_doc_bar(db_name, "bar")
 
-    changes = process_response(req_id.id, &parse_event/1)
+    changes = process_response(req_id.id, &parse_event/1, 3000)
 
     assert length(changes) == 2
     assert Enum.at(changes, 0)["id"] == "foo"
@@ -108,7 +106,7 @@ defmodule ChangesAsyncTest do
   test "eventsource heartbeat", context do
     db_name = context[:db_name]
 
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.base_url())
 
     req_id =
       Rawresp.get("/#{db_name}/_changes?feed=eventsource&heartbeat=10",
@@ -136,13 +134,12 @@ defmodule ChangesAsyncTest do
       )
 
     changes = process_response(req_id.id, &parse_chunk/1)
-    {changes_length, last_seq_prefix} = parse_changes_response(changes)
-    assert changes_length == 1, "db should not be empty"
-    assert last_seq_prefix == "3-", "seq must start with 3-"
+    assert length(changes["results"]) == 1, "db should not be empty"
+    assert changes["last_seq"] != 0
 
     last_seq = changes["last_seq"]
     # longpoll waits until a matching change before returning
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.base_url())
 
     req_id =
       Couch.get(
@@ -160,9 +157,8 @@ defmodule ChangesAsyncTest do
     # Doc matches the filter
     create_doc(db_name, %{_id: "bingo", bop: "bingo"})
     changes = process_response(req_id.id, &parse_chunk/1)
-    {changes_length, last_seq_prefix} = parse_changes_response(changes)
-    assert changes_length == 1, "db should not be empty"
-    assert last_seq_prefix == "5-", "seq must start with 5-"
+    assert length(changes["results"]) == 1, "db should not be empty"
+    assert changes["last_seq"] > last_seq
     assert Enum.at(changes["results"], 0)["id"] == "bingo"
   end
 
@@ -174,11 +170,11 @@ defmodule ChangesAsyncTest do
     create_doc(db_name, %{bop: false})
     create_doc(db_name, %{_id: "bingo", bop: "bingo"})
 
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.base_url())
 
     req_id =
       Rawresp.get(
-        "/#{db_name}/_changes?feed=continuous&filter=changes_filter/bop&timeout=500",
+        "/#{db_name}/_changes?feed=continuous&filter=changes_filter/bop&timeout=1000",
         stream_to: self(),
         direct: worker_pid
       )
@@ -186,7 +182,7 @@ defmodule ChangesAsyncTest do
     :ok = wait_for_headers(req_id.id, 200)
     create_doc(db_name, %{_id: "rusty", bop: "plankton"})
 
-    changes = process_response(req_id.id, &parse_changes_line_chunk/1)
+    changes = process_response(req_id.id, &parse_changes_line_chunk/1, 2000)
 
     changes_ids =
       changes
@@ -206,11 +202,11 @@ defmodule ChangesAsyncTest do
     create_doc(db_name, %{_id: "doc1", value: 1})
     create_doc(db_name, %{_id: "doc2", value: 2})
 
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.base_url())
 
     req_id =
       Rawresp.post(
-        "/#{db_name}/_changes?feed=continuous&timeout=500&filter=_doc_ids",
+        "/#{db_name}/_changes?feed=continuous&timeout=2000&filter=_doc_ids",
         body: doc_ids,
         headers: ["Content-Type": "application/json"],
         stream_to: self(),
@@ -220,7 +216,7 @@ defmodule ChangesAsyncTest do
     :ok = wait_for_headers(req_id.id, 200)
     create_doc(db_name, %{_id: "doc3", value: 3})
 
-    changes = process_response(req_id.id, &parse_changes_line_chunk/1)
+    changes = process_response(req_id.id, &parse_changes_line_chunk/1, 3000)
 
     changes_ids =
       changes
@@ -245,7 +241,7 @@ defmodule ChangesAsyncTest do
     assert length(resp.body["results"]) == 4
     seq = Enum.at(resp.body["results"], 1)["seq"]
 
-    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.process_url(""))
+    {:ok, worker_pid} = HTTPotion.spawn_link_worker_process(Couch.base_url())
 
     # simulate an EventSource request with a Last-Event-ID header
     req_id =
@@ -326,14 +322,10 @@ defmodule ChangesAsyncTest do
     end
   end
 
-  defp parse_changes_response(changes) do
-    {length(changes["results"]), String.slice(changes["last_seq"], 0..1)}
-  end
-
   defp check_empty_db(db_name) do
     resp = Couch.get("/#{db_name}/_changes")
     assert resp.body["results"] == [], "db must be empty"
-    assert String.at(resp.body["last_seq"], 0) == "0", "seq must start with 0"
+    assert resp.body["last_seq"] == 0
   end
 
   defp test_changes(db_name, feed) do
@@ -344,7 +336,7 @@ defmodule ChangesAsyncTest do
     # TODO: retry_part
     resp = Couch.get("/#{db_name}/_changes")
     assert length(resp.body["results"]) == 1, "db must not be empty"
-    assert String.at(resp.body["last_seq"], 0) == "1", "seq must start with 1"
+    assert resp.body["last_seq"] != 0
 
     # increase timeout to 100 to have enough time 2 assemble
     # (seems like too little timeouts kill
@@ -356,10 +348,10 @@ defmodule ChangesAsyncTest do
 
     # the sequence is not fully ordered and a complex structure now
     change = Enum.at(changes, 1)
-    assert String.at(change["last_seq"], 0) == "1"
+    assert change["last_seq"] != 0
 
-    # create_doc_bar(db_name,"bar")
-    {:ok, worker_pid} = HTTPotion.spawn_worker_process(Couch.process_url(""))
+     create_doc_bar(db_name, "bar1")
+    {:ok, worker_pid} = HTTPotion.spawn_worker_process(Couch.base_url())
 
     %HTTPotion.AsyncResponse{id: req_id} =
       Rawresp.get("/#{db_name}/_changes?feed=#{feed}&timeout=500",
@@ -368,7 +360,7 @@ defmodule ChangesAsyncTest do
       )
 
     :ok = wait_for_headers(req_id, 200)
-    create_doc_bar(db_name, "bar")
+    create_doc_bar(db_name, "bar2")
 
     changes = process_response(req_id, &parse_changes_line_chunk/1)
     assert length(changes) == 3
