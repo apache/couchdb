@@ -36,15 +36,6 @@
   "BulkDocsTest": [
   ],
   "ChangesAsyncTest": [
-    "COUCHDB-1852",
-    "continuous changes",
-    "continuous filtered changes",
-    "continuous filtered changes with doc ids",
-    "eventsource changes",
-    "eventsource heartbeat",
-    "live changes",
-    "longpoll changes",
-    "longpoll filtered changes"
   ],
   "ChangesTest": [
     "changes filtering on design docs"
