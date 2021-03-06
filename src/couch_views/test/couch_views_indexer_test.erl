@@ -373,7 +373,8 @@ index_autoupdater_callback(Db) ->
     ?assertMatch([{ok, <<_/binary>>}], Result),
     [{ok, JobId}] = Result,
 
-    ?assertEqual(ok, couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, DbSeq)).
+    ?assertMatch({ok, {_, _}},
+        couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, DbSeq)).
 
 
 multiple_design_docs(Db) ->

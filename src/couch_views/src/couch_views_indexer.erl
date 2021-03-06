@@ -110,7 +110,9 @@ init() ->
         doc_acc => [],
         design_opts => Mrst#mrst.design_opts,
         update_stats => #{},
-        tx_retry_limit => tx_retry_limit()
+        tx_retry_limit => tx_retry_limit(),
+        db_read_vsn => ?VIEW_CURRENT_VSN,
+        view_read_vsn => ?VIEW_CURRENT_VSN
     },
 
     try
@@ -209,7 +211,7 @@ update(#{} = Db, Mrst0, State0) ->
 
 do_update(Db, Mrst0, State0) ->
     TxOpts = #{retry_limit => maps:get(tx_retry_limit, State0)},
-    fabric2_fdb:transactional(Db, TxOpts, fun(TxDb) ->
+    TxResult = fabric2_fdb:transactional(Db, TxOpts, fun(TxDb) ->
         #{
             tx := Tx
         } = TxDb,
@@ -224,7 +226,6 @@ do_update(Db, Mrst0, State0) ->
         #{
             doc_acc := DocAcc,
             last_seq := LastSeq,
-            view_vs := ViewVS,
             changes_done := ChangesDone0,
             design_opts := DesignOpts
         } = State2,
@@ -244,12 +245,18 @@ do_update(Db, Mrst0, State0) ->
 
         case is_update_finished(State2) of
             true ->
-                maybe_set_build_status(TxDb, Mrst2, ViewVS, ?INDEX_READY),
-                report_progress(State2#{changes_done := ChangesDone}, finished),
-                {Mrst2, finished};
+                State3 = State2#{changes_done := ChangesDone},
+                % We must call report_progress/2 (which, in turn calls
+                % couch_jobs:update/3) in every transaction where indexing data
+                % is updated, otherwise we risk another indexer taking over and
+                % clobbering the indexing data
+                State4 = report_progress(State3, update),
+                {Mrst2, finished, State4#{
+                    db_read_vsn := erlfdb:wait(erlfdb:get_read_version(Tx))
+                }};
             false ->
                 State3 = report_progress(State2, update),
-                {Mrst2, State3#{
+                {Mrst2, continue, State3#{
                     tx_db := undefined,
                     count := 0,
                     doc_acc := [],
@@ -258,6 +265,37 @@ do_update(Db, Mrst0, State0) ->
                     update_stats := UpdateStats
                 }}
         end
+    end),
+    case TxResult of
+        {Mrst, continue, State} ->
+            {Mrst, State};
+        {Mrst, finished, State} ->
+            do_finalize(Mrst, State),
+            {Mrst, finished}
+    end.
+
+
+do_finalize(Mrst, State) ->
+    #{tx_db := OldDb} = State,
+    ViewReadVsn = erlfdb:get_committed_version(maps:get(tx, OldDb)),
+    fabric2_fdb:transactional(OldDb#{tx := undefined}, fun(TxDb) ->
+        % Use the recent committed version as the read
+        % version. However, if transaction retries due to an error,
+        % let it acquire its own version to avoid spinning
+        % continuously due to conflicts or other errors.
+        case erlfdb:get_last_error() of
+            undefined ->
+                erlfdb:set_read_version(maps:get(tx, TxDb), ViewReadVsn);
+            ErrorCode when is_integer(ErrorCode) ->
+                ok
+        end,
+        State1 = State#{
+            tx_db := TxDb,
+            view_read_vsn := ViewReadVsn
+        },
+        ViewVS = maps:get(view_vs, State1),
+        maybe_set_build_status(TxDb, Mrst, ViewVS, ?INDEX_READY),
+        report_progress(State1, finished)
     end).
 
 
@@ -583,7 +621,9 @@ report_progress(State, UpdateType) ->
         job_data := JobData,
         last_seq := LastSeq,
         db_seq := DBSeq,
-        changes_done := ChangesDone
+        changes_done := ChangesDone,
+        db_read_vsn := DbReadVsn,
+        view_read_vsn := ViewReadVsn
     } = State,
 
     #{
@@ -611,7 +651,9 @@ report_progress(State, UpdateType) ->
         <<"ddoc_id">> => DDocId,
         <<"sig">> => Sig,
         <<"view_seq">> => LastSeq,
-        <<"retries">> => Retries
+        <<"retries">> => Retries,
+        <<"db_read_vsn">> => DbReadVsn,
+        <<"view_read_vsn">> => ViewReadVsn
     },
     NewData = fabric2_active_tasks:update_active_task_info(NewData0,
         NewActiveTasks),

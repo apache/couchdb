@@ -13,7 +13,7 @@
 -module(couch_views_reader).
 
 -export([
-    read/6
+    read/7
 ]).
 
 
@@ -23,15 +23,19 @@
 -include_lib("fabric/include/fabric2.hrl").
 
 
-read(Db, Mrst, ViewName, UserCallback, UserAcc, Args) ->
+-define(LOAD_DOC_TIMEOUT_MSEC, 10000).
+
+
+read(Db, Mrst, ViewName, UserCallback, UserAcc, Args, DbReadVsn) ->
     ReadFun = case Args of
-        #mrargs{view_type = map} -> fun read_map_view/6;
-        #mrargs{view_type = red} -> fun read_red_view/6
+        #mrargs{view_type = map} -> fun read_map_view/7;
+        #mrargs{view_type = red} -> fun read_red_view/7
     end,
-    ReadFun(Db, Mrst, ViewName, UserCallback, UserAcc, Args).
+    ReadFun(Db, Mrst, ViewName, UserCallback, UserAcc, Args, DbReadVsn).
 
 
-read_map_view(Db, Mrst0, ViewName, UserCallback, UserAcc0, Args) ->
+read_map_view(Db, Mrst0, ViewName, UserCallback, UserAcc0, Args, DbReadVsn) ->
+    DocLoader = maybe_start_doc_loader(Db, DbReadVsn),
     try
         fabric2_fdb:transactional(Db, fun(TxDb) ->
             #mrst{
@@ -51,7 +55,8 @@ read_map_view(Db, Mrst0, ViewName, UserCallback, UserAcc0, Args) ->
                 limit => Args#mrargs.limit,
                 mrargs => undefined,
                 callback => UserCallback,
-                acc => UserAcc1
+                acc => UserAcc1,
+                doc_loader => DocLoader
             },
 
             Acc1 = lists:foldl(fun(KeyArgs, KeyAcc0) ->
@@ -73,10 +78,12 @@ read_map_view(Db, Mrst0, ViewName, UserCallback, UserAcc0, Args) ->
             {ok, Final};
         throw:{done, Out} ->
             {ok, Out}
+    after
+        stop_doc_loader(DocLoader)
     end.
 
 
-read_red_view(Db, Mrst0, ViewName, UserCallback, UserAcc0, Args) ->
+read_red_view(Db, Mrst0, ViewName, UserCallback, UserAcc0, Args, _DbReadVsn) ->
     #mrst{
         language = Lang,
         views = Views
@@ -179,7 +186,8 @@ handle_map_row(DocId, Key, Value, Acc) ->
         limit := Limit,
         mrargs := Args,
         callback := UserCallback,
-        acc := UserAcc0
+        acc := UserAcc0,
+        doc_loader := DocLoader
     } = Acc,
 
     BaseRow = [
@@ -196,7 +204,7 @@ handle_map_row(DocId, Key, Value, Acc) ->
         end,
 
         {TargetDocId, Rev} = get_doc_id(DocId, Value),
-        DocObj = load_doc(TxDb, TargetDocId, Rev, DocOpts1),
+        DocObj = load_doc(TxDb, TargetDocId, Rev, DocOpts1, DocLoader),
         [{doc, DocObj}]
     end,
 
@@ -340,6 +348,19 @@ get_doc_id(Id, _Value) ->
     {Id, null}.
 
 
+load_doc(TxDb, Id, Rev, DocOpts, undefined) ->
+    load_doc(TxDb, Id, Rev, DocOpts);
+
+load_doc(_TxDb, Id, Rev, DocOpts, DocLoader) when is_pid(DocLoader) ->
+    DocLoader ! {load_doc, Id, Rev, DocOpts},
+    receive
+        {load_doc_res, Result} -> Result
+    after
+        ?LOAD_DOC_TIMEOUT_MSEC ->
+            error(load_doc_timeout)
+    end.
+
+
 load_doc(TxDb, Id, null, DocOpts) ->
     case fabric2_db:open_doc(TxDb, Id, DocOpts) of
         {ok, Doc} -> couch_doc:to_json_obj(Doc, DocOpts);
@@ -351,4 +372,39 @@ load_doc(TxDb, Id, Rev, DocOpts) ->
     case fabric2_db:open_doc_revs(TxDb, Id, [Rev1], DocOpts) of
         {ok, [{ok, Doc}]} -> couch_doc:to_json_obj(Doc, DocOpts);
         {ok, [_Else]} -> null
+    end.
+
+
+
+% When reading doc bodies at the db version at which the indexer
+% observed them, need to use a separate process since the process dict
+% is used to hold some of the transaction metadata.
+%
+maybe_start_doc_loader(_Db, ?VIEW_CURRENT_VSN) ->
+    undefined;
+
+maybe_start_doc_loader(Db0, DbReadVsn) ->
+    Parent = self(),
+    Db = Db0#{tx := undefined},
+    spawn_link(fun() ->
+        fabric2_fdb:transactional(Db, fun(TxDb) ->
+            erlfdb:set_read_version(maps:get(tx, TxDb), DbReadVsn),
+            doc_loader_loop(TxDb, Parent)
+        end)
+    end).
+
+
+stop_doc_loader(undefined) ->
+    ok;
+
+stop_doc_loader(Pid) when is_pid(Pid) ->
+    unlink(Pid),
+    exit(Pid, kill).
+
+
+doc_loader_loop(TxDb, Parent) ->
+    receive
+        {load_doc, Id, Rev, DocOpts} ->
+            Parent ! {load_doc_res, load_doc(TxDb, Id, Rev, DocOpts)},
+            doc_loader_loop(TxDb, Parent)
     end.
