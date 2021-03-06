@@ -53,11 +53,12 @@ query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
     try
         fabric2_fdb:transactional(Db, fun(TxDb) ->
             ok = maybe_update_view(TxDb, Mrst, IsInteractive, Args3),
-            read_view(TxDb, Mrst, ViewName, Callback, Acc0, Args3)
+            IdxVStamps = {?VIEW_CURRENT_VSN, ?VIEW_CURRENT_VSN},
+            read_view(TxDb, Mrst, ViewName, Callback, Acc0, Args3, IdxVStamps)
         end)
     catch throw:{build_view, WaitSeq} ->
-        couch_views_jobs:build_view(Db, Mrst, WaitSeq),
-        read_view(Db, Mrst, ViewName, Callback, Acc0, Args3)
+        {ok, IdxVStamps} = couch_views_jobs:build_view(Db, Mrst, WaitSeq),
+        read_view(Db, Mrst, ViewName, Callback, Acc0, Args3, IdxVStamps)
     end.
 
 
@@ -126,14 +127,32 @@ get_total_view_size(TxDb, Mrst) ->
     end, 0, Mrst#mrst.views).
 
 
-read_view(Db, Mrst, ViewName, Callback, Acc0, Args) ->
+read_view(Db, Mrst, ViewName, Callback, Acc0, Args, {_, _} = IdxVStamps) ->
+    {DbReadVsn, ViewReadVsn} = IdxVStamps,
     fabric2_fdb:transactional(Db, fun(TxDb) ->
+        case ViewReadVsn of
+            ?VIEW_CURRENT_VSN ->
+                ok;
+            _ when is_integer(ViewReadVsn) ->
+                % Set the GRV of the transaction to the committed
+                % version of the indexer. That is the version at which
+                % the indexer has committed the view data.
+                erlfdb:set_read_version(maps:get(tx, TxDb), ViewReadVsn)
+        end,
         try
-            couch_views_reader:read(TxDb, Mrst, ViewName, Callback, Acc0, Args)
+            couch_views_reader:read(TxDb, Mrst, ViewName, Callback, Acc0, Args,
+                DbReadVsn)
         after
             UpdateAfter = Args#mrargs.update == lazy,
             if UpdateAfter == false -> ok; true ->
-                couch_views_jobs:build_view_async(TxDb, Mrst)
+                % Make sure to use a separate transaction if we are
+                % reading from a stale snapshot
+                case ViewReadVsn of
+                    ?VIEW_CURRENT_VSN ->
+                        couch_views_jobs:build_view_async(TxDb, Mrst);
+                    _ ->
+                        couch_views_jobs:build_view_async(Db, Mrst)
+                end
             end
         end
     end).

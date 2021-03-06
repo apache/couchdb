@@ -14,6 +14,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("couch_views.hrl").
 
 
@@ -58,6 +59,7 @@ map_views_test_() ->
                 ?TDEF(should_map_with_doc_emit),
                 ?TDEF(should_map_update_is_false),
                 ?TDEF(should_map_update_is_lazy),
+                ?TDEF(should_map_snapshot),
                 ?TDEF(should_map_wait_for_interactive),
                 ?TDEF(should_map_local_seq)
                 % fun should_give_ext_size_seq_indexed_test/1
@@ -410,7 +412,7 @@ should_map_update_is_lazy() ->
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     JobId = couch_views_jobs:job_id(Db, Mrst),
     UpdateSeq = fabric2_db:get_update_seq(Db),
-    ok = couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, UpdateSeq),
+    {ok, _} = couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, UpdateSeq),
 
     Args2 = #{
         start_key => 8,
@@ -420,6 +422,100 @@ should_map_update_is_lazy() ->
     Result2 = couch_views:query(Db, DDoc, Idx, fun default_cb/2,
         [], Args2),
     ?assertEqual(Expect, Result2).
+
+
+should_map_snapshot() ->
+    Idx = <<"baz">>,
+    DbName = ?tempdb(),
+
+    {ok, Db} = fabric2_db:create(DbName, [{user_ctx, ?ADMIN_USER}]),
+
+    DDoc = create_ddoc(),
+    Docs = make_docs(2),
+    fabric2_db:update_docs(Db, [DDoc | Docs]),
+
+    % Lazy query just get a hold of a job and wait for it so we can
+    % get the indexer versionstamps
+    ?assertEqual({ok, []}, couch_views:query(Db, DDoc, Idx, fun default_cb/2,
+        [], #{update => lazy})),
+    {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
+    JobId = couch_views_jobs:job_id(Db, Mrst),
+    DbSeq = fabric2_db:get_update_seq(Db),
+    {ok, VStamps} = couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, DbSeq),
+
+    {DbReadVsn, ViewReadVsn} = VStamps,
+    ?assert(is_integer(DbReadVsn)),
+    ?assert(is_integer(ViewReadVsn)),
+    ?assert(DbReadVsn < ViewReadVsn),
+
+    % Update doc 1 and delete doc 2
+    {ok, Doc1Open} = fabric2_db:open_doc(Db, <<"1">>),
+    Doc1Upd = Doc1Open#doc{body = {[{<<"val">>, 42}]}},
+    ?assertMatch({ok, {2, _}}, fabric2_db:update_doc(Db, Doc1Upd)),
+
+    {ok, Doc2Open} = fabric2_db:open_doc(Db, <<"2">>),
+    Doc2Del = Doc2Open#doc{deleted = true},
+    ?assertMatch({ok, {2, _}}, fabric2_db:update_doc(Db, Doc2Del)),
+
+    ReadSnapshot = fun(#{tx := Tx} = TxDb) ->
+        Args = #mrargs{include_docs = true, view_type = map},
+        Callback = fun default_cb/2,
+        erlfdb:set_read_version(Tx, ViewReadVsn),
+        couch_views_reader:read(TxDb, Mrst, Idx, Callback, [], Args, DbReadVsn)
+    end,
+
+    % Perform a stale snapshot read asserting that docs updates
+    % haven't affected include_docs results
+    ?assertMatch({ok, [
+        {row, [
+            {id, <<"1">>},
+            {key, 1},
+            {value, 1},
+            {doc, {[
+                {<<"_id">>, <<"1">>},
+                {<<"_rev">>, <<_/binary>>},
+                {<<"val">>, 1}
+            ]}}
+        ]},
+        {row, [
+            {id, <<"2">>},
+            {key, 2},
+            {value, 2},
+            {doc, {[
+                {<<"_id">>, <<"2">>},
+                {<<"_rev">>, <<_/binary>>},
+                {<<"val">>, 2}
+             ]}}
+        ]}
+    ]}, fabric2_fdb:transactional(Db, ReadSnapshot)),
+
+    % Update the view
+    ?assertMatch({ok, [{row, [{id, <<"1">>}, {key, 42}, {value, 42}]}]},
+        couch_views:query(Db, DDoc, Idx, fun default_cb/2, [], #{})),
+
+    % After the view was updated, the original snapshot stays the same
+    ?assertMatch({ok, [
+        {row, [
+            {id, <<"1">>},
+            {key, 1},
+            {value, 1},
+            {doc, {[
+                {<<"_id">>, <<"1">>},
+                {<<"_rev">>, <<_/binary>>},
+                {<<"val">>, 1}
+            ]}}
+        ]},
+        {row, [
+            {id, <<"2">>},
+            {key, 2},
+            {value, 2},
+            {doc, {[
+                {<<"_id">>, <<"2">>},
+                {<<"_rev">>, <<_/binary>>},
+                {<<"val">>, 2}
+             ]}}
+        ]}
+    ]}, fabric2_fdb:transactional(Db, ReadSnapshot)).
 
 
 should_map_wait_for_interactive() ->

@@ -40,3 +40,8 @@
 % indexing progress
 -define(INDEX_BUILDING, <<"building">>).
 -define(INDEX_READY, <<"ready">>).
+
+% Views/db marker to indicate that the current (latest) FDB GRV version should
+% be used. Use `null` so it can can be round-tripped through json serialization
+% with couch_jobs.
+-define(VIEW_CURRENT_VSN, null).
