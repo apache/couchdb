@@ -93,5 +93,20 @@ defmodule AttachmentNamesTest do
 
     assert resp.body["reason"] ==
              "Attachment name '_foo.txt' starts with prohibited character '_'"
+
+    resp =
+      Couch.post(
+        "/#{db_name}",
+        body: @leading_underscores_att
+      )
+
+    assert resp.status_code == 400
+
+    assert resp.body["reason"] ==
+             "Attachment name '_foo.txt' starts with prohibited character '_'"
+
+    resp = Couch.get("/#{db_name}/bin_doc2/_foo.txt")
+
+    assert resp.status_code == 404
   end
 end

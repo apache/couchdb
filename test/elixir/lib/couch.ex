@@ -40,15 +40,28 @@ defmodule Couch.Session do
 
   # Skipping head/patch/options for YAGNI. Feel free to add
   # if the need arises.
-
   def go(%Couch.Session{} = sess, method, url, opts) do
-    opts = Keyword.merge(opts, cookie: sess.cookie)
-    Couch.request(method, url, opts)
+    parse_response = Keyword.get(opts, :parse_response, true)
+    opts = opts
+           |> Keyword.merge(cookie: sess.cookie)
+           |> Keyword.delete(:parse_response)
+    if parse_response do
+      Couch.request(method, url, opts)
+    else
+      Rawresp.request(method, url, opts)
+    end
   end
 
   def go!(%Couch.Session{} = sess, method, url, opts) do
-    opts = Keyword.merge(opts, cookie: sess.cookie)
-    Couch.request!(method, url, opts)
+    parse_response = Keyword.get(opts, :parse_response, true)
+    opts = opts
+           |> Keyword.merge(cookie: sess.cookie)
+           |> Keyword.delete(:parse_response)
+    if parse_response do
+      Couch.request!(method, url, opts)
+    else
+      Rawresp.request!(method, url, opts)
+    end
   end
 end
 

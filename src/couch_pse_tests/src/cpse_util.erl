@@ -116,7 +116,8 @@ shutdown_db(Db) ->
         erlang:error(database_shutdown_timeout)
     end,
     test_util:wait(fun() ->
-        case ets:member(couch_dbs, couch_db:name(Db)) of
+        case ets:member(couch_server:couch_dbs(couch_db:name(Db)),
+          couch_db:name(Db)) of
             true -> wait;
             false -> ok
         end

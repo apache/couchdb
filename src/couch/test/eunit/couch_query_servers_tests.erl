@@ -12,6 +12,7 @@
 
 -module(couch_query_servers_tests).
 
+-include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 
 
@@ -21,6 +22,15 @@ setup() ->
 
 teardown(_) ->
     meck:unload().
+
+
+setup_oom() ->
+    test_util:start_couch([ioq]).
+
+
+teardown_oom(Ctx) ->
+    meck:unload(),
+    test_util:stop_couch(Ctx).
 
 
 sum_overflow_test_() ->
@@ -38,6 +48,19 @@ sum_overflow_test_() ->
         }
     }.
 
+
+filter_oom_test_() ->
+{
+    "Test recovery from oom in filters",
+    {
+        setup,
+        fun setup_oom/0,
+        fun teardown_oom/1,
+        [
+            fun should_split_large_batches/0
+        ]
+    }
+}.
 
 should_return_error_on_overflow() ->
     meck:reset([config, couch_log]),
@@ -83,6 +106,38 @@ should_return_object_on_false() ->
     ?assert(not lists:member(<<"error">>, Keys)),
     ?assert(meck:called(config, get, '_')),
     ?assertNot(meck:called(couch_log, error, '_')).
+
+
+should_split_large_batches() ->
+    Req = {json_req, {[]}},
+    Db = undefined,
+    DDoc = #doc{
+        id = <<"_design/foo">>,
+        revs = {0, [<<"bork bork bork">>]},
+        body = {[
+            {<<"filters">>, {[
+                {<<"bar">>, <<"function(req, doc) {return true;}">>}
+            ]}}
+        ]}
+    },
+    FName = <<"bar">>,
+    Docs = [
+        #doc{id = <<"a">>, body = {[]}},
+        #doc{id = <<"b">>, body = {[]}}
+    ],
+    meck:new(couch_os_process, [passthrough]),
+    meck:expect(couch_os_process, prompt, fun(Pid, Data) ->
+        case Data of
+            [<<"ddoc">>, _, [<<"filters">>, <<"bar">>], [[_, _], _]] ->
+                throw({os_process_error, {exit_status, 1}});
+            [<<"ddoc">>, _, [<<"filters">>, <<"bar">>], [[_], _]] ->
+                [true, [split_batch]];
+            _ ->
+                meck:passthrough([Pid, Data])
+        end
+    end),
+    {ok, Ret} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
+    ?assertEqual([split_batch, split_batch], Ret).
 
 
 gen_sum_kvs() ->

@@ -90,9 +90,6 @@ DIALYZE_OPTS=$(shell echo "\
 	" | sed -e 's/[a-z]\{1,\}= / /g')
 EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
-#ignore javascript tests
-ignore_js_suites=
-
 TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 
 ################################################################################
@@ -148,7 +145,6 @@ fauxton: share/www
 # target: check - Test everything
 check: all python-black
 	@$(MAKE) eunit
-	@$(MAKE) javascript
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
 
@@ -209,7 +205,7 @@ python-black: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run src/mango src/docs
+		build-aux/*.py dev/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
@@ -217,7 +213,7 @@ python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		. dev/run test/javascript/run src/mango src/docs
+		build-aux/*.py dev/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration
@@ -257,42 +253,6 @@ elixir-check-formatted: elixir-init
 elixir-credo: elixir-init
 	@mix credo
 
-.PHONY: javascript
-# target: javascript - Run JavaScript test suites or specific ones defined by suites option
-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-javascript: devclean
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script/test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@dev/run -n 1 -q --with-admin-party-please \
-            --enable-erlang-views \
-            "$(TEST_OPTS)" \
-            'test/javascript/run --suites "$(suites)" \
-            --ignore "$(ignore_js_suites)"'
-
-
-.PHONY: soak-javascript
-soak-javascript: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-soak-javascript:
-	@mkdir -p share/www/script/test
-ifeq ($(IN_RELEASE), true)
-	@cp test/javascript/tests/lorem*.txt share/www/script.test/
-else
-	@mkdir -p src/fauxton/dist/release/test
-	@cp test/javascript/tests/lorem*.txt src/fauxton/dist/release/test/
-endif
-	@rm -rf dev/lib
-	while [ $$? -eq 0 ]; do \
-		dev/run -n 1 -q --with-admin-party-please \
-				"$(TEST_OPTS)" \
-				'test/javascript/run --suites "$(suites)" \
-				--ignore "$(ignore_js_suites)"'  \
-	done
-
 .PHONY: build-report
 # target: build-report - Generate and upload a build report
 build-report:
@@ -317,14 +277,6 @@ list-eunit-apps:
 # target: list-eunit-suites - List EUnit target test suites
 list-eunit-suites:
 	@find ./src/ -type f -name *_test.erl -o -name *_tests.erl -exec basename {} \; \
-		| cut -d '.' -f -1 \
-		| sort
-
-
-.PHONY: list-js-suites
-# target: list-js-suites - List JavaScript test suites
-list-js-suites:
-	@find ./test/javascript/tests/ -type f -name *.js -exec basename {} \; \
 		| cut -d '.' -f -1 \
 		| sort
 
@@ -458,7 +410,7 @@ clean:
 	@rm -rf src/mango/.venv
 	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
-	@rm -f dev/boot_node.beam dev/pbkdf2.pyc log/crash.log
+	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 
 
 .PHONY: distclean
@@ -480,7 +432,7 @@ endif
 # target: devclean - Remove dev cluster artifacts
 devclean:
 	@rm -rf dev/lib/*/data
-
+	@rm -rf dev/lib/*/etc
 
 ################################################################################
 # Misc

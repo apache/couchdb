@@ -133,6 +133,12 @@ open(Db, State0) ->
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt};
+                {ok, Else} ->
+                    couch_log:error("~s has a bad header: got ~p",
+                        [IndexFName, Else]),
+                    NewSt = couch_mrview_util:reset_index(Db, Fd, State),
+                    ensure_local_purge_doc(Db, NewSt),
+                    {ok, NewSt};
                 no_valid_header ->
                     NewSt = couch_mrview_util:reset_index(Db, Fd, State),
                     ensure_local_purge_doc(Db, NewSt),
@@ -252,16 +258,7 @@ set_partitioned(Db, State) ->
     DbPartitioned = couch_db:is_partitioned(Db),
     ViewPartitioned = couch_util:get_value(
             <<"partitioned">>, DesignOpts, DbPartitioned),
-    IsPartitioned = case {DbPartitioned, ViewPartitioned} of
-        {true, true} ->
-            true;
-        {true, false} ->
-            false;
-        {false, false} ->
-            false;
-        _ ->
-            throw({bad_request, <<"invalid partition option">>})
-    end,
+    IsPartitioned = DbPartitioned andalso ViewPartitioned,
     State#mrst{partitioned = IsPartitioned}.
 
 

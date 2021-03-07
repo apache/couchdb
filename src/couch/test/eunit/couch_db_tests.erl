@@ -109,7 +109,8 @@ should_delete_db(DbName) ->
 
 should_create_multiple_dbs(DbNames) ->
     ?_test(begin
-        gen_server:call(couch_server, {set_max_dbs_open, 3}),
+        [gen_server:call(couch_server:couch_server(N), {set_max_dbs_open, 3}) ||
+            N <- lists:seq(1, couch_server:num_servers())],
         {ok, Before} = couch_server:all_databases(),
         [?assertNot(lists:member(DbName, Before))  || DbName <- DbNames],
         [?assert(create_db(DbName)) || DbName <- DbNames],
@@ -170,7 +171,7 @@ locking_should_work(DbName) ->
         ok = couch_db:close(Db),
         catch exit(couch_db:get_pid(Db), kill),
         test_util:wait(fun() ->
-            case ets:lookup(couch_dbs, DbName) of
+            case ets:lookup(couch_server:couch_dbs(DbName), DbName) of
                 [] -> ok;
                 [_ | _] -> wait
             end

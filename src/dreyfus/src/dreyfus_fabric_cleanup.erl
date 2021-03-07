@@ -30,12 +30,16 @@ go(DbName) ->
     ok.
 
 active_sigs(#doc{body={Fields}}=Doc) ->
-    {RawIndexes} = couch_util:get_value(<<"indexes">>, Fields, {[]}),
-    {IndexNames, _} = lists:unzip(RawIndexes),
-    [begin
-         {ok, Index} = dreyfus_index:design_doc_to_index(Doc, IndexName),
-         Index#index.sig
-     end || IndexName <- IndexNames].
+    try
+        {RawIndexes} = couch_util:get_value(<<"indexes">>, Fields, {[]}),
+        {IndexNames, _} = lists:unzip(RawIndexes),
+        [begin
+             {ok, Index} = dreyfus_index:design_doc_to_index(Doc, IndexName),
+             Index#index.sig
+         end || IndexName <- IndexNames]
+    catch error:{badmatch, _Error} ->
+        []
+    end.
 
 cleanup_local_purge_doc(DbName, ActiveSigs) ->
     {ok, BaseDir} = clouseau_rpc:get_root_dir(),

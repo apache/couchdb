@@ -49,6 +49,11 @@
         Suffix = couch_uuids:random(),
         iolist_to_binary(["eunit-test-db-", Suffix])
     end).
+-define(tempshard,
+    fun() ->
+        Suffix = couch_uuids:random(),
+        iolist_to_binary(["shards/80000000-ffffffff/eunit-test-db-", Suffix])
+    end).
 -define(docid,
     fun() ->
         integer_to_list(couch_util:unique_monotonic_integer())

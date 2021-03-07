@@ -96,8 +96,6 @@ couch_parse_args(int argc, const char* argv[])
                 fprintf(stderr, "Invalid stack size.\n");
                 exit(2);
             }
-        } else if(strcmp("-u", argv[i]) == 0) {
-            args->uri_file = argv[++i];
         } else if(strcmp("--eval", argv[i]) == 0) {
             args->eval = 1;
         } else if(strcmp("--", argv[i]) == 0) {

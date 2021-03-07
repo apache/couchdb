@@ -1073,7 +1073,7 @@ finish_compaction(Db, CompactInfo) ->
                 compactor_pid = CompactorPid
             }
     end,
-    ok = gen_server:call(couch_server, {db_updated, NewDb}, infinity),
+    ok = couch_server:db_updated(NewDb),
     {ok, NewDb}.
 
 

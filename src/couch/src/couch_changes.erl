@@ -238,7 +238,7 @@ filter(Db, DocInfo, {view, Style, DDoc, VName}) ->
 filter(Db, DocInfo, {custom, Style, Req0, DDoc, FName}) ->
     Req = case Req0 of
         {json_req, _} -> Req0;
-        #httpd{} -> {json_req, couch_httpd_external:json_req_obj(Req0, Db)}
+        #httpd{} -> {json_req, chttpd_external:json_req_obj(Req0, Db)}
     end,
     Docs = open_revs(Db, DocInfo, Style),
     {ok, Passes} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),

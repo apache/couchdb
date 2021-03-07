@@ -65,12 +65,12 @@ should_close_deleted_db(DbName) ->
             throw(timeout_error)
         end,
         test_util:wait(fun() ->
-            case ets:lookup(couch_dbs, DbName) of
+            case ets:lookup(couch_server:couch_dbs(DbName), DbName) of
                 [] -> ok;
                 _ -> wait
             end
         end),
-        ?assertEqual([], ets:lookup(couch_dbs, DbName))
+        ?assertEqual([], ets:lookup(couch_server:couch_dbs(DbName), DbName))
      end).
 
 

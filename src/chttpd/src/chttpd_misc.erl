@@ -105,7 +105,7 @@ handle_utils_dir_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 maybe_add_csp_headers(Headers, "true") ->
-    DefaultValues = "default-src 'self'; img-src 'self' data:; font-src 'self'; "
+    DefaultValues = "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
                     "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
     Value = config:get("csp", "header_value", DefaultValues),
     [{"Content-Security-Policy", Value} | Headers];
@@ -193,10 +193,9 @@ handle_task_status_req(#httpd{method='GET'}=Req) ->
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-handle_replicate_req(#httpd{method='POST', user_ctx=Ctx} = Req) ->
+handle_replicate_req(#httpd{method='POST', user_ctx=Ctx, req_body=PostBody} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     %% see HACK in chttpd.erl about replication
-    PostBody = get(post_body),
     case replicate(PostBody, Ctx) of
         {ok, {continuous, RepId}} ->
             send_json(Req, 202, {[{ok, true}, {<<"_local_id">>, RepId}]});

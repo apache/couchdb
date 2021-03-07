@@ -124,7 +124,7 @@ handle_call({add_task, TaskProps}, {From, _}, Server) ->
     end;
 handle_call(all, _, Server) ->
     All = [
-        [{pid, ?l2b(pid_to_list(Pid))} | TaskProps]
+        [{pid, ?l2b(pid_to_list(Pid))}, process_status(Pid) | TaskProps]
         ||
         {Pid, TaskProps} <- ets:tab2list(?MODULE)
     ],
@@ -160,3 +160,12 @@ timestamp() ->
 
 timestamp({Mega, Secs, _}) ->
     Mega * 1000000 + Secs.
+
+
+process_status(Pid) ->
+    case process_info(Pid, status) of
+        undefined ->
+            {process_status, exiting};
+        {status, Status} ->
+            {process_status, Status}
+    end.

@@ -23,7 +23,6 @@ deps() ->
     [
         sasl,
         inets,
-        os_mon,
         crypto,
         public_key,
         ssl,

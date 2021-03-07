@@ -54,7 +54,7 @@ X means done, - means partially
   - [X] Port invalid_docids.js
   - [X] Port jsonp.js
   - [X] Port large_docs.js
-  - [ ] Port list_views.js
+  - [X] Port list_views.js
   - [X] Port lorem_b64.txt
   - [X] Port lorem.txt
   - [X] Port lots_of_docs.js
@@ -62,11 +62,11 @@ X means done, - means partially
   - [X] Port multiple_rows.js
   - [X] Port proxyauth.js
   - [X] Port purge.js
-  - [ ] Port reader_acl.js
-  - [ ] Port recreate_doc.js
-  - [ ] Port reduce_builtin.js
-  - [ ] Port reduce_false.js
-  - [ ] Port reduce_false_temp.js
+  - [X] Port reader_acl.js
+  - [X] Port recreate_doc.js
+  - [X] Port reduce_builtin.js
+  - [X] Port reduce_false.js
+  - [ ] ~~Port reduce_false_temp.js~~
   - [X] Port reduce.js
   - [X] Port replication.js
   - [ ] Port replicator_db_bad_rep_id.js
@@ -87,30 +87,30 @@ X means done, - means partially
   - [ ] Port replicator_db_update_security.js
   - [ ] Port replicator_db_user_ctx.js
   - [ ] Port replicator_db_write_auth.js
-  - [ ] Port rev_stemming.js
+  - [X] Port rev_stemming.js
   - [X] Port rewrite.js
-  - [ ] Port rewrite_js.js
+  - [X] Port rewrite_js.js
   - [X] Port security_validation.js
-  - [ ] Port show_documents.js
+  - [X] Port show_documents.js
   - [ ] Port stats.js
-  - [ ] Port update_documents.js
+  - [X] Port update_documents.js
   - [X] Port users_db.js
-  - [ ] Port users_db_security.js
+  - [X] Port users_db_security.js
   - [X] Port utf8.js
   - [X] Port uuids.js
   - [X] Port view_collation.js
-  - [ ] Port view_collation_raw.js
-  - [ ] Port view_compaction.js
-  - [ ] Port view_conflicts.js
-  - [ ] Port view_errors.js
-  - [ ] Port view_include_docs.js
-  - [ ] Port view_multi_key_all_docs.js
-  - [ ] Port view_multi_key_design.js
-  - [ ] Port view_multi_key_temp.js
-  - [ ] Port view_offsets.js
+  - [X] Port view_collation_raw.js
+  - [X] Port view_compaction.js
+  - [X] Port view_conflicts.js
+  - [X] Port view_errors.js
+  - [X] Port view_include_docs.js
+  - [X] Port view_multi_key_all_docs.js
+  - [X] Port view_multi_key_design.js
+  - [ ] ~~Port view_multi_key_temp.js~~
+  - [X] Port view_offsets.js
   - [X] Port view_pagination.js
-  - [ ] Port view_sandboxing.js
-  - [ ] Port view_update_seq.js
+  - [X] Port view_sandboxing.js
+  - [X] Port view_update_seq.js
 
 # Using ExUnit to write unit tests
 

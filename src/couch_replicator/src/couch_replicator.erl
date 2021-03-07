@@ -141,7 +141,11 @@ strip_url_creds(Endpoint) ->
                 iolist_to_binary(couch_util:url_strip_password(Url))
     catch
         throw:{error, local_endpoints_not_supported} ->
-            Endpoint
+            Endpoint;
+        error:_ ->
+            % Avoid exposing any part of the URL in case there is a password in
+            % the malformed endpoint URL
+            null
     end.
 
 
@@ -356,7 +360,8 @@ strip_url_creds_test_() ->
         [
             t_strip_http_basic_creds(),
             t_strip_http_props_creds(),
-            t_strip_local_db_creds()
+            t_strip_local_db_creds(),
+            t_strip_url_creds_errors()
         ]
     }.
 
@@ -388,5 +393,24 @@ t_strip_http_props_creds() ->
         ]},
         ?assertEqual(<<"http://host/db/">>, strip_url_creds(Props2))
     end).
+
+
+t_strip_url_creds_errors() ->
+    ?_test(begin
+        Bad1 = {[{<<"url">>, <<"http://adm:pass/bad">>}]},
+        ?assertEqual(null, strip_url_creds(Bad1)),
+        Bad2 = {[{<<"garbage">>, <<"more garbage">>}]},
+        ?assertEqual(null, strip_url_creds(Bad2)),
+        Bad3 = <<"http://a:b:c">>,
+        ?assertEqual(null, strip_url_creds(Bad3)),
+        Bad4 = <<"http://adm:pass:pass/bad">>,
+        ?assertEqual(null, strip_url_creds(Bad4)),
+        ?assertEqual(null, strip_url_creds(null)),
+        ?assertEqual(null, strip_url_creds(42)),
+        ?assertEqual(null, strip_url_creds([<<"a">>, <<"b">>])),
+        Bad5 = {[{<<"source_proxy">>, <<"http://adm:pass/bad">>}]},
+        ?assertEqual(null, strip_url_creds(Bad5))
+    end).
+
 
 -endif.

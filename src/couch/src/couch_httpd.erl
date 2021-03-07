@@ -39,6 +39,7 @@
 -export([check_max_request_length/1]).
 -export([handle_request/1]).
 -export([set_auth_handlers/0]).
+-export([maybe_decompress/2]).
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 -define(MAX_DRAIN_BYTES, 1048576).
@@ -588,7 +589,8 @@ recv_chunked(#httpd{mochi_req=MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
     % Fun is called once with each chunk
     % Fun({Length, Binary}, State)
     % called with Length == 0 on the last time.
-    MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState).
+    MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState,
+        config:get_integer("httpd", "max_http_request_size", 4294967296)).
 
 body_length(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(body_length).
@@ -599,13 +601,16 @@ body(#httpd{mochi_req=MochiReq, req_body=undefined}) ->
 body(#httpd{req_body=ReqBody}) ->
     ReqBody.
 
-json_body(Httpd) ->
+json_body(#httpd{req_body=undefined} = Httpd) ->
     case body(Httpd) of
         undefined ->
             throw({bad_request, "Missing request body"});
         Body ->
             ?JSON_DECODE(maybe_decompress(Httpd, Body))
-    end.
+    end;
+
+json_body(#httpd{req_body=ReqBody}) ->
+    ReqBody.
 
 json_body_obj(Httpd) ->
     case json_body(Httpd) of
@@ -931,6 +936,8 @@ error_info({error, {illegal_database_name, Name}}) ->
     {400, <<"illegal_database_name">>, Message};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
+error_info({misconfigured_server, Reason}) ->
+    {500, <<"misconfigured_server">>, couch_util:to_binary(Reason)};
 error_info({Error, Reason}) ->
     {500, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
 error_info(Error) ->

@@ -127,18 +127,20 @@ SubDirs = [
     "src/couch_stats",
     "src/couch_peruser",
     "src/couch_tests",
+    "src/custodian",
     "src/ddoc_cache",
     "src/dreyfus",
     "src/fabric",
     "src/global_changes",
     "src/ioq",
+    "src/jwtf",
     "src/ken",
     "src/mango",
     "src/rexi",
     "src/setup",
     "src/smoosh",
     "rel"
-],
+].
 
 DepDescs = [
 %% Independent Apps
@@ -150,9 +152,9 @@ DepDescs = [
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},
-                   {tag, "3.0.0"}, [raw]},
+                   {tag, "3.1.1-RC2"}, [raw]},
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
-                   {tag, "v1.2.2"}, [raw]},
+                   {tag, "v1.2.6"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.3"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-6"}},
@@ -161,18 +163,18 @@ DepDescs = [
 {mochiweb,         "mochiweb",         {tag, "v2.20.0"}},
 {meck,             "meck",             {tag, "0.8.8"}},
 {recon,            "recon",            {tag, "2.5.0"}}
-],
+].
 
-WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true},
+WithProper = lists:keyfind(with_proper, 1, CouchConfig) == {with_proper, true}.
 
 OptionalDeps = case WithProper of
     true ->
         [{proper, {url, "https://github.com/proper-testing/proper"}, {tag, "v1.3"}}];
     false ->
         []
-end,
+end.
 
-BaseUrl = "https://github.com/apache/",
+BaseUrl = "https://github.com/apache/".
 
 MakeDep = fun
     ({AppName, {url, Url}, Version}) ->
@@ -185,12 +187,12 @@ MakeDep = fun
     ({AppName, RepoName, Version, Options}) ->
         Url = BaseUrl ++ "couchdb-" ++ RepoName ++ ".git",
         {AppName, ".*", {git, Url, Version}, Options}
-end,
+end.
 
 ErlOpts = case os:getenv("ERL_OPTS") of
     false -> [];
     Opts -> [list_to_atom(O) || O <- string:tokens(Opts, ",")]
-end,
+end.
 
 AddConfig = [
     {require_otp_vsn, "19|20|21|22"},
@@ -205,11 +207,11 @@ AddConfig = [
         {plt_location, local},
         {plt_location, COUCHDB_ROOT},
         {plt_extra_apps, [
-            asn1, compiler, crypto, inets, kernel, os_mon, runtime_tools,
+            asn1, compiler, crypto, inets, kernel, runtime_tools,
             sasl, setup, ssl, stdlib, syntax_tools, xmerl]},
         {warnings, [unmatched_returns, error_handling, race_conditions]}]},
     {post_hooks, [{compile, "escript support/build_js.escript"}]}
-],
+].
 
 C = lists:foldl(fun({K, V}, CfgAcc) ->
     lists:keystore(K, 1, CfgAcc, {K, V})

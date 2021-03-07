@@ -79,7 +79,7 @@ handle_call(cancel_compact, _From, #db{compactor_pid = Pid} = Db) ->
     exit(Pid, kill),
     couch_server:delete_compaction_files(Db#db.name),
     Db2 = Db#db{compactor_pid = nil},
-    ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
+    ok = couch_server:db_updated(Db2),
     {reply, ok, Db2, idle_limit()};
 
 handle_call({set_security, NewSec}, _From, #db{} = Db) ->
@@ -87,18 +87,18 @@ handle_call({set_security, NewSec}, _From, #db{} = Db) ->
     NewSecDb = commit_data(NewDb#db{
         security = NewSec
     }),
-    ok = gen_server:call(couch_server, {db_updated, NewSecDb}, infinity),
+    ok = couch_server:db_updated(NewSecDb),
     {reply, ok, NewSecDb, idle_limit()};
 
 handle_call({set_revs_limit, Limit}, _From, Db) ->
     {ok, Db2} = couch_db_engine:set_revs_limit(Db, Limit),
     Db3 = commit_data(Db2),
-    ok = gen_server:call(couch_server, {db_updated, Db3}, infinity),
+    ok = couch_server:db_updated(Db3),
     {reply, ok, Db3, idle_limit()};
 
 handle_call({set_purge_infos_limit, Limit}, _From, Db) ->
     {ok, Db2} = couch_db_engine:set_purge_infos_limit(Db, Limit),
-    ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
+    ok = couch_server:db_updated(Db2),
     {reply, ok, Db2, idle_limit()};
 
 handle_call({purge_docs, [], _}, _From, Db) ->
@@ -130,7 +130,7 @@ handle_call(Msg, From, Db) ->
 
 handle_cast({load_validation_funs, ValidationFuns}, Db) ->
     Db2 = Db#db{validate_doc_funs = ValidationFuns},
-    ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
+    ok = couch_server:db_updated(Db2),
     {noreply, Db2, idle_limit()};
 handle_cast(start_compact, Db) ->
     case Db#db.compactor_pid of
@@ -143,7 +143,7 @@ handle_cast(start_compact, Db) ->
             Args = [Db#db.name, UpdateSeq],
             couch_log:info("Starting compaction for db \"~s\" at ~p", Args),
             {ok, Db2} = couch_db_engine:start_compaction(Db),
-            ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
+            ok = couch_server:db_updated(Db2),
             {noreply, Db2, idle_limit()};
         _ ->
             % compact currently running, this is a no-op
@@ -175,7 +175,7 @@ handle_info({update_docs, Client, GroupedDocs, NonRepDocs, MergeConflicts},
     NonRepDocs2 = [{Client, NRDoc} || NRDoc <- NonRepDocs],
     try update_docs_int(Db, GroupedDocs3, NonRepDocs2, MergeConflicts) of
     {ok, Db2, UpdatedDDocIds} ->
-        ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
+        ok = couch_server:db_updated(Db2),
         case {couch_db:get_update_seq(Db), couch_db:get_update_seq(Db2)} of
             {Seq, Seq} -> ok;
             _ -> couch_event:notify(Db2#db.name, updated)
@@ -780,7 +780,7 @@ purge_docs(Db, PurgeReqs) ->
 
     {ok, Db1} = couch_db_engine:purge_docs(Db, Pairs, PInfos),
     Db2 = commit_data(Db1),
-    ok = gen_server:call(couch_server, {db_updated, Db2}, infinity),
+    ok = couch_server:db_updated(Db2),
     couch_event:notify(Db2#db.name, updated),
     {ok, Db2, Replies}.
 

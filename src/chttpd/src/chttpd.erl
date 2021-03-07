@@ -52,8 +52,9 @@
     req,
     code,
     headers,
-    first_chunk,
-    resp=nil
+    chunks,
+    resp=nil,
+    buffer_response=false
 }).
 
 start_link() ->
@@ -412,8 +413,7 @@ possibly_hack(#httpd{path_parts=[<<"_replicate">>]}=Req) ->
     {Props0} = chttpd:json_body_obj(Req),
     Props1 = fix_uri(Req, Props0, <<"source">>),
     Props2 = fix_uri(Req, Props1, <<"target">>),
-    put(post_body, {Props2}),
-    Req;
+    Req#httpd{req_body={Props2}};
 possibly_hack(Req) ->
     Req.
 
@@ -666,13 +666,16 @@ body(#httpd{mochi_req=MochiReq, req_body=ReqBody}) ->
 validate_ctype(Req, Ctype) ->
     couch_httpd:validate_ctype(Req, Ctype).
 
-json_body(Httpd) ->
+json_body(#httpd{req_body=undefined} = Httpd) ->
     case body(Httpd) of
         undefined ->
             throw({bad_request, "Missing request body"});
         Body ->
             ?JSON_DECODE(maybe_decompress(Httpd, Body))
-    end.
+    end;
+
+json_body(#httpd{req_body=ReqBody}) ->
+    ReqBody.
 
 json_body_obj(Httpd) ->
     case json_body(Httpd) of
@@ -780,11 +783,14 @@ start_json_response(Req, Code, Headers0) ->
 end_json_response(Resp) ->
     couch_httpd:end_json_response(Resp).
 
+
 start_delayed_json_response(Req, Code) ->
     start_delayed_json_response(Req, Code, []).
 
+
 start_delayed_json_response(Req, Code, Headers) ->
     start_delayed_json_response(Req, Code, Headers, "").
+
 
 start_delayed_json_response(Req, Code, Headers, FirstChunk) ->
     {ok, #delayed_resp{
@@ -792,10 +798,13 @@ start_delayed_json_response(Req, Code, Headers, FirstChunk) ->
         req = Req,
         code = Code,
         headers = Headers,
-        first_chunk = FirstChunk}}.
+        chunks = [FirstChunk],
+        buffer_response = buffer_response(Req)}}.
+
 
 start_delayed_chunked_response(Req, Code, Headers) ->
     start_delayed_chunked_response(Req, Code, Headers, "").
+
 
 start_delayed_chunked_response(Req, Code, Headers, FirstChunk) ->
     {ok, #delayed_resp{
@@ -803,16 +812,24 @@ start_delayed_chunked_response(Req, Code, Headers, FirstChunk) ->
         req = Req,
         code = Code,
         headers = Headers,
-        first_chunk = FirstChunk}}.
+        chunks = [FirstChunk],
+        buffer_response = buffer_response(Req)}}.
 
-send_delayed_chunk(#delayed_resp{}=DelayedResp, Chunk) ->
+
+send_delayed_chunk(#delayed_resp{buffer_response=false}=DelayedResp, Chunk) ->
     {ok, #delayed_resp{resp=Resp}=DelayedResp1} =
         start_delayed_response(DelayedResp),
     {ok, Resp} = send_chunk(Resp, Chunk),
-    {ok, DelayedResp1}.
+    {ok, DelayedResp1};
+
+send_delayed_chunk(#delayed_resp{buffer_response=true}=DelayedResp, Chunk) ->
+    #delayed_resp{chunks = Chunks} = DelayedResp,
+    {ok, DelayedResp#delayed_resp{chunks = [Chunk | Chunks]}}.
+
 
 send_delayed_last_chunk(Req) ->
     send_delayed_chunk(Req, []).
+
 
 send_delayed_error(#delayed_resp{req=Req,resp=nil}=DelayedResp, Reason) ->
     {Code, ErrorStr, ReasonStr} = error_info(Reason),
@@ -823,6 +840,7 @@ send_delayed_error(#delayed_resp{resp=Resp, req=Req}, Reason) ->
     log_error_with_stack_trace(Reason),
     throw({http_abort, Resp, Reason}).
 
+
 close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
     % Use a separate chunk to close the streamed array to maintain strict
     % compatibility with earlier versions. See COUCHDB-2724
@@ -831,10 +849,27 @@ close_delayed_json_object(Resp, Buffer, Terminator, 0) ->
 close_delayed_json_object(Resp, Buffer, Terminator, _Threshold) ->
     send_delayed_chunk(Resp, [Buffer | Terminator]).
 
-end_delayed_json_response(#delayed_resp{}=DelayedResp) ->
+
+end_delayed_json_response(#delayed_resp{buffer_response=false}=DelayedResp) ->
     {ok, #delayed_resp{resp=Resp}} =
         start_delayed_response(DelayedResp),
+    end_json_response(Resp);
+
+end_delayed_json_response(#delayed_resp{buffer_response=true}=DelayedResp) ->
+    #delayed_resp{
+        start_fun = StartFun,
+        req = Req,
+        code = Code,
+        headers = Headers,
+        chunks = Chunks
+    } = DelayedResp,
+    {ok, Resp} = StartFun(Req, Code, Headers),
+    lists:foreach(fun
+        ([]) -> ok;
+        (Chunk) -> send_chunk(Resp, Chunk)
+    end, lists:reverse(Chunks)),
     end_json_response(Resp).
+
 
 get_delayed_req(#delayed_resp{req=#httpd{mochi_req=MochiReq}}) ->
     MochiReq;
@@ -847,7 +882,7 @@ start_delayed_response(#delayed_resp{resp=nil}=DelayedResp) ->
         req=Req,
         code=Code,
         headers=Headers,
-        first_chunk=FirstChunk
+        chunks=[FirstChunk]
     }=DelayedResp,
     {ok, Resp} = StartFun(Req, Code, Headers),
     case FirstChunk of
@@ -857,6 +892,18 @@ start_delayed_response(#delayed_resp{resp=nil}=DelayedResp) ->
     {ok, DelayedResp#delayed_resp{resp=Resp}};
 start_delayed_response(#delayed_resp{}=DelayedResp) ->
     {ok, DelayedResp}.
+
+
+buffer_response(Req) ->
+    case chttpd:qs_value(Req, "buffer_response") of
+        "false" ->
+            false;
+        "true" ->
+            true;
+        _ ->
+            config:get_boolean("chttpd", "buffer_response", false)
+    end.
+
 
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});
@@ -970,6 +1017,8 @@ maybe_handle_error(Error) ->
             Result;
         {Err, Reason} ->
             {500, couch_util:to_binary(Err), couch_util:to_binary(Reason)};
+        normal ->
+            exit(normal);
         Error ->
             {500, <<"unknown_error">>, couch_util:to_binary(Error)}
     end.
@@ -1184,8 +1233,9 @@ basic_headers(Req, Headers0) ->
         ++ server_header()
         ++ couch_httpd_auth:cookie_auth_header(Req, Headers0),
     Headers1 = chttpd_cors:headers(Req, Headers),
-	Headers2 = chttpd_xframe_options:header(Req, Headers1),
-    chttpd_prefer_header:maybe_return_minimal(Req, Headers2).
+    Headers2 = chttpd_xframe_options:header(Req, Headers1),
+    Headers3 = [reqid(), timing() | Headers2],
+    chttpd_prefer_header:maybe_return_minimal(Req, Headers3).
 
 handle_response(Req0, Code0, Headers0, Args0, Type) ->
     {ok, {Req1, Code1, Headers1, Args1}} =

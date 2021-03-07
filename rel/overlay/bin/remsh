@@ -32,17 +32,28 @@ BINDIR=$ROOTDIR/erts-$ERTS_VSN/bin
 
 PROGNAME=${0##*/}
 VERBOSE=""
-NODE="couchdb@127.0.0.1"
+DEFAULT_NODE="couchdb@127.0.0.1"
 LHOST=127.0.0.1
-VM_ARGS=$COUCHDB_BIN_DIR/../etc/vm.args
+
+ARGS_FILE="${COUCHDB_ARGS_FILE:-$ROOTDIR/etc/vm.args}"
+
+# If present, extract cookie from ERL_FLAGS
+# This is used by the CouchDB Dockerfile and Helm chart
+NODE=$(echo "$ERL_FLAGS" | sed 's/^.*name \([^ ][^ ]*\).*$/\1/g')
+if test -f "$ARGS_FILE"; then
+# else attempt to extract from vm.args
+  ARGS_FILE_COOKIE=$(awk '$1=="-name"{print $2}' "$ARGS_FILE")
+  NODE="${NODE:-$ARGS_FILE_COOKIE}"
+fi
+NODE="${NODE:-$DEFAULT_NODE}"
 
 # If present, extract cookie from ERL_FLAGS
 # This is used by the CouchDB Dockerfile and Helm chart
 COOKIE=$(echo "$ERL_FLAGS" | sed 's/^.*setcookie \([^ ][^ ]*\).*$/\1/g')
-if test -f "$VM_ARGS"; then
+if test -f "$ARGS_FILE"; then
 # else attempt to extract from vm.args
-  VM_ARGS_COOKIE=$(awk '$1=="-setcookie"{print $2}' "$VM_ARGS")
-  COOKIE="${COOKIE:-$VM_ARGS_COOKIE}"
+  ARGS_FILE_COOKIE=$(awk '$1=="-setcookie"{print $2}' "$ARGS_FILE")
+  COOKIE="${COOKIE:-$ARGS_FILE_COOKIE}"
 fi
 COOKIE="${COOKIE:-monster}"
 

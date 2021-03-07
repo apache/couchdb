@@ -20,7 +20,7 @@
     handle_scheduler_req/1
 ]).
 
--import(couch_httpd, [
+-import(chttpd, [
     send_json/2,
     send_json/3,
     send_method_not_allowed/2

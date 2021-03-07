@@ -1,4 +1,5 @@
 *.o
+*.asc
 *.sha256
 *.sha512
 *.snap
@@ -13,13 +14,16 @@
 .rebar/
 .eunit/
 cover/
+core
+debian/
 log
 apache-couchdb-*/
 bin/
 config.erl
 *.tar.gz
 *.tar.bz2
-dev/boot_node.beam
+dev/*.beam
+dev/devnode.*
 dev/lib/
 dev/logs/
 ebin/
@@ -72,6 +76,7 @@ src/snappy/
 src/ssl_verify_fun/
 src/triq/
 src/unicode_util_compat/
+src/file_system/
 tmp/
 
 src/couch/*.o
@@ -115,6 +120,7 @@ src/mango/ebin/
 src/mango/test/*.pyc
 src/mango/nosetests.xml
 src/mango/venv/
+src/jwtf/.rebar3/
 test/javascript/junit.xml
 
 /_build/

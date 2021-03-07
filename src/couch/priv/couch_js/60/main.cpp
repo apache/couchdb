@@ -27,8 +27,6 @@
 #include <js/Wrapper.h>
 
 #include "config.h"
-#include "http.h"
-#include "utf8.h"
 #include "util.h"
 
 static bool enableSharedMemory = true;
@@ -53,129 +51,6 @@ static JSClass global_class = {
     JSCLASS_GLOBAL_FLAGS,
     &global_ops
 };
-
-
-static void
-req_dtor(JSFreeOp* fop, JSObject* obj)
-{
-    http_dtor(fop, obj);
-}
-
-// With JSClass.construct.
-static const JSClassOps clsOps = {
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    req_dtor,
-    nullptr,
-    nullptr,
-    nullptr
-};
-
-static const JSClass CouchHTTPClass = {
-    "CouchHTTP",  /* name */
-    JSCLASS_HAS_PRIVATE | JSCLASS_HAS_RESERVED_SLOTS(2),        /* flags */
-    &clsOps
-};
-
-static bool
-req_ctor(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    bool ret;
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JSObject* obj = JS_NewObjectForConstructor(cx, &CouchHTTPClass, args);
-    if(!obj) {
-        JS_ReportErrorUTF8(cx, "Failed to create CouchHTTP instance");
-        return false;
-    }
-    ret = http_ctor(cx, obj);
-    args.rval().setObject(*obj);
-    return ret;
-}
-
-static bool
-req_open(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    bool ret = false;
-
-    if(argc == 2) {
-        ret = http_open(cx, obj, args[0], args[1], JS::BooleanValue(false));
-    } else if(argc == 3) {
-        ret = http_open(cx, obj, args[0], args[1], args[2]);
-    } else {
-        JS_ReportErrorUTF8(cx, "Invalid call to CouchHTTP.open");
-    }
-
-    args.rval().setUndefined();
-    return ret;
-}
-
-
-static bool
-req_set_hdr(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    bool ret = false;
-
-    if(argc == 2) {
-        ret = http_set_hdr(cx, obj, args[0], args[1]);
-    } else {
-        JS_ReportErrorUTF8(cx, "Invalid call to CouchHTTP.set_header");
-    }
-
-    args.rval().setUndefined();
-    return ret;
-}
-
-
-static bool
-req_send(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    bool ret = false;
-
-    if(argc == 1) {
-        ret = http_send(cx, obj, args[0]);
-    } else {
-        JS_ReportErrorUTF8(cx, "Invalid call to CouchHTTP.send");
-    }
-
-    args.rval().setUndefined();
-    return ret;
-}
-
-static bool
-req_status(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    int status = http_status(cx, obj);
-
-    if(status < 0)
-        return false;
-
-    args.rval().set(JS::Int32Value(status));
-    return true;
-}
-
-static bool
-base_url(JSContext *cx, unsigned int argc, JS::Value* vp)
-{
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    JSObject* obj = JS_THIS_OBJECT(cx, vp);
-    couch_args *cargs = (couch_args*)JS_GetContextPrivate(cx);
-    JS::Value uri_val;
-    bool rc = http_uri(cx, obj, cargs, &uri_val);
-    args.rval().set(uri_val);
-    return rc;
-}
 
 static void
 SetStandardCompartmentOptions(JS::CompartmentOptions& options)
@@ -226,8 +101,14 @@ evalcx(JSContext *cx, unsigned int argc, JS::Value* vp)
         if (!sandbox)
             return false;
     }
-    JS_BeginRequest(cx);
+
     JSAutoRequest ar(cx);
+
+    if (!sandbox) {
+        sandbox = NewSandbox(cx, false);
+        if (!sandbox)
+            return false;
+    }
 
     js::AutoStableStringChars strChars(cx);
     if (!strChars.initTwoByte(cx, str))
@@ -236,12 +117,6 @@ evalcx(JSContext *cx, unsigned int argc, JS::Value* vp)
     mozilla::Range<const char16_t> chars = strChars.twoByteRange();
     size_t srclen = chars.length();
     const char16_t* src = chars.begin().get();
-
-    if (!sandbox) {
-        sandbox = NewSandbox(cx, false);
-        if (!sandbox)
-            return false;
-    }
 
     if(srclen == 0) {
         args.rval().setObject(*sandbox);
@@ -283,7 +158,19 @@ static bool
 print(JSContext* cx, unsigned int argc, JS::Value* vp)
 {
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-    couch_print(cx, argc, args);
+
+    bool use_stderr = false;
+    if(argc > 1 && args[1].isTrue()) {
+        use_stderr = true;
+    }
+
+    if(!args[0].isString()) {
+        JS_ReportErrorUTF8(cx, "Unable to print non-string value.");
+        return false;
+    }
+
+    couch_print(cx, args[0], use_stderr);
+
     args.rval().setUndefined();
     return true;
 }
@@ -335,43 +222,6 @@ seal(JSContext* cx, unsigned int argc, JS::Value* vp)
 }
 
 
-static bool
-js_sleep(JSContext* cx, unsigned int argc, JS::Value* vp)
-{
-    JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
-
-    int duration = args[0].toInt32();
-
-#ifdef XP_WIN
-    Sleep(duration);
-#else
-    usleep(duration * 1000);
-#endif
-
-    return true;
-}
-
-JSPropertySpec CouchHTTPProperties[] = {
-    JS_PSG("status", req_status, 0),
-    JS_PSG("base_url", base_url, 0),
-    JS_PS_END
-};
-
-
-JSFunctionSpec CouchHTTPFunctions[] = {
-    JS_FN("_open", req_open, 3, 0),
-    JS_FN("_setRequestHeader", req_set_hdr, 2, 0),
-    JS_FN("_send", req_send, 1, 0),
-    JS_FS_END
-};
-
-
-JSFunctionSpec TestSuiteFunctions[] = {
-    JS_FN("sleep", js_sleep, 1, 0),
-    JS_FS_END
-};
-
-
 static JSFunctionSpec global_functions[] = {
     JS_FN("evalcx", evalcx, 0, 0),
     JS_FN("gc", gc, 0, 0),
@@ -386,7 +236,7 @@ static JSFunctionSpec global_functions[] = {
 static bool
 csp_allows(JSContext* cx)
 {
-    couch_args *args = (couch_args*)JS_GetContextPrivate(cx);
+    couch_args* args = static_cast<couch_args*>(JS_GetContextPrivate(cx));
     if(args->eval) {
         return true;
     } else {
@@ -405,7 +255,6 @@ int
 main(int argc, const char* argv[])
 {
     JSContext* cx = NULL;
-    JSObject* klass = NULL;
     char* scriptsrc;
     size_t slen;
     int i;
@@ -443,40 +292,24 @@ main(int argc, const char* argv[])
     if(couch_load_funcs(cx, global, global_functions) != true)
         return 1;
 
-    if(args->use_http) {
-        http_check_enabled();
-
-        klass = JS_InitClass(
-            cx, global,
-            NULL,
-            &CouchHTTPClass, req_ctor,
-            0,
-            CouchHTTPProperties, CouchHTTPFunctions,
-            NULL, NULL
-        );
-
-        if(!klass)
-        {
-            fprintf(stderr, "Failed to initialize CouchHTTP class.\n");
-            exit(2);
-        }
-    }
-
-    if(args->use_test_funs) {
-        if(couch_load_funcs(cx, global, TestSuiteFunctions) != true)
-            return 1;
-    }
-
     for(i = 0 ; args->scripts[i] ; i++) {
         slen = couch_readfile(args->scripts[i], &scriptsrc);
 
         // Compile and run
         JS::CompileOptions options(cx);
         options.setFileAndLine(args->scripts[i], 1);
+        options.setUTF8(true);
         JS::RootedScript script(cx);
 
         if(!JS_CompileScript(cx, scriptsrc, slen, options, &script)) {
-            fprintf(stderr, "Failed to compile script.\n");
+            JS::RootedValue exc(cx);
+            if(!JS_GetPendingException(cx, &exc)) {
+                fprintf(stderr, "Failed to compile script.\n");
+            } else {
+                JS::RootedObject exc_obj(cx, &exc.toObject());
+                JSErrorReport* report = JS_ErrorFromException(cx, exc_obj);
+                couch_error(cx, report);
+            }
             return 1;
         }
 
@@ -484,7 +317,14 @@ main(int argc, const char* argv[])
 
         JS::RootedValue result(cx);
         if(JS_ExecuteScript(cx, script, &result) != true) {
-            fprintf(stderr, "Failed to execute script.\n");
+            JS::RootedValue exc(cx);
+            if(!JS_GetPendingException(cx, &exc)) {
+                fprintf(stderr, "Failed to execute script.\n");
+            } else {
+                JS::RootedObject exc_obj(cx, &exc.toObject());
+                JSErrorReport* report = JS_ErrorFromException(cx, exc_obj);
+                couch_error(cx, report);
+            }
             return 1;
         }
 

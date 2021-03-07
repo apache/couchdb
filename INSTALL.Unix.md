@@ -36,7 +36,7 @@ Please work through these in order if you experience any problems.
 
 You should have the following installed:
 
- * Erlang OTP (>=R16B03-1, =<19.x) (http://erlang.org/)
+ * Erlang OTP (>= 19.x)         (http://erlang.org/)
  * ICU                          (http://icu-project.org/)
  * OpenSSL                      (http://www.openssl.org/)
  * Mozilla SpiderMonkey - either 1.8.5 or 60
@@ -45,23 +45,20 @@ You should have the following installed:
    * https://archive.mozilla.org/pub/firefox/releases/60.9.0esr/source/ (src/js)
  * GNU Make                     (http://www.gnu.org/software/make/)
  * GNU Compiler Collection      (http://gcc.gnu.org/)
- * libcurl                      (http://curl.haxx.se/libcurl/)
- * help2man                     (http://www.gnu.org/s/help2man/)
- * Python (>=2.7)               (http://python.org/)
+ * Python (>=3.5)               (http://python.org/)
 
 To build Fauxton, you should have the following installed:
- * Node.JS (>=6.x)              (https://nodejs.org/)
+ * Node.JS (>=10.x)             (https://nodejs.org/)
    -- obtainable from NodeSource (https://github.com/nodesource/distributions)
 
 To build the documentation, you should have the following installed:
  * Python Sphinx (>=1.5)        (http://pypi.python.org/pypi/Sphinx)
+ * Sphinx RT theme              (https://github.com/readthedocs/sphinx_rtd_theme)
 
-It is recommended that you install Erlang OTP R16B03-1 or above where
-possible.  You will only need libcurl if you plan to run the
-JavaScript test suite. And help2man is only need if you plan on
-installing the CouchDB man pages.  Python and Sphinx are only required
-for building the online documentation. Documentation build can be disabled
-by adding the `--disable-docs` flag to the `configure` script.
+It is recommended that you install Erlang OTP 20.3.8.11 or above where
+possible. Sphinx and the RTD theme are only required for building the online
+documentation. You can disable Fauxton and/or the documentation builds by
+adding the --disable-fauxton and/or --disable-docs flag(s) to the configure script.
 
 ### Debian-based Systems
 
@@ -69,15 +66,17 @@ You can install the dependencies by running:
 
     sudo apt-get --no-install-recommends -y install \
         build-essential pkg-config erlang erlang-reltool \
-        libicu-dev libmozjs185-dev libcurl4-openssl-dev
+        libicu-dev libmozjs-60-dev python3
 
-You can install the Node.JS dependencies via [NodeSource](https://github.com/nodesource/distributions#installation-instructions).
+Your distribution may have libmozjs-68-dev instead of 60. Both are supported.
+
+You can install Node.JS [NodeSource](https://github.com/nodesource/distributions#installation-instructions).
 
 You can install the documentation dependencies by running:
 
     sudo apt-get --no-install-recommends -y install \
         python-sphinx
-        
+
     sudo pip install --upgrade sphinx_rtd_theme nose requests hypothesis
 
 
@@ -89,17 +88,17 @@ packages.
 You can install the dependencies by running:
 
     sudo yum install autoconf autoconf-archive automake \
-        curl-devel erlang-asn1 erlang-erts erlang-eunit \
-        erlang-os_mon erlang-xmerl help2man \
-        js-devel-1.8.5 libicu-devel libtool perl-Test-Harness
+        erlang-asn1 erlang-erts erlang-eunit erlang-xmerl \
+        libmozjs-60-dev libicu-devel libtool perl-Test-Harness \
+        python3
 
-You can install the Node.JS dependencies via [NodeSource](https://github.com/nodesource/distributions#rpminstall).
+You can install Node.JS via [NodeSource](https://github.com/nodesource/distributions#rpminstall).
 
 The built-in packages for Sphinx in RHEL repositories are too old
 to run the documentation build process. Instead, use pip:
 
     sudo yum install python-pip
-    sudo pip install sphinx
+    sudo pip install --upgrade sphinx nose requests hypothesis
 
 ### Mac OS X
 
@@ -111,17 +110,17 @@ the Command Line Tools:
 You can then install the other dependencies by running:
 
     brew install autoconf autoconf-archive automake libtool \
-        erlang icu4c spidermonkey curl pkg-config
+        erlang icu4c spidermonkey pkg-config
 
-You can install the Node.JS dependencies via the
+You can install Node.JS via the
 [official Macintosh installer](https://nodejs.org/en/download/).
 
 You can install the documentation dependencies by running:
 
     sudo easy_install pip
-    sudo pip install sphinx
+    sudo pip install --upgrade sphinx nose requests hypothesis
 
-You will need Homebrew installed to use the `brew` command.
+You will need Homebrew installed to use the brew command.
 
 Learn more about Homebrew at:
 
@@ -143,9 +142,9 @@ You can install this by running:
 
 You can install the remaining dependencies by running:
 
-    pkg install help2man openssl icu curl git bash \
-        autoconf automake libtool node spidermonkey185 \
-        erlang node8 npm-node8 lang/python py27-sphinx py27-pip
+    pkg install openssl icu git bash autoconf \
+        www/node npm libtool spidermonkey60 \
+        erlang lang/python py37-sphinx py37-pip
     pip install --upgrade sphinx_rtd_theme nose requests hypothesis
 
 ## Installing
@@ -246,7 +245,7 @@ From here you should verify your installation by pointing your web browser to:
 
     http://localhost:5984/_utils/#/verifyinstall
 
-## Running as a Daemon
+## Running as a daemon
 
 The couchdb team recommends [runit](http://smarden.org/runit/) to
 run CouchDB persistently and reliably. Configuration of runit is
