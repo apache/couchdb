@@ -131,6 +131,10 @@
   "CompactTest": [
     "compaction reduces size of deleted docs"
   ],
+  "ConcurrentWritesTest": [
+    "Primary data tests",
+    "Secondary data tests"
+  ],
   "ConfigTest": [
     "Atoms, binaries, and strings suffice as whitelist sections and keys.",
     "Blacklist is functional",
