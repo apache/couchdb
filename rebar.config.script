@@ -146,6 +146,7 @@ SubDirs = [
     "src/setup",
     "src/smoosh",
     "src/ebtree",
+    "src/couch_prometheus",
     "rel"
 ].
 

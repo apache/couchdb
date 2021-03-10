@@ -117,6 +117,12 @@ handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_stats">> | Path]}=
     chttpd:send_json(Req, EJSON1);
 handle_node_req(#httpd{path_parts=[_, _Node, <<"_stats">>]}=Req) ->
     send_method_not_allowed(Req, "GET");
+handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_prometheus">>]}=Req) ->
+    Metrics = call_node(Node, couch_prometheus_server, scrape, []),
+    Header = [{<<"Content-Type">>, <<"text/plain">>}],
+    chttpd:send_response(Req, 200, Header, Metrics);
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_prometheus">>]}=Req) ->
+    send_method_not_allowed(Req, "GET");
 % GET /_node/$node/_system
 handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_system">>]}=Req) ->
     Stats = call_node(Node, chttpd_node, get_stats, []),
