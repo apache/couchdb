@@ -28,6 +28,12 @@ init([]) ->
     {ok, {
         {one_for_one, 5, 10}, [
             ?CHILD(couch_prometheus_server, worker)
-        ]
+        ] ++ maybe_start_prometheus_http()
     }}.
 
+maybe_start_prometheus_http() ->
+    case config:get("prometheus", "additional_port", "false") of
+        "false" -> [];
+        "true" -> [?CHILD(couch_prometheus_http, worker)];
+        _ -> []
+    end.

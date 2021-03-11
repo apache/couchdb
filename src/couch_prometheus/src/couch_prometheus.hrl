@@ -10,4 +10,5 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--define(REFRESH_INTERVAL, 60).
+-define(REFRESH_INTERVAL, 5).
+
