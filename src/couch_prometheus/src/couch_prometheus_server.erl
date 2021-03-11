@@ -21,15 +21,17 @@
 ]).
 
 -export([
+    scrape/0
+]).
+
+-export([
     start_link/0,
     init/1,
     handle_call/3,
     handle_cast/2,
     handle_info/2,
     code_change/3,
-    terminate/2,
-
-    scrape/0
+    terminate/2
 ]).
 
 -include("couch_prometheus.hrl").
@@ -51,7 +53,6 @@ scrape() ->
     {ok, Metrics} = gen_server:call(?MODULE, scrape),
     Metrics.
 
-
 handle_call(scrape, _from, #st{metrics = Metrics}=State) ->
     {reply, {ok, Metrics}, State};
 handle_call(refresh, _from, #st{refresh=OldRT} = State) ->
@@ -67,7 +68,8 @@ handle_cast(Msg, State) ->
 
 handle_info(refresh, State) ->
     Metrics = refresh_metrics(),
-    {noreply, State#st{metrics=Metrics}};
+    RT = update_refresh_timer(),
+    {noreply, State#st{metrics=Metrics, refresh=RT}};
 handle_info(Msg, State) ->
     {stop, {unknown_info, Msg}, State}.
 
