@@ -78,10 +78,21 @@ couch_jobs_basic_test_() ->
 
 
 setup_couch() ->
+    % Because of a circular dependency between `couch_jobs` and `fabric` in
+    % `fabric2_db_expiration` module, disable db expiration so when
+    % `couch_jobs` is stopped the test, `fabric` app doesn't get torn down as
+    % well and we don't see spurious <<"db_expiration">> jobs show up in test
+    % results.
+    meck:new(fabric2_db_expiration, [passthrough]),
+    meck:expect(fabric2_db_expiration, handle_info, fun
+        (timeout, St) -> {noreply, St};
+        (Msg, St) -> meck:passthrough([Msg, St])
+    end),
     test_util:start_couch([fabric]).
 
 
 teardown_couch(Ctx) ->
+    meck:unload(),
     test_util:stop_couch(Ctx).
 
 
