@@ -104,16 +104,12 @@ defmodule Couch.DBTest do
   end
 
   def set_config_raw(section, key, value) do
-    resp = Couch.get("/_membership")
-
-    Enum.map(resp.body["all_nodes"], fn node ->
-      url = "/_node/#{node}/_config/#{section}/#{key}"
+      url = "/_node/_local/_config/#{section}/#{key}"
       headers = ["X-Couch-Persist": "false"]
       body = :jiffy.encode(value)
       resp = Couch.put(url, headers: headers, body: body)
       assert resp.status_code == 200
-      {node, resp.body}
-    end)
+      [{"_local", resp.body}]
   end
 
   def prepare_user_doc(user) do
@@ -449,9 +445,7 @@ defmodule Couch.DBTest do
   end
 
   def run_on_modified_server(settings, fun) do
-    resp = Couch.get("/_membership")
-    assert resp.status_code == 200
-    nodes = resp.body["all_nodes"]
+    nodes = ["_local"]
 
     prev_settings =
       Enum.map(settings, fn setting ->
