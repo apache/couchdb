@@ -55,6 +55,9 @@ foreach_setup() ->
 
 foreach_teardown({Db, _}) ->
     meck:unload(),
+    fabric2_fdb:transactional(Db, fun(TxDb) ->
+        couch_views:cleanup_indices(TxDb, [])
+    end),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
 
