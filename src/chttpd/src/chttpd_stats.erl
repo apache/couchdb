@@ -1,3 +1,4 @@
+
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License.  You may obtain a copy of
 % the License at
@@ -12,6 +13,8 @@
 
 -module(chttpd_stats).
 
+% for the stacktrace macro only so far
+-include_lib("couch/include/couch_db.hrl").
 
 -export([
     init/0,
@@ -50,8 +53,7 @@ report(HttpReq, HttpResp) ->
             _ ->
                 ok
         end
-    catch T:R ->
-        S = erlang:get_stacktrace(),
+    catch ?STACKTRACE(T, R, S)
         Fmt = "Failed to report chttpd request stats: ~p:~p ~p",
         couch_log:error(Fmt, [T, R, S])
     end.

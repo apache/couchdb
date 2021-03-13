@@ -219,3 +219,29 @@
 -type sec_props() :: [tuple()].
 -type sec_obj() :: {sec_props()}.
 
+%% Erlang/OTP 21 deprecates and 23 removes get_stacktrace(), so 
+%% we have to monkey around until we can drop support < 21.
+%% h/t https://github.com/erlang/otp/pull/1783#issuecomment-386190970
+
+%% use like so:
+% try function1(Arg1)
+% catch
+%     ?STACKTRACE(exit, badarg, ErrorStackTrace)
+%         % do stuff with ErrorStackTrace
+%         % ...
+% end,
+
+% for features specific to Erlang/OTP version 20.x (and later versions)
+-ifdef(ERLANG_OTP_VERSION_20).
+-else.
+-define(ERLANG_OTP_VERSION_21_FEATURES, true).
+-endif.
+% Get the stacktrace in a way that is backwards compatible
+-ifdef(ERLANG_OTP_VERSION_21_FEATURES).
+-define(STACKTRACE(ErrorType, Error, ErrorStackTrace),
+        ErrorType:Error:ErrorStackTrace ->).
+-else.
+-define(STACKTRACE(ErrorType, Error, ErrorStackTrace),
+        ErrorType:Error ->
+            ErrorStackTrace = erlang:get_stacktrace(),).
+-endif.

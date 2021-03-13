@@ -296,8 +296,7 @@ open_doc(DbName, Options, Id, IncludeDocs) ->
     try open_doc_int(DbName, Options, Id, IncludeDocs) of
         #view_row{} = Row ->
             exit(Row)
-    catch Type:Reason ->
-        Stack = erlang:get_stacktrace(),
+    catch ?STACKTRACE(Type, Reason, Stack)
         couch_log:error("_all_docs open error: ~s ~s :: ~w ~w", [
                 DbName, Id, {Type, Reason}, Stack]),
         exit({Id, Reason})

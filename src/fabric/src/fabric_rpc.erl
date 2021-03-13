@@ -330,9 +330,9 @@ with_db(DbName, Options, {M,F,A}) ->
             apply(M, F, [Db | A])
         catch Exception ->
             Exception;
-        error:Reason ->
+        ?STACKTRACE(error, Reason, Stack)
             couch_log:error("rpc ~p:~p/~p ~p ~p", [M, F, length(A)+1, Reason,
-                clean_stack()]),
+                clean_stack(Stack)]),
             {error, Reason}
         end);
     Error ->
@@ -596,9 +596,8 @@ make_att_reader({fabric_attachment_receiver, Middleman, Length}) ->
 make_att_reader(Else) ->
     Else.
 
-clean_stack() ->
-    lists:map(fun({M,F,A}) when is_list(A) -> {M,F,length(A)}; (X) -> X end,
-        erlang:get_stacktrace()).
+clean_stack(S) ->
+    lists:map(fun({M,F,A}) when is_list(A) -> {M,F,length(A)}; (X) -> X end, S).
 
 set_io_priority(DbName, Options) ->
     case lists:keyfind(io_priority, 1, Options) of

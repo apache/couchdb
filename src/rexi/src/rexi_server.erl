@@ -18,6 +18,9 @@
 
 -export([start_link/1, init_p/2, init_p/3]).
 
+% for the stacktrace macro only so far
+-include_lib("couch/include/couch_db.hrl").
+
 -include_lib("rexi/include/rexi.hrl").
 
 -record(job, {
@@ -135,8 +138,8 @@ init_p(From, {M,F,A}, Nonce) ->
     put(rexi_from, From),
     put('$initial_call', {M,F,length(A)}),
     put(nonce, Nonce),
-    try apply(M, F, A) catch exit:normal -> ok; Class:Reason ->
-        Stack = clean_stack(),
+    try apply(M, F, A) catch exit:normal -> ok; ?STACKTRACE(Class, Reason, Stack0)
+        Stack = clean_stack(Stack0),
         {ClientPid, _ClientRef} = From,
         couch_log:error(
             "rexi_server: from: ~s(~p) mfa: ~s:~s/~p ~p:~p ~100p", [
@@ -160,9 +163,8 @@ save_error(E, #st{errors=Q, error_limit=L, error_count=C} = St) when C >= L ->
 save_error(E, #st{errors=Q, error_count=C} = St) ->
     St#st{errors = queue:in(E, Q), error_count = C+1}.
 
-clean_stack() ->
-    lists:map(fun({M,F,A}) when is_list(A) -> {M,F,length(A)}; (X) -> X end,
-        erlang:get_stacktrace()).
+clean_stack(S) ->
+    lists:map(fun({M,F,A}) when is_list(A) -> {M,F,length(A)}; (X) -> X end, S).
 
 add_job(Job, #st{workers = Workers, clients = Clients} = State) ->
     ets:insert(Workers, Job),
