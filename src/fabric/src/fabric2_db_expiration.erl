@@ -131,8 +131,7 @@ cleanup(true) ->
                 {ok, Job1, Data1} = ?MODULE:process_expirations(Job, Data),
                 ok = resubmit_job(Job1, Data1, schedule_sec())
             catch
-                _Tag:Error ->
-                    Stack = erlang:get_stacktrace(),
+                ?STACKTRACE(_Tag, Error, Stack)
                     couch_log:error("~p : processing error ~p ~p ~p",
                         [?MODULE, Job, Error, Stack]),
                     ok = resubmit_job(Job, Data, ?ERROR_RESCHEDULE_SEC),

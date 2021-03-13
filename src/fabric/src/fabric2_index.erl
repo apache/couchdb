@@ -67,8 +67,7 @@ cleanup(Db) ->
     catch
         error:database_does_not_exist ->
             ok;
-        Tag:Reason ->
-            Stack = erlang:get_stacktrace(),
+        ?STACKTRACE(Tag, Reason, Stack)
             DbName = fabric2_db:name(Db),
             LogMsg = "~p failed to cleanup indices for `~s` ~p:~p ~p",
             couch_log:error(LogMsg, [?MODULE, DbName, Tag, Reason, Stack])
@@ -168,8 +167,7 @@ process_updates_iter([Db | Rest], Cont) ->
     catch
         error:database_does_not_exist ->
             ok;
-        Tag:Reason ->
-            Stack = erlang:get_stacktrace(),
+        ?STACKTRACE(Tag, Reason, Stack)
             LogMsg = "~p failed to build indices for `~s` ~p:~p ~p",
             couch_log:error(LogMsg, [?MODULE, Db, Tag, Reason, Stack])
     end,

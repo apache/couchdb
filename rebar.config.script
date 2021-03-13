@@ -139,7 +139,7 @@ DepDescs = [
 %% Independent Apps
 {config,           "config",           {tag, "2.1.8"}},
 {b64url,           "b64url",           {tag, "1.0.2"}},
-{erlfdb,           "erlfdb",           {tag, "v1.3.3"}},
+{erlfdb,           "erlfdb",           {tag, "v1.3.4"}},
 {ets_lru,          "ets-lru",          {tag, "1.1.0"}},
 
 %% Non-Erlang deps
@@ -151,8 +151,8 @@ DepDescs = [
 {folsom,           "folsom",           {tag, "CouchDB-0.8.3"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-6"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.0.1-2"}},
-{jaeger_passage,   "jaeger-passage",   {tag, "CouchDB-0.1.14-1"}},
-{jiffy,            "jiffy",            {tag, "CouchDB-1.0.4-1"}},
+{jaeger_passage,   "jaeger-passage",   {tag, "CouchDB-0.1.14-2"}},
+{jiffy,            "jiffy",            {tag, "CouchDB-1.0.5-1"}},
 {local,            "local",            {tag, "0.2.1"}},
 {mochiweb,         "mochiweb",         {tag, "v2.20.0"}},
 {meck,             "meck",             {tag, "0.8.8"}},
@@ -191,7 +191,7 @@ ErlOpts = case os:getenv("ERL_OPTS") of
 end.
 
 AddConfig = [
-    {require_otp_vsn, "19|20|21|22"},
+    {require_otp_vsn, "20|21|22|23"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},

@@ -12,6 +12,8 @@
 
 -module(chttpd_stats).
 
+% for the stacktrace macro only so far
+-include_lib("couch/include/couch_db.hrl").
 
 -export([
     init/1,
@@ -61,8 +63,7 @@ report(HttpResp) ->
             _ ->
                 ok
         end
-    catch T:R ->
-        S = erlang:get_stacktrace(),
+    catch ?STACKTRACE(T, R, S)
         Fmt = "Failed to report chttpd request stats: ~p:~p ~p",
         couch_log:error(Fmt, [T, R, S])
     end.

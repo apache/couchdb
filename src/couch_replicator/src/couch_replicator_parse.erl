@@ -22,6 +22,7 @@
 
 
 -include_lib("ibrowse/include/ibrowse.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
 
 
@@ -59,13 +60,11 @@ parse_rep_doc(RepDoc) ->
     {ok, Rep} = try
         parse_rep(RepDoc, null)
     catch
-        throw:{error, Reason} ->
-            Stack = erlang:get_stacktrace(),
+        ?STACKTRACE(throw, {error, Reason}, Stack)
             LogErr1 = "~p parse_rep_doc fail ~p ~p",
             couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
             throw({bad_rep_doc, Reason});
-        Tag:Err ->
-            Stack = erlang:get_stacktrace(),
+        ?STACKTRACE(Tag, Err, Stack)
             LogErr2 = "~p parse_rep_doc fail ~p:~p ~p",
             couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
             throw({bad_rep_doc, couch_util:to_binary({Tag, Err})})
@@ -83,13 +82,11 @@ parse_transient_rep(#{} = Body, UserName) ->
     {ok, Rep} = try
         parse_rep(Body, UserName)
     catch
-        throw:{error, Reason} ->
-            Stack = erlang:get_stacktrace(),
+        ?STACKTRACE(throw, {error, Reason}, Stack)
             LogErr1 = "~p parse_transient_rep fail ~p ~p",
             couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
             throw({bad_request, Reason});
-        Tag:Err ->
-            Stack = erlang:get_stacktrace(),
+        ?STACKTRACE(Tag, Err, Stack)
             LogErr2 = "~p parse_transient_rep fail ~p ~p",
             couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
             throw({bad_request, couch_util:to_binary({Tag, Err})})
