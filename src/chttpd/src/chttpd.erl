@@ -268,16 +268,15 @@ before_request(HttpReq) ->
     try
         chttpd_stats:init(),
         chttpd_plugin:before_request(HttpReq)
-    catch Tag:Error ->
-        {error, catch_error(HttpReq, Tag, Error)}
+    catch ?STACKTRACE(Tag, Error, Stack)
+        {error, catch_error(HttpReq, Tag, Error, Stack)}
     end.
 
 after_request(HttpReq, HttpResp0) ->
     {ok, HttpResp1} =
         try
             chttpd_plugin:after_request(HttpReq, HttpResp0)
-        catch _Tag:Error ->
-            Stack = erlang:get_stacktrace(),
+        catch ?STACKTRACE(_Tag, Error, Stack)
             send_error(HttpReq, {Error, nil, Stack}),
             {ok, HttpResp0#httpd_resp{status = aborted}}
         end,
@@ -310,8 +309,8 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
         Response ->
             {HttpReq, Response}
         end
-    catch Tag:Error ->
-        {HttpReq, catch_error(HttpReq, Tag, Error)}
+    catch ?STACKTRACE(Tag, Error, Stack)
+        {HttpReq, catch_error(HttpReq, Tag, Error, Stack)}
     end.
 
 handle_req_after_auth(HandlerKey, HttpReq) ->
@@ -321,17 +320,17 @@ handle_req_after_auth(HandlerKey, HttpReq) ->
         AuthorizedReq = chttpd_auth:authorize(possibly_hack(HttpReq),
             fun chttpd_auth_request:authorize_request/1),
         {AuthorizedReq, HandlerFun(AuthorizedReq)}
-    catch Tag:Error ->
-        {HttpReq, catch_error(HttpReq, Tag, Error)}
+    catch ?STACKTRACE(Tag, Error, Stack)
+        {HttpReq, catch_error(HttpReq, Tag, Error, Stack)}
     end.
 
-catch_error(_HttpReq, throw, {http_head_abort, Resp}) ->
+catch_error(_HttpReq, throw, {http_head_abort, Resp}, _Stack) ->
     {ok, Resp};
-catch_error(_HttpReq, throw, {http_abort, Resp, Reason}) ->
+catch_error(_HttpReq, throw, {http_abort, Resp, Reason}, _Stack) ->
     {aborted, Resp, Reason};
-catch_error(HttpReq, throw, {invalid_json, _}) ->
+catch_error(HttpReq, throw, {invalid_json, _}, _Stack) ->
     send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
-catch_error(HttpReq, exit, {mochiweb_recv_error, E}) ->
+catch_error(HttpReq, exit, {mochiweb_recv_error, E}, _Stack) ->
     #httpd{
         mochi_req = MochiReq,
         peer = Peer,
@@ -343,16 +342,15 @@ catch_error(HttpReq, exit, {mochiweb_recv_error, E}) ->
         MochiReq:get(raw_path),
         E]),
     exit(normal);
-catch_error(HttpReq, exit, {uri_too_long, _}) ->
+catch_error(HttpReq, exit, {uri_too_long, _}, _Stack) ->
     send_error(HttpReq, request_uri_too_long);
-catch_error(HttpReq, exit, {body_too_large, _}) ->
+catch_error(HttpReq, exit, {body_too_large, _}, _Stack) ->
     send_error(HttpReq, request_entity_too_large);
-catch_error(HttpReq, throw, Error) ->
+catch_error(HttpReq, throw, Error, _Stack) ->
     send_error(HttpReq, Error);
-catch_error(HttpReq, error, database_does_not_exist) ->
+catch_error(HttpReq, error, database_does_not_exist, _Stack) ->
     send_error(HttpReq, database_does_not_exist);
-catch_error(HttpReq, Tag, Error) ->
-    Stack = erlang:get_stacktrace(),
+catch_error(HttpReq, Tag, Error, Stack) ->
     % TODO improve logging and metrics collection for client disconnects
     case {Tag, Error, Stack} of
         {exit, normal, [{mochiweb_request, send, _, _} | _]} ->

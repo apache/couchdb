@@ -363,23 +363,19 @@ handle_request_int(MochiReq, DefaultFun,
             send_error(HttpReq, request_entity_too_large);
         exit:{uri_too_long, _} ->
             send_error(HttpReq, request_uri_too_long);
-        throw:Error ->
-            Stack = erlang:get_stacktrace(),
+        ?STACKTRACE(throw, Error, Stack)
             couch_log:debug("Minor error in HTTP request: ~p",[Error]),
             couch_log:debug("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, Error);
-        error:badarg ->
-            Stack = erlang:get_stacktrace(),
+        ?STACKTRACE(error, badarg, Stack)
             couch_log:error("Badarg error in HTTP request",[]),
             couch_log:info("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, badarg);
-        error:function_clause ->
-            Stack = erlang:get_stacktrace(),
+        ?STACKTRACE(error, function_clause, Stack)
             couch_log:error("function_clause error in HTTP request",[]),
             couch_log:info("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, function_clause);
-        Tag:Error ->
-            Stack = erlang:get_stacktrace(),
+        ?STACKTRACE(Tag, Error, Stack)
             couch_log:error("Uncaught error in HTTP request: ~p",
                             [{Tag, Error}]),
             couch_log:info("Stacktrace: ~p",[Stack]),
