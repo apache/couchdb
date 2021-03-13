@@ -178,3 +178,27 @@
 
 -define(record_to_keyval(Name, Record),
     lists:zip(record_info(fields, Name), tl(tuple_to_list(Record)))).
+
+%% Erlang/OTP 21 deprecates and 23 removes get_stacktrace(), so
+%% we have to monkey around until we can drop support < 21.
+%% h/t https://github.com/erlang/otp/pull/1783#issuecomment-386190970
+
+%% use like so:
+% try function1(Arg1)
+% catch
+%     ?STACKTRACE(exit, badarg, ErrorStackTrace)
+%         % do stuff with ErrorStackTrace
+%         % ...
+% end,
+
+% Get the stacktrace in a way that is backwards compatible
+% OTP_RELEASE is only available in OTP 21 and later, so we don’t need
+% to do any other version magic here.
+-ifdef(OTP_RELEASE).
+-define(STACKTRACE(ErrorType, Error, Stack),
+        ErrorType:Error:Stack ->).
+-else.
+-define(STACKTRACE(ErrorType, Error, Stack),
+        ErrorType:Error ->
+            Stack = erlang:get_stacktrace(),).
+-endif.

@@ -109,8 +109,7 @@ with_span(Operation, Options, Fun)  ->
     try
         start_span(Operation, Options),
         Fun()
-    catch Type:Reason ->
-        Stack = erlang:get_stacktrace(),
+    catch ?STACKTRACE(Type, Reason, Stack)
         log(#{
             ?LOG_FIELD_ERROR_KIND => Type,
             ?LOG_FIELD_MESSAGE => Reason,
