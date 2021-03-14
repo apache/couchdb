@@ -215,7 +215,8 @@ AddConfig = [
     {erl_opts, PlatformDefines ++ [
         {d, 'COUCHDB_VERSION', Version},
         {d, 'COUCHDB_GIT_SHA', GitSha},
-        {i, "../"}
+        {i, "../"},
+        {d, 'OTP_MAJOR_VSN_20', os:getenv("COUCHDB_OTP_MAJOR_VERSION_20")}
     ] ++ MD5Config ++ ProperConfig},
     {port_env, PortEnvOverrides},
     {eunit_compile_opts, PlatformDefines}

@@ -375,9 +375,9 @@ handle_request_int(MochiReq, DefaultFun,
             couch_log:error("function_clause error in HTTP request",[]),
             couch_log:info("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, function_clause);
-        ?STACKTRACE(Tag, Error, Stack)
+        ?STACKTRACE(ErrorType, Error, Stack)
             couch_log:error("Uncaught error in HTTP request: ~p",
-                            [{Tag, Error}]),
+                            [{ErrorType, Error}]),
             couch_log:info("Stacktrace: ~p",[Stack]),
             send_error(HttpReq, Error)
     end,
