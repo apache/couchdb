@@ -28,7 +28,7 @@
 -export([lock/2, unlock/1]).
 -export([db_updated/1]).
 -export([num_servers/0, couch_server/1, couch_dbs_pid_to_name/1, couch_dbs/1]).
--export([aggregate_queue_len/0]).
+-export([aggregate_queue_len/0,get_spidermonkey_version/0]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -84,6 +84,8 @@ get_stats() ->
     {Time, Open} =
     lists:foldl(Fun, {0, 0}, lists:seq(1, num_servers())),
     [{start_time, ?l2b(Time)}, {dbs_open, Open}].
+
+get_spidermonkey_version() -> list_to_binary(?COUCHDB_SPIDERMONKEY_VERSION).
 
 sup_start_link(N) ->
     gen_server:start_link({local, couch_server(N)}, couch_server, [N], []).

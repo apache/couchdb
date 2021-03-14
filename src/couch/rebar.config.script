@@ -228,6 +228,7 @@ AddConfig = [
     {erl_opts, PlatformDefines ++ [
         {d, 'COUCHDB_VERSION', Version},
         {d, 'COUCHDB_GIT_SHA', GitSha},
+        {d, 'COUCHDB_SPIDERMONKEY_VERSION', SMVsn},
         {i, "../"}
     ] ++ MD5Config ++ ProperConfig},
     {port_env, PortEnvOverrides},

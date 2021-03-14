@@ -31,6 +31,18 @@ handle_node_req(#httpd{path_parts=[_, <<"_local">>]}=Req) ->
     send_json(Req, 200, {[{name, node()}]});
 handle_node_req(#httpd{path_parts=[A, <<"_local">>|Rest]}=Req) ->
     handle_node_req(Req#httpd{path_parts=[A, node()] ++ Rest});
+% GET /_node/$node/_versions
+handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_versions">>]}=Req) ->
+    send_json(Req, 200, {[
+        {erlang_version, ?l2b(?COUCHDB_ERLANG_VERSION)},
+        {javascript_engine, {[
+            {name, <<"spidermonkey">>},
+            {version, couch_server:get_spidermonkey_version()}
+        ]}}
+    ]});
+handle_node_req(#httpd{path_parts=[_, _Node, <<"_versions">>]}=Req) ->
+    send_method_not_allowed(Req, "GET");
+
 % GET /_node/$node/_config
 handle_node_req(#httpd{method='GET', path_parts=[_, Node, <<"_config">>]}=Req) ->
     Grouped = lists:foldl(fun({{Section, Key}, Value}, Acc) ->
