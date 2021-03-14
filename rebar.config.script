@@ -92,6 +92,9 @@ case VerList of
     _ -> ok
 end.
 
+[OptMajorVersion|_] = VerList.
+OtpMajorVersion20 = case OptMajorVersion of 20 -> "true"; _ -> "false" end.
+os:putenv("COUCHDB_OTP_MAJOR_VERSION_20", OtpMajorVersion20).
 % Set the path to the configuration environment generated
 % by `./configure`.
 
@@ -200,7 +203,7 @@ AddConfig = [
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},
     {lib_dirs, ["src"]},
-    {erl_opts, [{i, "../"} | ErlOpts]},
+    {erl_opts, [{i, "../"}, {d, 'OTP_MAJOR_VSN_20', os:getenv("COUCHDB_OTP_MAJOR_VERSION_20")}, verbose] ++ ErlOpts},
     {eunit_opts, [verbose, {report,{eunit_surefire,[{dir,"."}]}}]},
     {plugins, [eunit_plugin]},
     {dialyzer, [

@@ -18,7 +18,10 @@ if not HaveDreyfus -> CONFIG; true ->
         {erl_opts, Opts} -> Opts;
         false -> []
     end,
-    NewOpts = [{d, 'HAVE_DREYFUS'} | CurrOpts],
+    NewOpts = [
+        {d, 'HAVE_DREYFUS'},
+        {d, 'OTP_MAJOR_VSN_20', os:getenv("COUCHDB_OTP_MAJOR_VERSION_20")}
+    ] ++ CurrOpts,
     lists:keystore(erl_opts, 1, CONFIG, {erl_opts, NewOpts})
 end.
 

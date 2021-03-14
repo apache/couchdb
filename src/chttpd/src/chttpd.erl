@@ -268,15 +268,15 @@ before_request(HttpReq) ->
     try
         chttpd_stats:init(),
         chttpd_plugin:before_request(HttpReq)
-    catch ?STACKTRACE(Tag, Error, Stack)
-        {error, catch_error(HttpReq, Tag, Error, Stack)}
+    catch ?STACKTRACE(ErrorType, Error, Stack)
+        {error, catch_error(HttpReq, ErrorType, Error, Stack)}
     end.
 
 after_request(HttpReq, HttpResp0) ->
     {ok, HttpResp1} =
         try
             chttpd_plugin:after_request(HttpReq, HttpResp0)
-        catch ?STACKTRACE(_Tag, Error, Stack)
+        catch ?STACKTRACE(_ErrorType, Error, Stack)
             send_error(HttpReq, {Error, nil, Stack}),
             {ok, HttpResp0#httpd_resp{status = aborted}}
         end,
@@ -309,8 +309,8 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
         Response ->
             {HttpReq, Response}
         end
-    catch ?STACKTRACE(Tag, Error, Stack)
-        {HttpReq, catch_error(HttpReq, Tag, Error, Stack)}
+    catch ?STACKTRACE(ErrorType, Error, Stack)
+        {HttpReq, catch_error(HttpReq, ErrorType, Error, Stack)}
     end.
 
 handle_req_after_auth(HandlerKey, HttpReq) ->
@@ -320,8 +320,8 @@ handle_req_after_auth(HandlerKey, HttpReq) ->
         AuthorizedReq = chttpd_auth:authorize(possibly_hack(HttpReq),
             fun chttpd_auth_request:authorize_request/1),
         {AuthorizedReq, HandlerFun(AuthorizedReq)}
-    catch ?STACKTRACE(Tag, Error, Stack)
-        {HttpReq, catch_error(HttpReq, Tag, Error, Stack)}
+    catch ?STACKTRACE(ErrorType, Error, Stack)
+        {HttpReq, catch_error(HttpReq, ErrorType, Error, Stack)}
     end.
 
 catch_error(_HttpReq, throw, {http_head_abort, Resp}, _Stack) ->
