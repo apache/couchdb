@@ -239,9 +239,6 @@ install_local_rebar() {
         if [ ! -d "${rootdir}/src/rebar" ]; then
             # git clone --depth 1 https://github.com/apache/couchdb-rebar.git ${rootdir}/src/rebar
             git clone https://github.com/apache/couchdb-rebar.git ${rootdir}/src/rebar
-            cd ${rootdir}/src/rebar
-              git checkout origin/feat/otp23
-            cd -
         fi
         make -C ${rootdir}/src/rebar
         mv ${rootdir}/src/rebar/rebar ${rootdir}/bin/rebar
