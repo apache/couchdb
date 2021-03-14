@@ -919,7 +919,7 @@ db_doc_req(#httpd{method='DELETE'}=Req, Db, DocId) ->
 
 db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
     #doc_query_args{
-        rev = Rev,
+        rev = Rev0,
         open_revs = Revs,
         options = Options0,
         atts_since = AttsSince
@@ -931,6 +931,12 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
         if AttsSince /= nil ->
             [{atts_since, AttsSince}, attachments | Options];
         true -> Options
+        end,
+        Rev = case lists:member(latest, Options) of
+          % couch_doc_open will open the winning rev despite of a rev passed
+          % https://docs.couchdb.org/en/stable/api/document/common.html?highlight=latest#get--db-docid
+          true -> nil;
+          false -> Rev0
         end,
         Doc = couch_doc_open(Db, DocId, Rev, Options2),
         send_doc(Req, Doc, Options2);
