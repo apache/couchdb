@@ -27,7 +27,6 @@ end.
 VerList = lists:map(fun(X) -> {Int, _} = string:to_integer(X), Int end,
     string:tokens(VerString, ".")).
 
-
 DisplayMsg = fun(Msg, Args) ->
     Base = iolist_to_binary(io_lib:format(Msg, Args)),
     Lines = binary:split(Base, <<"\n">>, [global]),
@@ -202,7 +201,7 @@ AddConfig = [
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},
     {lib_dirs, ["src"]},
-    {erl_opts, [{i, "../"}] ++ ErlOpts},
+    {erl_opts, [{i, "../"}] ++ [{d, 'COUCHDB_ERLANG_VERSION', VerString}] ++ ErlOpts},
     {eunit_opts, [verbose, {report,{eunit_surefire,[{dir,"."}]}}]},
     {plugins, [eunit_plugin]},
     {dialyzer, [
