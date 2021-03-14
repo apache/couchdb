@@ -55,15 +55,10 @@
     stats_updater_loop/1
 ]).
 
--include("couch_replicator_scheduler.hrl").
 -include("couch_replicator.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-%% types
--type event_type() :: added | started | stopped | {crashed, any()}.
--type event() :: {Type:: event_type(), When :: erlang:timestamp()}.
--type history() :: nonempty_list(event()).
 
 %% definitions
 -define(MAX_BACKOFF_EXPONENT, 10).
@@ -78,13 +73,13 @@
 -define(DEFAULT_SCHEDULER_INTERVAL, 60000).
 
 
--record(state, {interval, timer, max_jobs, max_churn, max_history, stats_pid}).
--record(job, {
-    id :: job_id() | '$1' | '_',
-    rep :: #rep{} | '_',
-    pid :: undefined | pid() | '$1' | '_',
-    monitor :: undefined | reference() | '_',
-    history :: history() | '_'
+-record(state, {
+    interval = ?DEFAULT_SCHEDULER_INTERVAL,
+    timer,
+    max_jobs,
+    max_churn,
+    max_history,
+    stats_pid
 }).
 
 -record(stats_acc, {
@@ -229,6 +224,7 @@ init(_) ->
     EtsOpts = [named_table, {keypos, #job.id}, {read_concurrency, true},
         {write_concurrency, true}],
     ?MODULE = ets:new(?MODULE, EtsOpts),
+    ok = couch_replicator_share:init(),
     ok = config:listen_for_changes(?MODULE, nil),
     Interval = config:get_integer("replicator", "interval",
         ?DEFAULT_SCHEDULER_INTERVAL),
@@ -290,6 +286,17 @@ handle_cast({set_interval, Interval}, State) when is_integer(Interval),
     couch_log:notice("~p: interval set to ~B", [?MODULE, Interval]),
     {noreply, State#state{interval = Interval}};
 
+handle_cast({update_shares, Key, Shares}, State) when is_binary(Key),
+        is_integer(Shares), Shares >= 0 ->
+    couch_log:notice("~p: shares for ~s set to ~B", [?MODULE, Key, Shares]),
+    couch_replicator_share:update_shares(Key, Shares),
+    {noreply, State};
+
+handle_cast({reset_shares, Key}, State) when is_binary(Key)  ->
+    couch_log:notice("~p: shares for ~s reset to default", [?MODULE, Key]),
+    couch_replicator_share:reset_shares(Key),
+    {noreply, State};
+
 handle_cast({update_job_stats, JobId, Stats}, State) ->
     case rep_state(JobId) of
         nil ->
@@ -314,6 +321,8 @@ handle_info(reschedule, State) ->
 handle_info({'DOWN', _Ref, process, Pid, normal}, State) ->
     {ok, Job} = job_by_pid(Pid),
     couch_log:notice("~p: Job ~p completed normally", [?MODULE, Job#job.id]),
+    Interval = State#state.interval,
+    couch_replicator_share:charge(Job, Interval, os:timestamp()),
     remove_job_int(Job),
     update_running_jobs_stats(State#state.stats_pid),
     {noreply, State};
@@ -324,6 +333,8 @@ handle_info({'DOWN', _Ref, process, Pid, Reason0}, State) ->
         {shutdown, ShutdownReason} -> ShutdownReason;
         Other -> Other
     end,
+    Interval = State#state.interval,
+    couch_replicator_share:charge(Job, Interval, os:timestamp()),
     ok = handle_crashed_job(Job, Reason, State),
     {noreply, State};
 
@@ -340,6 +351,7 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 terminate(_Reason, _State) ->
+    couch_replicator_share:clear(),
     ok.
 
 
@@ -367,6 +379,15 @@ handle_config_change("replicator", "interval", V, _, S) ->
 
 handle_config_change("replicator", "max_history", V, _, S) ->
     ok = gen_server:cast(?MODULE, {set_max_history, list_to_integer(V)}),
+    {ok, S};
+
+handle_config_change("replicator.shares", Key, deleted, _, S) ->
+    ok = gen_server:cast(?MODULE, {reset_shares, list_to_binary(Key)}),
+    {ok, S};
+
+handle_config_change("replicator.shares", Key, V, _, S) ->
+    ok = gen_server:cast(?MODULE, {update_shares, list_to_binary(Key),
+        list_to_integer(V)}),
     {ok, S};
 
 handle_config_change(_, _, _, _, S) ->
@@ -449,19 +470,19 @@ pending_jobs(0) ->
     [];
 
 pending_jobs(Count) when is_integer(Count), Count > 0 ->
-    Set0 = gb_sets:new(),  % [{LastStart, Job},...]
+    Set0 = gb_sets:new(),  % [{{Priority, LastStart}, Job},...]
     Now = os:timestamp(),
     Acc0 = {Set0, Now, Count, health_threshold()},
     {Set1, _, _, _} = ets:foldl(fun pending_fold/2, Acc0, ?MODULE),
-    [Job || {_Started, Job} <- gb_sets:to_list(Set1)].
+    [Job || {_PriorityKey, Job} <- gb_sets:to_list(Set1)].
 
 
 pending_fold(#job{pid = Pid}, Acc) when is_pid(Pid) ->
     Acc;
 
 pending_fold(Job, {Set, Now, Count, HealthThreshold}) ->
-    Set1 = case {not_recently_crashed(Job, Now, HealthThreshold),
-        gb_sets:size(Set) >= Count} of
+    Healthy = not_recently_crashed(Job, Now, HealthThreshold),
+    Set1 = case {Healthy, gb_sets:size(Set) >= Count} of
         {true, true} ->
              % Job is healthy but already reached accumulated limit, so might
              % have to replace one of the accumulated jobs
@@ -469,7 +490,7 @@ pending_fold(Job, {Set, Now, Count, HealthThreshold}) ->
         {true, false} ->
              % Job is healthy and we haven't reached the limit, so add job
              % to accumulator
-             gb_sets:add_element({last_started(Job), Job}, Set);
+             gb_sets:add_element({start_priority_key(Job), Job}, Set);
         {false, _} ->
              % This job is not healthy (has crashed too recently), so skip it.
              Set
@@ -477,23 +498,33 @@ pending_fold(Job, {Set, Now, Count, HealthThreshold}) ->
     {Set1, Now, Count, HealthThreshold}.
 
 
-% Replace Job in the accumulator if it is older than youngest job there.
-% "oldest" here means one which has been waiting to run the longest. "youngest"
-% means the one with most recent activity. The goal is to keep up to Count
-% oldest jobs during iteration. For example if there are jobs with these times
-% accumulated so far [5, 7, 11], and start time of current job is 6. Then
-% 6 < 11 is true, so 11 (youngest) is dropped and 6 inserted resulting in
-% [5, 6, 7]. In the end the result might look like [1, 2, 5], for example.
+% Replace Job in the accumulator if it has a higher priority (lower priority
+% value) than the lowest priority there. Job priority is indexed by
+% {FairSharePiority, LastStarted} tuples. If the FairSharePriority is the same
+% then last started timestamp is used to pick. The goal is to keep up to Count
+% oldest jobs during the iteration. For example, if there are jobs with these
+% priorities accumulated so far [5, 7, 11], and the priority of current job is
+% 6. Then 6 < 11 is true, so 11 (lower priority) is dropped and 6 is inserted
+% resulting in [5, 6, 7]. In the end the result might look like [1, 2, 5], for
+% example.
+%
 pending_maybe_replace(Job, Set) ->
-    Started = last_started(Job),
-    {Youngest, YoungestJob} = gb_sets:largest(Set),
-    case Started < Youngest of
+    Key = start_priority_key(Job),
+    {LowestPKey, LowestPJob} = gb_sets:largest(Set),
+    case Key < LowestPKey of
         true ->
-            Set1 = gb_sets:delete({Youngest, YoungestJob}, Set),
-            gb_sets:add_element({Started, Job}, Set1);
+            Set1 = gb_sets:delete({LowestPKey, LowestPJob}, Set),
+            gb_sets:add_element({Key, Job}, Set1);
         false ->
             Set
     end.
+
+% Starting priority key is used to order pending jobs such that the ones with a
+% lower priority value and start time would sort first, so they would be the
+% first to run.
+%
+start_priority_key(#job{} = Job) ->
+    {couch_replicator_share:priority(Job#job.id), last_started(Job)}.
 
 
 start_jobs(Count, State) ->
@@ -509,13 +540,18 @@ stop_jobs(Count, IsContinuous, State) when is_integer(Count) ->
     Running0 = running_jobs(),
     ContinuousPred = fun(Job) -> is_continuous(Job) =:= IsContinuous end,
     Running1 = lists:filter(ContinuousPred, Running0),
-    Running2 = lists:sort(fun longest_running/2, Running1),
-    Running3 = lists:sublist(Running2, Count),
-    length([stop_job_int(Job, State) || Job <- Running3]).
+    Running2 = [{stop_priority_key(Job), Job} || Job <- Running1],
+    Running3 = lists:sublist(lists:sort(Running2), Count),
+    length([stop_job_int(Job, State) || {_SortKey, Job} <- Running3]).
 
 
-longest_running(#job{} = A, #job{} = B) ->
-    last_started(A) =< last_started(B).
+% Lower priority jobs have higher priority values, so we negate them, that way
+% when sorted, they'll come up first. If priorities are equal, jobs are sorted
+% by the lowest starting times as jobs with lowest start time have been running
+% the longest.
+%
+stop_priority_key(#job{} = Job) ->
+    {-couch_replicator_share:priority(Job#job.id), last_started(Job)}.
 
 
 not_recently_crashed(#job{history = History}, Now, HealthThreshold) ->
@@ -593,6 +629,7 @@ backoff_micros(CrashCount) ->
 
 -spec add_job_int(#job{}) -> boolean().
 add_job_int(#job{} = Job) ->
+    couch_replicator_share:job_added(Job),
     ets:insert_new(?MODULE, Job).
 
 
@@ -600,6 +637,9 @@ add_job_int(#job{} = Job) ->
 maybe_remove_job_int(JobId, State) ->
     case job_by_id(JobId) of
         {ok, Job} ->
+            Now = os:timestamp(),
+            Interval = State#state.interval,
+            couch_replicator_share:charge(Job, Interval, Now),
             ok = stop_job_int(Job, State),
             true = remove_job_int(Job),
             couch_stats:increment_counter([couch_replicator, jobs, removes]),
@@ -657,6 +697,7 @@ stop_job_int(#job{} = Job, State) ->
 
 -spec remove_job_int(#job{}) -> true.
 remove_job_int(#job{} = Job) ->
+    couch_replicator_share:job_removed(Job),
     ets:delete(?MODULE, Job#job.id).
 
 
@@ -733,7 +774,8 @@ reset_job_process(#job{} = Job) ->
 
 
 -spec reschedule(#state{}) -> ok.
-reschedule(State) ->
+reschedule(#state{interval = Interval} = State) ->
+    couch_replicator_share:update(running_jobs(), Interval, os:timestamp()),
     StopCount = stop_excess_jobs(State, running_job_count()),
     rotate_jobs(State, StopCount),
     update_running_jobs_stats(State#state.stats_pid).
@@ -1035,7 +1077,8 @@ longest_running_test() ->
     J0 = testjob([crashed()]),
     J1 = testjob([started(1)]),
     J2 = testjob([started(2)]),
-    Sort = fun(Jobs) -> lists:sort(fun longest_running/2, Jobs) end,
+    SortFun = fun(A, B) -> last_started(A) =< last_started(B) end,
+    Sort = fun(Jobs) -> lists:sort(SortFun, Jobs) end,
     ?assertEqual([], Sort([])),
     ?assertEqual([J1], Sort([J1])),
     ?assertEqual([J1, J2], Sort([J2, J1])),
@@ -1381,11 +1424,12 @@ t_if_excess_is_trimmed_rotation_still_happens() ->
 t_if_transient_job_crashes_it_gets_removed() ->
     ?_test(begin
         Pid = mock_pid(),
+        Rep = continuous_rep(),
         Job =  #job{
             id = job1,
             pid = Pid,
             history = [added()],
-            rep = #rep{db_name = null, options = [{continuous, true}]}
+            rep = Rep#rep{db_name = null}
         },
         setup_jobs([Job]),
         ?assertEqual(1, ets:info(?MODULE, size)),
@@ -1399,15 +1443,20 @@ t_if_transient_job_crashes_it_gets_removed() ->
 t_if_permanent_job_crashes_it_stays_in_ets() ->
     ?_test(begin
         Pid = mock_pid(),
+        Rep = continuous_rep(),
         Job =  #job{
             id = job1,
             pid = Pid,
             history = [added()],
-            rep = #rep{db_name = <<"db1">>, options = [{continuous, true}]}
+            rep = Rep#rep{db_name = <<"db1">>}
         },
         setup_jobs([Job]),
         ?assertEqual(1, ets:info(?MODULE, size)),
-        State = #state{max_jobs =1, max_history = 3, stats_pid = self()},
+        State = #state{
+            max_jobs = 1,
+            max_history = 3,
+            stats_pid = self()
+        },
         {noreply, State} = handle_info({'DOWN', r1, process, Pid, failed},
             State),
         ?assertEqual(1, ets:info(?MODULE, size)),
@@ -1419,21 +1468,11 @@ t_if_permanent_job_crashes_it_stays_in_ets() ->
 
 t_existing_jobs() ->
     ?_test(begin
-        Rep = #rep{
-            id = job1,
-            db_name = <<"db">>,
-            source = <<"s">>,
-            target = <<"t">>,
-            options = [{continuous, true}]
-        },
+        Rep0 = continuous_rep(<<"s">>, <<"t">>),
+        Rep = Rep0#rep{id = job1, db_name = <<"db">>},
         setup_jobs([#job{id = Rep#rep.id, rep = Rep}]),
-        NewRep = #rep{
-            id = Rep#rep.id,
-            db_name = <<"db">>,
-            source = <<"s">>,
-            target = <<"t">>,
-            options = [{continuous, true}]
-        },
+        NewRep0 = continuous_rep(<<"s">>, <<"t">>),
+        NewRep = NewRep0#rep{id = Rep#rep.id, db_name = <<"db">>},
         ?assert(existing_replication(NewRep)),
         ?assertNot(existing_replication(NewRep#rep{source = <<"s1">>})),
         ?assertNot(existing_replication(NewRep#rep{target = <<"t1">>})),
@@ -1443,15 +1482,12 @@ t_existing_jobs() ->
 
 t_job_summary_running() ->
     ?_test(begin
+        Rep = rep(<<"s">>, <<"t">>),
         Job =  #job{
             id = job1,
             pid = mock_pid(),
             history = [added()],
-            rep = #rep{
-                db_name = <<"db1">>,
-                source = <<"s">>,
-                target = <<"t">>
-            }
+            rep = Rep#rep{db_name = <<"db1">>}
         },
         setup_jobs([Job]),
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
@@ -1472,7 +1508,7 @@ t_job_summary_pending() ->
             id = job1,
             pid = undefined,
             history = [stopped(20), started(10), added()],
-            rep = #rep{source = <<"s">>, target = <<"t">>}
+            rep = rep(<<"s">>, <<"t">>)
         },
         setup_jobs([Job]),
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
@@ -1492,7 +1528,7 @@ t_job_summary_crashing_once() ->
         Job =  #job{
             id = job1,
             history = [crashed(?DEFAULT_HEALTH_THRESHOLD_SEC + 1), started(0)],
-            rep = #rep{source = <<"s">>, target = <<"t">>}
+            rep = rep(<<"s">>, <<"t">>)
         },
         setup_jobs([Job]),
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
@@ -1508,7 +1544,7 @@ t_job_summary_crashing_many_times() ->
         Job =  #job{
             id = job1,
             history = [crashed(4), started(3), crashed(2), started(1)],
-            rep = #rep{source = <<"s">>, target = <<"t">>}
+            rep = rep(<<"s">>, <<"t">>)
         },
         setup_jobs([Job]),
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
@@ -1521,19 +1557,18 @@ t_job_summary_crashing_many_times() ->
 
 t_job_summary_proxy_fields() ->
     ?_test(begin
+        Src = #httpdb{
+            url = "https://s",
+            proxy_url = "http://u:p@sproxy:12"
+        },
+        Tgt = #httpdb{
+            url = "http://t",
+            proxy_url = "socks5://u:p@tproxy:34"
+        },
         Job =  #job{
             id = job1,
             history = [started(10), added()],
-            rep = #rep{
-                source = #httpdb{
-                    url = "https://s",
-                    proxy_url = "http://u:p@sproxy:12"
-                },
-                target = #httpdb{
-                    url = "http://t",
-                    proxy_url = "socks5://u:p@tproxy:34"
-                }
-            }
+            rep = rep(Src, Tgt)
         },
         setup_jobs([Job]),
         Summary = job_summary(job1, ?DEFAULT_HEALTH_THRESHOLD_SEC),
@@ -1548,6 +1583,8 @@ t_job_summary_proxy_fields() ->
 
 setup_all() ->
     catch ets:delete(?MODULE),
+    meck:expect(config, get, 1, []),
+    meck:expect(config, get, 2, undefined),
     meck:expect(couch_log, notice, 2, ok),
     meck:expect(couch_log, warning, 2, ok),
     meck:expect(couch_log, error, 2, ok),
@@ -1555,10 +1592,13 @@ setup_all() ->
     meck:expect(couch_stats, increment_counter, 1, ok),
     meck:expect(couch_stats, update_gauge, 2, ok),
     Pid = mock_pid(),
-    meck:expect(couch_replicator_scheduler_sup, start_child, 1, {ok, Pid}).
+    meck:expect(couch_replicator_scheduler_sup, start_child, 1, {ok, Pid}),
+    couch_replicator_share:init().
+
 
 
 teardown_all(_) ->
+    couch_replicator_share:clear(),
     catch ets:delete(?MODULE),
     meck:unload().
 
@@ -1567,7 +1607,8 @@ setup() ->
     meck:reset([
         couch_log,
         couch_replicator_scheduler_sup,
-        couch_stats
+        couch_stats,
+        config
     ]).
 
 
@@ -1621,13 +1662,31 @@ mock_state(MaxJobs, MaxChurn) ->
     }.
 
 
+rep() ->
+    #rep{options = [], user_ctx = #user_ctx{}}.
+
+
+rep(Src, Tgt) ->
+    Rep = rep(),
+    Rep#rep{source = Src, target = Tgt}.
+
+
+continuous_rep() ->
+    #rep{options = [{continuous, true}], user_ctx = #user_ctx{}}.
+
+
+continuous_rep(Src, Tgt) ->
+    Rep = continuous_rep(),
+    Rep#rep{source = Src, target = Tgt}.
+
+
 continuous(Id) when is_integer(Id) ->
     Started = Id,
     Hist = [stopped(Started+1), started(Started), added()],
     #job{
         id = Id,
         history = Hist,
-        rep = #rep{options = [{continuous, true}]}
+        rep = continuous_rep()
     }.
 
 
@@ -1637,7 +1696,7 @@ continuous_running(Id) when is_integer(Id) ->
     #job{
         id = Id,
         history = [started(Started), added()],
-        rep = #rep{options = [{continuous, true}]},
+        rep = continuous_rep(),
         pid = Pid,
         monitor = monitor(process, Pid)
     }.
@@ -1646,7 +1705,7 @@ continuous_running(Id) when is_integer(Id) ->
 oneshot(Id) when is_integer(Id) ->
     Started = Id,
     Hist = [stopped(Started + 1), started(Started), added()],
-    #job{id = Id, history = Hist, rep = #rep{options = []}}.
+    #job{id = Id, history = Hist, rep = rep()}.
 
 
 oneshot_running(Id) when is_integer(Id) ->
@@ -1655,7 +1714,7 @@ oneshot_running(Id) when is_integer(Id) ->
     #job{
         id = Id,
         history = [started(Started), added()],
-        rep = #rep{options = []},
+        rep = rep(),
         pid = Pid,
         monitor = monitor(process, Pid)
     }.

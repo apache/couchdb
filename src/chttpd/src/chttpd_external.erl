@@ -67,8 +67,10 @@ json_req_obj_field(<<"body">>, #httpd{req_body=undefined, mochi_req=Req}, _Db, _
     end;
 json_req_obj_field(<<"body">>, #httpd{req_body=Body}, _Db, _DocId) ->
     Body;
-json_req_obj_field(<<"peer">>, #httpd{mochi_req=Req}, _Db, _DocId) ->
+json_req_obj_field(<<"peer">>, #httpd{peer=undefined, mochi_req=Req}, _, _) ->
     ?l2b(Req:get(peer));
+json_req_obj_field(<<"peer">>, #httpd{peer=Peer}, _Db, _DocId) ->
+    ?l2b(Peer);
 json_req_obj_field(<<"form">>, #httpd{mochi_req=Req, method=Method}=HttpReq, Db, DocId) ->
     Body = json_req_obj_field(<<"body">>, HttpReq, Db, DocId),
     ParsedForm = case Req:get_primary_header_value("content-type") of
