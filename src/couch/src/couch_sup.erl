@@ -36,8 +36,6 @@ start_link() ->
     case supervisor:start_link({local, ?MODULE}, ?MODULE, []) of
         {ok, _} = Resp ->
             notify_started(),
-            notify_uris(),
-            write_uris(),
             Resp;
         Else ->
             notify_error(Else),
@@ -131,12 +129,6 @@ notify_error(Error) ->
     couch_log:error("Error starting Apache CouchDB:~n~n    ~p~n~n", [Error]).
 
 
-notify_uris() ->
-    lists:foreach(fun(Uri) ->
-        couch_log:info("Apache CouchDB has started on ~s", [Uri])
-    end, get_uris()).
-
-
 write_pidfile() ->
     case init:get_argument(pidfile) of
         {ok, [PidFile]} ->
@@ -144,49 +136,6 @@ write_pidfile() ->
         _ ->
             ok
     end.
-
-
-write_uris() ->
-    case config:get("couchdb", "uri_file", undefined) of
-        undefined ->
-            ok;
-        UriFile ->
-            Lines = [io_lib:format("~s~n", [Uri]) || Uri <- get_uris()],
-            write_file(UriFile, Lines)
-    end.
-
-
-get_uris() ->
-    Ip = config:get("chttpd", "bind_address"),
-    lists:flatmap(fun(Uri) ->
-        case get_uri(Uri, Ip) of
-            undefined -> [];
-            Else -> [Else]
-        end
-    end, [couch_httpd, https]).
-
-
-get_uri(Name, Ip) ->
-    case get_port(Name) of
-        undefined ->
-            undefined;
-        Port ->
-            io_lib:format("~s://~s:~w/", [get_scheme(Name), Ip, Port])
-    end.
-
-
-get_scheme(couch_httpd) -> "http";
-get_scheme(https) -> "https".
-
-
-get_port(Name) ->
-    try
-        mochiweb_socket_server:get(Name, port)
-    catch
-        exit:{noproc, _} ->
-            undefined
-    end.
-
 
 write_file(FileName, Contents) ->
     case file:write_file(FileName, Contents) of
