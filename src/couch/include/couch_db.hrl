@@ -231,13 +231,10 @@
 %         % ...
 % end,
 
-% for features specific to Erlang/OTP version 20.x (and later versions)
--ifdef(OTP_MAJOR_VSN_20).
--else.
--define(ERLANG_OTP_VERSION_21_FEATURES, true).
--endif.
 % Get the stacktrace in a way that is backwards compatible
--ifdef(ERLANG_OTP_VERSION_21_FEATURES).
+% OTP_VERSION is only available in OTP 21 and later, so we don’t need
+% to do any other version magic here.
+-ifdef(OTP_VERSION).
 -define(STACKTRACE(ErrorType, Error, Stack),
         ErrorType:Error:Stack ->).
 -else.
