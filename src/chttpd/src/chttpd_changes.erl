@@ -468,7 +468,9 @@ send_changes_doc_ids(Db, StartSeq, Dir, Fun, Acc0, {doc_ids, _Style, DocIds}) ->
 send_changes_design_docs(Db, StartSeq, Dir, Fun, Acc0, {design_docs, _Style}) ->
     FoldFun = fun(FDI, Acc) ->
         case FDI of
-            {row, Row} -> {ok, [fabric2_db:get_full_doc_info(Db, proplists:get_value(id, Row)) | Acc]};
+            {row, Row} ->
+                DocId = proplists:get_value(id, Row),
+                {ok, [fabric2_db:get_full_doc_info(Db, DocId) | Acc]};
             _ -> {ok, Acc}
         end
     end,
