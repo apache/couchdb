@@ -37,10 +37,23 @@ start_link() ->
     gen_server:start_link(?MODULE, [], []).
 
 
+% OTP_RELEASE defined in OTP >= 21 only
+-ifdef(OTP_RELEASE).
+
+init(_) ->
+    % see https://erlang.org/doc/man/error_logger.html#add_report_handler-1
+    ok = error_logger:add_report_handler(?HANDLER_MOD),
+    ok = gen_event:add_sup_handler(error_logger, ?HANDLER_MOD, []),
+    {ok, nil}.
+
+-else.
+
 init(_) ->
     error_logger:start(),
     ok = gen_event:add_sup_handler(error_logger, ?HANDLER_MOD, []),
     {ok, nil}.
+
+-endif.
 
 
 terminate(_, _) ->
