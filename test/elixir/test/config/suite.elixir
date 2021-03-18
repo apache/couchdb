@@ -133,7 +133,8 @@
   ],
   "ConcurrentWritesTest": [
     "Primary data tests",
-    "Secondary data tests"
+    "Secondary data tests",
+    "Secondary data tests with updates"
   ],
   "ConfigTest": [
     "Atoms, binaries, and strings suffice as whitelist sections and keys.",
