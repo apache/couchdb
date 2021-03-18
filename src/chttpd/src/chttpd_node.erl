@@ -72,7 +72,7 @@ handle_node_req(#httpd{method='PUT', path_parts=[_, Node, <<"_config">>, Section
     Persist = chttpd:header_value(Req, "X-Couch-Persist") /= "false",
     OldValue = call_node(Node, config, get, [Section, Key, ""]),
     IsSensitive = Section == <<"admins">>,
-    Opts = #{persisit => Persist, sensitive => IsSensitive},
+    Opts = #{persist => Persist, sensitive => IsSensitive},
     case call_node(Node, config, set, [Section, Key, ?b2l(Value), Opts]) of
         ok ->
             send_json(Req, 200, list_to_binary(OldValue));
