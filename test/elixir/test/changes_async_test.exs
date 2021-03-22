@@ -283,7 +283,7 @@ defmodule ChangesAsyncTest do
     end
   end
 
-  defp process_response(id, chunk_parser, timeout \\ 1000) do
+  defp process_response(id, chunk_parser, timeout \\ 2000) do
     receive do
       %HTTPotion.AsyncChunk{id: ^id} = msg ->
         chunk_parser.(msg)
