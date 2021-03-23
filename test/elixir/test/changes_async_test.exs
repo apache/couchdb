@@ -182,7 +182,7 @@ defmodule ChangesAsyncTest do
     :ok = wait_for_headers(req_id.id, 200)
     create_doc(db_name, %{_id: "rusty", bop: "plankton"})
 
-    changes = process_response(req_id.id, &parse_changes_line_chunk/1, 2000)
+    changes = process_response(req_id.id, &parse_changes_line_chunk/1, 5000)
 
     changes_ids =
       changes
