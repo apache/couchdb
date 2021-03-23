@@ -20,7 +20,7 @@
 -define(DOCS_CONFLICTS, [
     {<<"doc1">>, 10},
     % use some _design docs as well to test the special handling for them
-    {<<"_design/doc2">>, 100},
+    {<<"_design/doc2">>, 10},
     % a number > MaxURLlength (7000) / length(DocRevisionString)
     {<<"doc3">>, 210}
 ]).
@@ -41,7 +41,7 @@ docs_with_many_leaves_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    ?TDEF_FE(should_replicate_doc_with_many_leaves, 180)
+                    ?TDEF_FE(should_replicate_doc_with_many_leaves, 240)
                 ]
             }
         }
@@ -132,7 +132,7 @@ add_attachments(#{} = SourceDb, NumAtts,
     NewDocs = lists:foldl(fun
         (#doc{atts = Atts, revs = {Pos, [Rev | _]}} = Doc, Acc) ->
             NewAtts = lists:foldl(fun(I, AttAcc) ->
-                [att(I, {Pos, Rev}, 100) | AttAcc]
+                [att(I, {Pos, Rev}, 10) | AttAcc]
             end, [], lists:seq(1, NumAtts)),
             [Doc#doc{atts = Atts ++ NewAtts} | Acc]
     end, [], SourceDocs),
