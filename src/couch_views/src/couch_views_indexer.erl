@@ -43,10 +43,10 @@
 % These are all of the errors that we can fix by using
 % a smaller batch size.
 -define(IS_RECOVERABLE_ERROR(Code), (
-    (Code == 1004) % timed_out
-    orelse (Code == 1007) % transaction_too_old
-    orelse (Code == 1031) % transaction_timed_out
-    orelse (Code == 2101) % transaction_too_large
+    (Code == ?ERLFDB_TIMED_OUT) orelse
+    (Code == ?ERLFDB_TRANSACTION_TOO_OLD) orelse
+    (Code == ?ERLFDB_TRANSACTION_TIMED_OUT) orelse
+    (Code == ?ERLFDB_TRANSACTION_TOO_LARGE)
 )).
 
 
@@ -161,7 +161,7 @@ upgrade_data(Data) ->
 
 
 % Transaction limit exceeded don't retry
-should_retry(_, _, {erlfdb_error, 2101}) ->
+should_retry(_, _, {erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE}) ->
     false;
 
 should_retry(Retries, RetryLimit, _) when Retries < RetryLimit ->

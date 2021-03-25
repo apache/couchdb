@@ -351,7 +351,9 @@ accept_loop(Type, NoSched, MaxSchedTime, Timeout) ->
     catch
         error:{timeout, _} ->
             retry;
-        error:{erlfdb_error, Err} when Err =:= 1020 orelse Err =:= 1031 ->
+        error:{erlfdb_error, ?ERLFDB_TRANSACTION_TIMED_OUT} ->
+            retry;
+        error:{erlfdb_error, Err} when ?ERLFDB_IS_RETRYABLE(Err) ->
             retry
     end,
     case AcceptResult of
@@ -387,7 +389,10 @@ wait_pending(PendingWatch, MaxSTime, UserTimeout, NoSched) ->
         erlfdb:wait(PendingWatch, [{timeout, Timeout}]),
         ok
     catch
-        error:{erlfdb_error, ?FUTURE_VERSION} ->
+        error:{erlfdb_error, ?ERLFDB_TRANSACTION_TIMED_OUT} ->
+            erlfdb:cancel(PendingWatch, [flush]),
+            retry;
+        error:{erlfdb_error, Error} when ?ERLFDB_IS_RETRYABLE(Error) ->
             erlfdb:cancel(PendingWatch, [flush]),
             retry;
         error:{timeout, _} ->

@@ -252,8 +252,12 @@ try_notify_subscribers(ActiveVS, #st{} = St) ->
     try
         notify_subscribers(ActiveVS, St)
     catch
-        error:{timeout, _} -> try_notify_subscribers(ActiveVS, St);
-        error:{erlfdb_error, 1031} -> try_notify_subscribers(ActiveVS, St)
+        error:{timeout, _} ->
+            try_notify_subscribers(ActiveVS, St);
+        error:{erlfdb_error, ?ERLFDB_TRANSACTION_TIMED_OUT} ->
+            try_notify_subscribers(ActiveVS, St);
+        error:{erlfdb_error, Code} when ?ERLFDB_IS_RETRYABLE(Code) ->
+            try_notify_subscribers(ActiveVS, St)
     end.
 
 
