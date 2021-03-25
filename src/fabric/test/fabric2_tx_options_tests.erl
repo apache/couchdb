@@ -63,7 +63,7 @@ options_take_effect(_) ->
 
     DbName = ?tempdb(),
     {ok, Db} = fabric2_db:create(DbName, [?ADMIN_CTX]),
-    ?assertError({erlfdb_error, ?TRANSACTION_TOO_LARGE},
+    ?assertError({erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
         add_large_doc(Db, 200000)),
     ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
 
@@ -81,7 +81,7 @@ can_configure_options_at_runtime(_) ->
     DbName = ?tempdb(),
 
     {ok, Db} = fabric2_db:create(DbName, [?ADMIN_CTX]),
-    ?assertError({erlfdb_error, ?TRANSACTION_TOO_LARGE},
+    ?assertError({erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
         add_large_doc(Db, 200000)),
 
     meck:reset(erlfdb),
@@ -125,7 +125,7 @@ can_apply_options_to_db_handle_transactions(_) ->
         fabric2_db:update_doc(TxDb, large_doc(200000))
     end,
     TxOpts = #{size_limit => 150000},
-    ?assertError({erlfdb_error, ?TRANSACTION_TOO_LARGE},
+    ?assertError({erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
         fabric2_fdb:transactional(Db, TxOpts, TxFun)),
 
     ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).

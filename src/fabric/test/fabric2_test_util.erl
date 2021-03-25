@@ -21,6 +21,9 @@
 ]).
 
 
+-include_lib("fabric/include/fabric2.hrl").
+
+
 -define(PDICT_ERROR_IN_FOLD_RANGE, '$fabric2_error_in_fold_range').
 -define(PDICT_ERROR_IN_USER_FUN, '$fabric2_error_throw_in_user_fun').
 
@@ -68,7 +71,7 @@ maybe_tx_too_old(Key) ->
             put(Key, {Skip - 1, Count});
         {0, Count} when is_integer(Count), Count > 0 ->
             put(Key, {0, Count - 1}),
-            error({erlfdb_error, 1007});
+            error({erlfdb_error, ?ERLFDB_TRANSACTION_TOO_OLD});
         {0, 0} ->
             ok;
         undefined ->

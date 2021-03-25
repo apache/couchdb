@@ -28,6 +28,10 @@
     code_change/3
 ]).
 
+
+-include("couch_jobs.hrl").
+
+
 -record(st, {
     jtx,
     type,
@@ -68,7 +72,8 @@ handle_info(check_activity, St) ->
     St1 = try
         check_activity(St)
     catch
-        error:{erlfdb_error, Err} when Err =:= 1020 orelse Err =:= 1031 ->
+        error:{erlfdb_error, Err} when ?ERLFDB_IS_RETRYABLE(Err) orelse
+                Err =:= ?ERLFDB_TRANSACTION_TIMED_OUT ->
             LogMsg = "~p : type:~p got ~p error, possibly from overload",
             couch_log:error(LogMsg, [?MODULE, St#st.type, Err]),
             St

@@ -55,7 +55,10 @@ loop(#st{vs = VS, timeout = Timeout} = St) ->
     try
         erlfdb:wait(Watch, [{timeout, Timeout}])
     catch
-        error:{erlfdb_error, ?FUTURE_VERSION} ->
+        error:{erlfdb_error, ?ERLFDB_TRANSACTION_TIMED_OUT} ->
+            erlfdb:cancel(Watch, [flush]),
+            ok;
+        error:{erlfdb_error, Code} when ?ERLFDB_IS_RETRYABLE(Code) ->
             erlfdb:cancel(Watch, [flush]),
             ok;
         error:{timeout, _} ->

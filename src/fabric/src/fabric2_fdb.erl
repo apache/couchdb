@@ -567,10 +567,10 @@ get_info_wait(#info_future{tx = Tx, retries = Retries} = Future) ->
     try
         get_info_wait_int(Future)
     catch
-        error:{erlfdb_error, ?TRANSACTION_CANCELLED} ->
+        error:{erlfdb_error, ?ERLFDB_TRANSACTION_CANCELLED} ->
             Future1 = get_info_future(Tx, Future#info_future.db_prefix),
             get_info_wait(Future1#info_future{retries = Retries + 1});
-        error:{erlfdb_error, ?TRANSACTION_TOO_OLD} ->
+        error:{erlfdb_error, Error} when ?ERLFDB_IS_RETRYABLE(Error) ->
             ok = erlfdb:reset(Tx),
             Future1 = get_info_future(Tx, Future#info_future.db_prefix),
             get_info_wait(Future1#info_future{retries = Retries + 1})
@@ -1161,7 +1161,8 @@ fold_range(Tx, FAcc) ->
             user_acc = FinalUserAcc
         } = erlfdb:fold_range(Tx, Start, End, Callback, FAcc, Opts),
         FinalUserAcc
-    catch error:{erlfdb_error, ?TRANSACTION_TOO_OLD} when DoRestart ->
+    catch error:{erlfdb_error, Error} when
+            ?ERLFDB_IS_RETRYABLE(Error) andalso DoRestart ->
         % Possibly handle cluster_version_changed and future_version as well to
         % continue iteration instead fallback to transactional and retrying
         % from the beginning which is bound to fail when streaming data out to a
@@ -1991,7 +1992,7 @@ clear_transaction() ->
 
 
 is_commit_unknown_result() ->
-    erlfdb:get_last_error() == ?COMMIT_UNKNOWN_RESULT.
+    erlfdb:get_last_error() == ?ERLFDB_COMMIT_UNKNOWN_RESULT.
 
 
 has_transaction_id() ->
