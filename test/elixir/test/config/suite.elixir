@@ -128,9 +128,6 @@
   "CoffeeTest": [
     "CoffeeScript basic functionality"
   ],
-  "CompactTest": [
-    "compaction reduces size of deleted docs"
-  ],
   "ConcurrentWritesTest": [
     "Primary data tests",
     "Secondary data tests",
