@@ -42,9 +42,10 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/file.hrl").
 
-
--define(CLUSTER_FILE, "/usr/local/etc/foundationdb/fdb.cluster").
+-define(CLUSTER_FILE_MACOS, "/usr/local/etc/foundationdb/fdb.cluster").
+-define(CLUSTER_FILE_LINUX, "/etc/foundationdb/fdb.cluster").
 -define(FDB_DIRECTORY, fdb_directory).
 -define(FDB_CLUSTER, fdb_cluster).
 -define(DEFAULT_FDB_DIRECTORY, <<"couchdb">>).
@@ -212,7 +213,7 @@ get_db_and_cluster(EunitDbOpts) ->
         {ok, true} ->
             {<<"eunit_test">>, erlfdb_util:get_test_db(EunitDbOpts)};
         undefined ->
-            ClusterFileStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
+            ClusterFileStr = get_cluster_file_string(),
             {ok, ConnectionStr} = file:read_file(ClusterFileStr),
             DbHandle = erlfdb:open(iolist_to_binary(ClusterFileStr)),
             {string:trim(ConnectionStr), DbHandle}
@@ -220,6 +221,39 @@ get_db_and_cluster(EunitDbOpts) ->
     apply_tx_options(Db, config:get(?TX_OPTIONS_SECTION)),
     {Cluster, Db}.
 
+get_cluster_file_string() ->
+    Locations = [
+        {custom, config:get("erlfdb", "cluster_file", false)},
+        {custom, os:getenv("FDB_CLUSTER_FILE")},
+        {default, ?CLUSTER_FILE_MACOS},
+        {default, ?CLUSTER_FILE_LINUX}
+    ],
+    case find_cluster_file(Locations) of
+        {ok, Location} ->
+            Location;
+        {error, Reason} ->
+            erlang:error(Reason)
+    end.
+
+find_cluster_file([]) ->
+    {error, cluster_file_missing};
+find_cluster_file([{custom, false} | Rest]) ->
+    find_cluster_file(Rest);
+find_cluster_file([{Type, Location} | Rest]) ->
+    case file:read_file_info(Location, [posix]) of
+        {ok, #file_info{access = read_write}} ->
+            couch_log:info("Using ~s FDB cluster file: ~s", [Type, Location]),
+            {ok, Location};
+        {ok, _} ->
+            couch_log:error("CouchDB needs read/write access to FDB cluster file: ~s", [Location]),
+            {error, cluster_file_permissions};
+        {error, Reason} when Type =:= custom ->
+            couch_log:error("Encountered ~p error looking for FDB cluster file: ~s", [Reason, Location]),
+            {error, Reason};
+        {error, Reason} when Type =:= default ->
+            couch_log:warning("Encountered ~p error looking for FDB cluster file: ~s", [Reason, Location]),
+            find_cluster_file(Rest)
+    end.
 
 apply_tx_options(Db, Cfg) ->
     maps:map(fun(Option, {Type, Default}) ->
