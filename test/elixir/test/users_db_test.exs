@@ -298,4 +298,70 @@ defmodule UsersDbTest do
 
     assert resp.body["userCtx"]["name"] == "foo@example.org"
   end
+
+  test "users password requirements", context do
+    set_config({
+      "couch_httpd_auth",
+      "password_reqexp",
+      "[{\".{10,}\"}, {\"[A-Z]+\", \"Requirement 2.\"}, {\"[a-z]+\", \"\"}, {\"\\\\d+\", \"Req 4.\"}]"
+    })
+
+    session = login("jan", "apple")
+
+    # With password that doesn't confirm to any requirement.
+    # Requirement doesn't have a reason text.
+    jchris_user_doc =
+      prepare_user_doc([
+        {:name, "jchris@apache.org"},
+        {:password, "funnybone"}
+      ])
+    save_as(
+      @users_db_name,
+      jchris_user_doc,
+      use_session: session,
+      expect_response: 403,
+      error_message: "forbidden",
+      error_reason: "Password does not conform to requirements."
+    )
+
+    # With password that match the first requirement.
+    # Requirement does have a reason text.
+    jchris_user_doc2 = Map.put(jchris_user_doc, "password", "funnnnnybone")
+    save_as(
+      @users_db_name,
+      jchris_user_doc2,
+      use_session: session,
+      expect_response: 403,
+      error_message: "forbidden",
+      error_reason: "Password does not conform to requirements. Requirement 2."
+    )
+
+    # With password that match the first two requirements.
+    # Requirement does have an empty string as reason text.
+    jchris_user_doc3 = Map.put(jchris_user_doc, "password", "FUNNNNNYBONE")
+    save_as(
+      @users_db_name,
+      jchris_user_doc3,
+      use_session: session,
+      expect_response: 403,
+      error_message: "forbidden",
+      error_reason: "Password does not conform to requirements."
+    )
+
+    # With password that match all but the last requirements.
+    # Requirement does have a reason text.
+    jchris_user_doc4 = Map.put(jchris_user_doc, "password", "funnnnnyBONE")
+    save_as(
+      @users_db_name,
+      jchris_user_doc4,
+      use_session: session,
+      expect_response: 403,
+      error_message: "forbidden",
+      error_reason: "Password does not conform to requirements. Req 4."
+    )
+
+    # With password that match all requirements.
+    jchris_user_doc5 = Map.put(jchris_user_doc, "password", "funnnnnyB0N3")
+    save_as(@users_db_name, jchris_user_doc5, use_session: session, expect_response: 201)
+  end
 end
