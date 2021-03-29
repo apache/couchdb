@@ -53,8 +53,7 @@
     "PORT `BUGGED` ?raw tests from config.js",
     "Reload config",
     "Server-side password hashing, and raw updates disabling that",
-    "Settings can be altered with undefined whitelist allowing any change",
-    "Standard config options are present"
+    "Settings can be altered with undefined whitelist allowing any change"
   ],
   "CookieAuthTest": [
     "cookie auth"
