@@ -299,11 +299,21 @@ defmodule UsersDbTest do
     assert resp.body["userCtx"]["name"] == "foo@example.org"
   end
 
+  @tag :with_db
   test "users password requirements", context do
     set_config({
       "couch_httpd_auth",
-      "password_reqexp",
-      "[{\".{10,}\"}, {\"[A-Z]+\", \"Requirement 2.\"}, {\"[a-z]+\", \"\"}, {\"\\\\d+\", \"Req 4.\"}]"
+      "password_regexp",
+      Enum.join(
+        [
+          "[{\".{10,}\"},", # 10 chars
+          "{\"[A-Z]+\", \"Requirement 2.\"},", # a uppercase char
+          "{\"[a-z]+\", \"\"},", # a lowercase char
+          "{\"\\\\d+\", \"Req 4.\"},", # A number
+          "\"[!\.,\(\)]+\"]" # A special char
+        ],
+        " "
+      )
     })
 
     session = login("jan", "apple")
@@ -319,8 +329,8 @@ defmodule UsersDbTest do
       @users_db_name,
       jchris_user_doc,
       use_session: session,
-      expect_response: 403,
-      error_message: "forbidden",
+      expect_response: 400,
+      error_message: "bad_request",
       error_reason: "Password does not conform to requirements."
     )
 
@@ -331,8 +341,8 @@ defmodule UsersDbTest do
       @users_db_name,
       jchris_user_doc2,
       use_session: session,
-      expect_response: 403,
-      error_message: "forbidden",
+      expect_response: 400,
+      error_message: "bad_request",
       error_reason: "Password does not conform to requirements. Requirement 2."
     )
 
@@ -343,25 +353,87 @@ defmodule UsersDbTest do
       @users_db_name,
       jchris_user_doc3,
       use_session: session,
-      expect_response: 403,
-      error_message: "forbidden",
+      expect_response: 400,
+      error_message: "bad_request",
       error_reason: "Password does not conform to requirements."
     )
 
-    # With password that match all but the last requirements.
+    # With password that match the first three requirements.
     # Requirement does have a reason text.
     jchris_user_doc4 = Map.put(jchris_user_doc, "password", "funnnnnyBONE")
     save_as(
       @users_db_name,
       jchris_user_doc4,
       use_session: session,
-      expect_response: 403,
-      error_message: "forbidden",
+      expect_response: 400,
+      error_message: "bad_request",
       error_reason: "Password does not conform to requirements. Req 4."
     )
 
-    # With password that match all requirements.
+    # With password that match all but the last requirements.
+    # Requirement does have a reason text.
     jchris_user_doc5 = Map.put(jchris_user_doc, "password", "funnnnnyB0N3")
-    save_as(@users_db_name, jchris_user_doc5, use_session: session, expect_response: 201)
+    save_as(
+      @users_db_name,
+      jchris_user_doc5,
+      use_session: session,
+      expect_response: 400,
+      error_message: "bad_request",
+      error_reason: "Password does not conform to requirements."
+    )
+
+    # With password that match all requirements.
+    jchris_user_doc6 = Map.put(jchris_user_doc, "password", "funnnnnyB0N3!")
+    save_as(@users_db_name, jchris_user_doc6, use_session: session, expect_response: 201)
+  end
+
+  @tag :with_db
+  test "users password requirements with non list value", context do
+    set_config({
+      "couch_httpd_auth",
+      "password_regexp",
+      "{{\".{10,}\"}}"
+    })
+
+    session = login("jan", "apple")
+
+    jchris_user_doc =
+      prepare_user_doc([
+        {:name, "jchris@apache.org"},
+        {:password, "funnybone"}
+      ])
+    save_as(
+      @users_db_name,
+      jchris_user_doc,
+      use_session: session,
+      expect_response: 403,
+      error_message: "forbidden",
+      error_reason: "Server cannot hash passwords at this time."
+    )
+  end
+
+  @tag :with_db
+  test "users password requirements with not correct syntax", context do
+    set_config({
+      "couch_httpd_auth",
+      "password_regexp",
+      "[{\".{10,}\"]"
+    })
+
+    session = login("jan", "apple")
+
+    jchris_user_doc =
+      prepare_user_doc([
+        {:name, "jchris@apache.org"},
+        {:password, "funnybone"}
+      ])
+    save_as(
+      @users_db_name,
+      jchris_user_doc,
+      use_session: session,
+      expect_response: 403,
+      error_message: "forbidden",
+      error_reason: "Server cannot hash passwords at this time."
+    )
   end
 end
