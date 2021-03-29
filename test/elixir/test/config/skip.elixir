@@ -45,12 +45,10 @@
   "ConfigTest": [
     "Atoms, binaries, and strings suffice as whitelist sections and keys.",
     "Blacklist is functional",
-    "CouchDB respects configured protocols",
     "Keys not in the whitelist may not be modified",
     "Non-2-tuples in the whitelist are ignored",
     "Non-list whitelist values allow further modification of the whitelist",
     "Non-term whitelist values allow further modification of the whitelist",
-    "PORT `BUGGED` ?raw tests from config.js",
     "Reload config",
     "Server-side password hashing, and raw updates disabling that",
     "Settings can be altered with undefined whitelist allowing any change"
