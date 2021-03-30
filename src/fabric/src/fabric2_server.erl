@@ -213,7 +213,7 @@ get_db_and_cluster(EunitDbOpts) ->
         {ok, true} ->
             {<<"eunit_test">>, erlfdb_util:get_test_db(EunitDbOpts)};
         undefined ->
-            ClusterFileStr = get_cluster_file_string(),
+            ClusterFileStr = get_cluster_file_path(),
             {ok, ConnectionStr} = file:read_file(ClusterFileStr),
             DbHandle = erlfdb:open(iolist_to_binary(ClusterFileStr)),
             {string:trim(ConnectionStr), DbHandle}
@@ -221,10 +221,10 @@ get_db_and_cluster(EunitDbOpts) ->
     apply_tx_options(Db, config:get(?TX_OPTIONS_SECTION)),
     {Cluster, Db}.
 
-get_cluster_file_string() ->
+get_cluster_file_path() ->
     Locations = [
-        {custom, config:get("erlfdb", "cluster_file", false)},
-        {custom, os:getenv("FDB_CLUSTER_FILE")},
+        {custom, config:get("erlfdb", "cluster_file")},
+        {custom, os:getenv("FDB_CLUSTER_FILE", undefined)},
         {default, ?CLUSTER_FILE_MACOS},
         {default, ?CLUSTER_FILE_LINUX}
     ],
@@ -235,10 +235,13 @@ get_cluster_file_string() ->
             erlang:error(Reason)
     end.
 
+
 find_cluster_file([]) ->
     {error, cluster_file_missing};
-find_cluster_file([{custom, false} | Rest]) ->
+
+find_cluster_file([{custom, undefined} | Rest]) ->
     find_cluster_file(Rest);
+
 find_cluster_file([{Type, Location} | Rest]) ->
     case file:read_file_info(Location, [posix]) of
         {ok, #file_info{access = read_write}} ->
@@ -250,10 +253,14 @@ find_cluster_file([{Type, Location} | Rest]) ->
         {error, Reason} when Type =:= custom ->
             couch_log:error("Encountered ~p error looking for FDB cluster file: ~s", [Reason, Location]),
             {error, Reason};
+        {error, enoent} when Type =:= default ->
+            couch_log:info("No FDB cluster file found at ~s", [Location]),
+            find_cluster_file(Rest);
         {error, Reason} when Type =:= default ->
             couch_log:warning("Encountered ~p error looking for FDB cluster file: ~s", [Reason, Location]),
             find_cluster_file(Rest)
     end.
+
 
 apply_tx_options(Db, Cfg) ->
     maps:map(fun(Option, {Type, Default}) ->
