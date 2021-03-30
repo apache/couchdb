@@ -18,7 +18,10 @@
 -export([
     acquire_map_context/1,
     release_map_context/1,
-    map_docs/2
+    map_docs/2,
+    acquire_context/0,
+    release_context/1,
+    try_compile/4
 ]).
 
 
@@ -49,3 +52,15 @@ map_docs(Proc, Docs) ->
         end, Results),
         {Doc#doc.id, Tupled}
     end, Docs)}.
+
+acquire_context() ->
+    Ctx = couch_query_servers:get_os_process(?JS),
+    {ok, Ctx}.
+
+
+release_context(Proc) ->
+    couch_query_servers:ret_os_process(Proc).
+
+
+try_compile(Proc, FunctionType, FunName, FunSrc) ->
+    couch_query_servers:try_compile(Proc, FunctionType, FunName, FunSrc).

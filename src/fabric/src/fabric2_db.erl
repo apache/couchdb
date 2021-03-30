@@ -2154,7 +2154,7 @@ validate_doc_update(Db, Doc, PrevDoc) ->
 
 validate_ddoc(Db, DDoc) ->
     try
-        ok = couch_index_server:validate(Db, couch_doc:with_ejson_body(DDoc))
+        ok = couch_mrview:validate(Db, couch_doc:with_ejson_body(DDoc))
     catch
         throw:{invalid_design_doc, Reason} ->
             throw({bad_request, invalid_design_doc, Reason});
