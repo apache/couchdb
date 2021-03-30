@@ -245,19 +245,42 @@ find_cluster_file([{custom, undefined} | Rest]) ->
 find_cluster_file([{Type, Location} | Rest]) ->
     case file:read_file_info(Location, [posix]) of
         {ok, #file_info{access = read_write}} ->
-            couch_log:info("Using ~s FDB cluster file: ~s", [Type, Location]),
+            couch_log:info(
+                "Using ~s FDB cluster file: ~s",
+                [Type, Location]
+            ),
+            {ok, Location};
+        {ok, #file_info{access = read}} ->
+            couch_log:warning(
+                "Using read-only ~s FDB cluster file: ~s -- if coordinators "
+                "are changed without updating this file CouchDB may be unable "
+                "to connect to the FDB cluster!",
+                [Type, Location]
+            ),
             {ok, Location};
         {ok, _} ->
-            couch_log:error("CouchDB needs read/write access to FDB cluster file: ~s", [Location]),
+            couch_log:error(
+                "CouchDB needs read/write access to FDB cluster file: ~s",
+                [Location]
+            ),
             {error, cluster_file_permissions};
         {error, Reason} when Type =:= custom ->
-            couch_log:error("Encountered ~p error looking for FDB cluster file: ~s", [Reason, Location]),
+            couch_log:error(
+                "Encountered ~p error looking for FDB cluster file: ~s",
+                [Reason, Location]
+            ),
             {error, Reason};
         {error, enoent} when Type =:= default ->
-            couch_log:info("No FDB cluster file found at ~s", [Location]),
+            couch_log:info(
+                "No FDB cluster file found at ~s",
+                [Location]
+            ),
             find_cluster_file(Rest);
         {error, Reason} when Type =:= default ->
-            couch_log:warning("Encountered ~p error looking for FDB cluster file: ~s", [Reason, Location]),
+            couch_log:warning(
+                "Encountered ~p error looking for FDB cluster file: ~s",
+                [Reason, Location]
+            ),
             find_cluster_file(Rest)
     end.
 
