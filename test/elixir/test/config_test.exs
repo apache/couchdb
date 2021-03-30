@@ -10,8 +10,7 @@ defmodule ConfigTest do
   """
 
   setup do
-    # TODO: switch this to _local when that's landed
-    config_url = "/_node/node1@127.0.0.1/_config"
+    config_url = "/_node/_local/_config"
     resp = Couch.get(config_url)
     assert resp.status_code == 200
     {:ok, config: resp.body, config_url: config_url}
@@ -71,13 +70,9 @@ defmodule ConfigTest do
     end
   end
 
-  # TODO: port sever_port tests from config.js
-  @tag :pending
-  test "CouchDB respects configured protocols"
 
   test "Standard config options are present", context do
-    assert context[:config]["couchdb"]["database_dir"]
-    assert context[:config]["log"]["level"]
+    assert context[:config]["chttpd"]["port"]
   end
 
   test "Settings can be altered with undefined whitelist allowing any change", context do
@@ -99,9 +94,6 @@ defmodule ConfigTest do
     delete_config(context, "admins", "administrator")
     assert Couch.delete("/_session").body["ok"]
   end
-
-  @tag :pending
-  test "PORT `BUGGED` ?raw tests from config.js"
 
   test "Non-term whitelist values allow further modification of the whitelist", context do
     val = "!This is an invalid Erlang term!"
