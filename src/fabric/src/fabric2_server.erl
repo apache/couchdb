@@ -46,6 +46,7 @@
 
 -define(CLUSTER_FILE_MACOS, "/usr/local/etc/foundationdb/fdb.cluster").
 -define(CLUSTER_FILE_LINUX, "/etc/foundationdb/fdb.cluster").
+-define(CLUSTER_FILE_WIN32, "C:/ProgramData/foundationdb/fdb.cluster").
 -define(FDB_DIRECTORY, fdb_directory).
 -define(FDB_CLUSTER, fdb_cluster).
 -define(DEFAULT_FDB_DIRECTORY, <<"couchdb">>).
@@ -224,16 +225,26 @@ get_db_and_cluster(EunitDbOpts) ->
 get_cluster_file_path() ->
     Locations = [
         {custom, config:get("erlfdb", "cluster_file")},
-        {custom, os:getenv("FDB_CLUSTER_FILE", undefined)},
-        {default, ?CLUSTER_FILE_MACOS},
-        {default, ?CLUSTER_FILE_LINUX}
-    ],
+        {custom, os:getenv("FDB_CLUSTER_FILE", undefined)}
+    ] ++ default_locations(os:type()),
     case find_cluster_file(Locations) of
         {ok, Location} ->
             Location;
         {error, Reason} ->
             erlang:error(Reason)
     end.
+
+
+default_locations({unix, _}) ->
+    [
+        {default, ?CLUSTER_FILE_MACOS},
+        {default, ?CLUSTER_FILE_LINUX}
+    ];
+
+default_locations({win32, _}) ->
+    [
+        {default, ?CLUSTER_FILE_WIN32}
+    ].
 
 
 find_cluster_file([]) ->
