@@ -18,7 +18,10 @@
 -export([
     acquire_map_context/1,
     release_map_context/1,
-    map_docs/2
+    map_docs/2,
+    acquire_context/0,
+    release_context/1,
+    try_compile/4
 ]).
 
 
@@ -58,6 +61,18 @@ map_docs(Indexes, Docs) ->
         Results = index_doc(Indexes, Json),
         {Doc#doc.id, Results}
     end, Docs)}.
+
+
+acquire_context() ->
+    {ok, no_ctx}.
+
+
+release_context(_) ->
+    ok.
+
+
+try_compile(_Ctx, _FunType, _IndexName, IndexInfo) ->
+    mango_idx_view:validate_index_def(IndexInfo).
 
 
 index_doc(Indexes, Doc) ->

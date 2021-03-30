@@ -56,7 +56,7 @@
 
 
 start_couch() ->
-    Ctx = test_util:start_couch([fabric, chttpd, couch_replicator]),
+    Ctx = test_util:start_couch([fabric, chttpd, couch_replicator, couch_js]),
     Hashed = couch_passwords:hash_admin_password(?PASSWORD),
     ok = config:set("admins", ?USERNAME, ?b2l(Hashed), _Persist = false),
     Ctx.

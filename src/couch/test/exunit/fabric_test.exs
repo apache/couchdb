@@ -15,7 +15,7 @@ defmodule Couch.Test.Fabric do
   def with_db(context, setup) do
     setup =
       setup
-      |> Setup.Common.with_db()
+      |> Setup.Common.with_db([:couch_js])
       |> Setup.run()
 
     context =

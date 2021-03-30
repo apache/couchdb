@@ -188,8 +188,8 @@ validate(DbName, _IsDbPartitioned,  DDoc) ->
         (#mrview{reduce_funs = [{Name, _} | _]}) -> Name;
         (_) -> null
     end,
-    ValidateView = fun(Proc, #mrview{def=MapSrc, reduce_funs=Reds}=View) ->
-        couch_query_servers:try_compile(Proc, map, GetName(View), MapSrc),
+    ValidateView = fun(Ctx, #mrview{def=MapSrc, reduce_funs=Reds}=View) ->
+        couch_eval:try_compile(Ctx, map, GetName(View), MapSrc),
         lists:foreach(fun
             ({_RedName, <<"_sum", _/binary>>}) ->
                 ok;
@@ -203,7 +203,7 @@ validate(DbName, _IsDbPartitioned,  DDoc) ->
                 Msg = ["`", Bad, "` is not a supported reduce function."],
                 throw({invalid_design_doc, Msg});
             ({RedName, RedSrc}) ->
-                couch_query_servers:try_compile(Proc, reduce, RedName, RedSrc)
+                couch_eval:try_compile(Ctx, reduce, RedName, RedSrc)
         end, Reds)
     end,
     {ok, #mrst{
@@ -211,19 +211,10 @@ validate(DbName, _IsDbPartitioned,  DDoc) ->
         views = Views
     }} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
 
-    try Views =/= [] andalso couch_query_servers:get_os_process(Lang) of
-        false ->
-            ok;
-        Proc ->
-            try
-                lists:foreach(fun(V) -> ValidateView(Proc, V) end, Views)
-            after
-                couch_query_servers:ret_os_process(Proc)
-            end
-    catch {unknown_query_language, _Lang} ->
-    %% Allow users to save ddocs written in unknown languages
-        ok
-    end.
+    Views =/= [] andalso couch_eval:with_context(#{language => Lang}, fun (Ctx) ->
+        lists:foreach(fun(V) -> ValidateView(Ctx, V) end, Views)
+    end),
+    ok.
 
 
 query_all_docs(Db, Args) ->
