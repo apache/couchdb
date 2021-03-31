@@ -1100,10 +1100,15 @@ make_reduce_fun(Lang, ReduceFuns) ->
     end.
 
 
+couch_mrview_less_json_ids(_, {?HIGHEST_KEY, _}) ->
+    true;
+couch_mrview_less_json_ids(A, B) ->
+    couch_ejson_compare:less_json_ids(A, B).
+
 maybe_define_less_fun(#mrview{options = Options}) ->
     case couch_util:get_value(<<"collation">>, Options) of
         <<"raw">> -> undefined;
-        _ -> fun couch_ejson_compare:less_json_ids/2
+        _ -> fun couch_mrview_less_json_ids/2
     end.
 
 
