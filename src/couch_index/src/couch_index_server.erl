@@ -16,7 +16,7 @@
 
 -vsn(2).
 
--export([start_link/0, validate/2, get_index/4, get_index/3, get_index/2]).
+-export([start_link/0, get_index/4, get_index/3, get_index/2]).
 
 -export([init/1, terminate/2, code_change/3]).
 -export([handle_call/3, handle_cast/2, handle_info/2]).
@@ -39,25 +39,6 @@
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
-
-validate(Db, DDoc) ->
-    LoadModFun = fun
-        ({ModNameList, "true"}) ->
-            try
-                [list_to_existing_atom(ModNameList)]
-            catch error:badarg ->
-                []
-            end;
-        ({_ModNameList, _Enabled}) ->
-            []
-    end,
-    ValidateFun = fun
-        (ModName) ->
-            ModName:validate(Db, DDoc)
-    end,
-    EnabledIndexers = lists:flatmap(LoadModFun, config:get("indexers")),
-    lists:foreach(ValidateFun, EnabledIndexers).
 
 
 get_index(Module, <<"shards/", _/binary>> = DbName, DDoc)
