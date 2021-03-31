@@ -16,18 +16,19 @@
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
+-define(T(Name), {atom_to_list(Name), fun Name/0}).
 
 couch_log_config_test_() ->
     {setup,
         fun couch_log_test_util:start/0,
         fun couch_log_test_util:stop/1,
         [
-            fun check_level/0,
-            fun check_max_message_size/0,
-            fun check_bad_level/0,
-            fun check_bad_max_message_size/0,
-            fun check_strip_last_msg/0,
-            fun check_bad_strip_last_msg/0
+            ?T(check_level),
+            ?T(check_max_message_size),
+            ?T(check_bad_level),
+            ?T(check_bad_max_message_size),
+            ?T(check_strip_last_msg),
+            ?T(check_bad_strip_last_msg)
         ]
     }.
 
