@@ -42,9 +42,11 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/file.hrl").
 
-
--define(CLUSTER_FILE, "/usr/local/etc/foundationdb/fdb.cluster").
+-define(CLUSTER_FILE_MACOS, "/usr/local/etc/foundationdb/fdb.cluster").
+-define(CLUSTER_FILE_LINUX, "/etc/foundationdb/fdb.cluster").
+-define(CLUSTER_FILE_WIN32, "C:/ProgramData/foundationdb/fdb.cluster").
 -define(FDB_DIRECTORY, fdb_directory).
 -define(FDB_CLUSTER, fdb_cluster).
 -define(DEFAULT_FDB_DIRECTORY, <<"couchdb">>).
@@ -212,13 +214,86 @@ get_db_and_cluster(EunitDbOpts) ->
         {ok, true} ->
             {<<"eunit_test">>, erlfdb_util:get_test_db(EunitDbOpts)};
         undefined ->
-            ClusterFileStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
+            ClusterFileStr = get_cluster_file_path(),
             {ok, ConnectionStr} = file:read_file(ClusterFileStr),
             DbHandle = erlfdb:open(iolist_to_binary(ClusterFileStr)),
             {string:trim(ConnectionStr), DbHandle}
     end,
     apply_tx_options(Db, config:get(?TX_OPTIONS_SECTION)),
     {Cluster, Db}.
+
+get_cluster_file_path() ->
+    Locations = [
+        {custom, config:get("erlfdb", "cluster_file")},
+        {custom, os:getenv("FDB_CLUSTER_FILE", undefined)}
+    ] ++ default_locations(os:type()),
+    case find_cluster_file(Locations) of
+        {ok, Location} ->
+            Location;
+        {error, Reason} ->
+            erlang:error(Reason)
+    end.
+
+
+default_locations({unix, _}) ->
+    [
+        {default, ?CLUSTER_FILE_MACOS},
+        {default, ?CLUSTER_FILE_LINUX}
+    ];
+
+default_locations({win32, _}) ->
+    [
+        {default, ?CLUSTER_FILE_WIN32}
+    ].
+
+
+find_cluster_file([]) ->
+    {error, cluster_file_missing};
+
+find_cluster_file([{custom, undefined} | Rest]) ->
+    find_cluster_file(Rest);
+
+find_cluster_file([{Type, Location} | Rest]) ->
+    case file:read_file_info(Location, [posix]) of
+        {ok, #file_info{access = read_write}} ->
+            couch_log:info(
+                "Using ~s FDB cluster file: ~s",
+                [Type, Location]
+            ),
+            {ok, Location};
+        {ok, #file_info{access = read}} ->
+            couch_log:warning(
+                "Using read-only ~s FDB cluster file: ~s -- if coordinators "
+                "are changed without updating this file CouchDB may be unable "
+                "to connect to the FDB cluster!",
+                [Type, Location]
+            ),
+            {ok, Location};
+        {ok, _} ->
+            couch_log:error(
+                "CouchDB needs read/write access to FDB cluster file: ~s",
+                [Location]
+            ),
+            {error, cluster_file_permissions};
+        {error, Reason} when Type =:= custom ->
+            couch_log:error(
+                "Encountered ~p error looking for FDB cluster file: ~s",
+                [Reason, Location]
+            ),
+            {error, Reason};
+        {error, enoent} when Type =:= default ->
+            couch_log:info(
+                "No FDB cluster file found at ~s",
+                [Location]
+            ),
+            find_cluster_file(Rest);
+        {error, Reason} when Type =:= default ->
+            couch_log:warning(
+                "Encountered ~p error looking for FDB cluster file: ~s",
+                [Reason, Location]
+            ),
+            find_cluster_file(Rest)
+    end.
 
 
 apply_tx_options(Db, Cfg) ->
@@ -274,3 +349,72 @@ sanitize(#{} = Db) ->
         security_fun := undefined,
         interactive := false
     }.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+setup() ->
+    meck:new(file, [unstick, passthrough]),
+    meck:expect(file, read_file_info, fun
+        ("ok.cluster", _) ->
+            {ok, #file_info{access = read_write}};
+        ("readonly.cluster", _) ->
+            {ok, #file_info{access = read}};
+        ("noaccess.cluster", _) ->
+            {ok, #file_info{access = none}};
+        ("missing.cluster", _) ->
+            {error, enoent};
+        (Path, Options) ->
+            meck:passthrough([Path, Options])
+    end).
+
+teardown(_) ->
+    meck:unload().
+
+find_cluster_file_test_() ->
+    {setup,
+        fun setup/0,
+        fun teardown/1,
+        [
+            {"ignore unspecified config", ?_assertEqual(
+                {ok, "ok.cluster"},
+                find_cluster_file([
+                    {custom, undefined},
+                    {custom, "ok.cluster"}
+                ])
+            )},
+
+            {"allow read-only file", ?_assertEqual(
+                {ok, "readonly.cluster"},
+                find_cluster_file([
+                    {custom, "readonly.cluster"}
+                ])
+            )},
+
+            {"fail if no access to configured cluster file", ?_assertEqual(
+                {error, cluster_file_permissions},
+                find_cluster_file([
+                    {custom, "noaccess.cluster"}
+                ])
+            )},
+
+            {"fail if configured cluster file is missing", ?_assertEqual(
+                {error, enoent},
+                find_cluster_file([
+                    {custom, "missing.cluster"},
+                    {default, "ok.cluster"}
+                ])
+            )},
+
+            {"check multiple default locations", ?_assertEqual(
+                {ok, "ok.cluster"},
+                find_cluster_file([
+                    {default, "missing.cluster"},
+                    {default, "ok.cluster"}
+                ])
+            )}
+        ]
+    }.
+
+-endif.
