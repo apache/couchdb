@@ -349,3 +349,72 @@ sanitize(#{} = Db) ->
         security_fun := undefined,
         interactive := false
     }.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+setup() ->
+    meck:new(file, [unstick, passthrough]),
+    meck:expect(file, read_file_info, fun
+        ("ok.cluster", _) ->
+            {ok, #file_info{access = read_write}};
+        ("readonly.cluster", _) ->
+            {ok, #file_info{access = read}};
+        ("noaccess.cluster", _) ->
+            {ok, #file_info{access = none}};
+        ("missing.cluster", _) ->
+            {error, enoent};
+        (Path, Options) ->
+            meck:passthrough([Path, Options])
+    end).
+
+teardown(_) ->
+    meck:unload().
+
+find_cluster_file_test_() ->
+    {setup,
+        fun setup/0,
+        fun teardown/1,
+        [
+            {"ignore unspecified config", ?_assertEqual(
+                {ok, "ok.cluster"},
+                find_cluster_file([
+                    {custom, undefined},
+                    {custom, "ok.cluster"}
+                ])
+            )},
+
+            {"allow read-only file", ?_assertEqual(
+                {ok, "readonly.cluster"},
+                find_cluster_file([
+                    {custom, "readonly.cluster"}
+                ])
+            )},
+
+            {"fail if no access to configured cluster file", ?_assertEqual(
+                {error, cluster_file_permissions},
+                find_cluster_file([
+                    {custom, "noaccess.cluster"}
+                ])
+            )},
+
+            {"fail if configured cluster file is missing", ?_assertEqual(
+                {error, enoent},
+                find_cluster_file([
+                    {custom, "missing.cluster"},
+                    {default, "ok.cluster"}
+                ])
+            )},
+
+            {"check multiple default locations", ?_assertEqual(
+                {ok, "ok.cluster"},
+                find_cluster_file([
+                    {default, "missing.cluster"},
+                    {default, "ok.cluster"}
+                ])
+            )}
+        ]
+    }.
+
+-endif.
