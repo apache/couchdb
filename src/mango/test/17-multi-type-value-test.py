@@ -44,7 +44,7 @@ class MultiValueFieldTests:
 
     def test_can_query_with_age_and_name_range(self):
         docs = self.db.find({"age": {"$gte": 0, "$lt": 40}, "name": {"$gte": 0}})
-        # expect to include "Jimi", 1 and {"forename":"Eddie"}
+        # expect to include "Jimi" and {"forename":"Eddie"}
         self.assertEqual(len(docs), 2)
         for d in docs:
             self.assertIn("name", d)

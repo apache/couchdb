@@ -26,6 +26,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("couch_views.hrl").
+-include_lib("mango/src/mango_idx_view.hrl").
 
 
 ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
@@ -98,6 +99,9 @@ collate_raw(A, A) -> eq;
 collate_raw(A, B) when A < B -> lt;
 collate_raw(A, B) when A > B -> gt.
 
+
+collate_rows(_, {[?MAX_JSON_OBJ], _}) ->
+    lt;
 
 collate_rows({KeyA, DocIdA}, {KeyB, DocIdB}) ->
     case couch_ejson_compare:less(KeyA, KeyB) of
