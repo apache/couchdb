@@ -60,8 +60,6 @@ test_to_prom_output(Metric, Type, Val) ->
     Out = to_prom(Metric, Type, Val),
     lists:nth(2, Out).
 
-
 test_to_prom_sum_output(Metric, Info) ->
     Out = to_prom_summary(Metric, Info),
-    ?debugMsg(Out),
     lists:nth(3, Out).
