@@ -93,7 +93,7 @@ defmodule ChangesAsyncTest do
 
     create_doc_bar(db_name, "bar")
 
-    changes = process_response(req_id.id, &parse_event/1, 3000)
+    changes = process_response(req_id.id, &parse_event/1, 5000)
 
     assert length(changes) == 2
     assert Enum.at(changes, 0)["id"] == "foo"
@@ -174,7 +174,7 @@ defmodule ChangesAsyncTest do
 
     req_id =
       Rawresp.get(
-        "/#{db_name}/_changes?feed=continuous&filter=changes_filter/bop&timeout=1000",
+        "/#{db_name}/_changes?feed=continuous&filter=changes_filter/bop&timeout=2000",
         stream_to: self(),
         direct: worker_pid
       )
@@ -216,7 +216,7 @@ defmodule ChangesAsyncTest do
     :ok = wait_for_headers(req_id.id, 200)
     create_doc(db_name, %{_id: "doc3", value: 3})
 
-    changes = process_response(req_id.id, &parse_changes_line_chunk/1, 3000)
+    changes = process_response(req_id.id, &parse_changes_line_chunk/1, 5000)
 
     changes_ids =
       changes
