@@ -81,7 +81,20 @@ notify(#st{} = St) ->
     St#st{timestamp = Now}.
 
 
-get_vs_and_watch(#st{jtx = JTx, type = Type}) ->
-    couch_jobs_fdb:tx(JTx, fun(JTx1) ->
-        couch_jobs_fdb:get_activity_vs_and_watch(JTx1, Type)
-    end).
+get_vs_and_watch(#st{} = St) ->
+    #st{jtx = JTx, type = Type, holdoff = HoldOff} = St,
+    try
+        couch_jobs_fdb:tx(JTx, fun(JTx1) ->
+            couch_jobs_fdb:get_activity_vs_and_watch(JTx1, Type)
+        end)
+    catch
+        error:{erlfdb_error, ?ERLFDB_TRANSACTION_TIMED_OUT} ->
+            timer:sleep(HoldOff),
+            get_vs_and_watch(St);
+        error:{erlfdb_error, Code} when ?ERLFDB_IS_RETRYABLE(Code) ->
+            timer:sleep(HoldOff),
+            get_vs_and_watch(St);
+        error:{timeout, _} ->
+            timer:sleep(HoldOff),
+            get_vs_and_watch(St)
+    end.
