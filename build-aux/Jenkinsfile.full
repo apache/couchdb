@@ -498,6 +498,7 @@ pipeline {
         } // stage
 
         stage('Debian Buster arm64v8') {
+          when { expression { return false } }
           agent {
             docker {
               image 'couchdbdev/arm64v8-debian-buster-erlang-20.3.8.25-1:latest'
