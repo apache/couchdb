@@ -703,7 +703,8 @@ pipeline {
           sh '''
             cp js/centos-7/*rpm pkgs/centos7
             cp js/centos-8/*rpm pkgs/centos8
-            cd ../centos7 && createrepo --database .
+            cd pkgs
+            cd centos7 && createrepo --database .
             cd ../centos8 && createrepo --database .
           '''
 
