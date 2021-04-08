@@ -98,7 +98,8 @@
     nonce,
     cors_config,
     xframe_config,
-    qs
+    qs,
+    version
 }).
 
 

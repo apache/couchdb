@@ -170,7 +170,11 @@ handle_request_int(MochiReq) ->
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
     RawUri = MochiReq:get(raw_path),
-    {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
+    {"/" ++ Path, QS, Version} = try
+        split_api_version(MochiReq)
+    catch Tag:Error ->
+        catch_error(#httpd{mochi_req = MochiReq}, Tag, Error)
+    end,
 
     % get requested path
     RequestedPath = case MochiReq:get_header_value("x-couchdb-vhost-path") of
@@ -229,7 +233,9 @@ handle_request_int(MochiReq) ->
         path_parts = [list_to_binary(chttpd:unquote(Part))
                 || Part <- string:tokens(Path, "/")],
         requested_path_parts = [?l2b(unquote(Part))
-                || Part <- string:tokens(RequestedPath, "/")]
+                || Part <- string:tokens(RequestedPath, "/")],
+        version = Version,
+        qs = QS
     },
 
     % put small token on heap to keep requests synced to backend calls
@@ -320,10 +326,10 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
     end.
 
 handle_req_after_auth(HandlerKey, HttpReq) ->
-    #httpd{user_ctx = #user_ctx{name = User}} = HttpReq,
+    #httpd{user_ctx = #user_ctx{name = User}, version = Version} = HttpReq,
     ctrace:tag(#{user => User}),
     try
-        HandlerFun = chttpd_handlers:url_handler(HandlerKey,
+        HandlerFun = chttpd_handlers:url_handler(HandlerKey, Version,
             fun chttpd_db:handle_request/1),
         AuthorizedReq = chttpd_auth:authorize(possibly_hack(HttpReq),
             fun chttpd_auth_request:authorize_request/1),
@@ -1416,6 +1422,68 @@ span_error(Code, ErrorStr, ReasonStr, Stack) ->
     }),
     ctrace:finish_span().
 
+
+split_api_version(MochiReq) ->
+    RawUri = MochiReq:get(raw_path),
+    {VersionPath, Path} = case mochiweb_util:urlsplit_path(RawUri) of
+        {"/_v" ++ RestPath, _, _} ->
+            string:take(RestPath, "/", true);
+        {FullPath, _, _} ->
+            {undefined, FullPath}
+    end,
+    VersionHeader = MochiReq:get_header_value("X-Couch-API"),
+    VersionAccept = case MochiReq:get_header_value("Accept") of
+        undefined ->
+            undefined;
+        AcceptStr ->
+            case lists:keyfind("application/couchdb", 1, content_types(AcceptStr)) of
+                {"application/couchdb", Parameters} ->
+                    couch_util:get_value("_v", Parameters);
+                _ ->
+                    undefined
+            end
+    end,
+    QS0 = MochiReq:parse_qs(),
+    {QS, VersionQuery} = case lists:keytake("_v", 1, QS0) of
+        false ->
+            {QS0, undefined};
+        {value, {"_v", VersionStr}, QS1} ->
+            {QS1, VersionStr}
+    end,
+    Version = case lists:usort([VersionHeader,VersionAccept,VersionQuery,VersionPath]) -- [undefined] of
+        [] ->
+            1;
+        [SelectedVersion] ->
+            try
+                list_to_integer(SelectedVersion)
+            catch error:badarg ->
+                throw({bad_request, "Cannot parse API version"})
+            end;
+        _ ->
+            throw({bad_request, "conflicted API versions"})
+    end,
+    {Path, QS, Version}.
+
+-spec content_types(Header :: string()) ->
+    undefined
+    | string()
+    | {string(), [Parameters :: {Name :: string(), Value :: string()}]}.
+
+content_types(Value) ->
+    lists:map(fun(Type) ->
+        case string:split(Type, ";") of
+            [BaseType] ->
+                BaseType;
+            [BaseType | Parameters] ->
+                KVs = lists:map(fun(String) ->
+                    [K, V] = string:split(String, "=", all),
+                    {string:trim(K), string:trim(V)}
+                end, Parameters),
+                {BaseType, KVs}
+        end
+    end, string:split(Value, ",")).
+
+
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -1530,7 +1598,7 @@ handle_req_after_auth_test() ->
     AuthorizedReq = Req#httpd{user_ctx = AuthorizedCtx},
     ok = meck:new(chttpd_handlers, [passthrough]),
     ok = meck:new(chttpd_auth, [passthrough]),
-    ok = meck:expect(chttpd_handlers, url_handler, fun(_Key, _Fun) ->
+    ok = meck:expect(chttpd_handlers, url_handler, fun(_Key, _Fun, _) ->
          fun(_Req) -> handled_authorized_req end
     end),
     ok = meck:expect(chttpd_auth, authorize, fun(_Req, _Fun) ->
