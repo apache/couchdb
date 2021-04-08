@@ -998,6 +998,8 @@ error_info({service_unavailable, Reason}) ->
     {503, <<"service unavailable">>, Reason};
 error_info({timeout, _Reason}) ->
     error_info(timeout);
+error_info({'EXIT', {Error, _Stack}}) ->
+    error_info(Error);
 error_info({Error, null}) ->
     error_info(Error);
 error_info({_Error, _Reason} = Error) ->
