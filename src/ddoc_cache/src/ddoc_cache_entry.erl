@@ -14,6 +14,8 @@
 -behaviour(gen_server).
 -vsn(1).
 
+% for the stacktrace macro only so far
+-include_lib("couch/include/couch_db.hrl").
 
 -export([
     dbname/1,
@@ -297,8 +299,7 @@ do_open(Key) ->
     try recover(Key) of
         Resp ->
             erlang:exit({open_ok, Key, Resp})
-    catch T:R ->
-        S = erlang:get_stacktrace(),
+    catch ?STACKTRACE(T, R, S)
         erlang:exit({open_error, Key, {T, R, S}})
     end.
 

@@ -18,7 +18,9 @@ if not HaveDreyfus -> CONFIG; true ->
         {erl_opts, Opts} -> Opts;
         false -> []
     end,
-    NewOpts = [{d, 'HAVE_DREYFUS'} | CurrOpts],
+    NewOpts = [
+        {d, 'HAVE_DREYFUS'}
+    ] ++ CurrOpts,
     lists:keystore(erl_opts, 1, CONFIG, {erl_opts, NewOpts})
 end.
 

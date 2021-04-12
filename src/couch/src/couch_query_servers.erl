@@ -527,8 +527,7 @@ with_ddoc_proc(#doc{id=DDocId,revs={Start, [DiskRev|_]}}=DDoc, Fun) ->
         Resp ->
             ok = ret_os_process(Proc),
             Resp
-    catch Tag:Err ->
-        Stack = erlang:get_stacktrace(),
+    catch ?STACKTRACE(Tag, Err, Stack)
         catch proc_stop(Proc),
         erlang:raise(Tag, Err, Stack)
     end.

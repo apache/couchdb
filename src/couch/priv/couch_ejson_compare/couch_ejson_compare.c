@@ -13,6 +13,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <assert.h>
 #include "erl_nif.h"
 #include "unicode/ucol.h"
@@ -64,6 +65,11 @@ static __inline int compare_strings(ctx_t*, ErlNifBinary, ErlNifBinary);
 static __inline int compare_lists(int, ctx_t*, ERL_NIF_TERM, ERL_NIF_TERM);
 static __inline int compare_props(int, ctx_t*, ERL_NIF_TERM, ERL_NIF_TERM);
 static __inline UCollator* get_collator();
+
+/* Should match the <<255,255,255,255>> in:
+ *  - src/mango/src/mango_idx_view.hrl#L13
+ *  - src/couch_mrview/src/couch_mrview_util.erl#L40 */
+static const unsigned char max_utf8_marker[]  = {255, 255, 255, 255};
 
 
 UCollator*
@@ -357,11 +363,45 @@ compare_props(int depth, ctx_t* ctx, ERL_NIF_TERM a, ERL_NIF_TERM b)
 
 
 int
+is_max_utf8_marker(ErlNifBinary bin)
+{
+    if (bin.size == sizeof(max_utf8_marker)) {
+        if(memcmp(bin.data, max_utf8_marker, sizeof(max_utf8_marker)) == 0) {
+            return 1;
+        }
+        return 0;
+    }
+    return 0;
+}
+
+
+int
 compare_strings(ctx_t* ctx, ErlNifBinary a, ErlNifBinary b)
 {
     UErrorCode status = U_ZERO_ERROR;
     UCharIterator iterA, iterB;
     int result;
+
+    /* libicu versions earlier than 59 (at least) don't consider the
+     * {255,255,255,255} to be the highest sortable string as CouchDB expects.
+     * While we are still shipping CentOS 7 packages with libicu 50, we should
+     * explicitly check for the marker, later on we can remove the max
+     * logic */
+
+    int a_is_max = is_max_utf8_marker(a);
+    int b_is_max = is_max_utf8_marker(b);
+
+    if(a_is_max && b_is_max) {
+        return 0;
+    }
+
+    if(a_is_max) {
+        return 1;
+    }
+
+    if(b_is_max) {
+        return -1;
+    }
 
     uiter_setUTF8(&iterA, (const char *) a.data, (uint32_t) a.size);
     uiter_setUTF8(&iterB, (const char *) b.data, (uint32_t) b.size);

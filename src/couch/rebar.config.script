@@ -41,7 +41,7 @@ end.
 
 GitSha = case os:getenv("COUCHDB_GIT_SHA") of
     false ->
-        ""; % release builds won't get a fallback
+        ""; % release builds won\'t get a fallback
     GitSha0 ->
         string:strip(GitSha0, right)
 end.
@@ -61,6 +61,10 @@ SMVsn = case lists:keyfind(spidermonkey_version, 1, CouchConfig) of
         "60";
     {_, "68"} ->
         "68";
+    {_, "78"} ->
+        "78";
+    {_, "86"} ->
+        "86";
     undefined ->
         "1.8.5";
     {_, Unsupported} ->
@@ -82,7 +86,12 @@ ConfigH = [
     {"PACKAGE_VERSION", "\"" ++ Version ++ "\""}
 ].
 
-CouchJSConfig = "priv/couch_js/" ++ SMVsn ++ "/config.h".
+CouchJSConfig = case SMVsn of
+    "78" ->
+        "priv/couch_js/86/config.h";
+    _ ->
+        "priv/couch_js/" ++ SMVsn ++ "/config.h"
+end.
 ConfigSrc = [["#define ", K, " ", V, $\n] || {K, V} <- ConfigH].
 ConfigBin = iolist_to_binary(ConfigSrc).
 ok = CopyIfDifferent(CouchJSConfig, ConfigBin).
@@ -129,13 +138,25 @@ end.
         {
             "-DXP_UNIX -I/usr/include/mozjs-68 -I/usr/local/include/mozjs-68 -std=c++14 -Wno-invalid-offsetof",
             "-L/usr/local/lib -std=c++14 -lmozjs-68 -lm"
+        };
+    {unix, _} when SMVsn == "78" ->
+        {
+            "-DXP_UNIX -I/usr/include/mozjs-78 -I/usr/local/include/mozjs-78 -std=c++20 -Wno-invalid-offsetof",
+            "-L/usr/local/lib -std=c++20 -lmozjs-78 -lm"
+        };
+    {unix, _} when SMVsn == "86" ->
+        {
+            "-DXP_UNIX -I/usr/include/mozjs-86 -I/usr/local/include/mozjs-86 -I/opt/homebrew/include/mozjs-86/ -std=c++17 -Wno-invalid-offsetof",
+            "-L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-86 -lm"
         }
 end.
 
 CouchJSSrc = case SMVsn of
     "1.8.5" -> ["priv/couch_js/1.8.5/*.c"];
     "60" -> ["priv/couch_js/60/*.cpp"];
-    "68" -> ["priv/couch_js/68/*.cpp"]
+    "68" -> ["priv/couch_js/68/*.cpp"];
+    "78" -> ["priv/couch_js/86/*.cpp"];
+    "86" -> ["priv/couch_js/86/*.cpp"]
 end.
 
 CouchJSEnv = case SMVsn of
@@ -155,8 +176,8 @@ IcuPath = "priv/couch_icu_driver.so".
 IcuSrc = ["priv/icu_driver/*.c"].
 IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
           {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"}].
-IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include"},
-                {"LDFLAGS", "-L/usr/local/opt/icu4c/lib"}].
+IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include -I/opt/homebrew/opt/icu4c/include"},
+                {"LDFLAGS", "-L/usr/local/opt/icu4c/lib -L/opt/homebrew/opt/icu4c/lib"}].
 IcuBsdEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/include"},
              {"LDFLAGS", "-L/usr/local/lib"}].
 IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},

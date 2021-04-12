@@ -68,7 +68,13 @@ format(Event) ->
 
 do_format({error, _GL, {Pid, "** Generic server " ++ _, Args}}) ->
     %% gen_server terminate
-    [Name, LastMsg, State, Reason | Extra] = Args,
+    [Name, LastMsg0, State, Reason | Extra] = Args,
+    LastMsg = case couch_log_config:get(strip_last_msg) of
+        true ->
+            redacted;
+        false ->
+            LastMsg0
+    end,
     MsgFmt = "gen_server ~w terminated with reason: ~s~n" ++
                 "  last msg: ~p~n     state: ~p~n    extra: ~p",
     MsgArgs = [Name, format_reason(Reason), LastMsg, State, Extra],
@@ -76,7 +82,13 @@ do_format({error, _GL, {Pid, "** Generic server " ++ _, Args}}) ->
 
 do_format({error, _GL, {Pid, "** State machine " ++ _, Args}}) ->
     %% gen_fsm terminate
-    [Name, LastMsg, StateName, State, Reason | Extra] = Args,
+    [Name, LastMsg0, StateName, State, Reason | Extra] = Args,
+    LastMsg = case couch_log_config:get(strip_last_msg) of
+        true ->
+            redacted;
+        false ->
+            LastMsg0
+    end,
     MsgFmt = "gen_fsm ~w in state ~w terminated with reason: ~s~n" ++
                 " last msg: ~p~n     state: ~p~n    extra: ~p",
     MsgArgs = [Name, StateName, format_reason(Reason), LastMsg, State, Extra],
@@ -84,7 +96,13 @@ do_format({error, _GL, {Pid, "** State machine " ++ _, Args}}) ->
 
 do_format({error, _GL, {Pid, "** gen_event handler" ++ _, Args}}) ->
     %% gen_event handler terminate
-    [ID, Name, LastMsg, State, Reason] = Args,
+    [ID, Name, LastMsg0, State, Reason] = Args,
+    LastMsg = case couch_log_config:get(strip_last_msg) of
+        true ->
+            redacted;
+        false ->
+            LastMsg0
+    end,
     MsgFmt = "gen_event ~w installed in ~w terminated with reason: ~s~n" ++
                 "  last msg: ~p~n     state: ~p",
     MsgArgs = [ID, Name, format_reason(Reason), LastMsg, State],
@@ -181,7 +199,7 @@ format_crash_report(Report, Neighbours) ->
     MsgFmt = "Process ~s with ~w neighbors ~s with reason: ~s",
     Args = [Name, length(Neighbours), Type, ReasonStr],
     Msg = io_lib:format(MsgFmt, Args),
-    case filter_silly_list(Report, [pid, registered_name, error_info]) of
+    case filter_silly_list(Report) of
         [] ->
             Msg;
         Rest ->
@@ -413,6 +431,11 @@ print_val(Val) ->
     {Str, _} = couch_log_trunc_io:print(Val, 500),
     Str.
 
+filter_silly_list(KV) ->
+    %% The complete list of fields is from here
+    %% https://github.com/erlang/otp/blob/7ca7a6c59543db8a6d26b95ae434e61a044b0800/lib/stdlib/src/proc_lib.erl#L539:L553
+    FilterFields = couch_log_config:get(filter_fields),
+    filter_silly_list(KV, FilterFields).
 
 filter_silly_list([], _) ->
     [];

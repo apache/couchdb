@@ -49,7 +49,9 @@ entries() ->
     [
         {level, "level", "info"},
         {level_int, "level", "info"},
-        {max_message_size, "max_message_size", "16000"}
+        {max_message_size, "max_message_size", "16000"},
+        {strip_last_msg, "strip_last_msg", "true"},
+        {filter_fields, "filter_fields", "[pid, registered_name, error_info, messages]"}
      ].
 
 
@@ -97,4 +99,29 @@ transform(max_message_size, SizeStr) ->
         Size -> Size
     catch _:_ ->
         16000
+    end;
+
+transform(strip_last_msg, "false") ->
+    false;
+
+transform(strip_last_msg, _) ->
+    true;
+
+transform(filter_fields, FieldsStr) ->
+    Default = [pid, registered_name, error_info, messages],
+    case parse_term(FieldsStr) of
+        {ok, List} when is_list(List) ->
+            case lists:all(fun erlang:is_atom/1, List) of
+                true ->
+                    List;
+                false ->
+                    Default
+            end;
+        _ ->
+            Default
     end.
+
+
+parse_term(List) ->
+    {ok, Tokens, _} = erl_scan:string(List ++ "."),
+    erl_parse:parse_term(Tokens).
