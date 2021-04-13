@@ -11,4 +11,5 @@
 % the License.
 
 -define(REFRESH_INTERVAL, 5).
+-define(PROMETHEUS_VERSION, "2.0").
 

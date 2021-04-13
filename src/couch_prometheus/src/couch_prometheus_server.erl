@@ -21,7 +21,8 @@
 ]).
 
 -export([
-    scrape/0
+    scrape/0,
+    version/0
 ]).
 
 -export([
@@ -52,6 +53,9 @@ init([]) ->
 scrape() ->
     {ok, Metrics} = gen_server:call(?MODULE, scrape),
     Metrics.
+
+version() ->
+    ?PROMETHEUS_VERSION.
 
 handle_call(scrape, _from, #st{metrics = Metrics}=State) ->
     {reply, {ok, Metrics}, State};
