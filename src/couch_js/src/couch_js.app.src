@@ -21,7 +21,6 @@
         kernel,
         stdlib,
         config,
-        couch_log,
-        ioq
+        couch_log
     ]}
  ]}.

@@ -14,15 +14,12 @@
     {description, "Apache CouchDB"},
     {vsn, git},
     {registered, [
-        couch_db_update,
-        couch_db_update_notifier_sup,
         couch_httpd,
         couch_primary_services,
         couch_proc_manager,
         couch_secondary_services,
         couch_server,
-        couch_sup,
-        couch_task_status
+        couch_sup
     ]},
     {mod, {couch_app, []}},
     {applications, [
@@ -42,8 +39,6 @@
         couch_epi,
         b64url,
         couch_log,
-        couch_event,
-        ioq,
         couch_stats,
         hyper,
         couch_prometheus

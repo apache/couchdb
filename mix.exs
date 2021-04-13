@@ -133,16 +133,13 @@ defmodule CouchDBTest.Mixfile do
       "b64url",
       "bear",
       "mochiweb",
-      "snappy",
       "rebar",
       "proper",
       "mochiweb",
       "meck",
-      "khash",
       "hyper",
       "fauxton",
-      "folsom",
-      "hqueue"
+      "folsom"
     ]
 
     deps |> Enum.map(fn app -> "src/#{app}" end)
