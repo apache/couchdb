@@ -299,8 +299,7 @@ defmodule UsersDbTest do
     assert resp.body["userCtx"]["name"] == "foo@example.org"
   end
 
-  @tag :with_db
-  test "users password requirements", context do
+  test "users password requirements", _context do
     set_config({
       "couch_httpd_auth",
       "password_regexp",
@@ -385,51 +384,39 @@ defmodule UsersDbTest do
     # With password that match all requirements.
     jchris_user_doc6 = Map.put(jchris_user_doc, "password", "funnnnnyB0N3!")
     save_as(@users_db_name, jchris_user_doc6, use_session: session, expect_response: 201)
-  end
 
-  @tag :with_db
-  test "users password requirements with non list value", context do
+    # with non list value
     set_config({
       "couch_httpd_auth",
       "password_regexp",
       "{{\".{10,}\"}}"
     })
 
-    session = login("jan", "apple")
-
-    jchris_user_doc =
+    joe_user_doc =
       prepare_user_doc([
-        {:name, "jchris@apache.org"},
-        {:password, "funnybone"}
+        {:name, "joe_erlang"},
+        {:password, "querty"}
       ])
+
     save_as(
       @users_db_name,
-      jchris_user_doc,
+      joe_user_doc,
       use_session: session,
       expect_response: 403,
       error_message: "forbidden",
       error_reason: "Server cannot hash passwords at this time."
     )
-  end
 
-  @tag :with_db
-  test "users password requirements with not correct syntax", context do
+    # Not correct syntax
     set_config({
       "couch_httpd_auth",
       "password_regexp",
       "[{\".{10,}\"]"
     })
 
-    session = login("jan", "apple")
-
-    jchris_user_doc =
-      prepare_user_doc([
-        {:name, "jchris@apache.org"},
-        {:password, "funnybone"}
-      ])
     save_as(
       @users_db_name,
-      jchris_user_doc,
+      joe_user_doc,
       use_session: session,
       expect_response: 403,
       error_message: "forbidden",
