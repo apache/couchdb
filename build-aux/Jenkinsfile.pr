@@ -20,7 +20,7 @@ mkdir build
 cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
-. /usr/local/kerl/${KERL_VER}/activate
+. /usr/local/kerl/${ERLANG_VERSION}/activate
 ./configure --spidermonkey-version 60
 make check || (make build-report && false)
 '''
@@ -39,18 +39,18 @@ pipeline {
     GIT_COMMITTER_NAME = 'Jenkins User'
     GIT_COMMITTER_EMAIL = 'couchdb@apache.org'
     // Parameters for the matrix build
-    DOCKER_IMAGE = 'couchdbdev/debian-buster-erlang-all:latest'
+    DOCKER_IMAGE = 'apache/couchdbci-debian:buster-erlang-all'
     // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
     // We need the jenkins user mapped inside of the image
     // npm config cache below deals with /home/jenkins not mapping correctly
     // inside the image
     DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
-    // *** BE SURE TO CHANGE THE ERLANG VERSION FARTHER DOWN S WELL ***
+
+    // *** BE SURE TO ALSO CHANGE THE ERLANG VERSIONS FARTHER DOWN ***
     // Search for ERLANG_VERSION
-    // see https://issues.jenkins-ci.org/browse/JENKINS-40986
-    LOW_ERLANG_VER = '20.3.8.11'
-    MID_ERLANG_VER = '20.3.8.25'
-    HIGH_ERLANG_VER = '22.2.3'
+    // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
+    // be done parametrically
+    LOW_ERLANG_VER = '20.3.8.26'
   }
 
   options {
@@ -105,7 +105,7 @@ pipeline {
         axes {
           axis {
             name 'ERLANG_VERSION'
-            values "20.3.8.11", "20.3.8.25", "22.2.3"
+            values '20.3.8.26', '21.3.8.22', '22.3.4.17', '23.3.1'
           }
         }
 
@@ -117,9 +117,6 @@ pipeline {
                 label 'docker'
                 args "${DOCKER_ARGS}"
               }
-            }
-            environment {
-              KERL_VER = "${ERLANG_VERSION}"
             }
             options {
               skipDefaultCheckout()
