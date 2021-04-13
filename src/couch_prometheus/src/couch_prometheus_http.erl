@@ -48,8 +48,9 @@ handle_request(MochiReq) ->
     end.
 
 send_prometheus(MochiReq, Node) ->
+    Type = "text/plain; version=" ++ ?PROMETHEUS_VERSION,
     Headers = couch_httpd:server_header() ++ [
-        {<<"Content-Type">>, <<"text/plain">>}
+        {<<"Content-Type">>, ?l2b(Type)}
     ],
     Body = call_node(Node, couch_prometheus_server, scrape, []),
     send_resp(MochiReq, 200, Headers, Body).
