@@ -124,11 +124,6 @@ create_db(Url) ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
     {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
-    case Status of
-        201 -> ok;
-        202 -> ok;
-        _ -> io:format(user, "~n HTTP Status Code: ~p~n", [Status])
-    end,
     ?assert(Status =:= 201 orelse Status =:= 202).
 
 delete_db(Url) ->
