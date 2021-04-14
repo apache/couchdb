@@ -30,18 +30,10 @@
 -include("mango_idx.hrl").
 
 
--ifdef(HAVE_DREYFUS).
--define(CURSOR_MODULES, [
-    mango_cursor_view,
-    mango_cursor_text,
-    mango_cursor_special
-]).
--else.
 -define(CURSOR_MODULES, [
     mango_cursor_view,
     mango_cursor_special
 ]).
--endif.
 
 -define(SUPERVISOR, mango_cursor_sup).
 

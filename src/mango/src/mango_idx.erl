@@ -263,12 +263,7 @@ cursor_mod(#idx{type = <<"json">>}) ->
 cursor_mod(#idx{def = all_docs, type= <<"special">>}) ->
     mango_cursor_special;
 cursor_mod(#idx{type = <<"text">>}) ->
-    case clouseau_rpc:connected() of
-        true ->
-            mango_cursor_text;
-        false ->
-            ?MANGO_ERROR({index_service_unavailable, <<"text">>})
-    end.
+    ?MANGO_ERROR({index_service_unavailable, <<"text">>}).
 
 
 idx_mod(#idx{type = <<"json">>}) ->
@@ -276,12 +271,7 @@ idx_mod(#idx{type = <<"json">>}) ->
 idx_mod(#idx{type = <<"special">>}) ->
     mango_idx_special;
 idx_mod(#idx{type = <<"text">>}) ->
-    case clouseau_rpc:connected() of
-        true ->
-            mango_idx_text;
-        false ->
-            ?MANGO_ERROR({index_service_unavailable, <<"text">>})
-    end.
+    ?MANGO_ERROR({index_service_unavailable, <<"text">>}).
 
 
 db_to_name(Name) when is_binary(Name) ->
@@ -318,8 +308,7 @@ get_idx_type(Opts) ->
 
 
 is_text_service_available() ->
-    erlang:function_exported(clouseau_rpc, connected, 0) andalso
-        clouseau_rpc:connected().
+    false.
 
 
 get_idx_ddoc(Idx, Opts) ->
