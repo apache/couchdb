@@ -72,7 +72,7 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=folsom,meck,mochiweb,triq,proper,snappy,bcrypt,hyper
+skip_deps=folsom,meck,mochiweb,proper,bcrypt,hyper,local
 suites=
 tests=
 
@@ -160,9 +160,9 @@ endif
 .PHONY: check
 check:  all
 	@$(MAKE) emilio
-	@$(MAKE) eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango,chttpd,couch_replicator
+	@$(MAKE) eunit
 	@$(MAKE) elixir-suite
-	@$(MAKE) exunit apps=chttpd
+	@$(MAKE) exunit
 	@$(MAKE) mango-test
 
 .PHONY: eunit
