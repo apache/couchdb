@@ -37,7 +37,7 @@
 -type result() :: {doc_id(), [[{any(), any()}]]}.
 -type api_mod() :: atom().
 -type context() :: {api_mod(), any()}.
--type function_type() :: binary().
+-type function_type() :: binary() | atom().
 -type function_name() :: binary().
 -type function_src() :: binary().
 -type error(_Error) :: no_return().
@@ -117,6 +117,10 @@ with_context(#{language := Language}, Fun) ->
 
 
 -spec try_compile(context(), function_type(), function_name(), function_src()) -> ok.
+try_compile({_ApiMod, _Ctx}, reduce, <<_/binary>>, disabled) ->
+    % Reduce functions may be disabled. Accept that as a valid configuration.
+    ok;
+
 try_compile({ApiMod, Ctx}, FuncType, FuncName, FuncSrc) -> 
     ApiMod:try_compile(Ctx, FuncType, FuncName, FuncSrc).
 

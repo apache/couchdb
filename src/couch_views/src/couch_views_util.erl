@@ -19,12 +19,16 @@
     validate_args/1,
     validate_args/2,
     is_paginated/1,
-    active_tasks_info/5
+    active_tasks_info/5,
+    set_view_type/3,
+    set_extra/3,
+    get_view_queries/1,
+    get_view_keys/1,
+    extract_view/4
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("couch_views.hrl").
 
 
@@ -80,8 +84,51 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
         design_opts=DesignOpts,
         partitioned=Partitioned
     },
-    SigInfo = {Views1, Language, DesignOpts, couch_index_util:sort_lib(Lib)},
+    SigInfo = {Views1, Language, DesignOpts, sort_lib(Lib)},
     {ok, IdxState#mrst{sig=couch_hash:md5_hash(term_to_binary(SigInfo))}}.
+
+
+set_view_type(_Args, _ViewName, []) ->
+    throw({not_found, missing_named_view});
+
+set_view_type(Args, ViewName, [View | Rest]) ->
+    RedNames = [N || {N, _} <- View#mrview.reduce_funs],
+    case lists:member(ViewName, RedNames) of
+        true ->
+            case Args#mrargs.reduce of
+                false -> Args#mrargs{view_type=map};
+                _ -> Args#mrargs{view_type=red}
+            end;
+        false ->
+            case lists:member(ViewName, View#mrview.map_names) of
+                true -> Args#mrargs{view_type=map};
+                false -> set_view_type(Args, ViewName, Rest)
+            end
+    end.
+
+
+set_extra(#mrargs{} = Args, Key, Value) ->
+    Extra0 = Args#mrargs.extra,
+    Extra1 = lists:ukeysort(1, [{Key, Value} | Extra0]),
+    Args#mrargs{extra = Extra1}.
+
+
+extract_view(_Lang, _Args, _ViewName, []) ->
+    throw({not_found, missing_named_view});
+
+extract_view(Lang, #mrargs{view_type=map}=Args, Name, [View | Rest]) ->
+    Names = View#mrview.map_names ++ [N || {N, _} <- View#mrview.reduce_funs],
+    case lists:member(Name, Names) of
+        true -> {map, View, Args};
+        _ -> extract_view(Lang, Args, Name, Rest)
+    end;
+
+extract_view(Lang, #mrargs{view_type=red}=Args, Name, [View | Rest]) ->
+    RedNames = [N || {N, _} <- View#mrview.reduce_funs],
+    case lists:member(Name, RedNames) of
+        true -> {red, {index_of(Name, RedNames), Lang, View}, Args};
+        false -> extract_view(Lang, Args, Name, Rest)
+    end.
 
 
 collate_fun(View) ->
@@ -122,7 +169,7 @@ validate_args(Args) ->
     validate_args(Args, []).
 
 
-% This is mostly a copy of couch_mrview_util:validate_args/1 but it doesn't
+% This is mostly a copy of couch_validate:validate_args/1 but it doesn't
 % update start / end keys and also throws a not_implemented error for reduce
 %
 validate_args(#mrargs{} = Args, Opts) ->
@@ -366,3 +413,53 @@ convert_seq_to_stamp(Seq) ->
     VS = integer_to_list(Stamp) ++ "-" ++ integer_to_list(Batch) ++ "-"
             ++ integer_to_list(DocNumber),
     list_to_binary(VS).
+
+
+get_view_queries({Props}) ->
+    case couch_util:get_value(<<"queries">>, Props) of
+        undefined ->
+            undefined;
+        Queries when is_list(Queries) ->
+            Queries;
+        _ ->
+            throw({bad_request, "`queries` member must be an array."})
+    end.
+
+
+get_view_keys({Props}) ->
+    case couch_util:get_value(<<"keys">>, Props) of
+        undefined ->
+            undefined;
+        Keys when is_list(Keys) ->
+            Keys;
+        _ ->
+            throw({bad_request, "`keys` member must be an array."})
+    end.
+
+
+sort_lib({Lib}) ->
+    sort_lib(Lib, []).
+
+sort_lib([], LAcc) ->
+    lists:keysort(1, LAcc);
+
+sort_lib([{LName, {LObj}}|Rest], LAcc) ->
+    LSorted = sort_lib(LObj, []), % descend into nested object
+    sort_lib(Rest, [{LName, LSorted}|LAcc]);
+
+sort_lib([{LName, LCode}|Rest], LAcc) ->
+    sort_lib(Rest, [{LName, LCode}|LAcc]).
+
+
+index_of(Key, List) ->
+    index_of(Key, List, 1).
+
+
+index_of(_, [], _) ->
+    throw({error, missing_named_view});
+
+index_of(Key, [Key | _], Idx) ->
+    Idx;
+
+index_of(Key, [_ | Rest], Idx) ->
+    index_of(Key, Rest, Idx+1).
