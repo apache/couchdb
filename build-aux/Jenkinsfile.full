@@ -83,6 +83,8 @@ pipeline {
           label 'docker'
           image 'couchdbdev/debian-stretch-erlang-20.3.8.25-1:latest'
           args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
         }
       }
       options {
@@ -200,6 +202,8 @@ pipeline {
               image 'couchdbdev/centos-7-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
+              registryUrl 'https://docker.io/'
+              registryCredentialsId 'dockerhub_creds'
             }
           }
           environment {
@@ -244,6 +248,8 @@ pipeline {
               image 'couchdbdev/centos-8-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
+              registryUrl 'https://docker.io/'
+              registryCredentialsId 'dockerhub_creds'
             }
           }
           environment {
@@ -288,6 +294,8 @@ pipeline {
               image 'couchdbdev/ubuntu-xenial-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
+              registryUrl 'https://docker.io/'
+              registryCredentialsId 'dockerhub_creds'
             }
           }
           environment {
@@ -331,6 +339,8 @@ pipeline {
               image 'couchdbdev/ubuntu-bionic-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
+              registryUrl 'https://docker.io/'
+              registryCredentialsId 'dockerhub_creds'
             }
           }
           environment {
@@ -374,6 +384,8 @@ pipeline {
               image 'couchdbdev/ubuntu-focal-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
+              registryUrl 'https://docker.io/'
+              registryCredentialsId 'dockerhub_creds'
             }
           }
           environment {
@@ -417,6 +429,8 @@ pipeline {
               image 'couchdbdev/debian-stretch-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
+              registryUrl 'https://docker.io/'
+              registryCredentialsId 'dockerhub_creds'
             }
           }
           environment {
@@ -460,6 +474,8 @@ pipeline {
               image 'couchdbdev/debian-buster-erlang-20.3.8.25-1:latest'
               label 'docker'
               args "${DOCKER_ARGS}"
+              registryUrl 'https://docker.io/'
+              registryCredentialsId 'dockerhub_creds'
             }
           }
           environment {
@@ -504,6 +520,8 @@ pipeline {
               image 'couchdbdev/arm64v8-debian-buster-erlang-20.3.8.25-1:latest'
               label 'arm64v8'
               args "${DOCKER_ARGS}"
+              registryUrl 'https://docker.io/'
+              registryCredentialsId 'dockerhub_creds'
             }
           }
           environment {
@@ -551,6 +569,8 @@ pipeline {
 //              image 'couchdbdev/ppc64le-debian-buster-erlang-20.3.8.25-1:latest'
 //              label 'ppc64le'
 //              args "${DOCKER_ARGS}"
+//              registryUrl 'https://docker.io/'
+//              registryCredentialsId 'dockerhub_creds'
 //            }
 //          }
 //          environment {
@@ -664,6 +684,8 @@ pipeline {
           image 'couchdbdev/debian-buster-erlang-20.3.8.25-1:latest'
           label 'docker'
           args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
         }
       }
       options {
