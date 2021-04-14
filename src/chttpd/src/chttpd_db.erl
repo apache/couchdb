@@ -15,9 +15,7 @@
 -compile(tuple_calls).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
--include_lib("fabric/include/fabric.hrl").
--include_lib("mem3/include/mem3.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
     db_req/2, couch_doc_open/4,handle_changes_req/2,
@@ -573,7 +571,7 @@ db_req(#httpd{method='GET',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
 db_req(#httpd{method='POST',
     path_parts=[_, OP, <<"queries">>]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
     Props = chttpd:json_body_obj(Req),
-    case couch_mrview_util:get_view_queries(Props) of
+    case couch_views_util:get_view_queries(Props) of
         undefined ->
             throw({bad_request,
                 <<"POST body must include `queries` parameter.">>});
@@ -890,7 +888,7 @@ send_all_docs_keys(Db, #mrargs{} = Args, VAcc0) ->
                     doc = DocValue
                 }
         end,
-        Row1 = fabric_view:transform_row(Row0),
+        Row1 = couch_views_http:transform_row(Row0),
         view_cb(Row1, Acc)
     end,
     {ok, VAcc2} = fabric2_db:fold_docs(Db, Keys, CB, VAcc1, OpenOpts),
@@ -1131,7 +1129,7 @@ db_doc_req(#httpd{method='COPY'}=Req, Db, SourceDocId) ->
         missing_rev -> nil;
         Rev -> Rev
     end,
-    {TargetDocId0, TargetRevs} = couch_httpd_db:parse_copy_destination_header(Req),
+    {TargetDocId0, TargetRevs} = chttpd_util:parse_copy_destination_header(Req),
     TargetDocId = list_to_binary(mochiweb_util:unquote(TargetDocId0)),
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
@@ -1962,7 +1960,7 @@ set_namespace(<<"_local_docs">>, Args) ->
 set_namespace(<<"_design_docs">>, Args) ->
     set_namespace(<<"_design">>, Args);
 set_namespace(NS, #mrargs{} = Args) ->
-    couch_mrview_util:set_extra(Args, namespace, NS).
+    couch_views_util:set_extra(Args, namespace, NS).
 
 
 %% /db/_bulk_get stuff

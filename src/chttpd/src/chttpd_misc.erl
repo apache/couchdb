@@ -30,7 +30,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -115,7 +115,7 @@ handle_all_dbs_req(#httpd{method='GET'}=Req) ->
         direction = Dir,
         limit = Limit,
         skip = Skip
-    } = couch_mrview_http:parse_params(Req, undefined),
+    } = couch_views_http_util:parse_params(Req, undefined),
 
     Options = [
         {start_key, StartKey},
@@ -137,7 +137,7 @@ all_dbs_callback({meta, _Meta}, #vacc{resp=Resp0}=Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
     {ok, Acc#vacc{resp=Resp1}};
 all_dbs_callback({row, Row}, #vacc{resp=Resp0}=Acc) ->
-    Prepend = couch_mrview_http:prepend_val(Acc),
+    Prepend = couch_views_http_util:prepend_val(Acc),
     DbName = couch_util:get_value(id, Row),
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
     {ok, Acc#vacc{prepend=",", resp=Resp1}};
@@ -155,7 +155,7 @@ handle_dbs_info_req(#httpd{method = 'GET'} = Req) ->
 handle_dbs_info_req(#httpd{method='POST', user_ctx=UserCtx}=Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = chttpd:json_body_obj(Req),
-    Keys = couch_mrview_util:get_view_keys(Props),
+    Keys = couch_views_util:get_view_keys(Props),
     case Keys of
         undefined -> throw({bad_request, "`keys` member must exist."});
         _ -> ok
@@ -248,7 +248,7 @@ send_db_infos(Req, ListFunctionName) ->
         direction = Dir,
         limit = Limit,
         skip = Skip
-    } = couch_mrview_http:parse_params(Req, undefined),
+    } = couch_views_http_util:parse_params(Req, undefined),
 
     Options = [
         {start_key, StartKey},
@@ -275,7 +275,7 @@ dbs_info_callback({meta, _Meta}, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
     {ok, Acc#vacc{resp = Resp1}};
 dbs_info_callback({row, Props}, #vacc{resp = Resp0} = Acc) ->
-    Prepend = couch_mrview_http:prepend_val(Acc),
+    Prepend = couch_views_http_util:prepend_val(Acc),
     Chunk = [Prepend, ?JSON_ENCODE({Props})],
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
     {ok, Acc#vacc{prepend = ",", resp = Resp1}};

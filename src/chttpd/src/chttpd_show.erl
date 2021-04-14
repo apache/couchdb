@@ -15,7 +15,7 @@
 -export([handle_doc_update_req/3]).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 
 maybe_open_doc(Db, DocId, Options) ->

@@ -12,7 +12,7 @@
 
 -module(chttpd_view).
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 -export([
     handle_view_req/3,
@@ -35,10 +35,10 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
 
 
 stream_multi_query_view(Req, Db, DDoc, ViewName, Args0, Queries) ->
-    {ok, #mrst{views=Views}} = couch_mrview_util:ddoc_to_mrst(Db, DDoc),
-    Args1 = couch_mrview_util:set_view_type(Args0, ViewName, Views),
+    {ok, #mrst{views=Views}} = couch_views_util:ddoc_to_mrst(Db, DDoc),
+    Args1 = couch_views_util:set_view_type(Args0, ViewName, Views),
     ArgQueries = parse_queries(Req, Args1, Queries, fun(QueryArg) ->
-        couch_mrview_util:set_view_type(QueryArg, ViewName, Views)
+        couch_views_util:set_view_type(QueryArg, ViewName, Views)
     end),
     VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
     FirstChunk = "{\"results\":[",
@@ -54,9 +54,9 @@ stream_multi_query_view(Req, Db, DDoc, ViewName, Args0, Queries) ->
 
 
 paginate_multi_query_view(Req, Db, DDoc, ViewName, Args0, Queries) ->
-    {ok, #mrst{views=Views}} = couch_mrview_util:ddoc_to_mrst(Db, DDoc),
+    {ok, #mrst{views=Views}} = couch_views_util:ddoc_to_mrst(Db, DDoc),
     ArgQueries = parse_queries(Req, Args0, Queries, fun(QueryArg) ->
-        couch_mrview_util:set_view_type(QueryArg, ViewName, Views)
+        couch_views_util:set_view_type(QueryArg, ViewName, Views)
     end),
     KeyFun = fun({Props}) ->
         {couch_util:get_value(id, Props), couch_util:get_value(key, Props)}
@@ -76,7 +76,7 @@ paginate_multi_query_view(Req, Db, DDoc, ViewName, Args0, Queries) ->
 
 
 design_doc_post_view(Req, Props, Db, DDoc, ViewName, Keys) ->
-    Args = couch_mrview_http:parse_body_and_query(Req, Props, Keys),
+    Args = couch_views_http_util:parse_body_and_query(Req, Props, Keys),
     fabric_query_view(Db, Req, DDoc, ViewName, Args).
 
 design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
@@ -134,7 +134,7 @@ handle_view_req(#httpd{method='POST',
     path_parts=[_, _, _, _, ViewName, <<"queries">>]}=Req, Db, DDoc) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
-    case couch_mrview_util:get_view_queries(Props) of
+    case couch_views_util:get_view_queries(Props) of
         undefined ->
             throw({bad_request,
                 <<"POST body must include `queries` parameter.">>});
@@ -156,8 +156,8 @@ handle_view_req(#httpd{method='POST',
         path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
-    assert_no_queries_param(couch_mrview_util:get_view_queries(Props)),
-    Keys = couch_mrview_util:get_view_keys(Props),
+    assert_no_queries_param(couch_views_util:get_view_queries(Props)),
+    Keys = couch_views_util:get_view_keys(Props),
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     design_doc_post_view(Req, Props, Db, DDoc, ViewName, Keys);
 
@@ -299,7 +299,7 @@ t_check_user_can_override_individual_query_type() ->
 
 setup_all() ->
     Views = [#mrview{reduce_funs = [{<<"v">>, <<"_count">>}]}],
-    meck:expect(couch_mrview_util, ddoc_to_mrst, 2, {ok, #mrst{views = Views}}),
+    meck:expect(couch_views_util, ddoc_to_mrst, 2, {ok, #mrst{views = Views}}),
     meck:expect(chttpd, start_delayed_json_response, 4, {ok, resp}),
     meck:expect(couch_views, query, 6, {ok, #vacc{}}),
     meck:expect(chttpd, send_delayed_chunk, 2, {ok, resp}),
@@ -314,7 +314,7 @@ setup() ->
     meck:reset([
         chttpd,
         couch_views,
-        couch_mrview_util
+        couch_views_util
     ]).
 
 

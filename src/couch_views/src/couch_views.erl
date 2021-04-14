@@ -26,7 +26,6 @@
 ]).
 
 -include("couch_views.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 
 
 query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
@@ -46,8 +45,8 @@ query(Db, DDoc, ViewName, Callback, Acc0, Args0) ->
     } = Mrst,
 
     Args1 = to_mrargs(Args0),
-    Args2 = couch_mrview_util:set_view_type(Args1, ViewName, Views),
-    Args3 = couch_mrview_util:validate_args(Args2),
+    Args2 = couch_views_util:set_view_type(Args1, ViewName, Views),
+    Args3 = couch_views_validate:validate_args(Args2),
     ok = check_range(Mrst, ViewName, Args3),
 
     try
@@ -199,7 +198,7 @@ check_range(Mrst, ViewName, Args) ->
         language = Lang,
         views = Views
     } = Mrst,
-    View = case couch_mrview_util:extract_view(Lang, Args, ViewName, Views) of
+    View = case couch_views_util:extract_view(Lang, Args, ViewName, Views) of
         {map, V, _} -> V;
         {red, {_, _, V}, _} -> V
     end,

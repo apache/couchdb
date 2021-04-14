@@ -26,7 +26,6 @@
 -endif.
 
 
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("couch_views.hrl").
 
 

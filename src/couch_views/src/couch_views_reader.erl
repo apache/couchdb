@@ -19,7 +19,6 @@
 
 -include("couch_views.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 
 
@@ -245,14 +244,14 @@ maybe_finalize(Finalizer, Red) ->
 
 
 get_map_view(Lang, Args, ViewName, Views) ->
-    case couch_mrview_util:extract_view(Lang, Args, ViewName, Views) of
+    case couch_views_util:extract_view(Lang, Args, ViewName, Views) of
         {map, View, _Args} -> View;
         {red, {_Idx, _Lang, View}, _} -> View
     end.
 
 
 get_red_view(Lang, Args, ViewName, Views) ->
-    case couch_mrview_util:extract_view(Lang, Args, ViewName, Views) of
+    case couch_views_util:extract_view(Lang, Args, ViewName, Views) of
         {red, {Idx, Lang, View}, _} -> check_red_enabled({Idx, Lang, View});
         _ -> throw({not_found, missing_named_view})
     end.

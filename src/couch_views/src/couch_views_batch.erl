@@ -20,7 +20,7 @@
 ]).
 
 
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 -type update_stats() :: #{
     docs_read => non_neg_integer(),
