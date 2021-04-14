@@ -60,7 +60,7 @@ list(Db) ->
 
         case proplists:get_value(<<"language">>, Props) == <<"query">> of
             true ->
-                {ok, Mrst} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
+                {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
 
                 IsInteractive = couch_views_ddoc:is_interactive(DDoc),
                 BuildState = couch_views_fdb:get_build_status(Db, Mrst),

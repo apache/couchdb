@@ -30,7 +30,6 @@
 
 -include("couch_views.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 
 

@@ -12,7 +12,7 @@
 
 -module(chttpd_changes).
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 -export([
     handle_db_changes/3,
