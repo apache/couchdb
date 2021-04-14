@@ -65,7 +65,7 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
                 Options = [{user_ctx, Req#httpd.user_ctx}]
             end,
             NewDoc = couch_db:doc_from_json_obj_validate(Db, {NewJsonDoc}),
-            couch_doc:validate_docid(NewDoc#doc.id),
+            fabric2_db:validate_docid(NewDoc#doc.id),
             {UpdateResult, NewRev} = fabric:update_doc(Db, NewDoc, Options),
             chttpd_stats:incr_writes(),
             NewRevStr = couch_doc:rev_to_str(NewRev),

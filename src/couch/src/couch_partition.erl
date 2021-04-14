@@ -122,7 +122,7 @@ validate_docid(DocId) when is_binary(DocId) ->
             throw({illegal_docid, <<"Doc id must be of form partition:id">>});
         {Partition, PartitionedDocId} ->
             validate_partition(Partition),
-            couch_doc:validate_docid(PartitionedDocId)
+            fabric2_db:validate_docid(PartitionedDocId)
     end.
 
 
