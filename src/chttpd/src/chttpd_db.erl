@@ -23,8 +23,7 @@
     db_req/2, couch_doc_open/4,handle_changes_req/2,
     update_doc_result_to_json/1, update_doc_result_to_json/2,
     handle_design_info_req/3, handle_view_cleanup_req/2,
-    update_doc/4, http_code_from_status/1,
-    handle_partition_req/2]).
+    update_doc/4, http_code_from_status/1]).
 
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
@@ -274,80 +273,6 @@ handle_compact_req(Req, _Db) ->
 handle_view_cleanup_req(Req, Db) ->
     ok = fabric2_index:cleanup(Db),
     send_json(Req, 202, {[{ok, true}]}).
-
-
-handle_partition_req(#httpd{path_parts=[_,_]}=_Req, _Db) ->
-    throw({bad_request, invalid_partition_req});
-
-handle_partition_req(#httpd{method='GET', path_parts=[_,_,PartId]}=Req, Db) ->
-    couch_partition:validate_partition(PartId),
-    case couch_db:is_partitioned(Db) of
-        true ->
-            {ok, PartitionInfo} = fabric:get_partition_info(Db, PartId),
-            send_json(Req, {PartitionInfo});
-        false ->
-            throw({bad_request, <<"database is not partitioned">>})
-    end;
-
-handle_partition_req(#httpd{method='POST',
-    path_parts=[_, <<"_partition">>, <<"_", _/binary>>]}, _Db) ->
-    Msg = <<"Partition must not start with an underscore">>,
-    throw({illegal_partition, Msg});
-
-handle_partition_req(#httpd{path_parts = [_, _, _]}=Req, _Db) ->
-    send_method_not_allowed(Req, "GET");
-
-handle_partition_req(#httpd{path_parts=[DbName, _, PartId | Rest]}=Req, Db) ->
-    case couch_db:is_partitioned(Db) of
-        true ->
-            couch_partition:validate_partition(PartId),
-            QS = chttpd:qs(Req),
-            PartIdStr = ?b2l(PartId),
-            QSPartIdStr = couch_util:get_value("partition", QS, PartIdStr),
-            if QSPartIdStr == PartIdStr -> ok; true ->
-                Msg = <<"Conflicting value for `partition` in query string">>,
-                throw({bad_request, Msg})
-            end,
-            NewQS = lists:ukeysort(1, [{"partition", PartIdStr} | QS]),
-            NewReq = Req#httpd{
-                path_parts = [DbName | Rest],
-                qs = NewQS
-            },
-            update_partition_stats(Rest),
-            case Rest of
-                [OP | _] when OP == <<"_all_docs">> orelse ?IS_MANGO(OP) ->
-                    case chttpd_handlers:db_handler(OP, fun db_req/2) of
-                        Handler when is_function(Handler, 2) ->
-                            Handler(NewReq, Db);
-                        _ ->
-                            chttpd:send_error(Req, not_found)
-                    end;
-                [<<"_design">>, _Name, <<"_", _/binary>> | _] ->
-                    handle_design_req(NewReq, Db);
-                _ ->
-                    chttpd:send_error(Req, not_found)
-            end;
-        false ->
-            throw({bad_request, <<"database is not partitioned">>})
-    end;
-
-handle_partition_req(Req, _Db) ->
-    chttpd:send_error(Req, not_found).
-
-update_partition_stats(PathParts) ->
-    case PathParts of
-            [<<"_design">> | _] ->
-                couch_stats:increment_counter([couchdb, httpd, partition_view_requests]);
-            [<<"_all_docs">> | _] ->
-                couch_stats:increment_counter([couchdb, httpd, partition_all_docs_requests]);
-            [<<"_find">> | _] ->
-                couch_stats:increment_counter([couchdb, httpd, partition_find_requests]);
-            [<<"_explain">> | _] ->
-                couch_stats:increment_counter([couchdb, httpd, partition_explain_requests]);
-            _ ->
-                ok % ignore path that do not match
-        end.
-
 
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
@@ -635,41 +560,6 @@ db_req(#httpd{method='POST', path_parts=[_, <<"_bulk_get">>],
 db_req(#httpd{path_parts=[_, <<"_bulk_get">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 
-
-db_req(#httpd{method='POST',path_parts=[_,<<"_purge">>]}=Req, Db) ->
-    couch_stats:increment_counter([couchdb, httpd, purge_requests]),
-    chttpd:validate_ctype(Req, "application/json"),
-    {IdsRevs} = chttpd:json_body_obj(Req),
-    IdsRevs2 = [{Id, couch_doc:parse_revs(Revs)} || {Id, Revs} <- IdsRevs],
-    MaxIds = config:get_integer("purge", "max_document_id_number", 100),
-    case length(IdsRevs2) =< MaxIds of
-        false -> throw({bad_request, "Exceeded maximum number of documents."});
-        true -> ok
-    end,
-    RevsLen = lists:foldl(fun({_Id, Revs}, Acc) ->
-        length(Revs) + Acc
-    end, 0, IdsRevs2),
-    MaxRevs = config:get_integer("purge", "max_revisions_number", 1000),
-    case RevsLen =< MaxRevs of
-        false -> throw({bad_request, "Exceeded maximum number of revisions."});
-        true -> ok
-    end,
-    couch_stats:increment_counter([couchdb, document_purges, total], length(IdsRevs2)),
-    Results2 = case fabric:purge_docs(Db, IdsRevs2, []) of
-        {ok, Results} ->
-            chttpd_stats:incr_writes(length(Results)),
-            Results;
-        {accepted, Results} ->
-            chttpd_stats:incr_writes(length(Results)),
-            Results
-    end,
-    {Code, Json} = purge_results_to_json(IdsRevs2, Results2),
-    send_json(Req, Code, {[{<<"purge_seq">>, null}, {<<"purged">>, {Json}}]});
-
-db_req(#httpd{path_parts=[_,<<"_purge">>]}=Req, _Db) ->
-    send_method_not_allowed(Req, "POST");
-
-
 db_req(#httpd{method='GET',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
     case chttpd:qs_json_value(Req, "keys", nil) of
     Keys when is_list(Keys) ->
@@ -777,22 +667,6 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_revs_limit">>]}=Req, Db) ->
 
 db_req(#httpd{path_parts=[_,<<"_revs_limit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
-
-db_req(#httpd{method='PUT',path_parts=[_,<<"_purged_infos_limit">>]}=Req, Db) ->
-    case chttpd:json_body(Req) of
-        Limit when is_integer(Limit), Limit > 0 ->
-            case fabric:set_purge_infos_limit(Db, Limit, []) of
-                ok ->
-                    send_json(Req, {[{<<"ok">>, true}]});
-                Error ->
-                    throw(Error)
-            end;
-        _->
-            throw({bad_request, "`purge_infos_limit` must be positive integer"})
-    end;
-
-db_req(#httpd{method='GET',path_parts=[_,<<"_purged_infos_limit">>]}=Req, Db) ->
-    send_json(Req, fabric:get_purge_infos_limit(Db));
 
 % Special case to enable using an unencoded slash in the URL of design docs,
 % as slashes in document IDs must otherwise be URL encoded.
@@ -1443,24 +1317,6 @@ update_doc_result_to_json(DocId, {{DocId, _}, Error}) ->
 update_doc_result_to_json(DocId, Error) ->
     {_Code, ErrorStr, Reason} = chttpd:error_info(Error),
     {[{id, DocId}, {error, ErrorStr}, {reason, Reason}]}.
-
-purge_results_to_json([], []) ->
-    {201, []};
-purge_results_to_json([{DocId, _Revs} | RIn], [{ok, PRevs} | ROut]) ->
-    {Code, Results} = purge_results_to_json(RIn, ROut),
-    couch_stats:increment_counter([couchdb, document_purges, success]),
-    {Code, [{DocId, couch_doc:revs_to_strs(PRevs)} | Results]};
-purge_results_to_json([{DocId, _Revs} | RIn], [{accepted, PRevs} | ROut]) ->
-    {Code, Results} = purge_results_to_json(RIn, ROut),
-    couch_stats:increment_counter([couchdb, document_purges, success]),
-    NewResults = [{DocId, couch_doc:revs_to_strs(PRevs)} | Results],
-    {erlang:max(Code, 202), NewResults};
-purge_results_to_json([{DocId, _Revs} | RIn], [Error | ROut]) ->
-    {Code, Results} = purge_results_to_json(RIn, ROut),
-    {NewCode, ErrorStr, Reason} = chttpd:error_info(Error),
-    couch_stats:increment_counter([couchdb, document_purges, failure]),
-    NewResults = [{DocId, {[{error, ErrorStr}, {reason, Reason}]}} | Results],
-    {erlang:max(NewCode, Code), NewResults}.
 
 send_updated_doc(Req, Db, DocId, Json) ->
     send_updated_doc(Req, Db, DocId, Json, []).

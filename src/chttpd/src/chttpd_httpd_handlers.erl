@@ -15,9 +15,11 @@
 -export([url_handler/1, db_handler/1, design_handler/1, handler_info/3]).
 
 -export([
-    not_supported/2,
     not_supported/3,
-    not_implemented/2
+    not_supported/2,
+    not_supported/1,
+    not_implemented/2,
+    not_implemented/1
 ]).
 
 
@@ -38,16 +40,22 @@ url_handler(<<"_replicate">>)      -> fun chttpd_misc:handle_replicate_req/1;
 url_handler(<<"_uuids">>)          -> fun chttpd_misc:handle_uuids_req/1;
 url_handler(<<"_session">>)        -> fun chttpd_auth:handle_session_req/1;
 url_handler(<<"_up">>)             -> fun chttpd_misc:handle_up_req/1;
+url_handler(<<"_membership">>)     -> fun ?MODULE:not_supported/1;
+url_handler(<<"_reshard">>)        -> fun ?MODULE:not_supported/1;
+url_handler(<<"_db_updates">>)     -> fun ?MODULE:not_implemented/1;
+url_handler(<<"_cluster_setup">>)  -> fun ?MODULE:not_implemented/1;
 url_handler(_) -> no_match.
 
 db_handler(<<"_view_cleanup">>) -> fun chttpd_db:handle_view_cleanup_req/2;
 db_handler(<<"_compact">>)      -> fun chttpd_db:handle_compact_req/2;
 db_handler(<<"_design">>)       -> fun chttpd_db:handle_design_req/2;
-db_handler(<<"_partition">>)    -> fun chttpd_db:handle_partition_req/2;
+db_handler(<<"_partition">>)    -> fun ?MODULE:not_implemented/2;
 db_handler(<<"_temp_view">>)    -> fun ?MODULE:not_supported/2;
 db_handler(<<"_changes">>)      -> fun chttpd_db:handle_changes_req/2;
 db_handler(<<"_purge">>)        -> fun ?MODULE:not_implemented/2;
 db_handler(<<"_purged_infos_limit">>) -> fun ?MODULE:not_implemented/2;
+db_handler(<<"_shards">>)       -> fun ?MODULE:not_supported/2;
+db_handler(<<"_sync_shards">>)  -> fun ?MODULE:not_supported/2;
 db_handler(_) -> no_match.
 
 design_handler(<<"_view">>)    -> fun chttpd_view:handle_view_req/3;
@@ -186,7 +194,6 @@ handler_info(Method, [<<"_", _/binary>> = Part| Rest], Req) ->
     % on for known system databases.
     DbName = case Part of
         <<"_dbs">> -> '_dbs';
-        <<"_global_changes">> -> '_global_changes';
         <<"_metadata">> -> '_metadata';
         <<"_nodes">> -> '_nodes';
         <<"_replicator">> -> '_replicator';
@@ -497,7 +504,7 @@ handler_info(_, _, _) ->
 
 get_copy_destination(Req) ->
     try
-        {DocIdStr, _} = couch_httpd_db:parse_copy_destination_header(Req),
+        {DocIdStr, _} = chttpd_util:parse_copy_destination_header(Req),
         list_to_binary(mochiweb_util:unquote(DocIdStr))
     catch _:_ ->
         unknown
@@ -509,10 +516,18 @@ not_supported(#httpd{} = Req, Db, _DDoc) ->
 
 
 not_supported(#httpd{} = Req, _Db) ->
+    not_supported(Req).
+
+
+not_supported(#httpd{} = Req) ->
     Msg = <<"resource is not supported in CouchDB >= 4.x">>,
     chttpd:send_error(Req, 410, gone, Msg).
 
 
 not_implemented(#httpd{} = Req, _Db) ->
+    not_implemented(Req).
+
+
+not_implemented(#httpd{} = Req) ->
     Msg = <<"resource is not implemented">>,
     chttpd:send_error(Req, 501, not_implemented, Msg).

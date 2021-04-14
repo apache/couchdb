@@ -123,6 +123,12 @@ start_link(Name, Options) ->
          end,
     ok = couch_httpd:validate_bind_address(IP),
 
+    % Ensure uuid is set so that concurrent replications
+    % get the same value. This used to in the backend (:5986) httpd
+    % start_link and was moved here for now. Ideally this should be set
+    % in FDB or coordinated across all the nodes
+    couch_server:get_uuid(),
+
     set_auth_handlers(),
 
     Options1 = Options ++ [
@@ -153,7 +159,6 @@ stop() ->
     mochiweb_http:stop(?MODULE).
 
 handle_request(MochiReq0) ->
-    erlang:put(?REWRITE_COUNT, 0),
     MochiReq = couch_httpd_vhost:dispatch_host(MochiReq0),
     handle_request_int(MochiReq).
 
