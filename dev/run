@@ -794,7 +794,7 @@ def try_request(
 
 
 def create_system_databases(host, port):
-    for dbname in ["_users", "_replicator", "_global_changes"]:
+    for dbname in ["_users", "_replicator"]:
         conn = httpclient.HTTPConnection(host, port)
         conn.request("HEAD", "/" + dbname)
         resp = conn.getresponse()
