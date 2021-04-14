@@ -33,7 +33,7 @@
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
 -import(chttpd,
-    [send_json/2,send_json/3,send_method_not_allowed/2,
+    [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
     send_chunk/2,start_chunked_response/3]).
 
 -define(MAX_DB_NUM_FOR_DBS_INFO, 100).
@@ -61,12 +61,7 @@ handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 get_features() ->
-    case clouseau_rpc:connected() of
-        true ->
-            [search | config:features()];
-        false ->
-            config:features()
-    end.
+    config:features().
 
 handle_favicon_req(Req) ->
     handle_favicon_req(Req, get_docroot()).
@@ -334,9 +329,33 @@ handle_reload_query_servers_req(#httpd{method='POST'}=Req) ->
 handle_reload_query_servers_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
+handle_uuids_req(#httpd{method='GET'}=Req) ->
+    Max = list_to_integer(config:get("uuids","max_count","1000")),
+    Count = try list_to_integer(couch_httpd:qs_value(Req, "count", "1")) of
+        N when N > Max ->
+            throw({bad_request, <<"count parameter too large">>});
+        N when N < 0 ->
+            throw({bad_request, <<"count must be a positive integer">>});
+        N -> N
+    catch
+        error:badarg ->
+            throw({bad_request, <<"count must be a positive integer">>})
+    end,
+    UUIDs = [couch_uuids:new() || _ <- lists:seq(1, Count)],
+    Etag = couch_httpd:make_etag(UUIDs),
+    couch_httpd:etag_respond(Req, Etag, fun() ->
+        CacheBustingHeaders = [
+            {"Date", couch_util:rfc1123_date()},
+            {"Cache-Control", "no-cache"},
+            % Past date, ON PURPOSE!
+            {"Expires", "Mon, 01 Jan 1990 00:00:00 GMT"},
+            {"Pragma", "no-cache"},
+            {"ETag", Etag}
+        ],
+        send_json(Req, 200, CacheBustingHeaders, {[{<<"uuids">>, UUIDs}]})
+    end);
 handle_uuids_req(Req) ->
-    couch_httpd_misc_handlers:handle_uuids_req(Req).
-
+    send_method_not_allowed(Req, "GET").
 
 handle_up_req(#httpd{method='GET'} = Req) ->
     case config:get("couchdb", "maintenance_mode") of

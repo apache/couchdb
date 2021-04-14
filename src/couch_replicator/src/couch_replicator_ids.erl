@@ -58,7 +58,7 @@ base_id(#{?SOURCE := Src0, ?TARGET := Tgt0} = Rep, 3) ->
 
 base_id(#{?SOURCE := Src0, ?TARGET := Tgt0} = Rep, 2) ->
     {ok, HostName} = inet:gethostname(),
-    Port = case (catch mochiweb_socket_server:get(couch_httpd, port)) of
+    Port = case (catch mochiweb_socket_server:get(chttpd, port)) of
     P when is_number(P) ->
         P;
     _ ->

@@ -138,53 +138,13 @@ handle_node_req(#httpd{method='POST', path_parts=[_, Node, <<"_restart">>]}=Req)
     send_json(Req, 200, {[{ok, true}]});
 handle_node_req(#httpd{path_parts=[_, _Node, <<"_restart">>]}=Req) ->
     send_method_not_allowed(Req, "POST");
-handle_node_req(#httpd{path_parts=[_, Node | PathParts],
-                       mochi_req=MochiReq0}) ->
-    % strip /_node/{node} from Req0 before descending further
-    RawUri = MochiReq0:get(raw_path),
-    {_, Query, Fragment} = mochiweb_util:urlsplit_path(RawUri),
-    NewPath0 = "/" ++ lists:join("/", [couch_util:url_encode(P) || P <- PathParts]),
-    NewRawPath = mochiweb_util:urlunsplit_path({NewPath0, Query, Fragment}),
-    MaxSize =  config:get_integer("httpd", "max_http_request_size", 4294967296),
-    NewOpts = [{body, MochiReq0:recv_body(MaxSize)} | MochiReq0:get(opts)],
-    Ref = erlang:make_ref(),
-    MochiReq = mochiweb_request:new({remote, self(), Ref},
-                               NewOpts,
-                               MochiReq0:get(method),
-                               NewRawPath,
-                               MochiReq0:get(version),
-                               MochiReq0:get(headers)),
-    call_node(Node, couch_httpd, handle_request, [MochiReq]),
-    recv_loop(Ref, MochiReq0);
+handle_node_req(#httpd{path_parts=[_, _Node | _PathParts]}=Req) ->
+    % Local (backend) dbs are not support any more
+    chttpd_httpd_handlers:not_supported(Req);
 handle_node_req(#httpd{path_parts=[_]}=Req) ->
     chttpd:send_error(Req, {bad_request, <<"Incomplete path to _node request">>});
 handle_node_req(Req) ->
     chttpd:send_error(Req, not_found).
-
-recv_loop(Ref, ReqResp) ->
-    receive
-        {Ref, Code, Headers, _Args, start_response} ->
-            recv_loop(Ref, ReqResp:start({Code, Headers}));
-        {Ref, Code, Headers, Len, start_response_length} ->
-            recv_loop(Ref, ReqResp:start_response_length({Code, Headers, Len}));
-        {Ref, Code, Headers, chunked, respond} ->
-            Resp = ReqResp:respond({Code, Headers, chunked}),
-            recv_loop(Ref, Resp);
-        {Ref, Code, Headers, Args, respond} ->
-            Resp = ReqResp:respond({Code, Headers, Args}),
-            {ok, Resp};
-        {Ref, send, Data} ->
-            ReqResp:send(Data),
-            {ok, ReqResp};
-        {Ref, chunk, <<>>} ->
-            ReqResp:write_chunk(<<>>),
-            {ok, ReqResp};
-        {Ref, chunk, Data} ->
-            ReqResp:write_chunk(Data),
-            recv_loop(Ref, ReqResp);
-        _Else ->
-            recv_loop(Ref, ReqResp)
-    end.
 
 call_node(Node0, Mod, Fun, Args) when is_binary(Node0) ->
     Node1 = try
