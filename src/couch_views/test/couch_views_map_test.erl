@@ -14,7 +14,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("couch_views.hrl").
 
 
@@ -565,27 +564,6 @@ check_local_seq(Val, Expected) ->
         #{limit => 3}),
 
     ?assertEqual(Expected, Result).
-
-
-% should_give_ext_size_seq_indexed_test(Db) ->
-%     DDoc = couch_doc:from_json_obj({[
-%         {<<"_id">>, <<"_design/seqdoc">>},
-%         {<<"options">>, {[{<<"seq_indexed">>, true}]}},
-%         {<<"views">>, {[
-%                 {<<"view1">>, {[
-%                     {<<"map">>, <<"function(doc){emit(doc._id, doc._id);}">>}
-%                 ]}}
-%             ]}
-%         }
-%     ]}),
-%     {ok, _} = couch_db:update_doc(Db, DDoc, []),
-%     {ok, Db1} = couch_db:open_int(couch_db:name(Db), []),
-%     {ok, DDoc1} = couch_db:open_doc(Db1, <<"_design/seqdoc">>, [ejson_body]),
-%     couch_mrview:query_view(Db1, DDoc1, <<"view1">>, [{update, true}]),
-%     {ok, Info} = couch_mrview:get_info(Db1, DDoc),
-%     Size = couch_util:get_nested_json_value({Info}, [sizes, external]),
-%     ok = couch_db:close(Db1),
-%     ?assert(is_number(Size)).
 
 
 run_query(Idx, Args) ->

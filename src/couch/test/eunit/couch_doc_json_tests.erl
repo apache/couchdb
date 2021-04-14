@@ -19,19 +19,19 @@
 setup() ->
     mock(couch_log),
     mock(config),
-    mock(couch_db_plugin),
+    mock(fabric2_db_plugin),
     ok.
 
 teardown(_) ->
     meck:unload(couch_log),
     meck:unload(config),
-    meck:unload(couch_db_plugin),
+    meck:unload(fabric2_db_plugin),
     ok.
 
-mock(couch_db_plugin) ->
-    ok = meck:new(couch_db_plugin, [passthrough]),
-    ok = meck:expect(couch_db_plugin, validate_docid, fun(_) -> false end),
-    ok;
+mock(fabric2_db_plugin) ->
+     ok = meck:new(fabric2_db_plugin, [passthrough]),
+     ok = meck:expect(fabric2_db_plugin, validate_docid, fun(_) -> false end),
+     ok;
 mock(couch_log) ->
     ok = meck:new(couch_log, [passthrough]),
     ok = meck:expect(couch_log, debug, fun(_, _) -> ok end),
@@ -52,7 +52,6 @@ json_doc_test_() ->
         fun(_) ->
             [{"Document from JSON", [
                 from_json_with_dbname_error_cases(),
-                from_json_with_db_name_success_cases(),
                 from_json_success_cases(),
                 from_json_error_cases()
              ]},
@@ -113,7 +112,9 @@ from_json_success_cases() ->
                     {type, <<"application/awesome">>},
                     {att_len, 45},
                     {disk_len, 45},
-                    {revpos, undefined}
+                    {revpos, undefined},
+                    {encoding, identity},
+                    {md5, <<>>}
                 ]),
                 couch_att:new([
                     {name, <<"noahs_private_key.gpg">>},
@@ -121,7 +122,9 @@ from_json_success_cases() ->
                     {type, <<"application/pgp-signature">>},
                     {att_len, 18},
                     {disk_len, 18},
-                    {revpos, 0}
+                    {revpos, 0},
+                    {encoding, undefined},
+                    {md5, undefined}
                 ])
             ]},
             "Attachments are parsed correctly."
@@ -173,44 +176,6 @@ from_json_success_cases() ->
         end,
         Cases).
 
-from_json_with_db_name_success_cases() ->
-    Cases = [
-        {
-            {[]},
-            <<"_dbs">>,
-            #doc{},
-            "DbName _dbs is acceptable with no docid"
-        },
-        {
-            {[{<<"_id">>, <<"zing!">>}]},
-            <<"_dbs">>,
-            #doc{id = <<"zing!">>},
-            "DbName _dbs is acceptable with a normal docid"
-        },
-        {
-            {[{<<"_id">>, <<"_users">>}]},
-            <<"_dbs">>,
-            #doc{id = <<"_users">>},
-            "_dbs/_users is acceptable"
-        },
-        {
-            {[{<<"_id">>, <<"_replicator">>}]},
-            <<"_dbs">>,
-            #doc{id = <<"_replicator">>},
-            "_dbs/_replicator is acceptable"
-        },
-        {
-            {[{<<"_id">>, <<"_global_changes">>}]},
-            <<"_dbs">>,
-            #doc{id = <<"_global_changes">>},
-            "_dbs/_global_changes is acceptable"
-        }
-    ],
-    lists:map(
-        fun({EJson, DbName, Expect, Msg}) ->
-            {Msg, ?_assertMatch(Expect, couch_doc:from_json_obj_validate(EJson, DbName))}
-        end,
-        Cases).
 
 from_json_error_cases() ->
     Cases = [
@@ -306,13 +271,6 @@ from_json_error_cases() ->
 
 from_json_with_dbname_error_cases() ->
     Cases = [
-        {
-            {[{<<"_id">>, <<"_random">>}]},
-            <<"_dbs">>,
-            {illegal_docid,
-             <<"Only reserved document ids may start with underscore.">>},
-            "Disallow non-system-DB underscore prefixed docids in _dbs database."
-        },
         {
             {[{<<"_id">>, <<"_random">>}]},
             <<"foobar">>,
@@ -418,7 +376,9 @@ to_json_success_cases() ->
                     {data, fun() -> ok end},
                     {revpos, 1},
                     {att_len, 400},
-                    {disk_len, 400}
+                    {disk_len, 400},
+                    {md5, <<>>},
+                    {encoding, identity}
                 ]),
                 couch_att:new([
                     {name, <<"fast.json">>},
@@ -426,7 +386,9 @@ to_json_success_cases() ->
                     {data, <<"{\"so\": \"there!\"}">>},
                     {revpos, 1},
                     {att_len, 16},
-                    {disk_len, 16}
+                    {disk_len, 16},
+                    {md5, <<>>},
+                    {encoding, identity}
                 ])
             ]},
             {[
@@ -457,13 +419,17 @@ to_json_success_cases() ->
                     {data, fun() -> <<"diet pepsi">> end},
                     {revpos, 1},
                     {att_len, 10},
-                    {disk_len, 10}
+                    {disk_len, 10},
+                    {md5, <<>>},
+                    {encoding, identity}
                 ]),
                 couch_att:new([
                     {name, <<"food.now">>},
                     {type, <<"application/food">>},
                     {revpos, 1},
-                    {data, <<"sammich">>}
+                    {data, <<"sammich">>},
+                    {md5, <<>>},
+                    {encoding, identity}
                 ])
             ]},
             {[

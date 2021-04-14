@@ -14,10 +14,9 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 -include_lib("mango/src/mango_idx.hrl").
--include_lib("couch_views/include/couch_views.hrl").
 
 
 indexer_test_() ->

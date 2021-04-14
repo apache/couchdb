@@ -26,10 +26,10 @@ fdb_tx_options_test_() ->
         setup,
         fun() ->
             meck:new(erlfdb, [passthrough]),
-            % erlfdb, rexi and mem3 are all dependent apps for fabric. We make
+            % erlfdb, ctrace are all dependent apps for fabric. We make
             % sure to start them so when fabric is started during the test it
             % already has its dependencies
-            test_util:start_couch([erlfdb, rexi, mem3, ctrace, fabric])
+            test_util:start_couch([erlfdb, ctrace, fabric])
         end,
         fun(Ctx) ->
             meck:unload(),
