@@ -530,9 +530,7 @@ send_lookup_changes(FullDocInfos, StartSeq, Dir, Db, Fun, Acc0) ->
         fwd ->
             FinalAcc0 = case element(1, FinalAcc) of
                 changes_acc -> % we came here via couch_http or internal call
-                    FinalAcc#changes_acc{seq = fabric2_db:get_update_seq(Db)};
-                fabric_changes_acc -> % we came here via chttpd / fabric / rexi
-                    FinalAcc#fabric_changes_acc{seq = couch_db:get_update_seq(Db)}
+                    FinalAcc#changes_acc{seq = fabric2_db:get_update_seq(Db)}
             end,
             {ok, FinalAcc0};
         rev -> {ok, FinalAcc}
