@@ -199,7 +199,6 @@ get_stats() ->
         {process_count, erlang:system_info(process_count)},
         {process_limit, erlang:system_info(process_limit)},
         {message_queues, {MessageQueues}},
-        {internal_replication_jobs, mem3_sync:get_backlog()},
         {distribution, {get_distribution_stats()}}
     ].
 
