@@ -13,17 +13,12 @@
 -define(LOCAL_DOC_PREFIX, "_local/").
 -define(DESIGN_DOC_PREFIX0, "_design").
 -define(DESIGN_DOC_PREFIX, "_design/").
--define(DEFAULT_COMPRESSION, snappy).
 
 -define(MIN_STR, <<"">>).
 -define(MAX_STR, <<255>>). % illegal utf string
 
--define(REWRITE_COUNT, couch_rewrite_count).
-
 -define(JSON_ENCODE(V), couch_util:json_encode(V)).
 -define(JSON_DECODE(V), couch_util:json_decode(V)).
-
--define(IS_OLD_RECORD(V, R), (tuple_size(V) /= tuple_size(R))).
 
 -define(b2l(V), binary_to_list(V)).
 -define(l2b(V), list_to_binary(V)).
@@ -39,7 +34,6 @@
 
 -define(SYSTEM_DATABASES, [
     <<"_dbs">>,
-    <<"_global_changes">>,
     <<"_metadata">>,
     <<"_nodes">>,
     <<"_replicator">>,
@@ -128,18 +122,6 @@
     handler
 }).
 
--record(view_fold_helper_funs, {
-    reduce_count,
-    passed_end,
-    start_response,
-    send_row
-}).
-
--record(reduce_fold_helper_funs, {
-    start_response,
-    send_row
-}).
-
 -record(extern_resp_args, {
     code = 200,
     stop = false,
@@ -147,13 +129,6 @@
     ctype = "application/json",
     headers = [],
     json = nil
-}).
-
--record(index_header, {
-    seq=0,
-    purge_seq=0,
-    id_btree_state=nil,
-    view_states=nil
 }).
 
 % small value used in revision trees to indicate the revision isn't stored
@@ -176,16 +151,6 @@
     db_open_options = []
 }).
 
--record(btree, {
-    fd,
-    root,
-    extract_kv,
-    assemble_kv,
-    less,
-    reduce = nil,
-    compression = ?DEFAULT_COMPRESSION
-}).
-
 -record(proc, {
     pid,
     lang,
@@ -202,15 +167,6 @@
     seq,
     sizes = #size_info{},
     atts = []
-}).
-
--record (fabric_changes_acc, {
-    db,
-    seq,
-    args,
-    options,
-    pending,
-    epochs
 }).
 
 -type doc() :: #doc{}.
