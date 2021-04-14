@@ -711,10 +711,21 @@ read_raw_iolist_int(Fd, {Pos, _Size}, Len) -> % 0110 UPGRADE CODE
     read_raw_iolist_int(Fd, Pos, Len);
 read_raw_iolist_int(#file{fd = Fd} = File, Pos, Len) ->
     {Pos, TotalBytes} = get_pread_locnum(File, Pos, Len),
-    {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
-    {remove_block_prefixes(Pos rem ?SIZE_BLOCK, RawBin), Pos + TotalBytes}.
+    case catch file:pread(Fd, Pos, TotalBytes) of
+        {ok, <<RawBin:TotalBytes/binary>>} ->
+            {remove_block_prefixes(Pos rem ?SIZE_BLOCK, RawBin), Pos + TotalBytes};
+        Else ->
+            % This clause matches when the file we are working with got truncated
+            % outside of CouchDB after we opened it. To find affected files, we
+            % need to log the file path.
+            %
+            % Technically, this should also go into read_multi_raw_iolists_int/2,
+            % but that doesn’t seem to be in use anywhere.
+            {_Fd, Filepath} = get(couch_file_fd),
+            throw({file_truncate_error, Else, Filepath})
+    end.
 
-
+% TODO: check if this is really unused
 read_multi_raw_iolists_int(#file{fd = Fd} = File, PosLens) ->
     LocNums = lists:map(fun({Pos, Len}) ->
         get_pread_locnum(File, Pos, Len)
