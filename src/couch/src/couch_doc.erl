@@ -16,14 +16,13 @@
 -export([from_json_obj/1, from_json_obj_validate/1]).
 -export([from_json_obj/2, from_json_obj_validate/2]).
 -export([to_json_obj/2, has_stubs/1, merge_stubs/2]).
--export([validate_docid/1, validate_docid/2, get_validate_doc_fun/1]).
+-export([get_validate_doc_fun/1]).
 -export([doc_from_multi_part_stream/2, doc_from_multi_part_stream/3]).
 -export([doc_from_multi_part_stream/4]).
 -export([doc_to_multi_part_stream/5, len_doc_to_multi_part_stream/4]).
 -export([restart_open_doc_revs/3]).
 -export([to_path/1]).
 
--export([with_ejson_body/1]).
 -export([is_deleted/1]).
 
 
@@ -115,7 +114,7 @@ to_json_attachments(Atts, OutputData, Follows, ShowEnc) ->
     [{<<"_attachments">>, {Props}}].
 
 to_json_obj(Doc, Options) ->
-    doc_to_json_obj(with_ejson_body(Doc), Options).
+    doc_to_json_obj(Doc, Options).
 
 doc_to_json_obj(#doc{id=Id,deleted=Del,body=Body,revs={Start, RevIds},
             meta=Meta}=Doc,Options)->
@@ -198,58 +197,12 @@ parse_revs(_) ->
     throw({bad_request, "Invalid list of revisions"}).
 
 
-validate_docid(DocId, DbName) ->
-    case DbName =:= ?l2b(config:get("mem3", "shards_db", "_dbs")) andalso
-        couch_db:is_system_db_name(DocId) of
-        true ->
-            ok;
-        false ->
-            validate_docid(DocId)
-    end.
-
-validate_docid(<<"">>) ->
-    throw({illegal_docid, <<"Document id must not be empty">>});
-validate_docid(<<"_design/">>) ->
-    throw({illegal_docid, <<"Illegal document id `_design/`">>});
-validate_docid(<<"_local/">>) ->
-    throw({illegal_docid, <<"Illegal document id `_local/`">>});
-validate_docid(Id) when is_binary(Id) ->
-    MaxLen = case config:get("couchdb", "max_document_id_length", "infinity") of
-        "infinity" -> infinity;
-        IntegerVal -> list_to_integer(IntegerVal)
-    end,
-    case MaxLen > 0 andalso byte_size(Id) > MaxLen of
-        true -> throw({illegal_docid, <<"Document id is too long">>});
-        false -> ok
-    end,
-    case couch_util:validate_utf8(Id) of
-        false -> throw({illegal_docid, <<"Document id must be valid UTF-8">>});
-        true -> ok
-    end,
-    case Id of
-    <<"_design/", _/binary>> -> ok;
-    <<"_local/", _/binary>> -> ok;
-    <<"_", _/binary>> ->
-        case couch_db_plugin:validate_docid(Id) of
-            true ->
-                ok;
-            false ->
-                throw(
-                  {illegal_docid,
-                   <<"Only reserved document ids may start with underscore.">>})
-        end;
-    _Else -> ok
-    end;
-validate_docid(Id) ->
-    couch_log:debug("Document id is not a string: ~p", [Id]),
-    throw({illegal_docid, <<"Document id must be a string">>}).
-
 transfer_fields([], #doc{body=Fields}=Doc, _) ->
     % convert fields back to json object
     Doc#doc{body={lists:reverse(Fields)}};
 
 transfer_fields([{<<"_id">>, Id} | Rest], Doc, DbName) ->
-    validate_docid(Id, DbName),
+    fabric2_db:validate_docid(Id),
     transfer_fields(Rest, Doc#doc{id=Id}, DbName);
 
 transfer_fields([{<<"_rev">>, Rev} | Rest], #doc{revs={0, []}}=Doc, DbName) ->
@@ -518,9 +471,3 @@ flush_parser_messages(Ref) ->
     after 0 ->
         ok
     end.
-
-
-with_ejson_body(#doc{body = Body} = Doc) when is_binary(Body) ->
-    Doc#doc{body = couch_compress:decompress(Body)};
-with_ejson_body(#doc{body = {_}} = Doc) ->
-    Doc.
