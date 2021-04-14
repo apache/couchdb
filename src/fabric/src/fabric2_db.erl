@@ -128,7 +128,6 @@
     %% wait_for_compaction/2,
 
     dbname_suffix/1,
-    normalize_dbname/1,
     validate_dbname/1,
 
     %% make_doc/5,
@@ -1126,27 +1125,19 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
 
 
 dbname_suffix(DbName) ->
-    filename:basename(normalize_dbname(DbName)).
-
-
-normalize_dbname(DbName) ->
-    % Remove in the final cleanup. We don't need to handle shards prefix or
-    % remove .couch suffixes anymore. Keep it for now to pass all the existing
-    % tests.
-    couch_db:normalize_dbname(DbName).
+    filename:basename(DbName).
 
 
 validate_dbname(DbName) when is_list(DbName) ->
     validate_dbname(?l2b(DbName));
 
 validate_dbname(DbName) when is_binary(DbName) ->
-    Normalized = normalize_dbname(DbName),
     fabric2_db_plugin:validate_dbname(
-        DbName, Normalized, fun validate_dbname_int/2).
+        DbName, DbName, fun validate_dbname_int/2).
 
-validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
+validate_dbname_int(DbName, DbName) when is_binary(DbName) ->
     case validate_dbname_length(DbName) of
-        ok -> validate_dbname_pat(DbName, Normalized);
+        ok -> validate_dbname_pat(DbName);
         {error, _} = Error -> Error
     end.
 
@@ -1160,13 +1151,12 @@ validate_dbname_length(DbName) ->
     end.
 
 
-validate_dbname_pat(DbName, Normalized) ->
-    DbNoExt = couch_util:drop_dot_couch_ext(DbName),
-    case re:run(DbNoExt, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
+validate_dbname_pat(DbName) ->
+    case re:run(DbName, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
         match ->
             ok;
         nomatch ->
-            case is_system_db_name(Normalized) of
+            case is_system_db_name(DbName) of
                 true -> ok;
                 false -> {error, {illegal_database_name, DbName}}
             end
