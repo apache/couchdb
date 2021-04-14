@@ -28,7 +28,6 @@
 -export([url_strip_password/1]).
 -export([encode_doc_id/1]).
 -export([normalize_ddoc_id/1]).
--export([with_db/2]).
 -export([rfc1123_date/0, rfc1123_date/1]).
 -export([integer_to_boolean/1, boolean_to_integer/1]).
 -export([validate_positive_int/1]).
@@ -260,9 +259,9 @@ json_apply_field({Key, NewValue}, [], Acc) ->
     {[{Key, NewValue}|Acc]}.
 
 json_user_ctx(Db) ->
-    ShardName = couch_db:name(Db),
-    Ctx = couch_db:get_user_ctx(Db),
-    {[{<<"db">>, mem3:dbname(ShardName)},
+    #{name := DbName} = Db,
+    Ctx = fabric2_db:get_user_ctx(Db),
+    {[{<<"db">>, DbName},
             {<<"name">>,Ctx#user_ctx.name},
             {<<"roles">>,Ctx#user_ctx.roles}]}.
 
@@ -564,25 +563,6 @@ normalize_ddoc_id(<<"_design/", _/binary>> = DDocId) ->
     DDocId;
 normalize_ddoc_id(DDocId) when is_binary(DDocId) ->
     <<"_design/", DDocId/binary>>.
-
-with_db(DbName, Fun)  when is_binary(DbName) ->
-    case couch_db:open_int(DbName, [?ADMIN_CTX]) of
-        {ok, Db} ->
-            try
-                Fun(Db)
-            after
-                catch couch_db:close(Db)
-            end;
-        Else ->
-            throw(Else)
-    end;
-with_db(Db, Fun) ->
-    case couch_db:is_db(Db) of
-        true ->
-            Fun(Db);
-        false ->
-            erlang:error({invalid_db, Db})
-    end.
 
 rfc1123_date() ->
     {{YYYY,MM,DD},{Hour,Min,Sec}} = calendar:universal_time(),
