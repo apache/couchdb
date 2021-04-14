@@ -51,7 +51,7 @@ send(Pid, Data) ->
     gen_server:cast(Pid, {send, Data}).
 
 prompt(Pid, Data) ->
-    case ioq:call(Pid, {prompt, Data}, erlang:get(io_priority)) of
+    case gen_server:call(Pid, {prompt, Data}, infinity) of
         {ok, Result} ->
             Result;
         Error ->
