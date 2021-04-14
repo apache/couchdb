@@ -36,7 +36,7 @@ defmodule Couch.Test.Setup.Step.Create.DB do
   def setup(setup, %__MODULE__{name: name} = step) do
     assert Setup.completed?(setup, Step.Start), "Require `Start` step"
     assert :fabric in Step.Start.apps(), "Fabric is not started"
-    res = :fabric.create_db(name, [@admin])
+    res = :fabric2_db.create_db(name, [@admin])
     assert res in [:ok, :accepted], "Cannot create `#{name}` database"
     step
   end

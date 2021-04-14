@@ -26,21 +26,20 @@
     ?assertEqual(lists:usort(A), lists:usort(B))).
 
 start() ->
-    Ctx = test_util:start_couch([ioq]),
+    Ctx = test_util:start_couch([chttpd]),
     ok = config:set("httpd", "enable_cors", "true", false),
     ok = config:set("vhosts", "example.com", "/", false),
     Ctx.
 
 setup() ->
     DbName = ?tempdb(),
-    {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
-    couch_db:close(Db),
+    {ok, _} = fabric2_db:create(DbName, [?ADMIN_CTX]),
 
     config:set("cors", "credentials", "false", false),
     config:set("cors", "origins", "http://example.com", false),
 
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
-    Port = integer_to_list(mochiweb_socket_server:get(couch_httpd, port)),
+    Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
     Host = "http://" ++ Addr ++ ":" ++ Port,
     {Host, ?b2l(DbName)}.
 
@@ -57,7 +56,7 @@ setup({Mod, VHost}) ->
     {Host, DbName, Url, DefaultHeaders}.
 
 teardown(DbName) when is_list(DbName) ->
-    ok = couch_server:delete(?l2b(DbName), [?ADMIN_CTX]),
+    ok = fabric2_db:delete(?l2b(DbName), [?ADMIN_CTX]),
     ok;
 teardown({_, DbName}) ->
     teardown(DbName).

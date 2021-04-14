@@ -14,8 +14,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include("couch_db.hrl").
--include("couch_db_int.hrl").
--include("couch_bt_engine.hrl").
 
 -export([init_code_path/0]).
 -export([source_file/1, build_file/1]).
@@ -36,12 +34,10 @@
 
 -export([start/1, start/2, start/3, stop/1]).
 
--export([fake_db/1]).
-
 -record(test_context, {mocked = [], started = [], module}).
 
 -define(DEFAULT_APPS,
-        [inets, ibrowse, ssl, config, couch_epi, couch_event, couch]).
+        [inets, ibrowse, ssl, config, couch_epi, couch]).
 
 srcdir() ->
     code:priv_dir(couch) ++ "/../../".
@@ -54,8 +50,7 @@ init_code_path() ->
         "couchdb",
         "jiffy",
         "ibrowse",
-        "mochiweb",
-        "snappy"
+        "mochiweb"
     ],
     lists:foreach(fun(Name) ->
         code:add_patha(filename:join([builddir(), "src", Name]))
@@ -248,7 +243,7 @@ start(Module, ExtraApps) ->
     start(Module, ExtraApps, []).
 
 start(Module, ExtraApps, Options) ->
-    Apps = start_applications([config, couch_log, ioq, couch_epi | ExtraApps]),
+    Apps = start_applications([config, couch_log, couch_epi | ExtraApps]),
     ToMock = [config, couch_stats] -- proplists:get_value(dont_mock, Options, []),
     mock(ToMock),
     #test_context{module = Module, mocked = ToMock, started = Apps}.
@@ -256,37 +251,6 @@ start(Module, ExtraApps, Options) ->
 stop(#test_context{mocked = Mocked, started = Apps}) ->
     meck:unload(Mocked),
     stop_applications(Apps).
-
-fake_db(Fields0) ->
-    {ok, Db, Fields} = maybe_set_engine(Fields0),
-    Indexes = lists:zip(
-            record_info(fields, db),
-            lists:seq(2, record_info(size, db))
-        ),
-    lists:foldl(fun({FieldName, Value}, Acc) ->
-        Idx = couch_util:get_value(FieldName, Indexes),
-        setelement(Idx, Acc, Value)
-    end, Db, Fields).
-
-maybe_set_engine(Fields0) ->
-    case lists:member(engine, Fields0) of
-        true ->
-            {ok, #db{}, Fields0};
-        false ->
-            {ok, Header, Fields} = get_engine_header(Fields0),
-            Db = #db{engine = {couch_bt_engine, #st{header = Header}}},
-            {ok, Db, Fields}
-    end.
-
-get_engine_header(Fields) ->
-    Keys = [disk_version, update_seq, unused, id_tree_state,
-        seq_tree_state, local_tree_state, purge_seq, purged_docs,
-        security_ptr, revs_limit, uuid, epochs, compacted_seq],
-    {HeadFields, RestFields} = lists:partition(
-        fun({K, _}) -> lists:member(K, Keys) end, Fields),
-    Header0 = couch_bt_engine_header:new(),
-    Header = couch_bt_engine_header:set(Header0, HeadFields),
-    {ok, Header, RestFields}.
 
 now_us() ->
     {MegaSecs, Secs, MicroSecs} = os:timestamp(),

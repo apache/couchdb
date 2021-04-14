@@ -25,7 +25,7 @@ teardown(_) ->
 
 
 setup_oom() ->
-    test_util:start_couch([ioq]).
+    test_util:start_couch().
 
 
 teardown_oom(Ctx) ->

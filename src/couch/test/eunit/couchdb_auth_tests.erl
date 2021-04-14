@@ -49,7 +49,6 @@ auth_test_() ->
             fun() -> test_util:start_couch([chttpd]) end, fun test_util:stop_couch/1,
             [
                 make_test_cases(clustered, Tests),
-                make_test_cases(backdoor, Tests),
                 make_require_valid_user_test_cases(clustered, RequireValidUserTests)
             ]
         }
@@ -86,12 +85,6 @@ should_not_return_authenticated_field(_PortType, Url) ->
                 <<"info">>, <<"authenticated">>])
         end).
 
-should_return_list_of_handlers(backdoor, Url) ->
-    ?_assertEqual([<<"cookie">>,<<"default">>],
-        begin
-            couch_util:get_nested_json_value(session(Url), [
-                <<"info">>, <<"authentication_handlers">>])
-        end);
 should_return_list_of_handlers(clustered, Url) ->
     ?_assertEqual([<<"cookie">>,<<"default">>],
         begin
@@ -110,6 +103,4 @@ session(Url) ->
     jiffy:decode(Body).
 
 port(clustered) ->
-    integer_to_list(mochiweb_socket_server:get(chttpd, port));
-port(backdoor) ->
-    integer_to_list(mochiweb_socket_server:get(couch_httpd, port)).
+    integer_to_list(mochiweb_socket_server:get(chttpd, port)).
