@@ -27,7 +27,6 @@ init([]) ->
             dynamic}
     ],
     Daemons = [
-        {index_server, {couch_index_server, start_link, []}},
         {query_servers, {couch_proc_manager, start_link, []}},
         {vhosts, {couch_httpd_vhost, start_link, []}},
         {uuids, {couch_uuids, start, []}}
