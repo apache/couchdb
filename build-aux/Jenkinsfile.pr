@@ -69,6 +69,8 @@ pipeline {
           image "${DOCKER_IMAGE}"
           label 'docker'
           args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
         }
       }
       options {
