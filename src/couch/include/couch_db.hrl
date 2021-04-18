@@ -219,7 +219,7 @@
 -type sec_props() :: [tuple()].
 -type sec_obj() :: {sec_props()}.
 
-%% Erlang/OTP 21 deprecates and 23 removes get_stacktrace(), so 
+%% Erlang/OTP 21 deprecates and 23 removes get_stacktrace(), so
 %% we have to monkey around until we can drop support < 21.
 %% h/t https://github.com/erlang/otp/pull/1783#issuecomment-386190970
 
@@ -234,7 +234,7 @@
 % Get the stacktrace in a way that is backwards compatible
 % OTP_VERSION is only available in OTP 21 and later, so we don’t need
 % to do any other version magic here.
--ifdef(OTP_VERSION).
+-ifdef(OTP_RELEASE).
 -define(STACKTRACE(ErrorType, Error, Stack),
         ErrorType:Error:Stack ->).
 -else.
