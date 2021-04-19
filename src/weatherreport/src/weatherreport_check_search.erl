@@ -47,7 +47,8 @@ check(_Opts) ->
         pong ->
             [{info, {clouseau_ok, SearchNode}}];
         Error ->
-            [{error, {clouseau_error, SearchNode, Error}}]
+            % only warning since search is not enabled by default
+            [{warning, {clouseau_error, SearchNode, Error}}]
     end.
 
 -spec format(term()) -> {io:format(), [term()]}.
