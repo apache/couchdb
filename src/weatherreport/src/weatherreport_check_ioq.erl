@@ -62,7 +62,24 @@ sum_queues([{_Name, Value} | Rest], Acc) ->
     sum_queues(Rest, Acc + Value).
 
 -spec check(list()) -> [{atom(), term()}].
-check(_Opts) ->
+check(Opts) ->
+    case erlang:function_exported(ioq, get_queue_lengths, 0) of
+        true ->
+            case ioq:get_queue_lengths() of
+                Queues when is_map(Queues) ->
+                    Total = maps:fold(fun(_Key, Val, Acc) ->
+                        Val + Acc
+                    end, 0, Queues),
+                    [{total_to_level(Total), {ioq_requests, Total, Queues}}];
+                Error ->
+                    [{warning, {ioq_requests_unknown, Error}}]
+            end;
+        false ->
+            check_legacy(Opts)
+    end.
+
+-spec check_legacy(list()) -> [{atom(), term()}].
+check_legacy(_Opts) ->
     case ioq:get_disk_queues() of
         Queues when is_list(Queues) ->
             Total = sum_queues(Queues, 0),

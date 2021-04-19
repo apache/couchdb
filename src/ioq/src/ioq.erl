@@ -15,6 +15,7 @@
 -behaviour(config_listener).
 
 -export([start_link/0, call/3]).
+-export([get_queue_lengths/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, code_change/3, terminate/2]).
 
 % config_listener api
@@ -49,6 +50,9 @@ call(Fd, Msg, Metadata) ->
         false ->
             queued_call(Fd, Msg, Priority)
     end.
+
+get_queue_lengths() ->
+    gen_server:call(?MODULE, get_queue_lengths).
 
 bypass(Priority) ->
     config:get("ioq.bypass", atom_to_list(Priority)) =:= "true".
@@ -91,6 +95,12 @@ read_config(State) ->
     Concurrency = list_to_integer(config:get("ioq", "concurrency", "10")),
     State#state{concurrency=Concurrency, ratio=Ratio}.
 
+handle_call(get_queue_lengths, _From, State) ->
+    Response = #{
+        interactive => queue:len(State#state.interactive),
+        background => queue:len(State#state.background)
+    },
+    {reply, Response, State, 0};
 handle_call(#request{}=Request, From, State) ->
     {noreply, enqueue_request(Request#request{from=From}, State), 0}.
 
