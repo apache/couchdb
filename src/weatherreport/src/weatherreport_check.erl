@@ -1,6 +1,6 @@
 %% -------------------------------------------------------------------
 %%
-%% riaknostic - automated diagnostic tools for Riak
+%% derived from riaknostic - automated diagnostic tools for Riak
 %%
 %% Copyright (c) 2011 Basho Technologies, Inc.  All Rights Reserved.
 %%
