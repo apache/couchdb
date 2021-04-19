@@ -31,7 +31,7 @@ index(Db, #doc{id = Id, revs = Revs} = Doc, _NewWinner, _OldWinner, NewRevId,
             index_int(Db, Doc, Seq)
         end
     catch
-        ?STACKTRACE(error, {erlfdb_error, ErrCode}, Stack)
+        error:{erlfdb_error, ErrCode}:Stack when is_integer(ErrCode) ->
             DbName = fabric2_db:name(Db),
             couch_log:error("Mango index erlfdb error Db ~s Doc ~p ~p",
                 [DbName, Id, ErrCode]),

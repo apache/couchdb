@@ -121,7 +121,7 @@ init() ->
             ok;
         error:database_does_not_exist ->
             fail_job(Job, Data, db_deleted, "Database was deleted");
-        ?STACKTRACE(Error, Reason, Stack)
+        Error:Reason:Stack ->
             Fmt = "Error building view for ddoc ~s in ~s: ~p:~p ~p",
             couch_log:error(Fmt, [DbName, DDocId, Error, Reason, Stack]),
 

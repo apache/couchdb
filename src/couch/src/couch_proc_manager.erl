@@ -321,7 +321,7 @@ find_proc(#client{lang = Lang, ddoc = DDoc, ddoc_key = DDocKey} = Client) ->
 
 find_proc(Lang, Fun) ->
     try iter_procs(Lang, Fun)
-    catch ?STACKTRACE(error, Reason, StackTrace)
+    catch error:Reason:StackTrace ->
         couch_log:error("~p ~p ~p", [?MODULE, Reason, StackTrace]),
         {error, Reason}
     end.

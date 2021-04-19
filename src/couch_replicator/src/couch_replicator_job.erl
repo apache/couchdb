@@ -221,11 +221,9 @@ handle_info(timeout, delayed_init) ->
         {ok, State} -> {noreply, State};
         {stop, Reason, State} -> {stop, Reason, State}
     catch
-        ?STACKTRACE(exit, {shutdown, finished}, Stack)
-            {stop, {shutdown, finished}, {init_error, Stack}};
-        ?STACKTRACE(exit, {shtudown, halt}, Stack)
-            {stop, {shutdown, halt}, {init_error, Stack}};
-        ?STACKTRACE(_Tag, Error, Stack)
+        exit:{shutdown, Exit}:Stack when Exit =:= finished orelse Exit =:= halt ->
+            {stop, {shutdown, Exit}, {init_error, Stack}};
+        _Tag:Error:Stack ->
             ShutdownReason = {error, replication_start_error(Error)},
             {stop, {shutdown, ShutdownReason}, {init_error, Stack}}
     end;
@@ -406,14 +404,12 @@ delayed_init() ->
     try do_init(Job, JobData) of
         State = #rep_state{} -> {ok, State}
     catch
-        ?STACKTRACE(exit, {http_request_failed, _, _, max_backoff}, Stack)
+        exit:{http_request_failed, _, _, max_backoff}:Stack ->
             reschedule_on_error(undefined, Job, JobData, max_backoff),
             {stop, {shutdown, max_backoff}, {init_error, Stack}};
-        ?STACKTRACE(exit, {shutdown, finished}, Stack)
-            {stop, {shutdown, finished}, {init_error, Stack}};
-        ?STACKTRACE(exit, {shutdown, halt}, Stack)
-            {stop, {shutdown, halt}, {init_error, Stack}};
-        ?STACKTRACE(_Tag, Error, Stack)
+        exit:{shutdown, Exit}:Stack when Exit =:= finished orelse Exit =:= halt ->
+            {stop, {shutdown, Exit}, {init_error, Stack}};
+        _Tag:Error:Stack ->
             Reason = {error, replication_start_error(Error)},
             ErrMsg = "~p : job ~p failed during startup ~p stack:~p",
             couch_log:error(ErrMsg, [?MODULE, Job, Reason, Stack]),

@@ -44,7 +44,7 @@ handler_info(HttpReq) ->
     Default = {'unknown.unknown', #{}},
     try
         select(collect(handler_info, [Method, PathParts, HttpReq]), Default)
-    catch ?STACKTRACE(Type, Reason, Stack)
+    catch Type:Reason:Stack ->
         couch_log:error("~s :: handler_info failure for ~p : ~p:~p :: ~p", [
                 ?MODULE,
                 get(nonce),

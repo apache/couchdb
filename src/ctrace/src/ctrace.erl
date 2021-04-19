@@ -109,7 +109,7 @@ with_span(Operation, Options, Fun)  ->
     try
         start_span(Operation, Options),
         Fun()
-    catch ?STACKTRACE(Type, Reason, Stack)
+    catch Type:Reason:Stack ->
         log(#{
             ?LOG_FIELD_ERROR_KIND => Type,
             ?LOG_FIELD_MESSAGE => Reason,
