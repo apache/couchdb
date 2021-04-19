@@ -72,7 +72,7 @@ fold_processes([{Count, {M, F, A}} | T], Acc, Lim, CallType, Opts) ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(Opts) ->
-    CurrentCallCounts = recon:show_current_call_counts(),
+    CurrentCallCounts = show_current_call_counts(),
     CurrentCallMessages = fold_processes(
         CurrentCallCounts,
         [],
@@ -80,7 +80,7 @@ check(Opts) ->
         "current",
         Opts
     ),
-    FirstCallCounts = recon:show_first_call_counts(),
+    FirstCallCounts = show_first_call_counts(),
     lists:reverse(fold_processes(
         FirstCallCounts,
         CurrentCallMessages,
@@ -96,3 +96,58 @@ format({process_count, {CallType, Count, M, F, A}}) ->
     {"~w processes with ~s call ~w:~w/~w", [Count, CallType, M, F, A]};
 format({process_count, {CallType, Count, M, F, A, Pinfos}}) ->
     {"~w processes with ~s call ~w:~w/~w ~w", [Count, CallType, M, F, A, Pinfos]}.
+
+
+%% @doc Show the list of first calls sorted by the number of
+%% processes that had that initial call.
+-spec show_first_call_counts() -> [{Count, {Module, Function, Arity}}] when
+      Count :: pos_integer(),
+      Module :: atom(),
+      Function :: atom(),
+      Arity :: non_neg_integer().
+show_first_call_counts() ->
+    Res = lists:foldl(fun(Pid, Acc) ->
+        dict:update_counter(first_call(Pid), 1, Acc)
+    end, dict:new(), processes()),
+    Rev = [{Count, Call} || {Call, Count} <- dict:to_list(Res)],
+    lists:reverse(lists:sort(Rev)).
+
+
+%% @doc Show the list of current calls sorted by the number of
+%% processes that had that current call.
+-spec show_current_call_counts() -> [{Count, {Module, Function, Arity}}] when
+      Count :: pos_integer(),
+      Module :: atom(),
+      Function :: atom(),
+      Arity :: non_neg_integer().
+show_current_call_counts() ->
+    Res = lists:foldl(fun(Pid, Acc) ->
+        case process_info(Pid, current_function) of
+            {current_function, Call} ->
+                dict:update_counter(Call, 1, Acc);
+            undefined ->
+                Acc
+        end
+    end, dict:new(), processes()),
+    Rev = [{Count, Call} || {Call, Count} <- dict:to_list(Res)],
+    lists:reverse(lists:sort(Rev)).
+
+
+%% @doc Find the first function call for a Pid taking into account cases
+%% where '$initial_call' is set in the process dictionary.
+-spec first_call(Pid) -> {Module, Function, Arity} when
+      Pid :: pid(),
+      Module :: atom(),
+      Function :: atom(),
+      Arity :: non_neg_integer().
+first_call(Pid) ->
+    IC = case process_info(Pid, initial_call) of
+        {initial_call, IC0} -> IC0;
+        undefined -> undefined
+    end,
+    Dict = case process_info(Pid, dictionary) of
+        {dictionary, Dict0} -> Dict0;
+        undefined -> []
+    end,
+    MaybeCall = proplists:get_value('$initial_call', Dict, IC),
+    proplists:get_value(initial_call, Dict, MaybeCall).
