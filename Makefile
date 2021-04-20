@@ -99,7 +99,7 @@ TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
 
 .PHONY: all
 # target: all - Build everything
-all: couch fauxton docs
+all: couch fauxton docs escriptize
 
 
 .PHONY: help
@@ -136,6 +136,13 @@ endif
 fauxton: share/www
 
 
+.PHONY: escriptize
+# target: escriptize - Build CLI tools
+escriptize: couch
+	@$(REBAR) -r escriptize apps=weatherreport
+	@cp src/weatherreport/weatherreport bin/weatherreport
+
+
 ################################################################################
 # Testing
 ################################################################################
@@ -147,6 +154,7 @@ check: all python-black
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
+	@$(MAKE) weatherreport-test
 
 ifdef apps
 subdirs = $(apps)
@@ -296,6 +304,13 @@ mango-test: devclean all
 		.venv/bin/python3 -m pip install -r requirements.txt
 	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=testuser:testpass '.venv/bin/python3 -m nose --with-xunit'
 
+
+.PHONY: weatherreport-test
+# target: weatherreport-test - Run weatherreport against dev cluster
+weatherreport-test: devclean escriptize
+	@dev/run -n 1 -a adm:pass --no-eval \
+		'bin/weatherreport --etc dev/lib/node1/etc --level error'
+
 ################################################################################
 # Developing
 ################################################################################
@@ -353,6 +368,7 @@ release: all
 	@echo "Installing CouchDB into rel/couchdb/ ..."
 	@rm -rf rel/couchdb
 	@$(REBAR) generate # make full erlang release
+	@cp bin/weatherreport rel/couchdb/bin/weatherreport
 
 ifeq ($(with_fauxton), 1)
 	@mkdir -p rel/couchdb/share/
@@ -401,6 +417,7 @@ clean:
 	@$(REBAR) -r clean
 	@rm -rf .rebar/
 	@rm -f bin/couchjs
+	@rm -f bin/weatherreport
 	@rm -rf src/*/ebin
 	@rm -rf src/*/.rebar
 	@rm -rf src/*/priv/*.so

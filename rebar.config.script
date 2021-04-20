@@ -139,6 +139,7 @@ SubDirs = [
     "src/rexi",
     "src/setup",
     "src/smoosh",
+    "src/weatherreport",
     "rel"
 ].
 

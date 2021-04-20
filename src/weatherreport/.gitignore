@@ -1,0 +1,13 @@
+doc/
+deps/
+ebin/*
+log/
+edoc/
+index.html
+weatherreport
+*.png
+pkg/
+erl_crash.dump
+.eunit/
+*~
+#*#
