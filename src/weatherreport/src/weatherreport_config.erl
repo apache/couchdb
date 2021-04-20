@@ -136,7 +136,7 @@ load_app_config() ->
         filename:join(Etc, "local.ini")
     ],
     weatherreport_log:log(node(), debug, "Reading config from files: ~p", [IniFiles]),
-    config:start_link(IniFiles),
+    {ok, _Pid} = config:start_link(IniFiles),
     weatherreport_log:log(node(), debug, "Local node config: ~p~n", [config:all()]).
 
 load_vm_args() ->
