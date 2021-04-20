@@ -1,0 +1,23 @@
+@author Basho Technologies, Inc.
+@copyright 2011 Basho Technologies, Inc.
+@version 1.0.0
+@title riaknostic: Automated diagnostic tools for Riak
+@doc <p>riaknostic is an escript and set of tools that diagnoses common problems which could affect a Riak node or cluster. When experiencing any problem with Riak, riaknostic should be the first thing run during troubleshooting. The tool is integrated with Riak via the <code>riak-admin</code> script.</p>
+
+<pre>$ riak-admin diag</pre>
+
+<p>This documentation describes the <code>riaknostic</code> API and user interface commands. The application's core consists of 5 modules:</p>
+
+<ul>
+<li><strong>riaknostic</strong> - the core of the script, including CLI parsing and dispatching commands.</li>
+<li><strong>riaknostic_check</strong> - the behaviour module that all diagnostics must implement, including some general
+  functions that support the <code>riaknostic</code> module.</li>
+<li><strong>riaknostic_config</strong> - convenience functions for inspecting the configuration of the local Riak node.</li>
+<li><strong>riaknostic_node</strong> - functions for sending commands to or inspecting the local Riak node or all members of the cluster.</li>
+<li><strong>riaknostic_util</strong> - utility functions, including for running shell programs</li>
+</ul>
+
+<p>All other included modules are generally prefixed with <code>riaknostic_check_</code> and are individual diagnostics that can be run.</p>
+
+<p>riaknostic is licensed under the Apache v2 license.</p>
+@end
