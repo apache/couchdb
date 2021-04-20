@@ -56,7 +56,7 @@
 -export([main/1]).
 
 -define(OPTS, [
-               {etc,   undefined, "etc",   string,         undefined                                         },
+               {etc,   $c,        "etc",   string,         "Path to the CouchDB configuration directory"},
                {level, $d,        "level", {atom, notice}, "Minimum message severity level (default: notice)"},
                {expert, $e,       "expert", undefined,     "Perform more detailed diagnostics"               },
                {usage, $h,        "help",  undefined,      "Display help/usage"                              },

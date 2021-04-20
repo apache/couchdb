@@ -17,8 +17,9 @@ For most cases, you can just run the `weatherreport` command as given at the top
 
 ```bash
 weatherreport --help
-Usage: weatherreport [-d <level>] [-e] [-h] [-l] [check_name ...]
+Usage: weatherreport [-c <path>] [-d <level>] [-e] [-h] [-l] [check_name ...]
 
+  -c, --etc		Path to the CouchDB configuration directory
   -d, --level		Minimum message severity level (default: notice)
   -l, --list		Describe available diagnostic tasks
   -e, --expert		Perform more detailed diagnostics
@@ -29,12 +30,24 @@ Usage: weatherreport [-d <level>] [-e] [-h] [-l] [check_name ...]
 To get an idea of what checks will be run, use the `--list` option:
 
 ```bash
-weatherreport diag --list
+weatherreport --list
 Available diagnostic checks:
 
+  custodian            Shard safety/liveness checks
+  disk                 Data directory permissions and atime
+  internal_replication Check the number of pending internal replication jobs
+  ioq                  Check the total number of active IOQ requests
+  mem3_sync            Check there is a registered mem3_sync process
   membership           Cluster membership validity
   memory_use           Measure memory usage
+  message_queues       Check for processes with large mailboxes
+  node_stats           Check useful erlang statistics for diagnostics
   nodes_connected      Cluster node liveness
+  process_calls        Check for large numbers of processes with the same current/initial call
+  process_memory       Check for processes with high memory usage
+  safe_to_rebuild      Check whether the node can safely be taken out of service
+  search               Check the local search node is responsive
+  tcp_queues           Measure the length of tcp queues in the kernel
 ```
 
 If you want all the gory details about what WeatherReport is doing, you can run the checks at a more verbose logging level with the --level option:
