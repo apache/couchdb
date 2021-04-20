@@ -79,7 +79,7 @@ defmodule Couch.Test.Setup.Step.User do
       :config.delete("admins", String.to_charlist(name), false)
     else
       doc_id = "org.couchdb.user:#{name}"
-      assert {:ok, doc_info(revs: [rev | _])} = :fabric.get_doc_info(users_db)
+      assert {:ok, doc_info(revs: [rev | _])} = :fabric.get_doc_info(users_db, doc_id, [])
       doc = :couch_doc.from_json_obj(%{
         _id: doc_id,
         _rev: rev,
