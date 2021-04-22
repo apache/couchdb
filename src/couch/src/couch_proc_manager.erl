@@ -41,6 +41,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(PROCS, couch_proc_manager_procs).
 -define(WAITERS, couch_proc_manager_waiters).

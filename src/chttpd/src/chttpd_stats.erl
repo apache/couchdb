@@ -12,6 +12,7 @@
 
 -module(chttpd_stats).
 
+-include_lib("kernel/include/logger.hrl").
 
 -export([
     init/1,
@@ -62,12 +63,18 @@ report(HttpResp) ->
                 ok
         end
     catch T:R:S ->
+        ?LOG_ERROR(#{
+            what => stats_report_failure,
+            tag => T,
+            details => R,
+            stacktrace => S
+        }),
         Fmt = "Failed to report chttpd request stats: ~p:~p ~p",
         couch_log:error(Fmt, [T, R, S])
     end.
 
 
-report(HttpResp, #st{reporter = undefined}) ->
+report(_HttpResp, #st{reporter = undefined}) ->
     ok;
 
 report(HttpResp, #st{reporter = Reporter} = St) ->

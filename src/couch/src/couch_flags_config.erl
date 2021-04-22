@@ -13,6 +13,8 @@
 % This module implements {flags, config} data provider
 -module(couch_flags_config).
 
+-include_lib("kernel/include/logger.hrl").
+
 -export([
     enable/2,
     data/0,
@@ -80,50 +82,53 @@ data(Config) ->
 -spec parse_rules([{Key :: string(), Value :: string()}]) -> [rule()].
 
 parse_rules(Config) ->
-    lists:filtermap(fun({K, V}) ->
-        case parse_rule(K, V) of
-            {error, {Format, Args}} ->
-                couch_log:error(Format, Args),
-                false;
-            Rule ->
-                {true, Rule}
-        end
-    end, Config).
+    lists:filtermap(fun({K, V}) -> parse_rule(K, V) end, Config).
 
--spec parse_rule(Key :: string(), Value :: string()) ->
-    rule()
-    | {error, Reason :: term()}.
+-spec parse_rule(Key :: string(), Value :: string()) -> {true, rule()} | false.
 
-parse_rule(Key, "true")  ->
-    parse_flags(binary:split(list_to_binary(Key), <<"||">>), true);
-parse_rule(Key, "false") ->
-    parse_flags(binary:split(list_to_binary(Key), <<"||">>), false);
+parse_rule(Key, Value) when Value =:= "true" orelse Value =:= "false" ->
+    case binary:split(list_to_binary(Key), <<"||">>) of
+        [FlagsBin, PatternBin] ->
+            parse_flags([FlagsBin, PatternBin], list_to_atom(Value));
+        _ ->
+            ?LOG_ERROR(#{
+                what => invalid_flag_setting,
+                key => Key,
+                value => Value,
+                details => "key must be in the form of `[flags]||pattern`"
+            }),
+            false
+        end;
 parse_rule(Key, Value) ->
-    Reason = {
-        "Expected value for the `~p` either `true` or `false`, (got ~p)",
-        [Key, Value]
-    },
-    {error, Reason}.
+    ?LOG_ERROR(#{
+        what => invalid_flag_setting,
+        key => Key,
+        value => Value,
+        details => "value must be a boolean"
+    }),
+    false.
 
--spec parse_flags([binary()], Value :: boolean()) ->
-    rule() | {error, Reason :: term()}.
+-spec parse_flags([binary()], Value :: boolean()) -> {true, rule()} | false.
 
 parse_flags([FlagsBin, PatternBin], Value) ->
     case {parse_flags_term(FlagsBin), Value} of
-        {{error, _} = Error, _} ->
-            Error;
+        {{error, Errors}, _} ->
+            lists:foreach(fun(Error) ->
+                ?LOG_ERROR(#{
+                    what => invalid_flag_setting,
+                    flags => FlagsBin,
+                    error => Error
+                })
+            end, Errors),
+            false;
         {Flags, true} ->
-            {parse_pattern(PatternBin), Flags, []};
+            {true, {parse_pattern(PatternBin), Flags, []}};
         {Flags, false} ->
-            {parse_pattern(PatternBin), [], Flags}
-    end;
-parse_flags(_Tokens, _) ->
-    couch_log:error(
-      "Key should be in the form of `[flags]||pattern` (got ~s)", []),
-    false.
+            {true, {parse_pattern(PatternBin), [], Flags}}
+    end.
 
 -spec parse_flags_term(Flags :: binary()) ->
-    [flag_id()] | {error, Reason :: term()}.
+    [flag_id()] | {error, Failures :: [term()]}.
 
 parse_flags_term(FlagsBin) ->
     {Flags, Errors} = lists:splitwith(fun erlang:is_atom/1,
@@ -132,10 +137,7 @@ parse_flags_term(FlagsBin) ->
        [] ->
            lists:usort(Flags);
        _ ->
-           {error, {
-               "Cannot parse list of tags: ~n~p",
-               Errors
-           }}
+           {error, Errors}
     end.
 
 split_by_comma(Binary) ->

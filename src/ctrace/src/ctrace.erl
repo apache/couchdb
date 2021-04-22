@@ -44,6 +44,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("passage/include/opentracing.hrl").
 -include("ctrace.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -type operation()

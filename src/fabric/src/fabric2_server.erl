@@ -43,6 +43,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("kernel/include/file.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(CLUSTER_FILE_MACOS, "/usr/local/etc/foundationdb/fdb.cluster").
 -define(CLUSTER_FILE_LINUX, "/etc/foundationdb/fdb.cluster").
@@ -254,14 +255,25 @@ find_cluster_file([{custom, undefined} | Rest]) ->
     find_cluster_file(Rest);
 
 find_cluster_file([{Type, Location} | Rest]) ->
+    Msg = #{
+        in => fdb_connection_setup,
+        configuration_type => Type,
+        cluster_file => Location
+    },
     case file:read_file_info(Location, [posix]) of
         {ok, #file_info{access = read_write}} ->
+            ?LOG_INFO(maps:merge(Msg, #{status => ok})),
             couch_log:info(
                 "Using ~s FDB cluster file: ~s",
                 [Type, Location]
             ),
             {ok, Location};
         {ok, #file_info{access = read}} ->
+            ?LOG_WARNING(maps:merge(Msg, #{
+                status => read_only_file,
+                details => "If coordinators are changed without updating this "
+                    "file CouchDB may be unable to connect to the FDB cluster!"
+            })),
             couch_log:warning(
                 "Using read-only ~s FDB cluster file: ~s -- if coordinators "
                 "are changed without updating this file CouchDB may be unable "
@@ -270,24 +282,31 @@ find_cluster_file([{Type, Location} | Rest]) ->
             ),
             {ok, Location};
         {ok, _} ->
+            ?LOG_ERROR(maps:merge(Msg, #{
+                status => permissions_error,
+                details => "CouchDB needs read/write access to FDB cluster file"
+            })),
             couch_log:error(
                 "CouchDB needs read/write access to FDB cluster file: ~s",
                 [Location]
             ),
             {error, cluster_file_permissions};
         {error, Reason} when Type =:= custom ->
+            ?LOG_ERROR(maps:merge(Msg, #{status => Reason})),
             couch_log:error(
                 "Encountered ~p error looking for FDB cluster file: ~s",
                 [Reason, Location]
             ),
             {error, Reason};
         {error, enoent} when Type =:= default ->
+            ?LOG_INFO(maps:merge(Msg, #{status => enoent})),
             couch_log:info(
                 "No FDB cluster file found at ~s",
                 [Location]
             ),
             find_cluster_file(Rest);
         {error, Reason} when Type =:= default ->
+            ?LOG_WARNING(maps:merge(Msg, #{status => Reason})),
             couch_log:warning(
                 "Encountered ~p error looking for FDB cluster file: ~s",
                 [Reason, Location]
@@ -315,6 +334,11 @@ apply_tx_option(Db, Option, Val, integer) ->
         set_option(Db, Option, list_to_integer(Val))
     catch
         error:badarg ->
+            ?LOG_ERROR(#{
+                what => invalid_transaction_option_value,
+                option => Option,
+                value => Val
+            }),
             Msg = "~p : Invalid integer tx option ~p = ~p",
             couch_log:error(Msg, [?MODULE, Option, Val])
     end;
@@ -325,6 +349,12 @@ apply_tx_option(Db, Option, Val, binary) ->
         true ->
             set_option(Db, Option, BinVal);
         false ->
+            ?LOG_ERROR(#{
+                what => invalid_transaction_option_value,
+                option => Option,
+                value => Val,
+                details => "string transaction option must be less than 16 bytes"
+            }),
             Msg = "~p : String tx option ~p is larger than 16 bytes",
             couch_log:error(Msg, [?MODULE, Option])
     end.
@@ -337,6 +367,11 @@ set_option(Db, Option, Val) ->
         % This could happen if the option is not supported by erlfdb or
         % fdbsever.
         error:badarg ->
+            ?LOG_ERROR(#{
+                what => transaction_option_error,
+                option => Option,
+                value => Val
+            }),
             Msg = "~p : Could not set fdb tx option ~p = ~p",
             couch_log:error(Msg, [?MODULE, Option, Val])
     end.

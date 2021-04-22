@@ -27,6 +27,7 @@
 -export([handle_config_change/5, handle_config_terminate/3]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(SEPARATOR, $\/).
 -define(MATCH_ALL, {bind, '*'}).
@@ -146,6 +147,11 @@ redirect_to_vhost(MochiReq, VhostTarget) ->
     Path = MochiReq:get(raw_path),
     Target = append_path(VhostTarget, Path),
 
+    ?LOG_DEBUG(#{
+        what => vhost_redirect,
+        raw_path => Path,
+        target => Target
+    }),
     couch_log:debug("Vhost Target: '~p'~n", [Target]),
 
     Headers = mochiweb_headers:enter("x-couchdb-vhost-path", Path,

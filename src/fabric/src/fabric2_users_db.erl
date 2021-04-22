@@ -19,6 +19,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(NAME, <<"name">>).
 -define(PASSWORD, <<"password">>).
@@ -94,6 +95,13 @@ save_doc(#doc{body={Body}} = Doc) ->
         Body4 = proplists:delete(?PASSWORD, Body3),
         Doc#doc{body={Body4}};
     {_ClearPassword, Scheme} ->
+        ?LOG_ERROR(#{
+            what => invalid_config_setting,
+            section => couch_httpd_auth,
+            key => password_scheme,
+            value => Scheme,
+            details => "password_scheme must one of (simple, pbkdf2)"
+        }),
         couch_log:error("[couch_httpd_auth] password_scheme value of '~p' is invalid.", [Scheme]),
         throw({forbidden, "Server cannot hash passwords at this time."})
     end.

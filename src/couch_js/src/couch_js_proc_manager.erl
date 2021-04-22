@@ -40,6 +40,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(PROCS, couch_js_proc_manager_procs).
 -define(WAITERS, couch_js_proc_manager_waiters).
@@ -197,6 +198,7 @@ handle_cast({os_proc_idle, Pid}, #state{counts=Counts}=State) ->
         [#proc_int{client=undefined, lang=Lang}=Proc] ->
             case dict:find(Lang, Counts) of
                 {ok, Count} when Count >= State#state.soft_limit ->
+                    ?LOG_INFO(#{what => close_idle_os_process, pid => Pid}),
                     couch_log:info("Closing idle OS Process: ~p", [Pid]),
                     remove_proc(State, Proc);
                 {ok, _} ->
@@ -239,6 +241,7 @@ handle_info({'EXIT', Pid, spawn_error}, State) ->
     {noreply, flush_waiters(NewState, Lang)};
 
 handle_info({'EXIT', Pid, Reason}, State) ->
+    ?LOG_INFO(#{what => os_process_failure, pid => Pid, details => Reason}),
     couch_log:info("~p ~p died ~p", [?MODULE, Pid, Reason]),
     case ets:lookup(?PROCS, Pid) of
         [#proc_int{} = Proc] ->
@@ -321,6 +324,11 @@ find_proc(#client{lang = Lang, ddoc = DDoc, ddoc_key = DDocKey} = Client) ->
 find_proc(Lang, Fun) ->
     try iter_procs(Lang, Fun)
     catch error:Reason:StackTrace ->
+        ?LOG_ERROR(#{
+            what => os_process_not_available,
+            details => Reason,
+            stacktrace => StackTrace
+        }),
         couch_log:error("~p ~p ~p", [?MODULE, Reason, StackTrace]),
         {error, Reason}
     end.

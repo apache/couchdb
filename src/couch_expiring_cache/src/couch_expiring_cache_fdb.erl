@@ -27,6 +27,7 @@
 
 -include_lib("fabric/include/fabric2.hrl").
 -include_lib("couch_expiring_cache/include/couch_expiring_cache.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 % Data model
@@ -107,6 +108,7 @@ get_range_to(Name, EndTS, Limit) when Limit > 0 ->
         fun(Tx, PK, _XK, Key, _ExpiresTS, Acc) ->
             case get_val(Tx, PK) of
                 not_found ->
+                    ?LOG_ERROR(#{what => missing_key, key => Key}),
                     couch_log:error("~p:entry missing Key: ~p", [?MODULE, Key]),
                     Acc;
                 Val ->

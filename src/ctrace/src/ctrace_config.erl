@@ -29,6 +29,7 @@
 ]).
 
 -include("ctrace.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -spec is_enabled() -> boolean().
@@ -132,10 +133,12 @@ http_client(Endpoint, Method, Headers, Body, _ReporterOptions) ->
 
 compile_filter(OperationId, FilterDef) ->
     try
+        ?LOG_INFO(#{what => compile_filter, id => OperationId}),
         couch_log:info("Compiling filter : ~s", [OperationId]),
         ctrace_dsl:compile(OperationId, FilterDef),
         true
     catch throw:{error, Reason} ->
+        ?LOG_ERROR(#{what => compile_filter, id => OperationId, details => Reason}),
         couch_log:error("Cannot compile ~s :: ~s~n", [OperationId, Reason]),
         false
     end.

@@ -16,6 +16,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_views/include/couch_views.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -export([handle_request/1, handle_compact_req/2, handle_design_req/2,
     db_req/2, couch_doc_open/4,handle_changes_req/2,
@@ -360,6 +361,12 @@ db_req(#httpd{method='POST', path_parts=[DbName]}=Req, Db) ->
                     chttpd_stats:incr_writes(),
                     ok;
                 Error ->
+                    ?LOG_DEBUG(#{
+                        what => async_update_error,
+                        db => DbName,
+                        docid => DocId,
+                        details => Error
+                    }),
                     couch_log:debug("Batch doc error (~s): ~p",[DocId, Error])
                 end
             end),
@@ -1108,6 +1115,12 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
                         chttpd_stats:incr_writes(),
                         ok;
                     Error ->
+                        ?LOG_NOTICE(#{
+                            what => async_update_error,
+                            db => DbName,
+                            docid => DocId,
+                            details => Error
+                        }),
                         couch_log:notice("Batch doc error (~s): ~p",[DocId, Error])
                     end
                 end),
@@ -1944,6 +1957,10 @@ monitor_attachments(Atts) when is_list(Atts) ->
             stub ->
                 Monitors;
             Else ->
+                ?LOG_ERROR(#{
+                    what => malformed_attachment_data,
+                    attachment => Att
+                }),
                 couch_log:error("~p from couch_att:fetch(data, ~p)", [Else, Att]),
                 Monitors
         end

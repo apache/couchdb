@@ -15,6 +15,7 @@
 -compile(tuple_calls).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -export([party_mode_handler/1]).
 
@@ -212,6 +213,12 @@ get_configured_claims() ->
     Re = "((?<key1>[a-z]+)|{(?<key2>[a-z]+)\s*,\s*\"(?<val>[^\"]+)\"})",
     case re:run(Claims, Re, [global, {capture,  [key1, key2, val], binary}]) of
         nomatch when Claims /= "" ->
+            ?LOG_ERROR(#{
+                what => invalid_config_setting,
+                section => jwt_auth,
+                key => required_claims,
+                value => Claims
+            }),
             couch_log:error("[jwt_auth] required_claims is set to an invalid value.", []),
             throw({misconfigured_server, <<"JWT is not configured correctly">>});
         nomatch ->
@@ -246,6 +253,7 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req, AuthModule) ->
         CurrentTime = make_cookie_time(),
         case config:get("couch_httpd_auth", "secret", undefined) of
         undefined ->
+            ?LOG_DEBUG(#{what => cookie_auth_secret_undefined}),
             couch_log:debug("cookie auth secret is not set",[]),
             Req;
         SecretStr ->
@@ -265,6 +273,10 @@ cookie_authentication_handler(#httpd{mochi_req=MochiReq}=Req, AuthModule) ->
                         case couch_passwords:verify(ExpectedHash, Hash) of
                             true ->
                                 TimeLeft = TimeStamp + Timeout - CurrentTime,
+                                ?LOG_DEBUG(#{
+                                    what => successful_cookie_auth,
+                                    username => User
+                                }),
                                 couch_log:debug("Successful cookie auth as: ~p",
                                                 [User]),
                                 Req#httpd{user_ctx=#user_ctx{
@@ -338,6 +350,7 @@ handle_session_req(#httpd{method='POST', mochi_req=MochiReq}=Req, AuthModule) ->
     end,
     UserName = ?l2b(extract_username(Form)),
     Password = ?l2b(couch_util:get_value("password", Form, "")),
+    ?LOG_DEBUG(#{what => login_attempt, user => UserName}),
     couch_log:debug("Attempt Login: ~s",[UserName]),
     {ok, UserProps, _AuthCtx} = case AuthModule:get_user_creds(Req, UserName) of
         nil -> {ok, [], nil};
@@ -501,6 +514,13 @@ same_site() ->
         "lax" -> [{same_site, lax}];
         "strict" -> [{same_site, strict}];
         _ ->
+            ?LOG_ERROR(#{
+                what => invalid_config_setting,
+                section => couch_httpd_auth,
+                key => same_site,
+                value => SameSite,
+                details => "value must be one of `none`, `lax`, `strict`"
+            }),
             couch_log:error("invalid config value couch_httpd_auth.same_site: ~p ",[SameSite]),
             []
     end.
@@ -561,5 +581,10 @@ integer_to_binary(Int, Len) when is_integer(Int), is_integer(Len) ->
 
 authentication_warning(#httpd{mochi_req = Req}, User) ->
     Peer = Req:get(peer),
+    ?LOG_WARNING(#{
+        what => authentication_failure,
+        user => User,
+        peer => Peer
+    }),
     couch_log:warning("~p: Authentication failed for user ~s from ~s",
         [?MODULE, User, Peer]).

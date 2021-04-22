@@ -10,6 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+-include_lib("kernel/include/logger.hrl").
 
 -record(httpd_resp, {
     end_ts,

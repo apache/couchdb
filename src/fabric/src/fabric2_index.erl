@@ -34,6 +34,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -callback build_indices(Db :: map(), DDocs :: list(#doc{})) ->
@@ -69,6 +70,13 @@ cleanup(Db) ->
             ok;
         Tag:Reason:Stack ->
             DbName = fabric2_db:name(Db),
+            ?LOG_ERROR(#{
+                what => index_cleanup_failure,
+                db => DbName,
+                tag => Tag,
+                details => Reason,
+                stacktrace => Stack
+            }),
             LogMsg = "~p failed to cleanup indices for `~s` ~p:~p ~p",
             couch_log:error(LogMsg, [?MODULE, DbName, Tag, Reason, Stack])
     end.
@@ -168,6 +176,13 @@ process_updates_iter([Db | Rest], Cont) ->
         error:database_does_not_exist ->
             ok;
         Tag:Reason:Stack ->
+            ?LOG_ERROR(#{
+                what => index_build_failure,
+                db => Db,
+                tag => Tag,
+                details => Reason,
+                stacktrace => Stack
+            }),
             LogMsg = "~p failed to build indices for `~s` ~p:~p ~p",
             couch_log:error(LogMsg, [?MODULE, Db, Tag, Reason, Stack])
     end,

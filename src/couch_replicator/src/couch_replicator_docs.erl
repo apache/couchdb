@@ -24,6 +24,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -define(OWNER, <<"owner">>).
@@ -67,6 +68,13 @@ update_failed(null, null, null, _) ->
 
 update_failed(DbName, DbUUID, DocId, Error) ->
     Reason = error_reason(Error),
+    ?LOG_ERROR(#{
+        what => replication_failed,
+        in => replicator,
+        replicator_db => DbName,
+        replicator_doc => DocId,
+        details => Reason
+    }),
     couch_log:error("Error processing replication doc `~s` from `~s`: ~s",
         [DocId, DbName, Reason]),
     update_rep_doc(DbName, DbUUID, DocId, [
@@ -154,9 +162,17 @@ update_rep_doc(RepDbName, RepDbUUID, RepDocId, KVs, Wait)
         end
     catch
         throw:conflict ->
+            Delay = couch_rand:uniform(erlang:min(128, Wait)) * 100,
+            ?LOG_ERROR(#{
+                what => replication_doc_conflict,
+                in => replicator,
+                replication_db => RepDbName,
+                replication_doc => RepDocId,
+                retry_delay => Delay
+            }),
             Msg = "Conflict when updating replication doc `~s`. Retrying.",
             couch_log:error(Msg, [RepDocId]),
-            ok = timer:sleep(couch_rand:uniform(erlang:min(128, Wait)) * 100),
+            ok = timer:sleep(Delay),
             update_rep_doc(RepDbName, RepDbUUID, RepDocId, KVs, Wait * 2)
     end;
 
@@ -213,6 +229,13 @@ save_rep_doc(DbName, DbUUID, Doc) when is_binary(DbName), is_binary(DbUUID) ->
         % updating replication documents. Avoid crashing replicator and thus
         % preventing all other replication jobs on the node from running.
         throw:{forbidden, Reason} ->
+            ?LOG_ERROR(#{
+                what => replication_doc_update_forbidden,
+                in => replicator,
+                replication_db => DbName,
+                replication_doc => Doc#doc.id,
+                details => Reason
+            }),
             Msg = "~p VDU or BDU function preventing doc update to ~s ~s ~p",
             couch_log:error(Msg, [?MODULE, DbName, Doc#doc.id, Reason]),
             {ok, forbidden}

@@ -38,6 +38,7 @@
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -spec replicate({[_]}, any()) ->
@@ -287,6 +288,7 @@ cancel_replication(JobId) when is_binary(JobId) ->
             _ ->
                 JobId
         end,
+        ?LOG_NOTICE(#{what => cancel_replication, in => replicator, id => Id}),
         couch_log:notice("Canceling replication '~s'", [Id]),
         case couch_replicator_jobs:remove_job(JTx, JobId) of
             {error, not_found} ->
@@ -327,6 +329,13 @@ process_change(#{} = Db, #doc{deleted = false} = Doc) ->
                 ?ST_PENDING, null, DocState)
     end,
 
+    ?LOG_NOTICE(#{
+        what => replication_update,
+        db => DbName,
+        docid => DocId,
+        job_id => JobId,
+        job_state => DocState
+    }),
     LogMsg = "~p : replication doc update db:~s doc:~s job_id:~s doc_state:~s",
     couch_log:notice(LogMsg, [?MODULE, DbName, DocId, JobId, DocState]),
 

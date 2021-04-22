@@ -22,6 +22,8 @@
 
 -export([handle_config_change/5, handle_config_terminate/3]).
 
+-include_lib("kernel/include/logger.hrl").
+
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 100, Type, [I]}).
 
@@ -33,6 +35,7 @@ start_link() ->
     supervisor:start_link({local,?MODULE}, ?MODULE, Arg).
 
 init(disabled) ->
+    ?LOG_NOTICE(#{what => http_api_disabled}),
     couch_log:notice("~p : api_frontend disabled", [?MODULE]),
     {ok, {{one_for_one, 3, 10}, []}};
 
@@ -99,6 +102,13 @@ append_if_set({Key, Value}, Opts) when Value > 0 ->
 append_if_set({_Key, 0}, Opts) ->
     Opts;
 append_if_set({Key, Value}, Opts) ->
+    ?LOG_ERROR(#{
+        what => invalid_config_setting,
+        section => chttpd_auth_cache,
+        key => Key,
+        value => Value,
+        details => "value must be a positive integer"
+    }),
     couch_log:error(
         "The value for `~s` should be string convertable "
         "to integer which is >= 0 (got `~p`)", [Key, Value]),

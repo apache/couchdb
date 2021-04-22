@@ -21,6 +21,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_views/include/couch_views.hrl").
 -include("couch_replicator_api_wrap.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -export([
     db_open/1,
@@ -178,6 +179,12 @@ open_doc_revs(#httpdb{retries = 0} = HttpDb, Id, Revs, Options, _Fun, _Acc) ->
     Url = couch_util:url_strip_password(
         couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}])
     ),
+    ?LOG_ERROR(#{
+        what => permanent_request_failure,
+        in => replicator,
+        url => Url,
+        retries_remaining => 0
+    }),
     couch_log:error("Replication crashing because GET ~s failed", [Url]),
     exit(kaboom);
 open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
@@ -244,6 +251,13 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
                 true ->
                     throw(request_uri_too_long);
                 false ->
+                    ?LOG_INFO(#{
+                        what => request_uri_too_long,
+                        in => replicator,
+                        docid => Id,
+                        new_max_length => NewMaxLen,
+                        details => "reducing url length because of 414 response"
+                    }),
                     couch_log:info("Reducing url length to ~B because of"
                                    " 414 response", [NewMaxLen]),
                     Options1 = lists:keystore(max_url_len, 1, Options,
@@ -256,6 +270,13 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
             ),
             #httpdb{retries = Retries, wait = Wait0} = HttpDb,
             Wait = 2 * erlang:min(Wait0 * 2, ?MAX_WAIT),
+            ?LOG_NOTICE(#{
+                what => retry_request,
+                in => replicator,
+                url => Url,
+                delay => Wait / 1000,
+                details => error_reason(Else)
+            }),
             couch_log:notice("Retrying GET to ~s in ~p seconds due to error ~w",
                 [Url, Wait / 1000, error_reason(Else)]
             ),

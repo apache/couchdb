@@ -25,6 +25,7 @@
 -export([get_os_process/1, get_ddoc_process/2, ret_os_process/1]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(SUMERROR, <<"The _sum function requires that map values be numbers, "
     "arrays of numbers, or objects. Objects cannot be mixed with other "
@@ -264,6 +265,12 @@ check_sum_overflow(InSize, OutSize, Sum) ->
     end.
 
 log_sum_overflow(InSize, OutSize) ->
+    ?LOG_ERROR(#{
+        what => reduce_function_overflow,
+        input_size => InSize,
+        output_size => OutSize,
+        details => "reduce output must shrink more rapidly"
+    }),
     Fmt = "Reduce output must shrink more rapidly: "
             "input size: ~b "
             "output size: ~b",

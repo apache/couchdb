@@ -22,6 +22,7 @@
 -define(SERVICE_ID, chttpd_handlers).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -45,6 +46,12 @@ handler_info(HttpReq) ->
     try
         select(collect(handler_info, [Method, PathParts, HttpReq]), Default)
     catch Type:Reason:Stack ->
+        ?LOG_ERROR(#{
+            id => get(nonce),
+            result => Type,
+            details => Reason,
+            stack => Stack
+        }),
         couch_log:error("~s :: handler_info failure for ~p : ~p:~p :: ~p", [
                 ?MODULE,
                 get(nonce),

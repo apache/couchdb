@@ -30,6 +30,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_views.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
@@ -56,6 +57,12 @@ ddoc_to_mrst(DbName, #doc{id=Id, body={Fields}}) ->
                 DictBySrcAcc
         end;
         ({Name, Else}, DictBySrcAcc) ->
+            ?LOG_ERROR(#{
+                what => invalid_view_definition,
+                db => DbName,
+                ddoc => Id,
+                view => Name
+            }),
             couch_log:error("design_doc_to_view_group ~s views ~p",
                 [Name, Else]),
             DictBySrcAcc

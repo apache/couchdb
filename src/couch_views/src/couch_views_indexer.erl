@@ -31,6 +31,7 @@
 -include("couch_views.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("fabric/include/fabric2.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -define(KEY_SIZE_LIMIT, 8000).
@@ -122,6 +123,14 @@ init() ->
         error:database_does_not_exist ->
             fail_job(Job, Data, db_deleted, "Database was deleted");
         Error:Reason:Stack ->
+            ?LOG_ERROR(#{
+                what => view_update_failure,
+                db => DbName,
+                ddoc => DDocId,
+                tag => Error,
+                details => Reason,
+                stacktrace => Stack
+            }),
             Fmt = "Error building view for ddoc ~s in ~s: ~p:~p ~p",
             couch_log:error(Fmt, [DbName, DDocId, Error, Reason, Stack]),
 
@@ -592,6 +601,12 @@ check_kv_size_limit(Mrst, Doc, KeyLimit, ValLimit) ->
         Doc
     catch throw:{size_error, Type} ->
         #{id := DocId} = Doc,
+        ?LOG_ERROR(#{
+            what => lists:concat(["oversized_", Type]),
+            db => DbName,
+            docid => DocId,
+            index => IdxName
+        }),
         Fmt = "View ~s size error for docid `~s`, excluded from indexing "
             "in db `~s` for design doc `~s`",
         couch_log:error(Fmt, [Type, DocId, DbName, IdxName]),
@@ -662,6 +677,7 @@ report_progress(State, UpdateType) ->
                 {ok, Job2} ->
                     State#{job := Job2};
                 {error, halt} ->
+                    ?LOG_ERROR(#{what => job_halted, job => Job1}),
                     couch_log:error("~s job halted :: ~w", [?MODULE, Job1]),
                     exit(normal)
             end;
@@ -670,6 +686,7 @@ report_progress(State, UpdateType) ->
                 ok ->
                     State;
                 {error, halt} ->
+                    ?LOG_ERROR(#{what => job_halted, job => Job1}),
                     couch_log:error("~s job halted :: ~w", [?MODULE, Job1]),
                     exit(normal)
             end
