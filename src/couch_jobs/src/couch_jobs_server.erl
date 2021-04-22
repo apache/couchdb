@@ -15,6 +15,9 @@
 -behaviour(gen_server).
 
 
+-include("couch_jobs.hrl").
+
+
 -export([
     start_link/0,
     get_notifier_server/1,
@@ -170,8 +173,9 @@ fdb_types() ->
             couch_jobs_fdb:get_types(JTx)
         end)
     catch
-        error:{timeout, _} ->
-            couch_log:warning("~p : Timed out connecting to FDB", [?MODULE]),
+        error:{Tag, Err} when ?COUCH_JOBS_RETRYABLE(Tag, Err) ->
+            LogMsg = "~p : Error ~p:~p connecting to FDB",
+            couch_log:warning(LogMsg, [?MODULE, Tag, Err]),
             []
     end.
 

@@ -72,8 +72,7 @@ handle_info(check_activity, St) ->
     St1 = try
         check_activity(St)
     catch
-        error:{erlfdb_error, Err} when ?ERLFDB_IS_RETRYABLE(Err) orelse
-                Err =:= ?ERLFDB_TRANSACTION_TIMED_OUT ->
+        error:{Tag, Err} when ?COUCH_JOBS_RETRYABLE(Tag, Err) ->
             LogMsg = "~p : type:~p got ~p error, possibly from overload",
             couch_log:error(LogMsg, [?MODULE, St#st.type, Err]),
             St

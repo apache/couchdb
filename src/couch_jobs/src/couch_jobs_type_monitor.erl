@@ -55,13 +55,7 @@ loop(#st{vs = VS, timeout = Timeout} = St) ->
     try
         erlfdb:wait(Watch, [{timeout, Timeout}])
     catch
-        error:{erlfdb_error, ?ERLFDB_TRANSACTION_TIMED_OUT} ->
-            erlfdb:cancel(Watch, [flush]),
-            ok;
-        error:{erlfdb_error, Code} when ?ERLFDB_IS_RETRYABLE(Code) ->
-            erlfdb:cancel(Watch, [flush]),
-            ok;
-        error:{timeout, _} ->
+        error:{Tag, Err} when ?COUCH_JOBS_RETRYABLE(Tag, Err) ->
             erlfdb:cancel(Watch, [flush]),
             ok
     end,
@@ -88,13 +82,7 @@ get_vs_and_watch(#st{} = St) ->
             couch_jobs_fdb:get_activity_vs_and_watch(JTx1, Type)
         end)
     catch
-        error:{erlfdb_error, ?ERLFDB_TRANSACTION_TIMED_OUT} ->
-            timer:sleep(HoldOff),
-            get_vs_and_watch(St);
-        error:{erlfdb_error, Code} when ?ERLFDB_IS_RETRYABLE(Code) ->
-            timer:sleep(HoldOff),
-            get_vs_and_watch(St);
-        error:{timeout, _} ->
+        error:{Tag, Err} when ?COUCH_JOBS_RETRYABLE(Tag, Err) ->
             timer:sleep(HoldOff),
             get_vs_and_watch(St)
     end.
