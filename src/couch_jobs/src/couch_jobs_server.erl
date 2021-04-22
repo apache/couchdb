@@ -34,8 +34,8 @@
 ]).
 
 
--define(TYPE_CHECK_PERIOD_DEFAULT, 15000).
--define(MAX_JITTER_DEFAULT, 5000).
+-define(TYPE_CHECK_PERIOD_DEFAULT, "15000").
+-define(MAX_JITTER_DEFAULT, "5000").
 
 
 start_link() ->
@@ -188,10 +188,10 @@ schedule_check() ->
 
 
 get_period_msec() ->
-    config:get_integer("couch_jobs", "type_check_period_msec",
+    couch_jobs_util:get_non_neg_int(type_check_period_msec,
         ?TYPE_CHECK_PERIOD_DEFAULT).
 
 
 get_max_jitter_msec() ->
-    config:get_integer("couch_jobs", "type_check_max_jitter_msec",
+    couch_jobs_util:get_non_neg_int(type_check_max_jitter_msec,
         ?MAX_JITTER_DEFAULT).

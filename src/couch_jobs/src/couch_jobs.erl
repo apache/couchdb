@@ -121,9 +121,9 @@ get_job_state(Tx, Type, JobId) when is_binary(JobId) ->
 -spec get_active_jobs_ids(jtx(), job_type()) -> [job_id()] | {error,
     any()}.
 get_active_jobs_ids(Tx, Type) ->
+    SinceVS = {versionstamp, 0, 0},
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
-        Since = couch_jobs_fdb:get_active_since(JTx, Type,
-            {versionstamp, 0, 0}),
+        {Since, _} = couch_jobs_fdb:get_active_since(JTx, Type, SinceVS, []),
         maps:keys(Since)
     end).
 
