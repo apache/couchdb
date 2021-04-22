@@ -28,7 +28,10 @@
     row_to_obj/1,
     row_to_obj/2,
     row_to_json/1,
-    row_to_json/2
+    row_to_json/2,
+    parse_boolean/1,
+    parse_int/1,
+    parse_pos_int/1
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
