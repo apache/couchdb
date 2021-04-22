@@ -22,6 +22,32 @@
 -define(DOC_COUNT, 25).
 
 
+next_vs_function_with_txid_test() ->
+    Cases = [
+        {{0, 0, 1}, {0, 0, 0}},
+        {{0, 0, 2}, {0, 0, 1}},
+        {{0, 1, 0}, {0, 0, 16#FFFF}},
+        {{0, 2, 0}, {0, 1, 16#FFFF}},
+        {{1, 0, 0}, {0, 16#FFFF, 16#FFFF}},
+        {{2, 0, 0}, {1, 16#FFFF, 16#FFFF}}
+    ],
+    Next = fun({V, B, T}) -> fabric2_fdb:next_vs({versionstamp, V, B, T}) end,
+    [?assertEqual({versionstamp, RV, RB, RT}, Next({V, B, T})) ||
+        {{RV, RB, RT}, {V, B, T}} <- Cases].
+
+
+next_vs_function_without_txid_test() ->
+    Cases = [
+        {{0, 1}, {0, 0}},
+        {{0, 2}, {0, 1}},
+        {{1, 0}, {0, 16#FFFF}},
+        {{2, 0}, {1, 16#FFFF}}
+    ],
+    Next = fun({V, B}) -> fabric2_fdb:next_vs({versionstamp, V, B}) end,
+    [?assertEqual({versionstamp, RV, RB}, Next({V, B})) ||
+        {{RV, RB}, {V, B}} <- Cases].
+
+
 changes_fold_test_() ->
     {
         "Test changes fold operations",
