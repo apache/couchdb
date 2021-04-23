@@ -951,6 +951,7 @@ adjust_maxconn(Src = #{<<"http_connections">> := 1}, RepId) ->
     ?LOG_NOTICE(#{
         what => minimum_source_connections_override,
         in => replicator,
+        replication_id => RepId,
         details => "adjusting minimum source connections to 2"
     }),
     Msg = "Adjusting minimum number of HTTP source connections to 2 for ~p",
