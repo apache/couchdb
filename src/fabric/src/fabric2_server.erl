@@ -262,18 +262,18 @@ find_cluster_file([{Type, Location} | Rest]) ->
     },
     case file:read_file_info(Location, [posix]) of
         {ok, #file_info{access = read_write}} ->
-            ?LOG_INFO(maps:merge(Msg, #{status => ok})),
+            ?LOG_INFO(Msg#{status => ok}),
             couch_log:info(
                 "Using ~s FDB cluster file: ~s",
                 [Type, Location]
             ),
             {ok, Location};
         {ok, #file_info{access = read}} ->
-            ?LOG_WARNING(maps:merge(Msg, #{
+            ?LOG_WARNING(Msg#{
                 status => read_only_file,
                 details => "If coordinators are changed without updating this "
                     "file CouchDB may be unable to connect to the FDB cluster!"
-            })),
+            }),
             couch_log:warning(
                 "Using read-only ~s FDB cluster file: ~s -- if coordinators "
                 "are changed without updating this file CouchDB may be unable "
@@ -282,31 +282,31 @@ find_cluster_file([{Type, Location} | Rest]) ->
             ),
             {ok, Location};
         {ok, _} ->
-            ?LOG_ERROR(maps:merge(Msg, #{
+            ?LOG_ERROR(Msg#{
                 status => permissions_error,
                 details => "CouchDB needs read/write access to FDB cluster file"
-            })),
+            }),
             couch_log:error(
                 "CouchDB needs read/write access to FDB cluster file: ~s",
                 [Location]
             ),
             {error, cluster_file_permissions};
         {error, Reason} when Type =:= custom ->
-            ?LOG_ERROR(maps:merge(Msg, #{status => Reason})),
+            ?LOG_ERROR(Msg#{status => Reason}),
             couch_log:error(
                 "Encountered ~p error looking for FDB cluster file: ~s",
                 [Reason, Location]
             ),
             {error, Reason};
         {error, enoent} when Type =:= default ->
-            ?LOG_INFO(maps:merge(Msg, #{status => enoent})),
+            ?LOG_INFO(Msg#{status => enoent}),
             couch_log:info(
                 "No FDB cluster file found at ~s",
                 [Location]
             ),
             find_cluster_file(Rest);
         {error, Reason} when Type =:= default ->
-            ?LOG_WARNING(maps:merge(Msg, #{status => Reason})),
+            ?LOG_WARNING(Msg#{status => Reason}),
             couch_log:warning(
                 "Encountered ~p error looking for FDB cluster file: ~s",
                 [Reason, Location]

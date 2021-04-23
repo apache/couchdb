@@ -70,7 +70,7 @@ read_changes(Parent, StartSeq, Db, ChangesQueue, Options) ->
             },
             Db2 = case LastSeq of
             StartSeq ->
-                ?LOG_NOTICE(maps:merge(LogMsg, #{delay => Db#httpdb.wait / 1000})),
+                ?LOG_NOTICE(LogMsg#{delay => Db#httpdb.wait / 1000}),
                 couch_log:notice("Retrying _changes request to source database ~s"
                     " with since=~p in ~p seconds",
                     [couch_replicator_api_wrap:db_uri(Db), LastSeq, Db#httpdb.wait / 1000]),
