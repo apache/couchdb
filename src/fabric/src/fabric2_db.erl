@@ -275,20 +275,15 @@ list_dbs(UserFun, UserAcc0, Options) ->
     FoldFun = fun
         (DbName, Acc) -> maybe_stop(UserFun({row, [{id, DbName}]}, Acc))
     end,
-    fabric2_fdb:transactional(fun(Tx) ->
-        try
-            UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
-            UserAcc2 = fabric2_fdb:list_dbs(
-                    Tx,
-                    FoldFun,
-                    UserAcc1,
-                    Options
-                ),
-            {ok, maybe_stop(UserFun(complete, UserAcc2))}
-        catch throw:{stop, FinalUserAcc} ->
-            {ok, FinalUserAcc}
-        end
-    end).
+    try
+        UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
+        UserAcc2 = fabric2_fdb:transactional(fun(Tx) ->
+            fabric2_fdb:list_dbs(Tx, FoldFun, UserAcc1, Options)
+        end),
+        {ok, maybe_stop(UserFun(complete, UserAcc2))}
+    catch throw:{stop, FinalUserAcc} ->
+        {ok, FinalUserAcc}
+    end.
 
 
 list_dbs_info() ->
@@ -313,22 +308,22 @@ list_dbs_info(UserFun, UserAcc0, Options) ->
         NewFutureQ = queue:in({DbName, InfoFuture}, FutureQ),
         drain_info_futures(NewFutureQ, Count + 1, UserFun, Acc)
     end,
-    fabric2_fdb:transactional(fun(Tx) ->
-        try
-            UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
-            InitAcc = {queue:new(), 0, UserAcc1},
+    try
+        UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
+        InitAcc = {queue:new(), 0, UserAcc1},
+        UserAcc3 = fabric2_fdb:transactional(fun(Tx) ->
             {FinalFutureQ, _, UserAcc2} = fabric2_fdb:list_dbs_info(
                     Tx,
                     FoldFun,
                     InitAcc,
                     Options
                 ),
-            UserAcc3 = drain_all_info_futures(FinalFutureQ, UserFun, UserAcc2),
-            {ok, maybe_stop(UserFun(complete, UserAcc3))}
-        catch throw:{stop, FinalUserAcc} ->
-            {ok, FinalUserAcc}
-        end
-    end).
+            drain_all_info_futures(FinalFutureQ, UserFun, UserAcc2)
+        end),
+        {ok, maybe_stop(UserFun(complete, UserAcc3))}
+    catch throw:{stop, FinalUserAcc} ->
+        {ok, FinalUserAcc}
+    end.
 
 
 list_deleted_dbs_info() ->
@@ -390,26 +385,22 @@ list_deleted_dbs_info(UserFun, UserAcc0, Options0) ->
         NewFutureQ = queue:in({DbName, TimeStamp, InfoFuture}, FutureQ),
         drain_deleted_info_futures(NewFutureQ, Count + 1, UserFun, Acc)
     end,
-    fabric2_fdb:transactional(fun(Tx) ->
-        try
-            UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
-            InitAcc = {queue:new(), 0, UserAcc1},
+    try
+        UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
+        InitAcc = {queue:new(), 0, UserAcc1},
+        UserAcc3 = fabric2_fdb:transactional(fun(Tx) ->
             {FinalFutureQ, _, UserAcc2} = fabric2_fdb:list_deleted_dbs_info(
                     Tx,
                     FoldFun,
                     InitAcc,
                     Options2
                 ),
-            UserAcc3 = drain_all_deleted_info_futures(
-                    FinalFutureQ,
-                    UserFun,
-                    UserAcc2
-                ),
-            {ok, maybe_stop(UserFun(complete, UserAcc3))}
-        catch throw:{stop, FinalUserAcc} ->
-            {ok, FinalUserAcc}
-        end
-    end).
+            drain_all_deleted_info_futures(FinalFutureQ, UserFun, UserAcc2)
+        end),
+        {ok, maybe_stop(UserFun(complete, UserAcc3))}
+    catch throw:{stop, FinalUserAcc} ->
+        {ok, FinalUserAcc}
+    end.
 
 
 is_admin(Db, {SecProps}) when is_list(SecProps) ->
