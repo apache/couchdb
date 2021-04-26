@@ -449,9 +449,12 @@ list_dbs_tx_too_old(_) ->
     ?assertMatch({ok, _}, fabric2_db:create(DbName1, [])),
     ?assertMatch({ok, _}, fabric2_db:create(DbName2, [])),
 
-    UserFun = fun(Row, Acc) ->
-        fabric2_test_util:tx_too_old_raise_in_user_fun(),
-        {ok, [Row | Acc]}
+    UserFun = fun
+        ({row, _} = Row, Acc) ->
+            fabric2_test_util:tx_too_old_raise_in_user_fun(),
+            {ok, [Row | Acc]};
+        (Row, Acc) ->
+            {ok, [Row | Acc]}
     end,
 
     % Get get expected output without any transactions timing out
@@ -492,9 +495,12 @@ list_dbs_info_tx_too_old(_) ->
         DbName
     end, lists:seq(1, DbCount)),
 
-    UserFun = fun(Row, Acc) ->
-        fabric2_test_util:tx_too_old_raise_in_user_fun(),
-        {ok, [Row | Acc]}
+    UserFun = fun
+        ({row, _} = Row, Acc) ->
+            fabric2_test_util:tx_too_old_raise_in_user_fun(),
+            {ok, [Row | Acc]};
+        (Row, Acc) ->
+            {ok, [Row | Acc]}
     end,
 
     % This is the expected return with no tx timeouts
