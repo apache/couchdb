@@ -46,7 +46,8 @@ setup() ->
             fabric,
             couch_jobs,
             couch_js,
-            couch_eval
+            couch_eval,
+            couch_lib
         ]),
     Ctx.
 

@@ -18,4 +18,11 @@ Please DO NOT put CouchDB specific functionality in here. This means you shouldn
 
 # Provided functionality
 
+## String parsing
+
+All string parsing functions expect either string or binary as well as the type itself. I.e. if `parse_boolean/1` is called as `parse_boolean(true)` it would return `true`. They return either the parsed type or `{error, Reason :: term()}`.
+
+- `couch_lib_parse:parse_boolean/1` - parses given string or binary into Erlang's `boolean()` type
+- `couch_lib_parse:parse_integer/1` - parses given string as Erlang's `integer()` type
+- `couch_lib_parse:parse_non_neg_integer/1` - parses given string as Erlang's `non_neg_integer()` type (`[0..infinity)`)
 
