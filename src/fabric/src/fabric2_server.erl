@@ -27,7 +27,8 @@
     maybe_remove/1,
 
     fdb_directory/0,
-    fdb_cluster/0
+    fdb_cluster/0,
+    get_retry_limit/0
 ]).
 
 
@@ -193,6 +194,12 @@ fdb_directory() ->
 
 fdb_cluster() ->
     get_env(?FDB_CLUSTER).
+
+
+get_retry_limit() ->
+    Default = list_to_integer(?DEFAULT_RETRY_LIMIT),
+    config:get_integer(?TX_OPTIONS_SECTION, "retry_limit", Default).
+
 
 get_env(Key) ->
     case get(Key) of
