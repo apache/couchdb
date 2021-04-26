@@ -91,9 +91,6 @@
 -include("fabric2.hrl").
 
 
--define(MAX_FOLD_RANGE_RETRIES, 3).
-
-
 -record(fold_acc, {
     db,
     restart_tx,
@@ -1882,10 +1879,11 @@ restart_fold(Tx, #fold_acc{} = Acc) ->
 
     ok = erlfdb:reset(Tx),
 
+    MaxRetries = fabric2_server:get_retry_limit(),
     case {erase(?PDICT_FOLD_ACC_STATE), Acc#fold_acc.retries} of
         {#fold_acc{db = Db} = Acc1, _} ->
             Acc1#fold_acc{db = check_db_instance(Db), retries = 0};
-        {undefined, Retries} when Retries < ?MAX_FOLD_RANGE_RETRIES ->
+        {undefined, Retries} when Retries < MaxRetries ->
             Db = check_db_instance(Acc#fold_acc.db),
             Acc#fold_acc{db = Db, retries = Retries + 1};
         {undefined, _} ->

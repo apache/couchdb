@@ -81,6 +81,7 @@ changes_fold_test_() ->
 setup_all() ->
     Ctx = test_util:start_couch([fabric]),
     meck:new(erlfdb, [passthrough]),
+    meck:new(fabric2_server, [passthrough]),
     Ctx.
 
 
@@ -91,6 +92,7 @@ teardown_all(Ctx) ->
 
 setup() ->
     fabric2_test_util:tx_too_old_mock_erlfdb(),
+    meck:expect(fabric2_server, get_retry_limit, 0, 3),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     Rows = lists:map(fun(Val) ->
         DocId = fabric2_util:uuid(),
@@ -111,6 +113,8 @@ setup() ->
 
 
 cleanup({Db, _DocIdRevs}) ->
+    meck:reset(fabric2_server),
+    meck:expect(fabric2_server, get_retry_limit, 0, meck:passthrough()),
     fabric2_test_util:tx_too_old_reset_errors(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
