@@ -121,9 +121,9 @@ get_job_state(Tx, Type, JobId) when is_binary(JobId) ->
 -spec get_active_jobs_ids(jtx(), job_type()) -> [job_id()] | {error,
     any()}.
 get_active_jobs_ids(Tx, Type) ->
+    SinceVS = {versionstamp, 0, 0},
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
-        Since = couch_jobs_fdb:get_active_since(JTx, Type,
-            {versionstamp, 0, 0}),
+        {Since, _} = couch_jobs_fdb:get_active_since(JTx, Type, SinceVS, []),
         maps:keys(Since)
     end).
 
@@ -349,11 +349,7 @@ accept_loop(Type, NoSched, MaxSchedTime, Timeout) ->
     AcceptResult = try
         couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), TxFun)
     catch
-        error:{timeout, _} ->
-            retry;
-        error:{erlfdb_error, ?ERLFDB_TRANSACTION_TIMED_OUT} ->
-            retry;
-        error:{erlfdb_error, Err} when ?ERLFDB_IS_RETRYABLE(Err) ->
+        error:{Tag, Err} when ?COUCH_JOBS_RETRYABLE(Tag, Err) ->
             retry
     end,
     case AcceptResult of
@@ -389,15 +385,12 @@ wait_pending(PendingWatch, MaxSTime, UserTimeout, NoSched) ->
         erlfdb:wait(PendingWatch, [{timeout, Timeout}]),
         ok
     catch
-        error:{erlfdb_error, ?ERLFDB_TRANSACTION_TIMED_OUT} ->
-            erlfdb:cancel(PendingWatch, [flush]),
-            retry;
-        error:{erlfdb_error, Error} when ?ERLFDB_IS_RETRYABLE(Error) ->
-            erlfdb:cancel(PendingWatch, [flush]),
-            retry;
         error:{timeout, _} ->
             erlfdb:cancel(PendingWatch, [flush]),
-            {error, not_found}
+            {error, not_found};
+        error:{Err, Tag} when ?COUCH_JOBS_RETRYABLE(Err, Tag) ->
+            erlfdb:cancel(PendingWatch, [flush]),
+            retry
     end.
 
 

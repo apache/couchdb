@@ -1186,18 +1186,27 @@ seq_to_vs(Seq) when is_binary(Seq) ->
 
 
 next_vs({versionstamp, VS, Batch, TxId}) ->
-    {V, B, T} = case TxId =< 65535 of
+    {V, B, T} = case TxId < 16#FFFF of
         true ->
             {VS, Batch, TxId + 1};
         false ->
-            case Batch =< 65535 of
+            case Batch < 16#FFFF of
                 true ->
                     {VS, Batch + 1, 0};
                 false ->
                     {VS + 1, 0, 0}
             end
     end,
-    {versionstamp, V, B, T}.
+    {versionstamp, V, B, T};
+
+next_vs({versionstamp, VS, Batch}) ->
+    {V, B} = case Batch < 16#FFFF of
+        true ->
+            {VS, Batch + 1};
+        false ->
+            {VS + 1, 0}
+    end,
+    {versionstamp, V, B}.
 
 
 new_versionstamp(Tx) ->

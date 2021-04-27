@@ -16,6 +16,9 @@
 
 -include_lib("kernel/include/logger.hrl").
 
+-include("couch_jobs.hrl").
+
+
 -export([
     start_link/0,
     get_notifier_server/1,
@@ -32,8 +35,8 @@
 ]).
 
 
--define(TYPE_CHECK_PERIOD_DEFAULT, 15000).
--define(MAX_JITTER_DEFAULT, 5000).
+-define(TYPE_CHECK_PERIOD_DEFAULT, "15000").
+-define(MAX_JITTER_DEFAULT, "5000").
 
 
 start_link() ->
@@ -180,9 +183,14 @@ fdb_types() ->
             couch_jobs_fdb:get_types(JTx)
         end)
     catch
-        error:{timeout, _} ->
-            ?LOG_WARNING(#{what => fdb_connection_timeout}),
-            couch_log:warning("~p : Timed out connecting to FDB", [?MODULE]),
+        error:{Tag, Err} when ?COUCH_JOBS_RETRYABLE(Tag, Err) ->
+            ?LOG_WARNING(#{
+                what => fdb_connection_error,
+                tag => Tag,
+                details => Err
+            }),
+            LogMsg = "~p : Error ~p:~p connecting to FDB",
+            couch_log:warning(LogMsg, [?MODULE, Tag, Err]),
             []
     end.
 
@@ -195,10 +203,10 @@ schedule_check() ->
 
 
 get_period_msec() ->
-    config:get_integer("couch_jobs", "type_check_period_msec",
+    couch_jobs_util:get_non_neg_int(type_check_period_msec,
         ?TYPE_CHECK_PERIOD_DEFAULT).
 
 
 get_max_jitter_msec() ->
-    config:get_integer("couch_jobs", "type_check_max_jitter_msec",
+    couch_jobs_util:get_non_neg_int(type_check_max_jitter_msec,
         ?MAX_JITTER_DEFAULT).

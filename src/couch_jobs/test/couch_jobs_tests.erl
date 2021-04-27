@@ -77,7 +77,34 @@ couch_jobs_basic_test_() ->
     }.
 
 
+couch_jobs_batching_test_() ->
+    {
+        "Test couch jobs batching logic",
+        {
+            setup,
+            fun setup_couch/0, fun teardown_couch/1,
+            {
+                foreach,
+                fun setup_batch/0, fun teardown_batch/1,
+                [
+                    ?TDEF_FE(accept_blocking),
+                    ?TDEF_FE(resubmit_enqueues_job),
+                    ?TDEF_FE(accept_max_schedtime),
+                    ?TDEF_FE(accept_no_schedule),
+                    ?TDEF_FE(subscribe),
+                    ?TDEF_FE(remove_when_subscribed_and_pending),
+                    ?TDEF_FE(remove_when_subscribed_and_running),
+                    ?TDEF_FE(subscribe_wait_multiple),
+                    ?TDEF_FE(enqueue_inactive, 15)
+                ]
+            }
+        }
+    }.
+
+
 setup_couch() ->
+    meck:new(couch_jobs_fdb, [passthrough]),
+    meck:new(couch_jobs_util, [passthrough]),
     % Because of a circular dependency between `couch_jobs` and `fabric` in
     % `fabric2_db_expiration` module, disable db expiration so when
     % `couch_jobs` is stopped the test, `fabric` app doesn't get torn down as
@@ -119,6 +146,54 @@ setup() ->
 teardown(#{}) ->
     application:stop(couch_jobs),
     application:stop(fabric),
+    ok.
+
+
+setup_batch() ->
+    Ctx = setup(),
+
+    % Simulate having too many jobs to fit in a 10Mb
+    meck:expect(couch_jobs_fdb, re_enqueue_inactive, 3, meck:loop([
+        meck:raise(error, {erlfdb_error, 2101}),
+        meck:passthrough()
+    ])),
+
+    % Simulate get_inactive_since GRV timing out
+    meck:expect(couch_jobs_fdb, get_inactive_since, 4, meck:loop([
+        meck:raise(error, {erlfdb_error, 1007}),
+        meck:passthrough()
+    ])),
+
+    % Simulate get_active_since transaction timing out
+    meck:expect(couch_jobs_fdb, get_active_since, 4, meck:loop([
+        meck:raise(error, {erlfdb_error, 1031}),
+        meck:passthrough()
+    ])),
+
+    % Set up batching parameters to test small batches down to size 1
+    meck:expect(couch_jobs_util, get_non_neg_int, [
+        {[notifier_batch_increment, '_'], 1},
+        {[activity_monitor_batch_increment, '_'], 1},
+        {2, meck:passthrough()}
+    ]),
+    meck:expect(couch_jobs_util, get_float_0_1, [
+        {[notifier_batch_factor, '_'], 0.0001},
+        {[activity_monitor_batch_factor, '_'], 0.0001},
+        {2, meck:passthrough()}
+    ]),
+
+    Ctx.
+
+
+teardown_batch(Ctx) ->
+    teardown(Ctx),
+    meck:reset(couch_jobs_fdb),
+    meck:reset(couch_jobs_util),
+    meck:expect(couch_jobs_fdb, re_enqueue_inactive, 3, meck:passthrough()),
+    meck:expect(couch_jobs_fdb, get_active_since, 4, meck:passthrough()),
+    meck:expect(couch_jobs_fdb, get_inactive_since, 4, meck:passthrough()),
+    meck:expect(couch_jobs_util, get_non_neg_int, 2, meck:passthrough()),
+    meck:expect(couch_jobs_util, get_float_0_1, 2, meck:passthrough()),
     ok.
 
 
