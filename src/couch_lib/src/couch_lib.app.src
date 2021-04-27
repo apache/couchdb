@@ -10,25 +10,13 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, couch_views, [
-    {description, "CouchDB Views on FDB"},
+{application, couch_lib, [
+    {description, "CouchDB library of various helpers"},
     {vsn, git},
-    {mod, {couch_views_app, []}},
     {registered, [
-        couch_views_sup,
-        couch_views_server
     ]},
     {applications, [
         kernel,
-        stdlib,
-        erlfdb,
-        couch_epi,
-        couch_lib,
-        couch_log,
-        config,
-        couch_stats,
-        fabric,
-        couch_jobs,
-        couch_eval
+        stdlib
     ]}
 ]}.

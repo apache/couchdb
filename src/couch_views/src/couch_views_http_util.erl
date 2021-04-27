@@ -319,40 +319,19 @@ parse_param(Key, Val, Args, IsDecoded) ->
     end.
 
 
-parse_boolean(true) ->
-    true;
-parse_boolean(false) ->
-    false;
-
-parse_boolean(Val) when is_binary(Val) ->
-    parse_boolean(?b2l(Val));
-
 parse_boolean(Val) ->
-    case string:to_lower(Val) of
-    "true" -> true;
-    "false" -> false;
-    _ ->
-        Msg = io_lib:format("Invalid boolean parameter: ~p", [Val]),
-        throw({query_parse_error, ?l2b(Msg)})
+    case couch_lib_parse:parse_boolean(Val) of
+        {error, Reason} ->
+            throw({query_parse_error, Reason});
+        Boolean ->
+            Boolean
     end.
 
-parse_int(Val) when is_integer(Val) ->
-    Val;
-parse_int(Val) ->
-    case (catch list_to_integer(Val)) of
-    IntVal when is_integer(IntVal) ->
-        IntVal;
-    _ ->
-        Msg = io_lib:format("Invalid value for integer: ~p", [Val]),
-        throw({query_parse_error, ?l2b(Msg)})
-    end.
 
 parse_pos_int(Val) ->
-    case parse_int(Val) of
-    IntVal when IntVal >= 0 ->
-        IntVal;
-    _ ->
-        Fmt = "Invalid value for positive integer: ~p",
-        Msg = io_lib:format(Fmt, [Val]),
-        throw({query_parse_error, ?l2b(Msg)})
+    case couch_lib_parse:parse_non_neg_integer(Val) of
+        {error, Reason} ->
+            throw({query_parse_error, Reason});
+        Int ->
+            Int
     end.
