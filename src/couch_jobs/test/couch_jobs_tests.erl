@@ -757,13 +757,15 @@ metadata_version_bump(_) ->
     JTx1 = couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(Tx) -> Tx end),
     ?assertMatch(#{md_version := not_found}, JTx1),
 
-    ets:delete_all_objects(couch_jobs_fdb),
     couch_jobs_fdb:bump_metadata_version(),
+    ets:delete_all_objects(couch_jobs_fdb),
+
     JTx2 = couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(Tx) -> Tx end),
     ?assertMatch(#{md_version := Bin} when is_binary(Bin), JTx2),
 
-    ets:delete_all_objects(couch_jobs_fdb),
     couch_jobs_fdb:bump_metadata_version(),
+    ets:delete_all_objects(couch_jobs_fdb),
+
     JTx3 = couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(Tx) -> Tx end),
     OldMdv = maps:get(md_version, JTx2),
     NewMdv = maps:get(md_version, JTx3),
