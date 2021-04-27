@@ -230,6 +230,7 @@ handle_request_int(MochiReq) ->
     end,
 
     Nonce = couch_util:to_hex(crypto:strong_rand_bytes(5)),
+    logger:set_process_metadata(#{request_id => Nonce}),
 
     HttpReq0 = #httpd{
         mochi_req = MochiReq,
@@ -277,7 +278,6 @@ handle_request_int(MochiReq) ->
         #httpd_resp{status = aborted, reason = Reason} ->
             ?LOG_ERROR(#{
                 what => abnormal_response_termation,
-                id => get(nonce),
                 details => Reason
             }),
             couch_log:error("Response abnormally terminated: ~p", [Reason]),
@@ -362,7 +362,6 @@ catch_error(HttpReq, exit, {mochiweb_recv_error, E}, _Stack) ->
     } = HttpReq,
     ?LOG_NOTICE(#{
         what => mochiweb_recv_error,
-        id => get(nonce),
         peer => Peer,
         method => Method,
         path => MochiReq:get(raw_path),
@@ -443,7 +442,6 @@ maybe_log(#httpd{} = HttpReq, #httpd_resp{should_log = true} = HttpResp) ->
         method => Method,
         path => RawUri,
         code => Code,
-        id => get(nonce),
         user => User,
         % req_size => MochiReq:get(body_length),
         src => #{ip4 => Peer},
@@ -1283,7 +1281,6 @@ log_error_with_stack_trace({bad_request, _, _}) ->
 log_error_with_stack_trace({Error, Reason, Stack}) ->
     ?LOG_ERROR(#{
         what => request_failure,
-        id => get(nonce),
         error => Error,
         reason => Reason,
         hash => stack_hash(Stack),

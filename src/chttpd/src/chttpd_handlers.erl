@@ -47,7 +47,6 @@ handler_info(HttpReq) ->
         select(collect(handler_info, [Method, PathParts, HttpReq]), Default)
     catch Type:Reason:Stack ->
         ?LOG_ERROR(#{
-            id => get(nonce),
             result => Type,
             details => Reason,
             stack => Stack
