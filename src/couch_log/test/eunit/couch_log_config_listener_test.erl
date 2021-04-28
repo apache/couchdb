@@ -24,7 +24,8 @@ couch_log_config_test_() ->
         fun couch_log_test_util:stop/1,
         [
             fun check_restart_listener/0,
-            fun check_ignore_non_log/0
+            fun check_ignore_non_log/0,
+            fun check_only_one_couch_error_handler/0
         ]
     }.
 
@@ -67,6 +68,10 @@ check_ignore_non_log() ->
     end,
     ?assertError(config_change_timeout, Run()).
 
+check_only_one_couch_error_handler() ->
+    Handlers = gen_event:which_handlers(error_logger),
+    CouchHandlers = [H || H <- Handlers, H =:= couch_log_error_logger_h],
+    ?assertEqual(1, length(CouchHandlers)).
 
 get_handler() ->
     FoldFun = fun
