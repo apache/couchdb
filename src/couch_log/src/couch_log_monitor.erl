@@ -41,8 +41,12 @@ start_link() ->
 -ifdef(OTP_RELEASE).
 
 init(_) ->
-    % see https://erlang.org/doc/man/error_logger.html#add_report_handler-1
-    ok = error_logger:add_report_handler(?HANDLER_MOD),
+    % See https://erlang.org/doc/man/error_logger.html#add_report_handler-1
+    % however that call doesn't call a supervised handler so we do the same
+    % thing add_report_handler/1 does but call gen_event:add_sup_handler/3
+    % instead of gen_event:add_handler/3.
+    Opts =  #{level => info, filter_default => log},
+    _ = logger:add_handler(error_logger, error_logger, Opts),
     ok = gen_event:add_sup_handler(error_logger, ?HANDLER_MOD, []),
     {ok, nil}.
 
