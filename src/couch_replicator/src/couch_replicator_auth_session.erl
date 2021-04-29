@@ -182,7 +182,7 @@ handle_cast(Msg, State) ->
 
 
 handle_info(Msg, State) ->
-    ?LOG_ERROR(#{what => unexpected_msg, in => replicator, msg => Msg}),
+    ?LOG_ERROR(#{what => unexpected_message, in => replicator, msg => Msg}),
     couch_log:error("~p : Received un-expected message ~p", [?MODULE, Msg]),
     {noreply, State}.
 

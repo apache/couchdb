@@ -360,7 +360,7 @@ log_retry_error(Params, HttpDb, Wait, Error) ->
         in => replicator,
         method => Method,
         url => Url,
-        retry_delay => Wait / 1000,
+        retry_delay_sec => Wait / 1000,
         details => error_cause(Error)
     }),
     couch_log:notice("Retrying ~s request to ~s in ~p seconds due to error ~s",

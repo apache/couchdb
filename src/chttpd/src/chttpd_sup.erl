@@ -107,7 +107,7 @@ append_if_set({Key, Value}, Opts) ->
         section => chttpd_auth_cache,
         key => Key,
         value => Value,
-        details => "value must be a positive integer"
+        details => "value must be a non-negative integer"
     }),
     couch_log:error(
         "The value for `~s` should be string convertable "

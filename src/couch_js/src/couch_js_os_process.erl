@@ -150,6 +150,7 @@ readjson(OsProc) when is_record(OsProc, os_proc) ->
                 what => fatal_error,
                 in => os_process,
                 port => OsProc#os_proc.port,
+                tag => Id,
                 details => Reason
             }),
             couch_log:info("OS Process ~p Fatal Error :: ~s ~p",

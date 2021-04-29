@@ -274,7 +274,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
                 what => retry_request,
                 in => replicator,
                 url => Url,
-                delay => Wait / 1000,
+                delay_sec => Wait / 1000,
                 details => error_reason(Else)
             }),
             couch_log:notice("Retrying GET to ~s in ~p seconds due to error ~w",

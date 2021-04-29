@@ -349,7 +349,7 @@ handle_info({'EXIT', Pid, normal}, #rep_state{workers = Workers} = State) ->
             %% Processes might be linked by replicator's auth plugins so
             %% we tolerate them exiting `normal` here and don't crash
             ?LOG_WARNING(#{
-                what => unknown_process_exit,
+                what => linked_process_exit,
                 in => replicator,
                 pid => Pid,
                 reason => normal

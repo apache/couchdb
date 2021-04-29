@@ -97,7 +97,7 @@ handle_info(check_types, St) ->
 
 handle_info({'DOWN', _Ref, process, Pid, Reason}, St) ->
     ?LOG_ERROR(#{
-        what => unknown_process_crash,
+        what => monitored_process_crash,
         pid => Pid,
         details => Reason
     }),

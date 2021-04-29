@@ -168,7 +168,7 @@ update_rep_doc(RepDbName, RepDbUUID, RepDocId, KVs, Wait)
                 in => replicator,
                 replication_db => RepDbName,
                 replication_doc => RepDocId,
-                retry_delay => Delay
+                retry_delay_sec => Delay
             }),
             Msg = "Conflict when updating replication doc `~s`. Retrying.",
             couch_log:error(Msg, [RepDocId]),

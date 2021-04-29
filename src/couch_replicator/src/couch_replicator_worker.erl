@@ -277,7 +277,7 @@ fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
             source => couch_replicator_api_wrap:db_uri(Source),
             docid => Id,
             revisions => couch_doc:revs_to_strs(Revs),
-            retry_delay => WaitMSec / 1000
+            retry_delay_sec => WaitMSec / 1000
         }),
         timer:sleep(WaitMSec),
         couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc);
@@ -293,7 +293,7 @@ fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
             source => couch_replicator_api_wrap:db_uri(Source),
             docid => Id,
             revisions => couch_doc:revs_to_strs(Revs),
-            retry_delay => WaitMSec / 1000
+            retry_delay_sec => WaitMSec / 1000
         }),
         timer:sleep(WaitMSec),
         couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc)
@@ -341,7 +341,7 @@ spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
         ?LOG_DEBUG(#{
             what => flush_doc_batch,
             in => replicator,
-            batch_size => Size
+            batch_size_bytes => Size
         }),
         couch_log:debug("Worker flushing doc batch of size ~p bytes", [Size]);
     _ ->
@@ -386,7 +386,7 @@ maybe_flush_docs(#httpdb{} = Target, Batch, Doc) ->
         ?LOG_DEBUG(#{
             what => flush_doc_batch,
             in => replicator,
-            batch_size => SizeAcc2
+            batch_size_bytes => SizeAcc2
         }),
         couch_log:debug("Worker flushing doc batch of size ~p bytes", [SizeAcc2]),
         Stats = flush_docs(Target, [JsonDoc | DocAcc]),
@@ -423,7 +423,7 @@ handle_flush_docs_result({error, request_body_too_large}, Target, DocList) ->
         in => replicator,
         target => couch_replicator_api_wrap:db_uri(Target),
         reason => request_body_too_large,
-        original_batch_size => Len,
+        original_batch_size_bytes => Len,
         details => "splitting into two smaller batches and retrying"
     }),
     couch_log:notice("Replicator: couldn't write batch of size ~p to ~p because"
