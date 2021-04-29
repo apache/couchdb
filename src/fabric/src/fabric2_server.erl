@@ -256,7 +256,7 @@ find_cluster_file([{custom, undefined} | Rest]) ->
 
 find_cluster_file([{Type, Location} | Rest]) ->
     Msg = #{
-        in => fdb_connection_setup,
+        what => fdb_connection_setup,
         configuration_type => Type,
         cluster_file => Location
     },
@@ -292,21 +292,30 @@ find_cluster_file([{Type, Location} | Rest]) ->
             ),
             {error, cluster_file_permissions};
         {error, Reason} when Type =:= custom ->
-            ?LOG_ERROR(Msg#{status => Reason}),
+            ?LOG_ERROR(Msg#{
+                status => Reason,
+                details => file:format_error(Reason)
+            }),
             couch_log:error(
                 "Encountered ~p error looking for FDB cluster file: ~s",
                 [Reason, Location]
             ),
             {error, Reason};
         {error, enoent} when Type =:= default ->
-            ?LOG_INFO(Msg#{status => enoent}),
+            ?LOG_INFO(Msg#{
+                status => enoent,
+                details => file:format_error(enoent)
+            }),
             couch_log:info(
                 "No FDB cluster file found at ~s",
                 [Location]
             ),
             find_cluster_file(Rest);
         {error, Reason} when Type =:= default ->
-            ?LOG_WARNING(Msg#{status => Reason}),
+            ?LOG_WARNING(Msg#{
+                status => Reason,
+                details => file:format_error(Reason)
+            }),
             couch_log:warning(
                 "Encountered ~p error looking for FDB cluster file: ~s",
                 [Reason, Location]
