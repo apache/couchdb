@@ -386,6 +386,6 @@ pmap(Fun, Args, Opts) ->
 pmap_exec(Fun, Arg) ->
     try
         {'$res', Fun(Arg)}
-    catch ?STACKTRACE(Tag, Reason, Stack)
+    catch Tag:Reason:Stack ->
         {'$err', Tag, Reason, Stack}
     end.

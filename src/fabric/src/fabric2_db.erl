@@ -139,6 +139,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include("fabric2.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 % Default max database name length is based on CouchDb < 4.x compatibility. See
@@ -841,6 +842,7 @@ validate_docid(Id) when is_binary(Id) ->
     _Else -> ok
     end;
 validate_docid(Id) ->
+    ?LOG_DEBUG(#{what => illegal_docid, docid => Id}),
     couch_log:debug("Document id is not a string: ~p", [Id]),
     throw({illegal_docid, <<"Document id must be a string">>}).
 

@@ -74,6 +74,7 @@
 
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -type headers() :: [{string(), string()}].
@@ -156,6 +157,11 @@ handle_call({update_headers, Headers, _Epoch}, _From, State) ->
             Headers1 = [{"Cookie", Cookie} | Headers],
             {reply, {Headers1, State1#state.epoch}, State1};
         {error, Error} ->
+            ?LOG_ERROR(#{
+                what => terminate_session_auth_plugin,
+                in => replicator,
+                details => Error
+            }),
             LogMsg = "~p: Stopping session auth plugin because of error ~p",
             couch_log:error(LogMsg, [?MODULE, Error]),
             {stop, Error, State}
@@ -170,11 +176,13 @@ handle_call(stop, _From, State) ->
 
 
 handle_cast(Msg, State) ->
+    ?LOG_ERROR(#{what => unexpected_cast, in => replicator, msg => Msg}),
     couch_log:error("~p: Received un-expected cast ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 
 handle_info(Msg, State) ->
+    ?LOG_ERROR(#{what => unexpected_message, in => replicator, msg => Msg}),
     couch_log:error("~p : Received un-expected message ~p", [?MODULE, Msg]),
     {noreply, State}.
 
@@ -307,6 +315,11 @@ process_response(Code, Headers, _Epoch, State) when Code >= 200, Code < 300 ->
         {error, cookie_not_found} ->
             State;
         {error, Other} ->
+            ?LOG_ERROR(#{
+                what => cookie_parse_error,
+                in => replicator,
+                details => Other
+            }),
             LogMsg = "~p : Could not parse cookie from response headers ~p",
             couch_log:error(LogMsg, [?MODULE, Other]),
             State

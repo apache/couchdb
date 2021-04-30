@@ -22,6 +22,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 decode_multipart_stream(ContentType, DataFun, Ref) ->
     Parent = self(),
@@ -45,10 +46,20 @@ decode_multipart_stream(ContentType, DataFun, Ref) ->
     {'DOWN', ParserRef, _, _, normal} ->
         ok;
     {'DOWN', ParserRef, process, Parser, {{nocatch, {Error, Msg}}, _}} ->
+        ?LOG_ERROR(#{
+            what => multipart_streamer_failure,
+            ref => ParserRef,
+            details => Msg
+        }),
         couch_log:error("Multipart streamer ~p died with reason ~p",
                         [ParserRef, Msg]),
         throw({Error, Msg});
     {'DOWN', ParserRef, _, _, Reason} ->
+        ?LOG_ERROR(#{
+            what => multipart_streamer_failure,
+            ref => ParserRef,
+            details => Reason
+        }),
         couch_log:error("Multipart streamer ~p died with reason ~p",
                         [ParserRef, Reason]),
         throw({error, Reason})

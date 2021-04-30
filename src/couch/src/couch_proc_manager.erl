@@ -41,6 +41,7 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(PROCS, couch_proc_manager_procs).
 -define(WAITERS, couch_proc_manager_waiters).
@@ -321,7 +322,7 @@ find_proc(#client{lang = Lang, ddoc = DDoc, ddoc_key = DDocKey} = Client) ->
 
 find_proc(Lang, Fun) ->
     try iter_procs(Lang, Fun)
-    catch ?STACKTRACE(error, Reason, StackTrace)
+    catch error:Reason:StackTrace ->
         couch_log:error("~p ~p ~p", [?MODULE, Reason, StackTrace]),
         {error, Reason}
     end.

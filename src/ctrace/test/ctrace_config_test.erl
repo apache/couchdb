@@ -14,6 +14,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("ctrace/src/ctrace.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -define(TDEF(A), {atom_to_list(A), fun A/0}).
@@ -79,6 +80,7 @@ ensure_all_supported() ->
 
 
 handle_all_syntax_error_supported() ->
+    ?LOG_ERROR(#{what => xkcd, event => test_start}),
     couch_log:error("XKCD: TEST START", []),
     config:delete("tracing.filters", "all", false),
     test_util:wait_value(fun() ->
@@ -96,6 +98,7 @@ handle_all_syntax_error_supported() ->
     % then we default to not generating traces
     ?assertEqual(false, ctrace:match(bam, #{gee => whiz})),
 
+    ?LOG_ERROR(#{what => xkcd, event => test_end}),
     couch_log:error("XKCD: TEST END", []),
     config:delete("tracing.filters", "all", false).
 

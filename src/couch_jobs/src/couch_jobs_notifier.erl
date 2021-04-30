@@ -33,6 +33,7 @@
 
 
 -include("couch_jobs.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -define(TYPE_MONITOR_HOLDOFF_DEFAULT, "50").
@@ -125,6 +126,10 @@ handle_info({type_updated, VS}, St) ->
 handle_info({Ref, ready}, St) when is_reference(Ref) ->
     % Don't crash out couch_jobs_server and the whole application would need to
     % eventually do proper cleanup in erlfdb:wait timeout code.
+    ?LOG_ERROR(#{
+        what => spurious_future_ready,
+        ref => Ref
+    }),
     LogMsg = "~p : spurious erlfdb future ready message ~p",
     couch_log:error(LogMsg, [?MODULE, Ref]),
     {noreply, St};

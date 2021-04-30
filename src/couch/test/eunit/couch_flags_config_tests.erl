@@ -98,10 +98,8 @@ test_config() ->
 
 parse_flags_term_test_() ->
     LongBinary = binary:copy(<<"a">>, ?MAX_FLAG_NAME_LENGTH + 1),
-    ExpectedError = {error, {"Cannot parse list of tags: ~n~p",
-       [{too_long, LongBinary}]}},
-    ExpectedUnknownError = {error,{"Cannot parse list of tags: ~n~p",
-       [{invalid_flag,<<"dddddddd">>}]}},
+    ExpectedError = {error, [{too_long, LongBinary}]},
+    ExpectedUnknownError = {error, [{invalid_flag,<<"dddddddd">>}]},
 	[
 		{"empty binary", ?_assertEqual(
 		    [], couch_flags_config:parse_flags_term(<<>>))},

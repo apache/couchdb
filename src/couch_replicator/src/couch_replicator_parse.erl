@@ -22,8 +22,8 @@
 
 
 -include_lib("ibrowse/include/ibrowse.hrl").
--include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -define(DEFAULT_SOCK_OPTS, "[{keepalive, true}, {nodelay, false}]").
@@ -60,11 +60,24 @@ parse_rep_doc(RepDoc) ->
     {ok, Rep} = try
         parse_rep(RepDoc, null)
     catch
-        ?STACKTRACE(throw, {error, Reason}, Stack)
+        throw:{error, Reason}:Stack ->
+            ?LOG_ERROR(#{
+                what => replication_doc_parse_error,
+                in => replicator,
+                details => Reason,
+                stacktrace => Stack
+            }),
             LogErr1 = "~p parse_rep_doc fail ~p ~p",
             couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
             throw({bad_rep_doc, Reason});
-        ?STACKTRACE(Tag, Err, Stack)
+        Tag:Err:Stack ->
+            ?LOG_ERROR(#{
+                what => replication_doc_parse_error,
+                in => replicator,
+                tag => Tag,
+                details => Err,
+                stacktrace => Stack
+            }),
             LogErr2 = "~p parse_rep_doc fail ~p:~p ~p",
             couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
             throw({bad_rep_doc, couch_util:to_binary({Tag, Err})})
@@ -82,11 +95,24 @@ parse_transient_rep(#{} = Body, UserName) ->
     {ok, Rep} = try
         parse_rep(Body, UserName)
     catch
-        ?STACKTRACE(throw, {error, Reason}, Stack)
+        throw:{error, Reason}:Stack ->
+            ?LOG_ERROR(#{
+                what => transient_replication_parse_error,
+                in => replicator,
+                details => Reason,
+                stacktrace => Stack
+            }),
             LogErr1 = "~p parse_transient_rep fail ~p ~p",
             couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
             throw({bad_request, Reason});
-        ?STACKTRACE(Tag, Err, Stack)
+        Tag:Err:Stack ->
+            ?LOG_ERROR(#{
+                what => transient_replication_parse_error,
+                in => replicator,
+                tag => Tag,
+                details => Err,
+                stacktrace => Stack
+            }),
             LogErr2 = "~p parse_transient_rep fail ~p ~p",
             couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
             throw({bad_request, couch_util:to_binary({Tag, Err})})

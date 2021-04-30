@@ -14,6 +14,7 @@
 
 -behaviour(gen_server).
 
+-include_lib("kernel/include/logger.hrl").
 
 -include("couch_jobs.hrl").
 
@@ -95,6 +96,11 @@ handle_info(check_types, St) ->
     {noreply, St};
 
 handle_info({'DOWN', _Ref, process, Pid, Reason}, St) ->
+    ?LOG_ERROR(#{
+        what => monitored_process_crash,
+        pid => Pid,
+        details => Reason
+    }),
     LogMsg = "~p : process ~p exited with ~p",
     couch_log:error(LogMsg, [?MODULE, Pid, Reason]),
     {stop, {unexpected_process_exit, Pid, Reason}, St};
@@ -102,6 +108,10 @@ handle_info({'DOWN', _Ref, process, Pid, Reason}, St) ->
 handle_info({Ref, ready}, St) when is_reference(Ref) ->
     % Don't crash out couch_jobs_server and the whole application would need to
     % eventually do proper cleanup in erlfdb:wait timeout code.
+    ?LOG_ERROR(#{
+        what => spurious_future_ready,
+        ref => Ref
+    }),
     LogMsg = "~p : spurious erlfdb future ready message ~p",
     couch_log:error(LogMsg, [?MODULE, Ref]),
     {noreply, St};
@@ -174,6 +184,11 @@ fdb_types() ->
         end)
     catch
         error:{Tag, Err} when ?COUCH_JOBS_RETRYABLE(Tag, Err) ->
+            ?LOG_WARNING(#{
+                what => fdb_connection_error,
+                tag => Tag,
+                details => Err
+            }),
             LogMsg = "~p : Error ~p:~p connecting to FDB",
             couch_log:warning(LogMsg, [?MODULE, Tag, Err]),
             []

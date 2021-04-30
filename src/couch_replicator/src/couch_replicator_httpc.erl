@@ -15,6 +15,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -export([setup/1]).
 -export([send_req/3]).
@@ -55,6 +56,12 @@ setup(Db) ->
         {error, Error} ->
             LogMsg = "~p: auth plugin initialization failed ~p ~p",
             LogUrl = couch_util:url_strip_password(Url),
+            ?LOG_ERROR(#{
+                what => auth_plugin_initialization_failure,
+                in => replicator,
+                db => LogUrl,
+                details => Error
+            }),
             couch_log:error(LogMsg, [?MODULE, LogUrl, Error]),
             throw({replication_auth_error, Error})
     end.
@@ -348,6 +355,14 @@ update_first_error_timestamp(HttpDb) ->
 log_retry_error(Params, HttpDb, Wait, Error) ->
     Method = string:to_upper(atom_to_list(get_value(method, Params, get))),
     Url = couch_util:url_strip_password(full_url(HttpDb, Params)),
+    ?LOG_NOTICE(#{
+        what => retry_request,
+        in => replicator,
+        method => Method,
+        url => Url,
+        retry_delay_sec => Wait / 1000,
+        details => error_cause(Error)
+    }),
     couch_log:notice("Retrying ~s request to ~s in ~p seconds due to error ~s",
         [Method, Url, Wait / 1000, error_cause(Error)]).
 
@@ -360,10 +375,24 @@ report_error(_Worker, HttpDb, Params, Error) ->
 
 
 do_report_error(Url, Method, {code, Code}) ->
+    ?LOG_ERROR(#{
+        what => failed_request,
+        in => replicator,
+        method => Method,
+        url => Url,
+        status_code => Code
+    }),
     couch_log:error("Replicator, request ~s to ~p failed. The received "
         "HTTP error code is ~p", [Method, Url, Code]);
 
 do_report_error(FullUrl, Method, Error) ->
+    ?LOG_ERROR(#{
+        what => failed_request,
+        in => replicator,
+        method => Method,
+        url => FullUrl,
+        details => error_cause(Error)
+    }),
     couch_log:error("Replicator, request ~s to ~p failed due to error ~s",
         [Method, FullUrl, error_cause(Error)]).
 

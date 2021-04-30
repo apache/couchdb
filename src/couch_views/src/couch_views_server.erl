@@ -15,6 +15,7 @@
 
 -behaviour(gen_server).
 
+-include_lib("kernel/include/logger.hrl").
 
 -export([
     start_link/0
@@ -75,6 +76,7 @@ handle_call({accepted, Pid}, _From, St) ->
             },
             {reply, ok, spawn_acceptors(St1)};
         false ->
+            ?LOG_ERROR(#{what => unknown_acceptor, pid => Pid}),
             LogMsg = "~p : unknown acceptor processs ~p",
             couch_log:error(LogMsg, [?MODULE, Pid]),
             {stop, {unknown_acceptor_pid, Pid}, St}
@@ -127,6 +129,7 @@ format_status(_Opt, [_PDict, State]) ->
 
 handle_acceptor_exit(#{acceptors := Acceptors} = St, Pid, Reason) ->
     St1 = St#{acceptors := maps:remove(Pid, Acceptors)},
+    ?LOG_ERROR(#{what => acceptor_crash, pid => Pid, reason => Reason}),
     LogMsg = "~p : acceptor process ~p exited with ~p",
     couch_log:error(LogMsg, [?MODULE, Pid, Reason]),
     {noreply, spawn_acceptors(St1)}.
@@ -138,12 +141,14 @@ handle_worker_exit(#{workers := Workers} = St, Pid, normal) ->
 
 handle_worker_exit(#{workers := Workers} = St, Pid, Reason) ->
     St1 = St#{workers := maps:remove(Pid, Workers)},
+    ?LOG_ERROR(#{what => indexer_crash, pid => Pid, reason => Reason}),
     LogMsg = "~p : indexer process ~p exited with ~p",
     couch_log:error(LogMsg, [?MODULE, Pid, Reason]),
     {noreply, spawn_acceptors(St1)}.
 
 
 handle_unknown_exit(St, Pid, Reason) ->
+    ?LOG_ERROR(#{what => unknown_process_crash, pid => Pid, reason => Reason}),
     LogMsg = "~p : unknown process ~p exited with ~p",
     couch_log:error(LogMsg, [?MODULE, Pid, Reason]),
     {stop, {unknown_pid_exit, Pid}, St}.

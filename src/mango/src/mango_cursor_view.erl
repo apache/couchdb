@@ -30,6 +30,7 @@
 -include_lib("couch_views/include/couch_views.hrl").
 -include("mango_cursor.hrl").
 -include("mango_idx_view.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 create(Db, Indexes, Selector, Opts) ->
@@ -241,6 +242,7 @@ handle_message({row, Props}, Cursor) ->
             },
             {ok, Cursor1};
         Error ->
+            ?LOG_ERROR(#{what => load_doc_failure, details => Error}),
             couch_log:error("~s :: Error loading doc: ~p", [?MODULE, Error]),
             {ok, Cursor}
     end;

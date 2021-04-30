@@ -18,6 +18,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_views/include/couch_views.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 % If the doc revision doesn't not match the NewRevId passed here we can ignore
 % the document since it is then a conflict document and it doesn't need
@@ -31,13 +32,27 @@ index(Db, #doc{id = Id, revs = Revs} = Doc, _NewWinner, _OldWinner, NewRevId,
             index_int(Db, Doc, Seq)
         end
     catch
-        ?STACKTRACE(error, {erlfdb_error, ErrCode}, Stack)
+        error:{erlfdb_error, ErrCode}:Stack when is_integer(ErrCode) ->
             DbName = fabric2_db:name(Db),
+            ?LOG_ERROR(#{
+                what => mango_index_update,
+                status => erlfdb_error,
+                details => ErrCode,
+                db => DbName,
+                docid => Id
+            }),
             couch_log:error("Mango index erlfdb error Db ~s Doc ~p ~p",
                 [DbName, Id, ErrCode]),
             erlang:raise(error, {erlfdb_error, ErrCode}, Stack);
         Error:Reason ->
             DbName = fabric2_db:name(Db),
+            ?LOG_ERROR(#{
+                what => mango_index_update,
+                status => Error,
+                details => Reason,
+                db => DbName,
+                docid => Id
+            }),
             couch_log:error("Mango index error for Db ~s Doc ~p ~p ~p",
                 [DbName, Id, Error, Reason])
     end.

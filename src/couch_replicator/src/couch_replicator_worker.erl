@@ -25,6 +25,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 % TODO: maybe make both buffer max sizes configurable
 -define(DOC_BUFFER_BYTE_SIZE, 512 * 1024).   % for remote targets
@@ -225,6 +226,11 @@ queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager) ->
         {ok, Stats} = gen_server:call(Parent, flush, infinity),
         ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
         erlang:put(last_stats_report, os:timestamp()),
+        ?LOG_DEBUG(#{
+            what => worker_progress_report,
+            in => replicator,
+            seq => ReportSeq
+        }),
         couch_log:debug("Worker reported completion of seq ~p", [ReportSeq]),
         queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
     end.
@@ -265,6 +271,14 @@ fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
             [Id, couch_doc:revs_to_strs(Revs)]),
         WaitMSec = config:get_integer("replicator", "missing_doc_retry_msec",
             ?MISSING_DOC_RETRY_MSEC),
+        ?LOG_ERROR(#{
+            what => missing_document,
+            in => replicator,
+            source => couch_replicator_api_wrap:db_uri(Source),
+            docid => Id,
+            revisions => couch_doc:revs_to_strs(Revs),
+            retry_delay_sec => WaitMSec / 1000
+        }),
         timer:sleep(WaitMSec),
         couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc);
     throw:{missing_stub, _} ->
@@ -273,6 +287,14 @@ fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
             [Id, couch_doc:revs_to_strs(Revs)]),
         WaitMSec = config:get_integer("replicator", "missing_doc_retry_msec",
             ?MISSING_DOC_RETRY_MSEC),
+        ?LOG_ERROR(#{
+            what => missing_attachment_stub,
+            in => replicator,
+            source => couch_replicator_api_wrap:db_uri(Source),
+            docid => Id,
+            revisions => couch_doc:revs_to_strs(Revs),
+            retry_delay_sec => WaitMSec / 1000
+        }),
         timer:sleep(WaitMSec),
         couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc)
     end.
@@ -282,6 +304,7 @@ remote_doc_handler({ok, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc},
         Acc) ->
     % Flush design docs in their own PUT requests to correctly process
     % authorization failures for design doc updates.
+    ?LOG_DEBUG(#{what => flush_ddoc, in => replicator}),
     couch_log:debug("Worker flushing design doc", []),
     doc_handler_flush_doc(Doc, Acc);
 remote_doc_handler({ok, #doc{atts = [_ | _]} = Doc}, Acc) ->
@@ -289,6 +312,7 @@ remote_doc_handler({ok, #doc{atts = [_ | _]} = Doc}, Acc) ->
     % source. The data property of each attachment is a function that starts
     % streaming the attachment data from the remote source, therefore it's
     % convenient to call it ASAP to avoid ibrowse inactivity timeouts.
+    ?LOG_DEBUG(#{what => flush_doc_with_attachments, in => replicator}),
     couch_log:debug("Worker flushing doc with attachments", []),
     doc_handler_flush_doc(Doc, Acc);
 remote_doc_handler({ok, #doc{atts = []} = Doc}, {Parent, _} = Acc) ->
@@ -314,6 +338,11 @@ doc_handler_flush_doc(#doc{} = Doc, {Parent, Target} = Acc) ->
 spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
     case {Target, Size > 0} of
     {#httpdb{}, true} ->
+        ?LOG_DEBUG(#{
+            what => flush_doc_batch,
+            in => replicator,
+            batch_size_bytes => Size
+        }),
         couch_log:debug("Worker flushing doc batch of size ~p bytes", [Size]);
     _ ->
         ok
@@ -354,6 +383,11 @@ maybe_flush_docs(#httpdb{} = Target, Batch, Doc) ->
     JsonDoc = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs, attachments])),
     case SizeAcc + iolist_size(JsonDoc) of
     SizeAcc2 when SizeAcc2 > ?DOC_BUFFER_BYTE_SIZE ->
+        ?LOG_DEBUG(#{
+            what => flush_doc_batch,
+            in => replicator,
+            batch_size_bytes => SizeAcc2
+        }),
         couch_log:debug("Worker flushing doc batch of size ~p bytes", [SizeAcc2]),
         Stats = flush_docs(Target, [JsonDoc | DocAcc]),
         {#batch{}, Stats};
@@ -371,12 +405,27 @@ flush_docs(Target, DocList) ->
     handle_flush_docs_result(FlushResult, Target, DocList).
 
 
-handle_flush_docs_result({error, request_body_too_large}, _Target, [Doc]) ->
+handle_flush_docs_result({error, request_body_too_large}, Target, [Doc]) ->
+    ?LOG_ERROR(#{
+        what => doc_write_failure,
+        in => replicator,
+        target => couch_replicator_api_wrap:db_uri(Target),
+        reason => request_body_too_large,
+        docid => extract_value(<<"_id">>, Doc)
+    }),
     couch_log:error("Replicator: failed to write doc ~p. Too large", [Doc]),
     couch_replicator_stats:new([{doc_write_failures, 1}]);
 handle_flush_docs_result({error, request_body_too_large}, Target, DocList) ->
     Len = length(DocList),
     {DocList1, DocList2} = lists:split(Len div 2, DocList),
+    ?LOG_NOTICE(#{
+        what => split_large_batch,
+        in => replicator,
+        target => couch_replicator_api_wrap:db_uri(Target),
+        reason => request_body_too_large,
+        original_batch_size_bytes => Len,
+        details => "splitting into two smaller batches and retrying"
+    }),
     couch_log:notice("Replicator: couldn't write batch of size ~p to ~p because"
         " request body is too large. Splitting batch into 2 separate batches of"
         " sizes ~p and ~p", [Len, couch_replicator_api_wrap:db_uri(Target),
@@ -388,6 +437,15 @@ handle_flush_docs_result({ok, Errors}, Target, DocList) ->
     DbUri = couch_replicator_api_wrap:db_uri(Target),
     lists:foreach(
         fun({Props}) ->
+            ?LOG_ERROR(#{
+                what => doc_write_failure,
+                in => replicator,
+                target => couch_replicator_api_wrap:db_uri(Target),
+                docid => get_value(id, Props, undefined),
+                revision => get_value(rev, Props, undefined),
+                error => get_value(error, Props, undefined),
+                details => get_value(reason, Props, undefined)
+            }),
             couch_log:error("Replicator: couldn't write document `~s`, revision"
                 " `~s`, to target database `~s`. Error: `~s`, reason: `~s`.", [
                 get_value(id, Props, ""), get_value(rev, Props, ""), DbUri,
@@ -400,12 +458,29 @@ handle_flush_docs_result({ok, Errors}, Target, DocList) ->
 handle_flush_docs_result({error, {bulk_docs_failed, _, _} = Err}, _, _) ->
     exit(Err).
 
+extract_value(Prop, Json) when is_binary(Json) ->
+    try
+        {Props} = ?JSON_DECODE(Json),
+        get_value(Prop, Props, undefined)
+    catch _:_ ->
+        undefined
+    end;
+extract_value(_, _) ->
+    undefined.
 
 flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
     try couch_replicator_api_wrap:update_doc(Target, Doc, [], replicated_changes) of
     {ok, _} ->
         ok;
     Error ->
+        ?LOG_ERROR(#{
+            what => doc_write_failure,
+            in => replicator,
+            target => couch_replicator_api_wrap:db_uri(Target),
+            docid => Id,
+            revision => couch_doc:rev_to_str({Pos, RevId}),
+            details => Error
+        }),
         couch_log:error("Replicator: error writing document `~s` to `~s`: ~s",
             [Id, couch_replicator_api_wrap:db_uri(Target), couch_util:to_binary(Error)]),
         Error
@@ -413,12 +488,29 @@ flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
     throw:{missing_stub, _} = MissingStub ->
         throw(MissingStub);
     throw:{Error, Reason} ->
+        ?LOG_ERROR(#{
+            what => doc_write_failure,
+            in => replicator,
+            target => couch_replicator_api_wrap:db_uri(Target),
+            docid => Id,
+            revision => couch_doc:rev_to_str({Pos, RevId}),
+            error => Error,
+            details => Reason
+        }),
         couch_log:error("Replicator: couldn't write document `~s`, revision `~s`,"
             " to target database `~s`. Error: `~s`, reason: `~s`.",
             [Id, couch_doc:rev_to_str({Pos, RevId}),
                 couch_replicator_api_wrap:db_uri(Target), to_binary(Error), to_binary(Reason)]),
         {error, Error};
     throw:Err ->
+        ?LOG_ERROR(#{
+            what => doc_write_failure,
+            in => replicator,
+            target => couch_replicator_api_wrap:db_uri(Target),
+            docid => Id,
+            revision => couch_doc:rev_to_str({Pos, RevId}),
+            details => Err
+        }),
         couch_log:error("Replicator: couldn't write document `~s`, revision `~s`,"
             " to target database `~s`. Error: `~s`.",
             [Id, couch_doc:rev_to_str({Pos, RevId}),

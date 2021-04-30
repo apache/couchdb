@@ -30,6 +30,7 @@
 
 
 -include("couch_jobs.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -record(st, {
@@ -81,6 +82,12 @@ handle_info(check_activity, St) ->
         check_activity(St)
     catch
         error:{Tag, Err} when ?COUCH_JOBS_RETRYABLE(Tag, Err) ->
+            ?LOG_ERROR(#{
+                what => erlfdb_error,
+                job_type => St#st.type,
+                error_code => Err,
+                details => "possible overload condition"
+            }),
             LogMsg = "~p : type:~p got ~p error, possibly from overload",
             couch_log:error(LogMsg, [?MODULE, St#st.type, Err]),
             St
@@ -91,6 +98,10 @@ handle_info(check_activity, St) ->
 handle_info({Ref, ready}, St) when is_reference(Ref) ->
     % Don't crash out couch_jobs_server and the whole application would need to
     % eventually do proper cleanup in erlfdb:wait timeout code.
+    ?LOG_ERROR(#{
+        what => spurious_future_ready,
+        ref => Ref
+    }),
     LogMsg = "~p : spurious erlfdb future ready message ~p",
     couch_log:error(LogMsg, [?MODULE, Ref]),
     {noreply, St};

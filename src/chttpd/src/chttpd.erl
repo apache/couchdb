@@ -16,6 +16,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("chttpd/include/chttpd.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -export([start_link/0, start_link/1, start_link/2,
     stop/0, handle_request/1, handle_request_int/1,
@@ -206,7 +207,13 @@ handle_request_int(MochiReq) ->
     true ->
         couch_log:notice("MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
         case Method1 of
-        'POST' -> couch_util:to_existing_atom(MethodOverride);
+        'POST' ->
+            ?LOG_NOTICE(#{
+                what => http_method_override,
+                result => ok,
+                new_method => MethodOverride
+            }),
+            couch_util:to_existing_atom(MethodOverride);
         _ ->
             % Ignore X-HTTP-Method-Override when the original verb isn't POST.
             % I'd like to send a 406 error to the client, but that'd require a nasty refactor.
@@ -223,6 +230,7 @@ handle_request_int(MochiReq) ->
     end,
 
     Nonce = couch_util:to_hex(crypto:strong_rand_bytes(5)),
+    logger:set_process_metadata(#{request_id => Nonce}),
 
     HttpReq0 = #httpd{
         mochi_req = MochiReq,
@@ -268,6 +276,10 @@ handle_request_int(MochiReq) ->
             span_ok(HttpResp),
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
+            ?LOG_ERROR(#{
+                what => abnormal_response_termation,
+                details => Reason
+            }),
             couch_log:error("Response abnormally terminated: ~p", [Reason]),
             exit(normal)
     end.
@@ -278,7 +290,7 @@ before_request(HttpReq) ->
         {ok, HttpReq1} = chttpd_plugin:before_request(HttpReq),
         chttpd_stats:init(HttpReq1),
         {ok, HttpReq1}
-    catch ?STACKTRACE(Tag, Error, Stack)
+    catch Tag:Error:Stack ->
         {error, catch_error(HttpReq, Tag, Error, Stack)}
     end.
 
@@ -286,7 +298,7 @@ after_request(HttpReq, HttpResp0) ->
     {ok, HttpResp1} =
         try
             chttpd_plugin:after_request(HttpReq, HttpResp0)
-        catch ?STACKTRACE(_Tag, Error, Stack)
+        catch _Tag:Error:Stack ->
             send_error(HttpReq, {Error, nil, Stack}),
             {ok, HttpResp0#httpd_resp{status = aborted}}
         end,
@@ -319,7 +331,7 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
         Response ->
             {HttpReq, Response}
         end
-    catch ?STACKTRACE(Tag, Error, Stack)
+    catch Tag:Error:Stack ->
         {HttpReq, catch_error(HttpReq, Tag, Error, Stack)}
     end.
 
@@ -332,7 +344,7 @@ handle_req_after_auth(HandlerKey, HttpReq) ->
         AuthorizedReq = chttpd_auth:authorize(possibly_hack(HttpReq),
             fun chttpd_auth_request:authorize_request/1),
         {AuthorizedReq, HandlerFun(AuthorizedReq)}
-    catch ?STACKTRACE(Tag, Error, Stack)
+    catch Tag:Error:Stack ->
         {HttpReq, catch_error(HttpReq, Tag, Error, Stack)}
     end.
 
@@ -348,6 +360,13 @@ catch_error(HttpReq, exit, {mochiweb_recv_error, E}, _Stack) ->
         peer = Peer,
         original_method = Method
     } = HttpReq,
+    ?LOG_NOTICE(#{
+        what => mochiweb_recv_error,
+        peer => Peer,
+        method => Method,
+        path => MochiReq:get(raw_path),
+        details => E
+    }),
     couch_log:notice("mochiweb_recv_error for ~s - ~p ~s - ~p", [
         Peer,
         Method,
@@ -413,9 +432,23 @@ maybe_log(#httpd{} = HttpReq, #httpd_resp{should_log = true} = HttpResp) ->
     User = get_user(HttpReq),
     Host = MochiReq:get_header_value("Host"),
     RawUri = MochiReq:get(raw_path),
-    RequestTime = timer:now_diff(EndTime, BeginTime) / 1000,
+    RequestTime = round(timer:now_diff(EndTime, BeginTime) / 1000),
+    % Wish List
+    % - client port
+    % - timers: connection, request, time to first byte, ...
+    % - response size
+    % 
+    ?LOG_NOTICE(#{
+        method => Method,
+        path => RawUri,
+        code => Code,
+        user => User,
+        % req_size => MochiReq:get(body_length),
+        src => #{ip4 => Peer},
+        duration => RequestTime
+    }, #{domain => [chttpd_access_log]}),
     couch_log:notice("~s ~s ~s ~s ~s ~B ~p ~B", [Host, Peer, User,
-        Method, RawUri, Code, Status, round(RequestTime)]);
+        Method, RawUri, Code, Status, RequestTime]);
 maybe_log(_HttpReq, #httpd_resp{should_log = false}) ->
     ok.
 
@@ -1246,6 +1279,13 @@ maybe_decompress(Httpd, Body) ->
 log_error_with_stack_trace({bad_request, _, _}) ->
     ok;
 log_error_with_stack_trace({Error, Reason, Stack}) ->
+    ?LOG_ERROR(#{
+        what => request_failure,
+        error => Error,
+        reason => Reason,
+        hash => stack_hash(Stack),
+        stacktrace => Stack
+    }),
     EFmt = if is_binary(Error) -> "~s"; true -> "~w" end,
     RFmt = if is_binary(Reason) -> "~s"; true -> "~w" end,
     Fmt = "req_err(~w) " ++ EFmt ++ " : " ++ RFmt ++ "~n    ~p",
@@ -1396,8 +1436,13 @@ get_action(#httpd{} = Req) ->
     try
         chttpd_handlers:handler_info(Req)
     catch Tag:Error ->
+        ?LOG_ERROR(#{
+            what => tracing_configuration_failure,
+            tag => Tag,
+            details => Error
+        }),
         couch_log:error("Cannot set tracing action ~p:~p", [Tag, Error]),
-        {undefind, #{}}
+        {undefined, #{}}
     end.
 
 span_ok(#httpd_resp{code = Code}) ->

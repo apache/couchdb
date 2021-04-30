@@ -27,6 +27,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("chttpd/include/chttpd_cors.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 %% http://www.w3.org/TR/cors/#resource-preflight-requests
@@ -51,6 +52,12 @@ maybe_handle_preflight_request(#httpd{}=Req, Config) ->
                 not_preflight ->
                     not_preflight;
                 UnknownError ->
+                    ?LOG_ERROR(#{
+                        what => preflight_request_error,
+                        origin => get_origin(Req),
+                        accepted_origins => get_accepted_origins(Req, Config),
+                        details => UnknownError
+                    }),
                     couch_log:error(
                         "Unknown response of chttpd_cors:preflight_request(~p): ~p",
                         [Req, UnknownError]

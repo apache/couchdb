@@ -34,6 +34,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("fabric/include/fabric2.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(JOB_TYPE, <<"db_expiration">>).
 -define(JOB_ID, <<"db_expiration_job">>).
@@ -81,7 +82,9 @@ handle_info(timeout, #st{job = undefined} = St) ->
 handle_info({'EXIT', Pid, Exit}, #st{job = Pid} = St) ->
     case Exit of
         normal -> ok;
-        Error -> couch_log:error("~p : job error ~p", [?MODULE, Error])
+        Error ->
+            ?LOG_ERROR(#{what => job_error, details => Error}),
+            couch_log:error("~p : job error ~p", [?MODULE, Error])
     end,
     NewPid = spawn_link(?MODULE, cleanup, [is_enabled()]),
     {noreply, St#st{job = NewPid}};
@@ -131,7 +134,12 @@ cleanup(true) ->
                 {ok, Job1, Data1} = ?MODULE:process_expirations(Job, Data),
                 ok = resubmit_job(Job1, Data1, schedule_sec())
             catch
-                ?STACKTRACE(_Tag, Error, Stack)
+                _Tag:Error:Stack ->
+                    ?LOG_ERROR(#{
+                        what => process_expirations_error,
+                        job => Job,
+                        details => Error
+                    }),
                     couch_log:error("~p : processing error ~p ~p ~p",
                         [?MODULE, Job, Error, Stack]),
                     ok = resubmit_job(Job, Data, ?ERROR_RESCHEDULE_SEC),
@@ -179,6 +187,11 @@ process_row(DbInfo) ->
     Since = Now - Retention,
     case Since >= timestamp_to_sec(TimeStamp)  of
         true ->
+            ?LOG_NOTICE(#{
+                what => expire_db,
+                db => DbName,
+                deleted_at => TimeStamp
+            }),
             couch_log:notice("Permanently deleting ~s database with"
                 " timestamp ~s", [DbName, TimeStamp]),
             ok = fabric2_db:delete(DbName, [{deleted_at, TimeStamp}]);
