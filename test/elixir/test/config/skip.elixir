@@ -234,7 +234,8 @@
     "user db security"
   ],
   "UsersDbTest": [
-    "users db"
+    "users db",
+    "users password requirements"
   ],
   "ViewCollationRawTest": [
   ],
