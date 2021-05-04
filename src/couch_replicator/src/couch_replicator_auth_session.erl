@@ -296,7 +296,9 @@ extract_creds_from_url(Url) ->
             Prefix = lists:concat([Proto, "://", User, ":", Pass, "@"]),
             Suffix = lists:sublist(Url, length(Prefix) + 1, length(Url) + 1),
             NoCreds = lists:concat([Proto, "://", Suffix]),
-            {ok, User, Pass, NoCreds}
+            User1 = chttpd:unquote(User),
+            Pass1 = chttpd:unquote(Pass),
+            {ok, User1, Pass1, NoCreds}
     end.
 
 
@@ -589,12 +591,36 @@ extract_creds_success_test_() ->
             {"u", "p", #httpdb{url = "http://x.y/db"}}
         },
         {
+            #httpdb{url = "http://u%40:p%40@x.y/db"},
+            {"u@", "p@", #httpdb{url = "http://x.y/db"}}
+        },
+        {
+            #httpdb{url = "http://u%40u:p%40p@x.y/db"},
+            {"u@u", "p@p", #httpdb{url = "http://x.y/db"}}
+        },
+        {
+            #httpdb{url = "http://u%40%401:p%40%401@x.y/db"},
+            {"u@@1", "p@@1", #httpdb{url = "http://x.y/db"}}
+        },
+        {
+            #httpdb{url = "http://u%40%2540:p%40%2540@x.y/db"},
+            {"u@%40", "p@%40", #httpdb{url = "http://x.y/db"}}
+        },
+        {
             #httpdb{url = "http://u:p@h:80/db"},
             {"u", "p", #httpdb{url = "http://h:80/db"}}
         },
         {
+            #httpdb{url = "http://u%3A:p%3A@h:80/db"},
+            {"u:", "p:", #httpdb{url = "http://h:80/db"}}
+        },
+        {
             #httpdb{url = "https://u:p@h/db"},
             {"u", "p", #httpdb{url = "https://h/db"}}
+        },
+        {
+            #httpdb{url = "https://u%2F:p%2F@h/db"},
+            {"u/", "p/", #httpdb{url = "https://h/db"}}
         },
         {
             #httpdb{url = "http://u:p@127.0.0.1:5984/db"},
@@ -609,8 +635,16 @@ extract_creds_success_test_() ->
             {"u", "p", #httpdb{url = "http://[2001:db8:a1b:12f9::1]:81/db"}}
         },
         {
+            #httpdb{url = "http://u:p%3A%2F%5B%5D%40@[2001:db8:a1b:12f9::1]:81/db"},
+            {"u", "p:/[]@", #httpdb{url = "http://[2001:db8:a1b:12f9::1]:81/db"}}
+        },
+        {
             #httpdb{url = "http://u:p@x.y/db/other?query=Z&query=w"},
             {"u", "p", #httpdb{url = "http://x.y/db/other?query=Z&query=w"}}
+        },
+        {
+            #httpdb{url = "http://u:p%3F@x.y/db/other?query=Z&query=w"},
+            {"u", "p?", #httpdb{url = "http://x.y/db/other?query=Z&query=w"}}
         },
         {
             #httpdb{
@@ -620,6 +654,24 @@ extract_creds_success_test_() ->
                 ]
             },
             {"u", "p", #httpdb{url = "http://h/db"}}
+        },
+        {
+            #httpdb{
+                url = "http://h/db",
+                headers = DefaultHeaders ++ [
+                    {"Authorization", "Basic " ++ b64creds("u", "p@")}
+                ]
+            },
+            {"u", "p@", #httpdb{url = "http://h/db"}}
+        },
+        {
+            #httpdb{
+                url = "http://h/db",
+                headers = DefaultHeaders ++ [
+                    {"Authorization", "Basic " ++ b64creds("u", "p@%40")}
+                ]
+            },
+            {"u", "p@%40", #httpdb{url = "http://h/db"}}
         },
         {
             #httpdb{
