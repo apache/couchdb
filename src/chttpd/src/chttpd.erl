@@ -1070,6 +1070,9 @@ error_info(not_ciphertext) ->
     {500, <<"not_ciphertext">>, <<"Not Ciphertext">>};
 error_info({service_unavailable, Reason}) ->
     {503, <<"service unavailable">>, Reason};
+error_info({unknown_eval_api_language, Language}) ->
+    {400, <<"unknown_eval_api_language">>, <<"unsupported language in design"
+        " doc: `", Language/binary, "`">>};
 error_info({timeout, _Reason}) ->
     error_info(timeout);
 error_info({Error, null}) ->
