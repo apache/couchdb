@@ -430,6 +430,14 @@ to_json_success_cases() ->
                     {data, <<"sammich">>},
                     {md5, <<>>},
                     {encoding, identity}
+                ]),
+                couch_att:new([
+                    {name, <<"animals.json">>},
+                    {type, <<"application/json">>},
+                    {revpos, 1},
+                    {data, <<"leon">>},
+                    {md5, undefined},
+                    {encoding, identity}
                 ])
             ]},
             {[
@@ -444,6 +452,11 @@ to_json_success_cases() ->
                        {<<"content_type">>, <<"application/food">>},
                        {<<"revpos">>, 1},
                        {<<"data">>, <<"c2FtbWljaA==">>}
+                   ]}},
+                   {<<"animals.json">>, {[
+                       {<<"content_type">>, <<"application/json">>},
+                       {<<"revpos">>, 1},
+                       {<<"data">>, <<"bGVvbg==">>}
                    ]}}
                 ]}}
             ]},
