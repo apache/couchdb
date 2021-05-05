@@ -42,7 +42,7 @@ doc_to_multi_part_stream_test() ->
     AttLength = size(AttData),
     Atts = [couch_att:new([
        {name, <<"test">>}, {data, AttData}, {type, <<"text/plain">>},
-       {att_len, AttLength}, {disk_len, AttLength}])],
+       {att_len, AttLength}, {disk_len, AttLength}, {encoding, identity}])],
     couch_doc:doc_to_multi_part_stream(Boundary, JsonBytes, Atts, fun send/1, true),
     AttLengthStr = integer_to_binary(AttLength),
     BoundaryLen = size(Boundary),
@@ -69,50 +69,10 @@ len_doc_to_multi_part_stream_test() ->
     AttLength = size(AttData),
     Atts = [couch_att:new([
        {name, <<"test">>}, {data, AttData}, {type, <<"text/plain">>},
-       {att_len, AttLength}, {disk_len, AttLength}])],
+       {att_len, AttLength}, {disk_len, AttLength}, {encoding, identity}])],
     {ContentType, 258} = %% 258 is expected size of the document
         couch_doc:len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, true),
     ok.
-
-validate_docid_test_() ->
-    {setup,
-        fun() ->
-            mock_config(),
-            ok = meck:new(couch_db_plugin, [passthrough]),
-            meck:expect(couch_db_plugin, validate_docid, fun(_) -> false end)
-        end,
-        fun(_) ->
-            meck:unload(config),
-            meck:unload(couch_db_plugin)
-        end,
-        [
-            ?_assertEqual(ok, couch_doc:validate_docid(<<"idx">>)),
-            ?_assertEqual(ok, couch_doc:validate_docid(<<"_design/idx">>)),
-            ?_assertEqual(ok, couch_doc:validate_docid(<<"_local/idx">>)),
-            ?_assertEqual(ok, couch_doc:validate_docid(large_id(1024))),
-            ?_assertEqual(ok, couch_doc:validate_docid(<<"_users">>, <<"_dbs">>)),
-            ?_assertEqual(ok, couch_doc:validate_docid(<<"_replicator">>, <<"_dbs">>)),
-            ?_assertEqual(ok, couch_doc:validate_docid(<<"_global_changes">>, <<"_dbs">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<>>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<16#80>>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_idx">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_design/">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_local/">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(large_id(1025))),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_users">>, <<"foo">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_weeee">>, <<"_dbs">>))
-        ]
-    }.
 
 large_id(N) ->
     << <<"x">> || _ <- lists:seq(1, N) >>.
@@ -139,7 +99,6 @@ mock_config() ->
     meck:expect(config, get,
         fun("couchdb", "max_document_id_length", "infinity") -> "1024";
            ("couchdb", "max_attachment_size", "infinity") -> "infinity";
-           ("mem3", "shards_db", "_dbs") -> "_dbs";
             (Key, Val, Default) -> meck:passthrough([Key, Val, Default])
         end
     ).

@@ -12,7 +12,7 @@ defmodule BasicsTest do
   test "Session contains adm context" do
     user_ctx = Couch.get("/_session").body["userCtx"]
     assert user_ctx["name"] == "adm", "Should have adm user context"
-    assert user_ctx["roles"] == ["_admin"], "Should have _admin role"
+    assert "_admin" in user_ctx["roles"], "Should have _admin role"
   end
 
   test "Welcome endpoint" do
@@ -517,5 +517,15 @@ defmodule BasicsTest do
     resp = Couch.get("/#{db_name}/_revs_limit")
     assert resp.status_code == 200
     assert resp.body == 999
+  end
+
+  @tag :with_db
+  test "Default headers are returned for doc with open_revs=all", context do
+    db_name = context[:db_name]
+    post_response = Couch.post("/#{db_name}", body: %{:foo => :bar})
+    id = post_response.body["id"]
+    head_response = Couch.head("/#{db_name}/#{id}?open_revs=all")
+    assert head_response.headers["X-Couch-Request-ID"]
+    assert head_response.headers["X-CouchDB-Body-Time"]
   end
 end

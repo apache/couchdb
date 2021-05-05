@@ -15,7 +15,6 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("couch_views/include/couch_views.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
@@ -42,16 +41,18 @@ indexer_test_() ->
                     ?TDEF_FE(updated_docs_without_changes_are_reindexed),
                     ?TDEF_FE(deleted_docs_not_indexed),
                     ?TDEF_FE(deleted_docs_are_unindexed),
-                    ?TDEF_FE(multipe_docs_with_same_key),
-                    ?TDEF_FE(multipe_keys_from_same_doc),
-                    ?TDEF_FE(multipe_identical_keys_from_same_doc),
-                    ?TDEF_FE(fewer_multipe_identical_keys_from_same_doc),
+                    ?TDEF_FE(multiple_docs_with_same_key),
+                    ?TDEF_FE(multiple_keys_from_same_doc),
+                    ?TDEF_FE(multiple_identical_keys_from_same_doc),
+                    ?TDEF_FE(fewer_multiple_identical_keys_from_same_doc),
                     ?TDEF_FE(multiple_design_docs),
+                    ?TDEF_FE(multiple_doc_update_with_existing_rows),
                     ?TDEF_FE(handle_size_key_limits),
                     ?TDEF_FE(handle_size_value_limits),
                     ?TDEF_FE(index_autoupdater_callback),
                     ?TDEF_FE(handle_db_recreated_when_running),
                     ?TDEF_FE(handle_db_recreated_after_finished),
+                    ?TDEF_FE(handle_doc_updated_when_running),
                     ?TDEF_FE(index_can_recover_from_crash, 60)
                 ]
             }
@@ -215,7 +216,7 @@ deleted_docs_are_unindexed(Db) ->
     end).
 
 
-multipe_docs_with_same_key(Db) ->
+multiple_docs_with_same_key(Db) ->
     DDoc = create_ddoc(),
     Doc1 = doc(0, 1),
     Doc2 = doc(1, 1),
@@ -231,7 +232,7 @@ multipe_docs_with_same_key(Db) ->
     ], Out).
 
 
-multipe_keys_from_same_doc(Db) ->
+multiple_keys_from_same_doc(Db) ->
     DDoc = create_ddoc(multi_emit_different),
     Doc = doc(0, 1),
 
@@ -246,7 +247,7 @@ multipe_keys_from_same_doc(Db) ->
     ], Out).
 
 
-multipe_identical_keys_from_same_doc(Db) ->
+multiple_identical_keys_from_same_doc(Db) ->
     DDoc = create_ddoc(multi_emit_same),
     Doc = doc(0, 1),
 
@@ -261,7 +262,7 @@ multipe_identical_keys_from_same_doc(Db) ->
     ], Out).
 
 
-fewer_multipe_identical_keys_from_same_doc(Db) ->
+fewer_multiple_identical_keys_from_same_doc(Db) ->
     DDoc = create_ddoc(multi_emit_same),
     Doc0 = #doc{
             id = <<"0">>,
@@ -371,7 +372,8 @@ index_autoupdater_callback(Db) ->
     ?assertMatch([{ok, <<_/binary>>}], Result),
     [{ok, JobId}] = Result,
 
-    ?assertEqual(ok, couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, DbSeq)).
+    ?assertMatch({ok, {_, _}},
+        couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, DbSeq)).
 
 
 multiple_design_docs(Db) ->
@@ -422,6 +424,31 @@ multiple_design_docs(Db) ->
     % After the last ddoc is deleted we should get an error
     ?assertError({ddoc_deleted, _}, run_query(Db, DDoc2, ?MAP_FUN1)).
 
+
+multiple_doc_update_with_existing_rows(Db) ->
+    DDoc = create_ddoc(),
+    Doc0 = doc(0),
+    Doc1 = doc(1),
+
+    {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
+    {ok, {Pos, Rev}} = fabric2_db:update_doc(Db, Doc1, []),
+
+    {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
+
+    ?assertEqual([row(<<"1">>, 1, 1)], Out1),
+
+    Doc2 = Doc1#doc{
+        revs = {Pos, [Rev]},
+        body = {[{<<"val">>, 2}]}
+    },
+    {ok, _} = fabric2_db:update_docs(Db, [Doc0, Doc2], []),
+
+    {ok, Out2} = run_query(Db, DDoc, ?MAP_FUN1),
+
+    ?assertEqual([
+        row(<<"0">>, 0, 0),
+        row(<<"1">>, 2, 2)
+    ], Out2).    
 
 handle_db_recreated_when_running(Db) ->
     DbName = fabric2_db:name(Db),
@@ -501,6 +528,50 @@ handle_db_recreated_after_finished(Db) ->
     ?assertEqual([
         row(<<"2">>, 2, 2),
         row(<<"3">>, 3, 3)
+    ], Out2).
+
+
+handle_doc_updated_when_running(Db) ->
+    DDoc = create_ddoc(),
+    {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
+    {ok, _} = fabric2_db:update_doc(Db, doc(0), []),
+    {ok, _} = fabric2_db:update_doc(Db, doc(1), []),
+
+    % To intercept job building while it is running ensure updates happen one
+    % row at a time.
+    config:set("couch_views", "batch_initial_size", "1", false),
+
+    meck_intercept_job_update(self()),
+
+    [{ok, JobId}] = couch_views:build_indices(Db, [DDoc]),
+
+    {Indexer, _Job, _Data} = wait_indexer_update(10000),
+
+    {ok, State} = couch_jobs:get_job_state(undefined, ?INDEX_JOB_TYPE, JobId),
+    ?assertEqual(running, State),
+
+    {ok, SubId, running, _} = couch_jobs:subscribe(?INDEX_JOB_TYPE, JobId),
+
+    {ok, Doc} = fabric2_db:open_doc(Db, <<"1">>),
+    Doc2 = Doc#doc {
+        body = {[{<<"val">>, 2}]}
+    },
+    {ok, _} = fabric2_db:update_doc(Db, Doc2),
+
+    reset_intercept_job_update(Indexer),
+    Indexer ! continue,
+
+    ?assertMatch({
+        ?INDEX_JOB_TYPE,
+        JobId,
+        finished,
+        #{<<"active_task_info">> := #{<<"changes_done">> := 1}}
+    }, couch_jobs:wait(SubId, finished, infinity)),
+
+    Args = #mrargs{update = false},
+    {ok, Out2} = couch_views:query(Db, DDoc, ?MAP_FUN1, fun fold_fun/2, [], Args),
+    ?assertEqual([
+        row(<<"0">>, 0, 0)
     ], Out2).
 
 

@@ -40,6 +40,7 @@
 ]).
 
 -include_lib("ibrowse/include/ibrowse.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(DEFAULT_CLOSE_INTERVAL, 90000).
 -define(RELISTEN_DELAY, 5000).
@@ -232,6 +233,13 @@ maybe_log_worker_death(_Host, _Port, normal) ->
     ok;
 
 maybe_log_worker_death(Host, Port, Reason) ->
+    ?LOG_INFO(#{
+        what => connection_failed,
+        in => replicator,
+        host => Host,
+        port => Port,
+        details => Reason
+    }),
     ErrMsg = "Replication connection to: ~p:~p died with reason ~p",
     couch_log:info(ErrMsg, [Host, Port, Reason]).
 

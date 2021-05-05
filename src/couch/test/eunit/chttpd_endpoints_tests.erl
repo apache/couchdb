@@ -47,10 +47,10 @@ url_handlers() ->
         {<<"_replicate">>, chttpd_misc, handle_replicate_req},
         {<<"_uuids">>, chttpd_misc, handle_uuids_req},
         {<<"_session">>, chttpd_auth, handle_session_req},
-        {<<"_up">>, chttpd_misc, handle_up_req},
-        {<<"_membership">>, mem3_httpd, handle_membership_req},
-        {<<"_db_updates">>, global_changes_httpd, handle_global_changes_req},
-        {<<"_cluster_setup">>, setup_httpd, handle_setup_req}
+        {<<"_membership">>, chttpd_httpd_handlers, not_supported},
+        {<<"_db_updates">>, chttpd_httpd_handlers, not_implemented},
+        {<<"_cluster_setup">>, chttpd_httpd_handlers, not_implemented},
+        {<<"_up">>, chttpd_misc, handle_up_req}
     ],
 
     lists:foreach(fun({Path, Mod, Fun}) ->
@@ -67,9 +67,9 @@ db_handlers() ->
         {<<"_view_cleanup">>, chttpd_db, handle_view_cleanup_req},
         {<<"_compact">>, chttpd_db, handle_compact_req},
         {<<"_design">>, chttpd_db, handle_design_req},
-        {<<"_temp_view">>, chttpd_view, handle_temp_view_req},
+        {<<"_temp_view">>, chttpd_httpd_handlers, not_supported},
         {<<"_changes">>, chttpd_db, handle_changes_req},
-        {<<"_shards">>, mem3_httpd, handle_shards_req},
+        {<<"_shards">>, chttpd_httpd_handlers, not_supported},
         {<<"_index">>, mango_httpd, handle_req},
         {<<"_explain">>, mango_httpd, handle_req},
         {<<"_find">>, mango_httpd, handle_req}
@@ -87,11 +87,11 @@ db_handlers() ->
 design_handlers() ->
     Handlers = [
         {<<"_view">>, chttpd_view, handle_view_req},
-        {<<"_show">>, chttpd_show, handle_doc_show_req},
-        {<<"_list">>, chttpd_show, handle_view_list_req},
+        {<<"_show">>, chttpd_httpd_handlers, not_supported},
+        {<<"_list">>, chttpd_httpd_handlers, not_supported},
         {<<"_update">>, chttpd_show, handle_doc_update_req},
         {<<"_info">>, chttpd_db, handle_design_info_req},
-        {<<"_rewrite">>, chttpd_rewrite, handle_rewrite_req}
+        {<<"_rewrite">>, chttpd_httpd_handlers, not_supported}
     ],
 
     lists:foreach(fun({Path, Mod, Fun}) ->

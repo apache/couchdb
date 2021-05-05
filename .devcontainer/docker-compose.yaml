@@ -1,0 +1,52 @@
+services:
+  couch:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        # Base image for Erlang and Elixir. Useful choices include:
+        # 1.11 -> Erlang 23, Debian Buster
+        # 1.10 -> Erlang 22, Debian Buster
+        # 1.9  -> Erlang 22, Debian Buster
+        #
+        # Older versions based on Debian Stretch will not include
+        # SpiderMonkey 60, which the Dockerfile expects to be able
+        # to install via apt-get.
+        ELIXIR_VERSION: "1.10"
+
+        # SpiderMonkey version to install with apt-get
+        SM_VSN: "60"
+
+        # This should always match the value in fdb.image
+        FDB_VERSION: "6.2.28"
+
+    environment:
+      # This needs to match the name of the FoundationDB service below
+      FDB_COORDINATOR: fdb
+
+      # The location where the Dockerfile installs the FDB cluster file
+      # retrieved from the `fdb` image. CouchDB looks for the cluster file in
+      # this location by default. If you want to install it somewhere else you
+      # you need to change "[erlfdb] cluster_file" and ERL_ZFLAGS to match.
+      FDB_CLUSTER_FILE: /usr/local/etc/foundationdb/fdb.cluster
+
+      # The test suite will default to trying to start its own fdbserver
+      # process. This environment variable tells it to use the fdbserver
+      # running in the `fdb` image instead. Quite a hacky solution. An
+      # alternative might be to parameterize the Makefile so we can swap
+      # `eunit.config` for a `devcontainer.config` via an environment variable
+      # and maintain both config files in the repo.
+      ERL_ZFLAGS: "-erlfdb test_cluster_file <<\\\"/usr/local/etc/foundationdb/fdb.cluster\\\">>"
+
+    volumes:
+      # Mounts the project folder to '/usr/src/couchdb'. The target path inside
+      # the container should match what your application expects. In this case,
+      # the compose file is in a sub-folder, so you will mount '..'. You would
+      # then reference this path as the 'workspaceFolder' in
+      # '.devcontainer/devcontainer.json' so VS Code starts here.
+      - ..:/usr/src/couchdb:cached
+
+    network_mode: service:fdb
+
+  fdb:
+    image: foundationdb/foundationdb:6.2.28

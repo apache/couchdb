@@ -40,6 +40,12 @@
 -define(COUCH_JOBS_CURRENT, '$couch_jobs_current').
 -define(UNDEFINED_MAX_SCHEDULED_TIME, 1 bsl 36).
 
+-define(COUCH_JOBS_RETRYABLE(Tag, Err), (
+    (Tag == timeout) orelse (
+        (Tag == erlfdb_error andalso ?ERLFDB_IS_RETRYABLE(Err)) orelse
+        (Tag == erlfdb_error andalso Err =:= ?ERLFDB_TRANSACTION_TIMED_OUT))
+)).
+
 
 -type jtx() :: map() | undefined | tuple().
 -type job_id() :: binary().

@@ -1,0 +1,12 @@
+{
+    "dockerComposeFile": "docker-compose.yaml",
+    "service": "couch",
+    "workspaceFolder": "/usr/src/couchdb",
+
+    // Needs to run at start to translate service name into coordinator IP
+    "postStartCommand": ["bash", "/usr/local/bin/create_cluster_file.bash"],
+
+    "extensions": [
+        "erlang-ls.erlang-ls"
+    ]
+}

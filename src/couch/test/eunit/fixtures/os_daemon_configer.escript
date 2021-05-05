@@ -89,8 +89,7 @@ init_code_path() ->
         "couchdb",
         "jiffy",
         "ibrowse",
-        "mochiweb",
-        "snappy"
+        "mochiweb"
     ],
     lists:foreach(fun(Name) ->
         code:add_patha(filename:join([?BUILDDIR(), "src", Name, "ebin"]))

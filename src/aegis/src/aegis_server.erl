@@ -18,6 +18,7 @@
 
 
 -include("aegis.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 %% aegis_server API
@@ -94,6 +95,7 @@ encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
                 CipherText when is_binary(CipherText) ->
                     CipherText;
                 {error, {_Tag, {_C_FileName,_LineNumber}, _Desc} = Reason} ->
+                    ?LOG_ERROR(#{what => encrypt_failure, details => Reason}),
                     couch_log:error("aegis encryption failure: ~p ", [Reason]),
                     erlang:error(decryption_failed);
                 {error, Reason} ->
@@ -119,6 +121,7 @@ decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
                 PlainText when is_binary(PlainText) ->
                     PlainText;
                 {error, {_Tag, {_C_FileName,_LineNumber}, _Desc} = Reason} ->
+                    ?LOG_ERROR(#{what => decrypt_failure, details => Reason}),
                     couch_log:error("aegis decryption failure: ~p ", [Reason]),
                     erlang:error(decryption_failed);
                 {error, Reason} ->

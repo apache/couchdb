@@ -11,6 +11,9 @@
 % the License.
 
 
+-include_lib("erlfdb/include/erlfdb.hrl").
+
+
 -define(uint2bin(I), binary:encode_unsigned(I, little)).
 -define(bin2uint(I), binary:decode_unsigned(I, little)).
 -define(bin2int(V), binary_to_integer(V)).
@@ -76,13 +79,5 @@
 -define(PDICT_TX_ID_KEY, '$fabric_tx_id').
 -define(PDICT_TX_RES_KEY, '$fabric_tx_result').
 -define(PDICT_FOLD_ACC_STATE, '$fabric_fold_acc_state').
-
-% Let's keep these in ascending order
--define(TRANSACTION_TOO_OLD, 1007).
--define(FUTURE_VERSION, 1009).
--define(COMMIT_UNKNOWN_RESULT, 1021).
--define(TRANSACTION_CANCELLED, 1025).
--define(TRANSACTION_TOO_LARGE, 2101).
-
 
 -define(DEFAULT_BINARY_CHUNK_SIZE, 100000).

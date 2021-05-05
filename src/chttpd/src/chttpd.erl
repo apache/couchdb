@@ -16,6 +16,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("chttpd/include/chttpd.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -export([start_link/0, start_link/1, start_link/2,
     stop/0, handle_request/1, handle_request_int/1,
@@ -123,6 +124,12 @@ start_link(Name, Options) ->
          end,
     ok = couch_httpd:validate_bind_address(IP),
 
+    % Ensure uuid is set so that concurrent replications
+    % get the same value. This used to in the backend (:5986) httpd
+    % start_link and was moved here for now. Ideally this should be set
+    % in FDB or coordinated across all the nodes
+    couch_server:get_uuid(),
+
     set_auth_handlers(),
 
     Options1 = Options ++ [
@@ -153,7 +160,6 @@ stop() ->
     mochiweb_http:stop(?MODULE).
 
 handle_request(MochiReq0) ->
-    erlang:put(?REWRITE_COUNT, 0),
     MochiReq = couch_httpd_vhost:dispatch_host(MochiReq0),
     handle_request_int(MochiReq).
 
@@ -201,7 +207,13 @@ handle_request_int(MochiReq) ->
     true ->
         couch_log:notice("MethodOverride: ~s (real method was ~s)", [MethodOverride, Method1]),
         case Method1 of
-        'POST' -> couch_util:to_existing_atom(MethodOverride);
+        'POST' ->
+            ?LOG_NOTICE(#{
+                what => http_method_override,
+                result => ok,
+                new_method => MethodOverride
+            }),
+            couch_util:to_existing_atom(MethodOverride);
         _ ->
             % Ignore X-HTTP-Method-Override when the original verb isn't POST.
             % I'd like to send a 406 error to the client, but that'd require a nasty refactor.
@@ -218,6 +230,7 @@ handle_request_int(MochiReq) ->
     end,
 
     Nonce = couch_util:to_hex(crypto:strong_rand_bytes(5)),
+    logger:set_process_metadata(#{request_id => Nonce}),
 
     HttpReq0 = #httpd{
         mochi_req = MochiReq,
@@ -263,6 +276,10 @@ handle_request_int(MochiReq) ->
             span_ok(HttpResp),
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
+            ?LOG_ERROR(#{
+                what => abnormal_response_termation,
+                details => Reason
+            }),
             couch_log:error("Response abnormally terminated: ~p", [Reason]),
             exit(normal)
     end.
@@ -273,16 +290,15 @@ before_request(HttpReq) ->
         {ok, HttpReq1} = chttpd_plugin:before_request(HttpReq),
         chttpd_stats:init(HttpReq1),
         {ok, HttpReq1}
-    catch Tag:Error ->
-        {error, catch_error(HttpReq, Tag, Error)}
+    catch Tag:Error:Stack ->
+        {error, catch_error(HttpReq, Tag, Error, Stack)}
     end.
 
 after_request(HttpReq, HttpResp0) ->
     {ok, HttpResp1} =
         try
             chttpd_plugin:after_request(HttpReq, HttpResp0)
-        catch _Tag:Error ->
-            Stack = erlang:get_stacktrace(),
+        catch _Tag:Error:Stack ->
             send_error(HttpReq, {Error, nil, Stack}),
             {ok, HttpResp0#httpd_resp{status = aborted}}
         end,
@@ -315,8 +331,8 @@ process_request(#httpd{mochi_req = MochiReq} = HttpReq) ->
         Response ->
             {HttpReq, Response}
         end
-    catch Tag:Error ->
-        {HttpReq, catch_error(HttpReq, Tag, Error)}
+    catch Tag:Error:Stack ->
+        {HttpReq, catch_error(HttpReq, Tag, Error, Stack)}
     end.
 
 handle_req_after_auth(HandlerKey, HttpReq) ->
@@ -328,42 +344,50 @@ handle_req_after_auth(HandlerKey, HttpReq) ->
         AuthorizedReq = chttpd_auth:authorize(possibly_hack(HttpReq),
             fun chttpd_auth_request:authorize_request/1),
         {AuthorizedReq, HandlerFun(AuthorizedReq)}
-    catch Tag:Error ->
-        {HttpReq, catch_error(HttpReq, Tag, Error)}
+    catch Tag:Error:Stack ->
+        {HttpReq, catch_error(HttpReq, Tag, Error, Stack)}
     end.
 
-catch_error(_HttpReq, throw, {http_head_abort, Resp}) ->
+catch_error(_HttpReq, throw, {http_head_abort, Resp}, _Stack) ->
     {ok, Resp};
-catch_error(_HttpReq, throw, {http_abort, Resp, Reason}) ->
+catch_error(_HttpReq, throw, {http_abort, Resp, Reason}, _Stack) ->
     {aborted, Resp, Reason};
-catch_error(HttpReq, throw, {invalid_json, _}) ->
+catch_error(HttpReq, throw, {invalid_json, _}, _Stack) ->
     send_error(HttpReq, {bad_request, "invalid UTF-8 JSON"});
-catch_error(HttpReq, exit, {mochiweb_recv_error, E}) ->
+catch_error(HttpReq, exit, {mochiweb_recv_error, E}, _Stack) ->
     #httpd{
         mochi_req = MochiReq,
         peer = Peer,
         original_method = Method
     } = HttpReq,
+    ?LOG_NOTICE(#{
+        what => mochiweb_recv_error,
+        peer => Peer,
+        method => Method,
+        path => MochiReq:get(raw_path),
+        details => E
+    }),
     couch_log:notice("mochiweb_recv_error for ~s - ~p ~s - ~p", [
         Peer,
         Method,
         MochiReq:get(raw_path),
         E]),
     exit(normal);
-catch_error(HttpReq, exit, {uri_too_long, _}) ->
+catch_error(HttpReq, exit, {uri_too_long, _}, _Stack) ->
     send_error(HttpReq, request_uri_too_long);
-catch_error(HttpReq, exit, {body_too_large, _}) ->
+catch_error(HttpReq, exit, {body_too_large, _}, _Stack) ->
     send_error(HttpReq, request_entity_too_large);
-catch_error(HttpReq, throw, Error) ->
+catch_error(HttpReq, throw, Error, _Stack) ->
     send_error(HttpReq, Error);
-catch_error(HttpReq, error, database_does_not_exist) ->
+catch_error(HttpReq, error, database_does_not_exist, _Stack) ->
     send_error(HttpReq, database_does_not_exist);
-catch_error(HttpReq, error, decryption_failed) ->
+catch_error(HttpReq, error, decryption_failed, _Stack) ->
     send_error(HttpReq, decryption_failed);
-catch_error(HttpReq, error, not_ciphertext) ->
+catch_error(HttpReq, error, not_ciphertext, _Stack) ->
     send_error(HttpReq, not_ciphertext);
-catch_error(HttpReq, Tag, Error) ->
-    Stack = erlang:get_stacktrace(),
+catch_error(HttpReq, error, {erlfdb_error, _} = Error, _Stack) ->
+    send_error(HttpReq, Error);
+catch_error(HttpReq, Tag, Error, Stack) ->
     % TODO improve logging and metrics collection for client disconnects
     case {Tag, Error, Stack} of
         {exit, normal, [{mochiweb_request, send, _, _} | _]} ->
@@ -408,9 +432,23 @@ maybe_log(#httpd{} = HttpReq, #httpd_resp{should_log = true} = HttpResp) ->
     User = get_user(HttpReq),
     Host = MochiReq:get_header_value("Host"),
     RawUri = MochiReq:get(raw_path),
-    RequestTime = timer:now_diff(EndTime, BeginTime) / 1000,
+    RequestTime = round(timer:now_diff(EndTime, BeginTime) / 1000),
+    % Wish List
+    % - client port
+    % - timers: connection, request, time to first byte, ...
+    % - response size
+    % 
+    ?LOG_NOTICE(#{
+        method => Method,
+        path => RawUri,
+        code => Code,
+        user => User,
+        % req_size => MochiReq:get(body_length),
+        src => #{ip4 => Peer},
+        duration => RequestTime
+    }, #{domain => [chttpd_access_log]}),
     couch_log:notice("~s ~s ~s ~s ~s ~B ~p ~B", [Host, Peer, User,
-        Method, RawUri, Code, Status, round(RequestTime)]);
+        Method, RawUri, Code, Status, RequestTime]);
 maybe_log(_HttpReq, #httpd_resp{should_log = false}) ->
     ok.
 
@@ -923,6 +961,10 @@ buffer_response(Req) ->
     end.
 
 
+error_info({erlfdb_error, ErrorCode}) ->
+    ErrorDesc =  erlfdb:get_error_string(ErrorCode),
+    Reason = ?l2b(io_lib:format("code: ~B, desc: ~s", [ErrorCode, ErrorDesc])),
+    {500, erlfdb_error, Reason};
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, couch_util:to_binary(Reason)});
 error_info(bad_request) ->
@@ -1017,6 +1059,8 @@ error_info(all_workers_died) ->
         "request due to overloading or maintenance mode.">>};
 error_info(not_implemented) ->
     {501, <<"not_implemented">>, <<"this feature is not yet implemented">>};
+error_info({disabled, Reason}) ->
+    {501, <<"disabled">>, Reason};
 error_info(timeout) ->
     {500, <<"timeout">>, <<"The request could not be processed in a reasonable"
         " amount of time.">>};
@@ -1026,6 +1070,9 @@ error_info(not_ciphertext) ->
     {500, <<"not_ciphertext">>, <<"Not Ciphertext">>};
 error_info({service_unavailable, Reason}) ->
     {503, <<"service unavailable">>, Reason};
+error_info({unknown_eval_api_language, Language}) ->
+    {400, <<"unknown_eval_api_language">>, <<"unsupported language in design"
+        " doc: `", Language/binary, "`">>};
 error_info({timeout, _Reason}) ->
     error_info(timeout);
 error_info({Error, null}) ->
@@ -1235,6 +1282,13 @@ maybe_decompress(Httpd, Body) ->
 log_error_with_stack_trace({bad_request, _, _}) ->
     ok;
 log_error_with_stack_trace({Error, Reason, Stack}) ->
+    ?LOG_ERROR(#{
+        what => request_failure,
+        error => Error,
+        reason => Reason,
+        hash => stack_hash(Stack),
+        stacktrace => Stack
+    }),
     EFmt = if is_binary(Error) -> "~s"; true -> "~w" end,
     RFmt = if is_binary(Reason) -> "~s"; true -> "~w" end,
     Fmt = "req_err(~w) " ++ EFmt ++ " : " ++ RFmt ++ "~n    ~p",
@@ -1265,8 +1319,9 @@ basic_headers(Req, Headers0) ->
         ++ server_header()
         ++ couch_httpd_auth:cookie_auth_header(Req, Headers0),
     Headers1 = chttpd_cors:headers(Req, Headers),
-	Headers2 = chttpd_xframe_options:header(Req, Headers1),
-    chttpd_prefer_header:maybe_return_minimal(Req, Headers2).
+    Headers2 = chttpd_xframe_options:header(Req, Headers1),
+    Headers3 = [reqid(), timing() | Headers2],
+    chttpd_prefer_header:maybe_return_minimal(Req, Headers3).
 
 handle_response(Req0, Code0, Headers0, Args0, Type) ->
     {ok, {Req1, Code1, Headers1, Args1}} =
@@ -1384,8 +1439,13 @@ get_action(#httpd{} = Req) ->
     try
         chttpd_handlers:handler_info(Req)
     catch Tag:Error ->
+        ?LOG_ERROR(#{
+            what => tracing_configuration_failure,
+            tag => Tag,
+            details => Error
+        }),
         couch_log:error("Cannot set tracing action ~p:~p", [Tag, Error]),
-        {undefind, #{}}
+        {undefined, #{}}
     end.
 
 span_ok(#httpd_resp{code = Code}) ->

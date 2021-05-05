@@ -44,6 +44,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("passage/include/opentracing.hrl").
 -include("ctrace.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -type operation()
@@ -109,8 +110,7 @@ with_span(Operation, Options, Fun)  ->
     try
         start_span(Operation, Options),
         Fun()
-    catch Type:Reason ->
-        Stack = erlang:get_stacktrace(),
+    catch Type:Reason:Stack ->
         log(#{
             ?LOG_FIELD_ERROR_KIND => Type,
             ?LOG_FIELD_MESSAGE => Reason,

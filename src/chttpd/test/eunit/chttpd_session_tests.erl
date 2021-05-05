@@ -44,7 +44,8 @@ session_test_() ->
                 fun cleanup/1,
                 [
                     ?TDEF_FE(session_authentication_db_absent),
-                    ?TDEF_FE(session_authentication_db_present)
+                    ?TDEF_FE(session_authentication_db_present),
+                    ?TDEF_FE(session_authentication_gzip_request)
                 ]
             }
         }
@@ -61,6 +62,15 @@ session_authentication_db_present(Url) ->
     ok = config:set("chttpd_auth", "authentication_db", Name, false),
     ?assertEqual(list_to_binary(Name), session_authentication_db(Url)).
 
+
+session_authentication_gzip_request(Url) ->
+    {ok, 200, _, Body} = test_request:request(
+        post,
+        Url,
+        [{"Content-Type", "application/json"}, {"Content-Encoding", "gzip"}],
+        zlib:gzip(jiffy:encode({[{username, list_to_binary(?USER)}, {password, list_to_binary(?PASS)}]}))),
+    {BodyJson} = jiffy:decode(Body),
+    ?assert(lists:member({<<"name">>, list_to_binary(?USER)}, BodyJson)).
 
 session_authentication_db(Url) ->
     {ok, 200, _, Body} = test_request:get(Url, [{basic_auth, {?USER, ?PASS}}]),

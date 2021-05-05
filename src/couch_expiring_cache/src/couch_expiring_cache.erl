@@ -31,8 +31,9 @@ insert(Name, Key, Value, StaleTS, ExpiresTS)
     insert(undefined, Name, Key, Value, StaleTS, ExpiresTS).
 
 
--spec insert(Tx :: jtx(), Name :: binary(), Key :: binary(), Value :: binary(),
-    StaleTS :: ?TIME_UNIT(), ExpiresTS :: ?TIME_UNIT()) -> ok.
+-spec insert(Tx :: jtx() | undefined, Name :: binary(), Key :: binary(),
+    Value :: binary(), StaleTS :: ?TIME_UNIT(), ExpiresTS :: ?TIME_UNIT()) -> ok.
+-dialyzer({no_return, insert/6}).
 insert(Tx, Name, Key, Value, StaleTS, ExpiresTS)
         when is_binary(Name), is_binary(Key), is_binary(Value),
         is_integer(StaleTS), is_integer(ExpiresTS) ->

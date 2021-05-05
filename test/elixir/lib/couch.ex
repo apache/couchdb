@@ -79,6 +79,11 @@ defmodule Couch do
   # request_timeout largely just so we know which timeout fired.
   @request_timeout 60_000
   @inactivity_timeout 55_000
+  @max_sessions 1_000
+
+  def base_url() do
+    System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
+  end
 
   def process_url("http://" <> _ = url) do
     url
@@ -110,13 +115,14 @@ defmodule Couch do
   end
 
   def process_options(options) do
-    base_url = System.get_env("EX_COUCH_URL") || "http://127.0.0.1:15984"
+    base_url = base_url()
     options = Keyword.put_new(options, :base_url, base_url)
 
     options
     |> set_auth_options()
     |> set_inactivity_timeout()
     |> set_request_timeout()
+    |> set_max_sessions()
   end
 
   def process_request_body(body) do
@@ -174,6 +180,17 @@ defmodule Couch do
   def set_request_timeout(options) do
     timeout = Application.get_env(:httpotion, :default_timeout, @request_timeout)
     Keyword.put_new(options, :timeout, timeout)
+  end
+
+  def set_max_sessions(options) do
+    Keyword.update(
+      options,
+      :ibrowse,
+      [{:max_sessions, @max_sessions}],
+      fn ibrowse ->
+        Keyword.put_new(ibrowse, :max_sessions, @max_sessions)
+      end
+    )
   end
 
   def login(userinfo) do

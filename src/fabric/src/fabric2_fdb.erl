@@ -15,8 +15,10 @@
 
 -export([
     transactional/1,
-    transactional/3,
     transactional/2,
+    transactional/3,
+
+    with_snapshot/2,
 
     create/2,
     open/2,
@@ -89,9 +91,6 @@
 -include("fabric2.hrl").
 
 
--define(MAX_FOLD_RANGE_RETRIES, 3).
-
-
 -record(fold_acc, {
     db,
     restart_tx,
@@ -116,18 +115,25 @@
 
 
 transactional(Fun) ->
-    do_transaction(Fun, undefined).
+    do_transaction(Fun, undefined, #{}).
 
 
-transactional(DbName, Options, Fun) when is_binary(DbName) ->
+transactional(DbName, Fun) when is_binary(DbName), is_function(Fun) ->
+    transactional(DbName, #{}, Fun);
+
+transactional(#{} = Db, Fun) when is_function(Fun) ->
+    transactional(Db, #{}, Fun).
+
+
+
+transactional(DbName, #{} = TxOptions, Fun) when is_binary(DbName) ->
     with_span(Fun, #{'db.name' => DbName}, fun() ->
-        transactional(fun(Tx) ->
-            Fun(init_db(Tx, DbName, Options))
-        end)
-    end).
+        do_transaction(fun(Tx) ->
+            Fun(init_db(Tx, DbName))
+        end, undefined, TxOptions)
+    end);
 
-
-transactional(#{tx := undefined} = Db, Fun) ->
+transactional(#{tx := undefined} = Db, #{} = TxOptions, Fun) ->
     DbName = maps:get(name, Db, undefined),
     try
         Db1 = refresh(Db),
@@ -143,25 +149,31 @@ transactional(#{tx := undefined} = Db, Fun) ->
                     true -> Fun(reopen(Db2#{tx => Tx}));
                     false -> Fun(Db2#{tx => Tx})
                 end
-            end, LayerPrefix)
+            end, LayerPrefix, TxOptions)
         end)
     catch throw:{?MODULE, reopen} ->
         with_span('db.reopen', #{'db.name' => DbName}, fun() ->
             transactional(Db#{reopen => true}, Fun)
         end)
     end;
+transactional(#{tx := {erlfdb_snapshot, _}} = Db, #{} = _TxOptions, Fun) ->
+    DbName = maps:get(name, Db, undefined),
+    with_span(Fun, #{'db.name' => DbName}, fun() ->
+        Fun(Db)
+    end);
 
-transactional(#{tx := {erlfdb_transaction, _}} = Db, Fun) ->
+transactional(#{tx := {erlfdb_transaction, _}} = Db, #{} = _TxOptions, Fun) ->
     DbName = maps:get(name, Db, undefined),
     with_span(Fun, #{'db.name' => DbName}, fun() ->
         Fun(Db)
     end).
 
 
-do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
+do_transaction(Fun, LayerPrefix, #{} = TxOptions) when is_function(Fun, 1) ->
     Db = get_db_handle(),
     try
         erlfdb:transactional(Db, fun(Tx) ->
+            apply_tx_options(Tx, TxOptions),
             case get(erlfdb_trace) of
                 Name when is_binary(Name) ->
                     UId = erlang:unique_integer([positive]),
@@ -181,6 +193,20 @@ do_transaction(Fun, LayerPrefix) when is_function(Fun, 1) ->
     after
         clear_transaction()
     end.
+
+
+apply_tx_options(Tx, #{} = TxOptions) ->
+    maps:map(fun(K, V) ->
+        erlfdb:set_option(Tx, K, V)
+    end, TxOptions).
+
+
+with_snapshot(#{tx := {erlfdb_transaction, _} = Tx} = TxDb, Fun) ->
+    SSDb = TxDb#{tx := erlfdb:snapshot(Tx)},
+    Fun(SSDb);
+
+with_snapshot(#{tx := {erlfdb_snapshot, _}} = SSDb, Fun) ->
+    Fun(SSDb).
 
 
 create(#{} = Db0, Options) ->
@@ -350,7 +376,7 @@ reopen(#{} = OldDb) ->
         interactive := Interactive
     } = OldDb,
     Options1 = lists:keystore(user_ctx, 1, Options, {user_ctx, UserCtx}),
-    NewDb = open(init_db(Tx, DbName, Options1), Options1),
+    NewDb = open(init_db(Tx, DbName), Options1),
 
     % Check if database was re-created
     case {Interactive, maps:get(uuid, NewDb)} of
@@ -495,7 +521,9 @@ get_info(#{} = Db) ->
         tx := Tx,
         db_prefix := DbPrefix
     } = ensure_current(Db),
-    get_info_wait(get_info_future(Tx, DbPrefix)).
+    DbInfo = get_info_wait(get_info_future(Tx, DbPrefix)),
+    AegisProps = aegis:get_db_info(Db),
+    [{encryption, {AegisProps}} | DbInfo].
 
 
 get_info_future(Tx, DbPrefix) ->
@@ -536,10 +564,10 @@ get_info_wait(#info_future{tx = Tx, retries = Retries} = Future) ->
     try
         get_info_wait_int(Future)
     catch
-        error:{erlfdb_error, ?TRANSACTION_CANCELLED} ->
+        error:{erlfdb_error, ?ERLFDB_TRANSACTION_CANCELLED} ->
             Future1 = get_info_future(Tx, Future#info_future.db_prefix),
             get_info_wait(Future1#info_future{retries = Retries + 1});
-        error:{erlfdb_error, ?TRANSACTION_TOO_OLD} ->
+        error:{erlfdb_error, Error} when ?ERLFDB_IS_RETRYABLE(Error) ->
             ok = erlfdb:reset(Tx),
             Future1 = get_info_future(Tx, Future#info_future.db_prefix),
             get_info_wait(Future1#info_future{retries = Retries + 1})
@@ -1130,7 +1158,8 @@ fold_range(Tx, FAcc) ->
             user_acc = FinalUserAcc
         } = erlfdb:fold_range(Tx, Start, End, Callback, FAcc, Opts),
         FinalUserAcc
-    catch error:{erlfdb_error, ?TRANSACTION_TOO_OLD} when DoRestart ->
+    catch error:{erlfdb_error, Error} when
+            ?ERLFDB_IS_RETRYABLE(Error) andalso DoRestart ->
         % Possibly handle cluster_version_changed and future_version as well to
         % continue iteration instead fallback to transactional and retrying
         % from the beginning which is bound to fail when streaming data out to a
@@ -1154,18 +1183,27 @@ seq_to_vs(Seq) when is_binary(Seq) ->
 
 
 next_vs({versionstamp, VS, Batch, TxId}) ->
-    {V, B, T} = case TxId =< 65535 of
+    {V, B, T} = case TxId < 16#FFFF of
         true ->
             {VS, Batch, TxId + 1};
         false ->
-            case Batch =< 65535 of
+            case Batch < 16#FFFF of
                 true ->
                     {VS, Batch + 1, 0};
                 false ->
                     {VS + 1, 0, 0}
             end
     end,
-    {versionstamp, V, B, T}.
+    {versionstamp, V, B, T};
+
+next_vs({versionstamp, VS, Batch}) ->
+    {V, B} = case Batch < 16#FFFF of
+        true ->
+            {VS, Batch + 1};
+        false ->
+            {VS + 1, 0}
+    end,
+    {versionstamp, V, B}.
 
 
 new_versionstamp(Tx) ->
@@ -1209,7 +1247,7 @@ debug_cluster(Start, End) ->
     end).
 
 
-init_db(Tx, DbName, Options) ->
+init_db(Tx, DbName) ->
     Prefix = get_dir(Tx),
     Version = erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY)),
     #{
@@ -1219,7 +1257,7 @@ init_db(Tx, DbName, Options) ->
         md_version => Version,
 
         security_fun => undefined,
-        db_options => Options
+        db_options => []
     }.
 
 
@@ -1841,10 +1879,11 @@ restart_fold(Tx, #fold_acc{} = Acc) ->
 
     ok = erlfdb:reset(Tx),
 
+    MaxRetries = fabric2_server:get_retry_limit(),
     case {erase(?PDICT_FOLD_ACC_STATE), Acc#fold_acc.retries} of
         {#fold_acc{db = Db} = Acc1, _} ->
             Acc1#fold_acc{db = check_db_instance(Db), retries = 0};
-        {undefined, Retries} when Retries < ?MAX_FOLD_RANGE_RETRIES ->
+        {undefined, Retries} when Retries < MaxRetries ->
             Db = check_db_instance(Acc#fold_acc.db),
             Acc#fold_acc{db = Db, retries = Retries + 1};
         {undefined, _} ->
@@ -1863,6 +1902,8 @@ get_db_handle() ->
     end.
 
 
+require_transaction(#{tx := {erlfdb_snapshot, _}} = _Db) ->
+    ok;
 require_transaction(#{tx := {erlfdb_transaction, _}} = _Db) ->
     ok;
 require_transaction(#{} = _Db) ->
@@ -1958,7 +1999,7 @@ clear_transaction() ->
 
 
 is_commit_unknown_result() ->
-    erlfdb:get_last_error() == ?COMMIT_UNKNOWN_RESULT.
+    erlfdb:get_last_error() == ?ERLFDB_COMMIT_UNKNOWN_RESULT.
 
 
 has_transaction_id() ->

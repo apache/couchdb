@@ -27,11 +27,10 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
--include_lib("fabric/include/fabric.hrl").
-
+-include_lib("couch_views/include/couch_views.hrl").
 -include("mango_cursor.hrl").
 -include("mango_idx_view.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 create(Db, Indexes, Selector, Opts) ->
@@ -137,8 +136,7 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             Result = case mango_idx:def(Idx) of
                 all_docs ->
                     CB = fun ?MODULE:handle_all_docs_message/2,
-                    AllDocOpts = fabric2_util:all_docs_view_opts(Args)
-                        ++ [{restart_tx, true}],
+                    AllDocOpts = fabric2_util:all_docs_view_opts(Args),
                     fabric2_db:fold_docs(Db, CB, Cursor, AllDocOpts);
                 _ ->
                     CB = fun ?MODULE:handle_message/2,
@@ -244,6 +242,7 @@ handle_message({row, Props}, Cursor) ->
             },
             {ok, Cursor1};
         Error ->
+            ?LOG_ERROR(#{what => load_doc_failure, details => Error}),
             couch_log:error("~s :: Error loading doc: ~p", [?MODULE, Error]),
             {ok, Cursor}
     end;

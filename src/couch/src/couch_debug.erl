@@ -370,8 +370,6 @@ fold_tree(Tree, Acc, Fun) ->
 linked_processes_info(Pid, Info) ->
     link_tree(Pid, Info, fun(P, Props) -> {process_name(P), Props} end).
 
-print_linked_processes(couch_index_server) ->
-    print_couch_index_server_processes();
 print_linked_processes(Name) when is_atom(Name) ->
     case whereis(Name) of
         undefined -> {error, {unknown, Name}};
@@ -386,42 +384,6 @@ print_linked_processes(Pid) when is_pid(Pid) ->
     Tree = linked_processes_info(Pid, Info),
     print_tree(Tree, TableSpec).
 
-id("couch_file:init" ++ _, Pid, _Props) ->
-    case couch_file:process_info(Pid) of
-        {{file_descriptor, prim_file, {Port, Fd}}, FilePath} ->
-            term2str([
-                term2str(Fd), ":",
-                term2str(Port), ":",
-                shorten_path(FilePath)]);
-        undefined ->
-            ""
-    end;
-id(_IdStr, _Pid, _Props) ->
-    "".
-
-print_couch_index_server_processes() ->
-    Info = [reductions, message_queue_len, memory],
-    TableSpec = [
-        {50, left, name}, {12, centre, reductions},
-        {19, centre, message_queue_len}, {14, centre, memory}, {id}
-    ],
-
-    Tree = link_tree(whereis(couch_index_server), Info, fun(P, Props) ->
-        IdStr = process_name(P),
-        {IdStr, [{id, id(IdStr, P, Props)} | Props]}
-    end),
-    print_tree(Tree, TableSpec).
-
-shorten_path(Path) ->
-    ViewDir = list_to_binary(config:get("couchdb", "view_index_dir")),
-    DatabaseDir = list_to_binary(config:get("couchdb", "database_dir")),
-    File = list_to_binary(Path),
-    Len = max(
-        binary:longest_common_prefix([File, DatabaseDir]),
-        binary:longest_common_prefix([File, ViewDir])
-    ),
-    <<_:Len/binary, Rest/binary>> = File,
-    binary_to_list(Rest).
 
 %% Pretty print functions
 

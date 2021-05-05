@@ -56,6 +56,7 @@
 }).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 start_link() ->
     gen_server:start_link(?MODULE, [], []).
@@ -80,6 +81,11 @@ handle_call({set_timeout, TimeOut}, _From, State) ->
     {reply, ok, State#evstate{timeout=TimeOut}, State#evstate.idle};
 
 handle_call({prompt, Data}, _From, State) ->
+    ?LOG_DEBUG(#{
+        what => prompt,
+        in => native_process,
+        msg => ?JSON_ENCODE(Data)
+    }),
     couch_log:debug("Prompt native qs: ~s",[?JSON_ENCODE(Data)]),
     {NewState, Resp} = try run(State, to_binary(Data)) of
         {S, R} -> {S, R}
@@ -211,6 +217,11 @@ run(#evstate{ddocs=DDocs}=State, [<<"ddoc">>, DDocId | Rest]) ->
     DDoc = load_ddoc(DDocs, DDocId),
     ddoc(State, DDoc, Rest);
 run(_, Unknown) ->
+    ?LOG_ERROR(#{
+        what => unknown_command,
+        in => native_process,
+        cmd => Unknown
+    }),
     couch_log:error("Native Process: Unknown command: ~p~n", [Unknown]),
     throw({error, unknown_command}).
 
@@ -237,7 +248,13 @@ ddoc(State, {_, Fun}, [<<"filters">>|_], [Docs, Req]) ->
         case catch Fun(Doc, Req) of
         true -> true;
         false -> false;
-        {'EXIT', Error} -> couch_log:error("~p", [Error])
+        {'EXIT', Error} ->
+            ?LOG_ERROR(#{
+                what => filter_fun_crash,
+                in => native_process,
+                details => Error
+            }),
+            couch_log:error("~p", [Error])
         end
     end,
     Resp = lists:map(FilterFunWrapper, Docs),
@@ -249,7 +266,13 @@ ddoc(State, {_, Fun}, [<<"views">>|_], [Docs]) ->
         ok -> false;
         false -> false;
         [_|_] -> true;
-        {'EXIT', Error} -> couch_log:error("~p", [Error])
+        {'EXIT', Error} ->
+            ?LOG_ERROR(#{
+                what => view_fun_crash,
+                in => native_process,
+                details => Error
+            }),
+            couch_log:error("~p", [Error])
         end
     end,
     Resp = lists:map(MapFunWrapper, Docs),
@@ -318,6 +341,12 @@ bindings(State, Sig, DDoc) ->
     Self = self(),
 
     Log = fun(Msg) ->
+        ?LOG_INFO(#{
+            what => user_defined_log,
+            in => native_process,
+            signature => Sig,
+            msg => Msg
+        }),
         couch_log:info(Msg, [])
     end,
 
@@ -393,6 +422,13 @@ makefun(_State, Source, BindFuns) when is_list(BindFuns) ->
         {ok, [ParsedForm]} ->
             ParsedForm;
         {error, {LineNum, _Mod, [Mesg, Params]}}=Error ->
+            ?LOG_ERROR(#{
+                what => syntax_error,
+                in => native_process,
+                line => LineNum,
+                details => Mesg,
+                parameters => Params
+            }),
             couch_log:error("Syntax error on line: ~p~n~s~p~n",
                             [LineNum, Mesg, Params]),
             throw(Error)

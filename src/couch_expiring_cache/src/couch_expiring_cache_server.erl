@@ -37,6 +37,7 @@
 
 
 -include_lib("couch_expiring_cache/include/couch_expiring_cache.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 start_link(Name, Opts) when is_atom(Name) ->
@@ -96,6 +97,10 @@ handle_info(remove_expired, St) ->
 
 handle_info({Ref, ready}, St) when is_reference(Ref) ->
     % Prevent crashing server and application
+    ?LOG_ERROR(#{
+        what => spurious_future_ready,
+        ref => Ref
+    }),
     LogMsg = "~p : spurious erlfdb future ready message ~p",
     couch_log:error(LogMsg, [?MODULE, Ref]),
     {noreply, St};

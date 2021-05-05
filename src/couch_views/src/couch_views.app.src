@@ -23,6 +23,7 @@
         stdlib,
         erlfdb,
         couch_epi,
+        couch_lib,
         couch_log,
         config,
         couch_stats,

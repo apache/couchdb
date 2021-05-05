@@ -19,6 +19,7 @@
 -export([start_link/0]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -29,6 +30,7 @@ init([]) ->
     ok ->
         {ok, nil};
     {error, already_loaded} ->
+        ?LOG_INFO(#{what => reload_couch_icu_driver}),
         couch_log:info("~p reloading couch_icu_driver", [?MODULE]),
         ok = erl_ddll:reload(LibDir, "couch_icu_driver"),
         {ok, nil};

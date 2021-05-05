@@ -38,6 +38,7 @@
 
 
 -include("couch_replicator.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -define(MAX_ACCEPTORS, 2).
@@ -95,6 +96,11 @@ handle_call({accepted, Pid, Normal}, _From, #{} = St) ->
             },
             {reply, ok, spawn_acceptors(St1)};
         false ->
+            ?LOG_ERROR(#{
+                what => unknown_acceptor,
+                in => replicator,
+                pid => Pid
+            }),
             LogMsg = "~p : unknown acceptor processs ~p",
             couch_log:error(LogMsg, [?MODULE, Pid]),
             {stop, {unknown_acceptor_pid, Pid}, St}
@@ -234,6 +240,11 @@ transient_job_cleanup(#{} = St) ->
         case State =:= finished andalso IsTransient andalso IsOld of
             true ->
                 ok = couch_replicator_jobs:remove_job(undefined, JobId),
+                ?LOG_INFO(#{
+                    what => removing_old_job,
+                    in => replicator,
+                    jobid => JobId
+                }),
                 couch_log:info("~p : Removed old job ~p", [?MODULE, JobId]),
                 ok;
             false ->
@@ -301,6 +312,11 @@ wait_jobs_exit(#{} = Jobs, Timeout) ->
             wait_jobs_exit(maps:remove(Pid, Jobs), Timeout)
     after
         Timeout ->
+            ?LOG_ERROR(#{
+                what => unclean_job_termination,
+                in => replicator,
+                job_count => map_size(Jobs)
+            }),
             LogMsg = "~p : ~p jobs didn't terminate cleanly",
             couch_log:error(LogMsg, [?MODULE, map_size(Jobs)]),
             ok
@@ -329,6 +345,12 @@ spawn_acceptors(St) ->
 
 handle_acceptor_exit(#{acceptors := Acceptors} = St, Pid, Reason) ->
     St1 = St#{acceptors := maps:remove(Pid, Acceptors)},
+    ?LOG_ERROR(#{
+        what => acceptor_crash,
+        in => replicator,
+        pid => Pid,
+        details => Reason
+    }),
     LogMsg = "~p : acceptor process ~p exited with ~p",
     couch_log:error(LogMsg, [?MODULE, Pid, Reason]),
     {noreply, spawn_acceptors(St1)}.
@@ -344,6 +366,12 @@ handle_worker_exit(#{workers := Workers} = St, Pid, Reason) ->
         {shutdown, _} ->
             ok;
         _ ->
+            ?LOG_ERROR(#{
+                what => worker_crash,
+                in => replicator,
+                pid => Pid,
+                details => Reason
+            }),
             LogMsg = "~p : replicator job process ~p exited with ~p",
             couch_log:error(LogMsg, [?MODULE, Pid, Reason])
     end,
@@ -351,6 +379,11 @@ handle_worker_exit(#{workers := Workers} = St, Pid, Reason) ->
 
 
 handle_unknown_exit(St, Pid, Reason) ->
+    ?LOG_ERROR(#{
+        what => unknown_process_crash,
+        in => replicator,
+        pid => Pid
+    }),
     LogMsg = "~p : unknown process ~p exited with ~p",
     couch_log:error(LogMsg, [?MODULE, Pid, Reason]),
     {stop, {unknown_pid_exit, Pid}, St}.

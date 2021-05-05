@@ -16,6 +16,7 @@
 
 -behaviour(supervisor).
 
+-include_lib("kernel/include/logger.hrl").
 
 -export([
     start_link/0
@@ -46,6 +47,7 @@ init(normal) ->
     {ok, {flags(), Children}};
 
 init(builds_disabled) ->
+    ?LOG_NOTICE(#{what => view_indexing_disabled}),
     couch_log:notice("~p : view_indexing disabled", [?MODULE]),
     couch_views_jobs:set_timeout(),
     {ok, {flags(), []}}.

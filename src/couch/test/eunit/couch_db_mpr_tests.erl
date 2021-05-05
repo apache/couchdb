@@ -31,8 +31,8 @@ setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
     ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
     TmpDb = ?tempdb(),
-    Addr = config:get("httpd", "bind_address", "127.0.0.1"),
-    Port = mochiweb_socket_server:get(couch_httpd, port),
+    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
+    Port = mochiweb_socket_server:get(chttpd, port),
     Url = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
     Url.
 
@@ -64,8 +64,12 @@ couch_db_mpr_test_() ->
         "multi-part attachment tests",
         {
             setup,
-            fun test_util:start_couch/0,
-            fun test_util:stop_couch/1,
+            fun() ->
+                test_util:start_couch([chttpd])
+            end,
+            fun(Ctx) ->
+                test_util:stop_couch(Ctx)
+            end,
             {
                 foreach,
                 fun setup/0,

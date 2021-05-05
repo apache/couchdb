@@ -40,3 +40,102 @@
 % indexing progress
 -define(INDEX_BUILDING, <<"building">>).
 -define(INDEX_READY, <<"ready">>).
+
+% Views/db marker to indicate that the current (latest) FDB GRV version should
+% be used. Use `null` so it can can be round-tripped through json serialization
+% with couch_jobs.
+-define(VIEW_CURRENT_VSN, null).
+
+
+-record(mrst, {
+    sig=nil,
+    fd=nil,
+    fd_monitor,
+    db_name,
+    idx_name,
+    language,
+    design_opts=[],
+    partitioned=false,
+    lib,
+    views,
+    id_btree=nil,
+    update_seq=0,
+    purge_seq=0,
+    first_build,
+    partial_resp_pid,
+    doc_acc,
+    doc_queue,
+    write_queue,
+    qserver=nil
+}).
+
+
+-record(mrview, {
+    id_num,
+    update_seq=0,
+    purge_seq=0,
+    map_names=[],
+    reduce_funs=[],
+    def,
+    btree=nil,
+    options=[]
+}).
+
+
+-define(MAX_VIEW_LIMIT, 16#10000000).
+
+-record(mrargs, {
+    view_type,
+    reduce,
+
+    preflight_fun,
+
+    start_key,
+    start_key_docid,
+    end_key,
+    end_key_docid,
+    keys,
+
+    direction = fwd,
+    limit = ?MAX_VIEW_LIMIT,
+    skip = 0,
+    group_level = 0,
+    group = undefined,
+    stable = false,
+    update = true,
+    multi_get = false,
+    inclusive_end = true,
+    include_docs = false,
+    doc_options = [],
+    update_seq=false,
+    conflicts,
+    callback,
+    sorted = true,
+    extra = [],
+    page_size = undefined,
+    bookmark=nil
+}).
+
+-record(vacc, {
+    db,
+    req,
+    resp,
+    prepend,
+    etag,
+    should_close = false,
+    buffer = [],
+    bufsize = 0,
+    threshold = 1490,
+    row_sent = false,
+    meta_sent = false,
+    paginated = false,
+    meta = #{}
+}).
+
+
+-record(view_row, {
+    key,
+    id,
+    value,
+    doc
+}).

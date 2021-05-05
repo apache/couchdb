@@ -50,7 +50,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 
 revinfo_to_revs(RevInfo) ->
@@ -383,23 +383,9 @@ pmap(Fun, Args, Opts) ->
     end, Refs).
 
 
-% OTP_RELEASE is defined in OTP 21+ only
--ifdef(OTP_RELEASE).
-
 pmap_exec(Fun, Arg) ->
     try
         {'$res', Fun(Arg)}
     catch Tag:Reason:Stack ->
         {'$err', Tag, Reason, Stack}
     end.
-
--else.
-
-pmap_exec(Fun, Arg) ->
-    try
-        {'$res', Fun(Arg)}
-    catch Tag:Reason ->
-        {'$err', Tag, Reason, erlang:get_stacktrace()}
-    end.
-
--endif.

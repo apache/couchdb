@@ -11,9 +11,3 @@ intermediate reduction values on the inner nodes for performance.
 
 The FoundationDB keys start with a user defined prefix and the opaque
 node id.
-
-TODO
-
-1. Rewrite inner node ids (non-root, non-leaf) so we can safely cache
-    them outside of a transaction. (see "immutable" branch)
-2. Chunkify large values over multiple rows?

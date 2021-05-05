@@ -27,7 +27,8 @@
     maybe_remove/1,
 
     fdb_directory/0,
-    fdb_cluster/0
+    fdb_cluster/0,
+    get_retry_limit/0
 ]).
 
 
@@ -42,9 +43,12 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/file.hrl").
+-include_lib("kernel/include/logger.hrl").
 
-
--define(CLUSTER_FILE, "/usr/local/etc/foundationdb/fdb.cluster").
+-define(CLUSTER_FILE_MACOS, "/usr/local/etc/foundationdb/fdb.cluster").
+-define(CLUSTER_FILE_LINUX, "/etc/foundationdb/fdb.cluster").
+-define(CLUSTER_FILE_WIN32, "C:/ProgramData/foundationdb/fdb.cluster").
 -define(FDB_DIRECTORY, fdb_directory).
 -define(FDB_CLUSTER, fdb_cluster).
 -define(DEFAULT_FDB_DIRECTORY, <<"couchdb">>).
@@ -192,6 +196,12 @@ fdb_directory() ->
 fdb_cluster() ->
     get_env(?FDB_CLUSTER).
 
+
+get_retry_limit() ->
+    Default = list_to_integer(?DEFAULT_RETRY_LIMIT),
+    config:get_integer(?TX_OPTIONS_SECTION, "retry_limit", Default).
+
+
 get_env(Key) ->
     case get(Key) of
         undefined ->
@@ -212,13 +222,113 @@ get_db_and_cluster(EunitDbOpts) ->
         {ok, true} ->
             {<<"eunit_test">>, erlfdb_util:get_test_db(EunitDbOpts)};
         undefined ->
-            ClusterFileStr = config:get("erlfdb", "cluster_file", ?CLUSTER_FILE),
+            ClusterFileStr = get_cluster_file_path(),
             {ok, ConnectionStr} = file:read_file(ClusterFileStr),
             DbHandle = erlfdb:open(iolist_to_binary(ClusterFileStr)),
             {string:trim(ConnectionStr), DbHandle}
     end,
     apply_tx_options(Db, config:get(?TX_OPTIONS_SECTION)),
     {Cluster, Db}.
+
+get_cluster_file_path() ->
+    Locations = [
+        {custom, config:get("erlfdb", "cluster_file")},
+        {custom, os:getenv("FDB_CLUSTER_FILE", undefined)}
+    ] ++ default_locations(os:type()),
+    case find_cluster_file(Locations) of
+        {ok, Location} ->
+            Location;
+        {error, Reason} ->
+            erlang:error(Reason)
+    end.
+
+
+default_locations({unix, _}) ->
+    [
+        {default, ?CLUSTER_FILE_MACOS},
+        {default, ?CLUSTER_FILE_LINUX}
+    ];
+
+default_locations({win32, _}) ->
+    [
+        {default, ?CLUSTER_FILE_WIN32}
+    ].
+
+
+find_cluster_file([]) ->
+    {error, cluster_file_missing};
+
+find_cluster_file([{custom, undefined} | Rest]) ->
+    find_cluster_file(Rest);
+
+find_cluster_file([{Type, Location} | Rest]) ->
+    Msg = #{
+        what => fdb_connection_setup,
+        configuration_type => Type,
+        cluster_file => Location
+    },
+    case file:read_file_info(Location, [posix]) of
+        {ok, #file_info{access = read_write}} ->
+            ?LOG_INFO(Msg#{status => ok}),
+            couch_log:info(
+                "Using ~s FDB cluster file: ~s",
+                [Type, Location]
+            ),
+            {ok, Location};
+        {ok, #file_info{access = read}} ->
+            ?LOG_WARNING(Msg#{
+                status => read_only_file,
+                details => "If coordinators are changed without updating this "
+                    "file CouchDB may be unable to connect to the FDB cluster!"
+            }),
+            couch_log:warning(
+                "Using read-only ~s FDB cluster file: ~s -- if coordinators "
+                "are changed without updating this file CouchDB may be unable "
+                "to connect to the FDB cluster!",
+                [Type, Location]
+            ),
+            {ok, Location};
+        {ok, _} ->
+            ?LOG_ERROR(Msg#{
+                status => permissions_error,
+                details => "CouchDB needs read/write access to FDB cluster file"
+            }),
+            couch_log:error(
+                "CouchDB needs read/write access to FDB cluster file: ~s",
+                [Location]
+            ),
+            {error, cluster_file_permissions};
+        {error, Reason} when Type =:= custom ->
+            ?LOG_ERROR(Msg#{
+                status => Reason,
+                details => file:format_error(Reason)
+            }),
+            couch_log:error(
+                "Encountered ~p error looking for FDB cluster file: ~s",
+                [Reason, Location]
+            ),
+            {error, Reason};
+        {error, enoent} when Type =:= default ->
+            ?LOG_INFO(Msg#{
+                status => enoent,
+                details => file:format_error(enoent)
+            }),
+            couch_log:info(
+                "No FDB cluster file found at ~s",
+                [Location]
+            ),
+            find_cluster_file(Rest);
+        {error, Reason} when Type =:= default ->
+            ?LOG_WARNING(Msg#{
+                status => Reason,
+                details => file:format_error(Reason)
+            }),
+            couch_log:warning(
+                "Encountered ~p error looking for FDB cluster file: ~s",
+                [Reason, Location]
+            ),
+            find_cluster_file(Rest)
+    end.
 
 
 apply_tx_options(Db, Cfg) ->
@@ -240,6 +350,11 @@ apply_tx_option(Db, Option, Val, integer) ->
         set_option(Db, Option, list_to_integer(Val))
     catch
         error:badarg ->
+            ?LOG_ERROR(#{
+                what => invalid_transaction_option_value,
+                option => Option,
+                value => Val
+            }),
             Msg = "~p : Invalid integer tx option ~p = ~p",
             couch_log:error(Msg, [?MODULE, Option, Val])
     end;
@@ -250,6 +365,12 @@ apply_tx_option(Db, Option, Val, binary) ->
         true ->
             set_option(Db, Option, BinVal);
         false ->
+            ?LOG_ERROR(#{
+                what => invalid_transaction_option_value,
+                option => Option,
+                value => Val,
+                details => "string transaction option must be less than 16 bytes"
+            }),
             Msg = "~p : String tx option ~p is larger than 16 bytes",
             couch_log:error(Msg, [?MODULE, Option])
     end.
@@ -262,6 +383,11 @@ set_option(Db, Option, Val) ->
         % This could happen if the option is not supported by erlfdb or
         % fdbsever.
         error:badarg ->
+            ?LOG_ERROR(#{
+                what => transaction_option_error,
+                option => Option,
+                value => Val
+            }),
             Msg = "~p : Could not set fdb tx option ~p = ~p",
             couch_log:error(Msg, [?MODULE, Option, Val])
     end.
@@ -274,3 +400,72 @@ sanitize(#{} = Db) ->
         security_fun := undefined,
         interactive := false
     }.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+setup() ->
+    meck:new(file, [unstick, passthrough]),
+    meck:expect(file, read_file_info, fun
+        ("ok.cluster", _) ->
+            {ok, #file_info{access = read_write}};
+        ("readonly.cluster", _) ->
+            {ok, #file_info{access = read}};
+        ("noaccess.cluster", _) ->
+            {ok, #file_info{access = none}};
+        ("missing.cluster", _) ->
+            {error, enoent};
+        (Path, Options) ->
+            meck:passthrough([Path, Options])
+    end).
+
+teardown(_) ->
+    meck:unload().
+
+find_cluster_file_test_() ->
+    {setup,
+        fun setup/0,
+        fun teardown/1,
+        [
+            {"ignore unspecified config", ?_assertEqual(
+                {ok, "ok.cluster"},
+                find_cluster_file([
+                    {custom, undefined},
+                    {custom, "ok.cluster"}
+                ])
+            )},
+
+            {"allow read-only file", ?_assertEqual(
+                {ok, "readonly.cluster"},
+                find_cluster_file([
+                    {custom, "readonly.cluster"}
+                ])
+            )},
+
+            {"fail if no access to configured cluster file", ?_assertEqual(
+                {error, cluster_file_permissions},
+                find_cluster_file([
+                    {custom, "noaccess.cluster"}
+                ])
+            )},
+
+            {"fail if configured cluster file is missing", ?_assertEqual(
+                {error, enoent},
+                find_cluster_file([
+                    {custom, "missing.cluster"},
+                    {default, "ok.cluster"}
+                ])
+            )},
+
+            {"check multiple default locations", ?_assertEqual(
+                {ok, "ok.cluster"},
+                find_cluster_file([
+                    {default, "missing.cluster"},
+                    {default, "ok.cluster"}
+                ])
+            )}
+        ]
+    }.
+
+-endif.

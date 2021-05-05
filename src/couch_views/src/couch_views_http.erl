@@ -13,7 +13,7 @@
 -module(couch_views_http).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 -export([
     parse_body_and_query/2,
@@ -24,7 +24,8 @@
     row_to_obj/2,
     view_cb/2,
     paginated/5,
-    paginated/6
+    paginated/6,
+    transform_row/1
 ]).
 
 -define(BOOKMARK_VSN, 1).
@@ -63,7 +64,7 @@ parse_params(Props, Keys, #mrargs{}=Args, Options) ->
         _ ->
             throw({bad_request, "Cannot use `bookmark` with other options"})
     end,
-    couch_mrview_http:parse_params(Props, Keys, Args, Options).
+    couch_views_http_util:parse_params(Props, Keys, Args, Options).
 
 
 row_to_obj(Row) ->
@@ -72,11 +73,11 @@ row_to_obj(Row) ->
 
 
 row_to_obj(Id, Row) ->
-    couch_mrview_http:row_to_obj(Id, Row).
+    couch_views_http_util:row_to_obj(Id, Row).
 
 
 view_cb(Msg, #vacc{paginated = false}=Acc) ->
-    couch_mrview_http:view_cb(Msg, Acc);
+    couch_views_http_util:view_cb(Msg, Acc);
 view_cb(Msg, #vacc{paginated = true}=Acc) ->
     paginated_cb(Msg, Acc).
 
@@ -95,9 +96,8 @@ paginated_cb({meta, Meta}, #vacc{}=VAcc) ->
         case MetaData of
             {_Key, undefined} ->
                 Acc;
-            {total, _Value} ->
-                %% We set total_rows elsewere
-                Acc;
+            {total, Value} ->
+                maps:put(total_rows, Value, Acc);
             {Key, Value} ->
                 maps:put(list_to_binary(atom_to_list(Key)), Value, Acc)
         end
@@ -129,14 +129,12 @@ do_paginated(PageSize, QueriesArgs, KeyFun, Fun) when is_list(QueriesArgs) ->
                 Result0 = maybe_add_next_bookmark(
                     OriginalLimit, PageSize, Args, Meta, Items, KeyFun),
                 Result = maybe_add_previous_bookmark(Args, Result0, KeyFun),
-                #{total_rows := Total} = Result,
-                {Limit - Total, [Result | Acc]};
+                {Limit - length(maps:get(rows, Result)), [Result | Acc]};
             false ->
                 Bookmark = bookmark_encode(Args0),
                 Result = #{
                     rows => [],
-                    next => Bookmark,
-                    total_rows => 0
+                    next => Bookmark
                 },
                 {Limit, [Result | Acc]}
         end
@@ -152,8 +150,7 @@ maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun)
     case check_completion(OriginalLimit, RequestedLimit, Items) of
         {Rows, nil} ->
             maps:merge(Response, #{
-                rows => Rows,
-                total_rows => length(Rows)
+                rows => Rows
             });
         {Rows, Next} ->
             {FirstId, FirstKey} = first_key(KeyFun, Rows),
@@ -169,8 +166,7 @@ maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun)
             Bookmark = bookmark_encode(Args),
             maps:merge(Response, #{
                 rows => Rows,
-                next => Bookmark,
-                total_rows => length(Rows)
+                next => Bookmark
             })
     end.
 
@@ -282,6 +278,25 @@ mask_to_index(Mask, Pos, Acc) when is_integer(Mask), Mask > 0 ->
         1 -> [Pos | Acc]
     end,
     mask_to_index(Mask bsr 1, Pos + 1, NewAcc).
+
+
+transform_row(#view_row{value={[{reduce_overflow_error, Msg}]}}) ->
+    {row, [{key,null}, {id,error}, {value,reduce_overflow_error}, {reason,Msg}]};
+
+transform_row(#view_row{key=Key, id=reduced, value=Value}) ->
+    {row, [{key,Key}, {value,Value}]};
+
+transform_row(#view_row{key=Key, id=undefined}) ->
+    {row, [{key,Key}, {id,error}, {value,not_found}]};
+
+transform_row(#view_row{key=Key, id=Id, value=Value, doc=undefined}) ->
+    {row, [{id,Id}, {key,Key}, {value,Value}]};
+
+transform_row(#view_row{key=Key, id=_Id, value=_Value, doc={error,Reason}}) ->
+    {row, [{id,error}, {key,Key}, {value,Reason}]};
+
+transform_row(#view_row{key=Key, id=Id, value=Value, doc=Doc}) ->
+    {row, [{id,Id}, {key,Key}, {value,Value}, {doc,Doc}]}.
 
 
 -ifdef(TEST).

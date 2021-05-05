@@ -420,11 +420,29 @@ defmodule AllDocsTest do
 
     resp = Couch.get("/#{db_name}/_all_docs", query: %{:end_key => 0}).body
     rows = resp["rows"]
-    assert length(rows) === 0
+    assert Enum.empty?(rows)
   end
 
   defp get_ids(resp) do
     %{"rows" => rows} = resp
     Enum.map(rows, fn row -> row["id"] end)
+  end
+
+  @tag :with_db
+  test "POST boolean", context do
+    db_name = context[:db_name]
+
+    resp = Couch.post("/#{db_name}/_bulk_docs", body: %{docs: create_docs(0..3)})
+    assert resp.status_code in [201, 202]
+
+    resp = Couch.post(
+      "/#{db_name}/_all_docs",
+      body: %{
+        :stable => true,
+        :update => true
+      }
+    )
+
+    assert resp.status_code == 200
   end
 end

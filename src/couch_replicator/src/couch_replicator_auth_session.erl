@@ -74,6 +74,7 @@
 
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -type headers() :: [{string(), string()}].
@@ -156,6 +157,11 @@ handle_call({update_headers, Headers, _Epoch}, _From, State) ->
             Headers1 = [{"Cookie", Cookie} | Headers],
             {reply, {Headers1, State1#state.epoch}, State1};
         {error, Error} ->
+            ?LOG_ERROR(#{
+                what => terminate_session_auth_plugin,
+                in => replicator,
+                details => Error
+            }),
             LogMsg = "~p: Stopping session auth plugin because of error ~p",
             couch_log:error(LogMsg, [?MODULE, Error]),
             {stop, Error, State}
@@ -170,11 +176,13 @@ handle_call(stop, _From, State) ->
 
 
 handle_cast(Msg, State) ->
+    ?LOG_ERROR(#{what => unexpected_cast, in => replicator, msg => Msg}),
     couch_log:error("~p: Received un-expected cast ~p", [?MODULE, Msg]),
     {noreply, State}.
 
 
 handle_info(Msg, State) ->
+    ?LOG_ERROR(#{what => unexpected_message, in => replicator, msg => Msg}),
     couch_log:error("~p : Received un-expected message ~p", [?MODULE, Msg]),
     {noreply, State}.
 
@@ -288,7 +296,9 @@ extract_creds_from_url(Url) ->
             Prefix = lists:concat([Proto, "://", User, ":", Pass, "@"]),
             Suffix = lists:sublist(Url, length(Prefix) + 1, length(Url) + 1),
             NoCreds = lists:concat([Proto, "://", Suffix]),
-            {ok, User, Pass, NoCreds}
+            User1 = chttpd:unquote(User),
+            Pass1 = chttpd:unquote(Pass),
+            {ok, User1, Pass1, NoCreds}
     end.
 
 
@@ -307,6 +317,11 @@ process_response(Code, Headers, _Epoch, State) when Code >= 200, Code < 300 ->
         {error, cookie_not_found} ->
             State;
         {error, Other} ->
+            ?LOG_ERROR(#{
+                what => cookie_parse_error,
+                in => replicator,
+                details => Other
+            }),
             LogMsg = "~p : Could not parse cookie from response headers ~p",
             couch_log:error(LogMsg, [?MODULE, Other]),
             State
@@ -576,12 +591,36 @@ extract_creds_success_test_() ->
             {"u", "p", #httpdb{url = "http://x.y/db"}}
         },
         {
+            #httpdb{url = "http://u%40:p%40@x.y/db"},
+            {"u@", "p@", #httpdb{url = "http://x.y/db"}}
+        },
+        {
+            #httpdb{url = "http://u%40u:p%40p@x.y/db"},
+            {"u@u", "p@p", #httpdb{url = "http://x.y/db"}}
+        },
+        {
+            #httpdb{url = "http://u%40%401:p%40%401@x.y/db"},
+            {"u@@1", "p@@1", #httpdb{url = "http://x.y/db"}}
+        },
+        {
+            #httpdb{url = "http://u%40%2540:p%40%2540@x.y/db"},
+            {"u@%40", "p@%40", #httpdb{url = "http://x.y/db"}}
+        },
+        {
             #httpdb{url = "http://u:p@h:80/db"},
             {"u", "p", #httpdb{url = "http://h:80/db"}}
         },
         {
+            #httpdb{url = "http://u%3A:p%3A@h:80/db"},
+            {"u:", "p:", #httpdb{url = "http://h:80/db"}}
+        },
+        {
             #httpdb{url = "https://u:p@h/db"},
             {"u", "p", #httpdb{url = "https://h/db"}}
+        },
+        {
+            #httpdb{url = "https://u%2F:p%2F@h/db"},
+            {"u/", "p/", #httpdb{url = "https://h/db"}}
         },
         {
             #httpdb{url = "http://u:p@127.0.0.1:5984/db"},
@@ -596,8 +635,16 @@ extract_creds_success_test_() ->
             {"u", "p", #httpdb{url = "http://[2001:db8:a1b:12f9::1]:81/db"}}
         },
         {
+            #httpdb{url = "http://u:p%3A%2F%5B%5D%40@[2001:db8:a1b:12f9::1]:81/db"},
+            {"u", "p:/[]@", #httpdb{url = "http://[2001:db8:a1b:12f9::1]:81/db"}}
+        },
+        {
             #httpdb{url = "http://u:p@x.y/db/other?query=Z&query=w"},
             {"u", "p", #httpdb{url = "http://x.y/db/other?query=Z&query=w"}}
+        },
+        {
+            #httpdb{url = "http://u:p%3F@x.y/db/other?query=Z&query=w"},
+            {"u", "p?", #httpdb{url = "http://x.y/db/other?query=Z&query=w"}}
         },
         {
             #httpdb{
@@ -607,6 +654,24 @@ extract_creds_success_test_() ->
                 ]
             },
             {"u", "p", #httpdb{url = "http://h/db"}}
+        },
+        {
+            #httpdb{
+                url = "http://h/db",
+                headers = DefaultHeaders ++ [
+                    {"Authorization", "Basic " ++ b64creds("u", "p@")}
+                ]
+            },
+            {"u", "p@", #httpdb{url = "http://h/db"}}
+        },
+        {
+            #httpdb{
+                url = "http://h/db",
+                headers = DefaultHeaders ++ [
+                    {"Authorization", "Basic " ++ b64creds("u", "p@%40")}
+                ]
+            },
+            {"u", "p@%40", #httpdb{url = "http://h/db"}}
         },
         {
             #httpdb{

@@ -26,10 +26,10 @@ fdb_tx_options_test_() ->
         setup,
         fun() ->
             meck:new(erlfdb, [passthrough]),
-            % erlfdb, rexi and mem3 are all dependent apps for fabric. We make
+            % erlfdb, ctrace are all dependent apps for fabric. We make
             % sure to start them so when fabric is started during the test it
             % already has its dependencies
-            test_util:start_couch([erlfdb, rexi, mem3, ctrace, fabric])
+            test_util:start_couch([erlfdb, ctrace, fabric])
         end,
         fun(Ctx) ->
             meck:unload(),
@@ -43,7 +43,9 @@ fdb_tx_options_test_() ->
         end,
         with([
             ?TDEF(options_take_effect, 15),
-            ?TDEF(can_configure_options_at_runtime, 15)
+            ?TDEF(can_configure_options_at_runtime, 15),
+            ?TDEF(can_apply_options_to_db_name_transactions),
+            ?TDEF(can_apply_options_to_db_handle_transactions)
         ])
     }.
 
@@ -61,7 +63,7 @@ options_take_effect(_) ->
 
     DbName = ?tempdb(),
     {ok, Db} = fabric2_db:create(DbName, [?ADMIN_CTX]),
-    ?assertError({erlfdb_error, ?TRANSACTION_TOO_LARGE},
+    ?assertError({erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
         add_large_doc(Db, 200000)),
     ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
 
@@ -79,14 +81,20 @@ can_configure_options_at_runtime(_) ->
     DbName = ?tempdb(),
 
     {ok, Db} = fabric2_db:create(DbName, [?ADMIN_CTX]),
-    ?assertError({erlfdb_error, ?TRANSACTION_TOO_LARGE},
+    ?assertError({erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
         add_large_doc(Db, 200000)),
 
     meck:reset(erlfdb),
 
+    % Wait until after fabric2_server has updated the new fdb handle
+    OldDbHandle = get(?PDICT_DB_KEY),
     config:delete("fdb_tx_options", "size_limit", false),
-    % Assert that we get a new handle and are setting our default values
-    meck:wait(erlfdb, set_option, ['_', timeout, '_'], 4000),
+    test_util:wait(fun() ->
+        case application:get_env(fabric, db) of
+            {ok, OldDbHandle} -> wait;
+            {ok, _} -> ok
+        end
+    end),
     erase(?PDICT_DB_KEY),
 
     {ok, Db1} = fabric2_db:open(DbName, [?ADMIN_CTX]),
@@ -95,9 +103,40 @@ can_configure_options_at_runtime(_) ->
     ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
 
 
+can_apply_options_to_db_name_transactions(_) ->
+    DbName = ?tempdb(),
+
+    TxFun = fun(TxDb) ->
+        #{tx := Tx} = TxDb,
+        fabric2_fdb:create(TxDb, [?ADMIN_CTX]),
+        erlfdb:wait(erlfdb:get(Tx, <<16#FF, "/primaryDatacenter">>))
+    end,
+    TxOpts = #{read_system_keys => <<>>},
+    ?assertEqual(<<>>, fabric2_fdb:transactional(DbName, TxOpts, TxFun)),
+
+    ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
+
+
+can_apply_options_to_db_handle_transactions(_) ->
+    DbName = ?tempdb(),
+    {ok, Db} = fabric2_db:create(DbName, [?ADMIN_CTX]),
+
+    TxFun = fun(TxDb) ->
+        fabric2_db:update_doc(TxDb, large_doc(200000))
+    end,
+    TxOpts = #{size_limit => 150000},
+    ?assertError({erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
+        fabric2_fdb:transactional(Db, TxOpts, TxFun)),
+
+    ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
+
+
 add_large_doc(Db, Size) ->
-    Doc = #doc{
+    fabric2_db:update_doc(Db, large_doc(Size)).
+
+
+large_doc(Size) ->
+    #doc{
         id = fabric2_util:uuid(),
         body = {[{<<"x">>, crypto:strong_rand_bytes(Size)}]}
-    },
-    fabric2_db:update_doc(Db, Doc).
+    }.

@@ -22,6 +22,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_js_functions.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(CACHE, chttpd_auth_cache_lru).
 -define(RELISTEN_DELAY, 5000).
@@ -74,6 +75,7 @@ get_from_cache(UserName) ->
     try ets_lru:lookup_d(?CACHE, UserName) of
         {ok, Props} ->
             couch_stats:increment_counter([couchdb, auth_cache_hits]),
+            ?LOG_DEBUG(#{what => cache_hit, user => UserName}),
             couch_log:debug("cache hit for ~s", [UserName]),
             Props;
         _ ->
@@ -96,6 +98,7 @@ maybe_increment_auth_cache_miss(UserName) ->
     case lists:keymember(?b2l(UserName), 1, Admins) of
         false ->
             couch_stats:increment_counter([couchdb, auth_cache_misses]),
+            ?LOG_DEBUG(#{what => cache_miss, user => UserName}),
             couch_log:debug("cache miss for ~s", [UserName]);
         _True ->
             ok
@@ -137,9 +140,18 @@ handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
         {seq, EndSeq} ->
             EndSeq;
     {database_does_not_exist, _} ->
+            ?LOG_NOTICE(#{
+                what => changes_listener_died,
+                reason => database_does_not_exist,
+                details => "create the _users database to silence this notice"
+            }),
             couch_log:notice("~p changes listener died because the _users database does not exist. Create the database to silence this notice.", [?MODULE]),
             0;
         _ ->
+            ?LOG_NOTICE(#{
+                what => changes_listener_died,
+                reason => Reason
+            }),
             couch_log:notice("~p changes listener died ~r", [?MODULE, Reason]),
             0
     end,
@@ -192,6 +204,7 @@ changes_callback({change, {Change}}, _) ->
             ok;
         DocId ->
             UserName = username(DocId),
+            ?LOG_DEBUG(#{what => invalidate_cache, user => UserName}),
             couch_log:debug("Invalidating cached credentials for ~s", [UserName]),
             ets_lru:remove(?CACHE, UserName)
     end,
@@ -221,6 +234,10 @@ load_user_from_db(UserName) ->
         {Props} = couch_doc:to_json_obj(Doc, []),
         Props;
     _Else ->
+        ?LOG_DEBUG(#{
+            what => missing_user_document,
+            user => UserName
+        }),
         couch_log:debug("no record of user ~s", [UserName]),
         nil
     catch error:database_does_not_exist ->
@@ -267,6 +284,12 @@ ensure_auth_ddoc_exists(Db, DDocId) ->
                 update_doc_ignoring_conflict(Db, NewDoc)
         end;
     {error, Reason} ->
+        ?LOG_NOTICE(#{
+            what => ensure_auth_ddoc_exists_failure,
+            db => dbname(),
+            docid => DDocId,
+            details => Reason
+        }),
         couch_log:notice("Failed to ensure auth ddoc ~s/~s exists for reason: ~p", [dbname(), DDocId, Reason]),
         ok
     end,

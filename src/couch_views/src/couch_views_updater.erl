@@ -17,7 +17,8 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 % If the doc revision doesn't not match the NewRevId passed here we can ignore
 % the document since it is then a conflict document and it doesn't need
@@ -31,14 +32,27 @@ index(Db, #doc{id = Id, revs = Revs} = Doc, _NewWinner, _OldWinner, NewRevId,
             index_int(Db, Doc, Seq)
         end
     catch
-        error:{erlfdb_error, ErrCode} when is_integer(ErrCode) ->
-            Stack = erlang:get_stacktrace(),
+        error:{erlfdb_error, ErrCode}:Stack when is_integer(ErrCode) ->
             DbName = fabric2_db:name(Db),
+            ?LOG_ERROR(#{
+                what => mango_index_update,
+                status => erlfdb_error,
+                details => ErrCode,
+                db => DbName,
+                docid => Id
+            }),
             couch_log:error("Mango index erlfdb error Db ~s Doc ~p ~p",
                 [DbName, Id, ErrCode]),
             erlang:raise(error, {erlfdb_error, ErrCode}, Stack);
         Error:Reason ->
             DbName = fabric2_db:name(Db),
+            ?LOG_ERROR(#{
+                what => mango_index_update,
+                status => Error,
+                details => Reason,
+                db => DbName,
+                docid => Id
+            }),
             couch_log:error("Mango index error for Db ~s Doc ~p ~p ~p",
                 [DbName, Id, Error, Reason])
     end.
@@ -52,7 +66,7 @@ index_int(Db, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>,
 
     case couch_views_ddoc:is_interactive(DDoc) of
         true ->
-            {ok, Mrst} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
+            {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
             case couch_views_fdb:get_creation_vs(Db, Mrst) of
                 not_found ->
                     couch_views_fdb:new_interactive_index(Db, Mrst, Seq),
@@ -87,7 +101,7 @@ write_doc(Db, #doc{deleted = Deleted} = Doc) ->
     },
 
     lists:foreach(fun(DDoc) ->
-        {ok, Mrst0} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
+        {ok, Mrst0} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
         Mrst1 = couch_views_trees:open(Db, Mrst0),
 
         case should_index_doc(Doc, Mrst1) of

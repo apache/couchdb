@@ -72,7 +72,7 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=folsom,meck,mochiweb,triq,proper,snappy,bcrypt,hyper
+skip_deps=folsom,meck,mochiweb,proper,bcrypt,hyper,local
 suites=
 tests=
 
@@ -152,7 +152,7 @@ check-all-tests: all python-black
 	@$(MAKE) elixir
 
 ifdef apps
-subdirs = $(apps)
+subdirs=$(shell echo $(apps) | sed 's/,/ /g')
 else
 subdirs=$(shell ls src)
 endif
@@ -160,10 +160,10 @@ endif
 .PHONY: check
 check:  all
 	@$(MAKE) emilio
-	make eunit apps=couch_eval,couch_expiring_cache,ctrace,couch_jobs,couch_views,fabric,mango,chttpd,couch_replicator
-	make elixir tests=test/elixir/test/basics_test.exs,test/elixir/test/replication_test.exs,test/elixir/test/map_test.exs,test/elixir/test/all_docs_test.exs,test/elixir/test/bulk_docs_test.exs
-	make exunit apps=chttpd
-	make mango-test
+	@$(MAKE) eunit
+	@$(MAKE) elixir-suite
+	@$(MAKE) exunit
+	@$(MAKE) mango-test
 
 .PHONY: eunit
 # target: eunit - Run EUnit tests, use EUNIT_OPTS to provide custom options
@@ -270,6 +270,17 @@ elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devc
 	@dev/run -n 3 -q -a adm:pass \
 		--degrade-cluster 1 \
 		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
+
+.PHONY: elixir-suite
+elixir-suite: export MIX_ENV=integration
+elixir-suite: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+elixir-suite: elixir-init elixir-check-formatted elixir-credo devclean
+	@dev/run -n 1 -q -a adm:pass \
+		--enable-erlang-views \
+		--no-join \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--erlang-config rel/files/eunit.config \
+		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir'
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted: elixir-init
@@ -438,7 +449,7 @@ clean:
 	@rm -rf src/mango/.venv
 	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
-	@rm -f dev/boot_node.beam dev/pbkdf2.pyc log/crash.log
+	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
 
 
 .PHONY: distclean
@@ -485,7 +496,7 @@ endif
 share/www:
 ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
-	@cd src/fauxton && npm install --production && ./node_modules/grunt-cli/bin/grunt couchdb
+	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
 
 

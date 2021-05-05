@@ -128,7 +128,6 @@
     %% wait_for_compaction/2,
 
     dbname_suffix/1,
-    normalize_dbname/1,
     validate_dbname/1,
 
     %% make_doc/5,
@@ -140,6 +139,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include("fabric2.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 % Default max database name length is based on CouchDb < 4.x compatibility. See
@@ -173,7 +173,7 @@
 create(DbName, Options) ->
     case validate_dbname(DbName) of
         ok ->
-            Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
+            Result = fabric2_fdb:transactional(DbName, fun(TxDb) ->
                 case fabric2_fdb:exists(TxDb) of
                     true ->
                         {error, file_exists};
@@ -205,7 +205,7 @@ open(DbName, Options) ->
             Db2 = maybe_set_interactive(Db1, Options),
             {ok, require_member_check(Db2)};
         undefined ->
-            Result = fabric2_fdb:transactional(DbName, Options, fun(TxDb) ->
+            Result = fabric2_fdb:transactional(DbName, fun(TxDb) ->
                 fabric2_fdb:open(TxDb, Options)
             end),
             % Cache outside the transaction retry loop
@@ -227,7 +227,7 @@ delete(DbName, Options) ->
     Options1 = lists:keystore(user_ctx, 1, Options, ?ADMIN_CTX),
     case lists:keyfind(deleted_at, 1, Options1) of
         {deleted_at, TimeStamp} ->
-            fabric2_fdb:transactional(DbName, Options1, fun(TxDb) ->
+            fabric2_fdb:transactional(DbName, fun(TxDb) ->
                 fabric2_fdb:remove_deleted_db(TxDb, TimeStamp)
             end);
         false ->
@@ -245,7 +245,7 @@ delete(DbName, Options) ->
 undelete(DbName, TgtDbName, TimeStamp, Options) ->
     case validate_dbname(TgtDbName) of
         ok ->
-            Resp = fabric2_fdb:transactional(DbName, Options,
+            Resp = fabric2_fdb:transactional(DbName,
                 fun(TxDb) ->
                     fabric2_fdb:undelete(TxDb, TgtDbName, TimeStamp)
                 end
@@ -276,20 +276,15 @@ list_dbs(UserFun, UserAcc0, Options) ->
     FoldFun = fun
         (DbName, Acc) -> maybe_stop(UserFun({row, [{id, DbName}]}, Acc))
     end,
-    fabric2_fdb:transactional(fun(Tx) ->
-        try
-            UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
-            UserAcc2 = fabric2_fdb:list_dbs(
-                    Tx,
-                    FoldFun,
-                    UserAcc1,
-                    Options
-                ),
-            {ok, maybe_stop(UserFun(complete, UserAcc2))}
-        catch throw:{stop, FinalUserAcc} ->
-            {ok, FinalUserAcc}
-        end
-    end).
+    try
+        UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
+        UserAcc2 = fabric2_fdb:transactional(fun(Tx) ->
+            fabric2_fdb:list_dbs(Tx, FoldFun, UserAcc1, Options)
+        end),
+        {ok, maybe_stop(UserFun(complete, UserAcc2))}
+    catch throw:{stop, FinalUserAcc} ->
+        {ok, FinalUserAcc}
+    end.
 
 
 list_dbs_info() ->
@@ -314,22 +309,22 @@ list_dbs_info(UserFun, UserAcc0, Options) ->
         NewFutureQ = queue:in({DbName, InfoFuture}, FutureQ),
         drain_info_futures(NewFutureQ, Count + 1, UserFun, Acc)
     end,
-    fabric2_fdb:transactional(fun(Tx) ->
-        try
-            UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
-            InitAcc = {queue:new(), 0, UserAcc1},
+    try
+        UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
+        InitAcc = {queue:new(), 0, UserAcc1},
+        UserAcc3 = fabric2_fdb:transactional(fun(Tx) ->
             {FinalFutureQ, _, UserAcc2} = fabric2_fdb:list_dbs_info(
                     Tx,
                     FoldFun,
                     InitAcc,
                     Options
                 ),
-            UserAcc3 = drain_all_info_futures(FinalFutureQ, UserFun, UserAcc2),
-            {ok, maybe_stop(UserFun(complete, UserAcc3))}
-        catch throw:{stop, FinalUserAcc} ->
-            {ok, FinalUserAcc}
-        end
-    end).
+            drain_all_info_futures(FinalFutureQ, UserFun, UserAcc2)
+        end),
+        {ok, maybe_stop(UserFun(complete, UserAcc3))}
+    catch throw:{stop, FinalUserAcc} ->
+        {ok, FinalUserAcc}
+    end.
 
 
 list_deleted_dbs_info() ->
@@ -391,26 +386,22 @@ list_deleted_dbs_info(UserFun, UserAcc0, Options0) ->
         NewFutureQ = queue:in({DbName, TimeStamp, InfoFuture}, FutureQ),
         drain_deleted_info_futures(NewFutureQ, Count + 1, UserFun, Acc)
     end,
-    fabric2_fdb:transactional(fun(Tx) ->
-        try
-            UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
-            InitAcc = {queue:new(), 0, UserAcc1},
+    try
+        UserAcc1 = maybe_stop(UserFun({meta, []}, UserAcc0)),
+        InitAcc = {queue:new(), 0, UserAcc1},
+        UserAcc3 = fabric2_fdb:transactional(fun(Tx) ->
             {FinalFutureQ, _, UserAcc2} = fabric2_fdb:list_deleted_dbs_info(
                     Tx,
                     FoldFun,
                     InitAcc,
                     Options2
                 ),
-            UserAcc3 = drain_all_deleted_info_futures(
-                    FinalFutureQ,
-                    UserFun,
-                    UserAcc2
-                ),
-            {ok, maybe_stop(UserFun(complete, UserAcc3))}
-        catch throw:{stop, FinalUserAcc} ->
-            {ok, FinalUserAcc}
-        end
-    end).
+            drain_all_deleted_info_futures(FinalFutureQ, UserFun, UserAcc2)
+        end),
+        {ok, maybe_stop(UserFun(complete, UserAcc3))}
+    catch throw:{stop, FinalUserAcc} ->
+        {ok, FinalUserAcc}
+    end.
 
 
 is_admin(Db, {SecProps}) when is_list(SecProps) ->
@@ -851,6 +842,7 @@ validate_docid(Id) when is_binary(Id) ->
     _Else -> ok
     end;
 validate_docid(Id) ->
+    ?LOG_DEBUG(#{what => illegal_docid, docid => Id}),
     couch_log:debug("Document id is not a string: ~p", [Id]),
     throw({illegal_docid, <<"Document id must be a string">>}).
 
@@ -1093,14 +1085,18 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
             end,
 
             StartKey = get_since_seq(TxDb, Dir, SinceSeq),
-            EndKey = case Dir of
-                rev -> fabric2_util:seq_zero_vs();
-                _ -> fabric2_util:seq_max_vs()
+            EndKey = case fabric2_util:get_value(end_key, Options) of
+                undefined when Dir == rev ->
+                    fabric2_util:seq_zero_vs();
+                undefined ->
+                    fabric2_util:seq_max_vs();
+                EK when is_binary(EK) ->
+                    fabric2_fdb:seq_to_vs(EK);
+                EK when is_tuple(EK), element(1, EK) == versionstamp ->
+                    EK
             end,
-            FoldOpts = [
-                {start_key, StartKey},
-                {end_key, EndKey}
-            ] ++ RestartTx ++ Options,
+            BaseOpts = [{start_key, StartKey}] ++ RestartTx ++ Options,
+            FoldOpts = lists:keystore(end_key, 1, BaseOpts, {end_key, EndKey}),
 
             {ok, fabric2_fdb:fold_range(TxDb, Prefix, fun({K, V}, Acc) ->
                 {SeqVS} = erlfdb_tuple:unpack(K, Prefix),
@@ -1122,27 +1118,19 @@ fold_changes(Db, SinceSeq, UserFun, UserAcc, Options) ->
 
 
 dbname_suffix(DbName) ->
-    filename:basename(normalize_dbname(DbName)).
-
-
-normalize_dbname(DbName) ->
-    % Remove in the final cleanup. We don't need to handle shards prefix or
-    % remove .couch suffixes anymore. Keep it for now to pass all the existing
-    % tests.
-    couch_db:normalize_dbname(DbName).
+    filename:basename(DbName).
 
 
 validate_dbname(DbName) when is_list(DbName) ->
     validate_dbname(?l2b(DbName));
 
 validate_dbname(DbName) when is_binary(DbName) ->
-    Normalized = normalize_dbname(DbName),
     fabric2_db_plugin:validate_dbname(
-        DbName, Normalized, fun validate_dbname_int/2).
+        DbName, DbName, fun validate_dbname_int/2).
 
-validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
+validate_dbname_int(DbName, DbName) when is_binary(DbName) ->
     case validate_dbname_length(DbName) of
-        ok -> validate_dbname_pat(DbName, Normalized);
+        ok -> validate_dbname_pat(DbName);
         {error, _} = Error -> Error
     end.
 
@@ -1156,13 +1144,12 @@ validate_dbname_length(DbName) ->
     end.
 
 
-validate_dbname_pat(DbName, Normalized) ->
-    DbNoExt = couch_util:drop_dot_couch_ext(DbName),
-    case re:run(DbNoExt, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
+validate_dbname_pat(DbName) ->
+    case re:run(DbName, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
         match ->
             ok;
         nomatch ->
-            case is_system_db_name(Normalized) of
+            case is_system_db_name(DbName) of
                 true -> ok;
                 false -> {error, {illegal_database_name, DbName}}
             end
@@ -2150,7 +2137,7 @@ validate_doc_update(Db, Doc, PrevDoc) ->
 
 validate_ddoc(Db, DDoc) ->
     try
-        ok = couch_index_server:validate(Db, couch_doc:with_ejson_body(DDoc))
+        ok = couch_views_validate:validate_ddoc(Db, DDoc)
     catch
         throw:{invalid_design_doc, Reason} ->
             throw({bad_request, invalid_design_doc, Reason});

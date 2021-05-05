@@ -1,0 +1,9 @@
+#!/usr/bin/env escript
+
+main(_) ->
+    {ok, Server} = reltool:start_server([
+        {config, "../rel/reltool.config"}
+    ]),
+    {ok, Release} = reltool:get_rel(Server, "couchdb"),
+    ok = file:write_file("devnode.rel", io_lib:format("~p.~n", [Release])),
+    ok = systools:make_script("devnode", [local]).

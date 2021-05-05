@@ -35,7 +35,6 @@ providers() ->
 
 services() ->
     [
-        {couch_db, couch_db_plugin},
         {feature_flags, couch_flags}
     ].
 

@@ -7,9 +7,9 @@ everything is connected together. A higher level overview is available in the
 [RFC](https://github.com/apache/couchdb-documentation/pull/581). This
 documention assumes the audience is familiar with that description as well as
 with the [Couch Jobs
-RFC](https://github.com/apache/couchdb-documentation/blob/master/rfcs/007-background-jobs.md)
+RFC](https://github.com/apache/couchdb-documentation/blob/main/rfcs/007-background-jobs.md)
 as well as with the [Node Types
-RFC](https://github.com/apache/couchdb-documentation/blob/master/rfcs/013-node-types.md).
+RFC](https://github.com/apache/couchdb-documentation/blob/main/rfcs/013-node-types.md).
 
 A natural place to start is the top application supervisor:
 `couch_replicator_sup`. The set of children in the supervisor is split into

@@ -30,20 +30,23 @@
 
 -include("couch_views.hrl").
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric2.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 -define(KEY_SIZE_LIMIT, 8000).
 -define(VALUE_SIZE_LIMIT, 64000).
 
+-define(DEFAULT_TX_RETRY_LIMIT, 5).
+
+
 % These are all of the errors that we can fix by using
 % a smaller batch size.
 -define(IS_RECOVERABLE_ERROR(Code), (
-    (Code == 1004) % timed_out
-    orelse (Code == 1007) % transaction_too_old
-    orelse (Code == 1031) % transaction_timed_out
-    orelse (Code == 2101) % transaction_too_large
+    (Code == ?ERLFDB_TIMED_OUT) orelse
+    (Code == ?ERLFDB_TRANSACTION_TOO_OLD) orelse
+    (Code == ?ERLFDB_TRANSACTION_TIMED_OUT) orelse
+    (Code == ?ERLFDB_TRANSACTION_TOO_LARGE)
 )).
 
 
@@ -86,20 +89,30 @@ init() ->
         fail_job(Job, Data, sig_changed, "Design document was modified")
     end,
 
+    DbSeq = fabric2_fdb:transactional(Db, fun(TxDb) ->
+        fabric2_fdb:with_snapshot(TxDb, fun(SSDb) ->
+            fabric2_db:get_update_seq(SSDb)
+        end)
+    end),
+
     State = #{
         tx_db => undefined,
         db_uuid => DbUUID,
-        db_seq => undefined,
+        db_seq => DbSeq,
         view_seq => undefined,
         last_seq => undefined,
         view_vs => undefined,
         job => Job,
         job_data => Data,
+        rows_processed => 0,
         count => 0,
         changes_done => 0,
         doc_acc => [],
         design_opts => Mrst#mrst.design_opts,
-        update_stats => #{}
+        update_stats => #{},
+        tx_retry_limit => tx_retry_limit(),
+        db_read_vsn => ?VIEW_CURRENT_VSN,
+        view_read_vsn => ?VIEW_CURRENT_VSN
     },
 
     try
@@ -109,8 +122,15 @@ init() ->
             ok;
         error:database_does_not_exist ->
             fail_job(Job, Data, db_deleted, "Database was deleted");
-        Error:Reason  ->
-            Stack = erlang:get_stacktrace(),
+        Error:Reason:Stack ->
+            ?LOG_ERROR(#{
+                what => view_update_failure,
+                db => DbName,
+                ddoc => DDocId,
+                tag => Error,
+                details => Reason,
+                stacktrace => Stack
+            }),
             Fmt = "Error building view for ddoc ~s in ~s: ~p:~p ~p",
             couch_log:error(Fmt, [DbName, DDocId, Error, Reason, Stack]),
 
@@ -148,7 +168,7 @@ upgrade_data(Data) ->
 
 
 % Transaction limit exceeded don't retry
-should_retry(_, _, {erlfdb_error, 2101}) ->
+should_retry(_, _, {erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE}) ->
     false;
 
 should_retry(Retries, RetryLimit, _) when Retries < RetryLimit ->
@@ -175,17 +195,19 @@ add_error(Error, Reason, Data) ->
 
 update(#{} = Db, Mrst0, State0) ->
     Limit = couch_views_batch:start(Mrst0),
-    {Mrst1, State1} = try
+    Result = try
         do_update(Db, Mrst0, State0#{limit => Limit})
     catch
         error:{erlfdb_error, Error} when ?IS_RECOVERABLE_ERROR(Error) ->
             couch_views_batch:failure(Mrst0),
             update(Db, Mrst0, State0)
     end,
-    case State1 of
-        finished ->
+    case Result of
+        ok ->
+            ok; % Already finished and released map context
+        {Mrst1, finished} ->
             couch_eval:release_map_context(Mrst1#mrst.qserver);
-        _ ->
+        {Mrst1, State1} ->
             #{
                 update_stats := UpdateStats
             } = State1,
@@ -195,27 +217,27 @@ update(#{} = Db, Mrst0, State0) ->
 
 
 do_update(Db, Mrst0, State0) ->
-    fabric2_fdb:transactional(Db, fun(TxDb) ->
+    TxOpts = #{retry_limit => maps:get(tx_retry_limit, State0)},
+    TxResult = fabric2_fdb:transactional(Db, TxOpts, fun(TxDb) ->
         #{
             tx := Tx
         } = TxDb,
 
+        Snapshot = TxDb#{ tx := erlfdb:snapshot(Tx) },
+
         State1 = get_update_start_state(TxDb, Mrst0, State0),
         Mrst1 = couch_views_trees:open(TxDb, Mrst0),
 
-        {ok, State2} = fold_changes(State1),
+        {ok, State2} = fold_changes(Snapshot, State1),
 
         #{
-            count := Count,
-            limit := Limit,
             doc_acc := DocAcc,
             last_seq := LastSeq,
-            view_vs := ViewVS,
             changes_done := ChangesDone0,
             design_opts := DesignOpts
         } = State2,
 
-        DocAcc1 = fetch_docs(TxDb, DesignOpts, DocAcc),
+        DocAcc1 = fetch_docs(Snapshot, DesignOpts, DocAcc),
 
         {Mrst2, MappedDocs} = map_docs(Mrst0, DocAcc1),
         TotalKVs = write_docs(TxDb, Mrst1, MappedDocs, State2),
@@ -228,16 +250,20 @@ do_update(Db, Mrst0, State0) ->
             total_kvs => TotalKVs
         },
 
-        case Count < Limit of
+        case is_update_finished(State2) of
             true ->
-                maybe_set_build_status(TxDb, Mrst2, ViewVS,
-                    ?INDEX_READY),
-                report_progress(State2#{changes_done := ChangesDone},
-                    finished),
-                {Mrst2, finished};
+                State3 = State2#{changes_done := ChangesDone},
+                % We must call report_progress/2 (which, in turn calls
+                % couch_jobs:update/3) in every transaction where indexing data
+                % is updated, otherwise we risk another indexer taking over and
+                % clobbering the indexing data
+                State4 = report_progress(State3, update),
+                {Mrst2, finished, State4#{
+                    db_read_vsn := erlfdb:wait(erlfdb:get_read_version(Tx))
+                }};
             false ->
                 State3 = report_progress(State2, update),
-                {Mrst2, State3#{
+                {Mrst2, continue, State3#{
                     tx_db := undefined,
                     count := 0,
                     doc_acc := [],
@@ -246,7 +272,52 @@ do_update(Db, Mrst0, State0) ->
                     update_stats := UpdateStats
                 }}
         end
+    end),
+    case TxResult of
+        {Mrst, continue, State} ->
+            {Mrst, State};
+        {Mrst, finished, State} ->
+            do_finalize(Mrst, State),
+            {Mrst, finished}
+    end.
+
+
+do_finalize(Mrst, State) ->
+    #{tx_db := OldDb} = State,
+    ViewReadVsn = erlfdb:get_committed_version(maps:get(tx, OldDb)),
+    fabric2_fdb:transactional(OldDb#{tx := undefined}, fun(TxDb) ->
+        % Use the recent committed version as the read
+        % version. However, if transaction retries due to an error,
+        % let it acquire its own version to avoid spinning
+        % continuously due to conflicts or other errors.
+        case erlfdb:get_last_error() of
+            undefined ->
+                erlfdb:set_read_version(maps:get(tx, TxDb), ViewReadVsn);
+            ErrorCode when is_integer(ErrorCode) ->
+                ok
+        end,
+        State1 = State#{
+            tx_db := TxDb,
+            view_read_vsn := ViewReadVsn
+        },
+        ViewVS = maps:get(view_vs, State1),
+        maybe_set_build_status(TxDb, Mrst, ViewVS, ?INDEX_READY),
+        report_progress(State1, finished)
     end).
+
+
+is_update_finished(State) ->
+    #{
+        db_seq := DbSeq,
+        last_seq := LastSeq,
+        view_vs := ViewVs
+    } = State,
+    AtDbSeq = LastSeq == DbSeq,
+    AtViewVs = case ViewVs of
+        not_found -> false;
+        _ -> LastSeq == fabric2_fdb:vs_to_seq(ViewVs)
+    end,
+    AtDbSeq orelse AtViewVs.
 
 
 maybe_set_build_status(_TxDb, _Mrst1, not_found, _State) ->
@@ -258,7 +329,7 @@ maybe_set_build_status(TxDb, Mrst1, _ViewVS, State) ->
 
 % In the first iteration of update we need
 % to populate our db and view sequences
-get_update_start_state(TxDb, Mrst, #{db_seq := undefined} = State) ->
+get_update_start_state(TxDb, Mrst, #{view_seq := undefined} = State) ->
     #{
         view_vs := ViewVS,
         view_seq := ViewSeq
@@ -266,7 +337,6 @@ get_update_start_state(TxDb, Mrst, #{db_seq := undefined} = State) ->
 
     State#{
         tx_db := TxDb,
-        db_seq := fabric2_db:get_update_seq(TxDb),
         view_vs := ViewVS,
         view_seq := ViewSeq,
         last_seq := ViewSeq
@@ -278,21 +348,39 @@ get_update_start_state(TxDb, _Idx, State) ->
     }.
 
 
-fold_changes(State) ->
+fold_changes(Snapshot, State) ->
     #{
         view_seq := SinceSeq,
-        limit := Limit,
-        tx_db := TxDb
+        db_seq := DbSeq,
+        limit := Limit
     } = State,
 
+    FoldState = State#{
+        rows_processed := 0
+    },
+
     Fun = fun process_changes/2,
-    Opts = [{limit, Limit}, {restart_tx, false}],
-    fabric2_db:fold_changes(TxDb, SinceSeq, Fun, State, Opts).
+    Opts = [
+        {end_key, fabric2_fdb:seq_to_vs(DbSeq)},
+        {limit, Limit},
+        {restart_tx, false}
+    ],
+
+    case fabric2_db:fold_changes(Snapshot, SinceSeq, Fun, FoldState, Opts) of
+        {ok, #{rows_processed := 0} = FinalState} when Limit > 0 ->
+            % If we read zero rows with a non-zero limit
+            % it means we've caught up to the DbSeq as our
+            % last_seq.
+            {ok, FinalState#{last_seq := DbSeq}};
+        Result ->
+            Result
+    end.
 
 
 process_changes(Change, Acc) ->
     #{
         doc_acc := DocAcc,
+        rows_processed := RowsProcessed,
         count := Count,
         design_opts := DesignOpts,
         view_vs := ViewVS
@@ -308,12 +396,14 @@ process_changes(Change, Acc) ->
     Acc1 = case {Id, IncludeDesign} of
         {<<?DESIGN_DOC_PREFIX, _/binary>>, false} ->
             maps:merge(Acc, #{
+                rows_processed => RowsProcessed + 1,
                 count => Count + 1,
                 last_seq => LastSeq
             });
         _ ->
             Acc#{
                 doc_acc := DocAcc ++ [Change],
+                rows_processed := RowsProcessed + 1,
                 count := Count + 1,
                 last_seq := LastSeq
             }
@@ -511,6 +601,12 @@ check_kv_size_limit(Mrst, Doc, KeyLimit, ValLimit) ->
         Doc
     catch throw:{size_error, Type} ->
         #{id := DocId} = Doc,
+        ?LOG_ERROR(#{
+            what => lists:concat(["oversized_", Type]),
+            db => DbName,
+            docid => DocId,
+            index => IdxName
+        }),
         Fmt = "View ~s size error for docid `~s`, excluded from indexing "
             "in db `~s` for design doc `~s`",
         couch_log:error(Fmt, [Type, DocId, DbName, IdxName]),
@@ -538,7 +634,9 @@ report_progress(State, UpdateType) ->
         job_data := JobData,
         last_seq := LastSeq,
         db_seq := DBSeq,
-        changes_done := ChangesDone
+        changes_done := ChangesDone,
+        db_read_vsn := DbReadVsn,
+        view_read_vsn := ViewReadVsn
     } = State,
 
     #{
@@ -566,7 +664,9 @@ report_progress(State, UpdateType) ->
         <<"ddoc_id">> => DDocId,
         <<"sig">> => Sig,
         <<"view_seq">> => LastSeq,
-        <<"retries">> => Retries
+        <<"retries">> => Retries,
+        <<"db_read_vsn">> => DbReadVsn,
+        <<"view_read_vsn">> => ViewReadVsn
     },
     NewData = fabric2_active_tasks:update_active_task_info(NewData0,
         NewActiveTasks),
@@ -577,6 +677,7 @@ report_progress(State, UpdateType) ->
                 {ok, Job2} ->
                     State#{job := Job2};
                 {error, halt} ->
+                    ?LOG_ERROR(#{what => job_halted, job => Job1}),
                     couch_log:error("~s job halted :: ~w", [?MODULE, Job1]),
                     exit(normal)
             end;
@@ -585,6 +686,7 @@ report_progress(State, UpdateType) ->
                 ok ->
                     State;
                 {error, halt} ->
+                    ?LOG_ERROR(#{what => job_halted, job => Job1}),
                     couch_log:error("~s job halted :: ~w", [?MODULE, Job1]),
                     exit(normal)
             end
@@ -607,3 +709,8 @@ key_size_limit() ->
 
 value_size_limit() ->
     config:get_integer("couch_views", "value_size_limit", ?VALUE_SIZE_LIMIT).
+
+
+tx_retry_limit() ->
+    config:get_integer("couch_views", "indexer_tx_retry_limit",
+        ?DEFAULT_TX_RETRY_LIMIT).

@@ -22,7 +22,7 @@
 ]).
 
 
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 
 -record(batch_st, {
@@ -48,7 +48,7 @@ start(Mrst, undefined) ->
         search_incr = get_config(batch_search_increment, "500"),
         sense_incr = get_config(batch_sense_increment, "100"),
         max_tx_size_bytes = get_config(batch_max_tx_size_bytes, "9000000"),
-        max_tx_time_msec = get_config(batch_max_tx_time_msec, "4500"),
+        max_tx_time_msec = get_config(batch_max_tx_time_msec, "1500"),
         threshold_penalty = get_config(
                 batch_threshold_penalty,
                 "0.2",

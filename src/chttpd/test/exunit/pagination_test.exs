@@ -255,7 +255,7 @@ defmodule Couch.Test.Pagination do
       @describetag descending: descending
       setup [:with_session, :random_db, :with_docs]
 
-      test "total_rows matches the length of rows array", ctx do
+      test "total_rows matches the number of docs", ctx do
         resp =
           Couch.Session.get(ctx.session, "/#{ctx.db_name}/_all_docs",
             query: %{descending: ctx.descending}
@@ -263,7 +263,7 @@ defmodule Couch.Test.Pagination do
 
         assert resp.status_code == 200, "got error #{inspect(resp.body)}"
         body = resp.body
-        assert body["total_rows"] == length(body["rows"])
+        assert body["total_rows"] == ctx.n_docs
       end
 
       test "the rows are correctly sorted", ctx do
@@ -371,7 +371,7 @@ defmodule Couch.Test.Pagination do
     @describetag page_size: 4
     setup [:with_session, :random_db, :with_view, :with_docs]
 
-    test "total_rows matches the length of rows array", ctx do
+    test "total_rows matches the number of documents in view", ctx do
       resp =
         Couch.Session.get(
           ctx.session,
@@ -381,7 +381,7 @@ defmodule Couch.Test.Pagination do
 
       assert resp.status_code == 200, "got error #{inspect(resp.body)}"
       body = resp.body
-      assert body["total_rows"] == length(body["rows"])
+      assert body["total_rows"] == ctx.n_docs
     end
   end
 
@@ -593,14 +593,9 @@ defmodule Couch.Test.Pagination do
           assert Map.has_key?(body, "next")
         end
 
-        test "total_rows matches the length of rows array", ctx do
+        test "total_rows matches the number of documents", ctx do
           body = ctx.response
-          assert body["total_rows"] == length(body["rows"])
-        end
-
-        test "total_rows matches the requested page_size", ctx do
-          body = ctx.response
-          assert body["total_rows"] == ctx.page_size
+          assert body["total_rows"] == ctx.n_docs
         end
 
         test "can use 'next' bookmark to get remaining results", ctx do
@@ -613,8 +608,8 @@ defmodule Couch.Test.Pagination do
 
           assert resp.status_code == 200, "got error #{inspect(resp.body)}"
           body = resp.body
-          assert body["total_rows"] == length(body["rows"])
-          assert body["total_rows"] <= ctx.page_size
+          assert body["total_rows"] == ctx.n_docs
+          assert length(body["rows"]) <= ctx.page_size
         end
       end
 
@@ -721,7 +716,7 @@ defmodule Couch.Test.Pagination do
 
         test "final page doesn't include 'next' bookmark", ctx do
           assert not Map.has_key?(ctx.response, "next")
-          assert ctx.response["total_rows"] == rem(ctx.n_docs, ctx.page_size)
+          assert length(ctx.response["rows"]) == rem(ctx.n_docs, ctx.page_size)
         end
 
         test "each but last page has page_size rows", ctx do
@@ -768,14 +763,9 @@ defmodule Couch.Test.Pagination do
         assert not Map.has_key?(body, "next")
       end
 
-      test "total_rows matches the length of rows array", ctx do
+      test "total_rows matches the number of documents", ctx do
         body = ctx.response
-        assert body["total_rows"] == length(body["rows"])
-      end
-
-      test "total_rows less than the requested page_size", ctx do
-        body = ctx.response
-        assert body["total_rows"] <= ctx.page_size
+        assert body["total_rows"] == ctx.n_docs
       end
     end
   end
@@ -950,7 +940,7 @@ defmodule Couch.Test.Pagination do
           assert not Map.has_key?(resp.body, "previous")
         end
 
-        test "total_rows matches the length of rows array", ctx do
+        test "total_rows matches the number of documents in view", ctx do
           resp =
             Couch.Session.get(
               ctx.session,
@@ -960,19 +950,7 @@ defmodule Couch.Test.Pagination do
 
           assert resp.status_code == 200, "got error #{inspect(resp.body)}"
           body = resp.body
-          assert body["total_rows"] == length(body["rows"])
-        end
-
-        test "total_rows matches the requested page_size", ctx do
-          resp =
-            Couch.Session.get(
-              ctx.session,
-              "/#{ctx.db_name}/_design/#{ctx.ddoc_id}/_view/#{ctx.view_name}",
-              query: %{page_size: ctx.page_size, descending: ctx.descending}
-            )
-
-          assert resp.status_code == 200, "got error #{inspect(resp.body)}"
-          assert resp.body["total_rows"] == ctx.page_size
+          assert body["total_rows"] == ctx.n_docs
         end
 
         test "can use 'next' bookmark to get remaining results", ctx do
@@ -994,8 +972,8 @@ defmodule Couch.Test.Pagination do
 
           assert resp.status_code == 200, "got error #{inspect(resp.body)}"
           body = resp.body
-          assert body["total_rows"] == length(body["rows"])
-          assert body["total_rows"] <= ctx.page_size
+          assert body["total_rows"] == ctx.n_docs
+          assert length(body["rows"]) <= ctx.page_size
         end
 
         test "can use 'previous' bookmark", ctx do
@@ -1065,7 +1043,7 @@ defmodule Couch.Test.Pagination do
 
         assert resp.status_code == 200, "got error #{inspect(resp.body)}"
         body = resp.body
-        assert body["total_rows"] == length(body["rows"])
+        assert body["total_rows"] == ctx.n_docs
       end
 
       test "total_rows less than the requested page_size", ctx do
@@ -1077,7 +1055,7 @@ defmodule Couch.Test.Pagination do
           )
 
         assert resp.status_code == 200, "got error #{inspect(resp.body)}"
-        assert resp.body["total_rows"] <= ctx.page_size
+        assert length(resp.body["rows"]) <= ctx.page_size
       end
     end
   end

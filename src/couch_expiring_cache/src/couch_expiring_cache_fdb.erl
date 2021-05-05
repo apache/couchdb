@@ -27,6 +27,7 @@
 
 -include_lib("fabric/include/fabric2.hrl").
 -include_lib("couch_expiring_cache/include/couch_expiring_cache.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 % Data model
@@ -37,11 +38,12 @@
 
 
 -spec insert(JTx :: jtx(), Name :: binary(), Key :: binary(), Value :: binary(),
-    StaleTS :: ?TIME_UNIT, ExpiresTS :: ?TIME_UNIT) -> ok.
+    StaleTS :: millisecond(), ExpiresTS :: millisecond()) -> ok.
 insert(#{jtx := true} = JTx, Name, Key, Val, StaleTS, ExpiresTS) ->
     #{tx := Tx, layer_prefix := LayerPrefix} = couch_jobs_fdb:get_jtx(JTx),
     PK = primary_key(Name, Key, LayerPrefix),
-    case get_val(Tx, PK) of
+    % Use snapshot here to minimize conflicts on parallel inserts
+    case get_val(erlfdb:snapshot(Tx), PK) of
         not_found ->
             ok;
         {_OldVal, _OldStaleTS, OldExpiresTS} ->
@@ -86,7 +88,7 @@ clear_all(Name) ->
     end).
 
 
--spec clear_range_to(Name :: binary(), EndTS :: ?TIME_UNIT,
+-spec clear_range_to(Name :: binary(), EndTS :: millisecond(),
     Limit :: non_neg_integer()) ->
         OldestTS :: ?TIME_UNIT.
 clear_range_to(Name, EndTS, Limit) when Limit > 0 ->
@@ -98,7 +100,7 @@ clear_range_to(Name, EndTS, Limit) when Limit > 0 ->
         end, 0).
 
 
--spec get_range_to(Name :: binary(), EndTS :: ?TIME_UNIT,
+-spec get_range_to(Name :: binary(), EndTS :: millisecond(),
     Limit :: non_neg_integer()) ->
         [{Key :: binary(), Val :: binary()}].
 get_range_to(Name, EndTS, Limit) when Limit > 0 ->
@@ -106,6 +108,7 @@ get_range_to(Name, EndTS, Limit) when Limit > 0 ->
         fun(Tx, PK, _XK, Key, _ExpiresTS, Acc) ->
             case get_val(Tx, PK) of
                 not_found ->
+                    ?LOG_ERROR(#{what => missing_key, key => Key}),
                     couch_log:error("~p:entry missing Key: ~p", [?MODULE, Key]),
                     Acc;
                 Val ->

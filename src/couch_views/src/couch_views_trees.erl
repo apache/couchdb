@@ -32,7 +32,6 @@
 
 
 -include("couch_views.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 
 
@@ -144,15 +143,8 @@ fold_red_idx(TxDb, View, Idx, Options, Callback, Acc0) ->
         Callback(GroupKey, RedValue, WAcc)
     end,
 
-    case {GroupKeyFun, Dir} of
-        {group_all, fwd} ->
-            EBtreeOpts = [
-                {dir, fwd},
-                {inclusive_end, InclusiveEnd}
-            ],
-            Reduction = ebtree:reduce(Tx, Btree, StartKey, EndKey, EBtreeOpts),
-            Wrapper({null, Reduction}, Acc0);
-        {F, fwd} when is_function(F) ->
+    case Dir of
+        fwd ->
             EBtreeOpts = [
                 {dir, fwd},
                 {inclusive_end, InclusiveEnd}
@@ -167,16 +159,7 @@ fold_red_idx(TxDb, View, Idx, Options, Callback, Acc0) ->
                     Acc0,
                     EBtreeOpts
                 );
-        {group_all, rev} ->
-            % Start/End keys swapped on purpose because ebtree. Also
-            % inclusive_start for same reason.
-            EBtreeOpts = [
-                {dir, rev},
-                {inclusive_start, InclusiveEnd}
-            ],
-            Reduction = ebtree:reduce(Tx, Btree, EndKey, StartKey, EBtreeOpts),
-            Wrapper({null, Reduction}, Acc0);
-        {F, rev} when is_function(F) ->
+        rev ->
             % Start/End keys swapped on purpose because ebtree. Also
             % inclusive_start for same reason.
             EBtreeOpts = [
@@ -245,7 +228,7 @@ open_id_tree(TxDb, Sig) ->
     Prefix = id_tree_prefix(DbPrefix, Sig),
     TreeOpts = [
         {persist_fun, fun couch_views_fdb:persist_chunks/3},
-        {cache_fun, create_cache_fun(id_tree)}
+        {encode_fun, create_encode_fun(TxDb)}
     ],
     ebtree:open(Tx, Prefix, get_order(id_btree), TreeOpts).
 
@@ -261,7 +244,8 @@ open_view_tree(TxDb, Sig, Lang, View, Options) ->
     Prefix = view_tree_prefix(DbPrefix, Sig, ViewId),
     BaseOpts = [
         {collate_fun, couch_views_util:collate_fun(View)},
-        {persist_fun, fun couch_views_fdb:persist_chunks/3}
+        {persist_fun, fun couch_views_fdb:persist_chunks/3},
+        {encode_fun, create_encode_fun(TxDb)}
     ],
     ExtraOpts = case lists:keyfind(read_only, 1, Options) of
         {read_only, Idx} ->
@@ -269,8 +253,7 @@ open_view_tree(TxDb, Sig, Lang, View, Options) ->
             [{reduce_fun, RedFun}];
         false ->
             [
-                {reduce_fun, make_reduce_fun(Lang, View)},
-                {cache_fun, create_cache_fun({view, ViewId})}
+                {reduce_fun, make_reduce_fun(Lang, View)}
             ]
     end,
     TreeOpts = BaseOpts ++ ExtraOpts,
@@ -295,9 +278,6 @@ min_order(V) ->
 
 make_read_only_reduce_fun(Lang, View, NthRed) ->
     RedFuns = [Src || {_, Src} <- View#mrview.reduce_funs],
-    if RedFuns /= [] -> ok; true ->
-        io:format(standard_error, "~p~n", [process_info(self(), current_stacktrace)])
-    end,
     LPad = lists:duplicate(NthRed - 1, []),
     RPad = lists:duplicate(length(RedFuns) - NthRed, []),
     FunSrc = lists:nth(NthRed, RedFuns),
@@ -323,7 +303,7 @@ make_read_only_reduce_fun(Lang, View, NthRed) ->
 
 
 make_reduce_fun(Lang, #mrview{} = View) ->
-    RedFuns = [Src || {_, Src} <- View#mrview.reduce_funs],
+    RedFuns = [Src || {_, Src} <- View#mrview.reduce_funs, Src /= disabled],
     fun
         (KVs0, _ReReduce = false) ->
             KVs1 = expand_dupes(KVs0),
@@ -350,27 +330,14 @@ make_reduce_fun(Lang, #mrview{} = View) ->
     end.
 
 
-create_cache_fun(TreeId) ->
-    CacheTid = case get(TreeId) of
-        undefined ->
-            Tid = ets:new(?MODULE, [protected, set]),
-            put(TreeId, {ebtree_cache, Tid}),
-            Tid;
-        {ebtree_cache, Tid} ->
-            Tid
-    end,
+create_encode_fun(TxDb) ->
     fun
-        (set, [Id, Node]) ->
-            true = ets:insert_new(CacheTid, {Id, Node}),
-            ok;
-        (clear, Id) ->
-            ets:delete(CacheTid, Id),
-            ok;
-        (get, Id) ->
-            case ets:lookup(CacheTid, Id) of
-                [{Id, Node}] -> Node;
-                [] -> undefined
-            end
+        (encode, Key, Term) ->
+            Bin = term_to_binary(Term, [compressed, {minor_version, 2}]),
+            aegis:encrypt(TxDb, Key, Bin);
+        (decode, Key, Ciphertext) ->
+            Bin = aegis:decrypt(TxDb, Key, Ciphertext),
+            binary_to_term(Bin, [safe])
     end.
 
 
@@ -404,8 +371,9 @@ to_red_opts(Options) ->
     {Dir, StartKey, EndKey, InclusiveEnd} = to_map_opts(Options),
 
     GroupKeyFun = case lists:keyfind(group_key_fun, 1, Options) of
+        {group_key_fun, group_all} -> fun({_Key, _DocId}) -> null end;
         {group_key_fun, GKF} -> GKF;
-        false -> fun({_Key, _DocId}) -> global_group end
+        false -> fun({_Key, _DocId}) -> null end
     end,
 
     {Dir, StartKey, EndKey, InclusiveEnd, GroupKeyFun}.

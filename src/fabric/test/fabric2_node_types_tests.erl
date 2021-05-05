@@ -25,10 +25,10 @@ node_types_test_() ->
             os:putenv("COUCHDB_NODE_TYPE_FOO", "false"),
             os:putenv("COUCHDB_NODE_TYPE_BAZ", "true"),
             os:putenv("COUCHDB_NODE_TYPE_ZIG", ""),
-            % erlfdb, rexi and mem3 are all dependent apps for fabric. We make
+            % erlfdb, ctrace are all dependent apps for fabric. We make
             % sure to start them so when fabric is started during the test it
             % already has its dependencies
-            test_util:start_couch([erlfdb, rexi, mem3, ctrace, fabric])
+            test_util:start_couch([erlfdb, ctrace, fabric])
         end,
         fun(Ctx) ->
             test_util:stop_couch(Ctx),

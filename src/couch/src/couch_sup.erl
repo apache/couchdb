@@ -25,6 +25,7 @@
 
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 start_link() ->
@@ -93,6 +94,11 @@ assert_admins() ->
     couch_log:info("Preflight check: Asserting Admin Account~n", []),
     case {config:get("admins"), os:getenv("COUCHDB_TEST_ADMIN_PARTY_OVERRIDE")} of
         {[], false} ->
+            ?LOG_INFO(#{
+                what => admin_account_missing,
+                details => "No admin account found, aborting startup. Please configure "
+                    "an admin account in your local.ini file."
+            }),
             couch_log:info("~n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%~n"
                           ++ "  No Admin Account Found, aborting startup.                  ~n"
                           ++ "  Please configure an admin account in your local.ini file.  ~n"
@@ -104,6 +110,11 @@ assert_admins() ->
     end.
 
 send_no_admin_account_error_message() ->
+    ?LOG_ERROR(#{
+        what => admin_account_missing,
+        details => "No admin account configured. Please configure an admin "
+            "account in your local.ini file and restart CouchDB."
+    }),
     couch_log:error("No Admin Account configured."
         ++ " Please configure an Admin Account in your local.ini file and restart CouchDB.~n", []),
     FiveMinutes = 5 * 1000 * 60,
@@ -118,21 +129,37 @@ maybe_launch_admin_annoyance_reporter() ->
 
 
 notify_starting() ->
+    ?LOG_INFO(#{
+        what => starting_couchdb,
+        version => couch_server:get_version()
+    }),
     couch_log:info("Apache CouchDB ~s is starting.~n", [
         couch_server:get_version()
     ]).
 
 
 notify_started() ->
+    ?LOG_INFO(#{
+        what => starting_couchdb_complete,
+        time_to_relax => true
+    }),
     couch_log:info("Apache CouchDB has started. Time to relax.~n", []).
 
 
 notify_error(Error) ->
+    ?LOG_ERROR(#{
+        what => error_on_startup,
+        details => Error
+    }),
     couch_log:error("Error starting Apache CouchDB:~n~n    ~p~n~n", [Error]).
 
 
 notify_uris() ->
     lists:foreach(fun(Uri) ->
+        ?LOG_INFO(#{
+            what => couchdb_listener_started,
+            uri => Uri
+        }),
         couch_log:info("Apache CouchDB has started on ~s", [Uri])
     end, get_uris()).
 
@@ -193,7 +220,12 @@ write_file(FileName, Contents) ->
         ok ->
             ok;
         {error, Reason} ->
+            ?LOG_ERROR(#{
+                what => file_write_failure,
+                filename => FileName,
+                error => file:format_error(Reason)
+            }),
             Args = [FileName, file:format_error(Reason)],
-            couch_log:error("Failed ot write ~s :: ~s", Args),
+            couch_log:error("Failed to write ~s :: ~s", Args),
             throw({error, Reason})
     end.

@@ -35,6 +35,7 @@
 -include("mango.hrl").
 -include("mango_idx.hrl").
 -include("mango_idx_view.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 validate_new(#idx{}=Idx, _Db) ->
@@ -254,6 +255,12 @@ validate_ddoc(VProps) ->
         Opts = lists:keydelete(<<"sort">>, 1, Opts0),
         {Def, Opts}
     catch Error:Reason ->
+        ?LOG_ERROR(#{
+            what => invalid_index_definition,
+            tag => Error,
+            details => Reason,
+            index => VProps
+        }),
         couch_log:error("Invalid Index Def ~p. Error: ~p, Reason: ~p",
             [VProps, Error, Reason]),
         invalid_view

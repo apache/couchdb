@@ -22,6 +22,32 @@
 -define(DOC_COUNT, 25).
 
 
+next_vs_function_with_txid_test() ->
+    Cases = [
+        {{0, 0, 1}, {0, 0, 0}},
+        {{0, 0, 2}, {0, 0, 1}},
+        {{0, 1, 0}, {0, 0, 16#FFFF}},
+        {{0, 2, 0}, {0, 1, 16#FFFF}},
+        {{1, 0, 0}, {0, 16#FFFF, 16#FFFF}},
+        {{2, 0, 0}, {1, 16#FFFF, 16#FFFF}}
+    ],
+    Next = fun({V, B, T}) -> fabric2_fdb:next_vs({versionstamp, V, B, T}) end,
+    [?assertEqual({versionstamp, RV, RB, RT}, Next({V, B, T})) ||
+        {{RV, RB, RT}, {V, B, T}} <- Cases].
+
+
+next_vs_function_without_txid_test() ->
+    Cases = [
+        {{0, 1}, {0, 0}},
+        {{0, 2}, {0, 1}},
+        {{1, 0}, {0, 16#FFFF}},
+        {{2, 0}, {1, 16#FFFF}}
+    ],
+    Next = fun({V, B}) -> fabric2_fdb:next_vs({versionstamp, V, B}) end,
+    [?assertEqual({versionstamp, RV, RB}, Next({V, B})) ||
+        {{RV, RB}, {V, B}} <- Cases].
+
+
 changes_fold_test_() ->
     {
         "Test changes fold operations",
@@ -40,6 +66,7 @@ changes_fold_test_() ->
                     ?TDEF_FE(fold_changes_basic_rev),
                     ?TDEF_FE(fold_changes_since_now_rev),
                     ?TDEF_FE(fold_changes_since_seq_rev),
+                    ?TDEF_FE(fold_changes_with_end_key),
                     ?TDEF_FE(fold_changes_basic_tx_too_old),
                     ?TDEF_FE(fold_changes_reverse_tx_too_old),
                     ?TDEF_FE(fold_changes_tx_too_old_with_single_row_emits),
@@ -54,6 +81,7 @@ changes_fold_test_() ->
 setup_all() ->
     Ctx = test_util:start_couch([fabric]),
     meck:new(erlfdb, [passthrough]),
+    meck:new(fabric2_server, [passthrough]),
     Ctx.
 
 
@@ -64,6 +92,7 @@ teardown_all(Ctx) ->
 
 setup() ->
     fabric2_test_util:tx_too_old_mock_erlfdb(),
+    meck:expect(fabric2_server, get_retry_limit, 0, 3),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     Rows = lists:map(fun(Val) ->
         DocId = fabric2_util:uuid(),
@@ -84,6 +113,8 @@ setup() ->
 
 
 cleanup({Db, _DocIdRevs}) ->
+    meck:reset(fabric2_server),
+    meck:expect(fabric2_server, get_retry_limit, 0, meck:passthrough()),
     fabric2_test_util:tx_too_old_reset_errors(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
@@ -122,6 +153,16 @@ fold_changes_since_seq_rev({Db, DocRows}) ->
     ?assertEqual(DocRows, changes(Db, Since, Opts)),
     RestRows = lists:sublist(DocRows, length(DocRows) - 1),
     fold_changes_since_seq_rev({Db, RestRows}).
+
+
+fold_changes_with_end_key({Db, DocRows}) ->
+    lists:foldl(fun(DocRow, Acc) ->
+        EndSeq = maps:get(sequence, DocRow),
+        Changes = changes(Db, 0, [{end_key, EndSeq}]),
+        NewAcc = [DocRow | Acc],
+        ?assertEqual(Changes, NewAcc),
+        NewAcc
+    end, [], DocRows).
 
 
 fold_changes_basic_tx_too_old({Db, DocRows0}) ->

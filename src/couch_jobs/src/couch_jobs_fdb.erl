@@ -33,8 +33,8 @@
 
     get_activity_vs/2,
     get_activity_vs_and_watch/2,
-    get_active_since/3,
-    get_inactive_since/3,
+    get_active_since/4,
+    get_inactive_since/4,
     re_enqueue_inactive/3,
 
     init_cache/0,
@@ -356,26 +356,26 @@ get_activity_vs_and_watch(#{jtx := true} = JTx, Type) ->
     end.
 
 
-get_active_since(#{jtx := true} = JTx, Type, Versionstamp) ->
+get_active_since(#{jtx := true} = JTx, Type, Versionstamp, Opts) ->
     #{tx := Tx, jobs_path := Jobs} = get_jtx(JTx),
     Prefix = erlfdb_tuple:pack({?ACTIVITY}, Jobs),
     StartKey = erlfdb_tuple:pack({Type, Versionstamp}, Prefix),
     StartKeySel = erlfdb_key:first_greater_or_equal(StartKey),
     {_, EndKey} = erlfdb_tuple:range({Type}, Prefix),
-    Opts = [{streaming_mode, want_all}],
     Future = erlfdb:get_range(Tx, StartKeySel, EndKey, Opts),
-    maps:from_list(lists:map(fun({_K, V}) ->
-        erlfdb_tuple:unpack(V)
-    end, erlfdb:wait(Future))).
+    {JobIdsData, LastSeq} = lists:mapfoldl(fun({K, V}, _PrevSeq) ->
+        {Type, Seq} = erlfdb_tuple:unpack(K, Prefix),
+        {erlfdb_tuple:unpack(V), Seq}
+    end, Versionstamp, erlfdb:wait(Future)),
+    {maps:from_list(JobIdsData), LastSeq}.
 
 
-get_inactive_since(#{jtx := true} = JTx, Type, Versionstamp) ->
+get_inactive_since(#{jtx := true} = JTx, Type, Versionstamp, Opts) ->
     #{tx := Tx, jobs_path := Jobs} = get_jtx(JTx),
     Prefix = erlfdb_tuple:pack({?ACTIVITY}, Jobs),
     {StartKey, _} = erlfdb_tuple:range({Type}, Prefix),
     EndKey = erlfdb_tuple:pack({Type, Versionstamp}, Prefix),
     EndKeySel = erlfdb_key:first_greater_than(EndKey),
-    Opts = [{streaming_mode, want_all}],
     Future = erlfdb:get_range(Tx, StartKey, EndKeySel, Opts),
     lists:map(fun({_K, V}) ->
         {JobId, _} = erlfdb_tuple:unpack(V),

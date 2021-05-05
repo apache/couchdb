@@ -30,10 +30,10 @@
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 -import(chttpd,
-    [send_json/2,send_json/3,send_method_not_allowed/2,
+    [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
     send_chunk/2,start_chunked_response/3]).
 
 -define(MAX_DB_NUM_FOR_DBS_INFO, 100).
@@ -61,12 +61,7 @@ handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 get_features() ->
-    case clouseau_rpc:connected() of
-        true ->
-            [search | config:features()];
-        false ->
-            config:features()
-    end.
+    config:features().
 
 handle_favicon_req(Req) ->
     handle_favicon_req(Req, get_docroot()).
@@ -120,7 +115,7 @@ handle_all_dbs_req(#httpd{method='GET'}=Req) ->
         direction = Dir,
         limit = Limit,
         skip = Skip
-    } = couch_mrview_http:parse_params(Req, undefined),
+    } = couch_views_http_util:parse_params(Req, undefined),
 
     Options = [
         {start_key, StartKey},
@@ -142,7 +137,7 @@ all_dbs_callback({meta, _Meta}, #vacc{resp=Resp0}=Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
     {ok, Acc#vacc{resp=Resp1}};
 all_dbs_callback({row, Row}, #vacc{resp=Resp0}=Acc) ->
-    Prepend = couch_mrview_http:prepend_val(Acc),
+    Prepend = couch_views_http_util:prepend_val(Acc),
     DbName = couch_util:get_value(id, Row),
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
     {ok, Acc#vacc{prepend=",", resp=Resp1}};
@@ -160,7 +155,7 @@ handle_dbs_info_req(#httpd{method = 'GET'} = Req) ->
 handle_dbs_info_req(#httpd{method='POST', user_ctx=UserCtx}=Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = chttpd:json_body_obj(Req),
-    Keys = couch_mrview_util:get_view_keys(Props),
+    Keys = couch_views_util:get_view_keys(Props),
     case Keys of
         undefined -> throw({bad_request, "`keys` member must exist."});
         _ -> ok
@@ -253,7 +248,7 @@ send_db_infos(Req, ListFunctionName) ->
         direction = Dir,
         limit = Limit,
         skip = Skip
-    } = couch_mrview_http:parse_params(Req, undefined),
+    } = couch_views_http_util:parse_params(Req, undefined),
 
     Options = [
         {start_key, StartKey},
@@ -280,7 +275,7 @@ dbs_info_callback({meta, _Meta}, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
     {ok, Acc#vacc{resp = Resp1}};
 dbs_info_callback({row, Props}, #vacc{resp = Resp0} = Acc) ->
-    Prepend = couch_mrview_http:prepend_val(Acc),
+    Prepend = couch_views_http_util:prepend_val(Acc),
     Chunk = [Prepend, ?JSON_ENCODE({Props})],
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
     {ok, Acc#vacc{prepend = ",", resp = Resp1}};
@@ -334,9 +329,33 @@ handle_reload_query_servers_req(#httpd{method='POST'}=Req) ->
 handle_reload_query_servers_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
+handle_uuids_req(#httpd{method='GET'}=Req) ->
+    Max = list_to_integer(config:get("uuids","max_count","1000")),
+    Count = try list_to_integer(couch_httpd:qs_value(Req, "count", "1")) of
+        N when N > Max ->
+            throw({bad_request, <<"count parameter too large">>});
+        N when N < 0 ->
+            throw({bad_request, <<"count must be a positive integer">>});
+        N -> N
+    catch
+        error:badarg ->
+            throw({bad_request, <<"count must be a positive integer">>})
+    end,
+    UUIDs = [couch_uuids:new() || _ <- lists:seq(1, Count)],
+    Etag = couch_httpd:make_etag(UUIDs),
+    couch_httpd:etag_respond(Req, Etag, fun() ->
+        CacheBustingHeaders = [
+            {"Date", couch_util:rfc1123_date()},
+            {"Cache-Control", "no-cache"},
+            % Past date, ON PURPOSE!
+            {"Expires", "Mon, 01 Jan 1990 00:00:00 GMT"},
+            {"Pragma", "no-cache"},
+            {"ETag", Etag}
+        ],
+        send_json(Req, 200, CacheBustingHeaders, {[{<<"uuids">>, UUIDs}]})
+    end);
 handle_uuids_req(Req) ->
-    couch_httpd_misc_handlers:handle_uuids_req(Req).
-
+    send_method_not_allowed(Req, "GET").
 
 handle_up_req(#httpd{method='GET'} = Req) ->
     case config:get("couchdb", "maintenance_mode") of

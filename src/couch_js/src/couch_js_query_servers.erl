@@ -18,7 +18,6 @@
 -export([filter_docs/5]).
 -export([filter_view/3]).
 -export([finalize/2]).
--export([rewrite/3]).
 
 -export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
 
@@ -26,6 +25,7 @@
 -export([get_os_process/1, get_ddoc_process/2, ret_os_process/1]).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 -define(SUMERROR, <<"The _sum function requires that map values be numbers, "
     "arrays of numbers, or objects. Objects cannot be mixed with other "
@@ -265,6 +265,12 @@ check_sum_overflow(InSize, OutSize, Sum) ->
     end.
 
 log_sum_overflow(InSize, OutSize) ->
+    ?LOG_ERROR(#{
+        what => reduce_function_overflow,
+        input_size => InSize,
+        output_size => OutSize,
+        details => "reduce output must shrink more rapidly"
+    }),
     Fmt = "Reduce output must shrink more rapidly: "
             "input size: ~b "
             "output size: ~b",
@@ -385,85 +391,6 @@ validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
         Message when is_binary(Message) ->
             throw({unknown_error, Message})
     end.
-
-
-rewrite(Req, Db, DDoc) ->
-    Fields = [F || F <- chttpd_external:json_req_obj_fields(),
-              F =/= <<"info">>, F =/= <<"form">>,
-              F =/= <<"uuid">>, F =/= <<"id">>],
-    JsonReq = chttpd_external:json_req_obj(Req, Db, null, Fields),
-    case ddoc_prompt(DDoc, [<<"rewrites">>], [JsonReq]) of
-        {[{<<"forbidden">>, Message}]} ->
-            throw({forbidden, Message});
-        {[{<<"unauthorized">>, Message}]} ->
-            throw({unauthorized, Message});
-        [<<"no_dispatch_rule">>] ->
-            undefined;
-        [<<"ok">>, {V}=Rewrite] when is_list(V) ->
-            ok = validate_rewrite_response(Rewrite),
-            Rewrite;
-        [<<"ok">>, _]  ->
-            throw_rewrite_error(<<"bad rewrite">>);
-        V ->
-            couch_log:error("bad rewrite return ~p", [V]),
-            throw({unknown_error, V})
-    end.
-
-validate_rewrite_response({Fields}) when is_list(Fields) ->
-    validate_rewrite_response_fields(Fields).
-
-validate_rewrite_response_fields([{Key, Value} | Rest]) ->
-    validate_rewrite_response_field(Key, Value),
-    validate_rewrite_response_fields(Rest);
-validate_rewrite_response_fields([]) ->
-    ok.
-
-validate_rewrite_response_field(<<"method">>, Method) when is_binary(Method) ->
-    ok;
-validate_rewrite_response_field(<<"method">>, _) ->
-    throw_rewrite_error(<<"bad method">>);
-validate_rewrite_response_field(<<"path">>, Path) when is_binary(Path) ->
-    ok;
-validate_rewrite_response_field(<<"path">>, _) ->
-    throw_rewrite_error(<<"bad path">>);
-validate_rewrite_response_field(<<"body">>, Body) when is_binary(Body) ->
-    ok;
-validate_rewrite_response_field(<<"body">>, _) ->
-    throw_rewrite_error(<<"bad body">>);
-validate_rewrite_response_field(<<"headers">>, {Props}=Headers) when is_list(Props) ->
-    validate_object_fields(Headers);
-validate_rewrite_response_field(<<"headers">>, _) ->
-    throw_rewrite_error(<<"bad headers">>);
-validate_rewrite_response_field(<<"query">>, {Props}=Query) when is_list(Props) ->
-    validate_object_fields(Query);
-validate_rewrite_response_field(<<"query">>, _) ->
-    throw_rewrite_error(<<"bad query">>);
-validate_rewrite_response_field(<<"code">>, Code) when is_integer(Code) andalso Code >= 200 andalso Code < 600 ->
-    ok;
-validate_rewrite_response_field(<<"code">>, _) ->
-    throw_rewrite_error(<<"bad code">>);
-validate_rewrite_response_field(K, V) ->
-    couch_log:debug("unknown rewrite field ~p=~p", [K, V]),
-    ok.
-
-validate_object_fields({Props}) when is_list(Props) ->
-    lists:foreach(fun
-        ({Key, Value}) when is_binary(Key) andalso is_binary(Value) ->
-            ok;
-        ({Key, Value}) ->
-            Reason = io_lib:format(
-                "object key/value must be strings ~p=~p", [Key, Value]),
-            throw_rewrite_error(Reason);
-        (Value) ->
-            throw_rewrite_error(io_lib:format("bad value ~p", [Value]))
-    end, Props).
-
-
-throw_rewrite_error(Reason) when is_list(Reason)->
-    throw_rewrite_error(iolist_to_binary(Reason));
-throw_rewrite_error(Reason) when is_binary(Reason) ->
-    throw({rewrite_error, Reason}).
-
 
 json_doc_options() ->
     json_doc_options([]).

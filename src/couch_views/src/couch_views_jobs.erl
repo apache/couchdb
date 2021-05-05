@@ -26,7 +26,6 @@
 -endif.
 
 
--include_lib("couch_mrview/include/couch_mrview.hrl").
 -include("couch_views.hrl").
 
 
@@ -37,7 +36,7 @@ set_timeout() ->
 build_view(TxDb, Mrst, UpdateSeq) ->
     {ok, JobId} = build_view_async(TxDb, Mrst),
     case wait_for_job(JobId, Mrst#mrst.idx_name, UpdateSeq) of
-        ok -> ok;
+        {ok, IdxVStamps} -> {ok, IdxVStamps};
         retry -> build_view(TxDb, Mrst, UpdateSeq)
     end.
 
@@ -90,7 +89,7 @@ wait_for_job(JobId, DDocId, UpdateSeq) ->
         {ok, finished, Data} ->
             case Data of
                 #{<<"view_seq">> := ViewSeq} when ViewSeq >= UpdateSeq ->
-                    ok;
+                    {ok, idx_vstamps(Data)};
                 _ ->
                     retry
             end
@@ -117,16 +116,22 @@ wait_for_job(JobId, Subscription, DDocId, UpdateSeq) ->
         {finished, #{<<"error">> := Error, <<"reason">> := Reason}} ->
             couch_jobs:remove(undefined, ?INDEX_JOB_TYPE, JobId),
             erlang:error({binary_to_existing_atom(Error, latin1), Reason});
-        {finished, #{<<"view_seq">> := ViewSeq}} when ViewSeq >= UpdateSeq ->
-            ok;
+        {finished, #{<<"view_seq">> := ViewSeq} = JobData}
+                when ViewSeq >= UpdateSeq ->
+            {ok, idx_vstamps(JobData)};
         {finished, _} ->
             wait_for_job(JobId, DDocId, UpdateSeq);
-        {_State, #{<<"view_seq">> := ViewSeq}} when ViewSeq >= UpdateSeq ->
-            couch_jobs:unsubscribe(Subscription),
-            ok;
         {_, _} ->
             wait_for_job(JobId, Subscription, DDocId, UpdateSeq)
     end.
+
+
+idx_vstamps(#{} = JobData) ->
+    #{
+        <<"db_read_vsn">> := DbReadVsn,
+        <<"view_read_vsn">> := ViewReadVsn
+    } = JobData,
+    {DbReadVsn, ViewReadVsn}.
 
 
 job_id(#{name := DbName}, #mrst{sig = Sig}) ->

@@ -21,6 +21,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
+-include_lib("kernel/include/logger.hrl").
 
 
 start_link(StartSeq, #httpdb{} = Db, ChangesQueue, #{} = Options) ->
@@ -60,14 +61,23 @@ read_changes(Parent, StartSeq, Db, ChangesQueue, Options) ->
         N when N > 0 ->
             put(retries_left, N - 1),
             LastSeq = get(last_seq),
+            LogMsg = #{
+                what => retry_changes_feed,
+                in => replicator,
+                source => couch_replicator_api_wrap:db_uri(Db),
+                sequence => LastSeq,
+                retries_remaining => N
+            },
             Db2 = case LastSeq of
             StartSeq ->
+                ?LOG_NOTICE(LogMsg#{delay_sec => Db#httpdb.wait / 1000}),
                 couch_log:notice("Retrying _changes request to source database ~s"
                     " with since=~p in ~p seconds",
                     [couch_replicator_api_wrap:db_uri(Db), LastSeq, Db#httpdb.wait / 1000]),
                 ok = timer:sleep(Db#httpdb.wait),
                 Db#httpdb{wait = 2 * Db#httpdb.wait};
             _ ->
+                ?LOG_NOTICE(LogMsg),
                 couch_log:notice("Retrying _changes request to source database ~s"
                     " with since=~p", [couch_replicator_api_wrap:db_uri(Db), LastSeq]),
                 Db
@@ -82,6 +92,12 @@ read_changes(Parent, StartSeq, Db, ChangesQueue, Options) ->
 process_change(#doc_info{id = <<>>} = DocInfo, {_, Db, _, _}) ->
     % Previous CouchDB releases had a bug which allowed a doc with an empty ID
     % to be inserted into databases. Such doc is impossible to GET.
+    ?LOG_ERROR(#{
+        what => ignore_empty_docid,
+        in => replicator,
+        source => couch_replicator_api_wrap:db_uri(Db),
+        sequence => DocInfo#doc_info.high_seq
+    }),
     couch_log:error("Replicator: ignoring document with empty ID in "
         "source database `~s` (_changes sequence ~p)",
         [couch_replicator_api_wrap:db_uri(Db), DocInfo#doc_info.high_seq]);
@@ -90,6 +106,13 @@ process_change(#doc_info{id = Id} = DocInfo, {Parent, Db, ChangesQueue, _}) ->
     case is_doc_id_too_long(byte_size(Id)) of
         true ->
             SourceDb = couch_replicator_api_wrap:db_uri(Db),
+            ?LOG_ERROR(#{
+                what => doc_write_failure,
+                in => replicator,
+                source => SourceDb,
+                docid => Id,
+                details => "document ID too long"
+            }),
             couch_log:error("Replicator: document id `~s...` from source db "
                 " `~64s` is too long, ignoring.", [Id, SourceDb]),
             Stats = couch_replicator_stats:new([{doc_write_failures, 1}]),

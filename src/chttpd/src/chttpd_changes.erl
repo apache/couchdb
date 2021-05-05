@@ -12,7 +12,7 @@
 
 -module(chttpd_changes).
 -include_lib("couch/include/couch_db.hrl").
--include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("couch_views/include/couch_views.hrl").
 
 -export([
     handle_db_changes/3,
@@ -466,7 +466,14 @@ send_changes_doc_ids(Db, StartSeq, Dir, Fun, Acc0, {doc_ids, _Style, DocIds}) ->
 
 
 send_changes_design_docs(Db, StartSeq, Dir, Fun, Acc0, {design_docs, _Style}) ->
-    FoldFun = fun(FDI, Acc) -> {ok, [FDI | Acc]} end,
+    FoldFun = fun(FDI, Acc) ->
+        case FDI of
+            {row, Row} ->
+                DocId = proplists:get_value(id, Row),
+                {ok, [fabric2_db:get_full_doc_info(Db, DocId) | Acc]};
+            _ -> {ok, Acc}
+        end
+    end,
     Opts = [
         include_deleted,
         {start_key, <<"_design/">>},
@@ -523,9 +530,7 @@ send_lookup_changes(FullDocInfos, StartSeq, Dir, Db, Fun, Acc0) ->
         fwd ->
             FinalAcc0 = case element(1, FinalAcc) of
                 changes_acc -> % we came here via couch_http or internal call
-                    FinalAcc#changes_acc{seq = fabric2_db:get_update_seq(Db)};
-                fabric_changes_acc -> % we came here via chttpd / fabric / rexi
-                    FinalAcc#fabric_changes_acc{seq = couch_db:get_update_seq(Db)}
+                    FinalAcc#changes_acc{seq = fabric2_db:get_update_seq(Db)}
             end,
             {ok, FinalAcc0};
         rev -> {ok, FinalAcc}
