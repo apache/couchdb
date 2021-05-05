@@ -41,7 +41,8 @@
 ]).
 
 
-
+-define(CACHE, aegis_cache).
+-define(BY_ACCESS, aegis_by_access).
 -define(KEY_CHECK, aegis_key_check).
 -define(INIT_TIMEOUT, 60000).
 -define(TIMEOUT, 10000).
@@ -130,16 +131,14 @@ decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
 %% gen_server functions
 
 init([]) ->
-    Cache = ets:new(?MODULE, [set, private, {keypos, #entry.uuid}]),
-    ByAccess = ets:new(?MODULE,
-        [ordered_set, private, {keypos, #entry.counter}]),
+    ets:new(?CACHE, [named_table, set, private, {keypos, #entry.uuid}]),
+    ets:new(?BY_ACCESS,
+        [named_table, ordered_set, private, {keypos, #entry.counter}]),
     ets:new(?KEY_CHECK, [named_table, protected, {read_concurrency, true}]),
 
     erlang:send_after(0, self(), maybe_remove_expired),
 
     St = #{
-        cache => Cache,
-        by_access => ByAccess,
         counter => 0
     },
     {ok, St, ?INIT_TIMEOUT}.
@@ -149,8 +148,8 @@ terminate(_Reason, _St) ->
     ok.
 
 
-handle_call({insert_key, UUID, DbKey}, _From, #{cache := Cache} = St) ->
-    case ets:lookup(Cache, UUID) of
+handle_call({insert_key, UUID, DbKey}, _From, #{} = St) ->
+    case ets:lookup(?CACHE, UUID) of
         [#entry{uuid = UUID} = Entry] ->
             delete(St, Entry);
         [] ->
@@ -284,8 +283,6 @@ is_key_fresh(UUID) ->
 
 insert(St, UUID, DbKey) ->
     #{
-        cache := Cache,
-        by_access := ByAccess,
         counter := Counter
     } = St,
 
@@ -300,17 +297,17 @@ insert(St, UUID, DbKey) ->
         expires_at = ExpiresAt
     },
 
-    true = ets:insert(Cache, Entry),
-    true = ets:insert_new(ByAccess, Entry),
+    true = ets:insert(?CACHE, Entry),
+    true = ets:insert_new(?BY_ACCESS, Entry),
     true = ets:insert(?KEY_CHECK, {UUID, ExpiresAt}),
 
     CacheLimit = cache_limit(),
-    CacheSize = ets:info(Cache, size),
+    CacheSize = ets:info(?CACHE, size),
 
     case CacheSize > CacheLimit of
         true ->
-            LRUKey = ets:first(ByAccess),
-            [LRUEntry] = ets:lookup(ByAccess, LRUKey),
+            LRUKey = ets:first(?BY_ACCESS),
+            [LRUEntry] = ets:lookup(?BY_ACCESS, LRUKey),
             delete(St, LRUEntry);
         false ->
             ok
@@ -319,8 +316,8 @@ insert(St, UUID, DbKey) ->
     St#{counter := Counter + 1}.
 
 
-lookup(#{cache := Cache}, UUID) ->
-    case ets:lookup(Cache, UUID) of
+lookup(#{}, UUID) ->
+    case ets:lookup(?CACHE, UUID) of
         [#entry{uuid = UUID, encryption_key = DbKey} = Entry] ->
             maybe_bump_last_accessed(Entry),
             {ok, DbKey};
@@ -329,15 +326,10 @@ lookup(#{cache := Cache}, UUID) ->
     end.
 
 
-delete(St, #entry{uuid = UUID} = Entry) ->
-    #{
-        cache := Cache,
-        by_access := ByAccess
-    } = St,
-
+delete(_St, #entry{uuid = UUID} = Entry) ->
     true = ets:delete(?KEY_CHECK, UUID),
-    true = ets:delete_object(Cache, Entry),
-    true = ets:delete_object(ByAccess, Entry).
+    true = ets:delete_object(?CACHE, Entry),
+    true = ets:delete_object(?BY_ACCESS, Entry).
 
 
 maybe_bump_last_accessed(#entry{last_accessed = LastAccessed} = Entry) ->
@@ -351,33 +343,26 @@ maybe_bump_last_accessed(#entry{last_accessed = LastAccessed} = Entry) ->
 
 bump_last_accessed(St, UUID) ->
     #{
-        cache := Cache,
-        by_access := ByAccess,
         counter := Counter
     } = St,
 
 
-    [#entry{counter = OldCounter} = Entry0] = ets:lookup(Cache, UUID),
+    [#entry{counter = OldCounter} = Entry0] = ets:lookup(?CACHE, UUID),
 
     Entry = Entry0#entry{
         last_accessed = fabric2_util:now(sec),
         counter = Counter
     },
 
-    true = ets:insert(Cache, Entry),
-    true = ets:insert_new(ByAccess, Entry),
+    true = ets:insert(?CACHE, Entry),
+    true = ets:insert_new(?BY_ACCESS, Entry),
 
-    ets:delete(ByAccess, OldCounter),
+    ets:delete(?BY_ACCESS, OldCounter),
 
     St#{counter := Counter + 1}.
 
 
-remove_expired_entries(St) ->
-    #{
-        cache := Cache,
-        by_access := ByAccess
-    } = St,
-
+remove_expired_entries(_St) ->
     MatchConditions = [{'=<', '$1', fabric2_util:now(sec)}],
 
     KeyCheckMatchHead = {'_', '$1'},
@@ -386,8 +371,8 @@ remove_expired_entries(St) ->
 
     CacheMatchHead = #entry{expires_at = '$1', _ = '_'},
     CacheExpired = [{CacheMatchHead, MatchConditions, [true]}],
-    Count = ets:select_delete(Cache, CacheExpired),
-    Count = ets:select_delete(ByAccess, CacheExpired).
+    Count = ets:select_delete(?CACHE, CacheExpired),
+    Count = ets:select_delete(?BY_ACCESS, CacheExpired).
 
 
 
