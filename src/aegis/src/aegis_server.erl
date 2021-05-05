@@ -86,22 +86,13 @@ encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
         uuid := UUID
     } = Db,
 
-    case is_key_fresh(UUID) of
+    {ok, DbKey} = case is_key_fresh(UUID) of
         true ->
-            case gen_server:call(?MODULE, {encrypt, Db, Key, Value}) of
-                CipherText when is_binary(CipherText) ->
-                    CipherText;
-                {error, {_Tag, {_C_FileName,_LineNumber}, _Desc} = Reason} ->
-                    ?LOG_ERROR(#{what => encrypt_failure, details => Reason}),
-                    couch_log:error("aegis encryption failure: ~p ", [Reason]),
-                    erlang:error(decryption_failed);
-                {error, Reason} ->
-                    erlang:error(Reason)
-            end;
+	    lookup(UUID);
         false ->
-	    {ok, DbKey} = do_open_db(Db),
-	    do_encrypt(DbKey, Db, Key, Value)
-    end.
+	    do_open_db(Db)
+    end,
+    do_encrypt(DbKey, Db, Key, Value).
 
 
 -spec decrypt(Db :: #{}, Key :: binary(), Value :: binary()) -> binary().
@@ -110,30 +101,21 @@ decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
         uuid := UUID
     } = Db,
 
-    case is_key_fresh(UUID) of
+    {ok, DbKey} = case is_key_fresh(UUID) of
         true ->
-            case gen_server:call(?MODULE, {decrypt, Db, Key, Value}) of
-                PlainText when is_binary(PlainText) ->
-                    PlainText;
-                {error, {_Tag, {_C_FileName,_LineNumber}, _Desc} = Reason} ->
-                    ?LOG_ERROR(#{what => decrypt_failure, details => Reason}),
-                    couch_log:error("aegis decryption failure: ~p ", [Reason]),
-                    erlang:error(decryption_failed);
-                {error, Reason} ->
-                    erlang:error(Reason)
-            end;
+            lookup(UUID);
         false ->
-	    {ok, DbKey} = do_open_db(Db),
-	    do_decrypt(DbKey, Db, Key, Value)
-    end.
+	    do_open_db(Db)
+    end,
+    do_decrypt(DbKey, Db, Key, Value).
 
 
 %% gen_server functions
 
 init([]) ->
-    ets:new(?CACHE, [named_table, set, private, {keypos, #entry.uuid}]),
+    ets:new(?CACHE, [named_table, set, {keypos, #entry.uuid}]),
     ets:new(?BY_ACCESS,
-        [named_table, ordered_set, private, {keypos, #entry.counter}]),
+        [named_table, ordered_set, {keypos, #entry.counter}]),
     ets:new(?KEY_CHECK, [named_table, protected, {read_concurrency, true}]),
 
     erlang:send_after(0, self(), maybe_remove_expired),
@@ -157,42 +139,6 @@ handle_call({insert_key, UUID, DbKey}, _From, #{} = St) ->
     end,
     NewSt = insert(St, UUID, DbKey),
     {reply, ok, NewSt, ?TIMEOUT};
-
-handle_call({encrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
-
-    {ok, DbKey} = lookup(UUID),
-
-    erlang:spawn(fun() ->
-        try
-            do_encrypt(DbKey, Db, Key, Value)
-        of
-            Resp ->
-                gen_server:reply(From, Resp)
-        catch
-            _:Error ->
-                gen_server:reply(From, {error, Error})
-        end
-    end),
-
-    {noreply, St, ?TIMEOUT};
-
-handle_call({decrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
-
-    {ok, DbKey} = lookup(UUID),
-
-    erlang:spawn(fun() ->
-        try
-            do_decrypt(DbKey, Db, Key, Value)
-        of
-            Resp ->
-                gen_server:reply(From, Resp)
-        catch
-            _:Error ->
-                gen_server:reply(From, {error, Error})
-        end
-    end),
-
-    {noreply, St, ?TIMEOUT};
 
 handle_call(_Msg, _From, St) ->
     {noreply, St}.
