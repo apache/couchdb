@@ -151,7 +151,7 @@ terminate(_Reason, _St) ->
 handle_call({insert_key, UUID, DbKey}, _From, #{} = St) ->
     case ets:lookup(?CACHE, UUID) of
         [#entry{uuid = UUID} = Entry] ->
-            delete(St, Entry);
+            delete(Entry);
         [] ->
             ok
     end,
@@ -160,7 +160,7 @@ handle_call({insert_key, UUID, DbKey}, _From, #{} = St) ->
 
 handle_call({encrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
 
-    {ok, DbKey} = lookup(St, UUID),
+    {ok, DbKey} = lookup(UUID),
 
     erlang:spawn(fun() ->
         try
@@ -178,7 +178,7 @@ handle_call({encrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
 
 handle_call({decrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
 
-    {ok, DbKey} = lookup(St, UUID),
+    {ok, DbKey} = lookup(UUID),
 
     erlang:spawn(fun() ->
         try
@@ -208,7 +208,7 @@ handle_cast(_Msg, St) ->
 
 
 handle_info(maybe_remove_expired, St) ->
-    remove_expired_entries(St),
+    remove_expired_entries(),
     CheckInterval = erlang:convert_time_unit(
         expiration_check_interval(), second, millisecond),
     erlang:send_after(CheckInterval, self(), maybe_remove_expired),
@@ -308,7 +308,7 @@ insert(St, UUID, DbKey) ->
         true ->
             LRUKey = ets:first(?BY_ACCESS),
             [LRUEntry] = ets:lookup(?BY_ACCESS, LRUKey),
-            delete(St, LRUEntry);
+            delete(LRUEntry);
         false ->
             ok
     end,
@@ -316,7 +316,7 @@ insert(St, UUID, DbKey) ->
     St#{counter := Counter + 1}.
 
 
-lookup(#{}, UUID) ->
+lookup(UUID) ->
     case ets:lookup(?CACHE, UUID) of
         [#entry{uuid = UUID, encryption_key = DbKey} = Entry] ->
             maybe_bump_last_accessed(Entry),
@@ -326,7 +326,7 @@ lookup(#{}, UUID) ->
     end.
 
 
-delete(_St, #entry{uuid = UUID} = Entry) ->
+delete(#entry{uuid = UUID} = Entry) ->
     true = ets:delete(?KEY_CHECK, UUID),
     true = ets:delete_object(?CACHE, Entry),
     true = ets:delete_object(?BY_ACCESS, Entry).
@@ -362,7 +362,7 @@ bump_last_accessed(St, UUID) ->
     St#{counter := Counter + 1}.
 
 
-remove_expired_entries(_St) ->
+remove_expired_entries() ->
     MatchConditions = [{'=<', '$1', fabric2_util:now(sec)}],
 
     KeyCheckMatchHead = {'_', '$1'},
