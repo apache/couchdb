@@ -60,27 +60,23 @@ start_link() ->
 
 -spec init_db(Db :: #{}, Options :: list()) -> boolean().
 init_db(#{uuid := UUID} = Db, Options) ->
-    sensitive(fun() ->
-        case ?AEGIS_KEY_MANAGER:init_db(Db, Options) of
-            {ok, DbKey} ->
-                gen_server:call(?MODULE, {insert_key, UUID, DbKey}),
-                true;
-            false ->
-                false
-        end
-    end).
+    case ?AEGIS_KEY_MANAGER:init_db(Db, Options) of
+	{ok, DbKey} ->
+	    gen_server:call(?MODULE, {insert_key, UUID, DbKey}),
+	    true;
+	false ->
+	    false
+    end.
 
 
 -spec open_db(Db :: #{}) -> boolean().
 open_db(#{} = Db) ->
-    sensitive(fun() ->
-        case do_open_db(Db) of
-            {ok, _DbKey} ->
-                true;
-            false ->
-                false
-        end
-    end).
+    case do_open_db(Db) of
+	{ok, _DbKey} ->
+	    true;
+	false ->
+	    false
+    end.
 
 
 -spec encrypt(Db :: #{}, Key :: binary(), Value :: binary()) -> binary().
@@ -102,10 +98,8 @@ encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
                     erlang:error(Reason)
             end;
         false ->
-            sensitive(fun() ->
-                {ok, DbKey} = do_open_db(Db),
-                do_encrypt(DbKey, Db, Key, Value)
-            end)
+	    {ok, DbKey} = do_open_db(Db),
+	    do_encrypt(DbKey, Db, Key, Value)
     end.
 
 
@@ -128,17 +122,14 @@ decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
                     erlang:error(Reason)
             end;
         false ->
-            sensitive(fun() ->
-                {ok, DbKey} = do_open_db(Db),
-                do_decrypt(DbKey, Db, Key, Value)
-            end)
+	    {ok, DbKey} = do_open_db(Db),
+	    do_decrypt(DbKey, Db, Key, Value)
     end.
 
 
 %% gen_server functions
 
 init([]) ->
-    process_flag(sensitive, true),
     Cache = ets:new(?MODULE, [set, private, {keypos, #entry.uuid}]),
     ByAccess = ets:new(?MODULE,
         [ordered_set, private, {keypos, #entry.counter}]),
@@ -173,7 +164,6 @@ handle_call({encrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
     {ok, DbKey} = lookup(St, UUID),
 
     erlang:spawn(fun() ->
-        process_flag(sensitive, true),
         try
             do_encrypt(DbKey, Db, Key, Value)
         of
@@ -192,7 +182,6 @@ handle_call({decrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
     {ok, DbKey} = lookup(St, UUID),
 
     erlang:spawn(fun() ->
-        process_flag(sensitive, true),
         try
             do_decrypt(DbKey, Db, Key, Value)
         of
@@ -413,12 +402,3 @@ expiration_check_interval() ->
 
 cache_limit() ->
     config:get_integer("aegis", "cache_limit", ?CACHE_LIMIT).
-
-
-sensitive(Fun) when is_function(Fun, 0) ->
-    OldValue = process_flag(sensitive, true),
-    try
-        Fun()
-    after
-        process_flag(sensitive, OldValue)
-    end.
