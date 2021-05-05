@@ -94,9 +94,11 @@ acquire(Url0, ProxyUrl0) ->
     case gen_server:call(?MODULE, {acquire, Url, ProxyUrl}) of
         {ok, Worker} ->
             link(Worker),
+            start_owner_monitor(Worker),
             {ok, Worker};
         {error, all_allocated} ->
             {ok, Pid} = ibrowse:spawn_link_worker_process(Url),
+            start_owner_monitor(Worker),
             ok = gen_server:call(?MODULE, {create, Url, ProxyUrl, Pid}),
             {ok, Pid};
         {error, Reason} ->
@@ -105,6 +107,7 @@ acquire(Url0, ProxyUrl0) ->
 
 
 release(Worker) ->
+    stop_owner_monitor(Worker),
     unlink(Worker),
     gen_server:cast(?MODULE, {release, Worker}).
 
@@ -273,3 +276,32 @@ parse_proxy_url(undefined) ->
     #url{host=undefined, port=undefined};
 parse_proxy_url(ProxyUrl) ->
     ibrowse_lib:parse_url(ProxyUrl).
+
+
+start_owner_monitor(Worker) ->
+    case get({?OWNER_MONITOR, Worker}) of
+        undefined ->
+            ok;
+        Monitor when is_pid(Monitor) ->
+            error(duplicate_owner_monitor)
+    end,
+    Owner = self(),
+    Monitor = spawn(fun() ->
+        erlang:monitor(process, Owner),
+        receive
+            {'DOWN', _, _, Owner, _} ->
+                exit(Worker, kill)
+        end
+    end),
+    put({?OWNER_MONITOR, Worker}, Monitor),
+    ok.
+
+
+stop_owner_monitor(Worker) ->
+    case erase({?OWNER_MONITOR, Worker}) of
+        undefined ->
+            error(owner_monitor_not_found);
+        Pid when is_pid(Pid) ->
+            exit(Pid, kill)
+    end,
+    ok.
