@@ -20,39 +20,39 @@
 
 -define(ICV1, 16#A6A6A6A6A6A6A6A6).
 
--spec key_wrap(WrappingKey :: binary(), KeyToWrap :: binary()) -> binary().
-key_wrap(WrappingKey, KeyToWrap)
-  when is_binary(WrappingKey), bit_size(KeyToWrap) rem 64 == 0 ->
-    N = bit_size(KeyToWrap) div 64,
-    wrap(WrappingKey, <<?ICV1:64>>, KeyToWrap, 1, 6 * N).
+-spec key_wrap(WrappingKey :: aegis_key_manager:key_fun(), KeyToWrap :: aegis_key_manager:key_fun()) -> binary().
+key_wrap(WrappingKeyFun, KeyToWrapFun)
+  when is_function(WrappingKeyFun, 0), is_function(KeyToWrapFun, 0) ->
+    N = bit_size(KeyToWrapFun()) div 64,
+    wrap(WrappingKeyFun, <<?ICV1:64>>, KeyToWrapFun(), 1, 6 * N).
 
-wrap(_WrappingKey, A, R, T, End) when T > End ->
+wrap(_WrappingKeyFun, A, R, T, End) when T > End ->
     <<A/binary, R/binary>>;
-wrap(WrappingKey, A, R, T, End) ->
+wrap(WrappingKeyFun, A, R, T, End) ->
     <<R1:64, Rest/binary>> = R,
-    <<MSB_B:64, LSB_B:64>> = ?aes_ecb_encrypt(WrappingKey, <<A/binary, R1:64>>),
-    wrap(WrappingKey, <<(MSB_B bxor T):64>>, <<Rest/binary, LSB_B:64>>, T + 1, End).
+    <<MSB_B:64, LSB_B:64>> = ?aes_ecb_encrypt(WrappingKeyFun(), <<A/binary, R1:64>>),
+    wrap(WrappingKeyFun, <<(MSB_B bxor T):64>>, <<Rest/binary, LSB_B:64>>, T + 1, End).
 
 
--spec key_unwrap(WrappingKey :: binary(), KeyToUnwrap :: binary()) -> binary() | fail.
-key_unwrap(WrappingKey, KeyToUnwrap)
-  when is_binary(WrappingKey), bit_size(KeyToUnwrap) rem 64 == 0 ->
+-spec key_unwrap(WrappingKey :: aegis_key_manager:key_fun(), KeyToUnwrap :: binary()) -> aegis_key_manager:key_fun() | fail.
+key_unwrap(WrappingKeyFun, KeyToUnwrap)
+  when is_function(WrappingKeyFun, 0), bit_size(KeyToUnwrap) rem 64 == 0 ->
     N = (bit_size(KeyToUnwrap) div 64),
     <<A:64, R/binary>> = KeyToUnwrap,
-    case unwrap(WrappingKey, <<A:64>>, R, 6 * (N - 1)) of
+    case unwrap(WrappingKeyFun, <<A:64>>, R, 6 * (N - 1)) of
         <<?ICV1:64, UnwrappedKey/binary>> ->
-            UnwrappedKey;
+            fun() -> UnwrappedKey end;
         _ ->
             fail
     end.
 
-unwrap(_WrappingKey, A, R, 0) ->
+unwrap(_WrappingKeyFun, A, R, 0) ->
     <<A/binary, R/binary>>;
-unwrap(WrappingKey, <<A:64>>, R, T) ->
+unwrap(WrappingKeyFun, <<A:64>>, R, T) ->
     RestSize = bit_size(R) - 64,
     <<Rest:RestSize, R2: 64>> = R,
-    <<MSB_B:64, LSB_B:64>> = ?aes_ecb_decrypt(WrappingKey, <<(A bxor T):64, R2:64>>),
-    unwrap(WrappingKey, <<MSB_B:64>>, <<LSB_B:64, Rest:RestSize>>, T - 1).
+    <<MSB_B:64, LSB_B:64>> = ?aes_ecb_decrypt(WrappingKeyFun(), <<(A bxor T):64, R2:64>>),
+    unwrap(WrappingKeyFun, <<MSB_B:64>>, <<LSB_B:64, Rest:RestSize>>, T - 1).
 
 
 -ifdef(TEST).

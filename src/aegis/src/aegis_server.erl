@@ -181,12 +181,12 @@ do_open_db(#{uuid := UUID} = Db) ->
 
 
 do_encrypt(DbKey, #{uuid := UUID}, Key, Value) ->
-    EncryptionKey = crypto:strong_rand_bytes(32),
+    EncryptionKey = new_encryption_key(),
     <<WrappedKey:320>> = aegis_keywrap:key_wrap(DbKey, EncryptionKey),
 
     {CipherText, <<CipherTag:128>>} =
         ?aes_gcm_encrypt(
-           EncryptionKey,
+           EncryptionKey(),
            <<0:96>>,
            <<UUID/binary, 0:8, Key/binary>>,
            Value),
@@ -202,7 +202,7 @@ do_decrypt(DbKey, #{uuid := UUID}, Key, Value) ->
                 DecryptionKey ->
                     Decrypted =
                     ?aes_gcm_decrypt(
-                        DecryptionKey,
+                        DecryptionKey(),
                         <<0:96>>,
                         <<UUID/binary, 0:8, Key/binary>>,
                         CipherText,
@@ -333,3 +333,8 @@ expiration_check_interval() ->
 
 cache_limit() ->
     config:get_integer("aegis", "cache_limit", ?CACHE_LIMIT).
+
+
+new_encryption_key() ->
+    EncryptionKey = crypto:strong_rand_bytes(32),
+    fun() -> EncryptionKey end.

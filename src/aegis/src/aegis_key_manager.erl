@@ -12,14 +12,14 @@
 
 -module(aegis_key_manager).
 
-
+-type key_fun() :: fun(() -> binary()).
 
 -callback init_db(
     Db :: #{},
-    DbOptions :: list()) -> {ok, binary()} | false.
+    DbOptions :: list()) -> {ok, key_fun()} | false.
 
 
--callback open_db(Db :: #{}) -> {ok, binary()} | false.
+-callback open_db(Db :: #{}) -> {ok, key_fun()} | false.
 
 
 -callback get_db_info(Db :: #{}) -> list().
