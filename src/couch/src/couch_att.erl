@@ -331,7 +331,8 @@ digest_from_json(Props) ->
     end.
 
 
-to_json(Att, OutputData, DataToFollow, ShowEncoding) ->
+to_json(#{md5 := Md5} = Att, OutputData, DataToFollow, ShowEncoding)
+        when is_binary(Md5) ->
     #{
         name := Name,
         type := Type,
@@ -339,7 +340,6 @@ to_json(Att, OutputData, DataToFollow, ShowEncoding) ->
         disk_len := DiskLen,
         att_len := AttLen,
         revpos := RevPos,
-        md5 := Md5,
         encoding := Encoding
     } = Att,
     Props = [
@@ -371,7 +371,10 @@ to_json(Att, OutputData, DataToFollow, ShowEncoding) ->
         true ->
             []
     end,
-    {Name, {Props ++ DigestProp ++ DataProps ++ EncodingProps}}.
+    {Name, {Props ++ DigestProp ++ DataProps ++ EncodingProps}};
+
+to_json(#{md5 := undefined} = Att, OutputData, DataToFollow, ShowEncoding) ->
+    to_json(Att#{md5 => <<>>}, OutputData, DataToFollow, ShowEncoding).
 
 
 flush(Db, DocId, Att1) ->
