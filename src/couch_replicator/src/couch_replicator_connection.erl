@@ -72,7 +72,10 @@ init([]) ->
     Interval = config:get_integer("replicator", "connection_close_interval",
         ?DEFAULT_CLOSE_INTERVAL),
     Timer = erlang:send_after(Interval, self(), close_idle_connections),
-    ibrowse:add_config([{inactivity_timeout, Interval}]),
+    ibrowse:add_config([
+        {inactivity_timeout, Interval},
+        {worker_trap_exits, false}
+    ]),
     {ok, #state{close_interval=Interval, timer=Timer}}.
 
 acquire(Url) ->
