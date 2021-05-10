@@ -561,15 +561,19 @@ start_query_server(#mrst{qserver = nil} = Mrst) ->
         lib = Lib,
         views = Views
     } = Mrst,
-    {ok, QServer} = couch_eval:acquire_map_context(
+    case couch_eval:acquire_map_context(
             DbName,
             DDocId,
             Language,
             Sig,
             Lib,
             [View#mrview.def || View <- Views]
-        ),
-    Mrst#mrst{qserver = QServer};
+        ) of
+        {ok, QServer} ->
+            Mrst#mrst{qserver = QServer};
+        {error, Error} ->
+            throw(Error)
+    end;
 
 start_query_server(#mrst{} = Mrst) ->
     Mrst.
