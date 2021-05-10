@@ -282,6 +282,18 @@ elixir-suite: elixir-init elixir-check-formatted elixir-credo devclean
 		--erlang-config rel/files/eunit.config \
 		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir'
 
+.PHONY: buggify-elixir-suite
+buggify-elixir-suite: export MIX_ENV=integration
+buggify-elixir-suite: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+buggify-elixir-suite: elixir-init devclean
+	@dev/run -n 1 -q -a adm:pass \
+		--enable-erlang-views \
+		--no-join \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--locald-config test/elixir/test/config/buggify-test-config.ini \
+		--erlang-config rel/files/buggify-eunit.config \
+		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir'
+
 .PHONY: elixir-check-formatted
 elixir-check-formatted: elixir-init
 	@mix format --check-formatted
