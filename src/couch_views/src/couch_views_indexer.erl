@@ -572,7 +572,7 @@ start_query_server(#mrst{qserver = nil} = Mrst) ->
         {ok, QServer} ->
             Mrst#mrst{qserver = QServer};
         {error, Error} ->
-            throw(Error)
+            error(Error)
     end;
 
 start_query_server(#mrst{} = Mrst) ->
