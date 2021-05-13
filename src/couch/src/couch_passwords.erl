@@ -114,12 +114,12 @@ pbkdf2(_Password, _Salt, Iterations, _BlockIndex, Iteration, _Prev, Acc)
     when Iteration > Iterations ->
     Acc;
 pbkdf2(Password, Salt, Iterations, BlockIndex, 1, _Prev, _Acc) ->
-    InitialBlock = crypto:hmac(sha, Password,
+    InitialBlock = couch_util:hmac(sha, Password,
         <<Salt/binary,BlockIndex:32/integer>>),
     pbkdf2(Password, Salt, Iterations, BlockIndex, 2,
         InitialBlock, InitialBlock);
 pbkdf2(Password, Salt, Iterations, BlockIndex, Iteration, Prev, Acc) ->
-    Next = crypto:hmac(sha, Password, Prev),
+    Next = couch_util:hmac(sha, Password, Prev),
     pbkdf2(Password, Salt, Iterations, BlockIndex, Iteration + 1,
                    Next, crypto:exor(Next, Acc)).
 

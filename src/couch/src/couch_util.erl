@@ -40,6 +40,7 @@
 -export([check_md5/2]).
 -export([set_mqd_off_heap/1]).
 -export([set_process_priority/2]).
+-export([hmac/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -769,3 +770,28 @@ check_config_blacklist(Section) ->
         end
     end, ?BLACKLIST_CONFIG_SECTIONS),
     ok.
+
+
+-ifdef(OTP_RELEASE).
+
+-if(?OTP_RELEASE >= 22).
+
+% OTP >= 22
+hmac(Alg, Key, Message) ->
+    crypto:mac(hmac, Alg, Key, Message).
+
+-else.
+
+% OTP >= 21, < 22
+hmac(Alg, Key, Message) ->
+    crypto:hmac(Alg, Key, Message).
+
+-endif. % -if(?OTP_RELEASE >= 22)
+
+-else.
+
+% OTP < 21
+hmac(Alg, Key, Message) ->
+    crypto:hmac(Alg, Key, Message).
+
+-endif. % -ifdef(OTP_RELEASE)
