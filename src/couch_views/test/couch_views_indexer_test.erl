@@ -21,6 +21,8 @@
 
 -define(MAP_FUN1, <<"map_fun1">>).
 -define(MAP_FUN2, <<"map_fun2">>).
+-define(QUERY_SERVER_LANG_BINARY, <<"foo_lang">>).
+-define(QUERY_SERVER_LANG_STRING, binary_to_list(?QUERY_SERVER_LANG_BINARY)).
 
 
 indexer_test_() ->
@@ -53,7 +55,8 @@ indexer_test_() ->
                     ?TDEF_FE(handle_db_recreated_when_running),
                     ?TDEF_FE(handle_db_recreated_after_finished),
                     ?TDEF_FE(handle_doc_updated_when_running),
-                    ?TDEF_FE(index_can_recover_from_crash, 60)
+                    ?TDEF_FE(index_can_recover_from_crash, 60),
+                    ?TDEF_FE(handle_acquire_map_context_error)
                 ]
             }
         }
@@ -608,6 +611,23 @@ index_can_recover_from_crash(Db) ->
         row(<<"2">>, 2, 2),
         row(<<"3">>, 3, 3)
     ], Out).
+
+
+handle_acquire_map_context_error(_) ->
+    meck:new(mock_language_server, [non_strict]),
+    config:set("couch_eval.languages", ?QUERY_SERVER_LANG_STRING,
+        atom_to_list(mock_language_server)),
+    meck:expect(mock_language_server, acquire_map_context,
+        fun(_) -> {error, foo_error} end),
+    {'EXIT', {Reason, _}} = (catch couch_views_indexer:start_query_server(#mrst{
+        db_name = "DbName",
+        idx_name = "DDocId",
+        language = ?QUERY_SERVER_LANG_BINARY,
+        sig = "Sig",
+        lib = "Lib",
+        views = []
+    })),
+    ?assertEqual(foo_error, Reason).
 
 
 row(Id, Key, Value) ->
