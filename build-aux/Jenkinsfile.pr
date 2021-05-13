@@ -107,6 +107,7 @@ pipeline {
         axes {
           axis {
             name 'ERLANG_VERSION'
+            // kerl can't build 24 yet
             values '21.3.8.22', '22.3.4.17', '23.3.1'
           }
         }

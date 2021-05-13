@@ -149,16 +149,16 @@ DepDescs = [
 {fauxton,          {url, "https://github.com/apache/couchdb-fauxton"},
                    {tag, "v1.2.6"}, [raw]},
 %% Third party deps
-{folsom,           "folsom",           {tag, "CouchDB-0.8.3"}},
+{folsom,           "folsom",           {tag, "CouchDB-0.8.4"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-6"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-2"}},
-{jaeger_passage,   "jaeger-passage",   {tag, "CouchDB-0.1.14-2"}},
+{jaeger_passage,   "jaeger-passage",   {tag, "CouchDB-0.1.14-4"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-1.0.5-1"}},
 {local,            "local",            {tag, "0.2.1"}},
 {mochiweb,         "mochiweb",         {tag, "v2.20.0"}},
-{meck,             "meck",             {tag, "0.8.8"}},
+{meck,             "meck",             {tag, "0.9.2"}},
 {recon,            "recon",            {tag, "2.5.0"}},
-{passage,          "passage",          {tag, "0.2.6"}},
+{passage,          "passage",          {tag, "CouchDB-0.2.6-1"}},
 {thrift_protocol,  "thrift-protocol",  {tag, "0.1.5"}}
 ].
 
@@ -192,7 +192,7 @@ ErlOpts = case os:getenv("ERL_OPTS") of
 end.
 
 AddConfig = [
-    {require_otp_vsn, "21|22|23"},
+    {require_otp_vsn, "21|22|23|24"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},
