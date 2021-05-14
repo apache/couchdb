@@ -451,7 +451,8 @@ multiple_doc_update_with_existing_rows(Db) ->
     ?assertEqual([
         row(<<"0">>, 0, 0),
         row(<<"1">>, 2, 2)
-    ], Out2).    
+    ], Out2).
+
 
 handle_db_recreated_when_running(Db) ->
     DbName = fabric2_db:name(Db),
@@ -572,7 +573,8 @@ handle_doc_updated_when_running(Db) ->
     }, couch_jobs:wait(SubId, finished, infinity)),
 
     Args = #mrargs{update = false},
-    {ok, Out2} = couch_views:query(Db, DDoc, ?MAP_FUN1, fun fold_fun/2, [], Args),
+    {ok, Out2} = couch_views:query(Db, DDoc, ?MAP_FUN1, fun fold_fun/2, [],
+        Args),
     ?assertEqual([
         row(<<"0">>, 0, 0)
     ], Out2).
@@ -617,17 +619,17 @@ handle_acquire_map_context_error(_) ->
     meck:new(mock_language_server, [non_strict]),
     config:set("couch_eval.languages", ?QUERY_SERVER_LANG_STRING,
         atom_to_list(mock_language_server)),
-    meck:expect(mock_language_server, acquire_map_context,
-        fun(_) -> {error, foo_error} end),
-    {'EXIT', {Reason, _}} = (catch couch_views_indexer:start_query_server(#mrst{
+    meck:expect(mock_language_server, acquire_map_context, fun(_) ->
+        {error, foo_error}
+    end),
+    ?assertError(foo_error, couch_views_indexer:start_query_server(#mrst{
         db_name = "DbName",
         idx_name = "DDocId",
         language = ?QUERY_SERVER_LANG_BINARY,
         sig = "Sig",
         lib = "Lib",
         views = []
-    })),
-    ?assertEqual(foo_error, Reason).
+    })).
 
 
 row(Id, Key, Value) ->
