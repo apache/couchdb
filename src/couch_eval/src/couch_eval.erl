@@ -86,8 +86,12 @@ acquire_map_context(DbName, DDocId, Language, Sig, Lib, MapFuns) ->
         lib => Lib,
         map_funs => MapFuns
     },
-    {ok, Ctx} = ApiMod:acquire_map_context(CtxOpts),
-    {ok, {ApiMod, Ctx}}.
+    case ApiMod:acquire_map_context(CtxOpts) of
+        {ok, Ctx} ->
+            {ok, {ApiMod, Ctx}};
+        {error, Error} ->
+            {error, Error}
+    end.
 
 
 -spec release_map_context(context()) -> ok | {error, any()}.
