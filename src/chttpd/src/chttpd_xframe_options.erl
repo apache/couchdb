@@ -71,7 +71,8 @@ check_host(#httpd{mochi_req = MochiReq} = Req, Config) ->
 
 
 get_xframe_config(#httpd{xframe_config = undefined}) ->
-    EnableXFrame = config:get("httpd", "enable_xframe_options", "false") =:= "true",
+    EnableXFrame = chttpd_util:get_chttpd_config_boolean(
+        "enable_xframe_options", false),
     SameOrigin = config:get("x_frame_options", "same_origin", "false") =:= "true",
     AcceptedHosts = case config:get("x_frame_options", "hosts") of
         undefined -> [];

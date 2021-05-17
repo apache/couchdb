@@ -274,7 +274,7 @@ defmodule ChangesTest do
     assert resp.body["error"] == "bad_request"
     assert resp.body["reason"] == "invalid UTF-8 JSON"
 
-    set_config({"httpd", "max_http_request_size", "16"})
+    set_config({"chttpd", "max_http_request_size", "16"})
 
     resp = Couch.post("/#{db_name}/_changes?filter=changes_filter/bop",
       body: %{doc_ids: ["doc1", "doc3", "doc4"]},

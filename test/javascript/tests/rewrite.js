@@ -26,7 +26,7 @@ couchTests.rewrite = function(debug) {
       [{section: "httpd",
         key: "authentication_handlers",
         value: "{couch_httpd_auth, special_test_authentication_handler}"},
-       {section:"httpd",
+       {section:"chttpd",
         key: "WWW-Authenticate",
         value: "X-Couch-Test-Auth"}],
       
@@ -430,7 +430,7 @@ couchTests.rewrite = function(debug) {
         T(result.error == "insecure_rewrite_rule");
 
         run_on_modified_server(
-          [{section: "httpd",
+          [{section: "chttpd",
             key: "secure_rewrites",
             value: "false"}],
           function() {
@@ -483,7 +483,7 @@ couchTests.rewrite = function(debug) {
 
     // Assert loop detection
     run_on_modified_server(
-      [{section: "httpd",
+      [{section: "chttpd",
         key: "rewrite_limit",
         value: "2"}],
       function(){
@@ -494,10 +494,10 @@ couchTests.rewrite = function(debug) {
 
     // Assert serial execution is not spuriously counted as loop
     run_on_modified_server(
-      [{section: "httpd",
+      [{section: "chttpd",
         key: "rewrite_limit",
         value: "2"},
-       {section: "httpd",
+       {section: "chttpd",
         key: "secure_rewrites",
         value: "false"}],
       function(){

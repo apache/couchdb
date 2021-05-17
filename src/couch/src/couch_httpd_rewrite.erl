@@ -123,7 +123,7 @@ handle_rewrite_req(#httpd{
     QueryList = lists:map(fun decode_query_value/1, couch_httpd:qs(Req)),
 
     RewritesSoFar = erlang:get(?REWRITE_COUNT),
-    MaxRewrites = list_to_integer(config:get("httpd", "rewrite_limit", "100")),
+    MaxRewrites = chttpd_util:get_chttpd_config_integer("rewrite_limit", 100),
     case RewritesSoFar >= MaxRewrites of
         true ->
             throw({bad_request, <<"Exceeded rewrite recursion limit">>});
@@ -438,13 +438,13 @@ path_to_list([<<>>|R], Acc, DotDotCount) ->
 path_to_list([<<"*">>|R], Acc, DotDotCount) ->
     path_to_list(R, [?MATCH_ALL|Acc], DotDotCount);
 path_to_list([<<"..">>|R], Acc, DotDotCount) when DotDotCount == 2 ->
-    case config:get("httpd", "secure_rewrites", "true") of
-    "false" ->
-        path_to_list(R, [<<"..">>|Acc], DotDotCount+1);
-    _Else ->
-        couch_log:info("insecure_rewrite_rule ~p blocked",
-                       [lists:reverse(Acc) ++ [<<"..">>] ++ R]),
-        throw({insecure_rewrite_rule, "too many ../.. segments"})
+    case chttpd_util:get_chttpd_config_boolean("secure_rewrites", true) of
+        false ->
+            path_to_list(R, [<<"..">>|Acc], DotDotCount+1);
+        true ->
+            couch_log:info("insecure_rewrite_rule ~p blocked",
+                [lists:reverse(Acc) ++ [<<"..">>] ++ R]),
+            throw({insecure_rewrite_rule, "too many ../.. segments"})
     end;
 path_to_list([<<"..">>|R], Acc, DotDotCount) ->
     path_to_list(R, [<<"..">>|Acc], DotDotCount+1);
