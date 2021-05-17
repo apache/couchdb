@@ -73,7 +73,7 @@ make_fun_spec_strs(SpecStr) ->
     re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}]).
 
 validate_host(#httpd{} = Req) ->
-    case config:get_boolean("httpd", "validate_host", false) of
+    case chttpd_util:get_chttpd_config_boolean("validate_host", false) of
         true ->
             Host = hostname(Req),
             ValidHosts = valid_hosts(),
@@ -97,7 +97,7 @@ hostname(#httpd{} = Req) ->
     end.
 
 valid_hosts() ->
-    List = config:get("httpd", "valid_hosts", ""),
+    List = chttpd_util:get_chttpd_config("valid_hosts", ""),
     re:split(List, ",", [{return, list}]).
 
 validate_referer(Req) ->
@@ -130,7 +130,8 @@ validate_ctype(Req, Ctype) ->
 
 check_max_request_length(Req) ->
     Len = list_to_integer(header_value(Req, "Content-Length", "0")),
-    MaxLen = config:get_integer("httpd", "max_http_request_size", 4294967296),
+    MaxLen = chttpd_util:get_chttpd_config_integer(
+        "max_http_request_size", 4294967296),
     case Len > MaxLen of
         true ->
             exit({body_too_large, Len});
@@ -199,7 +200,8 @@ path(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(path).
 
 host_for_request(#httpd{mochi_req=MochiReq}) ->
-    XHost = config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
+    XHost = chttpd_util:get_chttpd_config(
+        "x_forwarded_host", "X-Forwarded-Host"),
     case MochiReq:get_header_value(XHost) of
         undefined ->
             case MochiReq:get_header_value("Host") of
@@ -217,11 +219,12 @@ host_for_request(#httpd{mochi_req=MochiReq}) ->
 
 absolute_uri(#httpd{mochi_req=MochiReq}=Req, [$/ | _] = Path) ->
     Host = host_for_request(Req),
-    XSsl = config:get("httpd", "x_forwarded_ssl", "X-Forwarded-Ssl"),
+    XSsl = chttpd_util:get_chttpd_config("x_forwarded_ssl", "X-Forwarded-Ssl"),
     Scheme = case MochiReq:get_header_value(XSsl) of
                  "on" -> "https";
                  _ ->
-                     XProto = config:get("httpd", "x_forwarded_proto", "X-Forwarded-Proto"),
+                     XProto = chttpd_util:get_chttpd_config(
+                         "x_forwarded_proto", "X-Forwarded-Proto"),
                      case MochiReq:get_header_value(XProto) of
                          %% Restrict to "https" and "http" schemes only
                          "https" -> "https";
@@ -252,13 +255,15 @@ recv_chunked(#httpd{mochi_req=MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
     % Fun({Length, Binary}, State)
     % called with Length == 0 on the last time.
     MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState,
-        config:get_integer("httpd", "max_http_request_size", 4294967296)).
+        chttpd_util:get_chttpd_config_integer(
+            "max_http_request_size", 4294967296)).
 
 body_length(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(body_length).
 
 body(#httpd{mochi_req=MochiReq, req_body=undefined}) ->
-    MaxSize = config:get_integer("httpd", "max_http_request_size", 4294967296),
+    MaxSize = chttpd_util:get_chttpd_config_integer(
+        "max_http_request_size", 4294967296),
     MochiReq:recv_body(MaxSize);
 body(#httpd{req_body=ReqBody}) ->
     ReqBody.
@@ -503,11 +508,12 @@ initialize_jsonp(Req) ->
         CallBack ->
             try
                 % make sure jsonp is configured on (default off)
-                case config:get("httpd", "allow_jsonp", "false") of
-                "true" ->
-                    validate_callback(CallBack);
-                _Else ->
-                    put(jsonp, no_jsonp)
+                case chttpd_util:get_chttpd_config_boolean(
+                        "allow_jsonp", false) of
+                    true ->
+                        validate_callback(CallBack);
+                    false ->
+                        put(jsonp, no_jsonp)
                 end
             catch
                 Error ->
@@ -610,7 +616,7 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
         % this is where the basic auth popup is triggered
         case MochiReq:get_header_value("X-CouchDB-WWW-Authenticate") of
         undefined ->
-            case config:get("httpd", "WWW-Authenticate", undefined) of
+            case chttpd_util:get_chttpd_config("WWW-Authenticate") of
             undefined ->
                 % If the client is a browser and the basic auth popup isn't turned on
                 % redirect to the session page.

@@ -467,7 +467,8 @@ possibly_hack(Req) ->
     Req.
 
 check_request_uri_length(Uri) ->
-    check_request_uri_length(Uri, config:get("httpd", "max_uri_length")).
+    check_request_uri_length(Uri,
+        chttpd_util:get_chttpd_config("max_uri_length")).
 
 check_request_uri_length(_Uri, undefined) ->
     ok;
@@ -637,7 +638,8 @@ path(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(path).
 
 absolute_uri(#httpd{mochi_req=MochiReq, absolute_uri = undefined}, Path) ->
-    XHost = config:get("httpd", "x_forwarded_host", "X-Forwarded-Host"),
+    XHost = chttpd_util:get_chttpd_config(
+        "x_forwarded_host", "X-Forwarded-Host"),
     Host = case MochiReq:get_header_value(XHost) of
         undefined ->
             case MochiReq:get_header_value("Host") of
@@ -652,12 +654,12 @@ absolute_uri(#httpd{mochi_req=MochiReq, absolute_uri = undefined}, Path) ->
             end;
         Value -> Value
     end,
-    XSsl = config:get("httpd", "x_forwarded_ssl", "X-Forwarded-Ssl"),
+    XSsl = chttpd_util:get_chttpd_config("x_forwarded_ssl", "X-Forwarded-Ssl"),
     Scheme = case MochiReq:get_header_value(XSsl) of
         "on" -> "https";
         _ ->
-            XProto = config:get("httpd", "x_forwarded_proto",
-                "X-Forwarded-Proto"),
+            XProto = chttpd_util:get_chttpd_config(
+                "x_forwarded_proto", "X-Forwarded-Proto"),
             case MochiReq:get_header_value(XProto) of
                 % Restrict to "https" and "http" schemes only
                 "https" -> "https";
@@ -699,8 +701,8 @@ body(#httpd{mochi_req=MochiReq, req_body=ReqBody}) ->
     case ReqBody of
         undefined ->
             % Maximum size of document PUT request body (4GB)
-            MaxSize =  config:get_integer("httpd", "max_http_request_size",
-                4294967296),
+            MaxSize = chttpd_util:get_chttpd_config_integer(
+                "max_http_request_size", 4294967296),
             Begin = os:timestamp(),
             try
                 MochiReq:recv_body(MaxSize)
@@ -1103,7 +1105,7 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, 401=Code, ErrorStr, ReasonStr) ->
     % this is where the basic auth popup is triggered
     case MochiReq:get_header_value("X-CouchDB-WWW-Authenticate") of
     undefined ->
-        case config:get("httpd", "WWW-Authenticate", undefined) of
+        case chttpd_util:get_chttpd_config("WWW-Authenticate") of
         undefined ->
             % If the client is a browser and the basic auth popup isn't turned on
             % redirect to the session page.
@@ -1312,7 +1314,7 @@ stack_hash(Stack) ->
 %% this value to 0 to restore the older behavior of sending each row in a
 %% dedicated chunk.
 chunked_response_buffer_size() ->
-    config:get_integer("httpd", "chunked_response_buffer", 1490).
+    chttpd_util:get_chttpd_config_integer("chunked_response_buffer", 1490).
 
 basic_headers(Req, Headers0) ->
     Headers = Headers0

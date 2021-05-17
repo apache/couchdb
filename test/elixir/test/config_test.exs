@@ -76,7 +76,7 @@ defmodule ConfigTest do
   end
 
   test "Settings can be altered with undefined whitelist allowing any change", context do
-    refute context["config"]["httpd"]["config_whitelist"], "Default whitelist is empty"
+    refute context["config"]["chttpd"]["config_whitelist"], "Default whitelist is empty"
     set_config(context, "test", "foo", "bar")
     assert get_config(context, "test")["foo"] == "bar"
     assert get_config(context, "test", "foo") == "bar"
@@ -97,32 +97,32 @@ defmodule ConfigTest do
 
   test "Non-term whitelist values allow further modification of the whitelist", context do
     val = "!This is an invalid Erlang term!"
-    set_config(context, "httpd", "config_whitelist", val)
-    assert val == get_config(context, "httpd", "config_whitelist")
-    delete_config(context, "httpd", "config_whitelist")
+    set_config(context, "chttpd", "config_whitelist", val)
+    assert val == get_config(context, "chttpd", "config_whitelist")
+    delete_config(context, "chttpd", "config_whitelist")
   end
 
   test "Non-list whitelist values allow further modification of the whitelist", context do
     val = "{[yes, a_valid_erlang_term, but_unfortunately, not_a_list]}"
-    set_config(context, "httpd", "config_whitelist", val)
-    assert val == get_config(context, "httpd", "config_whitelist")
-    delete_config(context, "httpd", "config_whitelist")
+    set_config(context, "chttpd", "config_whitelist", val)
+    assert val == get_config(context, "chttpd", "config_whitelist")
+    delete_config(context, "chttpd", "config_whitelist")
   end
 
   test "Keys not in the whitelist may not be modified", context do
-    val = "[{httpd,config_whitelist}, {test,foo}]"
-    set_config(context, "httpd", "config_whitelist", val)
-    assert val == get_config(context, "httpd", "config_whitelist")
+    val = "[{chttpd,config_whitelist}, {test,foo}]"
+    set_config(context, "chttpd", "config_whitelist", val)
+    assert val == get_config(context, "chttpd", "config_whitelist")
     set_config(context, "test", "foo", "PUT to whitelisted config variable")
     delete_config(context, "test", "foo")
   end
 
   test "Non-2-tuples in the whitelist are ignored", context do
     val =
-      "[{httpd,config_whitelist}, these, {are}, {nOt, 2, tuples}, [so], [they, will], [all, become, noops], {test,foo}]"
+      "[{chttpd,config_whitelist}, these, {are}, {nOt, 2, tuples}, [so], [they, will], [all, become, noops], {test,foo}]"
 
-    set_config(context, "httpd", "config_whitelist", val)
-    assert val == get_config(context, "httpd", "config_whitelist")
+    set_config(context, "chttpd", "config_whitelist", val)
+    assert val == get_config(context, "chttpd", "config_whitelist")
     set_config(context, "test", "foo", "PUT to whitelisted config variable")
     delete_config(context, "test", "foo")
   end
@@ -133,9 +133,9 @@ defmodule ConfigTest do
     Enum.each(vals, fn pair ->
       set_config(
         context,
-        "httpd",
+        "chttpd",
         "config_whitelist",
-        "[{httpd,config_whitelist}, #{pair}"
+        "[{chttpd,config_whitelist}, #{pair}"
       )
 
       pair_format =
@@ -149,7 +149,7 @@ defmodule ConfigTest do
       delete_config(context, "test", "foo")
     end)
 
-    delete_config(context, "httpd", "config_whitelist")
+    delete_config(context, "chttpd", "config_whitelist")
   end
 
   test "Blacklist is functional", context do

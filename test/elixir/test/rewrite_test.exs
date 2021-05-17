@@ -16,7 +16,7 @@ defmodule RewriteTest do
       @tag config: [
              {"httpd", "authentication_handlers",
               "{couch_httpd_auth, special_test_authentication_handler}"},
-             {"httpd", "WWW-Authenticate", "X-Couch-Test-Auth"}
+             {"chttpd", "WWW-Authenticate", "X-Couch-Test-Auth"}
            ]
       test "Test basic rewrites on #{db_name}", context do
         db_name = context[:db_name]
@@ -450,7 +450,7 @@ defmodule RewriteTest do
 
       @tag with_random_db: db_name
       @tag config: [
-             {"httpd", "secure_rewrites", "false"}
+             {"chttpd", "secure_rewrites", "false"}
            ]
       test "path relative to server on #{db_name}", context do
         db_name = context[:db_name]
@@ -474,7 +474,7 @@ defmodule RewriteTest do
 
       @tag with_random_db: db_name
       @tag config: [
-             {"httpd", "rewrite_limit", "2"}
+             {"chttpd", "rewrite_limit", "2"}
            ]
       test "loop detection on #{db_name}", context do
         db_name = context[:db_name]
@@ -492,8 +492,8 @@ defmodule RewriteTest do
 
       @tag with_random_db: db_name
       @tag config: [
-             {"httpd", "rewrite_limit", "2"},
-             {"httpd", "secure_rewrites", "false"}
+             {"chttpd", "rewrite_limit", "2"},
+             {"chttpd", "secure_rewrites", "false"}
            ]
       test "serial execution is not spuriously counted as loop on #{db_name}", context do
         db_name = context[:db_name]

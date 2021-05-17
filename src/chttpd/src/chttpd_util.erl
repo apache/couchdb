@@ -14,7 +14,11 @@
 
 
 -export([
-    parse_copy_destination_header/1
+    parse_copy_destination_header/1,
+    get_chttpd_config/1,
+    get_chttpd_config/2,
+    get_chttpd_config_integer/2,
+    get_chttpd_config_boolean/2
 ]).
 
 
@@ -39,3 +43,21 @@ parse_copy_destination_header(Req) ->
             end
         end
     end.
+
+
+get_chttpd_config(Key) ->
+    config:get("chttpd", Key, config:get("httpd", Key)).
+
+
+get_chttpd_config(Key, Default) ->
+    config:get("chttpd", Key, config:get("httpd", Key, Default)).
+
+
+get_chttpd_config_integer(Key, Default) ->
+    config:get_integer("chttpd", Key,
+        config:get_integer("httpd", Key, Default)).
+
+
+get_chttpd_config_boolean(Key, Default) ->
+    config:get_boolean("chttpd", Key,
+        config:get_boolean("httpd", Key, Default)).

@@ -20,7 +20,7 @@ defmodule JsonpTest do
 
     server_config = [
       %{
-        :section => "httpd",
+        :section => "chttpd",
         :key => "allow_jsonp",
         :value => "true"
       }
@@ -51,7 +51,7 @@ defmodule JsonpTest do
 
     server_config = [
       %{
-        :section => "httpd",
+        :section => "chttpd",
         :key => "allow_jsonp",
         :value => "true"
       }
