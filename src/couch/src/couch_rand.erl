@@ -12,16 +12,13 @@
 
 -module(couch_rand).
 
-
 -export([
     uniform/0,
     uniform/1
 ]).
 
-
 uniform() ->
     rand:uniform().
-
 
 uniform(N) ->
     rand:uniform(N).

@@ -15,8 +15,14 @@
 -behaviour(config_listener).
 
 -export([start_link/0, get_user_creds/2, update_user_creds/3]).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-    code_change/3]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
 -export([listen_for_changes/1, changes_callback/2]).
 -export([handle_config_change/5, handle_config_terminate/3]).
 
@@ -29,7 +35,7 @@
 
 -record(state, {
     changes_pid,
-    last_seq="0"
+    last_seq = "0"
 }).
 
 %% public functions
@@ -40,18 +46,21 @@ start_link() ->
 get_user_creds(Req, UserName) when is_list(UserName) ->
     get_user_creds(Req, ?l2b(UserName));
 get_user_creds(_Req, UserName) when is_binary(UserName) ->
-    Resp = case couch_auth_cache:get_admin(UserName) of
-    nil ->
-        get_from_cache(UserName);
-    Props ->
-        case get_from_cache(UserName) of
-        nil ->
-            Props;
-        UserProps when is_list(UserProps) ->
-            couch_auth_cache:add_roles(Props,
-                couch_util:get_value(<<"roles">>, UserProps))
-        end
-    end,
+    Resp =
+        case couch_auth_cache:get_admin(UserName) of
+            nil ->
+                get_from_cache(UserName);
+            Props ->
+                case get_from_cache(UserName) of
+                    nil ->
+                        Props;
+                    UserProps when is_list(UserProps) ->
+                        couch_auth_cache:add_roles(
+                            Props,
+                            couch_util:get_value(<<"roles">>, UserProps)
+                        )
+                end
+        end,
     maybe_validate_user_creds(Resp).
 
 update_user_creds(_Req, UserDoc, _Ctx) ->
@@ -128,35 +137,38 @@ handle_call(reinit_cache, _From, State) ->
     self() ! {start_listener, 0},
 
     {reply, ok, State#state{changes_pid = undefined}};
-
 handle_call(_Call, _From, State) ->
     {noreply, State}.
 
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
-handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid=Pid} = State) ->
-    Seq = case Reason of
-        {seq, EndSeq} ->
-            EndSeq;
-    {database_does_not_exist, _} ->
-            ?LOG_NOTICE(#{
-                what => changes_listener_died,
-                reason => database_does_not_exist,
-                details => "create the _users database to silence this notice"
-            }),
-            couch_log:notice("~p changes listener died because the _users database does not exist. Create the database to silence this notice.", [?MODULE]),
-            0;
-        _ ->
-            ?LOG_NOTICE(#{
-                what => changes_listener_died,
-                reason => Reason
-            }),
-            couch_log:notice("~p changes listener died ~r", [?MODULE, Reason]),
-            0
-    end,
+handle_info({'DOWN', _, _, Pid, Reason}, #state{changes_pid = Pid} = State) ->
+    Seq =
+        case Reason of
+            {seq, EndSeq} ->
+                EndSeq;
+            {database_does_not_exist, _} ->
+                ?LOG_NOTICE(#{
+                    what => changes_listener_died,
+                    reason => database_does_not_exist,
+                    details => "create the _users database to silence this notice"
+                }),
+                couch_log:notice(
+                    "~p changes listener died because the _users database does not exist. Create the database to silence this notice.",
+                    [?MODULE]
+                ),
+                0;
+            _ ->
+                ?LOG_NOTICE(#{
+                    what => changes_listener_died,
+                    reason => Reason
+                }),
+                couch_log:notice("~p changes listener died ~r", [?MODULE, Reason]),
+                0
+        end,
     erlang:send_after(5000, self(), {start_listener, Seq}),
-    {noreply, State#state{last_seq=Seq}};
+    {noreply, State#state{last_seq = Seq}};
 handle_info({start_listener, Seq}, State) ->
     {noreply, State#state{changes_pid = spawn_changes(Seq)}};
 handle_info(restart_config_listener, State) ->
@@ -170,7 +182,7 @@ terminate(_Reason, #state{changes_pid = Pid}) when is_pid(Pid) ->
 terminate(_Reason, _State) ->
     ok.
 
-code_change(_OldVsn, #state{}=State, _Extra) ->
+code_change(_OldVsn, #state{} = State, _Extra) ->
     {ok, State}.
 
 %% private functions
@@ -214,7 +226,6 @@ changes_callback({timeout, _ResponseType}, Acc) ->
 changes_callback({error, _}, EndSeq) ->
     exit({seq, EndSeq}).
 
-
 handle_config_change("chttpd_auth", "authentication_db", _DbName, _, _) ->
     {ok, gen_server:call(?MODULE, reinit_cache, infinity)};
 handle_config_change(_, _, _, _, _) ->
@@ -226,35 +237,34 @@ handle_config_terminate(_Server, _Reason, _State) ->
     Dst = whereis(?MODULE),
     erlang:send_after(?RELISTEN_DELAY, Dst, restart_config_listener).
 
-
 load_user_from_db(UserName) ->
     {ok, Db} = fabric2_db:open(dbname(), [?ADMIN_CTX]),
     try fabric2_db:open_doc(Db, docid(UserName), [conflicts]) of
-    {ok, Doc} ->
-        {Props} = couch_doc:to_json_obj(Doc, []),
-        Props;
-    _Else ->
-        ?LOG_DEBUG(#{
-            what => missing_user_document,
-            user => UserName
-        }),
-        couch_log:debug("no record of user ~s", [UserName]),
-        nil
-    catch error:database_does_not_exist ->
-        nil
+        {ok, Doc} ->
+            {Props} = couch_doc:to_json_obj(Doc, []),
+            Props;
+        _Else ->
+            ?LOG_DEBUG(#{
+                what => missing_user_document,
+                user => UserName
+            }),
+            couch_log:debug("no record of user ~s", [UserName]),
+            nil
+    catch
+        error:database_does_not_exist ->
+            nil
     end.
-
 
 ensure_auth_db() ->
     try
         fabric2_db:open(dbname(), [?ADMIN_CTX])
-    catch error:database_does_not_exist ->
-        case fabric2_db:create(dbname(), [?ADMIN_CTX]) of
-            {ok, _} -> ok;
-            {error, file_exists} -> ok
-        end
+    catch
+        error:database_does_not_exist ->
+            case fabric2_db:create(dbname(), [?ADMIN_CTX]) of
+                {ok, _} -> ok;
+                {error, file_exists} -> ok
+            end
     end.
-
 
 dbname() ->
     DbNameStr = config:get("chttpd_auth", "authentication_db", "_users"),
@@ -268,30 +278,37 @@ username(<<"org.couchdb.user:", UserName/binary>>) ->
 
 ensure_auth_ddoc_exists(Db, DDocId) ->
     case fabric2_db:open_doc(Db, DDocId) of
-    {not_found, _Reason} ->
-        {ok, AuthDesign} = couch_auth_cache:auth_design_doc(DDocId),
-        update_doc_ignoring_conflict(Db, AuthDesign);
-    {ok, Doc} ->
-        {Props} = couch_doc:to_json_obj(Doc, []),
-        case couch_util:get_value(<<"validate_doc_update">>, Props, []) of
-            ?AUTH_DB_DOC_VALIDATE_FUNCTION ->
-                ok;
-            _ ->
-                Props1 = lists:keyreplace(<<"validate_doc_update">>, 1, Props,
-                    {<<"validate_doc_update">>,
-                    ?AUTH_DB_DOC_VALIDATE_FUNCTION}),
-                NewDoc = couch_doc:from_json_obj({Props1}),
-                update_doc_ignoring_conflict(Db, NewDoc)
-        end;
-    {error, Reason} ->
-        ?LOG_NOTICE(#{
-            what => ensure_auth_ddoc_exists_failure,
-            db => dbname(),
-            docid => DDocId,
-            details => Reason
-        }),
-        couch_log:notice("Failed to ensure auth ddoc ~s/~s exists for reason: ~p", [dbname(), DDocId, Reason]),
-        ok
+        {not_found, _Reason} ->
+            {ok, AuthDesign} = couch_auth_cache:auth_design_doc(DDocId),
+            update_doc_ignoring_conflict(Db, AuthDesign);
+        {ok, Doc} ->
+            {Props} = couch_doc:to_json_obj(Doc, []),
+            case couch_util:get_value(<<"validate_doc_update">>, Props, []) of
+                ?AUTH_DB_DOC_VALIDATE_FUNCTION ->
+                    ok;
+                _ ->
+                    Props1 = lists:keyreplace(
+                        <<"validate_doc_update">>,
+                        1,
+                        Props,
+                        {<<"validate_doc_update">>, ?AUTH_DB_DOC_VALIDATE_FUNCTION}
+                    ),
+                    NewDoc = couch_doc:from_json_obj({Props1}),
+                    update_doc_ignoring_conflict(Db, NewDoc)
+            end;
+        {error, Reason} ->
+            ?LOG_NOTICE(#{
+                what => ensure_auth_ddoc_exists_failure,
+                db => dbname(),
+                docid => DDocId,
+                details => Reason
+            }),
+            couch_log:notice("Failed to ensure auth ddoc ~s/~s exists for reason: ~p", [
+                dbname(),
+                DDocId,
+                Reason
+            ]),
+            ok
     end,
     ok.
 
@@ -308,15 +325,20 @@ maybe_validate_user_creds(nil) ->
 % throws if UserCreds includes a _conflicts member
 % returns UserCreds otherwise
 maybe_validate_user_creds(UserCreds) ->
-    AllowConflictedUserDocs = config:get_boolean("chttpd_auth", "allow_conflicted_user_docs", false),
+    AllowConflictedUserDocs = config:get_boolean(
+        "chttpd_auth",
+        "allow_conflicted_user_docs",
+        false
+    ),
     case {couch_util:get_value(<<"_conflicts">>, UserCreds), AllowConflictedUserDocs} of
         {undefined, _} ->
             {ok, UserCreds, nil};
         {_, true} ->
             {ok, UserCreds, nil};
         {_ConflictList, false} ->
-            throw({unauthorized,
-                <<"User document conflicts must be resolved before the document",
-                  " is used for authentication purposes.">>
-            })
+            throw(
+                {unauthorized,
+                    <<"User document conflicts must be resolved before the document",
+                        " is used for authentication purposes.">>}
+            )
     end.

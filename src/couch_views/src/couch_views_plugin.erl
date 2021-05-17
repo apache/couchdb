@@ -10,22 +10,17 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 -module(couch_views_plugin).
-
 
 -export([
     after_interactive_write/4
 ]).
 
-
 -define(SERVICE_ID, couch_views).
-
 
 after_interactive_write(Db, Mrst, Result, DocNumber) ->
     with_pipe(after_interactive_write, [Db, Mrst, Result, DocNumber]),
     ok.
-
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -33,7 +28,6 @@ after_interactive_write(Db, Mrst, Result, DocNumber) ->
 
 with_pipe(Func, Args) ->
     do_apply(Func, Args, [pipe]).
-
 
 do_apply(Func, Args, Opts) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),

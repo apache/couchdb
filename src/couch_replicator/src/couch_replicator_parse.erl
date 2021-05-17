@@ -12,7 +12,6 @@
 
 -module(couch_replicator_parse).
 
-
 -export([
     parse_rep_doc/1,
     parse_transient_rep/2,
@@ -20,11 +19,9 @@
     parse_rep_db/3
 ]).
 
-
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include("couch_replicator.hrl").
 -include_lib("kernel/include/logger.hrl").
-
 
 -define(DEFAULT_SOCK_OPTS, "[{keepalive, true}, {nodelay, false}]").
 -define(VALID_SOCK_OPTS, [
@@ -54,69 +51,68 @@
     {"socket_options", ?DEFAULT_SOCK_OPTS, fun parse_sock_opts/1}
 ]).
 
-
 -spec parse_rep_doc({[_]}) -> #{}.
 parse_rep_doc(RepDoc) ->
-    {ok, Rep} = try
-        parse_rep(RepDoc, null)
-    catch
-        throw:{error, Reason}:Stack ->
-            ?LOG_ERROR(#{
-                what => replication_doc_parse_error,
-                in => replicator,
-                details => Reason,
-                stacktrace => Stack
-            }),
-            LogErr1 = "~p parse_rep_doc fail ~p ~p",
-            couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
-            throw({bad_rep_doc, Reason});
-        Tag:Err:Stack ->
-            ?LOG_ERROR(#{
-                what => replication_doc_parse_error,
-                in => replicator,
-                tag => Tag,
-                details => Err,
-                stacktrace => Stack
-            }),
-            LogErr2 = "~p parse_rep_doc fail ~p:~p ~p",
-            couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
-            throw({bad_rep_doc, couch_util:to_binary({Tag, Err})})
-    end,
+    {ok, Rep} =
+        try
+            parse_rep(RepDoc, null)
+        catch
+            throw:{error, Reason}:Stack ->
+                ?LOG_ERROR(#{
+                    what => replication_doc_parse_error,
+                    in => replicator,
+                    details => Reason,
+                    stacktrace => Stack
+                }),
+                LogErr1 = "~p parse_rep_doc fail ~p ~p",
+                couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
+                throw({bad_rep_doc, Reason});
+            Tag:Err:Stack ->
+                ?LOG_ERROR(#{
+                    what => replication_doc_parse_error,
+                    in => replicator,
+                    tag => Tag,
+                    details => Err,
+                    stacktrace => Stack
+                }),
+                LogErr2 = "~p parse_rep_doc fail ~p:~p ~p",
+                couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
+                throw({bad_rep_doc, couch_util:to_binary({Tag, Err})})
+        end,
     Rep.
-
 
 -spec parse_transient_rep({[_]} | #{}, user_name()) -> {ok, #{}}.
 parse_transient_rep({Props} = EJson, UserName) when is_list(Props) ->
     Str = couch_util:json_encode(EJson),
     Map = couch_util:json_decode(Str, [return_maps]),
     parse_transient_rep(Map, UserName);
-
 parse_transient_rep(#{} = Body, UserName) ->
-    {ok, Rep} = try
-        parse_rep(Body, UserName)
-    catch
-        throw:{error, Reason}:Stack ->
-            ?LOG_ERROR(#{
-                what => transient_replication_parse_error,
-                in => replicator,
-                details => Reason,
-                stacktrace => Stack
-            }),
-            LogErr1 = "~p parse_transient_rep fail ~p ~p",
-            couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
-            throw({bad_request, Reason});
-        Tag:Err:Stack ->
-            ?LOG_ERROR(#{
-                what => transient_replication_parse_error,
-                in => replicator,
-                tag => Tag,
-                details => Err,
-                stacktrace => Stack
-            }),
-            LogErr2 = "~p parse_transient_rep fail ~p ~p",
-            couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
-            throw({bad_request, couch_util:to_binary({Tag, Err})})
-    end,
+    {ok, Rep} =
+        try
+            parse_rep(Body, UserName)
+        catch
+            throw:{error, Reason}:Stack ->
+                ?LOG_ERROR(#{
+                    what => transient_replication_parse_error,
+                    in => replicator,
+                    details => Reason,
+                    stacktrace => Stack
+                }),
+                LogErr1 = "~p parse_transient_rep fail ~p ~p",
+                couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
+                throw({bad_request, Reason});
+            Tag:Err:Stack ->
+                ?LOG_ERROR(#{
+                    what => transient_replication_parse_error,
+                    in => replicator,
+                    tag => Tag,
+                    details => Err,
+                    stacktrace => Stack
+                }),
+                LogErr2 = "~p parse_transient_rep fail ~p ~p",
+                couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
+                throw({bad_request, couch_util:to_binary({Tag, Err})})
+        end,
     #{?OPTIONS := Options} = Rep,
     Cancel = maps:get(<<"cancel">>, Options, false),
     Id = maps:get(<<"id">>, Options, nil),
@@ -134,13 +130,11 @@ parse_transient_rep(#{} = Body, UserName) ->
             {ok, JobId, Rep}
     end.
 
-
 -spec parse_rep({[_]} | #{}, user_name()) -> {ok, #{}}.
 parse_rep({Props} = EJson, UserName) when is_list(Props) ->
     Str = couch_util:json_encode(EJson),
     Map = couch_util:json_decode(Str, [return_maps]),
     parse_rep(Map, UserName);
-
 parse_rep(#{} = Doc, UserName) ->
     {SrcProxy, TgtProxy} = parse_proxy_settings(Doc),
     Opts = make_options(Doc),
@@ -176,33 +170,38 @@ parse_rep(#{} = Doc, UserName) ->
             {ok, Rep}
     end.
 
-
 -spec parse_rep_db(#{}, #{}, #{}) -> #{}.
 parse_rep_db(#{} = Endpoint, #{} = ProxyParams, #{} = Options) ->
-    ProxyUrl = case ProxyParams of
-        #{<<"proxy_url">> := PUrl} -> PUrl;
-        _ -> null
-    end,
+    ProxyUrl =
+        case ProxyParams of
+            #{<<"proxy_url">> := PUrl} -> PUrl;
+            _ -> null
+        end,
 
     Url0 = maps:get(<<"url">>, Endpoint),
     Url = maybe_add_trailing_slash(Url0),
 
     AuthProps = maps:get(<<"auth">>, Endpoint, #{}),
-    if is_map(AuthProps) -> ok; true ->
-        throw({error, "if defined, `auth` must be an object"})
+    if
+        is_map(AuthProps) -> ok;
+        true -> throw({error, "if defined, `auth` must be an object"})
     end,
 
     Headers0 = maps:get(<<"headers">>, Endpoint, #{}),
-    if is_map(Headers0) -> ok; true ->
-        throw({error, "if defined `headers` must be an object"})
+    if
+        is_map(Headers0) -> ok;
+        true -> throw({error, "if defined `headers` must be an object"})
     end,
     DefaultHeaders = couch_replicator_utils:default_headers_map(),
     Headers = maps:merge(DefaultHeaders, Headers0),
 
     SockOpts = maps:get(<<"socket_options">>, Options, #{}),
-    SockAndProxy = maps:merge(#{
-        <<"socket_options">> => SockOpts
-    }, ProxyParams),
+    SockAndProxy = maps:merge(
+        #{
+            <<"socket_options">> => SockOpts
+        },
+        ProxyParams
+    ),
     SslParams = ssl_params(Url),
 
     #{
@@ -215,19 +214,14 @@ parse_rep_db(#{} = Endpoint, #{} = ProxyParams, #{} = Options) ->
         <<"retries">> => maps:get(<<"retries_per_request">>, Options),
         <<"proxy_url">> => ProxyUrl
     };
-
 parse_rep_db(<<"http://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db(#{<<"url">> => Url}, Proxy, Options);
-
 parse_rep_db(<<"https://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db(#{<<"url">> => Url}, Proxy, Options);
-
 parse_rep_db(<<_/binary>>, _Proxy, _Options) ->
     throw({error, local_endpoints_not_supported});
-
 parse_rep_db(undefined, _Proxy, _Options) ->
     throw({error, <<"Missing replication endpoint">>}).
-
 
 parse_proxy_settings(#{} = Doc) ->
     Proxy = maps:get(?PROXY, Doc, <<>>),
@@ -238,7 +232,7 @@ parse_proxy_settings(#{} = Doc) ->
         true when SrcProxy =/= <<>> ->
             Error = "`proxy` is mutually exclusive with `source_proxy`",
             throw({error, Error});
-        true when  TgtProxy =/= <<>> ->
+        true when TgtProxy =/= <<>> ->
             Error = "`proxy` is mutually exclusive with `target_proxy`",
             throw({error, Error});
         true ->
@@ -247,46 +241,49 @@ parse_proxy_settings(#{} = Doc) ->
             {parse_proxy_params(SrcProxy), parse_proxy_params(TgtProxy)}
     end.
 
-
 -spec maybe_add_trailing_slash(binary()) -> binary().
 maybe_add_trailing_slash(<<>>) ->
     <<>>;
-
 maybe_add_trailing_slash(Url) when is_binary(Url) ->
     case binary:match(Url, <<"?">>) of
         nomatch ->
             case binary:last(Url) of
-                $/  -> Url;
+                $/ -> Url;
                 _ -> <<Url/binary, "/">>
             end;
         _ ->
-            Url  % skip if there are query params
+            % skip if there are query params
+            Url
     end.
-
 
 -spec make_options(#{}) -> #{}.
 make_options(#{} = RepDoc) ->
     Options0 = convert_options(RepDoc),
     Options = check_options(Options0),
-    ConfigOptions = lists:foldl(fun({K, Default, ConversionFun}, Acc) ->
-        V = ConversionFun(config:get("replicator", K, Default)),
-        Acc#{list_to_binary(K) => V}
-    end, #{}, ?CONFIG_DEFAULTS),
+    ConfigOptions = lists:foldl(
+        fun({K, Default, ConversionFun}, Acc) ->
+            V = ConversionFun(config:get("replicator", K, Default)),
+            Acc#{list_to_binary(K) => V}
+        end,
+        #{},
+        ?CONFIG_DEFAULTS
+    ),
     maps:merge(ConfigOptions, Options).
-
 
 -spec convert_options(#{}) -> #{} | no_return().
 convert_options(#{} = Doc) ->
     maps:fold(fun convert_fold/3, #{}, Doc).
-
 
 -spec convert_fold(binary(), any(), #{}) -> #{}.
 convert_fold(<<"cancel">>, V, Acc) when is_boolean(V) ->
     Acc#{<<"cancel">> => V};
 convert_fold(<<"cancel">>, _, _) ->
     throw({error, <<"`cancel` must be a boolean">>});
-convert_fold(IdOpt, V, Acc) when IdOpt =:= <<"_local_id">>;
-        IdOpt =:= <<"replication_id">>; IdOpt =:= <<"id">> ->
+convert_fold(IdOpt, V, Acc) when
+    IdOpt =:= <<"_local_id">>;
+    IdOpt =:= <<"replication_id">>;
+    IdOpt =:= <<"id">>
+->
     Acc#{<<"id">> => couch_replicator_ids:convert(V)};
 convert_fold(<<"create_target">>, V, Acc) when is_boolean(V) ->
     Acc#{<<"create_target">> => V};
@@ -312,12 +309,15 @@ convert_fold(<<"doc_ids">>, null, Acc) ->
     Acc;
 convert_fold(<<"doc_ids">>, V, Acc) when is_list(V) ->
     % Compatibility behaviour as: accept a list of percent encoded doc IDs
-    Ids = lists:map(fun(Id) ->
-        case is_binary(Id) andalso byte_size(Id) > 0 of
-            true -> list_to_binary(couch_httpd:unquote(Id));
-            false -> throw({error, <<"`doc_ids` array must contain strings">>})
-        end
-    end, V),
+    Ids = lists:map(
+        fun(Id) ->
+            case is_binary(Id) andalso byte_size(Id) > 0 of
+                true -> list_to_binary(couch_httpd:unquote(Id));
+                false -> throw({error, <<"`doc_ids` array must contain strings">>})
+            end
+        end,
+        V
+    ),
     Acc#{<<"doc_ids">> => lists:usort(Ids)};
 convert_fold(<<"doc_ids">>, _, _) ->
     throw({error, <<"`doc_ids` must be an array">>});
@@ -345,13 +345,12 @@ convert_fold(<<"use_checkpoints">>, _, _) ->
     throw({error, <<"`use_checkpoints` must be a boolean">>});
 convert_fold(<<"checkpoint_interval">>, V, Acc) ->
     Acc#{<<"checkpoint_interval">> => bin2int(V, <<"checkpoint_interval">>)};
-convert_fold(_K, _V, Acc) -> % skip unknown option
+% skip unknown option
+convert_fold(_K, _V, Acc) ->
     Acc.
-
 
 bin2int(V, _Field) when is_integer(V) ->
     V;
-
 bin2int(V, Field) when is_binary(V) ->
     try
         erlang:binary_to_integer(V)
@@ -359,10 +358,8 @@ bin2int(V, Field) when is_binary(V) ->
         error:badarg ->
             throw({error, <<"`", Field/binary, "` must be an integer">>})
     end;
-
 bin2int(_V, Field) ->
     throw({error, <<"`", Field/binary, "` must be an integer">>}).
-
 
 -spec check_options(#{}) -> #{}.
 check_options(Options) ->
@@ -370,32 +367,43 @@ check_options(Options) ->
     Filter = maps:is_key(<<"filter">>, Options),
     Selector = maps:is_key(<<"selector">>, Options),
     case {DocIds, Filter, Selector} of
-        {false, false, false} -> Options;
-        {false, false, _} -> Options;
-        {false, _, false} -> Options;
-        {_, false, false} -> Options;
-        _ -> throw({error, <<"`doc_ids`,`filter`,`selector` are mutually "
-            " exclusive">>})
+        {false, false, false} ->
+            Options;
+        {false, false, _} ->
+            Options;
+        {false, _, false} ->
+            Options;
+        {_, false, false} ->
+            Options;
+        _ ->
+            throw(
+                {error, <<
+                    "`doc_ids`,`filter`,`selector` are mutually "
+                    " exclusive"
+                >>}
+            )
     end.
-
 
 parse_sock_opts(Term) ->
     {ok, SocketOptions} = couch_util:parse_term(Term),
-    lists:foldl(fun
-        ({K, V}, Acc) when is_atom(K) ->
-            case lists:member(K, ?VALID_SOCK_OPTS) of
-                true -> Acc#{atom_to_binary(K, utf8) => V};
-                false -> Acc
-            end;
-        (_, Acc) ->
-            Acc
-    end, #{}, SocketOptions).
-
+    lists:foldl(
+        fun
+            ({K, V}, Acc) when is_atom(K) ->
+                case lists:member(K, ?VALID_SOCK_OPTS) of
+                    true -> Acc#{atom_to_binary(K, utf8) => V};
+                    false -> Acc
+                end;
+            (_, Acc) ->
+                Acc
+        end,
+        #{},
+        SocketOptions
+    ).
 
 -spec parse_proxy_params(binary() | #{}) -> #{}.
 parse_proxy_params(<<>>) ->
     #{};
-parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl)->
+parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl) ->
     #url{
         host = Host,
         port = Port,
@@ -403,10 +411,11 @@ parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl)->
         password = Passwd,
         protocol = Prot0
     } = ibrowse_lib:parse_url(binary_to_list(ProxyUrl)),
-    Prot = case lists:member(Prot0, ?VALID_PROXY_PROTOCOLS) of
-        true -> atom_to_binary(Prot0, utf8);
-        false -> throw({error, <<"Unsupported proxy protocol">>})
-    end,
+    Prot =
+        case lists:member(Prot0, ?VALID_PROXY_PROTOCOLS) of
+            true -> atom_to_binary(Prot0, utf8);
+            false -> throw({error, <<"Unsupported proxy protocol">>})
+        end,
     ProxyParams = #{
         <<"proxy_url">> => ProxyUrl,
         <<"proxy_protocol">> => Prot,
@@ -423,7 +432,6 @@ parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl)->
             ProxyParams
     end.
 
-
 -spec ssl_params(binary()) -> #{}.
 ssl_params(Url) ->
     case ibrowse_lib:parse_url(binary_to_list(Url)) of
@@ -438,21 +446,26 @@ ssl_params(Url) ->
             VerifySslOptions = ssl_verify_options(VerifyCerts =:= "true"),
             SslOpts = maps:merge(VerifySslOptions, #{<<"depth">> => Depth}),
             HaveCertAndKey = CertFile /= null andalso KeyFile /= null,
-            SslOpts1 = case HaveCertAndKey of false -> SslOpts; true ->
-                CertOpts0 = #{
-                    <<"certfile">> => list_to_binary(CertFile),
-                    <<"keyfile">> => list_to_binary(KeyFile)
-                },
-                CertOpts = case Password of null -> CertOpts0; _ ->
-                    CertOpts0#{<<"password">> => list_to_binary(Password)}
+            SslOpts1 =
+                case HaveCertAndKey of
+                    false ->
+                        SslOpts;
+                    true ->
+                        CertOpts0 = #{
+                            <<"certfile">> => list_to_binary(CertFile),
+                            <<"keyfile">> => list_to_binary(KeyFile)
+                        },
+                        CertOpts =
+                            case Password of
+                                null -> CertOpts0;
+                                _ -> CertOpts0#{<<"password">> => list_to_binary(Password)}
+                            end,
+                        maps:merge(SslOpts, CertOpts)
                 end,
-                maps:merge(SslOpts, CertOpts)
-            end,
             #{<<"is_ssl">> => true, <<"ssl_options">> => SslOpts1};
         #url{protocol = http} ->
             #{}
     end.
-
 
 -spec ssl_verify_options(true | false) -> [_].
 ssl_verify_options(true) ->
@@ -468,73 +481,102 @@ ssl_verify_options(true) ->
                 <<"cacertfile">> => list_to_binary(CAFile)
             }
     end;
-
 ssl_verify_options(false) ->
     #{
         <<"verify">> => <<"verify_none">>
     }.
-
 
 -ifdef(TEST).
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 check_options_pass_values_test() ->
     ?assertEqual(check_options(#{}), #{}),
-    ?assertEqual(check_options(#{<<"baz">> => <<"foo">>}),
-        #{<<"baz">> => <<"foo">>}),
-    ?assertEqual(check_options(#{<<"doc_ids">> => [<<"x">>]}),
-        #{<<"doc_ids">> => [<<"x">>]}),
-    ?assertEqual(check_options(#{<<"filter">> => <<"f">>}),
-        #{<<"filter">> => <<"f">>}),
-    ?assertEqual(check_options(#{<<"selector">> => <<"s">>}),
-        #{<<"selector">> => <<"s">>}).
-
+    ?assertEqual(
+        check_options(#{<<"baz">> => <<"foo">>}),
+        #{<<"baz">> => <<"foo">>}
+    ),
+    ?assertEqual(
+        check_options(#{<<"doc_ids">> => [<<"x">>]}),
+        #{<<"doc_ids">> => [<<"x">>]}
+    ),
+    ?assertEqual(
+        check_options(#{<<"filter">> => <<"f">>}),
+        #{<<"filter">> => <<"f">>}
+    ),
+    ?assertEqual(
+        check_options(#{<<"selector">> => <<"s">>}),
+        #{<<"selector">> => <<"s">>}
+    ).
 
 check_options_fail_values_test() ->
-    ?assertThrow({error, _},
-        check_options(#{<<"doc_ids">> => [], <<"filter">> => <<"f">>})),
-    ?assertThrow({error, _},
-        check_options(#{<<"doc_ids">> => [], <<"selector">> => <<"s">>})),
-    ?assertThrow({error, _},
-        check_options(#{<<"filter">> => <<"f">>, <<"selector">> => <<"s">>})),
-    ?assertThrow({error, _},
+    ?assertThrow(
+        {error, _},
+        check_options(#{<<"doc_ids">> => [], <<"filter">> => <<"f">>})
+    ),
+    ?assertThrow(
+        {error, _},
+        check_options(#{<<"doc_ids">> => [], <<"selector">> => <<"s">>})
+    ),
+    ?assertThrow(
+        {error, _},
+        check_options(#{<<"filter">> => <<"f">>, <<"selector">> => <<"s">>})
+    ),
+    ?assertThrow(
+        {error, _},
         check_options(#{
             <<"doc_ids">> => [],
             <<"filter">> => <<"f">>,
-            <<"selector">> => <<"s">>}
-    )).
-
+            <<"selector">> => <<"s">>
+        })
+    ).
 
 check_convert_options_pass_test() ->
     ?assertEqual(#{}, convert_options(#{})),
     ?assertEqual(#{}, convert_options(#{<<"random">> => 42})),
-    ?assertEqual(#{<<"cancel">> => true},
-        convert_options(#{<<"cancel">> => true})),
-    ?assertEqual(#{<<"create_target">> => true},
-        convert_options(#{<<"create_target">> => true})),
-    ?assertEqual(#{<<"continuous">> => true},
-        convert_options(#{<<"continuous">> => true})),
-    ?assertEqual(#{<<"doc_ids">> => [<<"id">>]},
-        convert_options(#{<<"doc_ids">> => [<<"id">>]})),
-    ?assertEqual(#{<<"selector">> => #{<<"key">> => <<"value">>}},
-        convert_options(#{<<"selector">> => #{<<"key">> => <<"value">>}})).
-
+    ?assertEqual(
+        #{<<"cancel">> => true},
+        convert_options(#{<<"cancel">> => true})
+    ),
+    ?assertEqual(
+        #{<<"create_target">> => true},
+        convert_options(#{<<"create_target">> => true})
+    ),
+    ?assertEqual(
+        #{<<"continuous">> => true},
+        convert_options(#{<<"continuous">> => true})
+    ),
+    ?assertEqual(
+        #{<<"doc_ids">> => [<<"id">>]},
+        convert_options(#{<<"doc_ids">> => [<<"id">>]})
+    ),
+    ?assertEqual(
+        #{<<"selector">> => #{<<"key">> => <<"value">>}},
+        convert_options(#{<<"selector">> => #{<<"key">> => <<"value">>}})
+    ).
 
 check_convert_options_fail_test() ->
-    ?assertThrow({error, _},
-        convert_options(#{<<"cancel">> => <<"true">>})),
-    ?assertThrow({error, _},
-        convert_options(#{<<"create_target">> => <<"true">>})),
-    ?assertThrow({error, _},
-        convert_options(#{<<"continuous">> => <<"true">>})),
-    ?assertThrow({error, _},
-        convert_options(#{<<"doc_ids">> => <<"not_a_list">>})),
-    ?assertThrow({error, _},
-        convert_options(#{<<"selector">> => <<"bad">>})).
-
+    ?assertThrow(
+        {error, _},
+        convert_options(#{<<"cancel">> => <<"true">>})
+    ),
+    ?assertThrow(
+        {error, _},
+        convert_options(#{<<"create_target">> => <<"true">>})
+    ),
+    ?assertThrow(
+        {error, _},
+        convert_options(#{<<"continuous">> => <<"true">>})
+    ),
+    ?assertThrow(
+        {error, _},
+        convert_options(#{<<"doc_ids">> => <<"not_a_list">>})
+    ),
+    ?assertThrow(
+        {error, _},
+        convert_options(#{<<"selector">> => <<"bad">>})
+    ).
 
 local_replication_endpoint_error_test_() ->
     {
@@ -546,23 +588,20 @@ local_replication_endpoint_error_test_() ->
         ]
     }.
 
-
 setup() ->
     meck:expect(config, get, fun(_, _, Default) -> Default end).
-
 
 teardown(_) ->
     meck:unload().
 
-
 t_error_on_local_endpoint(_) ->
-    RepDoc = {[
-        {<<"_id">>, <<"someid">>},
-        {<<"source">>, <<"localdb">>},
-        {<<"target">>, <<"http://somehost.local/tgt">>}
-    ]},
+    RepDoc =
+        {[
+            {<<"_id">>, <<"someid">>},
+            {<<"source">>, <<"localdb">>},
+            {<<"target">>, <<"http://somehost.local/tgt">>}
+        ]},
     Expect = local_endpoints_not_supported,
     ?assertThrow({bad_rep_doc, Expect}, parse_rep_doc(RepDoc)).
-
 
 -endif.

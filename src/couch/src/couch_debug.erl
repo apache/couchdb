@@ -50,151 +50,181 @@ help() ->
 
 -spec help(Function :: atom()) -> ok.
 help(opened_files) ->
-    io:format("
-    opened_files()
-    --------------
-
-    Returns list of currently opened files
-    It iterates through `erlang:ports` and filters out all ports which are not efile.
-    It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
-    ---
-    ", []);
+    io:format(
+        "\n"
+        "    opened_files()\n"
+        "    --------------\n"
+        "\n"
+        "    Returns list of currently opened files\n"
+        "    It iterates through `erlang:ports` and filters out all ports which are not efile.\n"
+        "    It uses `process_info(Pid, dictionary)` to get info about couch_file properties.\n"
+        "    ---\n"
+        "    ",
+        []
+    );
 help(opened_files_by_regexp) ->
-    io:format("
-    opened_files_by_regexp(FileRegExp)
-    ----------------------------------
-
-    Returns list of currently opened files which name match the provided regular expression.
-    It iterates through `erlang:ports()` and filter out all ports which are not efile.
-    It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
-    ---
-    ", []);
+    io:format(
+        "\n"
+        "    opened_files_by_regexp(FileRegExp)\n"
+        "    ----------------------------------\n"
+        "\n"
+        "    Returns list of currently opened files which name match the provided regular expression.\n"
+        "    It iterates through `erlang:ports()` and filter out all ports which are not efile.\n"
+        "    It uses `process_info(Pid, dictionary)` to get info about couch_file properties.\n"
+        "    ---\n"
+        "    ",
+        []
+    );
 help(opened_files_contains) ->
-    io:format("
-    opened_files_contains(SubString)
-    --------------------------------
-
-    Returns list of currently opened files whose names contain the provided SubString.
-    It iterates through `erlang:ports()` and filters out all ports which are not efile.
-    It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
-    ---
-    ", []);
+    io:format(
+        "\n"
+        "    opened_files_contains(SubString)\n"
+        "    --------------------------------\n"
+        "\n"
+        "    Returns list of currently opened files whose names contain the provided SubString.\n"
+        "    It iterates through `erlang:ports()` and filters out all ports which are not efile.\n"
+        "    It uses `process_info(Pid, dictionary)` to get info about couch_file properties.\n"
+        "    ---\n"
+        "    ",
+        []
+    );
 help(process_name) ->
-    io:format("
-    process_name(Pid)
-    -----------------
-
-    Uses heuristics to figure out the process name.
-    The heuristic is based on the following information about the process:
-    - process_info(Pid, registered_name)
-    - '$initial_call' key in process dictionary
-    - process_info(Pid, initial_call)
-
-    ---
-    ", []);
+    io:format(
+        "\n"
+        "    process_name(Pid)\n"
+        "    -----------------\n"
+        "\n"
+        "    Uses heuristics to figure out the process name.\n"
+        "    The heuristic is based on the following information about the process:\n"
+        "    - process_info(Pid, registered_name)\n"
+        "    - '$initial_call' key in process dictionary\n"
+        "    - process_info(Pid, initial_call)\n"
+        "\n"
+        "    ---\n"
+        "    ",
+        []
+    );
 help(link_tree) ->
-    io:format("
-    link_tree(Pid)
-    --------------
-
-    Returns a tree which represents a cluster of linked processes.
-    This function receives the initial Pid to start from.
-    The function doesn't recurse to pids older than initial one.
-    The Pids which are lesser than initial Pid are still shown in the output.
-    This is analogue of `link_tree(RootPid, []).`
-
-    link_tree(Pid, Info)
-    --------------------
-
-    Returns a tree which represents a cluster of linked processes.
-    This function receives the initial Pid to start from.
-    The function doesn't recurse to pids older than initial one.
-    The Pids which are lesser than initial Pid are still shown in the output.
-    The info argument is a list of process_info_item() as documented in
-    erlang:process_info/2. We don't do any attempts to prevent dangerous items.
-    Be warn that passing some of them such as `messages` for example
-    can be dangerous in a very busy system.
-    ---
-    ", []);
+    io:format(
+        "\n"
+        "    link_tree(Pid)\n"
+        "    --------------\n"
+        "\n"
+        "    Returns a tree which represents a cluster of linked processes.\n"
+        "    This function receives the initial Pid to start from.\n"
+        "    The function doesn't recurse to pids older than initial one.\n"
+        "    The Pids which are lesser than initial Pid are still shown in the output.\n"
+        "    This is analogue of `link_tree(RootPid, []).`\n"
+        "\n"
+        "    link_tree(Pid, Info)\n"
+        "    --------------------\n"
+        "\n"
+        "    Returns a tree which represents a cluster of linked processes.\n"
+        "    This function receives the initial Pid to start from.\n"
+        "    The function doesn't recurse to pids older than initial one.\n"
+        "    The Pids which are lesser than initial Pid are still shown in the output.\n"
+        "    The info argument is a list of process_info_item() as documented in\n"
+        "    erlang:process_info/2. We don't do any attempts to prevent dangerous items.\n"
+        "    Be warn that passing some of them such as `messages` for example\n"
+        "    can be dangerous in a very busy system.\n"
+        "    ---\n"
+        "    ",
+        []
+    );
 help(mapfold_tree) ->
-    io:format("
-    mapfold_tree(Tree, Acc, Fun)
-    -----------------------
-
-    Traverses all nodes of the tree. It is a combination of a map and fold.
-    It calls a user provided callback for every node of the tree.
-    `Fun(Key, Value, Pos, Acc) -> {NewValue, NewAcc}`.
-    Where:
-      - Key of the node (usualy Pid of a process)
-      - Value of the node (usualy information collected by link_tree)
-      - Pos - depth from the root of the tree
-      - Acc - user's accumulator
-
-    ---
-    ", []);
+    io:format(
+        "\n"
+        "    mapfold_tree(Tree, Acc, Fun)\n"
+        "    -----------------------\n"
+        "\n"
+        "    Traverses all nodes of the tree. It is a combination of a map and fold.\n"
+        "    It calls a user provided callback for every node of the tree.\n"
+        "    `Fun(Key, Value, Pos, Acc) -> {NewValue, NewAcc}`.\n"
+        "    Where:\n"
+        "      - Key of the node (usualy Pid of a process)\n"
+        "      - Value of the node (usualy information collected by link_tree)\n"
+        "      - Pos - depth from the root of the tree\n"
+        "      - Acc - user's accumulator\n"
+        "\n"
+        "    ---\n"
+        "    ",
+        []
+    );
 help(map_tree) ->
-    io:format("
-    map_tree(Tree, Fun)
-    -----------------------
-
-    Traverses all nodes of the tree in order to modify them.
-    It calls a user provided callback
-    `Fun(Key, Value, Pos) -> NewValue`
-    Where:
-      - Key of the node (usualy Pid of a process)
-      - Value of the node (usualy information collected by link_tree)
-      - Pos - depth from the root of the tree
-
-    ---
-    ", []);
+    io:format(
+        "\n"
+        "    map_tree(Tree, Fun)\n"
+        "    -----------------------\n"
+        "\n"
+        "    Traverses all nodes of the tree in order to modify them.\n"
+        "    It calls a user provided callback\n"
+        "    `Fun(Key, Value, Pos) -> NewValue`\n"
+        "    Where:\n"
+        "      - Key of the node (usualy Pid of a process)\n"
+        "      - Value of the node (usualy information collected by link_tree)\n"
+        "      - Pos - depth from the root of the tree\n"
+        "\n"
+        "    ---\n"
+        "    ",
+        []
+    );
 help(fold_tree) ->
-    io:format("
-    fold_tree(Tree, Fun)
-    Traverses all nodes of the tree in order to collect some aggregated information
-    about the tree. It calls a user provided callback
-    `Fun(Key, Value, Pos) -> NewValue`
-    Where:
-      - Key of the node (usualy Pid of a process)
-      - Value of the node (usualy information collected by link_tree)
-      - Pos - depth from the root of the tree
-
-    ---
-    ", []);
+    io:format(
+        "\n"
+        "    fold_tree(Tree, Fun)\n"
+        "    Traverses all nodes of the tree in order to collect some aggregated information\n"
+        "    about the tree. It calls a user provided callback\n"
+        "    `Fun(Key, Value, Pos) -> NewValue`\n"
+        "    Where:\n"
+        "      - Key of the node (usualy Pid of a process)\n"
+        "      - Value of the node (usualy information collected by link_tree)\n"
+        "      - Pos - depth from the root of the tree\n"
+        "\n"
+        "    ---\n"
+        "    ",
+        []
+    );
 help(linked_processes_info) ->
-    io:format("
-        linked_processes_info(Pid, Info)
-        --------------------------------
-
-        Convenience function which reduces the amount of typing compared to direct
-        use of link_tree.
-          - Pid: initial Pid to start from
-          - Info: a list of process_info_item() as documented
-            in erlang:process_info/2.
-
-        ---
-    ", []);
+    io:format(
+        "\n"
+        "        linked_processes_info(Pid, Info)\n"
+        "        --------------------------------\n"
+        "\n"
+        "        Convenience function which reduces the amount of typing compared to direct\n"
+        "        use of link_tree.\n"
+        "          - Pid: initial Pid to start from\n"
+        "          - Info: a list of process_info_item() as documented\n"
+        "            in erlang:process_info/2.\n"
+        "\n"
+        "        ---\n"
+        "    ",
+        []
+    );
 help(print_linked_processes) ->
-    io:format("
-        - print_linked_processes(Pid)
-        - print_linked_processes(RegisteredName)
-        - print_linked_processes(couch_index_server)
-
-        ---------------------------
-
-        Print cluster of linked processes. This function receives the
-        initial Pid to start from. The function doesn't recurse to pids
-        older than initial one. The output would look like similar to:
-        ```
-couch_debug:print_linked_processes(whereis(couch_index_server)).
-name                                         | reductions | message_queue_len |  memory
-couch_index_server[<0.288.0>]                |   478240   |         0         |  109696
-  couch_index:init/1[<0.3520.22>]            |    4899    |         0         |  109456
-    couch_file:init/1[<0.886.22>]            |   11973    |         0         |  67984
-      couch_index:init/1[<0.3520.22>]        |    4899    |         0         |  109456
-        ```
-
-        ---
-    ", []);
+    io:format(
+        "\n"
+        "        - print_linked_processes(Pid)\n"
+        "        - print_linked_processes(RegisteredName)\n"
+        "        - print_linked_processes(couch_index_server)\n"
+        "\n"
+        "        ---------------------------\n"
+        "\n"
+        "        Print cluster of linked processes. This function receives the\n"
+        "        initial Pid to start from. The function doesn't recurse to pids\n"
+        "        older than initial one. The output would look like similar to:\n"
+        "        ```\n"
+        "couch_debug:print_linked_processes(whereis(couch_index_server)).\n"
+        "name                                         | reductions | message_queue_len |  memory\n"
+        "couch_index_server[<0.288.0>]                |   478240   |         0         |  109696\n"
+        "  couch_index:init/1[<0.3520.22>]            |    4899    |         0         |  109456\n"
+        "    couch_file:init/1[<0.886.22>]            |   11973    |         0         |  67984\n"
+        "      couch_index:init/1[<0.3520.22>]        |    4899    |         0         |  109456\n"
+        "        ```\n"
+        "\n"
+        "        ---\n"
+        "    ",
+        []
+    );
 help(Unknown) ->
     io:format("Unknown function: `~p`. Please try one of the following:~n", [Unknown]),
     [io:format("    - ~s~n", [Function]) || Function <- help()],
@@ -205,9 +235,11 @@ help(Unknown) ->
     [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 
 opened_files() ->
-    Info = [couch_file_port_info(Port)
-        || Port <- erlang:ports(),
-            {name, "efile"} =:= erlang:port_info(Port, name)],
+    Info = [
+        couch_file_port_info(Port)
+     || Port <- erlang:ports(),
+        {name, "efile"} =:= erlang:port_info(Port, name)
+    ],
     [I || I <- Info, is_tuple(I)].
 
 couch_file_port_info(Port) ->
@@ -223,17 +255,22 @@ couch_file_port_info(Port) ->
     [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 opened_files_by_regexp(FileRegExp) ->
     {ok, RegExp} = re:compile(FileRegExp),
-    lists:filter(fun({_Port, _Pid, _Fd, Path}) ->
-        re:run(Path, RegExp) =/= nomatch
-    end, couch_debug:opened_files()).
+    lists:filter(
+        fun({_Port, _Pid, _Fd, Path}) ->
+            re:run(Path, RegExp) =/= nomatch
+        end,
+        couch_debug:opened_files()
+    ).
 
 -spec opened_files_contains(FileNameFragment :: iodata()) ->
     [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 opened_files_contains(FileNameFragment) ->
-    lists:filter(fun({_Port, _Pid, _Fd, Path}) ->
-        string:str(Path, FileNameFragment) > 0
-    end, couch_debug:opened_files()).
-
+    lists:filter(
+        fun({_Port, _Pid, _Fd, Path}) ->
+            string:str(Path, FileNameFragment) > 0
+        end,
+        couch_debug:opened_files()
+    ).
 
 process_name(Pid) when is_pid(Pid) ->
     Info = process_info(Pid, [registered_name, dictionary, initial_call]),
@@ -260,7 +297,13 @@ link_tree(RootPid, Info) ->
 
 link_tree(RootPid, Info, Fun) ->
     {_, Result} = link_tree(
-        RootPid, [links | Info], gb_trees:empty(), 0, [RootPid], Fun),
+        RootPid,
+        [links | Info],
+        gb_trees:empty(),
+        0,
+        [RootPid],
+        Fun
+    ),
     Result.
 
 link_tree(RootPid, Info, Visited0, Pos, [Pid | Rest], Fun) ->
@@ -272,20 +315,37 @@ link_tree(RootPid, Info, Visited0, Pos, [Pid | Rest], Fun) ->
             Visited1 = gb_trees:insert(Pid, Props, Visited0),
             {links, Children} = lists:keyfind(links, 1, Props),
             {Visited2, NewTree} = link_tree(
-                RootPid, Info, Visited1, Pos + 1, Children, Fun),
+                RootPid,
+                Info,
+                Visited1,
+                Pos + 1,
+                Children,
+                Fun
+            ),
             {Visited3, Result} = link_tree(
-                RootPid, Info, Visited2, Pos, Rest, Fun),
-            {Visited3, [{Pos, {Pid, Fun(Pid, Props), NewTree}}]  ++ Result};
+                RootPid,
+                Info,
+                Visited2,
+                Pos,
+                Rest,
+                Fun
+            ),
+            {Visited3, [{Pos, {Pid, Fun(Pid, Props), NewTree}}] ++ Result};
         none ->
             Props = info(Pid, Info),
             Visited1 = gb_trees:insert(Pid, Props, Visited0),
             {Visited2, Result} = link_tree(
-                RootPid, Info, Visited1, Pos, Rest, Fun),
+                RootPid,
+                Info,
+                Visited1,
+                Pos,
+                Rest,
+                Fun
+            ),
             {Visited2, [{Pos, {Pid, Fun(Pid, Props), []}}] ++ Result}
     end;
 link_tree(_RootPid, _Info, Visited, _Pos, [], _Fun) ->
     {Visited, []}.
-
 
 info(Pid, Info) when is_pid(Pid) ->
     ValidProps = [
@@ -340,12 +400,16 @@ info(Port, Info) when is_port(Port) ->
     port_info(Port, lists:usort(Validated)).
 
 port_info(Port, Items) ->
-    lists:foldl(fun(Item, Acc) ->
-        case (catch erlang:port_info(Port, Item)) of
-            {Item, _Value} = Info -> [Info | Acc];
-            _Else -> Acc
-        end
-    end, [], Items).
+    lists:foldl(
+        fun(Item, Acc) ->
+            case (catch erlang:port_info(Port, Item)) of
+                {Item, _Value} = Info -> [Info | Acc];
+                _Else -> Acc
+            end
+        end,
+        [],
+        Items
+    ).
 
 mapfold_tree([], Acc, _Fun) ->
     {[], Acc};
@@ -378,12 +442,13 @@ print_linked_processes(Name) when is_atom(Name) ->
 print_linked_processes(Pid) when is_pid(Pid) ->
     Info = [reductions, message_queue_len, memory],
     TableSpec = [
-        {50, left, name}, {12, centre, reductions},
-        {19, centre, message_queue_len}, {10, centre, memory}
+        {50, left, name},
+        {12, centre, reductions},
+        {19, centre, message_queue_len},
+        {10, centre, memory}
     ],
     Tree = linked_processes_info(Pid, Info),
     print_tree(Tree, TableSpec).
-
 
 %% Pretty print functions
 
@@ -438,38 +503,46 @@ random_processes(Pids, 0) ->
 random_processes(Acc, Depth) ->
     Caller = self(),
     Ref = make_ref(),
-    Pid = case oneof([spawn_link, open_port]) of
-        spawn_monitor ->
-            {P, _} = spawn_monitor(fun() ->
-                Caller ! {Ref, random_processes(Depth - 1)},
-                receive looper -> ok end
-            end),
-            P;
-        spawn ->
-            spawn(fun() ->
-                Caller ! {Ref, random_processes(Depth - 1)},
-                receive looper -> ok end
-            end);
-        spawn_link ->
-            spawn_link(fun() ->
-                Caller ! {Ref, random_processes(Depth - 1)},
-                receive looper -> ok end
-            end);
-        open_port ->
-            spawn_link(fun() ->
-                Port = erlang:open_port({spawn, "sleep 10"}, []),
-                true = erlang:link(Port),
-                Caller ! {Ref, random_processes(Depth - 1)},
-                receive looper -> ok end
-            end)
-    end,
+    Pid =
+        case oneof([spawn_link, open_port]) of
+            spawn_monitor ->
+                {P, _} = spawn_monitor(fun() ->
+                    Caller ! {Ref, random_processes(Depth - 1)},
+                    receive
+                        looper -> ok
+                    end
+                end),
+                P;
+            spawn ->
+                spawn(fun() ->
+                    Caller ! {Ref, random_processes(Depth - 1)},
+                    receive
+                        looper -> ok
+                    end
+                end);
+            spawn_link ->
+                spawn_link(fun() ->
+                    Caller ! {Ref, random_processes(Depth - 1)},
+                    receive
+                        looper -> ok
+                    end
+                end);
+            open_port ->
+                spawn_link(fun() ->
+                    Port = erlang:open_port({spawn, "sleep 10"}, []),
+                    true = erlang:link(Port),
+                    Caller ! {Ref, random_processes(Depth - 1)},
+                    receive
+                        looper -> ok
+                    end
+                end)
+        end,
     receive
         {Ref, Pids} -> random_processes([Pid | Pids] ++ Acc, Depth - 1)
     end.
 
 oneof(Options) ->
     lists:nth(couch_rand:uniform(length(Options)), Options).
-
 
 tree() ->
     [InitialPid | _] = Processes = random_processes(5),
@@ -486,7 +559,8 @@ link_tree_test_() ->
         "link_tree tests",
         {
             foreach,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun should_have_same_shape/1,
                 fun should_include_extra_info/1
@@ -496,16 +570,16 @@ link_tree_test_() ->
 
 should_have_same_shape({InitialPid, _Processes, Tree}) ->
     ?_test(begin
-         InfoTree = linked_processes_info(InitialPid, []),
-         ?assert(is_equal(InfoTree, Tree)),
-         ok
+        InfoTree = linked_processes_info(InitialPid, []),
+        ?assert(is_equal(InfoTree, Tree)),
+        ok
     end).
 
 should_include_extra_info({InitialPid, _Processes, _Tree}) ->
     Info = [reductions, message_queue_len, memory],
     ?_test(begin
-         InfoTree = linked_processes_info(InitialPid, Info),
-         map_tree(InfoTree, fun(Key, {_Id, Props}, _Pos) ->
+        InfoTree = linked_processes_info(InitialPid, Info),
+        map_tree(InfoTree, fun(Key, {_Id, Props}, _Pos) ->
             case Key of
                 Pid when is_pid(Pid) ->
                     ?assert(lists:keymember(reductions, 1, Props)),
@@ -515,11 +589,12 @@ should_include_extra_info({InitialPid, _Processes, _Tree}) ->
                     ok
             end,
             Props
-         end),
-         ok
+        end),
+        ok
     end).
 
-is_equal([], []) -> true;
+is_equal([], []) ->
+    true;
 is_equal([{Pos, {Pid, _, A}} | RestA], [{Pos, {Pid, _, B}} | RestB]) ->
     case is_equal(RestA, RestB) of
         false -> false;

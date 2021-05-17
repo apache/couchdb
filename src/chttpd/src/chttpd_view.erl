@@ -33,28 +33,30 @@ multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
             paginate_multi_query_view(Req, Db, DDoc, ViewName, Args, Queries)
     end.
 
-
 stream_multi_query_view(Req, Db, DDoc, ViewName, Args0, Queries) ->
-    {ok, #mrst{views=Views}} = couch_views_util:ddoc_to_mrst(Db, DDoc),
+    {ok, #mrst{views = Views}} = couch_views_util:ddoc_to_mrst(Db, DDoc),
     Args1 = couch_views_util:set_view_type(Args0, ViewName, Views),
     ArgQueries = parse_queries(Req, Args1, Queries, fun(QueryArg) ->
         couch_views_util:set_view_type(QueryArg, ViewName, Views)
     end),
-    VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
+    VAcc0 = #vacc{db = Db, req = Req, prepend = "\r\n"},
     FirstChunk = "{\"results\":[",
     {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req, 200, [], FirstChunk),
-    VAcc1 = VAcc0#vacc{resp=Resp0},
-    VAcc2 = lists:foldl(fun(Args, Acc0) ->
-        Fun = fun view_cb/2,
-        {ok, Acc1} = couch_views:query(Db, DDoc, ViewName, Fun, Acc0, Args),
-        Acc1
-    end, VAcc1, ArgQueries),
+    VAcc1 = VAcc0#vacc{resp = Resp0},
+    VAcc2 = lists:foldl(
+        fun(Args, Acc0) ->
+            Fun = fun view_cb/2,
+            {ok, Acc1} = couch_views:query(Db, DDoc, ViewName, Fun, Acc0, Args),
+            Acc1
+        end,
+        VAcc1,
+        ArgQueries
+    ),
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
     chttpd:end_delayed_json_response(Resp1).
 
-
 paginate_multi_query_view(Req, Db, DDoc, ViewName, Args0, Queries) ->
-    {ok, #mrst{views=Views}} = couch_views_util:ddoc_to_mrst(Db, DDoc),
+    {ok, #mrst{views = Views}} = couch_views_util:ddoc_to_mrst(Db, DDoc),
     ArgQueries = parse_queries(Req, Args0, Queries, fun(QueryArg) ->
         couch_views_util:set_view_type(QueryArg, ViewName, Views)
     end),
@@ -66,14 +68,24 @@ paginate_multi_query_view(Req, Db, DDoc, ViewName, Args0, Queries) ->
     UpdateSeq = fabric2_db:get_update_seq(Db),
     EtagTerm = {Parts, UpdateSeq, Args0},
     Response = couch_views_http:paginated(
-        Req, EtagTerm, PageSize, ArgQueries, KeyFun,
+        Req,
+        EtagTerm,
+        PageSize,
+        ArgQueries,
+        KeyFun,
         fun(Args) ->
-           {ok, #vacc{meta=MetaMap, buffer=Items}} = couch_views:query(
-               Db, DDoc, ViewName, fun view_cb/2, #vacc{paginated=true}, Args),
-           {MetaMap, Items}
-        end),
+            {ok, #vacc{meta = MetaMap, buffer = Items}} = couch_views:query(
+                Db,
+                DDoc,
+                ViewName,
+                fun view_cb/2,
+                #vacc{paginated = true},
+                Args
+            ),
+            {MetaMap, Items}
+        end
+    ),
     chttpd:send_json(Req, Response).
-
 
 design_doc_post_view(Req, Props, Db, DDoc, ViewName, Keys) ->
     Args = couch_views_http_util:parse_body_and_query(Req, Props, Keys),
@@ -83,7 +95,6 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
     Args = couch_views_http:parse_params(Req, Keys),
     fabric_query_view(Db, Req, DDoc, ViewName, Args).
 
-
 fabric_query_view(Db, Req, DDoc, ViewName, Args) ->
     case couch_views_util:is_paginated(Args) of
         false ->
@@ -92,14 +103,12 @@ fabric_query_view(Db, Req, DDoc, ViewName, Args) ->
             paginate_fabric_query_view(Db, Req, DDoc, ViewName, Args)
     end.
 
-
 stream_fabric_query_view(Db, Req, DDoc, ViewName, Args) ->
     Max = chttpd:chunked_response_buffer_size(),
     Fun = fun view_cb/2,
-    VAcc = #vacc{db=Db, req=Req, threshold=Max},
+    VAcc = #vacc{db = Db, req = Req, threshold = Max},
     {ok, Resp} = couch_views:query(Db, DDoc, ViewName, Fun, VAcc, Args),
     {ok, Resp#vacc.resp}.
-
 
 paginate_fabric_query_view(Db, Req, DDoc, ViewName, Args0) ->
     KeyFun = fun({Props}) ->
@@ -109,13 +118,17 @@ paginate_fabric_query_view(Db, Req, DDoc, ViewName, Args0) ->
     UpdateSeq = fabric2_db:get_update_seq(Db),
     ETagTerm = {Parts, UpdateSeq, Args0},
     Response = couch_views_http:paginated(
-        Req, ETagTerm, Args0, KeyFun,
+        Req,
+        ETagTerm,
+        Args0,
+        KeyFun,
         fun(Args) ->
-            VAcc0 = #vacc{paginated=true},
+            VAcc0 = #vacc{paginated = true},
             {ok, VAcc1} = couch_views:query(Db, DDoc, ViewName, fun view_cb/2, VAcc0, Args),
-            #vacc{meta=Meta, buffer=Items} = VAcc1,
+            #vacc{meta = Meta, buffer = Items} = VAcc1,
             {Meta, Items}
-        end),
+        end
+    ),
     chttpd:send_json(Req, Response).
 
 view_cb({row, Row} = Msg, Acc) ->
@@ -125,45 +138,58 @@ view_cb({row, Row} = Msg, Acc) ->
     end,
     chttpd_stats:incr_rows(),
     couch_views_http:view_cb(Msg, Acc);
-
 view_cb(Msg, Acc) ->
     couch_views_http:view_cb(Msg, Acc).
 
-
-handle_view_req(#httpd{method='POST',
-    path_parts=[_, _, _, _, ViewName, <<"queries">>]}=Req, Db, DDoc) ->
+handle_view_req(
+    #httpd{
+        method = 'POST',
+        path_parts = [_, _, _, _, ViewName, <<"queries">>]
+    } = Req,
+    Db,
+    DDoc
+) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     case couch_views_util:get_view_queries(Props) of
         undefined ->
-            throw({bad_request,
-                <<"POST body must include `queries` parameter.">>});
+            throw({bad_request, <<"POST body must include `queries` parameter.">>});
         Queries ->
             multi_query_view(Req, Db, DDoc, ViewName, Queries)
     end;
-
-handle_view_req(#httpd{path_parts=[_, _, _, _, _, <<"queries">>]}=Req,
-    _Db, _DDoc) ->
+handle_view_req(
+    #httpd{path_parts = [_, _, _, _, _, <<"queries">>]} = Req,
+    _Db,
+    _DDoc
+) ->
     chttpd:send_method_not_allowed(Req, "POST");
-
-handle_view_req(#httpd{method='GET',
-        path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
+handle_view_req(
+    #httpd{
+        method = 'GET',
+        path_parts = [_, _, _, _, ViewName]
+    } = Req,
+    Db,
+    DDoc
+) ->
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
     design_doc_view(Req, Db, DDoc, ViewName, Keys);
-
-handle_view_req(#httpd{method='POST',
-        path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
+handle_view_req(
+    #httpd{
+        method = 'POST',
+        path_parts = [_, _, _, _, ViewName]
+    } = Req,
+    Db,
+    DDoc
+) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     assert_no_queries_param(couch_views_util:get_view_queries(Props)),
     Keys = couch_views_util:get_view_keys(Props),
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     design_doc_post_view(Req, Props, Db, DDoc, ViewName, Keys);
-
 handle_view_req(Req, _Db, _DDoc) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
-
 
 % See https://github.com/apache/couchdb/issues/2168
 assert_no_queries_param(undefined) ->
@@ -174,91 +200,127 @@ assert_no_queries_param(_) ->
         "The `queries` parameter is no longer supported at this endpoint"
     }).
 
-
 validate_args(Req, #mrargs{page_size = PageSize} = Args) when is_integer(PageSize) ->
     MaxPageSize = max_page_size(Req),
     couch_views_util:validate_args(Args, [{page_size, MaxPageSize}]);
-
 validate_args(_Req, #mrargs{} = Args) ->
     couch_views_util:validate_args(Args, []).
 
-
-max_page_size(#httpd{path_parts=[_Db, <<"_all_docs">>, <<"queries">>]}) ->
+max_page_size(#httpd{path_parts = [_Db, <<"_all_docs">>, <<"queries">>]}) ->
     config:get_integer(
-        "request_limits", "_all_docs/queries", ?DEFAULT_ALL_DOCS_PAGE_SIZE);
-
-max_page_size(#httpd{path_parts=[_Db, <<"_all_docs">>]}) ->
+        "request_limits",
+        "_all_docs/queries",
+        ?DEFAULT_ALL_DOCS_PAGE_SIZE
+    );
+max_page_size(#httpd{path_parts = [_Db, <<"_all_docs">>]}) ->
     config:get_integer(
-        "request_limits", "_all_docs", ?DEFAULT_ALL_DOCS_PAGE_SIZE);
-
-max_page_size(#httpd{path_parts=[_Db, <<"_local_docs">>, <<"queries">>]}) ->
+        "request_limits",
+        "_all_docs",
+        ?DEFAULT_ALL_DOCS_PAGE_SIZE
+    );
+max_page_size(#httpd{path_parts = [_Db, <<"_local_docs">>, <<"queries">>]}) ->
     config:get_integer(
-        "request_limits", "_all_docs/queries", ?DEFAULT_ALL_DOCS_PAGE_SIZE);
-
-max_page_size(#httpd{path_parts=[_Db, <<"_local_docs">>]}) ->
+        "request_limits",
+        "_all_docs/queries",
+        ?DEFAULT_ALL_DOCS_PAGE_SIZE
+    );
+max_page_size(#httpd{path_parts = [_Db, <<"_local_docs">>]}) ->
     config:get_integer(
-        "request_limits", "_all_docs", ?DEFAULT_ALL_DOCS_PAGE_SIZE);
-
-max_page_size(#httpd{path_parts=[_Db, <<"_design_docs">>, <<"queries">>]}) ->
+        "request_limits",
+        "_all_docs",
+        ?DEFAULT_ALL_DOCS_PAGE_SIZE
+    );
+max_page_size(#httpd{path_parts = [_Db, <<"_design_docs">>, <<"queries">>]}) ->
     config:get_integer(
-        "request_limits", "_all_docs/queries", ?DEFAULT_ALL_DOCS_PAGE_SIZE);
-
-max_page_size(#httpd{path_parts=[_Db, <<"_design_docs">>]}) ->
+        "request_limits",
+        "_all_docs/queries",
+        ?DEFAULT_ALL_DOCS_PAGE_SIZE
+    );
+max_page_size(#httpd{path_parts = [_Db, <<"_design_docs">>]}) ->
     config:get_integer(
-        "request_limits", "_all_docs", ?DEFAULT_ALL_DOCS_PAGE_SIZE);
-
-max_page_size(#httpd{path_parts=[
-        _Db, <<"_design">>, _DDocName, <<"_view">>, _View, <<"queries">>]}) ->
+        "request_limits",
+        "_all_docs",
+        ?DEFAULT_ALL_DOCS_PAGE_SIZE
+    );
+max_page_size(#httpd{
+    path_parts = [
+        _Db,
+        <<"_design">>,
+        _DDocName,
+        <<"_view">>,
+        _View,
+        <<"queries">>
+    ]
+}) ->
     config:get_integer(
-        "request_limits", "_view/queries", ?DEFAULT_VIEWS_PAGE_SIZE);
-
-max_page_size(#httpd{path_parts=[
-        _Db, <<"_design">>, _DDocName, <<"_view">>, _View]}) ->
+        "request_limits",
+        "_view/queries",
+        ?DEFAULT_VIEWS_PAGE_SIZE
+    );
+max_page_size(#httpd{
+    path_parts = [
+        _Db,
+        <<"_design">>,
+        _DDocName,
+        <<"_view">>,
+        _View
+    ]
+}) ->
     config:get_integer(
-        "request_limits", "_view", ?DEFAULT_VIEWS_PAGE_SIZE).
+        "request_limits",
+        "_view",
+        ?DEFAULT_VIEWS_PAGE_SIZE
+    ).
 
-
-parse_queries(Req, #mrargs{page_size = PageSize} = Args0, Queries, Fun)
-        when is_integer(PageSize) ->
+parse_queries(Req, #mrargs{page_size = PageSize} = Args0, Queries, Fun) when
+    is_integer(PageSize)
+->
     MaxPageSize = max_page_size(Req),
-    if length(Queries) < PageSize -> ok; true ->
-        throw({
-            query_parse_error,
-            <<"Provided number of queries is more than given page_size">>
-        })
+    if
+        length(Queries) < PageSize ->
+            ok;
+        true ->
+            throw({
+                query_parse_error,
+                <<"Provided number of queries is more than given page_size">>
+            })
     end,
     couch_views_util:validate_args(Fun(Args0), [{page_size, MaxPageSize}]),
     Args = Args0#mrargs{page_size = undefined},
-    lists:map(fun({Query}) ->
-        Args1 = couch_views_http:parse_params(Query, undefined, Args, [decoded]),
-        if not is_integer(Args1#mrargs.page_size) -> ok; true ->
-            throw({
-               query_parse_error,
-                <<"You cannot specify `page_size` inside the query">>
-            })
+    lists:map(
+        fun({Query}) ->
+            Args1 = couch_views_http:parse_params(Query, undefined, Args, [decoded]),
+            if
+                not is_integer(Args1#mrargs.page_size) ->
+                    ok;
+                true ->
+                    throw({
+                        query_parse_error,
+                        <<"You cannot specify `page_size` inside the query">>
+                    })
+            end,
+            Args2 = maybe_set_page_size(Args1, MaxPageSize),
+            couch_views_util:validate_args(Fun(Args2), [{page_size, MaxPageSize}])
         end,
-        Args2 = maybe_set_page_size(Args1, MaxPageSize),
-        couch_views_util:validate_args(Fun(Args2), [{page_size, MaxPageSize}])
-    end, Queries);
-
+        Queries
+    );
 parse_queries(_Req, #mrargs{} = Args, Queries, Fun) ->
-    lists:map(fun({Query}) ->
-        Args1 = couch_views_http:parse_params(Query, undefined, Args, [decoded]),
-        couch_views_util:validate_args(Fun(Args1))
-    end, Queries).
-
+    lists:map(
+        fun({Query}) ->
+            Args1 = couch_views_http:parse_params(Query, undefined, Args, [decoded]),
+            couch_views_util:validate_args(Fun(Args1))
+        end,
+        Queries
+    ).
 
 maybe_set_page_size(#mrargs{page_size = undefined} = Args, MaxPageSize) ->
     Args#mrargs{page_size = MaxPageSize};
-
 maybe_set_page_size(#mrargs{} = Args, _MaxPageSize) ->
     Args.
-
 
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
-
 
 check_multi_query_reduce_view_overrides_test_() ->
     {
@@ -276,7 +338,6 @@ check_multi_query_reduce_view_overrides_test_() ->
         }
     }.
 
-
 t_check_include_docs_throw_validation_error() ->
     ?_test(begin
         Req = #httpd{qs = []},
@@ -285,7 +346,6 @@ t_check_include_docs_throw_validation_error() ->
         Throw = {query_parse_error, <<"`include_docs` is invalid for reduce">>},
         ?assertThrow(Throw, multi_query_view(Req, Db, ddoc, <<"v">>, [Query]))
     end).
-
 
 t_check_user_can_override_individual_query_type() ->
     ?_test(begin
@@ -296,7 +356,6 @@ t_check_user_can_override_individual_query_type() ->
         ?assertEqual(1, meck:num_calls(chttpd, start_delayed_json_response, '_'))
     end).
 
-
 setup_all() ->
     Views = [#mrview{reduce_funs = [{<<"v">>, <<"_count">>}]}],
     meck:expect(couch_views_util, ddoc_to_mrst, 2, {ok, #mrst{views = Views}}),
@@ -305,10 +364,8 @@ setup_all() ->
     meck:expect(chttpd, send_delayed_chunk, 2, {ok, resp}),
     meck:expect(chttpd, end_delayed_json_response, 1, ok).
 
-
 teardown_all(_) ->
     meck:unload().
-
 
 setup() ->
     meck:reset([
@@ -317,9 +374,7 @@ setup() ->
         couch_views_util
     ]).
 
-
 teardown(_) ->
     ok.
-
 
 -endif.

@@ -14,10 +14,11 @@
 
 -export([generate/5]).
 
-generate(Alg, Key, CounterSecs, StepSecs, OutputLen)
-  when is_atom(Alg),
-       is_binary(Key),
-       is_integer(CounterSecs),
-       is_integer(StepSecs),
-       is_integer(OutputLen) ->
+generate(Alg, Key, CounterSecs, StepSecs, OutputLen) when
+    is_atom(Alg),
+    is_binary(Key),
+    is_integer(CounterSecs),
+    is_integer(StepSecs),
+    is_integer(OutputLen)
+->
     couch_hotp:generate(Alg, Key, CounterSecs div StepSecs, OutputLen).

@@ -15,10 +15,10 @@
 -behaviour(config_listener).
 -vsn(3).
 
--export([get_version/0,get_version/1,get_git_sha/0,get_uuid/0]).
--export([init/1, handle_call/3,sup_start_link/0]).
--export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
--export([is_admin/2,has_admins/0]).
+-export([get_version/0, get_version/1, get_git_sha/0, get_uuid/0]).
+-export([init/1, handle_call/3, sup_start_link/0]).
+-export([handle_cast/2, code_change/3, handle_info/2, terminate/2]).
+-export([is_admin/2, has_admins/0]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -28,11 +28,12 @@
 -define(RELISTEN_DELAY, 5000).
 
 get_version() ->
-    ?COUCHDB_VERSION. %% Defined in rebar.config.script
+    %% Defined in rebar.config.script
+    ?COUCHDB_VERSION.
 get_version(short) ->
-  %% strip git hash from version string
-  [Version|_Rest] = string:tokens(get_version(), "+"),
-  Version.
+    %% strip git hash from version string
+    [Version | _Rest] = string:tokens(get_version(), "+"),
+    Version.
 
 get_git_sha() -> ?COUCHDB_GIT_SHA.
 
@@ -42,7 +43,8 @@ get_uuid() ->
             UUID = couch_uuids:random(),
             config:set("couchdb", "uuid", ?b2l(UUID)),
             UUID;
-        UUID -> ?l2b(UUID)
+        UUID ->
+            ?l2b(UUID)
     end.
 
 sup_start_link() ->
@@ -50,11 +52,11 @@ sup_start_link() ->
 
 is_admin(User, ClearPwd) ->
     case config:get("admins", User) of
-    "-hashed-" ++ HashedPwdAndSalt ->
-        [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
-        couch_util:to_hex(crypto:hash(sha, ClearPwd ++ Salt)) == HashedPwd;
-    _Else ->
-        false
+        "-hashed-" ++ HashedPwdAndSalt ->
+            [HashedPwd, Salt] = string:tokens(HashedPwdAndSalt, ","),
+            couch_util:to_hex(crypto:hash(sha, ClearPwd ++ Salt)) == HashedPwd;
+        _Else ->
+            false
     end.
 
 has_admins() ->
@@ -68,7 +70,9 @@ hash_admin_passwords(Persist) ->
         fun({User, ClearPassword}) ->
             HashedPassword = couch_passwords:hash_admin_password(ClearPassword),
             config:set("admins", User, ?b2l(HashedPassword), Persist)
-        end, couch_passwords:get_unhashed_admins()).
+        end,
+        couch_passwords:get_unhashed_admins()
+    ).
 
 init([]) ->
     % Mark being able to receive documents with an _access property as a supported feature
@@ -76,7 +80,8 @@ init([]) ->
     % Mark if fips is enabled
     case
         erlang:function_exported(crypto, info_fips, 0) andalso
-          crypto:info_fips() == enabled of
+            crypto:info_fips() == enabled
+    of
         true ->
             config:enable_feature('fips');
         false ->

@@ -14,104 +14,103 @@
 -export([authorize_request/1]).
 -include_lib("couch/include/couch_db.hrl").
 
-authorize_request(#httpd{auth=Auth, user_ctx=Ctx} = Req) ->
+authorize_request(#httpd{auth = Auth, user_ctx = Ctx} = Req) ->
     try
-	authorize_request_int(Req)
+        authorize_request_int(Req)
     catch
-	throw:{forbidden, Msg} ->
-	    case {Auth, Ctx} of
-		{{cookie_auth_failed, {Error, Reason}}, _} ->
-		    throw({forbidden, {Error, Reason}});
-		{_, #user_ctx{name=null}} ->
-		    throw({unauthorized, Msg});
-		{_, _} ->
-		    throw({forbidden, Msg})
-	    end
+        throw:{forbidden, Msg} ->
+            case {Auth, Ctx} of
+                {{cookie_auth_failed, {Error, Reason}}, _} ->
+                    throw({forbidden, {Error, Reason}});
+                {_, #user_ctx{name = null}} ->
+                    throw({unauthorized, Msg});
+                {_, _} ->
+                    throw({forbidden, Msg})
+            end
     end.
 
-authorize_request_int(#httpd{path_parts=[]}=Req) ->
+authorize_request_int(#httpd{path_parts = []} = Req) ->
     Req;
-authorize_request_int(#httpd{path_parts=[<<"favicon.ico">>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"favicon.ico">> | _]} = Req) ->
     Req;
-authorize_request_int(#httpd{path_parts=[<<"_all_dbs">>|_]}=Req) ->
-   case config:get_boolean("chttpd", "admin_only_all_dbs", true) of
-       true -> require_admin(Req);
-       false -> Req
-   end;
-authorize_request_int(#httpd{path_parts=[<<"_dbs_info">>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_all_dbs">> | _]} = Req) ->
+    case config:get_boolean("chttpd", "admin_only_all_dbs", true) of
+        true -> require_admin(Req);
+        false -> Req
+    end;
+authorize_request_int(#httpd{path_parts = [<<"_dbs_info">> | _]} = Req) ->
     Req;
-authorize_request_int(#httpd{path_parts=[<<"_replicator">>], method='PUT'}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_replicator">>], method = 'PUT'} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[<<"_replicator">>], method='DELETE'}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_replicator">>], method = 'DELETE'} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[<<"_replicator">>,<<"_all_docs">>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_replicator">>, <<"_all_docs">> | _]} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[<<"_replicator">>,<<"_changes">>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_replicator">>, <<"_changes">> | _]} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[<<"_replicator">>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_replicator">> | _]} = Req) ->
     db_authorization_check(Req);
-authorize_request_int(#httpd{path_parts=[<<"_reshard">>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_reshard">> | _]} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[<<"_users">>], method='PUT'}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_users">>], method = 'PUT'} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[<<"_users">>], method='DELETE'}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_users">>], method = 'DELETE'} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[<<"_users">>,<<"_all_docs">>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_users">>, <<"_all_docs">> | _]} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[<<"_users">>,<<"_changes">>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_users">>, <<"_changes">> | _]} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[<<"_users">>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_users">> | _]} = Req) ->
     db_authorization_check(Req);
-authorize_request_int(#httpd{path_parts=[<<"_", _/binary>>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [<<"_", _/binary>> | _]} = Req) ->
     server_authorization_check(Req);
-authorize_request_int(#httpd{path_parts=[_DbName], method='PUT'}=Req) ->
+authorize_request_int(#httpd{path_parts = [_DbName], method = 'PUT'} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[_DbName], method='DELETE'}=Req) ->
+authorize_request_int(#httpd{path_parts = [_DbName], method = 'DELETE'} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[_DbName, <<"_compact">>|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [_DbName, <<"_compact">> | _]} = Req) ->
     require_db_admin(Req);
-authorize_request_int(#httpd{path_parts=[_DbName, <<"_view_cleanup">>]}=Req) ->
+authorize_request_int(#httpd{path_parts = [_DbName, <<"_view_cleanup">>]} = Req) ->
     require_db_admin(Req);
-authorize_request_int(#httpd{path_parts=[_DbName, <<"_sync_shards">>]}=Req) ->
+authorize_request_int(#httpd{path_parts = [_DbName, <<"_sync_shards">>]} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[_DbName, <<"_purge">>]}=Req) ->
+authorize_request_int(#httpd{path_parts = [_DbName, <<"_purge">>]} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[_DbName, <<"_purged_infos_limit">>]}=Req) ->
+authorize_request_int(#httpd{path_parts = [_DbName, <<"_purged_infos_limit">>]} = Req) ->
     require_admin(Req);
-authorize_request_int(#httpd{path_parts=[_DbName|_]}=Req) ->
+authorize_request_int(#httpd{path_parts = [_DbName | _]} = Req) ->
     db_authorization_check(Req).
 
-
-server_authorization_check(#httpd{path_parts=[<<"_up">>]}=Req) ->
+server_authorization_check(#httpd{path_parts = [<<"_up">>]} = Req) ->
     Req;
-server_authorization_check(#httpd{path_parts=[<<"_uuids">>]}=Req) ->
+server_authorization_check(#httpd{path_parts = [<<"_uuids">>]} = Req) ->
     Req;
-server_authorization_check(#httpd{path_parts=[<<"_session">>]}=Req) ->
+server_authorization_check(#httpd{path_parts = [<<"_session">>]} = Req) ->
     Req;
-server_authorization_check(#httpd{path_parts=[<<"_replicate">>]}=Req) ->
+server_authorization_check(#httpd{path_parts = [<<"_replicate">>]} = Req) ->
     Req;
-server_authorization_check(#httpd{path_parts=[<<"_stats">>]}=Req) ->
+server_authorization_check(#httpd{path_parts = [<<"_stats">>]} = Req) ->
     Req;
-server_authorization_check(#httpd{path_parts=[<<"_active_tasks">>]}=Req) ->
+server_authorization_check(#httpd{path_parts = [<<"_active_tasks">>]} = Req) ->
     Req;
-server_authorization_check(#httpd{path_parts=[<<"_dbs_info">>]}=Req) ->
+server_authorization_check(#httpd{path_parts = [<<"_dbs_info">>]} = Req) ->
     Req;
-server_authorization_check(#httpd{method=Method, path_parts=[<<"_utils">>|_]}=Req)
-  when Method =:= 'HEAD' orelse Method =:= 'GET' ->
+server_authorization_check(#httpd{method = Method, path_parts = [<<"_utils">> | _]} = Req) when
+    Method =:= 'HEAD' orelse Method =:= 'GET'
+->
     Req;
-server_authorization_check(#httpd{path_parts=[<<"_node">>,_ , <<"_stats">>|_]}=Req) ->
+server_authorization_check(#httpd{path_parts = [<<"_node">>, _, <<"_stats">> | _]} = Req) ->
     require_metrics(Req);
-server_authorization_check(#httpd{path_parts=[<<"_node">>,_ , <<"_system">>|_]}=Req) ->
+server_authorization_check(#httpd{path_parts = [<<"_node">>, _, <<"_system">> | _]} = Req) ->
     require_metrics(Req);
-server_authorization_check(#httpd{path_parts=[<<"_", _/binary>>|_]}=Req) ->
+server_authorization_check(#httpd{path_parts = [<<"_", _/binary>> | _]} = Req) ->
     require_admin(Req).
 
-db_authorization_check(#httpd{path_parts=[_DbName|_]}=Req) ->
+db_authorization_check(#httpd{path_parts = [_DbName | _]} = Req) ->
     % Db authorization checks are performed in fabric before every FDB operation
     Req.
 
-
-require_metrics(#httpd{user_ctx=#user_ctx{roles=UserRoles}}=Req) ->
+require_metrics(#httpd{user_ctx = #user_ctx{roles = UserRoles}} = Req) ->
     IsAdmin = lists:member(<<"_admin">>, UserRoles),
     IsMetrics = lists:member(<<"_metrics">>, UserRoles),
     case {IsAdmin, IsMetrics} of
@@ -124,15 +123,15 @@ require_admin(Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
     Req.
 
-require_db_admin(#httpd{path_parts=[DbName|_],user_ctx=Ctx}=Req) ->
+require_db_admin(#httpd{path_parts = [DbName | _], user_ctx = Ctx} = Req) ->
     {ok, Db} = fabric2_db:open(DbName, [{user_ctx, Ctx}]),
     Sec = fabric2_db:get_security(Db),
-    case is_db_admin(Ctx,Sec) of
+    case is_db_admin(Ctx, Sec) of
         true -> Req;
-        false ->  throw({unauthorized, <<"You are not a server or db admin.">>})
+        false -> throw({unauthorized, <<"You are not a server or db admin.">>})
     end.
 
-is_db_admin(#user_ctx{name=UserName,roles=UserRoles}, {Security}) ->
+is_db_admin(#user_ctx{name = UserName, roles = UserRoles}, {Security}) ->
     {Admins} = couch_util:get_value(<<"admins">>, Security, {[]}),
     Names = couch_util:get_value(<<"names">>, Admins, []),
     Roles = couch_util:get_value(<<"roles">>, Admins, []),

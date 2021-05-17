@@ -18,7 +18,7 @@
 %% exported for use by chttpd_misc
 -export([transform_stats/1, nest/1, to_ejson/1, extract_path/2]).
 
-handle_stats_req(#httpd{method='GET', path_parts=[_ | Path]}=Req) ->
+handle_stats_req(#httpd{method = 'GET', path_parts = [_ | Path]} = Req) ->
     flush(Req),
     Stats0 = couch_stats:fetch(),
     Stats = transform_stats(Stats0),
@@ -26,7 +26,6 @@ handle_stats_req(#httpd{method='GET', path_parts=[_ | Path]}=Req) ->
     EJSON0 = to_ejson(Nested),
     EJSON1 = extract_path(Path, EJSON0),
     couch_httpd:send_json(Req, EJSON1).
-
 
 transform_stats(Stats) ->
     transform_stats(Stats, []).
@@ -37,50 +36,54 @@ transform_stats([{Key, Props} | Rest], Acc) ->
     {_, Type} = proplists:lookup(type, Props),
     transform_stats(Rest, [{Key, transform_stat(Type, Props)} | Acc]).
 
-
 transform_stat(counter, Props) ->
     Props;
 transform_stat(gauge, Props) ->
     Props;
 transform_stat(histogram, Props) ->
-    lists:map(fun
-        ({value, Value}) ->
-            {value, lists:map(fun
-                ({Key, List}) when Key == percentile; Key == histogram ->
-                    {Key, [tuple_to_list(Item) || Item <- List]};
-                (Else) ->
-                    Else
-            end, Value)};
-        (Else) ->
-            Else
-      end, Props).
-
+    lists:map(
+        fun
+            ({value, Value}) ->
+                {value,
+                    lists:map(
+                        fun
+                            ({Key, List}) when Key == percentile; Key == histogram ->
+                                {Key, [tuple_to_list(Item) || Item <- List]};
+                            (Else) ->
+                                Else
+                        end,
+                        Value
+                    )};
+            (Else) ->
+                Else
+        end,
+        Props
+    ).
 
 nest(Proplist) ->
     nest(Proplist, []).
 
 nest([], Acc) ->
     Acc;
-nest([{[Key|Keys], Value}|Rest], Acc) ->
-    Acc1 = case proplists:lookup(Key, Acc) of
-        {Key, Old} ->
-            [{Key, nest([{Keys, Value}], Old)}|proplists:delete(Key, Acc)];
-        none ->
-            Term = lists:foldr(fun(K, A) -> [{K, A}] end, Value, Keys),
-            [{Key, Term}|Acc]
-    end,
+nest([{[Key | Keys], Value} | Rest], Acc) ->
+    Acc1 =
+        case proplists:lookup(Key, Acc) of
+            {Key, Old} ->
+                [{Key, nest([{Keys, Value}], Old)} | proplists:delete(Key, Acc)];
+            none ->
+                Term = lists:foldr(fun(K, A) -> [{K, A}] end, Value, Keys),
+                [{Key, Term} | Acc]
+        end,
     nest(Rest, Acc1).
 
-
-to_ejson([{_, _}|_]=Proplist) ->
+to_ejson([{_, _} | _] = Proplist) ->
     EJSONProps = lists:map(
-       fun({Key, Value}) -> {maybe_format_key(Key), to_ejson(Value)} end,
-       Proplist
+        fun({Key, Value}) -> {maybe_format_key(Key), to_ejson(Value)} end,
+        Proplist
     ),
     {EJSONProps};
 to_ejson(NotAProplist) ->
     NotAProplist.
-
 
 extract_path([], EJSON) ->
     EJSON;
@@ -93,7 +96,6 @@ extract_path([Key | Rest], {Props}) ->
     end;
 extract_path([_ | _], _NotAnObject) ->
     null.
-
 
 maybe_format_key(Key) when is_list(Key) ->
     list_to_binary(Key);

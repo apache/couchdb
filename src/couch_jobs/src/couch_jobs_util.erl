@@ -12,23 +12,19 @@
 
 -module(couch_jobs_util).
 
-
 -export([
     get_non_neg_int/2,
     get_float_0_1/2,
     get_timeout/2
 ]).
 
-
 get_non_neg_int(Key, Default) when is_atom(Key), is_list(Default) ->
     StrVal = config:get("couch_jobs", atom_to_list(Key), Default),
     non_neg_int(Key, StrVal).
 
-
 get_float_0_1(Key, Default) when is_atom(Key), is_list(Default) ->
     StrVal = config:get("couch_jobs", atom_to_list(Key), Default),
     float_0_1(Key, StrVal).
-
 
 get_timeout(Key, Default) when is_atom(Key), is_list(Default) ->
     case config:get("couch_jobs", atom_to_list(Key), Default) of
@@ -36,23 +32,25 @@ get_timeout(Key, Default) when is_atom(Key), is_list(Default) ->
         StrVal -> non_neg_int(Key, StrVal)
     end.
 
-
 non_neg_int(Name, Str) ->
     try
         Val = list_to_integer(Str),
         true = Val > 0,
         Val
-    catch _:_ ->
-        erlang:error({invalid_non_neg_integer, {couch_jobs, Name, Str}})
+    catch
+        _:_ ->
+            erlang:error({invalid_non_neg_integer, {couch_jobs, Name, Str}})
     end.
 
-
 float_0_1(Name, Str) ->
-    Val = try
-        list_to_float(Str)
-    catch error:badarg ->
-        erlang:error({invalid_float, {couch_jobs, Name, Str}})
-    end,
-    if Val >= 0.0 andalso Val =< 1.0 -> Val; true ->
-        erlang:error({float_out_of_range, {couch_jobs, Name, Str}})
+    Val =
+        try
+            list_to_float(Str)
+        catch
+            error:badarg ->
+                erlang:error({invalid_float, {couch_jobs, Name, Str}})
+        end,
+    if
+        Val >= 0.0 andalso Val =< 1.0 -> Val;
+        true -> erlang:error({float_out_of_range, {couch_jobs, Name, Str}})
     end.

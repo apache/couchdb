@@ -23,7 +23,7 @@ module_version(Module) ->
 
 hash(Term) ->
     <<SigInt:128/integer>> = couch_hash:md5_hash(term_to_binary(Term)),
-    lists:flatten(io_lib:format("\"~.36B\"",[SigInt])).
+    lists:flatten(io_lib:format("\"~.36B\"", [SigInt])).
 
 module_exists(Module) ->
     erlang:function_exported(Module, module_info, 0).
