@@ -65,7 +65,7 @@ encode(Header = {HeaderProps}, Claims, Key) ->
             {public_key, Algorithm} ->
                 public_key:sign(Message, Algorithm, Key);
             {hmac, Algorithm} ->
-                crypto:hmac(Algorithm, Key, Message)
+                hmac(Algorithm, Key, Message)
         end,
         EncodedSignatureOrMac = b64url:encode(SignatureOrMac),
         {ok, <<Message/binary, $., EncodedSignatureOrMac/binary>>}
@@ -290,7 +290,7 @@ public_key_verify(Algorithm, Message, Signature, PublicKey) ->
 
 
 hmac_verify(Algorithm, Message, HMAC, SecretKey) ->
-    case crypto:hmac(Algorithm, SecretKey, Message) of
+    case hmac(Algorithm, SecretKey, Message) of
         HMAC ->
             ok;
         _ ->
@@ -350,6 +350,31 @@ now_seconds() ->
 
 prop(Prop, Props) ->
     proplists:get_value(Prop, Props).
+
+
+-ifdef(OTP_RELEASE).
+
+-if(?OTP_RELEASE >= 22).
+
+% OTP >= 22
+hmac(Alg, Key, Message) ->
+    crypto:mac(hmac, Alg, Key, Message).
+
+-else.
+
+% OTP >= 21, < 22
+hmac(Alg, Key, Message) ->
+    crypto:hmac(Alg, Key, Message).
+
+-endif. % -if(?OTP_RELEASE >= 22)
+
+-else.
+
+% OTP < 21
+hmac(Alg, Key, Message) ->
+    crypto:hmac(Alg, Key, Message).
+
+-endif. % -ifdef(OTP_RELEASE)
 
 
 -ifdef(TEST).
