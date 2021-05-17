@@ -63,7 +63,11 @@ defmodule ProxyAuthTest do
   end
 
   defp hex_hmac_sha1(secret, message) do
-    signature = :crypto.hmac(:sha, secret, message)
+    signature = case :erlang.system_info(:otp_release) do
+      '20' -> :crypto.hmac(:sha, secret, message)
+      '21' -> :crypto.hmac(:sha, secret, message)
+      _ -> :crypto.mac(:hmac, :sha, secret, message)
+    end
     Base.encode16(signature, case: :lower)
   end
 
