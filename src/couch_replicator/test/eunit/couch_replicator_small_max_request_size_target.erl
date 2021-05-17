@@ -30,12 +30,12 @@ reduce_max_request_size_test_() ->
 setup() ->
     Source = couch_replicator_test_helper:create_db(),
     Target = couch_replicator_test_helper:create_db(),
-    config:set("httpd", "max_http_request_size", "10000", false),
+    config:set("chttpd", "max_http_request_size", "10000", false),
     {Source, Target}.
 
 
 teardown({Source, Target}) ->
-    config:delete("httpd", "max_http_request_size", false),
+    config:delete("chttpd", "max_http_request_size", false),
     couch_replicator_test_helper:delete_db(Source),
     couch_replicator_test_helper:delete_db(Target).
 
