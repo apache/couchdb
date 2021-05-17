@@ -24,7 +24,7 @@ setup(remote) ->
 
 setup({A, B}) ->
     Ctx = test_util:start_couch([couch_replicator]),
-    config:set("httpd", "max_http_request_size", "10000", false),
+    config:set("chttpd", "max_http_request_size", "10000", false),
     Source = setup(A),
     Target = setup(B),
     {Ctx, {Source, Target}}.

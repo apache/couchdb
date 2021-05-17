@@ -253,8 +253,8 @@ bind_path(_, _) ->
 %% create vhost list from ini
 
 host(MochiReq) ->
-    XHost = config:get("httpd", "x_forwarded_host",
-                             "X-Forwarded-Host"),
+    XHost = chttpd_util:get_chttpd_config(
+        "x_forwarded_host", "X-Forwarded-Host"),
     case MochiReq:get_header_value(XHost) of
         undefined ->
             case MochiReq:get_header_value("Host") of

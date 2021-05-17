@@ -30,7 +30,7 @@ defmodule HttpTest do
 
     server_config = [
       %{
-        :section => "httpd",
+        :section => "chttpd",
         :key => "x_forwarded_host",
         :value => "X-Host"
       }
