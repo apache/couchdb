@@ -45,7 +45,6 @@
   "ConfigTest": [
   ],
   "CookieAuthTest": [
-    "cookie auth"
   ],
   "CopyDocTest": [
     "Copy doc tests"
