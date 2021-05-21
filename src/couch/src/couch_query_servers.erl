@@ -110,7 +110,7 @@ rereduce(Lang, RedSrcs, ReducedValues) ->
 
 reduce(_Lang, [], _KVs) ->
     {ok, []};
-reduce(Lang, [<<"_", _/binary>>] = RedSrcs, KVs) ->
+reduce(_Lang, [<<"_", _/binary>>] = RedSrcs, KVs) ->
     builtin_reduce(reduce, RedSrcs, KVs, []);
 reduce(Lang, RedSrcs, KVs) ->
     {OsRedSrcs, BuiltinReds} = lists:partition(fun
