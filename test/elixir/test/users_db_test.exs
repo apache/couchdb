@@ -18,7 +18,7 @@ defmodule UsersDbTest do
                  @users_db_name
                },
                {
-                 "couch_httpd_auth",
+                 "chttpd_auth",
                  "iterations",
                  "1"
                },

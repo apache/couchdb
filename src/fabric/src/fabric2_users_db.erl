@@ -72,7 +72,7 @@ before_doc_update(Doc, Db, _UpdateType) ->
 %    newDoc.password = null
 save_doc(#doc{body={Body}} = Doc) ->
     %% Support both schemes to smooth migration from legacy scheme
-    Scheme = config:get("couch_httpd_auth", "password_scheme", "pbkdf2"),
+    Scheme = chttpd_util:get_chttpd_auth_config("password_scheme", "pbkdf2"),
     case {fabric2_util:get_value(?PASSWORD, Body), Scheme} of
     {null, _} -> % server admins don't have a user-db password entry
         Doc;
@@ -89,7 +89,8 @@ save_doc(#doc{body={Body}} = Doc) ->
         Doc#doc{body={Body3}};
     {ClearPassword, "pbkdf2"} ->
         ok = validate_password(ClearPassword),
-        Iterations = list_to_integer(config:get("couch_httpd_auth", "iterations", "1000")),
+        Iterations = chttpd_util:get_chttpd_auth_config_integer(
+            "iterations", 10),
         Salt = couch_uuids:random(),
         DerivedKey = couch_passwords:pbkdf2(ClearPassword, Salt, Iterations),
         Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?PBKDF2),
@@ -114,7 +115,7 @@ save_doc(#doc{body={Body}} = Doc) ->
 % Throws if not.
 % In this function the [couch_httpd_auth] password_regexp config is parsed.
 validate_password(ClearPassword) ->
-    case config:get("couch_httpd_auth", "password_regexp", "") of
+    case chttpd_util:get_chttpd_auth_config("password_regexp", "") of
         "" ->
             ok;
         "[]" ->
@@ -225,6 +226,6 @@ get_doc_name(_) ->
 
 
 strip_non_public_fields(#doc{body={Props}}=Doc) ->
-    PublicFields = config:get("couch_httpd_auth", "public_fields", ""),
+    PublicFields = chttpd_util:get_chttpd_auth_config("public_fields", ""),
     Public = re:split(PublicFields, "\\s*,\\s*", [{return, binary}]),
     Doc#doc{body={[{K, V} || {K, V} <- Props, lists:member(K, Public)]}}.
