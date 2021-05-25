@@ -197,8 +197,9 @@ is_public_fields_configured(Db) ->
     DbName = ?b2l(couch_db:name(Db)),
     case config:get("couch_httpd_auth", "authentication_db", "_users") of
     DbName ->
-        UsersDbPublic = config:get("couch_httpd_auth", "users_db_public", "false"),
-        PublicFields = config:get("couch_httpd_auth", "public_fields"),
+        UsersDbPublic = chttpd_util:get_chttpd_auth_config(
+            "users_db_public", "false"),
+        PublicFields = chttpd_util:get_chttpd_auth_config("public_fields"),
         case {UsersDbPublic, PublicFields} of
         {"true", PublicFields} when PublicFields =/= undefined ->
             true;
