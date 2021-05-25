@@ -18,7 +18,7 @@ defmodule CookieAuthTest do
                  @users_db
                },
                {
-                 "couch_httpd_auth",
+                 "chttpd_auth",
                  "iterations",
                  "1"
                },
