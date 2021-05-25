@@ -75,6 +75,21 @@ class OperatorTests:
         docs = self.db.find({"foo": {"$keyMapMatch": {"$eq": "aa"}}})
         self.assertEqual(len(docs), 1)
 
+    def test_size(self):
+        amdocs = [
+            {"customers": [0]},
+            {"customers": [0, 1]},
+            {"customers": [0, 1, 2]},
+            {"customers": [0, 1, 2, 3]}
+        ]
+        self.db.save_docs(amdocs, w=3)
+        docs = self.db.find({"customers": {"$size": 3}})
+        self.assertEqual(len(docs), 1)
+        docs = self.db.find({"customers": {"$sizeLte": 3}})
+        self.assertEqual(len(docs), 3)
+        docs = self.db.find({"customers": {"$sizeGte": 3}})
+        self.assertEqual(len(docs), 2)
+
     def test_in_operator_array(self):
         docs = self.db.find({"manager": True, "favorites": {"$in": ["Ruby", "Python"]}})
         self.assertUserIds([2, 6, 7, 9, 11, 12], docs)

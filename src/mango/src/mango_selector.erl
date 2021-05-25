@@ -148,6 +148,16 @@ norm_ops({[{<<"$size">>, Arg}]}) when is_integer(Arg), Arg >= 0 ->
 norm_ops({[{<<"$size">>, Arg}]}) ->
     ?MANGO_ERROR({bad_arg, '$size', Arg});
 
+norm_ops({[{<<"$sizeLte">>, Arg}]}) when is_integer(Arg), Arg >= 0 ->
+    {[{<<"$sizeLte">>, Arg}]};
+norm_ops({[{<<"$sizeLte">>, Arg}]}) ->
+    ?MANGO_ERROR({bad_arg, '$sizeLte', Arg});
+
+norm_ops({[{<<"$sizeGte">>, Arg}]}) when is_integer(Arg), Arg >= 0 ->
+    {[{<<"$sizeGte">>, Arg}]};
+norm_ops({[{<<"$sizeGte">>, Arg}]}) ->
+    ?MANGO_ERROR({bad_arg, '$sizeGte', Arg});
+
 norm_ops({[{<<"$text">>, Arg}]}) when is_binary(Arg); is_number(Arg);
         is_boolean(Arg) ->
     {[{<<"$default">>, {[{<<"$text">>, Arg}]}}]};
@@ -584,6 +594,16 @@ match({[{<<"$regex">>, _}]}, _Value, _Cmp) ->
 match({[{<<"$size">>, Arg}]}, Values, _Cmp) when is_list(Values) ->
     length(Values) == Arg;
 match({[{<<"$size">>, _}]}, _Value, _Cmp) ->
+    false;
+
+match({[{<<"$sizeGte">>, Arg}]}, Values, _Cmp) when is_list(Values) ->
+    length(Values) >= Arg;
+match({[{<<"$sizeGte">>, _}]}, _Value, _Cmp) ->
+    false;
+
+match({[{<<"$sizeLte">>, Arg}]}, Values, _Cmp) when is_list(Values) ->
+    length(Values) <= Arg;
+match({[{<<"$sizeLte">>, _}]}, _Value, _Cmp) ->
     false;
 
 % We don't have any choice but to believe that the text
