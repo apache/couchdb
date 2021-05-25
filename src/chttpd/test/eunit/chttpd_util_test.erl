@@ -21,14 +21,22 @@ setup() ->
     ok = config:set("httpd", "both_exist", "get_in_httpd", _Persist = false),
     ok = config:set("chttpd", "both_exist", "get_in_chttpd", _Persist = false),
     ok = config:set("httpd", "httpd_only", "true", _Persist = false),
-    ok = config:set("chttpd", "chttpd_only", "1", _Persist = false).
+    ok = config:set("chttpd", "chttpd_only", "1", _Persist = false),
+    ok = config:set("couch_httpd_auth", "both_exist", "cha", _Persist = false),
+    ok = config:set("chttpd_auth", "both_exist", "ca", _Persist = false),
+    ok = config:set("couch_httpd_auth", "cha_only", "true", _Persist = false),
+    ok = config:set("chttpd_auth", "ca_only", "1", _Persist = false).
 
 
 teardown(_) ->
     ok = config:delete("httpd", "both_exist", _Persist = false),
     ok = config:delete("chttpd", "both_exist", _Persist = false),
     ok = config:delete("httpd", "httpd_only", _Persist = false),
-    ok = config:delete("chttpd", "chttpd_only", _Persist = false).
+    ok = config:delete("chttpd", "chttpd_only", _Persist = false),
+    ok = config:delete("couch_httpd_auth", "both_exist", _Persist = false),
+    ok = config:delete("chttpd_auth", "both_exist", _Persist = false),
+    ok = config:delete("couch_httpd_auth", "cha_only", _Persist = false),
+    ok = config:delete("chttpd_auth", "ca_only", _Persist = false).
 
 
 chttpd_util_config_test_() ->
@@ -49,7 +57,12 @@ chttpd_util_config_test_() ->
                     ?TDEF_FE(test_with_chttpd_option),
                     ?TDEF_FE(test_with_chttpd_option_which_moved_from_httpd),
                     ?TDEF_FE(test_get_chttpd_config_integer),
-                    ?TDEF_FE(test_get_chttpd_config_boolean)
+                    ?TDEF_FE(test_get_chttpd_config_boolean),
+                    ?TDEF_FE(test_auth_behavior),
+                    ?TDEF_FE(test_auth_with_undefined_option),
+                    ?TDEF_FE(test_auth_with_moved_options),
+                    ?TDEF_FE(test_get_chttpd_auth_config_integer),
+                    ?TDEF_FE(test_get_chttpd_auth_config_boolean)
                 ]
             }
         }
@@ -105,3 +118,39 @@ test_get_chttpd_config_integer(_) ->
 
 test_get_chttpd_config_boolean(_) ->
     ?assert(chttpd_util:get_chttpd_config_boolean("allow_jsonp", true)).
+
+
+test_auth_behavior(_) ->
+    ?assertEqual("ca", chttpd_util:get_chttpd_auth_config("both_exist")),
+    ?assertEqual(1, chttpd_util:get_chttpd_auth_config_integer("ca_only", 0)),
+    ?assert(chttpd_util:get_chttpd_auth_config_boolean("cha_only", false)).
+
+
+test_auth_with_undefined_option(_) ->
+    ?assertEqual(undefined, chttpd_util:get_chttpd_auth_config("undefine")),
+    ?assertEqual(abc, chttpd_util:get_chttpd_auth_config("undefine", abc)),
+    ?assertEqual(123, chttpd_util:get_chttpd_auth_config("undefine", 123)),
+    ?assertEqual(0.2, chttpd_util:get_chttpd_auth_config("undefine", 0.2)),
+    ?assertEqual("a", chttpd_util:get_chttpd_auth_config("undefine", "a")),
+    ?assertEqual("", chttpd_util:get_chttpd_auth_config("undefine", "")),
+    ?assert(chttpd_util:get_chttpd_auth_config("undefine", true)),
+    ?assertNot(chttpd_util:get_chttpd_auth_config("undefine", false)).
+
+
+test_auth_with_moved_options(_) ->
+    ?assertEqual("/_utils/session.html", chttpd_util:get_chttpd_auth_config(
+        "authentication_redirect", "/_utils/session.html")),
+    ?assert(chttpd_util:get_chttpd_auth_config("require_valid_user", true)),
+    ?assertEqual(10, chttpd_util:get_chttpd_auth_config("iterations", 10)).
+
+
+test_get_chttpd_auth_config_integer(_) ->
+    ?assertEqual(123, chttpd_util:get_chttpd_auth_config_integer(
+        "timeout", 123)).
+
+
+test_get_chttpd_auth_config_boolean(_) ->
+    ?assertNot(chttpd_util:get_chttpd_auth_config_boolean(
+        "require_valid_user", false)),
+    ?assert(chttpd_util:get_chttpd_auth_config_boolean(
+        "allow_persistent_cookies", true)).

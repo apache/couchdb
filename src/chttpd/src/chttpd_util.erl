@@ -17,7 +17,11 @@
     get_chttpd_config/1,
     get_chttpd_config/2,
     get_chttpd_config_integer/2,
-    get_chttpd_config_boolean/2
+    get_chttpd_config_boolean/2,
+    get_chttpd_auth_config/1,
+    get_chttpd_auth_config/2,
+    get_chttpd_auth_config_integer/2,
+    get_chttpd_auth_config_boolean/2
 ]).
 
 
@@ -37,3 +41,22 @@ get_chttpd_config_integer(Key, Default) ->
 get_chttpd_config_boolean(Key, Default) ->
     config:get_boolean("chttpd", Key,
         config:get_boolean("httpd", Key, Default)).
+
+
+get_chttpd_auth_config(Key) ->
+    config:get("chttpd_auth", Key, config:get("couch_httpd_auth", Key)).
+
+
+get_chttpd_auth_config(Key, Default) ->
+    config:get("chttpd_auth", Key,
+        config:get("couch_httpd_auth", Key, Default)).
+
+
+get_chttpd_auth_config_integer(Key, Default) ->
+    config:get_integer("chttpd_auth", Key,
+        config:get_integer("couch_httpd_auth", Key, Default)).
+
+
+get_chttpd_auth_config_boolean(Key, Default) ->
+    config:get_boolean("chttpd_auth", Key,
+        config:get_boolean("couch_httpd_auth", Key, Default)).

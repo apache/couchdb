@@ -83,7 +83,7 @@ couchTests.replicator_db_by_doc_id = function(debug) {
 
   /*var server_config = [
     {
-      section: "couch_httpd_auth",
+      section: "chttpd_auth",
       key: "iterations",
       value: "1"
     },

@@ -33,8 +33,8 @@ stop({Ctx, DbName}) ->
 
 setup(default) ->
     add_admin("admin", <<"pass">>),
-    config:delete("couch_httpd_auth", "authentication_redirect", false),
-    config:set("couch_httpd_auth", "require_valid_user", "false", false),
+    config:delete("chttpd_auth", "authentication_redirect", false),
+    config:set("chttpd_auth", "require_valid_user", "false", false),
     get_host();
 setup(A) ->
     Host = setup(default),

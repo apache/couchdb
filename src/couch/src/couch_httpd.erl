@@ -957,14 +957,16 @@ error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
                 % redirect to the session page.
                 case ErrorStr of
                 <<"unauthorized">> ->
-                    case config:get("couch_httpd_auth", "authentication_redirect", undefined) of
+                    case chttpd_util:get_chttpd_auth_config(
+                        "authentication_redirect", "/_utils/session.html") of
                     undefined -> {Code, []};
                     AuthRedirect ->
-                        case config:get("couch_httpd_auth", "require_valid_user", "false") of
-                        "true" ->
+                        case chttpd_util:get_chttpd_auth_config_boolean(
+                            "require_valid_user", false) of
+                        true ->
                             % send the browser popup header no matter what if we are require_valid_user
                             {Code, [{"WWW-Authenticate", "Basic realm=\"server\""}]};
-                        _False ->
+                        false ->
                             case MochiReq:accepts_content_type("application/json") of
                             true ->
                                 {Code, []};
