@@ -18,6 +18,7 @@
     restart/0
 ]).
 
+
 deps() ->
     [
         sasl,
@@ -31,6 +32,7 @@ deps() ->
         couch_log
     ].
 
+
 start() ->
     catch erlang:system_flag(scheduler_bind_type, default_bind),
     case start_apps(deps()) of
@@ -40,23 +42,26 @@ start() ->
             throw(Else)
     end.
 
+
 stop() ->
     application:stop(couch).
+
 
 restart() ->
     init:restart().
 
+
 start_apps([]) ->
     ok;
-start_apps([App | Rest]) ->
+start_apps([App|Rest]) ->
     case application:start(App) of
-        ok ->
-            start_apps(Rest);
-        {error, {already_started, App}} ->
-            start_apps(Rest);
-        {error, _Reason} when App =:= public_key ->
-            % ignore on R12B5
-            start_apps(Rest);
-        {error, _Reason} ->
-            {error, {app_would_not_start, App}}
+    ok ->
+       start_apps(Rest);
+    {error, {already_started, App}} ->
+       start_apps(Rest);
+    {error, _Reason} when App =:= public_key ->
+       % ignore on R12B5
+       start_apps(Rest);
+    {error, _Reason} ->
+       {error, {app_would_not_start, App}}
     end.

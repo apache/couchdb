@@ -10,6 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+
 % Maintain cluster membership and stability notifications for replications.
 % On changes to cluster membership, broadcast events to `replication` gen_event.
 % Listeners will get `{cluster, stable}` or `{cluster, unstable}` events.
@@ -25,12 +26,13 @@
 -module(couch_replicator_rate_limiter_tables).
 
 -export([
-    create/1,
-    tids/0,
-    term_to_table/1
+   create/1,
+   tids/0,
+   term_to_table/1
 ]).
 
 -define(SHARDS_N, 16).
+
 
 -spec create(non_neg_integer()) -> ok.
 create(KeyPos) ->
@@ -38,18 +40,22 @@ create(KeyPos) ->
     [ets:new(list_to_atom(TableName), Opts) || TableName <- table_names()],
     ok.
 
+
 -spec tids() -> [atom()].
 tids() ->
     [list_to_existing_atom(TableName) || TableName <- table_names()].
+
 
 -spec term_to_table(any()) -> atom().
 term_to_table(Term) ->
     PHash = erlang:phash2(Term),
     list_to_existing_atom(table_name(PHash rem ?SHARDS_N)).
 
+
 -spec table_names() -> [string()].
 table_names() ->
     [table_name(N) || N <- lists:seq(0, ?SHARDS_N - 1)].
+
 
 -spec table_name(non_neg_integer()) -> string().
 table_name(Id) when is_integer(Id), Id >= 0 andalso Id < ?SHARDS_N ->
