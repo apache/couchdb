@@ -78,6 +78,7 @@
 -define(PDICT_CHECKED_MD_IS_CURRENT, '$fabric_checked_md_is_current').
 -define(PDICT_TX_ID_KEY, '$fabric_tx_id').
 -define(PDICT_TX_RES_KEY, '$fabric_tx_result').
+-define(PDICT_TX_RES_WAS_UNKNOWN, '$fabric_tx_res_was_unknown').
 -define(PDICT_FOLD_ACC_STATE, '$fabric_fold_acc_state').
 
 -define(DEFAULT_BINARY_CHUNK_SIZE, 100000).

@@ -28,7 +28,8 @@ retry_test_() ->
             ?TDEF(run_on_first_try),
             ?TDEF(retry_when_commit_conflict),
             ?TDEF(retry_when_txid_not_found),
-            ?TDEF(no_retry_when_txid_found)
+            ?TDEF(no_retry_when_txid_found),
+            ?TDEF(use_last_unknown_result)
         ])
     }.
 
@@ -166,6 +167,29 @@ no_retry_when_txid_found(_) ->
 
     put('$fabric_tx_id', <<"a txid">>),
     put('$fabric_tx_result', did_not_run),
+
+    Result = fabric2_fdb:transactional(fun(_Tx) ->
+        ?assert(false),
+        did_run
+    end),
+
+    ?assertEqual(did_not_run, Result),
+    ?assert(meck:validate([erlfdb, fabric2_txids])).
+
+
+use_last_unknown_result(_) ->
+    meck:expect(erlfdb, transactional, fun(_Db, UserFun) ->
+        UserFun(not_a_real_transaction)
+    end),
+    % Set another retryable error as last error
+    meck:expect(erlfdb, get_last_error, fun() -> 1009 end),
+    meck:expect(erlfdb, get, fun(_, <<"a txid">>) -> future end),
+    meck:expect(erlfdb, wait, fun(future) -> <<>> end),
+    meck:expect(fabric2_txids, remove, fun(<<"a txid">>) -> ok end),
+
+    put('$fabric_tx_id', <<"a txid">>),
+    put('$fabric_tx_result', did_not_run),
+    put('$fabric_tx_res_was_unknown', true),
 
     Result = fabric2_fdb:transactional(fun(_Tx) ->
         ?assert(false),

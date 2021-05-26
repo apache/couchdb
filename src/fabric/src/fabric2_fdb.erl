@@ -1969,7 +1969,7 @@ check_db_instance(#{} = Db) ->
 
 
 is_transaction_applied(Tx) ->
-    is_commit_unknown_result()
+    was_commit_unknown_result()
         andalso has_transaction_id()
         andalso transaction_id_exists(Tx).
 
@@ -1997,11 +1997,23 @@ clear_transaction() ->
     erase(?PDICT_CHECKED_DB_IS_CURRENT),
     erase(?PDICT_CHECKED_MD_IS_CURRENT),
     erase(?PDICT_TX_ID_KEY),
-    erase(?PDICT_TX_RES_KEY).
+    erase(?PDICT_TX_RES_KEY),
+    erase(?PDICT_TX_RES_WAS_UNKNOWN).
 
 
-is_commit_unknown_result() ->
-    erlfdb:get_last_error() == ?ERLFDB_COMMIT_UNKNOWN_RESULT.
+was_commit_unknown_result() ->
+    case get(?PDICT_TX_RES_WAS_UNKNOWN) of
+        true ->
+            true;
+        undefined ->
+            case erlfdb:get_last_error() == ?ERLFDB_COMMIT_UNKNOWN_RESULT of
+                true ->
+                    put(?PDICT_TX_RES_WAS_UNKNOWN, true),
+                    true;
+                false ->
+                    false
+            end
+    end.
 
 
 has_transaction_id() ->

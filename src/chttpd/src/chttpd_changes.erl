@@ -373,9 +373,8 @@ get_changes_timeout(Args, Callback) ->
         timeout = Timeout,
         feed = ResponseType
     } = Args,
-    DefaultTimeout = list_to_integer(
-        config:get("httpd", "changes_timeout", "60000")
-    ),
+    DefaultTimeout = chttpd_util:get_chttpd_config_integer(
+        "changes_timeout", 60000),
     case Heartbeat of
     undefined ->
         case Timeout of

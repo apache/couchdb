@@ -509,7 +509,6 @@ defmodule BasicsTest do
     assert resp.status_code == 200
     assert resp.body == 1000
 
-    body = "999"
     resp = Couch.put("/#{db_name}/_revs_limit", body: "999")
     assert resp.status_code == 200
     assert resp.body["ok"] == true
