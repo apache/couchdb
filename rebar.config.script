@@ -158,7 +158,7 @@ DepDescs = [
                    {tag, "v1.2.6"}, [raw]},
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.4"}},
-{hyper,            "hyper",            {tag, "CouchDB-2.2.0-6"}},
+{hyper,            "hyper",            {tag, "CouchDB-2.2.0-7"}},
 {ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-2"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-1.0.5-1"}},
 {mochiweb,         "mochiweb",         {tag, "v2.20.0"}},
