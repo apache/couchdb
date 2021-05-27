@@ -17,6 +17,7 @@
 include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
+ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
 
 # Handle the following scenarios:
 #   1. When building from a tarball, use version.mk.
@@ -160,6 +161,7 @@ endif
 .PHONY: check
 check:  all
 	@$(MAKE) emilio
+	@$(MAKE) erlfmt-check
 	@$(MAKE) eunit
 	@$(MAKE) elixir-suite
 	@$(MAKE) exunit
@@ -208,6 +210,12 @@ soak-eunit: couch
 
 emilio:
 	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3 || exit 0
+
+erlfmt-check:
+	ERLFMT_PATH=$(ERLFMT) python3 dev/format_check.py
+
+erlfmt-format:
+	ERLFMT_PATH=$(ERLFMT) python3 dev/format_all.py
 
 .venv/bin/black:
 	@python3 -m venv .venv
