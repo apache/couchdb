@@ -1072,8 +1072,8 @@ scheduler_job_format_status_test() ->
         highest_seq_done = <<"5">>
     },
     Format = format_status(opts_ignored, [pdict, State]),
-    ?assertEqual("http://u:*****@h1/d1/", proplists:get_value(source, Format)),
-    ?assertEqual("http://u:*****@h2/d2/", proplists:get_value(target, Format)),
+    ?assertEqual("http://h1/d1/", proplists:get_value(source, Format)),
+    ?assertEqual("http://h2/d2/", proplists:get_value(target, Format)),
     ?assertEqual({"base", "+ext"}, proplists:get_value(rep_id, Format)),
     ?assertEqual([{create_target, true}], proplists:get_value(options, Format)),
     ?assertEqual(<<"mydoc">>, proplists:get_value(doc_id, Format)),

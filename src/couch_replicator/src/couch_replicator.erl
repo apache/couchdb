@@ -373,13 +373,13 @@ t_strip_local_db_creds() ->
 t_strip_http_basic_creds() ->
     ?_test(begin
         Url1 = <<"http://adm:pass@host/db">>,
-        ?assertEqual(<<"http://adm:*****@host/db/">>, strip_url_creds(Url1)),
+        ?assertEqual(<<"http://host/db/">>, strip_url_creds(Url1)),
         Url2 = <<"https://adm:pass@host/db">>,
-        ?assertEqual(<<"https://adm:*****@host/db/">>, strip_url_creds(Url2)),
+        ?assertEqual(<<"https://host/db/">>, strip_url_creds(Url2)),
         Url3 = <<"http://adm:pass@host:80/db">>,
-        ?assertEqual(<<"http://adm:*****@host:80/db/">>, strip_url_creds(Url3)),
+        ?assertEqual(<<"http://host:80/db/">>, strip_url_creds(Url3)),
         Url4 = <<"http://adm:pass@host/db?a=b&c=d">>,
-        ?assertEqual(<<"http://adm:*****@host/db?a=b&c=d">>,
+        ?assertEqual(<<"http://host/db?a=b&c=d">>,
             strip_url_creds(Url4))
     end).
 
@@ -387,7 +387,7 @@ t_strip_http_basic_creds() ->
 t_strip_http_props_creds() ->
     ?_test(begin
         Props1 = {[{<<"url">>, <<"http://adm:pass@host/db">>}]},
-        ?assertEqual(<<"http://adm:*****@host/db/">>, strip_url_creds(Props1)),
+        ?assertEqual(<<"http://host/db/">>, strip_url_creds(Props1)),
         Props2 = {[ {<<"url">>, <<"http://host/db">>},
             {<<"headers">>, {[{<<"Authorization">>, <<"Basic pa55">>}]}}
         ]},

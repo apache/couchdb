@@ -134,21 +134,10 @@ get_rep_endpoint(#httpdb{url=Url, headers=Headers}) ->
 
 get_v4_endpoint(#httpdb{} = HttpDb) ->
     {remote, Url, Headers} = get_rep_endpoint(HttpDb),
-    {{UserFromHeaders, _}, HeadersWithoutBasicAuth} =
-        couch_replicator_utils:remove_basic_auth_from_headers(Headers),
-    {UserFromUrl, Host, NonDefaultPort, Path} = get_v4_url_info(Url),
-    User = pick_defined_value([UserFromUrl, UserFromHeaders]),
+    {User, _} = couch_replicator_utils:get_basic_auth_creds(HttpDb),
+    {Host, NonDefaultPort, Path} = get_v4_url_info(Url),
     OAuth = undefined, % Keep this to ensure checkpoints don't change
-    {remote, User, Host, NonDefaultPort, Path, HeadersWithoutBasicAuth, OAuth}.
-
-
-pick_defined_value(Values) ->
-    case [V || V <- Values, V /= undefined] of
-        [] ->
-            undefined;
-        DefinedValues ->
-            hd(DefinedValues)
-    end.
+    {remote, User, Host, NonDefaultPort, Path, Headers, OAuth}.
 
 
 get_v4_url_info(Url) when is_binary(Url) ->
@@ -158,16 +147,15 @@ get_v4_url_info(Url) ->
         {error, invalid_uri} ->
             % Tolerate errors here to avoid a bad user document
             % crashing the replicator
-            {undefined, Url, undefined, undefined};
+            {Url, undefined, undefined};
         #url{
             protocol = Schema,
-            username = User,
             host = Host,
             port = Port,
             path = Path
         } ->
             NonDefaultPort = get_non_default_port(Schema, Port),
-            {User, Host, NonDefaultPort, Path}
+            {Host, NonDefaultPort, Path}
     end.
 
 
@@ -197,71 +185,81 @@ replication_id_convert_test_() ->
 
 http_v4_endpoint_test_() ->
     [?_assertMatch({remote, User, Host, Port, Path, HeadersNoAuth, undefined},
-        get_v4_endpoint(#httpdb{url = Url, headers = Headers})) ||
-            {{User, Host, Port, Path, HeadersNoAuth}, {Url, Headers}} <- [
+        begin
+            HttpDb = #httpdb{url = Url, headers = Headers, auth_props = Auth},
+            HttpDb1 = couch_replicator_utils:normalize_basic_auth(HttpDb),
+            get_v4_endpoint(HttpDb1)
+        end) ||
+            {{User, Host, Port, Path, HeadersNoAuth}, {Url, Headers, Auth}} <- [
                 {
                     {undefined, "host", default, "/", []},
-                    {"http://host", []}
+                    {"http://host", [], []}
                 },
                 {
                     {undefined, "host", default, "/", []},
-                    {"https://host", []}
+                    {"https://host", [], []}
                 },
                 {
                     {undefined, "host", default, "/", []},
-                    {"http://host:5984", []}
+                    {"http://host:5984", [], []}
                 },
                 {
                     {undefined, "host", 1, "/", []},
-                    {"http://host:1", []}
+                    {"http://host:1", [], []}
                 },
                 {
                     {undefined, "host", 2, "/", []},
-                    {"https://host:2", []}
+                    {"https://host:2", [], []}
                 },
                 {
                     {undefined, "host", default, "/", [{"h","v"}]},
-                    {"http://host", [{"h","v"}]}
+                    {"http://host", [{"h","v"}], []}
                 },
                 {
                     {undefined, "host", default, "/a/b", []},
-                    {"http://host/a/b", []}
+                    {"http://host/a/b", [], []}
                 },
                 {
                     {"user", "host", default, "/", []},
-                    {"http://user:pass@host", []}
+                    {"http://user:pass@host", [], []}
                 },
                 {
                     {"user", "host", 3, "/", []},
-                    {"http://user:pass@host:3", []}
+                    {"http://user:pass@host:3", [], []}
                 },
                 {
                     {"user", "host", default, "/", []},
-                    {"http://user:newpass@host", []}
+                    {"http://user:newpass@host", [], []}
                 },
                 {
                     {"user", "host", default, "/", []},
-                    {"http://host", [basic_auth("user","pass")]}
+                    {"http://host", [basic_auth("user","pass")], []}
                 },
                 {
                     {"user", "host", default, "/", []},
-                    {"http://host", [basic_auth("user","newpass")]}
+                    {"http://host", [basic_auth("user","newpass")], []}
                 },
                 {
-                    {"user1", "host", default, "/", []},
-                    {"http://user1:pass1@host", [basic_auth("user2","pass2")]}
+                    {"user3", "host", default, "/", []},
+                    {"http://user1:pass1@host", [basic_auth("user2","pass2")],
+                        auth_props("user3", "pass3")}
+                },
+                {
+                    {"user2", "host", default, "/", [{"h", "v"}]},
+                    {"http://host", [{"h", "v"}, basic_auth("user","pass")],
+                        auth_props("user2", "pass2")}
                 },
                 {
                     {"user", "host", default, "/", [{"h", "v"}]},
-                    {"http://host", [{"h", "v"}, basic_auth("user","pass")]}
+                    {"http://host", [{"h", "v"}], auth_props("user", "pass")}
                 },
                 {
                     {undefined, "random_junk", undefined, undefined},
-                    {"random_junk", []}
+                    {"random_junk", [], []}
                 },
                 {
                     {undefined, "host", default, "/", []},
-                    {"http://host", [{"Authorization", "Basic bad"}]}
+                    {"http://host", [{"Authorization", "Basic bad"}], []}
                 }
         ]
     ].
@@ -271,5 +269,11 @@ basic_auth(User, Pass) ->
     B64Auth = base64:encode_to_string(User ++ ":" ++ Pass),
     {"Authorization", "Basic " ++ B64Auth}.
 
+
+auth_props(User, Pass) when is_list(User), is_list(Pass) ->
+    [{<<"basic">>, {[
+       {<<"username">>, list_to_binary(User)},
+       {<<"password">>, list_to_binary(Pass)}
+    ]}}].
 
 -endif.
