@@ -23,12 +23,15 @@
    pp_rep_id/1,
    iso8601/1,
    filter_state/3,
-   remove_basic_auth_from_headers/1,
    normalize_rep/1,
-   ejson_state_info/1
+   ejson_state_info/1,
+   get_basic_auth_creds/1,
+   remove_basic_auth_creds/1,
+   normalize_basic_auth/1
 ]).
 
 
+-include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
@@ -191,6 +194,98 @@ ejson_state_info(Info) ->
     {[{<<"error">>, ErrMsg}]}.
 
 
+-spec get_basic_auth_creds(#httpdb{}) ->
+    {string(), string()} | {undefined, undefined}.
+get_basic_auth_creds(#httpdb{auth_props = AuthProps}) ->
+    case couch_util:get_value(<<"basic">>, AuthProps) of
+        undefined ->
+            {undefined, undefined};
+        {UserPass} when is_list(UserPass)  ->
+            User = couch_util:get_value(<<"username">>, UserPass),
+            Pass = couch_util:get_value(<<"password">>, UserPass),
+            case {User, Pass} of
+                _ when is_binary(User), is_binary(Pass) ->
+                    {binary_to_list(User), binary_to_list(Pass)};
+                _Other ->
+                    {undefined, undefined}
+            end;
+        _Other ->
+            {undefined, undefined}
+    end.
+
+
+-spec remove_basic_auth_creds(#httpd{}) -> #httpdb{}.
+remove_basic_auth_creds(#httpdb{auth_props = Props} = HttpDb) ->
+    Props1 = lists:keydelete(<<"basic">>, 1, Props),
+    HttpDb#httpdb{auth_props = Props1}.
+
+
+-spec set_basic_auth_creds(string(), string(), #httpd{}) -> #httpdb{}.
+set_basic_auth_creds(undefined, undefined, #httpdb{} = HttpDb) ->
+    HttpDb;
+set_basic_auth_creds(User, Pass, #httpdb{} = HttpDb)
+        when is_list(User), is_list(Pass) ->
+    HttpDb1 = remove_basic_auth_creds(HttpDb),
+    Props = HttpDb1#httpdb.auth_props,
+    UserPass = {[
+        {<<"username">>, list_to_binary(User)},
+        {<<"password">>, list_to_binary(Pass)}
+    ]},
+    Props1 = lists:keystore(<<"basic">>, 1, Props, {<<"basic">>, UserPass}),
+    HttpDb1#httpdb{auth_props = Props1}.
+
+
+-spec extract_creds_from_url(string()) ->
+    {ok, {string() | undefined, string() | undefined}, string()} |
+    {error, term()}.
+extract_creds_from_url(Url) ->
+    case ibrowse_lib:parse_url(Url) of
+        {error, Error} ->
+            {error, Error};
+        #url{username = undefined, password = undefined} ->
+            {ok, {undefined, undefined}, Url};
+        #url{protocol = Proto, username = User, password = Pass} ->
+            % Excise user and pass parts from the url. Try to keep the host,
+            % port and path as they were in the original.
+            Prefix = lists:concat([Proto, "://", User, ":", Pass, "@"]),
+            Suffix = lists:sublist(Url, length(Prefix) + 1, length(Url) + 1),
+            NoCreds = lists:concat([Proto, "://", Suffix]),
+            {ok, {User, Pass}, NoCreds}
+    end.
+
+
+% Normalize basic auth credentials so they are set only in the auth props
+% object. If multiple basic auth credentials are provided, the resulting
+% credentials are picked in the following order.
+%  1) {"auth": "basic": {"username":.., "password": ...} ...}
+%  2) URL userinfo part
+%  3) "Authentication" : "basic $base64" headers
+%
+-spec normalize_basic_auth(#httpdb{}) -> #httpdb{}.
+normalize_basic_auth(#httpdb{} = HttpDb) ->
+    #httpdb{url = Url, headers = Headers} = HttpDb,
+    {HeaderCreds, HeadersNoCreds} = remove_basic_auth_from_headers(Headers),
+    {UrlCreds, UrlWithoutCreds} = case extract_creds_from_url(Url) of
+        {ok, Creds = {_, _}, UrlNoCreds} ->
+            {Creds, UrlNoCreds};
+        {error, _Error} ->
+            % Don't crash replicator if user provided an invalid
+            % userinfo part
+            {undefined, undefined}
+    end,
+    AuthCreds = {_, _} = get_basic_auth_creds(HttpDb),
+    HttpDb1 = remove_basic_auth_creds(HttpDb#httpdb{
+        url = UrlWithoutCreds,
+        headers = HeadersNoCreds
+    }),
+    {User, Pass} = case {AuthCreds, UrlCreds, HeaderCreds} of
+        {{U, P}, {_, _}, {_, _}} when is_list(U), is_list(P) -> {U, P};
+        {{_, _}, {U, P}, {_, _}} when is_list(U), is_list(P) -> {U, P};
+        {{_, _}, {_, _}, {U, P}} -> {U, P}
+    end,
+    set_basic_auth_creds(User, Pass, HttpDb1).
+
+
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
@@ -268,5 +363,177 @@ normalize_rep_test_() ->
             ?assertEqual(normalize_rep(Rep1), normalize_rep(Rep2))
         end)
     }.
+
+
+get_basic_auth_creds_test() ->
+    Check = fun(Props) ->
+        get_basic_auth_creds(#httpdb{auth_props = Props})
+    end,
+
+    ?assertEqual({undefined, undefined}, Check([])),
+
+    ?assertEqual({undefined, undefined}, Check([null])),
+
+    ?assertEqual({undefined, undefined}, Check([{<<"other">>, <<"x">>}])),
+
+    ?assertEqual({undefined, undefined}, Check([{<<"basic">>, []}])),
+
+    UserPass1 = {[{<<"username">>, <<"u">>}, {<<"password">>, <<"p">>}]},
+    ?assertEqual({"u", "p"}, Check([{<<"basic">>, UserPass1}])),
+
+    UserPass3 = {[{<<"username">>, <<"u">>}, {<<"password">>, null}]},
+    ?assertEqual({undefined, undefined}, Check([{<<"basic">>, UserPass3}])).
+
+
+remove_basic_auth_creds_test() ->
+    Check = fun(Props) ->
+        HttpDb = remove_basic_auth_creds(#httpdb{auth_props = Props}),
+        HttpDb#httpdb.auth_props
+    end,
+
+    ?assertEqual([], Check([])),
+
+    ?assertEqual([{<<"other">>, {[]}}], Check([{<<"other">>, {[]}}])),
+
+    ?assertEqual([], Check([
+        {<<"basic">>, {[
+            {<<"username">>, <<"u">>},
+            {<<"password">>, <<"p">>}
+        ]}}
+    ])),
+
+    ?assertEqual([{<<"other">>, {[]}}], Check([
+        {<<"basic">>, {[
+            {<<"username">>, <<"u">>},
+            {<<"password">>, <<"p">>}
+        ]}},
+        {<<"other">>, {[]}}
+    ])).
+
+
+set_basic_auth_creds_test() ->
+    Check = fun(User, Pass, Props) ->
+        HttpDb = set_basic_auth_creds(User, Pass, #httpdb{auth_props = Props}),
+        HttpDb#httpdb.auth_props
+    end,
+
+    ?assertEqual([], Check(undefined, undefined, [])),
+
+    ?assertEqual([{<<"other">>, {[]}}], Check(undefined, undefined,
+        [{<<"other">>, {[]}}])),
+
+    ?assertEqual([
+        {<<"basic">>, {[
+            {<<"username">>, <<"u">>},
+            {<<"password">>, <<"p">>}
+        ]}}
+    ], Check("u", "p", [])),
+
+    ?assertEqual([
+        {<<"other">>, {[]}},
+        {<<"basic">>, {[
+            {<<"username">>, <<"u">>},
+            {<<"password">>, <<"p">>}
+        ]}}
+    ], Check("u", "p", [{<<"other">>, {[]}}])).
+
+
+normalize_basic_creds_test_() ->
+    DefaultHeaders = (#httpdb{})#httpdb.headers,
+    [?_assertEqual(Expect, normalize_basic_auth(Input)) || {Input, Expect} <- [
+        {
+            #httpdb{url = "http://u:p@x.y/db"},
+            #httpdb{url = "http://x.y/db", auth_props = auth_props("u", "p")}
+        },
+        {
+            #httpdb{url = "http://u:p@h:80/db"},
+            #httpdb{url = "http://h:80/db", auth_props = auth_props("u", "p")}
+        },
+        {
+            #httpdb{url = "https://u:p@h/db"},
+            #httpdb{url = "https://h/db", auth_props = auth_props("u", "p")}
+        },
+        {
+            #httpdb{url = "http://u:p@[2001:db8:a1b:12f9::1]/db"},
+            #httpdb{url = "http://[2001:db8:a1b:12f9::1]/db",
+                auth_props = auth_props("u", "p")}
+        },
+        {
+            #httpdb{
+                url = "http://h/db",
+                headers = DefaultHeaders ++ [
+                    {"Authorization", "Basic " ++ b64creds("u", "p")}
+                ]
+            },
+            #httpdb{url = "http://h/db", auth_props = auth_props("u", "p")}
+        },
+        {
+            #httpdb{
+                url = "http://h/db",
+                headers = DefaultHeaders ++ [
+                    {"Authorization", "Basic " ++ b64creds("u", "p@")}
+                ]
+            },
+            #httpdb{url = "http://h/db", auth_props = auth_props("u", "p@")}
+        },
+        {
+            #httpdb{
+                url = "http://h/db",
+                headers = DefaultHeaders ++ [
+                    {"Authorization", "Basic " ++ b64creds("u", "p@%40")}
+                ]
+            },
+            #httpdb{url = "http://h/db", auth_props = auth_props("u", "p@%40")}
+        },
+        {
+            #httpdb{
+                url = "http://h/db",
+                headers = DefaultHeaders ++ [
+                    {"aUthoriZation", "bASIC " ++ b64creds("U", "p")}
+                ]
+            },
+            #httpdb{url = "http://h/db", auth_props = auth_props("U", "p")}
+        },
+        {
+            #httpdb{
+                url = "http://u1:p1@h/db",
+                headers = DefaultHeaders ++ [
+                    {"Authorization", "Basic " ++ b64creds("u2", "p2")}
+                ]
+            },
+            #httpdb{url ="http://h/db", auth_props = auth_props("u1", "p1")}
+        },
+        {
+            #httpdb{
+                url = "http://u1:p1@h/db",
+                auth_props = [{<<"basic">>, {[
+                    {<<"username">>, <<"u2">>},
+                    {<<"password">>, <<"p2">>}
+                ]}}]
+            },
+            #httpdb{url = "http://h/db", auth_props = auth_props("u2", "p2")}
+        },
+        {
+            #httpdb{
+                url = "http://u1:p1@h/db",
+                auth_props = [{<<"basic">>, {[
+                    {<<"username">>, <<"u2">>},
+                    {<<"password">>, <<"p2">>}
+                ]}}],
+                headers = DefaultHeaders ++ [
+                    {"Authorization", "Basic " ++ b64creds("u3", "p3")}
+                ]
+            },
+            #httpdb{url = "http://h/db", auth_props = auth_props("u2", "p2")}
+        }
+    ]].
+
+
+auth_props(User, Pass) when is_list(User), is_list(Pass) ->
+    [{<<"basic">>, {[
+       {<<"username">>, list_to_binary(User)},
+       {<<"password">>, list_to_binary(Pass)}
+    ]}}].
+
 
 -endif.

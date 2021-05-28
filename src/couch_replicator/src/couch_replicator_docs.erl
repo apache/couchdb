@@ -408,7 +408,7 @@ parse_rep_db({Props}, Proxy, Options) ->
     {BinHeaders} = get_value(<<"headers">>, Props, {[]}),
     Headers = lists:ukeysort(1, [{?b2l(K), ?b2l(V)} || {K, V} <- BinHeaders]),
     DefaultHeaders = (#httpdb{})#httpdb.headers,
-    #httpdb{
+    HttpDb = #httpdb{
         url = Url,
         auth_props = AuthProps,
         headers = lists:ukeymerge(1, Headers, DefaultHeaders),
@@ -419,7 +419,8 @@ parse_rep_db({Props}, Proxy, Options) ->
         http_connections = get_value(http_connections, Options),
         retries = get_value(retries, Options),
         proxy_url = ProxyURL
-    };
+    },
+    couch_replicator_utils:normalize_basic_auth(HttpDb);
 
 parse_rep_db(<<"http://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db({[{<<"url">>, Url}]}, Proxy, Options);

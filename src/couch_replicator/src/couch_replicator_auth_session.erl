@@ -78,7 +78,6 @@
 
 -type headers() :: [{string(), string()}].
 -type code() :: non_neg_integer().
--type creds() :: {string() | undefined, string() | undefined}.
 -type time_sec() :: non_neg_integer().
 -type age() :: time_sec() | undefined.
 
@@ -238,59 +237,15 @@ init_state(#httpdb{} = HttpDb) ->
 
 -spec extract_creds(#httpdb{}) ->
     {ok, string(), string(), #httpdb{}} | {error, term()}.
-extract_creds(#httpdb{url = Url, headers = Headers} = HttpDb) ->
-    {{HeadersUser, HeadersPass}, HeadersNoCreds} =
-            couch_replicator_utils:remove_basic_auth_from_headers(Headers),
-    case extract_creds_from_url(Url) of
-        {ok, UrlUser, UrlPass, UrlNoCreds} ->
-            case pick_creds({UrlUser, UrlPass}, {HeadersUser, HeadersPass}) of
-                {ok, User, Pass} ->
-                    HttpDb1 = HttpDb#httpdb{
-                        url = UrlNoCreds,
-                        headers = HeadersNoCreds
-                    },
-                    {ok, User, Pass, HttpDb1};
-                {error, Error} ->
-                    {error, Error}
-            end;
-        {error, Error} ->
-            {error, Error}
-    end.
-
-
-% Credentials could be specified in the url and/or in the headers.
-%  * If no credentials specified return error.
-%  * If specified in url but not in headers, pick url creds.
-%  * Otherwise pick headers creds.
-%
--spec pick_creds(creds(), creds()) ->
-    {ok, string(), string()} | {error, missing_credentials}.
-pick_creds({undefined, _}, {undefined, _}) ->
-    {error, missing_credentials};
-pick_creds({UrlUser, UrlPass}, {undefined, _}) ->
-    {ok, UrlUser, UrlPass};
-pick_creds({_, _}, {HeadersUser, HeadersPass}) ->
-    {ok, HeadersUser, HeadersPass}.
-
-
--spec extract_creds_from_url(string()) ->
-    {ok, string() | undefined, string() | undefined, string()} |
-    {error, term()}.
-extract_creds_from_url(Url) ->
-    case ibrowse_lib:parse_url(Url) of
-        {error, Error} ->
-            {error, Error};
-        #url{username = undefined, password = undefined} ->
-            {ok, undefined, undefined, Url};
-        #url{protocol = Proto, username = User, password = Pass} ->
-            % Excise user and pass parts from the url. Try to keep the host,
-            % port and path as they were in the original.
-            Prefix = lists:concat([Proto, "://", User, ":", Pass, "@"]),
-            Suffix = lists:sublist(Url, length(Prefix) + 1, length(Url) + 1),
-            NoCreds = lists:concat([Proto, "://", Suffix]),
-            User1 = chttpd:unquote(User),
-            Pass1 = chttpd:unquote(Pass),
-            {ok, User1, Pass1, NoCreds}
+extract_creds(#httpdb{} = HttpDb) ->
+    case couch_replicator_utils:get_basic_auth_creds(HttpDb) of
+        {undefined, undefined} ->
+            % Return error. Session plugin should ignore this replication
+            % endpoint as there are no valid creds which can be used
+            {error, missing_credentials};
+        {User, Pass} when is_list(User), is_list(Pass) ->
+            HttpDb1 = couch_replicator_utils:remove_basic_auth_creds(HttpDb),
+            {ok, User, Pass, HttpDb1}
     end.
 
 
@@ -569,116 +524,15 @@ get_session_url_test_() ->
     ]].
 
 
-extract_creds_success_test_() ->
-    DefaultHeaders = (#httpdb{})#httpdb.headers,
-    [?_assertEqual({ok, User, Pass, HttpDb2}, extract_creds(HttpDb1)) ||
-        {HttpDb1, {User, Pass, HttpDb2}} <- [
-        {
-            #httpdb{url = "http://u:p@x.y/db"},
-            {"u", "p", #httpdb{url = "http://x.y/db"}}
-        },
-        {
-            #httpdb{url = "http://u%40:p%40@x.y/db"},
-            {"u@", "p@", #httpdb{url = "http://x.y/db"}}
-        },
-        {
-            #httpdb{url = "http://u%40u:p%40p@x.y/db"},
-            {"u@u", "p@p", #httpdb{url = "http://x.y/db"}}
-        },
-        {
-            #httpdb{url = "http://u%40%401:p%40%401@x.y/db"},
-            {"u@@1", "p@@1", #httpdb{url = "http://x.y/db"}}
-        },
-        {
-            #httpdb{url = "http://u%40%2540:p%40%2540@x.y/db"},
-            {"u@%40", "p@%40", #httpdb{url = "http://x.y/db"}}
-        },
-        {
-            #httpdb{url = "http://u:p@h:80/db"},
-            {"u", "p", #httpdb{url = "http://h:80/db"}}
-        },
-        {
-            #httpdb{url = "http://u%3A:p%3A@h:80/db"},
-            {"u:", "p:", #httpdb{url = "http://h:80/db"}}
-        },
-        {
-            #httpdb{url = "https://u:p@h/db"},
-            {"u", "p", #httpdb{url = "https://h/db"}}
-        },
-        {
-            #httpdb{url = "https://u%2F:p%2F@h/db"},
-            {"u/", "p/", #httpdb{url = "https://h/db"}}
-        },
-        {
-            #httpdb{url = "http://u:p@127.0.0.1:5984/db"},
-            {"u", "p", #httpdb{url = "http://127.0.0.1:5984/db"}}
-        },
-        {
-            #httpdb{url = "http://u:p@[2001:db8:a1b:12f9::1]/db"},
-            {"u", "p", #httpdb{url = "http://[2001:db8:a1b:12f9::1]/db"}}
-        },
-        {
-            #httpdb{url = "http://u:p@[2001:db8:a1b:12f9::1]:81/db"},
-            {"u", "p", #httpdb{url = "http://[2001:db8:a1b:12f9::1]:81/db"}}
-        },
-        {
-            #httpdb{url = "http://u:p%3A%2F%5B%5D%40@[2001:db8:a1b:12f9::1]:81/db"},
-            {"u", "p:/[]@", #httpdb{url = "http://[2001:db8:a1b:12f9::1]:81/db"}}
-        },
-        {
-            #httpdb{url = "http://u:p@x.y/db/other?query=Z&query=w"},
-            {"u", "p", #httpdb{url = "http://x.y/db/other?query=Z&query=w"}}
-        },
-        {
-            #httpdb{url = "http://u:p%3F@x.y/db/other?query=Z&query=w"},
-            {"u", "p?", #httpdb{url = "http://x.y/db/other?query=Z&query=w"}}
-        },
-        {
-            #httpdb{
-                url = "http://h/db",
-                headers = DefaultHeaders ++ [
-                    {"Authorization", "Basic " ++ b64creds("u", "p")}
-                ]
-            },
-            {"u", "p", #httpdb{url = "http://h/db"}}
-        },
-        {
-            #httpdb{
-                url = "http://h/db",
-                headers = DefaultHeaders ++ [
-                    {"Authorization", "Basic " ++ b64creds("u", "p@")}
-                ]
-            },
-            {"u", "p@", #httpdb{url = "http://h/db"}}
-        },
-        {
-            #httpdb{
-                url = "http://h/db",
-                headers = DefaultHeaders ++ [
-                    {"Authorization", "Basic " ++ b64creds("u", "p@%40")}
-                ]
-            },
-            {"u", "p@%40", #httpdb{url = "http://h/db"}}
-        },
-        {
-            #httpdb{
-                url = "http://h/db",
-                headers = DefaultHeaders ++ [
-                    {"aUthoriZation", "bASIC " ++ b64creds("U", "p")}
-                ]
-            },
-            {"U", "p", #httpdb{url = "http://h/db"}}
-        },
-        {
-            #httpdb{
-                url = "http://u1:p1@h/db",
-                headers = DefaultHeaders ++ [
-                    {"Authorization", "Basic " ++ b64creds("u2", "p2")}
-                ]
-            },
-            {"u2", "p2", #httpdb{url = "http://h/db"}}
-        }
-    ]].
+extract_creds_success_test() ->
+    HttpDb = #httpdb{auth_props = [
+        {<<"basic">>, {[
+            {<<"username">>, <<"u2">>},
+            {<<"password">>, <<"p2">>}
+        ]}}
+    ]},
+    ?assertEqual({ok, "u2", "p2", #httpdb{}}, extract_creds(HttpDb)),
+    ?assertEqual({error, missing_credentials}, extract_creds(#httpdb{})).
 
 
 cookie_update_test_() ->
@@ -795,7 +649,7 @@ t_process_ok_no_cookie() ->
 t_init_state_fails_on_401() ->
     ?_test(begin
         mock_http_401_response(),
-        {error, Error} = init_state(#httpdb{url = "http://u:p@h"}),
+        {error, Error} = init_state(httpdb("http://u:p@h")),
         SessionUrl =  "http://h/_session",
         ?assertEqual({session_request_unauthorized, SessionUrl, "u"}, Error)
     end).
@@ -805,30 +659,34 @@ t_init_state_401_with_require_valid_user() ->
     ?_test(begin
         mock_http_401_response_with_require_valid_user(),
         ?assertMatch({ok, #httpdb{}, #state{cookie = "Cookie"}},
-            init_state(#httpdb{url = "http://u:p@h"}))
+            init_state(httpdb("http://u:p@h")))
     end).
 
 
 t_init_state_404() ->
     ?_test(begin
         mock_http_404_response(),
-        ?assertEqual(ignore, init_state(#httpdb{url = "http://u:p@h"}))
+        ?assertEqual(ignore, init_state(httpdb("http://u:p@h")))
     end).
 
 
 t_init_state_no_creds() ->
     ?_test(begin
-        ?_assertEqual(ignore, init_state(#httpdb{url = "http://h"}))
+        ?_assertEqual(ignore, init_state(httpdb("http://h")))
     end).
 
 
 t_init_state_http_error() ->
     ?_test(begin
         mock_http_error_response(),
-        {error, Error} = init_state(#httpdb{url = "http://u:p@h"}),
+        {error, Error} = init_state(httpdb("http://u:p@h")),
         SessionUrl = "http://h/_session",
         ?assertEqual({session_request_failed, SessionUrl, "u", x}, Error)
     end).
+
+
+httpdb(Url) ->
+    couch_replicator_utils:normalize_basic_auth(#httpdb{url = Url}).
 
 
 setup_all() ->
@@ -883,14 +741,6 @@ mock_http_404_response() ->
 
 mock_http_error_response() ->
     meck:expect(ibrowse, send_req_direct, 7, {error, x}).
-
-
-extract_creds_error_test_() ->
-    [?_assertMatch({error, Error}, extract_creds(HttpDb)) ||
-        {HttpDb, Error} <- [
-        {#httpdb{url = "some_junk"}, invalid_uri},
-        {#httpdb{url = "http://h/db"}, missing_credentials}
-    ]].
 
 
 parse_max_age_test_() ->

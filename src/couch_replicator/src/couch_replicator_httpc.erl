@@ -112,7 +112,13 @@ send_ibrowse_req(#httpdb{headers = BaseHeaders} = HttpDb0, Params) ->
         end
     end,
     {ok, Worker} = couch_replicator_httpc_pool:get_worker(HttpDb#httpdb.httpc_pool),
-    IbrowseOptions = [
+    BasicAuthOpts = case couch_replicator_utils:get_basic_auth_creds(HttpDb) of
+        {undefined, undefined} ->
+            [];
+        {User, Pass} when is_list(User), is_list(Pass) ->
+            [{basic_auth, {User, Pass}}]
+    end,
+    IbrowseOptions = BasicAuthOpts ++ [
         {response_format, binary}, {inactivity_timeout, HttpDb#httpdb.timeout} |
         lists:ukeymerge(1, get_value(ibrowse_options, Params, []),
             HttpDb#httpdb.ibrowse_options)
