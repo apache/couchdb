@@ -49,6 +49,7 @@
 -define(CACHE_MAX_AGE_SEC, 1800).
 -define(CACHE_EXPIRATION_CHECK_SEC, 10).
 -define(LAST_ACCESSED_INACTIVITY_SEC, 10).
+-define(CACHE_DELETION_GRACE_SEC, 5). % Keep in cache after expiration
 
 
 -record(entry, {uuid, encryption_key, counter, last_accessed, expires_at}).
@@ -168,43 +169,11 @@ handle_call({insert_key, UUID, DbKey}, _From, #{cache := Cache} = St) ->
     NewSt = insert(St, UUID, DbKey),
     {reply, ok, NewSt, ?TIMEOUT};
 
-handle_call({encrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
+handle_call({encrypt, Db, Key, Value}, From, St) ->
+    handle_crypto_call(fun do_encrypt/4, Db, Key, Value, From, St);
 
-    {ok, DbKey} = lookup(St, UUID),
-
-    erlang:spawn(fun() ->
-        process_flag(sensitive, true),
-        try
-            do_encrypt(DbKey, Db, Key, Value)
-        of
-            Resp ->
-                gen_server:reply(From, Resp)
-        catch
-            _:Error ->
-                gen_server:reply(From, {error, Error})
-        end
-    end),
-
-    {noreply, St, ?TIMEOUT};
-
-handle_call({decrypt, #{uuid := UUID} = Db, Key, Value}, From, St) ->
-
-    {ok, DbKey} = lookup(St, UUID),
-
-    erlang:spawn(fun() ->
-        process_flag(sensitive, true),
-        try
-            do_decrypt(DbKey, Db, Key, Value)
-        of
-            Resp ->
-                gen_server:reply(From, Resp)
-        catch
-            _:Error ->
-                gen_server:reply(From, {error, Error})
-        end
-    end),
-
-    {noreply, St, ?TIMEOUT};
+handle_call({decrypt, Db, Key, Value}, From, St) ->
+    handle_crypto_call(fun do_decrypt/4, Db, Key, Value, From, St);
 
 handle_call(_Msg, _From, St) ->
     {noreply, St}.
@@ -235,6 +204,29 @@ code_change(_OldVsn, St, _Extra) ->
 
 
 %% private functions
+
+
+handle_crypto_call(DoCryptoOp, Db, Key, Value, From, St) ->
+    #{uuid := UUID} = Db,
+    case lookup(St, UUID) of
+        {error, not_found} ->
+            gen_server:reply(From, {error, db_encryption_key_not_cached});
+        {ok, DbKey} ->
+            erlang:spawn(fun() ->
+                process_flag(sensitive, true),
+                try
+                    DoCryptoOp(DbKey, Db, Key, Value)
+                of
+                    Resp ->
+                        gen_server:reply(From, Resp)
+                catch
+                    _:Error ->
+                        gen_server:reply(From, {error, Error})
+                end
+            end),
+            {noreply, St, ?TIMEOUT}
+    end.
+
 
 do_open_db(#{uuid := UUID} = Db) ->
     case ?AEGIS_KEY_MANAGER:open_db(Db) of
@@ -389,7 +381,8 @@ remove_expired_entries(St) ->
         by_access := ByAccess
     } = St,
 
-    MatchConditions = [{'=<', '$1', fabric2_util:now(sec)}],
+    DeleteEntriesUntil = fabric2_util:now(sec) - cache_deletion_grace(),
+    MatchConditions = [{'<', '$1', DeleteEntriesUntil}],
 
     KeyCheckMatchHead = {'_', '$1'},
     KeyCheckExpired = [{KeyCheckMatchHead, MatchConditions, [true]}],
@@ -413,6 +406,11 @@ expiration_check_interval() ->
 
 cache_limit() ->
     config:get_integer("aegis", "cache_limit", ?CACHE_LIMIT).
+
+
+cache_deletion_grace() ->
+    config:get_integer(
+        "aegis", "cache_deletion_grace_sec", ?CACHE_DELETION_GRACE_SEC).
 
 
 sensitive(Fun) when is_function(Fun, 0) ->
