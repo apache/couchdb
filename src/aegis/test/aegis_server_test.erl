@@ -51,9 +51,10 @@ basic_test_() ->
 
 setup() ->
     Ctx = test_util:start_couch([fabric]),
-    meck:new([?AEGIS_KEY_MANAGER], [passthrough]),
+    meck:new([?AEGIS_KEY_MANAGER], [non_strict]),
     ok = meck:expect(?AEGIS_KEY_MANAGER, init_db, 2, {ok, <<0:256>>}),
     ok = meck:expect(?AEGIS_KEY_MANAGER, open_db, 1, {ok, <<0:256>>}),
+    ok = meck:expect(?AEGIS_KEY_MANAGER, get_db_info, 1, []),
     Ctx.
 
 
