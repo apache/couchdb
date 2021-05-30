@@ -18,6 +18,7 @@
 
 
 -export([
+    key_manager/0,
     init_db/2,
     open_db/1,
     get_db_info/1,
@@ -27,6 +28,10 @@
     encrypt/3,
     wrap_fold_fun/2
 ]).
+
+key_manager() ->
+    ?AEGIS_KEY_MANAGER.
+
 
 init_db(#{} = Db, Options) ->
     Db#{
