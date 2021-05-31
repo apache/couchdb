@@ -11,6 +11,11 @@
 % the License.
 
 
+CoverProps = [
+    {cover_enabled, true},
+    {cover_print_enabled, true}
+],
+
 CouchConfig = case filelib:is_file(os:getenv("COUCHDB_CONFIG")) of
     true ->
         {ok, Result} = file:consult(os:getenv("COUCHDB_CONFIG")),
@@ -31,5 +36,7 @@ CurrentOpts = case lists:keyfind(erl_opts, 1, CONFIG) of
     false -> []
 end,
 
+Config = CoverProps ++ CONFIG,
+
 AegisOpts = {d, 'AEGIS_KEY_MANAGER', AegisKeyManager},
-lists:keystore(erl_opts, 1, CONFIG, {erl_opts, [AegisOpts | CurrentOpts]}).
+lists:keystore(erl_opts, 1, Config, {erl_opts, [AegisOpts | CurrentOpts]}).
