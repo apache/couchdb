@@ -13,14 +13,17 @@
 -module(couch_log_writer_file).
 -behaviour(couch_log_writer).
 
+
 -export([
     init/0,
     terminate/2,
     write/2
 ]).
 
+
 -include_lib("kernel/include/file.hrl").
 -include("couch_log.hrl").
+
 
 -record(st, {
     file_path,
@@ -29,13 +32,16 @@
     last_check
 }).
 
+
 -define(CHECK_INTERVAL, 30000000).
+
 
 -ifdef(TEST).
 -export([
     maybe_reopen/1
 ]).
 -endif.
+
 
 init() ->
     FilePath = config:get("log", "file", "./couch.log"),
@@ -63,11 +69,13 @@ init() ->
             EnsureDirError
     end.
 
+
 terminate(_, St) ->
     % Apparently delayed_write can require two closes
     file:close(St#st.fd),
     file:close(St#st.fd),
     ok.
+
 
 write(Entry, St) ->
     {ok, NewSt} = maybe_reopen(St),
@@ -91,6 +99,7 @@ write(Entry, St) ->
     ok = file:write(NewSt#st.fd, [Data, Msg, "\n"]),
     {ok, NewSt}.
 
+
 buffer_opt() ->
     WriteBuffer = config:get_integer("log", "write_buffer", 0),
     WriteDelay = config:get_integer("log", "write_delay", 0),
@@ -101,6 +110,7 @@ buffer_opt() ->
             []
     end.
 
+
 maybe_reopen(St) ->
     #st{
         last_check = LastCheck
@@ -110,6 +120,7 @@ maybe_reopen(St) ->
         true -> reopen(St);
         false -> {ok, St}
     end.
+
 
 reopen(St) ->
     case file:read_file_info(St#st.file_path) of

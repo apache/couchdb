@@ -10,8 +10,10 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+
 -module(couch_js_sup).
 -behaviour(supervisor).
+
 
 -export([
     start_link/0
@@ -21,8 +23,10 @@
     init/1
 ]).
 
+
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
 
 init([]) ->
     Flags = #{

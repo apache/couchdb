@@ -17,9 +17,11 @@
 
 -module(couch_log_config_dyn).
 
+
 -export([
     get/1
 ]).
+
 
 get(level) -> info;
 get(level_int) -> 2;
