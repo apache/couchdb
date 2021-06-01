@@ -16,7 +16,6 @@
     spawn_link/0
 ]).
 
-
 -export([
     init/0,
     map_docs/2,
@@ -33,26 +32,22 @@
 -include_lib("fabric/include/fabric2.hrl").
 -include_lib("kernel/include/logger.hrl").
 
-
 -define(KEY_SIZE_LIMIT, 8000).
 -define(VALUE_SIZE_LIMIT, 64000).
 
 -define(DEFAULT_TX_RETRY_LIMIT, 5).
 
-
 % These are all of the errors that we can fix by using
 % a smaller batch size.
--define(IS_RECOVERABLE_ERROR(Code), (
-    (Code == ?ERLFDB_TIMED_OUT) orelse
-    (Code == ?ERLFDB_TRANSACTION_TOO_OLD) orelse
-    (Code == ?ERLFDB_TRANSACTION_TIMED_OUT) orelse
-    (Code == ?ERLFDB_TRANSACTION_TOO_LARGE)
-)).
-
+-define(IS_RECOVERABLE_ERROR(Code),
+    ((Code == ?ERLFDB_TIMED_OUT) orelse
+        (Code == ?ERLFDB_TRANSACTION_TOO_OLD) orelse
+        (Code == ?ERLFDB_TRANSACTION_TIMED_OUT) orelse
+        (Code == ?ERLFDB_TRANSACTION_TOO_LARGE))
+).
 
 spawn_link() ->
     proc_lib:spawn_link(?MODULE, init, []).
-
 
 init() ->
     Opts = #{no_schedule => true},
@@ -69,24 +64,28 @@ init() ->
         <<"retries">> := Retries
     } = Data,
 
-    {ok, Db} = try
-        fabric2_db:open(DbName, [?ADMIN_CTX, {uuid, DbUUID}])
-    catch error:database_does_not_exist ->
-        fail_job(Job, Data, db_deleted, "Database was deleted")
-    end,
+    {ok, Db} =
+        try
+            fabric2_db:open(DbName, [?ADMIN_CTX, {uuid, DbUUID}])
+        catch
+            error:database_does_not_exist ->
+                fail_job(Job, Data, db_deleted, "Database was deleted")
+        end,
 
-    {ok, DDoc} = case fabric2_db:open_doc(Db, DDocId) of
-        {ok, DDoc0} ->
-            {ok, DDoc0};
-        {not_found, _} ->
-            fail_job(Job, Data, ddoc_deleted, "Design document was deleted")
-    end,
+    {ok, DDoc} =
+        case fabric2_db:open_doc(Db, DDocId) of
+            {ok, DDoc0} ->
+                {ok, DDoc0};
+            {not_found, _} ->
+                fail_job(Job, Data, ddoc_deleted, "Design document was deleted")
+        end,
 
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     HexSig = fabric2_util:to_hex(Mrst#mrst.sig),
 
-    if HexSig == JobSig -> ok; true ->
-        fail_job(Job, Data, sig_changed, "Design document was modified")
+    if
+        HexSig == JobSig -> ok;
+        true -> fail_job(Job, Data, sig_changed, "Design document was modified")
     end,
 
     DbSeq = fabric2_fdb:transactional(Db, fun(TxDb) ->
@@ -151,32 +150,31 @@ init() ->
             end
     end.
 
-
 upgrade_data(Data) ->
     Defaults = [
         {<<"retries">>, 0},
         {<<"db_uuid">>, undefined}
     ],
-    lists:foldl(fun({Key, Default}, Acc) ->
-        case maps:is_key(Key, Acc) of
-            true -> Acc;
-            false -> maps:put(Key, Default, Acc)
-        end
-    end, Data, Defaults),
+    lists:foldl(
+        fun({Key, Default}, Acc) ->
+            case maps:is_key(Key, Acc) of
+                true -> Acc;
+                false -> maps:put(Key, Default, Acc)
+            end
+        end,
+        Data,
+        Defaults
+    ),
     % initialize active task
     fabric2_active_tasks:update_active_task_info(Data, #{}).
-
 
 % Transaction limit exceeded don't retry
 should_retry(_, _, {erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE}) ->
     false;
-
 should_retry(Retries, RetryLimit, _) when Retries < RetryLimit ->
     true;
-
 should_retry(_, _, _) ->
     false.
-
 
 add_error(error, {erlfdb_error, Code}, Data) ->
     CodeBin = couch_util:to_binary(Code),
@@ -185,26 +183,26 @@ add_error(error, {erlfdb_error, Code}, Data) ->
         error => foundationdb_error,
         reason => list_to_binary([CodeBin, <<"-">>, CodeString])
     };
-
 add_error(Error, Reason, Data) ->
     Data#{
         error => couch_util:to_binary(Error),
         reason => couch_util:to_binary(Reason)
     }.
 
-
 update(#{} = Db, Mrst0, State0) ->
     Limit = couch_views_batch:start(Mrst0),
-    Result = try
-        do_update(Db, Mrst0, State0#{limit => Limit})
-    catch
-        error:{erlfdb_error, Error} when ?IS_RECOVERABLE_ERROR(Error) ->
-            couch_views_batch:failure(Mrst0),
-            update(Db, Mrst0, State0)
-    end,
+    Result =
+        try
+            do_update(Db, Mrst0, State0#{limit => Limit})
+        catch
+            error:{erlfdb_error, Error} when ?IS_RECOVERABLE_ERROR(Error) ->
+                couch_views_batch:failure(Mrst0),
+                update(Db, Mrst0, State0)
+        end,
     case Result of
         ok ->
-            ok; % Already finished and released map context
+            % Already finished and released map context
+            ok;
         {Mrst1, finished} ->
             couch_eval:release_map_context(Mrst1#mrst.qserver);
         {Mrst1, State1} ->
@@ -215,7 +213,6 @@ update(#{} = Db, Mrst0, State0) ->
             update(Db, Mrst1, State1)
     end.
 
-
 do_update(Db, Mrst0, State0) ->
     TxOpts = #{retry_limit => maps:get(tx_retry_limit, State0)},
     TxResult = fabric2_fdb:transactional(Db, TxOpts, fun(TxDb) ->
@@ -223,7 +220,7 @@ do_update(Db, Mrst0, State0) ->
             tx := Tx
         } = TxDb,
 
-        Snapshot = TxDb#{ tx := erlfdb:snapshot(Tx) },
+        Snapshot = TxDb#{tx := erlfdb:snapshot(Tx)},
 
         State1 = get_update_start_state(TxDb, Mrst0, State0),
         Mrst1 = couch_views_trees:open(TxDb, Mrst0),
@@ -281,7 +278,6 @@ do_update(Db, Mrst0, State0) ->
             {Mrst, finished}
     end.
 
-
 do_finalize(Mrst, State) ->
     #{tx_db := OldDb} = State,
     ViewReadVsn = erlfdb:get_committed_version(maps:get(tx, OldDb)),
@@ -305,7 +301,6 @@ do_finalize(Mrst, State) ->
         report_progress(State1, finished)
     end).
 
-
 is_update_finished(State) ->
     #{
         db_seq := DbSeq,
@@ -313,19 +308,17 @@ is_update_finished(State) ->
         view_vs := ViewVs
     } = State,
     AtDbSeq = LastSeq == DbSeq,
-    AtViewVs = case ViewVs of
-        not_found -> false;
-        _ -> LastSeq == fabric2_fdb:vs_to_seq(ViewVs)
-    end,
+    AtViewVs =
+        case ViewVs of
+            not_found -> false;
+            _ -> LastSeq == fabric2_fdb:vs_to_seq(ViewVs)
+        end,
     AtDbSeq orelse AtViewVs.
-
 
 maybe_set_build_status(_TxDb, _Mrst1, not_found, _State) ->
     ok;
-
 maybe_set_build_status(TxDb, Mrst1, _ViewVS, State) ->
     couch_views_fdb:set_build_status(TxDb, Mrst1, State).
-
 
 % In the first iteration of update we need
 % to populate our db and view sequences
@@ -341,12 +334,10 @@ get_update_start_state(TxDb, Mrst, #{view_seq := undefined} = State) ->
         view_seq := ViewSeq,
         last_seq := ViewSeq
     };
-
 get_update_start_state(TxDb, _Idx, State) ->
     State#{
         tx_db := TxDb
     }.
-
 
 fold_changes(Snapshot, State) ->
     #{
@@ -376,7 +367,6 @@ fold_changes(Snapshot, State) ->
             Result
     end.
 
-
 process_changes(Change, Acc) ->
     #{
         doc_acc := DocAcc,
@@ -393,64 +383,74 @@ process_changes(Change, Acc) ->
 
     IncludeDesign = lists:keymember(<<"include_design">>, 1, DesignOpts),
 
-    Acc1 = case {Id, IncludeDesign} of
-        {<<?DESIGN_DOC_PREFIX, _/binary>>, false} ->
-            maps:merge(Acc, #{
-                rows_processed => RowsProcessed + 1,
-                count => Count + 1,
-                last_seq => LastSeq
-            });
-        _ ->
-            Acc#{
-                doc_acc := DocAcc ++ [Change],
-                rows_processed := RowsProcessed + 1,
-                count := Count + 1,
-                last_seq := LastSeq
-            }
-    end,
+    Acc1 =
+        case {Id, IncludeDesign} of
+            {<<?DESIGN_DOC_PREFIX, _/binary>>, false} ->
+                maps:merge(Acc, #{
+                    rows_processed => RowsProcessed + 1,
+                    count => Count + 1,
+                    last_seq => LastSeq
+                });
+            _ ->
+                Acc#{
+                    doc_acc := DocAcc ++ [Change],
+                    rows_processed := RowsProcessed + 1,
+                    count := Count + 1,
+                    last_seq := LastSeq
+                }
+        end,
 
     DocVS = fabric2_fdb:seq_to_vs(LastSeq),
 
     Go = maybe_stop_at_vs(ViewVS, DocVS),
     {Go, Acc1}.
 
-
 maybe_stop_at_vs({versionstamp, _} = ViewVS, DocVS) when DocVS >= ViewVS ->
     stop;
-
 maybe_stop_at_vs(_, _) ->
     ok.
 
-
 map_docs(Mrst, []) ->
     {Mrst, []};
-
 map_docs(Mrst, Docs) ->
     % Run all the non deleted docs through the view engine and
     Mrst1 = start_query_server(Mrst),
     QServer = Mrst1#mrst.qserver,
 
-    {Deleted0, NotDeleted0} = lists:partition(fun(Doc) ->
-        #{deleted := Deleted} = Doc,
-        Deleted
-    end, Docs),
+    {Deleted0, NotDeleted0} = lists:partition(
+        fun(Doc) ->
+            #{deleted := Deleted} = Doc,
+            Deleted
+        end,
+        Docs
+    ),
 
-    Deleted1 = lists:map(fun(Doc) ->
-        Doc#{results => [[] || _ <- Mrst1#mrst.views]}
-    end, Deleted0),
+    Deleted1 = lists:map(
+        fun(Doc) ->
+            Doc#{results => [[] || _ <- Mrst1#mrst.views]}
+        end,
+        Deleted0
+    ),
 
-    DocsToMap = lists:map(fun(Doc) ->
-        #{doc := DocRec} = Doc,
-        DocRec
-    end, NotDeleted0),
+    DocsToMap = lists:map(
+        fun(Doc) ->
+            #{doc := DocRec} = Doc,
+            DocRec
+        end,
+        NotDeleted0
+    ),
 
     {ok, AllResults} = couch_eval:map_docs(QServer, DocsToMap),
 
     % The expanded function head here is making an assertion
     % that the results match the given doc
-    NotDeleted1 = lists:zipwith(fun(#{id := DocId} = Doc, {DocId, Results}) ->
-        Doc#{results => Results}
-    end, NotDeleted0, AllResults),
+    NotDeleted1 = lists:zipwith(
+        fun(#{id := DocId} = Doc, {DocId, Results}) ->
+            Doc#{results => Results}
+        end,
+        NotDeleted0,
+        AllResults
+    ),
 
     % I'm being a bit careful here resorting the docs
     % in order of the changes feed. Theoretically this is
@@ -458,14 +458,16 @@ map_docs(Mrst, Docs) ->
     % However, I'm concerned if we ever split this up
     % into multiple transactions that this detail might
     % be important but forgotten.
-    MappedDocs = lists:sort(fun(A, B) ->
-        #{sequence := ASeq} = A,
-        #{sequence := BSeq} = B,
-        ASeq =< BSeq
-    end, Deleted1 ++ NotDeleted1),
+    MappedDocs = lists:sort(
+        fun(A, B) ->
+            #{sequence := ASeq} = A,
+            #{sequence := BSeq} = B,
+            ASeq =< BSeq
+        end,
+        Deleted1 ++ NotDeleted1
+    ),
 
     {Mrst1, MappedDocs}.
-
 
 write_docs(TxDb, Mrst, Docs0, State) ->
     #mrst{
@@ -479,78 +481,106 @@ write_docs(TxDb, Mrst, Docs0, State) ->
     KeyLimit = key_size_limit(),
     ValLimit = value_size_limit(),
 
-    {Docs1, TotalKVCount} = lists:mapfoldl(fun(Doc0, KVCount) ->
-        Doc1 = check_kv_size_limit(Mrst, Doc0, KeyLimit, ValLimit),
-        {Doc1, KVCount + count_kvs(Doc1)}
-    end, 0, Docs0),
+    {Docs1, TotalKVCount} = lists:mapfoldl(
+        fun(Doc0, KVCount) ->
+            Doc1 = check_kv_size_limit(Mrst, Doc0, KeyLimit, ValLimit),
+            {Doc1, KVCount + count_kvs(Doc1)}
+        end,
+        0,
+        Docs0
+    ),
 
     couch_views_trees:update_views(TxDb, Mrst, Docs1),
 
-    if LastSeq == false -> ok; true ->
-        couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq)
+    if
+        LastSeq == false -> ok;
+        true -> couch_views_fdb:set_update_seq(TxDb, Sig, LastSeq)
     end,
 
     TotalKVCount.
 
-
 fetch_docs(Db, DesignOpts, Changes) ->
-    {Deleted, NotDeleted} = lists:partition(fun(Doc) ->
-        #{deleted := Deleted} = Doc,
-        Deleted
-    end, Changes),
+    {Deleted, NotDeleted} = lists:partition(
+        fun(Doc) ->
+            #{deleted := Deleted} = Doc,
+            Deleted
+        end,
+        Changes
+    ),
 
-    RevState = lists:foldl(fun(Change, Acc) ->
-        #{id := Id} = Change,
-        RevFuture = fabric2_fdb:get_winning_revs_future(Db, Id, 1),
-        Acc#{
-            RevFuture => {Id, Change}
-        }
-    end, #{}, NotDeleted),
+    RevState = lists:foldl(
+        fun(Change, Acc) ->
+            #{id := Id} = Change,
+            RevFuture = fabric2_fdb:get_winning_revs_future(Db, Id, 1),
+            Acc#{
+                RevFuture => {Id, Change}
+            }
+        end,
+        #{},
+        NotDeleted
+    ),
 
     RevFutures = maps:keys(RevState),
-    BodyState = lists:foldl(fun(RevFuture, Acc) ->
-        {Id, Change} = maps:get(RevFuture, RevState),
-        Revs = fabric2_fdb:get_revs_wait(Db, RevFuture),
+    BodyState = lists:foldl(
+        fun(RevFuture, Acc) ->
+            {Id, Change} = maps:get(RevFuture, RevState),
+            Revs = fabric2_fdb:get_revs_wait(Db, RevFuture),
 
-        % I'm assuming that in this changes transaction that the winning
-        % doc body exists since it is listed in the changes feed as not deleted
-        #{winner := true} = RevInfo = lists:last(Revs),
-        BodyFuture = fabric2_fdb:get_doc_body_future(Db, Id, RevInfo),
-        Acc#{
-            BodyFuture => {Id, RevInfo, Change}
-        }
-    end, #{}, erlfdb:wait_for_all(RevFutures)),
+            % I'm assuming that in this changes transaction that the winning
+            % doc body exists since it is listed in the changes feed as not deleted
+            #{winner := true} = RevInfo = lists:last(Revs),
+            BodyFuture = fabric2_fdb:get_doc_body_future(Db, Id, RevInfo),
+            Acc#{
+                BodyFuture => {Id, RevInfo, Change}
+            }
+        end,
+        #{},
+        erlfdb:wait_for_all(RevFutures)
+    ),
 
     AddLocalSeq = fabric2_util:get_value(<<"local_seq">>, DesignOpts, false),
 
     BodyFutures = maps:keys(BodyState),
-    ChangesWithDocs = lists:map(fun (BodyFuture) ->
-        {Id, RevInfo, Change} = maps:get(BodyFuture, BodyState),
-        Doc = fabric2_fdb:get_doc_body_wait(Db, Id, RevInfo, BodyFuture),
+    ChangesWithDocs = lists:map(
+        fun(BodyFuture) ->
+            {Id, RevInfo, Change} = maps:get(BodyFuture, BodyState),
+            Doc = fabric2_fdb:get_doc_body_wait(Db, Id, RevInfo, BodyFuture),
 
-        Doc1 = case maps:get(branch_count, RevInfo, 1) of
-            1 when AddLocalSeq ->
-                {ok, DocWithLocalSeq} = fabric2_db:apply_open_doc_opts(Doc,
-                    [RevInfo], [local_seq]),
-                DocWithLocalSeq;
-            1 ->
-                Doc;
-            _ ->
-                RevConflicts = fabric2_fdb:get_all_revs(Db, Id),
-                DocOpts = if not AddLocalSeq -> []; true -> [local_seq] end,
+            Doc1 =
+                case maps:get(branch_count, RevInfo, 1) of
+                    1 when AddLocalSeq ->
+                        {ok, DocWithLocalSeq} = fabric2_db:apply_open_doc_opts(
+                            Doc,
+                            [RevInfo],
+                            [local_seq]
+                        ),
+                        DocWithLocalSeq;
+                    1 ->
+                        Doc;
+                    _ ->
+                        RevConflicts = fabric2_fdb:get_all_revs(Db, Id),
+                        DocOpts =
+                            if
+                                not AddLocalSeq -> [];
+                                true -> [local_seq]
+                            end,
 
-                {ok, DocWithConflicts} = fabric2_db:apply_open_doc_opts(Doc,
-                    RevConflicts, [conflicts | DocOpts]),
-                DocWithConflicts
+                        {ok, DocWithConflicts} = fabric2_db:apply_open_doc_opts(
+                            Doc,
+                            RevConflicts,
+                            [conflicts | DocOpts]
+                        ),
+                        DocWithConflicts
+                end,
+            Change#{doc => Doc1}
         end,
-        Change#{doc => Doc1}
-    end, erlfdb:wait_for_all(BodyFutures)),
+        erlfdb:wait_for_all(BodyFutures)
+    ),
 
     % This combines the deleted changes with the changes that contain docs
     % Important to note that this is now unsorted. Which is fine for now
     % But later could be an issue if we split this across transactions
     Deleted ++ ChangesWithDocs.
-
 
 start_query_server(#mrst{qserver = nil} = Mrst) ->
     #mrst{
@@ -561,23 +591,23 @@ start_query_server(#mrst{qserver = nil} = Mrst) ->
         lib = Lib,
         views = Views
     } = Mrst,
-    case couch_eval:acquire_map_context(
+    case
+        couch_eval:acquire_map_context(
             DbName,
             DDocId,
             Language,
             Sig,
             Lib,
             [View#mrview.def || View <- Views]
-        ) of
+        )
+    of
         {ok, QServer} ->
             Mrst#mrst{qserver = QServer};
         {error, Error} ->
             error(Error)
     end;
-
 start_query_server(#mrst{} = Mrst) ->
     Mrst.
-
 
 check_kv_size_limit(Mrst, Doc, KeyLimit, ValLimit) ->
     #mrst{
@@ -588,48 +618,60 @@ check_kv_size_limit(Mrst, Doc, KeyLimit, ValLimit) ->
         results := Results
     } = Doc,
     try
-        lists:foreach(fun(ViewRows) ->
-            lists:foreach(fun({K, V}) ->
-                KeySize = couch_ejson_size:encoded_size(K),
-                ValSize = couch_ejson_size:encoded_size(V),
+        lists:foreach(
+            fun(ViewRows) ->
+                lists:foreach(
+                    fun({K, V}) ->
+                        KeySize = couch_ejson_size:encoded_size(K),
+                        ValSize = couch_ejson_size:encoded_size(V),
 
-                if KeySize =< KeyLimit -> ok; true ->
-                    throw({size_error, key})
-                end,
+                        if
+                            KeySize =< KeyLimit -> ok;
+                            true -> throw({size_error, key})
+                        end,
 
-                if ValSize =< ValLimit -> ok; true ->
-                    throw({size_error, value})
-                end
-            end, ViewRows)
-        end, Results),
+                        if
+                            ValSize =< ValLimit -> ok;
+                            true -> throw({size_error, value})
+                        end
+                    end,
+                    ViewRows
+                )
+            end,
+            Results
+        ),
         Doc
-    catch throw:{size_error, Type} ->
-        #{id := DocId} = Doc,
-        ?LOG_ERROR(#{
-            what => lists:concat(["oversized_", Type]),
-            db => DbName,
-            docid => DocId,
-            index => IdxName
-        }),
-        Fmt = "View ~s size error for docid `~s`, excluded from indexing "
-            "in db `~s` for design doc `~s`",
-        couch_log:error(Fmt, [Type, DocId, DbName, IdxName]),
-        Doc#{
-            deleted := true,
-            results := [[] || _ <- Mrst#mrst.views],
-            kv_sizes => []
-        }
+    catch
+        throw:{size_error, Type} ->
+            #{id := DocId} = Doc,
+            ?LOG_ERROR(#{
+                what => lists:concat(["oversized_", Type]),
+                db => DbName,
+                docid => DocId,
+                index => IdxName
+            }),
+            Fmt =
+                "View ~s size error for docid `~s`, excluded from indexing "
+                "in db `~s` for design doc `~s`",
+            couch_log:error(Fmt, [Type, DocId, DbName, IdxName]),
+            Doc#{
+                deleted := true,
+                results := [[] || _ <- Mrst#mrst.views],
+                kv_sizes => []
+            }
     end.
-
 
 count_kvs(Doc) ->
     #{
         results := Results
     } = Doc,
-    lists:foldl(fun(ViewRows, Count) ->
-        Count + length(ViewRows)
-    end, 0, Results).
-
+    lists:foldl(
+        fun(ViewRows, Count) ->
+            Count + length(ViewRows)
+        end,
+        0,
+        Results
+    ).
 
 report_progress(State, UpdateType) ->
     #{
@@ -652,13 +694,19 @@ report_progress(State, UpdateType) ->
     } = JobData,
 
     ActiveTasks = fabric2_active_tasks:get_active_task_info(JobData),
-    TotalDone = case maps:get(<<"changes_done">>, ActiveTasks, 0) of
-        0 -> ChangesDone;
-        N -> N + ChangesDone
-    end,
+    TotalDone =
+        case maps:get(<<"changes_done">>, ActiveTasks, 0) of
+            0 -> ChangesDone;
+            N -> N + ChangesDone
+        end,
 
-    NewActiveTasks = couch_views_util:active_tasks_info(TotalDone,
-        DbName, DDocId, LastSeq, DBSeq),
+    NewActiveTasks = couch_views_util:active_tasks_info(
+        TotalDone,
+        DbName,
+        DDocId,
+        LastSeq,
+        DBSeq
+    ),
 
     % Reconstruct from scratch to remove any
     % possible existing error state.
@@ -672,8 +720,10 @@ report_progress(State, UpdateType) ->
         <<"db_read_vsn">> => DbReadVsn,
         <<"view_read_vsn">> => ViewReadVsn
     },
-    NewData = fabric2_active_tasks:update_active_task_info(NewData0,
-        NewActiveTasks),
+    NewData = fabric2_active_tasks:update_active_task_info(
+        NewData0,
+        NewActiveTasks
+    ),
 
     case UpdateType of
         update ->
@@ -696,25 +746,23 @@ report_progress(State, UpdateType) ->
             end
     end.
 
-
 fail_job(Job, Data, Error, Reason) ->
     NewData = add_error(Error, Reason, Data),
     couch_jobs:finish(undefined, Job, NewData),
     exit(normal).
 
-
 retry_limit() ->
     config:get_integer("couch_views", "retry_limit", 3).
-
 
 key_size_limit() ->
     config:get_integer("couch_views", "key_size_limit", ?KEY_SIZE_LIMIT).
 
-
 value_size_limit() ->
     config:get_integer("couch_views", "value_size_limit", ?VALUE_SIZE_LIMIT).
 
-
 tx_retry_limit() ->
-    config:get_integer("couch_views", "indexer_tx_retry_limit",
-        ?DEFAULT_TX_RETRY_LIMIT).
+    config:get_integer(
+        "couch_views",
+        "indexer_tx_retry_limit",
+        ?DEFAULT_TX_RETRY_LIMIT
+    ).

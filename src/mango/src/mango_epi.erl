@@ -29,7 +29,7 @@ app() ->
 
 providers() ->
     [
-         {chttpd_handlers, mango_httpd_handlers}
+        {chttpd_handlers, mango_httpd_handlers}
     ].
 
 services() ->

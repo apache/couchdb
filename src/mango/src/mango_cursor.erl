@@ -12,7 +12,6 @@
 
 -module(mango_cursor).
 
-
 -export([
     create/3,
     explain/1,
@@ -23,12 +22,10 @@
     maybe_noop_range/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 -include("mango_cursor.hrl").
 -include("mango_idx.hrl").
-
 
 -define(CURSOR_MODULES, [
     mango_cursor_view,
@@ -37,10 +34,9 @@
 
 -define(SUPERVISOR, mango_cursor_sup).
 
-
 create(Db, Selector0, Opts) ->
     Selector = mango_selector:normalize(Selector0),
-    UsableIndexes = fabric2_fdb:transactional(Db, fun (TxDb) ->
+    UsableIndexes = fabric2_fdb:transactional(Db, fun(TxDb) ->
         mango_idx:get_usable_indexes(TxDb, Selector, Opts)
     end),
     case mango_cursor:maybe_filter_indexes_by_ddoc(UsableIndexes, Opts) of
@@ -51,8 +47,7 @@ create(Db, Selector0, Opts) ->
             create_cursor(Db, UserSpecifiedIndex, Selector, Opts)
     end.
 
-
-explain(#cursor{}=Cursor) ->
+explain(#cursor{} = Cursor) ->
     #cursor{
         index = Idx,
         selector = Selector,
@@ -63,21 +58,21 @@ explain(#cursor{}=Cursor) ->
     } = Cursor,
     Mod = mango_idx:cursor_mod(Idx),
     Opts = lists:keydelete(user_ctx, 1, Opts0),
-    {[
-        {dbname, mango_idx:dbname(Idx)},
-        {index, mango_idx:to_json(Idx)},
-        {selector, Selector},
-        {opts, {Opts}},
-        {limit, Limit},
-        {skip, Skip},
-        {fields, Fields}
-    ] ++ Mod:explain(Cursor)}.
+    {
+        [
+            {dbname, mango_idx:dbname(Idx)},
+            {index, mango_idx:to_json(Idx)},
+            {selector, Selector},
+            {opts, {Opts}},
+            {limit, Limit},
+            {skip, Skip},
+            {fields, Fields}
+        ] ++ Mod:explain(Cursor)
+    }.
 
-
-execute(#cursor{index=Idx}=Cursor, UserFun, UserAcc) ->
+execute(#cursor{index = Idx} = Cursor, UserFun, UserAcc) ->
     Mod = mango_idx:cursor_mod(Idx),
     Mod:execute(Cursor, UserFun, UserAcc).
-
 
 maybe_filter_indexes_by_ddoc(Indexes, Opts) ->
     case lists:keyfind(use_index, 1, Opts) of
@@ -89,23 +84,21 @@ maybe_filter_indexes_by_ddoc(Indexes, Opts) ->
             filter_indexes(Indexes, DesignId, ViewName)
     end.
 
-
 filter_indexes(Indexes, DesignId0) ->
-    DesignId = case DesignId0 of
-        <<"_design/", _/binary>> ->
-            DesignId0;
-        Else ->
-            <<"_design/", Else/binary>>
-    end,
+    DesignId =
+        case DesignId0 of
+            <<"_design/", _/binary>> ->
+                DesignId0;
+            Else ->
+                <<"_design/", Else/binary>>
+        end,
     FiltFun = fun(I) -> mango_idx:ddoc(I) == DesignId end,
     lists:filter(FiltFun, Indexes).
-
 
 filter_indexes(Indexes0, DesignId, ViewName) ->
     Indexes = filter_indexes(Indexes0, DesignId),
     FiltFun = fun(I) -> mango_idx:name(I) == ViewName end,
     lists:filter(FiltFun, Indexes).
-
 
 remove_indexes_with_partial_filter_selector(Indexes) ->
     FiltFun = fun(Idx) ->
@@ -115,7 +108,6 @@ remove_indexes_with_partial_filter_selector(Indexes) ->
         end
     end,
     lists:filter(FiltFun, Indexes).
-
 
 maybe_add_warning(UserFun, #cursor{index = Index, opts = Opts}, Stats, UserAcc) ->
     W0 = invalid_index_warning(Index, Opts),
@@ -132,38 +124,40 @@ maybe_add_warning(UserFun, #cursor{index = Index, opts = Opts}, Stats, UserAcc) 
             UserAcc1
     end.
 
-
 create_cursor(Db, Indexes, Selector, Opts) ->
     [{CursorMod, CursorModIndexes} | _] = group_indexes_by_type(Indexes),
     CursorMod:create(Db, CursorModIndexes, Selector, Opts).
 
-
 group_indexes_by_type(Indexes) ->
-    IdxDict = lists:foldl(fun(I, D) ->
-        dict:append(mango_idx:cursor_mod(I), I, D)
-    end, dict:new(), Indexes),
+    IdxDict = lists:foldl(
+        fun(I, D) ->
+            dict:append(mango_idx:cursor_mod(I), I, D)
+        end,
+        dict:new(),
+        Indexes
+    ),
     % The first cursor module that has indexes will be
     % used to service this query. This is so that we
     % don't suddenly switch indexes for existing client
     % queries.
-    lists:flatmap(fun(CMod) ->
-        case dict:find(CMod, IdxDict) of
-            {ok, CModIndexes} ->
-                [{CMod, CModIndexes}];
-            error ->
-                []
-        end
-    end, ?CURSOR_MODULES).
-
+    lists:flatmap(
+        fun(CMod) ->
+            case dict:find(CMod, IdxDict) of
+                {ok, CModIndexes} ->
+                    [{CMod, CModIndexes}];
+                error ->
+                    []
+            end
+        end,
+        ?CURSOR_MODULES
+    ).
 
 % warn if the _all_docs index was used to fulfil a query
 no_index_warning(#idx{type = Type}) when Type =:= <<"special">> ->
     couch_stats:increment_counter([mango, unindexed_queries]),
     [<<"No matching index found, create an index to optimize query time.">>];
-
 no_index_warning(_) ->
     [].
-
 
 % warn if user specified an index which doesn't exist or isn't valid
 % for the selector.
@@ -172,43 +166,51 @@ invalid_index_warning(Index, Opts) ->
     UseIndex = lists:keyfind(use_index, 1, Opts),
     invalid_index_warning_int(Index, UseIndex).
 
-
 invalid_index_warning_int(Index, {use_index, [DesignId]}) ->
     Filtered = filter_indexes([Index], DesignId),
-    if Filtered /= [] -> []; true ->
-        couch_stats:increment_counter([mango, query_invalid_index]),
-        Reason = fmt("_design/~s was not used because it does not contain a valid index for this query.",
-                [ddoc_name(DesignId)]),
-        [Reason]
+    if
+        Filtered /= [] ->
+            [];
+        true ->
+            couch_stats:increment_counter([mango, query_invalid_index]),
+            Reason = fmt(
+                "_design/~s was not used because it does not contain a valid index for this query.",
+                [ddoc_name(DesignId)]
+            ),
+            [Reason]
     end;
-
 invalid_index_warning_int(Index, {use_index, [DesignId, ViewName]}) ->
     Filtered = filter_indexes([Index], DesignId, ViewName),
-    if Filtered /= [] -> []; true ->
-        couch_stats:increment_counter([mango, query_invalid_index]),
-        Reason = fmt("_design/~s, ~s was not used because it is not a valid index for this query.",
-            [ddoc_name(DesignId), ViewName]),
-        [Reason]
+    if
+        Filtered /= [] ->
+            [];
+        true ->
+            couch_stats:increment_counter([mango, query_invalid_index]),
+            Reason = fmt(
+                "_design/~s, ~s was not used because it is not a valid index for this query.",
+                [ddoc_name(DesignId), ViewName]
+            ),
+            [Reason]
     end;
-
 invalid_index_warning_int(_, _) ->
     [].
 
-
 % warn if a large number of documents needed to be scanned per result
 % returned, implying a lot of in-memory filtering
-index_scan_warning(#execution_stats {
-                    totalDocsExamined = Docs,
-                    resultsReturned = ResultCount
-                }) ->
+index_scan_warning(#execution_stats{
+    totalDocsExamined = Docs,
+    resultsReturned = ResultCount
+}) ->
     Ratio = calculate_index_scan_ratio(Docs, ResultCount),
     Threshold = config:get_integer("mango", "index_scan_warning_threshold", 10),
     case Threshold > 0 andalso Ratio > Threshold of
         true ->
             couch_stats:increment_counter([mango, too_many_docs_scanned]),
-            Reason = <<"The number of documents examined is high in proportion to the number of results returned. Consider adding a more specific index to improve this.">>,
+            Reason =
+                <<"The number of documents examined is high in proportion to the number of results returned. Consider adding a more specific index to improve this.">>,
             [Reason];
-        false -> []
+        false ->
+            []
     end.
 
 % When there is an empty array for certain operators, we don't actually
@@ -227,20 +229,15 @@ maybe_noop_range({[{Op, []}]}, IndexRanges) ->
 maybe_noop_range(_, IndexRanges) ->
     IndexRanges.
 
-
 calculate_index_scan_ratio(DocsScanned, 0) ->
     DocsScanned;
-
 calculate_index_scan_ratio(DocsScanned, ResultCount) ->
     DocsScanned / ResultCount.
-
 
 fmt(Format, Args) ->
     iolist_to_binary(io_lib:format(Format, Args)).
 
-
 ddoc_name(<<"_design/", Name/binary>>) ->
     Name;
-
 ddoc_name(Name) ->
     Name.

@@ -21,7 +21,6 @@
 -define(SAMEORIGIN, "SAMEORIGIN").
 -define(ALLOWFROM, "ALLOW-FROM ").
 
-
 -include_lib("couch/include/couch_db.hrl").
 
 % X-Frame-Options protects against clickjacking by limiting whether a response can be used in a
@@ -30,33 +29,28 @@
 header(Req, Headers) ->
     header(Req, Headers, get_xframe_config(Req)).
 
-
-
 header(Req, Headers, Config) ->
     case lists:keyfind(enabled, 1, Config) of
-        {enabled, true} -> 
+        {enabled, true} ->
             generate_xframe_header(Req, Headers, Config);
-        _ ->  
+        _ ->
             Headers
     end.
 
-
-
 generate_xframe_header(Req, Headers, Config) ->
-    XframeOption = case lists:keyfind(same_origin, 1, Config) of 
-        {same_origin, true} -> 
-            ?SAMEORIGIN;
-        _ ->
-            check_host(Req, Config)
-    end,
-    [{"X-Frame-Options", XframeOption } | Headers].
-
-
+    XframeOption =
+        case lists:keyfind(same_origin, 1, Config) of
+            {same_origin, true} ->
+                ?SAMEORIGIN;
+            _ ->
+                check_host(Req, Config)
+        end,
+    [{"X-Frame-Options", XframeOption} | Headers].
 
 check_host(#httpd{mochi_req = MochiReq} = Req, Config) ->
     Host = couch_httpd_vhost:host(MochiReq),
     case Host of
-        [] -> 
+        [] ->
             ?DENY;
         Host ->
             FullHost = chttpd:absolute_uri(Req, ""),
@@ -66,18 +60,19 @@ check_host(#httpd{mochi_req = MochiReq} = Req, Config) ->
                 true -> ?ALLOWFROM ++ FullHost;
                 false -> ?DENY
             end
-     end.
-
-
+    end.
 
 get_xframe_config(#httpd{xframe_config = undefined}) ->
     EnableXFrame = chttpd_util:get_chttpd_config_boolean(
-        "enable_xframe_options", false),
+        "enable_xframe_options",
+        false
+    ),
     SameOrigin = config:get("x_frame_options", "same_origin", "false") =:= "true",
-    AcceptedHosts = case config:get("x_frame_options", "hosts") of
-        undefined -> [];
-        Hosts -> split_list(Hosts)
-    end,
+    AcceptedHosts =
+        case config:get("x_frame_options", "hosts") of
+            undefined -> [];
+            Hosts -> split_list(Hosts)
+        end,
     [
         {enabled, EnableXFrame},
         {same_origin, SameOrigin},
@@ -86,15 +81,11 @@ get_xframe_config(#httpd{xframe_config = undefined}) ->
 get_xframe_config(#httpd{xframe_config = Config}) ->
     Config.
 
-
-
 get_accepted_hosts(Config) ->
     case lists:keyfind(hosts, 1, Config) of
         false -> [];
         {hosts, AcceptedHosts} -> AcceptedHosts
     end.
-
-
 
 split_list(S) ->
     re:split(S, "\\s*,\\s*", [trim, {return, list}]).

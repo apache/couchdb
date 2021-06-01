@@ -36,8 +36,7 @@
 
 -record(test_context, {mocked = [], started = [], module}).
 
--define(DEFAULT_APPS,
-        [inets, ibrowse, ssl, config, couch_epi, couch]).
+-define(DEFAULT_APPS, [inets, ibrowse, ssl, config, couch_epi, couch]).
 
 srcdir() ->
     code:priv_dir(couch) ++ "/../../".
@@ -52,9 +51,12 @@ init_code_path() ->
         "ibrowse",
         "mochiweb"
     ],
-    lists:foreach(fun(Name) ->
-        code:add_patha(filename:join([builddir(), "src", Name]))
-    end, Paths).
+    lists:foreach(
+        fun(Name) ->
+            code:add_patha(filename:join([builddir(), "src", Name]))
+        end,
+        Paths
+    ).
 
 source_file(Name) ->
     filename:join([srcdir(), Name]).
@@ -89,21 +91,21 @@ start_applications(Apps) ->
 
 start_applications([], Acc) ->
     lists:reverse(Acc);
-start_applications([App|Apps], Acc) when App == kernel; App == stdlib ->
+start_applications([App | Apps], Acc) when App == kernel; App == stdlib ->
     start_applications(Apps, Acc);
-start_applications([App|Apps], Acc) ->
+start_applications([App | Apps], Acc) ->
     case application:start(App) of
-    {error, {already_started, crypto}} ->
-        start_applications(Apps, [crypto | Acc]);
-    {error, {already_started, App}} ->
-        io:format(standard_error, "Application ~s was left running!~n", [App]),
-        application:stop(App),
-        start_applications([App|Apps], Acc);
-    {error, Reason} ->
-        io:format(standard_error, "Cannot start application '~s', reason ~p~n", [App, Reason]),
-        throw({error, {cannot_start, App, Reason}});
-    ok ->
-        start_applications(Apps, [App|Acc])
+        {error, {already_started, crypto}} ->
+            start_applications(Apps, [crypto | Acc]);
+        {error, {already_started, App}} ->
+            io:format(standard_error, "Application ~s was left running!~n", [App]),
+            application:stop(App),
+            start_applications([App | Apps], Acc);
+        {error, Reason} ->
+            io:format(standard_error, "Cannot start application '~s', reason ~p~n", [App, Reason]),
+            throw({error, {cannot_start, App, Reason}});
+        ok ->
+            start_applications(Apps, [App | Acc])
     end.
 
 stop_applications(Apps) ->
@@ -114,11 +116,10 @@ start_config(Chain) ->
     case config:start_link(Chain) of
         {ok, Pid} ->
             {ok, Pid};
-        {error, {already_started, OldPid}}  ->
+        {error, {already_started, OldPid}} ->
             ok = stop_config(OldPid),
             start_config(Chain)
     end.
-
 
 stop_config(Pid) ->
     Timeout = 1000,
@@ -145,8 +146,8 @@ stop_sync(Pid, Fun, Timeout) when is_function(Fun) and is_pid(Pid) ->
             catch unlink(Pid),
             Res = (catch Fun()),
             receive
-            {'DOWN', MRef, _, _, _} ->
-                Res
+                {'DOWN', MRef, _, _, _} ->
+                    Res
             after Timeout ->
                 timeout
             end
@@ -154,7 +155,8 @@ stop_sync(Pid, Fun, Timeout) when is_function(Fun) and is_pid(Pid) ->
     after
         erlang:demonitor(MRef, [flush])
     end;
-stop_sync(_, _, _) -> error(badarg).
+stop_sync(_, _, _) ->
+    error(badarg).
 
 stop_sync_throw(Name, Error) ->
     stop_sync_throw(Name, shutdown, Error).
@@ -171,7 +173,9 @@ stop_sync_throw(Pid, Fun, Error, Timeout) ->
 
 with_process_restart(Name) ->
     {Pid, true} = with_process_restart(
-        Name, fun() -> exit(whereis(Name), shutdown) end),
+        Name,
+        fun() -> exit(whereis(Name), shutdown) end
+    ),
     Pid.
 
 with_process_restart(Name, Fun) ->
@@ -180,24 +184,26 @@ with_process_restart(Name, Fun) ->
 with_process_restart(Name, Fun, Timeout) ->
     Res = stop_sync(Name, Fun),
     case wait_process(Name, Timeout) of
-    timeout ->
-        timeout;
-    Pid ->
-        {Pid, Res}
+        timeout ->
+            timeout;
+        Pid ->
+            {Pid, Res}
     end.
-
 
 wait_process(Name) ->
     wait_process(Name, 5000).
 wait_process(Name, Timeout) ->
-    wait(fun() ->
-       case whereis(Name) of
-       undefined ->
-          wait;
-       Pid ->
-          Pid
-       end
-    end, Timeout).
+    wait(
+        fun() ->
+            case whereis(Name) of
+                undefined ->
+                    wait;
+                Pid ->
+                    Pid
+            end
+        end,
+        Timeout
+    ).
 
 wait(Fun) ->
     wait(Fun, 5000, 50).
@@ -213,11 +219,11 @@ wait(_Fun, Timeout, _Delay, Started, Prev) when Prev - Started > Timeout ->
     timeout;
 wait(Fun, Timeout, Delay, Started, _Prev) ->
     case Fun() of
-    wait ->
-        ok = timer:sleep(Delay),
-        wait(Fun, Timeout, Delay, Started, now_us());
-    Else ->
-        Else
+        wait ->
+            ok = timer:sleep(Delay),
+            wait(Fun, Timeout, Delay, Started, now_us());
+        Else ->
+            Else
     end.
 
 wait_value(Fun, Value) ->
@@ -279,7 +285,7 @@ load_applications_with_stats() ->
     ok.
 
 stats_file_to_app(File) ->
-    [_Desc, _Priv, App|_] = lists:reverse(filename:split(File)),
+    [_Desc, _Priv, App | _] = lists:reverse(filename:split(File)),
     erlang:list_to_atom(App).
 
 calculate_start_order(Apps) ->
@@ -309,14 +315,19 @@ load_app_deps(App, StartOrder) ->
                 {error, {already_loaded, App}} -> ok
             end,
             {ok, Apps} = application:get_key(App, applications),
-            Deps = case App of
-                kernel -> Apps;
-                stdlib -> Apps;
-                _ -> lists:usort([kernel, stdlib | Apps])
-            end,
-            NewStartOrder = lists:foldl(fun(Dep, Acc) ->
-                load_app_deps(Dep, Acc)
-            end, StartOrder, Deps),
+            Deps =
+                case App of
+                    kernel -> Apps;
+                    stdlib -> Apps;
+                    _ -> lists:usort([kernel, stdlib | Apps])
+                end,
+            NewStartOrder = lists:foldl(
+                fun(Dep, Acc) ->
+                    load_app_deps(Dep, Acc)
+                end,
+                StartOrder,
+                Deps
+            ),
             [App | NewStartOrder]
     end.
 

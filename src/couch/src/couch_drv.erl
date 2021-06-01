@@ -13,8 +13,14 @@
 -module(couch_drv).
 -behaviour(gen_server).
 -vsn(1).
--export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
-    code_change/3]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
 
 -export([start_link/0]).
 
@@ -27,15 +33,15 @@ start_link() ->
 init([]) ->
     LibDir = util_driver_dir(),
     case erl_ddll:load(LibDir, "couch_icu_driver") of
-    ok ->
-        {ok, nil};
-    {error, already_loaded} ->
-        ?LOG_INFO(#{what => reload_couch_icu_driver}),
-        couch_log:info("~p reloading couch_icu_driver", [?MODULE]),
-        ok = erl_ddll:reload(LibDir, "couch_icu_driver"),
-        {ok, nil};
-    {error, Error} ->
-        {stop, erl_ddll:format_error(Error)}
+        ok ->
+            {ok, nil};
+        {error, already_loaded} ->
+            ?LOG_INFO(#{what => reload_couch_icu_driver}),
+            couch_log:info("~p reloading couch_icu_driver", [?MODULE]),
+            ok = erl_ddll:reload(LibDir, "couch_icu_driver"),
+            {ok, nil};
+        {error, Error} ->
+            {stop, erl_ddll:format_error(Error)}
     end.
 
 handle_call(_Request, _From, State) ->
@@ -51,15 +57,13 @@ terminate(_Reason, _State) ->
     ok.
 
 code_change(_OldVsn, State, _Extra) ->
-
     {ok, State}.
-
 
 % private API
 util_driver_dir() ->
     case config:get("couchdb", "util_driver_dir", undefined) of
-    undefined ->
-        couch_util:priv_dir();
-    LibDir0 ->
-        LibDir0
+        undefined ->
+            couch_util:priv_dir();
+        LibDir0 ->
+            LibDir0
     end.

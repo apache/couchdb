@@ -12,7 +12,6 @@
 
 -module(mango_json).
 
-
 -export([
     min/0,
     max/0,
@@ -23,18 +22,14 @@
     to_binary/1
 ]).
 
-
 -define(MIN_VAL, mango_json_min).
 -define(MAX_VAL, mango_json_max).
-
 
 min() ->
     ?MIN_VAL.
 
-
 max() ->
     ?MAX_VAL.
-
 
 cmp(?MIN_VAL, ?MIN_VAL) ->
     0;
@@ -50,7 +45,6 @@ cmp(_, ?MAX_VAL) ->
     -1;
 cmp(A, B) ->
     couch_ejson_compare:less(A, B).
-
 
 cmp_raw(?MIN_VAL, ?MIN_VAL) ->
     0;
@@ -77,7 +71,6 @@ cmp_raw(A, B) ->
             end
     end.
 
-
 type(null) ->
     <<"null">>;
 type(Bool) when is_boolean(Bool) ->
@@ -91,14 +84,12 @@ type({Props}) when is_list(Props) ->
 type(Vals) when is_list(Vals) ->
     <<"array">>.
 
-
 special(?MIN_VAL) ->
     true;
 special(?MAX_VAL) ->
     true;
 special(_) ->
     false.
-
 
 to_binary({Props}) ->
     Pred = fun({Key, Value}) ->

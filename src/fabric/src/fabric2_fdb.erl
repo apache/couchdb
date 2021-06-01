@@ -12,7 +12,6 @@
 
 -module(fabric2_fdb).
 
-
 -export([
     transactional/1,
     transactional/2,
@@ -86,10 +85,8 @@
     debug_cluster/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include("fabric2.hrl").
-
 
 -record(fold_acc, {
     db,
@@ -113,61 +110,63 @@
     retries = 0
 }).
 
-
 transactional(Fun) ->
     do_transaction(Fun, undefined, #{}).
 
-
 transactional(DbName, Fun) when is_binary(DbName), is_function(Fun) ->
     transactional(DbName, #{}, Fun);
-
 transactional(#{} = Db, Fun) when is_function(Fun) ->
     transactional(Db, #{}, Fun).
 
-
-
 transactional(DbName, #{} = TxOptions, Fun) when is_binary(DbName) ->
     with_span(Fun, #{'db.name' => DbName}, fun() ->
-        do_transaction(fun(Tx) ->
-            Fun(init_db(Tx, DbName))
-        end, undefined, TxOptions)
+        do_transaction(
+            fun(Tx) ->
+                Fun(init_db(Tx, DbName))
+            end,
+            undefined,
+            TxOptions
+        )
     end);
-
 transactional(#{tx := undefined} = Db, #{} = TxOptions, Fun) ->
     DbName = maps:get(name, Db, undefined),
     try
         Db1 = refresh(Db),
         Reopen = maps:get(reopen, Db1, false),
         Db2 = maps:remove(reopen, Db1),
-        LayerPrefix = case Reopen of
-            true -> undefined;
-            false -> maps:get(layer_prefix, Db2)
-        end,
+        LayerPrefix =
+            case Reopen of
+                true -> undefined;
+                false -> maps:get(layer_prefix, Db2)
+            end,
         with_span(Fun, #{'db.name' => DbName}, fun() ->
-            do_transaction(fun(Tx) ->
-                case Reopen of
-                    true -> Fun(reopen(Db2#{tx => Tx}));
-                    false -> Fun(Db2#{tx => Tx})
-                end
-            end, LayerPrefix, TxOptions)
+            do_transaction(
+                fun(Tx) ->
+                    case Reopen of
+                        true -> Fun(reopen(Db2#{tx => Tx}));
+                        false -> Fun(Db2#{tx => Tx})
+                    end
+                end,
+                LayerPrefix,
+                TxOptions
+            )
         end)
-    catch throw:{?MODULE, reopen} ->
-        with_span('db.reopen', #{'db.name' => DbName}, fun() ->
-            transactional(Db#{reopen => true}, Fun)
-        end)
+    catch
+        throw:{?MODULE, reopen} ->
+            with_span('db.reopen', #{'db.name' => DbName}, fun() ->
+                transactional(Db#{reopen => true}, Fun)
+            end)
     end;
 transactional(#{tx := {erlfdb_snapshot, _}} = Db, #{} = _TxOptions, Fun) ->
     DbName = maps:get(name, Db, undefined),
     with_span(Fun, #{'db.name' => DbName}, fun() ->
         Fun(Db)
     end);
-
 transactional(#{tx := {erlfdb_transaction, _}} = Db, #{} = _TxOptions, Fun) ->
     DbName = maps:get(name, Db, undefined),
     with_span(Fun, #{'db.name' => DbName}, fun() ->
         Fun(Db)
     end).
-
 
 do_transaction(Fun, LayerPrefix, #{} = TxOptions) when is_function(Fun, 1) ->
     Db = get_db_handle(),
@@ -194,20 +193,19 @@ do_transaction(Fun, LayerPrefix, #{} = TxOptions) when is_function(Fun, 1) ->
         clear_transaction()
     end.
 
-
 apply_tx_options(Tx, #{} = TxOptions) ->
-    maps:map(fun(K, V) ->
-        erlfdb:set_option(Tx, K, V)
-    end, TxOptions).
-
+    maps:map(
+        fun(K, V) ->
+            erlfdb:set_option(Tx, K, V)
+        end,
+        TxOptions
+    ).
 
 with_snapshot(#{tx := {erlfdb_transaction, _} = Tx} = TxDb, Fun) ->
     SSDb = TxDb#{tx := erlfdb:snapshot(Tx)},
     Fun(SSDb);
-
 with_snapshot(#{tx := {erlfdb_snapshot, _}} = SSDb, Fun) ->
     Fun(SSDb).
-
 
 create(#{} = Db0, Options) ->
     #{
@@ -245,14 +243,17 @@ create(#{} = Db0, Options) ->
         {?DB_STATS, <<"sizes">>, <<"external">>, ?uint2bin(2)},
         {?DB_STATS, <<"sizes">>, <<"views">>, ?uint2bin(0)}
     ],
-    lists:foreach(fun
-        ({P, K, V}) ->
-            Key = erlfdb_tuple:pack({P, K}, DbPrefix),
-            erlfdb:set(Tx, Key, V);
-        ({P, S, K, V}) ->
-            Key = erlfdb_tuple:pack({P, S, K}, DbPrefix),
-            erlfdb:set(Tx, Key, V)
-    end, Defaults),
+    lists:foreach(
+        fun
+            ({P, K, V}) ->
+                Key = erlfdb_tuple:pack({P, K}, DbPrefix),
+                erlfdb:set(Tx, Key, V);
+            ({P, S, K, V}) ->
+                Key = erlfdb_tuple:pack({P, S, K}, DbPrefix),
+                erlfdb:set(Tx, Key, V)
+        end,
+        Defaults
+    ),
 
     UserCtx = fabric2_util:get_value(user_ctx, Options, #user_ctx{}),
     Options1 = lists:keydelete(user_ctx, 1, Options),
@@ -277,7 +278,6 @@ create(#{} = Db0, Options) ->
     },
     aegis:init_db(Db2, Options).
 
-
 open(#{} = Db0, Options) ->
     #{
         name := DbName,
@@ -286,10 +286,11 @@ open(#{} = Db0, Options) ->
     } = Db1 = ensure_current(Db0, false),
 
     DbKey = erlfdb_tuple:pack({?ALL_DBS, DbName}, LayerPrefix),
-    DbPrefix = case erlfdb:wait(erlfdb:get(Tx, DbKey)) of
-        Bin when is_binary(Bin) -> Bin;
-        not_found -> erlang:error(database_does_not_exist)
-    end,
+    DbPrefix =
+        case erlfdb:wait(erlfdb:get(Tx, DbKey)) of
+            Bin when is_binary(Bin) -> Bin;
+            not_found -> erlang:error(database_does_not_exist)
+        end,
 
     DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
     DbVersion = erlfdb:wait(erlfdb:get(Tx, DbVersionKey)),
@@ -335,7 +336,6 @@ open(#{} = Db0, Options) ->
 
     load_validate_doc_funs(Db4).
 
-
 % Match on `name` in the function head since some non-fabric2 db
 % objects might not have names and so they don't get cached
 refresh(#{tx := undefined, name := DbName} = Db) ->
@@ -358,11 +358,8 @@ refresh(#{tx := undefined, name := DbName} = Db) ->
         _ ->
             Db
     end;
-
 refresh(#{} = Db) ->
     Db.
-
-
 
 reopen(#{} = OldDb) ->
     require_transaction(OldDb),
@@ -387,14 +384,12 @@ reopen(#{} = OldDb) ->
 
     NewDb#{security_fun := SecurityFun, interactive := Interactive}.
 
-
 delete(#{} = Db) ->
     DoRecovery = fabric2_util:do_recovery(),
     case DoRecovery of
         true -> soft_delete_db(Db);
         false -> hard_delete_db(Db)
     end.
-
 
 undelete(#{} = Db0, TgtDbName, TimeStamp) ->
     #{
@@ -427,7 +422,6 @@ undelete(#{} = Db0, TgtDbName, TimeStamp) ->
             end
     end.
 
-
 remove_deleted_db(#{} = Db0, TimeStamp) ->
     #{
         name := DbName,
@@ -454,7 +448,6 @@ remove_deleted_db(#{} = Db0, TimeStamp) ->
             ok
     end.
 
-
 exists(#{name := DbName} = Db) when is_binary(DbName) ->
     #{
         tx := Tx,
@@ -467,54 +460,70 @@ exists(#{name := DbName} = Db) when is_binary(DbName) ->
         not_found -> false
     end.
 
-
 get_dir(Tx) ->
     Root = erlfdb_directory:root(),
     Dir = fabric2_server:fdb_directory(),
     CouchDB = erlfdb_directory:create_or_open(Tx, Root, Dir),
     erlfdb_directory:get_name(CouchDB).
 
-
 list_dbs(Tx, Callback, AccIn, Options0) ->
-    Options = case fabric2_util:get_value(restart_tx, Options0) of
-        undefined -> [{restart_tx, true} | Options0];
-        _AlreadySet -> Options0
-    end,
+    Options =
+        case fabric2_util:get_value(restart_tx, Options0) of
+            undefined -> [{restart_tx, true} | Options0];
+            _AlreadySet -> Options0
+        end,
     LayerPrefix = get_dir(Tx),
     Prefix = erlfdb_tuple:pack({?ALL_DBS}, LayerPrefix),
-    fold_range({tx, Tx}, Prefix, fun({K, _V}, Acc) ->
-        {DbName} = erlfdb_tuple:unpack(K, Prefix),
-        Callback(DbName, Acc)
-    end, AccIn, Options).
-
+    fold_range(
+        {tx, Tx},
+        Prefix,
+        fun({K, _V}, Acc) ->
+            {DbName} = erlfdb_tuple:unpack(K, Prefix),
+            Callback(DbName, Acc)
+        end,
+        AccIn,
+        Options
+    ).
 
 list_dbs_info(Tx, Callback, AccIn, Options0) ->
-    Options = case fabric2_util:get_value(restart_tx, Options0) of
-        undefined -> [{restart_tx, true} | Options0];
-        _AlreadySet -> Options0
-    end,
+    Options =
+        case fabric2_util:get_value(restart_tx, Options0) of
+            undefined -> [{restart_tx, true} | Options0];
+            _AlreadySet -> Options0
+        end,
     LayerPrefix = get_dir(Tx),
     Prefix = erlfdb_tuple:pack({?ALL_DBS}, LayerPrefix),
-    fold_range({tx, Tx}, Prefix, fun({DbNameKey, DbPrefix}, Acc) ->
-        {DbName} = erlfdb_tuple:unpack(DbNameKey, Prefix),
-        InfoFuture = get_info_future(Tx, DbPrefix),
-        Callback(DbName, InfoFuture, Acc)
-    end, AccIn, Options).
-
+    fold_range(
+        {tx, Tx},
+        Prefix,
+        fun({DbNameKey, DbPrefix}, Acc) ->
+            {DbName} = erlfdb_tuple:unpack(DbNameKey, Prefix),
+            InfoFuture = get_info_future(Tx, DbPrefix),
+            Callback(DbName, InfoFuture, Acc)
+        end,
+        AccIn,
+        Options
+    ).
 
 list_deleted_dbs_info(Tx, Callback, AccIn, Options0) ->
-    Options = case fabric2_util:get_value(restart_tx, Options0) of
-        undefined -> [{restart_tx, true} | Options0];
-        _AlreadySet -> Options0
-    end,
+    Options =
+        case fabric2_util:get_value(restart_tx, Options0) of
+            undefined -> [{restart_tx, true} | Options0];
+            _AlreadySet -> Options0
+        end,
     LayerPrefix = get_dir(Tx),
     Prefix = erlfdb_tuple:pack({?DELETED_DBS}, LayerPrefix),
-    fold_range({tx, Tx}, Prefix, fun({DbKey, DbPrefix}, Acc) ->
-        {DbName, TimeStamp} = erlfdb_tuple:unpack(DbKey, Prefix),
-        InfoFuture = get_info_future(Tx, DbPrefix),
-        Callback(DbName, TimeStamp, InfoFuture, Acc)
-    end, AccIn, Options).
-
+    fold_range(
+        {tx, Tx},
+        Prefix,
+        fun({DbKey, DbPrefix}, Acc) ->
+            {DbName, TimeStamp} = erlfdb_tuple:unpack(DbKey, Prefix),
+            InfoFuture = get_info_future(Tx, DbPrefix),
+            Callback(DbName, TimeStamp, InfoFuture, Acc)
+        end,
+        AccIn,
+        Options
+    ).
 
 get_info(#{} = Db) ->
     #{
@@ -524,7 +533,6 @@ get_info(#{} = Db) ->
     DbInfo = get_info_wait(get_info_future(Tx, DbPrefix)),
     AegisProps = aegis:get_db_info(Db),
     [{encryption, {AegisProps}} | DbInfo].
-
 
 get_info_future(Tx, DbPrefix) ->
     {CStart, CEnd} = erlfdb_tuple:range({?DB_CHANGES}, DbPrefix),
@@ -542,10 +550,11 @@ get_info_future(Tx, DbPrefix) ->
 
     % Save the tx object only if it's read-only as we might retry to get the
     % future again after the tx was reset
-    SaveTx = case erlfdb:get_writes_allowed(Tx) of
-        true -> undefined;
-        false -> Tx
-    end,
+    SaveTx =
+        case erlfdb:get_writes_allowed(Tx) of
+            true -> undefined;
+            false -> Tx
+        end,
 
     #info_future{
         tx = SaveTx,
@@ -555,11 +564,10 @@ get_info_future(Tx, DbPrefix) ->
         uuid_future = UUIDFuture
     }.
 
-
-get_info_wait(#info_future{tx = Tx, retries = Retries} = Future)
-        when Tx =:= undefined orelse Retries >= 2 ->
+get_info_wait(#info_future{tx = Tx, retries = Retries} = Future) when
+    Tx =:= undefined orelse Retries >= 2
+->
     get_info_wait_int(Future);
-
 get_info_wait(#info_future{tx = Tx, retries = Retries} = Future) ->
     try
         get_info_wait_int(Future)
@@ -573,7 +581,6 @@ get_info_wait(#info_future{tx = Tx, retries = Retries} = Future) ->
             get_info_wait(Future1#info_future{retries = Retries + 1})
     end.
 
-
 load_config(#{} = Db) ->
     #{
         tx := Tx,
@@ -583,31 +590,34 @@ load_config(#{} = Db) ->
     {Start, End} = erlfdb_tuple:range({?DB_CONFIG}, DbPrefix),
     Future = erlfdb:get_range(Tx, Start, End),
 
-    lists:foldl(fun({K, V}, DbAcc) ->
-        {?DB_CONFIG, Key} = erlfdb_tuple:unpack(K, DbPrefix),
-        case Key of
-            <<"uuid">> ->  DbAcc#{uuid := V};
-            <<"revs_limit">> -> DbAcc#{revs_limit := ?bin2uint(V)};
-            <<"security_doc">> -> DbAcc#{security_doc := ?JSON_DECODE(V)}
-        end
-    end, Db, erlfdb:wait(Future)).
-
+    lists:foldl(
+        fun({K, V}, DbAcc) ->
+            {?DB_CONFIG, Key} = erlfdb_tuple:unpack(K, DbPrefix),
+            case Key of
+                <<"uuid">> -> DbAcc#{uuid := V};
+                <<"revs_limit">> -> DbAcc#{revs_limit := ?bin2uint(V)};
+                <<"security_doc">> -> DbAcc#{security_doc := ?JSON_DECODE(V)}
+            end
+        end,
+        Db,
+        erlfdb:wait(Future)
+    ).
 
 set_config(#{} = Db0, Key, Val) when is_atom(Key) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = Db = ensure_current(Db0),
-    {BinKey, BinVal} = case Key of
-        uuid -> {<<"uuid">>, Val};
-        revs_limit -> {<<"revs_limit">>, ?uint2bin(max(1, Val))};
-        security_doc -> {<<"security_doc">>, ?JSON_ENCODE(Val)}
-    end,
+    {BinKey, BinVal} =
+        case Key of
+            uuid -> {<<"uuid">>, Val};
+            revs_limit -> {<<"revs_limit">>, ?uint2bin(max(1, Val))};
+            security_doc -> {<<"security_doc">>, ?JSON_ENCODE(Val)}
+        end,
     DbKey = erlfdb_tuple:pack({?DB_CONFIG, BinKey}, DbPrefix),
     erlfdb:set(Tx, DbKey, BinVal),
     {ok, DbVersion} = bump_db_version(Db),
     {ok, Db#{db_version := DbVersion, Key := Val}}.
-
 
 get_stat(#{} = Db, StatKey) ->
     #{
@@ -622,10 +632,8 @@ get_stat(#{} = Db, StatKey) ->
     % atomic op adds for the moment.
     ?bin2uint(erlfdb:wait(erlfdb:get(Tx, Key))).
 
-
 incr_stat(_Db, _StatKey, 0) ->
     ok;
-
 incr_stat(#{} = Db, StatKey, Increment) when is_integer(Increment) ->
     #{
         tx := Tx,
@@ -635,10 +643,8 @@ incr_stat(#{} = Db, StatKey, Increment) when is_integer(Increment) ->
     Key = erlfdb_tuple:pack({?DB_STATS, StatKey}, DbPrefix),
     erlfdb:add(Tx, Key, Increment).
 
-
 incr_stat(_Db, _Section, _Key, 0) ->
     ok;
-
 incr_stat(#{} = Db, Section, Key, Increment) when is_integer(Increment) ->
     #{
         tx := Tx,
@@ -648,7 +654,6 @@ incr_stat(#{} = Db, Section, Key, Increment) when is_integer(Increment) ->
     BinKey = erlfdb_tuple:pack({?DB_STATS, Section, Key}, DbPrefix),
     erlfdb:add(Tx, BinKey, Increment).
 
-
 get_all_revs(#{} = Db, DocId) ->
     DbName = maps:get(name, Db, undefined),
     with_span('db.get_all_revs', #{'db.name' => DbName, 'doc.id' => DocId}, fun() ->
@@ -656,11 +661,9 @@ get_all_revs(#{} = Db, DocId) ->
         get_revs_wait(Db, Future)
     end).
 
-
 get_all_revs_future(#{} = Db, DocId) ->
     Options = [{streaming_mode, want_all}],
     get_revs_future(Db, DocId, Options).
-
 
 get_winning_revs(Db, DocId, NumRevs) ->
     DbName = maps:get(name, Db, undefined),
@@ -669,11 +672,9 @@ get_winning_revs(Db, DocId, NumRevs) ->
         get_revs_wait(Db, Future)
     end).
 
-
 get_winning_revs_future(#{} = Db, DocId, NumRevs) ->
     Options = [{reverse, true}, {limit, NumRevs}],
     get_revs_future(Db, DocId, Options).
-
 
 get_revs_future(#{} = Db, DocId, Options) ->
     #{
@@ -684,20 +685,23 @@ get_revs_future(#{} = Db, DocId, Options) ->
     {StartKey, EndKey} = erlfdb_tuple:range({?DB_REVS, DocId}, DbPrefix),
     erlfdb:fold_range_future(Tx, StartKey, EndKey, Options).
 
-
 get_revs_wait(#{} = Db, RangeFuture) ->
     #{
         tx := Tx,
         db_prefix := DbPrefix
     } = ensure_current(Db),
 
-    RevRows = erlfdb:fold_range_wait(Tx, RangeFuture, fun({K, V}, Acc) ->
-        Key = erlfdb_tuple:unpack(K, DbPrefix),
-        Val = erlfdb_tuple:unpack(V),
-        [fdb_to_revinfo(Key, Val) | Acc]
-    end, []),
+    RevRows = erlfdb:fold_range_wait(
+        Tx,
+        RangeFuture,
+        fun({K, V}, Acc) ->
+            Key = erlfdb_tuple:unpack(K, DbPrefix),
+            Val = erlfdb_tuple:unpack(V),
+            [fdb_to_revinfo(Key, Val) | Acc]
+        end,
+        []
+    ),
     lists:reverse(RevRows).
-
 
 get_non_deleted_rev(#{} = Db, DocId, RevId) ->
     #{
@@ -716,14 +720,12 @@ get_non_deleted_rev(#{} = Db, DocId, RevId) ->
             fdb_to_revinfo(BaseKey, erlfdb_tuple:unpack(Val))
     end.
 
-
 get_doc_body(Db, DocId, RevInfo) ->
     DbName = maps:get(name, Db, undefined),
     with_span('db.get_doc_body', #{'db.name' => DbName, 'doc.id' => DocId}, fun() ->
         Future = get_doc_body_future(Db, DocId, RevInfo),
         get_doc_body_wait(Db, DocId, RevInfo, Future)
     end).
-
 
 get_doc_body_future(#{} = Db, DocId, RevInfo) ->
     #{
@@ -738,7 +740,6 @@ get_doc_body_future(#{} = Db, DocId, RevInfo) ->
     Key = {?DB_DOCS, DocId, RevPos, Rev},
     {StartKey, EndKey} = erlfdb_tuple:range(Key, DbPrefix),
     erlfdb:fold_range_future(Tx, StartKey, EndKey, []).
-
 
 get_doc_body_wait(#{} = Db0, DocId, RevInfo, Future) ->
     #{
@@ -758,7 +759,6 @@ get_doc_body_wait(#{} = Db0, DocId, RevInfo, Future) ->
 
     fdb_to_doc(Db, DocId, RevPos, [Rev | RevPath], BodyRows).
 
-
 get_local_doc_rev_future(Db, DocId) ->
     #{
         tx := Tx,
@@ -768,10 +768,8 @@ get_local_doc_rev_future(Db, DocId) ->
     Key = erlfdb_tuple:pack({?DB_LOCAL_DOCS, DocId}, DbPrefix),
     erlfdb:get(Tx, Key).
 
-
 get_local_doc_rev_wait(Future) ->
     erlfdb:wait(Future).
-
 
 get_local_doc_body_future(#{} = Db, DocId, _Rev) ->
     #{
@@ -782,13 +780,11 @@ get_local_doc_body_future(#{} = Db, DocId, _Rev) ->
     Prefix = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, DocId}, DbPrefix),
     erlfdb:get_range_startswith(Tx, Prefix).
 
-
 get_local_doc_body_wait(#{} = Db0, DocId, Rev, Future) ->
     Db = ensure_current(Db0),
 
     {_, Chunks} = lists:unzip(aegis:decrypt(Db, erlfdb:wait(Future))),
     fdb_to_local_doc(Db, DocId, Rev, Chunks).
-
 
 get_local_doc(#{} = Db, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
     RevFuture = get_local_doc_rev_future(Db, DocId),
@@ -796,7 +792,6 @@ get_local_doc(#{} = Db, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId) ->
 
     BodyFuture = get_local_doc_body_future(Db, DocId, Rev),
     get_local_doc_body_wait(Db, DocId, Rev, BodyFuture).
-
 
 get_local_doc_rev(_Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, Val) ->
     case Val of
@@ -806,8 +801,9 @@ get_local_doc_rev(_Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, Val) ->
                 case erlfdb_tuple:unpack(RevBin) of
                     {?CURR_LDOC_FORMAT, Rev, _Size} -> Rev
                 end
-            catch _:_ ->
-                erlang:error({invalid_local_doc_rev, DocId, Val})
+            catch
+                _:_ ->
+                    erlang:error({invalid_local_doc_rev, DocId, Val})
             end;
         <<131, _/binary>> ->
             % Compatibility clause for an older encoding format
@@ -829,7 +825,6 @@ get_local_doc_rev(_Db0, <<?LOCAL_DOC_PREFIX, _/binary>> = DocId, Val) ->
                     erlang:error({invalid_local_doc_rev, DocId, Val})
             end
     end.
-
 
 write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     #{
@@ -857,13 +852,17 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     % the attachments have not changed.
     AttHash = fabric2_util:hash_atts(Atts),
     RevsToCheck = [NewWinner0] ++ ToUpdate ++ ToRemove,
-    AttHashCount = lists:foldl(fun(Att, Count) ->
-        #{att_hash := RevAttHash} = Att,
-        case RevAttHash == AttHash of
-            true -> Count + 1;
-            false -> Count
-        end
-    end, 0, RevsToCheck),
+    AttHashCount = lists:foldl(
+        fun(Att, Count) ->
+            #{att_hash := RevAttHash} = Att,
+            case RevAttHash == AttHash of
+                true -> Count + 1;
+                false -> Count
+            end
+        end,
+        0,
+        RevsToCheck
+    ),
     if
         AttHashCount == length(RevsToCheck) ->
             ok;
@@ -883,35 +882,42 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     {WKey, WVal, WinnerVS} = revinfo_to_fdb(Tx, DbPrefix, DocId, NewWinner),
     ok = erlfdb:set_versionstamped_value(Tx, WKey, WVal),
 
-    lists:foreach(fun(RI0) ->
-        RI = RI0#{winner := false},
-        {K, V, undefined} = revinfo_to_fdb(Tx, DbPrefix, DocId, RI),
-        ok = erlfdb:set(Tx, K, V)
-    end, ToUpdate),
+    lists:foreach(
+        fun(RI0) ->
+            RI = RI0#{winner := false},
+            {K, V, undefined} = revinfo_to_fdb(Tx, DbPrefix, DocId, RI),
+            ok = erlfdb:set(Tx, K, V)
+        end,
+        ToUpdate
+    ),
 
-    lists:foreach(fun(RI0) ->
-        RI = RI0#{winner := false},
-        {K, _, undefined} = revinfo_to_fdb(Tx, DbPrefix, DocId, RI),
-        ok = erlfdb:clear(Tx, K),
-        ok = clear_doc_body(Db, DocId, RI0)
-    end, ToRemove),
+    lists:foreach(
+        fun(RI0) ->
+            RI = RI0#{winner := false},
+            {K, _, undefined} = revinfo_to_fdb(Tx, DbPrefix, DocId, RI),
+            ok = erlfdb:clear(Tx, K),
+            ok = clear_doc_body(Db, DocId, RI0)
+        end,
+        ToRemove
+    ),
 
     % _all_docs
 
-    UpdateStatus = case {OldWinner, NewWinner} of
-        {not_found, #{deleted := false}} ->
-            created;
-        {not_found, #{deleted := true}} ->
-            replicate_deleted;
-        {#{deleted := true}, #{deleted := false}} ->
-            recreated;
-        {#{deleted := false}, #{deleted := false}} ->
-            updated;
-        {#{deleted := false}, #{deleted := true}} ->
-            deleted;
-        {#{deleted := true}, #{deleted := true}} ->
-            ignore
-    end,
+    UpdateStatus =
+        case {OldWinner, NewWinner} of
+            {not_found, #{deleted := false}} ->
+                created;
+            {not_found, #{deleted := true}} ->
+                replicate_deleted;
+            {#{deleted := true}, #{deleted := false}} ->
+                recreated;
+            {#{deleted := false}, #{deleted := false}} ->
+                updated;
+            {#{deleted := false}, #{deleted := true}} ->
+                deleted;
+            {#{deleted := true}, #{deleted := true}} ->
+                ignore
+        end,
 
     case UpdateStatus of
         replicate_deleted ->
@@ -929,10 +935,13 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
 
     % _changes
 
-    if OldWinner == not_found -> ok; true ->
-        OldSeq = maps:get(sequence, OldWinner),
-        OldSeqKey = erlfdb_tuple:pack({?DB_CHANGES, OldSeq}, DbPrefix),
-        erlfdb:clear(Tx, OldSeqKey)
+    if
+        OldWinner == not_found ->
+            ok;
+        true ->
+            OldSeq = maps:get(sequence, OldWinner),
+            OldSeqKey = erlfdb_tuple:pack({?DB_CHANGES, OldSeq}, DbPrefix),
+            erlfdb:clear(Tx, OldSeqKey)
     end,
 
     NewSeqKey = erlfdb_tuple:pack_vs({?DB_CHANGES, WinnerVS}, DbPrefix),
@@ -941,26 +950,30 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
 
     % Bump db version on design doc changes
 
-    IsDDoc = case Doc#doc.id of
-        <<?DESIGN_DOC_PREFIX, _/binary>> -> true;
-        _ -> false
-    end,
+    IsDDoc =
+        case Doc#doc.id of
+            <<?DESIGN_DOC_PREFIX, _/binary>> -> true;
+            _ -> false
+        end,
 
-    if not IsDDoc -> ok; true ->
-        bump_db_version(Db)
+    if
+        not IsDDoc -> ok;
+        true -> bump_db_version(Db)
     end,
 
     % Update our document counts
 
     case UpdateStatus of
         created ->
-            if not IsDDoc -> ok; true ->
-                incr_stat(Db, <<"doc_design_count">>, 1)
+            if
+                not IsDDoc -> ok;
+                true -> incr_stat(Db, <<"doc_design_count">>, 1)
             end,
             incr_stat(Db, <<"doc_count">>, 1);
         recreated ->
-            if not IsDDoc -> ok; true ->
-                incr_stat(Db, <<"doc_design_count">>, 1)
+            if
+                not IsDDoc -> ok;
+                true -> incr_stat(Db, <<"doc_design_count">>, 1)
             end,
             incr_stat(Db, <<"doc_count">>, 1),
             incr_stat(Db, <<"doc_del_count">>, -1);
@@ -969,8 +982,9 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
         ignore ->
             ok;
         deleted ->
-            if not IsDDoc -> ok; true ->
-                incr_stat(Db, <<"doc_design_count">>, -1)
+            if
+                not IsDDoc -> ok;
+                true -> incr_stat(Db, <<"doc_design_count">>, -1)
             end,
             incr_stat(Db, <<"doc_count">>, -1),
             incr_stat(Db, <<"doc_del_count">>, 1);
@@ -978,8 +992,14 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
             ok
     end,
 
-    fabric2_db_plugin:after_doc_write(Db, Doc, NewWinner, OldWinner,
-        NewRevId, WinnerVS),
+    fabric2_db_plugin:after_doc_write(
+        Db,
+        Doc,
+        NewWinner,
+        OldWinner,
+        NewRevId,
+        WinnerVS
+    ),
 
     % Update database size
     AddSize = sum_add_rev_sizes([NewWinner | ToUpdate]),
@@ -987,7 +1007,6 @@ write_doc(#{} = Db0, Doc, NewWinner0, OldWinner, ToUpdate, ToRemove) ->
     incr_stat(Db, <<"sizes">>, <<"external">>, AddSize - RemSize),
 
     ok.
-
 
 write_local_doc(#{} = Db0, Doc) ->
     #{
@@ -999,17 +1018,18 @@ write_local_doc(#{} = Db0, Doc) ->
 
     {LDocKey, LDocVal, NewSize, Rows} = local_doc_to_fdb(Db, Doc),
 
-    {WasDeleted, PrevSize} = case erlfdb:wait(erlfdb:get(Tx, LDocKey)) of
-        <<255, RevBin/binary>> ->
-            case erlfdb_tuple:unpack(RevBin) of
-                {?CURR_LDOC_FORMAT, _Rev, Size} ->
-                    {false, Size}
-            end;
-        <<_/binary>> ->
-            {false, 0};
-        not_found ->
-            {true, 0}
-    end,
+    {WasDeleted, PrevSize} =
+        case erlfdb:wait(erlfdb:get(Tx, LDocKey)) of
+            <<255, RevBin/binary>> ->
+                case erlfdb_tuple:unpack(RevBin) of
+                    {?CURR_LDOC_FORMAT, _Rev, Size} ->
+                        {false, Size}
+                end;
+            <<_/binary>> ->
+                {false, 0};
+            not_found ->
+                {true, 0}
+        end,
 
     BPrefix = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, Id}, DbPrefix),
 
@@ -1022,9 +1042,12 @@ write_local_doc(#{} = Db0, Doc) ->
             % Make sure to clear the whole range, in case there was a larger
             % document body there before.
             erlfdb:clear_range_startswith(Tx, BPrefix),
-            lists:foreach(fun({K, V}) ->
-                erlfdb:set(Tx, K, aegis:encrypt(Db, K, V))
-            end, Rows)
+            lists:foreach(
+                fun({K, V}) ->
+                    erlfdb:set(Tx, K, aegis:encrypt(Db, K, V))
+                end,
+                Rows
+            )
     end,
 
     case {WasDeleted, Doc#doc.deleted} of
@@ -1040,7 +1063,6 @@ write_local_doc(#{} = Db0, Doc) ->
 
     ok.
 
-
 read_attachment(#{} = Db, DocId, AttId) ->
     #{
         tx := Tx,
@@ -1048,18 +1070,20 @@ read_attachment(#{} = Db, DocId, AttId) ->
     } = ensure_current(Db),
 
     AttKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId}, DbPrefix),
-    Data = case erlfdb:wait(erlfdb:get_range_startswith(Tx, AttKey)) of
-        not_found ->
-            throw({not_found, missing});
-        KVs ->
-            {_, Chunks} = lists:unzip(aegis:decrypt(Db, KVs)),
-            iolist_to_binary(Chunks)
-    end,
+    Data =
+        case erlfdb:wait(erlfdb:get_range_startswith(Tx, AttKey)) of
+            not_found ->
+                throw({not_found, missing});
+            KVs ->
+                {_, Chunks} = lists:unzip(aegis:decrypt(Db, KVs)),
+                iolist_to_binary(Chunks)
+        end,
 
     IdKey = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId, AttId}, DbPrefix),
     case erlfdb:wait(erlfdb:get(Tx, IdKey)) of
         <<>> ->
-            Data; % Old format, before CURR_ATT_STORAGE_VER = 0
+            % Old format, before CURR_ATT_STORAGE_VER = 0
+            Data;
         <<_/binary>> = InfoBin ->
             {?CURR_ATT_STORAGE_VER, Compressed} = erlfdb_tuple:unpack(InfoBin),
             case Compressed of
@@ -1068,9 +1092,9 @@ read_attachment(#{} = Db, DocId, AttId) ->
             end
     end.
 
-
-write_attachment(#{} = Db, DocId, Data, Encoding)
-        when is_binary(Data), is_atom(Encoding) ->
+write_attachment(#{} = Db, DocId, Data, Encoding) when
+    is_binary(Data), is_atom(Encoding)
+->
     #{
         tx := Tx,
         db_prefix := DbPrefix
@@ -1078,17 +1102,18 @@ write_attachment(#{} = Db, DocId, Data, Encoding)
 
     AttId = fabric2_util:uuid(),
 
-    {Data1, Compressed} = case Encoding of
-        gzip ->
-            {Data, false};
-        _ ->
-            Opts = [{minor_version, 1}, {compressed, 6}],
-            CompressedData = term_to_binary(Data, Opts),
-            case size(CompressedData) < Data of
-                true -> {CompressedData, true};
-                false -> {Data, false}
-            end
-    end,
+    {Data1, Compressed} =
+        case Encoding of
+            gzip ->
+                {Data, false};
+            _ ->
+                Opts = [{minor_version, 1}, {compressed, 6}],
+                CompressedData = term_to_binary(Data, Opts),
+                case size(CompressedData) < Data of
+                    true -> {CompressedData, true};
+                    false -> {Data, false}
+                end
+        end,
 
     IdKey = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId, AttId}, DbPrefix),
     InfoVal = erlfdb_tuple:pack({?CURR_ATT_STORAGE_VER, Compressed}),
@@ -1096,13 +1121,16 @@ write_attachment(#{} = Db, DocId, Data, Encoding)
 
     Chunks = chunkify_binary(Data1),
 
-    lists:foldl(fun(Chunk, ChunkId) ->
-        AttKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId, ChunkId}, DbPrefix),
-        ok = erlfdb:set(Tx, AttKey, aegis:encrypt(Db, AttKey, Chunk)),
-        ChunkId + 1
-    end, 0, Chunks),
+    lists:foldl(
+        fun(Chunk, ChunkId) ->
+            AttKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId, ChunkId}, DbPrefix),
+            ok = erlfdb:set(Tx, AttKey, aegis:encrypt(Db, AttKey, Chunk)),
+            ChunkId + 1
+        end,
+        0,
+        Chunks
+    ),
     {ok, AttId}.
-
 
 get_last_change(#{} = Db) ->
     #{
@@ -1120,25 +1148,27 @@ get_last_change(#{} = Db) ->
             vs_to_seq(SeqVS)
     end.
 
-
 fold_range(TxOrDb, RangePrefix, UserFun, UserAcc, Options) ->
-    {Db, Tx} = case TxOrDb of
-        {tx, TxObj} ->
-            {undefined, TxObj};
-        #{} = DbObj ->
-            DbObj1 = #{tx := TxObj} = ensure_current(DbObj),
-            {DbObj1, TxObj}
-    end,
+    {Db, Tx} =
+        case TxOrDb of
+            {tx, TxObj} ->
+                {undefined, TxObj};
+            #{} = DbObj ->
+                DbObj1 = #{tx := TxObj} = ensure_current(DbObj),
+                {DbObj1, TxObj}
+        end,
     % FoundationDB treats a limit 0 of as unlimited so we guard against it
-    case fabric2_util:get_value(limit, Options) of 0 -> UserAcc; _ ->
-        FAcc = get_fold_acc(Db, RangePrefix, UserFun, UserAcc, Options),
-        try
-            fold_range(Tx, FAcc)
-        after
-            erase(?PDICT_FOLD_ACC_STATE)
-        end
+    case fabric2_util:get_value(limit, Options) of
+        0 ->
+            UserAcc;
+        _ ->
+            FAcc = get_fold_acc(Db, RangePrefix, UserFun, UserAcc, Options),
+            try
+                fold_range(Tx, FAcc)
+            after
+                erase(?PDICT_FOLD_ACC_STATE)
+            end
     end.
-
 
 fold_range(Tx, FAcc) ->
     #fold_acc{
@@ -1148,8 +1178,9 @@ fold_range(Tx, FAcc) ->
         base_opts = BaseOpts,
         restart_tx = DoRestart
     } = FAcc,
-    case DoRestart of false -> ok; true ->
-        ok = erlfdb:set_option(Tx, disallow_writes)
+    case DoRestart of
+        false -> ok;
+        true -> ok = erlfdb:set_option(Tx, disallow_writes)
     end,
     Opts = [{limit, Limit} | BaseOpts],
     Callback = fun fold_range_cb/2,
@@ -1158,21 +1189,21 @@ fold_range(Tx, FAcc) ->
             user_acc = FinalUserAcc
         } = erlfdb:fold_range(Tx, Start, End, Callback, FAcc, Opts),
         FinalUserAcc
-    catch error:{erlfdb_error, Error} when
-            ?ERLFDB_IS_RETRYABLE(Error) andalso DoRestart ->
-        % Possibly handle cluster_version_changed and future_version as well to
-        % continue iteration instead fallback to transactional and retrying
-        % from the beginning which is bound to fail when streaming data out to a
-        % socket.
-        fold_range(Tx, restart_fold(Tx, FAcc))
+    catch
+        error:{erlfdb_error, Error} when
+            ?ERLFDB_IS_RETRYABLE(Error) andalso DoRestart
+        ->
+            % Possibly handle cluster_version_changed and future_version as well to
+            % continue iteration instead fallback to transactional and retrying
+            % from the beginning which is bound to fail when streaming data out to a
+            % socket.
+            fold_range(Tx, restart_fold(Tx, FAcc))
     end.
-
 
 vs_to_seq(VS) when is_tuple(VS) ->
     % 51 is the versionstamp type tag
     <<51:8, SeqBin:12/binary>> = erlfdb_tuple:pack({VS}),
     fabric2_util:to_hex(SeqBin).
-
 
 seq_to_vs(Seq) when is_binary(Seq) ->
     Seq1 = fabric2_util:from_hex(Seq),
@@ -1181,45 +1212,41 @@ seq_to_vs(Seq) when is_binary(Seq) ->
     {VS} = erlfdb_tuple:unpack(Seq2),
     VS.
 
-
 next_vs({versionstamp, VS, Batch, TxId}) ->
-    {V, B, T} = case TxId < 16#FFFF of
-        true ->
-            {VS, Batch, TxId + 1};
-        false ->
-            case Batch < 16#FFFF of
-                true ->
-                    {VS, Batch + 1, 0};
-                false ->
-                    {VS + 1, 0, 0}
-            end
-    end,
+    {V, B, T} =
+        case TxId < 16#FFFF of
+            true ->
+                {VS, Batch, TxId + 1};
+            false ->
+                case Batch < 16#FFFF of
+                    true ->
+                        {VS, Batch + 1, 0};
+                    false ->
+                        {VS + 1, 0, 0}
+                end
+        end,
     {versionstamp, V, B, T};
-
 next_vs({versionstamp, VS, Batch}) ->
-    {V, B} = case Batch < 16#FFFF of
-        true ->
-            {VS, Batch + 1};
-        false ->
-            {VS + 1, 0}
-    end,
+    {V, B} =
+        case Batch < 16#FFFF of
+            true ->
+                {VS, Batch + 1};
+            false ->
+                {VS + 1, 0}
+        end,
     {versionstamp, V, B}.
-
 
 new_versionstamp(Tx) ->
     TxId = erlfdb:get_next_tx_id(Tx),
     {versionstamp, 16#FFFFFFFFFFFFFFFF, 16#FFFF, TxId}.
-
 
 get_approximate_tx_size(#{} = TxDb) ->
     require_transaction(TxDb),
     #{tx := Tx} = TxDb,
     erlfdb:wait(erlfdb:get_approximate_size(Tx)).
 
-
 chunkify_binary(Data) ->
     chunkify_binary(Data, binary_chunk_size()).
-
 
 chunkify_binary(Data, Size) ->
     case Data of
@@ -1231,21 +1258,21 @@ chunkify_binary(Data, Size) ->
             [Data]
     end.
 
-
 debug_cluster() ->
     debug_cluster(<<>>, <<16#FE, 16#FF, 16#FF>>).
 
-
 debug_cluster(Start, End) ->
     transactional(fun(Tx) ->
-        lists:foreach(fun({Key, Val}) ->
-            io:format(standard_error, "~s => ~s~n", [
+        lists:foreach(
+            fun({Key, Val}) ->
+                io:format(standard_error, "~s => ~s~n", [
                     string:pad(erlfdb_util:repr(Key), 60),
                     erlfdb_util:repr(Val)
                 ])
-        end, erlfdb:get_range(Tx, Start, End))
+            end,
+            erlfdb:get_range(Tx, Start, End)
+        )
     end).
-
 
 init_db(Tx, DbName) ->
     Prefix = get_dir(Tx),
@@ -1259,7 +1286,6 @@ init_db(Tx, DbName) ->
         security_fun => undefined,
         db_options => []
     }.
-
 
 load_validate_doc_funs(#{} = Db) ->
     FoldFun = fun
@@ -1277,54 +1303,66 @@ load_validate_doc_funs(#{} = Db) ->
 
     {ok, Infos1} = fabric2_db:fold_docs(Db, FoldFun, [], Options),
 
-    Infos2 = lists:map(fun(Info) ->
-        #{
-            id := DDocId = <<"_design/", _/binary>>
-        } = Info,
-        Info#{
-            rev_info => get_winning_revs_future(Db, DDocId, 1)
-        }
-    end, Infos1),
+    Infos2 = lists:map(
+        fun(Info) ->
+            #{
+                id := DDocId = <<"_design/", _/binary>>
+            } = Info,
+            Info#{
+                rev_info => get_winning_revs_future(Db, DDocId, 1)
+            }
+        end,
+        Infos1
+    ),
 
-    Infos3 = lists:flatmap(fun(Info) ->
-        #{
-            id := DDocId,
-            rev_info := RevInfoFuture
-        } = Info,
-        [RevInfo] = get_revs_wait(Db, RevInfoFuture),
-        #{deleted := Deleted} = RevInfo,
-        if Deleted -> []; true ->
-            [Info#{
+    Infos3 = lists:flatmap(
+        fun(Info) ->
+            #{
+                id := DDocId,
+                rev_info := RevInfoFuture
+            } = Info,
+            [RevInfo] = get_revs_wait(Db, RevInfoFuture),
+            #{deleted := Deleted} = RevInfo,
+            if
+                Deleted ->
+                    [];
+                true ->
+                    [
+                        Info#{
+                            rev_info := RevInfo,
+                            body => get_doc_body_future(Db, DDocId, RevInfo)
+                        }
+                    ]
+            end
+        end,
+        Infos2
+    ),
+
+    VDUs = lists:flatmap(
+        fun(Info) ->
+            #{
+                id := DDocId,
                 rev_info := RevInfo,
-                body => get_doc_body_future(Db, DDocId, RevInfo)
-            }]
-        end
-    end, Infos2),
-
-    VDUs = lists:flatmap(fun(Info) ->
-        #{
-            id := DDocId,
-            rev_info := RevInfo,
-            body := BodyFuture
-        } = Info,
-        #doc{} = Doc = get_doc_body_wait(Db, DDocId, RevInfo, BodyFuture),
-        case couch_doc:get_validate_doc_fun(Doc) of
-            nil -> [];
-            Fun -> [Fun]
-        end
-    end, Infos3),
+                body := BodyFuture
+            } = Info,
+            #doc{} = Doc = get_doc_body_wait(Db, DDocId, RevInfo, BodyFuture),
+            case couch_doc:get_validate_doc_fun(Doc) of
+                nil -> [];
+                Fun -> [Fun]
+            end
+        end,
+        Infos3
+    ),
 
     Db#{
         validate_doc_update_funs := VDUs
     }.
-
 
 bump_metadata_version(Tx) ->
     % The 14 zero bytes is pulled from the PR for adding the
     % metadata version key. Not sure why 14 bytes when version
     % stamps are only 80, but whatever for now.
     erlfdb:set_versionstamped_value(Tx, ?METADATA_VERSION_KEY, <<0:112>>).
-
 
 check_metadata_version(#{} = Db) ->
     #{
@@ -1333,27 +1371,29 @@ check_metadata_version(#{} = Db) ->
     } = Db,
 
     AlreadyChecked = get(?PDICT_CHECKED_MD_IS_CURRENT),
-    if AlreadyChecked == true -> {current, Db}; true ->
-        case erlfdb:wait(erlfdb:get_ss(Tx, ?METADATA_VERSION_KEY)) of
-            Version ->
-                put(?PDICT_CHECKED_MD_IS_CURRENT, true),
-                % We want to set a read conflict on the db version as we'd want
-                % to conflict with any writes to this particular db. However
-                % during db creation db prefix might not exist yet so we don't
-                % add a read-conflict on it then.
-                case maps:get(db_prefix, Db, not_found) of
-                    not_found ->
-                        ok;
-                    <<_/binary>> = DbPrefix ->
-                        DbVerKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
-                        erlfdb:add_read_conflict_key(Tx, DbVerKey)
-                end,
-                {current, Db};
-            NewVersion ->
-                {stale, Db#{md_version := NewVersion}}
-        end
+    if
+        AlreadyChecked == true ->
+            {current, Db};
+        true ->
+            case erlfdb:wait(erlfdb:get_ss(Tx, ?METADATA_VERSION_KEY)) of
+                Version ->
+                    put(?PDICT_CHECKED_MD_IS_CURRENT, true),
+                    % We want to set a read conflict on the db version as we'd want
+                    % to conflict with any writes to this particular db. However
+                    % during db creation db prefix might not exist yet so we don't
+                    % add a read-conflict on it then.
+                    case maps:get(db_prefix, Db, not_found) of
+                        not_found ->
+                            ok;
+                        <<_/binary>> = DbPrefix ->
+                            DbVerKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
+                            erlfdb:add_read_conflict_key(Tx, DbVerKey)
+                    end,
+                    {current, Db};
+                NewVersion ->
+                    {stale, Db#{md_version := NewVersion}}
+            end
     end.
-
 
 bump_db_version(#{} = Db) ->
     #{
@@ -1367,7 +1407,6 @@ bump_db_version(#{} = Db) ->
     ok = bump_metadata_version(Tx),
     {ok, DbVersion}.
 
-
 check_db_version(#{} = Db, CheckDbVersion) ->
     #{
         tx := Tx,
@@ -1376,17 +1415,19 @@ check_db_version(#{} = Db, CheckDbVersion) ->
     } = Db,
 
     AlreadyChecked = get(?PDICT_CHECKED_DB_IS_CURRENT),
-    if not CheckDbVersion orelse AlreadyChecked == true -> current; true ->
-        DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
-        case erlfdb:wait(erlfdb:get(Tx, DbVersionKey)) of
-            DbVersion ->
-                put(?PDICT_CHECKED_DB_IS_CURRENT, true),
-                current;
-            _NewDBVersion ->
-                stale
-        end
+    if
+        not CheckDbVersion orelse AlreadyChecked == true ->
+            current;
+        true ->
+            DbVersionKey = erlfdb_tuple:pack({?DB_VERSION}, DbPrefix),
+            case erlfdb:wait(erlfdb:get(Tx, DbVersionKey)) of
+                DbVersion ->
+                    put(?PDICT_CHECKED_DB_IS_CURRENT, true),
+                    current;
+                _NewDBVersion ->
+                    stale
+            end
     end.
-
 
 soft_delete_db(Db) ->
     #{
@@ -1410,7 +1451,6 @@ soft_delete_db(Db) ->
             {deletion_frequency_exceeded, DbName}
     end.
 
-
 hard_delete_db(Db) ->
     #{
         name := DbName,
@@ -1426,22 +1466,22 @@ hard_delete_db(Db) ->
     bump_metadata_version(Tx),
     ok.
 
-
 write_doc_body(#{} = Db0, #doc{} = Doc) ->
     #{
         tx := Tx
     } = Db = ensure_current(Db0),
 
     Rows = doc_to_fdb(Db, Doc),
-    lists:foreach(fun({Key, Value}) ->
-        ok = erlfdb:set(Tx, Key, aegis:encrypt(Db, Key, Value))
-    end, Rows).
-
+    lists:foreach(
+        fun({Key, Value}) ->
+            ok = erlfdb:set(Tx, Key, aegis:encrypt(Db, Key, Value))
+        end,
+        Rows
+    ).
 
 clear_doc_body(_Db, _DocId, not_found) ->
     % No old body to clear
     ok;
-
 clear_doc_body(#{} = Db, DocId, #{} = RevInfo) ->
     #{
         tx := Tx,
@@ -1456,7 +1496,6 @@ clear_doc_body(#{} = Db, DocId, #{} = RevInfo) ->
     {StartKey, EndKey} = erlfdb_tuple:range(BaseKey, DbPrefix),
     ok = erlfdb:clear_range(Tx, StartKey, EndKey).
 
-
 cleanup_attachments(Db, DocId, NewDoc, ToRemove) ->
     #{
         tx := Tx,
@@ -1470,40 +1509,54 @@ cleanup_attachments(Db, DocId, NewDoc, ToRemove) ->
     AllDocs = [{ok, NewDoc} | DiskDocs],
 
     % Get referenced attachment ids
-    ActiveIdSet = lists:foldl(fun({ok, Doc}, Acc) ->
-        #doc{
-            revs = {Pos, [Rev | _]}
-        } = Doc,
-        case lists:member({Pos, Rev}, RemoveRevs) of
-            true ->
-                Acc;
-            false ->
-                lists:foldl(fun(Att, InnerAcc) ->
-                    {loc, _Db, _DocId, AttId} = couch_att:fetch(data, Att),
-                    sets:add_element(AttId, InnerAcc)
-                end, Acc, Doc#doc.atts)
-        end
-    end, sets:new(), AllDocs),
+    ActiveIdSet = lists:foldl(
+        fun({ok, Doc}, Acc) ->
+            #doc{
+                revs = {Pos, [Rev | _]}
+            } = Doc,
+            case lists:member({Pos, Rev}, RemoveRevs) of
+                true ->
+                    Acc;
+                false ->
+                    lists:foldl(
+                        fun(Att, InnerAcc) ->
+                            {loc, _Db, _DocId, AttId} = couch_att:fetch(data, Att),
+                            sets:add_element(AttId, InnerAcc)
+                        end,
+                        Acc,
+                        Doc#doc.atts
+                    )
+            end
+        end,
+        sets:new(),
+        AllDocs
+    ),
 
     AttPrefix = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId}, DbPrefix),
     Options = [{streaming_mode, want_all}],
     Future = erlfdb:get_range_startswith(Tx, AttPrefix, Options),
 
-    ExistingIdSet = lists:foldl(fun({K, _}, Acc) ->
-        {?DB_ATT_NAMES, DocId, AttId} = erlfdb_tuple:unpack(K, DbPrefix),
-        sets:add_element(AttId, Acc)
-    end, sets:new(), erlfdb:wait(Future)),
+    ExistingIdSet = lists:foldl(
+        fun({K, _}, Acc) ->
+            {?DB_ATT_NAMES, DocId, AttId} = erlfdb_tuple:unpack(K, DbPrefix),
+            sets:add_element(AttId, Acc)
+        end,
+        sets:new(),
+        erlfdb:wait(Future)
+    ),
 
     AttsToRemove = sets:subtract(ExistingIdSet, ActiveIdSet),
 
-    lists:foreach(fun(AttId) ->
-        IdKey = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId, AttId}, DbPrefix),
-        erlfdb:clear(Tx, IdKey),
+    lists:foreach(
+        fun(AttId) ->
+            IdKey = erlfdb_tuple:pack({?DB_ATT_NAMES, DocId, AttId}, DbPrefix),
+            erlfdb:clear(Tx, IdKey),
 
-        ChunkKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId}, DbPrefix),
-        erlfdb:clear_range_startswith(Tx, ChunkKey)
-    end, sets:to_list(AttsToRemove)).
-
+            ChunkKey = erlfdb_tuple:pack({?DB_ATTS, DocId, AttId}, DbPrefix),
+            erlfdb:clear_range_startswith(Tx, ChunkKey)
+        end,
+        sets:to_list(AttsToRemove)
+    ).
 
 revinfo_to_fdb(Tx, DbPrefix, DocId, #{winner := true} = RevId) ->
     #{
@@ -1527,7 +1580,6 @@ revinfo_to_fdb(Tx, DbPrefix, DocId, #{winner := true} = RevId) ->
     KBin = erlfdb_tuple:pack(Key, DbPrefix),
     VBin = erlfdb_tuple:pack_vs(Val),
     {KBin, VBin, VS};
-
 revinfo_to_fdb(_Tx, DbPrefix, DocId, #{} = RevId) ->
     #{
         deleted := Deleted,
@@ -1541,7 +1593,6 @@ revinfo_to_fdb(_Tx, DbPrefix, DocId, #{} = RevId) ->
     KBin = erlfdb_tuple:pack(Key, DbPrefix),
     VBin = erlfdb_tuple:pack(Val),
     {KBin, VBin, undefined}.
-
 
 fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _, _, _} = Val) ->
     {?DB_REVS, _DocId, NotDeleted, RevPos, Rev} = Key,
@@ -1557,8 +1608,7 @@ fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _, _, _} = Val) ->
         att_hash => AttHash,
         rev_size => RevSize
     };
-
-fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _} = Val)  ->
+fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _} = Val) ->
     {?DB_REVS, _DocId, NotDeleted, RevPos, Rev} = Key,
     {_RevFormat, RevPath, AttHash, RevSize} = Val,
     #{
@@ -1572,25 +1622,20 @@ fdb_to_revinfo(Key, {?CURR_REV_FORMAT, _, _, _} = Val)  ->
         att_hash => AttHash,
         rev_size => RevSize
     };
-
 fdb_to_revinfo(Key, {0, Seq, BCount, RPath}) ->
     Val = {1, Seq, BCount, RPath, <<>>},
     fdb_to_revinfo(Key, Val);
-
 fdb_to_revinfo(Key, {0, RPath}) ->
     Val = {1, RPath, <<>>},
     fdb_to_revinfo(Key, Val);
-
 fdb_to_revinfo(Key, {1, Seq, BCount, RPath, AttHash}) ->
     % Don't forget to change ?CURR_REV_FORMAT to 2 here when it increments
     Val = {?CURR_REV_FORMAT, Seq, BCount, RPath, AttHash, 0},
     fdb_to_revinfo(Key, Val);
-
 fdb_to_revinfo(Key, {1, RPath, AttHash}) ->
     % Don't forget to change ?CURR_REV_FORMAT to 2 here when it increments
     Val = {?CURR_REV_FORMAT, RPath, AttHash, 0},
     fdb_to_revinfo(Key, Val).
-
 
 doc_to_fdb(Db, #doc{} = Doc) ->
     #{
@@ -1611,23 +1656,28 @@ doc_to_fdb(Db, #doc{} = Doc) ->
     Value = term_to_binary({Body, DiskAtts, Deleted}, Opts),
     Chunks = chunkify_binary(Value),
 
-    {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
-        Key = erlfdb_tuple:pack({?DB_DOCS, Id, Start, Rev, ChunkId}, DbPrefix),
-        {{Key, Chunk}, ChunkId + 1}
-    end, 0, Chunks),
+    {Rows, _} = lists:mapfoldl(
+        fun(Chunk, ChunkId) ->
+            Key = erlfdb_tuple:pack({?DB_DOCS, Id, Start, Rev, ChunkId}, DbPrefix),
+            {{Key, Chunk}, ChunkId + 1}
+        end,
+        0,
+        Chunks
+    ),
 
     Rows.
 
-
 fdb_to_doc(_Db, _DocId, _Pos, _Path, []) ->
     {not_found, missing};
-
 fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
     Bin = iolist_to_binary(BinRows),
     {Body, DiskAtts, Deleted} = binary_to_term(Bin, [safe]),
-    Atts = lists:map(fun(Att) ->
-        couch_att:from_disk_term(Db, DocId, Att)
-    end, DiskAtts),
+    Atts = lists:map(
+        fun(Att) ->
+            couch_att:from_disk_term(Db, DocId, Att)
+        end,
+        DiskAtts
+    ),
     Doc0 = #doc{
         id = DocId,
         revs = {Pos, Path},
@@ -1640,7 +1690,6 @@ fdb_to_doc(Db, DocId, Pos, Path, BinRows) when is_list(BinRows) ->
         #{after_doc_read := undefined} -> Doc0;
         #{after_doc_read := ADR} -> ADR(Doc0, Db)
     end.
-
 
 local_doc_to_fdb(Db, #doc{} = Doc) ->
     #{
@@ -1655,16 +1704,21 @@ local_doc_to_fdb(Db, #doc{} = Doc) ->
 
     Key = erlfdb_tuple:pack({?DB_LOCAL_DOCS, Id}, DbPrefix),
 
-    StoreRev = case Rev of
-        _ when is_integer(Rev) -> integer_to_binary(Rev);
-        _ when is_binary(Rev) -> Rev
-    end,
+    StoreRev =
+        case Rev of
+            _ when is_integer(Rev) -> integer_to_binary(Rev);
+            _ when is_binary(Rev) -> Rev
+        end,
 
     BVal = term_to_binary(Body, [{minor_version, 1}, {compressed, 6}]),
-    {Rows, _} = lists:mapfoldl(fun(Chunk, ChunkId) ->
-        K = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, Id, ChunkId}, DbPrefix),
-        {{K, Chunk}, ChunkId + 1}
-    end, 0, chunkify_binary(BVal)),
+    {Rows, _} = lists:mapfoldl(
+        fun(Chunk, ChunkId) ->
+            K = erlfdb_tuple:pack({?DB_LOCAL_DOC_BODIES, Id, ChunkId}, DbPrefix),
+            {{K, Chunk}, ChunkId + 1}
+        end,
+        0,
+        chunkify_binary(BVal)
+    ),
 
     NewSize = fabric2_util:ldoc_size(Doc),
     RawValue = erlfdb_tuple:pack({?CURR_LDOC_FORMAT, StoreRev, NewSize}),
@@ -1674,10 +1728,8 @@ local_doc_to_fdb(Db, #doc{} = Doc) ->
 
     {Key, Value, NewSize, Rows}.
 
-
 fdb_to_local_doc(_Db, _DocId, not_found, []) ->
     {not_found, missing};
-
 fdb_to_local_doc(_Db, DocId, <<131, _/binary>> = Val, []) ->
     % This is an upgrade clause for the old encoding. We allow reading the old
     % value and will perform an upgrade of the storage format on an update.
@@ -1688,11 +1740,11 @@ fdb_to_local_doc(_Db, DocId, <<131, _/binary>> = Val, []) ->
         deleted = false,
         body = Body
     };
-
 fdb_to_local_doc(_Db, DocId, <<255, RevBin/binary>>, Rows) when is_list(Rows) ->
-    Rev = case erlfdb_tuple:unpack(RevBin) of
-        {?CURR_LDOC_FORMAT, Rev0, _Size} -> Rev0
-    end,
+    Rev =
+        case erlfdb_tuple:unpack(RevBin) of
+            {?CURR_LDOC_FORMAT, Rev0, _Size} -> Rev0
+        end,
 
     BodyBin = iolist_to_binary(Rows),
     Body = binary_to_term(BodyBin, [safe]),
@@ -1703,43 +1755,48 @@ fdb_to_local_doc(_Db, DocId, <<255, RevBin/binary>>, Rows) when is_list(Rows) ->
         deleted = false,
         body = Body
     };
-
 fdb_to_local_doc(Db, DocId, RawRev, Rows) ->
     BaseRev = erlfdb_tuple:pack({?CURR_LDOC_FORMAT, RawRev, 0}),
     Rev = <<255, BaseRev/binary>>,
     fdb_to_local_doc(Db, DocId, Rev, Rows).
 
-
 sum_add_rev_sizes(RevInfos) ->
-    lists:foldl(fun(RI, Acc) ->
-        #{
-            exists := Exists,
-            rev_size := Size
-        } = RI,
-        case Exists of
-            true -> Acc;
-            false -> Size + Acc
-        end
-    end, 0, RevInfos).
-
+    lists:foldl(
+        fun(RI, Acc) ->
+            #{
+                exists := Exists,
+                rev_size := Size
+            } = RI,
+            case Exists of
+                true -> Acc;
+                false -> Size + Acc
+            end
+        end,
+        0,
+        RevInfos
+    ).
 
 sum_rem_rev_sizes(RevInfos) ->
-    lists:foldl(fun(RI, Acc) ->
-        #{
-            exists := true,
-            rev_size := Size
-        } = RI,
-        Size + Acc
-    end, 0, RevInfos).
+    lists:foldl(
+        fun(RI, Acc) ->
+            #{
+                exists := true,
+                rev_size := Size
+            } = RI,
+            Size + Acc
+        end,
+        0,
+        RevInfos
+    ).
 
-
-get_fold_acc(Db, RangePrefix, UserCallback, UserAcc, Options)
-        when is_map(Db) orelse Db =:= undefined ->
-
-    Reverse = case fabric2_util:get_value(dir, Options) of
-        rev -> true;
-        _ -> false
-    end,
+get_fold_acc(Db, RangePrefix, UserCallback, UserAcc, Options) when
+    is_map(Db) orelse Db =:= undefined
+->
+    Reverse =
+        case fabric2_util:get_value(dir, Options) of
+            rev -> true;
+            _ -> false
+        end,
 
     StartKey0 = fabric2_util:get_value(start_key, Options),
     EndKeyGt = fabric2_util:get_value(end_key_gt, Options),
@@ -1750,35 +1807,38 @@ get_fold_acc(Db, RangePrefix, UserCallback, UserAcc, Options)
     % CouchDB swaps the key meanings based on the direction
     % of the fold. FoundationDB does not so we have to
     % swap back here.
-    {StartKey1, EndKey1} = case Reverse of
-        false -> {StartKey0, EndKey0};
-        true -> {EndKey0, StartKey0}
-    end,
+    {StartKey1, EndKey1} =
+        case Reverse of
+            false -> {StartKey0, EndKey0};
+            true -> {EndKey0, StartKey0}
+        end,
 
     % Set the maximum bounds for the start and endkey
-    StartKey2 = case StartKey1 of
-        undefined ->
-            <<RangePrefix/binary, 16#00>>;
-        SK2 when not WrapKeys ->
-            erlfdb_tuple:pack(SK2, RangePrefix);
-        SK2 ->
-            erlfdb_tuple:pack({SK2}, RangePrefix)
-    end,
+    StartKey2 =
+        case StartKey1 of
+            undefined ->
+                <<RangePrefix/binary, 16#00>>;
+            SK2 when not WrapKeys ->
+                erlfdb_tuple:pack(SK2, RangePrefix);
+            SK2 ->
+                erlfdb_tuple:pack({SK2}, RangePrefix)
+        end,
 
-    EndKey2 = case EndKey1 of
-        undefined ->
-            <<RangePrefix/binary, 16#FF>>;
-        EK2 when Reverse andalso not WrapKeys ->
-            PackedEK = erlfdb_tuple:pack(EK2, RangePrefix),
-            <<PackedEK/binary, 16#FF>>;
-        EK2 when Reverse ->
-            PackedEK = erlfdb_tuple:pack({EK2}, RangePrefix),
-            <<PackedEK/binary, 16#FF>>;
-        EK2 when not WrapKeys ->
-            erlfdb_tuple:pack(EK2, RangePrefix);
-        EK2 ->
-            erlfdb_tuple:pack({EK2}, RangePrefix)
-    end,
+    EndKey2 =
+        case EndKey1 of
+            undefined ->
+                <<RangePrefix/binary, 16#FF>>;
+            EK2 when Reverse andalso not WrapKeys ->
+                PackedEK = erlfdb_tuple:pack(EK2, RangePrefix),
+                <<PackedEK/binary, 16#FF>>;
+            EK2 when Reverse ->
+                PackedEK = erlfdb_tuple:pack({EK2}, RangePrefix),
+                <<PackedEK/binary, 16#FF>>;
+            EK2 when not WrapKeys ->
+                erlfdb_tuple:pack(EK2, RangePrefix);
+            EK2 ->
+                erlfdb_tuple:pack({EK2}, RangePrefix)
+        end,
 
     % FoundationDB ranges are applied as SK <= key < EK
     % By default, CouchDB is SK <= key <= EK with the
@@ -1789,51 +1849,59 @@ get_fold_acc(Db, RangePrefix, UserCallback, UserAcc, Options)
     % Thus we have this wonderful bit of logic to account
     % for all of those combinations.
 
-    StartKey3 = case {Reverse, InclusiveEnd} of
-        {true, false} ->
-            erlfdb_key:first_greater_than(StartKey2);
-        _ ->
-            StartKey2
-    end,
+    StartKey3 =
+        case {Reverse, InclusiveEnd} of
+            {true, false} ->
+                erlfdb_key:first_greater_than(StartKey2);
+            _ ->
+                StartKey2
+        end,
 
-    EndKey3 = case {Reverse, InclusiveEnd} of
-        {false, true} when EndKey0 /= undefined ->
-            erlfdb_key:first_greater_than(EndKey2);
-        {true, _} ->
-            erlfdb_key:first_greater_than(EndKey2);
-        _ ->
-            EndKey2
-    end,
+    EndKey3 =
+        case {Reverse, InclusiveEnd} of
+            {false, true} when EndKey0 /= undefined ->
+                erlfdb_key:first_greater_than(EndKey2);
+            {true, _} ->
+                erlfdb_key:first_greater_than(EndKey2);
+            _ ->
+                EndKey2
+        end,
 
-    Skip = case fabric2_util:get_value(skip, Options) of
-        S when is_integer(S), S >= 0 -> S;
-        _ -> 0
-    end,
+    Skip =
+        case fabric2_util:get_value(skip, Options) of
+            S when is_integer(S), S >= 0 -> S;
+            _ -> 0
+        end,
 
-    Limit = case fabric2_util:get_value(limit, Options) of
-        L when is_integer(L), L >= 0 -> L + Skip;
-        undefined -> 0
-    end,
+    Limit =
+        case fabric2_util:get_value(limit, Options) of
+            L when is_integer(L), L >= 0 -> L + Skip;
+            undefined -> 0
+        end,
 
-    TargetBytes = case fabric2_util:get_value(target_bytes, Options) of
-        T when is_integer(T), T >= 0 -> [{target_bytes, T}];
-        undefined -> []
-    end,
+    TargetBytes =
+        case fabric2_util:get_value(target_bytes, Options) of
+            T when is_integer(T), T >= 0 -> [{target_bytes, T}];
+            undefined -> []
+        end,
 
-    StreamingMode = case fabric2_util:get_value(streaming_mode, Options) of
-        undefined -> [];
-        Name when is_atom(Name) -> [{streaming_mode, Name}]
-    end,
+    StreamingMode =
+        case fabric2_util:get_value(streaming_mode, Options) of
+            undefined -> [];
+            Name when is_atom(Name) -> [{streaming_mode, Name}]
+        end,
 
-    Snapshot = case fabric2_util:get_value(snapshot, Options) of
-        undefined -> [];
-        B when is_boolean(B) -> [{snapshot, B}]
-    end,
+    Snapshot =
+        case fabric2_util:get_value(snapshot, Options) of
+            undefined -> [];
+            B when is_boolean(B) -> [{snapshot, B}]
+        end,
 
-    BaseOpts = [{reverse, Reverse}]
-            ++ TargetBytes
-            ++ StreamingMode
-            ++ Snapshot,
+    BaseOpts =
+        [{reverse, Reverse}] ++
+            TargetBytes ++
+            StreamingMode ++
+            Snapshot,
 
     RestartTx = fabric2_util:get_value(restart_tx, Options, false),
 
@@ -1850,7 +1918,6 @@ get_fold_acc(Db, RangePrefix, UserCallback, UserAcc, Options)
         user_acc = UserAcc
     }.
 
-
 fold_range_cb({K, V}, #fold_acc{} = Acc) ->
     #fold_acc{
         skip = Skip,
@@ -1859,20 +1926,21 @@ fold_range_cb({K, V}, #fold_acc{} = Acc) ->
         user_acc = UserAcc,
         base_opts = Opts
     } = Acc,
-    Acc1 = case Skip =:= 0 of
-        true ->
-            UserAcc1 = UserFun({K, V}, UserAcc),
-            Acc#fold_acc{limit = max(0, Limit - 1), user_acc = UserAcc1};
-        false ->
-            Acc#fold_acc{skip = Skip - 1, limit = Limit - 1}
-    end,
-    Acc2 = case fabric2_util:get_value(reverse, Opts, false) of
-        true -> Acc1#fold_acc{end_key = erlfdb_key:last_less_or_equal(K)};
-        false -> Acc1#fold_acc{start_key = erlfdb_key:first_greater_than(K)}
-    end,
+    Acc1 =
+        case Skip =:= 0 of
+            true ->
+                UserAcc1 = UserFun({K, V}, UserAcc),
+                Acc#fold_acc{limit = max(0, Limit - 1), user_acc = UserAcc1};
+            false ->
+                Acc#fold_acc{skip = Skip - 1, limit = Limit - 1}
+        end,
+    Acc2 =
+        case fabric2_util:get_value(reverse, Opts, false) of
+            true -> Acc1#fold_acc{end_key = erlfdb_key:last_less_or_equal(K)};
+            false -> Acc1#fold_acc{start_key = erlfdb_key:first_greater_than(K)}
+        end,
     put(?PDICT_FOLD_ACC_STATE, Acc2),
     Acc2.
-
 
 restart_fold(Tx, #fold_acc{} = Acc) ->
     erase(?PDICT_CHECKED_MD_IS_CURRENT),
@@ -1884,14 +1952,15 @@ restart_fold(Tx, #fold_acc{} = Acc) ->
     case {erase(?PDICT_FOLD_ACC_STATE), Acc#fold_acc.retries} of
         {#fold_acc{db = Db} = Acc1, _} ->
             Acc1#fold_acc{db = check_db_instance(Db), retries = 0};
-        {undefined, Retries} when Retries < MaxRetries orelse
-                MaxRetries =:= -1 ->
+        {undefined, Retries} when
+            Retries < MaxRetries orelse
+                MaxRetries =:= -1
+        ->
             Db = check_db_instance(Acc#fold_acc.db),
             Acc#fold_acc{db = Db, retries = Retries + 1};
         {undefined, _} ->
             error(fold_range_not_progressing)
     end.
-
 
 get_db_handle() ->
     case get(?PDICT_DB_KEY) of
@@ -1903,7 +1972,6 @@ get_db_handle() ->
             Db
     end.
 
-
 require_transaction(#{tx := {erlfdb_snapshot, _}} = _Db) ->
     ok;
 require_transaction(#{tx := {erlfdb_transaction, _}} = _Db) ->
@@ -1911,31 +1979,30 @@ require_transaction(#{tx := {erlfdb_transaction, _}} = _Db) ->
 require_transaction(#{} = _Db) ->
     erlang:error(transaction_required).
 
-
 ensure_current(Db) ->
     ensure_current(Db, true).
 
-
 ensure_current(#{} = Db0, CheckDbVersion) ->
     require_transaction(Db0),
-    Db3 = case check_metadata_version(Db0) of
-        {current, Db1} ->
-            Db1;
-        {stale, Db1} ->
-            case check_db_version(Db1, CheckDbVersion) of
-                current ->
-                    % If db version is current, update cache with the latest
-                    % metadata so other requests can immediately see the
-                    % refreshed db handle.
-                    Now = erlang:monotonic_time(millisecond),
-                    Db2 = Db1#{check_current_ts := Now},
-                    fabric2_server:maybe_update(Db2),
-                    Db2;
-                stale ->
-                    fabric2_server:maybe_remove(Db1),
-                    throw({?MODULE, reopen})
-            end
-    end,
+    Db3 =
+        case check_metadata_version(Db0) of
+            {current, Db1} ->
+                Db1;
+            {stale, Db1} ->
+                case check_db_version(Db1, CheckDbVersion) of
+                    current ->
+                        % If db version is current, update cache with the latest
+                        % metadata so other requests can immediately see the
+                        % refreshed db handle.
+                        Now = erlang:monotonic_time(millisecond),
+                        Db2 = Db1#{check_current_ts := Now},
+                        fabric2_server:maybe_update(Db2),
+                        Db2;
+                    stale ->
+                        fabric2_server:maybe_remove(Db1),
+                        throw({?MODULE, reopen})
+                end
+        end,
     case maps:get(security_fun, Db3) of
         SecurityFun when is_function(SecurityFun, 2) ->
             #{security_doc := SecDoc} = Db3,
@@ -1945,10 +2012,8 @@ ensure_current(#{} = Db0, CheckDbVersion) ->
             Db3
     end.
 
-
 check_db_instance(undefined) ->
     undefined;
-
 check_db_instance(#{} = Db) ->
     require_transaction(Db),
     case check_metadata_version(Db) of
@@ -1967,16 +2032,13 @@ check_db_instance(#{} = Db) ->
             end
     end.
 
-
 is_transaction_applied(Tx) ->
-    was_commit_unknown_result()
-        andalso has_transaction_id()
-        andalso transaction_id_exists(Tx).
-
+    was_commit_unknown_result() andalso
+        has_transaction_id() andalso
+        transaction_id_exists(Tx).
 
 get_previous_transaction_result() ->
     get(?PDICT_TX_RES_KEY).
-
 
 execute_transaction(Tx, Fun, LayerPrefix) ->
     put(?PDICT_CHECKED_MD_IS_CURRENT, false),
@@ -1991,7 +2053,6 @@ execute_transaction(Tx, Fun, LayerPrefix) ->
     end,
     Result.
 
-
 clear_transaction() ->
     fabric2_txids:remove(get(?PDICT_TX_ID_KEY)),
     erase(?PDICT_CHECKED_DB_IS_CURRENT),
@@ -1999,7 +2060,6 @@ clear_transaction() ->
     erase(?PDICT_TX_ID_KEY),
     erase(?PDICT_TX_RES_KEY),
     erase(?PDICT_TX_RES_WAS_UNKNOWN).
-
 
 was_commit_unknown_result() ->
     case get(?PDICT_TX_RES_WAS_UNKNOWN) of
@@ -2015,14 +2075,11 @@ was_commit_unknown_result() ->
             end
     end.
 
-
 has_transaction_id() ->
     is_binary(get(?PDICT_TX_ID_KEY)).
 
-
 transaction_id_exists(Tx) ->
     erlfdb:wait(erlfdb:get(Tx, get(?PDICT_TX_ID_KEY))) == <<>>.
-
 
 get_transaction_id(Tx, LayerPrefix) ->
     case get(?PDICT_TX_ID_KEY) of
@@ -2034,24 +2091,25 @@ get_transaction_id(Tx, LayerPrefix) ->
             TxId
     end.
 
-
 with_span(Operation, ExtraTags, Fun) ->
     case ctrace:has_span() of
         true ->
-            Tags = maps:merge(#{
-                'span.kind' => <<"client">>,
-                component => <<"couchdb.fabric">>,
-                'db.instance' => fabric2_server:fdb_cluster(),
-                'db.namespace' => fabric2_server:fdb_directory(),
-                'db.type' => <<"fdb">>,
-                nonce => get(nonce),
-                pid => self()
-            }, ExtraTags),
+            Tags = maps:merge(
+                #{
+                    'span.kind' => <<"client">>,
+                    component => <<"couchdb.fabric">>,
+                    'db.instance' => fabric2_server:fdb_cluster(),
+                    'db.namespace' => fabric2_server:fdb_directory(),
+                    'db.type' => <<"fdb">>,
+                    nonce => get(nonce),
+                    pid => self()
+                },
+                ExtraTags
+            ),
             ctrace:with_span(Operation, Tags, Fun);
         false ->
             Fun()
     end.
-
 
 get_info_wait_int(#info_future{} = InfoFuture) ->
     #info_future{
@@ -2061,40 +2119,46 @@ get_info_wait_int(#info_future{} = InfoFuture) ->
         meta_future = MetaFuture
     } = InfoFuture,
 
-    RawSeq = case erlfdb:wait(ChangesFuture) of
-        [] ->
-            vs_to_seq(fabric2_util:seq_zero_vs());
-        [{SeqKey, _}] ->
-            {?DB_CHANGES, SeqVS} = erlfdb_tuple:unpack(SeqKey, DbPrefix),
-            vs_to_seq(SeqVS)
-    end,
+    RawSeq =
+        case erlfdb:wait(ChangesFuture) of
+            [] ->
+                vs_to_seq(fabric2_util:seq_zero_vs());
+            [{SeqKey, _}] ->
+                {?DB_CHANGES, SeqVS} = erlfdb_tuple:unpack(SeqKey, DbPrefix),
+                vs_to_seq(SeqVS)
+        end,
     CProp = {update_seq, RawSeq},
 
     UUIDProp = {uuid, erlfdb:wait(UUIDFuture)},
 
-    MProps = lists:foldl(fun({K, V}, Acc) ->
-        case erlfdb_tuple:unpack(K, DbPrefix) of
-            {?DB_STATS, <<"doc_count">>} ->
-                [{doc_count, ?bin2uint(V)} | Acc];
-            {?DB_STATS, <<"doc_del_count">>} ->
-                [{doc_del_count, ?bin2uint(V)} | Acc];
-            {?DB_STATS, <<"sizes">>, Name} ->
-                Val = ?bin2uint(V),
-                {_, {Sizes}} = lists:keyfind(sizes, 1, Acc),
-                NewSizes = lists:keystore(Name, 1, Sizes, {Name, Val}),
-                lists:keystore(sizes, 1, Acc, {sizes, {NewSizes}});
-            {?DB_STATS, _} ->
-                Acc
-        end
-    end, [{sizes, {[]}}], erlfdb:wait(MetaFuture)),
+    MProps = lists:foldl(
+        fun({K, V}, Acc) ->
+            case erlfdb_tuple:unpack(K, DbPrefix) of
+                {?DB_STATS, <<"doc_count">>} ->
+                    [{doc_count, ?bin2uint(V)} | Acc];
+                {?DB_STATS, <<"doc_del_count">>} ->
+                    [{doc_del_count, ?bin2uint(V)} | Acc];
+                {?DB_STATS, <<"sizes">>, Name} ->
+                    Val = ?bin2uint(V),
+                    {_, {Sizes}} = lists:keyfind(sizes, 1, Acc),
+                    NewSizes = lists:keystore(Name, 1, Sizes, {Name, Val}),
+                    lists:keystore(sizes, 1, Acc, {sizes, {NewSizes}});
+                {?DB_STATS, _} ->
+                    Acc
+            end
+        end,
+        [{sizes, {[]}}],
+        erlfdb:wait(MetaFuture)
+    ),
 
     [CProp, UUIDProp | MProps].
 
-
 binary_chunk_size() ->
     config:get_integer(
-        "fabric", "binary_chunk_size", ?DEFAULT_BINARY_CHUNK_SIZE).
-
+        "fabric",
+        "binary_chunk_size",
+        ?DEFAULT_BINARY_CHUNK_SIZE
+    ).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -2103,7 +2167,7 @@ fdb_to_revinfo_version_compatibility_test() ->
     DocId = <<"doc_id">>,
     FirstRevFormat = 0,
     RevPos = 1,
-    Rev = <<60,84,174,140,210,120,192,18,100,148,9,181,129,165,248,92>>,
+    Rev = <<60, 84, 174, 140, 210, 120, 192, 18, 100, 148, 9, 181, 129, 165, 248, 92>>,
     RevPath = {},
     NotDeleted = true,
     Sequence = {versionstamp, 10873034897377, 0, 0},
@@ -2112,16 +2176,29 @@ fdb_to_revinfo_version_compatibility_test() ->
     KeyWinner = {?DB_REVS, DocId, NotDeleted, RevPos, Rev},
     ValWinner = {FirstRevFormat, Sequence, BranchCount, RevPath},
     ExpectedWinner = expected(
-        true, BranchCount, NotDeleted, RevPos, Rev, RevPath, Sequence),
+        true,
+        BranchCount,
+        NotDeleted,
+        RevPos,
+        Rev,
+        RevPath,
+        Sequence
+    ),
     ?assertEqual(ExpectedWinner, fdb_to_revinfo(KeyWinner, ValWinner)),
 
     KeyLoser = {?DB_REVS, DocId, NotDeleted, RevPos, Rev},
     ValLoser = {FirstRevFormat, RevPath},
     ExpectedLoser = expected(
-        false, undefined, NotDeleted, RevPos, Rev, RevPath, undefined),
+        false,
+        undefined,
+        NotDeleted,
+        RevPos,
+        Rev,
+        RevPath,
+        undefined
+    ),
     ?assertEqual(ExpectedLoser, fdb_to_revinfo(KeyLoser, ValLoser)),
     ok.
-
 
 expected(Winner, BranchCount, NotDeleted, RevPos, Rev, RevPath, Sequence) ->
     #{
@@ -2135,6 +2212,5 @@ expected(Winner, BranchCount, NotDeleted, RevPos, Rev, RevPath, Sequence) ->
         sequence => Sequence,
         winner => Winner
     }.
-
 
 -endif.

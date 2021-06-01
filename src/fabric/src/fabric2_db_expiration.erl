@@ -12,9 +12,7 @@
 
 -module(fabric2_db_expiration).
 
-
 -behaviour(gen_server).
-
 
 -export([
     start_link/0,
@@ -31,7 +29,6 @@
     code_change/3
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 -include_lib("kernel/include/logger.hrl").
@@ -39,38 +36,33 @@
 -define(JOB_TYPE, <<"db_expiration">>).
 -define(JOB_ID, <<"db_expiration_job">>).
 -define(DEFAULT_JOB_Version, 1).
--define(DEFAULT_RETENTION_SEC, 172800). % 48 hours
--define(DEFAULT_SCHEDULE_SEC, 3600). % 1 hour
+% 48 hours
+-define(DEFAULT_RETENTION_SEC, 172800).
+% 1 hour
+-define(DEFAULT_SCHEDULE_SEC, 3600).
 -define(ERROR_RESCHEDULE_SEC, 5).
 -define(CHECK_ENABLED_SEC, 2).
 -define(JOB_TIMEOUT_SEC, 30).
-
 
 -record(st, {
     job
 }).
 
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
 
 init(_) ->
     process_flag(trap_exit, true),
     {ok, #st{job = undefined}, 0}.
 
-
 terminate(_M, _St) ->
     ok.
-
 
 handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
 
-
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
-
 
 handle_info(timeout, #st{job = undefined} = St) ->
     ok = wait_for_couch_jobs_app(),
@@ -78,24 +70,21 @@ handle_info(timeout, #st{job = undefined} = St) ->
     ok = maybe_add_job(),
     Pid = spawn_link(?MODULE, cleanup, [is_enabled()]),
     {noreply, St#st{job = Pid}};
-
 handle_info({'EXIT', Pid, Exit}, #st{job = Pid} = St) ->
     case Exit of
-        normal -> ok;
+        normal ->
+            ok;
         Error ->
             ?LOG_ERROR(#{what => job_error, details => Error}),
             couch_log:error("~p : job error ~p", [?MODULE, Error])
     end,
     NewPid = spawn_link(?MODULE, cleanup, [is_enabled()]),
     {noreply, St#st{job = NewPid}};
-
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
-
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
-
 
 wait_for_couch_jobs_app() ->
     % Because of a circular dependency between couch_jobs and fabric apps, wait
@@ -109,7 +98,6 @@ wait_for_couch_jobs_app() ->
             wait_for_couch_jobs_app()
     end.
 
-
 maybe_add_job() ->
     case couch_jobs:get_job_data(undefined, ?JOB_TYPE, job_id()) of
         {error, not_found} ->
@@ -119,11 +107,9 @@ maybe_add_job() ->
             ok
     end.
 
-
 cleanup(false) ->
     timer:sleep(?CHECK_ENABLED_SEC * 1000),
     exit(normal);
-
 cleanup(true) ->
     Now = erlang:system_time(second),
     ScheduleSec = schedule_sec(),
@@ -140,8 +126,10 @@ cleanup(true) ->
                         job => Job,
                         details => Error
                     }),
-                    couch_log:error("~p : processing error ~p ~p ~p",
-                        [?MODULE, Job, Error, Stack]),
+                    couch_log:error(
+                        "~p : processing error ~p ~p ~p",
+                        [?MODULE, Job, Error, Stack]
+                    ),
                     ok = resubmit_job(Job, Data, ?ERROR_RESCHEDULE_SEC),
                     exit({job_error, Error, Stack})
             end;
@@ -150,16 +138,14 @@ cleanup(true) ->
             ?MODULE:cleanup(is_enabled())
     end.
 
-
 resubmit_job(Job, Data, After) ->
     Now = erlang:system_time(second),
     SchedTime = Now + After,
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(JTx) ->
-         {ok, Job1} = couch_jobs:resubmit(JTx, Job, SchedTime),
-         ok = couch_jobs:finish(JTx, Job1, Data)
+        {ok, Job1} = couch_jobs:resubmit(JTx, Job, SchedTime),
+        ok = couch_jobs:finish(JTx, Job1, Data)
     end),
     ok.
-
 
 process_expirations(#{} = Job, #{} = Data) ->
     Start = now_sec(),
@@ -178,34 +164,34 @@ process_expirations(#{} = Job, #{} = Data) ->
     ),
     {ok, Job, Data}.
 
-
 process_row(DbInfo) ->
     DbName = proplists:get_value(db_name, DbInfo),
     TimeStamp = proplists:get_value(timestamp, DbInfo),
     Now = now_sec(),
     Retention = retention_sec(),
     Since = Now - Retention,
-    case Since >= timestamp_to_sec(TimeStamp)  of
+    case Since >= timestamp_to_sec(TimeStamp) of
         true ->
             ?LOG_NOTICE(#{
                 what => expire_db,
                 db => DbName,
                 deleted_at => TimeStamp
             }),
-            couch_log:notice("Permanently deleting ~s database with"
-                " timestamp ~s", [DbName, TimeStamp]),
+            couch_log:notice(
+                "Permanently deleting ~s database with"
+                " timestamp ~s",
+                [DbName, TimeStamp]
+            ),
             ok = fabric2_db:delete(DbName, [{deleted_at, TimeStamp}]);
         false ->
             ok
     end.
-
 
 maybe_report_progress(Job, LastUpdateAt) ->
     % Update periodically the job so it doesn't expire
     Now = now_sec(),
     Progress = #{
         <<"processed_at">> => Now
-
     },
     case (Now - LastUpdateAt) > (?JOB_TIMEOUT_SEC div 2) of
         true ->
@@ -215,44 +201,47 @@ maybe_report_progress(Job, LastUpdateAt) ->
             LastUpdateAt
     end.
 
-
 job_id() ->
     JobVersion = job_version(),
     <<?JOB_ID/binary, "-", JobVersion:16/integer>>.
-
 
 now_sec() ->
     Now = os:timestamp(),
     Nowish = calendar:now_to_universal_time(Now),
     calendar:datetime_to_gregorian_seconds(Nowish).
 
-
 timestamp_to_sec(TimeStamp) ->
-    <<Year:4/binary, "-", Month:2/binary, "-", Day:2/binary,
-        "T",
-        Hour:2/binary, ":", Minutes:2/binary, ":", Second:2/binary,
-        "Z">> = TimeStamp,
+    <<Year:4/binary, "-", Month:2/binary, "-", Day:2/binary, "T", Hour:2/binary, ":",
+        Minutes:2/binary, ":", Second:2/binary, "Z">> = TimeStamp,
 
     calendar:datetime_to_gregorian_seconds(
-        {{?bin2int(Year), ?bin2int(Month), ?bin2int(Day)},
-            {?bin2int(Hour), ?bin2int(Minutes), ?bin2int(Second)}}
+        {{?bin2int(Year), ?bin2int(Month), ?bin2int(Day)}, {
+            ?bin2int(Hour),
+            ?bin2int(Minutes),
+            ?bin2int(Second)
+        }}
     ).
-
 
 is_enabled() ->
     config:get_boolean("couchdb", "db_expiration_enabled", false).
 
-
 job_version() ->
-    config:get_integer("couchdb", "db_expiration_job_version",
-        ?DEFAULT_JOB_Version).
-
+    config:get_integer(
+        "couchdb",
+        "db_expiration_job_version",
+        ?DEFAULT_JOB_Version
+    ).
 
 retention_sec() ->
-    config:get_integer("couchdb", "db_expiration_retention_sec",
-        ?DEFAULT_RETENTION_SEC).
-
+    config:get_integer(
+        "couchdb",
+        "db_expiration_retention_sec",
+        ?DEFAULT_RETENTION_SEC
+    ).
 
 schedule_sec() ->
-    config:get_integer("couchdb", "db_expiration_schedule_sec",
-        ?DEFAULT_SCHEDULE_SEC).
+    config:get_integer(
+        "couchdb",
+        "db_expiration_schedule_sec",
+        ?DEFAULT_SCHEDULE_SEC
+    ).
