@@ -14,13 +14,11 @@
 -behaviour(gen_server).
 -vsn(1).
 
-
 -export([
     start_link/0,
     create/2,
     remove/1
 ]).
-
 
 -export([
     init/1,
@@ -32,35 +30,26 @@
     format_status/2
 ]).
 
-
 -include("fabric2.hrl").
-
 
 -define(ONE_HOUR, 3600000000).
 -define(MAX_TX_IDS, 1000).
 
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
 
 create(Tx, undefined) ->
     Prefix = fabric2_fdb:get_dir(Tx),
     create(Tx, Prefix);
-
 create(_Tx, LayerPrefix) ->
     {Mega, Secs, Micro} = os:timestamp(),
     Key = {?TX_IDS, Mega, Secs, Micro, fabric2_util:uuid()},
     erlfdb_tuple:pack(Key, LayerPrefix).
 
-
 remove(TxId) when is_binary(TxId) ->
     gen_server:cast(?MODULE, {remove, TxId});
-
 remove(undefined) ->
     ok.
-
-
 
 init(_) ->
     {ok, #{
@@ -68,21 +57,24 @@ init(_) ->
         txids => []
     }}.
 
-
 terminate(_, #{txids := TxIds}) ->
-    if TxIds == [] -> ok; true ->
-        fabric2_fdb:transactional(fun(Tx) ->
-            lists:foreach(fun(TxId) ->
-                erlfdb:clear(Tx, TxId)
-            end, TxIds)
-        end)
+    if
+        TxIds == [] ->
+            ok;
+        true ->
+            fabric2_fdb:transactional(fun(Tx) ->
+                lists:foreach(
+                    fun(TxId) ->
+                        erlfdb:clear(Tx, TxId)
+                    end,
+                    TxIds
+                )
+            end)
     end,
     ok.
 
-
 handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
-
 
 handle_cast({remove, TxId}, St) ->
     #{
@@ -102,14 +94,11 @@ handle_cast({remove, TxId}, St) ->
             {noreply, NewSt}
     end.
 
-
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
-
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
-
 
 format_status(_Opt, [_PDict, State]) ->
     #{
@@ -118,10 +107,7 @@ format_status(_Opt, [_PDict, State]) ->
     Scrubbed = State#{
         txids => {length, length(TxIds)}
     },
-    [{data, [{"State",
-        Scrubbed
-    }]}].
-
+    [{data, [{"State", Scrubbed}]}].
 
 clean(St, NeedsSweep) ->
     #{
@@ -129,9 +115,12 @@ clean(St, NeedsSweep) ->
         txids := TxIds
     } = St,
     fabric2_fdb:transactional(fun(Tx) ->
-        lists:foreach(fun(TxId) ->
-            erlfdb:clear(Tx, TxId)
-        end, TxIds),
+        lists:foreach(
+            fun(TxId) ->
+                erlfdb:clear(Tx, TxId)
+            end,
+            TxIds
+        ),
         case NeedsSweep of
             true ->
                 sweep(Tx, LastSweep),
@@ -143,7 +132,6 @@ clean(St, NeedsSweep) ->
                 St#{txids := []}
         end
     end).
-
 
 sweep(Tx, {Mega, Secs, Micro}) ->
     Prefix = fabric2_fdb:get_dir(Tx),

@@ -13,16 +13,13 @@
 -module(fabric2_app).
 -behaviour(application).
 
-
 -export([
     start/2,
     stop/1
 ]).
 
-
 start(_Type, StartArgs) ->
     fabric2_sup:start_link(StartArgs).
-
 
 stop(_State) ->
     case application:get_env(erlfdb, test_cluster_pid) of

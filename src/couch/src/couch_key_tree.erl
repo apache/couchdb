@@ -48,41 +48,43 @@
 -module(couch_key_tree).
 
 -export([
-count_leafs/1,
-find_missing/2,
-fold/3,
-get/2,
-get_all_leafs/1,
-get_all_leafs_full/1,
-get_full_key_paths/2,
-get_key_leafs/2,
-map/2,
-map_leafs/2,
-mapfold/3,
-multi_merge/2,
-merge/2,
-remove_leafs/2,
-stem/2
+    count_leafs/1,
+    find_missing/2,
+    fold/3,
+    get/2,
+    get_all_leafs/1,
+    get_all_leafs_full/1,
+    get_full_key_paths/2,
+    get_key_leafs/2,
+    map/2,
+    map_leafs/2,
+    mapfold/3,
+    multi_merge/2,
+    merge/2,
+    remove_leafs/2,
+    stem/2
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
--type treenode() :: {Key::term(), Value::term(), [Node::treenode()]}.
--type tree() :: {Depth::pos_integer(), [treenode()]}.
+-type treenode() :: {Key :: term(), Value :: term(), [Node :: treenode()]}.
+-type tree() :: {Depth :: pos_integer(), [treenode()]}.
 -type revtree() :: [tree()].
-
 
 %% @doc Merge multiple paths into the given tree.
 -spec multi_merge(revtree(), tree()) -> revtree().
 multi_merge(RevTree, Trees) ->
-    lists:foldl(fun(Tree, RevTreeAcc) ->
-        {NewRevTree, _} = merge(RevTreeAcc, Tree),
-        NewRevTree
-    end, RevTree, lists:sort(Trees)).
-
+    lists:foldl(
+        fun(Tree, RevTreeAcc) ->
+            {NewRevTree, _} = merge(RevTreeAcc, Tree),
+            NewRevTree
+        end,
+        RevTree,
+        lists:sort(Trees)
+    ).
 
 %% @doc Merge a path into a tree.
 -spec merge(revtree(), tree() | path()) ->
-                {revtree(), new_leaf | new_branch | internal_node}.
+    {revtree(), new_leaf | new_branch | internal_node}.
 merge(RevTree, Tree) ->
     {Merged, Result} = merge_tree(RevTree, Tree, []),
     {lists:sort(Merged), Result}.
@@ -92,12 +94,12 @@ merge(RevTree, Tree) ->
 %% If it can't find a branch that the new tree merges into, add it as a
 %% new branch in the RevTree.
 -spec merge_tree(revtree(), tree() | path(), revtree()) ->
-                {revtree(), new_leaf | new_branch | internal_node}.
+    {revtree(), new_leaf | new_branch | internal_node}.
 merge_tree([], Tree, []) ->
     {[Tree], new_leaf};
 merge_tree([], Tree, MergeAcc) ->
-    {[Tree|MergeAcc], new_branch};
-merge_tree([{Depth, Nodes} | Rest], {IDepth, INodes}=Tree, MergeAcc) ->
+    {[Tree | MergeAcc], new_branch};
+merge_tree([{Depth, Nodes} | Rest], {IDepth, INodes} = Tree, MergeAcc) ->
     % For the intrepid observer following along at home, notice what we're
     % doing here with (Depth - IDepth). This tells us which of the two
     % branches (Nodes or INodes) we need to seek into. If Depth > IDepth
@@ -125,7 +127,7 @@ merge_tree([{Depth, Nodes} | Rest], {IDepth, INodes}=Tree, MergeAcc) ->
 %% ends up running out of nodes we know that these two branches can
 %% not be merged.
 -spec merge_at([node()], integer(), [node()]) ->
-                {revtree(), new_leaf | new_branch | internal_node} | fail.
+    {revtree(), new_leaf | new_branch | internal_node} | fail.
 merge_at(_Nodes, _Pos, []) ->
     fail;
 merge_at([], _Pos, _INodes) ->
@@ -172,7 +174,7 @@ merge_at([Tree | Sibs], 0, INodes) ->
     end.
 
 -spec merge_extend(revtree(), revtree()) ->
-                {revtree(), new_leaf | new_branch | internal_node}.
+    {revtree(), new_leaf | new_branch | internal_node}.
 merge_extend([], B) when B =/= [] ->
     % Most likely the insert branch simply extends this one, so the new
     % branch is exactly B. Its also possible that B is a branch because
@@ -189,7 +191,7 @@ merge_extend([{K, V1, SubA} | NextA], [{K, V2, SubB}]) ->
     % level in the two branches.
     {Merged, Result} = merge_extend(SubA, SubB),
     {[{K, value_pref(V1, V2), Merged} | NextA], Result};
-merge_extend([{K1, _, _}=NodeA | Rest], [{K2, _, _}=NodeB]) when K1 > K2 ->
+merge_extend([{K1, _, _} = NodeA | Rest], [{K2, _, _} = NodeB]) when K1 > K2 ->
     % Keys are ordered so we know this is where the insert branch needs
     % to be inserted into the tree. We also know that this creates a new
     % branch so we have a new leaf to report.
@@ -200,10 +202,11 @@ merge_extend([Tree | RestA], NextB) ->
     % key in NextB might be larger than the largest key in RestA which
     % means we've created a new branch.
     {Merged, Result0} = merge_extend(RestA, NextB),
-    Result = case length(Merged) == length(RestA) of
-        true -> Result0;
-        false -> new_branch
-    end,
+    Result =
+        case length(Merged) == length(RestA) of
+            true -> Result0;
+            false -> new_branch
+        end,
     {[Tree | Merged], Result}.
 
 find_missing(_Tree, []) ->
@@ -228,17 +231,17 @@ find_missing_simple(Pos, [{Key, _, SubTree} | RestTree], SeachKeys) ->
     SrcKeys3 = find_missing_simple(Pos + 1, SubTree, SrcKeys2),
     ImpossibleKeys ++ find_missing_simple(Pos, RestTree, SrcKeys3).
 
-
 filter_leafs([], _Keys, FilteredAcc, RemovedKeysAcc) ->
     {FilteredAcc, RemovedKeysAcc};
-filter_leafs([{Pos, [{LeafKey, _}|_]} = Path |Rest], Keys, FilteredAcc, RemovedKeysAcc) ->
+filter_leafs([{Pos, [{LeafKey, _} | _]} = Path | Rest], Keys, FilteredAcc, RemovedKeysAcc) ->
     FilteredKeys = lists:delete({Pos, LeafKey}, Keys),
-    if FilteredKeys == Keys ->
-        % this leaf is not a key we are looking to remove
-        filter_leafs(Rest, Keys, [Path | FilteredAcc], RemovedKeysAcc);
-    true ->
-        % this did match a key, remove both the node and the input key
-        filter_leafs(Rest, FilteredKeys, FilteredAcc, [{Pos, LeafKey} | RemovedKeysAcc])
+    if
+        FilteredKeys == Keys ->
+            % this leaf is not a key we are looking to remove
+            filter_leafs(Rest, Keys, [Path | FilteredAcc], RemovedKeysAcc);
+        true ->
+            % this did match a key, remove both the node and the input key
+            filter_leafs(Rest, FilteredKeys, FilteredAcc, [{Pos, LeafKey} | RemovedKeysAcc])
     end.
 
 % Removes any branches from the tree whose leaf node(s) are in the Keys
@@ -255,14 +258,19 @@ remove_leafs(Trees, Keys) ->
 
     % convert paths back to trees
     NewTree = lists:foldl(
-        fun({StartPos, Path},TreeAcc) ->
+        fun({StartPos, Path}, TreeAcc) ->
             [SingleTree] = lists:foldl(
-                fun({K,V},NewTreeAcc) -> [{K,V,NewTreeAcc}] end, [], Path),
+                fun({K, V}, NewTreeAcc) -> [{K, V, NewTreeAcc}] end,
+                [],
+                Path
+            ),
             {NewTrees, _} = merge(TreeAcc, {StartPos, SingleTree}),
             NewTrees
-        end, [], SortedPaths),
+        end,
+        [],
+        SortedPaths
+    ),
     {NewTree, RemovedKeys}.
-
 
 % get the leafs in the tree matching the keys. The matching key nodes can be
 % leafs or an inner nodes. If an inner node, then the leafs for that node
@@ -274,7 +282,7 @@ get_key_leafs(_, [], Acc) ->
     {Acc, []};
 get_key_leafs([], Keys, Acc) ->
     {Acc, Keys};
-get_key_leafs([{Pos, Tree}|Rest], Keys, Acc) ->
+get_key_leafs([{Pos, Tree} | Rest], Keys, Acc) ->
     {Gotten, RemainingKeys} = get_key_leafs_simple(Pos, [Tree], Keys, []),
     get_key_leafs(Rest, RemainingKeys, Gotten ++ Acc).
 
@@ -282,7 +290,7 @@ get_key_leafs_simple(_Pos, _Tree, [], _PathAcc) ->
     {[], []};
 get_key_leafs_simple(_Pos, [], Keys, _PathAcc) ->
     {[], Keys};
-get_key_leafs_simple(Pos, [{Key, _, SubTree}=Tree | RestTree], Keys, PathAcc) ->
+get_key_leafs_simple(Pos, [{Key, _, SubTree} = Tree | RestTree], Keys, PathAcc) ->
     case lists:delete({Pos, Key}, Keys) of
         Keys ->
             % Same list, key not found
@@ -299,7 +307,6 @@ get_key_leafs_simple(Pos, [{Key, _, SubTree}=Tree | RestTree], Keys, PathAcc) ->
             {SiblingLeafs, Keys4} = get_key_leafs_simple(Pos, RestTree, Keys3, PathAcc),
             {ChildLeafs ++ SiblingLeafs, Keys4}
     end.
-
 
 get_key_leafs_simple2(_Pos, [], Keys, _PathAcc) ->
     % No more tree to deal with so no more keys to return.
@@ -320,10 +327,12 @@ get_key_leafs_simple2(Pos, [{Key, _Value, SubTree} | RestTree], Keys, PathAcc) -
     {SiblingLeafs, Keys4} = get_key_leafs_simple2(Pos, RestTree, Keys3, PathAcc),
     {ChildLeafs ++ SiblingLeafs, Keys4}.
 
-
 get(Tree, KeysToGet) ->
     {KeyPaths, KeysNotFound} = get_full_key_paths(Tree, KeysToGet),
-    FixedResults = [ {Value, {Pos, [Key0 || {Key0, _} <- Path]}} || {Pos, [{_Key, Value}|_]=Path} <- KeyPaths],
+    FixedResults = [
+        {Value, {Pos, [Key0 || {Key0, _} <- Path]}}
+     || {Pos, [{_Key, Value} | _] = Path} <- KeyPaths
+    ],
     {FixedResults, KeysNotFound}.
 
 get_full_key_paths(Tree, Keys) ->
@@ -333,10 +342,9 @@ get_full_key_paths(_, [], Acc) ->
     {Acc, []};
 get_full_key_paths([], Keys, Acc) ->
     {Acc, Keys};
-get_full_key_paths([{Pos, Tree}|Rest], Keys, Acc) ->
+get_full_key_paths([{Pos, Tree} | Rest], Keys, Acc) ->
     {Gotten, RemainingKeys} = get_full_key_paths(Pos, [Tree], Keys, []),
     get_full_key_paths(Rest, RemainingKeys, Gotten ++ Acc).
-
 
 get_full_key_paths(_Pos, _Tree, [], _KeyPathAcc) ->
     {[], []};
@@ -345,13 +353,18 @@ get_full_key_paths(_Pos, [], KeysToGet, _KeyPathAcc) ->
 get_full_key_paths(Pos, [{KeyId, Value, SubTree} | RestTree], KeysToGet, KeyPathAcc) ->
     KeysToGet2 = KeysToGet -- [{Pos, KeyId}],
     CurrentNodeResult =
-    case length(KeysToGet2) =:= length(KeysToGet) of
-    true -> % not in the key list.
-        [];
-    false -> % this node is the key list. return it
-        [{Pos, [{KeyId, Value} | KeyPathAcc]}]
-    end,
-    {KeysGotten, KeysRemaining} = get_full_key_paths(Pos + 1, SubTree, KeysToGet2, [{KeyId, Value} | KeyPathAcc]),
+        case length(KeysToGet2) =:= length(KeysToGet) of
+            % not in the key list.
+            true ->
+                [];
+            % this node is the key list. return it
+            false ->
+                [{Pos, [{KeyId, Value} | KeyPathAcc]}]
+        end,
+    {KeysGotten, KeysRemaining} = get_full_key_paths(Pos + 1, SubTree, KeysToGet2, [
+        {KeyId, Value}
+        | KeyPathAcc
+    ]),
     {KeysGotten2, KeysRemaining2} = get_full_key_paths(Pos, RestTree, KeysRemaining, KeyPathAcc),
     {CurrentNodeResult ++ KeysGotten ++ KeysGotten2, KeysRemaining2}.
 
@@ -368,14 +381,15 @@ get_all_leafs_full_simple(_Pos, [], _KeyPathAcc) ->
 get_all_leafs_full_simple(Pos, [{KeyId, Value, []} | RestTree], KeyPathAcc) ->
     [{Pos, [{KeyId, Value} | KeyPathAcc]} | get_all_leafs_full_simple(Pos, RestTree, KeyPathAcc)];
 get_all_leafs_full_simple(Pos, [{KeyId, Value, SubTree} | RestTree], KeyPathAcc) ->
-    get_all_leafs_full_simple(Pos + 1, SubTree, [{KeyId, Value} | KeyPathAcc]) ++ get_all_leafs_full_simple(Pos, RestTree, KeyPathAcc).
+    get_all_leafs_full_simple(Pos + 1, SubTree, [{KeyId, Value} | KeyPathAcc]) ++
+        get_all_leafs_full_simple(Pos, RestTree, KeyPathAcc).
 
 get_all_leafs(Trees) ->
     get_all_leafs(Trees, []).
 
 get_all_leafs([], Acc) ->
     Acc;
-get_all_leafs([{Pos, Tree}|Rest], Acc) ->
+get_all_leafs([{Pos, Tree} | Rest], Acc) ->
     get_all_leafs(Rest, get_all_leafs_simple(Pos, [Tree], []) ++ Acc).
 
 get_all_leafs_simple(_Pos, [], _KeyPathAcc) ->
@@ -383,12 +397,12 @@ get_all_leafs_simple(_Pos, [], _KeyPathAcc) ->
 get_all_leafs_simple(Pos, [{KeyId, Value, []} | RestTree], KeyPathAcc) ->
     [{Value, {Pos, [KeyId | KeyPathAcc]}} | get_all_leafs_simple(Pos, RestTree, KeyPathAcc)];
 get_all_leafs_simple(Pos, [{KeyId, _Value, SubTree} | RestTree], KeyPathAcc) ->
-    get_all_leafs_simple(Pos + 1, SubTree, [KeyId | KeyPathAcc]) ++ get_all_leafs_simple(Pos, RestTree, KeyPathAcc).
-
+    get_all_leafs_simple(Pos + 1, SubTree, [KeyId | KeyPathAcc]) ++
+        get_all_leafs_simple(Pos, RestTree, KeyPathAcc).
 
 count_leafs([]) ->
     0;
-count_leafs([{_Pos,Tree}|Rest]) ->
+count_leafs([{_Pos, Tree} | Rest]) ->
     count_leafs_simple([Tree]) + count_leafs(Rest).
 
 count_leafs_simple([]) ->
@@ -398,41 +412,48 @@ count_leafs_simple([{_Key, _Value, []} | RestTree]) ->
 count_leafs_simple([{_Key, _Value, SubTree} | RestTree]) ->
     count_leafs_simple(SubTree) + count_leafs_simple(RestTree).
 
-
 fold(_Fun, Acc, []) ->
     Acc;
-fold(Fun, Acc0, [{Pos, Tree}|Rest]) ->
+fold(Fun, Acc0, [{Pos, Tree} | Rest]) ->
     Acc1 = fold_simple(Fun, Acc0, Pos, [Tree]),
     fold(Fun, Acc1, Rest).
 
 fold_simple(_Fun, Acc, _Pos, []) ->
     Acc;
 fold_simple(Fun, Acc0, Pos, [{Key, Value, SubTree} | RestTree]) ->
-    Type = if SubTree == [] -> leaf; true -> branch end,
+    Type =
+        if
+            SubTree == [] -> leaf;
+            true -> branch
+        end,
     Acc1 = Fun({Pos, Key}, Value, Type, Acc0),
-    Acc2 = fold_simple(Fun, Acc1, Pos+1, SubTree),
+    Acc2 = fold_simple(Fun, Acc1, Pos + 1, SubTree),
     fold_simple(Fun, Acc2, Pos, RestTree).
-
 
 map(_Fun, []) ->
     [];
-map(Fun, [{Pos, Tree}|Rest]) ->
+map(Fun, [{Pos, Tree} | Rest]) ->
     case erlang:fun_info(Fun, arity) of
-    {arity, 2} ->
-        [NewTree] = map_simple(fun(A,B,_C) -> Fun(A,B) end, Pos, [Tree]),
-        [{Pos, NewTree} | map(Fun, Rest)];
-    {arity, 3} ->
-        [NewTree] = map_simple(Fun, Pos, [Tree]),
-        [{Pos, NewTree} | map(Fun, Rest)]
+        {arity, 2} ->
+            [NewTree] = map_simple(fun(A, B, _C) -> Fun(A, B) end, Pos, [Tree]),
+            [{Pos, NewTree} | map(Fun, Rest)];
+        {arity, 3} ->
+            [NewTree] = map_simple(Fun, Pos, [Tree]),
+            [{Pos, NewTree} | map(Fun, Rest)]
     end.
 
 map_simple(_Fun, _Pos, []) ->
     [];
 map_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree]) ->
-    Value2 = Fun({Pos, Key}, Value,
-            if SubTree == [] -> leaf; true -> branch end),
+    Value2 = Fun(
+        {Pos, Key},
+        Value,
+        if
+            SubTree == [] -> leaf;
+            true -> branch
+        end
+    ),
     [{Key, Value2, map_simple(Fun, Pos + 1, SubTree)} | map_simple(Fun, Pos, RestTree)].
-
 
 mapfold(_Fun, Acc, []) ->
     {[], Acc};
@@ -444,16 +465,22 @@ mapfold(Fun, Acc, [{Pos, Tree} | Rest]) ->
 mapfold_simple(_Fun, Acc, _Pos, []) ->
     {[], Acc};
 mapfold_simple(Fun, Acc, Pos, [{Key, Value, SubTree} | RestTree]) ->
-    {Value2, Acc2} = Fun({Pos, Key}, Value,
-            if SubTree == [] -> leaf; true -> branch end, Acc),
+    {Value2, Acc2} = Fun(
+        {Pos, Key},
+        Value,
+        if
+            SubTree == [] -> leaf;
+            true -> branch
+        end,
+        Acc
+    ),
     {SubTree2, Acc3} = mapfold_simple(Fun, Acc2, Pos + 1, SubTree),
     {RestTree2, Acc4} = mapfold_simple(Fun, Acc3, Pos, RestTree),
     {[{Key, Value2, SubTree2} | RestTree2], Acc4}.
 
-
 map_leafs(_Fun, []) ->
     [];
-map_leafs(Fun, [{Pos, Tree}|Rest]) ->
+map_leafs(Fun, [{Pos, Tree} | Rest]) ->
     [NewTree] = map_leafs_simple(Fun, Pos, [Tree]),
     [{Pos, NewTree} | map_leafs(Fun, Rest)].
 
@@ -465,18 +492,21 @@ map_leafs_simple(Fun, Pos, [{Key, Value, []} | RestTree]) ->
 map_leafs_simple(Fun, Pos, [{Key, Value, SubTree} | RestTree]) ->
     [{Key, Value, map_leafs_simple(Fun, Pos + 1, SubTree)} | map_leafs_simple(Fun, Pos, RestTree)].
 
-
 stem(Trees, Limit) ->
     try
-        {_, Branches} = lists:foldl(fun(Tree, {Seen, TreeAcc}) ->
-            {NewSeen, NewBranches} = stem_tree(Tree, Limit, Seen),
-            {NewSeen, NewBranches ++ TreeAcc}
-        end, {sets:new(), []}, Trees),
+        {_, Branches} = lists:foldl(
+            fun(Tree, {Seen, TreeAcc}) ->
+                {NewSeen, NewBranches} = stem_tree(Tree, Limit, Seen),
+                {NewSeen, NewBranches ++ TreeAcc}
+            end,
+            {sets:new(), []},
+            Trees
+        ),
         lists:sort(Branches)
-    catch throw:dupe_keys ->
-        repair_tree(Trees, Limit)
+    catch
+        throw:dupe_keys ->
+            repair_tree(Trees, Limit)
     end.
-
 
 stem_tree({Depth, Child}, Limit, Seen) ->
     case stem_tree(Depth, Child, Limit, Seen) of
@@ -486,40 +516,44 @@ stem_tree({Depth, Child}, Limit, Seen) ->
             {NewSeen, NewBranches}
     end.
 
-
 stem_tree(_Depth, {Key, _Val, []} = Leaf, Limit, Seen) ->
     {check_key(Key, Seen), Limit - 1, Leaf, []};
-
 stem_tree(Depth, {Key, Val, Children}, Limit, Seen0) ->
     Seen1 = check_key(Key, Seen0),
-    FinalAcc = lists:foldl(fun(Child, Acc) ->
-        {SeenAcc, LimitPosAcc, ChildAcc, BranchAcc} = Acc,
-        case stem_tree(Depth + 1, Child, Limit, SeenAcc) of
-            {NewSeenAcc, LimitPos, NewChild, NewBranches} ->
-                NewLimitPosAcc = erlang:max(LimitPos, LimitPosAcc),
-                NewChildAcc = [NewChild | ChildAcc],
-                NewBranchAcc = NewBranches ++ BranchAcc,
-                {NewSeenAcc, NewLimitPosAcc, NewChildAcc, NewBranchAcc};
-            {NewSeenAcc, LimitPos, NewBranches} ->
-                NewLimitPosAcc = erlang:max(LimitPos, LimitPosAcc),
-                NewBranchAcc = NewBranches ++ BranchAcc,
-                {NewSeenAcc, NewLimitPosAcc, ChildAcc, NewBranchAcc}
-        end
-    end, {Seen1, -1, [], []}, Children),
+    FinalAcc = lists:foldl(
+        fun(Child, Acc) ->
+            {SeenAcc, LimitPosAcc, ChildAcc, BranchAcc} = Acc,
+            case stem_tree(Depth + 1, Child, Limit, SeenAcc) of
+                {NewSeenAcc, LimitPos, NewChild, NewBranches} ->
+                    NewLimitPosAcc = erlang:max(LimitPos, LimitPosAcc),
+                    NewChildAcc = [NewChild | ChildAcc],
+                    NewBranchAcc = NewBranches ++ BranchAcc,
+                    {NewSeenAcc, NewLimitPosAcc, NewChildAcc, NewBranchAcc};
+                {NewSeenAcc, LimitPos, NewBranches} ->
+                    NewLimitPosAcc = erlang:max(LimitPos, LimitPosAcc),
+                    NewBranchAcc = NewBranches ++ BranchAcc,
+                    {NewSeenAcc, NewLimitPosAcc, ChildAcc, NewBranchAcc}
+            end
+        end,
+        {Seen1, -1, [], []},
+        Children
+    ),
     {FinalSeen, FinalLimitPos, FinalChildren, FinalBranches} = FinalAcc,
     case FinalLimitPos of
         N when N > 0, length(FinalChildren) > 0 ->
             FinalNode = {Key, Val, lists:reverse(FinalChildren)},
             {FinalSeen, FinalLimitPos - 1, FinalNode, FinalBranches};
         0 when length(FinalChildren) > 0 ->
-            NewBranches = lists:map(fun(Child) ->
-                {Depth + 1, Child}
-            end, lists:reverse(FinalChildren)),
+            NewBranches = lists:map(
+                fun(Child) ->
+                    {Depth + 1, Child}
+                end,
+                lists:reverse(FinalChildren)
+            ),
             {FinalSeen, -1, NewBranches ++ FinalBranches};
         N when N < 0, length(FinalChildren) == 0 ->
             {FinalSeen, FinalLimitPos - 1, FinalBranches}
     end.
-
 
 check_key(Key, Seen) ->
     case sets:is_element(Key, Seen) of
@@ -529,29 +563,42 @@ check_key(Key, Seen) ->
             sets:add_element(Key, Seen)
     end.
 
-
 repair_tree(Trees, Limit) ->
     % flatten each branch in a tree into a tree path, sort by starting rev #
-    Paths = lists:sort(lists:map(fun({Pos, Path}) ->
-        StemmedPath = lists:sublist(Path, Limit),
-        {Pos + 1 - length(StemmedPath), StemmedPath}
-    end, get_all_leafs_full(Trees))),
+    Paths = lists:sort(
+        lists:map(
+            fun({Pos, Path}) ->
+                StemmedPath = lists:sublist(Path, Limit),
+                {Pos + 1 - length(StemmedPath), StemmedPath}
+            end,
+            get_all_leafs_full(Trees)
+        )
+    ),
 
     % convert paths back to trees
     lists:foldl(
-        fun({StartPos, Path},TreeAcc) ->
+        fun({StartPos, Path}, TreeAcc) ->
             [SingleTree] = lists:foldl(
-                fun({K,V},NewTreeAcc) -> [{K,V,NewTreeAcc}] end, [], Path),
+                fun({K, V}, NewTreeAcc) -> [{K, V, NewTreeAcc}] end,
+                [],
+                Path
+            ),
             {NewTrees, _} = merge(TreeAcc, {StartPos, SingleTree}),
             NewTrees
-        end, [], Paths).
+        end,
+        [],
+        Paths
+    ).
 
-
-value_pref(Tuple, _) when is_tuple(Tuple),
-        (tuple_size(Tuple) == 3 orelse tuple_size(Tuple) == 4) ->
+value_pref(Tuple, _) when
+    is_tuple(Tuple),
+    (tuple_size(Tuple) == 3 orelse tuple_size(Tuple) == 4)
+->
     Tuple;
-value_pref(_, Tuple) when is_tuple(Tuple),
-        (tuple_size(Tuple) == 3 orelse tuple_size(Tuple) == 4) ->
+value_pref(_, Tuple) when
+    is_tuple(Tuple),
+    (tuple_size(Tuple) == 3 orelse tuple_size(Tuple) == 4)
+->
     Tuple;
 value_pref(?REV_MISSING, Other) ->
     Other;

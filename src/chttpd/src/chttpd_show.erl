@@ -17,14 +17,13 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_views/include/couch_views.hrl").
 
-
 maybe_open_doc(Db, DocId, Options) ->
     case fabric:open_doc(Db, DocId, Options) of
-    {ok, Doc} ->
-        chttpd_stats:incr_reads(),
-        Doc;
-    {not_found, _} ->
-        nil
+        {ok, Doc} ->
+            chttpd_stats:incr_reads(),
+            Doc;
+        {not_found, _} ->
+            nil
     end.
 
 % /db/_design/foo/update/bar/docid
@@ -33,19 +32,25 @@ maybe_open_doc(Db, DocId, Options) ->
 %     % anything but GET
 %     send_method_not_allowed(Req, "POST,PUT,DELETE,ETC");
 
-handle_doc_update_req(#httpd{
-        path_parts=[_, _, _, _, UpdateName]
-    }=Req, Db, DDoc) ->
+handle_doc_update_req(
+    #httpd{
+        path_parts = [_, _, _, _, UpdateName]
+    } = Req,
+    Db,
+    DDoc
+) ->
     send_doc_update_response(Req, Db, DDoc, UpdateName, nil, null);
-
-handle_doc_update_req(#httpd{
-        path_parts=[_, _, _, _, UpdateName | DocIdParts]
-    }=Req, Db, DDoc) ->
+handle_doc_update_req(
+    #httpd{
+        path_parts = [_, _, _, _, UpdateName | DocIdParts]
+    } = Req,
+    Db,
+    DDoc
+) ->
     DocId = ?l2b(string:join([?b2l(P) || P <- DocIdParts], "/")),
     Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
     Doc = maybe_open_doc(Db, DocId, Options),
     send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId);
-
 handle_doc_update_req(Req, _Db, _DDoc) ->
     chttpd:send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
 
@@ -56,33 +61,34 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     JsonDoc = couch_query_servers:json_doc(Doc),
     Cmd = [<<"updates">>, UpdateName],
     UpdateResp = couch_query_servers:ddoc_prompt(DDoc, Cmd, [JsonDoc, JsonReq]),
-    JsonResp = case UpdateResp of
-        [<<"up">>, {NewJsonDoc}, {JsonResp0}] ->
-            case chttpd:header_value(Req, "X-Couch-Full-Commit", "false") of
-            "true" ->
-                Options = [full_commit, {user_ctx, Req#httpd.user_ctx}];
-            _ ->
-                Options = [{user_ctx, Req#httpd.user_ctx}]
-            end,
-            NewDoc = couch_db:doc_from_json_obj_validate(Db, {NewJsonDoc}),
-            fabric2_db:validate_docid(NewDoc#doc.id),
-            {UpdateResult, NewRev} = fabric:update_doc(Db, NewDoc, Options),
-            chttpd_stats:incr_writes(),
-            NewRevStr = couch_doc:rev_to_str(NewRev),
-            case {UpdateResult, NewRev} of
-            {ok, _} ->
-                Code = 201;
-            {accepted, _} ->
-                Code = 202
-            end,
-            {JsonResp1} = apply_headers(JsonResp0, [
-                {<<"X-Couch-Update-NewRev">>, NewRevStr},
-                {<<"X-Couch-Id">>, couch_util:url_encode(NewDoc#doc.id)}
-            ]),
-            {[{<<"code">>, Code} | JsonResp1]};
-        [<<"up">>, _Other, {JsonResp0}] ->
-            {[{<<"code">>, 200} | JsonResp0]}
-    end,
+    JsonResp =
+        case UpdateResp of
+            [<<"up">>, {NewJsonDoc}, {JsonResp0}] ->
+                case chttpd:header_value(Req, "X-Couch-Full-Commit", "false") of
+                    "true" ->
+                        Options = [full_commit, {user_ctx, Req#httpd.user_ctx}];
+                    _ ->
+                        Options = [{user_ctx, Req#httpd.user_ctx}]
+                end,
+                NewDoc = couch_db:doc_from_json_obj_validate(Db, {NewJsonDoc}),
+                fabric2_db:validate_docid(NewDoc#doc.id),
+                {UpdateResult, NewRev} = fabric:update_doc(Db, NewDoc, Options),
+                chttpd_stats:incr_writes(),
+                NewRevStr = couch_doc:rev_to_str(NewRev),
+                case {UpdateResult, NewRev} of
+                    {ok, _} ->
+                        Code = 201;
+                    {accepted, _} ->
+                        Code = 202
+                end,
+                {JsonResp1} = apply_headers(JsonResp0, [
+                    {<<"X-Couch-Update-NewRev">>, NewRevStr},
+                    {<<"X-Couch-Id">>, couch_util:url_encode(NewDoc#doc.id)}
+                ]),
+                {[{<<"code">>, Code} | JsonResp1]};
+            [<<"up">>, _Other, {JsonResp0}] ->
+                {[{<<"code">>, 200} | JsonResp0]}
+        end,
     % todo set location field
     chttpd_external:send_external_response(Req, JsonResp).
 
@@ -98,14 +104,14 @@ json_apply_field({Key, NewValue}, [{OtherKey, OtherVal} | Headers], Acc) ->
     json_apply_field({Key, NewValue}, Headers, [{OtherKey, OtherVal} | Acc]);
 json_apply_field({Key, NewValue}, [], Acc) ->
     % end of list, add ours
-    {[{Key, NewValue}|Acc]}.
+    {[{Key, NewValue} | Acc]}.
 
 apply_headers(JsonResp, []) ->
     JsonResp;
 apply_headers(JsonResp, NewHeaders) ->
     case couch_util:get_value(<<"headers">>, JsonResp) of
         undefined ->
-            {[{<<"headers">>, {NewHeaders}}| JsonResp]};
+            {[{<<"headers">>, {NewHeaders}} | JsonResp]};
         JsonHeaders ->
             Headers = apply_headers1(JsonHeaders, NewHeaders),
             NewKV = {<<"headers">>, Headers},

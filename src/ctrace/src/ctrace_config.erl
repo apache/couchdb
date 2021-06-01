@@ -31,11 +31,9 @@
 -include("ctrace.hrl").
 -include_lib("kernel/include/logger.hrl").
 
-
 -spec is_enabled() -> boolean().
 is_enabled() ->
     config:get_boolean("tracing", "enabled", false).
-
 
 -spec update() -> ok.
 update() ->
@@ -45,36 +43,40 @@ update() ->
 
             CompiledFilters = get_compiled_filters(),
 
-            RemovedFilters = lists:foldl(fun({OperationId, FilterDef}, Acc) ->
-                case compile_filter(OperationId, FilterDef) of
-                    true -> Acc -- [OperationId];
-                    false -> Acc
-                end
-            end, CompiledFilters, config:get("tracing.filters")),
+            RemovedFilters = lists:foldl(
+                fun({OperationId, FilterDef}, Acc) ->
+                    case compile_filter(OperationId, FilterDef) of
+                        true -> Acc -- [OperationId];
+                        false -> Acc
+                    end
+                end,
+                CompiledFilters,
+                config:get("tracing.filters")
+            ),
 
-            lists:foreach(fun(OperationId) ->
-                ModName = filter_module_name(OperationId),
-                code:delete(ModName),
-                code:purge(ModName)
-            end, RemovedFilters),
+            lists:foreach(
+                fun(OperationId) ->
+                    ModName = filter_module_name(OperationId),
+                    code:delete(ModName),
+                    code:purge(ModName)
+                end,
+                RemovedFilters
+            ),
 
             case config:get("tracing.filters", "all") of
                 undefined -> compile_filter("all", "(#{}) -> false");
                 _ -> ok
             end;
-
         false ->
             jaeger_passage:stop_tracer(?MAIN_TRACER)
     end,
     ok.
-
 
 -spec filter_module_name(atom() | string()) -> atom().
 filter_module_name(OperationId) when is_atom(OperationId) ->
     filter_module_name(atom_to_list(OperationId));
 filter_module_name(OperationId) ->
     list_to_atom("ctrace_filter_" ++ OperationId).
-
 
 handle_config_change("tracing", "enabled", _, _Persist, St) ->
     update(),
@@ -88,7 +90,6 @@ handle_config_change(_Sec, _Key, _Val, _Persist, St) ->
 handle_config_terminate(_Server, _Reason, _State) ->
     update().
 
-
 maybe_start_main_tracer(TracerId) ->
     case passage_tracer_registry:get_reporter(TracerId) of
         error ->
@@ -97,35 +98,37 @@ maybe_start_main_tracer(TracerId) ->
             true
     end.
 
-
 start_main_tracer(TracerId) ->
     MaxQueueLen = config:get_integer("tracing", "max_queue_len", 1024),
     Sampler = jaeger_passage_sampler_queue_limit:new(
-        passage_sampler_all:new(), TracerId, MaxQueueLen),
+        passage_sampler_all:new(),
+        TracerId,
+        MaxQueueLen
+    ),
     ServiceName = list_to_atom(config:get("tracing", "app_name", "couchdb")),
 
-    ProtocolOptions = case config:get("tracing", "protocol", "udp") of
-        "udp" ->
-            [
-                {thrift_format, list_to_atom(
-                    config:get("tracing", "thrift_format", "compact"))},
-                {agent_host,
-                    config:get("tracing", "agent_host", "127.0.0.1")},
-                {agent_port,
-                    config:get_integer("tracing", "agent_port", 6831)},
-                {protocol, udp},
-                {default_service_name, ServiceName}
-           ];
-        "http" ++ _ ->
-            [
-                {endpoint,
-                    config:get("tracing", "endpoint", "http://127.0.0.1:14268")},
-                {protocol, http},
-                {http_client, fun http_client/5},
-                {default_service_name, ServiceName}
-           ]
-    end,
-    Options = [{default_service_name, ServiceName}|ProtocolOptions],
+    ProtocolOptions =
+        case config:get("tracing", "protocol", "udp") of
+            "udp" ->
+                [
+                    {thrift_format,
+                        list_to_atom(
+                            config:get("tracing", "thrift_format", "compact")
+                        )},
+                    {agent_host, config:get("tracing", "agent_host", "127.0.0.1")},
+                    {agent_port, config:get_integer("tracing", "agent_port", 6831)},
+                    {protocol, udp},
+                    {default_service_name, ServiceName}
+                ];
+            "http" ++ _ ->
+                [
+                    {endpoint, config:get("tracing", "endpoint", "http://127.0.0.1:14268")},
+                    {protocol, http},
+                    {http_client, fun http_client/5},
+                    {default_service_name, ServiceName}
+                ]
+        end,
+    Options = [{default_service_name, ServiceName} | ProtocolOptions],
     ok = jaeger_passage:start_tracer(TracerId, Sampler, Options).
 
 http_client(Endpoint, Method, Headers, Body, _ReporterOptions) ->
@@ -137,20 +140,24 @@ compile_filter(OperationId, FilterDef) ->
         couch_log:info("Compiling filter : ~s", [OperationId]),
         ctrace_dsl:compile(OperationId, FilterDef),
         true
-    catch throw:{error, Reason} ->
-        ?LOG_ERROR(#{what => compile_filter, id => OperationId, details => Reason}),
-        couch_log:error("Cannot compile ~s :: ~s~n", [OperationId, Reason]),
-        false
+    catch
+        throw:{error, Reason} ->
+            ?LOG_ERROR(#{what => compile_filter, id => OperationId, details => Reason}),
+            couch_log:error("Cannot compile ~s :: ~s~n", [OperationId, Reason]),
+            false
     end.
 
-
 get_compiled_filters() ->
-    lists:foldl(fun({Mod, _Path}, Acc) ->
-        ModStr = atom_to_list(Mod),
-        case ModStr of
-            "ctrace_filter_" ++ OpName ->
-                [OpName | Acc];
-            _ ->
-                Acc
-        end
-    end, [], code:all_loaded()).
+    lists:foldl(
+        fun({Mod, _Path}, Acc) ->
+            ModStr = atom_to_list(Mod),
+            case ModStr of
+                "ctrace_filter_" ++ OpName ->
+                    [OpName | Acc];
+                _ ->
+                    Acc
+            end
+        end,
+        [],
+        code:all_loaded()
+    ).

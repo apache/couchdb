@@ -12,14 +12,11 @@
 
 -module(couch_jobs_type_monitor).
 
-
 -export([
     start/4
 ]).
 
-
 -include("couch_jobs.hrl").
-
 
 -record(st, {
     jtx,
@@ -30,7 +27,6 @@
     holdoff,
     timeout
 }).
-
 
 start(Type, VS, HoldOff, Timeout) ->
     Parent = self(),
@@ -46,12 +42,12 @@ start(Type, VS, HoldOff, Timeout) ->
         })
     end).
 
-
 loop(#st{vs = VS, timeout = Timeout} = St) ->
-    {St1, Watch} = case get_vs_and_watch(St) of
-        {VS1, W} when VS1 =/= VS -> {notify(St#st{vs = VS1}), W};
-        {VS, W} -> {St, W}
-    end,
+    {St1, Watch} =
+        case get_vs_and_watch(St) of
+            {VS1, W} when VS1 =/= VS -> {notify(St#st{vs = VS1}), W};
+            {VS, W} -> {St, W}
+        end,
     try
         erlfdb:wait(Watch, [{timeout, Timeout}])
     catch
@@ -60,7 +56,6 @@ loop(#st{vs = VS, timeout = Timeout} = St) ->
             ok
     end,
     loop(St1).
-
 
 notify(#st{} = St) ->
     #st{holdoff = HoldOff, parent = Pid, timestamp = Ts, vs = VS} = St,
@@ -73,7 +68,6 @@ notify(#st{} = St) ->
     end,
     Pid ! {type_updated, VS},
     St#st{timestamp = Now}.
-
 
 get_vs_and_watch(#st{} = St) ->
     #st{jtx = JTx, type = Type, holdoff = HoldOff} = St,

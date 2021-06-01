@@ -62,11 +62,11 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
--type subject()
-    :: map()
-        | #httpd{}
-        | string()
-        | binary().
+-type subject() ::
+    map()
+    | #httpd{}
+    | string()
+    | binary().
 
 -define(SERVICE_ID, feature_flags).
 
@@ -75,8 +75,10 @@
 enabled(Subject) ->
     Key = maybe_handle(subject_key, [Subject], fun subject_key/1),
     Handle = couch_epi:get_handle({flags, config}),
-    lists:usort(enabled(Handle, {<<"/", Key/binary>>})
-        ++ enabled(Handle, {Key})).
+    lists:usort(
+        enabled(Handle, {<<"/", Key/binary>>}) ++
+            enabled(Handle, {Key})
+    ).
 
 -spec is_enabled(FlagId :: atom(), subject()) -> boolean().
 
@@ -102,9 +104,9 @@ enabled(Handle, Key) ->
 
 subject_key(#{} = Db) ->
     subject_key(fabric2_db:name(Db));
-subject_key(#httpd{path_parts=[Name | _Rest]}) ->
+subject_key(#httpd{path_parts = [Name | _Rest]}) ->
     subject_key(Name);
-subject_key(#httpd{path_parts=[]}) ->
+subject_key(#httpd{path_parts = []}) ->
     <<>>;
 subject_key(Name) when is_list(Name) ->
     subject_key(list_to_binary(Name));
@@ -112,9 +114,10 @@ subject_key(Name) when is_binary(Name) ->
     Name.
 
 -spec maybe_handle(
-        Function :: atom(),
-        Args :: [term()],
-        Default :: fun((Args :: [term()]) -> term())) ->
+    Function :: atom(),
+    Args :: [term()],
+    Default :: fun((Args :: [term()]) -> term())
+) ->
     term().
 
 maybe_handle(Func, Args, Default) ->

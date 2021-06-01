@@ -16,21 +16,27 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
--export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,qs_json_value/3]).
--export([path/1,absolute_uri/2,body_length/1]).
--export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
+-export([header_value/2, header_value/3, qs_value/2, qs_value/3, qs/1, qs_json_value/3]).
+-export([path/1, absolute_uri/2, body_length/1]).
+-export([verify_is_server_admin/1, unquote/1, quote/1, recv/2, recv_chunked/4, error_info/1]).
 -export([make_fun_spec_strs/1]).
 -export([make_arity_1_fun/1, make_arity_2_fun/1, make_arity_3_fun/1]).
--export([parse_form/1,json_body/1,json_body_obj/1,body/1]).
+-export([parse_form/1, json_body/1, json_body_obj/1, body/1]).
 -export([doc_etag/1, doc_etag/3, make_etag/1, etag_match/2, etag_respond/3, etag_maybe/2]).
--export([primary_header_value/2,partition/1,serve_file/3,serve_file/4, server_header/0]).
--export([start_chunked_response/3,send_chunk/2,log_request/2]).
+-export([primary_header_value/2, partition/1, serve_file/3, serve_file/4, server_header/0]).
+-export([start_chunked_response/3, send_chunk/2, log_request/2]).
 -export([start_response_length/4, start_response/3, send/2]).
 -export([start_json_response/2, start_json_response/3, end_json_response/1]).
--export([send_response/4,send_response_no_cors/4,send_method_not_allowed/2,
-    send_error/2,send_error/4, send_redirect/2,send_chunked_error/2]).
--export([send_json/2,send_json/3,send_json/4,last_chunk/1,parse_multipart_request/3]).
--export([accepted_encodings/1,validate_referer/1,validate_ctype/2]).
+-export([
+    send_response/4,
+    send_response_no_cors/4,
+    send_method_not_allowed/2,
+    send_error/2, send_error/4,
+    send_redirect/2,
+    send_chunked_error/2
+]).
+-export([send_json/2, send_json/3, send_json/4, last_chunk/1, parse_multipart_request/3]).
+-export([accepted_encodings/1, validate_referer/1, validate_ctype/2]).
 -export([http_1_0_keep_alive/2]).
 -export([validate_host/1]).
 -export([validate_bind_address/1]).
@@ -41,31 +47,30 @@
 -define(MAX_DRAIN_BYTES, 1048576).
 -define(MAX_DRAIN_TIME_MSEC, 1000).
 
-
 % SpecStr is a string like "{my_module, my_fun}"
 %  or "{my_module, my_fun, <<"my_arg">>}"
 make_arity_1_fun(SpecStr) ->
     case couch_util:parse_term(SpecStr) of
-    {ok, {Mod, Fun, SpecArg}} ->
-        fun(Arg) -> Mod:Fun(Arg, SpecArg) end;
-    {ok, {Mod, Fun}} ->
-        fun(Arg) -> Mod:Fun(Arg) end
+        {ok, {Mod, Fun, SpecArg}} ->
+            fun(Arg) -> Mod:Fun(Arg, SpecArg) end;
+        {ok, {Mod, Fun}} ->
+            fun(Arg) -> Mod:Fun(Arg) end
     end.
 
 make_arity_2_fun(SpecStr) ->
     case couch_util:parse_term(SpecStr) of
-    {ok, {Mod, Fun, SpecArg}} ->
-        fun(Arg1, Arg2) -> Mod:Fun(Arg1, Arg2, SpecArg) end;
-    {ok, {Mod, Fun}} ->
-        fun(Arg1, Arg2) -> Mod:Fun(Arg1, Arg2) end
+        {ok, {Mod, Fun, SpecArg}} ->
+            fun(Arg1, Arg2) -> Mod:Fun(Arg1, Arg2, SpecArg) end;
+        {ok, {Mod, Fun}} ->
+            fun(Arg1, Arg2) -> Mod:Fun(Arg1, Arg2) end
     end.
 
 make_arity_3_fun(SpecStr) ->
     case couch_util:parse_term(SpecStr) of
-    {ok, {Mod, Fun, SpecArg}} ->
-        fun(Arg1, Arg2, Arg3) -> Mod:Fun(Arg1, Arg2, Arg3, SpecArg) end;
-    {ok, {Mod, Fun}} ->
-        fun(Arg1, Arg2, Arg3) -> Mod:Fun(Arg1, Arg2, Arg3) end
+        {ok, {Mod, Fun, SpecArg}} ->
+            fun(Arg1, Arg2, Arg3) -> Mod:Fun(Arg1, Arg2, Arg3, SpecArg) end;
+        {ok, {Mod, Fun}} ->
+            fun(Arg1, Arg2, Arg3) -> Mod:Fun(Arg1, Arg2, Arg3) end
     end.
 
 % SpecStr is "{my_module, my_fun}, {my_module2, my_fun2}"
@@ -104,34 +109,34 @@ validate_referer(Req) ->
     Host = host_for_request(Req),
     Referer = header_value(Req, "Referer", fail),
     case Referer of
-    fail ->
-        throw({bad_request, <<"Referer header required.">>});
-    Referer ->
-        {_,RefererHost,_,_,_} = mochiweb_util:urlsplit(Referer),
-        if
-            RefererHost =:= Host -> ok;
-            true -> throw({bad_request, <<"Referer header must match host.">>})
-        end
+        fail ->
+            throw({bad_request, <<"Referer header required.">>});
+        Referer ->
+            {_, RefererHost, _, _, _} = mochiweb_util:urlsplit(Referer),
+            if
+                RefererHost =:= Host -> ok;
+                true -> throw({bad_request, <<"Referer header must match host.">>})
+            end
     end.
 
 validate_ctype(Req, Ctype) ->
     case header_value(Req, "Content-Type") of
-    undefined ->
-        throw({bad_ctype, "Content-Type must be "++Ctype});
-    ReqCtype ->
-        case string:tokens(ReqCtype, ";") of
-        [Ctype] -> ok;
-        [Ctype | _Rest] -> ok;
-        _Else ->
-            throw({bad_ctype, "Content-Type must be "++Ctype})
-        end
+        undefined ->
+            throw({bad_ctype, "Content-Type must be " ++ Ctype});
+        ReqCtype ->
+            case string:tokens(ReqCtype, ";") of
+                [Ctype] -> ok;
+                [Ctype | _Rest] -> ok;
+                _Else -> throw({bad_ctype, "Content-Type must be " ++ Ctype})
+            end
     end.
-
 
 check_max_request_length(Req) ->
     Len = list_to_integer(header_value(Req, "Content-Length", "0")),
     MaxLen = chttpd_util:get_chttpd_config_integer(
-        "max_http_request_size", 4294967296),
+        "max_http_request_size",
+        4294967296
+    ),
     case Len > MaxLen of
         true ->
             exit({body_too_large, Len});
@@ -139,32 +144,31 @@ check_max_request_length(Req) ->
             ok
     end.
 
-
 % Utilities
 
 partition(Path) ->
     mochiweb_util:partition(Path, "/").
 
-header_value(#httpd{mochi_req=MochiReq}, Key) ->
+header_value(#httpd{mochi_req = MochiReq}, Key) ->
     MochiReq:get_header_value(Key).
 
-header_value(#httpd{mochi_req=MochiReq}, Key, Default) ->
+header_value(#httpd{mochi_req = MochiReq}, Key, Default) ->
     case MochiReq:get_header_value(Key) of
-    undefined -> Default;
-    Value -> Value
+        undefined -> Default;
+        Value -> Value
     end.
 
-primary_header_value(#httpd{mochi_req=MochiReq}, Key) ->
+primary_header_value(#httpd{mochi_req = MochiReq}, Key) ->
     MochiReq:get_primary_header_value(Key).
 
-accepted_encodings(#httpd{mochi_req=MochiReq}) ->
+accepted_encodings(#httpd{mochi_req = MochiReq}) ->
     case MochiReq:accepted_encodings(["gzip", "identity"]) of
-    bad_accept_encoding_value ->
-        throw(bad_accept_encoding_value);
-    [] ->
-        throw(unacceptable_encoding);
-    EncList ->
-        EncList
+        bad_accept_encoding_value ->
+            throw(bad_accept_encoding_value);
+        [] ->
+            throw(unacceptable_encoding);
+        EncList ->
+            EncList
     end.
 
 serve_file(Req, RelativePath, DocumentRoot) ->
@@ -174,7 +178,12 @@ serve_file(Req0, RelativePath0, DocumentRoot0, ExtraHeaders) ->
     Headers0 = basic_headers(Req0, ExtraHeaders),
     {ok, {Req1, Code1, Headers1, RelativePath1, DocumentRoot1}} =
         chttpd_plugin:before_serve_file(
-            Req0, 200, Headers0, RelativePath0, DocumentRoot0),
+            Req0,
+            200,
+            Headers0,
+            RelativePath0,
+            DocumentRoot0
+        ),
     log_request(Req1, Code1),
     #httpd{mochi_req = MochiReq} = Req1,
     {ok, MochiReq:serve_file(RelativePath1, DocumentRoot1, Headers1)}.
@@ -187,53 +196,63 @@ qs_value(Req, Key, Default) ->
 
 qs_json_value(Req, Key, Default) ->
     case qs_value(Req, Key, Default) of
-    Default ->
-        Default;
-    Result ->
-        ?JSON_DECODE(Result)
+        Default ->
+            Default;
+        Result ->
+            ?JSON_DECODE(Result)
     end.
 
-qs(#httpd{mochi_req=MochiReq}) ->
+qs(#httpd{mochi_req = MochiReq}) ->
     MochiReq:parse_qs().
 
-path(#httpd{mochi_req=MochiReq}) ->
+path(#httpd{mochi_req = MochiReq}) ->
     MochiReq:get(path).
 
-host_for_request(#httpd{mochi_req=MochiReq}) ->
+host_for_request(#httpd{mochi_req = MochiReq}) ->
     XHost = chttpd_util:get_chttpd_config(
-        "x_forwarded_host", "X-Forwarded-Host"),
+        "x_forwarded_host",
+        "X-Forwarded-Host"
+    ),
     case MochiReq:get_header_value(XHost) of
         undefined ->
             case MochiReq:get_header_value("Host") of
                 undefined ->
-                    {ok, {Address, Port}} = case MochiReq:get(socket) of
-                        {ssl, SslSocket} -> ssl:sockname(SslSocket);
-                        Socket -> inet:sockname(Socket)
-                    end,
+                    {ok, {Address, Port}} =
+                        case MochiReq:get(socket) of
+                            {ssl, SslSocket} -> ssl:sockname(SslSocket);
+                            Socket -> inet:sockname(Socket)
+                        end,
                     inet_parse:ntoa(Address) ++ ":" ++ integer_to_list(Port);
                 Value1 ->
                     Value1
             end;
-        Value -> Value
+        Value ->
+            Value
     end.
 
-absolute_uri(#httpd{mochi_req=MochiReq}=Req, [$/ | _] = Path) ->
+absolute_uri(#httpd{mochi_req = MochiReq} = Req, [$/ | _] = Path) ->
     Host = host_for_request(Req),
     XSsl = chttpd_util:get_chttpd_config("x_forwarded_ssl", "X-Forwarded-Ssl"),
-    Scheme = case MochiReq:get_header_value(XSsl) of
-                 "on" -> "https";
-                 _ ->
-                     XProto = chttpd_util:get_chttpd_config(
-                         "x_forwarded_proto", "X-Forwarded-Proto"),
-                     case MochiReq:get_header_value(XProto) of
-                         %% Restrict to "https" and "http" schemes only
-                         "https" -> "https";
-                         _ -> case MochiReq:get(scheme) of
-                                  https -> "https";
-                                  http -> "http"
-                              end
-                     end
-             end,
+    Scheme =
+        case MochiReq:get_header_value(XSsl) of
+            "on" ->
+                "https";
+            _ ->
+                XProto = chttpd_util:get_chttpd_config(
+                    "x_forwarded_proto",
+                    "X-Forwarded-Proto"
+                ),
+                case MochiReq:get_header_value(XProto) of
+                    %% Restrict to "https" and "http" schemes only
+                    "https" ->
+                        "https";
+                    _ ->
+                        case MochiReq:get(scheme) of
+                            https -> "https";
+                            http -> "http"
+                        end
+                end
+        end,
     Scheme ++ "://" ++ Host ++ Path;
 absolute_uri(_Req, _Path) ->
     throw({bad_request, "path must begin with a /."}).
@@ -244,60 +263,65 @@ unquote(UrlEncodedString) ->
 quote(UrlDecodedString) ->
     mochiweb_util:quote_plus(UrlDecodedString).
 
-parse_form(#httpd{mochi_req=MochiReq}) ->
+parse_form(#httpd{mochi_req = MochiReq}) ->
     mochiweb_multipart:parse_form(MochiReq).
 
-recv(#httpd{mochi_req=MochiReq}, Len) ->
+recv(#httpd{mochi_req = MochiReq}, Len) ->
     MochiReq:recv(Len).
 
-recv_chunked(#httpd{mochi_req=MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
+recv_chunked(#httpd{mochi_req = MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
     % Fun is called once with each chunk
     % Fun({Length, Binary}, State)
     % called with Length == 0 on the last time.
-    MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState,
+    MochiReq:stream_body(
+        MaxChunkSize,
+        ChunkFun,
+        InitState,
         chttpd_util:get_chttpd_config_integer(
-            "max_http_request_size", 4294967296)).
+            "max_http_request_size",
+            4294967296
+        )
+    ).
 
-body_length(#httpd{mochi_req=MochiReq}) ->
+body_length(#httpd{mochi_req = MochiReq}) ->
     MochiReq:get(body_length).
 
-body(#httpd{mochi_req=MochiReq, req_body=undefined}) ->
+body(#httpd{mochi_req = MochiReq, req_body = undefined}) ->
     MaxSize = chttpd_util:get_chttpd_config_integer(
-        "max_http_request_size", 4294967296),
+        "max_http_request_size",
+        4294967296
+    ),
     MochiReq:recv_body(MaxSize);
-body(#httpd{req_body=ReqBody}) ->
+body(#httpd{req_body = ReqBody}) ->
     ReqBody.
 
-json_body(#httpd{req_body=undefined} = Httpd) ->
+json_body(#httpd{req_body = undefined} = Httpd) ->
     case body(Httpd) of
         undefined ->
             throw({bad_request, "Missing request body"});
         Body ->
             ?JSON_DECODE(maybe_decompress(Httpd, Body))
     end;
-
-json_body(#httpd{req_body=ReqBody}) ->
+json_body(#httpd{req_body = ReqBody}) ->
     ReqBody.
 
 json_body_obj(Httpd) ->
     case json_body(Httpd) of
         {Props} -> {Props};
-        _Else ->
-            throw({bad_request, "Request body must be a JSON object"})
+        _Else -> throw({bad_request, "Request body must be a JSON object"})
     end.
-
 
 maybe_decompress(Httpd, Body) ->
     case header_value(Httpd, "Content-Encoding", "identity") of
-    "gzip" ->
-        zlib:gunzip(Body);
-    "identity" ->
-        Body;
-    Else ->
-        throw({bad_ctype, [Else, " is not a supported content encoding."]})
+        "gzip" ->
+            zlib:gunzip(Body);
+        "identity" ->
+            Body;
+        Else ->
+            throw({bad_ctype, [Else, " is not a supported content encoding."]})
     end.
 
-doc_etag(#doc{id=Id, body=Body, revs={Start, [DiskRev|_]}}) ->
+doc_etag(#doc{id = Id, body = Body, revs = {Start, [DiskRev | _]}}) ->
     doc_etag(Id, Body, {Start, DiskRev}).
 
 doc_etag(<<"_local/", _/binary>>, Body, {Start, DiskRev}) ->
@@ -307,7 +331,7 @@ doc_etag(_Id, _Body, {Start, DiskRev}) ->
 
 rev_etag({Start, DiskRev}) ->
     Rev = couch_doc:rev_to_str({Start, DiskRev}),
-     <<$", Rev/binary, $">>.
+    <<$", Rev/binary, $">>.
 
 make_etag(Term) ->
     <<SigInt:128/integer>> = couch_hash:md5_hash(term_to_binary(Term)),
@@ -315,20 +339,21 @@ make_etag(Term) ->
 
 etag_match(Req, CurrentEtag) when is_binary(CurrentEtag) ->
     etag_match(Req, binary_to_list(CurrentEtag));
-
 etag_match(Req, CurrentEtag) ->
     EtagsToMatch = string:tokens(
-        header_value(Req, "If-None-Match", ""), ", "),
+        header_value(Req, "If-None-Match", ""),
+        ", "
+    ),
     lists:member(CurrentEtag, EtagsToMatch).
 
 etag_respond(Req, CurrentEtag, RespFun) ->
     case etag_match(Req, CurrentEtag) of
-    true ->
-        % the client has this in their cache.
-        send_response(Req, 304, [{"ETag", CurrentEtag}], <<>>);
-    false ->
-        % Run the function.
-        RespFun()
+        true ->
+            % the client has this in their cache.
+            send_response(Req, 304, [{"ETag", CurrentEtag}], <<>>);
+        false ->
+            % Run the function.
+            RespFun()
     end.
 
 etag_maybe(Req, RespFun) ->
@@ -339,15 +364,15 @@ etag_maybe(Req, RespFun) ->
             send_response(Req, 304, [{"ETag", ETag}], <<>>)
     end.
 
-verify_is_server_admin(#httpd{user_ctx=UserCtx}) ->
+verify_is_server_admin(#httpd{user_ctx = UserCtx}) ->
     verify_is_server_admin(UserCtx);
-verify_is_server_admin(#user_ctx{roles=Roles}) ->
+verify_is_server_admin(#user_ctx{roles = Roles}) ->
     case lists:member(<<"_admin">>, Roles) of
-    true -> ok;
-    false -> throw({unauthorized, <<"You are not a server admin.">>})
+        true -> ok;
+        false -> throw({unauthorized, <<"You are not a server admin.">>})
     end.
 
-log_request(#httpd{mochi_req=MochiReq,peer=Peer}=Req, Code) ->
+log_request(#httpd{mochi_req = MochiReq, peer = Peer} = Req, Code) ->
     case erlang:get(dont_log_request) of
         true ->
             ok;
@@ -374,16 +399,16 @@ log_response(Code, Body) ->
             couch_log:error("httpd ~p error response:~n ~s", [Code, Body])
     end.
 
-start_response_length(#httpd{mochi_req=MochiReq}=Req, Code, Headers0, Length) ->
+start_response_length(#httpd{mochi_req = MochiReq} = Req, Code, Headers0, Length) ->
     Headers1 = basic_headers(Req, Headers0),
     Resp = handle_response(Req, Code, Headers1, Length, start_response_length),
     case MochiReq:get(method) of
-    'HEAD' -> throw({http_head_abort, Resp});
-    _ -> ok
+        'HEAD' -> throw({http_head_abort, Resp});
+        _ -> ok
     end,
     {ok, Resp}.
 
-start_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
+start_response(#httpd{mochi_req = MochiReq} = Req, Code, Headers0) ->
     Headers1 = basic_headers(Req, Headers0),
     Resp = handle_response(Req, Code, Headers1, undefined, start_response),
     case MochiReq:get(method) of
@@ -401,9 +426,9 @@ send(Resp, Data) ->
 
 no_resp_conn_header([]) ->
     true;
-no_resp_conn_header([{Hdr, V}|Rest]) when is_binary(Hdr)->
-    no_resp_conn_header([{?b2l(Hdr), V}|Rest]);
-no_resp_conn_header([{Hdr, _}|Rest]) when is_list(Hdr)->
+no_resp_conn_header([{Hdr, V} | Rest]) when is_binary(Hdr) ->
+    no_resp_conn_header([{?b2l(Hdr), V} | Rest]);
+no_resp_conn_header([{Hdr, _} | Rest]) when is_list(Hdr) ->
     case string:to_lower(Hdr) of
         "connection" -> false;
         _ -> no_resp_conn_header(Rest)
@@ -420,12 +445,12 @@ http_1_0_keep_alive(Req, Headers) ->
         false -> Headers
     end.
 
-start_chunked_response(#httpd{mochi_req=MochiReq}=Req, Code, Headers0) ->
+start_chunked_response(#httpd{mochi_req = MochiReq} = Req, Code, Headers0) ->
     Headers1 = add_headers(Req, Headers0),
     Resp = handle_response(Req, Code, Headers1, chunked, respond),
     case MochiReq:get(method) of
-    'HEAD' -> throw({http_head_abort, Resp});
-    _ -> ok
+        'HEAD' -> throw({http_head_abort, Resp});
+        _ -> ok
     end,
     {ok, Resp}.
 
@@ -434,8 +459,9 @@ send_chunk({remote, Pid, Ref} = Resp, Data) ->
     {ok, Resp};
 send_chunk(Resp, Data) ->
     case iolist_size(Data) of
-    0 -> ok; % do nothing
-    _ -> Resp:write_chunk(Data)
+        % do nothing
+        0 -> ok;
+        _ -> Resp:write_chunk(Data)
     end,
     {ok, Resp}.
 
@@ -450,17 +476,23 @@ send_response(Req, Code, Headers0, Body) ->
     Headers1 = chttpd_cors:headers(Req, Headers0),
     send_response_no_cors(Req, Code, Headers1, Body).
 
-send_response_no_cors(#httpd{mochi_req=MochiReq}=Req, Code, Headers, Body) ->
+send_response_no_cors(#httpd{mochi_req = MochiReq} = Req, Code, Headers, Body) ->
     Headers1 = http_1_0_keep_alive(MochiReq, Headers),
     Headers2 = basic_headers_no_cors(Req, Headers1),
     Headers3 = chttpd_xframe_options:header(Req, Headers2),
-	Headers4 = chttpd_prefer_header:maybe_return_minimal(Req, Headers3),
+    Headers4 = chttpd_prefer_header:maybe_return_minimal(Req, Headers3),
     Resp = handle_response(Req, Code, Headers4, Body, respond),
     log_response(Code, Body),
     {ok, Resp}.
 
 send_method_not_allowed(Req, Methods) ->
-    send_error(Req, 405, [{"Allow", Methods}], <<"method_not_allowed">>, ?l2b("Only " ++ Methods ++ " allowed")).
+    send_error(
+        Req,
+        405,
+        [{"Allow", Methods}],
+        <<"method_not_allowed">>,
+        ?l2b("Only " ++ Methods ++ " allowed")
+    ).
 
 send_json(Req, Value) ->
     send_json(Req, 200, Value).
@@ -503,13 +535,19 @@ initialize_jsonp(Req) ->
         _ -> ok
     end,
     case get(jsonp) of
-        no_jsonp -> [];
-        [] -> [];
+        no_jsonp ->
+            [];
+        [] ->
+            [];
         CallBack ->
             try
                 % make sure jsonp is configured on (default off)
-                case chttpd_util:get_chttpd_config_boolean(
-                        "allow_jsonp", false) of
+                case
+                    chttpd_util:get_chttpd_config_boolean(
+                        "allow_jsonp",
+                        false
+                    )
+                of
                     true ->
                         validate_callback(CallBack);
                     false ->
@@ -549,11 +587,9 @@ validate_callback([Char | Rest]) ->
         _ when Char == $_ -> ok;
         _ when Char == $[ -> ok;
         _ when Char == $] -> ok;
-        _ ->
-            throw({bad_request, invalid_callback})
+        _ -> throw({bad_request, invalid_callback})
     end,
     validate_callback(Rest).
-
 
 error_info({Error, Reason}) when is_list(Reason) ->
     error_info({Error, ?l2b(Reason)});
@@ -583,8 +619,10 @@ error_info({forbidden, Msg}) ->
 error_info({unauthorized, Msg}) ->
     {401, <<"unauthorized">>, Msg};
 error_info(file_exists) ->
-    {412, <<"file_exists">>, <<"The database could not be "
-        "created, the file already exists.">>};
+    {412, <<"file_exists">>, <<
+        "The database could not be "
+        "created, the file already exists."
+    >>};
 error_info(request_entity_too_large) ->
     {413, <<"too_large">>, <<"the request entity is too large">>};
 error_info({request_entity_too_large, {attachment, AttName}}) ->
@@ -598,9 +636,10 @@ error_info({bad_ctype, Reason}) ->
 error_info(requested_range_not_satisfiable) ->
     {416, <<"requested_range_not_satisfiable">>, <<"Requested range not satisfiable">>};
 error_info({error, {illegal_database_name, Name}}) ->
-    Message = <<"Name: '", Name/binary, "'. Only lowercase characters (a-z), ",
-        "digits (0-9), and any of the characters _, $, (, ), +, -, and / ",
-        "are allowed. Must begin with a letter.">>,
+    Message =
+        <<"Name: '", Name/binary, "'. Only lowercase characters (a-z), ",
+            "digits (0-9), and any of the characters _, $, (, ), +, -, and / ",
+            "are allowed. Must begin with a letter.">>,
     {400, <<"illegal_database_name">>, Message};
 error_info({missing_stub, Reason}) ->
     {412, <<"missing_stub">>, Reason};
@@ -611,64 +650,104 @@ error_info({Error, Reason}) ->
 error_info(Error) ->
     {500, <<"unknown_error">>, couch_util:to_binary(Error)}.
 
-error_headers(#httpd{mochi_req=MochiReq}=Req, Code, ErrorStr, ReasonStr) ->
-    if Code == 401 ->
-        % this is where the basic auth popup is triggered
-        case MochiReq:get_header_value("X-CouchDB-WWW-Authenticate") of
-        undefined ->
-            case chttpd_util:get_chttpd_config("WWW-Authenticate") of
-            undefined ->
-                % If the client is a browser and the basic auth popup isn't turned on
-                % redirect to the session page.
-                case ErrorStr of
-                <<"unauthorized">> ->
-                    case chttpd_util:get_chttpd_auth_config(
-                        "authentication_redirect", "/_utils/session.html") of
-                    undefined -> {Code, []};
-                    AuthRedirect ->
-                        case chttpd_util:get_chttpd_auth_config_boolean(
-                            "require_valid_user", false) of
-                        true ->
-                            % send the browser popup header no matter what if we are require_valid_user
-                            {Code, [{"WWW-Authenticate", "Basic realm=\"server\""}]};
-                        false ->
-                            case MochiReq:accepts_content_type("application/json") of
-                            true ->
-                                {Code, []};
-                            false ->
-                                case MochiReq:accepts_content_type("text/html") of
-                                true ->
-                                    % Redirect to the path the user requested, not
-                                    % the one that is used internally.
-                                    UrlReturnRaw = case MochiReq:get_header_value("x-couchdb-vhost-path") of
-                                    undefined ->
-                                        MochiReq:get(path);
-                                    VHostPath ->
-                                        VHostPath
-                                    end,
-                                    RedirectLocation = lists:flatten([
-                                        AuthRedirect,
-                                        "?return=", couch_util:url_encode(UrlReturnRaw),
-                                        "&reason=", couch_util:url_encode(ReasonStr)
-                                    ]),
-                                    {302, [{"Location", absolute_uri(Req, RedirectLocation)}]};
-                                false ->
+error_headers(#httpd{mochi_req = MochiReq} = Req, Code, ErrorStr, ReasonStr) ->
+    if
+        Code == 401 ->
+            % this is where the basic auth popup is triggered
+            case MochiReq:get_header_value("X-CouchDB-WWW-Authenticate") of
+                undefined ->
+                    case chttpd_util:get_chttpd_config("WWW-Authenticate") of
+                        undefined ->
+                            % If the client is a browser and the basic auth popup isn't turned on
+                            % redirect to the session page.
+                            case ErrorStr of
+                                <<"unauthorized">> ->
+                                    case
+                                        chttpd_util:get_chttpd_auth_config(
+                                            "authentication_redirect",
+                                            "/_utils/session.html"
+                                        )
+                                    of
+                                        undefined ->
+                                            {Code, []};
+                                        AuthRedirect ->
+                                            case
+                                                chttpd_util:get_chttpd_auth_config_boolean(
+                                                    "require_valid_user",
+                                                    false
+                                                )
+                                            of
+                                                true ->
+                                                    % send the browser popup header no matter what if we are require_valid_user
+                                                    {Code, [
+                                                        {"WWW-Authenticate",
+                                                            "Basic realm=\"server\""}
+                                                    ]};
+                                                false ->
+                                                    case
+                                                        MochiReq:accepts_content_type(
+                                                            "application/json"
+                                                        )
+                                                    of
+                                                        true ->
+                                                            {Code, []};
+                                                        false ->
+                                                            case
+                                                                MochiReq:accepts_content_type(
+                                                                    "text/html"
+                                                                )
+                                                            of
+                                                                true ->
+                                                                    % Redirect to the path the user requested, not
+                                                                    % the one that is used internally.
+                                                                    UrlReturnRaw =
+                                                                        case
+                                                                            MochiReq:get_header_value(
+                                                                                "x-couchdb-vhost-path"
+                                                                            )
+                                                                        of
+                                                                            undefined ->
+                                                                                MochiReq:get(path);
+                                                                            VHostPath ->
+                                                                                VHostPath
+                                                                        end,
+                                                                    RedirectLocation = lists:flatten(
+                                                                        [
+                                                                            AuthRedirect,
+                                                                            "?return=",
+                                                                            couch_util:url_encode(
+                                                                                UrlReturnRaw
+                                                                            ),
+                                                                            "&reason=",
+                                                                            couch_util:url_encode(
+                                                                                ReasonStr
+                                                                            )
+                                                                        ]
+                                                                    ),
+                                                                    {302, [
+                                                                        {"Location",
+                                                                            absolute_uri(
+                                                                                Req,
+                                                                                RedirectLocation
+                                                                            )}
+                                                                    ]};
+                                                                false ->
+                                                                    {Code, []}
+                                                            end
+                                                    end
+                                            end
+                                    end;
+                                _Else ->
                                     {Code, []}
-                                end
-                            end
-                        end
+                            end;
+                        Type ->
+                            {Code, [{"WWW-Authenticate", Type}]}
                     end;
-                _Else ->
-                    {Code, []}
-                end;
-            Type ->
-                {Code, [{"WWW-Authenticate", Type}]}
+                Type ->
+                    {Code, [{"WWW-Authenticate", Type}]}
             end;
-        Type ->
-           {Code, [{"WWW-Authenticate", Type}]}
-        end;
-    true ->
-        {Code, []}
+        true ->
+            {Code, []}
     end.
 
 send_error(Req, Error) ->
@@ -680,25 +759,33 @@ send_error(Req, Code, ErrorStr, ReasonStr) ->
     send_error(Req, Code, [], ErrorStr, ReasonStr).
 
 send_error(Req, Code, Headers, ErrorStr, ReasonStr) ->
-    send_json(Req, Code, Headers,
-        {[{<<"error">>,  ErrorStr},
-         {<<"reason">>, ReasonStr}]}).
+    send_json(
+        Req,
+        Code,
+        Headers,
+        {[
+            {<<"error">>, ErrorStr},
+            {<<"reason">>, ReasonStr}
+        ]}
+    ).
 
 % give the option for list functions to output html or other raw errors
 send_chunked_error(Resp, {_Error, {[{<<"body">>, Reason}]}}) ->
     send_chunk(Resp, Reason),
     last_chunk(Resp);
-
 send_chunked_error(Resp, Error) ->
     {Code, ErrorStr, ReasonStr} = error_info(Error),
-    JsonError = {[{<<"code">>, Code},
-        {<<"error">>,  ErrorStr},
-        {<<"reason">>, ReasonStr}]},
-    send_chunk(Resp, ?l2b([$\n,?JSON_ENCODE(JsonError),$\n])),
+    JsonError =
+        {[
+            {<<"code">>, Code},
+            {<<"error">>, ErrorStr},
+            {<<"reason">>, ReasonStr}
+        ]},
+    send_chunk(Resp, ?l2b([$\n, ?JSON_ENCODE(JsonError), $\n])),
     last_chunk(Resp).
 
 send_redirect(Req, Path) ->
-     send_response(Req, 301, [{"Location", absolute_uri(Req, Path)}], <<>>).
+    send_response(Req, 301, [{"Location", absolute_uri(Req, Path)}], <<>>).
 
 negotiate_content_type(_Req) ->
     case get(jsonp) of
@@ -708,27 +795,33 @@ negotiate_content_type(_Req) ->
     end.
 
 server_header() ->
-    [{"Server", "CouchDB/" ++ couch_server:get_version() ++
-                " (Erlang OTP/" ++ erlang:system_info(otp_release) ++ ")"}].
-
+    [
+        {"Server",
+            "CouchDB/" ++ couch_server:get_version() ++
+                " (Erlang OTP/" ++ erlang:system_info(otp_release) ++ ")"}
+    ].
 
 -record(mp, {boundary, buffer, data_fun, callback}).
-
 
 parse_multipart_request(ContentType, DataFun, Callback) ->
     Boundary0 = iolist_to_binary(get_boundary(ContentType)),
     Boundary = <<"\r\n--", Boundary0/binary>>,
-    Mp = #mp{boundary= Boundary,
-            buffer= <<>>,
-            data_fun=DataFun,
-            callback=Callback},
-    {Mp2, _NilCallback} = read_until(Mp, <<"--", Boundary0/binary>>,
-        fun nil_callback/1),
-    #mp{buffer=Buffer, data_fun=DataFun2, callback=Callback2} =
-            parse_part_header(Mp2),
+    Mp = #mp{
+        boundary = Boundary,
+        buffer = <<>>,
+        data_fun = DataFun,
+        callback = Callback
+    },
+    {Mp2, _NilCallback} = read_until(
+        Mp,
+        <<"--", Boundary0/binary>>,
+        fun nil_callback/1
+    ),
+    #mp{buffer = Buffer, data_fun = DataFun2, callback = Callback2} =
+        parse_part_header(Mp2),
     {Buffer, DataFun2, Callback2}.
 
-nil_callback(_Data)->
+nil_callback(_Data) ->
     fun nil_callback/1.
 
 get_boundary({"multipart/" ++ _, Opts}) ->
@@ -737,83 +830,102 @@ get_boundary({"multipart/" ++ _, Opts}) ->
             S
     end;
 get_boundary(ContentType) ->
-    {"multipart/" ++ _ , Opts} = mochiweb_util:parse_header(ContentType),
+    {"multipart/" ++ _, Opts} = mochiweb_util:parse_header(ContentType),
     get_boundary({"multipart/", Opts}).
-
-
 
 split_header(<<>>) ->
     [];
 split_header(Line) ->
-    {Name, Rest} = lists:splitwith(fun (C) -> C =/= $: end,
-                                   binary_to_list(Line)),
-    [$: | Value] = case Rest of
-        [] ->
-            throw({bad_request, <<"bad part header">>});
-        Res ->
-            Res
-    end,
-    [{string:to_lower(string:strip(Name)),
-     mochiweb_util:parse_header(Value)}].
+    {Name, Rest} = lists:splitwith(
+        fun(C) -> C =/= $: end,
+        binary_to_list(Line)
+    ),
+    [$: | Value] =
+        case Rest of
+            [] ->
+                throw({bad_request, <<"bad part header">>});
+            Res ->
+                Res
+        end,
+    [{string:to_lower(string:strip(Name)), mochiweb_util:parse_header(Value)}].
 
-read_until(#mp{data_fun=DataFun, buffer=Buffer}=Mp, Pattern, Callback) ->
+read_until(#mp{data_fun = DataFun, buffer = Buffer} = Mp, Pattern, Callback) ->
     case couch_util:find_in_binary(Pattern, Buffer) of
-    not_found ->
-        Callback2 = Callback(Buffer),
-        {Buffer2, DataFun2} = DataFun(),
-        Buffer3 = iolist_to_binary(Buffer2),
-        read_until(Mp#mp{data_fun=DataFun2,buffer=Buffer3}, Pattern, Callback2);
-    {partial, 0} ->
-        {NewData, DataFun2} = DataFun(),
-        read_until(Mp#mp{data_fun=DataFun2,
-                buffer= iolist_to_binary([Buffer,NewData])},
-                Pattern, Callback);
-    {partial, Skip} ->
-        <<DataChunk:Skip/binary, Rest/binary>> = Buffer,
-        Callback2 = Callback(DataChunk),
-        {NewData, DataFun2} = DataFun(),
-        read_until(Mp#mp{data_fun=DataFun2,
-                buffer= iolist_to_binary([Rest | NewData])},
-                Pattern, Callback2);
-    {exact, 0} ->
-        PatternLen = size(Pattern),
-        <<_:PatternLen/binary, Rest/binary>> = Buffer,
-        {Mp#mp{buffer= Rest}, Callback};
-    {exact, Skip} ->
-        PatternLen = size(Pattern),
-        <<DataChunk:Skip/binary, _:PatternLen/binary, Rest/binary>> = Buffer,
-        Callback2 = Callback(DataChunk),
-        {Mp#mp{buffer= Rest}, Callback2}
+        not_found ->
+            Callback2 = Callback(Buffer),
+            {Buffer2, DataFun2} = DataFun(),
+            Buffer3 = iolist_to_binary(Buffer2),
+            read_until(Mp#mp{data_fun = DataFun2, buffer = Buffer3}, Pattern, Callback2);
+        {partial, 0} ->
+            {NewData, DataFun2} = DataFun(),
+            read_until(
+                Mp#mp{
+                    data_fun = DataFun2,
+                    buffer = iolist_to_binary([Buffer, NewData])
+                },
+                Pattern,
+                Callback
+            );
+        {partial, Skip} ->
+            <<DataChunk:Skip/binary, Rest/binary>> = Buffer,
+            Callback2 = Callback(DataChunk),
+            {NewData, DataFun2} = DataFun(),
+            read_until(
+                Mp#mp{
+                    data_fun = DataFun2,
+                    buffer = iolist_to_binary([Rest | NewData])
+                },
+                Pattern,
+                Callback2
+            );
+        {exact, 0} ->
+            PatternLen = size(Pattern),
+            <<_:PatternLen/binary, Rest/binary>> = Buffer,
+            {Mp#mp{buffer = Rest}, Callback};
+        {exact, Skip} ->
+            PatternLen = size(Pattern),
+            <<DataChunk:Skip/binary, _:PatternLen/binary, Rest/binary>> = Buffer,
+            Callback2 = Callback(DataChunk),
+            {Mp#mp{buffer = Rest}, Callback2}
     end.
 
-
-parse_part_header(#mp{callback=UserCallBack}=Mp) ->
-    {Mp2, AccCallback} = read_until(Mp, <<"\r\n\r\n">>,
-            fun(Next) -> acc_callback(Next, []) end),
+parse_part_header(#mp{callback = UserCallBack} = Mp) ->
+    {Mp2, AccCallback} = read_until(
+        Mp,
+        <<"\r\n\r\n">>,
+        fun(Next) -> acc_callback(Next, []) end
+    ),
     HeaderData = AccCallback(get_data),
 
     Headers =
-    lists:foldl(fun(Line, Acc) ->
-            split_header(Line) ++ Acc
-        end, [], re:split(HeaderData,<<"\r\n">>, [])),
+        lists:foldl(
+            fun(Line, Acc) ->
+                split_header(Line) ++ Acc
+            end,
+            [],
+            re:split(HeaderData, <<"\r\n">>, [])
+        ),
     NextCallback = UserCallBack({headers, Headers}),
-    parse_part_body(Mp2#mp{callback=NextCallback}).
+    parse_part_body(Mp2#mp{callback = NextCallback}).
 
-parse_part_body(#mp{boundary=Prefix, callback=Callback}=Mp) ->
-    {Mp2, WrappedCallback} = read_until(Mp, Prefix,
-            fun(Data) -> body_callback_wrapper(Data, Callback) end),
+parse_part_body(#mp{boundary = Prefix, callback = Callback} = Mp) ->
+    {Mp2, WrappedCallback} = read_until(
+        Mp,
+        Prefix,
+        fun(Data) -> body_callback_wrapper(Data, Callback) end
+    ),
     Callback2 = WrappedCallback(get_callback),
     Callback3 = Callback2(body_end),
-    case check_for_last(Mp2#mp{callback=Callback3}) of
-    {last, #mp{callback=Callback3}=Mp3} ->
-        Mp3#mp{callback=Callback3(eof)};
-    {more, Mp3} ->
-        parse_part_header(Mp3)
+    case check_for_last(Mp2#mp{callback = Callback3}) of
+        {last, #mp{callback = Callback3} = Mp3} ->
+            Mp3#mp{callback = Callback3(eof)};
+        {more, Mp3} ->
+            parse_part_header(Mp3)
     end.
 
-acc_callback(get_data, Acc)->
+acc_callback(get_data, Acc) ->
     iolist_to_binary(lists:reverse(Acc));
-acc_callback(Data, Acc)->
+acc_callback(Data, Acc) ->
     fun(Next) -> acc_callback(Next, [Data | Acc]) end.
 
 body_callback_wrapper(get_callback, Callback) ->
@@ -822,18 +934,23 @@ body_callback_wrapper(Data, Callback) ->
     Callback2 = Callback({body, Data}),
     fun(Next) -> body_callback_wrapper(Next, Callback2) end.
 
-
-check_for_last(#mp{buffer=Buffer, data_fun=DataFun}=Mp) ->
+check_for_last(#mp{buffer = Buffer, data_fun = DataFun} = Mp) ->
     case Buffer of
-    <<"--",_/binary>> -> {last, Mp};
-    <<_, _, _/binary>> -> {more, Mp};
-    _ -> % not long enough
-        {Data, DataFun2} = DataFun(),
-        check_for_last(Mp#mp{buffer= <<Buffer/binary, Data/binary>>,
-                data_fun = DataFun2})
+        <<"--", _/binary>> ->
+            {last, Mp};
+        <<_, _, _/binary>> ->
+            {more, Mp};
+        % not long enough
+        _ ->
+            {Data, DataFun2} = DataFun(),
+            check_for_last(Mp#mp{
+                buffer = <<Buffer/binary, Data/binary>>,
+                data_fun = DataFun2
+            })
     end.
 
-validate_bind_address(any) -> ok;
+validate_bind_address(any) ->
+    ok;
 validate_bind_address(Address) ->
     case inet_parse:address(Address) of
         {ok, _} -> ok;
@@ -851,9 +968,9 @@ basic_headers(Req, Headers0) ->
     chttpd_cors:headers(Req, Headers2).
 
 basic_headers_no_cors(Req, Headers) ->
-    Headers
-        ++ server_header()
-        ++ couch_httpd_auth:cookie_auth_header(Req, Headers).
+    Headers ++
+        server_header() ++
+        couch_httpd_auth:cookie_auth_header(Req, Headers).
 
 handle_response(Req0, Code0, Headers0, Args0, Type) ->
     {ok, {Req1, Code1, Headers1, Args1}} = before_response(Req0, Code0, Headers0, Args0),
@@ -895,7 +1012,6 @@ http_respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
 http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
 
-
 %%%%%%%% module tests below %%%%%%%%
 
 -ifdef(TEST).
@@ -912,27 +1028,40 @@ maybe_add_default_headers_test_() ->
     MustRevalidate = {"Cache-Control", "must-revalidate"},
     ApplicationJavascript = {"Content-Type", "application/javascript"},
     Cases = [
-        {[],
-         [MustRevalidate, ApplicationJavascript],
-          "Should add Content-Type and Cache-Control to empty heaeders"},
+        {
+            [],
+            [MustRevalidate, ApplicationJavascript],
+            "Should add Content-Type and Cache-Control to empty heaeders"
+        },
 
-        {[NoCache],
-         [NoCache, ApplicationJavascript],
-          "Should add Content-Type only if Cache-Control is present"},
+        {
+            [NoCache],
+            [NoCache, ApplicationJavascript],
+            "Should add Content-Type only if Cache-Control is present"
+        },
 
-        {[ApplicationJson],
-         [MustRevalidate, ApplicationJson],
-          "Should add Cache-Control if Content-Type is present"},
+        {
+            [ApplicationJson],
+            [MustRevalidate, ApplicationJson],
+            "Should add Cache-Control if Content-Type is present"
+        },
 
-        {[NoCache, ApplicationJson],
-         [NoCache, ApplicationJson],
-          "Should not add headers if Cache-Control and Content-Type are there"}
+        {
+            [NoCache, ApplicationJson],
+            [NoCache, ApplicationJson],
+            "Should not add headers if Cache-Control and Content-Type are there"
+        }
     ],
-    Tests = lists:map(fun({InitialHeaders, ProperResult, Desc}) ->
-        {Desc,
-        ?_assertEqual(ProperResult,
-         maybe_add_default_headers(DummyRequest, InitialHeaders))}
-    end, Cases),
+    Tests = lists:map(
+        fun({InitialHeaders, ProperResult, Desc}) ->
+            {Desc,
+                ?_assertEqual(
+                    ProperResult,
+                    maybe_add_default_headers(DummyRequest, InitialHeaders)
+                )}
+        end,
+        Cases
+    ),
     {"Tests adding default headers", Tests}.
 
 log_request_test_() ->
@@ -952,27 +1081,24 @@ log_request_test_() ->
         [
             fun() -> should_accept_code_and_message(true) end,
             fun() -> should_accept_code_and_message(false) end
-        ]
-    }.
+        ]}.
 
 should_accept_code_and_message(DontLogFlag) ->
     erlang:put(dont_log_response, DontLogFlag),
-    {"with dont_log_response = " ++ atom_to_list(DontLogFlag),
-        [
-            {"Should accept code 200 and string message",
-            ?_assertEqual(ok, log_response(200, "OK"))},
-            {"Should accept code 200 and JSON message",
+    {"with dont_log_response = " ++ atom_to_list(DontLogFlag), [
+        {"Should accept code 200 and string message", ?_assertEqual(ok, log_response(200, "OK"))},
+        {"Should accept code 200 and JSON message",
             ?_assertEqual(ok, log_response(200, {json, {[{ok, true}]}}))},
-            {"Should accept code >= 400 and string error",
+        {"Should accept code >= 400 and string error",
             ?_assertEqual(ok, log_response(405, method_not_allowed))},
-            {"Should accept code >= 400 and JSON error",
-            ?_assertEqual(ok,
-                log_response(405, {json, {[{error, method_not_allowed}]}}))},
-            {"Should accept code >= 500 and string error",
-            ?_assertEqual(ok, log_response(500, undef))},
-            {"Should accept code >= 500 and JSON error",
+        {"Should accept code >= 400 and JSON error",
+            ?_assertEqual(
+                ok,
+                log_response(405, {json, {[{error, method_not_allowed}]}})
+            )},
+        {"Should accept code >= 500 and string error", ?_assertEqual(ok, log_response(500, undef))},
+        {"Should accept code >= 500 and JSON error",
             ?_assertEqual(ok, log_response(500, {json, {[{error, undef}]}}))}
-        ]
-    }.
+    ]}.
 
 -endif.

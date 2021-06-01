@@ -40,36 +40,33 @@
     match/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("passage/include/opentracing.hrl").
 -include("ctrace.hrl").
 -include_lib("kernel/include/logger.hrl").
 
-
--type operation()
-    :: atom()
+-type operation() ::
+    atom()
     | fun().
 
--type tags()
-    :: #{atom() => term()}.
+-type tags() ::
+    #{atom() => term()}.
 
--type log_fields()
-    :: #{atom() => term()}.
+-type log_fields() ::
+    #{atom() => term()}.
 
--type start_span_options()
-    :: [start_span_option()].
+-type start_span_options() ::
+    [start_span_option()].
 
--type start_span_option()
-    :: {time, erlang:timespan()}
+-type start_span_option() ::
+    {time, erlang:timespan()}
     | {tags, tags()}.
 
--type finish_span_options()
-    :: [finish_span_option()].
+-type finish_span_options() ::
+    [finish_span_option()].
 
--type finish_span_option()
-    :: {time, erlang:timespan()}.
-
+-type finish_span_option() ::
+    {time, erlang:timespan()}.
 
 -spec is_enabled() -> boolean().
 
@@ -83,55 +80,57 @@ is_enabled() ->
             IsEnabled
     end.
 
-
 %% @equiv with_span(Operation, [], Fun)
 -spec with_span(
-       Operation :: operation(),
-       Fun
-   ) -> Result when
-       Fun :: fun (() -> Result),
-       Result :: term().
+    Operation :: operation(),
+    Fun
+) -> Result when
+    Fun :: fun(() -> Result),
+    Result :: term().
 
 with_span(Operation, Fun) ->
     with_span(Operation, #{}, Fun).
 
 -spec with_span(
-       Operation :: operation(),
-       TagsOrOptions :: tags() | start_span_options(),
-       Fun
-   ) -> Result when
-       Fun :: fun (() -> Result),
-       Result :: term().
+    Operation :: operation(),
+    TagsOrOptions :: tags() | start_span_options(),
+    Fun
+) -> Result when
+    Fun :: fun(() -> Result),
+    Result :: term().
 
 with_span(Operation, ExtraTags, Fun) when is_map(ExtraTags) ->
     with_span(Operation, [{tags, ExtraTags}], Fun);
-
-with_span(Operation, Options, Fun)  ->
+with_span(Operation, Options, Fun) ->
     try
         start_span(Operation, Options),
         Fun()
-    catch Type:Reason:Stack ->
-        log(#{
-            ?LOG_FIELD_ERROR_KIND => Type,
-            ?LOG_FIELD_MESSAGE => Reason,
-            ?LOG_FIELD_STACK => Stack
-        }, [error]),
-        erlang:raise(Type, Reason, Stack)
+    catch
+        Type:Reason:Stack ->
+            log(
+                #{
+                    ?LOG_FIELD_ERROR_KIND => Type,
+                    ?LOG_FIELD_MESSAGE => Reason,
+                    ?LOG_FIELD_STACK => Stack
+                },
+                [error]
+            ),
+            erlang:raise(Type, Reason, Stack)
     after
         finish_span()
     end.
 
 -spec start_span(
-        Operation :: operation()
-    ) -> ok.
+    Operation :: operation()
+) -> ok.
 
 start_span(Operation) ->
     start_span(Operation, []).
 
 -spec start_span(
-        Operation :: operation(),
-        Options :: start_span_options()
-    ) -> ok.
+    Operation :: operation(),
+    Options :: start_span_options()
+) -> ok.
 
 start_span(Operation, Options) ->
     case is_enabled() of
@@ -143,18 +142,18 @@ start_span(Operation, Options) ->
 
 do_start_span(Fun, Options) when is_function(Fun) ->
     start_span(fun_to_op(Fun), Options);
-
 do_start_span(OperationName, Options0) ->
     Options1 = add_time(Options0),
     case passage_pd:current_span() of
         undefined ->
             put(?ORIGIN_KEY, atom_to_binary(OperationName, utf8)),
-            Tags = case lists:keyfind(tags, 1, Options0) of
-                {tags, T} ->
-                    T;
-                false ->
-                    #{}
-            end,
+            Tags =
+                case lists:keyfind(tags, 1, Options0) of
+                    {tags, T} ->
+                        T;
+                    false ->
+                        #{}
+                end,
             case match(OperationName, Tags) of
                 true ->
                     Options = [
@@ -178,23 +177,23 @@ finish_span() ->
     finish_span([]).
 
 -spec finish_span(
-        Options :: finish_span_options()
-    ) -> ok.
+    Options :: finish_span_options()
+) -> ok.
 
 finish_span(Options0) ->
     Options = add_time(Options0),
     passage_pd:finish_span(Options).
 
 -spec tag(
-        Tags :: tags()
-    ) -> ok.
+    Tags :: tags()
+) -> ok.
 
 tag(Tags) ->
     passage_pd:set_tags(Tags).
 
 -spec log(
-        Fields :: log_fields() | fun (() -> log_fields())
-    ) -> ok.
+    Fields :: log_fields() | fun(() -> log_fields())
+) -> ok.
 
 log(FieldsOrFun) ->
     log(FieldsOrFun, []).
@@ -280,10 +279,10 @@ context() ->
     end.
 
 -spec external_span(
-        TraceId :: passage:trace_id(),
-        SpanId :: undefined | passage:span_id(),
-        ParentSpanId :: undefined | passage:span_id()
-    ) -> passage:maybe_span().
+    TraceId :: passage:trace_id(),
+    SpanId :: undefined | passage:span_id(),
+    ParentSpanId :: undefined | passage:span_id()
+) -> passage:maybe_span().
 
 external_span(TraceId, undefined, ParentSpanId) ->
     external_span(TraceId, rand:uniform(16#FFFFFFFFFFFFFFFF), ParentSpanId);
@@ -303,7 +302,6 @@ external_span(TraceId, SpanId, ParentSpanId) ->
     State = {ok, <<"binary">>, Binary, error},
     passage:extract_span(?MAIN_TRACER, binary, IterFun, State).
 
-
 match(OperationId, Tags) ->
     OpMod = ctrace_config:filter_module_name(OperationId),
     case erlang:function_exported(OpMod, match, 1) of
@@ -317,7 +315,6 @@ match(OperationId, Tags) ->
             end
     end.
 
-
 do_match(Mod, Tags) ->
     case Mod:match(Tags) of
         true ->
@@ -327,7 +324,6 @@ do_match(Mod, Tags) ->
         Rate when is_float(Rate) ->
             rand:uniform() =< Rate
     end.
-
 
 add_tags(Options, ExtraTags) ->
     case lists:keytake(tags, 1, Options) of
@@ -354,8 +350,8 @@ maybe_start_root(Options) ->
     end.
 
 fun_to_op(Fun) ->
-     {module, M} = erlang:fun_info(Fun, module),
-     {name, F} = erlang:fun_info(Fun, name),
-     {arity, A} = erlang:fun_info(Fun, arity),
-     Str = io_lib:format("~s:~s/~b", [M, F, A]),
-     list_to_atom(lists:flatten(Str)).
+    {module, M} = erlang:fun_info(Fun, module),
+    {name, F} = erlang:fun_info(Fun, name),
+    {arity, A} = erlang:fun_info(Fun, arity),
+    Str = io_lib:format("~s:~s/~b", [M, F, A]),
+    list_to_atom(lists:flatten(Str)).

@@ -25,13 +25,10 @@
 -compile(nowarn_export_all).
 -endif.
 
-
 -include("couch_views.hrl").
-
 
 set_timeout() ->
     couch_jobs:set_type_timeout(?INDEX_JOB_TYPE, 26).
-
 
 build_view(TxDb, Mrst, UpdateSeq) ->
     {ok, JobId} = build_view_async(TxDb, Mrst),
@@ -39,7 +36,6 @@ build_view(TxDb, Mrst, UpdateSeq) ->
         {ok, IdxVStamps} -> {ok, IdxVStamps};
         retry -> build_view(TxDb, Mrst, UpdateSeq)
     end.
-
 
 build_view_async(TxDb0, Mrst) ->
     JobId = job_id(TxDb0, Mrst),
@@ -60,27 +56,22 @@ build_view_async(TxDb0, Mrst) ->
     end),
     {ok, JobId}.
 
-
 remove(TxDb, Sig) ->
     DbName = fabric2_db:name(TxDb),
     JobId = job_id(DbName, Sig),
     couch_jobs:remove(TxDb, ?INDEX_JOB_TYPE, JobId).
 
-
 job_state(#{} = TxDb, #mrst{} = Mrst) ->
     JobId = job_id(TxDb, Mrst),
     couch_jobs:get_job_state(TxDb, ?INDEX_JOB_TYPE, JobId).
 
-
 ensure_correct_tx(#{tx := undefined} = TxDb) ->
     TxDb;
-
 ensure_correct_tx(#{tx := Tx} = TxDb) ->
     case erlfdb:is_read_only(Tx) of
         true -> TxDb#{tx := undefined};
         false -> TxDb
     end.
-
 
 wait_for_job(JobId, DDocId, UpdateSeq) ->
     case couch_jobs:subscribe(?INDEX_JOB_TYPE, JobId) of
@@ -94,7 +85,6 @@ wait_for_job(JobId, DDocId, UpdateSeq) ->
                     retry
             end
     end.
-
 
 wait_for_job(JobId, Subscription, DDocId, UpdateSeq) ->
     case wait(Subscription) of
@@ -116,15 +106,15 @@ wait_for_job(JobId, Subscription, DDocId, UpdateSeq) ->
         {finished, #{<<"error">> := Error, <<"reason">> := Reason}} ->
             couch_jobs:remove(undefined, ?INDEX_JOB_TYPE, JobId),
             erlang:error({binary_to_existing_atom(Error, latin1), Reason});
-        {finished, #{<<"view_seq">> := ViewSeq} = JobData}
-                when ViewSeq >= UpdateSeq ->
+        {finished, #{<<"view_seq">> := ViewSeq} = JobData} when
+            ViewSeq >= UpdateSeq
+        ->
             {ok, idx_vstamps(JobData)};
         {finished, _} ->
             wait_for_job(JobId, DDocId, UpdateSeq);
         {_, _} ->
             wait_for_job(JobId, Subscription, DDocId, UpdateSeq)
     end.
-
 
 idx_vstamps(#{} = JobData) ->
     #{
@@ -133,16 +123,13 @@ idx_vstamps(#{} = JobData) ->
     } = JobData,
     {DbReadVsn, ViewReadVsn}.
 
-
 job_id(#{name := DbName}, #mrst{sig = Sig}) ->
     job_id(DbName, Sig);
-
 job_id(DbName, Sig) ->
     HexSig = fabric2_util:to_hex(Sig),
     % Put signature first in order to be able to use the no_schedule
     % couch_jobs:accept/2 option
     <<HexSig/binary, "-", DbName/binary>>.
-
 
 job_data(Db, Mrst) ->
     #mrst{
@@ -157,7 +144,6 @@ job_data(Db, Mrst) ->
         sig => fabric2_util:to_hex(Sig),
         retries => 0
     }.
-
 
 wait(Subscription) ->
     case couch_jobs:wait(Subscription, infinity) of

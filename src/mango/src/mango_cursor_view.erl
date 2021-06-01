@@ -25,13 +25,11 @@
     choose_best_index/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_views/include/couch_views.hrl").
 -include("mango_cursor.hrl").
 -include("mango_idx_view.hrl").
 -include_lib("kernel/include/logger.hrl").
-
 
 create(Db, Indexes, Selector, Opts) ->
     FieldRanges = mango_idx_view:field_ranges(Selector),
@@ -57,7 +55,6 @@ create(Db, Indexes, Selector, Opts) ->
         bookmark = Bookmark
     }}.
 
-
 explain(Cursor) ->
     #cursor{
         opts = Opts
@@ -66,46 +63,46 @@ explain(Cursor) ->
     BaseArgs = base_args(Cursor),
     Args = apply_opts(Opts, BaseArgs),
 
-    [{mrargs, {[
-        {include_docs, Args#mrargs.include_docs},
-        {view_type, Args#mrargs.view_type},
-        {reduce, Args#mrargs.reduce},
-        {start_key, maybe_replace_max_json(Args#mrargs.start_key)},
-        {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
-        {direction, Args#mrargs.direction},
-        {stable, Args#mrargs.stable},
-        {update, Args#mrargs.update},
-        {conflicts, Args#mrargs.conflicts}
-    ]}}].
-
+    [
+        {mrargs,
+            {[
+                {include_docs, Args#mrargs.include_docs},
+                {view_type, Args#mrargs.view_type},
+                {reduce, Args#mrargs.reduce},
+                {start_key, maybe_replace_max_json(Args#mrargs.start_key)},
+                {end_key, maybe_replace_max_json(Args#mrargs.end_key)},
+                {direction, Args#mrargs.direction},
+                {stable, Args#mrargs.stable},
+                {update, Args#mrargs.update},
+                {conflicts, Args#mrargs.conflicts}
+            ]}}
+    ].
 
 % replace internal values that cannot
 % be represented as a valid UTF-8 string
 % with a token for JSON serialization
 maybe_replace_max_json([]) ->
     [];
-
 maybe_replace_max_json([?MAX_JSON_OBJ | T]) ->
     [<<"<MAX>">> | maybe_replace_max_json(T)];
-
 maybe_replace_max_json([H | T]) ->
     [H | maybe_replace_max_json(T)];
-
 maybe_replace_max_json(?MAX_STR) ->
     <<"<MAX>">>;
-
 maybe_replace_max_json(EndKey) ->
     EndKey.
 
-
 base_args(#cursor{index = Idx} = Cursor) ->
-    {StartKey, EndKey} = case Cursor#cursor.ranges of
-        [empty] ->
-            {null, null};
-        _ ->
-            {mango_idx:start_key(Idx, Cursor#cursor.ranges),
-                mango_idx:end_key(Idx, Cursor#cursor.ranges)}
-    end,
+    {StartKey, EndKey} =
+        case Cursor#cursor.ranges of
+            [empty] ->
+                {null, null};
+            _ ->
+                {
+                    mango_idx:start_key(Idx, Cursor#cursor.ranges),
+                    mango_idx:end_key(Idx, Cursor#cursor.ranges)
+                }
+        end,
     #mrargs{
         view_type = map,
         reduce = false,
@@ -116,7 +113,6 @@ base_args(#cursor{index = Idx} = Cursor) ->
             {ignore_partition_query_limit, true}
         ]
     }.
-
 
 execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFun, UserAcc) ->
     Cursor = Cursor0#cursor{
@@ -133,33 +129,43 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
             #cursor{opts = Opts, bookmark = Bookmark} = Cursor,
             Args0 = apply_opts(Opts, BaseArgs),
             Args = mango_json_bookmark:update_args(Bookmark, Args0),
-            Result = case mango_idx:def(Idx) of
-                all_docs ->
-                    CB = fun ?MODULE:handle_all_docs_message/2,
-                    AllDocOpts = fabric2_util:all_docs_view_opts(Args),
-                    fabric2_db:fold_docs(Db, CB, Cursor, AllDocOpts);
-                _ ->
-                    CB = fun ?MODULE:handle_message/2,
-                    % Normal view
-                    DDocId = mango_idx:ddoc(Idx),
-                    {ok, DDoc} = fabric2_db:open_doc(Db, DDocId),
-                    Name = mango_idx:name(Idx),
-                    couch_views:query(Db, DDoc, Name, CB, Cursor, Args)
-            end,
+            Result =
+                case mango_idx:def(Idx) of
+                    all_docs ->
+                        CB = fun ?MODULE:handle_all_docs_message/2,
+                        AllDocOpts = fabric2_util:all_docs_view_opts(Args),
+                        fabric2_db:fold_docs(Db, CB, Cursor, AllDocOpts);
+                    _ ->
+                        CB = fun ?MODULE:handle_message/2,
+                        % Normal view
+                        DDocId = mango_idx:ddoc(Idx),
+                        {ok, DDoc} = fabric2_db:open_doc(Db, DDocId),
+                        Name = mango_idx:name(Idx),
+                        couch_views:query(Db, DDoc, Name, CB, Cursor, Args)
+                end,
             case Result of
                 {ok, LastCursor} ->
                     NewBookmark = mango_json_bookmark:create(LastCursor),
                     Arg = {add_key, bookmark, NewBookmark},
                     {_Go, FinalUserAcc} = UserFun(Arg, LastCursor#cursor.user_acc),
                     Stats0 = LastCursor#cursor.execution_stats,
-                    FinalUserAcc0 = mango_execution_stats:maybe_add_stats(Opts, UserFun, Stats0, FinalUserAcc),
-                    FinalUserAcc1 = mango_cursor:maybe_add_warning(UserFun, Cursor, Stats0, FinalUserAcc0),
+                    FinalUserAcc0 = mango_execution_stats:maybe_add_stats(
+                        Opts,
+                        UserFun,
+                        Stats0,
+                        FinalUserAcc
+                    ),
+                    FinalUserAcc1 = mango_cursor:maybe_add_warning(
+                        UserFun,
+                        Cursor,
+                        Stats0,
+                        FinalUserAcc0
+                    ),
                     {ok, FinalUserAcc1};
                 {error, Reason} ->
                     {error, Reason}
             end
     end.
-
 
 % Any of these indexes may be a composite index. For each
 % index find the most specific set of fields for each
@@ -167,16 +173,19 @@ execute(#cursor{db = Db, index = Idx, execution_stats = Stats} = Cursor0, UserFu
 % check FieldRanges for a, b, c, and d and return
 % the longest prefix of columns found.
 composite_indexes(Indexes, FieldRanges) ->
-    lists:foldl(fun(Idx, Acc) ->
-        Cols = mango_idx:columns(Idx),
-        Prefix = composite_prefix(Cols, FieldRanges),
-        % Calcuate the difference between the FieldRanges/Selector
-        % and the Prefix. We want to select the index with a prefix
-        % that is as close to the FieldRanges as possible
-        PrefixDifference = length(FieldRanges) - length(Prefix),
-        [{Idx, Prefix, PrefixDifference} | Acc]
-    end, [], Indexes).
-
+    lists:foldl(
+        fun(Idx, Acc) ->
+            Cols = mango_idx:columns(Idx),
+            Prefix = composite_prefix(Cols, FieldRanges),
+            % Calcuate the difference between the FieldRanges/Selector
+            % and the Prefix. We want to select the index with a prefix
+            % that is as close to the FieldRanges as possible
+            PrefixDifference = length(FieldRanges) - length(Prefix),
+            [{Idx, Prefix, PrefixDifference} | Acc]
+        end,
+        [],
+        Indexes
+    ).
 
 composite_prefix([], _) ->
     [];
@@ -187,7 +196,6 @@ composite_prefix([Col | Rest], Ranges) ->
         false ->
             []
     end.
-
 
 % The query planner
 % First choose the index with the lowest difference between its
@@ -224,20 +232,19 @@ choose_best_index(_DbName, IndexRanges) ->
     {SelectedIndex, SelectedIndexRanges, _} = hd(lists:sort(Cmp, IndexRanges)),
     {SelectedIndex, SelectedIndexRanges}.
 
-
 handle_message({meta, _}, Cursor) ->
     {ok, Cursor};
 handle_message({row, Props}, Cursor) ->
     case match_doc(Cursor, Props) of
         {ok, Doc, {execution_stats, Stats}} ->
-            Cursor1 = Cursor#cursor {
+            Cursor1 = Cursor#cursor{
                 execution_stats = Stats
             },
             Cursor2 = update_bookmark_keys(Cursor1, Props),
             FinalDoc = mango_fields:extract(Doc, Cursor2#cursor.fields),
             handle_doc(Cursor2, FinalDoc);
         {no_match, _, {execution_stats, Stats}} ->
-            Cursor1 = Cursor#cursor {
+            Cursor1 = Cursor#cursor{
                 execution_stats = Stats
             },
             {ok, Cursor1};
@@ -257,7 +264,6 @@ handle_message(complete, Cursor) ->
 handle_message({error, Reason}, _Cursor) ->
     {error, Reason}.
 
-
 handle_all_docs_message({row, Props}, Cursor) ->
     case is_design_doc(Props) of
         true -> {ok, Cursor};
@@ -265,7 +271,6 @@ handle_all_docs_message({row, Props}, Cursor) ->
     end;
 handle_all_docs_message(Message, Cursor) ->
     handle_message(Message, Cursor).
-
 
 handle_doc(#cursor{skip = S} = C, _) when S > 0 ->
     {ok, C#cursor{skip = S - 1}};
@@ -280,7 +285,6 @@ handle_doc(#cursor{limit = L, execution_stats = Stats} = C, Doc) when L > 0 ->
     }};
 handle_doc(C, _Doc) ->
     {stop, C}.
-
 
 apply_opts([], Args) ->
     Args;
@@ -332,7 +336,6 @@ apply_opts([{_, _} | Rest], Args) ->
     % Ignore unknown options
     apply_opts(Rest, Args).
 
-
 match_doc(Cursor, RowProps) ->
     #cursor{
         execution_stats = Stats0,
@@ -347,18 +350,16 @@ match_doc(Cursor, RowProps) ->
             {no_match, Doc, {execution_stats, Stats1}}
     end.
 
-
 is_design_doc(RowProps) ->
     case couch_util:get_value(id, RowProps) of
         <<"_design/", _/binary>> -> true;
         _ -> false
     end.
 
-
 update_bookmark_keys(#cursor{limit = Limit} = Cursor, Props) when Limit > 0 ->
     Id = couch_util:get_value(id, Props),
     Key = couch_util:get_value(key, Props),
-    Cursor#cursor {
+    Cursor#cursor{
         bookmark_docid = Id,
         bookmark_key = Key
     };

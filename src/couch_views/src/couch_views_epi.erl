@@ -10,12 +10,9 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 -module(couch_views_epi).
 
-
 -behaviour(couch_epi_plugin).
-
 
 -export([
     app/0,
@@ -27,34 +24,27 @@
     notify/3
 ]).
 
-
 app() ->
     couch_views.
-
 
 providers() ->
     [
         {fabric2_db, couch_views_fabric2_plugin}
     ].
 
-
 services() ->
     [
         {couch_views, couch_views_plugin}
     ].
 
-
 data_subscriptions() ->
     [].
-
 
 data_providers() ->
     [].
 
-
 processes() ->
     [].
-
 
 notify(_Key, _Old, _New) ->
     ok.

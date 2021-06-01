@@ -23,8 +23,14 @@
 ]).
 
 % gen_server api.
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-    code_change/3, terminate/2]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    code_change/3,
+    terminate/2
+]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -33,7 +39,6 @@
 
 get(Alg, undefined) when is_binary(Alg) ->
     get(Alg, <<"_default">>);
-
 get(Alg, KID0) when is_binary(Alg), is_binary(KID0) ->
     Kty = kty(Alg),
     KID = binary_to_list(KID0),
@@ -43,9 +48,8 @@ get(Alg, KID0) when is_binary(Alg), is_binary(KID0) ->
             ok = gen_server:call(?MODULE, {set, Kty, KID, Key}),
             Key;
         [{{Kty, KID}, Key}] ->
-             Key
+            Key
     end.
-
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -57,35 +61,27 @@ init(_) ->
     ets:new(?MODULE, [public, named_table]),
     {ok, nil}.
 
-
 handle_call({set, Kty, KID, Key}, _From, State) ->
     true = ets:insert(?MODULE, {{Kty, KID}, Key}),
     {reply, ok, State}.
 
-
 handle_cast({delete, Kty, KID}, State) ->
     true = ets:delete(?MODULE, {Kty, KID}),
     {noreply, State};
-
 handle_cast(_Msg, State) ->
     {noreply, State}.
-
 
 handle_info(restart_config_listener, State) ->
     ok = config:listen_for_changes(?MODULE, nil),
     {noreply, State};
-
 handle_info(_Msg, State) ->
     {noreply, State}.
-
 
 terminate(_Reason, _State) ->
     ok.
 
-
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
 
 % config listener callback
 
@@ -97,13 +93,11 @@ handle_config_change("jwt_keys", ConfigKey, _ConfigValue, _, _) ->
             ignored
     end,
     {ok, nil};
-
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
 handle_config_terminate(_Server, stop, _State) ->
     ok;
-
 handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(100, whereis(?MODULE), restart_config_listener).
 
@@ -148,19 +142,16 @@ pem_decode(PEM) ->
             _ ->
                 throw({bad_request, <<"Not a valid key">>})
         end
-   catch
-       error:_ ->
-           throw({bad_request, <<"Not a valid key">>})
-   end.
+    catch
+        error:_ ->
+            throw({bad_request, <<"Not a valid key">>})
+    end.
 
 kty(<<"HS", _/binary>>) ->
     "hmac";
-
 kty(<<"RS", _/binary>>) ->
     "rsa";
-
 kty(<<"ES", _/binary>>) ->
     "ec";
-
 kty(_) ->
     throw({bad_request, <<"Unknown kty">>}).

@@ -12,7 +12,6 @@
 
 -module(fabric2_events).
 
-
 -export([
     link_listener/4,
     stop_listener/1
@@ -23,9 +22,7 @@
     poll/1
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
-
 
 link_listener(Mod, Fun, Acc, Options) ->
     State = #{
@@ -42,10 +39,8 @@ link_listener(Mod, Fun, Acc, Options) ->
     end,
     {ok, Pid}.
 
-
 stop_listener(Pid) ->
     Pid ! stop_listening.
-
 
 init(Parent, #{dbname := DbName} = State) ->
     {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
@@ -53,7 +48,6 @@ init(Parent, #{dbname := DbName} = State) ->
     erlang:monitor(process, Parent),
     Parent ! {self(), initialized},
     poll(State#{since => Since}).
-
 
 poll(#{} = State) ->
     #{
@@ -65,23 +59,25 @@ poll(#{} = State) ->
         callback := Fun,
         acc := Acc
     } = State,
-    {Resp, NewSince} = try
-        Opts = [?ADMIN_CTX, {uuid, DbUUID}],
-        case fabric2_db:open(DbName, Opts) of
-            {ok, Db} ->
-                case fabric2_db:get_update_seq(Db) of
-                    Since ->
-                        {{ok, Acc}, Since};
-                    Other ->
-                        {Mod:Fun(DbName, updated, Acc), Other}
-                end;
-            Error ->
-                exit(Error)
-        end
-    catch error:database_does_not_exist ->
-        Mod:Fun(DbName, deleted, Acc),
-        {{stop, ok}, Since}
-    end,
+    {Resp, NewSince} =
+        try
+            Opts = [?ADMIN_CTX, {uuid, DbUUID}],
+            case fabric2_db:open(DbName, Opts) of
+                {ok, Db} ->
+                    case fabric2_db:get_update_seq(Db) of
+                        Since ->
+                            {{ok, Acc}, Since};
+                        Other ->
+                            {Mod:Fun(DbName, updated, Acc), Other}
+                    end;
+                Error ->
+                    exit(Error)
+            end
+        catch
+            error:database_does_not_exist ->
+                Mod:Fun(DbName, deleted, Acc),
+                {{stop, ok}, Since}
+        end,
     receive
         stop_listening ->
             ok;
