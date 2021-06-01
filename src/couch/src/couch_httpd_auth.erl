@@ -19,17 +19,38 @@
 
 -export([party_mode_handler/1]).
 
--export([default_authentication_handler/1, default_authentication_handler/2,
-	 special_test_authentication_handler/1]).
--export([cookie_authentication_handler/1, cookie_authentication_handler/2]).
+-export([
+    default_authentication_handler/1,
+    default_authentication_handler/2,
+    special_test_authentication_handler/1
+]).
+-export([
+    cookie_authentication_handler/1,
+    cookie_authentication_handler/2
+]).
 -export([null_authentication_handler/1]).
--export([proxy_authentication_handler/1, proxy_authentification_handler/1]).
+-export([
+    proxy_authentication_handler/1,
+    proxy_authentification_handler/1
+]).
 -export([cookie_auth_header/2]).
--export([handle_session_req/1, handle_session_req/2]).
+-export([
+    handle_session_req/1,
+    handle_session_req/2
+]).
 
--export([authenticate/2, verify_totp/2]).
--export([ensure_cookie_auth_secret/0, make_cookie_time/0]).
--export([cookie_auth_cookie/4, cookie_scheme/1]).
+-export([
+    authenticate/2,
+    verify_totp/2
+]).
+-export([
+    ensure_cookie_auth_secret/0,
+    make_cookie_time/0
+]).
+-export([
+    cookie_auth_cookie/4,
+    cookie_scheme/1
+]).
 -export([maybe_value/3]).
 
 -export([jwt_authentication_handler/1]).
