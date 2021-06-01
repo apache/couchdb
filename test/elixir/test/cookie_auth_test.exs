@@ -18,7 +18,7 @@ defmodule CookieAuthTest do
                  @users_db
                },
                {
-                 "couch_httpd_auth",
+                 "chttpd_auth",
                  "iterations",
                  "1"
                },
@@ -369,11 +369,13 @@ defmodule CookieAuthTest do
       error_message: "forbidden"
     )
 
-    session = login("jchris", "funnybone")
-    info = Couch.Session.info(session)
+    retry_until(fn ->
+      session = login("jchris", "funnybone")
+      info = Couch.Session.info(session)
 
-    assert not Enum.member?(info["userCtx"]["roles"], "_admin")
-    assert(Enum.member?(info["userCtx"]["roles"], "foo"))
+      assert not Enum.member?(info["userCtx"]["roles"], "_admin")
+      assert(Enum.member?(info["userCtx"]["roles"], "foo"))
+    end)
 
     logout(session)
 

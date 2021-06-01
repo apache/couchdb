@@ -100,18 +100,6 @@ json_apply_field({Key, NewValue}, [], Acc) ->
     % end of list, add ours
     {[{Key, NewValue}|Acc]}.
 
-apply_etag(JsonResp, undefined) ->
-    JsonResp;
-apply_etag({ExternalResponse}, CurrentEtag) ->
-    % Here we embark on the delicate task of replacing or creating the
-    % headers on the JsonResponse object. We need to control the Etag and
-    % Vary headers. If the external function controls the Etag, we'd have to
-    % run it to check for a match, which sort of defeats the purpose.
-    apply_headers(ExternalResponse, [
-        {<<"ETag">>, CurrentEtag},
-        {<<"Vary">>, <<"Accept">>}
-    ]).
-
 apply_headers(JsonResp, []) ->
     JsonResp;
 apply_headers(JsonResp, NewHeaders) ->
