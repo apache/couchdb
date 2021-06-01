@@ -50,7 +50,7 @@ pipeline {
     // Search for ERLANG_VERSION
     // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
     // be done parametrically
-    LOW_ERLANG_VER = '21.3.8.22'
+    LOW_ERLANG_VER = '22.3.4.17'
   }
 
   options {
@@ -108,7 +108,7 @@ pipeline {
           axis {
             name 'ERLANG_VERSION'
             // kerl can't build 24 yet
-            values '21.3.8.22', '22.3.4.17', '23.3.1'
+            values '22.3.4.17', '23.3.1'
           }
         }
 
