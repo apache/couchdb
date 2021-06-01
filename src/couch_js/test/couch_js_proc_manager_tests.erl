@@ -19,7 +19,7 @@
 -define(TDEF(A), {atom_to_list(A), fun A/0}).
 
 -define(NUM_PROCS, 3).
--define(TIMEOUT, 1000).
+-define(TIMEOUT, 2000).
 
 -define(TIMEOUT_ERROR(Msg), erlang:error({assertion_failed, [
         {module, ?MODULE},
@@ -35,7 +35,12 @@ start() ->
     config:set("query_server_config", "os_process_limit", "3", false),
     config:set("query_server_config", "os_process_soft_limit", "2", false),
     config:set("query_server_config", "os_process_idle_limit", "1", false),
-    ok = config_wait("os_process_idle_limit", "1"),
+    ok = test_util:wait(fun() ->
+        case config:get("query_server_config", "os_process_idle_limit") of
+            "1" -> ok;
+            _ -> wait
+        end
+    end, ?TIMEOUT, 10),
     Started.
 
 
@@ -355,19 +360,4 @@ kill_client({Pid, Ref}) ->
             ok
     after ?TIMEOUT ->
         ?TIMEOUT_ERROR("Timeout waiting for killed client 'DOWN'")
-    end.
-
-
-config_wait(Key, Value) ->
-    config_wait(Key, Value, 0).
-
-config_wait(Key, Value, Count) ->
-    case config:get("query_server_config", Key) of
-        Value ->
-            ok;
-        _ when Count > 10 ->
-            ?TIMEOUT_ERROR("Error waiting for config changes.");
-        _ ->
-            timer:sleep(10),
-            config_wait(Key, Value, Count + 1)
     end.
