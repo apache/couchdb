@@ -49,6 +49,7 @@ help() ->
     ].
 
 -spec help(Function :: atom()) -> ok.
+%% erlfmt-ignore
 help(opened_files) ->
     io:format("
     opened_files()
