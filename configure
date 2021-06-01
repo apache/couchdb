@@ -291,7 +291,13 @@ install_local_rebar() {
 
 install_local_rebar3() {
     if [ ! -x "${rootdir}/bin/rebar3" ]; then
-      wget -O ${rootdir}/bin/rebar3 https://s3.amazonaws.com/rebar3/rebar3 && chmod +x ${rootdir}/bin/rebar3
+        if [ ! -d "${rootdir}/src/rebar3" ]; then
+            git clone --depth 1 https://github.com/erlang/rebar3.git ${rootdir}/src/rebar3
+        fi
+        cd src/rebar3
+        ./bootstrap
+        mv ${rootdir}/src/rebar3/rebar3 ${rootdir}/bin/rebar3
+        cd ..
     fi
 }
 
