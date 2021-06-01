@@ -529,8 +529,14 @@ db_req(#httpd{method='POST', path_parts=[_, <<"_bulk_get">>],
                         _ ->
                             "multipart/related"
                     end,
-                    CType = {"Content-Type", MpType ++ "; boundary=\"" ++
-                                          ?b2l(OuterBoundary) ++  "\""},
+                    CType =
+                        {
+                        "Content-Type",
+                         MpType
+                                ++ "; boundary=\""
+                                ++ ?b2l(OuterBoundary)
+                                ++  "\""
+                        },
                     {ok, Resp} = start_chunked_response(Req, 200, [CType]),
                     lists:foldl(fun(Doc, _Pre) ->
                         case bulk_get_open_doc_revs(Db, Doc, Options) of
