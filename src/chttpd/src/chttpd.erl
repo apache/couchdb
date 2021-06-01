@@ -537,6 +537,7 @@ extract_cookie(#httpd{mochi_req = MochiReq}) ->
     end.
 %%% end hack
 
+%% erlfmt-ignore
 set_auth_handlers() ->
     AuthenticationDefault =  "{chttpd_auth, cookie_authentication_handler},
       {chttpd_auth, default_authentication_handler}",
