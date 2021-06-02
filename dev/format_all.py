@@ -28,9 +28,9 @@ def get_hashes():
     for item in get_source_paths():
         if item["is_source_path"]:
             beam_path = f"{item['dirname']}/ebin/{item['filename']}.beam"
-            hashes[item['raw_path']] = subprocess.run(["md5sum", beam_path],
-                                                      encoding="utf-8",
-                                                      capture_output=True).stdout
+            hashes[item["raw_path"]] = subprocess.run(
+                ["md5sum", beam_path], encoding="utf-8", capture_output=True
+            ).stdout
         else:
             # command = ["erl",
             #            "-eval",
@@ -46,20 +46,31 @@ def get_hashes():
 
 if __name__ == "__main__":
     print("Cleaning...")
-    subprocess.run(["make", 'clean'], encoding="utf-8", stdout=subprocess.PIPE)
+    subprocess.run(["make", "clean"], encoding="utf-8", stdout=subprocess.PIPE)
     print("Compiling...")
-    subprocess.run(["bin/rebar", 'compile'], encoding="utf-8",
-                   stdout=subprocess.PIPE, env={'ERL_OPTS': 'no_line_info'})
-    os.chdir('src')
+    subprocess.run(
+        ["bin/rebar", "compile"],
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        env={"ERL_OPTS": "no_line_info"},
+    )
+    os.chdir("src")
     print("Getting previous hashes...")
     prev = get_hashes()
     for key in prev.keys():
-        subprocess.run([os.environ["ERLFMT_PATH"], '-w', key],
-                       encoding="utf-8", stdout=subprocess.PIPE)
-    os.chdir('..')
-    subprocess.run(["bin/rebar", 'compile'], encoding="utf-8",
-                   stdout=subprocess.PIPE, env={'ERL_OPTS': 'no_line_info'})
-    os.chdir('src')
+        subprocess.run(
+            [os.environ["ERLFMT_PATH"], "-w", key],
+            encoding="utf-8",
+            stdout=subprocess.PIPE,
+        )
+    os.chdir("..")
+    subprocess.run(
+        ["bin/rebar", "compile"],
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        env={"ERL_OPTS": "no_line_info"},
+    )
+    os.chdir("src")
     print("Getting post hashes...")
     post = get_hashes()
     if prev == post:

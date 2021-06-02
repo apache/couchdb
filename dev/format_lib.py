@@ -22,22 +22,21 @@ import subprocess
 
 
 def get_source_paths():
-    for item in subprocess.run(["git", "ls-files"], encoding="utf-8",
-                               capture_output=True).stdout.split("\n"):
+    for item in subprocess.run(
+        ["git", "ls-files"], encoding="utf-8", capture_output=True
+    ).stdout.split("\n"):
         item_path = pathlib.Path(item)
-        if item_path.suffix != '.erl':
+        if item_path.suffix != ".erl":
             continue
 
-        regex_result = re.search(r'([^/]+?)/src/([^/]+?).erl', item)
+        regex_result = re.search(r"([^/]+?)/src/([^/]+?).erl", item)
         result_dict = {
             "raw_path": item,
             "item_path": item_path,
             "is_source_path": regex_result is not None,
-
         }
         if result_dict["is_source_path"]:
-            result_dict.update({
-                "dirname": regex_result.group(1),
-                "filename": regex_result.group(2)
-            })
+            result_dict.update(
+                {"dirname": regex_result.group(1), "filename": regex_result.group(2)}
+            )
         yield result_dict
