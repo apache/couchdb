@@ -297,7 +297,7 @@ install_local_rebar3() {
         cd src/rebar3
         ./bootstrap
         mv ${rootdir}/src/rebar3/rebar3 ${rootdir}/bin/rebar3
-        cd ..
+        cd ../..
     fi
 }
 
