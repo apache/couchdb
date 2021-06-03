@@ -205,7 +205,7 @@ parse_rep_db(#{} = Endpoint, #{} = ProxyParams, #{} = Options) ->
     }, ProxyParams),
     SslParams = ssl_params(Url),
 
-    #{
+    HttpDb = #{
         <<"url">> => Url,
         <<"auth_props">> => AuthProps,
         <<"headers">> => Headers,
@@ -214,7 +214,8 @@ parse_rep_db(#{} = Endpoint, #{} = ProxyParams, #{} = Options) ->
         <<"http_connections">> => maps:get(<<"http_connections">>, Options),
         <<"retries">> => maps:get(<<"retries_per_request">>, Options),
         <<"proxy_url">> => ProxyUrl
-    };
+    },
+    normalize_basic_auth(HttpDb);
 
 parse_rep_db(<<"http://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db(#{<<"url">> => Url}, Proxy, Options);
@@ -475,6 +476,117 @@ ssl_verify_options(false) ->
     }.
 
 
+-spec set_basic_auth_creds(string(), string(), map()) -> map().
+set_basic_auth_creds(undefined, undefined, #{}= HttpDb) ->
+    HttpDb;
+set_basic_auth_creds(User, Pass, #{} = HttpDb)
+        when is_list(User), is_list(Pass) ->
+    #{<<"auth_props">> := AuthProps}  = HttpDb,
+    UserPass = #{
+        <<"username">> => list_to_binary(User),
+        <<"password">> => list_to_binary(Pass)
+    },
+    AuthProps1 = AuthProps#{<<"basic">> => UserPass},
+    HttpDb#{<<"auth_props">> := AuthProps1}.
+
+
+-spec extract_creds_from_url(binary()) ->
+    {ok, {string() | undefined, string() | undefined}, string()} |
+    {error, term()}.
+extract_creds_from_url(Url0) ->
+    Url = binary_to_list(Url0),
+    case ibrowse_lib:parse_url(Url) of
+        {error, Error} ->
+            {error, Error};
+        #url{username = undefined, password = undefined} ->
+            {ok, {undefined, undefined}, Url0};
+        #url{protocol = Proto, username = User, password = Pass} ->
+            % Excise user and pass parts from the url. Try to keep the host,
+            % port and path as they were in the original.
+            Prefix = lists:concat([Proto, "://", User, ":", Pass, "@"]),
+            Suffix = lists:sublist(Url, length(Prefix) + 1, length(Url) + 1),
+            NoCreds = lists:concat([Proto, "://", Suffix]),
+            {ok, {User, Pass}, list_to_binary(NoCreds)}
+    end.
+
+
+% Normalize basic auth credentials so they are set only in the auth props
+% object. If multiple basic auth credentials are provided, the resulting
+% credentials are picked in the following order.
+%  1) {"auth": "basic": {"username":.., "password": ...} ...}
+%  2) URL userinfo part
+%  3) "Authentication" : "basic $base64" headers
+%
+-spec normalize_basic_auth(map()) -> map().
+normalize_basic_auth(#{} = HttpDb) ->
+    #{
+        <<"url">> := Url,
+        <<"headers">> := Headers
+    } = HttpDb,
+    {HeaderCreds, HeadersNoCreds} = remove_basic_auth_from_headers(Headers),
+    {UrlCreds, UrlWithoutCreds} = case extract_creds_from_url(Url) of
+        {ok, Creds = {_, _}, UrlNoCreds} ->
+            {Creds, UrlNoCreds};
+        {error, _Error} ->
+            % Don't crash replicator if user provided an invalid
+            % userinfo part
+            {undefined, undefined}
+    end,
+    AuthCreds = {_, _} = couch_replicator_utils:get_basic_auth_creds(HttpDb),
+    HttpDb1 = HttpDb#{
+        <<"url">> := UrlWithoutCreds,
+        <<"headers">> := HeadersNoCreds
+    },
+    {User, Pass} = case {AuthCreds, UrlCreds, HeaderCreds} of
+        {{U, P}, {_, _}, {_, _}} when is_list(U), is_list(P) -> {U, P};
+        {{_, _}, {U, P}, {_, _}} when is_list(U), is_list(P) -> {U, P};
+        {{_, _}, {_, _}, {U, P}} -> {U, P}
+    end,
+    set_basic_auth_creds(User, Pass, HttpDb1).
+
+
+remove_basic_auth_from_headers(#{} = HeadersMap) ->
+    % Headers are passed in a map however mochiweb_headers expects them to be
+    % lists so we transform them to lists first, then back to maps
+    Headers = maps:fold(fun(K, V, Acc) ->
+        [{binary_to_list(K), binary_to_list(V)} | Acc]
+    end, [], HeadersMap),
+    Headers1 = mochiweb_headers:make(Headers),
+    case mochiweb_headers:get_value("Authorization", Headers1) of
+        undefined ->
+            {{undefined, undefined}, HeadersMap};
+        Auth ->
+            {Basic, B64} = lists:splitwith(fun(X) -> X =/= $\s end, Auth),
+            BasicLower = string:to_lower(Basic),
+            Result = maybe_remove_basic_auth(BasicLower, B64, Headers1),
+            {{User, Pass}, Headers2} = Result,
+            HeadersMapResult = lists:foldl(fun({K, V}, Acc) ->
+                Acc#{list_to_binary(K) => list_to_binary(V)}
+            end, #{}, Headers2),
+            {{User, Pass}, HeadersMapResult}
+    end.
+
+
+maybe_remove_basic_auth("basic", " " ++ Base64, Headers) ->
+    Headers1 = mochiweb_headers:delete_any("Authorization", Headers),
+    {decode_basic_creds(Base64), mochiweb_headers:to_list(Headers1)};
+maybe_remove_basic_auth(_, _, Headers) ->
+    {{undefined, undefined}, mochiweb_headers:to_list(Headers)}.
+
+
+decode_basic_creds(Base64) ->
+    try re:split(base64:decode(Base64), ":", [{return, list}, {parts, 2}]) of
+        [User, Pass] ->
+            {User, Pass};
+        _ ->
+            {undefined, undefined}
+    catch
+        % Tolerate invalid B64 values here to avoid crashing replicator
+        error:function_clause ->
+            {undefined, undefined}
+    end.
+
+
 -ifdef(TEST).
 
 -include_lib("couch/include/couch_eunit.hrl").
@@ -564,5 +676,244 @@ t_error_on_local_endpoint(_) ->
     Expect = local_endpoints_not_supported,
     ?assertThrow({bad_rep_doc, Expect}, parse_rep_doc(RepDoc)).
 
+
+remove_basic_auth_from_headers_test_() ->
+    B64 = list_to_binary(b64creds("user", "pass")),
+    [?_assertEqual({{User, Pass}, NoAuthHeaders},
+        remove_basic_auth_from_headers(Headers)) ||
+        {{User, Pass, NoAuthHeaders}, Headers} <- [
+            {
+                {undefined, undefined, #{}},
+                #{}
+            },
+            {
+                {undefined, undefined, #{<<"h">> => <<"v">>}},
+                #{<<"h">> => <<"v">>}
+            },
+            {
+                {undefined, undefined, #{<<"Authorization">> => <<"junk">>}},
+                #{<<"Authorization">> => <<"junk">>}
+            },
+            {
+                {undefined, undefined, #{}},
+                #{<<"Authorization">> => <<"basic X">>}
+            },
+            {
+                {"user", "pass", #{}},
+                #{<<"Authorization">> => <<"Basic ", B64/binary>>}
+            },
+            {
+                {"user", "pass", #{}},
+                #{<<"AuThorization">> => <<"Basic ", B64/binary>>}
+            },
+            {
+                {"user", "pass", #{}},
+                #{<<"Authorization">> => <<"bAsIc ", B64/binary>>}
+            },
+            {
+                {"user", "pass", #{<<"h">> => <<"v">>}},
+                #{
+                    <<"Authorization">> => <<"Basic ", B64/binary>>,
+                    <<"h">> => <<"v">>
+                }
+            }
+        ]
+    ].
+
+
+b64creds(User, Pass) ->
+    base64:encode_to_string(User ++ ":" ++ Pass).
+
+
+set_basic_auth_creds_test() ->
+    Check = fun(User, Pass, Props) ->
+        HttpDb = #{<<"auth_props">> => Props},
+        HttpDb1 = set_basic_auth_creds(User, Pass, HttpDb),
+        maps:get(<<"auth_props">>, HttpDb1)
+    end,
+
+    ?assertEqual(#{}, Check(undefined, undefined, #{})),
+
+    ?assertEqual(#{<<"other">> => #{}}, Check(undefined, undefined,
+        #{<<"other">> => #{}})),
+
+    ?assertEqual(#{
+        <<"basic">> => #{
+            <<"username">> => <<"u">>,
+            <<"password">> => <<"p">>
+        }
+    }, Check("u", "p", #{})),
+
+    ?assertEqual(#{
+        <<"other">> => #{},
+        <<"basic">> => #{
+            <<"username">> => <<"u">>,
+            <<"password">> => <<"p">>
+        }
+    }, Check("u", "p", #{<<"other">> => #{}})).
+
+
+normalize_basic_creds_test_() ->
+    DefaultHeaders = couch_replicator_utils:default_headers_map(),
+    [?_assertEqual(Expect, normalize_basic_auth(Input)) || {Input, Expect} <- [
+        {
+            #{
+                <<"url">> => <<"http://u:p@x.y/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => DefaultHeaders
+            },
+            #{
+                <<"url">> => <<"http://x.y/db">>,
+                <<"auth_props">> => auth_props("u", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://u:p@h:80/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => DefaultHeaders
+            },
+            #{
+                <<"url">> => <<"http://h:80/db">>,
+                <<"auth_props">> => auth_props("u", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"https://u:p@h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => DefaultHeaders
+            },
+            #{
+                <<"url">> => <<"https://h/db">>,
+                <<"auth_props">> => auth_props("u", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://u:p@[2001:db8:a1b:12f9::1]/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => DefaultHeaders
+            },
+            #{
+                <<"url">> => <<"http://[2001:db8:a1b:12f9::1]/db">>,
+                <<"auth_props">> => auth_props("u", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"authorization">> => basic_b64("u", "p")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"authorization">> => basic_b64("u", "p@")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u", "p@"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"authorization">> => basic_b64("u", "p@%40")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u", "p@%40"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"aUthoriZation">> => basic_b64("U", "p")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("U", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://u1:p1@h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"Authorization">> => basic_b64("u2", "p2")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u1", "p1"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://u1:p1@h/db">>,
+                <<"auth_props">> => auth_props("u2", "p2"),
+                <<"headers">> => DefaultHeaders
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u2", "p2"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://u1:p1@h/db">>,
+                <<"auth_props">> => auth_props("u2", "p2"),
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"Authorization">> => basic_b64("u3", "p3")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u2", "p2"),
+                <<"headers">> => DefaultHeaders
+            }
+        }
+    ]].
+
+
+basic_b64(User, Pass) when is_list(User), is_list(Pass) ->
+    B64Creds = list_to_binary(b64creds(User, Pass)),
+    <<"basic ", B64Creds/binary>>.
+
+
+auth_props(User, Pass) when is_list(User), is_list(Pass) ->
+    #{
+        <<"basic">> => #{
+            <<"username">> => list_to_binary(User),
+            <<"password">> => list_to_binary(Pass)
+        }
+    }.
 
 -endif.
