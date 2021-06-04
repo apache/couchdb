@@ -201,6 +201,21 @@ if ((Get-Command "rebar.cmd" -ErrorAction SilentlyContinue) -eq $null)
    $env:Path += ";$rootdir\bin"
 }
 
+# check for enc; if not found, build it and add it to our path
+if ((Get-Command "enc.cmd" -ErrorAction SilentlyContinue) -eq $null)
+{
+   Write-Verbose "==> enc.cmd not found; bootstrapping..."
+   if (-Not (Test-Path "src\erlang-native-compiler"))
+   {
+      git clone --depth 1 https://github.com/davisp/erlang-native-compiler.git $rootdir\src\erlang-native-compiler
+   }
+   cmd /c "cd src\erlang-native-compiler && $rootdir\src\erlang-native-compiler\bootstrap.bat"
+   cp $rootdir\src\erlang-native-compiler\enc $rootdir\bin\enc
+   cp $rootdir\src\erlang-native-compiler\enc.cmd $rootdir\bin\enc.cmd
+   make -C $rootdir\src\erlang-native-compiler clean
+   $env:Path += ";$rootdir\bin"
+}
+
 # check for emilio; if not found, get it and build it
 if ((Get-Command "emilio.cmd" -ErrorAction SilentlyContinue) -eq $null)
 {

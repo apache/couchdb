@@ -265,6 +265,17 @@ install_local_rebar() {
     fi
 }
 
+install_local_enc() {
+    if [ ! -x "${rootdir}/bin/enc" ]; then
+        if [ ! -d "${rootdir}/src/erlang-native-compiler" ]; then
+            git clone --depth 1 https://github.com/davisp/erlang-native-compiler.git ${rootdir}/src/erlang-native-compiler
+        fi
+        make -C ${rootdir}/src/erlang-native-compiler
+        mv ${rootdir}/src/erlang-native-compiler/enc ${rootdir}/bin/enc
+        make -C ${rootdir}/src/erlang-native-compiler clean
+    fi
+}
+
 install_local_emilio() {
     if [ ! -x "${rootdir}/bin/emilio" ]; then
         if [ ! -d "${rootdir}/src/emilio" ]; then
@@ -280,6 +291,11 @@ install_local_emilio() {
 if [ -z "${REBAR}" ]; then
     install_local_rebar
     REBAR=${rootdir}/bin/rebar
+fi
+
+if [ -z "${ENC}" ]; then
+    install_local_enc
+    ENC=${rootdir}/bin/enc
 fi
 
 install_local_emilio
