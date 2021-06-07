@@ -19,6 +19,7 @@
 -include_lib("fabric/test/fabric2_test.hrl").
 
 
+
 create_target_with_options_replication_test_() ->
     {
         "Create target with range partitions tests",
@@ -90,6 +91,7 @@ should_create_target_with_q_2_n_1({Source, Target}) ->
     ?assertEqual(0, couch_util:get_value(n, ClusterInfo)).
 
 
+
 should_create_target_with_default({Source, Target}) ->
     RepObject = {[
         {<<"source">>, Source},
@@ -102,6 +104,7 @@ should_create_target_with_default({Source, Target}) ->
 
     TargetInfo = db_info(Target),
     {ClusterInfo} = couch_util:get_value(cluster, TargetInfo),
+
     delete_db(Source),
     delete_db(Target),
     ?assertEqual(0, couch_util:get_value(q, ClusterInfo)).

@@ -598,11 +598,11 @@ can_spawn(#state{hard_limit = HardLimit, counts = Counts}, Lang) ->
 
 
 get_proc_config() ->
-    Limit = config:get("query_server_config", "reduce_limit", "true"),
-    Timeout = config:get("couchdb", "os_process_timeout", "5000"),
+    Limit = config:get_boolean("query_server_config", "reduce_limit", true),
+    Timeout = config:get_integer("couchdb", "os_process_timeout", 5000),
     {[
-        {<<"reduce_limit">>, list_to_atom(Limit)},
-        {<<"timeout">>, list_to_integer(Timeout)}
+        {<<"reduce_limit">>, Limit},
+        {<<"timeout">>, Timeout}
     ]}.
 
 
@@ -612,5 +612,4 @@ get_hard_limit() ->
 
 
 get_soft_limit() ->
-    LimStr = config:get("query_server_config", "os_process_soft_limit", "100"),
-    list_to_integer(LimStr).
+    config:get_integer("query_server_config", "os_process_soft_limit", 100).

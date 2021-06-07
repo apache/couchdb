@@ -16,15 +16,20 @@
     remove_state_fields/3,
     update_completed/4,
     update_failed/4,
+
     before_doc_update/3,
     after_doc_read/2
+
 ]).
 
 
 -include_lib("couch/include/couch_db.hrl").
+
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include("couch_replicator.hrl").
 -include_lib("kernel/include/logger.hrl").
+
+
 
 
 -define(OWNER, <<"owner">>).
@@ -34,6 +39,7 @@
 
 remove_state_fields(null, null, null) ->
     ok;
+
 
 remove_state_fields(DbName, DbUUID, DocId) ->
     update_rep_doc(DbName, DbUUID, DocId, [
@@ -46,6 +52,7 @@ remove_state_fields(DbName, DbUUID, DocId) ->
     ok.
 
 
+
 -spec update_completed(binary(), binary(), binary(), [_]) -> ok.
 update_completed(null, null, _, _) ->
     ok;
@@ -56,9 +63,11 @@ update_completed(DbName, DbUUID, DocId, #{} = Stats0) ->
         {?REPLICATION_STATE, ?ST_COMPLETED},
         {?REPLICATION_STATE_REASON, undefined},
         {?REPLICATION_STATS, Stats}]),
+
     couch_stats:increment_counter([couch_replicator, docs,
         completed_state_updates
     ]),
+
     ok.
 
 
@@ -94,6 +103,7 @@ before_doc_update(#doc{body = {Body}} = Doc, Db, _UpdateType) ->
     #user_ctx{roles = Roles, name = Name} = fabric2_db:get_user_ctx(Db),
     IsReplicator = lists:member(<<"_replicator">>, Roles),
 
+
     Doc1 = case IsReplicator of true -> Doc; false ->
         case couch_util:get_value(?OWNER, Body) of
             undefined ->
@@ -109,21 +119,27 @@ before_doc_update(#doc{body = {Body}} = Doc, Db, _UpdateType) ->
                     _ ->
                         throw({forbidden, <<"Can't update replication",
                             "documents from other users.">>})
+
                 end
         end
     end,
+
 
     Deleted = Doc1#doc.deleted,
     IsFailed = couch_util:get_value(?REPLICATION_STATE, Body) == ?ST_FAILED,
     case IsReplicator orelse Deleted orelse IsFailed of true -> ok; false ->
         try
             couch_replicator_parse:parse_rep_doc(Doc1#doc.body)
+
         catch
             throw:{bad_rep_doc, Error} ->
                 throw({forbidden, Error})
         end
+
     end,
     Doc1.
+
+
 
 
 -spec after_doc_read(#doc{}, Db::any()) -> #doc{}.
@@ -148,6 +164,7 @@ after_doc_read(#doc{body = {Body}} = Doc, Db) ->
 
 update_rep_doc(RepDbName, RepDbUUID, RepDocId, KVs) ->
     update_rep_doc(RepDbName, RepDbUUID, RepDocId, KVs, 1).
+
 
 
 update_rep_doc(RepDbName, RepDbUUID, RepDocId, KVs, Wait)
@@ -207,6 +224,7 @@ update_rep_doc(RepDbName, RepDbUUID, #doc{body = {RepDocBody}} = RepDoc, KVs, _T
 
 open_rep_doc(DbName, DbUUID, DocId) when is_binary(DbName), is_binary(DbUUID),
             is_binary(DocId) ->
+
     try
         case fabric2_db:open(DbName, [?CTX, sys_db, {uuid, DbUUID}]) of
             {ok, Db} -> fabric2_db:open_doc(Db, DocId, [ejson_body]);
@@ -219,6 +237,7 @@ open_rep_doc(DbName, DbUUID, DocId) when is_binary(DbName), is_binary(DbUUID),
 
 
 save_rep_doc(DbName, DbUUID, Doc) when is_binary(DbName), is_binary(DbUUID) ->
+
     try
         {ok, Db} = fabric2_db:open(DbName, [?CTX, sys_db, {uuid, DbUUID}]),
         fabric2_db:update_doc(Db, Doc, [])
@@ -239,6 +258,17 @@ save_rep_doc(DbName, DbUUID, Doc) when is_binary(DbName), is_binary(DbUUID) ->
             Msg = "~p VDU or BDU function preventing doc update to ~s ~s ~p",
             couch_log:error(Msg, [?MODULE, DbName, Doc#doc.id, Reason]),
             {ok, forbidden}
+
+
+
+
+
+
+
+
+
+
+
     end.
 
 

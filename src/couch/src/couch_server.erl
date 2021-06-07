@@ -17,15 +17,21 @@
 
 -export([get_version/0,get_version/1,get_git_sha/0,get_uuid/0]).
 -export([init/1, handle_call/3,sup_start_link/0]).
+
 -export([handle_cast/2,code_change/3,handle_info/2,terminate/2]).
 -export([is_admin/2,has_admins/0]).
+
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
 
 -include_lib("couch/include/couch_db.hrl").
 
+
+
 -define(RELISTEN_DELAY, 5000).
+-define(DEFAULT_ENGINE, "couch").
+
 
 get_version() ->
     ?COUCHDB_VERSION. %% Defined in rebar.config.script
@@ -47,6 +53,7 @@ get_uuid() ->
 
 sup_start_link() ->
     gen_server:start_link({local, couch_server}, couch_server, [], []).
+
 
 is_admin(User, ClearPwd) ->
     case config:get("admins", User) of
@@ -71,8 +78,10 @@ hash_admin_passwords(Persist) ->
         end, couch_passwords:get_unhashed_admins()).
 
 init([]) ->
+
     % Mark being able to receive documents with an _access property as a supported feature
     config:enable_feature('access-ready'),
+
     % Mark if fips is enabled
     case
         erlang:function_exported(crypto, info_fips, 0) andalso
@@ -95,19 +104,30 @@ handle_cast(Msg, Srv) ->
 handle_info(Msg, Srv) ->
     {stop, {unknown_message, Msg}, Srv}.
 
+
+
+
 code_change(_OldVsn, Srv, _Extra) ->
     {ok, Srv}.
 
 terminate(_Reason, _Srv) ->
+
     ok.
 
 handle_config_change("admins", _, _, Persist, _) ->
+
     % spawn here so couch event manager doesn't deadlock
     {ok, spawn(fun() -> hash_admin_passwords(Persist) end)};
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
+
 handle_config_terminate(_, stop, _) ->
     ok;
 handle_config_terminate(_Server, _Reason, _State) ->
     erlang:send_after(?RELISTEN_DELAY, whereis(?MODULE), restart_config_listener).
+
+
+
+
+

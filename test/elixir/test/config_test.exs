@@ -11,6 +11,7 @@ defmodule ConfigTest do
 
   setup do
     config_url = "/_node/_local/_config"
+
     resp = Couch.get(config_url)
     assert resp.status_code == 200
     {:ok, config: resp.body, config_url: config_url}
@@ -71,8 +72,10 @@ defmodule ConfigTest do
   end
 
 
+
   test "Standard config options are present", context do
     assert context[:config]["chttpd"]["port"]
+
   end
 
   test "Settings can be altered with undefined whitelist allowing any change", context do
@@ -94,6 +97,7 @@ defmodule ConfigTest do
     delete_config(context, "admins", "administrator")
     assert Couch.delete("/_session").body["ok"]
   end
+
 
   test "Non-term whitelist values allow further modification of the whitelist", context do
     val = "!This is an invalid Erlang term!"

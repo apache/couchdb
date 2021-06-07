@@ -16,6 +16,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+
 -export([header_value/2,header_value/3,qs_value/2,qs_value/3,qs/1,qs_json_value/3]).
 -export([path/1,absolute_uri/2,body_length/1]).
 -export([verify_is_server_admin/1,unquote/1,quote/1,recv/2,recv_chunked/4,error_info/1]).
@@ -35,11 +36,22 @@
 -export([validate_host/1]).
 -export([validate_bind_address/1]).
 -export([check_max_request_length/1]).
+
 -export([maybe_decompress/2]).
 
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 -define(MAX_DRAIN_BYTES, 1048576).
 -define(MAX_DRAIN_TIME_MSEC, 1000).
+-define(DEFAULT_SOCKET_OPTIONS, "[{sndbuf, 262144}]").
+-define(DEFAULT_AUTHENTICATION_HANDLERS,
+    "{couch_httpd_auth, cookie_authentication_handler}, "
+    "{couch_httpd_auth, default_authentication_handler}").
+
+
+
+
+
+            ?DEFAULT_AUTHENTICATION_HANDLERS)),
 
 
 % SpecStr is a string like "{my_module, my_fun}"
@@ -72,6 +84,7 @@ make_arity_3_fun(SpecStr) ->
 make_fun_spec_strs(SpecStr) ->
     re:split(SpecStr, "(?<=})\\s*,\\s*(?={)", [{return, list}]).
 
+
 validate_host(#httpd{} = Req) ->
     case chttpd_util:get_chttpd_config_boolean("validate_host", false) of
         true ->
@@ -99,6 +112,7 @@ hostname(#httpd{} = Req) ->
 valid_hosts() ->
     List = chttpd_util:get_chttpd_config("valid_hosts", ""),
     re:split(List, ",", [{return, list}]).
+
 
 validate_referer(Req) ->
     Host = host_for_request(Req),
@@ -894,6 +908,7 @@ http_respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
     Result;
 http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, Args, Type) ->
     MochiReq:Type({Code, Headers, Args}).
+
 
 
 %%%%%%%% module tests below %%%%%%%%

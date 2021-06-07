@@ -24,6 +24,7 @@
     handle_design_info_req/3, handle_view_cleanup_req/2,
     update_doc/4, http_code_from_status/1]).
 
+
 -import(chttpd,
     [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
     start_json_response/2,send_chunk/2,end_json_response/1,
@@ -40,6 +41,7 @@
 
 % Accumulator for changes_callback function
 -record(cacc, {
+
     feed,
     mochi,
     prepend = "",
@@ -87,6 +89,7 @@ handle_changes_req(#httpd{method='POST'}=Req, Db) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
         handle_changes_req_tx(Req, TxDb)
     end);
+
 handle_changes_req(#httpd{method='GET'}=Req, Db) ->
     fabric2_fdb:transactional(Db, fun(TxDb) ->
         handle_changes_req_tx(Req, TxDb)
@@ -97,15 +100,19 @@ handle_changes_req(#httpd{path_parts=[_,<<"_changes">>]}=Req, _Db) ->
 handle_changes_req_tx(#httpd{}=Req, Db) ->
     ChangesArgs = parse_changes_query(Req),
     ChangesFun = chttpd_changes:handle_db_changes(ChangesArgs, Req, Db),
+
     Max = chttpd:chunked_response_buffer_size(),
     case ChangesArgs#changes_args.feed of
     "normal" ->
+
         Acc0 = #cacc{
             feed = normal,
+
             mochi = Req,
             threshold = Max
         },
         ChangesFun({fun changes_callback/2, Acc0});
+
     Feed when Feed =:= "continuous"; Feed =:= "longpoll"; Feed =:= "eventsource"  ->
         couch_stats:increment_counter([couchdb, httpd, clients_requesting_changes]),
         Acc0 = #cacc{
@@ -179,6 +186,7 @@ changes_callback(start, #cacc{feed = normal} = Acc) ->
     #cacc{mochi = Req} = Acc,
     FirstChunk = "{\"results\":[\n",
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [], FirstChunk),
+
     {ok, Acc#cacc{mochi = Resp, responding = true}};
 changes_callback(start, Acc) ->
     #cacc{mochi = Req} = Acc,
@@ -264,7 +272,9 @@ incr_stats_changes_feed(IncludeDocs) ->
 % the future this endpoint will return a 410 response then it will be removed.
 handle_compact_req(#httpd{method='POST'}=Req, _Db) ->
     chttpd:validate_ctype(Req, "application/json"),
+
     send_json(Req, 202, {[{ok, true}]});
+
 
 handle_compact_req(Req, _Db) ->
     send_method_not_allowed(Req, "POST").
@@ -273,10 +283,12 @@ handle_view_cleanup_req(Req, Db) ->
     ok = fabric2_index:cleanup(Db),
     send_json(Req, 202, {[{ok, true}]}).
 
+
 handle_design_req(#httpd{
         path_parts=[_DbName, _Design, Name, <<"_",_/binary>> = Action | _Rest]
     }=Req, Db) ->
     case fabric2_db:open_doc(Db, <<"_design/", Name/binary>>) of
+
     {ok, DDoc} ->
         Handler = chttpd_handlers:design_handler(Action, fun bad_action_req/3),
         Handler(Req, Db, DDoc);
@@ -303,10 +315,12 @@ handle_design_info_req(Req, _Db, _DDoc) ->
 
 create_db_req(#httpd{user_ctx=Ctx}=Req, DbName) ->
     couch_httpd:verify_is_server_admin(Req),
+
     DocUrl = absolute_uri(Req, "/" ++ couch_util:url_encode(DbName)),
     case fabric2_db:create(DbName, [{user_ctx, Ctx}]) of
         {ok, _} ->
             send_json(Req, 201, [{"Location", DocUrl}], {[{ok, true}]});
+
         {error, file_exists} ->
             chttpd:send_error(Req, file_exists);
         Error ->
@@ -318,6 +332,7 @@ delete_db_req(#httpd{user_ctx=Ctx}=Req, DbName) ->
     case fabric2_db:delete(DbName, [{user_ctx, Ctx}]) of
         ok ->
             send_json(Req, 200, {[{ok, true}]});
+
         Error ->
             throw(Error)
     end.
@@ -325,6 +340,7 @@ delete_db_req(#httpd{user_ctx=Ctx}=Req, DbName) ->
 do_db_req(#httpd{path_parts=[DbName|_], user_ctx=Ctx}=Req, Fun) ->
     Options = [{user_ctx, Ctx}, {interactive, true}],
     {ok, Db} = fabric2_db:open(DbName, Options),
+
     Fun(Req, Db).
 
 db_req(#httpd{method='GET',path_parts=[_DbName]}=Req, Db) ->
@@ -342,6 +358,7 @@ db_req(#httpd{method='POST', path_parts=[DbName]}=Req, Db) ->
     Doc1 = couch_doc:from_json_obj_validate(Doc0, fabric2_db:name(Db)),
     validate_attachment_names(Doc1),
     Doc2 = case Doc1#doc.id of
+
         <<"">> ->
             Doc1#doc{id=couch_uuids:new(), revs={0, []}};
         _ ->
@@ -401,6 +418,7 @@ db_req(#httpd{method='POST', path_parts=[_DbName, <<"_ensure_full_commit">>]
         }=Req, Db) ->
     chttpd:validate_ctype(Req, "application/json"),
     #{db_prefix := <<_/binary>>} = Db,
+
     send_json(Req, 201, {[
         {ok, true},
         {instance_start_time, <<"0">>}
@@ -425,6 +443,7 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>]}=Req, Db) ->
     case length(DocsArray) =< MaxDocs of
         true -> ok;
         false -> throw({request_entity_too_large, {bulk_docs, MaxDocs}})
+
     end,
     couch_stats:update_histogram([couchdb, httpd, bulk_docs], length(DocsArray)),
     Options = case chttpd:header_value(Req, "X-Couch-Full-Commit") of
@@ -505,6 +524,7 @@ db_req(#httpd{method='POST', path_parts=[_, <<"_bulk_get">>],
             #doc_query_args{
                 options = Options
             } = bulk_get_parse_doc_query(Req),
+
             AcceptJson =  MochiReq:accepts_content_type("application/json"),
             AcceptMixedMp = MochiReq:accepts_content_type("multipart/mixed"),
             AcceptRelatedMp = MochiReq:accepts_content_type("multipart/related"),
@@ -564,6 +584,7 @@ db_req(#httpd{method='POST', path_parts=[_, <<"_bulk_get">>],
     end;
 db_req(#httpd{path_parts=[_, <<"_bulk_get">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "POST");
+
 
 db_req(#httpd{method='GET',path_parts=[_,OP]}=Req, Db) when ?IS_ALL_DOCS(OP) ->
     case chttpd:qs_json_value(Req, "keys", nil) of
@@ -648,6 +669,7 @@ db_req(#httpd{path_parts=[_,<<"_revs_diff">>]}=Req, _Db) ->
 
 db_req(#httpd{method = 'PUT',path_parts = [_, <<"_security">>]} = Req, Db) ->
     validate_security_can_be_edited(fabric2_db:name(Db)),
+
     SecObj = chttpd:json_body(Req),
     case fabric2_db:set_security(Db, SecObj) of
         ok ->
@@ -663,6 +685,7 @@ db_req(#httpd{path_parts=[_,<<"_security">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
 
 db_req(#httpd{method='PUT',path_parts=[_,<<"_revs_limit">>]}=Req, Db) ->
+
     Limit = chttpd:json_body(Req),
     ok = fabric2_db:set_revs_limit(Db, Limit),
     send_json(Req, {[{<<"ok">>, true}]});
@@ -672,6 +695,7 @@ db_req(#httpd{method='GET',path_parts=[_,<<"_revs_limit">>]}=Req, Db) ->
 
 db_req(#httpd{path_parts=[_,<<"_revs_limit">>]}=Req, _Db) ->
     send_method_not_allowed(Req, "PUT,GET");
+
 
 % Special case to enable using an unencoded slash in the URL of design docs,
 % as slashes in document IDs must otherwise be URL encoded.
@@ -777,6 +801,7 @@ stream_all_docs_view(Req, Db, Args0, OP) ->
     Args1 = Args0#mrargs{view_type=map},
     Args2 = couch_views_util:validate_args(Args1),
     Args3 = set_namespace(OP, Args2),
+
     Max = chttpd:chunked_response_buffer_size(),
     VAcc0 = #vacc{
         db = Db,
@@ -972,6 +997,7 @@ db_doc_req(#httpd{method='GET', mochi_req=MochiReq}=Req, Db, DocId) ->
         options = Options,
         atts_since = AttsSince
     } = parse_doc_query(Req),
+
     case Revs of
     [] ->
         Options2 =
@@ -1022,6 +1048,7 @@ db_doc_req(#httpd{method='POST'}=Req, Db, DocId) ->
     couch_httpd:validate_referer(Req),
     fabric2_db:validate_docid(DocId),
     chttpd:validate_ctype(Req, "multipart/form-data"),
+
 
     Form = couch_httpd:parse_form(Req),
     case proplists:is_defined("_doc", Form) of
@@ -1080,6 +1107,7 @@ db_doc_req(#httpd{method='PUT'}=Req, Db, DocId) ->
     } = parse_doc_query(Req),
     DbName = fabric2_db:name(Db),
     fabric2_db:validate_docid(DocId),
+
 
     Loc = absolute_uri(Req, [$/, couch_util:url_encode(DbName),
         $/, couch_util:url_encode(DocId)]),
@@ -1329,6 +1357,7 @@ update_doc_result_to_json(DocId, Error) ->
     {_Code, ErrorStr, Reason} = chttpd:error_info(Error),
     {[{id, DocId}, {error, ErrorStr}, {reason, Reason}]}.
 
+
 send_updated_doc(Req, Db, DocId, Json) ->
     send_updated_doc(Req, Db, DocId, Json, []).
 
@@ -1337,6 +1366,7 @@ send_updated_doc(Req, Db, DocId, Doc, Headers) ->
 
 send_updated_doc(#httpd{} = Req, Db, DocId, #doc{deleted=Deleted}=Doc,
         Headers, UpdateType) ->
+
     Options =
         case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
         "true" ->
@@ -1365,6 +1395,7 @@ http_code_from_status(Status) ->
 update_doc(Db, DocId, #doc{deleted=Deleted, body=DocBody}=Doc0, Options) ->
     Doc = read_att_data(Doc0),
     case fabric2_db:update_doc(Db, Doc, Options) of
+
     {ok, NewRev} ->
         Accepted = false;
     {accepted, NewRev} ->
@@ -1420,6 +1451,7 @@ couch_doc_from_req(Req, Db, DocId, Json) ->
 %   couch_doc_open(Db, DocId, nil, []).
 
 couch_doc_open(Db, DocId, Rev, Options) ->
+
     case Rev of
     nil -> % open most recent rev
         case fabric2_db:open_doc(Db, DocId, Options) of
@@ -1750,6 +1782,9 @@ get_md5_header(Req) ->
 parse_doc_query(Req) ->
     lists:foldl(fun parse_doc_query/2, #doc_query_args{}, chttpd:qs(Req)).
 
+
+
+
 parse_doc_query({Key, Value}, Args) ->
     case {Key, Value} of
         {"attachments", "true"} ->
@@ -1972,6 +2007,7 @@ demonitor_refs(Refs) when is_list(Refs) ->
     [demonitor(Ref) || Ref <- Refs].
 
 
+
 set_namespace(<<"_local_docs">>, Args) ->
     set_namespace(<<"_local">>, Args);
 set_namespace(<<"_design_docs">>, Args) ->
@@ -2134,3 +2170,7 @@ read_att_data(#doc{} = Doc) ->
     #doc{atts = Atts} = Doc,
     Atts1 = lists:map(fun couch_att:read_data/1, Atts),
     Doc#doc{atts = Atts1}.
+
+
+
+
