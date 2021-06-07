@@ -204,7 +204,7 @@ choose_shards(DbName, Nodes, Options) ->
        true -> ok
     end,
     Q = mem3_util:q_val(couch_util:get_value(q, Options,
-        config:get("cluster", "q", "8"))),
+        config:get_integer("cluster", "q", 2))),
     %% rotate to a random entry in the nodelist for even distribution
     RotatedNodes = rotate_rand(Nodes),
     mem3_util:create_partition_map(DbName, N, Q, RotatedNodes, Suffix).

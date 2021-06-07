@@ -24,6 +24,8 @@
 
 %% Helper macro for declaring children of supervisor
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 100, Type, [I]}).
+-define(DEFAULT_BACKLOG, 512).
+-define(DEFAULT_SERVER_OPTIONS, "[{recbuf, undefined}]").
 
 start_link(Args) ->
     case supervisor:start_link({local, ?MODULE}, ?MODULE, Args) of
@@ -75,8 +77,9 @@ settings() ->
     [
         {bind_address, config:get("chttpd", "bind_address")},
         {port, config:get("chttpd", "port")},
-        {backlog, config:get("chttpd", "backlog")},
-        {server_options, config:get("chttpd", "server_options")}
+        {backlog, config:get_integer("chttpd", "backlog", ?DEFAULT_BACKLOG)},
+        {server_options, config:get("chttpd",
+            "server_options", ?DEFAULT_SERVER_OPTIONS)}
     ].
 
 maybe_replace(Key, Value, Settings) ->

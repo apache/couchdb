@@ -149,7 +149,7 @@ get_n_rings(N, Ranges, Rings) ->
 
 
 cluster_n() ->
-    list_to_integer(config:get("cluster", "n", "3")).
+    config:get_integer("cluster", "n", 3).
 
 maintenance_nodes(Nodes) ->
     {Modes, _} = rpc:multicall(Nodes, config, get, ["couchdb", "maintenance_mode"]),

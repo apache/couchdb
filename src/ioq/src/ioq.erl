@@ -55,7 +55,15 @@ get_queue_lengths() ->
     gen_server:call(?MODULE, get_queue_lengths).
 
 bypass(Priority) ->
-    config:get("ioq.bypass", atom_to_list(Priority)) =:= "true".
+    case Priority of
+        os_process -> config:get_boolean("ioq.bypass", "os_process", true);
+        read -> config:get_boolean("ioq.bypass", "read", true);
+        write -> config:get_boolean("ioq.bypass", "write", true);
+        view_update -> config:get_boolean("ioq.bypass", "view_update", true);
+        shard_sync -> config:get_boolean("ioq.bypass", "shard_sync", false);
+        compaction -> config:get_boolean("ioq.bypass", "compaction", false);
+        _ -> config:get("ioq.bypass", atom_to_list(Priority)) =:= "true"
+    end.
 
 io_class({prompt, _}, _) ->
     os_process;
@@ -91,8 +99,8 @@ init(_) ->
     {ok, read_config(State)}.
 
 read_config(State) ->
-    Ratio = list_to_float(config:get("ioq", "ratio", "0.01")),
-    Concurrency = list_to_integer(config:get("ioq", "concurrency", "10")),
+    Ratio = config:get_float("ioq", "ratio", 0.01),
+    Concurrency = config:get_integer("ioq", "concurrency", 10),
     State#state{concurrency=Concurrency, ratio=Ratio}.
 
 handle_call(get_queue_lengths, _From, State) ->

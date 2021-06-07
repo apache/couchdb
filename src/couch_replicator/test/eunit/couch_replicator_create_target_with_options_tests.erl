@@ -101,10 +101,10 @@ should_create_target_with_default({_Ctx, {Source, Target}}) ->
 
     {ok, TargetInfo} = fabric:get_db_info(Target),
     {ClusterInfo} = couch_util:get_value(cluster, TargetInfo),
-    Q = config:get("cluster", "q", "8"),
+    Q = config:get_integer("cluster", "q", 2),
     delete_db(Source),
     delete_db(Target),
-    ?_assertEqual(list_to_integer(Q), couch_util:get_value(q, ClusterInfo)).
+    ?_assertEqual(Q, couch_util:get_value(q, ClusterInfo)).
 
 
 should_not_create_target_with_q_any({_Ctx, {Source, Target}}) ->

@@ -62,7 +62,7 @@ replication_id(#rep{} = Rep, 2) ->
         % TODO: we might be under an SSL socket server only, or both under
         % SSL and a non-SSL socket.
         % ... mochiweb_socket_server:get(https, port)
-        list_to_integer(config:get("httpd", "port", "5984"))
+        config:get_integer("httpd", "port", 5984)
     end,
     Src = get_rep_endpoint(Rep#rep.source),
     Tgt = get_rep_endpoint(Rep#rep.target),

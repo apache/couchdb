@@ -240,7 +240,7 @@ db_props_from_json([{K, V} | Rest]) ->
     [{K, V} | db_props_from_json(Rest)].
 
 n_val(undefined, NodeCount) ->
-    n_val(config:get("cluster", "n", "3"), NodeCount);
+    n_val(config:get_integer("cluster", "n", 3), NodeCount);
 n_val(N, NodeCount) when is_list(N) ->
     n_val(list_to_integer(N), NodeCount);
 n_val(N, NodeCount) when is_integer(NodeCount), N > NodeCount ->

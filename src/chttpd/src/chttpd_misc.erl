@@ -93,7 +93,7 @@ handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     {_ActionKey, "/", RelativePath} ->
         % GET /_utils/path or GET /_utils/
         CachingHeaders = [{"Cache-Control", "private, must-revalidate"}],
-        EnableCsp = config:get("csp", "enable", "false"),
+        EnableCsp = config:get("csp", "enable", "true"),
         Headers = maybe_add_csp_headers(CachingHeaders, EnableCsp),
         chttpd:serve_file(Req, RelativePath, DocumentRoot, Headers);
     {_ActionKey, "", _RelativePath} ->
