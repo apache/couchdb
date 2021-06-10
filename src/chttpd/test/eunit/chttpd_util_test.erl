@@ -18,6 +18,15 @@
 
 
 setup() ->
+    ok = lists:foreach(fun(Section) ->
+        ok = config_delete_all_keys(Section)
+    end, ["httpd", "chttpd", "couch_httpd_auth", "chttpd_auth"]),
+
+    ok = config:set("httpd", "authentication_handlers",
+        "{couch_httpd_auth, cookie_authentication_handler}, "
+        "{couch_httpd_auth, default_authentication_handler}", _Persist = false),
+    ok = config:set("httpd", "backlog", "512", _Persist = false),
+    ok = config:set("chttpd", "require_valid_user", "false", _Persist = false),
     ok = config:set("httpd", "both_exist", "get_in_httpd", _Persist = false),
     ok = config:set("chttpd", "both_exist", "get_in_chttpd", _Persist = false),
     ok = config:set("httpd", "httpd_only", "true", _Persist = false),
@@ -29,6 +38,9 @@ setup() ->
 
 
 teardown(_) ->
+    ok = config:delete("httpd", "authentication_handlers", _Persist = false),
+    ok = config:delete("httpd", "backlog", _Persist = false),
+    ok = config:delete("chttpd", "require_valid_user", _Persist = false),
     ok = config:delete("httpd", "both_exist", _Persist = false),
     ok = config:delete("chttpd", "both_exist", _Persist = false),
     ok = config:delete("httpd", "httpd_only", _Persist = false),
@@ -37,6 +49,12 @@ teardown(_) ->
     ok = config:delete("chttpd_auth", "both_exist", _Persist = false),
     ok = config:delete("couch_httpd_auth", "cha_only", _Persist = false),
     ok = config:delete("chttpd_auth", "ca_only", _Persist = false).
+
+
+config_delete_all_keys(Section) ->
+    lists:foreach(fun({Key, _Val}) ->
+        ok = config:delete(Section, Key, _Persist = false)
+    end, config:get(Section)).
 
 
 chttpd_util_config_test_() ->
