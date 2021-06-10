@@ -15,10 +15,8 @@ ARG FDB_VERSION
 ARG SM_VSN
 ENV SM_VSN=${SM_VSN:-60}
 
-# Workaround for Debian's temporary lack of trust in FDB Root CA
 RUN set -ex; \
-    wget https://www.geotrust.com/resources/root_certificates/certificates/GeoTrust_Global_CA.pem; \
-    wget --ca-certificate=GeoTrust_Global_CA.pem https://www.foundationdb.org/downloads/${FDB_VERSION}/ubuntu/installers/foundationdb-clients_${FDB_VERSION}-1_amd64.deb; \
+    wget https://www.foundationdb.org/downloads/${FDB_VERSION}/ubuntu/installers/foundationdb-clients_${FDB_VERSION}-1_amd64.deb; \
     mkdir /var/lib/foundationdb; \
     dpkg -i foundationdb-clients_${FDB_VERSION}-1_amd64.deb
 
