@@ -132,7 +132,7 @@ get_dbs() ->
 
 
 get_users_db() ->
-    UsersDb = config:get("couch_httpd_auth", "authentication_db", "users"),
+    UsersDb = chttpd_auth_cache:dbname(),
     [list_to_binary(UsersDb)].
 
 

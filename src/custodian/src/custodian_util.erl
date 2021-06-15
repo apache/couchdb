@@ -43,7 +43,7 @@ report() ->
     fold_dbs([], Fun).
 
 ensure_dbs_exists() ->
-    DbName = config:get("mem3", "shards_db", "dbs"),
+    DbName = mem3_sync:shards_db(),
     {ok, Db} = mem3_util:ensure_exists(DbName),
     ensure_custodian_ddoc_exists(Db),
     {ok, Db}.
