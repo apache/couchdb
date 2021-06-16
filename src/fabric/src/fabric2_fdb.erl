@@ -2154,9 +2154,12 @@ get_info_wait_int(#info_future{} = InfoFuture) ->
     [CProp, UUIDProp | MProps].
 
 binary_chunk_size() ->
-    config:get_integer(
-        "fabric", "binary_chunk_size", ?DEFAULT_BINARY_CHUNK_SIZE
-    ).
+    ConfigBinaryChunkSize = config:get_integer(
+        "fabric", 
+        "binary_chunk_size", 
+        ?DEFAULT_BINARY_CHUNK_SIZE_BYTES
+    ),
+    min(ConfigBinaryChunkSize, ?DEFAULT_BINARY_CHUNK_SIZE_BYTES).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

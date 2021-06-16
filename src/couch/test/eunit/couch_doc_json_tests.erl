@@ -40,7 +40,11 @@ mock(config) ->
     meck:expect(
         config,
         get_integer,
-        fun("couchdb", "max_document_size", 4294967296) -> 1024 end
+        fun
+            ("couchdb", "max_document_id_length", _) -> 512;
+            ("couchdb", "max_document_size", _) -> 1024;
+            ("couchdb", "max_attachment_size", _) -> 1024
+        end
     ),
     meck:expect(config, get, fun(_, _) -> undefined end),
     meck:expect(config, get, fun(_, _, Default) -> Default end),

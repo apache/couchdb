@@ -65,7 +65,7 @@ small_buffer(_, {_, Db}) ->
 default_buffer(_, {_, Db}) ->
     {timeout, 30,
         ?_test(begin
-            Id = data(7000),
+            Id = data(512),
             Headers = [{"Blah", data(7000)}],
             Status = put_req(url(Db) ++ "/" ++ Id, Headers, "{}"),
             ?assert(Status =:= 201 orelse Status =:= 202)

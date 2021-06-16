@@ -27,6 +27,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
+
 -spec to_path(#doc{}) -> path().
 to_path(#doc{revs = {Start, RevIds}} = Doc) ->
     [Branch] = to_branch(Doc, lists:reverse(RevIds)),
@@ -154,7 +155,12 @@ from_json_obj_validate(EJson) ->
     from_json_obj_validate(EJson, undefined).
 
 from_json_obj_validate(EJson, DbName) ->
-    MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
+    ConfigMaxSize = config:get_integer(
+        "couchdb",
+        "max_document_size",
+        ?DOCUMENT_SIZE_LIMIT_BYTES
+    ),
+    MaxSize = min(ConfigMaxSize, ?DOCUMENT_SIZE_LIMIT_BYTES),
     Doc = from_json_obj(EJson, DbName),
     case couch_ejson_size:encoded_size(Doc#doc.body) =< MaxSize of
         true ->

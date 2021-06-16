@@ -679,12 +679,12 @@ is_compressible(Type) ->
     ).
 
 max_attachment_size() ->
-    case config:get("couchdb", "max_attachment_size", "infinity") of
-        "infinity" ->
-            infinity;
-        MaxAttSize ->
-            list_to_integer(MaxAttSize)
-    end.
+    ConfigMaxAttSize = config:get_integer(
+        "couchdb",
+        "max_attachment_size",
+        ?ATT_SIZE_LIMIT_BYTES
+    ),
+    min(ConfigMaxAttSize, ?ATT_SIZE_LIMIT_BYTES).
 
 validate_attachment_size(AttName, AttSize, MaxAttSize) when
     is_integer(AttSize), AttSize > MaxAttSize
