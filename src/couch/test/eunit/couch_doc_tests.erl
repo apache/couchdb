@@ -115,8 +115,8 @@ mock_config() ->
         config,
         get,
         fun
-            ("couchdb", "max_document_id_length", "infinity") -> "1024";
-            ("couchdb", "max_attachment_size", "infinity") -> "infinity";
+            ("couchdb", "max_document_id_length", _) -> "512";
+            ("couchdb", "max_attachment_size", _) -> "1024";
             (Key, Val, Default) -> meck:passthrough([Key, Val, Default])
         end
     ).

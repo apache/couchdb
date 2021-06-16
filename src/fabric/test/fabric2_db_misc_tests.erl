@@ -189,11 +189,12 @@ validate_doc_ids(_) ->
     Tests = [
         {ok, <<"_local/foo">>},
         {ok, <<"_design/foo">>},
-        {ok, <<"0123456789012345">>},
+        {ok, generate_long_doc_id(16)},
+        {ok, generate_long_doc_id(512)},
         {illegal_docid, <<"">>},
         {illegal_docid, <<"_design/">>},
         {illegal_docid, <<"_local/">>},
-        {illegal_docid, <<"01234567890123456">>},
+        {illegal_docid, generate_long_doc_id(513)},
         {illegal_docid, <<16#FF>>},
         {illegal_docid, <<"_bad">>},
         {illegal_docid, null}
@@ -210,7 +211,7 @@ validate_doc_ids(_) ->
         meck:expect(
             config,
             get,
-            ["couchdb", "max_document_id_length", "infinity"],
+            ["couchdb", "max_document_id_length", "512"],
             "16"
         ),
         lists:foreach(CheckFun, Tests),
@@ -225,6 +226,9 @@ validate_doc_ids(_) ->
         % interferes with the db version bump test.
         meck:unload()
     end.
+
+generate_long_doc_id(Size) ->
+    list_to_binary(string:copies("x", Size)).
 
 get_doc_info({_, Db, _}) ->
     DocId = couch_uuids:random(),

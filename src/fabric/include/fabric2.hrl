@@ -81,4 +81,4 @@
 -define(PDICT_TX_RES_WAS_UNKNOWN, '$fabric_tx_res_was_unknown').
 -define(PDICT_FOLD_ACC_STATE, '$fabric_fold_acc_state').
 
--define(DEFAULT_BINARY_CHUNK_SIZE, 100000).
+-define(DEFAULT_BINARY_CHUNK_SIZE_BYTES, 96000).

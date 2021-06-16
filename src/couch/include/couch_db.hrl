@@ -40,6 +40,9 @@
     <<"_users">>
 ]).
 
+-define(DOCUMENT_SIZE_LIMIT_BYTES, 8000000).
+-define(ATT_SIZE_LIMIT_BYTES, 8000000).
+-define(DOC_ID_LIMIT_BYTES, 512).
 
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.

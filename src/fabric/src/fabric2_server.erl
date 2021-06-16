@@ -43,6 +43,8 @@
 -include_lib("kernel/include/file.hrl").
 -include_lib("kernel/include/logger.hrl").
 
+-include("fabric2.hrl").
+
 -define(CLUSTER_FILE_MACOS, "/usr/local/etc/foundationdb/fdb.cluster").
 -define(CLUSTER_FILE_LINUX, "/etc/foundationdb/fdb.cluster").
 -define(CLUSTER_FILE_WIN32, "C:/ProgramData/foundationdb/fdb.cluster").
@@ -64,6 +66,13 @@
     max_retry_delay => {integer, undefined},
     size_limit => {integer, undefined}
 }).
+
+-define(CONFIG_LIMITS, [
+    {"couchdb", "max_document_size", ?DOCUMENT_SIZE_LIMIT_BYTES},
+    {"couchdb", "max_attachment_size", ?ATT_SIZE_LIMIT_BYTES},
+    {"couchdb", "max_document_id_length", ?DOC_ID_LIMIT_BYTES},
+    {"fabric", "binary_chunk_size", ?DEFAULT_BINARY_CHUNK_SIZE_BYTES}
+]).
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
@@ -137,7 +146,20 @@ init(_) ->
         end,
     application:set_env(fabric, ?FDB_DIRECTORY, Dir),
     config:subscribe_for_changes([?TX_OPTIONS_SECTION]),
+    check_config_limits(),
     {ok, nil}.
+
+check_config_limits() ->
+    lists:foreach(fun({Sect, Key, Limit}) ->
+        ConfigVal = config:get_integer(Sect, Key, Limit),
+        case ConfigVal > Limit of
+            true ->
+                LogMsg = "Config value of ~p for [~s] ~s is greater than the limit: ~p",
+                couch_log:warning(LogMsg, [ConfigVal, Sect, Key, Limit]);
+            false ->
+                ok
+        end
+    end, ?CONFIG_LIMITS).
 
 terminate(_, _St) ->
     ok.

@@ -137,8 +137,9 @@ defmodule BulkDocsTest do
     set_config_raw("couchdb", "max_document_size", "67108864") # 64M
     resp = Couch.post("/#{ctx[:db_name]}/_bulk_docs", body: %{docs: docs})
     set_config_raw("couchdb", "max_document_size", old_size) # set back
-    assert resp.status_code == 500
-    assert resp.body["reason"] == "code: 2101, desc: Transaction exceeds byte limit"
+    assert resp.status_code == 413
+    assert resp.body["error"] == "document_too_large"
+    assert resp.body["reason"] == "0" # DocID
   end
 
   defp bulk_post(docs, db) do
