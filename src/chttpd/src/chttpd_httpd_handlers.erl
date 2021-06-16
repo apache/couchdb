@@ -240,11 +240,21 @@ handler_info('POST', [Db, <<"_compact">>], _) ->
 handler_info('GET', [Db, <<"_design">>, Name], _) ->
     {'db.design.doc.read', #{'db.name' => Db, 'design.id' => Name}};
 
-handler_info('POST', [Db, <<"_design">>, Name], _) ->
-    {'db.design.doc.write', #{'db.name' => Db, 'design.id' => Name}};
+handler_info('POST', [Db, <<"_design">>, Name], Req) ->
+    case chttpd:qs_value(Req, "rev") of
+        undefined ->
+            {'db.design.doc.write', #{'db.name' => Db, 'design.id' => Name}};
+        _ ->
+            {'db.design.doc.update', #{'db.name' => Db, 'design.id' => Name}}
+    end;
 
-handler_info('PUT', [Db, <<"_design">>, Name], _) ->
-    {'db.design.doc.write', #{'db.name' => Db, 'design.id' => Name}};
+handler_info('PUT', [Db, <<"_design">>, Name], Req) ->
+    case chttpd:qs_value(Req, "rev") of
+        undefined ->
+            {'db.design.doc.write', #{'db.name' => Db, 'design.id' => Name}};
+        _ ->
+            {'db.design.doc.update', #{'db.name' => Db, 'design.id' => Name}}
+    end;
 
 handler_info('COPY', [Db, <<"_design">>, Name], Req) ->
     {'db.design.doc.write', #{
@@ -335,8 +345,14 @@ handler_info('GET', [Db, <<"_design">>, Name | Path], _) ->
         'attachment.name' => filename:join(Path)
     }};
 
-handler_info('PUT', [Db, <<"_design">>, Name | Path], _) ->
-    {'db.design.doc.attachment.write', #{
+handler_info('PUT', [Db, <<"_design">>, Name | Path], Req) ->
+    ActionName = case has_rev(Req) of
+        true ->
+            'db.design.doc.attachment.update';
+        false ->
+            'db.design.doc.attachment.write'
+    end,
+    {ActionName, #{
         'db.name' => Db,
         'design.id' => Name,
         'attachment.name' => filename:join(Path)
@@ -367,11 +383,23 @@ handler_info('POST', [Db, <<"_ensure_full_commit">>], _) ->
 handler_info('GET', [Db, <<"_local">>, Name], _) ->
     {'db.local.doc.read', #{'db.name' => Db, 'local.id' => Name}};
 
-handler_info('POST', [Db, <<"_local">>, Name], _) ->
-    {'db.local.doc.write', #{'db.name' => Db, 'local.id' => Name}};
+handler_info('POST', [Db, <<"_local">>, Name], Req) ->
+    ActionName = case has_rev(Req) of
+        true ->
+            'db.local.doc.update';
+        false ->
+            'db.local.doc.write'
+    end,
+    {ActionName, #{'db.name' => Db, 'local.id' => Name}};
 
-handler_info('PUT', [Db, <<"_local">>, Name], _) ->
-    {'db.local.doc.write', #{'db.name' => Db, 'local.id' => Name}};
+handler_info('PUT', [Db, <<"_local">>, Name], Req) ->
+    ActionName = case has_rev(Req) of
+        true ->
+            'db.local.doc.update';
+        false ->
+            'db.local.doc.write'
+    end,
+    {ActionName, #{'db.name' => Db, 'local.id' => Name}};
 
 handler_info('COPY', [Db, <<"_local">>, Name], Req) ->
     {'db.local.doc.write', #{
@@ -461,11 +489,21 @@ handler_info(_, [_Db, <<"_", _/binary>> | _], _) ->
 handler_info('GET', [Db, DocId], _) ->
     {'db.doc.read', #{'db.name' => Db, 'doc.id' => DocId}};
 
-handler_info('POST', [Db, DocId], _) ->
-    {'db.doc.write', #{'db.name' => Db, 'design.id' => DocId}};
+handler_info('POST', [Db, DocId], Req) ->
+    case has_rev(Req) of
+        true ->
+            {'db.doc.update', #{'db.name' => Db, 'doc.id' => DocId}};
+        false ->
+            {'db.doc.write', #{'db.name' => Db, 'doc.id' => DocId}}
+    end;
 
-handler_info('PUT', [Db, DocId], _) ->
-    {'db.doc.write', #{'db.name' => Db, 'design.id' => DocId}};
+handler_info('PUT', [Db, DocId], Req) ->
+    case has_rev(Req) of
+        true ->
+            {'db.doc.update', #{'db.name' => Db, 'doc.id' => DocId}};
+        false ->
+            {'db.doc.write', #{'db.name' => Db, 'doc.id' => DocId}}
+    end;
 
 handler_info('COPY', [Db, DocId], Req) ->
     {'db.doc.write', #{
@@ -484,8 +522,14 @@ handler_info('GET', [Db, DocId | Path], _) ->
         'attachment.name' => filename:join(Path)
     }};
 
-handler_info('PUT', [Db, DocId | Path], _) ->
-    {'db.doc.attachment.write', #{
+handler_info('PUT', [Db, DocId | Path], Req) ->
+    ActionName = case chttpd:qs_value(Req, "rev") of
+        undefined ->
+            'db.doc.attachment.write';
+        _ ->
+            'db.doc.attachment.update'
+    end,
+    {ActionName, #{
         'db.name' => Db,
         'doc.id' => DocId,
         'attachment.name' => filename:join(Path)
@@ -531,3 +575,16 @@ not_implemented(#httpd{} = Req, _Db) ->
 not_implemented(#httpd{} = Req) ->
     Msg = <<"resource is not implemented">>,
     chttpd:send_error(Req, 501, not_implemented, Msg).
+
+has_rev(Req) ->
+    case chttpd:qs_value(Req, "rev") of
+        undefined ->
+            case chttpd:json_body_obj(Req) of
+                {Props} ->
+                    lists:keymember(<<"_rev">>, 1, Props);
+                _ ->
+                    false
+            end;
+        _ ->
+            true
+    end.
