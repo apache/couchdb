@@ -102,10 +102,12 @@ disk_size(DbName, DDoc, IndexName) ->
     end.
 
 get_or_create_db(DbName, Options) ->
+    DbOpts = mem3_shards:opts_for_db(DbName),
+    Options1 = mem3_util:merge_opts(DbOpts, Options),
     case couch_db:open_int(DbName, Options) of
     {not_found, no_db_file} ->
         couch_log:warning("~p creating ~s", [?MODULE, DbName]),
-        couch_server:create(DbName, Options);
+        couch_server:create(DbName, Options1);
     Else ->
         Else
     end.
