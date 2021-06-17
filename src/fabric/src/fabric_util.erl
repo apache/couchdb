@@ -105,7 +105,10 @@ get_db(DbName, Options) ->
     Nodes = [node()|erlang:nodes()],
     Live = [S || #shard{node = N} = S <- Shards, lists:member(N, Nodes)],
     Factor = list_to_integer(config:get("fabric", "shard_timeout_factor", "2")),
-    get_shard(Live, [{create_if_missing, true} | Options], 100, Factor).
+    DbOpts = mem3_shards:opts_for_db(DbName),
+    Options1 = [{create_if_missing, true} | Options],
+    Options2 = mem3_util:merge_opts(DbOpts, Options1),
+    get_shard(Live, Options2, 100, Factor).
 
 get_shard([], _Opts, _Timeout, _Factor) ->
     erlang:error({internal_server_error, "No DB shards could be opened."});
