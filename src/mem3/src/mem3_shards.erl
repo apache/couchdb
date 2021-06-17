@@ -46,7 +46,8 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-opts_for_db(DbName) ->
+opts_for_db(DbName0) ->
+    DbName = mem3:dbname(DbName0),
     {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
     case couch_db:open_doc(Db, DbName, [ejson_body]) of
         {ok, #doc{body = {Props}}} ->
@@ -358,7 +359,7 @@ changes_callback({change, {Change}, _}, _) ->
                 ets:insert(?OPENERS, {DbName, Writer}),
                 Msg = {cache_insert_change, DbName, Writer, Seq},
                 gen_server:cast(?MODULE, Msg),
-                [create_if_missing(mem3:name(S), mem3:engine(S)) || S
+                [create_if_missing(mem3:name(S)) || S
                     <- Shards, mem3:node(S) =:= node()]
             end
         end
@@ -408,17 +409,18 @@ in_range(Shard, HashKey) ->
     [B, E] = mem3:range(Shard),
     B =< HashKey andalso HashKey =< E.
 
-create_if_missing(Name, Options) ->
-    case couch_server:exists(Name) of
+create_if_missing(ShardName) ->
+    case couch_server:exists(ShardName) of
         true ->
             ok;
         false ->
-            case couch_server:create(Name, [?ADMIN_CTX] ++ Options) of
+            Options = opts_for_db(ShardName),
+            case couch_server:create(ShardName, [?ADMIN_CTX] ++ Options) of
             {ok, Db} ->
                 couch_db:close(Db);
             Error ->
                 couch_log:error("~p tried to create ~s, got ~p",
-                    [?MODULE, Name, Error])
+                    [?MODULE, ShardName, Error])
             end
     end.
 

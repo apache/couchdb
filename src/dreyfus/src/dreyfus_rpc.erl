@@ -103,12 +103,13 @@ disk_size(DbName, DDoc, IndexName) ->
 
 get_or_create_db(DbName, Options) ->
     case couch_db:open_int(DbName, Options) of
-    {not_found, no_db_file} ->
-        couch_log:warning("~p creating ~s", [?MODULE, DbName]),
-        couch_server:create(DbName, Options);
-    Else ->
-        Else
+        {not_found, no_db_file} ->
+            couch_log:warning("~p creating ~s", [?MODULE, DbName]),
+            mem3_util:get_or_create_db(DbName, Options);
+        Else ->
+            Else
     end.
+
 
 calculate_seqs(Db, Stale) ->
     LastSeq = couch_db:get_update_seq(Db),
