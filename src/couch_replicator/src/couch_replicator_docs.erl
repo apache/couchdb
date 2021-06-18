@@ -571,8 +571,7 @@ parse_proxy_params(ProxyUrl) ->
         password = Passwd,
         protocol = Protocol
     } = ibrowse_lib:parse_url(ProxyUrl),
-    [
-        {proxy_protocol, Protocol},
+    Params = [
         {proxy_host, Host},
         {proxy_port, Port}
     ] ++ case is_list(User) andalso is_list(Passwd) of
@@ -580,7 +579,24 @@ parse_proxy_params(ProxyUrl) ->
             [];
         true ->
             [{proxy_user, User}, {proxy_password, Passwd}]
-        end.
+    end,
+    case Protocol of
+        socks5 ->
+            [proxy_to_socks5(Param) || Param <- Params];
+        _ ->
+            Params
+    end.
+
+
+-spec proxy_to_socks5({atom(), string()}) -> {atom(), string()}.
+proxy_to_socks5({proxy_host, Val}) ->
+    {socks5_host, Val};
+proxy_to_socks5({proxy_port, Val}) ->
+    {socks5_port, Val};
+proxy_to_socks5({proxy_user, Val}) ->
+    {socks5_user, Val};
+proxy_to_socks5({proxy_password, Val}) ->
+    {socks5_password, Val}.
 
 
 -spec ssl_params([_]) -> [_].
@@ -788,6 +804,21 @@ check_strip_credentials_test() ->
             {[{<<"_id">>, <<"foo">>}, {<<"auth">>, <<"pluginsecret">>}]}
         }
     ]].
+
+
+parse_proxy_params_test() ->
+    ?assertEqual([
+        {proxy_host, "foo.com"},
+        {proxy_port, 443},
+        {proxy_user, "u"},
+        {proxy_password, "p"}
+    ], parse_proxy_params("https://u:p@foo.com")),
+    ?assertEqual([
+        {socks5_host, "foo.com"},
+        {socks5_port, 1080},
+        {socks5_user, "u"},
+        {socks5_password, "p"}
+    ], parse_proxy_params("socks5://u:p@foo.com")).
 
 
 setup() ->
