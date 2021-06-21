@@ -38,6 +38,7 @@
 
 -define(MAX_DBS_OPEN, 500).
 -define(RELISTEN_DELAY, 5000).
+-define(DEFAULT_ENGINE, "couch").
 
 -record(server,{
     root_dir = [],
@@ -270,10 +271,9 @@ init([N]) ->
 
     RootDir = config:get("couchdb", "database_dir", "."),
     Engines = get_configured_engines(),
-    MaxDbsOpen = list_to_integer(
-            config:get("couchdb", "max_dbs_open", integer_to_list(?MAX_DBS_OPEN))),
-    UpdateLruOnRead =
-        config:get("couchdb", "update_lru_on_read", "false") =:= "true",
+    MaxDbsOpen = config:get_integer("couchdb", "max_dbs_open", ?MAX_DBS_OPEN),
+    UpdateLruOnRead = config:get_boolean(
+        "couchdb", "update_lru_on_read", false),
     ok = config:listen_for_changes(?MODULE, N),
     ok = couch_file:init_delete_dir(RootDir),
     hash_admin_passwords(),
@@ -823,20 +823,16 @@ get_default_engine(Server, DbName) ->
         engines = Engines
     } = Server,
     Default = {couch_bt_engine, make_filepath(RootDir, DbName, "couch")},
-    case config:get("couchdb", "default_engine") of
-        Extension when is_list(Extension) ->
-            case lists:keyfind(Extension, 1, Engines) of
-                {Extension, Module} ->
-                    {ok, {Module, make_filepath(RootDir, DbName, Extension)}};
-                false ->
-                    Fmt = "Invalid storage engine extension ~s,"
-                            " configured engine extensions are: ~s",
-                    Exts = [E || {E, _} <- Engines],
-                    Args = [Extension, string:join(Exts, ", ")],
-                    couch_log:error(Fmt, Args),
-                    {ok, Default}
-            end;
-        _ ->
+    Extension = config:get("couchdb", "default_engine", ?DEFAULT_ENGINE),
+    case lists:keyfind(Extension, 1, Engines) of
+        {Extension, Module} ->
+            {ok, {Module, make_filepath(RootDir, DbName, Extension)}};
+        false ->
+            Fmt = "Invalid storage engine extension ~s,"
+                    " configured engine extensions are: ~s",
+            Exts = [E || {E, _} <- Engines],
+            Args = [Extension, string:join(Exts, ", ")],
+            couch_log:error(Fmt, Args),
             {ok, Default}
     end.
 

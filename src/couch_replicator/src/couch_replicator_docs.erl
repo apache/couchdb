@@ -456,26 +456,26 @@ maybe_add_trailing_slash(Url) ->
 make_options(Props) ->
     Options0 = lists:ukeysort(1, convert_options(Props)),
     Options = check_options(Options0),
-    DefWorkers = config:get("replicator", "worker_processes", "4"),
-    DefBatchSize = config:get("replicator", "worker_batch_size", "500"),
-    DefConns = config:get("replicator", "http_connections", "20"),
-    DefTimeout = config:get("replicator", "connection_timeout", "30000"),
-    DefRetries = config:get("replicator", "retries_per_request", "5"),
-    UseCheckpoints = config:get("replicator", "use_checkpoints", "true"),
-    DefCheckpointInterval = config:get("replicator", "checkpoint_interval",
-        "30000"),
+    DefWorkers = config:get_integer("replicator", "worker_processes", 4),
+    DefBatchSize = config:get_integer("replicator", "worker_batch_size", 500),
+    DefConns = config:get_integer("replicator", "http_connections", 20),
+    DefTimeout = config:get_integer("replicator", "connection_timeout", 30000),
+    DefRetries = config:get_integer("replicator", "retries_per_request", 5),
+    UseCheckpoints = config:get_boolean("replicator", "use_checkpoints", true),
+    DefCheckpointInterval = config:get_integer("replicator",
+        "checkpoint_interval", 30000),
     {ok, DefSocketOptions} = couch_util:parse_term(
         config:get("replicator", "socket_options",
             "[{keepalive, true}, {nodelay, false}]")),
     lists:ukeymerge(1, Options, lists:keysort(1, [
-        {connection_timeout, list_to_integer(DefTimeout)},
-        {retries, list_to_integer(DefRetries)},
-        {http_connections, list_to_integer(DefConns)},
+        {connection_timeout, DefTimeout},
+        {retries, DefRetries},
+        {http_connections, DefConns},
         {socket_options, DefSocketOptions},
-        {worker_batch_size, list_to_integer(DefBatchSize)},
-        {worker_processes, list_to_integer(DefWorkers)},
-        {use_checkpoints, list_to_existing_atom(UseCheckpoints)},
-        {checkpoint_interval, list_to_integer(DefCheckpointInterval)}
+        {worker_batch_size, DefBatchSize},
+        {worker_processes, DefWorkers},
+        {use_checkpoints, UseCheckpoints},
+        {checkpoint_interval, DefCheckpointInterval}
     ])).
 
 
@@ -587,14 +587,14 @@ parse_proxy_params(ProxyUrl) ->
 ssl_params(Url) ->
     case ibrowse_lib:parse_url(Url) of
     #url{protocol = https} ->
-        Depth = list_to_integer(
-            config:get("replicator", "ssl_certificate_max_depth", "3")
-        ),
-        VerifyCerts = config:get("replicator", "verify_ssl_certificates"),
+        Depth = config:get_integer("replicator",
+            "ssl_certificate_max_depth", 3),
+        VerifyCerts = config:get_boolean("replicator",
+            "verify_ssl_certificates", false),
         CertFile = config:get("replicator", "cert_file", undefined),
         KeyFile = config:get("replicator", "key_file", undefined),
         Password = config:get("replicator", "password", undefined),
-        SslOpts = [{depth, Depth} | ssl_verify_options(VerifyCerts =:= "true")],
+        SslOpts = [{depth, Depth} | ssl_verify_options(VerifyCerts)],
         SslOpts1 = case CertFile /= undefined andalso KeyFile /= undefined of
             true ->
                 case Password of

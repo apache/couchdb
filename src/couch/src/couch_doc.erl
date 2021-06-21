@@ -131,7 +131,7 @@ from_json_obj_validate(EJson) ->
     from_json_obj_validate(EJson, undefined).
 
 from_json_obj_validate(EJson, DbName) ->
-    MaxSize = config:get_integer("couchdb", "max_document_size", 4294967296),
+    MaxSize = config:get_integer("couchdb", "max_document_size", 8000000),
     Doc = from_json_obj(EJson, DbName),
     case couch_ejson_size:encoded_size(Doc#doc.body) =< MaxSize of
         true ->

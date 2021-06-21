@@ -142,6 +142,8 @@
     "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*" % use the stock CouchDB regex
     "(\\.[0-9]{10,})?$" % but allow an optional shard timestamp at the end
 ).
+-define(DEFAULT_COMPRESSIBLE_TYPES,
+    "text/*, application/javascript, application/json, application/xml").
 
 start_link(Engine, DbName, Filepath, Options) ->
     Arg = {Engine, DbName, Filepath, Options},
@@ -1391,7 +1393,8 @@ compressible_att_type(MimeType) when is_binary(MimeType) ->
     compressible_att_type(?b2l(MimeType));
 compressible_att_type(MimeType) ->
     TypeExpList = re:split(
-        config:get("attachments", "compressible_types", ""),
+        config:get("attachments", "compressible_types",
+            ?DEFAULT_COMPRESSIBLE_TYPES),
         "\\s*,\\s*",
         [{return, list}]
     ),
@@ -1416,13 +1419,12 @@ compressible_att_type(MimeType) ->
 % pretend that no Content-MD5 exists.
 with_stream(Db, Att, Fun) ->
     [InMd5, Type, Enc] = couch_att:fetch([md5, type, encoding], Att),
-    BufferSize = list_to_integer(
-        config:get("couchdb", "attachment_stream_buffer_size", "4096")),
+    BufferSize = config:get_integer("couchdb",
+        "attachment_stream_buffer_size", 4096),
     Options = case (Enc =:= identity) andalso compressible_att_type(Type) of
         true ->
-            CompLevel = list_to_integer(
-                config:get("attachments", "compression_level", "0")
-            ),
+            CompLevel = config:get_integer(
+                "attachments", "compression_level", 8),
             [
                 {buffer_size, BufferSize},
                 {encoding, gzip},

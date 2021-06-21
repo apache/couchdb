@@ -98,7 +98,7 @@ inc() ->
     couch_rand:uniform(16#ffd).
 
 state() ->
-    AlgoStr = config:get("uuids", "algorithm", "random"),
+    AlgoStr = config:get("uuids", "algorithm", "sequential"),
     case couch_util:to_existing_atom(AlgoStr) of
         random ->
             random;

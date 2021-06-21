@@ -116,13 +116,13 @@ middleman(Req, chunked) ->
     Receiver = spawn(fun() -> couch_httpd:recv_chunked(Req,4096,RcvFun,ok) end),
 
     % take requests from the DB writers and get data from the receiver
-    N = erlang:list_to_integer(config:get("cluster","n")),
+    N = config:get_integer("cluster", "n", 3),
     Timeout = fabric_util:attachments_timeout(),
     middleman_loop(Receiver, N, [], [], Timeout);
 
 middleman(Req, Length) ->
     Receiver = spawn(fun() -> receive_unchunked_attachment(Req, Length) end),
-    N = erlang:list_to_integer(config:get("cluster","n")),
+    N = config:get_integer("cluster", "n", 3),
     Timeout = fabric_util:attachments_timeout(),
     middleman_loop(Receiver, N, [], [], Timeout).
 

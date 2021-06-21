@@ -82,7 +82,7 @@ handle_task_status_req(Req) ->
 
 
 handle_uuids_req(#httpd{method='GET'}=Req) ->
-    Max = list_to_integer(config:get("uuids","max_count","1000")),
+    Max = config:get_integer("uuids","max_count", 1000),
     Count = try list_to_integer(couch_httpd:qs_value(Req, "count", "1")) of
         N when N > Max ->
             throw({bad_request, <<"count parameter too large">>});

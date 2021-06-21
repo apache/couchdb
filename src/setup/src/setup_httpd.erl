@@ -36,8 +36,8 @@ handle_setup_req(#httpd{method='GET'}=Req) ->
         true ->
             chttpd:send_json(Req, 200, {[{state, single_node_enabled}]});
         _ ->
-            case config:get("cluster", "n", undefined) of
-                "1" ->
+            case config:get_integer("cluster", "n", 3) of
+                1 ->
                     case setup:is_single_node_enabled(Dbs) of
                         false ->
                             chttpd:send_json(Req, 200, {[{state, single_node_disabled}]});

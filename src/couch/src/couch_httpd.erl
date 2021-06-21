@@ -44,6 +44,10 @@
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 -define(MAX_DRAIN_BYTES, 1048576).
 -define(MAX_DRAIN_TIME_MSEC, 1000).
+-define(DEFAULT_SOCKET_OPTIONS, "[{sndbuf, 262144}]").
+-define(DEFAULT_AUTHENTICATION_HANDLERS,
+    "{couch_httpd_auth, cookie_authentication_handler}, "
+    "{couch_httpd_auth, default_authentication_handler}").
 
 start_link() ->
     start_link(http).
@@ -110,7 +114,7 @@ start_link(Name, Options) ->
     {ok, ServerOptions} = couch_util:parse_term(
         config:get("httpd", "server_options", "[]")),
     {ok, SocketOptions} = couch_util:parse_term(
-        config:get("httpd", "socket_options", "[]")),
+        config:get("httpd", "socket_options", ?DEFAULT_SOCKET_OPTIONS)),
 
     set_auth_handlers(),
     Handlers = get_httpd_handlers(),
@@ -152,7 +156,8 @@ stop() ->
 
 set_auth_handlers() ->
     AuthenticationSrcs = make_fun_spec_strs(
-        config:get("httpd", "authentication_handlers", "")),
+        config:get("httpd", "authentication_handlers",
+            ?DEFAULT_AUTHENTICATION_HANDLERS)),
     AuthHandlers = lists:map(
         fun(A) -> {auth_handler_name(A), make_arity_1_fun(A)} end, AuthenticationSrcs),
     AuthenticationFuns = AuthHandlers ++ [
