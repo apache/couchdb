@@ -21,6 +21,8 @@
 -define(ATT_SIZE_2, round(6.6 * 1024 * 1024)).
 -define(DOCS_COUNT, 11).
 -define(TIMEOUT_EUNIT, 120).
+-define(DEFAULT_COMPRESSIBLE_TYPES,
+    "text/*, application/javascript, application/json, application/xml").
 
 
 large_atts_test_() ->
@@ -43,7 +45,8 @@ large_atts_test_() ->
 
 
 setup() ->
-    AttCfg = config:get("attachments", "compressible_types"),
+    AttCfg = config:get("attachments",
+        "compressible_types", ?DEFAULT_COMPRESSIBLE_TYPES),
     config:set("attachments", "compressible_types", "text/*", false),
     Source = couch_replicator_test_helper:create_db(),
     ok = populate_db(Source, ?DOCS_COUNT),
