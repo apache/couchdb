@@ -40,8 +40,7 @@
     changes_since/5,
     db_uri/1,
     db_from_json/1
-    ]).
-
+]).
 
 -define(MAX_WAIT, 5 * 60 * 1000).
 
@@ -50,53 +49,58 @@
 
 db_uri(#{<<"url">> := Url}) ->
     couch_util:url_strip_password(Url);
-
 db_uri(#httpdb{url = Url}) ->
     couch_util:url_strip_password(Url).
 
-
 db_open(#{} = Db) ->
     db_open(Db, false, #{}).
-
 
 db_open(#{} = Db0, Create, #{} = CreateParams) when is_boolean(Create) ->
     {ok, Db} = couch_replicator_httpc:setup(db_from_json(Db0)),
     try
         case Create of
-        false ->
-            ok;
-        true ->
-            Db2 = maybe_append_create_query_params(Db, CreateParams),
-            send_req(Db2, [{method, put}],
-                fun(401, _, _) ->
-                    throw({unauthorized, ?l2b(db_uri(Db2))});
-                (403, _, _) ->
-                    throw({forbidden, ?l2b(db_uri(Db2))});
-                (_, _, _) ->
-                    ok
-                end)
+            false ->
+                ok;
+            true ->
+                Db2 = maybe_append_create_query_params(Db, CreateParams),
+                send_req(
+                    Db2,
+                    [{method, put}],
+                    fun
+                        (401, _, _) ->
+                            throw({unauthorized, ?l2b(db_uri(Db2))});
+                        (403, _, _) ->
+                            throw({forbidden, ?l2b(db_uri(Db2))});
+                        (_, _, _) ->
+                            ok
+                    end
+                )
         end,
-        send_req(Db, [{method, get}],
-            fun(200, _, {Props}) ->
-                UpdateSeq = get_value(<<"update_seq">>, Props),
-                InstanceStart = get_value(<<"instance_start_time">>, Props),
-                case {UpdateSeq, InstanceStart} of
-                    {undefined, _} ->
-                        throw({db_not_found, ?l2b(db_uri(Db))});
-                    {_, undefined} ->
-                        throw({db_not_found, ?l2b(db_uri(Db))});
-                    _ ->
-                        {ok, Db}
-                end;
-            (200, _, _Body) ->
-                 throw({db_not_found, ?l2b(db_uri(Db))});
-            (401, _, _) ->
-                throw({unauthorized, ?l2b(db_uri(Db))});
-            (403, _, _) ->
-                throw({forbidden, ?l2b(db_uri(Db))});
-            (_, _, _) ->
-                throw({db_not_found, ?l2b(db_uri(Db))})
-            end)
+        send_req(
+            Db,
+            [{method, get}],
+            fun
+                (200, _, {Props}) ->
+                    UpdateSeq = get_value(<<"update_seq">>, Props),
+                    InstanceStart = get_value(<<"instance_start_time">>, Props),
+                    case {UpdateSeq, InstanceStart} of
+                        {undefined, _} ->
+                            throw({db_not_found, ?l2b(db_uri(Db))});
+                        {_, undefined} ->
+                            throw({db_not_found, ?l2b(db_uri(Db))});
+                        _ ->
+                            {ok, Db}
+                    end;
+                (200, _, _Body) ->
+                    throw({db_not_found, ?l2b(db_uri(Db))});
+                (401, _, _) ->
+                    throw({unauthorized, ?l2b(db_uri(Db))});
+                (403, _, _) ->
+                    throw({forbidden, ?l2b(db_uri(Db))});
+                (_, _, _) ->
+                    throw({db_not_found, ?l2b(db_uri(Db))})
+            end
+        )
     catch
         throw:Error ->
             db_close(Db),
@@ -114,12 +118,14 @@ db_close(#httpdb{httpc_pool = Pool} = HttpDb) ->
     unlink(Pool),
     ok = couch_replicator_httpc_pool:stop(Pool).
 
-
 get_db_info(#httpdb{} = Db) ->
-    send_req(Db, [],
+    send_req(
+        Db,
+        [],
         fun(200, _, {Props}) ->
             {ok, Props}
-        end).
+        end
+    ).
 
 get_pending_count(#httpdb{} = Db, Seq) when is_number(Seq) ->
     % Source looks like Apache CouchDB and not Cloudant so we fall
@@ -138,46 +144,54 @@ get_pending_count(#httpdb{} = Db, Seq) ->
         {ok, couch_util:get_value(<<"pending">>, Props, null)}
     end).
 
-
 ensure_full_commit(#httpdb{} = Db) ->
     send_req(
         Db,
-        [{method, post}, {path, "_ensure_full_commit"},
-            {headers, [{"Content-Type", "application/json"}]}],
-        fun(201, _, {Props}) ->
-            {ok, get_value(<<"instance_start_time">>, Props)};
-        (_, _, {Props}) ->
-            {error, get_value(<<"error">>, Props)}
-        end).
-
+        [
+            {method, post},
+            {path, "_ensure_full_commit"},
+            {headers, [{"Content-Type", "application/json"}]}
+        ],
+        fun
+            (201, _, {Props}) ->
+                {ok, get_value(<<"instance_start_time">>, Props)};
+            (_, _, {Props}) ->
+                {error, get_value(<<"error">>, Props)}
+        end
+    ).
 
 get_missing_revs(#httpdb{} = Db, IdRevs) ->
     JsonBody = {[{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs} <- IdRevs]},
     send_req(
         Db,
-        [{method, post}, {path, "_revs_diff"}, {body, ?JSON_ENCODE(JsonBody)},
-            {headers, [{"Content-Type", "application/json"}]}],
-        fun(200, _, {Props}) ->
-            ConvertToNativeFun = fun({Id, {Result}}) ->
-                MissingRevs = couch_doc:parse_revs(
-                    get_value(<<"missing">>, Result)
-                ),
-                PossibleAncestors = couch_doc:parse_revs(
-                    get_value(<<"possible_ancestors">>, Result, [])
-                ),
-                {Id, MissingRevs, PossibleAncestors}
-            end,
-            {ok, lists:map(ConvertToNativeFun, Props)};
-        (ErrCode, _, ErrMsg) when is_integer(ErrCode) ->
-            {error, {revs_diff_failed, ErrCode, ErrMsg}}
-        end).
-
+        [
+            {method, post},
+            {path, "_revs_diff"},
+            {body, ?JSON_ENCODE(JsonBody)},
+            {headers, [{"Content-Type", "application/json"}]}
+        ],
+        fun
+            (200, _, {Props}) ->
+                ConvertToNativeFun = fun({Id, {Result}}) ->
+                    MissingRevs = couch_doc:parse_revs(
+                        get_value(<<"missing">>, Result)
+                    ),
+                    PossibleAncestors = couch_doc:parse_revs(
+                        get_value(<<"possible_ancestors">>, Result, [])
+                    ),
+                    {Id, MissingRevs, PossibleAncestors}
+                end,
+                {ok, lists:map(ConvertToNativeFun, Props)};
+            (ErrCode, _, ErrMsg) when is_integer(ErrCode) ->
+                {error, {revs_diff_failed, ErrCode, ErrMsg}}
+        end
+    ).
 
 open_doc_revs(#httpdb{retries = 0} = HttpDb, Id, Revs, Options, _Fun, _Acc) ->
     Path = encode_doc_id(Id),
     QS = options_to_query_args(HttpDb, Path, [revs, {open_revs, Revs} | Options]),
     Url = couch_util:url_strip_password(
-        couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}])
+        couch_replicator_httpc:full_url(HttpDb, [{path, Path}, {qs, QS}])
     ),
     ?LOG_ERROR(#{
         what => permanent_request_failure,
@@ -193,15 +207,15 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
     {Pid, Ref} = spawn_monitor(fun() ->
         Self = self(),
         Callback = fun
-          (200, Headers, StreamDataFun) ->
-            remote_open_doc_revs_streamer_start(Self),
-            {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
-                header_value("Content-Type", Headers),
-                StreamDataFun,
-                fun mp_parse_mixed/1
-            );
-          (414, _, _) ->
-            exit(request_uri_too_long)
+            (200, Headers, StreamDataFun) ->
+                remote_open_doc_revs_streamer_start(Self),
+                {<<"--">>, _, _} = couch_httpd:parse_multipart_request(
+                    header_value("Content-Type", Headers),
+                    StreamDataFun,
+                    fun mp_parse_mixed/1
+                );
+            (414, _, _) ->
+                exit(request_uri_too_long)
         end,
         Streamer = spawn_link(fun() ->
             Params = [
@@ -228,12 +242,12 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
                     exit(Streamer, {streamer_parent_died, Self});
                 {'DOWN', Ref, process, Self, _} ->
                     ok
-                end
+            end
         end),
         receive
-        {started_open_doc_revs, Ref} ->
-            Ret = receive_docs_loop(Streamer, Fun, Id, Revs, Ref, Acc),
-            exit({exit_ok, Ret})
+            {started_open_doc_revs, Ref} ->
+                Ret = receive_docs_loop(Streamer, Fun, Id, Revs, Ref, Acc),
+                exit({exit_ok, Ret})
         end
     end),
     receive
@@ -241,7 +255,7 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
             Ret;
         {'DOWN', Ref, process, Pid, {{nocatch, missing_doc}, _}} ->
             throw(missing_doc);
-        {'DOWN', Ref, process, Pid, {{nocatch, {missing_stub,_} = Stub}, _}} ->
+        {'DOWN', Ref, process, Pid, {{nocatch, {missing_stub, _} = Stub}, _}} ->
             throw(Stub);
         {'DOWN', Ref, process, Pid, {http_request_failed, _, _, max_backoff}} ->
             exit(max_backoff);
@@ -258,15 +272,22 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
                         new_max_length => NewMaxLen,
                         details => "reducing url length because of 414 response"
                     }),
-                    couch_log:info("Reducing url length to ~B because of"
-                                   " 414 response", [NewMaxLen]),
-                    Options1 = lists:keystore(max_url_len, 1, Options,
-                                              {max_url_len, NewMaxLen}),
+                    couch_log:info(
+                        "Reducing url length to ~B because of"
+                        " 414 response",
+                        [NewMaxLen]
+                    ),
+                    Options1 = lists:keystore(
+                        max_url_len,
+                        1,
+                        Options,
+                        {max_url_len, NewMaxLen}
+                    ),
                     open_doc_revs(HttpDb, Id, Revs, Options1, Fun, Acc)
             end;
         {'DOWN', Ref, process, Pid, Else} ->
             Url = couch_util:url_strip_password(
-                couch_replicator_httpc:full_url(HttpDb, [{path,Path}, {qs,QS}])
+                couch_replicator_httpc:full_url(HttpDb, [{path, Path}, {qs, QS}])
             ),
             #httpdb{retries = Retries, wait = Wait0} = HttpDb,
             Wait = 2 * erlang:min(Wait0 * 2, ?MAX_WAIT),
@@ -277,7 +298,8 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
                 delay_sec => Wait / 1000,
                 details => error_reason(Else)
             }),
-            couch_log:notice("Retrying GET to ~s in ~p seconds due to error ~w",
+            couch_log:notice(
+                "Retrying GET to ~s in ~p seconds due to error ~w",
                 [Url, Wait / 1000, error_reason(Else)]
             ),
             ok = timer:sleep(Wait),
@@ -287,7 +309,6 @@ open_doc_revs(#httpdb{} = HttpDb, Id, Revs, Options, Fun, Acc) ->
             },
             open_doc_revs(RetryDb, Id, Revs, Options, Fun, Acc)
     end.
-
 
 error_reason({http_request_failed, "GET", _Url, {error, timeout}}) ->
     timeout;
@@ -302,35 +323,45 @@ open_doc(#httpdb{} = Db, Id, Options) ->
     send_req(
         Db,
         [{path, encode_doc_id(Id)}, {qs, options_to_query_args(Options, [])}],
-        fun(200, _, Body) ->
-            {ok, couch_doc:from_json_obj(Body)};
-        (_, _, {Props}) ->
-            {error, get_value(<<"error">>, Props)}
-        end).
-
+        fun
+            (200, _, Body) ->
+                {ok, couch_doc:from_json_obj(Body)};
+            (_, _, {Props}) ->
+                {error, get_value(<<"error">>, Props)}
+        end
+    ).
 
 update_doc(Db, Doc, Options) ->
     update_doc(Db, Doc, Options, interactive_edit).
 
 update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
-    QArgs = case Type of
-    replicated_changes ->
-        [{"new_edits", "false"}];
-    _ ->
-        []
-    end ++ options_to_query_args(Options, []),
+    QArgs =
+        case Type of
+            replicated_changes ->
+                [{"new_edits", "false"}];
+            _ ->
+                []
+        end ++ options_to_query_args(Options, []),
     Boundary = couch_uuids:random(),
     JsonBytes = ?JSON_ENCODE(
         couch_doc:to_json_obj(
-          Doc, [revs, attachments, follows, att_encoding_info | Options])),
-    {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(Boundary,
-        JsonBytes, Doc#doc.atts, true),
-    Headers = case lists:member(delay_commit, Options) of
-    true ->
-        [{"X-Couch-Full-Commit", "false"}];
-    false ->
-        []
-    end ++ [{"Content-Type", ?b2l(ContentType)}, {"Content-Length", Len}],
+            Doc,
+            [revs, attachments, follows, att_encoding_info | Options]
+        )
+    ),
+    {ContentType, Len} = couch_doc:len_doc_to_multi_part_stream(
+        Boundary,
+        JsonBytes,
+        Doc#doc.atts,
+        true
+    ),
+    Headers =
+        case lists:member(delay_commit, Options) of
+            true ->
+                [{"X-Couch-Full-Commit", "false"}];
+            false ->
+                []
+        end ++ [{"Content-Type", ?b2l(ContentType)}, {"Content-Length", Len}],
     Body = {fun stream_doc/1, {JsonBytes, Doc#doc.atts, Boundary, Len}},
     send_req(
         % A crash here bubbles all the way back up to run_user_fun inside
@@ -338,27 +369,33 @@ update_doc(#httpdb{} = HttpDb, #doc{id = DocId} = Doc, Options, Type) ->
         % appropriate course of action, since we've already started streaming
         % the response body from the GET request.
         HttpDb#httpdb{retries = 0},
-        [{method, put}, {path, encode_doc_id(DocId)},
-            {qs, QArgs}, {headers, Headers}, {body, Body}],
-        fun(Code, _, {Props}) when Code =:= 200 orelse Code =:= 201 orelse Code =:= 202 ->
+        [
+            {method, put},
+            {path, encode_doc_id(DocId)},
+            {qs, QArgs},
+            {headers, Headers},
+            {body, Body}
+        ],
+        fun
+            (Code, _, {Props}) when Code =:= 200 orelse Code =:= 201 orelse Code =:= 202 ->
                 {ok, couch_doc:parse_rev(get_value(<<"rev">>, Props))};
             (409, _, _) ->
                 throw(conflict);
             (Code, _, {Props}) ->
                 case {Code, get_value(<<"error">>, Props)} of
-                {401, <<"unauthorized">>} ->
-                    throw({unauthorized, get_value(<<"reason">>, Props)});
-                {403, <<"forbidden">>} ->
-                    throw({forbidden, get_value(<<"reason">>, Props)});
-                {412, <<"missing_stub">>} ->
-                    throw({missing_stub, get_value(<<"reason">>, Props)});
-                {413, _} ->
-                    {error, request_body_too_large};
-                {_, Error} ->
-                    {error, Error}
+                    {401, <<"unauthorized">>} ->
+                        throw({unauthorized, get_value(<<"reason">>, Props)});
+                    {403, <<"forbidden">>} ->
+                        throw({forbidden, get_value(<<"reason">>, Props)});
+                    {412, <<"missing_stub">>} ->
+                        throw({missing_stub, get_value(<<"reason">>, Props)});
+                    {413, _} ->
+                        {error, request_body_too_large};
+                    {_, Error} ->
+                        {error, Error}
                 end
-        end).
-
+        end
+    ).
 
 update_docs(Db, DocList, Options) ->
     update_docs(Db, DocList, Options, interactive_edit).
@@ -367,26 +404,30 @@ update_docs(_Db, [], _Options, _UpdateType) ->
     {ok, []};
 update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
     FullCommit = atom_to_list(not lists:member(delay_commit, Options)),
-    Prefix = case UpdateType of
-    replicated_changes ->
-        <<"{\"new_edits\":false,\"docs\":[">>;
-    interactive_edit ->
-        <<"{\"docs\":[">>
-    end,
+    Prefix =
+        case UpdateType of
+            replicated_changes ->
+                <<"{\"new_edits\":false,\"docs\":[">>;
+            interactive_edit ->
+                <<"{\"docs\":[">>
+        end,
     Suffix = <<"]}">>,
     % Note: nginx and other servers don't like PUT/POST requests without
     % a Content-Length header, so we can't do a chunked transfer encoding
     % and JSON encode each doc only before sending it through the socket.
     {Docs, Len} = lists:mapfoldl(
-        fun(#doc{} = Doc, Acc) ->
-            Json = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs, attachments])),
-            {Json, Acc + iolist_size(Json)};
-        (Doc, Acc) ->
-            {Doc, Acc + iolist_size(Doc)}
+        fun
+            (#doc{} = Doc, Acc) ->
+                Json = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs, attachments])),
+                {Json, Acc + iolist_size(Json)};
+            (Doc, Acc) ->
+                {Doc, Acc + iolist_size(Doc)}
         end,
         byte_size(Prefix) + byte_size(Suffix) + length(DocList) - 1,
-        DocList),
-    BodyFun = fun(eof) ->
+        DocList
+    ),
+    BodyFun = fun
+        (eof) ->
             eof;
         ([]) ->
             {ok, Suffix, eof};
@@ -404,153 +445,196 @@ update_docs(#httpdb{} = HttpDb, DocList, Options, UpdateType) ->
     ],
     send_req(
         HttpDb,
-        [{method, post}, {path, "_bulk_docs"},
-            {body, {BodyFun, [prefix | Docs]}}, {headers, Headers}],
-        fun(201, _, Results) when is_list(Results) ->
+        [
+            {method, post},
+            {path, "_bulk_docs"},
+            {body, {BodyFun, [prefix | Docs]}},
+            {headers, Headers}
+        ],
+        fun
+            (201, _, Results) when is_list(Results) ->
                 {ok, bulk_results_to_errors(DocList, Results, remote)};
-           (413, _, _) ->
+            (413, _, _) ->
                 {error, request_body_too_large};
-           (417, _, Results) when is_list(Results) ->
+            (417, _, Results) when is_list(Results) ->
                 {ok, bulk_results_to_errors(DocList, Results, remote)};
-           (ErrCode, _, ErrMsg) when is_integer(ErrCode) ->
+            (ErrCode, _, ErrMsg) when is_integer(ErrCode) ->
                 {error, {bulk_docs_failed, ErrCode, ErrMsg}}
-        end).
+        end
+    ).
 
-
-changes_since(#httpdb{headers = Headers1, timeout = InactiveTimeout} = HttpDb,
-              Style, StartSeq, UserFun, Options) ->
+changes_since(
+    #httpdb{headers = Headers1, timeout = InactiveTimeout} = HttpDb,
+    Style,
+    StartSeq,
+    UserFun,
+    Options
+) ->
     Timeout = erlang:max(1000, InactiveTimeout div 3),
-    BaseQArgs = case get_value(continuous, Options, false) of
-    false ->
-        [{"feed", "normal"}];
-    true ->
-        [{"feed", "continuous"}]
-    end ++ [
-        {"style", atom_to_list(Style)}, {"since", ?JSON_ENCODE(StartSeq)},
-        {"timeout", integer_to_list(Timeout)}
-           ],
+    BaseQArgs =
+        case get_value(continuous, Options, false) of
+            false ->
+                [{"feed", "normal"}];
+            true ->
+                [{"feed", "continuous"}]
+        end ++
+            [
+                {"style", atom_to_list(Style)},
+                {"since", ?JSON_ENCODE(StartSeq)},
+                {"timeout", integer_to_list(Timeout)}
+            ],
     DocIds = get_value(doc_ids, Options),
     Selector = get_value(selector, Options),
-    {QArgs, Method, Body, Headers} = case {DocIds, Selector} of
-    {undefined, undefined} ->
-        QArgs1 = maybe_add_changes_filter_q_args(BaseQArgs, Options),
-        {QArgs1, get, [], Headers1};
-    {undefined, #{}} ->
-        Headers2 = [{"Content-Type", "application/json"} | Headers1],
-        JsonSelector = ?JSON_ENCODE(#{<<"selector">> => Selector}),
-        {[{"filter", "_selector"} | BaseQArgs], post, JsonSelector, Headers2};
-    {_, undefined} when is_list(DocIds) ->
-        Headers2 = [{"Content-Type", "application/json"} | Headers1],
-        JsonDocIds = ?JSON_ENCODE({[{<<"doc_ids">>, DocIds}]}),
-        {[{"filter", "_doc_ids"} | BaseQArgs], post, JsonDocIds, Headers2}
-    end,
+    {QArgs, Method, Body, Headers} =
+        case {DocIds, Selector} of
+            {undefined, undefined} ->
+                QArgs1 = maybe_add_changes_filter_q_args(BaseQArgs, Options),
+                {QArgs1, get, [], Headers1};
+            {undefined, #{}} ->
+                Headers2 = [{"Content-Type", "application/json"} | Headers1],
+                JsonSelector = ?JSON_ENCODE(#{<<"selector">> => Selector}),
+                {[{"filter", "_selector"} | BaseQArgs], post, JsonSelector, Headers2};
+            {_, undefined} when is_list(DocIds) ->
+                Headers2 = [{"Content-Type", "application/json"} | Headers1],
+                JsonDocIds = ?JSON_ENCODE({[{<<"doc_ids">>, DocIds}]}),
+                {[{"filter", "_doc_ids"} | BaseQArgs], post, JsonDocIds, Headers2}
+        end,
     try
         send_req(
             HttpDb,
-            [{method, Method}, {path, "_changes"}, {qs, QArgs},
-                {headers, Headers}, {body, Body},
-                {ibrowse_options, [{stream_to, {self(), once}}]}],
-            fun(200, _, DataStreamFun) ->
+            [
+                {method, Method},
+                {path, "_changes"},
+                {qs, QArgs},
+                {headers, Headers},
+                {body, Body},
+                {ibrowse_options, [{stream_to, {self(), once}}]}
+            ],
+            fun
+                (200, _, DataStreamFun) ->
                     parse_changes_feed(Options, UserFun, DataStreamFun);
                 (405, _, _) when is_list(DocIds) ->
                     % CouchDB versions < 1.1.0 don't have the builtin
                     % _changes feed filter "_doc_ids" neither support POST
-                    send_req(HttpDb, [{method, get}, {path, "_changes"},
-                        {qs, BaseQArgs}, {headers, Headers1},
-                        {ibrowse_options, [{stream_to, {self(), once}}]}],
+                    send_req(
+                        HttpDb,
+                        [
+                            {method, get},
+                            {path, "_changes"},
+                            {qs, BaseQArgs},
+                            {headers, Headers1},
+                            {ibrowse_options, [{stream_to, {self(), once}}]}
+                        ],
                         fun(200, _, DataStreamFun2) ->
-                            UserFun2 = fun(#doc_info{id = Id} = DocInfo) ->
-                                case lists:member(Id, DocIds) of
-                                true ->
-                                    UserFun(DocInfo);
-                                false ->
-                                    ok
-                                end;
-                            (LastSeq) ->
-                                UserFun(LastSeq)
+                            UserFun2 = fun
+                                (#doc_info{id = Id} = DocInfo) ->
+                                    case lists:member(Id, DocIds) of
+                                        true ->
+                                            UserFun(DocInfo);
+                                        false ->
+                                            ok
+                                    end;
+                                (LastSeq) ->
+                                    UserFun(LastSeq)
                             end,
-                            parse_changes_feed(Options, UserFun2,
-                                DataStreamFun2)
-                        end);
-                 (ErrCode, _, ErrMsg) when is_integer(ErrCode) ->
+                            parse_changes_feed(
+                                Options,
+                                UserFun2,
+                                DataStreamFun2
+                            )
+                        end
+                    );
+                (ErrCode, _, ErrMsg) when is_integer(ErrCode) ->
                     throw({retry_limit, {changes_req_failed, ErrCode, ErrMsg}})
-            end)
+            end
+        )
     catch
         exit:{http_request_failed, _, _, max_backoff} ->
             exit(max_backoff);
-        exit:{http_request_failed, _, _, {error, {connection_closed,
-                mid_stream}}} ->
+        exit:{http_request_failed, _, _, {error, {connection_closed, mid_stream}}} ->
             throw(retry_no_limit);
         exit:{http_request_failed, _, _, _} = Error ->
             throw({retry_limit, Error})
     end.
 
-
 % internal functions
 
 maybe_add_changes_filter_q_args(BaseQS, Options) ->
     case get_value(filter, Options) of
-    undefined ->
-        BaseQS;
-    FilterName ->
-        %% get list of view attributes
-        ViewFields0 = [atom_to_list(F) || F <- record_info(fields,  mrargs)],
-        ViewFields = ["key" | ViewFields0],
+        undefined ->
+            BaseQS;
+        FilterName ->
+            %% get list of view attributes
+            ViewFields0 = [atom_to_list(F) || F <- record_info(fields, mrargs)],
+            ViewFields = ["key" | ViewFields0],
 
-        ParamsMap = #{} = get_value(query_params, Options, #{}),
-        Params = maps:to_list(ParamsMap),
-        [{"filter", ?b2l(FilterName)} | lists:foldl(
-            fun({K, V}, QSAcc) ->
-                Ks = couch_util:to_list(K),
-                case lists:keymember(Ks, 1, QSAcc) of
-                true ->
-                    QSAcc;
-                false when FilterName =:= <<"_view">> ->
-                    V1 = case lists:member(Ks, ViewFields) of
-                        true -> ?JSON_ENCODE(V);
-                        false -> couch_util:to_list(V)
+            ParamsMap = #{} = get_value(query_params, Options, #{}),
+            Params = maps:to_list(ParamsMap),
+            [
+                {"filter", ?b2l(FilterName)}
+                | lists:foldl(
+                    fun({K, V}, QSAcc) ->
+                        Ks = couch_util:to_list(K),
+                        case lists:keymember(Ks, 1, QSAcc) of
+                            true ->
+                                QSAcc;
+                            false when FilterName =:= <<"_view">> ->
+                                V1 =
+                                    case lists:member(Ks, ViewFields) of
+                                        true -> ?JSON_ENCODE(V);
+                                        false -> couch_util:to_list(V)
+                                    end,
+                                [{Ks, V1} | QSAcc];
+                            false ->
+                                [{Ks, couch_util:to_list(V)} | QSAcc]
+                        end
                     end,
-                    [{Ks, V1} | QSAcc];
-                false ->
-                    [{Ks, couch_util:to_list(V)} | QSAcc]
-                end
-            end,
-            BaseQS, Params)]
+                    BaseQS,
+                    Params
+                )
+            ]
     end.
 
 parse_changes_feed(Options, UserFun, DataStreamFun) ->
     case get_value(continuous, Options, false) of
-    true ->
-        continuous_changes(DataStreamFun, UserFun);
-    false ->
-        EventFun = fun(Ev) ->
-            changes_ev1(Ev, fun(DocInfo, _) -> UserFun(DocInfo) end, [])
-        end,
-        json_stream_parse:events(DataStreamFun, EventFun)
+        true ->
+            continuous_changes(DataStreamFun, UserFun);
+        false ->
+            EventFun = fun(Ev) ->
+                changes_ev1(Ev, fun(DocInfo, _) -> UserFun(DocInfo) end, [])
+            end,
+            json_stream_parse:events(DataStreamFun, EventFun)
     end.
-
 
 options_to_query_args(HttpDb, Path, Options0) ->
     case lists:keytake(max_url_len, 1, Options0) of
-        false -> MaxLen = ?MAX_URL_LEN, Options = Options0;
-        {value, {max_url_len, MaxLen}, Options} -> ok
+        false ->
+            MaxLen = ?MAX_URL_LEN,
+            Options = Options0;
+        {value, {max_url_len, MaxLen}, Options} ->
+            ok
     end,
     case lists:keytake(atts_since, 1, Options) of
-    false ->
-        options_to_query_args(Options, []);
-    {value, {atts_since, []}, Options2} ->
-        options_to_query_args(Options2, []);
-    {value, {atts_since, PAs}, Options2} ->
-        QueryArgs1 = options_to_query_args(Options2, []),
-        FullUrl = couch_replicator_httpc:full_url(
-            HttpDb, [{path, Path}, {qs, QueryArgs1}]),
-        RevList = atts_since_arg(
-            length("GET " ++ FullUrl ++ " HTTP/1.1\r\n") +
-            length("&atts_since=") + 6,  % +6 = % encoded [ and ]
-            PAs, MaxLen, []),
-        [{"atts_since", ?b2l(iolist_to_binary(?JSON_ENCODE(RevList)))} | QueryArgs1]
+        false ->
+            options_to_query_args(Options, []);
+        {value, {atts_since, []}, Options2} ->
+            options_to_query_args(Options2, []);
+        {value, {atts_since, PAs}, Options2} ->
+            QueryArgs1 = options_to_query_args(Options2, []),
+            FullUrl = couch_replicator_httpc:full_url(
+                HttpDb,
+                [{path, Path}, {qs, QueryArgs1}]
+            ),
+            RevList = atts_since_arg(
+                length("GET " ++ FullUrl ++ " HTTP/1.1\r\n") +
+                    % +6 = % encoded [ and ]
+                    length("&atts_since=") + 6,
+                PAs,
+                MaxLen,
+                []
+            ),
+            [{"atts_since", ?b2l(iolist_to_binary(?JSON_ENCODE(RevList)))} | QueryArgs1]
     end.
-
 
 options_to_query_args([], Acc) ->
     lists:reverse(Acc);
@@ -572,21 +656,21 @@ atts_since_arg(_UrlLen, [], _MaxLen, Acc) ->
     lists:reverse(Acc);
 atts_since_arg(UrlLen, [PA | Rest], MaxLen, Acc) ->
     RevStr = couch_doc:rev_to_str(PA),
-    NewUrlLen = case Rest of
-    [] ->
-        % plus 2 double quotes (% encoded)
-        UrlLen + size(RevStr) + 6;
-    _ ->
-        % plus 2 double quotes and a comma (% encoded)
-        UrlLen + size(RevStr) + 9
-    end,
+    NewUrlLen =
+        case Rest of
+            [] ->
+                % plus 2 double quotes (% encoded)
+                UrlLen + size(RevStr) + 6;
+            _ ->
+                % plus 2 double quotes and a comma (% encoded)
+                UrlLen + size(RevStr) + 9
+        end,
     case NewUrlLen >= MaxLen of
-    true ->
-        lists:reverse(Acc);
-    false ->
-        atts_since_arg(NewUrlLen, Rest, MaxLen, [RevStr | Acc])
+        true ->
+            lists:reverse(Acc);
+        false ->
+            atts_since_arg(NewUrlLen, Rest, MaxLen, [RevStr | Acc])
     end.
-
 
 % TODO: A less verbose, more elegant and automatic restart strategy for
 %       the exported open_doc_revs/6 function. The restart should be
@@ -598,50 +682,54 @@ receive_docs_loop(Streamer, Fun, Id, Revs, Ref, Acc) ->
         erlang:put(open_doc_revs, {Id, Revs, Ref, Streamer}),
         receive_docs(Streamer, Fun, Ref, Acc)
     catch
-    error:{restart_open_doc_revs, NewRef} ->
-        receive_docs_loop(Streamer, Fun, Id, Revs, NewRef, Acc)
+        error:{restart_open_doc_revs, NewRef} ->
+            receive_docs_loop(Streamer, Fun, Id, Revs, NewRef, Acc)
     end.
 
 receive_docs(Streamer, UserFun, Ref, UserAcc) ->
     Streamer ! {get_headers, Ref, self()},
     receive
-    {started_open_doc_revs, NewRef} ->
-        restart_remote_open_doc_revs(Ref, NewRef);
-    {headers, Ref, Headers} ->
-        case header_value("content-type", Headers) of
-        {"multipart/related", _} = ContentType ->
-            % Skip document body and attachment size limits validation here
-            % since these should be validated by the replication target
-            case couch_doc:doc_from_multi_part_stream(
-                ContentType,
-                fun() -> receive_doc_data(Streamer, Ref) end,
-                Ref, _ValidateDocLimits = false) of
-            {ok, Doc, WaitFun, Parser} ->
-                case run_user_fun(UserFun, {ok, Doc}, UserAcc, Ref) of
-                {ok, UserAcc2} ->
-                    ok;
-                {skip, UserAcc2} ->
-                    couch_httpd_multipart:abort_multipart_stream(Parser)
-                end,
-                WaitFun(),
-                receive_docs(Streamer, UserFun, Ref, UserAcc2)
+        {started_open_doc_revs, NewRef} ->
+            restart_remote_open_doc_revs(Ref, NewRef);
+        {headers, Ref, Headers} ->
+            case header_value("content-type", Headers) of
+                {"multipart/related", _} = ContentType ->
+                    % Skip document body and attachment size limits validation here
+                    % since these should be validated by the replication target
+                    case
+                        couch_doc:doc_from_multi_part_stream(
+                            ContentType,
+                            fun() -> receive_doc_data(Streamer, Ref) end,
+                            Ref,
+                            _ValidateDocLimits = false
+                        )
+                    of
+                        {ok, Doc, WaitFun, Parser} ->
+                            case run_user_fun(UserFun, {ok, Doc}, UserAcc, Ref) of
+                                {ok, UserAcc2} ->
+                                    ok;
+                                {skip, UserAcc2} ->
+                                    couch_httpd_multipart:abort_multipart_stream(Parser)
+                            end,
+                            WaitFun(),
+                            receive_docs(Streamer, UserFun, Ref, UserAcc2)
+                    end;
+                {"application/json", []} ->
+                    Doc = couch_doc:from_json_obj(
+                        ?JSON_DECODE(receive_all(Streamer, Ref, []))
+                    ),
+                    {_, UserAcc2} = run_user_fun(UserFun, {ok, Doc}, UserAcc, Ref),
+                    receive_docs(Streamer, UserFun, Ref, UserAcc2);
+                {"application/json", [{"error", "true"}]} ->
+                    {ErrorProps} = ?JSON_DECODE(receive_all(Streamer, Ref, [])),
+                    Rev = get_value(<<"missing">>, ErrorProps),
+                    Result = {{not_found, missing}, couch_doc:parse_rev(Rev)},
+                    {_, UserAcc2} = run_user_fun(UserFun, Result, UserAcc, Ref),
+                    receive_docs(Streamer, UserFun, Ref, UserAcc2)
             end;
-        {"application/json", []} ->
-            Doc = couch_doc:from_json_obj(
-                    ?JSON_DECODE(receive_all(Streamer, Ref, []))),
-            {_, UserAcc2} = run_user_fun(UserFun, {ok, Doc}, UserAcc, Ref),
-            receive_docs(Streamer, UserFun, Ref, UserAcc2);
-        {"application/json", [{"error","true"}]} ->
-            {ErrorProps} = ?JSON_DECODE(receive_all(Streamer, Ref, [])),
-            Rev = get_value(<<"missing">>, ErrorProps),
-            Result = {{not_found, missing}, couch_doc:parse_rev(Rev)},
-            {_, UserAcc2} = run_user_fun(UserFun, Result, UserAcc, Ref),
-            receive_docs(Streamer, UserFun, Ref, UserAcc2)
-        end;
-    {done, Ref} ->
-        {ok, UserAcc}
+        {done, Ref} ->
+            {ok, UserAcc}
     end.
-
 
 run_user_fun(UserFun, Arg, UserAcc, OldRef) ->
     {Pid, Ref} = spawn_monitor(fun() ->
@@ -672,77 +760,75 @@ run_user_fun(UserFun, Arg, UserAcc, OldRef) ->
             erlang:exit(Reason)
     end.
 
-
 restart_remote_open_doc_revs(Ref, NewRef) ->
     receive
-    {body_bytes, Ref, _} ->
-        restart_remote_open_doc_revs(Ref, NewRef);
-    {body_done, Ref} ->
-        restart_remote_open_doc_revs(Ref, NewRef);
-    {done, Ref} ->
-        restart_remote_open_doc_revs(Ref, NewRef);
-    {headers, Ref, _} ->
-        restart_remote_open_doc_revs(Ref, NewRef)
+        {body_bytes, Ref, _} ->
+            restart_remote_open_doc_revs(Ref, NewRef);
+        {body_done, Ref} ->
+            restart_remote_open_doc_revs(Ref, NewRef);
+        {done, Ref} ->
+            restart_remote_open_doc_revs(Ref, NewRef);
+        {headers, Ref, _} ->
+            restart_remote_open_doc_revs(Ref, NewRef)
     after 0 ->
         erlang:error({restart_open_doc_revs, NewRef})
     end.
 
-
 remote_open_doc_revs_streamer_start(Parent) ->
     receive
-    {get_headers, _Ref, Parent} ->
-        remote_open_doc_revs_streamer_start(Parent);
-    {next_bytes, _Ref, Parent} ->
-        remote_open_doc_revs_streamer_start(Parent)
+        {get_headers, _Ref, Parent} ->
+            remote_open_doc_revs_streamer_start(Parent);
+        {next_bytes, _Ref, Parent} ->
+            remote_open_doc_revs_streamer_start(Parent)
     after 0 ->
         Parent ! {started_open_doc_revs, make_ref()}
     end.
 
-
 receive_all(Streamer, Ref, Acc) ->
     Streamer ! {next_bytes, Ref, self()},
     receive
-    {started_open_doc_revs, NewRef} ->
-        restart_remote_open_doc_revs(Ref, NewRef);
-    {body_bytes, Ref, Bytes} ->
-        receive_all(Streamer, Ref, [Bytes | Acc]);
-    {body_done, Ref} ->
-        lists:reverse(Acc)
+        {started_open_doc_revs, NewRef} ->
+            restart_remote_open_doc_revs(Ref, NewRef);
+        {body_bytes, Ref, Bytes} ->
+            receive_all(Streamer, Ref, [Bytes | Acc]);
+        {body_done, Ref} ->
+            lists:reverse(Acc)
     end.
 
-
 mp_parse_mixed(eof) ->
-    receive {get_headers, Ref, From} ->
-        From ! {done, Ref}
+    receive
+        {get_headers, Ref, From} ->
+            From ! {done, Ref}
     end;
 mp_parse_mixed({headers, H}) ->
-    receive {get_headers, Ref, From} ->
-        From ! {headers, Ref, H}
+    receive
+        {get_headers, Ref, From} ->
+            From ! {headers, Ref, H}
     end,
     fun mp_parse_mixed/1;
 mp_parse_mixed({body, Bytes}) ->
-    receive {next_bytes, Ref, From} ->
-        From ! {body_bytes, Ref, Bytes}
+    receive
+        {next_bytes, Ref, From} ->
+            From ! {body_bytes, Ref, Bytes}
     end,
     fun mp_parse_mixed/1;
 mp_parse_mixed(body_end) ->
-    receive {next_bytes, Ref, From} ->
-        From ! {body_done, Ref};
-    {get_headers, Ref, From} ->
-        self() ! {get_headers, Ref, From}
+    receive
+        {next_bytes, Ref, From} ->
+            From ! {body_done, Ref};
+        {get_headers, Ref, From} ->
+            self() ! {get_headers, Ref, From}
     end,
     fun mp_parse_mixed/1.
-
 
 receive_doc_data(Streamer, Ref) ->
     Streamer ! {next_bytes, Ref, self()},
     receive
-    {body_bytes, Ref, Bytes} ->
-        {Bytes, fun() -> receive_doc_data(Streamer, Ref) end};
-    {body_done, Ref} ->
-        {<<>>, fun() -> receive_doc_data(Streamer, Ref) end}
+        {body_bytes, Ref, Bytes} ->
+            {Bytes, fun() -> receive_doc_data(Streamer, Ref) end};
+        {body_done, Ref} ->
+            {<<>>, fun() -> receive_doc_data(Streamer, Ref) end}
     end.
-
 
 changes_ev1(object_start, UserFun, UserAcc) ->
     fun(Ev) -> changes_ev2(Ev, UserFun, UserAcc) end.
@@ -757,11 +843,13 @@ changes_ev3(array_start, UserFun, UserAcc) ->
 
 changes_ev_loop(object_start, UserFun, UserAcc) ->
     fun(Ev) ->
-        json_stream_parse:collect_object(Ev,
+        json_stream_parse:collect_object(
+            Ev,
             fun(Obj) ->
                 UserAcc2 = UserFun(json_to_doc_info(Obj), UserAcc),
                 fun(Ev2) -> changes_ev_loop(Ev2, UserFun, UserAcc2) end
-            end)
+            end
+        )
     end;
 changes_ev_loop(array_end, _UserFun, _UserAcc) ->
     fun(_Ev) -> changes_ev_done() end.
@@ -772,80 +860,106 @@ changes_ev_done() ->
 continuous_changes(DataFun, UserFun) ->
     {DataFun2, _, Rest} = json_stream_parse:events(
         DataFun,
-        fun(Ev) -> parse_changes_line(Ev, UserFun) end),
+        fun(Ev) -> parse_changes_line(Ev, UserFun) end
+    ),
     continuous_changes(fun() -> {Rest, DataFun2} end, UserFun).
 
 parse_changes_line(object_start, UserFun) ->
     fun(Ev) ->
-        json_stream_parse:collect_object(Ev,
-            fun(Obj) -> UserFun(json_to_doc_info(Obj)) end)
+        json_stream_parse:collect_object(
+            Ev,
+            fun(Obj) -> UserFun(json_to_doc_info(Obj)) end
+        )
     end.
 
 json_to_doc_info({Props}) ->
     case get_value(<<"changes">>, Props) of
-    undefined ->
-        {last_seq, get_value(<<"last_seq">>, Props)};
-    Changes ->
-        RevsInfo0 = lists:map(
-            fun({Change}) ->
-                Rev = couch_doc:parse_rev(get_value(<<"rev">>, Change)),
-                Del = get_value(<<"deleted">>, Change, false),
-                #rev_info{rev=Rev, deleted=Del}
-            end, Changes),
+        undefined ->
+            {last_seq, get_value(<<"last_seq">>, Props)};
+        Changes ->
+            RevsInfo0 = lists:map(
+                fun({Change}) ->
+                    Rev = couch_doc:parse_rev(get_value(<<"rev">>, Change)),
+                    Del = get_value(<<"deleted">>, Change, false),
+                    #rev_info{rev = Rev, deleted = Del}
+                end,
+                Changes
+            ),
 
-        RevsInfo = case get_value(<<"removed">>, Props) of
-            true ->
-                [_ | RevsInfo1] = RevsInfo0,
-                RevsInfo1;
-            _ ->
-                RevsInfo0
-        end,
+            RevsInfo =
+                case get_value(<<"removed">>, Props) of
+                    true ->
+                        [_ | RevsInfo1] = RevsInfo0,
+                        RevsInfo1;
+                    _ ->
+                        RevsInfo0
+                end,
 
-        #doc_info{
-            id = get_value(<<"id">>, Props),
-            high_seq = get_value(<<"seq">>, Props),
-            revs = RevsInfo
-        }
+            #doc_info{
+                id = get_value(<<"id">>, Props),
+                high_seq = get_value(<<"seq">>, Props),
+                revs = RevsInfo
+            }
     end.
 
 bulk_results_to_errors(Docs, {ok, Results}, interactive_edit) ->
-    lists:reverse(lists:foldl(
-        fun({_, {ok, _}}, Acc) ->
-            Acc;
-        ({#doc{id = Id, revs = {Pos, [RevId | _]}}, Error}, Acc) ->
-            {_, Error, Reason} = couch_httpd:error_info(Error),
-            [ {[{id, Id}, {rev, rev_to_str({Pos, RevId})},
-                {error, Error}, {reason, Reason}]} | Acc ]
-        end,
-        [], lists:zip(Docs, Results)));
-
+    lists:reverse(
+        lists:foldl(
+            fun
+                ({_, {ok, _}}, Acc) ->
+                    Acc;
+                ({#doc{id = Id, revs = {Pos, [RevId | _]}}, Error}, Acc) ->
+                    {_, Error, Reason} = couch_httpd:error_info(Error),
+                    [
+                        {[
+                            {id, Id},
+                            {rev, rev_to_str({Pos, RevId})},
+                            {error, Error},
+                            {reason, Reason}
+                        ]}
+                        | Acc
+                    ]
+            end,
+            [],
+            lists:zip(Docs, Results)
+        )
+    );
 bulk_results_to_errors(Docs, {ok, Results}, replicated_changes) ->
     bulk_results_to_errors(Docs, {aborted, Results}, interactive_edit);
-
 bulk_results_to_errors(_Docs, {aborted, Results}, interactive_edit) ->
     lists:map(
         fun({{Id, Rev}, Err}) ->
             {_, Error, Reason} = couch_httpd:error_info(Err),
             {[{id, Id}, {rev, rev_to_str(Rev)}, {error, Error}, {reason, Reason}]}
         end,
-        Results);
-
+        Results
+    );
 bulk_results_to_errors(_Docs, Results, remote) ->
-    lists:reverse(lists:foldl(
-        fun({Props}, Acc) ->
-            case get_value(<<"error">>, Props, get_value(error, Props)) of
-            undefined ->
-                Acc;
-            Error ->
-                Id = get_value(<<"id">>, Props, get_value(id, Props)),
-                Rev = get_value(<<"rev">>, Props, get_value(rev, Props)),
-                Reason = get_value(<<"reason">>, Props, get_value(reason, Props)),
-                [ {[{id, Id}, {rev, rev_to_str(Rev)},
-                    {error, Error}, {reason, Reason}]} | Acc ]
-            end
-        end,
-        [], Results)).
-
+    lists:reverse(
+        lists:foldl(
+            fun({Props}, Acc) ->
+                case get_value(<<"error">>, Props, get_value(error, Props)) of
+                    undefined ->
+                        Acc;
+                    Error ->
+                        Id = get_value(<<"id">>, Props, get_value(id, Props)),
+                        Rev = get_value(<<"rev">>, Props, get_value(rev, Props)),
+                        Reason = get_value(<<"reason">>, Props, get_value(reason, Props)),
+                        [
+                            {[
+                                {id, Id},
+                                {rev, rev_to_str(Rev)},
+                                {error, Error},
+                                {reason, Reason}
+                            ]}
+                            | Acc
+                        ]
+                end
+            end,
+            [],
+            Results
+        )
+    ).
 
 rev_to_str({_Pos, _Id} = Rev) ->
     couch_doc:rev_to_str(Rev);
@@ -854,18 +968,19 @@ rev_to_str(Rev) ->
 
 write_fun() ->
     fun(Data) ->
-        receive {get_data, Ref, From} ->
-            From ! {data, Ref, Data}
+        receive
+            {get_data, Ref, From} ->
+                From ! {data, Ref, Data}
         end
     end.
 
 stream_doc({JsonBytes, Atts, Boundary, Len}) ->
     case erlang:erase({doc_streamer, Boundary}) of
-    Pid when is_pid(Pid) ->
-        unlink(Pid),
-        exit(Pid, kill);
-    _ ->
-        ok
+        Pid when is_pid(Pid) ->
+            unlink(Pid),
+            exit(Pid, kill);
+        _ ->
+            ok
     end,
     DocStreamer = spawn_link(
         couch_doc,
@@ -880,8 +995,9 @@ stream_doc({0, Id}) ->
 stream_doc({LenLeft, Id}) when LenLeft > 0 ->
     Ref = make_ref(),
     erlang:get({doc_streamer, Id}) ! {get_data, Ref, self()},
-    receive {data, Ref, Data} ->
-        {ok, Data, {LenLeft - iolist_size(Data), Id}}
+    receive
+        {data, Ref, Data} ->
+            {ok, Data, {LenLeft - iolist_size(Data), Id}}
     end.
 
 header_value(Key, Headers) ->
@@ -896,15 +1012,12 @@ header_value(Key, Headers, Default) ->
             Default
     end.
 
-
 maybe_append_create_query_params(Db, Params) when map_size(Params) == 0 ->
     Db;
-
 maybe_append_create_query_params(Db, #{} = Params) ->
     ParamList = maps:to_list(Params),
     NewUrl = Db#httpdb.url ++ "?" ++ mochiweb_util:urlencode(ParamList),
     Db#httpdb{url = NewUrl}.
-
 
 db_from_json(#{} = DbMap) ->
     #{
@@ -917,25 +1030,34 @@ db_from_json(#{} = DbMap) ->
         <<"retries">> := Retries,
         <<"proxy_url">> := ProxyUrl0
     } = DbMap,
-    Headers = maps:fold(fun(K, V, Acc) ->
-        [{binary_to_list(K), binary_to_list(V)} | Acc]
-    end, [], Headers0),
-    IBrowseOptions = maps:fold(fun
-        (<<"socket_options">>, #{} = SockOpts, Acc) ->
-            SockOptsKVs = maps:fold(fun sock_opts_fold/3, [], SockOpts),
-            [{socket_options, SockOptsKVs} | Acc];
-        (<<"ssl_options">>, #{} = SslOpts, Acc) ->
-            SslOptsKVs = maps:fold(fun ssl_opts_fold/3, [], SslOpts),
-            [{ssl_options, SslOptsKVs} | Acc];
-        (K, V, Acc) when is_binary(V) ->
-            [{binary_to_atom(K, utf8), binary_to_list(V)} | Acc];
-        (K, V, Acc) ->
-            [{binary_to_atom(K, utf8), V} | Acc]
-    end, [], IBrowseOptions0),
-    ProxyUrl = case ProxyUrl0 of
-        null -> undefined;
-        V when is_binary(V) -> binary_to_list(V)
-    end,
+    Headers = maps:fold(
+        fun(K, V, Acc) ->
+            [{binary_to_list(K), binary_to_list(V)} | Acc]
+        end,
+        [],
+        Headers0
+    ),
+    IBrowseOptions = maps:fold(
+        fun
+            (<<"socket_options">>, #{} = SockOpts, Acc) ->
+                SockOptsKVs = maps:fold(fun sock_opts_fold/3, [], SockOpts),
+                [{socket_options, SockOptsKVs} | Acc];
+            (<<"ssl_options">>, #{} = SslOpts, Acc) ->
+                SslOptsKVs = maps:fold(fun ssl_opts_fold/3, [], SslOpts),
+                [{ssl_options, SslOptsKVs} | Acc];
+            (K, V, Acc) when is_binary(V) ->
+                [{binary_to_atom(K, utf8), binary_to_list(V)} | Acc];
+            (K, V, Acc) ->
+                [{binary_to_atom(K, utf8), V} | Acc]
+        end,
+        [],
+        IBrowseOptions0
+    ),
+    ProxyUrl =
+        case ProxyUrl0 of
+            null -> undefined;
+            V when is_binary(V) -> binary_to_list(V)
+        end,
     #httpdb{
         url = binary_to_list(Url),
         auth_props = Auth,
@@ -947,23 +1069,17 @@ db_from_json(#{} = DbMap) ->
         proxy_url = ProxyUrl
     }.
 
-
 send_req(#httpdb{} = HttpDb, Opts, Callback) when is_function(Callback) ->
     couch_replicator_httpc:send_req(HttpDb, Opts, Callback).
-
 
 get_value(K, Props) ->
     couch_util:get_value(K, Props).
 
-
 get_value(K, Props, Default) ->
     couch_util:get_value(K, Props, Default).
 
-
 encode_doc_id(DocId) ->
     couch_util:encode_doc_id(DocId).
-
-
 
 % See couch_replicator_docs:ssl_params/1 for ssl parsed options
 % and http://erlang.org/doc/man/ssl.html#type-server_option
@@ -971,21 +1087,16 @@ encode_doc_id(DocId) ->
 %
 ssl_opts_fold(K, V, Acc) when is_boolean(V); is_integer(V) ->
     [{binary_to_atom(K, utf8), V} | Acc];
-
 ssl_opts_fold(K, null, Acc) ->
     [{binary_to_atom(K, utf8), undefined} | Acc];
-
 ssl_opts_fold(<<"verify">>, V, Acc) ->
     [{verify, binary_to_atom(V, utf8)} | Acc];
-
 ssl_opts_fold(K, V, Acc) when is_list(V) ->
     [{binary_to_atom(K, utf8), binary_to_list(V)} | Acc].
-
 
 % See ?VALID_SOCK_OPTS in couch_replicator_docs for accepted socket options
 %
 sock_opts_fold(K, V, Acc) when is_binary(V) ->
-     [{binary_to_atom(K, utf8), binary_to_atom(V, utf8)} | Acc];
-
+    [{binary_to_atom(K, utf8), binary_to_atom(V, utf8)} | Acc];
 sock_opts_fold(K, V, Acc) when is_boolean(V); is_integer(V) ->
     [{binary_to_atom(K, utf8), V} | Acc].

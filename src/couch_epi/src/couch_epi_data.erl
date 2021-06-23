@@ -60,10 +60,13 @@ minimal_interval({_App, #couch_epi_spec{options = Options}}, Min) ->
     end.
 
 locate_sources(Specs) ->
-    lists:map(fun({ProviderApp, #couch_epi_spec{value = Src}}) ->
-        {ok, Locator} = locate(ProviderApp, Src),
-        {ProviderApp, Locator}
-    end, Specs).
+    lists:map(
+        fun({ProviderApp, #couch_epi_spec{value = Src}}) ->
+            {ok, Locator} = locate(ProviderApp, Src),
+            {ProviderApp, Locator}
+        end,
+        Specs
+    ).
 
 locate(App, {priv_file, FileName}) ->
     case priv_path(App, FileName) of

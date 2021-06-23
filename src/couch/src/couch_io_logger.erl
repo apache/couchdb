@@ -20,7 +20,6 @@
     stop_error/1
 ]).
 
-
 start(undefined) ->
     ok;
 start(Dir) ->
@@ -42,7 +41,6 @@ start(Dir) ->
             ok
     end.
 
-
 stop_noerror() ->
     case get(logger_path) of
         undefined ->
@@ -50,7 +48,6 @@ stop_noerror() ->
         _Path ->
             close_logs()
     end.
-
 
 stop_error(Err) ->
     case get(logger_path) of
@@ -61,20 +58,16 @@ stop_error(Err) ->
             close_logs()
     end.
 
-
 log_output(Data) ->
     log(get(logger_out_fd), Data).
 
-
 log_input(Data) ->
     log(get(logger_in_fd), Data).
-
 
 unix_time() ->
     {Mega, Sec, USec} = os:timestamp(),
     UnixTs = (Mega * 1000000 + Sec) * 1000000 + USec,
     integer_to_list(UnixTs).
-
 
 log_name() ->
     Ts = unix_time(),
@@ -83,11 +76,9 @@ log_name() ->
     Pid2 = string:strip(Pid1, right, $>),
     lists:flatten(io_lib:format("~s_~s", [Ts, Pid2])).
 
-
 close_logs() ->
     file:close(get(logger_out_fd)),
     file:close(get(logger_in_fd)).
-
 
 save_error_logs(Path, Err) ->
     Otp = erlang:system_info(otp_release),
@@ -97,9 +88,8 @@ save_error_logs(Path, Err) ->
     OFd = get(logger_in_fd),
     file:position(IFd, 0),
     file:position(OFd, 0),
-    file:copy(IFd, Path ++  ".out.log"),
+    file:copy(IFd, Path ++ ".out.log"),
     file:copy(OFd, Path ++ ".in.log").
-
 
 log(undefined, _Data) ->
     ok;

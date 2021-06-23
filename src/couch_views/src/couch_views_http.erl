@@ -30,34 +30,38 @@
 
 -define(BOOKMARK_VSN, 1).
 
-parse_body_and_query(#httpd{method='POST'} = Req, Keys) ->
+parse_body_and_query(#httpd{method = 'POST'} = Req, Keys) ->
     Props = chttpd:json_body_obj(Req),
     parse_body_and_query(Req, Props, Keys);
-
 parse_body_and_query(Req, Keys) ->
-    parse_params(chttpd:qs(Req), Keys, #mrargs{keys=Keys, group=undefined,
-        group_level=undefined}, [keep_group_level]).
+    parse_params(
+        chttpd:qs(Req),
+        Keys,
+        #mrargs{
+            keys = Keys,
+            group = undefined,
+            group_level = undefined
+        },
+        [keep_group_level]
+    ).
 
 parse_body_and_query(Req, {Props}, Keys) ->
-    Args = #mrargs{keys=Keys, group=undefined, group_level=undefined},
+    Args = #mrargs{keys = Keys, group = undefined, group_level = undefined},
     BodyArgs = parse_params(Props, Keys, Args, [decoded]),
     parse_params(chttpd:qs(Req), Keys, BodyArgs, [keep_group_level]).
 
-parse_params(#httpd{}=Req, Keys) ->
+parse_params(#httpd{} = Req, Keys) ->
     parse_params(chttpd:qs(Req), Keys);
 parse_params(Props, Keys) ->
     Args = #mrargs{},
     parse_params(Props, Keys, Args).
 
-
 parse_params(Props, Keys, Args) ->
     parse_params(Props, Keys, Args, []).
 
-
 parse_params([{"bookmark", Bookmark}], _Keys, #mrargs{}, _Options) ->
     bookmark_decode(Bookmark);
-
-parse_params(Props, Keys, #mrargs{}=Args, Options) ->
+parse_params(Props, Keys, #mrargs{} = Args, Options) ->
     case couch_util:get_value("bookmark", Props, nil) of
         nil ->
             ok;
@@ -66,51 +70,46 @@ parse_params(Props, Keys, #mrargs{}=Args, Options) ->
     end,
     couch_views_http_util:parse_params(Props, Keys, Args, Options).
 
-
 row_to_obj(Row) ->
     Id = couch_util:get_value(id, Row),
     row_to_obj(Id, Row).
 
-
 row_to_obj(Id, Row) ->
     couch_views_http_util:row_to_obj(Id, Row).
 
-
-view_cb(Msg, #vacc{paginated = false}=Acc) ->
+view_cb(Msg, #vacc{paginated = false} = Acc) ->
     couch_views_http_util:view_cb(Msg, Acc);
-view_cb(Msg, #vacc{paginated = true}=Acc) ->
+view_cb(Msg, #vacc{paginated = true} = Acc) ->
     paginated_cb(Msg, Acc).
 
-
-paginated_cb({row, Row}, #vacc{buffer=Buf}=Acc) ->
+paginated_cb({row, Row}, #vacc{buffer = Buf} = Acc) ->
     {ok, Acc#vacc{buffer = [row_to_obj(Row) | Buf]}};
-
-paginated_cb({error, Reason}, #vacc{}=_Acc) ->
+paginated_cb({error, Reason}, #vacc{} = _Acc) ->
     throw({error, Reason});
-
-paginated_cb(complete, #vacc{buffer=Buf}=Acc) ->
-    {ok, Acc#vacc{buffer=lists:reverse(Buf)}};
-
-paginated_cb({meta, Meta}, #vacc{}=VAcc) ->
-    MetaMap = lists:foldl(fun(MetaData, Acc) ->
-        case MetaData of
-            {_Key, undefined} ->
-                Acc;
-            {total, Value} ->
-                maps:put(total_rows, Value, Acc);
-            {Key, Value} ->
-                maps:put(list_to_binary(atom_to_list(Key)), Value, Acc)
-        end
-    end, #{}, Meta),
-    {ok, VAcc#vacc{meta=MetaMap}}.
-
+paginated_cb(complete, #vacc{buffer = Buf} = Acc) ->
+    {ok, Acc#vacc{buffer = lists:reverse(Buf)}};
+paginated_cb({meta, Meta}, #vacc{} = VAcc) ->
+    MetaMap = lists:foldl(
+        fun(MetaData, Acc) ->
+            case MetaData of
+                {_Key, undefined} ->
+                    Acc;
+                {total, Value} ->
+                    maps:put(total_rows, Value, Acc);
+                {Key, Value} ->
+                    maps:put(list_to_binary(atom_to_list(Key)), Value, Acc)
+            end
+        end,
+        #{},
+        Meta
+    ),
+    {ok, VAcc#vacc{meta = MetaMap}}.
 
 paginated(Req, EtagTerm, #mrargs{page_size = PageSize} = Args, KeyFun, Fun) ->
     Etag = couch_httpd:make_etag(EtagTerm),
     chttpd:etag_respond(Req, Etag, fun() ->
         hd(do_paginated(PageSize, [Args], KeyFun, Fun))
     end).
-
 
 paginated(Req, EtagTerm, PageSize, QueriesArgs, KeyFun, Fun) when is_list(QueriesArgs) ->
     Etag = couch_httpd:make_etag(EtagTerm),
@@ -119,28 +118,36 @@ paginated(Req, EtagTerm, PageSize, QueriesArgs, KeyFun, Fun) when is_list(Querie
         #{results => Results}
     end).
 
-
 do_paginated(PageSize, QueriesArgs, KeyFun, Fun) when is_list(QueriesArgs) ->
-    {_N, Results} = lists:foldl(fun(Args0, {Limit, Acc}) ->
-        case Limit > 0 of
-            true ->
-                {OriginalLimit, Args} = set_limit(Args0#mrargs{page_size = Limit}),
-                {Meta, Items} = Fun(Args),
-                Result0 = maybe_add_next_bookmark(
-                    OriginalLimit, PageSize, Args, Meta, Items, KeyFun),
-                Result = maybe_add_previous_bookmark(Args, Result0, KeyFun),
-                {Limit - length(maps:get(rows, Result)), [Result | Acc]};
-            false ->
-                Bookmark = bookmark_encode(Args0),
-                Result = #{
-                    rows => [],
-                    next => Bookmark
-                },
-                {Limit, [Result | Acc]}
-        end
-    end, {PageSize, []}, QueriesArgs),
+    {_N, Results} = lists:foldl(
+        fun(Args0, {Limit, Acc}) ->
+            case Limit > 0 of
+                true ->
+                    {OriginalLimit, Args} = set_limit(Args0#mrargs{page_size = Limit}),
+                    {Meta, Items} = Fun(Args),
+                    Result0 = maybe_add_next_bookmark(
+                        OriginalLimit,
+                        PageSize,
+                        Args,
+                        Meta,
+                        Items,
+                        KeyFun
+                    ),
+                    Result = maybe_add_previous_bookmark(Args, Result0, KeyFun),
+                    {Limit - length(maps:get(rows, Result)), [Result | Acc]};
+                false ->
+                    Bookmark = bookmark_encode(Args0),
+                    Result = #{
+                        rows => [],
+                        next => Bookmark
+                    },
+                    {Limit, [Result | Acc]}
+            end
+        end,
+        {PageSize, []},
+        QueriesArgs
+    ),
     lists:reverse(Results).
-
 
 maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun) ->
     #mrargs{
@@ -170,7 +177,6 @@ maybe_add_next_bookmark(OriginalLimit, PageSize, Args0, Response, Items, KeyFun)
             })
     end.
 
-
 maybe_add_previous_bookmark(#mrargs{extra = Extra} = Args, #{rows := Rows} = Result, KeyFun) ->
     StartKey = couch_util:get_value(fk, Extra),
     StartId = couch_util:get_value(fid, Extra),
@@ -196,31 +202,27 @@ maybe_add_previous_bookmark(#mrargs{extra = Extra} = Args, #{rows := Rows} = Res
             maps:put(previous, Bookmark, Result)
     end.
 
-
 first_key(_KeyFun, []) ->
     {undefined, undefined};
-
 first_key(KeyFun, [First | _]) ->
     KeyFun(First).
 
-
-set_limit(#mrargs{page_size = PageSize, limit = Limit} = Args)
-        when is_integer(PageSize) andalso Limit > PageSize ->
+set_limit(#mrargs{page_size = PageSize, limit = Limit} = Args) when
+    is_integer(PageSize) andalso Limit > PageSize
+->
     {Limit, Args#mrargs{limit = PageSize + 1}};
-
-set_limit(#mrargs{page_size = PageSize, limit = Limit} = Args)
-        when is_integer(PageSize)  ->
+set_limit(#mrargs{page_size = PageSize, limit = Limit} = Args) when
+    is_integer(PageSize)
+->
     {Limit, Args#mrargs{limit = Limit + 1}}.
 
-
-check_completion(OriginalLimit, RequestedLimit, Items)
-        when is_integer(OriginalLimit) andalso OriginalLimit =< RequestedLimit ->
+check_completion(OriginalLimit, RequestedLimit, Items) when
+    is_integer(OriginalLimit) andalso OriginalLimit =< RequestedLimit
+->
     {Rows, _} = split(OriginalLimit, Items),
     {Rows, nil};
-
 check_completion(_OriginalLimit, RequestedLimit, Items) ->
     split(RequestedLimit, Items).
-
 
 split(Limit, Items) when length(Items) > Limit ->
     case lists:split(Limit, Items) of
@@ -229,31 +231,32 @@ split(Limit, Items) when length(Items) > Limit ->
         {Head, []} ->
             {Head, nil}
     end;
-
 split(_Limit, Items) ->
     {Items, nil}.
 
-
 bookmark_encode(Args0) ->
     Defaults = #mrargs{},
-    {RevTerms, Mask, _} = lists:foldl(fun(Value, {Acc, Mask, Idx}) ->
-        case element(Idx, Defaults) of
-            Value ->
-                {Acc, Mask, Idx + 1};
-            _Default when Idx == #mrargs.bookmark ->
-                {Acc, Mask, Idx + 1};
-            _Default ->
-                % Its `(Idx - 1)` because the initial `1`
-                % value already accounts for one bit.
-                {[Value | Acc], (1 bsl (Idx - 1)) bor Mask, Idx + 1}
-        end
-    end, {[], 0, 1}, tuple_to_list(Args0)),
+    {RevTerms, Mask, _} = lists:foldl(
+        fun(Value, {Acc, Mask, Idx}) ->
+            case element(Idx, Defaults) of
+                Value ->
+                    {Acc, Mask, Idx + 1};
+                _Default when Idx == #mrargs.bookmark ->
+                    {Acc, Mask, Idx + 1};
+                _Default ->
+                    % Its `(Idx - 1)` because the initial `1`
+                    % value already accounts for one bit.
+                    {[Value | Acc], (1 bsl (Idx - 1)) bor Mask, Idx + 1}
+            end
+        end,
+        {[], 0, 1},
+        tuple_to_list(Args0)
+    ),
     Terms = lists:reverse(RevTerms),
     TermBin = term_to_binary(Terms, [compressed, {minor_version, 2}]),
     MaskBin = binary:encode_unsigned(Mask),
     RawBookmark = <<?BOOKMARK_VSN, MaskBin/binary, TermBin/binary>>,
     couch_util:encodeBase64Url(RawBookmark).
-
 
 bookmark_decode(Bookmark) ->
     try
@@ -262,42 +265,40 @@ bookmark_decode(Bookmark) ->
         Mask = binary:decode_unsigned(MaskBin),
         Index = mask_to_index(Mask, 1, []),
         Terms = binary_to_term(TermBin, [safe]),
-        lists:foldl(fun({Idx, Value}, Acc) ->
-            setelement(Idx, Acc, Value)
-        end, #mrargs{}, lists:zip(Index, Terms))
-    catch _:_ ->
-        throw({bad_request, <<"Invalid bookmark">>})
+        lists:foldl(
+            fun({Idx, Value}, Acc) ->
+                setelement(Idx, Acc, Value)
+            end,
+            #mrargs{},
+            lists:zip(Index, Terms)
+        )
+    catch
+        _:_ ->
+            throw({bad_request, <<"Invalid bookmark">>})
     end.
-
 
 mask_to_index(0, _Pos, Acc) ->
     lists:reverse(Acc);
 mask_to_index(Mask, Pos, Acc) when is_integer(Mask), Mask > 0 ->
-    NewAcc = case Mask band 1 of
-        0 -> Acc;
-        1 -> [Pos | Acc]
-    end,
+    NewAcc =
+        case Mask band 1 of
+            0 -> Acc;
+            1 -> [Pos | Acc]
+        end,
     mask_to_index(Mask bsr 1, Pos + 1, NewAcc).
 
-
-transform_row(#view_row{value={[{reduce_overflow_error, Msg}]}}) ->
-    {row, [{key,null}, {id,error}, {value,reduce_overflow_error}, {reason,Msg}]};
-
-transform_row(#view_row{key=Key, id=reduced, value=Value}) ->
-    {row, [{key,Key}, {value,Value}]};
-
-transform_row(#view_row{key=Key, id=undefined}) ->
-    {row, [{key,Key}, {id,error}, {value,not_found}]};
-
-transform_row(#view_row{key=Key, id=Id, value=Value, doc=undefined}) ->
-    {row, [{id,Id}, {key,Key}, {value,Value}]};
-
-transform_row(#view_row{key=Key, id=_Id, value=_Value, doc={error,Reason}}) ->
-    {row, [{id,error}, {key,Key}, {value,Reason}]};
-
-transform_row(#view_row{key=Key, id=Id, value=Value, doc=Doc}) ->
-    {row, [{id,Id}, {key,Key}, {value,Value}, {doc,Doc}]}.
-
+transform_row(#view_row{value = {[{reduce_overflow_error, Msg}]}}) ->
+    {row, [{key, null}, {id, error}, {value, reduce_overflow_error}, {reason, Msg}]};
+transform_row(#view_row{key = Key, id = reduced, value = Value}) ->
+    {row, [{key, Key}, {value, Value}]};
+transform_row(#view_row{key = Key, id = undefined}) ->
+    {row, [{key, Key}, {id, error}, {value, not_found}]};
+transform_row(#view_row{key = Key, id = Id, value = Value, doc = undefined}) ->
+    {row, [{id, Id}, {key, Key}, {value, Value}]};
+transform_row(#view_row{key = Key, id = _Id, value = _Value, doc = {error, Reason}}) ->
+    {row, [{id, error}, {key, Key}, {value, Reason}]};
+transform_row(#view_row{key = Key, id = Id, value = Value, doc = Doc}) ->
+    {row, [{id, Id}, {key, Key}, {value, Value}, {doc, Doc}]}.
 
 -ifdef(TEST).
 
@@ -309,17 +310,21 @@ bookmark_encode_decode_test() ->
         bookmark_decode(bookmark_encode(#mrargs{page_size = 5}))
     ),
 
-    Randomized = lists:foldl(fun(Idx, Acc) ->
-        if Idx == #mrargs.bookmark -> Acc; true ->
-            setelement(Idx, Acc, couch_uuids:random())
-        end
-    end, #mrargs{}, lists:seq(1, record_info(size, mrargs))),
+    Randomized = lists:foldl(
+        fun(Idx, Acc) ->
+            if
+                Idx == #mrargs.bookmark -> Acc;
+                true -> setelement(Idx, Acc, couch_uuids:random())
+            end
+        end,
+        #mrargs{},
+        lists:seq(1, record_info(size, mrargs))
+    ),
 
     ?assertEqual(
         Randomized,
         bookmark_decode(bookmark_encode(Randomized))
     ).
-
 
 check_completion_test() ->
     ?assertEqual(

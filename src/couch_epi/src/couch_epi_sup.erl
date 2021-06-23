@@ -61,7 +61,7 @@ plugin_childspecs(Plugin, Children) ->
 %% ===================================================================
 
 init([]) ->
-    {ok, { {one_for_one, 5, 10}, keepers()} }.
+    {ok, {{one_for_one, 5, 10}, keepers()}}.
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -79,13 +79,16 @@ plugin_childspecs(Plugin, Plugins, Children) ->
     merge(ExtraChildren, Children) ++ childspecs(Definitions).
 
 childspecs(Definitions) ->
-    lists:map(fun({{Kind, Key}, Defs}) ->
-        CodeGen = couch_epi_plugin:codegen(Kind),
-        Handle = CodeGen:get_handle(Key),
-        Modules = lists:append([modules(Spec) || {_App, Spec} <- Defs]),
-        Name = service_name(Key) ++ "|" ++ atom_to_list(Kind),
-        code_monitor(Name, [Handle], [Handle|Modules])
-    end, Definitions).
+    lists:map(
+        fun({{Kind, Key}, Defs}) ->
+            CodeGen = couch_epi_plugin:codegen(Kind),
+            Handle = CodeGen:get_handle(Key),
+            Modules = lists:append([modules(Spec) || {_App, Spec} <- Defs]),
+            Name = service_name(Key) ++ "|" ++ atom_to_list(Kind),
+            code_monitor(Name, [Handle], [Handle | Modules])
+        end,
+        Definitions
+    ).
 
 %% ------------------------------------------------------------------
 %% Helper Function Definitions
@@ -95,21 +98,36 @@ remove_duplicates(Definitions) ->
     lists:ukeysort(1, Definitions).
 
 keeper_childspecs(Definitions) ->
-    lists:map(fun({{Kind, Key}, _Specs}) ->
-        Name = service_name(Key) ++ "|keeper",
-        CodeGen = couch_epi_plugin:codegen(Kind),
-        Handle = CodeGen:get_handle(Key),
-        keeper(Name, [provider_kind(Kind), Key, CodeGen], [Handle])
-    end, Definitions).
+    lists:map(
+        fun({{Kind, Key}, _Specs}) ->
+            Name = service_name(Key) ++ "|keeper",
+            CodeGen = couch_epi_plugin:codegen(Kind),
+            Handle = CodeGen:get_handle(Key),
+            keeper(Name, [provider_kind(Kind), Key, CodeGen], [Handle])
+        end,
+        Definitions
+    ).
 
 keeper(Name, Args, Modules) ->
-    {"couch_epi|" ++ Name, {couch_epi_module_keeper, start_link,
-        Args}, permanent, 5000, worker, Modules}.
+    {
+        "couch_epi|" ++ Name,
+        {couch_epi_module_keeper, start_link, Args},
+        permanent,
+        5000,
+        worker,
+        Modules
+    }.
 
 code_monitor(Name, Args, Modules0) ->
     Modules = [couch_epi_codechange_monitor | Modules0],
-    {"couch_epi_codechange_monitor|" ++ Name,
-        {couch_epi_codechange_monitor, start_link, Args}, permanent, 5000, worker, Modules}.
+    {
+        "couch_epi_codechange_monitor|" ++ Name,
+        {couch_epi_codechange_monitor, start_link, Args},
+        permanent,
+        5000,
+        worker,
+        Modules
+    }.
 
 provider_kind(services) -> providers;
 provider_kind(data_subscriptions) -> data_providers;
@@ -138,5 +156,8 @@ merge([], Children) ->
 merge([{Id, _, _, _, _, _} = Spec | Rest], Children) ->
     merge(Rest, lists:keystore(Id, 1, Children, Spec));
 merge([#{id := Id} = Spec | Rest], Children) ->
-    Replace = fun(#{id := I}) when I == Id -> Spec; (E) -> E end,
+    Replace = fun
+        (#{id := I}) when I == Id -> Spec;
+        (E) -> E
+    end,
     merge(Rest, lists:map(Replace, Children)).

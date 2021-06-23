@@ -43,7 +43,11 @@ definitions(Modules) ->
     [{M, M:module_info(exports) -- Blacklist} || M <- Modules].
 
 group(KV) ->
-    Dict = lists:foldr(fun({K,V}, D) ->
-        dict:append_list(K, V, D)
-    end, dict:new(), KV),
+    Dict = lists:foldr(
+        fun({K, V}, D) ->
+            dict:append_list(K, V, D)
+        end,
+        dict:new(),
+        KV
+    ),
     [{K, lists:reverse(V)} || {K, V} <- dict:to_list(Dict)].

@@ -12,13 +12,11 @@
 
 -module(couch_views_batch).
 
-
 -export([
     start/1,
     success/2,
     failure/1
 ]).
-
 
 -include_lib("couch_views/include/couch_views.hrl").
 
@@ -31,44 +29,41 @@
 -export_type([update_stats/0]).
 
 -callback start(
-            Mrst::#mrst{},
-            State::term()
-        ) -> {NewState::term(), BatchSize::pos_integer()}.
+    Mrst :: #mrst{},
+    State :: term()
+) -> {NewState :: term(), BatchSize :: pos_integer()}.
 
 -callback success(
-            Mrst::#mrst{},
-            UpdateStats::update_stats(),
-            State::term()
-        ) -> NewState::term().
+    Mrst :: #mrst{},
+    UpdateStats :: update_stats(),
+    State :: term()
+) -> NewState :: term().
 
--callback failure(Mrst::#mrst{}, State::term()) -> NewState::term().
-
+-callback failure(Mrst :: #mrst{}, State :: term()) -> NewState :: term().
 
 -define(DEFAULT_MOD, "couch_views_batch_impl").
 
-
 -spec start(#mrst{}) -> pos_integer().
 start(#mrst{} = Mrst) ->
-    {Mod, State} = case load_state() of
-        {M, S} ->
-            {M, S};
-        undefined ->
-            ModStr = config:get("couch_views", "batch_module", ?DEFAULT_MOD),
-            ModAtom = list_to_existing_atom(ModStr),
-            {ModAtom, undefined}
-    end,
+    {Mod, State} =
+        case load_state() of
+            {M, S} ->
+                {M, S};
+            undefined ->
+                ModStr = config:get("couch_views", "batch_module", ?DEFAULT_MOD),
+                ModAtom = list_to_existing_atom(ModStr),
+                {ModAtom, undefined}
+        end,
     {NewState, BatchSize} = Mod:start(Mrst, State),
     save_state(Mod, NewState),
     BatchSize.
 
-
--spec success(#mrst{}, UpdateStats::update_stats()) -> ok.
+-spec success(#mrst{}, UpdateStats :: update_stats()) -> ok.
 success(#mrst{} = Mrst, UpdateStats) ->
     {Mod, State} = load_state(),
     NewState = Mod:success(Mrst, UpdateStats, State),
     save_state(Mod, NewState),
     ok.
-
 
 -spec failure(#mrst{}) -> ok.
 failure(#mrst{} = Mrst) ->
@@ -77,10 +72,8 @@ failure(#mrst{} = Mrst) ->
     save_state(Mod, NewState),
     ok.
 
-
 load_state() ->
     get(?MODULE).
-
 
 save_state(Mod, State) ->
     put(?MODULE, {Mod, State}).

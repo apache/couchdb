@@ -19,35 +19,55 @@
     lookup/3
 ]).
 
-
 -include_lib("couch_expiring_cache/include/couch_expiring_cache.hrl").
 
-
--spec insert(Name :: binary(), Key :: binary(), Value :: binary(),
-    StaleTS :: ?TIME_UNIT(), ExpiresTS :: ?TIME_UNIT()) -> ok.
-insert(Name, Key, Value, StaleTS, ExpiresTS)
-        when is_binary(Name), is_binary(Key), is_binary(Value),
-        is_integer(StaleTS), is_integer(ExpiresTS) ->
+-spec insert(
+    Name :: binary(),
+    Key :: binary(),
+    Value :: binary(),
+    StaleTS :: ?TIME_UNIT(),
+    ExpiresTS :: ?TIME_UNIT()
+) -> ok.
+insert(Name, Key, Value, StaleTS, ExpiresTS) when
+    is_binary(Name),
+    is_binary(Key),
+    is_binary(Value),
+    is_integer(StaleTS),
+    is_integer(ExpiresTS)
+->
     insert(undefined, Name, Key, Value, StaleTS, ExpiresTS).
 
-
--spec insert(Tx :: jtx() | undefined, Name :: binary(), Key :: binary(),
-    Value :: binary(), StaleTS :: ?TIME_UNIT(), ExpiresTS :: ?TIME_UNIT()) -> ok.
+-spec insert(
+    Tx :: jtx() | undefined,
+    Name :: binary(),
+    Key :: binary(),
+    Value :: binary(),
+    StaleTS :: ?TIME_UNIT(),
+    ExpiresTS :: ?TIME_UNIT()
+) -> ok.
 -dialyzer({no_return, insert/6}).
-insert(Tx, Name, Key, Value, StaleTS, ExpiresTS)
-        when is_binary(Name), is_binary(Key), is_binary(Value),
-        is_integer(StaleTS), is_integer(ExpiresTS) ->
+insert(Tx, Name, Key, Value, StaleTS, ExpiresTS) when
+    is_binary(Name),
+    is_binary(Key),
+    is_binary(Value),
+    is_integer(StaleTS),
+    is_integer(ExpiresTS)
+->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         couch_expiring_cache_fdb:insert(
-            JTx, Name, Key, Value, StaleTS, ExpiresTS)
+            JTx,
+            Name,
+            Key,
+            Value,
+            StaleTS,
+            ExpiresTS
+        )
     end).
-
 
 -spec lookup(Name :: binary(), Key :: binary()) ->
     not_found | {fresh, Val :: binary()} | {stale, Val :: binary()} | expired.
 lookup(Name, Key) when is_binary(Name), is_binary(Key) ->
     lookup(undefined, Name, Key).
-
 
 -spec lookup(Tx :: jtx(), Name :: binary(), Key :: binary()) ->
     not_found | {fresh, Val :: binary()} | {stale, Val :: binary()} | expired.
