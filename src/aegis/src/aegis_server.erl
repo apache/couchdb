@@ -16,8 +16,10 @@
 
 -vsn(1).
 
+
 -include("aegis.hrl").
 -include_lib("kernel/include/logger.hrl").
+
 
 %% aegis_server API
 -export([
@@ -38,6 +40,8 @@
     code_change/3
 ]).
 
+
+
 -define(KEY_CHECK, aegis_key_check).
 -define(INIT_TIMEOUT, 60000).
 -define(TIMEOUT, 10000).
@@ -45,13 +49,15 @@
 -define(CACHE_MAX_AGE_SEC, 1800).
 -define(CACHE_EXPIRATION_CHECK_SEC, 10).
 -define(LAST_ACCESSED_INACTIVITY_SEC, 10).
-% Keep in cache after expiration
--define(CACHE_DELETION_GRACE_SEC, 5).
+-define(CACHE_DELETION_GRACE_SEC, 5). % Keep in cache after expiration
+
 
 -record(entry, {uuid, encryption_key, counter, last_accessed, expires_at}).
 
+
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
+
 
 -spec init_db(Db :: #{}, Options :: list()) -> boolean().
 init_db(#{uuid := UUID} = Db, Options) ->
@@ -65,6 +71,7 @@ init_db(#{uuid := UUID} = Db, Options) ->
         end
     end).
 
+
 -spec open_db(Db :: #{}) -> boolean().
 open_db(#{} = Db) ->
     sensitive(fun() ->
@@ -75,6 +82,7 @@ open_db(#{} = Db) ->
                 false
         end
     end).
+
 
 -spec encrypt(Db :: #{}, Key :: binary(), Value :: binary()) -> binary().
 encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
@@ -87,7 +95,7 @@ encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
             case gen_server:call(?MODULE, {encrypt, Db, Key, Value}) of
                 CipherText when is_binary(CipherText) ->
                     CipherText;
-                {error, {_Tag, {_C_FileName, _LineNumber}, _Desc} = Reason} ->
+                {error, {_Tag, {_C_FileName,_LineNumber}, _Desc} = Reason} ->
                     ?LOG_ERROR(#{what => encrypt_failure, details => Reason}),
                     couch_log:error("aegis encryption failure: ~p ", [Reason]),
                     erlang:error(decryption_failed);
@@ -101,6 +109,7 @@ encrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
             end)
     end.
 
+
 -spec decrypt(Db :: #{}, Key :: binary(), Value :: binary()) -> binary().
 decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
     #{
@@ -112,7 +121,7 @@ decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
             case gen_server:call(?MODULE, {decrypt, Db, Key, Value}) of
                 PlainText when is_binary(PlainText) ->
                     PlainText;
-                {error, {_Tag, {_C_FileName, _LineNumber}, _Desc} = Reason} ->
+                {error, {_Tag, {_C_FileName,_LineNumber}, _Desc} = Reason} ->
                     ?LOG_ERROR(#{what => decrypt_failure, details => Reason}),
                     couch_log:error("aegis decryption failure: ~p ", [Reason]),
                     erlang:error(decryption_failed);
@@ -126,15 +135,14 @@ decrypt(#{} = Db, Key, Value) when is_binary(Key), is_binary(Value) ->
             end)
     end.
 
+
 %% gen_server functions
 
 init([]) ->
     process_flag(sensitive, true),
     Cache = ets:new(?MODULE, [set, private, {keypos, #entry.uuid}]),
-    ByAccess = ets:new(
-        ?MODULE,
-        [ordered_set, private, {keypos, #entry.counter}]
-    ),
+    ByAccess = ets:new(?MODULE,
+        [ordered_set, private, {keypos, #entry.counter}]),
     ets:new(?KEY_CHECK, [named_table, protected, {read_concurrency, true}]),
 
     erlang:send_after(0, self(), maybe_remove_expired),
@@ -146,8 +154,10 @@ init([]) ->
     },
     {ok, St, ?INIT_TIMEOUT}.
 
+
 terminate(_Reason, _St) ->
     ok.
+
 
 handle_call({insert_key, UUID, DbKey}, _From, #{cache := Cache} = St) ->
     case ets:lookup(Cache, UUID) of
@@ -158,35 +168,43 @@ handle_call({insert_key, UUID, DbKey}, _From, #{cache := Cache} = St) ->
     end,
     NewSt = insert(St, UUID, DbKey),
     {reply, ok, NewSt, ?TIMEOUT};
+
 handle_call({encrypt, Db, Key, Value}, From, St) ->
     handle_crypto_call(fun do_encrypt/4, Db, Key, Value, From, St);
+
 handle_call({decrypt, Db, Key, Value}, From, St) ->
     handle_crypto_call(fun do_decrypt/4, Db, Key, Value, From, St);
+
 handle_call(_Msg, _From, St) ->
     {noreply, St}.
+
 
 handle_cast({accessed, UUID}, St) ->
     NewSt = bump_last_accessed(St, UUID),
     {noreply, NewSt};
+
+
 handle_cast(_Msg, St) ->
     {noreply, St}.
+
 
 handle_info(maybe_remove_expired, St) ->
     remove_expired_entries(St),
     CheckInterval = erlang:convert_time_unit(
-        expiration_check_interval(),
-        second,
-        millisecond
-    ),
+        expiration_check_interval(), second, millisecond),
     erlang:send_after(CheckInterval, self(), maybe_remove_expired),
     {noreply, St};
+
 handle_info(_Msg, St) ->
     {noreply, St}.
+
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
+
 %% private functions
+
 
 handle_crypto_call(DoCryptoOp, Db, Key, Value, From, St) ->
     #{uuid := UUID} = Db,
@@ -196,7 +214,9 @@ handle_crypto_call(DoCryptoOp, Db, Key, Value, From, St) ->
         {ok, DbKey} ->
             erlang:spawn(fun() ->
                 process_flag(sensitive, true),
-                try DoCryptoOp(DbKey, Db, Key, Value) of
+                try
+                    DoCryptoOp(DbKey, Db, Key, Value)
+                of
                     Resp ->
                         gen_server:reply(From, Resp)
                 catch
@@ -207,6 +227,7 @@ handle_crypto_call(DoCryptoOp, Db, Key, Value, From, St) ->
             {noreply, St, ?TIMEOUT}
     end.
 
+
 do_open_db(#{uuid := UUID} = Db) ->
     case ?AEGIS_KEY_MANAGER:open_db(Db) of
         {ok, DbKey} ->
@@ -216,18 +237,19 @@ do_open_db(#{uuid := UUID} = Db) ->
             false
     end.
 
+
 do_encrypt(DbKey, #{uuid := UUID}, Key, Value) ->
     EncryptionKey = crypto:strong_rand_bytes(32),
     <<WrappedKey:320>> = aegis_keywrap:key_wrap(DbKey, EncryptionKey),
 
     {CipherText, <<CipherTag:128>>} =
         ?aes_gcm_encrypt(
-            EncryptionKey,
-            <<0:96>>,
-            <<UUID/binary, 0:8, Key/binary>>,
-            Value
-        ),
+           EncryptionKey,
+           <<0:96>>,
+           <<UUID/binary, 0:8, Key/binary>>,
+           Value),
     <<1:8, WrappedKey:320, CipherTag:128, CipherText/binary>>.
+
 
 do_decrypt(DbKey, #{uuid := UUID}, Key, Value) ->
     case Value of
@@ -237,21 +259,20 @@ do_decrypt(DbKey, #{uuid := UUID}, Key, Value) ->
                     erlang:error(decryption_failed);
                 DecryptionKey ->
                     Decrypted =
-                        ?aes_gcm_decrypt(
-                            DecryptionKey,
-                            <<0:96>>,
-                            <<UUID/binary, 0:8, Key/binary>>,
-                            CipherText,
-                            <<CipherTag:128>>
-                        ),
-                    if
-                        Decrypted /= error -> Decrypted;
-                        true -> erlang:error(decryption_failed)
+                    ?aes_gcm_decrypt(
+                        DecryptionKey,
+                        <<0:96>>,
+                        <<UUID/binary, 0:8, Key/binary>>,
+                        CipherText,
+                        <<CipherTag:128>>),
+                    if Decrypted /= error -> Decrypted; true ->
+                        erlang:error(decryption_failed)
                     end
             end;
         _ ->
             erlang:error(not_ciphertext)
     end.
+
 
 is_key_fresh(UUID) ->
     Now = fabric2_util:now(sec),
@@ -260,6 +281,7 @@ is_key_fresh(UUID) ->
         [{UUID, ExpiresAt}] when ExpiresAt >= Now -> true;
         _ -> false
     end.
+
 
 %% cache functions
 
@@ -299,6 +321,7 @@ insert(St, UUID, DbKey) ->
 
     St#{counter := Counter + 1}.
 
+
 lookup(#{cache := Cache}, UUID) ->
     case ets:lookup(Cache, UUID) of
         [#entry{uuid = UUID, encryption_key = DbKey} = Entry] ->
@@ -307,6 +330,7 @@ lookup(#{cache := Cache}, UUID) ->
         [] ->
             {error, not_found}
     end.
+
 
 delete(St, #entry{uuid = UUID} = Entry) ->
     #{
@@ -318,6 +342,7 @@ delete(St, #entry{uuid = UUID} = Entry) ->
     true = ets:delete_object(Cache, Entry),
     true = ets:delete_object(ByAccess, Entry).
 
+
 maybe_bump_last_accessed(#entry{last_accessed = LastAccessed} = Entry) ->
     case fabric2_util:now(sec) > LastAccessed + ?LAST_ACCESSED_INACTIVITY_SEC of
         true ->
@@ -326,12 +351,14 @@ maybe_bump_last_accessed(#entry{last_accessed = LastAccessed} = Entry) ->
             ok
     end.
 
+
 bump_last_accessed(St, UUID) ->
     #{
         cache := Cache,
         by_access := ByAccess,
         counter := Counter
     } = St,
+
 
     [#entry{counter = OldCounter} = Entry0] = ets:lookup(Cache, UUID),
 
@@ -346,6 +373,7 @@ bump_last_accessed(St, UUID) ->
     ets:delete(ByAccess, OldCounter),
 
     St#{counter := Counter + 1}.
+
 
 remove_expired_entries(St) ->
     #{
@@ -365,25 +393,25 @@ remove_expired_entries(St) ->
     Count = ets:select_delete(Cache, CacheExpired),
     Count = ets:select_delete(ByAccess, CacheExpired).
 
+
+
 max_age() ->
     config:get_integer("aegis", "cache_max_age_sec", ?CACHE_MAX_AGE_SEC).
 
+
 expiration_check_interval() ->
     config:get_integer(
-        "aegis",
-        "cache_expiration_check_sec",
-        ?CACHE_EXPIRATION_CHECK_SEC
-    ).
+        "aegis", "cache_expiration_check_sec", ?CACHE_EXPIRATION_CHECK_SEC).
+
 
 cache_limit() ->
     config:get_integer("aegis", "cache_limit", ?CACHE_LIMIT).
 
+
 cache_deletion_grace() ->
     config:get_integer(
-        "aegis",
-        "cache_deletion_grace_sec",
-        ?CACHE_DELETION_GRACE_SEC
-    ).
+        "aegis", "cache_deletion_grace_sec", ?CACHE_DELETION_GRACE_SEC).
+
 
 sensitive(Fun) when is_function(Fun, 0) ->
     OldValue = process_flag(sensitive, true),

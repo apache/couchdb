@@ -29,7 +29,9 @@
     update_gauge/2
 ]).
 
+
 -include("couch_stats.hrl").
+
 
 -type response() :: ok | {error, unknown_metric}.
 -type stat() :: {any(), [{atom(), any()}]}.
@@ -93,9 +95,8 @@ decrement_counter(Name) ->
 decrement_counter(Name, Value) ->
     notify_existing_metric(Name, {dec, Value}, counter).
 
--spec update_histogram
-    (any(), number()) -> response();
-    (any(), function()) -> any().
+-spec update_histogram(any(), number()) -> response();
+                      (any(), function()) -> any().
 update_histogram(Name, Fun) when is_function(Fun, 0) ->
     Begin = os:timestamp(),
     Result = Fun(),
@@ -117,10 +118,9 @@ update_gauge(Name, Value) ->
 notify_existing_metric(Name, Op, Type) ->
     try
         ok = folsom_metrics:notify_existing_metric(Name, Op, Type)
-    catch
-        _:_ ->
-            error_logger:error_msg("unknown metric: ~p", [Name]),
-            {error, unknown_metric}
+    catch _:_ ->
+        error_logger:error_msg("unknown metric: ~p", [Name]),
+        {error, unknown_metric}
     end.
 
 -spec sample_type(any(), atom()) -> stat().

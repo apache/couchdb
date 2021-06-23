@@ -206,11 +206,9 @@ help(Unknown) ->
     [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 
 opened_files() ->
-    Info = [
-        couch_file_port_info(Port)
-     || Port <- erlang:ports(),
-        {name, "efile"} =:= erlang:port_info(Port, name)
-    ],
+    Info = [couch_file_port_info(Port)
+        || Port <- erlang:ports(),
+            {name, "efile"} =:= erlang:port_info(Port, name)],
     [I || I <- Info, is_tuple(I)].
 
 couch_file_port_info(Port) ->
@@ -226,22 +224,17 @@ couch_file_port_info(Port) ->
     [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 opened_files_by_regexp(FileRegExp) ->
     {ok, RegExp} = re:compile(FileRegExp),
-    lists:filter(
-        fun({_Port, _Pid, _Fd, Path}) ->
-            re:run(Path, RegExp) =/= nomatch
-        end,
-        couch_debug:opened_files()
-    ).
+    lists:filter(fun({_Port, _Pid, _Fd, Path}) ->
+        re:run(Path, RegExp) =/= nomatch
+    end, couch_debug:opened_files()).
 
 -spec opened_files_contains(FileNameFragment :: iodata()) ->
     [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 opened_files_contains(FileNameFragment) ->
-    lists:filter(
-        fun({_Port, _Pid, _Fd, Path}) ->
-            string:str(Path, FileNameFragment) > 0
-        end,
-        couch_debug:opened_files()
-    ).
+    lists:filter(fun({_Port, _Pid, _Fd, Path}) ->
+        string:str(Path, FileNameFragment) > 0
+    end, couch_debug:opened_files()).
+
 
 process_name(Pid) when is_pid(Pid) ->
     Info = process_info(Pid, [registered_name, dictionary, initial_call]),
@@ -268,13 +261,7 @@ link_tree(RootPid, Info) ->
 
 link_tree(RootPid, Info, Fun) ->
     {_, Result} = link_tree(
-        RootPid,
-        [links | Info],
-        gb_trees:empty(),
-        0,
-        [RootPid],
-        Fun
-    ),
+        RootPid, [links | Info], gb_trees:empty(), 0, [RootPid], Fun),
     Result.
 
 link_tree(RootPid, Info, Visited0, Pos, [Pid | Rest], Fun) ->
@@ -286,37 +273,20 @@ link_tree(RootPid, Info, Visited0, Pos, [Pid | Rest], Fun) ->
             Visited1 = gb_trees:insert(Pid, Props, Visited0),
             {links, Children} = lists:keyfind(links, 1, Props),
             {Visited2, NewTree} = link_tree(
-                RootPid,
-                Info,
-                Visited1,
-                Pos + 1,
-                Children,
-                Fun
-            ),
+                RootPid, Info, Visited1, Pos + 1, Children, Fun),
             {Visited3, Result} = link_tree(
-                RootPid,
-                Info,
-                Visited2,
-                Pos,
-                Rest,
-                Fun
-            ),
-            {Visited3, [{Pos, {Pid, Fun(Pid, Props), NewTree}}] ++ Result};
+                RootPid, Info, Visited2, Pos, Rest, Fun),
+            {Visited3, [{Pos, {Pid, Fun(Pid, Props), NewTree}}]  ++ Result};
         none ->
             Props = info(Pid, Info),
             Visited1 = gb_trees:insert(Pid, Props, Visited0),
             {Visited2, Result} = link_tree(
-                RootPid,
-                Info,
-                Visited1,
-                Pos,
-                Rest,
-                Fun
-            ),
+                RootPid, Info, Visited1, Pos, Rest, Fun),
             {Visited2, [{Pos, {Pid, Fun(Pid, Props), []}}] ++ Result}
     end;
 link_tree(_RootPid, _Info, Visited, _Pos, [], _Fun) ->
     {Visited, []}.
+
 
 info(Pid, Info) when is_pid(Pid) ->
     ValidProps = [
@@ -371,16 +341,12 @@ info(Port, Info) when is_port(Port) ->
     port_info(Port, lists:usort(Validated)).
 
 port_info(Port, Items) ->
-    lists:foldl(
-        fun(Item, Acc) ->
-            case (catch erlang:port_info(Port, Item)) of
-                {Item, _Value} = Info -> [Info | Acc];
-                _Else -> Acc
-            end
-        end,
-        [],
-        Items
-    ).
+    lists:foldl(fun(Item, Acc) ->
+        case (catch erlang:port_info(Port, Item)) of
+            {Item, _Value} = Info -> [Info | Acc];
+            _Else -> Acc
+        end
+    end, [], Items).
 
 mapfold_tree([], Acc, _Fun) ->
     {[], Acc};
@@ -413,13 +379,12 @@ print_linked_processes(Name) when is_atom(Name) ->
 print_linked_processes(Pid) when is_pid(Pid) ->
     Info = [reductions, message_queue_len, memory],
     TableSpec = [
-        {50, left, name},
-        {12, centre, reductions},
-        {19, centre, message_queue_len},
-        {10, centre, memory}
+        {50, left, name}, {12, centre, reductions},
+        {19, centre, message_queue_len}, {10, centre, memory}
     ],
     Tree = linked_processes_info(Pid, Info),
     print_tree(Tree, TableSpec).
+
 
 %% Pretty print functions
 
@@ -474,46 +439,38 @@ random_processes(Pids, 0) ->
 random_processes(Acc, Depth) ->
     Caller = self(),
     Ref = make_ref(),
-    Pid =
-        case oneof([spawn_link, open_port]) of
-            spawn_monitor ->
-                {P, _} = spawn_monitor(fun() ->
-                    Caller ! {Ref, random_processes(Depth - 1)},
-                    receive
-                        looper -> ok
-                    end
-                end),
-                P;
-            spawn ->
-                spawn(fun() ->
-                    Caller ! {Ref, random_processes(Depth - 1)},
-                    receive
-                        looper -> ok
-                    end
-                end);
-            spawn_link ->
-                spawn_link(fun() ->
-                    Caller ! {Ref, random_processes(Depth - 1)},
-                    receive
-                        looper -> ok
-                    end
-                end);
-            open_port ->
-                spawn_link(fun() ->
-                    Port = erlang:open_port({spawn, "sleep 10"}, []),
-                    true = erlang:link(Port),
-                    Caller ! {Ref, random_processes(Depth - 1)},
-                    receive
-                        looper -> ok
-                    end
-                end)
-        end,
+    Pid = case oneof([spawn_link, open_port]) of
+        spawn_monitor ->
+            {P, _} = spawn_monitor(fun() ->
+                Caller ! {Ref, random_processes(Depth - 1)},
+                receive looper -> ok end
+            end),
+            P;
+        spawn ->
+            spawn(fun() ->
+                Caller ! {Ref, random_processes(Depth - 1)},
+                receive looper -> ok end
+            end);
+        spawn_link ->
+            spawn_link(fun() ->
+                Caller ! {Ref, random_processes(Depth - 1)},
+                receive looper -> ok end
+            end);
+        open_port ->
+            spawn_link(fun() ->
+                Port = erlang:open_port({spawn, "sleep 10"}, []),
+                true = erlang:link(Port),
+                Caller ! {Ref, random_processes(Depth - 1)},
+                receive looper -> ok end
+            end)
+    end,
     receive
         {Ref, Pids} -> random_processes([Pid | Pids] ++ Acc, Depth - 1)
     end.
 
 oneof(Options) ->
     lists:nth(couch_rand:uniform(length(Options)), Options).
+
 
 tree() ->
     [InitialPid | _] = Processes = random_processes(5),
@@ -530,8 +487,7 @@ link_tree_test_() ->
         "link_tree tests",
         {
             foreach,
-            fun setup/0,
-            fun teardown/1,
+            fun setup/0, fun teardown/1,
             [
                 fun should_have_same_shape/1,
                 fun should_include_extra_info/1
@@ -541,16 +497,16 @@ link_tree_test_() ->
 
 should_have_same_shape({InitialPid, _Processes, Tree}) ->
     ?_test(begin
-        InfoTree = linked_processes_info(InitialPid, []),
-        ?assert(is_equal(InfoTree, Tree)),
-        ok
+         InfoTree = linked_processes_info(InitialPid, []),
+         ?assert(is_equal(InfoTree, Tree)),
+         ok
     end).
 
 should_include_extra_info({InitialPid, _Processes, _Tree}) ->
     Info = [reductions, message_queue_len, memory],
     ?_test(begin
-        InfoTree = linked_processes_info(InitialPid, Info),
-        map_tree(InfoTree, fun(Key, {_Id, Props}, _Pos) ->
+         InfoTree = linked_processes_info(InitialPid, Info),
+         map_tree(InfoTree, fun(Key, {_Id, Props}, _Pos) ->
             case Key of
                 Pid when is_pid(Pid) ->
                     ?assert(lists:keymember(reductions, 1, Props)),
@@ -560,12 +516,11 @@ should_include_extra_info({InitialPid, _Processes, _Tree}) ->
                     ok
             end,
             Props
-        end),
-        ok
+         end),
+         ok
     end).
 
-is_equal([], []) ->
-    true;
+is_equal([], []) -> true;
 is_equal([{Pos, {Pid, _, A}} | RestA], [{Pos, {Pid, _, B}} | RestB]) ->
     case is_equal(RestA, RestB) of
         false -> false;

@@ -10,6 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+
 -module(chttpd_epi).
 
 -behaviour(couch_epi_plugin).
@@ -31,6 +32,7 @@ providers() ->
     [
         {chttpd_handlers, chttpd_httpd_handlers}
     ].
+
 
 services() ->
     [

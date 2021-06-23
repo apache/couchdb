@@ -45,30 +45,20 @@ get_handle(ServiceId) ->
 apply(ServiceId, Function, Args, Opts) when is_atom(ServiceId) ->
     apply(get_handle(ServiceId), ServiceId, Function, Args, Opts).
 
--spec apply(
-    Handle :: atom(),
-    ServiceId :: atom(),
-    Function :: atom(),
-    Args :: [term()],
-    Opts :: couch_epi:apply_opts()
-) -> [any()].
+-spec apply(Handle :: atom(), ServiceId :: atom(), Function :: atom(),
+    Args :: [term()], Opts :: couch_epi:apply_opts()) -> [any()].
 
 apply(Handle, _ServiceId, Function, Args, Opts) ->
     DispatchOpts = parse_opts(Opts),
     Modules = providers(Handle, Function, length(Args), DispatchOpts),
     dispatch(Handle, Modules, Function, Args, DispatchOpts).
 
--spec decide(
-    Handle :: atom(),
-    ServiceId :: atom(),
-    Function :: atom(),
-    Args :: [term()],
-    Opts :: couch_epi:apply_opts()
-) ->
-    no_decision | {decided, term()}.
+-spec decide(Handle :: atom(), ServiceId :: atom(), Function :: atom(),
+    Args :: [term()], Opts :: couch_epi:apply_opts()) ->
+        no_decision | {decided, term()}.
 
 decide(Handle, _ServiceId, Function, Args, Opts) ->
-    DispatchOpts = parse_opts([interruptible | Opts]),
+    DispatchOpts = parse_opts([interruptible|Opts]),
     Modules = providers(Handle, Function, length(Args), DispatchOpts),
     dispatch(Handle, Modules, Function, Args, DispatchOpts).
 
@@ -77,33 +67,33 @@ decide(Handle, _ServiceId, Function, Args, Opts) ->
 %% ------------------------------------------------------------------
 
 preamble() ->
-    "\n"
-    "    -export([version/0, version/1]).\n"
-    "    -export([providers/0, providers/2]).\n"
-    "    -export([definitions/0, definitions/1]).\n"
-    "    -export([dispatch/3]).\n"
-    "    -export([callbacks/2]).\n"
-    "\n"
-    "    version() ->\n"
-    "        [{Provider, version(Provider)} || Provider <- providers()].\n"
-    "\n"
-    "    definitions() ->\n"
-    "        [{Provider, definitions(Provider)} || Provider <- providers()].\n"
-    "\n"
-    "    callbacks(Provider, Function) ->\n"
-    "        [].\n"
-    "\n"
-    "    "
-%% In addition to preamble we also generate following methods
-%% dispatch(Module, Function, [A1, A2]) -> Module:Function(A1, A2);
+    "
+    -export([version/0, version/1]).
+    -export([providers/0, providers/2]).
+    -export([definitions/0, definitions/1]).
+    -export([dispatch/3]).
+    -export([callbacks/2]).
 
-%% version(Source1) -> "HASH";
-%% version(Source) -> {error, {unknown, Source}}.
+    version() ->
+        [{Provider, version(Provider)} || Provider <- providers()].
 
-%% providers() -> [].
-%% providers(Function, Arity) -> [].
-%% definitions(Provider) -> [{Module, [{Fun, Arity}]}].
-.
+    definitions() ->
+        [{Provider, definitions(Provider)} || Provider <- providers()].
+
+    callbacks(Provider, Function) ->
+        [].
+
+    "
+    %% In addition to preamble we also generate following methods
+    %% dispatch(Module, Function, [A1, A2]) -> Module:Function(A1, A2);
+
+    %% version(Source1) -> "HASH";
+    %% version(Source) -> {error, {unknown, Source}}.
+
+    %% providers() -> [].
+    %% providers(Function, Arity) -> [].
+    %% definitions(Provider) -> [{Module, [{Fun, Arity}]}].
+    .
 
 generate(Handle, Defs) ->
     DispatchFunForms = couch_epi_codegen:function(dispatchers(Defs)),
@@ -113,11 +103,10 @@ generate(Handle, Defs) ->
     ProvidersForms = couch_epi_codegen:function(providers_method(Defs)),
     DefinitionsForms = couch_epi_codegen:function(definitions_method(Defs)),
 
-    Forms =
-        couch_epi_codegen:scan(preamble()) ++
-            DispatchFunForms ++ VersionFunForms ++
-            ProvidersForms ++ AllProvidersForms ++
-            DefinitionsForms,
+    Forms = couch_epi_codegen:scan(preamble())
+        ++ DispatchFunForms ++ VersionFunForms
+        ++ ProvidersForms ++ AllProvidersForms
+        ++ DefinitionsForms,
 
     couch_epi_codegen:generate(Handle, Forms).
 
@@ -128,13 +117,9 @@ all_providers_method(Defs) ->
 providers_method(Defs) ->
     Providers = providers_by_function(Defs),
     DefaultClause = "providers(_, _) -> [].",
-    lists:foldl(
-        fun({{Fun, Arity}, Modules}, Clauses) ->
-            providers(Fun, Arity, Modules) ++ Clauses
-        end,
-        [couch_epi_codegen:scan(DefaultClause)],
-        Providers
-    ).
+    lists:foldl(fun({{Fun, Arity}, Modules}, Clauses) ->
+        providers(Fun, Arity, Modules) ++ Clauses
+    end, [couch_epi_codegen:scan(DefaultClause)], Providers).
 
 providers(Function, Arity, Modules) ->
     ArityStr = integer_to_list(Arity),
@@ -142,38 +127,26 @@ providers(Function, Arity, Modules) ->
     Fun = atom_to_list(Function),
     %% providers(Function, Arity) -> [Module];
     couch_epi_codegen:scan(
-        "providers(" ++ Fun ++ "," ++ ArityStr ++ ") ->" ++ Mods ++ ";"
-    ).
+        "providers(" ++ Fun ++ "," ++ ArityStr ++ ") ->" ++ Mods ++ ";").
 
 dispatchers(Defs) ->
     DefaultClause = "dispatch(_Module, _Fun, _Args) -> ok.",
-    fold_defs(
-        Defs,
-        [couch_epi_codegen:scan(DefaultClause)],
+    fold_defs(Defs, [couch_epi_codegen:scan(DefaultClause)],
         fun({_Source, Module, Function, Arity}, Acc) ->
             dispatcher(Module, Function, Arity) ++ Acc
-        end
-    ).
+        end).
 
 version_method(Defs) ->
     DefaultClause = "version(S) -> {error, {unknown, S}}.",
-    lists:foldl(
-        fun({Source, SrcDefs}, Clauses) ->
-            version(Source, SrcDefs) ++ Clauses
-        end,
-        [couch_epi_codegen:scan(DefaultClause)],
-        Defs
-    ).
+    lists:foldl(fun({Source, SrcDefs}, Clauses) ->
+        version(Source, SrcDefs) ++ Clauses
+    end, [couch_epi_codegen:scan(DefaultClause)], Defs).
 
 definitions_method(Defs) ->
     DefaultClause = "definitions(S) -> {error, {unknown, S}}.",
-    lists:foldl(
-        fun({Source, SrcDefs}, Clauses) ->
-            definition(Source, SrcDefs) ++ Clauses
-        end,
-        [couch_epi_codegen:scan(DefaultClause)],
-        Defs
-    ).
+    lists:foldl(fun({Source, SrcDefs}, Clauses) ->
+        definition(Source, SrcDefs) ++ Clauses
+    end, [couch_epi_codegen:scan(DefaultClause)], Defs).
 
 definition(Source, Defs) ->
     Src = atom_to_list(Source),
@@ -186,28 +159,27 @@ dispatcher(Module, Function, 0) ->
 
     %% dispatch(Module, Function, []) -> Module:Function();
     couch_epi_codegen:scan(
-        "dispatch(" ++ M ++ "," ++ Fun ++ ", []) ->" ++
-            M ++ ":" ++ Fun ++ "();"
-    );
+        "dispatch(" ++ M ++ "," ++ Fun ++ ", []) ->"
+            ++ M ++ ":" ++ Fun ++ "();");
 dispatcher(Module, Function, Arity) ->
     Args = args_string(Arity),
     M = atom_to_list(Module),
     Fun = atom_to_list(Function),
     %% dispatch(Module, Function, [A1, A2]) -> Module:Function(A1, A2);
     couch_epi_codegen:scan(
-        "dispatch(" ++ M ++ "," ++ Fun ++ ", [" ++ Args ++ "]) ->" ++
-            M ++ ":" ++ Fun ++ "(" ++ Args ++ ");"
-    ).
+        "dispatch(" ++ M ++ "," ++ Fun ++ ", [" ++ Args ++ "]) ->"
+            ++ M ++ ":" ++ Fun ++ "(" ++ Args ++ ");").
 
 args_string(Arity) ->
-    Vars = ["A" ++ integer_to_list(Seq) || Seq <- lists:seq(1, Arity)],
+    Vars = ["A" ++ integer_to_list(Seq)  || Seq <- lists:seq(1, Arity)],
     string:join(Vars, ", ").
 
 version(Source, SrcDefs) ->
     Modules = [Module || {Module, _Exports} <- SrcDefs],
     couch_epi_codegen:scan(
-        "version(" ++ atom_to_list(Source) ++ ") ->" ++ hash(Modules) ++ ";"
-    ).
+        "version(" ++ atom_to_list(Source) ++ ") ->" ++ hash(Modules) ++ ";").
+
+
 
 %% ------------------------------------------------------------------
 %% Helper functions
@@ -232,48 +204,26 @@ defined_providers(Defs) ->
 
 %% Defs = [{Source, [{Module, [{Fun, Arity}]}]}]
 fold_defs(Defs, Acc, Fun) ->
-    lists:foldl(
-        fun({Source, SourceData}, Clauses) ->
-            lists:foldl(
-                fun({Module, Exports}, ExportsAcc) ->
-                    lists:foldl(
-                        fun({Function, Arity}, InAcc) ->
-                            Fun({Source, Module, Function, Arity}, InAcc)
-                        end,
-                        [],
-                        Exports
-                    ) ++ ExportsAcc
-                end,
-                [],
-                SourceData
-            ) ++ Clauses
-        end,
-        Acc,
-        Defs
-    ).
+    lists:foldl(fun({Source, SourceData}, Clauses) ->
+        lists:foldl(fun({Module, Exports}, ExportsAcc) ->
+            lists:foldl(fun({Function, Arity}, InAcc) ->
+                Fun({Source, Module, Function, Arity}, InAcc)
+            end, [], Exports) ++ ExportsAcc
+        end, [], SourceData) ++ Clauses
+    end, Acc, Defs).
 
 providers_by_function(Defs) ->
-    Providers = fold_defs(
-        Defs,
-        [],
+    Providers = fold_defs(Defs, [],
         fun({_Source, Module, Function, Arity}, Acc) ->
             [{{Function, Arity}, Module} | Acc]
         end
     ),
-    Dict = lists:foldl(
-        fun({K, V}, Acc) ->
-            dict:update(
-                K,
-                fun(Modules) ->
-                    append_if_missing(Modules, V)
-                end,
-                [V],
-                Acc
-            )
-        end,
-        dict:new(),
-        Providers
-    ),
+    Dict = lists:foldl(fun({K, V}, Acc) ->
+        dict:update(K, fun(Modules) ->
+            append_if_missing(Modules, V)
+        end, [V], Acc)
+
+    end, dict:new(), Providers),
     dict:to_list(Dict).
 
 append_if_missing(List, Value) ->
@@ -288,75 +238,36 @@ hash(Modules) ->
 
 dispatch(_Handle, _Modules, _Func, _Args, #opts{concurrent = true, pipe = true}) ->
     throw({error, {incompatible_options, [concurrent, pipe]}});
-dispatch(
-    Handle,
-    Modules,
-    Function,
-    Args,
-    #opts{pipe = true, ignore_errors = true}
-) ->
-    lists:foldl(
-        fun(Module, Acc) ->
-            try
-                Handle:dispatch(Module, Function, Acc)
-            catch
-                _:_ ->
-                    Acc
-            end
-        end,
-        Args,
-        Modules
-    );
-dispatch(
-    Handle,
-    Modules,
-    Function,
-    Args,
-    #opts{pipe = true}
-) ->
-    lists:foldl(
-        fun(Module, Acc) ->
+dispatch(Handle, Modules, Function, Args,
+        #opts{pipe = true, ignore_errors = true}) ->
+    lists:foldl(fun(Module, Acc) ->
+        try
             Handle:dispatch(Module, Function, Acc)
-        end,
-        Args,
-        Modules
-    );
-dispatch(
-    Handle,
-    Modules,
-    Function,
-    Args,
-    #opts{interruptible = true}
-) ->
+        catch _:_ ->
+            Acc
+        end
+    end, Args, Modules);
+dispatch(Handle, Modules, Function, Args,
+        #opts{pipe = true}) ->
+    lists:foldl(fun(Module, Acc) ->
+        Handle:dispatch(Module, Function, Acc)
+    end, Args, Modules);
+dispatch(Handle, Modules, Function, Args,
+        #opts{interruptible = true}) ->
     apply_while(Modules, Handle, Function, Args);
 dispatch(Handle, Modules, Function, Args, #opts{} = Opts) ->
     [do_dispatch(Handle, Module, Function, Args, Opts) || Module <- Modules].
 
-do_dispatch(
-    Handle,
-    Module,
-    Function,
-    Args,
-    #opts{concurrent = true, ignore_errors = true}
-) ->
+do_dispatch(Handle, Module, Function, Args,
+        #opts{concurrent = true, ignore_errors = true}) ->
     spawn(fun() ->
         (catch Handle:dispatch(Module, Function, Args))
     end);
-do_dispatch(
-    Handle,
-    Module,
-    Function,
-    Args,
-    #opts{ignore_errors = true}
-) ->
+do_dispatch(Handle, Module, Function, Args,
+        #opts{ignore_errors = true}) ->
     (catch Handle:dispatch(Module, Function, Args));
-do_dispatch(
-    Handle,
-    Module,
-    Function,
-    Args,
-    #opts{concurrent = true}
-) ->
+do_dispatch(Handle, Module, Function, Args,
+        #opts{concurrent = true}) ->
     spawn(fun() -> Handle:dispatch(Module, Function, Args) end);
 do_dispatch(Handle, Module, Function, Args, #opts{}) ->
     Handle:dispatch(Module, Function, Args).
@@ -374,13 +285,13 @@ apply_while([Module | Modules], Handle, Function, Args) ->
 parse_opts(Opts) ->
     parse_opts(Opts, #opts{}).
 
-parse_opts([ignore_errors | Rest], #opts{} = Acc) ->
+parse_opts([ignore_errors|Rest], #opts{} = Acc) ->
     parse_opts(Rest, Acc#opts{ignore_errors = true});
-parse_opts([pipe | Rest], #opts{} = Acc) ->
+parse_opts([pipe|Rest], #opts{} = Acc) ->
     parse_opts(Rest, Acc#opts{pipe = true});
-parse_opts([concurrent | Rest], #opts{} = Acc) ->
+parse_opts([concurrent|Rest], #opts{} = Acc) ->
     parse_opts(Rest, Acc#opts{concurrent = true});
-parse_opts([interruptible | Rest], #opts{} = Acc) ->
+parse_opts([interruptible|Rest], #opts{} = Acc) ->
     parse_opts(Rest, Acc#opts{interruptible = true});
 parse_opts([], Acc) ->
     Acc.
@@ -413,17 +324,16 @@ basic_test() ->
     generate(Module, [{app1, Defs}, {app2, Defs}]),
 
     Exports = lists:sort([
-        {callbacks, 2},
-        {version, 1},
-        {providers, 2},
-        {definitions, 1},
-        {module_info, 0},
-        {version, 0},
-        {dispatch, 3},
-        {providers, 0},
-        {module_info, 1},
-        {definitions, 0}
-    ]),
+          {callbacks,2},
+          {version,1},
+          {providers,2},
+          {definitions,1},
+          {module_info,0},
+          {version,0},
+          {dispatch,3},
+          {providers,0},
+          {module_info,1},
+          {definitions,0}]),
 
     ?assertEqual(Exports, lists:sort(Module:module_info(exports))),
     ?assertEqual([app1, app2], lists:sort(Module:providers())),
@@ -446,19 +356,19 @@ generate_module(Name, Body) ->
     couch_epi_codegen:generate(Name, Tokens).
 
 decide_module(decide) ->
-    "\n"
-    "    -export([inc/1]).\n"
-    "\n"
-    "    inc(A) ->\n"
-    "        {decided, A + 1}.\n"
-    "    ";
+    "
+    -export([inc/1]).
+
+    inc(A) ->
+        {decided, A + 1}.
+    ";
 decide_module(no_decision) ->
-    "\n"
-    "    -export([inc/1]).\n"
-    "\n"
-    "    inc(_A) ->\n"
-    "        no_decision.\n"
-    "    ".
+    "
+    -export([inc/1]).
+
+    inc(_A) ->
+        no_decision.
+    ".
 
 decide_test() ->
     ok = generate_module(decide, decide_module(decide)),
@@ -470,12 +380,12 @@ decide_test() ->
     DecideFirstHandle = decide_first_handle,
     ok = generate(DecideFirstHandle, [DecideDef, NoDecissionDef]),
     ?assertMatch([decide, no_decision], DecideFirstHandle:providers(inc, 1)),
-    ?assertMatch({decided, 4}, decide(DecideFirstHandle, anything, inc, [3], [])),
+    ?assertMatch({decided,4}, decide(DecideFirstHandle, anything, inc, [3], [])),
 
     DecideSecondHandle = decide_second_handle,
     ok = generate(DecideSecondHandle, [NoDecissionDef, DecideDef]),
     ?assertMatch([no_decision, decide], DecideSecondHandle:providers(inc, 1)),
-    ?assertMatch({decided, 4}, decide(DecideSecondHandle, anything, inc, [3], [])),
+    ?assertMatch({decided,4}, decide(DecideSecondHandle, anything, inc, [3], [])),
 
     NoDecissionHandle = no_decision_handle,
     ok = generate(NoDecissionHandle, [NoDecissionDef]),
