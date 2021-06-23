@@ -12,7 +12,6 @@
 
 -module(mango_doc).
 
-
 -export([
     from_bson/1,
 
@@ -26,36 +25,35 @@
     set_field/3
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 
-
 from_bson({Props}) ->
-    DocProps = case lists:keytake(<<"_id">>, 1, Props) of
-        {value, {<<"_id">>, DocId0}, RestProps} ->
-            DocId = case DocId0 of
-                {[{<<"$id">>, Id}]} ->
-                    Id;
-                Else ->
-                    Else
-            end,
-            [{<<"_id">>, DocId} | RestProps];
-        false ->
-            Props
-    end,
+    DocProps =
+        case lists:keytake(<<"_id">>, 1, Props) of
+            {value, {<<"_id">>, DocId0}, RestProps} ->
+                DocId =
+                    case DocId0 of
+                        {[{<<"$id">>, Id}]} ->
+                            Id;
+                        Else ->
+                            Else
+                    end,
+                [{<<"_id">>, DocId} | RestProps];
+            false ->
+                Props
+        end,
     Doc = couch_doc:from_json_obj({DocProps}),
     case Doc#doc.id of
         <<"">> ->
-            Doc#doc{id=couch_uuids:new(), revs={0, []}};
+            Doc#doc{id = couch_uuids:new(), revs = {0, []}};
         _ ->
             Doc
     end.
 
-
-apply_update(#doc{body={Props}}=Doc, Update) ->
+apply_update(#doc{body = {Props}} = Doc, Update) ->
     NewProps = apply_update(Props, Update),
-    Doc#doc{body={NewProps}};
+    Doc#doc{body = {NewProps}};
 apply_update({Props}, {Update}) ->
     Result = do_update({Props}, Update),
     case has_operators(Result) of
@@ -66,13 +64,11 @@ apply_update({Props}, {Update}) ->
     end,
     Result.
 
-
 update_as_insert({Update}) ->
     NewProps = do_update_to_insert(Update, {[]}),
     apply_update(NewProps, {Update}).
 
-
-has_operators(#doc{body=Body}) ->
+has_operators(#doc{body = Body}) ->
     has_operators(Body);
 has_operators({Props}) when is_list(Props) ->
     has_operators_obj(Props);
@@ -84,7 +80,6 @@ has_operators(Val) when is_number(Val) ->
     false;
 has_operators(Val) when is_binary(Val) ->
     false.
-
 
 has_operators_obj([]) ->
     false;
@@ -101,7 +96,6 @@ has_operators_obj([{K, V} | Rest]) ->
             end
     end.
 
-
 has_operators_arr([]) ->
     false;
 has_operators_arr([V | Rest]) ->
@@ -112,24 +106,23 @@ has_operators_arr([V | Rest]) ->
             has_operators_arr(Rest)
     end.
 
-
 do_update(Props, []) ->
     Props;
 do_update(Props, [{Op, Value} | Rest]) ->
     UpdateFun = update_operator_fun(Op),
-    NewProps = case UpdateFun of
-        undefined ->
-            lists:keystore(Op, 1, Props, {Op, Value});
-        Fun when is_function(Fun, 2) ->
-            case Value of
-                {ValueProps} ->
-                    Fun(Props, ValueProps);
-                _ ->
-                    ?MANGO_ERROR({invalid_operand, Op, Value})
-            end
-    end,
+    NewProps =
+        case UpdateFun of
+            undefined ->
+                lists:keystore(Op, 1, Props, {Op, Value});
+            Fun when is_function(Fun, 2) ->
+                case Value of
+                    {ValueProps} ->
+                        Fun(Props, ValueProps);
+                    _ ->
+                        ?MANGO_ERROR({invalid_operand, Op, Value})
+                end
+        end,
     do_update(NewProps, Rest).
-
 
 update_operator_fun(<<"$", _/binary>> = Op) ->
     OperatorFuns = [
@@ -160,35 +153,35 @@ update_operator_fun(<<"$", _/binary>> = Op) ->
 update_operator_fun(_) ->
     undefined.
 
-
 do_update_inc(Props, []) ->
     Props;
 do_update_inc(Props, [{Field, Incr} | Rest]) ->
-    if is_number(Incr) -> ok; true ->
-        ?MANGO_ERROR({invalid_increment, Incr})
+    if
+        is_number(Incr) -> ok;
+        true -> ?MANGO_ERROR({invalid_increment, Incr})
     end,
-    NewProps = case get_field(Props, Field, fun is_number/1) of
-        Value when is_number(Value) ->
-            set_field(Props, Field, Value + Incr);
-        not_found ->
-            set_field(Props, Field, Incr);
-        _ ->
-            Props
-    end,
+    NewProps =
+        case get_field(Props, Field, fun is_number/1) of
+            Value when is_number(Value) ->
+                set_field(Props, Field, Value + Incr);
+            not_found ->
+                set_field(Props, Field, Incr);
+            _ ->
+                Props
+        end,
     do_update_inc(NewProps, Rest).
-
 
 do_update_rename(Props, []) ->
     Props;
 do_update_rename(Props, [{OldField, NewField} | Rest]) ->
-    NewProps = case rem_field(Props, OldField) of
-        {RemProps, OldValue} ->
-            set_field(RemProps, NewField, OldValue);
-        _ ->
-            Props
-    end,
+    NewProps =
+        case rem_field(Props, OldField) of
+            {RemProps, OldValue} ->
+                set_field(RemProps, NewField, OldValue);
+            _ ->
+                Props
+        end,
     do_update_rename(NewProps, Rest).
-
 
 do_update_set_on_insert(Props, _) ->
     % This is only called during calls to apply_update/2
@@ -196,180 +189,193 @@ do_update_set_on_insert(Props, _) ->
     % the floor.
     Props.
 
-
 do_update_set(Props, []) ->
     Props;
 do_update_set(Props, [{Field, Value} | Rest]) ->
     NewProps = set_field(Props, Field, Value),
     do_update_set(NewProps, Rest).
 
-
 do_update_unset(Props, []) ->
     Props;
 do_update_unset(Props, [{Field, _} | Rest]) ->
-    NewProps = case rem_field(Props, Field) of
-        {RemProps, _} ->
-            RemProps;
-        _ ->
-            Props
-    end,
+    NewProps =
+        case rem_field(Props, Field) of
+            {RemProps, _} ->
+                RemProps;
+            _ ->
+                Props
+        end,
     do_update_unset(NewProps, Rest).
-
 
 do_update_add_to_set(Props, []) ->
     Props;
 do_update_add_to_set(Props, [{Field, NewValue} | Rest]) ->
-    ToAdd = case NewValue of
-        {[{<<"$each">>, NewValues}]} when is_list(NewValues) ->
-            NewValues;
-        {[{<<"$each">>, NewValue}]} ->
-            [NewValue];
-        Else ->
-            [Else]
-    end,
-    NewProps = case get_field(Props, Field) of
-        OldValues when is_list(OldValues) ->
-            FinalValues = lists:foldl(fun(V, Acc) ->
-                lists:append(Acc, [V])
-            end, OldValues, ToAdd),
-            set_field(Props, Field, FinalValues);
-        _ ->
-            Props
-    end,
+    ToAdd =
+        case NewValue of
+            {[{<<"$each">>, NewValues}]} when is_list(NewValues) ->
+                NewValues;
+            {[{<<"$each">>, NewValue}]} ->
+                [NewValue];
+            Else ->
+                [Else]
+        end,
+    NewProps =
+        case get_field(Props, Field) of
+            OldValues when is_list(OldValues) ->
+                FinalValues = lists:foldl(
+                    fun(V, Acc) ->
+                        lists:append(Acc, [V])
+                    end,
+                    OldValues,
+                    ToAdd
+                ),
+                set_field(Props, Field, FinalValues);
+            _ ->
+                Props
+        end,
     do_update_add_to_set(NewProps, Rest).
-
 
 do_update_pop(Props, []) ->
     Props;
 do_update_pop(Props, [{Field, Pos} | Rest]) ->
-    NewProps = case get_field(Props, Field) of
-        OldValues when is_list(OldValues) ->
-            NewValues = case Pos > 0 of
-                true ->
-                    lists:sublist(OldValues, 1, length(OldValues) - 1);
-                false ->
-                    lists:sublist(OldValues, 2, length(OldValues) - 1)
-            end,
-            set_field(Props, Field, NewValues);
-        _ ->
-            Props
-    end,
+    NewProps =
+        case get_field(Props, Field) of
+            OldValues when is_list(OldValues) ->
+                NewValues =
+                    case Pos > 0 of
+                        true ->
+                            lists:sublist(OldValues, 1, length(OldValues) - 1);
+                        false ->
+                            lists:sublist(OldValues, 2, length(OldValues) - 1)
+                    end,
+                set_field(Props, Field, NewValues);
+            _ ->
+                Props
+        end,
     do_update_pop(NewProps, Rest).
-
 
 do_update_pull_all(Props, []) ->
     Props;
 do_update_pull_all(Props, [{Field, Values} | Rest]) ->
-    ToRem = case is_list(Values) of
-        true -> Values;
-        false -> [Values]
-    end,
-    NewProps = case get_field(Props, Field) of
-        OldValues when is_list(OldValues) ->
-            NewValues = lists:foldl(fun(ValToRem, Acc) ->
-                % The logic in these filter functions is a bit
-                % subtle. The way to think of this is that we
-                % return true for all elements we want to keep.
-                FilterFun = case has_operators(ValToRem) of
-                    true ->
-                        fun(A) ->
-                            Sel = mango_selector:normalize(ValToRem),
-                            not mango_selector:match(A, Sel)
-                        end;
-                    false ->
-                        fun(A) -> A /= ValToRem end
-                end,
-                lists:filter(FilterFun, Acc)
-            end, OldValues, ToRem),
-            set_field(Props, Field, NewValues);
-        _ ->
-            Props
-    end,
+    ToRem =
+        case is_list(Values) of
+            true -> Values;
+            false -> [Values]
+        end,
+    NewProps =
+        case get_field(Props, Field) of
+            OldValues when is_list(OldValues) ->
+                NewValues = lists:foldl(
+                    fun(ValToRem, Acc) ->
+                        % The logic in these filter functions is a bit
+                        % subtle. The way to think of this is that we
+                        % return true for all elements we want to keep.
+                        FilterFun =
+                            case has_operators(ValToRem) of
+                                true ->
+                                    fun(A) ->
+                                        Sel = mango_selector:normalize(ValToRem),
+                                        not mango_selector:match(A, Sel)
+                                    end;
+                                false ->
+                                    fun(A) -> A /= ValToRem end
+                            end,
+                        lists:filter(FilterFun, Acc)
+                    end,
+                    OldValues,
+                    ToRem
+                ),
+                set_field(Props, Field, NewValues);
+            _ ->
+                Props
+        end,
     do_update_add_to_set(NewProps, Rest).
-
 
 do_update_pull(Props, []) ->
     Props;
 do_update_pull(Props, [{Field, Value} | Rest]) ->
-    ToRem = case Value of
-        {[{<<"$each">>, Values}]} when is_list(Values) ->
-            Values;
-        {[{<<"$each">>, Value}]} ->
-            [Value];
-        Else ->
-            [Else]
-    end,
+    ToRem =
+        case Value of
+            {[{<<"$each">>, Values}]} when is_list(Values) ->
+                Values;
+            {[{<<"$each">>, Value}]} ->
+                [Value];
+            Else ->
+                [Else]
+        end,
     NewProps = do_update_pull_all(Props, [{Field, ToRem}]),
     do_update_pull(NewProps, Rest).
-
 
 do_update_push_all(_, []) ->
     [];
 do_update_push_all(Props, [{Field, Values} | Rest]) ->
-    ToAdd = case is_list(Values) of
-        true -> Values;
-        false -> [Values]
-    end,
-    NewProps = case get_field(Props, Field) of
-        OldValues when is_list(OldValues) ->
-            NewValues = OldValues ++ ToAdd,
-            set_field(Props, Field, NewValues);
-        _ ->
-            Props
-    end,
+    ToAdd =
+        case is_list(Values) of
+            true -> Values;
+            false -> [Values]
+        end,
+    NewProps =
+        case get_field(Props, Field) of
+            OldValues when is_list(OldValues) ->
+                NewValues = OldValues ++ ToAdd,
+                set_field(Props, Field, NewValues);
+            _ ->
+                Props
+        end,
     do_update_push_all(NewProps, Rest).
-
 
 do_update_push(Props, []) ->
     Props;
 do_update_push(Props, [{Field, Value} | Rest]) ->
-    ToAdd = case Value of
-        {[{<<"$each">>, Values}]} when is_list(Values) ->
-            Values;
-        {[{<<"$each">>, Value}]} ->
-            [Value];
-        Else ->
-            [Else]
-    end,
+    ToAdd =
+        case Value of
+            {[{<<"$each">>, Values}]} when is_list(Values) ->
+                Values;
+            {[{<<"$each">>, Value}]} ->
+                [Value];
+            Else ->
+                [Else]
+        end,
     NewProps = do_update_push_all(Props, [{Field, ToAdd}]),
     do_update_push(NewProps, Rest).
-
-
 
 do_update_bitwise(Props, []) ->
     Props;
 do_update_bitwise(Props, [{Field, Value} | Rest]) ->
-    DoOp = case Value of
-        {[{<<"and">>, Val}]} when is_integer(Val) ->
-            fun(V) -> V band Val end;
-        {[{<<"or">>, Val}]} when is_integer(Val) ->
-            fun(V) -> V bor Val end;
-        _ ->
-            fun(V) -> V end
-    end,
-    NewProps = case get_field(Props, Field, fun is_number/1) of
-        Value when is_number(Value) ->
-            NewValue = DoOp(Value),
-            set_field(Props, Field, NewValue);
-        _ ->
-            Props
-    end,
+    DoOp =
+        case Value of
+            {[{<<"and">>, Val}]} when is_integer(Val) ->
+                fun(V) -> V band Val end;
+            {[{<<"or">>, Val}]} when is_integer(Val) ->
+                fun(V) -> V bor Val end;
+            _ ->
+                fun(V) -> V end
+        end,
+    NewProps =
+        case get_field(Props, Field, fun is_number/1) of
+            Value when is_number(Value) ->
+                NewValue = DoOp(Value),
+                set_field(Props, Field, NewValue);
+            _ ->
+                Props
+        end,
     do_update_bitwise(NewProps, Rest).
-
 
 do_update_to_insert([], Doc) ->
     Doc;
 do_update_to_insert([{<<"$setOnInsert">>, {FieldProps}}], Doc) ->
-    lists:foldl(fun({Field, Value}, DocAcc) ->
-        set_field(DocAcc, Field, Value)
-    end, Doc, FieldProps);
+    lists:foldl(
+        fun({Field, Value}, DocAcc) ->
+            set_field(DocAcc, Field, Value)
+        end,
+        Doc,
+        FieldProps
+    );
 do_update_to_insert([{_, _} | Rest], Doc) ->
     do_update_to_insert(Rest, Doc).
 
-
 get_field(Props, Field) ->
     get_field(Props, Field, no_validation).
-
 
 get_field(Props, Field, Validator) when is_binary(Field) ->
     {ok, Path} = mango_util:parse_field(Field),
@@ -402,12 +408,12 @@ get_field(Values, [Name | Rest], Validator) when is_list(Values) ->
             false ->
                 bad_path
         end
-    catch error:badarg ->
-        bad_path
+    catch
+        error:badarg ->
+            bad_path
     end;
-get_field(_, [_|_], _) ->
+get_field(_, [_ | _], _) ->
     bad_path.
-
 
 rem_field(Props, Field) when is_binary(Field) ->
     {ok, Path} = mango_util:parse_field(Field),
@@ -443,8 +449,9 @@ rem_field(Values, [Name]) when is_list(Values) ->
             false ->
                 bad_path
         end
-    catch error:badarg ->
-        bad_path
+    catch
+        error:badarg ->
+            bad_path
     end;
 rem_field(Values, [Name | Rest]) when is_list(Values) ->
     % Name might be an integer index into an array
@@ -463,12 +470,12 @@ rem_field(Values, [Name | Rest]) when is_list(Values) ->
             false ->
                 bad_path
         end
-    catch error:badarg ->
-        bad_path
+    catch
+        error:badarg ->
+            bad_path
     end;
-rem_field(_, [_|_]) ->
+rem_field(_, [_ | _]) ->
     bad_path.
-
 
 set_field(Props, Field, Value) when is_binary(Field) ->
     {ok, Path} = mango_util:parse_field(Field),
@@ -495,8 +502,9 @@ set_field(Values, [Name], Value) when is_list(Values) ->
             false ->
                 Values
         end
-    catch error:badarg ->
-        Values
+    catch
+        error:badarg ->
+            Values
     end;
 set_field(Values, [Name | Rest], Value) when is_list(Values) ->
     % Name might be an integer index into an array
@@ -511,27 +519,25 @@ set_field(Values, [Name | Rest], Value) when is_list(Values) ->
             false ->
                 Values
         end
-    catch error:badarg ->
-        Values
+    catch
+        error:badarg ->
+            Values
     end;
-set_field(Value, [_|_], _) ->
+set_field(Value, [_ | _], _) ->
     Value.
-
 
 make_nested([], Value) ->
     Value;
 make_nested([Name | Rest], Value) ->
     {[{Name, make_nested(Rest, Value)}]}.
 
-
 rem_elem(1, [Value | Rest]) ->
     {Rest, Value};
 rem_elem(I, [Item | Rest]) when I > 1 ->
-    {Tail, Value} = rem_elem(I+1, Rest),
+    {Tail, Value} = rem_elem(I + 1, Rest),
     {[Item | Tail], Value}.
-
 
 set_elem(1, [_ | Rest], Value) ->
     [Value | Rest];
 set_elem(I, [Item | Rest], Value) when I > 1 ->
-    [Item | set_elem(I-1, Rest, Value)].
+    [Item | set_elem(I - 1, Rest, Value)].

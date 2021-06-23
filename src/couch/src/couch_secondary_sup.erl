@@ -15,16 +15,12 @@
 -export([init/1, start_link/0]).
 
 start_link() ->
-    supervisor:start_link({local,couch_secondary_services}, ?MODULE, []).
+    supervisor:start_link({local, couch_secondary_services}, ?MODULE, []).
 
 init([]) ->
     SecondarySupervisors = [
-        {couch_plugin_event,
-            {gen_event, start_link, [{local, couch_plugin}]},
-            permanent,
-            brutal_kill,
-            worker,
-            dynamic}
+        {couch_plugin_event, {gen_event, start_link, [{local, couch_plugin}]}, permanent,
+            brutal_kill, worker, dynamic}
     ],
     Daemons = [
         {query_servers, {couch_proc_manager, start_link, []}},
@@ -32,26 +28,25 @@ init([]) ->
         {uuids, {couch_uuids, start, []}}
     ],
 
-    MaybeHttps = case https_enabled() of
-        true -> [{httpsd, {chttpd, start_link, [https]}}];
-        false -> []
-    end,
+    MaybeHttps =
+        case https_enabled() of
+            true -> [{httpsd, {chttpd, start_link, [https]}}];
+            false -> []
+        end,
 
-    Children = SecondarySupervisors ++ [
-        begin
-            {Module, Fun, Args} = Spec,
+    Children =
+        SecondarySupervisors ++
+            [
+                begin
+                    {Module, Fun, Args} = Spec,
 
-            {Name,
-                {Module, Fun, Args},
-                permanent,
-                brutal_kill,
-                worker,
-                [Module]}
-        end
-        || {Name, Spec}
-        <- Daemons ++ MaybeHttps, Spec /= ""],
-    {ok, {{one_for_one, 50, 3600},
-        couch_epi:register_service(couch_db_epi, Children)}}.
+                    {Name, {Module, Fun, Args}, permanent, brutal_kill, worker, [Module]}
+                end
+             || {Name, Spec} <-
+                    Daemons ++ MaybeHttps,
+                Spec /= ""
+            ],
+    {ok, {{one_for_one, 50, 3600}, couch_epi:register_service(couch_db_epi, Children)}}.
 
 https_enabled() ->
     % 1. [ssl] enable = true | false

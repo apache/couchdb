@@ -32,9 +32,15 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_views/include/couch_views.hrl").
 
--import(chttpd,
-    [send_json/2,send_json/3,send_json/4,send_method_not_allowed/2,
-    send_chunk/2,start_chunked_response/3]).
+-import(
+    chttpd,
+    [
+        send_json/2, send_json/3, send_json/4,
+        send_method_not_allowed/2,
+        send_chunk/2,
+        start_chunked_response/3
+    ]
+).
 
 -define(MAX_DB_NUM_FOR_DBS_INFO, 100).
 
@@ -43,19 +49,21 @@
 handle_welcome_req(Req) ->
     handle_welcome_req(Req, <<"Welcome">>).
 
-handle_welcome_req(#httpd{method='GET'}=Req, WelcomeMessage) ->
-    send_json(Req, {[
-        {couchdb, WelcomeMessage},
-        {version, list_to_binary(couch_server:get_version())},
-        {git_sha, list_to_binary(couch_server:get_git_sha())},
-        {uuid, couch_server:get_uuid()},
-        {features, get_features()}
-        ] ++ case config:get("vendor") of
-        [] ->
-            [];
-        Properties ->
-            [{vendor, {[{?l2b(K), ?l2b(V)} || {K, V} <- Properties]}}]
-        end
+handle_welcome_req(#httpd{method = 'GET'} = Req, WelcomeMessage) ->
+    send_json(Req, {
+        [
+            {couchdb, WelcomeMessage},
+            {version, list_to_binary(couch_server:get_version())},
+            {git_sha, list_to_binary(couch_server:get_git_sha())},
+            {uuid, couch_server:get_uuid()},
+            {features, get_features()}
+        ] ++
+            case config:get("vendor") of
+                [] ->
+                    [];
+                Properties ->
+                    [{vendor, {[{?l2b(K), ?l2b(V)} || {K, V} <- Properties]}}]
+            end
     });
 handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
@@ -66,7 +74,7 @@ get_features() ->
 handle_favicon_req(Req) ->
     handle_favicon_req(Req, get_docroot()).
 
-handle_favicon_req(#httpd{method='GET'}=Req, DocumentRoot) ->
+handle_favicon_req(#httpd{method = 'GET'} = Req, DocumentRoot) ->
     {DateNow, TimeNow} = calendar:universal_time(),
     DaysNow = calendar:date_to_gregorian_days(DateNow),
     DaysWhenExpires = DaysNow + 365,
@@ -83,32 +91,33 @@ handle_favicon_req(Req, _) ->
 handle_utils_dir_req(Req) ->
     handle_utils_dir_req(Req, get_docroot()).
 
-handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
+handle_utils_dir_req(#httpd{method = 'GET'} = Req, DocumentRoot) ->
     "/" ++ UrlPath = chttpd:path(Req),
     case chttpd:partition(UrlPath) of
-    {_ActionKey, "/", RelativePath} ->
-        % GET /_utils/path or GET /_utils/
-        CachingHeaders = [{"Cache-Control", "private, must-revalidate"}],
-        EnableCsp = config:get("csp", "enable", "false"),
-        Headers = maybe_add_csp_headers(CachingHeaders, EnableCsp),
-        chttpd:serve_file(Req, RelativePath, DocumentRoot, Headers);
-    {_ActionKey, "", _RelativePath} ->
-        % GET /_utils
-        RedirectPath = chttpd:path(Req) ++ "/",
-        chttpd:send_redirect(Req, RedirectPath)
+        {_ActionKey, "/", RelativePath} ->
+            % GET /_utils/path or GET /_utils/
+            CachingHeaders = [{"Cache-Control", "private, must-revalidate"}],
+            EnableCsp = config:get("csp", "enable", "false"),
+            Headers = maybe_add_csp_headers(CachingHeaders, EnableCsp),
+            chttpd:serve_file(Req, RelativePath, DocumentRoot, Headers);
+        {_ActionKey, "", _RelativePath} ->
+            % GET /_utils
+            RedirectPath = chttpd:path(Req) ++ "/",
+            chttpd:send_redirect(Req, RedirectPath)
     end;
 handle_utils_dir_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 maybe_add_csp_headers(Headers, "true") ->
-    DefaultValues = "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
-                    "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
+    DefaultValues =
+        "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
+        "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
     Value = config:get("csp", "header_value", DefaultValues),
     [{"Content-Security-Policy", Value} | Headers];
 maybe_add_csp_headers(Headers, _) ->
     Headers.
 
-handle_all_dbs_req(#httpd{method='GET'}=Req) ->
+handle_all_dbs_req(#httpd{method = 'GET'} = Req) ->
     #mrargs{
         start_key = StartKey,
         end_key = EndKey,
@@ -127,32 +136,32 @@ handle_all_dbs_req(#httpd{method='GET'}=Req) ->
 
     {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, []),
     Callback = fun all_dbs_callback/2,
-    Acc = #vacc{req=Req,resp=Resp},
+    Acc = #vacc{req = Req, resp = Resp},
     {ok, Acc1} = fabric2_db:list_dbs(Callback, Acc, Options),
     {ok, Acc1#vacc.resp};
 handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-all_dbs_callback({meta, _Meta}, #vacc{resp=Resp0}=Acc) ->
+all_dbs_callback({meta, _Meta}, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
-    {ok, Acc#vacc{resp=Resp1}};
-all_dbs_callback({row, Row}, #vacc{resp=Resp0}=Acc) ->
+    {ok, Acc#vacc{resp = Resp1}};
+all_dbs_callback({row, Row}, #vacc{resp = Resp0} = Acc) ->
     Prepend = couch_views_http_util:prepend_val(Acc),
     DbName = couch_util:get_value(id, Row),
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
-    {ok, Acc#vacc{prepend=",", resp=Resp1}};
-all_dbs_callback(complete, #vacc{resp=Resp0}=Acc) ->
+    {ok, Acc#vacc{prepend = ",", resp = Resp1}};
+all_dbs_callback(complete, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "]"),
     {ok, Resp2} = chttpd:end_delayed_json_response(Resp1),
-    {ok, Acc#vacc{resp=Resp2}};
-all_dbs_callback({error, Reason}, #vacc{resp=Resp0}=Acc) ->
+    {ok, Acc#vacc{resp = Resp2}};
+all_dbs_callback({error, Reason}, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
-    {ok, Acc#vacc{resp=Resp1}}.
+    {ok, Acc#vacc{resp = Resp1}}.
 
 handle_dbs_info_req(#httpd{method = 'GET'} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     send_db_infos(Req, list_dbs_info);
-handle_dbs_info_req(#httpd{method='POST', user_ctx=UserCtx}=Req) ->
+handle_dbs_info_req(#httpd{method = 'POST', user_ctx = UserCtx} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = chttpd:json_body_obj(Req),
     Keys = couch_views_util:get_view_keys(Props),
@@ -160,35 +169,44 @@ handle_dbs_info_req(#httpd{method='POST', user_ctx=UserCtx}=Req) ->
         undefined -> throw({bad_request, "`keys` member must exist."});
         _ -> ok
     end,
-    MaxNumber = config:get_integer("chttpd",
-        "max_db_number_for_dbs_info_req", ?MAX_DB_NUM_FOR_DBS_INFO),
+    MaxNumber = config:get_integer(
+        "chttpd",
+        "max_db_number_for_dbs_info_req",
+        ?MAX_DB_NUM_FOR_DBS_INFO
+    ),
     case length(Keys) =< MaxNumber of
         true -> ok;
         false -> throw({bad_request, too_many_keys})
     end,
     {ok, Resp} = chttpd:start_json_response(Req, 200),
     send_chunk(Resp, "["),
-    lists:foldl(fun(DbName, AccSeparator) ->
-        try
-            {ok, Db} = fabric2_db:open(DbName, [{user_ctx, UserCtx}]),
-            {ok, Info} = fabric2_db:get_db_info(Db),
-            Json = ?JSON_ENCODE({[{key, DbName}, {info, {Info}}]}),
-            send_chunk(Resp, AccSeparator ++ Json)
-        catch error:database_does_not_exist ->
-            ErrJson = ?JSON_ENCODE({[{key, DbName}, {error, not_found}]}),
-            send_chunk(Resp, AccSeparator ++ ErrJson)
+    lists:foldl(
+        fun(DbName, AccSeparator) ->
+            try
+                {ok, Db} = fabric2_db:open(DbName, [{user_ctx, UserCtx}]),
+                {ok, Info} = fabric2_db:get_db_info(Db),
+                Json = ?JSON_ENCODE({[{key, DbName}, {info, {Info}}]}),
+                send_chunk(Resp, AccSeparator ++ Json)
+            catch
+                error:database_does_not_exist ->
+                    ErrJson = ?JSON_ENCODE({[{key, DbName}, {error, not_found}]}),
+                    send_chunk(Resp, AccSeparator ++ ErrJson)
+            end,
+            % AccSeparator now has a comma
+            ","
         end,
-        "," % AccSeparator now has a comma
-    end, "", Keys),
+        "",
+        Keys
+    ),
     send_chunk(Resp, "]"),
     chttpd:end_json_response(Resp);
 handle_dbs_info_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST").
 
-handle_deleted_dbs_req(#httpd{method='GET', path_parts=[_]}=Req) ->
+handle_deleted_dbs_req(#httpd{method = 'GET', path_parts = [_]} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     send_db_infos(Req, list_deleted_dbs_info);
-handle_deleted_dbs_req(#httpd{method='POST', user_ctx=Ctx, path_parts=[_]}=Req) ->
+handle_deleted_dbs_req(#httpd{method = 'POST', user_ctx = Ctx, path_parts = [_]} = Req) ->
     couch_httpd:verify_is_server_admin(Req),
     chttpd:validate_ctype(Req, "application/json"),
     GetJSON = fun(Key, Props, Default) ->
@@ -218,16 +236,17 @@ handle_deleted_dbs_req(#httpd{method='POST', user_ctx=Ctx, path_parts=[_]}=Req) 
         Error ->
             throw(Error)
     end;
-handle_deleted_dbs_req(#httpd{path_parts = PP}=Req) when length(PP) == 1 ->
+handle_deleted_dbs_req(#httpd{path_parts = PP} = Req) when length(PP) == 1 ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
-handle_deleted_dbs_req(#httpd{method='DELETE', user_ctx=Ctx, path_parts=[_, DbName]}=Req) ->
+handle_deleted_dbs_req(#httpd{method = 'DELETE', user_ctx = Ctx, path_parts = [_, DbName]} = Req) ->
     couch_httpd:verify_is_server_admin(Req),
-    TS = case ?JSON_DECODE(couch_httpd:qs_value(Req, "timestamp", "null")) of
-        null ->
-            throw({bad_request, "`timestamp` parameter is not provided."});
-        TS0 ->
-            TS0
-    end,
+    TS =
+        case ?JSON_DECODE(couch_httpd:qs_value(Req, "timestamp", "null")) of
+            null ->
+                throw({bad_request, "`timestamp` parameter is not provided."});
+            TS0 ->
+                TS0
+        end,
     case fabric2_db:delete(DbName, [{user_ctx, Ctx}, {deleted_at, TS}]) of
         ok ->
             send_json(Req, 200, {[{ok, true}]});
@@ -236,7 +255,7 @@ handle_deleted_dbs_req(#httpd{method='DELETE', user_ctx=Ctx, path_parts=[_, DbNa
         Error ->
             throw(Error)
     end;
-handle_deleted_dbs_req(#httpd{path_parts = PP}=Req) when length(PP) == 2 ->
+handle_deleted_dbs_req(#httpd{path_parts = PP} = Req) when length(PP) == 2 ->
     send_method_not_allowed(Req, "HEAD,DELETE");
 handle_deleted_dbs_req(Req) ->
     chttpd:send_error(Req, not_found).
@@ -287,14 +306,14 @@ dbs_info_callback({error, Reason}, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
     {ok, Acc#vacc{resp = Resp1}}.
 
-handle_task_status_req(#httpd{method='GET'}=Req) ->
+handle_task_status_req(#httpd{method = 'GET'} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     ActiveTasks = fabric2_active_tasks:get_active_tasks(),
     send_json(Req, ActiveTasks);
 handle_task_status_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
-handle_replicate_req(#httpd{method='POST', user_ctx=Ctx, req_body=PostBody} = Req) ->
+handle_replicate_req(#httpd{method = 'POST', user_ctx = Ctx, req_body = PostBody} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     %% see HACK in chttpd.erl about replication
     case couch_replicator:replicate(PostBody, Ctx) of
@@ -306,41 +325,43 @@ handle_replicate_req(#httpd{method='POST', user_ctx=Ctx, req_body=PostBody} = Re
             send_json(Req, maps:merge(#{<<"ok">> => true}, JsonResults));
         {ok, stopped} ->
             send_json(Req, 200, {[{ok, stopped}]});
-        {error, not_found=Error} ->
+        {error, not_found = Error} ->
             chttpd:send_error(Req, Error);
         {error, #{<<"error">> := Err, <<"reason">> := Reason}} when
-                is_binary(Err), is_binary(Reason) ->
+            is_binary(Err), is_binary(Reason)
+        ->
             % Safe to use binary_to_atom since this is only built
             % from couch_replicator_jobs:error_info/1
             chttpd:send_error(Req, {binary_to_atom(Err, utf8), Reason});
-        {error, {_, _}=Error} ->
+        {error, {_, _} = Error} ->
             chttpd:send_error(Req, Error);
-        {_, _}=Error ->
+        {_, _} = Error ->
             chttpd:send_error(Req, Error)
     end;
 handle_replicate_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
-
-handle_reload_query_servers_req(#httpd{method='POST'}=Req) ->
+handle_reload_query_servers_req(#httpd{method = 'POST'} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),
     ok = couch_proc_manager:reload(),
     send_json(Req, 200, {[{ok, true}]});
 handle_reload_query_servers_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
-handle_uuids_req(#httpd{method='GET'}=Req) ->
-    Max = list_to_integer(config:get("uuids","max_count","1000")),
-    Count = try list_to_integer(couch_httpd:qs_value(Req, "count", "1")) of
-        N when N > Max ->
-            throw({bad_request, <<"count parameter too large">>});
-        N when N < 0 ->
-            throw({bad_request, <<"count must be a positive integer">>});
-        N -> N
-    catch
-        error:badarg ->
-            throw({bad_request, <<"count must be a positive integer">>})
-    end,
+handle_uuids_req(#httpd{method = 'GET'} = Req) ->
+    Max = list_to_integer(config:get("uuids", "max_count", "1000")),
+    Count =
+        try list_to_integer(couch_httpd:qs_value(Req, "count", "1")) of
+            N when N > Max ->
+                throw({bad_request, <<"count parameter too large">>});
+            N when N < 0 ->
+                throw({bad_request, <<"count must be a positive integer">>});
+            N ->
+                N
+        catch
+            error:badarg ->
+                throw({bad_request, <<"count must be a positive integer">>})
+        end,
     UUIDs = [couch_uuids:new() || _ <- lists:seq(1, Count)],
     Etag = couch_httpd:make_etag(UUIDs),
     couch_httpd:etag_respond(Req, Etag, fun() ->
@@ -357,21 +378,21 @@ handle_uuids_req(#httpd{method='GET'}=Req) ->
 handle_uuids_req(Req) ->
     send_method_not_allowed(Req, "GET").
 
-handle_up_req(#httpd{method='GET'} = Req) ->
+handle_up_req(#httpd{method = 'GET'} = Req) ->
     case config:get("couchdb", "maintenance_mode") of
-    "true" ->
-        send_json(Req, 404, {[{status, maintenance_mode}]});
-    "nolb" ->
-        send_json(Req, 404, {[{status, nolb}]});
-    _ ->
-        try
-            fabric2_db:list_dbs([{limit, 0}]),
-            send_json(Req, 200, {[{status, ok}]})
-        catch error:{timeout, _} ->
-            send_json(Req, 404, {[{status, backend_unavailable}]})
-        end
+        "true" ->
+            send_json(Req, 404, {[{status, maintenance_mode}]});
+        "nolb" ->
+            send_json(Req, 404, {[{status, nolb}]});
+        _ ->
+            try
+                fabric2_db:list_dbs([{limit, 0}]),
+                send_json(Req, 200, {[{status, ok}]})
+            catch
+                error:{timeout, _} ->
+                    send_json(Req, 404, {[{status, backend_unavailable}]})
+            end
     end;
-
 handle_up_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 

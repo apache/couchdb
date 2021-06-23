@@ -13,9 +13,7 @@
 % @doc Modules wishing to handle writing log
 % messages should implement this behavior.
 
-
 -module(couch_log_writer).
-
 
 -export([
     init/0,
@@ -23,18 +21,14 @@
     write/2
 ]).
 
-
 -include("couch_log.hrl").
-
 
 -define(DEFAULT_WRITER, couch_log_writer_stderr).
 
-
--callback init() -> {ok, State::term()}.
--callback terminate(Reason::term(), State::term()) -> ok.
--callback write(LogEntry::#log_entry{}, State::term()) ->
-            {ok, NewState::term()}.
-
+-callback init() -> {ok, State :: term()}.
+-callback terminate(Reason :: term(), State :: term()) -> ok.
+-callback write(LogEntry :: #log_entry{}, State :: term()) ->
+    {ok, NewState :: term()}.
 
 -spec init() -> {atom(), term()}.
 init() ->
@@ -42,17 +36,14 @@ init() ->
     {ok, St} = Writer:init(),
     {Writer, St}.
 
-
 -spec terminate(term(), {atom(), term()}) -> ok.
 terminate(Reason, {Writer, St}) ->
     ok = Writer:terminate(Reason, St).
-
 
 -spec write(#log_entry{}, {atom(), term()}) -> {atom(), term()}.
 write(Entry, {Writer, St}) ->
     {ok, NewSt} = Writer:write(Entry, St),
     {Writer, NewSt}.
-
 
 get_writer_mod() ->
     WriterStr = config:get("log", "writer", "stderr"),
@@ -70,14 +61,13 @@ get_writer_mod() ->
             end
     end.
 
-
 to_atom(Str) ->
     try list_to_existing_atom(Str) of
         Atom -> Atom
-    catch _:_ ->
-        undefined
+    catch
+        _:_ ->
+            undefined
     end.
-
 
 mod_exists(ModName) ->
     code:which(ModName) /= non_existing.

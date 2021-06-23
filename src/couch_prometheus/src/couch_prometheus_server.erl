@@ -48,7 +48,7 @@ start_link() ->
 init([]) ->
     Metrics = refresh_metrics(),
     RT = update_refresh_timer(),
-    {ok, #st{metrics=Metrics, refresh=RT}}.
+    {ok, #st{metrics = Metrics, refresh = RT}}.
 
 scrape() ->
     {ok, Metrics} = gen_server:call(?MODULE, scrape),
@@ -57,13 +57,13 @@ scrape() ->
 version() ->
     ?PROMETHEUS_VERSION.
 
-handle_call(scrape, _from, #st{metrics = Metrics}=State) ->
+handle_call(scrape, _from, #st{metrics = Metrics} = State) ->
     {reply, {ok, Metrics}, State};
-handle_call(refresh, _from, #st{refresh=OldRT} = State) ->
+handle_call(refresh, _from, #st{refresh = OldRT} = State) ->
     timer:cancel(OldRT),
     Metrics = refresh_metrics(),
     RT = update_refresh_timer(),
-    {reply, ok, State#st{metrics=Metrics, refresh=RT}};
+    {reply, ok, State#st{metrics = Metrics, refresh = RT}};
 handle_call(Msg, _From, State) ->
     {stop, {unknown_call, Msg}, error, State}.
 
@@ -73,7 +73,7 @@ handle_cast(Msg, State) ->
 handle_info(refresh, State) ->
     Metrics = refresh_metrics(),
     RT = update_refresh_timer(),
-    {noreply, State#st{metrics=Metrics, refresh=RT}};
+    {noreply, State#st{metrics = Metrics, refresh = RT}};
 handle_info(Msg, State) ->
     {stop, {unknown_info, Msg}, State}.
 
@@ -86,15 +86,23 @@ code_change(_OldVsn, State, _Extra) ->
 refresh_metrics() ->
     CouchDB = get_couchdb_stats(),
     System = couch_stats_httpd:to_ejson(get_system_stats()),
-    couch_prometheus_util:to_bin(lists:map(fun(Line) ->
-        io_lib:format("~s~n", [Line])
-    end, CouchDB ++ System)).
+    couch_prometheus_util:to_bin(
+        lists:map(
+            fun(Line) ->
+                io_lib:format("~s~n", [Line])
+            end,
+            CouchDB ++ System
+        )
+    ).
 
 get_couchdb_stats() ->
     Stats = lists:sort(couch_stats:fetch()),
-    lists:flatmap(fun({Path, Info}) ->
-        couch_to_prom(Path, Info, Stats)
-    end, Stats).
+    lists:flatmap(
+        fun({Path, Info}) ->
+            couch_to_prom(Path, Info, Stats)
+        end,
+        Stats
+    ).
 
 get_system_stats() ->
     lists:flatten([
@@ -111,9 +119,12 @@ get_uptime_stat() ->
     to_prom(uptime_seconds, counter, couch_app:uptime() div 1000).
 
 get_vm_stats() ->
-    MemLabels = lists:map(fun({Type,  Value}) ->
-        {[{memory_type, Type}], Value}
-    end, erlang:memory()),
+    MemLabels = lists:map(
+        fun({Type, Value}) ->
+            {[{memory_type, Type}], Value}
+        end,
+        erlang:memory()
+    ),
     {NumGCs, WordsReclaimed, _} = erlang:statistics(garbage_collection),
     CtxSwitches = element(1, erlang:statistics(context_switches)),
     Reds = element(1, erlang:statistics(reductions)),
@@ -137,14 +148,17 @@ get_io_stats() ->
     ].
 
 get_message_queue_stats() ->
-    Queues = lists:map(fun(Name) ->
-        case process_info(whereis(Name), message_queue_len) of
-            {message_queue_len, N} ->
-                N;
-            _ ->
-                0
-        end
-    end, registered()),
+    Queues = lists:map(
+        fun(Name) ->
+            case process_info(whereis(Name), message_queue_len) of
+                {message_queue_len, N} ->
+                    N;
+                _ ->
+                    0
+            end
+        end,
+        registered()
+    ),
     [
         to_prom(erlang_message_queues, gauge, lists:sum(Queues)),
         to_prom(erlang_message_queue_min, gauge, lists:min(Queues)),
@@ -153,13 +167,14 @@ get_message_queue_stats() ->
 
 get_run_queue_stats() ->
     %% Workaround for https://bugs.erlang.org/browse/ERL-1355
-    {Normal, Dirty} = case erlang:system_info(dirty_cpu_schedulers) > 0 of
-        false ->
-            {statistics(run_queue), 0};
-        true ->
-            [DCQ | SQs] = lists:reverse(statistics(run_queue_lengths)),
-            {lists:sum(SQs), DCQ}
-    end,
+    {Normal, Dirty} =
+        case erlang:system_info(dirty_cpu_schedulers) > 0 of
+            false ->
+                {statistics(run_queue), 0};
+            true ->
+                [DCQ | SQs] = lists:reverse(statistics(run_queue_lengths)),
+                {lists:sum(SQs), DCQ}
+        end,
     [
         to_prom(erlang_scheduler_queues, gauge, Normal),
         to_prom(erlang_dirty_cpu_scheduler_queues, gauge, Dirty)

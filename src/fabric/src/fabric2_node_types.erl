@@ -12,11 +12,9 @@
 
 -module(fabric2_node_types).
 
-
 -export([
     is_type/1
 ]).
-
 
 is_type(Type) when is_atom(Type) ->
     case {from_os_env(Type), from_app_env(Type)} of
@@ -29,7 +27,6 @@ is_type(Type) when is_atom(Type) ->
             % node will perform all the background tasks
             true
     end.
-
 
 from_os_env(Type) when is_atom(Type) ->
     StrType = erlang:atom_to_list(Type),
@@ -44,9 +41,8 @@ from_os_env(Type) when is_atom(Type) ->
             end
     end.
 
-
 from_app_env(Type) when is_atom(Type) ->
     case application:get_env(fabric, node_types) of
-        undefined ->  undefined;
+        undefined -> undefined;
         {ok, Props} when is_list(Props) -> proplists:get_value(Type, Props)
     end.

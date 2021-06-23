@@ -15,14 +15,14 @@
 -export([priv_dir/0, normpath/1, fold_files/5]).
 -export([should_flush/0, should_flush/1, to_existing_atom/1]).
 -export([rand32/0, implode/2, collate/2, collate/3, get_sort_key/1]).
--export([abs_pathname/1,abs_pathname/2, trim/1, drop_dot_couch_ext/1]).
+-export([abs_pathname/1, abs_pathname/2, trim/1, drop_dot_couch_ext/1]).
 -export([encodeBase64Url/1, decodeBase64Url/1]).
 -export([validate_utf8/1, to_hex/1, parse_term/1, dict_find/3]).
 -export([get_nested_json_value/2, json_user_ctx/1]).
 -export([proplist_apply_field/2, json_apply_field/2]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
 -export([json_encode/1, json_decode/1, json_decode/2]).
--export([verify/2,simple_call/2,shutdown_sync/1]).
+-export([verify/2, simple_call/2, shutdown_sync/1]).
 -export([get_value/2, get_value/3]).
 -export([reorder_results/2]).
 -export([url_strip_password/1]).
@@ -61,7 +61,6 @@
     <<"^tracing$">>
 ]).
 
-
 priv_dir() ->
     case code:priv_dir(couch) of
         {error, bad_name} ->
@@ -69,7 +68,8 @@ priv_dir() ->
             % renaming src/couch to src/couch. Not really worth the hassle.
             % -Damien
             code:priv_dir(couchdb);
-        Dir -> Dir
+        Dir ->
+            Dir
     end.
 
 % Normalize a pathname by removing .. and . components.
@@ -84,7 +84,6 @@ normparts(["." | RestParts], Acc) ->
     normparts(RestParts, Acc);
 normparts([Part | RestParts], Acc) ->
     normparts(RestParts, [Part | Acc]).
-
 
 % This is implementation is similar the builtin filelib:fold_files/5
 % except that this version will run the user supplied function
@@ -126,13 +125,21 @@ fold_files2([File | Rest], Dir, RegExp, Recursive, Fun, Acc0) ->
 % works like list_to_existing_atom, except can be list or binary and it
 % gives you the original value instead of an error if no existing atom.
 to_existing_atom(V) when is_list(V) ->
-    try list_to_existing_atom(V) catch _:_ -> V end;
+    try
+        list_to_existing_atom(V)
+    catch
+        _:_ -> V
+    end;
 to_existing_atom(V) when is_binary(V) ->
-    try list_to_existing_atom(?b2l(V)) catch _:_ -> V end;
+    try
+        list_to_existing_atom(?b2l(V))
+    catch
+        _:_ -> V
+    end;
 to_existing_atom(V) when is_atom(V) ->
     V.
 
-shutdown_sync(Pid) when not is_pid(Pid)->
+shutdown_sync(Pid) when not is_pid(Pid) ->
     ok;
 shutdown_sync(Pid) ->
     MRef = erlang:monitor(process, Pid),
@@ -140,23 +147,22 @@ shutdown_sync(Pid) ->
         catch unlink(Pid),
         catch exit(Pid, shutdown),
         receive
-        {'DOWN', MRef, _, _, _} ->
-            ok
+            {'DOWN', MRef, _, _, _} ->
+                ok
         end
     after
         erlang:demonitor(MRef, [flush])
     end.
-
 
 simple_call(Pid, Message) ->
     MRef = erlang:monitor(process, Pid),
     try
         Pid ! {self(), Message},
         receive
-        {Pid, Result} ->
-            Result;
-        {'DOWN', MRef, _, _, Reason} ->
-            exit(Reason)
+            {Pid, Result} ->
+                Result;
+            {'DOWN', MRef, _, _, Reason} ->
+                exit(Reason)
         end
     after
         erlang:demonitor(MRef, [flush])
@@ -172,27 +178,39 @@ validate_utf8_fast(B, O) ->
         <<_:O/binary>> ->
             true;
         <<_:O/binary, C1, _/binary>> when
-                C1 < 128 ->
+            C1 < 128
+        ->
             validate_utf8_fast(B, 1 + O);
         <<_:O/binary, C1, C2, _/binary>> when
-                C1 >= 194, C1 =< 223,
-                C2 >= 128, C2 =< 191 ->
+            C1 >= 194,
+            C1 =< 223,
+            C2 >= 128,
+            C2 =< 191
+        ->
             validate_utf8_fast(B, 2 + O);
         <<_:O/binary, C1, C2, C3, _/binary>> when
-                C1 >= 224, C1 =< 239,
-                C2 >= 128, C2 =< 191,
-                C3 >= 128, C3 =< 191 ->
+            C1 >= 224,
+            C1 =< 239,
+            C2 >= 128,
+            C2 =< 191,
+            C3 >= 128,
+            C3 =< 191
+        ->
             validate_utf8_fast(B, 3 + O);
         <<_:O/binary, C1, C2, C3, C4, _/binary>> when
-                C1 >= 240, C1 =< 244,
-                C2 >= 128, C2 =< 191,
-                C3 >= 128, C3 =< 191,
-                C4 >= 128, C4 =< 191 ->
+            C1 >= 240,
+            C1 =< 244,
+            C2 >= 128,
+            C2 =< 191,
+            C3 >= 128,
+            C3 =< 191,
+            C4 >= 128,
+            C4 =< 191
+        ->
             validate_utf8_fast(B, 4 + O);
         _ ->
             false
     end.
-
 
 to_hex(<<Hi:4, Lo:4, Rest/binary>>) ->
     [nibble_to_hex(Hi), nibble_to_hex(Lo) | to_hex(Rest)];
@@ -218,7 +236,6 @@ nibble_to_hex(13) -> $d;
 nibble_to_hex(14) -> $e;
 nibble_to_hex(15) -> $f.
 
-
 parse_term(Bin) when is_binary(Bin) ->
     parse_term(binary_to_list(Bin));
 parse_term(List) ->
@@ -230,16 +247,16 @@ get_value(Key, List) ->
 
 get_value(Key, List, Default) ->
     case lists:keysearch(Key, 1, List) of
-    {value, {Key,Value}} ->
-        Value;
-    false ->
-        Default
+        {value, {Key, Value}} ->
+            Value;
+        false ->
+            Default
     end.
 
-get_nested_json_value({Props}, [Key|Keys]) ->
+get_nested_json_value({Props}, [Key | Keys]) ->
     case couch_util:get_value(Key, Props, nil) of
-    nil -> throw({not_found, <<"missing json key: ", Key/binary>>});
-    Value -> get_nested_json_value(Value, Keys)
+        nil -> throw({not_found, <<"missing json key: ", Key/binary>>});
+        Value -> get_nested_json_value(Value, Keys)
     end;
 get_nested_json_value(Value, []) ->
     Value;
@@ -257,15 +274,16 @@ json_apply_field({Key, NewValue}, [{Key, _OldVal} | Headers], Acc) ->
 json_apply_field({Key, NewValue}, [{OtherKey, OtherVal} | Headers], Acc) ->
     json_apply_field({Key, NewValue}, Headers, [{OtherKey, OtherVal} | Acc]);
 json_apply_field({Key, NewValue}, [], Acc) ->
-    {[{Key, NewValue}|Acc]}.
+    {[{Key, NewValue} | Acc]}.
 
 json_user_ctx(Db) ->
     #{name := DbName} = Db,
     Ctx = fabric2_db:get_user_ctx(Db),
-    {[{<<"db">>, DbName},
-            {<<"name">>,Ctx#user_ctx.name},
-            {<<"roles">>,Ctx#user_ctx.roles}]}.
-
+    {[
+        {<<"db">>, DbName},
+        {<<"name">>, Ctx#user_ctx.name},
+        {<<"roles">>, Ctx#user_ctx.roles}
+    ]}.
 
 % returns a random integer
 rand32() ->
@@ -277,7 +295,7 @@ rand32() ->
 abs_pathname(" " ++ Filename) ->
     % strip leading whitspace
     abs_pathname(Filename);
-abs_pathname([$/ |_]=Filename) ->
+abs_pathname([$/ | _] = Filename) ->
     Filename;
 abs_pathname(Filename) ->
     {ok, Cwd} = file:get_cwd(),
@@ -288,24 +306,25 @@ abs_pathname(Filename, Dir) ->
     Name = filename:absname(Filename, Dir ++ "/"),
     OutFilename = filename:join(fix_path_list(filename:split(Name), [])),
     % If the filename is a dir (last char slash, put back end slash
-    case string:right(Filename,1) of
-    "/" ->
-        OutFilename ++ "/";
-    "\\" ->
-        OutFilename ++ "/";
-    _Else->
-        OutFilename
+    case string:right(Filename, 1) of
+        "/" ->
+            OutFilename ++ "/";
+        "\\" ->
+            OutFilename ++ "/";
+        _Else ->
+            OutFilename
     end.
 
 % if this as an executable with arguments, seperate out the arguments
 % ""./foo\ bar.sh -baz=blah" -> {"./foo\ bar.sh", " -baz=blah"}
 separate_cmd_args("", CmdAcc) ->
     {lists:reverse(CmdAcc), ""};
-separate_cmd_args("\\ " ++ Rest, CmdAcc) -> % handle skipped value
+% handle skipped value
+separate_cmd_args("\\ " ++ Rest, CmdAcc) ->
     separate_cmd_args(Rest, " \\" ++ CmdAcc);
 separate_cmd_args(" " ++ Rest, CmdAcc) ->
     {lists:reverse(CmdAcc), " " ++ Rest};
-separate_cmd_args([Char|Rest], CmdAcc) ->
+separate_cmd_args([Char | Rest], CmdAcc) ->
     separate_cmd_args(Rest, [Char | CmdAcc]).
 
 % Is a character whitespace (from https://en.wikipedia.org/wiki/Whitespace_character#Unicode)?
@@ -342,7 +361,6 @@ is_whitespace(8288) -> true;
 is_whitespace(65279) -> true;
 is_whitespace(_Else) -> false.
 
-
 % removes leading and trailing whitespace from a string
 trim(String) when is_binary(String) ->
     % mirror string:trim() behaviour of returning a binary when a binary is passed in
@@ -350,7 +368,6 @@ trim(String) when is_binary(String) ->
 trim(String) ->
     String2 = lists:dropwhile(fun is_whitespace/1, String),
     lists:reverse(lists:dropwhile(fun is_whitespace/1, lists:reverse(String2))).
-
 
 drop_dot_couch_ext(DbName) when is_binary(DbName) ->
     PrefixLen = size(DbName) - 6,
@@ -360,22 +377,19 @@ drop_dot_couch_ext(DbName) when is_binary(DbName) ->
         Else ->
             Else
     end;
-
 drop_dot_couch_ext(DbName) when is_list(DbName) ->
     binary_to_list(drop_dot_couch_ext(iolist_to_binary(DbName))).
-
 
 % takes a heirarchical list of dirs and removes the dots ".", double dots
 % ".." and the corresponding parent dirs.
 fix_path_list([], Acc) ->
     lists:reverse(Acc);
-fix_path_list([".."|Rest], [_PrevAcc|RestAcc]) ->
+fix_path_list([".." | Rest], [_PrevAcc | RestAcc]) ->
     fix_path_list(Rest, RestAcc);
-fix_path_list(["."|Rest], Acc) ->
+fix_path_list(["." | Rest], Acc) ->
     fix_path_list(Rest, Acc);
 fix_path_list([Dir | Rest], Acc) ->
     fix_path_list(Rest, [Dir | Acc]).
-
 
 implode(List, Sep) ->
     implode(List, Sep, []).
@@ -383,19 +397,18 @@ implode(List, Sep) ->
 implode([], _Sep, Acc) ->
     lists:flatten(lists:reverse(Acc));
 implode([H], Sep, Acc) ->
-    implode([], Sep, [H|Acc]);
-implode([H|T], Sep, Acc) ->
-    implode(T, Sep, [Sep,H|Acc]).
-
+    implode([], Sep, [H | Acc]);
+implode([H | T], Sep, Acc) ->
+    implode(T, Sep, [Sep, H | Acc]).
 
 drv_port() ->
     case get(couch_drv_port) of
-    undefined ->
-        Port = open_port({spawn, "couch_icu_driver"}, []),
-        put(couch_drv_port, Port),
-        Port;
-    Port ->
-        Port
+        undefined ->
+            Port = open_port({spawn, "couch_icu_driver"}, []),
+            put(couch_drv_port, Port),
+            Port;
+        Port ->
+            Port
     end.
 
 collate(A, B) ->
@@ -403,10 +416,12 @@ collate(A, B) ->
 
 collate(A, B, Options) when is_binary(A), is_binary(B) ->
     Operation =
-    case lists:member(nocase, Options) of
-        true -> 1; % Case insensitive
-        false -> 0 % Case sensitive
-    end,
+        case lists:member(nocase, Options) of
+            % Case insensitive
+            true -> 1;
+            % Case sensitive
+            false -> 0
+        end,
     SizeA = byte_size(A),
     SizeB = byte_size(B),
     Bin = <<SizeA:32/native, A/binary, SizeB:32/native, B/binary>>,
@@ -416,7 +431,8 @@ collate(A, B, Options) when is_binary(A), is_binary(B) ->
     Result - 1.
 
 get_sort_key(Str) when is_binary(Str) ->
-    Operation = 2, % get_sort_key
+    % get_sort_key
+    Operation = 2,
     Size = byte_size(Str),
     Bin = <<Size:32/native, Str/binary>>,
     case erlang:port_control(drv_port(), Operation, Bin) of
@@ -429,15 +445,24 @@ should_flush() ->
 
 should_flush(MemThreshHold) ->
     {memory, ProcMem} = process_info(self(), memory),
-    BinMem = lists:foldl(fun({_Id, Size, _NRefs}, Acc) -> Size+Acc end,
-        0, element(2,process_info(self(), binary))),
-    if ProcMem+BinMem > 2*MemThreshHold ->
-        garbage_collect(),
-        {memory, ProcMem2} = process_info(self(), memory),
-        BinMem2 = lists:foldl(fun({_Id, Size, _NRefs}, Acc) -> Size+Acc end,
-            0, element(2,process_info(self(), binary))),
-        ProcMem2+BinMem2 > MemThreshHold;
-    true -> false end.
+    BinMem = lists:foldl(
+        fun({_Id, Size, _NRefs}, Acc) -> Size + Acc end,
+        0,
+        element(2, process_info(self(), binary))
+    ),
+    if
+        ProcMem + BinMem > 2 * MemThreshHold ->
+            garbage_collect(),
+            {memory, ProcMem2} = process_info(self(), memory),
+            BinMem2 = lists:foldl(
+                fun({_Id, Size, _NRefs}, Acc) -> Size + Acc end,
+                0,
+                element(2, process_info(self(), binary))
+            ),
+            ProcMem2 + BinMem2 > MemThreshHold;
+        true ->
+            false
+    end.
 
 encodeBase64Url(Url) ->
     b64url:encode(Url).
@@ -447,10 +472,10 @@ decodeBase64Url(Url64) ->
 
 dict_find(Key, Dict, DefaultValue) ->
     case dict:find(Key, Dict) of
-    {ok, Value} ->
-        Value;
-    error ->
-        DefaultValue
+        {ok, Value} ->
+            Value;
+        error ->
+            DefaultValue
     end.
 
 to_binary(V) when is_binary(V) ->
@@ -485,23 +510,23 @@ to_list(V) ->
 
 url_encode(Bin) when is_binary(Bin) ->
     url_encode(binary_to_list(Bin));
-url_encode([H|T]) ->
+url_encode([H | T]) ->
     if
-    H >= $a, $z >= H ->
-        [H|url_encode(T)];
-    H >= $A, $Z >= H ->
-        [H|url_encode(T)];
-    H >= $0, $9 >= H ->
-        [H|url_encode(T)];
-    H == $_; H == $.; H == $-; H == $: ->
-        [H|url_encode(T)];
-    true ->
-        case lists:flatten(io_lib:format("~.16.0B", [H])) of
-        [X, Y] ->
-            [$%, X, Y | url_encode(T)];
-        [X] ->
-            [$%, $0, X | url_encode(T)]
-        end
+        H >= $a, $z >= H ->
+            [H | url_encode(T)];
+        H >= $A, $Z >= H ->
+            [H | url_encode(T)];
+        H >= $0, $9 >= H ->
+            [H | url_encode(T)];
+        H == $_; H == $.; H == $-; H == $: ->
+            [H | url_encode(T)];
+        true ->
+            case lists:flatten(io_lib:format("~.16.0B", [H])) of
+                [X, Y] ->
+                    [$%, X, Y | url_encode(T)];
+                [X] ->
+                    [$%, $0, X | url_encode(T)]
+            end
     end;
 url_encode([]) ->
     [].
@@ -520,7 +545,7 @@ json_decode(V, Opts) ->
             throw({invalid_json, Error})
     end.
 
-verify([X|RestX], [Y|RestY], Result) ->
+verify([X | RestX], [Y | RestY], Result) ->
     verify(RestX, RestY, (X bxor Y) bor Result);
 verify([], [], Result) ->
     Result == 0.
@@ -534,7 +559,8 @@ verify(X, Y) when is_list(X) and is_list(Y) ->
         false ->
             false
     end;
-verify(_X, _Y) -> false.
+verify(_X, _Y) ->
+    false.
 
 % linear search is faster for small lists, length() is 0.5 ms for 100k list
 reorder_results(Keys, SortedResults) when length(Keys) < 100 ->
@@ -544,10 +570,12 @@ reorder_results(Keys, SortedResults) ->
     [dict:fetch(Key, KeyDict) || Key <- Keys].
 
 url_strip_password(Url) ->
-    re:replace(Url,
+    re:replace(
+        Url,
         "(http|https|socks5)://([^:]+):[^@]+@(.*)$",
         "\\1://\\2:*****@\\3",
-        [{return, list}]).
+        [{return, list}]
+    ).
 
 encode_doc_id(#doc{id = Id}) ->
     encode_doc_id(Id);
@@ -566,20 +594,26 @@ normalize_ddoc_id(DDocId) when is_binary(DDocId) ->
     <<"_design/", DDocId/binary>>.
 
 rfc1123_date() ->
-    {{YYYY,MM,DD},{Hour,Min,Sec}} = calendar:universal_time(),
-    DayNumber = calendar:day_of_the_week({YYYY,MM,DD}),
+    {{YYYY, MM, DD}, {Hour, Min, Sec}} = calendar:universal_time(),
+    DayNumber = calendar:day_of_the_week({YYYY, MM, DD}),
     lists:flatten(
-      io_lib:format("~s, ~2.2.0w ~3.s ~4.4.0w ~2.2.0w:~2.2.0w:~2.2.0w GMT",
-            [day(DayNumber),DD,month(MM),YYYY,Hour,Min,Sec])).
+        io_lib:format(
+            "~s, ~2.2.0w ~3.s ~4.4.0w ~2.2.0w:~2.2.0w:~2.2.0w GMT",
+            [day(DayNumber), DD, month(MM), YYYY, Hour, Min, Sec]
+        )
+    ).
 
 rfc1123_date(undefined) ->
     undefined;
 rfc1123_date(UniversalTime) ->
-    {{YYYY,MM,DD},{Hour,Min,Sec}} = UniversalTime,
-    DayNumber = calendar:day_of_the_week({YYYY,MM,DD}),
+    {{YYYY, MM, DD}, {Hour, Min, Sec}} = UniversalTime,
+    DayNumber = calendar:day_of_the_week({YYYY, MM, DD}),
     lists:flatten(
-      io_lib:format("~s, ~2.2.0w ~3.s ~4.4.0w ~2.2.0w:~2.2.0w:~2.2.0w GMT",
-            [day(DayNumber),DD,month(MM),YYYY,Hour,Min,Sec])).
+        io_lib:format(
+            "~s, ~2.2.0w ~3.s ~4.4.0w ~2.2.0w:~2.2.0w:~2.2.0w GMT",
+            [day(DayNumber), DD, month(MM), YYYY, Hour, Min, Sec]
+        )
+    ).
 
 %% day
 
@@ -616,30 +650,32 @@ boolean_to_integer(true) ->
 boolean_to_integer(false) ->
     0.
 
-
 validate_positive_int(N) when is_list(N) ->
     try
         I = list_to_integer(N),
         validate_positive_int(I)
-    catch error:badarg ->
-        false
+    catch
+        error:badarg ->
+            false
     end;
 validate_positive_int(N) when is_integer(N), N > 0 -> true;
-validate_positive_int(_) -> false.
-
+validate_positive_int(_) ->
+    false.
 
 find_in_binary(_B, <<>>) ->
     not_found;
-
 find_in_binary(B, Data) ->
     case binary:match(Data, [B], []) of
-    nomatch ->
-        MatchLength = erlang:min(byte_size(B), byte_size(Data)),
-        match_prefix_at_end(binary:part(B, {0, MatchLength}),
-                            binary:part(Data, {byte_size(Data), -MatchLength}),
-                            MatchLength, byte_size(Data) - MatchLength);
-    {Pos, _Len} ->
-        {exact, Pos}
+        nomatch ->
+            MatchLength = erlang:min(byte_size(B), byte_size(Data)),
+            match_prefix_at_end(
+                binary:part(B, {0, MatchLength}),
+                binary:part(Data, {byte_size(Data), -MatchLength}),
+                MatchLength,
+                byte_size(Data) - MatchLength
+            );
+        {Pos, _Len} ->
+            {exact, Pos}
     end.
 
 match_prefix_at_end(Prefix, Data, PrefixLength, N) ->
@@ -648,10 +684,14 @@ match_prefix_at_end(Prefix, Data, PrefixLength, N) ->
 
 match_rest_of_prefix([], _Prefix, _Data, _PrefixLength, _N) ->
     not_found;
-
 match_rest_of_prefix([{Pos, _Len} | Rest], Prefix, Data, PrefixLength, N) ->
-    case binary:match(binary:part(Data, {PrefixLength, Pos - PrefixLength}),
-                      [binary:part(Prefix, {0, PrefixLength - Pos})], []) of
+    case
+        binary:match(
+            binary:part(Data, {PrefixLength, Pos - PrefixLength}),
+            [binary:part(Prefix, {0, PrefixLength - Pos})],
+            []
+        )
+    of
         nomatch ->
             match_rest_of_prefix(Rest, Prefix, Data, PrefixLength, N);
         {_Pos, _Len1} ->
@@ -660,29 +700,27 @@ match_rest_of_prefix([{Pos, _Len} | Rest], Prefix, Data, PrefixLength, N) ->
 
 callback_exists(Module, Function, Arity) ->
     case ensure_loaded(Module) of
-    true ->
-        InfoList = Module:module_info(exports),
-        lists:member({Function, Arity}, InfoList);
-    false ->
-        false
+        true ->
+            InfoList = Module:module_info(exports),
+            lists:member({Function, Arity}, InfoList);
+        false ->
+            false
     end.
 
 validate_callback_exists(Module, Function, Arity) ->
     case callback_exists(Module, Function, Arity) of
-    true ->
-        ok;
-    false ->
-        CallbackStr = lists:flatten(
-            io_lib:format("~w:~w/~w", [Module, Function, Arity])),
-        throw({error,
-            {undefined_callback, CallbackStr, {Module, Function, Arity}}})
+        true ->
+            ok;
+        false ->
+            CallbackStr = lists:flatten(
+                io_lib:format("~w:~w/~w", [Module, Function, Arity])
+            ),
+            throw({error, {undefined_callback, CallbackStr, {Module, Function, Arity}}})
     end.
-
 
 check_md5(_NewSig, <<>>) -> ok;
 check_md5(Sig, Sig) -> ok;
 check_md5(_, _) -> throw(md5_mismatch).
-
 
 set_mqd_off_heap(Module) ->
     case config:get_boolean("off_heap_mqd", atom_to_list(Module), true) of
@@ -690,13 +728,13 @@ set_mqd_off_heap(Module) ->
             try
                 erlang:process_flag(message_queue_data, off_heap),
                 ok
-            catch error:badarg ->
+            catch
+                error:badarg ->
                     ok
             end;
         false ->
             ok
     end.
-
 
 set_process_priority(Module, Level) ->
     case config:get_boolean("process_priority", atom_to_list(Module), false) of
@@ -707,18 +745,17 @@ set_process_priority(Module, Level) ->
             ok
     end.
 
-
 ensure_loaded(Module) when is_atom(Module) ->
     case code:ensure_loaded(Module) of
-    {module, Module} ->
-        true;
-    {error, embedded} ->
-        true;
-    {error, _} ->
-        false
+        {module, Module} ->
+            true;
+        {error, embedded} ->
+            true;
+        {error, _} ->
+            false
     end;
-ensure_loaded(_Module) -> false.
-
+ensure_loaded(_Module) ->
+    false.
 
 %% This is especially useful in gen_servers when you need to call
 %% a function that does a receive as it would hijack incoming messages.
@@ -736,10 +773,8 @@ with_proc(M, F, A, Timeout) ->
         {error, timeout}
     end.
 
-
 process_dict_get(Pid, Key) ->
     process_dict_get(Pid, Key, undefined).
-
 
 process_dict_get(Pid, Key, DefaultValue) ->
     case process_info(Pid, dictionary) of
@@ -754,23 +789,23 @@ process_dict_get(Pid, Key, DefaultValue) ->
             DefaultValue
     end.
 
-
 unique_monotonic_integer() ->
     erlang:unique_integer([monotonic, positive]).
 
-
 check_config_blacklist(Section) ->
-    lists:foreach(fun(RegExp) ->
-        case re:run(Section, RegExp) of
-            nomatch ->
-                ok;
-            _ ->
-                Msg = <<"Config section blacklisted for modification over HTTP API.">>,
-                throw({forbidden, Msg})
-        end
-    end, ?BLACKLIST_CONFIG_SECTIONS),
+    lists:foreach(
+        fun(RegExp) ->
+            case re:run(Section, RegExp) of
+                nomatch ->
+                    ok;
+                _ ->
+                    Msg = <<"Config section blacklisted for modification over HTTP API.">>,
+                    throw({forbidden, Msg})
+            end
+        end,
+        ?BLACKLIST_CONFIG_SECTIONS
+    ),
     ok.
-
 
 -ifdef(OTP_RELEASE).
 
@@ -786,7 +821,8 @@ hmac(Alg, Key, Message) ->
 hmac(Alg, Key, Message) ->
     crypto:hmac(Alg, Key, Message).
 
--endif. % -if(?OTP_RELEASE >= 22)
+% -if(?OTP_RELEASE >= 22)
+-endif.
 
 -else.
 
@@ -794,4 +830,5 @@ hmac(Alg, Key, Message) ->
 hmac(Alg, Key, Message) ->
     crypto:hmac(Alg, Key, Message).
 
--endif. % -ifdef(OTP_RELEASE)
+% -ifdef(OTP_RELEASE)
+-endif.

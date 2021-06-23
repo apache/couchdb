@@ -12,7 +12,6 @@
 
 -module(couch_epi_module_keeper).
 
-
 -behaviour(gen_server).
 
 %% ------------------------------------------------------------------
@@ -22,17 +21,29 @@
 -export([start_link/3, stop/1]).
 -export([reload/1]).
 
-
 %% ------------------------------------------------------------------
 %% gen_server Function Exports
 %% ------------------------------------------------------------------
 
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
 
 -record(state, {
-    codegen, module, key, type, handle, hash, kind,
-    timer = {undefined, undefined}}).
+    codegen,
+    module,
+    key,
+    type,
+    handle,
+    hash,
+    kind,
+    timer = {undefined, undefined}
+}).
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -41,7 +52,8 @@
 start_link(Type, Key, Codegen) ->
     Handle = Codegen:get_handle(Key),
     gen_server:start_link(
-        {local, Handle}, ?MODULE, [Type, Codegen, Key, Handle], []).
+        {local, Handle}, ?MODULE, [Type, Codegen, Key, Handle], []
+    ).
 
 stop(Server) ->
     catch gen_server:call(Server, stop).
@@ -151,8 +163,9 @@ safe_set(Hash, Data, #state{} = State) ->
         OldData = CodeGen:get_current_definitions(Handle),
         ok = CodeGen:generate(Handle, Data),
         {ok, OldData, State#state{hash = Hash}}
-    catch Class:Reason ->
-        {{Class, Reason}, State}
+    catch
+        Class:Reason ->
+            {{Class, Reason}, State}
     end.
 
 notify(Key, OldData, NewData, Defs) ->

@@ -30,19 +30,15 @@
     code_change/3
 ]).
 
-
 -define(DEFAULT_BATCH_SIZE, 1000).
 -define(DEFAULT_PERIOD_MSEC, 5000).
 -define(DEFAULT_MAX_JITTER_MSEC, 1000).
 
-
 -include_lib("couch_expiring_cache/include/couch_expiring_cache.hrl").
 -include_lib("kernel/include/logger.hrl").
 
-
 start_link(Name, Opts) when is_atom(Name) ->
     gen_server:start_link({local, Name}, ?MODULE, Opts#{name => Name}, []).
-
 
 init(Opts) ->
     DefaultCacheName = atom_to_binary(maps:get(name, Opts), utf8),
@@ -57,20 +53,17 @@ init(Opts) ->
         oldest_ts => 0,
         elapsed => 0,
         largest_elapsed => 0,
-        lag => 0}}.
-
+        lag => 0
+    }}.
 
 terminate(_, _) ->
     ok.
 
-
 handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
 
-
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
-
 
 handle_info(remove_expired, St) ->
     #{
@@ -83,8 +76,10 @@ handle_info(remove_expired, St) ->
     } = St,
 
     NowTS = now_ts(),
-    OldestTS = max(OldestTS0,
-        couch_expiring_cache_fdb:clear_range_to(Name, NowTS, BatchSize)),
+    OldestTS = max(
+        OldestTS0,
+        couch_expiring_cache_fdb:clear_range_to(Name, NowTS, BatchSize)
+    ),
     Elapsed = now_ts() - NowTS,
 
     {noreply, St#{
@@ -92,9 +87,8 @@ handle_info(remove_expired, St) ->
         oldest_ts := OldestTS,
         elapsed := Elapsed,
         largest_elapsed := max(Elapsed, LargestElapsed),
-        lag := NowTS - OldestTS}};
-
-
+        lag := NowTS - OldestTS
+    }};
 handle_info({Ref, ready}, St) when is_reference(Ref) ->
     % Prevent crashing server and application
     ?LOG_ERROR(#{
@@ -104,23 +98,17 @@ handle_info({Ref, ready}, St) when is_reference(Ref) ->
     LogMsg = "~p : spurious erlfdb future ready message ~p",
     couch_log:error(LogMsg, [?MODULE, Ref]),
     {noreply, St};
-
-
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
-
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
-
 
 now_ts() ->
     {Mega, Sec, Micro} = os:timestamp(),
     ((Mega * 1000000) + Sec) * 1000 + Micro div 1000.
 
-
 %% Private
-
 
 schedule_remove_expired(Timeout, MaxJitter) ->
     Jitter = max(Timeout div 2, MaxJitter),

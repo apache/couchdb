@@ -61,57 +61,57 @@ get_handle({Service, Key}) ->
 %% ------------------------------------------------------------------
 
 preamble() ->
-    "
-    -export([by_key/0, by_key/1]).
-    -export([by_source/0, by_source/1]).
-    -export([all/0, all/1, get/2]).
-    -export([version/0, version/1]).
-    -export([keys/0, subscribers/0]).
-    -compile({no_auto_import,[get/0, get/1]}).
-    all() ->
-        lists:foldl(fun({Key, Defs}, Acc) ->
-           [D || {_Subscriber, D} <- Defs ] ++ Acc
-        end, [], by_key()).
+    "\n"
+    "    -export([by_key/0, by_key/1]).\n"
+    "    -export([by_source/0, by_source/1]).\n"
+    "    -export([all/0, all/1, get/2]).\n"
+    "    -export([version/0, version/1]).\n"
+    "    -export([keys/0, subscribers/0]).\n"
+    "    -compile({no_auto_import,[get/0, get/1]}).\n"
+    "    all() ->\n"
+    "        lists:foldl(fun({Key, Defs}, Acc) ->\n"
+    "           [D || {_Subscriber, D} <- Defs ] ++ Acc\n"
+    "        end, [], by_key()).\n"
+    "\n"
+    "    all(Key) ->\n"
+    "        lists:foldl(fun({Subscriber, Data}, Acc) ->\n"
+    "           [Data | Acc]\n"
+    "        end, [], by_key(Key)).\n"
+    "\n"
+    "    by_key() ->\n"
+    "        [{Key, by_key(Key)} || Key <- keys()].\n"
+    "\n"
+    "    by_key(Key) ->\n"
+    "        lists:foldl(\n"
+    "            fun(Source, Acc) -> append_if_defined(Source, get(Source, Key), Acc)\n"
+    "        end, [], subscribers()).\n"
+    "\n"
+    "\n"
+    "    by_source() ->\n"
+    "        [{Source, by_source(Source)} || Source <- subscribers()].\n"
+    "\n"
+    "    by_source(Source) ->\n"
+    "        lists:foldl(\n"
+    "            fun(Key, Acc) -> append_if_defined(Key, get(Source, Key), Acc)\n"
+    "        end, [], keys()).\n"
+    "\n"
+    "    version() ->\n"
+    "        [{Subscriber, version(Subscriber)} || Subscriber <- subscribers()].\n"
+    "\n"
+    "    %% Helper functions\n"
+    "    append_if_defined(Type, undefined, Acc) -> Acc;\n"
+    "    append_if_defined(Type, Value, Acc) -> [{Type, Value} | Acc].\n"
+    "    "
+%% In addition to preamble we also generate following methods
+%% get(Source1, Key1) -> Data;
+%% get(Source, Key) -> undefined.
 
-    all(Key) ->
-        lists:foldl(fun({Subscriber, Data}, Acc) ->
-           [Data | Acc]
-        end, [], by_key(Key)).
+%% version(Source1) -> "HASH";
+%% version(Source) -> {error, {unknown, Source}}.
 
-    by_key() ->
-        [{Key, by_key(Key)} || Key <- keys()].
-
-    by_key(Key) ->
-        lists:foldl(
-            fun(Source, Acc) -> append_if_defined(Source, get(Source, Key), Acc)
-        end, [], subscribers()).
-
-
-    by_source() ->
-        [{Source, by_source(Source)} || Source <- subscribers()].
-
-    by_source(Source) ->
-        lists:foldl(
-            fun(Key, Acc) -> append_if_defined(Key, get(Source, Key), Acc)
-        end, [], keys()).
-
-    version() ->
-        [{Subscriber, version(Subscriber)} || Subscriber <- subscribers()].
-
-    %% Helper functions
-    append_if_defined(Type, undefined, Acc) -> Acc;
-    append_if_defined(Type, Value, Acc) -> [{Type, Value} | Acc].
-    "
-    %% In addition to preamble we also generate following methods
-    %% get(Source1, Key1) -> Data;
-    %% get(Source, Key) -> undefined.
-
-    %% version(Source1) -> "HASH";
-    %% version(Source) -> {error, {unknown, Source}}.
-
-    %% keys() -> [].
-    %% subscribers() -> [].
-    .
+%% keys() -> [].
+%% subscribers() -> [].
+.
 
 generate(Handle, Defs) ->
     GetFunForms = couch_epi_codegen:function(getters(Defs)),
@@ -119,9 +119,10 @@ generate(Handle, Defs) ->
     KeysForms = keys_method(Defs),
     SubscribersForms = subscribers_method(Defs),
 
-    Forms = couch_epi_codegen:scan(preamble())
-        ++ GetFunForms ++ VersionFunForms
-        ++ KeysForms ++ SubscribersForms,
+    Forms =
+        couch_epi_codegen:scan(preamble()) ++
+            GetFunForms ++ VersionFunForms ++
+            KeysForms ++ SubscribersForms,
 
     couch_epi_codegen:generate(Handle, Forms).
 
@@ -135,22 +136,30 @@ subscribers_method(Defs) ->
 
 getters(Defs) ->
     DefaultClause = "get(_S, _K) -> undefined.",
-    fold_defs(Defs, [couch_epi_codegen:scan(DefaultClause)],
+    fold_defs(
+        Defs,
+        [couch_epi_codegen:scan(DefaultClause)],
         fun({Source, Key, Data}, Acc) ->
             getter(Source, Key, Data) ++ Acc
-        end).
+        end
+    ).
 
 version_method(Defs) ->
     DefaultClause = "version(S) -> {error, {unknown, S}}.",
-    lists:foldl(fun({Source, Data}, Clauses) ->
-        version(Source, Data) ++ Clauses
-    end, [couch_epi_codegen:scan(DefaultClause)], Defs).
+    lists:foldl(
+        fun({Source, Data}, Clauses) ->
+            version(Source, Data) ++ Clauses
+        end,
+        [couch_epi_codegen:scan(DefaultClause)],
+        Defs
+    ).
 
 getter(Source, Key, Data) ->
     D = couch_epi_codegen:format_term(Data),
     Src = atom_to_list(Source),
     couch_epi_codegen:scan(
-        "get(" ++ Src ++ ", " ++ format_key(Key) ++ ") ->" ++ D ++ ";").
+        "get(" ++ Src ++ ", " ++ format_key(Key) ++ ") ->" ++ D ++ ";"
+    ).
 
 version(Source, Data) ->
     Src = atom_to_list(Source),
@@ -183,7 +192,6 @@ format_key(Key) ->
 module_name({Service, Key}) when is_list(Service) andalso is_list(Key) ->
     list_to_atom(string:join([atom_to_list(?MODULE), Service, Key], "_")).
 
-
 get_current_definitions(Handle) ->
     if_exists(Handle, by_source, 0, [], fun() ->
         Handle:by_source()
@@ -205,11 +213,19 @@ defined_subscribers(Defs) ->
     [Source || {Source, _} <- Defs].
 
 fold_defs(Defs, Acc, Fun) ->
-    lists:foldr(fun({Source, SourceData}, Clauses) ->
-        lists:foldr(fun({Key, Data}, InAcc) ->
-            Fun({Source, Key, Data}, InAcc)
-        end, [], SourceData) ++ Clauses
-    end, Acc, Defs).
+    lists:foldr(
+        fun({Source, SourceData}, Clauses) ->
+            lists:foldr(
+                fun({Key, Data}, InAcc) ->
+                    Fun({Source, Key, Data}, InAcc)
+                end,
+                [],
+                SourceData
+            ) ++ Clauses
+        end,
+        Acc,
+        Defs
+    ).
 
 %% ------------------------------------------------------------------
 %% Tests
@@ -243,15 +259,20 @@ basic_test() ->
     ?assertEqual("3KZ4EG4WBF4J683W8GSDDPYR3", Module:version(app1)),
     ?assertEqual("4EFUU47W9XDNMV9RMZSSJQU3Y", Module:version(app2)),
 
-    ?assertEqual({error,{unknown,bad}}, Module:version(bad)),
+    ?assertEqual({error, {unknown, bad}}, Module:version(bad)),
 
     ?assertEqual(
-        [{app1,"3KZ4EG4WBF4J683W8GSDDPYR3"},
-         {app2,"4EFUU47W9XDNMV9RMZSSJQU3Y"}], lists:usort(Module:version())),
+        [
+            {app1, "3KZ4EG4WBF4J683W8GSDDPYR3"},
+            {app2, "4EFUU47W9XDNMV9RMZSSJQU3Y"}
+        ],
+        lists:usort(Module:version())
+    ),
 
     ?assertEqual(
-        [{app1,[some_nice_data]},{app2,"other data"}],
-        lists:usort(Module:by_key(foo))),
+        [{app1, [some_nice_data]}, {app2, "other data"}],
+        lists:usort(Module:by_key(foo))
+    ),
 
     ?assertEqual([], lists:usort(Module:by_key(bad))),
 
@@ -260,8 +281,8 @@ basic_test() ->
             {bar, [{app2, {"even more data"}}]},
             {foo, [{app2, "other data"}, {app1, [some_nice_data]}]}
         ],
-        lists:usort(Module:by_key())),
-
+        lists:usort(Module:by_key())
+    ),
 
     ?assertEqual(Defs1, lists:usort(Module:by_source(app1))),
     ?assertEqual(Defs2, lists:usort(Module:by_source(app2))),
@@ -273,10 +294,12 @@ basic_test() ->
             {app1, [{foo, [some_nice_data]}]},
             {app2, [{foo, "other data"}, {bar, {"even more data"}}]}
         ],
-        lists:usort(Module:by_source())),
+        lists:usort(Module:by_source())
+    ),
 
     ?assertEqual(
-       lists:usort([Data1, Data2, Data3]), lists:usort(Module:all())),
+        lists:usort([Data1, Data2, Data3]), lists:usort(Module:all())
+    ),
     ?assertEqual(lists:usort([Data1, Data2]), lists:usort(Module:all(foo))),
     ?assertEqual([], lists:usort(Module:all(bad))),
     ok.

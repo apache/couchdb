@@ -24,14 +24,12 @@
     collect_cb/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 
-
-insert(Db, #doc{}=Doc, Opts) ->
+insert(Db, #doc{} = Doc, Opts) ->
     insert(Db, [Doc], Opts);
-insert(Db, {_}=Doc, Opts) ->
+insert(Db, {_} = Doc, Opts) ->
     insert(Db, [Doc], Opts);
 insert(Db, Docs, Opts) when is_list(Docs) ->
     case fabric2_db:update_docs(Db, Docs, Opts) of
@@ -43,11 +41,9 @@ insert(Db, Docs, Opts) when is_list(Docs) ->
             {error, lists:map(fun result_to_json/1, Errors)}
     end.
 
-
 find(Db, Selector, Callback, UserAcc, Opts) ->
     {ok, Cursor} = mango_cursor:create(Db, Selector, Opts),
     mango_cursor:execute(Cursor, Callback, UserAcc).
-
 
 update(Db, Selector, Update, Options) ->
     Upsert = proplists:get_value(upsert, Options),
@@ -61,46 +57,50 @@ update(Db, Selector, Update, Options) ->
                     % Probably need to catch and rethrow errors from
                     % this function.
                     Doc = couch_doc:from_json_obj(InitDoc),
-                    NewDoc = case Doc#doc.id of
-                        <<"">> ->
-                            Doc#doc{id=couch_uuids:new(), revs={0, []}};
-                        _ ->
-                            Doc
-                    end,
+                    NewDoc =
+                        case Doc#doc.id of
+                            <<"">> ->
+                                Doc#doc{id = couch_uuids:new(), revs = {0, []}};
+                            _ ->
+                                Doc
+                        end,
                     insert(Db, NewDoc, Options)
             end;
         {ok, Docs} ->
-            NewDocs = lists:map(fun(Doc) ->
-                mango_doc:apply_update(Doc, Update)
-            end, Docs),
+            NewDocs = lists:map(
+                fun(Doc) ->
+                    mango_doc:apply_update(Doc, Update)
+                end,
+                Docs
+            ),
             insert(Db, NewDocs, Options);
         Else ->
             Else
     end.
-
 
 delete(Db, Selector, Options) ->
     case collect_docs(Db, Selector, Options) of
         {ok, Docs} ->
-            NewDocs = lists:map(fun({Props}) ->
-                {[
-                    {<<"_id">>, proplists:get_value(<<"_id">>, Props)},
-                    {<<"_rev">>, proplists:get_value(<<"_rev">>, Props)},
-                    {<<"_deleted">>, true}
-                ]}
-            end, Docs),
+            NewDocs = lists:map(
+                fun({Props}) ->
+                    {[
+                        {<<"_id">>, proplists:get_value(<<"_id">>, Props)},
+                        {<<"_rev">>, proplists:get_value(<<"_rev">>, Props)},
+                        {<<"_deleted">>, true}
+                    ]}
+                end,
+                Docs
+            ),
             insert(Db, NewDocs, Options);
         Else ->
             Else
     end.
-
 
 explain(Db, Selector, Opts) ->
     {ok, Cursor} = mango_cursor:create(Db, Selector, Opts),
     mango_cursor:explain(Cursor).
 
-
-result_to_json(#doc{id=Id}, Result) ->
+result_to_json(#doc{id = Id}, Result) ->
     result_to_json(Id, Result);
 result_to_json({Props}, Result) ->
     Id = couch_util:get_value(<<"_id">>, Props),
@@ -126,7 +126,6 @@ result_to_json(DocId, Error) ->
         {reason, Reason}
     ]}.
 
-
 % This is for errors because for some reason we
 % need a different return value for errors? Blargh.
 result_to_json({{Id, Rev}, Error}) ->
@@ -138,7 +137,6 @@ result_to_json({{Id, Rev}, Error}) ->
         {reason, Reason}
     ]}.
 
-
 collect_docs(Db, Selector, Options) ->
     Cb = fun ?MODULE:collect_cb/2,
     case find(Db, Selector, Cb, [], Options) of
@@ -148,7 +146,5 @@ collect_docs(Db, Selector, Options) ->
             Else
     end.
 
-
 collect_cb({row, Doc}, Acc) ->
     {ok, [Doc | Acc]}.
-

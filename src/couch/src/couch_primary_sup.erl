@@ -15,22 +15,15 @@
 -export([init/1, start_link/0]).
 
 start_link() ->
-    supervisor:start_link({local,couch_primary_services}, ?MODULE, []).
+    supervisor:start_link({local, couch_primary_services}, ?MODULE, []).
 
 init([]) ->
     Children = [
-        {collation_driver,
-            {couch_drv, start_link, []},
-            permanent,
-            infinity,
-            supervisor,
-            [couch_drv]},
-        {couch_server,
-            {couch_server, sup_start_link, []},
-            permanent,
-            brutal_kill,
-            worker,
-            [couch_server]}
+        {collation_driver, {couch_drv, start_link, []}, permanent, infinity, supervisor, [
+            couch_drv
+        ]},
+        {couch_server, {couch_server, sup_start_link, []}, permanent, brutal_kill, worker, [
+            couch_server
+        ]}
     ],
     {ok, {{one_for_one, 10, 3600}, Children}}.
-

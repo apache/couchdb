@@ -10,15 +10,12 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 -module(couch_views_fabric2_plugin).
-
 
 -export([
     after_doc_write/6
 ]).
 
-
-after_doc_write(Db, Doc, NewWinner, OldWinner, NewRevId, Seq)->
+after_doc_write(Db, Doc, NewWinner, OldWinner, NewRevId, Seq) ->
     couch_views_updater:index(Db, Doc, NewWinner, OldWinner, NewRevId, Seq),
     [Db, Doc, NewWinner, OldWinner, NewRevId, Seq].

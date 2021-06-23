@@ -10,7 +10,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 % This is the replicator session auth plugin. It implements session based
 % authentication for the replicator. The only public API are the functions from
 % the couch_replicator_auth behaviour. Most of the logic and state is in the
@@ -46,13 +45,10 @@
 %    ensure if something goes wrong and one of the endpoints issues invalid
 %    cookies, replicator won't be stuck in a busy loop refreshing them.
 
-
 -module(couch_replicator_auth_session).
-
 
 -behaviour(couch_replicator_auth).
 -behaviour(gen_server).
-
 
 -export([
     initialize/1,
@@ -71,11 +67,9 @@
     format_status/2
 ]).
 
-
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include_lib("kernel/include/logger.hrl").
-
 
 -type headers() :: [{string(), string()}].
 -type code() :: non_neg_integer().
@@ -84,7 +78,6 @@
 
 -define(MIN_UPDATE_INTERVAL_SEC, 5).
 -define(DEFAULT_REFRESH_INTERVAL_SEC, 550).
-
 
 -record(state, {
     epoch = 0 :: non_neg_integer(),
@@ -95,11 +88,10 @@
     httpdb_pool :: pid(),
     httpdb_ibrowse_options = [] :: list(),
     session_url :: string(),
-    next_refresh = infinity :: infinity |  non_neg_integer(),
+    next_refresh = infinity :: infinity | non_neg_integer(),
     refresh_tstamp = 0 :: non_neg_integer(),
     require_valid_user = false :: boolean()
 }).
-
 
 % Behavior API callbacks
 
@@ -118,36 +110,30 @@ initialize(#httpdb{} = HttpDb) ->
             ignore
     end.
 
-
 -spec update_headers(term(), headers()) -> {headers(), term()}.
 update_headers({Pid, Epoch, Timeout}, Headers) ->
     Args = {update_headers, Headers, Epoch},
     {Headers1, Epoch1} = gen_server:call(Pid, Args, Timeout * 10),
     {Headers1, {Pid, Epoch1, Timeout}}.
 
-
 -spec handle_response(term(), code(), headers()) ->
     {continue | retry, term()}.
 handle_response({Pid, Epoch, Timeout}, Code, Headers) ->
-    Args =  {handle_response, Code, Headers, Epoch},
+    Args = {handle_response, Code, Headers, Epoch},
     {Retry, Epoch1} = gen_server:call(Pid, Args, Timeout * 10),
     {Retry, {Pid, Epoch1, Timeout}}.
-
 
 -spec cleanup(term()) -> ok.
 cleanup({Pid, _Epoch, Timeout}) ->
     gen_server:call(Pid, stop, Timeout * 10).
-
 
 %% gen_server functions
 
 init([#state{} = State]) ->
     {ok, State}.
 
-
 terminate(_Reason, _State) ->
     ok.
-
 
 handle_call({update_headers, Headers, _Epoch}, _From, State) ->
     case maybe_refresh(State) of
@@ -165,30 +151,24 @@ handle_call({update_headers, Headers, _Epoch}, _From, State) ->
             couch_log:error(LogMsg, [?MODULE, Error]),
             {stop, Error, State}
     end;
-
 handle_call({handle_response, Code, Headers, Epoch}, _From, State) ->
     {Retry, State1} = process_response(Code, Headers, Epoch, State),
     {reply, {Retry, State1#state.epoch}, State1};
-
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State}.
-
 
 handle_cast(Msg, State) ->
     ?LOG_ERROR(#{what => unexpected_cast, in => replicator, msg => Msg}),
     couch_log:error("~p: Received un-expected cast ~p", [?MODULE, Msg]),
     {noreply, State}.
 
-
 handle_info(Msg, State) ->
     ?LOG_ERROR(#{what => unexpected_message, in => replicator, msg => Msg}),
     couch_log:error("~p : Received un-expected message ~p", [?MODULE, Msg]),
     {noreply, State}.
 
-
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
 
 format_status(_Opt, [_PDict, State]) ->
     [
@@ -198,9 +178,7 @@ format_status(_Opt, [_PDict, State]) ->
         {refresh_tstamp, State#state.refresh_tstamp}
     ].
 
-
 %% Private helper functions
-
 
 -spec init_state(#httpdb{}) ->
     {ok, #httpdb{}, #state{}} | {error, term()} | ignore.
@@ -242,7 +220,6 @@ init_state(#httpdb{} = HttpDb) ->
             {error, Error}
     end.
 
-
 -spec extract_creds(#httpdb{}) ->
     {ok, string(), string(), #httpdb{}} | {error, term()}.
 extract_creds(#httpdb{} = HttpDb) ->
@@ -256,9 +233,12 @@ extract_creds(#httpdb{} = HttpDb) ->
             {ok, User, Pass, HttpDb1}
     end.
 
-
--spec process_response(non_neg_integer(), headers(),
-    non_neg_integer(), #state{}) -> {retry | continue, #state{}}.
+-spec process_response(
+    non_neg_integer(),
+    headers(),
+    non_neg_integer(),
+    #state{}
+) -> {retry | continue, #state{}}.
 process_response(403, _Headers, Epoch, State) ->
     process_auth_failure(Epoch, State);
 process_response(401, _Headers, Epoch, State) ->
@@ -266,30 +246,31 @@ process_response(401, _Headers, Epoch, State) ->
 process_response(Code, Headers, _Epoch, State) when Code >= 200, Code < 300 ->
     % If server noticed cookie is about to time out it can send a new cookie in
     % the response headers. Take advantage of that and refresh the cookie.
-    State1 = case maybe_update_cookie(Headers, State) of
-        {ok, UpdatedState} ->
-            UpdatedState;
-        {error, cookie_not_found} ->
-            State;
-        {error, Other} ->
-            ?LOG_ERROR(#{
-                what => cookie_parse_error,
-                in => replicator,
-                details => Other
-            }),
-            LogMsg = "~p : Could not parse cookie from response headers ~p",
-            couch_log:error(LogMsg, [?MODULE, Other]),
-            State
-    end,
+    State1 =
+        case maybe_update_cookie(Headers, State) of
+            {ok, UpdatedState} ->
+                UpdatedState;
+            {error, cookie_not_found} ->
+                State;
+            {error, Other} ->
+                ?LOG_ERROR(#{
+                    what => cookie_parse_error,
+                    in => replicator,
+                    details => Other
+                }),
+                LogMsg = "~p : Could not parse cookie from response headers ~p",
+                couch_log:error(LogMsg, [?MODULE, Other]),
+                State
+        end,
     {continue, State1};
 process_response(_Code, _Headers, _Epoch, State) ->
     {continue, State}.
 
-
 -spec process_auth_failure(non_neg_integer(), #state{}) ->
     {retry | continue, #state{}}.
-process_auth_failure(Epoch, #state{epoch = StateEpoch} = State)
-        when StateEpoch > Epoch ->
+process_auth_failure(Epoch, #state{epoch = StateEpoch} = State) when
+    StateEpoch > Epoch
+->
     % This request used an outdated cookie, tell it to immediately retry
     % and it will pick up the current cookie when its headers are updated
     {retry, State};
@@ -305,7 +286,6 @@ process_auth_failure(Epoch, #state{epoch = Epoch} = State) ->
             % httpc to retry the request.
             {retry, schedule_refresh(now_sec(), State)}
     end.
-
 
 -spec get_session_url(string()) -> string().
 get_session_url(Url) ->
@@ -324,13 +304,11 @@ get_session_url(Url) ->
             lists:concat([Proto, "://", Host, "/_session"])
     end.
 
-
 -spec schedule_refresh(non_neg_integer(), #state{}) -> #state{}.
 schedule_refresh(T, #state{next_refresh = Tc} = State) when T < Tc ->
     State#state{next_refresh = T};
 schedule_refresh(_, #state{} = State) ->
     State.
-
 
 -spec maybe_refresh(#state{}) -> {ok, #state{}} | {error, term()}.
 maybe_refresh(#state{next_refresh = T} = State) ->
@@ -341,20 +319,19 @@ maybe_refresh(#state{next_refresh = T} = State) ->
             {ok, State}
     end.
 
-
 -spec refresh(#state{}) -> {ok, #state{}} | {error, term()}.
 refresh(#state{session_url = Url, user = User, pass = Pass} = State) ->
-    Body =  mochiweb_util:urlencode([{name, User}, {password, Pass}]),
+    Body = mochiweb_util:urlencode([{name, User}, {password, Pass}]),
     Headers0 = [{"Content-Type", "application/x-www-form-urlencoded"}],
-    Headers = case State#state.require_valid_user of
-        true ->
-            Headers0 ++ [{"Authorization", "Basic " ++ b64creds(User, Pass)}];
-        false ->
-            Headers0
-    end,
+    Headers =
+        case State#state.require_valid_user of
+            true ->
+                Headers0 ++ [{"Authorization", "Basic " ++ b64creds(User, Pass)}];
+            false ->
+                Headers0
+        end,
     Result = http_request(State, Url, Headers, post, Body),
     http_response(Result, State).
-
 
 -spec http_request(#state{}, string(), headers(), atom(), iolist()) ->
     {ok, string(), headers(), binary()} | {error, term()}.
@@ -367,19 +344,25 @@ http_request(#state{httpdb_pool = Pool} = State, Url, Headers, Method, Body) ->
     ],
     {ok, Wrk} = couch_replicator_httpc_pool:get_worker(Pool),
     try
-        Result = ibrowse:send_req_direct(Wrk, Url, Headers, Method, Body, Opts,
-            Timeout),
+        Result = ibrowse:send_req_direct(
+            Wrk,
+            Url,
+            Headers,
+            Method,
+            Body,
+            Opts,
+            Timeout
+        ),
         case Result of
             {ok, _, ResultHeaders, _} ->
                 stop_worker_if_server_requested(ResultHeaders, Wrk);
             _Other ->
                 ok
-       end,
-       Result
+        end,
+        Result
     after
         ok = couch_replicator_httpc_pool:release_worker_sync(Pool, Wrk)
     end.
-
 
 -spec stop_worker_if_server_requested(headers(), pid()) -> ok.
 stop_worker_if_server_requested(ResultHeaders0, Worker) ->
@@ -396,13 +379,16 @@ stop_worker_if_server_requested(ResultHeaders0, Worker) ->
             ok
     end.
 
-
--spec http_response({ok, string(), headers(), binary()} | {error, term()},
-    #state{}) -> {ok, #state{}} | {error, term()}.
+-spec http_response(
+    {ok, string(), headers(), binary()} | {error, term()},
+    #state{}
+) -> {ok, #state{}} | {error, term()}.
 http_response({ok, "200", Headers, _}, State) ->
     maybe_update_cookie(Headers, State);
-http_response({ok, "401", Headers0, _}, #state{session_url = Url,
-        user = User}) ->
+http_response({ok, "401", Headers0, _}, #state{
+    session_url = Url,
+    user = User
+}) ->
     Headers = mochiweb_headers:make(Headers0),
     case mochiweb_headers:get_value("WWW-Authenticate", Headers) of
         undefined ->
@@ -418,7 +404,6 @@ http_response({ok, Code, _, _}, #state{session_url = Url, user = User}) ->
     {error, {session_unexpected_result, Code, Url, User}};
 http_response({error, Error}, #state{session_url = Url, user = User}) ->
     {error, {session_request_failed, Url, User, Error}}.
-
 
 -spec parse_cookie(list()) -> {ok, age(), string()} | {error, term()}.
 parse_cookie(Headers0) ->
@@ -438,14 +423,11 @@ parse_cookie(Headers0) ->
             end
     end.
 
-
 -spec parse_max_age(list()) -> age().
 parse_max_age(CaseInsKVs) ->
     case mochiweb_headers:get_value("Max-Age", CaseInsKVs) of
         String when is_list(String) ->
-            try
-                list_to_integer(String)
-            of
+            try list_to_integer(String) of
                 MaxAge when MaxAge >= 0 ->
                     MaxAge;
                 _ ->
@@ -458,7 +440,6 @@ parse_max_age(CaseInsKVs) ->
             undefined
     end.
 
-
 -spec maybe_update_cookie(headers(), #state{}) ->
     {ok, string()} | {error, term()}.
 maybe_update_cookie(ResponseHeaders, State) ->
@@ -468,7 +449,6 @@ maybe_update_cookie(ResponseHeaders, State) ->
         {error, Error} ->
             {error, Error}
     end.
-
 
 -spec update_cookie(#state{}, string(), time_sec(), age()) -> #state{}.
 update_cookie(#state{cookie = Cookie} = State, Cookie, _, _) ->
@@ -482,76 +462,74 @@ update_cookie(#state{epoch = Epoch} = State, Cookie, NowSec, MaxAge) ->
     },
     schedule_refresh(NextRefresh, NewState).
 
-
 -spec next_refresh(time_sec(), age(), time_sec()) -> time_sec().
 next_refresh(NowSec, undefined, RefreshInterval) ->
     NowSec + RefreshInterval;
-
 next_refresh(NowSec, MaxAge, _) when is_integer(MaxAge) ->
     % Apply a fudge factor to account for delays in receving the cookie
     % and / or time adjustments happening over a longer period of time
     NowSec + trunc(MaxAge * 0.9).
 
-
 -spec cookie_age_sec(#state{}, time_sec()) -> time_sec().
 cookie_age_sec(#state{refresh_tstamp = RefreshTs}, Now) ->
     max(0, Now - RefreshTs).
-
 
 -spec now_sec() -> time_sec().
 now_sec() ->
     {Mega, Sec, _Micro} = os:timestamp(),
     Mega * 1000000 + Sec.
 
-
 -spec min_update_interval() -> time_sec().
 min_update_interval() ->
-    config:get_integer("replicator", "session_min_update_interval",
-        ?MIN_UPDATE_INTERVAL_SEC).
-
+    config:get_integer(
+        "replicator",
+        "session_min_update_interval",
+        ?MIN_UPDATE_INTERVAL_SEC
+    ).
 
 -spec refresh_interval() -> integer().
 refresh_interval() ->
-    config:get_integer("replicator", "session_refresh_interval_sec",
-        ?DEFAULT_REFRESH_INTERVAL_SEC).
-
-
+    config:get_integer(
+        "replicator",
+        "session_refresh_interval_sec",
+        ?DEFAULT_REFRESH_INTERVAL_SEC
+    ).
 
 -spec b64creds(string(), string()) -> string().
 b64creds(User, Pass) ->
     base64:encode_to_string(User ++ ":" ++ Pass).
 
-
 remove_basic_auth_creds(#httpdb{auth_props = Props} = HttpDb) ->
     Props1 = maps:remove(<<"basic">>, Props),
     HttpDb#httpdb{auth_props = Props1}.
-
 
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
 
-
 get_session_url_test_() ->
-    [?_assertEqual(SessionUrl, get_session_url(Url)) || {Url, SessionUrl} <- [
-        {"http://host/db", "http://host/_session"},
-        {"http://127.0.0.1/db", "http://127.0.0.1/_session"},
-        {"http://host/x/y/z", "http://host/_session"},
-        {"http://host:5984/db", "http://host:5984/_session"},
-        {"https://host/db?q=1", "https://host/_session"}
-    ]].
-
+    [
+        ?_assertEqual(SessionUrl, get_session_url(Url))
+     || {Url, SessionUrl} <- [
+            {"http://host/db", "http://host/_session"},
+            {"http://127.0.0.1/db", "http://127.0.0.1/_session"},
+            {"http://host/x/y/z", "http://host/_session"},
+            {"http://host:5984/db", "http://host:5984/_session"},
+            {"https://host/db?q=1", "https://host/_session"}
+        ]
+    ].
 
 extract_creds_success_test() ->
-    HttpDb = #httpdb{auth_props = #{
-        <<"basic">> => #{
-            <<"username">> => <<"u2">>,
-            <<"password">> => <<"p2">>
+    HttpDb = #httpdb{
+        auth_props = #{
+            <<"basic">> => #{
+                <<"username">> => <<"u2">>,
+                <<"password">> => <<"p2">>
+            }
         }
-    }},
+    },
     ?assertEqual({ok, "u2", "p2", #httpdb{}}, extract_creds(HttpDb)),
     ?assertEqual({error, missing_credentials}, extract_creds(#httpdb{})).
-
 
 cookie_update_test_() ->
     {
@@ -580,7 +558,6 @@ cookie_update_test_() ->
         }
     }.
 
-
 t_do_refresh_without_max_age() ->
     ?_test(begin
         State = #state{next_refresh = 0},
@@ -590,7 +567,6 @@ t_do_refresh_without_max_age() ->
         RefreshInterval = NextRefresh - now_sec(),
         ?assert(540 < RefreshInterval andalso RefreshInterval =< 550)
     end).
-
 
 t_do_refresh_with_max_age() ->
     ?_test(begin
@@ -602,7 +578,6 @@ t_do_refresh_with_max_age() ->
         RefreshInterval = NextRefresh - now_sec(),
         ?assert(80 < RefreshInterval andalso RefreshInterval =< 90)
     end).
-
 
 t_dont_refresh() ->
     ?_test(begin
@@ -620,7 +595,6 @@ t_dont_refresh() ->
         ?assertMatch(State2, State3)
     end).
 
-
 t_process_auth_failure() ->
     ?_test(begin
         State = #state{epoch = 1, refresh_tstamp = 0},
@@ -629,20 +603,17 @@ t_process_auth_failure() ->
         ?assert(NextRefresh =< now_sec())
     end).
 
-
 t_process_auth_failure_stale_epoch() ->
     ?_test(begin
         State = #state{epoch = 3},
         ?assertMatch({retry, State}, process_auth_failure(2, State))
     end).
 
-
 t_process_auth_failure_too_frequent() ->
     ?_test(begin
         State = #state{epoch = 4, refresh_tstamp = now_sec()},
         ?assertMatch({continue, _}, process_auth_failure(4, State))
     end).
-
 
 t_process_ok_update_cookie() ->
     ?_test(begin
@@ -654,7 +625,6 @@ t_process_ok_update_cookie() ->
         ?assertMatch({continue, #state{cookie = "xyz", epoch = 2}}, Res2)
     end).
 
-
 t_process_ok_no_cookie() ->
     ?_test(begin
         Headers = [{"X", "y"}],
@@ -663,23 +633,22 @@ t_process_ok_no_cookie() ->
         ?assertMatch({continue, State}, Res)
     end).
 
-
 t_init_state_fails_on_401() ->
     ?_test(begin
         mock_http_401_response(),
         {error, Error} = init_state(httpdb("http://u:p@h")),
-        SessionUrl =  "http://h/_session",
+        SessionUrl = "http://h/_session",
         ?assertEqual({session_request_unauthorized, SessionUrl, "u"}, Error)
     end).
-
 
 t_init_state_401_with_require_valid_user() ->
     ?_test(begin
         mock_http_401_response_with_require_valid_user(),
-        ?assertMatch({ok, #httpdb{}, #state{cookie = "Cookie"}},
-            init_state(httpdb("http://u:p@h")))
+        ?assertMatch(
+            {ok, #httpdb{}, #state{cookie = "Cookie"}},
+            init_state(httpdb("http://u:p@h"))
+        )
     end).
-
 
 t_init_state_404() ->
     ?_test(begin
@@ -687,12 +656,10 @@ t_init_state_404() ->
         ?assertEqual(ignore, init_state(httpdb("http://u:p@h")))
     end).
 
-
 t_init_state_no_creds() ->
     ?_test(begin
         ?_assertEqual(ignore, init_state(httpdb("http://h")))
     end).
-
 
 t_init_state_http_error() ->
     ?_test(begin
@@ -701,7 +668,6 @@ t_init_state_http_error() ->
         SessionUrl = "http://h/_session",
         ?assertEqual({session_request_failed, SessionUrl, "u", x}, Error)
     end).
-
 
 httpdb(Url) when is_list(Url) ->
     FakeDoc = #{
@@ -712,7 +678,6 @@ httpdb(Url) when is_list(Url) ->
     HttpDb = maps:get(<<"source">>, Rep),
     couch_replicator_api_wrap:db_from_json(HttpDb).
 
-
 setup_all() ->
     meck:expect(couch_replicator_httpc_pool, get_worker, 1, {ok, worker}),
     meck:expect(couch_replicator_httpc_pool, release_worker_sync, 2, ok),
@@ -720,10 +685,8 @@ setup_all() ->
     mock_http_cookie_response("Abc"),
     ok.
 
-
 teardown_all(_) ->
     meck:unload().
-
 
 setup() ->
     meck:reset([
@@ -732,15 +695,12 @@ setup() ->
         ibrowse
     ]).
 
-
 teardown(_) ->
     ok.
-
 
 mock_http_cookie_response(Cookie) ->
     Resp = {ok, "200", [{"Set-Cookie", "AuthSession=" ++ Cookie}], []},
     meck:expect(ibrowse, send_req_direct, 7, Resp).
-
 
 mock_http_cookie_response_with_age(Cookie, Age) ->
     AgeKV = "Max-Age=" ++ Age,
@@ -748,28 +708,24 @@ mock_http_cookie_response_with_age(Cookie, Age) ->
     Resp = {ok, "200", [{"Set-Cookie", CookieKV ++ ";" ++ AgeKV}], []},
     meck:expect(ibrowse, send_req_direct, 7, Resp).
 
-
 mock_http_401_response() ->
     meck:expect(ibrowse, send_req_direct, 7, {ok, "401", [], []}).
-
 
 mock_http_401_response_with_require_valid_user() ->
     Resp1 = {ok, "401", [{"WWW-Authenticate", "Basic realm=\"server\""}], []},
     Resp2 = {ok, "200", [{"Set-Cookie", "AuthSession=Cookie"}], []},
     meck:expect(ibrowse, send_req_direct, 7, meck:seq([Resp1, Resp2])).
 
-
 mock_http_404_response() ->
     meck:expect(ibrowse, send_req_direct, 7, {ok, "404", [], []}).
-
 
 mock_http_error_response() ->
     meck:expect(ibrowse, send_req_direct, 7, {error, x}).
 
-
 parse_max_age_test_() ->
-    [?_assertEqual(R, parse_max_age(mochiweb_headers:make([{"Max-Age", A}])))
-        ||  {A, R} <- [
+    [
+        ?_assertEqual(R, parse_max_age(mochiweb_headers:make([{"Max-Age", A}])))
+     || {A, R} <- [
             {"-10", undefined},
             {"\ufeff", undefined},
             {"*", undefined},
@@ -782,7 +738,6 @@ parse_max_age_test_() ->
         ]
     ].
 
-
 remove_basic_auth_creds_test() ->
     Check = fun(Props) ->
         HttpDb = remove_basic_auth_creds(#httpdb{auth_props = Props}),
@@ -793,19 +748,25 @@ remove_basic_auth_creds_test() ->
 
     ?assertEqual(#{<<"other">> => #{}}, Check(#{<<"other">> => #{}})),
 
-    ?assertEqual(#{}, Check(#{
-        <<"basic">> => #{
-            <<"username">> => <<"u">>,
-            <<"password">> => <<"p">>
-        }
-    })),
+    ?assertEqual(
+        #{},
+        Check(#{
+            <<"basic">> => #{
+                <<"username">> => <<"u">>,
+                <<"password">> => <<"p">>
+            }
+        })
+    ),
 
-    ?assertEqual(#{<<"other">> => #{}}, Check(#{
-        <<"basic">> => #{
-            <<"username">> => <<"u">>,
-            <<"password">> => <<"p">>
-        },
-        <<"other">> => #{}
-    })).
+    ?assertEqual(
+        #{<<"other">> => #{}},
+        Check(#{
+            <<"basic">> => #{
+                <<"username">> => <<"u">>,
+                <<"password">> => <<"p">>
+            },
+            <<"other">> => #{}
+        })
+    ).
 
 -endif.
