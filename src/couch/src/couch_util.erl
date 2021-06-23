@@ -41,6 +41,7 @@
 -export([set_mqd_off_heap/1]).
 -export([set_process_priority/2]).
 -export([hmac/3]).
+-export([unquote_path/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -60,6 +61,17 @@
     <<"^tracing\..*$">>,
     <<"^tracing$">>
 ]).
+
+-define(PERCENT, 37).
+-define(IS_HEX(C),
+    ((C >= $0 andalso C =< $9) orelse
+        (C >= $a andalso C =< $f) orelse
+        (C >= $A andalso C =< $F))
+).
+
+unhexdigit(C) when C >= $0, C =< $9 -> C - $0;
+unhexdigit(C) when C >= $a, C =< $f -> C - $a + 10;
+unhexdigit(C) when C >= $A, C =< $F -> C - $A + 10.
 
 priv_dir() ->
     case code:priv_dir(couch) of
@@ -832,3 +844,18 @@ hmac(Alg, Key, Message) ->
 
 % -ifdef(OTP_RELEASE)
 -endif.
+
+unquote_path(Binary) when is_binary(Binary) ->
+    unquote_path(binary_to_list(Binary));
+unquote_path(String) ->
+    qs_revdecode(lists:reverse(String)).
+
+qs_revdecode(S) ->
+    qs_revdecode(S, []).
+
+qs_revdecode([], Acc) ->
+    Acc;
+qs_revdecode([Lo, Hi, ?PERCENT | Rest], Acc) when ?IS_HEX(Lo), ?IS_HEX(Hi) ->
+    qs_revdecode(Rest, [(unhexdigit(Lo) bor (unhexdigit(Hi) bsl 4)) | Acc]);
+qs_revdecode([C | Rest], Acc) ->
+    qs_revdecode(Rest, [C | Acc]).

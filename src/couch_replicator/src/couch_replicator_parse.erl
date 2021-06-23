@@ -313,7 +313,7 @@ convert_fold(<<"doc_ids">>, V, Acc) when is_list(V) ->
     Ids = lists:map(
         fun(Id) ->
             case is_binary(Id) andalso byte_size(Id) > 0 of
-                true -> list_to_binary(couch_httpd:unquote(Id));
+                true -> list_to_binary(couch_httpd:unquote_path(Id));
                 false -> throw({error, <<"`doc_ids` array must contain strings">>})
             end
         end,

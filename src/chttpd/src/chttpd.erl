@@ -34,6 +34,7 @@
     body_length/1,
     verify_is_server_admin/1,
     unquote/1,
+    unquote_path/1,
     quote/1,
     recv/2,
     recv_chunked/4,
@@ -322,11 +323,11 @@ handle_request_int(MochiReq) ->
         nonce = Nonce,
         method = Method,
         path_parts = [
-            list_to_binary(chttpd:unquote(Part))
+            list_to_binary(chttpd:unquote_path(Part))
          || Part <- string:tokens(Path, "/")
         ],
         requested_path_parts = [
-            ?l2b(unquote(Part))
+            ?l2b(chttpd:unquote_path(Part))
          || Part <- string:tokens(RequestedPath, "/")
         ]
     },
@@ -803,6 +804,9 @@ absolute_uri(#httpd{absolute_uri = URI}, Path) ->
 
 unquote(UrlEncodedString) ->
     mochiweb_util:unquote(UrlEncodedString).
+
+unquote_path(UrlEncodedString) ->
+    chttpd_util:unquote_path(UrlEncodedString).
 
 quote(UrlDecodedString) ->
     mochiweb_util:quote_plus(UrlDecodedString).

@@ -73,6 +73,31 @@ defmodule BasicsTest do
   end
 
   @tag :with_db
+  test "Database name with '+' should be created successfully", _context do
+    random_number = :rand.uniform(16_000_000)
+    db_name = "random+test+db+#{random_number}"
+    resp = Couch.put("/#{db_name}")
+
+    assert resp.status_code == 201
+    assert resp.body["ok"] == true
+
+    resp = Couch.get("/#{db_name}")
+    
+    assert resp.status_code == 200
+    assert resp.body["db_name"] == db_name
+  end
+
+  @tag :with_db
+  test "'+' in document name should encode to '+'", context do
+    db_name = context[:db_name]
+    doc = %{_id: "test+doc", foo: 1}
+    resp = Couch.post("/#{db_name}", body: doc)
+
+    assert resp.status_code == 201
+    assert resp.body["id"] == "test+doc"
+  end
+
+  @tag :with_db
   test "Empty database should have zero docs", context do
     assert Couch.get("/#{context[:db_name]}").body["doc_count"] == 0,
            "Empty doc count in empty db"

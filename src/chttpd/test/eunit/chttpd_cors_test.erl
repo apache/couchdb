@@ -112,7 +112,7 @@ mock_request(Method, Path, Headers0) ->
     Headers1 = mochiweb_headers:make(Headers),
     MochiReq = mochiweb_request:new(nil, Method, Path, {1, 1}, Headers1),
     PathParts = [
-        list_to_binary(chttpd:unquote(Part))
+        list_to_binary(chttpd:unquote_path(Part))
      || Part <- string:tokens(Path, "/")
     ],
     #httpd{method = Method, mochi_req = MochiReq, path_parts = PathParts}.

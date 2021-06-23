@@ -21,8 +21,20 @@
     get_chttpd_auth_config/1,
     get_chttpd_auth_config/2,
     get_chttpd_auth_config_integer/2,
-    get_chttpd_auth_config_boolean/2
+    get_chttpd_auth_config_boolean/2,
+    unquote_path/1
 ]).
+
+-define(PERCENT, 37).
+-define(IS_HEX(C),
+    ((C >= $0 andalso C =< $9) orelse
+        (C >= $a andalso C =< $f) orelse
+        (C >= $A andalso C =< $F))
+).
+
+unhexdigit(C) when C >= $0, C =< $9 -> C - $0;
+unhexdigit(C) when C >= $a, C =< $f -> C - $a + 10;
+unhexdigit(C) when C >= $A, C =< $F -> C - $A + 10.
 
 parse_copy_destination_header(Req) ->
     case couch_httpd:header_value(Req, "Destination") of
@@ -89,3 +101,18 @@ get_chttpd_auth_config_boolean(Key, Default) ->
         Key,
         config:get_boolean("couch_httpd_auth", Key, Default)
     ).
+
+unquote_path(Binary) when is_binary(Binary) ->
+    unquote_path(binary_to_list(Binary));
+unquote_path(String) ->
+    qs_revdecode(lists:reverse(String)).
+
+qs_revdecode(S) ->
+    qs_revdecode(S, []).
+
+qs_revdecode([], Acc) ->
+    Acc;
+qs_revdecode([Lo, Hi, ?PERCENT | Rest], Acc) when ?IS_HEX(Lo), ?IS_HEX(Hi) ->
+    qs_revdecode(Rest, [(unhexdigit(Lo) bor (unhexdigit(Hi) bsl 4)) | Acc]);
+qs_revdecode([C | Rest], Acc) ->
+    qs_revdecode(Rest, [C | Acc]).
