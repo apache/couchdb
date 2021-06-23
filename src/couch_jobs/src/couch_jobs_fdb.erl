@@ -12,6 +12,7 @@
 
 -module(couch_jobs_fdb).
 
+
 -export([
     add/5,
     remove/2,
@@ -52,7 +53,9 @@
     bump_metadata_version/1
 ]).
 
+
 -include("couch_jobs.hrl").
+
 
 -record(jv, {
     seq,
@@ -62,10 +65,12 @@
     data
 }).
 
+
 -define(JOBS_ETS_KEY, jobs).
 -define(MD_TIMESTAMP_ETS_KEY, md_timestamp).
 -define(MD_VERSION_MAX_AGE_SEC, 10).
 -define(PENDING_SEQ, 0).
+
 
 % Data model
 %
@@ -80,6 +85,7 @@
 %  0 - when the job is pending
 %  null - when the job is finished
 %  Versionstamp - when the job is running
+
 
 % Job creation API
 
@@ -107,6 +113,7 @@ add(#{jtx := true} = JTx0, Type, JobId, Data, STime) ->
             end
     end.
 
+
 remove(#{jtx := true} = JTx0, #{job := true} = Job) ->
     #{tx := Tx} = JTx = get_jtx(JTx0),
     #{type := Type, id := JobId} = Job,
@@ -122,6 +129,7 @@ remove(#{jtx := true} = JTx0, #{job := true} = Job) ->
             {error, not_found}
     end.
 
+
 get_job_state_and_data(#{jtx := true} = JTx, #{job := true} = Job) ->
     case get_job_val(get_jtx(JTx), Job) of
         #jv{seq = Seq, jlock = JLock, data = Data} ->
@@ -130,34 +138,32 @@ get_job_state_and_data(#{jtx := true} = JTx, #{job := true} = Job) ->
             {error, not_found}
     end.
 
+
 get_jobs(JTx, Type) ->
     get_jobs(JTx, Type, fun(_) -> true end).
+
 
 get_jobs(#{jtx := true} = JTx, Type, Filter) when is_function(Filter, 1) ->
     #{tx := Tx, jobs_path := Jobs} = get_jtx(JTx),
     Prefix = erlfdb_tuple:pack({?DATA, Type}, Jobs),
     Opts = [{streaming_mode, want_all}],
     Result = erlfdb:wait(erlfdb:get_range_startswith(Tx, Prefix, Opts)),
-    lists:foldl(
-        fun({K, V}, #{} = Acc) ->
-            {JobId} = erlfdb_tuple:unpack(K, Prefix),
-            case Filter(JobId) of
-                true ->
-                    {Seq, JLock, _, _, Data} = erlfdb_tuple:unpack(V),
-                    Acc#{JobId => {Seq, job_state(JLock, Seq), Data}};
-                false ->
-                    Acc
-            end
-        end,
-        #{},
-        Result
-    ).
+    lists:foldl(fun({K, V}, #{} = Acc) ->
+        {JobId} = erlfdb_tuple:unpack(K, Prefix),
+        case Filter(JobId) of
+            true ->
+                {Seq, JLock, _, _, Data} = erlfdb_tuple:unpack(V),
+                Acc#{JobId => {Seq, job_state(JLock, Seq), Data}};
+            false ->
+                Acc
+        end
+    end, #{}, Result).
+
 
 % Job processor API
 
-accept(#{jtx := true} = JTx0, Type, MaxSTime, NoSched) when
-    is_integer(MaxSTime), is_boolean(NoSched)
-->
+accept(#{jtx := true} = JTx0, Type, MaxSTime, NoSched)
+        when is_integer(MaxSTime), is_boolean(NoSched) ->
     #{jtx := true, tx := Tx} = JTx = get_jtx(JTx0),
     case couch_jobs_pending:dequeue(JTx, Type, MaxSTime, NoSched) of
         {not_found, PendingWatch} ->
@@ -179,18 +185,17 @@ accept(#{jtx := true} = JTx0, Type, MaxSTime, NoSched) when
             {ok, Job, decode_data(Data)}
     end.
 
+
 finish(#{jtx := true} = JTx0, #{jlock := <<_/binary>>} = Job, Data) when
-    is_map(Data) orelse Data =:= undefined
-->
+        is_map(Data) orelse Data =:= undefined ->
     #{tx := Tx} = JTx = get_jtx(JTx0),
     #{type := Type, jlock := JLock, id := JobId} = Job,
     case get_job_or_halt(Tx, job_key(JTx, Job), JLock) of
         #jv{seq = Seq, stime = STime, resubmit = Resubmit, data = OldData} ->
-            NewData =
-                case Data =:= undefined of
-                    true -> OldData;
-                    false -> Data
-                end,
+            NewData = case Data =:= undefined of
+                true -> OldData;
+                false -> Data
+            end,
             try maybe_enqueue(JTx, Type, JobId, STime, Resubmit, NewData) of
                 ok ->
                     clear_activity(JTx, Type, Seq),
@@ -206,17 +211,17 @@ finish(#{jtx := true} = JTx0, #{jlock := <<_/binary>>} = Job, Data) when
 resubmit(JTx0, Job, NewSTime) ->
     resubmit(JTx0, Job, NewSTime, undefined).
 
+
 resubmit(#{jtx := true} = JTx0, #{job := true} = Job, NewSTime, NewData) ->
     #{tx := Tx} = JTx = get_jtx(JTx0),
     #{type := Type, id := JobId} = Job,
     Key = job_key(JTx, Job),
     case get_job_val(Tx, Key) of
         #jv{seq = Seq, jlock = JLock, stime = OldSTime, data = Data} = JV ->
-            STime =
-                case NewSTime =:= undefined of
-                    true -> OldSTime;
-                    false -> NewSTime
-                end,
+            STime = case NewSTime =:= undefined of
+                true -> OldSTime;
+                false -> NewSTime
+            end,
             case job_state(JLock, Seq) of
                 finished ->
                     ok = maybe_enqueue(JTx, Type, JobId, STime, true, NewData),
@@ -254,31 +259,25 @@ resubmit(#{jtx := true} = JTx0, #{job := true} = Job, NewSTime, NewData) ->
                 running ->
                     JV1 = JV#jv{stime = STime, resubmit = true},
                     set_job_val(Tx, Key, JV1),
-                    {ok, Job#{
-                        resubmit => true,
-                        stime => STime,
-                        state => running,
-                        seq => Seq,
-                        data => Data
-                    }}
+                    {ok, Job#{resubmit => true, stime => STime,
+                        state => running, seq => Seq, data => Data}}
             end;
         not_found ->
             {error, not_found}
     end.
 
+
 update(#{jtx := true} = JTx0, #{jlock := <<_/binary>>} = Job, Data0) when
-    is_map(Data0) orelse Data0 =:= undefined
-->
+        is_map(Data0) orelse Data0 =:= undefined ->
     #{tx := Tx} = JTx = get_jtx(JTx0),
     #{jlock := JLock, type := Type, id := JobId} = Job,
     Key = job_key(JTx, Job),
     case get_job_or_halt(Tx, Key, JLock) of
         #jv{seq = Seq, stime = STime, resubmit = Resubmit} = JV0 ->
-            Data =
-                case Data0 =:= undefined of
-                    true -> JV0#jv.data;
-                    false -> Data0
-                end,
+            Data = case Data0 =:= undefined of
+                true -> JV0#jv.data;
+                false -> Data0
+            end,
             JV = JV0#jv{seq = ?UNSET_VS, data = Data},
             try set_job_val(Tx, Key, JV) of
                 ok ->
@@ -292,6 +291,7 @@ update(#{jtx := true} = JTx0, #{jlock := <<_/binary>>} = Job, Data0) when
             {error, halt}
     end.
 
+
 % Type and activity monitoring API
 
 set_type_timeout(#{jtx := true} = JTx, Type, Timeout) ->
@@ -300,10 +300,12 @@ set_type_timeout(#{jtx := true} = JTx, Type, Timeout) ->
     Val = erlfdb_tuple:pack({Timeout}),
     erlfdb:set(Tx, Key, Val).
 
+
 clear_type_timeout(#{jtx := true} = JTx, Type) ->
     #{tx := Tx, jobs_path := Jobs} = get_jtx(JTx),
     Key = erlfdb_tuple:pack({?ACTIVITY_TIMEOUT, Type}, Jobs),
     erlfdb:clear(Tx, Key).
+
 
 get_type_timeout(#{jtx := true} = JTx, Type) ->
     #{tx := Tx, jobs_path := Jobs} = get_jtx(JTx),
@@ -316,18 +318,17 @@ get_type_timeout(#{jtx := true} = JTx, Type) ->
             Timeout
     end.
 
+
 get_types(#{jtx := true} = JTx) ->
     #{tx := Tx, jobs_path := Jobs} = get_jtx(JTx),
     Prefix = erlfdb_tuple:pack({?ACTIVITY_TIMEOUT}, Jobs),
     Opts = [{streaming_mode, want_all}],
     Result = erlfdb:wait(erlfdb:get_range_startswith(Tx, Prefix, Opts)),
-    lists:map(
-        fun({K, _V}) ->
-            {Type} = erlfdb_tuple:unpack(K, Prefix),
-            Type
-        end,
-        Result
-    ).
+    lists:map(fun({K, _V}) ->
+        {Type} = erlfdb_tuple:unpack(K, Prefix),
+        Type
+    end, Result).
+
 
 get_activity_vs(#{jtx := true} = JTx, Type) ->
     #{tx := Tx, jobs_path := Jobs} = get_jtx(JTx),
@@ -339,6 +340,7 @@ get_activity_vs(#{jtx := true} = JTx, Type) ->
             {VS} = erlfdb_tuple:unpack(Val),
             VS
     end.
+
 
 get_activity_vs_and_watch(#{jtx := true} = JTx, Type) ->
     #{tx := Tx, jobs_path := Jobs} = get_jtx(JTx),
@@ -353,6 +355,7 @@ get_activity_vs_and_watch(#{jtx := true} = JTx, Type) ->
             {VS, Watch}
     end.
 
+
 get_active_since(#{jtx := true} = JTx, Type, Versionstamp, Opts) ->
     #{tx := Tx, jobs_path := Jobs} = get_jtx(JTx),
     Prefix = erlfdb_tuple:pack({?ACTIVITY}, Jobs),
@@ -360,15 +363,12 @@ get_active_since(#{jtx := true} = JTx, Type, Versionstamp, Opts) ->
     StartKeySel = erlfdb_key:first_greater_or_equal(StartKey),
     {_, EndKey} = erlfdb_tuple:range({Type}, Prefix),
     Future = erlfdb:get_range(Tx, StartKeySel, EndKey, Opts),
-    {JobIdsData, LastSeq} = lists:mapfoldl(
-        fun({K, V}, _PrevSeq) ->
-            {Type, Seq} = erlfdb_tuple:unpack(K, Prefix),
-            {erlfdb_tuple:unpack(V), Seq}
-        end,
-        Versionstamp,
-        erlfdb:wait(Future)
-    ),
+    {JobIdsData, LastSeq} = lists:mapfoldl(fun({K, V}, _PrevSeq) ->
+        {Type, Seq} = erlfdb_tuple:unpack(K, Prefix),
+        {erlfdb_tuple:unpack(V), Seq}
+    end, Versionstamp, erlfdb:wait(Future)),
     {maps:from_list(JobIdsData), LastSeq}.
+
 
 get_inactive_since(#{jtx := true} = JTx, Type, Versionstamp, Opts) ->
     #{tx := Tx, jobs_path := Jobs} = get_jtx(JTx),
@@ -377,32 +377,28 @@ get_inactive_since(#{jtx := true} = JTx, Type, Versionstamp, Opts) ->
     EndKey = erlfdb_tuple:pack({Type, Versionstamp}, Prefix),
     EndKeySel = erlfdb_key:first_greater_than(EndKey),
     Future = erlfdb:get_range(Tx, StartKey, EndKeySel, Opts),
-    lists:map(
-        fun({_K, V}) ->
-            {JobId, _} = erlfdb_tuple:unpack(V),
-            JobId
-        end,
-        erlfdb:wait(Future)
-    ).
+    lists:map(fun({_K, V}) ->
+        {JobId, _} = erlfdb_tuple:unpack(V),
+        JobId
+    end, erlfdb:wait(Future)).
+
 
 re_enqueue_inactive(#{jtx := true} = JTx, Type, JobIds) when is_list(JobIds) ->
     #{tx := Tx} = get_jtx(JTx),
-    lists:foreach(
-        fun(JobId) ->
-            case get_job_val(Tx, job_key(JTx, Type, JobId)) of
-                #jv{seq = Seq, stime = STime, data = Data} ->
-                    clear_activity(JTx, Type, Seq),
-                    maybe_enqueue(JTx, Type, JobId, STime, true, Data);
-                not_found ->
-                    ok
-            end
-        end,
-        JobIds
-    ),
+    lists:foreach(fun(JobId) ->
+        case get_job_val(Tx, job_key(JTx, Type, JobId)) of
+            #jv{seq = Seq, stime = STime, data = Data} ->
+                clear_activity(JTx, Type, Seq),
+                maybe_enqueue(JTx, Type, JobId, STime, true, Data);
+            not_found ->
+                ok
+        end
+    end, JobIds),
     case length(JobIds) > 0 of
         true -> update_watch(JTx, Type);
         false -> ok
     end.
+
 
 % Cache initialization API. Called from the supervisor just to create the ETS
 % table. It returns `ignore` to tell supervisor it won't actually start any
@@ -412,6 +408,7 @@ init_cache() ->
     ConcurrencyOpts = [{read_concurrency, true}, {write_concurrency, true}],
     ets:new(?MODULE, [public, named_table] ++ ConcurrencyOpts),
     ignore.
+
 
 % Functions to encode / decode JobData
 %
@@ -426,12 +423,16 @@ encode_data(#{} = JobData) ->
             error({json_encoding_error, Error})
     end.
 
+
 decode_data(not_found) ->
     not_found;
+
 decode_data(#{} = JobData) ->
     JobData;
+
 decode_data(<<_/binary>> = JobData) ->
     jiffy:decode(JobData, [dedupe_keys, return_maps]).
+
 
 % Cached job transaction object. This object wraps a transaction, caches the
 % directory lookup path, and the metadata version. The function can be used
@@ -441,8 +442,10 @@ decode_data(<<_/binary>> = JobData) ->
 get_jtx() ->
     get_jtx(undefined).
 
+
 get_jtx(#{tx := Tx} = _TxDb) ->
     get_jtx(Tx);
+
 get_jtx(undefined = _Tx) ->
     case ets:lookup(?MODULE, ?JOBS_ETS_KEY) of
         [{_, #{} = JTx}] ->
@@ -451,6 +454,7 @@ get_jtx(undefined = _Tx) ->
             JTx = update_jtx_cache(init_jtx(undefined)),
             JTx#{tx := undefined}
     end;
+
 get_jtx({erlfdb_transaction, _} = Tx) ->
     case ets:lookup(?MODULE, ?JOBS_ETS_KEY) of
         [{_, #{} = JTx}] ->
@@ -459,11 +463,13 @@ get_jtx({erlfdb_transaction, _} = Tx) ->
             update_jtx_cache(init_jtx(Tx))
     end.
 
+
 % Transaction processing to be used with couch jobs' specific transaction
 % contexts
 %
 tx(#{jtx := true} = JTx, Fun) when is_function(Fun, 1) ->
     fabric2_fdb:transactional(JTx, Fun).
+
 
 % Debug and testing API
 
@@ -488,22 +494,21 @@ get_job(Type, JobId) ->
         end
     end).
 
+
 get_jobs() ->
     fabric2_fdb:transactional(fun(Tx) ->
         #{jobs_path := Jobs} = init_jtx(Tx),
         Prefix = erlfdb_tuple:pack({?DATA}, Jobs),
         Opts = [{streaming_mode, want_all}],
         Result = erlfdb:wait(erlfdb:get_range_startswith(Tx, Prefix, Opts)),
-        lists:map(
-            fun({K, V}) ->
-                {Type, JobId} = erlfdb_tuple:unpack(K, Prefix),
-                {Seq, JLock, _, _, Data} = erlfdb_tuple:unpack(V),
-                JobState = job_state(JLock, Seq),
-                {Type, JobId, JobState, decode_data(Data)}
-            end,
-            Result
-        )
+        lists:map(fun({K, V}) ->
+            {Type, JobId} = erlfdb_tuple:unpack(K, Prefix),
+            {Seq, JLock, _, _, Data} = erlfdb_tuple:unpack(V),
+            JobState = job_state(JLock, Seq),
+            {Type, JobId, JobState, decode_data(Data)}
+        end, Result)
     end).
+
 
 % Call this function if the top level "couchdb" FDB directory layer
 % changes.
@@ -513,8 +518,10 @@ bump_metadata_version() ->
         bump_metadata_version(Tx)
     end).
 
+
 bump_metadata_version(Tx) ->
     erlfdb:set_versionstamped_value(Tx, ?COUCH_JOBS_MD_VERSION, <<0:112>>).
+
 
 % Private helper functions
 
@@ -537,14 +544,18 @@ maybe_enqueue(#{jtx := true} = JTx, Type, JobId, STime, Resubmit, Data) ->
     end,
     ok.
 
+
 job_key(#{jtx := true, jobs_path := Jobs}, Type, JobId) ->
     erlfdb_tuple:pack({?DATA, Type, JobId}, Jobs).
+
 
 job_key(JTx, #{type := Type, id := JobId}) ->
     job_key(JTx, Type, JobId).
 
+
 get_job_val(#{jtx := true, tx := Tx} = JTx, #{job := true} = Job) ->
     get_job_val(Tx, job_key(JTx, Job));
+
 get_job_val(Tx = {erlfdb_transaction, _}, Key) ->
     case erlfdb:wait(erlfdb:get(Tx, Key)) of
         <<_/binary>> = Val ->
@@ -560,6 +571,7 @@ get_job_val(Tx = {erlfdb_transaction, _}, Key) ->
             not_found
     end.
 
+
 set_job_val(Tx = {erlfdb_transaction, _}, Key, #jv{} = JV) ->
     #jv{
         seq = Seq,
@@ -568,11 +580,10 @@ set_job_val(Tx = {erlfdb_transaction, _}, Key, #jv{} = JV) ->
         resubmit = Resubmit,
         data = Data0
     } = JV,
-    Data =
-        case Data0 of
-            #{} -> encode_data(Data0);
-            <<_/binary>> -> Data0
-        end,
+    Data = case Data0 of
+        #{} -> encode_data(Data0);
+        <<_/binary>> -> Data0
+    end,
     case Seq of
         ?UNSET_VS ->
             Val = erlfdb_tuple:pack_vs({Seq, JLock, STime, Resubmit, Data}),
@@ -582,6 +593,7 @@ set_job_val(Tx = {erlfdb_transaction, _}, Key, #jv{} = JV) ->
             erlfdb:set(Tx, Key, Val)
     end,
     ok.
+
 
 get_job_or_halt(Tx, Key, JLock) ->
     case get_job_val(Tx, Key) of
@@ -593,33 +605,36 @@ get_job_or_halt(Tx, Key, JLock) ->
             halt
     end.
 
+
 update_activity(#{jtx := true} = JTx, Type, JobId, Seq, Data0) ->
-    #{tx := Tx, jobs_path := Jobs} = JTx,
+    #{tx := Tx, jobs_path :=  Jobs} = JTx,
     case Seq =/= null of
         true -> clear_activity(JTx, Type, Seq);
         false -> ok
     end,
     Key = erlfdb_tuple:pack_vs({?ACTIVITY, Type, ?UNSET_VS}, Jobs),
-    Data =
-        case Data0 of
-            #{} -> encode_data(Data0);
-            <<_/binary>> -> Data0
-        end,
+    Data = case Data0 of
+        #{} -> encode_data(Data0);
+        <<_/binary>> -> Data0
+    end,
     Val = erlfdb_tuple:pack({JobId, Data}),
     erlfdb:set_versionstamped_key(Tx, Key, Val),
     update_watch(JTx, Type).
 
+
 clear_activity(#{jtx := true} = JTx, Type, Seq) ->
-    #{tx := Tx, jobs_path := Jobs} = JTx,
+    #{tx := Tx, jobs_path :=  Jobs} = JTx,
     Key = erlfdb_tuple:pack({?ACTIVITY, Type, Seq}, Jobs),
     erlfdb:clear(Tx, Key).
 
+
 update_watch(#{jtx := true} = JTx, Type) ->
-    #{tx := Tx, jobs_path := Jobs} = JTx,
+    #{tx := Tx, jobs_path :=  Jobs} = JTx,
     Key = erlfdb_tuple:pack({?WATCHES_ACTIVITY, Type}, Jobs),
     Val = erlfdb_tuple:pack_vs({?UNSET_VS}),
     erlfdb:set_versionstamped_value(Tx, Key, Val),
     ok.
+
 
 job_state(JLock, Seq) ->
     case {JLock, Seq} of
@@ -628,6 +643,7 @@ job_state(JLock, Seq) ->
         {null, Seq} when Seq =/= null -> pending
     end.
 
+
 % This a transaction context object similar to the Db = #{} one from
 % fabric2_fdb. It's is used to cache the jobs path directory (to avoid extra
 % lookups on every operation) and to check for metadata changes (in case
@@ -635,6 +651,7 @@ job_state(JLock, Seq) ->
 %
 init_jtx(undefined) ->
     fabric2_fdb:transactional(fun(Tx) -> init_jtx(Tx) end);
+
 init_jtx({erlfdb_transaction, _} = Tx) ->
     LayerPrefix = fabric2_fdb:get_dir(Tx),
     Jobs = erlfdb_tuple:pack({?JOBS}, LayerPrefix),
@@ -649,6 +666,7 @@ init_jtx({erlfdb_transaction, _} = Tx) ->
         md_version => get_metadata_version(Tx)
     }.
 
+
 ensure_current(#{jtx := true, tx := Tx} = JTx) ->
     case get(?COUCH_JOBS_CURRENT) of
         Tx ->
@@ -659,8 +677,10 @@ ensure_current(#{jtx := true, tx := Tx} = JTx) ->
             JTx1
     end.
 
+
 get_metadata_version({erlfdb_transaction, _} = Tx) ->
     erlfdb:wait(erlfdb:get_ss(Tx, ?COUCH_JOBS_MD_VERSION)).
+
 
 update_current(#{tx := Tx, md_version := Version} = JTx) ->
     case get_md_version_age(Version) of
@@ -677,25 +697,29 @@ update_current(#{tx := Tx, md_version := Version} = JTx) ->
             end
     end.
 
+
 update_jtx_cache(#{jtx := true, md_version := Version} = JTx) ->
     CachedJTx = JTx#{tx := undefined},
     ets:insert(?MODULE, {?JOBS_ETS_KEY, CachedJTx}),
     update_md_version_timestamp(Version),
     JTx.
 
+
 get_md_version_age(Version) ->
-    Timestamp =
-        case ets:lookup(?MODULE, ?MD_TIMESTAMP_ETS_KEY) of
-            [{_, Version, Ts}] -> Ts;
-            _ -> 0
-        end,
+    Timestamp = case ets:lookup(?MODULE, ?MD_TIMESTAMP_ETS_KEY) of
+        [{_, Version, Ts}] -> Ts;
+        _ -> 0
+    end,
     erlang:system_time(second) - Timestamp.
+
 
 update_md_version_timestamp(Version) ->
     Ts = erlang:system_time(second),
     ets:insert(?MODULE, {?MD_TIMESTAMP_ETS_KEY, Version, Ts}).
 
+
 update_job_data(Data, undefined) ->
     Data;
+
 update_job_data(_Data, NewData) ->
     NewData.

@@ -10,6 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
+
 -module(mango_json_bookmark).
 
 -export([
@@ -17,14 +18,15 @@
     create/1
 ]).
 
+
 -include_lib("couch_views/include/couch_views.hrl").
 -include("mango_cursor.hrl").
 -include("mango.hrl").
 
-update_args(EncodedBookmark, #mrargs{skip = Skip} = Args) ->
+update_args(EncodedBookmark,  #mrargs{skip = Skip} = Args) ->
     Bookmark = unpack(EncodedBookmark),
     case is_list(Bookmark) of
-        true ->
+        true -> 
             {startkey, Startkey} = lists:keyfind(startkey, 1, Bookmark),
             {startkey_docid, StartkeyDocId} = lists:keyfind(startkey_docid, 1, Bookmark),
             Args#mrargs{
@@ -35,18 +37,18 @@ update_args(EncodedBookmark, #mrargs{skip = Skip} = Args) ->
         false ->
             Args
     end.
+    
 
-create(#cursor{bookmark_docid = BookmarkDocId, bookmark_key = BookmarkKey}) when
-    BookmarkKey =/= undefined
-->
+create(#cursor{bookmark_docid = BookmarkDocId, bookmark_key = BookmarkKey}) when BookmarkKey =/= undefined ->
     QueryArgs = [
         {startkey_docid, BookmarkDocId},
         {startkey, BookmarkKey}
     ],
-    Bin = term_to_binary(QueryArgs, [compressed, {minor_version, 1}]),
+    Bin = term_to_binary(QueryArgs, [compressed, {minor_version,1}]),
     couch_util:encodeBase64Url(Bin);
 create(#cursor{bookmark = Bookmark}) ->
     Bookmark.
+
 
 unpack(nil) ->
     nil;
@@ -54,17 +56,16 @@ unpack(Packed) ->
     try
         Bookmark = binary_to_term(couch_util:decodeBase64Url(Packed), [safe]),
         verify(Bookmark)
-    catch
-        _:_ ->
-            ?MANGO_ERROR({invalid_bookmark, Packed})
+    catch _:_ ->
+        ?MANGO_ERROR({invalid_bookmark, Packed})
     end.
 
 verify(Bookmark) when is_list(Bookmark) ->
-    case
-        lists:keymember(startkey, 1, Bookmark) andalso lists:keymember(startkey_docid, 1, Bookmark)
-    of
+    case lists:keymember(startkey, 1, Bookmark) andalso lists:keymember(startkey_docid, 1, Bookmark) of
         true -> Bookmark;
         _ -> throw(invalid_bookmark)
     end;
 verify(_Bookmark) ->
     throw(invalid_bookmark).
+
+   

@@ -27,9 +27,11 @@ before_find(HttpReq0) ->
     [HttpReq1] = with_pipe(before_find, [HttpReq0]),
     {ok, HttpReq1}.
 
+
 after_find(HttpReq, HttpResp, Arg0) ->
     [_HttpReq, _HttpResp, Arg1] = with_pipe(after_find, [HttpReq, HttpResp, Arg0]),
     {ok, Arg1}.
+
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
@@ -37,6 +39,7 @@ after_find(HttpReq, HttpResp, Arg0) ->
 
 with_pipe(Func, Args) ->
     do_apply(Func, Args, [pipe]).
+
 
 do_apply(Func, Args, Opts) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
