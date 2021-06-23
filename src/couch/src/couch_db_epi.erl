@@ -32,6 +32,7 @@ providers() ->
         {chttpd_handlers, couch_httpd_handlers}
     ].
 
+
 services() ->
     [
         {feature_flags, couch_flags}
