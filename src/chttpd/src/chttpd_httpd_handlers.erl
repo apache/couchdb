@@ -417,7 +417,7 @@ handler_info(_, _, _) ->
 get_copy_destination(Req) ->
     try
         {DocIdStr, _} = chttpd_util:parse_copy_destination_header(Req),
-        list_to_binary(mochiweb_util:unquote(DocIdStr))
+        list_to_binary(chttpd:unquote(DocIdStr))
     catch
         _:_ ->
             unknown
