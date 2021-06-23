@@ -1283,7 +1283,7 @@ db_doc_req(#httpd{method = 'COPY'} = Req, Db, SourceDocId) ->
             Rev -> Rev
         end,
     {TargetDocId0, TargetRevs} = chttpd_util:parse_copy_destination_header(Req),
-    TargetDocId = list_to_binary(mochiweb_util:unquote(TargetDocId0)),
+    TargetDocId = list_to_binary(chttpd:unquote(TargetDocId0)),
     % open old doc
     Doc = couch_doc_open(Db, SourceDocId, SourceRev, []),
     % save new doc

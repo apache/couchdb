@@ -322,7 +322,7 @@ handle_request_int(MochiReq) ->
         nonce = Nonce,
         method = Method,
         path_parts = [
-            list_to_binary(chttpd:unquote(Part))
+            list_to_binary(unquote(Part))
          || Part <- string:tokens(Path, "/")
         ],
         requested_path_parts = [
@@ -802,7 +802,10 @@ absolute_uri(#httpd{absolute_uri = URI}, Path) ->
     URI ++ Path.
 
 unquote(UrlEncodedString) ->
-    mochiweb_util:unquote(UrlEncodedString).
+    case config:get_boolean("chttpd", "decode_plus_to_space", false) of
+        true -> mochiweb_util:unquote(UrlEncodedString);
+        false -> mochiweb_util:unquote_path(UrlEncodedString)
+    end.
 
 quote(UrlDecodedString) ->
     mochiweb_util:quote_plus(UrlDecodedString).

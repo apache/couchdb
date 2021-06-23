@@ -72,6 +72,62 @@ defmodule BasicsTest do
     assert context[:db_name] in Couch.get("/_all_dbs").body, "Db name in _all_dbs"
   end
 
+  test "Database name with '+' should encode to '+'", _context do
+    set_config({"chttpd", "decode_plus_to_space", "false"})
+
+    random_number = :rand.uniform(16_000_000)
+    db_name = "random+test+db+#{random_number}"
+    resp = Couch.put("/#{db_name}")
+
+    assert resp.status_code == 201
+    assert resp.body["ok"] == true
+
+    resp = Couch.get("/#{db_name}")
+
+    assert resp.status_code == 200
+    assert resp.body["db_name"] == db_name
+  end
+
+  test "Database name with '%2B' should encode to '+'", _context do
+    set_config({"chttpd", "decode_plus_to_space", "true"})
+
+    random_number = :rand.uniform(16_000_000)
+    db_name = "random%2Btest%2Bdb2%2B#{random_number}"
+    resp = Couch.put("/#{db_name}")
+
+    assert resp.status_code == 201
+    assert resp.body["ok"] == true
+
+    resp = Couch.get("/#{db_name}")
+
+    assert resp.status_code == 200
+    assert resp.body["db_name"] == "random+test+db2+#{random_number}"
+  end
+
+  @tag :with_db
+  test "'+' in document name should encode to '+'", context do
+    set_config({"chttpd", "decode_plus_to_space", "false"})
+
+    db_name = context[:db_name]
+    doc_id = "test+doc"
+    resp = Couch.put("/#{db_name}/#{doc_id}", body: %{})
+
+    assert resp.status_code == 201
+    assert resp.body["id"] == "test+doc"
+  end
+
+  @tag :with_db
+  test "'+' in document name should encode to space", context do
+    set_config({"chttpd", "decode_plus_to_space", "true"})
+
+    db_name = context[:db_name]
+    doc_id = "test+doc+2"
+    resp = Couch.put("/#{db_name}/#{doc_id}", body: %{})
+
+    assert resp.status_code == 201
+    assert resp.body["id"] == "test doc 2"
+  end
+
   @tag :with_db
   test "Empty database should have zero docs", context do
     assert Couch.get("/#{context[:db_name]}").body["doc_count"] == 0,
