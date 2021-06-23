@@ -11,30 +11,28 @@
 % the License.
 -module(couch_views_ddoc).
 
-
 -export([
     get_interactive_list/1,
     get_mango_list/1,
     is_interactive/1
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
-
 
 % TODO: build a ddoc cache that checks the md_version
 get_interactive_list(Db) ->
     DDocs = fabric2_db:get_design_docs(Db),
     lists:filter(fun is_interactive/1, DDocs).
 
-
 get_mango_list(Db) ->
     DDocs = fabric2_db:get_design_docs(Db),
-    lists:filter(fun (DDoc) ->
-        {Props} = couch_doc:to_json_obj(DDoc, []),
-        fabric2_util:get_value(<<"language">>, Props) == <<"query">>
-    end, DDocs).
-
+    lists:filter(
+        fun(DDoc) ->
+            {Props} = couch_doc:to_json_obj(DDoc, []),
+            fabric2_util:get_value(<<"language">>, Props) == <<"query">>
+        end,
+        DDocs
+    ).
 
 is_interactive(#doc{} = DDoc) ->
     {Props} = couch_doc:to_json_obj(DDoc, []),

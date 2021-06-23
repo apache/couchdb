@@ -25,21 +25,29 @@ generate(ModuleName, Forms0) ->
 
 scan(String) ->
     Exprs = [E || E <- re:split(String, "\\.\n", [{return, list}, trim])],
-    FormsTokens = lists:foldl(fun(Expr, Acc) ->
-        case erl_scan:string(Expr) of
-            {ok, [], _} ->
-                Acc;
-            {ok, Tokens, _} ->
-                [{Expr, fixup_terminator(Tokens)} | Acc]
-        end
-    end, [], Exprs),
+    FormsTokens = lists:foldl(
+        fun(Expr, Acc) ->
+            case erl_scan:string(Expr) of
+                {ok, [], _} ->
+                    Acc;
+                {ok, Tokens, _} ->
+                    [{Expr, fixup_terminator(Tokens)} | Acc]
+            end
+        end,
+        [],
+        Exprs
+    ),
     lists:reverse(FormsTokens).
 
 parse(FormsTokens) ->
-    ASTForms = lists:foldl(fun(Tokens, Forms) ->
-        {ok, AST} = parse_form(Tokens),
-        [AST | Forms]
-    end, [], FormsTokens),
+    ASTForms = lists:foldl(
+        fun(Tokens, Forms) ->
+            {ok, AST} = parse_form(Tokens),
+            [AST | Forms]
+        end,
+        [],
+        FormsTokens
+    ),
     lists:reverse(ASTForms).
 
 format_term(Data) ->
@@ -49,11 +57,11 @@ parse_form(Tokens) ->
     {Expr, Forms} = split_expression(Tokens),
     case erl_parse:parse_form(Forms) of
         {ok, AST} -> {ok, AST};
-        {error,{_,_, Reason}} ->
-            {error, Expr, Reason}
+        {error, {_, _, Reason}} -> {error, Expr, Reason}
     end.
 
-split_expression({Expr, Forms}) -> {Expr, Forms};
+split_expression({Expr, Forms}) ->
+    {Expr, Forms};
 split_expression(Tokens) ->
     {Exprs, Forms} = lists:unzip(Tokens),
     {string:join(Exprs, "\n"), lists:append(Forms)}.
@@ -63,13 +71,14 @@ function(Clauses) ->
 
 fixup_terminator(Tokens) ->
     case lists:last(Tokens) of
-        {dot, _} -> Tokens;
-        {';', _} -> Tokens;
+        {dot, _} ->
+            Tokens;
+        {';', _} ->
+            Tokens;
         Token ->
             Line = line(Token),
             Tokens ++ [{dot, Line}]
     end.
-
 
 -ifdef(pre18).
 

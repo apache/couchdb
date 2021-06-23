@@ -14,7 +14,6 @@
 -behaviour(gen_server).
 -vsn(1).
 
-
 -export([
     start_link/0,
 
@@ -31,7 +30,6 @@
     get_retry_limit/0
 ]).
 
-
 -export([
     init/1,
     terminate/2,
@@ -40,7 +38,6 @@
     handle_info/2,
     code_change/3
 ]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("kernel/include/file.hrl").
@@ -59,19 +56,17 @@
 -define(DEFAULT_RETRY_LIMIT, "100").
 
 -define(TX_OPTIONS, #{
-    machine_id                           => {binary,  undefined},
-    datacenter_id                        => {binary,  undefined},
+    machine_id => {binary, undefined},
+    datacenter_id => {binary, undefined},
     transaction_logging_max_field_length => {integer, undefined},
-    timeout                              => {integer, ?DEFAULT_TIMEOUT_MSEC},
-    retry_limit                          => {integer, ?DEFAULT_RETRY_LIMIT},
-    max_retry_delay                      => {integer, undefined},
-    size_limit                           => {integer, undefined}
+    timeout => {integer, ?DEFAULT_TIMEOUT_MSEC},
+    retry_limit => {integer, ?DEFAULT_RETRY_LIMIT},
+    max_retry_delay => {integer, undefined},
+    size_limit => {integer, undefined}
 }).
-
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
 
 fetch(DbName, UUID) when is_binary(DbName) ->
     case {UUID, ets:lookup(?MODULE, DbName)} of
@@ -80,7 +75,6 @@ fetch(DbName, UUID) when is_binary(DbName) ->
         {<<_/binary>>, [{DbName, UUID, _, #{} = Db}]} -> Db;
         {<<_/binary>>, [{DbName, _UUID, _, #{} = _Db}]} -> undefined
     end.
-
 
 store(#{name := DbName} = Db0) when is_binary(DbName) ->
     #{
@@ -94,14 +88,13 @@ store(#{name := DbName} = Db0) when is_binary(DbName) ->
     end,
     ok.
 
-
 maybe_update(#{name := DbName} = Db0) when is_binary(DbName) ->
     #{
         uuid := UUID,
         md_version := MDVer
     } = Db0,
     Db1 = sanitize(Db0),
-    Head = {DbName, UUID,  '$1', '_'},
+    Head = {DbName, UUID, '$1', '_'},
     Guard = {'=<', '$1', MDVer},
     Body = {DbName, UUID, MDVer, {const, Db1}},
     try
@@ -111,11 +104,9 @@ maybe_update(#{name := DbName} = Db0) when is_binary(DbName) ->
             false
     end.
 
-
 remove(DbName) when is_binary(DbName) ->
     true = ets:delete(?MODULE, DbName),
     ok.
-
 
 maybe_remove(#{name := DbName} = Db) when is_binary(DbName) ->
     #{
@@ -126,40 +117,36 @@ maybe_remove(#{name := DbName} = Db) when is_binary(DbName) ->
     Guard = {'=<', '$1', MDVer},
     1 =:= ets:select_delete(?MODULE, [{Head, [Guard], [true]}]).
 
-
 init(_) ->
     ets:new(?MODULE, [
-            public,
-            named_table,
-            {read_concurrency, true},
-            {write_concurrency, true}
-        ]),
+        public,
+        named_table,
+        {read_concurrency, true},
+        {write_concurrency, true}
+    ]),
     {Cluster, Db} = get_db_and_cluster([empty]),
     application:set_env(fabric, ?FDB_CLUSTER, Cluster),
     application:set_env(fabric, db, Db),
 
-    Dir = case config:get("fabric", "fdb_directory") of
-        Val when is_list(Val), length(Val) > 0 ->
-            [?l2b(Val)];
-        _ ->
-            [?DEFAULT_FDB_DIRECTORY]
-    end,
+    Dir =
+        case config:get("fabric", "fdb_directory") of
+            Val when is_list(Val), length(Val) > 0 ->
+                [?l2b(Val)];
+            _ ->
+                [?DEFAULT_FDB_DIRECTORY]
+        end,
     application:set_env(fabric, ?FDB_DIRECTORY, Dir),
     config:subscribe_for_changes([?TX_OPTIONS_SECTION]),
     {ok, nil}.
 
-
 terminate(_, _St) ->
     ok.
-
 
 handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
 
-
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
-
 
 handle_info({config_change, ?TX_OPTIONS_SECTION, _K, deleted, _}, St) ->
     % Since we don't know the exact default values to reset the options
@@ -168,27 +155,21 @@ handle_info({config_change, ?TX_OPTIONS_SECTION, _K, deleted, _}, St) ->
     {_Cluster, NewDb} = get_db_and_cluster([]),
     application:set_env(fabric, db, NewDb),
     {noreply, St};
-
 handle_info({config_change, ?TX_OPTIONS_SECTION, K, V, _}, St) ->
     {ok, Db} = application:get_env(fabric, db),
     apply_tx_options(Db, [{K, V}]),
     {noreply, St};
-
 handle_info({gen_event_EXIT, _Handler, _Reason}, St) ->
     erlang:send_after(?RELISTEN_DELAY, self(), restart_config_listener),
     {noreply, St};
-
 handle_info(restart_config_listener, St) ->
     config:subscribe_for_changes([?TX_OPTIONS_SECTION]),
     {noreply, St};
-
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
-
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
-
 
 fdb_directory() ->
     get_env(?FDB_DIRECTORY).
@@ -196,11 +177,9 @@ fdb_directory() ->
 fdb_cluster() ->
     get_env(?FDB_CLUSTER).
 
-
 get_retry_limit() ->
     Default = list_to_integer(?DEFAULT_RETRY_LIMIT),
     config:get_integer(?TX_OPTIONS_SECTION, "retry_limit", Default).
-
 
 get_env(Key) ->
     case get(Key) of
@@ -216,25 +195,26 @@ get_env(Key) ->
             Value
     end.
 
-
 get_db_and_cluster(EunitDbOpts) ->
-     {Cluster, Db} = case application:get_env(fabric, eunit_run) of
-        {ok, true} ->
-            {<<"eunit_test">>, erlfdb_util:get_test_db(EunitDbOpts)};
-        undefined ->
-            ClusterFileStr = get_cluster_file_path(),
-            {ok, ConnectionStr} = file:read_file(ClusterFileStr),
-            DbHandle = erlfdb:open(iolist_to_binary(ClusterFileStr)),
-            {string:trim(ConnectionStr), DbHandle}
-    end,
+    {Cluster, Db} =
+        case application:get_env(fabric, eunit_run) of
+            {ok, true} ->
+                {<<"eunit_test">>, erlfdb_util:get_test_db(EunitDbOpts)};
+            undefined ->
+                ClusterFileStr = get_cluster_file_path(),
+                {ok, ConnectionStr} = file:read_file(ClusterFileStr),
+                DbHandle = erlfdb:open(iolist_to_binary(ClusterFileStr)),
+                {string:trim(ConnectionStr), DbHandle}
+        end,
     apply_tx_options(Db, config:get(?TX_OPTIONS_SECTION)),
     {Cluster, Db}.
 
 get_cluster_file_path() ->
-    Locations = [
-        {custom, config:get("erlfdb", "cluster_file")},
-        {custom, os:getenv("FDB_CLUSTER_FILE", undefined)}
-    ] ++ default_locations(os:type()),
+    Locations =
+        [
+            {custom, config:get("erlfdb", "cluster_file")},
+            {custom, os:getenv("FDB_CLUSTER_FILE", undefined)}
+        ] ++ default_locations(os:type()),
     case find_cluster_file(Locations) of
         {ok, Location} ->
             Location;
@@ -242,25 +222,20 @@ get_cluster_file_path() ->
             erlang:error(Reason)
     end.
 
-
 default_locations({unix, _}) ->
     [
         {default, ?CLUSTER_FILE_MACOS},
         {default, ?CLUSTER_FILE_LINUX}
     ];
-
 default_locations({win32, _}) ->
     [
         {default, ?CLUSTER_FILE_WIN32}
     ].
 
-
 find_cluster_file([]) ->
     {error, cluster_file_missing};
-
 find_cluster_file([{custom, undefined} | Rest]) ->
     find_cluster_file(Rest);
-
 find_cluster_file([{Type, Location} | Rest]) ->
     Msg = #{
         what => fdb_connection_setup,
@@ -278,7 +253,8 @@ find_cluster_file([{Type, Location} | Rest]) ->
         {ok, #file_info{access = read}} ->
             ?LOG_WARNING(Msg#{
                 status => read_only_file,
-                details => "If coordinators are changed without updating this "
+                details =>
+                    "If coordinators are changed without updating this "
                     "file CouchDB may be unable to connect to the FDB cluster!"
             }),
             couch_log:warning(
@@ -330,20 +306,21 @@ find_cluster_file([{Type, Location} | Rest]) ->
             find_cluster_file(Rest)
     end.
 
-
 apply_tx_options(Db, Cfg) ->
-    maps:map(fun(Option, {Type, Default}) ->
-        case lists:keyfind(atom_to_list(Option), 1, Cfg) of
-            false ->
-                case Default of
-                    undefined -> ok;
-                    _Defined -> apply_tx_option(Db, Option, Default, Type)
-                end;
-            {_K, Val} ->
-                apply_tx_option(Db, Option, Val, Type)
-        end
-    end, ?TX_OPTIONS).
-
+    maps:map(
+        fun(Option, {Type, Default}) ->
+            case lists:keyfind(atom_to_list(Option), 1, Cfg) of
+                false ->
+                    case Default of
+                        undefined -> ok;
+                        _Defined -> apply_tx_option(Db, Option, Default, Type)
+                    end;
+                {_K, Val} ->
+                    apply_tx_option(Db, Option, Val, Type)
+            end
+        end,
+        ?TX_OPTIONS
+    ).
 
 apply_tx_option(Db, Option, Val, integer) ->
     try
@@ -358,7 +335,6 @@ apply_tx_option(Db, Option, Val, integer) ->
             Msg = "~p : Invalid integer tx option ~p = ~p",
             couch_log:error(Msg, [?MODULE, Option, Val])
     end;
-
 apply_tx_option(Db, Option, Val, binary) ->
     BinVal = list_to_binary(Val),
     case size(BinVal) < 16 of
@@ -374,7 +350,6 @@ apply_tx_option(Db, Option, Val, binary) ->
             Msg = "~p : String tx option ~p is larger than 16 bytes",
             couch_log:error(Msg, [?MODULE, Option])
     end.
-
 
 set_option(Db, Option, Val) ->
     try
@@ -392,7 +367,6 @@ set_option(Db, Option, Val) ->
             couch_log:error(Msg, [?MODULE, Option, Val])
     end.
 
-
 sanitize(#{} = Db) ->
     Db#{
         tx := undefined,
@@ -400,7 +374,6 @@ sanitize(#{} = Db) ->
         security_fun := undefined,
         interactive := false
     }.
-
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -424,11 +397,9 @@ teardown(_) ->
     meck:unload().
 
 find_cluster_file_test_() ->
-    {setup,
-        fun setup/0,
-        fun teardown/1,
-        [
-            {"ignore unspecified config", ?_assertEqual(
+    {setup, fun setup/0, fun teardown/1, [
+        {"ignore unspecified config",
+            ?_assertEqual(
                 {ok, "ok.cluster"},
                 find_cluster_file([
                     {custom, undefined},
@@ -436,21 +407,24 @@ find_cluster_file_test_() ->
                 ])
             )},
 
-            {"allow read-only file", ?_assertEqual(
+        {"allow read-only file",
+            ?_assertEqual(
                 {ok, "readonly.cluster"},
                 find_cluster_file([
                     {custom, "readonly.cluster"}
                 ])
             )},
 
-            {"fail if no access to configured cluster file", ?_assertEqual(
+        {"fail if no access to configured cluster file",
+            ?_assertEqual(
                 {error, cluster_file_permissions},
                 find_cluster_file([
                     {custom, "noaccess.cluster"}
                 ])
             )},
 
-            {"fail if configured cluster file is missing", ?_assertEqual(
+        {"fail if configured cluster file is missing",
+            ?_assertEqual(
                 {error, enoent},
                 find_cluster_file([
                     {custom, "missing.cluster"},
@@ -458,14 +432,14 @@ find_cluster_file_test_() ->
                 ])
             )},
 
-            {"check multiple default locations", ?_assertEqual(
+        {"check multiple default locations",
+            ?_assertEqual(
                 {ok, "ok.cluster"},
                 find_cluster_file([
                     {default, "missing.cluster"},
                     {default, "ok.cluster"}
                 ])
             )}
-        ]
-    }.
+    ]}.
 
 -endif.

@@ -14,16 +14,13 @@
 
 -behavior(couch_views_batch).
 
-
 -export([
     start/2,
     success/3,
     failure/2
 ]).
 
-
 -include_lib("couch_views/include/couch_views.hrl").
-
 
 -record(batch_st, {
     start_time,
@@ -36,11 +33,10 @@
     threshold_penalty
 }).
 
-
 -spec start(
-        Mrst::#mrst{},
-        State::term()
-    ) -> {NewState::term(), BatchSize::pos_integer()}.
+    Mrst :: #mrst{},
+    State :: term()
+) -> {NewState :: term(), BatchSize :: pos_integer()}.
 start(Mrst, undefined) ->
     St = #batch_st{
         state = search,
@@ -50,25 +46,23 @@ start(Mrst, undefined) ->
         max_tx_size_bytes = get_config(batch_max_tx_size_bytes, "9000000"),
         max_tx_time_msec = get_config(batch_max_tx_time_msec, "1500"),
         threshold_penalty = get_config(
-                batch_threshold_penalty,
-                "0.2",
-                fun float_0_to_1/2
-            )
+            batch_threshold_penalty,
+            "0.2",
+            fun float_0_to_1/2
+        )
     },
     start(Mrst, St);
-
 start(_Mrst, #batch_st{size = Size} = St) ->
     NewSt = St#batch_st{
         start_time = erlang:monotonic_time()
     },
     {NewSt, Size}.
 
-
 -spec success(
-        Mrst::#mrst{},
-        UpdateStats::couch_views_batch:update_stats(),
-        State::term()
-    ) -> NewState::term().
+    Mrst :: #mrst{},
+    UpdateStats :: couch_views_batch:update_stats(),
+    State :: term()
+) -> NewState :: term().
 success(_Mrst, #{tx_size := TxSize}, #batch_st{} = St) ->
     #batch_st{
         start_time = StartTime,
@@ -84,62 +78,60 @@ success(_Mrst, #{tx_size := TxSize}, #batch_st{} = St) ->
     TxTimeNative = erlang:monotonic_time() - StartTime,
     TxTime = erlang:convert_time_unit(TxTimeNative, native, millisecond),
 
-    {NewSize, NewState} = case TxSize > MaxTxSize orelse TxTime > MaxTxTime of
-        true ->
-            {round(Size * (1.0 - ThresholdPenalty)), sense};
-        false when State == search ->
-            {Size + SearchIncr, State};
-        false when State == sense ->
-            {Size + SenseIncr, State}
-    end,
+    {NewSize, NewState} =
+        case TxSize > MaxTxSize orelse TxTime > MaxTxTime of
+            true ->
+                {round(Size * (1.0 - ThresholdPenalty)), sense};
+            false when State == search ->
+                {Size + SearchIncr, State};
+            false when State == sense ->
+                {Size + SenseIncr, State}
+        end,
 
     St#batch_st{
         size = erlang:max(1, NewSize),
         state = NewState
     }.
 
-
--spec failure(Mrst::#mrst{}, State::term()) -> NewState::term().
+-spec failure(Mrst :: #mrst{}, State :: term()) -> NewState :: term().
 failure(_Mrst, #batch_st{} = St) ->
     St#batch_st{
         size = erlang:max(1, St#batch_st.size div 2),
         state = sense
     }.
 
-
 get_config(Key, Default) ->
     get_config(Key, Default, fun non_neg_integer/2).
-
 
 get_config(Key, Default, Validator) ->
     StrVal = config:get("couch_views", atom_to_list(Key), Default),
     Validator(Key, StrVal).
-
 
 non_neg_integer(Name, Str) ->
     try
         Val = list_to_integer(Str),
         true = Val > 0,
         Val
-    catch _:_ ->
-        erlang:error({invalid_non_neg_integer, {couch_views, Name, Str}})
+    catch
+        _:_ ->
+            erlang:error({invalid_non_neg_integer, {couch_views, Name, Str}})
     end.
-
 
 float_0_to_1(Name, Str) ->
-    Val = try
-        list_to_float(Str)
-    catch error:badarg ->
-        erlang:error({invalid_float, {couch_views, Name, Str}})
-    end,
-    if Val >= 0.0 andalso Val =< 1.0 -> Val; true ->
-        erlang:error({float_out_of_range, {couch_views, Name, Str}})
+    Val =
+        try
+            list_to_float(Str)
+        catch
+            error:badarg ->
+                erlang:error({invalid_float, {couch_views, Name, Str}})
+        end,
+    if
+        Val >= 0.0 andalso Val =< 1.0 -> Val;
+        true -> erlang:error({float_out_of_range, {couch_views, Name, Str}})
     end.
-
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-
 
 good_config_test() ->
     with_good_config(fun() ->
@@ -158,7 +150,6 @@ good_config_test() ->
         )
     end).
 
-
 bad_config_test() ->
     Fields = [
         {batch_initial_size, invalid_non_neg_integer},
@@ -168,26 +159,30 @@ bad_config_test() ->
         {batch_max_tx_time_msec, invalid_non_neg_integer},
         {batch_threshold_penalty, invalid_float}
     ],
-    lists:foreach(fun({Field, Error}) ->
-        with_bad_config(atom_to_list(Field), fun() ->
-            ?assertError(
-                {Error, {couch_views, Field, _}},
-                start(#mrst{}, undefined)
-            )
-        end)
-    end, Fields).
-
+    lists:foreach(
+        fun({Field, Error}) ->
+            with_bad_config(atom_to_list(Field), fun() ->
+                ?assertError(
+                    {Error, {couch_views, Field, _}},
+                    start(#mrst{}, undefined)
+                )
+            end)
+        end,
+        Fields
+    ).
 
 float_range_test() ->
     with_bad_float_config("batch_threshold_penalty", fun() ->
-        lists:foreach(fun(_) ->
-            ?assertError(
-                {float_out_of_range, {couch_views, batch_threshold_penalty, _}},
-                start(#mrst{}, undefined)
-            )
-        end, lists:seq(1, 10))
+        lists:foreach(
+            fun(_) ->
+                ?assertError(
+                    {float_out_of_range, {couch_views, batch_threshold_penalty, _}},
+                    start(#mrst{}, undefined)
+                )
+            end,
+            lists:seq(1, 10)
+        )
     end).
-
 
 with_good_config(Fun) ->
     meck:new(config),
@@ -204,7 +199,6 @@ with_good_config(Fun) ->
     after
         meck:unload()
     end.
-
 
 with_bad_config(FieldName, Fun) ->
     meck:new(config),
@@ -224,7 +218,6 @@ with_bad_config(FieldName, Fun) ->
     after
         meck:unload()
     end.
-
 
 with_bad_float_config(FieldName, Fun) ->
     meck:new(config),

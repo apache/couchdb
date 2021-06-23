@@ -12,7 +12,6 @@
 
 -module(couch_replicator_auth).
 
-
 -export([
     initialize/1,
     update_headers/2,
@@ -20,16 +19,12 @@
     cleanup/1
 ]).
 
-
 -include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
-
 
 -type headers() :: [{string(), string()}].
 -type code() :: non_neg_integer().
 
-
 -define(DEFAULT_PLUGINS, "couch_replicator_auth_session,couch_replicator_auth_noop").
-
 
 % Behavior API
 
@@ -49,7 +44,6 @@
 
 -callback cleanup(term()) -> ok.
 
-
 % Main API
 
 -spec initialize(#httpdb{}) -> {ok, #httpdb{}} | {error, term()}.
@@ -61,12 +55,10 @@ initialize(#httpdb{auth_context = nil} = HttpDb) ->
             {error, Error}
     end.
 
-
 -spec update_headers(#httpdb{}, headers()) -> {headers(), #httpdb{}}.
 update_headers(#httpdb{auth_context = {Mod, Context}} = HttpDb, Headers) ->
     {Headers1, Context1} = Mod:update_headers(Context, Headers),
     {Headers1, HttpDb#httpdb{auth_context = {Mod, Context1}}}.
-
 
 -spec handle_response(#httpdb{}, code(), headers()) ->
     {continue | retry, term()}.
@@ -75,12 +67,10 @@ handle_response(#httpdb{} = HttpDb, Code, Headers) ->
     {Res, Context1} = Mod:handle_response(Context, Code, Headers),
     {Res, HttpDb#httpdb{auth_context = {Mod, Context1}}}.
 
-
 -spec cleanup(#httpdb{}) -> #httpdb{}.
 cleanup(#httpdb{auth_context = {Module, Context}} = HttpDb) ->
     ok = Module:cleanup(Context),
     HttpDb#httpdb{auth_context = nil}.
-
 
 % Private helper functions
 
@@ -88,7 +78,6 @@ cleanup(#httpdb{auth_context = {Module, Context}} = HttpDb) ->
 get_plugin_modules() ->
     Plugins1 = config:get("replicator", "auth_plugins", ?DEFAULT_PLUGINS),
     [list_to_atom(Plugin) || Plugin <- string:tokens(Plugins1, ",")].
-
 
 try_initialize([], _HttpDb) ->
     {error, no_more_auth_plugins_left_to_try};

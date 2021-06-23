@@ -20,15 +20,12 @@
     clear_range_to/3
 ]).
 
-
 -define(PK, 1).
 -define(EXP, 2).
-
 
 -include_lib("fabric/include/fabric2.hrl").
 -include_lib("couch_expiring_cache/include/couch_expiring_cache.hrl").
 -include_lib("kernel/include/logger.hrl").
-
 
 % Data model
 % see: https://forums.foundationdb.org/t/designing-key-value-expiration-in-fdb/156
@@ -36,9 +33,14 @@
 % (?EXPIRING_CACHE, Name, ?PK, Key) := (Val, StaleTS, ExpiresTS)
 % (?EXPIRING_CACHE, Name, ?EXP, ExpiresTS, Key) := ()
 
-
--spec insert(JTx :: jtx(), Name :: binary(), Key :: binary(), Value :: binary(),
-    StaleTS :: millisecond(), ExpiresTS :: millisecond()) -> ok.
+-spec insert(
+    JTx :: jtx(),
+    Name :: binary(),
+    Key :: binary(),
+    Value :: binary(),
+    StaleTS :: millisecond(),
+    ExpiresTS :: millisecond()
+) -> ok.
 insert(#{jtx := true} = JTx, Name, Key, Val, StaleTS, ExpiresTS) ->
     #{tx := Tx, layer_prefix := LayerPrefix} = couch_jobs_fdb:get_jtx(JTx),
     PK = primary_key(Name, Key, LayerPrefix),
@@ -59,7 +61,6 @@ insert(#{jtx := true} = JTx, Name, Key, Val, StaleTS, ExpiresTS) ->
     XV = erlfdb_tuple:pack({}),
     ok = erlfdb:set(Tx, XK, XV).
 
-
 -spec lookup(JTx :: jtx(), Name :: binary(), Key :: binary()) ->
     not_found | {fresh, Val :: binary()} | {stale, Val :: binary()} | expired.
 lookup(#{jtx := true} = JTx, Name, Key) ->
@@ -77,7 +78,6 @@ lookup(#{jtx := true} = JTx, Name, Key) ->
             end
     end.
 
-
 -spec clear_all(Name :: binary()) ->
     ok.
 clear_all(Name) ->
@@ -87,24 +87,36 @@ clear_all(Name) ->
         erlfdb:clear_range_startswith(Tx, NamePrefix)
     end).
 
-
--spec clear_range_to(Name :: binary(), EndTS :: millisecond(),
-    Limit :: non_neg_integer()) ->
-        OldestTS :: ?TIME_UNIT.
+-spec clear_range_to(
+    Name :: binary(),
+    EndTS :: millisecond(),
+    Limit :: non_neg_integer()
+) ->
+    OldestTS :: ?TIME_UNIT.
 clear_range_to(Name, EndTS, Limit) when Limit > 0 ->
-    fold_range(Name, EndTS, Limit,
+    fold_range(
+        Name,
+        EndTS,
+        Limit,
         fun(Tx, PK, XK, _Key, ExpiresTS, Acc) ->
             ok = erlfdb:clear(Tx, PK),
             ok = erlfdb:clear(Tx, XK),
             oldest_ts(ExpiresTS, Acc)
-        end, 0).
+        end,
+        0
+    ).
 
-
--spec get_range_to(Name :: binary(), EndTS :: millisecond(),
-    Limit :: non_neg_integer()) ->
-        [{Key :: binary(), Val :: binary()}].
+-spec get_range_to(
+    Name :: binary(),
+    EndTS :: millisecond(),
+    Limit :: non_neg_integer()
+) ->
+    [{Key :: binary(), Val :: binary()}].
 get_range_to(Name, EndTS, Limit) when Limit > 0 ->
-    fold_range(Name, EndTS, Limit,
+    fold_range(
+        Name,
+        EndTS,
+        Limit,
         fun(Tx, PK, _XK, Key, _ExpiresTS, Acc) ->
             case get_val(Tx, PK) of
                 not_found ->
@@ -114,40 +126,42 @@ get_range_to(Name, EndTS, Limit) when Limit > 0 ->
                 Val ->
                     [{Key, Val} | Acc]
             end
-        end, []).
-
+        end,
+        []
+    ).
 
 %% Private
-
 
 fold_range(Name, EndTS, Limit, Fun, Acc0) when Limit > 0 ->
     fabric2_fdb:transactional(fun(Tx) ->
         {LayerPrefix, ExpiresPrefix} = prefixes(Tx, Name),
-        fabric2_fdb:fold_range({tx, Tx}, ExpiresPrefix, fun({XK, _XV}, Acc) ->
-            {ExpiresTS, Key} = erlfdb_tuple:unpack(XK, ExpiresPrefix),
-            PK = primary_key(Name, Key, LayerPrefix),
-            Fun(Tx, PK, XK, Key, ExpiresTS, Acc)
-        end, Acc0, [{end_key, EndTS}, {limit, Limit}])
+        fabric2_fdb:fold_range(
+            {tx, Tx},
+            ExpiresPrefix,
+            fun({XK, _XV}, Acc) ->
+                {ExpiresTS, Key} = erlfdb_tuple:unpack(XK, ExpiresPrefix),
+                PK = primary_key(Name, Key, LayerPrefix),
+                Fun(Tx, PK, XK, Key, ExpiresTS, Acc)
+            end,
+            Acc0,
+            [{end_key, EndTS}, {limit, Limit}]
+        )
     end).
 
-
-oldest_ts(TS, 0) -> TS; % handle initial Acc = 0 case
+% handle initial Acc = 0 case
+oldest_ts(TS, 0) -> TS;
 oldest_ts(TS, OldestTS) -> min(TS, OldestTS).
-
 
 primary_key(Name, Key, Prefix) ->
     erlfdb_tuple:pack({?EXPIRING_CACHE, Name, ?PK, Key}, Prefix).
 
-
 expiry_key(ExpiresTS, Name, Key, Prefix) ->
     erlfdb_tuple:pack({?EXPIRING_CACHE, Name, ?EXP, ExpiresTS, Key}, Prefix).
-
 
 prefixes(Tx, Name) ->
     Layer = fabric2_fdb:get_dir(Tx),
     Expires = erlfdb_tuple:pack({?EXPIRING_CACHE, Name, ?EXP}, Layer),
     {Layer, Expires}.
-
 
 get_val(Tx, PK) ->
     case erlfdb:wait(erlfdb:get(Tx, PK)) of

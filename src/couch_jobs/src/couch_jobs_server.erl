@@ -18,7 +18,6 @@
 
 -include("couch_jobs.hrl").
 
-
 -export([
     start_link/0,
     get_notifier_server/1,
@@ -34,14 +33,11 @@
     code_change/3
 ]).
 
-
 -define(TYPE_CHECK_PERIOD_DEFAULT, "15000").
 -define(MAX_JITTER_DEFAULT, "5000").
 
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, nil, []).
-
 
 get_notifier_server(Type) ->
     case get_type_pid_refs(Type) of
@@ -57,10 +53,8 @@ get_notifier_server(Type) ->
             end
     end.
 
-
 force_check_types() ->
     gen_server:call(?MODULE, check_types, infinity).
-
 
 init(_) ->
     % If couch_jobs_server is after the notifiers and activity supervisor. If
@@ -73,28 +67,22 @@ init(_) ->
     schedule_check(),
     {ok, nil}.
 
-
 terminate(_, _St) ->
     ok.
-
 
 handle_call(check_types, _From, St) ->
     check_types(),
     {reply, ok, St};
-
 handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
 
-
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
-
 
 handle_info(check_types, St) ->
     check_types(),
     schedule_check(),
     {noreply, St};
-
 handle_info({'DOWN', _Ref, process, Pid, Reason}, St) ->
     ?LOG_ERROR(#{
         what => monitored_process_crash,
@@ -104,7 +92,6 @@ handle_info({'DOWN', _Ref, process, Pid, Reason}, St) ->
     LogMsg = "~p : process ~p exited with ~p",
     couch_log:error(LogMsg, [?MODULE, Pid, Reason]),
     {stop, {unexpected_process_exit, Pid, Reason}, St};
-
 handle_info({Ref, ready}, St) when is_reference(Ref) ->
     % Don't crash out couch_jobs_server and the whole application would need to
     % eventually do proper cleanup in erlfdb:wait timeout code.
@@ -115,14 +102,11 @@ handle_info({Ref, ready}, St) when is_reference(Ref) ->
     LogMsg = "~p : spurious erlfdb future ready message ~p",
     couch_log:error(LogMsg, [?MODULE, Ref]),
     {noreply, St};
-
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
-
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
-
 
 check_types() ->
     FdbTypes = fdb_types(),
@@ -132,18 +116,18 @@ check_types() ->
     lists:foreach(fun(Type) -> start_monitors(Type) end, ToStart),
     lists:foreach(fun(Type) -> stop_monitors(Type) end, ToStop).
 
-
 start_monitors(Type) ->
-    MonPidRef = case couch_jobs_activity_monitor_sup:start_monitor(Type) of
-        {ok, Pid1} -> {Pid1, monitor(process, Pid1)};
-        {error, Error1} -> error({failed_to_start_monitor, Type, Error1})
-    end,
-    NotifierPidRef = case couch_jobs_notifier_sup:start_notifier(Type) of
-        {ok, Pid2} -> {Pid2, monitor(process, Pid2)};
-        {error, Error2} -> error({failed_to_start_notifier, Type, Error2})
-    end,
+    MonPidRef =
+        case couch_jobs_activity_monitor_sup:start_monitor(Type) of
+            {ok, Pid1} -> {Pid1, monitor(process, Pid1)};
+            {error, Error1} -> error({failed_to_start_monitor, Type, Error1})
+        end,
+    NotifierPidRef =
+        case couch_jobs_notifier_sup:start_notifier(Type) of
+            {ok, Pid2} -> {Pid2, monitor(process, Pid2)};
+            {error, Error2} -> error({failed_to_start_notifier, Type, Error2})
+        end,
     ets:insert_new(?MODULE, {Type, MonPidRef, NotifierPidRef}).
-
 
 stop_monitors(Type) ->
     {{MonPid, MonRef}, {NotifierPid, NotifierRef}} = get_type_pid_refs(Type),
@@ -153,18 +137,21 @@ stop_monitors(Type) ->
     demonitor(NotifierRef, [flush]),
     ets:delete(?MODULE, Type).
 
-
 reset_monitors() ->
-    lists:foreach(fun(Pid) ->
-        couch_jobs_activity_monitor_sup:stop_monitor(Pid)
-    end, couch_jobs_activity_monitor_sup:get_child_pids()).
-
+    lists:foreach(
+        fun(Pid) ->
+            couch_jobs_activity_monitor_sup:stop_monitor(Pid)
+        end,
+        couch_jobs_activity_monitor_sup:get_child_pids()
+    ).
 
 reset_notifiers() ->
-    lists:foreach(fun(Pid) ->
-        couch_jobs_notifier_sup:stop_notifier(Pid)
-    end, couch_jobs_notifier_sup:get_child_pids()).
-
+    lists:foreach(
+        fun(Pid) ->
+            couch_jobs_notifier_sup:stop_notifier(Pid)
+        end,
+        couch_jobs_notifier_sup:get_child_pids()
+    ).
 
 get_type_pid_refs(Type) ->
     case ets:lookup(?MODULE, Type) of
@@ -172,10 +159,8 @@ get_type_pid_refs(Type) ->
         [] -> not_found
     end.
 
-
 ets_types() ->
     lists:flatten(ets:match(?MODULE, {'$1', '_', '_'})).
-
 
 fdb_types() ->
     try
@@ -194,19 +179,20 @@ fdb_types() ->
             []
     end.
 
-
 schedule_check() ->
     Timeout = get_period_msec(),
     MaxJitter = max(Timeout div 2, get_max_jitter_msec()),
     Wait = Timeout + rand:uniform(max(1, MaxJitter)),
     erlang:send_after(Wait, self(), check_types).
 
-
 get_period_msec() ->
-    couch_jobs_util:get_non_neg_int(type_check_period_msec,
-        ?TYPE_CHECK_PERIOD_DEFAULT).
-
+    couch_jobs_util:get_non_neg_int(
+        type_check_period_msec,
+        ?TYPE_CHECK_PERIOD_DEFAULT
+    ).
 
 get_max_jitter_msec() ->
-    couch_jobs_util:get_non_neg_int(type_check_max_jitter_msec,
-        ?MAX_JITTER_DEFAULT).
+    couch_jobs_util:get_non_neg_int(
+        type_check_max_jitter_msec,
+        ?MAX_JITTER_DEFAULT
+    ).

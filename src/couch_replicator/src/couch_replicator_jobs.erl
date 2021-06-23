@@ -12,7 +12,6 @@
 
 -module(couch_replicator_jobs).
 
-
 -export([
     % couch_jobs type timeouts
     set_timeout/0,
@@ -47,14 +46,11 @@
     get_job_ids/1
 ]).
 
-
 -include("couch_replicator.hrl").
 -include_lib("fabric/include/fabric2.hrl").
 
-
 -define(REP_JOBS, <<"rep_jobs">>).
 -define(REP_JOBS_TIMEOUT_SEC, 61).
-
 
 % Data model
 % ----------
@@ -73,10 +69,8 @@
 set_timeout() ->
     couch_jobs:set_type_timeout(?REP_JOBS, ?REP_JOBS_TIMEOUT_SEC).
 
-
 get_timeout() ->
     ?REP_JOBS_TIMEOUT_SEC.
-
 
 new_job(#{} = Rep, DbName, DbUUID, DocId, State, StateInfo, DocState) ->
     NowSec = erlang:system_time(second),
@@ -102,7 +96,6 @@ new_job(#{} = Rep, DbName, DbUUID, DocId, State, StateInfo, DocState) ->
         ?CHECKPOINT_HISTORY => []
     }.
 
-
 add_job(Tx, JobId, JobData) ->
     couch_stats:increment_counter([couch_replicator, jobs, adds]),
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
@@ -115,7 +108,6 @@ add_job(Tx, JobId, JobData) ->
         ok = couch_jobs:add(JTx, ?REP_JOBS, JobId, JobData)
     end).
 
-
 remove_job(Tx, JobId) ->
     couch_stats:increment_counter([couch_replicator, jobs, removes]),
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
@@ -127,12 +119,10 @@ remove_job(Tx, JobId) ->
         end
     end).
 
-
 get_job_data(Tx, JobId) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         couch_jobs:get_job_data(JTx, ?REP_JOBS, JobId)
     end).
-
 
 % UserFun = fun(JTx, JobId, JobState, JobData, UserAcc)
 %
@@ -141,17 +131,14 @@ fold_jobs(Tx, UserFun, Acc) when is_function(UserFun, 5) ->
         couch_jobs:fold_jobs(JTx, ?REP_JOBS, UserFun, Acc)
     end).
 
-
 pending_count(_Tx, Limit) when is_integer(Limit), Limit =< 0 ->
     0;
-
 pending_count(Tx, Limit) when is_integer(Limit), Limit > 0 ->
     Opts = #{
         max_sched_time => erlang:system_time(second),
         limit => Limit
     },
     couch_jobs:pending_count(Tx, ?REP_JOBS, Opts).
-
 
 wait_running(JobId) ->
     case couch_jobs:subscribe(?REP_JOBS, JobId) of
@@ -168,7 +155,6 @@ wait_running(JobId) ->
             {error, Error}
     end.
 
-
 wait_running(JobId, SubId) ->
     case couch_jobs:wait(SubId, infinity) of
         {?REP_JOBS, _, running, #{?STATE := ?ST_PENDING}} ->
@@ -183,43 +169,40 @@ wait_running(JobId, SubId) ->
             {ok, JobData}
     end.
 
-
 wait_result(JobId) ->
     case couch_jobs:subscribe(?REP_JOBS, JobId) of
         {ok, finished, JobData} ->
             {ok, JobData};
         {ok, SubId, _, _} ->
-            {?REP_JOBS, _, finished, JobData} = couch_jobs:wait(SubId,
-                finished, infinity),
+            {?REP_JOBS, _, finished, JobData} = couch_jobs:wait(
+                SubId,
+                finished,
+                infinity
+            ),
             {ok, JobData};
         {error, Error} ->
             {error, Error}
     end.
 
-
 accept_job(MaxSchedTime) when is_integer(MaxSchedTime) ->
     Opts = #{max_sched_time => MaxSchedTime},
     couch_jobs:accept(?REP_JOBS, Opts).
-
 
 update_job_data(Tx, #{} = Job, #{} = JobData) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         couch_jobs:update(JTx, Job, JobData)
     end).
 
-
 finish_job(Tx, #{} = Job, #{} = JobData) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         couch_jobs:finish(JTx, Job, JobData)
     end).
-
 
 reschedule_job(Tx, #{} = Job, #{} = JobData, Time) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         {ok, Job1} = couch_jobs:resubmit(JTx, Job, Time),
         ok = couch_jobs:finish(JTx, Job1, JobData)
     end).
-
 
 try_update_rep_id(Tx, JobId, RepId) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
@@ -235,7 +218,6 @@ try_update_rep_id(Tx, JobId, RepId) ->
         end
     end).
 
-
 update_rep_id(Tx, JobId, RepId) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         #{tx := ErlFdbTx, layer_prefix := LayerPrefix} = JTx,
@@ -243,10 +225,8 @@ update_rep_id(Tx, JobId, RepId) ->
         ok = erlfdb:set(ErlFdbTx, Key, JobId)
     end).
 
-
 clear_old_rep_id(_, _, null) ->
     ok;
-
 clear_old_rep_id(Tx, JobId, RepId) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         #{tx := ErlFdbTx, layer_prefix := LayerPrefix} = JTx,
@@ -261,7 +241,6 @@ clear_old_rep_id(Tx, JobId, RepId) ->
         end
     end).
 
-
 get_job_id(Tx, RepId) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         #{tx := ErlFdbTx, layer_prefix := LayerPrefix} = JTx,
@@ -274,7 +253,6 @@ get_job_id(Tx, RepId) ->
         end
     end).
 
-
 % Debug functions
 
 remove_jobs(Tx, JobIds) when is_list(JobIds) ->
@@ -283,18 +261,19 @@ remove_jobs(Tx, JobIds) when is_list(JobIds) ->
     end),
     [].
 
-
 get_job_ids(Tx) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         #{tx := ErlFdbTx, layer_prefix := LayerPrefix} = JTx,
         Prefix = erlfdb_tuple:pack({?REPLICATION_IDS}, LayerPrefix),
         KVs = erlfdb:wait(erlfdb:get_range_startswith(ErlFdbTx, Prefix)),
-        lists:map(fun({K, JobId}) ->
-            {RepId} = erlfdb_tuple:unpack(K, Prefix),
-            {RepId, JobId}
-        end, KVs)
+        lists:map(
+            fun({K, JobId}) ->
+                {RepId} = erlfdb_tuple:unpack(K, Prefix),
+                {RepId, JobId}
+            end,
+            KVs
+        )
     end).
-
 
 % Private functions
 

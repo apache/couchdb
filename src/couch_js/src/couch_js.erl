@@ -10,10 +10,8 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 -module(couch_js).
 -behavior(couch_eval).
-
 
 -export([
     acquire_map_context/1,
@@ -24,12 +22,9 @@
     try_compile/4
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 
-
 -define(JS, <<"javascript">>).
-
 
 acquire_map_context(Opts) ->
     #{
@@ -38,29 +33,32 @@ acquire_map_context(Opts) ->
     } = Opts,
     couch_js_query_servers:start_doc_map(?JS, MapFuns, Lib).
 
-
 release_map_context(Proc) ->
     couch_js_query_servers:stop_doc_map(Proc).
 
-
 map_docs(Proc, Docs) ->
-    {ok, lists:map(fun(Doc) ->
-        {ok, RawResults} = couch_js_query_servers:map_doc_raw(Proc, Doc),
-        Results = couch_js_query_servers:raw_to_ejson(RawResults),
-        Tupled = lists:map(fun(ViewResult) ->
-            lists:map(fun([K, V]) -> {K, V} end, ViewResult)
-        end, Results),
-        {Doc#doc.id, Tupled}
-    end, Docs)}.
+    {ok,
+        lists:map(
+            fun(Doc) ->
+                {ok, RawResults} = couch_js_query_servers:map_doc_raw(Proc, Doc),
+                Results = couch_js_query_servers:raw_to_ejson(RawResults),
+                Tupled = lists:map(
+                    fun(ViewResult) ->
+                        lists:map(fun([K, V]) -> {K, V} end, ViewResult)
+                    end,
+                    Results
+                ),
+                {Doc#doc.id, Tupled}
+            end,
+            Docs
+        )}.
 
 acquire_context() ->
     Ctx = couch_query_servers:get_os_process(?JS),
     {ok, Ctx}.
 
-
 release_context(Proc) ->
     couch_query_servers:ret_os_process(Proc).
-
 
 try_compile(Proc, FunctionType, FunName, FunSrc) ->
     couch_query_servers:try_compile(Proc, FunctionType, FunName, FunSrc).

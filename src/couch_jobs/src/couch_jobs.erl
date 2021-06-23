@@ -52,12 +52,9 @@
     get_type_timeout/1
 ]).
 
-
 -include("couch_jobs.hrl").
 
-
 -define(MIN_ACCEPT_WAIT_MSEC, 100).
-
 
 %% Job Creation API
 
@@ -65,11 +62,13 @@
 add(Tx, Type, JobId, JobData) ->
     add(Tx, Type, JobId, JobData, 0).
 
-
 -spec add(jtx(), job_type(), job_id(), job_data(), scheduled_time()) ->
     ok | {error, any()}.
-add(Tx, Type, JobId, JobData, ScheduledTime) when is_binary(JobId),
-        is_map(JobData), is_integer(ScheduledTime) ->
+add(Tx, Type, JobId, JobData, ScheduledTime) when
+    is_binary(JobId),
+    is_map(JobData),
+    is_integer(ScheduledTime)
+->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         case couch_jobs_fdb:add(JTx, Type, JobId, JobData, ScheduledTime) of
             {ok, _, _, _} -> ok;
@@ -77,13 +76,11 @@ add(Tx, Type, JobId, JobData, ScheduledTime) when is_binary(JobId),
         end
     end).
 
-
 -spec remove(jtx(), job_type(), job_id()) -> ok | {error, any()}.
 remove(Tx, Type, JobId) when is_binary(JobId) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         couch_jobs_fdb:remove(JTx, job(Type, JobId))
     end).
-
 
 -spec get_types(jtx()) -> [job_type()] | {error, any()}.
 get_types(Tx) ->
@@ -91,9 +88,9 @@ get_types(Tx) ->
         couch_jobs_fdb:get_types(JTx)
     end).
 
-
--spec get_job_data(jtx(), job_type(), job_id()) -> {ok, job_data()} | {error,
-    any()}.
+-spec get_job_data(jtx(), job_type(), job_id()) ->
+    {ok, job_data()}
+    | {error, any()}.
 get_job_data(Tx, Type, JobId) when is_binary(JobId) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         case couch_jobs_fdb:get_job_state_and_data(JTx, job(Type, JobId)) of
@@ -104,9 +101,9 @@ get_job_data(Tx, Type, JobId) when is_binary(JobId) ->
         end
     end).
 
-
--spec get_job_state(jtx(), job_type(), job_id()) -> {ok, job_state()} | {error,
-    any()}.
+-spec get_job_state(jtx(), job_type(), job_id()) ->
+    {ok, job_state()}
+    | {error, any()}.
 get_job_state(Tx, Type, JobId) when is_binary(JobId) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         case couch_jobs_fdb:get_job_state_and_data(JTx, job(Type, JobId)) of
@@ -117,9 +114,9 @@ get_job_state(Tx, Type, JobId) when is_binary(JobId) ->
         end
     end).
 
-
--spec get_active_jobs_ids(jtx(), job_type()) -> [job_id()] | {error,
-    any()}.
+-spec get_active_jobs_ids(jtx(), job_type()) ->
+    [job_id()]
+    | {error, any()}.
 get_active_jobs_ids(Tx, Type) ->
     SinceVS = {versionstamp, 0, 0},
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
@@ -127,21 +124,22 @@ get_active_jobs_ids(Tx, Type) ->
         maps:keys(Since)
     end).
 
-
 -spec fold_jobs(jtx(), job_type(), fun(), any()) -> any().
 fold_jobs(Tx, Type, Fun, UserAcc) when is_function(Fun, 5) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
-        maps:fold(fun(JobId, {_Seq, JobState, DataEnc}, Acc) ->
-            Data = couch_jobs_fdb:decode_data(DataEnc),
-            Fun(JTx, JobId, JobState, Data, Acc)
-        end, UserAcc, couch_jobs_fdb:get_jobs(JTx, Type))
+        maps:fold(
+            fun(JobId, {_Seq, JobState, DataEnc}, Acc) ->
+                Data = couch_jobs_fdb:decode_data(DataEnc),
+                Fun(JTx, JobId, JobState, Data, Acc)
+            end,
+            UserAcc,
+            couch_jobs_fdb:get_jobs(JTx, Type)
+        )
     end).
-
 
 -spec pending_count(jtx(), job_type()) -> integer().
 pending_count(Tx, Type) ->
     pending_count(Tx, Type, #{}).
-
 
 -spec pending_count(jtx(), job_type(), #{}) -> integer().
 pending_count(Tx, Type, Opts) ->
@@ -151,21 +149,20 @@ pending_count(Tx, Type, Opts) ->
         couch_jobs_pending:pending_count(JTx, Type, MaxSTime, Limit)
     end).
 
-
 %% Job processor API
 
 -spec accept(job_type()) -> {ok, job(), job_data()} | {error, any()}.
 accept(Type) ->
     accept(Type, #{}).
 
-
 -spec accept(job_type(), job_accept_opts()) -> {ok, job()} | {error, any()}.
 accept(Type, #{} = Opts) ->
     NoSched = maps:get(no_schedule, Opts, false),
-    MaxSchedTimeDefault = case NoSched of
-        true -> 0;
-        false -> ?UNDEFINED_MAX_SCHEDULED_TIME
-    end,
+    MaxSchedTimeDefault =
+        case NoSched of
+            true -> 0;
+            false -> ?UNDEFINED_MAX_SCHEDULED_TIME
+        end,
     MaxSchedTime = maps:get(max_sched_time, Opts, MaxSchedTimeDefault),
     Timeout = maps:get(timeout, Opts, infinity),
     case NoSched andalso MaxSchedTime =/= 0 of
@@ -175,11 +172,9 @@ accept(Type, #{} = Opts) ->
             accept_loop(Type, NoSched, MaxSchedTime, Timeout)
     end.
 
-
 -spec finish(jtx(), job()) -> ok | {error, any()}.
 finish(Tx, Job) ->
     finish(Tx, Job, undefined).
-
 
 -spec finish(jtx(), job(), job_data()) -> ok | {error, any()}.
 finish(Tx, #{jlock := <<_/binary>>} = Job, JobData) ->
@@ -187,11 +182,9 @@ finish(Tx, #{jlock := <<_/binary>>} = Job, JobData) ->
         couch_jobs_fdb:finish(JTx, Job, JobData)
     end).
 
-
 -spec resubmit(jtx(), job()) -> {ok, job()} | {error, any()}.
 resubmit(Tx, Job) ->
     resubmit(Tx, Job, ?UNDEFINED_MAX_SCHEDULED_TIME).
-
 
 -spec resubmit(jtx(), job(), scheduled_time()) -> {ok, job()} | {error, any()}.
 resubmit(Tx, #{jlock := <<_/binary>>} = Job, SchedTime) ->
@@ -199,23 +192,19 @@ resubmit(Tx, #{jlock := <<_/binary>>} = Job, SchedTime) ->
         couch_jobs_fdb:resubmit(JTx, Job, SchedTime)
     end).
 
-
 -spec resubmit(jtx(), job(), scheduled_time(), job_data()) -> {ok, job()} | {error, any()}.
 resubmit(Tx, #{jlock := <<_/binary>>} = Job, SchedTime, Data) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         couch_jobs_fdb:resubmit(JTx, Job, SchedTime, Data)
     end).
 
-
 -spec is_resubmitted(job()) -> true | false.
 is_resubmitted(#{job := true} = Job) ->
     maps:get(resubmit, Job, false).
 
-
 -spec update(jtx(), job()) -> {ok, job()} | {error, any()}.
 update(Tx, Job) ->
     update(Tx, Job, undefined).
-
 
 -spec update(jtx(), job(), job_data()) -> {ok, job()} | {error, any()}.
 update(Tx, #{jlock := <<_/binary>>} = Job, JobData) ->
@@ -223,21 +212,23 @@ update(Tx, #{jlock := <<_/binary>>} = Job, JobData) ->
         couch_jobs_fdb:update(JTx, Job, JobData)
     end).
 
-
 %% Subscription API
 
 % Receive events as messages. Wait for them using `wait/2,3`
 % functions.
 %
 
--spec subscribe(job_type(), job_id()) -> {ok, job_subscription(), job_state(),
-    job_data()} | {ok, finished, job_data()} | {error, any()}.
+-spec subscribe(job_type(), job_id()) ->
+    {ok, job_subscription(), job_state(), job_data()}
+    | {ok, finished, job_data()}
+    | {error, any()}.
 subscribe(Type, JobId) ->
     subscribe(undefined, Type, JobId).
 
-
--spec subscribe(jtx(), job_type(), job_id()) -> {ok, job_subscription(),
-    job_state(), job_data()} | {ok, finished, job_data()} | {error, any()}.
+-spec subscribe(jtx(), job_type(), job_id()) ->
+    {ok, job_subscription(), job_state(), job_data()}
+    | {ok, finished, job_data()}
+    | {error, any()}.
 subscribe(Tx, Type, JobId) ->
     StateData = couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(Tx), fun(JTx) ->
         Job = #{job => true, type => Type, id => JobId},
@@ -258,7 +249,6 @@ subscribe(Tx, Type, JobId) ->
             {error, Error}
     end.
 
-
 % Unsubscribe from getting notifications based on a particular subscription.
 % Each subscription should be followed by its own unsubscription call. However,
 % subscriber processes are also monitored and auto-unsubscribed if they exit.
@@ -272,7 +262,6 @@ unsubscribe({Server, Ref}) when is_pid(Server), is_reference(Ref) ->
         flush_notifications(Ref)
     end.
 
-
 % Wait to receive job state updates
 %
 -spec wait(job_subscription() | [job_subscription()], timeout()) ->
@@ -281,18 +270,15 @@ wait({_, Ref}, Timeout) ->
     receive
         {?COUCH_JOBS_EVENT, Ref, Type, Id, State, Data} ->
             {Type, Id, State, couch_jobs_fdb:decode_data(Data)}
-    after
-        Timeout -> timeout
+    after Timeout -> timeout
     end;
-
 wait(Subs, Timeout) when is_list(Subs) ->
     {Result, ResendQ} = wait_any(Subs, Timeout, []),
     lists:foreach(fun(Msg) -> self() ! Msg end, ResendQ),
     Result.
 
-
--spec wait(job_subscription() | [job_subscription()], job_state(), timeout())
-    -> {job_type(), job_id(), job_state(), job_data()} | timeout.
+-spec wait(job_subscription() | [job_subscription()], job_state(), timeout()) ->
+    {job_type(), job_id(), job_state(), job_data()} | timeout.
 wait({_, Ref} = Sub, State, Timeout) when is_atom(State) ->
     receive
         {?COUCH_JOBS_EVENT, Ref, Type, Id, MsgState, Data0} ->
@@ -303,16 +289,15 @@ wait({_, Ref} = Sub, State, Timeout) when is_atom(State) ->
                 false ->
                     wait(Sub, State, Timeout)
             end
-    after
-        Timeout -> timeout
+    after Timeout -> timeout
     end;
-
-wait(Subs, State, Timeout) when is_list(Subs),
-        is_atom(State) ->
+wait(Subs, State, Timeout) when
+    is_list(Subs),
+    is_atom(State)
+->
     {Result, ResendQ} = wait_any(Subs, State, Timeout, []),
     lists:foreach(fun(Msg) -> self() ! Msg end, ResendQ),
     Result.
-
 
 %% Job type timeout API
 
@@ -325,13 +310,11 @@ set_type_timeout(Type, Timeout) ->
     end),
     ok = couch_jobs_server:force_check_types().
 
-
 -spec clear_type_timeout(job_type()) -> ok.
 clear_type_timeout(Type) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(JTx) ->
         couch_jobs_fdb:clear_type_timeout(JTx, Type)
     end).
-
 
 -spec get_type_timeout(job_type()) -> timeout().
 get_type_timeout(Type) ->
@@ -339,19 +322,19 @@ get_type_timeout(Type) ->
         couch_jobs_fdb:get_type_timeout(JTx, Type)
     end).
 
-
 %% Private utilities
 
 accept_loop(Type, NoSched, MaxSchedTime, Timeout) ->
-    TxFun =  fun(JTx) ->
+    TxFun = fun(JTx) ->
         couch_jobs_fdb:accept(JTx, Type, MaxSchedTime, NoSched)
     end,
-    AcceptResult = try
-        couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), TxFun)
-    catch
-        error:{Tag, Err} when ?COUCH_JOBS_RETRYABLE(Tag, Err) ->
-            retry
-    end,
+    AcceptResult =
+        try
+            couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), TxFun)
+        catch
+            error:{Tag, Err} when ?COUCH_JOBS_RETRYABLE(Tag, Err) ->
+                retry
+        end,
     case AcceptResult of
         {ok, Job, Data} ->
             {ok, Job, Data};
@@ -368,15 +351,12 @@ accept_loop(Type, NoSched, MaxSchedTime, Timeout) ->
             end
     end.
 
-
 job(Type, JobId) ->
     #{job => true, type => Type, id => JobId}.
-
 
 wait_pending(PendingWatch, _MaxSTime, _UserTimeout = 0, _NoSched) ->
     erlfdb:cancel(PendingWatch, [flush]),
     {error, not_found};
-
 wait_pending(PendingWatch, MaxSTime, UserTimeout, NoSched) ->
     NowMSec = erlang:system_time(millisecond),
     Timeout0 = max(?MIN_ACCEPT_WAIT_MSEC, MaxSTime * 1000 - NowMSec),
@@ -393,7 +373,6 @@ wait_pending(PendingWatch, MaxSTime, UserTimeout, NoSched) ->
             retry
     end.
 
-
 wait_any(Subs, Timeout0, ResendQ) when is_list(Subs) ->
     Timeout = limit_timeout(Timeout0, false),
     receive
@@ -405,13 +384,12 @@ wait_any(Subs, Timeout0, ResendQ) when is_list(Subs) ->
                     Data = couch_jobs_fdb:decode_data(Data0),
                     {{Type, Id, State, Data}, ResendQ}
             end
-    after
-        Timeout -> {timeout, ResendQ}
+    after Timeout -> {timeout, ResendQ}
     end.
 
-
 wait_any(Subs, State, Timeout0, ResendQ) when
-        is_list(Subs) ->
+    is_list(Subs)
+->
     Timeout = limit_timeout(Timeout0, false),
     receive
         {?COUCH_JOBS_EVENT, Ref, Type, Id, MsgState, Data0} = Msg ->
@@ -427,25 +405,19 @@ wait_any(Subs, State, Timeout0, ResendQ) when
                             wait_any(Subs, Timeout, ResendQ)
                     end
             end
-    after
-        Timeout -> {timeout, ResendQ}
+    after Timeout -> {timeout, ResendQ}
     end.
-
 
 limit_timeout(_Timeout, true) ->
     infinity;
-
 limit_timeout(Timeout, false) when is_integer(Timeout), Timeout < 16#FFFFFFFF ->
     Timeout;
-
 limit_timeout(_Timeout, false) ->
     infinity.
-
 
 flush_notifications(Ref) ->
     receive
         {?COUCH_JOBS_EVENT, Ref, _, _, _} ->
             flush_notifications(Ref)
-    after
-        0 -> ok
+    after 0 -> ok
     end.

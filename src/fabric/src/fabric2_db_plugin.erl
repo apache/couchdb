@@ -24,12 +24,9 @@
     is_valid_purge_client/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 
-
 -define(SERVICE_ID, fabric2_db).
-
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -38,18 +35,14 @@
 validate_dbname(DbName, Normalized, Default) ->
     maybe_handle(validate_dbname, [DbName, Normalized], Default).
 
-
 after_db_create(DbName, DbUUID) when is_binary(DbName), is_binary(DbUUID) ->
     with_pipe(after_db_create, [DbName, DbUUID]).
-
 
 after_db_delete(DbName, DbUUID) when is_binary(DbName), is_binary(DbUUID) ->
     with_pipe(after_db_delete, [DbName, DbUUID]).
 
-
 before_doc_update(_, #doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>} = Doc, _) ->
     Doc;
-
 before_doc_update(Db, Doc0, UpdateType) ->
     Fun = fabric2_db:get_before_doc_update_fun(Db),
     case with_pipe(before_doc_update, [Doc0, Db, UpdateType]) of
@@ -59,10 +52,8 @@ before_doc_update(Db, Doc0, UpdateType) ->
             Doc1
     end.
 
-
-after_doc_write(Db, Doc, NewWinner, OldWinner, NewRevId, Seq)->
+after_doc_write(Db, Doc, NewWinner, OldWinner, NewRevId, Seq) ->
     with_pipe(after_doc_write, [Db, Doc, NewWinner, OldWinner, NewRevId, Seq]).
-
 
 after_doc_read(Db, Doc0) ->
     Fun = fabric2_db:get_after_doc_read_fun(Db),
@@ -71,18 +62,15 @@ after_doc_read(Db, Doc0) ->
         [Doc1, _Db] -> Doc1
     end.
 
-
 validate_docid(Id) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     %% callbacks return true only if it specifically allow the given Id
     couch_epi:any(Handle, ?SERVICE_ID, validate_docid, [Id], []).
 
-
 check_is_admin(Db) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     %% callbacks return true only if it specifically allow the given Id
     couch_epi:any(Handle, ?SERVICE_ID, check_is_admin, [Db], []).
-
 
 is_valid_purge_client(DbName, Props) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
@@ -103,10 +91,10 @@ do_apply(Func, Args, Opts) ->
 maybe_handle(Func, Args, Default) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     case couch_epi:decide(Handle, ?SERVICE_ID, Func, Args, []) of
-       no_decision when is_function(Default) ->
-           apply(Default, Args);
-       no_decision ->
-           Default;
-       {decided, Result} ->
-           Result
+        no_decision when is_function(Default) ->
+            apply(Default, Args);
+        no_decision ->
+            Default;
+        {decided, Result} ->
+            Result
     end.

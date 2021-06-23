@@ -12,7 +12,6 @@
 
 -module(chttpd_cors).
 
-
 -export([
     maybe_handle_preflight_request/1,
     maybe_handle_preflight_request/2,
@@ -24,15 +23,13 @@
     get_cors_config/1
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("chttpd/include/chttpd_cors.hrl").
 -include_lib("kernel/include/logger.hrl").
 
-
 %% http://www.w3.org/TR/cors/#resource-preflight-requests
 
-maybe_handle_preflight_request(#httpd{method=Method}) when Method /= 'OPTIONS' ->
+maybe_handle_preflight_request(#httpd{method = Method}) when Method /= 'OPTIONS' ->
     not_preflight;
 maybe_handle_preflight_request(Req) ->
     case maybe_handle_preflight_request(Req, get_cors_config(Req)) of
@@ -42,8 +39,7 @@ maybe_handle_preflight_request(Req) ->
             chttpd:send_response_no_cors(Req, 204, PreflightHeaders, <<>>)
     end.
 
-
-maybe_handle_preflight_request(#httpd{}=Req, Config) ->
+maybe_handle_preflight_request(#httpd{} = Req, Config) ->
     case is_cors_enabled(Config) of
         true ->
             case preflight_request(Req, Config) of
@@ -67,7 +63,6 @@ maybe_handle_preflight_request(#httpd{}=Req, Config) ->
         false ->
             not_preflight
     end.
-
 
 preflight_request(Req, Config) ->
     case get_origin(Req) of
@@ -103,69 +98,84 @@ preflight_request(Req, Config) ->
             end
     end.
 
-
 handle_preflight_request(Req, Config, Origin) ->
     case chttpd:header_value(Req, "Access-Control-Request-Method") of
-    undefined ->
-        %% If there is no Access-Control-Request-Method header
-        %% or if parsing failed, do not set any additional headers
-        %% and terminate this set of steps. The request is outside
-        %% the scope of this specification.
-        %% http://www.w3.org/TR/cors/#resource-preflight-requests
-        not_preflight;
-    Method ->
-        SupportedMethods = get_origin_config(Config, Origin,
-                <<"allow_methods">>, ?SUPPORTED_METHODS),
-
-        SupportedHeaders = get_origin_config(Config, Origin,
-                <<"allow_headers">>, ?SUPPORTED_HEADERS),
-
-
-        %% get max age
-        MaxAge = couch_util:get_value(<<"max_age">>, Config,
-            ?CORS_DEFAULT_MAX_AGE),
-
-        PreflightHeaders0 = maybe_add_credentials(Config, Origin, [
-            {"Access-Control-Allow-Origin", binary_to_list(Origin)},
-            {"Access-Control-Max-Age", MaxAge},
-            {"Access-Control-Allow-Methods",
-                string:join(SupportedMethods, ", ")}]),
-
-        case lists:member(Method, SupportedMethods) of
-            true ->
-                %% method ok , check headers
-                AccessHeaders = chttpd:header_value(Req,
-                    "Access-Control-Request-Headers"),
-                {FinalReqHeaders, ReqHeaders} = case AccessHeaders of
-                    undefined -> {"", []};
-                    "" -> {"", []};
-                    Headers ->
-                        %% transform header list in something we
-                        %% could check. make sure everything is a
-                        %% list
-                        RH = [to_lower(H)
-                              || H <- split_headers(Headers)],
-                        {Headers, RH}
-                end,
-                %% check if headers are supported
-                case ReqHeaders -- SupportedHeaders of
-                [] ->
-                    PreflightHeaders = PreflightHeaders0 ++
-                                       [{"Access-Control-Allow-Headers",
-                                         FinalReqHeaders}],
-                    {ok, PreflightHeaders};
-                _ ->
-                    not_preflight
-                end;
-            false ->
-            %% If method is not a case-sensitive match for any of
-            %% the values in list of methods do not set any additional
-            %% headers and terminate this set of steps.
+        undefined ->
+            %% If there is no Access-Control-Request-Method header
+            %% or if parsing failed, do not set any additional headers
+            %% and terminate this set of steps. The request is outside
+            %% the scope of this specification.
             %% http://www.w3.org/TR/cors/#resource-preflight-requests
-            not_preflight
-        end
-    end.
+            not_preflight;
+        Method ->
+            SupportedMethods = get_origin_config(
+                Config,
+                Origin,
+                <<"allow_methods">>,
+                ?SUPPORTED_METHODS
+            ),
 
+            SupportedHeaders = get_origin_config(
+                Config,
+                Origin,
+                <<"allow_headers">>,
+                ?SUPPORTED_HEADERS
+            ),
+
+            %% get max age
+            MaxAge = couch_util:get_value(
+                <<"max_age">>,
+                Config,
+                ?CORS_DEFAULT_MAX_AGE
+            ),
+
+            PreflightHeaders0 = maybe_add_credentials(Config, Origin, [
+                {"Access-Control-Allow-Origin", binary_to_list(Origin)},
+                {"Access-Control-Max-Age", MaxAge},
+                {"Access-Control-Allow-Methods", string:join(SupportedMethods, ", ")}
+            ]),
+
+            case lists:member(Method, SupportedMethods) of
+                true ->
+                    %% method ok , check headers
+                    AccessHeaders = chttpd:header_value(
+                        Req,
+                        "Access-Control-Request-Headers"
+                    ),
+                    {FinalReqHeaders, ReqHeaders} =
+                        case AccessHeaders of
+                            undefined ->
+                                {"", []};
+                            "" ->
+                                {"", []};
+                            Headers ->
+                                %% transform header list in something we
+                                %% could check. make sure everything is a
+                                %% list
+                                RH = [
+                                    to_lower(H)
+                                 || H <- split_headers(Headers)
+                                ],
+                                {Headers, RH}
+                        end,
+                    %% check if headers are supported
+                    case ReqHeaders -- SupportedHeaders of
+                        [] ->
+                            PreflightHeaders =
+                                PreflightHeaders0 ++
+                                    [{"Access-Control-Allow-Headers", FinalReqHeaders}],
+                            {ok, PreflightHeaders};
+                        _ ->
+                            not_preflight
+                    end;
+                false ->
+                    %% If method is not a case-sensitive match for any of
+                    %% the values in list of methods do not set any additional
+                    %% headers and terminate this set of steps.
+                    %% http://www.w3.org/TR/cors/#resource-preflight-requests
+                    not_preflight
+            end
+    end.
 
 headers(Req, RequestHeaders) ->
     case get_origin(Req) of
@@ -179,7 +189,6 @@ headers(Req, RequestHeaders) ->
             headers(Req, RequestHeaders, Origin, get_cors_config(Req))
     end.
 
-
 headers(_Req, RequestHeaders, undefined, _Config) ->
     RequestHeaders;
 headers(Req, RequestHeaders, Origin, Config) when is_list(Origin) ->
@@ -190,12 +199,14 @@ headers(Req, RequestHeaders, Origin, Config) ->
             AcceptedOrigins = get_accepted_origins(Req, Config),
             CorsHeaders = handle_headers(Config, Origin, AcceptedOrigins),
             ExposedCouchHeaders = couch_util:get_value(
-                <<"exposed_headers">>, Config, ?COUCH_HEADERS),
+                <<"exposed_headers">>,
+                Config,
+                ?COUCH_HEADERS
+            ),
             maybe_apply_headers(CorsHeaders, RequestHeaders, ExposedCouchHeaders);
         false ->
             RequestHeaders
     end.
-
 
 maybe_apply_headers([], RequestHeaders, _ExposedCouchHeaders) ->
     RequestHeaders;
@@ -207,66 +218,63 @@ maybe_apply_headers(CorsHeaders, RequestHeaders, ExposedCouchHeaders) ->
     %% need to be exposed.
     %% return: RequestHeaders ++ CorsHeaders ++ ACEH
 
-    ExposedHeaders0 = simple_headers([K || {K,_V} <- RequestHeaders]),
+    ExposedHeaders0 = simple_headers([K || {K, _V} <- RequestHeaders]),
 
     %% If Content-Type is not in ExposedHeaders, and the Content-Type
     %% is not a member of ?SIMPLE_CONTENT_TYPE_VALUES, then add it
     %% into the list of ExposedHeaders
     ContentType = proplists:get_value("content-type", ExposedHeaders0),
-    IncludeContentType = case ContentType of
-        undefined ->
-            false;
-        _ ->
-            lists:member(string:to_lower(ContentType), ?SIMPLE_CONTENT_TYPE_VALUES)
+    IncludeContentType =
+        case ContentType of
+            undefined ->
+                false;
+            _ ->
+                lists:member(string:to_lower(ContentType), ?SIMPLE_CONTENT_TYPE_VALUES)
         end,
-    ExposedHeaders = case IncludeContentType of
-        false ->
-            ["content-type" | lists:delete("content-type", ExposedHeaders0)];
-        true ->
-            ExposedHeaders0
+    ExposedHeaders =
+        case IncludeContentType of
+            false ->
+                ["content-type" | lists:delete("content-type", ExposedHeaders0)];
+            true ->
+                ExposedHeaders0
         end,
 
     %% ExposedCouchHeaders may get added later, so expose them by default
-    ACEH = [{"Access-Control-Expose-Headers",
-        string:join(ExposedHeaders ++ ExposedCouchHeaders, ", ")}],
+    ACEH = [
+        {"Access-Control-Expose-Headers", string:join(ExposedHeaders ++ ExposedCouchHeaders, ", ")}
+    ],
     CorsHeaders ++ RequestHeaders ++ ACEH.
-
 
 simple_headers(Headers) ->
     LCHeaders = [to_lower(H) || H <- Headers],
     lists:filter(fun(H) -> lists:member(H, ?SIMPLE_HEADERS) end, LCHeaders).
-
 
 to_lower(String) when is_binary(String) ->
     to_lower(?b2l(String));
 to_lower(String) ->
     string:to_lower(String).
 
-
 handle_headers(_Config, _Origin, []) ->
     [];
 handle_headers(Config, Origin, AcceptedOrigins) ->
     AcceptAll = lists:member(<<"*">>, AcceptedOrigins),
     case AcceptAll orelse lists:member(Origin, AcceptedOrigins) of
-    true ->
-        make_cors_header(Config, Origin);
-    false ->
-        %% If the value of the Origin header is not a
-        %% case-sensitive match for any of the values
-        %% in list of origins, do not set any additional
-        %% headers and terminate this set of steps.
-        %% http://www.w3.org/TR/cors/#resource-requests
-        []
+        true ->
+            make_cors_header(Config, Origin);
+        false ->
+            %% If the value of the Origin header is not a
+            %% case-sensitive match for any of the values
+            %% in list of origins, do not set any additional
+            %% headers and terminate this set of steps.
+            %% http://www.w3.org/TR/cors/#resource-requests
+            []
     end.
-
 
 make_cors_header(Config, Origin) ->
     Headers = [{"Access-Control-Allow-Origin", binary_to_list(Origin)}],
     maybe_add_credentials(Config, Origin, Headers).
 
-
 %% util
-
 
 maybe_add_credentials(Config, Origin, Headers) ->
     case allow_credentials(Config, Origin) of
@@ -276,13 +284,15 @@ maybe_add_credentials(Config, Origin, Headers) ->
             Headers ++ [{"Access-Control-Allow-Credentials", "true"}]
     end.
 
-
 allow_credentials(_Config, <<"*">>) ->
     false;
 allow_credentials(Config, Origin) ->
-    get_origin_config(Config, Origin, <<"allow_credentials">>,
-        ?CORS_DEFAULT_ALLOW_CREDENTIALS).
-
+    get_origin_config(
+        Config,
+        Origin,
+        <<"allow_credentials">>,
+        ?CORS_DEFAULT_ALLOW_CREDENTIALS
+    ).
 
 get_cors_config(#httpd{cors_config = undefined, mochi_req = MochiReq}) ->
     Host = couch_httpd_vhost:host(MochiReq),
@@ -290,24 +300,27 @@ get_cors_config(#httpd{cors_config = undefined, mochi_req = MochiReq}) ->
     EnableCors = chttpd_util:get_chttpd_config_boolean("enable_cors", false),
     AllowCredentials = cors_config(Host, "credentials", "false") =:= "true",
 
-    AllowHeaders = case cors_config(Host, "headers", undefined) of
-        undefined ->
-            ?SUPPORTED_HEADERS;
-        AllowHeaders0 ->
-            [to_lower(H) || H <- split_list(AllowHeaders0)]
-    end,
-    AllowMethods = case cors_config(Host, "methods", undefined) of
-        undefined ->
-            ?SUPPORTED_METHODS;
-        AllowMethods0 ->
-            split_list(AllowMethods0)
-    end,
-    ExposedHeaders = case cors_config(Host, "exposed_headers", undefined) of
-        undefined ->
-            ?COUCH_HEADERS;
-        ExposedHeaders0 ->
-            [to_lower(H) || H <- split_list(ExposedHeaders0)]
-    end,
+    AllowHeaders =
+        case cors_config(Host, "headers", undefined) of
+            undefined ->
+                ?SUPPORTED_HEADERS;
+            AllowHeaders0 ->
+                [to_lower(H) || H <- split_list(AllowHeaders0)]
+        end,
+    AllowMethods =
+        case cors_config(Host, "methods", undefined) of
+            undefined ->
+                ?SUPPORTED_METHODS;
+            AllowMethods0 ->
+                split_list(AllowMethods0)
+        end,
+    ExposedHeaders =
+        case cors_config(Host, "exposed_headers", undefined) of
+            undefined ->
+                ?COUCH_HEADERS;
+            ExposedHeaders0 ->
+                [to_lower(H) || H <- split_list(ExposedHeaders0)]
+        end,
     MaxAge = cors_config(Host, "max_age", ?CORS_DEFAULT_MAX_AGE),
     Origins0 = binary_split_list(cors_config(Host, "origins", [])),
     Origins = [{O, {[]}} || O <- Origins0],
@@ -323,24 +336,23 @@ get_cors_config(#httpd{cors_config = undefined, mochi_req = MochiReq}) ->
 get_cors_config(#httpd{cors_config = Config}) ->
     Config.
 
-
 cors_config(Host, Key, Default) ->
-    config:get(cors_section(Host), Key,
-        config:get("cors", Key, Default)).
-
+    config:get(
+        cors_section(Host),
+        Key,
+        config:get("cors", Key, Default)
+    ).
 
 cors_section(HostValue) ->
     HostPort = maybe_strip_scheme(HostValue),
     Host = hd(string:tokens(HostPort, ":")),
     "cors:" ++ Host.
 
-
 maybe_strip_scheme(Host) ->
     case string:str(Host, "://") of
         0 -> Host;
         N -> string:substr(Host, N + 3)
     end.
-
 
 is_cors_enabled(Config) ->
     case get(disable_couch_httpd_cors) of
@@ -350,7 +362,6 @@ is_cors_enabled(Config) ->
             ok
     end,
     couch_util:get_value(<<"enable_cors">>, Config, false).
-
 
 %% Get a list of {Origin, OriginConfig} tuples
 %% ie: get_origin_configs(Config) ->
@@ -369,7 +380,6 @@ get_origin_configs(Config) ->
     {Origins} = couch_util:get_value(<<"origins">>, Config, {[]}),
     Origins.
 
-
 %% Get config for an individual Origin
 %% ie: get_origin_config(Config, <<"http://foo.com">>) ->
 %% [
@@ -381,15 +391,16 @@ get_origin_config(Config, Origin) ->
     {OriginConfig} = couch_util:get_value(Origin, OriginConfigs, {[]}),
     OriginConfig.
 
-
 %% Get config of a single key for an individual Origin
 %% ie: get_origin_config(Config, <<"http://foo.com">>, <<"allow_methods">>, [])
 %% [<<"POST">>]
 get_origin_config(Config, Origin, Key, Default) ->
     OriginConfig = get_origin_config(Config, Origin),
-    couch_util:get_value(Key, OriginConfig,
-        couch_util:get_value(Key, Config, Default)).
-
+    couch_util:get_value(
+        Key,
+        OriginConfig,
+        couch_util:get_value(Key, Config, Default)
+    ).
 
 get_origin(Req) ->
     case chttpd:header_value(Req, "Origin") of
@@ -399,18 +410,14 @@ get_origin(Req) ->
             ?l2b(Origin)
     end.
 
-
 get_accepted_origins(_Req, Config) ->
-    lists:map(fun({K,_V}) -> K end, get_origin_configs(Config)).
-
+    lists:map(fun({K, _V}) -> K end, get_origin_configs(Config)).
 
 split_list(S) ->
     re:split(S, "\\s*,\\s*", [trim, {return, list}]).
 
-
 binary_split_list(S) ->
     [list_to_binary(E) || E <- split_list(S)].
 
-
 split_headers(H) ->
-    re:split(H, ",\\s*", [{return,list}, trim]).
+    re:split(H, ",\\s*", [{return, list}, trim]).

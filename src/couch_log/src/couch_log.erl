@@ -12,7 +12,6 @@
 
 -module(couch_log).
 
-
 -export([
     debug/2,
     info/2,
@@ -26,43 +25,33 @@
     set_level/1
 ]).
 
-
 -spec debug(string(), list()) -> ok.
 debug(Fmt, Args) -> log(debug, Fmt, Args).
-
 
 -spec info(string(), list()) -> ok.
 info(Fmt, Args) -> log(info, Fmt, Args).
 
-
 -spec notice(string(), list()) -> ok.
 notice(Fmt, Args) -> log(notice, Fmt, Args).
-
 
 -spec warning(string(), list()) -> ok.
 warning(Fmt, Args) -> log(warning, Fmt, Args).
 
-
 -spec error(string(), list()) -> ok.
 error(Fmt, Args) -> log(error, Fmt, Args).
-
 
 -spec critical(string(), list()) -> ok.
 critical(Fmt, Args) -> log(critical, Fmt, Args).
 
-
 -spec alert(string(), list()) -> ok.
 alert(Fmt, Args) -> log(alert, Fmt, Args).
-
 
 -spec emergency(string(), list()) -> ok.
 emergency(Fmt, Args) -> log(emergency, Fmt, Args).
 
-
 -spec set_level(atom() | string() | integer()) -> true.
 set_level(Level) ->
     config:set("log", "level", couch_log_util:level_to_string(Level)).
-
 
 -spec log(atom(), string(), list()) -> ok.
 log(Level, Fmt, Args) ->

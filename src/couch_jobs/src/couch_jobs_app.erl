@@ -8,19 +8,15 @@
 
 -module(couch_jobs_app).
 
-
 -behaviour(application).
-
 
 -export([
     start/2,
     stop/1
 ]).
 
-
 start(_Type, []) ->
     couch_jobs_sup:start_link().
-
 
 stop([]) ->
     ok.

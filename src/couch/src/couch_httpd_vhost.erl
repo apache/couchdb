@@ -34,9 +34,10 @@
 -define(RELISTEN_DELAY, 5000).
 
 -record(vhosts_state, {
-        vhosts,
-        vhost_globals,
-        vhosts_fun}).
+    vhosts,
+    vhost_globals,
+    vhosts_fun
+}).
 
 %% doc the vhost manager.
 %% This gen_server keep state of vhosts added to the ini and try to
@@ -110,34 +111,44 @@ dispatch_host_int(MochiReq) ->
     #vhosts_state{
         vhost_globals = VHostGlobals,
         vhosts = VHosts,
-        vhosts_fun=Fun} = get_state(),
+        vhosts_fun = Fun
+    } = get_state(),
 
     {"/" ++ VPath, Query, Fragment} = mochiweb_util:urlsplit_path(MochiReq:get(raw_path)),
-    VPathParts =  string:tokens(VPath, "/"),
+    VPathParts = string:tokens(VPath, "/"),
 
     VHost = host(MochiReq),
     {VHostParts, VhostPort} = split_host_port(VHost),
-    FinalMochiReq = case try_bind_vhost(VHosts, lists:reverse(VHostParts),
-            VhostPort, VPathParts) of
-        no_vhost_matched -> MochiReq;
-        {VhostTarget, NewPath} ->
-            case vhost_global(VHostGlobals, MochiReq) of
-                true ->
-                    MochiReq;
-                _Else ->
-                    NewPath1 = mochiweb_util:urlunsplit_path({NewPath, Query,
-                                          Fragment}),
-                    MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
-                                      MochiReq:get(method),
-                                      NewPath1,
-                                      MochiReq:get(version),
-                                      MochiReq:get(headers)),
-                    Fun(MochiReq1, VhostTarget)
-            end
-    end,
+    FinalMochiReq =
+        case
+            try_bind_vhost(
+                VHosts,
+                lists:reverse(VHostParts),
+                VhostPort,
+                VPathParts
+            )
+        of
+            no_vhost_matched ->
+                MochiReq;
+            {VhostTarget, NewPath} ->
+                case vhost_global(VHostGlobals, MochiReq) of
+                    true ->
+                        MochiReq;
+                    _Else ->
+                        NewPath1 = mochiweb_util:urlunsplit_path({NewPath, Query, Fragment}),
+                        MochiReq1 = mochiweb_request:new(
+                            MochiReq:get(socket),
+                            MochiReq:get(method),
+                            NewPath1,
+                            MochiReq:get(version),
+                            MochiReq:get(headers)
+                        ),
+                        Fun(MochiReq1, VhostTarget)
+                end
+        end,
     FinalMochiReq.
 
-append_path("/"=_Target, "/"=_Path) ->
+append_path("/" = _Target, "/" = _Path) ->
     "/";
 append_path(Target, Path) ->
     Target ++ Path.
@@ -154,15 +165,20 @@ redirect_to_vhost(MochiReq, VhostTarget) ->
     }),
     couch_log:debug("Vhost Target: '~p'~n", [Target]),
 
-    Headers = mochiweb_headers:enter("x-couchdb-vhost-path", Path,
-        MochiReq:get(headers)),
+    Headers = mochiweb_headers:enter(
+        "x-couchdb-vhost-path",
+        Path,
+        MochiReq:get(headers)
+    ),
 
     % build a new mochiweb request
-    MochiReq1 = mochiweb_request:new(MochiReq:get(socket),
-                                      MochiReq:get(method),
-                                      Target,
-                                      MochiReq:get(version),
-                                      Headers),
+    MochiReq1 = mochiweb_request:new(
+        MochiReq:get(socket),
+        MochiReq:get(method),
+        Target,
+        MochiReq:get(version),
+        Headers
+    ),
     % cleanup, It force mochiweb to reparse raw uri.
     MochiReq1:cleanup(),
     MochiReq1.
@@ -170,23 +186,25 @@ redirect_to_vhost(MochiReq, VhostTarget) ->
 %% if so, then it will not be rewritten, but will run as a normal couchdb request.
 %* normally you'd use this for _uuids _utils and a few of the others you want to
 %% keep available on vhosts. You can also use it to make databases 'global'.
-vhost_global( VhostGlobals, MochiReq) ->
+vhost_global(VhostGlobals, MochiReq) ->
     RawUri = MochiReq:get(raw_path),
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
 
-    Front = case couch_httpd:partition(Path) of
-    {"", "", ""} ->
-        "/"; % Special case the root url handler
-    {FirstPart, _, _} ->
-        FirstPart
-    end,
-    [true] == [true||V <- VhostGlobals, V == Front].
+    Front =
+        case couch_httpd:partition(Path) of
+            {"", "", ""} ->
+                % Special case the root url handler
+                "/";
+            {FirstPart, _, _} ->
+                FirstPart
+        end,
+    [true] == [true || V <- VhostGlobals, V == Front].
 
 %% bind host
 %% first it try to bind the port then the hostname.
 try_bind_vhost([], _HostParts, _Port, _PathParts) ->
     no_vhost_matched;
-try_bind_vhost([VhostSpec|Rest], HostParts, Port, PathParts) ->
+try_bind_vhost([VhostSpec | Rest], HostParts, Port, PathParts) ->
     {{VHostParts, VPort, VPath}, Path} = VhostSpec,
     case bind_port(VPort, Port) of
         ok ->
@@ -197,12 +215,18 @@ try_bind_vhost([VhostSpec|Rest], HostParts, Port, PathParts) ->
                             Path1 = make_target(Path, Bindings, Remainings, []),
                             {make_path(Path1), make_path(PathParts1)};
                         fail ->
-                            try_bind_vhost(Rest, HostParts, Port,
-                                PathParts)
+                            try_bind_vhost(
+                                Rest,
+                                HostParts,
+                                Port,
+                                PathParts
+                            )
                     end;
-                fail -> try_bind_vhost(Rest, HostParts, Port, PathParts)
+                fail ->
+                    try_bind_vhost(Rest, HostParts, Port, PathParts)
             end;
-        fail ->  try_bind_vhost(Rest, HostParts, Port, PathParts)
+        fail ->
+            try_bind_vhost(Rest, HostParts, Port, PathParts)
     end.
 
 %% doc: build new patch from bindings. bindings are query args
@@ -215,71 +239,82 @@ make_target([], _Bindings, _Remaining, Acc) ->
 make_target([?MATCH_ALL], _Bindings, Remaining, Acc) ->
     Acc1 = lists:reverse(Acc) ++ Remaining,
     Acc1;
-make_target([?MATCH_ALL|_Rest], _Bindings, Remaining, Acc) ->
+make_target([?MATCH_ALL | _Rest], _Bindings, Remaining, Acc) ->
     Acc1 = lists:reverse(Acc) ++ Remaining,
     Acc1;
-make_target([{bind, P}|Rest], Bindings, Remaining, Acc) ->
-    P2 = case couch_util:get_value({bind, P}, Bindings) of
-        undefined ->  "undefined";
-        P1 -> P1
-    end,
-    make_target(Rest, Bindings, Remaining, [P2|Acc]);
-make_target([P|Rest], Bindings, Remaining, Acc) ->
-    make_target(Rest, Bindings, Remaining, [P|Acc]).
+make_target([{bind, P} | Rest], Bindings, Remaining, Acc) ->
+    P2 =
+        case couch_util:get_value({bind, P}, Bindings) of
+            undefined -> "undefined";
+            P1 -> P1
+        end,
+    make_target(Rest, Bindings, Remaining, [P2 | Acc]);
+make_target([P | Rest], Bindings, Remaining, Acc) ->
+    make_target(Rest, Bindings, Remaining, [P | Acc]).
 
 %% bind port
 bind_port(Port, Port) -> ok;
 bind_port('*', _) -> ok;
-bind_port(_,_) -> fail.
+bind_port(_, _) -> fail.
 
 %% bind bhost
-bind_vhost([],[], Bindings) -> {ok, Bindings, []};
-bind_vhost([?MATCH_ALL], [], _Bindings) -> fail;
-bind_vhost([?MATCH_ALL], Rest, Bindings) -> {ok, Bindings, Rest};
-bind_vhost([], _HostParts, _Bindings) -> fail;
-bind_vhost([{bind, Token}|Rest], [Match|RestHost], Bindings) ->
-    bind_vhost(Rest, RestHost, [{{bind, Token}, Match}|Bindings]);
-bind_vhost([Cname|Rest], [Cname|RestHost], Bindings) ->
+bind_vhost([], [], Bindings) ->
+    {ok, Bindings, []};
+bind_vhost([?MATCH_ALL], [], _Bindings) ->
+    fail;
+bind_vhost([?MATCH_ALL], Rest, Bindings) ->
+    {ok, Bindings, Rest};
+bind_vhost([], _HostParts, _Bindings) ->
+    fail;
+bind_vhost([{bind, Token} | Rest], [Match | RestHost], Bindings) ->
+    bind_vhost(Rest, RestHost, [{{bind, Token}, Match} | Bindings]);
+bind_vhost([Cname | Rest], [Cname | RestHost], Bindings) ->
     bind_vhost(Rest, RestHost, Bindings);
-bind_vhost(_, _, _) -> fail.
+bind_vhost(_, _, _) ->
+    fail.
 
 %% bind path
 bind_path([], PathParts) ->
     {ok, PathParts};
 bind_path(_VPathParts, []) ->
     fail;
-bind_path([Path|VRest],[Path|Rest]) ->
-   bind_path(VRest, Rest);
+bind_path([Path | VRest], [Path | Rest]) ->
+    bind_path(VRest, Rest);
 bind_path(_, _) ->
     fail.
 
 % utilities
 
-
 %% create vhost list from ini
 
 host(MochiReq) ->
     XHost = chttpd_util:get_chttpd_config(
-        "x_forwarded_host", "X-Forwarded-Host"),
+        "x_forwarded_host",
+        "X-Forwarded-Host"
+    ),
     case MochiReq:get_header_value(XHost) of
         undefined ->
             case MochiReq:get_header_value("Host") of
                 undefined -> [];
                 Value1 -> Value1
             end;
-        Value -> Value
+        Value ->
+            Value
     end.
 
 make_vhosts() ->
-    Vhosts = lists:foldl(fun
-                ({_, ""}, Acc) ->
-                    Acc;
-                ({Vhost, Path}, Acc) ->
-                    [{parse_vhost(Vhost), split_path(Path)}|Acc]
-            end, [], config:get("vhosts")),
+    Vhosts = lists:foldl(
+        fun
+            ({_, ""}, Acc) ->
+                Acc;
+            ({Vhost, Path}, Acc) ->
+                [{parse_vhost(Vhost), split_path(Path)} | Acc]
+        end,
+        [],
+        config:get("vhosts")
+    ),
 
     lists:reverse(lists:usort(Vhosts)).
-
 
 parse_vhost(Vhost) ->
     case urlsplit_netloc(Vhost, []) of
@@ -295,15 +330,21 @@ parse_vhost(Vhost) ->
             {H1, P, string:tokens(Path, "/")}
     end.
 
-
 split_host_port(HostAsString) ->
     case string:rchr(HostAsString, $:) of
         0 ->
             {split_host(HostAsString), '*'};
         N ->
-            HostPart = string:substr(HostAsString, 1, N-1),
-            case (catch erlang:list_to_integer(string:substr(HostAsString,
-                            N+1, length(HostAsString)))) of
+            HostPart = string:substr(HostAsString, 1, N - 1),
+            case
+                (catch erlang:list_to_integer(
+                    string:substr(
+                        HostAsString,
+                        N + 1,
+                        length(HostAsString)
+                    )
+                ))
+            of
                 {'EXIT', _} ->
                     {split_host(HostAsString), '*'};
                 Port ->
@@ -317,36 +358,34 @@ split_host(HostAsString) ->
 split_path(Path) ->
     make_spec(string:tokens(Path, "/"), []).
 
-
 make_spec([], Acc) ->
     lists:reverse(Acc);
-make_spec([""|R], Acc) ->
+make_spec(["" | R], Acc) ->
     make_spec(R, Acc);
-make_spec(["*"|R], Acc) ->
-    make_spec(R, [?MATCH_ALL|Acc]);
-make_spec([P|R], Acc) ->
+make_spec(["*" | R], Acc) ->
+    make_spec(R, [?MATCH_ALL | Acc]);
+make_spec([P | R], Acc) ->
     P1 = parse_var(P),
-    make_spec(R, [P1|Acc]).
-
+    make_spec(R, [P1 | Acc]).
 
 parse_var(P) ->
     case P of
         ":" ++ Var ->
             {bind, Var};
-        _ -> P
+        _ ->
+            P
     end.
-
 
 % mochiweb doesn't export it.
 urlsplit_netloc("", Acc) ->
     {lists:reverse(Acc), ""};
-urlsplit_netloc(Rest=[C | _], Acc) when C =:= $/; C =:= $?; C =:= $# ->
+urlsplit_netloc(Rest = [C | _], Acc) when C =:= $/; C =:= $?; C =:= $# ->
     {lists:reverse(Acc), Rest};
 urlsplit_netloc([C | Rest], Acc) ->
     urlsplit_netloc(Rest, [C | Acc]).
 
 make_path(Parts) ->
-     "/" ++ string:join(Parts,[?SEPARATOR]).
+    "/" ++ string:join(Parts, [?SEPARATOR]).
 
 init(_) ->
     ok = config:listen_for_changes(?MODULE, nil),
@@ -354,17 +393,19 @@ init(_) ->
     %% load configuration
     {VHostGlobals, VHosts, Fun} = load_conf(),
     State = #vhosts_state{
-        vhost_globals=VHostGlobals,
-        vhosts=VHosts,
-        vhosts_fun=Fun},
+        vhost_globals = VHostGlobals,
+        vhosts = VHosts,
+        vhosts_fun = Fun
+    },
     {ok, State}.
 
 handle_call(reload, _From, _State) ->
     {VHostGlobals, VHosts, Fun} = load_conf(),
     {reply, ok, #vhosts_state{
-            vhost_globals=VHostGlobals,
-            vhosts=VHosts,
-            vhosts_fun=Fun}};
+        vhost_globals = VHostGlobals,
+        vhosts = VHosts,
+        vhosts_fun = Fun
+    }};
 handle_call(get_state, _From, State) ->
     {reply, State, State};
 handle_call(_Msg, _From, State) ->
@@ -385,7 +426,6 @@ terminate(_Reason, _State) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-
 handle_config_change("vhosts", _, _, _, _) ->
     {ok, ?MODULE:reload()};
 handle_config_change(_, _, _, _, _) ->
@@ -398,8 +438,11 @@ handle_config_terminate(_Server, _Reason, _State) ->
 
 load_conf() ->
     %% get vhost globals
-    VHostGlobals = re:split("_utils, _uuids, _session, _users", "\\s*,\\s*",
-        [{return, list}]),
+    VHostGlobals = re:split(
+        "_utils, _uuids, _session, _users",
+        "\\s*,\\s*",
+        [{return, list}]
+    ),
 
     %% build vhosts matching rules
     VHosts = make_vhosts(),

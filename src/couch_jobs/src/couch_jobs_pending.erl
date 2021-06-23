@@ -12,7 +12,6 @@
 
 -module(couch_jobs_pending).
 
-
 -export([
     enqueue/4,
     dequeue/4,
@@ -20,12 +19,9 @@
     pending_count/4
 ]).
 
-
 -include("couch_jobs.hrl").
 
-
 -define(RANGE_LIMIT, 1024).
-
 
 enqueue(#{jtx := true} = JTx, Type, STime, JobId) ->
     #{tx := Tx, jobs_path := Jobs} = JTx,
@@ -34,7 +30,6 @@ enqueue(#{jtx := true} = JTx, Type, STime, JobId) ->
     WatchKey = erlfdb_tuple:pack({?WATCHES_PENDING, Type}, Jobs),
     erlfdb:add(Tx, WatchKey, 1),
     ok.
-
 
 dequeue(#{jtx := true} = JTx, Type, _, true) ->
     #{tx := Tx, jobs_path := Jobs} = JTx,
@@ -47,7 +42,6 @@ dequeue(#{jtx := true} = JTx, Type, _, true) ->
             {JobId} = erlfdb_tuple:unpack(PendingKey, Prefix),
             {ok, JobId}
     end;
-
 dequeue(#{jtx := true} = JTx, Type, MaxSTime, _) ->
     #{tx := Tx, jobs_path := Jobs} = JTx,
     {StartKeySel, EndKeySel} = get_range_selectors(JTx, Type, MaxSTime),
@@ -60,12 +54,10 @@ dequeue(#{jtx := true} = JTx, Type, MaxSTime, _) ->
             {ok, JobId}
     end.
 
-
 remove(#{jtx := true} = JTx, Type, JobId, STime) ->
     #{tx := Tx, jobs_path := Jobs} = JTx,
     Key = erlfdb_tuple:pack({?PENDING, Type, STime, JobId}, Jobs),
     erlfdb:clear(Tx, Key).
-
 
 pending_count(#{jtx := true} = JTx, Type, MaxSTime, Limit) ->
     #{tx := Tx} = JTx,
@@ -78,7 +70,6 @@ pending_count(#{jtx := true} = JTx, Type, MaxSTime, Limit) ->
     FoldFun = fun(_Row, Cnt) -> Cnt + 1 end,
     erlfdb:fold_range(Tx, StartSel, EndSel, FoldFun, 0, Opts).
 
-
 %% Private functions
 
 % Get pending key selectors, taking into account max scheduled time value.
@@ -89,7 +80,6 @@ get_range_selectors(#{jtx := true} = JTx, Type, MaxSTime) ->
     End = erlfdb_tuple:pack({MaxSTime, <<16#FF>>}, Prefix),
     EndKeySel = erlfdb_key:first_greater_or_equal(End),
     {StartKeySel, EndKeySel}.
-
 
 % Pick a random item from the range without reading the keys in first. However
 % the constraint it that IDs should looks like random UUIDs
@@ -113,15 +103,13 @@ get_random_item(Tx, Prefix) ->
             end
     end.
 
-
 get_before(Snapshot, Prefix, Id) ->
     KSel = erlfdb_key:last_less_or_equal(erlfdb_tuple:pack({Id}, Prefix)),
     PrefixSize = byte_size(Prefix),
     case erlfdb:wait(erlfdb:get_key(Snapshot, KSel)) of
-        <<Prefix:PrefixSize/binary, _/binary>> = Key ->  {ok, Key};
+        <<Prefix:PrefixSize/binary, _/binary>> = Key -> {ok, Key};
         _ -> {error, not_found}
     end.
-
 
 get_after(Snapshot, Prefix, Id) ->
     KSel = erlfdb_key:first_greater_or_equal(erlfdb_tuple:pack({Id}, Prefix)),
@@ -130,7 +118,6 @@ get_after(Snapshot, Prefix, Id) ->
         <<Prefix:PrefixSize/binary, _/binary>> = Key -> {ok, Key};
         _ -> {error, not_found}
     end.
-
 
 % Pick a random key from the range snapshot. Then radomly pick a key to clear.
 % Before clearing, ensure there is a read conflict on the key in in case other
@@ -155,7 +142,6 @@ clear_random_key_from_range(Tx, Start, End) ->
             erlfdb:clear(Tx, Key),
             {ok, Key}
     end.
-
 
 get_pending_watch(#{jtx := true} = JTx, Type) ->
     #{tx := Tx, jobs_path := Jobs} = couch_jobs_fdb:get_jtx(JTx),

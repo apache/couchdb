@@ -127,22 +127,21 @@ utc_random(ClockSeq) ->
 
 utc_suffix(Suffix, ClockSeq, Now) ->
     OsMicros = micros_since_epoch(Now),
-    NewClockSeq = if
-        OsMicros =< ClockSeq ->
-            % Timestamp is lagging, use ClockSeq as Timestamp
-            ClockSeq + 1;
-        OsMicros > ClockSeq ->
-            % Timestamp advanced, use it, and reset ClockSeq with it
-            OsMicros
-    end,
+    NewClockSeq =
+        if
+            OsMicros =< ClockSeq ->
+                % Timestamp is lagging, use ClockSeq as Timestamp
+                ClockSeq + 1;
+            OsMicros > ClockSeq ->
+                % Timestamp advanced, use it, and reset ClockSeq with it
+                OsMicros
+        end,
     Prefix = io_lib:format("~14.16.0b", [NewClockSeq]),
     {list_to_binary(Prefix ++ Suffix), NewClockSeq}.
-
 
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
-
 
 utc_id_time_does_not_advance_test() ->
     % Timestamp didn't advance but local clock sequence should and new UUIds
@@ -155,7 +154,6 @@ utc_id_time_does_not_advance_test() ->
     {UtcId1, ClockSeq2} = utc_suffix("", ClockSeq1, Now),
     ?assertNotEqual(UtcId0, UtcId1),
     ?assertEqual(ClockSeq1 + 1, ClockSeq2).
-
 
 utc_id_time_advanced_test() ->
     % Timestamp advanced, a new UUID generated and also the last clock sequence
@@ -186,6 +184,5 @@ utc_random_test_time_advance_test() ->
     ?assert(is_binary(UtcRandom)),
     ?assertEqual(32, byte_size(UtcRandom)),
     ?assert(NextClockSeq > micros_since_epoch({1000, 0, 0})).
-
 
 -endif.

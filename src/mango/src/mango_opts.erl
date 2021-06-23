@@ -38,9 +38,7 @@
     default_limit/0
 ]).
 
-
 -include("mango.hrl").
-
 
 validate_idx_create({Props}) ->
     Opts = [
@@ -73,7 +71,6 @@ validate_idx_create({Props}) ->
         ]}
     ],
     validate(Props, Opts).
-
 
 validate_find({Props}) ->
     Opts = [
@@ -156,7 +153,6 @@ validate_find({Props}) ->
     ],
     validate(Props, Opts).
 
-
 validate_bulk_delete({Props}) ->
     Opts = [
         {<<"docids">>, [
@@ -171,7 +167,6 @@ validate_bulk_delete({Props}) ->
         ]}
     ],
     validate(Props, Opts).
-
 
 validate(Props, Opts) ->
     case mango_util:assert_ejson({Props}) of
@@ -189,12 +184,10 @@ validate(Props, Opts) ->
     end,
     {ok, Acc}.
 
-
 is_string(Val) when is_binary(Val) ->
     {ok, Val};
 is_string(Else) ->
     ?MANGO_ERROR({invalid_string, Else}).
-
 
 is_boolean(true) ->
     {ok, true};
@@ -203,18 +196,15 @@ is_boolean(false) ->
 is_boolean(Else) ->
     ?MANGO_ERROR({invalid_boolean, Else}).
 
-
 is_pos_integer(V) when is_integer(V), V > 0 ->
     {ok, V};
 is_pos_integer(Else) ->
     ?MANGO_ERROR({invalid_pos_integer, Else}).
 
-
 is_non_neg_integer(V) when is_integer(V), V >= 0 ->
     {ok, V};
 is_non_neg_integer(Else) ->
     ?MANGO_ERROR({invalid_non_neg_integer, Else}).
-
 
 is_object({Props}) ->
     true = mango_util:assert_ejson({Props}),
@@ -223,19 +213,19 @@ is_object(Else) ->
     ?MANGO_ERROR({invalid_object, Else}).
 
 is_ok_or_false(<<"ok">>) ->
-  {ok, ok};
-is_ok_or_false(<<"false">>) -> % convenience
-  {ok, false};
+    {ok, ok};
+% convenience
+is_ok_or_false(<<"false">>) ->
+    {ok, false};
 is_ok_or_false(false) ->
-  {ok, false};
+    {ok, false};
 is_ok_or_false(Else) ->
-  ?MANGO_ERROR({invalid_ok_or_false_value, Else}).
+    ?MANGO_ERROR({invalid_ok_or_false_value, Else}).
 
 validate_idx_name(auto_name) ->
     {ok, auto_name};
 validate_idx_name(Else) ->
     is_string(Else).
-
 
 validate_selector({Props}) ->
     Norm = mango_selector:normalize({Props}),
@@ -243,14 +233,12 @@ validate_selector({Props}) ->
 validate_selector(Else) ->
     ?MANGO_ERROR({invalid_selector_json, Else}).
 
-
 %% We re-use validate_use_index to make sure the index names are valid
 validate_bulk_docs(Docs) when is_list(Docs) ->
     lists:foreach(fun validate_use_index/1, Docs),
     {ok, Docs};
 validate_bulk_docs(Else) ->
     ?MANGO_ERROR({invalid_bulk_docs, Else}).
-
 
 validate_use_index(IndexName) when is_binary(IndexName) ->
     case binary:split(IndexName, <<"/">>) of
@@ -271,12 +259,12 @@ validate_use_index([]) ->
     {ok, []};
 validate_use_index([DesignId]) when is_binary(DesignId) ->
     {ok, [DesignId]};
-validate_use_index([DesignId, ViewName])
-        when is_binary(DesignId), is_binary(ViewName) ->
+validate_use_index([DesignId, ViewName]) when
+    is_binary(DesignId), is_binary(ViewName)
+->
     {ok, [DesignId, ViewName]};
 validate_use_index(Else) ->
     ?MANGO_ERROR({invalid_index_name, Else}).
-
 
 validate_bookmark(null) ->
     {ok, nil};
@@ -287,14 +275,11 @@ validate_bookmark(Bin) when is_binary(Bin) ->
 validate_bookmark(Else) ->
     ?MANGO_ERROR({invalid_bookmark, Else}).
 
-
 validate_sort(Value) ->
     mango_sort:new(Value).
 
-
 validate_fields(Value) ->
     mango_fields:new(Value).
-
 
 validate_opts([], Props, Acc) ->
     {Props, lists:reverse(Acc)};
@@ -308,7 +293,6 @@ validate_opts([{Name, Desc} | Rest], Props, Acc) ->
             NewAcc = [{Tag, validate_opt(Name, Desc, undefined)} | Acc],
             validate_opts(Rest, Props, NewAcc)
     end.
-
 
 validate_opt(_Name, [], Value) ->
     Value;
@@ -341,7 +325,6 @@ validate_opt(Name, [{validator, Fun} | Rest], Value) ->
         false ->
             ?MANGO_ERROR({invalid_value, Name, Value})
     end.
-
 
 default_limit() ->
     config:get_integer("mango", "default_limit", 25).

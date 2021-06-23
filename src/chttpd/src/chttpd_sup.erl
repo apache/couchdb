@@ -28,17 +28,17 @@
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 100, Type, [I]}).
 
 start_link() ->
-    Arg = case fabric2_node_types:is_type(api_frontend) of
-        true -> normal;
-        false -> disabled
-    end,
-    supervisor:start_link({local,?MODULE}, ?MODULE, Arg).
+    Arg =
+        case fabric2_node_types:is_type(api_frontend) of
+            true -> normal;
+            false -> disabled
+        end,
+    supervisor:start_link({local, ?MODULE}, ?MODULE, Arg).
 
 init(disabled) ->
     ?LOG_NOTICE(#{what => http_api_disabled}),
     couch_log:notice("~p : api_frontend disabled", [?MODULE]),
     {ok, {{one_for_one, 3, 10}, []}};
-
 init(normal) ->
     Children = [
         {
@@ -51,13 +51,11 @@ init(normal) ->
         },
         ?CHILD(chttpd, worker),
         ?CHILD(chttpd_auth_cache, worker),
-        {chttpd_auth_cache_lru,
-	 {ets_lru, start_link, [chttpd_auth_cache_lru, lru_opts()]},
-	 permanent, 5000, worker, [ets_lru]}
+        {chttpd_auth_cache_lru, {ets_lru, start_link, [chttpd_auth_cache_lru, lru_opts()]},
+            permanent, 5000, worker, [ets_lru]}
     ],
 
-    {ok, {{one_for_one, 3, 10},
-        couch_epi:register_service(chttpd_epi, Children)}}.
+    {ok, {{one_for_one, 3, 10}, couch_epi:register_service(chttpd_epi, Children)}}.
 
 handle_config_change("chttpd", "bind_address", Value, _, Settings) ->
     maybe_replace(bind_address, Value, Settings);
@@ -83,11 +81,11 @@ settings() ->
 
 maybe_replace(Key, Value, Settings) ->
     case couch_util:get_value(Key, Settings) of
-    Value ->
-        {ok, Settings};
-    _ ->
-        chttpd:stop(),
-        {ok, lists:keyreplace(Key, 1, Settings, {Key, Value})}
+        Value ->
+            {ok, Settings};
+        _ ->
+            chttpd:stop(),
+            {ok, lists:keyreplace(Key, 1, Settings, {Key, Value})}
     end.
 
 lru_opts() ->
@@ -111,5 +109,7 @@ append_if_set({Key, Value}, Opts) ->
     }),
     couch_log:error(
         "The value for `~s` should be string convertable "
-        "to integer which is >= 0 (got `~p`)", [Key, Value]),
+        "to integer which is >= 0 (got `~p`)",
+        [Key, Value]
+    ),
     Opts.

@@ -34,8 +34,7 @@
 -define(REQUIREMENT_ERROR, "Password does not conform to requirements.").
 -define(PASSWORD_SERVER_ERROR, "Server cannot hash passwords at this time.").
 
--define(
-    DDOCS_ADMIN_ONLY,
+-define(DDOCS_ADMIN_ONLY,
     <<"Only administrators can view design docs in the users database.">>
 ).
 
@@ -55,12 +54,12 @@ before_doc_update(Doc, Db, _UpdateType) ->
     #user_ctx{name = Name} = fabric2_db:get_user_ctx(Db),
     DocName = get_doc_name(Doc),
     case (catch fabric2_db:check_is_admin(Db)) of
-    ok ->
-        save_doc(Doc);
-    _ when Name =:= DocName orelse Name =:= null ->
-        save_doc(Doc);
-    _ ->
-        throw(not_found)
+        ok ->
+            save_doc(Doc);
+        _ when Name =:= DocName orelse Name =:= null ->
+            save_doc(Doc);
+        _ ->
+            throw(not_found)
     end.
 
 % If newDoc.password == null || newDoc.password == undefined:
@@ -70,45 +69,49 @@ before_doc_update(Doc, Db, _UpdateType) ->
 %    newDoc.password_sha = hash_pw(newDoc.password + salt)
 %    newDoc.salt = salt
 %    newDoc.password = null
-save_doc(#doc{body={Body}} = Doc) ->
+save_doc(#doc{body = {Body}} = Doc) ->
     %% Support both schemes to smooth migration from legacy scheme
     Scheme = chttpd_util:get_chttpd_auth_config("password_scheme", "pbkdf2"),
     case {fabric2_util:get_value(?PASSWORD, Body), Scheme} of
-    {null, _} -> % server admins don't have a user-db password entry
-        Doc;
-    {undefined, _} ->
-        Doc;
-    {ClearPassword, "simple"} -> % deprecated
-        ok = validate_password(ClearPassword),
-        Salt = couch_uuids:random(),
-        PasswordSha = couch_passwords:simple(ClearPassword, Salt),
-        Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?SIMPLE),
-        Body1 = ?replace(Body0, ?SALT, Salt),
-        Body2 = ?replace(Body1, ?PASSWORD_SHA, PasswordSha),
-        Body3 = proplists:delete(?PASSWORD, Body2),
-        Doc#doc{body={Body3}};
-    {ClearPassword, "pbkdf2"} ->
-        ok = validate_password(ClearPassword),
-        Iterations = chttpd_util:get_chttpd_auth_config_integer(
-            "iterations", 10),
-        Salt = couch_uuids:random(),
-        DerivedKey = couch_passwords:pbkdf2(ClearPassword, Salt, Iterations),
-        Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?PBKDF2),
-        Body1 = ?replace(Body0, ?ITERATIONS, Iterations),
-        Body2 = ?replace(Body1, ?DERIVED_KEY, DerivedKey),
-        Body3 = ?replace(Body2, ?SALT, Salt),
-        Body4 = proplists:delete(?PASSWORD, Body3),
-        Doc#doc{body={Body4}};
-    {_ClearPassword, Scheme} ->
-        ?LOG_ERROR(#{
-            what => invalid_config_setting,
-            section => couch_httpd_auth,
-            key => password_scheme,
-            value => Scheme,
-            details => "password_scheme must one of (simple, pbkdf2)"
-        }),
-        couch_log:error("[couch_httpd_auth] password_scheme value of '~p' is invalid.", [Scheme]),
-        throw({forbidden, ?PASSWORD_SERVER_ERROR})
+        % server admins don't have a user-db password entry
+        {null, _} ->
+            Doc;
+        {undefined, _} ->
+            Doc;
+        % deprecated
+        {ClearPassword, "simple"} ->
+            ok = validate_password(ClearPassword),
+            Salt = couch_uuids:random(),
+            PasswordSha = couch_passwords:simple(ClearPassword, Salt),
+            Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?SIMPLE),
+            Body1 = ?replace(Body0, ?SALT, Salt),
+            Body2 = ?replace(Body1, ?PASSWORD_SHA, PasswordSha),
+            Body3 = proplists:delete(?PASSWORD, Body2),
+            Doc#doc{body = {Body3}};
+        {ClearPassword, "pbkdf2"} ->
+            ok = validate_password(ClearPassword),
+            Iterations = chttpd_util:get_chttpd_auth_config_integer(
+                "iterations",
+                10
+            ),
+            Salt = couch_uuids:random(),
+            DerivedKey = couch_passwords:pbkdf2(ClearPassword, Salt, Iterations),
+            Body0 = ?replace(Body, ?PASSWORD_SCHEME, ?PBKDF2),
+            Body1 = ?replace(Body0, ?ITERATIONS, Iterations),
+            Body2 = ?replace(Body1, ?DERIVED_KEY, DerivedKey),
+            Body3 = ?replace(Body2, ?SALT, Salt),
+            Body4 = proplists:delete(?PASSWORD, Body3),
+            Doc#doc{body = {Body4}};
+        {_ClearPassword, Scheme} ->
+            ?LOG_ERROR(#{
+                what => invalid_config_setting,
+                section => couch_httpd_auth,
+                key => password_scheme,
+                value => Scheme,
+                details => "password_scheme must one of (simple, pbkdf2)"
+            }),
+            couch_log:error("[couch_httpd_auth] password_scheme value of '~p' is invalid.", [Scheme]),
+            throw({forbidden, ?PASSWORD_SERVER_ERROR})
     end.
 
 % Validate if a new password matches all RegExp in the password_regexp setting.
@@ -121,47 +124,52 @@ validate_password(ClearPassword) ->
         "[]" ->
             ok;
         ValidateConfig ->
-            RequirementList = case couch_util:parse_term(ValidateConfig) of
-                {ok, RegExpList} when is_list(RegExpList) ->
-                    RegExpList;
-                {ok, NonListValue} ->
-                    couch_log:error(
-                        "[couch_httpd_auth] password_regexp value of '~p'"
-                        " is not a list.",
-                        [NonListValue]
-                    ),
-                    throw({forbidden, ?PASSWORD_SERVER_ERROR});
-                {error, ErrorInfo} ->
-                    couch_log:error(
-                        "[couch_httpd_auth] password_regexp value of '~p'"
-                        " could not get parsed. ~p",
-                        [ValidateConfig, ErrorInfo]
-                    ),
-                    throw({forbidden, ?PASSWORD_SERVER_ERROR})
-            end,
-            % Check the password on every RegExp.
-            lists:foreach(fun(RegExpTuple) ->
-                case get_password_regexp_and_error_msg(RegExpTuple) of
-                    {ok, RegExp, PasswordErrorMsg} ->
-                        check_password(ClearPassword, RegExp, PasswordErrorMsg);
-                    {error} ->
+            RequirementList =
+                case couch_util:parse_term(ValidateConfig) of
+                    {ok, RegExpList} when is_list(RegExpList) ->
+                        RegExpList;
+                    {ok, NonListValue} ->
                         couch_log:error(
-                            "[couch_httpd_auth] password_regexp part of '~p' "
-                            "is not a RegExp string or "
-                            "a RegExp and Reason tuple.",
-                            [RegExpTuple]
+                            "[couch_httpd_auth] password_regexp value of '~p'"
+                            " is not a list.",
+                            [NonListValue]
+                        ),
+                        throw({forbidden, ?PASSWORD_SERVER_ERROR});
+                    {error, ErrorInfo} ->
+                        couch_log:error(
+                            "[couch_httpd_auth] password_regexp value of '~p'"
+                            " could not get parsed. ~p",
+                            [ValidateConfig, ErrorInfo]
                         ),
                         throw({forbidden, ?PASSWORD_SERVER_ERROR})
-                end
-            end, RequirementList),
+                end,
+            % Check the password on every RegExp.
+            lists:foreach(
+                fun(RegExpTuple) ->
+                    case get_password_regexp_and_error_msg(RegExpTuple) of
+                        {ok, RegExp, PasswordErrorMsg} ->
+                            check_password(ClearPassword, RegExp, PasswordErrorMsg);
+                        {error} ->
+                            couch_log:error(
+                                "[couch_httpd_auth] password_regexp part of '~p' "
+                                "is not a RegExp string or "
+                                "a RegExp and Reason tuple.",
+                                [RegExpTuple]
+                            ),
+                            throw({forbidden, ?PASSWORD_SERVER_ERROR})
+                    end
+                end,
+                RequirementList
+            ),
             ok
     end.
 
 % Get the RegExp out of the tuple and combine the the error message.
 % First is with a Reason string.
-get_password_regexp_and_error_msg({RegExp, Reason}) 
-        when is_list(RegExp) andalso is_list(Reason)
-        andalso length(Reason) > 0 ->
+get_password_regexp_and_error_msg({RegExp, Reason}) when
+    is_list(RegExp) andalso is_list(Reason) andalso
+        length(Reason) > 0
+->
     {ok, RegExp, lists:concat([?REQUIREMENT_ERROR, " ", Reason])};
 % With a not correct Reason string.
 get_password_regexp_and_error_msg({RegExp, _Reason}) when is_list(RegExp) ->
@@ -184,7 +192,6 @@ check_password(Password, RegExp, ErrorMsg) ->
         _ ->
             throw({bad_request, ErrorMsg})
     end.
-
 
 % If the doc is a design doc
 %   If the request's userCtx identifies an admin
@@ -213,19 +220,17 @@ after_doc_read(Doc, Db) ->
         _ ->
             Doc1 = strip_non_public_fields(Doc),
             case Doc1 of
-                #doc{body={[]}} -> throw(not_found);
+                #doc{body = {[]}} -> throw(not_found);
                 _ -> Doc1
             end
     end.
 
-
-get_doc_name(#doc{id= <<"org.couchdb.user:", Name/binary>>}) ->
+get_doc_name(#doc{id = <<"org.couchdb.user:", Name/binary>>}) ->
     Name;
 get_doc_name(_) ->
     undefined.
 
-
-strip_non_public_fields(#doc{body={Props}}=Doc) ->
+strip_non_public_fields(#doc{body = {Props}} = Doc) ->
     PublicFields = chttpd_util:get_chttpd_auth_config("public_fields", ""),
     Public = re:split(PublicFields, "\\s*,\\s*", [{return, binary}]),
-    Doc#doc{body={[{K, V} || {K, V} <- Props, lists:member(K, Public)]}}.
+    Doc#doc{body = {[{K, V} || {K, V} <- Props, lists:member(K, Public)]}}.

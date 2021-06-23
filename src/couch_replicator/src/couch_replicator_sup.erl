@@ -13,9 +13,7 @@
 
 -module(couch_replicator_sup).
 
-
 -behaviour(supervisor).
-
 
 -export([
     start_link/0
@@ -25,28 +23,26 @@
     init/1
 ]).
 
-
 start_link() ->
     Backend = fabric2_node_types:is_type(replication),
     Frontend = fabric2_node_types:is_type(api_frontend),
     Arg = {Backend, Frontend},
     supervisor:start_link({local, ?MODULE}, ?MODULE, Arg).
 
-
 init({Backend, Frontend}) ->
-    Children = case {Backend, Frontend} of
-        {true, true} -> backend() ++ frontend();
-        {true, false} -> backend();
-        {false, true} -> frontend();
-        {false, false} -> []
-    end,
-    Flags =  #{
+    Children =
+        case {Backend, Frontend} of
+            {true, true} -> backend() ++ frontend();
+            {true, false} -> backend();
+            {false, true} -> frontend();
+            {false, false} -> []
+        end,
+    Flags = #{
         strategy => rest_for_one,
         intensity => 1,
         period => 5
     },
     {ok, {Flags, Children}}.
-
 
 backend() ->
     Timeout = 5000,
@@ -65,7 +61,6 @@ backend() ->
             shutdown => Timeout
         }
     ].
-
 
 frontend() ->
     [

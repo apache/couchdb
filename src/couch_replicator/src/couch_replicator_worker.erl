@@ -28,15 +28,17 @@
 -include_lib("kernel/include/logger.hrl").
 
 % TODO: maybe make both buffer max sizes configurable
--define(DOC_BUFFER_BYTE_SIZE, 512 * 1024).   % for remote targets
--define(STATS_DELAY, 10000000).              % 10 seconds (in microseconds)
+
+% for remote targets
+-define(DOC_BUFFER_BYTE_SIZE, 512 * 1024).
+% 10 seconds (in microseconds)
+-define(STATS_DELAY, 10000000).
 -define(MISSING_DOC_RETRY_MSEC, 2000).
 
 -import(couch_util, [
     to_binary/1,
     get_value/3
 ]).
-
 
 -record(batch, {
     docs = [],
@@ -57,12 +59,12 @@
     batch = #batch{}
 }).
 
-
-
 start_link(Cp, #httpdb{} = Source, Target, ChangesManager, MaxConns) ->
     gen_server:start_link(
-        ?MODULE, {Cp, Source, Target, ChangesManager, MaxConns}, []).
-
+        ?MODULE,
+        {Cp, Source, Target, ChangesManager, MaxConns},
+        []
+    ).
 
 init({Cp, Source, Target, ChangesManager, MaxConns}) ->
     process_flag(trap_exit, true),
@@ -80,108 +82,122 @@ init({Cp, Source, Target, ChangesManager, MaxConns}) ->
     },
     {ok, State}.
 
-
-handle_call({fetch_doc, {_Id, _Revs, _PAs} = Params}, {Pid, _} = From,
-    #state{loop = Pid, readers = Readers, pending_fetch = nil,
-        source = Src, target = Tgt, max_parallel_conns = MaxConns} = State) ->
+handle_call(
+    {fetch_doc, {_Id, _Revs, _PAs} = Params},
+    {Pid, _} = From,
+    #state{
+        loop = Pid,
+        readers = Readers,
+        pending_fetch = nil,
+        source = Src,
+        target = Tgt,
+        max_parallel_conns = MaxConns
+    } = State
+) ->
     case length(Readers) of
-    Size when Size < MaxConns ->
-        Reader = spawn_doc_reader(Src, Tgt, Params),
-        NewState = State#state{
-            readers = [Reader | Readers]
-        },
-        {reply, ok, NewState};
-    _ ->
-        NewState = State#state{
-            pending_fetch = {From, Params}
-        },
-        {noreply, NewState}
+        Size when Size < MaxConns ->
+            Reader = spawn_doc_reader(Src, Tgt, Params),
+            NewState = State#state{
+                readers = [Reader | Readers]
+            },
+            {reply, ok, NewState};
+        _ ->
+            NewState = State#state{
+                pending_fetch = {From, Params}
+            },
+            {noreply, NewState}
     end;
-
 handle_call({batch_doc, Doc}, From, State) ->
     gen_server:reply(From, ok),
     {noreply, maybe_flush_docs(Doc, State)};
-
 handle_call({add_stats, IncStats}, From, #state{stats = Stats} = State) ->
     gen_server:reply(From, ok),
     NewStats = couch_replicator_stats:sum_stats(Stats, IncStats),
     NewStats2 = maybe_report_stats(State#state.cp, NewStats),
     {noreply, State#state{stats = NewStats2}};
-
-handle_call(flush, {Pid, _} = From,
-    #state{loop = Pid, writer = nil, flush_waiter = nil,
-        target = Target, batch = Batch} = State) ->
-    State2 = case State#state.readers of
-    [] ->
-        State#state{writer = spawn_writer(Target, Batch)};
-    _ ->
-        State
-    end,
+handle_call(
+    flush,
+    {Pid, _} = From,
+    #state{
+        loop = Pid,
+        writer = nil,
+        flush_waiter = nil,
+        target = Target,
+        batch = Batch
+    } = State
+) ->
+    State2 =
+        case State#state.readers of
+            [] ->
+                State#state{writer = spawn_writer(Target, Batch)};
+            _ ->
+                State
+        end,
     {noreply, State2#state{flush_waiter = From}}.
-
 
 handle_cast(Msg, State) ->
     {stop, {unexpected_async_call, Msg}, State}.
 
-
 handle_info({'EXIT', Pid, normal}, #state{loop = Pid} = State) ->
     #state{
-        batch = #batch{docs = []}, readers = [], writer = nil,
-        pending_fetch = nil, flush_waiter = nil
+        batch = #batch{docs = []},
+        readers = [],
+        writer = nil,
+        pending_fetch = nil,
+        flush_waiter = nil
     } = State,
     {stop, normal, State};
-
 handle_info({'EXIT', Pid, normal}, #state{writer = Pid} = State) ->
     {noreply, after_full_flush(State)};
-
 handle_info({'EXIT', Pid, normal}, #state{writer = nil} = State) ->
     #state{
-        readers = Readers, writer = Writer, batch = Batch,
-        source = Source, target = Target,
-        pending_fetch = Fetch, flush_waiter = FlushWaiter
+        readers = Readers,
+        writer = Writer,
+        batch = Batch,
+        source = Source,
+        target = Target,
+        pending_fetch = Fetch,
+        flush_waiter = FlushWaiter
     } = State,
     case Readers -- [Pid] of
-    Readers ->
-        {noreply, State};
-    Readers2 ->
-        State2 = case Fetch of
-        nil ->
-            case (FlushWaiter =/= nil) andalso (Writer =:= nil) andalso
-                (Readers2 =:= [])  of
-            true ->
-                State#state{
-                    readers = Readers2,
-                    writer = spawn_writer(Target, Batch)
-                };
-            false ->
-                State#state{readers = Readers2}
-            end;
-        {From, FetchParams} ->
-            Reader = spawn_doc_reader(Source, Target, FetchParams),
-            gen_server:reply(From, ok),
-            State#state{
-                readers = [Reader | Readers2],
-                pending_fetch = nil
-            }
-        end,
-        {noreply, State2}
+        Readers ->
+            {noreply, State};
+        Readers2 ->
+            State2 =
+                case Fetch of
+                    nil ->
+                        case
+                            (FlushWaiter =/= nil) andalso (Writer =:= nil) andalso
+                                (Readers2 =:= [])
+                        of
+                            true ->
+                                State#state{
+                                    readers = Readers2,
+                                    writer = spawn_writer(Target, Batch)
+                                };
+                            false ->
+                                State#state{readers = Readers2}
+                        end;
+                    {From, FetchParams} ->
+                        Reader = spawn_doc_reader(Source, Target, FetchParams),
+                        gen_server:reply(From, ok),
+                        State#state{
+                            readers = [Reader | Readers2],
+                            pending_fetch = nil
+                        }
+                end,
+            {noreply, State2}
     end;
-
 handle_info({'EXIT', _Pid, max_backoff}, State) ->
     {stop, {shutdown, max_backoff}, State};
-
 handle_info({'EXIT', _Pid, {bulk_docs_failed, _, _} = Err}, State) ->
     {stop, {shutdown, Err}, State};
-
 handle_info({'EXIT', _Pid, {revs_diff_failed, _, _} = Err}, State) ->
     {stop, {shutdown, Err}, State};
-
 handle_info({'EXIT', _Pid, {http_request_failed, _, _, _} = Err}, State) ->
     {stop, {shutdown, Err}, State};
-
 handle_info({'EXIT', Pid, Reason}, State) ->
-   {stop, {process_died, Pid, Reason}, State}.
-
+    {stop, {process_died, Pid, Reason}, State}.
 
 terminate(_Reason, _State) ->
     ok.
@@ -209,36 +225,33 @@ format_status(_Opt, [_PDict, State]) ->
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
-
 queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager) ->
     ChangesManager ! {get_changes, self()},
     receive
-    {closed, ChangesManager} ->
-        ok;
-    {changes, ChangesManager, [], ReportSeq} ->
-        Stats = couch_replicator_stats:new(),
-        ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
-        queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager);
-    {changes, ChangesManager, Changes, ReportSeq} ->
-        {IdRevs, Stats0} = find_missing(Changes, Target),
-        ok = gen_server:call(Parent, {add_stats, Stats0}, infinity),
-        remote_process_batch(IdRevs, Parent),
-        {ok, Stats} = gen_server:call(Parent, flush, infinity),
-        ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
-        erlang:put(last_stats_report, os:timestamp()),
-        ?LOG_DEBUG(#{
-            what => worker_progress_report,
-            in => replicator,
-            seq => ReportSeq
-        }),
-        couch_log:debug("Worker reported completion of seq ~p", [ReportSeq]),
-        queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
+        {closed, ChangesManager} ->
+            ok;
+        {changes, ChangesManager, [], ReportSeq} ->
+            Stats = couch_replicator_stats:new(),
+            ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
+            queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager);
+        {changes, ChangesManager, Changes, ReportSeq} ->
+            {IdRevs, Stats0} = find_missing(Changes, Target),
+            ok = gen_server:call(Parent, {add_stats, Stats0}, infinity),
+            remote_process_batch(IdRevs, Parent),
+            {ok, Stats} = gen_server:call(Parent, flush, infinity),
+            ok = gen_server:call(Cp, {report_seq_done, ReportSeq, Stats}, infinity),
+            erlang:put(last_stats_report, os:timestamp()),
+            ?LOG_DEBUG(#{
+                what => worker_progress_report,
+                in => replicator,
+                seq => ReportSeq
+            }),
+            couch_log:debug("Worker reported completion of seq ~p", [ReportSeq]),
+            queue_fetch_loop(Source, Target, Parent, Cp, ChangesManager)
     end.
-
 
 remote_process_batch([], _Parent) ->
     ok;
-
 remote_process_batch([{Id, Revs, PAs} | Rest], Parent) ->
     % When the source is a remote database, we fetch a single document revision
     % per HTTP request. This is mostly to facilitate retrying of HTTP requests
@@ -248,60 +261,80 @@ remote_process_batch([{Id, Revs, PAs} | Rest], Parent) ->
         fun(Rev) ->
             ok = gen_server:call(Parent, {fetch_doc, {Id, [Rev], PAs}}, infinity)
         end,
-        Revs),
+        Revs
+    ),
     remote_process_batch(Rest, Parent).
-
 
 spawn_doc_reader(Source, Target, FetchParams) ->
     Parent = self(),
     spawn_link(fun() ->
         fetch_doc(
-            Source, FetchParams, fun remote_doc_handler/2, {Parent, Target})
+            Source,
+            FetchParams,
+            fun remote_doc_handler/2,
+            {Parent, Target}
+        )
     end).
-
 
 fetch_doc(Source, {Id, Revs, PAs}, DocHandler, Acc) ->
     try
         couch_replicator_api_wrap:open_doc_revs(
-            Source, Id, Revs, [{atts_since, PAs}, latest], DocHandler, Acc)
+            Source,
+            Id,
+            Revs,
+            [{atts_since, PAs}, latest],
+            DocHandler,
+            Acc
+        )
     catch
-    throw:missing_doc ->
-        couch_log:error("Retrying fetch and update of document `~s` as it is "
-            "unexpectedly missing. Missing revisions are: ~s",
-            [Id, couch_doc:revs_to_strs(Revs)]),
-        WaitMSec = config:get_integer("replicator", "missing_doc_retry_msec",
-            ?MISSING_DOC_RETRY_MSEC),
-        ?LOG_ERROR(#{
-            what => missing_document,
-            in => replicator,
-            source => couch_replicator_api_wrap:db_uri(Source),
-            docid => Id,
-            revisions => couch_doc:revs_to_strs(Revs),
-            retry_delay_sec => WaitMSec / 1000
-        }),
-        timer:sleep(WaitMSec),
-        couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc);
-    throw:{missing_stub, _} ->
-        couch_log:error("Retrying fetch and update of document `~s` due to out of "
-            "sync attachment stubs. Missing revisions are: ~s",
-            [Id, couch_doc:revs_to_strs(Revs)]),
-        WaitMSec = config:get_integer("replicator", "missing_doc_retry_msec",
-            ?MISSING_DOC_RETRY_MSEC),
-        ?LOG_ERROR(#{
-            what => missing_attachment_stub,
-            in => replicator,
-            source => couch_replicator_api_wrap:db_uri(Source),
-            docid => Id,
-            revisions => couch_doc:revs_to_strs(Revs),
-            retry_delay_sec => WaitMSec / 1000
-        }),
-        timer:sleep(WaitMSec),
-        couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc)
+        throw:missing_doc ->
+            couch_log:error(
+                "Retrying fetch and update of document `~s` as it is "
+                "unexpectedly missing. Missing revisions are: ~s",
+                [Id, couch_doc:revs_to_strs(Revs)]
+            ),
+            WaitMSec = config:get_integer(
+                "replicator",
+                "missing_doc_retry_msec",
+                ?MISSING_DOC_RETRY_MSEC
+            ),
+            ?LOG_ERROR(#{
+                what => missing_document,
+                in => replicator,
+                source => couch_replicator_api_wrap:db_uri(Source),
+                docid => Id,
+                revisions => couch_doc:revs_to_strs(Revs),
+                retry_delay_sec => WaitMSec / 1000
+            }),
+            timer:sleep(WaitMSec),
+            couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc);
+        throw:{missing_stub, _} ->
+            couch_log:error(
+                "Retrying fetch and update of document `~s` due to out of "
+                "sync attachment stubs. Missing revisions are: ~s",
+                [Id, couch_doc:revs_to_strs(Revs)]
+            ),
+            WaitMSec = config:get_integer(
+                "replicator",
+                "missing_doc_retry_msec",
+                ?MISSING_DOC_RETRY_MSEC
+            ),
+            ?LOG_ERROR(#{
+                what => missing_attachment_stub,
+                in => replicator,
+                source => couch_replicator_api_wrap:db_uri(Source),
+                docid => Id,
+                revisions => couch_doc:revs_to_strs(Revs),
+                retry_delay_sec => WaitMSec / 1000
+            }),
+            timer:sleep(WaitMSec),
+            couch_replicator_api_wrap:open_doc_revs(Source, Id, Revs, [latest], DocHandler, Acc)
     end.
 
-
-remote_doc_handler({ok, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc},
-        Acc) ->
+remote_doc_handler(
+    {ok, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc},
+    Acc
+) ->
     % Flush design docs in their own PUT requests to correctly process
     % authorization failures for design doc updates.
     ?LOG_DEBUG(#{what => flush_ddoc, in => replicator}),
@@ -321,39 +354,38 @@ remote_doc_handler({ok, #doc{atts = []} = Doc}, {Parent, _} = Acc) ->
 remote_doc_handler({{not_found, missing}, _}, _Acc) ->
     throw(missing_doc).
 
-
 doc_handler_flush_doc(#doc{} = Doc, {Parent, Target} = Acc) ->
     Stats = couch_replicator_stats:new([{docs_read, 1}]),
     Success = (flush_doc(Target, Doc) =:= ok),
-    {Result, Stats2} = case Success of
-    true ->
-        {{ok, Acc}, couch_replicator_stats:increment(docs_written, Stats)};
-    false ->
-        {{skip, Acc}, couch_replicator_stats:increment(doc_write_failures, Stats)}
-    end,
+    {Result, Stats2} =
+        case Success of
+            true ->
+                {{ok, Acc}, couch_replicator_stats:increment(docs_written, Stats)};
+            false ->
+                {{skip, Acc}, couch_replicator_stats:increment(doc_write_failures, Stats)}
+        end,
     ok = gen_server:call(Parent, {add_stats, Stats2}, infinity),
     Result.
 
-
 spawn_writer(Target, #batch{docs = DocList, size = Size}) ->
     case {Target, Size > 0} of
-    {#httpdb{}, true} ->
-        ?LOG_DEBUG(#{
-            what => flush_doc_batch,
-            in => replicator,
-            batch_size_bytes => Size
-        }),
-        couch_log:debug("Worker flushing doc batch of size ~p bytes", [Size]);
-    _ ->
-        ok
+        {#httpdb{}, true} ->
+            ?LOG_DEBUG(#{
+                what => flush_doc_batch,
+                in => replicator,
+                batch_size_bytes => Size
+            }),
+            couch_log:debug("Worker flushing doc batch of size ~p bytes", [Size]);
+        _ ->
+            ok
     end,
     Parent = self(),
     spawn_link(
         fun() ->
             Stats = flush_docs(Target, DocList),
             ok = gen_server:call(Parent, {add_stats, Stats}, infinity)
-        end).
-
+        end
+    ).
 
 after_full_flush(#state{stats = Stats, flush_waiter = Waiter} = State) ->
     gen_server:reply(Waiter, {ok, Stats}),
@@ -365,11 +397,12 @@ after_full_flush(#state{stats = Stats, flush_waiter = Waiter} = State) ->
         batch = #batch{}
     }.
 
-
-maybe_flush_docs(Doc,State) ->
+maybe_flush_docs(Doc, State) ->
     #state{
-        target = Target, batch = Batch,
-        stats = Stats, cp = Cp
+        target = Target,
+        batch = Batch,
+        stats = Stats,
+        cp = Cp
     } = State,
     {Batch2, WStats} = maybe_flush_docs(Target, Batch, Doc),
     Stats2 = couch_replicator_stats:sum_stats(Stats, WStats),
@@ -377,33 +410,34 @@ maybe_flush_docs(Doc,State) ->
     Stats4 = maybe_report_stats(Cp, Stats3),
     State#state{stats = Stats4, batch = Batch2}.
 
-
 maybe_flush_docs(#httpdb{} = Target, Batch, Doc) ->
     #batch{docs = DocAcc, size = SizeAcc} = Batch,
     JsonDoc = ?JSON_ENCODE(couch_doc:to_json_obj(Doc, [revs, attachments])),
     case SizeAcc + iolist_size(JsonDoc) of
-    SizeAcc2 when SizeAcc2 > ?DOC_BUFFER_BYTE_SIZE ->
-        ?LOG_DEBUG(#{
-            what => flush_doc_batch,
-            in => replicator,
-            batch_size_bytes => SizeAcc2
-        }),
-        couch_log:debug("Worker flushing doc batch of size ~p bytes", [SizeAcc2]),
-        Stats = flush_docs(Target, [JsonDoc | DocAcc]),
-        {#batch{}, Stats};
-    SizeAcc2 ->
-        Stats = couch_replicator_stats:new(),
-        {#batch{docs = [JsonDoc | DocAcc], size = SizeAcc2}, Stats}
+        SizeAcc2 when SizeAcc2 > ?DOC_BUFFER_BYTE_SIZE ->
+            ?LOG_DEBUG(#{
+                what => flush_doc_batch,
+                in => replicator,
+                batch_size_bytes => SizeAcc2
+            }),
+            couch_log:debug("Worker flushing doc batch of size ~p bytes", [SizeAcc2]),
+            Stats = flush_docs(Target, [JsonDoc | DocAcc]),
+            {#batch{}, Stats};
+        SizeAcc2 ->
+            Stats = couch_replicator_stats:new(),
+            {#batch{docs = [JsonDoc | DocAcc], size = SizeAcc2}, Stats}
     end.
-
 
 flush_docs(_Target, []) ->
     couch_replicator_stats:new();
 flush_docs(Target, DocList) ->
-    FlushResult = couch_replicator_api_wrap:update_docs(Target, DocList,
-        [delay_commit], replicated_changes),
+    FlushResult = couch_replicator_api_wrap:update_docs(
+        Target,
+        DocList,
+        [delay_commit],
+        replicated_changes
+    ),
     handle_flush_docs_result(FlushResult, Target, DocList).
-
 
 handle_flush_docs_result({error, request_body_too_large}, Target, [Doc]) ->
     ?LOG_ERROR(#{
@@ -426,10 +460,17 @@ handle_flush_docs_result({error, request_body_too_large}, Target, DocList) ->
         original_batch_size_bytes => Len,
         details => "splitting into two smaller batches and retrying"
     }),
-    couch_log:notice("Replicator: couldn't write batch of size ~p to ~p because"
+    couch_log:notice(
+        "Replicator: couldn't write batch of size ~p to ~p because"
         " request body is too large. Splitting batch into 2 separate batches of"
-        " sizes ~p and ~p", [Len, couch_replicator_api_wrap:db_uri(Target),
-        length(DocList1), length(DocList2)]),
+        " sizes ~p and ~p",
+        [
+            Len,
+            couch_replicator_api_wrap:db_uri(Target),
+            length(DocList1),
+            length(DocList2)
+        ]
+    ),
     Stats1 = flush_docs(Target, DocList1),
     Stats2 = flush_docs(Target, DocList2),
     couch_replicator_stats:sum_stats(Stats1, Stats2);
@@ -446,11 +487,20 @@ handle_flush_docs_result({ok, Errors}, Target, DocList) ->
                 error => get_value(error, Props, undefined),
                 details => get_value(reason, Props, undefined)
             }),
-            couch_log:error("Replicator: couldn't write document `~s`, revision"
-                " `~s`, to target database `~s`. Error: `~s`, reason: `~s`.", [
-                get_value(id, Props, ""), get_value(rev, Props, ""), DbUri,
-                get_value(error, Props, ""), get_value(reason, Props, "")])
-        end, Errors),
+            couch_log:error(
+                "Replicator: couldn't write document `~s`, revision"
+                " `~s`, to target database `~s`. Error: `~s`, reason: `~s`.",
+                [
+                    get_value(id, Props, ""),
+                    get_value(rev, Props, ""),
+                    DbUri,
+                    get_value(error, Props, ""),
+                    get_value(reason, Props, "")
+                ]
+            )
+        end,
+        Errors
+    ),
     couch_replicator_stats:new([
         {docs_written, length(DocList) - length(Errors)},
         {doc_write_failures, length(Errors)}
@@ -462,103 +512,121 @@ extract_value(Prop, Json) when is_binary(Json) ->
     try
         {Props} = ?JSON_DECODE(Json),
         get_value(Prop, Props, undefined)
-    catch _:_ ->
-        undefined
+    catch
+        _:_ ->
+            undefined
     end;
 extract_value(_, _) ->
     undefined.
 
 flush_doc(Target, #doc{id = Id, revs = {Pos, [RevId | _]}} = Doc) ->
     try couch_replicator_api_wrap:update_doc(Target, Doc, [], replicated_changes) of
-    {ok, _} ->
-        ok;
-    Error ->
-        ?LOG_ERROR(#{
-            what => doc_write_failure,
-            in => replicator,
-            target => couch_replicator_api_wrap:db_uri(Target),
-            docid => Id,
-            revision => couch_doc:rev_to_str({Pos, RevId}),
-            details => Error
-        }),
-        couch_log:error("Replicator: error writing document `~s` to `~s`: ~s",
-            [Id, couch_replicator_api_wrap:db_uri(Target), couch_util:to_binary(Error)]),
-        Error
+        {ok, _} ->
+            ok;
+        Error ->
+            ?LOG_ERROR(#{
+                what => doc_write_failure,
+                in => replicator,
+                target => couch_replicator_api_wrap:db_uri(Target),
+                docid => Id,
+                revision => couch_doc:rev_to_str({Pos, RevId}),
+                details => Error
+            }),
+            couch_log:error(
+                "Replicator: error writing document `~s` to `~s`: ~s",
+                [Id, couch_replicator_api_wrap:db_uri(Target), couch_util:to_binary(Error)]
+            ),
+            Error
     catch
-    throw:{missing_stub, _} = MissingStub ->
-        throw(MissingStub);
-    throw:{Error, Reason} ->
-        ?LOG_ERROR(#{
-            what => doc_write_failure,
-            in => replicator,
-            target => couch_replicator_api_wrap:db_uri(Target),
-            docid => Id,
-            revision => couch_doc:rev_to_str({Pos, RevId}),
-            error => Error,
-            details => Reason
-        }),
-        couch_log:error("Replicator: couldn't write document `~s`, revision `~s`,"
-            " to target database `~s`. Error: `~s`, reason: `~s`.",
-            [Id, couch_doc:rev_to_str({Pos, RevId}),
-                couch_replicator_api_wrap:db_uri(Target), to_binary(Error), to_binary(Reason)]),
-        {error, Error};
-    throw:Err ->
-        ?LOG_ERROR(#{
-            what => doc_write_failure,
-            in => replicator,
-            target => couch_replicator_api_wrap:db_uri(Target),
-            docid => Id,
-            revision => couch_doc:rev_to_str({Pos, RevId}),
-            details => Err
-        }),
-        couch_log:error("Replicator: couldn't write document `~s`, revision `~s`,"
-            " to target database `~s`. Error: `~s`.",
-            [Id, couch_doc:rev_to_str({Pos, RevId}),
-                couch_replicator_api_wrap:db_uri(Target), to_binary(Err)]),
-        {error, Err}
+        throw:{missing_stub, _} = MissingStub ->
+            throw(MissingStub);
+        throw:{Error, Reason} ->
+            ?LOG_ERROR(#{
+                what => doc_write_failure,
+                in => replicator,
+                target => couch_replicator_api_wrap:db_uri(Target),
+                docid => Id,
+                revision => couch_doc:rev_to_str({Pos, RevId}),
+                error => Error,
+                details => Reason
+            }),
+            couch_log:error(
+                "Replicator: couldn't write document `~s`, revision `~s`,"
+                " to target database `~s`. Error: `~s`, reason: `~s`.",
+                [
+                    Id,
+                    couch_doc:rev_to_str({Pos, RevId}),
+                    couch_replicator_api_wrap:db_uri(Target),
+                    to_binary(Error),
+                    to_binary(Reason)
+                ]
+            ),
+            {error, Error};
+        throw:Err ->
+            ?LOG_ERROR(#{
+                what => doc_write_failure,
+                in => replicator,
+                target => couch_replicator_api_wrap:db_uri(Target),
+                docid => Id,
+                revision => couch_doc:rev_to_str({Pos, RevId}),
+                details => Err
+            }),
+            couch_log:error(
+                "Replicator: couldn't write document `~s`, revision `~s`,"
+                " to target database `~s`. Error: `~s`.",
+                [
+                    Id,
+                    couch_doc:rev_to_str({Pos, RevId}),
+                    couch_replicator_api_wrap:db_uri(Target),
+                    to_binary(Err)
+                ]
+            ),
+            {error, Err}
     end.
 
-
 find_missing(DocInfos, Target) ->
-    {IdRevs, AllRevsCount} = lists:foldr(fun
-                (#doc_info{revs = []}, {IdRevAcc, CountAcc}) ->
-                    {IdRevAcc, CountAcc};
-                (#doc_info{id = Id, revs = RevsInfo}, {IdRevAcc, CountAcc}) ->
-                    Revs = [Rev || #rev_info{rev = Rev} <- RevsInfo],
-                    {[{Id, Revs} | IdRevAcc], CountAcc + length(Revs)}
-            end, {[], 0}, DocInfos),
+    {IdRevs, AllRevsCount} = lists:foldr(
+        fun
+            (#doc_info{revs = []}, {IdRevAcc, CountAcc}) ->
+                {IdRevAcc, CountAcc};
+            (#doc_info{id = Id, revs = RevsInfo}, {IdRevAcc, CountAcc}) ->
+                Revs = [Rev || #rev_info{rev = Rev} <- RevsInfo],
+                {[{Id, Revs} | IdRevAcc], CountAcc + length(Revs)}
+        end,
+        {[], 0},
+        DocInfos
+    ),
 
-
-    Missing = case couch_replicator_api_wrap:get_missing_revs(Target, IdRevs) of
-        {ok, Result} -> Result;
-        {error, Error} -> exit(Error)
-    end,
+    Missing =
+        case couch_replicator_api_wrap:get_missing_revs(Target, IdRevs) of
+            {ok, Result} -> Result;
+            {error, Error} -> exit(Error)
+        end,
     MissingRevsCount = lists:foldl(
         fun({_Id, MissingRevs, _PAs}, Acc) -> Acc + length(MissingRevs) end,
-        0, Missing),
+        0,
+        Missing
+    ),
     Stats = couch_replicator_stats:new([
         {missing_checked, AllRevsCount},
         {missing_found, MissingRevsCount}
     ]),
     {Missing, Stats}.
 
-
 maybe_report_stats(Cp, Stats) ->
     Now = os:timestamp(),
     case timer:now_diff(erlang:get(last_stats_report), Now) >= ?STATS_DELAY of
-    true ->
-        ok = gen_server:call(Cp, {add_stats, Stats}, infinity),
-        erlang:put(last_stats_report, Now),
-        couch_replicator_stats:new();
-    false ->
-        Stats
+        true ->
+            ok = gen_server:call(Cp, {add_stats, Stats}, infinity),
+            erlang:put(last_stats_report, Now),
+            couch_replicator_stats:new();
+        false ->
+            Stats
     end.
-
 
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
-
 
 replication_worker_format_status_test() ->
     State = #state{
