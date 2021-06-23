@@ -174,21 +174,11 @@ get_rep_endpoint(#{<<"url">> := Url0, <<"headers">> := Headers0}) ->
 
 get_v4_endpoint(#{} = HttpDb) ->
     {remote, Url, Headers} = get_rep_endpoint(HttpDb),
-    {{UserFromHeaders, _}, HeadersWithoutBasicAuth} =
-        couch_replicator_utils:remove_basic_auth_from_headers(Headers),
-    {UserFromUrl, Host, NonDefaultPort, Path} = get_v4_url_info(Url),
-    User = pick_defined_value([UserFromUrl, UserFromHeaders]),
+    {User, _} = couch_replicator_utils:get_basic_auth_creds(HttpDb),
+    {Host, NonDefaultPort, Path} = get_v4_url_info(Url),
     OAuth = undefined, % Keep this to ensure checkpoints don't change
-    {remote, User, Host, NonDefaultPort, Path, HeadersWithoutBasicAuth, OAuth}.
+    {remote, User, Host, NonDefaultPort, Path, Headers, OAuth}.
 
-
-pick_defined_value(Values) ->
-    case [V || V <- Values, V /= undefined] of
-        [] ->
-            undefined;
-        DefinedValues ->
-            hd(DefinedValues)
-    end.
 
 
 get_v4_url_info(Url) when is_binary(Url) ->
@@ -198,16 +188,16 @@ get_v4_url_info(Url) ->
         {error, invalid_uri} ->
             % Tolerate errors here to avoid a bad user document
             % crashing the replicator
-            {undefined, Url, undefined, undefined};
+            {Url, undefined, undefined};
         #url{
             protocol = Schema,
-            username = User,
+
             host = Host,
             port = Port,
             path = Path
         } ->
             NonDefaultPort = get_non_default_port(Schema, Port),
-            {User, Host, NonDefaultPort, Path}
+            {Host, NonDefaultPort, Path}
     end.
 
 
@@ -239,82 +229,82 @@ replication_id_convert_test_() ->
 
 http_v4_endpoint_test_() ->
     [?_assertMatch({remote, User, Host, Port, Path, HeadersNoAuth, undefined},
-        get_v4_endpoint(#{<<"url">> => Url, <<"headers">> => Headers})) ||
-            {{User, Host, Port, Path, HeadersNoAuth}, {Url, Headers}} <- [
+        get_v4_endpoint(HttpDb)) ||
+            {{User, Host, Port, Path, HeadersNoAuth}, HttpDb} <- [
                 {
                     {undefined, "host", default, "/", []},
-                    {<<"http://host">>, #{}}
+                    httpdb("http://host")
                 },
                 {
                     {undefined, "host", default, "/", []},
-                    {<<"https://host">>, #{}}
+                    httpdb("https://host")
                 },
                 {
                     {undefined, "host", default, "/", []},
-                    {<<"http://host:5984">>, #{}}
+                    httpdb("http://host:5984")
                 },
                 {
                     {undefined, "host", 1, "/", []},
-                    {<<"http://host:1">>, #{}}
+                    httpdb("http://host:1")
                 },
                 {
                     {undefined, "host", 2, "/", []},
-                    {<<"https://host:2">>, #{}}
+                    httpdb("https://host:2")
                 },
                 {
                     {undefined, "host", default, "/", [{"h", "v"}]},
-                    {<<"http://host">>, #{<<"h">> => <<"v">>}}
+                    httpdb("http://host", undefined, undefined, #{"h" => "v"})
                 },
                 {
                     {undefined, "host", default, "/a/b", []},
-                    {<<"http://host/a/b">>, #{}}
+                    httpdb("http://host/a/b")
                 },
                 {
                     {"user", "host", default, "/", []},
-                    {<<"http://user:pass@host">>, #{}}
-                },
-                {
-                    {"user", "host", 3, "/", []},
-                    {<<"http://user:pass@host:3">>, #{}}
+                    httpdb("http://host", "user", "pass")
                 },
                 {
                     {"user", "host", default, "/", []},
-                    {<<"http://user:newpass@host">>, #{}}
+                    httpdb("http://host", "user", "newpass")
                 },
                 {
-                    {"user", "host", default, "/", []},
-                    {<<"http://host">>, basic_auth(<<"user">>, <<"pass">>)}
-                },
-                {
-                    {"user", "host", default, "/", []},
-                    {<<"http://host">>, basic_auth(<<"user">>, <<"newpass">>)}
-                },
-                {
-                    {"user1", "host", default, "/", []},
-                    {<<"http://user1:pass1@host">>, basic_auth(<<"user2">>,
-                        <<"pass2">>)}
-                },
-                {
-                    {"user", "host", default, "/", [{"h", "v"}]},
-                    {<<"http://host">>, maps:merge(#{<<"h">> => <<"v">>},
-                        basic_auth(<<"user">>, <<"pass">>))}
-                },
-                {
-                    {undefined, "random_junk", undefined, undefined},
-                    {<<"random_junk">>, #{}}
-                },
-                {
-                    {undefined, "host", default, "/", []},
-                    {<<"http://host">>, #{<<"Authorization">> =>
-                        <<"Basic bad">>}}
+                    {"user2", "host", default, "/", [{"h", "v"}]},
+                    httpdb("http://host", "user2", "pass2", #{"h" => "v"})
                 }
         ]
     ].
 
 
-basic_auth(User, Pass) ->
-    B64Auth = base64:encode(<<User/binary, ":", Pass/binary>>),
-    #{<<"Authorization">> => <<"Basic ", B64Auth/binary>>}.
+httpdb(Url) ->
+    #{
+        <<"url">> => list_to_binary(Url),
+        <<"auth_props">> => #{},
+        <<"headers">> => #{}
+    }.
+
+
+httpdb(Url, User, Pass) ->
+    #{
+        <<"url">> => list_to_binary(Url),
+        <<"auth_props">> => #{
+            <<"basic">> => #{
+                <<"username">> => list_to_binary(User),
+                <<"password">> => list_to_binary(Pass)
+            }
+        },
+        <<"headers">> => #{}
+    }.
+
+
+httpdb(Url, User, Pass, #{} = Headers) ->
+    HttpDb1 = case {User, Pass} of
+        {undefined, undefined} -> httpdb(Url);
+        {User, Pass} -> httpdb(Url, User, Pass)
+    end,
+    Headers1 = maps:fold(fun(K, V, Acc) ->
+        Acc#{list_to_binary(K) => list_to_binary(V)}
+    end, #{}, Headers),
+    HttpDb1#{<<"headers">> => Headers1}.
 
 
 version4_matches_couchdb3_test_() ->
@@ -351,5 +341,11 @@ id_matches_couchdb3(_) ->
     ?assertEqual(RepId3x, RepId),
     ?assertEqual(BaseId3x, BaseId).
 
+
+auth_props(User, Pass) when is_list(User), is_list(Pass) ->
+    [{<<"basic">>, {[
+       {<<"username">>, list_to_binary(User)},
+       {<<"password">>, list_to_binary(Pass)}
+    ]}}].
 
 -endif.

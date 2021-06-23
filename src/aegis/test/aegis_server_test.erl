@@ -51,9 +51,10 @@ basic_test_() ->
 
 setup() ->
     Ctx = test_util:start_couch([fabric]),
-    meck:new([?AEGIS_KEY_MANAGER], [passthrough]),
+    meck:new([?AEGIS_KEY_MANAGER], [non_strict]),
     ok = meck:expect(?AEGIS_KEY_MANAGER, init_db, 2, {ok, <<0:256>>}),
     ok = meck:expect(?AEGIS_KEY_MANAGER, open_db, 1, {ok, <<0:256>>}),
+    ok = meck:expect(?AEGIS_KEY_MANAGER, get_db_info, 1, []),
     Ctx.
 
 
@@ -138,9 +139,9 @@ disabled_test_() ->
         end,
         fun teardown/1,
         [
-            {"init_db returns false when encryptions disabled",
+            {"init_db returns false when encryption disabled",
             {timeout, ?TIMEOUT, fun test_disabled_init_db/0}},
-            {"open_db returns false when encryptions disabled",
+            {"open_db returns false when encryption disabled",
             {timeout, ?TIMEOUT, fun test_disabled_open_db/0}},
             {"pass through on encrypt when encryption disabled",
             {timeout, ?TIMEOUT, fun test_disabled_encrypt/0}},
@@ -184,6 +185,7 @@ lru_cache_with_expiration_test_() ->
                 ("aegis", "cache_limit", _) -> 5;
                 ("aegis", "cache_max_age_sec", _) -> 130;
                 ("aegis", "cache_expiration_check_sec", _) -> 1;
+                ("aegis", "cache_deletion_grace_sec", _) -> 1;
                 (_, _, Default) -> Default
             end),
             Ctx = setup(),
@@ -312,10 +314,11 @@ test_remove_expired() ->
     meck:reset(aegis_server),
     meck:wait(aegis_server, handle_info, [maybe_remove_expired, '_'], 2500),
 
-    %% 3 "oldest" entries should be removed, 2 yet to expire still in cache
+    %% 2 "oldest" entries should be removed, 2 yet to expire still in cache,
+    %% and one remaining in cache due to grace period
     lists:foreach(fun(I) ->
         Db = ?DB#{uuid => <<I:64>>},
         aegis_server:encrypt(Db, <<I:64>>, ?VALUE)
     end, lists:seq(1, 5)),
 
-    ?assertEqual(8, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
+    ?assertEqual(7, meck:num_calls(?AEGIS_KEY_MANAGER, open_db, 1)).
