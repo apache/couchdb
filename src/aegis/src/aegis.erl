@@ -13,7 +13,9 @@
 -module(aegis).
 -include_lib("fabric/include/fabric2.hrl").
 
+
 -define(WRAPPED_KEY, {?DB_AEGIS, 1}).
+
 
 -export([
     key_manager/0,
@@ -30,51 +32,55 @@
 key_manager() ->
     ?AEGIS_KEY_MANAGER.
 
+
 init_db(#{} = Db, Options) ->
     Db#{
         is_encrypted => aegis_server:init_db(Db, Options)
     }.
+
 
 open_db(#{} = Db) ->
     Db#{
         is_encrypted => aegis_server:open_db(Db)
     }.
 
+
 get_db_info(#{is_encrypted := IsEncrypted} = Db) ->
-    KeyManagerInfo =
-        case erlang:function_exported(?AEGIS_KEY_MANAGER, get_db_info, 1) of
-            true ->
-                ?AEGIS_KEY_MANAGER:get_db_info(Db);
-            false ->
-                []
-        end,
+    KeyManagerInfo = case erlang:function_exported(?AEGIS_KEY_MANAGER, get_db_info, 1) of
+        true ->
+            ?AEGIS_KEY_MANAGER:get_db_info(Db);
+        false ->
+            []
+    end,
     [{enabled, IsEncrypted}, {key_manager, {KeyManagerInfo}}].
+
 
 encrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
+
 encrypt(#{is_encrypted := false}, _Key, Value) when is_binary(Value) ->
     Value;
-encrypt(#{is_encrypted := true} = Db, Key, Value) when
-    is_binary(Key), is_binary(Value)
-->
+
+encrypt(#{is_encrypted := true} = Db, Key, Value)
+        when is_binary(Key), is_binary(Value) ->
     aegis_server:encrypt(Db, Key, Value).
 
+
 decrypt(#{} = Db, Rows) when is_list(Rows) ->
-    lists:map(
-        fun({Key, Value}) ->
-            {Key, decrypt(Db, Key, Value)}
-        end,
-        Rows
-    ).
+    lists:map(fun({Key, Value}) ->
+        {Key, decrypt(Db, Key, Value)}
+    end, Rows).
 
 decrypt(#{} = _Db, _Key, <<>>) ->
     <<>>;
+
 decrypt(#{is_encrypted := false}, _Key, Value) when is_binary(Value) ->
     Value;
-decrypt(#{is_encrypted := true} = Db, Key, Value) when
-    is_binary(Key), is_binary(Value)
-->
+
+decrypt(#{is_encrypted := true} = Db, Key, Value)
+        when is_binary(Key), is_binary(Value) ->
     aegis_server:decrypt(Db, Key, Value).
+
 
 wrap_fold_fun(Db, Fun) when is_function(Fun, 2) ->
     fun({Key, Value}, Acc) ->

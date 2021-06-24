@@ -12,6 +12,7 @@
 
 -module(mango_idx_view).
 
+
 -export([
     validate_new/2,
     validate_index_def/1,
@@ -29,87 +30,86 @@
     field_ranges/2
 ]).
 
+
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
 -include("mango_idx.hrl").
 -include("mango_idx_view.hrl").
 -include_lib("kernel/include/logger.hrl").
 
-validate_new(#idx{} = Idx, _Db) ->
+
+validate_new(#idx{}=Idx, _Db) ->
     {ok, Def} = do_validate(Idx#idx.def),
-    {ok, Idx#idx{def = Def}}.
+    {ok, Idx#idx{def=Def}}.
+
 
 validate_index_def(Def) ->
     def_to_json(Def).
 
-add(#doc{body = {Props0}} = DDoc, Idx) ->
-    Views1 =
-        case proplists:get_value(<<"views">>, Props0) of
-            {Views0} -> Views0;
-            _ -> []
-        end,
+
+add(#doc{body={Props0}}=DDoc, Idx) ->
+    Views1 = case proplists:get_value(<<"views">>, Props0) of
+        {Views0} -> Views0;
+        _ -> []
+    end,
     NewView = make_view(Idx),
     Views2 = lists:keystore(element(1, NewView), 1, Views1, NewView),
     Props1 = lists:keystore(<<"views">>, 1, Props0, {<<"views">>, {Views2}}),
 
     {Opts0} = proplists:get_value(<<"options">>, Props1, {[]}),
-    Opts1 =
-        case lists:keymember(<<"interactive">>, 1, Opts0) of
-            true -> Opts0;
-            false -> Opts0 ++ [{<<"interactive">>, true}]
-        end,
+    Opts1 = case lists:keymember(<<"interactive">>, 1, Opts0) of
+        true -> Opts0;
+        false -> Opts0 ++ [{<<"interactive">>, true}]
+    end,
     Props2 = lists:keystore(<<"options">>, 1, Props1, {<<"options">>, {Opts1}}),
 
     Props3 = [{<<"autoupdate">>, false}],
-    {ok, DDoc#doc{body = {Props2 ++ Props3}}}.
+    {ok, DDoc#doc{body={Props2 ++ Props3}}}.
 
-remove(#doc{body = {Props0}} = DDoc, Idx) ->
-    Views1 =
-        case proplists:get_value(<<"views">>, Props0) of
-            {Views0} ->
-                Views0;
-            _ ->
-                ?MANGO_ERROR({index_not_found, Idx#idx.name})
-        end,
-    Views2 = lists:keydelete(Idx#idx.name, 1, Views1),
-    if
-        Views2 /= Views1 -> ok;
-        true -> ?MANGO_ERROR({index_not_found, Idx#idx.name})
+
+remove(#doc{body={Props0}}=DDoc, Idx) ->
+    Views1 = case proplists:get_value(<<"views">>, Props0) of
+        {Views0} ->
+            Views0;
+        _ ->
+            ?MANGO_ERROR({index_not_found, Idx#idx.name})
     end,
-    Props3 =
-        case Views2 of
-            [] ->
-                Props1 = lists:keydelete(<<"views">>, 1, Props0),
-                Props2 = lists:keydelete(<<"options">>, 1, Props1),
-                lists:keydelete(<<"autoupdate">>, 1, Props2);
-            _ ->
-                lists:keystore(<<"views">>, 1, Props0, {<<"views">>, {Views2}})
-        end,
-    {ok, DDoc#doc{body = {Props3}}}.
+    Views2 = lists:keydelete(Idx#idx.name, 1, Views1),
+    if Views2 /= Views1 -> ok; true ->
+        ?MANGO_ERROR({index_not_found, Idx#idx.name})
+    end,
+    Props3 = case Views2 of
+        [] ->
+            Props1 = lists:keydelete(<<"views">>, 1, Props0),
+            Props2 = lists:keydelete(<<"options">>, 1, Props1),
+            lists:keydelete(<<"autoupdate">>, 1, Props2);
+        _ ->
+            lists:keystore(<<"views">>, 1, Props0, {<<"views">>, {Views2}})
+    end,
+    {ok, DDoc#doc{body={Props3}}}.
+
 
 from_ddoc({Props}) ->
     case lists:keyfind(<<"views">>, 1, Props) of
         {<<"views">>, {Views}} when is_list(Views) ->
-            lists:flatmap(
-                fun({Name, {VProps}}) ->
-                    case validate_ddoc(VProps) of
-                        invalid_view ->
-                            [];
-                        {Def, Opts} ->
-                            I = #idx{
-                                type = <<"json">>,
-                                name = Name,
-                                def = Def,
-                                opts = Opts
-                            },
-                            [I]
-                    end
-                end,
-                Views
-            );
+            lists:flatmap(fun({Name, {VProps}}) ->
+                case validate_ddoc(VProps) of
+                    invalid_view ->
+                        [];
+                    {Def, Opts} ->
+                        I = #idx{
+                        type = <<"json">>,
+                        name = Name,
+                        def = Def,
+                        opts = Opts
+                        },
+                        [I]
+                end
+            end, Views);
         _ ->
             []
     end.
+
 
 to_json(Idx) ->
     {[
@@ -120,10 +120,12 @@ to_json(Idx) ->
         {build_status, Idx#idx.build_status}
     ]}.
 
+
 columns(Idx) ->
     {Props} = Idx#idx.def,
     {<<"fields">>, {Fields}} = lists:keyfind(<<"fields">>, 1, Props),
     [Key || {Key, _} <- Fields].
+
 
 is_usable(Idx, Selector, SortFields) ->
     % This index is usable if all of the columns are
@@ -139,34 +141,30 @@ is_usable(Idx, Selector, SortFields) ->
     % we don't need to check the selector for these either
     RequiredFields2 = ordsets:subtract(
         RequiredFields1,
-        [<<"_id">>, <<"_rev">>]
-    ),
+        [<<"_id">>, <<"_rev">>]),
 
-    mango_selector:has_required_fields(Selector, RequiredFields2) andalso
-        not is_text_search(Selector) andalso
-        can_use_sort(RequiredFields, SortFields, Selector).
+    mango_selector:has_required_fields(Selector, RequiredFields2)
+        andalso not is_text_search(Selector)
+        andalso can_use_sort(RequiredFields, SortFields, Selector).
+
 
 is_text_search({[]}) ->
     false;
 is_text_search({[{<<"$default">>, _}]}) ->
     true;
 is_text_search({[{_Field, Cond}]}) when is_list(Cond) ->
-    lists:foldl(
-        fun(C, Exists) ->
-            Exists orelse is_text_search(C)
-        end,
-        false,
-        Cond
-    );
+    lists:foldl(fun(C, Exists) ->
+        Exists orelse is_text_search(C)
+    end, false, Cond);
 is_text_search({[{_Field, Cond}]}) when is_tuple(Cond) ->
     is_text_search(Cond);
 is_text_search({[{_Field, _Cond}]}) ->
     false;
 %% we reached values, which should always be false
-is_text_search(Val) when
-    is_number(Val); is_boolean(Val); is_binary(Val)
-->
+is_text_search(Val)
+        when is_number(Val); is_boolean(Val); is_binary(Val)->
     false.
+
 
 start_key([]) ->
     [];
@@ -184,6 +182,7 @@ start_key([{'$eq', Key, '$eq', Key} | Rest]) ->
     false = mango_json:special(Key),
     [Key | start_key(Rest)].
 
+
 end_key([]) ->
     [?MAX_JSON_OBJ];
 end_key([{_, _, '$lt', Key} | Rest]) ->
@@ -200,11 +199,13 @@ end_key([{'$eq', Key, '$eq', Key} | Rest]) ->
     false = mango_json:special(Key),
     [Key | end_key(Rest)].
 
+
 do_validate({Props}) ->
     {ok, Opts} = mango_opts:validate(Props, opts()),
     {ok, {Opts}};
 do_validate(Else) ->
     ?MANGO_ERROR({invalid_index_json, Else}).
+
 
 def_to_json({Props}) ->
     def_to_json(Props);
@@ -221,6 +222,7 @@ def_to_json([{<<"partial_filter_selector">>, {[]}} | Rest]) ->
 def_to_json([{Key, Value} | Rest]) ->
     [{Key, Value} | def_to_json(Rest)].
 
+
 opts() ->
     [
         {<<"fields">>, [
@@ -235,14 +237,15 @@ opts() ->
         ]}
     ].
 
+
 make_view(Idx) ->
-    View =
-        {[
-            {<<"map">>, Idx#idx.def},
-            {<<"reduce">>, <<"_count">>},
-            {<<"options">>, {Idx#idx.opts}}
-        ]},
+    View = {[
+        {<<"map">>, Idx#idx.def},
+        {<<"reduce">>, <<"_count">>},
+        {<<"options">>, {Idx#idx.opts}}
+    ]},
     {Idx#idx.name, View}.
+
 
 validate_ddoc(VProps) ->
     try
@@ -251,20 +254,18 @@ validate_ddoc(VProps) ->
         {Opts0} = proplists:get_value(<<"options">>, VProps),
         Opts = lists:keydelete(<<"sort">>, 1, Opts0),
         {Def, Opts}
-    catch
-        Error:Reason ->
-            ?LOG_ERROR(#{
-                what => invalid_index_definition,
-                tag => Error,
-                details => Reason,
-                index => VProps
-            }),
-            couch_log:error(
-                "Invalid Index Def ~p. Error: ~p, Reason: ~p",
-                [VProps, Error, Reason]
-            ),
-            invalid_view
+    catch Error:Reason ->
+        ?LOG_ERROR(#{
+            what => invalid_index_definition,
+            tag => Error,
+            details => Reason,
+            index => VProps
+        }),
+        couch_log:error("Invalid Index Def ~p. Error: ~p, Reason: ~p",
+            [VProps, Error, Reason]),
+        invalid_view
     end.
+
 
 % This function returns a list of indexes that
 % can be used to restrict this query. This works by
@@ -285,9 +286,11 @@ validate_ddoc(VProps) ->
 % We can see through '$and' trivially
 indexable_fields({[{<<"$and">>, Args}]}) ->
     lists:usort(lists:flatten([indexable_fields(A) || A <- Args]));
+
 % So far we can't see through any other operator
 indexable_fields({[{<<"$", _/binary>>, _}]}) ->
     [];
+
 % If we have a field with a terminator that is locatable
 % using an index then the field is a possible index
 indexable_fields({[{Field, Cond}]}) ->
@@ -297,9 +300,11 @@ indexable_fields({[{Field, Cond}]}) ->
         false ->
             []
     end;
+
 % An empty selector
 indexable_fields({[]}) ->
     [].
+
 
 % Check if a condition is indexable. The logical
 % comparisons are mostly straight forward. We
@@ -317,19 +322,23 @@ indexable({[{<<"$gt">>, _}]}) ->
     true;
 indexable({[{<<"$gte">>, _}]}) ->
     true;
+
 % All other operators are currently not indexable.
 % This is also a subtle assertion that we don't
 % call indexable/1 on a field name.
 indexable({[{<<"$", _/binary>>, _}]}) ->
     false.
 
+
 % For each field, return {Field, Range}
 field_ranges(Selector) ->
     Fields = indexable_fields(Selector),
     field_ranges(Selector, Fields).
 
+
 field_ranges(Selector, Fields) ->
     field_ranges(Selector, Fields, []).
+
 
 field_ranges(_Selector, [], Acc) ->
     lists:reverse(Acc);
@@ -341,6 +350,7 @@ field_ranges(Selector, [Field | Rest], Acc) ->
             field_ranges(Selector, Rest, [{Field, Range} | Acc])
     end.
 
+
 % Find the complete range for a given index in this
 % selector. This works by AND'ing logical comparisons
 % together so that we can define the start and end
@@ -351,30 +361,31 @@ field_ranges(Selector, [Field | Rest], Acc) ->
 range(Selector, Index) ->
     range(Selector, Index, '$gt', mango_json:min(), '$lt', mango_json:max()).
 
+
 % Adjust Low and High based on values found for the
 % givend Index in Selector.
 range({[{<<"$and">>, Args}]}, Index, LCmp, Low, HCmp, High) ->
-    lists:foldl(
-        fun
-            (Arg, {LC, L, HC, H}) ->
-                range(Arg, Index, LC, L, HC, H);
-            (_Arg, empty) ->
-                empty
-        end,
-        {LCmp, Low, HCmp, High},
-        Args
-    );
+    lists:foldl(fun
+        (Arg, {LC, L, HC, H}) ->
+            range(Arg, Index, LC, L, HC, H);
+        (_Arg, empty) ->
+            empty
+    end, {LCmp, Low, HCmp, High}, Args);
+
 % We can currently only traverse '$and' operators
 range({[{<<"$", _/binary>>}]}, _Index, LCmp, Low, HCmp, High) ->
     {LCmp, Low, HCmp, High};
+
 % If the field name matches the index see if we can narrow
 % the acceptable range.
 range({[{Index, Cond}]}, Index, LCmp, Low, HCmp, High) ->
     range(Cond, LCmp, Low, HCmp, High);
+
 % Else we have a field unrelated to this index so just
 % return the current values.
 range(_, _, LCmp, Low, HCmp, High) ->
     {LCmp, Low, HCmp, High}.
+
 
 % The comments below are a bit cryptic at first but they show
 % where the Arg cand land in the current range.
@@ -432,6 +443,7 @@ range({[{<<"$lt">>, Arg}]}, LCmp, Low, HCmp, High) ->
         max ->
             {LCmp, Low, HCmp, High}
     end;
+
 range({[{<<"$lte">>, Arg}]}, LCmp, Low, HCmp, High) ->
     case range_pos(Low, Arg, High) of
         min ->
@@ -447,6 +459,7 @@ range({[{<<"$lte">>, Arg}]}, LCmp, Low, HCmp, High) ->
         max ->
             {LCmp, Low, HCmp, High}
     end;
+
 range({[{<<"$eq">>, Arg}]}, LCmp, Low, HCmp, High) ->
     case range_pos(Low, Arg, High) of
         min ->
@@ -464,6 +477,7 @@ range({[{<<"$eq">>, Arg}]}, LCmp, Low, HCmp, High) ->
         max ->
             empty
     end;
+
 range({[{<<"$gte">>, Arg}]}, LCmp, Low, HCmp, High) ->
     case range_pos(Low, Arg, High) of
         min ->
@@ -479,6 +493,7 @@ range({[{<<"$gte">>, Arg}]}, LCmp, Low, HCmp, High) ->
         max ->
             empty
     end;
+
 range({[{<<"$gt">>, Arg}]}, LCmp, Low, HCmp, High) ->
     case range_pos(Low, Arg, High) of
         min ->
@@ -492,11 +507,13 @@ range({[{<<"$gt">>, Arg}]}, LCmp, Low, HCmp, High) ->
         max ->
             empty
     end;
+
 % There's some other un-indexable restriction on the index
 % that will be applied as a post-filter. Ignore it and
 % carry on our merry way.
 range({[{<<"$", _/binary>>, _}]}, LCmp, Low, HCmp, High) ->
     {LCmp, Low, HCmp, High}.
+
 
 % Returns the value min | low | mid | high | max depending
 % on how Arg compares to Low and High.
@@ -514,6 +531,7 @@ range_pos(Low, Arg, High) ->
                     max
             end
     end.
+
 
 % Can_use_sort works as follows:
 %

@@ -13,7 +13,9 @@
 
 -module(couch_jobs_activity_monitor_sup).
 
+
 -behaviour(supervisor).
+
 
 -export([
     start_link/0,
@@ -27,22 +29,24 @@
     init/1
 ]).
 
+
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
+
 
 start_monitor(Type) ->
     supervisor:start_child(?MODULE, [Type]).
 
+
 stop_monitor(Pid) ->
     supervisor:terminate_child(?MODULE, Pid).
 
+
 get_child_pids() ->
-    lists:map(
-        fun({_Id, Pid, _Type, _Mod}) ->
-            Pid
-        end,
-        supervisor:which_children(?MODULE)
-    ).
+    lists:map(fun({_Id, Pid, _Type, _Mod}) ->
+        Pid
+    end, supervisor:which_children(?MODULE)).
+
 
 init(_) ->
     Flags = #{

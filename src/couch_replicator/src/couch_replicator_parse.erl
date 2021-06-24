@@ -12,6 +12,7 @@
 
 -module(couch_replicator_parse).
 
+
 -export([
     parse_rep_doc/1,
     parse_transient_rep/2,
@@ -19,9 +20,11 @@
     parse_rep_db/3
 ]).
 
+
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include("couch_replicator.hrl").
 -include_lib("kernel/include/logger.hrl").
+
 
 -define(DEFAULT_SOCK_OPTS, "[{keepalive, true}, {nodelay, false}]").
 -define(VALID_SOCK_OPTS, [
@@ -51,68 +54,69 @@
     {"socket_options", ?DEFAULT_SOCK_OPTS, fun parse_sock_opts/1}
 ]).
 
+
 -spec parse_rep_doc({[_]}) -> #{}.
 parse_rep_doc(RepDoc) ->
-    {ok, Rep} =
-        try
-            parse_rep(RepDoc, null)
-        catch
-            throw:{error, Reason}:Stack ->
-                ?LOG_ERROR(#{
-                    what => replication_doc_parse_error,
-                    in => replicator,
-                    details => Reason,
-                    stacktrace => Stack
-                }),
-                LogErr1 = "~p parse_rep_doc fail ~p ~p",
-                couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
-                throw({bad_rep_doc, Reason});
-            Tag:Err:Stack ->
-                ?LOG_ERROR(#{
-                    what => replication_doc_parse_error,
-                    in => replicator,
-                    tag => Tag,
-                    details => Err,
-                    stacktrace => Stack
-                }),
-                LogErr2 = "~p parse_rep_doc fail ~p:~p ~p",
-                couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
-                throw({bad_rep_doc, couch_util:to_binary({Tag, Err})})
-        end,
+    {ok, Rep} = try
+        parse_rep(RepDoc, null)
+    catch
+        throw:{error, Reason}:Stack ->
+            ?LOG_ERROR(#{
+                what => replication_doc_parse_error,
+                in => replicator,
+                details => Reason,
+                stacktrace => Stack
+            }),
+            LogErr1 = "~p parse_rep_doc fail ~p ~p",
+            couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
+            throw({bad_rep_doc, Reason});
+        Tag:Err:Stack ->
+            ?LOG_ERROR(#{
+                what => replication_doc_parse_error,
+                in => replicator,
+                tag => Tag,
+                details => Err,
+                stacktrace => Stack
+            }),
+            LogErr2 = "~p parse_rep_doc fail ~p:~p ~p",
+            couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
+            throw({bad_rep_doc, couch_util:to_binary({Tag, Err})})
+    end,
     Rep.
+
 
 -spec parse_transient_rep({[_]} | #{}, user_name()) -> {ok, #{}}.
 parse_transient_rep({Props} = EJson, UserName) when is_list(Props) ->
     Str = couch_util:json_encode(EJson),
     Map = couch_util:json_decode(Str, [return_maps]),
     parse_transient_rep(Map, UserName);
+
 parse_transient_rep(#{} = Body, UserName) ->
-    {ok, Rep} =
-        try
-            parse_rep(Body, UserName)
-        catch
-            throw:{error, Reason}:Stack ->
-                ?LOG_ERROR(#{
-                    what => transient_replication_parse_error,
-                    in => replicator,
-                    details => Reason,
-                    stacktrace => Stack
-                }),
-                LogErr1 = "~p parse_transient_rep fail ~p ~p",
-                couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
-                throw({bad_request, Reason});
-            Tag:Err:Stack ->
-                ?LOG_ERROR(#{
-                    what => transient_replication_parse_error,
-                    in => replicator,
-                    tag => Tag,
-                    details => Err,
-                    stacktrace => Stack
-                }),
-                LogErr2 = "~p parse_transient_rep fail ~p ~p",
-                couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
-                throw({bad_request, couch_util:to_binary({Tag, Err})})
-        end,
+    {ok, Rep} = try
+        parse_rep(Body, UserName)
+    catch
+        throw:{error, Reason}:Stack ->
+            ?LOG_ERROR(#{
+                what => transient_replication_parse_error,
+                in => replicator,
+                details => Reason,
+                stacktrace => Stack
+            }),
+            LogErr1 = "~p parse_transient_rep fail ~p ~p",
+            couch_log:error(LogErr1, [?MODULE, Reason, Stack]),
+            throw({bad_request, Reason});
+        Tag:Err:Stack ->
+            ?LOG_ERROR(#{
+                what => transient_replication_parse_error,
+                in => replicator,
+                tag => Tag,
+                details => Err,
+                stacktrace => Stack
+            }),
+            LogErr2 = "~p parse_transient_rep fail ~p ~p",
+            couch_log:error(LogErr2, [?MODULE, Tag, Err, Stack]),
+            throw({bad_request, couch_util:to_binary({Tag, Err})})
+    end,
     #{?OPTIONS := Options} = Rep,
     Cancel = maps:get(<<"cancel">>, Options, false),
     Id = maps:get(<<"id">>, Options, nil),
@@ -130,11 +134,13 @@ parse_transient_rep(#{} = Body, UserName) ->
             {ok, JobId, Rep}
     end.
 
+
 -spec parse_rep({[_]} | #{}, user_name()) -> {ok, #{}}.
 parse_rep({Props} = EJson, UserName) when is_list(Props) ->
     Str = couch_util:json_encode(EJson),
     Map = couch_util:json_decode(Str, [return_maps]),
     parse_rep(Map, UserName);
+
 parse_rep(#{} = Doc, UserName) ->
     {SrcProxy, TgtProxy} = parse_proxy_settings(Doc),
     Opts = make_options(Doc),
@@ -170,38 +176,33 @@ parse_rep(#{} = Doc, UserName) ->
             {ok, Rep}
     end.
 
+
 -spec parse_rep_db(#{}, #{}, #{}) -> #{}.
 parse_rep_db(#{} = Endpoint, #{} = ProxyParams, #{} = Options) ->
-    ProxyUrl =
-        case ProxyParams of
-            #{<<"proxy_url">> := PUrl} -> PUrl;
-            _ -> null
-        end,
+    ProxyUrl = case ProxyParams of
+        #{<<"proxy_url">> := PUrl} -> PUrl;
+        _ -> null
+    end,
 
     Url0 = maps:get(<<"url">>, Endpoint),
     Url = maybe_add_trailing_slash(Url0),
 
     AuthProps = maps:get(<<"auth">>, Endpoint, #{}),
-    if
-        is_map(AuthProps) -> ok;
-        true -> throw({error, "if defined, `auth` must be an object"})
+    if is_map(AuthProps) -> ok; true ->
+        throw({error, "if defined, `auth` must be an object"})
     end,
 
     Headers0 = maps:get(<<"headers">>, Endpoint, #{}),
-    if
-        is_map(Headers0) -> ok;
-        true -> throw({error, "if defined `headers` must be an object"})
+    if is_map(Headers0) -> ok; true ->
+        throw({error, "if defined `headers` must be an object"})
     end,
     DefaultHeaders = couch_replicator_utils:default_headers_map(),
     Headers = maps:merge(DefaultHeaders, Headers0),
 
     SockOpts = maps:get(<<"socket_options">>, Options, #{}),
-    SockAndProxy = maps:merge(
-        #{
-            <<"socket_options">> => SockOpts
-        },
-        ProxyParams
-    ),
+    SockAndProxy = maps:merge(#{
+        <<"socket_options">> => SockOpts
+    }, ProxyParams),
     SslParams = ssl_params(Url),
 
     HttpDb = #{
@@ -215,14 +216,19 @@ parse_rep_db(#{} = Endpoint, #{} = ProxyParams, #{} = Options) ->
         <<"proxy_url">> => ProxyUrl
     },
     normalize_basic_auth(HttpDb);
+
 parse_rep_db(<<"http://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db(#{<<"url">> => Url}, Proxy, Options);
+
 parse_rep_db(<<"https://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db(#{<<"url">> => Url}, Proxy, Options);
+
 parse_rep_db(<<_/binary>>, _Proxy, _Options) ->
     throw({error, local_endpoints_not_supported});
+
 parse_rep_db(undefined, _Proxy, _Options) ->
     throw({error, <<"Missing replication endpoint">>}).
+
 
 parse_proxy_settings(#{} = Doc) ->
     Proxy = maps:get(?PROXY, Doc, <<>>),
@@ -233,7 +239,7 @@ parse_proxy_settings(#{} = Doc) ->
         true when SrcProxy =/= <<>> ->
             Error = "`proxy` is mutually exclusive with `source_proxy`",
             throw({error, Error});
-        true when TgtProxy =/= <<>> ->
+        true when  TgtProxy =/= <<>> ->
             Error = "`proxy` is mutually exclusive with `target_proxy`",
             throw({error, Error});
         true ->
@@ -242,49 +248,46 @@ parse_proxy_settings(#{} = Doc) ->
             {parse_proxy_params(SrcProxy), parse_proxy_params(TgtProxy)}
     end.
 
+
 -spec maybe_add_trailing_slash(binary()) -> binary().
 maybe_add_trailing_slash(<<>>) ->
     <<>>;
+
 maybe_add_trailing_slash(Url) when is_binary(Url) ->
     case binary:match(Url, <<"?">>) of
         nomatch ->
             case binary:last(Url) of
-                $/ -> Url;
+                $/  -> Url;
                 _ -> <<Url/binary, "/">>
             end;
         _ ->
-            % skip if there are query params
-            Url
+            Url  % skip if there are query params
     end.
+
 
 -spec make_options(#{}) -> #{}.
 make_options(#{} = RepDoc) ->
     Options0 = convert_options(RepDoc),
     Options = check_options(Options0),
-    ConfigOptions = lists:foldl(
-        fun({K, Default, ConversionFun}, Acc) ->
-            V = ConversionFun(config:get("replicator", K, Default)),
-            Acc#{list_to_binary(K) => V}
-        end,
-        #{},
-        ?CONFIG_DEFAULTS
-    ),
+    ConfigOptions = lists:foldl(fun({K, Default, ConversionFun}, Acc) ->
+        V = ConversionFun(config:get("replicator", K, Default)),
+        Acc#{list_to_binary(K) => V}
+    end, #{}, ?CONFIG_DEFAULTS),
     maps:merge(ConfigOptions, Options).
+
 
 -spec convert_options(#{}) -> #{} | no_return().
 convert_options(#{} = Doc) ->
     maps:fold(fun convert_fold/3, #{}, Doc).
+
 
 -spec convert_fold(binary(), any(), #{}) -> #{}.
 convert_fold(<<"cancel">>, V, Acc) when is_boolean(V) ->
     Acc#{<<"cancel">> => V};
 convert_fold(<<"cancel">>, _, _) ->
     throw({error, <<"`cancel` must be a boolean">>});
-convert_fold(IdOpt, V, Acc) when
-    IdOpt =:= <<"_local_id">>;
-    IdOpt =:= <<"replication_id">>;
-    IdOpt =:= <<"id">>
-->
+convert_fold(IdOpt, V, Acc) when IdOpt =:= <<"_local_id">>;
+        IdOpt =:= <<"replication_id">>; IdOpt =:= <<"id">> ->
     Acc#{<<"id">> => couch_replicator_ids:convert(V)};
 convert_fold(<<"create_target">>, V, Acc) when is_boolean(V) ->
     Acc#{<<"create_target">> => V};
@@ -310,15 +313,12 @@ convert_fold(<<"doc_ids">>, null, Acc) ->
     Acc;
 convert_fold(<<"doc_ids">>, V, Acc) when is_list(V) ->
     % Compatibility behaviour as: accept a list of percent encoded doc IDs
-    Ids = lists:map(
-        fun(Id) ->
-            case is_binary(Id) andalso byte_size(Id) > 0 of
-                true -> list_to_binary(couch_httpd:unquote(Id));
-                false -> throw({error, <<"`doc_ids` array must contain strings">>})
-            end
-        end,
-        V
-    ),
+    Ids = lists:map(fun(Id) ->
+        case is_binary(Id) andalso byte_size(Id) > 0 of
+            true -> list_to_binary(couch_httpd:unquote(Id));
+            false -> throw({error, <<"`doc_ids` array must contain strings">>})
+        end
+    end, V),
     Acc#{<<"doc_ids">> => lists:usort(Ids)};
 convert_fold(<<"doc_ids">>, _, _) ->
     throw({error, <<"`doc_ids` must be an array">>});
@@ -346,12 +346,13 @@ convert_fold(<<"use_checkpoints">>, _, _) ->
     throw({error, <<"`use_checkpoints` must be a boolean">>});
 convert_fold(<<"checkpoint_interval">>, V, Acc) ->
     Acc#{<<"checkpoint_interval">> => bin2int(V, <<"checkpoint_interval">>)};
-% skip unknown option
-convert_fold(_K, _V, Acc) ->
+convert_fold(_K, _V, Acc) -> % skip unknown option
     Acc.
+
 
 bin2int(V, _Field) when is_integer(V) ->
     V;
+
 bin2int(V, Field) when is_binary(V) ->
     try
         erlang:binary_to_integer(V)
@@ -359,8 +360,10 @@ bin2int(V, Field) when is_binary(V) ->
         error:badarg ->
             throw({error, <<"`", Field/binary, "` must be an integer">>})
     end;
+
 bin2int(_V, Field) ->
     throw({error, <<"`", Field/binary, "` must be an integer">>}).
+
 
 -spec check_options(#{}) -> #{}.
 check_options(Options) ->
@@ -368,43 +371,32 @@ check_options(Options) ->
     Filter = maps:is_key(<<"filter">>, Options),
     Selector = maps:is_key(<<"selector">>, Options),
     case {DocIds, Filter, Selector} of
-        {false, false, false} ->
-            Options;
-        {false, false, _} ->
-            Options;
-        {false, _, false} ->
-            Options;
-        {_, false, false} ->
-            Options;
-        _ ->
-            throw(
-                {error, <<
-                    "`doc_ids`,`filter`,`selector` are mutually "
-                    " exclusive"
-                >>}
-            )
+        {false, false, false} -> Options;
+        {false, false, _} -> Options;
+        {false, _, false} -> Options;
+        {_, false, false} -> Options;
+        _ -> throw({error, <<"`doc_ids`,`filter`,`selector` are mutually "
+            " exclusive">>})
     end.
+
 
 parse_sock_opts(Term) ->
     {ok, SocketOptions} = couch_util:parse_term(Term),
-    lists:foldl(
-        fun
-            ({K, V}, Acc) when is_atom(K) ->
-                case lists:member(K, ?VALID_SOCK_OPTS) of
-                    true -> Acc#{atom_to_binary(K, utf8) => V};
-                    false -> Acc
-                end;
-            (_, Acc) ->
-                Acc
-        end,
-        #{},
-        SocketOptions
-    ).
+    lists:foldl(fun
+        ({K, V}, Acc) when is_atom(K) ->
+            case lists:member(K, ?VALID_SOCK_OPTS) of
+                true -> Acc#{atom_to_binary(K, utf8) => V};
+                false -> Acc
+            end;
+        (_, Acc) ->
+            Acc
+    end, #{}, SocketOptions).
+
 
 -spec parse_proxy_params(binary() | #{}) -> #{}.
 parse_proxy_params(<<>>) ->
     #{};
-parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl) ->
+parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl)->
     #url{
         host = Host,
         port = Port,
@@ -412,11 +404,10 @@ parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl) ->
         password = Passwd,
         protocol = Prot0
     } = ibrowse_lib:parse_url(binary_to_list(ProxyUrl)),
-    Prot =
-        case lists:member(Prot0, ?VALID_PROXY_PROTOCOLS) of
-            true -> atom_to_binary(Prot0, utf8);
-            false -> throw({error, <<"Unsupported proxy protocol">>})
-        end,
+    Prot = case lists:member(Prot0, ?VALID_PROXY_PROTOCOLS) of
+        true -> atom_to_binary(Prot0, utf8);
+        false -> throw({error, <<"Unsupported proxy protocol">>})
+    end,
     ProxyParams = #{
         <<"proxy_url">> => ProxyUrl,
         <<"proxy_protocol">> => Prot,
@@ -433,6 +424,7 @@ parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl) ->
             ProxyParams
     end.
 
+
 -spec ssl_params(binary()) -> #{}.
 ssl_params(Url) ->
     case ibrowse_lib:parse_url(binary_to_list(Url)) of
@@ -447,26 +439,21 @@ ssl_params(Url) ->
             VerifySslOptions = ssl_verify_options(VerifyCerts =:= "true"),
             SslOpts = maps:merge(VerifySslOptions, #{<<"depth">> => Depth}),
             HaveCertAndKey = CertFile /= null andalso KeyFile /= null,
-            SslOpts1 =
-                case HaveCertAndKey of
-                    false ->
-                        SslOpts;
-                    true ->
-                        CertOpts0 = #{
-                            <<"certfile">> => list_to_binary(CertFile),
-                            <<"keyfile">> => list_to_binary(KeyFile)
-                        },
-                        CertOpts =
-                            case Password of
-                                null -> CertOpts0;
-                                _ -> CertOpts0#{<<"password">> => list_to_binary(Password)}
-                            end,
-                        maps:merge(SslOpts, CertOpts)
+            SslOpts1 = case HaveCertAndKey of false -> SslOpts; true ->
+                CertOpts0 = #{
+                    <<"certfile">> => list_to_binary(CertFile),
+                    <<"keyfile">> => list_to_binary(KeyFile)
+                },
+                CertOpts = case Password of null -> CertOpts0; _ ->
+                    CertOpts0#{<<"password">> => list_to_binary(Password)}
                 end,
+                maps:merge(SslOpts, CertOpts)
+            end,
             #{<<"is_ssl">> => true, <<"ssl_options">> => SslOpts1};
         #url{protocol = http} ->
             #{}
     end.
+
 
 -spec ssl_verify_options(true | false) -> [_].
 ssl_verify_options(true) ->
@@ -482,18 +469,19 @@ ssl_verify_options(true) ->
                 <<"cacertfile">> => list_to_binary(CAFile)
             }
     end;
+
 ssl_verify_options(false) ->
     #{
         <<"verify">> => <<"verify_none">>
     }.
 
+
 -spec set_basic_auth_creds(string(), string(), map()) -> map().
-set_basic_auth_creds(undefined, undefined, #{} = HttpDb) ->
+set_basic_auth_creds(undefined, undefined, #{}= HttpDb) ->
     HttpDb;
-set_basic_auth_creds(User, Pass, #{} = HttpDb) when
-    is_list(User), is_list(Pass)
-->
-    #{<<"auth_props">> := AuthProps} = HttpDb,
+set_basic_auth_creds(User, Pass, #{} = HttpDb)
+        when is_list(User), is_list(Pass) ->
+    #{<<"auth_props">> := AuthProps}  = HttpDb,
     UserPass = #{
         <<"username">> => list_to_binary(User),
         <<"password">> => list_to_binary(Pass)
@@ -501,9 +489,10 @@ set_basic_auth_creds(User, Pass, #{} = HttpDb) when
     AuthProps1 = AuthProps#{<<"basic">> => UserPass},
     HttpDb#{<<"auth_props">> := AuthProps1}.
 
+
 -spec extract_creds_from_url(binary()) ->
-    {ok, {string() | undefined, string() | undefined}, string()}
-    | {error, term()}.
+    {ok, {string() | undefined, string() | undefined}, string()} |
+    {error, term()}.
 extract_creds_from_url(Url0) ->
     Url = binary_to_list(Url0),
     case ibrowse_lib:parse_url(Url) of
@@ -520,6 +509,7 @@ extract_creds_from_url(Url0) ->
             {ok, {User, Pass}, list_to_binary(NoCreds)}
     end.
 
+
 % Normalize basic auth credentials so they are set only in the auth props
 % object. If multiple basic auth credentials are provided, the resulting
 % credentials are picked in the following order.
@@ -534,38 +524,33 @@ normalize_basic_auth(#{} = HttpDb) ->
         <<"headers">> := Headers
     } = HttpDb,
     {HeaderCreds, HeadersNoCreds} = remove_basic_auth_from_headers(Headers),
-    {UrlCreds, UrlWithoutCreds} =
-        case extract_creds_from_url(Url) of
-            {ok, Creds = {_, _}, UrlNoCreds} ->
-                {Creds, UrlNoCreds};
-            {error, _Error} ->
-                % Don't crash replicator if user provided an invalid
-                % userinfo part
-                {undefined, undefined}
-        end,
+    {UrlCreds, UrlWithoutCreds} = case extract_creds_from_url(Url) of
+        {ok, Creds = {_, _}, UrlNoCreds} ->
+            {Creds, UrlNoCreds};
+        {error, _Error} ->
+            % Don't crash replicator if user provided an invalid
+            % userinfo part
+            {undefined, undefined}
+    end,
     AuthCreds = {_, _} = couch_replicator_utils:get_basic_auth_creds(HttpDb),
     HttpDb1 = HttpDb#{
         <<"url">> := UrlWithoutCreds,
         <<"headers">> := HeadersNoCreds
     },
-    {User, Pass} =
-        case {AuthCreds, UrlCreds, HeaderCreds} of
-            {{U, P}, {_, _}, {_, _}} when is_list(U), is_list(P) -> {U, P};
-            {{_, _}, {U, P}, {_, _}} when is_list(U), is_list(P) -> {U, P};
-            {{_, _}, {_, _}, {U, P}} -> {U, P}
-        end,
+    {User, Pass} = case {AuthCreds, UrlCreds, HeaderCreds} of
+        {{U, P}, {_, _}, {_, _}} when is_list(U), is_list(P) -> {U, P};
+        {{_, _}, {U, P}, {_, _}} when is_list(U), is_list(P) -> {U, P};
+        {{_, _}, {_, _}, {U, P}} -> {U, P}
+    end,
     set_basic_auth_creds(User, Pass, HttpDb1).
+
 
 remove_basic_auth_from_headers(#{} = HeadersMap) ->
     % Headers are passed in a map however mochiweb_headers expects them to be
     % lists so we transform them to lists first, then back to maps
-    Headers = maps:fold(
-        fun(K, V, Acc) ->
-            [{binary_to_list(K), binary_to_list(V)} | Acc]
-        end,
-        [],
-        HeadersMap
-    ),
+    Headers = maps:fold(fun(K, V, Acc) ->
+        [{binary_to_list(K), binary_to_list(V)} | Acc]
+    end, [], HeadersMap),
     Headers1 = mochiweb_headers:make(Headers),
     case mochiweb_headers:get_value("Authorization", Headers1) of
         undefined ->
@@ -575,21 +560,19 @@ remove_basic_auth_from_headers(#{} = HeadersMap) ->
             BasicLower = string:to_lower(Basic),
             Result = maybe_remove_basic_auth(BasicLower, B64, Headers1),
             {{User, Pass}, Headers2} = Result,
-            HeadersMapResult = lists:foldl(
-                fun({K, V}, Acc) ->
-                    Acc#{list_to_binary(K) => list_to_binary(V)}
-                end,
-                #{},
-                Headers2
-            ),
+            HeadersMapResult = lists:foldl(fun({K, V}, Acc) ->
+                Acc#{list_to_binary(K) => list_to_binary(V)}
+            end, #{}, Headers2),
             {{User, Pass}, HeadersMapResult}
     end.
+
 
 maybe_remove_basic_auth("basic", " " ++ Base64, Headers) ->
     Headers1 = mochiweb_headers:delete_any("Authorization", Headers),
     {decode_basic_creds(Base64), mochiweb_headers:to_list(Headers1)};
 maybe_remove_basic_auth(_, _, Headers) ->
     {{undefined, undefined}, mochiweb_headers:to_list(Headers)}.
+
 
 decode_basic_creds(Base64) ->
     try re:split(base64:decode(Base64), ":", [{return, list}, {parts, 2}]) of
@@ -603,97 +586,67 @@ decode_basic_creds(Base64) ->
             {undefined, undefined}
     end.
 
+
 -ifdef(TEST).
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
+
 check_options_pass_values_test() ->
     ?assertEqual(check_options(#{}), #{}),
-    ?assertEqual(
-        check_options(#{<<"baz">> => <<"foo">>}),
-        #{<<"baz">> => <<"foo">>}
-    ),
-    ?assertEqual(
-        check_options(#{<<"doc_ids">> => [<<"x">>]}),
-        #{<<"doc_ids">> => [<<"x">>]}
-    ),
-    ?assertEqual(
-        check_options(#{<<"filter">> => <<"f">>}),
-        #{<<"filter">> => <<"f">>}
-    ),
-    ?assertEqual(
-        check_options(#{<<"selector">> => <<"s">>}),
-        #{<<"selector">> => <<"s">>}
-    ).
+    ?assertEqual(check_options(#{<<"baz">> => <<"foo">>}),
+        #{<<"baz">> => <<"foo">>}),
+    ?assertEqual(check_options(#{<<"doc_ids">> => [<<"x">>]}),
+        #{<<"doc_ids">> => [<<"x">>]}),
+    ?assertEqual(check_options(#{<<"filter">> => <<"f">>}),
+        #{<<"filter">> => <<"f">>}),
+    ?assertEqual(check_options(#{<<"selector">> => <<"s">>}),
+        #{<<"selector">> => <<"s">>}).
+
 
 check_options_fail_values_test() ->
-    ?assertThrow(
-        {error, _},
-        check_options(#{<<"doc_ids">> => [], <<"filter">> => <<"f">>})
-    ),
-    ?assertThrow(
-        {error, _},
-        check_options(#{<<"doc_ids">> => [], <<"selector">> => <<"s">>})
-    ),
-    ?assertThrow(
-        {error, _},
-        check_options(#{<<"filter">> => <<"f">>, <<"selector">> => <<"s">>})
-    ),
-    ?assertThrow(
-        {error, _},
+    ?assertThrow({error, _},
+        check_options(#{<<"doc_ids">> => [], <<"filter">> => <<"f">>})),
+    ?assertThrow({error, _},
+        check_options(#{<<"doc_ids">> => [], <<"selector">> => <<"s">>})),
+    ?assertThrow({error, _},
+        check_options(#{<<"filter">> => <<"f">>, <<"selector">> => <<"s">>})),
+    ?assertThrow({error, _},
         check_options(#{
             <<"doc_ids">> => [],
             <<"filter">> => <<"f">>,
-            <<"selector">> => <<"s">>
-        })
-    ).
+            <<"selector">> => <<"s">>}
+    )).
+
 
 check_convert_options_pass_test() ->
     ?assertEqual(#{}, convert_options(#{})),
     ?assertEqual(#{}, convert_options(#{<<"random">> => 42})),
-    ?assertEqual(
-        #{<<"cancel">> => true},
-        convert_options(#{<<"cancel">> => true})
-    ),
-    ?assertEqual(
-        #{<<"create_target">> => true},
-        convert_options(#{<<"create_target">> => true})
-    ),
-    ?assertEqual(
-        #{<<"continuous">> => true},
-        convert_options(#{<<"continuous">> => true})
-    ),
-    ?assertEqual(
-        #{<<"doc_ids">> => [<<"id">>]},
-        convert_options(#{<<"doc_ids">> => [<<"id">>]})
-    ),
-    ?assertEqual(
-        #{<<"selector">> => #{<<"key">> => <<"value">>}},
-        convert_options(#{<<"selector">> => #{<<"key">> => <<"value">>}})
-    ).
+    ?assertEqual(#{<<"cancel">> => true},
+        convert_options(#{<<"cancel">> => true})),
+    ?assertEqual(#{<<"create_target">> => true},
+        convert_options(#{<<"create_target">> => true})),
+    ?assertEqual(#{<<"continuous">> => true},
+        convert_options(#{<<"continuous">> => true})),
+    ?assertEqual(#{<<"doc_ids">> => [<<"id">>]},
+        convert_options(#{<<"doc_ids">> => [<<"id">>]})),
+    ?assertEqual(#{<<"selector">> => #{<<"key">> => <<"value">>}},
+        convert_options(#{<<"selector">> => #{<<"key">> => <<"value">>}})).
+
 
 check_convert_options_fail_test() ->
-    ?assertThrow(
-        {error, _},
-        convert_options(#{<<"cancel">> => <<"true">>})
-    ),
-    ?assertThrow(
-        {error, _},
-        convert_options(#{<<"create_target">> => <<"true">>})
-    ),
-    ?assertThrow(
-        {error, _},
-        convert_options(#{<<"continuous">> => <<"true">>})
-    ),
-    ?assertThrow(
-        {error, _},
-        convert_options(#{<<"doc_ids">> => <<"not_a_list">>})
-    ),
-    ?assertThrow(
-        {error, _},
-        convert_options(#{<<"selector">> => <<"bad">>})
-    ).
+    ?assertThrow({error, _},
+        convert_options(#{<<"cancel">> => <<"true">>})),
+    ?assertThrow({error, _},
+        convert_options(#{<<"create_target">> => <<"true">>})),
+    ?assertThrow({error, _},
+        convert_options(#{<<"continuous">> => <<"true">>})),
+    ?assertThrow({error, _},
+        convert_options(#{<<"doc_ids">> => <<"not_a_list">>})),
+    ?assertThrow({error, _},
+        convert_options(#{<<"selector">> => <<"bad">>})).
+
 
 local_replication_endpoint_error_test_() ->
     {
@@ -705,30 +658,30 @@ local_replication_endpoint_error_test_() ->
         ]
     }.
 
+
 setup() ->
     meck:expect(config, get, fun(_, _, Default) -> Default end).
+
 
 teardown(_) ->
     meck:unload().
 
+
 t_error_on_local_endpoint(_) ->
-    RepDoc =
-        {[
-            {<<"_id">>, <<"someid">>},
-            {<<"source">>, <<"localdb">>},
-            {<<"target">>, <<"http://somehost.local/tgt">>}
-        ]},
+    RepDoc = {[
+        {<<"_id">>, <<"someid">>},
+        {<<"source">>, <<"localdb">>},
+        {<<"target">>, <<"http://somehost.local/tgt">>}
+    ]},
     Expect = local_endpoints_not_supported,
     ?assertThrow({bad_rep_doc, Expect}, parse_rep_doc(RepDoc)).
 
+
 remove_basic_auth_from_headers_test_() ->
     B64 = list_to_binary(b64creds("user", "pass")),
-    [
-        ?_assertEqual(
-            {{User, Pass}, NoAuthHeaders},
-            remove_basic_auth_from_headers(Headers)
-        )
-     || {{User, Pass, NoAuthHeaders}, Headers} <- [
+    [?_assertEqual({{User, Pass}, NoAuthHeaders},
+        remove_basic_auth_from_headers(Headers)) ||
+        {{User, Pass, NoAuthHeaders}, Headers} <- [
             {
                 {undefined, undefined, #{}},
                 #{}
@@ -767,8 +720,10 @@ remove_basic_auth_from_headers_test_() ->
         ]
     ].
 
+
 b64creds(User, Pass) ->
     base64:encode_to_string(User ++ ":" ++ Pass).
+
 
 set_basic_auth_creds_test() ->
     Check = fun(User, Pass, Props) ->
@@ -779,191 +734,179 @@ set_basic_auth_creds_test() ->
 
     ?assertEqual(#{}, Check(undefined, undefined, #{})),
 
-    ?assertEqual(
-        #{<<"other">> => #{}},
-        Check(
-            undefined,
-            undefined,
-            #{<<"other">> => #{}}
-        )
-    ),
+    ?assertEqual(#{<<"other">> => #{}}, Check(undefined, undefined,
+        #{<<"other">> => #{}})),
 
-    ?assertEqual(
-        #{
-            <<"basic">> => #{
-                <<"username">> => <<"u">>,
-                <<"password">> => <<"p">>
-            }
-        },
-        Check("u", "p", #{})
-    ),
+    ?assertEqual(#{
+        <<"basic">> => #{
+            <<"username">> => <<"u">>,
+            <<"password">> => <<"p">>
+        }
+    }, Check("u", "p", #{})),
 
-    ?assertEqual(
-        #{
-            <<"other">> => #{},
-            <<"basic">> => #{
-                <<"username">> => <<"u">>,
-                <<"password">> => <<"p">>
-            }
-        },
-        Check("u", "p", #{<<"other">> => #{}})
-    ).
+    ?assertEqual(#{
+        <<"other">> => #{},
+        <<"basic">> => #{
+            <<"username">> => <<"u">>,
+            <<"password">> => <<"p">>
+        }
+    }, Check("u", "p", #{<<"other">> => #{}})).
+
 
 normalize_basic_creds_test_() ->
     DefaultHeaders = couch_replicator_utils:default_headers_map(),
-    [
-        ?_assertEqual(Expect, normalize_basic_auth(Input))
-     || {Input, Expect} <- [
-            {
-                #{
-                    <<"url">> => <<"http://u:p@x.y/db">>,
-                    <<"auth_props">> => #{},
-                    <<"headers">> => DefaultHeaders
-                },
-                #{
-                    <<"url">> => <<"http://x.y/db">>,
-                    <<"auth_props">> => auth_props("u", "p"),
-                    <<"headers">> => DefaultHeaders
-                }
+    [?_assertEqual(Expect, normalize_basic_auth(Input)) || {Input, Expect} <- [
+        {
+            #{
+                <<"url">> => <<"http://u:p@x.y/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => DefaultHeaders
             },
-            {
-                #{
-                    <<"url">> => <<"http://u:p@h:80/db">>,
-                    <<"auth_props">> => #{},
-                    <<"headers">> => DefaultHeaders
-                },
-                #{
-                    <<"url">> => <<"http://h:80/db">>,
-                    <<"auth_props">> => auth_props("u", "p"),
-                    <<"headers">> => DefaultHeaders
-                }
-            },
-            {
-                #{
-                    <<"url">> => <<"https://u:p@h/db">>,
-                    <<"auth_props">> => #{},
-                    <<"headers">> => DefaultHeaders
-                },
-                #{
-                    <<"url">> => <<"https://h/db">>,
-                    <<"auth_props">> => auth_props("u", "p"),
-                    <<"headers">> => DefaultHeaders
-                }
-            },
-            {
-                #{
-                    <<"url">> => <<"http://u:p@[2001:db8:a1b:12f9::1]/db">>,
-                    <<"auth_props">> => #{},
-                    <<"headers">> => DefaultHeaders
-                },
-                #{
-                    <<"url">> => <<"http://[2001:db8:a1b:12f9::1]/db">>,
-                    <<"auth_props">> => auth_props("u", "p"),
-                    <<"headers">> => DefaultHeaders
-                }
-            },
-            {
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => #{},
-                    <<"headers">> => maps:merge(DefaultHeaders, #{
-                        <<"authorization">> => basic_b64("u", "p")
-                    })
-                },
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => auth_props("u", "p"),
-                    <<"headers">> => DefaultHeaders
-                }
-            },
-            {
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => #{},
-                    <<"headers">> => maps:merge(DefaultHeaders, #{
-                        <<"authorization">> => basic_b64("u", "p@")
-                    })
-                },
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => auth_props("u", "p@"),
-                    <<"headers">> => DefaultHeaders
-                }
-            },
-            {
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => #{},
-                    <<"headers">> => maps:merge(DefaultHeaders, #{
-                        <<"authorization">> => basic_b64("u", "p@%40")
-                    })
-                },
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => auth_props("u", "p@%40"),
-                    <<"headers">> => DefaultHeaders
-                }
-            },
-            {
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => #{},
-                    <<"headers">> => maps:merge(DefaultHeaders, #{
-                        <<"aUthoriZation">> => basic_b64("U", "p")
-                    })
-                },
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => auth_props("U", "p"),
-                    <<"headers">> => DefaultHeaders
-                }
-            },
-            {
-                #{
-                    <<"url">> => <<"http://u1:p1@h/db">>,
-                    <<"auth_props">> => #{},
-                    <<"headers">> => maps:merge(DefaultHeaders, #{
-                        <<"Authorization">> => basic_b64("u2", "p2")
-                    })
-                },
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => auth_props("u1", "p1"),
-                    <<"headers">> => DefaultHeaders
-                }
-            },
-            {
-                #{
-                    <<"url">> => <<"http://u1:p1@h/db">>,
-                    <<"auth_props">> => auth_props("u2", "p2"),
-                    <<"headers">> => DefaultHeaders
-                },
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => auth_props("u2", "p2"),
-                    <<"headers">> => DefaultHeaders
-                }
-            },
-            {
-                #{
-                    <<"url">> => <<"http://u1:p1@h/db">>,
-                    <<"auth_props">> => auth_props("u2", "p2"),
-                    <<"headers">> => maps:merge(DefaultHeaders, #{
-                        <<"Authorization">> => basic_b64("u3", "p3")
-                    })
-                },
-                #{
-                    <<"url">> => <<"http://h/db">>,
-                    <<"auth_props">> => auth_props("u2", "p2"),
-                    <<"headers">> => DefaultHeaders
-                }
+            #{
+                <<"url">> => <<"http://x.y/db">>,
+                <<"auth_props">> => auth_props("u", "p"),
+                <<"headers">> => DefaultHeaders
             }
-        ]
-    ].
+        },
+        {
+            #{
+                <<"url">> => <<"http://u:p@h:80/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => DefaultHeaders
+            },
+            #{
+                <<"url">> => <<"http://h:80/db">>,
+                <<"auth_props">> => auth_props("u", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"https://u:p@h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => DefaultHeaders
+            },
+            #{
+                <<"url">> => <<"https://h/db">>,
+                <<"auth_props">> => auth_props("u", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://u:p@[2001:db8:a1b:12f9::1]/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => DefaultHeaders
+            },
+            #{
+                <<"url">> => <<"http://[2001:db8:a1b:12f9::1]/db">>,
+                <<"auth_props">> => auth_props("u", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"authorization">> => basic_b64("u", "p")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"authorization">> => basic_b64("u", "p@")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u", "p@"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"authorization">> => basic_b64("u", "p@%40")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u", "p@%40"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"aUthoriZation">> => basic_b64("U", "p")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("U", "p"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://u1:p1@h/db">>,
+                <<"auth_props">> => #{},
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"Authorization">> => basic_b64("u2", "p2")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u1", "p1"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://u1:p1@h/db">>,
+                <<"auth_props">> => auth_props("u2", "p2"),
+                <<"headers">> => DefaultHeaders
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u2", "p2"),
+                <<"headers">> => DefaultHeaders
+            }
+        },
+        {
+            #{
+                <<"url">> => <<"http://u1:p1@h/db">>,
+                <<"auth_props">> => auth_props("u2", "p2"),
+                <<"headers">> => maps:merge(DefaultHeaders, #{
+                    <<"Authorization">> => basic_b64("u3", "p3")
+                })
+            },
+            #{
+                <<"url">> => <<"http://h/db">>,
+                <<"auth_props">> => auth_props("u2", "p2"),
+                <<"headers">> => DefaultHeaders
+            }
+        }
+    ]].
+
 
 basic_b64(User, Pass) when is_list(User), is_list(Pass) ->
     B64Creds = list_to_binary(b64creds(User, Pass)),
     <<"basic ", B64Creds/binary>>.
+
 
 auth_props(User, Pass) when is_list(User), is_list(Pass) ->
     #{
