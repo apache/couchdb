@@ -65,7 +65,7 @@ powerset(X, [H | T], Acc) ->
 
 permutations([]) ->
     [[]];
-permutations(L)  ->
+permutations(L) ->
     [[H | T] || H <- L, T <- permutations(L -- [H])].
 
 %% @doc product({Items1, Items2, ..., ItemsN})
@@ -83,7 +83,7 @@ permutations(L)  ->
 %%      ]
 -spec product(Elements :: list()) -> [list()].
 
-product([H])   ->
+product([H]) ->
     [[A] || A <- H];
 product([H | T]) ->
     [[A | B] || A <- H, B <- product(T)].
@@ -108,7 +108,6 @@ product([H | T]) ->
 
 binary_combinations(NBits) ->
     product(lists:duplicate(NBits, [true, false])).
-
 
 %% @doc combinations(N, Items).
 %% Generate all combinations by choosing N values from a given list of Items

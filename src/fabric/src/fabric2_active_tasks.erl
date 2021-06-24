@@ -10,9 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 -module(fabric2_active_tasks).
-
 
 -export([
     get_active_tasks/0,
@@ -21,32 +19,35 @@
     update_active_task_info/2
 ]).
 
-
 -define(ACTIVE_TASK_INFO, <<"active_task_info">>).
-
 
 get_active_tasks() ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(undefined), fun(JTx) ->
         Types = couch_jobs:get_types(JTx),
-        lists:foldl(fun(Type, TaskAcc) ->
-            JobIds = couch_jobs:get_active_jobs_ids(JTx, Type),
-            Tasks = lists:filtermap(fun(JobId) ->
-                {ok, Data} = couch_jobs:get_job_data(JTx, Type, JobId),
-                case maps:get(?ACTIVE_TASK_INFO, Data, not_found) of
-                    not_found -> false;
-                    #{} = Map when map_size(Map) == 0 -> false;
-                    #{} = Info -> {true, Info}
-                end
-            end, JobIds),
-            TaskAcc ++ Tasks
-        end, [], Types)
+        lists:foldl(
+            fun(Type, TaskAcc) ->
+                JobIds = couch_jobs:get_active_jobs_ids(JTx, Type),
+                Tasks = lists:filtermap(
+                    fun(JobId) ->
+                        {ok, Data} = couch_jobs:get_job_data(JTx, Type, JobId),
+                        case maps:get(?ACTIVE_TASK_INFO, Data, not_found) of
+                            not_found -> false;
+                            #{} = Map when map_size(Map) == 0 -> false;
+                            #{} = Info -> {true, Info}
+                        end
+                    end,
+                    JobIds
+                ),
+                TaskAcc ++ Tasks
+            end,
+            [],
+            Types
+        )
     end).
 
-
 get_active_task_info(JobData) ->
-    #{?ACTIVE_TASK_INFO:= ActiveTaskInfo} = JobData,
+    #{?ACTIVE_TASK_INFO := ActiveTaskInfo} = JobData,
     ActiveTaskInfo.
-
 
 update_active_task_info(JobData, ActiveTaskInfo) ->
     JobData#{?ACTIVE_TASK_INFO => ActiveTaskInfo}.

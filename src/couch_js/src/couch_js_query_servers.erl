@@ -14,7 +14,7 @@
 
 -export([try_compile/4]).
 -export([start_doc_map/3, map_doc_raw/2, stop_doc_map/1, raw_to_ejson/1]).
--export([reduce/3, rereduce/3,validate_doc_update/5]).
+-export([reduce/3, rereduce/3, validate_doc_update/5]).
 -export([filter_docs/5]).
 -export([filter_view/3]).
 -export([finalize/2]).
@@ -27,14 +27,17 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("kernel/include/logger.hrl").
 
--define(SUMERROR, <<"The _sum function requires that map values be numbers, "
+-define(SUMERROR, <<
+    "The _sum function requires that map values be numbers, "
     "arrays of numbers, or objects. Objects cannot be mixed with other "
     "data structures. Objects can be arbitrarily nested, provided that the values "
-    "for all fields are themselves numbers, arrays of numbers, or objects.">>).
+    "for all fields are themselves numbers, arrays of numbers, or objects."
+>>).
 
--define(STATERROR, <<"The _stats function requires that map values be numbers "
-    "or arrays of numbers, not '~p'">>).
-
+-define(STATERROR, <<
+    "The _stats function requires that map values be numbers "
+    "or arrays of numbers, not '~p'"
+>>).
 
 try_compile(Proc, FunctionType, FunctionName, FunctionSource) ->
     try
@@ -54,19 +57,20 @@ try_compile(Proc, FunctionType, FunctionName, FunctionSource) ->
 start_doc_map(Lang, Functions, Lib) ->
     Proc = get_os_process(Lang),
     case Lib of
-    {[]} -> ok;
-    Lib ->
-        true = proc_prompt(Proc, [<<"add_lib">>, Lib])
+        {[]} -> ok;
+        Lib -> true = proc_prompt(Proc, [<<"add_lib">>, Lib])
     end,
-    lists:foreach(fun(FunctionSource) ->
-        true = proc_prompt(Proc, [<<"add_fun">>, FunctionSource])
-    end, Functions),
+    lists:foreach(
+        fun(FunctionSource) ->
+            true = proc_prompt(Proc, [<<"add_fun">>, FunctionSource])
+        end,
+        Functions
+    ),
     {ok, Proc}.
 
 map_doc_raw(Proc, Doc) ->
     Json = couch_doc:to_json_obj(Doc, []),
     {ok, proc_prompt_raw(Proc, [<<"map_doc">>, Json])}.
-
 
 stop_doc_map(nil) ->
     ok;
@@ -77,20 +81,24 @@ group_reductions_results([]) ->
     [];
 group_reductions_results(List) ->
     {Heads, Tails} = lists:foldl(
-        fun([H|T], {HAcc,TAcc}) ->
-            {[H|HAcc], [T|TAcc]}
-        end, {[], []}, List),
+        fun([H | T], {HAcc, TAcc}) ->
+            {[H | HAcc], [T | TAcc]}
+        end,
+        {[], []},
+        List
+    ),
     case Tails of
-    [[]|_] -> % no tails left
-        [Heads];
-    _ ->
-     [Heads | group_reductions_results(Tails)]
+        % no tails left
+        [[] | _] ->
+            [Heads];
+        _ ->
+            [Heads | group_reductions_results(Tails)]
     end.
 
-finalize(<<"_approx_count_distinct",_/binary>>, Reduction) ->
+finalize(<<"_approx_count_distinct", _/binary>>, Reduction) ->
     true = hyper:is_hyper(Reduction),
     {ok, round(hyper:card(Reduction))};
-finalize(<<"_stats",_/binary>>, Unpacked) ->
+finalize(<<"_stats", _/binary>>, Unpacked) ->
     {ok, pack_stats(Unpacked)};
 finalize(_RedSrc, Reduction) ->
     {ok, Reduction}.
@@ -101,45 +109,51 @@ rereduce(Lang, RedSrcs, ReducedValues) ->
     Grouped = group_reductions_results(ReducedValues),
     Results = lists:zipwith(
         fun
-        (<<"_", _/binary>> = FunSrc, Values) ->
-            {ok, [Result]} = builtin_reduce(rereduce, [FunSrc], [[[], V] || V <- Values], []),
-            Result;
-        (FunSrc, Values) ->
-            os_rereduce(Lang, [FunSrc], Values)
-        end, RedSrcs, Grouped),
+            (<<"_", _/binary>> = FunSrc, Values) ->
+                {ok, [Result]} = builtin_reduce(rereduce, [FunSrc], [[[], V] || V <- Values], []),
+                Result;
+            (FunSrc, Values) ->
+                os_rereduce(Lang, [FunSrc], Values)
+        end,
+        RedSrcs,
+        Grouped
+    ),
     {ok, Results}.
 
 reduce(_Lang, [], _KVs) ->
     {ok, []};
 reduce(Lang, RedSrcs, KVs) ->
-    {OsRedSrcs, BuiltinReds} = lists:partition(fun
-        (<<"_", _/binary>>) -> false;
-        (_OsFun) -> true
-    end, RedSrcs),
+    {OsRedSrcs, BuiltinReds} = lists:partition(
+        fun
+            (<<"_", _/binary>>) -> false;
+            (_OsFun) -> true
+        end,
+        RedSrcs
+    ),
     {ok, OsResults} = os_reduce(Lang, OsRedSrcs, KVs),
     {ok, BuiltinResults} = builtin_reduce(reduce, BuiltinReds, KVs, []),
     recombine_reduce_results(RedSrcs, OsResults, BuiltinResults, []).
 
-
 recombine_reduce_results([], [], [], Acc) ->
     {ok, lists:reverse(Acc)};
-recombine_reduce_results([<<"_", _/binary>>|RedSrcs], OsResults, [BRes|BuiltinResults], Acc) ->
-    recombine_reduce_results(RedSrcs, OsResults, BuiltinResults, [BRes|Acc]);
-recombine_reduce_results([_OsFun|RedSrcs], [OsR|OsResults], BuiltinResults, Acc) ->
-    recombine_reduce_results(RedSrcs, OsResults, BuiltinResults, [OsR|Acc]).
+recombine_reduce_results([<<"_", _/binary>> | RedSrcs], OsResults, [BRes | BuiltinResults], Acc) ->
+    recombine_reduce_results(RedSrcs, OsResults, BuiltinResults, [BRes | Acc]);
+recombine_reduce_results([_OsFun | RedSrcs], [OsR | OsResults], BuiltinResults, Acc) ->
+    recombine_reduce_results(RedSrcs, OsResults, BuiltinResults, [OsR | Acc]).
 
 os_reduce(_Lang, [], _KVs) ->
     {ok, []};
 os_reduce(Lang, OsRedSrcs, KVs) ->
     Proc = get_os_process(Lang),
-    OsResults = try proc_prompt(Proc, [<<"reduce">>, OsRedSrcs, KVs]) of
-        [true, Reductions] -> Reductions
-    catch
-        throw:{reduce_overflow_error, Msg} ->
-            [{[{reduce_overflow_error, Msg}]} || _ <- OsRedSrcs]
-    after
-        ok = ret_os_process(Proc)
-    end,
+    OsResults =
+        try proc_prompt(Proc, [<<"reduce">>, OsRedSrcs, KVs]) of
+            [true, Reductions] -> Reductions
+        catch
+            throw:{reduce_overflow_error, Msg} ->
+                [{[{reduce_overflow_error, Msg}]} || _ <- OsRedSrcs]
+        after
+            ok = ret_os_process(Proc)
+        end,
     {ok, OsResults}.
 
 os_rereduce(Lang, OsRedSrcs, KVs) ->
@@ -158,7 +172,6 @@ os_rereduce(Lang, OsRedSrcs, KVs) ->
             Error
     end.
 
-
 get_overflow_error([]) ->
     undefined;
 get_overflow_error([{[{reduce_overflow_error, _}]} = Error | _]) ->
@@ -166,26 +179,24 @@ get_overflow_error([{[{reduce_overflow_error, _}]} = Error | _]) ->
 get_overflow_error([_ | Rest]) ->
     get_overflow_error(Rest).
 
-
 builtin_reduce(_Re, [], _KVs, Acc) ->
     {ok, lists:reverse(Acc)};
-builtin_reduce(Re, [<<"_sum",_/binary>>|BuiltinReds], KVs, Acc) ->
+builtin_reduce(Re, [<<"_sum", _/binary>> | BuiltinReds], KVs, Acc) ->
     Sum = builtin_sum_rows(KVs, 0),
     Red = check_sum_overflow(?term_size(KVs), ?term_size(Sum), Sum),
-    builtin_reduce(Re, BuiltinReds, KVs, [Red|Acc]);
-builtin_reduce(reduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
+    builtin_reduce(Re, BuiltinReds, KVs, [Red | Acc]);
+builtin_reduce(reduce, [<<"_count", _/binary>> | BuiltinReds], KVs, Acc) ->
     Count = length(KVs),
-    builtin_reduce(reduce, BuiltinReds, KVs, [Count|Acc]);
-builtin_reduce(rereduce, [<<"_count",_/binary>>|BuiltinReds], KVs, Acc) ->
+    builtin_reduce(reduce, BuiltinReds, KVs, [Count | Acc]);
+builtin_reduce(rereduce, [<<"_count", _/binary>> | BuiltinReds], KVs, Acc) ->
     Count = builtin_sum_rows(KVs, 0),
-    builtin_reduce(rereduce, BuiltinReds, KVs, [Count|Acc]);
-builtin_reduce(Re, [<<"_stats",_/binary>>|BuiltinReds], KVs, Acc) ->
+    builtin_reduce(rereduce, BuiltinReds, KVs, [Count | Acc]);
+builtin_reduce(Re, [<<"_stats", _/binary>> | BuiltinReds], KVs, Acc) ->
     Stats = builtin_stats(Re, KVs),
-    builtin_reduce(Re, BuiltinReds, KVs, [Stats|Acc]);
-builtin_reduce(Re, [<<"_approx_count_distinct",_/binary>>|BuiltinReds], KVs, Acc) ->
+    builtin_reduce(Re, BuiltinReds, KVs, [Stats | Acc]);
+builtin_reduce(Re, [<<"_approx_count_distinct", _/binary>> | BuiltinReds], KVs, Acc) ->
     Distinct = approx_count_distinct(Re, KVs),
-    builtin_reduce(Re, BuiltinReds, KVs, [Distinct|Acc]).
-
+    builtin_reduce(Re, BuiltinReds, KVs, [Distinct | Acc]).
 
 builtin_sum_rows([], Acc) ->
     Acc;
@@ -197,10 +208,12 @@ builtin_sum_rows([[_Key, Value] | RestKVs], Acc) ->
         throw:{builtin_reduce_error, Obj} ->
             Obj;
         throw:{invalid_value, Reason, Cause} ->
-            {[{<<"error">>, <<"builtin_reduce_error">>},
-                {<<"reason">>, Reason}, {<<"caused_by">>, Cause}]}
+            {[
+                {<<"error">>, <<"builtin_reduce_error">>},
+                {<<"reason">>, Reason},
+                {<<"caused_by">>, Cause}
+            ]}
     end.
-
 
 sum_values(Value, Acc) when is_number(Value), is_number(Acc) ->
     Acc + Value;
@@ -239,12 +252,12 @@ sum_objects(Rest, []) ->
 
 sum_arrays([], []) ->
     [];
-sum_arrays([_|_]=Xs, []) ->
+sum_arrays([_ | _] = Xs, []) ->
     Xs;
-sum_arrays([], [_|_]=Ys) ->
+sum_arrays([], [_ | _] = Ys) ->
     Ys;
-sum_arrays([X|Xs], [Y|Ys]) when is_number(X), is_number(Y) ->
-    [X+Y | sum_arrays(Xs,Ys)];
+sum_arrays([X | Xs], [Y | Ys]) when is_number(X), is_number(Y) ->
+    [X + Y | sum_arrays(Xs, Ys)];
 sum_arrays(Else, _) ->
     throw_sum_error(Else).
 
@@ -271,37 +284,42 @@ log_sum_overflow(InSize, OutSize) ->
         output_size => OutSize,
         details => "reduce output must shrink more rapidly"
     }),
-    Fmt = "Reduce output must shrink more rapidly: "
-            "input size: ~b "
-            "output size: ~b",
+    Fmt =
+        "Reduce output must shrink more rapidly: "
+        "input size: ~b "
+        "output size: ~b",
     Msg = iolist_to_binary(io_lib:format(Fmt, [InSize, OutSize])),
     couch_log:error(Msg, []),
     Msg.
 
 builtin_stats(_, []) ->
     {0, 0, 0, 0, 0};
-builtin_stats(_, [[_,First]|Rest]) ->
-    lists:foldl(fun([_Key, Value], Acc) ->
-        stat_values(Value, Acc)
-    end, build_initial_accumulator(First), Rest).
+builtin_stats(_, [[_, First] | Rest]) ->
+    lists:foldl(
+        fun([_Key, Value], Acc) ->
+            stat_values(Value, Acc)
+        end,
+        build_initial_accumulator(First),
+        Rest
+    ).
 
 stat_values(Value, Acc) when is_list(Value), is_list(Acc) ->
     lists:zipwith(fun stat_values/2, Value, Acc);
 stat_values({PreRed}, Acc) when is_list(PreRed) ->
     stat_values(unpack_stats({PreRed}), Acc);
 stat_values(Value, Acc) when is_number(Value) ->
-    stat_values({Value, 1, Value, Value, Value*Value}, Acc);
+    stat_values({Value, 1, Value, Value, Value * Value}, Acc);
 stat_values(Value, Acc) when is_number(Acc) ->
-    stat_values(Value, {Acc, 1, Acc, Acc, Acc*Acc});
+    stat_values(Value, {Acc, 1, Acc, Acc, Acc * Acc});
 stat_values(Value, Acc) when is_tuple(Value), is_tuple(Acc) ->
     {Sum0, Cnt0, Min0, Max0, Sqr0} = Value,
     {Sum1, Cnt1, Min1, Max1, Sqr1} = Acc,
     {
-      Sum0 + Sum1,
-      Cnt0 + Cnt1,
-      erlang:min(Min0, Min1),
-      erlang:max(Max0, Max1),
-      Sqr0 + Sqr1
+        Sum0 + Sum1,
+        Cnt0 + Cnt1,
+        erlang:min(Min0, Min1),
+        erlang:max(Max0, Max1),
+        Sqr0 + Sqr1
     };
 stat_values(Else, _Acc) ->
     throw_stat_error(Else).
@@ -309,7 +327,7 @@ stat_values(Else, _Acc) ->
 build_initial_accumulator(L) when is_list(L) ->
     [build_initial_accumulator(X) || X <- L];
 build_initial_accumulator(X) when is_number(X) ->
-    {X, 1, X, X, X*X};
+    {X, 1, X, X, X * X};
 build_initial_accumulator({_, _, _, _, _} = AlreadyUnpacked) ->
     AlreadyUnpacked;
 build_initial_accumulator({Props}) ->
@@ -320,16 +338,21 @@ build_initial_accumulator(Else) ->
 
 unpack_stats({PreRed}) when is_list(PreRed) ->
     {
-      get_number(<<"sum">>, PreRed),
-      get_number(<<"count">>, PreRed),
-      get_number(<<"min">>, PreRed),
-      get_number(<<"max">>, PreRed),
-      get_number(<<"sumsqr">>, PreRed)
+        get_number(<<"sum">>, PreRed),
+        get_number(<<"count">>, PreRed),
+        get_number(<<"min">>, PreRed),
+        get_number(<<"max">>, PreRed),
+        get_number(<<"sumsqr">>, PreRed)
     }.
 
-
 pack_stats({Sum, Cnt, Min, Max, Sqr}) ->
-    {[{<<"sum">>,Sum}, {<<"count">>,Cnt}, {<<"min">>,Min}, {<<"max">>,Max}, {<<"sumsqr">>,Sqr}]};
+    {[
+        {<<"sum">>, Sum},
+        {<<"count">>, Cnt},
+        {<<"min">>, Min},
+        {<<"max">>, Max},
+        {<<"sumsqr">>, Sqr}
+    ]};
 pack_stats({Packed}) ->
     % Legacy code path before we had the finalize operation
     {Packed};
@@ -338,35 +361,43 @@ pack_stats(Stats) when is_list(Stats) ->
 
 get_number(Key, Props) ->
     case couch_util:get_value(Key, Props) of
-    X when is_number(X) ->
-        X;
-    undefined when is_binary(Key) ->
-        get_number(binary_to_atom(Key, latin1), Props);
-    undefined ->
-        Msg = io_lib:format("user _stats input missing required field ~s (~p)",
-            [Key, Props]),
-        throw({invalid_value, iolist_to_binary(Msg)});
-    Else ->
-        Msg = io_lib:format("non-numeric _stats input received for ~s: ~w",
-            [Key, Else]),
-        throw({invalid_value, iolist_to_binary(Msg)})
+        X when is_number(X) ->
+            X;
+        undefined when is_binary(Key) ->
+            get_number(binary_to_atom(Key, latin1), Props);
+        undefined ->
+            Msg = io_lib:format(
+                "user _stats input missing required field ~s (~p)",
+                [Key, Props]
+            ),
+            throw({invalid_value, iolist_to_binary(Msg)});
+        Else ->
+            Msg = io_lib:format(
+                "non-numeric _stats input received for ~s: ~w",
+                [Key, Else]
+            ),
+            throw({invalid_value, iolist_to_binary(Msg)})
     end.
 
 % TODO allow customization of precision in the ddoc.
 approx_count_distinct(reduce, KVs) ->
-    lists:foldl(fun([[Key, _Id], _Value], Filter) ->
-        hyper:insert(term_to_binary(Key), Filter)
-    end, hyper:new(11), KVs);
+    lists:foldl(
+        fun([[Key, _Id], _Value], Filter) ->
+            hyper:insert(term_to_binary(Key), Filter)
+        end,
+        hyper:new(11),
+        KVs
+    );
 approx_count_distinct(rereduce, Reds) ->
     hyper:union([Filter || [_, Filter] <- Reds]).
 
 % use the function stored in ddoc.validate_doc_update to test an update.
 -spec validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) -> ok when
-    DDoc    :: ddoc(),
+    DDoc :: ddoc(),
     EditDoc :: doc(),
     DiskDoc :: doc() | nil,
-    Ctx     :: user_ctx(),
-    SecObj  :: sec_obj().
+    Ctx :: user_ctx(),
+    SecObj :: sec_obj().
 
 validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
     JsonEditDoc = couch_doc:to_json_obj(EditDoc, [revs]),
@@ -376,8 +407,9 @@ validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj) ->
         [<<"validate_doc_update">>],
         [JsonEditDoc, JsonDiskDoc, Ctx, SecObj]
     ),
-    if Resp == 1 -> ok; true ->
-        couch_stats:increment_counter([couchdb, query_server, vdu_rejects], 1)
+    if
+        Resp == 1 -> ok;
+        true -> couch_stats:increment_counter([couchdb, query_server, vdu_rejects], 1)
     end,
     case Resp of
         RespCode when RespCode =:= 1; RespCode =:= ok; RespCode =:= true ->
@@ -414,16 +446,20 @@ filter_view(DDoc, VName, Docs) ->
     {ok, Passes}.
 
 filter_docs(Req, Db, DDoc, FName, Docs) ->
-    JsonReq = case Req of
-        {json_req, JsonObj} ->
-            JsonObj;
-        #httpd{} = HttpReq ->
-            couch_httpd_external:json_req_obj(HttpReq, Db)
-    end,
+    JsonReq =
+        case Req of
+            {json_req, JsonObj} ->
+                JsonObj;
+            #httpd{} = HttpReq ->
+                couch_httpd_external:json_req_obj(HttpReq, Db)
+        end,
     Options = json_doc_options(),
     JsonDocs = [json_doc(Doc, Options) || Doc <- Docs],
-    [true, Passes] = ddoc_prompt(DDoc, [<<"filters">>, FName],
-        [JsonDocs, JsonReq]),
+    [true, Passes] = ddoc_prompt(
+        DDoc,
+        [<<"filters">>, FName],
+        [JsonDocs, JsonReq]
+    ),
     {ok, Passes}.
 
 ddoc_proc_prompt({Proc, DDocId}, FunPath, Args) ->
@@ -434,22 +470,23 @@ ddoc_prompt(DDoc, FunPath, Args) ->
         proc_prompt(Proc, [<<"ddoc">>, DDocId, FunPath, Args])
     end).
 
-with_ddoc_proc(#doc{id=DDocId,revs={Start, [DiskRev|_]}}=DDoc, Fun) ->
+with_ddoc_proc(#doc{id = DDocId, revs = {Start, [DiskRev | _]}} = DDoc, Fun) ->
     Rev = couch_doc:rev_to_str({Start, DiskRev}),
     DDocKey = {DDocId, Rev},
     Proc = get_ddoc_process(DDoc, DDocKey),
-    try Fun({Proc, DDocId})
+    try
+        Fun({Proc, DDocId})
     after
         ok = ret_os_process(Proc)
     end.
 
 proc_prompt(Proc, Args) ->
-     case proc_prompt_raw(Proc, Args) of
-     {json, Json} ->
-         ?JSON_DECODE(Json);
-     EJson ->
-         EJson
-     end.
+    case proc_prompt_raw(Proc, Args) of
+        {json, Json} ->
+            ?JSON_DECODE(Json);
+        EJson ->
+            EJson
+    end.
 
 proc_prompt_raw(#proc{prompt_fun = {Mod, Func}} = Proc, Args) ->
     apply(Mod, Func, [Proc#proc.pid, Args]).
@@ -472,34 +509,36 @@ get_os_process_timeout() ->
 
 get_ddoc_process(#doc{} = DDoc, DDocKey) ->
     % remove this case statement
-    case gen_server:call(couch_js_proc_manager, {get_proc, DDoc, DDocKey}, get_os_process_timeout()) of
-    {ok, Proc, {QueryConfig}} ->
-        % process knows the ddoc
-        case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
-        true ->
-            proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
-            Proc;
-        _ ->
-            catch proc_stop(Proc),
-            get_ddoc_process(DDoc, DDocKey)
-        end;
-    Error ->
-        throw(Error)
+    case
+        gen_server:call(couch_js_proc_manager, {get_proc, DDoc, DDocKey}, get_os_process_timeout())
+    of
+        {ok, Proc, {QueryConfig}} ->
+            % process knows the ddoc
+            case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
+                true ->
+                    proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
+                    Proc;
+                _ ->
+                    catch proc_stop(Proc),
+                    get_ddoc_process(DDoc, DDocKey)
+            end;
+        Error ->
+            throw(Error)
     end.
 
 get_os_process(Lang) ->
     case gen_server:call(couch_js_proc_manager, {get_proc, Lang}, get_os_process_timeout()) of
-    {ok, Proc, {QueryConfig}} ->
-        case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
-        true ->
-            proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
-            Proc;
-        _ ->
-            catch proc_stop(Proc),
-            get_os_process(Lang)
-        end;
-    Error ->
-        throw(Error)
+        {ok, Proc, {QueryConfig}} ->
+            case (catch proc_prompt(Proc, [<<"reset">>, {QueryConfig}])) of
+                true ->
+                    proc_set_timeout(Proc, couch_util:get_value(<<"timeout">>, QueryConfig)),
+                    Proc;
+                _ ->
+                    catch proc_stop(Proc),
+                    get_os_process(Lang)
+            end;
+        Error ->
+            throw(Error)
     end.
 
 ret_os_process(Proc) ->
@@ -513,7 +552,6 @@ throw_sum_error(Else) ->
 throw_stat_error(Else) ->
     throw({invalid_value, iolist_to_binary(io_lib:format(?STATERROR, [Else]))}).
 
-
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -525,19 +563,38 @@ builtin_sum_rows_negative_test() ->
     % it's only one document.
     ?assertEqual(A, builtin_sum_rows([["K", A]], [])),
     {Result} = builtin_sum_rows([["K", A]], [1, 2, 3]),
-    ?assertEqual({<<"error">>, <<"builtin_reduce_error">>},
-        lists:keyfind(<<"error">>, 1, Result)).
+    ?assertEqual(
+        {<<"error">>, <<"builtin_reduce_error">>},
+        lists:keyfind(<<"error">>, 1, Result)
+    ).
 
 sum_values_test() ->
     ?assertEqual(3, sum_values(1, 2)),
-    ?assertEqual([2,4,6], sum_values(1, [1,4,6])),
-    ?assertEqual([3,5,7], sum_values([3,2,4], [0,3,3])),
-    X = {[{<<"a">>,1}, {<<"b">>,[1,2]}, {<<"c">>, {[{<<"d">>,3}]}},
-            {<<"g">>,1}]},
-    Y = {[{<<"a">>,2}, {<<"b">>,3}, {<<"c">>, {[{<<"e">>, 5}]}},
-            {<<"f">>,1}, {<<"g">>,1}]},
-    Z = {[{<<"a">>,3}, {<<"b">>,[4,2]}, {<<"c">>, {[{<<"d">>,3},{<<"e">>,5}]}},
-            {<<"f">>,1}, {<<"g">>,2}]},
+    ?assertEqual([2, 4, 6], sum_values(1, [1, 4, 6])),
+    ?assertEqual([3, 5, 7], sum_values([3, 2, 4], [0, 3, 3])),
+    X =
+        {[
+            {<<"a">>, 1},
+            {<<"b">>, [1, 2]},
+            {<<"c">>, {[{<<"d">>, 3}]}},
+            {<<"g">>, 1}
+        ]},
+    Y =
+        {[
+            {<<"a">>, 2},
+            {<<"b">>, 3},
+            {<<"c">>, {[{<<"e">>, 5}]}},
+            {<<"f">>, 1},
+            {<<"g">>, 1}
+        ]},
+    Z =
+        {[
+            {<<"a">>, 3},
+            {<<"b">>, [4, 2]},
+            {<<"c">>, {[{<<"d">>, 3}, {<<"e">>, 5}]}},
+            {<<"f">>, 1},
+            {<<"g">>, 2}
+        ]},
     ?assertEqual(Z, sum_values(X, Y)),
     ?assertEqual(Z, sum_values(Y, X)).
 
@@ -546,8 +603,12 @@ sum_values_negative_test() ->
     A = [{[{<<"a">>, 1}]}, {[{<<"a">>, 2}]}, {[{<<"a">>, 3}]}],
     B = ["error 1", "error 2"],
     C = [<<"error 3">>, <<"error 4">>],
-    KV = {[{<<"error">>, <<"builtin_reduce_error">>},
-        {<<"reason">>, ?SUMERROR}, {<<"caused_by">>, <<"some cause">>}]},
+    KV =
+        {[
+            {<<"error">>, <<"builtin_reduce_error">>},
+            {<<"reason">>, ?SUMERROR},
+            {<<"caused_by">>, <<"some cause">>}
+        ]},
     ?assertThrow({invalid_value, _, _}, sum_values(A, [1, 2, 3])),
     ?assertThrow({invalid_value, _, _}, sum_values(A, 0)),
     ?assertThrow({invalid_value, _, _}, sum_values(B, [1, 2])),
@@ -557,48 +618,103 @@ sum_values_negative_test() ->
 stat_values_test() ->
     ?assertEqual({1, 2, 0, 1, 1}, stat_values(1, 0)),
     ?assertEqual({11, 2, 1, 10, 101}, stat_values(1, 10)),
-    ?assertEqual([{9, 2, 2, 7, 53},
-                  {14, 2, 3, 11, 130},
-                  {18, 2, 5, 13, 194}
-                 ], stat_values([2,3,5], [7,11,13])).
+    ?assertEqual(
+        [
+            {9, 2, 2, 7, 53},
+            {14, 2, 3, 11, 130},
+            {18, 2, 5, 13, 194}
+        ],
+        stat_values([2, 3, 5], [7, 11, 13])
+    ).
 
 reduce_stats_test() ->
-    ?assertEqual([
-        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
-    ], test_reduce(<<"_stats">>, [[[null, key], 2]])),
-
-    ?assertEqual([[
-        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
-        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
-    ]], test_reduce(<<"_stats">>, [[[null, key],[1,2]]])),
+    ?assertEqual(
+        [
+            {[{<<"sum">>, 2}, {<<"count">>, 1}, {<<"min">>, 2}, {<<"max">>, 2}, {<<"sumsqr">>, 4}]}
+        ],
+        test_reduce(<<"_stats">>, [[[null, key], 2]])
+    ),
 
     ?assertEqual(
-         {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
-    , element(2, finalize(<<"_stats">>, {2, 1, 2, 2, 4}))),
+        [
+            [
+                {[
+                    {<<"sum">>, 1},
+                    {<<"count">>, 1},
+                    {<<"min">>, 1},
+                    {<<"max">>, 1},
+                    {<<"sumsqr">>, 1}
+                ]},
+                {[
+                    {<<"sum">>, 2},
+                    {<<"count">>, 1},
+                    {<<"min">>, 2},
+                    {<<"max">>, 2},
+                    {<<"sumsqr">>, 4}
+                ]}
+            ]
+        ],
+        test_reduce(<<"_stats">>, [[[null, key], [1, 2]]])
+    ),
 
-    ?assertEqual([
-        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
-        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
-    ], element(2, finalize(<<"_stats">>, [
-        {1, 1, 1, 1, 1},
-        {2, 1, 2, 2, 4}
-    ]))),
+    ?assertEqual(
+        {[{<<"sum">>, 2}, {<<"count">>, 1}, {<<"min">>, 2}, {<<"max">>, 2}, {<<"sumsqr">>, 4}]},
+        element(2, finalize(<<"_stats">>, {2, 1, 2, 2, 4}))
+    ),
 
-    ?assertEqual([
-        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
-        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
-    ], element(2, finalize(<<"_stats">>, [
-        {1, 1, 1, 1, 1},
-        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
-    ]))),
+    ?assertEqual(
+        [
+            {[{<<"sum">>, 1}, {<<"count">>, 1}, {<<"min">>, 1}, {<<"max">>, 1}, {<<"sumsqr">>, 1}]},
+            {[{<<"sum">>, 2}, {<<"count">>, 1}, {<<"min">>, 2}, {<<"max">>, 2}, {<<"sumsqr">>, 4}]}
+        ],
+        element(
+            2,
+            finalize(<<"_stats">>, [
+                {1, 1, 1, 1, 1},
+                {2, 1, 2, 2, 4}
+            ])
+        )
+    ),
 
-    ?assertEqual([
-        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
-        {[{<<"sum">>,2},{<<"count">>,1},{<<"min">>,2},{<<"max">>,2},{<<"sumsqr">>,4}]}
-    ], element(2, finalize(<<"_stats">>, [
-        {[{<<"sum">>,1},{<<"count">>,1},{<<"min">>,1},{<<"max">>,1},{<<"sumsqr">>,1}]},
-        {2, 1, 2, 2, 4}
-    ]))),
+    ?assertEqual(
+        [
+            {[{<<"sum">>, 1}, {<<"count">>, 1}, {<<"min">>, 1}, {<<"max">>, 1}, {<<"sumsqr">>, 1}]},
+            {[{<<"sum">>, 2}, {<<"count">>, 1}, {<<"min">>, 2}, {<<"max">>, 2}, {<<"sumsqr">>, 4}]}
+        ],
+        element(
+            2,
+            finalize(<<"_stats">>, [
+                {1, 1, 1, 1, 1},
+                {[
+                    {<<"sum">>, 2},
+                    {<<"count">>, 1},
+                    {<<"min">>, 2},
+                    {<<"max">>, 2},
+                    {<<"sumsqr">>, 4}
+                ]}
+            ])
+        )
+    ),
+
+    ?assertEqual(
+        [
+            {[{<<"sum">>, 1}, {<<"count">>, 1}, {<<"min">>, 1}, {<<"max">>, 1}, {<<"sumsqr">>, 1}]},
+            {[{<<"sum">>, 2}, {<<"count">>, 1}, {<<"min">>, 2}, {<<"max">>, 2}, {<<"sumsqr">>, 4}]}
+        ],
+        element(
+            2,
+            finalize(<<"_stats">>, [
+                {[
+                    {<<"sum">>, 1},
+                    {<<"count">>, 1},
+                    {<<"min">>, 1},
+                    {<<"max">>, 1},
+                    {<<"sumsqr">>, 1}
+                ]},
+                {2, 1, 2, 2, 4}
+            ])
+        )
+    ),
     ok.
 
 test_reduce(Reducer, KVs) ->

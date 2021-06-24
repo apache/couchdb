@@ -26,7 +26,8 @@ start_link() ->
 
 init([]) ->
     {ok, {
-        {one_for_one, 5, 10}, [
+        {one_for_one, 5, 10},
+        [
             ?CHILD(couch_prometheus_server, worker)
         ] ++ maybe_start_prometheus_http()
     }}.

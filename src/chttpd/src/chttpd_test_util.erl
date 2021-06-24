@@ -16,7 +16,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
-
 start_couch() ->
     start_couch(?CONFIG_CHAIN).
 

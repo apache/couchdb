@@ -17,6 +17,7 @@
 include version.mk
 
 REBAR?=$(shell echo `pwd`/bin/rebar)
+ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
 
 # Handle the following scenarios:
 #   1. When building from a tarball, use version.mk.
@@ -160,6 +161,7 @@ endif
 .PHONY: check
 check:  all
 	@$(MAKE) emilio
+	@$(MAKE) erlfmt-check
 	@$(MAKE) eunit
 	@$(MAKE) elixir-suite
 	@$(MAKE) exunit
@@ -209,6 +211,12 @@ soak-eunit: couch
 emilio:
 	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3 || exit 0
 
+erlfmt-check:
+	ERLFMT_PATH=$(ERLFMT) python3 dev/format_check.py
+
+erlfmt-format:
+	ERLFMT_PATH=$(ERLFMT) python3 dev/format_all.py
+
 .venv/bin/black:
 	@python3 -m venv .venv
 	@.venv/bin/pip3 install black || touch .venv/bin/black
@@ -219,16 +227,16 @@ python-black: .venv/bin/black
 	       echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black --check \
-		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		build-aux/*.py dev/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
+		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/rebar/pr2relnotes.py|src/fauxton" \
+		build-aux/*.py dev/run dev/format_*.py src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 python-black-update: .venv/bin/black
 	@python3 -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
 	       echo "Python formatter not supported on Python < 3.6; check results on a newer platform"
 	@python3 -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		LC_ALL=C.UTF-8 LANG=C.UTF-8 .venv/bin/black \
-		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
-		build-aux/*.py dev/run src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
+		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/rebar/pr2relnotes.py|src/fauxton" \
+		build-aux/*.py dev/run dev/format_*.py src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
 .PHONY: elixir
 elixir: export MIX_ENV=integration

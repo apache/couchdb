@@ -30,7 +30,6 @@
     update_interval/1
 ]).
 
-
 -record(st, {
     reads = 0,
     writes = 0,
@@ -41,18 +40,23 @@
     request
 }).
 
-
 -define(KEY, chttpd_stats).
 -define(INTERVAL_IN_SEC, 60).
 
 init(Request) ->
     Reporter = config:get("chttpd", "stats_reporter"),
     Time = erlang:monotonic_time(second),
-    Interval = config:get_integer("chttpd", "stats_reporting_interval",
-        ?INTERVAL_IN_SEC),
-    put(?KEY, #st{reporter = Reporter, last_report_ts = Time,
-        interval = Interval, request = Request}).
-
+    Interval = config:get_integer(
+        "chttpd",
+        "stats_reporting_interval",
+        ?INTERVAL_IN_SEC
+    ),
+    put(?KEY, #st{
+        reporter = Reporter,
+        last_report_ts = Time,
+        interval = Interval,
+        request = Request
+    }).
 
 report(HttpResp) ->
     try
@@ -62,21 +66,20 @@ report(HttpResp) ->
             _ ->
                 ok
         end
-    catch T:R:S ->
-        ?LOG_ERROR(#{
-            what => stats_report_failure,
-            tag => T,
-            details => R,
-            stacktrace => S
-        }),
-        Fmt = "Failed to report chttpd request stats: ~p:~p ~p",
-        couch_log:error(Fmt, [T, R, S])
+    catch
+        T:R:S ->
+            ?LOG_ERROR(#{
+                what => stats_report_failure,
+                tag => T,
+                details => R,
+                stacktrace => S
+            }),
+            Fmt = "Failed to report chttpd request stats: ~p:~p ~p",
+            couch_log:error(Fmt, [T, R, S])
     end.
-
 
 report(_HttpResp, #st{reporter = undefined}) ->
     ok;
-
 report(HttpResp, #st{reporter = Reporter} = St) ->
     Mod = list_to_existing_atom(Reporter),
     #st{
@@ -87,30 +90,23 @@ report(HttpResp, #st{reporter = Reporter} = St) ->
     } = St,
     Mod:report(HttpReq, HttpResp, Reads, Writes, Rows).
 
-
 incr_reads() ->
     incr(#st.reads, 1).
-
 
 incr_reads(N) when is_integer(N), N >= 0 ->
     incr(#st.reads, N).
 
-
 incr_writes() ->
     incr(#st.writes, 1).
-
 
 incr_writes(N) when is_integer(N), N >= 0 ->
     incr(#st.writes, N).
 
-
 incr_rows() ->
     incr(#st.rows, 1).
 
-
 incr_rows(N) when is_integer(N), N >= 0 ->
     incr(#st.rows, N).
-
 
 incr(Idx, Count) ->
     case get(?KEY) of
@@ -122,7 +118,6 @@ incr(Idx, Count) ->
         _ ->
             ok
     end.
-
 
 maybe_report_intermittent(State) ->
     #st{last_report_ts = LastTime, interval = Interval} = State,
@@ -144,7 +139,6 @@ maybe_report_intermittent(State) ->
             ok
     end.
 
-
 update_interval(Interval) ->
     case get(?KEY) of
         #st{} = St ->
@@ -152,7 +146,6 @@ update_interval(Interval) ->
         _ ->
             ok
     end.
-
 
 reset_stats(State, NewTime) ->
     put(?KEY, State#st{

@@ -12,9 +12,7 @@
 
 -module(fabric2_index).
 
-
 -behaviour(gen_server).
-
 
 -export([
     register_index/1,
@@ -32,32 +30,26 @@
     code_change/3
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("kernel/include/logger.hrl").
 
-
 -callback build_indices(Db :: map(), DDocs :: list(#doc{})) ->
-    [{ok, JobId::binary()} | {error, any()}].
+    [{ok, JobId :: binary()} | {error, any()}].
 
 -callback cleanup_indices(Db :: map(), DDocs :: list(#doc{})) ->
     [ok | {error, any()}].
-
 
 -define(SHARDS, 32).
 -define(DEFAULT_DELAY_MSEC, 60000).
 -define(DEFAULT_RESOLUTION_MSEC, 10000).
 
-
 register_index(Mod) when is_atom(Mod) ->
     Indices = lists:usort([Mod | registrations()]),
     application:set_env(fabric, indices, Indices).
 
-
 db_updated(DbName) when is_binary(DbName) ->
     Table = table(erlang:phash2(DbName) rem ?SHARDS),
     ets:insert_new(Table, {DbName, now_msec()}).
-
 
 cleanup(Db) ->
     try
@@ -81,37 +73,32 @@ cleanup(Db) ->
             couch_log:error(LogMsg, [?MODULE, DbName, Tag, Reason, Stack])
     end.
 
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-
 init(_) ->
-    lists:foreach(fun(T) ->
-        spawn_link(fun() -> process_loop(T) end)
-    end, create_tables()),
+    lists:foreach(
+        fun(T) ->
+            spawn_link(fun() -> process_loop(T) end)
+        end,
+        create_tables()
+    ),
     {ok, nil}.
-
 
 terminate(_M, _St) ->
     ok.
 
-
 handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
-
 
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
 
-
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
-
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
-
 
 create_tables() ->
     Opts = [
@@ -123,10 +110,8 @@ create_tables() ->
     Tables = [table(N) || N <- lists:seq(0, ?SHARDS - 1)],
     [ets:new(T, Opts) || T <- Tables].
 
-
 table(Id) when is_integer(Id), Id >= 0 andalso Id < ?SHARDS ->
     list_to_atom("fabric2_index_" ++ integer_to_list(Id)).
-
 
 process_loop(Table) ->
     Now = now_msec(),
@@ -144,7 +129,6 @@ process_loop(Table) ->
     timer:sleep(Resolution + Jitter),
     process_loop(Table).
 
-
 clean_stale(Table, Since) ->
     Head = {'_', '$1'},
     Guard = {'<', '$1', Since},
@@ -152,7 +136,6 @@ clean_stale(Table, Since) ->
     % clean with `<` in case there was an update with the same timestamp after
     % we started processing already at that timestamp.
     ets:select_delete(Table, [{Head, [Guard], [true]}]).
-
 
 process_updates(Table, Since) ->
     Head = {'$1', '$2'},
@@ -162,13 +145,11 @@ process_updates(Table, Since) ->
         {Match, Cont} -> process_updates_iter(Match, Cont)
     end.
 
-
 process_updates_iter([], Cont) ->
     case ets:select(Cont) of
         '$end_of_table' -> ok;
         {Match, Cont1} -> process_updates_iter(Match, Cont1)
     end;
-
 process_updates_iter([Db | Rest], Cont) ->
     try
         process_db(Db)
@@ -188,7 +169,6 @@ process_updates_iter([Db | Rest], Cont) ->
     end,
     process_updates_iter(Rest, Cont).
 
-
 process_db(DbName) when is_binary(DbName) ->
     {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
     fabric2_fdb:transactional(Db, fun(TxDb) ->
@@ -202,53 +182,54 @@ process_db(DbName) when is_binary(DbName) ->
         end
     end).
 
-
 build_indices(_TxDb, []) ->
     [];
-
 build_indices(TxDb, DDocs) ->
-    lists:flatmap(fun(Mod) ->
-        Mod:build_indices(TxDb, DDocs)
-    end, registrations()).
-
+    lists:flatmap(
+        fun(Mod) ->
+            Mod:build_indices(TxDb, DDocs)
+        end,
+        registrations()
+    ).
 
 cleanup_indices(TxDb, DDocs) ->
-    lists:foreach(fun(Mod) ->
-        Mod:cleanup_indices(TxDb, DDocs)
-    end, registrations()).
-
+    lists:foreach(
+        fun(Mod) ->
+            Mod:cleanup_indices(TxDb, DDocs)
+        end,
+        registrations()
+    ).
 
 registrations() ->
     application:get_env(fabric, indices, []).
 
-
 should_update(#doc{body = {Props}}) ->
     couch_util:get_value(<<"autoupdate">>, Props, true).
-
 
 shuffle(Items) ->
     Tagged = [{rand:uniform(), I} || I <- Items],
     Sorted = lists:sort(Tagged),
     [I || {_T, I} <- Sorted].
 
-
 now_msec() ->
     erlang:monotonic_time(millisecond).
-
 
 is_enabled() ->
     config:get_boolean("fabric", "index_updater_enabled", true).
 
-
 delay_msec() ->
-    config:get_integer("fabric", "index_updater_delay_msec",
-        ?DEFAULT_DELAY_MSEC).
-
+    config:get_integer(
+        "fabric",
+        "index_updater_delay_msec",
+        ?DEFAULT_DELAY_MSEC
+    ).
 
 resolution_msec() ->
-    config:get_integer("fabric", "index_updater_resolution_msec",
-        ?DEFAULT_RESOLUTION_MSEC).
-
+    config:get_integer(
+        "fabric",
+        "index_updater_resolution_msec",
+        ?DEFAULT_RESOLUTION_MSEC
+    ).
 
 auto_cleanup() ->
     config:get_boolean("fabric", "index_updater_remove_old_indices", false).

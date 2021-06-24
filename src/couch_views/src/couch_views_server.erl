@@ -12,7 +12,6 @@
 
 -module(couch_views_server).
 
-
 -behaviour(gen_server).
 
 -include_lib("kernel/include/logger.hrl").
@@ -38,14 +37,11 @@
 -define(MAX_ACCEPTORS, 5).
 -define(MAX_WORKERS, 100).
 
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-
 accepted(Worker) when is_pid(Worker) ->
     gen_server:call(?MODULE, {accepted, Worker}, infinity).
-
 
 init(_) ->
     process_flag(trap_exit, true),
@@ -58,10 +54,8 @@ init(_) ->
     },
     {ok, spawn_acceptors(St)}.
 
-
 terminate(_, _St) ->
     ok.
-
 
 handle_call({accepted, Pid}, _From, St) ->
     #{
@@ -81,14 +75,11 @@ handle_call({accepted, Pid}, _From, St) ->
             couch_log:error(LogMsg, [?MODULE, Pid]),
             {stop, {unknown_acceptor_pid, Pid}, St}
     end;
-
 handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
 
-
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
-
 
 handle_info({'EXIT', Pid, Reason}, St) ->
     #{
@@ -102,14 +93,11 @@ handle_info({'EXIT', Pid, Reason}, St) ->
         {false, true} -> handle_worker_exit(St, Pid, Reason);
         {false, false} -> handle_unknown_exit(St, Pid, Reason)
     end;
-
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
-
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
-
 
 format_status(_Opt, [_PDict, State]) ->
     #{
@@ -120,10 +108,7 @@ format_status(_Opt, [_PDict, State]) ->
         workers => {map_size, maps:size(Workers)},
         acceptors => {map_size, maps:size(Acceptors)}
     },
-    [{data, [{"State",
-        Scrubbed
-    }]}].
-
+    [{data, [{"State", Scrubbed}]}].
 
 % Worker process exit handlers
 
@@ -134,11 +119,9 @@ handle_acceptor_exit(#{acceptors := Acceptors} = St, Pid, Reason) ->
     couch_log:error(LogMsg, [?MODULE, Pid, Reason]),
     {noreply, spawn_acceptors(St1)}.
 
-
 handle_worker_exit(#{workers := Workers} = St, Pid, normal) ->
     St1 = St#{workers := maps:remove(Pid, Workers)},
     {noreply, spawn_acceptors(St1)};
-
 handle_worker_exit(#{workers := Workers} = St, Pid, Reason) ->
     St1 = St#{workers := maps:remove(Pid, Workers)},
     ?LOG_ERROR(#{what => indexer_crash, pid => Pid, reason => Reason}),
@@ -146,13 +129,11 @@ handle_worker_exit(#{workers := Workers} = St, Pid, Reason) ->
     couch_log:error(LogMsg, [?MODULE, Pid, Reason]),
     {noreply, spawn_acceptors(St1)}.
 
-
 handle_unknown_exit(St, Pid, Reason) ->
     ?LOG_ERROR(#{what => unknown_process_crash, pid => Pid, reason => Reason}),
     LogMsg = "~p : unknown process ~p exited with ~p",
     couch_log:error(LogMsg, [?MODULE, Pid, Reason]),
     {stop, {unknown_pid_exit, Pid}, St}.
-
 
 spawn_acceptors(St) ->
     #{
@@ -172,10 +153,8 @@ spawn_acceptors(St) ->
             St
     end.
 
-
 max_acceptors() ->
     config:get_integer("couch_views", "max_acceptors", ?MAX_ACCEPTORS).
-
 
 max_workers() ->
     config:get_integer("couch_views", "max_workers", ?MAX_WORKERS).

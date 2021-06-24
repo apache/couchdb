@@ -127,6 +127,20 @@ ignore their build and avoid any issues with their dependencies.
 
 See ``./configure --help`` for more information.
 
+Developing
+----------
+
+Formatting
+~~~~~~~~~~
+
+The ``erl`` files in ``src`` are formatted using erlfmt_. The checks are run
+for every PR in the CI. To run the checks locally, run ``make erlfmt-check``.
+To format the ``erl`` files in ``src``, run ``make erlfmt-format``.
+To use ``erlfmt`` for specific files only, use the executable ``bin/erlfmt``
+that is installed by ``configure``.
+
+.. _erlfmt: https://github.com/WhatsApp/erlfmt
+
 Testing
 -------
 

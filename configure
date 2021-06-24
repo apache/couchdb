@@ -53,6 +53,8 @@ Options:
   --spidermonkey-version VSN  specify the version of SpiderMonkey to use (defaults to $SM_VSN)
   --skip-deps                 do not update erlang dependencies
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
+  --rebar3=PATH               use rebar3 by specified path
+  --erlfmt=PATH               use erlfmt by specified path
 EOF
 }
 
@@ -131,6 +133,28 @@ parse_opts() {
                     continue
                 else
                     printf 'ERROR: "--rebar" requires valid path to executable.\n' >&2
+                    exit 1
+                fi
+                ;;
+
+            --rebar3)
+                if [ -x "$2" ]; then
+                    eval REBAR3=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--rebar3" requires valid path to executable.\n' >&2
+                    exit 1
+                fi
+                ;;
+
+            --erlfmt)
+                if [ -x "$2" ]; then
+                    eval ERLFMT=$2
+                    shift 2
+                    continue
+                else
+                    printf 'ERROR: "--erlfmt" requires valid path to executable.\n' >&2
                     exit 1
                 fi
                 ;;
@@ -265,6 +289,31 @@ install_local_rebar() {
     fi
 }
 
+install_local_rebar3() {
+    if [ ! -x "${rootdir}/bin/rebar3" ]; then
+        if [ ! -d "${rootdir}/src/rebar3" ]; then
+            git clone --depth 1 https://github.com/erlang/rebar3.git ${rootdir}/src/rebar3
+        fi
+        cd src/rebar3
+        ./bootstrap
+        mv ${rootdir}/src/rebar3/rebar3 ${rootdir}/bin/rebar3
+        cd ../..
+    fi
+}
+
+install_local_erlfmt() {
+    if [ ! -x "${rootdir}/bin/erlfmt" ]; then
+        if [ ! -d "${rootdir}/src/erlfmt" ]; then
+            git clone --depth 1 https://github.com/WhatsApp/erlfmt.git ${rootdir}/src/erlfmt
+        fi
+        cd "${rootdir}"/src/erlfmt
+        ${REBAR3} as release escriptize
+        mv ${rootdir}/src/erlfmt/_build/release/bin/erlfmt ${rootdir}/bin/erlfmt
+        ${REBAR3} clean
+        cd ../..
+    fi
+}
+
 install_local_emilio() {
     if [ ! -x "${rootdir}/bin/emilio" ]; then
         if [ ! -d "${rootdir}/src/emilio" ]; then
@@ -280,6 +329,16 @@ install_local_emilio() {
 if [ -z "${REBAR}" ]; then
     install_local_rebar
     REBAR=${rootdir}/bin/rebar
+fi
+
+if [ -z "${REBAR3}" ]; then
+    install_local_rebar3
+    REBAR3=${rootdir}/bin/rebar3
+fi
+
+if [ -z "${ERLFMT}" ]; then
+    install_local_erlfmt
+    ERLFMT=${rootdir}/bin/erlfmt
 fi
 
 install_local_emilio

@@ -12,7 +12,6 @@
 
 -module(chttpd_util).
 
-
 -export([
     parse_copy_destination_header/1,
     get_chttpd_config/1,
@@ -25,62 +24,68 @@
     get_chttpd_auth_config_boolean/2
 ]).
 
-
 parse_copy_destination_header(Req) ->
     case couch_httpd:header_value(Req, "Destination") of
-    undefined ->
-        throw({bad_request, "Destination header is mandatory for COPY."});
-    Destination ->
-        case re:run(Destination, "^https?://", [{capture, none}]) of
-        match ->
-            throw({bad_request, "Destination URL must be relative."});
-        nomatch ->
-            % see if ?rev=revid got appended to the Destination header
-            case re:run(Destination, "\\?", [{capture, none}]) of
-            nomatch ->
-                {list_to_binary(Destination), {0, []}};
-            match ->
-                [DocId, RevQs] = re:split(Destination, "\\?", [{return, list}]),
-                [_RevQueryKey, Rev] = re:split(RevQs, "=", [{return, list}]),
-                {Pos, RevId} = couch_doc:parse_rev(Rev),
-                {list_to_binary(DocId), {Pos, [RevId]}}
+        undefined ->
+            throw({bad_request, "Destination header is mandatory for COPY."});
+        Destination ->
+            case re:run(Destination, "^https?://", [{capture, none}]) of
+                match ->
+                    throw({bad_request, "Destination URL must be relative."});
+                nomatch ->
+                    % see if ?rev=revid got appended to the Destination header
+                    case re:run(Destination, "\\?", [{capture, none}]) of
+                        nomatch ->
+                            {list_to_binary(Destination), {0, []}};
+                        match ->
+                            [DocId, RevQs] = re:split(Destination, "\\?", [{return, list}]),
+                            [_RevQueryKey, Rev] = re:split(RevQs, "=", [{return, list}]),
+                            {Pos, RevId} = couch_doc:parse_rev(Rev),
+                            {list_to_binary(DocId), {Pos, [RevId]}}
+                    end
             end
-        end
     end.
-
 
 get_chttpd_config(Key) ->
     config:get("chttpd", Key, config:get("httpd", Key)).
 
-
 get_chttpd_config(Key, Default) ->
     config:get("chttpd", Key, config:get("httpd", Key, Default)).
 
-
 get_chttpd_config_integer(Key, Default) ->
-    config:get_integer("chttpd", Key,
-        config:get_integer("httpd", Key, Default)).
-
+    config:get_integer(
+        "chttpd",
+        Key,
+        config:get_integer("httpd", Key, Default)
+    ).
 
 get_chttpd_config_boolean(Key, Default) ->
-    config:get_boolean("chttpd", Key,
-        config:get_boolean("httpd", Key, Default)).
-
+    config:get_boolean(
+        "chttpd",
+        Key,
+        config:get_boolean("httpd", Key, Default)
+    ).
 
 get_chttpd_auth_config(Key) ->
     config:get("chttpd_auth", Key, config:get("couch_httpd_auth", Key)).
 
-
 get_chttpd_auth_config(Key, Default) ->
-    config:get("chttpd_auth", Key,
-        config:get("couch_httpd_auth", Key, Default)).
-
+    config:get(
+        "chttpd_auth",
+        Key,
+        config:get("couch_httpd_auth", Key, Default)
+    ).
 
 get_chttpd_auth_config_integer(Key, Default) ->
-    config:get_integer("chttpd_auth", Key,
-        config:get_integer("couch_httpd_auth", Key, Default)).
-
+    config:get_integer(
+        "chttpd_auth",
+        Key,
+        config:get_integer("couch_httpd_auth", Key, Default)
+    ).
 
 get_chttpd_auth_config_boolean(Key, Default) ->
-    config:get_boolean("chttpd_auth", Key,
-        config:get_boolean("couch_httpd_auth", Key, Default)).
+    config:get_boolean(
+        "chttpd_auth",
+        Key,
+        config:get_boolean("couch_httpd_auth", Key, Default)
+    ).
