@@ -18,7 +18,6 @@
 -export([is_deleted/1, rotate_list/2]).
 -export([get_shard_opts/1, get_engine_opt/1, get_props_opt/1]).
 -export([get_shard_props/1, find_dirty_shards/0]).
--export([add_db_config_options/2]).
 -export([
     iso8601_timestamp/0,
     live_nodes/0,
@@ -521,15 +520,19 @@ add_db_config_options(DbName, Options) ->
     merge_opts(DbOpts, Options).
 
 
-get_or_create_db(DbName, Options) ->
-    case couch_db:open_int(DbName, Options) of
+get_or_create_db(DbName, Options0) ->
+    Options = case proplists:get_value(user_ctx, Options0, undefined) of
+        undefined -> [?ADMIN_CTX | Options0];
+        _         -> Options0
+    end,
+    case couch_db:open(DbName, Options) of
         {ok, _} = OkDb ->
             OkDb;
         {not_found, no_db_file} ->
             try
                 Options1 = [{create_if_missing, true} | Options],
                 Options2 = add_db_config_options(DbName, Options1),
-                couch_db:open_int(DbName, Options2)
+                couch_db:open(DbName, Options2)
             catch error:database_does_not_exist ->
                 throw({error, missing_target})
             end;
