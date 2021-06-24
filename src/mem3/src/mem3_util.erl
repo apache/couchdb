@@ -101,6 +101,10 @@ write_db_doc(DbName, #doc{id=Id, body=Body} = Doc, ShouldMutate) ->
     {ok, #doc{body = Body}} ->
         % the doc is already in the desired state, we're done here
         ok;
+    {ok, #doc{body = Body1}} ->
+        % the doc has a new body to be written
+        {ok, _} = couch_db:update_doc(Db, Doc#doc{body=Body1}, []),
+        ok;
     {not_found, _} when ShouldMutate ->
         try couch_db:update_doc(Db, Doc, []) of
         {ok, _} ->
