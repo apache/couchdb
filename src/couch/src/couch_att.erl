@@ -55,34 +55,30 @@
 -compile(nowarn_deprecated_type).
 -export_type([att/0]).
 
-
 -include_lib("couch/include/couch_db.hrl").
-
 
 -define(CURRENT_ATT_FORMAT, 0).
 -define(DEFAULT_COMPRESSIBLE_TYPES,
-    "text/*, application/javascript, application/json, application/xml").
-
+    "text/*, application/javascript, application/json, application/xml"
+).
 
 -type prop_name() ::
-    name |
-    type |
-    att_len |
-    disk_len |
-    md5 |
-    revpos |
-    data |
-    encoding.
-
+    name
+    | type
+    | att_len
+    | disk_len
+    | md5
+    | revpos
+    | data
+    | encoding.
 
 -type data_prop_type() ::
-    {loc, #{}, binary(), binary()} |
-    stub |
-    follows |
-    binary() |
-    {follows, pid(), reference()} |
-    fun(() -> binary()).
-
+    {loc, #{}, binary(), binary()}
+    | stub
+    | follows
+    | binary()
+    | {follows, pid(), reference()}
+    | fun(() -> binary()).
 
 -type att() :: #{
     name := binary(),
@@ -94,7 +90,6 @@
     data := data_prop_type(),
     encoding := identity | gzip | undefined
 }.
-
 
 new() ->
     #{
@@ -108,39 +103,37 @@ new() ->
         encoding => undefined
     }.
 
-
 -spec new([{prop_name(), any()}]) -> att().
 new(Props) ->
     store(Props, new()).
 
-
--spec fetch([atom()], att()) -> [any()];
-           (atom(), att()) -> any().
+-spec fetch
+    ([atom()], att()) -> [any()];
+    (atom(), att()) -> any().
 fetch(Fields, Att) when is_list(Fields) ->
     [fetch(Field, Att) || Field <- Fields];
 fetch(Field, Att) ->
     maps:get(Field, Att).
 
-
 -spec store([{atom(), any()}], att()) -> att().
 store(Props, Att0) ->
-    lists:foldl(fun({Field, Value}, Att) ->
-        maps:update(Field, Value, Att)
-    end, Att0, Props).
-
+    lists:foldl(
+        fun({Field, Value}, Att) ->
+            maps:update(Field, Value, Att)
+        end,
+        Att0,
+        Props
+    ).
 
 store(Field, Value, Att) ->
     maps:update(Field, Value, Att).
-
 
 -spec transform(atom(), fun(), att()) -> att().
 transform(Field, Fun, Att) ->
     maps:update_with(Field, Fun, Att).
 
-
 is_stub(#{data := stub}) -> true;
 is_stub(#{}) -> false.
-
 
 %% merge_stubs takes all stub attachments and replaces them with on disk
 %% attachments. It will return {missing, Name} if a stub isn't matched with
@@ -151,7 +144,6 @@ merge_stubs(MemAtts, DiskAtts) ->
         [{fetch(name, Att), Att} || Att <- DiskAtts]
     ),
     merge_stubs(MemAtts, OnDisk, []).
-
 
 -spec merge_stubs([att()], dict:dict(), [att()]) -> [att()].
 merge_stubs([Att | Rest], OnDisk, Merged) ->
@@ -180,30 +172,32 @@ merge_stubs([Att | Rest], OnDisk, Merged) ->
 merge_stubs([], _, Merged) ->
     {ok, lists:reverse(Merged)}.
 
-
 external_size(Att) ->
     NameSize = size(fetch(name, Att)),
-    TypeSize = case fetch(type, Att) of
-        undefined -> 0;
-        Type -> size(Type)
-    end,
+    TypeSize =
+        case fetch(type, Att) of
+            undefined -> 0;
+            Type -> size(Type)
+        end,
     AttSize = fetch(att_len, Att),
-    Md5Size = case fetch(md5, Att) of
-        undefined -> 0;
-        Md5 -> size(Md5)
-    end,
+    Md5Size =
+        case fetch(md5, Att) of
+            undefined -> 0;
+            Md5 -> size(Md5)
+        end,
     NameSize + TypeSize + AttSize + Md5Size.
-
 
 size_info([]) ->
     {ok, []};
 size_info(Atts) ->
-    Info = lists:map(fun(Att) ->
-        [{loc, _Db, _DocId, AttId}, AttLen] = fetch([data, att_len], Att),
-        {AttId, AttLen}
-    end, Atts),
+    Info = lists:map(
+        fun(Att) ->
+            [{loc, _Db, _DocId, AttId}, AttLen] = fetch([data, att_len], Att),
+            {AttId, AttLen}
+        end,
+        Atts
+    ),
     {ok, lists:usort(Info)}.
-
 
 %% When converting an attachment to disk term format, attempt to stay with the
 %% old format when possible. This should help make the attachment lazy upgrade
@@ -221,7 +215,6 @@ to_disk_term(Att) ->
         fetch(md5, Att),
         fetch(encoding, Att)
     }}.
-
 
 from_disk_term(#{} = Db, DocId, {?CURRENT_ATT_FORMAT, Props}) ->
     {
@@ -245,7 +238,6 @@ from_disk_term(#{} = Db, DocId, {?CURRENT_ATT_FORMAT, Props}) ->
         {encoding, Encoding}
     ]).
 
-
 %% from_json reads in embedded JSON attachments and creates usable attachment
 %% values. The attachment may be a stub,
 from_json(Name, Props) ->
@@ -261,7 +253,6 @@ from_json(Name, Props) ->
         true -> inline_from_json(Att, Props)
     end.
 
-
 stub_from_json(Att, Props) ->
     {DiskLen, EncodedLen, Encoding} = encoded_lengths_from_json(Props),
     Digest = digest_from_json(Props),
@@ -269,29 +260,33 @@ stub_from_json(Att, Props) ->
     %% the revpos consistency check on stubs when it's not provided in the
     %% json object. See merge_stubs/3 for the stub check.
     RevPos = couch_util:get_value(<<"revpos">>, Props),
-    store([
-        {data, stub},
-        {disk_len, DiskLen},
-        {att_len, EncodedLen},
-        {revpos, RevPos},
-        {md5, Digest},
-        {encoding, Encoding}
-    ], Att).
-
+    store(
+        [
+            {data, stub},
+            {disk_len, DiskLen},
+            {att_len, EncodedLen},
+            {revpos, RevPos},
+            {md5, Digest},
+            {encoding, Encoding}
+        ],
+        Att
+    ).
 
 follow_from_json(Att, Props) ->
     {DiskLen, EncodedLen, Encoding} = encoded_lengths_from_json(Props),
     Digest = digest_from_json(Props),
     RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
-    store([
-        {data, follows},
-        {disk_len, DiskLen},
-        {att_len, EncodedLen},
-        {revpos, RevPos},
-        {md5, Digest},
-        {encoding, Encoding}
-    ], Att).
-
+    store(
+        [
+            {data, follows},
+            {disk_len, DiskLen},
+            {att_len, EncodedLen},
+            {revpos, RevPos},
+            {md5, Digest},
+            {encoding, Encoding}
+        ],
+        Att
+    ).
 
 inline_from_json(Att, Props) ->
     B64Data = couch_util:get_value(<<"data">>, Props),
@@ -299,19 +294,21 @@ inline_from_json(Att, Props) ->
         Data ->
             Length = size(Data),
             RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
-            store([
-                {data, Data},
-                {disk_len, Length},
-                {att_len, Length},
-                {revpos, RevPos}
-            ], Att)
+            store(
+                [
+                    {data, Data},
+                    {disk_len, Length},
+                    {att_len, Length},
+                    {revpos, RevPos}
+                ],
+                Att
+            )
     catch
         _:_ ->
             Name = fetch(name, Att),
-            ErrMsg =  <<"Invalid attachment data for ", Name/binary>>,
+            ErrMsg = <<"Invalid attachment data for ", Name/binary>>,
             throw({bad_request, ErrMsg})
     end.
-
 
 encoded_lengths_from_json(Props) ->
     Len = couch_util:get_value(<<"length">>, Props),
@@ -325,16 +322,15 @@ encoded_lengths_from_json(Props) ->
     end,
     {Len, EncodedLen, Encoding}.
 
-
 digest_from_json(Props) ->
     case couch_util:get_value(<<"digest">>, Props) of
         <<"md5-", EncodedMd5/binary>> -> base64:decode(EncodedMd5);
         _ -> <<>>
     end.
 
-
-to_json(#{md5 := Md5} = Att, OutputData, DataToFollow, ShowEncoding)
-        when is_binary(Md5) ->
+to_json(#{md5 := Md5} = Att, OutputData, DataToFollow, ShowEncoding) when
+    is_binary(Md5)
+->
     #{
         name := Name,
         type := Type,
@@ -348,36 +344,38 @@ to_json(#{md5 := Md5} = Att, OutputData, DataToFollow, ShowEncoding)
         {<<"content_type">>, Type},
         {<<"revpos">>, RevPos}
     ],
-    DigestProp = case base64:encode(Md5) of
-        <<>> -> [];
-        Digest -> [{<<"digest">>, <<"md5-", Digest/binary>>}]
-    end,
-    DataProps = if
-        not OutputData orelse Data == stub ->
-            [{<<"length">>, DiskLen}, {<<"stub">>, true}];
-        DataToFollow ->
-            [{<<"length">>, DiskLen}, {<<"follows">>, true}];
-        true ->
-            AttData = case Encoding of
-                gzip -> zlib:gunzip(to_binary(Att));
-                identity -> to_binary(Att)
-            end,
-            [{<<"data">>, base64:encode(AttData)}]
-    end,
-    EncodingProps = if
-        ShowEncoding andalso Encoding /= identity ->
-            [
-                {<<"encoding">>, couch_util:to_binary(Encoding)},
-                {<<"encoded_length">>, AttLen}
-            ];
-        true ->
-            []
-    end,
+    DigestProp =
+        case base64:encode(Md5) of
+            <<>> -> [];
+            Digest -> [{<<"digest">>, <<"md5-", Digest/binary>>}]
+        end,
+    DataProps =
+        if
+            not OutputData orelse Data == stub ->
+                [{<<"length">>, DiskLen}, {<<"stub">>, true}];
+            DataToFollow ->
+                [{<<"length">>, DiskLen}, {<<"follows">>, true}];
+            true ->
+                AttData =
+                    case Encoding of
+                        gzip -> zlib:gunzip(to_binary(Att));
+                        identity -> to_binary(Att)
+                    end,
+                [{<<"data">>, base64:encode(AttData)}]
+        end,
+    EncodingProps =
+        if
+            ShowEncoding andalso Encoding /= identity ->
+                [
+                    {<<"encoding">>, couch_util:to_binary(Encoding)},
+                    {<<"encoded_length">>, AttLen}
+                ];
+            true ->
+                []
+        end,
     {Name, {Props ++ DigestProp ++ DataProps ++ EncodingProps}};
-
 to_json(#{md5 := undefined} = Att, OutputData, DataToFollow, ShowEncoding) ->
     to_json(Att#{md5 => <<>>}, OutputData, DataToFollow, ShowEncoding).
-
 
 flush(Db, DocId, Att1) ->
     Data0 = fetch(data, Att1),
@@ -401,21 +399,23 @@ flush(Db, DocId, Att1) ->
 
     % If we were sent a gzip'ed attachment with no
     % length data, we have to set it here.
-    Att3 = case DiskLen of
-        undefined when AttLen /= undefined ->
-            store(disk_len, AttLen, Att2);
-        undefined when is_binary(Data) ->
-            store(disk_len, size(Data), Att2);
-        _ ->
-            Att2
-    end,
+    Att3 =
+        case DiskLen of
+            undefined when AttLen /= undefined ->
+                store(disk_len, AttLen, Att2);
+            undefined when is_binary(Data) ->
+                store(disk_len, size(Data), Att2);
+            _ ->
+                Att2
+        end,
 
     % If no encoding has been set, default to
     % identity
-    Att4 = case Encoding of
-        undefined -> store(encoding, identity, Att3);
-        _ -> Att3
-    end,
+    Att4 =
+        case Encoding of
+            undefined -> store(encoding, identity, Att3);
+            _ -> Att3
+        end,
 
     case Data of
         {loc, _, _, _} ->
@@ -423,24 +423,22 @@ flush(Db, DocId, Att1) ->
             Att1;
         _ when is_binary(Data) ->
             DataMd5 = couch_hash:md5_hash(Data),
-            if ReqMd5 == undefined -> ok; true ->
-                couch_util:check_md5(DataMd5, ReqMd5)
+            if
+                ReqMd5 == undefined -> ok;
+                true -> couch_util:check_md5(DataMd5, ReqMd5)
             end,
             Att5 = store(md5, DataMd5, Att4),
             Att6 = maybe_compress(Att5),
             fabric2_db:write_attachment(Db, DocId, Att6)
     end.
 
-
 read_data(Att) ->
     Data = fetch(data, Att),
     read_data(Data, Att).
 
-
 read_data({loc, #{}, _DocId, _AttId}, Att) ->
     % Attachment already written to fdb
     Att;
-
 read_data({follows, Parser, Ref}, Att) ->
     ParserRef = erlang:monitor(process, Parser),
     Fun = fun() ->
@@ -459,13 +457,11 @@ read_data({follows, Parser, Ref}, Att) ->
     after
         erlang:demonitor(ParserRef, [flush])
     end;
-
 read_data(Data, Att) when is_binary(Data) ->
     case fetch(att_len, Att) of
         undefined -> store(att_len, size(Data), Att);
-        Int when is_integer(Int) ->  Att
+        Int when is_integer(Int) -> Att
     end;
-
 read_data(Fun, Att) when is_function(Fun) ->
     [AttName, AttLen, InMd5] = fetch([name, att_len, md5], Att),
     MaxAttSize = max_attachment_size(),
@@ -476,17 +472,20 @@ read_data(Fun, Att) when is_function(Fun) ->
             WriterFun = fun
                 ({0, Footers}, {Len, Acc}) ->
                     F = mochiweb_headers:from_binary(Footers),
-                    Md5 = case mochiweb_headers:get_value("Content-MD5", F) of
-                        undefined -> undefined;
-                        Value -> base64:decode(Value)
-                    end,
+                    Md5 =
+                        case mochiweb_headers:get_value("Content-MD5", F) of
+                            undefined -> undefined;
+                            Value -> base64:decode(Value)
+                        end,
                     Props0 = [
                         {data, iolist_to_binary(lists:reverse(Acc))},
                         {att_len, Len}
                     ],
-                    Props1 = if InMd5 /= md5_in_footer -> Props0; true ->
-                        [{md5, Md5} | Props0]
-                    end,
+                    Props1 =
+                        if
+                            InMd5 /= md5_in_footer -> Props0;
+                            true -> [{md5, Md5} | Props0]
+                        end,
                     store(Props1, Att);
                 ({ChunkLen, Chunk}, {Len, Acc}) ->
                     NewLen = Len + ChunkLen,
@@ -499,50 +498,44 @@ read_data(Fun, Att) when is_function(Fun) ->
             read_streamed_attachment(Att, Fun, AttLen, [])
     end.
 
-
 read_streamed_attachment(Att, _F, 0, Acc) ->
     Bin = iolist_to_binary(lists:reverse(Acc)),
-    store([
-        {data, Bin},
-        {att_len, size(Bin)}
-    ], Att);
-
+    store(
+        [
+            {data, Bin},
+            {att_len, size(Bin)}
+        ],
+        Att
+    );
 read_streamed_attachment(_Att, _F, LenLeft, _Acc) when LenLeft < 0 ->
     throw({bad_request, <<"attachment longer than expected">>});
-
 read_streamed_attachment(Att, F, LenLeft, Acc) when LenLeft > 0 ->
-    Bin = try
-        read_next_chunk(F, LenLeft)
-    catch
-        {mp_parser_died, normal} ->
-            throw({bad_request, <<"attachment shorter than expected">>})
-    end,
+    Bin =
+        try
+            read_next_chunk(F, LenLeft)
+        catch
+            {mp_parser_died, normal} ->
+                throw({bad_request, <<"attachment shorter than expected">>})
+        end,
     Size = iolist_size(Bin),
     read_streamed_attachment(Att, F, LenLeft - Size, [Bin | Acc]).
 
-
 read_next_chunk(F, _) when is_function(F, 0) ->
     F();
-
 read_next_chunk(F, LenLeft) when is_function(F, 1) ->
     F(lists:min([LenLeft, 16#2000])).
-
 
 foldl(Att, Fun, Acc) ->
     foldl(fetch(data, Att), Att, Fun, Acc).
 
-
 foldl({loc, Db, DocId, AttId}, _Att, Fun, Acc) ->
     Bin = fabric2_db:read_attachment(Db#{tx := undefined}, DocId, AttId),
     Fun(Bin, Acc);
-
 foldl(Bin, _Att, Fun, Acc) when is_binary(Bin) ->
     Fun(Bin, Acc);
-
 foldl(DataFun, Att, Fun, Acc) when is_function(DataFun) ->
     Len = fetch(att_len, Att),
     fold_streamed_data(DataFun, Len, Fun, Acc);
-
 foldl({follows, Parser, Ref}, Att, Fun, Acc) ->
     ParserRef = erlang:monitor(process, Parser),
     DataFun = fun() ->
@@ -562,24 +555,23 @@ foldl({follows, Parser, Ref}, Att, Fun, Acc) ->
         erlang:demonitor(ParserRef, [flush])
     end.
 
-
 range_foldl(Bin1, From, To, Fun, Acc) when is_binary(Bin1) ->
     ReadLen = To - From,
-    Bin2 = case Bin1 of
-        _ when size(Bin1) < From -> <<>>;
-        <<_:From/binary, B2/binary>> -> B2
-    end,
-    Bin3 = case Bin2 of
-        _ when size(Bin2) < ReadLen -> Bin2;
-        <<B3:ReadLen/binary, _/binary>> -> B3
-    end,
+    Bin2 =
+        case Bin1 of
+            _ when size(Bin1) < From -> <<>>;
+            <<_:From/binary, B2/binary>> -> B2
+        end,
+    Bin3 =
+        case Bin2 of
+            _ when size(Bin2) < ReadLen -> Bin2;
+            <<B3:ReadLen/binary, _/binary>> -> B3
+        end,
     Fun(Bin3, Acc);
-
 range_foldl(Att, From, To, Fun, Acc) ->
     {loc, Db, DocId, AttId} = fetch(data, Att),
     Bin = fabric2_db:read_attachment(Db, DocId, AttId),
     range_foldl(Bin, From, To, Fun, Acc).
-
 
 foldl_decode(Att, Fun, Acc) ->
     [Encoding, Data] = fetch([encoding, data], Att),
@@ -599,10 +591,8 @@ foldl_decode(Att, Fun, Acc) ->
             foldl(Att, Fun, Acc)
     end.
 
-
 to_binary(Att) ->
     to_binary(fetch(data, Att), Att).
-
 
 to_binary(Bin, _Att) when is_binary(Bin) ->
     Bin;
@@ -611,26 +601,25 @@ to_binary(Iolist, _Att) when is_list(Iolist) ->
 to_binary({loc, Db, DocId, AttId}, _Att) ->
     NoTxDb = Db#{tx := undefined},
     fabric2_db:read_attachment(NoTxDb, DocId, AttId);
-to_binary(DataFun, Att) when is_function(DataFun)->
+to_binary(DataFun, Att) when is_function(DataFun) ->
     Len = fetch(att_len, Att),
     iolist_to_binary(
-        lists:reverse(fold_streamed_data(
-            DataFun,
-            Len,
-            fun(Data, Acc) -> [Data | Acc] end,
-            []
-        ))
+        lists:reverse(
+            fold_streamed_data(
+                DataFun,
+                Len,
+                fun(Data, Acc) -> [Data | Acc] end,
+                []
+            )
+        )
     ).
-
 
 fold_streamed_data(_RcvFun, 0, _Fun, Acc) ->
     Acc;
-
-fold_streamed_data(RcvFun, LenLeft, Fun, Acc) when LenLeft > 0->
+fold_streamed_data(RcvFun, LenLeft, Fun, Acc) when LenLeft > 0 ->
     Bin = RcvFun(),
     ResultAcc = Fun(Bin, Acc),
     fold_streamed_data(RcvFun, LenLeft - size(Bin), Fun, ResultAcc).
-
 
 maybe_compress(Att) ->
     [Encoding, Type] = fetch([encoding, type], Att),
@@ -643,7 +632,6 @@ maybe_compress(Att) ->
             Att
     end.
 
-
 compress(Att, Level) ->
     Data = fetch(data, Att),
 
@@ -655,32 +643,40 @@ compress(Att, Level) ->
     ok = zlib:deflateEnd(Z),
     ok = zlib:close(Z),
 
-    store([
-        {att_len, size(CompData)},
-        {md5, couch_hash:md5_hash(CompData)},
-        {data, CompData},
-        {encoding, gzip}
-    ], Att).
-
+    store(
+        [
+            {att_len, size(CompData)},
+            {md5, couch_hash:md5_hash(CompData)},
+            {data, CompData},
+            {encoding, gzip}
+        ],
+        Att
+    ).
 
 is_compressible(Type) when is_binary(Type) ->
     is_compressible(binary_to_list(Type));
 is_compressible(Type) ->
     TypeExpList = re:split(
-        config:get("attachments", "compressible_types",
-            ?DEFAULT_COMPRESSIBLE_TYPES),
+        config:get(
+            "attachments",
+            "compressible_types",
+            ?DEFAULT_COMPRESSIBLE_TYPES
+        ),
         "\\s*,\\s*",
         [{return, list}]
     ),
     lists:any(
         fun(TypeExp) ->
-            Regexp = ["^\\s*", re:replace(TypeExp, "\\*", ".*"),
-                "(?:\\s*;.*?)?\\s*", $$],
+            Regexp = [
+                "^\\s*",
+                re:replace(TypeExp, "\\*", ".*"),
+                "(?:\\s*;.*?)?\\s*",
+                $$
+            ],
             re:run(Type, Regexp, [caseless]) =/= nomatch
         end,
         [T || T <- TypeExpList, T /= []]
     ).
-
 
 max_attachment_size() ->
     case config:get("couchdb", "max_attachment_size", "infinity") of
@@ -690,9 +686,9 @@ max_attachment_size() ->
             list_to_integer(MaxAttSize)
     end.
 
-
-validate_attachment_size(AttName, AttSize, MaxAttSize)
-        when is_integer(AttSize),  AttSize > MaxAttSize ->
+validate_attachment_size(AttName, AttSize, MaxAttSize) when
+    is_integer(AttSize), AttSize > MaxAttSize
+->
     throw({request_entity_too_large, {attachment, AttName}});
 validate_attachment_size(_AttName, _AttSize, _MAxAttSize) ->
     ok.

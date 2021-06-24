@@ -34,26 +34,25 @@
     get_job_ids/0
 ]).
 
-
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
 -include_lib("kernel/include/logger.hrl").
 
-
 -spec replicate({[_]}, any()) ->
-    {ok, {continuous, binary()}} |
-    {ok, #{}} |
-    {ok, {cancelled, binary()}} |
-    {error, any()} |
-    no_return().
+    {ok, {continuous, binary()}}
+    | {ok, #{}}
+    | {ok, {cancelled, binary()}}
+    | {error, any()}
+    | no_return().
 replicate(Body, #user_ctx{name = User} = UserCtx) ->
     {ok, Id, Rep} = couch_replicator_parse:parse_transient_rep(Body, User),
     #{?OPTIONS := Options} = Rep,
-    JobId = case couch_replicator_jobs:get_job_id(undefined, Id) of
-        {ok, JobId0} -> JobId0;
-        {error, not_found} -> Id
-    end,
+    JobId =
+        case couch_replicator_jobs:get_job_id(undefined, Id) of
+            {ok, JobId0} -> JobId0;
+            {error, not_found} -> Id
+        end,
     case maps:get(<<"cancel">>, Options, false) of
         true ->
             case check_authorization(JobId, UserCtx) of
@@ -85,7 +84,6 @@ replicate(Body, #user_ctx{name = User} = UserCtx) ->
             end
     end.
 
-
 jobs() ->
     FoldFun = fun(_JTx, _JobId, CouchJobsState, JobData, Acc) ->
         case CouchJobsState of
@@ -96,18 +94,17 @@ jobs() ->
     end,
     couch_replicator_jobs:fold_jobs(undefined, FoldFun, []).
 
-
 job(Id0) when is_binary(Id0) ->
     Id1 = couch_replicator_ids:convert(Id0),
-    JobId = case couch_replicator_jobs:get_job_id(undefined, Id1) of
-        {ok, JobId0} -> JobId0;
-        {error, not_found} -> Id1
-    end,
+    JobId =
+        case couch_replicator_jobs:get_job_id(undefined, Id1) of
+            {ok, JobId0} -> JobId0;
+            {error, not_found} -> Id1
+        end,
     case couch_replicator_jobs:get_job_data(undefined, JobId) of
         {ok, #{} = JobData} -> {ok, job_ejson(JobData)};
         {error, not_found} -> {error, not_found}
     end.
-
 
 docs(#{} = Db, States) when is_list(States) ->
     DbName = fabric2_db:name(Db),
@@ -115,8 +112,8 @@ docs(#{} = Db, States) when is_list(States) ->
         case JobData of
             #{?DB_NAME := DbName, ?STATE := State} ->
                 case {States, lists:member(State, States)} of
-                    {[], _} ->  [doc_ejson(JobData) | Acc];
-                    {[_ | _], true} ->  [doc_ejson(JobData) | Acc];
+                    {[], _} -> [doc_ejson(JobData) | Acc];
+                    {[_ | _], true} -> [doc_ejson(JobData) | Acc];
                     {[_ | _], false} -> Acc
                 end;
             #{} ->
@@ -125,17 +122,15 @@ docs(#{} = Db, States) when is_list(States) ->
     end,
     couch_replicator_jobs:fold_jobs(undefined, FoldFun, []).
 
-
 doc(#{} = Db, DocId) when is_binary(DocId) ->
     DbUUID = fabric2_db:get_uuid(Db),
     JobId = couch_replicator_ids:job_id(DbUUID, DocId),
     case couch_replicator_jobs:get_job_data(undefined, JobId) of
         {ok, #{} = JobData} -> {ok, doc_ejson(JobData)};
-        {error, not_found} ->  {error, not_found}
+        {error, not_found} -> {error, not_found}
     end.
 
-
-after_db_create(DbName, DbUUID) when ?IS_REP_DB(DbName)->
+after_db_create(DbName, DbUUID) when ?IS_REP_DB(DbName) ->
     couch_stats:increment_counter([couch_replicator, docs, dbs_created]),
     try fabric2_db:open(DbName, [{uuid, DbUUID}, ?ADMIN_CTX]) of
         {ok, Db} ->
@@ -146,10 +141,8 @@ after_db_create(DbName, DbUUID) when ?IS_REP_DB(DbName)->
         error:database_does_not_exist ->
             ok
     end;
-
 after_db_create(_DbName, _DbUUID) ->
     ok.
-
 
 after_db_delete(DbName, DbUUID) when ?IS_REP_DB(DbName) ->
     couch_stats:increment_counter([couch_replicator, docs, dbs_deleted]),
@@ -162,13 +155,17 @@ after_db_delete(DbName, DbUUID) when ?IS_REP_DB(DbName) ->
         end
     end,
     couch_replicator_jobs:fold_jobs(undefined, FoldFun, ok);
-
 after_db_delete(_DbName, _DbUUID) ->
     ok.
 
-
-after_doc_write(#{name := DbName} = Db, #doc{} = Doc, _NewWinner, _OldWinner,
-        _NewRevId, _Seq) when ?IS_REP_DB(DbName) ->
+after_doc_write(
+    #{name := DbName} = Db,
+    #doc{} = Doc,
+    _NewWinner,
+    _OldWinner,
+    _NewRevId,
+    _Seq
+) when ?IS_REP_DB(DbName) ->
     couch_stats:increment_counter([couch_replicator, docs, db_changes]),
     {Props} = Doc#doc.body,
     case couch_util:get_value(?REPLICATION_STATE, Props) of
@@ -176,10 +173,8 @@ after_doc_write(#{name := DbName} = Db, #doc{} = Doc, _NewWinner, _OldWinner,
         ?ST_FAILED -> ok;
         _ -> process_change(Db, Doc)
     end;
-
 after_doc_write(_Db, _Doc, _NewWinner, _OldWinner, _NewRevId, _Seq) ->
     ok.
-
 
 % This is called from supervisor, must return ignore.
 -spec ensure_rep_db_exists() -> ignore.
@@ -187,7 +182,7 @@ ensure_rep_db_exists() ->
     couch_replicator_jobs:set_timeout(),
     case config:get_boolean("replicator", "create_replicator_db", false) of
         true ->
-            UserCtx = #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]},
+            UserCtx = #user_ctx{roles = [<<"_admin">>, <<"_replicator">>]},
             Opts = [{user_ctx, UserCtx}, sys_db],
             case fabric2_db:create(?REP_DB_NAME, Opts) of
                 {error, file_exists} -> ok;
@@ -198,12 +193,10 @@ ensure_rep_db_exists() ->
     end,
     ignore.
 
-
 % Testing and debug functions
 
 rescan_jobs() ->
     rescan_jobs(?REP_DB_NAME).
-
 
 rescan_jobs(DbName) when is_binary(DbName), ?IS_REP_DB(DbName) ->
     try fabric2_db:open(DbName, [?ADMIN_CTX]) of
@@ -214,10 +207,8 @@ rescan_jobs(DbName) when is_binary(DbName), ?IS_REP_DB(DbName) ->
             database_does_not_exist
     end.
 
-
 reenqueue_jobs() ->
     reenqueue_jobs(?REP_DB_NAME).
-
 
 reenqueue_jobs(DbName) when is_binary(DbName), ?IS_REP_DB(DbName) ->
     try fabric2_db:open(DbName, [?ADMIN_CTX]) of
@@ -229,7 +220,6 @@ reenqueue_jobs(DbName) when is_binary(DbName), ?IS_REP_DB(DbName) ->
         error:database_does_not_exist ->
             database_does_not_exist
     end.
-
 
 remove_jobs() ->
     % If we clear a large number of jobs make sure to use batching so we don't
@@ -245,17 +235,22 @@ remove_jobs() ->
     [] = couch_replicator_jobs:remove_jobs(undefined, Acc),
     ok.
 
-
 get_job_ids() ->
     couch_replicator_jobs:get_job_ids(undefined).
-
 
 % Private functions
 
 -spec start_transient_job(binary(), #{}) -> ok.
 start_transient_job(JobId, #{} = Rep) ->
-    JobData = couch_replicator_jobs:new_job(Rep, null, null, null,
-        ?ST_PENDING, null, null),
+    JobData = couch_replicator_jobs:new_job(
+        Rep,
+        null,
+        null,
+        null,
+        ?ST_PENDING,
+        null,
+        null
+    ),
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(JTx) ->
         case couch_replicator_jobs:get_job_data(JTx, JobId) of
             {ok, #{?REP := OldRep, ?STATE := State}} ->
@@ -277,17 +272,17 @@ start_transient_job(JobId, #{} = Rep) ->
         end
     end).
 
-
 -spec cancel_replication(job_id()) ->
     {ok, {cancelled, binary()}} | {error, not_found}.
 cancel_replication(JobId) when is_binary(JobId) ->
     couch_jobs_fdb:tx(couch_jobs_fdb:get_jtx(), fun(JTx) ->
-        Id = case couch_replicator_jobs:get_job_data(JTx, JobId) of
-            {ok, #{?REP_ID := RepId}} when is_binary(RepId) ->
-                RepId;
-            _ ->
-                JobId
-        end,
+        Id =
+            case couch_replicator_jobs:get_job_data(JTx, JobId) of
+                {ok, #{?REP_ID := RepId}} when is_binary(RepId) ->
+                    RepId;
+                _ ->
+                    JobId
+            end,
         ?LOG_NOTICE(#{what => cancel_replication, in => replicator, id => Id}),
         couch_log:notice("Canceling replication '~s'", [Id]),
         case couch_replicator_jobs:remove_job(JTx, JobId) of
@@ -298,36 +293,49 @@ cancel_replication(JobId) when is_binary(JobId) ->
         end
     end).
 
-
 process_change(_Db, #doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>}) ->
     ok;
-
 process_change(#{} = Db, #doc{deleted = true} = Doc) ->
     DbUUID = fabric2_db:get_uuid(Db),
     JobId = couch_replicator_ids:job_id(DbUUID, Doc#doc.id),
     couch_replicator_jobs:remove_job(undefined, JobId);
-
 process_change(#{} = Db, #doc{deleted = false} = Doc) ->
     #doc{id = DocId, body = {Props} = Body} = Doc,
     DbName = fabric2_db:name(Db),
     DbUUID = fabric2_db:get_uuid(Db),
-    {Rep, DocState, Error} = try
-        Rep0 = couch_replicator_parse:parse_rep_doc(Body),
-        DocState0 = couch_util:get_value(?REPLICATION_STATE, Props, null),
-        {Rep0, DocState0, null}
-    catch
-        throw:{bad_rep_doc, Reason} ->
-            {null, null, couch_replicator_utils:rep_error_to_binary(Reason)}
-    end,
+    {Rep, DocState, Error} =
+        try
+            Rep0 = couch_replicator_parse:parse_rep_doc(Body),
+            DocState0 = couch_util:get_value(?REPLICATION_STATE, Props, null),
+            {Rep0, DocState0, null}
+        catch
+            throw:{bad_rep_doc, Reason} ->
+                {null, null, couch_replicator_utils:rep_error_to_binary(Reason)}
+        end,
     JobId = couch_replicator_ids:job_id(DbUUID, DocId),
-    JobData = case Rep of
-        null ->
-            couch_relicator_jobs:new_job(Rep, DbName, DbUUID, DocId,
-                ?ST_FAILED, Error, null);
-        #{} ->
-            couch_replicator_jobs:new_job(Rep, DbName, DbUUID, DocId,
-                ?ST_PENDING, null, DocState)
-    end,
+    JobData =
+        case Rep of
+            null ->
+                couch_relicator_jobs:new_job(
+                    Rep,
+                    DbName,
+                    DbUUID,
+                    DocId,
+                    ?ST_FAILED,
+                    Error,
+                    null
+                );
+            #{} ->
+                couch_replicator_jobs:new_job(
+                    Rep,
+                    DbName,
+                    DbUUID,
+                    DocId,
+                    ?ST_PENDING,
+                    null,
+                    DocState
+                )
+        end,
 
     ?LOG_NOTICE(#{
         what => replication_update,
@@ -362,13 +370,11 @@ process_change(#{} = Db, #doc{deleted = false} = Doc) ->
             {error, not_found} ->
                 couch_replicator_jobs:add_job(JTx, JobId, JobData)
         end
-
     end).
-
 
 -spec add_jobs_from_db(#{}) -> ok.
 add_jobs_from_db(#{} = TxDb) ->
-    FoldFun  = fun
+    FoldFun = fun
         ({meta, _Meta}, ok) ->
             {ok, ok};
         (complete, ok) ->
@@ -382,13 +388,11 @@ add_jobs_from_db(#{} = TxDb) ->
     {ok, ok} = fabric2_db:fold_docs(TxDb, FoldFun, ok, Opts),
     ok.
 
-
 -spec get_doc(#{}, list()) -> #doc{}.
 get_doc(TxDb, Row) ->
     {_, DocId} = lists:keyfind(id, 1, Row),
     {ok, #doc{deleted = false} = Doc} = fabric2_db:open_doc(TxDb, DocId, []),
     Doc.
-
 
 doc_ejson(#{} = JobData) ->
     #{
@@ -414,11 +418,12 @@ doc_ejson(#{} = JobData) ->
     LastUpdatedISO8601 = couch_replicator_utils:iso8601(LastUpdatedSec),
     StartISO8601 = couch_replicator_utils:iso8601(StartSec),
 
-    Info = case State of
-        ?ST_RUNNING -> Stats;
-        ?ST_PENDING -> Stats;
-        _Other -> Info0
-    end,
+    Info =
+        case State of
+            ?ST_RUNNING -> Stats;
+            ?ST_PENDING -> Stats;
+            _Other -> Info0
+        end,
 
     #{
         <<"id">> => RepId,
@@ -436,7 +441,6 @@ doc_ejson(#{} = JobData) ->
         <<"node">> => Node,
         <<"pid">> => Pid
     }.
-
 
 job_ejson(#{} = JobData) ->
     #{
@@ -461,15 +465,19 @@ job_ejson(#{} = JobData) ->
 
     StartISO8601 = couch_replicator_utils:iso8601(StartSec),
 
-    History1 = lists:map(fun(#{?HIST_TIMESTAMP := Ts} = Evt) ->
-        Evt#{?HIST_TIMESTAMP := couch_replicator_utils:iso8601(Ts)}
-    end, History),
+    History1 = lists:map(
+        fun(#{?HIST_TIMESTAMP := Ts} = Evt) ->
+            Evt#{?HIST_TIMESTAMP := couch_replicator_utils:iso8601(Ts)}
+        end,
+        History
+    ),
 
-    Info = case State of
-        ?ST_RUNNING -> Stats;
-        ?ST_PENDING -> Stats;
-        _Other -> Info0
-    end,
+    Info =
+        case State of
+            ?ST_RUNNING -> Stats;
+            ?ST_PENDING -> Stats;
+            _Other -> Info0
+        end,
 
     #{
         <<"id">> => RepId,
@@ -486,13 +494,10 @@ job_ejson(#{} = JobData) ->
         <<"pid">> => Pid
     }.
 
-
 ejson_url(Url) when is_binary(Url) ->
     strip_url_creds(Url);
-
 ejson_url(null) ->
     null.
-
 
 -spec strip_url_creds(binary()) -> binary() | null.
 strip_url_creds(Url) ->
@@ -509,7 +514,6 @@ strip_url_creds(Url) ->
             null
     end.
 
-
 -spec check_authorization(rep_id(), #user_ctx{}) -> ok | not_found.
 check_authorization(JobId, #user_ctx{} = Ctx) when is_binary(JobId) ->
     #user_ctx{name = Name} = Ctx,
@@ -524,18 +528,16 @@ check_authorization(JobId, #user_ctx{} = Ctx) when is_binary(JobId) ->
             couch_httpd:verify_is_server_admin(Ctx)
     end.
 
-
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 authorization_test_() ->
     {
         foreach,
-        fun () -> ok end,
-        fun (_) -> meck:unload() end,
+        fun() -> ok end,
+        fun(_) -> meck:unload() end,
         [
             ?TDEF_FE(t_admin_is_always_authorized),
             ?TDEF_FE(t_username_must_match),
@@ -543,21 +545,23 @@ authorization_test_() ->
         ]
     }.
 
-
 t_admin_is_always_authorized(_) ->
     expect_job_data({ok, #{?REP => #{?REP_USER => <<"someuser">>}}}),
     UserCtx = #user_ctx{name = <<"adm">>, roles = [<<"_admin">>]},
     ?assertEqual(ok, check_authorization(<<"RepId">>, UserCtx)).
-
 
 t_username_must_match(_) ->
     expect_job_data({ok, #{?REP => #{?REP_USER => <<"user1">>}}}),
     UserCtx1 = #user_ctx{name = <<"user1">>, roles = [<<"somerole">>]},
     ?assertEqual(ok, check_authorization(<<"RepId">>, UserCtx1)),
     UserCtx2 = #user_ctx{name = <<"other">>, roles = [<<"somerole">>]},
-    ?assertThrow({unauthorized, _}, check_authorization(<<"RepId">>,
-        UserCtx2)).
-
+    ?assertThrow(
+        {unauthorized, _},
+        check_authorization(
+            <<"RepId">>,
+            UserCtx2
+        )
+    ).
 
 t_replication_not_found(_) ->
     expect_job_data({error, not_found}),
@@ -566,10 +570,8 @@ t_replication_not_found(_) ->
     UserCtx2 = #user_ctx{name = <<"adm">>, roles = [<<"_admin">>]},
     ?assertEqual(not_found, check_authorization(<<"RepId">>, UserCtx2)).
 
-
 expect_job_data(JobDataRes) ->
     meck:expect(couch_replicator_jobs, get_job_data, 2, JobDataRes).
-
 
 strip_url_creds_test_() ->
     {
@@ -586,7 +588,6 @@ strip_url_creds_test_() ->
         ])
     }.
 
-
 t_strip_http_basic_creds(_) ->
     Url1 = <<"http://adm:pass@host/db/">>,
     ?assertEqual(<<"http://adm:*****@host/db/">>, strip_url_creds(Url1)),
@@ -595,9 +596,10 @@ t_strip_http_basic_creds(_) ->
     Url3 = <<"http://adm:pass@host:80/db/">>,
     ?assertEqual(<<"http://adm:*****@host:80/db/">>, strip_url_creds(Url3)),
     Url4 = <<"http://adm:pass@host/db?a=b&c=d">>,
-    ?assertEqual(<<"http://adm:*****@host/db?a=b&c=d">>,
-        strip_url_creds(Url4)).
-
+    ?assertEqual(
+        <<"http://adm:*****@host/db?a=b&c=d">>,
+        strip_url_creds(Url4)
+    ).
 
 t_strip_url_creds_errors(_) ->
     Bad1 = <<"http://adm:pass/bad">>,
@@ -613,6 +615,5 @@ t_strip_url_creds_errors(_) ->
     ?assertEqual(null, strip_url_creds([<<"a">>, <<"b">>])),
     Bad5 = <<"http://adm:pass/bad">>,
     ?assertEqual(null, strip_url_creds(Bad5)).
-
 
 -endif.

@@ -10,7 +10,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 % This module implements rate limiting based on a variation the additive
 % increase / multiplicative decrease feedback control algorithm.
 %
@@ -36,36 +35,34 @@
 % function is the current period value. Caller then might decide to sleep for
 % that amount of time before or after each request.
 
-
 -module(couch_replicator_rate_limiter).
 
 -behaviour(gen_server).
 
 -export([
-   start_link/0
+    start_link/0
 ]).
 
 -export([
-   init/1,
-   terminate/2,
-   handle_call/3,
-   handle_info/2,
-   handle_cast/2,
-   code_change/3
+    init/1,
+    terminate/2,
+    handle_call/3,
+    handle_info/2,
+    handle_cast/2,
+    code_change/3
 ]).
 
 -export([
-   interval/1,
-   max_interval/0,
-   failure/1,
-   success/1
+    interval/1,
+    max_interval/0,
+    failure/1,
+    success/1
 ]).
 
 % Types
 -type key() :: any().
 -type interval() :: non_neg_integer().
 -type msec() :: non_neg_integer().
-
 
 % Definitions
 
@@ -98,38 +95,31 @@
 % use something similar to solve the ACK compression problem).
 -define(SENSITIVITY_TIME_WINDOW, 80).
 
-
 -record(state, {timer}).
 -record(rec, {id, backoff, ts}).
-
 
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
 
 -spec interval(key()) -> interval().
 interval(Key) ->
     {Interval, _Timestamp} = interval_and_timestamp(Key),
     Interval.
 
-
 -spec max_interval() -> interval().
 max_interval() ->
     ?MAX_INTERVAL.
-
 
 -spec failure(key()) -> interval().
 failure(Key) ->
     {Interval, Timestamp} = interval_and_timestamp(Key),
     update_failure(Key, Interval, Timestamp, now_msec()).
 
-
 -spec success(key()) -> interval().
 success(Key) ->
     {Interval, Timestamp} = interval_and_timestamp(Key),
     update_success(Key, Interval, Timestamp, now_msec()).
-
 
 % gen_server callbacks
 
@@ -137,18 +127,14 @@ init([]) ->
     couch_replicator_rate_limiter_tables:create(#rec.id),
     {ok, #state{timer = new_timer()}}.
 
-
 terminate(_Reason, _State) ->
     ok.
-
 
 handle_call(_Msg, _From, State) ->
     {reply, invalid, State}.
 
-
 handle_cast(_, State) ->
     {noreply, State}.
-
 
 handle_info(cleanup, #state{timer = Timer}) ->
     erlang:cancel_timer(Timer),
@@ -156,21 +142,20 @@ handle_info(cleanup, #state{timer = Timer}) ->
     [cleanup_table(TId, now_msec() - ?MAX_INTERVAL) || TId <- TIds],
     {noreply, #state{timer = new_timer()}}.
 
-
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
 
 % Private functions
 
 -spec update_success(any(), interval(), msec(), msec()) -> interval().
 update_success(_Key, _Interval, _Timestamp = 0, _Now) ->
-    0;  % No ets entry. Keep it that way and don't insert a new one.
-
-update_success(_Key, Interval, Timestamp, Now)
-    when Now - Timestamp =< ?SENSITIVITY_TIME_WINDOW ->
-    Interval;  % Ignore too frequent updates.
-
+    % No ets entry. Keep it that way and don't insert a new one.
+    0;
+update_success(_Key, Interval, Timestamp, Now) when
+    Now - Timestamp =< ?SENSITIVITY_TIME_WINDOW
+->
+    % Ignore too frequent updates.
+    Interval;
 update_success(Key, Interval, Timestamp, Now) ->
     DecayedInterval = time_decay(Now - Timestamp, Interval),
     AdditiveFactor = additive_factor(DecayedInterval),
@@ -186,18 +171,17 @@ update_success(Key, Interval, Timestamp, Now) ->
             insert(Key, NewInterval, Now)
     end.
 
-
 -spec update_failure(any(), interval(), msec(), msec()) -> interval().
-update_failure(_Key, Interval, Timestamp, Now)
-    when Now - Timestamp =< ?SENSITIVITY_TIME_WINDOW ->
-    Interval;  % Ignore too frequent updates.
-
+update_failure(_Key, Interval, Timestamp, Now) when
+    Now - Timestamp =< ?SENSITIVITY_TIME_WINDOW
+->
+    % Ignore too frequent updates.
+    Interval;
 update_failure(Key, Interval, _Timestamp, Now) ->
     Interval1 = erlang:max(Interval, ?BASE_INTERVAL),
     Interval2 = round(Interval1 * ?BACKOFF_FACTOR),
     Interval3 = erlang:min(Interval2, ?MAX_INTERVAL),
     insert(Key, Interval3, Now).
-
 
 -spec insert(any(), interval(), msec()) -> interval().
 insert(Key, Interval, Timestamp) ->
@@ -205,7 +189,6 @@ insert(Key, Interval, Timestamp) ->
     Table = couch_replicator_rate_limiter_tables:term_to_table(Key),
     ets:insert(Table, Entry),
     Interval.
-
 
 -spec interval_and_timestamp(key()) -> {interval(), msec()}.
 interval_and_timestamp(Key) ->
@@ -217,15 +200,12 @@ interval_and_timestamp(Key) ->
             {Interval, Timestamp}
     end.
 
-
 -spec time_decay(msec(), interval()) -> interval().
 time_decay(Dt, Interval) when Dt > ?TIME_DECAY_THRESHOLD ->
     DecayedInterval = Interval - ?TIME_DECAY_FACTOR * Dt,
     erlang:max(round(DecayedInterval), 0);
-
 time_decay(_Dt, Interval) ->
     Interval.
-
 
 % Calculate additive factor. Ideally it would be a constant but in this case
 % it is a step function to help handle larger values as they are approaching
@@ -243,17 +223,14 @@ additive_factor(Interval) when Interval > 100 ->
 additive_factor(_Interval) ->
     ?BASE_INTERVAL.
 
-
 -spec new_timer() -> reference().
 new_timer() ->
     erlang:send_after(?MAX_INTERVAL * 2, self(), cleanup).
-
 
 -spec now_msec() -> msec().
 now_msec() ->
     {Mega, Sec, Micro} = os:timestamp(),
     ((Mega * 1000000) + Sec) * 1000 + Micro div 1000.
-
 
 -spec cleanup_table(atom(), msec()) -> non_neg_integer().
 cleanup_table(Tid, LimitMSec) ->

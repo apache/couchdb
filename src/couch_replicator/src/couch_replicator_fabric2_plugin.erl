@@ -10,9 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 -module(couch_replicator_fabric2_plugin).
-
 
 -export([
     after_db_create/2,
@@ -20,17 +18,14 @@
     after_doc_write/6
 ]).
 
-
 after_db_create(DbName, DbUUID) ->
     couch_replicator:after_db_create(DbName, DbUUID),
     [DbName, DbUUID].
-
 
 after_db_delete(DbName, DbUUID) ->
     couch_replicator:after_db_delete(DbName, DbUUID),
     [DbName, DbUUID].
 
-
-after_doc_write(Db, Doc, Winner, OldWinner, RevId, Seq)->
+after_doc_write(Db, Doc, Winner, OldWinner, RevId, Seq) ->
     couch_replicator:after_doc_write(Db, Doc, Winner, OldWinner, RevId, Seq),
     [Db, Doc, Winner, OldWinner, RevId, Seq].

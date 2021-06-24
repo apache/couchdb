@@ -20,9 +20,7 @@
     source/2
 ]).
 
-
 -type ast() :: erl_syntax:syntaxTree().
-
 
 -spec compile(OperationId :: string(), FilterDef :: string()) -> ok.
 compile(OperationId, FilterDef) ->
@@ -30,23 +28,22 @@ compile(OperationId, FilterDef) ->
     merl:compile_and_load(AST),
     ok.
 
-
 -spec source(OperationId :: string(), FilterDef :: string()) -> string().
 source(OperationId, FilterDef) ->
     AST = parse_filter(OperationId, FilterDef),
     Options = [{paper, 160}, {ribbon, 80}],
     erl_prettypr:format(erl_syntax:form_list(AST), Options).
 
-
 -spec parse_filter(OperationId :: string(), FilterDef :: string()) -> [ast()].
 parse_filter(OperationId, FilterDef) ->
     AST = merl:quote("match" ++ FilterDef ++ "."),
     case AST of
-        ?Q("match(_@Args) when _@__@Guard -> _@Return.")
-            when erl_syntax:type(Args) == map_expr ->
-                validate_args(Args),
-                validate_return(Return),
-                generate(OperationId, Args, Guard, Return);
+        ?Q("match(_@Args) when _@__@Guard -> _@Return.") when
+            erl_syntax:type(Args) == map_expr
+        ->
+            validate_args(Args),
+            validate_return(Return),
+            generate(OperationId, Args, Guard, Return);
         ?Q("match(_@Args) when _@__@Guard -> _@@_.") ->
             fail("The only argument of the filter should be map");
         ?Q("match(_@@Args) when _@__@Guard -> _@@_.") ->
@@ -55,27 +52,29 @@ parse_filter(OperationId, FilterDef) ->
             fail("Unknown shape of a filter function")
     end.
 
-
 -spec validate_args(MapAST :: ast()) -> ok.
 validate_args(MapAST) ->
     %% Unfortunatelly merl doesn't seem to support maps
     %% so we had to do it manually
-    lists:foldl(fun(AST, Bindings) ->
-        erl_syntax:type(AST) == map_field_exact
-            orelse fail("Only #{field := Var} syntax is supported in the header"),
-        NameAST = erl_syntax:map_field_exact_name(AST),
-        erl_syntax:type(NameAST) == atom
-            orelse fail("Only atoms are supported as field names in the header"),
-        Name = erl_syntax:atom_value(NameAST),
-        VarAST = erl_syntax:map_field_exact_value(AST),
-        erl_syntax:type(VarAST) == variable
-            orelse fail("Only capitalized names are supported as matching variables in the header"),
-        Var = erl_syntax:variable_name(VarAST),
-        maps:is_key(Var, Bindings)
-            andalso fail("'~s' variable is already in use", [Var]),
-        Bindings#{Var => Name}
-    end, #{}, erl_syntax:map_expr_fields(MapAST)).
-
+    lists:foldl(
+        fun(AST, Bindings) ->
+            erl_syntax:type(AST) == map_field_exact orelse
+                fail("Only #{field := Var} syntax is supported in the header"),
+            NameAST = erl_syntax:map_field_exact_name(AST),
+            erl_syntax:type(NameAST) == atom orelse
+                fail("Only atoms are supported as field names in the header"),
+            Name = erl_syntax:atom_value(NameAST),
+            VarAST = erl_syntax:map_field_exact_value(AST),
+            erl_syntax:type(VarAST) == variable orelse
+                fail("Only capitalized names are supported as matching variables in the header"),
+            Var = erl_syntax:variable_name(VarAST),
+            maps:is_key(Var, Bindings) andalso
+                fail("'~s' variable is already in use", [Var]),
+            Bindings#{Var => Name}
+        end,
+        #{},
+        erl_syntax:map_expr_fields(MapAST)
+    ).
 
 -spec validate_return(Return :: [ast()]) -> ok.
 validate_return(Return) ->
@@ -83,10 +82,8 @@ validate_return(Return) ->
         ?Q("true") -> ok;
         ?Q("false") -> ok;
         ?Q("_@AST") when erl_syntax:type(AST) == float -> ok;
-        _ ->
-            fail("Unsupported return value '~s'", [erl_prettypr:format(Return)])
+        _ -> fail("Unsupported return value '~s'", [erl_prettypr:format(Return)])
     end.
-
 
 generate(OperationId, Args, Guard, Return) ->
     ModuleName = ctrace_config:filter_module_name(OperationId),
@@ -97,7 +94,6 @@ generate(OperationId, Args, Guard, Return) ->
         ?Q("(_) -> false")
     ]),
     lists:flatten([Module, Export, Function]).
-
 
 fail(Msg) ->
     throw({error, Msg}).

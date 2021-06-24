@@ -18,42 +18,39 @@
     maybe_return_minimal/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
-
 
 -define(DEFAULT_PREFER_MINIMAL,
     "Cache-Control, Content-Length, Content-Range, "
-    "Content-Type, ETag, Server, Transfer-Encoding, Vary").
-
+    "Content-Type, ETag, Server, Transfer-Encoding, Vary"
+).
 
 maybe_return_minimal(#httpd{mochi_req = MochiReq}, Headers) ->
     case get_prefer_header(MochiReq) of
-        "return=minimal" -> 
+        "return=minimal" ->
             filter_headers(Headers, get_header_list());
-        _ -> 
+        _ ->
             Headers
     end.
-
 
 get_prefer_header(Req) ->
     case Req:get_header_value("Prefer") of
         Value when is_list(Value) ->
             string:to_lower(Value);
-        undefined -> 
+        undefined ->
             undefined
     end.
 
-
 filter_headers(Headers, IncludeList) ->
-    lists:filter(fun({HeaderName, _}) -> 
-        lists:member(HeaderName, IncludeList)
-    end, Headers).
-
+    lists:filter(
+        fun({HeaderName, _}) ->
+            lists:member(HeaderName, IncludeList)
+        end,
+        Headers
+    ).
 
 get_header_list() ->
     split_list(config:get("chttpd", "prefer_minimal", ?DEFAULT_PREFER_MINIMAL)).
 
-
 split_list(S) ->
-    re:split(S, "\\s*,\\s*", [trim, {return, list}]). 
+    re:split(S, "\\s*,\\s*", [trim, {return, list}]).

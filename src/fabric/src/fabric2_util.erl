@@ -12,7 +12,6 @@
 
 -module(fabric2_util).
 
-
 -export([
     revinfo_to_revs/1,
     revinfo_to_path/1,
@@ -48,10 +47,8 @@
     pmap/3
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_views/include/couch_views.hrl").
-
 
 revinfo_to_revs(RevInfo) ->
     #{
@@ -59,7 +56,6 @@ revinfo_to_revs(RevInfo) ->
         rev_path := RevPath
     } = RevInfo,
     {RevPos, [Rev | RevPath]}.
-
 
 revinfo_to_path(RevInfo) ->
     #{
@@ -70,18 +66,14 @@ revinfo_to_path(RevInfo) ->
     Path = revinfo_to_path(RevInfo, Revs),
     {RevPos - length(Revs) + 1, Path}.
 
-
 revinfo_to_path(RevInfo, [Rev]) ->
     {Rev, RevInfo, []};
-
 revinfo_to_path(RevInfo, [Rev | Rest]) ->
     {Rev, ?REV_MISSING, [revinfo_to_path(RevInfo, Rest)]}.
-
 
 sort_revinfos(RevInfos) ->
     CmpFun = fun(A, B) -> rev_sort_key(A) > rev_sort_key(B) end,
     lists:sort(CmpFun, RevInfos).
-
 
 rev_sort_key(#{} = RevInfo) ->
     #{
@@ -89,7 +81,6 @@ rev_sort_key(#{} = RevInfo) ->
         rev_id := {RevPos, Rev}
     } = RevInfo,
     {not Deleted, RevPos, Rev}.
-
 
 rev_size(#doc{} = Doc) ->
     #doc{
@@ -99,22 +90,27 @@ rev_size(#doc{} = Doc) ->
         atts = Atts
     } = Doc,
 
-    {Start, Rev} = case Revs of
-        {0, []} -> {0, <<>>};
-        {N, [RevId | _]} -> {N, RevId}
-    end,
+    {Start, Rev} =
+        case Revs of
+            {0, []} -> {0, <<>>};
+            {N, [RevId | _]} -> {N, RevId}
+        end,
 
     lists:sum([
         size(Id),
         size(erlfdb_tuple:pack({Start})),
         size(Rev),
-        1, % FDB tuple encoding of booleans for deleted flag is 1 byte
+        % FDB tuple encoding of booleans for deleted flag is 1 byte
+        1,
         couch_ejson_size:encoded_size(Body),
-        lists:foldl(fun(Att, Acc) ->
-            couch_att:external_size(Att) + Acc
-        end, 0, Atts)
+        lists:foldl(
+            fun(Att, Acc) ->
+                couch_att:external_size(Att) + Acc
+            end,
+            0,
+            Atts
+        )
     ]).
-
 
 ldoc_size(#doc{id = <<"_local/", _/binary>>} = Doc) ->
     #doc{
@@ -124,10 +120,11 @@ ldoc_size(#doc{id = <<"_local/", _/binary>>} = Doc) ->
         body = Body
     } = Doc,
 
-    StoreRev = case Rev of
-        _ when is_integer(Rev) -> integer_to_binary(Rev);
-        _ when is_binary(Rev) -> Rev
-    end,
+    StoreRev =
+        case Rev of
+            _ when is_integer(Rev) -> integer_to_binary(Rev);
+            _ when is_binary(Rev) -> Rev
+        end,
 
     case Deleted of
         true ->
@@ -140,14 +137,11 @@ ldoc_size(#doc{id = <<"_local/", _/binary>>} = Doc) ->
             ])
     end.
 
-
 seq_zero_vs() ->
     {versionstamp, 0, 0, 0}.
 
-
 seq_max_vs() ->
     {versionstamp, 18446744073709551615, 65535, 65535}.
-
 
 user_ctx_to_json(Db) ->
     UserCtx = fabric2_db:get_user_ctx(Db),
@@ -156,7 +150,6 @@ user_ctx_to_json(Db) ->
         {<<"name">>, UserCtx#user_ctx.name},
         {<<"roles">>, UserCtx#user_ctx.roles}
     ]}.
-
 
 validate_security_object({SecProps}) ->
     Admins = get_value(<<"admins">>, SecProps, {[]}),
@@ -167,71 +160,70 @@ validate_security_object({SecProps}) ->
     Members = get_value(<<"members">>, SecProps, Readers),
     ok = validate_names_and_roles(Members).
 
-
 validate_names_and_roles({Props}) when is_list(Props) ->
     validate_json_list_of_strings(<<"names">>, Props),
     validate_json_list_of_strings(<<"roles">>, Props);
 validate_names_and_roles(_) ->
     throw("admins or members must be a JSON list of strings").
 
-
 validate_json_list_of_strings(Member, Props) ->
     case get_value(Member, Props, []) of
         Values when is_list(Values) ->
             NonBinary = lists:filter(fun(V) -> not is_binary(V) end, Values),
-            if NonBinary == [] -> ok; true ->
-                MemberStr = binary_to_list(Member),
-                throw(MemberStr ++ " must be a JSON list of strings")
+            if
+                NonBinary == [] ->
+                    ok;
+                true ->
+                    MemberStr = binary_to_list(Member),
+                    throw(MemberStr ++ " must be a JSON list of strings")
             end;
         _ ->
             MemberStr = binary_to_list(Member),
             throw(MemberStr ++ " must be a JSON list of strings")
     end.
 
-
 hash_atts([]) ->
     <<>>;
-
 hash_atts(Atts) ->
-    SortedAtts = lists:sort(fun(A, B) ->
-        couch_att:fetch(name, A) =< couch_att:fetch(name, B)
-    end, Atts),
-    Md5St = lists:foldl(fun(Att, Acc) ->
-        {loc, _Db, _DocId, AttId} = couch_att:fetch(data, Att),
-        couch_hash:md5_hash_update(Acc, AttId)
-    end, couch_hash:md5_hash_init(), SortedAtts),
+    SortedAtts = lists:sort(
+        fun(A, B) ->
+            couch_att:fetch(name, A) =< couch_att:fetch(name, B)
+        end,
+        Atts
+    ),
+    Md5St = lists:foldl(
+        fun(Att, Acc) ->
+            {loc, _Db, _DocId, AttId} = couch_att:fetch(data, Att),
+            couch_hash:md5_hash_update(Acc, AttId)
+        end,
+        couch_hash:md5_hash_init(),
+        SortedAtts
+    ),
     couch_hash:md5_hash_final(Md5St).
-
 
 dbname_ends_with(#{} = Db, Suffix) ->
     dbname_ends_with(fabric2_db:name(Db), Suffix);
-
 dbname_ends_with(DbName, Suffix) when is_binary(DbName), is_binary(Suffix) ->
     Suffix == filename:basename(DbName).
-
 
 get_value(Key, List) ->
     get_value(Key, List, undefined).
 
-
 get_value(Key, List, Default) ->
     case lists:keysearch(Key, 1, List) of
-        {value, {Key,Value}} ->
+        {value, {Key, Value}} ->
             Value;
         false ->
             Default
     end.
 
-
 to_hex(Bin) ->
     list_to_binary(to_hex_int(Bin)).
-
 
 to_hex_int(<<>>) ->
     [];
 to_hex_int(<<Hi:4, Lo:4, Rest/binary>>) ->
     [nibble_to_hex(Hi), nibble_to_hex(Lo) | to_hex(Rest)].
-
 
 nibble_to_hex(I) ->
     case I of
@@ -253,10 +245,8 @@ nibble_to_hex(I) ->
         15 -> $f
     end.
 
-
 from_hex(Bin) ->
     iolist_to_binary(from_hex_int(Bin)).
-
 
 from_hex_int(<<>>) ->
     [];
@@ -266,7 +256,6 @@ from_hex_int(<<Hi:8, Lo:8, RestBinary/binary>>) ->
     [<<HiNib:4, LoNib:4>> | from_hex_int(RestBinary)];
 from_hex_int(<<BadHex/binary>>) ->
     erlang:error({invalid_hex, BadHex}).
-
 
 hex_to_nibble(N) ->
     case N of
@@ -295,40 +284,42 @@ hex_to_nibble(N) ->
         _ -> erlang:error({invalid_hex, N})
     end.
 
-
 uuid() ->
     to_hex(crypto:strong_rand_bytes(16)).
-
 
 encode_all_doc_key(B) when is_binary(B) -> B;
 encode_all_doc_key(Term) when Term < <<>> -> <<>>;
 encode_all_doc_key(_) -> <<255>>.
 
-
 all_docs_view_opts(#mrargs{} = Args) ->
     NS = couch_util:get_value(namespace, Args#mrargs.extra),
-    StartKey = case Args#mrargs.start_key of
-        undefined -> Args#mrargs.start_key_docid;
-        SKey -> SKey
-    end,
-    EndKey = case Args#mrargs.end_key of
-        undefined -> Args#mrargs.end_key_docid;
-        EKey -> EKey
-    end,
-    StartKeyOpts = case StartKey of
-        undefined -> [];
-        _ -> [{start_key, encode_all_doc_key(StartKey)}]
-    end,
-    EndKeyOpts = case {EndKey, Args#mrargs.inclusive_end} of
-        {undefined, _} -> [];
-        {_, false} -> [{end_key_gt, encode_all_doc_key(EndKey)}];
-        {_, true} -> [{end_key, encode_all_doc_key(EndKey)}]
-    end,
+    StartKey =
+        case Args#mrargs.start_key of
+            undefined -> Args#mrargs.start_key_docid;
+            SKey -> SKey
+        end,
+    EndKey =
+        case Args#mrargs.end_key of
+            undefined -> Args#mrargs.end_key_docid;
+            EKey -> EKey
+        end,
+    StartKeyOpts =
+        case StartKey of
+            undefined -> [];
+            _ -> [{start_key, encode_all_doc_key(StartKey)}]
+        end,
+    EndKeyOpts =
+        case {EndKey, Args#mrargs.inclusive_end} of
+            {undefined, _} -> [];
+            {_, false} -> [{end_key_gt, encode_all_doc_key(EndKey)}];
+            {_, true} -> [{end_key, encode_all_doc_key(EndKey)}]
+        end,
 
-    DocOpts = case Args#mrargs.conflicts of
-        true -> [conflicts | Args#mrargs.doc_options];
-        _ -> Args#mrargs.doc_options
-    end,
+    DocOpts =
+        case Args#mrargs.conflicts of
+            true -> [conflicts | Args#mrargs.doc_options];
+            _ -> Args#mrargs.doc_options
+        end,
 
     [
         {dir, Args#mrargs.direction},
@@ -340,7 +331,6 @@ all_docs_view_opts(#mrargs{} = Args) ->
         {doc_opts, DocOpts}
     ] ++ StartKeyOpts ++ EndKeyOpts.
 
-
 iso8601_timestamp() ->
     Now = os:timestamp(),
     {{Year, Month, Date}, {Hour, Minute, Second}} =
@@ -348,44 +338,49 @@ iso8601_timestamp() ->
     Format = "~4.10.0B-~2.10.0B-~2.10.0BT~2.10.0B:~2.10.0B:~2.10.0BZ",
     io_lib:format(Format, [Year, Month, Date, Hour, Minute, Second]).
 
-
 now(ms) ->
     {Mega, Sec, Micro} = os:timestamp(),
     (Mega * 1000000 + Sec) * 1000 + round(Micro / 1000);
 now(sec) ->
     now(ms) div 1000.
 
-
 do_recovery() ->
-    config:get_boolean("couchdb",
-        "enable_database_recovery", false).
-
+    config:get_boolean(
+        "couchdb",
+        "enable_database_recovery",
+        false
+    ).
 
 pmap(Fun, Args) ->
     pmap(Fun, Args, []).
 
-
 pmap(Fun, Args, Opts) ->
-    Refs = lists:map(fun(Arg) ->
-        {_, Ref} = spawn_monitor(fun() -> exit(pmap_exec(Fun, Arg)) end),
-        Ref
-    end, Args),
+    Refs = lists:map(
+        fun(Arg) ->
+            {_, Ref} = spawn_monitor(fun() -> exit(pmap_exec(Fun, Arg)) end),
+            Ref
+        end,
+        Args
+    ),
     Timeout = fabric2_util:get_value(timeout, Opts, 5000),
-    lists:map(fun(Ref) ->
-        receive
-            {'DOWN', Ref, _, _, {'$res', Res}} ->
-                Res;
-            {'DOWN', Ref, _, _, {'$err', Tag, Reason, Stack}} ->
-                erlang:raise(Tag, Reason, Stack)
-        after Timeout ->
-            error({pmap_timeout, Timeout})
-        end
-    end, Refs).
-
+    lists:map(
+        fun(Ref) ->
+            receive
+                {'DOWN', Ref, _, _, {'$res', Res}} ->
+                    Res;
+                {'DOWN', Ref, _, _, {'$err', Tag, Reason, Stack}} ->
+                    erlang:raise(Tag, Reason, Stack)
+            after Timeout ->
+                error({pmap_timeout, Timeout})
+            end
+        end,
+        Refs
+    ).
 
 pmap_exec(Fun, Arg) ->
     try
         {'$res', Fun(Arg)}
-    catch Tag:Reason:Stack ->
-        {'$err', Tag, Reason, Stack}
+    catch
+        Tag:Reason:Stack ->
+            {'$err', Tag, Reason, Stack}
     end.

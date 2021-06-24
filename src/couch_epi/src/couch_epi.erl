@@ -17,9 +17,14 @@
 
 %% queries and introspection
 -export([
-    dump/1, get/2, get_value/3,
-    by_key/1, by_key/2, by_source/1, by_source/2,
-    keys/1, subscribers/1]).
+    dump/1,
+    get/2,
+    get_value/3,
+    by_key/1, by_key/2,
+    by_source/1, by_source/2,
+    keys/1,
+    subscribers/1
+]).
 
 %% apply
 -export([apply/5, decide/5]).
@@ -51,19 +56,18 @@
 
 -opaque handle() :: module().
 
--type apply_opt()
-    :: ignore_errors
-        | concurrent
-        | pipe.
+-type apply_opt() ::
+    ignore_errors
+    | concurrent
+    | pipe.
 
 -type apply_opts() :: [apply_opt()].
 
--type data_spec()
-    :: {static_module, module()}
-        | {callback_module, module()}
-        | {priv_file, FileName :: string()}
-        | {file, FileName :: string()}.
-
+-type data_spec() ::
+    {static_module, module()}
+    | {callback_module, module()}
+    | {priv_file, FileName :: string()}
+    | {file, FileName :: string()}.
 
 %% ------------------------------------------------------------------
 %% API Function Definitions
@@ -87,13 +91,11 @@ get(Handle, Key) when Handle /= undefined ->
 get_value(Handle, Subscriber, Key) when Handle /= undefined ->
     couch_epi_data_gen:get(Handle, Subscriber, Key).
 
-
 -spec by_key(Handle :: handle()) ->
     [{Key :: key(), [{Source :: app(), properties()}]}].
 
 by_key(Handle) when Handle /= undefined ->
     couch_epi_data_gen:by_key(Handle).
-
 
 -spec by_key(Handle :: handle(), Key :: key()) ->
     [{Source :: app(), properties()}].
@@ -101,13 +103,11 @@ by_key(Handle) when Handle /= undefined ->
 by_key(Handle, Key) when Handle /= undefined ->
     couch_epi_data_gen:by_key(Handle, Key).
 
-
 -spec by_source(Handle :: handle()) ->
     [{Source :: app(), [{Key :: key(), properties()}]}].
 
 by_source(Handle) when Handle /= undefined ->
     couch_epi_data_gen:by_source(Handle).
-
 
 -spec by_source(Handle :: handle(), Subscriber :: app()) ->
     [{Key :: key(), properties()}].
@@ -115,13 +115,11 @@ by_source(Handle) when Handle /= undefined ->
 by_source(Handle, Subscriber) when Handle /= undefined ->
     couch_epi_data_gen:by_source(Handle, Subscriber).
 
-
 -spec keys(Handle :: handle()) ->
     [Key :: key()].
 
 keys(Handle) when Handle /= undefined ->
     couch_epi_data_gen:keys(Handle).
-
 
 -spec subscribers(Handle :: handle()) ->
     [Subscriber :: app()].
@@ -129,51 +127,73 @@ keys(Handle) when Handle /= undefined ->
 subscribers(Handle) when Handle /= undefined ->
     couch_epi_data_gen:subscribers(Handle).
 
--spec apply(Handle :: handle(), ServiceId :: atom(), Function :: atom(),
-    Args :: [term()], Opts :: apply_opts()) -> [any()].
+-spec apply(
+    Handle :: handle(),
+    ServiceId :: atom(),
+    Function :: atom(),
+    Args :: [term()],
+    Opts :: apply_opts()
+) -> [any()].
 
 apply(Handle, ServiceId, Function, Args, Opts) when Handle /= undefined ->
     couch_epi_functions_gen:apply(Handle, ServiceId, Function, Args, Opts).
 
--spec get_handle({ServiceId :: service_id(), Key :: key()}) -> handle();
-                (ServiceId :: service_id()) -> handle().
+-spec get_handle
+    ({ServiceId :: service_id(), Key :: key()}) -> handle();
+    (ServiceId :: service_id()) -> handle().
 
 get_handle({_ServiceId, _Key} = EPIKey) ->
     couch_epi_data_gen:get_handle(EPIKey);
 get_handle(ServiceId) when is_atom(ServiceId) ->
     couch_epi_functions_gen:get_handle(ServiceId).
 
--spec any(Handle :: handle(), ServiceId :: atom(), Function :: atom(),
-    Args :: [term()], Opts :: apply_opts()) -> boolean().
+-spec any(
+    Handle :: handle(),
+    ServiceId :: atom(),
+    Function :: atom(),
+    Args :: [term()],
+    Opts :: apply_opts()
+) -> boolean().
 
 any(Handle, ServiceId, Function, Args, Opts) when Handle /= undefined ->
     Replies = apply(Handle, ServiceId, Function, Args, Opts),
     [] /= [Reply || Reply <- Replies, Reply == true].
 
--spec all(Handle :: handle(), ServiceId :: atom(), Function :: atom(),
-    Args :: [term()], Opts :: apply_opts()) -> boolean().
+-spec all(
+    Handle :: handle(),
+    ServiceId :: atom(),
+    Function :: atom(),
+    Args :: [term()],
+    Opts :: apply_opts()
+) -> boolean().
 
 all(Handle, ServiceId, Function, Args, Opts) when Handle /= undefined ->
     Replies = apply(Handle, ServiceId, Function, Args, Opts),
     [] == [Reply || Reply <- Replies, Reply == false].
 
 -spec is_configured(
-    Handle :: handle(), Function :: atom(), Arity :: pos_integer()) -> boolean().
+    Handle :: handle(), Function :: atom(), Arity :: pos_integer()
+) -> boolean().
 
 is_configured(Handle, Function, Arity) when Handle /= undefined ->
     [] /= couch_epi_functions_gen:modules(Handle, Function, Arity).
 
-
 -spec register_service(
-    PluginId :: plugin_id(), Children :: [supervisor:child_spec()]) ->
-        [supervisor:child_spec()].
+    PluginId :: plugin_id(), Children :: [supervisor:child_spec()]
+) ->
+    [supervisor:child_spec()].
 
 register_service(Plugin, Children) ->
     couch_epi_sup:plugin_childspecs(Plugin, Children).
 
--spec decide(Handle :: handle(), ServiceId :: atom(), Function :: atom(),
-    Args :: [term()], Opts :: apply_opts()) ->
-        no_decision | {decided, term()}.
+-spec decide(
+    Handle :: handle(),
+    ServiceId :: atom(),
+    Function :: atom(),
+    Args :: [term()],
+    Opts :: apply_opts()
+) ->
+    no_decision | {decided, term()}.
 
 decide(Handle, ServiceId, Function, Args, Opts) when Handle /= undefined ->
     couch_epi_functions_gen:decide(Handle, ServiceId, Function, Args, Opts).

@@ -23,11 +23,9 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-
 init([]) ->
     ok = couch_log_config:init(),
     {ok, {{one_for_one, 10, 10}, children()}}.
-
 
 children() ->
     [
@@ -74,7 +72,6 @@ handle_config_change("log", Key, _, _, S) ->
     end,
     notify_listeners(),
     {ok, S};
-
 handle_config_change(_, _, _, _, S) ->
     {ok, S}.
 
@@ -84,9 +81,12 @@ handle_config_terminate(_Server, _Reason, _State) ->
 -ifdef(TEST).
 notify_listeners() ->
     Listeners = application:get_env(couch_log, config_listeners, []),
-    lists:foreach(fun(L) ->
-        L ! couch_log_config_change_finished
-    end, Listeners).
+    lists:foreach(
+        fun(L) ->
+            L ! couch_log_config_change_finished
+        end,
+        Listeners
+    ).
 -else.
 notify_listeners() ->
     ok.

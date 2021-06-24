@@ -12,21 +12,20 @@
 
 -module(mango_error).
 
-
 -include_lib("couch/include/couch_db.hrl").
-
 
 -export([
     info/2
 ]).
 
-
 info(mango_idx, {no_usable_index, missing_sort_index}) ->
     {
         400,
         <<"no_usable_index">>,
-        <<"No index exists for this sort, "
-            "try indexing by the sort fields.">>
+        <<
+            "No index exists for this sort, "
+            "try indexing by the sort fields."
+        >>
     };
 info(mango_idx, {no_usable_index, missing_sort_index_global}) ->
     {
@@ -40,7 +39,6 @@ info(mango_json_bookmark, {invalid_bookmark, BadBookmark}) ->
         <<"invalid_bookmark">>,
         fmt("Invalid bookmark value: ~s", [?JSON_ENCODE(BadBookmark)])
     };
-
 info(mango_cursor_text, {invalid_bookmark, BadBookmark}) ->
     {
         400,
@@ -53,8 +51,9 @@ info(mango_cursor_text, multiple_text_indexes) ->
         <<"multiple_text_indexes">>,
         <<"You must specify an index with the `use_index` parameter.">>
     };
-info(mango_cursor_text, {text_search_error, {error, {bad_request, Msg}}})
-        when is_binary(Msg) ->
+info(mango_cursor_text, {text_search_error, {error, {bad_request, Msg}}}) when
+    is_binary(Msg)
+->
     {
         400,
         <<"text_search_error">>,
@@ -66,7 +65,6 @@ info(mango_cursor_text, {text_search_error, {error, Error}}) ->
         <<"text_search_error">>,
         fmt("~p", [Error])
     };
-
 info(mango_fields, {invalid_fields_json, BadFields}) ->
     {
         400,
@@ -79,7 +77,6 @@ info(mango_fields, {invalid_field_json, BadField}) ->
         <<"invalid_field">>,
         fmt("Invalid JSON for field spec: ~w", [BadField])
     };
-
 info(mango_httpd, error_saving_ddoc) ->
     {
         500,
@@ -102,9 +99,8 @@ info(mango_httpd, invalid_list_index_params) ->
     {
         500,
         <<"invalid_list_index_params">>,
-        <<"Index parameter ranges: limit > 1, skip > 0" >>
+        <<"Index parameter ranges: limit > 1, skip > 0">>
     };
-
 info(mango_idx, {invalid_index_type, BadType}) ->
     {
         400,
@@ -135,7 +131,6 @@ info(mango_idx, {index_service_unavailable, IndexName}) ->
         <<"required index service unavailable">>,
         fmt("~s", [IndexName])
     };
-
 info(mango_idx_view, {invalid_index_json, BadIdx}) ->
     {
         400,
@@ -146,9 +141,12 @@ info(mango_idx_text, {invalid_index_fields_definition, Def}) ->
     {
         400,
         <<"invalid_index_fields_definition">>,
-        fmt("Text Index field definitions must be of the form
-            {\"name\": \"non-empty fieldname\", \"type\":
-                \"boolean,number, or string\"}. Def: ~p", [Def])
+        fmt(
+            "Text Index field definitions must be of the form\n"
+            "            {\"name\": \"non-empty fieldname\", \"type\":\n"
+            "                \"boolean,number, or string\"}. Def: ~p",
+            [Def]
+        )
     };
 info(mango_idx_view, {index_not_found, BadIdx}) ->
     {
@@ -156,7 +154,6 @@ info(mango_idx_view, {index_not_found, BadIdx}) ->
         <<"invalid_index">>,
         fmt("JSON index ~s not found in this design doc.", [BadIdx])
     };
-
 info(mango_idx_text, {invalid_index_text, BadIdx}) ->
     {
         400,
@@ -175,13 +172,14 @@ info(mango_idx_text, index_all_disabled) ->
         <<"index_all_disabled">>,
         <<"New text indexes are forbidden to index all fields.">>
     };
-
 info(mango_opts, {invalid_bulk_docs, Val}) ->
     {
         400,
         <<"invalid_bulk_docs">>,
-        fmt("Bulk Delete requires an array of non-null docids. Docids: ~w",
-            [Val])
+        fmt(
+            "Bulk Delete requires an array of non-null docids. Docids: ~w",
+            [Val]
+        )
     };
 info(mango_opts, {invalid_ejson, Val}) ->
     {
@@ -255,15 +253,15 @@ info(mango_opts, {invalid_index_name, BadName}) ->
         <<"invalid_index_name">>,
         fmt("Invalid index name: ~w", [BadName])
     };
-
 info(mango_opts, {multiple_text_operator, {invalid_selector, BadSel}}) ->
     {
         400,
         <<"multiple_text_selector">>,
-        fmt("Selector cannot contain more than one $text operator: ~w",
-            [BadSel])
+        fmt(
+            "Selector cannot contain more than one $text operator: ~w",
+            [BadSel]
+        )
     };
-
 info(mango_selector, {invalid_selector, missing_field_name}) ->
     {
         400,
@@ -294,7 +292,6 @@ info(mango_selector, {bad_field, BadSel}) ->
         <<"bad_field">>,
         fmt("Invalid field normalization on selector: ~w", [BadSel])
     };
-
 info(mango_selector_text, {invalid_operator, Op}) ->
     {
         400,
@@ -303,14 +300,14 @@ info(mango_selector_text, {invalid_operator, Op}) ->
     };
 info(mango_selector_text, {text_sort_error, Field}) ->
     S = binary_to_list(Field),
-    Msg = "Unspecified or ambiguous sort type. Try appending :number or"
+    Msg =
+        "Unspecified or ambiguous sort type. Try appending :number or"
         " :string to the sort field. ~s",
     {
         400,
         <<"text_sort_error">>,
         fmt(Msg, [S])
     };
-
 info(mango_sort, {invalid_sort_json, BadSort}) ->
     {
         400,
@@ -335,7 +332,6 @@ info(mango_sort, {unsupported, mixed_sort}) ->
         <<"unsupported_mixed_sort">>,
         <<"Sorts currently only support a single direction for all fields.">>
     };
-
 info(mango_util, {error_loading_doc, DocId}) ->
     {
         500,
@@ -354,14 +350,12 @@ info(mango_util, {invalid_ddoc_lang, Lang}) ->
         <<"invalid_ddoc_lang">>,
         fmt("Existing design doc has an invalid language: ~w", [Lang])
     };
-
 info(Module, Reason) ->
     {
         500,
         <<"unknown_error">>,
         fmt("Unknown Error: ~s :: ~w", [Module, Reason])
     }.
-
 
 fmt(Format, Args) ->
     iolist_to_binary(io_lib:format(Format, Args)).

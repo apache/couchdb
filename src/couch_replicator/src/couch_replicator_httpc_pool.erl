@@ -31,12 +31,14 @@
 -record(state, {
     url,
     proxy_url,
-    limit,                  % max # of workers allowed
+    % max # of workers allowed
+    limit,
     workers = [],
-    waiting = queue:new(),  % blocked clients waiting for a worker
-    callers = []            % clients who've been given a worker
+    % blocked clients waiting for a worker
+    waiting = queue:new(),
+    % clients who've been given a worker
+    callers = []
 }).
-
 
 start_link(Url, Options) ->
     start_link(Url, undefined, Options).
@@ -47,10 +49,8 @@ start_link(Url, ProxyUrl, Options) ->
 stop(Pool) ->
     ok = gen_server:call(Pool, stop, infinity).
 
-
 get_worker(Pool) ->
     {ok, _Worker} = gen_server:call(Pool, get_worker, infinity).
-
 
 release_worker(Pool, Worker) ->
     ok = gen_server:cast(Pool, {release_worker, Worker}).
@@ -67,7 +67,6 @@ init({Url, ProxyUrl, Options}) ->
     },
     {ok, State}.
 
-
 handle_call(get_worker, From, State) ->
     #state{
         waiting = Waiting,
@@ -78,22 +77,20 @@ handle_call(get_worker, From, State) ->
         workers = Workers
     } = State,
     case length(Workers) >= Limit of
-    true ->
-        {noreply, State#state{waiting = queue:in(From, Waiting)}};
-    false ->
-        % If the call to acquire fails, the worker pool will crash with a
-        % badmatch.
-        {ok, Worker} = couch_replicator_connection:acquire(Url, ProxyUrl),
-        NewState = State#state{
-            workers = [Worker | Workers],
-            callers = monitor_client(Callers, Worker, From)
-        },
-        {reply, {ok, Worker}, NewState}
+        true ->
+            {noreply, State#state{waiting = queue:in(From, Waiting)}};
+        false ->
+            % If the call to acquire fails, the worker pool will crash with a
+            % badmatch.
+            {ok, Worker} = couch_replicator_connection:acquire(Url, ProxyUrl),
+            NewState = State#state{
+                workers = [Worker | Workers],
+                callers = monitor_client(Callers, Worker, From)
+            },
+            {reply, {ok, Worker}, NewState}
     end;
-
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
-
 handle_call({release_worker_sync, Worker}, _From, State) ->
     {reply, ok, release_worker_internal(Worker, State)}.
 
@@ -115,8 +112,10 @@ handle_info({'EXIT', Pid, _Reason}, State) ->
         Workers2 ->
             case queue:out(Waiting) of
                 {empty, _} ->
-                    {noreply, State#state{workers = Workers2,
-                        callers = NewCallers0}};
+                    {noreply, State#state{
+                        workers = Workers2,
+                        callers = NewCallers0
+                    }};
                 {{value, From}, Waiting2} ->
                     {ok, Worker} = couch_replicator_connection:acquire(Url, ProxyUrl),
                     NewCallers1 = monitor_client(NewCallers0, Worker, From),
@@ -129,7 +128,6 @@ handle_info({'EXIT', Pid, _Reason}, State) ->
                     {noreply, NewState}
             end
     end;
-
 handle_info({'DOWN', Ref, process, _, _}, #state{callers = Callers} = State) ->
     case lists:keysearch(Ref, 2, Callers) of
         {value, {Worker, Ref}} ->
@@ -138,9 +136,8 @@ handle_info({'DOWN', Ref, process, _, _}, #state{callers = Callers} = State) ->
             {noreply, State}
     end.
 
-code_change(_OldVsn, #state{}=State, _Extra) ->
+code_change(_OldVsn, #state{} = State, _Extra) ->
     {ok, State}.
-
 
 terminate(_Reason, _State) ->
     ok.
@@ -172,25 +169,28 @@ demonitor_client(Callers, Worker) ->
 release_worker_internal(Worker, State) ->
     #state{waiting = Waiting, callers = Callers} = State,
     NewCallers0 = demonitor_client(Callers, Worker),
-    case is_process_alive(Worker) andalso
-        lists:member(Worker, State#state.workers) of
-    true ->
-        Workers = case queue:out(Waiting) of
-        {empty, Waiting2} ->
-            NewCallers1 = NewCallers0,
-            couch_replicator_connection:release(Worker),
-            State#state.workers -- [Worker];
-        {{value, From}, Waiting2} ->
-            NewCallers1 = monitor_client(NewCallers0, Worker, From),
-            gen_server:reply(From, {ok, Worker}),
-            State#state.workers
-        end,
-        NewState = State#state{
-           workers = Workers,
-           waiting = Waiting2,
-           callers = NewCallers1
-        },
-        NewState;
-   false ->
-        State#state{callers = NewCallers0}
-   end.
+    case
+        is_process_alive(Worker) andalso
+            lists:member(Worker, State#state.workers)
+    of
+        true ->
+            Workers =
+                case queue:out(Waiting) of
+                    {empty, Waiting2} ->
+                        NewCallers1 = NewCallers0,
+                        couch_replicator_connection:release(Worker),
+                        State#state.workers -- [Worker];
+                    {{value, From}, Waiting2} ->
+                        NewCallers1 = monitor_client(NewCallers0, Worker, From),
+                        gen_server:reply(From, {ok, Worker}),
+                        State#state.workers
+                end,
+            NewState = State#state{
+                workers = Workers,
+                waiting = Waiting2,
+                callers = NewCallers1
+            },
+            NewState;
+        false ->
+            State#state{callers = NewCallers0}
+    end.
