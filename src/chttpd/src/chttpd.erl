@@ -58,6 +58,9 @@
     buffer_response=false
 }).
 
+-define(DEFAULT_SERVER_OPTIONS, "[{recbuf, undefined}]").
+-define(DEFAULT_SOCKET_OPTIONS, "[{sndbuf, 262144}, {nodelay, true}]").
+
 start_link() ->
     start_link(http).
 start_link(http) ->
@@ -148,7 +151,13 @@ start_link(Name, Options) ->
     end.
 
 get_server_options(Module) ->
-    ServerOptsCfg = config:get(Module, "server_options", "[]"),
+    ServerOptsCfg =
+        case Module of
+            "chttpd" ->
+                config:get(Module, "server_options", ?DEFAULT_SERVER_OPTIONS);
+            _ ->
+                config:get(Module, "server_options", "[]")
+        end,
     {ok, ServerOpts} = couch_util:parse_term(ServerOptsCfg),
     ServerOpts.
 
@@ -165,13 +174,10 @@ handle_request(MochiReq0) ->
 
 handle_request_int(MochiReq) ->
     Begin = os:timestamp(),
-    case config:get("chttpd", "socket_options") of
-    undefined ->
-        ok;
-    SocketOptsCfg ->
-        {ok, SocketOpts} = couch_util:parse_term(SocketOptsCfg),
-        ok = mochiweb_socket:setopts(MochiReq:get(socket), SocketOpts)
-    end,
+    SocketOptsCfg = config:get("chttpd",
+        "socket_options", ?DEFAULT_SOCKET_OPTIONS),
+    {ok, SocketOpts} = couch_util:parse_term(SocketOptsCfg),
+    ok = mochiweb_socket:setopts(MochiReq:get(socket), SocketOpts),
 
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact

@@ -145,11 +145,19 @@ release_context({ApiMod, Ctx}) ->
 get_api_mod(Language) when is_binary(Language) ->
     try
         LangStr = binary_to_list(Language),
-        ModStr = config:get("couch_eval.languages", LangStr),
-        if ModStr /= undefined -> ok; true ->
-            erlang:error({unknown_eval_api_language, Language})
-        end,
-        list_to_existing_atom(ModStr)
+        ModStr =
+            case LangStr of
+                "javascript" ->
+                    config:get("couch_eval.languages", LangStr, "couch_js");
+                "query" ->
+                    config:get("couch_eval.languages", LangStr, "mango_eval");
+                _ ->
+                    config:get("couch_eval.languages", LangStr)
+            end,
+        case ModStr of
+            _ -> list_to_existing_atom(ModStr);
+            undefined -> erlang:error({unknown_eval_api_language, Language})
+        end
     catch error:badarg ->
         erlang:error({invalid_eval_api_mod, Language})
     end.

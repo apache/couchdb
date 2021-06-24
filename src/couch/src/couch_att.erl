@@ -60,6 +60,8 @@
 
 
 -define(CURRENT_ATT_FORMAT, 0).
+-define(DEFAULT_COMPRESSIBLE_TYPES,
+    "text/*, application/javascript, application/json, application/xml").
 
 
 -type prop_name() ::
@@ -633,7 +635,7 @@ fold_streamed_data(RcvFun, LenLeft, Fun, Acc) when LenLeft > 0->
 maybe_compress(Att) ->
     [Encoding, Type] = fetch([encoding, type], Att),
     IsCompressible = is_compressible(Type),
-    CompLevel = config:get_integer("attachments", "compression_level", 0),
+    CompLevel = config:get_integer("attachments", "compression_level", 8),
     case Encoding of
         identity when IsCompressible, CompLevel >= 1, CompLevel =< 9 ->
             compress(Att, CompLevel);
@@ -665,7 +667,8 @@ is_compressible(Type) when is_binary(Type) ->
     is_compressible(binary_to_list(Type));
 is_compressible(Type) ->
     TypeExpList = re:split(
-        config:get("attachments", "compressible_types", ""),
+        config:get("attachments", "compressible_types",
+            ?DEFAULT_COMPRESSIBLE_TYPES),
         "\\s*,\\s*",
         [{return, list}]
     ),

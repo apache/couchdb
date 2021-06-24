@@ -89,7 +89,7 @@ handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     {_ActionKey, "/", RelativePath} ->
         % GET /_utils/path or GET /_utils/
         CachingHeaders = [{"Cache-Control", "private, must-revalidate"}],
-        EnableCsp = config:get("csp", "enable", "false"),
+        EnableCsp = config:get("csp", "enable", "true"),
         Headers = maybe_add_csp_headers(CachingHeaders, EnableCsp),
         chttpd:serve_file(Req, RelativePath, DocumentRoot, Headers);
     {_ActionKey, "", _RelativePath} ->
@@ -330,7 +330,7 @@ handle_reload_query_servers_req(Req) ->
     send_method_not_allowed(Req, "POST").
 
 handle_uuids_req(#httpd{method='GET'}=Req) ->
-    Max = list_to_integer(config:get("uuids","max_count","1000")),
+    Max = config:get_integer("uuids", "max_count", 1000),
     Count = try list_to_integer(couch_httpd:qs_value(Req, "count", "1")) of
         N when N > Max ->
             throw({bad_request, <<"count parameter too large">>});

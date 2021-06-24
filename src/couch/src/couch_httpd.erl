@@ -40,6 +40,7 @@
 -define(HANDLER_NAME_IN_MODULE_POS, 6).
 -define(MAX_DRAIN_BYTES, 1048576).
 -define(MAX_DRAIN_TIME_MSEC, 1000).
+-define(DEFAULT_MAX_HTTP_REQUEST_SIZE, 4294967296).
 
 
 % SpecStr is a string like "{my_module, my_fun}"
@@ -131,7 +132,7 @@ validate_ctype(Req, Ctype) ->
 check_max_request_length(Req) ->
     Len = list_to_integer(header_value(Req, "Content-Length", "0")),
     MaxLen = chttpd_util:get_chttpd_config_integer(
-        "max_http_request_size", 4294967296),
+        "max_http_request_size", ?DEFAULT_MAX_HTTP_REQUEST_SIZE),
     case Len > MaxLen of
         true ->
             exit({body_too_large, Len});
@@ -256,14 +257,14 @@ recv_chunked(#httpd{mochi_req=MochiReq}, MaxChunkSize, ChunkFun, InitState) ->
     % called with Length == 0 on the last time.
     MochiReq:stream_body(MaxChunkSize, ChunkFun, InitState,
         chttpd_util:get_chttpd_config_integer(
-            "max_http_request_size", 4294967296)).
+            "max_http_request_size", ?DEFAULT_MAX_HTTP_REQUEST_SIZE)).
 
 body_length(#httpd{mochi_req=MochiReq}) ->
     MochiReq:get(body_length).
 
 body(#httpd{mochi_req=MochiReq, req_body=undefined}) ->
     MaxSize = chttpd_util:get_chttpd_config_integer(
-        "max_http_request_size", 4294967296),
+        "max_http_request_size", ?DEFAULT_MAX_HTTP_REQUEST_SIZE),
     MochiReq:recv_body(MaxSize);
 body(#httpd{req_body=ReqBody}) ->
     ReqBody.
