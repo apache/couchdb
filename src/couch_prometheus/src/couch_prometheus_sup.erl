@@ -32,8 +32,7 @@ init([]) ->
     }}.
 
 maybe_start_prometheus_http() ->
-    case config:get("prometheus", "additional_port", "false") of
-        "false" -> [];
-        "true" -> [?CHILD(couch_prometheus_http, worker)];
-        _ -> []
+    case config:get_boolean("prometheus", "additional_port", false) of
+        false -> [];
+        true -> [?CHILD(couch_prometheus_http, worker)]
     end.
