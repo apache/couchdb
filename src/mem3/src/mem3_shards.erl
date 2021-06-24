@@ -358,8 +358,9 @@ changes_callback({change, {Change}, _}, _) ->
                 ets:insert(?OPENERS, {DbName, Writer}),
                 Msg = {cache_insert_change, DbName, Writer, Seq},
                 gen_server:cast(?MODULE, Msg),
-                Opts = mem3_util:get_shard_opts(Doc),
-                [create_if_missing(mem3:name(S), Opts) || S
+                %% Opts = mem3_util:get_shard_opts(Doc),
+                %% [create_if_missing(mem3:name(S), Opts) || S
+                [create_if_missing(mem3:name(S), mem3:engine(S)) || S
                     <- Shards, mem3:node(S) =:= node()]
             end
         end
