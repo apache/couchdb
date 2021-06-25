@@ -59,16 +59,17 @@ COOKIE="${COOKIE:-monster}"
 
 printHelpAndExit() {
   echo "Usage: ${PROGNAME} [OPTION]... [-- <additional Erlang cli options>]"
-  echo "  -c cookie     specify shared Erlang cookie (default: monster)"
-  echo "  -l HOST       specify remsh's host name (default: 127.0.0.1)"
-  echo "  -m            use output of \`hostname -f\` as remsh's host name"
-  echo "  -n NAME@HOST  specify couchdb's Erlang node name (-name in vm.args)"
-  echo "  -v            verbose; print invocation line"
-  echo "  -h            this help message"
+  echo "  -c cookie         specify shared Erlang cookie (default: monster)"
+  echo "  -l HOST           specify remsh's host name (default: 127.0.0.1)"
+  echo "  -m                use output of \`hostname -f\` as remsh's host name"
+  echo "  -n NAME@HOST      specify couchdb's Erlang node name (-name in vm.args)"
+  echo "  -v                verbose; print invocation line"
+  echo "  -t path/to/conf   enable TLS distribution (customize in vm.args)"
+  echo "  -h                this help message"
   exit
 }
 
-while getopts ":hn:c:l:mv" optionName; do
+while getopts ":hn:c:l:mvt:" optionName; do
   case "$optionName" in
     h)
       printHelpAndExit 0
@@ -88,6 +89,13 @@ while getopts ":hn:c:l:mv" optionName; do
     v)
       VERBOSE=0
       ;;
+    t)
+      TLSCONF=$OPTARG
+      if [ ! -f "$TLSCONF" ]; then
+        echo "ERROR: Could't find the file \"$TLSCONF\"." >&2
+        exit 1
+      fi
+      ;;
     \?)
       echo "Invalid option: -$OPTARG" >&2
       printHelpAndExit 0
@@ -106,6 +114,13 @@ fi
 # to avoid conflicts with the cli parameters
 ERL_FLAGS_CLEAN=$(echo "$ERL_FLAGS" | sed 's/-setcookie \([^ ][^ ]*\)//g' | sed 's/-name \([^ ][^ ]*\)//g')
 
-exec env ERL_FLAGS="$ERL_FLAGS_CLEAN" "$BINDIR/erl" -boot "$ROOTDIR/releases/$APP_VSN/start_clean" \
-    -name remsh$$@$LHOST -remsh $NODE -hidden -setcookie $COOKIE \
-    "$@"
+if [ -z "$TLSCONF" ]; then
+  exec env ERL_FLAGS="$ERL_FLAGS_CLEAN" "$BINDIR/erl" -boot "$ROOTDIR/releases/$APP_VSN/start_clean" \
+      -name remsh$$@$LHOST -remsh $NODE -hidden -setcookie $COOKIE \
+      "$@"
+else
+  exec env ERL_FLAGS="$ERL_FLAGS_CLEAN" "$BINDIR/erl" -boot "$ROOTDIR/releases/$APP_VSN/start_clean" \
+      -name remsh$$@$LHOST -remsh $NODE -hidden -setcookie $COOKIE \
+      -proto_dist inet_tls -ssl_dist_optfile $TLSCONF \
+      "$@"
+fi
