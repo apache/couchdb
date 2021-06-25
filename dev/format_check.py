@@ -45,7 +45,8 @@ if __name__ == "__main__":
                     item["raw_path"],
                 ],
                 encoding="utf-8",
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
             if run_result.returncode != 0:
                 # erlfmt sometimes returns a non-zero status code with no
