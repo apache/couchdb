@@ -12,19 +12,16 @@
 
 -module(fabric2_db_misc_tests).
 
-
 % Used in events_listener test
 -export([
     event_listener_callback/3
 ]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2.hrl").
 -include("fabric2_test.hrl").
-
 
 misc_test_() ->
     {
@@ -56,19 +53,16 @@ misc_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([fabric]),
     DbName = ?tempdb(),
     {ok, Db} = fabric2_db:create(DbName, [{user_ctx, ?ADMIN_USER}]),
     {DbName, Db, Ctx}.
 
-
 cleanup({_DbName, Db, Ctx}) ->
     meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []),
     test_util:stop_couch(Ctx).
-
 
 empty_db_info({DbName, Db, _}) ->
     {ok, Info} = fabric2_db:get_db_info(Db),
@@ -79,7 +73,6 @@ empty_db_info({DbName, Db, _}) ->
     InfoUUID = fabric2_util:get_value(uuid, Info),
     UUID = fabric2_db:get_uuid(Db),
     ?assertEqual(UUID, InfoUUID).
-
 
 accessors({DbName, Db, _}) ->
     SeqZero = fabric2_fdb:vs_to_seq(fabric2_util:seq_zero_vs()),
@@ -99,39 +92,43 @@ accessors({DbName, Db, _}) ->
     ?assertEqual(false, fabric2_db:is_partitioned(Db)),
     ?assertEqual(false, fabric2_db:is_clustered(Db)).
 
-
 set_revs_limit({DbName, Db, _}) ->
     ?assertEqual(ok, fabric2_db:set_revs_limit(Db, 500)),
     {ok, Db2} = fabric2_db:open(DbName, []),
     ?assertEqual(500, fabric2_db:get_revs_limit(Db2)).
 
-
 set_security({DbName, Db, _}) ->
-    SecObj = {[
-        {<<"admins">>, {[
-            {<<"names">>, []},
-            {<<"roles">>, []}
-        ]}}
-    ]},
+    SecObj =
+        {[
+            {<<"admins">>,
+                {[
+                    {<<"names">>, []},
+                    {<<"roles">>, []}
+                ]}}
+        ]},
     ?assertEqual(ok, fabric2_db:set_security(Db, SecObj)),
     {ok, Db2} = fabric2_db:open(DbName, []),
     ?assertEqual(SecObj, fabric2_db:get_security(Db2)).
 
-
 get_security_cached({DbName, Db, _}) ->
     OldSecObj = fabric2_db:get_security(Db),
-    SecObj = {[
-        {<<"admins">>, {[
-            {<<"names">>, [<<"foo1">>]},
-            {<<"roles">>, []}
-        ]}}
-    ]},
+    SecObj =
+        {[
+            {<<"admins">>,
+                {[
+                    {<<"names">>, [<<"foo1">>]},
+                    {<<"roles">>, []}
+                ]}}
+        ]},
 
     % Set directly so we don't auto-update the local cache
     {ok, Db1} = fabric2_db:open(DbName, [?ADMIN_CTX]),
-    ?assertMatch({ok, #{}}, fabric2_fdb:transactional(Db1, fun(TxDb) ->
-        fabric2_fdb:set_config(TxDb, security_doc, SecObj)
-    end)),
+    ?assertMatch(
+        {ok, #{}},
+        fabric2_fdb:transactional(Db1, fun(TxDb) ->
+            fabric2_fdb:set_config(TxDb, security_doc, SecObj)
+        end)
+    ),
 
     {ok, Db2} = fabric2_db:open(DbName, [?ADMIN_CTX]),
     ?assertEqual(OldSecObj, fabric2_db:get_security(Db2, [{max_age, 1000}])),
@@ -140,7 +137,6 @@ get_security_cached({DbName, Db, _}) ->
     ?assertEqual(SecObj, fabric2_db:get_security(Db2, [{max_age, 50}])),
 
     ?assertEqual(ok, fabric2_db:set_security(Db2, OldSecObj)).
-
 
 is_system_db({DbName, Db, _}) ->
     ?assertEqual(false, fabric2_db:is_system_db(Db)),
@@ -152,7 +148,6 @@ is_system_db({DbName, Db, _}) ->
     ?assertEqual(false, fabric2_db:is_system_db_name(<<"f.o/_replicator">>)),
     ?assertEqual(false, fabric2_db:is_system_db_name(<<"foo/bar">>)).
 
-
 validate_dbname(_) ->
     Tests = [
         {ok, <<"foo">>},
@@ -162,13 +157,13 @@ validate_dbname(_) ->
         {error, illegal_database_name, <<"foo|bar">>},
         {error, illegal_database_name, <<"Foo">>},
         {error, database_name_too_long, <<
-                "0123456789012345678901234567890123456789"
-                "0123456789012345678901234567890123456789"
-                "0123456789012345678901234567890123456789"
-                "0123456789012345678901234567890123456789"
-                "0123456789012345678901234567890123456789"
-                "0123456789012345678901234567890123456789"
-            >>}
+            "0123456789012345678901234567890123456789"
+            "0123456789012345678901234567890123456789"
+            "0123456789012345678901234567890123456789"
+            "0123456789012345678901234567890123456789"
+            "0123456789012345678901234567890123456789"
+            "0123456789012345678901234567890123456789"
+        >>}
     ],
     CheckFun = fun
         ({ok, DbName}) ->
@@ -186,7 +181,6 @@ validate_dbname(_) ->
         % Unload within the test to minimize interference with other tests
         meck:unload()
     end.
-
 
 validate_doc_ids(_) ->
     % Basic test with default max infinity length
@@ -214,11 +208,11 @@ validate_doc_ids(_) ->
     try
         meck:new(config, [passthrough]),
         meck:expect(
-                config,
-                get,
-                ["couchdb", "max_document_id_length", "infinity"],
-                "16"
-            ),
+            config,
+            get,
+            ["couchdb", "max_document_id_length", "infinity"],
+            "16"
+        ),
         lists:foreach(CheckFun, Tests),
 
         % Check that fabric2_db_plugin can't allow for
@@ -231,7 +225,6 @@ validate_doc_ids(_) ->
         % interferes with the db version bump test.
         meck:unload()
     end.
-
 
 get_doc_info({_, Db, _}) ->
     DocId = couch_uuids:random(),
@@ -253,23 +246,23 @@ get_doc_info({_, Db, _}) ->
     ?assert(is_binary(HighSeq)),
     ?assertMatch([#rev_info{}], Revs),
 
-    [#rev_info{
-        rev = DIRev,
-        seq = Seq,
-        deleted = Deleted,
-        body_sp = BodySp
-    }] = Revs,
+    [
+        #rev_info{
+            rev = DIRev,
+            seq = Seq,
+            deleted = Deleted,
+            body_sp = BodySp
+        }
+    ] = Revs,
 
     ?assertEqual({Pos, Rev}, DIRev),
     ?assert(is_binary(Seq)),
     ?assert(not Deleted),
     ?assertMatch(undefined, BodySp).
 
-
 get_doc_info_not_found({_, Db, _}) ->
     DocId = couch_uuids:random(),
     ?assertEqual(not_found, fabric2_db:get_doc_info(Db, DocId)).
-
 
 get_full_doc_info({_, Db, _}) ->
     DocId = couch_uuids:random(),
@@ -295,30 +288,33 @@ get_full_doc_info({_, Db, _}) ->
     ?assertMatch([{Pos, {Rev, _, []}}], RevTree),
     ?assertEqual(#size_info{}, SizeInfo).
 
-
 get_full_doc_info_not_found({_, Db, _}) ->
     DocId = couch_uuids:random(),
     ?assertEqual(not_found, fabric2_db:get_full_doc_info(Db, DocId)).
 
-
 get_full_doc_infos({_, Db, _}) ->
-    DocIds = lists:map(fun(_) ->
-        DocId = couch_uuids:random(),
-        Doc = #doc{id = DocId},
-        {ok, _} = fabric2_db:update_doc(Db, Doc, []),
-        DocId
-    end, lists:seq(1, 5)),
+    DocIds = lists:map(
+        fun(_) ->
+            DocId = couch_uuids:random(),
+            Doc = #doc{id = DocId},
+            {ok, _} = fabric2_db:update_doc(Db, Doc, []),
+            DocId
+        end,
+        lists:seq(1, 5)
+    ),
 
     FDIs = fabric2_db:get_full_doc_infos(Db, DocIds),
-    lists:zipwith(fun(DocId, FDI) ->
-        ?assertEqual(DocId, FDI#full_doc_info.id)
-    end, DocIds, FDIs).
-
+    lists:zipwith(
+        fun(DocId, FDI) ->
+            ?assertEqual(DocId, FDI#full_doc_info.id)
+        end,
+        DocIds,
+        FDIs
+    ).
 
 ensure_full_commit({_, Db, _}) ->
     ?assertEqual({ok, 0}, fabric2_db:ensure_full_commit(Db)),
     ?assertEqual({ok, 0}, fabric2_db:ensure_full_commit(Db, 5)).
-
 
 metadata_bump({DbName, _, _}) ->
     % Call open again here to make sure we have a version in the cache
@@ -343,11 +339,13 @@ metadata_bump({DbName, _, _}) ->
     % Check that db handle in the cache got the new metadata version
     % and that check_current_ts was updated
     CachedDb = fabric2_server:fetch(DbName, undefined),
-    ?assertMatch(#{
-        md_version := NewMDVersion,
-        check_current_ts := Ts
-    } when Ts >= TsBeforeEnsureCurrent, CachedDb).
-
+    ?assertMatch(
+        #{
+            md_version := NewMDVersion,
+            check_current_ts := Ts
+        } when Ts >= TsBeforeEnsureCurrent,
+        CachedDb
+    ).
 
 db_version_bump({DbName, _, _}) ->
     % Call open again here to make sure we have a version in the cache
@@ -378,7 +376,6 @@ db_version_bump({DbName, _, _}) ->
     % Check that db handle in the cache got the new metadata version
     ?assertMatch(#{db_version := NewDbVersion}, Db2).
 
-
 db_cache_doesnt_evict_newer_handles({DbName, _, _}) ->
     {ok, Db} = fabric2_db:open(DbName, [{user_ctx, ?ADMIN_USER}]),
     CachedDb = fabric2_server:fetch(DbName, undefined),
@@ -393,7 +390,6 @@ db_cache_doesnt_evict_newer_handles({DbName, _, _}) ->
 
     ?assert(not fabric2_server:maybe_remove(StaleDb)),
     ?assertEqual(CachedDb, fabric2_server:fetch(DbName, undefined)).
-
 
 events_listener({DbName, Db, _}) ->
     Opts = [
@@ -437,7 +433,6 @@ events_listener({DbName, Db, _}) ->
 
     % After db is deleted or re-created listener should die
     ?assertEqual(exited_normal, NextEvent(1000)).
-
 
 % Callback for event_listener function
 event_listener_callback(_DbName, Event, TestPid) ->

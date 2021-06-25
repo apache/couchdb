@@ -12,15 +12,12 @@
 
 -module(fabric2_db_crud_tests).
 
-
 -include_lib("fabric/include/fabric2.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2_test.hrl").
 
-
 -define(PDICT_RAISE_IN_ERLFDB_WAIT, '$pdict_raise_in_erlfdb_wait').
-
 
 crud_test_() ->
     {
@@ -63,7 +60,6 @@ crud_test_() ->
         }
     }.
 
-
 scheduled_db_remove_error_test_() ->
     {
         "Test scheduled database remove operations",
@@ -82,7 +78,6 @@ scheduled_db_remove_error_test_() ->
         }
     }.
 
-
 setup_all() ->
     meck:new(config, [passthrough]),
     meck:expect(config, get_integer, fun
@@ -95,15 +90,12 @@ setup_all() ->
     meck:new(fabric2_db_expiration, [passthrough]),
     Ctx.
 
-
 teardown_all(Ctx) ->
     meck:unload(),
     test_util:stop_couch(Ctx).
 
-
 setup() ->
     fabric2_test_util:tx_too_old_mock_erlfdb().
-
 
 cleanup(_) ->
     ok = config:set("couchdb", "db_expiration_enabled", "false", false),
@@ -114,13 +106,11 @@ cleanup(_) ->
     meck:reset([config]),
     meck:reset([erlfdb]).
 
-
 create_db(_) ->
     DbName = ?tempdb(),
     ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
     ?assertEqual(true, ets:member(fabric2_server, DbName)),
     ?assertEqual({error, file_exists}, fabric2_db:create(DbName, [])).
-
 
 open_db(_) ->
     DbName = ?tempdb(),
@@ -136,7 +126,6 @@ open_db(_) ->
     true = ets:delete(fabric2_server, DbName),
     ?assertMatch({ok, _}, fabric2_db:open(DbName, [])).
 
-
 delete_db(_) ->
     DbName = ?tempdb(),
     ?assertError(database_does_not_exist, fabric2_db:delete(DbName, [])),
@@ -148,7 +137,6 @@ delete_db(_) ->
     ?assertEqual(false, ets:member(fabric2_server, DbName)),
 
     ?assertError(database_does_not_exist, fabric2_db:open(DbName, [])).
-
 
 recreate_db(_) ->
     DbName = ?tempdb(),
@@ -180,7 +168,6 @@ recreate_db(_) ->
     fabric2_server:remove(DbName),
     ?assertError(database_does_not_exist, fabric2_db:open(DbName, BadOpts)).
 
-
 recreate_db_interactive(_) ->
     DbName = ?tempdb(),
     ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
@@ -191,7 +178,6 @@ recreate_db_interactive(_) ->
     ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
 
     ?assertMatch({ok, _}, fabric2_db:get_db_info(Db1)).
-
 
 recreate_db_non_interactive(_) ->
     % This is also the default case, but we check that parsing the `false` open
@@ -206,7 +192,6 @@ recreate_db_non_interactive(_) ->
 
     ?assertError(database_does_not_exist, fabric2_db:get_db_info(Db1)).
 
-
 undelete_db(_) ->
     DbName = ?tempdb(),
     ?assertError(database_does_not_exist, fabric2_db:delete(DbName, [])),
@@ -218,9 +203,10 @@ undelete_db(_) ->
     ?assertEqual(ok, fabric2_db:delete(DbName, [])),
     ?assertEqual(false, ets:member(fabric2_server, DbName)),
 
-
     {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
-    [DeletedDbInfo] = [Info || Info <- Infos,
+    [DeletedDbInfo] = [
+        Info
+     || Info <- Infos,
         DbName == proplists:get_value(db_name, Info)
     ],
     Timestamp = proplists:get_value(timestamp, DeletedDbInfo),
@@ -228,13 +214,14 @@ undelete_db(_) ->
     OldTS = <<"2020-01-01T12:00:00Z">>,
     ?assertEqual(not_found, fabric2_db:undelete(DbName, DbName, OldTS, [])),
     BadDbName = <<"bad_dbname">>,
-    ?assertEqual(not_found,
-        fabric2_db:undelete(BadDbName, BadDbName, Timestamp, [])),
+    ?assertEqual(
+        not_found,
+        fabric2_db:undelete(BadDbName, BadDbName, Timestamp, [])
+    ),
 
     ok = fabric2_db:undelete(DbName, DbName, Timestamp, []),
     {ok, AllDbInfos} = fabric2_db:list_dbs_info(),
     ?assert(is_db_info_member(DbName, AllDbInfos)).
-
 
 remove_deleted_db(_) ->
     DbName = ?tempdb(),
@@ -248,22 +235,27 @@ remove_deleted_db(_) ->
     ?assertEqual(false, ets:member(fabric2_server, DbName)),
 
     {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
-    [DeletedDbInfo] = [Info || Info <- Infos,
+    [DeletedDbInfo] = [
+        Info
+     || Info <- Infos,
         DbName == proplists:get_value(db_name, Info)
     ],
     Timestamp = proplists:get_value(timestamp, DeletedDbInfo),
     OldTS = <<"2020-01-01T12:00:00Z">>,
-    ?assertEqual(not_found,
-        fabric2_db:delete(DbName, [{deleted_at, OldTS}])),
+    ?assertEqual(
+        not_found,
+        fabric2_db:delete(DbName, [{deleted_at, OldTS}])
+    ),
     BadDbName = <<"bad_dbname">>,
-    ?assertEqual(not_found,
-        fabric2_db:delete(BadDbName, [{deleted_at, Timestamp}])),
+    ?assertEqual(
+        not_found,
+        fabric2_db:delete(BadDbName, [{deleted_at, Timestamp}])
+    ),
 
     ok = fabric2_db:delete(DbName, [{deleted_at, Timestamp}]),
     {ok, Infos2} = fabric2_db:list_deleted_dbs_info(),
     DeletedDbs = [proplists:get_value(db_name, Info) || Info <- Infos2],
     ?assert(not lists:member(DbName, DeletedDbs)).
-
 
 scheduled_remove_deleted_db(_) ->
     ok = config:set("couchdb", "db_expiration_enabled", "true", false),
@@ -280,15 +272,17 @@ scheduled_remove_deleted_db(_) ->
     meck:reset(fabric2_db_expiration),
     meck:wait(fabric2_db_expiration, process_expirations, '_', 7000),
 
-    ?assertEqual(ok, test_util:wait(fun() ->
-        {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
-        DeletedDbs = [proplists:get_value(db_name, Info) || Info <- Infos],
-        case lists:member(DbName, DeletedDbs) of
-            true -> wait;
-            false -> ok
-        end
-    end)).
-
+    ?assertEqual(
+        ok,
+        test_util:wait(fun() ->
+            {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
+            DeletedDbs = [proplists:get_value(db_name, Info) || Info <- Infos],
+            case lists:member(DbName, DeletedDbs) of
+                true -> wait;
+                false -> ok
+            end
+        end)
+    ).
 
 scheduled_remove_deleted_dbs(_) ->
     ok = config:set("couchdb", "db_expiration_enabled", "true", false),
@@ -300,10 +294,12 @@ scheduled_remove_deleted_dbs(_) ->
 
     {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
     DeletedDbs = [proplists:get_value(db_name, Info) || Info <- Infos],
-    lists:map(fun(DbName) ->
-        ?assert(not lists:member(DbName, DeletedDbs))
-    end, DbNameList).
-
+    lists:map(
+        fun(DbName) ->
+            ?assert(not lists:member(DbName, DeletedDbs))
+        end,
+        DbNameList
+    ).
 
 scheduled_remove_deleted_dbs_with_error(_) ->
     meck:expect(fabric2_db_expiration, process_expirations, fun(_, _) ->
@@ -324,7 +320,6 @@ scheduled_remove_deleted_dbs_with_error(_) ->
     ?assertMatch({ok, _}, couch_jobs:get_job_data(undefined, JobType, FQJobId)),
     {ok, JobState} = couch_jobs:get_job_state(undefined, JobType, FQJobId),
     ?assert(lists:member(JobState, [pending, running])).
-
 
 old_db_handle(_) ->
     % db hard deleted
@@ -366,7 +361,9 @@ old_db_handle(_) ->
     ok = config:set("couchdb", "enable_database_recovery", "true", false),
     ?assertEqual(ok, fabric2_db:delete(DbName4, [])),
     {ok, Infos} = fabric2_db:list_deleted_dbs_info(),
-    [DeletedDbInfo] = [Info || Info <- Infos,
+    [DeletedDbInfo] = [
+        Info
+     || Info <- Infos,
         DbName4 == proplists:get_value(db_name, Info)
     ],
     Timestamp = proplists:get_value(timestamp, DeletedDbInfo),
@@ -384,7 +381,6 @@ old_db_handle(_) ->
     ?assertMatch({ok, _}, fabric2_db:create(DbName5, [])),
     ?assertError(database_does_not_exist, fabric2_db:get_db_info(Db5)).
 
-
 list_dbs(_) ->
     DbName = ?tempdb(),
     AllDbs1 = fabric2_db:list_dbs(),
@@ -400,26 +396,27 @@ list_dbs(_) ->
     AllDbs3 = fabric2_db:list_dbs(),
     ?assert(not lists:member(DbName, AllDbs3)).
 
-
 list_dbs_user_fun(_) ->
     ?assertMatch({ok, _}, fabric2_db:create(?tempdb(), [])),
 
     UserFun = fun(Row, Acc) -> {ok, [Row | Acc]} end,
     {ok, UserAcc} = fabric2_db:list_dbs(UserFun, [], []),
 
-    Base = lists:foldl(fun(DbName, Acc) ->
-        [{row, [{id, DbName}]} | Acc]
-    end, [{meta, []}], fabric2_db:list_dbs()),
+    Base = lists:foldl(
+        fun(DbName, Acc) ->
+            [{row, [{id, DbName}]} | Acc]
+        end,
+        [{meta, []}],
+        fabric2_db:list_dbs()
+    ),
     Expect = lists:reverse(Base, [complete]),
 
     ?assertEqual(Expect, lists:reverse(UserAcc)).
-
 
 list_dbs_user_fun_partial(_) ->
     UserFun = fun(Row, Acc) -> {stop, [Row | Acc]} end,
     {ok, UserAcc} = fabric2_db:list_dbs(UserFun, [], []),
     ?assertEqual([{meta, []}], UserAcc).
-
 
 list_dbs_info(_) ->
     DbName = ?tempdb(),
@@ -436,12 +433,10 @@ list_dbs_info(_) ->
     {ok, AllDbInfos3} = fabric2_db:list_dbs_info(),
     ?assert(not is_db_info_member(DbName, AllDbInfos3)).
 
-
 list_dbs_info_partial(_) ->
     UserFun = fun(Row, Acc) -> {stop, [Row | Acc]} end,
     {ok, UserAcc} = fabric2_db:list_dbs_info(UserFun, [], []),
     ?assertEqual([{meta, []}], UserAcc).
-
 
 list_dbs_tx_too_old(_) ->
     DbName1 = ?tempdb(),
@@ -483,17 +478,19 @@ list_dbs_tx_too_old(_) ->
     ok = fabric2_db:delete(DbName1, []),
     ok = fabric2_db:delete(DbName2, []).
 
-
 list_dbs_info_tx_too_old(_) ->
     % list_dbs_info uses a queue of 100 futures to fetch db infos in parallel
     % so create more than 100 dbs so make sure we have 100+ dbs in our test
 
     DbCount = 101,
-    DbNames = fabric2_util:pmap(fun(_) ->
-        DbName = ?tempdb(),
-        ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
-        DbName
-    end, lists:seq(1, DbCount)),
+    DbNames = fabric2_util:pmap(
+        fun(_) ->
+            DbName = ?tempdb(),
+            ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
+            DbName
+        end,
+        lists:seq(1, DbCount)
+    ),
 
     UserFun = fun
         ({row, _} = Row, Acc) ->
@@ -542,10 +539,12 @@ list_dbs_info_tx_too_old(_) ->
     fabric2_test_util:tx_too_old_setup_errors(1, {1, 1}),
     ?assertEqual({ok, DbInfos}, fabric2_db:list_dbs_info(UserFun, [], [])),
 
-    fabric2_util:pmap(fun(DbName) ->
-        ?assertEqual(ok, fabric2_db:delete(DbName, []))
-    end, DbNames).
-
+    fabric2_util:pmap(
+        fun(DbName) ->
+            ?assertEqual(ok, fabric2_db:delete(DbName, []))
+        end,
+        DbNames
+    ).
 
 list_deleted_dbs_info(_) ->
     DbName = ?tempdb(),
@@ -567,7 +566,6 @@ list_deleted_dbs_info(_) ->
     DeletedDbs4 = get_deleted_dbs(DeletedDbsInfo),
     ?assert(lists:member(DbName, DeletedDbs4)).
 
-
 list_deleted_dbs_info_user_fun(_) ->
     DbName = ?tempdb(),
     ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
@@ -577,19 +575,21 @@ list_deleted_dbs_info_user_fun(_) ->
     {ok, UserAcc} = fabric2_db:list_deleted_dbs_info(UserFun, [], []),
     {ok, DeletedDbsInfo} = fabric2_db:list_deleted_dbs_info(),
 
-    Base = lists:foldl(fun(DbInfo, Acc) ->
-        [{row, DbInfo} | Acc]
-    end, [{meta, []}], DeletedDbsInfo),
+    Base = lists:foldl(
+        fun(DbInfo, Acc) ->
+            [{row, DbInfo} | Acc]
+        end,
+        [{meta, []}],
+        DeletedDbsInfo
+    ),
     Expect = lists:reverse(Base, [complete]),
 
     ?assertEqual(Expect, lists:reverse(UserAcc)).
-
 
 list_deleted_dbs_info_user_fun_partial(_) ->
     UserFun = fun(Row, Acc) -> {stop, [Row | Acc]} end,
     {ok, UserAcc} = fabric2_db:list_deleted_dbs_info(UserFun, [], []),
     ?assertEqual([{meta, []}], UserAcc).
-
 
 list_deleted_dbs_info_with_timestamps(_) ->
     ok = config:set("couchdb", "enable_database_recovery", "true", false),
@@ -624,7 +624,8 @@ list_deleted_dbs_info_with_timestamps(_) ->
     {ok, Infos2} = fabric2_db:list_deleted_dbs_info(UserFun, [], Options2),
     TimeStamps2 = [fabric2_util:get_value(timestamp, Info) || Info <- Infos2],
     ?assertEqual(2, length(TimeStamps2)),
-    ?assertEqual([LastTS, MiddleTS], TimeStamps2), % because foldl reverses
+    % because foldl reverses
+    ?assertEqual([LastTS, MiddleTS], TimeStamps2),
 
     % Check we an end before LastTS
     Options3 = [{start_key, DbName}, {end_key, [DbName, MiddleTS]}],
@@ -647,7 +648,6 @@ list_deleted_dbs_info_with_timestamps(_) ->
     {ok, Infos5} = fabric2_db:list_deleted_dbs_info(UserFun, [], Options5),
     TimeStamps5 = [fabric2_util:get_value(timestamp, Info) || Info <- Infos5],
     ?assertEqual([FirstTS, MiddleTS], TimeStamps5).
-
 
 get_info_wait_retry_on_tx_too_old(_) ->
     DbName = ?tempdb(),
@@ -676,8 +676,7 @@ get_info_wait_retry_on_tx_too_old(_) ->
         ?assertEqual(ok, fabric2_db:delete(DbName, []))
     end).
 
-
-get_info_wait_retry_on_tx_abort(_)->
+get_info_wait_retry_on_tx_abort(_) ->
     DbName = ?tempdb(),
     ?assertMatch({ok, _}, fabric2_db:create(DbName, [])),
 
@@ -704,11 +703,9 @@ get_info_wait_retry_on_tx_abort(_)->
         ?assertEqual(ok, fabric2_db:delete(DbName, []))
     end).
 
-
 reset_fail_erfdb_wait() ->
     erase(?PDICT_RAISE_IN_ERLFDB_WAIT),
     meck:expect(erlfdb, wait, fun(F) -> meck:passthrough([F]) end).
-
 
 raise_in_erlfdb_wait(Future, Error, Count) ->
     put(?PDICT_RAISE_IN_ERLFDB_WAIT, Count),
@@ -725,10 +722,8 @@ raise_in_erlfdb_wait(Future, Error, Count) ->
             meck:passthrough([F])
     end).
 
-
 is_db_info_member(_, []) ->
     false;
-
 is_db_info_member(DbName, [DbInfo | RestInfos]) ->
     case lists:keyfind(db_name, 1, DbInfo) of
         {db_name, DbName} ->
@@ -737,12 +732,15 @@ is_db_info_member(DbName, [DbInfo | RestInfos]) ->
             is_db_info_member(DbName, RestInfos)
     end.
 
-get_deleted_dbs(DeletedDbInfos)  ->
-    lists:foldl(fun(DbInfo, Acc) ->
-        DbName = fabric2_util:get_value(db_name, DbInfo),
-        [DbName | Acc]
-    end, [], DeletedDbInfos).
-
+get_deleted_dbs(DeletedDbInfos) ->
+    lists:foldl(
+        fun(DbInfo, Acc) ->
+            DbName = fabric2_util:get_value(db_name, DbInfo),
+            [DbName | Acc]
+        end,
+        [],
+        DeletedDbInfos
+    ).
 
 create_and_delete_db() ->
     DbName = ?tempdb(),

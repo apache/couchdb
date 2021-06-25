@@ -20,26 +20,24 @@
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
 
-
 setup(SocketOpts) ->
     StartCtx = start_couch_with_cfg(SocketOpts),
     Db = ?tempdb(),
     create_db(url(Db)),
     {StartCtx, Db}.
 
-
 teardown(_, {StartCtx, Db}) ->
     delete_db(url(Db)),
-    ok = config:delete("admins", ?USER, _Persist=false),
+    ok = config:delete("admins", ?USER, _Persist = false),
     test_util:stop_couch(StartCtx).
-
 
 socket_buffer_size_test_() ->
     {
         "chttpd socket_buffer_size_test",
         {
             foreachx,
-            fun setup/1, fun teardown/2,
+            fun setup/1,
+            fun teardown/2,
             [
                 {"[{recbuf, undefined}]", fun default_buffer/2},
                 {"[{recbuf, 1024}]", fun small_recbuf/2},
@@ -48,31 +46,30 @@ socket_buffer_size_test_() ->
         }
     }.
 
-
 small_recbuf(_, {_, Db}) ->
-    {timeout, 30, ?_test(begin
-        Id = data(2048),
-        Response = put_req(url(Db) ++ "/" ++ Id, "{}"),
-        ?assert(Response =:= 400 orelse Response =:= request_failed)
-    end)}.
-
+    {timeout, 30,
+        ?_test(begin
+            Id = data(2048),
+            Response = put_req(url(Db) ++ "/" ++ Id, "{}"),
+            ?assert(Response =:= 400 orelse Response =:= request_failed)
+        end)}.
 
 small_buffer(_, {_, Db}) ->
-    {timeout, 30, ?_test(begin
-        Id = data(2048),
-        Response = put_req(url(Db) ++ "/" ++ Id, "{}"),
-        ?assert(Response =:= 400 orelse Response =:= request_failed)
-    end)}.
-
+    {timeout, 30,
+        ?_test(begin
+            Id = data(2048),
+            Response = put_req(url(Db) ++ "/" ++ Id, "{}"),
+            ?assert(Response =:= 400 orelse Response =:= request_failed)
+        end)}.
 
 default_buffer(_, {_, Db}) ->
-    {timeout, 30, ?_test(begin
-        Id = data(7000),
-        Headers = [{"Blah", data(7000)}],
-        Status = put_req(url(Db) ++ "/" ++ Id, Headers, "{}"),
-        ?assert(Status =:= 201 orelse Status =:= 202)
-    end)}.
-
+    {timeout, 30,
+        ?_test(begin
+            Id = data(7000),
+            Headers = [{"Blah", data(7000)}],
+            Status = put_req(url(Db) ++ "/" ++ Id, Headers, "{}"),
+            ?assert(Status =:= 201 orelse Status =:= 202)
+        end)}.
 
 % Helper functions
 
@@ -81,23 +78,18 @@ url() ->
     Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
     "http://" ++ Addr ++ ":" ++ Port.
 
-
 url(Db) ->
     url() ++ "/" ++ ?b2l(Db).
-
 
 create_db(Url) ->
     Status = put_req(Url ++ "?q=1&n=1", "{}"),
     ?assert(Status =:= 201 orelse Status =:= 202).
 
-
 delete_db(Url) ->
     {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
 
-
 put_req(Url, Body) ->
     put_req(Url, [], Body).
-
 
 put_req(Url, Headers, Body) ->
     AllHeaders = Headers ++ [?CONTENT_JSON, ?AUTH],
@@ -106,10 +98,8 @@ put_req(Url, Headers, Body) ->
         {error, Error} -> Error
     end.
 
-
 data(Size) ->
     string:copies("x", Size).
-
 
 append_to_cfg_chain(Cfg) ->
     CfgDir = filename:dirname(lists:last(?CONFIG_CHAIN)),
@@ -118,10 +108,9 @@ append_to_cfg_chain(Cfg) ->
     ok = file:write_file(CfgFile, CfgSect),
     ?CONFIG_CHAIN ++ [CfgFile].
 
-
 start_couch_with_cfg(Cfg) ->
     CfgChain = append_to_cfg_chain(Cfg),
     StartCtx = test_util:start_couch(CfgChain, [chttpd]),
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
     StartCtx.

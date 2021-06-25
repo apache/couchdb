@@ -12,16 +12,13 @@
 
 -module(fabric2_index_tests).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("fabric2_test.hrl").
 
-
 % Should match fabric2_index define
 -define(SHARDS, 32).
-
 
 index_test_() ->
     {
@@ -41,7 +38,6 @@ index_test_() ->
         }
     }.
 
-
 index_process_cleanup_test_() ->
     {
         "Test fabric process cleanup in indexing module",
@@ -58,13 +54,11 @@ index_process_cleanup_test_() ->
         }
     }.
 
-
 setup() ->
     meck:new(config, [passthrough]),
     meck:expect(config, get_integer, fun
         ("fabric", "index_updater_delay_msec", _) -> 200;
         ("fabric", "index_updater_resolution_msec", _) -> 100;
-
         (_, _, Default) -> Default
     end),
     meck:expect(config, get_boolean, fun
@@ -93,7 +87,6 @@ setup() ->
 
     #{db1 => Db1, db2 => Db2, ctx => Ctx, indices => Indices}.
 
-
 cleanup(#{db1 := Db1, db2 := Db2, ctx := Ctx, indices := Indices}) ->
     catch fabric2_db:delete(fabric2_db:name(Db1), []),
     catch fabric2_db:delete(fabric2_db:name(Db2), []),
@@ -102,7 +95,6 @@ cleanup(#{db1 := Db1, db2 := Db2, ctx := Ctx, indices := Indices}) ->
     application:set_env(fabric, indices, Indices),
 
     meck:unload().
-
 
 register_index_works(_) ->
     reset_callbacks(),
@@ -117,7 +109,6 @@ register_index_works(_) ->
     Indices2 = application:get_env(fabric, indices, []),
     ?assertEqual(lists:sort([Mod1, Mod2]), lists:sort(Indices2)).
 
-
 single_update(#{db1 := Db}) ->
     reset_callbacks(),
 
@@ -127,7 +118,6 @@ single_update(#{db1 := Db}) ->
 
     meck:wait(Mod, build_indices, 2, 2000),
     ?assertEqual(1, meck:num_calls(Mod, build_indices, 2)).
-
 
 multiple_updates(#{db1 := Db}) ->
     reset_callbacks(),
@@ -143,7 +133,6 @@ multiple_updates(#{db1 := Db}) ->
     timer:sleep(500),
     ?assert(meck:num_calls(Mod, build_indices, 2) =< 3).
 
-
 skip_db_if_no_ddocs(#{db2 := Db}) ->
     reset_callbacks(),
 
@@ -154,24 +143,28 @@ skip_db_if_no_ddocs(#{db2 := Db}) ->
     timer:sleep(500),
     ?assertEqual(0, meck:num_calls(Mod, build_indices, 2)).
 
-
 ignore_deleted_dbs(#{}) ->
     reset_callbacks(),
 
     Mod = fabric2_test_callback6,
     setup_callback(Mod),
-    lists:foreach(fun(_) ->
-        RandomDbName = fabric2_util:uuid(),
-        fabric2_index:db_updated(RandomDbName)
-    end, lists:seq(1, 1000)),
+    lists:foreach(
+        fun(_) ->
+            RandomDbName = fabric2_util:uuid(),
+            fabric2_index:db_updated(RandomDbName)
+        end,
+        lists:seq(1, 1000)
+    ),
 
-    test_util:wait(fun() ->
-        case table_sizes() =:= 0 of
-            true -> ok;
-            false -> wait
-        end
-    end, 5000).
-
+    test_util:wait(
+        fun() ->
+            case table_sizes() =:= 0 of
+                true -> ok;
+                false -> wait
+            end
+        end,
+        5000
+    ).
 
 check_gen_server_messages(#{}) ->
     CallExpect = {stop, {bad_call, foo}, {bad_call, foo}, baz},
@@ -183,34 +176,40 @@ check_gen_server_messages(#{}) ->
     ?assertEqual(ok, fabric2_index:terminate(shutdown, nil)),
     ?assertEqual({ok, nil}, fabric2_index:code_change(v0, nil, extra)).
 
-
 updater_processes_start(#{}) ->
     Pid = whereis(fabric2_index),
     ?assert(is_process_alive(Pid)),
-    lists:map(fun(N) ->
-        ?assertEqual(tid(N), ets:info(tid(N), name))
-    end, lists:seq(0, ?SHARDS - 1)).
-
+    lists:map(
+        fun(N) ->
+            ?assertEqual(tid(N), ets:info(tid(N), name))
+        end,
+        lists:seq(0, ?SHARDS - 1)
+    ).
 
 updater_processes_stop(#{}) ->
-    Refs = lists:map(fun(N) ->
-        Pid = ets:info(tid(N), owner),
-        ?assert(is_process_alive(Pid)),
-        monitor(process, Pid)
-    end, lists:seq(0, ?SHARDS - 1)),
+    Refs = lists:map(
+        fun(N) ->
+            Pid = ets:info(tid(N), owner),
+            ?assert(is_process_alive(Pid)),
+            monitor(process, Pid)
+        end,
+        lists:seq(0, ?SHARDS - 1)
+    ),
 
     % We stop but don't restart fabric after this as we're running in a foreach
     % test list where app restart happens after each test.
     application:stop(fabric),
 
-    lists:foreach(fun(Ref) ->
-        receive
-            {'DOWN', Ref, _, _, _} -> ok
-        after 5000 ->
-            ?assert(false)
-        end
-    end, Refs).
-
+    lists:foreach(
+        fun(Ref) ->
+            receive
+                {'DOWN', Ref, _, _, _} -> ok
+            after 5000 ->
+                ?assert(false)
+            end
+        end,
+        Refs
+    ).
 
 indexing_can_be_disabled(#{db1 := Db}) ->
     meck:expect(config, get_boolean, fun
@@ -233,7 +232,6 @@ indexing_can_be_disabled(#{db1 := Db}) ->
     create_doc(Db),
     meck:wait(Mod, build_indices, 2, 2000).
 
-
 handle_indexer_blowing_up(#{db1 := Db}) ->
     Mod = fabric2_test_callback8,
     setup_callback(Mod),
@@ -251,7 +249,6 @@ handle_indexer_blowing_up(#{db1 := Db}) ->
     ?assertEqual(lists:sort(WPids1), lists:sort(WPids2)),
     ?assert(lists:all(fun(Pid) -> is_process_alive(Pid) end, WPids2)).
 
-
 % Utility functions
 
 setup_callback(Mod) ->
@@ -260,40 +257,39 @@ setup_callback(Mod) ->
     meck:expect(Mod, build_indices, 2, []),
     fabric2_index:register_index(Mod).
 
-
 reset_callbacks() ->
     Mods = application:get_env(fabric, indices, []),
     application:set_env(fabric, indices, []),
-    lists:foreach(fun(M) ->
-        catch meck:reset(M),
-        catch meck:unload(M)
-    end, Mods).
-
+    lists:foreach(
+        fun(M) ->
+            catch meck:reset(M),
+            catch meck:unload(M)
+        end,
+        Mods
+    ).
 
 tid(Id) when is_integer(Id) ->
     TableName = "fabric2_index_" ++ integer_to_list(Id),
     list_to_existing_atom(TableName).
 
-
 table_sizes() ->
     Sizes = [ets:info(tid(N), size) || N <- lists:seq(0, ?SHARDS - 1)],
     lists:sum(Sizes).
 
-
 create_docs(Db, Count) ->
-    lists:map(fun(_) ->
-        {DocId, _RevStr} = create_doc(Db),
-        DocId
-    end, lists:seq(1, Count)).
-
+    lists:map(
+        fun(_) ->
+            {DocId, _RevStr} = create_doc(Db),
+            DocId
+        end,
+        lists:seq(1, Count)
+    ).
 
 create_doc(Db) ->
     create_doc(Db, fabric2_util:uuid()).
 
-
 create_doc(Db, DocId) ->
     create_doc(Db, DocId, {[]}).
-
 
 create_doc(Db, DocId, Body) ->
     Doc = #doc{

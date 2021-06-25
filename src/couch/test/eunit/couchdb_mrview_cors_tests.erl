@@ -15,24 +15,24 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
-
--define(DDOC, {[
-    {<<"_id">>, <<"_design/foo">>},
-    {<<"shows">>, {[
-        {<<"bar">>, <<"function(doc, req) {return '<h1>wosh</h1>';}">>}
-    ]}}
-]}).
+-define(DDOC,
+    {[
+        {<<"_id">>, <<"_design/foo">>},
+        {<<"shows">>,
+            {[
+                {<<"bar">>, <<"function(doc, req) {return '<h1>wosh</h1>';}">>}
+            ]}}
+    ]}
+).
 
 -define(USER, "mrview_cors_test_admin").
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 
-
 start() ->
     Ctx = test_util:start_couch([chttpd]),
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
     ok = config:set("chttpd", "enable_cors", "true", false),
     ok = config:set("vhosts", "example.com", "/", false),
     Ctx.
@@ -49,7 +49,7 @@ setup(PortType) ->
     {Host, ?b2l(DbName)}.
 
 teardown(Ctx) ->
-    ok = config:delete("admins", ?USER, _Persist=false),
+    ok = config:delete("admins", ?USER, _Persist = false),
     test_util:stop_couch(Ctx).
 
 teardown(PortType, {_Host, DbName}) ->
@@ -61,7 +61,8 @@ cors_test_() ->
         "CORS for mrview",
         {
             setup,
-            fun start/0, fun teardown/1,
+            fun start/0,
+            fun teardown/1,
             [show_tests()]
         }
     }.
@@ -82,10 +83,13 @@ make_test_case(Mod, Funs) ->
 
 should_make_shows_request(_, {Host, DbName}) ->
     ?_test(begin
-         ReqUrl = Host ++ "/" ++ DbName ++ "/_design/foo/_show/bar",
-         Headers = [{"Origin", "http://example.com"},
-                    {"Access-Control-Request-Method", "GET"}, ?AUTH],
-         ?assertMatch({ok, 410, _, _}, test_request:get(ReqUrl, Headers))
+        ReqUrl = Host ++ "/" ++ DbName ++ "/_design/foo/_show/bar",
+        Headers = [
+            {"Origin", "http://example.com"},
+            {"Access-Control-Request-Method", "GET"},
+            ?AUTH
+        ],
+        ?assertMatch({ok, 410, _, _}, test_request:get(ReqUrl, Headers))
     end).
 
 create_db(clustered, DbName) ->
@@ -102,7 +106,6 @@ assert_success(create_db, Status) ->
     true = lists:member(Status, [201, 202]);
 assert_success(delete_db, Status) ->
     true = lists:member(Status, [200, 202]).
-    
 
 host_url(PortType) ->
     "http://" ++ bind_address(PortType) ++ ":" ++ port(PortType).
@@ -119,7 +122,6 @@ db_url(DbName) when is_list(DbName) ->
 
 port(clustered) ->
     integer_to_list(mochiweb_socket_server:get(chttpd, port)).
-
 
 upload_ddoc(Host, DbName) ->
     Url = Host ++ "/" ++ DbName ++ "/_design/foo",

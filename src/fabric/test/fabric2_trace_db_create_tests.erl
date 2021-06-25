@@ -12,12 +12,10 @@
 
 -module(fabric2_trace_db_create_tests).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2_test.hrl").
-
 
 trace_test_() ->
     {
@@ -32,15 +30,12 @@ trace_test_() ->
         }
     }.
 
-
 setup() ->
     put(erlfdb_trace, "starting fabric"),
     test_util:start_couch([fabric]).
 
-
 cleanup(Ctx) ->
     test_util:stop_couch(Ctx).
-
 
 create_db(_) ->
     put(erlfdb_trace, <<"create db">>),

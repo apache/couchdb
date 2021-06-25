@@ -27,14 +27,17 @@
     notify/3
 ]).
 
-
 %% ------------------------------------------------------------------
 %% API functions definitions
 %% ------------------------------------------------------------------
 
 dispatch(ServiceId, CallbackModule) ->
-    couch_tests:new(?MODULE, dispatch,
-        setup_dispatch(ServiceId, CallbackModule), teardown_dispatch()).
+    couch_tests:new(
+        ?MODULE,
+        dispatch,
+        setup_dispatch(ServiceId, CallbackModule),
+        teardown_dispatch()
+    ).
 
 %% ------------------------------------------------------------------
 %% setups and teardowns

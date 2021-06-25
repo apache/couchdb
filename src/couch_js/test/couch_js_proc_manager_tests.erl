@@ -15,18 +15,20 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
 -define(TDEF(A), {atom_to_list(A), fun A/0}).
 
 -define(NUM_PROCS, 3).
 -define(TIMEOUT, 2000).
 
--define(TIMEOUT_ERROR(Msg), erlang:error({assertion_failed, [
-        {module, ?MODULE},
-        {line, ?LINE},
-        {reason, Msg}
-    ]})).
-
+-define(TIMEOUT_ERROR(Msg),
+    erlang:error(
+        {assertion_failed, [
+            {module, ?MODULE},
+            {line, ?LINE},
+            {reason, Msg}
+        ]}
+    )
+).
 
 start() ->
     ok = application:set_env(config, ini_files, ?CONFIG_CHAIN),
@@ -35,20 +37,25 @@ start() ->
     config:set("query_server_config", "os_process_limit", "3", false),
     config:set("query_server_config", "os_process_soft_limit", "2", false),
     config:set("query_server_config", "os_process_idle_limit", "1", false),
-    ok = test_util:wait(fun() ->
-        case config:get("query_server_config", "os_process_idle_limit") of
-            "1" -> ok;
-            _ -> wait
-        end
-    end, ?TIMEOUT, 10),
+    ok = test_util:wait(
+        fun() ->
+            case config:get("query_server_config", "os_process_idle_limit") of
+                "1" -> ok;
+                _ -> wait
+            end
+        end,
+        ?TIMEOUT,
+        10
+    ),
     Started.
 
-
 stop(Apps) ->
-    lists:foreach(fun(App) ->
-        ok = application:stop(App)
-    end, lists:reverse(Apps)).
-
+    lists:foreach(
+        fun(App) ->
+            ok = application:stop(App)
+        end,
+        lists:reverse(Apps)
+    ).
 
 couch_js_proc_manager_test_() ->
     {
@@ -67,7 +74,6 @@ couch_js_proc_manager_test_() ->
         }
     }.
 
-
 should_block_new_proc_on_full_pool() ->
     ok = couch_js_proc_manager:reload(),
 
@@ -77,9 +83,12 @@ should_block_new_proc_on_full_pool() ->
         spawn_client()
     ],
 
-    lists:foreach(fun(Client) ->
-        ?assertEqual(ok, ping_client(Client))
-    end, Clients),
+    lists:foreach(
+        fun(Client) ->
+            ?assertEqual(ok, ping_client(Client))
+        end,
+        Clients
+    ),
 
     % Make sure everyone got a different proc
     Procs = [get_client_proc(Client) || Client <- Clients],
@@ -101,10 +110,12 @@ should_block_new_proc_on_full_pool() ->
     ?assertEqual(Proc1#proc.pid, Proc4#proc.pid),
     ?assertNotEqual(Proc1#proc.client, Proc4#proc.client),
 
-    lists:map(fun(C) ->
-        ?assertEqual(ok, stop_client(C))
-    end, [Client4 | tl(Clients)]).
-
+    lists:map(
+        fun(C) ->
+            ?assertEqual(ok, stop_client(C))
+        end,
+        [Client4 | tl(Clients)]
+    ).
 
 should_free_slot_on_proc_unexpected_exit() ->
     ok = couch_js_proc_manager:reload(),
@@ -115,9 +126,12 @@ should_free_slot_on_proc_unexpected_exit() ->
         spawn_client()
     ],
 
-    lists:foreach(fun(Client) ->
-        ?assertEqual(ok, ping_client(Client))
-    end, Clients),
+    lists:foreach(
+        fun(Client) ->
+            ?assertEqual(ok, ping_client(Client))
+        end,
+        Clients
+    ),
 
     Procs1 = [get_client_proc(Client) || Client <- Clients],
     ProcClients1 = [Proc#proc.client || Proc <- Procs1],
@@ -140,10 +154,12 @@ should_free_slot_on_proc_unexpected_exit() ->
     ?assertEqual(lists:sort(Procs2), lists:usort(Procs2)),
     ?assertEqual(lists:sort(ProcClients2), lists:usort(ProcClients2)),
 
-    lists:map(fun(C) ->
-        ?assertEqual(ok, stop_client(C))
-    end, [Client4 | tl(Clients)]).
-
+    lists:map(
+        fun(C) ->
+            ?assertEqual(ok, stop_client(C))
+        end,
+        [Client4 | tl(Clients)]
+    ).
 
 should_reuse_known_proc() ->
     ok = couch_js_proc_manager:reload(),
@@ -153,20 +169,29 @@ should_reuse_known_proc() ->
         spawn_client(<<"ddoc2">>)
     ],
 
-    lists:foreach(fun(Client) ->
-        ?assertEqual(ok, ping_client(Client))
-    end, Clients),
+    lists:foreach(
+        fun(Client) ->
+            ?assertEqual(ok, ping_client(Client))
+        end,
+        Clients
+    ),
 
     Procs = [get_client_proc(Client) || Client <- Clients],
     ?assertEqual(lists:sort(Procs), lists:usort(Procs)),
 
-    lists:foreach(fun(Client) ->
-        ?assertEqual(ok, stop_client(Client))
-    end, Clients),
+    lists:foreach(
+        fun(Client) ->
+            ?assertEqual(ok, stop_client(Client))
+        end,
+        Clients
+    ),
 
-    lists:foreach(fun(Proc) ->
-        ?assert(is_process_alive(Proc#proc.pid))
-    end, Procs),
+    lists:foreach(
+        fun(Proc) ->
+            ?assert(is_process_alive(Proc#proc.pid))
+        end,
+        Procs
+    ),
 
     Client = spawn_client(<<"ddoc1">>),
     ?assertEqual(ok, ping_client(Client)),
@@ -178,7 +203,6 @@ should_reuse_known_proc() ->
     ?assertNotEqual(OldProc#proc.client, NewProc#proc.client),
     ?assertEqual(ok, stop_client(Client)).
 
-
 should_process_waiting_queue_as_fifo() ->
     Clients = [
         spawn_client(<<"ddoc1">>),
@@ -189,45 +213,62 @@ should_process_waiting_queue_as_fifo() ->
         spawn_client(<<"ddoc6">>)
     ],
 
-    lists:foldl(fun(Client, Pos) ->
-        case Pos =< ?NUM_PROCS of
-            true ->
-                ?assertEqual(ok, ping_client(Client));
-            false ->
-                ?assert(is_client_waiting(Client))
-        end,
-        Pos + 1
-    end, 1, Clients),
-
-    LastClients = lists:foldl(fun(_Iteration, ClientAcc) ->
-        FirstClient = hd(ClientAcc),
-        FirstProc = get_client_proc(FirstClient),
-        ?assertEqual(ok, stop_client(FirstClient)),
-
-        RestClients = tl(ClientAcc),
-
-        lists:foldl(fun(Client, Pos) ->
+    lists:foldl(
+        fun(Client, Pos) ->
             case Pos =< ?NUM_PROCS of
                 true ->
                     ?assertEqual(ok, ping_client(Client));
                 false ->
                     ?assert(is_client_waiting(Client))
             end,
-            if Pos /= ?NUM_PROCS -> ok; true ->
-                BubbleProc = get_client_proc(Client),
-                ?assertEqual(FirstProc#proc.pid, BubbleProc#proc.pid),
-                ?assertNotEqual(FirstProc#proc.client, BubbleProc#proc.client)
-            end,
             Pos + 1
-        end, 1, RestClients),
+        end,
+        1,
+        Clients
+    ),
 
-        RestClients
-    end, Clients, lists:seq(1, 3)),
+    LastClients = lists:foldl(
+        fun(_Iteration, ClientAcc) ->
+            FirstClient = hd(ClientAcc),
+            FirstProc = get_client_proc(FirstClient),
+            ?assertEqual(ok, stop_client(FirstClient)),
 
-    lists:foreach(fun(Client) ->
-        ?assertEqual(ok, stop_client(Client))
-    end, LastClients).
+            RestClients = tl(ClientAcc),
 
+            lists:foldl(
+                fun(Client, Pos) ->
+                    case Pos =< ?NUM_PROCS of
+                        true ->
+                            ?assertEqual(ok, ping_client(Client));
+                        false ->
+                            ?assert(is_client_waiting(Client))
+                    end,
+                    if
+                        Pos /= ?NUM_PROCS ->
+                            ok;
+                        true ->
+                            BubbleProc = get_client_proc(Client),
+                            ?assertEqual(FirstProc#proc.pid, BubbleProc#proc.pid),
+                            ?assertNotEqual(FirstProc#proc.client, BubbleProc#proc.client)
+                    end,
+                    Pos + 1
+                end,
+                1,
+                RestClients
+            ),
+
+            RestClients
+        end,
+        Clients,
+        lists:seq(1, 3)
+    ),
+
+    lists:foreach(
+        fun(Client) ->
+            ?assertEqual(ok, stop_client(Client))
+        end,
+        LastClients
+    ).
 
 should_reduce_pool_on_idle_os_procs() ->
     Clients = [
@@ -236,22 +277,27 @@ should_reduce_pool_on_idle_os_procs() ->
         spawn_client(<<"ddoc3">>)
     ],
 
-    lists:foreach(fun(Client) ->
-        ?assertEqual(ok, ping_client(Client))
-    end, Clients),
+    lists:foreach(
+        fun(Client) ->
+            ?assertEqual(ok, ping_client(Client))
+        end,
+        Clients
+    ),
 
     ?assertEqual(3, couch_js_proc_manager:get_proc_count()),
 
-    lists:foreach(fun(Client) ->
-        ?assertEqual(ok, stop_client(Client))
-    end, Clients),
+    lists:foreach(
+        fun(Client) ->
+            ?assertEqual(ok, stop_client(Client))
+        end,
+        Clients
+    ),
 
     ?assertEqual(3, couch_js_proc_manager:get_proc_count()),
 
     timer:sleep(1200),
 
     ?assertEqual(1, couch_js_proc_manager:get_proc_count()).
-
 
 spawn_client() ->
     Parent = self(),
@@ -269,13 +315,12 @@ spawn_client() ->
     end,
     {Pid, Ref}.
 
-
 spawn_client(DDocId) ->
     Parent = self(),
     Ref = make_ref(),
     {Pid, _} = spawn_monitor(fun() ->
         DDocKey = {DDocId, <<"1-abcdefgh">>},
-        DDoc = #doc{body={[{<<"language">>, <<"erlang">>}]}},
+        DDoc = #doc{body = {[{<<"language">>, <<"erlang">>}]}},
         Parent ! {self(), initialized},
         Proc = couch_js_query_servers:get_ddoc_process(DDoc, DDocKey),
         loop(Parent, Ref, Proc)
@@ -288,13 +333,12 @@ spawn_client(DDocId) ->
     end,
     {Pid, Ref}.
 
-
 loop(Parent, Ref, Proc) ->
     receive
         ping ->
             Parent ! {pong, Ref},
             loop(Parent, Ref, Proc);
-        get_proc  ->
+        get_proc ->
             Parent ! {proc, Ref, Proc},
             loop(Parent, Ref, Proc);
         stop ->
@@ -305,7 +349,6 @@ loop(Parent, Ref, Proc) ->
             exit(some_error)
     end.
 
-
 ping_client({Pid, Ref}) ->
     Pid ! ping,
     receive
@@ -315,12 +358,10 @@ ping_client({Pid, Ref}) ->
         ?TIMEOUT_ERROR("Timeout pinging client")
     end.
 
-
 is_client_waiting({Pid, _Ref}) ->
     {status, Status} = process_info(Pid, status),
     {current_function, {M, F, A}} = process_info(Pid, current_function),
     Status == waiting andalso {M, F, A} == {gen, do_call, 4}.
-
 
 get_client_proc({Pid, Ref}) ->
     Pid ! get_proc,
@@ -329,7 +370,6 @@ get_client_proc({Pid, Ref}) ->
     after ?TIMEOUT ->
         ?TIMEOUT_ERROR("Timeout getting proc from client")
     end.
-
 
 stop_client({Pid, Ref}) ->
     Pid ! stop,
@@ -345,7 +385,6 @@ stop_client({Pid, Ref}) ->
     after ?TIMEOUT ->
         ?TIMEOUT_ERROR("Timeout waiting for stopped client 'DOWN'")
     end.
-
 
 kill_client({Pid, Ref}) ->
     Pid ! die,

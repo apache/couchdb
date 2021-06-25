@@ -19,10 +19,8 @@
 -include_lib("fabric/include/fabric2.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 -define(MAP_FUN1, <<"map_fun1">>).
 -define(MAP_FUN2, <<"map_fun2">>).
-
 
 upgrade_test_() ->
     {
@@ -47,31 +45,26 @@ upgrade_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([
-            fabric,
-            couch_jobs,
-            couch_js,
-            couch_views
-        ]),
+        fabric,
+        couch_jobs,
+        couch_js,
+        couch_views
+    ]),
     Ctx.
-
 
 cleanup(Ctx) ->
     test_util:stop_couch(Ctx).
-
 
 foreach_setup() ->
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     Db.
 
-
 foreach_teardown(Db) ->
     meck:unload(),
     config:delete("couch_views", "change_limit"),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
-
 
 empty_state(Db) ->
     DDoc = create_ddoc(),
@@ -89,7 +82,6 @@ empty_state(Db) ->
     ?assertEqual(Expect, State),
     assert_fdb_state(Db, Mrst, Expect).
 
-
 indexed_state(Db) ->
     DDoc = create_ddoc(),
     Doc1 = doc(0),
@@ -106,7 +98,6 @@ indexed_state(Db) ->
         view_vs => not_found,
         build_status => not_found
     }).
-
 
 upgrade_non_interactive(Db) ->
     DDoc = create_ddoc(),
@@ -126,7 +117,6 @@ upgrade_non_interactive(Db) ->
         view_vs => not_found,
         build_status => not_found
     }).
-
 
 upgrade_unbuilt_interactive(Db) ->
     DDoc = create_ddoc(),
@@ -163,7 +153,6 @@ upgrade_unbuilt_interactive(Db) ->
         view_vs => fabric2_fdb:seq_to_vs(DbSeq),
         build_status => ?INDEX_READY
     }).
-
 
 upgrade_partially_built_interactive(Db) ->
     DDoc = create_ddoc(),
@@ -206,7 +195,6 @@ upgrade_partially_built_interactive(Db) ->
         build_status => ?INDEX_READY
     }).
 
-
 upgrade_built_interactive(Db) ->
     DDoc = create_ddoc(),
     Doc1 = doc(0),
@@ -246,32 +234,35 @@ upgrade_built_interactive(Db) ->
         build_status => ?INDEX_READY
     }).
 
-
 init_fdb_state(Db, #doc{} = DDoc, Values) ->
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(fabric2_db:name(Db), DDoc),
     init_fdb_state(Db, Mrst, Values);
 init_fdb_state(Db, #mrst{sig = Sig}, Values) ->
     init_fdb_state(Db, Sig, Values);
 init_fdb_state(Db, Sig, Values) ->
-    VersionRow = case maps:get(version, Values, undefined) of
-        undefined -> [];
-        Version -> [{pack(Db, key(version, Sig)), pack({Version})}]
-    end,
+    VersionRow =
+        case maps:get(version, Values, undefined) of
+            undefined -> [];
+            Version -> [{pack(Db, key(version, Sig)), pack({Version})}]
+        end,
 
-    SeqRow = case maps:get(view_seq, Values, undefined) of
-        undefined -> [];
-        Seq -> [{pack(Db, key(seq, Sig)), Seq}]
-    end,
+    SeqRow =
+        case maps:get(view_seq, Values, undefined) of
+            undefined -> [];
+            Seq -> [{pack(Db, key(seq, Sig)), Seq}]
+        end,
 
-    VSRow = case maps:get(view_vs, Values, undefined) of
-        undefined -> [];
-        VS -> [{pack(Db, key(vs, Sig)), pack({VS})}]
-    end,
+    VSRow =
+        case maps:get(view_vs, Values, undefined) of
+            undefined -> [];
+            VS -> [{pack(Db, key(vs, Sig)), pack({VS})}]
+        end,
 
-    BSRow = case maps:get(build_status, Values, undefined) of
-        undefined -> [];
-        BS -> [{pack(Db, key(bs, Sig)), BS}]
-    end,
+    BSRow =
+        case maps:get(build_status, Values, undefined) of
+            undefined -> [];
+            BS -> [{pack(Db, key(bs, Sig)), BS}]
+        end,
 
     Rows = VersionRow ++ SeqRow ++ VSRow ++ BSRow,
 
@@ -279,11 +270,13 @@ init_fdb_state(Db, Sig, Values) ->
         #{
             tx := Tx
         } = TxDb,
-        lists:foreach(fun({K, V}) ->
-            erlfdb:set(Tx, K, V)
-        end, Rows)
+        lists:foreach(
+            fun({K, V}) ->
+                erlfdb:set(Tx, K, V)
+            end,
+            Rows
+        )
     end).
-
 
 assert_fdb_state(Db, #doc{} = DDoc, Expect) ->
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(fabric2_db:name(Db), DDoc),
@@ -298,25 +291,29 @@ assert_fdb_state(Db, Sig, Expect) ->
         build_status := BuildStatus
     } = Expect,
 
-    VersionRow = case Version of
-        not_found -> [];
-        _ -> [{pack(Db, key(version, Sig)), pack({Version})}]
-    end,
+    VersionRow =
+        case Version of
+            not_found -> [];
+            _ -> [{pack(Db, key(version, Sig)), pack({Version})}]
+        end,
 
-    SeqRow = case ViewSeq of
-        <<>> -> [];
-        _ -> [{pack(Db, key(seq, Sig)), ViewSeq}]
-    end,
+    SeqRow =
+        case ViewSeq of
+            <<>> -> [];
+            _ -> [{pack(Db, key(seq, Sig)), ViewSeq}]
+        end,
 
-    VSRow = case ViewVS of
-        not_found -> [];
-        _ -> [{pack(Db, key(vs, Sig)), pack({ViewVS})}]
-    end,
+    VSRow =
+        case ViewVS of
+            not_found -> [];
+            _ -> [{pack(Db, key(vs, Sig)), pack({ViewVS})}]
+        end,
 
-    BSRow = case BuildStatus of
-        not_found -> [];
-        _ -> [{pack(Db, key(bs, Sig)), BuildStatus}]
-    end,
+    BSRow =
+        case BuildStatus of
+            not_found -> [];
+            _ -> [{pack(Db, key(bs, Sig)), BuildStatus}]
+        end,
 
     ExpectRows = lists:sort(VersionRow ++ SeqRow ++ VSRow ++ BSRow),
 
@@ -335,13 +332,11 @@ assert_fdb_state(Db, Sig, Expect) ->
 
     ?assertEqual(ExpectRows, ExistingRows).
 
-
 key(version, Sig) -> {?DB_VIEWS, ?VIEW_INFO, ?VIEW_IMPL_VERSION, Sig};
 key(seq, Sig) -> {?DB_VIEWS, ?VIEW_INFO, ?VIEW_UPDATE_SEQ, Sig};
 key(kv_size, Sig) -> {?DB_VIEWS, ?VIEW_INFO, ?VIEW_KV_SIZE, Sig};
 key(vs, Sig) -> {?DB_VIEWS, ?VIEW_INFO, ?VIEW_CREATION_VS, Sig};
 key(bs, Sig) -> {?DB_VIEWS, ?VIEW_INFO, ?VIEW_BUILD_STATUS, Sig}.
-
 
 pack(Db, Key) ->
     #{
@@ -349,10 +344,8 @@ pack(Db, Key) ->
     } = Db,
     erlfdb_tuple:pack(Key, DbPrefix).
 
-
 pack(Value) ->
     erlfdb_tuple:pack(Value).
-
 
 row(Id, Key, Value) ->
     {row, [
@@ -361,7 +354,6 @@ row(Id, Key, Value) ->
         {value, Value}
     ]}.
 
-
 fold_fun({meta, _Meta}, Acc) ->
     {ok, Acc};
 fold_fun({row, _} = Row, Acc) ->
@@ -369,31 +361,34 @@ fold_fun({row, _} = Row, Acc) ->
 fold_fun(complete, Acc) ->
     {ok, lists:reverse(Acc)}.
 
-
 create_ddoc() ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
-        {<<"views">>, {[
-            {?MAP_FUN1, {[
-                {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
-            ]}},
-            {?MAP_FUN2, {[
-                {<<"map">>, <<"function(doc) {}">>}
-            ]}}
-        ]}}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/bar">>},
+            {<<"views">>,
+                {[
+                    {?MAP_FUN1,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
+                        ]}},
+                    {?MAP_FUN2,
+                        {[
+                            {<<"map">>, <<"function(doc) {}">>}
+                        ]}}
+                ]}}
+        ]}
+    ).
 
 doc(Id) ->
     doc(Id, Id).
 
-
 doc(Id, Val) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, list_to_binary(integer_to_list(Id))},
-        {<<"val">>, Val}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, list_to_binary(integer_to_list(Id))},
+            {<<"val">>, Val}
+        ]}
+    ).
 
 run_query(#{} = Db, DDoc, <<_/binary>> = View) ->
     couch_views:query(Db, DDoc, View, fun fold_fun/2, [], #mrargs{}).

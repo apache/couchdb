@@ -12,23 +12,16 @@
 
 -module(couch_log_test).
 
-
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-
 couch_log_test_() ->
-    {setup,
-        fun couch_log_test_util:start/0,
-        fun couch_log_test_util:stop/1,
-        gen() ++ [fun check_set_level/0]
-    }.
-
+    {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1,
+        gen() ++ [fun check_set_level/0]}.
 
 check_set_level() ->
     couch_log:set_level(crit),
     ?assertEqual("crit", config:get("log", "level")).
-
 
 levels() ->
     [
@@ -43,17 +36,17 @@ levels() ->
         none
     ].
 
-
 gen() ->
-    lists:map(fun(L) ->
-        Name = "Test log level: " ++ couch_log_util:level_to_string(L),
-        {Name, fun() -> check_levels(L, levels()) end}
-    end, levels() -- [none]).
-
+    lists:map(
+        fun(L) ->
+            Name = "Test log level: " ++ couch_log_util:level_to_string(L),
+            {Name, fun() -> check_levels(L, levels()) end}
+        end,
+        levels() -- [none]
+    ).
 
 check_levels(_, []) ->
     ok;
-
 check_levels(TestLevel, [CfgLevel | RestLevels]) ->
     TestInt = couch_log_util:level_to_integer(TestLevel),
     CfgInt = couch_log_util:level_to_integer(CfgLevel),
@@ -77,7 +70,6 @@ check_levels(TestLevel, [CfgLevel | RestLevels]) ->
         end
     end),
     check_levels(TestLevel, RestLevels).
-
 
 new_msg() ->
     Bin = list_to_binary([couch_rand:uniform(255) || _ <- lists:seq(1, 16)]),

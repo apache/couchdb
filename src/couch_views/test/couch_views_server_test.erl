@@ -15,7 +15,6 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 couch_views_server_test_() ->
     {
         "Test couch_views_server",
@@ -40,21 +39,18 @@ couch_views_server_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([
-            fabric,
-            couch_jobs,
-            couch_js,
-            couch_eval,
-            couch_lib
-        ]),
+        fabric,
+        couch_jobs,
+        couch_js,
+        couch_eval,
+        couch_lib
+    ]),
     Ctx.
-
 
 cleanup(Ctx) ->
     test_util:stop_couch(Ctx).
-
 
 foreach_setup() ->
     config:set("couch_views", "max_acceptors", "2", false),
@@ -62,12 +58,15 @@ foreach_setup() ->
     meck:new(couch_views_server, [passthrough]),
     meck:new(couch_views_indexer, [passthrough]),
     meck:expect(couch_views_indexer, init, fun() ->
-        receive pls_accept -> ok end,
+        receive
+            pls_accept -> ok
+        end,
         couch_views_server:accepted(self()),
-        receive pls_die -> ok end
+        receive
+            pls_die -> ok
+        end
     end),
     ok = application:start(couch_views).
-
 
 foreach_teardown(_) ->
     ok = application:stop(couch_views),
@@ -75,7 +74,6 @@ foreach_teardown(_) ->
     config:delete("couch_views", "max_acceptors", false),
     config:delete("couch_views", "max_workers", false),
     ok.
-
 
 max_acceptors_started(_) ->
     #{max_acceptors := MaxAcceptors, max_workers := MaxWorkers} = get_state(),
@@ -90,7 +88,6 @@ max_acceptors_started(_) ->
     ?assert(is_process_alive(Pid1)),
     ?assert(is_process_alive(Pid2)).
 
-
 acceptors_become_workers(_) ->
     ?assertEqual(0, maps:size(workers())),
 
@@ -101,7 +98,6 @@ acceptors_become_workers(_) ->
     ?assertEqual(2, maps:size(workers())),
 
     ?assertEqual(InitAcceptors, workers()).
-
 
 handle_worker_death(_) ->
     [Pid1, Pid2] = maps:keys(acceptors()),
@@ -117,7 +113,6 @@ handle_worker_death(_) ->
     ?assertEqual(2, maps:size(acceptors())),
     ?assertEqual(0, maps:size(workers())).
 
-
 handle_acceptor_death(_) ->
     [Pid1, Pid2] = maps:keys(acceptors()),
     finish_error([Pid1]),
@@ -127,14 +122,17 @@ handle_acceptor_death(_) ->
     ?assert(lists:member(Pid2, maps:keys(NewAcceptors))),
     ?assert(not lists:member(Pid1, maps:keys(NewAcceptors))).
 
-
 handle_unknown_process_death(_) ->
     meck:reset(couch_views_server),
     Pid = self(),
     whereis(couch_views_server) ! {'EXIT', Pid, blah},
-    meck:wait(1, couch_views_server, terminate,
-        [{unknown_pid_exit, Pid}, '_'], 5000).
-
+    meck:wait(
+        1,
+        couch_views_server,
+        terminate,
+        [{unknown_pid_exit, Pid}, '_'],
+        5000
+    ).
 
 max_workers_limit_works(_) ->
     % Accept 2 jobs -> 2 workers
@@ -180,7 +178,6 @@ max_acceptors_greater_than_max_workers(_) ->
     ?assertEqual(1, maps:size(acceptors())),
     ?assertEqual(0, maps:size(workers())).
 
-
 % Utility functions
 
 accept_all() ->
@@ -189,30 +186,35 @@ accept_all() ->
     [Pid ! pls_accept || Pid <- maps:keys(Acceptors)],
     meck:wait(maps:size(Acceptors), couch_views_server, handle_call, 3, 5000).
 
-
 acceptors() ->
     #{acceptors := Acceptors} = get_state(),
     Acceptors.
-
 
 workers() ->
     #{workers := Workers} = get_state(),
     Workers.
 
-
 get_state() ->
     sys:get_state(couch_views_server, infinity).
-
 
 finish_normal(Workers) when is_list(Workers) ->
     meck:reset(couch_views_server),
     [Pid ! pls_die || Pid <- Workers],
-    meck:wait(length(Workers), couch_views_server, handle_info,
-        [{'_', '_', normal}, '_'], 5000).
-
+    meck:wait(
+        length(Workers),
+        couch_views_server,
+        handle_info,
+        [{'_', '_', normal}, '_'],
+        5000
+    ).
 
 finish_error(Workers) when is_list(Workers) ->
     meck:reset(couch_views_server),
     [exit(Pid, badness) || Pid <- Workers],
-    meck:wait(length(Workers), couch_views_server, handle_info,
-        [{'_', '_', badness}, '_'], 5000).
+    meck:wait(
+        length(Workers),
+        couch_views_server,
+        handle_info,
+        [{'_', '_', badness}, '_'],
+        5000
+    ).

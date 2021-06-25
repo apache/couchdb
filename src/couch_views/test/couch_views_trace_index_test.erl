@@ -10,15 +10,12 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 -module(couch_views_trace_index_test).
-
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_views/include/couch_views.hrl").
-
 
 % Steps for this to work
 % Run export FDB_NETWORK_OPTION_TRACE_ENABLE="" &&
@@ -27,9 +24,7 @@
 % Might need to add extra </Trace> to finish up file
 % Analyze!
 
-
 -define(EUNIT_FTW(Tests), [{with, [T]} || T <- Tests]).
-
 
 indexer_test_() ->
     {
@@ -49,24 +44,19 @@ indexer_test_() ->
         }
     }.
 
-
 setup() ->
     test_util:start_couch([fabric, couch_js]).
 
-
 cleanup(Ctx) ->
     test_util:stop_couch(Ctx).
-
 
 foreach_setup() ->
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     Db.
 
-
 foreach_teardown(Db) ->
     meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
-
 
 trace_single_doc(Db) ->
     DbName = fabric2_db:name(Db),
@@ -103,43 +93,49 @@ trace_single_doc(Db) ->
         #mrargs{}
     ),
 
-    ?assertEqual([{row, [
-        {id, <<"0">>},
-        {key, 0},
-        {value, 0}
-    ]}], Out).
-
+    ?assertEqual(
+        [
+            {row, [
+                {id, <<"0">>},
+                {key, 0},
+                {value, 0}
+            ]}
+        ],
+        Out
+    ).
 
 create_ddoc() ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
-        {<<"views">>, {[
-            {<<"map_fun1">>, {[
-                {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
-            ]}},
-            {<<"map_fun2">>, {[
-                {<<"map">>, <<"function(doc) {}">>}
-            ]}}
-        ]}}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/bar">>},
+            {<<"views">>,
+                {[
+                    {<<"map_fun1">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
+                        ]}},
+                    {<<"map_fun2">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {}">>}
+                        ]}}
+                ]}}
+        ]}
+    ).
 
 doc(Id) ->
     doc(Id, Id).
 
-
 doc(Id, Val) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, list_to_binary(integer_to_list(Id))},
-        {<<"val">>, Val}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, list_to_binary(integer_to_list(Id))},
+            {<<"val">>, Val}
+        ]}
+    ).
 
 fold_fun({meta, _Meta}, Acc) ->
     {ok, Acc};
-
 fold_fun({row, _} = Row, Acc) ->
     {ok, [Row | Acc]};
-
 fold_fun(complete, Acc) ->
     {ok, lists:reverse(Acc)}.

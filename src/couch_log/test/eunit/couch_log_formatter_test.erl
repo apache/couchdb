@@ -12,22 +12,18 @@
 
 -module(couch_log_formatter_test).
 
-
 -include("couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
-
 
 truncate_fmt_test() ->
     Msg = [0 || _ <- lists:seq(1, 1048576)],
     Entry = couch_log_formatter:format(info, self(), "~w", [Msg]),
     ?assert(length(Entry#log_entry.msg) =< 16000).
 
-
 truncate_test() ->
     Msg = [0 || _ <- lists:seq(1, 1048576)],
     Entry = couch_log_formatter:format(info, self(), Msg),
     ?assert(length(Entry#log_entry.msg) =< 16000).
-
 
 format_reason_test() ->
     MsgFmt = "This is a reason: ~r",
@@ -35,7 +31,6 @@ format_reason_test() ->
     Entry = couch_log_formatter:format(info, self(), MsgFmt, [Reason]),
     Formatted = "This is a reason: foo at x:k/3 <= c:d/2",
     ?assertEqual(Formatted, lists:flatten(Entry#log_entry.msg)).
-
 
 crashing_formatting_test() ->
     Pid = self(),
@@ -45,7 +40,8 @@ crashing_formatting_test() ->
         {
             Pid,
             "** Generic server and some stuff",
-            [a_gen_server, {foo, bar}, server_state]  % not enough args!
+            % not enough args!
+            [a_gen_server, {foo, bar}, server_state]
         }
     },
     ?assertMatch(
@@ -58,7 +54,6 @@ crashing_formatting_test() ->
     do_matches(do_format(Event), [
         "Encountered error {error,{badmatch"
     ]).
-
 
 gen_server_error_test() ->
     Pid = self(),
@@ -86,7 +81,6 @@ gen_server_error_test() ->
         "extra: \\[\\]"
     ]).
 
-
 gen_server_error_with_extra_args_test() ->
     Pid = self(),
     Event = {
@@ -113,7 +107,6 @@ gen_server_error_with_extra_args_test() ->
         "extra: \\[sad,args\\]"
     ]).
 
-
 gen_fsm_error_test() ->
     Pid = self(),
     Event = {
@@ -122,7 +115,7 @@ gen_fsm_error_test() ->
         {
             Pid,
             "** State machine did a thing",
-            [a_gen_fsm, {ohai,there}, state_name, curr_state, barf]
+            [a_gen_fsm, {ohai, there}, state_name, curr_state, barf]
         }
     },
     ?assertMatch(
@@ -140,7 +133,6 @@ gen_fsm_error_test() ->
         "extra: \\[\\]"
     ]).
 
-
 gen_fsm_error_with_extra_args_test() ->
     Pid = self(),
     Event = {
@@ -149,7 +141,7 @@ gen_fsm_error_with_extra_args_test() ->
         {
             Pid,
             "** State machine did a thing",
-            [a_gen_fsm, {ohai,there}, state_name, curr_state, barf, sad, args]
+            [a_gen_fsm, {ohai, there}, state_name, curr_state, barf, sad, args]
         }
     },
     ?assertMatch(
@@ -167,7 +159,6 @@ gen_fsm_error_with_extra_args_test() ->
         "extra: \\[sad,args\\]"
     ]).
 
-
 gen_event_error_test() ->
     Pid = self(),
     Event = {
@@ -179,7 +170,7 @@ gen_event_error_test() ->
             [
                 handler_id,
                 a_gen_event,
-                {ohai,there},
+                {ohai, there},
                 curr_state,
                 barf
             ]
@@ -199,7 +190,6 @@ gen_event_error_test() ->
         "state: curr_state"
     ]).
 
-
 emulator_error_test() ->
     Event = {
         error,
@@ -218,7 +208,6 @@ emulator_error_test() ->
         },
         do_format(Event)
     ).
-
 
 normal_error_test() ->
     Pid = self(),
@@ -243,7 +232,6 @@ normal_error_test() ->
         do_format(Event)
     ).
 
-
 error_report_std_error_test() ->
     Pid = self(),
     Event = {
@@ -263,7 +251,6 @@ error_report_std_error_test() ->
         },
         do_format(Event)
     ).
-
 
 supervisor_report_test() ->
     Pid = self(),
@@ -382,7 +369,6 @@ supervisor_report_test() ->
         do_format(Event4)
     ).
 
-
 crash_report_test() ->
     Pid = self(),
     % A standard crash report
@@ -395,11 +381,12 @@ crash_report_test() ->
             [
                 [
                     {pid, list_to_pid("<0.2.0>")},
-                    {error_info, {
-                        exit,
-                        undef,
-                        [{mod_name, fun_name, [a, b]}]
-                    }}
+                    {error_info,
+                        {
+                            exit,
+                            undef,
+                            [{mod_name, fun_name, [a, b]}]
+                        }}
                 ],
                 [list_to_pid("<0.3.0>"), list_to_pid("<0.4.0>")]
             ]
@@ -429,11 +416,12 @@ crash_report_test() ->
                 [
                     {pid, list_to_pid("<0.2.0>")},
                     {registered_name, couch_log_server},
-                    {error_info, {
-                        exit,
-                        undef,
-                        [{mod_name, fun_name, [a, b]}]
-                    }}
+                    {error_info,
+                        {
+                            exit,
+                            undef,
+                            [{mod_name, fun_name, [a, b]}]
+                        }}
                 ],
                 [list_to_pid("<0.3.0>"), list_to_pid("<0.4.0>")]
             ]
@@ -453,11 +441,12 @@ crash_report_test() ->
                 [
                     {pid, list_to_pid("<0.2.0>")},
                     {registered_name, couch_log_server},
-                    {error_info, {
-                        killed,
-                        undef,
-                        [{mod_name, fun_name, [a, b]}]
-                    }}
+                    {error_info,
+                        {
+                            killed,
+                            undef,
+                            [{mod_name, fun_name, [a, b]}]
+                        }}
                 ],
                 [list_to_pid("<0.3.0>"), list_to_pid("<0.4.0>")]
             ]
@@ -476,11 +465,12 @@ crash_report_test() ->
             [
                 [
                     {pid, list_to_pid("<0.2.0>")},
-                    {error_info, {
-                        killed,
-                        undef,
-                        [{mod_name, fun_name, [a, b]}]
-                    }},
+                    {error_info,
+                        {
+                            killed,
+                            undef,
+                            [{mod_name, fun_name, [a, b]}]
+                        }},
                     {another, entry},
                     yep
                 ],
@@ -491,7 +481,6 @@ crash_report_test() ->
     do_matches(do_format(Event4), [
         "; another: entry, yep"
     ]).
-
 
 warning_report_test() ->
     Pid = self(),
@@ -531,7 +520,6 @@ warning_report_test() ->
         },
         do_format(Event2)
     ).
-
 
 info_report_test() ->
     Pid = self(),
@@ -615,7 +603,6 @@ info_report_test() ->
         do_format(Event4)
     ).
 
-
 progress_report_test() ->
     Pid = self(),
     % Application started
@@ -656,8 +643,9 @@ progress_report_test() ->
         #log_entry{
             level = debug,
             pid = Pid,
-            msg = "Supervisor sup_dude started mod_name:fun_name/1"
-                    " at pid <0.5.0>"
+            msg =
+                "Supervisor sup_dude started mod_name:fun_name/1"
+                " at pid <0.5.0>"
         },
         do_format(Event2)
     ),
@@ -680,7 +668,6 @@ progress_report_test() ->
         do_format(Event3)
     ).
 
-
 log_unknown_event_test() ->
     Pid = self(),
     ?assertMatch(
@@ -691,7 +678,6 @@ log_unknown_event_test() ->
         },
         do_format(an_unknown_event)
     ).
-
 
 format_reason_test_() ->
     Cases = [
@@ -805,13 +791,14 @@ format_reason_test_() ->
         }
     ],
     [
-        {Msg, fun() -> ?assertEqual(
-            Msg,
-            lists:flatten(couch_log_formatter:format_reason(Reason))
-        ) end}
-        || {Reason, Msg} <- Cases
+        {Msg, fun() ->
+            ?assertEqual(
+                Msg,
+                lists:flatten(couch_log_formatter:format_reason(Reason))
+            )
+        end}
+     || {Reason, Msg} <- Cases
     ].
-
 
 coverage_test() ->
     % MFA's that aren't
@@ -830,11 +817,13 @@ coverage_test() ->
             level = error,
             msg = "foobar"
         },
-        do_format({
-            error_report,
-            erlang:group_leader(),
-            {self(), std_error, "foobar"}
-        })
+        do_format(
+            {
+                error_report,
+                erlang:group_leader(),
+                {self(), std_error, "foobar"}
+            }
+        )
     ),
 
     % Excercising print_silly_list
@@ -843,11 +832,13 @@ coverage_test() ->
             level = error,
             msg = "dang"
         },
-        do_format({
-            error_report,
-            erlang:group_leader(),
-            {self(), std_error, dang}
-        })
+        do_format(
+            {
+                error_report,
+                erlang:group_leader(),
+                {self(), std_error, dang}
+            }
+        )
     ).
 
 gen_server_error_with_last_msg_test() ->
@@ -889,7 +880,7 @@ gen_event_error_with_last_msg_test() ->
             [
                 handler_id,
                 a_gen_event,
-                {ohai,there},
+                {ohai, there},
                 curr_state,
                 barf
             ]
@@ -911,7 +902,6 @@ gen_event_error_with_last_msg_test() ->
         ])
     end).
 
-
 gen_fsm_error_with_last_msg_test() ->
     Pid = self(),
     Event = {
@@ -920,7 +910,7 @@ gen_fsm_error_with_last_msg_test() ->
         {
             Pid,
             "** State machine did a thing",
-            [a_gen_fsm, {ohai,there}, state_name, curr_state, barf]
+            [a_gen_fsm, {ohai, there}, state_name, curr_state, barf]
         }
     },
     ?assertMatch(
@@ -939,7 +929,6 @@ gen_fsm_error_with_last_msg_test() ->
             "extra: \\[\\]"
         ])
     end).
-
 
 with_last(Fun) ->
     meck:new(couch_log_config_dyn, [passthrough]),
@@ -963,10 +952,8 @@ do_format(Event) ->
         time_stamp = lists:flatten(E#log_entry.time_stamp)
     }.
 
-
 do_matches(_, []) ->
     ok;
-
 do_matches(#log_entry{msg = Msg} = E, [Pattern | RestPatterns]) ->
     case re:run(Msg, Pattern) of
         {match, _} ->

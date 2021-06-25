@@ -12,12 +12,10 @@
 
 -module(fabric2_update_docs_tests).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2_test.hrl").
-
 
 update_docs_test_() ->
     {
@@ -43,23 +41,18 @@ update_docs_test_() ->
         }
     }.
 
-
 setup_all() ->
     test_util:start_couch([fabric]).
 
-
 teardown_all(Ctx) ->
     test_util:stop_couch(Ctx).
-
 
 setup() ->
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     Db.
 
-
 cleanup(#{} = Db) ->
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
-
 
 update_docs(Db) ->
     ?assertEqual({ok, []}, fabric2_db:update_docs(Db, [])),
@@ -81,7 +74,6 @@ update_docs(Db) ->
     ?assertMatch({ok, {1, <<_/binary>>}}, Doc2Res),
     ?assertMatch({ok, {1, <<_/binary>>}}, Doc3Res).
 
-
 update_docs_replicated(Db) ->
     Opts = [replicated_changes],
 
@@ -100,7 +92,6 @@ update_docs_replicated(Db) ->
     {ok, Doc3Open} = fabric2_db:open_doc(Db, Doc3#doc.id),
     ?assertEqual(Doc3, Doc3Open).
 
-
 update_docs_batches(Db) ->
     Opts = [{batch_size, 5000}],
 
@@ -108,18 +99,23 @@ update_docs_batches(Db) ->
 
     ?assertMatch({ok, [_ | _]}, fabric2_db:update_docs(Db, Docs1, Opts)),
 
-    lists:foreach(fun(#doc{} = Doc) ->
-        ?assertMatch({ok, #doc{}}, fabric2_db:open_doc(Db, Doc#doc.id))
-    end, Docs1),
+    lists:foreach(
+        fun(#doc{} = Doc) ->
+            ?assertMatch({ok, #doc{}}, fabric2_db:open_doc(Db, Doc#doc.id))
+        end,
+        Docs1
+    ),
 
     Docs2 = [doc(10), doc(10), doc(9000), doc(10)],
 
     ?assertMatch({ok, [_ | _]}, fabric2_db:update_docs(Db, Docs2, Opts)),
 
-    lists:foreach(fun(#doc{} = Doc) ->
-        ?assertMatch({ok, #doc{}}, fabric2_db:open_doc(Db, Doc#doc.id))
-    end, Docs2).
-
+    lists:foreach(
+        fun(#doc{} = Doc) ->
+            ?assertMatch({ok, #doc{}}, fabric2_db:open_doc(Db, Doc#doc.id))
+        end,
+        Docs2
+    ).
 
 update_docs_replicated_batches(Db) ->
     Opts = [{batch_size, 5000}, replicated_changes],
@@ -128,18 +124,23 @@ update_docs_replicated_batches(Db) ->
 
     ?assertMatch({ok, []}, fabric2_db:update_docs(Db, Docs1, Opts)),
 
-    lists:foreach(fun(#doc{} = Doc) ->
-        ?assertEqual({ok, Doc}, fabric2_db:open_doc(Db, Doc#doc.id))
-    end, Docs1),
+    lists:foreach(
+        fun(#doc{} = Doc) ->
+            ?assertEqual({ok, Doc}, fabric2_db:open_doc(Db, Doc#doc.id))
+        end,
+        Docs1
+    ),
 
     Docs2 = [doc(Size, {1, [rev()]}) || Size <- [10, 10, 9000, 10]],
 
     ?assertMatch({ok, []}, fabric2_db:update_docs(Db, Docs2, Opts)),
 
-    lists:foreach(fun(#doc{} = Doc) ->
-        ?assertEqual({ok, Doc}, fabric2_db:open_doc(Db, Doc#doc.id))
-    end, Docs2).
-
+    lists:foreach(
+        fun(#doc{} = Doc) ->
+            ?assertEqual({ok, Doc}, fabric2_db:open_doc(Db, Doc#doc.id))
+        end,
+        Docs2
+    ).
 
 update_docs_duplicate_ids_conflict(Db) ->
     Doc = doc(),
@@ -151,7 +152,6 @@ update_docs_duplicate_ids_conflict(Db) ->
     ?assertMatch({ok, {1, <<_/binary>>}}, Doc1Res),
     ?assertMatch({ok, {1, <<_/binary>>}}, Doc2Res),
     ?assertMatch(conflict, Doc3Res).
-
 
 update_docs_duplicate_ids_with_batches(Db) ->
     Opts = [{batch_size, 5000}],
@@ -166,7 +166,6 @@ update_docs_duplicate_ids_with_batches(Db) ->
     ?assertMatch({ok, {1, <<_/binary>>}}, Doc2Res),
     ?assertMatch(conflict, Doc3Res).
 
-
 update_docs_replicate_batches_duplicate_id(Db) ->
     Opts = [replicated_changes],
 
@@ -177,16 +176,13 @@ update_docs_replicate_batches_duplicate_id(Db) ->
 
     ?assertEqual({ok, Doc}, fabric2_db:open_doc(Db, Doc#doc.id)).
 
-
 % Utility functions
 
 doc() ->
     doc(2).
 
-
 doc(Size) ->
     doc(Size, undefined).
-
 
 doc(Size, Revs) ->
     Doc = #doc{
@@ -198,10 +194,8 @@ doc(Size, Revs) ->
         _ -> Doc#doc{revs = Revs}
     end.
 
-
 rev() ->
     fabric2_util:to_hex(crypto:strong_rand_bytes(16)).
-
 
 doc_body(Size) when is_integer(Size), Size >= 2 ->
     Val = fabric2_util:to_hex(crypto:strong_rand_bytes(Size div 2)),

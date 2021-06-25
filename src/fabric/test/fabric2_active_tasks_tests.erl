@@ -12,16 +12,13 @@
 
 -module(fabric2_active_tasks_tests).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("fabric2_test.hrl").
 
-
 -define(JOB_TYPE, <<"fabric2_active_tasks_tests_type">>).
 -define(JOB_ID, <<"job_id">>).
-
 
 active_tasks_test_() ->
     {
@@ -44,7 +41,6 @@ active_tasks_test_() ->
         }
     }.
 
-
 setup_all() ->
     Ctx = test_util:start_couch([fabric, couch_jobs]),
     couch_jobs:set_type_timeout(?JOB_TYPE, 5000),
@@ -52,27 +48,22 @@ setup_all() ->
     meck:expect(couch_jobs, get_types, 1, [?JOB_TYPE]),
     Ctx.
 
-
 cleanup_all(Ctx) ->
     meck:unload(),
     test_util:stop_couch(Ctx).
-
 
 setup() ->
     ok = couch_jobs:add(undefined, ?JOB_TYPE, ?JOB_ID, #{}),
     ok.
 
-
 cleanup(_) ->
     meck:reset(couch_jobs),
     couch_jobs:remove(undefined, ?JOB_TYPE, ?JOB_ID).
-
 
 no_active_tasks_defined(_) ->
     {ok, Job1, #{}} = couch_jobs:accept(?JOB_TYPE),
     ?assertEqual([], fabric2_active_tasks:get_active_tasks()),
     ok = couch_jobs:finish(undefined, Job1).
-
 
 empty_map_info(_) ->
     {ok, Job1, Data} = couch_jobs:accept(?JOB_TYPE),
@@ -81,7 +72,6 @@ empty_map_info(_) ->
     {ok, Job2} = couch_jobs:update(undefined, Job1, Data1),
     ?assertEqual([], fabric2_active_tasks:get_active_tasks()),
     ok = couch_jobs:finish(undefined, Job2).
-
 
 can_read_active_tasks(_) ->
     {ok, Job1, Data} = couch_jobs:accept(?JOB_TYPE),
@@ -95,10 +85,11 @@ can_read_active_tasks(_) ->
     Info2 = Info1#{<<"y">> => 2},
     Data2 = fabric2_active_tasks:update_active_task_info(Data1, Info2),
     {ok, Job3} = couch_jobs:update(undefined, Job2, Data2),
-    ?assertEqual([#{<<"x">> => 1, <<"y">> => 2}],
-        fabric2_active_tasks:get_active_tasks()),
+    ?assertEqual(
+        [#{<<"x">> => 1, <<"y">> => 2}],
+        fabric2_active_tasks:get_active_tasks()
+    ),
     ok = couch_jobs:finish(undefined, Job3).
-
 
 only_running_tasks_appear(_) ->
     {ok, Job1, Data} = couch_jobs:accept(?JOB_TYPE),

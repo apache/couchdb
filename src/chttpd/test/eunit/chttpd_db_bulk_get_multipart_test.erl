@@ -17,7 +17,6 @@
 
 -define(TIMEOUT, 3000).
 
-
 setup_all() ->
     mock(config),
     mock(chttpd),
@@ -27,10 +26,8 @@ setup_all() ->
     mock(fabric),
     mock(mochireq).
 
-
 teardown_all(_) ->
     meck:unload().
-
 
 setup() ->
     meck:reset([
@@ -44,10 +41,8 @@ setup() ->
     ]),
     spawn_accumulator().
 
-
 teardown(Pid) ->
     ok = stop_accumulator(Pid).
-
 
 bulk_get_test_() ->
     {
@@ -75,36 +70,36 @@ bulk_get_test_() ->
         }
     }.
 
-
 should_require_docs_field(_) ->
     Req = fake_request({[{}]}),
-    Db  = #{name => <<"foo">>},
+    Db = #{name => <<"foo">>},
     ?_assertThrow({bad_request, _}, chttpd_db:db_req(Req, Db)).
-
 
 should_not_accept_specific_query_params(_) ->
     Req = fake_request({[{<<"docs">>, []}]}),
-    Db  = #{name => <<"foo">>},
-    lists:map(fun (Param) ->
-        {Param, ?_assertThrow({bad_request, _}, begin
-            BadReq = Req#httpd{qs = [{Param, ""}]},
-            chttpd_db:db_req(BadReq, Db)
-        end)}
-    end, ["rev", "open_revs", "atts_since", "w", "new_edits"]).
-
+    Db = #{name => <<"foo">>},
+    lists:map(
+        fun(Param) ->
+            {Param,
+                ?_assertThrow({bad_request, _}, begin
+                    BadReq = Req#httpd{qs = [{Param, ""}]},
+                    chttpd_db:db_req(BadReq, Db)
+                end)}
+        end,
+        ["rev", "open_revs", "atts_since", "w", "new_edits"]
+    ).
 
 should_return_empty_results_on_no_docs(Pid) ->
     Req = fake_request({[{<<"docs">>, []}]}),
-    Db  = #{name => <<"foo">>},
+    Db = #{name => <<"foo">>},
     chttpd_db:db_req(Req, Db),
     Results = get_results_from_response(Pid),
     ?_assertEqual([], Results).
 
-
 should_get_doc_with_all_revs(Pid) ->
     DocId = <<"docudoc">>,
     Req = fake_request(DocId),
-    Db  = #{name => <<"foo">>},
+    Db = #{name => <<"foo">>},
 
     DocRevA = #doc{id = DocId, body = {[{<<"_rev">>, <<"1-ABC">>}]}},
     DocRevB = #doc{id = DocId, body = {[{<<"_rev">>, <<"1-CDE">>}]}},
@@ -115,94 +110,119 @@ should_get_doc_with_all_revs(Pid) ->
     Result = get_results_from_response(Pid),
     ?_assertEqual(DocId, couch_util:get_value(<<"_id">>, Result)).
 
-
 should_validate_doc_with_bad_id(Pid) ->
     DocId = <<"_docudoc">>,
 
     Req = fake_request(DocId),
-    Db  = #{name => <<"foo">>},
+    Db = #{name => <<"foo">>},
     chttpd_db:db_req(Req, Db),
 
     Result = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
 
-    ?_assertMatch([{<<"id">>, DocId},
-                    {<<"rev">>, null},
-                    {<<"error">>, <<"illegal_docid">>},
-                    {<<"reason">>, _}], Result).
-
+    ?_assertMatch(
+        [
+            {<<"id">>, DocId},
+            {<<"rev">>, null},
+            {<<"error">>, <<"illegal_docid">>},
+            {<<"reason">>, _}
+        ],
+        Result
+    ).
 
 should_validate_doc_with_bad_rev(Pid) ->
     DocId = <<"docudoc">>,
     Rev = <<"revorev">>,
 
     Req = fake_request(DocId, Rev),
-    Db  = #{name => <<"foo">>},
+    Db = #{name => <<"foo">>},
     chttpd_db:db_req(Req, Db),
 
     Result = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
 
-    ?_assertMatch([{<<"id">>, DocId},
-                    {<<"rev">>, Rev},
-                    {<<"error">>, <<"bad_request">>},
-                    {<<"reason">>, _}], Result).
-
+    ?_assertMatch(
+        [
+            {<<"id">>, DocId},
+            {<<"rev">>, Rev},
+            {<<"error">>, <<"bad_request">>},
+            {<<"reason">>, _}
+        ],
+        Result
+    ).
 
 should_validate_missing_doc(Pid) ->
     DocId = <<"docudoc">>,
     Rev = <<"1-revorev">>,
 
     Req = fake_request(DocId, Rev),
-    Db  = #{name => <<"foo">>},
-    mock_open_revs([{1,<<"revorev">>}], {ok, []}),
+    Db = #{name => <<"foo">>},
+    mock_open_revs([{1, <<"revorev">>}], {ok, []}),
     chttpd_db:db_req(Req, Db),
 
     Result = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
 
-    ?_assertMatch([{<<"id">>, DocId},
-                    {<<"rev">>, Rev},
-                    {<<"error">>, <<"not_found">>},
-                    {<<"reason">>, _}], Result).
-
+    ?_assertMatch(
+        [
+            {<<"id">>, DocId},
+            {<<"rev">>, Rev},
+            {<<"error">>, <<"not_found">>},
+            {<<"reason">>, _}
+        ],
+        Result
+    ).
 
 should_validate_bad_atts_since(Pid) ->
     DocId = <<"docudoc">>,
     Rev = <<"1-revorev">>,
 
     Req = fake_request(DocId, Rev, <<"badattsince">>),
-    Db  = #{name => <<"foo">>},
-    mock_open_revs([{1,<<"revorev">>}], {ok, []}),
+    Db = #{name => <<"foo">>},
+    mock_open_revs([{1, <<"revorev">>}], {ok, []}),
     chttpd_db:db_req(Req, Db),
 
     Result = get_results_from_response(Pid),
     ?assertEqual(DocId, couch_util:get_value(<<"id">>, Result)),
 
-    ?_assertMatch([{<<"id">>, DocId},
-                    {<<"rev">>, <<"badattsince">>},
-                    {<<"error">>, <<"bad_request">>},
-                    {<<"reason">>, _}], Result).
-
+    ?_assertMatch(
+        [
+            {<<"id">>, DocId},
+            {<<"rev">>, <<"badattsince">>},
+            {<<"error">>, <<"bad_request">>},
+            {<<"reason">>, _}
+        ],
+        Result
+    ).
 
 should_include_attachments_when_atts_since_specified(_) ->
     DocId = <<"docudoc">>,
     Rev = <<"1-revorev">>,
 
     Req = fake_request(DocId, Rev, [<<"1-abc">>]),
-    Db  = #{name => <<"foo">>},
-    mock_open_revs([{1,<<"revorev">>}], {ok, []}),
+    Db = #{name => <<"foo">>},
+    mock_open_revs([{1, <<"revorev">>}], {ok, []}),
     chttpd_db:db_req(Req, Db),
 
     Options = [{atts_since, [{1, <<"abc">>}]}, attachments],
-    ?_assert(meck:called(fabric2_db, open_doc_revs, ['_', DocId,
-        [{1, <<"revorev">>}], Options])).
+    ?_assert(
+        meck:called(fabric2_db, open_doc_revs, [
+            '_',
+            DocId,
+            [{1, <<"revorev">>}],
+            Options
+        ])
+    ).
 
 %% helpers
 
 fake_request(Payload) when is_tuple(Payload) ->
-    #httpd{method='POST', path_parts=[<<"db">>, <<"_bulk_get">>],
-           mochi_req=mochireq, req_body=Payload};
+    #httpd{
+        method = 'POST',
+        path_parts = [<<"db">>, <<"_bulk_get">>],
+        mochi_req = mochireq,
+        req_body = Payload
+    };
 fake_request(DocId) when is_binary(DocId) ->
     fake_request({[{<<"docs">>, [{[{<<"id">>, DocId}]}]}]}).
 
@@ -210,25 +230,36 @@ fake_request(DocId, Rev) ->
     fake_request({[{<<"docs">>, [{[{<<"id">>, DocId}, {<<"rev">>, Rev}]}]}]}).
 
 fake_request(DocId, Rev, AttsSince) ->
-    fake_request({[{<<"docs">>, [{[{<<"id">>, DocId},
-                                   {<<"rev">>, Rev},
-                                   {<<"atts_since">>, AttsSince}]}]}]}).
-
+    fake_request(
+        {[
+            {<<"docs">>, [
+                {[
+                    {<<"id">>, DocId},
+                    {<<"rev">>, Rev},
+                    {<<"atts_since">>, AttsSince}
+                ]}
+            ]}
+        ]}
+    ).
 
 mock_open_revs(RevsReq0, RevsResp) ->
-    ok = meck:expect(fabric2_db, open_doc_revs,
-                     fun(_, _, RevsReq1, _) ->
-                         ?assertEqual(RevsReq0, RevsReq1),
-                         RevsResp
-                     end).
-
+    ok = meck:expect(
+        fabric2_db,
+        open_doc_revs,
+        fun(_, _, RevsReq1, _) ->
+            ?assertEqual(RevsReq0, RevsReq1),
+            RevsResp
+        end
+    ).
 
 mock(mochireq) ->
     ok = meck:new(mochireq, [non_strict]),
     ok = meck:expect(mochireq, parse_qs, fun() -> [] end),
-    ok = meck:expect(mochireq, accepts_content_type, fun("multipart/mixed") -> true;
-                                                        ("multipart/related") -> true;
-                                                        (_) -> false end),
+    ok = meck:expect(mochireq, accepts_content_type, fun
+        ("multipart/mixed") -> true;
+        ("multipart/related") -> true;
+        (_) -> false
+    end),
     ok;
 mock(couch_httpd) ->
     ok = meck:new(couch_httpd, [passthrough]),
@@ -242,7 +273,7 @@ mock(chttpd) ->
     ok = meck:expect(chttpd, start_chunked_response, fun(_, _, _) -> {ok, nil} end),
     ok = meck:expect(chttpd, end_json_response, fun(_) -> ok end),
     ok = meck:expect(chttpd, send_chunk, fun send_chunk/2),
-    ok = meck:expect(chttpd, json_body_obj, fun (#httpd{req_body=Body}) -> Body end),
+    ok = meck:expect(chttpd, json_body_obj, fun(#httpd{req_body = Body}) -> Body end),
     ok;
 mock(couch_epi) ->
     ok = meck:new(couch_epi, [passthrough]),
@@ -265,7 +296,6 @@ mock(config) ->
     ok = meck:expect(config, get, fun(_, _, Default) -> Default end),
     ok.
 
-
 spawn_accumulator() ->
     Parent = self(),
     Pid = spawn(fun() -> accumulator_loop(Parent, []) end),
@@ -281,7 +311,7 @@ accumulator_loop(Parent, Acc) ->
             accumulator_loop(Parent, Acc);
         {put, Ref, Chunk} ->
             Parent ! {ok, Ref},
-            accumulator_loop(Parent, [Chunk|Acc])
+            accumulator_loop(Parent, [Chunk | Acc])
     end.
 
 stop_accumulator(Pid) ->
@@ -294,10 +324,9 @@ stop_accumulator(Pid) ->
         throw({timeout, <<"process stop timeout">>})
     end.
 
-
 send_chunk(_, []) ->
     {ok, nil};
-send_chunk(_Req, [H|T]=Chunk) when is_list(Chunk) ->
+send_chunk(_Req, [H | T] = Chunk) when is_list(Chunk) ->
     send_chunk(_Req, H),
     send_chunk(_Req, T);
 send_chunk(_, Chunk) ->
@@ -309,7 +338,6 @@ send_chunk(_, Chunk) ->
     after ?TIMEOUT ->
         throw({timeout, <<"send chunk timeout">>})
     end.
-
 
 get_response(Pid) ->
     Ref = make_ref(),
@@ -324,8 +352,8 @@ get_response(Pid) ->
 get_results_from_response(Pid) ->
     case get_response(Pid) of
         [] ->
-          [];
+            [];
         Result ->
-          {Result1} = ?JSON_DECODE(lists:nth(2, Result)),
-          Result1
+            {Result1} = ?JSON_DECODE(lists:nth(2, Result)),
+            Result1
     end.

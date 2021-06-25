@@ -12,11 +12,9 @@
 
 -module(couch_views_batch_test).
 
-
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 -include_lib("couch_views/include/couch_views.hrl").
-
 
 batch_test_() ->
     {
@@ -35,26 +33,21 @@ batch_test_() ->
         }
     }.
 
-
 setup() ->
     test_util:start_couch().
-
 
 cleanup(Ctx) ->
     test_util:stop_couch(Ctx).
 
-
 basic(_) ->
     erase(couch_views_batch),
     ?assertEqual(100, couch_views_batch:start(#mrst{})).
-
 
 search_success(_) ->
     erase(couch_views_batch),
     couch_views_batch:start(#mrst{}),
     couch_views_batch:success(#mrst{}, ustats(0, 0, 0)),
     ?assertEqual(600, couch_views_batch:start(#mrst{})).
-
 
 sense_success(_) ->
     erase(couch_views_batch),
@@ -65,13 +58,11 @@ sense_success(_) ->
     couch_views_batch:success(#mrst{}, ustats(0, 0, 0)),
     ?assertEqual(180, couch_views_batch:start(#mrst{})).
 
-
 failure(_) ->
     erase(couch_views_batch),
     couch_views_batch:start(#mrst{}),
     couch_views_batch:failure(#mrst{}),
     ?assertEqual(50, couch_views_batch:start(#mrst{})).
-
 
 failure_switches_to_sense(_) ->
     erase(couch_views_batch),
@@ -80,7 +71,6 @@ failure_switches_to_sense(_) ->
     couch_views_batch:start(#mrst{}),
     couch_views_batch:success(#mrst{}, ustats(0, 0, 0)),
     ?assertEqual(150, couch_views_batch:start(#mrst{})).
-
 
 ustats(DocsRead, TxSize, TotalKVs) ->
     #{

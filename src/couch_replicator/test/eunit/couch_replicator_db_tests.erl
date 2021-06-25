@@ -17,7 +17,6 @@
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 couch_replicator_db_test_() ->
     {
         "Replications are started from docs in _replicator dbs",
@@ -44,20 +43,17 @@ couch_replicator_db_test_() ->
         }
     }.
 
-
 setup() ->
     Source = couch_replicator_test_helper:create_db(),
     create_doc(Source, #{<<"_id">> => <<"doc1">>}),
     Target = couch_replicator_test_helper:create_db(),
     Name = ?tempdb(),
-    RepDb = couch_replicator_test_helper:create_db(<<Name/binary,
-        "/_replicator">>),
+    RepDb = couch_replicator_test_helper:create_db(<<Name/binary, "/_replicator">>),
     config:set("replicator", "stats_update_interval_sec", "0", false),
     config:set("replicator", "create_replicator_db", "false", false),
     config:set("couchdb", "enable_database_recovery", "false", false),
     config:set("replicator", "min_backoff_penalty_sec", "1", false),
     {Source, Target, RepDb}.
-
 
 teardown({Source, Target, RepDb}) ->
     config:delete("replicator", "stats_update_interval_sec", false),
@@ -70,12 +66,10 @@ teardown({Source, Target, RepDb}) ->
     couch_replicator_test_helper:delete_db(Source),
     couch_replicator_test_helper:delete_db(Target).
 
-
 default_replicator_db_is_created({_, _, _}) ->
     config:set("replicator", "create_replicator_db", "true", false),
     ?assertEqual(ignore, couch_replicator:ensure_rep_db_exists()),
     ?assertMatch({ok, #{}}, fabric2_db:open(?REP_DB_NAME, [])).
-
 
 continuous_replication_created_from_doc({Source, Target, RepDb}) ->
     DocId = <<"rdoc1">>,
@@ -85,31 +79,41 @@ continuous_replication_created_from_doc({Source, Target, RepDb}) ->
 
     {Code, DocInfo} = scheduler_docs(RepDb, DocId),
     ?assertEqual(200, Code),
-    ?assertMatch(#{
-        <<"database">> := RepDb,
-        <<"doc_id">> := DocId
-    }, DocInfo),
+    ?assertMatch(
+        #{
+            <<"database">> := RepDb,
+            <<"doc_id">> := DocId
+        },
+        DocInfo
+    ),
 
     RepId = maps:get(<<"id">>, DocInfo),
 
-    ?assertMatch([#{
-        <<"database">> := RepDb,
-        <<"doc_id">> := DocId,
-        <<"id">> := RepId,
-        <<"state">> := <<"running">>
-    }], couch_replicator_test_helper:scheduler_jobs()),
+    ?assertMatch(
+        [
+            #{
+                <<"database">> := RepDb,
+                <<"doc_id">> := DocId,
+                <<"id">> := RepId,
+                <<"state">> := <<"running">>
+            }
+        ],
+        couch_replicator_test_helper:scheduler_jobs()
+    ),
 
-    ?assertMatch({200, #{
-        <<"database">> := RepDb,
-        <<"doc_id">> := DocId,
-        <<"id">> := RepId,
-        <<"state">> := <<"running">>
-    }}, scheduler_jobs(RepId)),
+    ?assertMatch(
+        {200, #{
+            <<"database">> := RepDb,
+            <<"doc_id">> := DocId,
+            <<"id">> := RepId,
+            <<"state">> := <<"running">>
+        }},
+        scheduler_jobs(RepId)
+    ),
 
     delete_doc(RepDb, DocId),
     wait_scheduler_docs_not_found(RepDb, DocId),
     ?assertMatch({404, #{}}, scheduler_jobs(RepId)).
-
 
 normal_replication_created_from_doc({Source, Target, RepDb}) ->
     DocId = <<"rdoc2">>,
@@ -119,30 +123,35 @@ normal_replication_created_from_doc({Source, Target, RepDb}) ->
 
     {Code, DocInfo} = scheduler_docs(RepDb, DocId),
     ?assertEqual(200, Code),
-    ?assertMatch(#{
-        <<"database">> := RepDb,
-        <<"doc_id">> := DocId,
-        <<"state">> := <<"completed">>,
-        <<"info">> := #{
-            <<"docs_written">> := 1,
-            <<"docs_read">> := 1,
-            <<"missing_revisions_found">> := 1
-        }
-    }, DocInfo),
+    ?assertMatch(
+        #{
+            <<"database">> := RepDb,
+            <<"doc_id">> := DocId,
+            <<"state">> := <<"completed">>,
+            <<"info">> := #{
+                <<"docs_written">> := 1,
+                <<"docs_read">> := 1,
+                <<"missing_revisions_found">> := 1
+            }
+        },
+        DocInfo
+    ),
 
     wait_doc_state(RepDb, DocId, <<"completed">>),
-    ?assertMatch(#{
-        <<"_replication_state">> := <<"completed">>,
-        <<"_replication_stats">> := #{
-            <<"docs_written">> := 1,
-            <<"docs_read">> := 1,
-            <<"missing_revisions_found">> := 1
-        }
-    }, read_doc(RepDb, DocId)),
+    ?assertMatch(
+        #{
+            <<"_replication_state">> := <<"completed">>,
+            <<"_replication_stats">> := #{
+                <<"docs_written">> := 1,
+                <<"docs_read">> := 1,
+                <<"missing_revisions_found">> := 1
+            }
+        },
+        read_doc(RepDb, DocId)
+    ),
 
     delete_doc(RepDb, DocId),
     wait_scheduler_docs_not_found(RepDb, DocId).
-
 
 replicator_db_deleted({Source, Target, RepDb}) ->
     DocId = <<"rdoc3">>,
@@ -151,7 +160,6 @@ replicator_db_deleted({Source, Target, RepDb}) ->
     wait_scheduler_docs_state(RepDb, DocId, <<"running">>),
     fabric2_db:delete(RepDb, [?ADMIN_CTX]),
     wait_scheduler_docs_not_found(RepDb, DocId).
-
 
 replicator_db_recreated({Source, Target, RepDb}) ->
     DocId = <<"rdoc4">>,
@@ -172,7 +180,6 @@ replicator_db_recreated({Source, Target, RepDb}) ->
     config:set("couchdb", "enable_database_recovery", "false", false),
     fabric2_db:delete(RepDb, [?ADMIN_CTX]),
     wait_scheduler_docs_not_found(RepDb, DocId).
-
 
 invalid_replication_docs({_, _, RepDb}) ->
     Docs = [
@@ -212,10 +219,12 @@ invalid_replication_docs({_, _, RepDb}) ->
             <<"doc_ids">> => 42
         }
     ],
-    lists:foreach(fun(Doc) ->
-        ?assertThrow({forbidden, _}, create_doc(RepDb, Doc))
-    end, Docs).
-
+    lists:foreach(
+        fun(Doc) ->
+            ?assertThrow({forbidden, _}, create_doc(RepDb, Doc))
+        end,
+        Docs
+    ).
 
 duplicate_persistent_replication({Source, Target, RepDb}) ->
     DocId1 = <<"rdoc5">>,
@@ -234,10 +243,10 @@ duplicate_persistent_replication({Source, Target, RepDb}) ->
     wait_scheduler_docs_not_found(RepDb, DocId1),
     wait_scheduler_docs_not_found(RepDb, DocId2).
 
-
 duplicate_transient_replication({Source, Target, RepDb}) ->
     {ok, _Pid, RepId} = couch_replicator_test_helper:replicate_continuous(
-        Source, Target),
+        Source, Target
+    ),
 
     DocId = <<"rdoc7">>,
     RDoc = rep_doc(Source, Target, DocId, #{<<"continuous">> => true}),
@@ -250,7 +259,6 @@ duplicate_transient_replication({Source, Target, RepDb}) ->
     delete_doc(RepDb, DocId),
     wait_scheduler_docs_not_found(RepDb, DocId).
 
-
 scheduler_default_headers_returned({_, _, _}) ->
     SUrl = couch_replicator_test_helper:server_url(),
     Url = lists:flatten(io_lib:format("~s/_scheduler/jobs", [SUrl])),
@@ -258,13 +266,11 @@ scheduler_default_headers_returned({_, _, _}) ->
     ?assertEqual(true, lists:keymember("X-Couch-Request-ID", 1, Headers)),
     ?assertEqual(true, lists:keymember("X-CouchDB-Body-Time", 1, Headers)).
 
-
 scheduler_jobs(Id) ->
     SUrl = couch_replicator_test_helper:server_url(),
     Url = lists:flatten(io_lib:format("~s/_scheduler/jobs/~s", [SUrl, Id])),
     {ok, Code, _, Body} = test_request:get(Url, []),
     {Code, jiffy:decode(Body, [return_maps])}.
-
 
 scheduler_docs(DbName, DocId) ->
     SUrl = couch_replicator_test_helper:server_url(),
@@ -273,22 +279,21 @@ scheduler_docs(DbName, DocId) ->
     {ok, Code, _, Body} = test_request:get(Url, []),
     {Code, jiffy:decode(Body, [return_maps])}.
 
-
 rep_doc(Source, Target, DocId) ->
     rep_doc(Source, Target, DocId, #{}).
 
-
 rep_doc(Source, Target, DocId, #{} = Extra) ->
-    maps:merge(#{
-        <<"_id">> => DocId,
-        <<"source">> => couch_replicator_test_helper:db_url(Source),
-        <<"target">> => couch_replicator_test_helper:db_url(Target)
-    }, Extra).
-
+    maps:merge(
+        #{
+            <<"_id">> => DocId,
+            <<"source">> => couch_replicator_test_helper:db_url(Source),
+            <<"target">> => couch_replicator_test_helper:db_url(Target)
+        },
+        Extra
+    ).
 
 create_doc(DbName, Doc) ->
     couch_replicator_test_helper:create_docs(DbName, [Doc]).
-
 
 delete_doc(DbName, DocId) ->
     {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
@@ -296,46 +301,57 @@ delete_doc(DbName, DocId) ->
     Doc1 = Doc#doc{deleted = true},
     {ok, _} = fabric2_db:update_doc(Db, Doc1, []).
 
-
 read_doc(DbName, DocId) ->
     {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
     {ok, Doc} = fabric2_db:open_doc(Db, DocId, [ejson_body]),
     Body = Doc#doc.body,
     couch_util:json_decode(couch_util:json_encode(Body), [return_maps]).
 
-
 wait_scheduler_docs_state(DbName, DocId, State) ->
-    test_util:wait(fun() ->
-        case scheduler_docs(DbName, DocId) of
-            {200, #{<<"state">> := State} = Res} -> Res;
-            {_, _} -> wait
-        end
-    end, 10000, 250).
-
+    test_util:wait(
+        fun() ->
+            case scheduler_docs(DbName, DocId) of
+                {200, #{<<"state">> := State} = Res} -> Res;
+                {_, _} -> wait
+            end
+        end,
+        10000,
+        250
+    ).
 
 wait_scheduler_docs_not_found(DbName, DocId) ->
-    test_util:wait(fun() ->
-        case scheduler_docs(DbName, DocId) of
-            {404, _} -> ok;
-            {_, _} -> wait
-        end
-    end, 10000, 250).
-
+    test_util:wait(
+        fun() ->
+            case scheduler_docs(DbName, DocId) of
+                {404, _} -> ok;
+                {_, _} -> wait
+            end
+        end,
+        10000,
+        250
+    ).
 
 wait_reschedule_docs_state(DbName, DocId, State) ->
-    test_util:wait(fun() ->
-        couch_replicator_job_server:reschedule(),
-        case scheduler_docs(DbName, DocId) of
-            {200, #{<<"state">> := State} = Res} -> Res;
-            {_, _} -> wait
-        end
-    end, 10000, 500).
-
+    test_util:wait(
+        fun() ->
+            couch_replicator_job_server:reschedule(),
+            case scheduler_docs(DbName, DocId) of
+                {200, #{<<"state">> := State} = Res} -> Res;
+                {_, _} -> wait
+            end
+        end,
+        10000,
+        500
+    ).
 
 wait_doc_state(DbName, DocId, State) ->
-    test_util:wait(fun() ->
-        case read_doc(DbName, DocId) of
-            #{<<"_replication_state">> := State} -> ok;
-            #{} -> wait
-        end
-    end, 10000, 250).
+    test_util:wait(
+        fun() ->
+            case read_doc(DbName, DocId) of
+                #{<<"_replication_state">> := State} -> ok;
+                #{} -> wait
+            end
+        end,
+        10000,
+        250
+    ).

@@ -12,50 +12,41 @@
 
 -module(couch_log_writer_file_test).
 
-
 -include_lib("kernel/include/file.hrl").
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-
 -define(WRITER, couch_log_writer_file).
 
-
 couch_log_writer_file_test_() ->
-    {setup,
-        fun couch_log_test_util:start/0,
-        fun couch_log_test_util:stop/1,
-        [
-            fun check_init_terminate/0,
-            fun() ->
-                couch_log_test_util:with_meck(
-                    [{filelib, [unstick]}],
-                    fun check_ensure_dir_fail/0
-                )
-            end,
-            fun() ->
-                couch_log_test_util:with_meck(
-                    [{file, [unstick, passthrough]}],
-                    fun check_open_fail/0
-                )
-            end,
-            fun() ->
-                couch_log_test_util:with_meck(
-                    [{file, [unstick, passthrough]}],
-                    fun check_read_file_info_fail/0
-                )
-            end,
-            fun check_file_write/0,
-            fun check_buffered_file_write/0,
-            fun check_reopen/0
-        ]
-    }.
-
+    {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
+        fun check_init_terminate/0,
+        fun() ->
+            couch_log_test_util:with_meck(
+                [{filelib, [unstick]}],
+                fun check_ensure_dir_fail/0
+            )
+        end,
+        fun() ->
+            couch_log_test_util:with_meck(
+                [{file, [unstick, passthrough]}],
+                fun check_open_fail/0
+            )
+        end,
+        fun() ->
+            couch_log_test_util:with_meck(
+                [{file, [unstick, passthrough]}],
+                fun check_read_file_info_fail/0
+            )
+        end,
+        fun check_file_write/0,
+        fun check_buffered_file_write/0,
+        fun check_reopen/0
+    ]}.
 
 check_init_terminate() ->
     {ok, St} = ?WRITER:init(),
     ok = ?WRITER:terminate(stop, St).
-
 
 check_ensure_dir_fail() ->
     meck:expect(filelib, ensure_dir, 1, {error, eperm}),
@@ -63,13 +54,11 @@ check_ensure_dir_fail() ->
     ?assert(meck:called(filelib, ensure_dir, 1)),
     ?assert(meck:validate(filelib)).
 
-
 check_open_fail() ->
     meck:expect(file, open, 2, {error, enotfound}),
     ?assertEqual({error, enotfound}, ?WRITER:init()),
     ?assert(meck:called(file, open, 2)),
     ?assert(meck:validate(file)).
-
 
 check_read_file_info_fail() ->
     RFI = fun
@@ -81,12 +70,12 @@ check_read_file_info_fail() ->
     ?assert(meck:called(file, read_file_info, 1)),
     ?assert(meck:validate(file)).
 
-
 check_file_write() ->
     % Make sure we have an empty log for this test
     IsFile = filelib:is_file("./couch.log"),
-    if not IsFile -> ok; true ->
-        file:delete("./couch.log")
+    if
+        not IsFile -> ok;
+        true -> file:delete("./couch.log")
     end,
 
     Entry = #log_entry{
@@ -104,12 +93,12 @@ check_file_write() ->
     Expect = <<"[info] time_stamp nonode@nohost <0.1.0> msg_id stuff\n">>,
     ?assertEqual(Expect, Data).
 
-
 check_buffered_file_write() ->
     % Make sure we have an empty log for this test
     IsFile = filelib:is_file("./couch.log"),
-    if not IsFile -> ok; true ->
-        file:delete("./couch.log")
+    if
+        not IsFile -> ok;
+        true -> file:delete("./couch.log")
     end,
 
     config:set("log", "write_buffer", "1024"),
@@ -135,7 +124,6 @@ check_buffered_file_write() ->
     Expect = <<"[info] time_stamp nonode@nohost <0.1.0> msg_id stuff\n">>,
     ?assertEqual(Expect, Data).
 
-
 check_reopen() ->
     {ok, St1} = clear_clock(?WRITER:init()),
     {ok, St2} = clear_clock(couch_log_writer_file:maybe_reopen(St1)),
@@ -160,10 +148,8 @@ check_reopen() ->
             ?assert(element(3, St4) /= element(3, St2))
     end.
 
-
 clear_clock({ok, St}) ->
     {ok, clear_clock(St)};
-
 clear_clock(St) ->
     {st, Path, Fd, INode, _} = St,
     {st, Path, Fd, INode, {0, 0, 0}}.

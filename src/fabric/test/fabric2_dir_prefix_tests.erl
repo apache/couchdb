@@ -12,11 +12,9 @@
 
 -module(fabric2_dir_prefix_tests).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2_test.hrl").
-
 
 dir_prefix_test_() ->
     {
@@ -38,7 +36,6 @@ dir_prefix_test_() ->
         ])
     }.
 
-
 default_prefix(_) ->
     erase(fdb_directory),
     ok = config:delete("fabric", "fdb_directory", false),
@@ -53,7 +50,6 @@ default_prefix(_) ->
     % Check that we can create dbs
     DbName = ?tempdb(),
     ?assertMatch({ok, _}, fabric2_db:create(DbName, [])).
-
 
 custom_prefix(_) ->
     erase(fdb_directory),

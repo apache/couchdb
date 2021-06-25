@@ -15,7 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
 setup() ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
@@ -24,7 +23,6 @@ setup() ->
 
 teardown(_Url) ->
     ok.
-
 
 replicate_test_() ->
     {
@@ -35,7 +33,8 @@ replicate_test_() ->
             fun chttpd_test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun should_escape_dbname_on_replicate/1
                 ]
@@ -43,16 +42,17 @@ replicate_test_() ->
         }
     }.
 
-
 should_escape_dbname_on_replicate(Url) ->
     ?_test(
         begin
             UrlBin = ?l2b(Url),
-            Request = couch_util:json_encode({[
-                {<<"source">>, <<UrlBin/binary, "/foo%2Fbar">>},
-                {<<"target">>, <<"bar/baz">>},
-                {<<"create_target">>, true}
-            ]}),
+            Request = couch_util:json_encode(
+                {[
+                    {<<"source">>, <<UrlBin/binary, "/foo%2Fbar">>},
+                    {<<"target">>, <<"bar/baz">>},
+                    {<<"create_target">>, true}
+                ]}
+            ),
             {ok, 200, _, Body} = request_replicate(Url ++ "/_replicate", Request),
             JSON = couch_util:json_decode(Body),
 
@@ -60,8 +60,8 @@ should_escape_dbname_on_replicate(Url) ->
             Target = json_value(JSON, [<<"target">>, <<"url">>]),
             ?assertEqual(<<UrlBin/binary, "/foo%2Fbar">>, Source),
             ?assertEqual(<<UrlBin/binary, "/bar%2Fbaz">>, Target)
-        end).
-
+        end
+    ).
 
 json_value(JSON, Keys) ->
     couch_util:get_nested_json_value(JSON, Keys).
@@ -80,8 +80,9 @@ request(Method, Url, Headers, Body, {M, F}, MockFun) ->
         Result = test_request:Method(Url, Headers, Body),
         ?assert(meck:validate(M)),
         Result
-    catch Kind:Reason ->
-        {Kind, Reason}
+    catch
+        Kind:Reason ->
+            {Kind, Reason}
     after
         meck:unload(M)
     end.

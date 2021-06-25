@@ -16,11 +16,9 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 -define(DOCS_COUNT, 100).
 -define(i2l(I), integer_to_list(I)).
 -define(io2b(Io), iolist_to_binary(Io)).
-
 
 use_checkpoints_test_() ->
     {
@@ -38,17 +36,14 @@ use_checkpoints_test_() ->
         }
     }.
 
-
 setup() ->
     Source = couch_replicator_test_helper:create_db(),
     Target = couch_replicator_test_helper:create_db(),
     {Source, Target}.
 
-
 teardown({Source, Target}) ->
     couch_replicator_test_helper:delete_db(Source),
     couch_replicator_test_helper:delete_db(Target).
-
 
 t_replicate_with_checkpoints({Source, Target}) ->
     populate_db(Source, ?DOCS_COUNT),
@@ -70,7 +65,6 @@ t_replicate_with_checkpoints({Source, Target}) ->
 
     couch_replicator_test_helper:compare_dbs(Source, Target).
 
-
 t_replicate_without_checkpoints({Source, Target}) ->
     populate_db(Source, ?DOCS_COUNT),
     Res = couch_replicator_test_helper:replicate(#{
@@ -81,15 +75,18 @@ t_replicate_without_checkpoints({Source, Target}) ->
     ?assertEqual({ok, #{<<"use_checkpoints">> => false}}, Res),
     couch_replicator_test_helper:compare_dbs(Source, Target).
 
-
 populate_db(DbName, DocCount) ->
-    Docs = lists:foldl(fun(DocIdCounter, Acc) ->
-        Id = ?io2b(["doc", ?i2l(DocIdCounter)]),
-        Value = ?io2b(["val", ?i2l(DocIdCounter)]),
-        Doc = #doc{
-            id = Id,
-            body = {[{<<"value">>, Value}]}
-        },
-        [Doc | Acc]
-    end, [], lists:seq(1, DocCount)),
+    Docs = lists:foldl(
+        fun(DocIdCounter, Acc) ->
+            Id = ?io2b(["doc", ?i2l(DocIdCounter)]),
+            Value = ?io2b(["val", ?i2l(DocIdCounter)]),
+            Doc = #doc{
+                id = Id,
+                body = {[{<<"value">>, Value}]}
+            },
+            [Doc | Acc]
+        end,
+        [],
+        lists:seq(1, DocCount)
+    ),
     couch_replicator_test_helper:create_docs(DbName, Docs).

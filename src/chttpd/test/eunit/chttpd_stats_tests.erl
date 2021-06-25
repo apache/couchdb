@@ -3,26 +3,20 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
 start() ->
     ok = application:start(config),
     ok = application:start(couch_log).
-
 
 stop(_) ->
     ok = application:stop(config),
     ok = application:stop(couch_log).
 
-
 setup() ->
     ok = meck:new(chttpd_stats, [passthrough]).
-
 
 teardown(_) ->
     meck:unload(),
     ok.
-
-
 
 chttpd_stats_test_() ->
     {
@@ -33,7 +27,8 @@ chttpd_stats_test_() ->
             fun stop/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun test_reset/1,
                     fun test_no_reset/1
@@ -41,7 +36,6 @@ chttpd_stats_test_() ->
             }
         }
     }.
-
 
 test_reset(_) ->
     ?_test(begin
@@ -64,7 +58,6 @@ test_reset(_) ->
         ResetState = get(chttpd_stats),
         ?assertMatch({st, 0, 0, 0, _, _, _, _}, ResetState)
     end).
-
 
 test_no_reset(_) ->
     ?_test(begin

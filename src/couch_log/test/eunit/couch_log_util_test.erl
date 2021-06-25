@@ -12,10 +12,8 @@
 
 -module(couch_log_util_test).
 
-
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
-
 
 get_message_id_test() ->
     ?assertEqual("--------", couch_log_util:get_msg_id()),
@@ -23,14 +21,15 @@ get_message_id_test() ->
     ?assertEqual("deadbeef", couch_log_util:get_msg_id()),
     erlang:put(nonce, undefined).
 
-
 level_to_atom_test() ->
-    lists:foreach(fun(L) ->
-        ?assert(is_atom(couch_log_util:level_to_atom(L))),
-        ?assert(is_integer(couch_log_util:level_to_integer(L))),
-        ?assert(is_list(couch_log_util:level_to_string(L)))
-    end, levels()).
-
+    lists:foreach(
+        fun(L) ->
+            ?assert(is_atom(couch_log_util:level_to_atom(L))),
+            ?assert(is_integer(couch_log_util:level_to_integer(L))),
+            ?assert(is_list(couch_log_util:level_to_string(L)))
+        end,
+        levels()
+    ).
 
 string_p_test() ->
     ?assertEqual(false, couch_log_util:string_p([])),
@@ -43,13 +42,50 @@ string_p_test() ->
     ?assertEqual(true, couch_log_util:string_p([$\f])),
     ?assertEqual(true, couch_log_util:string_p([$\e])).
 
-
 levels() ->
     [
-        1, 2, 3, 4, 5, 6, 7, 8, 9,
-        "1", "2", "3", "4", "5", "6", "7", "8", "9",
-        debug, info, notice, warning, warn, error, err,
-        critical, crit, alert, emergency, emerg, none,
-        "debug", "info", "notice", "warning", "warn", "error", "err",
-        "critical", "crit", "alert", "emergency", "emerg", "none"
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        debug,
+        info,
+        notice,
+        warning,
+        warn,
+        error,
+        err,
+        critical,
+        crit,
+        alert,
+        emergency,
+        emerg,
+        none,
+        "debug",
+        "info",
+        "notice",
+        "warning",
+        "warn",
+        "error",
+        "err",
+        "critical",
+        "crit",
+        "alert",
+        "emergency",
+        "emerg",
+        "none"
     ].

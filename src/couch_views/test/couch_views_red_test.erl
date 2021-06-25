@@ -17,9 +17,7 @@
 -include_lib("fabric/test/fabric2_test.hrl").
 -include("couch_views.hrl").
 
-
 -define(NUM_DOCS, 2000).
-
 
 reduce_views_shraed_db_test_() ->
     {
@@ -73,7 +71,6 @@ reduce_views_shraed_db_test_() ->
         }
     }.
 
-
 reduce_views_collation_test_() ->
     {
         "Reduce collation test",
@@ -87,17 +84,15 @@ reduce_views_collation_test_() ->
         }
     }.
 
-
 setup_db() ->
     Ctx = test_util:start_couch([
-            fabric,
-            couch_jobs,
-            couch_js,
-            couch_views
-        ]),
+        fabric,
+        couch_jobs,
+        couch_js,
+        couch_views
+    ]),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     {Db, Ctx}.
-
 
 setup_db_with_docs() ->
     {Db, Ctx} = setup_db(),
@@ -106,17 +101,14 @@ setup_db_with_docs() ->
     run_query(Db, <<"baz">>, #{limit => 0}),
     {Db, Ctx}.
 
-
 teardown_db({Db, Ctx}) ->
     fabric2_db:delete(fabric2_db:name(Db), [{user_ctx, ?ADMIN_USER}]),
     test_util:stop_couch(Ctx).
-
 
 should_reduce({Db, _}) ->
     Result = run_query(Db, <<"baz_count">>, #{}),
     Expect = {ok, [row(null, ?NUM_DOCS)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_rev({Db, _}) ->
     Args = #{
@@ -126,7 +118,6 @@ should_reduce_rev({Db, _}) ->
     Expect = {ok, [row(null, ?NUM_DOCS)]},
     ?assertEqual(Expect, Result).
 
-
 should_reduce_start_key({Db, _}) ->
     Args = #{
         start_key => 4
@@ -134,7 +125,6 @@ should_reduce_start_key({Db, _}) ->
     Result = run_query(Db, <<"baz_count">>, Args),
     Expect = {ok, [row(null, ?NUM_DOCS - 3)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_start_key_rev({Db, _}) ->
     Args = #{
@@ -145,7 +135,6 @@ should_reduce_start_key_rev({Db, _}) ->
     Expect = {ok, [row(null, 4)]},
     ?assertEqual(Expect, Result).
 
-
 should_reduce_end_key({Db, _}) ->
     Args = #{
         end_key => 6
@@ -153,7 +142,6 @@ should_reduce_end_key({Db, _}) ->
     Result = run_query(Db, <<"baz_count">>, Args),
     Expect = {ok, [row(null, 6)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_end_key_rev({Db, _}) ->
     Args = #{
@@ -164,7 +152,6 @@ should_reduce_end_key_rev({Db, _}) ->
     Expect = {ok, [row(null, ?NUM_DOCS - 5)]},
     ?assertEqual(Expect, Result).
 
-
 should_reduce_inclusive_end_false({Db, _}) ->
     Args = #{
         end_key => 6,
@@ -173,7 +160,6 @@ should_reduce_inclusive_end_false({Db, _}) ->
     Result = run_query(Db, <<"baz_count">>, Args),
     Expect = {ok, [row(null, 5)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_inclusive_end_false_rev({Db, _}) ->
     Args = #{
@@ -185,7 +171,6 @@ should_reduce_inclusive_end_false_rev({Db, _}) ->
     Expect = {ok, [row(null, ?NUM_DOCS - 6)]},
     ?assertEqual(Expect, Result).
 
-
 should_reduce_start_and_end_key({Db, _}) ->
     Args = #{
         start_key => 3,
@@ -194,7 +179,6 @@ should_reduce_start_and_end_key({Db, _}) ->
     Result = run_query(Db, <<"baz_count">>, Args),
     Expect = {ok, [row(null, 3)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_start_and_end_key_rev({Db, _}) ->
     Args = #{
@@ -206,7 +190,6 @@ should_reduce_start_and_end_key_rev({Db, _}) ->
     Expect = {ok, [row(null, 3)]},
     ?assertEqual(Expect, Result).
 
-
 should_reduce_empty_range({Db, _}) ->
     Args = #{
         start_key => 100000,
@@ -215,7 +198,6 @@ should_reduce_empty_range({Db, _}) ->
     Result = run_query(Db, <<"baz_count">>, Args),
     Expect = {ok, []},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_empty_range_rev({Db, _}) ->
     Args = #{
@@ -227,17 +209,13 @@ should_reduce_empty_range_rev({Db, _}) ->
     Expect = {ok, []},
     ?assertEqual(Expect, Result).
 
-
 should_reduce_grouped({Db, _}) ->
     Args = #{
         group_level => exact
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [
-        row(I, 1) || I <- lists:seq(1, ?NUM_DOCS)
-    ]},
+    Expect = {ok, [row(I, 1) || I <- lists:seq(1, ?NUM_DOCS)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_rev({Db, _}) ->
     Args = #{
@@ -245,11 +223,8 @@ should_reduce_grouped_rev({Db, _}) ->
         group_level => exact
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [
-        row(I, 1) || I <- lists:seq(?NUM_DOCS, 1, -1)
-    ]},
+    Expect = {ok, [row(I, 1) || I <- lists:seq(?NUM_DOCS, 1, -1)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_start_key({Db, _}) ->
     Args = #{
@@ -257,11 +232,8 @@ should_reduce_grouped_start_key({Db, _}) ->
         start_key => 3
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [
-        row(I, 1) || I <- lists:seq(3, ?NUM_DOCS)
-    ]},
+    Expect = {ok, [row(I, 1) || I <- lists:seq(3, ?NUM_DOCS)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_start_key_rev({Db, _}) ->
     Args = #{
@@ -270,13 +242,13 @@ should_reduce_grouped_start_key_rev({Db, _}) ->
         start_key => 3
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [
-        row(3, 1),
-        row(2, 1),
-        row(1, 1)
-    ]},
+    Expect =
+        {ok, [
+            row(3, 1),
+            row(2, 1),
+            row(1, 1)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_end_key({Db, _}) ->
     Args = #{
@@ -284,11 +256,8 @@ should_reduce_grouped_end_key({Db, _}) ->
         end_key => 6
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [
-        row(I, 1) || I <- lists:seq(1, 6)
-    ]},
+    Expect = {ok, [row(I, 1) || I <- lists:seq(1, 6)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_end_key_rev({Db, _}) ->
     Args = #{
@@ -297,11 +266,8 @@ should_reduce_grouped_end_key_rev({Db, _}) ->
         end_key => 6
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [
-        row(I, 1) || I <- lists:seq(?NUM_DOCS, 6, -1)
-    ]},
+    Expect = {ok, [row(I, 1) || I <- lists:seq(?NUM_DOCS, 6, -1)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_inclusive_end_false({Db, _}) ->
     Args = #{
@@ -310,11 +276,8 @@ should_reduce_grouped_inclusive_end_false({Db, _}) ->
         inclusive_end => false
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [
-        row(I, 1) || I <- lists:seq(1, 3)
-    ]},
+    Expect = {ok, [row(I, 1) || I <- lists:seq(1, 3)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_inclusive_end_false_rev({Db, _}) ->
     Args = #{
@@ -324,11 +287,8 @@ should_reduce_grouped_inclusive_end_false_rev({Db, _}) ->
         inclusive_end => false
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [
-        row(I, 1) || I <- lists:seq(?NUM_DOCS, 5, -1)
-    ]},
+    Expect = {ok, [row(I, 1) || I <- lists:seq(?NUM_DOCS, 5, -1)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_start_and_end_key({Db, _}) ->
     Args = #{
@@ -337,11 +297,8 @@ should_reduce_grouped_start_and_end_key({Db, _}) ->
         end_key => 4
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [
-        row(I, 1) || I <- lists:seq(2, 4)
-    ]},
+    Expect = {ok, [row(I, 1) || I <- lists:seq(2, 4)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_start_and_end_key_rev({Db, _}) ->
     Args = #{
@@ -351,11 +308,8 @@ should_reduce_grouped_start_and_end_key_rev({Db, _}) ->
         end_key => 2
     },
     Result = run_query(Db, <<"baz_count">>, Args),
-    Expect = {ok, [
-        row(I, 1) || I <- lists:seq(4, 2, -1)
-    ]},
+    Expect = {ok, [row(I, 1) || I <- lists:seq(4, 2, -1)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_empty_range({Db, _}) ->
     Args = #{
@@ -366,7 +320,6 @@ should_reduce_grouped_empty_range({Db, _}) ->
     Result = run_query(Db, <<"baz_count">>, Args),
     Expect = {ok, []},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_empty_range_rev({Db, _}) ->
     Args = #{
@@ -379,36 +332,31 @@ should_reduce_grouped_empty_range_rev({Db, _}) ->
     Expect = {ok, []},
     ?assertEqual(Expect, Result).
 
-
 should_reduce_array_keys({Db, _}) ->
     Result = run_query(Db, <<"boom">>, #{}),
     Expect = {ok, [row(null, 1.5 * ?NUM_DOCS)]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_grouped_array_keys({Db, _}) ->
     Args = #{
         group_level => exact
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, lists:sort([
-        row([I rem 3, I], 1.5) || I <- lists:seq(1, ?NUM_DOCS)
-    ])},
+    Expect = {ok, lists:sort([row([I rem 3, I], 1.5) || I <- lists:seq(1, ?NUM_DOCS)])},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys({Db, _}) ->
     Args = #{
         group_level => 1
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([0], rem_count(0, ?NUM_DOCS) * 1.5),
-        row([1], rem_count(1, ?NUM_DOCS) * 1.5),
-        row([2], rem_count(2, ?NUM_DOCS) * 1.5)
-    ]},
+    Expect =
+        {ok, [
+            row([0], rem_count(0, ?NUM_DOCS) * 1.5),
+            row([1], rem_count(1, ?NUM_DOCS) * 1.5),
+            row([2], rem_count(2, ?NUM_DOCS) * 1.5)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_start_key({Db, _}) ->
     Args = #{
@@ -416,12 +364,12 @@ should_reduce_group_1_array_keys_start_key({Db, _}) ->
         start_key => [1]
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([1], rem_count(1, ?NUM_DOCS) * 1.5),
-        row([2], rem_count(2, ?NUM_DOCS) * 1.5)
-    ]},
+    Expect =
+        {ok, [
+            row([1], rem_count(1, ?NUM_DOCS) * 1.5),
+            row([2], rem_count(2, ?NUM_DOCS) * 1.5)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_start_key_rev({Db, _}) ->
     Args = #{
@@ -430,12 +378,12 @@ should_reduce_group_1_array_keys_start_key_rev({Db, _}) ->
         start_key => [1, ?NUM_DOCS + 1]
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([1], rem_count(1, ?NUM_DOCS) * 1.5),
-        row([0], rem_count(0, ?NUM_DOCS) * 1.5)
-    ]},
+    Expect =
+        {ok, [
+            row([1], rem_count(1, ?NUM_DOCS) * 1.5),
+            row([0], rem_count(0, ?NUM_DOCS) * 1.5)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_end_key({Db, _}) ->
     Args = #{
@@ -443,12 +391,12 @@ should_reduce_group_1_array_keys_end_key({Db, _}) ->
         end_key => [1, ?NUM_DOCS + 1]
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([0], rem_count(0, ?NUM_DOCS) * 1.5),
-        row([1], rem_count(1, ?NUM_DOCS) * 1.5)
-    ]},
+    Expect =
+        {ok, [
+            row([0], rem_count(0, ?NUM_DOCS) * 1.5),
+            row([1], rem_count(1, ?NUM_DOCS) * 1.5)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_end_key_rev({Db, _}) ->
     Args = #{
@@ -457,12 +405,12 @@ should_reduce_group_1_array_keys_end_key_rev({Db, _}) ->
         end_key => [1]
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([2], rem_count(2, ?NUM_DOCS) * 1.5),
-        row([1], rem_count(1, ?NUM_DOCS) * 1.5)
-    ]},
+    Expect =
+        {ok, [
+            row([2], rem_count(2, ?NUM_DOCS) * 1.5),
+            row([1], rem_count(1, ?NUM_DOCS) * 1.5)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_inclusive_end_false({Db, _}) ->
     Args = #{
@@ -471,11 +419,11 @@ should_reduce_group_1_array_keys_inclusive_end_false({Db, _}) ->
         inclusive_end => false
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([0], rem_count(0, ?NUM_DOCS) * 1.5)
-    ]},
+    Expect =
+        {ok, [
+            row([0], rem_count(0, ?NUM_DOCS) * 1.5)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_inclusive_end_false_rev({Db, _}) ->
     Args = #{
@@ -485,11 +433,11 @@ should_reduce_group_1_array_keys_inclusive_end_false_rev({Db, _}) ->
         inclusive_end => false
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([2], rem_count(2, ?NUM_DOCS) * 1.5)
-    ]},
+    Expect =
+        {ok, [
+            row([2], rem_count(2, ?NUM_DOCS) * 1.5)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_start_and_end_key({Db, _}) ->
     Args = #{
@@ -498,11 +446,11 @@ should_reduce_group_1_array_keys_start_and_end_key({Db, _}) ->
         end_key => [1, ?NUM_DOCS + 1]
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([1], rem_count(1, ?NUM_DOCS) * 1.5)
-    ]},
+    Expect =
+        {ok, [
+            row([1], rem_count(1, ?NUM_DOCS) * 1.5)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_start_and_end_key_rev({Db, _}) ->
     Args = #{
@@ -512,11 +460,11 @@ should_reduce_group_1_array_keys_start_and_end_key_rev({Db, _}) ->
         end_key => [1]
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([1], rem_count(1, ?NUM_DOCS) * 1.5)
-    ]},
+    Expect =
+        {ok, [
+            row([1], rem_count(1, ?NUM_DOCS) * 1.5)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_sub_array_select({Db, _}) ->
     % Test that keys are applied below the key grouping
@@ -526,12 +474,12 @@ should_reduce_group_1_array_keys_sub_array_select({Db, _}) ->
         end_key => [1, 4]
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([0], 3.0),
-        row([1], 3.0)
-    ]},
+    Expect =
+        {ok, [
+            row([0], 3.0),
+            row([1], 3.0)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_sub_array_select_rev({Db, _}) ->
     % Test that keys are applied below the key grouping
@@ -542,12 +490,12 @@ should_reduce_group_1_array_keys_sub_array_select_rev({Db, _}) ->
         end_key => [0, ?NUM_DOCS - 6]
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([1], 3.0),
-        row([0], 3.0)
-    ]},
+    Expect =
+        {ok, [
+            row([1], 3.0),
+            row([0], 3.0)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_sub_array_inclusive_end({Db, _}) ->
     % Test that keys are applied below the key grouping
@@ -558,12 +506,12 @@ should_reduce_group_1_array_keys_sub_array_inclusive_end({Db, _}) ->
         inclusive_end => false
     },
     Result = run_query(Db, <<"boom">>, Args),
-    Expect = {ok, [
-        row([0], 3.0),
-        row([1], 1.5)
-    ]},
+    Expect =
+        {ok, [
+            row([0], 3.0),
+            row([1], 1.5)
+        ]},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_empty_range({Db, _}) ->
     Args = #{
@@ -574,7 +522,6 @@ should_reduce_group_1_array_keys_empty_range({Db, _}) ->
     Result = run_query(Db, <<"boom">>, Args),
     Expect = {ok, []},
     ?assertEqual(Expect, Result).
-
 
 should_reduce_group_1_array_keys_empty_range_rev({Db, _}) ->
     Args = #{
@@ -587,29 +534,36 @@ should_reduce_group_1_array_keys_empty_range_rev({Db, _}) ->
     Expect = {ok, []},
     ?assertEqual(Expect, Result).
 
-
 should_collate_group_keys({Db, _}) ->
-    DDoc = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
-        {<<"views">>, {[
-            {<<"group">>, {[
-                {<<"map">>, <<"function(doc) {emit([doc.val], 1);}">>},
-                {<<"reduce">>, <<"_count">>}
-            ]}}
-        ]}}
-    ]}),
+    DDoc = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/bar">>},
+            {<<"views">>,
+                {[
+                    {<<"group">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit([doc.val], 1);}">>},
+                            {<<"reduce">>, <<"_count">>}
+                        ]}}
+                ]}}
+        ]}
+    ),
 
     % val is "föö" without combining characters
-    Doc1 = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"a">>},
-        {<<"val">>, <<16#66, 16#C3, 16#B6, 16#C3, 16#B6>>}
-    ]}),
+    Doc1 = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"a">>},
+            {<<"val">>, <<16#66, 16#C3, 16#B6, 16#C3, 16#B6>>}
+        ]}
+    ),
 
     % val is "föö" without combining characters
-    Doc2 = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"b">>},
-        {<<"val">>, <<16#66, 16#6F, 16#CC, 16#88, 16#6F, 16#CC, 16#88>>}
-    ]}),
+    Doc2 = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"b">>},
+            {<<"val">>, <<16#66, 16#6F, 16#CC, 16#88, 16#6F, 16#CC, 16#88>>}
+        ]}
+    ),
     {ok, _} = fabric2_db:update_docs(Db, [DDoc, Doc1, Doc2]),
 
     % An implementation detail we have is that depending on
@@ -622,9 +576,10 @@ should_collate_group_keys({Db, _}) ->
         group_level => exact
     },
     ResultFwd = run_query(Db, DDoc, <<"group">>, ArgsFwd),
-    ExpectFwd = {ok, [
-        row([<<16#66, 16#C3, 16#B6, 16#C3, 16#B6>>], 2)
-    ]},
+    ExpectFwd =
+        {ok, [
+            row([<<16#66, 16#C3, 16#B6, 16#C3, 16#B6>>], 2)
+        ]},
     ?assertEqual(ExpectFwd, ResultFwd),
 
     ArgsRev = #{
@@ -632,25 +587,22 @@ should_collate_group_keys({Db, _}) ->
         group_level => exact
     },
     ResultRev = run_query(Db, DDoc, <<"group">>, ArgsRev),
-    ExpectRev = {ok, [
-        row([<<16#66, 16#6F, 16#CC, 16#88, 16#6F, 16#CC, 16#88>>], 2)
-    ]},
+    ExpectRev =
+        {ok, [
+            row([<<16#66, 16#6F, 16#CC, 16#88, 16#6F, 16#CC, 16#88>>], 2)
+        ]},
     ?assertEqual(ExpectRev, ResultRev).
-
 
 rem_count(Rem, Count) ->
     Members = [I || I <- lists:seq(1, Count), I rem 3 == Rem],
     length(Members).
 
-
 run_query(Db, Idx, Args) ->
     DDoc = create_ddoc(),
     run_query(Db, DDoc, Idx, Args).
 
-
 run_query(Db, DDoc, Idx, Args) ->
     couch_views:query(Db, DDoc, Idx, fun default_cb/2, [], Args).
-
 
 default_cb(complete, Acc) ->
     {ok, lists:reverse(Acc)};
@@ -665,81 +617,90 @@ default_cb(ok, ddoc_updated) ->
 default_cb(Row, Acc) ->
     {ok, [Row | Acc]}.
 
-
 row(Key, Value) ->
     {row, [{key, Key}, {value, Value}]}.
 
-
 create_ddoc() ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
-        {<<"views">>, {[
-            {<<"baz">>, {[
-                {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
-            ]}},
-            {<<"baz_count">>, {[
-                {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>},
-                {<<"reduce">>, <<"_count">>}
-            ]}},
-            {<<"baz_size">>, {[
-                {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>},
-                {<<"reduce">>, <<"_sum">>}
-            ]}},
-            {<<"boom">>, {[
-                {<<"map">>, <<
-                    "function(doc) {\n"
-                    "   emit([doc.val % 3, doc.val], 1.5);\n"
-                    "}"
-                >>},
-                {<<"reduce">>, <<"_sum">>}
-            ]}},
-            {<<"bing">>, {[
-                {<<"map">>, <<"function(doc) {}">>},
-                {<<"reduce">>, <<"_count">>}
-            ]}},
-            {<<"bing_hyper">>, {[
-                {<<"map">>, <<"function(doc) {}">>},
-                {<<"reduce">>, <<"_approx_count_distinct">>}
-            ]}},
-            {<<"doc_emit">>, {[
-                {<<"map">>, <<"function(doc) {emit(doc.val, doc)}">>}
-            ]}},
-            {<<"duplicate_keys">>, {[
-                {<<"map">>, <<
-                    "function(doc) {\n"
-                    "   emit(doc._id, doc.val);\n"
-                    "   emit(doc._id, doc.val + 1);\n"
-                    "}">>},
-                {<<"reduce">>, <<"_count">>}
-            ]}},
-            {<<"zing">>, {[
-                {<<"map">>, <<
-                    "function(doc) {\n"
-                    "  if(doc.foo !== undefined)\n"
-                    "    emit(doc.foo, 0);\n"
-                    "}"
-                >>}
-            ]}}
-        ]}}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/bar">>},
+            {<<"views">>,
+                {[
+                    {<<"baz">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
+                        ]}},
+                    {<<"baz_count">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>},
+                            {<<"reduce">>, <<"_count">>}
+                        ]}},
+                    {<<"baz_size">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>},
+                            {<<"reduce">>, <<"_sum">>}
+                        ]}},
+                    {<<"boom">>,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) {\n"
+                                "   emit([doc.val % 3, doc.val], 1.5);\n"
+                                "}"
+                            >>},
+                            {<<"reduce">>, <<"_sum">>}
+                        ]}},
+                    {<<"bing">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {}">>},
+                            {<<"reduce">>, <<"_count">>}
+                        ]}},
+                    {<<"bing_hyper">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {}">>},
+                            {<<"reduce">>, <<"_approx_count_distinct">>}
+                        ]}},
+                    {<<"doc_emit">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc.val, doc)}">>}
+                        ]}},
+                    {<<"duplicate_keys">>,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) {\n"
+                                "   emit(doc._id, doc.val);\n"
+                                "   emit(doc._id, doc.val + 1);\n"
+                                "}"
+                            >>},
+                            {<<"reduce">>, <<"_count">>}
+                        ]}},
+                    {<<"zing">>,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) {\n"
+                                "  if(doc.foo !== undefined)\n"
+                                "    emit(doc.foo, 0);\n"
+                                "}"
+                            >>}
+                        ]}}
+                ]}}
+        ]}
+    ).
 
 make_docs(Db, TotalDocs) when TotalDocs > 0 ->
     make_docs(Db, TotalDocs, 0).
-
 
 make_docs(Db, TotalDocs, DocsMade) when TotalDocs > DocsMade ->
     DocCount = min(TotalDocs - DocsMade, 500),
     Docs = [doc(I + DocsMade) || I <- lists:seq(1, DocCount)],
     fabric2_db:update_docs(Db, Docs),
     make_docs(Db, TotalDocs, DocsMade + DocCount);
-
 make_docs(_Db, TotalDocs, DocsMade) when TotalDocs =< DocsMade ->
     ok.
 
-
 doc(Id) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, list_to_binary(integer_to_list(Id))},
-        {<<"val">>, Id}
-    ]}).
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, list_to_binary(integer_to_list(Id))},
+            {<<"val">>, Id}
+        ]}
+    ).

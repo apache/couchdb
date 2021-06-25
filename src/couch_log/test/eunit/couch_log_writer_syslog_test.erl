@@ -12,40 +12,31 @@
 
 -module(couch_log_writer_syslog_test).
 
-
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-
 -define(WRITER, couch_log_writer_syslog).
 
-
 couch_log_writer_syslog_test_() ->
-    {setup,
-        fun couch_log_test_util:start/0,
-        fun couch_log_test_util:stop/1,
-        [
-            fun check_init_terminate/0,
-            fun() ->
-                couch_log_test_util:with_meck(
-                    [{io, [unstick]}],
-                    fun check_stderr_write/0
-                )
-            end,
-            fun() ->
-                couch_log_test_util:with_meck(
-                    [{gen_udp, [unstick]}],
-                    fun check_udp_send/0
-                )
-            end
-        ]
-    }.
-
+    {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
+        fun check_init_terminate/0,
+        fun() ->
+            couch_log_test_util:with_meck(
+                [{io, [unstick]}],
+                fun check_stderr_write/0
+            )
+        end,
+        fun() ->
+            couch_log_test_util:with_meck(
+                [{gen_udp, [unstick]}],
+                fun check_udp_send/0
+            )
+        end
+    ]}.
 
 check_init_terminate() ->
     {ok, St} = ?WRITER:init(),
     ok = ?WRITER:terminate(stop, St).
-
 
 check_stderr_write() ->
     meck:expect(io, format, 3, ok),
@@ -63,7 +54,6 @@ check_stderr_write() ->
 
     ?assert(meck:called(io, format, 3)),
     ?assert(meck:validate(io)).
-
 
 check_udp_send() ->
     meck:expect(gen_udp, open, 1, {ok, socket}),
@@ -91,32 +81,64 @@ check_udp_send() ->
     ?assert(meck:called(gen_udp, close, 1)),
     ?assert(meck:validate(gen_udp)).
 
-
 facility_test() ->
     Names = [
-        "kern", "user", "mail", "daemon", "auth", "syslog", "lpr",
-        "news", "uucp", "clock", "authpriv", "ftp", "ntp", "audit",
-        "alert", "cron", "local0", "local1", "local2", "local3",
-        "local4", "local5", "local6", "local7"
+        "kern",
+        "user",
+        "mail",
+        "daemon",
+        "auth",
+        "syslog",
+        "lpr",
+        "news",
+        "uucp",
+        "clock",
+        "authpriv",
+        "ftp",
+        "ntp",
+        "audit",
+        "alert",
+        "cron",
+        "local0",
+        "local1",
+        "local2",
+        "local3",
+        "local4",
+        "local5",
+        "local6",
+        "local7"
     ],
-    lists:foldl(fun(Name, Id) ->
-        IdStr = lists:flatten(io_lib:format("~w", [Id])),
-        ?assertEqual(Id bsl 3, couch_log_writer_syslog:get_facility(Name)),
-        ?assertEqual(Id bsl 3, couch_log_writer_syslog:get_facility(IdStr)),
-        Id + 1
-    end, 0, Names),
+    lists:foldl(
+        fun(Name, Id) ->
+            IdStr = lists:flatten(io_lib:format("~w", [Id])),
+            ?assertEqual(Id bsl 3, couch_log_writer_syslog:get_facility(Name)),
+            ?assertEqual(Id bsl 3, couch_log_writer_syslog:get_facility(IdStr)),
+            Id + 1
+        end,
+        0,
+        Names
+    ),
     ?assertEqual(23 bsl 3, couch_log_writer_syslog:get_facility("foo")),
     ?assertEqual(23 bsl 3, couch_log_writer_syslog:get_facility("-1")),
     ?assertEqual(23 bsl 3, couch_log_writer_syslog:get_facility("24")).
 
-
 level_test() ->
     Levels = [
-        emergency, alert, critical, error,
-        warning, notice, info, debug
+        emergency,
+        alert,
+        critical,
+        error,
+        warning,
+        notice,
+        info,
+        debug
     ],
-    lists:foldl(fun(Name, Id) ->
-        ?assertEqual(Id, couch_log_writer_syslog:get_level(Name)),
-        Id + 1
-    end, 0, Levels),
+    lists:foldl(
+        fun(Name, Id) ->
+            ?assertEqual(Id, couch_log_writer_syslog:get_level(Name)),
+            Id + 1
+        end,
+        0,
+        Levels
+    ),
     ?assertEqual(3, couch_log_writer_syslog:get_level(foo)).

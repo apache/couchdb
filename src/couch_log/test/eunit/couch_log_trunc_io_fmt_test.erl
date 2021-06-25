@@ -12,29 +12,28 @@
 
 -module(couch_log_trunc_io_fmt_test).
 
-
 -include_lib("eunit/include/eunit.hrl").
 
-
 format_test_() ->
-    lists:map(fun({Fmt, Args, Expect}) ->
-        Name = io_lib:format("~p", [Expect]),
-        {lists:flatten(Name),
-            ?_assertEqual(
-                Expect,
-                lists:flatten(couch_log_trunc_io_fmt:format(Fmt, Args, 1024))
-            )
-        }
-    end, cases()).
-
-
+    lists:map(
+        fun({Fmt, Args, Expect}) ->
+            Name = io_lib:format("~p", [Expect]),
+            {
+                lists:flatten(Name),
+                ?_assertEqual(
+                    Expect,
+                    lists:flatten(couch_log_trunc_io_fmt:format(Fmt, Args, 1024))
+                )
+            }
+        end,
+        cases()
+    ).
 
 chomp_test() ->
     R1 = couch_log_trunc_io_fmt:format("\n", [], 1024, [{chomp, true}]),
     ?assertEqual("", lists:flatten(R1)),
     R2 = couch_log_trunc_io_fmt:format("~n", [], 1024, [{chomp, true}]),
     ?assertEqual("", lists:flatten(R2)).
-
 
 cases() ->
     [

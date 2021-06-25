@@ -18,37 +18,43 @@
 -define(LANG_BINARY, <<"foo_lang">>).
 -define(LANG_STRING, binary_to_list(?LANG_BINARY)).
 
-
 setup() ->
     meck:new(mock_language_server, [non_strict]),
     Ctx = test_util:start_couch(),
-    config:set("couch_eval.languages", ?LANG_STRING,
-        atom_to_list(mock_language_server)),
+    config:set(
+        "couch_eval.languages",
+        ?LANG_STRING,
+        atom_to_list(mock_language_server)
+    ),
     Ctx.
-
 
 teardown(Ctx) ->
     test_util:stop_couch(Ctx),
     meck:unload().
-
 
 error_test_() ->
     {
         "Error tests",
         {
             setup,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun acquire_map_context_error_handled/0
             ]
         }
     }.
 
-
 acquire_map_context_error_handled() ->
     meck:expect(mock_language_server, acquire_map_context, fun(_) ->
         {error, foo_error}
     end),
-    Result = couch_eval:acquire_map_context(<<"foo">>, <<"bar">>, ?LANG_BINARY,
-        <<"baz">>, <<"quux">>, [<<"quuz">>]),
+    Result = couch_eval:acquire_map_context(
+        <<"foo">>,
+        <<"bar">>,
+        ?LANG_BINARY,
+        <<"baz">>,
+        <<"quux">>,
+        [<<"quuz">>]
+    ),
     ?assertEqual({error, foo_error}, Result).

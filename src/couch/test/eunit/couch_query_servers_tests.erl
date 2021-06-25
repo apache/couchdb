@@ -15,23 +15,18 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 
-
 setup() ->
     meck:new([config, couch_log]).
-
 
 teardown(_) ->
     meck:unload().
 
-
 setup_oom() ->
     test_util:start_couch().
-
 
 teardown_oom(Ctx) ->
     meck:unload(),
     test_util:stop_couch(Ctx).
-
 
 sum_overflow_test_() ->
     {
@@ -48,26 +43,27 @@ sum_overflow_test_() ->
         }
     }.
 
-
 filter_oom_test_() ->
-{
-    "Test recovery from oom in filters",
     {
-        setup,
-        fun setup_oom/0,
-        fun teardown_oom/1,
-        [
-            fun should_split_large_batches/0
-        ]
-    }
-}.
+        "Test recovery from oom in filters",
+        {
+            setup,
+            fun setup_oom/0,
+            fun teardown_oom/1,
+            [
+                fun should_split_large_batches/0
+            ]
+        }
+    }.
 
 should_return_error_on_overflow() ->
     meck:reset([config, couch_log]),
     meck:expect(
-            config, get, ["query_server_config", "reduce_limit", "true"],
-            "true"
-        ),
+        config,
+        get,
+        ["query_server_config", "reduce_limit", "true"],
+        "true"
+    ),
     meck:expect(couch_log, error, ['_', '_'], ok),
     KVs = gen_sum_kvs(),
     {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
@@ -75,13 +71,14 @@ should_return_error_on_overflow() ->
     ?assert(meck:called(config, get, '_')),
     ?assert(meck:called(couch_log, error, '_')).
 
-
 should_return_object_on_log() ->
     meck:reset([config, couch_log]),
     meck:expect(
-            config, get, ["query_server_config", "reduce_limit", "true"],
-            "log"
-        ),
+        config,
+        get,
+        ["query_server_config", "reduce_limit", "true"],
+        "log"
+    ),
     meck:expect(couch_log, error, ['_', '_'], ok),
     KVs = gen_sum_kvs(),
     {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
@@ -91,13 +88,14 @@ should_return_object_on_log() ->
     ?assert(meck:called(config, get, '_')),
     ?assert(meck:called(couch_log, error, '_')).
 
-
 should_return_object_on_false() ->
     meck:reset([config, couch_log]),
     meck:expect(
-            config, get, ["query_server_config", "reduce_limit", "true"],
-            "false"
-        ),
+        config,
+        get,
+        ["query_server_config", "reduce_limit", "true"],
+        "false"
+    ),
     meck:expect(couch_log, error, ['_', '_'], ok),
     KVs = gen_sum_kvs(),
     {ok, [Result]} = couch_query_servers:reduce(<<"foo">>, [<<"_sum">>], KVs),
@@ -107,18 +105,19 @@ should_return_object_on_false() ->
     ?assert(meck:called(config, get, '_')),
     ?assertNot(meck:called(couch_log, error, '_')).
 
-
 should_split_large_batches() ->
     Req = {json_req, {[]}},
     Db = undefined,
     DDoc = #doc{
         id = <<"_design/foo">>,
         revs = {0, [<<"bork bork bork">>]},
-        body = {[
-            {<<"filters">>, {[
-                {<<"bar">>, <<"function(req, doc) {return true;}">>}
-            ]}}
-        ]}
+        body =
+            {[
+                {<<"filters">>,
+                    {[
+                        {<<"bar">>, <<"function(req, doc) {return true;}">>}
+                    ]}}
+            ]}
     },
     FName = <<"bar">>,
     Docs = [
@@ -139,12 +138,17 @@ should_split_large_batches() ->
     {ok, Ret} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
     ?assertEqual([split_batch, split_batch], Ret).
 
-
 gen_sum_kvs() ->
-    lists:map(fun(I) ->
-        Props = lists:map(fun(_) ->
-            K = couch_util:encodeBase64Url(crypto:strong_rand_bytes(16)),
-            {K, 1}
-        end, lists:seq(1, 20)),
-        [I, {Props}]
-    end, lists:seq(1, 10)).
+    lists:map(
+        fun(I) ->
+            Props = lists:map(
+                fun(_) ->
+                    K = couch_util:encodeBase64Url(crypto:strong_rand_bytes(16)),
+                    {K, 1}
+                end,
+                lists:seq(1, 20)
+            ),
+            [I, {Props}]
+        end,
+        lists:seq(1, 10)
+    ).

@@ -40,14 +40,14 @@ teardown(Ctx) ->
     %% erl_ddll:unload_driver(couch_icu_driver),
     ok.
 
-
 collation_test_() ->
     {
         "Collation tests",
         [
             {
                 setup,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     should_collate_ascii(),
                     should_collate_non_ascii()
@@ -80,8 +80,10 @@ implode_test() ->
     ?assertEqual([1, 38, 2, 38, 3], couch_util:implode([1, 2, 3], "&")).
 
 trim_test() ->
-    lists:map(fun(S) -> ?assertEqual("foo", couch_util:trim(S)) end,
-              [" foo", "foo ", "\tfoo", " foo ", "foo\t", "foo\n", "\nfoo"]).
+    lists:map(
+        fun(S) -> ?assertEqual("foo", couch_util:trim(S)) end,
+        [" foo", "foo ", "\tfoo", " foo ", "foo\t", "foo\n", "\nfoo"]
+    ).
 
 abs_pathname_test() ->
     {ok, Cwd} = file:get_cwd(),
@@ -91,8 +93,10 @@ flush_test() ->
     ?assertNot(couch_util:should_flush()),
     AcquireMem = fun() ->
         _IntsToAGazillion = lists:seq(1, 200000),
-        _LotsOfData = lists:map(fun(_) -> <<"foobar">> end,
-                                lists:seq(1, 500000)),
+        _LotsOfData = lists:map(
+            fun(_) -> <<"foobar">> end,
+            lists:seq(1, 500000)
+        ),
         _ = list_to_binary(_LotsOfData),
 
         %% Allocation 200K tuples puts us above the memory threshold
@@ -144,11 +148,20 @@ find_in_binary_test_() ->
     ],
     lists:map(
         fun({Needle, Haystack, Result}) ->
-            Msg = lists:flatten(io_lib:format("Looking for ~s in ~s",
-                                              [Needle, Haystack])),
-            {Msg, ?_assertMatch(Result,
-                                couch_util:find_in_binary(Needle, Haystack))}
-        end, Cases).
+            Msg = lists:flatten(
+                io_lib:format(
+                    "Looking for ~s in ~s",
+                    [Needle, Haystack]
+                )
+            ),
+            {Msg,
+                ?_assertMatch(
+                    Result,
+                    couch_util:find_in_binary(Needle, Haystack)
+                )}
+        end,
+        Cases
+    ).
 
 should_succeed_for_existent_cb() ->
     ?_assert(couch_util:validate_callback_exists(lists, any, 2)).
@@ -162,10 +175,14 @@ should_fail_for_missing_cb() ->
     lists:map(
         fun({M, F, A} = MFA) ->
             Name = lists:flatten(io_lib:format("~w:~w/~w", [M, F, A])),
-            {Name, ?_assertThrow(
-                {error, {undefined_callback, Name, MFA}},
-                couch_util:validate_callback_exists(M, F, A))}
-        end, Cases).
+            {Name,
+                ?_assertThrow(
+                    {error, {undefined_callback, Name, MFA}},
+                    couch_util:validate_callback_exists(M, F, A)
+                )}
+        end,
+        Cases
+    ).
 
 to_hex_test_() ->
     [
@@ -188,7 +205,8 @@ sort_key_test_() ->
         [
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun test_get_sort_key/1,
                     fun test_get_sort_key_jiffy_string/1,
@@ -215,19 +233,22 @@ test_get_sort_key(_) ->
         <<"pizza">>
     ],
     Pairs = [{S1, S2} || S1 <- Strs, S2 <- Strs],
-    lists:map(fun({S1, S2}) ->
-        S1K = couch_util:get_sort_key(S1),
-        S2K = couch_util:get_sort_key(S2),
-        SortRes = sort_keys(S1K, S2K),
-        Comment = list_to_binary(io_lib:format("strcmp(~p, ~p)", [S1, S2])),
-        CollRes = couch_util:collate(S1, S2),
-        {Comment, ?_assertEqual(SortRes, CollRes)}
-    end, Pairs).
+    lists:map(
+        fun({S1, S2}) ->
+            S1K = couch_util:get_sort_key(S1),
+            S2K = couch_util:get_sort_key(S2),
+            SortRes = sort_keys(S1K, S2K),
+            Comment = list_to_binary(io_lib:format("strcmp(~p, ~p)", [S1, S2])),
+            CollRes = couch_util:collate(S1, S2),
+            {Comment, ?_assertEqual(SortRes, CollRes)}
+        end,
+        Pairs
+    ).
 
 test_get_sort_key_jiffy_string(_) ->
     %% jiffy:decode does not null terminate strings
     %% so we use it here to test unterminated strings
-    {[{S1,S2}]} = jiffy:decode(<<"{\"foo\": \"bar\"}">>),
+    {[{S1, S2}]} = jiffy:decode(<<"{\"foo\": \"bar\"}">>),
     S1K = couch_util:get_sort_key(S1),
     S2K = couch_util:get_sort_key(S2),
     SortRes = sort_keys(S1K, S2K),
@@ -237,7 +258,7 @@ test_get_sort_key_jiffy_string(_) ->
 test_get_sort_key_fails_on_bad_input(_) ->
     %% generated with crypto:strong_rand_bytes
     %% contains invalid character, should error
-    S = <<209,98,222,144,60,163,72,134,206,157>>,
+    S = <<209, 98, 222, 144, 60, 163, 72, 134, 206, 157>>,
     Res = couch_util:get_sort_key(S),
     ?_assertEqual(error, Res).
 
@@ -249,35 +270,47 @@ test_get_sort_key_longer_than_buffer(_) ->
 
 test_sort_key_collation(_) ->
     ?_test(begin
-        lists:foreach(fun(_) ->
-            K1 = random_unicode_binary(),
-            SK1 = couch_util:get_sort_key(K1),
+        lists:foreach(
+            fun(_) ->
+                K1 = random_unicode_binary(),
+                SK1 = couch_util:get_sort_key(K1),
 
-            K2 = random_unicode_binary(),
-            SK2 = couch_util:get_sort_key(K2),
+                K2 = random_unicode_binary(),
+                SK2 = couch_util:get_sort_key(K2),
 
-            % Probably kinda silly but whatevs
-            ?assertEqual(couch_util:collate(K1, K1), sort_keys(SK1, SK1)),
-            ?assertEqual(couch_util:collate(K2, K2), sort_keys(SK2, SK2)),
+                % Probably kinda silly but whatevs
+                ?assertEqual(couch_util:collate(K1, K1), sort_keys(SK1, SK1)),
+                ?assertEqual(couch_util:collate(K2, K2), sort_keys(SK2, SK2)),
 
-            ?assertEqual(couch_util:collate(K1, K2), sort_keys(SK1, SK2)),
-            ?assertEqual(couch_util:collate(K2, K1), sort_keys(SK2, SK1))
-        end, lists:seq(1, ?RANDOM_TEST_SIZE))
+                ?assertEqual(couch_util:collate(K1, K2), sort_keys(SK1, SK2)),
+                ?assertEqual(couch_util:collate(K2, K1), sort_keys(SK2, SK1))
+            end,
+            lists:seq(1, ?RANDOM_TEST_SIZE)
+        )
     end).
 
 test_sort_key_list_sort(_) ->
     ?_test(begin
-        RandomKeys = lists:map(fun(_) ->
-            random_unicode_binary()
-        end, lists:seq(1, ?RANDOM_TEST_SIZE)),
+        RandomKeys = lists:map(
+            fun(_) ->
+                random_unicode_binary()
+            end,
+            lists:seq(1, ?RANDOM_TEST_SIZE)
+        ),
 
-        CollationSorted = lists:sort(fun(A, B) ->
-            couch_util:collate(A, B) =< 0
-        end, RandomKeys),
+        CollationSorted = lists:sort(
+            fun(A, B) ->
+                couch_util:collate(A, B) =< 0
+            end,
+            RandomKeys
+        ),
 
-        SortKeys = lists:map(fun(K) ->
-            {couch_util:get_sort_key(K), K}
-        end, RandomKeys),
+        SortKeys = lists:map(
+            fun(K) ->
+                {couch_util:get_sort_key(K), K}
+            end,
+            RandomKeys
+        ),
         {_, SortKeySorted} = lists:unzip(lists:sort(SortKeys)),
 
         ?assertEqual(CollationSorted, SortKeySorted)
@@ -287,12 +320,13 @@ sort_keys(S1, S2) ->
     case S1 < S2 of
         true ->
             -1;
-        false -> case S1 =:= S2 of
-            true ->
-                0;
-            false ->
-                1
-        end
+        false ->
+            case S1 =:= S2 of
+                true ->
+                    0;
+                false ->
+                    1
+            end
     end.
 
 random_unicode_binary() ->

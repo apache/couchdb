@@ -14,11 +14,9 @@
 
 -export([start/0]).
 
-
 start() ->
     {ok, [[PPid]]} = init:get_argument(parent_pid),
     spawn(fun() -> monitor_parent(PPid) end).
-
 
 monitor_parent(PPid) ->
     timer:sleep(1000),
