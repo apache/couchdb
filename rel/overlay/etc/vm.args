@@ -60,3 +60,36 @@
 
 # Set maximum SSL session lifetime to reap terminated replication readers
 -ssl session_lifetime 300
+
+## TLS distribution
+## Use TLS for connections between Erlang cluster members.
+## http://erlang.org/doc/apps/ssl/ssl_distribution.html
+##
+## Generate CA and certificate/key pairs
+## $ git clone https://github.com/michaelklishin/tls-gen tls-gen
+## $ cd tls-gen/basic
+## $ make PASSWORD=couchdb
+## $ make verify
+## $ make info
+## $ ls -l ./result
+#
+#-proto_dist couch
+#
+## Use TCP, set to true
+## Use TLS, set to false
+#-couch_dist no_tls true
+#
+## Don't forget to override the paths to point to your certificate(s) and key(s)!
+## Once a connection is established, Erlang doesn't differentiate between
+## a client and a server - the same certs/keys can be used on both sides.
+#-ssl_dist_opt server_certfile </path/to/server_certificate.pem>
+#-ssl_dist_opt server_keyfile </path/to/server_key.pem>
+#-ssl_dist_opt server_cacertfile </path/to/ca_certificate.pem>
+#
+#-ssl_dist_opt client_certfile </path/to/client_certificate.pem>
+#-ssl_dist_opt client_keyfile </path/to/client_key.pem>
+#-ssl_dist_opt client_cacertfile </path/to/ca_certificate.pem>
+#
+#-ssl_dist_opt server_verify verify_peer
+#-ssl_dist_opt client_verify verify_peer
+#-ssl_dist_opt server_fail_if_no_peer_cert true
