@@ -428,6 +428,7 @@ clean:
 	@rm -f src/couch/priv/couchspawnkillable
 	@rm -f src/couch/priv/couch_js/config.h
 	@rm -f dev/*.beam dev/devnode.* dev/pbkdf2.pyc log/crash.log
+	@rm -f dev/erlserver.pem dev/couch_ssl_dist.conf
 
 
 .PHONY: distclean
