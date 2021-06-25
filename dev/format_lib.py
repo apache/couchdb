@@ -17,7 +17,6 @@ Warning: this file is not meant to be executed manually
 """
 
 import pathlib
-import re
 import subprocess
 
 
@@ -29,14 +28,8 @@ def get_source_paths():
         if item_path.suffix != ".erl":
             continue
 
-        regex_result = re.search(r"([^/]+?)/src/([^/]+?).erl", item)
         result_dict = {
             "raw_path": item,
             "item_path": item_path,
-            "is_source_path": regex_result is not None,
         }
-        if result_dict["is_source_path"]:
-            result_dict.update(
-                {"dirname": regex_result.group(1), "filename": regex_result.group(2)}
-            )
         yield result_dict

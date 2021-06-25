@@ -22,59 +22,10 @@ import subprocess
 
 from format_lib import get_source_paths
 
-
-def get_hashes():
-    hashes = {}
-    for item in get_source_paths():
-        if item["is_source_path"]:
-            beam_path = f"{item['dirname']}/ebin/{item['filename']}.beam"
-            hashes[item["raw_path"]] = subprocess.run(
-                ["md5sum", beam_path], encoding="utf-8", capture_output=True
-            ).stdout
-        else:
-            # command = ["erl",
-            #            "-eval",
-            #            "{ok, _, Binary} = compile:file(\"" + item['raw_path'] +
-            #            "\", [binary, no_line_info, deterministic])," +
-            #            "erlang:display(crypto:hash(md5, Binary)), halt().",
-            #            "-noshell"]
-            # hashes[item['raw_path']] = subprocess.run(command, encoding="utf-8",
-            #                                           capture_output=True).stdout
-            pass
-    return hashes
-
-
 if __name__ == "__main__":
-    print("Cleaning...")
-    subprocess.run(["make", "clean"], encoding="utf-8", stdout=subprocess.PIPE)
-    print("Compiling...")
-    subprocess.run(
-        ["bin/rebar", "compile"],
-        encoding="utf-8",
-        stdout=subprocess.PIPE,
-        env={"ERL_OPTS": "no_line_info"},
-    )
-    os.chdir("src")
-    print("Getting previous hashes...")
-    prev = get_hashes()
-    for key in prev.keys():
+    for item in get_source_paths():
         subprocess.run(
-            [os.environ["ERLFMT_PATH"], "-w", key],
+            [os.environ["ERLFMT_PATH"], "-w", item["raw_path"]],
             encoding="utf-8",
             stdout=subprocess.PIPE,
         )
-    os.chdir("..")
-    subprocess.run(
-        ["bin/rebar", "compile"],
-        encoding="utf-8",
-        stdout=subprocess.PIPE,
-        env={"ERL_OPTS": "no_line_info"},
-    )
-    os.chdir("src")
-    print("Getting post hashes...")
-    post = get_hashes()
-    if prev == post:
-        print("Hashes match")
-    else:
-        print("Hash mismatch")
-        print("Diff: ", set(prev.items()) ^ set(post.items()))
