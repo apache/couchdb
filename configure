@@ -55,7 +55,27 @@ Options:
   --rebar=PATH                use rebar by specified path (version >=2.6.0 && <3.0 required)
   --rebar3=PATH               use rebar3 by specified path
   --erlfmt=PATH               use erlfmt by specified path
+  --generate-tls-dev-cert     generate a cert for TLS distribution (To enable TLS, change the vm.args file.)
 EOF
+}
+
+# This is just an example to generate a certfile for TLS distribution.
+# This is not an endorsement of specific expiration limits, key sizes, or algorithms.
+generate_tls_dev_cert() {
+    if [ ! -e "${rootdir}/dev/erlserver.pem" ]; then
+        openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout key.pem -out cert.pem
+        cat key.pem cert.pem > dev/erlserver.pem && rm key.pem cert.pem
+    fi
+
+    if [ ! -e "${rootdir}/dev/couch_ssl_dist.conf" ]; then
+        cat > "${rootdir}/dev/couch_ssl_dist.conf" << EOF
+[{server,
+  [{certfile, "${rootdir}/dev/erlserver.pem"},
+   {secure_renegotiate, true}]},
+ {client,
+  [{secure_renegotiate, true}]}].
+EOF
+    fi
 }
 
 parse_opts() {
@@ -194,6 +214,14 @@ parse_opts() {
                 printf 'ERROR: "--spidermonkey-version" requires a non-empty argument.\n' >&2
                 exit 1
                 ;;
+
+            --generate-tls-dev-cert)
+                echo "WARNING: To enable TLS distribution, don't forget to customize \033[31mvm.args\033[0m file."
+                generate_tls_dev_cert
+                shift
+                continue
+                ;;
+
             --) # End of options
                 shift
                 break
@@ -282,6 +310,7 @@ install_local_rebar() {
     if [ ! -x "${rootdir}/bin/rebar" ]; then
         if [ ! -d "${rootdir}/src/rebar" ]; then
             git clone --depth 1 https://github.com/apache/couchdb-rebar.git ${rootdir}/src/rebar
+
         fi
         make -C ${rootdir}/src/rebar
         mv ${rootdir}/src/rebar/rebar ${rootdir}/bin/rebar

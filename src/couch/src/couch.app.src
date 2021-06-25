@@ -14,12 +14,14 @@
     {description, "Apache CouchDB"},
     {vsn, git},
     {registered, [
+
         couch_httpd,
         couch_primary_services,
         couch_proc_manager,
         couch_secondary_services,
         couch_server,
         couch_sup
+
     ]},
     {mod, {couch_app, []}},
     {applications, [
@@ -39,8 +41,11 @@
         couch_epi,
         b64url,
         couch_log,
+
         couch_stats,
         hyper,
-        couch_prometheus
+        couch_prometheus,
+        couch_dist
+
     ]}
 ]}.

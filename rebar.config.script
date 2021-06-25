@@ -120,18 +120,25 @@ SubDirs = [
     "src/couch_eval",
     "src/couch_js",
     "src/couch_lib",
+
     "src/couch_replicator",
+
     "src/couch_stats",
+
     "src/couch_tests",
     "src/couch_views",
+    "src/couch_dist",
     "src/ctrace",
+
     "src/fabric",
     "src/aegis",
     "src/couch_jobs",
     "src/couch_expiring_cache",
     "src/jwtf",
+
     "src/mango",
     "src/ebtree",
+
     "src/couch_prometheus",
     "rel"
 ].
@@ -142,6 +149,7 @@ DepDescs = [
 {b64url,           "b64url",           {tag, "1.0.2"}},
 {erlfdb,           "erlfdb",           {tag, "v1.3.4"}},
 {ets_lru,          "ets-lru",          {tag, "1.1.0"}},
+
 
 %% Non-Erlang deps
 {docs,             {url, "https://github.com/apache/couchdb-documentation"},

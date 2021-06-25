@@ -60,3 +60,36 @@
 
 # Set maximum SSL session lifetime to reap terminated replication readers
 -ssl session_lifetime 300
+
+## TLS Distribution
+## Use TLS for connections between Erlang cluster members.
+## http://erlang.org/doc/apps/ssl/ssl_distribution.html
+##
+## Generate Cert(PEM) File
+## This is just an example command to generate a certfile (PEM).
+## This is not an endorsement of specific expiration limits, key sizes, or algorithms.
+##    $ openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout key.pem -out cert.pem
+##    $ cat key.pem cert.pem > dev/erlserver.pem && rm key.pem cert.pem
+##
+## Generate a Config File (couch_ssl_dist.conf)
+##    [{server,
+##      [{certfile, "</path/to/erlserver.pem>"},
+##       {secure_renegotiate, true}]},
+##     {client,
+##      [{secure_renegotiate, true}]}].
+##
+## CouchDB recommends the following values for no_tls flag:
+## 1. Use TCP only, set to true, such as:
+##      -couch_dist no_tls true
+## 2. Use TLS only, set to false, such as:
+##      -couch_dist no_tls false
+## 3. Specify which node to use TCP, such as:
+##      -couch_dist no_tls \"*@127.0.0.1\"
+##
+## To ensure search works, make sure to set 'no_tls' option for the clouseau node.
+## By default that would be "clouseau@127.0.0.1".
+## Don't forget to override the paths to point to your certificate(s) and key(s)!
+##
+#-proto_dist couch
+#-couch_dist no_tls \"clouseau@127.0.0.1\"
+#-ssl_dist_optfile <path/to/couch_ssl_dist.conf>
