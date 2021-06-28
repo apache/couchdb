@@ -43,7 +43,6 @@ if __name__ == "__main__":
                     "--print-width=167",
                     item["raw_path"],
                 ],
-                encoding="utf-8",
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )

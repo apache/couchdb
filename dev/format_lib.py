@@ -21,12 +21,15 @@ import subprocess
 
 
 def get_source_paths():
-    for item in subprocess.run(
-        ["git", "ls-files"],
-        encoding="utf-8",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    ).stdout.split("\n"):
+    for item in (
+        subprocess.run(
+            ["git", "ls-files"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        .stdout.decode("utf-8")
+        .split("\n")
+    ):
         item_path = pathlib.Path(item)
         if item_path.suffix != ".erl":
             continue
