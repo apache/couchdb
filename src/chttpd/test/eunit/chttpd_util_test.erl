@@ -12,10 +12,8 @@
 
 -module(chttpd_util_test).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include("chttpd_test.hrl").
-
 
 setup() ->
     ok = config:set("httpd", "both_exist", "get_in_httpd", _Persist = false),
@@ -27,7 +25,6 @@ setup() ->
     ok = config:set("couch_httpd_auth", "cha_only", "true", _Persist = false),
     ok = config:set("chttpd_auth", "ca_only", "1", _Persist = false).
 
-
 teardown(_) ->
     ok = config:delete("httpd", "both_exist", _Persist = false),
     ok = config:delete("chttpd", "both_exist", _Persist = false),
@@ -37,7 +34,6 @@ teardown(_) ->
     ok = config:delete("chttpd_auth", "both_exist", _Persist = false),
     ok = config:delete("couch_httpd_auth", "cha_only", _Persist = false),
     ok = config:delete("chttpd_auth", "ca_only", _Persist = false).
-
 
 chttpd_util_config_test_() ->
     {
@@ -60,12 +56,10 @@ chttpd_util_config_test_() ->
         }
     }.
 
-
 test_chttpd_behavior(_) ->
     ?assertEqual("get_in_chttpd", chttpd_util:get_chttpd_config("both_exist")),
     ?assertEqual(1, chttpd_util:get_chttpd_config_integer("chttpd_only", 0)),
     ?assert(chttpd_util:get_chttpd_config_boolean("httpd_only", false)).
-
 
 test_with_undefined_option(_) ->
     ?assertEqual(undefined, chttpd_util:get_chttpd_config("undefined_option")),
@@ -77,12 +71,10 @@ test_with_undefined_option(_) ->
     ?assert(chttpd_util:get_chttpd_config("undefined_option", true)),
     ?assertNot(chttpd_util:get_chttpd_config("undefined_option", false)).
 
-
 test_auth_behavior(_) ->
     ?assertEqual("ca", chttpd_util:get_chttpd_auth_config("both_exist")),
     ?assertEqual(1, chttpd_util:get_chttpd_auth_config_integer("ca_only", 0)),
     ?assert(chttpd_util:get_chttpd_auth_config_boolean("cha_only", false)).
-
 
 test_auth_with_undefined_option(_) ->
     ?assertEqual(undefined, chttpd_util:get_chttpd_auth_config("undefine")),

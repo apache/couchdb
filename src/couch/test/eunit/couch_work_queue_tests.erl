@@ -16,7 +16,6 @@
 
 -define(TIMEOUT, 100).
 
-
 setup(Opts) ->
     {ok, Q} = couch_work_queue:new(Opts),
     Producer = spawn_producer(Q),
@@ -33,9 +32,11 @@ setup_max_items_and_size() ->
     setup([{max_size, 160}, {max_items, 3}]).
 
 setup_multi_workers() ->
-    {Q, Producer, Consumer1} = setup([{max_size, 160},
-                                      {max_items, 3},
-                                      {multi_workers, true}]),
+    {Q, Producer, Consumer1} = setup([
+        {max_size, 160},
+        {max_items, 3},
+        {multi_workers, true}
+    ]),
     Consumer2 = spawn_consumer(Q),
     Consumer3 = spawn_consumer(Q),
     {Q, Producer, [Consumer1, Consumer2, Consumer3]}.
@@ -52,7 +53,6 @@ teardown({Q, Producer, Consumers}) when is_list(Consumers) ->
 teardown({Q, Producer, Consumer}) ->
     teardown({Q, Producer, [Consumer]}).
 
-
 single_consumer_test_() ->
     {
         "Single producer and consumer",
@@ -61,7 +61,8 @@ single_consumer_test_() ->
                 "Queue with 3 max items",
                 {
                     foreach,
-                    fun setup_max_items/0, fun teardown/1,
+                    fun setup_max_items/0,
+                    fun teardown/1,
                     single_consumer_max_item_count() ++ common_cases()
                 }
             },
@@ -69,7 +70,8 @@ single_consumer_test_() ->
                 "Queue with max size of 160 bytes",
                 {
                     foreach,
-                    fun setup_max_size/0, fun teardown/1,
+                    fun setup_max_size/0,
+                    fun teardown/1,
                     single_consumer_max_size() ++ common_cases()
                 }
             },
@@ -77,7 +79,8 @@ single_consumer_test_() ->
                 "Queue with max size of 160 bytes and 3 max items",
                 {
                     foreach,
-                    fun setup_max_items_and_size/0, fun teardown/1,
+                    fun setup_max_items_and_size/0,
+                    fun teardown/1,
                     single_consumer_max_items_and_size() ++ common_cases()
                 }
             }
@@ -92,15 +95,15 @@ multiple_consumers_test_() ->
                 "Queue with max size of 160 bytes and 3 max items",
                 {
                     foreach,
-                    fun setup_multi_workers/0, fun teardown/1,
+                    fun setup_multi_workers/0,
+                    fun teardown/1,
                     common_cases() ++ multiple_consumers()
                 }
-
             }
         ]
     }.
 
-common_cases()->
+common_cases() ->
     [
         fun should_block_consumer_on_dequeue_from_empty_queue/1,
         fun should_consume_right_item/1,
@@ -109,7 +112,7 @@ common_cases()->
         fun should_be_closed/1
     ].
 
-single_consumer_max_item_count()->
+single_consumer_max_item_count() ->
     [
         fun should_have_no_items_for_new_queue/1,
         fun should_block_producer_on_full_queue_count/1,
@@ -118,7 +121,7 @@ single_consumer_max_item_count()->
         fun should_consume_all/1
     ].
 
-single_consumer_max_size()->
+single_consumer_max_size() ->
     [
         fun should_have_zero_size_for_new_queue/1,
         fun should_block_producer_on_full_queue_size/1,
@@ -137,7 +140,6 @@ multiple_consumers() ->
         fun should_have_no_items_for_new_queue/1,
         fun should_increase_queue_size_on_produce/1
     ].
-
 
 should_have_no_items_for_new_queue({Q, _, _}) ->
     ?_assertEqual(0, couch_work_queue:item_count(Q)).
@@ -172,8 +174,10 @@ should_consume_right_item({Q, Producer, Consumers}) when is_list(Consumers) ->
     ?assertEqual(0, couch_work_queue:item_count(Q)),
     ?assertEqual(0, couch_work_queue:size(Q)),
 
-    R = [{ping(C), Item}
-         || {C, Item} <- lists:zip(Consumers, [Item1, Item2, Item3])],
+    R = [
+        {ping(C), Item}
+     || {C, Item} <- lists:zip(Consumers, [Item1, Item2, Item3])
+    ],
 
     ?_assertEqual([{ok, Item1}, {ok, Item2}, {ok, Item3}], R);
 should_consume_right_item({Q, Producer, Consumer}) ->
@@ -284,8 +288,10 @@ should_be_closed({Q, _, Consumers}) when is_list(Consumers) ->
     ItemsCount = couch_work_queue:item_count(Q),
     Size = couch_work_queue:size(Q),
 
-    ?_assertEqual({[closed, closed, closed], closed, closed},
-                  {LastConsumerItems, ItemsCount, Size});
+    ?_assertEqual(
+        {[closed, closed, closed], closed, closed},
+        {LastConsumerItems, ItemsCount, Size}
+    );
 should_be_closed({Q, _, Consumer}) ->
     ok = close_queue(Q),
 
@@ -295,14 +301,19 @@ should_be_closed({Q, _, Consumer}) ->
     ItemsCount = couch_work_queue:item_count(Q),
     Size = couch_work_queue:size(Q),
 
-    ?_assertEqual({closed, closed, closed},
-                  {LastConsumerItems, ItemsCount, Size}).
-
+    ?_assertEqual(
+        {closed, closed, closed},
+        {LastConsumerItems, ItemsCount, Size}
+    ).
 
 close_queue(Q) ->
-    test_util:stop_sync(Q, fun() ->
-        ok = couch_work_queue:close(Q)
-    end, ?TIMEOUT).
+    test_util:stop_sync(
+        Q,
+        fun() ->
+            ok = couch_work_queue:close(Q)
+        end,
+        ?TIMEOUT
+    ).
 
 spawn_consumer(Q) ->
     Parent = self(),
@@ -365,10 +376,13 @@ produce(Q, Producer, Size, Wait) ->
         {item, Ref, Item} ->
             Item
     after ?TIMEOUT ->
-        erlang:error({assertion_failed,
-                      [{module, ?MODULE},
-                       {line, ?LINE},
-                       {reason, "Timeout asking producer to produce an item"}]})
+        erlang:error(
+            {assertion_failed, [
+                {module, ?MODULE},
+                {line, ?LINE},
+                {reason, "Timeout asking producer to produce an item"}
+            ]}
+        )
     end.
 
 ping(Pid) ->
@@ -393,10 +407,10 @@ stop(Pid, Name) ->
 
 wait_increment(Q, ItemsCount) ->
     test_util:wait(fun() ->
-       case couch_work_queue:item_count(Q) > ItemsCount of
-           true ->
-               ok;
-           false ->
-               wait
-       end
+        case couch_work_queue:item_count(Q) > ItemsCount of
+            true ->
+                ok;
+            false ->
+                wait
+        end
     end).

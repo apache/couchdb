@@ -14,23 +14,21 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
-
 setup(PortType) ->
     Hashed = couch_passwords:hash_admin_password("artischocko"),
-    ok = config:set("admins", "rocko", binary_to_list(Hashed), _Persist=false),
+    ok = config:set("admins", "rocko", binary_to_list(Hashed), _Persist = false),
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     lists:concat(["http://", Addr, ":", port(PortType), "/_session"]).
 
 setup_require_valid_user(PortType) ->
-    ok = config:set("chttpd", "require_valid_user", "true", _Persist=false),
+    ok = config:set("chttpd", "require_valid_user", "true", _Persist = false),
     setup(PortType).
 
 teardown(_, _) ->
     ok.
 
 teardown_require_valid_user(_, _) ->
-    config:set("chttpd", "require_valid_user", "false", _Persist=false).
-
+    config:set("chttpd", "require_valid_user", "false", _Persist = false).
 
 auth_test_() ->
     Tests = [
@@ -46,7 +44,8 @@ auth_test_() ->
         "Auth tests",
         {
             setup,
-            fun() -> test_util:start_couch([chttpd]) end, fun test_util:stop_couch/1,
+            fun() -> test_util:start_couch([chttpd]) end,
+            fun test_util:stop_couch/1,
             [
                 make_test_cases(clustered, Tests),
                 make_require_valid_user_test_cases(clustered, RequireValidUserTests)
@@ -63,43 +62,60 @@ make_test_cases(Mod, Funs) ->
 make_require_valid_user_test_cases(Mod, Funs) ->
     {
         lists:flatten(io_lib:format("~s require_valid_user=true", [Mod])),
-        {foreachx, fun setup_require_valid_user/1, fun teardown_require_valid_user/2,
-            [{Mod, Fun} || Fun <- Funs]}
+        {foreachx, fun setup_require_valid_user/1, fun teardown_require_valid_user/2, [
+            {Mod, Fun}
+         || Fun <- Funs
+        ]}
     }.
 
 should_return_username_on_post_to_session(_PortType, Url) ->
-    ?_assertEqual(<<"rocko">>,
+    ?_assertEqual(
+        <<"rocko">>,
         begin
             Hashed = couch_passwords:hash_admin_password(<<"artischocko">>),
             ok = config:set("admins", "rocko", binary_to_list(Hashed), false),
-            {ok, _, _, Body} = test_request:post(Url, [{"Content-Type", "application/json"}],
-                "{\"name\":\"rocko\", \"password\":\"artischocko\"}"),
+            {ok, _, _, Body} = test_request:post(
+                Url,
+                [{"Content-Type", "application/json"}],
+                "{\"name\":\"rocko\", \"password\":\"artischocko\"}"
+            ),
             {Json} = jiffy:decode(Body),
             proplists:get_value(<<"name">>, Json)
-        end).
+        end
+    ).
 
 should_not_return_authenticated_field(_PortType, Url) ->
-    ?_assertThrow({not_found, _},
+    ?_assertThrow(
+        {not_found, _},
         begin
             couch_util:get_nested_json_value(session(Url), [
-                <<"info">>, <<"authenticated">>])
-        end).
+                <<"info">>,
+                <<"authenticated">>
+            ])
+        end
+    ).
 
 should_return_list_of_handlers(clustered, Url) ->
-    ?_assertEqual([<<"cookie">>,<<"default">>],
+    ?_assertEqual(
+        [<<"cookie">>, <<"default">>],
         begin
             couch_util:get_nested_json_value(session(Url), [
-                <<"info">>, <<"authentication_handlers">>])
-        end).
-
+                <<"info">>,
+                <<"authentication_handlers">>
+            ])
+        end
+    ).
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions
 %% ------------------------------------------------------------------
 
 session(Url) ->
-    {ok, _, _, Body} = test_request:get(Url, [{"Content-Type", "application/json"}],
-        "{\"name\":\"rocko\", \"password\":\"artischocko\"}"),
+    {ok, _, _, Body} = test_request:get(
+        Url,
+        [{"Content-Type", "application/json"}],
+        "{\"name\":\"rocko\", \"password\":\"artischocko\"}"
+    ),
     jiffy:decode(Body).
 
 port(clustered) ->

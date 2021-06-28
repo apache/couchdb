@@ -12,13 +12,11 @@
 
 -module(fabric2_doc_att_tests).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2.hrl").
 -include("fabric2_test.hrl").
-
 
 doc_crud_test_() ->
     {
@@ -39,17 +37,14 @@ doc_crud_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([fabric]),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     {Db, Ctx}.
 
-
 cleanup({Db, Ctx}) ->
     ok = fabric2_db:delete(fabric2_db:name(Db), []),
     test_util:stop_couch(Ctx).
-
 
 create_att({Db, _}) ->
     DocId = fabric2_util:uuid(),
@@ -91,7 +86,6 @@ create_att({Db, _}) ->
         ?assertMatch([{_, Expect}], AttVals)
     end).
 
-
 create_att_already_compressed({Db, _}) ->
     DocId = fabric2_util:uuid(),
     Att1 = couch_att:new([
@@ -129,7 +123,6 @@ create_att_already_compressed({Db, _}) ->
         ?assertEqual(erlfdb_tuple:pack({0, false}), IdVal),
         ?assertMatch([{_, <<"foobar">>}], AttVals)
     end).
-
 
 delete_att({Db, _}) ->
     DocId = fabric2_util:uuid(),
@@ -173,7 +166,6 @@ delete_att({Db, _}) ->
         ?assertMatch([], AttVals)
     end).
 
-
 multiple_atts({Db, _}) ->
     DocId = fabric2_util:uuid(),
     Atts = [
@@ -183,14 +175,13 @@ multiple_atts({Db, _}) ->
     ],
     {ok, _} = create_doc(Db, DocId, Atts),
     ?assertEqual(
-            #{
-                <<"foo.txt">> => <<"foobar">>,
-                <<"bar.txt">> => <<"barfoo">>,
-                <<"baz.png">> => <<"blargh">>
-            },
-            read_atts(Db, DocId)
-        ).
-
+        #{
+            <<"foo.txt">> => <<"foobar">>,
+            <<"bar.txt">> => <<"barfoo">>,
+            <<"baz.png">> => <<"blargh">>
+        },
+        read_atts(Db, DocId)
+    ).
 
 delete_one_att({Db, _}) ->
     DocId = fabric2_util:uuid(),
@@ -203,20 +194,17 @@ delete_one_att({Db, _}) ->
     Atts2 = tl(Atts1),
     {ok, _} = update_doc(Db, DocId, RevId, stubify(RevId, Atts2)),
     ?assertEqual(
-            #{
-                <<"bar.txt">> => <<"barfoo">>,
-                <<"baz.png">> => <<"blargh">>
-            },
-            read_atts(Db, DocId)
-        ).
-
+        #{
+            <<"bar.txt">> => <<"barfoo">>,
+            <<"baz.png">> => <<"blargh">>
+        },
+        read_atts(Db, DocId)
+    ).
 
 large_att({Db, _}) ->
     DocId = fabric2_util:uuid(),
     % Total size ~360,000 bytes
-    AttData = iolist_to_binary([
-        <<"foobar">> || _ <- lists:seq(1, 60000)
-    ]),
+    AttData = iolist_to_binary([<<"foobar">> || _ <- lists:seq(1, 60000)]),
     Att1 = mk_att(<<"long.txt">>, AttData, gzip),
     {ok, _} = create_doc(Db, DocId, [Att1]),
     ?assertEqual(#{<<"long.txt">> => AttData}, read_atts(Db, DocId)),
@@ -232,22 +220,19 @@ large_att({Db, _}) ->
         ?assertEqual(4, length(AttVals))
     end).
 
-
 att_on_conflict_isolation({Db, _}) ->
     DocId = fabric2_util:uuid(),
     [PosRevA1, PosRevB1] = create_conflicts(Db, DocId, []),
     Att = mk_att(<<"happy_goat.tiff">>, <<":D>">>),
     {ok, PosRevA2} = update_doc(Db, DocId, PosRevA1, [Att]),
     ?assertEqual(
-            #{<<"happy_goat.tiff">> => <<":D>">>},
-            read_atts(Db, DocId, PosRevA2)
-        ),
+        #{<<"happy_goat.tiff">> => <<":D>">>},
+        read_atts(Db, DocId, PosRevA2)
+    ),
     ?assertEqual(#{}, read_atts(Db, DocId, PosRevB1)).
-
 
 mk_att(Name, Data) ->
     mk_att(Name, Data, identity).
-
 
 mk_att(Name, Data, Encoding) ->
     couch_att:new([
@@ -259,18 +244,21 @@ mk_att(Name, Data, Encoding) ->
         {md5, <<>>}
     ]).
 
-
 stubify(RevId, Atts) when is_list(Atts) ->
-    lists:map(fun(Att) ->
-        stubify(RevId, Att)
-    end, Atts);
-
+    lists:map(
+        fun(Att) ->
+            stubify(RevId, Att)
+        end,
+        Atts
+    );
 stubify({Pos, _Rev}, Att) ->
-    couch_att:store([
-        {data, stub},
-        {revpos, Pos}
-    ], Att).
-
+    couch_att:store(
+        [
+            {data, stub},
+            {revpos, Pos}
+        ],
+        Att
+    ).
 
 create_doc(Db, DocId, Atts) ->
     Doc = #doc{
@@ -279,7 +267,6 @@ create_doc(Db, DocId, Atts) ->
     },
     fabric2_db:update_doc(Db, Doc).
 
-
 update_doc(Db, DocId, {Pos, Rev}, Atts) ->
     Doc = #doc{
         id = DocId,
@@ -287,7 +274,6 @@ update_doc(Db, DocId, {Pos, Rev}, Atts) ->
         atts = Atts
     },
     fabric2_db:update_doc(Db, Doc).
-
 
 create_conflicts(Db, DocId, Atts) ->
     Base = #doc{
@@ -310,22 +296,23 @@ create_conflicts(Db, DocId, Atts) ->
     {ok, _} = fabric2_db:update_doc(Db, Doc2, [replicated_changes]),
     lists:reverse(lists:sort([{2, Rev2}, {2, Rev3}])).
 
-
 read_atts(Db, DocId) ->
     {ok, #doc{atts = Atts}} = fabric2_db:open_doc(Db, DocId),
     atts_to_map(Db, DocId, Atts).
-
 
 read_atts(Db, DocId, PosRev) ->
     {ok, Docs} = fabric2_db:open_doc_revs(Db, DocId, [PosRev], []),
     [{ok, #doc{atts = Atts}}] = Docs,
     atts_to_map(Db, DocId, Atts).
 
-
 atts_to_map(Db, DocId, Atts) ->
-    lists:foldl(fun(Att, Acc) ->
-        [Name, Data] = couch_att:fetch([name, data], Att),
-        {loc, _Db, DocId, AttId} = Data,
-        AttBin = fabric2_db:read_attachment(Db, DocId, AttId),
-        maps:put(Name, AttBin, Acc)
-    end, #{}, Atts).
+    lists:foldl(
+        fun(Att, Acc) ->
+            [Name, Data] = couch_att:fetch([name, data], Att),
+            {loc, _Db, DocId, AttId} = Data,
+            AttBin = fabric2_db:read_attachment(Db, DocId, AttId),
+            maps:put(Name, AttBin, Acc)
+        end,
+        #{},
+        Atts
+    ).

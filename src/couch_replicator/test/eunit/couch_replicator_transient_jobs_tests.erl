@@ -17,7 +17,6 @@
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 transient_jobs_test_() ->
     {
         "Transient jobs tests",
@@ -38,7 +37,6 @@ transient_jobs_test_() ->
         }
     }.
 
-
 setup() ->
     Source = couch_replicator_test_helper:create_db(),
     couch_replicator_test_helper:create_docs(Source, [
@@ -49,13 +47,11 @@ setup() ->
     config:set("replicator", "transient_job_max_age_sec", "9999", false),
     {Source, Target}.
 
-
 teardown({Source, Target}) ->
     config:delete("replicator", "stats_update_interval_sec", false),
     config:delete("replicator", "transient_job_max_age_sec", false),
     couch_replicator_test_helper:delete_db(Source),
     couch_replicator_test_helper:delete_db(Target).
-
 
 transient_job_is_removed({Source, Target}) ->
     {ok, #{}} = replicate(Source, Target),
@@ -72,7 +68,6 @@ transient_job_is_removed({Source, Target}) ->
     % Should be gone now
     ?assertMatch({404, #{}}, scheduler_jobs(JobId)).
 
-
 posting_same_job_is_a_noop({Source, Target}) ->
     {ok, Pid1, RepId1} = replicate_continuous(Source, Target),
     {ok, Pid2, RepId2} = replicate_continuous(Source, Target),
@@ -80,37 +75,41 @@ posting_same_job_is_a_noop({Source, Target}) ->
     ?assertEqual(Pid1, Pid2),
     couch_replicator_test_helper:cancel(RepId1).
 
-
 transient_job_with_a_bad_filter({Source, Target}) ->
     DDoc = #{<<"_id">> => <<"_design/myddoc">>},
     couch_replicator_test_helper:create_docs(Source, [DDoc]),
-    Result = couch_replicator:replicate(#{
-        <<"source">> => couch_replicator_test_helper:db_url(Source),
-        <<"target">> => couch_replicator_test_helper:db_url(Target),
-        <<"continuous">> => true,
-        <<"filter">> => <<"myddoc/myfilter">>
-    }, ?ADMIN_USER),
+    Result = couch_replicator:replicate(
+        #{
+            <<"source">> => couch_replicator_test_helper:db_url(Source),
+            <<"target">> => couch_replicator_test_helper:db_url(Target),
+            <<"continuous">> => true,
+            <<"filter">> => <<"myddoc/myfilter">>
+        },
+        ?ADMIN_USER
+    ),
     ?assertMatch({error, #{<<"error">> := <<"filter_fetch_error">>}}, Result).
 
-
 get_rep_id(Source, Target) ->
-    {ok, Id, _} = couch_replicator_parse:parse_transient_rep(#{
-        <<"source">> => couch_replicator_test_helper:db_url(Source),
-        <<"target">> => couch_replicator_test_helper:db_url(Target)
-    }, null),
+    {ok, Id, _} = couch_replicator_parse:parse_transient_rep(
+        #{
+            <<"source">> => couch_replicator_test_helper:db_url(Source),
+            <<"target">> => couch_replicator_test_helper:db_url(Target)
+        },
+        null
+    ),
     Id.
 
-
 replicate(Source, Target) ->
-    couch_replicator:replicate(#{
-        <<"source">> => couch_replicator_test_helper:db_url(Source),
-        <<"target">> => couch_replicator_test_helper:db_url(Target)
-    }, ?ADMIN_USER).
-
+    couch_replicator:replicate(
+        #{
+            <<"source">> => couch_replicator_test_helper:db_url(Source),
+            <<"target">> => couch_replicator_test_helper:db_url(Target)
+        },
+        ?ADMIN_USER
+    ).
 
 replicate_continuous(Source, Target) ->
     couch_replicator_test_helper:replicate_continuous(Source, Target).
-
 
 scheduler_jobs(Id) ->
     SUrl = couch_replicator_test_helper:server_url(),

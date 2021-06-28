@@ -12,14 +12,11 @@
 
 -module(couch_replicator_httpc_pool_tests).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 -define(TIMEOUT, 1000).
-
 
 httpc_pool_test_() ->
     {
@@ -40,14 +37,11 @@ httpc_pool_test_() ->
         }
     }.
 
-
 setup() ->
     spawn_pool().
 
-
 teardown(Pool) ->
     stop_pool(Pool).
-
 
 should_block_new_clients_when_full(Pool) ->
     Client1 = spawn_client(Pool),
@@ -79,10 +73,12 @@ should_block_new_clients_when_full(Pool) ->
     Worker4 = get_client_worker(Client4, "4"),
     ?assertEqual(Worker1, Worker4),
 
-    lists:foreach(fun(C) ->
+    lists:foreach(
+        fun(C) ->
             ?assertEqual(ok, stop_client(C))
-    end, [Client2, Client3, Client4]).
-
+        end,
+        [Client2, Client3, Client4]
+    ).
 
 should_replace_worker_on_death(Pool) ->
     Client1 = spawn_client(Pool),
@@ -102,7 +98,6 @@ should_replace_worker_on_death(Pool) ->
     ?assertNotEqual(Worker1, Worker2),
     ?assertEqual(ok, stop_client(Client2)).
 
-
 spawn_client(Pool) ->
     Parent = self(),
     Ref = make_ref(),
@@ -111,7 +106,6 @@ spawn_client(Pool) ->
         loop(Parent, Ref, Worker, Pool)
     end),
     {Pid, Ref}.
-
 
 ping_client({Pid, Ref}) ->
     Pid ! ping,
@@ -122,17 +116,20 @@ ping_client({Pid, Ref}) ->
         timeout
     end.
 
-
 get_client_worker({Pid, Ref}, ClientName) ->
     Pid ! get_worker,
     receive
         {worker, Ref, Worker} ->
             Worker
     after ?TIMEOUT ->
-        erlang:error({assertion_failed, [{module, ?MODULE}, {line, ?LINE},
-            {reason, "Timeout getting client " ++ ClientName ++ " worker"}]})
+        erlang:error(
+            {assertion_failed, [
+                {module, ?MODULE},
+                {line, ?LINE},
+                {reason, "Timeout getting client " ++ ClientName ++ " worker"}
+            ]}
+        )
     end.
-
 
 stop_client({Pid, Ref}) ->
     Pid ! stop,
@@ -142,7 +139,6 @@ stop_client({Pid, Ref}) ->
     after ?TIMEOUT ->
         timeout
     end.
-
 
 kill_client_worker({Pid, Ref}) ->
     Pid ! get_worker,
@@ -154,13 +150,12 @@ kill_client_worker({Pid, Ref}) ->
         timeout
     end.
 
-
 loop(Parent, Ref, Worker, Pool) ->
     receive
         ping ->
             Parent ! {pong, Ref},
             loop(Parent, Ref, Worker, Pool);
-        get_worker  ->
+        get_worker ->
             Parent ! {worker, Ref, Worker},
             loop(Parent, Ref, Worker, Pool);
         stop ->
@@ -168,14 +163,13 @@ loop(Parent, Ref, Worker, Pool) ->
             Parent ! {stop, Ref}
     end.
 
-
 spawn_pool() ->
     Host = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = config:get("chttpd", "port", "5984"),
     {ok, Pool} = couch_replicator_httpc_pool:start_link(
-        "http://" ++ Host ++ ":" ++ Port, [{max_connections, 3}]),
+        "http://" ++ Host ++ ":" ++ Port, [{max_connections, 3}]
+    ),
     Pool.
-
 
 stop_pool(Pool) ->
     ok = couch_replicator_httpc_pool:stop(Pool).

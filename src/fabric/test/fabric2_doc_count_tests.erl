@@ -12,15 +12,12 @@
 
 -module(fabric2_doc_count_tests).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2_test.hrl").
 
-
 -define(DOC_COUNT, 10).
-
 
 doc_count_test_() ->
     {
@@ -38,78 +35,84 @@ doc_count_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([fabric]),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     {Db, Ctx}.
 
-
 cleanup({Db, Ctx}) ->
     ok = fabric2_db:delete(fabric2_db:name(Db), []),
     test_util:stop_couch(Ctx).
 
-
 normal_docs({Db, _}) ->
     {DocCount, DelDocCount, DDocCount, LDocCount} = get_doc_counts(Db),
 
-    Docs1 = lists:map(fun(Id) ->
-        Doc = #doc{
-            id = integer_to_binary(Id),
-            body = {[{<<"value">>, Id}]}
-        },
-        {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Doc, []),
-        Doc#doc{revs = {RevPos, [Rev]}}
-    end, lists:seq(1, ?DOC_COUNT)),
-
-    check_doc_counts(
-            Db,
-            DocCount + ?DOC_COUNT,
-            DelDocCount,
-            DDocCount,
-            LDocCount
-        ),
-
-    Docs2 = lists:map(fun(Doc) ->
-        {[{<<"value">>, V}]} = Doc#doc.body,
-        NewDoc = case V rem 2 of
-            0 -> Doc#doc{deleted = true};
-            1 -> Doc
+    Docs1 = lists:map(
+        fun(Id) ->
+            Doc = #doc{
+                id = integer_to_binary(Id),
+                body = {[{<<"value">>, Id}]}
+            },
+            {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Doc, []),
+            Doc#doc{revs = {RevPos, [Rev]}}
         end,
-        {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, NewDoc, []),
-        NewDoc#doc{revs = {RevPos, [Rev]}}
-    end, Docs1),
+        lists:seq(1, ?DOC_COUNT)
+    ),
 
     check_doc_counts(
-            Db,
-            DocCount + ?DOC_COUNT div 2,
-            DelDocCount + ?DOC_COUNT div 2,
-            DDocCount,
-            LDocCount
-        ),
+        Db,
+        DocCount + ?DOC_COUNT,
+        DelDocCount,
+        DDocCount,
+        LDocCount
+    ),
 
-    lists:map(fun(Doc) ->
-        case Doc#doc.deleted of
-            true ->
-                Undeleted = Doc#doc{
-                    revs = {0, []},
-                    deleted = false
-                },
-                {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Undeleted, []),
-                Undeleted#doc{revs = {RevPos, [Rev]}};
-            false ->
-                Doc
-        end
-    end, Docs2),
+    Docs2 = lists:map(
+        fun(Doc) ->
+            {[{<<"value">>, V}]} = Doc#doc.body,
+            NewDoc =
+                case V rem 2 of
+                    0 -> Doc#doc{deleted = true};
+                    1 -> Doc
+                end,
+            {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, NewDoc, []),
+            NewDoc#doc{revs = {RevPos, [Rev]}}
+        end,
+        Docs1
+    ),
 
     check_doc_counts(
-            Db,
-            DocCount + ?DOC_COUNT,
-            DelDocCount,
-            DDocCount,
-            LDocCount
-        ).
+        Db,
+        DocCount + ?DOC_COUNT div 2,
+        DelDocCount + ?DOC_COUNT div 2,
+        DDocCount,
+        LDocCount
+    ),
 
+    lists:map(
+        fun(Doc) ->
+            case Doc#doc.deleted of
+                true ->
+                    Undeleted = Doc#doc{
+                        revs = {0, []},
+                        deleted = false
+                    },
+                    {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Undeleted, []),
+                    Undeleted#doc{revs = {RevPos, [Rev]}};
+                false ->
+                    Doc
+            end
+        end,
+        Docs2
+    ),
+
+    check_doc_counts(
+        Db,
+        DocCount + ?DOC_COUNT,
+        DelDocCount,
+        DDocCount,
+        LDocCount
+    ).
 
 replicated_docs({Db, _}) ->
     {DocCount, DelDocCount, DDocCount, LDocCount} = get_doc_counts(Db),
@@ -133,134 +136,151 @@ replicated_docs({Db, _}) ->
     % as deleted
     Doc3 = #doc{id = <<"rd2">>, revs = {2, [R3, R2]}, deleted = true},
     {ok, {2, R3}} = fabric2_db:update_doc(Db, Doc3, Opts),
-    check_doc_counts(Db, DocCount + 1, DelDocCount + 1 , DDocCount, LDocCount).
-
+    check_doc_counts(Db, DocCount + 1, DelDocCount + 1, DDocCount, LDocCount).
 
 design_docs({Db, _}) ->
     {DocCount, DelDocCount, DDocCount, LDocCount} = get_doc_counts(Db),
 
-    Docs1 = lists:map(fun(Id) ->
-        BinId = integer_to_binary(Id),
-        DDocId = <<?DESIGN_DOC_PREFIX, BinId/binary>>,
-        Doc = #doc{
-            id = DDocId,
-            body = {[{<<"value">>, Id}]}
-        },
-        {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Doc, []),
-        Doc#doc{revs = {RevPos, [Rev]}}
-    end, lists:seq(1, ?DOC_COUNT)),
-
-    check_doc_counts(
-            Db,
-            DocCount + ?DOC_COUNT,
-            DelDocCount,
-            DDocCount + ?DOC_COUNT,
-            LDocCount
-        ),
-
-    Docs2 = lists:map(fun(Doc) ->
-        {[{<<"value">>, V}]} = Doc#doc.body,
-        NewDoc = case V rem 2 of
-            0 -> Doc#doc{deleted = true};
-            1 -> Doc
+    Docs1 = lists:map(
+        fun(Id) ->
+            BinId = integer_to_binary(Id),
+            DDocId = <<?DESIGN_DOC_PREFIX, BinId/binary>>,
+            Doc = #doc{
+                id = DDocId,
+                body = {[{<<"value">>, Id}]}
+            },
+            {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Doc, []),
+            Doc#doc{revs = {RevPos, [Rev]}}
         end,
-        {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, NewDoc, []),
-        NewDoc#doc{revs = {RevPos, [Rev]}}
-    end, Docs1),
+        lists:seq(1, ?DOC_COUNT)
+    ),
 
     check_doc_counts(
-            Db,
-            DocCount + ?DOC_COUNT div 2,
-            DelDocCount + ?DOC_COUNT div 2,
-            DDocCount + ?DOC_COUNT div 2,
-            LDocCount
-        ),
+        Db,
+        DocCount + ?DOC_COUNT,
+        DelDocCount,
+        DDocCount + ?DOC_COUNT,
+        LDocCount
+    ),
 
-    lists:map(fun(Doc) ->
-        case Doc#doc.deleted of
-            true ->
-                Undeleted = Doc#doc{
-                    revs = {0, []},
-                    deleted = false
-                },
-                {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Undeleted, []),
-                Undeleted#doc{revs = {RevPos, [Rev]}};
-            false ->
-                Doc
-        end
-    end, Docs2),
+    Docs2 = lists:map(
+        fun(Doc) ->
+            {[{<<"value">>, V}]} = Doc#doc.body,
+            NewDoc =
+                case V rem 2 of
+                    0 -> Doc#doc{deleted = true};
+                    1 -> Doc
+                end,
+            {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, NewDoc, []),
+            NewDoc#doc{revs = {RevPos, [Rev]}}
+        end,
+        Docs1
+    ),
 
     check_doc_counts(
-            Db,
-            DocCount + ?DOC_COUNT,
-            DelDocCount,
-            DDocCount + ?DOC_COUNT,
-            LDocCount
-        ).
+        Db,
+        DocCount + ?DOC_COUNT div 2,
+        DelDocCount + ?DOC_COUNT div 2,
+        DDocCount + ?DOC_COUNT div 2,
+        LDocCount
+    ),
 
+    lists:map(
+        fun(Doc) ->
+            case Doc#doc.deleted of
+                true ->
+                    Undeleted = Doc#doc{
+                        revs = {0, []},
+                        deleted = false
+                    },
+                    {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Undeleted, []),
+                    Undeleted#doc{revs = {RevPos, [Rev]}};
+                false ->
+                    Doc
+            end
+        end,
+        Docs2
+    ),
+
+    check_doc_counts(
+        Db,
+        DocCount + ?DOC_COUNT,
+        DelDocCount,
+        DDocCount + ?DOC_COUNT,
+        LDocCount
+    ).
 
 local_docs({Db, _}) ->
     {DocCount, DelDocCount, DDocCount, LDocCount} = get_doc_counts(Db),
 
-    Docs1 = lists:map(fun(Id) ->
-        BinId = integer_to_binary(Id),
-        LDocId = <<?LOCAL_DOC_PREFIX, BinId/binary>>,
-        Doc = #doc{
-            id = LDocId,
-            body = {[{<<"value">>, Id}]}
-        },
-        {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Doc, []),
-        Doc#doc{revs = {RevPos, [Rev]}}
-    end, lists:seq(1, ?DOC_COUNT)),
-
-    check_doc_counts(
-            Db,
-            DocCount,
-            DelDocCount,
-            DDocCount,
-            LDocCount + ?DOC_COUNT
-        ),
-
-    Docs2 = lists:map(fun(Doc) ->
-        {[{<<"value">>, V}]} = Doc#doc.body,
-        NewDoc = case V rem 2 of
-            0 -> Doc#doc{deleted = true};
-            1 -> Doc
+    Docs1 = lists:map(
+        fun(Id) ->
+            BinId = integer_to_binary(Id),
+            LDocId = <<?LOCAL_DOC_PREFIX, BinId/binary>>,
+            Doc = #doc{
+                id = LDocId,
+                body = {[{<<"value">>, Id}]}
+            },
+            {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Doc, []),
+            Doc#doc{revs = {RevPos, [Rev]}}
         end,
-        {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, NewDoc, []),
-        NewDoc#doc{revs = {RevPos, [Rev]}}
-    end, Docs1),
+        lists:seq(1, ?DOC_COUNT)
+    ),
 
     check_doc_counts(
-            Db,
-            DocCount,
-            DelDocCount,
-            DDocCount,
-            LDocCount + ?DOC_COUNT div 2
-        ),
+        Db,
+        DocCount,
+        DelDocCount,
+        DDocCount,
+        LDocCount + ?DOC_COUNT
+    ),
 
-    lists:map(fun(Doc) ->
-        case Doc#doc.deleted of
-            true ->
-                Undeleted = Doc#doc{
-                    revs = {0, []},
-                    deleted = false
-                },
-                {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Undeleted, []),
-                Undeleted#doc{revs = {RevPos, [Rev]}};
-            false ->
-                Doc
-        end
-    end, Docs2),
+    Docs2 = lists:map(
+        fun(Doc) ->
+            {[{<<"value">>, V}]} = Doc#doc.body,
+            NewDoc =
+                case V rem 2 of
+                    0 -> Doc#doc{deleted = true};
+                    1 -> Doc
+                end,
+            {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, NewDoc, []),
+            NewDoc#doc{revs = {RevPos, [Rev]}}
+        end,
+        Docs1
+    ),
 
     check_doc_counts(
-            Db,
-            DocCount,
-            DelDocCount,
-            DDocCount,
-            LDocCount + ?DOC_COUNT
-        ).
+        Db,
+        DocCount,
+        DelDocCount,
+        DDocCount,
+        LDocCount + ?DOC_COUNT div 2
+    ),
 
+    lists:map(
+        fun(Doc) ->
+            case Doc#doc.deleted of
+                true ->
+                    Undeleted = Doc#doc{
+                        revs = {0, []},
+                        deleted = false
+                    },
+                    {ok, {RevPos, Rev}} = fabric2_db:update_doc(Db, Undeleted, []),
+                    Undeleted#doc{revs = {RevPos, [Rev]}};
+                false ->
+                    Doc
+            end
+        end,
+        Docs2
+    ),
+
+    check_doc_counts(
+        Db,
+        DocCount,
+        DelDocCount,
+        DDocCount,
+        LDocCount + ?DOC_COUNT
+    ).
 
 get_doc_counts(Db) ->
     DocCount = fabric2_db:get_doc_count(Db),
@@ -268,7 +288,6 @@ get_doc_counts(Db) ->
     DDocCount = fabric2_db:get_doc_count(Db, <<"_design">>),
     LDocCount = fabric2_db:get_doc_count(Db, <<"_local">>),
     {DocCount, DelDocCount, DDocCount, LDocCount}.
-
 
 check_doc_counts(Db, DocCount, DelDocCount, DDocCount, LDocCount) ->
     ?assertEqual(DocCount, fabric2_db:get_doc_count(Db)),

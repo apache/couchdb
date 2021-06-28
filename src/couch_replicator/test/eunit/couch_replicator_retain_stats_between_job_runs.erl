@@ -17,9 +17,7 @@
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 -define(DELAY, 500).
-
 
 stats_retained_test_() ->
     {
@@ -36,7 +34,6 @@ stats_retained_test_() ->
         }
     }.
 
-
 setup() ->
     Source = couch_replicator_test_helper:create_db(),
     Target = couch_replicator_test_helper:create_db(),
@@ -44,19 +41,18 @@ setup() ->
     config:set("replicator", "checkpoint_interval", "1000", false),
     {Source, Target}.
 
-
 teardown({Source, Target}) ->
     config:delete("replicator", "stats_update_interval_sec", false),
     config:delete("replicator", "checkpoint_interval", false),
     couch_replicator_test_helper:delete_db(Source),
     couch_replicator_test_helper:delete_db(Target).
 
-
 t_stats_retained_on_job_removal({Source, Target}) ->
     {ok, _} = add_vdu(Target),
     populate_db_reject_even_docs(Source, 1, 10),
     {ok, Pid1, RepId} = replicate(Source, Target),
-    wait_target_in_sync(6, Target), % 5 + 1 vdu
+    % 5 + 1 vdu
+    wait_target_in_sync(6, Target),
 
     check_scheduler_jobs(10, 5, 5),
 
@@ -64,7 +60,8 @@ t_stats_retained_on_job_removal({Source, Target}) ->
 
     populate_db_reject_even_docs(Source, 11, 20),
     {ok, Pid2, RepId} = replicate(Source, Target),
-    wait_target_in_sync(11, Target), % 6 + 5
+    % 6 + 5
+    wait_target_in_sync(11, Target),
 
     check_scheduler_jobs(20, 10, 10),
 
@@ -72,12 +69,12 @@ t_stats_retained_on_job_removal({Source, Target}) ->
 
     populate_db_reject_even_docs(Source, 21, 30),
     {ok, Pid3, RepId} = replicate(Source, Target),
-    wait_target_in_sync(16, Target), % 11 + 5
+    % 11 + 5
+    wait_target_in_sync(16, Target),
 
     check_scheduler_jobs(30, 15, 15),
 
     cancel(RepId, Pid3).
-
 
 check_scheduler_jobs(DocsRead, DocsWritten, DocFailed) ->
     Info = wait_scheduler_info(DocsRead),
@@ -92,7 +89,6 @@ check_scheduler_jobs(DocsRead, DocsWritten, DocFailed) ->
     ?assertMatch(#{<<"docs_read">> := DocsRead}, Info),
     ?assertMatch(#{<<"docs_written">> := DocsWritten}, Info),
     ?assertMatch(#{<<"doc_write_failures">> := DocFailed}, Info).
-
 
 wait_scheduler_info(DocsRead) ->
     test_util:wait(fun() ->
@@ -109,7 +105,6 @@ wait_scheduler_info(DocsRead) ->
         end
     end).
 
-
 populate_db_reject_even_docs(DbName, Start, End) ->
     BodyFun = fun(Id) ->
         case Id rem 2 == 0 of
@@ -119,31 +114,34 @@ populate_db_reject_even_docs(DbName, Start, End) ->
     end,
     populate_db(DbName, Start, End, BodyFun).
 
-
 populate_db(DbName, Start, End, BodyFun) when is_function(BodyFun, 1) ->
-    Docs = lists:foldl(fun(DocIdCounter, Acc) ->
-        Id = integer_to_binary(DocIdCounter),
-        Doc = #doc{id = Id, body = BodyFun(DocIdCounter)},
-        [Doc | Acc]
-    end, [], lists:seq(Start, End)),
+    Docs = lists:foldl(
+        fun(DocIdCounter, Acc) ->
+            Id = integer_to_binary(DocIdCounter),
+            Doc = #doc{id = Id, body = BodyFun(DocIdCounter)},
+            [Doc | Acc]
+        end,
+        [],
+        lists:seq(Start, End)
+    ),
     couch_replicator_test_helper:create_docs(DbName, Docs).
-
 
 wait_target_in_sync(DocCount, Target) when is_integer(DocCount) ->
     wait_target_in_sync_loop(DocCount, Target, 300).
 
-
 wait_target_in_sync_loop(_DocCount, _TargetName, 0) ->
-    erlang:error({assertion_failed, [
-        {module, ?MODULE}, {line, ?LINE},
-        {reason, "Could not get source and target databases in sync"}
-    ]});
-
+    erlang:error(
+        {assertion_failed, [
+            {module, ?MODULE},
+            {line, ?LINE},
+            {reason, "Could not get source and target databases in sync"}
+        ]}
+    );
 wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
     {ok, Db} = fabric2_db:open(TargetName, [?ADMIN_CTX]),
     {ok, TargetInfo} = fabric2_db:get_db_info(Db),
     TargetDocCount = couch_util:get_value(doc_count, TargetInfo),
-    case TargetDocCount  == DocCount of
+    case TargetDocCount == DocCount of
         true ->
             true;
         false ->
@@ -151,24 +149,20 @@ wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
             wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft - 1)
     end.
 
-
 replicate(Source, Target) ->
     couch_replicator_test_helper:replicate_continuous(Source, Target).
-
 
 cancel(RepId, Pid) ->
     couch_replicator_test_helper:cancel(RepId, Pid).
 
-
 vdu() ->
-    <<"function(newDoc, oldDoc, userCtx) {
-        if(newDoc.nope === true) {
-            throw({forbidden: 'nope'});
-        } else {
-            return;
-        }
-    }">>.
-
+    <<"function(newDoc, oldDoc, userCtx) {\n"
+    "        if(newDoc.nope === true) {\n"
+    "            throw({forbidden: 'nope'});\n"
+    "        } else {\n"
+    "            return;\n"
+    "        }\n"
+    "    }">>.
 
 add_vdu(DbName) ->
     DocProps = [

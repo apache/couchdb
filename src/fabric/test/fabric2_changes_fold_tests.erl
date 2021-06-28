@@ -12,15 +12,12 @@
 
 -module(fabric2_changes_fold_tests).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2_test.hrl").
 
-
 -define(DOC_COUNT, 25).
-
 
 next_vs_function_with_txid_test() ->
     Cases = [
@@ -32,9 +29,10 @@ next_vs_function_with_txid_test() ->
         {{2, 0, 0}, {1, 16#FFFF, 16#FFFF}}
     ],
     Next = fun({V, B, T}) -> fabric2_fdb:next_vs({versionstamp, V, B, T}) end,
-    [?assertEqual({versionstamp, RV, RB, RT}, Next({V, B, T})) ||
-        {{RV, RB, RT}, {V, B, T}} <- Cases].
-
+    [
+        ?assertEqual({versionstamp, RV, RB, RT}, Next({V, B, T}))
+     || {{RV, RB, RT}, {V, B, T}} <- Cases
+    ].
 
 next_vs_function_without_txid_test() ->
     Cases = [
@@ -44,9 +42,10 @@ next_vs_function_without_txid_test() ->
         {{2, 0}, {1, 16#FFFF}}
     ],
     Next = fun({V, B}) -> fabric2_fdb:next_vs({versionstamp, V, B}) end,
-    [?assertEqual({versionstamp, RV, RB}, Next({V, B})) ||
-        {{RV, RB}, {V, B}} <- Cases].
-
+    [
+        ?assertEqual({versionstamp, RV, RB}, Next({V, B}))
+     || {{RV, RB}, {V, B}} <- Cases
+    ].
 
 changes_fold_test_() ->
     {
@@ -77,40 +76,39 @@ changes_fold_test_() ->
         }
     }.
 
-
 setup_all() ->
     Ctx = test_util:start_couch([fabric]),
     meck:new(erlfdb, [passthrough]),
     meck:new(fabric2_server, [passthrough]),
     Ctx.
 
-
 teardown_all(Ctx) ->
     meck:unload(),
     test_util:stop_couch(Ctx).
-
 
 setup() ->
     fabric2_test_util:tx_too_old_mock_erlfdb(),
     meck:expect(fabric2_server, get_retry_limit, 0, 3),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
-    Rows = lists:map(fun(Val) ->
-        DocId = fabric2_util:uuid(),
-        Doc = #doc{
-            id = DocId,
-            body = {[{<<"value">>, Val}]}
-        },
-        {ok, RevId} = fabric2_db:update_doc(Db, Doc, []),
-        UpdateSeq = fabric2_db:get_update_seq(Db),
-        #{
-            id => DocId,
-            sequence => UpdateSeq,
-            deleted => false,
-            rev_id => RevId
-        }
-    end, lists:seq(1, ?DOC_COUNT)),
+    Rows = lists:map(
+        fun(Val) ->
+            DocId = fabric2_util:uuid(),
+            Doc = #doc{
+                id = DocId,
+                body = {[{<<"value">>, Val}]}
+            },
+            {ok, RevId} = fabric2_db:update_doc(Db, Doc, []),
+            UpdateSeq = fabric2_db:get_update_seq(Db),
+            #{
+                id => DocId,
+                sequence => UpdateSeq,
+                deleted => false,
+                rev_id => RevId
+            }
+        end,
+        lists:seq(1, ?DOC_COUNT)
+    ),
     {Db, Rows}.
-
 
 cleanup({Db, _DocIdRevs}) ->
     meck:reset(fabric2_server),
@@ -118,35 +116,27 @@ cleanup({Db, _DocIdRevs}) ->
     fabric2_test_util:tx_too_old_reset_errors(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
-
 fold_changes_basic({Db, DocRows}) ->
     ?assertEqual(lists:reverse(DocRows), changes(Db)).
-
 
 fold_changes_since_now({Db, _}) ->
     ?assertEqual([], changes(Db, now, [])).
 
-
 fold_changes_since_seq({_, []}) ->
     ok;
-
 fold_changes_since_seq({Db, [Row | RestRows]}) ->
     #{sequence := Since} = Row,
     ?assertEqual(lists:reverse(RestRows), changes(Db, Since, [])),
     fold_changes_since_seq({Db, RestRows}).
 
-
 fold_changes_basic_rev({Db, _}) ->
     ?assertEqual([], changes(Db, 0, [{dir, rev}])).
-
 
 fold_changes_since_now_rev({Db, DocRows}) ->
     ?assertEqual(DocRows, changes(Db, now, [{dir, rev}])).
 
-
 fold_changes_since_seq_rev({_, []}) ->
     ok;
-
 fold_changes_since_seq_rev({Db, DocRows}) ->
     #{sequence := Since} = lists:last(DocRows),
     Opts = [{dir, rev}],
@@ -154,16 +144,18 @@ fold_changes_since_seq_rev({Db, DocRows}) ->
     RestRows = lists:sublist(DocRows, length(DocRows) - 1),
     fold_changes_since_seq_rev({Db, RestRows}).
 
-
 fold_changes_with_end_key({Db, DocRows}) ->
-    lists:foldl(fun(DocRow, Acc) ->
-        EndSeq = maps:get(sequence, DocRow),
-        Changes = changes(Db, 0, [{end_key, EndSeq}]),
-        NewAcc = [DocRow | Acc],
-        ?assertEqual(Changes, NewAcc),
-        NewAcc
-    end, [], DocRows).
-
+    lists:foldl(
+        fun(DocRow, Acc) ->
+            EndSeq = maps:get(sequence, DocRow),
+            Changes = changes(Db, 0, [{end_key, EndSeq}]),
+            NewAcc = [DocRow | Acc],
+            ?assertEqual(Changes, NewAcc),
+            NewAcc
+        end,
+        [],
+        DocRows
+    ).
 
 fold_changes_basic_tx_too_old({Db, DocRows0}) ->
     DocRows = lists:reverse(DocRows0),
@@ -186,7 +178,6 @@ fold_changes_basic_tx_too_old({Db, DocRows0}) ->
     % fold_range. But it is not enough to stop the iteration.
     fabric2_test_util:tx_too_old_setup_errors({1, 1}, {1, 2}),
     ?assertEqual(DocRows, changes(Db)).
-
 
 fold_changes_reverse_tx_too_old({Db, DocRows}) ->
     Opts = [{dir, rev}],
@@ -215,7 +206,6 @@ fold_changes_reverse_tx_too_old({Db, DocRows}) ->
     fabric2_test_util:tx_too_old_setup_errors({1, 1}, {1, 2}),
     ?assertEqual(DocRows, changes(Db, now, Opts)).
 
-
 fold_changes_tx_too_old_with_single_row_emits({Db, DocRows0}) ->
     % This test does a few basic operations while forcing erlfdb range fold to
     % emit a single row at a time, thus forcing it to use continuations while
@@ -237,14 +227,12 @@ fold_changes_tx_too_old_with_single_row_emits({Db, DocRows0}) ->
     fabric2_test_util:tx_too_old_setup_errors({?DOC_COUNT - 1, 1}, 0),
     ?assertEqual(DocRows, changes(Db, 0, Opts)).
 
-
 fold_changes_since_seq_tx_too_old({Db, Rows}) ->
     % Blow up after after a successful emit, then twice
     % in range fold call. Also re-use already existing basic
     % fold_changes_since_seq test function.
     fabric2_test_util:tx_too_old_setup_errors({1, 1}, {1, 2}),
     fold_changes_since_seq({Db, Rows}).
-
 
 fold_changes_not_progressing({Db, _}) ->
     % Fail in first fold range call.
@@ -267,15 +255,12 @@ fold_changes_not_progressing({Db, _}) ->
     fabric2_test_util:tx_too_old_setup_errors({1, 1}, {1, 4}),
     ?assertError(fold_range_not_progressing, changes(Db)).
 
-
 fold_fun(#{} = Change, Acc) ->
     fabric2_test_util:tx_too_old_raise_in_user_fun(),
     {ok, [Change | Acc]}.
 
-
 changes(Db) ->
     changes(Db, 0, []).
-
 
 changes(Db, Since, Opts) ->
     {ok, Rows} = fabric2_db:fold_changes(Db, Since, fun fold_fun/2, [], Opts),

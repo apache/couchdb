@@ -1,6 +1,5 @@
 -module(chttpd_xframe_test).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
@@ -62,7 +61,6 @@ no_header_if_xframe_disabled_test() ->
 enabled_with_same_origin_test() ->
     Headers = chttpd_xframe_options:header(mock_request(), [], config_sameorigin()),
     ?assertEqual(Headers, [{"X-Frame-Options", "SAMEORIGIN"}]).
-
 
 xframe_host_test_() ->
     {

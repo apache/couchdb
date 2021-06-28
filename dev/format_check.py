@@ -30,7 +30,6 @@ FILTERED_LINES = [
 ]
 
 if __name__ == "__main__":
-    os.chdir("src")
     failed_checks = 0
     for item in get_source_paths():
         if item["is_source_path"]:
@@ -61,5 +60,4 @@ if __name__ == "__main__":
                 if len(stderr_lines) > 0:
                     print("\n".join(stderr_lines), file=sys.stderr)
                     failed_checks += 1
-    os.chdir("..")
     sys.exit(failed_checks)

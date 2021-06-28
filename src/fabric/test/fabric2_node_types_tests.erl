@@ -12,10 +12,8 @@
 
 -module(fabric2_node_types_tests).
 
-
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2_test.hrl").
-
 
 node_types_test_() ->
     {
@@ -43,7 +41,6 @@ node_types_test_() ->
         ])
     }.
 
-
 basics(_) ->
     % default is true for new types
     ?assert(fabric2_node_types:is_type(some_new_node_type)),
@@ -57,7 +54,6 @@ basics(_) ->
     application:set_env(fabric, node_types, [{zag, true}, {bam, false}]),
     ?assert(fabric2_node_types:is_type(zag)),
     ?assert(not fabric2_node_types:is_type(bam)).
-
 
 os_env_priority(_) ->
     % os env takes precedence

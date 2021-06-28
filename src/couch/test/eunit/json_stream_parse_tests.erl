@@ -14,82 +14,87 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
--define(CASES,
-    [
-        {1, "1", "integer numeric literial"},
-        {3.1416, "3.14160", "float numeric literal"},  % text representation may truncate, trail zeroes
-        {-1, "-1", "negative integer numeric literal"},
-        {-3.1416, "-3.14160", "negative float numeric literal"},
-        {12.0e10, "1.20000e+11", "float literal in scientific notation"},
-        {1.234E+10, "1.23400e+10", "another float literal in scientific notation"},
-        {-1.234E-10, "-1.23400e-10", "negative float literal in scientific notation"},
-        {10.0, "1.0e+01", "yet another float literal in scientific notation"},
-        {123.456, "1.23456E+2", "yet another float literal in scientific notation"},
-        {10.0, "1e1", "yet another float literal in scientific notation"},
-        {<<"foo">>, "\"foo\"", "string literal"},
-        {<<"foo", 5, "bar">>, "\"foo\\u0005bar\"", "string literal with \\u0005"},
-        {<<"">>, "\"\"", "empty string literal"},
-        {<<"\n\n\n">>, "\"\\n\\n\\n\"", "only new lines literal"},
-        {<<"\" \b\f\r\n\t\"">>, "\"\\\" \\b\\f\\r\\n\\t\\\"\"",
-            "only white spaces string literal"},
-        {null, "null", "null literal"},
-        {true, "true", "true literal"},
-        {false, "false", "false literal"},
-        {<<"null">>, "\"null\"", "null string literal"},
-        {<<"true">>, "\"true\"", "true string literal"},
-        {<<"false">>, "\"false\"", "false string literal"},
-        {{[]}, "{}", "empty object literal"},
-        {{[{<<"foo">>, <<"bar">>}]}, "{\"foo\":\"bar\"}",
-            "simple object literal"},
-        {{[{<<"foo">>, <<"bar">>}, {<<"baz">>, 123}]},
-            "{\"foo\":\"bar\",\"baz\":123}", "another simple object literal"},
-        {[], "[]", "empty array literal"},
-        {[[]], "[[]]", "empty array literal inside a single element array literal"},
-        {[1, <<"foo">>], "[1,\"foo\"]", "simple non-empty array literal"},
-        {[1199344435545.0, 1], "[1199344435545.0,1]",
-             "another simple non-empty array literal"},
-        {[false, true, 321, null], "[false, true, 321, null]", "array of literals"},
-        {{[{<<"foo">>, [123]}]}, "{\"foo\":[123]}",
-             "object literal with an array valued property"},
-        {{[{<<"foo">>, {[{<<"bar">>, true}]}}]},
-            "{\"foo\":{\"bar\":true}}", "nested object literal"},
-        {{[{<<"foo">>, []}, {<<"bar">>, {[{<<"baz">>, true}]}},
-                {<<"alice">>, <<"bob">>}]},
-            "{\"foo\":[],\"bar\":{\"baz\":true},\"alice\":\"bob\"}",
-            "complex object literal"},
-        {[-123, <<"foo">>, {[{<<"bar">>, []}]}, null],
-            "[-123,\"foo\",{\"bar\":[]},null]",
-            "complex array literal"}
-    ]
-).
-
+-define(CASES, [
+    {1, "1", "integer numeric literial"},
+    % text representation may truncate, trail zeroes
+    {3.1416, "3.14160", "float numeric literal"},
+    {-1, "-1", "negative integer numeric literal"},
+    {-3.1416, "-3.14160", "negative float numeric literal"},
+    {12.0e10, "1.20000e+11", "float literal in scientific notation"},
+    {1.234E+10, "1.23400e+10", "another float literal in scientific notation"},
+    {-1.234E-10, "-1.23400e-10", "negative float literal in scientific notation"},
+    {10.0, "1.0e+01", "yet another float literal in scientific notation"},
+    {123.456, "1.23456E+2", "yet another float literal in scientific notation"},
+    {10.0, "1e1", "yet another float literal in scientific notation"},
+    {<<"foo">>, "\"foo\"", "string literal"},
+    {<<"foo", 5, "bar">>, "\"foo\\u0005bar\"", "string literal with \\u0005"},
+    {<<"">>, "\"\"", "empty string literal"},
+    {<<"\n\n\n">>, "\"\\n\\n\\n\"", "only new lines literal"},
+    {<<"\" \b\f\r\n\t\"">>, "\"\\\" \\b\\f\\r\\n\\t\\\"\"", "only white spaces string literal"},
+    {null, "null", "null literal"},
+    {true, "true", "true literal"},
+    {false, "false", "false literal"},
+    {<<"null">>, "\"null\"", "null string literal"},
+    {<<"true">>, "\"true\"", "true string literal"},
+    {<<"false">>, "\"false\"", "false string literal"},
+    {{[]}, "{}", "empty object literal"},
+    {{[{<<"foo">>, <<"bar">>}]}, "{\"foo\":\"bar\"}", "simple object literal"},
+    {
+        {[{<<"foo">>, <<"bar">>}, {<<"baz">>, 123}]},
+        "{\"foo\":\"bar\",\"baz\":123}",
+        "another simple object literal"
+    },
+    {[], "[]", "empty array literal"},
+    {[[]], "[[]]", "empty array literal inside a single element array literal"},
+    {[1, <<"foo">>], "[1,\"foo\"]", "simple non-empty array literal"},
+    {[1199344435545.0, 1], "[1199344435545.0,1]", "another simple non-empty array literal"},
+    {[false, true, 321, null], "[false, true, 321, null]", "array of literals"},
+    {{[{<<"foo">>, [123]}]}, "{\"foo\":[123]}", "object literal with an array valued property"},
+    {{[{<<"foo">>, {[{<<"bar">>, true}]}}]}, "{\"foo\":{\"bar\":true}}", "nested object literal"},
+    {
+        {[
+            {<<"foo">>, []},
+            {<<"bar">>, {[{<<"baz">>, true}]}},
+            {<<"alice">>, <<"bob">>}
+        ]},
+        "{\"foo\":[],\"bar\":{\"baz\":true},\"alice\":\"bob\"}",
+        "complex object literal"
+    },
+    {
+        [-123, <<"foo">>, {[{<<"bar">>, []}]}, null],
+        "[-123,\"foo\",{\"bar\":[]},null]",
+        "complex array literal"
+    }
+]).
 
 raw_json_input_test_() ->
     Tests = lists:map(
         fun({EJson, JsonString, Desc}) ->
-            {Desc,
-             ?_assert(equiv(EJson, json_stream_parse:to_ejson(JsonString)))}
-        end, ?CASES),
+            {Desc, ?_assert(equiv(EJson, json_stream_parse:to_ejson(JsonString)))}
+        end,
+        ?CASES
+    ),
     {"Tests with raw JSON string as the input", Tests}.
 
 one_byte_data_fun_test_() ->
     Tests = lists:map(
         fun({EJson, JsonString, Desc}) ->
             DataFun = fun() -> single_byte_data_fun(JsonString) end,
-            {Desc,
-             ?_assert(equiv(EJson, json_stream_parse:to_ejson(DataFun)))}
-        end, ?CASES),
+            {Desc, ?_assert(equiv(EJson, json_stream_parse:to_ejson(DataFun)))}
+        end,
+        ?CASES
+    ),
     {"Tests with a 1 byte output data function as the input", Tests}.
 
 test_multiple_bytes_data_fun_test_() ->
     Tests = lists:map(
         fun({EJson, JsonString, Desc}) ->
             DataFun = fun() -> multiple_bytes_data_fun(JsonString) end,
-            {Desc,
-             ?_assert(equiv(EJson, json_stream_parse:to_ejson(DataFun)))}
-        end, ?CASES),
+            {Desc, ?_assert(equiv(EJson, json_stream_parse:to_ejson(DataFun)))}
+        end,
+        ?CASES
+    ),
     {"Tests with a multiple bytes output data function as the input", Tests}.
-
 
 %% Test for equivalence of Erlang terms.
 %% Due to arbitrary order of construction, equivalent objects might
@@ -120,7 +125,8 @@ equiv_object(Props1, Props2) ->
         fun({{K1, V1}, {K2, V2}}) ->
             equiv(K1, K2) andalso equiv(V1, V2)
         end,
-        Pairs).
+        Pairs
+    ).
 
 %% Recursively compare tuple elements for equivalence.
 equiv_list([], []) ->
@@ -147,5 +153,5 @@ split(L, N) ->
 
 take(0, L, Acc) ->
     {lists:reverse(Acc), L};
-take(N, [H|L], Acc) ->
+take(N, [H | L], Acc) ->
     take(N - 1, L, [H | Acc]).

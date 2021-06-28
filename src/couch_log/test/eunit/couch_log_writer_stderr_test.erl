@@ -12,34 +12,25 @@
 
 -module(couch_log_writer_stderr_test).
 
-
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-
 -define(WRITER, couch_log_writer_stderr).
 
-
 couch_log_writer_stderr_test_() ->
-    {setup,
-        fun couch_log_test_util:start/0,
-        fun couch_log_test_util:stop/1,
-        [
-            fun check_init_terminate/0,
-            fun() ->
-                couch_log_test_util:with_meck(
-                    [{io, [unstick]}],
-                    fun check_write/0
-                )
-            end
-        ]
-    }.
-
+    {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
+        fun check_init_terminate/0,
+        fun() ->
+            couch_log_test_util:with_meck(
+                [{io, [unstick]}],
+                fun check_write/0
+            )
+        end
+    ]}.
 
 check_init_terminate() ->
     {ok, St} = ?WRITER:init(),
     ok = ?WRITER:terminate(stop, St).
-
 
 check_write() ->
     meck:expect(io, format, 3, ok),

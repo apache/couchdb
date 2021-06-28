@@ -14,14 +14,11 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
-
 setup() ->
     meck:new([config, couch_log]).
 
-
 teardown(_) ->
     meck:unload().
-
 
 sum_overflow_test_() ->
     {
@@ -38,7 +35,6 @@ sum_overflow_test_() ->
         }
     }.
 
-
 should_return_error_on_overflow() ->
     setup_reduce_limit_mock("true"),
 
@@ -47,7 +43,6 @@ should_return_error_on_overflow() ->
     ?assertMatch({[{<<"error">>, <<"builtin_reduce_error">>} | _]}, Result),
 
     check_reduce_limit_mock().
-
 
 should_return_object_on_log() ->
     setup_reduce_limit_mock("log"),
@@ -59,7 +54,6 @@ should_return_object_on_log() ->
     ?assert(not lists:member(<<"error">>, Keys)),
 
     check_reduce_limit_mock().
-
 
 should_return_object_on_false() ->
     setup_reduce_limit_mock("false"),
@@ -73,23 +67,26 @@ should_return_object_on_false() ->
     ?assert(meck:called(config, get, '_')),
     ?assertNot(meck:called(couch_log, error, '_')).
 
-
 gen_sum_kvs() ->
-    lists:map(fun(I) ->
-        Props = lists:map(fun(_) ->
-            K = couch_util:encodeBase64Url(crypto:strong_rand_bytes(16)),
-            {K, 1}
-        end, lists:seq(1, 20)),
-        [I, {Props}]
-    end, lists:seq(1, 10)).
-
+    lists:map(
+        fun(I) ->
+            Props = lists:map(
+                fun(_) ->
+                    K = couch_util:encodeBase64Url(crypto:strong_rand_bytes(16)),
+                    {K, 1}
+                end,
+                lists:seq(1, 20)
+            ),
+            [I, {Props}]
+        end,
+        lists:seq(1, 10)
+    ).
 
 setup_reduce_limit_mock(Value) ->
     ConfigArgs = ["query_server_config", "reduce_limit", "true"],
     meck:reset([config, couch_log]),
     meck:expect(config, get, ConfigArgs, Value),
     meck:expect(couch_log, error, ['_', '_'], ok).
-
 
 check_reduce_limit_mock() ->
     ?assert(meck:called(config, get, '_')),

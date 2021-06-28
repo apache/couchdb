@@ -12,23 +12,17 @@
 
 -module(couch_log_config_listener_test).
 
-
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -define(TIMEOUT, 1000).
 
 couch_log_config_test_() ->
-    {setup,
-        fun couch_log_test_util:start/0,
-        fun couch_log_test_util:stop/1,
-        [
-            fun check_restart_listener/0,
-            fun check_ignore_non_log/0,
-            fun check_only_one_couch_error_handler/0
-        ]
-    }.
-
+    {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
+        fun check_restart_listener/0,
+        fun check_ignore_non_log/0,
+        fun check_only_one_couch_error_handler/0
+    ]}.
 
 check_restart_listener() ->
     Listener1 = get_listener(),
@@ -42,16 +36,20 @@ check_restart_listener() ->
     receive
         {'DOWN', Ref, process, _, _} ->
             ?assertNot(is_process_alive(Listener1))
-        after ?TIMEOUT ->
-            erlang:error({timeout, config_listener_mon_death})
+    after ?TIMEOUT ->
+        erlang:error({timeout, config_listener_mon_death})
     end,
 
-    NewHandler = test_util:wait(fun() ->
-        case get_handler() of
-            not_found -> wait;
-            Reply -> Reply
-        end
-    end, ?TIMEOUT, 20),
+    NewHandler = test_util:wait(
+        fun() ->
+            case get_handler() of
+                not_found -> wait;
+                Reply -> Reply
+            end
+        end,
+        ?TIMEOUT,
+        20
+    ),
     ?assertEqual(Handler1, NewHandler),
 
     Listener2 = get_listener(),

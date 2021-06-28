@@ -17,7 +17,6 @@
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 id_too_long_replication_test_() ->
     {
         "Doc id too long tests",
@@ -32,12 +31,10 @@ id_too_long_replication_test_() ->
                 [
                     ?TDEF_FE(should_succeed),
                     ?TDEF_FE(should_fail)
-
                 ]
             }
         }
     }.
-
 
 setup() ->
     Source = couch_replicator_test_helper:create_db(),
@@ -45,26 +42,28 @@ setup() ->
     Target = couch_replicator_test_helper:create_db(),
     {Source, Target}.
 
-
 teardown({Source, Target}) ->
     config:delete("replicator", "max_document_id_length", false),
     couch_replicator_test_helper:delete_db(Source),
     couch_replicator_test_helper:delete_db(Target).
-
 
 should_succeed({Source, Target}) ->
     config:set("replicator", "max_document_id_length", "5", false),
     {ok, _} = couch_replicator_test_helper:replicate(Source, Target),
     ?assertEqual(ok, couch_replicator_test_helper:compare_dbs(Source, Target)).
 
-
 should_fail({Source, Target}) ->
     config:set("replicator", "max_document_id_length", "4", false),
     {ok, _} = couch_replicator_test_helper:replicate(Source, Target),
     ExceptIds = [<<"12345">>],
-    ?assertEqual(ok, couch_replicator_test_helper:compare_dbs(Source, Target,
-        ExceptIds)).
-
+    ?assertEqual(
+        ok,
+        couch_replicator_test_helper:compare_dbs(
+            Source,
+            Target,
+            ExceptIds
+        )
+    ).
 
 create_doc(DbName) ->
     Docs = [#{<<"_id">> => <<"12345">>}],

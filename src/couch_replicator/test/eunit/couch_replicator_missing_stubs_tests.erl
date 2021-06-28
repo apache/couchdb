@@ -16,9 +16,7 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 -define(REVS_LIMIT, 3).
-
 
 missing_stubs_test_() ->
     {
@@ -38,33 +36,33 @@ missing_stubs_test_() ->
         }
     }.
 
-
 setup() ->
     Source = couch_replicator_test_helper:create_db(),
     populate_db(Source),
     Target = couch_replicator_test_helper:create_db(),
     {Source, Target}.
 
-
 teardown({Source, Target}) ->
     couch_replicator_test_helper:delete_db(Source),
     couch_replicator_test_helper:delete_db(Target).
-
 
 should_replicate_docs_with_missed_att_stubs({Source, Target}) ->
     {ok, TargetDb} = fabric2_db:open(Target, [?ADMIN_CTX]),
     ?assertEqual(ok, fabric2_db:set_revs_limit(TargetDb, ?REVS_LIMIT)),
 
-    ?assertMatch({ok, _},
-        couch_replicator_test_helper:replicate(Source, Target)),
+    ?assertMatch(
+        {ok, _},
+        couch_replicator_test_helper:replicate(Source, Target)
+    ),
     ?assertEqual(ok, couch_replicator_test_helper:compare_dbs(Source, Target)),
 
     ok = update_db_docs(Source, ?REVS_LIMIT * 2),
 
-    ?assertMatch({ok, _},
-        couch_replicator_test_helper:replicate(Source, Target)),
+    ?assertMatch(
+        {ok, _},
+        couch_replicator_test_helper:replicate(Source, Target)
+    ),
     ?assertEqual(ok, couch_replicator_test_helper:compare_dbs(Source, Target)).
-
 
 populate_db(DbName) ->
     AttData = crypto:strong_rand_bytes(6000),
@@ -80,7 +78,6 @@ populate_db(DbName) ->
         ]
     },
     couch_replicator_test_helper:create_docs(DbName, [Doc]).
-
 
 update_db_docs(DbName, Times) ->
     {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
@@ -98,10 +95,8 @@ update_db_docs(DbName, Times) ->
     {ok, _} = fabric2_db:fold_docs(Db, FoldFun, ok, Opts),
     ok.
 
-
 update_doc(_DbName, _DocId, 0) ->
     ok;
-
 update_doc(DbName, DocId, Times) ->
     {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
     {ok, Doc} = fabric2_db:open_doc(Db, DocId, []),

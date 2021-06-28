@@ -18,12 +18,10 @@
 -include_lib("couch_views/include/couch_views.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 -define(MAP_FUN1, <<"map_fun1">>).
 -define(MAP_FUN2, <<"map_fun2">>).
 -define(QUERY_SERVER_LANG_BINARY, <<"foo_lang">>).
 -define(QUERY_SERVER_LANG_STRING, binary_to_list(?QUERY_SERVER_LANG_BINARY)).
-
 
 indexer_test_() ->
     {
@@ -62,37 +60,31 @@ indexer_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([
-            fabric,
-            couch_jobs,
-            couch_js,
-            couch_views
-        ]),
+        fabric,
+        couch_jobs,
+        couch_js,
+        couch_views
+    ]),
     Ctx.
-
 
 cleanup(Ctx) ->
     test_util:stop_couch(Ctx).
 
-
 foreach_setup() ->
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     Db.
-
 
 foreach_teardown(Db) ->
     meck:unload(),
     config:delete("couch_views", "change_limit"),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
-
 indexed_empty_db(Db) ->
     DDoc = create_ddoc(),
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
     ?assertEqual({ok, []}, run_query(Db, DDoc, ?MAP_FUN1)).
-
 
 indexed_single_doc(Db) ->
     DDoc = create_ddoc(),
@@ -104,7 +96,6 @@ indexed_single_doc(Db) ->
     {ok, Out} = run_query(Db, DDoc, ?MAP_FUN1),
 
     ?assertEqual([row(<<"0">>, 0, 0)], Out).
-
 
 updated_docs_are_reindexed(Db) ->
     DDoc = create_ddoc(),
@@ -138,7 +129,6 @@ updated_docs_are_reindexed(Db) ->
         ?assertEqual({<<"0">>, [{1, []}, {0, [1]}]}, IdRow)
     end).
 
-
 updated_docs_without_changes_are_reindexed(Db) ->
     DDoc = create_ddoc(),
     Doc1 = doc(0),
@@ -171,7 +161,6 @@ updated_docs_without_changes_are_reindexed(Db) ->
         ?assertEqual({<<"0">>, [{1, []}, {0, [0]}]}, IdRow)
     end).
 
-
 deleted_docs_not_indexed(Db) ->
     DDoc = create_ddoc(),
     Doc1 = doc(0),
@@ -186,7 +175,6 @@ deleted_docs_not_indexed(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, Doc2, []),
 
     ?assertEqual({ok, []}, run_query(Db, DDoc, ?MAP_FUN1)).
-
 
 deleted_docs_are_unindexed(Db) ->
     DDoc = create_ddoc(),
@@ -218,7 +206,6 @@ deleted_docs_are_unindexed(Db) ->
         ?assertEqual(false, IdRow)
     end).
 
-
 multiple_docs_with_same_key(Db) ->
     DDoc = create_ddoc(),
     Doc1 = doc(0, 1),
@@ -229,11 +216,13 @@ multiple_docs_with_same_key(Db) ->
 
     {ok, Out} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([
-        row(<<"0">>, 1, 1),
-        row(<<"1">>, 1, 1)
-    ], Out).
-
+    ?assertEqual(
+        [
+            row(<<"0">>, 1, 1),
+            row(<<"1">>, 1, 1)
+        ],
+        Out
+    ).
 
 multiple_keys_from_same_doc(Db) ->
     DDoc = create_ddoc(multi_emit_different),
@@ -244,11 +233,13 @@ multiple_keys_from_same_doc(Db) ->
 
     {ok, Out} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([
+    ?assertEqual(
+        [
             row(<<"0">>, 1, 1),
             row(<<"0">>, <<"0">>, <<"0">>)
-    ], Out).
-
+        ],
+        Out
+    ).
 
 multiple_identical_keys_from_same_doc(Db) ->
     DDoc = create_ddoc(multi_emit_same),
@@ -259,17 +250,19 @@ multiple_identical_keys_from_same_doc(Db) ->
 
     {ok, Out} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([
-        row(<<"0">>, 1, 1),
-        row(<<"0">>, 1, 2)
-    ], Out).
-
+    ?assertEqual(
+        [
+            row(<<"0">>, 1, 1),
+            row(<<"0">>, 1, 2)
+        ],
+        Out
+    ).
 
 fewer_multiple_identical_keys_from_same_doc(Db) ->
     DDoc = create_ddoc(multi_emit_same),
     Doc0 = #doc{
-            id = <<"0">>,
-            body = {[{<<"val">>, 1}, {<<"extra">>, 3}]}
+        id = <<"0">>,
+        body = {[{<<"val">>, 1}, {<<"extra">>, 3}]}
     },
 
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
@@ -277,11 +270,14 @@ fewer_multiple_identical_keys_from_same_doc(Db) ->
 
     {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([
-        row(<<"0">>, 1, 1),
-        row(<<"0">>, 1, 2),
-        row(<<"0">>, 1, 3)
-    ], Out1),
+    ?assertEqual(
+        [
+            row(<<"0">>, 1, 1),
+            row(<<"0">>, 1, 2),
+            row(<<"0">>, 1, 3)
+        ],
+        Out1
+    ),
 
     Doc1 = #doc{
         id = <<"0">>,
@@ -292,11 +288,13 @@ fewer_multiple_identical_keys_from_same_doc(Db) ->
 
     {ok, Out2} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([
-        row(<<"0">>, 1, 1),
-        row(<<"0">>, 1, 2)
-    ], Out2).
-
+    ?assertEqual(
+        [
+            row(<<"0">>, 1, 1),
+            row(<<"0">>, 1, 2)
+        ],
+        Out2
+    ).
 
 handle_size_key_limits(Db) ->
     ok = meck:new(config, [passthrough]),
@@ -315,18 +313,20 @@ handle_size_key_limits(Db) ->
     ?assertEqual([row(<<"1">>, 2, 2)], Out),
 
     {ok, Doc} = fabric2_db:open_doc(Db, <<"2">>),
-    Doc2 = Doc#doc {
+    Doc2 = Doc#doc{
         body = {[{<<"val">>, 2}]}
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc2),
 
     {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([
-        row(<<"1">>, 2, 2),
-        row(<<"2">>, 2, 2)
-    ], Out1).
-
+    ?assertEqual(
+        [
+            row(<<"1">>, 2, 2),
+            row(<<"2">>, 2, 2)
+        ],
+        Out1
+    ).
 
 handle_size_value_limits(Db) ->
     ok = meck:new(config, [passthrough]),
@@ -342,12 +342,15 @@ handle_size_value_limits(Db) ->
 
     {ok, Out} = run_query(Db, DDoc, ?MAP_FUN2),
 
-    ?assertEqual([
-        row(<<"1">>, 2, 2),
-        row(<<"2">>, 3, 3),
-        row(<<"1">>, 22, 2),
-        row(<<"2">>, 23, 3)
-    ], Out),
+    ?assertEqual(
+        [
+            row(<<"1">>, 2, 2),
+            row(<<"2">>, 3, 3),
+            row(<<"1">>, 22, 2),
+            row(<<"2">>, 23, 3)
+        ],
+        Out
+    ),
 
     {ok, Doc} = fabric2_db:open_doc(Db, <<"1">>),
     Doc2 = Doc#doc{
@@ -357,11 +360,13 @@ handle_size_value_limits(Db) ->
 
     {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN2),
 
-    ?assertEqual([
-        row(<<"2">>, 3, 3),
-        row(<<"2">>, 23, 3)
-    ], Out1).
-
+    ?assertEqual(
+        [
+            row(<<"2">>, 3, 3),
+            row(<<"2">>, 23, 3)
+        ],
+        Out1
+    ).
 
 index_autoupdater_callback(Db) ->
     DDoc = create_ddoc(),
@@ -375,9 +380,10 @@ index_autoupdater_callback(Db) ->
     ?assertMatch([{ok, <<_/binary>>}], Result),
     [{ok, JobId}] = Result,
 
-    ?assertMatch({ok, {_, _}},
-        couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, DbSeq)).
-
+    ?assertMatch(
+        {ok, {_, _}},
+        couch_views_jobs:wait_for_job(JobId, DDoc#doc.id, DbSeq)
+    ).
 
 multiple_design_docs(Db) ->
     Cleanup = fun() ->
@@ -427,7 +433,6 @@ multiple_design_docs(Db) ->
     % After the last ddoc is deleted we should get an error
     ?assertError({ddoc_deleted, _}, run_query(Db, DDoc2, ?MAP_FUN1)).
 
-
 multiple_doc_update_with_existing_rows(Db) ->
     DDoc = create_ddoc(),
     Doc0 = doc(0),
@@ -448,11 +453,13 @@ multiple_doc_update_with_existing_rows(Db) ->
 
     {ok, Out2} = run_query(Db, DDoc, ?MAP_FUN1),
 
-    ?assertEqual([
-        row(<<"0">>, 0, 0),
-        row(<<"1">>, 2, 2)
-    ], Out2).
-
+    ?assertEqual(
+        [
+            row(<<"0">>, 0, 0),
+            row(<<"1">>, 2, 2)
+        ],
+        Out2
+    ).
 
 handle_db_recreated_when_running(Db) ->
     DbName = fabric2_db:name(Db),
@@ -482,12 +489,15 @@ handle_db_recreated_when_running(Db) ->
 
     Indexer ! continue,
 
-    ?assertMatch({
-        ?INDEX_JOB_TYPE,
-        JobId,
-        finished,
-        #{<<"error">> := <<"db_deleted">>}
-    }, couch_jobs:wait(SubId, infinity)),
+    ?assertMatch(
+        {
+            ?INDEX_JOB_TYPE,
+            JobId,
+            finished,
+            #{<<"error">> := <<"db_deleted">>}
+        },
+        couch_jobs:wait(SubId, infinity)
+    ),
 
     {ok, _} = fabric2_db:update_doc(Db1, DDoc, []),
     {ok, _} = fabric2_db:update_doc(Db1, doc(2), []),
@@ -496,11 +506,13 @@ handle_db_recreated_when_running(Db) ->
     reset_intercept_job_update(Indexer),
 
     {ok, Out2} = run_query(Db1, DDoc, ?MAP_FUN1),
-    ?assertEqual([
-        row(<<"2">>, 2, 2),
-        row(<<"3">>, 3, 3)
-    ], Out2).
-
+    ?assertEqual(
+        [
+            row(<<"2">>, 2, 2),
+            row(<<"3">>, 3, 3)
+        ],
+        Out2
+    ).
 
 handle_db_recreated_after_finished(Db) ->
     DbName = fabric2_db:name(Db),
@@ -511,10 +523,13 @@ handle_db_recreated_after_finished(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, doc(1), []),
 
     {ok, Out1} = run_query(Db, DDoc, ?MAP_FUN1),
-    ?assertEqual([
-        row(<<"0">>, 0, 0),
-        row(<<"1">>, 1, 1)
-    ], Out1),
+    ?assertEqual(
+        [
+            row(<<"0">>, 0, 0),
+            row(<<"1">>, 1, 1)
+        ],
+        Out1
+    ),
 
     ok = fabric2_db:delete(DbName, []),
 
@@ -529,11 +544,13 @@ handle_db_recreated_after_finished(Db) ->
     ?assertError(database_does_not_exist, run_query(Db, DDoc, ?MAP_FUN1)),
 
     {ok, Out2} = run_query(Db1, DDoc, ?MAP_FUN1),
-    ?assertEqual([
-        row(<<"2">>, 2, 2),
-        row(<<"3">>, 3, 3)
-    ], Out2).
-
+    ?assertEqual(
+        [
+            row(<<"2">>, 2, 2),
+            row(<<"3">>, 3, 3)
+        ],
+        Out2
+    ).
 
 handle_doc_updated_when_running(Db) ->
     DDoc = create_ddoc(),
@@ -557,7 +574,7 @@ handle_doc_updated_when_running(Db) ->
     {ok, SubId, running, _} = couch_jobs:subscribe(?INDEX_JOB_TYPE, JobId),
 
     {ok, Doc} = fabric2_db:open_doc(Db, <<"1">>),
-    Doc2 = Doc#doc {
+    Doc2 = Doc#doc{
         body = {[{<<"val">>, 2}]}
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc2),
@@ -565,20 +582,31 @@ handle_doc_updated_when_running(Db) ->
     reset_intercept_job_update(Indexer),
     Indexer ! continue,
 
-    ?assertMatch({
-        ?INDEX_JOB_TYPE,
-        JobId,
-        finished,
-        #{<<"active_task_info">> := #{<<"changes_done">> := 1}}
-    }, couch_jobs:wait(SubId, finished, infinity)),
+    ?assertMatch(
+        {
+            ?INDEX_JOB_TYPE,
+            JobId,
+            finished,
+            #{<<"active_task_info">> := #{<<"changes_done">> := 1}}
+        },
+        couch_jobs:wait(SubId, finished, infinity)
+    ),
 
     Args = #mrargs{update = false},
-    {ok, Out2} = couch_views:query(Db, DDoc, ?MAP_FUN1, fun fold_fun/2, [],
-        Args),
-    ?assertEqual([
-        row(<<"0">>, 0, 0)
-    ], Out2).
-
+    {ok, Out2} = couch_views:query(
+        Db,
+        DDoc,
+        ?MAP_FUN1,
+        fun fold_fun/2,
+        [],
+        Args
+    ),
+    ?assertEqual(
+        [
+            row(<<"0">>, 0, 0)
+        ],
+        Out2
+    ).
 
 index_can_recover_from_crash(Db) ->
     ok = meck:new(config, [passthrough]),
@@ -608,29 +636,36 @@ index_can_recover_from_crash(Db) ->
     {ok, _} = fabric2_db:update_docs(Db, Docs, []),
 
     {ok, Out} = run_query(Db, DDoc, ?MAP_FUN1),
-    ?assertEqual([
-        row(<<"1">>, 1, 1),
-        row(<<"2">>, 2, 2),
-        row(<<"3">>, 3, 3)
-    ], Out).
-
+    ?assertEqual(
+        [
+            row(<<"1">>, 1, 1),
+            row(<<"2">>, 2, 2),
+            row(<<"3">>, 3, 3)
+        ],
+        Out
+    ).
 
 handle_acquire_map_context_error(_) ->
     meck:new(mock_language_server, [non_strict]),
-    config:set("couch_eval.languages", ?QUERY_SERVER_LANG_STRING,
-        atom_to_list(mock_language_server)),
+    config:set(
+        "couch_eval.languages",
+        ?QUERY_SERVER_LANG_STRING,
+        atom_to_list(mock_language_server)
+    ),
     meck:expect(mock_language_server, acquire_map_context, fun(_) ->
         {error, foo_error}
     end),
-    ?assertError(foo_error, couch_views_indexer:start_query_server(#mrst{
-        db_name = "DbName",
-        idx_name = "DDocId",
-        language = ?QUERY_SERVER_LANG_BINARY,
-        sig = "Sig",
-        lib = "Lib",
-        views = []
-    })).
-
+    ?assertError(
+        foo_error,
+        couch_views_indexer:start_query_server(#mrst{
+            db_name = "DbName",
+            idx_name = "DDocId",
+            language = ?QUERY_SERVER_LANG_BINARY,
+            sig = "Sig",
+            lib = "Lib",
+            views = []
+        })
+    ).
 
 row(Id, Key, Value) ->
     {row, [
@@ -639,7 +674,6 @@ row(Id, Key, Value) ->
         {value, Value}
     ]}.
 
-
 fold_fun({meta, _Meta}, Acc) ->
     {ok, Acc};
 fold_fun({row, _} = Row, Acc) ->
@@ -647,114 +681,132 @@ fold_fun({row, _} = Row, Acc) ->
 fold_fun(complete, Acc) ->
     {ok, lists:reverse(Acc)}.
 
-
 create_ddoc() ->
     create_ddoc(simple).
-
 
 create_ddoc(Type) ->
     create_ddoc(Type, <<"_design/bar">>).
 
-
 create_ddoc(simple, DocId) when is_binary(DocId) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, DocId},
-        {<<"views">>, {[
-            {?MAP_FUN1, {[
-                {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
-            ]}},
-            {?MAP_FUN2, {[
-                {<<"map">>, <<"function(doc) {}">>}
-            ]}}
-        ]}}
-    ]});
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DocId},
+            {<<"views">>,
+                {[
+                    {?MAP_FUN1,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
+                        ]}},
+                    {?MAP_FUN2,
+                        {[
+                            {<<"map">>, <<"function(doc) {}">>}
+                        ]}}
+                ]}}
+        ]}
+    );
 create_ddoc(multi_emit_different, DocId) when is_binary(DocId) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, DocId},
-        {<<"views">>, {[
-            {?MAP_FUN1, {[
-                {<<"map">>, <<"function(doc) { "
-                    "emit(doc._id, doc._id); "
-                    "emit(doc.val, doc.val); "
-                "}">>}
-            ]}},
-            {?MAP_FUN2, {[
-                {<<"map">>, <<"function(doc) {}">>}
-            ]}}
-        ]}}
-    ]});
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DocId},
+            {<<"views">>,
+                {[
+                    {?MAP_FUN1,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) { "
+                                "emit(doc._id, doc._id); "
+                                "emit(doc.val, doc.val); "
+                                "}"
+                            >>}
+                        ]}},
+                    {?MAP_FUN2,
+                        {[
+                            {<<"map">>, <<"function(doc) {}">>}
+                        ]}}
+                ]}}
+        ]}
+    );
 create_ddoc(multi_emit_same, DocId) when is_binary(DocId) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, DocId},
-        {<<"views">>, {[
-            {?MAP_FUN1, {[
-                {<<"map">>, <<"function(doc) { "
-                    "emit(doc.val, doc.val * 2); "
-                    "emit(doc.val, doc.val); "
-                    "if(doc.extra) {"
-                    "  emit(doc.val, doc.extra);"
-                    "}"
-                "}">>}
-            ]}},
-            {?MAP_FUN2, {[
-                {<<"map">>, <<"function(doc) {}">>}
-            ]}}
-        ]}}
-    ]});
-
-create_ddoc(multi_emit_key_limit, DocId) when is_binary(DocId)  ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, DocId},
-        {<<"views">>, {[
-            {?MAP_FUN1, {[
-                {<<"map">>, <<"function(doc) { "
-                    "if (doc.val === 1) { "
-                        "emit('a very long string to be limited', doc.val);"
-                    "} else {"
-                        "emit(doc.val, doc.val)"
-                    "}"
-                "}">>}
-            ]}},
-            {?MAP_FUN2, {[
-                {<<"map">>, <<"function(doc) { "
-                    "emit(doc.val + 20, doc.val);"
-                    "if (doc.val === 1) { "
-                        "emit(doc.val, 'a very long string to be limited');"
-                    "} else {"
-                        "emit(doc.val, doc.val)"
-                    "}"
-                "}">>}
-            ]}}
-        ]}}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DocId},
+            {<<"views">>,
+                {[
+                    {?MAP_FUN1,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) { "
+                                "emit(doc.val, doc.val * 2); "
+                                "emit(doc.val, doc.val); "
+                                "if(doc.extra) {"
+                                "  emit(doc.val, doc.extra);"
+                                "}"
+                                "}"
+                            >>}
+                        ]}},
+                    {?MAP_FUN2,
+                        {[
+                            {<<"map">>, <<"function(doc) {}">>}
+                        ]}}
+                ]}}
+        ]}
+    );
+create_ddoc(multi_emit_key_limit, DocId) when is_binary(DocId) ->
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DocId},
+            {<<"views">>,
+                {[
+                    {?MAP_FUN1,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) { "
+                                "if (doc.val === 1) { "
+                                "emit('a very long string to be limited', doc.val);"
+                                "} else {"
+                                "emit(doc.val, doc.val)"
+                                "}"
+                                "}"
+                            >>}
+                        ]}},
+                    {?MAP_FUN2,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) { "
+                                "emit(doc.val + 20, doc.val);"
+                                "if (doc.val === 1) { "
+                                "emit(doc.val, 'a very long string to be limited');"
+                                "} else {"
+                                "emit(doc.val, doc.val)"
+                                "}"
+                                "}"
+                            >>}
+                        ]}}
+                ]}}
+        ]}
+    ).
 
 make_docs(Count) ->
     [doc(I) || I <- lists:seq(1, Count)].
 
-
 doc(Id) ->
     doc(Id, Id).
 
-
 doc(Id, Val) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, list_to_binary(integer_to_list(Id))},
-        {<<"val">>, Val}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, list_to_binary(integer_to_list(Id))},
+            {<<"val">>, Val}
+        ]}
+    ).
 
 run_query(#{} = Db, DDoc, <<_/binary>> = View) ->
     couch_views:query(Db, DDoc, View, fun fold_fun/2, [], #mrargs{}).
-
 
 get_job_id(#{} = Db, DDoc) ->
     DbName = fabric2_db:name(Db),
     {ok, Mrst} = couch_views_util:ddoc_to_mrst(DbName, DDoc),
     couch_views_jobs:job_id(Db, Mrst).
-
 
 wait_job_finished(JobId, Timeout) ->
     case couch_jobs:subscribe(?INDEX_JOB_TYPE, JobId) of
@@ -767,22 +819,21 @@ wait_job_finished(JobId, Timeout) ->
             ok
     end.
 
-
 meck_intercept_job_update(ParentPid) ->
     meck:new(couch_jobs, [passthrough]),
     meck:expect(couch_jobs, update, fun(Db, Job, Data) ->
         ParentPid ! {self(), Job, Data},
-        receive continue -> ok end,
+        receive
+            continue -> ok
+        end,
         meck:passthrough([Db, Job, Data])
     end).
-
 
 reset_intercept_job_update(IndexerPid) ->
     meck:expect(couch_jobs, update, fun(Db, Job, Data) ->
         meck:passthrough([Db, Job, Data])
     end),
     IndexerPid ! continue.
-
 
 wait_indexer_update(Timeout) ->
     receive

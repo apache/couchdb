@@ -15,9 +15,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("ctrace/src/ctrace.hrl").
 
-
 -define(TDEF(A), {atom_to_list(A), fun A/0}).
-
 
 ctrace_config_test_() ->
     {
@@ -47,7 +45,6 @@ ctrace_config_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([ctrace]),
 
@@ -62,11 +59,9 @@ setup() ->
 
     {MainReporter, Ctx}.
 
-
 cleanup({MainReporter, Ctx}) ->
     passage_tracer_registry:set_reporter(?MAIN_TRACER, MainReporter),
     test_util:stop_couch(Ctx).
-
 
 is_enabled_cached() ->
     erase(?IS_ENABLED_KEY),
@@ -80,7 +75,6 @@ is_enabled_cached() ->
 
     % Revert to original to not mess with other tests
     put(?IS_ENABLED_KEY, Result).
-
 
 simple_with_span() ->
     set_self_reporter(),
@@ -96,17 +90,18 @@ simple_with_span() ->
             ?assertEqual(zing, passage_span:get_operation_name(Span))
     end.
 
-
 with_span_exception() ->
     set_self_reporter(),
 
-    Result = try
-        ctrace:with_span(zab, fun() ->
-            throw(foo)
-        end)
-    catch T:R ->
-        {T, R}
-    end,
+    Result =
+        try
+            ctrace:with_span(zab, fun() ->
+                throw(foo)
+            end)
+        catch
+            T:R ->
+                {T, R}
+        end,
 
     ?assertEqual({throw, foo}, Result),
 
@@ -115,17 +110,19 @@ with_span_exception() ->
             ?assertEqual(zab, passage_span:get_operation_name(Span)),
             ?assertMatch(
                 [
-                    {#{
-                        'error.kind' := throw,
-                        event := error,
-                        message := foo,
-                        stack := [_ | _]
-                    }, _TimeStamp}
+                    {
+                        #{
+                            'error.kind' := throw,
+                            event := error,
+                            message := foo,
+                            stack := [_ | _]
+                        },
+                        _TimeStamp
+                    }
                 ],
                 passage_span:get_logs(Span)
             )
     end.
-
 
 simple_start_finish_span() ->
     set_self_reporter(),
@@ -137,7 +134,6 @@ simple_start_finish_span() ->
         {span, Span} ->
             ?assertEqual(foo, passage_span:get_operation_name(Span))
     end.
-
 
 op_name_from_fun() ->
     set_self_reporter(),
@@ -151,7 +147,6 @@ op_name_from_fun() ->
             ?assertEqual('ctrace:match/2', OpName)
     end.
 
-
 skipped_when_disabled() ->
     set_self_reporter(),
 
@@ -160,7 +155,9 @@ skipped_when_disabled() ->
     ?assert(ctrace:has_span()),
     ctrace:finish_span(),
     ?assert(not ctrace:has_span()),
-    receive {span, _Span} -> ok end,
+    receive
+        {span, _Span} -> ok
+    end,
 
     IsEnabled = get(?IS_ENABLED_KEY),
     try
@@ -175,7 +172,6 @@ skipped_when_disabled() ->
         put(?IS_ENABLED_KEY, IsEnabled)
     end.
 
-
 set_tags_on_start_span() ->
     set_self_reporter(),
 
@@ -188,7 +184,6 @@ set_tags_on_start_span() ->
             ?assertEqual(bang, passage_span:get_operation_name(Span)),
             ?assertEqual(#{foo => bar}, passage_span:get_tags(Span))
     end.
-
 
 set_time_on_start_span() ->
     set_self_reporter(),
@@ -203,7 +198,6 @@ set_time_on_start_span() ->
             ?assertEqual(Time, passage_span:get_start_time(Span))
     end.
 
-
 skip_on_filtered() ->
     set_self_reporter(),
 
@@ -215,7 +209,6 @@ skip_on_filtered() ->
     ?assert(not ctrace:has_span()),
     ctrace:finish_span(),
     ?assert(not ctrace:has_span()).
-
 
 include_or_skip_on_sampled() ->
     set_self_reporter(),
@@ -252,16 +245,18 @@ include_or_skip_on_sampled() ->
     ctrace:finish_span(),
     ?assert(not ctrace:has_span()),
 
-    if not IsSampled -> ok; true ->
-        receive
-            {span, Span2} ->
-                ?assertEqual(
+    if
+        not IsSampled ->
+            ok;
+        true ->
+            receive
+                {span, Span2} ->
+                    ?assertEqual(
                         sample,
                         passage_span:get_operation_name(Span2)
                     )
-        end
+            end
     end.
-
 
 simple_child_span() ->
     set_self_reporter(),
@@ -281,7 +276,6 @@ simple_child_span() ->
             ?assertEqual(parent, passage_span:get_operation_name(PSpan))
     end.
 
-
 update_tags() ->
     set_self_reporter(),
 
@@ -292,11 +286,10 @@ update_tags() ->
     receive
         {span, Span} ->
             ?assertEqual(
-                    #{foo => bar, bango => bongo},
-                    passage_span:get_tags(Span)
-                )
+                #{foo => bar, bango => bongo},
+                passage_span:get_tags(Span)
+            )
     end.
-
 
 update_logs() ->
     set_self_reporter(),
@@ -308,9 +301,9 @@ update_logs() ->
     receive
         {span, Span1} ->
             ?assertMatch(
-                    [{#{foo := bar}, _TimeStamp}],
-                    passage_span:get_logs(Span1)
-                )
+                [{#{foo := bar}, _TimeStamp}],
+                passage_span:get_logs(Span1)
+            )
     end,
 
     ctrace:start_span(foo),
@@ -322,11 +315,10 @@ update_logs() ->
     receive
         {span, Span2} ->
             ?assertMatch(
-                    [{#{foo := baz}, _TimeStamp}],
-                    passage_span:get_logs(Span2)
-                )
+                [{#{foo := baz}, _TimeStamp}],
+                passage_span:get_logs(Span2)
+            )
     end.
-
 
 current_span_getters() ->
     ?assertEqual(false, ctrace:has_span()),
@@ -363,7 +355,6 @@ current_span_getters() ->
             ?assertEqual(parent, passage_span:get_operation_name(PSpan))
     end.
 
-
 create_external_span() ->
     Span1 = ctrace:external_span(1, 2, 3),
     Ctx1 = passage_span:get_context(Span1),
@@ -374,7 +365,6 @@ create_external_span() ->
     Ctx2 = passage_span:get_context(Span2),
     ?assertEqual(42, jaeger_passage_span_context:get_trace_id(Ctx2)),
     ?assert(is_integer(jaeger_passage_span_context:get_span_id(Ctx2))).
-
 
 use_external_span() ->
     Parent = ctrace:external_span(1, 2, 3),
@@ -392,21 +382,28 @@ use_external_span() ->
             ?assertEqual(1, TraceId)
     end.
 
-
 config_set(Section, Key, Value) ->
     PrevValue = config:get(Section, Key),
-    if Value == PrevValue -> ok; true ->
-        config:set(Section, Key, Value, false),
-        test_util:wait_other_value(fun() ->
-            config:get(Section, Key)
-        end, PrevValue)
+    if
+        Value == PrevValue ->
+            ok;
+        true ->
+            config:set(Section, Key, Value, false),
+            test_util:wait_other_value(
+                fun() ->
+                    config:get(Section, Key)
+                end,
+                PrevValue
+            )
     end.
-
 
 set_self_reporter() ->
     SelfReporter = passage_reporter_process:new(self(), span),
     passage_tracer_registry:set_reporter(?MAIN_TRACER, SelfReporter),
-    test_util:wait_value(fun() ->
-        {ok, Result} = passage_tracer_registry:get_reporter(?MAIN_TRACER),
-        Result
-    end, SelfReporter).
+    test_util:wait_value(
+        fun() ->
+            {ok, Result} = passage_tracer_registry:get_reporter(?MAIN_TRACER),
+            Result
+        end,
+        SelfReporter
+    ).

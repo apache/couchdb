@@ -18,10 +18,8 @@
 -include_lib("couch_views/include/couch_views.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 -define(MAP_FUN1, <<"map_fun1">>).
 -define(MAP_FUN2, <<"map_fun2">>).
-
 
 indexer_test_() ->
     {
@@ -50,32 +48,27 @@ indexer_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([
-            fabric,
-            couch_jobs,
-            couch_js,
-            couch_views
-        ]),
+        fabric,
+        couch_jobs,
+        couch_js,
+        couch_views
+    ]),
     Ctx.
-
 
 cleanup(Ctx) ->
     test_util:stop_couch(Ctx).
-
 
 foreach_setup() ->
     config:set("couch_views", "view_btree_node_size", "4", false),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     Db.
 
-
 foreach_teardown(Db) ->
     meck:unload(),
     config:delete("couch_views", "change_limit"),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
-
 
 empty_view(Db) ->
     DDoc = create_ddoc(),
@@ -83,7 +76,6 @@ empty_view(Db) ->
     {ok, _} = fabric2_db:update_doc(Db, DDoc, []),
     {ok, _} = run_query(Db, DDoc, ?MAP_FUN1),
     ?assertEqual(0, view_size(Db)).
-
 
 single_doc(Db) ->
     DDoc = create_ddoc(),
@@ -98,7 +90,6 @@ single_doc(Db) ->
     % Total: 1 + 1 = 2
     ?assertEqual(2, view_size(Db)).
 
-
 multiple_docs(Db) ->
     DDoc = create_ddoc(),
     Docs = [doc(I) || I <- lists:seq(0, 49)],
@@ -111,7 +102,6 @@ multiple_docs(Db) ->
     % Rows 10->49: 2 + 2 = 4
     % 10 * 2 + 40 * 4 = 180
     ?assertEqual(180, view_size(Db)).
-
 
 update_no_size_change(Db) ->
     DDoc = create_ddoc(),
@@ -134,7 +124,6 @@ update_no_size_change(Db) ->
     % 1 + 1 = 2 so samesies
     ?assertEqual(2, view_size(Db)).
 
-
 update_increases_size(Db) ->
     DDoc = create_ddoc(),
     Doc1 = doc(0),
@@ -155,7 +144,6 @@ update_increases_size(Db) ->
     % Row became: key: 10, val: 10
     % 2 + 2 = 4
     ?assertEqual(4, view_size(Db)).
-
 
 update_decreases_size(Db) ->
     DDoc = create_ddoc(),
@@ -180,7 +168,6 @@ update_decreases_size(Db) ->
     % 1 + 1 = 2
     ?assertEqual(2, view_size(Db)).
 
-
 deleting_docs_decreases_size(Db) ->
     DDoc = create_ddoc(),
     Doc1 = doc(0),
@@ -201,7 +188,6 @@ deleting_docs_decreases_size(Db) ->
 
     ?assertEqual(0, view_size(Db)).
 
-
 multi_identical_keys_count_twice(Db) ->
     DDoc = create_ddoc(multi_emit_same),
     Doc = doc(0),
@@ -212,7 +198,6 @@ multi_identical_keys_count_twice(Db) ->
 
     % Two rows that are the same
     ?assertEqual(4, view_size(Db)).
-
 
 multiple_design_docs(Db) ->
     Cleanup = fun() ->
@@ -248,7 +233,6 @@ multiple_design_docs(Db) ->
     Cleanup(),
     ?assertEqual(0, view_size(Db)).
 
-
 multiple_identical_design_docs(Db) ->
     Cleanup = fun() ->
         fabric2_fdb:transactional(Db, fun(TxDb) ->
@@ -283,69 +267,74 @@ multiple_identical_design_docs(Db) ->
     Cleanup(),
     ?assertEqual(0, view_size(Db)).
 
-
 view_size(Db) ->
     {ok, Info} = fabric2_db:get_db_info(Db),
     {sizes, {Sizes}} = lists:keyfind(sizes, 1, Info),
     {<<"views">>, ViewSize} = lists:keyfind(<<"views">>, 1, Sizes),
     ViewSize.
 
-
 create_ddoc() ->
     create_ddoc(simple).
-
 
 create_ddoc(Type) ->
     create_ddoc(Type, <<"_design/bar">>).
 
-
 create_ddoc(simple, DocId) when is_binary(DocId) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, DocId},
-        {<<"views">>, {[
-            {?MAP_FUN1, {[
-                {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
-            ]}},
-            {?MAP_FUN2, {[
-                {<<"map">>, <<"function(doc) {}">>}
-            ]}}
-        ]}}
-    ]});
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DocId},
+            {<<"views">>,
+                {[
+                    {?MAP_FUN1,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
+                        ]}},
+                    {?MAP_FUN2,
+                        {[
+                            {<<"map">>, <<"function(doc) {}">>}
+                        ]}}
+                ]}}
+        ]}
+    );
 create_ddoc(multi_emit_same, DocId) when is_binary(DocId) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, DocId},
-        {<<"views">>, {[
-            {?MAP_FUN1, {[
-                {<<"map">>, <<"function(doc) { "
-                    "emit(doc.val, doc.val * 2); "
-                    "emit(doc.val, doc.val); "
-                    "if(doc.extra) {"
-                    "  emit(doc.val, doc.extra);"
-                    "}"
-                "}">>}
-            ]}},
-            {?MAP_FUN2, {[
-                {<<"map">>, <<"function(doc) {}">>}
-            ]}}
-        ]}}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DocId},
+            {<<"views">>,
+                {[
+                    {?MAP_FUN1,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) { "
+                                "emit(doc.val, doc.val * 2); "
+                                "emit(doc.val, doc.val); "
+                                "if(doc.extra) {"
+                                "  emit(doc.val, doc.extra);"
+                                "}"
+                                "}"
+                            >>}
+                        ]}},
+                    {?MAP_FUN2,
+                        {[
+                            {<<"map">>, <<"function(doc) {}">>}
+                        ]}}
+                ]}}
+        ]}
+    ).
 
 doc(Id) ->
     doc(Id, Id).
 
-
 doc(Id, Val) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, list_to_binary(integer_to_list(Id))},
-        {<<"val">>, Val}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, list_to_binary(integer_to_list(Id))},
+            {<<"val">>, Val}
+        ]}
+    ).
 
 run_query(#{} = Db, DDoc, <<_/binary>> = View) ->
     couch_views:query(Db, DDoc, View, fun fold_fun/2, [], #mrargs{}).
-
 
 fold_fun({meta, _Meta}, Acc) ->
     {ok, Acc};

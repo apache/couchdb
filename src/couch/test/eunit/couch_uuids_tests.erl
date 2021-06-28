@@ -16,16 +16,13 @@
 
 -define(TIMEOUT, 20).
 
-
 setup_all() ->
     test_util:start_applications([config]),
     couch_uuids:start().
 
-
 teardown_all(_) ->
     couch_uuids:stop(),
     test_util:stop_applications([config]).
-
 
 uuids_test_() ->
     {
@@ -40,11 +37,9 @@ uuids_test_() ->
         ]
     }.
 
-
 default_algorithm() ->
     config:delete("uuids", "algorithm", false),
     check_unique().
-
 
 sequential_algorithm() ->
     config:set("uuids", "algorithm", "sequential", false),
@@ -52,12 +47,10 @@ sequential_algorithm() ->
     check_increment_monotonically(),
     check_rollover().
 
-
 utc_algorithm() ->
     config:set("uuids", "algorithm", "utc_random", false),
     check_unique(),
     check_increment_monotonically().
-
 
 utc_id_suffix_algorithm() ->
     config:set("uuids", "algorithm", "utc_id", false),
@@ -66,15 +59,12 @@ utc_id_suffix_algorithm() ->
     check_increment_monotonically(),
     check_preserve_suffix().
 
-
 check_unique() ->
     %% this one may really runs for too long on slow hosts
     ?assert(test_unique(10000, [couch_uuids:new()])).
 
-
 check_increment_monotonically() ->
     ?assert(couch_uuids:new() < couch_uuids:new()).
-
 
 check_rollover() ->
     UUID = binary_to_list(couch_uuids:new()),
@@ -82,20 +72,17 @@ check_rollover() ->
     N = gen_until_pref_change(Prefix, 0),
     ?assert(N >= 5000 andalso N =< 11000).
 
-
 check_preserve_suffix() ->
     UUID = binary_to_list(couch_uuids:new()),
     Suffix = get_suffix(UUID),
     ?assert(test_same_suffix(10000, Suffix)).
-
 
 test_unique(0, _) ->
     true;
 test_unique(N, UUIDs) ->
     UUID = couch_uuids:new(),
     ?assertNot(lists:member(UUID, UUIDs)),
-    test_unique(N - 1, [UUID| UUIDs]).
-
+    test_unique(N - 1, [UUID | UUIDs]).
 
 gen_until_pref_change(_, Count) when Count > 8251 ->
     Count;
@@ -105,7 +92,6 @@ gen_until_pref_change(Prefix, N) ->
         _ -> N
     end.
 
-
 test_same_suffix(0, _) ->
     true;
 test_same_suffix(N, Suffix) ->
@@ -114,10 +100,8 @@ test_same_suffix(N, Suffix) ->
         _ -> false
     end.
 
-
 get_prefix(UUID) ->
     element(1, lists:split(26, binary_to_list(UUID))).
-
 
 get_suffix(UUID) when is_binary(UUID) ->
     get_suffix(binary_to_list(UUID));

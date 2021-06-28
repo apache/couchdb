@@ -12,10 +12,8 @@
 
 -module(fabric2_doc_size_tests).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
-
 
 % Doc body size calculations
 % ID: size(Doc#doc.id)
@@ -23,9 +21,7 @@
 % Deleted: 1 % (binary value is one byte)
 % Body: couch_ejson_size:external_size(Body) % Where empty is {} which is 2)
 
-
 -define(NUM_RANDOM_TESTS, 1000).
-
 
 -define(DOC_IDS, [
     {0, <<>>},
@@ -123,87 +119,108 @@
     {7, <<"1000000">>}
 ]).
 
-
 empty_doc_test() ->
     ?assertEqual(4, fabric2_util:rev_size(#doc{})).
 
-
 docid_size_test() ->
-    lists:foreach(fun({Size, DocId}) ->
-        ?assertEqual(4 + Size, fabric2_util:rev_size(#doc{id = DocId}))
-    end, ?DOC_IDS).
-
+    lists:foreach(
+        fun({Size, DocId}) ->
+            ?assertEqual(4 + Size, fabric2_util:rev_size(#doc{id = DocId}))
+        end,
+        ?DOC_IDS
+    ).
 
 rev_size_test() ->
-    lists:foreach(fun({StartSize, Start}) ->
-        lists:foreach(fun({RevSize, Rev}) ->
-            Doc = #doc{
-                revs = {Start, [Rev]}
-            },
-            ?assertEqual(3 + StartSize + RevSize, fabric2_util:rev_size(Doc))
-        end, ?REVS)
-    end, ?REV_STARTS).
-
+    lists:foreach(
+        fun({StartSize, Start}) ->
+            lists:foreach(
+                fun({RevSize, Rev}) ->
+                    Doc = #doc{
+                        revs = {Start, [Rev]}
+                    },
+                    ?assertEqual(3 + StartSize + RevSize, fabric2_util:rev_size(Doc))
+                end,
+                ?REVS
+            )
+        end,
+        ?REV_STARTS
+    ).
 
 deleted_size_test() ->
-    lists:foreach(fun({Size, Deleted}) ->
-        ?assertEqual(3 + Size, fabric2_util:rev_size(#doc{deleted = Deleted}))
-    end, ?DELETED).
-
+    lists:foreach(
+        fun({Size, Deleted}) ->
+            ?assertEqual(3 + Size, fabric2_util:rev_size(#doc{deleted = Deleted}))
+        end,
+        ?DELETED
+    ).
 
 body_size_test() ->
-    lists:foreach(fun({Size, Body}) ->
-        ?assertEqual(2 + Size, fabric2_util:rev_size(#doc{body = Body}))
-    end, ?BODIES).
-
+    lists:foreach(
+        fun({Size, Body}) ->
+            ?assertEqual(2 + Size, fabric2_util:rev_size(#doc{body = Body}))
+        end,
+        ?BODIES
+    ).
 
 att_names_test() ->
-    lists:foreach(fun({Size, AttName}) ->
-        Att = mk_att(AttName, <<>>, <<>>, false),
-        Doc = #doc{atts = [Att]},
-        ?assertEqual(4 + Size, fabric2_util:rev_size(Doc))
-    end, ?ATT_NAMES).
-
+    lists:foreach(
+        fun({Size, AttName}) ->
+            Att = mk_att(AttName, <<>>, <<>>, false),
+            Doc = #doc{atts = [Att]},
+            ?assertEqual(4 + Size, fabric2_util:rev_size(Doc))
+        end,
+        ?ATT_NAMES
+    ).
 
 att_types_test() ->
-    lists:foreach(fun({Size, AttType}) ->
-        Att = mk_att(<<"foo">>, AttType, <<>>, false),
-        Doc = #doc{atts = [Att]},
-        ?assertEqual(7 + Size, fabric2_util:rev_size(Doc))
-    end, ?ATT_TYPES).
-
+    lists:foreach(
+        fun({Size, AttType}) ->
+            Att = mk_att(<<"foo">>, AttType, <<>>, false),
+            Doc = #doc{atts = [Att]},
+            ?assertEqual(7 + Size, fabric2_util:rev_size(Doc))
+        end,
+        ?ATT_TYPES
+    ).
 
 att_bodies_test() ->
-    lists:foreach(fun({Size, AttBody}) ->
-        Att1 = mk_att(<<"foo">>, <<>>, AttBody, false),
-        Doc1 = #doc{atts = [Att1]},
-        ?assertEqual(7 + Size, fabric2_util:rev_size(Doc1)),
+    lists:foreach(
+        fun({Size, AttBody}) ->
+            Att1 = mk_att(<<"foo">>, <<>>, AttBody, false),
+            Doc1 = #doc{atts = [Att1]},
+            ?assertEqual(7 + Size, fabric2_util:rev_size(Doc1)),
 
-        Att2 = mk_att(<<"foo">>, <<>>, AttBody, true),
-        Doc2 = #doc{atts = [Att2]},
-        ?assertEqual(7 + 16 + Size, fabric2_util:rev_size(Doc2))
-    end, ?ATT_BODIES).
-
+            Att2 = mk_att(<<"foo">>, <<>>, AttBody, true),
+            Doc2 = #doc{atts = [Att2]},
+            ?assertEqual(7 + 16 + Size, fabric2_util:rev_size(Doc2))
+        end,
+        ?ATT_BODIES
+    ).
 
 local_doc_ids_test() ->
-    lists:foreach(fun({Size, LDocId}) ->
-        ?assertEqual(3 + Size, fabric2_util:ldoc_size(mk_ldoc(LDocId, 0)))
-    end, ?LDOC_IDS).
-
+    lists:foreach(
+        fun({Size, LDocId}) ->
+            ?assertEqual(3 + Size, fabric2_util:ldoc_size(mk_ldoc(LDocId, 0)))
+        end,
+        ?LDOC_IDS
+    ).
 
 local_doc_revs_test() ->
-    lists:foreach(fun({Size, Rev}) ->
-        Doc = mk_ldoc(<<"_local/foo">>, Rev),
-        ?assertEqual(12 + Size, fabric2_util:ldoc_size(Doc))
-    end, ?LDOC_REVS).
-
+    lists:foreach(
+        fun({Size, Rev}) ->
+            Doc = mk_ldoc(<<"_local/foo">>, Rev),
+            ?assertEqual(12 + Size, fabric2_util:ldoc_size(Doc))
+        end,
+        ?LDOC_REVS
+    ).
 
 local_doc_bodies_test() ->
-    lists:foreach(fun({Size, Body}) ->
-        Doc = mk_ldoc(<<"_local/foo">>, 0, Body),
-        ?assertEqual(11 + Size, fabric2_util:ldoc_size(Doc))
-    end, ?BODIES).
-
+    lists:foreach(
+        fun({Size, Body}) ->
+            Doc = mk_ldoc(<<"_local/foo">>, 0, Body),
+            ?assertEqual(11 + Size, fabric2_util:ldoc_size(Doc))
+        end,
+        ?BODIES
+    ).
 
 doc_combinatorics_test() ->
     Elements = [
@@ -213,23 +230,23 @@ doc_combinatorics_test() ->
             Doc#doc{revs = {RevStart, RevIds}}
         end},
         {?REVS, fun(Doc, Rev) ->
-           #doc{revs = {Start, _}} = Doc,
-           Doc#doc{revs = {Start, [Rev]}}
+            #doc{revs = {Start, _}} = Doc,
+            Doc#doc{revs = {Start, [Rev]}}
         end},
         {?DELETED, fun(Doc, Deleted) -> Doc#doc{deleted = Deleted} end},
         {?BODIES, fun(Doc, Body) -> Doc#doc{body = Body} end}
     ],
     doc_combine(Elements, 0, #doc{}).
 
-
 doc_combine([], TotalSize, Doc) ->
     ?assertEqual(TotalSize, fabric2_util:rev_size(Doc));
-
 doc_combine([{Elems, UpdateFun} | Rest], TotalSize, Doc) ->
-    lists:foreach(fun({Size, Elem}) ->
-        doc_combine(Rest, TotalSize + Size, UpdateFun(Doc, Elem))
-    end, Elems).
-
+    lists:foreach(
+        fun({Size, Elem}) ->
+            doc_combine(Rest, TotalSize + Size, UpdateFun(Doc, Elem))
+        end,
+        Elems
+    ).
 
 local_doc_combinatorics_test() ->
     Elements = [
@@ -239,46 +256,52 @@ local_doc_combinatorics_test() ->
     ],
     local_doc_combine(Elements, 0, #doc{}).
 
-
 local_doc_combine([], TotalSize, Doc) ->
     ?assertEqual(TotalSize, fabric2_util:ldoc_size(Doc));
-
 local_doc_combine([{Elems, UpdateFun} | Rest], TotalSize, Doc) ->
-    lists:foreach(fun({Size, Elem}) ->
-        local_doc_combine(Rest, TotalSize + Size, UpdateFun(Doc, Elem))
-    end, Elems).
-
+    lists:foreach(
+        fun({Size, Elem}) ->
+            local_doc_combine(Rest, TotalSize + Size, UpdateFun(Doc, Elem))
+        end,
+        Elems
+    ).
 
 random_docs_test() ->
-    lists:foreach(fun(_) ->
-        {DocIdSize, DocId} = choose(?DOC_IDS),
-        {RevStartSize, RevStart} = choose(?REV_STARTS),
-        {RevSize, Rev} = choose(?REVS),
-        {DeletedSize, Deleted} = choose(?DELETED),
-        {BodySize, Body} = choose(?BODIES),
-        NumAtts = choose([0, 1, 2, 5]),
-        {Atts, AttSize} = lists:mapfoldl(fun(_, Acc) ->
-            {S, A} = random_att(),
-            {A, Acc + S}
-        end, 0, lists:seq(1, NumAtts)),
-        Doc = #doc{
-            id = DocId,
-            revs = {RevStart, [Rev]},
-            deleted = Deleted,
-            body = Body,
-            atts = Atts
-        },
-        Expect = lists:sum([
-            DocIdSize,
-            RevStartSize,
-            RevSize,
-            DeletedSize,
-            BodySize,
-            AttSize
-        ]),
-        ?assertEqual(Expect, fabric2_util:rev_size(Doc))
-    end, lists:seq(1, ?NUM_RANDOM_TESTS)).
-
+    lists:foreach(
+        fun(_) ->
+            {DocIdSize, DocId} = choose(?DOC_IDS),
+            {RevStartSize, RevStart} = choose(?REV_STARTS),
+            {RevSize, Rev} = choose(?REVS),
+            {DeletedSize, Deleted} = choose(?DELETED),
+            {BodySize, Body} = choose(?BODIES),
+            NumAtts = choose([0, 1, 2, 5]),
+            {Atts, AttSize} = lists:mapfoldl(
+                fun(_, Acc) ->
+                    {S, A} = random_att(),
+                    {A, Acc + S}
+                end,
+                0,
+                lists:seq(1, NumAtts)
+            ),
+            Doc = #doc{
+                id = DocId,
+                revs = {RevStart, [Rev]},
+                deleted = Deleted,
+                body = Body,
+                atts = Atts
+            },
+            Expect = lists:sum([
+                DocIdSize,
+                RevStartSize,
+                RevSize,
+                DeletedSize,
+                BodySize,
+                AttSize
+            ]),
+            ?assertEqual(Expect, fabric2_util:rev_size(Doc))
+        end,
+        lists:seq(1, ?NUM_RANDOM_TESTS)
+    ).
 
 random_att() ->
     {NameSize, Name} = choose(?ATT_NAMES),
@@ -288,11 +311,12 @@ random_att() ->
     AttSize = lists:sum([NameSize, TypeSize, BodySize, Md5Size]),
     {AttSize, mk_att(Name, Type, Body, AddMd5)}.
 
-
 mk_att(Name, Type, Data, AddMd5) ->
-    Md5 = if not AddMd5 -> <<>>; true ->
-        erlang:md5(Data)
-    end,
+    Md5 =
+        if
+            not AddMd5 -> <<>>;
+            true -> erlang:md5(Data)
+        end,
     couch_att:new([
         {name, Name},
         {type, Type},
@@ -302,10 +326,8 @@ mk_att(Name, Type, Data, AddMd5) ->
         {md5, Md5}
     ]).
 
-
 mk_ldoc(DocId, Rev) ->
     mk_ldoc(DocId, Rev, {[]}).
-
 
 mk_ldoc(DocId, Rev, Body) ->
     #doc{
@@ -313,7 +335,6 @@ mk_ldoc(DocId, Rev, Body) ->
         revs = {0, [Rev]},
         body = Body
     }.
-
 
 choose(Options) ->
     Pos = rand:uniform(length(Options)),

@@ -12,7 +12,6 @@
 
 -module(couch_replicator_filtered_tests).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
@@ -22,33 +21,35 @@
 -define(DDOC, #{
     <<"_id">> => ?DDOC_ID,
     <<"filters">> => #{
-        <<"testfilter">> => <<"
-            function(doc, req){if (doc.class == 'mammal') return true;}
-        ">>,
-        <<"queryfilter">> => <<"
-            function(doc, req) {
-                if (doc.class && req.query.starts) {
-                    return doc.class.indexOf(req.query.starts) === 0;
-                }
-                else {
-                    return false;
-                }
-            }
-        ">>
+        <<"testfilter">> =>
+            <<"\n"
+            "            function(doc, req){if (doc.class == 'mammal') return true;}\n"
+            "        ">>,
+        <<"queryfilter">> =>
+            <<"\n"
+            "            function(doc, req) {\n"
+            "                if (doc.class && req.query.starts) {\n"
+            "                    return doc.class.indexOf(req.query.starts) === 0;\n"
+            "                }\n"
+            "                else {\n"
+            "                    return false;\n"
+            "                }\n"
+            "            }\n"
+            "        ">>
     },
     <<"views">> => #{
         <<"mammals">> => #{
-            <<"map">> => <<"
-                function(doc) {
-                    if (doc.class == 'mammal') {
-                        emit(doc._id, null);
-                    }
-                }
-            ">>
+            <<"map">> =>
+                <<"\n"
+                "                function(doc) {\n"
+                "                    if (doc.class == 'mammal') {\n"
+                "                        emit(doc._id, null);\n"
+                "                    }\n"
+                "                }\n"
+                "            ">>
         }
     }
 }).
-
 
 filtered_replication_test_() ->
     {
@@ -71,7 +72,6 @@ filtered_replication_test_() ->
         }
     }.
 
-
 setup() ->
     Source = couch_replicator_test_helper:create_db(),
     create_docs(Source),
@@ -80,7 +80,6 @@ setup() ->
     config:set("replicator", "interval_sec", "1", false),
     {Source, Target}.
 
-
 teardown({Source, Target}) ->
     config:delete("replicator", "stats_update_interval_sec", false),
     config:delete("replicator", "checkpoint_interval", false),
@@ -88,13 +87,13 @@ teardown({Source, Target}) ->
     couch_replicator_test_helper:delete_db(Source),
     couch_replicator_test_helper:delete_db(Target).
 
-
 filtered_replication_test({Source, Target}) ->
-    RepObject = {[
-        {<<"source">>, Source},
-        {<<"target">>, Target},
-        {<<"filter">>, <<"filter_ddoc/testfilter">>}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, Source},
+            {<<"target">>, Target},
+            {<<"filter">>, <<"filter_ddoc/testfilter">>}
+        ]},
     {ok, _} = couch_replicator_test_helper:replicate(RepObject),
     FilterFun = fun(_DocId, {Props}) ->
         couch_util:get_value(<<"class">>, Props) == <<"mammal">>
@@ -104,16 +103,17 @@ filtered_replication_test({Source, Target}) ->
     ?assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo)),
     ?assert(lists:all(fun(Valid) -> Valid end, AllReplies)).
 
-
 query_filtered_replication_test({Source, Target}) ->
-    RepObject = {[
-        {<<"source">>, Source},
-        {<<"target">>, Target},
-        {<<"filter">>, <<"filter_ddoc/queryfilter">>},
-        {<<"query_params">>, {[
-            {<<"starts">>, <<"a">>}
-        ]}}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, Source},
+            {<<"target">>, Target},
+            {<<"filter">>, <<"filter_ddoc/queryfilter">>},
+            {<<"query_params">>,
+                {[
+                    {<<"starts">>, <<"a">>}
+                ]}}
+        ]},
     {ok, _} = couch_replicator_test_helper:replicate(RepObject),
     FilterFun = fun(_DocId, {Props}) ->
         case couch_util:get_value(<<"class">>, Props) of
@@ -126,16 +126,17 @@ query_filtered_replication_test({Source, Target}) ->
     ?assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo)),
     ?assert(lists:all(fun(Valid) -> Valid end, AllReplies)).
 
-
 view_filtered_replication_test({Source, Target}) ->
-    RepObject = {[
-        {<<"source">>, Source},
-        {<<"target">>, Target},
-        {<<"filter">>, <<"_view">>},
-        {<<"query_params">>, {[
-            {<<"view">>, <<"filter_ddoc/mammals">>}
-        ]}}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, Source},
+            {<<"target">>, Target},
+            {<<"filter">>, <<"_view">>},
+            {<<"query_params">>,
+                {[
+                    {<<"view">>, <<"filter_ddoc/mammals">>}
+                ]}}
+        ]},
     {ok, _} = couch_replicator_test_helper:replicate(RepObject),
     FilterFun = fun(_DocId, {Props}) ->
         couch_util:get_value(<<"class">>, Props) == <<"mammal">>
@@ -145,21 +146,23 @@ view_filtered_replication_test({Source, Target}) ->
     ?assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo)),
     ?assert(lists:all(fun(Valid) -> Valid end, AllReplies)).
 
-
 replication_id_changes_if_filter_changes({Source, Target}) ->
     config:set("replicator", "checkpoint_interval", "500", false),
-    Rep = {[
-        {<<"source">>, Source},
-        {<<"target">>, Target},
-        {<<"filter">>, <<"filter_ddoc/testfilter">>},
-        {<<"continuous">>, true}
-    ]},
+    Rep =
+        {[
+            {<<"source">>, Source},
+            {<<"target">>, Target},
+            {<<"filter">>, <<"filter_ddoc/testfilter">>},
+            {<<"continuous">>, true}
+        ]},
     {ok, _, RepId1} = couch_replicator_test_helper:replicate_continuous(Rep),
 
     wait_scheduler_docs_written(1),
 
-    ?assertMatch([#{<<"id">> := RepId1}],
-        couch_replicator_test_helper:scheduler_jobs()),
+    ?assertMatch(
+        [#{<<"id">> := RepId1}],
+        couch_replicator_test_helper:scheduler_jobs()
+    ),
 
     FilterFun1 = fun(_, {Props}) ->
         couch_util:get_value(<<"class">>, Props) == <<"mammal">>
@@ -171,11 +174,15 @@ replication_id_changes_if_filter_changes({Source, Target}) ->
     {ok, SourceDb} = fabric2_db:open(Source, [?ADMIN_CTX]),
     {ok, DDoc1} = fabric2_db:open_doc(SourceDb, ?DDOC_ID),
     Flt = <<"function(doc, req) {if (doc.class == 'reptiles') return true};">>,
-    DDoc2 = DDoc1#doc{body = {[
-        {<<"filters">>, {[
-            {<<"testfilter">>, Flt}
-        ]}}
-    ]}},
+    DDoc2 = DDoc1#doc{
+        body =
+            {[
+                {<<"filters">>,
+                    {[
+                        {<<"testfilter">>, Flt}
+                    ]}}
+            ]}
+    },
     {ok, {_, _}} = fabric2_db:update_doc(SourceDb, DDoc2),
     Info = wait_scheduler_repid_change(RepId1),
 
@@ -194,7 +201,6 @@ replication_id_changes_if_filter_changes({Source, Target}) ->
 
     couch_replicator_test_helper:cancel(RepId2).
 
-
 compare_dbs(Source, Target, FilterFun) ->
     {ok, TargetDb} = fabric2_db:open(Target, [?ADMIN_CTX]),
     {ok, TargetDbInfo} = fabric2_db:get_db_info(TargetDb),
@@ -206,7 +212,6 @@ compare_dbs(Source, Target, FilterFun) ->
     end,
     Res = couch_replicator_test_helper:compare_fold(Source, Target, Fun, []),
     {ok, TargetDbInfo, Res}.
-
 
 create_docs(DbName) ->
     couch_replicator_test_helper:create_docs(DbName, [
@@ -233,33 +238,39 @@ create_docs(DbName) ->
         }
     ]).
 
-
 wait_scheduler_docs_written(DocsWritten) ->
-    test_util:wait(fun() ->
-        case couch_replicator_test_helper:scheduler_jobs() of
-            [] ->
-                wait;
-            [#{<<"info">> := null}] ->
-                wait;
-            [#{<<"info">> := Info}] ->
-                case Info of
-                    #{<<"docs_written">> := DocsWritten} -> Info;
-                    #{} -> wait
-                end
-        end
-    end, 10000, 250).
-
+    test_util:wait(
+        fun() ->
+            case couch_replicator_test_helper:scheduler_jobs() of
+                [] ->
+                    wait;
+                [#{<<"info">> := null}] ->
+                    wait;
+                [#{<<"info">> := Info}] ->
+                    case Info of
+                        #{<<"docs_written">> := DocsWritten} -> Info;
+                        #{} -> wait
+                    end
+            end
+        end,
+        10000,
+        250
+    ).
 
 wait_scheduler_repid_change(OldRepId) ->
-    test_util:wait(fun() ->
-        case couch_replicator_test_helper:scheduler_jobs() of
-            [] ->
-                wait;
-            [#{<<"id">> := OldRepId}] ->
-                wait;
-            [#{<<"id">> := null}] ->
-                wait;
-            [#{<<"id">> := NewId} = Info] when is_binary(NewId) ->
-                Info
-        end
-    end, 10000, 250).
+    test_util:wait(
+        fun() ->
+            case couch_replicator_test_helper:scheduler_jobs() of
+                [] ->
+                    wait;
+                [#{<<"id">> := OldRepId}] ->
+                    wait;
+                [#{<<"id">> := null}] ->
+                    wait;
+                [#{<<"id">> := NewId} = Info] when is_binary(NewId) ->
+                    Info
+            end
+        end,
+        10000,
+        250
+    ).

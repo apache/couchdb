@@ -22,11 +22,13 @@ val_encoding_test() ->
         <<"a">>,
         {[{<<"a">>, 1.0}, {<<"b">>, <<"hello">>}]}
     ],
-    lists:foreach(fun (Val) ->
-        EncVal = couch_views_encoding:encode(Val),
-        ?assertEqual(Val, couch_views_encoding:decode(EncVal))
-    end, Values).
-
+    lists:foreach(
+        fun(Val) ->
+            EncVal = couch_views_encoding:encode(Val),
+            ?assertEqual(Val, couch_views_encoding:decode(EncVal))
+        end,
+        Values
+    ).
 
 setup() ->
     % Load the ICU driver for couch_util:get_sort_key/1
@@ -34,13 +36,11 @@ setup() ->
     {ok, DrvPid} = gen_server:start_link(couch_drv, [], []),
     {CfgPid, DrvPid}.
 
-
 teardown({CfgPid, DrvPid}) ->
     unlink(CfgPid),
     unlink(DrvPid),
     exit(CfgPid, kill),
     exit(DrvPid, kill).
-
 
 correct_ordering_test_() ->
     {
@@ -51,7 +51,6 @@ correct_ordering_test_() ->
             fun t_correct_ordering/0
         ]
     }.
-
 
 t_correct_ordering() ->
     ?_test(begin
@@ -97,19 +96,24 @@ t_correct_ordering() ->
             {[{<<"b">>, 2}, {<<"c">>, 2}]}
         ],
 
-        Encoded = lists:map(fun(Elem) ->
-            K = couch_views_encoding:encode(Elem, key),
-            V = couch_views_encoding:encode(Elem, value),
-            {K, V}
-        end, Ordered),
+        Encoded = lists:map(
+            fun(Elem) ->
+                K = couch_views_encoding:encode(Elem, key),
+                V = couch_views_encoding:encode(Elem, value),
+                {K, V}
+            end,
+            Ordered
+        ),
         Shuffled = shuffle(Encoded),
         Reordered = lists:sort(Shuffled),
 
-        lists:foreach(fun({Original, {_K, ViewEncoded}}) ->
-            ?assertEqual(Original, couch_views_encoding:decode(ViewEncoded))
-        end, lists:zip(Ordered, Reordered))
+        lists:foreach(
+            fun({Original, {_K, ViewEncoded}}) ->
+                ?assertEqual(Original, couch_views_encoding:decode(ViewEncoded))
+            end,
+            lists:zip(Ordered, Reordered)
+        )
     end).
-
 
 shuffle(List) when is_list(List) ->
     Tagged = [{rand:uniform(), Item} || Item <- List],

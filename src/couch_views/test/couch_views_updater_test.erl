@@ -18,7 +18,6 @@
 -include_lib("fabric/test/fabric2_test.hrl").
 -include_lib("mango/src/mango_idx.hrl").
 
-
 indexer_test_() ->
     {
         "Test indexing",
@@ -41,7 +40,6 @@ indexer_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([
         fabric,
@@ -52,10 +50,8 @@ setup() ->
     ]),
     Ctx.
 
-
 cleanup(Ctx) ->
     test_util:stop_couch(Ctx).
-
 
 foreach_setup() ->
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
@@ -71,20 +67,20 @@ foreach_setup() ->
     meck:new(couch_views_trees, [passthrough]),
     {Db, DDoc}.
 
-
 foreach_teardown({Db, _}) ->
     meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
 
-
 index_docs({Db, DDoc}) ->
     Docs = run_query(Db, DDoc),
-    ?assertEqual([
-        [{id, <<"1">>}, {value, 1}],
-        [{id, <<"2">>}, {value, 2}],
-        [{id, <<"3">>}, {value, 3}]
-    ], Docs).
-
+    ?assertEqual(
+        [
+            [{id, <<"1">>}, {value, 1}],
+            [{id, <<"2">>}, {value, 2}],
+            [{id, <<"3">>}, {value, 3}]
+        ],
+        Docs
+    ).
 
 update_doc({Db, DDoc}) ->
     {ok, Doc} = fabric2_db:open_doc(Db, <<"2">>),
@@ -94,12 +90,14 @@ update_doc({Db, DDoc}) ->
     fabric2_db:update_doc(Db, Doc2),
 
     Docs = run_query(Db, DDoc),
-    ?assertEqual([
-        [{id, <<"1">>}, {value, 1}],
-        [{id, <<"3">>}, {value, 3}],
-        [{id, <<"2">>}, {value, 4}]
-    ], Docs).
-
+    ?assertEqual(
+        [
+            [{id, <<"1">>}, {value, 1}],
+            [{id, <<"3">>}, {value, 3}],
+            [{id, <<"2">>}, {value, 4}]
+        ],
+        Docs
+    ).
 
 delete_doc({Db, DDoc}) ->
     {ok, Doc} = fabric2_db:open_doc(Db, <<"2">>),
@@ -109,11 +107,13 @@ delete_doc({Db, DDoc}) ->
     fabric2_db:update_doc(Db, Doc2),
 
     Docs = run_query(Db, DDoc),
-    ?assertEqual([
-        [{id, <<"1">>}, {value, 1}],
-        [{id, <<"3">>}, {value, 3}]
-    ], Docs).
-
+    ?assertEqual(
+        [
+            [{id, <<"1">>}, {value, 1}],
+            [{id, <<"3">>}, {value, 3}]
+        ],
+        Docs
+    ).
 
 includes_design_docs({Db, _}) ->
     DDoc = create_idx_include_ddocs(),
@@ -127,18 +127,19 @@ includes_design_docs({Db, _}) ->
     fabric2_db:update_docs(Db, [IndexDDoc]),
 
     Docs = run_query(Db, DDoc),
-    ?assertEqual([
-        [{id, <<"_design/ddoc_that_indexes_ddocs">>}, {value, 1}],
-        [{id, <<"_design/to_be_indexed">>}, {value, 1}]
-    ], Docs).
-
+    ?assertEqual(
+        [
+            [{id, <<"_design/ddoc_that_indexes_ddocs">>}, {value, 1}],
+            [{id, <<"_design/to_be_indexed">>}, {value, 1}]
+        ],
+        Docs
+    ).
 
 handle_erlfdb_errors({Db, _}) ->
     meck:expect(couch_views_trees, update_views, fun(_, _, _) ->
         error({erlfdb_error, 1009})
     end),
     ?assertError({erlfdb_error, 1009}, fabric2_db:update_docs(Db, [doc(4)])).
-
 
 run_query(Db, DDoc) ->
     Args = #mrargs{
@@ -149,91 +150,99 @@ run_query(Db, DDoc) ->
     },
     CB = fun query_cb/2,
     {ok, Acc} = couch_views:query(Db, DDoc, <<"idx_01">>, CB, [], Args),
-    lists:map(fun ({Props}) ->
-        [
-            {id, couch_util:get_value(<<"_id">>, Props)},
-            {value, couch_util:get_value(<<"value">>, Props, 1)}
-        ]
-
-    end, Acc).
-
+    lists:map(
+        fun({Props}) ->
+            [
+                {id, couch_util:get_value(<<"_id">>, Props)},
+                {value, couch_util:get_value(<<"value">>, Props, 1)}
+            ]
+        end,
+        Acc
+    ).
 
 create_idx_ddoc() ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/ddoc1">>},
-        {<<"language">>, <<"query">>},
-        {<<"views">>, {[
-            {<<"idx_01">>, {[
-                {<<"map">>, {[
-                    {<<"fields">>, {[{<<"value">>, <<"asc">>}]}}
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/ddoc1">>},
+            {<<"language">>, <<"query">>},
+            {<<"views">>,
+                {[
+                    {<<"idx_01">>,
+                        {[
+                            {<<"map">>,
+                                {[
+                                    {<<"fields">>, {[{<<"value">>, <<"asc">>}]}}
+                                ]}},
+                            {<<"reduce">>, <<"_count">>},
+                            {<<"options">>,
+                                {[
+                                    {<<"def">>, {[{<<"fields">>, {[{<<"value">>, <<"asc">>}]}}]}}
+                                ]}}
+                        ]}}
                 ]}},
-                {<<"reduce">>, <<"_count">>},
-                {<<"options">>, {[
-                        {<<"def">>,
-                        {[{<<"fields">>,
-                            {[{<<"value">>, <<"asc">>}]}}]}}
-                    ]}}
-            ]}}
+            {<<"autoupdate">>, false},
+            {<<"options">>, {[{<<"interactive">>, true}]}}
         ]}
-        },
-        {<<"autoupdate">>, false},
-        {<<"options">>, {[{<<"interactive">>, true}]}}
-    ]}).
-
+    ).
 
 create_idx_include_ddocs() ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/ddoc_that_indexes_ddocs">>},
-        {<<"language">>, <<"javascript">>},
-        {<<"views">>, {[
-            {<<"idx_01">>, {[
-                {<<"map">>, <<
-                    "function(doc) {"
-                        "if (doc.language) {"
-                            "emit(doc.language, 1);"
-                        "}"
-                    "}">>}
-            ]}}
-        ]}},
-        {<<"autoupdate">>, false},
-        {<<"options">>, {[
-            {<<"include_design">>, true},
-            {<<"interactive">>, true}
-        ]}}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/ddoc_that_indexes_ddocs">>},
+            {<<"language">>, <<"javascript">>},
+            {<<"views">>,
+                {[
+                    {<<"idx_01">>,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) {"
+                                "if (doc.language) {"
+                                "emit(doc.language, 1);"
+                                "}"
+                                "}"
+                            >>}
+                        ]}}
+                ]}},
+            {<<"autoupdate">>, false},
+            {<<"options">>,
+                {[
+                    {<<"include_design">>, true},
+                    {<<"interactive">>, true}
+                ]}}
+        ]}
+    ).
 
 wait_while_ddoc_builds(Db) ->
-    Fun = fun () ->
+    Fun = fun() ->
         fabric2_fdb:transactional(Db, fun(TxDb) ->
-            Ready = lists:filter(fun (Idx) ->
-                Idx#idx.build_status == ?INDEX_READY
-            end, mango_idx:list(TxDb)),
+            Ready = lists:filter(
+                fun(Idx) ->
+                    Idx#idx.build_status == ?INDEX_READY
+                end,
+                mango_idx:list(TxDb)
+            ),
 
-            if length(Ready) > 1 -> ok; true ->
-                wait
+            if
+                length(Ready) > 1 -> ok;
+                true -> wait
             end
         end)
     end,
     test_util:wait(Fun).
 
-
-
 make_docs(Count) ->
     [doc(I) || I <- lists:seq(1, Count)].
 
-
 doc(Id) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, list_to_binary(integer_to_list(Id))},
-        {<<"value">>, Id}
-    ]}).
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, list_to_binary(integer_to_list(Id))},
+            {<<"value">>, Id}
+        ]}
+    ).
 
-
-query_cb({row, Props},  Acc) ->
+query_cb({row, Props}, Acc) ->
     Doc = couch_util:get_value(doc, Props),
     {ok, Acc ++ [Doc]};
-
 query_cb(_, Acc) ->
     {ok, Acc}.
-

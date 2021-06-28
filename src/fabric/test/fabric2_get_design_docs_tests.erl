@@ -12,12 +12,10 @@
 
 -module(fabric2_get_design_docs_tests).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2_test.hrl").
-
 
 get_design_docs_test_() ->
     {
@@ -42,34 +40,27 @@ get_design_docs_test_() ->
         }
     }.
 
-
 setup_all() ->
     test_util:start_couch([fabric]).
 
-
 cleanup_all(Ctx) ->
     test_util:stop_couch(Ctx).
-
 
 setup() ->
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     Db.
 
-
 cleanup(Db) ->
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
-
 
 empty_db(Db) ->
     DDocs = fabric2_db:get_design_docs(Db),
     ?assertEqual([], DDocs).
 
-
 get_one(Db) ->
     DDoc = create_ddoc(Db, <<"foo">>),
     DDocs = fabric2_db:get_design_docs(Db),
     ?assertEqual([DDoc], DDocs).
-
 
 get_two(Db) ->
     DDoc1 = create_ddoc(Db, <<"foo">>),
@@ -78,15 +69,16 @@ get_two(Db) ->
     % DDocs come back sorted
     ?assertEqual([DDoc2, DDoc1], DDocs).
 
-
 get_many(Db) ->
-    DDocsIn = lists:map(fun(Seq) ->
-        Id = io_lib:format("~2..0b", [Seq]),
-        create_ddoc(Db, iolist_to_binary(Id))
-    end, lists:seq(1, 10)),
+    DDocsIn = lists:map(
+        fun(Seq) ->
+            Id = io_lib:format("~2..0b", [Seq]),
+            create_ddoc(Db, iolist_to_binary(Id))
+        end,
+        lists:seq(1, 10)
+    ),
     DDocsOut = fabric2_db:get_design_docs(Db),
     ?assertEqual(DDocsIn, DDocsOut).
-
 
 get_many_with_regular_docs(Db) ->
     RegularIds = [
@@ -97,40 +89,45 @@ get_many_with_regular_docs(Db) ->
         <<"a_doc_as_well">>,
         <<"zebra_doc">>
     ],
-    lists:foreach(fun(DocId) ->
-        create_doc(Db, DocId)
-    end, RegularIds),
-    DDocsIn = lists:map(fun(Seq) ->
-        Id = io_lib:format("~2..0b", [Seq]),
-        create_ddoc(Db, iolist_to_binary(Id))
-    end, lists:seq(1, 10)),
+    lists:foreach(
+        fun(DocId) ->
+            create_doc(Db, DocId)
+        end,
+        RegularIds
+    ),
+    DDocsIn = lists:map(
+        fun(Seq) ->
+            Id = io_lib:format("~2..0b", [Seq]),
+            create_ddoc(Db, iolist_to_binary(Id))
+        end,
+        lists:seq(1, 10)
+    ),
     DDocsOut = fabric2_db:get_design_docs(Db),
     ?assertEqual(DDocsIn, DDocsOut).
-
 
 dont_return_deleted_ddocs(Db) ->
-    DDocsIn = lists:flatmap(fun(Seq) ->
-        Id = io_lib:format("~2..0b", [Seq]),
-        DDoc = create_ddoc(Db, iolist_to_binary(Id)),
-        case Seq rem 2 == 0 of
-            true ->
-                delete_ddoc(Db, DDoc),
-                [];
-            false ->
-                [DDoc]
-        end
-    end, lists:seq(1, 10)),
+    DDocsIn = lists:flatmap(
+        fun(Seq) ->
+            Id = io_lib:format("~2..0b", [Seq]),
+            DDoc = create_ddoc(Db, iolist_to_binary(Id)),
+            case Seq rem 2 == 0 of
+                true ->
+                    delete_ddoc(Db, DDoc),
+                    [];
+                false ->
+                    [DDoc]
+            end
+        end,
+        lists:seq(1, 10)
+    ),
     DDocsOut = fabric2_db:get_design_docs(Db),
     ?assertEqual(DDocsIn, DDocsOut).
-
 
 create_ddoc(Db, Id) ->
     create_doc(Db, <<"_design/", Id/binary>>).
 
-
 delete_ddoc(Db, DDoc) ->
     {ok, _} = fabric2_db:update_doc(Db, DDoc#doc{deleted = true}).
-
 
 create_doc(Db, Id) ->
     Doc = #doc{id = Id},

@@ -12,13 +12,11 @@
 
 -module(fabric2_tx_options_tests).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("fabric2_test.hrl").
 -include("fabric2.hrl").
-
 
 fdb_tx_options_test_() ->
     {
@@ -49,7 +47,6 @@ fdb_tx_options_test_() ->
         ])
     }.
 
-
 options_take_effect(_) ->
     ok = application:stop(fabric),
 
@@ -63,10 +60,11 @@ options_take_effect(_) ->
 
     DbName = ?tempdb(),
     {ok, Db} = fabric2_db:create(DbName, [?ADMIN_CTX]),
-    ?assertError({erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
-        add_large_doc(Db, 200000)),
+    ?assertError(
+        {erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
+        add_large_doc(Db, 200000)
+    ),
     ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
-
 
 can_configure_options_at_runtime(_) ->
     meck:expect(erlfdb, set_option, fun(Fdb, Option, Val) ->
@@ -81,8 +79,10 @@ can_configure_options_at_runtime(_) ->
     DbName = ?tempdb(),
 
     {ok, Db} = fabric2_db:create(DbName, [?ADMIN_CTX]),
-    ?assertError({erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
-        add_large_doc(Db, 200000)),
+    ?assertError(
+        {erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
+        add_large_doc(Db, 200000)
+    ),
 
     meck:reset(erlfdb),
 
@@ -102,7 +102,6 @@ can_configure_options_at_runtime(_) ->
 
     ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
 
-
 can_apply_options_to_db_name_transactions(_) ->
     DbName = ?tempdb(),
 
@@ -116,7 +115,6 @@ can_apply_options_to_db_name_transactions(_) ->
 
     ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
 
-
 can_apply_options_to_db_handle_transactions(_) ->
     DbName = ?tempdb(),
     {ok, Db} = fabric2_db:create(DbName, [?ADMIN_CTX]),
@@ -125,15 +123,15 @@ can_apply_options_to_db_handle_transactions(_) ->
         fabric2_db:update_doc(TxDb, large_doc(200000))
     end,
     TxOpts = #{size_limit => 150000},
-    ?assertError({erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
-        fabric2_fdb:transactional(Db, TxOpts, TxFun)),
+    ?assertError(
+        {erlfdb_error, ?ERLFDB_TRANSACTION_TOO_LARGE},
+        fabric2_fdb:transactional(Db, TxOpts, TxFun)
+    ),
 
     ok = fabric2_db:delete(DbName, [?ADMIN_CTX]).
 
-
 add_large_doc(Db, Size) ->
     fabric2_db:update_doc(Db, large_doc(Size)).
-
 
 large_doc(Size) ->
     #doc{

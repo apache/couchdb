@@ -22,7 +22,6 @@
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
 
-
 error_test_() ->
     {
         "Test views report errors",
@@ -41,23 +40,20 @@ error_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([
-            fabric,
-            chttpd,
-            couch_jobs,
-            couch_js,
-            couch_views
-        ]),
+        fabric,
+        chttpd,
+        couch_jobs,
+        couch_js,
+        couch_views
+    ]),
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
     Ctx.
-
 
 teardown(Ctx) ->
     test_util:stop_couch(Ctx).
-
 
 foreach_setup() ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
@@ -67,11 +63,9 @@ foreach_setup() ->
     Url = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(DbName)]),
     {Db, Url}.
 
-
 foreach_teardown({Db, _}) ->
     meck:unload(),
     ok = fabric2_db:delete(fabric2_db:name(Db), []).
-
 
 view_reports_error({Db, Url}) ->
     meck:new(couch_views_batch, [passthrough]),
@@ -89,14 +83,17 @@ view_reports_error({Db, Url}) ->
     {<<"error">>, Error} = lists:keyfind(<<"error">>, 1, Props),
     ?assertEqual(<<"foundationdb_error">>, Error).
 
-
 ddoc() ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/foo">>},
-        {<<"language">>, <<"javascript">>},
-        {<<"views">>, {[
-            {<<"bar">>, {[
-                {<<"map">>, <<"function(doc) {emit(doc.value, doc.value);}">>}
-            ]}}
-        ]}}
-    ]}).
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/foo">>},
+            {<<"language">>, <<"javascript">>},
+            {<<"views">>,
+                {[
+                    {<<"bar">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc.value, doc.value);}">>}
+                        ]}}
+                ]}}
+        ]}
+    ).

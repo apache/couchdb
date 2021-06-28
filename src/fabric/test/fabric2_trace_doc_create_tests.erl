@@ -12,12 +12,10 @@
 
 -module(fabric2_trace_doc_create_tests).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("fabric2_test.hrl").
-
 
 trace_doc_create_test_() ->
     {
@@ -34,17 +32,14 @@ trace_doc_create_test_() ->
         }
     }.
 
-
 setup() ->
     Ctx = test_util:start_couch([fabric]),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     {Db, Ctx}.
 
-
 cleanup({Db, Ctx}) ->
     ok = fabric2_db:delete(fabric2_db:name(Db), []),
     test_util:stop_couch(Ctx).
-
 
 create_new_doc({Db, _}) ->
     put(erlfdb_trace, <<"one doc">>),
@@ -53,7 +48,6 @@ create_new_doc({Db, _}) ->
         body = {[{<<"foo">>, <<"bar">>}]}
     },
     {ok, _} = fabric2_db:update_doc(Db, Doc).
-
 
 create_two_docs({Db, _}) ->
     put(erlfdb_trace, <<"two docs">>),
@@ -67,21 +61,31 @@ create_two_docs({Db, _}) ->
     },
     {ok, _} = fabric2_db:update_docs(Db, [Doc1, Doc2]).
 
-
 create_50_docs({Db, _}) ->
-    lists:foreach(fun(_) ->
-        spawn_monitor(fun() ->
-            Name = io_lib:format("50 docs : ~w", [self()]),
-            put(erlfdb_trace, iolist_to_binary(Name)),
-            Docs = lists:map(fun(Val) ->
-                #doc{
-                    id = fabric2_util:uuid(),
-                    body = {[{<<"value">>, Val}]}
-                }
-            end, lists:seq(1, 50)),
-            {ok, _} = fabric2_db:update_docs(Db, Docs)
-        end)
-    end, lists:seq(1, 5)),
-    lists:foreach(fun(_) ->
-        receive {'DOWN', _, _, _, _} -> ok end
-    end, lists:seq(1, 5)).
+    lists:foreach(
+        fun(_) ->
+            spawn_monitor(fun() ->
+                Name = io_lib:format("50 docs : ~w", [self()]),
+                put(erlfdb_trace, iolist_to_binary(Name)),
+                Docs = lists:map(
+                    fun(Val) ->
+                        #doc{
+                            id = fabric2_util:uuid(),
+                            body = {[{<<"value">>, Val}]}
+                        }
+                    end,
+                    lists:seq(1, 50)
+                ),
+                {ok, _} = fabric2_db:update_docs(Db, Docs)
+            end)
+        end,
+        lists:seq(1, 5)
+    ),
+    lists:foreach(
+        fun(_) ->
+            receive
+                {'DOWN', _, _, _, _} -> ok
+            end
+        end,
+        lists:seq(1, 5)
+    ).

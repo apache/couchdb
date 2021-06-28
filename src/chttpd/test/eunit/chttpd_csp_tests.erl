@@ -14,7 +14,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
-
 setup() ->
     ok = config:set("csp", "enable", "true", false),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
@@ -24,17 +23,17 @@ setup() ->
 teardown(_) ->
     ok.
 
-
-
 csp_test_() ->
     {
         "Content Security Policy tests",
         {
             setup,
-            fun chttpd_test_util:start_couch/0, fun chttpd_test_util:stop_couch/1,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun should_not_return_any_csp_headers_when_disabled/1,
                     fun should_apply_default_policy/1,
@@ -45,14 +44,15 @@ csp_test_() ->
         }
     }.
 
-
 should_not_return_any_csp_headers_when_disabled(Url) ->
-    ?_assertEqual(undefined,
+    ?_assertEqual(
+        undefined,
         begin
             ok = config:set("csp", "enable", "false", false),
             {ok, _, Headers, _} = test_request:get(Url),
             proplists:get_value("Content-Security-Policy", Headers)
-        end).
+        end
+    ).
 
 should_apply_default_policy(Url) ->
     ?_assertEqual(
@@ -61,21 +61,30 @@ should_apply_default_policy(Url) ->
         begin
             {ok, _, Headers, _} = test_request:get(Url),
             proplists:get_value("Content-Security-Policy", Headers)
-        end).
+        end
+    ).
 
 should_return_custom_policy(Url) ->
-    ?_assertEqual("default-src 'http://example.com';",
+    ?_assertEqual(
+        "default-src 'http://example.com';",
         begin
-            ok = config:set("csp", "header_value",
-                                  "default-src 'http://example.com';", false),
+            ok = config:set(
+                "csp",
+                "header_value",
+                "default-src 'http://example.com';",
+                false
+            ),
             {ok, _, Headers, _} = test_request:get(Url),
             proplists:get_value("Content-Security-Policy", Headers)
-        end).
+        end
+    ).
 
 should_only_enable_csp_when_true(Url) ->
-    ?_assertEqual(undefined,
+    ?_assertEqual(
+        undefined,
         begin
             ok = config:set("csp", "enable", "tru", false),
             {ok, _, Headers, _} = test_request:get(Url),
             proplists:get_value("Content-Security-Policy", Headers)
-        end).
+        end
+    ).

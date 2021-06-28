@@ -18,18 +18,15 @@
 -define(USER, "chttpd_test_admin").
 -define(PASS, "pass").
 
-
 setup() ->
-    ok = config:delete("chttpd_auth", "authentication_db", _Persist=false),
+    ok = config:delete("chttpd_auth", "authentication_db", _Persist = false),
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, binary_to_list(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, binary_to_list(Hashed), _Persist = false),
     root_url() ++ "/_session".
 
-
 cleanup(_) ->
-    ok = config:delete("chttpd_auth", "authentication_db", _Persist=false),
-    ok = config:delete("admins", ?USER, _Persist=false).
-
+    ok = config:delete("chttpd_auth", "authentication_db", _Persist = false),
+    ok = config:delete("admins", ?USER, _Persist = false).
 
 session_test_() ->
     {
@@ -51,32 +48,32 @@ session_test_() ->
         }
     }.
 
-
 session_authentication_db_absent(Url) ->
-    ok = config:delete("chttpd_auth", "authentication_db", _Persist=false),
+    ok = config:delete("chttpd_auth", "authentication_db", _Persist = false),
     ?assertThrow({not_found, _}, session_authentication_db(Url)).
-
 
 session_authentication_db_present(Url) ->
     Name = "_users",
     ok = config:set("chttpd_auth", "authentication_db", Name, false),
     ?assertEqual(list_to_binary(Name), session_authentication_db(Url)).
 
-
 session_authentication_gzip_request(Url) ->
     {ok, 200, _, Body} = test_request:request(
         post,
         Url,
         [{"Content-Type", "application/json"}, {"Content-Encoding", "gzip"}],
-        zlib:gzip(jiffy:encode({[{username, list_to_binary(?USER)}, {password, list_to_binary(?PASS)}]}))),
+        zlib:gzip(
+            jiffy:encode({[{username, list_to_binary(?USER)}, {password, list_to_binary(?PASS)}]})
+        )
+    ),
     {BodyJson} = jiffy:decode(Body),
     ?assert(lists:member({<<"name">>, list_to_binary(?USER)}, BodyJson)).
 
 session_authentication_db(Url) ->
     {ok, 200, _, Body} = test_request:get(Url, [{basic_auth, {?USER, ?PASS}}]),
     couch_util:get_nested_json_value(
-        jiffy:decode(Body), [<<"info">>, <<"authentication_db">>]).
-
+        jiffy:decode(Body), [<<"info">>, <<"authentication_db">>]
+    ).
 
 root_url() ->
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),

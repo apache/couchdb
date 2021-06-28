@@ -16,7 +16,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 -define(DOCS_CONFLICTS, [
     {<<"doc1">>, 10},
     % use some _design docs as well to test the special handling for them
@@ -27,7 +26,6 @@
 -define(NUM_ATTS, 2).
 -define(i2l(I), integer_to_list(I)).
 -define(io2b(Io), iolist_to_binary(Io)).
-
 
 docs_with_many_leaves_test_() ->
     {
@@ -47,18 +45,15 @@ docs_with_many_leaves_test_() ->
         }
     }.
 
-
 setup() ->
     Source = couch_replicator_test_helper:create_db(),
     populate_db(Source),
     Target = couch_replicator_test_helper:create_db(),
     {Source, Target}.
 
-
 teardown({Source, Target}) ->
     couch_replicator_test_helper:delete_db(Source),
     couch_replicator_test_helper:delete_db(Target).
-
 
 should_replicate_doc_with_many_leaves({Source, Target}) ->
     replicate(Source, Target),
@@ -69,27 +64,26 @@ should_replicate_doc_with_many_leaves({Source, Target}) ->
     replicate(Source, Target),
     verify_target(SourceDb, TargetDb, ?DOCS_CONFLICTS).
 
-
 populate_db(DbName) ->
     {ok, Db} = fabric2_db:open(DbName, [?ADMIN_CTX]),
-    lists:foreach(fun({DocId, NumConflicts}) ->
-        Doc = #doc{
-            id = DocId,
-            body = {[{<<"value">>, <<"0">>}]}
-        },
-        {ok, _} = fabric2_db:update_doc(Db, Doc),
-        {ok, _} = add_doc_siblings(Db, DocId, NumConflicts)
-    end, ?DOCS_CONFLICTS).
-
+    lists:foreach(
+        fun({DocId, NumConflicts}) ->
+            Doc = #doc{
+                id = DocId,
+                body = {[{<<"value">>, <<"0">>}]}
+            },
+            {ok, _} = fabric2_db:update_doc(Db, Doc),
+            {ok, _} = add_doc_siblings(Db, DocId, NumConflicts)
+        end,
+        ?DOCS_CONFLICTS
+    ).
 
 add_doc_siblings(#{} = Db, DocId, NumLeaves) when NumLeaves > 0 ->
     add_doc_siblings(Db, DocId, NumLeaves, [], []).
 
-
 add_doc_siblings(#{} = Db, _DocId, 0, AccDocs, AccRevs) ->
     {ok, []} = fabric2_db:update_docs(Db, AccDocs, [replicated_changes]),
     {ok, AccRevs};
-
 add_doc_siblings(#{} = Db, DocId, NumLeaves, AccDocs, AccRevs) ->
     Value = ?l2b(?i2l(NumLeaves)),
     Rev = couch_hash:md5_hash(Value),
@@ -98,15 +92,21 @@ add_doc_siblings(#{} = Db, DocId, NumLeaves, AccDocs, AccRevs) ->
         revs = {1, [Rev]},
         body = {[{<<"value">>, Value}]}
     },
-    add_doc_siblings(Db, DocId, NumLeaves - 1,
-        [Doc | AccDocs], [{1, Rev} | AccRevs]).
-
+    add_doc_siblings(
+        Db,
+        DocId,
+        NumLeaves - 1,
+        [Doc | AccDocs],
+        [{1, Rev} | AccRevs]
+    ).
 
 verify_target(_SourceDb, _TargetDb, []) ->
     ok;
-
-verify_target(#{} = SourceDb, #{} = TargetDb,
-        [{DocId, NumConflicts} | Rest]) ->
+verify_target(
+    #{} = SourceDb,
+    #{} = TargetDb,
+    [{DocId, NumConflicts} | Rest]
+) ->
     Opts = [conflicts, deleted_conflicts],
     {ok, SourceLookups} = open_doc_revs(SourceDb, DocId, Opts),
     {ok, TargetLookups} = open_doc_revs(TargetDb, DocId, Opts),
@@ -114,36 +114,49 @@ verify_target(#{} = SourceDb, #{} = TargetDb,
     TargetDocs = [Doc || {ok, Doc} <- TargetLookups],
     Total = NumConflicts + 1,
     ?assertEqual(Total, length(TargetDocs)),
-    lists:foreach(fun({SourceDoc, TargetDoc}) ->
-        ?assertEqual(json_doc(SourceDoc), json_doc(TargetDoc))
-    end, lists:zip(SourceDocs, TargetDocs)),
+    lists:foreach(
+        fun({SourceDoc, TargetDoc}) ->
+            ?assertEqual(json_doc(SourceDoc), json_doc(TargetDoc))
+        end,
+        lists:zip(SourceDocs, TargetDocs)
+    ),
     verify_target(SourceDb, TargetDb, Rest).
-
 
 add_attachments(_SourceDb, _NumAtts, []) ->
     ok;
-
-add_attachments(#{} = SourceDb, NumAtts,
-        [{DocId, NumConflicts} | Rest]) ->
+add_attachments(
+    #{} = SourceDb,
+    NumAtts,
+    [{DocId, NumConflicts} | Rest]
+) ->
     {ok, SourceLookups} = open_doc_revs(SourceDb, DocId, []),
     SourceDocs = [Doc || {ok, Doc} <- SourceLookups],
     Total = NumConflicts + 1,
     ?assertEqual(Total, length(SourceDocs)),
-    NewDocs = lists:foldl(fun
-        (#doc{atts = Atts, revs = {Pos, [Rev | _]}} = Doc, Acc) ->
-            NewAtts = lists:foldl(fun(I, AttAcc) ->
-                [att(I, {Pos, Rev}, 10) | AttAcc]
-            end, [], lists:seq(1, NumAtts)),
+    NewDocs = lists:foldl(
+        fun(#doc{atts = Atts, revs = {Pos, [Rev | _]}} = Doc, Acc) ->
+            NewAtts = lists:foldl(
+                fun(I, AttAcc) ->
+                    [att(I, {Pos, Rev}, 10) | AttAcc]
+                end,
+                [],
+                lists:seq(1, NumAtts)
+            ),
             [Doc#doc{atts = Atts ++ NewAtts} | Acc]
-    end, [], SourceDocs),
-    lists:foreach(fun(#doc{} = Doc) ->
-        ?assertMatch({ok, _}, fabric2_db:update_doc(SourceDb, Doc))
-    end, NewDocs),
+        end,
+        [],
+        SourceDocs
+    ),
+    lists:foreach(
+        fun(#doc{} = Doc) ->
+            ?assertMatch({ok, _}, fabric2_db:update_doc(SourceDb, Doc))
+        end,
+        NewDocs
+    ),
     add_attachments(SourceDb, NumAtts, Rest).
 
-
 att(I, PosRev, Size) ->
-    Name =  ?io2b(["att_", ?i2l(I), "_", couch_doc:rev_to_str(PosRev)]),
+    Name = ?io2b(["att_", ?i2l(I), "_", couch_doc:rev_to_str(PosRev)]),
     AttData = crypto:strong_rand_bytes(Size),
     couch_att:new([
         {name, Name},
@@ -152,14 +165,11 @@ att(I, PosRev, Size) ->
         {data, AttData}
     ]).
 
-
 open_doc_revs(#{} = Db, DocId, Opts) ->
     fabric2_db:open_doc_revs(Db, DocId, all, Opts).
 
-
 json_doc(#doc{} = Doc) ->
     couch_doc:to_json_obj(Doc, [attachments]).
-
 
 replicate(Source, Target) ->
     % Serialize the concurrent updates of the same document in order
@@ -170,5 +180,7 @@ replicate(Source, Target) ->
         <<"worker_processes">> => 1,
         <<"http_connections">> => 1
     },
-    ?assertMatch({ok, _},
-        couch_replicator_test_helper:replicate(RepObject)).
+    ?assertMatch(
+        {ok, _},
+        couch_replicator_test_helper:replicate(RepObject)
+    ).

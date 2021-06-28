@@ -24,72 +24,77 @@
 -define(TIMEOUT, 5000).
 -define(RELOAD_WAIT, 1000).
 
--define(temp_atom,
-    fun() ->
-        {A, B, C} = os:timestamp(),
-        list_to_atom(lists:flatten(io_lib:format("~p~p~p", [A, B, C])))
-    end).
+-define(temp_atom, fun() ->
+    {A, B, C} = os:timestamp(),
+    list_to_atom(lists:flatten(io_lib:format("~p~p~p", [A, B, C])))
+end).
 
--define(MODULE1(Name), "
-    -export([inc/2, fail/2]).
+-define(MODULE1(Name),
+    "\n"
+    "    -export([inc/2, fail/2]).\n"
+    "\n"
+    "    inc(KV, A) ->\n"
+    "        Reply = A + 1,\n"
+    "        couch_epi_tests:save(KV, inc1, Reply),\n"
+    "        [KV, Reply].\n"
+    "\n"
+    "    fail(KV, A) ->\n"
+    "        inc(KV, A).\n"
+).
 
-    inc(KV, A) ->
-        Reply = A + 1,
-        couch_epi_tests:save(KV, inc1, Reply),
-        [KV, Reply].
+-define(MODULE2(Name),
+    "\n"
+    "    -export([inc/2, fail/2]).\n"
+    "\n"
+    "    inc(KV, A) ->\n"
+    "        Reply = A + 1,\n"
+    "        couch_epi_tests:save(KV, inc2, Reply),\n"
+    "        [KV, Reply].\n"
+    "\n"
+    "    fail(KV, _A) ->\n"
+    "        couch_epi_tests:save(KV, inc2, check_error),\n"
+    "        throw(check_error).\n"
+).
 
-    fail(KV, A) ->
-        inc(KV, A).
-").
+-define(DATA_MODULE1(Name),
+    "\n"
+    "    -export([data/0]).\n"
+    "\n"
+    "    data() ->\n"
+    "        [\n"
+    "            {[complex, key, 1], [\n"
+    "                {type, counter},\n"
+    "                {desc, foo}\n"
+    "            ]}\n"
+    "        ].\n"
+).
 
--define(MODULE2(Name), "
-    -export([inc/2, fail/2]).
+-define(DATA_MODULE2(Name),
+    "\n"
+    "    -export([data/0]).\n"
+    "\n"
+    "    data() ->\n"
+    "        [\n"
+    "            {[complex, key, 2], [\n"
+    "                {type, counter},\n"
+    "                {desc, bar}\n"
+    "            ]},\n"
+    "            {[complex, key, 1], [\n"
+    "                {type, counter},\n"
+    "                {desc, updated_foo}\n"
+    "            ]}\n"
+    "        ].\n"
+).
 
-    inc(KV, A) ->
-        Reply = A + 1,
-        couch_epi_tests:save(KV, inc2, Reply),
-        [KV, Reply].
-
-    fail(KV, _A) ->
-        couch_epi_tests:save(KV, inc2, check_error),
-        throw(check_error).
-").
-
--define(DATA_MODULE1(Name), "
-    -export([data/0]).
-
-    data() ->
-        [
-            {[complex, key, 1], [
-                {type, counter},
-                {desc, foo}
-            ]}
-        ].
-").
-
--define(DATA_MODULE2(Name), "
-    -export([data/0]).
-
-    data() ->
-        [
-            {[complex, key, 2], [
-                {type, counter},
-                {desc, bar}
-            ]},
-            {[complex, key, 1], [
-                {type, counter},
-                {desc, updated_foo}
-            ]}
-        ].
-").
-
--define(DATA_MODULE3(Name, Kv), "
-    -export([data/0]).
-
-data() ->
-    {ok, Data} = couch_epi_tests:get('" ++ atom_to_list(Kv) ++ "', data),
-    Data.
-").
+-define(DATA_MODULE3(Name, Kv),
+    "\n"
+    "    -export([data/0]).\n"
+    "\n"
+    "data() ->\n"
+    "    {ok, Data} = couch_epi_tests:get('" ++ atom_to_list(Kv) ++
+        "', data),\n"
+        "    Data.\n"
+).
 
 %% ------------------------------------------------------------------
 %% couch_epi_plugin behaviour
@@ -98,69 +103,76 @@ data() ->
 plugin_module([KV, Spec]) when is_tuple(Spec) ->
     SpecStr = io_lib:format("~w", [Spec]),
     KVStr = "'" ++ atom_to_list(KV) ++ "'",
-    "
-        -compile([export_all]).
-
-        app() -> test_app.
-        providers() ->
-            [].
-
-        services() ->
-            [].
-
-        data_providers() ->
-            [
-                {{test_app, descriptions}, " ++ SpecStr ++ ", [{interval, 100}]}
-            ].
-
-        data_subscriptions() ->
-            [
-                {test_app, descriptions}
-            ].
-
-        processes() -> [].
-
-        notify(Key, OldData, Data) ->
-            couch_epi_tests:notify_cb(Key, OldData, Data, " ++ KVStr ++ ").
-    ";
+    "\n"
+    "        -compile([export_all]).\n"
+    "\n"
+    "        app() -> test_app.\n"
+    "        providers() ->\n"
+    "            [].\n"
+    "\n"
+    "        services() ->\n"
+    "            [].\n"
+    "\n"
+    "        data_providers() ->\n"
+    "            [\n"
+    "                {{test_app, descriptions}, " ++ SpecStr ++
+        ", [{interval, 100}]}\n"
+        "            ].\n"
+        "\n"
+        "        data_subscriptions() ->\n"
+        "            [\n"
+        "                {test_app, descriptions}\n"
+        "            ].\n"
+        "\n"
+        "        processes() -> [].\n"
+        "\n"
+        "        notify(Key, OldData, Data) ->\n"
+        "            couch_epi_tests:notify_cb(Key, OldData, Data, " ++ KVStr ++
+        ").\n"
+        "    ";
 plugin_module([KV, Provider]) when is_atom(Provider) ->
     KVStr = "'" ++ atom_to_list(KV) ++ "'",
-    "
-        -compile([export_all]).
-
-        app() -> test_app.
-        providers() ->
-            [
-                {my_service, " ++ atom_to_list(Provider) ++ "}
-            ].
-
-        services() ->
-            [
-                {my_service, " ++ atom_to_list(Provider) ++ "}
-            ].
-
-        data_providers() ->
-            [].
-
-        data_subscriptions() ->
-            [].
-
-        processes() -> [].
-
-        notify(Key, OldData, Data) ->
-            couch_epi_tests:notify_cb(Key, OldData, Data, " ++ KVStr ++ ").
-    ".
-
+    "\n"
+    "        -compile([export_all]).\n"
+    "\n"
+    "        app() -> test_app.\n"
+    "        providers() ->\n"
+    "            [\n"
+    "                {my_service, " ++ atom_to_list(Provider) ++
+        "}\n"
+        "            ].\n"
+        "\n"
+        "        services() ->\n"
+        "            [\n"
+        "                {my_service, " ++ atom_to_list(Provider) ++
+        "}\n"
+        "            ].\n"
+        "\n"
+        "        data_providers() ->\n"
+        "            [].\n"
+        "\n"
+        "        data_subscriptions() ->\n"
+        "            [].\n"
+        "\n"
+        "        processes() -> [].\n"
+        "\n"
+        "        notify(Key, OldData, Data) ->\n"
+        "            couch_epi_tests:notify_cb(Key, OldData, Data, " ++ KVStr ++
+        ").\n"
+        "    ".
 
 notify_cb(Key, OldData, Data, KV) ->
     save(KV, is_called, {Key, OldData, Data}).
 
 start_epi(Plugins) ->
     application:load(couch_epi),
-    PluginsModules = lists:map(fun({Module, Body}) ->
-        ok = generate_module(Module, Body),
-        Module
-    end, Plugins),
+    PluginsModules = lists:map(
+        fun({Module, Body}) ->
+            ok = generate_module(Module, Body),
+            Module
+        end,
+        Plugins
+    ),
     application:set_env(couch_epi, plugins, PluginsModules),
     {ok, _} = application:ensure_all_started(couch_epi),
     ok.
@@ -177,13 +189,13 @@ setup(data_file) ->
 
     Pid = whereis(couch_epi:get_handle(Key)),
 
-
     #ctx{
         file = File,
         key = Key,
         handle = couch_epi:get_handle(Key),
         kv = KV,
-        pid = Pid};
+        pid = Pid
+    };
 setup(static_data_module) ->
     error_logger:tty(false),
 
@@ -202,7 +214,8 @@ setup(static_data_module) ->
         handle = Handle,
         modules = [Handle, provider],
         kv = KV,
-        pid = Pid};
+        pid = Pid
+    };
 setup(callback_data_module) ->
     error_logger:tty(false),
 
@@ -225,11 +238,12 @@ setup(callback_data_module) ->
     Handle = couch_epi:get_handle(Key),
 
     #ctx{
-       key = Key,
-       handle = Handle,
-       modules = [Handle, provider],
-       kv = KV,
-       pid = Pid};
+        key = Key,
+        handle = Handle,
+        modules = [Handle, provider],
+        kv = KV,
+        pid = Pid
+    };
 setup(functions) ->
     Key = my_service,
     error_logger:tty(false),
@@ -252,7 +266,8 @@ setup(functions) ->
         handle = Handle,
         modules = [Handle, provider1, provider2],
         kv = KV,
-        pid = Pid};
+        pid = Pid
+    };
 setup({options, _Opts}) ->
     setup(functions).
 
@@ -309,7 +324,6 @@ epi_data_source_test_() ->
         [make_case("Check query API for: ", Cases, Funs)]
     }.
 
-
 epi_apply_test_() ->
     {
         "epi dispatch tests",
@@ -339,7 +353,6 @@ epi_providers_order_test_() ->
         }
     }.
 
-
 epi_reload_test_() ->
     Cases = [
         data_file,
@@ -365,19 +378,21 @@ apply_options_test_() ->
         [make_case("Apply with options: ", Setups, Funs)]
     }.
 
-
 make_case(Msg, {Tag, P}, Funs) ->
     Cases = [{Tag, Case} || Case <- P],
     make_case(Msg, Cases, Funs);
 make_case(Msg, P, Funs) ->
-    [{format_case_name(Msg, Case), [
-        {
-            foreachx, fun setup/1, fun teardown/2,
-            [
-                 {Case, make_fun(Fun, 2)} || Fun <- Funs
-            ]
-        }
-    ]} || Case <- P].
+    [
+        {format_case_name(Msg, Case), [
+            {
+                foreachx,
+                fun setup/1,
+                fun teardown/2,
+                [{Case, make_fun(Fun, 2)} || Fun <- Funs]
+            }
+        ]}
+     || Case <- P
+    ].
 
 make_fun(Fun, Arity) ->
     {arity, A} = lists:keyfind(arity, 1, erlang:fun_info(Fun)),
@@ -406,8 +421,8 @@ ensure_notified_when_changed(functions, #ctx{key = Key} = Ctx) ->
         update(functions, Ctx),
         Result = get(Ctx, is_called),
         ExpectedDefs = [
-            {provider1,[{inc,2},{fail,2}]},
-            {provider2,[{inc,2},{fail,2}]}
+            {provider1, [{inc, 2}, {fail, 2}]},
+            {provider2, [{inc, 2}, {fail, 2}]}
         ],
         ?assertEqual({ok, {Key, ExpectedDefs, ExpectedDefs}}, Result),
         ok
@@ -426,7 +441,8 @@ ensure_notified_when_changed(Case, #ctx{key = Key} = Ctx) ->
         ?assertMatch(ExpectedData, lists:usort(Data)),
         ?assertMatch(
             [{[complex, key, 1], [{type, counter}, {desc, foo}]}],
-            lists:usort(OldData))
+            lists:usort(OldData)
+        )
     end).
 
 ensure_not_notified_when_no_change(_Case, #ctx{key = Key} = Ctx) ->
@@ -464,15 +480,19 @@ check_broken_pipe(#ctx{handle = Handle, kv = KV, key = Key} = Ctx) ->
 
 ensure_fail_pipe(#ctx{handle = Handle, kv = KV, key = Key}) ->
     ?_test(begin
-        ?assertThrow(check_error,
-            couch_epi:apply(Handle, Key, fail, [KV, 2], [pipe])),
+        ?assertThrow(
+            check_error,
+            couch_epi:apply(Handle, Key, fail, [KV, 2], [pipe])
+        ),
         ok
     end).
 
 ensure_fail(#ctx{handle = Handle, kv = KV, key = Key}) ->
     ?_test(begin
-        ?assertThrow(check_error,
-            couch_epi:apply(Handle, Key, fail, [KV, 2], [])),
+        ?assertThrow(
+            check_error,
+            couch_epi:apply(Handle, Key, fail, [KV, 2], [])
+        ),
         ok
     end).
 
@@ -484,51 +504,55 @@ check_dump(_Case, #ctx{handle = Handle}) ->
     ?_test(begin
         ?assertMatch(
             [[{type, counter}, {desc, foo}]],
-            couch_epi:dump(Handle))
+            couch_epi:dump(Handle)
+        )
     end).
 
 check_get(_Case, #ctx{handle = Handle}) ->
     ?_test(begin
         ?assertMatch(
             [[{type, counter}, {desc, foo}]],
-            couch_epi:get(Handle, [complex,key, 1]))
+            couch_epi:get(Handle, [complex, key, 1])
+        )
     end).
 
 check_get_value(_Case, #ctx{handle = Handle}) ->
     ?_test(begin
         ?assertMatch(
             [{type, counter}, {desc, foo}],
-            couch_epi:get_value(Handle, test_app, [complex,key, 1]))
+            couch_epi:get_value(Handle, test_app, [complex, key, 1])
+        )
     end).
 
 check_by_key(_Case, #ctx{handle = Handle}) ->
     ?_test(begin
         ?assertMatch(
-            [{[complex, key, 1],
-                [{test_app, [{type, counter}, {desc, foo}]}]}],
-            couch_epi:by_key(Handle)),
+            [{[complex, key, 1], [{test_app, [{type, counter}, {desc, foo}]}]}],
+            couch_epi:by_key(Handle)
+        ),
         ?assertMatch(
             [{test_app, [{type, counter}, {desc, foo}]}],
-            couch_epi:by_key(Handle, [complex, key, 1]))
+            couch_epi:by_key(Handle, [complex, key, 1])
+        )
     end).
 
 check_by_source(_Case, #ctx{handle = Handle}) ->
     ?_test(begin
         ?assertMatch(
-            [{test_app,
-                [{[complex,key, 1], [{type, counter}, {desc, foo}]}]}],
-            couch_epi:by_source(Handle)),
+            [{test_app, [{[complex, key, 1], [{type, counter}, {desc, foo}]}]}],
+            couch_epi:by_source(Handle)
+        ),
         ?assertMatch(
-            [{[complex,key, 1], [{type, counter}, {desc, foo}]}],
-            couch_epi:by_source(Handle, test_app))
+            [{[complex, key, 1], [{type, counter}, {desc, foo}]}],
+            couch_epi:by_source(Handle, test_app)
+        )
     end).
 
 check_keys(_Case, #ctx{handle = Handle}) ->
-    ?_assertMatch([[complex,key,1]], couch_epi:keys(Handle)).
+    ?_assertMatch([[complex, key, 1]], couch_epi:keys(Handle)).
 
 check_subscribers(_Case, #ctx{handle = Handle}) ->
     ?_assertMatch([test_app], couch_epi:subscribers(Handle)).
-
 
 ensure_reload_if_manually_triggered(Case, #ctx{pid = Pid, key = Key} = Ctx) ->
     ?_test(begin
@@ -539,8 +563,10 @@ ensure_reload_if_manually_triggered(Case, #ctx{pid = Pid, key = Key} = Ctx) ->
         ?assertNotEqual(error, get(Ctx, is_called))
     end).
 
-ensure_reload_if_changed(data_file =  Case,
-        #ctx{key = Key, handle = Handle} = Ctx) ->
+ensure_reload_if_changed(
+    data_file = Case,
+    #ctx{key = Key, handle = Handle} = Ctx
+) ->
     ?_test(begin
         Version = Handle:version(),
         subscribe(Ctx, test_app, Key),
@@ -549,19 +575,24 @@ ensure_reload_if_changed(data_file =  Case,
         ?assertNotEqual(Version, Handle:version()),
         ?assertNotEqual(error, get(Ctx, is_called))
     end);
-ensure_reload_if_changed(Case,
-        #ctx{key = Key, handle = Handle} = Ctx) ->
+ensure_reload_if_changed(
+    Case,
+    #ctx{key = Key, handle = Handle} = Ctx
+) ->
     ?_test(begin
         Version = Handle:version(),
         subscribe(Ctx, test_app, Key),
         update(Case, Ctx),
         ?assertNotEqual(Version, Handle:version()),
-        timer:sleep(?RELOAD_WAIT), %% Allow some time for notify to be called
+        %% Allow some time for notify to be called
+        timer:sleep(?RELOAD_WAIT),
         ?assertNotEqual(error, get(Ctx, is_called))
     end).
 
-ensure_no_reload_when_no_change(functions,
-        #ctx{pid = Pid, key = Key, handle = Handle, modules = Modules} = Ctx) ->
+ensure_no_reload_when_no_change(
+    functions,
+    #ctx{pid = Pid, key = Key, handle = Handle, modules = Modules} = Ctx
+) ->
     ?_test(begin
         Version = Handle:version(),
         subscribe(Ctx, test_app, Key),
@@ -569,8 +600,10 @@ ensure_no_reload_when_no_change(functions,
         ?assertEqual(Version, Handle:version()),
         ?assertEqual(error, get(Ctx, is_called))
     end);
-ensure_no_reload_when_no_change(_Case,
-        #ctx{key = Key, handle = Handle} = Ctx) ->
+ensure_no_reload_when_no_change(
+    _Case,
+    #ctx{key = Key, handle = Handle} = Ctx
+) ->
     ?_test(begin
         Version = Handle:version(),
         subscribe(Ctx, test_app, Key),
@@ -639,7 +672,8 @@ wait_update(Ctx) ->
         error ->
             timer:sleep(?RELOAD_WAIT),
             wait_update(Ctx);
-        _ -> ok
+        _ ->
+            ok
     end.
 
 %% ------------

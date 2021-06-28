@@ -21,7 +21,7 @@
 setup() ->
     Ctx = test_util:start_couch([chttpd]),
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
     Url = ?l2b(io_lib:format("http://~s:~b/_session", [Addr, Port])),
@@ -30,7 +30,7 @@ setup() ->
     {ok, ?b2l(Url), ContentType, ?b2l(Payload), Ctx}.
 
 teardown({ok, _, _, _, Ctx}) ->
-    ok = config:delete("admins", ?USER, _Persist=false),
+    ok = config:delete("admins", ?USER, _Persist = false),
     test_util:stop_couch(Ctx).
 
 cookie_test_() ->
@@ -52,8 +52,12 @@ cookie_test_() ->
 
 should_set_cookie_domain(Url, ContentType, Payload) ->
     ?_test(begin
-        ok = config:set("couch_httpd_auth", "cookie_domain",
-            "example.com", false),
+        ok = config:set(
+            "couch_httpd_auth",
+            "cookie_domain",
+            "example.com",
+            false
+        ),
         {ok, Code, Headers, _} = test_request:post(Url, ContentType, Payload),
         ?assertEqual(200, Code),
         Cookie = proplists:get_value("Set-Cookie", Headers),
@@ -71,8 +75,12 @@ should_not_set_cookie_domain(Url, ContentType, Payload) ->
 
 should_delete_cookie_domain(Url, ContentType, Payload) ->
     ?_test(begin
-        ok = config:set("couch_httpd_auth", "cookie_domain",
-            "example.com", false),
+        ok = config:set(
+            "couch_httpd_auth",
+            "cookie_domain",
+            "example.com",
+            false
+        ),
         {ok, Code, Headers, _} = test_request:delete(Url, ContentType, Payload),
         ?assertEqual(200, Code),
         Cookie = proplists:get_value("Set-Cookie", Headers),

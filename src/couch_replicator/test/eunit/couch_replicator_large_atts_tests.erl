@@ -16,14 +16,13 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
-
 -define(ATT_SIZE_1, 2 * 1024 * 1024).
 -define(ATT_SIZE_2, round(6.6 * 1024 * 1024)).
 -define(DOCS_COUNT, 11).
 -define(TIMEOUT_EUNIT, 120).
 -define(DEFAULT_COMPRESSIBLE_TYPES,
-    "text/*, application/javascript, application/json, application/xml").
-
+    "text/*, application/javascript, application/json, application/xml"
+).
 
 large_atts_test_() ->
     {
@@ -43,16 +42,17 @@ large_atts_test_() ->
         }
     }.
 
-
 setup() ->
-    AttCfg = config:get("attachments",
-        "compressible_types", ?DEFAULT_COMPRESSIBLE_TYPES),
+    AttCfg = config:get(
+        "attachments",
+        "compressible_types",
+        ?DEFAULT_COMPRESSIBLE_TYPES
+    ),
     config:set("attachments", "compressible_types", "text/*", false),
     Source = couch_replicator_test_helper:create_db(),
     ok = populate_db(Source, ?DOCS_COUNT),
     Target = couch_replicator_test_helper:create_db(),
     {AttCfg, Source, Target}.
-
 
 teardown({AttCfg, Source, Target}) ->
     couch_replicator_test_helper:delete_db(Source),
@@ -64,27 +64,30 @@ teardown({AttCfg, Source, Target}) ->
             config:set("attachments", "compressible_types", AttCfg)
     end.
 
-
 should_replicate_attachments({_AttCfg, Source, Target}) ->
-    ?assertMatch({ok, _},
-        couch_replicator_test_helper:replicate(Source, Target)),
+    ?assertMatch(
+        {ok, _},
+        couch_replicator_test_helper:replicate(Source, Target)
+    ),
     ?assertEqual(ok, couch_replicator_test_helper:compare_dbs(Source, Target)).
 
-
 populate_db(DbName, DocCount) ->
-    Docs = lists:foldl(fun(DocIdCounter, Acc) ->
-        Doc = #doc{
-            id = iolist_to_binary(["doc", integer_to_list(DocIdCounter)]),
-            body = {[]},
-            atts = [
-                att(<<"att1">>, ?ATT_SIZE_1, <<"text/plain">>),
-                att(<<"att2">>, ?ATT_SIZE_2, <<"app/binary">>)
-            ]
-        },
-        [Doc | Acc]
-    end, [], lists:seq(1, DocCount)),
+    Docs = lists:foldl(
+        fun(DocIdCounter, Acc) ->
+            Doc = #doc{
+                id = iolist_to_binary(["doc", integer_to_list(DocIdCounter)]),
+                body = {[]},
+                atts = [
+                    att(<<"att1">>, ?ATT_SIZE_1, <<"text/plain">>),
+                    att(<<"att2">>, ?ATT_SIZE_2, <<"app/binary">>)
+                ]
+            },
+            [Doc | Acc]
+        end,
+        [],
+        lists:seq(1, DocCount)
+    ),
     couch_replicator_test_helper:create_docs(DbName, Docs).
-
 
 att(Name, Size, Type) ->
     couch_att:new([
