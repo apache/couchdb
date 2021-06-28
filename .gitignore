@@ -79,6 +79,7 @@ src/parse_trans/
 src/passage/
 src/proper/
 src/rebar/
+src/rebar3/
 src/recon/
 src/smoosh/
 src/snappy/
