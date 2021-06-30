@@ -14,6 +14,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
+-include_lib("couch_replicator/include/couch_replicator_api_wrap.hrl").
 -include_lib("fabric/test/fabric2_test.hrl").
 
 replicator_proxy_test_() ->
@@ -28,7 +29,8 @@ replicator_proxy_test_() ->
                 ?TDEF(parse_rep_doc_with_proxy),
                 ?TDEF(parse_rep_source_target_proxy),
                 ?TDEF(mutually_exclusive_proxy_and_source_proxy),
-                ?TDEF(mutually_exclusive_proxy_and_target_proxy)
+                ?TDEF(mutually_exclusive_proxy_and_target_proxy),
+                ?TDEF(sock5_proxy_in_db_from_json)
             ])
         }
     }.
@@ -100,3 +102,33 @@ mutually_exclusive_proxy_and_target_proxy(_) ->
         {bad_rep_doc, _},
         couch_replicator_parse:parse_rep_doc(ProxyDoc)
     ).
+
+sock5_proxy_in_db_from_json(_) ->
+    SrcProxyURL = <<"socks5://u1:p1@mysrcproxy.com:1234">>,
+    TgtProxyURL = <<"http://u2:p2@mytgtproxy.com:9999">>,
+    ProxyDoc =
+        {[
+            {<<"source">>, <<"http://unproxied.com">>},
+            {<<"target">>, <<"http://otherunproxied.com">>},
+            {<<"source_proxy">>, SrcProxyURL},
+            {<<"target_proxy">>, TgtProxyURL}
+        ]},
+    Rep = couch_replicator_parse:parse_rep_doc(ProxyDoc),
+    Src = maps:get(?SOURCE, Rep),
+    Tgt = maps:get(?TARGET, Rep),
+    ?assertEqual(SrcProxyURL, maps:get(<<"proxy_url">>, Src)),
+    ?assertEqual(TgtProxyURL, maps:get(<<"proxy_url">>, Tgt)),
+    SrcHttpDb = couch_replicator_api_wrap:db_from_json(Src),
+    TgtHttpDb = couch_replicator_api_wrap:db_from_json(Tgt),
+    SrcOpts = SrcHttpDb#httpdb.ibrowse_options,
+    TgtOpts = TgtHttpDb#httpdb.ibrowse_options,
+    ?assertEqual(undefined, couch_util:get_value(proxy_protocol, SrcOpts)),
+    ?assertEqual(undefined, couch_util:get_value(proxy_protocol, TgtOpts)),
+    ?assertEqual("mysrcproxy.com", couch_util:get_value(socks5_host, SrcOpts)),
+    ?assertEqual("mytgtproxy.com", couch_util:get_value(proxy_host, TgtOpts)),
+    ?assertEqual(1234, couch_util:get_value(socks5_port, SrcOpts)),
+    ?assertEqual(9999, couch_util:get_value(proxy_port, TgtOpts)),
+    ?assertEqual("u1", couch_util:get_value(socks5_user, SrcOpts)),
+    ?assertEqual("u2", couch_util:get_value(proxy_user, TgtOpts)),
+    ?assertEqual("p1", couch_util:get_value(socks5_password, SrcOpts)),
+    ?assertEqual("p2", couch_util:get_value(proxy_password, TgtOpts)).
