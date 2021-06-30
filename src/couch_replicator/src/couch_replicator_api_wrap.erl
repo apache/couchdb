@@ -1035,6 +1035,10 @@ db_from_json(#{} = DbMap) ->
         [],
         Headers0
     ),
+    Socks5 = case maps:get(<<"proxy_protocol">>, IBrowseOptions0, undefined) of
+        <<"socks5">> -> true;
+        _ -> false
+    end,
     IBrowseOptions = maps:fold(
         fun
             (<<"socket_options">>, #{} = SockOpts, Acc) ->
@@ -1043,6 +1047,16 @@ db_from_json(#{} = DbMap) ->
             (<<"ssl_options">>, #{} = SslOpts, Acc) ->
                 SslOptsKVs = maps:fold(fun ssl_opts_fold/3, [], SslOpts),
                 [{ssl_options, SslOptsKVs} | Acc];
+            (<<"proxy_protocol">>, _Val, Acc) ->
+                Acc;
+            (<<"proxy_host">>, Val, Acc) when Socks5, is_binary(Val) ->
+                [{socks5_host, binary_to_list(Val)} | Acc];
+            (<<"proxy_port">>, Val, Acc) when Socks5, is_integer(Val) ->
+                [{socks5_port, Val} | Acc];
+            (<<"proxy_user">>, Val, Acc) when Socks5, is_binary(Val) ->
+                [{socks5_user, binary_to_list(Val)} | Acc];
+            (<<"proxy_password">>, Val, Acc) when Socks5, is_binary(Val) ->
+                [{socks5_password, binary_to_list(Val)} | Acc];
             (K, V, Acc) when is_binary(V) ->
                 [{binary_to_atom(K, utf8), binary_to_list(V)} | Acc];
             (K, V, Acc) ->
