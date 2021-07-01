@@ -132,11 +132,9 @@ defmodule BulkDocsTest do
 
   @tag :with_db
   test "bulk docs raises error for transaction larger than 10MB", ctx do
-    docs = [%{_id: "0", a: random_string(16_000_000)}]
-    old_size = Couch.get("/_node/node1@127.0.0.1/_config/couchdb/max_document_size").body
-    set_config_raw("couchdb", "max_document_size", "67108864") # 64M
+    # the default value for max_document_size is 8_000_000
+    docs = [%{_id: "0", a: random_string(9_000_000)}]
     resp = Couch.post("/#{ctx[:db_name]}/_bulk_docs", body: %{docs: docs})
-    set_config_raw("couchdb", "max_document_size", old_size) # set back
     assert resp.status_code == 413
     assert resp.body["error"] == "document_too_large"
     assert resp.body["reason"] == "0" # DocID
