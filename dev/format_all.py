@@ -26,6 +26,5 @@ if __name__ == "__main__":
     for item in get_source_paths():
         subprocess.run(
             [os.environ["ERLFMT_PATH"], "-w", item["raw_path"]],
-            encoding="utf-8",
             stdout=subprocess.PIPE,
         )

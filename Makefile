@@ -73,7 +73,7 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=folsom,meck,mochiweb,proper,bcrypt,hyper,local
+skip_deps=folsom,meck,mochiweb,proper,bcrypt,hyper,ibrowse,local
 suites=
 tests=
 
