@@ -25,6 +25,18 @@ defmodule SecurityValidationTest do
     spike: [
       # spike:dog
       authorization: "Basic c3Bpa2U6ZG9n"
+    ],
+    jerry_lowercase_basic: [
+      # jerry:mouse with lowercase 'Basic'
+      authorization: "basic amVycnk6bW91c2U="
+    ],
+    jerry_uppercase_basic: [
+      # jerry:mouse with uppercase 'Basic'
+      authorization: "BASIC amVycnk6bW91c2U="
+    ],
+    jerry_mixed_case_basic: [
+      # jerry:mouse with mixed case 'Basic'
+      authorization: "BAsIc amVycnk6bW91c2U="
     ]
   }
 
@@ -109,6 +121,33 @@ defmodule SecurityValidationTest do
     assert Couch.get("/_session", headers: headers).body["userCtx"]["name"] == "jerry"
 
     doc = %{_id: "testdoc", foo: 1, author: "jerry"}
+    assert Couch.post("/#{context[:db_name]}", body: doc).body["ok"]
+  end
+
+  @tag :with_db
+  test "Jerry with lowercase 'Basic' auth can save a document normally", context do
+    headers = @auth_headers[:jerry_lowercase_basic]
+    assert Couch.get("/_session", headers: headers).body["userCtx"]["name"] == "jerry"
+
+    doc = %{_id: "testdoc1", foo: 1, author: "jerry"}
+    assert Couch.post("/#{context[:db_name]}", body: doc).body["ok"]
+  end
+
+  @tag :with_db
+  test "Jerry with uppercase 'Basic' auth can save a document normally", context do
+    headers = @auth_headers[:jerry_uppercase_basic]
+    assert Couch.get("/_session", headers: headers).body["userCtx"]["name"] == "jerry"
+
+    doc = %{_id: "testdoc2", foo: 1, author: "jerry"}
+    assert Couch.post("/#{context[:db_name]}", body: doc).body["ok"]
+  end
+
+  @tag :with_db
+  test "Jerry with mixed case 'Basic' auth can save a document normally", context do
+    headers = @auth_headers[:jerry_mixed_case_basic]
+    assert Couch.get("/_session", headers: headers).body["userCtx"]["name"] == "jerry"
+
+    doc = %{_id: "testdoc3", foo: 1, author: "jerry"}
     assert Couch.post("/#{context[:db_name]}", body: doc).body["ok"]
   end
 
