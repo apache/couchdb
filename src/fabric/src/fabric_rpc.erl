@@ -304,7 +304,7 @@ reset_validation_funs(DbName) ->
 open_shard(Name, Opts) ->
     set_io_priority(Name, Opts),
     try
-        rexi:reply(couch_db:open(Name, Opts))
+        rexi:reply(mem3_util:get_or_create_db(Name, Opts))
     catch exit:{timeout, _} ->
         couch_stats:increment_counter([fabric, open_shard, timeouts])
     end.
@@ -439,7 +439,7 @@ get_node_seqs(Db, Nodes) ->
 
 
 get_or_create_db(DbName, Options) ->
-    mem3_util:get_or_create_db(DbName, Options).
+    mem3_util:get_or_create_db_int(DbName, Options).
 
 
 get_view_cb(#mrargs{extra = Options}) ->
