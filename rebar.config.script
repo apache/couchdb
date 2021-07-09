@@ -146,7 +146,7 @@ SubDirs = [
 
 DepDescs = [
 %% Independent Apps
-{config,           "config",           {tag, "2.1.8"}},
+{config,           "config",           {tag, "2.1.9"}},
 {b64url,           "b64url",           {tag, "1.0.2"}},
 {ets_lru,          "ets-lru",          {tag, "1.1.0"}},
 {khash,            "khash",            {tag, "1.1.0"}},
@@ -160,9 +160,9 @@ DepDescs = [
 %% Third party deps
 {folsom,           "folsom",           {tag, "CouchDB-0.8.4"}},
 {hyper,            "hyper",            {tag, "CouchDB-2.2.0-7"}},
-{ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-3"}},
+{ibrowse,          "ibrowse",          {tag, "CouchDB-4.4.2-5"}},
 {jiffy,            "jiffy",            {tag, "CouchDB-1.0.5-1"}},
-{mochiweb,         "mochiweb",         {tag, "v2.20.0"}},
+{mochiweb,         "mochiweb",         {tag, "v2.21.0"}},
 {meck,             "meck",             {tag, "0.9.2"}},
 {recon,            "recon",            {tag, "2.5.0"}}
 ].
@@ -197,7 +197,7 @@ ErlOpts = case os:getenv("ERL_OPTS") of
 end.
 
 AddConfig = [
-    {require_otp_vsn, "19|20|21|22|23|24"},
+    {require_otp_vsn, "20|21|22|23|24"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},

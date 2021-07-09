@@ -39,7 +39,7 @@ mock(couch_log) ->
 mock(config) ->
     meck:new(config, [passthrough]),
     meck:expect(config, get_integer,
-        fun("couchdb", "max_document_size", 4294967296) -> 1024 end),
+        fun("couchdb", "max_document_size", 8000000) -> 1024 end),
     meck:expect(config, get, fun(_, _) -> undefined end),
     meck:expect(config, get, fun(_, _, Default) -> Default end),
     ok.

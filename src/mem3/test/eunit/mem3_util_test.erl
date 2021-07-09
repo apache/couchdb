@@ -118,7 +118,7 @@ nval_test_() ->
         fun() ->
             meck:new([config, couch_log]),
             meck:expect(couch_log, error, 2, ok),
-            meck:expect(config, get, 3, "5")
+            meck:expect(config, get_integer, 3, 5)
         end,
         fun(_) -> meck:unload() end,
         [

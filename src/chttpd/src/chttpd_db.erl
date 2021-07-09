@@ -1713,8 +1713,8 @@ parse_doc_query(Req) ->
 
 parse_shards_opt(Req) ->
     [
-        {n, parse_shards_opt("n", Req, config:get("cluster", "n", "3"))},
-        {q, parse_shards_opt("q", Req, config:get("cluster", "q", "8"))},
+        {n, parse_shards_opt("n", Req, config:get_integer("cluster", "n", 3))},
+        {q, parse_shards_opt("q", Req, config:get_integer("cluster", "q", 2))},
         {placement, parse_shards_opt(
             "placement", Req, config:get("cluster", "placement"))}
     ].
@@ -2230,7 +2230,7 @@ t_should_default_on_missing_q() ->
     ?_test(begin
         Req = mock_request("/all-test21"),
         Opts = parse_shards_opt(Req),
-        ?assertEqual("8", couch_util:get_value(q, Opts))
+        ?assertEqual(2, couch_util:get_value(q, Opts))
     end).
 
 t_should_throw_on_invalid_q() ->
@@ -2251,7 +2251,7 @@ t_should_default_on_missing_n() ->
     ?_test(begin
         Req = mock_request("/all-test21"),
         Opts = parse_shards_opt(Req),
-        ?assertEqual("3", couch_util:get_value(n, Opts))
+        ?assertEqual(3, couch_util:get_value(n, Opts))
     end).
 
 t_should_throw_on_invalid_n() ->

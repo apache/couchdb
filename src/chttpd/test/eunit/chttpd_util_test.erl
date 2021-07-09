@@ -18,6 +18,15 @@
 
 
 setup() ->
+    ok = lists:foreach(fun(Section) ->
+        ok = config_delete_all_keys(Section)
+    end, ["httpd", "chttpd", "couch_httpd_auth", "chttpd_auth"]),
+
+    ok = config:set("httpd", "authentication_handlers",
+        "{couch_httpd_auth, cookie_authentication_handler}, "
+        "{couch_httpd_auth, default_authentication_handler}", _Persist = false),
+    ok = config:set("httpd", "backlog", "512", _Persist = false),
+    ok = config:set("chttpd", "require_valid_user", "false", _Persist = false),
     ok = config:set("httpd", "both_exist", "get_in_httpd", _Persist = false),
     ok = config:set("chttpd", "both_exist", "get_in_chttpd", _Persist = false),
     ok = config:set("httpd", "httpd_only", "true", _Persist = false),
@@ -29,6 +38,9 @@ setup() ->
 
 
 teardown(_) ->
+    ok = config:delete("httpd", "authentication_handlers", _Persist = false),
+    ok = config:delete("httpd", "backlog", _Persist = false),
+    ok = config:delete("chttpd", "require_valid_user", _Persist = false),
     ok = config:delete("httpd", "both_exist", _Persist = false),
     ok = config:delete("chttpd", "both_exist", _Persist = false),
     ok = config:delete("httpd", "httpd_only", _Persist = false),
@@ -37,6 +49,12 @@ teardown(_) ->
     ok = config:delete("chttpd_auth", "both_exist", _Persist = false),
     ok = config:delete("couch_httpd_auth", "cha_only", _Persist = false),
     ok = config:delete("chttpd_auth", "ca_only", _Persist = false).
+
+
+config_delete_all_keys(Section) ->
+    lists:foreach(fun({Key, _Val}) ->
+        ok = config:delete(Section, Key, _Persist = false)
+    end, config:get(Section)).
 
 
 chttpd_util_config_test_() ->
@@ -51,25 +69,17 @@ chttpd_util_config_test_() ->
                 fun setup/0,
                 fun teardown/1,
                 [
-                    ?TDEF_FE(test_behavior),
+                    ?TDEF_FE(test_chttpd_behavior),
                     ?TDEF_FE(test_with_undefined_option),
-                    ?TDEF_FE(test_with_httpd_option),
-                    ?TDEF_FE(test_with_chttpd_option),
-                    ?TDEF_FE(test_with_chttpd_option_which_moved_from_httpd),
-                    ?TDEF_FE(test_get_chttpd_config_integer),
-                    ?TDEF_FE(test_get_chttpd_config_boolean),
                     ?TDEF_FE(test_auth_behavior),
-                    ?TDEF_FE(test_auth_with_undefined_option),
-                    ?TDEF_FE(test_auth_with_moved_options),
-                    ?TDEF_FE(test_get_chttpd_auth_config_integer),
-                    ?TDEF_FE(test_get_chttpd_auth_config_boolean)
+                    ?TDEF_FE(test_auth_with_undefined_option)
                 ]
             }
         }
     }.
 
 
-test_behavior(_) ->
+test_chttpd_behavior(_) ->
     ?assertEqual("get_in_chttpd", chttpd_util:get_chttpd_config("both_exist")),
     ?assertEqual(1, chttpd_util:get_chttpd_config_integer("chttpd_only", 0)),
     ?assert(chttpd_util:get_chttpd_config_boolean("httpd_only", false)).
@@ -84,40 +94,6 @@ test_with_undefined_option(_) ->
     ?assertEqual("", chttpd_util:get_chttpd_config("undefined_option", "")),
     ?assert(chttpd_util:get_chttpd_config("undefined_option", true)),
     ?assertNot(chttpd_util:get_chttpd_config("undefined_option", false)).
-
-
-test_with_httpd_option(_) ->
-    ?assertEqual("{couch_httpd_auth, cookie_authentication_handler}, " ++
-            "{couch_httpd_auth, default_authentication_handler}",
-                    chttpd_util:get_chttpd_config("authentication_handlers")).
-
-
-test_with_chttpd_option(_) ->
-    ?assertEqual("512", chttpd_util:get_chttpd_config("backlog")),
-    ?assertEqual("512", chttpd_util:get_chttpd_config("backlog", 123)),
-    ?assertEqual(512, chttpd_util:get_chttpd_config_integer("backlog", 123)),
-    ?assertEqual("false",
-        chttpd_util:get_chttpd_config("require_valid_user")),
-    ?assertEqual("false",
-        chttpd_util:get_chttpd_config("require_valid_user", "true")),
-    ?assertEqual(false,
-        chttpd_util:get_chttpd_config_boolean("require_valid_user", true)).
-
-
-test_with_chttpd_option_which_moved_from_httpd(_) ->
-    ?assertEqual(undefined, chttpd_util:get_chttpd_config("max_uri_length")),
-    ?assertEqual(8000, chttpd_util:get_chttpd_config("max_uri_length", 8000)),
-    ?assertEqual(undefined, chttpd_util:get_chttpd_config("WWW-Authenticate")),
-    ?assert(chttpd_util:get_chttpd_config("enable_cors", true)).
-
-
-test_get_chttpd_config_integer(_) ->
-    ?assertEqual(123,
-        chttpd_util:get_chttpd_config_integer("max_http_request_size", 123)).
-
-
-test_get_chttpd_config_boolean(_) ->
-    ?assert(chttpd_util:get_chttpd_config_boolean("allow_jsonp", true)).
 
 
 test_auth_behavior(_) ->
@@ -135,22 +111,3 @@ test_auth_with_undefined_option(_) ->
     ?assertEqual("", chttpd_util:get_chttpd_auth_config("undefine", "")),
     ?assert(chttpd_util:get_chttpd_auth_config("undefine", true)),
     ?assertNot(chttpd_util:get_chttpd_auth_config("undefine", false)).
-
-
-test_auth_with_moved_options(_) ->
-    ?assertEqual("/_utils/session.html", chttpd_util:get_chttpd_auth_config(
-        "authentication_redirect", "/_utils/session.html")),
-    ?assert(chttpd_util:get_chttpd_auth_config("require_valid_user", true)),
-    ?assertEqual(10, chttpd_util:get_chttpd_auth_config("iterations", 10)).
-
-
-test_get_chttpd_auth_config_integer(_) ->
-    ?assertEqual(123, chttpd_util:get_chttpd_auth_config_integer(
-        "timeout", 123)).
-
-
-test_get_chttpd_auth_config_boolean(_) ->
-    ?assertNot(chttpd_util:get_chttpd_auth_config_boolean(
-        "require_valid_user", false)),
-    ?assert(chttpd_util:get_chttpd_auth_config_boolean(
-        "allow_persistent_cookies", true)).

@@ -401,7 +401,7 @@ rexi_call(Node, MFA, Timeout) ->
 
 
 get_or_create_db(DbName, Options) ->
-    mem3_util:get_or_create_db(DbName, Options).
+    mem3_util:get_or_create_db_int(DbName, Options).
 
 
 -ifdef(TEST).

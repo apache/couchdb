@@ -13,7 +13,7 @@
 -module(chttpd_auth_cache).
 -behaviour(gen_server).
 
--export([start_link/0, get_user_creds/2, update_user_creds/3]).
+-export([start_link/0, get_user_creds/2, update_user_creds/3, dbname/0]).
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2, terminate/2,
     code_change/3]).
 -export([listen_for_changes/1, changes_callback/2]).
