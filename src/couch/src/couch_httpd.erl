@@ -18,7 +18,15 @@
 
 -export([header_value/2, header_value/3, qs_value/2, qs_value/3, qs/1, qs_json_value/3]).
 -export([path/1, absolute_uri/2, body_length/1]).
--export([verify_is_server_admin/1, unquote/1, quote/1, recv/2, recv_chunked/4, error_info/1]).
+-export([
+    verify_is_server_admin/1,
+    unquote/1,
+    unquote_path/1,
+    quote/1,
+    recv/2,
+    recv_chunked/4,
+    error_info/1
+]).
 -export([make_fun_spec_strs/1]).
 -export([make_arity_1_fun/1, make_arity_2_fun/1, make_arity_3_fun/1]).
 -export([parse_form/1, json_body/1, json_body_obj/1, body/1]).
@@ -253,6 +261,9 @@ absolute_uri(_Req, _Path) ->
 
 unquote(UrlEncodedString) ->
     mochiweb_util:unquote(UrlEncodedString).
+
+unquote_path(UrlEncodedString) ->
+    couch_util:unquote_path(UrlEncodedString).
 
 quote(UrlDecodedString) ->
     mochiweb_util:quote_plus(UrlDecodedString).
