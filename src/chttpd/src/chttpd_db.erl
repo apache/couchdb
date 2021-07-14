@@ -1664,6 +1664,22 @@ couch_doc_open(Db, DocId, Rev, Options) ->
             end
     end.
 
+get_attachment(Req, Db, DocId, FileName) ->
+    % Check if attachment exists
+    #doc_query_args{
+        rev=Rev,
+        options=Options
+    } = parse_doc_query(Req),
+    #doc{
+        atts=Atts
+    } = Doc = couch_doc_open(Db, DocId, Rev, Options),
+    case [A || A <- Atts, couch_att:fetch(name, A) == FileName] of
+        [] ->
+            {error, missing};
+        [Att] ->
+            {ok, Doc, Att}
+    end.
+
 % Attachment request handlers
 
 db_attachment_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId, FileNameParts) ->
@@ -1676,17 +1692,10 @@ db_attachment_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId,
             "/"
         )
     ),
-    #doc_query_args{
-        rev = Rev,
-        options = Options
-    } = parse_doc_query(Req),
-    #doc{
-        atts = Atts
-    } = Doc = couch_doc_open(Db, DocId, Rev, Options),
-    case [A || A <- Atts, couch_att:fetch(name, A) == FileName] of
-        [] ->
+    case get_attachment(Req, Db, DocId, FileName) of
+        {error, missing} ->
             throw({not_found, "Document is missing attachment"});
-        [Att] ->
+        {ok, Doc, Att} ->
             [Type, Enc, DiskLen, AttLen, Md5] = couch_att:fetch(
                 [type, encoding, disk_len, att_len, md5], Att
             ),
@@ -1822,7 +1831,12 @@ db_attachment_req(#httpd{method = Method} = Req, Db, DocId, FileNameParts) when
     NewAtt =
         case Method of
             'DELETE' ->
-                [];
+                case get_attachment(Req, Db, DocId, FileName) of
+                    {error, missing} ->
+                        throw({not_found, "Document is missing attachment"});
+                    {ok, _, _} ->
+                        []
+                end;
             _ ->
                 MimeType =
                     case chttpd:header_value(Req, "Content-Type") of
