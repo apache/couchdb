@@ -109,6 +109,11 @@ defmodule AttachmentsTest do
     resp = Couch.delete("/#{db_name}/bin_doc/foo.txt", query: %{w: 3})
 
     assert resp.status_code == 409
+    
+    resp = Couch.delete("/#{db_name}/bin_doc/notexisting.txt", query: %{w: 3, rev: rev})
+    assert resp.status_code == 404
+    assert resp.body["error"] == "not_found"
+    assert resp.body["reason"] == "Document is missing attachment"
 
     resp = Couch.delete("/#{db_name}/bin_doc/foo.txt", query: %{w: 3, rev: rev})
     assert resp.status_code == 200
