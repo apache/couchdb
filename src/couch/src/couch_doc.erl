@@ -27,7 +27,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
-
 -spec to_path(#doc{}) -> path().
 to_path(#doc{revs = {Start, RevIds}} = Doc) ->
     [Branch] = to_branch(Doc, lists:reverse(RevIds)),
@@ -431,7 +430,7 @@ get_validate_doc_fun(#doc{body = {Props}} = DDoc) ->
             nil;
         _Else ->
             fun(EditDoc, DiskDoc, Ctx, SecObj) ->
-                couch_query_servers:validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj)
+                couch_eval:validate_doc_update(DDoc, EditDoc, DiskDoc, Ctx, SecObj)
             end
     end.
 
