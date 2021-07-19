@@ -147,7 +147,6 @@ fauxton: share/www
 .PHONY: check-all-tests
 # target: check - Test everything
 check-all-tests: all python-black
-	@$(MAKE) emilio
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir
@@ -159,8 +158,7 @@ subdirs=$(shell ls src)
 endif
 
 .PHONY: check
-check:  all
-	@$(MAKE) emilio
+check:  all 
 	@$(MAKE) erlfmt-check
 	@$(MAKE) eunit
 	@$(MAKE) elixir-suite
@@ -207,9 +205,6 @@ soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
 	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
-
-emilio:
-	@bin/emilio -c emilio.config src/ | bin/warnings_in_scope -s 3 || exit 0
 
 erlfmt-check:
 	ERLFMT_PATH=$(ERLFMT) python3 dev/format_check.py

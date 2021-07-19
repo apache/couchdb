@@ -132,7 +132,6 @@ fauxton: share\www
 .PHONY: check
 # target: check - Test everything
 check: all python-black
-	@$(MAKE) emilio
 	@$(MAKE) erlfmt-check
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
@@ -174,9 +173,6 @@ just-eunit: export BUILDDIR = $(shell pwd)
 just-eunit: export ERL_AFLAGS = "-config $(shell echo %cd%)/rel/files/eunit.config")
 just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
-
-emilio:
-	@bin\emilio -c emilio.config src\ | python.exe bin\warnings_in_scope -s 3 || exit 0
 
 erlfmt-check:
 	ERLFMT_PATH=bin\erlfmt python3 dev\format_check.py
