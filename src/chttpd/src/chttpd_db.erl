@@ -1442,11 +1442,8 @@ couch_doc_open(Db, DocId, Rev, Options0) ->
       end
   end.
 
-% Attachment request handlers
-
-db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNameParts) ->
-    FileName = list_to_binary(mochiweb_util:join(lists:map(fun binary_to_list/1,
-        FileNameParts),"/")),
+get_attachment(Req, Db, DocId, FileName) ->
+    % Check if attachment exists
     #doc_query_args{
         rev=Rev,
         options=Options
@@ -1455,9 +1452,21 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
         atts=Atts
     } = Doc = couch_doc_open(Db, DocId, Rev, Options),
     case [A || A <- Atts, couch_att:fetch(name, A) == FileName] of
-    [] ->
+        [] ->
+            {error, missing};
+        [Att] ->
+            {ok, Doc, Att}
+    end.
+
+% Attachment request handlers
+
+db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNameParts) ->
+    FileName = list_to_binary(mochiweb_util:join(lists:map(fun binary_to_list/1,
+        FileNameParts),"/")),
+    case get_attachment(Req, Db, DocId, FileName) of
+    {error, missing} ->
         throw({not_found, "Document is missing attachment"});
-    [Att] ->
+    {ok, Doc, Att} ->
         [Type, Enc, DiskLen, AttLen, Md5] = couch_att:fetch([type, encoding, disk_len, att_len, md5], Att),
         Refs = monitor_attachments(Att),
         try
@@ -1559,7 +1568,12 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
 
     NewAtt = case Method of
         'DELETE' ->
-            [];
+            case get_attachment(Req, Db, DocId, FileName) of
+                {error, missing} ->
+                    throw({not_found, "Document is missing attachment"});
+                {ok, _, _} ->
+                    []
+            end;
         _ ->
             MimeType = case couch_httpd:header_value(Req,"Content-Type") of
                 % We could throw an error here or guess by the FileName.
