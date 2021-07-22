@@ -88,7 +88,7 @@ setup_db() ->
     Ctx = test_util:start_couch([
         fabric,
         couch_jobs,
-        couch_js,
+        js_engine,
         couch_views
     ]),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),

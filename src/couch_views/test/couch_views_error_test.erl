@@ -45,7 +45,7 @@ setup() ->
         fabric,
         chttpd,
         couch_jobs,
-        couch_js,
+        js_engine,
         couch_views
     ]),
     Hashed = couch_passwords:hash_admin_password(?PASS),

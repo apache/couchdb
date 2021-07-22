@@ -52,7 +52,7 @@
 -define(PASSWORD, "rep_eunit_password").
 
 start_couch() ->
-    Ctx = test_util:start_couch([fabric, chttpd, couch_replicator, couch_js]),
+    Ctx = test_util:start_couch([fabric, chttpd, couch_replicator, js_engine]),
     Hashed = couch_passwords:hash_admin_password(?PASSWORD),
     ok = config:set("admins", ?USERNAME, ?b2l(Hashed), _Persist = false),
     Ctx.
