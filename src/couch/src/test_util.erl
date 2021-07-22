@@ -73,7 +73,8 @@ start_couch(ExtraApps) ->
 start_couch(IniFiles, ExtraApps) ->
     load_applications_with_stats(),
     ok = application:set_env(config, ini_files, IniFiles),
-    Apps = start_applications(?DEFAULT_APPS ++ ExtraApps),
+    ExtraApps1 = maybe_add_js_engine(ExtraApps),
+    Apps = start_applications(?DEFAULT_APPS ++ ExtraApps1),
     ok = config:delete("compactions", "_default", false),
     #test_context{started = Apps}.
 
@@ -336,3 +337,16 @@ sort_apps(Apps) ->
 
 weight_app(couch_log) -> {0.0, couch_log};
 weight_app(Else) -> {1.0, Else}.
+
+maybe_add_js_engine(Apps) ->
+    case lists:member(js_engine, Apps) of
+        false ->
+            Apps;
+        true ->
+            application:start(config),
+            % Deleting the config app from the list because we started it here
+            % and don't need to start it again.
+            Apps1 = lists:delete(config, Apps),
+            JS = list_to_atom(config:get("couch_eval.languages", "javascript", "couch_js")),
+            lists:delete(js_engine, Apps1) ++ [JS]
+    end.

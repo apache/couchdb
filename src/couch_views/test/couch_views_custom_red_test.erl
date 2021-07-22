@@ -70,7 +70,7 @@ setup_common(Enabled) ->
     Ctx = test_util:start_couch([
         fabric,
         couch_jobs,
-        couch_js,
+        js_engine,
         couch_views
     ]),
     config:set_boolean("couch_views", "custom_reduce_enabled", Enabled, false),

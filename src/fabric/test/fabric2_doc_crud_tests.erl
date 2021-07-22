@@ -72,7 +72,7 @@ doc_crud_test_() ->
     }.
 
 setup() ->
-    Ctx = test_util:start_couch([fabric, couch_js]),
+    Ctx = test_util:start_couch([fabric, js_engine]),
     {ok, Db} = fabric2_db:create(?tempdb(), [{user_ctx, ?ADMIN_USER}]),
     {Db, Ctx}.
 
