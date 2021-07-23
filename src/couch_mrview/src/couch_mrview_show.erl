@@ -259,7 +259,8 @@ fixup_headers(Headers, #lacc{etag=ETag} = Acc) ->
         headers = ExtHeaders
     } = chttpd_external:parse_external_response(Headers2),
     Headers3 = chttpd_external:default_or_content_type(CType, ExtHeaders),
-    Acc#lacc{code=Code, headers=Headers3}.
+    Headers4 = chttpd_util:maybe_add_csp_header("showlist", Headers3, "sandbox"),
+    Acc#lacc{code=Code, headers=Headers4}.
 
 send_list_row(Row, #lacc{qserver = {Proc, _}, req = Req, resp = Resp} = Acc) ->
     RowObj = case couch_util:get_value(id, Row) of
@@ -449,6 +450,7 @@ send_list_row_test_() ->
     }.
 
 setup() ->
+    ok = application:start(config, permanent),
     ok = meck:expect(chttpd, send_chunk,
         fun(Resp, _) -> {ok, Resp} end),
     ok = meck:expect(chttpd, send_chunked_error,

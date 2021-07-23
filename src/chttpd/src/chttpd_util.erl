@@ -21,7 +21,8 @@
     get_chttpd_auth_config/1,
     get_chttpd_auth_config/2,
     get_chttpd_auth_config_integer/2,
-    get_chttpd_auth_config_boolean/2
+    get_chttpd_auth_config_boolean/2,
+    maybe_add_csp_header/3
 ]).
 
 
@@ -60,3 +61,38 @@ get_chttpd_auth_config_integer(Key, Default) ->
 get_chttpd_auth_config_boolean(Key, Default) ->
     config:get_boolean("chttpd_auth", Key,
         config:get_boolean("couch_httpd_auth", Key, Default)).
+
+
+maybe_add_csp_header(Component, OriginalHeaders, DefaultHeaderValue) ->
+    Enabled = config:get_boolean("csp", Component ++ "_enable", true),
+    couch_log:notice("~n> maybe_add_csp_header~n Component: ~n~p~n OriginalHeaders: ~n~p~n DefaultHeaderValue: ~n~p~n, Enabled: ~n~p~n", [Component, OriginalHeaders, DefaultHeaderValue, Enabled]),
+    case Enabled of
+        true ->
+            HeaderValue = config:get("csp", Component ++ "_header_value", DefaultHeaderValue),
+            % As per https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy#multiple_content_security_policies
+            % The top most CSP header defines the most open policy,
+            % subsequent CSP headers set by show/list functions can
+            % only further restrict the policy.
+            %
+            % Ours goes on top and we don’t have to worry about additional
+            % headers set by users.
+            [{"Content-Security-Policy", HeaderValue} | OriginalHeaders];
+        false ->
+            % Fallback for old config vars
+            case Component of
+                "utils" ->
+                    handle_legacy_config(OriginalHeaders, DefaultHeaderValue);
+                _ ->
+                    OriginalHeaders
+            end
+    end.
+
+handle_legacy_config(OriginalHeaders, DefaultHeaderValue) ->
+    LegacyUtilsEnabled = config:get_boolean("csp", "enable", true),
+    case LegacyUtilsEnabled of
+        true ->
+            LegacyUtilsHeaderValue = config:get("csp", "header_value", DefaultHeaderValue),
+            [{"Content-Security-Policy", LegacyUtilsHeaderValue} | OriginalHeaders];
+        false ->
+            OriginalHeaders
+    end.

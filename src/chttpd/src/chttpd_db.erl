@@ -1477,7 +1477,7 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
        atom_to_list(Enc),
        couch_httpd:accepted_encodings(Req)
     ),
-    Headers = [
+    Headers0 = [
         {"ETag", Etag},
         {"Cache-Control", "must-revalidate"},
         {"Content-Type", binary_to_list(Type)}
@@ -1494,6 +1494,8 @@ db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNa
         _ ->
             [{"Accept-Ranges", "none"}]
     end,
+    Headers = chttpd_util:maybe_add_csp_header("attachments", Headers0, "sandbox"),
+    couch_log:notice("~n Headers0: ~n~p ~nHeaders: ~n~p~n", [Headers0, Headers]),
     Len = case {Enc, ReqAcceptsAttEnc} of
     {identity, _} ->
         % stored and served in identity form
