@@ -93,8 +93,9 @@ handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     {_ActionKey, "/", RelativePath} ->
         % GET /_utils/path or GET /_utils/
         CachingHeaders = [{"Cache-Control", "private, must-revalidate"}],
-        EnableCsp = config:get("csp", "enable", "true"),
-        Headers = maybe_add_csp_headers(CachingHeaders, EnableCsp),
+        DefaultValues = "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
+            "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
+        Headers = chttpd_util:maybe_add_csp_header("utils", CachingHeaders, DefaultValues),
         chttpd:serve_file(Req, RelativePath, DocumentRoot, Headers);
     {_ActionKey, "", _RelativePath} ->
         % GET /_utils
@@ -103,14 +104,6 @@ handle_utils_dir_req(#httpd{method='GET'}=Req, DocumentRoot) ->
     end;
 handle_utils_dir_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
-
-maybe_add_csp_headers(Headers, "true") ->
-    DefaultValues = "child-src 'self' data: blob:; default-src 'self'; img-src 'self' data:; font-src 'self'; "
-                    "script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
-    Value = config:get("csp", "header_value", DefaultValues),
-    [{"Content-Security-Policy", Value} | Headers];
-maybe_add_csp_headers(Headers, _) ->
-    Headers.
 
 handle_all_dbs_req(#httpd{method='GET'}=Req) ->
     Args = couch_mrview_http:parse_params(Req, undefined),
