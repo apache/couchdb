@@ -139,7 +139,8 @@ send_external_response(Req, Response) ->
     Headers1 = default_or_content_type(CType, Headers0),
     case Json of
     nil ->
-        chttpd:send_response(Req, Code, Headers1, Data);
+        Headers2 = chttpd_util:maybe_add_csp_header("showlist", Headers1, "sandbox"),
+        chttpd:send_response(Req, Code, Headers2, Data);
     Json ->
         chttpd:send_json(Req, Code, Headers1, Json)
     end.

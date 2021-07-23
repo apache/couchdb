@@ -69,6 +69,9 @@ all_test_() ->
                     fun should_return_404_for_delete_att_on_notadoc/1,
                     fun should_return_409_for_del_att_without_rev/1,
                     fun should_return_200_for_del_att_with_rev/1,
+                    fun should_not_send_csp_header_with_att_by_default/1,
+                    fun should_send_csp_header_with_att_when_configured/1,
+                    fun should_send_not_csp_header_with_att_when_no_config/1,
                     fun should_return_409_for_put_att_nonexistent_rev/1,
                     fun should_return_update_seq_when_set_on_all_docs/1,
                     fun should_not_return_update_seq_when_unset_on_all_docs/1,
@@ -206,6 +209,73 @@ should_return_200_for_del_att_with_rev(Url) ->
           []
       ),
       ?assertEqual(200, RC1)
+    end)}.
+
+
+should_not_send_csp_header_with_att_by_default(Url) ->
+  {timeout, ?TIMEOUT, ?_test(begin
+      {ok, RC, _, _} = test_request:put(
+          Url ++ "/testdoc5",
+          [?CONTENT_JSON, ?AUTH],
+          jiffy:encode(attachment_doc())
+      ),
+      ?assertEqual(201, RC),
+
+      {ok, _, Headers, _} = test_request:get(
+          Url ++ "/testdoc5/file.erl",
+          [?AUTH],
+          []
+      ),
+      CSPHeader = couch_util:get_value("Content-Security-Policy", Headers),
+      ?assertEqual(undefined, CSPHeader)
+    end)}.
+
+
+should_send_csp_header_with_att_when_configured(Url) ->
+  {timeout, ?TIMEOUT, ?_test(begin
+      {ok, RC, _, _} = test_request:put(
+          Url ++ "/testdoc51",
+          [?CONTENT_JSON, ?AUTH],
+          jiffy:encode(attachment_doc())
+      ),
+      ?assertEqual(201, RC),
+
+      config:set_boolean("csp", "attachments_enable", true, _Persist=false),
+
+      {ok, _, Headers, _} = test_request:get(
+          Url ++ "/testdoc51/file.erl",
+          [?AUTH],
+          []
+      ),
+      CSPHeader = couch_util:get_value("Content-Security-Policy", Headers),
+      ?assertEqual("sandbox", CSPHeader),
+
+      config:delete("csp", "attachments_enable", _Persist=false)
+
+    end)}.
+
+
+should_send_not_csp_header_with_att_when_no_config(Url) ->
+  {timeout, ?TIMEOUT, ?_test(begin
+      {ok, RC, _, _} = test_request:put(
+          Url ++ "/testdoc6",
+          [?CONTENT_JSON, ?AUTH],
+          jiffy:encode(attachment_doc())
+      ),
+      ?assertEqual(201, RC),
+
+      config:set_boolean("csp", "attachments_enable", false, _Persist=false),
+
+      {ok, _, Headers, _} = test_request:get(
+          Url ++ "/testdoc6/file.erl",
+          [?AUTH],
+          []
+      ),
+      CSPHeader = couch_util:get_value("Content-Security-Policy", Headers),
+      ?assertEqual(undefined, CSPHeader),
+
+      config:delete("csp", "attachments_enable", _Persist=false)
+
     end)}.
 
 
