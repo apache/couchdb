@@ -155,7 +155,7 @@ CouchJSSrc = case SMVsn of
     "1.8.5" -> ["priv/couch_js/1.8.5/*.c"];
     "60" -> ["priv/couch_js/60/*.cpp"];
     "68" -> ["priv/couch_js/68/*.cpp"];
-    "78" -> ["priv/couch_js/86/*.cpp"];
+    "78" -> ["priv/couch_js/78/*.cpp"];
     "86" -> ["priv/couch_js/86/*.cpp"]
 end.
 
