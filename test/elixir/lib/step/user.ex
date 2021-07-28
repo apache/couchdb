@@ -36,9 +36,9 @@ defmodule Couch.Test.Setup.Step.User do
       :config.get('chttpd_auth', 'authentication_db', '_users'))
     if not Utils.db_exists?(users_db) do
       on_exit fn ->
-        :fabric.delete_db(users_db, [@admin])
+        :fabric2_db.delete(users_db, [@admin])
       end
-      res = :fabric.create_db(users_db, [@admin])
+      res = :fabric2_db.create(users_db, [@admin])
       assert res in [:ok, :accepted], "Cannot create `users` database #{users_db}"
     end
 
@@ -63,7 +63,7 @@ defmodule Couch.Test.Setup.Step.User do
         roles: roles,
         password: pass
       })
-      res = :fabric.update_doc(users_db, user_doc, [@admin])
+      res = :fabric2_db.update_doc(users_db, user_doc, [@admin])
       assert res in [:ok, :accepted], "Cannot create user document"
       %{step |
         name: name,
@@ -79,13 +79,14 @@ defmodule Couch.Test.Setup.Step.User do
       :config.delete("admins", String.to_charlist(name), false)
     else
       doc_id = "org.couchdb.user:#{name}"
-      assert {:ok, doc_info(revs: [rev | _])} = :fabric.get_doc_info(users_db)
+      assert {:ok, doc_info(revs: [rev | _])} =
+        :fabric2_db.get_doc_info(users_db, doc_id)
       doc = :couch_doc.from_json_obj(%{
         _id: doc_id,
         _rev: rev,
         _deleted: true
       })
-      assert {:ok, _resp} = :fabric.update_doc(users_db, doc, [@admin])
+      assert {:ok, _resp} = :fabric2_db.update_doc(users_db, doc, [@admin])
     end
     :ok
   end

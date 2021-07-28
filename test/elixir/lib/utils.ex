@@ -23,7 +23,7 @@ defmodule Couch.Test.Utils do
 
   def db_exists?(db_name) do
     try do
-      :fabric.get_db_info(db_name)
+      :fabric2_db.get_db_info(db_name)
     catch
       :error, :database_does_not_exist -> false
     end
