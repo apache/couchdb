@@ -1568,12 +1568,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
 
     NewAtt = case Method of
         'DELETE' ->
-            case get_attachment(Req, Db, DocId, FileName) of
-                {error, missing} ->
-                    throw({not_found, "Document is missing attachment"});
-                {ok, _, _} ->
-                    []
-            end;
+            [];
         _ ->
             MimeType = case couch_httpd:header_value(Req,"Content-Type") of
                 % We could throw an error here or guess by the FileName.
@@ -1631,6 +1626,17 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
     end,
 
     #doc{atts=Atts} = Doc,
+    case Method of
+        'DELETE' ->
+            case get_attachment(Req, Db, DocId, FileName) of
+                {error, missing} ->
+                    throw({not_found, "Document is missing attachment"});
+                {ok, _, _} ->
+                    []
+            end;
+        _ ->
+            nil
+    end,
     DocEdited = Doc#doc{
         atts = NewAtt ++ [A || A <- Atts, couch_att:fetch(name, A) /= FileName]
     },
