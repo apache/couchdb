@@ -1442,20 +1442,12 @@ couch_doc_open(Db, DocId, Rev, Options0) ->
       end
   end.
 
-get_attachment(Req, Db, DocId, FileName) ->
-    % Check if attachment exists
-    #doc_query_args{
-        rev=Rev,
-        options=Options
-    } = parse_doc_query(Req),
-    #doc{
-        atts=Atts
-    } = Doc = couch_doc_open(Db, DocId, Rev, Options),
+
+get_existing_attachment(Atts, FileName) ->
+    % Check if attachment exists, if not throw not_found
     case [A || A <- Atts, couch_att:fetch(name, A) == FileName] of
-        [] ->
-            {error, missing};
-        [Att] ->
-            {ok, Doc, Att}
+        [] -> throw({not_found, "Document is missing attachment"});
+        [Att] -> Att
     end.
 
 % Attachment request handlers
@@ -1463,99 +1455,102 @@ get_attachment(Req, Db, DocId, FileName) ->
 db_attachment_req(#httpd{method='GET',mochi_req=MochiReq}=Req, Db, DocId, FileNameParts) ->
     FileName = list_to_binary(mochiweb_util:join(lists:map(fun binary_to_list/1,
         FileNameParts),"/")),
-    case get_attachment(Req, Db, DocId, FileName) of
-    {error, missing} ->
-        throw({not_found, "Document is missing attachment"});
-    {ok, Doc, Att} ->
-        [Type, Enc, DiskLen, AttLen, Md5] = couch_att:fetch([type, encoding, disk_len, att_len, md5], Att),
-        Refs = monitor_attachments(Att),
-        try
-        Etag = case Md5 of
-            <<>> -> chttpd:doc_etag(Doc);
-            _ -> "\"" ++ ?b2l(base64:encode(Md5)) ++ "\""
-        end,
-        ReqAcceptsAttEnc = lists:member(
-           atom_to_list(Enc),
-           couch_httpd:accepted_encodings(Req)
-        ),
-        Headers = [
-            {"ETag", Etag},
-            {"Cache-Control", "must-revalidate"},
-            {"Content-Type", binary_to_list(Type)}
-        ] ++ case ReqAcceptsAttEnc of
-        true when Enc =/= identity ->
-            % RFC 2616 says that the 'identify' encoding should not be used in
-            % the Content-Encoding header
-            [{"Content-Encoding", atom_to_list(Enc)}];
+    #doc_query_args{
+        rev=Rev,
+        options=Options
+    } = parse_doc_query(Req),
+    #doc{
+        atts=Atts
+    } = Doc = couch_doc_open(Db, DocId, Rev, Options),
+    Att = get_existing_attachment(Atts, FileName),
+    [Type, Enc, DiskLen, AttLen, Md5] = couch_att:fetch([type, encoding, disk_len, att_len, md5], Att),
+    Refs = monitor_attachments(Att),
+    try
+    Etag = case Md5 of
+        <<>> -> chttpd:doc_etag(Doc);
+        _ -> "\"" ++ ?b2l(base64:encode(Md5)) ++ "\""
+    end,
+    ReqAcceptsAttEnc = lists:member(
+       atom_to_list(Enc),
+       couch_httpd:accepted_encodings(Req)
+    ),
+    Headers = [
+        {"ETag", Etag},
+        {"Cache-Control", "must-revalidate"},
+        {"Content-Type", binary_to_list(Type)}
+    ] ++ case ReqAcceptsAttEnc of
+    true when Enc =/= identity ->
+        % RFC 2616 says that the 'identify' encoding should not be used in
+        % the Content-Encoding header
+        [{"Content-Encoding", atom_to_list(Enc)}];
+    _ ->
+        []
+    end ++ case Enc of
+        identity ->
+            [{"Accept-Ranges", "bytes"}];
         _ ->
-            []
-        end ++ case Enc of
-            identity ->
-                [{"Accept-Ranges", "bytes"}];
+            [{"Accept-Ranges", "none"}]
+    end,
+    Len = case {Enc, ReqAcceptsAttEnc} of
+    {identity, _} ->
+        % stored and served in identity form
+        DiskLen;
+    {_, false} when DiskLen =/= AttLen ->
+        % Stored encoded, but client doesn't accept the encoding we used,
+        % so we need to decode on the fly.  DiskLen is the identity length
+        % of the attachment.
+        DiskLen;
+    {_, true} ->
+        % Stored and served encoded.  AttLen is the encoded length.
+        AttLen;
+    _ ->
+        % We received an encoded attachment and stored it as such, so we
+        % don't know the identity length.  The client doesn't accept the
+        % encoding, and since we cannot serve a correct Content-Length
+        % header we'll fall back to a chunked response.
+        undefined
+    end,
+    AttFun = case ReqAcceptsAttEnc of
+    false ->
+        fun couch_att:foldl_decode/3;
+    true ->
+        fun couch_att:foldl/3
+    end,
+    chttpd:etag_respond(
+        Req,
+        Etag,
+        fun() ->
+            case Len of
+            undefined ->
+                {ok, Resp} = start_chunked_response(Req, 200, Headers),
+                AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, {ok, Resp}),
+                couch_httpd:last_chunk(Resp);
             _ ->
-                [{"Accept-Ranges", "none"}]
-        end,
-        Len = case {Enc, ReqAcceptsAttEnc} of
-        {identity, _} ->
-            % stored and served in identity form
-            DiskLen;
-        {_, false} when DiskLen =/= AttLen ->
-            % Stored encoded, but client doesn't accept the encoding we used,
-            % so we need to decode on the fly.  DiskLen is the identity length
-            % of the attachment.
-            DiskLen;
-        {_, true} ->
-            % Stored and served encoded.  AttLen is the encoded length.
-            AttLen;
-        _ ->
-            % We received an encoded attachment and stored it as such, so we
-            % don't know the identity length.  The client doesn't accept the
-            % encoding, and since we cannot serve a correct Content-Length
-            % header we'll fall back to a chunked response.
-            undefined
-        end,
-        AttFun = case ReqAcceptsAttEnc of
-        false ->
-            fun couch_att:foldl_decode/3;
-        true ->
-            fun couch_att:foldl/3
-        end,
-        chttpd:etag_respond(
-            Req,
-            Etag,
-            fun() ->
-                case Len of
-                undefined ->
-                    {ok, Resp} = start_chunked_response(Req, 200, Headers),
-                    AttFun(Att, fun(Seg, _) -> send_chunk(Resp, Seg) end, {ok, Resp}),
-                    couch_httpd:last_chunk(Resp);
-                _ ->
-                    Ranges = parse_ranges(MochiReq:get(range), Len),
-                    case {Enc, Ranges} of
-                        {identity, [{From, To}]} ->
-                            Headers1 = [{"Content-Range", make_content_range(From, To, Len)}]
-                                ++ Headers,
-                            {ok, Resp} = start_response_length(Req, 206, Headers1, To - From + 1),
-                            couch_att:range_foldl(Att, From, To + 1,
-                                fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp});
-                        {identity, Ranges} when is_list(Ranges) andalso length(Ranges) < 10 ->
-                            send_ranges_multipart(Req, Type, Len, Att, Ranges);
-                        _ ->
-                            Headers1 = Headers ++
-                                if Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
-                                    [{"Content-MD5", base64:encode(couch_att:fetch(md5, Att))}];
-                                true ->
-                                    []
-                            end,
-                            {ok, Resp} = start_response_length(Req, 200, Headers1, Len),
-                            AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
-                    end
+                Ranges = parse_ranges(MochiReq:get(range), Len),
+                case {Enc, Ranges} of
+                    {identity, [{From, To}]} ->
+                        Headers1 = [{"Content-Range", make_content_range(From, To, Len)}]
+                            ++ Headers,
+                        {ok, Resp} = start_response_length(Req, 206, Headers1, To - From + 1),
+                        couch_att:range_foldl(Att, From, To + 1,
+                            fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp});
+                    {identity, Ranges} when is_list(Ranges) andalso length(Ranges) < 10 ->
+                        send_ranges_multipart(Req, Type, Len, Att, Ranges);
+                    _ ->
+                        Headers1 = Headers ++
+                            if Enc =:= identity orelse ReqAcceptsAttEnc =:= true ->
+                                [{"Content-MD5", base64:encode(couch_att:fetch(md5, Att))}];
+                            true ->
+                                []
+                        end,
+                        {ok, Resp} = start_response_length(Req, 200, Headers1, Len),
+                        AttFun(Att, fun(Seg, _) -> send(Resp, Seg) end, {ok, Resp})
                 end
             end
-        )
-        after
-            demonitor_refs(Refs)
         end
+    )
+    after
+        demonitor_refs(Refs)
     end;
 
 
@@ -1568,12 +1563,7 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
 
     NewAtt = case Method of
         'DELETE' ->
-            case get_attachment(Req, Db, DocId, FileName) of
-                {error, missing} ->
-                    throw({not_found, "Document is missing attachment"});
-                {ok, _, _} ->
-                    []
-            end;
+            [];
         _ ->
             MimeType = case couch_httpd:header_value(Req,"Content-Type") of
                 % We could throw an error here or guess by the FileName.
@@ -1613,8 +1603,9 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
     Doc = case extract_header_rev(Req, chttpd:qs_value(Req, "rev")) of
         missing_rev -> % make the new doc
             if Method =/= 'DELETE' -> ok; true ->
-                % check for the existence of the doc to handle the 404 case.
-                couch_doc_open(Db, DocId, nil, [])
+                % check for the existence of the doc and attachment
+                CurrDoc = #doc{} = couch_doc_open(Db, DocId, nil, []),
+                get_existing_attachment(CurrDoc#doc.atts, FileName)
             end,
             couch_db:validate_docid(Db, DocId),
             #doc{id=DocId};
@@ -1622,6 +1613,10 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
             case fabric:open_revs(Db, DocId, [Rev], [{user_ctx,Ctx}]) of
             {ok, [{ok, Doc0}]} ->
                 chttpd_stats:incr_reads(),
+                if Method =/= 'DELETE' -> ok; true ->
+                    % check if attachment exists
+                    get_existing_attachment(Doc0#doc.atts, FileName)
+                end,
                 Doc0;
             {ok, [Error]} ->
                 throw(Error);
