@@ -1628,14 +1628,11 @@ db_attachment_req(#httpd{method=Method, user_ctx=Ctx}=Req, Db, DocId, FileNamePa
     #doc{atts=Atts} = Doc,
     case Method of
         'DELETE' ->
-            case get_attachment(Req, Db, DocId, FileName) of
-                {error, missing} ->
-                    throw({not_found, "Document is missing attachment"});
-                {ok, _, _} ->
-                    []
+            case [A || A <- Atts, couch_att:fetch(name, A) == FileName] of
+                [] -> throw({not_found, "Document is missing attachment"});
+                _ ->  ok
             end;
-        _ ->
-            nil
+        _ -> ok
     end,
     DocEdited = Doc#doc{
         atts = NewAtt ++ [A || A <- Atts, couch_att:fetch(name, A) /= FileName]
