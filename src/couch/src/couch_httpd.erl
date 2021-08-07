@@ -579,7 +579,7 @@ absolute_uri(_Req, _Path) ->
     throw({bad_request, "path must begin with a /."}).
 
 unquote(UrlEncodedString) ->
-    mochiweb_util:unquote(UrlEncodedString).
+    chttpd:unquote(UrlEncodedString).
 
 quote(UrlDecodedString) ->
     mochiweb_util:quote_plus(UrlDecodedString).

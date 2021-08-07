@@ -137,17 +137,20 @@ assert_not_preflight_(Val) ->
 
 
 cors_disabled_test_() ->
-    {"CORS disabled tests",
-        [
-            {"Empty user",
-                {foreach,
-                    fun empty_cors_config/0,
-                    [
-                        fun test_no_access_control_method_preflight_request_/1,
-                        fun test_no_headers_/1,
-                        fun test_no_headers_server_/1,
-                        fun test_no_headers_db_/1
-                    ]}}]}.
+    {"CORS disabled tests", [
+        {"Empty user",
+            {setup,
+                fun chttpd_test_util:start_couch/0,
+                fun chttpd_test_util:stop_couch/1,
+                {foreach, fun empty_cors_config/0, [
+                    fun test_no_access_control_method_preflight_request_/1,
+                    fun test_no_headers_/1,
+                    fun test_no_headers_server_/1,
+                    fun test_no_headers_db_/1
+                ]}
+            }
+        }
+    ]}.
 
 
 %% CORS enabled tests
@@ -155,20 +158,24 @@ cors_disabled_test_() ->
 
 cors_enabled_minimal_config_test_() ->
     {"Minimal CORS enabled, no Origins",
-        {foreach,
-            fun minimal_cors_config/0,
-            [
+        {setup,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
+            {foreach, fun minimal_cors_config/0, [
                 fun test_no_access_control_method_preflight_request_/1,
                 fun test_incorrect_origin_simple_request_/1,
                 fun test_incorrect_origin_preflight_request_/1
-            ]}}.
+            ]}
+        }
+    }.
 
 
 cors_enabled_simple_config_test_() ->
     {"Simple CORS config",
-        {foreach,
-            fun simple_cors_config/0,
-            [
+        {setup,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
+            {foreach, fun simple_cors_config/0, [
                 fun test_no_access_control_method_preflight_request_/1,
                 fun test_preflight_request_/1,
                 fun test_bad_headers_preflight_request_/1,
@@ -180,23 +187,29 @@ cors_enabled_simple_config_test_() ->
                 fun test_preflight_with_scheme_no_origin_/1,
                 fun test_preflight_with_scheme_port_no_origin_/1,
                 fun test_case_sensitive_mismatch_of_allowed_origins_/1
-            ]}}.
+            ]}
+        }
+    }.
 
 cors_enabled_custom_config_test_() ->
     {"Simple CORS config with custom allow_methods/allow_headers/exposed_headers",
-        {foreach,
-            fun custom_cors_config/0,
-            [
+        {setup,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
+            {foreach, fun custom_cors_config/0, [
                 fun test_good_headers_preflight_request_with_custom_config_/1,
                 fun test_db_request_with_custom_config_/1
-            ]}}.
+            ]}
+        }
+    }.
 
 
 cors_enabled_multiple_config_test_() ->
     {"Multiple options CORS config",
-        {foreach,
-            fun multiple_cors_config/0,
-            [
+        {setup,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
+            {foreach, fun multiple_cors_config/0, [
                 fun test_no_access_control_method_preflight_request_/1,
                 fun test_preflight_request_/1,
                 fun test_db_request_/1,
@@ -205,7 +218,9 @@ cors_enabled_multiple_config_test_() ->
                 fun test_preflight_with_port_with_origin_/1,
                 fun test_preflight_with_scheme_with_origin_/1,
                 fun test_preflight_with_scheme_port_with_origin_/1
-            ]}}.
+            ]}
+        }
+    }.
 
 
 %% Access-Control-Allow-Credentials tests
@@ -251,9 +266,10 @@ db_request_credentials_header_on_test_() ->
 
 cors_enabled_wildcard_test_() ->
     {"Wildcard CORS config",
-        {foreach,
-            fun wildcard_cors_config/0,
-            [
+        {setup,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
+            {foreach, fun wildcard_cors_config/0, [
                 fun test_no_access_control_method_preflight_request_/1,
                 fun test_preflight_request_/1,
                 fun test_preflight_request_no_allow_credentials_/1,
@@ -265,7 +281,9 @@ cors_enabled_wildcard_test_() ->
                 fun test_preflight_with_scheme_with_origin_/1,
                 fun test_preflight_with_scheme_port_with_origin_/1,
                 fun test_case_sensitive_mismatch_of_allowed_origins_/1
-            ]}}.
+            ]}
+        }
+    }.
 
 
 %% Test generators
