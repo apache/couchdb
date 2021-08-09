@@ -19,7 +19,15 @@
 -export([filter_view/3]).
 -export([finalize/2]).
 
--export([with_ddoc_proc/2, proc_prompt/2, ddoc_prompt/3, ddoc_proc_prompt/3, json_doc/1]).
+-export([
+    with_ddoc_proc/2,
+    proc_prompt/2,
+    ddoc_prompt/3,
+    ddoc_proc_prompt/3,
+    json_doc_options/0,
+    json_doc/1,
+    json_doc/2
+]).
 
 % For 210-os-proc-pool.t
 -export([get_os_process/1, get_ddoc_process/2, ret_os_process/1]).
