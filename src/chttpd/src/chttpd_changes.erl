@@ -242,7 +242,7 @@ filter(Db, Change, {design_docs, Style}) ->
     end;
 filter(Db, Change, {view, Style, DDoc, VName}) ->
     Docs = open_revs(Db, Change, Style),
-    {ok, Passes} = couch_query_servers:filter_view(DDoc, VName, Docs),
+    {ok, Passes} = couch_eval:filter_view(DDoc, VName, Docs),
     filter_revs(Passes, Docs);
 filter(Db, Change, {custom, Style, Req0, DDoc, FName}) ->
     Req =
@@ -251,7 +251,7 @@ filter(Db, Change, {custom, Style, Req0, DDoc, FName}) ->
             #httpd{} -> {json_req, chttpd_external:json_req_obj(Req0, Db)}
         end,
     Docs = open_revs(Db, Change, Style),
-    {ok, Passes} = couch_query_servers:filter_docs(Req, Db, DDoc, FName, Docs),
+    {ok, Passes} = couch_eval:filter_docs(Req, Db, DDoc, FName, Docs),
     filter_revs(Passes, Docs);
 filter(Db, Change, Filter) ->
     erlang:error({filter_error, Db, Change, Filter}).

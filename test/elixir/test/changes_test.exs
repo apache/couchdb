@@ -133,6 +133,8 @@ defmodule ChangesTest do
     assert length(resp.body["results"]) == 2
   end
 
+  #ignoring for now because erlang functions are not supported in couch_eval
+  @tag :skip
   @tag :with_db
   test "erlang function filtered changes", context do
     db_name = context[:db_name]

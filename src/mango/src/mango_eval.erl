@@ -19,7 +19,10 @@
     map_docs/2,
     acquire_context/0,
     release_context/1,
-    try_compile/4
+    try_compile/4,
+    validate_doc_update/5,
+    filter_view/3,
+    filter_docs/5
 ]).
 
 -export([
@@ -70,6 +73,17 @@ release_context(_) ->
 
 try_compile(_Ctx, _FunType, _IndexName, IndexInfo) ->
     mango_idx_view:validate_index_def(IndexInfo).
+
+% Add these functions in so that it implements the couch_eval
+% even though it is not supported
+validate_doc_update(_DDoc, _EditDoc, _DiskDoc, _UserCtx, _SecObj) ->
+    throw({not_supported}).
+
+filter_view(_DDoc, _VName, _Docs) ->
+    throw({not_supported}).
+
+filter_docs(_Req, _Db, _DDoc, _FName, _Docs) ->
+    throw({not_supported}).
 
 index_doc(Indexes, Doc) ->
     lists:map(
