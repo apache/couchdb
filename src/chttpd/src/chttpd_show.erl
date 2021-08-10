@@ -95,11 +95,12 @@ show_etag(#httpd{user_ctx=UserCtx}=Req, Doc, DDoc, More) ->
     couch_httpd:make_etag({couch_httpd:doc_etag(DDoc), DocPart, Accept,
         UserCtx#user_ctx.roles, More}).
 
-% /db/_design/foo/update/bar/docid
-% updates a doc based on a request
-% handle_doc_update_req(#httpd{method = 'GET'}=Req, _Db, _DDoc) ->
-%     % anything but GET
-%     send_method_not_allowed(Req, "POST,PUT,DELETE,ETC");
+
+handle_doc_update_req(#httpd{
+        method=Method,
+        path_parts=[_, <<"_design">>, _, <<"_update">> | _MaybeDocIdParts]
+    }=Req, _Db, _DDoc) when Method =/= 'POST' andalso Method =/= 'PUT' ->
+    chttpd:send_method_not_allowed(Req, "POST,PUT");
 
 handle_doc_update_req(#httpd{
         path_parts=[_, _, _, _, UpdateName]

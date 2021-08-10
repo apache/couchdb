@@ -106,6 +106,17 @@ defmodule UpdateDocumentsTest do
   @document %{word: "plankton", name: "Rusty"}
 
   @tag :with_db
+  test "update error method not allowed", context do
+    db_name = context[:db_name]
+    create_doc(db_name, @ddoc)
+
+    resp = Couch.get("/#{db_name}/_design/update/_update/")
+    assert resp.status_code == 405
+    assert resp.body["error"] == "method_not_allowed"
+    assert resp.body["reason"] == "Only POST,PUT allowed"
+  end
+
+  @tag :with_db
   test "update error invalid path", context do
     db_name = context[:db_name]
     create_doc(db_name, @ddoc)
@@ -135,7 +146,7 @@ defmodule UpdateDocumentsTest do
     # Fix for COUCHDB-379
     assert String.starts_with?(resp.headers["Server"], "CouchDB")
 
-    resp = Couch.put("/#{db_name}/_design/update/_update/hello")
+    resp = Couch.post("/#{db_name}/_design/update/_update/hello")
     assert resp.status_code == 200
     assert resp.body == "<p>Empty World</p>"
   end
@@ -246,7 +257,7 @@ defmodule UpdateDocumentsTest do
   test "Server provides UUID when POSTing without an ID in the URL", context do
     db_name = context[:db_name]
     create_doc(db_name, @ddoc)
-    resp = Couch.put("/#{db_name}/_design/update/_update/get-uuid/")
+    resp = Couch.post("/#{db_name}/_design/update/_update/get-uuid/")
     assert resp.status_code == 200
     assert String.length(resp.body) == 32
   end
@@ -286,10 +297,10 @@ defmodule UpdateDocumentsTest do
     assert resp.status_code == 200
     assert resp.body["counter"] == 3
 
-    resp = Couch.put("/#{db_name}/_design/update/_update/resp-code/")
+    resp = Couch.post("/#{db_name}/_design/update/_update/resp-code/")
     assert resp.status_code == 302
 
-    resp = Couch.put("/#{db_name}/_design/update/_update/resp-code-and-json/")
+    resp = Couch.post("/#{db_name}/_design/update/_update/resp-code-and-json/")
     assert resp.status_code == 302
     assert resp.body["ok"] == true
   end
