@@ -575,7 +575,7 @@ get_compacted_seq(#db{}=Db) ->
 get_compactor_pid(#db{compactor_pid = Pid}) ->
     Pid.
 
-get_compactor_pid_sync(#db{main_pid=Pid}=Db) ->
+get_compactor_pid_sync(#db{main_pid=Pid}) ->
     case gen_server:call(Pid, compactor_pid, infinity) of
         CPid when is_pid(CPid) ->
             CPid;
