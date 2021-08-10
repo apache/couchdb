@@ -363,7 +363,7 @@ handle_info(maybe_close, State) ->
                     {stop, normal, State}
             end;
         _ ->
-            erlang:send_after(?CHECK_INTERVAL, self, maybe_close),
+            erlang:send_after(?CHECK_INTERVAL, self(), maybe_close),
             {noreply, State}
     end;
 handle_info({'DOWN', _, _, _Pid, _}, #st{mod=Mod, idx_state=IdxState}=State) ->
