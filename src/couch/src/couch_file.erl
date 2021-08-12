@@ -38,7 +38,7 @@
 
 % public API
 -export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, set_db_pid/2]).
--export([pread_term/2, pread_iolist/2, pread_binary/2]).
+-export([pread_term/2, pread_term/3, pread_iolist/2, pread_binary/2]).
 -export([append_binary/2, append_binary_md5/2]).
 -export([append_raw_chunk/2, assemble_file_chunk/1, assemble_file_chunk/2]).
 -export([append_term/2, append_term/3, append_term_md5/2, append_term_md5/3]).
@@ -155,10 +155,38 @@ assemble_file_chunk(Bin, Md5) ->
 %%  or {error, Reason}.
 %%----------------------------------------------------------------------
 
-
 pread_term(Fd, Pos) ->
+    UseCache = config:get_boolean("couchdb", "use_couch_file_cache", true),
+    pread_term(Fd, Pos, UseCache).
+
+
+pread_term(Fd, Pos, true) ->
+    case erlang:get(couch_file_hash) of
+        undefined ->
+            pread_term(Fd, Pos, false);
+        _ ->
+            load_from_cache(Fd, Pos)
+    end;
+pread_term(Fd, Pos, false) ->
     {ok, Bin} = pread_binary(Fd, Pos),
     {ok, couch_compress:decompress(Bin)}.
+
+
+%% TODO: add purpose docs
+load_from_cache(Fd, Pos) ->
+    Hash = erlang:get(couch_file_hash),
+    case ets:lookup(Hash, Pos) of
+        [{Pos, {ok, Res}}] ->
+            {ok, Res};
+        [] ->
+            %% TODO: don't repeat this, but avoid circular recursion
+            %% pread_term(Fd, Pos, false),
+            {ok, Bin} = pread_binary(Fd, Pos),
+            Val = {ok, couch_compress:decompress(Bin)},
+            %% TODO: should probably be inserted directly by the gen_server
+            gen_server:cast(Fd, {cache, Pos, Val}),
+            Val
+    end.
 
 
 %%----------------------------------------------------------------------
@@ -407,6 +435,9 @@ init({Filepath, Options, ReturnPid, Ref}) ->
     Limit = get_pread_limit(),
     IsSys = lists:member(sys_db, Options),
     update_read_timestamp(),
+    Tab = list_to_atom(integer_to_list(mem3_hash:crc32(Filepath))),
+    erlang:put(couch_file_cache, Tab),
+    ets:new(Tab, [set, protected, named_table, {read_concurrency, true}]),
     case lists:member(create, Options) of
     true ->
         filelib:ensure_dir(Filepath),
@@ -600,6 +631,12 @@ handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
 handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
     {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File}.
 
+
+handle_cast({cache, Key, Val}, Fd) ->
+    %% TODO: should we skip if value exists?
+    Tab = erlang:get(couch_file_cache),
+    ets:insert(Tab, {Key, Val}),
+    {noreply, Fd};
 handle_cast(close, Fd) ->
     {stop,normal,Fd}.
 

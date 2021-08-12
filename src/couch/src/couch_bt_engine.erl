@@ -846,6 +846,8 @@ copy_props(#st{header = Header} = St, Props) ->
 
 
 open_db_file(FilePath, Options) ->
+    Hash = list_to_atom(integer_to_list(mem3_hash:crc32(FilePath))),
+    erlang:put(couch_file_hash, Hash),
     case couch_file:open(FilePath, Options) of
         {ok, Fd} ->
             {ok, Fd};

@@ -944,6 +944,13 @@ set_update_seq(#db{} = Db, UpdateSeq) ->
 
 
 open_docs(#db{} = Db, DocIds) ->
+    case erlang:get(couch_file_hash) of
+        undefined ->
+            Hash = list_to_atom(integer_to_list(mem3_hash:crc32(Db#db.filepath))),
+            erlang:put(couch_file_hash, Hash);
+        _ ->
+            ok
+    end,
     #db{engine = {Engine, EngineState}} = Db,
     Engine:open_docs(EngineState, DocIds).
 
