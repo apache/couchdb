@@ -14,6 +14,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("ioq/include/ioq.hrl").
 
 -export([compact/3, swap_compacted/2, remove_compacted/1]).
 
@@ -46,8 +47,9 @@ compact(State) ->
     erlang:put(io_priority, {view_compact, DbName, IdxName}),
 
     {EmptyState, NumDocIds} = couch_util:with_db(DbName, fun(Db) ->
+        IOQPid = ioq:ioq_pid(couch_db:get_fd_handle(Db)),
         CompactFName = couch_mrview_util:compaction_file(DbName, Sig),
-        {ok, Fd} = couch_mrview_util:open_file(CompactFName),
+        {ok, Fd} = couch_mrview_util:open_file(CompactFName, IOQPid),
         ESt = couch_mrview_util:reset_index(Db, Fd, State),
 
         {ok, Count} = couch_db:get_doc_count(Db),
@@ -125,7 +127,7 @@ compact(State) ->
         lists:zip(Views, EmptyViews)
     ),
 
-    unlink(EmptyState#mrst.fd),
+    unlink(ioq:fd_pid(EmptyState#mrst.fd)),
     {ok, EmptyState#mrst{
         id_btree = NewIdBtree,
         views = NewViews,
@@ -139,7 +141,7 @@ recompact(#mrst{db_name = DbName, idx_name = IdxName}, 0) ->
     erlang:error({exceeded_recompact_retry_count, [{db_name, DbName}, {idx_name, IdxName}]});
 recompact(State, RetryCount) ->
     Self = self(),
-    link(State#mrst.fd),
+    link(ioq:fd_pid(State#mrst.fd)),
     {Pid, Ref} = erlang:spawn_monitor(fun() ->
         couch_index_updater:update(Self, couch_mrview_index, State)
     end),
@@ -151,10 +153,10 @@ recompact_loop(Pid, Ref, State, RetryCount) ->
             % We've made progress so reset RetryCount
             recompact_loop(Pid, Ref, State2, recompact_retry_count());
         {'DOWN', Ref, _, _, {updated, Pid, State2}} ->
-            unlink(State#mrst.fd),
+            unlink(ioq:fd_pid(State#mrst.fd)),
             {ok, State2};
         {'DOWN', Ref, _, _, Reason} ->
-            unlink(State#mrst.fd),
+            unlink(ioq:fd_pid(State#mrst.fd)),
             couch_log:warning("Error during recompaction: ~r", [Reason]),
             recompact(State, RetryCount - 1)
     end.
@@ -239,8 +241,8 @@ swap_compacted(OldState, NewState) ->
         fd = NewFd
     } = NewState,
 
-    link(NewState#mrst.fd),
-    Ref = erlang:monitor(process, NewState#mrst.fd),
+    link(ioq:fd_pid(NewState#mrst.fd)),
+    Ref = erlang:monitor(process, ioq:fd_pid(NewState#mrst.fd)),
 
     RootDir = couch_index_util:root_dir(),
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
@@ -256,7 +258,7 @@ swap_compacted(OldState, NewState) ->
     ok = couch_file:delete(RootDir, IndexFName),
     ok = file:rename(CompactFName, IndexFName),
 
-    unlink(OldState#mrst.fd),
+    unlink(ioq:fd_pid(OldState#mrst.fd)),
     erlang:demonitor(OldState#mrst.fd_monitor, [flush]),
 
     {ok, NewState#mrst{fd_monitor = Ref}}.
@@ -295,7 +297,7 @@ recompact_success_after_progress() ->
             timer:sleep(100),
             exit({updated, self(), State#mrst{update_seq = 2}})
         end),
-        State = #mrst{fd = self(), update_seq = 0},
+        State = #mrst{fd=#ioq_file{fd=self()}, update_seq=0},
         ?assertEqual({ok, State#mrst{update_seq = 2}}, recompact(State))
     end).
 
@@ -309,9 +311,10 @@ recompact_exceeded_retry_count() ->
             end
         ),
         ok = meck:expect(couch_log, warning, fun(_, _) -> ok end),
-        State = #mrst{fd = self(), db_name = foo, idx_name = bar},
-        ExpectedError = {exceeded_recompact_retry_count, [{db_name, foo}, {idx_name, bar}]},
-        ?assertError(ExpectedError, recompact(State))
+        State = #mrst{fd=#ioq_file{fd=self()}, db_name=foo, idx_name=bar},
+        ExpectedError = {exceeded_recompact_retry_count,
+            [{db_name, foo}, {idx_name, bar}]},
+            ?assertError(ExpectedError, recompact(State))
     end).
 
 -endif.

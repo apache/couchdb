@@ -90,64 +90,64 @@ start(#st{} = St, DbName, Options, Parent) ->
 open_compaction_files(DbName, OldSt, Options) ->
     #st{
         filepath = DbFilePath,
-        header = SrcHdr
+        header = SrcHdr,
+        fd = OldFd
     } = OldSt,
+    IOQPid = ioq:ioq_pid(OldFd),
     DataFile = DbFilePath ++ ".compact.data",
     MetaFile = DbFilePath ++ ".compact.meta",
-    {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
-    {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile),
+    {ok, DataFd, DataHdr} = open_compaction_file(DataFile, IOQPid),
+    {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile, IOQPid),
     DataHdrIsDbHdr = couch_bt_engine_header:is_header(DataHdr),
-    CompSt =
-        case {DataHdr, MetaHdr} of
-            {#comp_header{} = A, #comp_header{} = A} ->
-                % We're restarting a compaction that did not finish
-                % before trying to swap out with the original db
-                DbHeader = A#comp_header.db_header,
-                St0 = couch_bt_engine:init_state(
-                    DataFile, DataFd, DbHeader, Options
-                ),
-                St1 = bind_emsort(St0, MetaFd, A#comp_header.meta_st),
-                #comp_st{
-                    db_name = DbName,
-                    old_st = OldSt,
-                    new_st = St1,
-                    meta_fd = MetaFd,
-                    retry = St0#st.id_tree
-                };
-            _ when DataHdrIsDbHdr ->
-                % We tried to swap out the compaction but there were
-                % writes to the database during compaction. Start
-                % a compaction retry.
-                Header = couch_bt_engine_header:from(SrcHdr),
-                ok = reset_compaction_file(MetaFd, Header),
-                St0 = couch_bt_engine:init_state(
-                    DataFile, DataFd, DataHdr, Options
-                ),
-                St1 = bind_emsort(St0, MetaFd, nil),
-                #comp_st{
-                    db_name = DbName,
-                    old_st = OldSt,
-                    new_st = St1,
-                    meta_fd = MetaFd,
-                    retry = St0#st.id_tree
-                };
-            _ ->
-                % We're starting a compaction from scratch
-                Header = couch_bt_engine_header:from(SrcHdr),
-                ok = reset_compaction_file(DataFd, Header),
-                ok = reset_compaction_file(MetaFd, Header),
-                St0 = couch_bt_engine:init_state(DataFile, DataFd, Header, Options),
-                St1 = bind_emsort(St0, MetaFd, nil),
-                #comp_st{
-                    db_name = DbName,
-                    old_st = OldSt,
-                    new_st = St1,
-                    meta_fd = MetaFd,
-                    retry = nil
-                }
-        end,
-    unlink(DataFd),
-    erlang:monitor(process, MetaFd),
+    CompSt = case {DataHdr, MetaHdr} of
+        {#comp_header{}=A, #comp_header{}=A} ->
+            % We're restarting a compaction that did not finish
+            % before trying to swap out with the original db
+            DbHeader = A#comp_header.db_header,
+            St0 = couch_bt_engine:init_state(
+                    DataFile, DataFd, DbHeader, Options),
+            St1 = bind_emsort(St0, MetaFd, A#comp_header.meta_st),
+            #comp_st{
+                db_name = DbName,
+                old_st = OldSt,
+                new_st = St1,
+                meta_fd = MetaFd,
+                retry = St0#st.id_tree
+            };
+        _ when DataHdrIsDbHdr ->
+            % We tried to swap out the compaction but there were
+            % writes to the database during compaction. Start
+            % a compaction retry.
+            Header = couch_bt_engine_header:from(SrcHdr),
+            ok = reset_compaction_file(MetaFd, Header),
+            St0 = couch_bt_engine:init_state(
+                    DataFile, DataFd, DataHdr, Options),
+            St1 = bind_emsort(St0, MetaFd, nil),
+            #comp_st{
+                db_name = DbName,
+                old_st = OldSt,
+                new_st = St1,
+                meta_fd = MetaFd,
+                retry = St0#st.id_tree
+            };
+        _ ->
+            % We're starting a compaction from scratch
+            Header = couch_bt_engine_header:from(SrcHdr),
+            ok = reset_compaction_file(DataFd, Header),
+            ok = reset_compaction_file(MetaFd, Header),
+            St0 = couch_bt_engine:init_state(DataFile, DataFd, Header, Options),
+            St1 = bind_emsort(St0, MetaFd, nil),
+            #comp_st{
+                db_name = DbName,
+                old_st = OldSt,
+                new_st = St1,
+                meta_fd = MetaFd,
+                retry = nil
+            }
+    end,
+    unlink(ioq:fd_pid(DataFd)),
+    unlink(ioq:ioq_pid(DataFd)),
+    erlang:monitor(process, ioq:fd_pid(MetaFd)),
     {ok, CompSt}.
 
 copy_purge_info(#comp_st{} = CompSt) ->
@@ -623,15 +623,15 @@ compact_final_sync(#comp_st{new_st = St0} = CompSt) ->
         new_st = St1
     }.
 
-open_compaction_file(FilePath) ->
-    case couch_file:open(FilePath, [nologifmissing]) of
+open_compaction_file(FilePath, IOQPid) ->
+    case couch_file:open(FilePath, [nologifmissing], IOQPid) of
         {ok, Fd} ->
             case couch_file:read_header(Fd) of
                 {ok, Header} -> {ok, Fd, Header};
                 no_valid_header -> {ok, Fd, nil}
             end;
         {error, enoent} ->
-            {ok, Fd} = couch_file:open(FilePath, [create]),
+            {ok, Fd} = couch_file:open(FilePath, [create], IOQPid),
             {ok, Fd, nil}
     end.
 

@@ -13,6 +13,7 @@
 -module(couch_file_tests).
 
 -include_lib("couch/include/couch_eunit.hrl").
+-include_lib("ioq/include/ioq.hrl").
 
 -define(BLOCK_SIZE, 4096).
 -define(setup(F), {setup, fun setup/0, fun teardown/1, F}).
@@ -23,10 +24,39 @@ setup() ->
     Fd.
 
 teardown(Fd) ->
-    case is_process_alive(Fd) of
+    case is_process_alive(ioq:fd_pid(Fd)) of
         true -> ok = couch_file:close(Fd);
         false -> ok
     end.
+
+mock_server() ->
+    %%meck:new(config),
+    meck:expect(config, get, fun(Group) ->
+        []
+    end),
+    meck:expect(config, get, fun(_,_) ->
+        undefined
+    end),
+    meck:expect(config, get, fun("ioq2", _, Default) ->
+        Default
+    end),
+    meck:expect(config, get, fun(_, _, Default) ->
+        Default
+    end),
+    %%  meck:expect(config, get, fun(_, _, _) ->
+    %%      undefined
+    %%  end),
+    meck:expect(config, get_integer, fun("ioq2", _, Default) ->
+        Default
+    end),
+    meck:expect(config, get_boolean, fun("ioq2", _, Default) ->
+        Default
+    end).
+
+
+unmock_server(_) ->
+    true = meck:validate(config),
+    ok = meck:unload(config).
 
 open_close_test_() ->
     {
@@ -39,7 +69,7 @@ open_close_test_() ->
                 should_return_enoent_if_missed(),
                 should_ignore_invalid_flags_with_open(),
                 ?setup(fun should_return_pid_on_file_open/1),
-                should_close_file_properly(),
+                ?setup(fun should_close_file_properly/0),
                 ?setup(fun should_create_empty_new_files/1)
             ]
         }
@@ -55,7 +85,7 @@ should_ignore_invalid_flags_with_open() ->
     ).
 
 should_return_pid_on_file_open(Fd) ->
-    ?_assert(is_pid(Fd)).
+    ?_assert(is_pid(ioq:fd_pid(Fd))).
 
 should_close_file_properly() ->
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
@@ -139,9 +169,15 @@ should_not_read_beyond_eof(Fd) ->
     {ok, Io} = file:open(Filepath, [read, write, binary]),
     ok = file:pwrite(Io, Pos, <<0:1/integer, DoubleBin:31/integer>>),
     file:close(Io),
-    unlink(Fd),
-    ExpectedError = {badmatch, {'EXIT', {bad_return_value, {read_beyond_eof, Filepath}}}},
-    ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
+    unlink(ioq:fd_pid(Fd)),
+    unlink(ioq:ioq_pid(Fd)),
+    %% ExpectedError = {badmatch, {'EXIT', {bad_return_value,
+    %%     {read_beyond_eof, Filepath}}}},
+    %%ExpectedError = {exit, {{bad_return_value, {read_beyond_eof Filepath,}}, _}, _},
+
+    ?_assertExit(
+        {{bad_return_value, {read_beyond_eof, Filepath}}, _},
+        couch_file:pread_binary(Fd, Pos)).
 
 should_truncate(Fd) ->
     {ok, 0, _} = couch_file:append_term(Fd, foo),
@@ -179,9 +215,19 @@ should_not_read_more_than_pread_limit(Fd) ->
     {_, Filepath} = couch_file:process_info(Fd),
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
     {ok, Pos, _Size} = couch_file:append_binary(Fd, BigBin),
-    unlink(Fd),
-    ExpectedError = {badmatch, {'EXIT', {bad_return_value, {exceed_pread_limit, Filepath, 50000}}}},
-    ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
+    unlink(ioq:fd_pid(Fd)),
+    unlink(ioq:ioq_pid(Fd)),
+    ExpectedError = {badmatch, {'EXIT', {bad_return_value,
+        {exceed_pread_limit, Filepath, 50000}}}},
+    ?debugFmt("EXPECTED ERROR IS: ~p~n", [ExpectedError]),
+    %%?_assert(couch_file:pread_binary(Fd, Pos)).
+    %%try couch_file:pread_binary(Fd, Pos)
+    %%catch E:R:S -> ?debugFmt("GOT ERROR: ~p || ~p~n~p~n", [E,R,S])
+    %%end,
+    %%?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
+    ?_assertExit(
+        {{bad_return_value, {exceed_pread_limit, Filepath, 50000}}, _},
+        couch_file:pread_binary(Fd, Pos)).
 
 header_test_() ->
     {
@@ -540,7 +586,8 @@ fsync_error_test_() ->
     }.
 
 fsync_raises_errors() ->
-    Fd = spawn(fun() -> fake_fsync_fd() end),
+    FdPid = spawn(fun() -> fake_fsync_fd() end),
+    Fd = #ioq_file{fd=FdPid},
     ?assertError({fsync_error, eio}, couch_file:sync(Fd)).
 
 fake_fsync_fd() ->

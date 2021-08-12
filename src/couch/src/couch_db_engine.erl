@@ -191,6 +191,10 @@
 % All of the get_* functions may be called from many
 % processes concurrently.
 
+% Get the FD handle, usually for #ioq_file{}
+-callback get_fd_handle(DbHandle::db_handle()) -> any().
+
+
 % The database should make a note of the update sequence when it
 % was last compacted. If the database doesn't need compacting it
 % can just hard code a return value of 0.
@@ -676,6 +680,7 @@
     last_activity/1,
 
     get_engine/1,
+    get_fd_handle/1,
     get_compacted_seq/1,
     get_del_doc_count/1,
     get_disk_version/1,
@@ -799,6 +804,10 @@ get_engine(#db{} = Db) ->
     #db{engine = {Engine, _}} = Db,
     Engine.
 
+get_fd_handle(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:get_fd_handle(EngineState).
+
 get_compacted_seq(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,
     Engine:get_compacted_seq(EngineState).
@@ -885,6 +894,13 @@ set_update_seq(#db{} = Db, UpdateSeq) ->
     {ok, Db#db{engine = {Engine, NewSt}}}.
 
 open_docs(#db{} = Db, DocIds) ->
+    case erlang:get(couch_file_hash) of
+        undefined ->
+            Hash = list_to_atom(integer_to_list(mem3_hash:crc32(Db#db.filepath))),
+            erlang:put(couch_file_hash, Hash);
+        _ ->
+            ok
+    end,
     #db{engine = {Engine, EngineState}} = Db,
     Engine:open_docs(EngineState, DocIds).
 

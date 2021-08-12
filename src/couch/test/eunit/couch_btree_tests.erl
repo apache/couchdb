@@ -14,6 +14,7 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("ioq/include/ioq.hrl").
 
 -define(ROWS, 1000).
 % seconds
@@ -47,6 +48,8 @@ setup_red() ->
 setup_red(_) ->
     setup_red().
 
+teardown(#ioq_file{}=Fd) ->
+    ok = couch_file:close(Fd);
 teardown(Fd) when is_pid(Fd) ->
     ok = couch_file:close(Fd);
 teardown({Fd, _}) ->
@@ -77,6 +80,14 @@ red_test_funs() ->
     ].
 
 btree_open_test_() ->
+    {
+        setup,
+        fun() -> test_util:start(?MODULE, [ioq]) end,
+        fun test_util:stop/1,
+        fun btree_should_open/0
+    }.
+
+btree_should_open() ->
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
     {ok, Btree} = couch_btree:open(nil, Fd, [{compression, none}]),
     {

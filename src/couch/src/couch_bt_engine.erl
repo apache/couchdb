@@ -22,6 +22,7 @@
     is_compacting/1,
 
     init/2,
+    init/3,
     terminate/2,
     handle_db_updater_call/2,
     handle_db_updater_info/2,
@@ -32,6 +33,7 @@
 
     last_activity/1,
 
+    get_fd_handle/1,
     get_compacted_seq/1,
     get_del_doc_count/1,
     get_disk_version/1,
@@ -115,6 +117,7 @@
 -include_lib("kernel/include/file.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_bt_engine.hrl").
+-include_lib("ioq/include/ioq.hrl").
 
 exists(FilePath) ->
     case is_file(FilePath) of
@@ -150,26 +153,29 @@ is_compacting(DbName) ->
     ).
 
 init(FilePath, Options) ->
-    {ok, Fd} = open_db_file(FilePath, Options),
-    Header =
-        case lists:member(create, Options) of
-            true ->
-                delete_compaction_files(FilePath),
-                Header0 = couch_bt_engine_header:new(),
-                Header1 = init_set_props(Fd, Header0, Options),
-                ok = couch_file:write_header(Fd, Header1),
-                Header1;
-            false ->
-                case couch_file:read_header(Fd) of
-                    {ok, Header0} ->
-                        Header0;
-                    no_valid_header ->
-                        delete_compaction_files(FilePath),
-                        Header0 = couch_bt_engine_header:new(),
-                        ok = couch_file:write_header(Fd, Header0),
-                        Header0
-                end
-        end,
+    init(FilePath, Options, undefined).
+
+
+init(FilePath, Options, IOQPid) ->
+    {ok, Fd} = open_db_file(FilePath, Options, IOQPid),
+    Header = case lists:member(create, Options) of
+        true ->
+            delete_compaction_files(FilePath),
+            Header0 = couch_bt_engine_header:new(),
+            Header1 = init_set_props(Fd, Header0, Options),
+            ok = couch_file:write_header(Fd, Header1),
+            Header1;
+        false ->
+            case couch_file:read_header(Fd) of
+                {ok, Header0} ->
+                    Header0;
+                no_valid_header ->
+                    delete_compaction_files(FilePath),
+                    Header0 =  couch_bt_engine_header:new(),
+                    ok = couch_file:write_header(Fd, Header0),
+                    Header0
+            end
+    end,
     {ok, init_state(FilePath, Fd, Header, Options)}.
 
 terminate(_Reason, St) ->
@@ -197,15 +203,15 @@ handle_db_updater_call(Msg, St) ->
 handle_db_updater_info({'DOWN', Ref, _, _, _}, #st{fd_monitor = Ref} = St) ->
     {stop, normal, St#st{fd = undefined, fd_monitor = closed}}.
 
-incref(St) ->
-    {ok, St#st{fd_monitor = erlang:monitor(process, St#st.fd)}}.
+incref(#st{fd=#ioq_file{fd=Fd}}=St) ->
+    {ok, St#st{fd_monitor = erlang:monitor(process, Fd)}}.
 
 decref(St) ->
     true = erlang:demonitor(St#st.fd_monitor, [flush]),
     ok.
 
-monitored_by(St) ->
-    case erlang:process_info(St#st.fd, monitored_by) of
+monitored_by(#st{fd=#ioq_file{fd=Fd}}=St) ->
+    case erlang:process_info(Fd, monitored_by) of
         {monitored_by, Pids} ->
             lists:filter(fun is_pid/1, Pids);
         _ ->
@@ -214,6 +220,9 @@ monitored_by(St) ->
 
 last_activity(#st{fd = Fd}) ->
     couch_file:last_read(Fd).
+
+get_fd_handle(#st{fd = Fd}) ->
+    Fd.
 
 get_compacted_seq(#st{header = Header}) ->
     couch_bt_engine_header:get(Header, compacted_seq).
@@ -637,7 +646,8 @@ start_compaction(St, DbName, Options, Parent) ->
     {ok, St, Pid}.
 
 finish_compaction(OldState, DbName, Options, CompactFilePath) ->
-    {ok, NewState1} = ?MODULE:init(CompactFilePath, Options),
+    IOQPid = ioq:ioq_pid(OldState#st.fd),
+    {ok, NewState1} = ?MODULE:init(CompactFilePath, Options, IOQPid),
     OldSeq = get_update_seq(OldState),
     NewSeq = get_update_seq(NewState1),
     case OldSeq == NewSeq of
@@ -827,8 +837,10 @@ copy_props(#st{header = Header} = St, Props) ->
         needs_commit = true
     }}.
 
-open_db_file(FilePath, Options) ->
-    case couch_file:open(FilePath, Options) of
+open_db_file(FilePath, Options, IOQPid) ->
+    Hash = list_to_atom(integer_to_list(mem3_hash:crc32(FilePath))),
+    erlang:put(couch_file_hash, Hash),
+    case couch_file:open(FilePath, Options, IOQPid) of
         {ok, Fd} ->
             {ok, Fd};
         {error, enoent} ->
@@ -899,7 +911,7 @@ init_state(FilePath, Fd, Header0, Options) ->
     St = #st{
         filepath = FilePath,
         fd = Fd,
-        fd_monitor = erlang:monitor(process, Fd),
+        fd_monitor = erlang:monitor(process, Fd#ioq_file.fd),
         header = Header,
         needs_commit = false,
         id_tree = IdTree,

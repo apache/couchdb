@@ -15,6 +15,7 @@
 -vsn(2).
 
 -include_lib("couch/include/couch_db.hrl").
+-include_lib("ioq/include/ioq.hrl").
 
 -define(INITIAL_WAIT, 60000).
 -define(MONITOR_CHECK, 10000).
@@ -33,11 +34,12 @@
     is_sys,
     eof = 0,
     db_monitor,
-    pread_limit = 0
+    pread_limit = 0,
+    tab
 }).
 
 % public API
--export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, set_db_pid/2]).
+-export([open/1, open/2, open/3, close/1, bytes/1, sync/1, truncate/2, set_db_pid/2]).
 -export([pread_term/2, pread_iolist/2, pread_binary/2]).
 -export([append_binary/2]).
 -export([append_raw_chunk/2, assemble_file_chunk/2]).
@@ -66,46 +68,39 @@ open(Filepath) ->
     open(Filepath, []).
 
 open(Filepath, Options) ->
-    case
-        gen_server:start_link(
-            couch_file,
-            {Filepath, Options, self(), Ref = make_ref()},
-            []
-        )
-    of
-        {ok, Fd} ->
-            {ok, Fd};
-        ignore ->
-            % get the error
-            receive
-                {Ref, Pid, {error, Reason} = Error} ->
-                    case process_info(self(), trap_exit) of
-                        {trap_exit, true} ->
-                            receive
-                                {'EXIT', Pid, _} -> ok
-                            end;
-                        {trap_exit, false} ->
-                            ok
-                    end,
-                    case {lists:member(nologifmissing, Options), Reason} of
-                        {true, enoent} ->
-                            ok;
-                        _ ->
-                            couch_log:error(
-                                "Could not open file ~s: ~s",
-                                [Filepath, file:format_error(Reason)]
-                            )
-                    end,
-                    Error
-            end;
-        Error ->
-            % We can't say much here, because it could be any kind of error.
-            % Just let it bubble and an encapsulating subcomponent can perhaps
-            % be more informative. It will likely appear in the SASL log, anyway.
+    open(Filepath, Options, undefined).
+
+open(Filepath, Options, IOQPid0) ->
+    case gen_server:start_link(couch_file,
+            {Filepath, Options, self(), Ref = make_ref()}, []) of
+    {ok, Fd} ->
+        IOQPid = case IOQPid0 of
+            undefined ->
+                {ok, IOQPid1} = ioq_server2:start_link({by_shard, Filepath, Fd}),
+                IOQPid1;
+            IOQPid0 when is_pid(IOQPid0) ->
+                IOQPid0
+        end,
+        Tab = gen_server:call(Fd, get_cache_ref),
+        {ok, #ioq_file{fd=Fd, ioq=IOQPid, tab=Tab}};
+    ignore ->
+        % get the error
+        receive
+        {Ref, Pid, {error, Reason} = Error} ->
+            case process_info(self(), trap_exit) of
+            {trap_exit, true} -> receive {'EXIT', Pid, _} -> ok end;
+            {trap_exit, false} -> ok
+            end,
+            case {lists:member(nologifmissing, Options), Reason} of
+            {true, enoent} -> ok;
+            _ ->
+            couch_log:error("Could not open file ~s: ~s",
+                            [Filepath, file:format_error(Reason)])
+            end,
             Error
     end.
 
-set_db_pid(Fd, Pid) ->
+set_db_pid(#ioq_file{fd=Fd}, Pid) ->
     gen_server:call(Fd, {set_db_pid, Pid}).
 
 %%----------------------------------------------------------------------
@@ -155,6 +150,18 @@ pread_term(Fd, Pos) ->
     {ok, Bin} = pread_binary(Fd, Pos),
     {ok, couch_compress:decompress(Bin)}.
 
+%% TODO: add purpose docs
+load_from_cache(#ioq_file{tab=undefined}, _Pos) ->
+    missing;
+load_from_cache(#ioq_file{tab=Tab}, Pos) ->
+    case ets:lookup(Tab, Pos) of
+        [{Pos, Res}] ->
+            %% io:format("CACHE HIT: ~p{~p}~n", [Tab, Pos]),
+            Res;
+        [] ->
+            missing
+    end.
+
 %%----------------------------------------------------------------------
 %% Purpose: Reads a binrary from a file that was written with append_binary
 %% Args:    Pos, the offset into the file where the term is serialized.
@@ -167,11 +174,18 @@ pread_binary(Fd, Pos) ->
     {ok, iolist_to_binary(L)}.
 
 pread_iolist(Fd, Pos) ->
-    case ioq:call(Fd, {pread_iolist, Pos}, erlang:get(io_priority)) of
+    case load_from_cache(Fd, Pos) of
         {ok, IoList, Md5} ->
+            couch_stats:increment_counter([couchdb, couch_file, cache_hits]),
             {ok, verify_md5(Fd, Pos, IoList, Md5)};
-        Error ->
-            Error
+        missing ->
+            couch_stats:increment_counter([couchdb, couch_file, cache_misses]),
+            case ioq:call(Fd, {pread_iolist, Pos}, erlang:get(io_priority)) of
+                {ok, IoList, Md5} ->
+                    {ok, verify_md5(Fd, Pos, IoList, Md5)};
+                Error ->
+                    Error
+            end
     end.
 
 pread_terms(Fd, PosList) ->
@@ -227,7 +241,7 @@ append_binaries(Fd, Bins) ->
 %%----------------------------------------------------------------------
 
 % length in bytes
-bytes(Fd) ->
+bytes(#ioq_file{fd=Fd}) ->
     gen_server:call(Fd, bytes, infinity).
 
 %%----------------------------------------------------------------------
@@ -236,7 +250,7 @@ bytes(Fd) ->
 %%  or {error, Reason}.
 %%----------------------------------------------------------------------
 
-truncate(Fd, Pos) ->
+truncate(#ioq_file{fd=Fd}, Pos) ->
     gen_server:call(Fd, {truncate, Pos}, infinity).
 
 %%----------------------------------------------------------------------
@@ -261,7 +275,7 @@ sync(Filepath) when is_list(Filepath) ->
         {error, Error} ->
             erlang:error(Error)
     end;
-sync(Fd) ->
+sync(#ioq_file{fd=Fd}) ->
     case gen_server:call(Fd, sync, infinity) of
         ok ->
             ok;
@@ -273,8 +287,10 @@ sync(Fd) ->
 %% Purpose: Close the file.
 %% Returns: ok
 %%----------------------------------------------------------------------
-close(Fd) ->
-    gen_server:call(Fd, close, infinity).
+close(#ioq_file{fd=Fd, ioq=IOP}) ->
+    Res = gen_server:call(Fd, close, infinity),
+    gen_server:call(IOP, close, infinity),
+    Res.
 
 delete(RootDir, Filepath) ->
     delete(RootDir, Filepath, []).
@@ -408,7 +424,7 @@ init_status_error(ReturnPid, Ref, Error) ->
     ReturnPid ! {Ref, self(), Error},
     ignore.
 
-last_read(Fd) when is_pid(Fd) ->
+last_read(#ioq_file{fd=Fd}) when is_pid(Fd) ->
     Now = os:timestamp(),
     couch_util:process_dict_get(Fd, read_timestamp, Now).
 
@@ -419,38 +435,62 @@ init({Filepath, Options, ReturnPid, Ref}) ->
     Limit = get_pread_limit(),
     IsSys = lists:member(sys_db, Options),
     update_read_timestamp(),
-    case lists:member(create, Options) of
+    ShouldCache = config:get_boolean("couchdb", "couch_file_cache", true),
+    Tab = case ShouldCache of
         true ->
-            filelib:ensure_dir(Filepath),
+            couch_stats:increment_counter([couchdb, couch_file, cache_opens]),
+            ets:new(?MODULE, [set, protected, {read_concurrency, true}]);
+        false ->
+            undefined
+    end,
+    case lists:member(create, Options) of
+    true ->
+        filelib:ensure_dir(Filepath),
+        case file:open(Filepath, OpenOptions) of
+        {ok, Fd} ->
+            %% Save Fd in process dictionary for debugging purposes
+            put(couch_file_fd, {Fd, Filepath}),
+            {ok, Length} = file:position(Fd, eof),
+            case Length > 0 of
+            true ->
+                % this means the file already exists and has data.
+                % FYI: We don't differentiate between empty files and non-existant
+                % files here.
+                case lists:member(overwrite, Options) of
+                true ->
+                    {ok, 0} = file:position(Fd, 0),
+                    ok = file:truncate(Fd),
+                    ok = file:sync(Fd),
+                    maybe_track_open_os_files(Options),
+                    erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
+                    {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit, tab=Tab}};
+                false ->
+                    ok = file:close(Fd),
+                    init_status_error(ReturnPid, Ref, {error, eexist})
+                end;
+            false ->
+                maybe_track_open_os_files(Options),
+                erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
+                {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit, tab=Tab}}
+            end;
+        Error ->
+            init_status_error(ReturnPid, Ref, Error)
+        end;
+    false ->
+        % open in read mode first, so we don't create the file if it doesn't exist.
+        case file:open(Filepath, [read, raw]) of
+        {ok, Fd_Read} ->
             case file:open(Filepath, OpenOptions) of
                 {ok, Fd} ->
-                    %% Save Fd in process dictionary for debugging purposes
-                    put(couch_file_fd, {Fd, Filepath}),
-                    {ok, Length} = file:position(Fd, eof),
-                    case Length > 0 of
-                        true ->
-                            % this means the file already exists and has data.
-                            % FYI: We don't differentiate between empty files and non-existant
-                            % files here.
-                            case lists:member(overwrite, Options) of
-                                true ->
-                                    {ok, 0} = file:position(Fd, 0),
-                                    ok = file:truncate(Fd),
-                                    ok = file:sync(Fd),
-                                    maybe_track_open_os_files(Options),
-                                    erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                                    {ok, #file{fd = Fd, is_sys = IsSys, pread_limit = Limit}};
-                                false ->
-                                    ok = file:close(Fd),
-                                    init_status_error(ReturnPid, Ref, {error, eexist})
-                            end;
-                        false ->
-                            maybe_track_open_os_files(Options),
-                            erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, #file{fd = Fd, is_sys = IsSys, pread_limit = Limit}}
-                    end;
-                Error ->
-                    init_status_error(ReturnPid, Ref, Error)
+                     %% Save Fd in process dictionary for debugging purposes
+                     put(couch_file_fd, {Fd, Filepath}),
+                     ok = file:close(Fd_Read),
+                     maybe_track_open_os_files(Options),
+                     {ok, Eof} = file:position(Fd, eof),
+                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
+                     {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit, tab=Tab}};
+                 Error ->
+                     init_status_error(ReturnPid, Ref, Error)
             end;
         false ->
             % open in read mode first, so we don't create the file if it doesn't exist.
@@ -502,16 +542,18 @@ handle_call(close, _From, #file{fd = Fd} = File) ->
 handle_call({pread_iolist, Pos}, _From, File) ->
     update_read_timestamp(),
     {LenIolist, NextPos} = read_raw_iolist_int(File, Pos, 4),
-    case iolist_to_binary(LenIolist) of
-        % an MD5-prefixed term
-        <<1:1/integer, Len:31/integer>> ->
-            {Md5AndIoList, _} = read_raw_iolist_int(File, NextPos, Len + 16),
-            {Md5, IoList} = extract_md5(Md5AndIoList),
-            {reply, {ok, IoList, Md5}, File};
-        <<0:1/integer, Len:31/integer>> ->
-            {Iolist, _} = read_raw_iolist_int(File, NextPos, Len),
-            {reply, {ok, Iolist, <<>>}, File}
-    end;
+    Resp = case iolist_to_binary(LenIolist) of
+    <<1:1/integer,Len:31/integer>> -> % an MD5-prefixed term
+        {Md5AndIoList, _} = read_raw_iolist_int(File, NextPos, Len+16),
+        {Md5, IoList} = extract_md5(Md5AndIoList),
+        {ok, IoList, Md5};
+    <<0:1/integer,Len:31/integer>> ->
+        {Iolist, _} = read_raw_iolist_int(File, NextPos, Len),
+        {ok, Iolist, <<>>}
+    end,
+    maybe_cache(File#file.tab, {Pos, Resp}),
+    {reply, Resp, File};
+
 handle_call({pread_iolists, PosL}, _From, File) ->
     update_read_timestamp(),
     LocNums1 = [{Pos, 4} || Pos <- PosL],
@@ -613,8 +655,17 @@ handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
             {reply, Error, reset_eof(File)}
     end;
 handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
-    {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File}.
+    {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File};
 
+handle_call(get_cache_ref, _From, #file{tab=Tab} = File) ->
+    {reply, Tab, File}.
+
+
+handle_cast({cache, Key, Val}, Fd) ->
+    %% TODO: should we skip if value exists?
+    Tab = erlang:get(couch_file_cache),
+    ets:insert(Tab, {Key, Val}),
+    {noreply, Fd};
 handle_cast(close, Fd) ->
     {stop, normal, Fd}.
 
@@ -881,7 +932,9 @@ is_idle(#file{is_sys = false}) ->
 -spec process_info(CouchFilePid :: pid()) ->
     {Fd :: pid() | tuple(), FilePath :: string()} | undefined.
 
-process_info(Pid) ->
+process_info(Pid) when is_pid(Pid) ->
+    couch_util:process_dict_get(Pid, couch_file_fd);
+process_info(#ioq_file{fd=Pid}) ->
     couch_util:process_dict_get(Pid, couch_file_fd).
 
 update_read_timestamp() ->
@@ -904,6 +957,11 @@ get_pread_limit() ->
 reset_eof(#file{} = File) ->
     {ok, Eof} = file:position(File#file.fd, eof),
     File#file{eof = Eof}.
+
+maybe_cache(undefined, _Obj) ->
+    ok;
+maybe_cache(Tab, Obj) ->
+    ets:insert(Tab, Obj).
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").

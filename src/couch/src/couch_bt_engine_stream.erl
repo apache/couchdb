@@ -20,6 +20,9 @@
     to_disk_term/1
 ]).
 
+-include_lib("ioq/include/ioq.hrl").
+
+
 foldl({_Fd, []}, _Fun, Acc) ->
     Acc;
 foldl({Fd, [{Pos, _} | Rest]}, Fun, Acc) ->
@@ -49,9 +52,9 @@ seek({Fd, [Pos | Rest]}, Offset) when is_integer(Pos) ->
             {ok, {Fd, [Tail | Rest]}}
     end.
 
-write({Fd, Written}, Data) when is_pid(Fd) ->
-    {ok, Pos, _} = couch_file:append_binary(Fd, Data),
-    {ok, {Fd, [{Pos, iolist_size(Data)} | Written]}}.
+write({#ioq_file{fd=Fd}=IOF, Written}, Data) when is_pid(Fd) ->
+    {ok, Pos, _} = couch_file:append_binary(IOF, Data),
+    {ok, {IOF, [{Pos, iolist_size(Data)} | Written]}}.
 
 finalize({Fd, Written}) ->
     {ok, {Fd, lists:reverse(Written)}}.
