@@ -757,6 +757,8 @@ set_security(_, _) ->
     throw(bad_request).
 
 set_user_ctx(#db{} = Db, UserCtx) ->
+    %% TODO:
+    %% couch_db_engine:set_user_ctx(Db, UserCtx),
     {ok, Db#db{user_ctx = UserCtx}}.
 
 validate_security_object(SecProps) ->
