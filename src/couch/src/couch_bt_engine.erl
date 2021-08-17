@@ -117,6 +117,7 @@
 -include_lib("kernel/include/file.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_bt_engine.hrl").
+-include_lib("ioq/include/ioq.hrl").
 
 
 exists(FilePath) ->
@@ -192,8 +193,8 @@ handle_db_updater_info({'DOWN', Ref, _, _, _}, #st{fd_monitor=Ref} = St) ->
     {stop, normal, St#st{fd=undefined, fd_monitor=closed}}.
 
 
-incref(St) ->
-    {ok, St#st{fd_monitor = erlang:monitor(process, St#st.fd)}}.
+incref(#st{fd=#ioq_file{fd=Fd}}=St) ->
+    {ok, St#st{fd_monitor = erlang:monitor(process, Fd)}}.
 
 
 decref(St) ->
@@ -201,8 +202,8 @@ decref(St) ->
     ok.
 
 
-monitored_by(St) ->
-    case erlang:process_info(St#st.fd, monitored_by) of
+monitored_by(#st{fd=#ioq_file{fd=Fd}}=St) ->
+    case erlang:process_info(Fd, monitored_by) of
         {monitored_by, Pids} ->
             lists:filter(fun is_pid/1, Pids);
         _ ->
@@ -920,7 +921,7 @@ init_state(FilePath, Fd, Header0, Options) ->
     St = #st{
         filepath = FilePath,
         fd = Fd,
-        fd_monitor = erlang:monitor(process, Fd),
+        fd_monitor = erlang:monitor(process, Fd#ioq_file.fd),
         header = Header,
         needs_commit = false,
         id_tree = IdTree,
