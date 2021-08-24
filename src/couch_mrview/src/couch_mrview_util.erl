@@ -81,7 +81,7 @@ get_signature_from_filename(FileName) ->
 get_view(Db, DDoc, ViewName, Args0) ->
     case get_view_index_state(Db, DDoc, ViewName, Args0) of
         {ok, State, Args2} ->
-            Ref = erlang:monitor(process, State#mrst.fd),
+            Ref = erlang:monitor(process, ioq:fd_pid(State#mrst.fd)),
             #mrst{language=Lang, views=Views} = State,
             {Type, View, Args3} = extract_view(Lang, Args2, ViewName, Views),
             check_range(Args3, view_cmp(View)),
@@ -298,7 +298,7 @@ init_state(Db, Fd, State, Header) ->
 
     State#mrst{
         fd=Fd,
-        fd_monitor=erlang:monitor(process, Fd),
+        fd_monitor=erlang:monitor(process, ioq:fd_pid(Fd)),
         update_seq=Seq,
         purge_seq=PurgeSeq,
         id_btree=IdBtree,

@@ -889,7 +889,9 @@ is_idle(#file{is_sys=false}) ->
 -spec process_info(CouchFilePid :: pid()) ->
     {Fd :: pid() | tuple(), FilePath :: string()} | undefined.
 
-process_info(Pid) ->
+process_info(Pid) when is_pid(Pid) ->
+    couch_util:process_dict_get(Pid, couch_file_fd);
+process_info(#ioq_file{fd=Pid}) ->
     couch_util:process_dict_get(Pid, couch_file_fd).
 
 update_read_timestamp() ->
