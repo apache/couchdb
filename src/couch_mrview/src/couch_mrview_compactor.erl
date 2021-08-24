@@ -115,7 +115,7 @@ compact(State) ->
         compact_view(View, EmptyView, BufferSize, Acc)
     end, FinalAcc2, lists:zip(Views, EmptyViews)),
 
-    unlink(EmptyState#mrst.fd),
+    unlink(ioq:fd_pid(EmptyState#mrst.fd)),
     {ok, EmptyState#mrst{
         id_btree=NewIdBtree,
         views=NewViews,
@@ -132,7 +132,7 @@ recompact(#mrst{db_name=DbName, idx_name=IdxName}, 0) ->
 
 recompact(State, RetryCount) ->
     Self = self(),
-    link(State#mrst.fd),
+    link(ioq:fd_pid(State#mrst.fd)),
     {Pid, Ref} = erlang:spawn_monitor(fun() ->
         couch_index_updater:update(Self, couch_mrview_index, State)
     end),
@@ -144,10 +144,10 @@ recompact_loop(Pid, Ref, State, RetryCount) ->
             % We've made progress so reset RetryCount
             recompact_loop(Pid, Ref, State2, recompact_retry_count());
         {'DOWN', Ref, _, _, {updated, Pid, State2}} ->
-            unlink(State#mrst.fd),
+            unlink(ioq:fd_pid(State#mrst.fd)),
             {ok, State2};
         {'DOWN', Ref, _, _, Reason} ->
-            unlink(State#mrst.fd),
+            unlink(ioq:fd_pid(State#mrst.fd)),
             couch_log:warning("Error during recompaction: ~r", [Reason]),
             recompact(State, RetryCount - 1)
     end.
@@ -218,7 +218,7 @@ swap_compacted(OldState, NewState) ->
         fd=NewFd
     } = NewState,
 
-    link(NewState#mrst.fd),
+    link(ioq:fd_pid(NewState#mrst.fd)),
     Ref = erlang:monitor(process, NewState#mrst.fd),
 
     RootDir = couch_index_util:root_dir(),
@@ -232,7 +232,7 @@ swap_compacted(OldState, NewState) ->
     ok = couch_file:delete(RootDir, IndexFName),
     ok = file:rename(CompactFName, IndexFName),
 
-    unlink(OldState#mrst.fd),
+    unlink(ioq:fd_pid(OldState#mrst.fd)),
     erlang:demonitor(OldState#mrst.fd_monitor, [flush]),
 
     {ok, NewState#mrst{fd_monitor=Ref}}.

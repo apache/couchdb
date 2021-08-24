@@ -145,8 +145,9 @@ open_compaction_files(DbName, OldSt, Options) ->
                 retry = nil
             }
     end,
-    unlink(DataFd),
-    erlang:monitor(process, MetaFd),
+    unlink(ioq:fd_pid(DataFd)),
+    unlink(ioq:ioq_pid(DataFd)),
+    erlang:monitor(process, ioq:fd_pid(MetaFd)),
     {ok, CompSt}.
 
 
