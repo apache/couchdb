@@ -122,6 +122,9 @@ handle_response(Shard, Response, Workers, Responses, RingOpts) ->
 %    a partitioned database. As soon as a result from any of the shards
 %    arrives, result collection stops.
 %
+%  * When RingOpts is [all], responses are accepted until all the shards return
+%  results
+%
 handle_response(Shard, Response, Workers, Responses, RingOpts, CleanupCb) ->
     Workers1 = fabric_dict:erase(Shard, Workers),
     case RingOpts of
@@ -130,7 +133,10 @@ handle_response(Shard, Response, Workers, Responses, RingOpts, CleanupCb) ->
             Responses1 = [{{B, E}, Shard, Response} | Responses],
             handle_response_ring(Workers1, Responses1, CleanupCb);
         [{any, Any}] ->
-            handle_response_any(Shard, Response, Workers1, Any, CleanupCb)
+            handle_response_any(Shard, Response, Workers1, Any, CleanupCb);
+        [all] ->
+            Responses1 = [{Shard, Response} | Responses],
+            handle_response_all(Workers1, Responses1)
     end.
 
 
@@ -164,6 +170,15 @@ handle_response_any(Shard, Response, Workers, Any, CleanupCb) ->
     end.
 
 
+handle_response_all(Workers, Responses) ->
+    case fabric_dict:size(Workers) =:= 0 of
+        true ->
+            {stop, fabric_dict:from_list(Responses)};
+        false ->
+            {ok, {Workers, Responses}}
+    end.
+
+
 % Check if workers still waiting and the already received responses could
 % still form a continous range. The range won't always be the full ring, and
 % the bounds are computed based on the minimum and maximum interval beginning
@@ -185,6 +200,9 @@ is_progress_possible(Counters, Responses, MinB, MaxE, []) ->
     ResponseRanges = lists:map(fun({{B, E}, _, _}) -> {B, E} end, Responses),
     Ranges = fabric_util:worker_ranges(Counters) ++ ResponseRanges,
     mem3_util:get_ring(Ranges, MinB, MaxE) =/= [];
+
+is_progress_possible(Counters, _Responses, _, _, [all]) ->
+    fabric_dict:size(Counters) > 0;
 
 is_progress_possible(Counters, Responses, _, _, [{any, AnyShards}]) ->
     InAny = fun(S) -> lists:member(S#shard{ref = undefined}, AnyShards) end,
@@ -305,7 +323,7 @@ is_progress_possible_with_responses_test() ->
     ?assertEqual(true, is_progress_possible([], RS1, 7, 8, [])).
 
 
-is_progress_possible_with_ring_opts_test() ->
+is_progress_possible_with_ring_opts_any_test() ->
     Opts = [{any, [mk_shard("n1", [0, 5]), mk_shard("n2", [3, 10])]}],
     C1 = [{mk_shard("n1", [0, ?RING_END]), nil}],
     RS1 = mk_resps([{"n1", 3, 10, 42}]),
@@ -321,6 +339,12 @@ is_progress_possible_with_ring_opts_test() ->
     % assert that counters can fill the ring not just the response
     C2 = [{mk_shard("n1", [0, 5]), nil}],
     ?assertEqual(true, is_progress_possible(C2, [], 0, ?RING_END, Opts)).
+
+
+is_progress_possible_with_ring_opts_all_test() ->
+    C1 = [{mk_shard("n1", [0, ?RING_END]), nil}],
+    ?assertEqual(true, is_progress_possible(C1, [], 0, ?RING_END, [all])),
+    ?assertEqual(false, is_progress_possible([], [], 0, ?RING_END, [all])).
 
 
 get_shard_replacements_test() ->
@@ -422,7 +446,7 @@ handle_response_backtracking_test() ->
     ?assertEqual({stop, [{Shard3, 44}, {Shard4, 45}]}, Result4).
 
 
-handle_response_ring_opts_test() ->
+handle_response_ring_opts_any_test() ->
     Shard1 = mk_shard("n1", [0, 5]),
     Shard2 = mk_shard("n2", [0, 1]),
     Shard3 = mk_shard("n3", [0, 1]),
@@ -444,6 +468,30 @@ handle_response_ring_opts_test() ->
 
     Result3 = handle_response(Shard3, 44, Workers3, [], Opts, undefined),
     ?assertEqual({stop, [{Shard3, 44}]}, Result3).
+
+
+handle_response_ring_opts_all_test() ->
+    Shard1 = mk_shard("n1", [0, 5]),
+    Shard2 = mk_shard("n2", [0, 1]),
+    Shard3 = mk_shard("n3", [0, 1]),
+
+    ShardList = [Shard1, Shard2, Shard3],
+    [W1, W2, W3] = WithRefs = [S#shard{ref = make_ref()} || S <- ShardList],
+    Workers1 = fabric_dict:init(WithRefs, nil),
+
+    Result1 = handle_response(W1, 42, Workers1, [], [all], undefined),
+    ?assertMatch({ok, {_, _}}, Result1),
+    {ok, {Workers2, _}} = Result1,
+
+    % Even though n2 and n3 cover the same range, with 'all' option we wait for
+    % all workers to return.
+    Result2 = handle_response(W2, 43, Workers2, [], [all], undefined),
+    ?assertMatch({ok, {_, _}}, Result2),
+    {ok, {Workers3, _}} = Result2,
+
+    % Stop only after all the shards respond
+    Result3 = handle_response(W3, 44, Workers3, [], [all], undefined),
+    ?assertMatch({stop, [_ | _]}, Result3).
 
 
 handle_error_test() ->

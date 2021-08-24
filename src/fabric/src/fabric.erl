@@ -37,7 +37,7 @@
 % miscellany
 -export([design_docs/1, reset_validation_funs/1, cleanup_index_files/0,
     cleanup_index_files/1, cleanup_index_files_all_nodes/1, dbname/1,
-    inactive_index_files/1]).
+    inactive_index_files/1, db_uuids/1]).
 
 -include_lib("fabric/include/fabric.hrl").
 
@@ -550,6 +550,11 @@ dbname(Db) ->
     catch error:badarg ->
         erlang:error({illegal_database_name, Db})
     end.
+
+%% @doc get db shard uuids
+-spec db_uuids(dbname())  -> map().
+db_uuids(DbName) ->
+    fabric_db_uuids:go(dbname(DbName)).
 
 name(Thing) ->
     couch_util:to_binary(Thing).

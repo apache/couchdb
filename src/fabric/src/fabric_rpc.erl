@@ -26,7 +26,7 @@
 
 -export([get_db_info/2, get_doc_count/2, get_design_doc_count/2,
          get_update_seq/2, changes/4, map_view/5, reduce_view/5,
-         group_info/3, update_mrview/4]).
+         group_info/3, update_mrview/4, get_uuid/1]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -317,6 +317,9 @@ compact(ShardName, DesignName) ->
         couch_mrview_index, ShardName, <<"_design/", DesignName/binary>>),
     Ref = erlang:make_ref(),
     Pid ! {'$gen_call', {self(), Ref}, compact}.
+
+get_uuid(DbName) ->
+    with_db(DbName, [], {couch_db, get_uuid, []}).
 
 %%
 %% internal
@@ -637,10 +640,9 @@ calculate_start_seq(Db, Node, Seq) ->
 
 uuid(Db) ->
     Uuid = couch_db:get_uuid(Db),
-    binary:part(Uuid, {0, uuid_prefix_len()}).
+    Prefix = fabric_util:get_uuid_prefix_len(),
+    binary:part(Uuid, {0, Prefix}).
 
-uuid_prefix_len() ->
-    list_to_integer(config:get("fabric", "uuid_prefix_len", "7")).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

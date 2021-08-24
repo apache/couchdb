@@ -453,12 +453,14 @@ do_unpack_seqs(Opaque, DbName) ->
         true ->
             Unpacked;
         false ->
+            Uuids = get_db_uuid_shards(DbName),
             PotentialWorkers = lists:map(fun({Node, [A, B], Seq}) ->
                 case mem3:get_shard(DbName, Node, [A, B]) of
                     {ok, Shard} ->
                         {Shard, Seq};
                     {error, not_found} ->
-                        {#shard{node = Node, range = [A, B]}, Seq}
+                        Shard = replace_moved_shard(Node, [A, B], Seq, Uuids),
+                        {Shard, Seq}
                 end
             end, Deduped),
             Shards = mem3:shards(DbName),
@@ -492,6 +494,59 @@ get_old_seq(#shard{range=R}=Shard, SinceSeqs) ->
             couch_log:warning("~p get_old_seq error: ~p, shard: ~p, seqs: ~p",
                 [?MODULE, Error, Shard, SinceSeqs]),
             0
+    end.
+
+
+get_db_uuid_shards(DbName) ->
+    % Need to use an isolated process as we are performing a fabric call from
+    % another fabric call and there is a good chance we'd polute the mailbox
+    % with returned messages
+    Timeout = fabric_util:request_timeout(),
+    IsolatedFun = fun() -> fabric:db_uuids(DbName) end,
+    try fabric_util:isolate(IsolatedFun, Timeout) of
+        {ok, Uuids} ->
+            % Trim uuids so we match exactly based on the currently configured
+            % uuid_prefix_len. The assumption is that we are getting an older
+            % sequence from the same cluster and we didn't tweak that
+            % relatively obscure config option in the meantime.
+            PrefixLen = fabric_util:get_uuid_prefix_len(),
+            maps:fold(fun(Uuid, Shard, Acc) ->
+                TrimmedUuid = binary:part(Uuid, {0, PrefixLen}),
+                Acc#{TrimmedUuid => Shard}
+            end, #{}, Uuids);
+        {error, Error} ->
+            % Since we are doing a best-effort approach to match moved shards,
+            % tolerate and log errors. This should also handle cases when the
+            % cluster is partially upgraded, as some nodes will not have the
+            % newer get_uuid fabric_rpc handler.
+            ErrMsg = "~p : could not get db_uuids for Db:~p Error:~p",
+            couch_log:error(ErrMsg, [?MODULE, DbName, Error]),
+            #{}
+    catch
+        _Tag:Error ->
+            ErrMsg = "~p : could not get db_uuids for Db:~p Error:~p",
+            couch_log:error(ErrMsg, [?MODULE, DbName, Error]),
+            #{}
+    end.
+
+
+%% Determine if the missing shard moved to a new node. Do that by matching the
+%% uuids from the current shard map. If we cannot find a moved shard, we return
+%% the original node and range as a shard and hope for the best.
+replace_moved_shard(Node, Range, Seq, #{} = _UuidShards) when is_number(Seq) ->
+    % Cannot figure out shard moves without uuid matching
+    #shard{node = Node, range = Range};
+replace_moved_shard(Node, Range, {Seq, Uuid}, #{} = UuidShards) ->
+    % Compatibility case for an old seq format which didn't have epoch nodes
+    replace_moved_shard(Node, Range, {Seq, Uuid, Node}, UuidShards);
+replace_moved_shard(Node, Range, {_Seq, Uuid, _EpochNode}, #{} = UuidShards) ->
+    case UuidShards of
+        #{Uuid := #shard{range = Range} = Shard} ->
+            % Found a moved shard by matching both the uuid and the range
+            Shard;
+        #{} ->
+            % Did not find a moved shard, use the original node
+            #shard{node = Node, range = Range}
     end.
 
 
