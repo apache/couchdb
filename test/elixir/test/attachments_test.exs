@@ -124,6 +124,21 @@ defmodule AttachmentsTest do
   end
 
   @tag :with_db
+  test "delete attachment request with a payload should not block following requests", context do
+    db_name = context[:db_name]
+
+    resp = Couch.put("/#{db_name}/bin_doc", body: @bin_att_doc, query: %{w: 3})
+    assert resp.status_code in [201, 202]
+    rev = resp.body["rev"]
+
+    resp = Couch.delete("/#{db_name}/bin_doc/foo.txt", body: 'some payload', query: %{w: 3, rev: rev}, ibrowse: [{:max_sessions, 1}, {:max_pipeline_size, 1}])
+    assert resp.status_code == 200
+
+    resp = Couch.get("/", timeout: 1000, ibrowse: [{:max_sessions, 1}, {:max_pipeline_size, 1}])
+    assert resp.status_code == 200
+  end
+
+  @tag :with_db
   test "saves binary", context do
     db_name = context[:db_name]
 

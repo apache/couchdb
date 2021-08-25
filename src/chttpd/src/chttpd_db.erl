@@ -857,6 +857,9 @@ db_req(#httpd{path_parts=[_DbName, <<"_local">> | _Rest]}, _Db) ->
 db_req(#httpd{path_parts=[_, DocId]}=Req, Db) ->
     db_doc_req(Req, Db, DocId);
 
+db_req(#httpd{method='DELETE', path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
+    chttpd:body(Req),
+    db_attachment_req(Req, Db, DocId, FileNameParts);
 db_req(#httpd{path_parts=[_, DocId | FileNameParts]}=Req, Db) ->
     db_attachment_req(Req, Db, DocId, FileNameParts).
 
