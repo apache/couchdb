@@ -28,7 +28,7 @@
 % Documents
 -export([open_doc/3, open_revs/4, get_doc_info/3, get_full_doc_info/3,
     get_missing_revs/2, get_missing_revs/3, update_doc/3, update_docs/3,
-    purge_docs/3, att_receiver/2]).
+    purge_docs/3, att_receiver/3]).
 
 % Views
 -export([all_docs/4, all_docs/5, changes/4, query_view/3, query_view/4,
@@ -324,11 +324,11 @@ purge_docs(DbName, IdsRevs, Options) when is_list(IdsRevs) ->
 %%      returns a fabric attachment receiver context tuple
 %%      with the spawned middleman process, an empty binary,
 %%      or exits with an error tuple {Error, Arg}
--spec att_receiver(#httpd{}, Length :: undefined | chunked | pos_integer() |
+-spec att_receiver(#httpd{}, dbname(), Length :: undefined | chunked | pos_integer() |
         {unknown_transfer_encoding, any()}) ->
     {fabric_attachment_receiver, pid(), chunked | pos_integer()} | binary().
-att_receiver(Req, Length) ->
-    fabric_doc_atts:receiver(Req, Length).
+att_receiver(Req, DbName, Length) ->
+    fabric_doc_atts:receiver(Req, DbName, Length).
 
 %% @equiv all_docs(DbName, [], Callback, Acc0, QueryArgs)
 all_docs(DbName, Callback, Acc, QueryArgs) ->
