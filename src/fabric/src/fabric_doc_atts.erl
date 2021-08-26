@@ -18,25 +18,25 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([
-    receiver/2,
+    receiver/3,
     receiver_callback/2
 ]).
 
 
-receiver(_Req, undefined) ->
+receiver(_Req, _DbName, undefined) ->
     <<"">>;
-receiver(_Req, {unknown_transfer_encoding, Unknown}) ->
+receiver(_Req, _DbName, {unknown_transfer_encoding, Unknown}) ->
     exit({unknown_transfer_encoding, Unknown});
-receiver(Req, chunked) ->
-    MiddleMan = spawn(fun() -> middleman(Req, chunked) end),
+receiver(Req, DbName, chunked) ->
+    MiddleMan = spawn(fun() -> middleman(Req, DbName, chunked) end),
     {fabric_attachment_receiver, MiddleMan, chunked};
-receiver(_Req, 0) ->
+receiver(_Req, _DbName, 0) ->
     <<"">>;
-receiver(Req, Length) when is_integer(Length) ->
+receiver(Req, DbName, Length) when is_integer(Length) ->
     maybe_send_continue(Req),
-    Middleman = spawn(fun() -> middleman(Req, Length) end),
+    Middleman = spawn(fun() -> middleman(Req, DbName, Length) end),
     {fabric_attachment_receiver, Middleman, Length};
-receiver(_Req, Length) ->
+receiver(_Req, _DbName, Length) ->
     exit({length_not_integer, Length}).
 
 
@@ -108,7 +108,7 @@ receive_unchunked_attachment(Req, Length) ->
     end,
     receive_unchunked_attachment(Req, Length - size(Data)).
 
-middleman(Req, chunked) ->
+middleman(Req, DbName, chunked) ->
     % spawn a process to actually receive the uploaded data
     RcvFun = fun(ChunkRecord, ok) ->
         receive {From, go} -> From ! {self(), ChunkRecord} end, ok
@@ -116,13 +116,13 @@ middleman(Req, chunked) ->
     Receiver = spawn(fun() -> couch_httpd:recv_chunked(Req,4096,RcvFun,ok) end),
 
     % take requests from the DB writers and get data from the receiver
-    N = config:get_integer("cluster", "n", 3),
+    N = mem3:n(DbName),
     Timeout = fabric_util:attachments_timeout(),
     middleman_loop(Receiver, N, [], [], Timeout);
 
-middleman(Req, Length) ->
+middleman(Req, DbName, Length) ->
     Receiver = spawn(fun() -> receive_unchunked_attachment(Req, Length) end),
-    N = config:get_integer("cluster", "n", 3),
+    N = mem3:n(DbName),
     Timeout = fabric_util:attachments_timeout(),
     middleman_loop(Receiver, N, [], [], Timeout).
 
