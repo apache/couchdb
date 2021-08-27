@@ -19,3 +19,5 @@ test/engines/log/
 
 .rebar/
 .eunit
+
+rebar.config
