@@ -219,7 +219,7 @@ swap_compacted(OldState, NewState) ->
     } = NewState,
 
     link(ioq:fd_pid(NewState#mrst.fd)),
-    Ref = erlang:monitor(process, NewState#mrst.fd),
+    Ref = erlang:monitor(process, ioq:fd_pid(NewState#mrst.fd)),
 
     RootDir = couch_index_util:root_dir(),
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
