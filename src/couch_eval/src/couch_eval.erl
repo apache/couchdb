@@ -164,8 +164,8 @@ get_api_mod(Language) when is_binary(Language) ->
                     config:get("couch_eval.languages", LangStr)
             end,
         case ModStr of
-            _ -> list_to_existing_atom(ModStr);
-            undefined -> erlang:error({unknown_eval_api_language, Language})
+            undefined -> erlang:error({unknown_eval_api_language, Language});
+            _ -> list_to_existing_atom(ModStr)
         end
     catch
         error:badarg ->
