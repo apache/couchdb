@@ -192,8 +192,10 @@ pread_binary(Fd, Pos) ->
 pread_iolist(Fd, Pos) ->
     case load_from_cache(Fd, Pos) of
         {ok, IoList, Md5} ->
+            couch_stats:increment_counter([couchdb, couch_file, cache_hits]),
             {ok, verify_md5(Fd, Pos, IoList, Md5)};
         missing ->
+            couch_stats:increment_counter([couchdb, couch_file, cache_misses]),
             case ioq:call(Fd, {pread_iolist, Pos}, erlang:get(io_priority)) of
                 {ok, IoList, Md5} ->
                     {ok, verify_md5(Fd, Pos, IoList, Md5)};
@@ -433,6 +435,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
     ShouldCache = config:get_boolean("couchdb", "couch_file_cache", true),
     Tab = case ShouldCache of
         true ->
+            couch_stats:increment_counter([couchdb, couch_file, cache_opens]),
             ets:new(?MODULE, [set, protected, {read_concurrency, true}]);
         false ->
             undefined
