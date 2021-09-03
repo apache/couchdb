@@ -1,7 +1,5 @@
 defmodule Couch.Test.OpenTracing do
   use Couch.Test.ExUnit.Case
-  alias Couch.Test.Setup
-  alias Couch.Test.Setup.Step
   alias Couch.Test.Utils
   import Couch.DBTest, only: [retry_until: 1]
 
@@ -17,7 +15,7 @@ defmodule Couch.Test.OpenTracing do
   end
 
   setup_all context do
-    test_ctx = :test_util.start_couch([:chttpd])
+    _test_ctx = :test_util.start_couch([:chttpd])
     :ok = create_admin("adm", "pass")
 
     Map.merge(context, %{
