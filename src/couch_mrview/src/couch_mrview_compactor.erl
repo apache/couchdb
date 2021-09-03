@@ -14,6 +14,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
+-include_lib("ioq/include/ioq.hrl").
 
 -export([compact/3, swap_compacted/2, remove_compacted/1]).
 
@@ -274,7 +275,7 @@ recompact_success_after_progress() ->
                 timer:sleep(100),
                 exit({updated, self(), State#mrst{update_seq = 2}})
         end),
-        State = #mrst{fd=self(), update_seq=0},
+        State = #mrst{fd=#ioq_file{fd=self()}, update_seq=0},
         ?assertEqual({ok, State#mrst{update_seq = 2}}, recompact(State))
     end).
 
@@ -285,7 +286,7 @@ recompact_exceeded_retry_count() ->
                 exit(error)
         end),
         ok = meck:expect(couch_log, warning, fun(_, _) -> ok end),
-        State = #mrst{fd=self(), db_name=foo, idx_name=bar},
+        State = #mrst{fd=#ioq_file{fd=self()}, db_name=foo, idx_name=bar},
         ExpectedError = {exceeded_recompact_retry_count,
             [{db_name, foo}, {idx_name, bar}]},
             ?assertError(ExpectedError, recompact(State))

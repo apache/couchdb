@@ -165,7 +165,7 @@ close(State) ->
 % outstanding queries are done.
 shutdown(State) ->
     erlang:demonitor(State#mrst.fd_monitor, [flush]),
-    unlink(State#mrst.fd).
+    unlink(ioq:fd_pid(State#mrst.fd)).
 
 
 delete(#mrst{db_name=DbName, sig=Sig}=State) ->
