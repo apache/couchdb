@@ -109,7 +109,7 @@ defmodule Couch.Test.Pagination do
     paginate_queries(context, [], opts)
   end
 
-  defp paginate_queries(context, acc, opts) do
+  defp paginate_queries(context, _acc, opts) do
     {paginate_opts, client_opts} = Keyword.split(opts, [:url, :direction])
 
     resp =
@@ -1262,7 +1262,7 @@ defmodule Couch.Test.Pagination do
                    inspect(field(results, "id"))
                  })
 
-          keys = Enum.map(results, &Map.get(&1, "key"))
+          _keys = Enum.map(results, &Map.get(&1, "key"))
         end
       end
     end
