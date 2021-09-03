@@ -16,7 +16,7 @@ defmodule Couch.Test.Pagination do
 
   setup_all do
     test_ctx =
-      :test_util.start_couch([:chttpd, :couch_jobs, :couch_views, :couch_eval, :couch_js])
+      :test_util.start_couch([:chttpd, :couch_jobs, :couch_views, :couch_eval, :ateles])
 
     :ok = create_admin("adm", "pass")
 
