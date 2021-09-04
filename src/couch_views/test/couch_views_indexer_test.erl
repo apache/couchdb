@@ -45,7 +45,7 @@ indexer_test_() ->
                     ?TDEF_FE(multiple_keys_from_same_doc),
                     ?TDEF_FE(multiple_identical_keys_from_same_doc),
                     ?TDEF_FE(fewer_multiple_identical_keys_from_same_doc),
-                    ?TDEF_FE(multiple_design_docs),
+                    ?TDEF_FE(multiple_design_docs, 10),
                     ?TDEF_FE(multiple_doc_update_with_existing_rows),
                     ?TDEF_FE(handle_size_key_limits),
                     ?TDEF_FE(handle_size_value_limits),
