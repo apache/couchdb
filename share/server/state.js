@@ -22,10 +22,12 @@ var State = {
   addFun : function(newFun) {
     // Compile to a function and add it to funs array
     State.funs.push(Couch.compileFunction(newFun, {views : {lib : State.lib}}));
+    State.cache = {}; // reset cache only when we add new map funs
     print("true");
   },
   addLib : function(lib) {
     State.lib = lib;
     print("true");
-  }
+  },
+  cache: {}
 };

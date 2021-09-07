@@ -197,3 +197,8 @@ This product also includes the following third-party components:
 * weatherreport_getopt.erl
 
   Copyright (C) 2009 Juan Jose Comellas
+
+* sha256.ts
+
+  Copyright (c) 2018-2021 the Deno authors. All rights reserved.
+  Copyright (c) 2014-2017 Chen, Yi-Cyuan

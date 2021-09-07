@@ -34,6 +34,7 @@ main([]) ->
     end,
 
     JsFiles =  [
+        "share/server/sha256.js",
         "share/server/json2.js",
         "share/server/dreyfus.js",
         "share/server/filter.js",
@@ -47,6 +48,7 @@ main([]) ->
     ],
 
     CoffeeFiles = [
+        "share/server/sha256.js",
         "share/server/json2.js",
         "share/server/dreyfus.js",
         "share/server/filter.js",

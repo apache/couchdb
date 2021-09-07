@@ -14,8 +14,13 @@
 // found here:
 //
 //  https://github.com/dmunch/couch-chakra/blob/master/js/normalizeFunction.js
-
 function rewriteFunInt(fun) {
+    const hash = new Sha256();
+    hash.update(fun);
+    const key = hash.toString();
+    if (State.cache[key]) {
+        return State.cache[key];
+    }
     const ast = esprima.parse(fun);
     let idx = ast.body.length - 1;
     let decl = {};
@@ -38,7 +43,9 @@ function rewriteFunInt(fun) {
     }
 
     // Generate source from the rewritten AST
-    return escodegen.generate(ast);
+    const newSource = escodegen.generate(ast);
+    State.cache[key] = newSource;
+    return State.cache[key];
 }
 
 
