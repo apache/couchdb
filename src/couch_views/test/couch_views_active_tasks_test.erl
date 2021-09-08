@@ -66,8 +66,8 @@ active_tasks_test_() ->
                 fun foreach_setup/0,
                 fun foreach_teardown/1,
                 [
-                    ?TDEF_FE(verify_basic_active_tasks),
-                    ?TDEF_FE(verify_muliple_active_tasks)
+                    ?TDEF_FE(verify_basic_active_tasks, 10),
+                    ?TDEF_FE(verify_muliple_active_tasks, 10)
                 ]
             }
         }
