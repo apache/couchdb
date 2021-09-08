@@ -107,8 +107,12 @@ get_db(DbName, Options) ->
     % suppress shards from down nodes
     Nodes = [node()|erlang:nodes()],
     Live = [S || #shard{node = N} = S <- Shards, lists:member(N, Nodes)],
-    Factor = list_to_integer(config:get("fabric", "shard_timeout_factor", "2")),
-    get_shard(Live, Options, 100, Factor).
+    % Only accept factors > 1, otherwise our math breaks further down
+    Factor = max(2, config:get_integer("fabric", "shard_timeout_factor", 2)),
+    MinTimeout = config:get_integer("fabric", "shard_timeout_min_msec", 100),
+    MaxTimeout = request_timeout(),
+    Timeout = get_db_timeout(length(Live), Factor, MinTimeout, MaxTimeout),
+    get_shard(Live, Options, Timeout, Factor).
 
 get_shard([], _Opts, _Timeout, _Factor) ->
     erlang:error({internal_server_error, "No DB shards could be opened."});
@@ -133,6 +137,25 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     after
         rexi_monitor:stop(Mon)
     end.
+
+get_db_timeout(N, Factor, MinTimeout, MaxTimeout) ->
+    %
+    % The progression of timeouts forms a geometric series:
+    %
+    %     MaxTimeout = T + T*F + T*F^2 + T*F^3 ...
+    %
+    % Where T is the initial timeout and F is the factor. The formula for
+    % the sum is:
+    %
+    %     Sum[T * F^I, I <- 0..N] = T * (1 - F^(N + 1)) / (1 - F)
+    %
+    % Then, for a given sum and factor we can calculate the initial timeout T:
+    %
+    %     T = Sum / ((1 - F^(N+1)) / (1 - F))
+    %
+    Timeout = MaxTimeout / ((1 - math:pow(Factor, N + 1)) / (1 - Factor)),
+    % Apply a minimum timeout value
+    max(MinTimeout, trunc(Timeout)).
 
 error_info({{timeout, _} = Error, _Stack}) ->
     Error;
@@ -400,3 +423,41 @@ do_isolate(Fun) ->
 
 
 -endif.
+
+
+get_db_timeout_test() ->
+    % Q=1, N=1
+    ?assertEqual(20000, get_db_timeout(1, 2, 100, 60000)),
+
+    % Q=2, N=1
+    ?assertEqual(8571, get_db_timeout(2, 2, 100, 60000)),
+
+    % Q=2, N=3 (default)
+    ?assertEqual(472, get_db_timeout(2 * 3, 2, 100, 60000)),
+
+    % Q=3, N=3
+    ?assertEqual(100, get_db_timeout(3 * 3, 2, 100, 60000)),
+
+    % Q=4, N=1
+    ?assertEqual(1935, get_db_timeout(4, 2, 100, 60000)),
+
+    % Q=8, N=1
+    ?assertEqual(117, get_db_timeout(8, 2, 100, 60000)),
+
+    % Q=8, N=3 (default in 2.x)
+    ?assertEqual(100, get_db_timeout(8 * 3, 2, 100, 60000)),
+
+    % Q=256, N=3
+    ?assertEqual(100, get_db_timeout(256 * 3, 2, 100, 60000)),
+
+    % Large factor = 100
+    ?assertEqual(100, get_db_timeout(2 * 3, 100, 100, 60000)),
+
+    % Small total request timeout = 1 sec
+    ?assertEqual(100, get_db_timeout(2 * 3, 2, 100, 1000)),
+
+    % Large total request timeout
+    ?assertEqual(28346, get_db_timeout(2 * 3, 2, 100, 3600000)),
+
+    % No shards at all
+    ?assertEqual(60000, get_db_timeout(0, 2, 100, 60000)).
