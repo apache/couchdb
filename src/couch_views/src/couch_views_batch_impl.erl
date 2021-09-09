@@ -150,8 +150,8 @@ good_config_test() ->
         )
     end).
 
-bad_config_test() ->
-    Fields = [
+bad_config_test_() ->
+    FieldErrors = [
         {batch_initial_size, invalid_non_neg_integer},
         {batch_search_increment, invalid_non_neg_integer},
         {batch_sense_increment, invalid_non_neg_integer},
@@ -159,16 +159,17 @@ bad_config_test() ->
         {batch_max_tx_time_msec, invalid_non_neg_integer},
         {batch_threshold_penalty, invalid_float}
     ],
-    lists:foreach(
+    lists:map(
         fun({Field, Error}) ->
-            with_bad_config(atom_to_list(Field), fun() ->
-                ?assertError(
-                    {Error, {couch_views, Field, _}},
+            FieldName = atom_to_list(Field),
+            {FieldName, ?_assertError(
+                {Error, {couch_views, Field, _}},
+                with_bad_config(FieldName, fun() ->
                     start(#mrst{}, undefined)
-                )
-            end)
+                end))
+            }
         end,
-        Fields
+        FieldErrors
     ).
 
 float_range_test() ->
