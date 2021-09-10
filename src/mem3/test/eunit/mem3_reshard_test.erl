@@ -65,6 +65,7 @@ mem3_reshard_db_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun split_one_shard/1,
+                    fun split_shard_with_lots_of_purges/1,
                     fun update_docs_before_topoff1/1,
                     fun indices_are_built/1,
                     fun split_partitioned_db/1,
@@ -137,6 +138,56 @@ split_one_shard(#{db1 := Db}) ->
         % Don't forget about the local but don't include internal checkpoints
         % as some of those are munged and transformed during the split
         ?assertEqual(without_meta_locals(Local0), without_meta_locals(Local1))
+    end)}.
+
+
+% Test to check that shard with high number of purges can be split
+split_shard_with_lots_of_purges(#{db1 := Db}) ->
+    {timeout, ?TIMEOUT, ?_test(begin
+        % Set a low purge infos limit, we are planning to overrun it
+        set_purge_infos_limit(Db, 10),
+
+        % Add docs 1..20 and purge them
+        add_test_docs(Db, #{docs => [1, 20]}),
+        IdRevs = maps:fold(fun(Id, #{<<"_rev">> := Rev}, Acc) ->
+            [{Id, [Rev]} | Acc]
+        end, [], get_all_docs(Db)),
+        ?assertMatch({ok, _}, purge_docs(Db, IdRevs)),
+
+        % Compact to trim the purge sequence
+        ok = compact(Db),
+
+        % Add some extra docs, these won't be purged
+        add_test_docs(Db, #{docs => [21, 30]}),
+        Docs0 = get_all_docs(Db),
+
+        % Save db info before splitting
+        DbInfo0 = get_db_info(Db),
+
+        % Split the one shard
+        [#shard{name=Shard}] = lists:sort(mem3:local_shards(Db)),
+        {ok, JobId} = mem3_reshard:start_split_job(Shard),
+        wait_state(JobId, completed),
+
+        % Perform some basic checks that the shard was split
+        Shards1 = lists:sort(mem3:local_shards(Db)),
+        ?assertEqual(2, length(Shards1)),
+        [#shard{range = R1}, #shard{range = R2}] = Shards1,
+        ?assertEqual([16#00000000, 16#7fffffff], R1),
+        ?assertEqual([16#80000000, 16#ffffffff], R2),
+
+        % Check metadata bits after the split
+        ?assertEqual(10, get_purge_infos_limit(Db)),
+
+        DbInfo1 = get_db_info(Db),
+        Docs1 = get_all_docs(Db),
+
+        % When comparing db infos, ignore update sequences they won't be the
+        % same since they are more shards involved after the split
+        ?assertEqual(without_seqs(DbInfo0), without_seqs(DbInfo1)),
+
+        % Finally compare that the documents are still there after the split
+        ?assertEqual(Docs0, Docs1)
     end)}.
 
 
@@ -554,6 +605,36 @@ set_purge_infos_limit(DbName, Limit) ->
     with_proc(fun() ->
         fabric:set_purge_infos_limit(DbName, Limit, [?ADMIN_CTX])
     end).
+
+
+purge_docs(DbName, DocIdRevs) ->
+    with_proc(fun() ->
+        fabric:purge_docs(DbName, DocIdRevs, [])
+    end).
+
+
+compact(DbName) ->
+    InitFileSize = get_db_file_size(DbName),
+    ok = with_proc(fun() -> fabric:compact(DbName) end),
+    test_util:wait(fun() ->
+        case {compact_running(DbName), get_db_file_size(DbName)} of
+            {true, _} -> wait;
+            {false, FileSize} when FileSize == InitFileSize -> wait;
+            {false, FileSize} when FileSize < InitFileSize -> ok
+        end
+    end, 5000, 200).
+
+
+compact_running(DbName) ->
+    {ok, DbInfo} = with_proc(fun() -> fabric:get_db_info(DbName) end),
+    #{<<"compact_running">> := CompactRunning} = to_map(DbInfo),
+    CompactRunning.
+
+
+get_db_file_size(DbName) ->
+    {ok, DbInfo} = with_proc(fun() -> fabric:get_db_info(DbName) end),
+    #{<<"sizes">> := #{<<"file">> := FileSize}} = to_map(DbInfo),
+    FileSize.
 
 
 set_security(DbName, SecObj) ->

@@ -301,7 +301,8 @@ copy_meta(#state{source_db = SourceDb, targets = Targets} = State) ->
 
 
 copy_purge_info(#state{source_db = Db} = State) ->
-    {ok, NewState} = couch_db:fold_purge_infos(Db, 0, fun purge_cb/2, State),
+    Seq = max(0, couch_db:get_oldest_purge_seq(Db) - 1),
+    {ok, NewState} = couch_db:fold_purge_infos(Db, Seq, fun purge_cb/2, State),
     Targets = maps:map(fun(_, #target{} = T) ->
         commit_purge_infos(T)
     end, NewState#state.targets),
