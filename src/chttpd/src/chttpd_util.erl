@@ -65,7 +65,6 @@ get_chttpd_auth_config_boolean(Key, Default) ->
 
 maybe_add_csp_header(Component, OriginalHeaders, DefaultHeaderValue) ->
     Enabled = config:get_boolean("csp", Component ++ "_enable", true),
-    couch_log:notice("~n> maybe_add_csp_header~n Component: ~n~p~n OriginalHeaders: ~n~p~n DefaultHeaderValue: ~n~p~n, Enabled: ~n~p~n", [Component, OriginalHeaders, DefaultHeaderValue, Enabled]),
     case Enabled of
         true ->
             HeaderValue = config:get("csp", Component ++ "_header_value", DefaultHeaderValue),
