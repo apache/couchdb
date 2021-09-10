@@ -92,6 +92,7 @@ open(Db, State0) ->
         db_name=DbName,
         sig=Sig
     } = State = set_partitioned(Db, State0),
+    IOQPid = ioq:ioq_pid(couch_db:get_fd_handle(Db)),
     IndexFName = couch_mrview_util:index_file(DbName, Sig),
 
     % If we are upgrading from <= 2.x, we upgrade the view
@@ -111,7 +112,7 @@ open(Db, State0) ->
 
     OldSig = couch_mrview_util:maybe_update_index_file(State),
 
-    case couch_mrview_util:open_file(IndexFName) of
+    case couch_mrview_util:open_file(IndexFName, IOQPid) of
         {ok, Fd} ->
             case couch_file:read_header(Fd) of
                 % upgrade code for <= 2.x

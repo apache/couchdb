@@ -47,8 +47,9 @@ compact(State) ->
     erlang:put(io_priority, {view_compact, DbName, IdxName}),
 
     {EmptyState, NumDocIds} = couch_util:with_db(DbName, fun(Db) ->
+        IOQPid = ioq:ioq_pid(couch_db:get_fd_handle(Db)),
         CompactFName = couch_mrview_util:compaction_file(DbName, Sig),
-        {ok, Fd} = couch_mrview_util:open_file(CompactFName),
+        {ok, Fd} = couch_mrview_util:open_file(CompactFName, IOQPid),
         ESt = couch_mrview_util:reset_index(Db, Fd, State),
 
         {ok, Count} = couch_db:get_doc_count(Db),

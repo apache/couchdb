@@ -39,7 +39,7 @@
 }).
 
 % public API
--export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, set_db_pid/2]).
+-export([open/1, open/2, open/3, close/1, bytes/1, sync/1, truncate/2, set_db_pid/2]).
 -export([pread_term/2, pread_iolist/2, pread_binary/2]).
 -export([append_binary/2, append_binary_md5/2]).
 -export([append_raw_chunk/2, assemble_file_chunk/1, assemble_file_chunk/2]).
@@ -68,10 +68,19 @@ open(Filepath) ->
     open(Filepath, []).
 
 open(Filepath, Options) ->
+    open(Filepath, Options, undefined).
+
+open(Filepath, Options, IOQPid0) ->
     case gen_server:start_link(couch_file,
             {Filepath, Options, self(), Ref = make_ref()}, []) of
     {ok, Fd} ->
-        {ok, IOQPid} = ioq_server2:start_link({by_shard, Filepath, Fd}),
+        IOQPid = case IOQPid0 of
+            undefined ->
+                {ok, IOQPid1} = ioq_server2:start_link({by_shard, Filepath, Fd}),
+                IOQPid1;
+            IOQPid0 when is_pid(IOQPid0) ->
+                IOQPid0
+        end,
         Tab = gen_server:call(Fd, get_cache_ref),
         {ok, #ioq_file{fd=Fd, ioq=IOQPid, tab=Tab}};
     ignore ->

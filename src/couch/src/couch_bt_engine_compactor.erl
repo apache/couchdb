@@ -92,12 +92,14 @@ start(#st{} = St, DbName, Options, Parent) ->
 open_compaction_files(DbName, OldSt, Options) ->
     #st{
         filepath = DbFilePath,
-        header = SrcHdr
+        header = SrcHdr,
+        fd = OldFd
     } = OldSt,
+    IOQPid = ioq:ioq_pid(OldFd),
     DataFile = DbFilePath ++ ".compact.data",
     MetaFile = DbFilePath ++ ".compact.meta",
-    {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
-    {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile),
+    {ok, DataFd, DataHdr} = open_compaction_file(DataFile, IOQPid),
+    {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile, IOQPid),
     DataHdrIsDbHdr = couch_bt_engine_header:is_header(DataHdr),
     CompSt = case {DataHdr, MetaHdr} of
         {#comp_header{}=A, #comp_header{}=A} ->
@@ -577,15 +579,15 @@ compact_final_sync(#comp_st{new_st = St0} = CompSt) ->
     }.
 
 
-open_compaction_file(FilePath) ->
-    case couch_file:open(FilePath, [nologifmissing]) of
+open_compaction_file(FilePath, IOQPid) ->
+    case couch_file:open(FilePath, [nologifmissing], IOQPid) of
         {ok, Fd} ->
             case couch_file:read_header(Fd) of
                 {ok, Header} -> {ok, Fd, Header};
                 no_valid_header -> {ok, Fd, nil}
             end;
         {error, enoent} ->
-            {ok, Fd} = couch_file:open(FilePath, [create]),
+            {ok, Fd} = couch_file:open(FilePath, [create], IOQPid),
             {ok, Fd, nil}
     end.
 

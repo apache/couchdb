@@ -20,6 +20,7 @@
     delete_compaction_files/3,
 
     init/2,
+    init/3,
     terminate/2,
     handle_db_updater_call/2,
     handle_db_updater_info/2,
@@ -30,6 +31,7 @@
 
     last_activity/1,
 
+    get_fd_handle/1,
     get_compacted_seq/1,
     get_del_doc_count/1,
     get_disk_version/1,
@@ -146,7 +148,11 @@ delete_compaction_files(RootDir, FilePath, DelOpts) ->
 
 
 init(FilePath, Options) ->
-    {ok, Fd} = open_db_file(FilePath, Options),
+    init(FilePath, Options, undefined).
+
+
+init(FilePath, Options, IOQPid) ->
+    {ok, Fd} = open_db_file(FilePath, Options, IOQPid),
     Header = case lists:member(create, Options) of
         true ->
             delete_compaction_files(FilePath),
@@ -213,6 +219,10 @@ monitored_by(#st{fd=#ioq_file{fd=Fd}}=St) ->
 
 last_activity(#st{fd = Fd}) ->
     couch_file:last_read(Fd).
+
+
+get_fd_handle(#st{fd = Fd}) ->
+    Fd.
 
 
 get_compacted_seq(#st{header = Header}) ->
@@ -655,7 +665,8 @@ start_compaction(St, DbName, Options, Parent) ->
 
 
 finish_compaction(OldState, DbName, Options, CompactFilePath) ->
-    {ok, NewState1} = ?MODULE:init(CompactFilePath, Options),
+    IOQPid = ioq:ioq_pid(OldState#st.fd),
+    {ok, NewState1} = ?MODULE:init(CompactFilePath, Options, IOQPid),
     OldSeq = get_update_seq(OldState),
     NewSeq = get_update_seq(NewState1),
     case OldSeq == NewSeq of
@@ -846,10 +857,10 @@ copy_props(#st{header = Header} = St, Props) ->
     }}.
 
 
-open_db_file(FilePath, Options) ->
+open_db_file(FilePath, Options, IOQPid) ->
     Hash = list_to_atom(integer_to_list(mem3_hash:crc32(FilePath))),
     erlang:put(couch_file_hash, Hash),
-    case couch_file:open(FilePath, Options) of
+    case couch_file:open(FilePath, Options, IOQPid) of
         {ok, Fd} ->
             {ok, Fd};
         {error, enoent} ->

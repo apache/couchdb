@@ -45,6 +45,7 @@
     get_epochs/1,
     get_filepath/1,
     get_instance_start_time/1,
+    get_fd_handle/1,
     get_pid/1,
     get_revs_limit/1,
     get_security/1,
@@ -206,6 +207,9 @@ clustered_db(DbName, #user_ctx{} = UserCtx) ->
 
 clustered_db(DbName, UserCtx, SecProps) ->
     clustered_db(DbName, [{user_ctx, UserCtx}, {security, SecProps}]).
+
+get_fd_handle(#db{} = Db) ->
+    couch_db_engine:get_fd_handle(Db).
 
 is_db(#db{}) ->
     true;
