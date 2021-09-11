@@ -13,8 +13,7 @@
 -include_lib("proper/include/proper.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-
--define(EUNIT_QUICKCHECK(QuickcheckTimeout),
+-define(EUNIT_QUICKCHECK(QuickcheckTimeout, NumTests),
     [
         {
             atom_to_list(F),
@@ -22,8 +21,13 @@
                 ?_assert(proper:quickcheck(?MODULE:F(), [
                     {to_file, user},
                     {start_size, 2},
+                    {numtests, NumTests},
                     long_result
                  ]))}
             }
         || {F, 0} <- ?MODULE:module_info(exports), F > 'prop_', F < 'prop`'
     ]).
+
+-define(EUNIT_QUICKCHECK(QuickcheckTimeout),
+        ?EUNIT_QUICKCHECK(QuickcheckTimeout, 100)
+    ).

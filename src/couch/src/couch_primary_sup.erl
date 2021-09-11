@@ -19,12 +19,6 @@ start_link() ->
 
 init([]) ->
     Children = [
-        {collation_driver,
-            {couch_drv, start_link, []},
-            permanent,
-            infinity,
-            supervisor,
-            [couch_drv]},
         {couch_task_status,
             {couch_task_status, start_link, []},
             permanent,

@@ -172,8 +172,6 @@ CouchJSEnv = case SMVsn of
         ]
 end.
 
-IcuPath = "priv/couch_icu_driver.so".
-IcuSrc = ["priv/icu_driver/*.c"].
 IcuEnv = [{"DRV_CFLAGS",  "$DRV_CFLAGS -DPIC -O2 -fno-common"},
           {"DRV_LDFLAGS", "$DRV_LDFLAGS -lm -licuuc -licudata -licui18n -lpthread"}].
 IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include -I/opt/homebrew/opt/icu4c/include"},
@@ -189,11 +187,6 @@ CompareSrc = ["priv/couch_ejson_compare/*.c"].
 BaseSpecs = [
         %% couchjs
         {".*", CouchJSPath, CouchJSSrc, [{env, CouchJSEnv}]},
-        % ICU
-        {"darwin", IcuPath, IcuSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
-        {"linux",  IcuPath, IcuSrc, [{env, IcuEnv}]},
-        {"bsd",   IcuPath, IcuSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
-        {"win32",  IcuPath, IcuSrc, [{env, IcuWinEnv}]},
         % ejson_compare
         {"darwin", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  ComparePath, CompareSrc, [{env, IcuEnv}]},
