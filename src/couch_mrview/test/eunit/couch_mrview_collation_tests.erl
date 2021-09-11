@@ -52,7 +52,11 @@
     {[{<<"b">>, 1}]},
     {[{<<"b">>, 2}]},
     {[{<<"b">>, 2}, {<<"a">>, 1}]},
-    {[{<<"b">>, 2}, {<<"c">>, 2}]}
+    {[{<<"b">>, 2}, {<<"c">>, 2}]},
+
+    % Values with depth > 10 trigger the erlang collation fallback in couch_ejson_compare
+    {[{<<"x">>, [[[[[[[[[[[<<"y">>]]]]]]]]]]]}]}
+
 ]).
 
 

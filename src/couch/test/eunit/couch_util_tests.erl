@@ -25,30 +25,13 @@ setup() ->
     %%
     Ctx = test_util:start_couch(),
     %% config:start_link(?CONFIG_CHAIN),
-    %% {ok, _} = couch_drv:start_link(),
     Ctx.
 
 teardown(Ctx) ->
     ok = test_util:stop_couch(Ctx),
     %% config:stop(),
-    %% erl_ddll:unload_driver(couch_icu_driver),
     ok.
 
-
-collation_test_() ->
-    {
-        "Collation tests",
-        [
-            {
-                setup,
-                fun setup/0, fun teardown/1,
-                [
-                    should_collate_ascii(),
-                    should_collate_non_ascii()
-                ]
-            }
-        ]
-    }.
 
 validate_callback_exists_test_() ->
     {
@@ -58,12 +41,6 @@ validate_callback_exists_test_() ->
             should_fail_for_missing_cb()
         ]
     }.
-
-should_collate_ascii() ->
-    ?_assertEqual(1, couch_util:collate(<<"foo">>, <<"bar">>)).
-
-should_collate_non_ascii() ->
-    ?_assertEqual(-1, couch_util:collate(<<"A">>, <<"aa">>)).
 
 to_existed_atom_test() ->
     ?assert(couch_util:to_existing_atom(true)),

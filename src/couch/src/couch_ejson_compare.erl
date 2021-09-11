@@ -14,6 +14,10 @@
 
 -export([less/2, less_json_ids/2, less_json/2]).
 
+% For testing
+-export([less_nif/2, less_erl/2, compare_strings_nif/2]).
+
+
 -on_load(init/0).
 
 
@@ -30,8 +34,8 @@ less(A, B) ->
     try
         less_nif(A, B)
     catch
-    error:badarg ->
-        % Maybe the EJSON structure is too deep, fallback to Erlang land.
+    error:max_depth_error ->
+        % The EJSON structure is too deep, fallback to Erlang land.
         less_erl(A, B)
     end.
 
@@ -48,7 +52,11 @@ less_json(A,B) ->
 
 
 less_nif(A, B) ->
-    less_erl(A, B).
+    erlang:nif_error(less_nif_load_error, [A, B]).
+
+
+compare_strings_nif(A, B) ->
+    erlang:nif_error(compare_string_nif, [A, B]).
 
 
 less_erl(A,A)                                 -> 0;
@@ -61,7 +69,7 @@ less_erl(A,B) when is_number(A), is_number(B) -> A - B;
 less_erl(A,_) when is_number(A)               -> -1;
 less_erl(_,B) when is_number(B)               -> 1;
 
-less_erl(A,B) when is_binary(A), is_binary(B) -> couch_util:collate(A,B);
+less_erl(A,B) when is_binary(A), is_binary(B) -> compare_strings_nif(A,B);
 less_erl(A,_) when is_binary(A)               -> -1;
 less_erl(_,B) when is_binary(B)               -> 1;
 
@@ -84,7 +92,7 @@ less_props([], [_|_]) ->
 less_props(_, []) ->
     1;
 less_props([{AKey, AValue}|RestA], [{BKey, BValue}|RestB]) ->
-    case couch_util:collate(AKey, BKey) of
+    case compare_strings_nif(AKey, BKey) of
     0 ->
         case less_erl(AValue, BValue) of
         0 ->
