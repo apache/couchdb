@@ -6,10 +6,7 @@
     "POST edge case with colliding parameters - query takes precedence",
     "POST with empty body",
     "POST with keys and limit",
-    "POST with missing keys",
-    "POST with query parameter and JSON body",
-    "_local_docs POST with keys and limit",
-    "all_docs ordering"
+    "POST with query parameter and JSON body"
   ],
   "AttachmentMultipartTest": [
     "manages attachments multipart requests successfully",
@@ -32,6 +29,7 @@
     "COUCHDB-809 - stubs should only require the 'stub' field",
     "attachment via multipart/form-data",
     "delete attachment",
+    "delete attachment request with a payload should not block following requests",
     "empty attachments",
     "errors for bad attachment",
     "etags for attachments",
@@ -48,19 +46,21 @@
     "auth cache management"
   ],
   "BasicsTest": [
+    "'+' in document name should encode to '+'",
+    "'+' in document name should encode to space",
     "A document read with etag works",
     "Can create several documents",
-    "Check _revs_limit",
     "Check for invalid document members",
     "Create a document and save it to the database",
     "Created database has appropriate db info name",
     "Creating a new DB should return location header",
     "Creating a new DB with slashes should return Location header (COUCHDB-411)",
     "DELETE'ing a non-existent doc should 404",
+    "Database name with '%2B' should encode to '+'",
+    "Database name with '+' should encode to '+'",
     "Database should be in _all_dbs",
     "Default headers are returned for doc with open_revs=all",
     "Empty database should have zero docs",
-    "Exceeding configured DB name size limit returns an error",
     "Make sure you can do a seq=true option",
     "On restart, a request for creating an already existing db can not override",
     "POST doc response has a Location header",
@@ -68,17 +68,13 @@
     "PUT doc has a Location header",
     "PUT error when body not an object",
     "PUT on existing DB should return 412 instead of 500",
-    "Ready endpoint",
     "Regression test for COUCHDB-954",
     "Revs info status is good",
     "Session contains adm context",
     "Simple map functions",
     "Welcome endpoint",
     "_all_docs POST error when multi-get is not a {'key': [...]} structure",
-    "_all_docs/queries works",
     "_bulk_docs POST error when body not an object",
-    "_design_docs works",
-    "_local_docs works",
     "oops, the doc id got lost in code nirwana"
   ],
   "BatchSaveTest": [
@@ -95,7 +91,6 @@
     "bulk docs raises error for invlaid `docs` parameter",
     "bulk docs raises error for invlaid `new_edits` parameter",
     "bulk docs raises error for missing `docs` parameter",
-    "bulk docs raises transaction_too_large error for transaction larger than 10MB",
     "bulk docs supplies `id` if not provided in doc"
   ],
   "ChangesAsyncTest": [
@@ -115,6 +110,8 @@
     "COUCHDB-1923",
     "Changes feed negative heartbeat",
     "Changes feed non-integer heartbeat",
+    "changes fail on invalid payload",
+    "changes filtering on custom filter",
     "changes filtering on design docs",
     "changes filtering on docids",
     "changes limit",
@@ -289,6 +286,114 @@
   "MultipleRowsTest": [
     "multiple rows"
   ],
+  "PartitionAllDocsTest": [
+    "all_docs with partitioned:true returns partitioned fields",
+    "partition _all_docs with descending",
+    "partition _all_docs with key",
+    "partition _all_docs with skip",
+    "partition _all_docs with timeout",
+    "partition _all_docs works with limit",
+    "partition all docs can set query limits",
+    "partition all_docs errors with incorrect partition supplied",
+    "partitioned _all_docs works with keys",
+    "partitioned _all_docs works with startkey, endkey range"
+  ],
+  "PartitionCrudTest": [
+    "GET to partition returns 400",
+    "POST and GET document",
+    "POST and _bulk_get document",
+    "POST fails if a partition key is not supplied",
+    "PUT and GET document",
+    "PUT fails for bad partitions",
+    "PUT fails for partitions with _",
+    "PUT fails if a partition key is not supplied",
+    "Sets partition in db info",
+    "_bulk_docs errors with bad doc key",
+    "_bulk_docs errors with bad partition key",
+    "_bulk_docs errors with missing partition key",
+    "_bulk_docs saves docs with partition key",
+    "_bulk_get bad partitioned document",
+    "can create unpartitioned system db",
+    "can purge partitioned db docs",
+    "cannot create partitioned system db",
+    "create database with bad `partitioned` value",
+    "purge rejects unpartitioned docid",
+    "saves attachment with partitioned doc"
+  ],
+  "PartitionDDocTest": [
+    "DELETE /dbname/_design/foo",
+    "GET /dbname/_all_docs?key=$ddoc_id",
+    "GET /dbname/_bulk_get",
+    "GET /dbname/_bulk_get with rev",
+    "GET /dbname/_design/foo",
+    "GET /dbname/_design/foo?rev=$rev",
+    "GET /dbname/_design_docs",
+    "POST /dbname with design doc",
+    "POST /dbname/_bulk_docs with design doc",
+    "PUT /dbname/_design/foo",
+    "PUT /dbname/_design/foo to update",
+    "PUT /dbname/_design/foo/readme.txt"
+  ],
+  "PartitionDesignDocsTest": [
+    "/_partition/:pk/_design/doc 404"
+  ],
+  "PartitionMangoTest": [
+    "explain works with non partitioned db",
+    "explain works with partitions",
+    "global query does not use partition index",
+    "global query uses global index",
+    "non-partitioned query using _all_docs and $eq",
+    "partitioned _find and _explain with missing partition returns 400",
+    "partitioned query does not use global index",
+    "partitioned query sends correct errors for sort errors",
+    "partitioned query using _all_docs",
+    "partitioned query using _all_docs and range scan",
+    "partitioned query using _all_docs with $eq",
+    "partitioned query using bookmarks",
+    "partitioned query using index and range scan",
+    "partitioned query with query server config set",
+    "query using _id and partition works",
+    "query using _id works for global and local query",
+    "query with partitioned:true using index and $eq"
+  ],
+  "PartitionSizeLimitTest": [
+    "compacting a full partition works",
+    "decreasing partition size disables more writes",
+    "fill partition manually",
+    "full partition does not affect design documents",
+    "full partition does not affect other partitions",
+    "full partitions are still readable",
+    "full partitions can accept deletes",
+    "full partitions can accept updates that reduce size",
+    "full partitions reject POST /dbname",
+    "full partitions reject POST /dbname/_bulk_docs",
+    "full partitions reject PUT /dbname/docid",
+    "full partitions with mixed POST /dbname/_bulk_docs",
+    "increasing partition size allows more writes",
+    "indexing a full partition works",
+    "purging docs allows writes",
+    "replication into a full partition works"
+  ],
+  "PartitionSizeTest": [
+    "adding docs increases partition sizes",
+    "attachments don't affect other partitions",
+    "deleting a doc affects partition sizes",
+    "design docs do not affect partition sizes",
+    "get all partition sizes",
+    "get empty partition",
+    "get partition size with attachment",
+    "partition activity not affect other partition sizes",
+    "purging docs decreases partition size",
+    "simple partition size",
+    "unknown partition return's zero",
+    "updating docs affects partition sizes"
+  ],
+  "PartitionViewUpdateTest": [
+    "purge removes view rows",
+    "purged conflict changes view rows",
+    "query with update=false works",
+    "view updates properly remove old keys"
+  ],
   "ProxyAuthTest": [
     "proxy auth with secret",
     "proxy auth without secret"
@@ -324,13 +429,12 @@
     "More complex reductions that need to use the combine option",
     "Reduce pagination"
   ],
-  "ReplicationBadIdTest": [
-    "replication doc with bad rep id"
-  ],
   "ReplicationTest": [
     "compressed attachment replication - remote-to-remote",
     "continuous replication - remote-to-remote",
     "create_target filter option - remote-to-remote",
+    "default headers returned for _scheduler/docs ",
+    "default headers returned for _scheduler/jobs",
     "filtered replications - remote-to-remote",
     "non-admin or reader user on source - remote-to-remote",
     "non-admin user on target - remote-to-remote",
@@ -344,8 +448,16 @@
     "unauthorized replication cancellation",
     "validate_doc_update failure replications - remote-to-remote"
   ],
-  "ReplicatorDBByDocIdTest": [
-    "replicatior db by doc id"
+  "ReshardAllDocsTest": [
+    "all_docs after splitting all shards on node1",
+    "all_docs after splitting the same range on all nodes"
+  ],
+  "ReshardBasicTest": [
+    "basic api querying, no jobs present",
+    "check validation of invalid parameters",
+    "split q=1 db shards on node1 (1 job)",
+    "split q=2 shards on node1 (2 jobs)",
+    "toggle global state"
   ],
   "RevStemmingTest": [
     "revs limit is kept after compaction",
@@ -445,7 +557,8 @@
     "user db security"
   ],
   "UsersDbTest": [
-    "users db"
+    "users db",
+    "users password requirements"
   ],
   "ViewCollationRawTest": [
     "ascending collation order",
@@ -489,21 +602,6 @@
     "link to another doc from a value",
     "no reduce support"
   ],
-  "ViewMapTest": [
-    "_conflict is supported",
-    "_local_seq is supported",
-    "bad range returns error",
-    "can do design doc swap",
-    "can index design docs",
-    "can use key in query string",
-    "can use keys in query string",
-    "descending=true query with startkey_docid",
-    "inclusive = false",
-    "multiple emits in correct value order",
-    "query returns docs",
-    "supports linked documents",
-    "updated docs rebuilds index"
-  ],
   "ViewMultiKeyAllDocsTest": [
     "GET - get invalid rows when the key doesn't exist",
     "POST - get invalid rows when the key doesn't exist",
@@ -546,6 +644,27 @@
     "descending=false parameter should just be ignored",
     "endkey document id",
     "endkey document id, but with end_key_doc_id alias"
+  ],
+  "ViewPartitionTest": [
+    "conflicting partitions in path and query string rejected",
+    "default view query returns partitioned fields",
+    "global query works with keys",
+    "include_design works correctly",
+    "partition query can set query limits",
+    "partition query errors with incorrect partition supplied",
+    "partition query with descending",
+    "partition query with key",
+    "partition query with skip",
+    "partition query with startkey_docid and endkey_docid",
+    "partition query works with limit",
+    "partitioned ddoc cannot be used in global query",
+    "partitioned query cannot be used with global ddoc",
+    "partitioned query works with keys",
+    "partitioned query works with startkey, endkey range",
+    "query will return zero results for wrong inputs",
+    "query with partitioned:true returns partitioned fields",
+    "query with reduce works",
+    "view query returns all docs for global query"
   ],
   "ViewSandboxingTest": [
     "COUCHDB-925 - altering 'doc' variable in map function affects other map functions",
