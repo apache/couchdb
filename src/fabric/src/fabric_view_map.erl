@@ -146,7 +146,7 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
         }}
     end;
 
-handle_message(#view_row{}, {_, _}, #collector{limit=0} = State) ->
+handle_message(#view_row{}, {_, _}, #collector{sorted=false, limit=0} = State) ->
     #collector{callback=Callback} = State,
     {_, Acc} = Callback(complete, State#collector.user_acc),
     {stop, State#collector{user_acc=Acc}};
