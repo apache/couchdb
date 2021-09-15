@@ -153,7 +153,7 @@ defmodule Couch.Test.Suite do
 
       if not started? do
         ExUnit.start(autorun: false)
-        Process.get(EXUNIT_STARTED, true)
+        Process.put(EXUNIT_STARTED, true)
       end
     end
   end
