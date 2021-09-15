@@ -171,6 +171,9 @@
     "replication doc with bad rep id"
   ],
   "ReplicationTest": [
+    "non-admin user on target - remote-to-remote",
+    "non-admin or reader user on source - remote-to-remote",
+    "unauthorized replication cancellation"
   ],
   "ReplicatorDBByDocIdTest": [
     "replicatior db by doc id"
@@ -203,6 +206,7 @@
     "serial execution is not spuriously counted as loop on test_rewrite_suite_db%2Fwith_slashes"
   ],
   "SecurityValidationTest": [
+    "Author presence and user security when replicated"
   ],
   "ShowDocumentsTest": [
     "JS can't set etag",
