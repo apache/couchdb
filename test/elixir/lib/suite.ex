@@ -163,9 +163,18 @@ defmodule Couch.Test.Suite do
     Enum.filter(files, &File.regular?/1)
   end
 
+  defp test_helpers(directory) do
+    files = Path.wildcard(Path.join(directory, "*_helpers.exs"))
+    Enum.filter(files, &File.regular?/1)
+  end
+
   def tests_in_file(file_path) do
     ensure_exunit_started()
     Code.compiler_options(ignore_module_conflict: true)
+
+    Enum.each(
+      test_helpers(Path.dirname(file_path)), &require_file/1
+    )
 
     tests =
       Enum.reduce(require_file(file_path), [], fn {module_name, _}, acc ->
