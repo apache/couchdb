@@ -146,11 +146,10 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
         }}
     end;
 
-handle_message(#view_row{}, {_, From}, #collector{limit=0} = State) ->
-    rexi:stream_ack(From),
-    % Rely on limit=0 clause in maybe_send_row/1 to wait until all
-    % shard ranges reply with meta
-    fabric_view:maybe_send_row(State);
+handle_message(#view_row{}, {_, _}, #collector{limit=0} = State) ->
+    #collector{callback=Callback} = State,
+    {_, Acc} = Callback(complete, State#collector.user_acc),
+    {stop, State#collector{user_acc=Acc}};
 
 handle_message(#view_row{} = Row, {_,From}, #collector{sorted=false} = St) ->
     #collector{callback=Callback, user_acc=AccIn, limit=Limit} = St,
