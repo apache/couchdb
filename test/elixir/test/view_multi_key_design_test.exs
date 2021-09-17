@@ -209,16 +209,38 @@ defmodule ViewMultiKeyDesignTest do
     assert length(rows) == 99
   end
 
-  test "dir works", context do
+  test "dir ascending works", context do
     db_name = context[:db_name]
 
-    resp = view(db_name, "test/multi_emit", [descending: true], [1])
-    rows = resp.body["rows"]
-    assert length(rows) == 100
+    expect_rows = mk_rows(0..99, 1, &</2) ++ mk_rows(0..99, 2, &</2)
 
-    resp = view(db_name, "test/multi_emit", descending: true, keys: :jiffy.encode([1]))
+    resp = view(db_name, "test/multi_emit", [descending: false], [1, 2])
     rows = resp.body["rows"]
-    assert length(rows) == 100
+    assert length(rows) == 200
+    assert expect_rows == rows
+
+    keys = :jiffy.encode([1, 2])
+    resp = view(db_name, "test/multi_emit", descending: false, keys: keys)
+    rows = resp.body["rows"]
+    assert length(rows) == 200
+    assert expect_rows == rows
+  end
+
+  test "dir descending works", context do
+    db_name = context[:db_name]
+
+    expect_rows = mk_rows(0..99, 2, &>/2) ++ mk_rows(0..99, 1, &>/2)
+
+    resp = view(db_name, "test/multi_emit", [descending: true], [1, 2])
+    rows = resp.body["rows"]
+    assert length(rows) == 200
+    assert expect_rows == rows
+
+    keys = :jiffy.encode([1, 2])
+    resp = view(db_name, "test/multi_emit", descending: true, keys: keys)
+    rows = resp.body["rows"]
+    assert length(rows) == 200
+    assert expect_rows == rows
   end
 
   test "argument combinations", context do
@@ -312,5 +334,13 @@ defmodule ViewMultiKeyDesignTest do
 
     rows = resp.body["rows"]
     assert length(rows) == 2
+  end
+
+  defp mk_rows(range, key, sort_fun) do
+    row_fun = fn(i) -> %{"id" => "#{i}", "key" => key, "value" => i} end
+    sort_mapper = fn(row) -> {row["key"], row["id"]} end
+    range
+    |> Enum.map(row_fun)
+    |> Enum.sort_by(sort_mapper, sort_fun)
   end
 end

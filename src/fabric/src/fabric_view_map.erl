@@ -24,8 +24,14 @@ go(DbName, Options, GroupId, View, Args, Callback, Acc, VInfo)
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
     go(DbName, Options, DDoc, View, Args, Callback, Acc, VInfo);
 
-go(Db, Options, DDoc, View, Args, Callback, Acc, VInfo) ->
+go(Db, Options, DDoc, View, Args0, Callback, Acc, VInfo) ->
     DbName = fabric:dbname(Db),
+    Args = case Args0 of
+        #mrargs{keys = Keys, direction = rev} when is_list(Keys) ->
+            Args0#mrargs{keys = lists:reverse(Keys)};
+        #mrargs{} ->
+            Args0
+    end,
     {Shards, RingOpts} = fabric_view:get_shards(Db, Args),
     {CoordArgs, WorkerArgs} = fabric_view:fix_skip_and_limit(Args),
     DocIdAndRev = fabric_util:doc_id_and_rev(DDoc),
@@ -221,10 +227,12 @@ merge_row(Dir, Collation, KeyDict0, Row, Rows0) ->
                             IdA < IdB;
                         {rev, 0} ->
                             IdB < IdA;
-                        {fwd, _} ->
-                            dict:fetch(A, KeyDict1) < dict:fetch(B, KeyDict1);
-                        {rev, _} ->
-                            dict:fetch(B, KeyDict1) < dict:fetch(A, KeyDict1)
+                        {_, _} ->
+                            % We already have a reversed key dict, and sent the
+                            % workers the same reversed keys list. So here we
+                            % just enforce sorting according to the order in
+                            % the key dict
+                            dict:fetch(A, KeyDict1) < dict:fetch(B, KeyDict1)
                     end
                 end,
                 [Row],
