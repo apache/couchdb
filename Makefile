@@ -153,7 +153,7 @@ escriptize: couch
 check: all python-black
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
-	@$(MAKE) elixir
+	@$(MAKE) elixir-suite
 	@$(MAKE) weatherreport-test
 
 ifdef apps
@@ -250,6 +250,17 @@ elixir-cluster-with-quorum: elixir-init elixir-check-formatted elixir-credo devc
 	@dev/run -n 3 -q -a adm:pass \
 		--degrade-cluster 1 \
 		--no-eval 'mix test --trace --only with_quorum_test $(EXUNIT_OPTS)'
+
+.PHONY: elixir-suite
+elixir-suite: export MIX_ENV=integration
+elixir-suite: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+elixir-suite: elixir-init elixir-check-formatted elixir-credo devclean
+	@dev/run -n 1 -q -a adm:pass \
+		--enable-erlang-views \
+		--no-join \
+		--locald-config test/elixir/test/config/test-config.ini \
+		--erlang-config rel/files/eunit.config \
+		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir'
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted: elixir-init

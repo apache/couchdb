@@ -1,0 +1,317 @@
+%{
+  "AllDocsTest": [
+  ],
+  "AttachmentMultipartTest": [
+    "manages attachments multipart requests successfully",
+    "manages compressed attachments successfully"
+  ],
+  "AttachmentNamesTest": [
+    "saves attachment names successfully"
+  ],
+  "AttachmentPathsTest": [
+    "manages attachment paths successfully - design docs"
+  ],
+  "AttachmentRangesTest": [
+  ],
+  "AttachmentViewTest": [
+    "manages attachments in views successfully"
+  ],
+  "AttachmentsTest": [
+    "COUCHDB-809 - stubs should only require the 'stub' field",
+    "empty attachments",
+    "etags for attachments",
+    "implicit doc creation allows creating docs with a reserved id. COUCHDB-565",
+    "large attachments COUCHDB-366",
+    "md5 header for attachments",
+    "saves binary",
+    "COUCHDB-497 - empty attachments",
+    "update attachment"
+  ],
+  "AuthCacheTest": [
+  ],
+  "BasicsTest": [
+  ],
+  "BatchSaveTest": [
+  ],
+  "BulkDocsTest": [
+  ],
+  "ChangesAsyncTest": [
+    "COUCHDB-1852",
+    "continuous changes",
+    "continuous filtered changes",
+    "continuous filtered changes with doc ids",
+    "eventsource changes",
+    "eventsource heartbeat",
+    "live changes",
+    "longpoll changes",
+    "longpoll filtered changes"
+  ],
+  "ChangesTest": [
+    "changes filtering on design docs"
+  ],
+  "CoffeeTest": [
+    "CoffeeScript basic functionality"
+  ],
+  "CompactTest": [
+  ],
+  "ConfigTest": [
+    "Atoms, binaries, and strings suffice as whitelist sections and keys.",
+    "Blacklist is functional",
+    "CouchDB respects configured protocols",
+    "Keys not in the whitelist may not be modified",
+    "Non-2-tuples in the whitelist are ignored",
+    "Non-list whitelist values allow further modification of the whitelist",
+    "Non-term whitelist values allow further modification of the whitelist",
+    "PORT `BUGGED` ?raw tests from config.js",
+    "Reload config",
+    "Server-side password hashing, and raw updates disabling that",
+    "Settings can be altered with undefined whitelist allowing any change",
+    "Standard config options are present"
+  ],
+  "CookieAuthTest": [
+    "cookie auth"
+  ],
+  "CopyDocTest": [
+    "Copy doc tests"
+  ],
+  "DesignDocsQueryTest": [
+  ],
+  "DesignDocsTest": [
+    "circular commonjs dependencies",
+    "commonjs require",
+    "module id values are as expected"
+  ],
+  "DesignOptionsTest": [
+    "design doc options - include_desing=false"
+  ],
+  "DesignPathTest": [
+    "design doc path",
+    "design doc path with slash in db name"
+  ],
+  "ErlangViewsTest": [
+    "Erlang map function",
+    "Erlang reduce function",
+    "Erlang reduce function larger dataset"
+  ],
+  "EtagsHeadTest": [
+  ],
+  "FormSubmitTest": [
+  ],
+  "HelperTest": [
+  ],
+  "HttpTest": [
+    "COUCHDB-708: newlines document names",
+    "location header"
+  ],
+  "InvalidDocIDsTest": [
+  ],
+  "JsonpTest": [
+  ],
+  "JwtAuthTest": [
+  ],
+  "ListViewsTest": [
+    "COUCHDB-1113",
+    "HTTP header response set after getRow() called in _list function",
+    "abort iteration with reduce",
+    "empty list",
+    "extra qs params",
+    "get with query params",
+    "handling _all_docs by _list functions. the result should be equal",
+    "multi-key fetch with GET",
+    "multi-key fetch with POST",
+    "multiple languages in design docs",
+    "no multi-key fetch allowed when group=false",
+    "reduce with 0 rows",
+    "secObj is available",
+    "standard GET",
+    "standard OPTIONS",
+    "stop iteration",
+    "the richness of the arguments",
+    "too many Get Rows",
+    "we can run lists and views from separate docs",
+    "we do multi-key requests on lists and views in separate docs",
+    "when there is a reduce present, and used",
+    "when there is a reduce present, but not used",
+    "with 0 rows",
+    "with accept headers for HTML",
+    "with include_docs and a reference to the doc"
+  ],
+  "LocalDocsTest": [
+  ],
+  "LotsOfDocsTest": [
+  ],
+  "MethodOverrideTest": [
+  ],
+  "MultipleRowsTest": [
+  ],
+  "ProxyAuthTest": [
+    "proxy auth with secret",
+    "proxy auth without secret"
+  ],
+  "PurgeTest": [
+    "COUCHDB-1065",
+    "purge documents"
+  ],
+  "ReaderACLTest": [
+    "can't set non string reader names or roles",
+    "members can query views",
+    "restricted db can be read by authorized users",
+    "unrestricted db can be read",
+    "works with readers (backwards compat with 1.0)"
+  ],
+  "RecreateDocTest": [
+  ],
+  "ReduceBuiltinTest": [
+  ],
+  "ReduceFalseTest": [
+  ],
+  "ReduceTest": [
+  ],
+  "ReplicationBadIdTest": [
+    "replication doc with bad rep id"
+  ],
+  "ReplicationTest": [
+    "non-admin user on target - remote-to-remote",
+    "non-admin or reader user on source - remote-to-remote",
+    "unauthorized replication cancellation"
+  ],
+  "ReplicatorDBByDocIdTest": [
+    "replicatior db by doc id"
+  ],
+  "RevStemmingTest": [
+    "revs limit is kept after compaction"
+  ],
+  "RevisionTest": [
+  ],
+  "RewriteJSTest": [
+    "Test basic js rewrites on test_rewrite_suite_db",
+    "Test basic js rewrites on test_rewrite_suite_db%2Fwith_slashes",
+    "early response on test_rewrite_suite_db",
+    "early response on test_rewrite_suite_db%2Fwith_slashes",
+    "loop on test_rewrite_suite_db",
+    "loop on test_rewrite_suite_db%2Fwith_slashes",
+    "path relative to server on test_rewrite_suite_db",
+    "path relative to server on test_rewrite_suite_db%2Fwith_slashes",
+    "requests with body preserve the query string rewrite on test_rewrite_suite_db",
+    "requests with body preserve the query string rewrite on test_rewrite_suite_db%2Fwith_slashes"
+  ],
+  "RewriteTest": [
+    "Test basic rewrites on test_rewrite_suite_db",
+    "Test basic rewrites on test_rewrite_suite_db%2Fwith_slashes",
+    "loop detection on test_rewrite_suite_db",
+    "loop detection on test_rewrite_suite_db%2Fwith_slashes",
+    "path relative to server on test_rewrite_suite_db",
+    "path relative to server on test_rewrite_suite_db%2Fwith_slashes",
+    "serial execution is not spuriously counted as loop on test_rewrite_suite_db",
+    "serial execution is not spuriously counted as loop on test_rewrite_suite_db%2Fwith_slashes"
+  ],
+  "SecurityValidationTest": [
+    "Author presence and user security when replicated"
+  ],
+  "ShowDocumentsTest": [
+    "JS can't set etag",
+    "accept header switching - different mime has different etag",
+    "deleted docs",
+    "id with slash",
+    "list() compatible API",
+    "list() compatible API with provides function",
+    "missing design doc",
+    "registering types works",
+    "security object",
+    "should keep next result order: chunks + return value + provided chunks + provided return value",
+    "show error",
+    "show fail with non-existing docid",
+    "show query parameters",
+    "show with doc",
+    "show with doc - etags",
+    "show with existing doc",
+    "show with missing doc",
+    "show with non-existing docid",
+    "show without docid",
+    "the provides mime matcher",
+    "the provides mime matcher without a match"
+  ],
+  "UTF8Test": [
+  ],
+  "UUIDsTest": [
+    "sequential uuids are sequential",
+    "utc_id uuids are correct",
+    "utc_random uuids are roughly random"
+  ],
+  "UpdateDocumentsTest": [
+    "COUCHDB-1229 - allow slashes in doc ids for update handlers",
+    "COUCHDB-648 - the code in the JSON response should be honored",
+    "Insert doc with empty id",
+    "base64 response",
+    "bump counter",
+    "doc can be created",
+    "form update via application/x-www-form-urlencoded",
+    "in place update",
+    "update document"
+  ],
+  "UsersDbSecurityTest": [
+    "user db security"
+  ],
+  "UsersDbTest": [
+    "users db"
+  ],
+  "ViewCollationRawTest": [
+  ],
+  "ViewCollationTest": [
+  ],
+  "ViewCompactionTest": [
+    "view compaction"
+  ],
+  "ViewConflictsTest": [
+  ],
+  "ViewErrorsTest": [
+    "infinite loop",
+    "reduce overflow error",
+    "temporary view should give error message"
+  ],
+  "ViewIncludeDocsTest": [
+    "emitted _rev controls things"
+  ],
+  "ViewMapTest": [
+  ],
+  "ViewMultiKeyAllDocsTest": [
+  ],
+  "ViewMultiKeyDesignTest": [
+  ],
+  "ViewOffsetTest": [
+    "basic view offsets",
+    "repeated view offsets"
+  ],
+  "ViewPaginationTest": [
+    "aliases start_key and start_key_doc_id should work",
+    "basic view pagination",
+    "descending view pagination",
+    "descending=false parameter should just be ignored",
+    "endkey document id",
+    "endkey document id, but with end_key_doc_id alias"
+  ],
+  "ViewSandboxingTest": [
+  ],
+  "ViewTest": [
+  ],
+  "ViewUpdateSeqTest": [
+    "_all_docs update seq",
+    "db info update seq",
+    "view update seq"
+  ],
+  "WithQuorumTest": [
+    "Attachments overriden quorum should return 202-Acepted",
+    "Attachments should return 201-Created",
+    "Bulk docs overriden quorum should return 202-Acepted",
+    "Creating-Updating/Deleting doc with overriden quorum should return 202-Acepted/200-OK",
+    "Creating/Deleting DB should return 201-Created/202-Acepted"
+  ],
+  "WithoutQuorumTest": [
+    "Attachments overriden quorum should return 201-Created",
+    "Attachments should return 202-Acepted",
+    "Bulk docs should return 202-Acepted",
+    "Copy doc should return 202-Acepted",
+    "Creating/Deleting DB should return 202-Acepted",
+    "Creating/Updating/Deleting doc should return 202-Acepted"
+  ]
+}
