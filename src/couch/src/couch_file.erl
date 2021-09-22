@@ -199,7 +199,9 @@ pread_binary(Fd, Pos) ->
     {ok, iolist_to_binary(L)}.
 
 
-pread_iolist(#ioq_file{parallel=true, fd=File}, Pos) ->
+pread_iolist(#ioq_file{parallel=true, fd=Fd}, Pos) ->
+    Limit = get_pread_limit(),
+    File = #file{fd=Fd, is_sys=false, pread_limit=Limit},
     {LenIolist, NextPos} = read_raw_iolist_int(File, Pos, 4),
     case iolist_to_binary(LenIolist) of
         <<1:1/integer,Len:31/integer>> -> % an MD5-prefixed term
