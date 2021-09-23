@@ -298,7 +298,6 @@ transform_row(#view_row{key=Key, id=_Id, value=_Value, doc={error,Reason}}) ->
 transform_row(#view_row{key=Key, id=Id, value=Value, doc=Doc}) ->
     {row, [{id,Id}, {key,Key}, {value,Value}, {doc,Doc}]}.
 
-compare(_, _, A, A) -> true;
 compare(fwd, <<"raw">>, A, B) -> A < B;
 compare(rev, <<"raw">>, A, B) -> B < A;
 compare(fwd, _, A, B) -> couch_ejson_compare:less_json(A, B);
