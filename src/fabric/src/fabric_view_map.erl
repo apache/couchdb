@@ -241,7 +241,6 @@ merge_row(Dir, Collation, KeyDict0, Row, Rows0) ->
             {Rows1, KeyDict1}
     end.
 
-compare(_, _, A, A) -> true;
 compare(fwd, <<"raw">>, A, B) -> A < B;
 compare(rev, <<"raw">>, A, B) -> B < A;
 compare(fwd, _, A, B) -> couch_ejson_compare:less_json_ids(A, B);
