@@ -31,7 +31,7 @@
 
 %% export so we can use fully qualified call to facilitate hot-code upgrade
 -export([
-    keep_sending_changes/3
+    keep_sending_changes/4
 ]).
 
 -record(changes_acc, {
@@ -107,7 +107,8 @@ handle_db_changes(Args0, Req, Db0) ->
                     keep_sending_changes(
                         Args#changes_args{dir = fwd},
                         Acc0,
-                        true
+                        true,
+                        os:timestamp()
                     )
                 after
                     fabric2_events:stop_listener(Listener),
@@ -573,7 +574,7 @@ send_lookup_changes(FullDocInfos, StartSeq, Dir, Db, Fun, Acc0) ->
             {ok, FinalAcc}
     end.
 
-keep_sending_changes(Args, Acc0, FirstRound) ->
+keep_sending_changes(Args, Acc0, FirstRound, T0) ->
     #changes_args{
         feed = ResponseType,
         limit = Limit,
@@ -604,29 +605,47 @@ keep_sending_changes(Args, Acc0, FirstRound) ->
                 true ->
                     case wait_updated(Timeout, TimeoutFun, UserAcc3) of
                         {updated, UserAcc4} ->
-                            UserCtx = fabric2_db:get_user_ctx(Db),
-                            DbOptions1 = [{user_ctx, UserCtx} | DbOptions],
-                            case fabric2_db:open(fabric2_db:name(Db), DbOptions1) of
-                                {ok, Db2} ->
-                                    ?MODULE:keep_sending_changes(
-                                        Args#changes_args{limit = NewLimit},
-                                        ChangesAcc#changes_acc{
-                                            db = Db2,
-                                            user_acc = UserAcc4,
-                                            seq = EndSeq,
-                                            prepend = Prepend2,
-                                            timeout = Timeout,
-                                            timeout_fun = TimeoutFun
-                                        },
-                                        false
-                                    );
-                                _Else ->
-                                    end_sending_changes(Callback, UserAcc3, EndSeq)
+                            AccumulatedTime = timer:now_diff(os:timestamp(), T0) div 1000,
+                            Max = changes_duration(),
+                            case AccumulatedTime > Max of
+                                true ->
+                                    end_sending_changes(Callback, UserAcc4, EndSeq);
+                                false ->
+                                    UserCtx = fabric2_db:get_user_ctx(Db),
+                                    DbOptions1 = [{user_ctx, UserCtx} | DbOptions],
+                                    case fabric2_db:open(fabric2_db:name(Db), DbOptions1) of
+                                        {ok, Db2} ->
+                                            ?MODULE:keep_sending_changes(
+                                                Args#changes_args{limit = NewLimit},
+                                                ChangesAcc#changes_acc{
+                                                    db = Db2,
+                                                    user_acc = UserAcc4,
+                                                    seq = EndSeq,
+                                                    prepend = Prepend2,
+                                                    timeout = Timeout,
+                                                    timeout_fun = TimeoutFun
+                                                },
+                                                false,
+                                                T0
+                                            );
+                                        _Else ->
+                                            end_sending_changes(Callback, UserAcc3, EndSeq)
+                                    end
                             end;
                         {stop, UserAcc4} ->
                             end_sending_changes(Callback, UserAcc4, EndSeq)
                     end
             end
+    end.
+
+
+changes_duration() ->
+    %% preserving original (3.x) configuration segment;
+    case config:get("fabric", "changes_duration", "infinity") of
+        "infinity" ->
+            infinity;
+        MaxStr ->
+            list_to_integer(MaxStr)
     end.
 
 notify_waiting_for_updates(Callback, UserAcc) ->
