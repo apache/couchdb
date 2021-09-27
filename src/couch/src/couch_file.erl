@@ -82,8 +82,7 @@ open(Filepath, Options, IOQPid0) ->
                 IOQPid0
         end,
         Tab = gen_server:call(Fd, get_cache_ref),
-        ParallelReads = config:get_boolean("couchdb", "couch_file_parallel", false),
-        {ok, #ioq_file{fd=Fd, ioq=IOQPid, tab=Tab, parallel=ParallelReads}};
+        {ok, #ioq_file{fd=Fd, ioq=IOQPid, tab=Tab}};
     ignore ->
         % get the error
         receive
@@ -199,17 +198,6 @@ pread_binary(Fd, Pos) ->
     {ok, iolist_to_binary(L)}.
 
 
-pread_iolist(#ioq_file{parallel=true, fd=File}, Pos) ->
-    {LenIolist, NextPos} = read_raw_iolist_int(File, Pos, 4),
-    case iolist_to_binary(LenIolist) of
-        <<1:1/integer,Len:31/integer>> -> % an MD5-prefixed term
-            {Md5AndIoList, _} = read_raw_iolist_int(File, NextPos, Len+16),
-            {Md5, IoList} = extract_md5(Md5AndIoList),
-            {ok, verify_md5(File, Pos, IoList, Md5)};
-        <<0:1/integer,Len:31/integer>> ->
-            {Iolist, _} = read_raw_iolist_int(File, NextPos, Len),
-            {ok, Iolist}
-    end;
 pread_iolist(Fd, Pos) ->
     case load_from_cache(Fd, Pos) of
         {ok, IoList, Md5} ->
