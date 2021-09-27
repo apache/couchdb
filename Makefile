@@ -486,7 +486,7 @@ endif
 share/www:
 ifeq ($(with_fauxton), 1)
 	@echo "Building Fauxton"
-	@cd src/fauxton && npm install --production && ./node_modules/grunt-cli/bin/grunt couchdb
+	@cd src/fauxton && npm install && ./node_modules/grunt-cli/bin/grunt couchdb
 endif
 
 
