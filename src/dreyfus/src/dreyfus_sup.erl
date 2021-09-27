@@ -15,18 +15,45 @@
 
 -module(dreyfus_sup).
 -behaviour(supervisor).
+-behaviour(config_listener).
 
--export([start_link/0, init/1]).
+-export([start_link/0, init/1, handle_config_change/5, handle_config_terminate/3]).
+
+-define(DEFAULT_ENABLE_SEARCH, false).
+
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
+
 init(_Args) ->
     Children = [
+        child(config_listener_mon),
         child(dreyfus_index_manager)
     ],
-    {ok, {{one_for_one,10,1},
+    {ok, {{one_for_one, 10, 1},
         couch_epi:register_service(dreyfus_epi, Children)}}.
 
+
+handle_config_change("dreyfus", "enable", _, _, _) ->
+    case config:get_boolean("dreyfus", "enable", ?DEFAULT_ENABLE_SEARCH) andalso clouseau_rpc:connected() of
+        true -> config:enable_feature(search);
+        false -> config:disable_feature(search)
+    end;
+handle_config_change(_, _, _, _, Settings) ->
+    {ok, Settings}.
+
+
+handle_config_terminate(_Server, _Reason, _State) ->
+    ok.
+
+
+child(Child) when Child =:= config_listener_mon ->
+    {Child, {Child, start_link,
+        [?MODULE, settings()]}, permanent, 5000, worker, [Child]};
 child(Child) ->
     {Child, {Child, start_link, []}, permanent, 1000, worker, [Child]}.
+
+
+settings() ->
+    [{enable, config:get("dreyfus", "enable", ?DEFAULT_ENABLE_SEARCH)}].

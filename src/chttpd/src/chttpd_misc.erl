@@ -36,6 +36,7 @@
     send_chunk/2,start_chunked_response/3]).
 
 -define(MAX_DB_NUM_FOR_DBS_INFO, 100).
+-define(DEFAULT_ENABLE_SEARCH, false).
 
 % httpd global handlers
 
@@ -60,7 +61,8 @@ handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 get_features() ->
-    case clouseau_rpc:connected() of
+    case clouseau_rpc:connected() andalso config:get_boolean(
+        "dreyfus", "enable", ?DEFAULT_ENABLE_SEARCH) of
         true ->
             [search | config:features()];
         false ->
