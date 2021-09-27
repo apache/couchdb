@@ -259,7 +259,7 @@ should_return_correct_id_on_doc_copy(Url) ->
             [?CONTENT_JSON, ?AUTH, ?DESTHEADER1]),
         {ResultJson1} = ?JSON_DECODE(ResultBody1),
         Id1 = couch_util:get_value(<<"id">>, ResultJson1),
-        
+
         {_, _, _, ResultBody2} = test_request:copy(Url ++ "/testdoc/",
             [?CONTENT_JSON, ?AUTH, ?DESTHEADER2]),
         {ResultJson2} = ?JSON_DECODE(ResultBody2),
@@ -276,7 +276,7 @@ should_return_only_one_ok_on_doc_copy(Url) ->
        {_, _, _, ResultBody} = test_request:copy(Url ++ "/testdoc",
            [?CONTENT_JSON, ?AUTH, ?DESTHEADER1]),
        {ResultJson} = jiffy:decode(ResultBody),
-       NumOks = length(lists:filter(fun({Key, Value}) -> Key == <<"ok">> end, ResultJson)),
+       NumOks = length(lists:filter(fun({Key, _Value}) -> Key == <<"ok">> end, ResultJson)),
        [
            ?assertEqual(1, NumOks)
        ]
@@ -311,7 +311,6 @@ should_not_change_db_proper_after_rewriting_shardmap(_) ->
         TmpDb = ?tempdb(),
         Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
         Port = mochiweb_socket_server:get(chttpd, port),
-        AdmPort = mochiweb_socket_server:get(couch_httpd, port),
 
         BaseUrl = lists:concat(["http://", Addr, ":", Port, "/", ?b2l(TmpDb)]),
         Url = BaseUrl ++ "?partitioned=true&q=1",
