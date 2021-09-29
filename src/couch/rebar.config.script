@@ -141,8 +141,8 @@ end.
         };
     {unix, _} when SMVsn == "78" ->
         {
-            "-DXP_UNIX -I/usr/include/mozjs-78 -I/usr/local/include/mozjs-78 -std=c++20 -Wno-invalid-offsetof",
-            "-L/usr/local/lib -std=c++20 -lmozjs-78 -lm"
+            "-DXP_UNIX -I/usr/include/mozjs-78 -I/usr/local/include/mozjs-78 -std=c++17 -Wno-invalid-offsetof",
+            "-L/usr/local/lib -std=c++17 -lmozjs-78 -lm"
         };
     {unix, _} when SMVsn == "86" ->
         {
