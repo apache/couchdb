@@ -504,9 +504,13 @@ cleanup_index_files() ->
 %% @doc clean up index files for a specific db
 -spec cleanup_index_files(dbname()) -> ok.
 cleanup_index_files(DbName) ->
-    lists:foreach(fun(File) ->
-        file:delete(File)
-    end, inactive_index_files(DbName)).
+    try lists:foreach(
+        fun(File) ->
+            file:delete(File)
+        end, inactive_index_files(DbName))
+    catch
+        error:database_does_not_exist -> ok
+    end.
 
 %% @doc inactive index files for a specific db
 -spec inactive_index_files(dbname()) -> ok.
