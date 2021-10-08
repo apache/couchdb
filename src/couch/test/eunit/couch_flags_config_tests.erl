@@ -81,9 +81,6 @@ test_id(Items, ExpectedResult) ->
     lists:flatten(io_lib:format("~p -> ~p", [[P || {P, _} <- Items], ExpectedResult])).
 
 
-test_id(Items) ->
-    lists:flatten(io_lib:format("~p", [[P || {P, _} <- Items]])).
-
 test_config() ->
     [
         {"flag_foo||*", "true"},
