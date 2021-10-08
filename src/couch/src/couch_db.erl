@@ -1503,17 +1503,20 @@ calculate_start_seq(Db, _Node, {Seq, {split, Uuid}, EpochNode}) ->
                 [?MODULE, Db#db.name, Seq, Uuid, EpochNode, get_epochs(Db)]),
             0
     end;
-calculate_start_seq(Db, _Node, {Seq, Uuid, EpochNode}) ->
+calculate_start_seq(Db, Node, {Seq, Uuid, EpochNode}) ->
     case is_prefix(Uuid, get_uuid(Db)) of
         true ->
             case is_owner(EpochNode, Seq, get_epochs(Db)) of
                 true -> Seq;
                 false ->
-                    couch_log:warning("~p calculate_start_seq not owner "
-                        "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p, epochs: ~p",
-                        [?MODULE, Db#db.name, Seq, Uuid, EpochNode,
-                            get_epochs(Db)]),
-                    0
+                    %% Shard might have been moved from another node. We
+                    %% matched the uuid already, try to find last viable
+                    %% sequence we can use
+                    couch_log:warning( "~p calculate_start_seq not owner, "
+                        " trying replacement db: ~p, seq: ~p, uuid: ~p, "
+                        "epoch_node: ~p, epochs: ~p", [?MODULE, Db#db.name,
+                        Seq, Uuid, EpochNode, get_epochs(Db)]),
+                    calculate_start_seq(Db, Node, {replace, EpochNode, Uuid, Seq})
             end;
         false ->
             couch_log:warning("~p calculate_start_seq uuid prefix mismatch "
@@ -1984,7 +1987,8 @@ calculate_start_seq_test_() ->
                 t_calculate_start_seq_is_owner(),
                 t_calculate_start_seq_not_owner(),
                 t_calculate_start_seq_raw(),
-                t_calculate_start_seq_epoch_mismatch()
+                t_calculate_start_seq_epoch_mismatch(),
+                t_calculate_start_seq_shard_move()
             ]
         }
     }.
@@ -2028,7 +2032,7 @@ t_calculate_start_seq_is_owner() ->
 t_calculate_start_seq_not_owner() ->
     ?_test(begin
         Db = test_util:fake_db([]),
-        Seq = calculate_start_seq(Db, node1, {15, <<"foo">>}),
+        Seq = calculate_start_seq(Db, node3, {15, <<"foo">>}),
         ?assertEqual(0, Seq)
     end).
 
@@ -2045,6 +2049,18 @@ t_calculate_start_seq_epoch_mismatch() ->
         SeqIn = {replace, not_this_node, get_uuid(Db), 42},
         Seq = calculate_start_seq(Db, node1, SeqIn),
         ?assertEqual(0, Seq)
+    end).
+
+t_calculate_start_seq_shard_move() ->
+    ?_test(begin
+        Db = test_util:fake_db([]),
+        % Sequence when shard was on node1
+        ?assertEqual(2, calculate_start_seq(Db, node1, {2, <<"foo">>})),
+        % Sequence from node1 after the move happened, we reset back to the
+        % start of the epoch on node2 = 10
+        ?assertEqual(10, calculate_start_seq(Db, node1, {16, <<"foo">>})),
+        % Invalid node, epoch mismatch, start at 0
+        ?assertEqual(0, calculate_start_seq(Db, node3, {16, <<"foo">>}))
     end).
 
 is_owner_test() ->
