@@ -247,8 +247,8 @@ enqueue_request(State, Object) ->
         {ok, Pid, Priority} ->
             smoosh_channel:enqueue(Pid, Object, Priority)
         end
-    catch Class:Exception ->
-        Stack = erlang:get_stacktrace(),
+    catch
+        ?STACKTRACE(Class, Exception, Stack)
         couch_log:notice("~s: ~p ~p for ~s : ~p",
             [?MODULE, Class, Exception,
                 smoosh_utils:stringify(Object), Stack])
