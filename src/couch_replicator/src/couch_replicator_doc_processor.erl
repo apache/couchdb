@@ -875,7 +875,7 @@ setup() ->
 
 
 teardown(Pid) ->
-    exit(Pid, kill).
+    test_util:stop_sync(Pid, kill, 1000). % 1s wait should suffice
 
 
 removed_state_fields() ->
