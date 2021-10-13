@@ -509,7 +509,11 @@ cleanup_index_files(DbName) ->
             file:delete(File)
         end, inactive_index_files(DbName))
     catch
-        error:database_does_not_exist -> ok
+        error:Error ->
+            couch_log:error(
+                "~p:cleanup_index_files. Error: ~p",
+                [?MODULE, Error]),
+            ok
     end.
 
 %% @doc inactive index files for a specific db
