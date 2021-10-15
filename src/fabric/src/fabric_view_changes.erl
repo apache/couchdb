@@ -143,30 +143,17 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
          Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, Arg]}),
          {S#shard{ref = Ref}, Seq}
     end, WSplitSeqs0),
-    % For ranges that were not split start sequences from 0
-    WReps = lists:map(fun(#shard{name = Name, node = N} = S) ->
-         Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, 0]}),
+    % For ranges that were not split, look for a replacement on a different node
+    WReps = lists:map(fun(#shard{name = Name, node = NewNode, range = R} = S) ->
+         Arg = find_replacement_sequence(Dead, R),
+         Ref = rexi:cast(NewNode, {fabric_rpc, changes, [Name, ChangesArgs, Arg]}),
          {S#shard{ref = Ref}, 0}
     end, Reps1),
     Seqs = WSeqs ++ WSplitSeqs ++ WReps,
     {Workers0, _} = lists:unzip(Seqs),
     Repls = fabric_ring:get_shard_replacements(DbName, Workers0),
     StartFun = fun(#shard{name=Name, node=N, range=R0}=Shard) ->
-        %% Find the original shard copy in the Seqs array
-        case lists:dropwhile(fun({S, _}) -> S#shard.range =/= R0 end, Seqs) of
-            [{#shard{}, {replace, _, _, _}} | _] ->
-                % Don't attempt to replace a replacement
-                SeqArg = 0;
-            [{#shard{node = OldNode}, OldSeq} | _] ->
-                SeqArg = make_replacement_arg(OldNode, OldSeq);
-            _ ->
-                % TODO this clause is probably unreachable in the N>2
-                % case because we compute replacements only if a shard has one
-                % in the original set.
-                couch_log:error("Streaming ~s from zero while replacing ~p",
-                    [Name, PackedSeqs]),
-                SeqArg = 0
-        end,
+        SeqArg = find_replacement_sequence(Seqs, R0),
         Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, SeqArg]}),
         Shard#shard{ref = Ref}
     end,
@@ -649,6 +636,22 @@ find_split_shard_replacements(DeadWorkers, Shards) ->
     end, Acc0, DeadWorkers),
     {Workers, Available} = AccF,
     {fabric_dict:from_list(Workers), Available}.
+
+
+find_replacement_sequence(OriginalSeqs, R0) ->
+    %% Find the original shard copy in the Seqs array
+    case lists:dropwhile(fun({S, _}) -> S#shard.range =/= R0 end, OriginalSeqs) of
+        [{#shard{}, {replace, _, _, _}} | _] ->
+            % Don't attempt to replace a replacement
+            0;
+        [{#shard{node = OldNode}, OldSeq} | _] ->
+            make_replacement_arg(OldNode, OldSeq);
+        _ ->
+            % TODO we don't currently attempt to replace a shard with split
+            % replicas of that range on other nodes, so it's possible to end
+            % up with an empty list here.
+            0
+    end.
 
 
 make_split_seq({Num, Uuid, Node}, RepCount) when RepCount > 1 ->
