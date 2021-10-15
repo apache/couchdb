@@ -138,6 +138,10 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
         rexi_monitor:stop(Mon)
     end.
 
+get_db_timeout(N, Factor, MinTimeout, infinity) ->
+    % MaxTimeout may be infinity so we just use the largest Erlang small int to
+    % avoid blowing up the arithmetic
+    get_db_timeout(N, Factor, MinTimeout, 1 bsl 59);
 get_db_timeout(N, Factor, MinTimeout, MaxTimeout) ->
     %
     % The progression of timeouts forms a geometric series:
@@ -460,4 +464,8 @@ get_db_timeout_test() ->
     ?assertEqual(28346, get_db_timeout(2 * 3, 2, 100, 3600000)),
 
     % No shards at all
-    ?assertEqual(60000, get_db_timeout(0, 2, 100, 60000)).
+    ?assertEqual(60000, get_db_timeout(0, 2, 100, 60000)),
+
+    % request_timeout was set to infinity, with enough shards it still gets to
+    % 100 min timeout at the start from the exponential logic
+    ?assertEqual(100, get_db_timeout(64, 2, 100, infinity)).
