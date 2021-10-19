@@ -77,7 +77,7 @@ handle_message(Reason, Shard, {Counters, Resps, CInfo}) ->
 
 build_final_response(CInfo, DbName, Responses) ->
     AccF = fabric_dict:fold(fun(Shard, Info, {Seqs, PSeqs, Infos}) ->
-        Seq = couch_util:get_value(update_seq, Info),
+        Seq = build_seq(Shard, Info),
         PSeq = couch_util:get_value(purge_seq, Info),
         {[{Shard, Seq} | Seqs], [{Shard, PSeq} | PSeqs], [Info | Infos]}
     end, {[], [], []}, Responses),
@@ -87,6 +87,13 @@ build_final_response(CInfo, DbName, Responses) ->
     MergedInfos = merge_results(lists:flatten([CInfo | Infos])),
     Sequences = [{purge_seq, PackedPSeq}, {update_seq, PackedSeq}],
     [{db_name, DbName}] ++ Sequences ++ MergedInfos.
+
+
+build_seq(#shard{node = Node}, Info) when is_list(Info) ->
+    Seq = couch_util:get_value(update_seq, Info),
+    Uuid = couch_util:get_value(uuid, Info),
+    PrefixLen = fabric_util:get_uuid_prefix_len(),
+    {Seq, binary:part(Uuid, {0, PrefixLen}), Node}.
 
 
 merge_results(Info) ->
