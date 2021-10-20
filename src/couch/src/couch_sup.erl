@@ -44,6 +44,11 @@ start_link() ->
 
 
 init(_Args) ->
+    CacheArgs = #{
+        strategy => lru,
+        segment_num => 3,
+        ttl => {milliseconds, 1000}
+    },
     couch_log:info("Starting ~s", [?MODULE]),
     {ok, {{one_for_one,10, 60}, [
         {
@@ -53,6 +58,14 @@ init(_Args) ->
             5000,
             worker,
             [config_listener_mon]
+        },
+        {
+            couch_cache,
+            {segmented_cache, start_link, [CacheArgs]},
+            permanent,
+            5000,
+            worker,
+            [segmented_cache]
         },
         {
             couch_primary_services,

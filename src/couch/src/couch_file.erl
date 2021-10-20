@@ -35,7 +35,8 @@
     eof = 0,
     db_monitor,
     pread_limit = 0,
-    tab
+    tab,
+    id_ref
 }).
 
 % public API
@@ -81,8 +82,8 @@ open(Filepath, Options, IOQPid0) ->
             IOQPid0 when is_pid(IOQPid0) ->
                 IOQPid0
         end,
-        Tab = gen_server:call(Fd, get_cache_ref),
-        {ok, #ioq_file{fd=Fd, ioq=IOQPid, tab=Tab}};
+        {Tab, Ref} = gen_server:call(Fd, get_cache_ref),
+        {ok, #ioq_file{fd=Fd, ioq=IOQPid, tab=Tab, id_ref=Ref}};
     ignore ->
         % get the error
         receive
@@ -176,6 +177,11 @@ pread_term(Fd, Pos) ->
 %% TODO: add purpose docs
 load_from_cache(#ioq_file{tab=undefined}, _Pos) ->
     missing;
+load_from_cache(#ioq_file{tab=segmented, id_ref=Ref}, Pos) ->
+    case segmented_cache:get_entry(?COUCH_CACHE, {Ref, Pos}) of
+        not_found -> missing;
+        Res       -> Res
+    end;
 load_from_cache(#ioq_file{tab=Tab}, Pos) ->
     case ets:lookup(Tab, Pos) of
         [{Pos, Res}] ->
@@ -441,12 +447,14 @@ init({Filepath, Options, ReturnPid, Ref}) ->
     Limit = get_pread_limit(),
     IsSys = lists:member(sys_db, Options),
     update_read_timestamp(),
-    ShouldCache = config:get_boolean("couchdb", "couch_file_cache", true),
-    Tab = case ShouldCache of
-        true ->
+    IdRef = make_ref(),
+    Tab = case config:get("couchdb", "couch_file_cache", "true") of
+        "true" ->
             couch_stats:increment_counter([couchdb, couch_file, cache_opens]),
             ets:new(?MODULE, [set, protected, {read_concurrency, true}]);
-        false ->
+        "segmented" ->
+            segmented;
+        "false" ->
             undefined
     end,
     case lists:member(create, Options) of
@@ -469,7 +477,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                     ok = file:sync(Fd),
                     maybe_track_open_os_files(Options),
                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                    {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit, tab=Tab}};
+                    {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit, tab=Tab, id_ref=IdRef}};
                 false ->
                     ok = file:close(Fd),
                     init_status_error(ReturnPid, Ref, {error, eexist})
@@ -477,7 +485,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
             false ->
                 maybe_track_open_os_files(Options),
                 erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit, tab=Tab}}
+                {ok, #file{fd=Fd, is_sys=IsSys, pread_limit=Limit, tab=Tab, id_ref=IdRef}}
             end;
         Error ->
             init_status_error(ReturnPid, Ref, Error)
@@ -494,7 +502,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                      maybe_track_open_os_files(Options),
                      {ok, Eof} = file:position(Fd, eof),
                      erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                     {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit, tab=Tab}};
+                     {ok, #file{fd=Fd, eof=Eof, is_sys=IsSys, pread_limit=Limit, tab=Tab, id_ref=IdRef}};
                  Error ->
                      init_status_error(ReturnPid, Ref, Error)
             end;
@@ -542,7 +550,7 @@ handle_call({pread_iolist, Pos}, _From, File) ->
         {Iolist, _} = read_raw_iolist_int(File, NextPos, Len),
         {ok, Iolist, <<>>}
     end,
-    maybe_cache(File#file.tab, {Pos, Resp}),
+    maybe_cache(File, Pos, Resp),
     {reply, Resp, File};
 
 handle_call({pread_iolists, PosL}, _From, File) ->
@@ -644,8 +652,8 @@ handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
 handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
     {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File};
 
-handle_call(get_cache_ref, _From, #file{tab=Tab} = File) ->
-    {reply, Tab, File}.
+handle_call(get_cache_ref, _From, #file{tab=Tab, id_ref=Ref} = File) ->
+    {reply, {Tab, Ref}, File}.
 
 
 handle_cast({cache, Key, Val}, Fd) ->
@@ -927,10 +935,12 @@ reset_eof(#file{} = File) ->
     {ok, Eof} = file:position(File#file.fd, eof),
     File#file{eof = Eof}.
 
-maybe_cache(undefined, _Obj) ->
+maybe_cache(#file{tab=undefined}, _Key, _Val) ->
     ok;
-maybe_cache(Tab, Obj) ->
-    ets:insert(Tab, Obj).
+maybe_cache(#file{tab=segmented, id_ref=Ref}, Key, Val) ->
+    segmented_cache:put_entry(?COUCH_CACHE, {Ref, Key}, Val);
+maybe_cache(#file{tab=Tab}, Key, Val) ->
+    ets:insert(Tab, {Key, Val}).
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").

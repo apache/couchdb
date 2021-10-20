@@ -46,6 +46,8 @@
     <<"_users">>
 ]).
 
+-define(COUCH_CACHE, couch_cache).
+
 
 -type branch() :: {Key::term(), Value::term(), Tree::term()}.
 -type path() :: {Start::pos_integer(), branch()}.
