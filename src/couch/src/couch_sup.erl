@@ -60,8 +60,8 @@ init(_Args) ->
             [config_listener_mon]
         },
         {
-            couch_cache,
-            {segmented_cache, start_link, [CacheArgs]},
+            ?COUCH_CACHE,
+            {segmented_cache, start_link, [?COUCH_CACHE, CacheArgs]},
             permanent,
             5000,
             worker,
