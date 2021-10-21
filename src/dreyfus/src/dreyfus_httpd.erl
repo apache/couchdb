@@ -532,16 +532,18 @@ hits_to_json(DbName, IncludeDocs, Hits) ->
     if IncludeDocs ->
         chttpd_stats:incr_reads(length(Hits)),
         {ok, JsonDocs} = dreyfus_fabric:get_json_docs(DbName, Ids),
-        lists:zipwith(fun(Hit, {Id, Doc}) ->
+        lists:zipwith(fun
+            (Hit, {Id, Doc}) ->
                 case Hit of
-                    {Id, Order, Fields} ->
-                        {[{id, Id}, {order, Order}, {fields, {Fields}}, Doc]};
-                    {Id, Order, Fields, Highlights} ->
+                    {HitId, Order, Fields} ->
+                        Doc1 = hits_id_validator(HitId, {Id, Doc}),
+                        {[{id, Id}, {order, Order}, {fields, {Fields}}, Doc1]};
+                    {HitId, Order, Fields, Highlights} ->
+                        Doc1 = hits_id_validator(HitId, {Id, Doc}),
                         {[{id, Id}, {order, Order}, {fields, {Fields}},
-                          {highlights, {Highlights}}, Doc]}
+                          {highlights, {Highlights}}, Doc1]}
                 end
-            end, HitData, JsonDocs);
-
+        end, HitData, JsonDocs);
     true ->
         lists:map(fun(Hit) ->
                 case Hit of
@@ -552,6 +554,21 @@ hits_to_json(DbName, IncludeDocs, Hits) ->
                 end
           end, HitData)
     end.
+
+
+% _all_docs returned {error, false} meaning document  doesn't exist
+hits_id_validator(HitId, {error, false}) ->
+    couch_log:error("HitId: ~p does not exist in db. Index may be out of sync or corrupt", [HitId]),
+    {error, <<"not_found">>};
+hits_id_validator(HitId, {error, Reason}) ->
+    couch_log:error("HitId: ~p does not exist in db. Reason: ~p", [HitId, Reason]),
+    {error, Reason};
+hits_id_validator(HitId, {DocId, Doc}) when DocId =:= HitId ->
+    Doc;
+hits_id_validator(HitId, {DocId, _}) ->
+    couch_log:error("HitId: ~p DocId: ~p mismatch. Index maybe out of sync or corrupt.", [HitId, DocId]),
+    {error, <<"docid mismatch">>}.
+
 
 get_hit_data(Hit) ->
     Id = couch_util:get_value(<<"_id">>, Hit#hit.fields),
@@ -612,3 +629,20 @@ backoff_and_retry(Req, Db, DDoc, RetryCount, RetryPause, Error) ->
             timer:sleep(RetryPause),
             handle_search_req(Req, Db, DDoc, RetryCount + 1, RetryPause * 2)
     end.
+
+
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+
+hits_id_validator_test() ->
+    Doc = {doc, {[
+        {<<"_id">>, <<"foo">>},
+        {<<"_rev">>, <<"1-4c6114c65e295552ab1019e2b046b10e">>},
+        {<<"foo">>, <<"bar">>}
+    ]}},
+    ?assertEqual(Doc, hits_id_validator(<<"foo">>, {<<"foo">>, Doc})),
+    ?assertEqual({error, <<"not_found">>}, hits_id_validator(<<"foo>">>, {error, false})),
+    ?assertEqual({error, some_reason}, hits_id_validator(<<"foo>">>, {error, some_reason})),
+    ?assertEqual({error, <<"docid mismatch">>}, hits_id_validator(<<"bar">>, {<<"foo">>, Doc})).
+
+-endif.
