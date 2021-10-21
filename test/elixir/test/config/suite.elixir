@@ -59,6 +59,7 @@
     "Database name with '%2B' should encode to '+'",
     "Database name with '+' should encode to '+'",
     "Database should be in _all_dbs",
+    "Limit and skip should work in _all_dbs",
     "Default headers are returned for doc with open_revs=all",
     "Empty database should have zero docs",
     "Make sure you can do a seq=true option",

@@ -58,6 +58,17 @@ defmodule BasicsTest do
     assert context[:db_name] in Couch.get("/_all_dbs").body, "Db name in _all_dbs"
   end
 
+  @tag :with_db
+  test "Limit and skip should work in _all_dbs", context do
+    db = context[:db_name]
+    db_count = length(Couch.get("/_all_dbs").body)
+    assert db_count > 0
+    assert Couch.get("/_all_dbs?limit=0").body == []
+    assert length(Couch.get("/_all_dbs?limit=1").body) >= 1
+    assert length(Couch.get("/_all_dbs?skip=1").body) == (db_count - 1)
+    assert [db] == Couch.get("/_all_dbs?start_key=\"#{db}\"&limit=1").body
+  end
+
   test "Database name with '+' should encode to '+'", _context do
     set_config({"chttpd", "decode_plus_to_space", "false"})
 

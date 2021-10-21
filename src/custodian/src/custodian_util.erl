@@ -11,13 +11,15 @@
 % the License.
 
 -module(custodian_util).
--include("custodian.hrl").
 
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
 -export([summary/0, report/0]).
 -export([ensure_dbs_exists/0]).
+
+% Old design doc which should be cleaned up
+-define(CUSTODIAN_ID, <<"_design/custodian">>).
 
 -record(state, {live, safe, n, callback, db, acc}).
 
@@ -45,7 +47,7 @@ report() ->
 ensure_dbs_exists() ->
     DbName = mem3_sync:shards_db(),
     {ok, Db} = mem3_util:ensure_exists(DbName),
-    ensure_custodian_ddoc_exists(Db),
+    ensure_custodian_ddoc_is_deleted(Db),
     {ok, Db}.
 
 %% private functions.
@@ -180,40 +182,27 @@ count_conflicts(#full_doc_info{rev_tree = T}) ->
     Leafs = [1 || {#leaf{deleted=false}, _} <- couch_key_tree:get_all_leafs(T)],
     length(Leafs) - 1.
 
-ensure_custodian_ddoc_exists(Db) ->
+
+% Ensure the design doc which was added 3.2.0 is deleted as we switched to using a BDU
+% function instead. After a few releases this function could be removed as well
+%
+ensure_custodian_ddoc_is_deleted(Db) ->
     case couch_db:open_doc(Db, ?CUSTODIAN_ID, [ejson_body]) of
         {not_found, _Reason} ->
-            try couch_db:update_doc(Db, custodian_ddoc(), []) of
-            {ok, _} ->
-                ok
-            catch conflict ->
-                {ok, NewDb} = couch_db:reopen(Db),
-                ensure_custodian_ddoc_exists(NewDb)
-            end;
+            ok;
         {ok, Doc} ->
-            {Props} = couch_doc:to_json_obj(Doc, []),
-            Props1 = lists:keystore(<<"validate_doc_update">>, 1, Props, {<<"validate_doc_update">>, ?CUSTODIAN_VALIDATION}),
-            case Props =:= Props1 of
-                true ->
-                    ok;
-                false ->
-                    try couch_db:update_doc(Db, couch_doc:from_json_obj({Props1}), []) of
-                    {ok, _} ->
-                        ok
-                    catch conflict ->
-                        {ok, NewDb} = couch_db:reopen(Db),
-                        ensure_custodian_ddoc_exists(NewDb)
-                    end
+            DeletedDoc = Doc#doc{deleted = true, body = {[]}},
+            try couch_db:update_doc(Db, DeletedDoc, [?ADMIN_CTX]) of
+                {ok, _} ->
+                    LogMsg = "~p : deleted custodian ddoc ~s",
+                    couch_log:notice(LogMsg, [?MODULE, ?CUSTODIAN_ID]),
+                    ok
+            catch
+                conflict ->
+                    {ok, NewDb} = couch_db:reopen(Db),
+                    ensure_custodian_ddoc_is_deleted(NewDb)
             end
     end.
-
-custodian_ddoc() ->
-    Props = [
-        {<<"_id">>, ?CUSTODIAN_ID},
-        {<<"language">>, <<"javascript">>},
-        {<<"validate_doc_update">>, ?CUSTODIAN_VALIDATION}
-    ],
-    couch_doc:from_json_obj({Props}).
 
 
 -ifdef(TEST).
