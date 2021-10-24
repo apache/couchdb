@@ -183,6 +183,26 @@ zero_width_chars() ->
 
 % Regular EUnit tests
 
+get_icu_version_test() ->
+    Ver = couch_ejson_compare:get_icu_version(),
+    ?assertMatch({_, _, _, _}, Ver),
+    {V1, V2, V3, V4} = Ver,
+    ?assert(is_integer(V1) andalso V1 > 0),
+    ?assert(is_integer(V2) andalso V2 >= 0),
+    ?assert(is_integer(V3) andalso V3 >= 0),
+    ?assert(is_integer(V4) andalso V4 >= 0).
+
+
+get_uca_version_test() ->
+    Ver = couch_ejson_compare:get_uca_version(),
+    ?assertMatch({_, _, _, _}, Ver),
+    {V1, V2, V3, V4} = Ver,
+    ?assert(is_integer(V1) andalso V1 > 0),
+    ?assert(is_integer(V2) andalso V2 >= 0),
+    ?assert(is_integer(V3) andalso V3 >= 0),
+    ?assert(is_integer(V4) andalso V4 >= 0).
+
+
 max_depth_error_list_test() ->
     % NIF can handle terms with depth <= 9
     Nested9 = nest_list(<<"val">>, 9),
