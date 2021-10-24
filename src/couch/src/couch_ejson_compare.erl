@@ -12,10 +12,20 @@
 
 -module(couch_ejson_compare).
 
--export([less/2, less_json_ids/2, less_json/2]).
+-export([
+    less/2,
+    less_json_ids/2,
+    less_json/2,
+    get_icu_version/0,
+    get_uca_version/0
+]).
 
 % For testing
--export([less_nif/2, less_erl/2, compare_strings_nif/2]).
+-export([
+    less_nif/2,
+    less_erl/2,
+    compare_strings_nif/2
+]).
 
 
 -on_load(init/0).
@@ -49,6 +59,14 @@ less_json_ids({JsonA, IdA}, {JsonB, IdB}) ->
 
 less_json(A,B) ->
     less(A, B) < 0.
+
+
+get_icu_version() ->
+    erlang:nif_error(get_icu_version).
+
+
+get_uca_version() ->
+    erlang:nif_error(get_uca_version).
 
 
 less_nif(A, B) ->
