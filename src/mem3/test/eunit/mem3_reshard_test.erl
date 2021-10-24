@@ -519,7 +519,6 @@ target_reset_in_initial_copy(#{db1 := Db}) ->
 
 split_an_incomplete_shard_map(#{db1 := Db}) ->
     {timeout, ?TIMEOUT, ?_test(begin
-        [#shard{} = Src] = lists:sort(mem3:local_shards(Db)),
         [#shard{name=Shard}] = lists:sort(mem3:local_shards(Db)),
         meck:expect(mem3_util, calculate_max_n, 1, 0),
         ?assertMatch({error, {not_enough_shard_copies, _}},

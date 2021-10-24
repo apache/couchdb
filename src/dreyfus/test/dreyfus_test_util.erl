@@ -1,6 +1,8 @@
 -module(dreyfus_test_util).
 
--compile(export_all).
+-export([
+    wait_config_change/2
+]).
 
 -include_lib("couch/include/couch_db.hrl").
 
