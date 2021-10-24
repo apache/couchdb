@@ -15,24 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 
 
-setup() ->
-    %% We cannot start driver from here since it becomes bounded to eunit
-    %% master process and the next couch_server_sup:start_link call will
-    %% fail because server couldn't load driver since it already is.
-    %%
-    %% On other hand, we cannot unload driver here due to
-    %% {error, not_loaded_by_this_process} while it is. Any ideas is welcome.
-    %%
-    Ctx = test_util:start_couch(),
-    %% config:start_link(?CONFIG_CHAIN),
-    Ctx.
-
-teardown(Ctx) ->
-    ok = test_util:stop_couch(Ctx),
-    %% config:stop(),
-    ok.
-
-
 validate_callback_exists_test_() ->
     {
         "validate_callback_exists tests",

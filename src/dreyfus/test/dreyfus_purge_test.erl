@@ -27,6 +27,8 @@
         test_local_doc/0, test_delete_local_doc/0, test_purge_search/0]).
 
 -compile(export_all).
+-compile(nowarn_export_all).
+
 
 test_all() ->
     test_purge_single(),
@@ -703,10 +705,14 @@ test_purge_search() ->
 
 %private API
 db_name() ->
-    Nums = tuple_to_list(erlang:now()),
-    Prefix = "test-db",
-    Suffix = lists:concat([integer_to_list(Num) || Num <- Nums]),
-    list_to_binary(Prefix ++ "-" ++ Suffix).
+    iolist_to_binary([
+        "dreyfus-test-db-", [
+            integer_to_list(I) || I <- [
+                erlang:unique_integer([positive]),
+                rand:uniform(10000)
+            ]
+        ]
+    ]).
 
 purge_docs(DBName, DocIds) ->
     IdsRevs = [{DocId, [get_rev(DBName, DocId)]} || DocId <- DocIds],

@@ -62,8 +62,8 @@ do_not_await_1() ->
     State = create_state(?DBNAME, Index, nil, nil, []),
     Msg = "Index Blocked from Updating - db: ~p, ddocid: ~p name: ~p",
     Return = wait_log_message(Msg, fun() ->
-        {noreply, NewState} = dreyfus_index:handle_call({await, 1},
-        self(), State)
+        {noreply, _NewState} = dreyfus_index:handle_call({await, 1},
+            self(), State)
     end),
     ?assertEqual(Return, ok).
 

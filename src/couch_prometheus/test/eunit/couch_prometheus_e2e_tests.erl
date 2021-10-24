@@ -85,17 +85,15 @@ node_call_prometheus_http(_) ->
     Url = construct_url(?PROM_PORT),
     {ok, RC1, _, _} = test_request:get(
             Url,
-            [?CONTENT_JSON, ?AUTH],
-            []
+            [?CONTENT_JSON, ?AUTH]
         ),
     % since this port doesn't require auth, this should work
     {ok, RC2, _, _} = test_request:get(
             Url,
-            [?CONTENT_JSON],
-            []
+            [?CONTENT_JSON]
         ),
     delete_db(Url),
-    ?_assertEqual(200, RC2).
+    ?_assertEqual({200, 200}, {RC1, RC2}).
 
 % we don't start the http server
 deny_prometheus_http(_) ->
@@ -121,8 +119,6 @@ construct_url(Port) ->
     lists:concat(["http://", Addr, ":", Port, "/_node/_local/_prometheus"]).
 
 create_db(Url) ->
-    Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
-    Port = mochiweb_socket_server:get(chttpd, port),
     {ok, Status, _, _} = test_request:put(Url, [?CONTENT_JSON, ?AUTH], "{}"),
     ?assert(Status =:= 201 orelse Status =:= 202).
 
