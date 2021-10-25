@@ -89,8 +89,7 @@ t_can_insert_shard_map_doc({Top, Db}) ->
     },
     {Code, Res} = req(post, Top ++ ?DBS, ShardMap),
     ?assertEqual(201, Code),
-    ?assertMatch(#{<<"ok">> := true}, Res),
-    ?assertMatch({200, _}, req(get, Top ++ Db)).
+    ?assertMatch(#{<<"ok">> := true}, Res).
 
 
 t_missing_by_node_section({Top, Db}) ->
@@ -236,7 +235,6 @@ t_replicated_changes_not_validated({Top, Db}) ->
     {Code, Res} = req(post, Top ++ ?DBS ++ "/_bulk_docs", Docs),
     ?assertEqual(201, Code),
     ?assertEqual([], Res),
-    ?assertMatch({200, _}, req(get, Top ++ Db)),
     Deleted = #{
         <<"id">> => Db,
         <<"_rev">> => <<"1-abc">>,
@@ -267,12 +265,6 @@ sync_delete_db(Top, Db) when is_binary(Db) ->
         error:database_does_not_exist ->
             ok
     end.
-
-
-req(Method, Url) ->
-    Headers = [?AUTH],
-    {ok, Code, _, Res} = test_request:request(Method, Url, Headers),
-    {Code, jiffy:decode(Res, [return_maps])}.
 
 
 req(Method, Url, #{} = Body) ->
