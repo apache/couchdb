@@ -146,6 +146,9 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     % For ranges that were not split, look for a replacement on a different node
     WReps = lists:map(fun(#shard{name = Name, node = NewNode, range = R} = S) ->
          Arg = find_replacement_sequence(Dead, R),
+         case Arg =/= 0 of true -> ok; false ->
+             couch_log:warning("~p reset seq for ~p", [?MODULE, S])
+         end,
          Ref = rexi:cast(NewNode, {fabric_rpc, changes, [Name, ChangesArgs, Arg]}),
          {S#shard{ref = Ref}, 0}
     end, Reps1),
@@ -154,6 +157,9 @@ send_changes(DbName, ChangesArgs, Callback, PackedSeqs, AccIn, Timeout) ->
     Repls = fabric_ring:get_shard_replacements(DbName, Workers0),
     StartFun = fun(#shard{name=Name, node=N, range=R0}=Shard) ->
         SeqArg = find_replacement_sequence(Seqs, R0),
+        case SeqArg =/= 0 of true -> ok; false ->
+            couch_log:warning("~p StartFun reset seq for ~p", [?MODULE, Shard])
+        end,
         Ref = rexi:cast(N, {fabric_rpc, changes, [Name, ChangesArgs, SeqArg]}),
         Shard#shard{ref = Ref}
     end,
