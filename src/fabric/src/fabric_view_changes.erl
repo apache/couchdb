@@ -876,3 +876,36 @@ find_split_shard_replacements_test() ->
     {Workers3, ShardsLeft3} = find_split_shard_replacements(Dead3, Shards3),
     ?assertEqual([], Workers3),
     ?assertEqual(Shards3, ShardsLeft3).
+
+
+find_replacement_sequence_test() ->
+    Shards = [{"n2", 0, 10}, {"n3", 0, 5}],
+    Uuid = <<"abc1234">>,
+    Epoch = 'n1',
+
+    % Not safe to use a plain integer sequence number
+    Dead1 = mk_workers(Shards, 42),
+    ?assertEqual(0, find_replacement_sequence(Dead1, [0, 10])),
+    ?assertEqual(0, find_replacement_sequence(Dead1, [0, 5])),
+
+    % {Seq, Uuid} should work
+    Dead2 = mk_workers(Shards, {43, Uuid}),
+    ?assertEqual({replace, 'n2', Uuid, 43},
+        find_replacement_sequence(Dead2, [0, 10])),
+    ?assertEqual({replace, 'n3', Uuid, 43},
+        find_replacement_sequence(Dead2, [0, 5])),
+
+    % Can't find the range at all
+    ?assertEqual(0, find_replacement_sequence(Dead2, [0, 4])),
+
+    % {Seq, Uuids, EpochNode} should work
+    Dead3 = mk_workers(Shards, {44, Uuid, Epoch}),
+    ?assertEqual({replace, 'n1', Uuid, 44},
+        find_replacement_sequence(Dead3, [0, 10])),
+    ?assertEqual({replace, 'n1', Uuid, 44},
+        find_replacement_sequence(Dead3, [0, 5])),
+
+    % Cannot replace a replacement
+    Dead4 = mk_workers(Shards, {replace, 'n1', Uuid, 45}),
+    ?assertEqual(0, find_replacement_sequence(Dead4, [0, 10])),
+    ?assertEqual(0, find_replacement_sequence(Dead4, [0, 5])).
