@@ -218,6 +218,10 @@ subscribe_for_config() ->
 -include_lib("couch/include/couch_eunit.hrl").
 
 setup_all() ->
+    % couch_log used by config app
+    ok = meck:expect(couch_log, notice, 2, ok),
+    ok = meck:expect(couch_log, warning, 2, ok),
+
     application:start(config),
 
     ok = meck:new(couch_event, [passthrough]),
