@@ -23,7 +23,6 @@
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(JSON, {"Content-Type", "application/json"}).
--define(DBS, "_node/_local/_dbs").
 
 
 setup() ->
@@ -33,10 +32,11 @@ setup() ->
     Db = ?tempdb(),
     Port = mochiweb_socket_server:get(chttpd, port),
     Url = lists:concat(["http://", Addr, ":", Port, "/"]),
-    {Url, Db}.
+    ShardsDb = "_node/_local/" ++ config:get("mem3", "shards_db", "_dbs"),
+    {Url, Db, ShardsDb}.
 
 
-teardown({Url, Db}) ->
+teardown({Url, Db, _}) ->
     sync_delete_db(Url, Db),
     ok = config:delete("admins", ?USER, _Persist=false).
 
@@ -78,7 +78,7 @@ mem3_bdu_shard_doc_test_() ->
     }.
 
 
-t_can_insert_shard_map_doc({Top, Db}) ->
+t_can_insert_shard_map_doc({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
@@ -87,22 +87,22 @@ t_can_insert_shard_map_doc({Top, Db}) ->
         <<"by_range">> => #{Range => [Node]},
         <<"suffix">> => suffix()
     },
-    {Code, Res} = req(post, Top ++ ?DBS, ShardMap),
+    {Code, Res} = req(post, Top ++ ShardsDb, ShardMap),
     ?assertEqual(201, Code),
     ?assertMatch(#{<<"ok">> := true}, Res).
 
 
-t_missing_by_node_section({Top, Db}) ->
+t_missing_by_node_section({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
         <<"_id">> => Db,
         <<"by_range">> => #{Range => [Node]}
     },
-    ?assertMatch({403, _}, req(post, Top ++ ?DBS, ShardMap)).
+    ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
 
-t_by_node_not_a_map({Top, Db}) ->
+t_by_node_not_a_map({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
@@ -110,20 +110,20 @@ t_by_node_not_a_map({Top, Db}) ->
         <<"by_node">> => 42,
         <<"by_range">> => #{Range => [Node]}
     },
-    ?assertMatch({403, _}, req(post, Top ++ ?DBS, ShardMap)).
+    ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
 
-t_missing_by_range_section({Top, Db}) ->
+t_missing_by_range_section({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
         <<"_id">> => Db,
         <<"by_node">> => #{Node => [Range]}
     },
-    ?assertMatch({403, _}, req(post, Top ++ ?DBS, ShardMap)).
+    ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
 
-t_by_range_not_a_map({Top, Db}) ->
+t_by_range_not_a_map({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
@@ -131,10 +131,10 @@ t_by_range_not_a_map({Top, Db}) ->
         <<"by_node">> => #{Node => [Range]},
         <<"by_range">> => 42
     },
-    ?assertMatch({403, _}, req(post, Top ++ ?DBS, ShardMap)).
+    ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
 
-t_missing_range_in_by_range({Top, Db}) ->
+t_missing_range_in_by_range({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
@@ -142,10 +142,10 @@ t_missing_range_in_by_range({Top, Db}) ->
         <<"by_node">> => #{Node => [Range]},
         <<"by_range">> => #{<<"xyz">> => [Node]}
     },
-    ?assertMatch({403, _}, req(post, Top ++ ?DBS, ShardMap)).
+    ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
 
-t_missing_node_in_by_range_node_list({Top, Db}) ->
+t_missing_node_in_by_range_node_list({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
@@ -153,10 +153,10 @@ t_missing_node_in_by_range_node_list({Top, Db}) ->
         <<"by_node">> => #{Node => [Range]},
         <<"by_range">> => #{Range => [<<"xyz">>]}
     },
-    ?assertMatch({403, _}, req(post, Top ++ ?DBS, ShardMap)).
+    ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
 
-t_missing_node_in_by_node({Top, Db}) ->
+t_missing_node_in_by_node({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
@@ -164,10 +164,10 @@ t_missing_node_in_by_node({Top, Db}) ->
         <<"by_node">> => #{<<"xyz">> => [Range]},
         <<"by_range">> => #{Range => [Node]}
     },
-    ?assertMatch({403, _}, req(post, Top ++ ?DBS, ShardMap)).
+    ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
 
-t_missing_range_in_by_node_range_list({Top, Db}) ->
+t_missing_range_in_by_node_range_list({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
@@ -175,10 +175,10 @@ t_missing_range_in_by_node_range_list({Top, Db}) ->
         <<"by_node">> => #{Node => [<<"xyz">>]},
         <<"by_range">> => #{Range => [Node]}
     },
-    ?assertMatch({403, _}, req(post, Top ++ ?DBS, ShardMap)).
+    ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
 
-t_by_node_val_not_array({Top, Db}) ->
+t_by_node_val_not_array({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
@@ -186,10 +186,10 @@ t_by_node_val_not_array({Top, Db}) ->
         <<"by_node">> => #{Node => 42},
         <<"by_range">> => #{Range => [Node]}
     },
-    ?assertMatch({403, _}, req(post, Top ++ ?DBS, ShardMap)).
+    ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
 
-t_by_range_val_not_array({Top, Db}) ->
+t_by_range_val_not_array({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
@@ -197,12 +197,12 @@ t_by_range_val_not_array({Top, Db}) ->
         <<"by_node">> => #{Node => [Range]},
         <<"by_range">> => #{Range => 42}
     },
-    ?assertMatch({403, _}, req(post, Top ++ ?DBS, ShardMap)).
+    ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
 
-t_design_docs_are_not_validated({Top, _}) ->
+t_design_docs_are_not_validated({Top, _, ShardsDb}) ->
     DDoc = #{<<"_id">> => <<"_design/ddoc_bdu_test">>},
-    {Code, Res} = req(post, Top ++ ?DBS, DDoc),
+    {Code, Res} = req(post, Top ++ ShardsDb, DDoc),
     ?assertEqual(201, Code),
     #{<<"rev">> := Rev} = Res,
     Deleted = #{
@@ -210,10 +210,10 @@ t_design_docs_are_not_validated({Top, _}) ->
         <<"_rev">> => Rev,
         <<"_deleted">> => true
     },
-    ?assertMatch({200, _}, req(post, Top ++ ?DBS, Deleted)).
+    ?assertMatch({200, _}, req(post, Top ++ ShardsDb, Deleted)).
 
 
-t_replicated_changes_not_validated({Top, Db}) ->
+t_replicated_changes_not_validated({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
     ShardMap = #{
@@ -232,7 +232,7 @@ t_replicated_changes_not_validated({Top, Db}) ->
         <<"docs">> => [ShardMap],
         <<"new_edits">> => false
     },
-    {Code, Res} = req(post, Top ++ ?DBS ++ "/_bulk_docs", Docs),
+    {Code, Res} = req(post, Top ++ ShardsDb ++ "/_bulk_docs", Docs),
     ?assertEqual(201, Code),
     ?assertEqual([], Res),
     Deleted = #{
@@ -240,7 +240,7 @@ t_replicated_changes_not_validated({Top, Db}) ->
         <<"_rev">> => <<"1-abc">>,
         <<"_deleted">> => true
     },
-    ?assertMatch({200, _}, req(post, Top ++ ?DBS, Deleted)).
+    ?assertMatch({200, _}, req(post, Top ++ ShardsDb, Deleted)).
 
 
 delete_db(Top, Db) when is_binary(Db) ->
