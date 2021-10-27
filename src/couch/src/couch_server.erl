@@ -189,7 +189,8 @@ maybe_add_sys_db_callbacks(DbName, Options) ->
         orelse path_ends_with(DbName, UsersDbSuffix),
     if
         DbName == DbsDbName ->
-            [sys_db | Options];
+            [{before_doc_update, fun mem3_bdu:before_doc_update/3},
+             sys_db | Options];
         DbName == NodesDbName ->
             [sys_db | Options];
         IsReplicatorDb ->

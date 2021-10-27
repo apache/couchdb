@@ -138,7 +138,7 @@ start_job() ->
 
 
 check_active_tasks(DocsRead, DocsWritten, DocsFailed) ->
-    RepTask = wait_for_task_status(),
+    RepTask = wait_for_task_status(DocsWritten),
     ?assertNotEqual(timeout, RepTask),
     ?assertEqual(DocsRead, couch_util:get_value(docs_read, RepTask)),
     ?assertEqual(DocsWritten, couch_util:get_value(docs_written, RepTask)),
@@ -147,7 +147,7 @@ check_active_tasks(DocsRead, DocsWritten, DocsFailed) ->
 
 
 check_scheduler_jobs(DocsRead, DocsWritten, DocFailed) ->
-    Info = wait_scheduler_info(),
+    Info = wait_scheduler_info(DocsWritten),
     ?assert(maps:is_key(<<"changes_pending">>, Info)),
     ?assert(maps:is_key(<<"doc_write_failures">>, Info)),
     ?assert(maps:is_key(<<"docs_read">>, Info)),
@@ -167,21 +167,29 @@ replication_tasks() ->
     end, couch_task_status:all()).
 
 
-wait_for_task_status() ->
+wait_for_task_status(DocsWritten) ->
     test_util:wait(fun() ->
         case replication_tasks() of
             [] -> wait;
-            [RepTask] -> RepTask
+            [RepTask] ->
+                case couch_util:get_value(docs_written, RepTask) of
+                    DocsWritten -> RepTask;
+                    _Other -> wait
+                end
         end
     end).
 
 
-wait_scheduler_info() ->
+wait_scheduler_info(DocsWritten) ->
     test_util:wait(fun() ->
         case scheduler_jobs() of
             [] -> wait;
             [#{<<"info">> := null}] -> wait;
-            [#{<<"info">> := Info}] -> Info
+            [#{<<"info">> := Info}] ->
+                case maps:get(<<"docs_written">>, Info, undefined) of
+                    DocsWritten -> Info;
+                    _Other -> wait
+                end
         end
     end).
 

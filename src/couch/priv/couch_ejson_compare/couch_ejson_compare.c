@@ -166,6 +166,40 @@ compare_strings_nif(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
 }
 
 
+ERL_NIF_TERM
+get_icu_version(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    UVersionInfo ver = {0};
+    ERL_NIF_TERM tup[U_MAX_VERSION_LENGTH] = {0};
+    int i;
+
+    u_getVersion(ver);
+
+    for (i = 0; i < U_MAX_VERSION_LENGTH; i++) {
+        tup[i] = enif_make_int(env, ver[i]);
+    }
+
+    return enif_make_tuple_from_array(env, tup, U_MAX_VERSION_LENGTH);
+}
+
+
+ERL_NIF_TERM
+get_uca_version(ErlNifEnv* env, int argc, const ERL_NIF_TERM argv[])
+{
+    UVersionInfo ver = {0};
+    ERL_NIF_TERM tup[U_MAX_VERSION_LENGTH] = {0};
+    int i;
+
+    ucol_getUCAVersion(get_collator(), ver);
+
+    for (i = 0; i < U_MAX_VERSION_LENGTH; i++) {
+        tup[i] = enif_make_int(env, ver[i]);
+    }
+
+    return enif_make_tuple_from_array(env, tup, U_MAX_VERSION_LENGTH);
+}
+
+
 int
 less_json(int depth, ctx_t* ctx, ERL_NIF_TERM a, ERL_NIF_TERM b)
 {
@@ -531,7 +565,9 @@ on_unload(ErlNifEnv* env, void* priv_data)
 
 static ErlNifFunc nif_functions[] = {
     {"less_nif", 2, less_json_nif},
-    {"compare_strings_nif", 2, compare_strings_nif}
+    {"compare_strings_nif", 2, compare_strings_nif},
+    {"get_icu_version", 0, get_icu_version},
+    {"get_uca_version", 0, get_uca_version}
 };
 
 

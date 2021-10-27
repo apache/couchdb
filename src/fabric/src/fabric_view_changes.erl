@@ -18,6 +18,9 @@
 %% exported for upgrade purposes.
 -export([keep_sending_changes/8]).
 
+%% exported for testing and remsh debugging
+-export([decode_seq/1]).
+
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
@@ -403,6 +406,22 @@ unpack_seq_decode_term(Opaque) ->
     binary_to_term(couch_util:decodeBase64Url(Opaque)).
 
 
+% This is used for testing and for remsh debugging
+%
+% Return the unpacked list of sequences from a raw update seq string. The input
+% string is expected to include the N- prefix. The result looks like:
+%  [{Node, Range, {SeqNum, Uuid, EpochNode}}, ...]
+%
+-spec decode_seq(binary()) -> [tuple()].
+decode_seq(Packed) ->
+    Opaque = unpack_seq_regex_match(Packed),
+    unpack_seq_decode_term(Opaque).
+
+
+% Returns fabric_dict with {Shard, Seq} entries
+%
+-spec unpack_seqs(pos_integer() | list() | binary(), binary()) ->
+        orddict:orddict().
 unpack_seqs(0, DbName) ->
     fabric_dict:init(mem3:shards(DbName), 0);
 
