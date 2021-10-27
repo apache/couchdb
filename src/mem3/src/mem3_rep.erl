@@ -788,36 +788,53 @@ reset_remaining(#{} = Targets) ->
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
+-define(TDEF(A), {atom_to_list(A), fun A/0}).
 
-find_source_seq_unknown_node_test() ->
+
+find_source_seq_int_test_() ->
+    {
+        setup,
+        fun() -> meck:expect(couch_log, warning, 2, ok) end,
+        fun(_) -> meck:unload() end,
+        [
+            ?TDEF(t_unknown_node),
+            ?TDEF(t_unknown_uuid),
+            ?TDEF(t_ok),
+            ?TDEF(t_old_ok),
+            ?TDEF(t_different_node)
+        ]
+    }.
+
+
+t_unknown_node() ->
     ?assertEqual(
         find_source_seq_int(doc_(), <<"foo">>, <<"bing">>, <<"bar_uuid">>, 10),
         0
     ).
 
 
-find_source_seq_unknown_uuid_test() ->
+t_unknown_uuid() ->
     ?assertEqual(
         find_source_seq_int(doc_(), <<"foo">>, <<"bar">>, <<"teapot">>, 10),
         0
     ).
 
 
-find_source_seq_ok_test() ->
+t_ok() ->
     ?assertEqual(
         find_source_seq_int(doc_(), <<"foo">>, <<"bar">>, <<"bar_uuid">>, 100),
         100
     ).
 
 
-find_source_seq_old_ok_test() ->
+t_old_ok() ->
     ?assertEqual(
         find_source_seq_int(doc_(), <<"foo">>, <<"bar">>, <<"bar_uuid">>, 84),
         50
     ).
 
 
-find_source_seq_different_node_test() ->
+t_different_node() ->
     ?assertEqual(
         find_source_seq_int(doc_(), <<"foo2">>, <<"bar">>, <<"bar_uuid">>, 92),
         31
