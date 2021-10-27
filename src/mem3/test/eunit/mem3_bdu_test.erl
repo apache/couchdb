@@ -201,12 +201,14 @@ t_by_range_val_not_array({Top, Db, ShardsDb}) ->
 
 
 t_design_docs_are_not_validated({Top, _, ShardsDb}) ->
-    DDoc = #{<<"_id">> => <<"_design/ddoc_bdu_test">>},
+    Suffix = integer_to_list(erlang:system_time() + rand:uniform(1000)),
+    DDocId = list_to_binary("_design/ddoc_bdu_test-" ++ Suffix),
+    DDoc = #{<<"_id">> => DDocId},
     {Code, Res} = req(post, Top ++ ShardsDb, DDoc),
     ?assertEqual(201, Code),
     #{<<"rev">> := Rev} = Res,
     Deleted = #{
-        <<"id">> => <<"_design/ddoc_bdu_test">>,
+        <<"id">> => DDocId,
         <<"_rev">> => Rev,
         <<"_deleted">> => true
     },
