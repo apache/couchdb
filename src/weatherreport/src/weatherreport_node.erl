@@ -123,7 +123,7 @@ can_connect() ->
 can_connect_all() ->
     case is_connected() of
         true ->
-            case weatherreport_check_nodes_connected:check() of
+            case weatherreport_check_nodes_connected:check([]) of
                 [] -> true;
                 _ -> false
             end;
