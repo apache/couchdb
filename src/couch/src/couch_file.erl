@@ -82,8 +82,8 @@ open(Filepath, Options, IOQPid0) ->
             IOQPid0 when is_pid(IOQPid0) ->
                 IOQPid0
         end,
-        {Tab, Ref} = gen_server:call(Fd, get_cache_ref),
-        {ok, #ioq_file{fd=Fd, ioq=IOQPid, tab=Tab, id_ref=Ref}};
+        {Tab, IdRef} = gen_server:call(Fd, get_cache_ref),
+        {ok, #ioq_file{fd=Fd, ioq=IOQPid, tab=Tab, id_ref=IdRef}};
     ignore ->
         % get the error
         receive
@@ -448,7 +448,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
     IsSys = lists:member(sys_db, Options),
     update_read_timestamp(),
     IdRef = make_ref(),
-    Tab = case config:get("couchdb", "couch_file_cache", "true") of
+    Tab = case config:get("couchdb", "couch_file_cache", "segmented") of
         "true" ->
             couch_stats:increment_counter([couchdb, couch_file, cache_opens]),
             ets:new(?MODULE, [set, protected, {read_concurrency, true}]);

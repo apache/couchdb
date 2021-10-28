@@ -44,10 +44,11 @@ start_link() ->
 
 
 init(_Args) ->
+    TTL = config:get_integer("couchdb", "couch_file_ttl", 1000),
     CacheArgs = #{
         strategy => lru,
         segment_num => 3,
-        ttl => {milliseconds, 1000}
+        ttl => {milliseconds, TTL}
     },
     couch_log:info("Starting ~s", [?MODULE]),
     {ok, {{one_for_one,10, 60}, [
