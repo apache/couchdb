@@ -132,8 +132,9 @@ start_shard_checker(#state{shard_checker=Pid}=State) when is_pid(Pid) ->
 
 
 start_event_listener() ->
+    DbName = mem3_sync:shards_db(),
     couch_event:link_listener(
-            ?MODULE, handle_db_event, nil, [{dbname, <<"dbs">>}]
+            ?MODULE, handle_db_event, nil, [{dbname, DbName}]
         ).
 
 handle_db_event(_DbName, updated, _St) ->
