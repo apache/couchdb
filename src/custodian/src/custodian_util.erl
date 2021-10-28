@@ -21,7 +21,7 @@
 % Old design doc which should be cleaned up
 -define(CUSTODIAN_ID, <<"_design/custodian">>).
 
--record(state, {live, safe, n, callback, db, acc}).
+-record(state, {live, safe, callback, db, acc}).
 
 %% public functions.
 
@@ -55,10 +55,9 @@ ensure_dbs_exists() ->
 fold_dbs(Acc, Fun) ->
     Safe = maybe_redirect([node() | nodes()]),
     Live = Safe -- maintenance_nodes(Safe),
-    N = cluster_n(),
     {ok, Db} = ensure_dbs_exists(),
     try
-        State0 = #state{live=Live, safe=Safe, n=N, callback=Fun, db=Db, acc=Acc},
+        State0 = #state{live=Live, safe=Safe, callback=Fun, db=Db, acc=Acc},
         {ok, State1} = couch_db:fold_docs(Db, fun fold_dbs1/2, State0, []),
         State1#state.acc
     after
@@ -82,9 +81,9 @@ fold_dbs1(#full_doc_info{id = Id} = FDI, State) ->
 fold_dbs(Id, Shards, State) ->
     IsSafe = fun(#shard{node = N}) -> lists:member(N, State#state.safe) end,
     IsLive = fun(#shard{node = N}) -> lists:member(N, State#state.live) end,
-    TargetN = State#state.n,
     LiveShards = lists:filter(IsLive, Shards),
     SafeShards = lists:filter(IsSafe, Shards),
+    TargetN = mem3_util:calculate_max_n(Shards),
     Acc0 = State#state.acc,
     Acc1 = case mem3_util:calculate_max_n(LiveShards) of
         LiveN when LiveN < TargetN ->
