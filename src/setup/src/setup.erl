@@ -254,8 +254,8 @@ sync_uuid() ->
     sync_config("couchdb", "uuid", Uuid).
 
 sync_auth_secret() ->
-    Secret = config:get("couch_httpd_auth", "secret"),
-    sync_config("couch_httpd_auth", "secret", Secret).
+    Secret = config:get("chttpd_auth", "secret"),
+    sync_config("chttpd_auth", "secret", Secret).
 
 
 sync_config(Section, Key, Value) ->
