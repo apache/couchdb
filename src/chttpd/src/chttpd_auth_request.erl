@@ -103,6 +103,8 @@ server_authorization_check(#httpd{path_parts=[<<"_node">>,_ , <<"_stats">>|_]}=R
     require_metrics(Req);
 server_authorization_check(#httpd{path_parts=[<<"_node">>,_ , <<"_system">>|_]}=Req) ->
     require_metrics(Req);
+server_authorization_check(#httpd{path_parts=[<<"_node">>,_ , <<"_prometheus">>|_]}=Req) ->
+    require_metrics(Req);
 server_authorization_check(#httpd{path_parts=[<<"_", _/binary>>|_]}=Req) ->
     require_admin(Req).
 
