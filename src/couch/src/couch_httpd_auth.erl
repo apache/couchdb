@@ -315,7 +315,7 @@ ensure_cookie_auth_secret() ->
     case chttpd_util:get_chttpd_auth_config("secret") of
         undefined ->
             NewSecret = ?b2l(couch_uuids:random()),
-            config:set("couch_httpd_auth", "secret", NewSecret),
+            config:set("chttpd_auth", "secret", NewSecret),
             NewSecret;
         Secret -> Secret
     end.
