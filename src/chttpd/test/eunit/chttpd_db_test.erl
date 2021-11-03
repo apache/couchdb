@@ -62,6 +62,8 @@ all_test_() ->
                 fun setup/0, fun teardown/1,
                 [
                     fun should_return_ok_true_on_bulk_update/1,
+                    fun should_return_201_new_edits_false_with_revs_on_bulk_update/1,
+                    fun should_return_400_new_edits_false_no_revs_on_bulk_update/1,
                     fun should_return_ok_true_on_ensure_full_commit/1,
                     fun should_return_404_for_ensure_full_commit_on_no_db/1,
                     fun should_accept_live_as_an_alias_for_continuous/1,
@@ -103,6 +105,36 @@ should_return_ok_true_on_bulk_update(Url) ->
             ResultJson = ?JSON_DECODE(ResultBody),
             {InnerJson} = lists:nth(1, ResultJson),
             couch_util:get_value(<<"ok">>, InnerJson, undefined)
+        end)}.
+
+
+should_return_201_new_edits_false_with_revs_on_bulk_update(Url) ->
+    {timeout, ?TIMEOUT, ?_test(
+        begin
+            {ok, _, _, Body} = create_doc(Url, "dochasrev"),
+            {Json} = ?JSON_DECODE(Body),
+            Ref = couch_util:get_value(<<"rev">>, Json, undefined),
+            NewDoc = "{\"docs\": [{\"_rev\": \"" ++ ?b2l(Ref) ++
+                "\", \"_id\": \"dochasrev\"}], \"new_edits\": false}",
+            {ok, Status, _, ResultBody} = test_request:post(Url ++
+                "/_bulk_docs/", [?CONTENT_JSON, ?AUTH], NewDoc),
+            ?assertEqual(201, Status),
+            ?assertEqual([], ?JSON_DECODE(ResultBody))
+        end)}.
+
+
+should_return_400_new_edits_false_no_revs_on_bulk_update(Url) ->
+    {timeout, ?TIMEOUT, ?_test(
+        begin
+            {ok, _, _, _} = create_doc(Url, "docnorev"),
+            NewDoc = "{\"docs\": [{\"_id\": \"docnorev\"}], "
+                ++ "\"new_edits\": false}",
+            {ok, Status, _, ResultBody} = test_request:post(Url ++
+                "/_bulk_docs/", [?CONTENT_JSON, ?AUTH], NewDoc),
+            {ResultJson} = ?JSON_DECODE(ResultBody),
+            ?assertEqual(400, Status),
+            ?assertEqual(<<"bad_request">>,
+                couch_util:get_value(<<"error">>, ResultJson))
         end)}.
 
 
