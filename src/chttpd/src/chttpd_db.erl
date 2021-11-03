@@ -535,15 +535,17 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
     _ ->
         Options = [{user_ctx,Ctx}, {w,W}]
     end,
+    NewEdits = couch_util:get_value(<<"new_edits">>, JsonProps, true),
     Docs = lists:map(fun(JsonObj) ->
         Doc = couch_db:doc_from_json_obj_validate(Db, JsonObj),
+        validate_revs(Doc, NewEdits),
         validate_attachment_names(Doc),
         case Doc#doc.id of
             <<>> -> Doc#doc{id = couch_uuids:new()};
             _ -> Doc
         end
     end, DocsArray),
-    case couch_util:get_value(<<"new_edits">>, JsonProps, true) of
+    case NewEdits of
     true ->
         Options2 =
         case couch_util:get_value(<<"all_or_nothing">>, JsonProps) of
@@ -1959,6 +1961,14 @@ validate_security_can_be_edited(DbName) ->
             throw({forbidden, Msg});
         {_,_} -> ok
     end.
+
+validate_revs(_Doc, true) ->
+    ok;
+validate_revs(#doc{revs = {0, []}}, false) ->
+    throw({bad_request, ?l2b("When `new_edits: false`, " ++
+        "the document needs `_rev` or `_revisions` specified")});
+validate_revs(_Doc, false) ->
+    ok.
 
 validate_attachment_names(Doc) ->
     lists:foreach(fun(Att) ->
