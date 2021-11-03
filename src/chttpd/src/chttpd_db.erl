@@ -570,15 +570,22 @@ db_req(#httpd{method='POST',path_parts=[_,<<"_bulk_docs">>], user_ctx=Ctx}=Req, 
         end;
     false ->
         Docs2 = [Doc || Doc <- Docs, element(3, Doc) =/= {0, []}],
-        case fabric:update_docs(Db, Docs2, [replicated_changes | Options]) of
-        {ok, Errors} ->
-            chttpd_stats:incr_writes(length(Docs)),
-            ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
-            send_json(Req, 201, ErrorsJson);
-        {accepted, Errors} ->
-            chttpd_stats:incr_writes(length(Docs)),
-            ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
-            send_json(Req, 202, ErrorsJson)
+        case length(Docs2) of
+        0 ->
+            send_json(Req, 400, {[{missing_revs,
+                ?l2b("If `new_edits` is false, a well-formed "
+                "`_rev` must be included in the document.")}]});
+        _ ->
+            case fabric:update_docs(Db, Docs2, [replicated_changes | Options]) of
+            {ok, Errors} ->
+                chttpd_stats:incr_writes(length(Docs)),
+                ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
+                send_json(Req, 201, ErrorsJson);
+            {accepted, Errors} ->
+                chttpd_stats:incr_writes(length(Docs)),
+                ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
+                send_json(Req, 202, ErrorsJson)
+            end
         end;
     _ ->
         throw({bad_request, <<"`new_edits` parameter must be a boolean.">>})
