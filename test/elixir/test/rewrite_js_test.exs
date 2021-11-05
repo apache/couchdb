@@ -212,6 +212,7 @@ defmodule RewriteJSTest do
   Enum.each(
     ["test_rewrite_suite_db", "test_rewrite_suite_db%2Fwith_slashes"],
     fn db_name ->
+      @tag :pending # Not supported on 4.x
       @tag with_random_db: db_name
       test "Test basic js rewrites on #{db_name}", context do
         db_name = context[:db_name]
@@ -314,6 +315,7 @@ defmodule RewriteJSTest do
         assert Map.has_key?(resp.body, "_revs_info")
       end
 
+      @tag :pending # Not supported on 4.x
       @tag with_random_db: db_name
       test "early response on #{db_name}", context do
         db_name = context[:db_name]
@@ -345,6 +347,7 @@ defmodule RewriteJSTest do
         assert resp.status_code == 500
       end
 
+      @tag :pending # Not supported on 4.x
       @tag with_random_db: db_name
       test "path relative to server on #{db_name}", context do
         db_name = context[:db_name]
@@ -364,6 +367,7 @@ defmodule RewriteJSTest do
         assert length(resp.body["uuids"]) == 1
       end
 
+      @tag :pending # Not supported on 4.x
       @tag with_random_db: db_name
       test "loop on #{db_name}", context do
         db_name = context[:db_name]
@@ -382,6 +386,7 @@ defmodule RewriteJSTest do
         assert resp.status_code == 400
       end
 
+      @tag :pending # Not supported on 4.x
       @tag with_random_db: db_name
       test "requests with body preserve the query string rewrite on #{db_name}",
            context do

@@ -198,6 +198,7 @@ defmodule ShowDocumentsTest do
     {:ok, [db_name: db_name]}
   end
 
+  @tag :pending # Not supported on 4.x
   test "show error", context do
     db_name = context[:db_name]
 
@@ -206,6 +207,7 @@ defmodule ShowDocumentsTest do
     assert resp.body["reason"] == "Invalid path."
   end
 
+  @tag :pending # Not supported on 4.x
   test "show with existing doc", context do
     db_name = context[:db_name]
 
@@ -217,6 +219,7 @@ defmodule ShowDocumentsTest do
     assert String.match?(resp.headers["Server"], ~r/^CouchDB/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "show without docid", context do
     db_name = context[:db_name]
     resp = Rawresp.get("/#{db_name}/_design/template/_show/hello")
@@ -226,6 +229,7 @@ defmodule ShowDocumentsTest do
     assert resp.body == ""
   end
 
+  @tag :pending # Not supported on 4.x
   test "show fail with non-existing docid", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design/template/_show/fail/nonExistingDoc")
@@ -233,12 +237,14 @@ defmodule ShowDocumentsTest do
     assert resp.body["error"] == "not_found"
   end
 
+  @tag :pending # Not supported on 4.x
   test "show with doc", context do
     db_name = context[:db_name]
     resp = Rawresp.get("/#{db_name}/_design/template/_show/just-name/test-doc-id")
     assert resp.body == "Just Rusty"
   end
 
+  @tag :pending # Not supported on 4.x
   test "show with missing doc", context do
     db_name = context[:db_name]
     resp = Rawresp.get("/#{db_name}/_design/template/_show/just-name/missingdoc")
@@ -246,6 +252,7 @@ defmodule ShowDocumentsTest do
     assert resp.body == "No such doc"
   end
 
+  @tag :pending # Not supported on 4.x
   test "missing design doc", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_design/missingddoc/_show/just-name/test-doc-id")
@@ -253,6 +260,7 @@ defmodule ShowDocumentsTest do
     assert resp.body["error"] == "not_found"
   end
 
+  @tag :pending # Not supported on 4.x
   test "show query parameters", context do
     db_name = context[:db_name]
 
@@ -268,6 +276,7 @@ defmodule ShowDocumentsTest do
     assert resp.body["info"]["db_name"] == db_name
   end
 
+  @tag :pending # Not supported on 4.x
   test "accept header switching - different mime has different etag", context do
     db_name = context[:db_name]
 
@@ -294,6 +303,7 @@ defmodule ShowDocumentsTest do
     assert etag != etag2
   end
 
+  @tag :pending # Not supported on 4.x
   test "show with doc - etags", context do
     db_name = context[:db_name]
 
@@ -322,6 +332,7 @@ defmodule ShowDocumentsTest do
     assert resp.status_code == 200
   end
 
+  @tag :pending # Not supported on 4.x
   test "JS can't set etag", context do
     db_name = context[:db_name]
 
@@ -329,6 +340,7 @@ defmodule ShowDocumentsTest do
     assert resp.headers["etag"] != "skipped"
   end
 
+  @tag :pending # Not supported on 4.x
   test "the provides mime matcher", context do
     db_name = context[:db_name]
 
@@ -342,6 +354,7 @@ defmodule ShowDocumentsTest do
     assert resp.body == "Ha ha, you said \"plankton\"."
   end
 
+  @tag :pending # Not supported on 4.x
   test "registering types works", context do
     db_name = context[:db_name]
 
@@ -354,6 +367,7 @@ defmodule ShowDocumentsTest do
     assert String.match?(resp.body, ~r/foofoo/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "the provides mime matcher without a match", context do
     db_name = context[:db_name]
 
@@ -365,6 +379,7 @@ defmodule ShowDocumentsTest do
     assert resp.body["error"] == "not_acceptable"
   end
 
+  @tag :pending # Not supported on 4.x
   test "id with slash", context do
     db_name = context[:db_name]
 
@@ -374,6 +389,7 @@ defmodule ShowDocumentsTest do
     assert resp.status_code == 200
   end
 
+  @tag :pending # Not supported on 4.x
   test "show with non-existing docid", context do
     db_name = context[:db_name]
 
@@ -381,6 +397,7 @@ defmodule ShowDocumentsTest do
     assert resp.body == "New World"
   end
 
+  @tag :pending # Not supported on 4.x
   test "list() compatible API", context do
     db_name = context[:db_name]
 
@@ -389,6 +406,7 @@ defmodule ShowDocumentsTest do
     assert resp.headers["X-Couch-Test-Header"] == "Yeah"
   end
 
+  @tag :pending # Not supported on 4.x
   test "list() compatible API with provides function", context do
     db_name = context[:db_name]
 
@@ -398,6 +416,7 @@ defmodule ShowDocumentsTest do
     assert resp.body == "foo, bar, baz!"
   end
 
+  @tag :pending # Not supported on 4.x
   test "should keep next result order: chunks + return value + provided chunks + provided return value",
        context do
     db_name = context[:db_name]
@@ -419,6 +438,7 @@ defmodule ShowDocumentsTest do
     assert resp.headers["X-Couch-Test-Header-Awesome"] == "Oh Yeah!"
   end
 
+  @tag :pending # Not supported on 4.x
   test "deleted docs", context do
     db_name = context[:db_name]
 
@@ -433,6 +453,7 @@ defmodule ShowDocumentsTest do
   end
 
   @tag :with_db
+  @tag :pending # Not supported on 4.x
   test "security object", context do
     db_name = context[:db_name]
     {:ok, _} = create_doc(db_name, @ddoc)

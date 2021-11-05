@@ -449,6 +449,7 @@ defmodule RewriteTest do
         assert resp.body["error"] == "insecure_rewrite_rule"
       end
 
+      @tag :pending # Not supported on 4.x
       @tag with_random_db: db_name
       @tag config: [
              {"chttpd", "secure_rewrites", "false"}
@@ -473,6 +474,7 @@ defmodule RewriteTest do
         assert length(resp.body["uuids"]) == 1
       end
 
+      @tag :pending # Not supported on 4.x
       @tag with_random_db: db_name
       @tag config: [
              {"chttpd", "rewrite_limit", "2"}
@@ -491,6 +493,7 @@ defmodule RewriteTest do
         assert resp.status_code == 400
       end
 
+      @tag :pending # Not supported on 4.x
       @tag with_random_db: db_name
       @tag config: [
              {"chttpd", "rewrite_limit", "2"},
