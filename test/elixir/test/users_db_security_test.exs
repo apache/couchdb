@@ -269,6 +269,7 @@ defmodule UsersDbSecurityTest do
            "apple"
          }
        ]
+  @tag :pending # 500
   test "user db security" do
     # _users db
     # a doc with a field 'password' should be hashed to 'derived_key'

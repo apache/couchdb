@@ -301,6 +301,7 @@ defmodule UsersDbTest do
     assert resp.body["userCtx"]["name"] == "foo@example.org"
   end
 
+  @tag :pending
   test "users password requirements", _context do
     set_config({
       "couch_httpd_auth",
