@@ -253,6 +253,7 @@ defmodule ListViewsTest do
      [db_name: db_name, db_name_cross: db_name_cross, db_name_erlang: db_name_erlang]}
   end
 
+  @tag :pending # Not supported on 4.x
   test "standard GET", context do
     db_name = context[:db_name]
     resp = Rawresp.get("/#{db_name}/_design/lists/_list/basicBasic/basicView")
@@ -260,6 +261,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/head0123456789tail/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "standard OPTIONS", context do
     db_name = context[:db_name]
     resp = Rawresp.options("/#{db_name}/_design/lists/_list/basicBasic/basicView")
@@ -267,6 +269,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/head0123456789tail/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "the richness of the arguments", context do
     db_name = context[:db_name]
 
@@ -298,6 +301,7 @@ defmodule ListViewsTest do
              "/#{db_name}/_design/lists/_list/basicJSON/basicView?update_seq=true"
   end
 
+  @tag :pending # Not supported on 4.x
   test "get with query params", context do
     db_name = context[:db_name]
 
@@ -312,6 +316,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/LastKey: 8/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "with 0 rows", context do
     db_name = context[:db_name]
 
@@ -321,6 +326,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/<\/ul>/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "too many Get Rows", context do
     db_name = context[:db_name]
 
@@ -330,6 +336,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/9after row: null/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "reduce with 0 rows", context do
     db_name = context[:db_name]
 
@@ -340,6 +347,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/LastKey: undefined/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "when there is a reduce present, but not used", context do
     db_name = context[:db_name]
 
@@ -350,6 +358,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/Key: 1/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "when there is a reduce present, and used", context do
     db_name = context[:db_name]
 
@@ -359,6 +368,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/Key: 1/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "empty list", context do
     db_name = context[:db_name]
 
@@ -369,6 +379,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/^ $/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "multi-key fetch with POST", context do
     db_name = context[:db_name]
 
@@ -384,6 +395,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/LastKey: 7/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "multi-key fetch with GET", context do
     db_name = context[:db_name]
 
@@ -397,6 +409,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/LastKey: 7/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "no multi-key fetch allowed when group=false", context do
     db_name = context[:db_name]
 
@@ -412,6 +425,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/ReferenceError/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "with include_docs and a reference to the doc", context do
     db_name = context[:db_name]
 
@@ -423,12 +437,14 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/head0tail/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "extra qs params", context do
     db_name = context[:db_name]
     resp = Rawresp.get("/#{db_name}/_design/lists/_list/qsParams/basicView?foo=blam")
     assert String.match?(resp.body, ~r/blam/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "stop iteration", context do
     db_name = context[:db_name]
     resp = Rawresp.get("/#{db_name}/_design/lists/_list/stopIter/basicView")
@@ -442,6 +458,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/^head 0 1 2 tail$/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "abort iteration with reduce", context do
     db_name = context[:db_name]
 
@@ -456,6 +473,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/^head 0 1 2 tail$/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "with accept headers for HTML", context do
     db_name = context[:db_name]
 
@@ -469,6 +487,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/Value/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "we can run lists and views from separate docs", context do
     db_name = context[:db_name_cross]
 
@@ -483,6 +502,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/LastKey: 0/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "we do multi-key requests on lists and views in separate docs", context do
     db_name = context[:db_name_cross]
 
@@ -499,6 +519,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/LastKey: -7/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "secObj is available", context do
     db_name = context[:db_name]
 
@@ -507,6 +528,7 @@ defmodule ListViewsTest do
     assert is_map(resp.body)
   end
 
+  @tag :pending # Not supported on 4.x
   test "multiple languages in design docs", context do
     db_name = context[:db_name_erlang]
 
@@ -522,6 +544,7 @@ defmodule ListViewsTest do
   end
 
   @tag :with_db
+  @tag :pending # Not supported on 4.x
   test "COUCHDB-1113", context do
     db_name = context[:db_name]
 
@@ -556,6 +579,7 @@ defmodule ListViewsTest do
     assert resp.status_code == 200
   end
 
+  @tag :pending # Not supported on 4.x
   test "HTTP header response set after getRow() called in _list function", context do
     db_name = context[:db_name]
 
@@ -565,6 +589,7 @@ defmodule ListViewsTest do
     assert String.match?(resp.body, ~r/^bad request$/)
   end
 
+  @tag :pending # Not supported on 4.x
   test "handling _all_docs by _list functions. the result should be equal", context do
     db_name = context[:db_name]
 
