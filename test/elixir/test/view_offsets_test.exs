@@ -60,7 +60,7 @@ defmodule ViewOffsetTest do
   end
 
   test "repeated view offsets" do
-    0..14 |> Enum.each(fn _ -> repeated_view_offset_test_fun end)
+    0..14 |> Enum.each(fn _ -> repeated_view_offset_test_fun() end)
   end
 
   def repeated_view_offset_test_fun do
