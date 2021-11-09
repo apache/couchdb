@@ -1753,7 +1753,7 @@ defmodule ReplicationTest do
   def cmp_json(lhs, rhs), do: lhs == rhs
 
   def seq_to_shards(seq) do
-    for {_node, range, {seq_num, uuid, epoch}} <- decode_seq(seq) do
+    for {_node, range, {seq_num, _uuid, _epoch}} <- decode_seq(seq) do
       {range, seq_num}
     end
   end
