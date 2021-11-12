@@ -256,7 +256,7 @@ defmodule DesignDocsTest do
 
   @tag :pending # No compact_running key
   @tag :with_db
-  test "test that we get correct design doc info back", context do
+  test "that we get correct design doc info back", context do
     db_name = context[:db_name]
     {:ok, _} = create_doc(db_name, @design_doc)
 
