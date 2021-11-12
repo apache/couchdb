@@ -300,7 +300,7 @@ defmodule AttachmentsTest do
   end
 
   @tag :with_db
-  test "test COUCHDB-497 - empty attachments", context do
+  test "COUCHDB-497 - empty attachments", context do
     db_name = context[:db_name]
 
     lorem_att = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
