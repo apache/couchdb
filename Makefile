@@ -233,6 +233,22 @@ python-black-update: .venv/bin/black
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/rebar/pr2relnotes.py|src/fauxton" \
 		build-aux/*.py dev/run dev/format_*.py src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
+.PHONY: elixir-suite
+elixir-suite: elixir-init elixir-check-formatted elixir-credo elixir-integration
+
+.PHONY: elixir-init
+elixir-init: config.erl
+	@mix local.rebar --force && mix local.hex --force && mix deps.get
+
+.PHONY: elixir-check-formatted
+elixir-check-formatted:
+	@mix format --check-formatted
+
+.PHONY: elixir-credo
+# target: elixir-credo: Run the Credo static code analysis tool on Elixir files
+elixir-credo:
+	@mix credo
+
 .PHONY: elixir-integration
 elixir-integration: export MIX_ENV=integration
 elixir-integration: devclean
@@ -241,33 +257,15 @@ elixir-integration: devclean
 		--erlang-config rel/files/eunit.config \
 		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 
-.PHONY: elixir-init
-elixir-init: MIX_ENV=test
-elixir-init: config.erl
-	@mix local.rebar --force && mix local.hex --force && mix deps.get
-
-.PHONY: elixir-suite
-elixir-suite: export MIX_ENV=integration
-elixir-suite: elixir-init elixir-check-formatted elixir-credo elixir-integration
-
 .PHONY: buggify-elixir-integration
+# target: buggify-elixir-integration - Run ExUnit integration tests while FoundationDB randomly throws errors
 buggify-elixir-integration: export MIX_ENV=integration
-buggify-elixir-integration: elixir-init devclean
+buggify-elixir-integration: devclean
 	@dev/run -n 1 -q -a adm:pass \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--locald-config test/elixir/test/config/buggify-test-config.ini \
 		--erlang-config rel/files/buggify-eunit.config \
 		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
-
-.PHONY: elixir-check-formatted
-elixir-check-formatted: elixir-init
-	@mix format --check-formatted
-
-# Credo is a static code analysis tool for Elixir.
-# We use it in our tests
-.PHONY: elixir-credo
-elixir-credo: elixir-init
-	@mix credo
 
 .PHONY: build-report
 # target: build-report - Generate and upload a build report
