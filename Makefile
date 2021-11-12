@@ -91,8 +91,6 @@ DIALYZE_OPTS=$(shell echo "\
 	" | sed -e 's/[a-z]\{1,\}= / /g')
 EXUNIT_OPTS=$(subst $(comma),$(space),$(tests))
 
-TEST_OPTS="-c 'startup_jitter=0' -c 'default_security=admin_local'"
-
 ################################################################################
 # Main commands
 ################################################################################
@@ -294,12 +292,13 @@ build-test:
 
 .PHONY: mango-test
 # target: mango-test - Run Mango tests
-mango-test: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 mango-test: devclean all
 	@cd src/mango && \
 		python3 -m venv .venv && \
 		.venv/bin/python3 -m pip install -r requirements.txt
-	@cd src/mango && ../../dev/run "$(TEST_OPTS)" -n 1 --admin=adm:pass --erlang-config=rel/files/eunit.config '.venv/bin/python3 -m nose -v --with-xunit'
+	@dev/run -n 1 -q -a adm:pass \
+		--erlang-config rel/files/eunit.config \
+		--no-eval 'src/mango/.venv/bin/python3 -m nose -v --where src/mango --with-xunit'
 
 ################################################################################
 # Developing
