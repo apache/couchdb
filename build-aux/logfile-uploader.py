@@ -34,7 +34,7 @@ def _tojson(req):
 
 
 def collect_logfiles():
-    """ Find and tarball all logfiles """
+    """Find and tarball all logfiles"""
     tb = tarfile.open(name=TARFILE, mode="w:gz")
     # Test results
     for log in glob.glob("test-results.log"):
@@ -52,7 +52,7 @@ def collect_logfiles():
 
 
 def build_ci_doc():
-    """ Build a metadata document with relevant detail from CI env """
+    """Build a metadata document with relevant detail from CI env"""
     doc = {}
     if "TRAVIS" in os.environ:
         doc["builder"] = "travis"
@@ -125,7 +125,7 @@ def upload_logs():
 
 
 def main():
-    """ Find latest logfile and upload to Couch logfile db. """
+    """Find latest logfile and upload to Couch logfile db."""
     print("Uploading logfiles...")
     collect_logfiles()
     req = upload_logs()

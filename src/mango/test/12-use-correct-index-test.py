@@ -54,14 +54,18 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.db.save_docs(copy.deepcopy(DOCS))
 
     def test_choose_index_with_one_field_in_index(self):
-        self.db.create_index(["name", "age", "user_id"], ddoc="aaa", wait_for_built_index=False)
+        self.db.create_index(
+            ["name", "age", "user_id"], ddoc="aaa", wait_for_built_index=False
+        )
         self.db.create_index(["name"], ddoc="zzz", wait_for_built_index=False)
         self.db.wait_for_built_indexes()
         explain = self.db.find({"name": "Eddie"}, explain=True)
         self.assertEqual(explain["index"]["ddoc"], "_design/zzz")
 
     def test_choose_index_with_two(self):
-        self.db.create_index(["name", "age", "user_id"], ddoc="aaa", wait_for_built_index=False)
+        self.db.create_index(
+            ["name", "age", "user_id"], ddoc="aaa", wait_for_built_index=False
+        )
         self.db.create_index(["name", "age"], ddoc="bbb", wait_for_built_index=False)
         self.db.create_index(["name"], ddoc="zzz", wait_for_built_index=False)
         self.db.wait_for_built_indexes()
@@ -77,7 +81,9 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.assertEqual(explain["index"]["ddoc"], "_design/aaa")
 
     def test_choose_index_most_accurate(self):
-        self.db.create_index(["name", "age", "user_id"], ddoc="aaa", wait_for_built_index=False)
+        self.db.create_index(
+            ["name", "age", "user_id"], ddoc="aaa", wait_for_built_index=False
+        )
         self.db.create_index(["name", "age"], ddoc="bbb", wait_for_built_index=False)
         self.db.create_index(["name"], ddoc="zzz", wait_for_built_index=False)
         self.db.wait_for_built_indexes()
@@ -85,8 +91,12 @@ class ChooseCorrectIndexForDocs(mango.DbPerClass):
         self.assertEqual(explain["index"]["ddoc"], "_design/bbb")
 
     def test_choose_index_most_accurate_in_memory_selector(self):
-        self.db.create_index(["name", "location", "user_id"], ddoc="aaa", wait_for_built_index=False)
-        self.db.create_index(["name", "age", "user_id"], ddoc="bbb", wait_for_built_index=False)
+        self.db.create_index(
+            ["name", "location", "user_id"], ddoc="aaa", wait_for_built_index=False
+        )
+        self.db.create_index(
+            ["name", "age", "user_id"], ddoc="bbb", wait_for_built_index=False
+        )
         self.db.create_index(["name"], ddoc="zzz", wait_for_built_index=False)
         self.db.wait_for_built_indexes()
         explain = self.db.find({"name": "Eddie", "number": {"$lte": 12}}, explain=True)

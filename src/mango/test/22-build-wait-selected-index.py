@@ -28,23 +28,23 @@ class BuildAndWaitOnSelectedIndex(mango.DbPerClass):
     def test_wait_for_query(self):
         self.db.create_index(["val"], ddoc="my-ddoc", wait_for_built_index=False)
 
-        explain = self.db.find({'val': {"$gt": 990}}, use_index="my-ddoc", explain=True)
+        explain = self.db.find({"val": {"$gt": 990}}, use_index="my-ddoc", explain=True)
         self.assertEqual(explain["index"]["ddoc"], "_design/my-ddoc")
 
-        docs = self.db.find({'val': {"$gte": 990}}, limit=10)
+        docs = self.db.find({"val": {"$gte": 990}}, limit=10)
 
         self.assertEqual(len(docs), 10)
 
     def test_dont_wait(self):
         self.db.create_index(["val"], ddoc="my-ddoc", wait_for_built_index=False)
 
-        explain = self.db.find({'val': {"$gt": 990}}, explain=True)
+        explain = self.db.find({"val": {"$gt": 990}}, explain=True)
         self.assertEqual(explain["index"]["name"], "_all_docs")
 
-        docs = self.db.find({'val': {"$gte": 990}})
+        docs = self.db.find({"val": {"$gte": 990}})
         self.assertEqual(len(docs), 10)
 
     def test_update_false(self):
         self.db.create_index(["val"], ddoc="my-ddoc", wait_for_built_index=False)
-        docs = self.db.find({'val': {"$gte": 990}}, update=False, use_index="my-ddoc")
+        docs = self.db.find({"val": {"$gte": 990}}, update=False, use_index="my-ddoc")
         self.assertEqual(docs, [])

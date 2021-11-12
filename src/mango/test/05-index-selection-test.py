@@ -207,7 +207,7 @@ class IndexSelectionTests:
             self.db.save_doc(design_doc)
             assert False, "Should not get here."
         except requests.exceptions.HTTPError as e:
-            self.assertEqual(e.response.json()['error'], 'invalid_design_doc')
+            self.assertEqual(e.response.json()["error"], "invalid_design_doc")
 
     def test_explain_sort_reverse(self):
         selector = {"manager": {"$gt": None}}

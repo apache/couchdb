@@ -117,14 +117,12 @@ class IndexCrudTests(mango.DbPerClass):
         fields = ["baz", "foo"]
         ret = self.db.create_index(fields, name="idx_02")
         assert ret is True
-        self.db.save_doc({
-            "_id": "_design/ignore",
-            "views": {
-                "view1": {
-                    "map": "function (doc) { emit(doc._id, 1)}"
-                }
+        self.db.save_doc(
+            {
+                "_id": "_design/ignore",
+                "views": {"view1": {"map": "function (doc) { emit(doc._id, 1)}"}},
             }
-        })
+        )
         indexes = self.db.list_indexes()
         self.assertEqual(len(indexes), 2)
 

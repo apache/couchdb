@@ -33,9 +33,7 @@ class ExecutionStatsTests(mango.UserDocsTests):
         assert "execution_stats" not in resp
 
     def test_quorum_json_index(self):
-        resp = self.db.find(
-            {"age": {"$lt": 35}}, return_raw=True, executionStats=True
-        )
+        resp = self.db.find({"age": {"$lt": 35}}, return_raw=True, executionStats=True)
         self.assertEqual(len(resp["docs"]), 3)
         self.assertEqual(resp["execution_stats"]["total_keys_examined"], 0)
         self.assertEqual(resp["execution_stats"]["total_docs_examined"], 3)
