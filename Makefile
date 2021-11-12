@@ -237,7 +237,7 @@ python-black-update: .venv/bin/black
 elixir-suite: elixir-init elixir-check-formatted elixir-credo elixir-integration
 
 .PHONY: elixir-init
-elixir-init: config.erl
+elixir-init:
 	@mix local.rebar --force && mix local.hex --force && mix deps.get
 
 .PHONY: elixir-check-formatted
