@@ -233,27 +233,13 @@ python-black-update: .venv/bin/black
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/erlfmt|src/rebar/pr2relnotes.py|src/fauxton" \
 		build-aux/*.py dev/run dev/format_*.py src/mango/test/*.py src/docs/src/conf.py src/docs/ext/*.py .
 
-.PHONY: elixir
-elixir: export MIX_ENV=integration
-elixir: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-elixir: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run "$(TEST_OPTS)" \
-		-a adm:pass \
-		-n 1 \
-		--enable-erlang-views \
+.PHONY: elixir-integration
+elixir-integration: export MIX_ENV=integration
+elixir-integration: devclean
+	@dev/run -n 1 -q -a adm:pass \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --exclude pending $(EXUNIT_OPTS)'
-
-.PHONY: elixir-only
-elixir-only: devclean
-	@dev/run "$(TEST_OPTS)" \
-		-a adm:pass \
-		-n 1 \
-		--enable-erlang-views \
-		--locald-config test/elixir/test/config/test-config.ini \
-		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --exclude pending $(EXUNIT_OPTS)'
+		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 
 .PHONY: elixir-init
 elixir-init: MIX_ENV=test
@@ -262,26 +248,16 @@ elixir-init: config.erl
 
 .PHONY: elixir-suite
 elixir-suite: export MIX_ENV=integration
-elixir-suite: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-elixir-suite: elixir-init elixir-check-formatted elixir-credo devclean
-	@dev/run -n 1 -q -a adm:pass \
-		--enable-erlang-views \
-		--no-join \
-		--locald-config test/elixir/test/config/test-config.ini \
-		--erlang-config rel/files/eunit.config \
-		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir'
+elixir-suite: elixir-init elixir-check-formatted elixir-credo elixir-integration
 
-.PHONY: buggify-elixir-suite
-buggify-elixir-suite: export MIX_ENV=integration
-buggify-elixir-suite: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-buggify-elixir-suite: elixir-init devclean
+.PHONY: buggify-elixir-integration
+buggify-elixir-integration: export MIX_ENV=integration
+buggify-elixir-integration: elixir-init devclean
 	@dev/run -n 1 -q -a adm:pass \
-		--enable-erlang-views \
-		--no-join \
 		--locald-config test/elixir/test/config/test-config.ini \
 		--locald-config test/elixir/test/config/buggify-test-config.ini \
 		--erlang-config rel/files/buggify-eunit.config \
-		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir'
+		--no-eval 'mix test --trace --include test/elixir/test/config/suite.elixir --exclude test/elixir/test/config/skip.elixir $(EXUNIT_OPTS)'
 
 .PHONY: elixir-check-formatted
 elixir-check-formatted: elixir-init

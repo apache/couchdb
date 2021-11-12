@@ -14,13 +14,6 @@ defmodule ReplicationTest do
     {"remote-to-remote", "http://127.0.0.1:15984/", "http://127.0.0.1:15984/"}
   ]
 
-  # This should probably go into `make elixir` like what
-  # happens for JavaScript tests.
-  @moduletag config: [
-      {"replicator", "startup_jitter", "0"},
-      {"replicator", "stats_update_interval_sec", "0"}
-  ]
-
   test "source database not found with host" do
     name = random_db_name()
     src_url = "http://127.0.0.1:15984/" <> name <> "_src"
