@@ -16,6 +16,7 @@ import mango, requests, unittest
 
 # Re-enable once the _users db is implemented
 
+
 class UsersDbFindTests(mango.UsersDbTests):
     @classmethod
     def setUpClass(klass):

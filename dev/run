@@ -287,8 +287,9 @@ def check_boot_script(ctx):
 @log("Prepare configuration files")
 def setup_configs(ctx):
     for idx, node in enumerate(ctx["nodes"]):
-        cluster_port, backend_port, prometheus_port = get_ports(ctx,
-            idx + ctx["node_number"])
+        cluster_port, backend_port, prometheus_port = get_ports(
+            ctx, idx + ctx["node_number"]
+        )
         env = {
             "prefix": toposixpath(ctx["rootdir"]),
             "package_author_name": "The Apache Software Foundation",
@@ -362,8 +363,11 @@ def apply_config_overrides(ctx, content):
 def get_ports(ctx, idnode):
     assert idnode
     if idnode <= 5 and not ctx["auto_ports"]:
-        return ((10000 * idnode) + 5984, (10000 * idnode) + 5986,
-            (10000 * idnode) + 7986)
+        return (
+            (10000 * idnode) + 5984,
+            (10000 * idnode) + 5986,
+            (10000 * idnode) + 7986,
+        )
     else:
         return tuple(get_available_ports(2))
 

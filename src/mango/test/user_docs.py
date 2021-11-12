@@ -71,6 +71,7 @@ def setup(db, index_type="view", **kwargs):
         add_text_indexes(db, kwargs)
     db.save_docs(copy.deepcopy(DOCS))
 
+
 def add_view_indexes(db, kwargs):
     indexes = [
         (["user_id"], "user_id"),
@@ -93,8 +94,10 @@ def add_view_indexes(db, kwargs):
         (["ordered"], "ordered"),
     ]
     for (idx, name) in indexes:
-        assert db.create_index(idx, name=name, ddoc=name,
-                               wait_for_built_index=False) is True
+        assert (
+            db.create_index(idx, name=name, ddoc=name, wait_for_built_index=False)
+            is True
+        )
     db.wait_for_built_indexes()
 
 

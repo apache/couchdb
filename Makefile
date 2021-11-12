@@ -142,15 +142,6 @@ fauxton: share/www
 ################################################################################
 
 
-# When we can run all the tests with FDB switch this back to be the default
-# "make check" command
-.PHONY: check-all-tests
-# target: check - Test everything
-check-all-tests: all python-black
-	@$(MAKE) eunit
-	@$(MAKE) mango-test
-	@$(MAKE) elixir
-
 ifdef apps
 subdirs=$(shell echo $(apps) | sed 's/,/ /g')
 else
@@ -158,7 +149,7 @@ subdirs=$(shell ls src)
 endif
 
 .PHONY: check
-check:  all 
+check:  all python-black
 	@$(MAKE) erlfmt-check
 	@$(MAKE) eunit
 	@$(MAKE) elixir-suite

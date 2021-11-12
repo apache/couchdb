@@ -19,6 +19,7 @@ DOC = [{"_id": "doc", "a": 2}, {"_id": "doc1", "b": 2}]
 CONFLICT = [{"_id": "doc", "_rev": "1-23202479633c2b380f79507a776743d5", "a": 1}]
 CONFLICT2 = [{"_id": "doc1", "_rev": "1-23202479633c2b380f79507a776743d5", "b": 1}]
 
+
 class ChooseCorrectIndexForDocs(mango.DbPerClass):
     def setUp(self):
         self.db.recreate()
