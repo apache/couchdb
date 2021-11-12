@@ -411,7 +411,8 @@ should_not_change_db_proper_after_rewriting_shardmap(_) ->
 
             {Prop2} = ?JSON_DECODE(?JSON_ENCODE({Props})),
             Shards2 = mem3_util:build_shards(TmpDb, Prop2),
-            ?assertEqual(Shards2, Shards)
+            ?assertEqual(Shards2, Shards),
+            {ok, 200, _, _} = test_request:delete(BaseUrl, [?AUTH])
         end)}.
 
 should_succeed_on_all_docs_with_queries_keys(Url) ->

@@ -21,7 +21,8 @@
     get_chttpd_auth_config/2,
     get_chttpd_auth_config_integer/2,
     get_chttpd_auth_config_boolean/2,
-    maybe_add_csp_header/3
+    maybe_add_csp_header/3,
+    get_db_info/1
 ]).
 
 get_chttpd_config(Key) ->
@@ -99,4 +100,13 @@ handle_legacy_config(OriginalHeaders, DefaultHeaderValue) ->
             [{"Content-Security-Policy", LegacyUtilsHeaderValue} | OriginalHeaders];
         false ->
             OriginalHeaders
+    end.
+
+get_db_info(DbName) ->
+    Timeout = fabric_util:request_timeout(),
+    IsolatedFun = fun() -> fabric:get_db_info(DbName) end,
+    try
+        fabric_util:isolate(IsolatedFun, Timeout)
+    catch
+        _Tag:Error -> {error, Error}
     end.
