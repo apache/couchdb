@@ -29,6 +29,7 @@
     "manages attachments in views successfully"
   ],
   "AttachmentsTest": [
+    "COUCHDB-497 - empty attachments",
     "COUCHDB-809 - stubs should only require the 'stub' field",
     "attachment via multipart/form-data",
     "delete attachment",
@@ -41,13 +42,14 @@
     "reads attachment successfully",
     "saves attachment successfully",
     "saves binary",
-    "COUCHDB-497 - empty attachments",
     "update attachment"
   ],
   "AuthCacheTest": [
     "auth cache management"
   ],
   "BasicsTest": [
+    "'+' in document name should encode to '+'",
+    "'+' in document name should encode to space",
     "A document read with etag works",
     "Can create several documents",
     "Check _revs_limit",
@@ -57,11 +59,9 @@
     "Creating a new DB should return location header",
     "Creating a new DB with slashes should return Location header (COUCHDB-411)",
     "DELETE'ing a non-existent doc should 404",
-    "Database should be in _all_dbs",
-    "Database name with '+' should encode to '+'",
-    "'+' in document name should encode to '+'",
     "Database name with '%2B' should encode to '+'",
-    "'+' in document name should encode to space",
+    "Database name with '+' should encode to '+'",
+    "Database should be in _all_dbs",
     "Default headers are returned for doc with open_revs=all",
     "Empty database should have zero docs",
     "Exceeding configured DB name size limit returns an error",
@@ -135,17 +135,17 @@
   "ConcurrentWritesTest": [
     "Primary data tests",
     "Secondary data tests",
-    "Secondary data tests with updates"
+    "Secondary data tests with deletes and queries",
+    "Secondary data tests with updates",
+    "Secondary data tests with updates and queries"
   ],
   "ConfigTest": [
     "Atoms, binaries, and strings suffice as whitelist sections and keys.",
     "Blacklist is functional",
-    "CouchDB respects configured protocols",
     "Keys not in the whitelist may not be modified",
     "Non-2-tuples in the whitelist are ignored",
     "Non-list whitelist values allow further modification of the whitelist",
     "Non-term whitelist values allow further modification of the whitelist",
-    "PORT `BUGGED` ?raw tests from config.js",
     "Reload config",
     "Server-side password hashing, and raw updates disabling that",
     "Settings can be altered with undefined whitelist allowing any change",
@@ -393,8 +393,8 @@
     "Force basic login",
     "Jerry can save a document normally",
     "Jerry with lowercase 'Basic' auth can save a document normally",
-    "Jerry with uppercase 'Basic' auth can save a document normally",
     "Jerry with mixed case 'Basic' auth can save a document normally",
+    "Jerry with uppercase 'Basic' auth can save a document normally",
     "Non-admin user cannot save a ddoc",
     "Saving document using the wrong credentials",
     "_session API",
@@ -454,7 +454,8 @@
     "user db security"
   ],
   "UsersDbTest": [
-    "users db"
+    "users db",
+    "users password requirements"
   ],
   "ViewCollationRawTest": [
     "ascending collation order",
@@ -577,25 +578,5 @@
     "_all_docs update seq",
     "db info update seq",
     "view update seq"
-  ],
-  "WithQuorumTest": [
-    "Attachments overriden quorum should return 202-Acepted",
-    "Attachments should return 201-Created",
-    "Bulk docs overriden quorum should return 202-Acepted",
-    "Bulk docs should return 201-Created",
-    "Copy doc should return 201-Created",
-    "Creating-Updating/Deleting doc should return 201-Created/200-OK",
-    "Creating-Updating/Deleting doc with overriden quorum should return 202-Acepted/200-OK",
-    "Creating/Deleting DB should return 201-Created/202-Acepted"
-  ],
-  "WithoutQuorumTest": [
-    "Attachments overriden quorum should return 201-Created",
-    "Attachments should return 202-Acepted",
-    "Bulk docs overriden quorum should return 201-Created",
-    "Bulk docs should return 202-Acepted",
-    "Copy doc should return 202-Acepted",
-    "Creating-Updating/Deleting doc with overriden quorum should return 201-Created/200-OK",
-    "Creating/Deleting DB should return 202-Acepted",
-    "Creating/Updating/Deleting doc should return 202-Acepted"
   ]
 }
