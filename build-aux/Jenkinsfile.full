@@ -95,6 +95,7 @@ pipeline {
           set
           rm -rf apache-couchdb-*
           ./configure
+          make erlfmt-check
           make dist
           chmod -R a+w * .
         '''
