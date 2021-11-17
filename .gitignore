@@ -80,6 +80,8 @@ src/ssl_verify_fun/
 src/triq/
 src/unicode_util_compat/
 src/file_system/
+src/rebar3/
+src/erlfmt/
 tmp/
 
 src/couch/*.o
