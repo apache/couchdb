@@ -12,22 +12,21 @@
 
 -module(fabric_tests).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
-
 
 cleanup_index_files_test_() ->
     {
         setup,
         fun setup/0,
         fun teardown/1,
-        fun(Ctx) -> [
-            t_cleanup_index_files(),
-            t_cleanup_index_files_with_existing_db(Ctx),
-            t_cleanup_index_files_with_deleted_db(Ctx)
-        ] end
+        fun(Ctx) ->
+            [
+                t_cleanup_index_files(),
+                t_cleanup_index_files_with_existing_db(Ctx),
+                t_cleanup_index_files_with_deleted_db(Ctx)
+            ]
+        end
     }.
-
 
 setup() ->
     Ctx = test_util:start_couch([fabric]),
@@ -36,25 +35,25 @@ setup() ->
     fabric:create_db(TempDb),
     {Ctx, TempDb}.
 
-
 teardown({Ctx, _TempDb}) ->
     test_util:stop_couch(Ctx).
 
-
 t_cleanup_index_files() ->
     ?_assert(
-        lists:all(fun(Res) -> Res =:= ok end, fabric:cleanup_index_files())).
-
+        lists:all(fun(Res) -> Res =:= ok end, fabric:cleanup_index_files())
+    ).
 
 t_cleanup_index_files_with_existing_db({_Ctx, TempDb}) ->
     ?_assertEqual(ok, fabric:cleanup_index_files(TempDb)).
-
 
 t_cleanup_index_files_with_deleted_db({_Ctx, TempDb}) ->
     ?_test(
         begin
             fabric:delete_db(TempDb, []),
-            ?assertError(database_does_not_exist,
-                fabric:inactive_index_files(TempDb)),
+            ?assertError(
+                database_does_not_exist,
+                fabric:inactive_index_files(TempDb)
+            ),
             ?assertEqual(ok, fabric:cleanup_index_files(TempDb))
-        end).
+        end
+    ).

@@ -18,10 +18,8 @@
     stop/1
 ]).
 
-
 start(_StartType, _StartArgs) ->
     couch_event_sup2:start_link().
-
 
 stop(_State) ->
     ok.

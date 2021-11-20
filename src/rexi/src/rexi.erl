@@ -30,8 +30,8 @@ stop() ->
     application:stop(rexi).
 
 restart() ->
-    stop(), start().
-
+    stop(),
+    start().
 
 %% @equiv cast(Node, self(), MFA)
 -spec cast(node(), {atom(), atom(), list()}) -> reference().
@@ -86,22 +86,34 @@ kill_all(NodeRefs) when is_list(NodeRefs) ->
     %% configure the cluster to send kill_all messages.
     case config:get_boolean("rexi", "use_kill_all", false) of
         true ->
-            PerNodeMap = lists:foldl(fun({Node, Ref}, Acc) ->
-                maps:update_with(Node, fun(Refs) ->
-                    [Ref | Refs]
-                end, [Ref], Acc)
-            end, #{}, NodeRefs),
-            maps:map(fun(Node, Refs) ->
-                ServerPid = rexi_utils:server_pid(Node),
-                rexi_utils:send(ServerPid, cast_msg({kill_all, Refs}))
-            end, PerNodeMap);
+            PerNodeMap = lists:foldl(
+                fun({Node, Ref}, Acc) ->
+                    maps:update_with(
+                        Node,
+                        fun(Refs) ->
+                            [Ref | Refs]
+                        end,
+                        [Ref],
+                        Acc
+                    )
+                end,
+                #{},
+                NodeRefs
+            ),
+            maps:map(
+                fun(Node, Refs) ->
+                    ServerPid = rexi_utils:server_pid(Node),
+                    rexi_utils:send(ServerPid, cast_msg({kill_all, Refs}))
+                end,
+                PerNodeMap
+            );
         false ->
             lists:foreach(fun({Node, Ref}) -> kill(Node, Ref) end, NodeRefs)
     end,
     ok.
 
 %% @equiv async_server_call(Server, self(), Request)
--spec async_server_call(pid() | {atom(),node()}, any()) -> reference().
+-spec async_server_call(pid() | {atom(), node()}, any()) -> reference().
 async_server_call(Server, Request) ->
     async_server_call(Server, self(), Request).
 
@@ -110,17 +122,17 @@ async_server_call(Server, Request) ->
 %% function acts more like cast() than call() in that the server process
 %% is not monitored.  Clients who want to know if the server is alive should
 %% monitor it themselves before calling this function.
--spec async_server_call(pid() | {atom(),node()}, pid(), any()) -> reference().
+-spec async_server_call(pid() | {atom(), node()}, pid(), any()) -> reference().
 async_server_call(Server, Caller, Request) ->
     Ref = make_ref(),
-    rexi_utils:send(Server, {'$gen_call', {Caller,Ref}, Request}),
+    rexi_utils:send(Server, {'$gen_call', {Caller, Ref}, Request}),
     Ref.
 
 %% @doc convenience function to reply to the original rexi Caller.
 -spec reply(any()) -> any().
 reply(Reply) ->
     {Caller, Ref} = get(rexi_from),
-    erlang:send(Caller, {Ref,Reply}).
+    erlang:send(Caller, {Ref, Reply}).
 
 %% @equiv sync_reply(Reply, 300000)
 sync_reply(Reply) ->
@@ -133,9 +145,10 @@ sync_reply(Reply) ->
 sync_reply(Reply, Timeout) ->
     {Caller, Ref} = get(rexi_from),
     Tag = make_ref(),
-    erlang:send(Caller, {Ref, {self(),Tag}, Reply}),
-    receive {Tag, Response} ->
-        Response
+    erlang:send(Caller, {Ref, {self(), Tag}, Reply}),
+    receive
+        {Tag, Response} ->
+            Response
     after Timeout ->
         timeout
     end.
@@ -174,7 +187,7 @@ stream_init(Timeout) ->
 %% sending messages. The `From` should be the value provided by
 %% the worker in the rexi_STREAM_INIT message.
 -spec stream_start({pid(), any()}) -> ok.
-stream_start({Pid, _Tag}=From) when is_pid(Pid) ->
+stream_start({Pid, _Tag} = From) when is_pid(Pid) ->
     gen_server:reply(From, rexi_STREAM_START).
 
 %% @doc Cancel a worker stream
@@ -184,7 +197,7 @@ stream_start({Pid, _Tag}=From) when is_pid(Pid) ->
 %% The `From` should be the value provided by the worker in the
 %% rexi_STREAM_INIT message.
 -spec stream_cancel({pid(), any()}) -> ok.
-stream_cancel({Pid, _Tag}=From) when is_pid(Pid) ->
+stream_cancel({Pid, _Tag} = From) when is_pid(Pid) ->
     gen_server:reply(From, rexi_STREAM_CANCEL).
 
 %% @equiv stream(Msg, 100, 300000)
@@ -202,13 +215,14 @@ stream(Msg, Limit) ->
 stream(Msg, Limit, Timeout) ->
     try maybe_wait(Limit, Timeout) of
         {ok, Count} ->
-            put(rexi_unacked, Count+1),
+            put(rexi_unacked, Count + 1),
             {Caller, Ref} = get(rexi_from),
             erlang:send(Caller, {Ref, self(), Msg}),
             ok
-    catch throw:timeout ->
-        couch_stats:increment_counter([rexi, streams, timeout, stream]),
-        exit(timeout)
+    catch
+        throw:timeout ->
+            couch_stats:increment_counter([rexi, streams, timeout, stream]),
+            exit(timeout)
     end.
 
 %% @equiv stream2(Msg, 5, 300000)
@@ -230,13 +244,14 @@ stream2(Msg, Limit, Timeout) ->
     maybe_init_stream(Timeout),
     try maybe_wait(Limit, Timeout) of
         {ok, Count} ->
-            put(rexi_unacked, Count+1),
+            put(rexi_unacked, Count + 1),
             {Caller, Ref} = get(rexi_from),
             erlang:send(Caller, {Ref, self(), Msg}),
             ok
-    catch throw:timeout ->
-        couch_stats:increment_counter([rexi, streams, timeout, stream]),
-        exit(timeout)
+    catch
+        throw:timeout ->
+            couch_stats:increment_counter([rexi, streams, timeout, stream]),
+            exit(timeout)
     end.
 
 %% @equiv stream_last(Msg, 300000)
@@ -259,13 +274,11 @@ stream_ack(Client) ->
 stream_ack(Client, N) ->
     erlang:send(Client, {rexi_ack, N}).
 
-
 %% Sends a ping message to the coordinator. This is for long running
 %% operations on a node that could exceed the rexi timeout
-ping() -> 
+ping() ->
     {Caller, _} = get(rexi_from),
     erlang:send(Caller, {rexi, '$rexi_ping'}).
-
 
 %% internal functions %%
 
@@ -304,7 +317,7 @@ maybe_wait(Limit, Timeout) ->
 
 wait_for_ack(Count, Timeout) ->
     receive
-        {rexi_ack, N} -> drain_acks(Count-N)
+        {rexi_ack, N} -> drain_acks(Count - N)
     after Timeout ->
         couch_stats:increment_counter([rexi, streams, timeout, wait_for_ack]),
         throw(timeout)
@@ -314,7 +327,7 @@ drain_acks(Count) when Count < 0 ->
     erlang:error(mismatched_rexi_ack);
 drain_acks(Count) ->
     receive
-        {rexi_ack, N} -> drain_acks(Count-N)
+        {rexi_ack, N} -> drain_acks(Count - N)
     after 0 ->
         {ok, Count}
     end.

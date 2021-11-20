@@ -12,13 +12,10 @@
 
 -module(fabric_db_uuids).
 
-
 -export([go/1]).
-
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
-
 
 go(DbName) when is_binary(DbName) ->
     Shards = mem3:live_shards(DbName, [node() | nodes()]),
@@ -36,30 +33,30 @@ go(DbName) when is_binary(DbName) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-
-handle_message({rexi_DOWN, _, {_, NodeRef},_}, _Shard, {Cntrs, Res}) ->
+handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Shard, {Cntrs, Res}) ->
     case fabric_ring:node_down(NodeRef, Cntrs, Res, [all]) of
         {ok, Cntrs1} -> {ok, {Cntrs1, Res}};
         error -> {error, {nodedown, <<"progress not possible">>}}
     end;
-
 handle_message({rexi_EXIT, Reason}, Shard, {Cntrs, Res}) ->
     case fabric_ring:handle_error(Shard, Cntrs, Res, [all]) of
         {ok, Cntrs1} -> {ok, {Cntrs1, Res}};
         error -> {error, Reason}
     end;
-
 handle_message(Uuid, Shard, {Cntrs, Res}) when is_binary(Uuid) ->
     case fabric_ring:handle_response(Shard, Uuid, Cntrs, Res, [all]) of
         {ok, {Cntrs1, Res1}} ->
             {ok, {Cntrs1, Res1}};
         {stop, Res1} ->
-            Uuids = fabric_dict:fold(fun(#shard{} = S, Id, #{} = Acc) ->
-                Acc#{Id => S#shard{ref = undefined}}
-            end, #{}, Res1),
+            Uuids = fabric_dict:fold(
+                fun(#shard{} = S, Id, #{} = Acc) ->
+                    Acc#{Id => S#shard{ref = undefined}}
+                end,
+                #{},
+                Res1
+            ),
             {stop, Uuids}
     end;
-
 handle_message(Reason, Shard, {Cntrs, Res}) ->
     case fabric_ring:handle_error(Shard, Cntrs, Res, [all]) of
         {ok, Cntrs1} -> {ok, {Cntrs1, Res}};

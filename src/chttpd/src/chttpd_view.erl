@@ -18,24 +18,42 @@
 
 multi_query_view(Req, Db, DDoc, ViewName, Queries) ->
     Args0 = couch_mrview_http:parse_params(Req, undefined),
-    {ok, #mrst{views=Views}} = couch_mrview_util:ddoc_to_mrst(Db, DDoc),
+    {ok, #mrst{views = Views}} = couch_mrview_util:ddoc_to_mrst(Db, DDoc),
     Args1 = couch_mrview_util:set_view_type(Args0, ViewName, Views),
-    ArgQueries = lists:map(fun({Query}) ->
-        QueryArg = couch_mrview_http:parse_params(Query, undefined,
-            Args1, [decoded]),
-        QueryArg1 = couch_mrview_util:set_view_type(QueryArg, ViewName, Views),
-        fabric_util:validate_args(Db, DDoc, QueryArg1)
-    end, Queries),
+    ArgQueries = lists:map(
+        fun({Query}) ->
+            QueryArg = couch_mrview_http:parse_params(
+                Query,
+                undefined,
+                Args1,
+                [decoded]
+            ),
+            QueryArg1 = couch_mrview_util:set_view_type(QueryArg, ViewName, Views),
+            fabric_util:validate_args(Db, DDoc, QueryArg1)
+        end,
+        Queries
+    ),
     Options = [{user_ctx, Req#httpd.user_ctx}],
-    VAcc0 = #vacc{db=Db, req=Req, prepend="\r\n"},
+    VAcc0 = #vacc{db = Db, req = Req, prepend = "\r\n"},
     FirstChunk = "{\"results\":[",
     {ok, Resp0} = chttpd:start_delayed_json_response(VAcc0#vacc.req, 200, [], FirstChunk),
-    VAcc1 = VAcc0#vacc{resp=Resp0},
-    VAcc2 = lists:foldl(fun(Args, Acc0) ->
-        {ok, Acc1} = fabric:query_view(Db, Options, DDoc, ViewName,
-            fun view_cb/2, Acc0, Args),
-        Acc1
-    end, VAcc1, ArgQueries),
+    VAcc1 = VAcc0#vacc{resp = Resp0},
+    VAcc2 = lists:foldl(
+        fun(Args, Acc0) ->
+            {ok, Acc1} = fabric:query_view(
+                Db,
+                Options,
+                DDoc,
+                ViewName,
+                fun view_cb/2,
+                Acc0,
+                Args
+            ),
+            Acc1
+        end,
+        VAcc1,
+        ArgQueries
+    ),
     {ok, Resp1} = chttpd:send_delayed_chunk(VAcc2#vacc.resp, "\r\n]}"),
     chttpd:end_delayed_json_response(Resp1).
 
@@ -49,12 +67,18 @@ design_doc_view(Req, Db, DDoc, ViewName, Keys) ->
 
 fabric_query_view(Db, Req, DDoc, ViewName, Args) ->
     Max = chttpd:chunked_response_buffer_size(),
-    VAcc = #vacc{db=Db, req=Req, threshold=Max},
+    VAcc = #vacc{db = Db, req = Req, threshold = Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
-    {ok, Resp} = fabric:query_view(Db, Options, DDoc, ViewName,
-            fun view_cb/2, VAcc, Args),
+    {ok, Resp} = fabric:query_view(
+        Db,
+        Options,
+        DDoc,
+        ViewName,
+        fun view_cb/2,
+        VAcc,
+        Args
+    ),
     {ok, Resp#vacc.resp}.
-
 
 view_cb({row, Row} = Msg, Acc) ->
     case lists:keymember(doc, 1, Row) of
@@ -63,42 +87,56 @@ view_cb({row, Row} = Msg, Acc) ->
     end,
     chttpd_stats:incr_rows(),
     couch_mrview_http:view_cb(Msg, Acc);
-
 view_cb(Msg, Acc) ->
     couch_mrview_http:view_cb(Msg, Acc).
 
-
-handle_view_req(#httpd{method='POST',
-    path_parts=[_, _, _, _, ViewName, <<"queries">>]}=Req, Db, DDoc) ->
+handle_view_req(
+    #httpd{
+        method = 'POST',
+        path_parts = [_, _, _, _, ViewName, <<"queries">>]
+    } = Req,
+    Db,
+    DDoc
+) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     case couch_mrview_util:get_view_queries(Props) of
         undefined ->
-            throw({bad_request,
-                <<"POST body must include `queries` parameter.">>});
+            throw({bad_request, <<"POST body must include `queries` parameter.">>});
         Queries ->
             multi_query_view(Req, Db, DDoc, ViewName, Queries)
     end;
-
-handle_view_req(#httpd{path_parts=[_, _, _, _, _, <<"queries">>]}=Req,
-    _Db, _DDoc) ->
+handle_view_req(
+    #httpd{path_parts = [_, _, _, _, _, <<"queries">>]} = Req,
+    _Db,
+    _DDoc
+) ->
     chttpd:send_method_not_allowed(Req, "POST");
-
-handle_view_req(#httpd{method='GET',
-        path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
+handle_view_req(
+    #httpd{
+        method = 'GET',
+        path_parts = [_, _, _, _, ViewName]
+    } = Req,
+    Db,
+    DDoc
+) ->
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
     design_doc_view(Req, Db, DDoc, ViewName, Keys);
-
-handle_view_req(#httpd{method='POST',
-        path_parts=[_, _, _, _, ViewName]}=Req, Db, DDoc) ->
+handle_view_req(
+    #httpd{
+        method = 'POST',
+        path_parts = [_, _, _, _, ViewName]
+    } = Req,
+    Db,
+    DDoc
+) ->
     chttpd:validate_ctype(Req, "application/json"),
     Props = couch_httpd:json_body_obj(Req),
     assert_no_queries_param(couch_mrview_util:get_view_queries(Props)),
     Keys = couch_mrview_util:get_view_keys(Props),
     couch_stats:increment_counter([couchdb, httpd, view_reads]),
     design_doc_post_view(Req, Props, Db, DDoc, ViewName, Keys);
-
 handle_view_req(Req, _Db, _DDoc) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
@@ -115,11 +153,9 @@ assert_no_queries_param(_) ->
         "The `queries` parameter is no longer supported at this endpoint"
     }).
 
-
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
-
 
 check_multi_query_reduce_view_overrides_test_() ->
     {
@@ -137,7 +173,6 @@ check_multi_query_reduce_view_overrides_test_() ->
         }
     }.
 
-
 t_check_include_docs_throw_validation_error() ->
     ?_test(begin
         Req = #httpd{qs = []},
@@ -146,7 +181,6 @@ t_check_include_docs_throw_validation_error() ->
         Throw = {query_parse_error, <<"`include_docs` is invalid for reduce">>},
         ?assertThrow(Throw, multi_query_view(Req, Db, ddoc, <<"v">>, [Query]))
     end).
-
 
 t_check_user_can_override_individual_query_type() ->
     ?_test(begin
@@ -157,7 +191,6 @@ t_check_user_can_override_individual_query_type() ->
         ?assertEqual(1, meck:num_calls(chttpd, start_delayed_json_response, '_'))
     end).
 
-
 setup_all() ->
     Views = [#mrview{reduce_funs = [{<<"v">>, <<"_count">>}]}],
     meck:expect(couch_mrview_util, ddoc_to_mrst, 2, {ok, #mrst{views = Views}}),
@@ -166,10 +199,8 @@ setup_all() ->
     meck:expect(chttpd, send_delayed_chunk, 2, {ok, resp}),
     meck:expect(chttpd, end_delayed_json_response, 1, ok).
 
-
 teardown_all(_) ->
     meck:unload().
-
 
 setup() ->
     meck:reset([
@@ -178,9 +209,7 @@ setup() ->
         fabric
     ]).
 
-
 teardown(_) ->
     ok.
-
 
 -endif.

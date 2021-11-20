@@ -15,7 +15,7 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
-handle_req(#httpd{method='POST'}=Req) ->
+handle_req(#httpd{method = 'POST'} = Req) ->
     ok = couch_httpd:verify_is_server_admin(Req),
     couch_httpd:validate_ctype(Req, "application/json"),
 
@@ -29,15 +29,15 @@ handle_req(#httpd{method='POST'}=Req) ->
 
     Plugin = {Name, Url, Version, Checksums},
     case do_install(Delete, Plugin) of
-    ok ->
-        couch_httpd:send_json(Req, 202, {[{ok, true}]});
-    Error ->
-        couch_log:debug("Plugin Spec: ~p", [PluginSpec]),
-        couch_httpd:send_error(Req, {bad_request, Error})
+        ok ->
+            couch_httpd:send_json(Req, 202, {[{ok, true}]});
+        Error ->
+            couch_log:debug("Plugin Spec: ~p", [PluginSpec]),
+            couch_httpd:send_error(Req, {bad_request, Error})
     end;
 % handles /_plugins/<pluginname>/<file>
 % serves <plugin_dir>/<pluginname>-<pluginversion>-<otpversion>-<couchdbversion>/<file>
-handle_req(#httpd{method='GET',path_parts=[_, Name0 | Path0]}=Req) ->
+handle_req(#httpd{method = 'GET', path_parts = [_, Name0 | Path0]} = Req) ->
     Name = ?b2l(Name0),
     Path = lists:map(fun binary_to_list/1, Path0),
     OTPRelease = erlang:system_info(otp_release),
@@ -51,15 +51,19 @@ handle_req(Req) ->
     couch_httpd:send_method_not_allowed(Req, "POST").
 
 plugin_dir() ->
-  couch_config:get("couchdb", "plugin_dir").
+    couch_config:get("couchdb", "plugin_dir").
 do_install(false, Plugin) ->
     couch_plugins:install(Plugin);
 do_install(true, Plugin) ->
     couch_plugins:uninstall(Plugin).
 
 parse_checksums(Checksums) ->
-    lists:map(fun({K, {V}}) ->
-        {binary_to_list(K), parse_checksums(V)};
-      ({K, V}) ->
-         {binary_to_list(K), binary_to_list(V)}
-    end, Checksums).
+    lists:map(
+        fun
+            ({K, {V}}) ->
+                {binary_to_list(K), parse_checksums(V)};
+            ({K, V}) ->
+                {binary_to_list(K), binary_to_list(V)}
+        end,
+        Checksums
+    ).

@@ -36,35 +36,29 @@
 
 -define(set(L, K, V), lists:keystore(K, 1, L, {K, V})).
 
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
 
 stop() ->
     gen_server:cast(?MODULE, stop).
 
-
 all() ->
     gen_server:call(?MODULE, all).
-
 
 add_task(Props) ->
     put(task_status_update, {{0, 0, 0}, 0}),
     Ts = timestamp(),
     TaskProps = lists:ukeysort(
-        1, [{started_on, Ts}, {updated_on, Ts} | Props]),
+        1, [{started_on, Ts}, {updated_on, Ts} | Props]
+    ),
     put(task_status_props, TaskProps),
     gen_server:call(?MODULE, {add_task, TaskProps}).
-
 
 is_task_added() ->
     is_list(erlang:get(task_status_props)).
 
-
 set_update_frequency(Msecs) ->
     put(task_status_update, {{0, 0, 0}, Msecs * 1000}).
-
 
 update(Props) ->
     MergeProps = lists:ukeysort(1, Props),
@@ -77,7 +71,6 @@ update(Props) ->
             persist(TaskProps)
     end.
 
-
 get(Props) when is_list(Props) ->
     TaskProps = erlang:get(task_status_props),
     [couch_util:get_value(P, TaskProps) || P <- Props];
@@ -85,61 +78,54 @@ get(Prop) ->
     TaskProps = erlang:get(task_status_props),
     couch_util:get_value(Prop, TaskProps).
 
-
 maybe_persist(TaskProps) ->
     {LastUpdateTime, Frequency} = erlang:get(task_status_update),
     case timer:now_diff(Now = os:timestamp(), LastUpdateTime) >= Frequency of
-    true ->
-        put(task_status_update, {Now, Frequency}),
-        persist(TaskProps);
-    false ->
-        ok
+        true ->
+            put(task_status_update, {Now, Frequency}),
+            persist(TaskProps);
+        false ->
+            ok
     end.
-
 
 persist(TaskProps0) ->
     TaskProps = ?set(TaskProps0, updated_on, timestamp(os:timestamp())),
     put(task_status_props, TaskProps),
     gen_server:cast(?MODULE, {update_status, self(), TaskProps}).
 
-
 init([]) ->
     % read configuration settings and register for configuration changes
     ets:new(?MODULE, [ordered_set, protected, named_table]),
     {ok, nil}.
 
-
-terminate(_Reason,_State) ->
+terminate(_Reason, _State) ->
     ok.
-
 
 handle_call({add_task, TaskProps}, {From, _}, Server) ->
     case ets:lookup(?MODULE, From) of
-    [] ->
-        true = ets:insert(?MODULE, {From, TaskProps}),
-        erlang:monitor(process, From),
-        {reply, ok, Server};
-    [_] ->
-        {reply, {add_task_error, already_registered}, Server}
+        [] ->
+            true = ets:insert(?MODULE, {From, TaskProps}),
+            erlang:monitor(process, From),
+            {reply, ok, Server};
+        [_] ->
+            {reply, {add_task_error, already_registered}, Server}
     end;
 handle_call(all, _, Server) ->
     All = [
         [{pid, ?l2b(pid_to_list(Pid))}, process_status(Pid) | TaskProps]
-        ||
-        {Pid, TaskProps} <- ets:tab2list(?MODULE)
+     || {Pid, TaskProps} <- ets:tab2list(?MODULE)
     ],
     {reply, All, Server}.
 
-
 handle_cast({update_status, Pid, NewProps}, Server) ->
     case ets:lookup(?MODULE, Pid) of
-    [{Pid, _CurProps}] ->
-        couch_log:debug("New task status for ~p: ~p", [Pid, NewProps]),
-        true = ets:insert(?MODULE, {Pid, NewProps});
-    _ ->
-        % Task finished/died in the meanwhile and we must have received
-        % a monitor message before this call - ignore.
-        ok
+        [{Pid, _CurProps}] ->
+            couch_log:debug("New task status for ~p: ~p", [Pid, NewProps]),
+            true = ets:insert(?MODULE, {Pid, NewProps});
+        _ ->
+            % Task finished/died in the meanwhile and we must have received
+            % a monitor message before this call - ignore.
+            ok
     end,
     {noreply, Server};
 handle_cast(stop, State) ->
@@ -150,17 +136,14 @@ handle_info({'DOWN', _MonitorRef, _Type, Pid, _Info}, Server) ->
     ets:delete(?MODULE, Pid),
     {noreply, Server}.
 
-
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
 
 timestamp() ->
     timestamp(os:timestamp()).
 
 timestamp({Mega, Secs, _}) ->
     Mega * 1000000 + Secs.
-
 
 process_status(Pid) ->
     case process_info(Pid, status) of

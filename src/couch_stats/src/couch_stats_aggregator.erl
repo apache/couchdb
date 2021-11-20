@@ -30,7 +30,6 @@
     terminate/2
 ]).
 
-
 -include("couch_stats.hrl").
 
 -record(st, {
@@ -57,17 +56,17 @@ init([]) ->
     {ok, Descs} = reload_metrics(),
     CT = erlang:send_after(get_interval(collect), self(), collect),
     RT = erlang:send_after(get_interval(reload), self(), reload),
-    {ok, #st{descriptions=Descs, stats=[], collect_timer=CT, reload_timer=RT}}.
+    {ok, #st{descriptions = Descs, stats = [], collect_timer = CT, reload_timer = RT}}.
 
-handle_call(fetch, _from, #st{stats = Stats}=State) ->
+handle_call(fetch, _from, #st{stats = Stats} = State) ->
     {reply, {ok, Stats}, State};
 handle_call(flush, _From, State) ->
     {reply, ok, collect(State)};
-handle_call(reload, _from, #st{reload_timer=OldRT} = State) ->
+handle_call(reload, _from, #st{reload_timer = OldRT} = State) ->
     timer:cancel(OldRT),
     {ok, Descriptions} = reload_metrics(),
     RT = update_timer(reload),
-    {reply, ok, State#st{descriptions=Descriptions, reload_timer=RT}};
+    {reply, ok, State#st{descriptions = Descriptions, reload_timer = RT}};
 handle_call(Msg, _From, State) ->
     {stop, {unknown_call, Msg}, error, State}.
 
@@ -78,7 +77,7 @@ handle_info(collect, State) ->
     {noreply, collect(State)};
 handle_info(reload, State) ->
     {ok, Descriptions} = reload_metrics(),
-    {noreply, State#st{descriptions=Descriptions}};
+    {noreply, State#st{descriptions = Descriptions}};
 handle_info(Msg, State) ->
     {stop, {unknown_info, Msg}, State}.
 
@@ -101,7 +100,10 @@ reload_metrics() ->
     ToDelete = sets:subtract(ExistingSet, CurrentSet),
     ToCreate = sets:subtract(CurrentSet, ExistingSet),
     sets:fold(
-        fun({Name, _}, _) -> couch_stats:delete(Name), nil end,
+        fun({Name, _}, _) ->
+            couch_stats:delete(Name),
+            nil
+        end,
         nil,
         ToDelete
     ),
@@ -141,16 +143,16 @@ load_metrics_for_application(AppName) ->
             end
     end.
 
-collect(#st{collect_timer=OldCT} = State) ->
+collect(#st{collect_timer = OldCT} = State) ->
     timer:cancel(OldCT),
     Stats = lists:map(
         fun({Name, Props}) ->
-            {Name, [{value, couch_stats:sample(Name)}|Props]}
+            {Name, [{value, couch_stats:sample(Name)} | Props]}
         end,
         State#st.descriptions
     ),
     CT = update_timer(collect),
-    State#st{stats=Stats, collect_timer=CT}.
+    State#st{stats = Stats, collect_timer = CT}.
 
 update_timer(Type) ->
     Interval = get_interval(Type),

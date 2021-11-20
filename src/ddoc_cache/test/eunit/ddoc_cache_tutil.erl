@@ -12,7 +12,6 @@
 
 -module(ddoc_cache_tutil).
 
-
 -export([
     start_couch/0,
     start_couch/1,
@@ -24,14 +23,11 @@
     with/1
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 
-
 start_couch() ->
     start_couch([{write_ddocs, true}]).
-
 
 start_couch(Options) ->
     WriteDDocs = couch_util:get_value(write_ddocs, Options, true),
@@ -39,20 +35,18 @@ start_couch(Options) ->
     Ctx = test_util:start_couch(?CONFIG_CHAIN, [chttpd, ddoc_cache]),
     TmpDb = ?tempdb(),
     ok = fabric:create_db(TmpDb, [{q, "1"}, {n, "1"}]),
-    if not WriteDDocs -> ok; true ->
-        {ok, _} = fabric:update_docs(TmpDb, ddocs(), [?ADMIN_CTX])
+    if
+        not WriteDDocs -> ok;
+        true -> {ok, _} = fabric:update_docs(TmpDb, ddocs(), [?ADMIN_CTX])
     end,
     {TmpDb, Ctx}.
-
 
 stop_couch({_TmpDb, Ctx}) ->
     test_util:stop_couch(Ctx).
 
-
 clear() ->
     application:stop(ddoc_cache),
     application:start(ddoc_cache).
-
 
 get_rev(DbName, DDocId) ->
     {_, Ref} = erlang:spawn_monitor(fun() ->
@@ -64,48 +58,52 @@ get_rev(DbName, DDocId) ->
         {'DOWN', Ref, _, _, Rev} -> Rev
     end.
 
-
 ddocs() ->
     FooBar = #doc{
         id = <<"_design/foobar">>,
-        body = {[
-            {<<"foo">>, <<"bar">>}
-        ]}
+        body =
+            {[
+                {<<"foo">>, <<"bar">>}
+            ]}
     },
     VDU = #doc{
         id = <<"_design/vdu">>,
-        body = {[
-            {<<"validate_doc_update">>, <<"function(doc) {return;}">>}
-        ]}
+        body =
+            {[
+                {<<"validate_doc_update">>, <<"function(doc) {return;}">>}
+            ]}
     },
     Custom = #doc{
         id = <<"_design/custom">>,
-        body = {[
-            {<<"status">>, <<"ok">>},
-            {<<"custom">>, <<"hotrod">>}
-        ]}
+        body =
+            {[
+                {<<"status">>, <<"ok">>},
+                {<<"custom">>, <<"hotrod">>}
+            ]}
     },
     [FooBar, VDU, Custom].
-
 
 purge_modules() ->
     case application:get_key(ddoc_cache, modules) of
         {ok, Mods} ->
-            lists:foreach(fun(Mod) ->
-                case code:which(Mod) of
-                    cover_compiled ->
-                        ok;
-                    _ ->
-                        code:delete(Mod),
-                        code:purge(Mod)
-                end
-            end, Mods);
+            lists:foreach(
+                fun(Mod) ->
+                    case code:which(Mod) of
+                        cover_compiled ->
+                            ok;
+                        _ ->
+                            code:delete(Mod),
+                            code:purge(Mod)
+                    end
+                end,
+                Mods
+            );
         undefined ->
             ok
     end.
 
 %% eunit implementation of {with, Tests} doesn't detect test name correctly
 with(Tests) ->
-	fun(ArgsTuple) ->
-	   [{Name, ?_test(Fun(ArgsTuple))} || {Name, Fun} <- Tests]
-	end.
+    fun(ArgsTuple) ->
+        [{Name, ?_test(Fun(ArgsTuple))} || {Name, Fun} <- Tests]
+    end.

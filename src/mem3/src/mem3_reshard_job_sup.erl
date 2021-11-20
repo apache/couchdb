@@ -22,34 +22,25 @@
     init/1
 ]).
 
-
 -include("mem3_reshard.hrl").
-
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-
 start_child(Job) ->
     supervisor:start_child(?MODULE, [Job]).
 
-
 terminate_child(Pid) ->
     supervisor:terminate_child(?MODULE, Pid).
-
 
 count_children() ->
     Props = supervisor:count_children(?MODULE),
     proplists:get_value(active, Props).
 
-
 init(_Args) ->
     Children = [
-        {mem3_reshard_job,
-            {mem3_reshard_job, start_link, []},
-            temporary,
-            60000,
-            worker,
-            [mem3_reshard_job]}
+        {mem3_reshard_job, {mem3_reshard_job, start_link, []}, temporary, 60000, worker, [
+            mem3_reshard_job
+        ]}
     ],
     {ok, {{simple_one_for_one, 10, 3}, Children}}.

@@ -12,31 +12,25 @@
 
 -module(ddoc_cache_basic_test).
 
-
 -export([
     recover/1
 ]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("ddoc_cache_test.hrl").
 
-
 recover(DbName) ->
     {ok, {DbName, totes_custom}}.
-
 
 start_couch() ->
     Ctx = ddoc_cache_tutil:start_couch(),
     meck:new(ddoc_cache_ev, [passthrough]),
     Ctx.
 
-
 stop_couch(Ctx) ->
     meck:unload(),
     ddoc_cache_tutil:stop_couch(Ctx).
-
 
 check_basic_test_() ->
     {
@@ -54,7 +48,6 @@ check_basic_test_() ->
         ])
     }.
 
-
 check_no_vdu_test_() ->
     {
         setup,
@@ -65,7 +58,6 @@ check_no_vdu_test_() ->
             {"cache_no_vdu_empty_ddoc", fun cache_no_vdu_empty_ddoc/1}
         ])
     }.
-
 
 cache_ddoc({DbName, _}) ->
     ddoc_cache_tutil:clear(),
@@ -79,7 +71,6 @@ cache_ddoc({DbName, _}) ->
     Resp2 = ddoc_cache:open_doc(DbName, ?FOOBAR),
     ?assertEqual(Resp1, Resp2),
     ?assertEqual(2, ets:info(?CACHE, size)).
-
 
 cache_ddoc_rev({DbName, _}) ->
     ddoc_cache_tutil:clear(),
@@ -100,7 +91,6 @@ cache_ddoc_rev({DbName, _}) ->
     ?assertMatch({ok, #doc{id = ?FOOBAR}}, Resp3),
     ?assertEqual(2, ets:info(?CACHE, size)).
 
-
 cache_vdu({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     ?assertEqual(0, ets:info(?CACHE, size)),
@@ -111,7 +101,6 @@ cache_vdu({DbName, _}) ->
     ?assertEqual(Resp1, Resp2),
     ?assertEqual(1, ets:info(?CACHE, size)).
 
-
 cache_custom({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     ?assertEqual(0, ets:info(?CACHE, size)),
@@ -121,7 +110,6 @@ cache_custom({DbName, _}) ->
     Resp2 = ddoc_cache:open_custom(DbName, ?MODULE),
     ?assertEqual(Resp1, Resp2),
     ?assertEqual(1, ets:info(?CACHE, size)).
-
 
 cache_ddoc_refresher_unchanged({DbName, _}) ->
     ddoc_cache_tutil:clear(),
@@ -136,7 +124,6 @@ cache_ddoc_refresher_unchanged({DbName, _}) ->
     Tab2 = lists:sort(ets:tab2list(?CACHE)),
     ?assertEqual(Tab2, Tab1).
 
-
 dont_cache_not_found({DbName, _}) ->
     DDocId = <<"_design/not_found">>,
     ddoc_cache_tutil:clear(),
@@ -145,7 +132,6 @@ dont_cache_not_found({DbName, _}) ->
     ?assertEqual(0, ets:info(?CACHE, size)),
     ?assertEqual(0, ets:info(?LRU, size)).
 
-
 deprecated_api_works({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     {ok, _} = ddoc_cache:open(DbName, ?FOOBAR),
@@ -153,14 +139,12 @@ deprecated_api_works({DbName, _}) ->
     {ok, _} = ddoc_cache:open(DbName, ?MODULE),
     {ok, _} = ddoc_cache:open(DbName, validation_funs).
 
-
 cache_no_vdu_no_ddoc({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     Resp = ddoc_cache:open_validation_funs(DbName),
     ?assertEqual({ok, []}, Resp),
     ?assertEqual(1, ets:info(?CACHE, size)),
     ?assertEqual(1, ets:info(?LRU, size)).
-
 
 cache_no_vdu_empty_ddoc({DbName, _}) ->
     ddoc_cache_tutil:clear(),

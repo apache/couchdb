@@ -14,9 +14,7 @@
 % https://github.com/basho/lager which is available under the
 % above marked ASFL v2 license.
 
-
 -module(couch_log_error_logger_h).
-
 
 -behaviour(gen_event).
 
@@ -29,29 +27,22 @@
     code_change/3
 ]).
 
-
 init(_) ->
     {ok, undefined}.
-
 
 terminate(_Reason, _St) ->
     ok.
 
-
 handle_call(_, St) ->
     {ok, ignored, St}.
-
 
 handle_event(Event, St) ->
     Entry = couch_log_formatter:format(Event),
     ok = couch_log_server:log(Entry),
     {ok, St}.
 
-
 handle_info(_, St) ->
     {ok, St}.
 
-
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-

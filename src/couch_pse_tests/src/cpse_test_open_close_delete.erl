@@ -14,13 +14,10 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
-
 -include_lib("eunit/include/eunit.hrl").
-
 
 setup_each() ->
     cpse_util:dbname().
-
 
 teardown_each(DbName) ->
     case couch_server:exists(DbName) of
@@ -28,13 +25,11 @@ teardown_each(DbName) ->
         false -> ok
     end.
 
-
 cpse_open_non_existent(DbName) ->
     % Try twice to check that a failed open doesn't create
     % the database for some reason.
     ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)),
     ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)).
-
 
 cpse_open_create(DbName) ->
     ?assertEqual(false, couch_server:exists(DbName)),
@@ -42,13 +37,11 @@ cpse_open_create(DbName) ->
     ?assertMatch({ok, _}, cpse_util:create_db(DbName)),
     ?assertEqual(true, couch_server:exists(DbName)).
 
-
 cpse_open_when_exists(DbName) ->
     ?assertEqual(false, couch_server:exists(DbName)),
     ?assertEqual({not_found, no_db_file}, cpse_util:open_db(DbName)),
     ?assertMatch({ok, _}, cpse_util:create_db(DbName)),
     ?assertEqual(file_exists, cpse_util:create_db(DbName)).
-
 
 cpse_terminate(DbName) ->
     ?assertEqual(false, couch_server:exists(DbName)),
@@ -56,13 +49,14 @@ cpse_terminate(DbName) ->
     ?assertEqual(ok, cycle_db(DbName, create_db)),
     ?assertEqual(true, couch_server:exists(DbName)).
 
-
 cpse_rapid_recycle(DbName) ->
     ?assertEqual(ok, cycle_db(DbName, create_db)),
-    lists:foreach(fun(_) ->
-        ?assertEqual(ok, cycle_db(DbName, open_db))
-    end, lists:seq(1, 100)).
-
+    lists:foreach(
+        fun(_) ->
+            ?assertEqual(ok, cycle_db(DbName, open_db))
+        end,
+        lists:seq(1, 100)
+    ).
 
 cpse_delete(DbName) ->
     ?assertEqual(false, couch_server:exists(DbName)),
@@ -70,7 +64,6 @@ cpse_delete(DbName) ->
     ?assertEqual(true, couch_server:exists(DbName)),
     ?assertEqual(ok, couch_server:delete(DbName, [])),
     ?assertEqual(false, couch_server:exists(DbName)).
-
 
 cycle_db(DbName, Type) ->
     {ok, Db} = cpse_util:Type(DbName),

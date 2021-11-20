@@ -13,26 +13,21 @@
 -module(couch_log_writer_ets).
 -behaviour(couch_log_writer).
 
-
 -export([
     init/0,
     terminate/2,
     write/2
 ]).
 
-
 -include("couch_log.hrl").
-
 
 init() ->
     ets:new(?COUCH_LOG_TEST_TABLE, [named_table, public, ordered_set]),
     {ok, 0}.
 
-
 terminate(_, _St) ->
     ets:delete(?COUCH_LOG_TEST_TABLE),
     ok.
-
 
 write(Entry0, St) ->
     Entry = Entry0#log_entry{

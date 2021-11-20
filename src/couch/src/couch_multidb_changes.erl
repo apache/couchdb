@@ -15,27 +15,27 @@
 -behaviour(gen_server).
 
 -export([
-   start_link/4
+    start_link/4
 ]).
 
 -export([
-   init/1,
-   terminate/2,
-   handle_call/3,
-   handle_info/2,
-   handle_cast/2,
-   code_change/3
+    init/1,
+    terminate/2,
+    handle_call/3,
+    handle_info/2,
+    handle_cast/2,
+    code_change/3
 ]).
 
 -export([
-   changes_reader/3,
-   changes_reader_cb/3
+    changes_reader/3,
+    changes_reader_cb/3
 ]).
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
--define(CTX, {user_ctx, #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]}}).
+-define(CTX, {user_ctx, #user_ctx{roles = [<<"_admin">>, <<"_replicator">>]}}).
 
 -define(AVG_DELAY_MSEC, 10).
 -define(MAX_DELAY_MSEC, 120000).
@@ -68,9 +68,7 @@
 -callback db_change(DbName :: binary(), Change :: term(), Context :: term()) ->
     Context :: term().
 
-
 % External API
-
 
 % Opts list can contain:
 %  - `skip_ddocs` : Skip design docs
@@ -78,9 +76,9 @@
 -spec start_link(binary(), module(), term(), list()) ->
     {ok, pid()} | ignore | {error, term()}.
 start_link(DbSuffix, Module, Context, Opts) when
-    is_binary(DbSuffix), is_atom(Module), is_list(Opts) ->
+    is_binary(DbSuffix), is_atom(Module), is_list(Opts)
+->
     gen_server:start_link(?MODULE, [DbSuffix, Module, Context, Opts], []).
-
 
 % gen_server callbacks
 
@@ -98,21 +96,21 @@ init([DbSuffix, Module, Context, Opts]) ->
         skip_ddocs = proplists:is_defined(skip_ddocs, Opts)
     }}.
 
-
 terminate(_Reason, _State) ->
     ok.
 
-
-handle_call({change, DbName, Change}, _From,
-    #state{skip_ddocs=SkipDDocs, mod=Mod, ctx=Ctx} = State) ->
+handle_call(
+    {change, DbName, Change},
+    _From,
+    #state{skip_ddocs = SkipDDocs, mod = Mod, ctx = Ctx} = State
+) ->
     case {SkipDDocs, is_design_doc(Change)} of
         {true, true} ->
             {reply, ok, State};
         {_, _} ->
-            {reply, ok, State#state{ctx=Mod:db_change(DbName, Change, Ctx)}}
+            {reply, ok, State#state{ctx = Mod:db_change(DbName, Change, Ctx)}}
     end;
-
-handle_call({checkpoint, DbName, EndSeq}, _From, #state{tid=Ets} = State) ->
+handle_call({checkpoint, DbName, EndSeq}, _From, #state{tid = Ets} = State) ->
     case ets:lookup(Ets, DbName) of
         [] ->
             true = ets:insert(Ets, {DbName, EndSeq, false});
@@ -121,10 +119,8 @@ handle_call({checkpoint, DbName, EndSeq}, _From, #state{tid=Ets} = State) ->
     end,
     {reply, ok, State}.
 
-
 handle_cast({resume_scan, DbName}, State) ->
     {noreply, resume_scan(DbName, State)}.
-
 
 handle_info({'$couch_event', DbName, Event}, #state{suffix = Suf} = State) ->
     case Suf =:= couch_db:dbname_suffix(DbName) of
@@ -133,23 +129,22 @@ handle_info({'$couch_event', DbName, Event}, #state{suffix = Suf} = State) ->
         _ ->
             {noreply, State}
     end;
-
 handle_info({'DOWN', Ref, _, _, Info}, #state{event_server = Ref} = State) ->
     {stop, {couch_event_server_died, Info}, State};
-
 handle_info({'EXIT', From, normal}, #state{scanner = From} = State) ->
-    {noreply, State#state{scanner=nil}};
-
+    {noreply, State#state{scanner = nil}};
 handle_info({'EXIT', From, Reason}, #state{scanner = From} = State) ->
     {stop, {scanner_died, Reason}, State};
-
 handle_info({'EXIT', From, Reason}, #state{pids = Pids} = State) ->
     couch_log:debug("~p change feed exited ~p", [State#state.suffix, From]),
     case lists:keytake(From, 2, Pids) of
         {value, {DbName, From}, NewPids} ->
-            if Reason == normal -> ok; true ->
-                Fmt = "~s : Known change feed ~w died :: ~w",
-                couch_log:error(Fmt, [?MODULE, From, Reason])
+            if
+                Reason == normal ->
+                    ok;
+                true ->
+                    Fmt = "~s : Known change feed ~w died :: ~w",
+                    couch_log:error(Fmt, [?MODULE, From, Reason])
             end,
             NewState = State#state{pids = NewPids},
             case ets:lookup(State#state.tid, DbName) of
@@ -165,14 +160,11 @@ handle_info({'EXIT', From, Reason}, #state{pids = Pids} = State) ->
             couch_log:error(Fmt, [?MODULE, State#state.suffix, From, Reason]),
             {stop, {unexpected_exit, From, Reason}, State}
     end;
-
 handle_info(_Msg, State) ->
     {noreply, State}.
 
-
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
 
 % Private functions
 
@@ -181,7 +173,6 @@ register_with_event_server(Server) ->
     Ref = erlang:monitor(process, couch_event_server),
     couch_event:register_all(Server),
     Ref.
-
 
 -spec db_callback(created | deleted | updated, binary(), #state{}) -> #state{}.
 db_callback(created, DbName, #state{mod = Mod, ctx = Ctx} = State) ->
@@ -194,9 +185,8 @@ db_callback(updated, DbName, State) ->
 db_callback(_Other, _DbName, State) ->
     State.
 
-
 -spec resume_scan(binary(), #state{}) -> #state{}.
-resume_scan(DbName, #state{pids=Pids, tid=Ets} = State) ->
+resume_scan(DbName, #state{pids = Pids, tid = Ets} = State) ->
     case {lists:keyfind(DbName, 1, Pids), ets:lookup(Ets, DbName)} of
         {{DbName, _}, []} ->
             % Found existing change feed, but not entry in ETS
@@ -217,19 +207,17 @@ resume_scan(DbName, #state{pids=Pids, tid=Ets} = State) ->
             Mod = State#state.mod,
             Ctx = Mod:db_found(DbName, State#state.ctx),
             Pid = start_changes_reader(DbName, 0),
-            State#state{ctx=Ctx, pids=[{DbName, Pid} | Pids]};
+            State#state{ctx = Ctx, pids = [{DbName, Pid} | Pids]};
         {false, [{DbName, EndSeq, _}]} ->
             % No existing change feed running. Found existing checkpoint.
             % Start a new change reader from last checkpoint.
             true = ets:insert(Ets, {DbName, EndSeq, false}),
             Pid = start_changes_reader(DbName, EndSeq),
-            State#state{pids=[{DbName, Pid} | Pids]}
-     end.
-
+            State#state{pids = [{DbName, Pid} | Pids]}
+    end.
 
 start_changes_reader(DbName, Since) ->
     spawn_link(?MODULE, changes_reader, [self(), DbName, Since]).
-
 
 changes_reader(Server, DbName, Since) ->
     {ok, Db} = couch_db:open_int(DbName, [?CTX, sys_db]),
@@ -242,7 +230,6 @@ changes_reader(Server, DbName, Since) ->
     ChFun = couch_changes:handle_db_changes(ChangesArgs, {json_req, null}, Db),
     ChFun({fun ?MODULE:changes_reader_cb/3, {Server, DbName}}).
 
-
 changes_reader_cb({change, Change, _}, _, {Server, DbName}) ->
     ok = gen_server:call(Server, {change, DbName, Change}, infinity),
     {Server, DbName};
@@ -252,33 +239,34 @@ changes_reader_cb({stop, EndSeq}, _, {Server, DbName}) ->
 changes_reader_cb(_, _, Acc) ->
     Acc.
 
-
 scan_all_dbs(Server, DbSuffix) when is_pid(Server) ->
     ok = scan_local_db(Server, DbSuffix),
     {ok, Db} = mem3_util:ensure_exists(
-        config:get("mem3", "shards_db", "_dbs")),
+        config:get("mem3", "shards_db", "_dbs")
+    ),
     ChangesFun = couch_changes:handle_db_changes(#changes_args{}, nil, Db),
     ChangesFun({fun scan_changes_cb/3, {Server, DbSuffix, 1}}),
     couch_db:close(Db).
 
-
 scan_changes_cb({change, {Change}, _}, _, {_Server, DbSuffix, _Count} = Acc) ->
     DbName = couch_util:get_value(<<"id">>, Change),
-    case DbName of <<"_design/", _/binary>> -> Acc; _Else ->
-        NameMatch = DbSuffix =:= couch_db:dbname_suffix(DbName),
-        case {NameMatch, couch_replicator_utils:is_deleted(Change)} of
-            {false, _} ->
-                Acc;
-            {true, true} ->
-                Acc;
-            {true, false} ->
-                Shards = local_shards(DbName),
-                lists:foldl(fun notify_fold/2, Acc, Shards)
-        end
+    case DbName of
+        <<"_design/", _/binary>> ->
+            Acc;
+        _Else ->
+            NameMatch = DbSuffix =:= couch_db:dbname_suffix(DbName),
+            case {NameMatch, couch_replicator_utils:is_deleted(Change)} of
+                {false, _} ->
+                    Acc;
+                {true, true} ->
+                    Acc;
+                {true, false} ->
+                    Shards = local_shards(DbName),
+                    lists:foldl(fun notify_fold/2, Acc, Shards)
+            end
     end;
 scan_changes_cb(_, _, Acc) ->
     Acc.
-
 
 local_shards(DbName) ->
     try
@@ -288,7 +276,6 @@ local_shards(DbName) ->
             []
     end.
 
-
 notify_fold(DbName, {Server, DbSuffix, Count}) ->
     Jitter = jitter(Count),
     spawn_link(fun() ->
@@ -297,14 +284,12 @@ notify_fold(DbName, {Server, DbSuffix, Count}) ->
     end),
     {Server, DbSuffix, Count + 1}.
 
-
 % Jitter is proportional to the number of shards found so far. This is done to
 % avoid a stampede and notifying the callback function with potentially a large
 % number of shards back to back during startup.
 jitter(N) ->
     Range = min(2 * N * ?AVG_DELAY_MSEC, ?MAX_DELAY_MSEC),
     couch_rand:uniform(Range).
-
 
 scan_local_db(Server, DbSuffix) when is_pid(Server) ->
     case couch_db:open_int(DbSuffix, [?CTX, sys_db, nologifmissing]) of
@@ -315,7 +300,6 @@ scan_local_db(Server, DbSuffix) when is_pid(Server) ->
             ok
     end.
 
-
 is_design_doc({Change}) ->
     case lists:keyfind(<<"id">>, 1, Change) of
         false ->
@@ -324,12 +308,10 @@ is_design_doc({Change}) ->
             is_design_doc_id(Id)
     end.
 
-
 is_design_doc_id(<<?DESIGN_DOC_PREFIX, _/binary>>) ->
     true;
 is_design_doc_id(_) ->
     false.
-
 
 -ifdef(TEST).
 
@@ -380,7 +362,6 @@ couch_multidb_changes_test_() ->
         }
     }.
 
-
 setup_all() ->
     mock_logs(),
     mock_callback_mod(),
@@ -389,24 +370,30 @@ setup_all() ->
     meck:expect(mem3_util, ensure_exists, 1, {ok, dbs}),
     ChangesFun = meck:val(fun(_) -> ok end),
     meck:expect(couch_changes, handle_db_changes, 3, ChangesFun),
-    meck:expect(couch_db, open_int,
-        fun(?DBNAME, [?CTX, sys_db]) -> {ok, db};
+    meck:expect(
+        couch_db,
+        open_int,
+        fun
+            (?DBNAME, [?CTX, sys_db]) -> {ok, db};
             (_, _) -> {not_found, no_db_file}
-        end),
+        end
+    ),
     meck:expect(couch_db, close, 1, ok),
     mock_changes_reader(),
     % create process to stand in for couch_event_server
     % mocking erlang:monitor doesn't work, so give it real process to monitor
-    EvtPid = spawn_link(fun() -> receive looper -> ok end end),
+    EvtPid = spawn_link(fun() ->
+        receive
+            looper -> ok
+        end
+    end),
     true = register(couch_event_server, EvtPid),
     EvtPid.
-
 
 teardown_all(EvtPid) ->
     unlink(EvtPid),
     exit(EvtPid, kill),
     meck:unload().
-
 
 setup() ->
     meck:reset([
@@ -417,10 +404,8 @@ setup() ->
         couch_log
     ]).
 
-
 teardown(_) ->
     ok.
-
 
 t_handle_call_change() ->
     ?_test(begin
@@ -430,7 +415,6 @@ t_handle_call_change() ->
         ?assert(meck:validate(?MOD)),
         ?assert(meck:called(?MOD, db_change, [?DBNAME, Change, zig]))
     end).
-
 
 t_handle_call_change_filter_design_docs() ->
     ?_test(begin
@@ -442,7 +426,6 @@ t_handle_call_change_filter_design_docs() ->
         ?assertNot(meck:called(?MOD, db_change, [?DBNAME, Change, zig]))
     end).
 
-
 t_handle_call_checkpoint_new() ->
     ?_test(begin
         Tid = mock_ets(),
@@ -451,7 +434,6 @@ t_handle_call_checkpoint_new() ->
         ?assertEqual([{?DBNAME, 1, false}], ets:tab2list(Tid)),
         ets:delete(Tid)
     end).
-
 
 t_handle_call_checkpoint_existing() ->
     ?_test(begin
@@ -463,7 +445,6 @@ t_handle_call_checkpoint_existing() ->
         ets:delete(Tid)
     end).
 
-
 t_handle_info_created() ->
     ?_test(begin
         Tid = mock_ets(),
@@ -473,18 +454,16 @@ t_handle_info_created() ->
         ?assert(meck:called(?MOD, db_created, [?DBNAME, zig]))
     end).
 
-
 t_handle_info_deleted() ->
-     ?_test(begin
+    ?_test(begin
         State = mock_state(),
         handle_info_check({'$couch_event', ?DBNAME, deleted}, State),
         ?assert(meck:validate(?MOD)),
         ?assert(meck:called(?MOD, db_deleted, [?DBNAME, zig]))
     end).
 
-
 t_handle_info_updated() ->
-     ?_test(begin
+    ?_test(begin
         Tid = mock_ets(),
         State = mock_state(Tid),
         handle_info_check({'$couch_event', ?DBNAME, updated}, State),
@@ -492,9 +471,8 @@ t_handle_info_updated() ->
         ?assert(meck:called(?MOD, db_found, [?DBNAME, zig]))
     end).
 
-
 t_handle_info_other_event() ->
-     ?_test(begin
+    ?_test(begin
         State = mock_state(),
         handle_info_check({'$couch_event', ?DBNAME, somethingelse}, State),
         ?assertNot(meck:called(?MOD, db_created, [?DBNAME, somethingelse])),
@@ -502,14 +480,12 @@ t_handle_info_other_event() ->
         ?assertNot(meck:called(?MOD, db_found, [?DBNAME, somethingelse]))
     end).
 
-
 t_handle_info_created_other_db() ->
-     ?_test(begin
+    ?_test(begin
         State = mock_state(),
         handle_info_check({'$couch_event', <<"otherdb">>, created}, State),
         ?assertNot(meck:called(?MOD, db_created, [?DBNAME, zig]))
     end).
-
 
 t_handle_info_scanner_exit_normal() ->
     ?_test(begin
@@ -519,13 +495,11 @@ t_handle_info_scanner_exit_normal() ->
         ?assertEqual(nil, RState#state.scanner)
     end).
 
-
 t_handle_info_scanner_crashed() ->
     ?_test(begin
         Res = handle_info({'EXIT', spid, oops}, mock_state()),
         ?assertMatch({stop, {scanner_died, oops}, _State}, Res)
     end).
-
 
 t_handle_info_event_server_exited() ->
     ?_test(begin
@@ -533,17 +507,15 @@ t_handle_info_event_server_exited() ->
         ?assertMatch({stop, {couch_event_server_died, reason}, _}, Res)
     end).
 
-
 t_handle_info_unknown_pid_exited() ->
     ?_test(begin
         State0 = mock_state(),
-        Res0 =  handle_info({'EXIT', somepid, normal}, State0),
+        Res0 = handle_info({'EXIT', somepid, normal}, State0),
         ?assertMatch({noreply, State0}, Res0),
         State1 = mock_state(),
         Res1 = handle_info({'EXIT', somepid, oops}, State1),
         ?assertMatch({stop, {unexpected_exit, somepid, oops}, State1}, Res1)
     end).
-
 
 t_handle_info_change_feed_exited() ->
     ?_test(begin
@@ -563,7 +535,6 @@ t_handle_info_change_feed_exited() ->
         ets:delete(Tid1)
     end).
 
-
 t_handle_info_change_feed_exited_and_need_rescan() ->
     ?_test(begin
         Tid = mock_ets(),
@@ -582,7 +553,6 @@ t_handle_info_change_feed_exited_and_need_rescan() ->
         ets:delete(Tid)
     end).
 
-
 t_spawn_changes_reader() ->
     ?_test(begin
         Pid = start_changes_reader(?DBNAME, 3),
@@ -592,15 +562,19 @@ t_spawn_changes_reader() ->
         ?assert(meck:validate(couch_db)),
         ?assert(meck:validate(couch_changes)),
         ?assert(meck:called(couch_db, open_int, [?DBNAME, [?CTX, sys_db]])),
-        ?assert(meck:called(couch_changes, handle_db_changes, [
-            #changes_args{
-                include_docs = true,
-                since = 3,
-                feed = "normal",
-                timeout = infinity
-            }, {json_req, null}, db]))
+        ?assert(
+            meck:called(couch_changes, handle_db_changes, [
+                #changes_args{
+                    include_docs = true,
+                    since = 3,
+                    feed = "normal",
+                    timeout = infinity
+                },
+                {json_req, null},
+                db
+            ])
+        )
     end).
-
 
 t_changes_reader_cb_change() ->
     ?_test(begin
@@ -612,7 +586,6 @@ t_changes_reader_cb_change() ->
         unlink(Pid),
         exit(Pid, kill)
     end).
-
 
 t_changes_reader_cb_stop() ->
     ?_test(begin
@@ -626,10 +599,8 @@ t_changes_reader_cb_stop() ->
         exit(Pid, kill)
     end).
 
-
 t_changes_reader_cb_other() ->
     ?_assertEqual(acc, changes_reader_cb(other, chtype, acc)).
-
 
 t_handle_call_resume_scan_no_chfeed_no_ets_entry() ->
     ?_test(begin
@@ -644,16 +615,20 @@ t_handle_call_resume_scan_no_chfeed_no_ets_entry() ->
         [{?DBNAME, Pid}] = RState#state.pids,
         ChArgs = kill_mock_changes_reader_and_get_its_args(Pid),
         ?assertEqual({self(), ?DBNAME}, ChArgs),
-        ?assert(meck:called(couch_changes, handle_db_changes, [
-              #changes_args{
-                  include_docs = true,
-                  since = 0,
-                  feed = "normal",
-                  timeout = infinity
-              }, {json_req, null}, db])),
+        ?assert(
+            meck:called(couch_changes, handle_db_changes, [
+                #changes_args{
+                    include_docs = true,
+                    since = 0,
+                    feed = "normal",
+                    timeout = infinity
+                },
+                {json_req, null},
+                db
+            ])
+        ),
         ets:delete(Tid)
     end).
-
 
 t_handle_call_resume_scan_chfeed_no_ets_entry() ->
     ?_test(begin
@@ -666,7 +641,6 @@ t_handle_call_resume_scan_chfeed_no_ets_entry() ->
         ets:delete(Tid),
         kill_mock_changes_reader_and_get_its_args(Pid)
     end).
-
 
 t_handle_call_resume_scan_chfeed_ets_entry() ->
     ?_test(begin
@@ -681,7 +655,6 @@ t_handle_call_resume_scan_chfeed_ets_entry() ->
         kill_mock_changes_reader_and_get_its_args(Pid)
     end).
 
-
 t_handle_call_resume_scan_no_chfeed_ets_entry() ->
     ?_test(begin
         Tid = mock_ets(),
@@ -694,49 +667,57 @@ t_handle_call_resume_scan_no_chfeed_ets_entry() ->
         [{?DBNAME, Pid}] = RState#state.pids,
         ChArgs = kill_mock_changes_reader_and_get_its_args(Pid),
         ?assertEqual({self(), ?DBNAME}, ChArgs),
-        ?assert(meck:called(couch_changes, handle_db_changes, [
-            #changes_args{
-                include_docs = true,
-                since = 1,
-                feed = "normal",
-                timeout = infinity
-            }, {json_req, null}, db])),
+        ?assert(
+            meck:called(couch_changes, handle_db_changes, [
+                #changes_args{
+                    include_docs = true,
+                    since = 1,
+                    feed = "normal",
+                    timeout = infinity
+                },
+                {json_req, null},
+                db
+            ])
+        ),
         ets:delete(Tid)
     end).
-
 
 t_start_link() ->
     ?_test(begin
         {ok, Pid} = start_link(?SUFFIX, ?MOD, nil, []),
         ?assert(is_pid(Pid)),
-        ?assertMatch(#state{
-            mod = ?MOD,
-            suffix = ?SUFFIX,
-            ctx = nil,
-            pids = [],
-            skip_ddocs = false
-        },  sys:get_state(Pid)),
+        ?assertMatch(
+            #state{
+                mod = ?MOD,
+                suffix = ?SUFFIX,
+                ctx = nil,
+                pids = [],
+                skip_ddocs = false
+            },
+            sys:get_state(Pid)
+        ),
         unlink(Pid),
         exit(Pid, kill),
         ?assert(meck:called(couch_event, register_all, [Pid]))
     end).
 
-
 t_start_link_no_ddocs() ->
     ?_test(begin
         {ok, Pid} = start_link(?SUFFIX, ?MOD, nil, [skip_ddocs]),
         ?assert(is_pid(Pid)),
-        ?assertMatch(#state{
-            mod = ?MOD,
-            suffix = ?SUFFIX,
-            ctx = nil,
-            pids = [],
-            skip_ddocs = true
-        },  sys:get_state(Pid)),
+        ?assertMatch(
+            #state{
+                mod = ?MOD,
+                suffix = ?SUFFIX,
+                ctx = nil,
+                pids = [],
+                skip_ddocs = true
+            },
+            sys:get_state(Pid)
+        ),
         unlink(Pid),
         exit(Pid, kill)
     end).
-
 
 t_misc_gen_server_callbacks() ->
     ?_test(begin
@@ -744,41 +725,37 @@ t_misc_gen_server_callbacks() ->
         ?assertEqual({ok, state}, code_change(old, state, extra))
     end).
 
-
 scan_dbs_test_() ->
-{
-    setup,
-    fun() ->
-        Ctx = test_util:start_couch([mem3, fabric]),
-        GlobalDb = ?tempdb(),
-        ok = fabric:create_db(GlobalDb, [?CTX]),
-        #shard{name = LocalDb} = hd(mem3:local_shards(GlobalDb)),
-        {Ctx, GlobalDb, LocalDb}
-    end,
-    fun({Ctx, GlobalDb, _LocalDb}) ->
-        fabric:delete_db(GlobalDb, [?CTX]),
-        test_util:stop_couch(Ctx)
-    end,
-    {with, [
-        fun t_find_shard/1,
-        fun t_shard_not_found/1,
-        fun t_pass_local/1,
-        fun t_fail_local/1
-    ]}
-}.
-
+    {
+        setup,
+        fun() ->
+            Ctx = test_util:start_couch([mem3, fabric]),
+            GlobalDb = ?tempdb(),
+            ok = fabric:create_db(GlobalDb, [?CTX]),
+            #shard{name = LocalDb} = hd(mem3:local_shards(GlobalDb)),
+            {Ctx, GlobalDb, LocalDb}
+        end,
+        fun({Ctx, GlobalDb, _LocalDb}) ->
+            fabric:delete_db(GlobalDb, [?CTX]),
+            test_util:stop_couch(Ctx)
+        end,
+        {with, [
+            fun t_find_shard/1,
+            fun t_shard_not_found/1,
+            fun t_pass_local/1,
+            fun t_fail_local/1
+        ]}
+    }.
 
 t_find_shard({_, DbName, _}) ->
     ?_test(begin
         ?assertEqual(2, length(local_shards(DbName)))
     end).
 
-
 t_shard_not_found(_) ->
     ?_test(begin
         ?assertEqual([], local_shards(?tempdb()))
     end).
-
 
 t_pass_local({_, _, LocalDb}) ->
     ?_test(begin
@@ -787,10 +764,9 @@ t_pass_local({_, _, LocalDb}) ->
             {'$gen_cast', Msg} ->
                 ?assertEqual(Msg, {resume_scan, LocalDb})
         after 0 ->
-                ?assert(false)
+            ?assert(false)
         end
     end).
-
 
 t_fail_local({_, _, LocalDb}) ->
     ?_test(begin
@@ -799,10 +775,9 @@ t_fail_local({_, _, LocalDb}) ->
             {'$gen_cast', Msg} ->
                 ?assertNotEqual(Msg, {resume_scan, LocalDb})
         after 0 ->
-                ?assert(true)
+            ?assert(true)
         end
     end).
-
 
 % Test helper functions
 
@@ -812,14 +787,12 @@ mock_logs() ->
     meck:expect(couch_log, info, 2, ok),
     meck:expect(couch_log, debug, 2, ok).
 
-
 mock_callback_mod() ->
     meck:new(?MOD, [non_strict]),
     meck:expect(?MOD, db_created, fun(_DbName, Ctx) -> Ctx end),
     meck:expect(?MOD, db_deleted, fun(_DbName, Ctx) -> Ctx end),
     meck:expect(?MOD, db_found, fun(_DbName, Ctx) -> Ctx end),
     meck:expect(?MOD, db_change, fun(_DbName, _Change, Ctx) -> Ctx end).
-
 
 mock_changes_reader_loop({_CbFun, {Server, DbName}}) ->
     receive
@@ -834,22 +807,22 @@ kill_mock_changes_reader_and_get_its_args(Pid) ->
     receive
         {'DOWN', Ref, _, Pid, {Server, DbName}} ->
             {Server, DbName}
-        after 1000 ->
-            erlang:error(spawn_change_reader_timeout)
+    after 1000 ->
+        erlang:error(spawn_change_reader_timeout)
     end.
 
-
 mock_changes_reader() ->
-    meck:expect(couch_changes, handle_db_changes,
+    meck:expect(
+        couch_changes,
+        handle_db_changes,
         fun
             (_ChArgs, _Req, db) -> fun mock_changes_reader_loop/1;
             (_ChArgs, _Req, dbs) -> fun(_) -> ok end
-        end).
-
+        end
+    ).
 
 mock_ets() ->
     ets:new(multidb_test_ets, [set, public]).
-
 
 mock_state() ->
     #state{
@@ -858,18 +831,16 @@ mock_state() ->
         suffix = ?SUFFIX,
         event_server = esref,
         scanner = spid,
-        pids = []}.
-
+        pids = []
+    }.
 
 mock_state(Ets) ->
     State = mock_state(),
     State#state{tid = Ets}.
 
-
 mock_state(Ets, Pid) ->
     State = mock_state(Ets),
     State#state{pids = [{?DBNAME, Pid}]}.
-
 
 change_row(Id) when is_binary(Id) ->
     {[
@@ -879,13 +850,10 @@ change_row(Id) when is_binary(Id) ->
         {doc, {[{<<"_id">>, Id}, {<<"_rev">>, <<"1-f00">>}]}}
     ]}.
 
-
 handle_call_ok(Msg, State) ->
     ?assertMatch({reply, ok, _}, handle_call(Msg, from, State)).
 
-
 handle_info_check(Msg, State) ->
     ?assertMatch({noreply, _}, handle_info(Msg, State)).
-
 
 -endif.

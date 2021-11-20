@@ -34,18 +34,16 @@ go(DbName) ->
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Resps}) ->
+handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Shard, {Counters, Resps}) ->
     case fabric_ring:node_down(NodeRef, Counters, Resps) of
         {ok, Counters1} -> {ok, {Counters1, Resps}};
         error -> {error, {nodedown, <<"progress not possible">>}}
     end;
-
 handle_message({rexi_EXIT, Reason}, Shard, {Counters, Resps}) ->
     case fabric_ring:handle_error(Shard, Counters, Resps) of
         {ok, Counters1} -> {ok, {Counters1, Resps}};
         error -> {error, Reason}
     end;
-
 handle_message({ok, Count}, Shard, {Counters, Resps}) ->
     case fabric_ring:handle_response(Shard, Count, Counters, Resps) of
         {ok, {Counters1, Resps1}} ->
@@ -54,7 +52,6 @@ handle_message({ok, Count}, Shard, {Counters, Resps}) ->
             Total = fabric_dict:fold(fun(_, C, A) -> A + C end, 0, Resps1),
             {stop, Total}
     end;
-
 handle_message(Reason, Shard, {Counters, Resps}) ->
     case fabric_ring:handle_error(Shard, Counters, Resps) of
         {ok, Counters1} -> {ok, {Counters1, Resps}};

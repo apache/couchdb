@@ -27,7 +27,6 @@
 
 -define(SERVICE_ID, chttpd_auth).
 
-
 %% ------------------------------------------------------------------
 %% API Function Definitions
 %% ------------------------------------------------------------------
@@ -37,7 +36,6 @@ authenticate(HttpReq, Default) ->
 
 authorize(HttpReq, Default) ->
     maybe_handle(authorize, [HttpReq], Default).
-
 
 %% ------------------------------------------------------------------
 %% Default callbacks
@@ -55,17 +53,20 @@ proxy_authentication_handler(Req) ->
 jwt_authentication_handler(Req) ->
     couch_httpd_auth:jwt_authentication_handler(Req).
 
-party_mode_handler(#httpd{method='POST', path_parts=[<<"_session">>]} = Req) ->
+party_mode_handler(#httpd{method = 'POST', path_parts = [<<"_session">>]} = Req) ->
     % See #1947 - users should always be able to attempt a login
-    Req#httpd{user_ctx=#user_ctx{}};
-party_mode_handler(#httpd{path_parts=[<<"_up">>]} = Req) ->
+    Req#httpd{user_ctx = #user_ctx{}};
+party_mode_handler(#httpd{path_parts = [<<"_up">>]} = Req) ->
     RequireValidUser = config:get_boolean("chttpd", "require_valid_user", false),
-    RequireValidUserExceptUp = config:get_boolean("chttpd", "require_valid_user_except_for_up", false),
+    RequireValidUserExceptUp = config:get_boolean(
+        "chttpd", "require_valid_user_except_for_up", false
+    ),
     require_valid_user(Req, RequireValidUser andalso not RequireValidUserExceptUp);
-
 party_mode_handler(Req) ->
     RequireValidUser = config:get_boolean("chttpd", "require_valid_user", false),
-    RequireValidUserExceptUp = config:get_boolean("chttpd", "require_valid_user_except_for_up", false),
+    RequireValidUserExceptUp = config:get_boolean(
+        "chttpd", "require_valid_user_except_for_up", false
+    ),
     require_valid_user(Req, RequireValidUser orelse RequireValidUserExceptUp).
 
 require_valid_user(_Req, true) ->
@@ -75,12 +76,11 @@ require_valid_user(Req, false) ->
         [] ->
             Req#httpd{user_ctx = ?ADMIN_USER};
         _ ->
-            Req#httpd{user_ctx=#user_ctx{}}
+            Req#httpd{user_ctx = #user_ctx{}}
     end.
 
 handle_session_req(Req) ->
     couch_httpd_auth:handle_session_req(Req, chttpd_auth_cache).
-
 
 %% ------------------------------------------------------------------
 %% Internal Function Definitions

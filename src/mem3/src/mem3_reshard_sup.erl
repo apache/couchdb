@@ -22,26 +22,15 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-
 init(_Args) ->
     Children = [
-        {mem3_reshard_dbdoc,
-            {mem3_reshard_dbdoc, start_link, []},
-            permanent,
-            infinity,
-            worker,
-            [mem3_reshard_dbdoc]},
-        {mem3_reshard_job_sup,
-            {mem3_reshard_job_sup, start_link, []},
-            permanent,
-            infinity,
-            supervisor,
-            [mem3_reshard_job_sup]},
-        {mem3_reshard,
-            {mem3_reshard, start_link, []},
-            permanent,
-            brutal_kill,
-            worker,
-            [mem3_reshard]}
+        {mem3_reshard_dbdoc, {mem3_reshard_dbdoc, start_link, []}, permanent, infinity, worker, [
+            mem3_reshard_dbdoc
+        ]},
+        {mem3_reshard_job_sup, {mem3_reshard_job_sup, start_link, []}, permanent, infinity,
+            supervisor, [mem3_reshard_job_sup]},
+        {mem3_reshard, {mem3_reshard, start_link, []}, permanent, brutal_kill, worker, [
+            mem3_reshard
+        ]}
     ],
     {ok, {{one_for_all, 5, 5}, Children}}.

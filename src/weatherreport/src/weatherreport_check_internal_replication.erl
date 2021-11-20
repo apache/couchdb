@@ -21,15 +21,17 @@
 %% -------------------------------------------------------------------
 
 %% @doc Diagnostic that checks the current size of the mem3_sync
-%% backlog. The size is printed as an info message if under a defined 
+%% backlog. The size is printed as an info message if under a defined
 %% threshold, or as a warning if above the threshold.
 -module(weatherreport_check_internal_replication).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -define(THRESHOLD, 1000000).
 
@@ -49,8 +51,8 @@ total_to_level(_Total) ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-     Backlog = mem3_sync:get_backlog(),
-     [{total_to_level(Backlog), Backlog}].
+    Backlog = mem3_sync:get_backlog(),
+    [{total_to_level(Backlog), Backlog}].
 
 -spec format(term()) -> {io:format(), [term()]}.
 format(Backlog) ->

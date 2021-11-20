@@ -58,27 +58,31 @@
 
 -module(weatherreport_check).
 -export([behaviour_info/1]).
--export([check/2,
-         modules/0,
-         print/1]).
+-export([
+    check/2,
+    modules/0,
+    print/1
+]).
 
 %% @doc The behaviour definition for diagnostic modules.
 -spec behaviour_info(atom()) -> 'undefined' | [{atom(), arity()}].
 behaviour_info(callbacks) ->
-    [{description, 0},
-     {valid, 0},
-     {check, 1},
-     {format, 1}];
+    [
+        {description, 0},
+        {valid, 0},
+        {check, 1},
+        {format, 1}
+    ];
 behaviour_info(_) ->
     undefined.
 
 %% @doc Runs the diagnostic in the given module, if it is valid. Returns a
 %% list of messages that will be printed later using print/1.
--spec check(Module::module(), list()) -> [{atom(), module(), term()}].
+-spec check(Module :: module(), list()) -> [{atom(), module(), term()}].
 check(Module, Opts) ->
     case Module:valid() of
         true ->
-            [ {Level, Module, Message} || {Level, Message} <- Module:check(Opts) ];
+            [{Level, Module, Message} || {Level, Message} <- Module:check(Opts)];
         _ ->
             []
     end.
@@ -88,16 +92,18 @@ check(Module, Opts) ->
 -spec modules() -> [module()].
 modules() ->
     {ok, Mods} = application:get_key(weatherreport, modules),
-    [ M || M <- Mods,
-           Attr <- M:module_info(attributes),
-           {behaviour, [?MODULE]} =:= Attr orelse {behavior, [?MODULE]} =:= Attr ].
-
+    [
+        M
+     || M <- Mods,
+        Attr <- M:module_info(attributes),
+        {behaviour, [?MODULE]} =:= Attr orelse {behavior, [?MODULE]} =:= Attr
+    ].
 
 %% @doc Formats and prints the given message. The diagnostic
 %% module's format/1 function will be called to provide a
 %% human-readable message. It should return an iolist() or a 2-tuple
 %% consisting of a format string and a list of terms.
--spec print({Node::atom(), Level::atom(), Module::module(), Data::term()}) -> ok.
+-spec print({Node :: atom(), Level :: atom(), Module :: module(), Data :: term()}) -> ok.
 print({Node, Level, Mod, Data}) ->
     case Mod:format(Data) of
         {Format, Terms} ->

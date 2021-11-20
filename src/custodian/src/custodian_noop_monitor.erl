@@ -12,9 +12,7 @@
 
 -module(custodian_noop_monitor).
 
-
 -behaviour(custodian_monitor).
-
 
 -export([
     send_missing_db_alert/1,
@@ -22,14 +20,11 @@
     send_event/3
 ]).
 
-
 send_missing_db_alert(_DbName) ->
     false.
 
-
 clear_missing_dbs_alert() ->
     false.
-
 
 send_event(_Name, _Count, _Description) ->
     false.

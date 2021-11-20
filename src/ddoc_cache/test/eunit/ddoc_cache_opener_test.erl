@@ -12,11 +12,9 @@
 
 -module(ddoc_cache_opener_test).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("ddoc_cache_test.hrl").
-
 
 empty_hull_test() ->
     InitExpect = {ok, nil},

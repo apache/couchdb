@@ -22,7 +22,6 @@
     receiver_callback/2
 ]).
 
-
 receiver(_Req, _DbName, undefined) ->
     <<"">>;
 receiver(_Req, _DbName, {unknown_transfer_encoding, Unknown}) ->
@@ -38,7 +37,6 @@ receiver(Req, DbName, Length) when is_integer(Length) ->
     {fabric_attachment_receiver, Middleman, Length};
 receiver(_Req, _DbName, Length) ->
     exit({length_not_integer, Length}).
-
 
 receiver_callback(Middleman, chunked) ->
     fun(4096, ChunkFun, State) ->
@@ -57,36 +55,35 @@ receiver_callback(Middleman, Length) when is_integer(Length) ->
         end
     end.
 
-
 %%
 %% internal
 %%
 
 maybe_send_continue(#httpd{mochi_req = MochiReq} = Req) ->
     case couch_httpd:header_value(Req, "expect") of
-    undefined ->
-        ok;
-    Expect ->
-        case string:to_lower(Expect) of
-        "100-continue" ->
-            MochiReq:start_raw_response({100, gb_trees:empty()});
-        _ ->
-            ok
-        end
+        undefined ->
+            ok;
+        Expect ->
+            case string:to_lower(Expect) of
+                "100-continue" ->
+                    MochiReq:start_raw_response({100, gb_trees:empty()});
+                _ ->
+                    ok
+            end
     end.
 
 write_chunks(MiddleMan, ChunkFun, State) ->
     MiddleMan ! {self(), gimme_data},
     Timeout = fabric_util:attachments_timeout(),
     receive
-    {MiddleMan, ChunkRecordList} ->
-        rexi:reply(attachment_chunk_received),
-        case flush_chunks(ChunkRecordList, ChunkFun, State) of
-            {continue, NewState} ->
-                write_chunks(MiddleMan, ChunkFun, NewState);
-            {done, NewState} ->
-                NewState
-        end
+        {MiddleMan, ChunkRecordList} ->
+            rexi:reply(attachment_chunk_received),
+            case flush_chunks(ChunkRecordList, ChunkFun, State) of
+                {continue, NewState} ->
+                    write_chunks(MiddleMan, ChunkFun, NewState);
+                {done, NewState} ->
+                    NewState
+            end
     after Timeout ->
         exit(timeout)
     end.
@@ -102,24 +99,27 @@ flush_chunks([Chunk | Rest], ChunkFun, State) ->
 receive_unchunked_attachment(_Req, 0) ->
     ok;
 receive_unchunked_attachment(Req, Length) ->
-    receive {MiddleMan, go} ->
-        Data = couch_httpd:recv(Req, 0),
-        MiddleMan ! {self(), Data}
+    receive
+        {MiddleMan, go} ->
+            Data = couch_httpd:recv(Req, 0),
+            MiddleMan ! {self(), Data}
     end,
     receive_unchunked_attachment(Req, Length - size(Data)).
 
 middleman(Req, DbName, chunked) ->
     % spawn a process to actually receive the uploaded data
     RcvFun = fun(ChunkRecord, ok) ->
-        receive {From, go} -> From ! {self(), ChunkRecord} end, ok
+        receive
+            {From, go} -> From ! {self(), ChunkRecord}
+        end,
+        ok
     end,
-    Receiver = spawn(fun() -> couch_httpd:recv_chunked(Req,4096,RcvFun,ok) end),
+    Receiver = spawn(fun() -> couch_httpd:recv_chunked(Req, 4096, RcvFun, ok) end),
 
     % take requests from the DB writers and get data from the receiver
     N = mem3:n(DbName),
     Timeout = fabric_util:attachments_timeout(),
     middleman_loop(Receiver, N, [], [], Timeout);
-
 middleman(Req, DbName, Length) ->
     Receiver = spawn(fun() -> receive_unchunked_attachment(Req, Length) end),
     N = mem3:n(DbName),
@@ -127,43 +127,50 @@ middleman(Req, DbName, Length) ->
     middleman_loop(Receiver, N, [], [], Timeout).
 
 middleman_loop(Receiver, N, Counters0, ChunkList0, Timeout) ->
-    receive {From, gimme_data} ->
-        % Figure out how far along this writer (From) is in the list
-        ListIndex = case fabric_dict:lookup_element(From, Counters0) of
-        undefined -> 0;
-        I -> I
-        end,
+    receive
+        {From, gimme_data} ->
+            % Figure out how far along this writer (From) is in the list
+            ListIndex =
+                case fabric_dict:lookup_element(From, Counters0) of
+                    undefined -> 0;
+                    I -> I
+                end,
 
-        % Talk to the receiver to get another chunk if necessary
-        ChunkList1 = if ListIndex == length(ChunkList0) ->
-            Receiver ! {self(), go},
-            receive
-                {Receiver, ChunkRecord} ->
-                    ChunkList0 ++ [ChunkRecord]
-            end;
-        true -> ChunkList0 end,
+            % Talk to the receiver to get another chunk if necessary
+            ChunkList1 =
+                if
+                    ListIndex == length(ChunkList0) ->
+                        Receiver ! {self(), go},
+                        receive
+                            {Receiver, ChunkRecord} ->
+                                ChunkList0 ++ [ChunkRecord]
+                        end;
+                    true ->
+                        ChunkList0
+                end,
 
-        % reply to the writer
-        Reply = lists:nthtail(ListIndex, ChunkList1),
-        From ! {self(), Reply},
+            % reply to the writer
+            Reply = lists:nthtail(ListIndex, ChunkList1),
+            From ! {self(), Reply},
 
-        % Update the counter for this writer
-        Counters1 = fabric_dict:update_counter(From, length(Reply), Counters0),
+            % Update the counter for this writer
+            Counters1 = fabric_dict:update_counter(From, length(Reply), Counters0),
 
-        % Drop any chunks that have been sent to all writers
-        Size = fabric_dict:size(Counters1),
-        NumToDrop = lists:min([I || {_, I} <- Counters1]),
+            % Drop any chunks that have been sent to all writers
+            Size = fabric_dict:size(Counters1),
+            NumToDrop = lists:min([I || {_, I} <- Counters1]),
 
-        {ChunkList3, Counters3} =
-        if Size == N andalso NumToDrop > 0 ->
-            ChunkList2 = lists:nthtail(NumToDrop, ChunkList1),
-            Counters2 = [{F, I-NumToDrop} || {F, I} <- Counters1],
-            {ChunkList2, Counters2};
-        true ->
-            {ChunkList1, Counters1}
-        end,
+            {ChunkList3, Counters3} =
+                if
+                    Size == N andalso NumToDrop > 0 ->
+                        ChunkList2 = lists:nthtail(NumToDrop, ChunkList1),
+                        Counters2 = [{F, I - NumToDrop} || {F, I} <- Counters1],
+                        {ChunkList2, Counters2};
+                    true ->
+                        {ChunkList1, Counters1}
+                end,
 
-        middleman_loop(Receiver, N, Counters3, ChunkList3, Timeout)
+            middleman_loop(Receiver, N, Counters3, ChunkList3, Timeout)
     after Timeout ->
         exit(Receiver, kill),
         ok

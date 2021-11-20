@@ -23,23 +23,19 @@
 
 %% supervisor api
 -export([
-   init/1
+    init/1
 ]).
-
 
 %% includes
 -include("couch_replicator.hrl").
-
 
 %% public functions
 
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-
 start_child(#rep{} = Rep) ->
     supervisor:start_child(?MODULE, [Rep]).
-
 
 terminate_child(Pid) ->
     supervisor:terminate_child(?MODULE, Pid).
@@ -48,7 +44,8 @@ terminate_child(Pid) ->
 
 init(_Args) ->
     Start = {couch_replicator_scheduler_job, start_link, []},
-    Restart = temporary, % A crashed job is not entitled to immediate restart.
+    % A crashed job is not entitled to immediate restart.
+    Restart = temporary,
     Shutdown = 5000,
     Type = worker,
     Modules = [couch_replicator_scheduler_job],

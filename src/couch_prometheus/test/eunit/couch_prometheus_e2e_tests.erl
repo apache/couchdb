@@ -26,7 +26,7 @@ start() ->
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
     ok = config:set_integer("stats", "interval", 2),
     ok = config:set_integer("couch_prometheus", "interval", 1),
     Port = mochiweb_socket_server:get(chttpd, port),
@@ -40,10 +40,12 @@ couch_prometheus_e2e_test_() ->
         "Prometheus E2E Tests",
         {
             setup,
-            fun start/0, fun test_util:stop_couch/1,
+            fun start/0,
+            fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun node_call_chttpd/1,
                     fun node_call_prometheus_http/1,
@@ -56,11 +58,11 @@ couch_prometheus_e2e_test_() ->
 
 % normal chttpd path via cluster port
 node_call_chttpd(Url) ->
-   {ok, RC1, _, _} = test_request:get(
-            Url,
-            [?CONTENT_JSON, ?AUTH],
-            []
-        ),
+    {ok, RC1, _, _} = test_request:get(
+        Url,
+        [?CONTENT_JSON, ?AUTH],
+        []
+    ),
     ?_assertEqual(200, RC1).
 
 % normal chttpd path via cluster port
@@ -84,14 +86,14 @@ node_call_prometheus_http(_) ->
     maybe_start_http_server("true"),
     Url = construct_url(?PROM_PORT),
     {ok, RC1, _, _} = test_request:get(
-            Url,
-            [?CONTENT_JSON, ?AUTH]
-        ),
+        Url,
+        [?CONTENT_JSON, ?AUTH]
+    ),
     % since this port doesn't require auth, this should work
     {ok, RC2, _, _} = test_request:get(
-            Url,
-            [?CONTENT_JSON]
-        ),
+        Url,
+        [?CONTENT_JSON]
+    ),
     delete_db(Url),
     ?_assertEqual({200, 200}, {RC1, RC2}).
 
@@ -100,16 +102,16 @@ deny_prometheus_http(_) ->
     maybe_start_http_server("false"),
     Url = construct_url(?PROM_PORT),
     Response = test_request:get(
-            Url,
-            [?CONTENT_JSON, ?AUTH],
-            []
-        ),
-    ?_assertEqual({error,{conn_failed,{error,econnrefused}}}, Response).
+        Url,
+        [?CONTENT_JSON, ?AUTH],
+        []
+    ),
+    ?_assertEqual({error, {conn_failed, {error, econnrefused}}}, Response).
 
 maybe_start_http_server(Additional) ->
     test_util:stop_applications([couch_prometheus, chttpd]),
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
     ok = config:set("prometheus", "additional_port", Additional),
     ok = config:set("prometheus", "port", ?PROM_PORT),
     test_util:start_applications([couch_prometheus, chttpd]).
@@ -126,18 +128,24 @@ delete_db(Url) ->
     {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
 
 create_doc(Url, Id) ->
-    test_request:put(Url ++ "/" ++ Id,
-      [?CONTENT_JSON, ?AUTH], "{\"mr\": \"rockoartischocko\"}").
+    test_request:put(
+        Url ++ "/" ++ Id,
+        [?CONTENT_JSON, ?AUTH],
+        "{\"mr\": \"rockoartischocko\"}"
+    ).
 
 wait_for_metrics(Url, Value, Timeout) ->
-    test_util:wait(fun() ->
+    test_util:wait(
+        fun() ->
             {ok, _, _, Body} = test_request:get(
-            Url,
-            [?CONTENT_JSON, ?AUTH],
-            []
-        ),
-        case string:find(Body, Value) of
-            nomatch -> wait;
-            M -> M
-        end
-    end, Timeout).
+                Url,
+                [?CONTENT_JSON, ?AUTH],
+                []
+            ),
+            case string:find(Body, Value) of
+                nomatch -> wait;
+                M -> M
+            end
+        end,
+        Timeout
+    ).

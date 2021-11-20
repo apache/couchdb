@@ -25,19 +25,24 @@
 -define(i2l(I), integer_to_list(I)).
 -define(io2b(Io), iolist_to_binary(Io)).
 
-
 start(false) ->
     fun
         ({finished, _, {CheckpointHistory}}) ->
-            ?assertEqual([{<<"use_checkpoints">>,false}], CheckpointHistory);
+            ?assertEqual([{<<"use_checkpoints">>, false}], CheckpointHistory);
         (_) ->
             ok
     end;
 start(true) ->
     fun
         ({finished, _, {CheckpointHistory}}) ->
-            ?assertNotEqual(false, lists:keyfind(<<"session_id">>,
-                                                 1, CheckpointHistory));
+            ?assertNotEqual(
+                false,
+                lists:keyfind(
+                    <<"session_id">>,
+                    1,
+                    CheckpointHistory
+                )
+            );
         (_) ->
             ok
     end.
@@ -79,9 +84,12 @@ use_checkpoints_test_() ->
         "Replication use_checkpoints feature tests",
         {
             foreachx,
-            fun start/1, fun stop/2,
-            [{UseCheckpoints, fun use_checkpoints_tests/2}
-             || UseCheckpoints <- [false, true]]
+            fun start/1,
+            fun stop/2,
+            [
+                {UseCheckpoints, fun use_checkpoints_tests/2}
+             || UseCheckpoints <- [false, true]
+            ]
         }
     }.
 
@@ -91,21 +99,26 @@ use_checkpoints_tests(UseCheckpoints, Fun) ->
         "use_checkpoints: " ++ atom_to_list(UseCheckpoints),
         {
             foreachx,
-            fun setup/1, fun teardown/2,
-            [{{UseCheckpoints, Fun, Pair}, fun should_test_checkpoints/2}
-             || Pair <- Pairs]
+            fun setup/1,
+            fun teardown/2,
+            [
+                {{UseCheckpoints, Fun, Pair}, fun should_test_checkpoints/2}
+             || Pair <- Pairs
+            ]
         }
     }.
 
 should_test_checkpoints({UseCheckpoints, _, {From, To}}, {_Ctx, {Source, Target, _}}) ->
     should_test_checkpoints(UseCheckpoints, {From, To}, {Source, Target}).
 should_test_checkpoints(UseCheckpoints, {From, To}, {Source, Target}) ->
-    {lists:flatten(io_lib:format("~p -> ~p", [From, To])),
-     {inorder, [
-        should_populate_source(Source, ?DOCS_COUNT),
-        should_replicate(Source, Target, UseCheckpoints),
-        should_compare_databases(Source, Target)
-     ]}}.
+    {
+        lists:flatten(io_lib:format("~p -> ~p", [From, To])),
+        {inorder, [
+            should_populate_source(Source, ?DOCS_COUNT),
+            should_replicate(Source, Target, UseCheckpoints),
+            should_compare_databases(Source, Target)
+        ]}
+    }.
 
 should_populate_source({remote, Source}, DocCount) ->
     should_populate_source(Source, DocCount);
@@ -126,7 +139,6 @@ should_compare_databases(Source, {remote, Target}) ->
 should_compare_databases(Source, Target) ->
     {timeout, ?TIMEOUT_EUNIT, ?_test(compare_dbs(Source, Target))}.
 
-
 populate_db(DbName, DocCount) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     Docs = lists:foldl(
@@ -135,11 +147,13 @@ populate_db(DbName, DocCount) ->
             Value = ?io2b(["val", ?i2l(DocIdCounter)]),
             Doc = #doc{
                 id = Id,
-                body = {[ {<<"value">>, Value} ]}
+                body = {[{<<"value">>, Value}]}
             },
             [Doc | Acc]
         end,
-        [], lists:seq(1, DocCount)),
+        [],
+        lists:seq(1, DocCount)
+    ),
     {ok, _} = couch_db:update_docs(Db, Docs, []),
     ok = couch_db:close(Db).
 
@@ -150,16 +164,24 @@ compare_dbs(Source, Target) ->
         {ok, Doc} = couch_db:open_doc(SourceDb, FullDocInfo),
         {Props} = DocJson = couch_doc:to_json_obj(Doc, [attachments]),
         DocId = couch_util:get_value(<<"_id">>, Props),
-        DocTarget = case couch_db:open_doc(TargetDb, DocId) of
-            {ok, DocT} ->
-                DocT;
-            Error ->
-                erlang:error(
-                    {assertion_failed,
-                     [{module, ?MODULE}, {line, ?LINE},
-                      {reason, lists:concat(["Error opening document '",
-                                             ?b2l(DocId), "' from target: ",
-                                             couch_util:to_list(Error)])}]})
+        DocTarget =
+            case couch_db:open_doc(TargetDb, DocId) of
+                {ok, DocT} ->
+                    DocT;
+                Error ->
+                    erlang:error(
+                        {assertion_failed, [
+                            {module, ?MODULE},
+                            {line, ?LINE},
+                            {reason,
+                                lists:concat([
+                                    "Error opening document '",
+                                    ?b2l(DocId),
+                                    "' from target: ",
+                                    couch_util:to_list(Error)
+                                ])}
+                        ]}
+                    )
             end,
         DocTargetJson = couch_doc:to_json_obj(DocTarget, [attachments]),
         ?assertEqual(DocJson, DocTargetJson),
@@ -170,9 +192,10 @@ compare_dbs(Source, Target) ->
     ok = couch_db:close(TargetDb).
 
 replicate(Source, Target, UseCheckpoints) ->
-    replicate({[
-        {<<"source">>, Source},
-        {<<"target">>, Target},
-        {<<"use_checkpoints">>, UseCheckpoints}
-    ]}).
-
+    replicate(
+        {[
+            {<<"source">>, Source},
+            {<<"target">>, Target},
+            {<<"use_checkpoints">>, UseCheckpoints}
+        ]}
+    ).

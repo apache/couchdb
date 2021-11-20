@@ -74,7 +74,6 @@ options(Url, Headers) ->
 options(Url, Headers, Opts) ->
     request(options, Url, Headers, [], Opts).
 
-
 request(Method, Url, Headers) ->
     request(Method, Url, Headers, []).
 

@@ -13,16 +13,13 @@
 -module(couch_log_writer_syslog).
 -behavior(couch_log_writer).
 
-
 -export([
     init/0,
     terminate/2,
     write/2
 ]).
 
-
 -include("couch_log.hrl").
-
 
 -record(st, {
     socket,
@@ -34,9 +31,7 @@
     facility
 }).
 
-
 -define(SYSLOG_VERSION, 1).
-
 
 -ifdef(TEST).
 -export([
@@ -45,20 +40,20 @@
 ]).
 -endif.
 
-
 init() ->
     {ok, Socket} = gen_udp:open(0),
 
-    Host = case config:get("log", "syslog_host") of
-        undefined ->
-            undefined;
-        SysLogHost ->
-            case inet:getaddr(SysLogHost, inet) of
-                {ok, Address} ->
-                    Address;
-                _ ->
-                    undefined
-            end
+    Host =
+        case config:get("log", "syslog_host") of
+            undefined ->
+                undefined;
+            SysLogHost ->
+                case inet:getaddr(SysLogHost, inet) of
+                    {ok, Address} ->
+                        Address;
+                    _ ->
+                        undefined
+                end
         end,
 
     {ok, #st{
@@ -71,10 +66,8 @@ init() ->
         facility = get_facility(config:get("log", "syslog_facility", "local2"))
     }}.
 
-
 terminate(_Reason, St) ->
     gen_udp:close(St#st.socket).
-
 
 write(Entry, St) ->
     #log_entry{
@@ -98,10 +91,8 @@ write(Entry, St) ->
     ok = send(St, [Pre, Msg, $\n]),
     {ok, St}.
 
-
-send(#st{host=undefined}, Packet) ->
+send(#st{host = undefined}, Packet) ->
     io:format(standard_error, "~s", [Packet]);
-
 send(St, Packet) ->
     #st{
         socket = Socket,
@@ -110,53 +101,101 @@ send(St, Packet) ->
     } = St,
     gen_udp:send(Socket, Host, Port, Packet).
 
-
 get_facility(Name) ->
-    FacId = case Name of
-        "kern"      ->  0; % Kernel messages
-        "user"      ->  1; % Random user-level messages
-        "mail"      ->  2; % Mail system
-        "daemon"    ->  3; % System daemons
-        "auth"      ->  4; % Security/Authorization messages
-        "syslog"    ->  5; % Internal Syslog messages
-        "lpr"       ->  6; % Line printer subsystem
-        "news"      ->  7; % Network news subsystems
-        "uucp"      ->  8; % UUCP subsystem
-        "clock"     ->  9; % Clock daemon
-        "authpriv"  -> 10; % Security/Authorization messages
-        "ftp"       -> 11; % FTP daemon
-        "ntp"       -> 12; % NTP subsystem
-        "audit"     -> 13; % Log audit
-        "alert"     -> 14; % Log alert
-        "cron"      -> 15; % Scheduling daemon
-        "local0"    -> 16; % Local use 0
-        "local1"    -> 17; % Local use 1
-        "local2"    -> 18; % Local use 2
-        "local3"    -> 19; % Local use 3
-        "local4"    -> 20; % Local use 4
-        "local5"    -> 21; % Local use 5
-        "local6"    -> 22; % Local use 6
-        "local7"    -> 23; % Local use 7
-        _ ->
-            try list_to_integer(Name) of
-                N when N >= 0, N =< 23 -> N;
-                _ -> 23
-            catch _:_ ->
-                23
-            end
-    end,
+    FacId =
+        case Name of
+            % Kernel messages
+            "kern" ->
+                0;
+            % Random user-level messages
+            "user" ->
+                1;
+            % Mail system
+            "mail" ->
+                2;
+            % System daemons
+            "daemon" ->
+                3;
+            % Security/Authorization messages
+            "auth" ->
+                4;
+            % Internal Syslog messages
+            "syslog" ->
+                5;
+            % Line printer subsystem
+            "lpr" ->
+                6;
+            % Network news subsystems
+            "news" ->
+                7;
+            % UUCP subsystem
+            "uucp" ->
+                8;
+            % Clock daemon
+            "clock" ->
+                9;
+            % Security/Authorization messages
+            "authpriv" ->
+                10;
+            % FTP daemon
+            "ftp" ->
+                11;
+            % NTP subsystem
+            "ntp" ->
+                12;
+            % Log audit
+            "audit" ->
+                13;
+            % Log alert
+            "alert" ->
+                14;
+            % Scheduling daemon
+            "cron" ->
+                15;
+            % Local use 0
+            "local0" ->
+                16;
+            % Local use 1
+            "local1" ->
+                17;
+            % Local use 2
+            "local2" ->
+                18;
+            % Local use 3
+            "local3" ->
+                19;
+            % Local use 4
+            "local4" ->
+                20;
+            % Local use 5
+            "local5" ->
+                21;
+            % Local use 6
+            "local6" ->
+                22;
+            % Local use 7
+            "local7" ->
+                23;
+            _ ->
+                try list_to_integer(Name) of
+                    N when N >= 0, N =< 23 -> N;
+                    _ -> 23
+                catch
+                    _:_ ->
+                        23
+                end
+        end,
     FacId bsl 3.
-
 
 get_level(Name) when is_atom(Name) ->
     case Name of
-        debug       -> 7;
-        info        -> 6;
-        notice      -> 5;
-        warning     -> 4;
-        error       -> 3;
-        critical    -> 2;
-        alert       -> 1;
-        emergency   -> 0;
-        _           -> 3
+        debug -> 7;
+        info -> 6;
+        notice -> 5;
+        warning -> 4;
+        error -> 3;
+        critical -> 2;
+        alert -> 1;
+        emergency -> 0;
+        _ -> 3
     end.

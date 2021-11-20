@@ -34,10 +34,12 @@
 -module(weatherreport_check_membership).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -include_lib("eunit/include/eunit.hrl").
 
@@ -62,4 +64,5 @@ check(_Opts) ->
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({not_ring_member, Nodename}) ->
-    {"Local node ~w is not a member of the cluster. Please check that the -name setting in vm.args is correct.", [Nodename]}.
+    {"Local node ~w is not a member of the cluster. Please check that the -name setting in vm.args is correct.",
+        [Nodename]}.

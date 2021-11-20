@@ -12,10 +12,8 @@
 
 -module(mem3_bdu_test).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
-
 
 -define(TDEF_FE(Name), fun(Arg) -> {atom_to_list(Name), ?_test(Name(Arg))} end).
 
@@ -24,10 +22,9 @@
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(JSON, {"Content-Type", "application/json"}).
 
-
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Db = ?tempdb(),
     Port = mochiweb_socket_server:get(chttpd, port),
@@ -35,29 +32,27 @@ setup() ->
     ShardsDb = "_node/_local/" ++ config:get("mem3", "shards_db", "_dbs"),
     {Url, Db, ShardsDb}.
 
-
 teardown({Url, Db, _}) ->
     sync_delete_db(Url, Db),
-    ok = config:delete("admins", ?USER, _Persist=false).
-
+    ok = config:delete("admins", ?USER, _Persist = false).
 
 start_couch() ->
     test_util:start_couch([mem3, chttpd]).
 
-
 stop_couch(Ctx) ->
     test_util:stop_couch(Ctx).
-
 
 mem3_bdu_shard_doc_test_() ->
     {
         "mem3 bdu shard doc tests",
         {
             setup,
-            fun start_couch/0, fun stop_couch/1,
+            fun start_couch/0,
+            fun stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     ?TDEF_FE(t_can_insert_shard_map_doc),
                     ?TDEF_FE(t_missing_by_node_section),
@@ -77,7 +72,6 @@ mem3_bdu_shard_doc_test_() ->
         }
     }.
 
-
 t_can_insert_shard_map_doc({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
@@ -91,7 +85,6 @@ t_can_insert_shard_map_doc({Top, Db, ShardsDb}) ->
     ?assertEqual(201, Code),
     ?assertMatch(#{<<"ok">> := true}, Res).
 
-
 t_missing_by_node_section({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
@@ -100,7 +93,6 @@ t_missing_by_node_section({Top, Db, ShardsDb}) ->
         <<"by_range">> => #{Range => [Node]}
     },
     ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
-
 
 t_by_node_not_a_map({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
@@ -112,7 +104,6 @@ t_by_node_not_a_map({Top, Db, ShardsDb}) ->
     },
     ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
-
 t_missing_by_range_section({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
@@ -121,7 +112,6 @@ t_missing_by_range_section({Top, Db, ShardsDb}) ->
         <<"by_node">> => #{Node => [Range]}
     },
     ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
-
 
 t_by_range_not_a_map({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
@@ -133,7 +123,6 @@ t_by_range_not_a_map({Top, Db, ShardsDb}) ->
     },
     ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
-
 t_missing_range_in_by_range({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
@@ -143,7 +132,6 @@ t_missing_range_in_by_range({Top, Db, ShardsDb}) ->
         <<"by_range">> => #{<<"xyz">> => [Node]}
     },
     ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
-
 
 t_missing_node_in_by_range_node_list({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
@@ -155,7 +143,6 @@ t_missing_node_in_by_range_node_list({Top, Db, ShardsDb}) ->
     },
     ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
-
 t_missing_node_in_by_node({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
@@ -165,7 +152,6 @@ t_missing_node_in_by_node({Top, Db, ShardsDb}) ->
         <<"by_range">> => #{Range => [Node]}
     },
     ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
-
 
 t_missing_range_in_by_node_range_list({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
@@ -177,7 +163,6 @@ t_missing_range_in_by_node_range_list({Top, Db, ShardsDb}) ->
     },
     ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
-
 t_by_node_val_not_array({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
@@ -188,7 +173,6 @@ t_by_node_val_not_array({Top, Db, ShardsDb}) ->
     },
     ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
 
-
 t_by_range_val_not_array({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
     Range = <<"00000000-ffffffff">>,
@@ -198,7 +182,6 @@ t_by_range_val_not_array({Top, Db, ShardsDb}) ->
         <<"by_range">> => #{Range => 42}
     },
     ?assertMatch({403, _}, req(post, Top ++ ShardsDb, ShardMap)).
-
 
 t_design_docs_are_not_validated({Top, _, ShardsDb}) ->
     Suffix = integer_to_list(erlang:system_time() + rand:uniform(1000)),
@@ -213,7 +196,6 @@ t_design_docs_are_not_validated({Top, _, ShardsDb}) ->
         <<"_deleted">> => true
     },
     ?assertMatch({200, _}, req(post, Top ++ ShardsDb, Deleted)).
-
 
 t_replicated_changes_not_validated({Top, Db, ShardsDb}) ->
     Node = atom_to_binary(node(), utf8),
@@ -244,7 +226,6 @@ t_replicated_changes_not_validated({Top, Db, ShardsDb}) ->
     },
     ?assertMatch({200, _}, req(post, Top ++ ShardsDb, Deleted)).
 
-
 delete_db(Top, Db) when is_binary(Db) ->
     Url = Top ++ binary_to_list(Db),
     case test_request:get(Url, [?AUTH]) of
@@ -254,7 +235,6 @@ delete_db(Top, Db) when is_binary(Db) ->
             {ok, 200, _, _} = test_request:delete(Url, [?AUTH]),
             ok
     end.
-
 
 sync_delete_db(Top, Db) when is_binary(Db) ->
     delete_db(Top, Db),
@@ -268,15 +248,12 @@ sync_delete_db(Top, Db) when is_binary(Db) ->
             ok
     end.
 
-
 req(Method, Url, #{} = Body) ->
     req(Method, Url, jiffy:encode(Body));
-
 req(Method, Url, Body) ->
     Headers = [?JSON, ?AUTH],
     {ok, Code, _, Res} = test_request:request(Method, Url, Headers, Body),
     {Code, jiffy:decode(Res, [return_maps])}.
-
 
 suffix() ->
     integer_to_list(erlang:system_time(second)).

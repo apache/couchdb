@@ -31,21 +31,22 @@
 %% node or other members of the cluster.
 -module(weatherreport_node).
 
--export([can_connect/0,
-         can_connect_all/0,
-         pid/0,
-         local_command/2,
-         local_command/3,
-         local_command/4,
-         multicall/5,
-         nodename/0
-        ]).
+-export([
+    can_connect/0,
+    can_connect_all/0,
+    pid/0,
+    local_command/2,
+    local_command/3,
+    local_command/4,
+    multicall/5,
+    nodename/0
+]).
 
 %% @doc Calls the given 0-arity module and function on the local
 %% node and returns the result of that call.
 %% @equiv local_command(Module, Function, [])
 %% @see can_connect/0.
--spec local_command(Module::atom(), Function::atom()) -> term().
+-spec local_command(Module :: atom(), Function :: atom()) -> term().
 local_command(Module, Function) ->
     local_command(Module, Function, []).
 
@@ -53,7 +54,7 @@ local_command(Module, Function) ->
 %% on the local node and returns the result of that call.
 %% @equiv local_command(Module, Function, Args, 5000)
 %% @see can_connect/0
--spec local_command(Module::atom(), Function::atom(), Args::[term()]) -> term().
+-spec local_command(Module :: atom(), Function :: atom(), Args :: [term()]) -> term().
 local_command(Module, Function, Args) ->
     local_command(Module, Function, Args, weatherreport_config:timeout()).
 
@@ -63,7 +64,8 @@ local_command(Module, Function, Args) ->
 %% timeout.
 %% @equiv rpc:call(NodeName, Module, Function, Args, Timeout)
 %% @see can_connect/0
--spec local_command(Module::atom(), Function::atom(), Args::[term()], Timeout::integer()) -> term().
+-spec local_command(Module :: atom(), Function :: atom(), Args :: [term()], Timeout :: integer()) ->
+    term().
 local_command(Module, Function, Args, Timeout) ->
     case is_cluster_node() of
         true ->
@@ -86,7 +88,9 @@ local_command(Module, Function, Args, Timeout) ->
 
 %% @doc Call rpc:multicall/5 from the local cluster node rather than the
 %% escript.
--spec multicall([node()], Module::atom(), Function::atom(), Args::[term()], Timeout::integer()) -> term().
+-spec multicall(
+    [node()], Module :: atom(), Function :: atom(), Args :: [term()], Timeout :: integer()
+) -> term().
 multicall(Nodes, Module, Function, Args, Timeout) ->
     case local_command(rpc, multicall, [Nodes, Module, Function, Args, Timeout]) of
         {badrpc, Reason} ->
@@ -108,7 +112,8 @@ pid() ->
 -spec can_connect() -> true | false.
 can_connect() ->
     case is_connected() or is_cluster_node() of
-        true -> true;
+        true ->
+            true;
         false ->
             weatherreport_log:log(
                 node(),
@@ -127,16 +132,18 @@ can_connect_all() ->
                 [] -> true;
                 _ -> false
             end;
-        false -> false
+        false ->
+            false
     end.
 
 nodename() ->
-    Name = case weatherreport_config:node_name() of
-        undefined ->
-            atom_to_list(node());
-        {_, NodeName} ->
-            NodeName
-    end,
+    Name =
+        case weatherreport_config:node_name() of
+            undefined ->
+                atom_to_list(node());
+            {_, NodeName} ->
+                NodeName
+        end,
     case string:tokens(Name, "@") of
         [_Node, _Host] ->
             list_to_atom(Name);

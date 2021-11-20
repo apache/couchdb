@@ -56,24 +56,28 @@ missing_stubs_test_() ->
         "Replicate docs with missing stubs (COUCHDB-1365)",
         {
             foreachx,
-            fun setup/1, fun teardown/2,
-            [{Pair, fun should_replicate_docs_with_missed_att_stubs/2}
-             || Pair <- Pairs]
+            fun setup/1,
+            fun teardown/2,
+            [
+                {Pair, fun should_replicate_docs_with_missed_att_stubs/2}
+             || Pair <- Pairs
+            ]
         }
     }.
 
-
 should_replicate_docs_with_missed_att_stubs({From, To}, {_Ctx, {Source, Target}}) ->
-    {lists:flatten(io_lib:format("~p -> ~p", [From, To])),
-     {inorder, [
-        should_populate_source(Source),
-        should_set_target_revs_limit(Target, ?REVS_LIMIT),
-        should_replicate(Source, Target),
-        should_compare_databases(Source, Target),
-        should_update_source_docs(Source, ?REVS_LIMIT * 2),
-        should_replicate(Source, Target),
-        should_compare_databases(Source, Target)
-     ]}}.
+    {
+        lists:flatten(io_lib:format("~p -> ~p", [From, To])),
+        {inorder, [
+            should_populate_source(Source),
+            should_set_target_revs_limit(Target, ?REVS_LIMIT),
+            should_replicate(Source, Target),
+            should_compare_databases(Source, Target),
+            should_update_source_docs(Source, ?REVS_LIMIT * 2),
+            should_replicate(Source, Target),
+            should_compare_databases(Source, Target)
+        ]}
+    }.
 
 should_populate_source({remote, Source}) ->
     should_populate_source(Source);
@@ -108,7 +112,6 @@ should_update_source_docs({remote, Source}, Times) ->
 should_update_source_docs(Source, Times) ->
     {timeout, ?TIMEOUT_EUNIT, ?_test(update_db_docs(Source, Times))}.
 
-
 populate_db(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     AttData = crypto:strong_rand_bytes(6000),
@@ -120,7 +123,7 @@ populate_db(DbName) ->
                 {type, <<"application/foobar">>},
                 {att_len, byte_size(AttData)},
                 {data, AttData}
-           ])
+            ])
         ]
     },
     {ok, _} = couch_db:update_doc(Db, Doc, []),
@@ -132,7 +135,8 @@ update_db_docs(DbName, Times) ->
         Db,
         fun(FDI, Acc) -> db_fold_fun(FDI, Acc) end,
         {DbName, Times},
-        []),
+        []
+    ),
     ok = couch_db:close(Db).
 
 db_fold_fun(FullDocInfo, {DbName, Times}) ->
@@ -149,6 +153,7 @@ db_fold_fun(FullDocInfo, {DbName, Times}) ->
             NewRev
         end,
         {element(1, Doc#doc.revs), hd(element(2, Doc#doc.revs))},
-        lists:seq(1, Times)),
+        lists:seq(1, Times)
+    ),
     ok = couch_db:close(Db),
     {ok, {DbName, Times}}.

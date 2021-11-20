@@ -34,7 +34,9 @@
 -define(TDEF(Name), {atom_to_list(Name), fun Name/1}).
 -define(TDEF(Name, Timeout), {atom_to_list(Name), Timeout, fun Name/1}).
 -define(TDEF_FE(Name), fun(Arg) -> {atom_to_list(Name), ?_test(Name(Arg))} end).
--define(TDEF_FE(Name, Timeout), fun(Arg) -> {atom_to_list(Name), {timeout, Timeout, ?_test(Name(Arg))}} end).
+-define(TDEF_FE(Name, Timeout), fun(Arg) ->
+    {atom_to_list(Name), {timeout, Timeout, ?_test(Name(Arg))}}
+end).
 
 csp_test_() ->
     {
@@ -101,7 +103,7 @@ sandbox_ddoc_attachments(DbName) ->
 
 sandbox_shows(DbName) ->
     DbUrl = base_url() ++ "/" ++ DbName,
-    DDocUrl =  DbUrl ++ "/" ++ ?DDOC1,
+    DDocUrl = DbUrl ++ "/" ++ ?DDOC1,
     Url = DDocUrl ++ "/_show/" ++ ?SHOW1 ++ "/" ++ ?DOC1,
     ?assertEqual({200, true}, req(get, ?ACC, Url)),
     config:set("csp", "showlist_enable", "false", false),
@@ -109,21 +111,22 @@ sandbox_shows(DbName) ->
 
 sandbox_lists(DbName) ->
     DbUrl = base_url() ++ "/" ++ DbName,
-    DDocUrl =  DbUrl ++ "/" ++ ?DDOC1,
+    DDocUrl = DbUrl ++ "/" ++ ?DDOC1,
     Url = DDocUrl ++ "/_list/" ++ ?LIST1 ++ "/" ++ ?VIEW1,
     ?assertEqual({200, true}, req(get, ?ACC, Url)),
     config:set("csp", "showlist_enable", "false", false),
     ?assertEqual({200, false}, req(get, ?ACC, Url)).
 
-
 should_not_return_any_csp_headers_when_disabled(_DbName) ->
-    ?_assertEqual(undefined,
+    ?_assertEqual(
+        undefined,
         begin
             ok = config:set("csp", "utils_enable", "false", false),
             ok = config:set("csp", "enable", "false", false),
             {ok, _, Headers, _} = test_request:get(base_url() ++ "/_utils/"),
             proplists:get_value("Content-Security-Policy", Headers)
-        end).
+        end
+    ).
 
 should_apply_default_policy(_DbName) ->
     ?_assertEqual(
@@ -132,7 +135,8 @@ should_apply_default_policy(_DbName) ->
         begin
             {ok, _, Headers, _} = test_request:get(base_url() ++ "/_utils/"),
             proplists:get_value("Content-Security-Policy", Headers)
-        end).
+        end
+    ).
 
 should_apply_default_policy_with_legacy_config(_DbName) ->
     ?_assertEqual(
@@ -143,17 +147,23 @@ should_apply_default_policy_with_legacy_config(_DbName) ->
             ok = config:set("csp", "enable", "true", false),
             {ok, _, Headers, _} = test_request:get(base_url() ++ "/_utils/"),
             proplists:get_value("Content-Security-Policy", Headers)
-        end).
+        end
+    ).
 
 should_return_custom_policy(_DbName) ->
-    ?_assertEqual("default-src 'http://example.com';",
+    ?_assertEqual(
+        "default-src 'http://example.com';",
         begin
-            ok = config:set("csp", "utils_header_value",
-                                  "default-src 'http://example.com';", false),
+            ok = config:set(
+                "csp",
+                "utils_header_value",
+                "default-src 'http://example.com';",
+                false
+            ),
             {ok, _, Headers, _} = test_request:get(base_url() ++ "/_utils/"),
             proplists:get_value("Content-Security-Policy", Headers)
-        end).
-
+        end
+    ).
 
 % Utility functions
 
@@ -204,19 +214,18 @@ setup() ->
             <<?SHOW1>> => <<"function(doc, req) {return '<h1>show1!</h1>';}">>
         },
         <<"lists">> => #{
-            <<?LIST1>> => <<"function(head, req) {",
-                "var row;",
-                "while(row = getRow()){ send(row.key); };",
-            "}">>
+            <<?LIST1>> =>
+                <<"function(head, req) {", "var row;", "while(row = getRow()){ send(row.key); };",
+                    "}">>
         }
     }),
     ok = create_doc(?ACC, DbName, #{<<"_id">> => <<?LDOC1>>}),
     DbName.
 
 cleanup(DbName) ->
-    config:delete("csp", "utils_enable", _Persist=false),
-    config:delete("csp", "attachments_enable", _Persist=false),
-    config:delete("csp", "showlist_enable", _Persist=false),
+    config:delete("csp", "utils_enable", _Persist = false),
+    config:delete("csp", "attachments_enable", _Persist = false),
+    config:delete("csp", "showlist_enable", _Persist = false),
     DbUrl = base_url() ++ "/" ++ DbName,
     {200, _} = req(delete, ?ADM, DbUrl),
     UsersDb = config:get("chttpd_auth", "authentication_db"),
@@ -229,8 +238,12 @@ base_url() ->
     Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
     "http://" ++ Addr ++ ":" ++ Port.
 
-create_user(UsersDb, Name, Pass, Roles) when is_list(UsersDb),
-        is_binary(Name), is_binary(Pass), is_list(Roles) ->
+create_user(UsersDb, Name, Pass, Roles) when
+    is_list(UsersDb),
+    is_binary(Name),
+    is_binary(Pass),
+    is_list(Roles)
+->
     Body = #{
         <<"name">> => Name,
         <<"type">> => <<"user">>,

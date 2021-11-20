@@ -57,9 +57,9 @@ select(Handlers, _Default) ->
 
 do_select([], Acc) ->
     Acc;
-do_select([{override, Handler}|_], _Acc) ->
+do_select([{override, Handler} | _], _Acc) ->
     [Handler];
-do_select([{default, _}|Rest], Acc) ->
+do_select([{default, _} | Rest], Acc) ->
     do_select(Rest, Acc);
 do_select([Handler], Acc) ->
     [Handler | Acc];
@@ -73,14 +73,16 @@ select_override_test() ->
     ?assertEqual(selected, select([{override, selected}, foo], default)),
     ?assertEqual(selected, select([foo, {override, selected}], default)),
     ?assertEqual(selected, select([{override, selected}, {override, bar}], default)),
-    ?assertError({badmatch,[bar, foo]}, select([foo, bar], default)).
+    ?assertError({badmatch, [bar, foo]}, select([foo, bar], default)).
 
 select_default_override_test() ->
     ?assertEqual(selected, select([{default, new_default}, selected], old_default)),
     ?assertEqual(selected, select([selected, {default, new_default}], old_default)),
     ?assertEqual(selected, select([{default, selected}], old_default)),
     ?assertEqual(selected, select([], selected)),
-    ?assertEqual(selected,
-        select([{default, new_default}, {override, selected}, bar], old_default)).
+    ?assertEqual(
+        selected,
+        select([{default, new_default}, {override, selected}, bar], old_default)
+    ).
 
 -endif.

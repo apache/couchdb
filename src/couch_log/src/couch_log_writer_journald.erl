@@ -13,24 +13,19 @@
 -module(couch_log_writer_journald).
 -behaviour(couch_log_writer).
 
-
 -export([
     init/0,
     terminate/2,
     write/2
 ]).
 
-
 -include("couch_log.hrl").
-
 
 init() ->
     {ok, nil}.
 
-
 terminate(_, _St) ->
     ok.
-
 
 write(Entry, St) ->
     #log_entry{
@@ -51,19 +46,18 @@ write(Entry, St) ->
     io:format(standard_error, [Data, Msg, "\n"], []),
     {ok, St}.
 
-
 % log level mapping from sd-daemon(3)
 % https://www.freedesktop.org/software/systemd/man/sd-daemon.html
 -spec level_for_journald(atom()) -> integer().
 level_for_journald(Level) when is_atom(Level) ->
     case Level of
-        debug       -> 7;
-        info        -> 6;
-        notice      -> 5;
-        warning     -> 4;
-        error       -> 3;
-        critical    -> 2;
-        alert       -> 1;
-        emergency   -> 0;
-        _           -> 3
+        debug -> 7;
+        info -> 6;
+        notice -> 5;
+        warning -> 4;
+        error -> 3;
+        critical -> 2;
+        alert -> 1;
+        emergency -> 0;
+        _ -> 3
     end.

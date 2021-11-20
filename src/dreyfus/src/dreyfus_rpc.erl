@@ -10,7 +10,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 
 -module(dreyfus_rpc).
@@ -109,7 +108,6 @@ get_or_create_db(DbName, Options) ->
         Else ->
             Else
     end.
-
 
 calculate_seqs(Db, Stale) ->
     LastSeq = couch_db:get_update_seq(Db),

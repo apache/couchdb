@@ -129,21 +129,22 @@
     new_revid/1
 ]).
 
-
 -export([
     start_link/4
 ]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_db_int.hrl").
 
 -define(DBNAME_REGEX,
-    "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*" % use the stock CouchDB regex
-    "(\\.[0-9]{10,})?$" % but allow an optional shard timestamp at the end
+    % use the stock CouchDB regex
+    "^[a-z][a-z0-9\\_\\$()\\+\\-\\/]*"
+    % but allow an optional shard timestamp at the end
+    "(\\.[0-9]{10,})?$"
 ).
 -define(DEFAULT_COMPRESSIBLE_TYPES,
-    "text/*, application/javascript, application/json, application/xml").
+    "text/*, application/javascript, application/json, application/xml"
+).
 
 start_link(Engine, DbName, Filepath, Options) ->
     Arg = {Engine, DbName, Filepath, Options},
@@ -170,9 +171,9 @@ open(DbName, Options) ->
                     close(Db),
                     throw(Error)
             end;
-        Else -> Else
+        Else ->
+            Else
     end.
-
 
 reopen(#db{} = Db) ->
     % We could have just swapped out the storage engine
@@ -183,7 +184,6 @@ reopen(#db{} = Db) ->
     after
         close(Db)
     end.
-
 
 % You shouldn't call this. Its part of the ref counting between
 % couch_server and couch_db instances.
@@ -200,7 +200,6 @@ clustered_db(DbName, Options) when is_list(Options) ->
         security = SecProps,
         options = [{props, Props}]
     }};
-
 clustered_db(DbName, #user_ctx{} = UserCtx) ->
     clustered_db(DbName, [{user_ctx, UserCtx}]).
 
@@ -231,7 +230,7 @@ close(#db{} = Db) ->
 close(?OLD_DB_REC) ->
     ok.
 
-is_idle(#db{compactor_pid=nil} = Db) ->
+is_idle(#db{compactor_pid = nil} = Db) ->
     monitored_by(Db) == [];
 is_idle(_Db) ->
     false.
@@ -245,20 +244,19 @@ monitored_by(Db) ->
             []
     end.
 
-
-monitor(#db{main_pid=MainPid}) ->
+monitor(#db{main_pid = MainPid}) ->
     erlang:monitor(process, MainPid).
 
 start_compact(#db{} = Db) ->
     gen_server:call(Db#db.main_pid, start_compact).
 
-cancel_compact(#db{main_pid=Pid}) ->
+cancel_compact(#db{main_pid = Pid}) ->
     gen_server:call(Pid, cancel_compact).
 
 wait_for_compaction(Db) ->
     wait_for_compaction(Db, infinity).
 
-wait_for_compaction(#db{main_pid=Pid}=Db, Timeout) ->
+wait_for_compaction(#db{main_pid = Pid} = Db, Timeout) ->
     Start = os:timestamp(),
     case gen_server:call(Pid, compactor_pid) of
         CPid when is_pid(CPid) ->
@@ -280,7 +278,7 @@ wait_for_compaction(#db{main_pid=Pid}=Db, Timeout) ->
     end.
 
 delete_doc(Db, Id, Revisions) ->
-    DeletedDocs = [#doc{id=Id, revs=[Rev], deleted=true} || Rev <- Revisions],
+    DeletedDocs = [#doc{id = Id, revs = [Rev], deleted = true} || Rev <- Revisions],
     {ok, [Result]} = update_docs(Db, DeletedDocs, []),
     {ok, Result}.
 
@@ -290,50 +288,55 @@ open_doc(Db, IdOrDocInfo) ->
 open_doc(Db, Id, Options) ->
     increment_stat(Db, [couchdb, database_reads]),
     case open_doc_int(Db, Id, Options) of
-    {ok, #doc{deleted=true}=Doc} ->
-        case lists:member(deleted, Options) of
-        true ->
-            apply_open_options({ok, Doc},Options);
-        false ->
-            {not_found, deleted}
-        end;
-    Else ->
-        apply_open_options(Else,Options)
+        {ok, #doc{deleted = true} = Doc} ->
+            case lists:member(deleted, Options) of
+                true ->
+                    apply_open_options({ok, Doc}, Options);
+                false ->
+                    {not_found, deleted}
+            end;
+        Else ->
+            apply_open_options(Else, Options)
     end.
 
-apply_open_options({ok, Doc},Options) ->
-    apply_open_options2(Doc,Options);
-apply_open_options(Else,_Options) ->
+apply_open_options({ok, Doc}, Options) ->
+    apply_open_options2(Doc, Options);
+apply_open_options(Else, _Options) ->
     Else.
 
-apply_open_options2(Doc,[]) ->
+apply_open_options2(Doc, []) ->
     {ok, Doc};
-apply_open_options2(#doc{atts=Atts0,revs=Revs}=Doc,
-        [{atts_since, PossibleAncestors}|Rest]) ->
+apply_open_options2(
+    #doc{atts = Atts0, revs = Revs} = Doc,
+    [{atts_since, PossibleAncestors} | Rest]
+) ->
     RevPos = find_ancestor_rev_pos(Revs, PossibleAncestors),
-    Atts = lists:map(fun(Att) ->
-        [AttPos, Data] = couch_att:fetch([revpos, data], Att),
-        if  AttPos > RevPos -> couch_att:store(data, Data, Att);
-            true -> couch_att:store(data, stub, Att)
-        end
-    end, Atts0),
-    apply_open_options2(Doc#doc{atts=Atts}, Rest);
+    Atts = lists:map(
+        fun(Att) ->
+            [AttPos, Data] = couch_att:fetch([revpos, data], Att),
+            if
+                AttPos > RevPos -> couch_att:store(data, Data, Att);
+                true -> couch_att:store(data, stub, Att)
+            end
+        end,
+        Atts0
+    ),
+    apply_open_options2(Doc#doc{atts = Atts}, Rest);
 apply_open_options2(Doc, [ejson_body | Rest]) ->
     apply_open_options2(couch_doc:with_ejson_body(Doc), Rest);
-apply_open_options2(Doc,[_|Rest]) ->
-    apply_open_options2(Doc,Rest).
-
+apply_open_options2(Doc, [_ | Rest]) ->
+    apply_open_options2(Doc, Rest).
 
 find_ancestor_rev_pos({_, []}, _AttsSinceRevs) ->
     0;
 find_ancestor_rev_pos(_DocRevs, []) ->
     0;
-find_ancestor_rev_pos({RevPos, [RevId|Rest]}, AttsSinceRevs) ->
+find_ancestor_rev_pos({RevPos, [RevId | Rest]}, AttsSinceRevs) ->
     case lists:member({RevPos, RevId}, AttsSinceRevs) of
-    true ->
-        RevPos;
-    false ->
-        find_ancestor_rev_pos({RevPos - 1, Rest}, AttsSinceRevs)
+        true ->
+            RevPos;
+        false ->
+            find_ancestor_rev_pos({RevPos - 1, Rest}, AttsSinceRevs)
     end.
 
 open_doc_revs(Db, Id, Revs, Options) ->
@@ -350,39 +353,52 @@ get_missing_revs(Db, IdRevsList) ->
 
 find_missing([], []) ->
     [];
-find_missing([{Id, Revs}|RestIdRevs], [FullInfo | RestLookupInfo])
-        when is_record(FullInfo, full_doc_info) ->
+find_missing([{Id, Revs} | RestIdRevs], [FullInfo | RestLookupInfo]) when
+    is_record(FullInfo, full_doc_info)
+->
     case couch_key_tree:find_missing(FullInfo#full_doc_info.rev_tree, Revs) of
-    [] ->
-        find_missing(RestIdRevs, RestLookupInfo);
-    MissingRevs ->
-        #doc_info{revs=RevsInfo} = couch_doc:to_doc_info(FullInfo),
-        LeafRevs = [Rev || #rev_info{rev=Rev} <- RevsInfo],
-        % Find the revs that are possible parents of this rev
-        PossibleAncestors =
-        lists:foldl(fun({LeafPos, LeafRevId}, Acc) ->
-            % this leaf is a "possible ancenstor" of the missing
-            % revs if this LeafPos lessthan any of the missing revs
-            case lists:any(fun({MissingPos, _}) ->
-                    LeafPos < MissingPos end, MissingRevs) of
-            true ->
-                [{LeafPos, LeafRevId} | Acc];
-            false ->
-                Acc
-            end
-        end, [], LeafRevs),
-        [{Id, MissingRevs, PossibleAncestors} |
-                find_missing(RestIdRevs, RestLookupInfo)]
+        [] ->
+            find_missing(RestIdRevs, RestLookupInfo);
+        MissingRevs ->
+            #doc_info{revs = RevsInfo} = couch_doc:to_doc_info(FullInfo),
+            LeafRevs = [Rev || #rev_info{rev = Rev} <- RevsInfo],
+            % Find the revs that are possible parents of this rev
+            PossibleAncestors =
+                lists:foldl(
+                    fun({LeafPos, LeafRevId}, Acc) ->
+                        % this leaf is a "possible ancenstor" of the missing
+                        % revs if this LeafPos lessthan any of the missing revs
+                        case
+                            lists:any(
+                                fun({MissingPos, _}) ->
+                                    LeafPos < MissingPos
+                                end,
+                                MissingRevs
+                            )
+                        of
+                            true ->
+                                [{LeafPos, LeafRevId} | Acc];
+                            false ->
+                                Acc
+                        end
+                    end,
+                    [],
+                    LeafRevs
+                ),
+            [
+                {Id, MissingRevs, PossibleAncestors}
+                | find_missing(RestIdRevs, RestLookupInfo)
+            ]
     end;
-find_missing([{Id, Revs}|RestIdRevs], [not_found | RestLookupInfo]) ->
+find_missing([{Id, Revs} | RestIdRevs], [not_found | RestLookupInfo]) ->
     [{Id, Revs, []} | find_missing(RestIdRevs, RestLookupInfo)].
 
 get_doc_info(Db, Id) ->
     case get_full_doc_info(Db, Id) of
-    #full_doc_info{} = FDI ->
-        {ok, couch_doc:to_doc_info(FDI)};
-    Else ->
-        Else
+        #full_doc_info{} = FDI ->
+            {ok, couch_doc:to_doc_info(FDI)};
+        Else ->
+            Else
     end.
 
 get_full_doc_info(Db, Id) ->
@@ -396,27 +412,39 @@ purge_docs(Db, IdRevs) ->
     purge_docs(Db, IdRevs, []).
 
 -spec purge_docs(#db{}, [{UUId, Id, [Rev]}], [PurgeOption]) ->
-    {ok, [Reply]} when
+    {ok, [Reply]}
+when
     UUId :: binary(),
     Id :: binary() | list(),
     Rev :: {non_neg_integer(), binary()},
     PurgeOption :: interactive_edit | replicated_changes,
     Reply :: {ok, []} | {ok, [Rev]}.
 purge_docs(#db{main_pid = Pid} = Db, UUIDsIdsRevs, Options) ->
-    UUIDsIdsRevs2 = [{UUID, couch_util:to_binary(Id), Revs}
-        || {UUID, Id, Revs}  <- UUIDsIdsRevs],
+    UUIDsIdsRevs2 = [
+        {UUID, couch_util:to_binary(Id), Revs}
+     || {UUID, Id, Revs} <- UUIDsIdsRevs
+    ],
     % Check here if any UUIDs already exist when
     % we're not replicating purge infos
     IsRepl = lists:member(replicated_changes, Options),
-    if IsRepl -> ok; true ->
-        UUIDs = [UUID || {UUID, _, _} <- UUIDsIdsRevs2],
-        lists:foreach(fun(Resp) ->
-            if Resp == not_found -> ok; true ->
-                Fmt = "Duplicate purge info UIUD: ~s",
-                Reason = io_lib:format(Fmt, [element(2, Resp)]),
-                throw({badreq, Reason})
-            end
-        end, get_purge_infos(Db, UUIDs))
+    if
+        IsRepl ->
+            ok;
+        true ->
+            UUIDs = [UUID || {UUID, _, _} <- UUIDsIdsRevs2],
+            lists:foreach(
+                fun(Resp) ->
+                    if
+                        Resp == not_found ->
+                            ok;
+                        true ->
+                            Fmt = "Duplicate purge info UIUD: ~s",
+                            Reason = io_lib:format(Fmt, [element(2, Resp)]),
+                            throw({badreq, Reason})
+                    end
+                end,
+                get_purge_infos(Db, UUIDs)
+            )
     end,
     increment_stat(Db, [couchdb, database_purges]),
     gen_server:call(Pid, {purge_docs, UUIDsIdsRevs2, Options}).
@@ -429,7 +457,6 @@ purge_docs(#db{main_pid = Pid} = Db, UUIDsIdsRevs, Options) ->
     Rev :: {non_neg_integer(), binary()}.
 get_purge_infos(Db, UUIDs) ->
     couch_db_engine:load_purge_infos(Db, UUIDs).
-
 
 get_minimum_purge_seq(#db{} = Db) ->
     PurgeSeq = couch_db_engine:get_purge_seq(Db),
@@ -468,24 +495,31 @@ get_minimum_purge_seq(#db{} = Db) ->
         {start_key, list_to_binary(?LOCAL_DOC_PREFIX ++ "purge-")}
     ],
     {ok, MinIdxSeq} = couch_db:fold_local_docs(Db, FoldFun, InitMinSeq, Opts),
-    FinalSeq = case MinIdxSeq < PurgeSeq - PurgeInfosLimit of
-        true -> MinIdxSeq;
-        false -> erlang:max(0, PurgeSeq - PurgeInfosLimit)
-    end,
+    FinalSeq =
+        case MinIdxSeq < PurgeSeq - PurgeInfosLimit of
+            true -> MinIdxSeq;
+            false -> erlang:max(0, PurgeSeq - PurgeInfosLimit)
+        end,
     % Log a warning if we've got a purge sequence exceeding the
     % configured threshold.
-    if FinalSeq >= (PurgeSeq - PurgeInfosLimit) -> ok; true ->
-        Fmt = "The purge sequence for '~s' exceeds configured threshold",
-        couch_log:warning(Fmt, [couch_db:name(Db)])
+    if
+        FinalSeq >= (PurgeSeq - PurgeInfosLimit) ->
+            ok;
+        true ->
+            Fmt = "The purge sequence for '~s' exceeds configured threshold",
+            couch_log:warning(Fmt, [couch_db:name(Db)])
     end,
     FinalSeq.
-
 
 purge_client_exists(DbName, DocId, Props) ->
     % Warn about clients that have not updated their purge
     % checkpoints in the last "index_lag_warn_seconds"
     LagWindow = config:get_integer(
-            "purge", "index_lag_warn_seconds", 86400), % Default 24 hours
+        % Default 24 hours
+        "purge",
+        "index_lag_warn_seconds",
+        86400
+    ),
 
     {Mega, Secs, _} = os:timestamp(),
     NowSecs = Mega * 1000000 + Secs,
@@ -493,32 +527,39 @@ purge_client_exists(DbName, DocId, Props) ->
 
     try
         Exists = couch_db_plugin:is_valid_purge_client(DbName, Props),
-        if not Exists -> ok; true ->
-            Updated = couch_util:get_value(<<"updated_on">>, Props),
-            if is_integer(Updated) and Updated > LagThreshold -> ok; true ->
-                Diff = NowSecs - Updated,
-                Fmt1 = "Purge checkpoint '~s' not updated in ~p seconds
-                    in database ~p",
-                couch_log:error(Fmt1, [DocId, Diff, DbName])
-            end
+        if
+            not Exists ->
+                ok;
+            true ->
+                Updated = couch_util:get_value(<<"updated_on">>, Props),
+                if
+                    is_integer(Updated) and Updated > LagThreshold ->
+                        ok;
+                    true ->
+                        Diff = NowSecs - Updated,
+                        Fmt1 =
+                            "Purge checkpoint '~s' not updated in ~p seconds\n"
+                            "                    in database ~p",
+                        couch_log:error(Fmt1, [DocId, Diff, DbName])
+                end
         end,
         Exists
-    catch _:_ ->
-        % If we fail to check for a client we have to assume that
-        % it exists.
-        Fmt2 = "Failed to check purge checkpoint using
-            document '~p' in database ~p",
-        couch_log:error(Fmt2, [DocId, DbName]),
-        true
+    catch
+        _:_ ->
+            % If we fail to check for a client we have to assume that
+            % it exists.
+            Fmt2 =
+                "Failed to check purge checkpoint using\n"
+                "            document '~p' in database ~p",
+            couch_log:error(Fmt2, [DocId, DbName]),
+            true
     end.
 
-
-set_purge_infos_limit(#db{main_pid=Pid}=Db, Limit) when Limit > 0 ->
+set_purge_infos_limit(#db{main_pid = Pid} = Db, Limit) when Limit > 0 ->
     check_is_admin(Db),
     gen_server:call(Pid, {set_purge_infos_limit, Limit}, infinity);
 set_purge_infos_limit(_Db, _Limit) ->
     throw(invalid_purge_infos_limit).
-
 
 get_after_doc_read_fun(#db{after_doc_read = Fun}) ->
     Fun.
@@ -526,10 +567,10 @@ get_after_doc_read_fun(#db{after_doc_read = Fun}) ->
 get_before_doc_update_fun(#db{before_doc_update = Fun}) ->
     Fun.
 
-get_committed_update_seq(#db{committed_update_seq=Seq}) ->
+get_committed_update_seq(#db{committed_update_seq = Seq}) ->
     Seq.
 
-get_update_seq(#db{} = Db)->
+get_update_seq(#db{} = Db) ->
     couch_db_engine:get_update_seq(Db).
 
 get_user_ctx(#db{user_ctx = UserCtx}) ->
@@ -537,13 +578,13 @@ get_user_ctx(#db{user_ctx = UserCtx}) ->
 get_user_ctx(?OLD_DB_REC = Db) ->
     ?OLD_DB_USER_CTX(Db).
 
-get_purge_seq(#db{}=Db) ->
+get_purge_seq(#db{} = Db) ->
     couch_db_engine:get_purge_seq(Db).
 
-get_oldest_purge_seq(#db{}=Db) ->
+get_oldest_purge_seq(#db{} = Db) ->
     couch_db_engine:get_oldest_purge_seq(Db).
 
-get_purge_infos_limit(#db{}=Db) ->
+get_purge_infos_limit(#db{} = Db) ->
     couch_db_engine:get_purge_infos_limit(Db).
 
 get_pid(#db{main_pid = Pid}) ->
@@ -555,10 +596,10 @@ get_del_doc_count(Db) ->
 get_doc_count(Db) ->
     {ok, couch_db_engine:get_doc_count(Db)}.
 
-get_uuid(#db{}=Db) ->
+get_uuid(#db{} = Db) ->
     couch_db_engine:get_uuid(Db).
 
-get_epochs(#db{}=Db) ->
+get_epochs(#db{} = Db) ->
     Epochs = couch_db_engine:get_epochs(Db),
     validate_epochs(Epochs),
     Epochs.
@@ -569,13 +610,13 @@ get_filepath(#db{filepath = FilePath}) ->
 get_instance_start_time(#db{instance_start_time = IST}) ->
     IST.
 
-get_compacted_seq(#db{}=Db) ->
+get_compacted_seq(#db{} = Db) ->
     couch_db_engine:get_compacted_seq(Db).
 
 get_compactor_pid(#db{compactor_pid = Pid}) ->
     Pid.
 
-get_compactor_pid_sync(#db{main_pid=Pid}) ->
+get_compactor_pid_sync(#db{main_pid = Pid}) ->
     case gen_server:call(Pid, compactor_pid, infinity) of
         CPid when is_pid(CPid) ->
             CPid;
@@ -594,18 +635,21 @@ get_db_info(Db) ->
     {ok, DelDocCount} = get_del_doc_count(Db),
     SizeInfo = couch_db_engine:get_size_info(Db),
     DiskVersion = couch_db_engine:get_disk_version(Db),
-    Uuid = case get_uuid(Db) of
-        undefined -> null;
-        Uuid0 -> Uuid0
-    end,
-    CompactedSeq = case get_compacted_seq(Db) of
-        undefined -> null;
-        Else1 -> Else1
-    end,
-    Props = case couch_db_engine:get_props(Db) of
-        undefined -> null;
-        Else2 -> {Else2}
-    end,
+    Uuid =
+        case get_uuid(Db) of
+            undefined -> null;
+            Uuid0 -> Uuid0
+        end,
+    CompactedSeq =
+        case get_compacted_seq(Db) of
+            undefined -> null;
+            Else1 -> Else1
+        end,
+    Props =
+        case couch_db_engine:get_props(Db) of
+            undefined -> null;
+            Else2 -> {Else2}
+        end,
     InfoList = [
         {db_name, Name},
         {engine, couch_db_engine:get_engine(Db)},
@@ -630,15 +674,15 @@ get_partition_info(#db{} = Db, Partition) when is_binary(Partition) ->
 get_partition_info(_Db, _Partition) ->
     throw({bad_request, <<"`partition` is not valid">>}).
 
-
 get_design_doc(#db{name = <<"shards/", _/binary>> = ShardDbName}, DDocId0) ->
     DDocId = couch_util:normalize_ddoc_id(DDocId0),
     DbName = mem3:dbname(ShardDbName),
     {_, Ref} = spawn_monitor(fun() ->
         exit(fabric:open_doc(DbName, DDocId, []))
     end),
-    receive {'DOWN', Ref, _, _, Response} ->
-        Response
+    receive
+        {'DOWN', Ref, _, _, Response} ->
+            Response
     end;
 get_design_doc(#db{} = Db, DDocId0) ->
     DDocId = couch_util:normalize_ddoc_id(DDocId0),
@@ -647,8 +691,9 @@ get_design_doc(#db{} = Db, DDocId0) ->
 get_design_docs(#db{name = <<"shards/", _/binary>> = ShardDbName}) ->
     DbName = mem3:dbname(ShardDbName),
     {_, Ref} = spawn_monitor(fun() -> exit(fabric:design_docs(DbName)) end),
-    receive {'DOWN', Ref, _, _, Response} ->
-        Response
+    receive
+        {'DOWN', Ref, _, _, Response} ->
+            Response
     end;
 get_design_docs(#db{} = Db) ->
     FoldFun = fun(FDI, Acc) -> {ok, [FDI | Acc]} end,
@@ -659,47 +704,51 @@ get_design_doc_count(#db{} = Db) ->
     FoldFun = fun(_, Acc) -> {ok, Acc + 1} end,
     fold_design_docs(Db, FoldFun, 0, []).
 
-check_is_admin(#db{user_ctx=UserCtx}=Db) ->
+check_is_admin(#db{user_ctx = UserCtx} = Db) ->
     case is_admin(Db) of
-        true -> ok;
+        true ->
+            ok;
         false ->
             Reason = <<"You are not a db or server admin.">>,
             throw_security_error(UserCtx, Reason)
     end.
 
-check_is_member(#db{user_ctx=UserCtx}=Db) ->
+check_is_member(#db{user_ctx = UserCtx} = Db) ->
     case is_member(Db) of
         true -> ok;
         false -> throw_security_error(UserCtx)
     end.
 
-is_admin(#db{user_ctx=UserCtx}=Db) ->
+is_admin(#db{user_ctx = UserCtx} = Db) ->
     case couch_db_plugin:check_is_admin(Db) of
-        true -> true;
+        true ->
+            true;
         false ->
             {Admins} = get_admins(Db),
             is_authorized(UserCtx, Admins)
     end.
 
-is_member(#db{user_ctx=UserCtx}=Db) ->
+is_member(#db{user_ctx = UserCtx} = Db) ->
     case is_admin(Db) of
-        true -> true;
+        true ->
+            true;
         false ->
             case is_public_db(Db) of
-                true -> true;
+                true ->
+                    true;
                 false ->
                     {Members} = get_members(Db),
                     is_authorized(UserCtx, Members)
             end
     end.
 
-is_public_db(#db{}=Db) ->
+is_public_db(#db{} = Db) ->
     {Members} = get_members(Db),
     Names = couch_util:get_value(<<"names">>, Members, []),
     Roles = couch_util:get_value(<<"roles">>, Members, []),
     Names =:= [] andalso Roles =:= [].
 
-is_authorized(#user_ctx{name=UserName,roles=UserRoles}, Security) ->
+is_authorized(#user_ctx{name = UserName, roles = UserRoles}, Security) ->
     Names = couch_util:get_value(<<"names">>, Security, []),
     Roles = couch_util:get_value(<<"roles">>, Security, []),
     case check_security(roles, UserRoles, [<<"_admin">> | Roles]) of
@@ -720,36 +769,38 @@ check_security(names, null, _) ->
 check_security(names, UserName, Names) ->
     lists:member(UserName, Names).
 
-throw_security_error(#user_ctx{name=null}=UserCtx) ->
+throw_security_error(#user_ctx{name = null} = UserCtx) ->
     Reason = <<"You are not authorized to access this db.">>,
     throw_security_error(UserCtx, Reason);
-throw_security_error(#user_ctx{name=_}=UserCtx) ->
+throw_security_error(#user_ctx{name = _} = UserCtx) ->
     Reason = <<"You are not allowed to access this db.">>,
     throw_security_error(UserCtx, Reason).
-throw_security_error(#user_ctx{}=UserCtx, Reason) ->
+throw_security_error(#user_ctx{} = UserCtx, Reason) ->
     Error = security_error_type(UserCtx),
     throw({Error, Reason}).
 
-security_error_type(#user_ctx{name=null}) ->
+security_error_type(#user_ctx{name = null}) ->
     unauthorized;
-security_error_type(#user_ctx{name=_}) ->
+security_error_type(#user_ctx{name = _}) ->
     forbidden.
 
-
-get_admins(#db{security=SecProps}) ->
+get_admins(#db{security = SecProps}) ->
     couch_util:get_value(<<"admins">>, SecProps, {[]}).
 
-get_members(#db{security=SecProps}) ->
+get_members(#db{security = SecProps}) ->
     % we fallback to readers here for backwards compatibility
-    couch_util:get_value(<<"members">>, SecProps,
-        couch_util:get_value(<<"readers">>, SecProps, {[]})).
+    couch_util:get_value(
+        <<"members">>,
+        SecProps,
+        couch_util:get_value(<<"readers">>, SecProps, {[]})
+    ).
 
-get_security(#db{security=SecProps}) ->
+get_security(#db{security = SecProps}) ->
     {SecProps};
 get_security(?OLD_DB_REC = Db) ->
     {?OLD_DB_SECURITY(Db)}.
 
-set_security(#db{main_pid=Pid}=Db, {NewSecProps}) when is_list(NewSecProps) ->
+set_security(#db{main_pid = Pid} = Db, {NewSecProps}) when is_list(NewSecProps) ->
     check_is_admin(Db),
     ok = validate_security_object(NewSecProps),
     gen_server:call(Pid, {set_security, NewSecProps}, infinity);
@@ -762,8 +813,11 @@ set_user_ctx(#db{} = Db, UserCtx) ->
 validate_security_object(SecProps) ->
     Admins = couch_util:get_value(<<"admins">>, SecProps, {[]}),
     % we fallback to readers here for backwards compatibility
-    Members = couch_util:get_value(<<"members">>, SecProps,
-        couch_util:get_value(<<"readers">>, SecProps, {[]})),
+    Members = couch_util:get_value(
+        <<"members">>,
+        SecProps,
+        couch_util:get_value(<<"readers">>, SecProps, {[]})
+    ),
     ok = validate_names_and_roles(Admins),
     ok = validate_names_and_roles(Members),
     ok.
@@ -771,18 +825,18 @@ validate_security_object(SecProps) ->
 % validate user input
 validate_names_and_roles({Props}) when is_list(Props) ->
     case couch_util:get_value(<<"names">>, Props, []) of
-    Ns when is_list(Ns) ->
-            [throw("names must be a JSON list of strings") ||N <- Ns, not is_binary(N)],
+        Ns when is_list(Ns) ->
+            [throw("names must be a JSON list of strings") || N <- Ns, not is_binary(N)],
             Ns;
-    _ ->
-        throw("names must be a JSON list of strings")
+        _ ->
+            throw("names must be a JSON list of strings")
     end,
     case couch_util:get_value(<<"roles">>, Props, []) of
-    Rs when is_list(Rs) ->
-        [throw("roles must be a JSON list of strings") ||R <- Rs, not is_binary(R)],
-        Rs;
-    _ ->
-        throw("roles must be a JSON list of strings")
+        Rs when is_list(Rs) ->
+            [throw("roles must be a JSON list of strings") || R <- Rs, not is_binary(R)],
+            Rs;
+        _ ->
+            throw("roles must be a JSON list of strings")
     end,
     ok;
 validate_names_and_roles(_) ->
@@ -791,17 +845,16 @@ validate_names_and_roles(_) ->
 get_revs_limit(#db{} = Db) ->
     couch_db_engine:get_revs_limit(Db).
 
-set_revs_limit(#db{main_pid=Pid}=Db, Limit) when Limit > 0 ->
+set_revs_limit(#db{main_pid = Pid} = Db, Limit) when Limit > 0 ->
     check_is_admin(Db),
     gen_server:call(Pid, {set_revs_limit, Limit}, infinity);
 set_revs_limit(_Db, _Limit) ->
     throw(invalid_revs_limit).
 
-name(#db{name=Name}) ->
+name(#db{name = Name}) ->
     Name;
 name(?OLD_DB_REC = Db) ->
     ?OLD_DB_NAME(Db).
-
 
 validate_docid(#db{} = Db, DocId) when is_binary(DocId) ->
     couch_doc:validate_docid(DocId, name(Db)),
@@ -811,7 +864,6 @@ validate_docid(#db{} = Db, DocId) when is_binary(DocId) ->
         false ->
             ok
     end.
-
 
 doc_from_json_obj_validate(#db{} = Db, DocJson) ->
     Doc = couch_doc:from_json_obj_validate(DocJson, name(Db)),
@@ -825,22 +877,21 @@ doc_from_json_obj_validate(#db{} = Db, DocJson) ->
     end,
     Doc.
 
-
 update_doc(Db, Doc, Options) ->
     update_doc(Db, Doc, Options, interactive_edit).
 
 update_doc(Db, Doc, Options, UpdateType) ->
     case update_docs(Db, [Doc], Options, UpdateType) of
-    {ok, [{ok, NewRev}]} ->
-        {ok, NewRev};
-    {ok, [{{_Id, _Rev}, Error}]} ->
-        throw(Error);
-    {ok, [Error]} ->
-        throw(Error);
-    {ok, []} ->
-        % replication success
-        {Pos, [RevId | _]} = Doc#doc.revs,
-        {ok, {Pos, RevId}}
+        {ok, [{ok, NewRev}]} ->
+            {ok, NewRev};
+        {ok, [{{_Id, _Rev}, Error}]} ->
+            throw(Error);
+        {ok, [Error]} ->
+            throw(Error);
+        {ok, []} ->
+            % replication success
+            {Pos, [RevId | _]} = Doc#doc.revs,
+            {ok, {Pos, RevId}}
     end.
 
 update_docs(Db, Docs) ->
@@ -860,30 +911,30 @@ group_alike_docs(Docs) ->
 
 group_alike_docs([], Buckets) ->
     lists:reverse(lists:map(fun lists:reverse/1, Buckets));
-group_alike_docs([Doc|Rest], []) ->
+group_alike_docs([Doc | Rest], []) ->
     group_alike_docs(Rest, [[Doc]]);
-group_alike_docs([Doc|Rest], [Bucket|RestBuckets]) ->
-    [#doc{id=BucketId}|_] = Bucket,
+group_alike_docs([Doc | Rest], [Bucket | RestBuckets]) ->
+    [#doc{id = BucketId} | _] = Bucket,
     case Doc#doc.id == BucketId of
-    true ->
-        % add to existing bucket
-        group_alike_docs(Rest, [[Doc|Bucket]|RestBuckets]);
-    false ->
-        % add to new bucket
-       group_alike_docs(Rest, [[Doc]|[Bucket|RestBuckets]])
+        true ->
+            % add to existing bucket
+            group_alike_docs(Rest, [[Doc | Bucket] | RestBuckets]);
+        false ->
+            % add to new bucket
+            group_alike_docs(Rest, [[Doc] | [Bucket | RestBuckets]])
     end.
 
-validate_doc_update(#db{}=Db, #doc{id= <<"_design/",_/binary>>}=Doc, _GetDiskDocFun) ->
+validate_doc_update(#db{} = Db, #doc{id = <<"_design/", _/binary>>} = Doc, _GetDiskDocFun) ->
     case catch check_is_admin(Db) of
         ok -> validate_ddoc(Db, Doc);
         Error -> Error
     end;
 validate_doc_update(#db{validate_doc_funs = undefined} = Db, Doc, Fun) ->
     ValidationFuns = load_validation_funs(Db),
-    validate_doc_update(Db#db{validate_doc_funs=ValidationFuns}, Doc, Fun);
-validate_doc_update(#db{validate_doc_funs=[]}, _Doc, _GetDiskDocFun) ->
+    validate_doc_update(Db#db{validate_doc_funs = ValidationFuns}, Doc, Fun);
+validate_doc_update(#db{validate_doc_funs = []}, _Doc, _GetDiskDocFun) ->
     ok;
-validate_doc_update(_Db, #doc{id= <<"_local/",_/binary>>}, _GetDiskDocFun) ->
+validate_doc_update(_Db, #doc{id = <<"_local/", _/binary>>}, _GetDiskDocFun) ->
     ok;
 validate_doc_update(Db, Doc, GetDiskDocFun) ->
     case get(io_priority) of
@@ -911,22 +962,26 @@ validate_doc_update_int(Db, Doc, GetDiskDocFun) ->
         JsonCtx = couch_util:json_user_ctx(Db),
         SecObj = get_security(Db),
         try
-            [case Fun(Doc, DiskDoc, JsonCtx, SecObj) of
-                ok -> ok;
-                Error -> throw(Error)
-             end || Fun <- Db#db.validate_doc_funs],
+            [
+                case Fun(Doc, DiskDoc, JsonCtx, SecObj) of
+                    ok -> ok;
+                    Error -> throw(Error)
+                end
+             || Fun <- Db#db.validate_doc_funs
+            ],
             ok
         catch
             throw:Error ->
                 Error
         end
     end,
-    couch_stats:update_histogram([couchdb, query_server, vdu_process_time],
-                                 Fun).
-
+    couch_stats:update_histogram(
+        [couchdb, query_server, vdu_process_time],
+        Fun
+    ).
 
 % to be safe, spawn a middleman here
-load_validation_funs(#db{main_pid=Pid, name = <<"shards/", _/binary>>}=Db) ->
+load_validation_funs(#db{main_pid = Pid, name = <<"shards/", _/binary>>} = Db) ->
     {_, Ref} = spawn_monitor(fun() ->
         exit(ddoc_cache:open(mem3:dbname(Db#db.name), validation_funs))
     end),
@@ -941,242 +996,326 @@ load_validation_funs(#db{main_pid=Pid, name = <<"shards/", _/binary>>}=Db) ->
             couch_log:error("could not load validation funs ~p", [Reason]),
             throw(internal_server_error)
     end;
-load_validation_funs(#db{main_pid=Pid}=Db) ->
+load_validation_funs(#db{main_pid = Pid} = Db) ->
     {ok, DDocInfos} = get_design_docs(Db),
-    OpenDocs = fun
-        (#full_doc_info{}=D) ->
-            {ok, Doc} = open_doc_int(Db, D, [ejson_body]),
-            Doc
+    OpenDocs = fun(#full_doc_info{} = D) ->
+        {ok, Doc} = open_doc_int(Db, D, [ejson_body]),
+        Doc
     end,
     DDocs = lists:map(OpenDocs, DDocInfos),
-    Funs = lists:flatmap(fun(DDoc) ->
-        case couch_doc:get_validate_doc_fun(DDoc) of
-            nil -> [];
-            Fun -> [Fun]
-        end
-    end, DDocs),
+    Funs = lists:flatmap(
+        fun(DDoc) ->
+            case couch_doc:get_validate_doc_fun(DDoc) of
+                nil -> [];
+                Fun -> [Fun]
+            end
+        end,
+        DDocs
+    ),
     gen_server:cast(Pid, {load_validation_funs, Funs}),
     Funs.
 
 reload_validation_funs(#db{} = Db) ->
     gen_server:cast(Db#db.main_pid, {load_validation_funs, undefined}).
 
-prep_and_validate_update(Db, #doc{id=Id,revs={RevStart, Revs}}=Doc,
-        OldFullDocInfo, LeafRevsDict, AllowConflict) ->
+prep_and_validate_update(
+    Db,
+    #doc{id = Id, revs = {RevStart, Revs}} = Doc,
+    OldFullDocInfo,
+    LeafRevsDict,
+    AllowConflict
+) ->
     case Revs of
-    [PrevRev|_] ->
-        case dict:find({RevStart, PrevRev}, LeafRevsDict) of
-        {ok, {#leaf{deleted=Deleted, ptr=DiskSp}, DiskRevs}} ->
-            case couch_doc:has_stubs(Doc) of
-            true ->
-                DiskDoc = make_doc(Db, Id, Deleted, DiskSp, DiskRevs),
-                Doc2 = couch_doc:merge_stubs(Doc, DiskDoc),
-                {validate_doc_update(Db, Doc2, fun() -> DiskDoc end), Doc2};
-            false ->
-                LoadDiskDoc = fun() -> make_doc(Db,Id,Deleted,DiskSp,DiskRevs) end,
-                {validate_doc_update(Db, Doc, LoadDiskDoc), Doc}
+        [PrevRev | _] ->
+            case dict:find({RevStart, PrevRev}, LeafRevsDict) of
+                {ok, {#leaf{deleted = Deleted, ptr = DiskSp}, DiskRevs}} ->
+                    case couch_doc:has_stubs(Doc) of
+                        true ->
+                            DiskDoc = make_doc(Db, Id, Deleted, DiskSp, DiskRevs),
+                            Doc2 = couch_doc:merge_stubs(Doc, DiskDoc),
+                            {validate_doc_update(Db, Doc2, fun() -> DiskDoc end), Doc2};
+                        false ->
+                            LoadDiskDoc = fun() -> make_doc(Db, Id, Deleted, DiskSp, DiskRevs) end,
+                            {validate_doc_update(Db, Doc, LoadDiskDoc), Doc}
+                    end;
+                error when AllowConflict ->
+                    % will generate error if
+                    couch_doc:merge_stubs(Doc, #doc{}),
+                    % there are stubs
+                    {validate_doc_update(Db, Doc, fun() -> nil end), Doc};
+                error ->
+                    {conflict, Doc}
             end;
-        error when AllowConflict ->
-            couch_doc:merge_stubs(Doc, #doc{}), % will generate error if
-                                                        % there are stubs
-            {validate_doc_update(Db, Doc, fun() -> nil end), Doc};
-        error ->
-            {conflict, Doc}
-        end;
-    [] ->
-        % new doc, and we have existing revs.
-        % reuse existing deleted doc
-        if OldFullDocInfo#full_doc_info.deleted orelse AllowConflict ->
-            {validate_doc_update(Db, Doc, fun() -> nil end), Doc};
-        true ->
-            {conflict, Doc}
-        end
+        [] ->
+            % new doc, and we have existing revs.
+            % reuse existing deleted doc
+            if
+                OldFullDocInfo#full_doc_info.deleted orelse AllowConflict ->
+                    {validate_doc_update(Db, Doc, fun() -> nil end), Doc};
+                true ->
+                    {conflict, Doc}
+            end
     end.
 
-
-
-prep_and_validate_updates(_Db, [], [], _AllowConflict, AccPrepped,
-        AccFatalErrors) ->
+prep_and_validate_updates(
+    _Db,
+    [],
+    [],
+    _AllowConflict,
+    AccPrepped,
+    AccFatalErrors
+) ->
     AccPrepped2 = lists:reverse(lists:map(fun lists:reverse/1, AccPrepped)),
     {AccPrepped2, AccFatalErrors};
-prep_and_validate_updates(Db, [DocBucket|RestBuckets], [not_found|RestLookups],
-        AllowConflict, AccPrepped, AccErrors) ->
+prep_and_validate_updates(
+    Db,
+    [DocBucket | RestBuckets],
+    [not_found | RestLookups],
+    AllowConflict,
+    AccPrepped,
+    AccErrors
+) ->
     % no existing revs are known,
     {PreppedBucket, AccErrors3} = lists:foldl(
-        fun(#doc{revs=Revs}=Doc, {AccBucket, AccErrors2}) ->
+        fun(#doc{revs = Revs} = Doc, {AccBucket, AccErrors2}) ->
             case couch_doc:has_stubs(Doc) of
-            true ->
-                couch_doc:merge_stubs(Doc, #doc{}); % will throw exception
-            false -> ok
+                true ->
+                    % will throw exception
+                    couch_doc:merge_stubs(Doc, #doc{});
+                false ->
+                    ok
             end,
             case Revs of
-            {0, []} ->
-                case validate_doc_update(Db, Doc, fun() -> nil end) of
-                ok ->
-                    {[Doc | AccBucket], AccErrors2};
-                Error ->
-                    {AccBucket, [{doc_tag(Doc), Error} | AccErrors2]}
-                end;
-            _ ->
-                % old revs specified but none exist, a conflict
-                {AccBucket, [{doc_tag(Doc), conflict} | AccErrors2]}
+                {0, []} ->
+                    case validate_doc_update(Db, Doc, fun() -> nil end) of
+                        ok ->
+                            {[Doc | AccBucket], AccErrors2};
+                        Error ->
+                            {AccBucket, [{doc_tag(Doc), Error} | AccErrors2]}
+                    end;
+                _ ->
+                    % old revs specified but none exist, a conflict
+                    {AccBucket, [{doc_tag(Doc), conflict} | AccErrors2]}
             end
         end,
-        {[], AccErrors}, DocBucket),
+        {[], AccErrors},
+        DocBucket
+    ),
 
-    prep_and_validate_updates(Db, RestBuckets, RestLookups, AllowConflict,
-            [PreppedBucket | AccPrepped], AccErrors3);
-prep_and_validate_updates(Db, [DocBucket|RestBuckets],
-        [#full_doc_info{rev_tree=OldRevTree}=OldFullDocInfo|RestLookups],
-        AllowConflict, AccPrepped, AccErrors) ->
+    prep_and_validate_updates(
+        Db,
+        RestBuckets,
+        RestLookups,
+        AllowConflict,
+        [PreppedBucket | AccPrepped],
+        AccErrors3
+    );
+prep_and_validate_updates(
+    Db,
+    [DocBucket | RestBuckets],
+    [#full_doc_info{rev_tree = OldRevTree} = OldFullDocInfo | RestLookups],
+    AllowConflict,
+    AccPrepped,
+    AccErrors
+) ->
     Leafs = couch_key_tree:get_all_leafs(OldRevTree),
     LeafRevsDict = dict:from_list([
-        {{Start, RevId}, {Leaf, Revs}} ||
-        {Leaf, {Start, [RevId | _]} = Revs} <- Leafs
+        {{Start, RevId}, {Leaf, Revs}}
+     || {Leaf, {Start, [RevId | _]} = Revs} <- Leafs
     ]),
     {PreppedBucket, AccErrors3} = lists:foldl(
         fun(Doc, {Docs2Acc, AccErrors2}) ->
-            case prep_and_validate_update(Db, Doc, OldFullDocInfo,
-                    LeafRevsDict, AllowConflict) of
-            {ok, Doc2} ->
-                {[Doc2 | Docs2Acc], AccErrors2};
-            {Error, _} ->
-                % Record the error
-                {Docs2Acc, [{doc_tag(Doc), Error} |AccErrors2]}
+            case
+                prep_and_validate_update(
+                    Db,
+                    Doc,
+                    OldFullDocInfo,
+                    LeafRevsDict,
+                    AllowConflict
+                )
+            of
+                {ok, Doc2} ->
+                    {[Doc2 | Docs2Acc], AccErrors2};
+                {Error, _} ->
+                    % Record the error
+                    {Docs2Acc, [{doc_tag(Doc), Error} | AccErrors2]}
             end
         end,
-        {[], AccErrors}, DocBucket),
-    prep_and_validate_updates(Db, RestBuckets, RestLookups, AllowConflict,
-            [PreppedBucket | AccPrepped], AccErrors3).
-
+        {[], AccErrors},
+        DocBucket
+    ),
+    prep_and_validate_updates(
+        Db,
+        RestBuckets,
+        RestLookups,
+        AllowConflict,
+        [PreppedBucket | AccPrepped],
+        AccErrors3
+    ).
 
 update_docs(Db, Docs, Options) ->
     update_docs(Db, Docs, Options, interactive_edit).
 
-
 prep_and_validate_replicated_updates(_Db, [], [], AccPrepped, AccErrors) ->
-    Errors2 = [{{Id, {Pos, Rev}}, Error} ||
-            {#doc{id=Id,revs={Pos,[Rev|_]}}, Error} <- AccErrors],
+    Errors2 = [
+        {{Id, {Pos, Rev}}, Error}
+     || {#doc{id = Id, revs = {Pos, [Rev | _]}}, Error} <- AccErrors
+    ],
     AccPrepped2 = lists:reverse(lists:map(fun lists:reverse/1, AccPrepped)),
     {AccPrepped2, lists:reverse(Errors2)};
-prep_and_validate_replicated_updates(Db, [Bucket|RestBuckets], [OldInfo|RestOldInfo], AccPrepped, AccErrors) ->
+prep_and_validate_replicated_updates(
+    Db, [Bucket | RestBuckets], [OldInfo | RestOldInfo], AccPrepped, AccErrors
+) ->
     case OldInfo of
-    not_found ->
-        {ValidatedBucket, AccErrors3} = lists:foldl(
-            fun(Doc, {AccPrepped2, AccErrors2}) ->
-                case couch_doc:has_stubs(Doc) of
-                true ->
-                    couch_doc:merge_stubs(Doc, #doc{}); % will throw exception
-                false -> ok
-                end,
-                case validate_doc_update(Db, Doc, fun() -> nil end) of
-                ok ->
-                    {[Doc | AccPrepped2], AccErrors2};
-                Error ->
-                    {AccPrepped2, [{Doc, Error} | AccErrors2]}
-                end
-            end,
-            {[], AccErrors}, Bucket),
-        prep_and_validate_replicated_updates(Db, RestBuckets, RestOldInfo, [ValidatedBucket | AccPrepped], AccErrors3);
-    #full_doc_info{rev_tree=OldTree} ->
-        OldLeafs = couch_key_tree:get_all_leafs_full(OldTree),
-        OldLeafsLU = [{Start, RevId} || {Start, [{RevId, _}|_]} <- OldLeafs],
-        NewPaths = lists:map(fun couch_doc:to_path/1, Bucket),
-        NewRevTree = couch_key_tree:multi_merge(OldTree, NewPaths),
-        Leafs = couch_key_tree:get_all_leafs_full(NewRevTree),
-        LeafRevsFullDict = dict:from_list( [{{Start, RevId}, FullPath} || {Start, [{RevId, _}|_]}=FullPath <- Leafs]),
-        {ValidatedBucket, AccErrors3} =
-        lists:foldl(
-            fun(#doc{id=Id,revs={Pos, [RevId|_]}}=Doc, {AccValidated, AccErrors2}) ->
-                IsOldLeaf = lists:member({Pos, RevId}, OldLeafsLU),
-                case dict:find({Pos, RevId}, LeafRevsFullDict) of
-                {ok, {Start, Path}} when not IsOldLeaf ->
-                    % our unflushed doc is a leaf node. Go back on the path
-                    % to find the previous rev that's on disk.
-
-                    LoadPrevRevFun = fun() ->
-                                make_first_doc_on_disk(Db,Id,Start-1, tl(Path))
-                            end,
-
+        not_found ->
+            {ValidatedBucket, AccErrors3} = lists:foldl(
+                fun(Doc, {AccPrepped2, AccErrors2}) ->
                     case couch_doc:has_stubs(Doc) of
-                    true ->
-                        DiskDoc = case LoadPrevRevFun() of
-                            #doc{} = DiskDoc0 ->
-                                DiskDoc0;
-                            _ ->
-                                % Force a missing_stub exception
-                                couch_doc:merge_stubs(Doc, #doc{})
-                        end,
-                        Doc2 = couch_doc:merge_stubs(Doc, DiskDoc),
-                        GetDiskDocFun = fun() -> DiskDoc end;
-                    false ->
-                        Doc2 = Doc,
-                        GetDiskDocFun = LoadPrevRevFun
+                        true ->
+                            % will throw exception
+                            couch_doc:merge_stubs(Doc, #doc{});
+                        false ->
+                            ok
                     end,
+                    case validate_doc_update(Db, Doc, fun() -> nil end) of
+                        ok ->
+                            {[Doc | AccPrepped2], AccErrors2};
+                        Error ->
+                            {AccPrepped2, [{Doc, Error} | AccErrors2]}
+                    end
+                end,
+                {[], AccErrors},
+                Bucket
+            ),
+            prep_and_validate_replicated_updates(
+                Db, RestBuckets, RestOldInfo, [ValidatedBucket | AccPrepped], AccErrors3
+            );
+        #full_doc_info{rev_tree = OldTree} ->
+            OldLeafs = couch_key_tree:get_all_leafs_full(OldTree),
+            OldLeafsLU = [{Start, RevId} || {Start, [{RevId, _} | _]} <- OldLeafs],
+            NewPaths = lists:map(fun couch_doc:to_path/1, Bucket),
+            NewRevTree = couch_key_tree:multi_merge(OldTree, NewPaths),
+            Leafs = couch_key_tree:get_all_leafs_full(NewRevTree),
+            LeafRevsFullDict = dict:from_list([
+                {{Start, RevId}, FullPath}
+             || {Start, [{RevId, _} | _]} = FullPath <- Leafs
+            ]),
+            {ValidatedBucket, AccErrors3} =
+                lists:foldl(
+                    fun(#doc{id = Id, revs = {Pos, [RevId | _]}} = Doc, {AccValidated, AccErrors2}) ->
+                        IsOldLeaf = lists:member({Pos, RevId}, OldLeafsLU),
+                        case dict:find({Pos, RevId}, LeafRevsFullDict) of
+                            {ok, {Start, Path}} when not IsOldLeaf ->
+                                % our unflushed doc is a leaf node. Go back on the path
+                                % to find the previous rev that's on disk.
 
-                    case validate_doc_update(Db, Doc2, GetDiskDocFun) of
-                    ok ->
-                        {[Doc2 | AccValidated], AccErrors2};
-                    Error ->
-                        {AccValidated, [{Doc, Error} | AccErrors2]}
-                    end;
-                _ ->
-                    % this doc isn't a leaf or already exists in the tree.
-                    % ignore but consider it a success.
-                    {AccValidated, AccErrors2}
-                end
-            end,
-            {[], AccErrors}, Bucket),
-        prep_and_validate_replicated_updates(Db, RestBuckets, RestOldInfo,
-                [ValidatedBucket | AccPrepped], AccErrors3)
+                                LoadPrevRevFun = fun() ->
+                                    make_first_doc_on_disk(Db, Id, Start - 1, tl(Path))
+                                end,
+
+                                case couch_doc:has_stubs(Doc) of
+                                    true ->
+                                        DiskDoc =
+                                            case LoadPrevRevFun() of
+                                                #doc{} = DiskDoc0 ->
+                                                    DiskDoc0;
+                                                _ ->
+                                                    % Force a missing_stub exception
+                                                    couch_doc:merge_stubs(Doc, #doc{})
+                                            end,
+                                        Doc2 = couch_doc:merge_stubs(Doc, DiskDoc),
+                                        GetDiskDocFun = fun() -> DiskDoc end;
+                                    false ->
+                                        Doc2 = Doc,
+                                        GetDiskDocFun = LoadPrevRevFun
+                                end,
+
+                                case validate_doc_update(Db, Doc2, GetDiskDocFun) of
+                                    ok ->
+                                        {[Doc2 | AccValidated], AccErrors2};
+                                    Error ->
+                                        {AccValidated, [{Doc, Error} | AccErrors2]}
+                                end;
+                            _ ->
+                                % this doc isn't a leaf or already exists in the tree.
+                                % ignore but consider it a success.
+                                {AccValidated, AccErrors2}
+                        end
+                    end,
+                    {[], AccErrors},
+                    Bucket
+                ),
+            prep_and_validate_replicated_updates(
+                Db,
+                RestBuckets,
+                RestOldInfo,
+                [ValidatedBucket | AccPrepped],
+                AccErrors3
+            )
     end.
 
-
-
-new_revid(#doc{body=Body, revs={OldStart,OldRevs}, atts=Atts, deleted=Deleted}) ->
-    DigestedAtts = lists:foldl(fun(Att, Acc) ->
-        [N, T, M] = couch_att:fetch([name, type, md5], Att),
-        case M == <<>> of
-            true -> Acc;
-            false -> [{N, T, M} | Acc]
-        end
-    end, [], Atts),
+new_revid(#doc{body = Body, revs = {OldStart, OldRevs}, atts = Atts, deleted = Deleted}) ->
+    DigestedAtts = lists:foldl(
+        fun(Att, Acc) ->
+            [N, T, M] = couch_att:fetch([name, type, md5], Att),
+            case M == <<>> of
+                true -> Acc;
+                false -> [{N, T, M} | Acc]
+            end
+        end,
+        [],
+        Atts
+    ),
     case DigestedAtts of
         Atts2 when length(Atts) =/= length(Atts2) ->
             % We must have old style non-md5 attachments
             ?l2b(integer_to_list(couch_util:rand32()));
         Atts2 ->
-            OldRev = case OldRevs of [] -> 0; [OldRev0|_] -> OldRev0 end,
-            couch_hash:md5_hash(term_to_binary([Deleted, OldStart, OldRev, Body, Atts2], [{minor_version, 1}]))
+            OldRev =
+                case OldRevs of
+                    [] -> 0;
+                    [OldRev0 | _] -> OldRev0
+                end,
+            couch_hash:md5_hash(
+                term_to_binary([Deleted, OldStart, OldRev, Body, Atts2], [{minor_version, 1}])
+            )
     end.
 
 new_revs([], OutBuckets, IdRevsAcc) ->
     {lists:reverse(OutBuckets), IdRevsAcc};
-new_revs([Bucket|RestBuckets], OutBuckets, IdRevsAcc) ->
+new_revs([Bucket | RestBuckets], OutBuckets, IdRevsAcc) ->
     {NewBucket, IdRevsAcc3} = lists:mapfoldl(
-        fun(#doc{revs={Start, RevIds}}=Doc, IdRevsAcc2)->
-        NewRevId = new_revid(Doc),
-        {Doc#doc{revs={Start+1, [NewRevId | RevIds]}},
-            [{doc_tag(Doc), {ok, {Start+1, NewRevId}}} | IdRevsAcc2]}
-    end, IdRevsAcc, Bucket),
-    new_revs(RestBuckets, [NewBucket|OutBuckets], IdRevsAcc3).
+        fun(#doc{revs = {Start, RevIds}} = Doc, IdRevsAcc2) ->
+            NewRevId = new_revid(Doc),
+            {Doc#doc{revs = {Start + 1, [NewRevId | RevIds]}}, [
+                {doc_tag(Doc), {ok, {Start + 1, NewRevId}}} | IdRevsAcc2
+            ]}
+        end,
+        IdRevsAcc,
+        Bucket
+    ),
+    new_revs(RestBuckets, [NewBucket | OutBuckets], IdRevsAcc3).
 
-check_dup_atts(#doc{atts=Atts}=Doc) ->
-    lists:foldl(fun(Att, Names) ->
-        Name = couch_att:fetch(name, Att),
-        case ordsets:is_element(Name, Names) of
-            true -> throw({bad_request, <<"Duplicate attachments">>});
-            false -> ordsets:add_element(Name, Names)
-        end
-    end, ordsets:new(), Atts),
+check_dup_atts(#doc{atts = Atts} = Doc) ->
+    lists:foldl(
+        fun(Att, Names) ->
+            Name = couch_att:fetch(name, Att),
+            case ordsets:is_element(Name, Names) of
+                true -> throw({bad_request, <<"Duplicate attachments">>});
+                false -> ordsets:add_element(Name, Names)
+            end
+        end,
+        ordsets:new(),
+        Atts
+    ),
     Doc.
 
 tag_docs([]) ->
     [];
-tag_docs([#doc{meta=Meta}=Doc | Rest]) ->
-    [Doc#doc{meta=[{ref, make_ref()} | Meta]} | tag_docs(Rest)].
+tag_docs([#doc{meta = Meta} = Doc | Rest]) ->
+    [Doc#doc{meta = [{ref, make_ref()} | Meta]} | tag_docs(Rest)].
 
-doc_tag(#doc{meta=Meta}) ->
+doc_tag(#doc{meta = Meta}) ->
     case lists:keyfind(ref, 1, Meta) of
         {ref, Ref} when is_reference(Ref) -> Ref;
         false -> throw(doc_not_tagged);
@@ -1187,58 +1326,105 @@ update_docs(Db, Docs0, Options, replicated_changes) ->
     Docs = tag_docs(Docs0),
 
     PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
-        prep_and_validate_replicated_updates(Db0, DocBuckets0,
-            ExistingDocInfos, [], [])
+        prep_and_validate_replicated_updates(
+            Db0,
+            DocBuckets0,
+            ExistingDocInfos,
+            [],
+            []
+        )
     end,
 
-    {ok, DocBuckets, NonRepDocs, DocErrors}
-        = before_docs_update(Db, Docs, PrepValidateFun, replicated_changes),
+    {ok, DocBuckets, NonRepDocs, DocErrors} =
+        before_docs_update(Db, Docs, PrepValidateFun, replicated_changes),
 
-    DocBuckets2 = [[doc_flush_atts(Db, check_dup_atts(Doc))
-            || Doc <- Bucket] || Bucket <- DocBuckets],
-    {ok, _} = write_and_commit(Db, DocBuckets2,
-        NonRepDocs, [merge_conflicts | Options]),
+    DocBuckets2 = [
+        [
+            doc_flush_atts(Db, check_dup_atts(Doc))
+         || Doc <- Bucket
+        ]
+     || Bucket <- DocBuckets
+    ],
+    {ok, _} = write_and_commit(
+        Db,
+        DocBuckets2,
+        NonRepDocs,
+        [merge_conflicts | Options]
+    ),
     {ok, DocErrors};
-
 update_docs(Db, Docs0, Options, interactive_edit) ->
     Docs = tag_docs(Docs0),
 
     AllOrNothing = lists:member(all_or_nothing, Options),
     PrepValidateFun = fun(Db0, DocBuckets0, ExistingDocInfos) ->
-        prep_and_validate_updates(Db0, DocBuckets0, ExistingDocInfos,
-            AllOrNothing, [], [])
+        prep_and_validate_updates(
+            Db0,
+            DocBuckets0,
+            ExistingDocInfos,
+            AllOrNothing,
+            [],
+            []
+        )
     end,
 
-    {ok, DocBuckets, NonRepDocs, DocErrors}
-        = before_docs_update(Db, Docs, PrepValidateFun, interactive_edit),
+    {ok, DocBuckets, NonRepDocs, DocErrors} =
+        before_docs_update(Db, Docs, PrepValidateFun, interactive_edit),
 
-    if (AllOrNothing) and (DocErrors /= []) ->
-        RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),
-        {aborted, lists:map(fun({Ref, Error}) ->
-            #doc{id=Id,revs={Start,RevIds}} = dict:fetch(Ref, RefErrorDict),
-            case {Start, RevIds} of
-                {Pos, [RevId | _]} -> {{Id, {Pos, RevId}}, Error};
-                {0, []} -> {{Id, {0, <<>>}}, Error}
-            end
-        end, DocErrors)};
-    true ->
-        Options2 = if AllOrNothing -> [merge_conflicts];
-                true -> [] end ++ Options,
-        DocBuckets2 = [[
-                doc_flush_atts(Db, set_new_att_revpos(
-                        check_dup_atts(Doc)))
-                || Doc <- B] || B <- DocBuckets],
-        {DocBuckets3, IdRevs} = new_revs(DocBuckets2, [], []),
+    if
+        (AllOrNothing) and (DocErrors /= []) ->
+            RefErrorDict = dict:from_list([{doc_tag(Doc), Doc} || Doc <- Docs]),
+            {aborted,
+                lists:map(
+                    fun({Ref, Error}) ->
+                        #doc{id = Id, revs = {Start, RevIds}} = dict:fetch(Ref, RefErrorDict),
+                        case {Start, RevIds} of
+                            {Pos, [RevId | _]} -> {{Id, {Pos, RevId}}, Error};
+                            {0, []} -> {{Id, {0, <<>>}}, Error}
+                        end
+                    end,
+                    DocErrors
+                )};
+        true ->
+            Options2 =
+                if
+                    AllOrNothing -> [merge_conflicts];
+                    true -> []
+                end ++ Options,
+            DocBuckets2 = [
+                [
+                    doc_flush_atts(
+                        Db,
+                        set_new_att_revpos(
+                            check_dup_atts(Doc)
+                        )
+                    )
+                 || Doc <- B
+                ]
+             || B <- DocBuckets
+            ],
+            {DocBuckets3, IdRevs} = new_revs(DocBuckets2, [], []),
 
-        {ok, CommitResults} = write_and_commit(Db, DocBuckets3,
-            NonRepDocs, Options2),
+            {ok, CommitResults} = write_and_commit(
+                Db,
+                DocBuckets3,
+                NonRepDocs,
+                Options2
+            ),
 
-        ResultsDict = lists:foldl(fun({Key, Resp}, ResultsAcc) ->
-            dict:store(Key, Resp, ResultsAcc)
-        end, dict:from_list(IdRevs), CommitResults ++ DocErrors),
-        {ok, lists:map(fun(Doc) ->
-            dict:fetch(doc_tag(Doc), ResultsDict)
-        end, Docs)}
+            ResultsDict = lists:foldl(
+                fun({Key, Resp}, ResultsAcc) ->
+                    dict:store(Key, Resp, ResultsAcc)
+                end,
+                dict:from_list(IdRevs),
+                CommitResults ++ DocErrors
+            ),
+            {ok,
+                lists:map(
+                    fun(Doc) ->
+                        dict:fetch(doc_tag(Doc), ResultsDict)
+                    end,
+                    Docs
+                )}
     end.
 
 % Returns the first available document on disk. Input list is a full rev path
@@ -1246,10 +1432,10 @@ update_docs(Db, Docs0, Options, interactive_edit) ->
 make_first_doc_on_disk(_Db, _Id, _Pos, []) ->
     nil;
 make_first_doc_on_disk(Db, Id, Pos, [{_Rev, #doc{}} | RestPath]) ->
-    make_first_doc_on_disk(Db, Id, Pos-1, RestPath);
-make_first_doc_on_disk(Db, Id, Pos, [{_Rev, ?REV_MISSING}|RestPath]) ->
     make_first_doc_on_disk(Db, Id, Pos - 1, RestPath);
-make_first_doc_on_disk(Db, Id, Pos, [{_Rev, #leaf{deleted=IsDel, ptr=Sp}} |_]=DocPath) ->
+make_first_doc_on_disk(Db, Id, Pos, [{_Rev, ?REV_MISSING} | RestPath]) ->
+    make_first_doc_on_disk(Db, Id, Pos - 1, RestPath);
+make_first_doc_on_disk(Db, Id, Pos, [{_Rev, #leaf{deleted = IsDel, ptr = Sp}} | _] = DocPath) ->
     Revs = [Rev || {Rev, _} <- DocPath],
     make_doc(Db, Id, IsDel, Sp, {Pos, Revs}).
 
@@ -1267,90 +1453,105 @@ collect_results_with_metrics(Pid, MRef, []) ->
 
 collect_results(Pid, MRef, ResultsAcc) ->
     receive
-    {result, Pid, Result} ->
-        collect_results(Pid, MRef, [Result | ResultsAcc]);
-    {done, Pid} ->
-        {ok, ResultsAcc};
-    {retry, Pid} ->
-        retry;
-    {'DOWN', MRef, _, _, Reason} ->
-        exit(Reason)
+        {result, Pid, Result} ->
+            collect_results(Pid, MRef, [Result | ResultsAcc]);
+        {done, Pid} ->
+            {ok, ResultsAcc};
+        {retry, Pid} ->
+            retry;
+        {'DOWN', MRef, _, _, Reason} ->
+            exit(Reason)
     end.
 
-write_and_commit(#db{main_pid=Pid, user_ctx=Ctx}=Db, DocBuckets1,
-        NonRepDocs, Options) ->
+write_and_commit(
+    #db{main_pid = Pid, user_ctx = Ctx} = Db,
+    DocBuckets1,
+    NonRepDocs,
+    Options
+) ->
     DocBuckets = prepare_doc_summaries(Db, DocBuckets1),
     MergeConflicts = lists:member(merge_conflicts, Options),
     MRef = erlang:monitor(process, Pid),
     try
         Pid ! {update_docs, self(), DocBuckets, NonRepDocs, MergeConflicts},
         case collect_results_with_metrics(Pid, MRef, []) of
-        {ok, Results} -> {ok, Results};
-        retry ->
-            % This can happen if the db file we wrote to was swapped out by
-            % compaction. Retry by reopening the db and writing to the current file
-            {ok, Db2} = open(Db#db.name, [{user_ctx, Ctx}]),
-            DocBuckets2 = [
-                [doc_flush_atts(Db2, Doc) || Doc <- Bucket] ||
-                Bucket <- DocBuckets1
-            ],
-            % We only retry once
-            DocBuckets3 = prepare_doc_summaries(Db2, DocBuckets2),
-            close(Db2),
-            Pid ! {update_docs, self(), DocBuckets3, NonRepDocs, MergeConflicts},
-            case collect_results_with_metrics(Pid, MRef, []) of
-            {ok, Results} -> {ok, Results};
-            retry -> throw({update_error, compaction_retry})
-            end
+            {ok, Results} ->
+                {ok, Results};
+            retry ->
+                % This can happen if the db file we wrote to was swapped out by
+                % compaction. Retry by reopening the db and writing to the current file
+                {ok, Db2} = open(Db#db.name, [{user_ctx, Ctx}]),
+                DocBuckets2 = [
+                    [doc_flush_atts(Db2, Doc) || Doc <- Bucket]
+                 || Bucket <- DocBuckets1
+                ],
+                % We only retry once
+                DocBuckets3 = prepare_doc_summaries(Db2, DocBuckets2),
+                close(Db2),
+                Pid ! {update_docs, self(), DocBuckets3, NonRepDocs, MergeConflicts},
+                case collect_results_with_metrics(Pid, MRef, []) of
+                    {ok, Results} -> {ok, Results};
+                    retry -> throw({update_error, compaction_retry})
+                end
         end
     after
         erlang:demonitor(MRef, [flush])
     end.
 
-
 prepare_doc_summaries(Db, BucketList) ->
-    [lists:map(
-        fun(#doc{body = Body, atts = Atts} = Doc0) ->
-            DiskAtts = [couch_att:to_disk_term(Att) || Att <- Atts],
-            {ok, SizeInfo} = couch_att:size_info(Atts),
-            AttsStream = case Atts of
-                [Att | _] ->
-                    {stream, StreamEngine} = couch_att:fetch(data, Att),
-                    StreamEngine;
-                [] ->
-                    nil
+    [
+        lists:map(
+            fun(#doc{body = Body, atts = Atts} = Doc0) ->
+                DiskAtts = [couch_att:to_disk_term(Att) || Att <- Atts],
+                {ok, SizeInfo} = couch_att:size_info(Atts),
+                AttsStream =
+                    case Atts of
+                        [Att | _] ->
+                            {stream, StreamEngine} = couch_att:fetch(data, Att),
+                            StreamEngine;
+                        [] ->
+                            nil
+                    end,
+                Doc1 = Doc0#doc{
+                    atts = DiskAtts,
+                    meta =
+                        [
+                            {size_info, SizeInfo},
+                            {atts_stream, AttsStream},
+                            {ejson_size, couch_ejson_size:encoded_size(Body)}
+                        ] ++ Doc0#doc.meta
+                },
+                couch_db_engine:serialize_doc(Db, Doc1)
             end,
-            Doc1 = Doc0#doc{
-                atts = DiskAtts,
-                meta = [
-                    {size_info, SizeInfo},
-                    {atts_stream, AttsStream},
-                    {ejson_size, couch_ejson_size:encoded_size(Body)}
-                ] ++ Doc0#doc.meta
-            },
-            couch_db_engine:serialize_doc(Db, Doc1)
-        end,
-        Bucket) || Bucket <- BucketList].
-
+            Bucket
+        )
+     || Bucket <- BucketList
+    ].
 
 before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun, UpdateType) ->
     increment_stat(Db, [couchdb, database_writes]),
 
     % Separate _local docs from normal docs
     IsLocal = fun
-        (#doc{id= <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
+        (#doc{id = <<?LOCAL_DOC_PREFIX, _/binary>>}) -> true;
         (_) -> false
     end,
     {NonRepDocs, Docs2} = lists:partition(IsLocal, Docs),
 
     BucketList = group_alike_docs(Docs2),
 
-    DocBuckets = lists:map(fun(Bucket) ->
-        lists:map(fun(Doc) ->
-            DocWithBody = couch_doc:with_ejson_body(Doc),
-            couch_db_plugin:before_doc_update(Db, DocWithBody, UpdateType)
-        end, Bucket)
-    end, BucketList),
+    DocBuckets = lists:map(
+        fun(Bucket) ->
+            lists:map(
+                fun(Doc) ->
+                    DocWithBody = couch_doc:with_ejson_body(Doc),
+                    couch_db_plugin:before_doc_update(Db, DocWithBody, UpdateType)
+                end,
+                Bucket
+            )
+        end,
+        BucketList
+    ),
 
     ValidatePred = fun
         (#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>}) -> true;
@@ -1363,15 +1564,14 @@ before_docs_update(#db{validate_doc_funs = VDFuns} = Db, Docs, PVFun, UpdateType
             Ids = [Id || [#doc{id = Id} | _] <- DocBuckets],
             ExistingDocs = get_full_doc_infos(Db, Ids),
             {DocBuckets2, DocErrors} = PVFun(Db, DocBuckets, ExistingDocs),
-             % remove empty buckets
+            % remove empty buckets
             DocBuckets3 = [Bucket || Bucket <- DocBuckets2, Bucket /= []],
             {ok, DocBuckets3, NonRepDocs, DocErrors};
         false ->
             {ok, DocBuckets, NonRepDocs, []}
     end.
 
-
-set_new_att_revpos(#doc{revs={RevPos,_Revs},atts=Atts0}=Doc) ->
+set_new_att_revpos(#doc{revs = {RevPos, _Revs}, atts = Atts0} = Doc) ->
     Atts = lists:map(
         fun(Att) ->
             case couch_att:fetch(data, Att) of
@@ -1379,29 +1579,36 @@ set_new_att_revpos(#doc{revs={RevPos,_Revs},atts=Atts0}=Doc) ->
                 {stream, _} -> Att;
                 {Fd, _} when is_pid(Fd) -> Att;
                 % write required so update RevPos
-                _ -> couch_att:store(revpos, RevPos+1, Att)
+                _ -> couch_att:store(revpos, RevPos + 1, Att)
             end
-        end, Atts0),
+        end,
+        Atts0
+    ),
     Doc#doc{atts = Atts}.
 
-
 doc_flush_atts(Db, Doc) ->
-    Doc#doc{atts=[couch_att:flush(Db, Att) || Att <- Doc#doc.atts]}.
-
+    Doc#doc{atts = [couch_att:flush(Db, Att) || Att <- Doc#doc.atts]}.
 
 compressible_att_type(MimeType) when is_binary(MimeType) ->
     compressible_att_type(?b2l(MimeType));
 compressible_att_type(MimeType) ->
     TypeExpList = re:split(
-        config:get("attachments", "compressible_types",
-            ?DEFAULT_COMPRESSIBLE_TYPES),
+        config:get(
+            "attachments",
+            "compressible_types",
+            ?DEFAULT_COMPRESSIBLE_TYPES
+        ),
         "\\s*,\\s*",
         [{return, list}]
     ),
     lists:any(
         fun(TypeExp) ->
-            Regexp = ["^\\s*", re:replace(TypeExp, "\\*", ".*"),
-                "(?:\\s*;.*?)?\\s*", $$],
+            Regexp = [
+                "^\\s*",
+                re:replace(TypeExp, "\\*", ".*"),
+                "(?:\\s*;.*?)?\\s*",
+                $$
+            ],
             re:run(MimeType, Regexp, [caseless]) =/= nomatch
         end,
         [T || T <- TypeExpList, T /= []]
@@ -1419,73 +1626,79 @@ compressible_att_type(MimeType) ->
 % pretend that no Content-MD5 exists.
 with_stream(Db, Att, Fun) ->
     [InMd5, Type, Enc] = couch_att:fetch([md5, type, encoding], Att),
-    BufferSize = config:get_integer("couchdb",
-        "attachment_stream_buffer_size", 4096),
-    Options = case (Enc =:= identity) andalso compressible_att_type(Type) of
-        true ->
-            CompLevel = config:get_integer(
-                "attachments", "compression_level", 8),
-            [
-                {buffer_size, BufferSize},
-                {encoding, gzip},
-                {compression_level, CompLevel}
-            ];
-        _ ->
-            [{buffer_size, BufferSize}]
-    end,
+    BufferSize = config:get_integer(
+        "couchdb",
+        "attachment_stream_buffer_size",
+        4096
+    ),
+    Options =
+        case (Enc =:= identity) andalso compressible_att_type(Type) of
+            true ->
+                CompLevel = config:get_integer(
+                    "attachments", "compression_level", 8
+                ),
+                [
+                    {buffer_size, BufferSize},
+                    {encoding, gzip},
+                    {compression_level, CompLevel}
+                ];
+            _ ->
+                [{buffer_size, BufferSize}]
+        end,
     {ok, OutputStream} = open_write_stream(Db, Options),
-    ReqMd5 = case Fun(OutputStream) of
-        {md5, FooterMd5} ->
-            case InMd5 of
-                md5_in_footer -> FooterMd5;
-                _ -> InMd5
-            end;
-        _ ->
-            InMd5
-    end,
+    ReqMd5 =
+        case Fun(OutputStream) of
+            {md5, FooterMd5} ->
+                case InMd5 of
+                    md5_in_footer -> FooterMd5;
+                    _ -> InMd5
+                end;
+            _ ->
+                InMd5
+        end,
     {StreamEngine, Len, IdentityLen, Md5, IdentityMd5} =
         couch_stream:close(OutputStream),
     couch_util:check_md5(IdentityMd5, ReqMd5),
-    {AttLen, DiskLen, NewEnc} = case Enc of
-    identity ->
-        case {Md5, IdentityMd5} of
-        {Same, Same} ->
-            {Len, IdentityLen, identity};
-        _ ->
-            {Len, IdentityLen, gzip}
-        end;
-    gzip ->
-        case couch_att:fetch([att_len, disk_len], Att) of
-            [AL, DL] when AL =:= undefined orelse DL =:= undefined ->
-                % Compressed attachment uploaded through the standalone API.
-                {Len, Len, gzip};
-            [AL, DL] ->
-                % This case is used for efficient push-replication, where a
-                % compressed attachment is located in the body of multipart
-                % content-type request.
-                {AL, DL, gzip}
-        end
-    end,
-    couch_att:store([
-        {data, {stream, StreamEngine}},
-        {att_len, AttLen},
-        {disk_len, DiskLen},
-        {md5, Md5},
-        {encoding, NewEnc}
-    ], Att).
-
+    {AttLen, DiskLen, NewEnc} =
+        case Enc of
+            identity ->
+                case {Md5, IdentityMd5} of
+                    {Same, Same} ->
+                        {Len, IdentityLen, identity};
+                    _ ->
+                        {Len, IdentityLen, gzip}
+                end;
+            gzip ->
+                case couch_att:fetch([att_len, disk_len], Att) of
+                    [AL, DL] when AL =:= undefined orelse DL =:= undefined ->
+                        % Compressed attachment uploaded through the standalone API.
+                        {Len, Len, gzip};
+                    [AL, DL] ->
+                        % This case is used for efficient push-replication, where a
+                        % compressed attachment is located in the body of multipart
+                        % content-type request.
+                        {AL, DL, gzip}
+                end
+        end,
+    couch_att:store(
+        [
+            {data, {stream, StreamEngine}},
+            {att_len, AttLen},
+            {disk_len, DiskLen},
+            {md5, Md5},
+            {encoding, NewEnc}
+        ],
+        Att
+    ).
 
 open_write_stream(Db, Options) ->
     couch_db_engine:open_write_stream(Db, Options).
 
-
 open_read_stream(Db, AttState) ->
     couch_db_engine:open_read_stream(Db, AttState).
 
-
 is_active_stream(Db, StreamEngine) ->
     couch_db_engine:is_active_stream(Db, StreamEngine).
-
 
 calculate_start_seq(_Db, _Node, Seq) when is_integer(Seq) ->
     Seq;
@@ -1498,30 +1711,44 @@ calculate_start_seq(Db, _Node, {Seq, {split, Uuid}, EpochNode}) ->
             % Find last replicated sequence from split source to target
             mem3_rep:find_split_target_seq(Db, EpochNode, Uuid, Seq);
         false ->
-            couch_log:warning("~p calculate_start_seq not owner "
+            couch_log:warning(
+                "~p calculate_start_seq not owner "
                 "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p, epochs: ~p",
-                [?MODULE, Db#db.name, Seq, Uuid, EpochNode, get_epochs(Db)]),
+                [?MODULE, Db#db.name, Seq, Uuid, EpochNode, get_epochs(Db)]
+            ),
             0
     end;
 calculate_start_seq(Db, Node, {Seq, Uuid, EpochNode}) ->
     case is_prefix(Uuid, get_uuid(Db)) of
         true ->
             case is_owner(EpochNode, Seq, get_epochs(Db)) of
-                true -> Seq;
+                true ->
+                    Seq;
                 false ->
                     %% Shard might have been moved from another node. We
                     %% matched the uuid already, try to find last viable
                     %% sequence we can use
-                    couch_log:warning( "~p calculate_start_seq not owner, "
+                    couch_log:warning(
+                        "~p calculate_start_seq not owner, "
                         " trying replacement db: ~p, seq: ~p, uuid: ~p, "
-                        "epoch_node: ~p, epochs: ~p", [?MODULE, Db#db.name,
-                        Seq, Uuid, EpochNode, get_epochs(Db)]),
+                        "epoch_node: ~p, epochs: ~p",
+                        [
+                            ?MODULE,
+                            Db#db.name,
+                            Seq,
+                            Uuid,
+                            EpochNode,
+                            get_epochs(Db)
+                        ]
+                    ),
                     calculate_start_seq(Db, Node, {replace, EpochNode, Uuid, Seq})
             end;
         false ->
-            couch_log:warning("~p calculate_start_seq uuid prefix mismatch "
+            couch_log:warning(
+                "~p calculate_start_seq uuid prefix mismatch "
                 "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p",
-                [?MODULE, Db#db.name, Seq, Uuid, EpochNode]),
+                [?MODULE, Db#db.name, Seq, Uuid, EpochNode]
+            ),
             %% The file was rebuilt, most likely in a different
             %% order, so rewind.
             0
@@ -1531,37 +1758,36 @@ calculate_start_seq(Db, _Node, {replace, OriginalNode, Uuid, Seq}) ->
         true ->
             try
                 start_seq(get_epochs(Db), OriginalNode, Seq)
-            catch throw:epoch_mismatch ->
-                couch_log:warning("~p start_seq duplicate uuid on node: ~p "
-                    "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p",
-                    [?MODULE, node(), Db#db.name, Seq, Uuid, OriginalNode]),
-                0
+            catch
+                throw:epoch_mismatch ->
+                    couch_log:warning(
+                        "~p start_seq duplicate uuid on node: ~p "
+                        "db: ~p, seq: ~p, uuid: ~p, epoch_node: ~p",
+                        [?MODULE, node(), Db#db.name, Seq, Uuid, OriginalNode]
+                    ),
+                    0
             end;
         false ->
             {replace, OriginalNode, Uuid, Seq}
     end.
 
-
 validate_epochs(Epochs) ->
     %% Assert uniqueness.
     case length(Epochs) == length(lists:ukeysort(2, Epochs)) of
-        true  -> ok;
+        true -> ok;
         false -> erlang:error(duplicate_epoch)
     end,
     %% Assert order.
     case Epochs == lists:sort(fun({_, A}, {_, B}) -> B =< A end, Epochs) of
-        true  -> ok;
+        true -> ok;
         false -> erlang:error(epoch_order)
     end.
 
-
 is_prefix(Pattern, Subject) ->
-     binary:longest_common_prefix([Pattern, Subject]) == size(Pattern).
-
+    binary:longest_common_prefix([Pattern, Subject]) == size(Pattern).
 
 is_owner(Node, Seq, Epochs) ->
     Node =:= owner_of(Epochs, Seq).
-
 
 owner_of(Db, Seq) when not is_list(Db) ->
     owner_of(get_epochs(Db), Seq);
@@ -1571,7 +1797,6 @@ owner_of([{EpochNode, EpochSeq} | _Rest], Seq) when Seq > EpochSeq ->
     EpochNode;
 owner_of([_ | Rest], Seq) ->
     owner_of(Rest, Seq).
-
 
 start_seq([{OrigNode, EpochSeq} | _], OrigNode, Seq) when Seq > EpochSeq ->
     %% OrigNode is the owner of the Seq so we can safely stream from there
@@ -1586,42 +1811,33 @@ start_seq([_ | Rest], OrigNode, Seq) ->
 start_seq([], _OrigNode, _Seq) ->
     throw(epoch_mismatch).
 
-
 fold_docs(Db, UserFun, UserAcc) ->
     fold_docs(Db, UserFun, UserAcc, []).
 
 fold_docs(Db, UserFun, UserAcc, Options) ->
     couch_db_engine:fold_docs(Db, UserFun, UserAcc, Options).
 
-
 fold_local_docs(Db, UserFun, UserAcc, Options) ->
     couch_db_engine:fold_local_docs(Db, UserFun, UserAcc, Options).
-
 
 fold_design_docs(Db, UserFun, UserAcc, Options1) ->
     Options2 = set_design_doc_keys(Options1),
     couch_db_engine:fold_docs(Db, UserFun, UserAcc, Options2).
 
-
 fold_changes(Db, StartSeq, UserFun, UserAcc) ->
     fold_changes(Db, StartSeq, UserFun, UserAcc, []).
-
 
 fold_changes(Db, StartSeq, UserFun, UserAcc, Opts) ->
     couch_db_engine:fold_changes(Db, StartSeq, UserFun, UserAcc, Opts).
 
-
 fold_purge_infos(Db, StartPurgeSeq, Fun, Acc) ->
     fold_purge_infos(Db, StartPurgeSeq, Fun, Acc, []).
-
 
 fold_purge_infos(Db, StartPurgeSeq, UFun, UAcc, Opts) ->
     couch_db_engine:fold_purge_infos(Db, StartPurgeSeq, UFun, UAcc, Opts).
 
-
 count_changes_since(Db, SinceSeq) ->
     couch_db_engine:count_changes_since(Db, SinceSeq).
-
 
 %%% Internal function %%%
 open_doc_revs_int(Db, IdRevs, Options) ->
@@ -1630,106 +1846,125 @@ open_doc_revs_int(Db, IdRevs, Options) ->
     lists:zipwith(
         fun({Id, Revs}, Lookup) ->
             case Lookup of
-            #full_doc_info{rev_tree=RevTree} ->
-                {FoundRevs, MissingRevs} =
-                case Revs of
-                all ->
-                    {couch_key_tree:get_all_leafs(RevTree), []};
-                _ ->
-                    case lists:member(latest, Options) of
-                    true ->
-                        couch_key_tree:get_key_leafs(RevTree, Revs);
-                    false ->
-                        couch_key_tree:get(RevTree, Revs)
-                    end
-                end,
-                FoundResults =
-                lists:map(fun({Value, {Pos, [Rev|_]}=FoundRevPath}) ->
-                    case Value of
-                    ?REV_MISSING ->
-                        % we have the rev in our list but know nothing about it
-                        {{not_found, missing}, {Pos, Rev}};
-                    #leaf{deleted=IsDeleted, ptr=SummaryPtr} ->
-                        {ok, make_doc(Db, Id, IsDeleted, SummaryPtr, FoundRevPath)}
-                    end
-                end, FoundRevs),
-                Results = FoundResults ++ [{{not_found, missing}, MissingRev} || MissingRev <- MissingRevs],
-                {ok, Results};
-            not_found when Revs == all ->
-                {ok, []};
-            not_found ->
-                {ok, [{{not_found, missing}, Rev} || Rev <- Revs]}
+                #full_doc_info{rev_tree = RevTree} ->
+                    {FoundRevs, MissingRevs} =
+                        case Revs of
+                            all ->
+                                {couch_key_tree:get_all_leafs(RevTree), []};
+                            _ ->
+                                case lists:member(latest, Options) of
+                                    true ->
+                                        couch_key_tree:get_key_leafs(RevTree, Revs);
+                                    false ->
+                                        couch_key_tree:get(RevTree, Revs)
+                                end
+                        end,
+                    FoundResults =
+                        lists:map(
+                            fun({Value, {Pos, [Rev | _]} = FoundRevPath}) ->
+                                case Value of
+                                    ?REV_MISSING ->
+                                        % we have the rev in our list but know nothing about it
+                                        {{not_found, missing}, {Pos, Rev}};
+                                    #leaf{deleted = IsDeleted, ptr = SummaryPtr} ->
+                                        {ok, make_doc(Db, Id, IsDeleted, SummaryPtr, FoundRevPath)}
+                                end
+                            end,
+                            FoundRevs
+                        ),
+                    Results =
+                        FoundResults ++
+                            [{{not_found, missing}, MissingRev} || MissingRev <- MissingRevs],
+                    {ok, Results};
+                not_found when Revs == all ->
+                    {ok, []};
+                not_found ->
+                    {ok, [{{not_found, missing}, Rev} || Rev <- Revs]}
             end
         end,
-        IdRevs, LookupResults).
+        IdRevs,
+        LookupResults
+    ).
 
 open_doc_int(Db, <<?LOCAL_DOC_PREFIX, _/binary>> = Id, Options) ->
     case couch_db_engine:open_local_docs(Db, [Id]) of
-    [#doc{} = Doc] ->
-        apply_open_options({ok, Doc}, Options);
-    [not_found] ->
-        {not_found, missing}
+        [#doc{} = Doc] ->
+            apply_open_options({ok, Doc}, Options);
+        [not_found] ->
+            {not_found, missing}
     end;
-open_doc_int(Db, #doc_info{id=Id,revs=[RevInfo|_]}=DocInfo, Options) ->
-    #rev_info{deleted=IsDeleted,rev={Pos,RevId},body_sp=Bp} = RevInfo,
-    Doc = make_doc(Db, Id, IsDeleted, Bp, {Pos,[RevId]}),
+open_doc_int(Db, #doc_info{id = Id, revs = [RevInfo | _]} = DocInfo, Options) ->
+    #rev_info{deleted = IsDeleted, rev = {Pos, RevId}, body_sp = Bp} = RevInfo,
+    Doc = make_doc(Db, Id, IsDeleted, Bp, {Pos, [RevId]}),
     apply_open_options(
-       {ok, Doc#doc{meta=doc_meta_info(DocInfo, [], Options)}}, Options);
-open_doc_int(Db, #full_doc_info{id=Id,rev_tree=RevTree}=FullDocInfo, Options) ->
-    #doc_info{revs=[#rev_info{deleted=IsDeleted,rev=Rev,body_sp=Bp}|_]} =
+        {ok, Doc#doc{meta = doc_meta_info(DocInfo, [], Options)}}, Options
+    );
+open_doc_int(Db, #full_doc_info{id = Id, rev_tree = RevTree} = FullDocInfo, Options) ->
+    #doc_info{revs = [#rev_info{deleted = IsDeleted, rev = Rev, body_sp = Bp} | _]} =
         DocInfo = couch_doc:to_doc_info(FullDocInfo),
     {[{_, RevPath}], []} = couch_key_tree:get(RevTree, [Rev]),
     Doc = make_doc(Db, Id, IsDeleted, Bp, RevPath),
     apply_open_options(
-        {ok, Doc#doc{meta=doc_meta_info(DocInfo, RevTree, Options)}}, Options);
+        {ok, Doc#doc{meta = doc_meta_info(DocInfo, RevTree, Options)}}, Options
+    );
 open_doc_int(Db, Id, Options) ->
     case get_full_doc_info(Db, Id) of
-    #full_doc_info{} = FullDocInfo ->
-        open_doc_int(Db, FullDocInfo, Options);
-    not_found ->
-        {not_found, missing}
+        #full_doc_info{} = FullDocInfo ->
+            open_doc_int(Db, FullDocInfo, Options);
+        not_found ->
+            {not_found, missing}
     end.
 
-doc_meta_info(#doc_info{high_seq=Seq,revs=[#rev_info{rev=Rev}|RestInfo]}, RevTree, Options) ->
+doc_meta_info(
+    #doc_info{high_seq = Seq, revs = [#rev_info{rev = Rev} | RestInfo]}, RevTree, Options
+) ->
     case lists:member(revs_info, Options) of
-    false -> [];
-    true ->
-        {[{Pos, RevPath}],[]} =
-            couch_key_tree:get_full_key_paths(RevTree, [Rev]),
+        false ->
+            [];
+        true ->
+            {[{Pos, RevPath}], []} =
+                couch_key_tree:get_full_key_paths(RevTree, [Rev]),
 
-        [{revs_info, Pos, lists:map(
-            fun({Rev1, ?REV_MISSING}) ->
-                {Rev1, missing};
-            ({Rev1, Leaf}) ->
-                case Leaf#leaf.deleted of
-                true ->
-                    {Rev1, deleted};
-                false ->
-                    {Rev1, available}
+            [
+                {revs_info, Pos,
+                    lists:map(
+                        fun
+                            ({Rev1, ?REV_MISSING}) ->
+                                {Rev1, missing};
+                            ({Rev1, Leaf}) ->
+                                case Leaf#leaf.deleted of
+                                    true ->
+                                        {Rev1, deleted};
+                                    false ->
+                                        {Rev1, available}
+                                end
+                        end,
+                        RevPath
+                    )}
+            ]
+    end ++
+        case lists:member(conflicts, Options) of
+            false ->
+                [];
+            true ->
+                case [Rev1 || #rev_info{rev = Rev1, deleted = false} <- RestInfo] of
+                    [] -> [];
+                    ConflictRevs -> [{conflicts, ConflictRevs}]
                 end
-            end, RevPath)}]
-    end ++
-    case lists:member(conflicts, Options) of
-    false -> [];
-    true ->
-        case [Rev1 || #rev_info{rev=Rev1,deleted=false} <- RestInfo] of
-        [] -> [];
-        ConflictRevs -> [{conflicts, ConflictRevs}]
-        end
-    end ++
-    case lists:member(deleted_conflicts, Options) of
-    false -> [];
-    true ->
-        case [Rev1 || #rev_info{rev=Rev1,deleted=true} <- RestInfo] of
-        [] -> [];
-        DelConflictRevs -> [{deleted_conflicts, DelConflictRevs}]
-        end
-    end ++
-    case lists:member(local_seq, Options) of
-    false -> [];
-    true -> [{local_seq, Seq}]
-    end.
-
+        end ++
+        case lists:member(deleted_conflicts, Options) of
+            false ->
+                [];
+            true ->
+                case [Rev1 || #rev_info{rev = Rev1, deleted = true} <- RestInfo] of
+                    [] -> [];
+                    DelConflictRevs -> [{deleted_conflicts, DelConflictRevs}]
+                end
+        end ++
+        case lists:member(local_seq, Options) of
+            false -> [];
+            true -> [{local_seq, Seq}]
+        end.
 
 make_doc(_Db, Id, Deleted, nil = _Bp, RevisionPath) ->
     #doc{
@@ -1747,18 +1982,18 @@ make_doc(#db{} = Db, Id, Deleted, Bp, {Pos, Revs}) ->
         body = Bp,
         deleted = Deleted
     }),
-    Doc1 = case Doc0#doc.atts of
-        BinAtts when is_binary(BinAtts) ->
-            Doc0#doc{
-                atts = couch_compress:decompress(BinAtts)
-            };
-        ListAtts when is_list(ListAtts) ->
-            Doc0
-    end,
+    Doc1 =
+        case Doc0#doc.atts of
+            BinAtts when is_binary(BinAtts) ->
+                Doc0#doc{
+                    atts = couch_compress:decompress(BinAtts)
+                };
+            ListAtts when is_list(ListAtts) ->
+                Doc0
+        end,
     after_doc_read(Db, Doc1#doc{
         atts = [couch_att:from_disk_term(Db, T) || T <- Doc1#doc.atts]
     }).
-
 
 after_doc_read(#db{} = Db, Doc) ->
     DocWithBody = couch_doc:with_ejson_body(Doc),
@@ -1766,10 +2001,10 @@ after_doc_read(#db{} = Db, Doc) ->
 
 increment_stat(#db{options = Options}, Stat) ->
     case lists:member(sys_db, Options) of
-    true ->
-        ok;
-    false ->
-        couch_stats:increment_counter(Stat)
+        true ->
+            ok;
+        false ->
+            couch_stats:increment_counter(Stat)
     end.
 
 -spec normalize_dbname(list() | binary()) -> binary().
@@ -1779,23 +2014,22 @@ normalize_dbname(DbName) when is_list(DbName) ->
 normalize_dbname(DbName) when is_binary(DbName) ->
     mem3:dbname(couch_util:drop_dot_couch_ext(DbName)).
 
-
 -spec dbname_suffix(list() | binary()) -> binary().
 
 dbname_suffix(DbName) ->
     filename:basename(normalize_dbname(DbName)).
-
 
 validate_dbname(DbName) when is_list(DbName) ->
     validate_dbname(?l2b(DbName));
 validate_dbname(DbName) when is_binary(DbName) ->
     Normalized = normalize_dbname(DbName),
     couch_db_plugin:validate_dbname(
-        DbName, Normalized, fun validate_dbname_int/2).
+        DbName, Normalized, fun validate_dbname_int/2
+    ).
 
 validate_dbname_int(DbName, Normalized) when is_binary(DbName) ->
     DbNoExt = couch_util:drop_dot_couch_ext(DbName),
-    case re:run(DbNoExt, ?DBNAME_REGEX, [{capture,none}, dollar_endonly]) of
+    case re:run(DbNoExt, ?DBNAME_REGEX, [{capture, none}, dollar_endonly]) of
         match ->
             ok;
         nomatch ->
@@ -1811,75 +2045,80 @@ is_system_db_name(DbName) when is_binary(DbName) ->
     Normalized = normalize_dbname(DbName),
     Suffix = filename:basename(Normalized),
     case {filename:dirname(Normalized), lists:member(Suffix, ?SYSTEM_DATABASES)} of
-        {<<".">>, Result} -> Result;
-        {_Prefix, false} -> false;
+        {<<".">>, Result} ->
+            Result;
+        {_Prefix, false} ->
+            false;
         {Prefix, true} ->
-            ReOpts =  [{capture,none}, dollar_endonly],
+            ReOpts = [{capture, none}, dollar_endonly],
             re:run(Prefix, ?DBNAME_REGEX, ReOpts) == match
     end.
 
 set_design_doc_keys(Options1) ->
-    Dir = case lists:keyfind(dir, 1, Options1) of
-        {dir, D0} -> D0;
-        _ -> fwd
-    end,
+    Dir =
+        case lists:keyfind(dir, 1, Options1) of
+            {dir, D0} -> D0;
+            _ -> fwd
+        end,
     Options2 = set_design_doc_start_key(Options1, Dir),
     set_design_doc_end_key(Options2, Dir).
-
 
 -define(FIRST_DDOC_KEY, <<"_design/">>).
 -define(LAST_DDOC_KEY, <<"_design0">>).
 
-
 set_design_doc_start_key(Options, fwd) ->
     Key1 = couch_util:get_value(start_key, Options, ?FIRST_DDOC_KEY),
-    Key2 = case Key1 < ?FIRST_DDOC_KEY of
-        true -> ?FIRST_DDOC_KEY;
-        false -> Key1
-    end,
+    Key2 =
+        case Key1 < ?FIRST_DDOC_KEY of
+            true -> ?FIRST_DDOC_KEY;
+            false -> Key1
+        end,
     lists:keystore(start_key, 1, Options, {start_key, Key2});
 set_design_doc_start_key(Options, rev) ->
     Key1 = couch_util:get_value(start_key, Options, ?LAST_DDOC_KEY),
-    Key2 = case Key1 > ?LAST_DDOC_KEY of
-        true -> ?LAST_DDOC_KEY;
-        false -> Key1
-    end,
+    Key2 =
+        case Key1 > ?LAST_DDOC_KEY of
+            true -> ?LAST_DDOC_KEY;
+            false -> Key1
+        end,
     lists:keystore(start_key, 1, Options, {start_key, Key2}).
-
 
 set_design_doc_end_key(Options, fwd) ->
     case couch_util:get_value(end_key_gt, Options) of
         undefined ->
             Key1 = couch_util:get_value(end_key, Options, ?LAST_DDOC_KEY),
-            Key2 = case Key1 > ?LAST_DDOC_KEY of
-                true -> ?LAST_DDOC_KEY;
-                false -> Key1
-            end,
+            Key2 =
+                case Key1 > ?LAST_DDOC_KEY of
+                    true -> ?LAST_DDOC_KEY;
+                    false -> Key1
+                end,
             lists:keystore(end_key, 1, Options, {end_key, Key2});
         EKeyGT ->
-            Key2 = case EKeyGT > ?LAST_DDOC_KEY of
-                true -> ?LAST_DDOC_KEY;
-                false -> EKeyGT
-            end,
+            Key2 =
+                case EKeyGT > ?LAST_DDOC_KEY of
+                    true -> ?LAST_DDOC_KEY;
+                    false -> EKeyGT
+                end,
             lists:keystore(end_key_gt, 1, Options, {end_key_gt, Key2})
     end;
 set_design_doc_end_key(Options, rev) ->
     case couch_util:get_value(end_key_gt, Options) of
         undefined ->
             Key1 = couch_util:get_value(end_key, Options, ?LAST_DDOC_KEY),
-            Key2 = case Key1 < ?FIRST_DDOC_KEY of
-                true -> ?FIRST_DDOC_KEY;
-                false -> Key1
-            end,
+            Key2 =
+                case Key1 < ?FIRST_DDOC_KEY of
+                    true -> ?FIRST_DDOC_KEY;
+                    false -> Key1
+                end,
             lists:keystore(end_key, 1, Options, {end_key, Key2});
         EKeyGT ->
-            Key2 = case EKeyGT < ?FIRST_DDOC_KEY of
-                true -> ?FIRST_DDOC_KEY;
-                false -> EKeyGT
-            end,
+            Key2 =
+                case EKeyGT < ?FIRST_DDOC_KEY of
+                    true -> ?FIRST_DDOC_KEY;
+                    false -> EKeyGT
+                end,
             lists:keystore(end_key_gt, 1, Options, {end_key_gt, Key2})
     end.
-
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -1900,11 +2139,14 @@ teardown(_) ->
 
 validate_dbname_success_test_() ->
     Cases =
-        generate_cases_with_shards("long/co$mplex-/path+/something")
-        ++ generate_cases_with_shards("something")
-        ++ lists:append(
-            [generate_cases_with_shards(?b2l(SystemDb))
-                || SystemDb <- ?SYSTEM_DATABASES]),
+        generate_cases_with_shards("long/co$mplex-/path+/something") ++
+            generate_cases_with_shards("something") ++
+            lists:append(
+                [
+                    generate_cases_with_shards(?b2l(SystemDb))
+                 || SystemDb <- ?SYSTEM_DATABASES
+                ]
+            ),
     {
         setup,
         fun setup_all/0,
@@ -1918,12 +2160,13 @@ validate_dbname_success_test_() ->
     }.
 
 validate_dbname_fail_test_() ->
-    Cases = generate_cases("_long/co$mplex-/path+/_something")
-       ++ generate_cases("_something")
-       ++ generate_cases_with_shards("long/co$mplex-/path+/_something#")
-       ++ generate_cases_with_shards("long/co$mplex-/path+/some.thing")
-       ++ generate_cases("!abcdefg/werwej/_users")
-       ++ generate_cases_with_shards("!abcdefg/werwej/_users"),
+    Cases =
+        generate_cases("_long/co$mplex-/path+/_something") ++
+            generate_cases("_something") ++
+            generate_cases_with_shards("long/co$mplex-/path+/_something#") ++
+            generate_cases_with_shards("long/co$mplex-/path+/some.thing") ++
+            generate_cases("!abcdefg/werwej/_users") ++
+            generate_cases_with_shards("!abcdefg/werwej/_users"),
     {
         setup,
         fun setup_all/0,
@@ -1937,41 +2180,56 @@ validate_dbname_fail_test_() ->
     }.
 
 normalize_dbname_test_() ->
-    Cases = generate_cases_with_shards("long/co$mplex-/path+/_something")
-       ++ generate_cases_with_shards("_something"),
+    Cases =
+        generate_cases_with_shards("long/co$mplex-/path+/_something") ++
+            generate_cases_with_shards("_something"),
     WithExpected = [{?l2b(filename:rootname(A)), B} || {A, B} <- Cases],
-    [{test_name({Expected, Db}), ?_assertEqual(Expected, normalize_dbname(Db))}
-        || {Expected, Db} <- WithExpected].
+    [
+        {test_name({Expected, Db}), ?_assertEqual(Expected, normalize_dbname(Db))}
+     || {Expected, Db} <- WithExpected
+    ].
 
 dbname_suffix_test_() ->
-    Cases = generate_cases_with_shards("long/co$mplex-/path+/_something")
-       ++ generate_cases_with_shards("_something"),
+    Cases =
+        generate_cases_with_shards("long/co$mplex-/path+/_something") ++
+            generate_cases_with_shards("_something"),
     WithExpected = [{?l2b(filename:basename(Arg)), Db} || {Arg, Db} <- Cases],
-    [{test_name({Expected, Db}), ?_assertEqual(Expected, dbname_suffix(Db))}
-        || {Expected, Db} <- WithExpected].
+    [
+        {test_name({Expected, Db}), ?_assertEqual(Expected, dbname_suffix(Db))}
+     || {Expected, Db} <- WithExpected
+    ].
 
 is_system_db_name_test_() ->
-    Cases = lists:append([
-        generate_cases_with_shards("long/co$mplex-/path+/" ++ ?b2l(Db))
-            || Db <- ?SYSTEM_DATABASES]
-        ++ [generate_cases_with_shards(?b2l(Db)) || Db <- ?SYSTEM_DATABASES
-    ]),
-    WithExpected = [{?l2b(filename:basename(filename:rootname(Arg))), Db}
-        || {Arg, Db} <- Cases],
-    [{test_name({Expected, Db}) ++ " in ?SYSTEM_DATABASES",
-        ?_assert(is_system_db_name(Db))} || {Expected, Db} <- WithExpected].
+    Cases = lists:append(
+        [
+            generate_cases_with_shards("long/co$mplex-/path+/" ++ ?b2l(Db))
+         || Db <- ?SYSTEM_DATABASES
+        ] ++
+            [generate_cases_with_shards(?b2l(Db)) || Db <- ?SYSTEM_DATABASES]
+    ),
+    WithExpected = [
+        {?l2b(filename:basename(filename:rootname(Arg))), Db}
+     || {Arg, Db} <- Cases
+    ],
+    [
+        {test_name({Expected, Db}) ++ " in ?SYSTEM_DATABASES", ?_assert(is_system_db_name(Db))}
+     || {Expected, Db} <- WithExpected
+    ].
 
 should_pass_validate_dbname(DbName) ->
     {test_name(DbName), ?_assertEqual(ok, validate_dbname(DbName))}.
 
 should_fail_validate_dbname(DbName) ->
-    {test_name(DbName), ?_test(begin
-        Result = validate_dbname(DbName),
-        ?assertMatch({error, {illegal_database_name, _}}, Result),
-        {error, {illegal_database_name, FailedDbName}} = Result,
-        ?assertEqual(to_binary(DbName), FailedDbName),
-        ok
-    end)}.
+    {
+        test_name(DbName),
+        ?_test(begin
+            Result = validate_dbname(DbName),
+            ?assertMatch({error, {illegal_database_name, _}}, Result),
+            {error, {illegal_database_name, FailedDbName}} = Result,
+            ?assertEqual(to_binary(DbName), FailedDbName),
+            ok
+        end)
+    }.
 
 calculate_start_seq_test_() ->
     {
@@ -2087,9 +2345,12 @@ generate_cases_with_shards(DbName) ->
     DbNameWithShard = add_shard(DbName),
     DbNameWithShardAndExtension = add_shard(DbName) ++ ".couch",
     Cases = [
-        DbName, ?l2b(DbName),
-        DbNameWithShard, ?l2b(DbNameWithShard),
-        DbNameWithShardAndExtension, ?l2b(DbNameWithShardAndExtension)
+        DbName,
+        ?l2b(DbName),
+        DbNameWithShard,
+        ?l2b(DbNameWithShard),
+        DbNameWithShardAndExtension,
+        ?l2b(DbNameWithShardAndExtension)
     ],
     [{DbName, Case} || Case <- Cases].
 

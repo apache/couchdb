@@ -14,7 +14,6 @@
 -behaviour(gen_server).
 -vsn(1).
 
-
 -export([
     start_link/1
 ]).
@@ -28,49 +27,41 @@
     code_change/3
 ]).
 
-
 start_link(Exe) when is_list(Exe) ->
     gen_server:start_link(?MODULE, Exe, []).
-
 
 init(Exe) ->
     process_flag(trap_exit, true),
     ok = couch_event:register_all(self()),
     couch_os_process:start_link(Exe, []).
 
-
 terminate(_Reason, Pid) when is_pid(Pid) ->
     couch_os_process:stop(Pid);
 terminate(_Reason, _Pid) ->
     ok.
 
-
 handle_call(Msg, From, Pid) ->
     couch_log:notice("~s ignoring call ~w from ~w", [?MODULE, Msg, From]),
     {reply, ignored, Pid, 0}.
-
 
 handle_cast(Msg, Pid) ->
     couch_log:notice("~s ignoring cast ~w", [?MODULE, Msg]),
     {noreply, Pid, 0}.
 
-
 handle_info({'$couch_event', DbName, Event}, Pid) ->
-    Obj = {[
-        {db, DbName},
-        {type, list_to_binary(atom_to_list(Event))}
-    ]},
+    Obj =
+        {[
+            {db, DbName},
+            {type, list_to_binary(atom_to_list(Event))}
+        ]},
     ok = couch_os_process:send(Pid, Obj),
     {noreply, Pid};
-
 handle_info({'EXIT', Pid, Reason}, Pid) ->
     couch_log:error("Update notificatio process ~w died: ~w", [Pid, Reason]),
     {stop, normal, nil};
-
 handle_info(Msg, Pid) ->
     couch_log:notice("~s ignoring info ~w", [?MODULE, Msg]),
     {noreply, Pid, 0}.
-
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.

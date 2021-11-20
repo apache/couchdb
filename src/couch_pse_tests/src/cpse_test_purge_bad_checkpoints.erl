@@ -14,10 +14,8 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
-
 
 setup_each() ->
     {ok, Db1} = cpse_util:create_db(),
@@ -33,19 +31,20 @@ setup_each() ->
         {[{'_id', foo8}, {vsn, 8}]},
         {[{'_id', foo9}, {vsn, 9}]}
     ]),
-    PInfos = lists:map(fun(Idx) ->
-        DocId = iolist_to_binary(["foo", $0 + Idx]),
-        Rev = lists:nth(Idx + 1, Revs),
-        {cpse_util:uuid(), DocId, [Rev]}
-    end, lists:seq(0, 9)),
+    PInfos = lists:map(
+        fun(Idx) ->
+            DocId = iolist_to_binary(["foo", $0 + Idx]),
+            Rev = lists:nth(Idx + 1, Revs),
+            {cpse_util:uuid(), DocId, [Rev]}
+        end,
+        lists:seq(0, 9)
+    ),
     {ok, _} = cpse_util:purge(couch_db:name(Db1), PInfos),
     {ok, Db2} = couch_db:reopen(Db1),
     Db2.
 
-
 teardown_each(Db) ->
     ok = couch_server:delete(couch_db:name(Db), []).
-
 
 cpse_bad_purge_seq(Db1) ->
     Db2 = save_local_doc(Db1, <<"foo">>),
@@ -55,7 +54,6 @@ cpse_bad_purge_seq(Db1) ->
     {ok, Db3} = couch_db:reopen(Db2),
     ?assertEqual(1, couch_db:get_minimum_purge_seq(Db3)).
 
-
 cpse_verify_non_boolean(Db1) ->
     Db2 = save_local_doc(Db1, 2),
     ?assertEqual(0, couch_db:get_minimum_purge_seq(Db2)),
@@ -64,17 +62,22 @@ cpse_verify_non_boolean(Db1) ->
     {ok, Db3} = couch_db:reopen(Db2),
     ?assertEqual(5, couch_db:get_minimum_purge_seq(Db3)).
 
-
 save_local_doc(Db1, PurgeSeq) ->
     {Mega, Secs, _} = os:timestamp(),
     NowSecs = Mega * 1000000 + Secs,
-    Doc = couch_doc:from_json_obj(?JSON_DECODE(?JSON_ENCODE({[
-        {<<"_id">>, <<"_local/purge-test-stuff">>},
-        {<<"purge_seq">>, PurgeSeq},
-        {<<"timestamp_utc">>, NowSecs},
-        {<<"verify_options">>, {[{<<"signature">>, <<"stuff">>}]}},
-        {<<"type">>, <<"test">>}
-    ]}))),
+    Doc = couch_doc:from_json_obj(
+        ?JSON_DECODE(
+            ?JSON_ENCODE(
+                {[
+                    {<<"_id">>, <<"_local/purge-test-stuff">>},
+                    {<<"purge_seq">>, PurgeSeq},
+                    {<<"timestamp_utc">>, NowSecs},
+                    {<<"verify_options">>, {[{<<"signature">>, <<"stuff">>}]}},
+                    {<<"type">>, <<"test">>}
+                ]}
+            )
+        )
+    ),
     {ok, _} = couch_db:update_doc(Db1, Doc, []),
     {ok, Db2} = couch_db:reopen(Db1),
     Db2.

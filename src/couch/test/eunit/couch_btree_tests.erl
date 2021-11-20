@@ -16,13 +16,15 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -define(ROWS, 1000).
--define(TIMEOUT, 60). % seconds
-
+% seconds
+-define(TIMEOUT, 60).
 
 setup() ->
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
-    {ok, Btree} = couch_btree:open(nil, Fd, [{compression, none},
-                                             {reduce, fun reduce_fun/2}]),
+    {ok, Btree} = couch_btree:open(nil, Fd, [
+        {compression, none},
+        {reduce, fun reduce_fun/2}
+    ]),
     {Fd, Btree}.
 
 setup_kvs(_) ->
@@ -35,7 +37,10 @@ setup_red() ->
                 "even" -> {"odd", [{{Key, Idx}, 1} | Acc]};
                 _ -> {"even", [{{Key, Idx}, 1} | Acc]}
             end
-        end, {"odd", []}, lists:seq(1, ?ROWS)),
+        end,
+        {"odd", []},
+        lists:seq(1, ?ROWS)
+    ),
     {Fd, Btree} = setup(),
     {ok, Btree1} = couch_btree:add_remove(Btree, EvenOddKVs, []),
     {Fd, Btree1}.
@@ -48,7 +53,6 @@ teardown({Fd, _}) ->
     teardown(Fd).
 teardown(_, {Fd, _}) ->
     teardown(Fd).
-
 
 kvs_test_funs() ->
     [
@@ -72,7 +76,6 @@ red_test_funs() ->
         fun should_reduce_second_half/2
     ].
 
-
 btree_open_test_() ->
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
     {ok, Btree} = couch_btree:open(nil, Fd, [{compression, none}]),
@@ -88,10 +91,12 @@ sorted_kvs_test_() ->
         "BTree with sorted keys",
         {
             setup,
-            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            fun() -> test_util:start(?MODULE, [ioq]) end,
+            fun test_util:stop/1,
             {
                 foreachx,
-                fun setup_kvs/1, fun teardown/2,
+                fun setup_kvs/1,
+                fun teardown/2,
                 [{Sorted, Fun} || Fun <- Funs]
             }
         }
@@ -105,10 +110,12 @@ rsorted_kvs_test_() ->
         "BTree with backward sorted keys",
         {
             setup,
-            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            fun() -> test_util:start(?MODULE, [ioq]) end,
+            fun test_util:stop/1,
             {
                 foreachx,
-                fun setup_kvs/1, fun teardown/2,
+                fun setup_kvs/1,
+                fun teardown/2,
                 [{Reversed, Fun} || Fun <- Funs]
             }
         }
@@ -122,10 +129,12 @@ shuffled_kvs_test_() ->
         "BTree with shuffled keys",
         {
             setup,
-            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            fun() -> test_util:start(?MODULE, [ioq]) end,
+            fun test_util:stop/1,
             {
                 foreachx,
-                fun setup_kvs/1, fun teardown/2,
+                fun setup_kvs/1,
+                fun teardown/2,
                 [{Shuffled, Fun} || Fun <- Funs]
             }
         }
@@ -136,13 +145,15 @@ reductions_test_() ->
         "BTree reductions",
         {
             setup,
-            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            fun() -> test_util:start(?MODULE, [ioq]) end,
+            fun test_util:stop/1,
             [
                 {
                     "Common tests",
                     {
                         foreach,
-                        fun setup_red/0, fun teardown/1,
+                        fun setup_red/0,
+                        fun teardown/1,
                         [
                             fun should_reduce_without_specified_direction/1,
                             fun should_reduce_forward/1,
@@ -157,7 +168,8 @@ reductions_test_() ->
                             "Forward direction",
                             {
                                 foreachx,
-                                fun setup_red/1, fun teardown/2,
+                                fun setup_red/1,
+                                fun teardown/2,
                                 [{fwd, F} || F <- red_test_funs()]
                             }
                         },
@@ -165,7 +177,8 @@ reductions_test_() ->
                             "Backward direction",
                             {
                                 foreachx,
-                                fun setup_red/1, fun teardown/2,
+                                fun setup_red/1,
+                                fun teardown/2,
                                 [{rev, F} || F <- red_test_funs()]
                             }
                         }
@@ -174,7 +187,6 @@ reductions_test_() ->
             ]
         }
     }.
-
 
 should_set_fd_correctly(_, {Fd, Btree}) ->
     ?_assertMatch(Fd, Btree#btree.fd).
@@ -191,7 +203,7 @@ should_set_reduce_option(_, {_, Btree}) ->
     ?_assertMatch(ReduceFun, Btree1#btree.reduce).
 
 should_fold_over_empty_btree(_, {_, Btree}) ->
-    {ok, _, EmptyRes} = couch_btree:foldl(Btree, fun(_, X) -> {ok, X+1} end, 0),
+    {ok, _, EmptyRes} = couch_btree:foldl(Btree, fun(_, X) -> {ok, X + 1} end, 0),
     ?_assertEqual(EmptyRes, 0).
 
 should_add_all_keys(KeyValues, {Fd, Btree}) ->
@@ -214,8 +226,10 @@ should_have_lesser_size_than_file(Fd, Btree) ->
     ?_assert((couch_btree:size(Btree) =< couch_file:bytes(Fd))).
 
 should_keep_root_pointer_to_kp_node(Fd, Btree) ->
-    ?_assertMatch({ok, {kp_node, _}},
-                  couch_file:pread_term(Fd, element(1, Btree#btree.root))).
+    ?_assertMatch(
+        {ok, {kp_node, _}},
+        couch_file:pread_term(Fd, element(1, Btree#btree.root))
+    ).
 
 should_remove_all_keys(KeyValues, Btree) ->
     Keys = keys(KeyValues),
@@ -234,7 +248,10 @@ should_continuously_add_new_kv(KeyValues, {_, Btree}) ->
             {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [KV], []),
             ?assert(couch_btree:size(BtAcc2) > PrevSize),
             {BtAcc2, couch_btree:size(BtAcc2)}
-        end, {Btree, couch_btree:size(Btree)}, KeyValues),
+        end,
+        {Btree, couch_btree:size(Btree)},
+        KeyValues
+    ),
     {
         "Should continuously add key-values to btree",
         [
@@ -250,7 +267,10 @@ should_continuously_remove_keys(KeyValues, {_, Btree}) ->
             {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [], [K]),
             ?assert(couch_btree:size(BtAcc2) < PrevSize),
             {BtAcc2, couch_btree:size(BtAcc2)}
-        end, {Btree1, couch_btree:size(Btree1)}, KeyValues),
+        end,
+        {Btree1, couch_btree:size(Btree1)},
+        KeyValues
+    ),
     {
         "Should continuously remove keys from btree",
         [
@@ -266,48 +286,57 @@ should_insert_keys_in_reversed_order(KeyValues, {_, Btree}) ->
             {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [KV], []),
             ?assert(couch_btree:size(BtAcc2) > PrevSize),
             {BtAcc2, couch_btree:size(BtAcc2)}
-        end, {Btree, couch_btree:size(Btree)}, KeyValuesRev),
+        end,
+        {Btree, couch_btree:size(Btree)},
+        KeyValuesRev
+    ),
     should_produce_valid_btree(Btree1, KeyValues).
 
 should_add_every_odd_key_remove_every_even(KeyValues, {_, Btree}) ->
     {ok, Btree1} = couch_btree:add_remove(Btree, KeyValues, []),
-    {_, Rem2Keys0, Rem2Keys1} = lists:foldl(fun(X, {Count, Left, Right}) ->
-        case Count rem 2 == 0 of
-            true -> {Count + 1, [X | Left], Right};
-            false -> {Count + 1, Left, [X | Right]}
-        end
-                                            end, {0, [], []}, KeyValues),
-    {timeout, ?TIMEOUT,
-        ?_assert(test_add_remove(Btree1, Rem2Keys0, Rem2Keys1))
-    }.
+    {_, Rem2Keys0, Rem2Keys1} = lists:foldl(
+        fun(X, {Count, Left, Right}) ->
+            case Count rem 2 == 0 of
+                true -> {Count + 1, [X | Left], Right};
+                false -> {Count + 1, Left, [X | Right]}
+            end
+        end,
+        {0, [], []},
+        KeyValues
+    ),
+    {timeout, ?TIMEOUT, ?_assert(test_add_remove(Btree1, Rem2Keys0, Rem2Keys1))}.
 
 should_add_every_even_key_remove_every_old(KeyValues, {_, Btree}) ->
     {ok, Btree1} = couch_btree:add_remove(Btree, KeyValues, []),
-    {_, Rem2Keys0, Rem2Keys1} = lists:foldl(fun(X, {Count, Left, Right}) ->
-        case Count rem 2 == 0 of
-            true -> {Count + 1, [X | Left], Right};
-            false -> {Count + 1, Left, [X | Right]}
-        end
-                                            end, {0, [], []}, KeyValues),
-    {timeout, ?TIMEOUT,
-        ?_assert(test_add_remove(Btree1, Rem2Keys1, Rem2Keys0))
-    }.
-
+    {_, Rem2Keys0, Rem2Keys1} = lists:foldl(
+        fun(X, {Count, Left, Right}) ->
+            case Count rem 2 == 0 of
+                true -> {Count + 1, [X | Left], Right};
+                false -> {Count + 1, Left, [X | Right]}
+            end
+        end,
+        {0, [], []},
+        KeyValues
+    ),
+    {timeout, ?TIMEOUT, ?_assert(test_add_remove(Btree1, Rem2Keys1, Rem2Keys0))}.
 
 should_reduce_without_specified_direction({_, Btree}) ->
     ?_assertMatch(
         {ok, [{{"odd", _}, ?ROWS div 2}, {{"even", _}, ?ROWS div 2}]},
-        fold_reduce(Btree, [])).
+        fold_reduce(Btree, [])
+    ).
 
 should_reduce_forward({_, Btree}) ->
     ?_assertMatch(
         {ok, [{{"odd", _}, ?ROWS div 2}, {{"even", _}, ?ROWS div 2}]},
-        fold_reduce(Btree, [{dir, fwd}])).
+        fold_reduce(Btree, [{dir, fwd}])
+    ).
 
 should_reduce_backward({_, Btree}) ->
     ?_assertMatch(
         {ok, [{{"even", _}, ?ROWS div 2}, {{"odd", _}, ?ROWS div 2}]},
-        fold_reduce(Btree, [{dir, rev}])).
+        fold_reduce(Btree, [{dir, rev}])
+    ).
 
 should_reduce_whole_range(fwd, {_, Btree}) ->
     {SK, EK} = {{"even", 0}, {"odd", ?ROWS - 1}},
@@ -315,20 +344,30 @@ should_reduce_whole_range(fwd, {_, Btree}) ->
         {
             "include endkey",
             ?_assertMatch(
-                {ok, [{{"odd", 1}, ?ROWS div 2},
-                      {{"even", 2}, ?ROWS div 2}]},
-                fold_reduce(Btree, [{dir, fwd},
-                                    {start_key, SK},
-                                    {end_key, EK}]))
+                {ok, [
+                    {{"odd", 1}, ?ROWS div 2},
+                    {{"even", 2}, ?ROWS div 2}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, fwd},
+                    {start_key, SK},
+                    {end_key, EK}
+                ])
+            )
         },
         {
             "exclude endkey",
             ?_assertMatch(
-                {ok, [{{"odd", 1}, (?ROWS div 2) - 1},
-                      {{"even", 2}, ?ROWS div 2}]},
-                fold_reduce(Btree, [{dir, fwd},
-                                    {start_key, SK},
-                                    {end_key_gt, EK}]))
+                {ok, [
+                    {{"odd", 1}, (?ROWS div 2) - 1},
+                    {{"even", 2}, ?ROWS div 2}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, fwd},
+                    {start_key, SK},
+                    {end_key_gt, EK}
+                ])
+            )
         }
     ];
 should_reduce_whole_range(rev, {_, Btree}) ->
@@ -337,20 +376,30 @@ should_reduce_whole_range(rev, {_, Btree}) ->
         {
             "include endkey",
             ?_assertMatch(
-                {ok, [{{"even", ?ROWS}, ?ROWS div 2},
-                      {{"odd", ?ROWS - 1}, ?ROWS div 2}]},
-                fold_reduce(Btree, [{dir, rev},
-                                    {start_key, SK},
-                                    {end_key, EK}]))
+                {ok, [
+                    {{"even", ?ROWS}, ?ROWS div 2},
+                    {{"odd", ?ROWS - 1}, ?ROWS div 2}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, rev},
+                    {start_key, SK},
+                    {end_key, EK}
+                ])
+            )
         },
         {
             "exclude endkey",
             ?_assertMatch(
-                {ok, [{{"even", ?ROWS}, (?ROWS div 2) - 1},
-                      {{"odd", ?ROWS - 1}, ?ROWS div 2}]},
-                fold_reduce(Btree, [{dir, rev},
-                                    {start_key, SK},
-                                    {end_key_gt, EK}]))
+                {ok, [
+                    {{"even", ?ROWS}, (?ROWS div 2) - 1},
+                    {{"odd", ?ROWS - 1}, ?ROWS div 2}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, rev},
+                    {start_key, SK},
+                    {end_key_gt, EK}
+                ])
+            )
         }
     ].
 
@@ -360,19 +409,30 @@ should_reduce_first_half(fwd, {_, Btree}) ->
         {
             "include endkey",
             ?_assertMatch(
-                {ok, [{{"odd", 1}, ?ROWS div 4},
-                      {{"even", 2}, ?ROWS div 2}]},
-                fold_reduce(Btree, [{dir, fwd},
-                                    {start_key, SK}, {end_key, EK}]))
+                {ok, [
+                    {{"odd", 1}, ?ROWS div 4},
+                    {{"even", 2}, ?ROWS div 2}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, fwd},
+                    {start_key, SK},
+                    {end_key, EK}
+                ])
+            )
         },
         {
             "exclude endkey",
             ?_assertMatch(
-                {ok, [{{"odd", 1}, (?ROWS div 4) - 1},
-                      {{"even", 2}, ?ROWS div 2}]},
-                fold_reduce(Btree, [{dir, fwd},
-                                    {start_key, SK},
-                                    {end_key_gt, EK}]))
+                {ok, [
+                    {{"odd", 1}, (?ROWS div 4) - 1},
+                    {{"even", 2}, ?ROWS div 2}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, fwd},
+                    {start_key, SK},
+                    {end_key_gt, EK}
+                ])
+            )
         }
     ];
 should_reduce_first_half(rev, {_, Btree}) ->
@@ -381,20 +441,30 @@ should_reduce_first_half(rev, {_, Btree}) ->
         {
             "include endkey",
             ?_assertMatch(
-                {ok, [{{"even", ?ROWS}, (?ROWS div 4) + 1},
-                      {{"odd", ?ROWS - 1}, ?ROWS div 2}]},
-                fold_reduce(Btree, [{dir, rev},
-                                    {start_key, SK},
-                                    {end_key, EK}]))
+                {ok, [
+                    {{"even", ?ROWS}, (?ROWS div 4) + 1},
+                    {{"odd", ?ROWS - 1}, ?ROWS div 2}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, rev},
+                    {start_key, SK},
+                    {end_key, EK}
+                ])
+            )
         },
         {
             "exclude endkey",
             ?_assertMatch(
-                {ok, [{{"even", ?ROWS}, ?ROWS div 4},
-                      {{"odd", ?ROWS - 1}, ?ROWS div 2}]},
-                fold_reduce(Btree, [{dir, rev},
-                                    {start_key, SK},
-                                    {end_key_gt, EK}]))
+                {ok, [
+                    {{"even", ?ROWS}, ?ROWS div 4},
+                    {{"odd", ?ROWS - 1}, ?ROWS div 2}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, rev},
+                    {start_key, SK},
+                    {end_key_gt, EK}
+                ])
+            )
         }
     ].
 
@@ -404,20 +474,30 @@ should_reduce_second_half(fwd, {_, Btree}) ->
         {
             "include endkey",
             ?_assertMatch(
-                {ok, [{{"odd", 1}, ?ROWS div 2},
-                      {{"even", ?ROWS div 2}, (?ROWS div 4) + 1}]},
-                fold_reduce(Btree, [{dir, fwd},
-                                    {start_key, SK},
-                                    {end_key, EK}]))
+                {ok, [
+                    {{"odd", 1}, ?ROWS div 2},
+                    {{"even", ?ROWS div 2}, (?ROWS div 4) + 1}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, fwd},
+                    {start_key, SK},
+                    {end_key, EK}
+                ])
+            )
         },
         {
             "exclude endkey",
             ?_assertMatch(
-                {ok, [{{"odd", 1}, (?ROWS div 2) - 1},
-                      {{"even", ?ROWS div 2}, (?ROWS div 4) + 1}]},
-                fold_reduce(Btree, [{dir, fwd},
-                                    {start_key, SK},
-                                    {end_key_gt, EK}]))
+                {ok, [
+                    {{"odd", 1}, (?ROWS div 2) - 1},
+                    {{"even", ?ROWS div 2}, (?ROWS div 4) + 1}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, fwd},
+                    {start_key, SK},
+                    {end_key_gt, EK}
+                ])
+            )
         }
     ];
 should_reduce_second_half(rev, {_, Btree}) ->
@@ -426,20 +506,30 @@ should_reduce_second_half(rev, {_, Btree}) ->
         {
             "include endkey",
             ?_assertMatch(
-                {ok, [{{"even", ?ROWS}, ?ROWS div 2},
-                      {{"odd", (?ROWS div 2) + 1}, (?ROWS div 4) + 1}]},
-                fold_reduce(Btree, [{dir, rev},
-                                    {start_key, SK},
-                                    {end_key, EK}]))
+                {ok, [
+                    {{"even", ?ROWS}, ?ROWS div 2},
+                    {{"odd", (?ROWS div 2) + 1}, (?ROWS div 4) + 1}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, rev},
+                    {start_key, SK},
+                    {end_key, EK}
+                ])
+            )
         },
         {
             "exclude endkey",
             ?_assertMatch(
-                {ok, [{{"even", ?ROWS}, (?ROWS div 2) - 1},
-                      {{"odd", (?ROWS div 2) + 1}, (?ROWS div 4) + 1}]},
-                fold_reduce(Btree, [{dir, rev},
-                                    {start_key, SK},
-                                    {end_key_gt, EK}]))
+                {ok, [
+                    {{"even", ?ROWS}, (?ROWS div 2) - 1},
+                    {{"odd", (?ROWS div 2) + 1}, (?ROWS div 4) + 1}
+                ]},
+                fold_reduce(Btree, [
+                    {dir, rev},
+                    {start_key, SK},
+                    {end_key_gt, EK}
+                ])
+            )
         }
     ].
 
@@ -459,9 +549,12 @@ fold_reduce(Btree, Opts) ->
     FoldFun = fun(GroupedKey, Unreduced, Acc) ->
         {ok, [{GroupedKey, couch_btree:final_reduce(Btree, Unreduced)} | Acc]}
     end,
-    couch_btree:fold_reduce(Btree, FoldFun, [],
-                            [{key_group_fun, GroupFun}] ++ Opts).
-
+    couch_btree:fold_reduce(
+        Btree,
+        FoldFun,
+        [],
+        [{key_group_fun, GroupFun}] ++ Opts
+    ).
 
 keys(KVs) ->
     [K || {K, _} <- KVs].
@@ -470,7 +563,6 @@ reduce_fun(reduce, KVs) ->
     length(KVs);
 reduce_fun(rereduce, Reds) ->
     lists:sum(Reds).
-
 
 shuffle(List) ->
     randomize(round(math:log(length(List)) + 0.5), List).
@@ -481,7 +573,10 @@ randomize(T, List) ->
     lists:foldl(
         fun(_E, Acc) ->
             randomize(Acc)
-        end, randomize(List), lists:seq(1, (T - 1))).
+        end,
+        randomize(List),
+        lists:seq(1, (T - 1))
+    ).
 
 randomize(List) ->
     D = lists:map(fun(A) -> {couch_rand:uniform(), A} end, List),
@@ -500,18 +595,24 @@ test_add_remove(Btree, OutKeyValues, RemainingKeyValues) ->
         fun({K, _}, BtAcc) ->
             {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [], [K]),
             BtAcc2
-        end, Btree, OutKeyValues),
+        end,
+        Btree,
+        OutKeyValues
+    ),
     true = test_btree(Btree2, RemainingKeyValues),
 
     Btree3 = lists:foldl(
         fun(KV, BtAcc) ->
             {ok, BtAcc2} = couch_btree:add_remove(BtAcc, [KV], []),
             BtAcc2
-        end, Btree2, OutKeyValues),
+        end,
+        Btree2,
+        OutKeyValues
+    ),
     true = test_btree(Btree3, OutKeyValues ++ RemainingKeyValues).
 
 test_key_access(Btree, List) ->
-    FoldFun = fun(Element, {[HAcc|TAcc], Count}) ->
+    FoldFun = fun(Element, {[HAcc | TAcc], Count}) ->
         case Element == HAcc of
             true -> {ok, {TAcc, Count + 1}};
             _ -> {ok, {TAcc, Count + 1}}
@@ -520,8 +621,12 @@ test_key_access(Btree, List) ->
     Length = length(List),
     Sorted = lists:sort(List),
     {ok, _, {[], Length}} = couch_btree:foldl(Btree, FoldFun, {Sorted, 0}),
-    {ok, _, {[], Length}} = couch_btree:fold(Btree, FoldFun,
-                                             {Sorted, 0}, [{dir, rev}]),
+    {ok, _, {[], Length}} = couch_btree:fold(
+        Btree,
+        FoldFun,
+        {Sorted, 0},
+        [{dir, rev}]
+    ),
     ok.
 
 test_lookup_access(Btree, KeyValues) ->
@@ -529,9 +634,15 @@ test_lookup_access(Btree, KeyValues) ->
     lists:foreach(
         fun({Key, Value}) ->
             [{ok, {Key, Value}}] = couch_btree:lookup(Btree, [Key]),
-            {ok, _, true} = couch_btree:foldl(Btree, FoldFun,
-                                              {Key, Value}, [{start_key, Key}])
-        end, KeyValues).
+            {ok, _, true} = couch_btree:foldl(
+                Btree,
+                FoldFun,
+                {Key, Value},
+                [{start_key, Key}]
+            )
+        end,
+        KeyValues
+    ).
 
 test_final_reductions(Btree, KeyValues) ->
     KVLen = length(KeyValues),
@@ -545,18 +656,28 @@ test_final_reductions(Btree, KeyValues) ->
         CountToEnd = couch_btree:final_reduce(Btree, LeadingReds),
         {ok, Acc + 1}
     end,
-    {LStartKey, _} = case KVLen of
-        0 -> {nil, nil};
-        _ -> lists:nth(KVLen div 3 + 1, lists:sort(KeyValues))
-    end,
-    {RStartKey, _} = case KVLen of
-        0 -> {nil, nil};
-        _ -> lists:nth(KVLen div 3, lists:sort(KeyValues))
-    end,
-    {ok, _, FoldLRed} = couch_btree:foldl(Btree, FoldLFun, 0,
-                                          [{start_key, LStartKey}]),
-    {ok, _, FoldRRed} = couch_btree:fold(Btree, FoldRFun, 0,
-                                         [{dir, rev}, {start_key, RStartKey}]),
+    {LStartKey, _} =
+        case KVLen of
+            0 -> {nil, nil};
+            _ -> lists:nth(KVLen div 3 + 1, lists:sort(KeyValues))
+        end,
+    {RStartKey, _} =
+        case KVLen of
+            0 -> {nil, nil};
+            _ -> lists:nth(KVLen div 3, lists:sort(KeyValues))
+        end,
+    {ok, _, FoldLRed} = couch_btree:foldl(
+        Btree,
+        FoldLFun,
+        0,
+        [{start_key, LStartKey}]
+    ),
+    {ok, _, FoldRRed} = couch_btree:fold(
+        Btree,
+        FoldRFun,
+        0,
+        [{dir, rev}, {start_key, RStartKey}]
+    ),
     KVLen = FoldLRed + FoldRRed,
     ok.
 

@@ -24,28 +24,26 @@ go(DbName) ->
     RexiMon = fabric_util:create_monitors(Shards),
     Acc0 = {fabric_dict:init(Workers, nil), []},
     try fabric_util:recv(Workers, #shard.ref, fun handle_message/3, Acc0) of
-    {timeout, {WorkersDict, _}} ->
-        DefunctWorkers = fabric_util:remove_done_workers(WorkersDict, nil),
-        fabric_util:log_timeout(DefunctWorkers, "get_doc_count"),
-        {error, timeout};
-    Else ->
-        Else
+        {timeout, {WorkersDict, _}} ->
+            DefunctWorkers = fabric_util:remove_done_workers(WorkersDict, nil),
+            fabric_util:log_timeout(DefunctWorkers, "get_doc_count"),
+            {error, timeout};
+        Else ->
+            Else
     after
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, {Counters, Resps}) ->
+handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Shard, {Counters, Resps}) ->
     case fabric_ring:node_down(NodeRef, Counters, Resps) of
         {ok, Counters1} -> {ok, {Counters1, Resps}};
         error -> {error, {nodedown, <<"progress not possible">>}}
     end;
-
 handle_message({rexi_EXIT, Reason}, Shard, {Counters, Resps}) ->
     case fabric_ring:handle_error(Shard, Counters, Resps) of
         {ok, Counters1} -> {ok, {Counters1, Resps}};
         error -> {error, Reason}
     end;
-
 handle_message({ok, Count}, Shard, {Counters, Resps}) ->
     case fabric_ring:handle_response(Shard, Count, Counters, Resps) of
         {ok, {Counters1, Resps1}} ->
@@ -54,7 +52,6 @@ handle_message({ok, Count}, Shard, {Counters, Resps}) ->
             Total = fabric_dict:fold(fun(_, C, A) -> A + C end, 0, Resps1),
             {stop, Total}
     end;
-
 handle_message(Reason, Shard, {Counters, Resps}) ->
     case fabric_ring:handle_error(Shard, Counters, Resps) of
         {ok, Counters1} -> {ok, {Counters1, Resps}};

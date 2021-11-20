@@ -12,28 +12,22 @@
 
 -module(couch_log_config_test).
 
-
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -define(T(Name), {atom_to_list(Name), fun Name/0}).
 
 couch_log_config_test_() ->
-    {setup,
-        fun couch_log_test_util:start/0,
-        fun couch_log_test_util:stop/1,
-        [
-            ?T(check_level),
-            ?T(check_max_message_size),
-            ?T(check_bad_level),
-            ?T(check_bad_max_message_size),
-            ?T(check_strip_last_msg),
-            ?T(check_bad_strip_last_msg),
-            ?T(check_filter_fields),
-            ?T(check_bad_filter_fields)
-        ]
-    }.
-
+    {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
+        ?T(check_level),
+        ?T(check_max_message_size),
+        ?T(check_bad_level),
+        ?T(check_bad_max_message_size),
+        ?T(check_strip_last_msg),
+        ?T(check_bad_strip_last_msg),
+        ?T(check_filter_fields),
+        ?T(check_bad_filter_fields)
+    ]}.
 
 check_level() ->
     % Default level is info
@@ -57,7 +51,6 @@ check_level() ->
         ?assertEqual(2, couch_log_config:get(level_int))
     end).
 
-
 check_max_message_size() ->
     % Default is 16000
     ?assertEqual(16000, couch_log_config:get(max_message_size)),
@@ -71,7 +64,6 @@ check_max_message_size() ->
         couch_log_test_util:wait_for_config(),
         ?assertEqual(16000, couch_log_config:get(max_message_size))
     end).
-
 
 check_bad_level() ->
     % Default level is info
@@ -95,7 +87,6 @@ check_bad_level() ->
         ?assertEqual(2, couch_log_config:get(level_int))
     end).
 
-
 check_bad_max_message_size() ->
     % Default level is 16000
     ?assertEqual(16000, couch_log_config:get(max_message_size)),
@@ -113,7 +104,6 @@ check_bad_max_message_size() ->
         couch_log_test_util:wait_for_config(),
         ?assertEqual(16000, couch_log_config:get(max_message_size))
     end).
-
 
 check_strip_last_msg() ->
     % Default is true
@@ -146,7 +136,6 @@ check_bad_strip_last_msg() ->
         couch_log_test_util:wait_for_config(),
         ?assertEqual(true, couch_log_config:get(strip_last_msg))
     end).
-
 
 check_filter_fields() ->
     Default = [pid, registered_name, error_info, messages],

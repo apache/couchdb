@@ -53,7 +53,6 @@
 %
 % [1] : https://proteusmaster.urcf.drexel.edu/urcfwiki/images/KayLauderFairShare.pdf
 
-
 -module(couch_replicator_share).
 
 -export([
@@ -68,10 +67,8 @@
     charge/3
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_replicator.hrl").
-
 
 % Usage coefficient decays historic usage every scheduling cycle. For example,
 % the usage value for a job running 1 minute is 60000000 (i.e microseconds /
@@ -101,7 +98,6 @@
 %
 -define(DEFAULT_PRIORITY_COEFF, 0.98).
 
-
 -define(MIN_SHARES, 1).
 -define(MAX_SHARES, 1000).
 -define(DEFAULT_SHARES, 100).
@@ -112,33 +108,33 @@
 -define(CHARGES, couch_replicator_stopped_usage).
 -define(NUM_JOBS, couch_replicator_num_jobs).
 
-
 init() ->
     EtsOpts = [named_table, public],
-    ?SHARES = ets:new(?SHARES, EtsOpts), % {Key, Shares}
-    ?PRIORITIES = ets:new(?PRIORITIES, EtsOpts), % {JobId, Priority}
-    ?USAGE = ets:new(?USAGE, EtsOpts), % {Key, Usage}
-    ?CHARGES = ets:new(?CHARGES, EtsOpts), % {Key, Charges}
-    ?NUM_JOBS = ets:new(?NUM_JOBS, EtsOpts), % {Key, NumJobs}
+    % {Key, Shares}
+    ?SHARES = ets:new(?SHARES, EtsOpts),
+    % {JobId, Priority}
+    ?PRIORITIES = ets:new(?PRIORITIES, EtsOpts),
+    % {Key, Usage}
+    ?USAGE = ets:new(?USAGE, EtsOpts),
+    % {Key, Charges}
+    ?CHARGES = ets:new(?CHARGES, EtsOpts),
+    % {Key, NumJobs}
+    ?NUM_JOBS = ets:new(?NUM_JOBS, EtsOpts),
     lists:foreach(fun({K, V}) -> update_shares(K, V) end, get_config_shares()).
-
 
 clear() ->
     Tables = [?SHARES, ?PRIORITIES, ?USAGE, ?CHARGES, ?NUM_JOBS],
     lists:foreach(fun(T) -> catch ets:delete(T) end, Tables).
-
 
 % This should be called when user updates the replicator.shares config section
 %
 update_shares(Key, Shares) when is_integer(Shares) ->
     ets:insert(?SHARES, {Key, bounded(Shares, ?MIN_SHARES, ?MAX_SHARES)}).
 
-
 % Called when the config value is deleted and shares are reset to the default
 % value.
 reset_shares(Key) ->
     ets:delete(?SHARES, Key).
-
 
 job_added(#job{} = Job) ->
     Key = key(Job),
@@ -147,7 +143,6 @@ job_added(#job{} = Job) ->
     % Update job's priority as if it ran during one scheduler cycle. This is so
     % new jobs don't get to be at priority 0 (highest).
     update_priority(Job).
-
 
 job_removed(#job{} = Job) ->
     Key = key(Job),
@@ -159,7 +154,6 @@ job_removed(#job{} = Job) ->
             ok
     end,
     ok.
-
 
 % This is the main algorithm update function. It should be called during each
 % rescheduling cycle with a list of running jobs, the interval from the
@@ -180,7 +174,6 @@ update(RunningJobs, Interval, {_, _, _} = Now) ->
     decay_priorities(),
     lists:foreach(fun(Job) -> update_priority(Job) end, RunningJobs).
 
-
 priority(JobId) ->
     % Not found means it was removed because it's value was 0
     case ets:lookup(?PRIORITIES, JobId) of
@@ -188,16 +181,13 @@ priority(JobId) ->
         [] -> 0
     end.
 
-
 charge(#job{pid = undefined}, _, _) ->
     0;
-
 charge(#job{} = Job, Interval, {_, _, _} = Now) when is_integer(Interval) ->
     Key = key(Job),
     Charges = job_charges(Job, Interval, Now),
     % If the entry is not present {Key, 0} is used as the default
     ets:update_counter(?CHARGES, Key, Charges, {Key, 0}).
-
 
 usage(Key) ->
     case ets:lookup(?USAGE, Key) of
@@ -205,20 +195,17 @@ usage(Key) ->
         [] -> 0
     end.
 
-
 num_jobs(Key) ->
     case ets:lookup(?NUM_JOBS, Key) of
         [{_, NumJobs}] -> NumJobs;
         [] -> 0
     end.
 
-
 shares(Key) ->
     case ets:lookup(?SHARES, Key) of
         [{_, Shares}] -> Shares;
         [] -> ?DEFAULT_SHARES
     end.
-
 
 % In [1] this described in the "Decay of Process Priorities" section
 %
@@ -227,7 +214,6 @@ decay_priorities() ->
     % If priority becomes 0, it's removed. When looking it up, if it
     % is missing we assume it is 0
     clear_zero(?PRIORITIES).
-
 
 % This is the main part of the alrgorithm. In [1] it is described in the
 % "Priority Adjustment" section.
@@ -240,19 +226,21 @@ update_priority(#job{} = Job) ->
     % If the entry is not present {Id, 0} is used as the default
     ets:update_counter(?PRIORITIES, Id, trunc(Priority), {Id, 0}).
 
-
 % This is the "User-Level Scheduling" part from [1]
 %
 update_usage() ->
     decay(?USAGE, usage_coeff()),
     clear_zero(?USAGE),
-    ets:foldl(fun({Key, Charges}, _) ->
-        % If the entry is not present {Key, 0} is used as the default
-        ets:update_counter(?USAGE, Key, Charges, {Key, 0})
-    end, 0, ?CHARGES),
+    ets:foldl(
+        fun({Key, Charges}, _) ->
+            % If the entry is not present {Key, 0} is used as the default
+            ets:update_counter(?USAGE, Key, Charges, {Key, 0})
+        end,
+        0,
+        ?CHARGES
+    ),
     % Start each interval with a fresh charges table
     ets:delete_all_objects(?CHARGES).
-
 
 % Private helper functions
 
@@ -263,10 +251,8 @@ decay(Ets, Coeff) when is_atom(Ets) ->
     Result = {{'$1', {trunc, {'*', '$2', {const, Coeff}}}}},
     ets:select_replace(Ets, [{Head, [], [Result]}]).
 
-
 clear_zero(Ets) when is_atom(Ets) ->
     ets:select_delete(Ets, [{{'_', '$1'}, [{'=<', '$1', 0}], [true]}]).
-
 
 key(#job{} = Job) ->
     Rep = Job#job.rep,
@@ -274,7 +260,6 @@ key(#job{} = Job) ->
         true -> mem3:dbname(Rep#rep.db_name);
         false -> (Rep#rep.user_ctx)#user_ctx.name
     end.
-
 
 % Jobs are charged based on the amount of time the job was running during the
 % last scheduling interval. The time units used are microseconds in order to
@@ -294,25 +279,25 @@ job_charges(#job{} = Job, IntervalMSec, {_, _, _} = Now) ->
     IntervalUSec = IntervalMSec * 1000,
     bounded(TimeRunning, 0, IntervalUSec).
 
-
 last_started(#job{} = Job) ->
     case lists:keyfind(started, 1, Job#job.history) of
-        false -> {0, 0, 0};  % In case user set too low of a max history
+        % In case user set too low of a max history
+        false -> {0, 0, 0};
         {started, When} -> When
     end.
-
 
 bounded(Val, Min, Max) ->
     max(Min, min(Max, Val)).
 
-
 % Config helper functions
 
 get_config_shares() ->
-    lists:map(fun({K, V}) ->
-        {list_to_binary(K), int_val(V, ?DEFAULT_SHARES)}
-    end, config:get("replicator.shares")).
-
+    lists:map(
+        fun({K, V}) ->
+            {list_to_binary(K), int_val(V, ?DEFAULT_SHARES)}
+        end,
+        config:get("replicator.shares")
+    ).
 
 priority_coeff() ->
     % This is the K2 coefficient from [1]
@@ -320,13 +305,11 @@ priority_coeff() ->
     Val = float_val(config:get("replicator", "priority_coeff"), Default),
     bounded(Val, 0.0, 1.0).
 
-
 usage_coeff() ->
     % This is the K1 coefficient from [1]
     Default = ?DEFAULT_USAGE_COEFF,
     Val = float_val(config:get("replicator", "usage_coeff"), Default),
     bounded(Val, 0.0, 1.0).
-
 
 int_val(Str, Default) when is_list(Str) ->
     try list_to_integer(Str) of
@@ -336,10 +319,8 @@ int_val(Str, Default) when is_list(Str) ->
             Default
     end.
 
-
 float_val(undefined, Default) ->
     Default;
-
 float_val(Str, Default) when is_list(Str) ->
     try list_to_float(Str) of
         Val -> Val
@@ -348,13 +329,11 @@ float_val(Str, Default) when is_list(Str) ->
             Default
     end.
 
-
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_replicator/test/eunit/couch_replicator_test.hrl").
-
 
 -define(DB1, <<"db1">>).
 -define(DB2, <<"db2">>).
@@ -362,7 +341,6 @@ float_val(Str, Default) when is_list(Str) ->
 -define(J1, <<"j1">>).
 -define(J2, <<"j2">>).
 -define(J3, <<"j3">>).
-
 
 fair_share_test_() ->
     {
@@ -395,10 +373,8 @@ fair_share_test_() ->
         }
     }.
 
-
 setup_all() ->
     test_util:start_couch().
-
 
 teardown_all(Ctx) ->
     config_delete("priority_coeff"),
@@ -406,11 +382,9 @@ teardown_all(Ctx) ->
     config_shares_delete(),
     test_util:stop_couch(Ctx).
 
-
 setup() ->
     init(),
     ok.
-
 
 teardown(_) ->
     clear(),
@@ -418,8 +392,7 @@ teardown(_) ->
     config_delete("usage_coeff"),
     config_shares_delete().
 
-
-init_works(_)->
+init_works(_) ->
     Tables = [?SHARES, ?PRIORITIES, ?USAGE, ?CHARGES, ?NUM_JOBS],
     [?assert(is_list(ets:info(T))) || T <- Tables],
     ?assertEqual(#{}, tab2map(?SHARES)),
@@ -431,7 +404,6 @@ init_works(_)->
     init(),
     ?assertEqual(200, shares(?DB1)),
     ?assertEqual(#{?DB1 => 200}, tab2map(?SHARES)).
-
 
 shares_are_updated_and_reset(_) ->
     ?assertEqual(#{}, tab2map(?SHARES)),
@@ -450,7 +422,6 @@ shares_are_updated_and_reset(_) ->
     % max shares
     update_shares(?DB1, 1001),
     ?assertEqual(1000, shares(?DB1)).
-
 
 jobs_are_added_and_removed(_) ->
     job_added(job(?J1, ?DB1)),
@@ -479,7 +450,6 @@ jobs_are_added_and_removed(_) ->
     ?assertEqual(0, priority(?J2)),
     ?assertEqual(#{}, tab2map(?PRIORITIES)).
 
-
 can_fetch_job_priority(_) ->
     job_added(job(?J1, ?DB1)),
     ?assertEqual(0, priority(?J1)),
@@ -489,7 +459,6 @@ can_fetch_job_priority(_) ->
 
     ets:delete(?PRIORITIES, ?J1),
     ?assertEqual(0, priority(?J1)).
-
 
 jobs_are_charged(_) ->
     Job1 = running_job(?J1, ?DB1),
@@ -517,7 +486,6 @@ jobs_are_charged(_) ->
     job_removed(Job1),
     job_removed(Job2),
     ?assertEqual(#{?DB1 => 2000001}, tab2map(?CHARGES)).
-
 
 usage_is_updated(_) ->
     Job = running_job(?J1, ?DB1),
@@ -549,7 +517,6 @@ usage_is_updated(_) ->
     ?assertEqual(0, usage(?DB1)),
     ?assertEqual(#{}, tab2map(?USAGE)).
 
-
 priority_coefficient_works(_) ->
     job_added(job(?J1, ?DB1)),
     ets:insert(?PRIORITIES, {?J1, 1000}),
@@ -578,7 +545,6 @@ priority_coefficient_works(_) ->
     ?assertEqual(0, priority(?J1)),
     ?assertEqual(#{}, tab2map(?PRIORITIES)).
 
-
 priority_decays_when_jobs_stop_running(_) ->
     Job = running_job(?J1, ?DB1),
     job_added(Job),
@@ -592,7 +558,6 @@ priority_decays_when_jobs_stop_running(_) ->
     % Priority decays to 0 after some cycles
     [reschedule(0, {[], Pending}) || _ <- lists:seq(1, 500)],
     ?assertEqual(0, priority(?J1)).
-
 
 priority_increases_when_jobs_run(_) ->
     Job = running_job(?J1, ?DB1),
@@ -617,7 +582,6 @@ priority_increases_when_jobs_run(_) ->
     Pm = priority(?J1),
     ?assertEqual(Pn, Pm).
 
-
 two_dbs_equal_shares_equal_number_of_jobs(_) ->
     update_shares(?DB1, 100),
     update_shares(?DB2, 100),
@@ -625,7 +589,6 @@ two_dbs_equal_shares_equal_number_of_jobs(_) ->
     #{?DB1 := Db1, ?DB2 := Db2} = run_scheduler(1000, 10, Jobs),
     ?assert(49 =< Db1 andalso Db1 =< 51),
     ?assert(49 =< Db2 andalso Db2 =< 51).
-
 
 two_dbs_unequal_shares_equal_number_of_jobs(_) ->
     update_shares(?DB1, 100),
@@ -635,7 +598,6 @@ two_dbs_unequal_shares_equal_number_of_jobs(_) ->
     ?assert(89 =< Db1 andalso Db1 =< 91),
     ?assert(9 =< Db2 andalso Db2 =< 11).
 
-
 two_dbs_equal_shares_unequal_number_of_jobs(_) ->
     update_shares(?DB1, 100),
     update_shares(?DB2, 100),
@@ -644,7 +606,6 @@ two_dbs_equal_shares_unequal_number_of_jobs(_) ->
     ?assert(49 =< Db1 andalso Db1 =< 51),
     ?assert(49 =< Db2 andalso Db2 =< 51).
 
-
 two_dbs_unequal_shares_unequal_number_of_jobs(_) ->
     update_shares(?DB1, 1),
     update_shares(?DB2, 100),
@@ -652,7 +613,6 @@ two_dbs_unequal_shares_unequal_number_of_jobs(_) ->
     #{?DB1 := Db1, ?DB2 := Db2} = run_scheduler(1000, 10, Jobs),
     ?assert(0 =< Db1 andalso Db1 =< 2),
     ?assert(98 =< Db2 andalso Db2 =< 100).
-
 
 three_dbs_equal_shares_equal_number_of_jobs(_) ->
     update_shares(?DB1, 100),
@@ -664,17 +624,15 @@ three_dbs_equal_shares_equal_number_of_jobs(_) ->
     ?assert(32 =< Db2 andalso Db2 =< 34),
     ?assert(32 =< Db3 andalso Db3 =< 34).
 
-
 three_dbs_unequal_shares_equal_number_of_jobs(_) ->
     update_shares(?DB1, 100),
     update_shares(?DB2, 700),
     update_shares(?DB3, 200),
     Jobs = jobs(#{?DB1 => {25, 75}, ?DB2 => {25, 75}, ?DB3 => {25, 75}}),
     #{?DB1 := Db1, ?DB2 := Db2, ?DB3 := Db3} = run_scheduler(1000, 10, Jobs),
-    ?assert(9 =<  Db1 andalso Db1 =< 11),
+    ?assert(9 =< Db1 andalso Db1 =< 11),
     ?assert(69 =< Db2 andalso Db2 =< 71),
     ?assert(19 =< Db3 andalso Db3 =< 21).
-
 
 three_dbs_equal_shares_unequal_number_of_jobs(_) ->
     update_shares(?DB1, 100),
@@ -686,7 +644,6 @@ three_dbs_equal_shares_unequal_number_of_jobs(_) ->
     ?assert(32 =< Db2 andalso Db2 =< 34),
     ?assert(32 =< Db3 andalso Db3 =< 34).
 
-
 three_dbs_unequal_shares_unequal_number_of_jobs(_) ->
     update_shares(?DB1, 1000),
     update_shares(?DB2, 100),
@@ -697,31 +654,26 @@ three_dbs_unequal_shares_unequal_number_of_jobs(_) ->
     ?assert(9 =< Db2 andalso Db2 =< 11),
     ?assert(2 =< Db3 andalso Db3 =< 4).
 
-
 config_set(K, V) ->
     config:set("replicator", K, V, _Persist = false).
-
 
 config_delete(K) ->
     config:delete("replicator", K, _Persist = false).
 
-
 config_share_set(K, V) ->
     config:set("replicator.shares", K, V, _Persist = false).
 
-
 config_shares_delete() ->
-    [config:delete("replicator.shares", K, _Persist = false) ||
-        {K, _} <- config:get("replicator.shares")].
-
+    [
+        config:delete("replicator.shares", K, _Persist = false)
+     || {K, _} <- config:get("replicator.shares")
+    ].
 
 tab2map(T) when is_atom(T) ->
     maps:from_list(ets:tab2list(T)).
 
-
 job(rand, Db) ->
     job(rand:uniform(1 bsl 59), Db);
-
 job(Id, Db) ->
     Job = #job{
         id = Id,
@@ -732,10 +684,8 @@ job(Id, Db) ->
     },
     stop(Job).
 
-
 running_job(Id, Db) ->
     run(job(Id, Db)).
-
 
 run(#job{} = Job) ->
     Job#job{
@@ -743,13 +693,11 @@ run(#job{} = Job) ->
         history = [{started, {0, 0, 0}}, {added, {0, 0, 0}}]
     }.
 
-
 stop(#job{} = Job) ->
     Job#job{
         pid = undefined,
         history = [{added, {0, 0, 0}}]
     }.
-
 
 % Simple scheduler simulator. Start and stop N jobs and do the
 % accounting steps. Return a new list of running and pending jobs. If
@@ -773,33 +721,42 @@ reschedule(N, {Running, Pending}) ->
 
     {Running2, Pending2}.
 
-
 % Run a few scheduling cycles and calculate usage percentage for each db
 %
 run_scheduler(Cycles, Churn, Jobs0) ->
     Acc0 = {#{}, Jobs0},
 
-    {Sum, _} = lists:foldl(fun(_CycleCnt, {UsageAcc, {Running, _} = Jobs}) ->
-        UsageAcc1 = lists:foldl(fun(#job{} = Job, Acc) ->
-            Db = Job#job.rep#rep.db_name,
-            maps:update_with(Db, fun(V) -> V + 1 end, 0, Acc)
-        end, UsageAcc, Running),
-        {UsageAcc1, reschedule(Churn, Jobs)}
-    end, Acc0, lists:seq(1, Cycles)),
+    {Sum, _} = lists:foldl(
+        fun(_CycleCnt, {UsageAcc, {Running, _} = Jobs}) ->
+            UsageAcc1 = lists:foldl(
+                fun(#job{} = Job, Acc) ->
+                    Db = Job#job.rep#rep.db_name,
+                    maps:update_with(Db, fun(V) -> V + 1 end, 0, Acc)
+                end,
+                UsageAcc,
+                Running
+            ),
+            {UsageAcc1, reschedule(Churn, Jobs)}
+        end,
+        Acc0,
+        lists:seq(1, Cycles)
+    ),
 
     Total = maps:fold(fun(_, V, Acc) -> Acc + V end, 0, Sum),
     maps:map(fun(_Db, V) -> round(V / Total * 100) end, Sum).
 
-
 % Dbs = #{Db => {RunningCount, PendingCount}
 %
 jobs(#{} = Dbs) ->
-    maps:fold(fun(Db, {RCnt, PCnt}, {Running, Pending}) ->
-        RJobs = [running_job(rand, Db) || _ <- lists:seq(1, RCnt)],
-        PJobs = [job(rand, Db) || _ <- lists:seq(1, PCnt)],
-        [job_added(Job) || Job <- RJobs ++ PJobs],
-        {Running ++ RJobs, Pending ++ PJobs}
-    end, {[], []}, Dbs).
-
+    maps:fold(
+        fun(Db, {RCnt, PCnt}, {Running, Pending}) ->
+            RJobs = [running_job(rand, Db) || _ <- lists:seq(1, RCnt)],
+            PJobs = [job(rand, Db) || _ <- lists:seq(1, PCnt)],
+            [job_added(Job) || Job <- RJobs ++ PJobs],
+            {Running ++ RJobs, Pending ++ PJobs}
+        end,
+        {[], []},
+        Dbs
+    ).
 
 -endif.

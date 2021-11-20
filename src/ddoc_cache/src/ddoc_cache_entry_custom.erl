@@ -12,7 +12,6 @@
 
 -module(ddoc_cache_entry_custom).
 
-
 -export([
     dbname/1,
     ddocid/1,
@@ -20,18 +19,14 @@
     insert/2
 ]).
 
-
 dbname({DbName, _}) ->
     DbName.
-
 
 ddocid(_) ->
     no_ddocid.
 
-
 recover({DbName, Mod}) ->
     Mod:recover(DbName).
-
 
 insert(_, _) ->
     ok.

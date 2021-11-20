@@ -12,8 +12,7 @@
 
 -module(couch_ejson_compare_tests).
 
-
--define(MAX_UNICODE_STRING, <<255,255,255,255>>).
+-define(MAX_UNICODE_STRING, <<255, 255, 255, 255>>).
 
 % See mango_idx_view.hrl
 -define(MAX_JSON_OBJ, {?MAX_UNICODE_STRING}).
@@ -52,39 +51,38 @@
     {[{<<"b">>, 2}, {<<"c">>, 2}]}
 ]).
 
-
 % Propery tests
 
 -ifdef(WITH_PROPER).
 
 -include_lib("couch/include/couch_eunit_proper.hrl").
 
-
 property_test_() ->
     ?EUNIT_QUICKCHECK(60, 400).
-
 
 % Properties
 
 % The main, nif-based comparison, sorts the test values correctly
 prop_nif_sorts_correctly() ->
     Positions = get_positions(?TEST_VALUES),
-    ?FORALL(A, oneof(?TEST_VALUES),
+    ?FORALL(
+        A,
+        oneof(?TEST_VALUES),
         ?FORALL(B, oneof(?TEST_VALUES), begin
             expected_less(A, B, Positions) =:= less_nif(A, B)
         end)
     ).
 
-
 % The erlang fallback comparison sorts the test values correctly
 prop_erlang_sorts_correctly() ->
     Positions = get_positions(?TEST_VALUES),
-    ?FORALL(A, oneof(?TEST_VALUES),
+    ?FORALL(
+        A,
+        oneof(?TEST_VALUES),
         ?FORALL(B, oneof(?TEST_VALUES), begin
             expected_less(A, B, Positions) =:= less_erl(A, B)
         end)
     ).
-
 
 % Zero width unicode chars are ignored
 prop_equivalent_unicode_values() ->
@@ -93,13 +91,11 @@ prop_equivalent_unicode_values() ->
         less(<<"a">>, Binary) =:= 0
     end).
 
-
 % Every test value sorts less than the special ?MAX_JSON_OBJ
 prop_test_values_are_less_than_max_json() ->
     ?FORALL(V, oneof(?TEST_VALUES), begin
         less(V, ?MAX_JSON_OBJ) =:= -1
     end).
-
 
 % Any json value sorts less than the special ?MAX_JSON_OBJ
 prop_any_json_is_less_than_max_json() ->
@@ -107,21 +103,20 @@ prop_any_json_is_less_than_max_json() ->
         less(V, ?MAX_JSON_OBJ) =:= -1
     end).
 
-
 % In general, for any json, the nif collator matches the erlang collator
 prop_nif_matches_erlang() ->
-    ?FORALL(A, json(),
+    ?FORALL(
+        A,
+        json(),
         ?FORALL(B, json(), begin
             less_nif(A, B) =:= less_erl(A, B)
         end)
     ).
 
-
 % Generators
 
 json() ->
     ?SIZED(Size, json(Size)).
-
 
 json(0) ->
     oneof([
@@ -133,7 +128,6 @@ json(0) ->
         [],
         {[]}
     ]);
-
 json(Size) ->
     frequency([
         {1, null},
@@ -147,39 +141,29 @@ json(Size) ->
         {5, ?LAZY(json_object(Size))}
     ]).
 
-
 json_number() ->
     oneof([largeint(), int(), real()]).
-
 
 json_string() ->
     utf8().
 
-
 json_array(0) ->
     [];
-
 json_array(Size) ->
     vector(Size div 2, json(Size div 2)).
 
-
 json_object(0) ->
     {[]};
-
 json_object(Size) ->
     {vector(Size div 2, {json_string(), json(Size div 2)})}.
-
 
 zero_width_list() ->
     ?SIZED(Size, vector(Size, zero_width_chars())).
 
-
 zero_width_chars() ->
     oneof([16#200B, 16#200C, 16#200D]).
 
-
 -endif.
-
 
 % Regular EUnit tests
 
@@ -192,7 +176,6 @@ get_icu_version_test() ->
     ?assert(is_integer(V3) andalso V3 >= 0),
     ?assert(is_integer(V4) andalso V4 >= 0).
 
-
 get_uca_version_test() ->
     Ver = couch_ejson_compare:get_uca_version(),
     ?assertMatch({_, _, _, _}, Ver),
@@ -201,7 +184,6 @@ get_uca_version_test() ->
     ?assert(is_integer(V2) andalso V2 >= 0),
     ?assert(is_integer(V3) andalso V3 >= 0),
     ?assert(is_integer(V4) andalso V4 >= 0).
-
 
 max_depth_error_list_test() ->
     % NIF can handle terms with depth <= 9
@@ -215,7 +197,6 @@ max_depth_error_list_test() ->
     % Then it should transparently jump to erlang land
     ?assertEqual(0, less(Nested10, Nested10)).
 
-
 max_depth_error_obj_test() ->
     % NIF can handle terms with depth <= 9
     Nested9 = nest_obj(<<"k">>, <<"v">>, 9),
@@ -228,13 +209,12 @@ max_depth_error_obj_test() ->
     % Then it should transparently jump to erlang land
     ?assertEqual(0, less(Nested10, Nested10)).
 
-
 compare_strings_nif_test() ->
     ?assertEqual(-1, compare_strings(<<"a">>, <<"b">>)),
     ?assertEqual(0, compare_strings(<<"a">>, <<"a">>)),
     ?assertEqual(1, compare_strings(<<"b">>, <<"a">>)),
 
-    LargeBin1 = << <<"x">> || _ <- lists:seq(1, 1000000)>>,
+    LargeBin1 = <<<<"x">> || _ <- lists:seq(1, 1000000)>>,
     LargeBin2 = <<LargeBin1/binary, "x">>,
     ?assertEqual(-1, compare_strings(LargeBin1, LargeBin2)),
     ?assertEqual(1, compare_strings(LargeBin2, LargeBin1)),
@@ -244,47 +224,41 @@ compare_strings_nif_test() ->
     ?assertError(badarg, compare_strings(<<"a">>, 42)),
     ?assertError(badarg, compare_strings(42, 42)).
 
-
 % Helper functions
 
 less(A, B) ->
     cmp_norm(couch_ejson_compare:less(A, B)).
 
-
 less_nif(A, B) ->
     cmp_norm(couch_ejson_compare:less_nif(A, B)).
-
 
 less_erl(A, B) ->
     cmp_norm(couch_ejson_compare:less_erl(A, B)).
 
-
 compare_strings(A, B) ->
     couch_ejson_compare:compare_strings_nif(A, B).
 
-
 nest_list(Val, 0) ->
     Val;
-
 nest_list(Val, Depth) when is_integer(Depth), Depth > 0 ->
     [nest_list(Val, Depth - 1)].
 
-
 nest_obj(K, V, 1) ->
     {[{K, V}]};
-
 nest_obj(K, V, Depth) when is_integer(Depth), Depth > 1 ->
     {[{K, nest_obj(K, V, Depth - 1)}]}.
-
 
 % Build a map of #{Val => PositionIndex} for the test values so that when any
 % two are compared we can verify their position in the test list matches the
 % compared result
 get_positions(TestValues) ->
-    lists:foldl(fun(Val, Acc) ->
-        Acc#{Val => map_size(Acc)}
-    end, #{}, TestValues).
-
+    lists:foldl(
+        fun(Val, Acc) ->
+            Acc#{Val => map_size(Acc)}
+        end,
+        #{},
+        TestValues
+    ).
 
 % When two values are compared, check the test values positions index to ensure
 % the order in the test value list matches the comparison result

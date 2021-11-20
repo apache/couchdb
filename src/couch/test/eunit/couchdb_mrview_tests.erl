@@ -15,41 +15,46 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
-
--define(DDOC, {[
-    {<<"_id">>, <<"_design/foo">>},
-    {<<"shows">>, {[
-        {<<"bar">>, <<"function(doc, req) {return '<h1>wosh</h1>';}">>}
-    ]}},
-    {<<"updates">>, {[
-        {<<"report">>, <<"function(doc, req) {"
-            "var data = JSON.parse(req.body); "
-            "return ['test', data];"
-        "}">>}
-    ]}},
-    {<<"views">>, {[
-        {<<"view1">>, {[
-            {<<"map">>, <<"function(doc){emit(doc._id, doc._rev)}">>}
-        ]}}
-    ]}}
-]}).
+-define(DDOC,
+    {[
+        {<<"_id">>, <<"_design/foo">>},
+        {<<"shows">>,
+            {[
+                {<<"bar">>, <<"function(doc, req) {return '<h1>wosh</h1>';}">>}
+            ]}},
+        {<<"updates">>,
+            {[
+                {<<"report">>, <<
+                    "function(doc, req) {"
+                    "var data = JSON.parse(req.body); "
+                    "return ['test', data];"
+                    "}"
+                >>}
+            ]}},
+        {<<"views">>,
+            {[
+                {<<"view1">>,
+                    {[
+                        {<<"map">>, <<"function(doc){emit(doc._id, doc._rev)}">>}
+                    ]}}
+            ]}}
+    ]}
+).
 
 -define(USER, "admin").
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 
-
 setup_all() ->
     Ctx = test_util:start_couch([chttpd]),
     ok = meck:new(mochiweb_socket, [passthrough]),
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
     Ctx.
 
 teardown_all(Ctx) ->
     meck:unload(),
-    ok = config:delete("admins", ?USER, _Persist=false),
+    ok = config:delete("admins", ?USER, _Persist = false),
     test_util:stop_couch(Ctx).
 
 setup(PortType) ->
@@ -108,7 +113,6 @@ mrview_cleanup_index_files_test_() ->
         }
     }.
 
-
 make_test_case(Mod, Funs) ->
     {
         lists:flatten(io_lib:format("~s", [Mod])),
@@ -122,33 +126,38 @@ make_test_case(Mod, Funs) ->
 
 should_return_invalid_request_body(PortType, {Host, DbName}) ->
     ?_test(begin
-         ok = create_doc(PortType, ?l2b(DbName), <<"doc_id">>, {[]}),
-         ReqUrl = Host ++ "/" ++ DbName ++ "/_design/foo/_update/report/doc_id",
-         {ok, Status, _Headers, Body} =
-              test_request:post(ReqUrl, [?AUTH], <<"{truncated}">>),
-         {Props} = jiffy:decode(Body),
-         ?assertEqual(
-            <<"bad_request">>, couch_util:get_value(<<"error">>, Props)),
-         ?assertEqual(
-            <<"Invalid request body">>, couch_util:get_value(<<"reason">>, Props)),
-         ?assertEqual(400, Status),
-         ok
+        ok = create_doc(PortType, ?l2b(DbName), <<"doc_id">>, {[]}),
+        ReqUrl = Host ++ "/" ++ DbName ++ "/_design/foo/_update/report/doc_id",
+        {ok, Status, _Headers, Body} =
+            test_request:post(ReqUrl, [?AUTH], <<"{truncated}">>),
+        {Props} = jiffy:decode(Body),
+        ?assertEqual(
+            <<"bad_request">>, couch_util:get_value(<<"error">>, Props)
+        ),
+        ?assertEqual(
+            <<"Invalid request body">>, couch_util:get_value(<<"reason">>, Props)
+        ),
+        ?assertEqual(400, Status),
+        ok
     end).
 
 should_return_400_for_wrong_order_of_keys(_PortType, {Host, DbName}) ->
     Args = [{start_key, "\"bbb\""}, {end_key, "\"aaa\""}],
     ?_test(begin
-         ReqUrl = Host ++ "/" ++ DbName
-              ++ "/_design/foo/_view/view1?" ++ mochiweb_util:urlencode(Args),
-         {ok, Status, _Headers, Body} = test_request:get(ReqUrl, [?AUTH]),
-         {Props} = jiffy:decode(Body),
-         ?assertEqual(
-            <<"query_parse_error">>, couch_util:get_value(<<"error">>, Props)),
-         ?assertEqual(
+        ReqUrl =
+            Host ++ "/" ++ DbName ++
+                "/_design/foo/_view/view1?" ++ mochiweb_util:urlencode(Args),
+        {ok, Status, _Headers, Body} = test_request:get(ReqUrl, [?AUTH]),
+        {Props} = jiffy:decode(Body),
+        ?assertEqual(
+            <<"query_parse_error">>, couch_util:get_value(<<"error">>, Props)
+        ),
+        ?assertEqual(
             <<"No rows can match your key range, reverse your start_key and end_key or set descending=true">>,
-            couch_util:get_value(<<"reason">>, Props)),
-         ?assertEqual(400, Status),
-         ok
+            couch_util:get_value(<<"reason">>, Props)
+        ),
+        ?assertEqual(400, Status),
+        ok
     end).
 
 should_cleanup_index_files(_PortType, {Host, DbName}) ->
@@ -167,29 +176,33 @@ should_cleanup_index_files(_PortType, {Host, DbName}) ->
         % It is hard to simulate inactive view.
         % Since couch_mrview:cleanup is called on view definition change.
         % That's why we just create extra files in place
-        ToDelete = lists:map(fun(FilePath) ->
-            ViewFile = filename:join([
-                filename:dirname(FilePath),
-                "11111111111111111111111111111111.view"]),
-            file:write_file(ViewFile, <<>>),
-            ViewFile
-        end, FileList0),
+        ToDelete = lists:map(
+            fun(FilePath) ->
+                ViewFile = filename:join([
+                    filename:dirname(FilePath),
+                    "11111111111111111111111111111111.view"
+                ]),
+                file:write_file(ViewFile, <<>>),
+                ViewFile
+            end,
+            FileList0
+        ),
         FileList1 = filelib:wildcard(IndexWildCard),
         ?assertEqual([], lists:usort(FileList1 -- (FileList0 ++ ToDelete))),
 
         CleanupUrl = Host ++ "/" ++ DbName ++ "/_view_cleanup",
         {ok, _Status1, _Headers1, _Body1} = test_request:post(
-            CleanupUrl, [], <<>>, [?AUTH]),
+            CleanupUrl, [], <<>>, [?AUTH]
+        ),
         test_util:wait(fun() ->
-                IndexFiles = filelib:wildcard(IndexWildCard),
-                case lists:usort(FileList0) == lists:usort(IndexFiles) of
-                    false -> wait;
-                    true -> ok
-                end
+            IndexFiles = filelib:wildcard(IndexWildCard),
+            case lists:usort(FileList0) == lists:usort(IndexFiles) of
+                false -> wait;
+                true -> ok
+            end
         end),
         ok
     end).
-
 
 create_doc(backdoor, DbName, Id, Body) ->
     JsonDoc = couch_util:json_apply_field({<<"_id">>, Id}, Body),
@@ -223,7 +236,6 @@ assert_success(create_db, Status) ->
 assert_success(delete_db, Status) ->
     ?assert(lists:member(Status, [200, 202])).
 
-
 host_url(PortType) ->
     "http://" ++ bind_address(PortType) ++ ":" ++ port(PortType).
 
@@ -242,7 +254,6 @@ port(clustered) ->
     integer_to_list(mochiweb_socket_server:get(chttpd, port));
 port(backdoor) ->
     integer_to_list(mochiweb_socket_server:get(couch_httpd, port)).
-
 
 upload_ddoc(Host, DbName) ->
     Url = Host ++ "/" ++ DbName ++ "/_design/foo",

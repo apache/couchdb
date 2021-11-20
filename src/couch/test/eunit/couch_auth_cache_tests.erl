@@ -21,27 +21,31 @@
 start() ->
     test_util:start_couch([ioq]).
 
-
 setup() ->
     DbName = ?tempdb(),
-    config:set("couch_httpd_auth", "authentication_db",
-                     ?b2l(DbName), false),
+    config:set(
+        "couch_httpd_auth",
+        "authentication_db",
+        ?b2l(DbName),
+        false
+    ),
     DbName.
 
 teardown(DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
 
-
 couch_auth_cache_test_() ->
     {
         "CouchDB auth cache tests",
         {
             setup,
-            fun start/0, fun test_util:stop_couch/1,
+            fun start/0,
+            fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun should_get_nil_on_missed_cache/1,
                     fun should_get_right_password_hash/1,
@@ -120,18 +124,18 @@ auth_vdu_test_() ->
         [missing, user, other]
     ]),
     AllPossibleCases = couch_tests_combinatorics:product(
-        [AllPossibleDocs, AllPossibleDocs]),
+        [AllPossibleDocs, AllPossibleDocs]
+    ),
     ?assertEqual([], AllPossibleCases -- [[A, B] || {A, B, _} <- Cases]),
 
     {
         "Check User doc validation",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
-            [
-                make_validate_test(Case) || Case <- Cases
-            ]
-       }
+            fun test_util:start_couch/0,
+            fun test_util:stop_couch/1,
+            [make_validate_test(Case) || Case <- Cases]
+        }
     }.
 
 should_get_nil_on_missed_cache(_) ->
@@ -142,8 +146,10 @@ should_get_right_password_hash(DbName) ->
         PasswordHash = hash_password("pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
         {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
-        ?assertEqual(PasswordHash,
-                      couch_util:get_value(<<"password_sha">>, Creds))
+        ?assertEqual(
+            PasswordHash,
+            couch_util:get_value(<<"password_sha">>, Creds)
+        )
     end).
 
 should_ensure_doc_hash_equals_cached_one(DbName) ->
@@ -162,8 +168,10 @@ should_update_password(DbName) ->
         {ok, Rev} = update_user_doc(DbName, "joe", "pass1"),
         {ok, _} = update_user_doc(DbName, "joe", "pass2", Rev),
         {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
-        ?assertEqual(PasswordHash,
-                      couch_util:get_value(<<"password_sha">>, Creds))
+        ?assertEqual(
+            PasswordHash,
+            couch_util:get_value(<<"password_sha">>, Creds)
+        )
     end).
 
 should_cleanup_cache_after_userdoc_deletion(DbName) ->
@@ -183,15 +191,21 @@ should_restore_cache_after_userdoc_recreation(DbName) ->
         {ok, _} = update_user_doc(DbName, "joe", "pass5"),
         {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
 
-        ?assertEqual(PasswordHash,
-                      couch_util:get_value(<<"password_sha">>, Creds))
+        ?assertEqual(
+            PasswordHash,
+            couch_util:get_value(<<"password_sha">>, Creds)
+        )
     end).
 
 should_drop_cache_on_auth_db_change(DbName) ->
     ?_test(begin
         {ok, _} = update_user_doc(DbName, "joe", "pass1"),
-        config:set("couch_httpd_auth", "authentication_db",
-                         ?b2l(?tempdb()), false),
+        config:set(
+            "couch_httpd_auth",
+            "authentication_db",
+            ?b2l(?tempdb()),
+            false
+        ),
         ?assertEqual(nil, couch_auth_cache:get_user_creds("joe"))
     end).
 
@@ -202,17 +216,27 @@ should_restore_cache_on_auth_db_change(DbName) ->
         {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
 
         DbName1 = ?tempdb(),
-        config:set("couch_httpd_auth", "authentication_db",
-                         ?b2l(DbName1), false),
+        config:set(
+            "couch_httpd_auth",
+            "authentication_db",
+            ?b2l(DbName1),
+            false
+        ),
 
         {ok, _} = update_user_doc(DbName1, "joe", "pass5"),
 
-        config:set("couch_httpd_auth", "authentication_db",
-                         ?b2l(DbName), false),
+        config:set(
+            "couch_httpd_auth",
+            "authentication_db",
+            ?b2l(DbName),
+            false
+        ),
 
         {ok, Creds, _} = couch_auth_cache:get_user_creds("joe"),
-        ?assertEqual(PasswordHash,
-                      couch_util:get_value(<<"password_sha">>, Creds))
+        ?assertEqual(
+            PasswordHash,
+            couch_util:get_value(<<"password_sha">>, Creds)
+        )
     end).
 
 should_recover_cache_after_shutdown(DbName) ->
@@ -224,7 +248,6 @@ should_recover_cache_after_shutdown(DbName) ->
         {ok, Rev1} = get_doc_rev(DbName, "joe"),
         ?assertEqual(PasswordHash, get_user_doc_password_sha(DbName, "joe"))
     end).
-
 
 should_get_admin_from_config(_DbName) ->
     ?_test(begin
@@ -245,17 +268,19 @@ update_user_doc(DbName, UserName, Password) ->
 update_user_doc(DbName, UserName, Password, Rev) ->
     ok = couch_auth_cache:ensure_users_db_exists(),
     User = iolist_to_binary(UserName),
-    Doc = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"org.couchdb.user:", User/binary>>},
-        {<<"name">>, User},
-        {<<"type">>, <<"user">>},
-        {<<"salt">>, ?SALT},
-        {<<"password_sha">>, hash_password(Password)},
-        {<<"roles">>, []}
-    ] ++ case Rev of
-            nil -> [];
-            _ ->   [{<<"_rev">>, Rev}]
-         end
+    Doc = couch_doc:from_json_obj({
+        [
+            {<<"_id">>, <<"org.couchdb.user:", User/binary>>},
+            {<<"name">>, User},
+            {<<"type">>, <<"user">>},
+            {<<"salt">>, ?SALT},
+            {<<"password_sha">>, hash_password(Password)},
+            {<<"roles">>, []}
+        ] ++
+            case Rev of
+                nil -> [];
+                _ -> [{<<"_rev">>, Rev}]
+            end
     }),
     {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, NewRev} = couch_db:update_doc(AuthDb, Doc, []),
@@ -275,13 +300,13 @@ get_doc_rev(DbName, UserName) ->
     DocId = iolist_to_binary([<<"org.couchdb.user:">>, UserName]),
     {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     UpdateRev =
-    case couch_db:open_doc(AuthDb, DocId, []) of
-    {ok, Doc} ->
-        {Props} = couch_doc:to_json_obj(Doc, []),
-        couch_util:get_value(<<"_rev">>, Props);
-    {not_found, missing} ->
-        nil
-    end,
+        case couch_db:open_doc(AuthDb, DocId, []) of
+            {ok, Doc} ->
+                {Props} = couch_doc:to_json_obj(Doc, []),
+                couch_util:get_value(<<"_rev">>, Props);
+            {not_found, missing} ->
+                nil
+        end,
     ok = couch_db:close(AuthDb),
     {ok, UpdateRev}.
 
@@ -298,14 +323,15 @@ delete_user_doc(DbName, UserName) ->
     {ok, AuthDb} = couch_db:open_int(DbName, [?ADMIN_CTX]),
     {ok, Doc} = couch_db:open_doc(AuthDb, DocId, []),
     {Props} = couch_doc:to_json_obj(Doc, []),
-    DeletedDoc = couch_doc:from_json_obj({[
-        {<<"_id">>, DocId},
-        {<<"_rev">>, couch_util:get_value(<<"_rev">>, Props)},
-        {<<"_deleted">>, true}
-    ]}),
+    DeletedDoc = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DocId},
+            {<<"_rev">>, couch_util:get_value(<<"_rev">>, Props)},
+            {<<"_deleted">>, true}
+        ]}
+    ),
     {ok, _} = couch_db:update_doc(AuthDb, DeletedDoc, []),
     ok = couch_db:close(AuthDb).
-
 
 make_validate_test({Old, New, "ok"} = Case) ->
     {test_id(Case), ?_assertEqual(ok, validate(doc(Old), doc(New)))};
@@ -314,19 +340,25 @@ make_validate_test({Old, New, Reason} = Case) ->
     {test_id(Case), ?_assertThrow({forbidden, Failure}, validate(doc(Old), doc(New)))}.
 
 test_id({[OldRoles, OldType], [NewRoles, NewType], Result}) ->
-    lists:flatten(io_lib:format(
-        "(roles: ~w, type: ~w) -> (roles: ~w, type: ~w) ==> \"~s\"",
-        [OldRoles, OldType, NewRoles, NewType, Result])).
+    lists:flatten(
+        io_lib:format(
+            "(roles: ~w, type: ~w) -> (roles: ~w, type: ~w) ==> \"~s\"",
+            [OldRoles, OldType, NewRoles, NewType, Result]
+        )
+    ).
 
 doc([Roles, Type]) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>,<<"org.couchdb.user:foo">>},
-        {<<"_rev">>,<<"1-281c81adb1bf10927a6160f246dc0468">>},
-        {<<"name">>,<<"foo">>},
-        {<<"password_scheme">>,<<"simple">>},
-        {<<"salt">>,<<"00000000000000000000000000000000">>},
-        {<<"password_sha">>, <<"111111111111111111111111111111111111">>}]
-        ++ type(Type) ++ roles(Roles)}).
+    couch_doc:from_json_obj({
+        [
+            {<<"_id">>, <<"org.couchdb.user:foo">>},
+            {<<"_rev">>, <<"1-281c81adb1bf10927a6160f246dc0468">>},
+            {<<"name">>, <<"foo">>},
+            {<<"password_scheme">>, <<"simple">>},
+            {<<"salt">>, <<"00000000000000000000000000000000">>},
+            {<<"password_sha">>, <<"111111111111111111111111111111111111">>}
+        ] ++
+            type(Type) ++ roles(Roles)
+    }).
 
 roles(custom) -> [{<<"roles">>, [<<"custom">>]}];
 roles(missing) -> [].
@@ -336,11 +368,12 @@ type(other) -> [{<<"type">>, <<"other">>}];
 type(missing) -> [].
 
 validate(DiskDoc, NewDoc) ->
-    JSONCtx = {[
-        {<<"db">>, <<"foo/bar">>},
-        {<<"name">>, <<"foo">>},
-        {<<"roles">>, [<<"_admin">>]}
-    ]},
+    JSONCtx =
+        {[
+            {<<"db">>, <<"foo/bar">>},
+            {<<"name">>, <<"foo">>},
+            {<<"roles">>, [<<"_admin">>]}
+        ]},
     validate(DiskDoc, NewDoc, JSONCtx).
 
 validate(DiskDoc, NewDoc, JSONCtx) ->

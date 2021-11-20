@@ -12,17 +12,14 @@
 
 -module(mem3_reshard_index).
 
-
 -export([
     design_docs/1,
     target_indices/2,
     spawn_builders/1
 ]).
 
-
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("couch/include/couch_db.hrl").
-
 
 %% Public API
 
@@ -37,15 +34,14 @@ design_docs(DbName) ->
             Else ->
                 Else
         end
-    catch error:database_does_not_exist ->
-        {ok, []}
+    catch
+        error:database_does_not_exist ->
+            {ok, []}
     end.
-
 
 target_indices(Docs, Targets) ->
     Indices = [[indices(N, D) || D <- Docs] || #shard{name = N} <- Targets],
     lists:flatten(Indices).
-
 
 spawn_builders(Indices) ->
     Results = [build_index(Index) || Index <- Indices],
@@ -58,13 +54,15 @@ spawn_builders(Indices) ->
             % spawned, kill the spawned ones and and return the error.
             ErrMsg = "~p failed to spawn index builders: ~p ~p",
             couch_log:error(ErrMsg, [?MODULE, Error, Indices]),
-            lists:foreach(fun({ok, Pid}) ->
-                catch unlink(Pid),
-                catch exit(Pid, kill)
-            end, Oks),
+            lists:foreach(
+                fun({ok, Pid}) ->
+                    catch unlink(Pid),
+                    catch exit(Pid, kill)
+                end,
+                Oks
+            ),
             {error, Error}
     end.
-
 
 %% Private API
 
@@ -74,12 +72,10 @@ fabric_design_docs(DbName) ->
         {error, Error} -> Error
     end.
 
-
 indices(DbName, Doc) ->
-    mrview_indices(DbName, Doc)
-    ++ [dreyfus_indices(DbName, Doc) || has_app(dreyfus)]
-    ++ [hastings_indices(DbName, Doc) || has_app(hastings)].
-
+    mrview_indices(DbName, Doc) ++
+        [dreyfus_indices(DbName, Doc) || has_app(dreyfus)] ++
+        [hastings_indices(DbName, Doc) || has_app(hastings)].
 
 mrview_indices(DbName, Doc) ->
     try
@@ -98,7 +94,6 @@ mrview_indices(DbName, Doc) ->
             []
     end.
 
-
 dreyfus_indices(DbName, Doc) ->
     try
         Indices = dreyfus_index:design_doc_to_indexes(Doc),
@@ -109,7 +104,6 @@ dreyfus_indices(DbName, Doc) ->
             couch_log:error(Msg, [?MODULE, DbName, Doc, Tag, Err]),
             []
     end.
-
 
 hastings_indices(DbName, Doc) ->
     try
@@ -122,7 +116,6 @@ hastings_indices(DbName, Doc) ->
             []
     end.
 
-
 build_index({mrview, DbName, MRSt}) ->
     case couch_index_server:get_index(couch_mrview_index, MRSt) of
         {ok, Pid} ->
@@ -132,8 +125,7 @@ build_index({mrview, DbName, MRSt}) ->
         Error ->
             Error
     end;
-
-build_index({dreyfus, DbName, Index})->
+build_index({dreyfus, DbName, Index}) ->
     case dreyfus_index_manager:get_index(DbName, Index) of
         {ok, Pid} ->
             Args = [Pid, get_update_seq(DbName)],
@@ -142,7 +134,6 @@ build_index({dreyfus, DbName, Index})->
         Error ->
             Error
     end;
-
 build_index({hastings, DbName, Index}) ->
     case hastings_index_manager:get_index(DbName, Index) of
         {ok, Pid} ->
@@ -153,10 +144,8 @@ build_index({hastings, DbName, Index}) ->
             Error
     end.
 
-
 has_app(App) ->
     code:lib_dir(App) /= {error, bad_name}.
-
 
 get_update_seq(DbName) ->
     couch_util:with_db(DbName, fun(Db) ->

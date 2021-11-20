@@ -12,7 +12,6 @@
 
 -module(ddoc_cache_entry_validation_funs).
 
-
 -export([
     dbname/1,
     ddocid/1,
@@ -20,25 +19,24 @@
     insert/2
 ]).
 
-
 dbname(DbName) ->
     DbName.
-
 
 ddocid(_) ->
     no_ddocid.
 
-
 recover(DbName) ->
     {ok, DDocs} = fabric:design_docs(mem3:dbname(DbName)),
-    Funs = lists:flatmap(fun(DDoc) ->
-        case couch_doc:get_validate_doc_fun(DDoc) of
-            nil -> [];
-            Fun -> [Fun]
-        end
-    end, DDocs),
+    Funs = lists:flatmap(
+        fun(DDoc) ->
+            case couch_doc:get_validate_doc_fun(DDoc) of
+                nil -> [];
+                Fun -> [Fun]
+            end
+        end,
+        DDocs
+    ),
     {ok, Funs}.
-
 
 insert(_, _) ->
     ok.

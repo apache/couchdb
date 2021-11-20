@@ -12,17 +12,14 @@
 
 -module(ddoc_cache_remove_test).
 
-
 -export([
     recover/1
 ]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("ddoc_cache_test.hrl").
-
 
 recover(DbName) ->
     {ok, #doc{body = {Body}}} = fabric:open_doc(DbName, ?CUSTOM, [?ADMIN_CTX]),
@@ -35,17 +32,14 @@ recover(DbName) ->
             erlang:error(thpppt)
     end.
 
-
 start_couch() ->
     Ctx = ddoc_cache_tutil:start_couch(),
     meck:new(ddoc_cache_ev, [passthrough]),
     Ctx.
 
-
 stop_couch(Ctx) ->
     meck:unload(),
     ddoc_cache_tutil:stop_couch(Ctx).
-
 
 check_refresh_test_() ->
     {
@@ -60,7 +54,6 @@ check_refresh_test_() ->
             {"remove_custom_error", fun remove_custom_error/1}
         ])
     }.
-
 
 remove_ddoc({DbName, _}) ->
     ddoc_cache_tutil:clear(),
@@ -88,7 +81,6 @@ remove_ddoc({DbName, _}) ->
     ?assertMatch({not_found, deleted}, ddoc_cache:open_doc(DbName, ?FOOBAR)),
     ?assertEqual(1, ets:info(?CACHE, size)).
 
-
 remove_ddoc_rev({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     meck:reset(ddoc_cache_ev),
@@ -100,8 +92,8 @@ remove_ddoc_rev({DbName, _}) ->
 
     % Notice the sort so that we know we're getting the
     % revid version second.
-    [_, #entry{key = Key, val = DDoc, pid = Pid}]
-            = lists:sort(ets:tab2list(?CACHE)),
+    [_, #entry{key = Key, val = DDoc, pid = Pid}] =
+        lists:sort(ets:tab2list(?CACHE)),
 
     NewDDoc = DDoc#doc{
         body = {[{<<"an">>, <<"update">>}]}
@@ -109,18 +101,20 @@ remove_ddoc_rev({DbName, _}) ->
     {ok, _} = fabric:update_doc(DbName, NewDDoc, [?ADMIN_CTX]),
     meck:wait(ddoc_cache_ev, event, [update_noop, Key], 1000),
     % Compact the database so that the old rev is removed
-    lists:foreach(fun(Shard) ->
-        do_compact(Shard#shard.name)
-    end, mem3:local_shards(DbName)),
+    lists:foreach(
+        fun(Shard) ->
+            do_compact(Shard#shard.name)
+        end,
+        mem3:local_shards(DbName)
+    ),
     % Trigger a refresh rather than wait for the timeout
     ddoc_cache_entry:refresh(Pid),
     meck:wait(ddoc_cache_ev, event, [removed, Key], 1000),
     ?assertMatch(
-            {{not_found, missing}, _},
-            ddoc_cache:open_doc(DbName, ?VDU, Rev)
-        ),
+        {{not_found, missing}, _},
+        ddoc_cache:open_doc(DbName, ?VDU, Rev)
+    ),
     ?assertEqual(1, ets:info(?CACHE, size)).
-
 
 remove_ddoc_rev_only({DbName, _}) ->
     ddoc_cache_tutil:clear(),
@@ -141,9 +135,12 @@ remove_ddoc_rev_only({DbName, _}) ->
     meck:wait(ddoc_cache_ev, event, [updated, '_'], 1000),
     meck:wait(ddoc_cache_ev, event, [update_noop, RevKey], 1000),
     % Compact the database so that the old rev is removed
-    lists:foreach(fun(Shard) ->
-        do_compact(Shard#shard.name)
-    end, mem3:local_shards(DbName)),
+    lists:foreach(
+        fun(Shard) ->
+            do_compact(Shard#shard.name)
+        end,
+        mem3:local_shards(DbName)
+    ),
     % Trigger a refresh rather than wait for the timeout
     ddoc_cache_entry:refresh(NoRevPid),
     ddoc_cache_entry:refresh(RevPid),
@@ -151,9 +148,9 @@ remove_ddoc_rev_only({DbName, _}) ->
     meck:wait(ddoc_cache_ev, event, [removed, RevKey], 1000),
     ?assertMatch({ok, _}, ddoc_cache:open_doc(DbName, ?VDU)),
     ?assertMatch(
-            {{not_found, missing}, _},
-            ddoc_cache:open_doc(DbName, ?VDU, Rev)
-        ),
+        {{not_found, missing}, _},
+        ddoc_cache:open_doc(DbName, ?VDU, Rev)
+    ),
     ?assertEqual(1, ets:info(?CACHE, size)).
 
 remove_custom_not_ok({DbName, _}) ->
@@ -171,7 +168,6 @@ remove_custom_not_ok({DbName, _}) ->
     ?assertEqual({ruh, roh}, ddoc_cache:open_custom(DbName, ?MODULE)),
     ?assertEqual(0, ets:info(?CACHE, size)).
 
-
 remove_custom_error({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     meck:reset(ddoc_cache_ev),
@@ -187,13 +183,11 @@ remove_custom_error({DbName, _}) ->
     ?assertError(thpppt, ddoc_cache:open_custom(DbName, ?MODULE)),
     ?assertEqual(0, ets:info(?CACHE, size)).
 
-
 init_custom_ddoc(DbName) ->
     Body = {[{<<"status">>, <<"ok">>}]},
     {ok, Doc} = fabric:open_doc(DbName, ?CUSTOM, [?ADMIN_CTX]),
     NewDoc = Doc#doc{body = Body},
     {ok, _} = fabric:update_doc(DbName, NewDoc, [?ADMIN_CTX]).
-
 
 do_compact(ShardName) ->
     {ok, Db} = couch_db:open_int(ShardName, []),
@@ -209,16 +203,19 @@ do_compact(ShardName) ->
     end,
     wait_for_compaction(ShardName).
 
-
 wait_for_compaction(ShardName) ->
     {ok, Db} = couch_db:open_int(ShardName, []),
-    CompactRunning = try
-        {ok, Info} = couch_db:get_db_info(Db),
-        couch_util:get_value(compact_running, Info)
-    after
-        couch_db:close(Db)
-    end,
-    if not CompactRunning -> ok; true ->
-        timer:sleep(100),
-        wait_for_compaction(ShardName)
+    CompactRunning =
+        try
+            {ok, Info} = couch_db:get_db_info(Db),
+            couch_util:get_value(compact_running, Info)
+        after
+            couch_db:close(Db)
+        end,
+    if
+        not CompactRunning ->
+            ok;
+        true ->
+            timer:sleep(100),
+            wait_for_compaction(ShardName)
     end.

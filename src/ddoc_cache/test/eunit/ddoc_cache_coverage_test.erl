@@ -12,11 +12,9 @@
 
 -module(ddoc_cache_coverage_test).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("ddoc_cache_test.hrl").
-
 
 coverage_test_() ->
     {
@@ -29,12 +27,10 @@ coverage_test_() ->
         ]
     }.
 
-
 restart_lru() ->
     send_bad_messages(ddoc_cache_lru),
     ?assertEqual(ok, ddoc_cache_lru:terminate(bang, {st, a, b, c})),
     ?assertEqual({ok, foo}, ddoc_cache_lru:code_change(1, foo, [])).
-
 
 stop_on_evictor_death() ->
     meck:new(ddoc_cache_ev, [passthrough]),
@@ -54,7 +50,6 @@ stop_on_evictor_death() ->
         meck:unload()
     end.
 
-
 send_bad_messages(Name) ->
     wait_for_restart(Name, fun() ->
         ?assertEqual({invalid_call, foo}, gen_server:call(Name, foo))
@@ -65,7 +60,6 @@ send_bad_messages(Name) ->
     wait_for_restart(Name, fun() ->
         whereis(Name) ! foo
     end).
-
 
 wait_for_restart(Server, Fun) ->
     Ref = erlang:monitor(process, whereis(Server)),

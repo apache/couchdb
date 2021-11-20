@@ -14,7 +14,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
-
 validate_callback_exists_test_() ->
     {
         "validate_callback_exists tests",
@@ -33,8 +32,10 @@ implode_test() ->
     ?assertEqual([1, 38, 2, 38, 3], couch_util:implode([1, 2, 3], "&")).
 
 trim_test() ->
-    lists:map(fun(S) -> ?assertEqual("foo", couch_util:trim(S)) end,
-              [" foo", "foo ", "\tfoo", " foo ", "foo\t", "foo\n", "\nfoo"]).
+    lists:map(
+        fun(S) -> ?assertEqual("foo", couch_util:trim(S)) end,
+        [" foo", "foo ", "\tfoo", " foo ", "foo\t", "foo\n", "\nfoo"]
+    ).
 
 abs_pathname_test() ->
     {ok, Cwd} = file:get_cwd(),
@@ -44,8 +45,10 @@ flush_test() ->
     ?assertNot(couch_util:should_flush()),
     AcquireMem = fun() ->
         _IntsToAGazillion = lists:seq(1, 200000),
-        _LotsOfData = lists:map(fun(_) -> <<"foobar">> end,
-                                lists:seq(1, 500000)),
+        _LotsOfData = lists:map(
+            fun(_) -> <<"foobar">> end,
+            lists:seq(1, 500000)
+        ),
         _ = list_to_binary(_LotsOfData),
 
         %% Allocation 200K tuples puts us above the memory threshold
@@ -97,11 +100,20 @@ find_in_binary_test_() ->
     ],
     lists:map(
         fun({Needle, Haystack, Result}) ->
-            Msg = lists:flatten(io_lib:format("Looking for ~s in ~s",
-                                              [Needle, Haystack])),
-            {Msg, ?_assertMatch(Result,
-                                couch_util:find_in_binary(Needle, Haystack))}
-        end, Cases).
+            Msg = lists:flatten(
+                io_lib:format(
+                    "Looking for ~s in ~s",
+                    [Needle, Haystack]
+                )
+            ),
+            {Msg,
+                ?_assertMatch(
+                    Result,
+                    couch_util:find_in_binary(Needle, Haystack)
+                )}
+        end,
+        Cases
+    ).
 
 should_succeed_for_existent_cb() ->
     ?_assert(couch_util:validate_callback_exists(lists, any, 2)).
@@ -115,10 +127,14 @@ should_fail_for_missing_cb() ->
     lists:map(
         fun({M, F, A} = MFA) ->
             Name = lists:flatten(io_lib:format("~w:~w/~w", [M, F, A])),
-            {Name, ?_assertThrow(
-                {error, {undefined_callback, Name, MFA}},
-                couch_util:validate_callback_exists(M, F, A))}
-        end, Cases).
+            {Name,
+                ?_assertThrow(
+                    {error, {undefined_callback, Name, MFA}},
+                    couch_util:validate_callback_exists(M, F, A)
+                )}
+        end,
+        Cases
+    ).
 
 to_hex_test_() ->
     [

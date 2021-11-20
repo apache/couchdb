@@ -12,12 +12,10 @@
 
 -module(dreyfus_config_test).
 
-
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -define(TIMEOUT, 1000).
-
 
 start() ->
     test_util:start_couch([dreyfus]).
@@ -33,10 +31,12 @@ dreyfus_config_test_() ->
         "dreyfus config tests",
         {
             setup,
-            fun start/0, fun test_util:stop_couch/1,
+            fun start/0,
+            fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun check_black_list/0,
                     fun check_delete_from_blacklist/0
@@ -54,9 +54,12 @@ check_black_list() ->
     ok = config:set("dreyfus_blacklist", Index3, "true"),
     dreyfus_test_util:wait_config_change(Index3, "true"),
     FinalBl = [Index3, Index2, Index],
-    lists:foreach(fun (I) ->
-        ?assertEqual("true", dreyfus_config:get(I))
-    end, FinalBl).
+    lists:foreach(
+        fun(I) ->
+            ?assertEqual("true", dreyfus_config:get(I))
+        end,
+        FinalBl
+    ).
 
 check_delete_from_blacklist() ->
     Index = "mydb.myddocid.myindexname",

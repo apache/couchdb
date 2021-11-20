@@ -30,7 +30,6 @@
     update_error/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("ibrowse/include/ibrowse.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -49,13 +48,11 @@
     get_json_value/3
 ]).
 
-
 -define(REP_DB_NAME, <<"_replicator">>).
 -define(REP_DESIGN_DOC, <<"_design/_replicator">>).
 -define(OWNER, <<"owner">>).
--define(CTX, {user_ctx, #user_ctx{roles=[<<"_admin">>, <<"_replicator">>]}}).
+-define(CTX, {user_ctx, #user_ctx{roles = [<<"_admin">>, <<"_replicator">>]}}).
 -define(replace(L, K, V), lists:keystore(K, 1, L, {K, V})).
-
 
 remove_state_fields(DbName, DocId) ->
     update_rep_doc(DbName, DocId, [
@@ -63,31 +60,39 @@ remove_state_fields(DbName, DocId) ->
         {<<"_replication_state_time">>, undefined},
         {<<"_replication_state_reason">>, undefined},
         {<<"_replication_id">>, undefined},
-        {<<"_replication_stats">>, undefined}]).
-
+        {<<"_replication_stats">>, undefined}
+    ]).
 
 -spec update_doc_completed(binary(), binary(), [_]) -> any().
 update_doc_completed(DbName, DocId, Stats) ->
     update_rep_doc(DbName, DocId, [
         {<<"_replication_state">>, <<"completed">>},
         {<<"_replication_state_reason">>, undefined},
-        {<<"_replication_stats">>, {Stats}}]),
-    couch_stats:increment_counter([couch_replicator, docs,
-        completed_state_updates]).
-
+        {<<"_replication_stats">>, {Stats}}
+    ]),
+    couch_stats:increment_counter([
+        couch_replicator,
+        docs,
+        completed_state_updates
+    ]).
 
 -spec update_failed(binary(), binary(), any()) -> any().
 update_failed(DbName, DocId, Error) ->
     Reason = error_reason(Error),
-    couch_log:error("Error processing replication doc `~s` from `~s`: ~s",
-        [DocId, DbName, Reason]),
+    couch_log:error(
+        "Error processing replication doc `~s` from `~s`: ~s",
+        [DocId, DbName, Reason]
+    ),
     update_rep_doc(DbName, DocId, [
         {<<"_replication_state">>, <<"failed">>},
         {<<"_replication_stats">>, undefined},
-        {<<"_replication_state_reason">>, Reason}]),
-    couch_stats:increment_counter([couch_replicator, docs,
-        failed_state_updates]).
-
+        {<<"_replication_state_reason">>, Reason}
+    ]),
+    couch_stats:increment_counter([
+        couch_replicator,
+        docs,
+        failed_state_updates
+    ]).
 
 -spec update_triggered(#rep{}, rep_id()) -> ok.
 update_triggered(Rep, {Base, Ext}) ->
@@ -99,26 +104,27 @@ update_triggered(Rep, {Base, Ext}) ->
         {<<"_replication_state">>, <<"triggered">>},
         {<<"_replication_state_reason">>, undefined},
         {<<"_replication_id">>, iolist_to_binary([Base, Ext])},
-        {<<"_replication_stats">>, undefined}]),
+        {<<"_replication_stats">>, undefined}
+    ]),
     ok.
-
 
 -spec update_error(#rep{}, any()) -> ok.
 update_error(#rep{db_name = DbName, doc_id = DocId, id = RepId}, Error) ->
     Reason = error_reason(Error),
-    BinRepId = case RepId of
-        {Base, Ext} ->
-            iolist_to_binary([Base, Ext]);
-        _Other ->
-            null
-    end,
+    BinRepId =
+        case RepId of
+            {Base, Ext} ->
+                iolist_to_binary([Base, Ext]);
+            _Other ->
+                null
+        end,
     update_rep_doc(DbName, DocId, [
         {<<"_replication_state">>, <<"error">>},
         {<<"_replication_state_reason">>, Reason},
         {<<"_replication_stats">>, undefined},
-        {<<"_replication_id">>, BinRepId}]),
+        {<<"_replication_id">>, BinRepId}
+    ]),
     ok.
-
 
 -spec ensure_rep_ddoc_exists(binary()) -> ok.
 ensure_rep_ddoc_exists(RepDb) ->
@@ -128,7 +134,6 @@ ensure_rep_ddoc_exists(RepDb) ->
         false ->
             ok
     end.
-
 
 -spec ensure_rep_ddoc_exists(binary(), binary()) -> ok.
 ensure_rep_ddoc_exists(RepDb, DDocId) ->
@@ -163,20 +168,17 @@ ensure_rep_ddoc_exists(RepDb, DDocId) ->
     end,
     ok.
 
-
 -spec ensure_cluster_rep_ddoc_exists(binary()) -> ok.
 ensure_cluster_rep_ddoc_exists(RepDb) ->
     DDocId = ?REP_DESIGN_DOC,
     [#shard{name = DbShard} | _] = mem3:shards(RepDb, DDocId),
     ensure_rep_ddoc_exists(DbShard, DDocId).
 
-
 -spec compare_ejson({[_]}, {[_]}) -> boolean().
 compare_ejson(EJson1, EJson2) ->
     EjsonSorted1 = couch_replicator_filters:ejsort(EJson1),
     EjsonSorted2 = couch_replicator_filters:ejsort(EJson2),
     EjsonSorted1 == EjsonSorted2.
-
 
 -spec replication_design_doc_props(binary()) -> [_].
 replication_design_doc_props(DDocId) ->
@@ -186,7 +188,6 @@ replication_design_doc_props(DDocId) ->
         {<<"validate_doc_update">>, ?REP_DB_DOC_VALIDATE_FUN}
     ].
 
-
 % Note: parse_rep_doc can handle filtered replications. During parsing of the
 % replication doc it will make possibly remote http requests to the source
 % database. If failure or parsing of filter docs fails, parse_doc throws a
@@ -195,31 +196,31 @@ replication_design_doc_props(DDocId) ->
 % on netowrk availability of the source db and other factors.
 -spec parse_rep_doc({[_]}) -> #rep{}.
 parse_rep_doc(RepDoc) ->
-    {ok, Rep} = try
-        parse_rep_doc(RepDoc, rep_user_ctx(RepDoc))
-    catch
-        throw:{error, Reason} ->
-            throw({bad_rep_doc, Reason});
-        throw:{filter_fetch_error, Reason} ->
-            throw({filter_fetch_error, Reason});
-        Tag:Err ->
-            throw({bad_rep_doc, to_binary({Tag, Err})})
-    end,
+    {ok, Rep} =
+        try
+            parse_rep_doc(RepDoc, rep_user_ctx(RepDoc))
+        catch
+            throw:{error, Reason} ->
+                throw({bad_rep_doc, Reason});
+            throw:{filter_fetch_error, Reason} ->
+                throw({filter_fetch_error, Reason});
+            Tag:Err ->
+                throw({bad_rep_doc, to_binary({Tag, Err})})
+        end,
     Rep.
-
 
 -spec parse_rep_doc_without_id({[_]}) -> #rep{}.
 parse_rep_doc_without_id(RepDoc) ->
-    {ok, Rep} = try
-        parse_rep_doc_without_id(RepDoc, rep_user_ctx(RepDoc))
-    catch
-        throw:{error, Reason} ->
-            throw({bad_rep_doc, Reason});
-        Tag:Err ->
-            throw({bad_rep_doc, to_binary({Tag, Err})})
-    end,
+    {ok, Rep} =
+        try
+            parse_rep_doc_without_id(RepDoc, rep_user_ctx(RepDoc))
+        catch
+            throw:{error, Reason} ->
+                throw({bad_rep_doc, Reason});
+            Tag:Err ->
+                throw({bad_rep_doc, to_binary({Tag, Err})})
+        end,
     Rep.
-
 
 -spec parse_rep_doc({[_]}, #user_ctx{}) -> {ok, #rep{}}.
 parse_rep_doc(Doc, UserCtx) ->
@@ -238,43 +239,44 @@ parse_rep_doc(Doc, UserCtx) ->
             {ok, update_rep_id(Rep)}
     end.
 
-
 -spec parse_rep_doc_without_id({[_]}, #user_ctx{}) -> {ok, #rep{}}.
 parse_rep_doc_without_id({Props}, UserCtx) ->
     {SrcProxy, TgtProxy} = parse_proxy_settings(Props),
     Opts = make_options(Props),
-    case get_value(cancel, Opts, false) andalso
-        (get_value(id, Opts, nil) =/= nil) of
-    true ->
-        {ok, #rep{options = Opts, user_ctx = UserCtx}};
-    false ->
-        Source = parse_rep_db(get_value(<<"source">>, Props), SrcProxy, Opts),
-        Target = parse_rep_db(get_value(<<"target">>, Props), TgtProxy, Opts),
-        {Type, View} = case couch_replicator_filters:view_type(Props, Opts) of
-        {error, Error} ->
-            throw({bad_request, Error});
-        Result ->
-            Result
-        end,
-        Rep = #rep{
-            source = Source,
-            target = Target,
-            options = Opts,
-            user_ctx = UserCtx,
-            type = Type,
-            view = View,
-            doc_id = get_value(<<"_id">>, Props, null)
-        },
-        % Check if can parse filter code, if not throw exception
-        case couch_replicator_filters:parse(Opts) of
-        {error, FilterError} ->
-            throw({error, FilterError});
-        {ok, _Filter} ->
-             ok
-        end,
-        {ok, Rep}
+    case
+        get_value(cancel, Opts, false) andalso
+            (get_value(id, Opts, nil) =/= nil)
+    of
+        true ->
+            {ok, #rep{options = Opts, user_ctx = UserCtx}};
+        false ->
+            Source = parse_rep_db(get_value(<<"source">>, Props), SrcProxy, Opts),
+            Target = parse_rep_db(get_value(<<"target">>, Props), TgtProxy, Opts),
+            {Type, View} =
+                case couch_replicator_filters:view_type(Props, Opts) of
+                    {error, Error} ->
+                        throw({bad_request, Error});
+                    Result ->
+                        Result
+                end,
+            Rep = #rep{
+                source = Source,
+                target = Target,
+                options = Opts,
+                user_ctx = UserCtx,
+                type = Type,
+                view = View,
+                doc_id = get_value(<<"_id">>, Props, null)
+            },
+            % Check if can parse filter code, if not throw exception
+            case couch_replicator_filters:parse(Opts) of
+                {error, FilterError} ->
+                    throw({error, FilterError});
+                {ok, _Filter} ->
+                    ok
+            end,
+            {ok, Rep}
     end.
-
 
 parse_proxy_settings(Props) when is_list(Props) ->
     Proxy = get_value(<<"proxy">>, Props, <<>>),
@@ -285,7 +287,7 @@ parse_proxy_settings(Props) when is_list(Props) ->
         true when SrcProxy =/= <<>> ->
             Error = "`proxy` is mutually exclusive with `source_proxy`",
             throw({bad_request, Error});
-        true when  TgtProxy =/= <<>> ->
+        true when TgtProxy =/= <<>> ->
             Error = "`proxy` is mutually exclusive with `target_proxy`",
             throw({bad_request, Error});
         true ->
@@ -293,7 +295,6 @@ parse_proxy_settings(Props) when is_list(Props) ->
         false ->
             {SrcProxy, TgtProxy}
     end.
-
 
 % Update a #rep{} record with a replication_id. Calculating the id might involve
 % fetching a filter from the source db, and so it could fail intermetently.
@@ -303,10 +304,8 @@ update_rep_id(Rep) ->
     RepId = couch_replicator_ids:replication_id(Rep),
     Rep#rep{id = RepId}.
 
-
 update_rep_doc(RepDbName, RepDocId, KVs) ->
     update_rep_doc(RepDbName, RepDocId, KVs, 1).
-
 
 update_rep_doc(RepDbName, RepDocId, KVs, Wait) when is_binary(RepDocId) ->
     try
@@ -323,35 +322,39 @@ update_rep_doc(RepDbName, RepDocId, KVs, Wait) when is_binary(RepDocId) ->
             ok = timer:sleep(couch_rand:uniform(erlang:min(128, Wait)) * 100),
             update_rep_doc(RepDbName, RepDocId, KVs, Wait * 2)
     end;
-
 update_rep_doc(RepDbName, #doc{body = {RepDocBody}} = RepDoc, KVs, _Try) ->
     NewRepDocBody = lists:foldl(
-        fun({K, undefined}, Body) ->
+        fun
+            ({K, undefined}, Body) ->
                 lists:keydelete(K, 1, Body);
-           ({<<"_replication_state">> = K, State} = KV, Body) ->
+            ({<<"_replication_state">> = K, State} = KV, Body) ->
                 case get_json_value(K, Body) of
-                State ->
-                    Body;
-                _ ->
-                    Body1 = lists:keystore(K, 1, Body, KV),
-                    Timestamp = couch_replicator_utils:iso8601(os:timestamp()),
-                    lists:keystore(
-                        <<"_replication_state_time">>, 1, Body1,
-                        {<<"_replication_state_time">>, Timestamp})
+                    State ->
+                        Body;
+                    _ ->
+                        Body1 = lists:keystore(K, 1, Body, KV),
+                        Timestamp = couch_replicator_utils:iso8601(os:timestamp()),
+                        lists:keystore(
+                            <<"_replication_state_time">>,
+                            1,
+                            Body1,
+                            {<<"_replication_state_time">>, Timestamp}
+                        )
                 end;
             ({K, _V} = KV, Body) ->
                 lists:keystore(K, 1, Body, KV)
         end,
-        RepDocBody, KVs),
+        RepDocBody,
+        KVs
+    ),
     case NewRepDocBody of
-    RepDocBody ->
-        ok;
-    _ ->
-        % Might not succeed - when the replication doc is deleted right
-        % before this update (not an error, ignore).
-        save_rep_doc(RepDbName, RepDoc#doc{body = {NewRepDocBody}})
+        RepDocBody ->
+            ok;
+        _ ->
+            % Might not succeed - when the replication doc is deleted right
+            % before this update (not an error, ignore).
+            save_rep_doc(RepDbName, RepDoc#doc{body = {NewRepDocBody}})
     end.
-
 
 open_rep_doc(DbName, DocId) ->
     case couch_db:open_int(DbName, [?CTX, sys_db]) of
@@ -364,7 +367,6 @@ open_rep_doc(DbName, DocId) ->
         Else ->
             Else
     end.
-
 
 save_rep_doc(DbName, Doc) ->
     {ok, Db} = couch_db:open_int(DbName, [?CTX, sys_db]),
@@ -382,27 +384,26 @@ save_rep_doc(DbName, Doc) ->
         couch_db:close(Db)
     end.
 
-
 -spec rep_user_ctx({[_]}) -> #user_ctx{}.
 rep_user_ctx({RepDoc}) ->
     case get_json_value(<<"user_ctx">>, RepDoc) of
-    undefined ->
-        #user_ctx{};
-    {UserCtx} ->
-        #user_ctx{
-            name = get_json_value(<<"name">>, UserCtx, null),
-            roles = get_json_value(<<"roles">>, UserCtx, [])
-        }
+        undefined ->
+            #user_ctx{};
+        {UserCtx} ->
+            #user_ctx{
+                name = get_json_value(<<"name">>, UserCtx, null),
+                roles = get_json_value(<<"roles">>, UserCtx, [])
+            }
     end.
-
 
 -spec parse_rep_db({[_]} | binary(), binary(), [_]) -> #httpd{} | binary().
 parse_rep_db({Props}, Proxy, Options) ->
     ProxyParams = parse_proxy_params(Proxy),
-    ProxyURL = case ProxyParams of
-        [] -> undefined;
-        _ -> binary_to_list(Proxy)
-    end,
+    ProxyURL =
+        case ProxyParams of
+            [] -> undefined;
+            _ -> binary_to_list(Proxy)
+        end,
     Url = maybe_add_trailing_slash(get_value(<<"url">>, Props)),
     {AuthProps} = get_value(<<"auth">>, Props, {[]}),
     {BinHeaders} = get_value(<<"headers">>, Props, {[]}),
@@ -412,28 +413,27 @@ parse_rep_db({Props}, Proxy, Options) ->
         url = Url,
         auth_props = AuthProps,
         headers = lists:ukeymerge(1, Headers, DefaultHeaders),
-        ibrowse_options = lists:keysort(1,
-            [{socket_options, get_value(socket_options, Options)} |
-                ProxyParams ++ ssl_params(Url)]),
+        ibrowse_options = lists:keysort(
+            1,
+            [
+                {socket_options, get_value(socket_options, Options)}
+                | ProxyParams ++ ssl_params(Url)
+            ]
+        ),
         timeout = get_value(connection_timeout, Options),
         http_connections = get_value(http_connections, Options),
         retries = get_value(retries, Options),
         proxy_url = ProxyURL
     },
     couch_replicator_utils:normalize_basic_auth(HttpDb);
-
 parse_rep_db(<<"http://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db({[{<<"url">>, Url}]}, Proxy, Options);
-
 parse_rep_db(<<"https://", _/binary>> = Url, Proxy, Options) ->
     parse_rep_db({[{<<"url">>, Url}]}, Proxy, Options);
-
 parse_rep_db(<<_/binary>>, _Proxy, _Options) ->
     throw({error, local_endpoints_not_supported});
-
 parse_rep_db(undefined, _Proxy, _Options) ->
     throw({error, <<"Missing replicator database">>}).
-
 
 -spec maybe_add_trailing_slash(binary() | list()) -> list().
 maybe_add_trailing_slash(Url) when is_binary(Url) ->
@@ -441,7 +441,8 @@ maybe_add_trailing_slash(Url) when is_binary(Url) ->
 maybe_add_trailing_slash(Url) ->
     case lists:member($?, Url) of
         true ->
-            Url;  % skip if there are query params
+            % skip if there are query params
+            Url;
         false ->
             case lists:last(Url) of
                 $/ ->
@@ -450,7 +451,6 @@ maybe_add_trailing_slash(Url) ->
                     Url ++ "/"
             end
     end.
-
 
 -spec make_options([_]) -> [_].
 make_options(Props) ->
@@ -462,43 +462,55 @@ make_options(Props) ->
     DefTimeout = config:get_integer("replicator", "connection_timeout", 30000),
     DefRetries = config:get_integer("replicator", "retries_per_request", 5),
     UseCheckpoints = config:get_boolean("replicator", "use_checkpoints", true),
-    DefCheckpointInterval = config:get_integer("replicator",
-        "checkpoint_interval", 30000),
+    DefCheckpointInterval = config:get_integer(
+        "replicator",
+        "checkpoint_interval",
+        30000
+    ),
     {ok, DefSocketOptions} = couch_util:parse_term(
-        config:get("replicator", "socket_options",
-            "[{keepalive, true}, {nodelay, false}]")),
-    lists:ukeymerge(1, Options, lists:keysort(1, [
-        {connection_timeout, DefTimeout},
-        {retries, DefRetries},
-        {http_connections, DefConns},
-        {socket_options, DefSocketOptions},
-        {worker_batch_size, DefBatchSize},
-        {worker_processes, DefWorkers},
-        {use_checkpoints, UseCheckpoints},
-        {checkpoint_interval, DefCheckpointInterval}
-    ])).
-
+        config:get(
+            "replicator",
+            "socket_options",
+            "[{keepalive, true}, {nodelay, false}]"
+        )
+    ),
+    lists:ukeymerge(
+        1,
+        Options,
+        lists:keysort(1, [
+            {connection_timeout, DefTimeout},
+            {retries, DefRetries},
+            {http_connections, DefConns},
+            {socket_options, DefSocketOptions},
+            {worker_batch_size, DefBatchSize},
+            {worker_processes, DefWorkers},
+            {use_checkpoints, UseCheckpoints},
+            {checkpoint_interval, DefCheckpointInterval}
+        ])
+    ).
 
 -spec convert_options([_]) -> [_].
-convert_options([])->
+convert_options([]) ->
     [];
-convert_options([{<<"cancel">>, V} | _R]) when not is_boolean(V)->
+convert_options([{<<"cancel">>, V} | _R]) when not is_boolean(V) ->
     throw({bad_request, <<"parameter `cancel` must be a boolean">>});
 convert_options([{<<"cancel">>, V} | R]) ->
     [{cancel, V} | convert_options(R)];
-convert_options([{IdOpt, V} | R]) when IdOpt =:= <<"_local_id">>;
-        IdOpt =:= <<"replication_id">>; IdOpt =:= <<"id">> ->
+convert_options([{IdOpt, V} | R]) when
+    IdOpt =:= <<"_local_id">>;
+    IdOpt =:= <<"replication_id">>;
+    IdOpt =:= <<"id">>
+->
     [{id, couch_replicator_ids:convert(V)} | convert_options(R)];
-convert_options([{<<"create_target">>, V} | _R]) when not is_boolean(V)->
+convert_options([{<<"create_target">>, V} | _R]) when not is_boolean(V) ->
     throw({bad_request, <<"parameter `create_target` must be a boolean">>});
 convert_options([{<<"create_target">>, V} | R]) ->
     [{create_target, V} | convert_options(R)];
 convert_options([{<<"create_target_params">>, V} | _R]) when not is_tuple(V) ->
-    throw({bad_request,
-        <<"parameter `create_target_params` must be a JSON object">>});
+    throw({bad_request, <<"parameter `create_target_params` must be a JSON object">>});
 convert_options([{<<"create_target_params">>, V} | R]) ->
     [{create_target_params, V} | convert_options(R)];
-convert_options([{<<"continuous">>, V} | _R]) when not is_boolean(V)->
+convert_options([{<<"continuous">>, V} | _R]) when not is_boolean(V) ->
     throw({bad_request, <<"parameter `continuous` must be a boolean">>});
 convert_options([{<<"continuous">>, V} | R]) ->
     [{continuous, V} | convert_options(R)];
@@ -538,9 +550,9 @@ convert_options([{<<"use_checkpoints">>, V} | R]) ->
     [{use_checkpoints, V} | convert_options(R)];
 convert_options([{<<"checkpoint_interval">>, V} | R]) ->
     [{checkpoint_interval, couch_util:to_integer(V)} | convert_options(R)];
-convert_options([_ | R]) -> % skip unknown option
+% skip unknown option
+convert_options([_ | R]) ->
     convert_options(R).
-
 
 -spec check_options([_]) -> [_].
 check_options(Options) ->
@@ -552,11 +564,8 @@ check_options(Options) ->
         {false, false, _} -> Options;
         {false, _, false} -> Options;
         {_, false, false} -> Options;
-        _ ->
-            throw({bad_request,
-                "`doc_ids`,`filter`,`selector` are mutually exclusive"})
+        _ -> throw({bad_request, "`doc_ids`,`filter`,`selector` are mutually exclusive"})
     end.
-
 
 -spec parse_proxy_params(binary() | [_]) -> [_].
 parse_proxy_params(ProxyUrl) when is_binary(ProxyUrl) ->
@@ -571,22 +580,23 @@ parse_proxy_params(ProxyUrl) ->
         password = Passwd,
         protocol = Protocol
     } = ibrowse_lib:parse_url(ProxyUrl),
-    Params = [
-        {proxy_host, Host},
-        {proxy_port, Port}
-    ] ++ case is_list(User) andalso is_list(Passwd) of
-        false ->
-            [];
-        true ->
-            [{proxy_user, User}, {proxy_password, Passwd}]
-    end,
+    Params =
+        [
+            {proxy_host, Host},
+            {proxy_port, Port}
+        ] ++
+            case is_list(User) andalso is_list(Passwd) of
+                false ->
+                    [];
+                true ->
+                    [{proxy_user, User}, {proxy_password, Passwd}]
+            end,
     case Protocol of
         socks5 ->
             [proxy_to_socks5(Param) || Param <- Params];
         _ ->
             Params
     end.
-
 
 -spec proxy_to_socks5({atom(), string()}) -> {atom(), string()}.
 proxy_to_socks5({proxy_host, Val}) ->
@@ -598,35 +608,44 @@ proxy_to_socks5({proxy_user, Val}) ->
 proxy_to_socks5({proxy_password, Val}) ->
     {socks5_password, Val}.
 
-
 -spec ssl_params([_]) -> [_].
 ssl_params(Url) ->
     case ibrowse_lib:parse_url(Url) of
-    #url{protocol = https} ->
-        Depth = config:get_integer("replicator",
-            "ssl_certificate_max_depth", 3),
-        VerifyCerts = config:get_boolean("replicator",
-            "verify_ssl_certificates", false),
-        CertFile = config:get("replicator", "cert_file", undefined),
-        KeyFile = config:get("replicator", "key_file", undefined),
-        Password = config:get("replicator", "password", undefined),
-        SslOpts = [{depth, Depth} | ssl_verify_options(VerifyCerts)],
-        SslOpts1 = case CertFile /= undefined andalso KeyFile /= undefined of
-            true ->
-                case Password of
-                    undefined ->
-                        [{certfile, CertFile}, {keyfile, KeyFile}] ++ SslOpts;
-                    _ ->
-                        [{certfile, CertFile}, {keyfile, KeyFile},
-                            {password, Password}] ++ SslOpts
-                end;
-            false -> SslOpts
-        end,
-        [{is_ssl, true}, {ssl_options, SslOpts1}];
-    #url{protocol = http} ->
-        []
+        #url{protocol = https} ->
+            Depth = config:get_integer(
+                "replicator",
+                "ssl_certificate_max_depth",
+                3
+            ),
+            VerifyCerts = config:get_boolean(
+                "replicator",
+                "verify_ssl_certificates",
+                false
+            ),
+            CertFile = config:get("replicator", "cert_file", undefined),
+            KeyFile = config:get("replicator", "key_file", undefined),
+            Password = config:get("replicator", "password", undefined),
+            SslOpts = [{depth, Depth} | ssl_verify_options(VerifyCerts)],
+            SslOpts1 =
+                case CertFile /= undefined andalso KeyFile /= undefined of
+                    true ->
+                        case Password of
+                            undefined ->
+                                [{certfile, CertFile}, {keyfile, KeyFile}] ++ SslOpts;
+                            _ ->
+                                [
+                                    {certfile, CertFile},
+                                    {keyfile, KeyFile},
+                                    {password, Password}
+                                ] ++ SslOpts
+                        end;
+                    false ->
+                        SslOpts
+                end,
+            [{is_ssl, true}, {ssl_options, SslOpts1}];
+        #url{protocol = http} ->
+            []
     end.
-
 
 -spec ssl_verify_options(true | false) -> [_].
 ssl_verify_options(true) ->
@@ -635,75 +654,85 @@ ssl_verify_options(true) ->
 ssl_verify_options(false) ->
     [{verify, verify_none}].
 
-
--spec before_doc_update(#doc{}, Db::any(), couch_db:update_type()) -> #doc{}.
+-spec before_doc_update(#doc{}, Db :: any(), couch_db:update_type()) -> #doc{}.
 before_doc_update(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db, _UpdateType) ->
     Doc;
 before_doc_update(#doc{body = {Body}} = Doc, Db, _UpdateType) ->
     #user_ctx{
-       roles = Roles,
-       name = Name
+        roles = Roles,
+        name = Name
     } = couch_db:get_user_ctx(Db),
     case lists:member(<<"_replicator">>, Roles) of
-    true ->
-        Doc;
-    false ->
-        case couch_util:get_value(?OWNER, Body) of
-        undefined ->
-            Doc#doc{body = {?replace(Body, ?OWNER, Name)}};
-        Name ->
+        true ->
             Doc;
-        Other ->
-            case (catch couch_db:check_is_admin(Db)) of
-            ok when Other =:= null ->
-                Doc#doc{body = {?replace(Body, ?OWNER, Name)}};
-            ok ->
-                Doc;
-            _ ->
-                throw({forbidden, <<"Can't update replication documents",
-                    " from other users.">>})
+        false ->
+            case couch_util:get_value(?OWNER, Body) of
+                undefined ->
+                    Doc#doc{body = {?replace(Body, ?OWNER, Name)}};
+                Name ->
+                    Doc;
+                Other ->
+                    case (catch couch_db:check_is_admin(Db)) of
+                        ok when Other =:= null ->
+                            Doc#doc{body = {?replace(Body, ?OWNER, Name)}};
+                        ok ->
+                            Doc;
+                        _ ->
+                            throw(
+                                {forbidden,
+                                    <<"Can't update replication documents", " from other users.">>}
+                            )
+                    end
             end
-        end
     end.
 
-
--spec after_doc_read(#doc{}, Db::any()) -> #doc{}.
+-spec after_doc_read(#doc{}, Db :: any()) -> #doc{}.
 after_doc_read(#doc{id = <<?DESIGN_DOC_PREFIX, _/binary>>} = Doc, _Db) ->
     Doc;
 after_doc_read(#doc{body = {Body}} = Doc, Db) ->
     #user_ctx{name = Name} = couch_db:get_user_ctx(Db),
     case (catch couch_db:check_is_admin(Db)) of
-    ok ->
-        Doc;
-    _ ->
-        case couch_util:get_value(?OWNER, Body) of
-        Name ->
+        ok ->
             Doc;
-        _Other ->
-            Source = strip_credentials(couch_util:get_value(<<"source">>,
-Body)),
-            Target = strip_credentials(couch_util:get_value(<<"target">>,
-Body)),
-            NewBody0 = ?replace(Body, <<"source">>, Source),
-            NewBody = ?replace(NewBody0, <<"target">>, Target),
-            #doc{revs = {Pos, [_ | Revs]}} = Doc,
-            NewDoc = Doc#doc{body = {NewBody}, revs = {Pos - 1, Revs}},
-            NewRevId = couch_db:new_revid(NewDoc),
-            NewDoc#doc{revs = {Pos, [NewRevId | Revs]}}
-        end
+        _ ->
+            case couch_util:get_value(?OWNER, Body) of
+                Name ->
+                    Doc;
+                _Other ->
+                    Source = strip_credentials(
+                        couch_util:get_value(
+                            <<"source">>,
+                            Body
+                        )
+                    ),
+                    Target = strip_credentials(
+                        couch_util:get_value(
+                            <<"target">>,
+                            Body
+                        )
+                    ),
+                    NewBody0 = ?replace(Body, <<"source">>, Source),
+                    NewBody = ?replace(NewBody0, <<"target">>, Target),
+                    #doc{revs = {Pos, [_ | Revs]}} = Doc,
+                    NewDoc = Doc#doc{body = {NewBody}, revs = {Pos - 1, Revs}},
+                    NewRevId = couch_db:new_revid(NewDoc),
+                    NewDoc#doc{revs = {Pos, [NewRevId | Revs]}}
+            end
     end.
 
-
--spec strip_credentials(undefined) -> undefined;
+-spec strip_credentials
+    (undefined) -> undefined;
     (binary()) -> binary();
     ({[_]}) -> {[_]}.
 strip_credentials(undefined) ->
     undefined;
 strip_credentials(Url) when is_binary(Url) ->
-    re:replace(Url,
+    re:replace(
+        Url,
         "http(s)?://(?:[^:]+):[^@]+@(.*)$",
         "http\\1://\\2",
-        [{return, binary}]);
+        [{return, binary}]
+    );
 strip_credentials({Props0}) ->
     Props1 = lists:keydelete(<<"headers">>, 1, Props0),
     % Strip "auth" just like headers, for replication plugins it can be a place
@@ -711,25 +740,22 @@ strip_credentials({Props0}) ->
     Props2 = lists:keydelete(<<"auth">>, 1, Props1),
     {Props2}.
 
-
 error_reason({shutdown, Error}) ->
     error_reason(Error);
 error_reason({bad_rep_doc, Reason}) ->
     to_binary(Reason);
-error_reason({error, {Error, Reason}})
-  when is_atom(Error), is_binary(Reason) ->
+error_reason({error, {Error, Reason}}) when
+    is_atom(Error), is_binary(Reason)
+->
     to_binary(io_lib:format("~s: ~s", [Error, Reason]));
 error_reason({error, Reason}) ->
     to_binary(Reason);
 error_reason(Reason) ->
     to_binary(Reason).
 
-
 -ifdef(TEST).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
-
 
 check_options_pass_values_test() ->
     ?assertEqual(check_options([]), []),
@@ -738,88 +764,120 @@ check_options_pass_values_test() ->
     ?assertEqual(check_options([{filter, x}]), [{filter, x}]),
     ?assertEqual(check_options([{selector, x}]), [{selector, x}]).
 
-
 check_options_fail_values_test() ->
-    ?assertThrow({bad_request, _},
-        check_options([{doc_ids, x}, {filter, y}])),
-    ?assertThrow({bad_request, _},
-        check_options([{doc_ids, x}, {selector, y}])),
-    ?assertThrow({bad_request, _},
-        check_options([{filter, x}, {selector, y}])),
-    ?assertThrow({bad_request, _},
-        check_options([{doc_ids, x}, {selector, y}, {filter, z}])).
-
+    ?assertThrow(
+        {bad_request, _},
+        check_options([{doc_ids, x}, {filter, y}])
+    ),
+    ?assertThrow(
+        {bad_request, _},
+        check_options([{doc_ids, x}, {selector, y}])
+    ),
+    ?assertThrow(
+        {bad_request, _},
+        check_options([{filter, x}, {selector, y}])
+    ),
+    ?assertThrow(
+        {bad_request, _},
+        check_options([{doc_ids, x}, {selector, y}, {filter, z}])
+    ).
 
 check_convert_options_pass_test() ->
     ?assertEqual([], convert_options([])),
     ?assertEqual([], convert_options([{<<"random">>, 42}])),
-    ?assertEqual([{cancel, true}],
-        convert_options([{<<"cancel">>, true}])),
-    ?assertEqual([{create_target, true}],
-        convert_options([{<<"create_target">>, true}])),
-    ?assertEqual([{continuous, true}],
-        convert_options([{<<"continuous">>, true}])),
-    ?assertEqual([{doc_ids, [<<"id">>]}],
-        convert_options([{<<"doc_ids">>, [<<"id">>]}])),
-    ?assertEqual([{selector, {key, value}}],
-        convert_options([{<<"selector">>, {key, value}}])).
-
+    ?assertEqual(
+        [{cancel, true}],
+        convert_options([{<<"cancel">>, true}])
+    ),
+    ?assertEqual(
+        [{create_target, true}],
+        convert_options([{<<"create_target">>, true}])
+    ),
+    ?assertEqual(
+        [{continuous, true}],
+        convert_options([{<<"continuous">>, true}])
+    ),
+    ?assertEqual(
+        [{doc_ids, [<<"id">>]}],
+        convert_options([{<<"doc_ids">>, [<<"id">>]}])
+    ),
+    ?assertEqual(
+        [{selector, {key, value}}],
+        convert_options([{<<"selector">>, {key, value}}])
+    ).
 
 check_convert_options_fail_test() ->
-    ?assertThrow({bad_request, _},
-        convert_options([{<<"cancel">>, <<"true">>}])),
-    ?assertThrow({bad_request, _},
-        convert_options([{<<"create_target">>, <<"true">>}])),
-    ?assertThrow({bad_request, _},
-        convert_options([{<<"continuous">>, <<"true">>}])),
-    ?assertThrow({bad_request, _},
-        convert_options([{<<"doc_ids">>, not_a_list}])),
-    ?assertThrow({bad_request, _},
-        convert_options([{<<"selector">>, [{key, value}]}])).
+    ?assertThrow(
+        {bad_request, _},
+        convert_options([{<<"cancel">>, <<"true">>}])
+    ),
+    ?assertThrow(
+        {bad_request, _},
+        convert_options([{<<"create_target">>, <<"true">>}])
+    ),
+    ?assertThrow(
+        {bad_request, _},
+        convert_options([{<<"continuous">>, <<"true">>}])
+    ),
+    ?assertThrow(
+        {bad_request, _},
+        convert_options([{<<"doc_ids">>, not_a_list}])
+    ),
+    ?assertThrow(
+        {bad_request, _},
+        convert_options([{<<"selector">>, [{key, value}]}])
+    ).
 
 check_strip_credentials_test() ->
-    [?assertEqual(Expected, strip_credentials(Body)) || {Expected, Body} <- [
-        {
-            undefined,
-            undefined
-        },
-        {
-            <<"https://remote_server/database">>,
-            <<"https://foo:bar@remote_server/database">>
-        },
-        {
-            {[{<<"_id">>, <<"foo">>}]},
-            {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"bar">>}]}
-        },
-        {
-            {[{<<"_id">>, <<"foo">>}, {<<"other">>, <<"bar">>}]},
-            {[{<<"_id">>, <<"foo">>}, {<<"other">>, <<"bar">>}]}
-        },
-        {
-            {[{<<"_id">>, <<"foo">>}]},
-            {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"baz">>}]}
-        },
-        {
-            {[{<<"_id">>, <<"foo">>}]},
-            {[{<<"_id">>, <<"foo">>}, {<<"auth">>, <<"pluginsecret">>}]}
-        }
-    ]].
-
+    [
+        ?assertEqual(Expected, strip_credentials(Body))
+     || {Expected, Body} <- [
+            {
+                undefined,
+                undefined
+            },
+            {
+                <<"https://remote_server/database">>,
+                <<"https://foo:bar@remote_server/database">>
+            },
+            {
+                {[{<<"_id">>, <<"foo">>}]},
+                {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"bar">>}]}
+            },
+            {
+                {[{<<"_id">>, <<"foo">>}, {<<"other">>, <<"bar">>}]},
+                {[{<<"_id">>, <<"foo">>}, {<<"other">>, <<"bar">>}]}
+            },
+            {
+                {[{<<"_id">>, <<"foo">>}]},
+                {[{<<"_id">>, <<"foo">>}, {<<"headers">>, <<"baz">>}]}
+            },
+            {
+                {[{<<"_id">>, <<"foo">>}]},
+                {[{<<"_id">>, <<"foo">>}, {<<"auth">>, <<"pluginsecret">>}]}
+            }
+        ]
+    ].
 
 parse_proxy_params_test() ->
-    ?assertEqual([
-        {proxy_host, "foo.com"},
-        {proxy_port, 443},
-        {proxy_user, "u"},
-        {proxy_password, "p"}
-    ], parse_proxy_params("https://u:p@foo.com")),
-    ?assertEqual([
-        {socks5_host, "foo.com"},
-        {socks5_port, 1080},
-        {socks5_user, "u"},
-        {socks5_password, "p"}
-    ], parse_proxy_params("socks5://u:p@foo.com")).
-
+    ?assertEqual(
+        [
+            {proxy_host, "foo.com"},
+            {proxy_port, 443},
+            {proxy_user, "u"},
+            {proxy_password, "p"}
+        ],
+        parse_proxy_params("https://u:p@foo.com")
+    ),
+    ?assertEqual(
+        [
+            {socks5_host, "foo.com"},
+            {socks5_port, 1080},
+            {socks5_user, "u"},
+            {socks5_password, "p"}
+        ],
+        parse_proxy_params("socks5://u:p@foo.com")
+    ).
 
 setup() ->
     DbName = ?tempdb(),
@@ -828,11 +886,9 @@ setup() ->
     create_vdu(DbName),
     DbName.
 
-
 teardown(DbName) when is_binary(DbName) ->
     couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
-
 
 create_vdu(DbName) ->
     couch_util:with_db(DbName, fun(Db) ->
@@ -844,20 +900,20 @@ create_vdu(DbName) ->
         {ok, _} = couch_db:update_docs(Db, [Doc])
     end).
 
-
 update_replicator_doc_with_bad_vdu_test_() ->
     {
         setup,
         fun test_util:start_couch/0,
         fun test_util:stop_couch/1,
         {
-            foreach, fun setup/0, fun teardown/1,
+            foreach,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun t_vdu_does_not_crash_on_save/1
             ]
         }
     }.
-
 
 t_vdu_does_not_crash_on_save(DbName) ->
     ?_test(begin
@@ -865,27 +921,30 @@ t_vdu_does_not_crash_on_save(DbName) ->
         ?assertEqual({ok, forbidden}, save_rep_doc(DbName, Doc))
     end).
 
-
 local_replication_endpoint_error_test_() ->
-     {
+    {
         foreach,
-        fun () -> meck:expect(config, get,
-            fun(_, _, Default) -> Default end)
+        fun() ->
+            meck:expect(
+                config,
+                get,
+                fun(_, _, Default) -> Default end
+            )
         end,
-        fun (_) -> meck:unload() end,
+        fun(_) -> meck:unload() end,
         [
             t_error_on_local_endpoint()
         ]
     }.
 
-
 t_error_on_local_endpoint() ->
     ?_test(begin
-        RepDoc = {[
-            {<<"_id">>, <<"someid">>},
-            {<<"source">>, <<"localdb">>},
-            {<<"target">>, <<"http://somehost.local/tgt">>}
-        ]},
+        RepDoc =
+            {[
+                {<<"_id">>, <<"someid">>},
+                {<<"source">>, <<"localdb">>},
+                {<<"target">>, <<"http://somehost.local/tgt">>}
+            ]},
         Expect = local_endpoints_not_supported,
         ?assertThrow({bad_rep_doc, Expect}, parse_rep_doc_without_id(RepDoc))
     end).

@@ -45,13 +45,13 @@ teardown(rename, Db) ->
 teardown(_, Db) ->
     teardown(Db).
 
-
 delete_db_test_() ->
     {
         "Test for proper deletion of db file",
         {
             setup,
-            fun start/0, fun test_util:stop/1,
+            fun start/0,
+            fun test_util:stop/1,
             [
                 make_test_case(rename, [fun should_rename_on_delete/2]),
                 make_test_case(delete, [fun should_delete/2])
@@ -76,7 +76,8 @@ should_rename_on_delete(_, Db) ->
         ?assertMatch([_], DeletedFiles),
         [Renamed] = DeletedFiles,
         ?assertEqual(
-            filename:extension(Origin), filename:extension(Renamed)),
+            filename:extension(Origin), filename:extension(Renamed)
+        ),
         ?assert(filelib:is_regular(Renamed))
     end).
 
@@ -93,7 +94,6 @@ should_delete(_, Db) ->
 deleted_files(ViewFile) ->
     filelib:wildcard(filename:rootname(ViewFile) ++ "*.deleted.*").
 
-
 bad_engine_option_test_() ->
     {
         setup,
@@ -104,26 +104,25 @@ bad_engine_option_test_() ->
         ]
     }.
 
-
 t_bad_engine_option() ->
     Resp = couch_server:create(?tempdb(), [{engine, <<"cowabunga!">>}]),
     ?assertEqual(Resp, {error, {invalid_engine_extension, <<"cowabunga!">>}}).
 
-
 get_engine_path_test_() ->
     {
         setup,
-        fun start/0, fun test_util:stop/1,
+        fun start/0,
+        fun test_util:stop/1,
         {
             foreach,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun should_return_engine_path/1,
                 fun should_return_invalid_engine_error/1
             ]
         }
     }.
-
 
 should_return_engine_path(Db) ->
     DbName = couch_db:name(Db),
@@ -132,13 +131,11 @@ should_return_engine_path(Db) ->
     FilePath = couch_db:get_filepath(Db),
     ?_assertMatch({ok, FilePath}, Resp).
 
-
 should_return_invalid_engine_error(Db) ->
     DbName = couch_db:name(Db),
     Engine = fake_engine,
     Resp = couch_server:get_engine_path(DbName, Engine),
     ?_assertMatch({error, {invalid_engine, Engine}}, Resp).
-
 
 interleaved_requests_test_() ->
     {
@@ -147,7 +144,6 @@ interleaved_requests_test_() ->
         fun stop_interleaved/1,
         fun make_interleaved_requests/1
     }.
-
 
 start_interleaved() ->
     TestDbName = ?tempdb(),
@@ -180,18 +176,15 @@ start_interleaved() ->
     end),
     {test_util:start_couch(), TestDbName}.
 
-
 stop_interleaved({Ctx, TestDbName}) ->
     couch_server:delete(TestDbName, [?ADMIN_CTX]),
     meck:unload(),
     test_util:stop_couch(Ctx).
 
-
 make_interleaved_requests({_, TestDbName}) ->
     [
         fun() -> t_interleaved_create_delete_open(TestDbName) end
     ].
-
 
 t_interleaved_create_delete_open(DbName) ->
     {CrtRef, OpenRef} = {make_ref(), make_ref()},
@@ -247,7 +240,6 @@ t_interleaved_create_delete_open(DbName) ->
     ?assert(is_process_alive(CouchServer)),
     check_monitor_not_triggered(CSRef).
 
-
 get_opener_pid(DbName) ->
     WaitFun = fun() ->
         case ets:lookup(couch_server:couch_dbs(DbName), DbName) of
@@ -259,22 +251,27 @@ get_opener_pid(DbName) ->
     end,
     test_util:wait(WaitFun).
 
-
 wait_for_open_async_result(CouchServer, Opener) ->
     WaitFun = fun() ->
         {_, Messages} = erlang:process_info(CouchServer, messages),
-        Found = lists:foldl(fun(Msg, Acc) ->
-            case Msg of
-                {'$gen_call', {Opener, _}, {open_result, _, {ok, _}}} ->
-                    true;
-                _ ->
-                    Acc
-            end
-        end, false, Messages),
-        if Found -> ok; true -> wait end
+        Found = lists:foldl(
+            fun(Msg, Acc) ->
+                case Msg of
+                    {'$gen_call', {Opener, _}, {open_result, _, {ok, _}}} ->
+                        true;
+                    _ ->
+                        Acc
+                end
+            end,
+            false,
+            Messages
+        ),
+        if
+            Found -> ok;
+            true -> wait
+        end
     end,
     test_util:wait(WaitFun).
-
 
 check_monitor_not_triggered(Ref) ->
     receive
@@ -283,7 +280,6 @@ check_monitor_not_triggered(Ref) ->
     after 100 ->
         ok
     end.
-
 
 get_next_message() ->
     receive

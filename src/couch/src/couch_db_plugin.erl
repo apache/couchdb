@@ -87,10 +87,10 @@ do_apply(Func, Args, Opts) ->
 maybe_handle(Func, Args, Default) ->
     Handle = couch_epi:get_handle(?SERVICE_ID),
     case couch_epi:decide(Handle, ?SERVICE_ID, Func, Args, []) of
-       no_decision when is_function(Default) ->
-           apply(Default, Args);
-       no_decision ->
-           Default;
-       {decided, Result} ->
-           Result
+        no_decision when is_function(Default) ->
+            apply(Default, Args);
+        no_decision ->
+            Default;
+        {decided, Result} ->
+            Result
     end.

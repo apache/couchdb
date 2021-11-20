@@ -28,11 +28,13 @@
 %% @doc Utility functions for weatherreport.
 %% @end
 -module(weatherreport_util).
--export([short_name/1,
-         run_command/1,
-         binary_to_float/1,
-         flush_stdout/0,
-         check_proc_count/3]).
+-export([
+    short_name/1,
+    run_command/1,
+    binary_to_float/1,
+    flush_stdout/0,
+    check_proc_count/3
+]).
 
 %% @doc Converts a check module name into a short name that can be
 %% used to refer to a check on the command line.  For example,
@@ -44,7 +46,7 @@ short_name(Mod) when is_atom(Mod) ->
 
 %% @doc Runs a shell command and returns the output. stderr is
 %% redirected to stdout so its output will be included.
--spec run_command(Command::iodata()) -> StdOut::iodata().
+-spec run_command(Command :: iodata()) -> StdOut :: iodata().
 run_command(Command) ->
     weatherreport_log:log(
         node(),
@@ -52,7 +54,7 @@ run_command(Command) ->
         "Running shell command: ~s",
         [Command]
     ),
-    Port = erlang:open_port({spawn,Command},[exit_status, stderr_to_stdout]),
+    Port = erlang:open_port({spawn, Command}, [exit_status, stderr_to_stdout]),
     do_read(Port, []).
 
 do_read(Port, Acc) ->
@@ -65,14 +67,14 @@ do_read(Port, Acc) ->
                 [StdOut]
             ),
             do_read(Port, Acc ++ StdOut);
-        {Port, {exit_status, _}} -> 
+        {Port, {exit_status, _}} ->
             %%port_close(Port),
             Acc;
-        Other -> 
+        Other ->
             io:format("~w", [Other]),
             do_read(Port, Acc)
     end.
- 
+
 %% @doc Converts a binary containing a text representation of a float
 %% into a float type.
 -spec binary_to_float(binary()) -> float().
@@ -95,17 +97,19 @@ check_proc_count(Key, Threshold, Opts) ->
 procs_to_messages([], _Threshold, Acc, _Opts) ->
     Acc;
 procs_to_messages([{Pid, Value, Info} | T], Threshold, Acc, Opts) ->
-    Level = case Value > Threshold of
-        true -> warning;
-        _ -> info
-    end,
-    Message = case {Level, proplists:get_value(expert, Opts)} of
-        {warning, true} ->
-            Pinfo = recon:info(Pid),
-            {warning, {high, {Pid, Value, Info, Pinfo}}};
-        {warning, _} ->
-            {warning, {high, {Pid, Value, Info}}};
-        {info, _} ->
-            {info, {ok, {Pid, Value, Info}}}
-    end,
+    Level =
+        case Value > Threshold of
+            true -> warning;
+            _ -> info
+        end,
+    Message =
+        case {Level, proplists:get_value(expert, Opts)} of
+            {warning, true} ->
+                Pinfo = recon:info(Pid),
+                {warning, {high, {Pid, Value, Info, Pinfo}}};
+            {warning, _} ->
+                {warning, {high, {Pid, Value, Info}}};
+            {info, _} ->
+                {info, {ok, {Pid, Value, Info}}}
+        end,
     procs_to_messages(T, Threshold, [Message | Acc], Opts).

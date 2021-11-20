@@ -26,10 +26,12 @@
 -module(weatherreport_check_process_memory).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -define(THRESHOLD, 104857600).
 
@@ -46,7 +48,8 @@ check(Opts) ->
     weatherreport_util:check_proc_count(
         memory,
         ?THRESHOLD,
-        Opts).
+        Opts
+    ).
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({high, {Pid, Memory, Info, Pinfo}}) ->

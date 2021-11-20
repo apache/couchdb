@@ -25,7 +25,6 @@
 
 -include("couch_log.hrl").
 
-
 start() ->
     remove_error_loggers(),
     application:set_env(config, ini_files, config_files()),
@@ -35,12 +34,10 @@ start() ->
     meck:new(couch_stats),
     ok = meck:expect(couch_stats, increment_counter, ['_'], ok).
 
-
 stop(_) ->
     application:stop(config),
     application:stop(couch_log),
     meck:unload(couch_stats).
-
 
 with_level(Name, Fun) ->
     with_config_listener(fun() ->
@@ -54,7 +51,6 @@ with_level(Name, Fun) ->
         end
     end).
 
-
 with_config_listener(Fun) ->
     Listener = self(),
     try
@@ -64,7 +60,6 @@ with_config_listener(Fun) ->
         rem_listener(Listener)
     end.
 
-
 wait_for_config() ->
     receive
         couch_log_config_change_finished -> ok
@@ -72,25 +67,29 @@ wait_for_config() ->
         erlang:error(config_change_timeout)
     end.
 
-
 with_meck(Mods, Fun) ->
-    lists:foreach(fun(M) ->
-        case M of
-            {Name, Opts} -> meck:new(Name, Opts);
-            Name -> meck:new(Name)
-        end
-    end, Mods),
+    lists:foreach(
+        fun(M) ->
+            case M of
+                {Name, Opts} -> meck:new(Name, Opts);
+                Name -> meck:new(Name)
+            end
+        end,
+        Mods
+    ),
     try
         Fun()
     after
-        lists:foreach(fun(M) ->
-            case M of
-                {Name, _} -> meck:unload(Name);
-                Name -> meck:unload(Name)
-            end
-        end, Mods)
+        lists:foreach(
+            fun(M) ->
+                case M of
+                    {Name, _} -> meck:unload(Name);
+                    Name -> meck:unload(Name)
+                end
+            end,
+            Mods
+        )
     end.
-
 
 ignore_common_loggers() ->
     IgnoreSet = [
@@ -98,21 +97,23 @@ ignore_common_loggers() ->
         config,
         config_event
     ],
-    lists:foreach(fun(Proc) ->
-        disable_logs_from(Proc)
-    end, IgnoreSet).
-
+    lists:foreach(
+        fun(Proc) ->
+            disable_logs_from(Proc)
+        end,
+        IgnoreSet
+    ).
 
 disable_logs_from(Pid) when is_pid(Pid) ->
-    Ignored = case application:get_env(couch_log, ignored_pids) of
-        {ok, L} when is_list(L) ->
-            lists:usort([Pid | L]);
-        _E ->
-            [Pid]
-    end,
+    Ignored =
+        case application:get_env(couch_log, ignored_pids) of
+            {ok, L} when is_list(L) ->
+                lists:usort([Pid | L]);
+            _E ->
+                [Pid]
+        end,
     IgnoredAlive = [P || P <- Ignored, is_process_alive(P)],
     application:set_env(couch_log, ignored_pids, IgnoredAlive);
-
 disable_logs_from(Name) when is_atom(Name) ->
     case whereis(Name) of
         P when is_pid(P) ->
@@ -121,24 +122,26 @@ disable_logs_from(Name) when is_atom(Name) ->
             erlang:error({unknown_pid_name, Name})
     end.
 
-
 last_log_key() ->
     ets:last(?COUCH_LOG_TEST_TABLE).
-
 
 last_log() ->
     [{_, Entry}] = ets:lookup(?COUCH_LOG_TEST_TABLE, last_log_key()),
     Entry.
 
-
 remove_error_loggers() ->
     ErrorLoggerPid = whereis(error_logger),
-    if ErrorLoggerPid == undefined -> ok; true ->
-        lists:foreach(fun(Handler) ->
-            error_logger:delete_report_handler(Handler)
-        end, gen_event:which_handlers(ErrorLoggerPid))
+    if
+        ErrorLoggerPid == undefined ->
+            ok;
+        true ->
+            lists:foreach(
+                fun(Handler) ->
+                    error_logger:delete_report_handler(Handler)
+                end,
+                gen_event:which_handlers(ErrorLoggerPid)
+            )
     end.
-
 
 config_files() ->
     Path = filename:dirname(code:which(?MODULE)),
@@ -146,23 +149,22 @@ config_files() ->
     ok = file:write_file(Name, "[log]\nwriter = ets\n"),
     [Name].
 
-
 add_listener(Listener) ->
-    Listeners = case application:get_env(couch_log, config_listeners) of
-        {ok, L} when is_list(L) ->
-            lists:usort([Listener | L]);
-        _ ->
-            [Listener]
-    end,
+    Listeners =
+        case application:get_env(couch_log, config_listeners) of
+            {ok, L} when is_list(L) ->
+                lists:usort([Listener | L]);
+            _ ->
+                [Listener]
+        end,
     application:set_env(couch_log, config_listeners, Listeners).
-
 
 rem_listener(Listener) ->
-    Listeners = case application:get_env(couch_lig, config_listeners) of
-        {ok, L} when is_list(L) ->
-            L -- [Listener];
-        _ ->
-            []
-    end,
+    Listeners =
+        case application:get_env(couch_lig, config_listeners) of
+            {ok, L} when is_list(L) ->
+                L -- [Listener];
+            _ ->
+                []
+        end,
     application:set_env(couch_log, config_listeners, Listeners).
-

@@ -17,48 +17,49 @@
 -export([init/1]).
 
 start_link(Args) ->
-    supervisor:start_link({local,?MODULE}, ?MODULE, Args).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, Args).
 
 init([]) ->
-    {ok, {{rest_for_one, 3, 10}, [
-        {
-            rexi_server,
-            {rexi_server, start_link, [rexi_server]},
-            permanent,
-            100,
-            worker,
-            [rexi_server]
-        },
-        {
-            rexi_server_sup,
-            {rexi_server_sup, start_link, [rexi_server_sup]},
-            permanent,
-            100,
-            supervisor,
-            [rexi_server_sup]
-        },
-        {
-            rexi_server_mon,
-            {rexi_server_mon, start_link, [rexi_server]},
-            permanent,
-            100,
-            worker,
-            [rexi_server_mon]
-        },
-        {
-            rexi_buffer_sup,
-            {rexi_server_sup, start_link, [rexi_buffer_sup]},
-            permanent,
-            100,
-            supervisor,
-            [rexi_server_sup]
-        },
-        {
-            rexi_buffer_mon,
-            {rexi_server_mon, start_link, [rexi_buffer]},
-            permanent,
-            100,
-            worker,
-            [rexi_server_mon]
-        }
-    ]}}.
+    {ok,
+        {{rest_for_one, 3, 10}, [
+            {
+                rexi_server,
+                {rexi_server, start_link, [rexi_server]},
+                permanent,
+                100,
+                worker,
+                [rexi_server]
+            },
+            {
+                rexi_server_sup,
+                {rexi_server_sup, start_link, [rexi_server_sup]},
+                permanent,
+                100,
+                supervisor,
+                [rexi_server_sup]
+            },
+            {
+                rexi_server_mon,
+                {rexi_server_mon, start_link, [rexi_server]},
+                permanent,
+                100,
+                worker,
+                [rexi_server_mon]
+            },
+            {
+                rexi_buffer_sup,
+                {rexi_server_sup, start_link, [rexi_buffer_sup]},
+                permanent,
+                100,
+                supervisor,
+                [rexi_server_sup]
+            },
+            {
+                rexi_buffer_mon,
+                {rexi_server_mon, start_link, [rexi_buffer]},
+                permanent,
+                100,
+                worker,
+                [rexi_server_mon]
+            }
+        ]}}.

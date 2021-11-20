@@ -20,29 +20,28 @@
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
 
-
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = mochiweb_socket_server:get(chttpd, port),
     Url = lists:concat(["http://", Addr, ":", Port, "/"]),
     Url.
 
-
 teardown(_Url) ->
-    ok = config:delete("admins", ?USER, _Persist=false).
-
+    ok = config:delete("admins", ?USER, _Persist = false).
 
 welcome_test_() ->
     {
         "chttpd welcome endpoint tests",
         {
             setup,
-            fun chttpd_test_util:start_couch/0, fun chttpd_test_util:stop_couch/1,
+            fun chttpd_test_util:start_couch/0,
+            fun chttpd_test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun should_have_version/1,
                     fun should_have_features/1,
@@ -69,7 +68,6 @@ should_have_uuid(Url) ->
         ?assert(is_list(Features))
     end).
 
-
 should_have_version(Url) ->
     ?_test(begin
         {ok, Status, _, Body} = test_request:get(Url, [?CONTENT_JSON, ?AUTH]),
@@ -85,7 +83,6 @@ should_have_version(Url) ->
         ?assertEqual(RealVersion, Version),
         ?assert(is_list(Features))
     end).
-
 
 should_have_features(Url) ->
     ?_test(begin

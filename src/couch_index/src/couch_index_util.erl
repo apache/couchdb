@@ -17,10 +17,8 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
-
 root_dir() ->
-  config:get("couchdb", "view_index_dir").
-
+    config:get("couchdb", "view_index_dir").
 
 index_dir(Module, DbName) when is_binary(DbName) ->
     DbDir = "." ++ binary_to_list(DbName) ++ "_design",
@@ -28,33 +26,32 @@ index_dir(Module, DbName) when is_binary(DbName) ->
 index_dir(Module, Db) ->
     index_dir(Module, couch_db:name(Db)).
 
-
 index_file(Module, DbName, FileName) ->
     filename:join(index_dir(Module, DbName), FileName).
 
-
-load_doc(Db, #doc_info{}=DI, Opts) ->
+load_doc(Db, #doc_info{} = DI, Opts) ->
     Deleted = lists:member(deleted, Opts),
     case (catch couch_db:open_doc(Db, DI, Opts)) of
-        {ok, #doc{deleted=false}=Doc} -> Doc;
-        {ok, #doc{deleted=true}=Doc} when Deleted -> Doc;
+        {ok, #doc{deleted = false} = Doc} -> Doc;
+        {ok, #doc{deleted = true} = Doc} when Deleted -> Doc;
         _Else -> null
     end;
 load_doc(Db, {DocId, Rev}, Opts) ->
     case (catch load_doc(Db, DocId, Rev, Opts)) of
-        #doc{deleted=false} = Doc -> Doc;
+        #doc{deleted = false} = Doc -> Doc;
         _ -> null
     end.
 
-
 load_doc(Db, DocId, Rev, Options) ->
     case Rev of
-        nil -> % open most recent rev
+        % open most recent rev
+        nil ->
             case (catch couch_db:open_doc(Db, DocId, Options)) of
                 {ok, Doc} -> Doc;
                 _Error -> null
             end;
-        _ -> % open a specific rev (deletions come back as stubs)
+        % open a specific rev (deletions come back as stubs)
+        _ ->
             case (catch couch_db:open_doc_revs(Db, DocId, [Rev], Options)) of
                 {ok, [{ok, Doc}]} -> Doc;
                 {ok, [{{not_found, missing}, Rev}]} -> null;
@@ -62,17 +59,16 @@ load_doc(Db, DocId, Rev, Options) ->
             end
     end.
 
-
 sort_lib({Lib}) ->
     sort_lib(Lib, []).
 sort_lib([], LAcc) ->
     lists:keysort(1, LAcc);
-sort_lib([{LName, {LObj}}|Rest], LAcc) ->
-    LSorted = sort_lib(LObj, []), % descend into nested object
-    sort_lib(Rest, [{LName, LSorted}|LAcc]);
-sort_lib([{LName, LCode}|Rest], LAcc) ->
-    sort_lib(Rest, [{LName, LCode}|LAcc]).
-
+sort_lib([{LName, {LObj}} | Rest], LAcc) ->
+    % descend into nested object
+    LSorted = sort_lib(LObj, []),
+    sort_lib(Rest, [{LName, LSorted} | LAcc]);
+sort_lib([{LName, LCode} | Rest], LAcc) ->
+    sort_lib(Rest, [{LName, LCode} | LAcc]).
 
 hexsig(Sig) ->
     couch_util:to_hex(binary_to_list(Sig)).

@@ -12,7 +12,6 @@
 
 -module(couch_partition).
 
-
 -export([
     extract/1,
     from_docid/1,
@@ -29,9 +28,7 @@
     hash/1
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
-
 
 extract(Value) when is_binary(Value) ->
     case binary:split(Value, <<":">>) of
@@ -40,10 +37,8 @@ extract(Value) when is_binary(Value) ->
         _ ->
             undefined
     end;
-
 extract(_) ->
     undefined.
-
 
 from_docid(DocId) ->
     case extract(DocId) of
@@ -53,7 +48,6 @@ from_docid(DocId) ->
             Partition
     end.
 
-
 is_member(DocId, Partition) ->
     case extract(DocId) of
         {Partition, _} ->
@@ -62,18 +56,14 @@ is_member(DocId, Partition) ->
             false
     end.
 
-
 start_key(Partition) ->
     <<Partition/binary, ":">>.
-
 
 end_key(Partition) ->
     <<Partition/binary, ";">>.
 
-
 shard_key(Partition) ->
     <<Partition/binary, ":foo">>.
-
 
 validate_dbname(DbName, Options) when is_list(DbName) ->
     validate_dbname(?l2b(DbName), Options);
@@ -81,33 +71,36 @@ validate_dbname(DbName, Options) when is_binary(DbName) ->
     Props = couch_util:get_value(props, Options, []),
     IsPartitioned = couch_util:get_value(partitioned, Props, false),
 
-    if not IsPartitioned -> ok; true ->
+    if
+        not IsPartitioned ->
+            ok;
+        true ->
+            DbsDbName = config:get("mem3", "shards_db", "_dbs"),
+            NodesDbName = config:get("mem3", "nodes_db", "_nodes"),
+            UsersDbSuffix = config:get("couchdb", "users_db_suffix", "_users"),
+            Suffix = couch_db:dbname_suffix(DbName),
 
-        DbsDbName = config:get("mem3", "shards_db", "_dbs"),
-        NodesDbName = config:get("mem3", "nodes_db", "_nodes"),
-        UsersDbSuffix = config:get("couchdb", "users_db_suffix", "_users"),
-        Suffix = couch_db:dbname_suffix(DbName),
-
-        SysDbNames = [
+            SysDbNames = [
                 iolist_to_binary(DbsDbName),
                 iolist_to_binary(NodesDbName)
                 | ?SYSTEM_DATABASES
             ],
 
-        Suffices = [
+            Suffices = [
                 <<"_replicator">>,
                 <<"_users">>,
                 iolist_to_binary(UsersDbSuffix)
             ],
 
-        IsSysDb = lists:member(DbName, SysDbNames)
-                orelse lists:member(Suffix, Suffices),
+            IsSysDb =
+                lists:member(DbName, SysDbNames) orelse
+                    lists:member(Suffix, Suffices),
 
-        if not IsSysDb -> ok; true ->
-            throw({bad_request, <<"Cannot partition a system database">>})
-        end
+            if
+                not IsSysDb -> ok;
+                true -> throw({bad_request, <<"Cannot partition a system database">>})
+            end
     end.
-
 
 validate_docid(<<"_design/", _/binary>>) ->
     ok;
@@ -124,7 +117,6 @@ validate_docid(DocId) when is_binary(DocId) ->
             validate_partition(Partition),
             couch_doc:validate_docid(PartitionedDocId)
     end.
-
 
 validate_partition(<<>>) ->
     throw({illegal_partition, <<"Partition must not be empty">>});
@@ -152,7 +144,6 @@ validate_partition(Partition) when is_binary(Partition) ->
     end;
 validate_partition(_) ->
     throw({illegal_partition, <<"Partition must be a string">>}).
-
 
 % Document ids that start with an underscore
 % (i.e., _local and _design) do not contain a

@@ -16,7 +16,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 
-
 setup(_) ->
     Ctx = test_util:start_couch([couch_replicator]),
     Source = create_db(),
@@ -36,17 +35,19 @@ selector_replication_test_() ->
         "Selector filtered replication tests",
         {
             foreachx,
-            fun setup/1, fun teardown/2,
+            fun setup/1,
+            fun teardown/2,
             [{Pair, fun should_succeed/2} || Pair <- Pairs]
         }
     }.
 
 should_succeed({From, To}, {_Ctx, {Source, Target}}) ->
-    RepObject = {[
-        {<<"source">>, db_url(From, Source)},
-        {<<"target">>, db_url(To, Target)},
-        {<<"selector">>, {[{<<"_id">>, <<"doc2">>}]}}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, db_url(From, Source)},
+            {<<"target">>, db_url(To, Target)},
+            {<<"selector">>, {[{<<"_id">>, <<"doc2">>}]}}
+        ]},
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
     %% FilteredFun is an Erlang version of following mango selector
     FilterFun = fun(_DocId, {Props}) ->
@@ -55,9 +56,9 @@ should_succeed({From, To}, {_Ctx, {Source, Target}}) ->
     {ok, TargetDbInfo, AllReplies} = compare_dbs(Source, Target, FilterFun),
     {lists:flatten(io_lib:format("~p -> ~p", [From, To])), [
         {"Target DB has proper number of docs",
-        ?_assertEqual(1, proplists:get_value(doc_count, TargetDbInfo))},
+            ?_assertEqual(1, proplists:get_value(doc_count, TargetDbInfo))},
         {"All the docs selected as expected",
-        ?_assert(lists:all(fun(Valid) -> Valid end, AllReplies))}
+            ?_assert(lists:all(fun(Valid) -> Valid end, AllReplies))}
     ]}.
 
 compare_dbs(Source, Target, FilterFun) ->
@@ -70,10 +71,10 @@ compare_dbs(Source, Target, FilterFun) ->
         case FilterFun(DocId, SourceDoc) of
             true ->
                 ValidReply = {ok, DocId, SourceDoc} == TargetReply,
-                {ok, [ValidReply|Acc]};
+                {ok, [ValidReply | Acc]};
             false ->
                 ValidReply = {not_found, missing} == TargetReply,
-                {ok, [ValidReply|Acc]}
+                {ok, [ValidReply | Acc]}
         end
     end,
     {ok, AllReplies} = couch_db:fold_docs(SourceDb, Fun, [], []),
@@ -99,12 +100,16 @@ create_db() ->
 
 create_docs(DbName) ->
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
-    Doc1 = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"doc1">>}
-    ]}),
-    Doc2 = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"doc2">>}
-    ]}),
+    Doc1 = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"doc1">>}
+        ]}
+    ),
+    Doc2 = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"doc2">>}
+        ]}
+    ),
     {ok, _} = couch_db:update_docs(Db, [Doc1, Doc2]),
     couch_db:close(Db).
 

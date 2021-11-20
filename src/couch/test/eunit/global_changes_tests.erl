@@ -35,7 +35,7 @@ http_create_db(Name) ->
     {ok, Status, _, _} = test_request:put(db_url(Name), [?AUTH], ""),
     true = lists:member(Status, [201, 202]),
     ok.
-    
+
 http_delete_db(Name) ->
     {ok, Status, _, _} = test_request:delete(db_url(Name), [?AUTH]),
     true = lists:member(Status, [200, 202]),
@@ -75,7 +75,8 @@ check_response() ->
         "Check response",
         {
             foreach,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun should_return_correct_response_on_create/1,
                 fun should_return_correct_response_on_update/1
@@ -105,9 +106,11 @@ should_return_correct_response_on_update({Host, DbName}) ->
 create_doc(Host, DbName, Id) ->
     Headers = [?AUTH],
     Url = Host ++ "/" ++ escape(DbName) ++ "/" ++ escape(Id),
-    Body = jiffy:encode({[
-        {key, "value"}
-    ]}),
+    Body = jiffy:encode(
+        {[
+            {key, "value"}
+        ]}
+    ),
     {ok, Status, _Headers, _Body} = test_request:put(Url, Headers, Body),
     ?assert(Status =:= 201 orelse Status =:= 202),
     timer:sleep(1000),
@@ -118,10 +121,12 @@ update_doc(Host, DbName, Id, Value) ->
     Url = Host ++ "/" ++ escape(DbName) ++ "/" ++ escape(Id),
     {ok, 200, _Headers0, BinBody} = test_request:get(Url, Headers),
     [Rev] = decode_response(BinBody, [<<"_rev">>]),
-    Body = jiffy:encode({[
-        {key, Value},
-        {'_rev', Rev}
-    ]}),
+    Body = jiffy:encode(
+        {[
+            {key, Value},
+            {'_rev', Rev}
+        ]}
+    ),
     {ok, Status, _Headers1, _Body} = test_request:put(Url, Headers, Body),
     ?assert(Status =:= 201 orelse Status =:= 202),
     timer:sleep(1000),
@@ -145,7 +150,7 @@ decode_response(BinBody, ToDecode) ->
 
 add_admin(User, Pass) ->
     Hashed = couch_passwords:hash_admin_password(Pass),
-    config:set("admins", User, ?b2l(Hashed), _Persist=false).
+    config:set("admins", User, ?b2l(Hashed), _Persist = false).
 
 delete_admin(User) ->
     config:delete("admins", User, false).

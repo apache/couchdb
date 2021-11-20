@@ -12,20 +12,13 @@
 
 -module(couch_log_writer_test).
 
-
 -include_lib("couch_log/include/couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-
 couch_log_writer_test_() ->
-    {setup,
-        fun couch_log_test_util:start/0,
-        fun couch_log_test_util:stop/1,
-        [
-            fun check_writer_change/0
-        ]
-    }.
-
+    {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
+        fun check_writer_change/0
+    ]}.
 
 check_writer_change() ->
     % Change to file and back
@@ -51,4 +44,3 @@ check_writer_change() ->
         couch_log_test_util:wait_for_config(),
         ?assertEqual(0, ets:info(?COUCH_LOG_TEST_TABLE, size))
     end).
-

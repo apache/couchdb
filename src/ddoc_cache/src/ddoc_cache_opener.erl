@@ -14,7 +14,6 @@
 -behaviour(gen_server).
 -vsn(1).
 
-
 -export([
     start_link/0
 ]).
@@ -28,10 +27,8 @@
     code_change/3
 ]).
 
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
 
 init(_) ->
     {ok, nil}.
@@ -39,28 +36,22 @@ init(_) ->
 terminate(_Reason, _St) ->
     ok.
 
-
 handle_call(Msg, _From, St) ->
     {stop, {invalid_call, Msg}, {invalid_call, Msg}, St}.
-
 
 % The do_evict clauses are upgrades while we're
 % in a rolling reboot.
 handle_cast({do_evict, _} = Msg, St) ->
     gen_server:cast(ddoc_cache_lru, Msg),
     {noreply, St};
-
 handle_cast({do_evict, DbName, DDocIds}, St) ->
     gen_server:cast(ddoc_cache_lru, {do_refresh, DbName, DDocIds}),
     {noreply, St};
-
 handle_cast(Msg, St) ->
     {stop, {invalid_cast, Msg}, St}.
 
-
 handle_info(Msg, St) ->
     {stop, {invalid_info, Msg}, St}.
-
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.

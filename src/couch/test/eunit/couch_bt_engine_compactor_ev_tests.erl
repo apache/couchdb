@@ -39,21 +39,28 @@
 
 events() ->
     [
-        init,               % The compactor process is spawned
-        files_opened,       % After compaction files have opened
+        % The compactor process is spawned
+        init,
+        % After compaction files have opened
+        files_opened,
 
-        purge_init,         % Just before apply purge changes
-        purge_done,         % Just after finish purge updates
+        % Just before apply purge changes
+        purge_init,
+        % Just after finish purge updates
+        purge_done,
 
         % The firs phase is when we copy all document body and attachment
         % data to the new database file in order of update sequence so
         % that we can resume on crash.
 
-        seq_init,           % Before the first change is copied
-        {seq_copy, 0},      % After change N is copied
+        % Before the first change is copied
+        seq_init,
+        % After change N is copied
+        {seq_copy, 0},
         {seq_copy, ?INIT_DOCS div 2},
         {seq_copy, ?INIT_DOCS - 2},
-        seq_done,           % After last change is copied
+        % After last change is copied
+        seq_done,
 
         % The id copy phases come in two flavors. Before a compaction
         % swap is attempted they're copied from the id_tree in the
@@ -61,19 +68,27 @@ events() ->
         % stored in an emsort file on disk. Thus the two sets of
         % related events here.
 
-        md_sort_init,       % Just before metadata sort starts
-        md_sort_done,       % Justa after metadata sort finished
-        md_copy_init,       % Just before metadata copy starts
-        {md_copy_row, 0},   % After docid N is copied
+        % Just before metadata sort starts
+        md_sort_init,
+        % Justa after metadata sort finished
+        md_sort_done,
+        % Just before metadata copy starts
+        md_copy_init,
+        % After docid N is copied
+        {md_copy_row, 0},
         {md_copy_row, ?INIT_DOCS div 2},
         {md_copy_row, ?INIT_DOCS - 2},
-        md_copy_done,       % Just after the last docid is copied
+        % Just after the last docid is copied
+        md_copy_done,
 
         % And then the final steps before we finish
 
-        before_final_sync,  % Just before final sync
-        after_final_sync,   % Just after the final sync
-        before_notify       % Just before the final notification
+        % Just before final sync
+        before_final_sync,
+        % Just after the final sync
+        after_final_sync,
+        % Just before the final notification
+        before_notify
     ].
 
 % Mark which evens only happen when documents are present
@@ -86,7 +101,6 @@ requires_docs({md_copy_row, _}) -> true;
 requires_docs(md_copy_done) -> true;
 requires_docs(_) -> false.
 
-
 % Mark which events only happen when there's write activity during
 % a compaction.
 
@@ -97,24 +111,20 @@ requires_write({md_copy_row, _}) -> true;
 requires_write(md_copy_done) -> true;
 requires_write(_) -> false.
 
-
 setup() ->
     purge_module(),
     ?EV_MOD:init(),
     test_util:start_couch().
 
-
 teardown(Ctx) ->
     test_util:stop_couch(Ctx),
     ?EV_MOD:terminate().
-
 
 start_empty_db_test(_Event) ->
     ?EV_MOD:clear(),
     DbName = ?tempdb(),
     {ok, _} = couch_db:create(DbName, [?ADMIN_CTX]),
     DbName.
-
 
 start_populated_db_test(Event) ->
     DbName = start_empty_db_test(Event),
@@ -126,10 +136,8 @@ start_populated_db_test(Event) ->
     end,
     DbName.
 
-
 stop_test(_Event, DbName) ->
     couch_server:delete(DbName, [?ADMIN_CTX]).
-
 
 static_empty_db_test_() ->
     FiltFun = fun(E) ->
@@ -153,7 +161,6 @@ static_empty_db_test_() ->
         }
     }.
 
-
 static_populated_db_test_() ->
     FiltFun = fun(E) -> not requires_write(E) end,
     Events = lists:filter(FiltFun, events()) -- [init],
@@ -173,7 +180,6 @@ static_populated_db_test_() ->
             ]
         }
     }.
-
 
 dynamic_empty_db_test_() ->
     FiltFun = fun(E) -> not requires_docs(E) end,
@@ -195,7 +201,6 @@ dynamic_empty_db_test_() ->
         }
     }.
 
-
 dynamic_populated_db_test_() ->
     Events = events() -- [init],
     {
@@ -215,12 +220,10 @@ dynamic_populated_db_test_() ->
         }
     }.
 
-
 run_static_init(Event, DbName) ->
     Name = lists:flatten(io_lib:format("~p", [Event])),
     Test = {timeout, ?TIMEOUT_EUNIT, ?_test(run_static(Event, DbName))},
     {Name, Test}.
-
 
 run_static(Event, DbName) ->
     {ok, ContinueFun} = ?EV_MOD:set_wait(init),
@@ -236,12 +239,10 @@ run_static(Event, DbName) ->
     run_successful_compaction(DbName),
     couch_db:close(Db).
 
-
 run_dynamic_init(Event, DbName) ->
     Name = lists:flatten(io_lib:format("~p", [Event])),
     Test = {timeout, ?TIMEOUT_EUNIT, ?_test(run_dynamic(Event, DbName))},
     {Name, Test}.
-
 
 run_dynamic(Event, DbName) ->
     {ok, ContinueFun} = ?EV_MOD:set_wait(init),
@@ -258,7 +259,6 @@ run_dynamic(Event, DbName) ->
     run_successful_compaction(DbName),
     couch_db:close(Db).
 
-
 run_successful_compaction(DbName) ->
     ?EV_MOD:clear(),
     {ok, ContinueFun} = ?EV_MOD:set_wait(init),
@@ -274,14 +274,11 @@ run_successful_compaction(DbName) ->
     validate_compaction(NewDb),
     couch_db:close(Db).
 
-
 wait_db_cleared(Db) ->
     wait_db_cleared(Db, 5).
 
-
 wait_db_cleared(Db, N) when N < 0 ->
     erlang:error({db_clear_timeout, couch_db:name(Db)});
-
 wait_db_cleared(Db, N) ->
     Tab = couch_server:couch_dbs(couch_db:name(Db)),
     case ets:lookup(Tab, couch_db:name(Db)) of
@@ -290,12 +287,14 @@ wait_db_cleared(Db, N) ->
         [#entry{db = NewDb}] ->
             OldPid = couch_db:get_pid(Db),
             NewPid = couch_db:get_pid(NewDb),
-            if NewPid /= OldPid -> ok; true ->
-                timer:sleep(100),
-                wait_db_cleared(Db, N - 1)
+            if
+                NewPid /= OldPid ->
+                    ok;
+                true ->
+                    timer:sleep(100),
+                    wait_db_cleared(Db, N - 1)
             end
     end.
-
 
 populate_db(_Db, NumDocs) when NumDocs =< 0 ->
     ok;
@@ -303,15 +302,17 @@ populate_db(Db, NumDocs) ->
     String = [$a || _ <- lists:seq(1, erlang:min(NumDocs, 500))],
     Docs = lists:map(
         fun(_) ->
-            couch_doc:from_json_obj({[
-                {<<"_id">>, couch_uuids:random()},
-                {<<"string">>, list_to_binary(String)}
-            ]})
+            couch_doc:from_json_obj(
+                {[
+                    {<<"_id">>, couch_uuids:random()},
+                    {<<"string">>, list_to_binary(String)}
+                ]}
+            )
         end,
-        lists:seq(1, 500)),
+        lists:seq(1, 500)
+    ),
     {ok, _} = couch_db:update_docs(Db, Docs, []),
     populate_db(Db, NumDocs - 500).
-
 
 validate_compaction(Db) ->
     {ok, DocCount} = couch_db:get_doc_count(Db),
@@ -324,7 +325,6 @@ validate_compaction(Db) ->
     {ok, {_, LastCount}} = couch_db:fold_docs(Db, FoldFun, {<<>>, 0}),
     ?assertEqual(DocCount + DelDocCount, LastCount),
     ?assertEqual(NumChanges, LastCount).
-
 
 purge_module() ->
     case code:which(couch_db_updater) of

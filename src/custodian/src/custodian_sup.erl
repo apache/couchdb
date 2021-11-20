@@ -35,11 +35,11 @@ start_link() ->
 %% ===================================================================
 
 init([]) ->
-    {ok, {
-        {one_for_one, 5, 10},
-        [
-            ?CHILD(custodian_server, worker),
-            ?CHILD(custodian_db_checker, worker)
-        ]
-    }}.
-
+    {ok,
+        {
+            {one_for_one, 5, 10},
+            [
+                ?CHILD(custodian_server, worker),
+                ?CHILD(custodian_db_checker, worker)
+            ]
+        }}.

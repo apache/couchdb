@@ -26,10 +26,12 @@
 -module(weatherreport_check_node_stats).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -define(SAMPLES, 10).
 -define(T_RUN_QUEUE, 40).
@@ -57,9 +59,9 @@ mean_to_message({Statistic, Mean}) ->
 
 -spec check(list()) -> [{atom(), term()}].
 check(_Opts) ->
-     SumOfStats = recon:node_stats(?SAMPLES, 100, fun sum_absolute_stats/2, []),
-     MeanStats = [{K, erlang:round(V / ?SAMPLES)} || {K, V} <- SumOfStats],
-     lists:map(fun mean_to_message/1, MeanStats).
+    SumOfStats = recon:node_stats(?SAMPLES, 100, fun sum_absolute_stats/2, []),
+    MeanStats = [{K, erlang:round(V / ?SAMPLES)} || {K, V} <- SumOfStats],
+    lists:map(fun mean_to_message/1, MeanStats).
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({Statistic, Value}) ->

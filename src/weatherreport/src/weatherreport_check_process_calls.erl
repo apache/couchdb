@@ -25,10 +25,12 @@
 -module(weatherreport_check_process_calls).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -define(THRESHOLD, 1000).
 
@@ -56,18 +58,22 @@ fold_processes([{Count, undefined} | T], Acc, Lim, CallType, Opts) ->
     fold_processes(T, [Message | Acc], Lim - 1, CallType, Opts);
 fold_processes([{Count, {M, F, A}} | T], Acc, Lim, CallType, Opts) ->
     Level = total_to_level(Count),
-    Message = case proplists:get_value(expert, Opts) of
-        true ->
-            PidFun = list_to_atom("find_by_" ++ CallType ++ "_call"),
-            Pids = erlang:apply(recon, PidFun, [M, F]),
-            Pinfos = lists:map(fun(Pid) ->
-                Pinfo = recon:info(Pid),
-                {Pid, Pinfo}
-            end, lists:sublist(Pids, 10)),
-            {Level, {process_count, {CallType, Count, M, F, A, Pinfos}}};
-        _ ->
-            {Level, {process_count, {CallType, Count, M, F, A}}}
-    end,
+    Message =
+        case proplists:get_value(expert, Opts) of
+            true ->
+                PidFun = list_to_atom("find_by_" ++ CallType ++ "_call"),
+                Pids = erlang:apply(recon, PidFun, [M, F]),
+                Pinfos = lists:map(
+                    fun(Pid) ->
+                        Pinfo = recon:info(Pid),
+                        {Pid, Pinfo}
+                    end,
+                    lists:sublist(Pids, 10)
+                ),
+                {Level, {process_count, {CallType, Count, M, F, A, Pinfos}}};
+            _ ->
+                {Level, {process_count, {CallType, Count, M, F, A}}}
+        end,
     fold_processes(T, [Message | Acc], Lim - 1, CallType, Opts).
 
 -spec check(list()) -> [{atom(), term()}].
@@ -81,13 +87,15 @@ check(Opts) ->
         Opts
     ),
     FirstCallCounts = show_first_call_counts(),
-    lists:reverse(fold_processes(
-        FirstCallCounts,
-        CurrentCallMessages,
-        10,
-        "first",
-        Opts
-    )).
+    lists:reverse(
+        fold_processes(
+            FirstCallCounts,
+            CurrentCallMessages,
+            10,
+            "first",
+            Opts
+        )
+    ).
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({process_count, {CallType, Count, undefined}}) ->
@@ -97,57 +105,64 @@ format({process_count, {CallType, Count, M, F, A}}) ->
 format({process_count, {CallType, Count, M, F, A, Pinfos}}) ->
     {"~w processes with ~s call ~w:~w/~w ~w", [Count, CallType, M, F, A, Pinfos]}.
 
-
 %% @doc Show the list of first calls sorted by the number of
 %% processes that had that initial call.
 -spec show_first_call_counts() -> [{Count, {Module, Function, Arity}}] when
-      Count :: pos_integer(),
-      Module :: atom(),
-      Function :: atom(),
-      Arity :: non_neg_integer().
+    Count :: pos_integer(),
+    Module :: atom(),
+    Function :: atom(),
+    Arity :: non_neg_integer().
 show_first_call_counts() ->
-    Res = lists:foldl(fun(Pid, Acc) ->
-        dict:update_counter(first_call(Pid), 1, Acc)
-    end, dict:new(), processes()),
+    Res = lists:foldl(
+        fun(Pid, Acc) ->
+            dict:update_counter(first_call(Pid), 1, Acc)
+        end,
+        dict:new(),
+        processes()
+    ),
     Rev = [{Count, Call} || {Call, Count} <- dict:to_list(Res)],
     lists:reverse(lists:sort(Rev)).
-
 
 %% @doc Show the list of current calls sorted by the number of
 %% processes that had that current call.
 -spec show_current_call_counts() -> [{Count, {Module, Function, Arity}}] when
-      Count :: pos_integer(),
-      Module :: atom(),
-      Function :: atom(),
-      Arity :: non_neg_integer().
+    Count :: pos_integer(),
+    Module :: atom(),
+    Function :: atom(),
+    Arity :: non_neg_integer().
 show_current_call_counts() ->
-    Res = lists:foldl(fun(Pid, Acc) ->
-        case process_info(Pid, current_function) of
-            {current_function, Call} ->
-                dict:update_counter(Call, 1, Acc);
-            undefined ->
-                Acc
-        end
-    end, dict:new(), processes()),
+    Res = lists:foldl(
+        fun(Pid, Acc) ->
+            case process_info(Pid, current_function) of
+                {current_function, Call} ->
+                    dict:update_counter(Call, 1, Acc);
+                undefined ->
+                    Acc
+            end
+        end,
+        dict:new(),
+        processes()
+    ),
     Rev = [{Count, Call} || {Call, Count} <- dict:to_list(Res)],
     lists:reverse(lists:sort(Rev)).
-
 
 %% @doc Find the first function call for a Pid taking into account cases
 %% where '$initial_call' is set in the process dictionary.
 -spec first_call(Pid) -> {Module, Function, Arity} when
-      Pid :: pid(),
-      Module :: atom(),
-      Function :: atom(),
-      Arity :: non_neg_integer().
+    Pid :: pid(),
+    Module :: atom(),
+    Function :: atom(),
+    Arity :: non_neg_integer().
 first_call(Pid) ->
-    IC = case process_info(Pid, initial_call) of
-        {initial_call, IC0} -> IC0;
-        undefined -> undefined
-    end,
-    Dict = case process_info(Pid, dictionary) of
-        {dictionary, Dict0} -> Dict0;
-        undefined -> []
-    end,
+    IC =
+        case process_info(Pid, initial_call) of
+            {initial_call, IC0} -> IC0;
+            undefined -> undefined
+        end,
+    Dict =
+        case process_info(Pid, dictionary) of
+            {dictionary, Dict0} -> Dict0;
+            undefined -> []
+        end,
     MaybeCall = proplists:get_value('$initial_call', Dict, IC),
     proplists:get_value(initial_call, Dict, MaybeCall).

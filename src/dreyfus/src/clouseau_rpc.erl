@@ -10,7 +10,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 
 -module(clouseau_rpc).
@@ -55,12 +54,12 @@ search(Ref, Args) ->
     case rpc(Ref, {search, Args}) of
         {ok, Response} when is_list(Response) ->
             {ok, #top_docs{
-               update_seq = couch_util:get_value(update_seq, Response),
-               total_hits = couch_util:get_value(total_hits, Response),
-               hits = couch_util:get_value(hits, Response),
-               counts = couch_util:get_value(counts, Response),
-               ranges = couch_util:get_value(ranges, Response)
-              }};
+                update_seq = couch_util:get_value(update_seq, Response),
+                total_hits = couch_util:get_value(total_hits, Response),
+                hits = couch_util:get_value(hits, Response),
+                counts = couch_util:get_value(counts, Response),
+                ranges = couch_util:get_value(ranges, Response)
+            }};
         Else ->
             Else
     end.
@@ -81,7 +80,7 @@ cleanup(DbName) ->
     gen_server:cast({cleanup, clouseau()}, {cleanup, DbName}).
 
 rename(DbName) ->
-  gen_server:cast({cleanup, clouseau()}, {rename, DbName}).
+    gen_server:cast({cleanup, clouseau()}, {rename, DbName}).
 
 cleanup(DbName, ActiveSigs) ->
     gen_server:cast({cleanup, clouseau()}, {cleanup, DbName, ActiveSigs}).

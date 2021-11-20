@@ -17,7 +17,6 @@
 
 -define(WAIT_TIMEOUT, 1000).
 
-
 setup_all() ->
     Ctx = test_util:start_couch(),
     meck:new([test_index], [non_strict]),
@@ -41,8 +40,13 @@ fake_index(DbName) ->
     ok = meck:expect(test_index, open, fun(_Db, State) ->
         {ok, State}
     end),
-    ok = meck:expect(test_index, compact, ['_', '_', '_'],
-        meck:seq([{ok, 9}, {ok, 10}])), %% to trigger recompaction
+    ok = meck:expect(
+        test_index,
+        compact,
+        ['_', '_', '_'],
+        %% to trigger recompaction
+        meck:seq([{ok, 9}, {ok, 10}])
+    ),
     ok = meck:expect(test_index, commit, ['_'], ok),
     ok = meck:expect(test_index, get, fun
         (db_name, _) ->
@@ -50,7 +54,7 @@ fake_index(DbName) ->
         (idx_name, _) ->
             <<"idx_name">>;
         (signature, _) ->
-            <<61,237,157,230,136,93,96,201,204,17,137,186,50,249,44,135>>;
+            <<61, 237, 157, 230, 136, 93, 96, 201, 204, 17, 137, 186, 50, 249, 44, 135>>;
         (update_seq, Seq) ->
             Seq
     end),
@@ -80,7 +84,6 @@ compaction_test_() ->
         }
     }.
 
-
 hold_db_for_recompaction({Db, Idx}) ->
     ?_test(begin
         ?assertNot(is_opened(Db)),
@@ -105,12 +108,15 @@ hold_db_for_recompaction({Db, Idx}) ->
     end).
 
 wait_db_close(Db) ->
-    test_util:wait(fun() ->
-        case is_opened(Db) of
-            false -> ok;
-            true -> wait
-        end
-    end, ?WAIT_TIMEOUT).
+    test_util:wait(
+        fun() ->
+            case is_opened(Db) of
+                false -> ok;
+                true -> wait
+            end
+        end,
+        ?WAIT_TIMEOUT
+    ).
 
 is_opened(Db) ->
     Monitors = [M || M <- couch_db:monitored_by(Db), M =/= self()],

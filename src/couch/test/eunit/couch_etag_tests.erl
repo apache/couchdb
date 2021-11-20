@@ -18,13 +18,14 @@ local_with_empty_body_test() ->
     Etag = couch_httpd:doc_etag(<<"_local/local-and-empty">>, {[]}, {0, <<"1">>}),
     ?assertEqual(Etag, <<"\"5ZVXQYO7VLEOU0TL9VXDNP5PV\"">>).
 
-
 local_with_body_test() ->
-    DocBody = {[{<<"hello">>,<<"world">>},{<<"relax">>,true}]},
+    DocBody = {[{<<"hello">>, <<"world">>}, {<<"relax">>, true}]},
     Etag = couch_httpd:doc_etag(<<"_local/local-with-body">>, DocBody, {0, <<"1">>}),
     ?assertEqual(Etag, <<"\"CEFXP6WH8OKYIWO1GLGBHKCCA\"">>).
 
 normal_doc_uses_rev_test() ->
-    DocBody = {[{<<"hello">>,<<"world">>},{<<"relax">>,true}]},
-    Etag = couch_httpd:doc_etag(<<"nomal-doc">>, DocBody, {1, <<"efda11e34e88ebe31a2f83e84a0435b6">>}),
+    DocBody = {[{<<"hello">>, <<"world">>}, {<<"relax">>, true}]},
+    Etag = couch_httpd:doc_etag(
+        <<"nomal-doc">>, DocBody, {1, <<"efda11e34e88ebe31a2f83e84a0435b6">>}
+    ),
     ?assertEqual(Etag, <<"\"1-efda11e34e88ebe31a2f83e84a0435b6\"">>).

@@ -38,8 +38,12 @@ setup(default) ->
     get_host();
 setup(A) ->
     Host = setup(default),
-    ok = config:set("global_changes", "allowed_owner",
-        ?t2l({?MODULE, allowed_owner, A}), false),
+    ok = config:set(
+        "global_changes",
+        "allowed_owner",
+        ?t2l({?MODULE, allowed_owner, A}),
+        false
+    ),
     Host.
 
 teardown(_) ->
@@ -57,7 +61,8 @@ allowed_owner_hook_test_() ->
         "Check allowed_owner hook",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun start/0,
+            fun stop/1,
             [
                 disabled_allowed_owner_integration_point(),
                 enabled_allowed_owner_integration_point()
@@ -70,11 +75,12 @@ disabled_allowed_owner_integration_point() ->
         "disabled allowed_owner integration point",
         {
             foreach,
-            fun() -> setup(default) end, fun teardown/1,
+            fun() -> setup(default) end,
+            fun teardown/1,
             [
                 fun should_not_fail_for_admin/1,
                 fun should_fail_for_non_admin/1
-             ]
+            ]
         }
     }.
 
@@ -84,12 +90,14 @@ enabled_allowed_owner_integration_point() ->
         [
             {
                 foreach,
-                fun() -> setup("throw") end, fun teardown/1,
+                fun() -> setup("throw") end,
+                fun teardown/1,
                 [fun should_throw/1]
             },
             {
                 foreach,
-                fun() -> setup("pass") end, fun teardown/1,
+                fun() -> setup("pass") end,
+                fun teardown/1,
                 [fun should_pass/1]
             }
         ]

@@ -17,23 +17,23 @@
 
 -define(TIMEOUT, 1000).
 
-
 setup() ->
     spawn_pool().
 
 teardown(Pool) ->
     stop_pool(Pool).
 
-
 httpc_pool_test_() ->
     {
         "httpc pool tests",
         {
             setup,
-            fun() -> test_util:start_couch([couch_replicator]) end, fun test_util:stop_couch/1,
+            fun() -> test_util:start_couch([couch_replicator]) end,
+            fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun should_block_new_clients_when_full/1,
                     fun should_replace_worker_on_death/1
@@ -41,7 +41,6 @@ httpc_pool_test_() ->
             }
         }
     }.
-
 
 should_block_new_clients_when_full(Pool) ->
     ?_test(begin
@@ -77,7 +76,9 @@ should_block_new_clients_when_full(Pool) ->
         lists:foreach(
             fun(C) ->
                 ?assertEqual(ok, stop_client(C))
-            end, [Client2, Client3, Client4])
+            end,
+            [Client2, Client3, Client4]
+        )
     end).
 
 should_replace_worker_on_death(Pool) ->
@@ -99,7 +100,6 @@ should_replace_worker_on_death(Pool) ->
         ?assertNotEqual(Worker1, Worker2),
         ?assertEqual(ok, stop_client(Client2))
     end).
-
 
 spawn_client(Pool) ->
     Parent = self(),
@@ -126,9 +126,12 @@ get_client_worker({Pid, Ref}, ClientName) ->
             Worker
     after ?TIMEOUT ->
         erlang:error(
-            {assertion_failed,
-             [{module, ?MODULE}, {line, ?LINE},
-              {reason, "Timeout getting client " ++ ClientName ++ " worker"}]})
+            {assertion_failed, [
+                {module, ?MODULE},
+                {line, ?LINE},
+                {reason, "Timeout getting client " ++ ClientName ++ " worker"}
+            ]}
+        )
     end.
 
 stop_client({Pid, Ref}) ->
@@ -155,7 +158,7 @@ loop(Parent, Ref, Worker, Pool) ->
         ping ->
             Parent ! {pong, Ref},
             loop(Parent, Ref, Worker, Pool);
-        get_worker  ->
+        get_worker ->
             Parent ! {worker, Ref, Worker},
             loop(Parent, Ref, Worker, Pool);
         stop ->
@@ -167,7 +170,8 @@ spawn_pool() ->
     Host = config:get("httpd", "bind_address", "127.0.0.1"),
     Port = config:get("httpd", "port", "5984"),
     {ok, Pool} = couch_replicator_httpc_pool:start_link(
-        "http://" ++ Host ++ ":" ++ Port, [{max_connections, 3}]),
+        "http://" ++ Host ++ ":" ++ Port, [{max_connections, 3}]
+    ),
     Pool.
 
 stop_pool(Pool) ->

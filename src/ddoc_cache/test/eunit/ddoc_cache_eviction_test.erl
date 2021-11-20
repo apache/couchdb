@@ -12,32 +12,26 @@
 
 -module(ddoc_cache_eviction_test).
 
-
 -export([
     recover/1
 ]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("mem3/include/mem3.hrl").
 -include("ddoc_cache_test.hrl").
 
-
 recover(DbName) ->
     {ok, {DbName, totes_custom}}.
-
 
 start_couch() ->
     Ctx = ddoc_cache_tutil:start_couch(),
     meck:new(ddoc_cache_ev, [passthrough]),
     Ctx.
 
-
 stop_couch(Ctx) ->
     meck:unload(),
     ddoc_cache_tutil:stop_couch(Ctx).
-
 
 check_eviction_test_() ->
     {
@@ -50,7 +44,6 @@ check_eviction_test_() ->
             {"check_upgrade_clause", fun check_upgrade_clause/1}
         ])
     }.
-
 
 evict_all({DbName, _}) ->
     ddoc_cache_tutil:clear(),
@@ -67,7 +60,6 @@ evict_all({DbName, _}) ->
     meck:wait(4, ddoc_cache_ev, event, [removed, '_'], 1000),
     ?assertEqual(0, ets:info(?CACHE, size)).
 
-
 dont_evict_all_unrelated({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     meck:reset(ddoc_cache_ev),
@@ -81,7 +73,6 @@ dont_evict_all_unrelated({DbName, _}) ->
     {ok, _} = ddoc_cache_lru:handle_db_event(ShardName, deleted, foo),
     meck:wait(ddoc_cache_ev, event, [evict_noop, <<"test">>], 1000),
     ?assertEqual(4, ets:info(?CACHE, size)).
-
 
 check_upgrade_clause({DbName, _}) ->
     ddoc_cache_tutil:clear(),

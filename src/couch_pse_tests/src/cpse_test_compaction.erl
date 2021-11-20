@@ -14,19 +14,15 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
-
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
-
 
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
     Db.
 
-
 teardown_each(Db) ->
     ok = couch_server:delete(couch_db:name(Db), []).
-
 
 cpse_compact_empty(Db1) ->
     Term1 = cpse_util:db_as_term(Db1),
@@ -38,7 +34,6 @@ cpse_compact_empty(Db1) ->
 
     Diff = cpse_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
-
 
 cpse_compact_doc(Db1) ->
     Actions = [{create, {<<"foo">>, {[]}}}],
@@ -53,7 +48,6 @@ cpse_compact_doc(Db1) ->
     Diff = cpse_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
-
 cpse_compact_local_doc(Db1) ->
     Actions = [{create, {<<"_local/foo">>, {[]}}}],
     {ok, Db2} = cpse_util:apply_actions(Db1, Actions),
@@ -67,16 +61,21 @@ cpse_compact_local_doc(Db1) ->
     Diff = cpse_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
-
 cpse_compact_with_everything(Db1) ->
     % Add a whole bunch of docs
-    DocActions = lists:map(fun(Seq) ->
-        {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
-    end, lists:seq(1, 1000)),
+    DocActions = lists:map(
+        fun(Seq) ->
+            {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
+        end,
+        lists:seq(1, 1000)
+    ),
 
-    LocalActions = lists:map(fun(I) ->
-        {create, {local_docid(I), {[{<<"int">>, I}]}}}
-    end, lists:seq(1, 25)),
+    LocalActions = lists:map(
+        fun(I) ->
+            {create, {local_docid(I), {[{<<"int">>, I}]}}}
+        end,
+        lists:seq(1, 25)
+    ),
 
     Actions1 = DocActions ++ LocalActions,
 
@@ -110,11 +109,13 @@ cpse_compact_with_everything(Db1) ->
     ],
 
     {ok, PIdRevs4} = couch_db_engine:fold_purge_infos(
-            Db4, 0, fun fold_fun/2, [], []),
+        Db4, 0, fun fold_fun/2, [], []
+    ),
     ?assertEqual(PurgedIdRevs, PIdRevs4),
 
-    {ok, Db5} = try
-        [Att0, Att1, Att2, Att3, Att4] = cpse_util:prep_atts(Db4, [
+    {ok, Db5} =
+        try
+            [Att0, Att1, Att2, Att3, Att4] = cpse_util:prep_atts(Db4, [
                 {<<"ohai.txt">>, crypto:strong_rand_bytes(2048)},
                 {<<"stuff.py">>, crypto:strong_rand_bytes(32768)},
                 {<<"a.erl">>, crypto:strong_rand_bytes(29)},
@@ -122,15 +123,16 @@ cpse_compact_with_everything(Db1) ->
                 {<<"a.app">>, crypto:strong_rand_bytes(400)}
             ]),
 
-        Actions4 = [
-            {create, {<<"small_att">>, {[]}, [Att0]}},
-            {create, {<<"large_att">>, {[]}, [Att1]}},
-            {create, {<<"multi_att">>, {[]}, [Att2, Att3, Att4]}}
-        ],
-        cpse_util:apply_actions(Db4, Actions4)
-    catch throw:not_supported ->
-        {ok, Db4}
-    end,
+            Actions4 = [
+                {create, {<<"small_att">>, {[]}, [Att0]}},
+                {create, {<<"large_att">>, {[]}, [Att1]}},
+                {create, {<<"multi_att">>, {[]}, [Att2, Att3, Att4]}}
+            ],
+            cpse_util:apply_actions(Db4, Actions4)
+        catch
+            throw:not_supported ->
+                {ok, Db4}
+        end,
     {ok, Db6} = couch_db:reopen(Db5),
 
     Term1 = cpse_util:db_as_term(Db6),
@@ -150,11 +152,13 @@ cpse_compact_with_everything(Db1) ->
     Diff = cpse_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
-
 cpse_recompact_updates(Db1) ->
-    Actions1 = lists:map(fun(Seq) ->
-        {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
-    end, lists:seq(1, 1000)),
+    Actions1 = lists:map(
+        fun(Seq) ->
+            {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
+        end,
+        lists:seq(1, 1000)
+    ),
     {ok, Db2} = cpse_util:apply_batch(Db1, Actions1),
 
     {ok, Compactor} = couch_db:start_compact(Db2),
@@ -177,11 +181,13 @@ cpse_recompact_updates(Db1) ->
     Diff = cpse_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
-
 cpse_purge_during_compact(Db1) ->
-    Actions1 = lists:map(fun(Seq) ->
-        {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
-    end, lists:seq(1, 1000)),
+    Actions1 = lists:map(
+        fun(Seq) ->
+            {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
+        end,
+        lists:seq(1, 1000)
+    ),
     Actions2 = [
         {create, {<<"foo">>, {[]}}},
         {create, {<<"bar">>, {[]}}},
@@ -216,11 +222,13 @@ cpse_purge_during_compact(Db1) ->
     Diff = cpse_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
-
 cpse_multiple_purge_during_compact(Db1) ->
-    Actions1 = lists:map(fun(Seq) ->
-        {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
-    end, lists:seq(1, 1000)),
+    Actions1 = lists:map(
+        fun(Seq) ->
+            {create, {docid(Seq), {[{<<"int">>, Seq}]}}}
+        end,
+        lists:seq(1, 1000)
+    ),
     Actions2 = [
         {create, {<<"foo">>, {[]}}},
         {create, {<<"bar">>, {[]}}},
@@ -232,7 +240,6 @@ cpse_multiple_purge_during_compact(Db1) ->
         {conflict, {<<"bar">>, {[{<<"vsn">>, 2}]}}}
     ],
     {ok, Db3} = cpse_util:apply_actions(Db2, Actions3),
-
 
     {ok, Pid} = couch_db:start_compact(Db3),
     catch erlang:suspend_process(Pid),
@@ -261,31 +268,39 @@ cpse_multiple_purge_during_compact(Db1) ->
     Diff = cpse_util:term_diff(Term1, Term2),
     ?assertEqual(nodiff, Diff).
 
-
 cpse_compact_purged_docs_limit(Db1) ->
     NumDocs = 1200,
-    {RActions, RIds} = lists:foldl(fun(Id, {CActions, CIds}) ->
-        Id1 = docid(Id),
-        Action = {create, {Id1, {[{<<"int">>, Id}]}}},
-        {[Action| CActions], [Id1| CIds]}
-    end, {[], []}, lists:seq(1, NumDocs)),
+    {RActions, RIds} = lists:foldl(
+        fun(Id, {CActions, CIds}) ->
+            Id1 = docid(Id),
+            Action = {create, {Id1, {[{<<"int">>, Id}]}}},
+            {[Action | CActions], [Id1 | CIds]}
+        end,
+        {[], []},
+        lists:seq(1, NumDocs)
+    ),
     Ids = lists:reverse(RIds),
     {ok, Db2} = cpse_util:apply_batch(Db1, lists:reverse(RActions)),
 
     FDIs = couch_db_engine:open_docs(Db2, Ids),
-    RActions2 = lists:foldl(fun(FDI, CActions) ->
-        Id = FDI#full_doc_info.id,
-        PrevRev = cpse_util:prev_rev(FDI),
-        Rev = PrevRev#rev_info.rev,
-        [{purge, {Id, Rev}}| CActions]
-    end, [], FDIs),
+    RActions2 = lists:foldl(
+        fun(FDI, CActions) ->
+            Id = FDI#full_doc_info.id,
+            PrevRev = cpse_util:prev_rev(FDI),
+            Rev = PrevRev#rev_info.rev,
+            [{purge, {Id, Rev}} | CActions]
+        end,
+        [],
+        FDIs
+    ),
     {ok, Db3} = cpse_util:apply_batch(Db2, lists:reverse(RActions2)),
 
     % check that before compaction all NumDocs of purge_requests
     % are in purge_tree,
     % even if NumDocs=1200 is greater than purged_docs_limit=1000
     {ok, PurgedIdRevs} = couch_db_engine:fold_purge_infos(
-            Db3, 0, fun fold_fun/2, [], []),
+        Db3, 0, fun fold_fun/2, [], []
+    ),
     ?assertEqual(1, couch_db_engine:get_oldest_purge_seq(Db3)),
     ?assertEqual(NumDocs, length(PurgedIdRevs)),
 
@@ -298,21 +313,19 @@ cpse_compact_purged_docs_limit(Db1) ->
     PurgedDocsLimit = couch_db_engine:get_purge_infos_limit(Db4),
     OldestPSeq = couch_db_engine:get_oldest_purge_seq(Db4),
     {ok, PurgedIdRevs2} = couch_db_engine:fold_purge_infos(
-        Db4, OldestPSeq - 1, fun fold_fun/2, [], []),
+        Db4, OldestPSeq - 1, fun fold_fun/2, [], []
+    ),
     ExpectedOldestPSeq = NumDocs - PurgedDocsLimit + 1,
     ?assertEqual(ExpectedOldestPSeq, OldestPSeq),
     ?assertEqual(PurgedDocsLimit, length(PurgedIdRevs2)).
-
 
 docid(I) ->
     Str = io_lib:format("~4..0b", [I]),
     iolist_to_binary(Str).
 
-
 local_docid(I) ->
     Str = io_lib:format("_local/~4..0b", [I]),
     iolist_to_binary(Str).
-
 
 fold_fun({_PSeq, _UUID, Id, Revs}, Acc) ->
     {ok, [{Id, Revs} | Acc]}.

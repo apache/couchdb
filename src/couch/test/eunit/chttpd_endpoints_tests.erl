@@ -15,7 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
 endpoints_test_() ->
     {
         "Checking dynamic endpoints",
@@ -32,7 +31,6 @@ endpoints_test_() ->
             ]
         }
     }.
-
 
 url_handlers() ->
     Handlers = [
@@ -53,14 +51,16 @@ url_handlers() ->
         {<<"_cluster_setup">>, setup_httpd, handle_setup_req}
     ],
 
-    lists:foreach(fun({Path, Mod, Fun}) ->
-        Handler = chttpd_handlers:url_handler(Path, undefined),
-        Expect = fun Mod:Fun/1,
-        ?assertEqual(Expect, Handler)
-    end, Handlers),
+    lists:foreach(
+        fun({Path, Mod, Fun}) ->
+            Handler = chttpd_handlers:url_handler(Path, undefined),
+            Expect = fun Mod:Fun/1,
+            ?assertEqual(Expect, Handler)
+        end,
+        Handlers
+    ),
 
     ?assertEqual(undefined, chttpd_handlers:url_handler("foo", undefined)).
-
 
 db_handlers() ->
     Handlers = [
@@ -75,14 +75,16 @@ db_handlers() ->
         {<<"_find">>, mango_httpd, handle_req}
     ],
 
-    lists:foreach(fun({Path, Mod, Fun}) ->
-        Handler = chttpd_handlers:db_handler(Path, undefined),
-        Expect = fun Mod:Fun/2,
-        ?assertEqual(Expect, Handler)
-    end, Handlers),
+    lists:foreach(
+        fun({Path, Mod, Fun}) ->
+            Handler = chttpd_handlers:db_handler(Path, undefined),
+            Expect = fun Mod:Fun/2,
+            ?assertEqual(Expect, Handler)
+        end,
+        Handlers
+    ),
 
     ?assertEqual(undefined, chttpd_handlers:db_handler("bam", undefined)).
-
 
 design_handlers() ->
     Handlers = [
@@ -94,10 +96,13 @@ design_handlers() ->
         {<<"_rewrite">>, chttpd_rewrite, handle_rewrite_req}
     ],
 
-    lists:foreach(fun({Path, Mod, Fun}) ->
-        Handler = chttpd_handlers:design_handler(Path, undefined),
-        Expect = fun Mod:Fun/3,
-        ?assertEqual(Expect, Handler)
-    end, Handlers),
+    lists:foreach(
+        fun({Path, Mod, Fun}) ->
+            Handler = chttpd_handlers:design_handler(Path, undefined),
+            Expect = fun Mod:Fun/3,
+            ?assertEqual(Expect, Handler)
+        end,
+        Handlers
+    ),
 
     ?assertEqual(undefined, chttpd_handlers:design_handler("baz", undefined)).

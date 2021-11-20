@@ -32,7 +32,6 @@ providers() ->
         {chttpd_handlers, couch_httpd_handlers}
     ].
 
-
 services() ->
     [
         {couch_db, couch_db_plugin},

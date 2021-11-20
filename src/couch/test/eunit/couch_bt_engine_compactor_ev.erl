@@ -12,7 +12,6 @@
 
 -module(couch_bt_engine_compactor_ev).
 
-
 -export([
     init/0,
     terminate/0,
@@ -24,21 +23,16 @@
     event/1
 ]).
 
-
 -define(TAB, couch_db_updater_ev_tab).
-
 
 init() ->
     ets:new(?TAB, [set, public, named_table]).
 
-
 terminate() ->
     ets:delete(?TAB).
 
-
 clear() ->
     ets:delete_all_objects(?TAB).
-
 
 set_wait(Event) ->
     Self = self(),
@@ -51,11 +45,12 @@ set_wait(Event) ->
     end,
     ContinueFun = fun(Pid) ->
         Pid ! {Self, go},
-        receive {Pid, ok} -> ok end
+        receive
+            {Pid, ok} -> ok
+        end
     end,
     ets:insert(?TAB, {Event, WaitFun}),
     {ok, ContinueFun}.
-
 
 set_crash(Event) ->
     Reason = {couch_db_updater_ev_crash, Event},
@@ -63,35 +58,34 @@ set_crash(Event) ->
     ets:insert(?TAB, {Event, CrashFun}),
     {ok, Reason}.
 
-
 event(Event) ->
-    NewEvent = case Event of
-        seq_init ->
-            put(?MODULE, 0),
-            Event;
-        seq_copy ->
-            Count = get(?MODULE),
-            put(?MODULE, Count + 1),
-            {seq_copy, Count};
-        id_init ->
-            put(?MODULE, 0),
-            Event;
-        id_copy ->
-            Count = get(?MODULE),
-            put(?MODULE, Count + 1),
-            {id_copy, Count};
-        md_copy_init ->
-            put(?MODULE, 0),
-            Event;
-        md_copy_row ->
-            Count = get(?MODULE),
-            put(?MODULE, Count + 1),
-            {md_copy_row, Count};
-        _ ->
-            Event
-    end,
+    NewEvent =
+        case Event of
+            seq_init ->
+                put(?MODULE, 0),
+                Event;
+            seq_copy ->
+                Count = get(?MODULE),
+                put(?MODULE, Count + 1),
+                {seq_copy, Count};
+            id_init ->
+                put(?MODULE, 0),
+                Event;
+            id_copy ->
+                Count = get(?MODULE),
+                put(?MODULE, Count + 1),
+                {id_copy, Count};
+            md_copy_init ->
+                put(?MODULE, 0),
+                Event;
+            md_copy_row ->
+                Count = get(?MODULE),
+                put(?MODULE, Count + 1),
+                {md_copy_row, Count};
+            _ ->
+                Event
+        end,
     handle_event(NewEvent).
-
 
 handle_event(Event) ->
     try
@@ -101,6 +95,7 @@ handle_event(Event) ->
             [] ->
                 ok
         end
-    catch error:badarg ->
-        ok
+    catch
+        error:badarg ->
+            ok
     end.

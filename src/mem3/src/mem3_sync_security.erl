@@ -17,8 +17,7 @@
 
 -include_lib("mem3/include/mem3.hrl").
 
-
-maybe_sync(#shard{}=Src, #shard{}=Dst) ->
+maybe_sync(#shard{} = Src, #shard{} = Dst) ->
     case is_local(Src#shard.name) of
         false ->
             erlang:spawn(?MODULE, maybe_sync_int, [Src, Dst]);
@@ -26,7 +25,7 @@ maybe_sync(#shard{}=Src, #shard{}=Dst) ->
             ok
     end.
 
-maybe_sync_int(#shard{name=Name}=Src, Dst) ->
+maybe_sync_int(#shard{name = Name} = Src, Dst) ->
     DbName = mem3:dbname(Name),
     case fabric:get_all_security(DbName, [{shards, [Src, Dst]}]) of
         {ok, WorkerObjs} ->
@@ -53,44 +52,55 @@ handle_existing_db(DbName) ->
     try handle_db(DbName) of
         _ -> ok
     catch
-        error:database_does_not_exist->
-            couch_log:error("Db was deleted while getting security"
-                " object. DbName: ~p", [DbName]),
+        error:database_does_not_exist ->
+            couch_log:error(
+                "Db was deleted while getting security"
+                " object. DbName: ~p",
+                [DbName]
+            ),
             ok
     end.
 
 handle_db(DbName) ->
     ShardCount = length(mem3:shards(DbName)),
     case get_all_security(DbName) of
-    {ok, SecObjs} ->
-        case is_ok(SecObjs, ShardCount) of
-        ok ->
-            ok;
-        {fixable, SecObj} ->
-            couch_log:info("Sync security object for ~p: ~p", [DbName, SecObj]),
-            case fabric:set_security(DbName, SecObj) of
-                ok -> ok;
-                Error ->
-                    couch_log:error("Error setting security object in ~p: ~p",
-                        [DbName, Error])
+        {ok, SecObjs} ->
+            case is_ok(SecObjs, ShardCount) of
+                ok ->
+                    ok;
+                {fixable, SecObj} ->
+                    couch_log:info("Sync security object for ~p: ~p", [DbName, SecObj]),
+                    case fabric:set_security(DbName, SecObj) of
+                        ok ->
+                            ok;
+                        Error ->
+                            couch_log:error(
+                                "Error setting security object in ~p: ~p",
+                                [DbName, Error]
+                            )
+                    end;
+                broken ->
+                    couch_log:error("Bad security object in ~p: ~p", [DbName, SecObjs])
             end;
-        broken ->
-            couch_log:error("Bad security object in ~p: ~p", [DbName, SecObjs])
-        end;
-    Error ->
-        couch_log:error("Error getting security objects for ~p: ~p", [
-                DbName, Error])
+        Error ->
+            couch_log:error("Error getting security objects for ~p: ~p", [
+                DbName, Error
+            ])
     end.
 
 get_all_security(DbName) ->
     case fabric:get_all_security(DbName) of
-    {ok, SecObjs} ->
-        SecObjsDict = lists:foldl(fun({_, SO}, Acc) ->
-            dict:update_counter(SO, 1, Acc)
-        end, dict:new(), SecObjs),
-        {ok, dict:to_list(SecObjsDict)};
-    Error ->
-        Error
+        {ok, SecObjs} ->
+            SecObjsDict = lists:foldl(
+                fun({_, SO}, Acc) ->
+                    dict:update_counter(SO, 1, Acc)
+                end,
+                dict:new(),
+                SecObjs
+            ),
+            {ok, dict:to_list(SecObjsDict)};
+        Error ->
+            Error
     end.
 
 is_ok([_], _) ->
@@ -100,7 +110,7 @@ is_ok([_, _] = SecObjs0, ShardCount) ->
     % Figure out if we have a simple majority of security objects
     % and if so, use that as the correct value. Otherwise we abort
     % and rely on human intervention.
-    {Count, SecObj} =  lists:max([{C, O} || {O, C} <- SecObjs0]),
+    {Count, SecObj} = lists:max([{C, O} || {O, C} <- SecObjs0]),
     case Count >= ((ShardCount div 2) + 1) of
         true -> {fixable, SecObj};
         false -> broken
@@ -109,9 +119,7 @@ is_ok(_, _) ->
     % Anything else requires human intervention
     broken.
 
-
 is_local(<<"shards/", _/binary>>) ->
     false;
 is_local(_) ->
     true.
-

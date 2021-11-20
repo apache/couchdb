@@ -41,11 +41,15 @@ t_can_get_shard_uuids() ->
     Shards = mem3:shards(DbName),
     {ok, Uuids} = fabric:db_uuids(DbName),
     ?assertEqual(length(Shards), map_size(Uuids)),
-    UuidsFromShards = lists:foldl(fun(#shard{} = Shard, Acc) ->
-        Uuid = couch_util:with_db(Shard#shard.name, fun(Db) ->
-            couch_db:get_uuid(Db)
-        end),
-        Acc#{Uuid => Shard}
-    end, #{}, Shards),
+    UuidsFromShards = lists:foldl(
+        fun(#shard{} = Shard, Acc) ->
+            Uuid = couch_util:with_db(Shard#shard.name, fun(Db) ->
+                couch_db:get_uuid(Db)
+            end),
+            Acc#{Uuid => Shard}
+        end,
+        #{},
+        Shards
+    ),
     ?assertEqual(UuidsFromShards, Uuids),
     ok = fabric:delete_db(DbName, []).

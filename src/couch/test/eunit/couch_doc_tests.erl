@@ -15,9 +15,9 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
 -define(REQUEST_FIXTURE,
-    filename:join([?FIXTURESDIR, "multipart.http"])).
+    filename:join([?FIXTURESDIR, "multipart.http"])
+).
 
 parse_rev_test() ->
     ?assertEqual({1, <<"123">>}, couch_doc:parse_rev("1-123")),
@@ -40,24 +40,30 @@ doc_to_multi_part_stream_test() ->
     JsonBytes = <<"{\n \"_id\": \"our document goes here\"\n}\n\n">>,
     AttData = <<"Hello my important document">>,
     AttLength = size(AttData),
-    Atts = [couch_att:new([
-       {name, <<"test">>}, {data, AttData}, {type, <<"text/plain">>},
-       {att_len, AttLength}, {disk_len, AttLength}])],
+    Atts = [
+        couch_att:new([
+            {name, <<"test">>},
+            {data, AttData},
+            {type, <<"text/plain">>},
+            {att_len, AttLength},
+            {disk_len, AttLength}
+        ])
+    ],
     couch_doc:doc_to_multi_part_stream(Boundary, JsonBytes, Atts, fun send/1, true),
     AttLengthStr = integer_to_binary(AttLength),
     BoundaryLen = size(Boundary),
     [
-     <<"--", Boundary/binary>>,
-     <<"Content-Type: application/json">>,
-     <<>>,
-     JsonBytes,
-     <<"--", Boundary/binary>>,
-     <<"Content-Disposition: attachment; filename=\"test\"">>,
-     <<"Content-Type: text/plain">>,
-     <<"Content-Length: ", AttLengthStr/binary>>,
-     <<>>,
-     AttData,
-     <<"--", Boundary:BoundaryLen/binary, "--">>
+        <<"--", Boundary/binary>>,
+        <<"Content-Type: application/json">>,
+        <<>>,
+        JsonBytes,
+        <<"--", Boundary/binary>>,
+        <<"Content-Disposition: attachment; filename=\"test\"">>,
+        <<"Content-Type: text/plain">>,
+        <<"Content-Length: ", AttLengthStr/binary>>,
+        <<>>,
+        AttData,
+        <<"--", Boundary:BoundaryLen/binary, "--">>
     ] = collected(),
     ok.
 
@@ -67,10 +73,17 @@ len_doc_to_multi_part_stream_test() ->
     ContentType = <<"multipart/related; boundary=\"", Boundary/binary, "\"">>,
     AttData = <<"Hello my important document">>,
     AttLength = size(AttData),
-    Atts = [couch_att:new([
-       {name, <<"test">>}, {data, AttData}, {type, <<"text/plain">>},
-       {att_len, AttLength}, {disk_len, AttLength}])],
-    {ContentType, 258} = %% 258 is expected size of the document
+    Atts = [
+        couch_att:new([
+            {name, <<"test">>},
+            {data, AttData},
+            {type, <<"text/plain">>},
+            {att_len, AttLength},
+            {disk_len, AttLength}
+        ])
+    ],
+    %% 258 is expected size of the document
+    {ContentType, 258} =
         couch_doc:len_doc_to_multi_part_stream(Boundary, JsonBytes, Atts, true),
     ok.
 
@@ -93,29 +106,46 @@ validate_docid_test_() ->
             ?_assertEqual(ok, couch_doc:validate_docid(<<"_users">>, <<"_dbs">>)),
             ?_assertEqual(ok, couch_doc:validate_docid(<<"_replicator">>, <<"_dbs">>)),
             ?_assertEqual(ok, couch_doc:validate_docid(<<"_global_changes">>, <<"_dbs">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<>>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<16#80>>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_idx">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_design/">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_local/">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(large_id(1025))),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_users">>, <<"foo">>)),
-            ?_assertThrow({illegal_docid, _},
-                couch_doc:validate_docid(<<"_weeee">>, <<"_dbs">>))
-        ]
-    }.
+            ?_assertThrow(
+                {illegal_docid, _},
+                couch_doc:validate_docid(<<>>)
+            ),
+            ?_assertThrow(
+                {illegal_docid, _},
+                couch_doc:validate_docid(<<16#80>>)
+            ),
+            ?_assertThrow(
+                {illegal_docid, _},
+                couch_doc:validate_docid(<<"_idx">>)
+            ),
+            ?_assertThrow(
+                {illegal_docid, _},
+                couch_doc:validate_docid(<<"_">>)
+            ),
+            ?_assertThrow(
+                {illegal_docid, _},
+                couch_doc:validate_docid(<<"_design/">>)
+            ),
+            ?_assertThrow(
+                {illegal_docid, _},
+                couch_doc:validate_docid(<<"_local/">>)
+            ),
+            ?_assertThrow(
+                {illegal_docid, _},
+                couch_doc:validate_docid(large_id(1025))
+            ),
+            ?_assertThrow(
+                {illegal_docid, _},
+                couch_doc:validate_docid(<<"_users">>, <<"foo">>)
+            ),
+            ?_assertThrow(
+                {illegal_docid, _},
+                couch_doc:validate_docid(<<"_weeee">>, <<"_dbs">>)
+            )
+        ]}.
 
 large_id(N) ->
-    << <<"x">> || _ <- lists:seq(1, N) >>.
+    <<<<"x">> || _ <- lists:seq(1, N)>>.
 
 request(start) ->
     {ok, Doc} = file:read_file(?REQUEST_FIXTURE),
@@ -128,7 +158,7 @@ send(Data) ->
 send(Data, undefined) ->
     send(Data, []);
 send(Data, Acc) ->
-    put(data, [Acc|Data]).
+    put(data, [Acc | Data]).
 
 collected() ->
     B = binary:replace(iolist_to_binary(get(data)), <<"\r\n">>, <<0>>, [global]),
@@ -136,11 +166,14 @@ collected() ->
 
 mock_config() ->
     ok = meck:new(config, [passthrough]),
-    meck:expect(config, get,
-        fun("couchdb", "max_document_id_length", "infinity") -> "1024";
-           ("couchdb", "max_attachment_size", "infinity") -> "infinity";
-           ("couchdb", "max_attachment_size", 1073741824) -> 1073741824;
-           ("mem3", "shards_db", "_dbs") -> "_dbs";
+    meck:expect(
+        config,
+        get,
+        fun
+            ("couchdb", "max_document_id_length", "infinity") -> "1024";
+            ("couchdb", "max_attachment_size", "infinity") -> "infinity";
+            ("couchdb", "max_attachment_size", 1073741824) -> 1073741824;
+            ("mem3", "shards_db", "_dbs") -> "_dbs";
             (Key, Val, Default) -> meck:passthrough([Key, Val, Default])
         end
     ).

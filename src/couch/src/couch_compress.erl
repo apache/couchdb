@@ -25,20 +25,18 @@
 -define(TERM_PREFIX, 131).
 -define(COMPRESSED_TERM_PREFIX, 131, 80).
 
-
 get_compression_method() ->
     case config:get("couchdb", "file_compression") of
-    undefined ->
-        ?DEFAULT_COMPRESSION;
-    Method1 ->
-        case string:tokens(Method1, "_") of
-        [Method] ->
-            list_to_existing_atom(Method);
-        [Method, Level] ->
-            {list_to_existing_atom(Method), list_to_integer(Level)}
-        end
+        undefined ->
+            ?DEFAULT_COMPRESSION;
+        Method1 ->
+            case string:tokens(Method1, "_") of
+                [Method] ->
+                    list_to_existing_atom(Method);
+                [Method, Level] ->
+                    {list_to_existing_atom(Method), list_to_integer(Level)}
+            end
     end.
-
 
 compress(<<?SNAPPY_PREFIX, _/binary>> = Bin, snappy) ->
     Bin;
@@ -57,10 +55,10 @@ compress(Term, snappy) ->
     try
         {ok, CompressedBin} = snappy:compress(Bin),
         <<?SNAPPY_PREFIX, CompressedBin/binary>>
-    catch exit:snappy_nif_not_loaded ->
-        Bin
+    catch
+        exit:snappy_nif_not_loaded ->
+            Bin
     end.
-
 
 decompress(<<?SNAPPY_PREFIX, Rest/binary>>) ->
     {ok, TermBin} = snappy:decompress(Rest),
@@ -69,7 +67,6 @@ decompress(<<?TERM_PREFIX, _/binary>> = Bin) ->
     binary_to_term(Bin);
 decompress(_) ->
     error(invalid_compression).
-
 
 is_compressed(<<?SNAPPY_PREFIX, _/binary>>, Method) ->
     Method =:= snappy;
@@ -83,7 +80,6 @@ is_compressed(Term, _Method) when not is_binary(Term) ->
     false;
 is_compressed(_, _) ->
     error(invalid_compression).
-
 
 uncompressed_size(<<?SNAPPY_PREFIX, Rest/binary>>) ->
     {ok, Size} = snappy:uncompressed_length(Rest),

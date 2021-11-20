@@ -12,7 +12,6 @@
 
 -module(mango_util).
 
-
 -export([
     open_doc/2,
     open_ddocs/1,
@@ -46,43 +45,40 @@
     cached_re/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include("mango.hrl").
-
 
 -define(DIGITS, "(\\p{N}+)").
 -define(HEXDIGITS, "([0-9a-fA-F]+)").
 -define(EXP, "[eE][+-]?" ++ ?DIGITS).
 -define(NUMSTRING,
-"[\\x00-\\x20]*" ++ "[+-]?(" ++ "NaN|"
-     ++ "Infinity|" ++ "((("
-     ++ ?DIGITS
-     ++ "(\\.)?("
-     ++ ?DIGITS
-     ++ "?)("
-     ++ ?EXP
-     ++ ")?)|"
-     ++ "(\\.("
-     ++ ?DIGITS
-     ++ ")("
-     ++ ?EXP
-     ++ ")?)|"
-     ++ "(("
-     ++ "(0[xX]"
-     ++ ?HEXDIGITS
-     ++ "(\\.)?)|"
-     ++ "(0[xX]"
-     ++ ?HEXDIGITS
-     ++ "?(\\.)"
-     ++ ?HEXDIGITS
-     ++ ")"
-     ++ ")[pP][+-]?" ++ ?DIGITS ++ "))" ++ "[fFdD]?))" ++ "[\\x00-\\x20]*").
-
+    "[\\x00-\\x20]*" ++ "[+-]?(" ++ "NaN|" ++
+        "Infinity|" ++ "(((" ++
+        ?DIGITS ++
+        "(\\.)?(" ++
+        ?DIGITS ++
+        "?)(" ++
+        ?EXP ++
+        ")?)|" ++
+        "(\\.(" ++
+        ?DIGITS ++
+        ")(" ++
+        ?EXP ++
+        ")?)|" ++
+        "((" ++
+        "(0[xX]" ++
+        ?HEXDIGITS ++
+        "(\\.)?)|" ++
+        "(0[xX]" ++
+        ?HEXDIGITS ++
+        "?(\\.)" ++
+        ?HEXDIGITS ++
+        ")" ++
+        ")[pP][+-]?" ++ ?DIGITS ++ "))" ++ "[fFdD]?))" ++ "[\\x00-\\x20]*"
+).
 
 open_doc(Db, DocId) ->
     open_doc(Db, DocId, [deleted, ejson_body]).
-
 
 open_doc(Db, DocId, Options) ->
     case mango_util:defer(fabric, open_doc, [Db, DocId, Options]) of
@@ -94,7 +90,6 @@ open_doc(Db, DocId, Options) ->
             ?MANGO_ERROR({error_loading_doc, DocId})
     end.
 
-
 open_ddocs(Db) ->
     case mango_util:defer(fabric, design_docs, [Db]) of
         {ok, Docs} ->
@@ -102,7 +97,6 @@ open_ddocs(Db) ->
         _ ->
             ?MANGO_ERROR(error_loading_ddocs)
     end.
-
 
 load_ddoc(Db, DDocId) ->
     load_ddoc(Db, DDocId, [deleted, ejson_body]).
@@ -112,12 +106,12 @@ load_ddoc(Db, DDocId, DbOpts) ->
         {ok, Doc} ->
             {ok, check_lang(Doc)};
         not_found ->
-            Body = {[
-                {<<"language">>, <<"query">>}
-            ]},
+            Body =
+                {[
+                    {<<"language">>, <<"query">>}
+                ]},
             {ok, #doc{id = DDocId, body = Body}}
     end.
-
 
 defer(Mod, Fun, Args) ->
     {Pid, Ref} = erlang:spawn_monitor(?MODULE, do_defer, [Mod, Fun, Args]),
@@ -131,7 +125,6 @@ defer(Mod, Fun, Args) ->
         {'DOWN', Ref, process, Pid, {mango_defer_exit, Value}} ->
             erlang:exit(Value)
     end.
-
 
 do_defer(Mod, Fun, Args) ->
     try erlang:apply(Mod, Fun, Args) of
@@ -148,7 +141,6 @@ do_defer(Mod, Fun, Args) ->
             couch_log:error("Defered error: ~w~n    ~p", [{exit, Error}, Stack]),
             erlang:exit({mango_defer_exit, Error})
     end.
-
 
 assert_ejson({Props}) ->
     assert_ejson_obj(Props);
@@ -167,7 +159,6 @@ assert_ejson(Number) when is_number(Number) ->
 assert_ejson(_Else) ->
     false.
 
-
 assert_ejson_obj([]) ->
     true;
 assert_ejson_obj([{Key, Val} | Rest]) when is_binary(Key) ->
@@ -180,7 +171,6 @@ assert_ejson_obj([{Key, Val} | Rest]) when is_binary(Key) ->
 assert_ejson_obj(_Else) ->
     false.
 
-
 assert_ejson_arr([]) ->
     true;
 assert_ejson_arr([Val | Rest]) ->
@@ -191,11 +181,11 @@ assert_ejson_arr([Val | Rest]) ->
             false
     end.
 
-
 check_lang(#doc{id = Id, deleted = true}) ->
-    Body = {[
-        {<<"language">>, <<"query">>}
-    ]},
+    Body =
+        {[
+            {<<"language">>, <<"query">>}
+        ]},
     #doc{id = Id, body = Body};
 check_lang(#doc{body = {Props}} = Doc) ->
     case lists:keyfind(<<"language">>, 1, Props) of
@@ -205,12 +195,10 @@ check_lang(#doc{body = {Props}} = Doc) ->
             ?MANGO_ERROR({invalid_ddoc_lang, Else})
     end.
 
-
 to_lower(Key) when is_binary(Key) ->
     KStr = binary_to_list(Key),
     KLower = string:to_lower(KStr),
     list_to_binary(KLower).
-
 
 enc_dbname(<<>>) ->
     <<>>;
@@ -219,7 +207,6 @@ enc_dbname(<<A:8/integer, Rest/binary>>) ->
     Tail = enc_dbname(Rest),
     <<Bytes/binary, Tail/binary>>.
 
-
 enc_db_byte(N) when N >= $a, N =< $z -> <<N>>;
 enc_db_byte(N) when N >= $0, N =< $9 -> <<N>>;
 enc_db_byte(N) when N == $/; N == $_; N == $- -> <<N>>;
@@ -227,7 +214,6 @@ enc_db_byte(N) ->
     H = enc_hex_byte(N div 16),
     L = enc_hex_byte(N rem 16),
     <<$$, H:8/integer, L:8/integer>>.
-
 
 dec_dbname(<<>>) ->
     <<>>;
@@ -241,7 +227,6 @@ dec_dbname(<<N:8/integer, Rest/binary>>) ->
     Tail = dec_dbname(Rest),
     <<N:8/integer, Tail/binary>>.
 
-
 enc_hex(<<>>) ->
     <<>>;
 enc_hex(<<V:8/integer, Rest/binary>>) ->
@@ -250,11 +235,9 @@ enc_hex(<<V:8/integer, Rest/binary>>) ->
     Tail = enc_hex(Rest),
     <<H:8/integer, L:8/integer, Tail/binary>>.
 
-
 enc_hex_byte(N) when N >= 0, N < 10 -> $0 + N;
 enc_hex_byte(N) when N >= 10, N < 16 -> $a + (N - 10);
 enc_hex_byte(N) -> throw({invalid_hex_value, N}).
-
 
 dec_hex(<<>>) ->
     <<>>;
@@ -265,13 +248,10 @@ dec_hex(<<H:8/integer, L:8/integer, Rest/binary>>) ->
     Tail = dec_hex(Rest),
     <<Byte:8/integer, Tail/binary>>.
 
-
 dec_hex_byte(N) when N >= $0, N =< $9 -> (N - $0);
 dec_hex_byte(N) when N >= $a, N =< $f -> (N - $a) + 10;
 dec_hex_byte(N) when N >= $A, N =< $F -> (N - $A) + 10;
 dec_hex_byte(N) -> throw({invalid_hex_character, N}).
-
-
 
 lucene_escape_field(Bin) when is_binary(Bin) ->
     Str = binary_to_list(Bin),
@@ -289,10 +269,9 @@ lucene_escape_field([H | T]) when is_number(H), H >= 0, H =< 255 ->
             Hi = enc_hex_byte(H div 16),
             Lo = enc_hex_byte(H rem 16),
             [$_, Hi, Lo | lucene_escape_field(T)]
-        end;
+    end;
 lucene_escape_field([]) ->
     [].
-
 
 lucene_escape_query_value(IoList) when is_list(IoList) ->
     lucene_escape_query_value(iolist_to_binary(IoList));
@@ -300,46 +279,47 @@ lucene_escape_query_value(Bin) when is_binary(Bin) ->
     IoList = lucene_escape_qv(Bin),
     iolist_to_binary(IoList).
 
-
 % This escapes the special Lucene query characters
 % listed below as well as any whitespace.
 %
 %   + - && || ! ( ) { } [ ] ^ ~ * ? : \ " /
 %
 
-lucene_escape_qv(<<>>) -> [];
+lucene_escape_qv(<<>>) ->
+    [];
 lucene_escape_qv(<<"&&", Rest/binary>>) ->
     ["\\&&" | lucene_escape_qv(Rest)];
 lucene_escape_qv(<<"||", Rest/binary>>) ->
     ["\\||" | lucene_escape_qv(Rest)];
 lucene_escape_qv(<<C, Rest/binary>>) ->
     NeedsEscape = "+-(){}[]!^~*?:/\\\" \t\r\n",
-    Out = case lists:member(C, NeedsEscape) of
-        true -> ["\\", C];
-        false -> [C]
-    end,
+    Out =
+        case lists:member(C, NeedsEscape) of
+            true -> ["\\", C];
+            false -> [C]
+        end,
     Out ++ lucene_escape_qv(Rest).
-
 
 lucene_escape_user(Field) ->
     {ok, Path} = parse_field(Field),
     Escaped = [mango_util:lucene_escape_field(P) || P <- Path],
     iolist_to_binary(join(".", Escaped)).
 
-
 has_suffix(Bin, Suffix) when is_binary(Bin), is_binary(Suffix) ->
     SBin = size(Bin),
     SSuffix = size(Suffix),
-    if SBin < SSuffix -> false; true ->
-        PSize = SBin - SSuffix,
-        case Bin of
-            <<_:PSize/binary, Suffix/binary>> ->
-                true;
-            _ ->
-                false
-        end
+    if
+        SBin < SSuffix ->
+            false;
+        true ->
+            PSize = SBin - SSuffix,
+            case Bin of
+                <<_:PSize/binary, Suffix/binary>> ->
+                    true;
+                _ ->
+                    false
+            end
     end.
-
 
 join(_Sep, []) ->
     [];
@@ -348,10 +328,9 @@ join(_Sep, [Item]) ->
 join(Sep, [Item | Rest]) ->
     [Item, Sep | join(Sep, Rest)].
 
-
 is_number_string(Value) when is_binary(Value) ->
     is_number_string(binary_to_list(Value));
-is_number_string(Value) when is_list(Value)->
+is_number_string(Value) when is_list(Value) ->
     MP = cached_re(mango_numstring_re, ?NUMSTRING),
     case re:run(Value, MP) of
         nomatch ->
@@ -359,7 +338,6 @@ is_number_string(Value) when is_list(Value)->
         _ ->
             true
     end.
-
 
 cached_re(Name, RE) ->
     case mochiglobal:get(Name) of
@@ -371,7 +349,6 @@ cached_re(Name, RE) ->
             MP
     end.
 
-
 parse_field(Field) ->
     case binary:match(Field, <<"\\">>, []) of
         nomatch ->
@@ -382,12 +359,15 @@ parse_field(Field) ->
     end.
 
 parse_field_slow(Field) ->
-    Path = lists:map(fun
-        (P) when P =:= <<>> ->
-            ?MANGO_ERROR({invalid_field_name, Field});
-        (P) ->
-            re:replace(P, <<"\\\\">>, <<>>, [global, {return, binary}])
-    end, re:split(Field, <<"(?<!\\\\)\\.">>)),
+    Path = lists:map(
+        fun
+            (P) when P =:= <<>> ->
+                ?MANGO_ERROR({invalid_field_name, Field});
+            (P) ->
+                re:replace(P, <<"\\\\">>, <<>>, [global, {return, binary}])
+        end,
+        re:split(Field, <<"(?<!\\\\)\\.">>)
+    ),
     {ok, Path}.
 
 check_non_empty(Field, Parts) ->
@@ -397,7 +377,6 @@ check_non_empty(Field, Parts) ->
         false ->
             Parts
     end.
-
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

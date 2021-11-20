@@ -14,19 +14,15 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
-
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
-
 
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
     couch_db:name(Db).
 
-
 teardown_each(DbName) ->
     ok = couch_server:delete(DbName, []).
-
 
 cpse_increment_purge_seq_on_complete_purge(DbName) ->
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
@@ -68,7 +64,6 @@ cpse_increment_purge_seq_on_complete_purge(DbName) ->
         {purge_infos, PurgeInfos1 ++ PurgeInfos2}
     ]).
 
-
 cpse_increment_purge_multiple_times(DbName) ->
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
     {ok, Rev2} = cpse_util:save_doc(DbName, {[{'_id', foo2}, {vsn, 1.2}]}),
@@ -97,14 +92,14 @@ cpse_increment_purge_multiple_times(DbName) ->
         {purge_infos, PurgeInfos1}
     ]).
 
-
 cpse_increment_purge_seq_on_partial_purge(DbName) ->
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, <<"1.1">>}]}),
-    Update = {[
-        {'_id', foo1},
-        {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
-        {vsn, <<"1.2">>}
-    ]},
+    Update =
+        {[
+            {'_id', foo1},
+            {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
+            {vsn, <<"1.2">>}
+        ]},
     {ok, [_Rev2]} = cpse_util:save_docs(DbName, [Update], [replicated_changes]),
 
     cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [

@@ -15,25 +15,23 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
-
-
 couch_mrview_util_test_() ->
     [
-         ?_assertEqual(0, validate_group_level(undefined, undefined)),
-         ?_assertEqual(exact, validate_group_level(true, undefined)),
-         ?_assertEqual(0, validate_group_level(false, undefined)),
-         ?_assertEqual(1, validate_group_level(undefined, 1)),
-         ?_assertEqual(0, validate_group_level(true, 0)),
-         ?_assertEqual(0, validate_group_level(undefined, 0)),
-         ?_assertEqual(1, validate_group_level(true, 1)),
-         ?_assertEqual(0, validate_group_level(false, 0)),
-         ?_assertThrow({query_parse_error,
-              <<"Can't specify group=false and group_level>0 at the same time">>},
-              validate_group_level(false,1))
+        ?_assertEqual(0, validate_group_level(undefined, undefined)),
+        ?_assertEqual(exact, validate_group_level(true, undefined)),
+        ?_assertEqual(0, validate_group_level(false, undefined)),
+        ?_assertEqual(1, validate_group_level(undefined, 1)),
+        ?_assertEqual(0, validate_group_level(true, 0)),
+        ?_assertEqual(0, validate_group_level(undefined, 0)),
+        ?_assertEqual(1, validate_group_level(true, 1)),
+        ?_assertEqual(0, validate_group_level(false, 0)),
+        ?_assertThrow(
+            {query_parse_error, <<"Can't specify group=false and group_level>0 at the same time">>},
+            validate_group_level(false, 1)
+        )
     ].
 
 validate_group_level(Group, GroupLevel) ->
-    Args0 = #mrargs{group=Group, group_level=GroupLevel, view_type=red},
+    Args0 = #mrargs{group = Group, group_level = GroupLevel, view_type = red},
     Args1 = couch_mrview_util:validate_args(Args0),
     Args1#mrargs.group_level.
-

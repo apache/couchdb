@@ -37,33 +37,48 @@ status() ->
     smoosh_server:status().
 
 enqueue_all_dbs() ->
-    fold_local_shards(fun(#shard{name=Name}, _Acc) ->
-        sync_enqueue(Name) end, ok).
+    fold_local_shards(
+        fun(#shard{name = Name}, _Acc) ->
+            sync_enqueue(Name)
+        end,
+        ok
+    ).
 
 enqueue_all_dbs(Timeout) ->
-    fold_local_shards(fun(#shard{name=Name}, _Acc) ->
-        sync_enqueue(Name, Timeout) end, ok).
+    fold_local_shards(
+        fun(#shard{name = Name}, _Acc) ->
+            sync_enqueue(Name, Timeout)
+        end,
+        ok
+    ).
 
 enqueue_all_views() ->
-    fold_local_shards(fun(#shard{name=Name}, _Acc) ->
-        catch enqueue_views(Name) end, ok).
+    fold_local_shards(
+        fun(#shard{name = Name}, _Acc) ->
+            catch enqueue_views(Name)
+        end,
+        ok
+    ).
 
 fold_local_shards(Fun, Acc0) ->
-    mem3:fold_shards(fun(Shard, Acc1) ->
-        case node() == Shard#shard.node of
-            true ->
-                Fun(Shard, Acc1);
-            false ->
-                Acc1
-        end
-    end, Acc0).
+    mem3:fold_shards(
+        fun(Shard, Acc1) ->
+            case node() == Shard#shard.node of
+                true ->
+                    Fun(Shard, Acc1);
+                false ->
+                    Acc1
+            end
+        end,
+        Acc0
+    ).
 
 enqueue_views(ShardName) ->
     DbName = mem3:dbname(ShardName),
     {ok, DDocs} = fabric:design_docs(DbName),
     [sync_enqueue({ShardName, id(DDoc)}) || DDoc <- DDocs].
 
-id(#doc{id=Id}) ->
+id(#doc{id = Id}) ->
     Id;
 id({Props}) ->
     couch_util:get_value(<<"_id">>, Props).

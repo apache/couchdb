@@ -19,15 +19,12 @@
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
--define(CONTENT_MULTI_RELATED, {"Content-Type",
-    "multipart/related;boundary=\"bound\""}).
--define(CONTENT_MULTI_FORM, {"Content-Type",
-    "multipart/form-data;boundary=\"bound\""}).
-
+-define(CONTENT_MULTI_RELATED, {"Content-Type", "multipart/related;boundary=\"bound\""}).
+-define(CONTENT_MULTI_FORM, {"Content-Type", "multipart/form-data;boundary=\"bound\""}).
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
     ok = config:set("couchdb", "max_document_size", "50"),
     TmpDb = ?tempdb(),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
@@ -38,7 +35,7 @@ setup() ->
 
 teardown(Url) ->
     delete_db(Url),
-    ok = config:delete("admins", ?USER, _Persist=false),
+    ok = config:delete("admins", ?USER, _Persist = false),
     ok = config:delete("couchdb", "max_document_size").
 
 create_db(Url) ->
@@ -62,7 +59,8 @@ all_test_() ->
             fun chttpd_test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun post_single_doc/1,
                     fun put_single_doc/1,
@@ -76,52 +74,80 @@ all_test_() ->
     }.
 
 post_single_doc(Url) ->
-    NewDoc = "{\"post_single_doc\": \"some_doc\",
-        \"_id\": \"testdoc\", \"should_be\" : \"too_large\"}",
-    {ok, _, _, ResultBody} = test_request:post(Url,
-        [?CONTENT_JSON, ?AUTH], NewDoc),
+    NewDoc =
+        "{\"post_single_doc\": \"some_doc\",\n"
+        "        \"_id\": \"testdoc\", \"should_be\" : \"too_large\"}",
+    {ok, _, _, ResultBody} = test_request:post(
+        Url,
+        [?CONTENT_JSON, ?AUTH],
+        NewDoc
+    ),
     {[ErrorMsg | _]} = ?JSON_DECODE(ResultBody),
     ?_assertEqual({<<"error">>, <<"document_too_large">>}, ErrorMsg).
 
 put_single_doc(Url) ->
-    NewDoc = "{\"post_single_doc\": \"some_doc\",
-        \"_id\": \"testdoc\", \"should_be\" : \"too_large\"}",
-    {ok, _, _, ResultBody} = test_request:put(Url ++ "/" ++ "testid",
-        [?CONTENT_JSON, ?AUTH], NewDoc),
+    NewDoc =
+        "{\"post_single_doc\": \"some_doc\",\n"
+        "        \"_id\": \"testdoc\", \"should_be\" : \"too_large\"}",
+    {ok, _, _, ResultBody} = test_request:put(
+        Url ++ "/" ++ "testid",
+        [?CONTENT_JSON, ?AUTH],
+        NewDoc
+    ),
     {[ErrorMsg | _]} = ?JSON_DECODE(ResultBody),
     ?_assertEqual({<<"error">>, <<"document_too_large">>}, ErrorMsg).
 
 bulk_doc(Url) ->
-    NewDoc = "{\"docs\": [{\"doc1\": 1}, {\"errordoc\":
-        \"this_should_be_the_too_large_error_document\"}]}",
-    {ok, _, _, ResultBody} = test_request:post(Url ++ "/_bulk_docs/",
-        [?CONTENT_JSON, ?AUTH], NewDoc),
+    NewDoc =
+        "{\"docs\": [{\"doc1\": 1}, {\"errordoc\":\n"
+        "        \"this_should_be_the_too_large_error_document\"}]}",
+    {ok, _, _, ResultBody} = test_request:post(
+        Url ++ "/_bulk_docs/",
+        [?CONTENT_JSON, ?AUTH],
+        NewDoc
+    ),
     ResultJson = ?JSON_DECODE(ResultBody),
-    Expect = {[{<<"error">>,<<"document_too_large">>},{<<"reason">>,<<>>}]},
+    Expect = {[{<<"error">>, <<"document_too_large">>}, {<<"reason">>, <<>>}]},
     ?_assertEqual(Expect, ResultJson).
 
 put_post_doc_attach_inline(Url) ->
     Body1 = "{\"body\":\"This is a body.\",",
-    Body2 = lists:concat(["{\"body\":\"This is a body it should fail",
-        "because there are too many characters.\","]),
-    DocRest =  lists:concat(["\"_attachments\":{\"foo.txt\":{",
+    Body2 = lists:concat([
+        "{\"body\":\"This is a body it should fail",
+        "because there are too many characters.\","
+    ]),
+    DocRest = lists:concat([
+        "\"_attachments\":{\"foo.txt\":{",
         "\"content_type\":\"text/plain\",",
-        "\"data\": \"VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=\"}}}"]),
+        "\"data\": \"VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ=\"}}}"
+    ]),
     Doc1 = lists:concat([Body1, DocRest]),
     Doc2 = lists:concat([Body2, DocRest]),
 
-    {ok, _, _, ResultBody} = test_request:post(Url,
-        [?CONTENT_JSON, ?AUTH], Doc1),
+    {ok, _, _, ResultBody} = test_request:post(
+        Url,
+        [?CONTENT_JSON, ?AUTH],
+        Doc1
+    ),
     {[Msg | _]} = ?JSON_DECODE(ResultBody),
-    {ok, _, _, ResultBody1} = test_request:post(Url,
-        [?CONTENT_JSON, ?AUTH], Doc2),
+    {ok, _, _, ResultBody1} = test_request:post(
+        Url,
+        [?CONTENT_JSON, ?AUTH],
+        Doc2
+    ),
     {[Msg1 | _]} = ?JSON_DECODE(ResultBody1),
 
-    {ok, _, _, ResultBody2} = test_request:put(Url ++ "/" ++ "accept",
-        [?CONTENT_JSON, ?AUTH], Doc1),
+    {ok, _, _, ResultBody2} = test_request:put(
+        Url ++ "/" ++ "accept",
+        [?CONTENT_JSON, ?AUTH],
+        Doc1
+    ),
     {[Msg2 | _]} = ?JSON_DECODE(ResultBody2),
-    {ok, _, _, ResultBody3} = test_request:put(Url ++ "/" ++ "fail",
-        [?CONTENT_JSON, ?AUTH], Doc2),
+    {ok, _, _, ResultBody3} = test_request:put(
+        Url ++ "/" ++ "fail",
+        [?CONTENT_JSON, ?AUTH],
+        Doc2
+    ),
     {[Msg3 | _]} = ?JSON_DECODE(ResultBody3),
     [
         ?_assertEqual({<<"ok">>, true}, Msg),
@@ -132,21 +158,31 @@ put_post_doc_attach_inline(Url) ->
 
 put_multi_part_related(Url) ->
     Body1 = "{\"body\":\"This is a body.\",",
-    Body2 = lists:concat(["{\"body\":\"This is a body it should fail",
-        "because there are too many characters.\","]),
+    Body2 = lists:concat([
+        "{\"body\":\"This is a body it should fail",
+        "because there are too many characters.\","
+    ]),
     DocBeg = "--bound\r\nContent-Type: application/json\r\n\r\n",
-    DocRest =  lists:concat(["\"_attachments\":{\"foo.txt\":{\"follows\":true,",
+    DocRest = lists:concat([
+        "\"_attachments\":{\"foo.txt\":{\"follows\":true,",
         "\"content_type\":\"text/plain\",\"length\":21},\"bar.txt\":",
         "{\"follows\":true,\"content_type\":\"text/plain\",",
         "\"length\":20}}}\r\n--bound\r\n\r\nthis is 21 chars long",
-        "\r\n--bound\r\n\r\nthis is 20 chars lon\r\n--bound--epilogue"]),
+        "\r\n--bound\r\n\r\nthis is 20 chars lon\r\n--bound--epilogue"
+    ]),
     Doc1 = lists:concat([DocBeg, Body1, DocRest]),
     Doc2 = lists:concat([DocBeg, Body2, DocRest]),
-    {ok, _, _, ResultBody} = test_request:put(Url ++ "/" ++ "accept",
-        [?CONTENT_MULTI_RELATED, ?AUTH], Doc1),
+    {ok, _, _, ResultBody} = test_request:put(
+        Url ++ "/" ++ "accept",
+        [?CONTENT_MULTI_RELATED, ?AUTH],
+        Doc1
+    ),
     {[Msg | _]} = ?JSON_DECODE(ResultBody),
-       {ok, _, _, ResultBody1} = test_request:put(Url ++ "/" ++ "faildoc",
-        [?CONTENT_MULTI_RELATED, ?AUTH], Doc2),
+    {ok, _, _, ResultBody1} = test_request:put(
+        Url ++ "/" ++ "faildoc",
+        [?CONTENT_MULTI_RELATED, ?AUTH],
+        Doc2
+    ),
     {[Msg1 | _]} = ?JSON_DECODE(ResultBody1),
     [
         ?_assertEqual({<<"ok">>, true}, Msg),
@@ -155,23 +191,33 @@ put_multi_part_related(Url) ->
 
 post_multi_part_form(Url) ->
     Port = mochiweb_socket_server:get(chttpd, port),
-    Host = lists:concat([ "http://127.0.0.1:", Port]),
+    Host = lists:concat(["http://127.0.0.1:", Port]),
     Referer = {"Referer", Host},
     Body1 = "{\"body\":\"This is a body.\"}",
-    Body2 = lists:concat(["{\"body\":\"This is a body it should fail",
-        "because there are too many characters.\"}"]),
+    Body2 = lists:concat([
+        "{\"body\":\"This is a body it should fail",
+        "because there are too many characters.\"}"
+    ]),
     DocBeg = "--bound\r\nContent-Disposition: form-data; name=\"_doc\"\r\n\r\n",
-    DocRest = lists:concat(["\r\n--bound\r\nContent-Disposition:",
+    DocRest = lists:concat([
+        "\r\n--bound\r\nContent-Disposition:",
         "form-data; name=\"_attachments\"; filename=\"file.txt\"\r\n",
         "Content-Type: text/plain\r\n\r\ncontents of file.txt\r\n\r\n",
-        "--bound--"]),
+        "--bound--"
+    ]),
     Doc1 = lists:concat([DocBeg, Body1, DocRest]),
     Doc2 = lists:concat([DocBeg, Body2, DocRest]),
-    {ok, _, _, ResultBody} = test_request:post(Url ++ "/" ++ "accept",
-        [?CONTENT_MULTI_FORM, ?AUTH, Referer], Doc1),
+    {ok, _, _, ResultBody} = test_request:post(
+        Url ++ "/" ++ "accept",
+        [?CONTENT_MULTI_FORM, ?AUTH, Referer],
+        Doc1
+    ),
     {[Msg | _]} = ?JSON_DECODE(ResultBody),
-    {ok, _, _, ResultBody1} = test_request:post(Url ++ "/" ++ "fail",
-        [?CONTENT_MULTI_FORM, ?AUTH, Referer], Doc2),
+    {ok, _, _, ResultBody1} = test_request:post(
+        Url ++ "/" ++ "fail",
+        [?CONTENT_MULTI_FORM, ?AUTH, Referer],
+        Doc2
+    ),
     {[Msg1 | _]} = ?JSON_DECODE(ResultBody1),
     [
         ?_assertEqual({<<"ok">>, true}, Msg),

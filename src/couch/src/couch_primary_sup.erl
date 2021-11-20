@@ -15,19 +15,15 @@
 -export([init/1, start_link/0]).
 
 start_link() ->
-    supervisor:start_link({local,couch_primary_services}, ?MODULE, []).
+    supervisor:start_link({local, couch_primary_services}, ?MODULE, []).
 
 init([]) ->
-    Children = [
-        {couch_task_status,
-            {couch_task_status, start_link, []},
-            permanent,
-            brutal_kill,
-            worker,
-            [couch_task_status]}
-    ] ++ couch_servers(),
+    Children =
+        [
+            {couch_task_status, {couch_task_status, start_link, []}, permanent, brutal_kill, worker,
+                [couch_task_status]}
+        ] ++ couch_servers(),
     {ok, {{one_for_one, 10, 3600}, Children}}.
-
 
 couch_servers() ->
     N = couch_server:num_servers(),
@@ -35,10 +31,4 @@ couch_servers() ->
 
 couch_server(N) ->
     Name = couch_server:couch_server(N),
-    {Name,
-        {couch_server, sup_start_link, [N]},
-        permanent,
-        brutal_kill,
-        worker,
-        [couch_server]
-    }.
+    {Name, {couch_server, sup_start_link, [N]}, permanent, brutal_kill, worker, [couch_server]}.

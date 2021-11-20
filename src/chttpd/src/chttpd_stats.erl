@@ -1,4 +1,3 @@
-
 % Licensed under the Apache License, Version 2.0 (the "License"); you may not
 % use this file except in compliance with the License.  You may obtain a copy of
 % the License at
@@ -30,20 +29,16 @@
     incr_rows/1
 ]).
 
-
 -record(st, {
     reads = 0,
     writes = 0,
     rows = 0
 }).
 
-
 -define(KEY, chttpd_stats).
-
 
 init() ->
     put(?KEY, #st{}).
-
 
 report(HttpReq, HttpResp) ->
     try
@@ -57,7 +52,6 @@ report(HttpReq, HttpResp) ->
         Fmt = "Failed to report chttpd request stats: ~p:~p ~p",
         couch_log:error(Fmt, [T, R, S])
     end.
-
 
 report(HttpReq, HttpResp, St) ->
     case config:get("chttpd", "stats_reporter") of
@@ -73,30 +67,23 @@ report(HttpReq, HttpResp, St) ->
             Mod:report(HttpReq, HttpResp, Reads, Writes, Rows)
     end.
 
-
 incr_reads() ->
     incr(#st.reads, 1).
-
 
 incr_reads(N) when is_integer(N), N >= 0 ->
     incr(#st.reads, N).
 
-
 incr_writes() ->
     incr(#st.writes, 1).
-
 
 incr_writes(N) when is_integer(N), N >= 0 ->
     incr(#st.writes, N).
 
-
 incr_rows() ->
     incr(#st.rows, 1).
 
-
 incr_rows(N) when is_integer(N), N >= 0 ->
     incr(#st.rows, N).
-
 
 incr(Idx, Count) ->
     case get(?KEY) of

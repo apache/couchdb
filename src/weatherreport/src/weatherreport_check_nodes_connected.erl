@@ -32,10 +32,12 @@
 -module(weatherreport_check_nodes_connected).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -spec description() -> string().
 description() ->
@@ -50,9 +52,12 @@ check(_Opts) ->
     NodeName = node(),
     ConnectedNodes = [NodeName | erlang:nodes()],
     Members = mem3:nodes(),
-    [{warning, {node_disconnected, N}} || N <- Members,
-                                          N =/= NodeName,
-                                          lists:member(N, ConnectedNodes) == false].
+    [
+        {warning, {node_disconnected, N}}
+     || N <- Members,
+        N =/= NodeName,
+        lists:member(N, ConnectedNodes) == false
+    ].
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({node_disconnected, Node}) ->

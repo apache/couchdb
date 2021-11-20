@@ -2,7 +2,6 @@
 
 -include_lib("couch/include/couch_eunit.hrl").
 
-
 rate_limiter_test_() ->
     {
         foreach,
@@ -18,18 +17,15 @@ rate_limiter_test_() ->
         ]
     }.
 
-
 t_new_key() ->
     ?_test(begin
         ?assertEqual(0, couch_replicator_rate_limiter:interval({"foo", get}))
     end).
 
-
 t_1_failure() ->
     ?_test(begin
         ?assertEqual(24, couch_replicator_rate_limiter:failure({"foo", get}))
     end).
-
 
 t_2_failures() ->
     ?_test(begin
@@ -39,14 +35,12 @@ t_2_failures() ->
         ?assertEqual(29, Interval)
     end).
 
-
 t_2_failures_back_to_back() ->
     ?_test(begin
         couch_replicator_rate_limiter:failure({"foo", get}),
         Interval = couch_replicator_rate_limiter:failure({"foo", get}),
         ?assertEqual(24, Interval)
     end).
-
 
 t_success_threshold() ->
     ?_test(begin
@@ -55,7 +49,6 @@ t_success_threshold() ->
         Interval = couch_replicator_rate_limiter:success({"foo", get}),
         ?assertEqual(0, Interval)
     end).
-
 
 t_1_failure_2_successes() ->
     ?_test(begin
@@ -68,15 +61,12 @@ t_1_failure_2_successes() ->
         ?assertEqual(0, Succ2)
     end).
 
-
 low_pass_filter_delay() ->
     timer:sleep(100).
-
 
 setup() ->
     {ok, Pid} = couch_replicator_rate_limiter:start_link(),
     Pid.
-
 
 teardown(Pid) ->
     Ref = erlang:monitor(process, Pid),

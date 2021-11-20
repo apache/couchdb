@@ -28,25 +28,25 @@
 %% Types Definitions
 %% ------------------------------------------------------------------
 
--type kind()
-    :: providers
-        | data_providers
-        | services
-        | data_subscriptions
-    .
+-type kind() ::
+    providers
+    | data_providers
+    | services
+    | data_subscriptions.
 
--type key()
-    :: {ServiceId :: couch_epi:service_id(), Key :: couch_epi:key()}
-        | couch_epi:service_id().
+-type key() ::
+    {ServiceId :: couch_epi:service_id(), Key :: couch_epi:key()}
+    | couch_epi:service_id().
 
 -callback app() -> couch_epi:app().
 -callback providers() -> [{couch_epi:service_id(), module()}].
 -callback services() -> [{couch_epi:service_id(), module()}].
 -callback data_subscriptions() -> [{couch_epi:service_id(), couch_epi:key()}].
--callback data_providers() -> [
-    {couch_epi:key(), couch_epi:data_spec()}
+-callback data_providers() ->
+    [
+        {couch_epi:key(), couch_epi:data_spec()}
         | {couch_epi:key(), couch_epi:data_spec(), [couch_epi:data_spec_opt()]}
-].
+    ].
 -callback processes() -> [{couch_epi:plugin_id(), [supervisor:child_spec()]}].
 -callback notify(Key :: term(), Old :: term(), New :: term()) -> ok.
 
@@ -58,8 +58,7 @@ definitions(Plugins) ->
     lists:append([extract_definitions(Plugin) || Plugin <- Plugins]).
 
 plugin_processes(Plugin, Plugins) ->
-    lists:append([
-        Specs || P0 <- Plugins, {P1, Specs} <- P0:processes(), P1 =:= Plugin]).
+    lists:append([Specs || P0 <- Plugins, {P1, Specs} <- P0:processes(), P1 =:= Plugin]).
 
 grouped_definitions(Plugins) ->
     Defs = lists:append([extract_definitions(Plugin) || Plugin <- Plugins]),
@@ -87,7 +86,6 @@ notify_plugin(Plugin, Key, OldData, NewData) ->
     App = Plugin:app(),
     Plugin:notify(Key, app_data(App, OldData), app_data(App, NewData)).
 
-
 app_data(App, Data) ->
     case lists:keyfind(App, 1, Data) of
         {App, AppData} -> AppData;
@@ -100,12 +98,11 @@ filter_by_key(Definitions, Kind, Key) ->
 by_key(#couch_epi_spec{kind = Kind, key = Key}, Kind, Key) -> true;
 by_key(_, _, _) -> false.
 
-
 extract_definitions(Plugin) ->
-    specs(Plugin, providers)
-        ++ specs(Plugin, data_providers)
-        ++ specs(Plugin, services)
-        ++ specs(Plugin, data_subscriptions).
+    specs(Plugin, providers) ++
+        specs(Plugin, data_providers) ++
+        specs(Plugin, services) ++
+        specs(Plugin, data_subscriptions).
 
 -spec group_specs(Specs :: [#couch_epi_spec{}]) -> GroupedSpecs when
     GroupedSpecs ::
@@ -113,15 +110,23 @@ extract_definitions(Plugin) ->
 
 group_specs(Specs) ->
     Grouped = group(
-        [{{Kind, Key}, group([{App, Spec}])}
-            || #couch_epi_spec{kind = Kind, key = Key, app = App} = Spec <- Specs]),
+        [
+            {{Kind, Key}, group([{App, Spec}])}
+         || #couch_epi_spec{kind = Kind, key = Key, app = App} = Spec <- Specs
+        ]
+    ),
     [{K, lists:reverse(V)} || {K, V} <- Grouped].
 
-
 group(KV) ->
-    dict:to_list(lists:foldr(fun({K,V}, D) ->
-        dict:append_list(K, V, D)
-    end, dict:new(), KV)).
+    dict:to_list(
+        lists:foldr(
+            fun({K, V}, D) ->
+                dict:append_list(K, V, D)
+            end,
+            dict:new(),
+            KV
+        )
+    ).
 
 specs(Plugin, Kind) ->
     [spec(parse(Spec, Kind), Plugin, Kind) || Spec <- Plugin:Kind()].
@@ -156,7 +161,6 @@ type(services, _) -> couch_epi_functions;
 type(data_providers, _) -> couch_epi_data;
 type(data_subscriptions, _) -> undefined.
 
-
 %% ------------------------------------------------------------------
 %% Tests
 %% ------------------------------------------------------------------
@@ -165,66 +169,66 @@ type(data_subscriptions, _) -> undefined.
 -include_lib("eunit/include/eunit.hrl").
 
 plugin_module(foo_epi) ->
-    "
-        -compile([export_all]).
-
-        app() -> foo.
-        providers() ->
-            [
-                {chttpd_handlers, foo_provider},
-                {bar_handlers, bar_provider1},
-                {bar_handlers, bar_provider2}
-            ].
-
-        services() ->
-            [
-                {foo_handlers, foo_service}
-            ].
-
-        data_providers() ->
-            [
-                {{foo_service, data1}, {file, \"abs_file\"}, [{interval, 5000}]},
-                {{foo_service, data2}, {priv_file, \"priv_file\"}},
-                {{foo_service, data3}, {module, foo_data}}
-            ].
-
-        data_subscriptions() ->
-            [
-                {stats, foo_definitions}
-            ].
-
-        processes() -> [].
-
-        notify(_, _, _) -> ok.
-    ";
+    "\n"
+    "        -compile([export_all]).\n"
+    "\n"
+    "        app() -> foo.\n"
+    "        providers() ->\n"
+    "            [\n"
+    "                {chttpd_handlers, foo_provider},\n"
+    "                {bar_handlers, bar_provider1},\n"
+    "                {bar_handlers, bar_provider2}\n"
+    "            ].\n"
+    "\n"
+    "        services() ->\n"
+    "            [\n"
+    "                {foo_handlers, foo_service}\n"
+    "            ].\n"
+    "\n"
+    "        data_providers() ->\n"
+    "            [\n"
+    "                {{foo_service, data1}, {file, \"abs_file\"}, [{interval, 5000}]},\n"
+    "                {{foo_service, data2}, {priv_file, \"priv_file\"}},\n"
+    "                {{foo_service, data3}, {module, foo_data}}\n"
+    "            ].\n"
+    "\n"
+    "        data_subscriptions() ->\n"
+    "            [\n"
+    "                {stats, foo_definitions}\n"
+    "            ].\n"
+    "\n"
+    "        processes() -> [].\n"
+    "\n"
+    "        notify(_, _, _) -> ok.\n"
+    "    ";
 plugin_module(bar_epi) ->
-    "
-        -compile([export_all]).
-
-        app() -> bar.
-        providers() ->
-            [
-                {chttpd_handlers, bar_provider},
-                {bar_handlers, bar_provider}
-            ].
-
-        services() ->
-            [
-                {bar_handlers, bar_service}
-            ].
-
-        data_providers() ->
-            [].
-
-        data_subscriptions() ->
-            [
-                {foo_service, data1}
-            ].
-
-        processes() -> [].
-
-        notify(_, _, _) -> ok.
-    ".
+    "\n"
+    "        -compile([export_all]).\n"
+    "\n"
+    "        app() -> bar.\n"
+    "        providers() ->\n"
+    "            [\n"
+    "                {chttpd_handlers, bar_provider},\n"
+    "                {bar_handlers, bar_provider}\n"
+    "            ].\n"
+    "\n"
+    "        services() ->\n"
+    "            [\n"
+    "                {bar_handlers, bar_service}\n"
+    "            ].\n"
+    "\n"
+    "        data_providers() ->\n"
+    "            [].\n"
+    "\n"
+    "        data_subscriptions() ->\n"
+    "            [\n"
+    "                {foo_service, data1}\n"
+    "            ].\n"
+    "\n"
+    "        processes() -> [].\n"
+    "\n"
+    "        notify(_, _, _) -> ok.\n"
+    "    ".
 
 generate_module(Name, Body) ->
     Tokens = couch_epi_codegen:scan(Body),
@@ -234,7 +238,7 @@ generate_modules(Kind, Providers) ->
     [generate_module(P, Kind(P)) || P <- Providers].
 
 provider_modules_order_test() ->
-    [ok,ok] = generate_modules(fun plugin_module/1, [foo_epi, bar_epi]),
+    [ok, ok] = generate_modules(fun plugin_module/1, [foo_epi, bar_epi]),
     ok = application:set_env(couch_epi, plugins, [foo_epi, bar_epi]),
     Expected = [
         {foo, bar_provider1},
@@ -249,7 +253,7 @@ provider_modules_order_test() ->
     ok.
 
 providers_order_test() ->
-    [ok,ok] = generate_modules(fun plugin_module/1, [foo_epi, bar_epi]),
+    [ok, ok] = generate_modules(fun plugin_module/1, [foo_epi, bar_epi]),
     Expected = [
         {foo, bar_provider1},
         {foo, bar_provider2},
@@ -331,7 +335,8 @@ definitions_test() ->
             key = chttpd_handlers,
             value = foo_provider,
             codegen = couch_epi_functions_gen,
-            type = couch_epi_functions},
+            type = couch_epi_functions
+        },
         #couch_epi_spec{
             behaviour = foo_epi,
             app = foo,
@@ -340,14 +345,15 @@ definitions_test() ->
             key = foo_handlers,
             value = foo_service,
             codegen = couch_epi_functions_gen,
-            type = couch_epi_functions},
+            type = couch_epi_functions
+        },
         #couch_epi_spec{
             behaviour = foo_epi,
             app = foo,
             kind = data_providers,
             options = [{interval, 5000}],
             key = {foo_service, data1},
-            value = {file,"abs_file"},
+            value = {file, "abs_file"},
             codegen = couch_epi_data_gen,
             type = couch_epi_data
         },
@@ -382,7 +388,7 @@ definitions_test() ->
         }
     ]),
 
-    [ok,ok] = generate_modules(fun plugin_module/1, [foo_epi, bar_epi]),
+    [ok, ok] = generate_modules(fun plugin_module/1, [foo_epi, bar_epi]),
     Tests = lists:zip(Expected, lists:sort(definitions([foo_epi, bar_epi]))),
     [?assertEqual(Expect, Result) || {Expect, Result} <- Tests],
     ok.

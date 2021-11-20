@@ -17,7 +17,6 @@
 
 -define(TIMEOUT, 1000).
 
-
 setup() ->
     ok = couch_proc_manager:reload(),
     meck:new(couch_os_process, [passthrough]),
@@ -32,22 +31,23 @@ os_proc_pool_test_() ->
         "OS processes pool tests",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun test_util:start_couch/0,
+            fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     should_block_new_proc_on_full_pool(),
                     should_free_slot_on_proc_unexpected_exit(),
                     should_reuse_known_proc(),
-%                    should_process_waiting_queue_as_fifo(),
+                    %                    should_process_waiting_queue_as_fifo(),
                     should_reduce_pool_on_idle_os_procs(),
                     should_not_return_broken_process_to_the_pool()
                 ]
             }
         }
     }.
-
 
 should_block_new_proc_on_full_pool() ->
     ?_test(begin
@@ -78,11 +78,13 @@ should_block_new_proc_on_full_pool() ->
         ?assertEqual(Proc1#proc.pid, Proc4#proc.pid),
         ?assertNotEqual(Proc1#proc.client, Proc4#proc.client),
 
-        lists:map(fun(C) ->
-            ?assertEqual(ok, stop_client(C))
-        end, [Client2, Client3, Client4])
+        lists:map(
+            fun(C) ->
+                ?assertEqual(ok, stop_client(C))
+            end,
+            [Client2, Client3, Client4]
+        )
     end).
-
 
 should_free_slot_on_proc_unexpected_exit() ->
     ?_test(begin
@@ -119,11 +121,13 @@ should_free_slot_on_proc_unexpected_exit() ->
         ?assertNotEqual(Proc3#proc.pid, Proc4#proc.pid),
         ?assertNotEqual(Proc3#proc.client, Proc4#proc.client),
 
-        lists:map(fun(C) ->
-            ?assertEqual(ok, stop_client(C))
-        end, [Client2, Client3, Client4])
+        lists:map(
+            fun(C) ->
+                ?assertEqual(ok, stop_client(C))
+            end,
+            [Client2, Client3, Client4]
+        )
     end).
-
 
 should_reuse_known_proc() ->
     ?_test(begin
@@ -149,7 +153,6 @@ should_reuse_known_proc() ->
         ?assertNotEqual(Proc1#proc.client, Proc1Again#proc.client),
         ?assertEqual(ok, stop_client(Client1Again))
     end).
-
 
 %should_process_waiting_queue_as_fifo() ->
 %    ?_test(begin
@@ -181,12 +184,15 @@ should_reuse_known_proc() ->
 %        ?assertEqual(ok, stop_client(Client5))
 %    end).
 
-
 should_reduce_pool_on_idle_os_procs() ->
     ?_test(begin
         %% os_process_idle_limit is in sec
-        config:set("query_server_config",
-            "os_process_idle_limit", "1", false),
+        config:set(
+            "query_server_config",
+            "os_process_idle_limit",
+            "1",
+            false
+        ),
         ok = confirm_config("os_process_idle_limit", "1"),
 
         Client1 = spawn_client(<<"ddoc1">>),
@@ -207,15 +213,22 @@ should_reduce_pool_on_idle_os_procs() ->
         ?assertEqual(1, couch_proc_manager:get_proc_count())
     end).
 
-
 should_not_return_broken_process_to_the_pool() ->
     ?_test(begin
-        config:set("query_server_config",
-            "os_process_soft_limit", "1", false),
+        config:set(
+            "query_server_config",
+            "os_process_soft_limit",
+            "1",
+            false
+        ),
         ok = confirm_config("os_process_soft_limit", "1"),
 
-        config:set("query_server_config",
-            "os_process_limit", "1", false),
+        config:set(
+            "query_server_config",
+            "os_process_limit",
+            "1",
+            false
+        ),
         ok = confirm_config("os_process_limit", "1"),
 
         DDoc1 = ddoc(<<"_design/ddoc1">>),
@@ -227,9 +240,12 @@ should_not_return_broken_process_to_the_pool() ->
         ?assertEqual(0, meck:num_calls(couch_os_process, stop, 1)),
         ?assertEqual(1, couch_proc_manager:get_proc_count()),
 
-        ?assertError(bad, couch_query_servers:with_ddoc_proc(DDoc1, fun(_) ->
-            error(bad)
-        end)),
+        ?assertError(
+            bad,
+            couch_query_servers:with_ddoc_proc(DDoc1, fun(_) ->
+                error(bad)
+            end)
+        ),
         ?assertEqual(1, meck:num_calls(couch_os_process, stop, 1)),
 
         WaitFun = fun() ->
@@ -250,19 +266,21 @@ should_not_return_broken_process_to_the_pool() ->
         ?assertEqual(1, couch_proc_manager:get_proc_count())
     end).
 
-
 ddoc(DDocId) ->
     #doc{
         id = DDocId,
         revs = {1, [<<"abc">>]},
-        body = {[
-            {<<"language">>, <<"javascript">>},
-            {<<"views">>, {[
-                {<<"v1">>, {[
-                    {<<"map">>, <<"function(doc) {emit(doc.value,1);}">>}
-                ]}}
-            ]}}
-        ]}
+        body =
+            {[
+                {<<"language">>, <<"javascript">>},
+                {<<"views">>,
+                    {[
+                        {<<"v1">>,
+                            {[
+                                {<<"map">>, <<"function(doc) {emit(doc.value,1);}">>}
+                            ]}}
+                    ]}}
+            ]}
     }.
 
 setup_config() ->
@@ -279,11 +297,13 @@ confirm_config(Key, Value, Count) ->
         Value ->
             ok;
         _ when Count > 10 ->
-            erlang:error({config_setup, [
-                {module, ?MODULE},
-                {line, ?LINE},
-                {value, timeout}
-            ]});
+            erlang:error(
+                {config_setup, [
+                    {module, ?MODULE},
+                    {line, ?LINE},
+                    {value, timeout}
+                ]}
+            );
         _ ->
             %% we need to wait to let gen_server:cast finish
             timer:sleep(10),
@@ -304,7 +324,7 @@ spawn_client(DDocId) ->
     Ref = make_ref(),
     Pid = spawn(fun() ->
         DDocKey = {DDocId, <<"1-abcdefgh">>},
-        DDoc = #doc{body={[{<<"language">>, <<"erlang">>}]}},
+        DDoc = #doc{body = {[{<<"language">>, <<"erlang">>}]}},
         Proc = couch_query_servers:get_ddoc_process(DDoc, DDocKey),
         loop(Parent, Ref, Proc)
     end),
@@ -324,11 +344,15 @@ get_client_proc({Pid, Ref}, ClientName) ->
     receive
         {proc, Ref, Proc} -> Proc
     after ?TIMEOUT ->
-        erlang:error({assertion_failed,
-                     [{module, ?MODULE},
-                      {line, ?LINE},
-                      {reason, "Timeout getting client "
-                               ++ ClientName ++ " proc"}]})
+        erlang:error(
+            {assertion_failed, [
+                {module, ?MODULE},
+                {line, ?LINE},
+                {reason,
+                    "Timeout getting client " ++
+                        ClientName ++ " proc"}
+            ]}
+        )
     end.
 
 stop_client({Pid, Ref}) ->
@@ -354,7 +378,7 @@ loop(Parent, Ref, Proc) ->
         ping ->
             Parent ! {pong, Ref},
             loop(Parent, Ref, Proc);
-        get_proc  ->
+        get_proc ->
             Parent ! {proc, Ref, Proc},
             loop(Parent, Ref, Proc);
         stop ->

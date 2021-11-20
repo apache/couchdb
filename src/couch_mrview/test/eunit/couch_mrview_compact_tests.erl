@@ -17,7 +17,6 @@
 
 -define(TIMEOUT, 1000).
 
-
 setup() ->
     {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map, 1000),
     ok = meck:new(couch_mrview_compactor, [passthrough]),
@@ -29,16 +28,17 @@ teardown(Db) ->
     couch_server:delete(couch_db:name(Db), [?ADMIN_CTX]),
     ok.
 
-
 compaction_test_() ->
     {
         "Compaction tests",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun test_util:start_couch/0,
+            fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun should_swap/1,
                     fun should_remove/1
@@ -46,7 +46,6 @@ compaction_test_() ->
             }
         }
     }.
-
 
 should_swap(Db) ->
     ?_test(begin
@@ -57,9 +56,12 @@ should_swap(Db) ->
             {'DOWN', MonRef, process, _, _} -> ok
         after ?TIMEOUT ->
             erlang:error(
-                {assertion_failed,
-                 [{module, ?MODULE}, {line, ?LINE},
-                  {reason, "compaction failed"}]})
+                {assertion_failed, [
+                    {module, ?MODULE},
+                    {line, ?LINE},
+                    {reason, "compaction failed"}
+                ]}
+            )
         end,
         QPid ! {self(), continue},
         receive
@@ -67,12 +69,14 @@ should_swap(Db) ->
                 ?assertEqual(1000, Count)
         after ?TIMEOUT ->
             erlang:error(
-                {assertion_failed,
-                 [{module, ?MODULE}, {line, ?LINE},
-                  {reason, "query failed"}]})
+                {assertion_failed, [
+                    {module, ?MODULE},
+                    {line, ?LINE},
+                    {reason, "query failed"}
+                ]}
+            )
         end
     end).
-
 
 should_remove(Db) ->
     ?_test(begin
@@ -87,29 +91,40 @@ should_remove(Db) ->
         receive
             {'DOWN', MonRef, process, _, crash} ->
                 meck:wait(couch_mrview_compactor, remove_compacted, '_', 100),
-                ?assertEqual(1, meck:num_calls(
-                    couch_mrview_compactor, remove_compacted, '_', IndexPid)),
+                ?assertEqual(
+                    1,
+                    meck:num_calls(
+                        couch_mrview_compactor, remove_compacted, '_', IndexPid
+                    )
+                ),
                 ?assert(is_process_alive(IndexPid)),
                 ?assert(is_process_alive(CompactorPid))
         after ?TIMEOUT ->
             erlang:error(
                 {assertion_failed, [
-                    {module, ?MODULE}, {line, ?LINE},
-                    {reason, "compaction didn't exit :/"}]})
+                    {module, ?MODULE},
+                    {line, ?LINE},
+                    {reason, "compaction didn't exit :/"}
+                ]}
+            )
         end
     end).
-
 
 start_query(Db) ->
     Self = self(),
     Pid = spawn(fun() ->
         CB = fun
-            (_, wait) -> receive {Self, continue} -> {ok, 0} end;
-            ({row, _}, Count) -> {ok, Count+1};
-            (_, Count) -> {ok, Count}
+            (_, wait) ->
+                receive
+                    {Self, continue} -> {ok, 0}
+                end;
+            ({row, _}, Count) ->
+                {ok, Count + 1};
+            (_, Count) ->
+                {ok, Count}
         end,
         {ok, Result} =
-        couch_mrview:query_view(Db, <<"_design/bar">>, <<"baz">>, [], CB, wait),
+            couch_mrview:query_view(Db, <<"_design/bar">>, <<"baz">>, [], CB, wait),
         Self ! {self(), Result}
     end),
     {ok, Pid}.

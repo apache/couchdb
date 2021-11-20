@@ -26,10 +26,12 @@
 -module(weatherreport_check_tcp_queues).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -define(THRESHOLD, 1000000).
 
@@ -55,13 +57,14 @@ sum_queues(Netstats) ->
 sum_queues([], Acc) ->
     Acc;
 sum_queues([Row | Rest], {SumRecvQ, SumSendQ}) ->
-    {RecvQ, SendQ} = case string:tokens(Row, " ") of
-        [[$t, $c, $p | _] | _]=Cols ->
-            {Rq, Sq} = {lists:nth(2, Cols), lists:nth(3, Cols)},
-            {list_to_integer(Rq), list_to_integer(Sq)};
-        _ ->
-            {0, 0}
-    end,
+    {RecvQ, SendQ} =
+        case string:tokens(Row, " ") of
+            [[$t, $c, $p | _] | _] = Cols ->
+                {Rq, Sq} = {lists:nth(2, Cols), lists:nth(3, Cols)},
+                {list_to_integer(Rq), list_to_integer(Sq)};
+            _ ->
+                {0, 0}
+        end,
     sum_queues(Rest, {RecvQ + SumRecvQ, SendQ + SumSendQ}).
 
 %% @doc Converts the sum of queue lengths to a log message at the approriate
@@ -77,7 +80,7 @@ check(_Opts) ->
     Netstats = weatherreport_util:run_command("netstat"),
     {SumRecvQ, SumSendQ} = sum_queues(Netstats),
     [sum_to_message(SumRecvQ, "recv_q"), sum_to_message(SumSendQ, "send_q")].
-    
+
 -spec format(term()) -> {io:format(), [term()]}.
 format({recv_q_high, QLen}) ->
     {"Total TCP Recv-Q is HIGH: ~w", [QLen]};

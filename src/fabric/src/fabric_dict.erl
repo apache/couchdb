@@ -27,7 +27,7 @@ fetch_keys(Dict) ->
     orddict:fetch_keys(Dict).
 
 decrement_all(Dict) ->
-    [{K,V-1} || {K,V} <- Dict].
+    [{K, V - 1} || {K, V} <- Dict].
 
 store(Key, Value, Dict) ->
     orddict:store(Key, Value, Dict).
@@ -37,7 +37,6 @@ erase(Key, Dict) ->
 
 update_counter(Key, Incr, Dict0) ->
     orddict:update_counter(Key, Incr, Dict0).
-
 
 lookup_element(Key, Dict) ->
     couch_util:get_value(Key, Dict).

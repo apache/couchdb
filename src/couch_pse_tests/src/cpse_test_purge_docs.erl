@@ -14,22 +14,17 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
-
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
 -define(REV_DEPTH, 100).
-
 
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
     couch_db:name(Db).
 
-
 teardown_each(DbName) ->
     ok = couch_server:delete(DbName, []).
-
 
 cpse_purge_simple(DbName) ->
     {ok, Rev} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
@@ -57,7 +52,6 @@ cpse_purge_simple(DbName) ->
         {purge_infos, PurgeInfos}
     ]).
 
-
 cpse_purge_simple_info_check(DbName) ->
     {ok, Rev} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
     PurgeInfos = [
@@ -71,7 +65,6 @@ cpse_purge_simple_info_check(DbName) ->
     end),
 
     ?assertMatch([{1, <<_/binary>>, <<"foo1">>, [Rev]}], AllInfos).
-
 
 cpse_purge_empty_db(DbName) ->
     PurgeInfos = [
@@ -89,7 +82,6 @@ cpse_purge_empty_db(DbName) ->
         {purge_seq, 1},
         {purge_infos, PurgeInfos}
     ]).
-
 
 cpse_purge_single_docid(DbName) ->
     {ok, [Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
@@ -120,7 +112,6 @@ cpse_purge_single_docid(DbName) ->
         {purge_seq, 1},
         {purge_infos, PurgeInfos}
     ]).
-
 
 cpse_purge_multiple_docids(DbName) ->
     {ok, [Rev1, Rev2]} = cpse_util:save_docs(DbName, [
@@ -156,7 +147,6 @@ cpse_purge_multiple_docids(DbName) ->
         {purge_infos, PurgeInfos}
     ]).
 
-
 cpse_purge_no_docids(DbName) ->
     {ok, [_Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
         {[{'_id', foo1}, {vsn, 1}]},
@@ -183,15 +173,15 @@ cpse_purge_no_docids(DbName) ->
         {purge_infos, []}
     ]).
 
-
 cpse_purge_rev_path(DbName) ->
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, 1}]}),
-    Update = {[
-        {<<"_id">>, <<"foo">>},
-        {<<"_rev">>, couch_doc:rev_to_str(Rev1)},
-        {<<"_deleted">>, true},
-        {<<"vsn">>, 2}
-    ]},
+    Update =
+        {[
+            {<<"_id">>, <<"foo">>},
+            {<<"_rev">>, couch_doc:rev_to_str(Rev1)},
+            {<<"_deleted">>, true},
+            {<<"vsn">>, 2}
+        ]},
     {ok, Rev2} = cpse_util:save_doc(DbName, Update),
 
     cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
@@ -219,18 +209,22 @@ cpse_purge_rev_path(DbName) ->
         {purge_infos, PurgeInfos}
     ]).
 
-
 cpse_purge_deep_revision_path(DbName) ->
     {ok, InitRev} = cpse_util:save_doc(DbName, {[{'_id', bar}, {vsn, 0}]}),
-    LastRev = lists:foldl(fun(Count, PrevRev) ->
-        Update = {[
-            {'_id', bar},
-            {'_rev', couch_doc:rev_to_str(PrevRev)},
-            {vsn, Count}
-        ]},
-        {ok, NewRev} = cpse_util:save_doc(DbName, Update),
-        NewRev
-    end, InitRev, lists:seq(1, ?REV_DEPTH)),
+    LastRev = lists:foldl(
+        fun(Count, PrevRev) ->
+            Update =
+                {[
+                    {'_id', bar},
+                    {'_rev', couch_doc:rev_to_str(PrevRev)},
+                    {vsn, Count}
+                ]},
+            {ok, NewRev} = cpse_util:save_doc(DbName, Update),
+            NewRev
+        end,
+        InitRev,
+        lists:seq(1, ?REV_DEPTH)
+    ),
 
     PurgeInfos = [
         {cpse_util:uuid(), <<"bar">>, [LastRev]}
@@ -248,14 +242,14 @@ cpse_purge_deep_revision_path(DbName) ->
         {purge_infos, PurgeInfos}
     ]).
 
-
 cpse_purge_partial_revs(DbName) ->
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, <<"1.1">>}]}),
-    Update = {[
-        {'_id', foo},
-        {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
-        {vsn, <<"1.2">>}
-    ]},
+    Update =
+        {[
+            {'_id', foo},
+            {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
+            {vsn, <<"1.2">>}
+        ]},
     {ok, [_Rev2]} = cpse_util:save_docs(DbName, [Update], [replicated_changes]),
 
     PurgeInfos = [
@@ -273,7 +267,6 @@ cpse_purge_partial_revs(DbName) ->
         {purge_seq, 1},
         {purge_infos, PurgeInfos}
     ]).
-
 
 cpse_purge_missing_docid(DbName) ->
     {ok, [Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
@@ -304,7 +297,6 @@ cpse_purge_missing_docid(DbName) ->
         {purge_seq, 1},
         {purge_infos, PurgeInfos}
     ]).
-
 
 cpse_purge_duplicate_docids(DbName) ->
     {ok, [Rev1, _Rev2]} = cpse_util:save_docs(DbName, [
@@ -338,14 +330,14 @@ cpse_purge_duplicate_docids(DbName) ->
         {purge_infos, PurgeInfos}
     ]).
 
-
 cpse_purge_internal_revision(DbName) ->
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, 1}]}),
-    Update = {[
-        {'_id', foo},
-        {'_rev', couch_doc:rev_to_str(Rev1)},
-        {vsn, 2}
-    ]},
+    Update =
+        {[
+            {'_id', foo},
+            {'_rev', couch_doc:rev_to_str(Rev1)},
+            {vsn, 2}
+        ]},
     {ok, _Rev2} = cpse_util:save_doc(DbName, Update),
 
     PurgeInfos = [
@@ -363,7 +355,6 @@ cpse_purge_internal_revision(DbName) ->
         {purge_seq, 1},
         {purge_infos, PurgeInfos}
     ]).
-
 
 cpse_purge_missing_revision(DbName) ->
     {ok, [_Rev1, Rev2]} = cpse_util:save_docs(DbName, [
@@ -387,14 +378,14 @@ cpse_purge_missing_revision(DbName) ->
         {purge_infos, PurgeInfos}
     ]).
 
-
 cpse_purge_repeated_revisions(DbName) ->
     {ok, Rev1} = cpse_util:save_doc(DbName, {[{'_id', foo}, {vsn, <<"1.1">>}]}),
-    Update = {[
-        {'_id', foo},
-        {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
-        {vsn, <<"1.2">>}
-    ]},
+    Update =
+        {[
+            {'_id', foo},
+            {'_rev', couch_doc:rev_to_str({1, [couch_hash:md5_hash(<<"1.2">>)]})},
+            {vsn, <<"1.2">>}
+        ]},
     {ok, [Rev2]} = cpse_util:save_docs(DbName, [Update], [replicated_changes]),
 
     cpse_util:assert_db_props(?MODULE, ?LINE, DbName, [
@@ -423,7 +414,6 @@ cpse_purge_repeated_revisions(DbName) ->
         {purge_seq, 2},
         {purge_infos, PurgeInfos1}
     ]).
-
 
 cpse_purge_repeated_uuid(DbName) ->
     {ok, Rev} = cpse_util:save_doc(DbName, {[{'_id', foo1}, {vsn, 1.1}]}),
@@ -458,7 +448,6 @@ cpse_purge_repeated_uuid(DbName) ->
         {purge_seq, 1},
         {purge_infos, PurgeInfos}
     ]).
-
 
 fold_all_infos(Info, Acc) ->
     {ok, [Info | Acc]}.

@@ -12,8 +12,18 @@
 
 -module(mem3).
 
--export([start/0, stop/0, restart/0, nodes/0, node_info/2, shards/1, shards/2,
-    choose_shards/2, n/1, n/2, dbname/1, ushards/1, ushards/2]).
+-export([
+    start/0,
+    stop/0,
+    restart/0,
+    nodes/0,
+    node_info/2,
+    shards/1, shards/2,
+    choose_shards/2,
+    n/1, n/2,
+    dbname/1,
+    ushards/1, ushards/2
+]).
 -export([get_shard/3, local_shards/1, shard_suffix/1, fold_shards/2]).
 -export([sync_security/0, sync_security/1]).
 -export([compare_nodelists/0, compare_shards/1]).
@@ -47,30 +57,45 @@ restart() ->
 %%      key and the nodes holding that state as the value.  Also reports member
 %%      nodes which fail to respond and nodes which are connected but are not
 %%      cluster members.  Useful for debugging.
--spec compare_nodelists() -> [{{cluster_nodes, [node()]} | bad_nodes
-    | non_member_nodes, [node()]}].
+-spec compare_nodelists() ->
+    [
+        {
+            {cluster_nodes, [node()]}
+            | bad_nodes
+            | non_member_nodes,
+            [node()]
+        }
+    ].
 compare_nodelists() ->
     Nodes = mem3:nodes(),
     AllNodes = erlang:nodes([this, visible]),
     {Replies, BadNodes} = gen_server:multi_call(Nodes, mem3_nodes, get_nodelist),
-    Dict = lists:foldl(fun({Node, Nodelist}, D) ->
-        orddict:append({cluster_nodes, Nodelist}, Node, D)
-    end, orddict:new(), Replies),
+    Dict = lists:foldl(
+        fun({Node, Nodelist}, D) ->
+            orddict:append({cluster_nodes, Nodelist}, Node, D)
+        end,
+        orddict:new(),
+        Replies
+    ),
     [{non_member_nodes, AllNodes -- Nodes}, {bad_nodes, BadNodes} | Dict].
 
--spec compare_shards(DbName::iodata()) -> [{bad_nodes | [#shard{}], [node()]}].
+-spec compare_shards(DbName :: iodata()) -> [{bad_nodes | [#shard{}], [node()]}].
 compare_shards(DbName) when is_list(DbName) ->
     compare_shards(list_to_binary(DbName));
 compare_shards(DbName) ->
     Nodes = mem3:nodes(),
     {Replies, BadNodes} = rpc:multicall(mem3, shards, [DbName]),
     GoodNodes = [N || N <- Nodes, not lists:member(N, BadNodes)],
-    Dict = lists:foldl(fun({Shards, Node}, D) ->
-        orddict:append(Shards, Node, D)
-    end, orddict:new(), lists:zip(Replies, GoodNodes)),
+    Dict = lists:foldl(
+        fun({Shards, Node}, D) ->
+            orddict:append(Shards, Node, D)
+        end,
+        orddict:new(),
+        lists:zip(Replies, GoodNodes)
+    ),
     [{bad_nodes, BadNodes} | Dict].
 
--spec n(DbName::iodata()) -> integer().
+-spec n(DbName :: iodata()) -> integer().
 n(DbName) ->
     % Use _design to avoid issues with
     % partition validation
@@ -86,7 +111,7 @@ nodes() ->
 node_info(Node, Key) ->
     mem3_nodes:get_node_info(Node, Key).
 
--spec shards(DbName::iodata()) -> [#shard{}].
+-spec shards(DbName :: iodata()) -> [#shard{}].
 shards(DbName) ->
     shards_int(DbName, []).
 
@@ -97,30 +122,36 @@ shards_int(DbName, Options) ->
     ShardDbName =
         list_to_binary(config:get("mem3", "shards_db", "_dbs")),
     case DbName of
-    ShardDbName when Ordered ->
-        %% shard_db is treated as a single sharded db to support calls to db_info
-        %% and view_all_docs
-        [#ordered_shard{
-            node = node(),
-            name = ShardDbName,
-            dbname = ShardDbName,
-            range = [0, (2 bsl 31)-1],
-            order = undefined,
-            opts = []}];
-    ShardDbName ->
-        %% shard_db is treated as a single sharded db to support calls to db_info
-        %% and view_all_docs
-        [#shard{
-            node = node(),
-            name = ShardDbName,
-            dbname = ShardDbName,
-            range = [0, (2 bsl 31)-1],
-            opts = []}];
-    _ ->
-        mem3_shards:for_db(DbName, Options)
+        ShardDbName when Ordered ->
+            %% shard_db is treated as a single sharded db to support calls to db_info
+            %% and view_all_docs
+            [
+                #ordered_shard{
+                    node = node(),
+                    name = ShardDbName,
+                    dbname = ShardDbName,
+                    range = [0, (2 bsl 31) - 1],
+                    order = undefined,
+                    opts = []
+                }
+            ];
+        ShardDbName ->
+            %% shard_db is treated as a single sharded db to support calls to db_info
+            %% and view_all_docs
+            [
+                #shard{
+                    node = node(),
+                    name = ShardDbName,
+                    dbname = ShardDbName,
+                    range = [0, (2 bsl 31) - 1],
+                    opts = []
+                }
+            ];
+        _ ->
+            mem3_shards:for_db(DbName, Options)
     end.
 
--spec shards(DbName::iodata(), DocId::binary()) -> [#shard{}].
+-spec shards(DbName :: iodata(), DocId :: binary()) -> [#shard{}].
 shards(DbName, DocId) ->
     shards_int(DbName, DocId, []).
 
@@ -131,22 +162,21 @@ shards_int(DbName, DocId, Options) when is_list(DocId) ->
 shards_int(DbName, DocId, Options) ->
     mem3_shards:for_docid(DbName, DocId, Options).
 
-
--spec ushards(DbName::iodata()) -> [#shard{}].
+-spec ushards(DbName :: iodata()) -> [#shard{}].
 ushards(DbName) ->
-    Nodes = [node()|erlang:nodes()],
+    Nodes = [node() | erlang:nodes()],
     ZoneMap = zone_map(Nodes),
     Shards = ushards(DbName, live_shards(DbName, Nodes, [ordered]), ZoneMap),
     mem3_util:downcast(Shards).
 
--spec ushards(DbName::iodata(), DocId::binary()) -> [#shard{}].
+-spec ushards(DbName :: iodata(), DocId :: binary()) -> [#shard{}].
 ushards(DbName, DocId) ->
     Shards = shards_int(DbName, DocId, [ordered]),
     Shard = hd(Shards),
     mem3_util:downcast([Shard]).
 
 ushards(DbName, Shards0, ZoneMap) ->
-    {L,S,D} = group_by_proximity(Shards0, ZoneMap),
+    {L, S, D} = group_by_proximity(Shards0, ZoneMap),
     % Prefer shards in the local zone over shards in a different zone,
     % but sort each zone separately to ensure a consistent choice between
     % nodes in the same zone.
@@ -177,34 +207,45 @@ sync_security() ->
 sync_security(Db) ->
     mem3_sync_security:go(dbname(Db)).
 
--spec choose_shards(DbName::iodata(), Options::list()) -> [#shard{}].
+-spec choose_shards(DbName :: iodata(), Options :: list()) -> [#shard{}].
 choose_shards(DbName, Options) when is_list(DbName) ->
     choose_shards(list_to_binary(DbName), Options);
 choose_shards(DbName, Options) ->
-    try shards(DbName)
-    catch error:E when E==database_does_not_exist; E==badarg ->
-        Nodes = allowed_nodes(),
-        case get_placement(Options) of
-            undefined ->
-                choose_shards(DbName, Nodes, Options);
-            Placement ->
-                lists:flatmap(fun({Zone, N}) ->
-                    NodesInZone = nodes_in_zone(Nodes, Zone),
-                    Options1 = lists:keymerge(1, [{n,N}], Options),
-                    choose_shards(DbName, NodesInZone, Options1)
-                end, Placement)
-        end
+    try
+        shards(DbName)
+    catch
+        error:E when E == database_does_not_exist; E == badarg ->
+            Nodes = allowed_nodes(),
+            case get_placement(Options) of
+                undefined ->
+                    choose_shards(DbName, Nodes, Options);
+                Placement ->
+                    lists:flatmap(
+                        fun({Zone, N}) ->
+                            NodesInZone = nodes_in_zone(Nodes, Zone),
+                            Options1 = lists:keymerge(1, [{n, N}], Options),
+                            choose_shards(DbName, NodesInZone, Options1)
+                        end,
+                        Placement
+                    )
+            end
     end.
 
 choose_shards(DbName, Nodes, Options) ->
     NodeCount = length(Nodes),
     Suffix = couch_util:get_value(shard_suffix, Options, ""),
     N = mem3_util:n_val(couch_util:get_value(n, Options), NodeCount),
-    if N =:= 0 -> erlang:error(no_nodes_in_zone);
-       true -> ok
+    if
+        N =:= 0 -> erlang:error(no_nodes_in_zone);
+        true -> ok
     end,
-    Q = mem3_util:q_val(couch_util:get_value(q, Options,
-        config:get_integer("cluster", "q", 2))),
+    Q = mem3_util:q_val(
+        couch_util:get_value(
+            q,
+            Options,
+            config:get_integer("cluster", "q", 2)
+        )
+    ),
     %% rotate to a random entry in the nodelist for even distribution
     RotatedNodes = rotate_rand(Nodes),
     mem3_util:create_partition_map(DbName, N, Q, RotatedNodes, Suffix).
@@ -227,10 +268,13 @@ get_placement(Options) ->
     end.
 
 decode_placement_string(PlacementStr) ->
-    [begin
-         [Zone, N] = string:tokens(Rule, ":"),
-         {list_to_binary(Zone), list_to_integer(N)}
-     end || Rule <- string:tokens(PlacementStr, ",")].
+    [
+        begin
+            [Zone, N] = string:tokens(Rule, ":"),
+            {list_to_binary(Zone), list_to_integer(N)}
+        end
+     || Rule <- string:tokens(PlacementStr, ",")
+    ].
 
 -spec dbname(#shard{} | iodata()) -> binary().
 dbname(#shard{dbname = DbName}) ->
@@ -245,7 +289,7 @@ dbname(_) ->
     erlang:error(badarg).
 
 %% @doc Determine if DocId belongs in shard (identified by record or filename)
-belongs(#shard{}=Shard, DocId) when is_binary(DocId) ->
+belongs(#shard{} = Shard, DocId) when is_binary(DocId) ->
     [Begin, End] = range(Shard),
     belongs(Begin, End, Shard, DocId);
 belongs(<<"shards/", _/binary>> = ShardName, DocId) when is_binary(DocId) ->
@@ -263,14 +307,19 @@ range(#shard{range = Range}) ->
 range(#ordered_shard{range = Range}) ->
     Range;
 range(<<"shards/", Start:8/binary, "-", End:8/binary, "/", _/binary>>) ->
-    [httpd_util:hexlist_to_integer(binary_to_list(Start)),
-     httpd_util:hexlist_to_integer(binary_to_list(End))].
+    [
+        httpd_util:hexlist_to_integer(binary_to_list(Start)),
+        httpd_util:hexlist_to_integer(binary_to_list(End))
+    ].
 
 allowed_nodes() ->
-    lists:filter(fun(Node) ->
-        Decom = mem3:node_info(Node, <<"decom">>),
-        (Decom =/= true) andalso (Decom =/= <<"true">>)
-    end, mem3:nodes()).
+    lists:filter(
+        fun(Node) ->
+            Decom = mem3:node_info(Node, <<"decom">>),
+            (Decom =/= true) andalso (Decom =/= <<"true">>)
+        end,
+        mem3:nodes()
+    ).
 
 nodes_in_zone(Nodes, Zone) ->
     [Node || Node <- Nodes, Zone == mem3:node_info(Node, <<"zone">>)].
@@ -289,8 +338,10 @@ group_by_proximity(Shards) ->
     group_by_proximity(Shards, zone_map(Nodes)).
 
 group_by_proximity(Shards, ZoneMap) ->
-    {Local, Remote} = lists:partition(fun(S) -> mem3:node(S) =:= node() end,
-        Shards),
+    {Local, Remote} = lists:partition(
+        fun(S) -> mem3:node(S) =:= node() end,
+        Shards
+    ),
     LocalZone = proplists:get_value(node(), ZoneMap),
     Fun = fun(S) -> proplists:get_value(mem3:node(S), ZoneMap) =:= LocalZone end,
     {SameZone, DifferentZone} = lists:partition(Fun, Remote),
@@ -298,18 +349,25 @@ group_by_proximity(Shards, ZoneMap) ->
 
 choose_ushards(DbName, Shards) ->
     Groups0 = group_by_range(Shards),
-    Groups1 = [mem3_util:rotate_list({DbName, R}, order_shards(G))
-               || {R, G} <- Groups0],
+    Groups1 = [
+        mem3_util:rotate_list({DbName, R}, order_shards(G))
+     || {R, G} <- Groups0
+    ],
     [hd(G) || G <- Groups1].
 
-order_shards([#ordered_shard{}|_]=OrderedShards) ->
+order_shards([#ordered_shard{} | _] = OrderedShards) ->
     lists:keysort(#ordered_shard.order, OrderedShards);
 order_shards(UnorderedShards) ->
     UnorderedShards.
 
 group_by_range(Shards) ->
-    lists:foldl(fun(Shard, Dict) ->
-        orddict:append(mem3:range(Shard), Shard, Dict) end, orddict:new(), Shards).
+    lists:foldl(
+        fun(Shard, Dict) ->
+            orddict:append(mem3:range(Shard), Shard, Dict)
+        end,
+        orddict:new(),
+        Shards
+    ).
 
 % quorum functions
 
@@ -318,15 +376,14 @@ quorum(DbName) when is_binary(DbName) ->
 quorum(Db) ->
     quorum(couch_db:name(Db)).
 
-
-node(#shard{node=Node}) ->
+node(#shard{node = Node}) ->
     Node;
-node(#ordered_shard{node=Node}) ->
+node(#ordered_shard{node = Node}) ->
     Node.
 
-name(#shard{name=Name}) ->
+name(#shard{name = Name}) ->
     Name;
-name(#ordered_shard{name=Name}) ->
+name(#ordered_shard{name = Name}) ->
     Name.
 
 % Direct calculation of node membership. This is the algorithm part. It
@@ -335,9 +392,9 @@ name(#ordered_shard{name=Name}) ->
 owner(DbName, DocId, Nodes) ->
     hd(mem3_util:rotate_list({DbName, DocId}, lists:usort(Nodes))).
 
-engine(#shard{opts=Opts}) ->
+engine(#shard{opts = Opts}) ->
     engine(Opts);
-engine(#ordered_shard{opts=Opts}) ->
+engine(#ordered_shard{opts = Opts}) ->
     engine(Opts);
 engine(Opts) when is_list(Opts) ->
     case couch_util:get_value(engine, Opts) of
@@ -360,18 +417,23 @@ ping(Node) ->
 ping(Node, Timeout) when is_atom(Node) ->
     %% The implementation of the function is copied from
     %% lib/kernel/src/net_adm.erl with addition of a Timeout
-    case catch gen:call({net_kernel, Node},
-            '$gen_call', {is_auth, node()}, Timeout) of
-        {ok, yes} -> pong;
+    case
+        catch gen:call(
+            {net_kernel, Node},
+            '$gen_call',
+            {is_auth, node()},
+            Timeout
+        )
+    of
+        {ok, yes} ->
+            pong;
         _ ->
             erlang:disconnect_node(Node),
             pang
     end.
 
-
 db_is_current(#shard{name = Name}) ->
     db_is_current(Name);
-
 db_is_current(<<"shards/", _/binary>> = Name) ->
     try
         Shards = mem3:shards(mem3:dbname(Name)),
@@ -380,12 +442,10 @@ db_is_current(<<"shards/", _/binary>> = Name) ->
         error:database_does_not_exist ->
             false
     end;
-
 db_is_current(Name) when is_binary(Name) ->
     % This accounts for local (non-sharded) dbs, and is mostly
     % for unit tests that either test or use mem3_rep logic
     couch_server:exists(Name).
-
 
 -ifdef(TEST).
 
@@ -394,25 +454,34 @@ db_is_current(Name) when is_binary(Name) ->
 -define(ALLOWED_NODE, 'node1@127.0.0.1').
 
 allowed_nodes_test_() ->
-    {"allowed_nodes test", [{
-        setup,
-        fun () ->
-            Props = [
-                {?ALLOWED_NODE, []},
-                {'node2@127.0.0.1', [{<<"decom">>,<<"true">>}]},
-                {'node3@127.0.0.1', [{<<"decom">>,true}]}],
-            ok = meck:expect(mem3_nodes, get_nodelist,
-                fun() -> proplists:get_keys(Props) end),
-            ok = meck:expect(mem3_nodes, get_node_info,
-                fun(Node, Key) ->
-                    couch_util:get_value(Key, proplists:get_value(Node, Props))
-                end)
-        end,
-        fun (_) -> meck:unload() end,
-        [
-            ?_assertMatch([?ALLOWED_NODE], allowed_nodes())
-        ]
-    }]}.
+    {"allowed_nodes test", [
+        {
+            setup,
+            fun() ->
+                Props = [
+                    {?ALLOWED_NODE, []},
+                    {'node2@127.0.0.1', [{<<"decom">>, <<"true">>}]},
+                    {'node3@127.0.0.1', [{<<"decom">>, true}]}
+                ],
+                ok = meck:expect(
+                    mem3_nodes,
+                    get_nodelist,
+                    fun() -> proplists:get_keys(Props) end
+                ),
+                ok = meck:expect(
+                    mem3_nodes,
+                    get_node_info,
+                    fun(Node, Key) ->
+                        couch_util:get_value(Key, proplists:get_value(Node, Props))
+                    end
+                )
+            end,
+            fun(_) -> meck:unload() end,
+            [
+                ?_assertMatch([?ALLOWED_NODE], allowed_nodes())
+            ]
+        }
+    ]}.
 
 rotate_rand_degenerate_test() ->
     ?assertEqual([1], rotate_rand([1])).

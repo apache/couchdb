@@ -14,16 +14,17 @@
 -export([start/1, stop/1]).
 -export([wait_monitors/1]).
 
-
 %% @doc spawn_links a process which monitors the supplied list of items and
 %% returns the process ID.  If a monitored process exits, the caller will
 %% receive a {rexi_DOWN, MonitoringPid, DeadPid, Reason} message.
--spec start([pid() | atom() | {atom(),node()}]) -> pid().
+-spec start([pid() | atom() | {atom(), node()}]) -> pid().
 start(Procs) ->
     Parent = self(),
     Nodes = [node() | nodes()],
-    {Mon, Skip} = lists:partition(fun(P) -> should_monitor(P, Nodes) end,
-        Procs),
+    {Mon, Skip} = lists:partition(
+        fun(P) -> should_monitor(P, Nodes) end,
+        Procs
+    ),
     spawn_link(fun() ->
         [notify_parent(Parent, P, noconnect) || P <- Skip],
         [erlang:monitor(process, P) || P <- Mon],
@@ -50,16 +51,17 @@ should_monitor({_, Node}, Nodes) ->
 
 wait_monitors(Parent) ->
     receive
-    {'DOWN', _, process, Pid, Reason} ->
-        notify_parent(Parent, Pid, Reason),
-        ?MODULE:wait_monitors(Parent);
-    {Parent, shutdown} ->
-        ok
+        {'DOWN', _, process, Pid, Reason} ->
+            notify_parent(Parent, Pid, Reason),
+            ?MODULE:wait_monitors(Parent);
+        {Parent, shutdown} ->
+            ok
     end.
 
 flush_down_messages() ->
-    receive {rexi_DOWN, _, _, _} ->
-        flush_down_messages()
+    receive
+        {rexi_DOWN, _, _, _} ->
+            flush_down_messages()
     after 0 ->
         ok
     end.

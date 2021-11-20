@@ -17,13 +17,11 @@
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
-
 -record(acc, {
     counters,
     replies,
     ring_opts
 }).
-
 
 go(DbName, Partition) ->
     Shards = mem3:shards(DbName, couch_partition:shard_key(Partition)),
@@ -33,11 +31,12 @@ go(DbName, Partition) ->
     Acc0 = #acc{
         counters = fabric_dict:init(Workers, nil),
         replies = [],
-        ring_opts =  [{any, Shards}]
+        ring_opts = [{any, Shards}]
     },
     try
         case fabric_util:recv(Workers, #shard.ref, Fun, Acc0) of
-            {ok, Res} -> {ok, Res};
+            {ok, Res} ->
+                {ok, Res};
             {timeout, {WorkersDict, _}} ->
                 DefunctWorkers = fabric_util:remove_done_workers(
                     WorkersDict,
@@ -48,32 +47,31 @@ go(DbName, Partition) ->
                     "get_partition_info"
                 ),
                 {error, timeout};
-            {error, Error} -> throw(Error)
+            {error, Error} ->
+                throw(Error)
         end
     after
         rexi_monitor:stop(RexiMon)
     end.
 
-handle_message({rexi_DOWN, _, {_,NodeRef},_}, _Shard, #acc{} = Acc) ->
+handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _Shard, #acc{} = Acc) ->
     #acc{counters = Counters, ring_opts = RingOpts} = Acc,
     case fabric_util:remove_down_workers(Counters, NodeRef, RingOpts) of
-    {ok, NewCounters} ->
-        {ok, Acc#acc{counters = NewCounters}};
-    error ->
-        {error, {nodedown, <<"progress not possible">>}}
+        {ok, NewCounters} ->
+            {ok, Acc#acc{counters = NewCounters}};
+        error ->
+            {error, {nodedown, <<"progress not possible">>}}
     end;
-
 handle_message({rexi_EXIT, Reason}, Shard, #acc{} = Acc) ->
     #acc{counters = Counters, ring_opts = RingOpts} = Acc,
     NewCounters = fabric_dict:erase(Shard, Counters),
     case fabric_ring:is_progress_possible(NewCounters, RingOpts) of
-    true ->
-        {ok, Acc#acc{counters = NewCounters}};
-    false ->
-        {error, Reason}
+        true ->
+            {ok, Acc#acc{counters = NewCounters}};
+        false ->
+            {error, Reason}
     end;
-
-handle_message({ok, Info}, #shard{dbname=Name} = Shard, #acc{} = Acc) ->
+handle_message({ok, Info}, #shard{dbname = Name} = Shard, #acc{} = Acc) ->
     #acc{counters = Counters, replies = Replies} = Acc,
     Replies1 = [Info | Replies],
     Counters1 = fabric_dict:erase(Shard, Counters),
@@ -85,10 +83,8 @@ handle_message({ok, Info}, #shard{dbname=Name} = Shard, #acc{} = Acc) ->
         false ->
             {ok, Acc#acc{counters = Counters1, replies = Replies1}}
     end;
-
 handle_message(_, _, #acc{} = Acc) ->
     {ok, Acc}.
-
 
 get_max_partition_size(Max, []) ->
     Max;
@@ -105,21 +101,18 @@ get_max_partition_size(MaxInfo, [NextInfo | Rest]) ->
             get_max_partition_size(MaxInfo, Rest)
     end.
 
-
 % for JS to work nicely we need to convert the size list
 % to a jiffy object
 format_partition(PartitionInfo) ->
     {value, {sizes, Size}, PartitionInfo1} = lists:keytake(sizes, 1, PartitionInfo),
     [{sizes, {Size}} | PartitionInfo1].
 
-
 -ifdef(TEST).
 
 -include_lib("eunit/include/eunit.hrl").
 
-
 node_down_test() ->
-    [S1, S2] = [mk_shard("n1", [0, 4]),  mk_shard("n2", [0, 8])],
+    [S1, S2] = [mk_shard("n1", [0, 4]), mk_shard("n2", [0, 8])],
     Acc1 = #acc{
         counters = fabric_dict:init([S1, S2], nil),
         ring_opts = [{any, [S1, S2]}]
@@ -130,12 +123,13 @@ node_down_test() ->
     ?assertEqual([{S2, nil}], Acc2#acc.counters),
 
     N2 = S2#shard.node,
-    ?assertEqual({error, {nodedown, <<"progress not possible">>}},
-        handle_message({rexi_DOWN, nil, {nil, N2}, nil}, nil, Acc2)).
-
+    ?assertEqual(
+        {error, {nodedown, <<"progress not possible">>}},
+        handle_message({rexi_DOWN, nil, {nil, N2}, nil}, nil, Acc2)
+    ).
 
 worker_exit_test() ->
-    [S1, S2] = [mk_shard("n1", [0, 4]),  mk_shard("n2", [0, 8])],
+    [S1, S2] = [mk_shard("n1", [0, 4]), mk_shard("n2", [0, 8])],
     Acc1 = #acc{
         counters = fabric_dict:init([S1, S2], nil),
         ring_opts = [{any, [S1, S2]}]
@@ -145,7 +139,6 @@ worker_exit_test() ->
     ?assertEqual([{S2, nil}], Acc2#acc.counters),
 
     ?assertEqual({error, bam}, handle_message({rexi_EXIT, bam}, S2, Acc2)).
-
 
 mk_shard(Name, Range) ->
     Node = list_to_atom(Name),

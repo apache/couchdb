@@ -25,21 +25,21 @@ setup() ->
     BaseUrl = "http://" ++ Addr ++ ":" ++ Port,
     {?b2l(DbName), BaseUrl}.
 
-
 teardown({DbName, _}) ->
     couch_server:delete(?l2b(DbName), [?ADMIN_CTX]),
     ok.
-
 
 design_list_test_() ->
     {
         "Check _list functionality",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun test_util:start_couch/0,
+            fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun should_return_empty_when_plain_return/1,
                     fun should_return_empty_when_no_docs/1
@@ -50,38 +50,50 @@ design_list_test_() ->
 
 should_return_empty_when_plain_return({DbName, BaseUrl}) ->
     ?_test(begin
-        ?assertEqual(<<>>,
-            query_text(BaseUrl, DbName, "foo", "_list/plain_return/simple_view"))
+        ?assertEqual(
+            <<>>,
+            query_text(BaseUrl, DbName, "foo", "_list/plain_return/simple_view")
+        )
     end).
 
 should_return_empty_when_no_docs({DbName, BaseUrl}) ->
     ?_test(begin
-        ?assertEqual(<<>>,
-            query_text(BaseUrl, DbName, "foo", "_list/simple_render/simple_view"))
+        ?assertEqual(
+            <<>>,
+            query_text(BaseUrl, DbName, "foo", "_list/simple_render/simple_view")
+        )
     end).
 
 create_design_doc(DbName, DDName) ->
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
-    DDoc = couch_doc:from_json_obj({[
-        {<<"_id">>, DDName},
-        {<<"language">>, <<"javascript">>},
-        {<<"views">>, {[
-            {<<"simple_view">>, {[
-                {<<"map">>, <<"function(doc) {emit(doc._id, doc)}">> },
-                {<<"reduce">>, <<"function (key, values, rereduce) {return sum(values);}">> }
-            ]}}
-        ]}},
-        {<<"lists">>, {[
-            {<<"plain_return">>, <<"function(head, req) {return;}">>},
-            {<<"simple_render">>, <<"function(head, req) {var row; while(row=getRow()) {send(JSON.stringify(row)); }}">>}
-        ]}}
-    ]}),
+    DDoc = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, DDName},
+            {<<"language">>, <<"javascript">>},
+            {<<"views">>,
+                {[
+                    {<<"simple_view">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc._id, doc)}">>},
+                            {<<"reduce">>,
+                                <<"function (key, values, rereduce) {return sum(values);}">>}
+                        ]}}
+                ]}},
+            {<<"lists">>,
+                {[
+                    {<<"plain_return">>, <<"function(head, req) {return;}">>},
+                    {<<"simple_render">>,
+                        <<"function(head, req) {var row; while(row=getRow()) {send(JSON.stringify(row)); }}">>}
+                ]}}
+        ]}
+    ),
     {ok, Rev} = couch_db:update_doc(Db, DDoc, []),
     couch_db:close(Db),
     Rev.
 
 query_text(BaseUrl, DbName, DDoc, Path) ->
     {ok, Code, _Headers, Body} = test_request:get(
-        BaseUrl ++ "/" ++ DbName ++ "/_design/" ++ DDoc ++ "/" ++ Path),
+        BaseUrl ++ "/" ++ DbName ++ "/_design/" ++ DDoc ++ "/" ++ Path
+    ),
     ?assertEqual(200, Code),
     Body.

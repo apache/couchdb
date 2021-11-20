@@ -29,13 +29,13 @@
 -export([run/1, run/2, format/1]).
 
 %% @doc Run the supplied list of checks on the local node
--spec run([Module::atom()]) -> [tuple()].
+-spec run([Module :: atom()]) -> [tuple()].
 run(Checks) ->
     weatherreport_node:can_connect(),
     run(Checks, [weatherreport_node:nodename()]).
 
 %% @doc Run the supplied list of checks on the supplied list of cluster nodes
--spec run([Module::atom()], [node()] | all) -> [tuple()].
+-spec run([Module :: atom()], [node()] | all) -> [tuple()].
 run(Checks, all) ->
     weatherreport_node:can_connect(),
     case weatherreport_node:local_command(mem3, nodes, []) of
@@ -46,27 +46,33 @@ run(Checks, all) ->
     end;
 run(Checks, Nodes) ->
     CheckOpts = get_check_options(),
-    lists:flatten(lists:foldl(fun(Mod, Acc) ->
-        {Resps, BadNodes} = weatherreport_node:multicall(
-            Nodes,
-            erlang,
-            apply,
-            [fun() -> {node(), weatherreport_check:check(Mod, CheckOpts)} end, []],
-            weatherreport_config:timeout()
-        ),
-        TransformFailedCheck = fun(Node) ->
-            {node(), crit, weatherreport_runner, {check_failed, Mod, Node}}
-        end,
-        FailedChecks = [TransformFailedCheck(Node) || Node <- BadNodes],
-        TransformResponse = fun
-            ({badrpc, Error}) ->
-                [{node(), crit, weatherreport_runner, {badrpc, Mod, Error}}];
-            ({Node, Messages}) ->
-                [{Node, Lvl, Module, Msg} || {Lvl, Module, Msg} <- Messages]
-        end,
-        Responses = [TransformResponse(Resp) || Resp <- Resps],
-        [Responses ++ FailedChecks | Acc]
-    end, [], Checks)).
+    lists:flatten(
+        lists:foldl(
+            fun(Mod, Acc) ->
+                {Resps, BadNodes} = weatherreport_node:multicall(
+                    Nodes,
+                    erlang,
+                    apply,
+                    [fun() -> {node(), weatherreport_check:check(Mod, CheckOpts)} end, []],
+                    weatherreport_config:timeout()
+                ),
+                TransformFailedCheck = fun(Node) ->
+                    {node(), crit, weatherreport_runner, {check_failed, Mod, Node}}
+                end,
+                FailedChecks = [TransformFailedCheck(Node) || Node <- BadNodes],
+                TransformResponse = fun
+                    ({badrpc, Error}) ->
+                        [{node(), crit, weatherreport_runner, {badrpc, Mod, Error}}];
+                    ({Node, Messages}) ->
+                        [{Node, Lvl, Module, Msg} || {Lvl, Module, Msg} <- Messages]
+                end,
+                Responses = [TransformResponse(Resp) || Resp <- Resps],
+                [Responses ++ FailedChecks | Acc]
+            end,
+            [],
+            Checks
+        )
+    ).
 
 %% @doc Part of the weatherreport_check behaviour. This means that any messages
 %% returned by this module can be handled via the existing message reporting
@@ -80,10 +86,11 @@ format({badrpc, Check, Error}) ->
 
 %% Private functions
 get_check_options() ->
-    Expert = case application:get_env(weatherreport, expert) of
-        {ok, true} ->
-            true;
-        _ ->
-            false
-    end,
+    Expert =
+        case application:get_env(weatherreport, expert) of
+            {ok, true} ->
+                true;
+            _ ->
+                false
+        end,
     [{expert, Expert}].

@@ -12,15 +12,12 @@
 
 -module(couch_bt_engine_compactor).
 
-
 -export([
     start/4
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include("couch_bt_engine.hrl").
-
 
 -record(comp_st, {
     db_name,
@@ -44,13 +41,11 @@
     locs
 }).
 
-
 -ifdef(TEST).
 -define(COMP_EVENT(Name), couch_bt_engine_compactor_ev:event(Name)).
 -else.
 -define(COMP_EVENT(Name), ignore).
 -endif.
-
 
 start(#st{} = St, DbName, Options, Parent) ->
     erlang:put(io_priority, {db_compact, DbName}),
@@ -72,9 +67,13 @@ start(#st{} = St, DbName, Options, Parent) ->
         fun compact_final_sync/1
     ],
 
-    FinalCompSt = lists:foldl(fun(Stage, CompSt) ->
-        Stage(CompSt)
-    end, InitCompSt, Stages),
+    FinalCompSt = lists:foldl(
+        fun(Stage, CompSt) ->
+            Stage(CompSt)
+        end,
+        InitCompSt,
+        Stages
+    ),
 
     #comp_st{
         new_st = FinalNewSt,
@@ -88,7 +87,6 @@ start(#st{} = St, DbName, Options, Parent) ->
     Msg = {compact_done, couch_bt_engine, FinalNewSt#st.filepath},
     gen_server:cast(Parent, Msg).
 
-
 open_compaction_files(DbName, OldSt, Options) ->
     #st{
         filepath = DbFilePath,
@@ -99,56 +97,58 @@ open_compaction_files(DbName, OldSt, Options) ->
     {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
     {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile),
     DataHdrIsDbHdr = couch_bt_engine_header:is_header(DataHdr),
-    CompSt = case {DataHdr, MetaHdr} of
-        {#comp_header{}=A, #comp_header{}=A} ->
-            % We're restarting a compaction that did not finish
-            % before trying to swap out with the original db
-            DbHeader = A#comp_header.db_header,
-            St0 = couch_bt_engine:init_state(
-                    DataFile, DataFd, DbHeader, Options),
-            St1 = bind_emsort(St0, MetaFd, A#comp_header.meta_st),
-            #comp_st{
-                db_name = DbName,
-                old_st = OldSt,
-                new_st = St1,
-                meta_fd = MetaFd,
-                retry = St0#st.id_tree
-            };
-        _ when DataHdrIsDbHdr ->
-            % We tried to swap out the compaction but there were
-            % writes to the database during compaction. Start
-            % a compaction retry.
-            Header = couch_bt_engine_header:from(SrcHdr),
-            ok = reset_compaction_file(MetaFd, Header),
-            St0 = couch_bt_engine:init_state(
-                    DataFile, DataFd, DataHdr, Options),
-            St1 = bind_emsort(St0, MetaFd, nil),
-            #comp_st{
-                db_name = DbName,
-                old_st = OldSt,
-                new_st = St1,
-                meta_fd = MetaFd,
-                retry = St0#st.id_tree
-            };
-        _ ->
-            % We're starting a compaction from scratch
-            Header = couch_bt_engine_header:from(SrcHdr),
-            ok = reset_compaction_file(DataFd, Header),
-            ok = reset_compaction_file(MetaFd, Header),
-            St0 = couch_bt_engine:init_state(DataFile, DataFd, Header, Options),
-            St1 = bind_emsort(St0, MetaFd, nil),
-            #comp_st{
-                db_name = DbName,
-                old_st = OldSt,
-                new_st = St1,
-                meta_fd = MetaFd,
-                retry = nil
-            }
-    end,
+    CompSt =
+        case {DataHdr, MetaHdr} of
+            {#comp_header{} = A, #comp_header{} = A} ->
+                % We're restarting a compaction that did not finish
+                % before trying to swap out with the original db
+                DbHeader = A#comp_header.db_header,
+                St0 = couch_bt_engine:init_state(
+                    DataFile, DataFd, DbHeader, Options
+                ),
+                St1 = bind_emsort(St0, MetaFd, A#comp_header.meta_st),
+                #comp_st{
+                    db_name = DbName,
+                    old_st = OldSt,
+                    new_st = St1,
+                    meta_fd = MetaFd,
+                    retry = St0#st.id_tree
+                };
+            _ when DataHdrIsDbHdr ->
+                % We tried to swap out the compaction but there were
+                % writes to the database during compaction. Start
+                % a compaction retry.
+                Header = couch_bt_engine_header:from(SrcHdr),
+                ok = reset_compaction_file(MetaFd, Header),
+                St0 = couch_bt_engine:init_state(
+                    DataFile, DataFd, DataHdr, Options
+                ),
+                St1 = bind_emsort(St0, MetaFd, nil),
+                #comp_st{
+                    db_name = DbName,
+                    old_st = OldSt,
+                    new_st = St1,
+                    meta_fd = MetaFd,
+                    retry = St0#st.id_tree
+                };
+            _ ->
+                % We're starting a compaction from scratch
+                Header = couch_bt_engine_header:from(SrcHdr),
+                ok = reset_compaction_file(DataFd, Header),
+                ok = reset_compaction_file(MetaFd, Header),
+                St0 = couch_bt_engine:init_state(DataFile, DataFd, Header, Options),
+                St1 = bind_emsort(St0, MetaFd, nil),
+                #comp_st{
+                    db_name = DbName,
+                    old_st = OldSt,
+                    new_st = St1,
+                    meta_fd = MetaFd,
+                    retry = nil
+                }
+        end,
     unlink(DataFd),
     erlang:monitor(process, MetaFd),
     {ok, CompSt}.
-
 
 copy_purge_info(#comp_st{} = CompSt) ->
     #comp_st{
@@ -164,25 +164,30 @@ copy_purge_info(#comp_st{} = CompSt) ->
     OldPSTree = OldSt#st.purge_seq_tree,
     StartSeq = couch_bt_engine:get_purge_seq(NewSt) + 1,
     BufferSize = config:get_integer(
-            "database_compaction", "doc_buffer_size", 524288),
+        "database_compaction", "doc_buffer_size", 524288
+    ),
     CheckpointAfter = config:get(
-            "database_compaction", "checkpoint_after", BufferSize * 10),
+        "database_compaction", "checkpoint_after", BufferSize * 10
+    ),
 
     EnumFun = fun(Info, _Reds, {StAcc0, InfosAcc, InfosSize, CopiedSize}) ->
         NewInfosSize = InfosSize + ?term_size(Info),
-        if NewInfosSize >= BufferSize ->
-            StAcc1 = copy_purge_infos(
-                    OldSt, StAcc0, [Info | InfosAcc], MinPurgeSeq, Retry),
-            NewCopiedSize = CopiedSize + NewInfosSize,
-            if NewCopiedSize >= CheckpointAfter ->
-                StAcc2 = commit_compaction_data(StAcc1),
-                {ok, {StAcc2, [], 0, 0}};
+        if
+            NewInfosSize >= BufferSize ->
+                StAcc1 = copy_purge_infos(
+                    OldSt, StAcc0, [Info | InfosAcc], MinPurgeSeq, Retry
+                ),
+                NewCopiedSize = CopiedSize + NewInfosSize,
+                if
+                    NewCopiedSize >= CheckpointAfter ->
+                        StAcc2 = commit_compaction_data(StAcc1),
+                        {ok, {StAcc2, [], 0, 0}};
+                    true ->
+                        {ok, {StAcc1, [], 0, NewCopiedSize}}
+                end;
             true ->
-                {ok, {StAcc1, [], 0, NewCopiedSize}}
-            end;
-        true ->
-            NewInfosAcc = [Info | InfosAcc],
-            {ok, {StAcc0, NewInfosAcc, NewInfosSize, CopiedSize}}
+                NewInfosAcc = [Info | InfosAcc],
+                {ok, {StAcc0, NewInfosAcc, NewInfosSize, CopiedSize}}
         end
     end,
 
@@ -196,7 +201,6 @@ copy_purge_info(#comp_st{} = CompSt) ->
     CompSt#comp_st{
         new_st = FinalNewSt
     }.
-
 
 copy_purge_infos(OldSt, NewSt0, Infos, MinPurgeSeq, Retry) ->
     #st{
@@ -217,9 +221,12 @@ copy_purge_infos(OldSt, NewSt0, Infos, MinPurgeSeq, Retry) ->
     } = NewSt1,
 
     % Copy over the purge infos
-    InfosToAdd = lists:filter(fun({PSeq, _, _, _}) ->
-        PSeq > MinPurgeSeq
-    end, Infos),
+    InfosToAdd = lists:filter(
+        fun({PSeq, _, _, _}) ->
+            PSeq > MinPurgeSeq
+        end,
+        Infos
+    ),
     {ok, NewPurgeTree1} = couch_btree:add(NewPurgeTree0, InfosToAdd),
     {ok, NewPurgeSeqTree1} = couch_btree:add(NewPurgeSeqTree0, InfosToAdd),
 
@@ -232,42 +239,50 @@ copy_purge_infos(OldSt, NewSt0, Infos, MinPurgeSeq, Retry) ->
     % any of the referenced docs have been completely purged
     % from the database. Any doc that has been completely purged
     % must then be removed from our partially compacted database.
-    NewSt3 = if Retry == nil -> NewSt2; true ->
-        AllDocIds = [DocId || {_PurgeSeq, _UUID, DocId, _Revs} <- Infos],
-        UniqDocIds = lists:usort(AllDocIds),
-        OldIdResults = couch_btree:lookup(OldIdTree, UniqDocIds),
-        OldZipped = lists:zip(UniqDocIds, OldIdResults),
+    NewSt3 =
+        if
+            Retry == nil ->
+                NewSt2;
+            true ->
+                AllDocIds = [DocId || {_PurgeSeq, _UUID, DocId, _Revs} <- Infos],
+                UniqDocIds = lists:usort(AllDocIds),
+                OldIdResults = couch_btree:lookup(OldIdTree, UniqDocIds),
+                OldZipped = lists:zip(UniqDocIds, OldIdResults),
 
-        % The list of non-existant docs in the database being compacted
-        MaybeRemDocIds = [DocId || {DocId, not_found} <- OldZipped],
+                % The list of non-existant docs in the database being compacted
+                MaybeRemDocIds = [DocId || {DocId, not_found} <- OldZipped],
 
-        % Removing anything that exists in the partially compacted database
-        NewIdResults = couch_btree:lookup(NewIdTree0, MaybeRemDocIds),
-        ToRemove = [Doc || {ok, Doc} <- NewIdResults, Doc /= {ok, not_found}],
+                % Removing anything that exists in the partially compacted database
+                NewIdResults = couch_btree:lookup(NewIdTree0, MaybeRemDocIds),
+                ToRemove = [Doc || {ok, Doc} <- NewIdResults, Doc /= {ok, not_found}],
 
-        {RemIds, RemSeqs} = lists:unzip(lists:map(fun(FDI) ->
-            #full_doc_info{
-                id = Id,
-                update_seq = Seq
-            } = FDI,
-            {Id, Seq}
-        end, ToRemove)),
+                {RemIds, RemSeqs} = lists:unzip(
+                    lists:map(
+                        fun(FDI) ->
+                            #full_doc_info{
+                                id = Id,
+                                update_seq = Seq
+                            } = FDI,
+                            {Id, Seq}
+                        end,
+                        ToRemove
+                    )
+                ),
 
-        {ok, NewIdTree1} = couch_btree:add_remove(NewIdTree0, [], RemIds),
-        {ok, NewSeqTree1} = couch_btree:add_remove(NewSeqTree0, [], RemSeqs),
+                {ok, NewIdTree1} = couch_btree:add_remove(NewIdTree0, [], RemIds),
+                {ok, NewSeqTree1} = couch_btree:add_remove(NewSeqTree0, [], RemSeqs),
 
-        NewSt2#st{
-            id_tree = NewIdTree1,
-            seq_tree = NewSeqTree1
-        }
-    end,
+                NewSt2#st{
+                    id_tree = NewIdTree1,
+                    seq_tree = NewSeqTree1
+                }
+        end,
 
     Header = couch_bt_engine:update_header(NewSt3, NewSt3#st.header),
     NewSt4 = NewSt3#st{
         header = Header
     },
     bind_emsort(NewSt4, MetaFd, MetaState).
-
 
 copy_compact(#comp_st{} = CompSt) ->
     #comp_st{
@@ -282,38 +297,48 @@ copy_compact(#comp_st{} = CompSt) ->
     NewUpdateSeq = couch_bt_engine:get_update_seq(NewSt0),
     TotalChanges = couch_bt_engine:count_changes_since(St, NewUpdateSeq),
     BufferSize = list_to_integer(
-        config:get("database_compaction", "doc_buffer_size", "524288")),
+        config:get("database_compaction", "doc_buffer_size", "524288")
+    ),
     CheckpointAfter = couch_util:to_integer(
-        config:get("database_compaction", "checkpoint_after",
-            BufferSize * 10)),
+        config:get(
+            "database_compaction",
+            "checkpoint_after",
+            BufferSize * 10
+        )
+    ),
 
     EnumBySeqFun =
-    fun(DocInfo, _Offset,
-            {AccNewSt, AccUncopied, AccUncopiedSize, AccCopiedSize}) ->
+        fun(
+            DocInfo,
+            _Offset,
+            {AccNewSt, AccUncopied, AccUncopiedSize, AccCopiedSize}
+        ) ->
+            Seq =
+                case DocInfo of
+                    #full_doc_info{} -> DocInfo#full_doc_info.update_seq;
+                    #doc_info{} -> DocInfo#doc_info.high_seq
+                end,
 
-        Seq = case DocInfo of
-            #full_doc_info{} -> DocInfo#full_doc_info.update_seq;
-            #doc_info{} -> DocInfo#doc_info.high_seq
+            AccUncopiedSize2 = AccUncopiedSize + ?term_size(DocInfo),
+            if
+                AccUncopiedSize2 >= BufferSize ->
+                    NewSt2 = copy_docs(
+                        St, AccNewSt, lists:reverse([DocInfo | AccUncopied]), Retry
+                    ),
+                    AccCopiedSize2 = AccCopiedSize + AccUncopiedSize2,
+                    if
+                        AccCopiedSize2 >= CheckpointAfter ->
+                            {ok, NewSt3} = couch_bt_engine:set_update_seq(NewSt2, Seq),
+                            CommNewSt3 = commit_compaction_data(NewSt3),
+                            {ok, {CommNewSt3, [], 0, 0}};
+                        true ->
+                            {ok, NewSt3} = couch_bt_engine:set_update_seq(NewSt2, Seq),
+                            {ok, {NewSt3, [], 0, AccCopiedSize2}}
+                    end;
+                true ->
+                    {ok, {AccNewSt, [DocInfo | AccUncopied], AccUncopiedSize2, AccCopiedSize}}
+            end
         end,
-
-        AccUncopiedSize2 = AccUncopiedSize + ?term_size(DocInfo),
-        if AccUncopiedSize2 >= BufferSize ->
-            NewSt2 = copy_docs(
-                St, AccNewSt, lists:reverse([DocInfo | AccUncopied]), Retry),
-            AccCopiedSize2 = AccCopiedSize + AccUncopiedSize2,
-            if AccCopiedSize2 >= CheckpointAfter ->
-                {ok, NewSt3} = couch_bt_engine:set_update_seq(NewSt2, Seq),
-                CommNewSt3 = commit_compaction_data(NewSt3),
-                {ok, {CommNewSt3, [], 0, 0}};
-            true ->
-                {ok, NewSt3} = couch_bt_engine:set_update_seq(NewSt2, Seq),
-                {ok, {NewSt3, [], 0, AccCopiedSize2}}
-            end;
-        true ->
-            {ok, {AccNewSt, [DocInfo | AccUncopied], AccUncopiedSize2,
-                AccCopiedSize}}
-        end
-    end,
 
     TaskProps0 = [
         {type, database_compaction},
@@ -324,24 +349,27 @@ copy_compact(#comp_st{} = CompSt) ->
         {total_changes, TotalChanges}
     ],
     case (Retry =/= nil) and couch_task_status:is_task_added() of
-    true ->
-        couch_task_status:update([
-            {retry, true},
-            {phase, document_copy},
-            {progress, 0},
-            {changes_done, 0},
-            {total_changes, TotalChanges}
-        ]);
-    false ->
-        couch_task_status:add_task(TaskProps0),
-        couch_task_status:set_update_frequency(500)
+        true ->
+            couch_task_status:update([
+                {retry, true},
+                {phase, document_copy},
+                {progress, 0},
+                {changes_done, 0},
+                {total_changes, TotalChanges}
+            ]);
+        false ->
+            couch_task_status:add_task(TaskProps0),
+            couch_task_status:set_update_frequency(500)
     end,
 
     ?COMP_EVENT(seq_init),
     {ok, _, {NewSt2, Uncopied, _, _}} =
-        couch_btree:foldl(St#st.seq_tree, EnumBySeqFun,
+        couch_btree:foldl(
+            St#st.seq_tree,
+            EnumBySeqFun,
             {NewSt, [], 0, 0},
-            [{start_key, NewUpdateSeq + 1}]),
+            [{start_key, NewUpdateSeq + 1}]
+        ),
 
     NewSt3 = copy_docs(St, NewSt2, lists:reverse(Uncopied), Retry),
 
@@ -362,145 +390,167 @@ copy_compact(#comp_st{} = CompSt) ->
         new_st = NewSt6
     }.
 
-
 copy_docs(St, #st{} = NewSt, MixedInfos, Retry) ->
-    DocInfoIds = [Id || #doc_info{id=Id} <- MixedInfos],
+    DocInfoIds = [Id || #doc_info{id = Id} <- MixedInfos],
     LookupResults = couch_btree:lookup(St#st.id_tree, DocInfoIds),
     % COUCHDB-968, make sure we prune duplicates during compaction
-    NewInfos0 = lists:usort(fun(#full_doc_info{id=A}, #full_doc_info{id=B}) ->
-        A =< B
-    end, merge_lookups(MixedInfos, LookupResults)),
+    NewInfos0 = lists:usort(
+        fun(#full_doc_info{id = A}, #full_doc_info{id = B}) ->
+            A =< B
+        end,
+        merge_lookups(MixedInfos, LookupResults)
+    ),
 
-    NewInfos1 = lists:map(fun(Info) ->
-        {NewRevTree, FinalAcc} = couch_key_tree:mapfold(fun
-            ({RevPos, RevId}, #leaf{ptr=Sp}=Leaf, leaf, SizesAcc) ->
-                {Body, AttInfos} = copy_doc_attachments(St, Sp, NewSt),
-                #size_info{external = OldExternalSize} = Leaf#leaf.sizes,
-                ExternalSize = case OldExternalSize of
-                    0 when is_binary(Body) ->
-                        couch_compress:uncompressed_size(Body);
-                    0 ->
-                        couch_ejson_size:encoded_size(Body);
-                    N -> N
+    NewInfos1 = lists:map(
+        fun(Info) ->
+            {NewRevTree, FinalAcc} = couch_key_tree:mapfold(
+                fun
+                    ({RevPos, RevId}, #leaf{ptr = Sp} = Leaf, leaf, SizesAcc) ->
+                        {Body, AttInfos} = copy_doc_attachments(St, Sp, NewSt),
+                        #size_info{external = OldExternalSize} = Leaf#leaf.sizes,
+                        ExternalSize =
+                            case OldExternalSize of
+                                0 when is_binary(Body) ->
+                                    couch_compress:uncompressed_size(Body);
+                                0 ->
+                                    couch_ejson_size:encoded_size(Body);
+                                N ->
+                                    N
+                            end,
+                        Doc0 = #doc{
+                            id = Info#full_doc_info.id,
+                            revs = {RevPos, [RevId]},
+                            deleted = Leaf#leaf.deleted,
+                            body = Body,
+                            atts = AttInfos
+                        },
+                        Doc1 = couch_bt_engine:serialize_doc(NewSt, Doc0),
+                        {ok, Doc2, ActiveSize} =
+                            couch_bt_engine:write_doc_body(NewSt, Doc1),
+                        AttSizes = [{element(3, A), element(4, A)} || A <- AttInfos],
+                        NewLeaf = Leaf#leaf{
+                            ptr = Doc2#doc.body,
+                            sizes = #size_info{
+                                active = ActiveSize,
+                                external = ExternalSize
+                            },
+                            atts = AttSizes
+                        },
+                        {NewLeaf, couch_db_updater:add_sizes(leaf, NewLeaf, SizesAcc)};
+                    (_Rev, _Leaf, branch, SizesAcc) ->
+                        {?REV_MISSING, SizesAcc}
                 end,
-                Doc0 = #doc{
-                    id = Info#full_doc_info.id,
-                    revs = {RevPos, [RevId]},
-                    deleted = Leaf#leaf.deleted,
-                    body = Body,
-                    atts = AttInfos
-                },
-                Doc1 = couch_bt_engine:serialize_doc(NewSt, Doc0),
-                {ok, Doc2, ActiveSize} =
-                        couch_bt_engine:write_doc_body(NewSt, Doc1),
-                AttSizes = [{element(3,A), element(4,A)} || A <- AttInfos],
-                NewLeaf = Leaf#leaf{
-                    ptr = Doc2#doc.body,
-                    sizes = #size_info{
-                        active = ActiveSize,
-                        external = ExternalSize
-                    },
-                    atts = AttSizes
-                },
-                {NewLeaf, couch_db_updater:add_sizes(leaf, NewLeaf, SizesAcc)};
-            (_Rev, _Leaf, branch, SizesAcc) ->
-                {?REV_MISSING, SizesAcc}
-        end, {0, 0, []}, Info#full_doc_info.rev_tree),
-        {FinalAS, FinalES, FinalAtts} = FinalAcc,
-        TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
-        NewActiveSize = FinalAS + TotalAttSize,
-        NewExternalSize = FinalES + TotalAttSize,
-        ?COMP_EVENT(seq_copy),
-        Info#full_doc_info{
-            rev_tree = NewRevTree,
-            sizes = #size_info{
-                active = NewActiveSize,
-                external = NewExternalSize
+                {0, 0, []},
+                Info#full_doc_info.rev_tree
+            ),
+            {FinalAS, FinalES, FinalAtts} = FinalAcc,
+            TotalAttSize = lists:foldl(fun({_, S}, A) -> S + A end, 0, FinalAtts),
+            NewActiveSize = FinalAS + TotalAttSize,
+            NewExternalSize = FinalES + TotalAttSize,
+            ?COMP_EVENT(seq_copy),
+            Info#full_doc_info{
+                rev_tree = NewRevTree,
+                sizes = #size_info{
+                    active = NewActiveSize,
+                    external = NewExternalSize
+                }
             }
-        }
-    end, NewInfos0),
+        end,
+        NewInfos0
+    ),
 
     Limit = couch_bt_engine:get_revs_limit(St),
-    NewInfos = lists:map(fun(FDI) ->
-        FDI#full_doc_info{
-            rev_tree = couch_key_tree:stem(FDI#full_doc_info.rev_tree, Limit)
-        }
-    end, NewInfos1),
+    NewInfos = lists:map(
+        fun(FDI) ->
+            FDI#full_doc_info{
+                rev_tree = couch_key_tree:stem(FDI#full_doc_info.rev_tree, Limit)
+            }
+        end,
+        NewInfos1
+    ),
 
     RemoveSeqs =
-    case Retry of
-    nil ->
-        [];
-    OldDocIdTree ->
-        % Compaction is being rerun to catch up to writes during the
-        % first pass. This means we may have docs that already exist
-        % in the seq_tree in the .data file. Here we lookup any old
-        % update_seqs so that they can be removed.
-        Ids = [Id || #full_doc_info{id=Id} <- NewInfos],
-        Existing = couch_btree:lookup(OldDocIdTree, Ids),
-        [Seq || {ok, #full_doc_info{update_seq=Seq}} <- Existing]
-    end,
+        case Retry of
+            nil ->
+                [];
+            OldDocIdTree ->
+                % Compaction is being rerun to catch up to writes during the
+                % first pass. This means we may have docs that already exist
+                % in the seq_tree in the .data file. Here we lookup any old
+                % update_seqs so that they can be removed.
+                Ids = [Id || #full_doc_info{id = Id} <- NewInfos],
+                Existing = couch_btree:lookup(OldDocIdTree, Ids),
+                [Seq || {ok, #full_doc_info{update_seq = Seq}} <- Existing]
+        end,
 
     {ok, SeqTree} = couch_btree:add_remove(
-            NewSt#st.seq_tree, NewInfos, RemoveSeqs),
+        NewSt#st.seq_tree, NewInfos, RemoveSeqs
+    ),
 
     EMSortFd = couch_emsort:get_fd(NewSt#st.id_tree),
     {ok, LocSizes} = couch_file:append_terms(EMSortFd, NewInfos),
-    EMSortEntries = lists:zipwith(fun(FDI, {Loc, _}) ->
-        #full_doc_info{
-            id = Id,
-            update_seq = Seq
-        } = FDI,
-        {{Id, Seq}, Loc}
-    end, NewInfos, LocSizes),
+    EMSortEntries = lists:zipwith(
+        fun(FDI, {Loc, _}) ->
+            #full_doc_info{
+                id = Id,
+                update_seq = Seq
+            } = FDI,
+            {{Id, Seq}, Loc}
+        end,
+        NewInfos,
+        LocSizes
+    ),
     {ok, IdEms} = couch_emsort:add(NewSt#st.id_tree, EMSortEntries),
     update_compact_task(length(NewInfos)),
-    NewSt#st{id_tree=IdEms, seq_tree=SeqTree}.
-
+    NewSt#st{id_tree = IdEms, seq_tree = SeqTree}.
 
 copy_doc_attachments(#st{} = SrcSt, SrcSp, DstSt) ->
     {ok, {BodyData, BinInfos0}} = couch_file:pread_term(SrcSt#st.fd, SrcSp),
-    BinInfos = case BinInfos0 of
-    _ when is_binary(BinInfos0) ->
-        couch_compress:decompress(BinInfos0);
-    _ when is_list(BinInfos0) ->
-        % pre 1.2 file format
-        BinInfos0
-    end,
+    BinInfos =
+        case BinInfos0 of
+            _ when is_binary(BinInfos0) ->
+                couch_compress:decompress(BinInfos0);
+            _ when is_list(BinInfos0) ->
+                % pre 1.2 file format
+                BinInfos0
+        end,
     % copy the bin values
     NewBinInfos = lists:map(
-        fun({Name, Type, BinSp, AttLen, RevPos, ExpectedMd5}) ->
-            % 010 UPGRADE CODE
-            {ok, SrcStream} = couch_bt_engine:open_read_stream(SrcSt, BinSp),
-            {ok, DstStream} = couch_bt_engine:open_write_stream(DstSt, []),
-            ok = couch_stream:copy(SrcStream, DstStream),
-            {NewStream, AttLen, AttLen, ActualMd5, _IdentityMd5} =
-                couch_stream:close(DstStream),
-            {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
-            couch_util:check_md5(ExpectedMd5, ActualMd5),
-            {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedMd5, identity};
-        ({Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc1}) ->
-            {ok, SrcStream} = couch_bt_engine:open_read_stream(SrcSt, BinSp),
-            {ok, DstStream} = couch_bt_engine:open_write_stream(DstSt, []),
-            ok = couch_stream:copy(SrcStream, DstStream),
-            {NewStream, AttLen, _, ActualMd5, _IdentityMd5} =
-                couch_stream:close(DstStream),
-            {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
-            couch_util:check_md5(ExpectedMd5, ActualMd5),
-            Enc = case Enc1 of
-            true ->
-                % 0110 UPGRADE CODE
-                gzip;
-            false ->
-                % 0110 UPGRADE CODE
-                identity;
-            _ ->
-                Enc1
-            end,
-            {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc}
-        end, BinInfos),
+        fun
+            ({Name, Type, BinSp, AttLen, RevPos, ExpectedMd5}) ->
+                % 010 UPGRADE CODE
+                {ok, SrcStream} = couch_bt_engine:open_read_stream(SrcSt, BinSp),
+                {ok, DstStream} = couch_bt_engine:open_write_stream(DstSt, []),
+                ok = couch_stream:copy(SrcStream, DstStream),
+                {NewStream, AttLen, AttLen, ActualMd5, _IdentityMd5} =
+                    couch_stream:close(DstStream),
+                {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
+                couch_util:check_md5(ExpectedMd5, ActualMd5),
+                {Name, Type, NewBinSp, AttLen, AttLen, RevPos, ExpectedMd5, identity};
+            ({Name, Type, BinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc1}) ->
+                {ok, SrcStream} = couch_bt_engine:open_read_stream(SrcSt, BinSp),
+                {ok, DstStream} = couch_bt_engine:open_write_stream(DstSt, []),
+                ok = couch_stream:copy(SrcStream, DstStream),
+                {NewStream, AttLen, _, ActualMd5, _IdentityMd5} =
+                    couch_stream:close(DstStream),
+                {ok, NewBinSp} = couch_stream:to_disk_term(NewStream),
+                couch_util:check_md5(ExpectedMd5, ActualMd5),
+                Enc =
+                    case Enc1 of
+                        true ->
+                            % 0110 UPGRADE CODE
+                            gzip;
+                        false ->
+                            % 0110 UPGRADE CODE
+                            identity;
+                        _ ->
+                            Enc1
+                    end,
+                {Name, Type, NewBinSp, AttLen, DiskLen, RevPos, ExpectedMd5, Enc}
+        end,
+        BinInfos
+    ),
     {BodyData, NewBinInfos}.
-
 
 sort_meta_data(#comp_st{new_st = St0} = CompSt) ->
     ?COMP_EVENT(md_sort_init),
@@ -521,7 +571,6 @@ sort_meta_data(#comp_st{new_st = St0} = CompSt) ->
         }
     }.
 
-
 copy_meta_data(#comp_st{new_st = St} = CompSt) ->
     #st{
         fd = Fd,
@@ -537,11 +586,11 @@ copy_meta_data(#comp_st{new_st = St} = CompSt) ->
     ]),
     {ok, Iter} = couch_emsort:iter(Src),
     Acc0 = #merge_st{
-        src_fd=SrcFd,
-        id_tree=IdTree0,
-        seq_tree=St#st.seq_tree,
-        rem_seqs=[],
-        locs=[]
+        src_fd = SrcFd,
+        id_tree = IdTree0,
+        seq_tree = St#st.seq_tree,
+        rem_seqs = [],
+        locs = []
     },
     ?COMP_EVENT(md_copy_init),
     NumKVs = couch_emsort:num_kvs(Src),
@@ -566,7 +615,6 @@ copy_meta_data(#comp_st{new_st = St} = CompSt) ->
         }
     }.
 
-
 compact_final_sync(#comp_st{new_st = St0} = CompSt) ->
     ?COMP_EVENT(before_final_sync),
     {ok, St1} = couch_bt_engine:commit_data(St0),
@@ -574,7 +622,6 @@ compact_final_sync(#comp_st{new_st = St0} = CompSt) ->
     CompSt#comp_st{
         new_st = St1
     }.
-
 
 open_compaction_file(FilePath) ->
     case couch_file:open(FilePath, [nologifmissing]) of
@@ -588,11 +635,9 @@ open_compaction_file(FilePath) ->
             {ok, Fd, nil}
     end.
 
-
 reset_compaction_file(Fd, Header) ->
     ok = couch_file:truncate(Fd, 0),
     ok = couch_file:write_header(Fd, Header).
-
 
 commit_compaction_data(#comp_st{new_st = St} = CompSt) ->
     % Compaction needs to write headers to both the data file
@@ -601,11 +646,9 @@ commit_compaction_data(#comp_st{new_st = St} = CompSt) ->
     CompSt#comp_st{
         new_st = commit_compaction_data(St)
     };
-
 commit_compaction_data(#st{} = St) ->
     commit_compaction_data(St, couch_emsort:get_fd(St#st.id_tree)),
     commit_compaction_data(St, St#st.fd).
-
 
 commit_compaction_data(#st{header = OldHeader} = St0, Fd) ->
     DataState = couch_bt_engine_header:id_tree_state(OldHeader),
@@ -624,17 +667,15 @@ commit_compaction_data(#st{header = OldHeader} = St0, Fd) ->
     },
     bind_emsort(St2, MetaFd, MetaState).
 
-
 bind_emsort(St, Fd, nil) ->
     {ok, Ems} = couch_emsort:open(Fd),
-    St#st{id_tree=Ems};
+    St#st{id_tree = Ems};
 bind_emsort(St, Fd, {BB, _} = Root) when is_list(BB) ->
     % Upgrade clause when we find old compaction files
     bind_emsort(St, Fd, [{root, Root}]);
 bind_emsort(St, Fd, State) ->
     {ok, Ems} = couch_emsort:open(Fd, State),
-    St#st{id_tree=Ems}.
-
+    St#st{id_tree = Ems}.
 
 bind_id_tree(St, Fd, State) ->
     {ok, IdBtree} = couch_btree:open(State, Fd, [
@@ -642,42 +683,41 @@ bind_id_tree(St, Fd, State) ->
         {join, fun couch_bt_engine:id_tree_join/2},
         {reduce, fun couch_bt_engine:id_tree_reduce/2}
     ]),
-    St#st{id_tree=IdBtree}.
-
+    St#st{id_tree = IdBtree}.
 
 merge_lookups(Infos, []) ->
     Infos;
 merge_lookups([], _) ->
     [];
-merge_lookups([#doc_info{}=DI | RestInfos], [{ok, FDI} | RestLookups]) ->
+merge_lookups([#doc_info{} = DI | RestInfos], [{ok, FDI} | RestLookups]) ->
     % Assert we've matched our lookups
-    if DI#doc_info.id == FDI#full_doc_info.id -> ok; true ->
-        erlang:error({mismatched_doc_infos, DI#doc_info.id})
+    if
+        DI#doc_info.id == FDI#full_doc_info.id -> ok;
+        true -> erlang:error({mismatched_doc_infos, DI#doc_info.id})
     end,
     [FDI | merge_lookups(RestInfos, RestLookups)];
 merge_lookups([FDI | RestInfos], Lookups) ->
     [FDI | merge_lookups(RestInfos, Lookups)].
 
-
-merge_docids(Iter, #merge_st{locs=Locs}=Acc) when length(Locs) > 1000 ->
+merge_docids(Iter, #merge_st{locs = Locs} = Acc) when length(Locs) > 1000 ->
     #merge_st{
-        src_fd=SrcFd,
-        id_tree=IdTree0,
-        seq_tree=SeqTree0,
-        rem_seqs=RemSeqs
+        src_fd = SrcFd,
+        id_tree = IdTree0,
+        seq_tree = SeqTree0,
+        rem_seqs = RemSeqs
     } = Acc,
     {ok, Infos} = couch_file:pread_terms(SrcFd, Locs),
     {ok, IdTree1} = couch_btree:add(IdTree0, Infos),
     {ok, SeqTree1} = couch_btree:add_remove(SeqTree0, [], RemSeqs),
     Acc1 = Acc#merge_st{
-        id_tree=IdTree1,
-        seq_tree=SeqTree1,
-        rem_seqs=[],
-        locs=[]
+        id_tree = IdTree1,
+        seq_tree = SeqTree1,
+        rem_seqs = [],
+        locs = []
     },
     update_compact_task(length(Locs)),
     merge_docids(Iter, Acc1);
-merge_docids(Iter, #merge_st{curr=Curr}=Acc) ->
+merge_docids(Iter, #merge_st{curr = Curr} = Acc) ->
     case next_info(Iter, Curr, []) of
         {NextIter, NewCurr, Loc, Seqs} ->
             Acc1 = Acc#merge_st{
@@ -697,7 +737,6 @@ merge_docids(Iter, #merge_st{curr=Curr}=Acc) ->
             Acc
     end.
 
-
 next_info(Iter, undefined, []) ->
     case couch_emsort:next(Iter) of
         {ok, {{Id, Seq}, Loc}, NextIter} ->
@@ -715,15 +754,14 @@ next_info(Iter, {Id, Seq, Loc}, Seqs) ->
             {finished, Loc, Seqs}
     end.
 
-
 update_compact_task(NumChanges) ->
     [Changes, Total] = couch_task_status:get([changes_done, total_changes]),
     Changes2 = Changes + NumChanges,
-    Progress = case Total of
-    0 ->
-        0;
-    _ ->
-        (Changes2 * 100) div Total
-    end,
+    Progress =
+        case Total of
+            0 ->
+                0;
+            _ ->
+                (Changes2 * 100) div Total
+        end,
     couch_task_status:update([{changes_done, Changes2}, {progress, Progress}]).
-

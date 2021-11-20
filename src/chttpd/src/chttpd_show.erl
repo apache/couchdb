@@ -24,17 +24,20 @@
 
 maybe_open_doc(Db, DocId, Options) ->
     case fabric:open_doc(Db, DocId, Options) of
-    {ok, Doc} ->
-        chttpd_stats:incr_reads(),
-        Doc;
-    {not_found, _} ->
-        nil
+        {ok, Doc} ->
+            chttpd_stats:incr_reads(),
+            Doc;
+        {not_found, _} ->
+            nil
     end.
 
-handle_doc_show_req(#httpd{
-        path_parts=[_, _, _, _, ShowName, DocId]
-    }=Req, Db, DDoc) ->
-
+handle_doc_show_req(
+    #httpd{
+        path_parts = [_, _, _, _, ShowName, DocId]
+    } = Req,
+    Db,
+    DDoc
+) ->
     % open the doc
     Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
     Doc = maybe_open_doc(Db, DocId, Options),
@@ -42,13 +45,15 @@ handle_doc_show_req(#httpd{
     % we don't handle revs here b/c they are an internal api
     % returns 404 if there is no doc with DocId
     handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId);
-
-handle_doc_show_req(#httpd{
-        path_parts=[_, _, _, _, ShowName, DocId|Rest]
-    }=Req, Db, DDoc) ->
-
-    DocParts = [DocId|Rest],
-    DocId1 = ?l2b(string:join([?b2l(P)|| P <- DocParts], "/")),
+handle_doc_show_req(
+    #httpd{
+        path_parts = [_, _, _, _, ShowName, DocId | Rest]
+    } = Req,
+    Db,
+    DDoc
+) ->
+    DocParts = [DocId | Rest],
+    DocId1 = ?l2b(string:join([?b2l(P) || P <- DocParts], "/")),
 
     % open the doc
     Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
@@ -57,13 +62,15 @@ handle_doc_show_req(#httpd{
     % we don't handle revs here b/c they are an internal api
     % pass 404 docs to the show function
     handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId1);
-
-handle_doc_show_req(#httpd{
-        path_parts=[_, _, _, _, ShowName]
-    }=Req, Db, DDoc) ->
+handle_doc_show_req(
+    #httpd{
+        path_parts = [_, _, _, _, ShowName]
+    } = Req,
+    Db,
+    DDoc
+) ->
     % with no docid the doc is nil
     handle_doc_show(Req, Db, DDoc, ShowName, nil);
-
 handle_doc_show_req(Req, _Db, _DDoc) ->
     chttpd:send_error(Req, 404, <<"show_error">>, <<"Invalid path.">>).
 
@@ -79,21 +86,25 @@ handle_doc_show(Req, Db, DDoc, ShowName, Doc, DocId) ->
         JsonReq = chttpd_external:json_req_obj(Req, Db, DocId),
         JsonDoc = couch_query_servers:json_doc(Doc),
         [<<"resp">>, ExternalResp] =
-            couch_query_servers:ddoc_prompt(DDoc, [<<"shows">>, ShowName],
-                [JsonDoc, JsonReq]),
+            couch_query_servers:ddoc_prompt(
+                DDoc,
+                [<<"shows">>, ShowName],
+                [JsonDoc, JsonReq]
+            ),
         JsonResp = apply_etag(ExternalResp, CurrentEtag),
         chttpd_external:send_external_response(Req, JsonResp)
     end).
 
-
-show_etag(#httpd{user_ctx=UserCtx}=Req, Doc, DDoc, More) ->
+show_etag(#httpd{user_ctx = UserCtx} = Req, Doc, DDoc, More) ->
     Accept = chttpd:header_value(Req, "Accept"),
-    DocPart = case Doc of
-        nil -> nil;
-        Doc -> chttpd:doc_etag(Doc)
-    end,
-    couch_httpd:make_etag({couch_httpd:doc_etag(DDoc), DocPart, Accept,
-        UserCtx#user_ctx.roles, More}).
+    DocPart =
+        case Doc of
+            nil -> nil;
+            Doc -> chttpd:doc_etag(Doc)
+        end,
+    couch_httpd:make_etag({
+        couch_httpd:doc_etag(DDoc), DocPart, Accept, UserCtx#user_ctx.roles, More
+    }).
 
 % /db/_design/foo/update/bar/docid
 % updates a doc based on a request
@@ -101,19 +112,25 @@ show_etag(#httpd{user_ctx=UserCtx}=Req, Doc, DDoc, More) ->
 %     % anything but GET
 %     send_method_not_allowed(Req, "POST,PUT,DELETE,ETC");
 
-handle_doc_update_req(#httpd{
-        path_parts=[_, _, _, _, UpdateName]
-    }=Req, Db, DDoc) ->
+handle_doc_update_req(
+    #httpd{
+        path_parts = [_, _, _, _, UpdateName]
+    } = Req,
+    Db,
+    DDoc
+) ->
     send_doc_update_response(Req, Db, DDoc, UpdateName, nil, null);
-
-handle_doc_update_req(#httpd{
-        path_parts=[_, _, _, _, UpdateName | DocIdParts]
-    }=Req, Db, DDoc) ->
+handle_doc_update_req(
+    #httpd{
+        path_parts = [_, _, _, _, UpdateName | DocIdParts]
+    } = Req,
+    Db,
+    DDoc
+) ->
     DocId = ?l2b(string:join([?b2l(P) || P <- DocIdParts], "/")),
     Options = [conflicts, {user_ctx, Req#httpd.user_ctx}],
     Doc = maybe_open_doc(Db, DocId, Options),
     send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId);
-
 handle_doc_update_req(Req, _Db, _DDoc) ->
     chttpd:send_error(Req, 404, <<"update_error">>, <<"Invalid path.">>).
 
@@ -125,74 +142,107 @@ send_doc_update_response(Req, Db, DDoc, UpdateName, Doc, DocId) ->
     Cmd = [<<"updates">>, UpdateName],
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     UpdateResp = couch_query_servers:ddoc_prompt(DDoc, Cmd, [JsonDoc, JsonReq]),
-    JsonResp = case UpdateResp of
-        [<<"up">>, {NewJsonDoc}, {JsonResp0}] ->
-            case chttpd:header_value(Req, "X-Couch-Full-Commit", "false") of
-            "true" ->
-                Options = [full_commit, {user_ctx, Req#httpd.user_ctx}, {w, W}];
-            _ ->
-                Options = [{user_ctx, Req#httpd.user_ctx}, {w, W}]
-            end,
-            NewDoc = couch_db:doc_from_json_obj_validate(Db, {NewJsonDoc}),
-            couch_doc:validate_docid(NewDoc#doc.id),
-            {UpdateResult, NewRev} = fabric:update_doc(Db, NewDoc, Options),
-            chttpd_stats:incr_writes(),
-            NewRevStr = couch_doc:rev_to_str(NewRev),
-            case {UpdateResult, NewRev} of
-            {ok, _} ->
-                Code = 201;
-            {accepted, _} ->
-                Code = 202
-            end,
-            {JsonResp1} = apply_headers(JsonResp0, [
-                {<<"X-Couch-Update-NewRev">>, NewRevStr},
-                {<<"X-Couch-Id">>, couch_util:url_encode(NewDoc#doc.id)}
-            ]),
-            {[{<<"code">>, Code} | JsonResp1]};
-        [<<"up">>, _Other, {JsonResp0}] ->
-            {[{<<"code">>, 200} | JsonResp0]}
-    end,
+    JsonResp =
+        case UpdateResp of
+            [<<"up">>, {NewJsonDoc}, {JsonResp0}] ->
+                case chttpd:header_value(Req, "X-Couch-Full-Commit", "false") of
+                    "true" ->
+                        Options = [full_commit, {user_ctx, Req#httpd.user_ctx}, {w, W}];
+                    _ ->
+                        Options = [{user_ctx, Req#httpd.user_ctx}, {w, W}]
+                end,
+                NewDoc = couch_db:doc_from_json_obj_validate(Db, {NewJsonDoc}),
+                couch_doc:validate_docid(NewDoc#doc.id),
+                {UpdateResult, NewRev} = fabric:update_doc(Db, NewDoc, Options),
+                chttpd_stats:incr_writes(),
+                NewRevStr = couch_doc:rev_to_str(NewRev),
+                case {UpdateResult, NewRev} of
+                    {ok, _} ->
+                        Code = 201;
+                    {accepted, _} ->
+                        Code = 202
+                end,
+                {JsonResp1} = apply_headers(JsonResp0, [
+                    {<<"X-Couch-Update-NewRev">>, NewRevStr},
+                    {<<"X-Couch-Id">>, couch_util:url_encode(NewDoc#doc.id)}
+                ]),
+                {[{<<"code">>, Code} | JsonResp1]};
+            [<<"up">>, _Other, {JsonResp0}] ->
+                {[{<<"code">>, 200} | JsonResp0]}
+        end,
     % todo set location field
     chttpd_external:send_external_response(Req, JsonResp).
 
-
 % view-list request with view and list from same design doc.
-handle_view_list_req(#httpd{method=Method,
-        path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc)
-        when Method =:= 'GET' orelse Method =:= 'OPTIONS' ->
+handle_view_list_req(
+    #httpd{
+        method = Method,
+        path_parts = [_, _, DesignName, _, ListName, ViewName]
+    } = Req,
+    Db,
+    DDoc
+) when
+    Method =:= 'GET' orelse Method =:= 'OPTIONS'
+->
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
     handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
-
 % view-list request with view and list from different design docs.
-handle_view_list_req(#httpd{method=Method,
-        path_parts=[_, _, _, _, ListName, DesignName, ViewName]}=Req, Db, DDoc)
-        when Method =:= 'GET' orelse Method =:= 'OPTIONS' ->
+handle_view_list_req(
+    #httpd{
+        method = Method,
+        path_parts = [_, _, _, _, ListName, DesignName, ViewName]
+    } = Req,
+    Db,
+    DDoc
+) when
+    Method =:= 'GET' orelse Method =:= 'OPTIONS'
+->
     Keys = chttpd:qs_json_value(Req, "keys", undefined),
     handle_view_list(Req, Db, DDoc, ListName, {DesignName, ViewName}, Keys);
-
-handle_view_list_req(#httpd{method=Method}=Req, _Db, _DDoc)
-        when Method =:= 'GET' orelse Method =:= 'OPTIONS' ->
+handle_view_list_req(#httpd{method = Method} = Req, _Db, _DDoc) when
+    Method =:= 'GET' orelse Method =:= 'OPTIONS'
+->
     chttpd:send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
-
-handle_view_list_req(#httpd{method='POST',
-        path_parts=[_, _, DesignName, _, ListName, ViewName]}=Req, Db, DDoc) ->
+handle_view_list_req(
+    #httpd{
+        method = 'POST',
+        path_parts = [_, _, DesignName, _, ListName, ViewName]
+    } = Req,
+    Db,
+    DDoc
+) ->
     chttpd:validate_ctype(Req, "application/json"),
     {Props} = chttpd:json_body(Req),
     Keys = proplists:get_value(<<"keys">>, Props, undefined),
-    handle_view_list(Req#httpd{req_body={Props}}, Db, DDoc, ListName,
-        {DesignName, ViewName}, Keys);
-
-handle_view_list_req(#httpd{method='POST',
-        path_parts=[_, _, _, _, ListName, DesignName, ViewName]}=Req, Db, DDoc) ->
+    handle_view_list(
+        Req#httpd{req_body = {Props}},
+        Db,
+        DDoc,
+        ListName,
+        {DesignName, ViewName},
+        Keys
+    );
+handle_view_list_req(
+    #httpd{
+        method = 'POST',
+        path_parts = [_, _, _, _, ListName, DesignName, ViewName]
+    } = Req,
+    Db,
+    DDoc
+) ->
     chttpd:validate_ctype(Req, "application/json"),
     {Props} = chttpd:json_body(Req),
     Keys = proplists:get_value(<<"keys">>, Props, undefined),
-    handle_view_list(Req#httpd{req_body={Props}}, Db, DDoc, ListName,
-        {DesignName, ViewName}, Keys);
-
-handle_view_list_req(#httpd{method='POST'}=Req, _Db, _DDoc) ->
+    handle_view_list(
+        Req#httpd{req_body = {Props}},
+        Db,
+        DDoc,
+        ListName,
+        {DesignName, ViewName},
+        Keys
+    );
+handle_view_list_req(#httpd{method = 'POST'} = Req, _Db, _DDoc) ->
     chttpd:send_error(Req, 404, <<"list_error">>, <<"Invalid path.">>);
-
 handle_view_list_req(Req, _Db, _DDoc) ->
     chttpd:send_method_not_allowed(Req, "GET,POST,HEAD").
 
@@ -215,11 +265,17 @@ handle_view_list(Req, Db, DDoc, LName, {ViewDesignName, ViewName}, Keys) ->
             <<"_all_docs">> ->
                 fabric:all_docs(Db, Options, CB, Acc, QueryArgs);
             _ ->
-                fabric:query_view(Db, Options, VDoc, ViewName,
-                    CB, Acc, QueryArgs)
+                fabric:query_view(
+                    Db,
+                    Options,
+                    VDoc,
+                    ViewName,
+                    CB,
+                    Acc,
+                    QueryArgs
+                )
         end
     end).
-
 
 list_cb({row, Row} = Msg, Acc) ->
     case lists:keymember(doc, 1, Row) of
@@ -228,10 +284,8 @@ list_cb({row, Row} = Msg, Acc) ->
     end,
     chttpd_stats:incr_rows(),
     couch_mrview_show:list_cb(Msg, Acc);
-
 list_cb(Msg, Acc) ->
     couch_mrview_show:list_cb(Msg, Acc).
-
 
 % Maybe this is in the proplists API
 % todo move to couch_util
@@ -245,7 +299,7 @@ json_apply_field({Key, NewValue}, [{OtherKey, OtherVal} | Headers], Acc) ->
     json_apply_field({Key, NewValue}, Headers, [{OtherKey, OtherVal} | Acc]);
 json_apply_field({Key, NewValue}, [], Acc) ->
     % end of list, add ours
-    {[{Key, NewValue}|Acc]}.
+    {[{Key, NewValue} | Acc]}.
 
 apply_etag(JsonResp, undefined) ->
     JsonResp;
@@ -264,7 +318,7 @@ apply_headers(JsonResp, []) ->
 apply_headers(JsonResp, NewHeaders) ->
     case couch_util:get_value(<<"headers">>, JsonResp) of
         undefined ->
-            {[{<<"headers">>, {NewHeaders}}| JsonResp]};
+            {[{<<"headers">>, {NewHeaders}} | JsonResp]};
         JsonHeaders ->
             Headers = apply_headers1(JsonHeaders, NewHeaders),
             NewKV = {<<"headers">>, Headers},

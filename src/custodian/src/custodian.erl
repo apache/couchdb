@@ -18,4 +18,4 @@ report() ->
     custodian_util:report().
 
 summary() ->
-     custodian_util:summary().
+    custodian_util:summary().

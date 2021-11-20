@@ -18,12 +18,12 @@
 -export([compact/3, swap_compacted/2, remove_compacted/1]).
 
 -record(acc, {
-   btree = nil,
-   last_id = nil,
-   kvs = [],
-   kvs_size = 0,
-   changes = 0,
-   total_changes
+    btree = nil,
+    last_id = nil,
+    kvs = [],
+    kvs_size = 0,
+    changes = 0,
+    total_changes
 }).
 
 -define(DEFAULT_RECOMPACT_RETRY_COUNT, 3).
@@ -36,12 +36,12 @@ compact(_Db, State, Opts) ->
 
 compact(State) ->
     #mrst{
-        db_name=DbName,
-        idx_name=IdxName,
-        sig=Sig,
-        update_seq=Seq,
-        id_btree=IdBtree,
-        views=Views
+        db_name = DbName,
+        idx_name = IdxName,
+        sig = Sig,
+        update_seq = Seq,
+        id_btree = IdBtree,
+        views = Views
     } = State,
     erlang:put(io_priority, {view_compact, DbName, IdxName}),
 
@@ -65,7 +65,9 @@ compact(State) ->
             {ok, Kvs} = couch_mrview_util:get_row_count(View),
             Acc + Kvs
         end,
-        NumDocIds, Views),
+        NumDocIds,
+        Views
+    ),
 
     couch_task_status:add_task([
         {type, view_compaction},
@@ -83,24 +85,29 @@ compact(State) ->
 
     FoldFun = fun({DocId, ViewIdKeys} = KV, Acc) ->
         #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize} = Acc,
-        NewKvs = case Kvs of
-            [{DocId, OldViewIdKeys} | Rest] ->
-                couch_log:error("Dupes of ~s in ~s ~s",
-                                [DocId, DbName, IdxName]),
-                [{DocId, ViewIdKeys ++ OldViewIdKeys} | Rest];
-            _ ->
-                [KV | Kvs]
-        end,
+        NewKvs =
+            case Kvs of
+                [{DocId, OldViewIdKeys} | Rest] ->
+                    couch_log:error(
+                        "Dupes of ~s in ~s ~s",
+                        [DocId, DbName, IdxName]
+                    ),
+                    [{DocId, ViewIdKeys ++ OldViewIdKeys} | Rest];
+                _ ->
+                    [KV | Kvs]
+            end,
         KvsSize2 = KvsSize + ?term_size(KV),
         case KvsSize2 >= BufferSize of
             true ->
                 {ok, Bt2} = couch_btree:add(Bt, lists:reverse(NewKvs)),
                 Acc2 = update_task(Acc, length(NewKvs)),
                 {ok, Acc2#acc{
-                    btree = Bt2, kvs = [], kvs_size = 0, last_id = DocId}};
+                    btree = Bt2, kvs = [], kvs_size = 0, last_id = DocId
+                }};
             _ ->
                 {ok, Acc#acc{
-                    kvs = NewKvs, kvs_size = KvsSize2, last_id = DocId}}
+                    kvs = NewKvs, kvs_size = KvsSize2, last_id = DocId
+                }}
         end
     end,
 
@@ -110,26 +117,26 @@ compact(State) ->
     {ok, NewIdBtree} = couch_btree:add(Bt3, lists:reverse(Uncopied)),
     FinalAcc2 = update_task(FinalAcc, length(Uncopied)),
 
-
-    {NewViews, _} = lists:mapfoldl(fun({View, EmptyView}, Acc) ->
-        compact_view(View, EmptyView, BufferSize, Acc)
-    end, FinalAcc2, lists:zip(Views, EmptyViews)),
+    {NewViews, _} = lists:mapfoldl(
+        fun({View, EmptyView}, Acc) ->
+            compact_view(View, EmptyView, BufferSize, Acc)
+        end,
+        FinalAcc2,
+        lists:zip(Views, EmptyViews)
+    ),
 
     unlink(EmptyState#mrst.fd),
     {ok, EmptyState#mrst{
-        id_btree=NewIdBtree,
-        views=NewViews,
-        update_seq=Seq
+        id_btree = NewIdBtree,
+        views = NewViews,
+        update_seq = Seq
     }}.
-
 
 recompact(State) ->
     recompact(State, recompact_retry_count()).
 
-recompact(#mrst{db_name=DbName, idx_name=IdxName}, 0) ->
-    erlang:error({exceeded_recompact_retry_count,
-        [{db_name, DbName}, {idx_name, IdxName}]});
-
+recompact(#mrst{db_name = DbName, idx_name = IdxName}, 0) ->
+    erlang:error({exceeded_recompact_retry_count, [{db_name, DbName}, {idx_name, IdxName}]});
 recompact(State, RetryCount) ->
     Self = self(),
     link(State#mrst.fd),
@@ -159,27 +166,35 @@ recompact_retry_count() ->
         ?DEFAULT_RECOMPACT_RETRY_COUNT
     ).
 
-
 %% @spec compact_view(View, EmptyView, Retry, Acc) -> {CompactView, NewAcc}
-compact_view(#mrview{id_num=VID}=View, EmptyView, BufferSize, Acc0) ->
+compact_view(#mrview{id_num = VID} = View, EmptyView, BufferSize, Acc0) ->
+    {NewBt, FinalAcc} = compact_view_btree(
+        View#mrview.btree,
+        EmptyView#mrview.btree,
+        VID,
+        BufferSize,
+        Acc0
+    ),
 
-    {NewBt, FinalAcc} = compact_view_btree(View#mrview.btree,
-                                       EmptyView#mrview.btree,
-                                       VID, BufferSize, Acc0),
-
-    {EmptyView#mrview{btree=NewBt,
-                      update_seq=View#mrview.update_seq,
-                      purge_seq=View#mrview.purge_seq}, FinalAcc}.
+    {
+        EmptyView#mrview{
+            btree = NewBt,
+            update_seq = View#mrview.update_seq,
+            purge_seq = View#mrview.purge_seq
+        },
+        FinalAcc
+    }.
 
 compact_view_btree(Btree, EmptyBtree, VID, BufferSize, Acc0) ->
     Fun = fun(KV, #acc{btree = Bt, kvs = Kvs, kvs_size = KvsSize} = Acc) ->
         KvsSize2 = KvsSize + ?term_size(KV),
-        if KvsSize2 >= BufferSize ->
-            {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV | Kvs])),
-            Acc2 = update_task(VID, Acc, 1 + length(Kvs)),
-            {ok, Acc2#acc{btree = Bt2, kvs = [], kvs_size = 0}};
-        true ->
-            {ok, Acc#acc{kvs = [KV | Kvs], kvs_size = KvsSize2}}
+        if
+            KvsSize2 >= BufferSize ->
+                {ok, Bt2} = couch_btree:add(Bt, lists:reverse([KV | Kvs])),
+                Acc2 = update_task(VID, Acc, 1 + length(Kvs)),
+                {ok, Acc2#acc{btree = Bt2, kvs = [], kvs_size = 0}};
+            true ->
+                {ok, Acc#acc{kvs = [KV | Kvs], kvs_size = KvsSize2}}
         end
     end,
 
@@ -193,11 +208,18 @@ compact_view_btree(Btree, EmptyBtree, VID, BufferSize, Acc0) ->
 update_task(Acc, ChangesInc) ->
     update_task(null, Acc, ChangesInc).
 
-
-update_task(VID, #acc{changes=Changes, total_changes=Total}=Acc, ChangesInc) ->
-    Phase = if is_integer(VID) -> view; true -> ids end,
+update_task(VID, #acc{changes = Changes, total_changes = Total} = Acc, ChangesInc) ->
+    Phase =
+        if
+            is_integer(VID) -> view;
+            true -> ids
+        end,
     Changes2 = Changes + ChangesInc,
-    Progress = if Total == 0 -> 0; true -> (Changes2 * 100) div Total end,
+    Progress =
+        if
+            Total == 0 -> 0;
+            true -> (Changes2 * 100) div Total
+        end,
     couch_task_status:update([
         {phase, Phase},
         {view, VID},
@@ -207,15 +229,14 @@ update_task(VID, #acc{changes=Changes, total_changes=Total}=Acc, ChangesInc) ->
     ]),
     Acc#acc{changes = Changes2}.
 
-
 swap_compacted(OldState, NewState) ->
     #mrst{
         fd = Fd
     } = OldState,
     #mrst{
-        sig=Sig,
-        db_name=DbName,
-        fd=NewFd
+        sig = Sig,
+        db_name = DbName,
+        fd = NewFd
     } = NewState,
 
     link(NewState#mrst.fd),
@@ -227,23 +248,24 @@ swap_compacted(OldState, NewState) ->
 
     {ok, Pre} = couch_file:bytes(Fd),
     {ok, Post} = couch_file:bytes(NewFd),
-    couch_log:notice("Compaction swap for view ~s ~p ~p", [IndexFName,
-        Pre, Post]),
+    couch_log:notice("Compaction swap for view ~s ~p ~p", [
+        IndexFName,
+        Pre,
+        Post
+    ]),
     ok = couch_file:delete(RootDir, IndexFName),
     ok = file:rename(CompactFName, IndexFName),
 
     unlink(OldState#mrst.fd),
     erlang:demonitor(OldState#mrst.fd_monitor, [flush]),
 
-    {ok, NewState#mrst{fd_monitor=Ref}}.
-
+    {ok, NewState#mrst{fd_monitor = Ref}}.
 
 remove_compacted(#mrst{sig = Sig, db_name = DbName} = State) ->
     RootDir = couch_index_util:root_dir(),
     CompactFName = couch_mrview_util:compaction_file(DbName, Sig),
     ok = couch_file:delete(RootDir, CompactFName),
     {ok, State}.
-
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
@@ -268,27 +290,28 @@ recompact_test_() ->
 
 recompact_success_after_progress() ->
     ?_test(begin
-        ok = meck:expect(couch_index_updater, update, fun
-            (Pid, _, #mrst{update_seq=0} = State) ->
-                Pid ! {'$gen_cast', {new_state, State#mrst{update_seq = 1}}},
-                timer:sleep(100),
-                exit({updated, self(), State#mrst{update_seq = 2}})
+        ok = meck:expect(couch_index_updater, update, fun(Pid, _, #mrst{update_seq = 0} = State) ->
+            Pid ! {'$gen_cast', {new_state, State#mrst{update_seq = 1}}},
+            timer:sleep(100),
+            exit({updated, self(), State#mrst{update_seq = 2}})
         end),
-        State = #mrst{fd=self(), update_seq=0},
+        State = #mrst{fd = self(), update_seq = 0},
         ?assertEqual({ok, State#mrst{update_seq = 2}}, recompact(State))
     end).
 
 recompact_exceeded_retry_count() ->
     ?_test(begin
-        ok = meck:expect(couch_index_updater, update,
+        ok = meck:expect(
+            couch_index_updater,
+            update,
             fun(_, _, _) ->
                 exit(error)
-        end),
+            end
+        ),
         ok = meck:expect(couch_log, warning, fun(_, _) -> ok end),
-        State = #mrst{fd=self(), db_name=foo, idx_name=bar},
-        ExpectedError = {exceeded_recompact_retry_count,
-            [{db_name, foo}, {idx_name, bar}]},
-            ?assertError(ExpectedError, recompact(State))
+        State = #mrst{fd = self(), db_name = foo, idx_name = bar},
+        ExpectedError = {exceeded_recompact_retry_count, [{db_name, foo}, {idx_name, bar}]},
+        ?assertError(ExpectedError, recompact(State))
     end).
 
 -endif.

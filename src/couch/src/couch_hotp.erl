@@ -14,15 +14,16 @@
 
 -export([generate/4]).
 
-generate(Alg, Key, Counter, OutputLen)
-  when is_atom(Alg), is_binary(Key), is_integer(Counter), is_integer(OutputLen) ->
+generate(Alg, Key, Counter, OutputLen) when
+    is_atom(Alg), is_binary(Key), is_integer(Counter), is_integer(OutputLen)
+->
     Hmac = couch_util:hmac(Alg, Key, <<Counter:64>>),
     Offset = binary:last(Hmac) band 16#f,
     Code =
         ((binary:at(Hmac, Offset) band 16#7f) bsl 24) +
-        ((binary:at(Hmac, Offset + 1) band 16#ff) bsl 16) +
-        ((binary:at(Hmac, Offset + 2) band 16#ff) bsl 8) +
-        ((binary:at(Hmac, Offset + 3) band 16#ff)),
+            ((binary:at(Hmac, Offset + 1) band 16#ff) bsl 16) +
+            ((binary:at(Hmac, Offset + 2) band 16#ff) bsl 8) +
+            (binary:at(Hmac, Offset + 3) band 16#ff),
     case OutputLen of
         6 -> Code rem 1000000;
         7 -> Code rem 10000000;

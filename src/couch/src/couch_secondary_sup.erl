@@ -15,16 +15,12 @@
 -export([init/1, start_link/0]).
 
 start_link() ->
-    supervisor:start_link({local,couch_secondary_services}, ?MODULE, []).
+    supervisor:start_link({local, couch_secondary_services}, ?MODULE, []).
 
 init([]) ->
     SecondarySupervisors = [
-        {couch_plugin_event,
-            {gen_event, start_link, [{local, couch_plugin}]},
-            permanent,
-            brutal_kill,
-            worker,
-            dynamic}
+        {couch_plugin_event, {gen_event, start_link, [{local, couch_plugin}]}, permanent,
+            brutal_kill, worker, dynamic}
     ],
     Daemons = [
         {index_server, {couch_index_server, start_link, []}},
@@ -33,31 +29,34 @@ init([]) ->
         {uuids, {couch_uuids, start, []}}
     ],
 
-    MaybeHttp = case http_enabled() of
-        true -> [{httpd, {couch_httpd, start_link, []}}];
-        false -> couch_httpd:set_auth_handlers(), []
-    end,
+    MaybeHttp =
+        case http_enabled() of
+            true ->
+                [{httpd, {couch_httpd, start_link, []}}];
+            false ->
+                couch_httpd:set_auth_handlers(),
+                []
+        end,
 
-    MaybeHttps = case https_enabled() of
-        true -> [{httpsd, {chttpd, start_link, [https]}}];
-        false -> []
-    end,
+    MaybeHttps =
+        case https_enabled() of
+            true -> [{httpsd, {chttpd, start_link, [https]}}];
+            false -> []
+        end,
 
-    Children = SecondarySupervisors ++ [
-        begin
-            {Module, Fun, Args} = Spec,
+    Children =
+        SecondarySupervisors ++
+            [
+                begin
+                    {Module, Fun, Args} = Spec,
 
-            {Name,
-                {Module, Fun, Args},
-                permanent,
-                brutal_kill,
-                worker,
-                [Module]}
-        end
-        || {Name, Spec}
-        <- Daemons ++ MaybeHttp ++ MaybeHttps, Spec /= ""],
-    {ok, {{one_for_one, 50, 3600},
-        couch_epi:register_service(couch_db_epi, Children)}}.
+                    {Name, {Module, Fun, Args}, permanent, brutal_kill, worker, [Module]}
+                end
+             || {Name, Spec} <-
+                    Daemons ++ MaybeHttp ++ MaybeHttps,
+                Spec /= ""
+            ],
+    {ok, {{one_for_one, 50, 3600}, couch_epi:register_service(couch_db_epi, Children)}}.
 
 http_enabled() ->
     config:get_boolean("httpd", "enable", false).

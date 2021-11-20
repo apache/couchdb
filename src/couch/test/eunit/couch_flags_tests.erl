@@ -55,7 +55,9 @@ rules() ->
 
 setup() ->
     %% FIXME after we upgrade couch_epi
-    application:stop(couch_epi), % in case it's already running from other tests...
+
+    % in case it's already running from other tests...
+    application:stop(couch_epi),
     application:unload(couch_epi),
 
     application:load(couch_epi),
@@ -63,8 +65,7 @@ setup() ->
     meck:expect(config, get, 1, []),
 
     Ctx = test_util:start_couch([couch_epi]),
-    Ctx. 
-
+    Ctx.
 
 teardown(Ctx) ->
     test_util:stop_couch(Ctx),
@@ -76,57 +77,65 @@ couch_flags_test_() ->
     {
         "test couch_flags",
         {
-           setup, fun setup/0, fun teardown/1,
-           enabled_flags_tests()
-              ++ is_enabled()
-%%              ++ match_performance()
+            setup,
+            fun setup/0,
+            fun teardown/1,
+            enabled_flags_tests() ++
+                is_enabled()
+            %%              ++ match_performance()
         }
     }.
 
 enabled_flags_tests() ->
-
-    [{"enabled_flags_tests", [
-        {"flags_default_rule",
-         ?_assertEqual(
-            [foo], couch_flags:enabled("something"))},
-        {"flags_wildcard_rule",
-         ?_assertEqual(
-            [bar, baz, foo],
-            couch_flags:enabled("shards/test/something"))},
-        {"flags_exact_rule",
-         ?_assertEqual(
-            [bar, baz, foo],
-            couch_flags:enabled("shards/test/exact"))},
-        {"flags_blacklist_rule",
-         ?_assertEqual(
-            [],
-            couch_flags:enabled("shards/blacklist/4"))}
-    ]}].
+    [
+        {"enabled_flags_tests", [
+            {"flags_default_rule",
+                ?_assertEqual(
+                    [foo], couch_flags:enabled("something")
+                )},
+            {"flags_wildcard_rule",
+                ?_assertEqual(
+                    [bar, baz, foo],
+                    couch_flags:enabled("shards/test/something")
+                )},
+            {"flags_exact_rule",
+                ?_assertEqual(
+                    [bar, baz, foo],
+                    couch_flags:enabled("shards/test/exact")
+                )},
+            {"flags_blacklist_rule",
+                ?_assertEqual(
+                    [],
+                    couch_flags:enabled("shards/blacklist/4")
+                )}
+        ]}
+    ].
 
 is_enabled() ->
-     [{"is_enabled_tests", [
-        {"flags_default_rule [enabled]",
-            ?_assert(couch_flags:is_enabled(foo, "something"))},
-        {"flags_default_rule [disabled]",
-            ?_assertNot(couch_flags:is_enabled(baz, "something"))},
-        {"flags_default_rule [not_existent]",
-            ?_assertNot(couch_flags:is_enabled(non_existent, "something"))},
+    [
+        {"is_enabled_tests", [
+            {"flags_default_rule [enabled]", ?_assert(couch_flags:is_enabled(foo, "something"))},
+            {"flags_default_rule [disabled]",
+                ?_assertNot(couch_flags:is_enabled(baz, "something"))},
+            {"flags_default_rule [not_existent]",
+                ?_assertNot(couch_flags:is_enabled(non_existent, "something"))},
 
-        {"flags_wildcard_rule [enabled]",
-            ?_assert(couch_flags:is_enabled(bar, "shards/test/something"))},
-        {"flags_wildcard_rule [not_existent]",
-            ?_assertNot(couch_flags:is_enabled(non_existent, "shards/test/something"))},
+            {"flags_wildcard_rule [enabled]",
+                ?_assert(couch_flags:is_enabled(bar, "shards/test/something"))},
+            {"flags_wildcard_rule [not_existent]",
+                ?_assertNot(couch_flags:is_enabled(non_existent, "shards/test/something"))},
 
-        {"flags_exact_rule [overide_disbled]",
-            ?_assert(couch_flags:is_enabled(bar, "shards/test/exact"))},
-        {"flags_exact_rule [not_existent]",
-            ?_assertNot(couch_flags:is_enabled(non_existent, "shards/test/exact"))},
+            {"flags_exact_rule [overide_disbled]",
+                ?_assert(couch_flags:is_enabled(bar, "shards/test/exact"))},
+            {"flags_exact_rule [not_existent]",
+                ?_assertNot(couch_flags:is_enabled(non_existent, "shards/test/exact"))},
 
-        {"flags_blacklist_rule [overide_enabled]",
-            ?_assertNot(couch_flags:is_enabled(foo, "shards/blacklist/4"))},
-        {"flags_blacklist_rule [not_existent]",
-            ?_assertNot(couch_flags:is_enabled(non_existent, "shards/blacklist/4"))}
-    ]}].
+            {"flags_blacklist_rule [overide_enabled]",
+                ?_assertNot(couch_flags:is_enabled(foo, "shards/blacklist/4"))},
+            {"flags_blacklist_rule [not_existent]",
+                ?_assertNot(couch_flags:is_enabled(non_existent, "shards/blacklist/4"))}
+        ]}
+    ].
 
 %% match_performance() ->
 %%     [{"match_performance", [
@@ -136,7 +145,6 @@ is_enabled() ->
 %%             end, lists:seq(1, 1000000)))
 %%         end)
 %%     ]}].
-
 
 test_config() ->
     [

@@ -12,11 +12,9 @@
 
 -module(ddoc_cache_open_error_test).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("ddoc_cache_test.hrl").
-
 
 start_couch() ->
     Ctx = ddoc_cache_tutil:start_couch(),
@@ -25,11 +23,9 @@ start_couch() ->
     end),
     Ctx.
 
-
 stop_couch(Ctx) ->
     meck:unload(),
     ddoc_cache_tutil:stop_couch(Ctx).
-
 
 check_open_error_test_() ->
     {
@@ -40,7 +36,6 @@ check_open_error_test_() ->
             {"handle_open_error", fun handle_open_error/1}
         ])
     }.
-
 
 handle_open_error({DbName, _}) ->
     ?assertError(test_kaboom, ddoc_cache:open_doc(DbName, ?FOOBAR)).

@@ -56,20 +56,23 @@
 -export([main/1]).
 
 -define(OPTS, [
-               {etc,   $c,        "etc",   string,         "Path to the CouchDB configuration directory"},
-               {level, $d,        "level", {atom, notice}, "Minimum message severity level (default: notice)"},
-               {expert, $e,       "expert", undefined,     "Perform more detailed diagnostics"               },
-               {usage, $h,        "help",  undefined,      "Display help/usage"                              },
-               {list,  $l,        "list",  undefined,      "Describe available diagnostic tasks"             },
-               {all_nodes, $a,    "all-nodes", undefined,  "Run weatherreport on all cluster nodes"          },
-               {timeout, $t,      "timeout", integer,      "Timeout value (in ms) for each diagnostic check"              }
-              ]).
+    {etc, $c, "etc", string, "Path to the CouchDB configuration directory"},
+    {level, $d, "level", {atom, notice}, "Minimum message severity level (default: notice)"},
+    {expert, $e, "expert", undefined, "Perform more detailed diagnostics"},
+    {usage, $h, "help", undefined, "Display help/usage"},
+    {list, $l, "list", undefined, "Describe available diagnostic tasks"},
+    {all_nodes, $a, "all-nodes", undefined, "Run weatherreport on all cluster nodes"},
+    {timeout, $t, "timeout", integer, "Timeout value (in ms) for each diagnostic check"}
+]).
 
--define(USAGE_OPTS, [ O || O <- ?OPTS,
-                           element(5,O) =/= undefined]).
+-define(USAGE_OPTS, [
+    O
+ || O <- ?OPTS,
+    element(5, O) =/= undefined
+]).
 
 %% @doc The main entry point for the weatherreport escript.
--spec main(CommandLineArguments::[string()]) -> any().
+-spec main(CommandLineArguments :: [string()]) -> any().
 main(Args) ->
     application:load(weatherreport),
 
@@ -86,15 +89,22 @@ main(Args) ->
     end.
 
 list_checks() ->
-    Descriptions = [ {weatherreport_util:short_name(Mod), Mod:description()} ||
-                       Mod <- weatherreport_check:modules() ],
+    Descriptions = [
+        {weatherreport_util:short_name(Mod), Mod:description()}
+     || Mod <- weatherreport_check:modules()
+    ],
     io:format("Available diagnostic checks:~n~n"),
-    lists:foreach(fun({Mod, Desc}) ->
-                          io:format("  ~.20s ~s~n", [Mod, Desc])
-                  end, lists:sort(Descriptions)).
+    lists:foreach(
+        fun({Mod, Desc}) ->
+            io:format("  ~.20s ~s~n", [Mod, Desc])
+        end,
+        lists:sort(Descriptions)
+    ).
 
 usage() ->
-    weatherreport_getopt:usage(?USAGE_OPTS, "weatherreport ", "[check_name ...]", [{"check_name", "A specific check to run"}]).
+    weatherreport_getopt:usage(?USAGE_OPTS, "weatherreport ", "[check_name ...]", [
+        {"check_name", "A specific check to run"}
+    ]).
 
 run(InputChecks) ->
     case weatherreport_config:prepare() of
@@ -104,47 +114,58 @@ run(InputChecks) ->
         _ ->
             ok
     end,
-    Checks = case InputChecks of
-    [] ->
-        weatherreport_check:modules();
-    _ ->
-        ShortNames = [{weatherreport_util:short_name(Mod), Mod} || Mod <- weatherreport_check:modules() ],
-        element(1, lists:foldr(fun validate_checks/2, {[], ShortNames}, InputChecks))
-    end,
-    Messages = case application:get_env(weatherreport, all_nodes) of
-        {ok, true} ->
-            weatherreport_runner:run(Checks, all);
-        _ ->
-            weatherreport_runner:run(Checks)
-    end,
-    case Messages of
-    [] ->
-        io:format("No diagnostic messages to report.~n"),
-        halt(0);
-    _ ->
-        %% Print the most critical messages first
-        FilteredMessages = lists:filter(fun({_,Level,_,_}) ->
-            weatherreport_log:should_log(Level)
-        end, Messages),
-        SortedMessages = lists:sort(fun({_, ALevel, _, _}, {_, BLevel, _, _}) ->
-            weatherreport_log:level(ALevel) =< weatherreport_log:level(BLevel)
-        end, FilteredMessages),
-        case SortedMessages of
+    Checks =
+        case InputChecks of
             [] ->
-                io:format("No diagnostic messages to report.~n"),
-                halt(0);
+                weatherreport_check:modules();
             _ ->
-                lists:foreach(fun weatherreport_check:print/1, SortedMessages),
-                weatherreport_util:flush_stdout(),
-                halt(1)
+                ShortNames = [
+                    {weatherreport_util:short_name(Mod), Mod}
+                 || Mod <- weatherreport_check:modules()
+                ],
+                element(1, lists:foldr(fun validate_checks/2, {[], ShortNames}, InputChecks))
         end,
-        halt(1)
+    Messages =
+        case application:get_env(weatherreport, all_nodes) of
+            {ok, true} ->
+                weatherreport_runner:run(Checks, all);
+            _ ->
+                weatherreport_runner:run(Checks)
+        end,
+    case Messages of
+        [] ->
+            io:format("No diagnostic messages to report.~n"),
+            halt(0);
+        _ ->
+            %% Print the most critical messages first
+            FilteredMessages = lists:filter(
+                fun({_, Level, _, _}) ->
+                    weatherreport_log:should_log(Level)
+                end,
+                Messages
+            ),
+            SortedMessages = lists:sort(
+                fun({_, ALevel, _, _}, {_, BLevel, _, _}) ->
+                    weatherreport_log:level(ALevel) =< weatherreport_log:level(BLevel)
+                end,
+                FilteredMessages
+            ),
+            case SortedMessages of
+                [] ->
+                    io:format("No diagnostic messages to report.~n"),
+                    halt(0);
+                _ ->
+                    lists:foreach(fun weatherreport_check:print/1, SortedMessages),
+                    weatherreport_util:flush_stdout(),
+                    halt(1)
+            end,
+            halt(1)
     end.
 
 validate_checks(Check, {Mods, SNames}) ->
     case lists:keyfind(Check, 1, SNames) of
         {Check, Mod} ->
-            {[Mod|Mods], lists:delete({Check, Mod}, SNames)};
+            {[Mod | Mods], lists:delete({Check, Mod}, SNames)};
         _ ->
             io:format("Unknown check '~s' specified, skipping.~n", [Check]),
             {Mods, SNames}
@@ -155,10 +176,10 @@ process_opts(Opts) ->
 
 process_opts([], Result) ->
     Result;
-process_opts([H|T], Result) ->
+process_opts([H | T], Result) ->
     process_opts(T, process_option(H, Result)).
 
-process_option({etc,Path}, Result) ->
+process_option({etc, Path}, Result) ->
     application:set_env(weatherreport, etc, filename:absname(Path)),
     Result;
 process_option({level, Level}, Result) ->
@@ -173,7 +194,8 @@ process_option(expert, Result) ->
 process_option(all_nodes, Result) ->
     application:set_env(weatherreport, all_nodes, true),
     Result;
-process_option(list, usage) -> %% Help should have precedence over listing checks
+%% Help should have precedence over listing checks
+process_option(list, usage) ->
     usage;
 process_option(list, _) ->
     list;

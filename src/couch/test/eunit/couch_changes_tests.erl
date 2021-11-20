@@ -28,39 +28,49 @@
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = create_db(DbName),
-    Revs = [R || {ok, R} <- [
-        save_doc(Db, {[{<<"_id">>, <<"doc1">>}]}),
-        save_doc(Db, {[{<<"_id">>, <<"doc2">>}]}),
-        save_doc(Db, {[{<<"_id">>, <<"doc3">>}]}),
-        save_doc(Db, {[{<<"_id">>, <<"doc4">>}]}),
-        save_doc(Db, {[{<<"_id">>, <<"doc5">>}]})
-    ]],
+    Revs = [
+        R
+     || {ok, R} <- [
+            save_doc(Db, {[{<<"_id">>, <<"doc1">>}]}),
+            save_doc(Db, {[{<<"_id">>, <<"doc2">>}]}),
+            save_doc(Db, {[{<<"_id">>, <<"doc3">>}]}),
+            save_doc(Db, {[{<<"_id">>, <<"doc4">>}]}),
+            save_doc(Db, {[{<<"_id">>, <<"doc5">>}]})
+        ]
+    ],
     Rev = lists:nth(3, Revs),
     {ok, Db1} = couch_db:reopen(Db),
 
     {ok, Rev1} = save_doc(Db1, {[{<<"_id">>, <<"doc3">>}, {<<"_rev">>, Rev}]}),
     Revs1 = Revs ++ [Rev1],
-    Revs2 = Revs1 ++ [R || {ok, R} <- [
-        save_doc(Db1, {[{<<"_id">>, <<"doc6">>}]}),
-        save_doc(Db1, {[{<<"_id">>, <<"_design/foo">>}]}),
-        save_doc(Db1, {[{<<"_id">>, <<"doc7">>}]}),
-        save_doc(Db1, {[{<<"_id">>, <<"doc8">>}]})
-    ]],
-    config:set("native_query_servers", "erlang", "{couch_native_process, start_link, []}", _Persist=false),
+    Revs2 =
+        Revs1 ++
+            [
+                R
+             || {ok, R} <- [
+                    save_doc(Db1, {[{<<"_id">>, <<"doc6">>}]}),
+                    save_doc(Db1, {[{<<"_id">>, <<"_design/foo">>}]}),
+                    save_doc(Db1, {[{<<"_id">>, <<"doc7">>}]}),
+                    save_doc(Db1, {[{<<"_id">>, <<"doc8">>}]})
+                ]
+            ],
+    config:set(
+        "native_query_servers", "erlang", "{couch_native_process, start_link, []}", _Persist = false
+    ),
     {DbName, list_to_tuple(Revs2)}.
 
 teardown({DbName, _}) ->
-    config:delete("native_query_servers", "erlang", _Persist=false),
+    config:delete("native_query_servers", "erlang", _Persist = false),
     delete_db(DbName),
     ok.
-
 
 changes_test_() ->
     {
         "Changes feed",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun test_util:start_couch/0,
+            fun test_util:stop_couch/1,
             [
                 filter_by_selector(),
                 filter_by_doc_id(),
@@ -78,7 +88,8 @@ filter_by_doc_id() ->
         "Filter _doc_id",
         {
             foreach,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun should_filter_by_specific_doc_ids/1,
                 fun should_filter_by_specific_doc_ids_descending/1,
@@ -94,7 +105,8 @@ filter_by_selector() ->
         "Filter _selector",
         {
             foreach,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun should_select_basic/1,
                 fun should_select_with_since/1,
@@ -108,13 +120,13 @@ filter_by_selector() ->
         }
     }.
 
-
 filter_by_design() ->
     {
         "Filter _design",
         {
             foreach,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun should_emit_only_design_documents/1
             ]
@@ -138,7 +150,8 @@ filter_by_filter_function() ->
         "Filter by filters",
         {
             foreach,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun should_filter_by_doc_attribute/1,
                 fun should_filter_by_user_ctx/1
@@ -151,7 +164,8 @@ filter_by_view() ->
         "Filter _view",
         {
             foreach,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun should_filter_by_view/1,
                 fun should_filter_by_erlang_view/1
@@ -164,14 +178,14 @@ continuous_feed() ->
         "Continuous Feed",
         {
             foreach,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun should_filter_continuous_feed_by_specific_doc_ids/1,
                 fun should_end_changes_when_db_deleted/1
             ]
         }
     }.
-
 
 should_filter_by_specific_doc_ids({DbName, _}) ->
     ?_test(
@@ -190,7 +204,8 @@ should_filter_by_specific_doc_ids({DbName, _}) ->
             ?assertEqual(<<"doc3">>, Id2),
             ?assertEqual(6, Seq2),
             ?assertEqual(UpSeq, LastSeq)
-        end).
+        end
+    ).
 
 should_filter_by_specific_doc_ids_descending({DbName, _}) ->
     ?_test(
@@ -210,7 +225,8 @@ should_filter_by_specific_doc_ids_descending({DbName, _}) ->
             ?assertEqual(<<"doc4">>, Id2),
             ?assertEqual(4, Seq2),
             ?assertEqual(4, LastSeq)
-        end).
+        end
+    ).
 
 should_filter_by_specific_doc_ids_with_since({DbName, _}) ->
     ?_test(
@@ -228,7 +244,8 @@ should_filter_by_specific_doc_ids_with_since({DbName, _}) ->
             ?assertEqual(<<"doc3">>, Id1),
             ?assertEqual(6, Seq1),
             ?assertEqual(UpSeq, LastSeq)
-        end).
+        end
+    ).
 
 should_filter_by_specific_doc_ids_no_result({DbName, _}) ->
     ?_test(
@@ -243,7 +260,8 @@ should_filter_by_specific_doc_ids_no_result({DbName, _}) ->
 
             ?assertEqual(0, length(Rows)),
             ?assertEqual(UpSeq, LastSeq)
-        end).
+        end
+    ).
 
 should_handle_deleted_docs({DbName, Revs}) ->
     ?_test(
@@ -252,9 +270,12 @@ should_handle_deleted_docs({DbName, Revs}) ->
             {ok, Db} = couch_db:open_int(DbName, []),
             {ok, _} = save_doc(
                 Db,
-                {[{<<"_id">>, <<"doc3">>},
-                  {<<"_deleted">>, true},
-                  {<<"_rev">>, Rev3_2}]}),
+                {[
+                    {<<"_id">>, <<"doc3">>},
+                    {<<"_deleted">>, true},
+                    {<<"_rev">>, Rev3_2}
+                ]}
+            ),
 
             ChArgs = #changes_args{
                 filter = "_doc_ids",
@@ -270,7 +291,8 @@ should_handle_deleted_docs({DbName, Revs}) ->
                 Rows
             ),
             ?assertEqual(11, LastSeq)
-        end).
+        end
+    ).
 
 should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
     ?_test(
@@ -305,14 +327,29 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
 
             Rev4 = element(4, Revs),
             Rev3_2 = element(6, Revs),
-            {ok, Rev4_2} = save_doc(Db, {[{<<"_id">>, <<"doc4">>},
-                                          {<<"_rev">>, Rev4}]}),
+            {ok, Rev4_2} = save_doc(
+                Db,
+                {[
+                    {<<"_id">>, <<"doc4">>},
+                    {<<"_rev">>, Rev4}
+                ]}
+            ),
             {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc11">>}]}),
-            {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc4">>},
-                                     {<<"_rev">>, Rev4_2}]}),
+            {ok, _} = save_doc(
+                Db,
+                {[
+                    {<<"_id">>, <<"doc4">>},
+                    {<<"_rev">>, Rev4_2}
+                ]}
+            ),
             {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc12">>}]}),
-            {ok, Rev3_3} = save_doc(Db, {[{<<"_id">>, <<"doc3">>},
-                                          {<<"_rev">>, Rev3_2}]}),
+            {ok, Rev3_3} = save_doc(
+                Db,
+                {[
+                    {<<"_id">>, <<"doc3">>},
+                    {<<"_rev">>, Rev3_2}
+                ]}
+            ),
             reset_row_notifications(),
             ok = unpause(Consumer),
             ?assertEqual(ok, wait_row_notifications(2)),
@@ -327,8 +364,13 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
             ?assertEqual(17, Row16#row.seq),
 
             clear_rows(Consumer),
-            {ok, _Rev3_4} = save_doc(Db, {[{<<"_id">>, <<"doc3">>},
-                                           {<<"_rev">>, Rev3_3}]}),
+            {ok, _Rev3_4} = save_doc(
+                Db,
+                {[
+                    {<<"_id">>, <<"doc3">>},
+                    {<<"_rev">>, Rev3_3}
+                ]}
+            ),
             reset_row_notifications(),
             ok = unpause(Consumer),
             ?assertEqual(ok, wait_row_notifications(1)),
@@ -340,8 +382,8 @@ should_filter_continuous_feed_by_specific_doc_ids({DbName, Revs}) ->
             stop_consumer(Consumer),
 
             ?assertMatch([#row{seq = 18, id = <<"doc3">>}], FinalRows)
-        end).
-
+        end
+    ).
 
 should_end_changes_when_db_deleted({DbName, _Revs}) ->
     ?_test(begin
@@ -361,7 +403,6 @@ should_end_changes_when_db_deleted({DbName, _Revs}) ->
         ok
     end).
 
-
 should_select_basic({DbName, _}) ->
     ?_test(
         begin
@@ -374,7 +415,8 @@ should_select_basic({DbName, _}) ->
             ?assertEqual(<<"doc3">>, Id),
             ?assertEqual(6, Seq),
             ?assertEqual(UpSeq, LastSeq)
-        end).
+        end
+    ).
 
 should_select_with_since({DbName, _}) ->
     ?_test(
@@ -389,7 +431,8 @@ should_select_with_since({DbName, _}) ->
             ?assertEqual(<<"doc8">>, Id),
             ?assertEqual(10, Seq),
             ?assertEqual(UpSeq, LastSeq)
-        end).
+        end
+    ).
 
 should_select_when_no_result({DbName, _}) ->
     ?_test(
@@ -400,7 +443,8 @@ should_select_when_no_result({DbName, _}) ->
             {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(0, length(Rows)),
             ?assertEqual(UpSeq, LastSeq)
-        end).
+        end
+    ).
 
 should_select_with_deleted_docs({DbName, Revs}) ->
     ?_test(
@@ -409,9 +453,12 @@ should_select_with_deleted_docs({DbName, Revs}) ->
             {ok, Db} = couch_db:open_int(DbName, []),
             {ok, _} = save_doc(
                 Db,
-                {[{<<"_id">>, <<"doc3">>},
-                  {<<"_deleted">>, true},
-                  {<<"_rev">>, Rev3_2}]}),
+                {[
+                    {<<"_id">>, <<"doc3">>},
+                    {<<"_deleted">>, true},
+                    {<<"_rev">>, Rev3_2}
+                ]}
+            ),
             ChArgs = #changes_args{filter = "_selector"},
             Selector = {[{<<"_id">>, <<"doc3">>}]},
             Req = {json_req, {[{<<"selector">>, Selector}]}},
@@ -421,7 +468,8 @@ should_select_with_deleted_docs({DbName, Revs}) ->
                 Rows
             ),
             ?assertEqual(11, LastSeq)
-        end).
+        end
+    ).
 
 should_select_with_continuous({DbName, Revs}) ->
     ?_test(
@@ -437,8 +485,8 @@ should_select_with_continuous({DbName, Revs}) ->
             ok = pause(Consumer),
             Rows = get_rows(Consumer),
             ?assertMatch(
-               [#row{seq = 10, id = <<"doc8">>, deleted = false}],
-               Rows
+                [#row{seq = 10, id = <<"doc8">>, deleted = false}],
+                Rows
             ),
             clear_rows(Consumer),
             {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc01">>}]}),
@@ -448,45 +496,60 @@ should_select_with_continuous({DbName, Revs}) ->
             ?assertEqual([], get_rows(Consumer)),
             Rev4 = element(4, Revs),
             Rev8 = element(10, Revs),
-            {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc8">>},
-                                     {<<"_rev">>, Rev8}]}),
-            {ok, _} = save_doc(Db, {[{<<"_id">>, <<"doc4">>},
-                                     {<<"_rev">>, Rev4}]}),
+            {ok, _} = save_doc(
+                Db,
+                {[
+                    {<<"_id">>, <<"doc8">>},
+                    {<<"_rev">>, Rev8}
+                ]}
+            ),
+            {ok, _} = save_doc(
+                Db,
+                {[
+                    {<<"_id">>, <<"doc4">>},
+                    {<<"_rev">>, Rev4}
+                ]}
+            ),
             reset_row_notifications(),
             ok = unpause(Consumer),
             ?assertEqual(ok, wait_row_notifications(1)),
             ok = pause(Consumer),
             NewRows = get_rows(Consumer),
             ?assertMatch(
-               [#row{seq = _, id = <<"doc8">>, deleted = false}],
-               NewRows
+                [#row{seq = _, id = <<"doc8">>, deleted = false}],
+                NewRows
             )
-        end).
+        end
+    ).
 
 should_stop_selector_when_db_deleted({DbName, _Revs}) ->
     ?_test(
-       begin
-           {ok, _Db} = couch_db:open_int(DbName, []),
-           ChArgs = #changes_args{filter = "_selector", feed = "continuous"},
-           Selector = {[{<<"_id">>, <<"doc3">>}]},
-           Req = {json_req, {[{<<"selector">>, Selector}]}},
-           Consumer = spawn_consumer(DbName, ChArgs, Req),
-           ok = pause(Consumer),
-           ok = couch_server:delete(DbName, [?ADMIN_CTX]),
-           ok = unpause(Consumer),
-           {_Rows, _LastSeq} = wait_finished(Consumer),
-           stop_consumer(Consumer),
-           ok
-       end).
-
+        begin
+            {ok, _Db} = couch_db:open_int(DbName, []),
+            ChArgs = #changes_args{filter = "_selector", feed = "continuous"},
+            Selector = {[{<<"_id">>, <<"doc3">>}]},
+            Req = {json_req, {[{<<"selector">>, Selector}]}},
+            Consumer = spawn_consumer(DbName, ChArgs, Req),
+            ok = pause(Consumer),
+            ok = couch_server:delete(DbName, [?ADMIN_CTX]),
+            ok = unpause(Consumer),
+            {_Rows, _LastSeq} = wait_finished(Consumer),
+            stop_consumer(Consumer),
+            ok
+        end
+    ).
 
 should_select_with_empty_fields({DbName, _}) ->
     ?_test(
         begin
-            ChArgs = #changes_args{filter = "_selector", include_docs=true},
+            ChArgs = #changes_args{filter = "_selector", include_docs = true},
             Selector = {[{<<"_id">>, <<"doc3">>}]},
-            Req = {json_req, {[{<<"selector">>, Selector},
-                               {<<"fields">>, []}]}},
+            Req =
+                {json_req,
+                    {[
+                        {<<"selector">>, Selector},
+                        {<<"fields">>, []}
+                    ]}},
             {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(1, length(Rows)),
             [#row{seq = Seq, id = Id, doc = Doc}] = Rows,
@@ -494,15 +557,20 @@ should_select_with_empty_fields({DbName, _}) ->
             ?assertEqual(6, Seq),
             ?assertEqual(UpSeq, LastSeq),
             ?assertMatch({[{_K1, _V1}, {_K2, _V2}]}, Doc)
-        end).
+        end
+    ).
 
 should_select_with_fields({DbName, _}) ->
     ?_test(
         begin
-            ChArgs = #changes_args{filter = "_selector", include_docs=true},
+            ChArgs = #changes_args{filter = "_selector", include_docs = true},
             Selector = {[{<<"_id">>, <<"doc3">>}]},
-            Req = {json_req, {[{<<"selector">>, Selector},
-                               {<<"fields">>, [<<"_id">>, <<"nope">>]}]}},
+            Req =
+                {json_req,
+                    {[
+                        {<<"selector">>, Selector},
+                        {<<"fields">>, [<<"_id">>, <<"nope">>]}
+                    ]}},
             {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(1, length(Rows)),
             [#row{seq = Seq, id = Id, doc = Doc}] = Rows,
@@ -510,8 +578,8 @@ should_select_with_fields({DbName, _}) ->
             ?assertEqual(6, Seq),
             ?assertEqual(UpSeq, LastSeq),
             ?assertMatch(Doc, {[{<<"_id">>, <<"doc3">>}]})
-        end).
-
+        end
+    ).
 
 should_emit_only_design_documents({DbName, Revs}) ->
     ?_test(
@@ -526,11 +594,15 @@ should_emit_only_design_documents({DbName, Revs}) ->
             ?assertEqual(UpSeq, LastSeq),
             ?assertEqual([#row{seq = 8, id = <<"_design/foo">>}], Rows),
 
-
             {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
-            {ok, _} = save_doc(Db, {[{<<"_id">>, <<"_design/foo">>},
-                                      {<<"_rev">>, element(8, Revs)},
-                                      {<<"_deleted">>, true}]}),
+            {ok, _} = save_doc(
+                Db,
+                {[
+                    {<<"_id">>, <<"_design/foo">>},
+                    {<<"_rev">>, element(8, Revs)},
+                    {<<"_deleted">>, true}
+                ]}
+            ),
 
             couch_db:close(Db),
             {Rows2, LastSeq2, _} = run_changes_query(DbName, ChArgs, Req),
@@ -539,11 +611,18 @@ should_emit_only_design_documents({DbName, Revs}) ->
 
             ?assertEqual(1, length(Rows2)),
             ?assertEqual(UpSeq2, LastSeq2),
-            ?assertEqual([#row{seq = 11,
-                               id = <<"_design/foo">>,
-                               deleted = true}],
-                          Rows2)
-        end).
+            ?assertEqual(
+                [
+                    #row{
+                        seq = 11,
+                        id = <<"_design/foo">>,
+                        deleted = true
+                    }
+                ],
+                Rows2
+            )
+        end
+    ).
 
 %% should_receive_heartbeats(_) ->
 %%     {timeout, ?TEST_TIMEOUT div 1000,
@@ -616,16 +695,21 @@ should_filter_by_doc_attribute({DbName, _}) ->
     ?_test(
         begin
             DDocId = <<"_design/app">>,
-            DDoc = couch_doc:from_json_obj({[
-                {<<"_id">>, DDocId},
-                {<<"language">>, <<"javascript">>},
-                {<<"filters">>, {[
-                    {<<"valid">>, <<"function(doc, req) {"
-                    " if (doc._id == 'doc3') {"
-                        " return true; "
-                    "} }">>}
-                ]}}
-            ]}),
+            DDoc = couch_doc:from_json_obj(
+                {[
+                    {<<"_id">>, DDocId},
+                    {<<"language">>, <<"javascript">>},
+                    {<<"filters">>,
+                        {[
+                            {<<"valid">>, <<
+                                "function(doc, req) {"
+                                " if (doc._id == 'doc3') {"
+                                " return true; "
+                                "} }"
+                            >>}
+                        ]}}
+                ]}
+            ),
             ChArgs = #changes_args{filter = "app/valid"},
             Req = {json_req, null},
             ok = update_ddoc(DbName, DDoc),
@@ -635,28 +719,38 @@ should_filter_by_doc_attribute({DbName, _}) ->
             ?assertEqual(<<"doc3">>, Id),
             ?assertEqual(6, Seq),
             ?assertEqual(UpSeq, LastSeq)
-        end).
+        end
+    ).
 
 should_filter_by_user_ctx({DbName, _}) ->
     ?_test(
         begin
             DDocId = <<"_design/app">>,
-            DDoc = couch_doc:from_json_obj({[
-                {<<"_id">>, DDocId},
-                {<<"language">>, <<"javascript">>},
-                {<<"filters">>, {[
-                    {<<"valid">>, <<"function(doc, req) {"
-                    " if (req.userCtx.name == doc._id) {"
-                        " return true; "
-                    "} }">>}
-                ]}}
-            ]}),
+            DDoc = couch_doc:from_json_obj(
+                {[
+                    {<<"_id">>, DDocId},
+                    {<<"language">>, <<"javascript">>},
+                    {<<"filters">>,
+                        {[
+                            {<<"valid">>, <<
+                                "function(doc, req) {"
+                                " if (req.userCtx.name == doc._id) {"
+                                " return true; "
+                                "} }"
+                            >>}
+                        ]}}
+                ]}
+            ),
             ChArgs = #changes_args{filter = "app/valid"},
             UserCtx = #user_ctx{name = <<"doc3">>, roles = []},
             {ok, DbRec} = couch_db:clustered_db(DbName, UserCtx),
-            Req = {json_req, {[{
-                <<"userCtx">>, couch_util:json_user_ctx(DbRec)
-            }]}},
+            Req =
+                {json_req,
+                    {[
+                        {
+                            <<"userCtx">>, couch_util:json_user_ctx(DbRec)
+                        }
+                    ]}},
             ok = update_ddoc(DbName, DDoc),
             {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(1, length(Rows)),
@@ -664,30 +758,42 @@ should_filter_by_user_ctx({DbName, _}) ->
             ?assertEqual(<<"doc3">>, Id),
             ?assertEqual(6, Seq),
             ?assertEqual(UpSeq, LastSeq)
-        end).
+        end
+    ).
 
 should_filter_by_view({DbName, _}) ->
     ?_test(
         begin
             DDocId = <<"_design/app">>,
-            DDoc = couch_doc:from_json_obj({[
-                {<<"_id">>, DDocId},
-                {<<"language">>, <<"javascript">>},
-                {<<"views">>, {[
-                    {<<"valid">>, {[
-                        {<<"map">>, <<"function(doc) {"
-                        " if (doc._id == 'doc3') {"
-                            " emit(doc); "
-                        "} }">>}
-                    ]}}
-                ]}}
-            ]}),
-            ChArgs = #changes_args{filter = "_view"},
-            Req = {json_req, {[{
-                <<"query">>, {[
-                    {<<"view">>, <<"app/valid">>}
+            DDoc = couch_doc:from_json_obj(
+                {[
+                    {<<"_id">>, DDocId},
+                    {<<"language">>, <<"javascript">>},
+                    {<<"views">>,
+                        {[
+                            {<<"valid">>,
+                                {[
+                                    {<<"map">>, <<
+                                        "function(doc) {"
+                                        " if (doc._id == 'doc3') {"
+                                        " emit(doc); "
+                                        "} }"
+                                    >>}
+                                ]}}
+                        ]}}
                 ]}
-            }]}},
+            ),
+            ChArgs = #changes_args{filter = "_view"},
+            Req =
+                {json_req,
+                    {[
+                        {
+                            <<"query">>,
+                            {[
+                                {<<"view">>, <<"app/valid">>}
+                            ]}
+                        }
+                    ]}},
             ok = update_ddoc(DbName, DDoc),
             {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(1, length(Rows)),
@@ -695,32 +801,44 @@ should_filter_by_view({DbName, _}) ->
             ?assertEqual(<<"doc3">>, Id),
             ?assertEqual(6, Seq),
             ?assertEqual(UpSeq, LastSeq)
-        end).
+        end
+    ).
 
 should_filter_by_erlang_view({DbName, _}) ->
     ?_test(
         begin
             DDocId = <<"_design/app">>,
-            DDoc = couch_doc:from_json_obj({[
-                {<<"_id">>, DDocId},
-                {<<"language">>, <<"erlang">>},
-                {<<"views">>, {[
-                    {<<"valid">>, {[
-                        {<<"map">>, <<"fun({Doc}) ->"
-                            " case lists:keyfind(<<\"_id\">>, 1, Doc) of"
-                                " {<<\"_id\">>, <<\"doc3\">>} ->  Emit(Doc, null); "
-                                " false -> ok"
-                            " end "
-                        "end.">>}
-                    ]}}
-                ]}}
-            ]}),
-            ChArgs = #changes_args{filter = "_view"},
-            Req = {json_req, {[{
-                <<"query">>, {[
-                    {<<"view">>, <<"app/valid">>}
+            DDoc = couch_doc:from_json_obj(
+                {[
+                    {<<"_id">>, DDocId},
+                    {<<"language">>, <<"erlang">>},
+                    {<<"views">>,
+                        {[
+                            {<<"valid">>,
+                                {[
+                                    {<<"map">>, <<
+                                        "fun({Doc}) ->"
+                                        " case lists:keyfind(<<\"_id\">>, 1, Doc) of"
+                                        " {<<\"_id\">>, <<\"doc3\">>} ->  Emit(Doc, null); "
+                                        " false -> ok"
+                                        " end "
+                                        "end."
+                                    >>}
+                                ]}}
+                        ]}}
                 ]}
-            }]}},
+            ),
+            ChArgs = #changes_args{filter = "_view"},
+            Req =
+                {json_req,
+                    {[
+                        {
+                            <<"query">>,
+                            {[
+                                {<<"view">>, <<"app/valid">>}
+                            ]}
+                        }
+                    ]}},
             ok = update_ddoc(DbName, DDoc),
             {Rows, LastSeq, UpSeq} = run_changes_query(DbName, ChArgs, Req),
             ?assertEqual(1, length(Rows)),
@@ -728,7 +846,8 @@ should_filter_by_erlang_view({DbName, _}) ->
             ?assertEqual(<<"doc3">>, Id),
             ?assertEqual(6, Seq),
             ?assertEqual(UpSeq, LastSeq)
-    end).
+        end
+    ).
 
 update_ddoc(DbName, DDoc) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
@@ -752,12 +871,13 @@ save_doc(Db, Json) ->
 get_rows({Consumer, _}) ->
     Ref = make_ref(),
     Consumer ! {get_rows, Ref},
-    Resp = receive
-        {rows, Ref, Rows} ->
-            Rows
-    after ?TIMEOUT ->
-        timeout
-    end,
+    Resp =
+        receive
+            {rows, Ref, Rows} ->
+                Rows
+        after ?TIMEOUT ->
+            timeout
+        end,
     ?assertNotEqual(timeout, Resp),
     Resp.
 
@@ -776,48 +896,52 @@ get_rows({Consumer, _}) ->
 clear_rows({Consumer, _}) ->
     Ref = make_ref(),
     Consumer ! {reset, Ref},
-    Resp = receive
-        {ok, Ref} ->
-            ok
-    after ?TIMEOUT ->
-        timeout
-    end,
+    Resp =
+        receive
+            {ok, Ref} ->
+                ok
+        after ?TIMEOUT ->
+            timeout
+        end,
     ?assertNotEqual(timeout, Resp),
     Resp.
 
 stop_consumer({Consumer, _}) ->
     Ref = make_ref(),
     Consumer ! {stop, Ref},
-    Resp = receive
-        {ok, Ref} ->
-            ok
-    after ?TIMEOUT ->
-        timeout
-    end,
+    Resp =
+        receive
+            {ok, Ref} ->
+                ok
+        after ?TIMEOUT ->
+            timeout
+        end,
     ?assertNotEqual(timeout, Resp),
     Resp.
 
 pause({Consumer, _}) ->
     Ref = make_ref(),
     Consumer ! {pause, Ref},
-    Resp = receive
-        {paused, Ref} ->
-            ok
-    after ?TIMEOUT ->
-        timeout
-    end,
+    Resp =
+        receive
+            {paused, Ref} ->
+                ok
+        after ?TIMEOUT ->
+            timeout
+        end,
     ?assertNotEqual(timeout, Resp),
     Resp.
 
 unpause({Consumer, _}) ->
     Ref = make_ref(),
     Consumer ! {continue, Ref},
-    Resp = receive
-        {ok, Ref} ->
-            ok
-    after ?TIMEOUT ->
-       timeout
-    end,
+    Resp =
+        receive
+            {ok, Ref} ->
+                ok
+        after ?TIMEOUT ->
+            timeout
+        end,
     ?assertNotEqual(timeout, Resp),
     Resp.
 
@@ -828,19 +952,22 @@ wait_finished({_, ConsumerRef}) ->
         {'DOWN', ConsumerRef, _, _, Msg} when Msg == normal; Msg == ok ->
             ok;
         {'DOWN', ConsumerRef, _, _, Msg} ->
-            erlang:error({consumer_died, [
+            erlang:error(
+                {consumer_died, [
+                    {module, ?MODULE},
+                    {line, ?LINE},
+                    {value, Msg}
+                ]}
+            )
+    after ?TIMEOUT ->
+        erlang:error(
+            {consumer_died, [
                 {module, ?MODULE},
                 {line, ?LINE},
-                {value, Msg}
-            ]})
-    after ?TIMEOUT ->
-        erlang:error({consumer_died, [
-            {module, ?MODULE},
-            {line, ?LINE},
-            {value, timeout}
-        ]})
+                {value, timeout}
+            ]}
+        )
     end.
-
 
 reset_row_notifications() ->
     receive
@@ -849,7 +976,6 @@ reset_row_notifications() ->
     after 0 ->
         ok
     end.
-
 
 wait_row_notifications(N) ->
     receive
@@ -860,7 +986,6 @@ wait_row_notifications(N) ->
     after ?TIMEOUT ->
         timeout
     end.
-
 
 spawn_consumer(DbName, ChangesArgs0, Req) ->
     Parent = self(),
@@ -884,13 +1009,16 @@ spawn_consumer(DbName, ChangesArgs0, Req) ->
                 maybe_pause(Parent, Acc)
         end,
         {ok, Db} = couch_db:open_int(DbName, []),
-        ChangesArgs = case (ChangesArgs0#changes_args.timeout =:= undefined)
-            andalso (ChangesArgs0#changes_args.heartbeat =:= undefined) of
-            true ->
-                ChangesArgs0#changes_args{timeout = 1000, heartbeat = 100};
-            false ->
-                ChangesArgs0
-        end,
+        ChangesArgs =
+            case
+                (ChangesArgs0#changes_args.timeout =:= undefined) andalso
+                    (ChangesArgs0#changes_args.heartbeat =:= undefined)
+            of
+                true ->
+                    ChangesArgs0#changes_args{timeout = 1000, heartbeat = 100};
+                false ->
+                    ChangesArgs0
+            end,
         FeedFun = couch_changes:handle_db_changes(ChangesArgs, Req, Db),
         try
             FeedFun({Callback, []})
@@ -920,11 +1048,14 @@ maybe_pause(Parent, Acc) ->
             Parent ! {ok, Ref},
             throw({stop, Acc});
         V when V /= updated ->
-            erlang:error({assertion_failed,
-                      [{module, ?MODULE},
-                       {line, ?LINE},
-                       {value, V},
-                       {reason, "Received unexpected message"}]})
+            erlang:error(
+                {assertion_failed, [
+                    {module, ?MODULE},
+                    {line, ?LINE},
+                    {value, V},
+                    {reason, "Received unexpected message"}
+                ]}
+            )
     after 0 ->
         Acc
     end.
