@@ -25,7 +25,6 @@
 % That can be configured via the StartPeriod argument. If the time since start
 % is less than a full period, then the StartPeriod is used as the period.
 
-
 -module(mem3_cluster).
 
 -behaviour(gen_server).
@@ -44,10 +43,8 @@
     code_change/3
 ]).
 
-
 -callback cluster_stable(Context :: term()) -> NewContext :: term().
 -callback cluster_unstable(Context :: term()) -> NewContext :: term().
-
 
 -record(state, {
     mod :: atom(),
@@ -59,18 +56,16 @@
     timer :: reference()
 }).
 
-
 -spec start_link(module(), term(), integer(), integer()) ->
     {ok, pid()} | ignore | {error, term()}.
-start_link(Module, Context, StartPeriod, Period)
-        when is_atom(Module), is_integer(StartPeriod), is_integer(Period) ->
+start_link(Module, Context, StartPeriod, Period) when
+    is_atom(Module), is_integer(StartPeriod), is_integer(Period)
+->
     gen_server:start_link(?MODULE, [Module, Context, StartPeriod, Period], []).
-
 
 -spec set_period(pid(), integer()) -> ok.
 set_period(Server, Period) when is_pid(Server), is_integer(Period) ->
     gen_server:cast(Server, {set_period, Period}).
-
 
 % gen_server callbacks
 
@@ -84,8 +79,7 @@ init([Module, Context, StartPeriod, Period]) ->
         period = Period,
         start_period = StartPeriod,
         timer = new_timer(StartPeriod)
-     }}.
-
+    }}.
 
 terminate(_Reason, _State) ->
     ok.
@@ -93,31 +87,25 @@ terminate(_Reason, _State) ->
 handle_call(_Msg, _From, State) ->
     {reply, ignored, State}.
 
-
 handle_cast({set_period, Period}, State) ->
     {noreply, State#state{period = Period}}.
 
-
 handle_info({nodeup, _Node}, State) ->
     {noreply, cluster_changed(State)};
-
 handle_info({nodedown, _Node}, State) ->
     {noreply, cluster_changed(State)};
-
 handle_info(stability_check, #state{mod = Mod, ctx = Ctx} = State) ->
-   erlang:cancel_timer(State#state.timer),
-   case now_diff_sec(State#state.last_change) > interval(State) of
-       true ->
-           {noreply, State#state{ctx = Mod:cluster_stable(Ctx)}};
-       false ->
-           Timer = new_timer(interval(State)),
-           {noreply, State#state{timer = Timer}}
-   end.
-
+    erlang:cancel_timer(State#state.timer),
+    case now_diff_sec(State#state.last_change) > interval(State) of
+        true ->
+            {noreply, State#state{ctx = Mod:cluster_stable(Ctx)}};
+        false ->
+            Timer = new_timer(interval(State)),
+            {noreply, State#state{timer = Timer}}
+    end.
 
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
 
 %% Internal functions
 
@@ -129,18 +117,19 @@ cluster_changed(#state{mod = Mod, ctx = Ctx} = State) ->
         ctx = Mod:cluster_unstable(Ctx)
     }.
 
-
 -spec new_timer(non_neg_integer()) -> reference().
 new_timer(IntervalSec) ->
     erlang:send_after(IntervalSec * 1000, self(), stability_check).
-
 
 % For the first Period seconds after node boot we check cluster stability every
 % StartPeriod seconds. Once the initial Period seconds have passed we continue
 % to monitor once every Period seconds
 -spec interval(#state{}) -> non_neg_integer().
-interval(#state{period = Period, start_period = StartPeriod,
-        start_time = T0}) ->
+interval(#state{
+    period = Period,
+    start_period = StartPeriod,
+    start_time = T0
+}) ->
     case now_diff_sec(T0) > Period of
         true ->
             % Normal operation
@@ -150,12 +139,11 @@ interval(#state{period = Period, start_period = StartPeriod,
             StartPeriod
     end.
 
-
 -spec now_diff_sec(erlang:timestamp()) -> non_neg_integer().
 now_diff_sec(Time) ->
     case timer:now_diff(os:timestamp(), Time) of
         USec when USec < 0 ->
             0;
         USec when USec >= 0 ->
-             USec / 1000000
+            USec / 1000000
     end.

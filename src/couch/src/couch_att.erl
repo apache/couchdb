@@ -60,7 +60,6 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
-
 %% Legacy attachment record. This is going to be phased out by the new proplist
 %% based structure. It's needed for now to allow code to perform lazy upgrades
 %% while the patch is rolled out to the cluster. Attachments passed as records
@@ -79,8 +78,13 @@
 
     md5 = <<>> :: binary(),
     revpos = 0 :: non_neg_integer(),
-    data :: stub | follows | binary() | {any(), any()} |
-            {follows, pid(), reference()} | fun(() -> binary()),
+    data ::
+        stub
+        | follows
+        | binary()
+        | {any(), any()}
+        | {follows, pid(), reference()}
+        | fun(() -> binary()),
 
     %% Encoding of the attachment
     %% currently supported values are:
@@ -90,7 +94,6 @@
     encoding = identity :: identity | gzip
 }).
 
-
 %% Extensible Attachment Type
 %%
 %% The following types describe the known properties for attachment fields
@@ -99,11 +102,9 @@
 %% be used by upgraded code. If you plan on operating on new data, please add
 %% an entry here as documentation.
 
-
 %% The name of the attachment is also used as the mime-part name for file
 %% downloads. These must be unique per document.
 -type name_prop() :: {name, binary()}.
-
 
 %% The mime type of the attachment. This does affect compression of certain
 %% attachments if the type is found to be configured as a compressable type.
@@ -111,45 +112,47 @@
 %% cases as well. See definition and use of couch_util:compressable_att_type/1.
 -type type_prop() :: {type, binary()}.
 
-
 %% The attachment length is similar to disk-length but ignores additional
 %% encoding that may have occurred.
 -type att_len_prop() :: {att_len, non_neg_integer()}.
 
-
 %% The size of the attachment as stored in a disk stream.
 -type disk_len_prop() :: {disk_len, non_neg_integer()}.
-
 
 %% This is a digest of the original attachment data as uploaded by the client.
 %% it's useful for checking validity of contents against other attachment data
 %% as well as quick digest computation of the enclosing document.
 -type md5_prop() :: {md5, binary()}.
 
-
 -type revpos_prop() :: {revpos, 0}.
-
 
 %% This field is currently overloaded with just about everything. The
 %% {any(), any()} type is just there until I have time to check the actual
 %% values expected. Over time this should be split into more than one property
 %% to allow simpler handling.
 -type data_prop() :: {
-    data, stub | follows | binary() | {any(), any()} |
-    {follows, pid(), reference()} | fun(() -> binary())
+    data,
+    stub
+    | follows
+    | binary()
+    | {any(), any()}
+    | {follows, pid(), reference()}
+    | fun(() -> binary())
 }.
-
 
 %% We will occasionally compress our data. See type_prop() for more information
 %% on when this happens.
 -type encoding_prop() :: {encoding, identity | gzip}.
 
-
 -type attachment() :: [
-    name_prop() | type_prop() |
-    att_len_prop() | disk_len_prop() |
-    md5_prop() | revpos_prop() |
-    data_prop() | encoding_prop()
+    name_prop()
+    | type_prop()
+    | att_len_prop()
+    | disk_len_prop()
+    | md5_prop()
+    | revpos_prop()
+    | data_prop()
+    | encoding_prop()
 ].
 
 -type disk_att_v1() :: {
@@ -178,7 +181,7 @@
 
 -type att() :: #att{} | attachment() | disk_att().
 
--define(GB, (1024*1024*1024)).
+-define(GB, (1024 * 1024 * 1024)).
 
 new() ->
     %% We construct a record by default for compatability. This will be
@@ -189,14 +192,13 @@ new() ->
     %% undefined.
     #att{}.
 
-
 -spec new([{atom(), any()}]) -> att().
 new(Props) ->
     store(Props, new()).
 
-
--spec fetch([atom()], att()) -> [any()];
-           (atom(), att()) -> any().
+-spec fetch
+    ([atom()], att()) -> [any()];
+    (atom(), att()) -> any().
 fetch(Fields, Att) when is_list(Fields) ->
     [fetch(Field, Att) || Field <- Fields];
 fetch(Field, Att) when is_list(Att) ->
@@ -223,13 +225,15 @@ fetch(encoding, #att{encoding = Encoding}) ->
 fetch(_, _) ->
     undefined.
 
-
 -spec store([{atom(), any()}], att()) -> att().
 store(Props, Att0) ->
-    lists:foldl(fun({Field, Value}, Att) ->
-        store(Field, Value, Att)
-    end, Att0, Props).
-
+    lists:foldl(
+        fun({Field, Value}, Att) ->
+            store(Field, Value, Att)
+        end,
+        Att0,
+        Props
+    ).
 
 -spec store(atom(), any(), att()) -> att().
 store(Field, undefined, Att) when is_list(Att) ->
@@ -255,16 +259,13 @@ store(encoding, Encoding, Att) ->
 store(Field, Value, Att) ->
     store(Field, Value, upgrade(Att)).
 
-
 -spec transform(atom(), fun(), att()) -> att().
 transform(Field, Fun, Att) ->
     NewValue = Fun(fetch(Field, Att)),
     store(Field, NewValue, Att).
 
-
 is_stub(Att) ->
     stub == fetch(data, Att).
-
 
 %% merge_stubs takes all stub attachments and replaces them with on disk
 %% attachments. It will return {missing, Name} if a stub isn't matched with
@@ -275,7 +276,6 @@ merge_stubs(MemAtts, DiskAtts) ->
         [{fetch(name, Att), Att} || Att <- DiskAtts]
     ),
     merge_stubs(MemAtts, OnDisk, []).
-
 
 %% restore spec when R14 support is dropped
 %% -spec merge_stubs([att()], dict:dict(), [att()]) -> [att()].
@@ -305,22 +305,23 @@ merge_stubs([Att | Rest], OnDisk, Merged) ->
 merge_stubs([], _, Merged) ->
     {ok, lists:reverse(Merged)}.
 
-
 size_info([]) ->
     {ok, []};
 size_info(Atts) ->
-    Info = lists:map(fun(Att) ->
-        AttLen = fetch(att_len, Att),
-        case fetch(data, Att) of
-             {stream, StreamEngine} ->
-                 {ok, SPos} = couch_stream:to_disk_term(StreamEngine),
-                 {SPos, AttLen};
-             {_, SPos} ->
-                 {SPos, AttLen}
-        end
-    end, Atts),
+    Info = lists:map(
+        fun(Att) ->
+            AttLen = fetch(att_len, Att),
+            case fetch(data, Att) of
+                {stream, StreamEngine} ->
+                    {ok, SPos} = couch_stream:to_disk_term(StreamEngine),
+                    {SPos, AttLen};
+                {_, SPos} ->
+                    {SPos, AttLen}
+            end
+        end,
+        Atts
+    ),
     {ok, lists:usort(Info)}.
-
 
 %% When converting an attachment to disk term format, attempt to stay with the
 %% old format when possible. This should help make the attachment lazy upgrade
@@ -364,7 +365,6 @@ to_disk_term(Att) ->
     ),
     {list_to_tuple(lists:reverse(Base)), Extended}.
 
-
 %% The new disk term format is a simple wrapper around the legacy format. Base
 %% properties will remain in a tuple while the new fields and possibly data from
 %% future extensions will be stored in a list of atom/value pairs. While this is
@@ -372,44 +372,44 @@ to_disk_term(Att) ->
 %% compression to remove these sorts of common bits (block level compression
 %% with something like a shared dictionary that is checkpointed every now and
 %% then).
-from_disk_term(StreamSrc, {Base, Extended})
-        when is_tuple(Base), is_list(Extended) ->
+from_disk_term(StreamSrc, {Base, Extended}) when
+    is_tuple(Base), is_list(Extended)
+->
     store(Extended, from_disk_term(StreamSrc, Base));
-from_disk_term(StreamSrc, {Name,Type,Sp,AttLen,DiskLen,RevPos,Md5,Enc}) ->
+from_disk_term(StreamSrc, {Name, Type, Sp, AttLen, DiskLen, RevPos, Md5, Enc}) ->
     {ok, Stream} = open_stream(StreamSrc, Sp),
     #att{
-        name=Name,
-        type=Type,
-        att_len=AttLen,
-        disk_len=DiskLen,
-        md5=Md5,
-        revpos=RevPos,
-        data={stream, Stream},
-        encoding=upgrade_encoding(Enc)
+        name = Name,
+        type = Type,
+        att_len = AttLen,
+        disk_len = DiskLen,
+        md5 = Md5,
+        revpos = RevPos,
+        data = {stream, Stream},
+        encoding = upgrade_encoding(Enc)
     };
-from_disk_term(StreamSrc, {Name,Type,Sp,AttLen,RevPos,Md5}) ->
+from_disk_term(StreamSrc, {Name, Type, Sp, AttLen, RevPos, Md5}) ->
     {ok, Stream} = open_stream(StreamSrc, Sp),
     #att{
-        name=Name,
-        type=Type,
-        att_len=AttLen,
-        disk_len=AttLen,
-        md5=Md5,
-        revpos=RevPos,
-        data={stream, Stream}
+        name = Name,
+        type = Type,
+        att_len = AttLen,
+        disk_len = AttLen,
+        md5 = Md5,
+        revpos = RevPos,
+        data = {stream, Stream}
     };
-from_disk_term(StreamSrc, {Name,{Type,Sp,AttLen}}) ->
+from_disk_term(StreamSrc, {Name, {Type, Sp, AttLen}}) ->
     {ok, Stream} = open_stream(StreamSrc, Sp),
     #att{
-        name=Name,
-        type=Type,
-        att_len=AttLen,
-        disk_len=AttLen,
-        md5= <<>>,
-        revpos=0,
-        data={stream, Stream}
+        name = Name,
+        type = Type,
+        att_len = AttLen,
+        disk_len = AttLen,
+        md5 = <<>>,
+        revpos = 0,
+        data = {stream, Stream}
     }.
-
 
 %% from_json reads in embedded JSON attachments and creates usable attachment
 %% values. The attachment may be a stub,
@@ -426,7 +426,6 @@ from_json(Name, Props) ->
         true -> inline_from_json(Att, Props)
     end.
 
-
 stub_from_json(Att, Props) ->
     {DiskLen, EncodedLen, Encoding} = encoded_lengths_from_json(Props),
     Digest = digest_from_json(Props),
@@ -434,21 +433,33 @@ stub_from_json(Att, Props) ->
     %% the revpos consistency check on stubs when it's not provided in the
     %% json object. See merge_stubs/3 for the stub check.
     RevPos = couch_util:get_value(<<"revpos">>, Props),
-    store([
-        {md5, Digest}, {revpos, RevPos}, {data, stub}, {disk_len, DiskLen},
-        {att_len, EncodedLen}, {encoding, Encoding}
-    ], Att).
-
+    store(
+        [
+            {md5, Digest},
+            {revpos, RevPos},
+            {data, stub},
+            {disk_len, DiskLen},
+            {att_len, EncodedLen},
+            {encoding, Encoding}
+        ],
+        Att
+    ).
 
 follow_from_json(Att, Props) ->
     {DiskLen, EncodedLen, Encoding} = encoded_lengths_from_json(Props),
     Digest = digest_from_json(Props),
     RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
-    store([
-        {md5, Digest}, {revpos, RevPos}, {data, follows}, {disk_len, DiskLen},
-        {att_len, EncodedLen}, {encoding, Encoding}
-    ], Att).
-
+    store(
+        [
+            {md5, Digest},
+            {revpos, RevPos},
+            {data, follows},
+            {disk_len, DiskLen},
+            {att_len, EncodedLen},
+            {encoding, Encoding}
+        ],
+        Att
+    ).
 
 inline_from_json(Att, Props) ->
     B64Data = couch_util:get_value(<<"data">>, Props),
@@ -456,18 +467,21 @@ inline_from_json(Att, Props) ->
         Data ->
             Length = size(Data),
             RevPos = couch_util:get_value(<<"revpos">>, Props, 0),
-            store([
-                {data, Data}, {revpos, RevPos}, {disk_len, Length},
-                {att_len, Length}
-            ], Att)
+            store(
+                [
+                    {data, Data},
+                    {revpos, RevPos},
+                    {disk_len, Length},
+                    {att_len, Length}
+                ],
+                Att
+            )
     catch
         _:_ ->
             Name = fetch(name, Att),
-            ErrMsg =  <<"Invalid attachment data for ", Name/binary>>,
+            ErrMsg = <<"Invalid attachment data for ", Name/binary>>,
             throw({bad_request, ErrMsg})
     end.
-
-
 
 encoded_lengths_from_json(Props) ->
     Len = couch_util:get_value(<<"length">>, Props),
@@ -481,13 +495,11 @@ encoded_lengths_from_json(Props) ->
     end,
     {Len, EncodedLen, Encoding}.
 
-
 digest_from_json(Props) ->
     case couch_util:get_value(<<"digest">>, Props) of
         <<"md5-", EncodedMd5/binary>> -> base64:decode(EncodedMd5);
         _ -> <<>>
     end.
-
 
 to_json(Att, OutputData, DataToFollow, ShowEncoding) ->
     [Name, Data, DiskLen, AttLen, Enc, Type, RevPos, Md5] = fetch(
@@ -497,41 +509,44 @@ to_json(Att, OutputData, DataToFollow, ShowEncoding) ->
         {<<"content_type">>, Type},
         {<<"revpos">>, RevPos}
     ],
-    DigestProp = case base64:encode(Md5) of
-        <<>> -> [];
-        Digest -> [{<<"digest">>, <<"md5-", Digest/binary>>}]
-    end,
-    DataProps = if
-        not OutputData orelse Data == stub ->
-            [{<<"length">>, DiskLen}, {<<"stub">>, true}];
-        DataToFollow ->
-            [{<<"length">>, DiskLen}, {<<"follows">>, true}];
-        true ->
-            AttData = case Enc of
-                gzip -> zlib:gunzip(to_binary(Att));
-                identity -> to_binary(Att)
-            end,
-            [{<<"data">>, base64:encode(AttData)}]
-    end,
-    EncodingProps = if
-        ShowEncoding andalso Enc /= identity ->
-            [
-                {<<"encoding">>, couch_util:to_binary(Enc)},
-                {<<"encoded_length">>, AttLen}
-            ];
-        true ->
-            []
-    end,
-    HeadersProp = case fetch(headers, Att) of
-        undefined -> [];
-        Headers -> [{<<"headers">>, Headers}]
-    end,
+    DigestProp =
+        case base64:encode(Md5) of
+            <<>> -> [];
+            Digest -> [{<<"digest">>, <<"md5-", Digest/binary>>}]
+        end,
+    DataProps =
+        if
+            not OutputData orelse Data == stub ->
+                [{<<"length">>, DiskLen}, {<<"stub">>, true}];
+            DataToFollow ->
+                [{<<"length">>, DiskLen}, {<<"follows">>, true}];
+            true ->
+                AttData =
+                    case Enc of
+                        gzip -> zlib:gunzip(to_binary(Att));
+                        identity -> to_binary(Att)
+                    end,
+                [{<<"data">>, base64:encode(AttData)}]
+        end,
+    EncodingProps =
+        if
+            ShowEncoding andalso Enc /= identity ->
+                [
+                    {<<"encoding">>, couch_util:to_binary(Enc)},
+                    {<<"encoded_length">>, AttLen}
+                ];
+            true ->
+                []
+        end,
+    HeadersProp =
+        case fetch(headers, Att) of
+            undefined -> [];
+            Headers -> [{<<"headers">>, Headers}]
+        end,
     {Name, {Props ++ DigestProp ++ DataProps ++ EncodingProps ++ HeadersProp}}.
-
 
 flush(Db, Att) ->
     flush_data(Db, fetch(data, Att), Att).
-
 
 flush_data(Db, Data, Att) when is_binary(Data) ->
     couch_db:with_stream(Db, Att, fun(OutputStream) ->
@@ -545,25 +560,29 @@ flush_data(Db, Fun, Att) when is_function(Fun) ->
             couch_db:with_stream(Db, Att, fun(OutputStream) ->
                 % Fun(MaxChunkSize, WriterFun) must call WriterFun
                 % once for each chunk of the attachment,
-                Fun(4096,
+                Fun(
+                    4096,
                     % WriterFun({Length, Binary}, State)
                     % WriterFun({0, _Footers}, State)
                     % Called with Length == 0 on the last time.
                     % WriterFun returns NewState.
-                    fun({0, Footers}, _Total) ->
-                        F = mochiweb_headers:from_binary(Footers),
-                        case mochiweb_headers:get_value("Content-MD5", F) of
-                        undefined ->
-                            ok;
-                        Md5 ->
-                            {md5, base64:decode(Md5)}
-                        end;
-                    ({Length, Chunk}, Total0) ->
-                        Total = Total0 + Length,
-                        validate_attachment_size(AttName, Total, MaxAttSize),
-                        couch_stream:write(OutputStream, Chunk),
-                        Total
-                    end, 0)
+                    fun
+                        ({0, Footers}, _Total) ->
+                            F = mochiweb_headers:from_binary(Footers),
+                            case mochiweb_headers:get_value("Content-MD5", F) of
+                                undefined ->
+                                    ok;
+                                Md5 ->
+                                    {md5, base64:decode(Md5)}
+                            end;
+                        ({Length, Chunk}, Total0) ->
+                            Total = Total0 + Length,
+                            validate_attachment_size(AttName, Total, MaxAttSize),
+                            couch_stream:write(OutputStream, Chunk),
+                            Total
+                    end,
+                    0
+                )
             end);
         AttLen ->
             validate_attachment_size(AttName, AttLen, MaxAttSize),
@@ -600,17 +619,18 @@ flush_data(Db, {stream, StreamEngine}, Att) ->
             end)
     end.
 
-
 write_streamed_attachment(_Stream, _F, 0) ->
     ok;
 write_streamed_attachment(_Stream, _F, LenLeft) when LenLeft < 0 ->
     throw({bad_request, <<"attachment longer than expected">>});
 write_streamed_attachment(Stream, F, LenLeft) when LenLeft > 0 ->
-    Bin = try read_next_chunk(F, LenLeft)
-    catch
-        {mp_parser_died, normal} ->
-            throw({bad_request, <<"attachment shorter than expected">>})
-    end,
+    Bin =
+        try
+            read_next_chunk(F, LenLeft)
+        catch
+            {mp_parser_died, normal} ->
+                throw({bad_request, <<"attachment shorter than expected">>})
+        end,
     ok = couch_stream:write(Stream, Bin),
     write_streamed_attachment(Stream, F, LenLeft - iolist_size(Bin)).
 
@@ -619,10 +639,8 @@ read_next_chunk(F, _) when is_function(F, 0) ->
 read_next_chunk(F, LenLeft) when is_function(F, 1) ->
     F(lists:min([LenLeft, 16#2000])).
 
-
 foldl(Att, Fun, Acc) ->
     foldl(fetch(data, Att), Att, Fun, Acc).
-
 
 foldl(Bin, _Att, Fun, Acc) when is_binary(Bin) ->
     Fun(Bin, Acc);
@@ -651,25 +669,22 @@ foldl({follows, Parser, Ref}, Att, Fun, Acc) ->
         erlang:demonitor(ParserRef, [flush])
     end.
 
-
 range_foldl(Att, From, To, Fun, Acc) ->
     {stream, StreamEngine} = fetch(data, Att),
     couch_stream:range_foldl(StreamEngine, From, To, Fun, Acc).
-
 
 foldl_decode(Att, Fun, Acc) ->
     case fetch([data, encoding], Att) of
         [{stream, StreamEngine}, Enc] ->
             couch_stream:foldl_decode(
-                    StreamEngine, fetch(md5, Att), Enc, Fun, Acc);
+                StreamEngine, fetch(md5, Att), Enc, Fun, Acc
+            );
         [Fun2, identity] ->
             fold_streamed_data(Fun2, fetch(att_len, Att), Fun, Acc)
     end.
 
-
 to_binary(Att) ->
     to_binary(fetch(data, Att), Att).
-
 
 to_binary(Bin, _Att) when is_binary(Bin) ->
     Bin;
@@ -677,27 +692,27 @@ to_binary(Iolist, _Att) when is_list(Iolist) ->
     iolist_to_binary(Iolist);
 to_binary({stream, _StreamEngine}, Att) ->
     iolist_to_binary(
-        lists:reverse(foldl(Att, fun(Bin,Acc) -> [Bin|Acc] end, []))
+        lists:reverse(foldl(Att, fun(Bin, Acc) -> [Bin | Acc] end, []))
     );
-to_binary(DataFun, Att) when is_function(DataFun)->
+to_binary(DataFun, Att) when is_function(DataFun) ->
     Len = fetch(att_len, Att),
     iolist_to_binary(
-        lists:reverse(fold_streamed_data(
-            DataFun,
-            Len,
-            fun(Data, Acc) -> [Data | Acc] end,
-            []
-        ))
+        lists:reverse(
+            fold_streamed_data(
+                DataFun,
+                Len,
+                fun(Data, Acc) -> [Data | Acc] end,
+                []
+            )
+        )
     ).
-
 
 fold_streamed_data(_RcvFun, 0, _Fun, Acc) ->
     Acc;
-fold_streamed_data(RcvFun, LenLeft, Fun, Acc) when LenLeft > 0->
+fold_streamed_data(RcvFun, LenLeft, Fun, Acc) when LenLeft > 0 ->
     Bin = RcvFun(),
     ResultAcc = Fun(Bin, Acc),
     fold_streamed_data(RcvFun, LenLeft - size(Bin), Fun, ResultAcc).
-
 
 %% Upgrade an attachment record to a property list on demand. This is a one-way
 %% operation as downgrading potentially truncates fields with important data.
@@ -711,7 +726,6 @@ upgrade(#att{} = Att) ->
     [{F, element(I, Att)} || {F, I} <- Map, element(I, Att) /= undefined];
 upgrade(Att) ->
     Att.
-
 
 %% Downgrade is exposed for interactive convenience. In practice, unless done
 %% manually, upgrades are always one-way.
@@ -729,7 +743,6 @@ downgrade(Att) ->
         encoding = fetch(encoding, Att)
     }.
 
-
 upgrade_encoding(true) -> gzip;
 upgrade_encoding(false) -> identity;
 upgrade_encoding(Encoding) -> Encoding.
@@ -744,9 +757,12 @@ max_attachment_size(MaxAttSizeConfig) ->
         MaxAttSize when is_list(MaxAttSize) ->
             try list_to_integer(MaxAttSize) of
                 Result -> Result
-            catch _:_ ->
-                couch_log:error("invalid config value for max attachment size: ~p ", [MaxAttSize]),
-                throw(internal_server_error)
+            catch
+                _:_ ->
+                    couch_log:error("invalid config value for max attachment size: ~p ", [
+                        MaxAttSize
+                    ]),
+                    throw(internal_server_error)
             end;
         MaxAttSize when is_integer(MaxAttSize) ->
             MaxAttSize;
@@ -755,13 +771,12 @@ max_attachment_size(MaxAttSizeConfig) ->
             throw(internal_server_error)
     end.
 
-
-validate_attachment_size(AttName, AttSize, MaxAttSize)
-        when is_integer(AttSize),  AttSize > MaxAttSize ->
+validate_attachment_size(AttName, AttSize, MaxAttSize) when
+    is_integer(AttSize), AttSize > MaxAttSize
+->
     throw({request_entity_too_large, {attachment, AttName}});
 validate_attachment_size(_AttName, _AttSize, _MAxAttSize) ->
     ok.
-
 
 open_stream(StreamSrc, Data) ->
     case couch_db:is_db(StreamSrc) of
@@ -776,7 +791,6 @@ open_stream(StreamSrc, Data) ->
             end
     end.
 
-
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -785,27 +799,19 @@ open_stream(StreamSrc, Data) ->
 
 %% Test utilities
 
-
 empty_att() -> new().
-
 
 upgraded_empty_att() ->
     new([{headers, undefined}]).
 
-
 %% Test groups
-
 
 attachment_upgrade_test_() ->
     {"Lazy record upgrade tests", [
         {"Existing record fields don't upgrade",
-            {with, empty_att(), [fun test_non_upgrading_fields/1]}
-        },
-        {"New fields upgrade",
-            {with, empty_att(), [fun test_upgrading_fields/1]}
-        }
+            {with, empty_att(), [fun test_non_upgrading_fields/1]}},
+        {"New fields upgrade", {with, empty_att(), [fun test_upgrading_fields/1]}}
     ]}.
-
 
 attachment_defaults_test_() ->
     {"Attachment defaults tests", [
@@ -827,14 +833,13 @@ attachment_field_api_test_() ->
         fun test_transform/0
     ]}.
 
-
 attachment_disk_term_test_() ->
     BaseAttachment = new([
         {name, <<"empty">>},
         {type, <<"application/octet-stream">>},
         {att_len, 0},
         {disk_len, 0},
-        {md5, <<212,29,140,217,143,0,178,4,233,128,9,152,236,248,66,126>>},
+        {md5, <<212, 29, 140, 217, 143, 0, 178, 4, 233, 128, 9, 152, 236, 248, 66, 126>>},
         {revpos, 4},
         {data, {stream, {couch_bt_engine_stream, {fake_fd, fake_sp}}}},
         {encoding, identity}
@@ -843,21 +848,22 @@ attachment_disk_term_test_() ->
         <<"empty">>,
         <<"application/octet-stream">>,
         fake_sp,
-        0, 0, 4,
-        <<212,29,140,217,143,0,178,4,233,128,9,152,236,248,66,126>>,
+        0,
+        0,
+        4,
+        <<212, 29, 140, 217, 143, 0, 178, 4, 233, 128, 9, 152, 236, 248, 66, 126>>,
         identity
     },
     Headers = [{<<"X-Foo">>, <<"bar">>}],
     ExtendedAttachment = store(headers, Headers, BaseAttachment),
     ExtendedDiskTerm = {BaseDiskTerm, [{headers, Headers}]},
-    FakeDb = test_util:fake_db([{engine, {couch_bt_engine, #st{fd=fake_fd}}}]),
+    FakeDb = test_util:fake_db([{engine, {couch_bt_engine, #st{fd = fake_fd}}}]),
     {"Disk term tests", [
         ?_assertEqual(BaseDiskTerm, to_disk_term(BaseAttachment)),
         ?_assertEqual(BaseAttachment, from_disk_term(FakeDb, BaseDiskTerm)),
         ?_assertEqual(ExtendedDiskTerm, to_disk_term(ExtendedAttachment)),
         ?_assertEqual(ExtendedAttachment, from_disk_term(FakeDb, ExtendedDiskTerm))
     ]}.
-
 
 attachment_json_term_test_() ->
     Props = [
@@ -892,15 +898,12 @@ attachment_json_term_test_() ->
         ?_assertThrow({bad_request, _}, inline_from_json(Att, InvalidProps))
     ]}.
 
-
 attachment_stub_merge_test_() ->
     %% Stub merging needs to demonstrate revpos matching, skipping, and missing
     %% attachment errors.
     {"Attachment stub merging tests", []}.
 
-
 %% Test generators
-
 
 test_non_upgrading_fields(Attachment) ->
     Pairs = [
@@ -919,8 +922,8 @@ test_non_upgrading_fields(Attachment) ->
             Updated = store(Field, Value, Attachment),
             ?assertMatch(#att{}, Updated)
         end,
-    Pairs).
-
+        Pairs
+    ).
 
 test_upgrading_fields(Attachment) ->
     ?assertMatch(#att{}, Attachment),
@@ -929,12 +932,10 @@ test_upgrading_fields(Attachment) ->
     UpdatedHeadersUndefined = store(headers, undefined, Attachment),
     ?assertMatch(X when is_list(X), UpdatedHeadersUndefined).
 
-
 test_legacy_defaults(Attachment) ->
     ?assertEqual(<<>>, fetch(md5, Attachment)),
     ?assertEqual(0, fetch(revpos, Attachment)),
     ?assertEqual(identity, fetch(encoding, Attachment)).
-
 
 test_elided_entries(Attachment) ->
     ?assertNot(lists:keymember(name, 1, Attachment)),
@@ -943,25 +944,21 @@ test_elided_entries(Attachment) ->
     ?assertNot(lists:keymember(disk_len, 1, Attachment)),
     ?assertNot(lists:keymember(data, 1, Attachment)).
 
-
 test_construction() ->
     ?assert(new() == new()),
     Initialized = new([{name, <<"foo.bar">>}, {type, <<"application/qux">>}]),
     ?assertEqual(<<"foo.bar">>, fetch(name, Initialized)),
     ?assertEqual(<<"application/qux">>, fetch(type, Initialized)).
 
-
 test_store_and_fetch() ->
     Attachment = empty_att(),
     ?assertEqual(<<"abc">>, fetch(name, store(name, <<"abc">>, Attachment))),
     ?assertEqual(42, fetch(ans, store(ans, 42, Attachment))).
 
-
 test_transform() ->
     Attachment = new([{counter, 0}]),
     Transformed = transform(counter, fun(Count) -> Count + 1 end, Attachment),
     ?assertEqual(1, fetch(counter, Transformed)).
-
 
 max_attachment_size_test_() ->
     {"Max attachment size tests", [

@@ -16,7 +16,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
-
 setup() ->
     DbName = <<"test">>,
     DbFileName = "test.couch",
@@ -30,11 +29,9 @@ setup() ->
 
     DbName.
 
-
 teardown(DbName) when is_binary(DbName) ->
     couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
-
 
 old_db_info_test_() ->
     {
@@ -56,14 +53,12 @@ old_db_info_test_() ->
         }
     }.
 
-
 can_get_props(DbName) ->
     ?_test(begin
         {ok, Db} = couch_db:open_int(DbName, []),
         Props = couch_db_engine:get_props(Db),
         ?assert(is_list(Props))
-      end).
-
+    end).
 
 can_get_db_info(DbName) ->
     ?_test(begin
@@ -71,8 +66,7 @@ can_get_db_info(DbName) ->
         {ok, Info} = couch_db:get_db_info(Db),
         Props = couch_util:get_value(props, Info),
         ?assertEqual({[]}, Props)
-      end).
-
+    end).
 
 can_compact_db(DbName) ->
     ?_test(begin

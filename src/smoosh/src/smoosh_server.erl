@@ -31,8 +31,14 @@
 -define(SECONDS_PER_MINUTE, 60).
 
 % gen_server api.
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-    code_change/3, terminate/2]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    code_change/3,
+    terminate/2
+]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -49,12 +55,12 @@
 % private records.
 
 -record(state, {
-    db_channels=[],
-    view_channels=[],
-    schema_channels=[],
+    db_channels = [],
+    view_channels = [],
+    schema_channels = [],
     tab,
     event_listener,
-    waiting=dict:new()
+    waiting = dict:new()
 }).
 
 -record(channel, {
@@ -107,19 +113,27 @@ init([]) ->
     ok = config:listen_for_changes(?MODULE, nil),
     {ok, Pid} = start_event_listener(),
     DbChannels = smoosh_utils:split(
-                   config:get("smoosh", "db_channels", "upgrade_dbs,ratio_dbs,slack_dbs")),
+        config:get("smoosh", "db_channels", "upgrade_dbs,ratio_dbs,slack_dbs")
+    ),
     ViewChannels = smoosh_utils:split(
-                     config:get("smoosh", "view_channels", "upgrade_views,ratio_views,slack_views")),
-    SchemaChannels = smoosh_utils:split(config:get("smoosh",
-        "schema_channels", "ratio_schemas,slack_schemas")),
+        config:get("smoosh", "view_channels", "upgrade_views,ratio_views,slack_views")
+    ),
+    SchemaChannels = smoosh_utils:split(
+        config:get(
+            "smoosh",
+            "schema_channels",
+            "ratio_schemas,slack_schemas"
+        )
+    ),
     Tab = ets:new(channels, [{keypos, #channel.name}]),
-    {ok, create_missing_channels(#state{
-        db_channels=DbChannels,
-        view_channels=ViewChannels,
-        schema_channels=SchemaChannels,
-        event_listener=Pid,
-        tab=Tab
-    })}.
+    {ok,
+        create_missing_channels(#state{
+            db_channels = DbChannels,
+            view_channels = ViewChannels,
+            schema_channels = SchemaChannels,
+            event_listener = Pid,
+            tab = Tab
+        })}.
 
 handle_config_change("smoosh", "db_channels", L, _, _) ->
     {ok, gen_server:cast(?MODULE, {new_db_channels, smoosh_utils:split(L)})};
@@ -133,105 +147,123 @@ handle_config_change(_, _, _, _, _) ->
 handle_config_terminate(_Server, stop, _State) ->
     ok;
 handle_config_terminate(_Server, _Reason, _State) ->
-    erlang:send_after(?RELISTEN_DELAY,
-        whereis(?MODULE), restart_config_listener).
+    erlang:send_after(
+        ?RELISTEN_DELAY,
+        whereis(?MODULE),
+        restart_config_listener
+    ).
 
 handle_call(status, _From, State) ->
     Acc = ets:foldl(fun get_channel_status/2, [], State#state.tab),
     {reply, {ok, Acc}, State};
-
 handle_call({enqueue, Object}, _From, State) ->
     {noreply, NewState} = handle_cast({enqueue, Object}, State),
     {reply, ok, NewState};
-
 handle_call(suspend, _From, State) ->
-    ets:foldl(fun(#channel{name=Name, pid=P}, _) ->
-        couch_log:notice("Suspending ~p", [Name]),
-        smoosh_channel:suspend(P) end, 0,
-        State#state.tab),
+    ets:foldl(
+        fun(#channel{name = Name, pid = P}, _) ->
+            couch_log:notice("Suspending ~p", [Name]),
+            smoosh_channel:suspend(P)
+        end,
+        0,
+        State#state.tab
+    ),
     {reply, ok, State};
-
 handle_call(resume, _From, State) ->
-    ets:foldl(fun(#channel{name=Name, pid=P}, _) ->
-        couch_log:notice("Resuming ~p", [Name]),
-        smoosh_channel:resume(P) end, 0,
-        State#state.tab),
+    ets:foldl(
+        fun(#channel{name = Name, pid = P}, _) ->
+            couch_log:notice("Resuming ~p", [Name]),
+            smoosh_channel:resume(P)
+        end,
+        0,
+        State#state.tab
+    ),
     {reply, ok, State}.
 
 handle_cast({new_db_channels, Channels}, State) ->
-    [smoosh_channel:close(channel_pid(State#state.tab, C)) ||
-        C <- State#state.db_channels -- Channels],
-    {noreply, create_missing_channels(State#state{db_channels=Channels})};
-
+    [
+        smoosh_channel:close(channel_pid(State#state.tab, C))
+     || C <- State#state.db_channels -- Channels
+    ],
+    {noreply, create_missing_channels(State#state{db_channels = Channels})};
 handle_cast({new_view_channels, Channels}, State) ->
-    [smoosh_channel:close(channel_pid(State#state.tab, C)) ||
-        C <- State#state.view_channels -- Channels],
-    {noreply, create_missing_channels(State#state{view_channels=Channels})};
-
+    [
+        smoosh_channel:close(channel_pid(State#state.tab, C))
+     || C <- State#state.view_channels -- Channels
+    ],
+    {noreply, create_missing_channels(State#state{view_channels = Channels})};
 handle_cast({new_schema_channels, Channels}, State) ->
-    [smoosh_channel:close(channel_pid(State#state.tab, C)) ||
-        C <- State#state.schema_channels -- Channels],
-    {noreply, create_missing_channels(State#state{view_channels=Channels})};
-
+    [
+        smoosh_channel:close(channel_pid(State#state.tab, C))
+     || C <- State#state.schema_channels -- Channels
+    ],
+    {noreply, create_missing_channels(State#state{view_channels = Channels})};
 handle_cast({enqueue, Object}, State) ->
-    #state{waiting=Waiting}=State,
+    #state{waiting = Waiting} = State,
     case dict:is_key(Object, Waiting) of
         true ->
             {noreply, State};
         false ->
             {_Pid, Ref} = spawn_monitor(?MODULE, enqueue_request, [State, Object]),
-            {noreply, State#state{waiting=dict:store(Object, Ref, Waiting)}}
+            {noreply, State#state{waiting = dict:store(Object, Ref, Waiting)}}
     end.
 
-handle_info({'EXIT', Pid, Reason}, #state{event_listener=Pid}=State) ->
-        couch_log:notice("update notifier died ~p", [Reason]),
-        {ok, Pid1} = start_event_listener(),
-        {noreply, State#state{event_listener=Pid1}};
+handle_info({'EXIT', Pid, Reason}, #state{event_listener = Pid} = State) ->
+    couch_log:notice("update notifier died ~p", [Reason]),
+    {ok, Pid1} = start_event_listener(),
+    {noreply, State#state{event_listener = Pid1}};
 handle_info({'EXIT', Pid, Reason}, State) ->
     couch_log:notice("~p ~p died ~p", [?MODULE, Pid, Reason]),
-    case ets:match_object(State#state.tab, #channel{pid=Pid, _='_'}) of
-    [#channel{name=Name}] ->
-        ets:delete(State#state.tab, Name);
-    _ ->
-        ok
+    case ets:match_object(State#state.tab, #channel{pid = Pid, _ = '_'}) of
+        [#channel{name = Name}] ->
+            ets:delete(State#state.tab, Name);
+        _ ->
+            ok
     end,
     {noreply, create_missing_channels(State)};
-
 handle_info({'DOWN', Ref, _, _, _}, State) ->
-    Waiting = dict:filter(fun(_Key, Value) -> Value =/= Ref end,
-                          State#state.waiting),
-    {noreply, State#state{waiting=Waiting}};
-
+    Waiting = dict:filter(
+        fun(_Key, Value) -> Value =/= Ref end,
+        State#state.waiting
+    ),
+    {noreply, State#state{waiting = Waiting}};
 handle_info(restart_config_listener, State) ->
     ok = config:listen_for_changes(?MODULE, nil),
     {noreply, State};
-
 handle_info(_Msg, State) ->
     {noreply, State}.
 
 terminate(_Reason, State) ->
-    ets:foldl(fun(#channel{pid=P}, _) -> smoosh_channel:close(P) end, 0,
-        State#state.tab),
+    ets:foldl(
+        fun(#channel{pid = P}, _) -> smoosh_channel:close(P) end,
+        0,
+        State#state.tab
+    ),
     ok.
 
-code_change(_OldVsn, {state, DbChannels, ViewChannels, Tab,
-        EventListener, Waiting}, _Extra) ->
-    {ok, #state{db_channels=DbChannels, view_channels=ViewChannels,
-        schema_channels=[], tab=Tab, event_listener = EventListener,
-            waiting=Waiting}};
+code_change(_OldVsn, {state, DbChannels, ViewChannels, Tab, EventListener, Waiting}, _Extra) ->
+    {ok, #state{
+        db_channels = DbChannels,
+        view_channels = ViewChannels,
+        schema_channels = [],
+        tab = Tab,
+        event_listener = EventListener,
+        waiting = Waiting
+    }};
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 % private functions.
 
-get_channel_status(#channel{name=Name, pid=P}, Acc0) when is_pid(P) ->
+get_channel_status(#channel{name = Name, pid = P}, Acc0) when is_pid(P) ->
     try gen_server:call(P, status) of
-    {ok, Status} ->
-        [{Name, Status} | Acc0];
-    _ ->
-        Acc0
-    catch _:_ ->
-        Acc0
+        {ok, Status} ->
+            [{Name, Status} | Acc0];
+        _ ->
+            Acc0
+    catch
+        _:_ ->
+            Acc0
     end;
 get_channel_status(_, Acc0) ->
     Acc0.
@@ -254,41 +286,42 @@ enqueue_request(State, Object) ->
                 smoosh_utils:stringify(Object), Stack])
     end.
 
-find_channel(#state{}=State, {schema, DbName, GroupId}) ->
+find_channel(#state{} = State, {schema, DbName, GroupId}) ->
     find_channel(State#state.tab, State#state.schema_channels, {schema, DbName, GroupId});
-find_channel(#state{}=State, {Shard, GroupId}) ->
+find_channel(#state{} = State, {Shard, GroupId}) ->
     find_channel(State#state.tab, State#state.view_channels, {Shard, GroupId});
-find_channel(#state{}=State, DbName) ->
+find_channel(#state{} = State, DbName) ->
     find_channel(State#state.tab, State#state.db_channels, DbName).
 
 find_channel(_Tab, [], _Object) ->
     false;
-find_channel(Tab, [Channel|Rest], Object) ->
+find_channel(Tab, [Channel | Rest], Object) ->
     Pid = channel_pid(Tab, Channel),
     LastUpdated = smoosh_channel:last_updated(Pid, Object),
-    StalenessInSec = config:get_integer("smoosh", "staleness", 5)
-        * ?SECONDS_PER_MINUTE,
+    StalenessInSec =
+        config:get_integer("smoosh", "staleness", 5) *
+            ?SECONDS_PER_MINUTE,
     Staleness = erlang:convert_time_unit(StalenessInSec, seconds, native),
     Now = erlang:monotonic_time(),
     case LastUpdated =:= false orelse Now - LastUpdated > Staleness of
-    true ->
-        case smoosh_utils:ignore_db(Object) of
         true ->
-            find_channel(Tab, Rest, Object);
-        _ ->
-            case get_priority(Channel, Object) of
-            0 ->
-                find_channel(Tab, Rest, Object);
-            Priority ->
-                {ok, Pid, Priority}
-            end
-        end;
-    false ->
-        find_channel(Tab, Rest, Object)
+            case smoosh_utils:ignore_db(Object) of
+                true ->
+                    find_channel(Tab, Rest, Object);
+                _ ->
+                    case get_priority(Channel, Object) of
+                        0 ->
+                            find_channel(Tab, Rest, Object);
+                        Priority ->
+                            {ok, Pid, Priority}
+                    end
+            end;
+        false ->
+            find_channel(Tab, Rest, Object)
     end.
 
 channel_pid(Tab, Channel) ->
-    [#channel{pid=Pid}] = ets:lookup(Tab, Channel),
+    [#channel{pid = Pid}] = ets:lookup(Tab, Channel),
     Pid.
 
 create_missing_channels(State) ->
@@ -299,11 +332,11 @@ create_missing_channels(State) ->
 
 create_missing_channels(_Tab, []) ->
     ok;
-create_missing_channels(Tab, [Channel|Rest]) ->
+create_missing_channels(Tab, [Channel | Rest]) ->
     case ets:lookup(Tab, Channel) of
         [] ->
             {ok, Pid} = smoosh_channel:start_link(Channel),
-            true = ets:insert(Tab, [#channel{name=Channel, pid=Pid}]);
+            true = ets:insert(Tab, [#channel{name = Channel, pid = Pid}]);
         _ ->
             ok
     end,
@@ -311,44 +344,50 @@ create_missing_channels(Tab, [Channel|Rest]) ->
 
 get_priority(Channel, {Shard, GroupId}) ->
     case couch_index_server:get_index(couch_mrview_index, Shard, GroupId) of
-    {ok, Pid} ->
-        try
-            {ok, ViewInfo} = couch_index:get_info(Pid),
-            {SizeInfo} = couch_util:get_value(sizes, ViewInfo),
-            DiskSize = couch_util:get_value(file, SizeInfo),
-            ActiveSize = couch_util:get_value(active, SizeInfo),
-            NeedsUpgrade = needs_upgrade(ViewInfo),
-            get_priority(Channel, DiskSize, ActiveSize, NeedsUpgrade)
-        catch
-            exit:{timeout, _} ->
-                0
-        end;
-    {not_found, _Reason} ->
-        0;
-    {error, Reason} ->
-        couch_log:warning("Failed to get group_pid for ~p ~p ~p: ~p",
-            [Channel, Shard, GroupId, Reason]),
-        0
+        {ok, Pid} ->
+            try
+                {ok, ViewInfo} = couch_index:get_info(Pid),
+                {SizeInfo} = couch_util:get_value(sizes, ViewInfo),
+                DiskSize = couch_util:get_value(file, SizeInfo),
+                ActiveSize = couch_util:get_value(active, SizeInfo),
+                NeedsUpgrade = needs_upgrade(ViewInfo),
+                get_priority(Channel, DiskSize, ActiveSize, NeedsUpgrade)
+            catch
+                exit:{timeout, _} ->
+                    0
+            end;
+        {not_found, _Reason} ->
+            0;
+        {error, Reason} ->
+            couch_log:warning(
+                "Failed to get group_pid for ~p ~p ~p: ~p",
+                [Channel, Shard, GroupId, Reason]
+            ),
+            0
     end;
-
 get_priority(Channel, {schema, DbName, DDocId}) ->
     case couch_md_index_manager:get_group_pid(DbName, DDocId) of
-    {ok, Pid} ->
-        {ok, SchemaInfo} = couch_md_index:get_info(Pid),
-        DiskSize = couch_util:get_value(disk_size, SchemaInfo),
-        DataSize = couch_util:get_value(data_size, SchemaInfo),
-        get_priority(Channel, DiskSize, DataSize, false);
-    {error, Reason} ->
-        couch_log:warning("Failed to get group_pid for ~p ~p ~p: ~p",
-            [Channel, DbName, DDocId, Reason]),
-        0
+        {ok, Pid} ->
+            {ok, SchemaInfo} = couch_md_index:get_info(Pid),
+            DiskSize = couch_util:get_value(disk_size, SchemaInfo),
+            DataSize = couch_util:get_value(data_size, SchemaInfo),
+            get_priority(Channel, DiskSize, DataSize, false);
+        {error, Reason} ->
+            couch_log:warning(
+                "Failed to get group_pid for ~p ~p ~p: ~p",
+                [Channel, DbName, DDocId, Reason]
+            ),
+            0
     end;
-
 get_priority(Channel, DbName) when is_list(DbName) ->
     get_priority(Channel, ?l2b(DbName));
 get_priority(Channel, DbName) when is_binary(DbName) ->
     {ok, Db} = couch_db:open_int(DbName, []),
-    try get_priority(Channel, Db) after couch_db:close(Db) end;
+    try
+        get_priority(Channel, Db)
+    after
+        couch_db:close(Db)
+    end;
 get_priority(Channel, Db) ->
     {ok, DocInfo} = couch_db:get_db_info(Db),
     {SizeInfo} = couch_util:get_value(sizes, DocInfo),
@@ -356,7 +395,7 @@ get_priority(Channel, Db) ->
     ActiveSize = couch_util:get_value(active, SizeInfo),
     NeedsUpgrade = needs_upgrade(DocInfo),
     case db_changed(Channel, DocInfo) of
-        true  -> get_priority(Channel, DiskSize, ActiveSize, NeedsUpgrade);
+        true -> get_priority(Channel, DiskSize, ActiveSize, NeedsUpgrade);
         false -> 0
     end.
 
@@ -364,30 +403,35 @@ get_priority(Channel, DiskSize, DataSize, NeedsUpgrade) ->
     Priority = get_priority(Channel),
     MinSize = to_number(Channel, "min_size", "1048576"),
     MaxSize = to_number(Channel, "max_size", "infinity"),
-    DefaultMinPriority = case Priority of "slack" -> "536870912"; _ -> "2.0" end,
+    DefaultMinPriority =
+        case Priority of
+            "slack" -> "536870912";
+            _ -> "2.0"
+        end,
     MinPriority = to_number(Channel, "min_priority", DefaultMinPriority),
     MaxPriority = to_number(Channel, "max_priority", "infinity"),
-    if Priority =:= "upgrade", NeedsUpgrade ->
+    if
+        Priority =:= "upgrade", NeedsUpgrade ->
             1;
-       DiskSize =< MinSize ->
+        DiskSize =< MinSize ->
             0;
-       DiskSize > MaxSize ->
+        DiskSize > MaxSize ->
             0;
-       DataSize =:= 0 ->
+        DataSize =:= 0 ->
             MinPriority;
-       Priority =:= "ratio", DiskSize/DataSize =< MinPriority ->
+        Priority =:= "ratio", DiskSize / DataSize =< MinPriority ->
             0;
-       Priority =:= "ratio", DiskSize/DataSize > MaxPriority ->
+        Priority =:= "ratio", DiskSize / DataSize > MaxPriority ->
             0;
-       Priority =:= "ratio" ->
-            DiskSize/DataSize;
-       Priority =:= "slack", DiskSize-DataSize =< MinPriority ->
+        Priority =:= "ratio" ->
+            DiskSize / DataSize;
+        Priority =:= "slack", DiskSize - DataSize =< MinPriority ->
             0;
-       Priority =:= "slack", DiskSize-DataSize > MaxPriority ->
+        Priority =:= "slack", DiskSize - DataSize > MaxPriority ->
             0;
-       Priority =:= "slack" ->
-            DiskSize-DataSize;
-       true ->
+        Priority =:= "slack" ->
+            DiskSize - DataSize;
+        true ->
             0
     end.
 
@@ -397,19 +441,22 @@ db_changed(Channel, Info) ->
             true;
         CompactedSeq ->
             MinChanges = list_to_integer(
-                smoosh_utils:get(Channel, "min_changes", "0")),
+                smoosh_utils:get(Channel, "min_changes", "0")
+            ),
             UpdateSeq = couch_util:get_value(update_seq, Info),
             UpdateSeq - CompactedSeq >= MinChanges
     end.
 
 to_number(Channel, Name, Default) ->
     case smoosh_utils:get(Channel, Name, Default) of
-        "infinity" -> infinity;
+        "infinity" ->
+            infinity;
         Value ->
             try
                 list_to_float(Value)
-            catch error:badarg ->
-                list_to_integer(Value)
+            catch
+                error:badarg ->
+                    list_to_integer(Value)
             end
     end.
 
@@ -441,10 +488,8 @@ needs_upgrade(Props) ->
             false
     end.
 
-
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
-
 
 setup_all() ->
     Ctx = test_util:start_couch([couch_log]),
@@ -477,7 +522,7 @@ config_change_test_() ->
                 fun t_restart_config_listener/1
             ]
         }
-}.
+    }.
 
 get_priority_test_() ->
     {

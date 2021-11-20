@@ -21,11 +21,9 @@ setup() ->
     fabric:create_db(DbName),
     DbName.
 
-
 teardown(DbName) ->
     (catch fabric:delete_db(DbName)),
     ok.
-
 
 clustered_db_test_() ->
     {
@@ -39,7 +37,8 @@ clustered_db_test_() ->
                     "DB deletion",
                     {
                         foreach,
-                        fun setup/0, fun teardown/1,
+                        fun setup/0,
+                        fun teardown/1,
                         [
                             fun should_close_deleted_db/1,
                             fun should_kill_caller_from_load_validation_funs_for_deleted_db/1
@@ -50,7 +49,6 @@ clustered_db_test_() ->
         }
     }.
 
-
 should_close_deleted_db(DbName) ->
     ?_test(begin
         [#shard{name = ShardName} | _] = mem3:shards(DbName),
@@ -60,7 +58,7 @@ should_close_deleted_db(DbName) ->
         fabric:delete_db(DbName),
         receive
             {'DOWN', MonitorRef, _Type, _Pid, _Info} ->
-            ok
+                ok
         after 2000 ->
             throw(timeout_error)
         end,
@@ -71,8 +69,7 @@ should_close_deleted_db(DbName) ->
             end
         end),
         ?assertEqual([], ets:lookup(couch_server:couch_dbs(DbName), DbName))
-     end).
-
+    end).
 
 should_kill_caller_from_load_validation_funs_for_deleted_db(DbName) ->
     ?_test(begin
@@ -85,7 +82,7 @@ should_kill_caller_from_load_validation_funs_for_deleted_db(DbName) ->
             {'DOWN', MonitorRef, _Type, _Pid, _Info} ->
                 ok
         after 2000 ->
-                throw(timeout_error)
+            throw(timeout_error)
         end,
         ?assertError(database_does_not_exist, couch_db:load_validation_funs(Db))
     end).

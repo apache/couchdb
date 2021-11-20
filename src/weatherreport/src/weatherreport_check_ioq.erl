@@ -26,10 +26,12 @@
 -module(weatherreport_check_ioq).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -define(THRESHOLD, 500).
 
@@ -67,9 +69,13 @@ check(Opts) ->
         true ->
             case ioq:get_queue_lengths() of
                 Queues when is_map(Queues) ->
-                    Total = maps:fold(fun(_Key, Val, Acc) ->
-                        Val + Acc
-                    end, 0, Queues),
+                    Total = maps:fold(
+                        fun(_Key, Val, Acc) ->
+                            Val + Acc
+                        end,
+                        0,
+                        Queues
+                    ),
                     [{total_to_level(Total), {ioq_requests, Total, Queues}}];
                 Error ->
                     [{warning, {ioq_requests_unknown, Error}}]

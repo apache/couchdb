@@ -24,16 +24,17 @@ setup() ->
 teardown({Fd, _}) ->
     ok = couch_file:close(Fd).
 
-
 stream_test_() ->
     {
         "CouchDB stream tests",
         {
             setup,
-            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            fun() -> test_util:start(?MODULE, [ioq]) end,
+            fun test_util:stop/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun should_write/1,
                     fun should_write_consecutive/1,
@@ -48,7 +49,6 @@ stream_test_() ->
             }
         }
     }.
-
 
 should_write({_, Stream}) ->
     ?_assertEqual(ok, couch_stream:write(Stream, <<"food">>)).
@@ -98,7 +98,10 @@ should_stream_more_with_4K_chunk_size({Fd, _}) ->
             Data = <<"a1b2c">>,
             couch_stream:write(Stream, Data),
             [Data | Acc]
-        end, [], lists:seq(1, 1024)),
+        end,
+        [],
+        lists:seq(1, 1024)
+    ),
     {NewEngine, Length, _, _, _} = couch_stream:close(Stream),
     {ok, Ptrs} = couch_stream:to_disk_term(NewEngine),
     ?_assertMatch({[{0, 4100}, {4106, 1020}], 5120}, {Ptrs, Length}).
@@ -109,15 +112,16 @@ should_stop_on_normal_exit_of_stream_opener({Fd, _}) ->
         fun() ->
             {ok, StreamPid} = couch_stream:open(?ENGINE(Fd)),
             RunnerPid ! {pid, StreamPid}
-        end),
-    StreamPid = receive
-        {pid, StreamPid0} -> StreamPid0
-    end,
+        end
+    ),
+    StreamPid =
+        receive
+            {pid, StreamPid0} -> StreamPid0
+        end,
     % Confirm the validity of the test by verifying the stream opener has died
     ?assertNot(is_process_alive(OpenerPid)),
     % Verify the stream itself has also died
     ?_assertNot(is_process_alive(StreamPid)).
-
 
 read_all(Engine) ->
     Data = couch_stream:foldl(Engine, fun(Bin, Acc) -> [Bin, Acc] end, []),

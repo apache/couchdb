@@ -38,18 +38,22 @@
 -define(TEST_FILE, "weatherreport.tmp").
 
 %% A dependent chain of permissions checking functions.
--define(CHECKPERMFUNS, [fun check_is_dir/1,
-                        fun check_is_writeable/1,
-                        fun check_is_readable/1,
-                        fun check_is_file_readable/1,
-                        fun check_atime/1]).
+-define(CHECKPERMFUNS, [
+    fun check_is_dir/1,
+    fun check_is_writeable/1,
+    fun check_is_readable/1,
+    fun check_is_file_readable/1,
+    fun check_atime/1
+]).
 
 -include_lib("kernel/include/file.hrl").
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -spec description() -> string().
 description() ->
@@ -63,29 +67,41 @@ valid() ->
 check(_Opts) ->
     DataDirs = weatherreport_config:data_directories(),
     %% Add additional disk checks in the function below
-    lists:flatmap(fun(Dir) ->
-                          check_directory_permissions(Dir)
-                  end,
-                  DataDirs).
+    lists:flatmap(
+        fun(Dir) ->
+            check_directory_permissions(Dir)
+        end,
+        DataDirs
+    ).
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({disk_full, DataDir}) ->
-    {"Disk containing data directory ~s is full! "
-     "Please check that it is set to the correct location and that there are not "
-     "other files using up space intended for Riak.", [DataDir]};
+    {
+        "Disk containing data directory ~s is full! "
+        "Please check that it is set to the correct location and that there are not "
+        "other files using up space intended for Riak.",
+        [DataDir]
+    };
 format({no_data_dir, DataDir}) ->
     {"Data directory ~s does not exist. Please create it.", [DataDir]};
 format({no_write, DataDir}) ->
     User = weatherreport_config:user(),
-    {"No write access to data directory ~s. Please make it writeable by the '~s' user.", [DataDir, User]};
+    {"No write access to data directory ~s. Please make it writeable by the '~s' user.", [
+        DataDir, User
+    ]};
 format({no_read, DataDir}) ->
     User = weatherreport_config:user(),
-    {"No read access to data directory ~s. Please make it readable by the '~s' user.", [DataDir, User]};
+    {"No read access to data directory ~s. Please make it readable by the '~s' user.", [
+        DataDir, User
+    ]};
 format({write_check, File}) ->
     {"Write-test file ~s is a directory! Please remove it so this test can continue.", [File]};
 format({atime, Dir}) ->
-    {"Data directory ~s is not mounted with 'noatime'. "
-     "Please remount its disk with the 'noatime' flag to improve performance.", [Dir]}.
+    {
+        "Data directory ~s is not mounted with 'noatime'. "
+        "Please remount its disk with the 'noatime' flag to improve performance.",
+        [Dir]
+    }.
 
 %%% Private functions
 
@@ -96,12 +112,12 @@ check_directory_permissions(Directory) ->
 %% returning the first non-ok result.
 check_directory(_, []) ->
     [];
-check_directory(Directory, [Check|Checks]) ->
+check_directory(Directory, [Check | Checks]) ->
     case Check(Directory) of
         ok ->
             check_directory(Directory, Checks);
         Message ->
-            [ Message ]
+            [Message]
     end.
 
 %% Check if the path is actually a directory
@@ -130,13 +146,17 @@ check_is_writeable(Directory) ->
 %% Check if the directory is readable
 check_is_readable(Directory) ->
     case file:read_file_info(Directory) of
-        {ok, #file_info{access=Access}} when Access == read orelse
-                                             Access == read_write ->
+        {ok, #file_info{access = Access}} when
+            Access == read orelse
+                Access == read_write
+        ->
             ok;
         {error, eacces} ->
             {error, {no_read, Directory}};
-        {error, Error} when Error == enoent orelse
-                            Error == enotdir ->
+        {error, Error} when
+            Error == enoent orelse
+                Error == enotdir
+        ->
             {error, {no_data_dir, Directory}};
         _ ->
             {error, {no_read, Directory}}
@@ -146,12 +166,15 @@ check_is_readable(Directory) ->
 check_is_file_readable(Directory) ->
     File = filename:join([Directory, ?TEST_FILE]),
     case file:read_file(File) of
-        {error, Error} when Error == eacces orelse
-                            Error == enotdir ->
+        {error, Error} when
+            Error == eacces orelse
+                Error == enotdir
+        ->
             {error, {no_read, Directory}};
         {error, enoent} ->
             {error, {write_check, File}};
-        _ -> ok
+        _ ->
+            ok
     end.
 
 %% Check if the directory is mounted with 'noatime'

@@ -25,10 +25,12 @@
 -module(weatherreport_check_safe_to_rebuild).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -spec description() -> string().
 description() ->
@@ -42,15 +44,17 @@ valid() ->
 %% that no shard would end up with N<Threshold when the node is offline
 -spec safe_to_rebuild(atom(), integer()) -> [list()].
 safe_to_rebuild(Node, RawThreshold) ->
-    Threshold = case config:get("couchdb", "maintenance_mode") of
-        "true" ->
-            RawThreshold - 1;
-        _ ->
-            RawThreshold
-    end,
+    Threshold =
+        case config:get("couchdb", "maintenance_mode") of
+            "true" ->
+                RawThreshold - 1;
+            _ ->
+                RawThreshold
+        end,
     BelowThreshold = fun
         ({_, _, {_, C}}) when C =< Threshold -> true;
-        (_) -> false end,
+        (_) -> false
+    end,
     ToKV = fun({Db, Range, Status}) -> {[Db, Range], Status} end,
 
     ShardsInDanger = dict:from_list(
@@ -77,7 +81,8 @@ safe_to_rebuild(Node, RawThreshold) ->
                         _ ->
                             Acc
                     end;
-                _ -> Acc
+                _ ->
+                    Acc
             end
         end,
         []

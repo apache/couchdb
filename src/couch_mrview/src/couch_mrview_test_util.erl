@@ -18,16 +18,13 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch/include/couch_eunit.hrl").
 
-
 init_db(Name, Type) ->
     init_db(Name, Type, 10).
-
 
 init_db(Name, Type, Count) ->
     {ok, Db} = new_db(Name, Type),
     Docs = make_docs(Type, Count),
     save_docs(Db, Docs).
-
 
 new_db(Name, Type) when Type == local; Type == design ->
     couch_server:delete(Name, [?ADMIN_CTX]),
@@ -44,80 +41,96 @@ save_docs(Db, Docs) ->
     {ok, _} = couch_db:update_docs(Db, Docs, []),
     couch_db:reopen(Db).
 
-
 make_docs(local, Count) ->
     [local_doc(I) || I <- lists:seq(1, Count)];
 make_docs(design, Count) ->
-    lists:foldl(fun(I, Acc) ->
-        [doc(I), ddoc(I) | Acc]
-    end, [], lists:seq(1, Count));
+    lists:foldl(
+        fun(I, Acc) ->
+            [doc(I), ddoc(I) | Acc]
+        end,
+        [],
+        lists:seq(1, Count)
+    );
 make_docs(_, Count) ->
     [doc(I) || I <- lists:seq(1, Count)].
-
 
 make_docs(_, Since, Count) ->
     [doc(I) || I <- lists:seq(Since, Count)].
 
-
 ddoc(map) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/bar">>},
-        {<<"views">>, {[
-            {<<"baz">>, {[
-                {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
-            ]}},
-            {<<"bing">>, {[
-                {<<"map">>, <<"function(doc) {}">>}
-            ]}},
-            {<<"zing">>, {[
-                {<<"map">>, <<
-                    "function(doc) {\n"
-                    "  if(doc.foo !== undefined)\n"
-                    "    emit(doc.foo, 0);\n"
-                    "}"
-                >>}
-            ]}}
-        ]}}
-    ]});
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/bar">>},
+            {<<"views">>,
+                {[
+                    {<<"baz">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {emit(doc.val, doc.val);}">>}
+                        ]}},
+                    {<<"bing">>,
+                        {[
+                            {<<"map">>, <<"function(doc) {}">>}
+                        ]}},
+                    {<<"zing">>,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) {\n"
+                                "  if(doc.foo !== undefined)\n"
+                                "    emit(doc.foo, 0);\n"
+                                "}"
+                            >>}
+                        ]}}
+                ]}}
+        ]}
+    );
 ddoc(red) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, <<"_design/red">>},
-        {<<"views">>, {[
-            {<<"baz">>, {[
-                {<<"map">>, <<
-                    "function(doc) {\n"
-                    "  emit([doc.val % 2, doc.val], doc.val);\n"
-                    "}\n"
-                >>},
-                {<<"reduce">>, <<"function(keys, vals) {return sum(vals);}">>}
-            ]}},
-            {<<"zing">>, {[
-                {<<"map">>, <<
-                    "function(doc) {\n"
-                    "  if(doc.foo !== undefined)\n"
-                    "    emit(doc.foo, null);\n"
-                    "}"
-                >>},
-                {<<"reduce">>, <<"_count">>}
-            ]}}
-        ]}}
-    ]});
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"_design/red">>},
+            {<<"views">>,
+                {[
+                    {<<"baz">>,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) {\n"
+                                "  emit([doc.val % 2, doc.val], doc.val);\n"
+                                "}\n"
+                            >>},
+                            {<<"reduce">>, <<"function(keys, vals) {return sum(vals);}">>}
+                        ]}},
+                    {<<"zing">>,
+                        {[
+                            {<<"map">>, <<
+                                "function(doc) {\n"
+                                "  if(doc.foo !== undefined)\n"
+                                "    emit(doc.foo, null);\n"
+                                "}"
+                            >>},
+                            {<<"reduce">>, <<"_count">>}
+                        ]}}
+                ]}}
+        ]}
+    );
 ddoc(Id) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, list_to_binary(io_lib:format("_design/bar~2..0b", [Id]))},
-        {<<"views">>, {[]}}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, list_to_binary(io_lib:format("_design/bar~2..0b", [Id]))},
+            {<<"views">>, {[]}}
+        ]}
+    ).
 
 doc(Id) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, list_to_binary(integer_to_list(Id))},
-        {<<"val">>, Id}
-    ]}).
-
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, list_to_binary(integer_to_list(Id))},
+            {<<"val">>, Id}
+        ]}
+    ).
 
 local_doc(Id) ->
-    couch_doc:from_json_obj({[
-        {<<"_id">>, list_to_binary(io_lib:format("_local/~b", [Id]))},
-        {<<"val">>, Id}
-    ]}).
+    couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, list_to_binary(io_lib:format("_local/~b", [Id]))},
+            {<<"val">>, Id}
+        ]}
+    ).

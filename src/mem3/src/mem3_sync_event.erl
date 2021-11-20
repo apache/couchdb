@@ -14,8 +14,14 @@
 -behaviour(gen_event).
 -vsn(1).
 
--export([init/1, handle_event/2, handle_call/2, handle_info/2, terminate/2,
-    code_change/3]).
+-export([
+    init/1,
+    handle_event/2,
+    handle_call/2,
+    handle_info/2,
+    terminate/2,
+    code_change/3
+]).
 
 init(_) ->
     net_kernel:monitor_nodes(true),
@@ -25,11 +31,9 @@ handle_event({add_node, Node}, State) when Node =/= node() ->
     net_kernel:connect_node(Node),
     mem3_sync_nodes:add([Node]),
     {ok, State};
-
-handle_event({remove_node, Node}, State)  ->
+handle_event({remove_node, Node}, State) ->
     mem3_sync:remove_node(Node),
     {ok, State};
-
 handle_event(_Event, State) ->
     {ok, State}.
 
@@ -41,11 +45,9 @@ handle_info({nodeup, Node}, State) ->
     Nodes = lists:filter(fun(N) -> lists:member(N, mem3:nodes()) end, Nodes0),
     wait_for_rexi(Nodes, 5),
     {ok, State};
-
 handle_info({nodedown, Node}, State) ->
     mem3_sync:remove_node(Node),
     {ok, State};
-
 handle_info(_Info, State) ->
     {ok, State}.
 
@@ -75,12 +77,13 @@ wait_for_rexi(Waiting, Retries) ->
     case length(Up) > 0 of
         true ->
             mem3_sync_nodes:add(Up);
-        false -> ok
+        false ->
+            ok
     end,
     case length(NotUp) > 0 andalso Retries > 0 of
         true ->
             timer:sleep(1000),
-            wait_for_rexi(NotUp, Retries-1);
+            wait_for_rexi(NotUp, Retries - 1);
         false ->
             ok
     end.

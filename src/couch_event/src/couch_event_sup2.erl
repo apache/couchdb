@@ -19,26 +19,18 @@
 -module(couch_event_sup2).
 -behavior(supervisor).
 
-
 -export([
     start_link/0,
     init/1
 ]).
 
-
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, nil).
 
-
 init(_) ->
     Children = [
-        {couch_event_server,
-            {couch_event_server, start_link, []},
-            permanent,
-            5000,
-            worker,
-            [couch_event_server]
-        }
+        {couch_event_server, {couch_event_server, start_link, []}, permanent, 5000, worker, [
+            couch_event_server
+        ]}
     ],
     {ok, {{one_for_one, 5, 10}, Children}}.
-

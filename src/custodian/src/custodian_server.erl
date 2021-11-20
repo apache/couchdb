@@ -19,8 +19,14 @@
 -export([start_link/0]).
 
 % gen_server api.
--export([init/1, handle_call/3, handle_cast/2, handle_info/2,
-    code_change/3, terminate/2]).
+-export([
+    init/1,
+    handle_call/3,
+    handle_cast/2,
+    handle_info/2,
+    code_change/3,
+    terminate/2
+]).
 
 % exported for callback.
 -export([
@@ -35,7 +41,7 @@
 -record(state, {
     event_listener,
     shard_checker,
-    rescan=false
+    rescan = false
 }).
 
 -define(VSN_0_2_7, 184129240591641721395874905059581858099).
@@ -45,7 +51,6 @@
 -else.
 -define(RELISTEN_DELAY, 5000).
 -endif.
-
 
 % public functions.
 
@@ -69,9 +74,10 @@ init(_) ->
     net_kernel:monitor_nodes(true),
     ok = config:listen_for_changes(?MODULE, nil),
     {ok, LisPid} = start_event_listener(),
-    {ok, start_shard_checker(#state{
-        event_listener=LisPid
-    })}.
+    {ok,
+        start_shard_checker(#state{
+            event_listener = LisPid
+        })}.
 
 handle_call(_Msg, _From, State) ->
     {noreply, State}.
@@ -81,29 +87,24 @@ handle_cast(refresh, State) ->
 
 handle_info({nodeup, _}, State) ->
     {noreply, start_shard_checker(State)};
-
 handle_info({nodedown, _}, State) ->
     {noreply, start_shard_checker(State)};
-
-handle_info({'EXIT', Pid, normal}, #state{shard_checker=Pid}=State) ->
-    NewState = State#state{shard_checker=undefined},
+handle_info({'EXIT', Pid, normal}, #state{shard_checker = Pid} = State) ->
+    NewState = State#state{shard_checker = undefined},
     case State#state.rescan of
         true ->
             {noreply, start_shard_checker(NewState)};
         false ->
             {noreply, NewState}
     end;
-
-handle_info({'EXIT', Pid, Reason}, #state{shard_checker=Pid}=State) ->
+handle_info({'EXIT', Pid, Reason}, #state{shard_checker = Pid} = State) ->
     couch_log:notice("custodian shard checker died ~p", [Reason]),
-    NewState = State#state{shard_checker=undefined},
+    NewState = State#state{shard_checker = undefined},
     {noreply, start_shard_checker(NewState)};
-
-handle_info({'EXIT', Pid, Reason}, #state{event_listener=Pid}=State) ->
+handle_info({'EXIT', Pid, Reason}, #state{event_listener = Pid} = State) ->
     couch_log:notice("custodian update notifier died ~p", [Reason]),
     {ok, Pid1} = start_event_listener(),
-    {noreply, State#state{event_listener=Pid1}};
-
+    {noreply, State#state{event_listener = Pid1}};
 handle_info(restart_config_listener, State) ->
     ok = config:listen_for_changes(?MODULE, nil),
     {noreply, State}.
@@ -116,26 +117,24 @@ terminate(_Reason, State) ->
 code_change(?VSN_0_2_7, State, _Extra) ->
     ok = config:listen_for_changes(?MODULE, nil),
     {ok, State};
-code_change(_OldVsn, #state{}=State, _Extra) ->
+code_change(_OldVsn, #state{} = State, _Extra) ->
     {ok, State}.
 
 % private functions
 
-
-start_shard_checker(#state{shard_checker=undefined}=State) ->
+start_shard_checker(#state{shard_checker = undefined} = State) ->
     State#state{
-        shard_checker=spawn_link(fun ?MODULE:check_shards/0),
-        rescan=false
+        shard_checker = spawn_link(fun ?MODULE:check_shards/0),
+        rescan = false
     };
-start_shard_checker(#state{shard_checker=Pid}=State) when is_pid(Pid) ->
-    State#state{rescan=true}.
-
+start_shard_checker(#state{shard_checker = Pid} = State) when is_pid(Pid) ->
+    State#state{rescan = true}.
 
 start_event_listener() ->
     DbName = mem3_sync:shards_db(),
     couch_event:link_listener(
-            ?MODULE, handle_db_event, nil, [{dbname, DbName}]
-        ).
+        ?MODULE, handle_db_event, nil, [{dbname, DbName}]
+    ).
 
 handle_db_event(_DbName, updated, _St) ->
     gen_server:cast(?MODULE, refresh),
@@ -145,7 +144,6 @@ handle_db_event(_DbName, _Event, _St) ->
 
 check_shards() ->
     [send_event(Item) || Item <- custodian:summary()].
-
 
 send_event({_, Count} = Item) ->
     Description = describe(Item),
@@ -160,13 +158,28 @@ send_event({_, Count} = Item) ->
     end,
     ?CUSTODIAN_MONITOR:send_event(Name, Count, Description).
 
-
 describe({{safe, N}, Count}) ->
-    lists:concat([Count, " ", shards(Count), " in cluster with only ", N,
-                  " ", copies(N), " on nodes that are currently up"]);
+    lists:concat([
+        Count,
+        " ",
+        shards(Count),
+        " in cluster with only ",
+        N,
+        " ",
+        copies(N),
+        " on nodes that are currently up"
+    ]);
 describe({{live, N}, Count}) ->
-    lists:concat([Count, " ", shards(Count), " in cluster with only ",
-                  N, " ", copies(N), " on nodes not in maintenance mode"]);
+    lists:concat([
+        Count,
+        " ",
+        shards(Count),
+        " in cluster with only ",
+        N,
+        " ",
+        copies(N),
+        " on nodes not in maintenance mode"
+    ]);
 describe({conflicted, Count}) ->
     lists:concat([Count, " conflicted ", shards(Count), " in cluster"]).
 
@@ -185,7 +198,6 @@ copies(1) ->
 copies(_) ->
     "copies".
 
-
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 
@@ -200,7 +212,7 @@ config_update_test_() ->
                 fun t_restart_config_listener/1
             ]
         }
-}.
+    }.
 
 t_restart_config_listener(_) ->
     ?_test(begin

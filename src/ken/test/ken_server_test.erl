@@ -16,10 +16,8 @@
 
 %% hardcoded defaults: limit: 20; batch: 1; delay: 5000; prune: 60000
 default_test_() ->
-    {inorder, {setup,
-        fun setup_default/0,
-        fun teardown/1,
-        [
+    {inorder,
+        {setup, fun setup_default/0, fun teardown/1, [
             set_builder("returns default", set_limit, 12, 20),
             set_builder("keeps set", set_limit, 6, 12),
             set_builder("returns default", set_batch_size, 3, 1),
@@ -28,14 +26,11 @@ default_test_() ->
             set_builder("keeps set", set_delay, 10000, 7000),
             set_builder("returns default", set_prune_interval, 70000, 60000),
             set_builder("keeps set", set_prune_interval, 80000, 70000)
-        ]
-    }}.
+        ]}}.
 
 exception_test_() ->
-    {inorder, {foreach,
-        fun setup_default/0,
-        fun teardown/1,
-        [
+    {inorder,
+        {foreach, fun setup_default/0, fun teardown/1, [
             exception_builder("exception on zero", set_limit, 0),
             exception_builder("exception on negative", set_limit, -12),
             exception_builder("exception on zero", set_batch_size, 0),
@@ -44,18 +39,14 @@ exception_test_() ->
             exception_builder("exception on negative", set_delay, -12),
             exception_builder("exception on zero", set_prune_interval, 0),
             exception_builder("exception on negative", set_prune_interval, -12)
-        ]
-    }}.
+        ]}}.
 
 config_test_() ->
-    {inorder, {setup,
-        fun setup_config/0,
-        fun teardown/1,
-        [
+    {inorder,
+        {setup, fun setup_config/0, fun teardown/1, [
             set_builder("reads config", set_limit, 24, 42),
             set_builder("keeps set", set_limit, 6, 24)
-        ]
-    }}.
+        ]}}.
 
 setup_default() ->
     {ok, EventPid} = start_server(couch_event_server),
@@ -94,4 +85,6 @@ stop_server(Key, Cfg) ->
     {Key, Pid} = lists:keyfind(Key, 1, Cfg),
     MRef = erlang:monitor(process, Pid),
     true = exit(Pid, kill),
-    receive {'DOWN', MRef, _, _, _} -> ok end.
+    receive
+        {'DOWN', MRef, _, _, _} -> ok
+    end.

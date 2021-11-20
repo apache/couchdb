@@ -10,7 +10,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 
 -module(dreyfus_fabric_cleanup).
@@ -23,22 +22,30 @@
 
 go(DbName) ->
     {ok, DesignDocs} = fabric:design_docs(DbName),
-    ActiveSigs = lists:usort(lists:flatmap(fun active_sigs/1,
-        [couch_doc:from_json_obj(DD) || DD <- DesignDocs])),
+    ActiveSigs = lists:usort(
+        lists:flatmap(
+            fun active_sigs/1,
+            [couch_doc:from_json_obj(DD) || DD <- DesignDocs]
+        )
+    ),
     cleanup_local_purge_doc(DbName, ActiveSigs),
     clouseau_rpc:cleanup(DbName, ActiveSigs),
     ok.
 
-active_sigs(#doc{body={Fields}}=Doc) ->
+active_sigs(#doc{body = {Fields}} = Doc) ->
     try
         {RawIndexes} = couch_util:get_value(<<"indexes">>, Fields, {[]}),
         {IndexNames, _} = lists:unzip(RawIndexes),
-        [begin
-             {ok, Index} = dreyfus_index:design_doc_to_index(Doc, IndexName),
-             Index#index.sig
-         end || IndexName <- IndexNames]
-    catch error:{badmatch, _Error} ->
-        []
+        [
+            begin
+                {ok, Index} = dreyfus_index:design_doc_to_index(Doc, IndexName),
+                Index#index.sig
+            end
+         || IndexName <- IndexNames
+        ]
+    catch
+        error:{badmatch, _Error} ->
+            []
     end.
 
 cleanup_local_purge_doc(DbName, ActiveSigs) ->
@@ -49,30 +56,50 @@ cleanup_local_purge_doc(DbName, ActiveSigs) ->
     DirListStrs = filelib:wildcard(Pattern),
     DirList = [iolist_to_binary(DL) || DL <- DirListStrs],
     LocalShards = mem3:local_shards(DbName),
-    ActiveDirs = lists:foldl(fun(LS, AccOuter) ->
-        lists:foldl(fun(Sig, AccInner) ->
-            DirName = filename:join([BaseDir, LS#shard.name, Sig]),
-            [DirName | AccInner]
-        end, AccOuter, ActiveSigs)
-    end, [], LocalShards),
+    ActiveDirs = lists:foldl(
+        fun(LS, AccOuter) ->
+            lists:foldl(
+                fun(Sig, AccInner) ->
+                    DirName = filename:join([BaseDir, LS#shard.name, Sig]),
+                    [DirName | AccInner]
+                end,
+                AccOuter,
+                ActiveSigs
+            )
+        end,
+        [],
+        LocalShards
+    ),
 
     DeadDirs = DirList -- ActiveDirs,
-    lists:foreach(fun(IdxDir) ->
-        Sig = dreyfus_util:get_signature_from_idxdir(IdxDir),
-        case Sig of undefined -> ok; _ ->
-            DocId = dreyfus_util:get_local_purge_doc_id(Sig),
-            LocalShards = mem3:local_shards(DbName),
-            lists:foreach(fun(LS) ->
-                ShardDbName = LS#shard.name,
-                {ok, ShardDb} = couch_db:open_int(ShardDbName, []),
-                case couch_db:open_doc(ShardDb, DocId, []) of
-                    {ok, LocalPurgeDoc} ->
-                        couch_db:update_doc(ShardDb,
-                            LocalPurgeDoc#doc{deleted=true}, [?ADMIN_CTX]);
-                    {not_found, _} ->
-                        ok
-                end,
-                couch_db:close(ShardDb)
-            end, LocalShards)
-        end
-    end, DeadDirs).
+    lists:foreach(
+        fun(IdxDir) ->
+            Sig = dreyfus_util:get_signature_from_idxdir(IdxDir),
+            case Sig of
+                undefined ->
+                    ok;
+                _ ->
+                    DocId = dreyfus_util:get_local_purge_doc_id(Sig),
+                    LocalShards = mem3:local_shards(DbName),
+                    lists:foreach(
+                        fun(LS) ->
+                            ShardDbName = LS#shard.name,
+                            {ok, ShardDb} = couch_db:open_int(ShardDbName, []),
+                            case couch_db:open_doc(ShardDb, DocId, []) of
+                                {ok, LocalPurgeDoc} ->
+                                    couch_db:update_doc(
+                                        ShardDb,
+                                        LocalPurgeDoc#doc{deleted = true},
+                                        [?ADMIN_CTX]
+                                    );
+                                {not_found, _} ->
+                                    ok
+                            end,
+                            couch_db:close(ShardDb)
+                        end,
+                        LocalShards
+                    )
+            end
+        end,
+        DeadDirs
+    ).

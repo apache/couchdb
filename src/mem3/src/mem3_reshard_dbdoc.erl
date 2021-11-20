@@ -27,10 +27,8 @@
     code_change/3
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include("mem3_reshard.hrl").
-
 
 -spec update_shard_map(#job{}) -> no_return | ok.
 update_shard_map(#job{source = Source, target = Target} = Job) ->
@@ -58,48 +56,40 @@ update_shard_map(#job{source = Source, target = Target} = Job) ->
         false -> exit(shard_update_did_not_propagate)
     end.
 
-
 -spec start_link() -> {ok, pid()} | ignore | {error, term()}.
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
-
 
 init(_) ->
     couch_log:notice("~p start init()", [?MODULE]),
     {ok, nil}.
 
-
 terminate(_Reason, _State) ->
     ok.
 
-
 handle_call({update_shard_map, Source, Target}, _From, State) ->
-    Res = try
-        update_shard_map(Source, Target)
-    catch
-        throw:{error, Error} ->
-            {error, Error}
-    end,
+    Res =
+        try
+            update_shard_map(Source, Target)
+        catch
+            throw:{error, Error} ->
+                {error, Error}
+        end,
     {reply, Res, State};
-
 handle_call(Call, From, State) ->
     couch_log:error("~p unknown call ~p from: ~p", [?MODULE, Call, From]),
     {noreply, State}.
-
 
 handle_cast(Cast, State) ->
     couch_log:error("~p unexpected cast ~p", [?MODULE, Cast]),
     {noreply, State}.
 
-
 handle_info(Info, State) ->
     couch_log:error("~p unexpected info ~p", [?MODULE, Info]),
     {noreply, State}.
 
-
 code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
-
 
 % Private
 
@@ -107,22 +97,22 @@ update_shard_map(Source, Target) ->
     ok = validate_coordinator(),
     ok = replicate_from_all_nodes(shard_update_timeout_msec()),
     DocId = mem3:dbname(Source#shard.name),
-    OldDoc = case mem3_util:open_db_doc(DocId) of
-        {ok, #doc{deleted = true}} ->
-            throw({error, missing_source});
-        {ok, #doc{} = Doc} ->
-            Doc;
-        {not_found, deleted} ->
-            throw({error, missing_source});
-        OpenErr ->
-            throw({error, {shard_doc_open_error, OpenErr}})
-    end,
+    OldDoc =
+        case mem3_util:open_db_doc(DocId) of
+            {ok, #doc{deleted = true}} ->
+                throw({error, missing_source});
+            {ok, #doc{} = Doc} ->
+                Doc;
+            {not_found, deleted} ->
+                throw({error, missing_source});
+            OpenErr ->
+                throw({error, {shard_doc_open_error, OpenErr}})
+        end,
     #doc{body = OldBody} = OldDoc,
     NewBody = update_shard_props(OldBody, Source, Target),
-    {ok, _}  = write_shard_doc(OldDoc, NewBody),
+    {ok, _} = write_shard_doc(OldDoc, NewBody),
     ok = replicate_to_all_nodes(shard_update_timeout_msec()),
     {ok, NewBody}.
-
 
 validate_coordinator() ->
     case hd(mem3_util:live_nodes()) =:= node() of
@@ -130,20 +120,17 @@ validate_coordinator() ->
         false -> throw({error, coordinator_changed})
     end.
 
-
 replicate_from_all_nodes(TimeoutMSec) ->
     case mem3_util:replicate_dbs_from_all_nodes(TimeoutMSec) of
         ok -> ok;
         Error -> throw({error, Error})
     end.
 
-
 replicate_to_all_nodes(TimeoutMSec) ->
     case mem3_util:replicate_dbs_to_all_nodes(TimeoutMSec) of
         ok -> ok;
         Error -> throw({error, Error})
     end.
-
 
 write_shard_doc(#doc{id = Id} = Doc, Body) ->
     UpdatedDoc = Doc#doc{body = Body},
@@ -156,9 +143,8 @@ write_shard_doc(#doc{id = Id} = Doc, Body) ->
         end
     end).
 
-
 update_shard_props({Props0}, #shard{} = Source, [#shard{} | _] = Targets) ->
-    {ByNode0} =  couch_util:get_value(<<"by_node">>, Props0, {[]}),
+    {ByNode0} = couch_util:get_value(<<"by_node">>, Props0, {[]}),
     ByNodeKV = {<<"by_node">>, {update_by_node(ByNode0, Source, Targets)}},
     Props1 = lists:keyreplace(<<"by_node">>, 1, Props0, ByNodeKV),
 
@@ -175,7 +161,6 @@ update_shard_props({Props0}, #shard{} = Source, [#shard{} | _] = Targets) ->
 
     {Props3}.
 
-
 update_by_node(ByNode, #shard{} = Source, [#shard{} | _] = Targets) ->
     {NodeKey, SKey} = {node_key(Source), range_key(Source)},
     {_, Ranges} = lists:keyfind(NodeKey, 1, ByNode),
@@ -183,11 +168,9 @@ update_by_node(ByNode, #shard{} = Source, [#shard{} | _] = Targets) ->
     Ranges2 = Ranges1 ++ [range_key(T) || T <- Targets],
     lists:keyreplace(NodeKey, 1, ByNode, {NodeKey, lists:sort(Ranges2)}).
 
-
 update_by_range(ByRange, Source, Targets) ->
     ByRange1 = remove_node_from_source(ByRange, Source),
     lists:foldl(fun add_node_to_target_foldl/2, ByRange1, Targets).
-
 
 remove_node_from_source(ByRange, Source) ->
     {NodeKey, SKey} = {node_key(Source), range_key(Source)},
@@ -208,7 +191,6 @@ remove_node_from_source(ByRange, Source) ->
             lists:keyreplace(SKey, 1, ByRange, {SKey, SourceNodes1})
     end.
 
-
 add_node_to_target_foldl(#shard{} = Target, ByRange) ->
     {NodeKey, TKey} = {node_key(Target), range_key(Target)},
     case lists:keyfind(TKey, 1, ByRange) of
@@ -227,20 +209,16 @@ add_node_to_target_foldl(#shard{} = Target, ByRange) ->
             lists:sort([{TKey, [NodeKey]} | ByRange])
     end.
 
-
 node_key(#shard{node = Node}) ->
     couch_util:to_binary(Node).
-
 
 range_key(#shard{range = [B, E]}) ->
     BHex = couch_util:to_hex(<<B:32/integer>>),
     EHex = couch_util:to_hex(<<E:32/integer>>),
     list_to_binary([BHex, "-", EHex]).
 
-
 shard_update_timeout_msec() ->
     config:get_integer("reshard", "shard_upate_timeout_msec", 300000).
-
 
 wait_source_removed(#shard{name = Name} = Source, SleepSec, UntilSec) ->
     case check_source_removed(Source) of
@@ -258,7 +236,6 @@ wait_source_removed(#shard{name = Name} = Source, SleepSec, UntilSec) ->
             end
     end.
 
-
 check_source_removed(#shard{name = Name}) ->
     DbName = mem3:dbname(Name),
     Live = mem3_util:live_nodes(),
@@ -266,9 +243,13 @@ check_source_removed(#shard{name = Name}) ->
     Nodes = lists:usort([N || N <- ShardNodes, lists:member(N, Live)]),
     {Responses, _} = rpc:multicall(Nodes, mem3, shards, [DbName]),
     Shards = lists:usort(lists:flatten(Responses)),
-    SourcePresent = [S || S = #shard{name = S, node = N} <- Shards, S =:= Name,
-        N =:= node()],
+    SourcePresent = [
+        S
+     || S = #shard{name = S, node = N} <- Shards,
+        S =:= Name,
+        N =:= node()
+    ],
     case SourcePresent of
-        [] ->  true;
+        [] -> true;
         [_ | _] -> false
     end.

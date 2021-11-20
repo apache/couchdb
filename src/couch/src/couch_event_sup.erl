@@ -20,8 +20,8 @@
 
 -include_lib("couch/include/couch_db.hrl").
 
--export([start_link/3,start_link/4, stop/1]).
--export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2,code_change/3]).
+-export([start_link/3, start_link/4, stop/1]).
+-export([init/1, terminate/2, handle_call/3, handle_cast/2, handle_info/2, code_change/3]).
 
 %
 % Instead calling the
@@ -52,10 +52,10 @@ stop(Pid) ->
 
 init({EventMgr, EventHandler, Args}) ->
     case gen_event:add_sup_handler(EventMgr, EventHandler, Args) of
-    ok ->
-        {ok, {EventMgr, EventHandler}};
-    {stop, Error} ->
-        {stop, Error}
+        ok ->
+            {ok, {EventMgr, EventHandler}};
+        {stop, Error} ->
+            {stop, Error}
     end.
 
 terminate(_Reason, _State) ->

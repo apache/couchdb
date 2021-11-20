@@ -14,7 +14,6 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-
 error_info_test() ->
     Error = <<"error">>,
     Reason = <<"reason">>,
@@ -75,7 +74,7 @@ error_info_test() ->
         {
             file_exists,
             {412, <<"file_exists">>,
-             <<"The database could not be created, the file already exists.">>}
+                <<"The database could not be created, the file already exists.">>}
         },
         {
             {error, {nodedown, Reason}}, {412, <<"nodedown">>, Reason}
@@ -102,18 +101,18 @@ error_info_test() ->
         },
         {
             requested_range_not_satisfiable,
-            {416, <<"requested_range_not_satisfiable">>,
-             <<"Requested range not satisfiable">>}
+            {416, <<"requested_range_not_satisfiable">>, <<"Requested range not satisfiable">>}
         },
         {
             {error, {illegal_database_name, <<"foo">>}},
-            {400, <<"illegal_database_name">>,
-             <<"Name: 'foo'. Only lowercase characters (a-z), digits (0-9), and any of"
-               " the characters _, $, (, ), +, -, and / are allowed."
-               " Must begin with a letter.">>}
+            {400, <<"illegal_database_name">>, <<
+                "Name: 'foo'. Only lowercase characters (a-z), digits (0-9), and any of"
+                " the characters _, $, (, ), +, -, and / are allowed."
+                " Must begin with a letter."
+            >>}
         },
         {
-            {Error, {illegal_docid,1}},
+            {Error, {illegal_docid, 1}},
             {400, <<"illegal_docid">>, 1}
         },
         {
@@ -126,20 +125,21 @@ error_info_test() ->
         },
         {
             not_implemented,
-            {501, <<"not_implemented">>,
-             <<"this feature is not yet implemented">>}
+            {501, <<"not_implemented">>, <<"this feature is not yet implemented">>}
         },
         {
             timeout,
-            {500, <<"timeout">>,
-             <<"The request could not be processed in a reasonable"
-               " amount of time.">>}
+            {500, <<"timeout">>, <<
+                "The request could not be processed in a reasonable"
+                " amount of time."
+            >>}
         },
         {
             {timeout, Error},
-            {500, <<"timeout">>,
-             <<"The request could not be processed in a reasonable"
-               " amount of time.">>}
+            {500, <<"timeout">>, <<
+                "The request could not be processed in a reasonable"
+                " amount of time."
+            >>}
         },
         {
             {Error, null},
@@ -163,6 +163,9 @@ error_info_test() ->
         }
     ],
 
-    lists:foreach(fun({Arg, Result}) ->
-        ?assertEqual(Result, chttpd:error_info(Arg))
-    end, ArgResult).
+    lists:foreach(
+        fun({Arg, Result}) ->
+            ?assertEqual(Result, chttpd:error_info(Arg))
+        end,
+        ArgResult
+    ).

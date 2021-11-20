@@ -15,15 +15,12 @@
 -module(rexi_server_sup).
 -behaviour(supervisor).
 
-
 -export([init/1]).
 
 -export([start_link/1]).
 
-
 start_link(Name) ->
     supervisor:start_link({local, Name}, ?MODULE, []).
-
 
 init([]) ->
     {ok, {{one_for_one, 1, 1}, []}}.

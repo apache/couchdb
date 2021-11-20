@@ -26,22 +26,25 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
     {ok, DocQueue} = couch_work_queue:new(QueueOpts),
     {ok, WriteQueue} = couch_work_queue:new(QueueOpts),
     InitState = State#mrst{
-        first_build=State#mrst.update_seq==0,
-        partial_resp_pid=Partial,
-        doc_acc=[],
-        doc_queue=DocQueue,
-        write_queue=WriteQueue
+        first_build = State#mrst.update_seq == 0,
+        partial_resp_pid = Partial,
+        doc_acc = [],
+        doc_queue = DocQueue,
+        write_queue = WriteQueue
     },
 
     Self = self(),
 
     MapFun = fun() ->
-        erlang:put(io_priority,
-            {view_update, State#mrst.db_name, State#mrst.idx_name}),
-        Progress = case NumChanges of
-            0 -> 0;
-            _ -> (NumChangesDone * 100) div NumChanges
-        end,
+        erlang:put(
+            io_priority,
+            {view_update, State#mrst.db_name, State#mrst.idx_name}
+        ),
+        Progress =
+            case NumChanges of
+                0 -> 0;
+                _ -> (NumChangesDone * 100) div NumChanges
+            end,
         couch_task_status:add_task([
             {indexer_pid, ?l2b(pid_to_list(Partial))},
             {type, indexer},
@@ -55,8 +58,10 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
         map_docs(Self, InitState)
     end,
     WriteFun = fun() ->
-        erlang:put(io_priority,
-            {view_update, State#mrst.db_name, State#mrst.idx_name}),
+        erlang:put(
+            io_priority,
+            {view_update, State#mrst.db_name, State#mrst.idx_name}
+        ),
         write_results(Self, InitState)
     end,
     spawn_link(MapFun),
@@ -64,12 +69,11 @@ start_update(Partial, State, NumChanges, NumChangesDone) ->
 
     {ok, InitState}.
 
-
 purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
     #mrst{
-        id_btree=IdBtree,
-        views=Views,
-        partitioned=Partitioned
+        id_btree = IdBtree,
+        views = Views,
+        partitioned = Partitioned
     } = State,
 
     Ids = [Id || {Id, _Revs} <- PurgedIdRevs],
@@ -81,10 +85,14 @@ purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
                 ({ViewNum, {Key, Seq, _Op}}, DictAcc2) ->
                     dict:append(ViewNum, {Key, Seq, DocId}, DictAcc2);
                 ({ViewNum, RowKey0}, DictAcc2) ->
-                    RowKey = if not Partitioned -> RowKey0; true ->
-                        [{RK, _}] = inject_partition([{RowKey0, DocId}]),
-                        RK
-                    end,
+                    RowKey =
+                        if
+                            not Partitioned ->
+                                RowKey0;
+                            true ->
+                                [{RK, _}] = inject_partition([{RowKey0, DocId}]),
+                                RK
+                        end,
                     dict:append(ViewNum, {RowKey, DocId}, DictAcc2)
             end,
             lists:foldl(FoldFun, DictAcc, ViewNumRowKeys);
@@ -93,53 +101,53 @@ purge(_Db, PurgeSeq, PurgedIdRevs, State) ->
     end,
     KeysToRemove = lists:foldl(MakeDictFun, dict:new(), Lookups),
 
-    RemKeysFun = fun(#mrview{id_num=ViewId}=View) ->
+    RemKeysFun = fun(#mrview{id_num = ViewId} = View) ->
         ToRem = couch_util:dict_find(ViewId, KeysToRemove, []),
         {ok, VBtree2} = couch_btree:add_remove(View#mrview.btree, [], ToRem),
-        NewPurgeSeq = case VBtree2 =/= View#mrview.btree of
-            true -> PurgeSeq;
-            _ -> View#mrview.purge_seq
-        end,
-        View#mrview{btree=VBtree2, purge_seq=NewPurgeSeq}
+        NewPurgeSeq =
+            case VBtree2 =/= View#mrview.btree of
+                true -> PurgeSeq;
+                _ -> View#mrview.purge_seq
+            end,
+        View#mrview{btree = VBtree2, purge_seq = NewPurgeSeq}
     end,
 
     Views2 = lists:map(RemKeysFun, Views),
     {ok, State#mrst{
-        id_btree=IdBtree2,
-        views=Views2,
-        purge_seq=PurgeSeq
+        id_btree = IdBtree2,
+        views = Views2,
+        purge_seq = PurgeSeq
     }}.
 
-
-process_doc(Doc, Seq, #mrst{doc_acc=Acc}=State) when length(Acc) > 100 ->
+process_doc(Doc, Seq, #mrst{doc_acc = Acc} = State) when length(Acc) > 100 ->
     couch_work_queue:queue(State#mrst.doc_queue, lists:reverse(Acc)),
-    process_doc(Doc, Seq, State#mrst{doc_acc=[]});
-process_doc(nil, Seq, #mrst{doc_acc=Acc}=State) ->
-    {ok, State#mrst{doc_acc=[{nil, Seq, nil} | Acc]}};
-process_doc(#doc{id=Id, deleted=true}, Seq, #mrst{doc_acc=Acc}=State) ->
-    {ok, State#mrst{doc_acc=[{Id, Seq, deleted} | Acc]}};
-process_doc(#doc{id=Id}=Doc, Seq, #mrst{doc_acc=Acc}=State) ->
-    {ok, State#mrst{doc_acc=[{Id, Seq, Doc} | Acc]}}.
+    process_doc(Doc, Seq, State#mrst{doc_acc = []});
+process_doc(nil, Seq, #mrst{doc_acc = Acc} = State) ->
+    {ok, State#mrst{doc_acc = [{nil, Seq, nil} | Acc]}};
+process_doc(#doc{id = Id, deleted = true}, Seq, #mrst{doc_acc = Acc} = State) ->
+    {ok, State#mrst{doc_acc = [{Id, Seq, deleted} | Acc]}};
+process_doc(#doc{id = Id} = Doc, Seq, #mrst{doc_acc = Acc} = State) ->
+    {ok, State#mrst{doc_acc = [{Id, Seq, Doc} | Acc]}}.
 
-
-finish_update(#mrst{doc_acc=Acc}=State) ->
-    if Acc /= [] ->
-        couch_work_queue:queue(State#mrst.doc_queue, Acc);
-        true -> ok
+finish_update(#mrst{doc_acc = Acc} = State) ->
+    if
+        Acc /= [] ->
+            couch_work_queue:queue(State#mrst.doc_queue, Acc);
+        true ->
+            ok
     end,
     couch_work_queue:close(State#mrst.doc_queue),
     receive
         {new_state, NewState} ->
             {ok, NewState#mrst{
-                first_build=undefined,
-                partial_resp_pid=undefined,
-                doc_acc=undefined,
-                doc_queue=undefined,
-                write_queue=undefined,
-                qserver=nil
+                first_build = undefined,
+                partial_resp_pid = undefined,
+                doc_acc = undefined,
+                doc_queue = undefined,
+                write_queue = undefined,
+                qserver = nil
             }}
     end.
-
 
 map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
     erlang:put(io_priority, {view_update, DbName, IdxName}),
@@ -150,10 +158,11 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
         {ok, Dequeued} ->
             % Run all the non deleted docs through the view engine and
             % then pass the results on to the writer process.
-            State1 = case State0#mrst.qserver of
-                nil -> start_query_server(State0);
-                _ -> State0
-            end,
+            State1 =
+                case State0#mrst.qserver of
+                    nil -> start_query_server(State0);
+                    _ -> State0
+                end,
             QServer = State1#mrst.qserver,
             DocFun = fun
                 ({nil, Seq, _}, {SeqAcc, Results}) ->
@@ -174,38 +183,37 @@ map_docs(Parent, #mrst{db_name = DbName, idx_name = IdxName} = State0) ->
             map_docs(Parent, State1)
     end.
 
-
 write_results(Parent, #mrst{} = State) ->
     case accumulate_writes(State, State#mrst.write_queue, nil) of
         stop ->
             Parent ! {new_state, State};
         {Go, {Seq, ViewKVs, DocIdKeys}} ->
             NewState = write_kvs(State, Seq, ViewKVs, DocIdKeys),
-            if Go == stop ->
-                Parent ! {new_state, NewState};
-            true ->
-                send_partial(NewState#mrst.partial_resp_pid, NewState),
-                write_results(Parent, NewState)
+            if
+                Go == stop ->
+                    Parent ! {new_state, NewState};
+                true ->
+                    send_partial(NewState#mrst.partial_resp_pid, NewState),
+                    write_results(Parent, NewState)
             end
     end.
 
-
 start_query_server(State) ->
     #mrst{
-        language=Language,
-        lib=Lib,
-        views=Views
+        language = Language,
+        lib = Lib,
+        views = Views
     } = State,
     Defs = [View#mrview.def || View <- Views],
     {ok, QServer} = couch_query_servers:start_doc_map(Language, Defs, Lib),
-    State#mrst{qserver=QServer}.
-
+    State#mrst{qserver = QServer}.
 
 accumulate_writes(State, W, Acc0) ->
-    {Seq, ViewKVs, DocIdKVs} = case Acc0 of
-        nil -> {0, [{V#mrview.id_num, []} || V <- State#mrst.views], []};
-        _ -> Acc0
-    end,
+    {Seq, ViewKVs, DocIdKVs} =
+        case Acc0 of
+            nil -> {0, [{V#mrview.id_num, []} || V <- State#mrst.views], []};
+            _ -> Acc0
+        end,
     case couch_work_queue:dequeue(W) of
         closed when Seq == 0 ->
             stop;
@@ -219,15 +227,13 @@ accumulate_writes(State, W, Acc0) ->
             end
     end.
 
-
 accumulate_more(NumDocIds, Acc) ->
     % check if we have enough items now
     MinItems = config:get("view_updater", "min_writer_items", "100"),
     MinSize = config:get("view_updater", "min_writer_size", "16777216"),
     CurrMem = ?term_size(Acc),
-    NumDocIds < list_to_integer(MinItems)
-        andalso CurrMem < list_to_integer(MinSize).
-
+    NumDocIds < list_to_integer(MinItems) andalso
+        CurrMem < list_to_integer(MinSize).
 
 merge_results([], SeqAcc, ViewKVs, DocIdKeys) ->
     {SeqAcc, ViewKVs, DocIdKeys};
@@ -237,7 +243,6 @@ merge_results([{Seq, Results} | Rest], SeqAcc, ViewKVs, DocIdKeys) ->
     end,
     {ViewKVs1, DocIdKeys1} = lists:foldl(Fun, {ViewKVs, DocIdKeys}, Results),
     merge_results(Rest, erlang:max(Seq, SeqAcc), ViewKVs1, DocIdKeys1).
-
 
 merge_results({DocId, []}, ViewKVs, DocIdKeys) ->
     {ViewKVs, [{DocId, []} | DocIdKeys]};
@@ -252,7 +257,6 @@ merge_results({DocId, RawResults}, ViewKVs, DocIdKeys) ->
             {ViewKVs1, [ViewIdKeys | DocIdKeys]}
     end.
 
-
 insert_results(DocId, [], [], ViewKVs, ViewIdKeys) ->
     {lists:reverse(ViewKVs), {DocId, ViewIdKeys}};
 insert_results(DocId, [KVs | RKVs], [{Id, VKVs} | RVKVs], VKVAcc, VIdKeys) ->
@@ -266,62 +270,67 @@ insert_results(DocId, [KVs | RKVs], [{Id, VKVs} | RVKVs], VKVAcc, VIdKeys) ->
     end,
     InitAcc = {[], VIdKeys},
     couch_stats:increment_counter([couchdb, mrview, emits], length(KVs)),
-    {Duped, VIdKeys0} = lists:foldl(CombineDupesFun, InitAcc,
-                                          lists:sort(KVs)),
+    {Duped, VIdKeys0} = lists:foldl(
+        CombineDupesFun,
+        InitAcc,
+        lists:sort(KVs)
+    ),
     FinalKVs = [{{Key, DocId}, Val} || {Key, Val} <- Duped] ++ VKVs,
     insert_results(DocId, RKVs, RVKVs, [{Id, FinalKVs} | VKVAcc], VIdKeys0).
 
-
 write_kvs(State, UpdateSeq, ViewKVs, DocIdKeys) ->
     #mrst{
-        id_btree=IdBtree,
-        first_build=FirstBuild,
-        partitioned=Partitioned
+        id_btree = IdBtree,
+        first_build = FirstBuild,
+        partitioned = Partitioned
     } = State,
 
     {ok, ToRemove, IdBtree2} = update_id_btree(IdBtree, DocIdKeys, FirstBuild),
     ToRemByView = collapse_rem_keys(ToRemove, dict:new()),
 
-    UpdateView = fun(#mrview{id_num=ViewId}=View, {ViewId, KVs0}) ->
+    UpdateView = fun(#mrview{id_num = ViewId} = View, {ViewId, KVs0}) ->
         ToRem0 = couch_util:dict_find(ViewId, ToRemByView, []),
-        {KVs, ToRem} = case Partitioned of
-            true ->
-                KVs1 = inject_partition(KVs0),
-                ToRem1 = inject_partition(ToRem0),
-                {KVs1, ToRem1};
-            false ->
-                {KVs0, ToRem0}
-        end,
+        {KVs, ToRem} =
+            case Partitioned of
+                true ->
+                    KVs1 = inject_partition(KVs0),
+                    ToRem1 = inject_partition(ToRem0),
+                    {KVs1, ToRem1};
+                false ->
+                    {KVs0, ToRem0}
+            end,
         {ok, VBtree2} = couch_btree:add_remove(View#mrview.btree, KVs, ToRem),
-        NewUpdateSeq = case VBtree2 =/= View#mrview.btree of
-            true -> UpdateSeq;
-            _ -> View#mrview.update_seq
-        end,
+        NewUpdateSeq =
+            case VBtree2 =/= View#mrview.btree of
+                true -> UpdateSeq;
+                _ -> View#mrview.update_seq
+            end,
 
-        View2 = View#mrview{btree=VBtree2, update_seq=NewUpdateSeq},
+        View2 = View#mrview{btree = VBtree2, update_seq = NewUpdateSeq},
         maybe_notify(State, View2, KVs, ToRem),
         View2
     end,
 
     State#mrst{
-        views=lists:zipwith(UpdateView, State#mrst.views, ViewKVs),
-        update_seq=UpdateSeq,
-        id_btree=IdBtree2
+        views = lists:zipwith(UpdateView, State#mrst.views, ViewKVs),
+        update_seq = UpdateSeq,
+        id_btree = IdBtree2
     }.
 
-
 inject_partition(Rows) ->
-    lists:map(fun
-        ({{Key, DocId}, Value}) ->
-            % Adding a row to the view
-            {Partition, _} = couch_partition:extract(DocId),
-            {{{p, Partition, Key}, DocId}, Value};
-        ({Key, DocId}) ->
-            % Removing a row based on values in id_tree
-            {Partition, _} = couch_partition:extract(DocId),
-            {{p, Partition, Key}, DocId}
-    end, Rows).
-
+    lists:map(
+        fun
+            ({{Key, DocId}, Value}) ->
+                % Adding a row to the view
+                {Partition, _} = couch_partition:extract(DocId),
+                {{{p, Partition, Key}, DocId}, Value};
+            ({Key, DocId}) ->
+                % Removing a row based on values in id_tree
+                {Partition, _} = couch_partition:extract(DocId),
+                {{p, Partition, Key}, DocId}
+        end,
+        Rows
+    ).
 
 update_id_btree(Btree, DocIdKeys, true) ->
     ToAdd = [{Id, DIKeys} || {Id, DIKeys} <- DocIdKeys, DIKeys /= []],
@@ -332,36 +341,37 @@ update_id_btree(Btree, DocIdKeys, _) ->
     ToRem = [Id || {Id, DIKeys} <- DocIdKeys, DIKeys == []],
     couch_btree:query_modify(Btree, ToFind, ToAdd, ToRem).
 
-
 collapse_rem_keys([], Acc) ->
     Acc;
 collapse_rem_keys([{ok, {DocId, ViewIdKeys}} | Rest], Acc) ->
-    NewAcc = lists:foldl(fun({ViewId, Key}, Acc2) ->
-        dict:append(ViewId, {Key, DocId}, Acc2)
-    end, Acc, ViewIdKeys),
+    NewAcc = lists:foldl(
+        fun({ViewId, Key}, Acc2) ->
+            dict:append(ViewId, {Key, DocId}, Acc2)
+        end,
+        Acc,
+        ViewIdKeys
+    ),
     collapse_rem_keys(Rest, NewAcc);
 collapse_rem_keys([{not_found, _} | Rest], Acc) ->
     collapse_rem_keys(Rest, Acc).
-
 
 send_partial(Pid, State) when is_pid(Pid) ->
     gen_server:cast(Pid, {new_state, State});
 send_partial(_, _) ->
     ok.
 
-
 update_task(NumChanges) ->
     [Changes, Total] = couch_task_status:get([changes_done, total_changes]),
     Changes2 = Changes + NumChanges,
-    Progress = case Total of
-        0 ->
-            % updater restart after compaction finishes
-            0;
-        _ ->
-            (Changes2 * 100) div Total
-    end,
+    Progress =
+        case Total of
+            0 ->
+                % updater restart after compaction finishes
+                0;
+            _ ->
+                (Changes2 * 100) div Total
+        end,
     couch_task_status:update([{progress, Progress}, {changes_done, Changes2}]).
-
 
 maybe_notify(State, View, KVs, ToRem) ->
     Updated = fun() ->

@@ -12,19 +12,24 @@
 
 -module(chttpd_util_test).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include("chttpd_test.hrl").
 
-
 setup() ->
-    ok = lists:foreach(fun(Section) ->
-        ok = config_delete_all_keys(Section)
-    end, ["httpd", "chttpd", "couch_httpd_auth", "chttpd_auth"]),
+    ok = lists:foreach(
+        fun(Section) ->
+            ok = config_delete_all_keys(Section)
+        end,
+        ["httpd", "chttpd", "couch_httpd_auth", "chttpd_auth"]
+    ),
 
-    ok = config:set("httpd", "authentication_handlers",
+    ok = config:set(
+        "httpd",
+        "authentication_handlers",
         "{couch_httpd_auth, cookie_authentication_handler}, "
-        "{couch_httpd_auth, default_authentication_handler}", _Persist = false),
+        "{couch_httpd_auth, default_authentication_handler}",
+        _Persist = false
+    ),
     ok = config:set("httpd", "backlog", "512", _Persist = false),
     ok = config:set("chttpd", "require_valid_user", "false", _Persist = false),
     ok = config:set("httpd", "both_exist", "get_in_httpd", _Persist = false),
@@ -35,7 +40,6 @@ setup() ->
     ok = config:set("chttpd_auth", "both_exist", "ca", _Persist = false),
     ok = config:set("couch_httpd_auth", "cha_only", "true", _Persist = false),
     ok = config:set("chttpd_auth", "ca_only", "1", _Persist = false).
-
 
 teardown(_) ->
     ok = config:delete("httpd", "authentication_handlers", _Persist = false),
@@ -50,12 +54,13 @@ teardown(_) ->
     ok = config:delete("couch_httpd_auth", "cha_only", _Persist = false),
     ok = config:delete("chttpd_auth", "ca_only", _Persist = false).
 
-
 config_delete_all_keys(Section) ->
-    lists:foreach(fun({Key, _Val}) ->
-        ok = config:delete(Section, Key, _Persist = false)
-    end, config:get(Section)).
-
+    lists:foreach(
+        fun({Key, _Val}) ->
+            ok = config:delete(Section, Key, _Persist = false)
+        end,
+        config:get(Section)
+    ).
 
 chttpd_util_config_test_() ->
     {
@@ -78,12 +83,10 @@ chttpd_util_config_test_() ->
         }
     }.
 
-
 test_chttpd_behavior(_) ->
     ?assertEqual("get_in_chttpd", chttpd_util:get_chttpd_config("both_exist")),
     ?assertEqual(1, chttpd_util:get_chttpd_config_integer("chttpd_only", 0)),
     ?assert(chttpd_util:get_chttpd_config_boolean("httpd_only", false)).
-
 
 test_with_undefined_option(_) ->
     ?assertEqual(undefined, chttpd_util:get_chttpd_config("undefined_option")),
@@ -95,12 +98,10 @@ test_with_undefined_option(_) ->
     ?assert(chttpd_util:get_chttpd_config("undefined_option", true)),
     ?assertNot(chttpd_util:get_chttpd_config("undefined_option", false)).
 
-
 test_auth_behavior(_) ->
     ?assertEqual("ca", chttpd_util:get_chttpd_auth_config("both_exist")),
     ?assertEqual(1, chttpd_util:get_chttpd_auth_config_integer("ca_only", 0)),
     ?assert(chttpd_util:get_chttpd_auth_config_boolean("cha_only", false)).
-
 
 test_auth_with_undefined_option(_) ->
     ?assertEqual(undefined, chttpd_util:get_chttpd_auth_config("undefine")),

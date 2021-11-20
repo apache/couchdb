@@ -16,8 +16,12 @@
 -include_lib("public_key/include/public_key.hrl").
 
 -define(HMAC_SECRET, "aGVsbG8=").
--define(RSA_SECRET, "-----BEGIN PUBLIC KEY-----\\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAztanwQtIx0sms+x7m1SF\\nh7EHJHkM2biTJ41jR89FsDE2gd3MChpaqxemS5GpNvfFKRvuHa4PUZ3JtRCBG1KM\\n/7EWIVTy1JQDr2mb8couGlQNqz4uXN2vkNQ0XszgjU4Wn6ZpvYxmqPFbmkRe8QSn\\nAy2Wf8jQgjsbez8eaaX0G9S1hgFZUN3KFu7SVmUDQNvWpQdaJPP+ms5Z0CqF7JLa\\nvJmSdsU49nlYw9VH/XmwlUBMye6HgR4ZGCLQS85frqF0xLWvi7CsMdchcIjHudXH\\nQK1AumD/VVZVdi8Q5Qew7F6VXeXqnhbw9n6Px25cCuNuh6u5+E6GUzXRrMpqo9vO\\nqQIDAQAB\\n-----END PUBLIC KEY-----\\n").
--define(EC_SECRET, "-----BEGIN PUBLIC KEY-----\\nMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEDsr0lz/Dg3luarb+Kua0Wcj9WrfR23os\\nwHzakglb8GhWRDn+oZT0Bt/26sX8uB4/ij9PEOLHPo+IHBtX4ELFFVr5GTzlqcJe\\nyctaTDd1OOAPXYuc67EWtGZ3pDAzztRs\\n-----END PUBLIC KEY-----\\n").
+-define(RSA_SECRET,
+    "-----BEGIN PUBLIC KEY-----\\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAztanwQtIx0sms+x7m1SF\\nh7EHJHkM2biTJ41jR89FsDE2gd3MChpaqxemS5GpNvfFKRvuHa4PUZ3JtRCBG1KM\\n/7EWIVTy1JQDr2mb8couGlQNqz4uXN2vkNQ0XszgjU4Wn6ZpvYxmqPFbmkRe8QSn\\nAy2Wf8jQgjsbez8eaaX0G9S1hgFZUN3KFu7SVmUDQNvWpQdaJPP+ms5Z0CqF7JLa\\nvJmSdsU49nlYw9VH/XmwlUBMye6HgR4ZGCLQS85frqF0xLWvi7CsMdchcIjHudXH\\nQK1AumD/VVZVdi8Q5Qew7F6VXeXqnhbw9n6Px25cCuNuh6u5+E6GUzXRrMpqo9vO\\nqQIDAQAB\\n-----END PUBLIC KEY-----\\n"
+).
+-define(EC_SECRET,
+    "-----BEGIN PUBLIC KEY-----\\nMHYwEAYHKoZIzj0CAQYFK4EEACIDYgAEDsr0lz/Dg3luarb+Kua0Wcj9WrfR23os\\nwHzakglb8GhWRDn+oZT0Bt/26sX8uB4/ij9PEOLHPo+IHBtX4ELFFVr5GTzlqcJe\\nyctaTDd1OOAPXYuc67EWtGZ3pDAzztRs\\n-----END PUBLIC KEY-----\\n"
+).
 
 setup() ->
     test_util:start_applications([couch_log, config, jwtf]),
@@ -38,20 +42,20 @@ teardown(_) ->
 
 jwtf_keystore_test_() ->
     {
-     setup,
-     fun setup/0,
-     fun teardown/1,
-     [
-      ?_assertEqual(<<"hello">>,       jwtf_keystore:get(<<"HS256">>, <<"hmac">>)),
-      ?_assertThrow({bad_request, _},  jwtf_keystore:get(<<"RS256">>, <<"hmac">>)),
-      ?_assertThrow({bad_request, _},  jwtf_keystore:get(<<"ES256">>, <<"hmac">>)),
+        setup,
+        fun setup/0,
+        fun teardown/1,
+        [
+            ?_assertEqual(<<"hello">>, jwtf_keystore:get(<<"HS256">>, <<"hmac">>)),
+            ?_assertThrow({bad_request, _}, jwtf_keystore:get(<<"RS256">>, <<"hmac">>)),
+            ?_assertThrow({bad_request, _}, jwtf_keystore:get(<<"ES256">>, <<"hmac">>)),
 
-      ?_assertThrow({bad_request, _},  jwtf_keystore:get(<<"HS256">>, <<"rsa">>)),
-      ?_assertMatch(#'RSAPublicKey'{}, jwtf_keystore:get(<<"RS256">>, <<"rsa">>)),
-      ?_assertThrow({bad_request, _},  jwtf_keystore:get(<<"ES256">>, <<"rsa">>)),
+            ?_assertThrow({bad_request, _}, jwtf_keystore:get(<<"HS256">>, <<"rsa">>)),
+            ?_assertMatch(#'RSAPublicKey'{}, jwtf_keystore:get(<<"RS256">>, <<"rsa">>)),
+            ?_assertThrow({bad_request, _}, jwtf_keystore:get(<<"ES256">>, <<"rsa">>)),
 
-      ?_assertThrow({bad_request, _},  jwtf_keystore:get(<<"HS256">>, <<"ec">>)),
-      ?_assertThrow({bad_request, _},  jwtf_keystore:get(<<"RS256">>, <<"ec">>)),
-      ?_assertMatch({#'ECPoint'{}, _}, jwtf_keystore:get(<<"ES256">>, <<"ec">>))
-     ]
+            ?_assertThrow({bad_request, _}, jwtf_keystore:get(<<"HS256">>, <<"ec">>)),
+            ?_assertThrow({bad_request, _}, jwtf_keystore:get(<<"RS256">>, <<"ec">>)),
+            ?_assertMatch({#'ECPoint'{}, _}, jwtf_keystore:get(<<"ES256">>, <<"ec">>))
+        ]
     }.

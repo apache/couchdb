@@ -32,7 +32,8 @@
     ready = false,
     seeds = [],
     jobref = nil,
-    status = [] % nested proplist keyed on node name
+    % nested proplist keyed on node name
+    status = []
 }).
 
 -define(REPLICATION_INTERVAL, 60000).
@@ -58,29 +59,36 @@ init([]) ->
     InitStatus = [{Seed, {[]}} || Seed <- Seeds],
     State = #st{
         seeds = Seeds,
-        ready = case Seeds of [] -> true; _ -> false end,
+        ready =
+            case Seeds of
+                [] -> true;
+                _ -> false
+            end,
         jobref = start_replication(Seeds),
         status = InitStatus
     },
     {ok, State}.
 
 handle_call(get_status, _From, St) ->
-    Status = {[
-        {status, case St#st.ready of true -> ok; false -> seeding end},
-        {seeds, {St#st.status}}
-    ]},
+    Status =
+        {[
+            {status,
+                case St#st.ready of
+                    true -> ok;
+                    false -> seeding
+                end},
+            {seeds, {St#st.status}}
+        ]},
     {reply, {ok, Status}, St}.
 
 handle_cast(_Msg, St) ->
     {noreply, St}.
 
-handle_info(start_replication, #st{jobref=nil} = St) ->
+handle_info(start_replication, #st{jobref = nil} = St) ->
     JobRef = start_replication(St#st.seeds),
     {noreply, St#st{jobref = JobRef}};
-
 handle_info({'DOWN', Ref, _, Pid, Output}, #st{jobref = {Pid, Ref}} = St) ->
     {noreply, update_state(St, Output)};
-
 handle_info(_Msg, St) ->
     {noreply, St}.
 
@@ -102,11 +110,12 @@ start_replication([Seed | _]) ->
 
 update_state(State, {ok, Data}) ->
     #st{seeds = [Current | Tail], status = Status} = State,
-    Report = {[
-        {timestamp, list_to_binary(mem3_util:iso8601_timestamp())},
-        {last_replication_status, ok},
-        format_data(Data)
-    ]},
+    Report =
+        {[
+            {timestamp, list_to_binary(mem3_util:iso8601_timestamp())},
+            {last_replication_status, ok},
+            format_data(Data)
+        ]},
     NewStatus = lists:ukeymerge(1, [{Current, Report}], Status),
     Ready = is_ready(State#st.ready, Data),
     case Ready of
@@ -126,16 +135,18 @@ update_state(State, {ok, Data}) ->
     };
 update_state(State, {_Error, _Stack}) ->
     #st{seeds = [Current | Tail], status = Status} = State,
-    Report = {[
-        {timestamp, list_to_binary(mem3_util:iso8601_timestamp())},
-        {last_replication_status, error}
-    ]},
+    Report =
+        {[
+            {timestamp, list_to_binary(mem3_util:iso8601_timestamp())},
+            {last_replication_status, error}
+        ]},
     NewStatus = lists:ukeymerge(1, [{Current, Report}], Status),
     Seeds = Tail ++ [Current],
-    if not State#st.ready ->
-        erlang:send_after(1000, self(), start_replication);
-    true ->
-        ok
+    if
+        not State#st.ready ->
+            erlang:send_after(1000, self(), start_replication);
+        true ->
+            ok
     end,
     State#st{
         seeds = Seeds,
@@ -149,14 +160,17 @@ is_ready(false, Data) ->
     lists:all(fun({_DbName, Pending}) -> Pending =:= {ok, 0} end, Data).
 
 format_data(Data) ->
-    Formatted = lists:map(fun({DbName, Status}) ->
-        case Status of
-            {ok, Pending} when is_number(Pending) ->
-                {DbName, Pending};
-            {error, Tag} ->
-                {DbName, list_to_binary(io_lib:format("~p", [Tag]))};
-            _Else ->
-                {DbName, unknown_error}
-        end
-    end, Data),
+    Formatted = lists:map(
+        fun({DbName, Status}) ->
+            case Status of
+                {ok, Pending} when is_number(Pending) ->
+                    {DbName, Pending};
+                {error, Tag} ->
+                    {DbName, list_to_binary(io_lib:format("~p", [Tag]))};
+                _Else ->
+                    {DbName, unknown_error}
+            end
+        end,
+        Data
+    ),
     {pending_updates, {Formatted}}.

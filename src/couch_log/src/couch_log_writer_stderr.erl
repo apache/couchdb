@@ -13,24 +13,19 @@
 -module(couch_log_writer_stderr).
 -behaviour(couch_log_writer).
 
-
 -export([
     init/0,
     terminate/2,
     write/2
 ]).
 
-
 -include("couch_log.hrl").
-
 
 init() ->
     {ok, nil}.
 
-
 terminate(_, _St) ->
     ok.
-
 
 write(Entry, St) ->
     #log_entry{

@@ -18,7 +18,6 @@
 -define(setup(F), {setup, fun setup/0, fun teardown/1, F}).
 -define(foreach(Fs), {foreach, fun setup/0, fun teardown/1, Fs}).
 
-
 setup() ->
     {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite]),
     Fd.
@@ -34,7 +33,8 @@ open_close_test_() ->
         "Test for proper file open and close",
         {
             setup,
-            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            fun() -> test_util:start(?MODULE, [ioq]) end,
+            fun test_util:stop/1,
             [
                 should_return_enoent_if_missed(),
                 should_ignore_invalid_flags_with_open(),
@@ -49,8 +49,10 @@ should_return_enoent_if_missed() ->
     ?_assertEqual({error, enoent}, couch_file:open("not a real file")).
 
 should_ignore_invalid_flags_with_open() ->
-    ?_assertMatch({ok, _},
-                  couch_file:open(?tempfile(), [create, invalid_option])).
+    ?_assertMatch(
+        {ok, _},
+        couch_file:open(?tempfile(), [create, invalid_option])
+    ).
 
 should_return_pid_on_file_open(Fd) ->
     ?_assert(is_pid(Fd)).
@@ -63,13 +65,13 @@ should_close_file_properly() ->
 should_create_empty_new_files(Fd) ->
     ?_assertMatch({ok, 0}, couch_file:bytes(Fd)).
 
-
 read_write_test_() ->
     {
         "Common file read/write tests",
         {
             setup,
-            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            fun() -> test_util:start(?MODULE, [ioq]) end,
+            fun test_util:stop/1,
             ?foreach([
                 fun should_increase_file_size_on_write/1,
                 fun should_return_current_file_size_on_write/1,
@@ -85,7 +87,6 @@ read_write_test_() ->
             ])
         }
     }.
-
 
 should_increase_file_size_on_write(Fd) ->
     {ok, 0, _} = couch_file:append_term(Fd, foo),
@@ -111,7 +112,7 @@ should_return_term_as_binary_for_reading_binary(Fd) ->
     ?_assertMatch({ok, Foo}, couch_file:pread_binary(Fd, Pos)).
 
 should_read_term_written_as_binary(Fd) ->
-    {ok, Pos, _} = couch_file:append_binary(Fd, <<131,100,0,3,102,111,111>>),
+    {ok, Pos, _} = couch_file:append_binary(Fd, <<131, 100, 0, 3, 102, 111, 111>>),
     ?_assertMatch({ok, foo}, couch_file:pread_term(Fd, Pos)).
 
 should_write_and_read_large_binary(Fd) ->
@@ -139,8 +140,7 @@ should_not_read_beyond_eof(Fd) ->
     ok = file:pwrite(Io, Pos, <<0:1/integer, DoubleBin:31/integer>>),
     file:close(Io),
     unlink(Fd),
-    ExpectedError = {badmatch, {'EXIT', {bad_return_value,
-        {read_beyond_eof, Filepath}}}},
+    ExpectedError = {badmatch, {'EXIT', {bad_return_value, {read_beyond_eof, Filepath}}}},
     ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
 
 should_truncate(Fd) ->
@@ -180,17 +180,16 @@ should_not_read_more_than_pread_limit(Fd) ->
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
     {ok, Pos, _Size} = couch_file:append_binary(Fd, BigBin),
     unlink(Fd),
-    ExpectedError = {badmatch, {'EXIT', {bad_return_value,
-        {exceed_pread_limit, Filepath, 50000}}}},
+    ExpectedError = {badmatch, {'EXIT', {bad_return_value, {exceed_pread_limit, Filepath, 50000}}}},
     ?_assertError(ExpectedError, couch_file:pread_binary(Fd, Pos)).
-
 
 header_test_() ->
     {
         "File header read/write tests",
         {
             setup,
-            fun() -> test_util:start(?MODULE, [ioq]) end, fun test_util:stop/1,
+            fun() -> test_util:start(?MODULE, [ioq]) end,
+            fun test_util:stop/1,
             [
                 ?foreach([
                     fun should_write_and_read_atom_header/1,
@@ -207,7 +206,6 @@ header_test_() ->
             ]
         }
     }.
-
 
 should_write_and_read_atom_header(Fd) ->
     ok = couch_file:write_header(Fd, hello),
@@ -243,7 +241,6 @@ should_save_headers_larger_than_block_size(Fd) ->
     couch_file:write_header(Fd, Header),
     {"COUCHDB-1319", ?_assertMatch({ok, Header}, couch_file:read_header(Fd))}.
 
-
 should_recover_header_marker_corruption() ->
     ?_assertMatch(
         ok,
@@ -252,7 +249,8 @@ should_recover_header_marker_corruption() ->
                 ?assertNotMatch(Expect, couch_file:read_header(CouchFd)),
                 file:pwrite(RawFd, HeaderPos, <<0>>),
                 ?assertMatch(Expect, couch_file:read_header(CouchFd))
-            end)
+            end
+        )
     ).
 
 should_recover_header_size_corruption() ->
@@ -264,7 +262,8 @@ should_recover_header_size_corruption() ->
                 % +1 for 0x1 byte marker
                 file:pwrite(RawFd, HeaderPos + 1, <<10/integer>>),
                 ?assertMatch(Expect, couch_file:read_header(CouchFd))
-            end)
+            end
+        )
     ).
 
 should_recover_header_md5sig_corruption() ->
@@ -276,7 +275,8 @@ should_recover_header_md5sig_corruption() ->
                 % +5 = +1 for 0x1 byte and +4 for term size.
                 file:pwrite(RawFd, HeaderPos + 5, <<"F01034F88D320B22">>),
                 ?assertMatch(Expect, couch_file:read_header(CouchFd))
-            end)
+            end
+        )
     ).
 
 should_recover_header_data_corruption() ->
@@ -288,9 +288,9 @@ should_recover_header_data_corruption() ->
                 % +21 = +1 for 0x1 byte, +4 for term size and +16 for MD5 sig
                 file:pwrite(RawFd, HeaderPos + 21, <<"some data goes here!">>),
                 ?assertMatch(Expect, couch_file:read_header(CouchFd))
-            end)
+            end
+        )
     ).
-
 
 check_header_recovery(CheckFun) ->
     Path = ?tempfile(),
@@ -322,7 +322,6 @@ write_random_data(Fd, N) ->
     {ok, _, _} = couch_file:append_term(Fd, Term),
     write_random_data(Fd, N - 1).
 
-
 delete_test_() ->
     {
         "File delete tests",
@@ -350,33 +349,32 @@ delete_test_() ->
                 [
                     fun(Cfg) ->
                         {"enable_database_recovery = false, context = delete",
-                        make_enable_recovery_test_case(Cfg, false, delete)}
+                            make_enable_recovery_test_case(Cfg, false, delete)}
                     end,
                     fun(Cfg) ->
                         {"enable_database_recovery = true, context = delete",
-                        make_enable_recovery_test_case(Cfg, true, delete)}
+                            make_enable_recovery_test_case(Cfg, true, delete)}
                     end,
                     fun(Cfg) ->
                         {"enable_database_recovery = false, context = compaction",
-                        make_enable_recovery_test_case(Cfg, false, compaction)}
+                            make_enable_recovery_test_case(Cfg, false, compaction)}
                     end,
                     fun(Cfg) ->
                         {"enable_database_recovery = true, context = compaction",
-                        make_enable_recovery_test_case(Cfg, true, compaction)}
+                            make_enable_recovery_test_case(Cfg, true, compaction)}
                     end,
                     fun(Cfg) ->
                         {"delete_after_rename = true",
-                        make_delete_after_rename_test_case(Cfg, true)}
+                            make_delete_after_rename_test_case(Cfg, true)}
                     end,
                     fun(Cfg) ->
                         {"delete_after_rename = false",
-                        make_delete_after_rename_test_case(Cfg, false)}
+                            make_delete_after_rename_test_case(Cfg, false)}
                     end
                 ]
             }
         }
     }.
-
 
 make_enable_recovery_test_case({RootDir, File}, EnableRecovery, Context) ->
     meck:expect(config, get_boolean, fun
@@ -388,10 +386,11 @@ make_enable_recovery_test_case({RootDir, File}, EnableRecovery, Context) ->
     FileExistsAfter = filelib:is_regular(File),
     RenamedFiles = filelib:wildcard(filename:rootname(File) ++ "*.deleted.*"),
     DeletedFiles = filelib:wildcard(RootDir ++ "/.delete/*"),
-    {ExpectRenamedCount, ExpectDeletedCount} = if
-        EnableRecovery andalso Context =:= delete -> {1, 0};
-        true -> {0, 1}
-    end,
+    {ExpectRenamedCount, ExpectDeletedCount} =
+        if
+            EnableRecovery andalso Context =:= delete -> {1, 0};
+            true -> {0, 1}
+        end,
     [
         ?_assert(FileExistsBefore),
         ?_assertNot(FileExistsAfter),
@@ -408,13 +407,16 @@ make_delete_after_rename_test_case({RootDir, File}, DeleteAfterRename) ->
     couch_file:delete(RootDir, File),
     FileExistsAfter = filelib:is_regular(File),
     RenamedFiles = filelib:wildcard(filename:join([RootDir, ".delete", "*"])),
-    ExpectRenamedCount = if DeleteAfterRename -> 0; true -> 1 end,
+    ExpectRenamedCount =
+        if
+            DeleteAfterRename -> 0;
+            true -> 1
+        end,
     [
         ?_assert(FileExistsBefore),
         ?_assertNot(FileExistsAfter),
         ?_assertEqual(ExpectRenamedCount, length(RenamedFiles))
     ].
-
 
 nuke_dir_test_() ->
     {
@@ -454,26 +456,21 @@ nuke_dir_test_() ->
                 end,
                 [
                     fun(Cfg) ->
-                        {"enable_database_recovery = false",
-                        make_rename_dir_test_case(Cfg, false)}
+                        {"enable_database_recovery = false", make_rename_dir_test_case(Cfg, false)}
                     end,
                     fun(Cfg) ->
-                        {"enable_database_recovery = true",
-                        make_rename_dir_test_case(Cfg, true)}
+                        {"enable_database_recovery = true", make_rename_dir_test_case(Cfg, true)}
                     end,
                     fun(Cfg) ->
-                        {"delete_after_rename = true",
-                        make_delete_dir_test_case(Cfg, true)}
+                        {"delete_after_rename = true", make_delete_dir_test_case(Cfg, true)}
                     end,
                     fun(Cfg) ->
-                        {"delete_after_rename = false",
-                        make_delete_dir_test_case(Cfg, false)}
+                        {"delete_after_rename = false", make_delete_dir_test_case(Cfg, false)}
                     end
                 ]
             }
         }
     }.
-
 
 make_rename_dir_test_case({RootDir, ViewDir}, EnableRecovery) ->
     meck:expect(config, get_boolean, fun
@@ -486,7 +483,11 @@ make_rename_dir_test_case({RootDir, ViewDir}, EnableRecovery) ->
     DirExistsAfter = filelib:is_dir(ViewDir),
     Ext = filename:extension(ViewDir),
     RenamedDirs = filelib:wildcard(RootDir ++ "/*.deleted" ++ Ext),
-    ExpectRenamedCount = if EnableRecovery -> 1; true -> 0 end,
+    ExpectRenamedCount =
+        if
+            EnableRecovery -> 1;
+            true -> 0
+        end,
     [
         ?_assert(DirExistsBefore),
         ?_assertNot(DirExistsAfter),
@@ -505,7 +506,11 @@ make_delete_dir_test_case({RootDir, ViewDir}, DeleteAfterRename) ->
     Ext = filename:extension(ViewDir),
     RenamedDirs = filelib:wildcard(RootDir ++ "/*.deleted" ++ Ext),
     RenamedFiles = filelib:wildcard(RootDir ++ "/.delete/*"),
-    ExpectRenamedCount = if DeleteAfterRename -> 0; true -> 1 end,
+    ExpectRenamedCount =
+        if
+            DeleteAfterRename -> 0;
+            true -> 1
+        end,
     [
         ?_assert(DirExistsBefore),
         ?_assertNot(DirExistsAfter),
@@ -516,7 +521,6 @@ make_delete_dir_test_case({RootDir, ViewDir}, DeleteAfterRename) ->
 remove_dir(Dir) ->
     [file:delete(File) || File <- filelib:wildcard(filename:join([Dir, "*"]))],
     file:del_dir(Dir).
-
 
 fsync_error_test_() ->
     {
@@ -535,11 +539,9 @@ fsync_error_test_() ->
         }
     }.
 
-
 fsync_raises_errors() ->
     Fd = spawn(fun() -> fake_fsync_fd() end),
     ?assertError({fsync_error, eio}, couch_file:sync(Fd)).
-
 
 fake_fsync_fd() ->
     % Mocking gen_server did not go very

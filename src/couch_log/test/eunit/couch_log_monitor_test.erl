@@ -12,24 +12,16 @@
 
 -module(couch_log_monitor_test).
 
-
 -include_lib("eunit/include/eunit.hrl").
-
 
 -define(HANDLER, couch_log_error_logger_h).
 
-
 couch_log_monitor_test_() ->
-    {setup,
-        fun couch_log_test_util:start/0,
-        fun couch_log_test_util:stop/1,
-        [
-            fun monitor_ignores_unknown_messages/0,
-            fun monitor_restarts_handler/0,
-            fun coverage_test/0
-        ]
-    }.
-
+    {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
+        fun monitor_ignores_unknown_messages/0,
+        fun monitor_restarts_handler/0,
+        fun coverage_test/0
+    ]}.
 
 monitor_ignores_unknown_messages() ->
     Pid1 = get_monitor_pid(),
@@ -40,7 +32,6 @@ monitor_ignores_unknown_messages() ->
     Pid1 ! do_baz_please,
     timer:sleep(250),
     ?assert(is_process_alive(Pid1)).
-
 
 monitor_restarts_handler() ->
     Pid1 = get_monitor_pid(),
@@ -55,11 +46,9 @@ monitor_restarts_handler() ->
     Handlers = gen_event:which_handlers(error_logger),
     ?assert(lists:member(?HANDLER, Handlers)).
 
-
 coverage_test() ->
     Resp = couch_log_monitor:code_change(foo, bazinga, baz),
     ?assertEqual({ok, bazinga}, Resp).
-
 
 get_monitor_pid() ->
     Children = supervisor:which_children(couch_log_sup),

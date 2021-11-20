@@ -18,11 +18,10 @@
 
 -include_lib("../couch/include/couch_db.hrl").
 
-
 require_admins(undefined, {undefined, undefined}) ->
     % no admin in CouchDB, no admin in request
     throw({error, "Cluster setup requires admin account to be configured"});
-require_admins(_,_) ->
+require_admins(_, _) ->
     ok.
 
 require_node_count(undefined) ->
@@ -34,8 +33,14 @@ error_local_bind_address() ->
     throw({error, "Cluster setup requires a remote bind_address (not 127.0.0.1 nor ::1)"}).
 
 error_invalid_bind_address(InvalidBindAddress) ->
-    throw({error, io:format("Setup requires a valid IP bind_address. " ++
-                         "~p is invalid.", [InvalidBindAddress])}).
+    throw(
+        {error,
+            io:format(
+                "Setup requires a valid IP bind_address. " ++
+                    "~p is invalid.",
+                [InvalidBindAddress]
+            )}
+    ).
 
 require_remote_bind_address(OldBindAddress, NewBindAddress) ->
     case {OldBindAddress, NewBindAddress} of
@@ -60,8 +65,8 @@ is_cluster_enabled() ->
     Admins = config:get("admins"),
     case {BindAddress, Admins} of
         {"127.0.0.1", _} -> false;
-        {_,[]} -> false;
-        {_,_} -> true
+        {_, []} -> false;
+        {_, _} -> true
     end.
 
 is_single_node_enabled(Dbs) ->
@@ -71,23 +76,21 @@ is_single_node_enabled(Dbs) ->
     case {Admins, HasDbs} of
         {[], _} -> false;
         {_, false} -> false;
-        {_,_} -> true
+        {_, _} -> true
     end.
 
 cluster_system_dbs() ->
     ["_users", "_replicator"].
 
-
 has_cluster_system_dbs([]) ->
     true;
-has_cluster_system_dbs([Db|Dbs]) ->
+has_cluster_system_dbs([Db | Dbs]) ->
     case catch fabric:get_db_info(Db) of
         {ok, _} -> has_cluster_system_dbs(Dbs);
         _ -> false
     end.
 
 enable_cluster(Options) ->
-
     case couch_util:get_value(remote_node, Options, undefined) of
         undefined ->
             enable_cluster_int(Options, is_cluster_enabled());
@@ -114,17 +117,19 @@ enable_cluster_http(Options) ->
     AdminUsername = couch_util:get_value(username, Options),
     AdminPasswordHash = config:get("admins", binary_to_list(AdminUsername)),
 
-    Body = ?JSON_ENCODE({[
-        {<<"action">>, <<"enable_cluster">>},
-        {<<"username">>, AdminUsername},
-        {<<"password_hash">>, ?l2b(AdminPasswordHash)},
-        {<<"bind_address">>, couch_util:get_value(bind_address, Options)},
-        {<<"port">>, couch_util:get_value(port, Options)},
-        {<<"node_count">>, couch_util:get_value(node_count, Options)}
-    ]}),
+    Body = ?JSON_ENCODE(
+        {[
+            {<<"action">>, <<"enable_cluster">>},
+            {<<"username">>, AdminUsername},
+            {<<"password_hash">>, ?l2b(AdminPasswordHash)},
+            {<<"bind_address">>, couch_util:get_value(bind_address, Options)},
+            {<<"port">>, couch_util:get_value(port, Options)},
+            {<<"node_count">>, couch_util:get_value(node_count, Options)}
+        ]}
+    ),
 
     Headers = [
-        {"Content-Type","application/json"}
+        {"Content-Type", "application/json"}
     ],
 
     RemoteNode = couch_util:get_value(remote_node, Options),
@@ -142,19 +147,18 @@ enable_cluster_http(Options) ->
 enable_cluster_int(_Options, true) ->
     {error, cluster_enabled};
 enable_cluster_int(Options, false) ->
-
     % if no admin in config and no admin in req -> error
     CurrentAdmins = config:get("admins"),
     NewCredentials = {
         proplists:get_value(username, Options),
         case proplists:get_value(password_hash, Options) of
-          undefined -> proplists:get_value(password, Options);
-          Pw -> Pw
+            undefined -> proplists:get_value(password, Options);
+            Pw -> Pw
         end
     },
     ok = require_admins(CurrentAdmins, NewCredentials),
     % if bind_address == 127.0.0.1 and no bind_address in req -> error
-    CurrentBindAddress = config:get("chttpd","bind_address"),
+    CurrentBindAddress = config:get("chttpd", "bind_address"),
     NewBindAddress = proplists:get_value(bind_address, Options),
     ok = require_remote_bind_address(CurrentBindAddress, NewBindAddress),
     NodeCount = couch_util:get_value(node_count, Options),
@@ -196,7 +200,6 @@ setup_node(NewCredentials, NewBindAddress, NodeCount, Port) ->
             config:set_integer("chttpd", "port", Port)
     end.
 
-
 finish_cluster(Options) ->
     % ensure that uuid is set
     couch_server:get_uuid(),
@@ -207,7 +210,6 @@ finish_cluster(Options) ->
     ok = sync_auth_secret(),
     Dbs = proplists:get_value(ensure_dbs_exist, Options, cluster_system_dbs()),
     finish_cluster_int(Dbs, has_cluster_system_dbs(Dbs)).
-
 
 wait_connected() ->
     Nodes = other_nodes(),
@@ -225,29 +227,30 @@ wait_connected() ->
             ok
     end.
 
-
 other_nodes() ->
     mem3:nodes() -- [node()].
 
-
 disconnected(Nodes) ->
-    lists:filter(fun(Node) ->
-        case net_adm:ping(Node) of
-            pong -> false;
-            pang -> true
-        end
-    end, Nodes).
-
+    lists:filter(
+        fun(Node) ->
+            case net_adm:ping(Node) of
+                pong -> false;
+                pang -> true
+            end
+        end,
+        Nodes
+    ).
 
 sync_admins() ->
-    ok = lists:foreach(fun({User, Pass}) ->
-        sync_admin(User, Pass)
-    end, config:get("admins")).
-
+    ok = lists:foreach(
+        fun({User, Pass}) ->
+            sync_admin(User, Pass)
+        end,
+        config:get("admins")
+    ).
 
 sync_admin(User, Pass) ->
     sync_config("admins", User, Pass).
-
 
 sync_uuid() ->
     Uuid = config:get("couchdb", "uuid"),
@@ -257,26 +260,33 @@ sync_auth_secret() ->
     Secret = config:get("chttpd_auth", "secret"),
     sync_config("chttpd_auth", "secret", Secret).
 
-
 sync_config(Section, Key, Value) ->
-    {Results, Errors} = rpc:multicall(other_nodes(), config, set,
-        [Section, Key, Value]),
+    {Results, Errors} = rpc:multicall(
+        other_nodes(),
+        config,
+        set,
+        [Section, Key, Value]
+    ),
     case validate_multicall(Results, Errors) of
         ok ->
             ok;
         error ->
-            couch_log:error("~p sync_admin results ~p errors ~p",
-                [?MODULE, Results, Errors]),
+            couch_log:error(
+                "~p sync_admin results ~p errors ~p",
+                [?MODULE, Results, Errors]
+            ),
             Reason = "Cluster setup unable to sync admin passwords",
             throw({setup_error, Reason})
     end.
 
-
 validate_multicall(Results, Errors) ->
-    AllOk = lists:all(fun
-        (ok) -> true;
-        (_) -> false
-    end, Results),
+    AllOk = lists:all(
+        fun
+            (ok) -> true;
+            (_) -> false
+        end,
+        Results
+    ),
     case AllOk andalso Errors == [] of
         true ->
             ok;
@@ -284,12 +294,10 @@ validate_multicall(Results, Errors) ->
             error
     end.
 
-
 finish_cluster_int(_Dbs, true) ->
     {error, cluster_finished};
 finish_cluster_int(Dbs, false) ->
     lists:foreach(fun fabric:create_db/1, Dbs).
-
 
 enable_single_node(Options) ->
     % if no admin in config and no admin in req -> error
@@ -297,8 +305,8 @@ enable_single_node(Options) ->
     NewCredentials = {
         proplists:get_value(username, Options),
         case proplists:get_value(password_hash, Options) of
-          undefined -> proplists:get_value(password, Options);
-          Pw -> Pw
+            undefined -> proplists:get_value(password, Options);
+            Pw -> Pw
         end
     },
     ok = require_admins(CurrentAdmins, NewCredentials),
@@ -310,7 +318,6 @@ enable_single_node(Options) ->
     Dbs = proplists:get_value(ensure_dbs_exist, Options, cluster_system_dbs()),
     finish_cluster_int(Dbs, has_cluster_system_dbs(Dbs)),
     couch_log:debug("Enable Single Node: ~p~n", [Options]).
-
 
 add_node(Options) ->
     add_node_int(Options, is_cluster_enabled()).
@@ -329,13 +336,15 @@ add_node_int(Options, true) ->
         }}
     ],
 
-    Body = ?JSON_ENCODE({[
-        {<<"action">>, <<"receive_cookie">>},
-        {<<"cookie">>, atom_to_binary(ErlangCookie, utf8)}
-    ]}),
+    Body = ?JSON_ENCODE(
+        {[
+            {<<"action">>, <<"receive_cookie">>},
+            {<<"cookie">>, atom_to_binary(ErlangCookie, utf8)}
+        ]}
+    ),
 
     Headers = [
-        {"Content-Type","application/json"}
+        {"Content-Type", "application/json"}
     ],
 
     Host = proplists:get_value(host, Options),

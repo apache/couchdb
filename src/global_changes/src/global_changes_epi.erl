@@ -32,7 +32,6 @@ providers() ->
         {chttpd_handlers, global_changes_httpd_handlers}
     ].
 
-
 services() ->
     [
         {global_changes, global_changes_plugin}

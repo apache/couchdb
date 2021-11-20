@@ -26,10 +26,12 @@
 -module(weatherreport_check_message_queues).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -define(THRESHOLD, 1000).
 
@@ -46,7 +48,8 @@ check(Opts) ->
     weatherreport_util:check_proc_count(
         message_queue_len,
         ?THRESHOLD,
-        Opts).
+        Opts
+    ).
 
 -spec format(term()) -> {io:format(), [term()]}.
 format({high, {Pid, MBoxSize, Info, Pinfo}}) ->

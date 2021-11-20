@@ -17,17 +17,20 @@
 -include("mem3.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--define(TIMEOUT, 5). % seconds
+% seconds
+-define(TIMEOUT, 5).
 
 go_test_() ->
     {
         "security property sync test",
         {
             setup,
-            fun start_couch/0, fun stop_couch/1,
+            fun start_couch/0,
+            fun stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun sync_security_ok/1
                 ]

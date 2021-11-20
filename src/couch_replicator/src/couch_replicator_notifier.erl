@@ -25,15 +25,17 @@
 -include_lib("couch/include/couch_db.hrl").
 
 start_link(FunAcc) ->
-    couch_event_sup:start_link(couch_replication,
-        {couch_replicator_notifier, make_ref()}, FunAcc).
+    couch_event_sup:start_link(
+        couch_replication,
+        {couch_replicator_notifier, make_ref()},
+        FunAcc
+    ).
 
 notify(Event) ->
     gen_event:notify(couch_replication, Event).
 
 stop(Pid) ->
     couch_event_sup:stop(Pid).
-
 
 init(FunAcc) ->
     {ok, FunAcc}.

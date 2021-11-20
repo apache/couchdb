@@ -12,14 +12,11 @@
 
 -module(fabric_db_create_tests).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
-
 -define(TDEF(A), {atom_to_list(A), fun A/0}).
-
 
 main_test_() ->
     {
@@ -31,15 +28,12 @@ main_test_() ->
         ]
     }.
 
-
 setup() ->
     test_util:start_couch([fabric]).
-
 
 teardown(Ctx) ->
     meck:unload(),
     test_util:stop_couch(Ctx).
-
 
 t_handle_shard_doc_conflict() ->
     DbName = ?tempdb(),

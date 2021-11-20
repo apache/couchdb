@@ -116,19 +116,22 @@ validate_fixture(#couch_tests_fixture{} = Fixture0, Args, Opts) ->
     StartedAppsAfterTeardown = Ctx1#couch_tests_ctx.started_apps,
 
     validate_and_report([
-         {equal, "Expected applications before calling fixture (~p) "
-            "to be equal to applications after its calling",
-            AppsBefore, AppsAfter},
-         {equal, "Expected list of started applications (~p) "
-            "to be equal to #couch_tests_fixture.apps (~p)",
-            AppsStarted, FixtureApps},
-         {equal, "Expected list of started applications (~p) "
-            "to be equal to #couch_tests_ctx.started_apps (~p)",
-            AppsStarted, StartedAppsBeforeTeardown},
-         {equal, "Expected list of stopped applications (~p) "
-            "to be equal to #couch_tests_ctx.stopped_apps (~p)",
-            AppsStarted, StoppedAppsAfterTeardown},
-         {equal, "Expected empty list ~i of #couch_tests_ctx.started_apps (~p) "
+        {equal,
+            "Expected applications before calling fixture (~p) "
+            "to be equal to applications after its calling", AppsBefore, AppsAfter},
+        {equal,
+            "Expected list of started applications (~p) "
+            "to be equal to #couch_tests_fixture.apps (~p)", AppsStarted, FixtureApps},
+        {equal,
+            "Expected list of started applications (~p) "
+            "to be equal to #couch_tests_ctx.started_apps (~p)", AppsStarted,
+            StartedAppsBeforeTeardown},
+        {equal,
+            "Expected list of stopped applications (~p) "
+            "to be equal to #couch_tests_ctx.stopped_apps (~p)", AppsStarted,
+            StoppedAppsAfterTeardown},
+        {equal,
+            "Expected empty list ~i of #couch_tests_ctx.started_apps (~p) "
             "after teardown", [], StartedAppsAfterTeardown}
     ]).
 
@@ -151,16 +154,19 @@ validate_and_report(Sheet) ->
 %% Helper functions definitions
 %% ------------------------------------------------------------------
 
-
 do_setup([#couch_tests_fixture{setup = Setup} = Fixture | Rest], Ctx0, Acc) ->
     Ctx1 = Ctx0#couch_tests_ctx{started_apps = []},
     #couch_tests_ctx{started_apps = Apps} = Ctx2 = Setup(Fixture, Ctx1),
     Ctx3 = Ctx2#couch_tests_ctx{started_apps = []},
     do_setup(Rest, Ctx3, [Fixture#couch_tests_fixture{apps = Apps} | Acc]);
 do_setup([], Ctx, Acc) ->
-    Apps = lists:foldl(fun(#couch_tests_fixture{apps = A}, AppsAcc) ->
-        A ++ AppsAcc
-    end, [], Acc),
+    Apps = lists:foldl(
+        fun(#couch_tests_fixture{apps = A}, AppsAcc) ->
+            A ++ AppsAcc
+        end,
+        [],
+        Acc
+    ),
     Ctx#couch_tests_ctx{chain = lists:reverse(Acc), started_apps = Apps}.
 
 do_teardown(Fixture, Ctx0) ->
@@ -175,14 +181,14 @@ do_start_applications([], Acc) ->
     lists:reverse(Acc);
 do_start_applications([App | Apps], Acc) ->
     case application:start(App) of
-    {error, {already_started, _}} ->
-        do_start_applications(Apps, Acc);
-    {error, {not_started, Dep}} ->
-        do_start_applications([Dep, App | Apps], Acc);
-    {error, {not_running, Dep}} ->
-        do_start_applications([Dep, App | Apps], Acc);
-    ok ->
-        do_start_applications(Apps, [App | Acc])
+        {error, {already_started, _}} ->
+            do_start_applications(Apps, Acc);
+        {error, {not_started, Dep}} ->
+            do_start_applications([Dep, App | Apps], Acc);
+        {error, {not_running, Dep}} ->
+            do_start_applications([Dep, App | Apps], Acc);
+        ok ->
+            do_start_applications(Apps, [App | Acc])
     end.
 
 stop_applications(Apps) ->
@@ -192,25 +198,24 @@ do_stop_applications([], Acc) ->
     lists:reverse(Acc);
 do_stop_applications([App | Apps], Acc) ->
     case application:stop(App) of
-    {error, _} ->
-        do_stop_applications(Apps, Acc);
-    ok ->
-        do_stop_applications(Apps, [App | Acc])
+        {error, _} ->
+            do_stop_applications(Apps, Acc);
+        ok ->
+            do_stop_applications(Apps, [App | Acc])
     end.
 
-remove_duplicates([])    ->
+remove_duplicates([]) ->
     [];
 remove_duplicates([H | T]) ->
     [H | [X || X <- remove_duplicates(T), X /= H]].
 
 applications() ->
-    lists:usort([App || {App, _, _} <-application:which_applications()]).
+    lists:usort([App || {App, _, _} <- application:which_applications()]).
 
 do_validate({equal, _Message, Arg, Arg}, Acc) ->
     Acc;
 do_validate({equal, Message, Arg1, Arg2}, Acc) ->
     [io_lib:format(Message, [Arg1, Arg2]) | Acc].
-
 
 %% ------------------------------------------------------------------
 %% Tests

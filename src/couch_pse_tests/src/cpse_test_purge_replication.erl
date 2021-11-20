@@ -14,26 +14,21 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
-
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
-
 setup_all() ->
     cpse_util:setup_all([mem3, fabric, couch_replicator]).
-
 
 setup_each() ->
     {ok, Src} = cpse_util:create_db(),
     {ok, Tgt} = cpse_util:create_db(),
     {couch_db:name(Src), couch_db:name(Tgt)}.
 
-
 teardown_each({SrcDb, TgtDb}) ->
     ok = couch_server:delete(SrcDb, []),
     ok = couch_server:delete(TgtDb, []).
-
 
 cpse_purge_http_replication({Source, Target}) ->
     {ok, Rev1} = cpse_util:save_doc(Source, {[{'_id', foo}, {vsn, 1}]}),
@@ -47,10 +42,11 @@ cpse_purge_http_replication({Source, Target}) ->
         {purge_infos, []}
     ]),
 
-    RepObject = {[
-        {<<"source">>, db_url(Source)},
-        {<<"target">>, db_url(Target)}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, db_url(Source)},
+            {<<"target">>, db_url(Target)}
+        ]},
 
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
     {ok, Doc1} = cpse_util:open_doc(Target, foo),
@@ -99,10 +95,11 @@ cpse_purge_http_replication({Source, Target}) ->
 
     % Show that replicating from the target
     % back to the source reintroduces the doc
-    RepObject2 = {[
-        {<<"source">>, db_url(Target)},
-        {<<"target">>, db_url(Source)}
-    ]},
+    RepObject2 =
+        {[
+            {<<"source">>, db_url(Target)},
+            {<<"target">>, db_url(Source)}
+        ]},
 
     {ok, _} = couch_replicator:replicate(RepObject2, ?ADMIN_USER),
     {ok, Doc3} = cpse_util:open_doc(Source, foo),
@@ -117,7 +114,6 @@ cpse_purge_http_replication({Source, Target}) ->
         {purge_seq, 1},
         {purge_infos, PurgeInfos}
     ]).
-
 
 cpse_purge_internal_repl_disabled({Source, Target}) ->
     cpse_util:with_config([{"mem3", "replicate_purges", "false"}], fun() ->
@@ -151,7 +147,6 @@ cpse_purge_internal_repl_disabled({Source, Target}) ->
         ?assertMatch({ok, #doc_info{}}, cpse_util:open_doc(Target, <<"foo1">>))
     end).
 
-
 cpse_purge_repl_simple_pull({Source, Target}) ->
     repl(Source, Target),
 
@@ -164,7 +159,6 @@ cpse_purge_repl_simple_pull({Source, Target}) ->
     {ok, [{ok, PRevs}]} = cpse_util:purge(Target, PurgeInfos),
     ?assertEqual([Rev], PRevs),
     repl(Source, Target).
-
 
 cpse_purge_repl_simple_push({Source, Target}) ->
     repl(Source, Target),
@@ -179,7 +173,6 @@ cpse_purge_repl_simple_push({Source, Target}) ->
     ?assertEqual([Rev], PRevs),
     repl(Source, Target).
 
-
 repl(Source, Target) ->
     SrcShard = make_shard(Source),
     TgtShard = make_shard(Target),
@@ -192,7 +185,6 @@ repl(Source, Target) ->
     Diff = cpse_util:term_diff(SrcTerm, TgtTerm),
     ?assertEqual(nodiff, Diff).
 
-
 make_shard(DbName) ->
     #shard{
         name = DbName,
@@ -200,7 +192,6 @@ make_shard(DbName) ->
         dbname = DbName,
         range = [0, 16#FFFFFFFF]
     }.
-
 
 db_url(DbName) ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),

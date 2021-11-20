@@ -34,14 +34,16 @@
 
 -module(weatherreport_config).
 
--export([prepare/0,
-         data_directories/0,
-         get_vm_env/1,
-         etc_dir/0,
-         timeout/0,
-         node_name/0,
-         cookie/0,
-         user/0]).
+-export([
+    prepare/0,
+    data_directories/0,
+    get_vm_env/1,
+    etc_dir/0,
+    timeout/0,
+    node_name/0,
+    cookie/0,
+    user/0
+]).
 
 %% @doc Prepares appropriate configuration to the weatherreport script
 %%      can run.  This is called by the weaterreport module and you do
@@ -52,7 +54,7 @@ prepare() ->
 
 prepare([]) ->
     ok;
-prepare([Fun|T]) ->
+prepare([Fun | T]) ->
     case Fun() of
         {error, Reason} ->
             {error, Reason};
@@ -62,9 +64,9 @@ prepare([Fun|T]) ->
 
 %% @doc Determines where CouchDB is configured to store data. Returns a
 %%      list of paths to directories defined by storage backends.
--spec data_directories() -> [ file:filename() ].
+-spec data_directories() -> [file:filename()].
 data_directories() ->
-    [config:get("couchdb","view_index_dir"), config:get("couchdb","database_dir")].
+    [config:get("couchdb", "view_index_dir"), config:get("couchdb", "database_dir")].
 
 %% @doc Get an -env flag out of the vm.args file.
 -spec get_vm_env(string()) -> string() | undefined.
@@ -110,7 +112,7 @@ etc_dir() ->
 
 %% @doc The local node name. Includes whether the node uses short
 %% or long nodenames for distributed Erlang.
--spec node_name() -> {shortnames | longnames, Name::string()}.
+-spec node_name() -> {shortnames | longnames, Name :: string()}.
 node_name() ->
     case application:get_env(weatherreport, node_name) of
         undefined ->
@@ -140,13 +142,15 @@ load_app_config() ->
     weatherreport_log:log(node(), debug, "Local node config: ~p~n", [config:all()]).
 
 load_vm_args() ->
-    VmArgs = case init:get_argument(vm_args) of 
-        {ok, [[X]]} -> X;
-        _ ->
-            %% This is a backup. If for some reason -vm_args isn't specified
-            %% then assume it lives in the same dir as app.config
-            filename:absname("./vm.args", ?MODULE:etc_dir())
-    end,
+    VmArgs =
+        case init:get_argument(vm_args) of
+            {ok, [[X]]} ->
+                X;
+            _ ->
+                %% This is a backup. If for some reason -vm_args isn't specified
+                %% then assume it lives in the same dir as app.config
+                filename:absname("./vm.args", ?MODULE:etc_dir())
+        end,
 
     case file:read_file(VmArgs) of
         {error, Reason} ->
@@ -159,32 +163,32 @@ load_vm_args(Bin) when is_binary(Bin) ->
     load_vm_args(re:split(Bin, "\s*\r?\n\s*", [{return, list}, trim]));
 load_vm_args([]) ->
     ok;
-load_vm_args([[$#|_]|T]) ->
+load_vm_args([[$# | _] | T]) ->
     load_vm_args(T);
-load_vm_args([""|T]) ->
+load_vm_args(["" | T]) ->
     load_vm_args(T);
-load_vm_args(["-sname " ++ NodeName|T]) ->
+load_vm_args(["-sname " ++ NodeName | T]) ->
     application:set_env(weatherreport, node_name, {shortnames, string:strip(NodeName)}),
     load_vm_args(T);
-load_vm_args(["-name " ++ NodeName|T]) ->
+load_vm_args(["-name " ++ NodeName | T]) ->
     application:set_env(weatherreport, node_name, {longnames, string:strip(NodeName)}),
     load_vm_args(T);
-load_vm_args(["-setcookie " ++ Cookie|T]) ->
+load_vm_args(["-setcookie " ++ Cookie | T]) ->
     application:set_env(weatherreport, cookie, string:strip(Cookie)),
     load_vm_args(T);
-load_vm_args(["-env " ++ Env|T]) ->
+load_vm_args(["-env " ++ Env | T]) ->
     [Key, Value] = re:split(Env, "\s+", [{return, list}, trim]),
     add_or_insert_env(vm_env, {Key, Value}),
     load_vm_args(T);
-load_vm_args([[$+|EmuFlags]|T]) ->
-    [Flag|Rest] = re:split(EmuFlags, "\s+", [{return,list}, trim]),
-    add_or_insert_env(emu_flags, {[$+|Flag], Rest}),
+load_vm_args([[$+ | EmuFlags] | T]) ->
+    [Flag | Rest] = re:split(EmuFlags, "\s+", [{return, list}, trim]),
+    add_or_insert_env(emu_flags, {[$+ | Flag], Rest}),
     load_vm_args(T);
-load_vm_args([[$-|InitFlags]|T]) ->
-    [Flag|Rest] = re:split(InitFlags, "\s+", [{return,list}, trim]),
-    add_or_insert_env(init_flags, {[$-|Flag], Rest}),
+load_vm_args([[$- | InitFlags] | T]) ->
+    [Flag | Rest] = re:split(InitFlags, "\s+", [{return, list}, trim]),
+    add_or_insert_env(init_flags, {[$- | Flag], Rest}),
     load_vm_args(T);
-load_vm_args([Line|_]) ->
+load_vm_args([Line | _]) ->
     {error, io_lib:format("Erroneous line in vm.args: ~s", [Line])}.
 
 add_or_insert_env(Key, Value) ->
@@ -192,5 +196,5 @@ add_or_insert_env(Key, Value) ->
         undefined ->
             application:set_env(weatherreport, Key, [Value]);
         {ok, List} ->
-            application:set_env(weatherreport, Key, [Value|List])
+            application:set_env(weatherreport, Key, [Value | List])
     end.

@@ -12,38 +12,32 @@
 
 -module(ddoc_cache_lru_test).
 
-
 -export([
     recover/1
 ]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("ddoc_cache_test.hrl").
 
-
 recover(<<"pause", _/binary>>) ->
-    receive go -> ok end,
+    receive
+        go -> ok
+    end,
     {ok, paused};
-
 recover(<<"big", _/binary>>) ->
     {ok, [couch_rand:uniform() || _ <- lists:seq(1, 8192)]};
-
 recover(DbName) ->
     {ok, DbName}.
-
 
 start_couch() ->
     Ctx = ddoc_cache_tutil:start_couch(),
     meck:new(ddoc_cache_ev, [passthrough]),
     Ctx.
 
-
 stop_couch(Ctx) ->
     meck:unload(),
     ddoc_cache_tutil:stop_couch(Ctx).
-
 
 check_not_started_test() ->
     % Starting couch, but not ddoc_cache
@@ -73,33 +67,42 @@ check_lru_test_() ->
         ])
     }.
 
-
 check_multi_start(_) ->
     ddoc_cache_tutil:clear(),
     meck:reset(ddoc_cache_ev),
     Key = {ddoc_cache_entry_custom, {<<"pause">>, ?MODULE}},
     % These will all get sent through ddoc_cache_lru
-    Clients = lists:map(fun(_) ->
-        spawn_monitor(fun() ->
-            ddoc_cache_lru:open(Key)
-        end)
-    end, lists:seq(1, 10)),
+    Clients = lists:map(
+        fun(_) ->
+            spawn_monitor(fun() ->
+                ddoc_cache_lru:open(Key)
+            end)
+        end,
+        lists:seq(1, 10)
+    ),
     meck:wait(ddoc_cache_ev, event, [started, Key], 1000),
-    lists:foreach(fun({Pid, _Ref}) ->
-        ?assert(is_process_alive(Pid))
-    end, Clients),
+    lists:foreach(
+        fun({Pid, _Ref}) ->
+            ?assert(is_process_alive(Pid))
+        end,
+        Clients
+    ),
     [#entry{pid = Pid}] = ets:tab2list(?CACHE),
     Opener = element(4, sys:get_state(Pid)),
     OpenerRef = erlang:monitor(process, Opener),
     ?assert(is_process_alive(Opener)),
     Opener ! go,
-    receive {'DOWN', OpenerRef, _, _, _} -> ok end,
-    lists:foreach(fun({_, Ref}) ->
-        receive
-            {'DOWN', Ref, _, _, normal} -> ok
-        end
-    end, Clients).
-
+    receive
+        {'DOWN', OpenerRef, _, _, _} -> ok
+    end,
+    lists:foreach(
+        fun({_, Ref}) ->
+            receive
+                {'DOWN', Ref, _, _, normal} -> ok
+            end
+        end,
+        Clients
+    ).
 
 check_multi_open(_) ->
     ddoc_cache_tutil:clear(),
@@ -112,24 +115,38 @@ check_multi_open(_) ->
         ddoc_cache_lru:open(Key)
     end),
     meck:wait(ddoc_cache_ev, event, [started, Key], 1000),
-    Clients = [Client1] ++ lists:map(fun(_) ->
-        spawn_monitor(fun() ->
-            ddoc_cache_lru:open(Key)
-        end)
-    end, lists:seq(1, 9)),
-    lists:foreach(fun({Pid, _Ref}) ->
-        ?assert(is_process_alive(Pid))
-    end, Clients),
+    Clients =
+        [Client1] ++
+            lists:map(
+                fun(_) ->
+                    spawn_monitor(fun() ->
+                        ddoc_cache_lru:open(Key)
+                    end)
+                end,
+                lists:seq(1, 9)
+            ),
+    lists:foreach(
+        fun({Pid, _Ref}) ->
+            ?assert(is_process_alive(Pid))
+        end,
+        Clients
+    ),
     [#entry{pid = Pid}] = ets:tab2list(?CACHE),
     Opener = element(4, sys:get_state(Pid)),
     OpenerRef = erlang:monitor(process, Opener),
     ?assert(is_process_alive(Opener)),
     Opener ! go,
-    receive {'DOWN', OpenerRef, _, _, _} -> ok end,
-    lists:foreach(fun({_, Ref}) ->
-        receive {'DOWN', Ref, _, _, normal} -> ok end
-    end, Clients).
-
+    receive
+        {'DOWN', OpenerRef, _, _, _} -> ok
+    end,
+    lists:foreach(
+        fun({_, Ref}) ->
+            receive
+                {'DOWN', Ref, _, _, normal} -> ok
+            end
+        end,
+        Clients
+    ).
 
 check_capped_size(_) ->
     % The extra factor of two in the size checks is
@@ -141,19 +158,24 @@ check_capped_size(_) ->
     MaxSize = 1048576,
     ddoc_cache_tutil:clear(),
     meck:reset(ddoc_cache_ev),
-    lists:foreach(fun(I) ->
-        DbName = list_to_binary("big_" ++ integer_to_list(I)),
-        ddoc_cache:open_custom(DbName, ?MODULE),
-        meck:wait(I, ddoc_cache_ev, event, [started, '_'], 1000),
-        ?assert(cache_size() < MaxSize * 2)
-    end, lists:seq(1, 25)),
-    lists:foreach(fun(I) ->
-        DbName = list_to_binary("big_" ++ integer_to_list(I)),
-        ddoc_cache:open_custom(DbName, ?MODULE),
-        meck:wait(I, ddoc_cache_ev, event, [started, '_'], 1000),
-        ?assert(cache_size() < MaxSize * 2)
-    end, lists:seq(26, 100)).
-
+    lists:foreach(
+        fun(I) ->
+            DbName = list_to_binary("big_" ++ integer_to_list(I)),
+            ddoc_cache:open_custom(DbName, ?MODULE),
+            meck:wait(I, ddoc_cache_ev, event, [started, '_'], 1000),
+            ?assert(cache_size() < MaxSize * 2)
+        end,
+        lists:seq(1, 25)
+    ),
+    lists:foreach(
+        fun(I) ->
+            DbName = list_to_binary("big_" ++ integer_to_list(I)),
+            ddoc_cache:open_custom(DbName, ?MODULE),
+            meck:wait(I, ddoc_cache_ev, event, [started, '_'], 1000),
+            ?assert(cache_size() < MaxSize * 2)
+        end,
+        lists:seq(26, 100)
+    ).
 
 check_cache_refill({DbName, _}) ->
     ddoc_cache_tutil:clear(),
@@ -168,10 +190,13 @@ check_cache_refill({DbName, _}) ->
         {ddoc_cache_entry_ddocid, {DbName, DDocId}}
     end,
 
-    lists:foreach(fun(I) ->
-        Key = InitDDoc(I),
-        meck:wait(ddoc_cache_ev, event, [started, Key], 1000)
-    end, lists:seq(1, 5)),
+    lists:foreach(
+        fun(I) ->
+            Key = InitDDoc(I),
+            meck:wait(ddoc_cache_ev, event, [started, Key], 1000)
+        end,
+        lists:seq(1, 5)
+    ),
 
     ShardName = mem3:name(hd(mem3:shards(DbName))),
     {ok, _} = ddoc_cache_lru:handle_db_event(ShardName, deleted, foo),
@@ -179,11 +204,13 @@ check_cache_refill({DbName, _}) ->
     meck:wait(10, ddoc_cache_ev, event, [removed, '_'], 1000),
     ?assertEqual(0, ets:info(?CACHE, size)),
 
-    lists:foreach(fun(I) ->
-        Key = InitDDoc(I),
-        meck:wait(ddoc_cache_ev, event, [started, Key], 1000)
-    end, lists:seq(6, 10)).
-
+    lists:foreach(
+        fun(I) ->
+            Key = InitDDoc(I),
+            meck:wait(ddoc_cache_ev, event, [started, Key], 1000)
+        end,
+        lists:seq(6, 10)
+    ).
 
 check_evict_and_exit(_) ->
     ddoc_cache_tutil:clear(),
@@ -213,7 +240,6 @@ check_evict_and_exit(_) ->
     % And verify our monitor doesn't fire
     timer:sleep(500),
     ?assertEqual({messages, []}, process_info(self(), messages)).
-
 
 cache_size() ->
     ets:info(?CACHE, memory) * erlang:system_info(wordsize).

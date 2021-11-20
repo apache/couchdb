@@ -12,7 +12,6 @@
 
 -module(mem3_reshard_job).
 
-
 -export([
     start_link/1,
 
@@ -46,10 +45,8 @@
     completed/1
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include("mem3_reshard.hrl").
-
 
 % Batch size for internal replication topoffs
 -define(INTERNAL_REP_BATCH_SIZE, 2000).
@@ -73,7 +70,6 @@
     completed
 ]).
 
-
 % When a job starts it may be resuming from a partially
 % completed state. These state pairs list the state
 % we have to restart from for each possible state.
@@ -91,7 +87,6 @@
     completed => completed
 }).
 
-
 % If we have a worker failing during any of these
 % states we need to clean up the targets
 -define(CLEAN_TARGET_STATES, [
@@ -102,10 +97,8 @@
     copy_local_docs
 ]).
 
-
 start_link(#job{} = Job) ->
     proc_lib:start_link(?MODULE, init, [Job]).
-
 
 % This is called by the main proces after it has checkpointed the progress
 % of the job. After the new state is checkpointed, we signal the job to start
@@ -114,7 +107,6 @@ checkpoint_done(#job{pid = Pid} = Job) ->
     couch_log:notice(" ~p : checkpoint done for ~p", [?MODULE, jobfmt(Job)]),
     Pid ! checkpoint_done,
     ok.
-
 
 % Formatting function, used for logging mostly
 jobfmt(#job{} = Job) ->
@@ -131,13 +123,13 @@ jobfmt(#job{} = Job) ->
     Fmt = io_lib:format(Msg, [Id, Source, TargetCount, JobState, State, Pid]),
     lists:flatten(Fmt).
 
-
 % This is the function which picks between various targets. It is used here as
 % well as in mem3_rep internal replicator and couch_db_split bulk copy logic.
 % Given a document id and list of ranges, and a hash function, it will pick one
 % of the range or return not_in_range atom.
 pickfun(DocId, [[B, E] | _] = Ranges, {_M, _F, _A} = HashFun) when
-        is_integer(B), is_integer(E), B =< E ->
+    is_integer(B), is_integer(E), B =< E
+->
     HashKey = mem3_hash:calculate(HashFun, DocId),
     Pred = fun([Begin, End]) ->
         Begin =< HashKey andalso HashKey =< End
@@ -146,7 +138,6 @@ pickfun(DocId, [[B, E] | _] = Ranges, {_M, _F, _A} = HashFun) when
         [] -> not_in_range;
         [Key] -> Key
     end.
-
 
 init(#job{} = Job0) ->
     process_flag(trap_exit, true),
@@ -162,26 +153,26 @@ init(#job{} = Job0) ->
     ok = checkpoint(Job2),
     run(Job2).
 
-
 run(#job{split_state = CurrState} = Job) ->
-    StateFun = case CurrState of
-        topoff1 -> topoff;
-        topoff2 -> topoff;
-        topoff3 -> topoff;
-        _ -> CurrState
-    end,
-    NewJob = try
-        Job1 = ?MODULE:StateFun(Job),
-        Job2 = wait_for_workers(Job1),
-        Job3 = switch_to_next_state(Job2),
-        ok = checkpoint(Job3),
-        Job3
-    catch
-        throw:{retry, RetryJob} ->
-            RetryJob
-    end,
+    StateFun =
+        case CurrState of
+            topoff1 -> topoff;
+            topoff2 -> topoff;
+            topoff3 -> topoff;
+            _ -> CurrState
+        end,
+    NewJob =
+        try
+            Job1 = ?MODULE:StateFun(Job),
+            Job2 = wait_for_workers(Job1),
+            Job3 = switch_to_next_state(Job2),
+            ok = checkpoint(Job3),
+            Job3
+        catch
+            throw:{retry, RetryJob} ->
+                RetryJob
+        end,
     run(NewJob).
-
 
 set_start_state(#job{split_state = State} = Job) ->
     case maps:get(State, ?STATE_RESTART, undefined) of
@@ -189,24 +180,19 @@ set_start_state(#job{split_state = State} = Job) ->
             Fmt1 = "~p recover : unknown state ~s",
             couch_log:error(Fmt1, [?MODULE, jobfmt(Job)]),
             erlang:error({invalid_split_job_recover_state, Job});
-        StartState->
+        StartState ->
             Job#job{split_state = StartState}
     end.
-
 
 get_next_state(#job{split_state = State}) ->
     get_next_state(State, ?SPLIT_STATES).
 
-
 get_next_state(completed, _) ->
     completed;
-
 get_next_state(CurrState, [CurrState, NextState | _]) ->
     NextState;
-
 get_next_state(CurrState, [_ | Rest]) ->
     get_next_state(CurrState, Rest).
-
 
 switch_to_next_state(#job{} = Job0) ->
     Info0 = Job0#job.state_info,
@@ -221,7 +207,6 @@ switch_to_next_state(#job{} = Job0) ->
     },
     Job2 = update_split_history(Job1),
     check_state(Job2).
-
 
 checkpoint(Job) ->
     % Ask main process to checkpoint. When it has finished it will notify us
@@ -241,10 +226,8 @@ checkpoint(Job) ->
             handle_unknown_msg(Job, "checkpoint", Other)
     end.
 
-
 wait_for_workers(#job{workers = []} = Job) ->
     Job;
-
 wait_for_workers(#job{workers = Workers} = Job) ->
     Parent = parent(),
     receive
@@ -262,10 +245,8 @@ wait_for_workers(#job{workers = Workers} = Job) ->
             handle_unknown_msg(Job, "wait_for_workers", Other)
     end.
 
-
 handle_worker_exit(#job{workers = Workers} = Job, Pid, normal) ->
     Job#job{workers = Workers -- [Pid]};
-
 handle_worker_exit(#job{} = Job, _Pid, {error, missing_source}) ->
     Msg1 = "~p stopping worker due to source missing ~p",
     couch_log:error(Msg1, [?MODULE, jobfmt(Job)]),
@@ -279,13 +260,11 @@ handle_worker_exit(#job{} = Job, _Pid, {error, missing_source}) ->
         false ->
             exit({error, missing_source})
     end;
-
 handle_worker_exit(#job{} = Job, _Pid, {error, missing_target}) ->
     Msg = "~p stopping worker due to target db missing ~p",
     couch_log:error(Msg, [?MODULE, jobfmt(Job)]),
     kill_workers(Job),
     exit({error, missing_target});
-
 handle_worker_exit(#job{} = Job0, _Pid, Reason) ->
     couch_log:error("~p worker error ~p ~p", [?MODULE, jobfmt(Job0), Reason]),
     kill_workers(Job0),
@@ -297,11 +276,12 @@ handle_worker_exit(#job{} = Job0, _Pid, Reason) ->
             exit(Reason)
     end.
 
-
 % Cleanup and exit when we receive an 'EXIT' message from our parent. In case
 % the shard map is being updated, try to wait some time for it to finish.
-handle_exit(#job{split_state = update_shardmap, workers = [WPid]} = Job,
-        Reason) ->
+handle_exit(
+    #job{split_state = update_shardmap, workers = [WPid]} = Job,
+    Reason
+) ->
     Timeout = update_shard_map_timeout_sec(),
     Msg1 = "~p job exit ~s ~p  while shard map is updating, waiting ~p sec",
     couch_log:warning(Msg1, [?MODULE, jobfmt(Job), Reason, Timeout]),
@@ -314,17 +294,15 @@ handle_exit(#job{split_state = update_shardmap, workers = [WPid]} = Job,
             Msg3 = "~p ~s shard map update failed with error ~p",
             couch_log:error(Msg3, [?MODULE, jobfmt(Job), Error]),
             exit(Reason)
-    after Timeout * 1000->
+    after Timeout * 1000 ->
         Msg4 = "~p ~s shard map update timeout exceeded ~p sec",
         couch_log:error(Msg4, [?MODULE, jobfmt(Job), Timeout]),
         kill_workers(Job),
         exit(Reason)
     end;
-
 handle_exit(#job{} = Job, Reason) ->
     kill_workers(Job),
     exit(Reason).
-
 
 retry_state(#job{retries = Retries, state_info = Info} = Job0, Error) ->
     Job1 = Job0#job{
@@ -345,20 +323,20 @@ retry_state(#job{retries = Retries, state_info = Info} = Job0, Error) ->
     end,
     throw({retry, Job2}).
 
-
 report(#job{manager = ManagerPid} = Job) ->
     Job1 = Job#job{update_time = mem3_reshard:now_sec()},
     ok = mem3_reshard:report(ManagerPid, Job1),
     Job1.
 
-
 kill_workers(#job{workers = Workers}) ->
-    lists:foreach(fun(Worker) ->
-        unlink(Worker),
-        exit(Worker, kill)
-    end, Workers),
+    lists:foreach(
+        fun(Worker) ->
+            unlink(Worker),
+            exit(Worker, kill)
+        end,
+        Workers
+    ),
     flush_worker_messages().
-
 
 flush_worker_messages() ->
     Parent = parent(),
@@ -369,7 +347,6 @@ flush_worker_messages() ->
         ok
     end.
 
-
 parent() ->
     case get('$ancestors') of
         [Pid | _] when is_pid(Pid) -> Pid;
@@ -377,17 +354,14 @@ parent() ->
         _ -> undefined
     end.
 
-
 handle_unknown_msg(Job, When, RMsg) ->
     LogMsg = "~p ~s received an unknown message ~p when in ~s",
     couch_log:error(LogMsg, [?MODULE, jobfmt(Job), RMsg, When]),
     erlang:error({invalid_split_job_message, Job#job.id, When, RMsg}).
 
-
 initial_copy(#job{} = Job) ->
     Pid = spawn_link(?MODULE, initial_copy_impl, [Job]),
     report(Job#job{workers = [Pid]}).
-
 
 initial_copy_impl(#job{source = Source, target = Targets0} = Job) ->
     #shard{name = SourceName} = Source,
@@ -410,18 +384,16 @@ initial_copy_impl(#job{source = Source, target = Targets0} = Job) ->
             exit({error, Error})
     end.
 
-
 topoff(#job{} = Job) ->
     Pid = spawn_link(?MODULE, topoff_impl, [Job]),
     report(Job#job{workers = [Pid]}).
-
 
 topoff_impl(#job{source = #shard{} = Source, target = Targets}) ->
     couch_log:notice("~p topoff ~p", [?MODULE, shardsstr(Source, Targets)]),
     check_source_exists(Source, topoff),
     check_targets_exist(Targets, topoff),
     TMap = maps:from_list([{R, T} || #shard{range = R} = T <- Targets]),
-    Opts =  [{batch_size, ?INTERNAL_REP_BATCH_SIZE}, {batch_count, all}],
+    Opts = [{batch_size, ?INTERNAL_REP_BATCH_SIZE}, {batch_count, all}],
     case mem3_rep:go(Source, TMap, Opts) of
         {ok, Count} ->
             Args = [?MODULE, shardsstr(Source, Targets), Count],
@@ -432,7 +404,6 @@ topoff_impl(#job{source = #shard{} = Source, target = Targets}) ->
             couch_log:error("~p topoff failed ~s, error: ~p", Args),
             exit({error, Error})
     end.
-
 
 build_indices(#job{} = Job) ->
     #job{
@@ -462,11 +433,9 @@ build_indices(#job{} = Job) ->
             end
     end.
 
-
 copy_local_docs(#job{split_state = copy_local_docs} = Job) ->
     Pid = spawn_link(?MODULE, copy_local_docs_impl, [Job]),
     report(Job#job{workers = [Pid]}).
-
 
 copy_local_docs_impl(#job{source = Source, target = Targets0}) ->
     #shard{name = SourceName} = Source,
@@ -484,17 +453,14 @@ copy_local_docs_impl(#job{source = Source, target = Targets0}) ->
             exit({error, Error})
     end.
 
-
 update_shardmap(#job{} = Job) ->
     Pid = spawn_link(mem3_reshard_dbdoc, update_shard_map, [Job]),
     report(Job#job{workers = [Pid]}).
-
 
 wait_source_close(#job{source = #shard{name = Name}} = Job) ->
     couch_event:notify(Name, deleted),
     Pid = spawn_link(?MODULE, wait_source_close_impl, [Job]),
     report(Job#job{workers = [Pid]}).
-
 
 wait_source_close_impl(#job{source = #shard{name = Name}, target = Targets}) ->
     Timeout = config:get_integer("reshard", "source_close_timeout_sec", 600),
@@ -513,7 +479,6 @@ wait_source_close_impl(#job{source = #shard{name = Name}, target = Targets}) ->
             ok
     end.
 
-
 wait_source_close(Db, SleepSec, UntilSec) ->
     case couch_db:monitored_by(Db) -- [self()] of
         [] ->
@@ -531,11 +496,9 @@ wait_source_close(Db, SleepSec, UntilSec) ->
             end
     end.
 
-
 source_delete(#job{} = Job) ->
     Pid = spawn_link(?MODULE, source_delete_impl, [Job]),
     report(Job#job{workers = [Pid]}).
-
 
 source_delete_impl(#job{source = #shard{name = Name}, target = Targets}) ->
     check_targets_exist(Targets, source_delete),
@@ -543,11 +506,15 @@ source_delete_impl(#job{source = #shard{name = Name}, target = Targets}) ->
         true ->
             case couch_server:delete(Name, [?ADMIN_CTX]) of
                 ok ->
-                    couch_log:notice("~p : deleted source shard ~p",
-                        [?MODULE, Name]);
+                    couch_log:notice(
+                        "~p : deleted source shard ~p",
+                        [?MODULE, Name]
+                    );
                 not_found ->
-                    couch_log:warning("~p : source was already deleted ~p",
-                        [?MODULE, Name])
+                    couch_log:warning(
+                        "~p : source was already deleted ~p",
+                        [?MODULE, Name]
+                    )
             end;
         false ->
             % Emit deleted event even when not actually deleting the files this
@@ -562,11 +529,9 @@ source_delete_impl(#job{source = #shard{name = Name}, target = Targets}) ->
     TNames = [TName || #shard{name = TName} <- Targets],
     lists:foreach(fun(TName) -> couch_event:notify(TName, updated) end, TNames).
 
-
 completed(#job{} = Job) ->
     couch_log:notice("~p : ~p completed, exit normal", [?MODULE, jobfmt(Job)]),
     exit(normal).
-
 
 % This is for belt and suspenders really. Call periodically to validate the
 % state is one of the expected states.
@@ -579,44 +544,46 @@ check_state(#job{split_state = State} = Job) ->
             erlang:error({invalid_shard_split_state, State, Job})
     end.
 
-
 create_artificial_mem3_rep_checkpoints(#job{} = Job, Seq) ->
     #job{source = Source = #shard{name = SourceName}, target = Targets} = Job,
     check_source_exists(Source, initial_copy),
     TNames = [TN || #shard{name = TN} <- Targets],
     Timestamp = list_to_binary(mem3_util:iso8601_timestamp()),
     couch_util:with_db(SourceName, fun(SDb) ->
-        [couch_util:with_db(TName, fun(TDb) ->
-            Doc = mem3_rep_checkpoint_doc(SDb, TDb, Timestamp, Seq),
-            {ok, _} = couch_db:update_doc(SDb, Doc, []),
-            {ok, _} = couch_db:update_doc(TDb, Doc, []),
-            ok
-        end) || TName <- TNames]
+        [
+            couch_util:with_db(TName, fun(TDb) ->
+                Doc = mem3_rep_checkpoint_doc(SDb, TDb, Timestamp, Seq),
+                {ok, _} = couch_db:update_doc(SDb, Doc, []),
+                {ok, _} = couch_db:update_doc(TDb, Doc, []),
+                ok
+            end)
+         || TName <- TNames
+        ]
     end),
     ok.
 
-
 mem3_rep_checkpoint_doc(SourceDb, TargetDb, Timestamp, Seq) ->
     Node = atom_to_binary(node(), utf8),
-    SourceUUID =  couch_db:get_uuid(SourceDb),
+    SourceUUID = couch_db:get_uuid(SourceDb),
     TargetUUID = couch_db:get_uuid(TargetDb),
-    History = {[
-        {<<"source_node">>, Node},
-        {<<"source_uuid">>, SourceUUID},
-        {<<"source_seq">>, Seq},
-        {<<"timestamp">>, Timestamp},
-        {<<"target_node">>, Node},
-        {<<"target_uuid">>, TargetUUID},
-        {<<"target_seq">>, Seq}
-    ]},
-    Body = {[
-        {<<"seq">>, Seq},
-        {<<"target_uuid">>, TargetUUID},
-        {<<"history">>, {[{Node, [History]}]}}
-    ]},
+    History =
+        {[
+            {<<"source_node">>, Node},
+            {<<"source_uuid">>, SourceUUID},
+            {<<"source_seq">>, Seq},
+            {<<"timestamp">>, Timestamp},
+            {<<"target_node">>, Node},
+            {<<"target_uuid">>, TargetUUID},
+            {<<"target_seq">>, Seq}
+        ]},
+    Body =
+        {[
+            {<<"seq">>, Seq},
+            {<<"target_uuid">>, TargetUUID},
+            {<<"history">>, {[{Node, [History]}]}}
+        ]},
     Id = mem3_rep:make_local_id(SourceUUID, TargetUUID),
     #doc{id = Id, body = Body}.
-
 
 check_source_exists(#shard{name = Name}, StateName) ->
     case couch_server:exists(Name) of
@@ -628,89 +595,87 @@ check_source_exists(#shard{name = Name}, StateName) ->
             exit({error, missing_source})
     end.
 
-
 check_targets_exist(Targets, StateName) ->
-    lists:foreach(fun(#shard{name = Name}) ->
-        case couch_server:exists(Name) of
-            true ->
-                ok;
-            false ->
-                ErrMsg = "~p target ~p is unexpectedly missing in ~p",
-                couch_log:error(ErrMsg, [?MODULE, Name, StateName]),
-                exit({error, missing_target})
-        end
-    end, Targets).
-
+    lists:foreach(
+        fun(#shard{name = Name}) ->
+            case couch_server:exists(Name) of
+                true ->
+                    ok;
+                false ->
+                    ErrMsg = "~p target ~p is unexpectedly missing in ~p",
+                    couch_log:error(ErrMsg, [?MODULE, Name, StateName]),
+                    exit({error, missing_target})
+            end
+        end,
+        Targets
+    ).
 
 -spec max_retries() -> integer().
 max_retries() ->
     config:get_integer("reshard", "max_retries", 1).
 
-
 -spec retry_interval_sec() -> integer().
 retry_interval_sec() ->
     config:get_integer("reshard", "retry_interval_sec", 10).
-
 
 -spec update_shard_map_timeout_sec() -> integer().
 update_shard_map_timeout_sec() ->
     config:get_integer("reshard", "update_shardmap_timeout_sec", 60).
 
-
 -spec info_update(atom(), any(), [tuple()]) -> [tuple()].
 info_update(Key, Val, StateInfo) ->
     lists:keystore(Key, 1, StateInfo, {Key, Val}).
-
 
 -spec info_delete(atom(), [tuple()]) -> [tuple()].
 info_delete(Key, StateInfo) ->
     lists:keydelete(Key, 1, StateInfo).
 
-
 -spec shardsstr(#shard{}, #shard{} | [#shard{}]) -> string().
 shardsstr(#shard{name = SourceName}, #shard{name = TargetName}) ->
     lists:flatten(io_lib:format("~s -> ~s", [SourceName, TargetName]));
-
 shardsstr(#shard{name = SourceName}, Targets) ->
     TNames = [TN || #shard{name = TN} <- Targets],
     TargetsStr = string:join([binary_to_list(T) || T <- TNames], ","),
     lists:flatten(io_lib:format("~s -> ~s", [SourceName, TargetsStr])).
 
-
 -spec reset_target(#job{}) -> #job{}.
 reset_target(#job{source = Source, target = Targets} = Job) ->
-    ShardNames = try
-        [N || #shard{name = N} <- mem3:local_shards(mem3:dbname(Source))]
-    catch
-        error:database_does_not_exist ->
-            []
-    end,
-    lists:map(fun(#shard{name = Name}) ->
-        case {couch_server:exists(Name), lists:member(Name, ShardNames)} of
-            {_, true} ->
-                % Should never get here but if we do crash and don't continue
-                LogMsg = "~p : ~p target unexpectedly found in shard map ~p",
-                couch_log:error(LogMsg, [?MODULE, jobfmt(Job), Name]),
-                erlang:error({target_present_in_shard_map, Name});
-            {true, false} ->
-                LogMsg = "~p : ~p resetting ~p target",
-                couch_log:warning(LogMsg, [?MODULE, jobfmt(Job), Name]),
-                couch_db_split:cleanup_target(Source#shard.name, Name);
-            {false, false} ->
-                ok
-        end
-    end, Targets),
+    ShardNames =
+        try
+            [N || #shard{name = N} <- mem3:local_shards(mem3:dbname(Source))]
+        catch
+            error:database_does_not_exist ->
+                []
+        end,
+    lists:map(
+        fun(#shard{name = Name}) ->
+            case {couch_server:exists(Name), lists:member(Name, ShardNames)} of
+                {_, true} ->
+                    % Should never get here but if we do crash and don't continue
+                    LogMsg = "~p : ~p target unexpectedly found in shard map ~p",
+                    couch_log:error(LogMsg, [?MODULE, jobfmt(Job), Name]),
+                    erlang:error({target_present_in_shard_map, Name});
+                {true, false} ->
+                    LogMsg = "~p : ~p resetting ~p target",
+                    couch_log:warning(LogMsg, [?MODULE, jobfmt(Job), Name]),
+                    couch_db_split:cleanup_target(Source#shard.name, Name);
+                {false, false} ->
+                    ok
+            end
+        end,
+        Targets
+    ),
     Job.
-
 
 -spec update_split_history(#job{}) -> #job{}.
 update_split_history(#job{split_state = St, update_time = Ts} = Job) ->
     Hist = Job#job.history,
-    JobSt = case St of
-        completed -> completed;
-        failed -> failed;
-        new -> new;
-        stopped -> stopped;
-        _ -> running
-    end,
+    JobSt =
+        case St of
+            completed -> completed;
+            failed -> failed;
+            new -> new;
+            stopped -> stopped;
+            _ -> running
+        end,
     Job#job{history = mem3_reshard:update_history(JobSt, St, Ts, Hist)}.

@@ -13,7 +13,6 @@
 -module(couch_event_listener_mfa).
 -behavior(couch_event_listener).
 
-
 -export([
     start_link/4,
     enter_loop/4,
@@ -28,7 +27,6 @@
     handle_info/2
 ]).
 
-
 -record(st, {
     mod,
     func,
@@ -36,24 +34,24 @@
     parent
 }).
 
-
 start_link(Mod, Func, State, Options) ->
-    Parent = case proplists:get_value(parent, Options) of
-        P when is_pid(P) -> P;
-        _ -> self()
-    end,
+    Parent =
+        case proplists:get_value(parent, Options) of
+            P when is_pid(P) -> P;
+            _ -> self()
+        end,
     Arg = {Parent, Mod, Func, State},
     couch_event_listener:start_link(?MODULE, Arg, Options).
 
-
 enter_loop(Mod, Func, State, Options) ->
-    Parent = case proplists:get_value(parent, Options) of
-        P when is_pid(P) ->
-            erlang:monitor(process, P),
-            P;
-        _ ->
-            undefined
-    end,
+    Parent =
+        case proplists:get_value(parent, Options) of
+            P when is_pid(P) ->
+                erlang:monitor(process, P),
+                P;
+            _ ->
+                undefined
+        end,
     St = #st{
         mod = Mod,
         func = Func,
@@ -62,10 +60,8 @@ enter_loop(Mod, Func, State, Options) ->
     },
     couch_event_listener:enter_loop(?MODULE, St, Options).
 
-
 stop(Pid) ->
     couch_event_listener:cast(Pid, shutdown).
-
 
 init({Parent, Mod, Func, State}) ->
     erlang:monitor(process, Parent),
@@ -76,32 +72,25 @@ init({Parent, Mod, Func, State}) ->
         parent = Parent
     }}.
 
-
 terminate(_Reason, _MFA) ->
     ok.
 
-
-handle_event(DbName, Event, #st{mod=Mod, func=Func, state=State}=St) ->
+handle_event(DbName, Event, #st{mod = Mod, func = Func, state = State} = St) ->
     case (catch Mod:Func(DbName, Event, State)) of
         {ok, NewState} ->
-            {ok, St#st{state=NewState}};
+            {ok, St#st{state = NewState}};
         stop ->
             {stop, normal, St};
         Else ->
             erlang:error(Else)
     end.
 
-
 handle_cast(shutdown, St) ->
     {stop, normal, St};
-
 handle_cast(_Msg, St) ->
     {ok, St}.
 
-
-handle_info({'DOWN', _Ref, process, Parent, _Reason}, #st{parent=Parent}=St) ->
+handle_info({'DOWN', _Ref, process, Parent, _Reason}, #st{parent = Parent} = St) ->
     {stop, normal, St};
-
 handle_info(_Msg, St) ->
     {ok, St}.
-

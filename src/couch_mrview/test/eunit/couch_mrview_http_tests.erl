@@ -15,14 +15,23 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
-
 mrview_http_test_() ->
     [
-         ?_assertEqual(#mrargs{group_level=undefined, group=true},
-                       couch_mrview_http:parse_params([{"group", "true"}],
-                                            undefined, #mrargs{})),
+        ?_assertEqual(
+            #mrargs{group_level = undefined, group = true},
+            couch_mrview_http:parse_params(
+                [{"group", "true"}],
+                undefined,
+                #mrargs{}
+            )
+        ),
 
-         ?_assertEqual(#mrargs{group_level=1, group=undefined},
-                       couch_mrview_http:parse_params([{"group_level", "1"}],
-                                            undefined, #mrargs{}))
+        ?_assertEqual(
+            #mrargs{group_level = 1, group = undefined},
+            couch_mrview_http:parse_params(
+                [{"group_level", "1"}],
+                undefined,
+                #mrargs{}
+            )
+        )
     ].

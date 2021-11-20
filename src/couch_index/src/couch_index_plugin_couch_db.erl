@@ -17,10 +17,8 @@
     on_compact/2
 ]).
 
-
 is_valid_purge_client(DbName, Props) ->
     couch_mrview_index:verify_index_exists(DbName, Props).
-
 
 on_compact(DbName, DDocs) ->
     couch_mrview_index:ensure_local_purge_docs(DbName, DDocs).

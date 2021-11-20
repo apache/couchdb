@@ -12,9 +12,19 @@
 
 -module(fabric_util).
 
--export([submit_jobs/3, submit_jobs/4, cleanup/1, recv/4, get_db/1, get_db/2, error_info/1,
-        update_counter/3, remove_ancestors/2, create_monitors/1, kv/2,
-        remove_down_workers/2, remove_down_workers/3, doc_id_and_rev/1]).
+-export([
+    submit_jobs/3, submit_jobs/4,
+    cleanup/1,
+    recv/4,
+    get_db/1, get_db/2,
+    error_info/1,
+    update_counter/3,
+    remove_ancestors/2,
+    create_monitors/1,
+    kv/2,
+    remove_down_workers/2, remove_down_workers/3,
+    doc_id_and_rev/1
+]).
 -export([request_timeout/0, attachments_timeout/0, all_docs_timeout/0, view_timeout/1]).
 -export([log_timeout/2, remove_done_workers/2]).
 -export([is_users_db/1, is_replicator_db/1]).
@@ -26,8 +36,7 @@
 -export([get_uuid_prefix_len/0]).
 -export([isolate/1, isolate/2]).
 
-
--compile({inline, [{doc_id_and_rev,1}]}).
+-compile({inline, [{doc_id_and_rev, 1}]}).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("mem3/include/mem3.hrl").
@@ -42,20 +51,23 @@ remove_down_workers(Workers, BadNode, RingOpts) ->
     Filter = fun(#shard{node = Node}, _) -> Node =/= BadNode end,
     NewWorkers = fabric_dict:filter(Filter, Workers),
     case fabric_ring:is_progress_possible(NewWorkers, RingOpts) of
-    true ->
-        {ok, NewWorkers};
-    false ->
-        error
+        true ->
+            {ok, NewWorkers};
+        false ->
+            error
     end.
 
 submit_jobs(Shards, EndPoint, ExtraArgs) ->
     submit_jobs(Shards, fabric_rpc, EndPoint, ExtraArgs).
 
 submit_jobs(Shards, Module, EndPoint, ExtraArgs) ->
-    lists:map(fun(#shard{node=Node, name=ShardName} = Shard) ->
-        Ref = rexi:cast(Node, {Module, EndPoint, [ShardName | ExtraArgs]}),
-        Shard#shard{ref = Ref}
-    end, Shards).
+    lists:map(
+        fun(#shard{node = Node, name = ShardName} = Shard) ->
+            Ref = rexi:cast(Node, {Module, EndPoint, [ShardName | ExtraArgs]}),
+            Shard#shard{ref = Ref}
+        end,
+        Shards
+    ).
 
 cleanup(Workers) ->
     rexi:kill_all([{Node, Ref} || #shard{node = Node, ref = Ref} <- Workers]).
@@ -88,10 +100,13 @@ timeout(Type, Default) ->
 log_timeout(Workers, EndPoint) ->
     CounterKey = [fabric, worker, timeouts],
     couch_stats:increment_counter(CounterKey),
-    lists:map(fun(#shard{node=Dest, name=Name}) ->
-        Fmt = "fabric_worker_timeout ~s,~p,~p",
-        couch_log:error(Fmt, [EndPoint, Dest, Name])
-    end, Workers).
+    lists:map(
+        fun(#shard{node = Dest, name = Name}) ->
+            Fmt = "fabric_worker_timeout ~s,~p,~p",
+            couch_log:error(Fmt, [EndPoint, Dest, Name])
+        end,
+        Workers
+    ).
 
 remove_done_workers(Workers, WaitingIndicator) ->
     [W || {W, WI} <- fabric_dict:to_list(Workers), WI == WaitingIndicator].
@@ -103,9 +118,10 @@ get_db(DbName, Options) ->
     {Local, SameZone, DifferentZone} = mem3:group_by_proximity(mem3:shards(DbName)),
     % Prefer shards on the same node over other nodes, prefer shards in the same zone over
     % over zones and sort each remote list by name so that we don't repeatedly try the same node.
-    Shards = Local ++ lists:keysort(#shard.name, SameZone) ++ lists:keysort(#shard.name, DifferentZone),
+    Shards =
+        Local ++ lists:keysort(#shard.name, SameZone) ++ lists:keysort(#shard.name, DifferentZone),
     % suppress shards from down nodes
-    Nodes = [node()|erlang:nodes()],
+    Nodes = [node() | erlang:nodes()],
     Live = [S || #shard{node = N} = S <- Shards, lists:member(N, Nodes)],
     % Only accept factors > 1, otherwise our math breaks further down
     Factor = max(2, config:get_integer("fabric", "shard_timeout_factor", 2)),
@@ -121,15 +137,16 @@ get_shard([#shard{node = Node, name = Name} | Rest], Opts, Timeout, Factor) ->
     MFA = {fabric_rpc, open_shard, [Name, [{timeout, Timeout} | Opts]]},
     Ref = rexi:cast(Node, self(), MFA, [sync]),
     try
-        receive {Ref, {ok, Db}} ->
-            {ok, Db};
-        {Ref, {'rexi_EXIT', {{unauthorized, _} = Error, _}}} ->
-            throw(Error);
-        {Ref, {'rexi_EXIT', {{forbidden, _} = Error, _}}} ->
-            throw(Error);
-        {Ref, Reason} ->
-            couch_log:debug("Failed to open shard ~p because: ~p", [Name, Reason]),
-            get_shard(Rest, Opts, Timeout, Factor)
+        receive
+            {Ref, {ok, Db}} ->
+                {ok, Db};
+            {Ref, {'rexi_EXIT', {{unauthorized, _} = Error, _}}} ->
+                throw(Error);
+            {Ref, {'rexi_EXIT', {{forbidden, _} = Error, _}}} ->
+                throw(Error);
+            {Ref, Reason} ->
+                couch_log:debug("Failed to open shard ~p because: ~p", [Name, Reason]),
+                get_shard(Rest, Opts, Timeout, Factor)
         after Timeout ->
             couch_log:debug("Failed to open shard ~p after: ~p", [Name, Timeout]),
             get_shard(Rest, Opts, Factor * Timeout, Factor)
@@ -169,18 +186,18 @@ error_info({Error, Stack}) ->
     {Error, nil, Stack}.
 
 update_counter(Item, Incr, D) ->
-    UpdateFun = fun ({Old, Count}) -> {Old, Count + Incr} end,
+    UpdateFun = fun({Old, Count}) -> {Old, Count + Incr} end,
     orddict:update(make_key(Item), UpdateFun, {Item, Incr}, D).
 
 make_key({ok, L}) when is_list(L) ->
     make_key(L);
 make_key([]) ->
     [];
-make_key([{ok, #doc{revs= {Pos,[RevId | _]}}} | Rest]) ->
+make_key([{ok, #doc{revs = {Pos, [RevId | _]}}} | Rest]) ->
     [{ok, {Pos, RevId}} | make_key(Rest)];
 make_key([{{not_found, missing}, Rev} | Rest]) ->
     [{not_found, Rev} | make_key(Rest)];
-make_key({ok, #doc{id=Id,revs=Revs}}) ->
+make_key({ok, #doc{id = Id, revs = Revs}}) ->
     {Id, Revs};
 make_key(Else) ->
     Else.
@@ -190,69 +207,88 @@ remove_ancestors([], Acc) ->
     lists:reverse(Acc);
 remove_ancestors([{_, {{not_found, _}, Count}} = Head | Tail], Acc) ->
     % any document is a descendant
-    case lists:filter(fun({_,{{ok, #doc{}}, _}}) -> true; (_) -> false end, Tail) of
-    [{_,{{ok, #doc{}} = Descendant, _}} | _] ->
-        remove_ancestors(update_counter(Descendant, Count, Tail), Acc);
-    [] ->
-        remove_ancestors(Tail, [Head | Acc])
-    end;
-remove_ancestors([{_,{{ok, #doc{revs = {Pos, Revs}}}, Count}} = Head | Tail], Acc) ->
-    Descendants = lists:dropwhile(fun
-    ({_,{{ok, #doc{revs = {Pos2, Revs2}}}, _}}) ->
-        case lists:nthtail(erlang:min(Pos2 - Pos, length(Revs2)), Revs2) of
+    case
+        lists:filter(
+            fun
+                ({_, {{ok, #doc{}}, _}}) -> true;
+                (_) -> false
+            end,
+            Tail
+        )
+    of
+        [{_, {{ok, #doc{}} = Descendant, _}} | _] ->
+            remove_ancestors(update_counter(Descendant, Count, Tail), Acc);
         [] ->
-            % impossible to tell if Revs2 is a descendant - assume no
-            true;
-        History ->
-            % if Revs2 is a descendant, History is a prefix of Revs
-            not lists:prefix(History, Revs)
-        end
-    end, Tail),
-    case Descendants of [] ->
-        remove_ancestors(Tail, [Head | Acc]);
-    [{Descendant, _} | _] ->
-        remove_ancestors(update_counter(Descendant, Count, Tail), Acc)
+            remove_ancestors(Tail, [Head | Acc])
+    end;
+remove_ancestors([{_, {{ok, #doc{revs = {Pos, Revs}}}, Count}} = Head | Tail], Acc) ->
+    Descendants = lists:dropwhile(
+        fun({_, {{ok, #doc{revs = {Pos2, Revs2}}}, _}}) ->
+            case lists:nthtail(erlang:min(Pos2 - Pos, length(Revs2)), Revs2) of
+                [] ->
+                    % impossible to tell if Revs2 is a descendant - assume no
+                    true;
+                History ->
+                    % if Revs2 is a descendant, History is a prefix of Revs
+                    not lists:prefix(History, Revs)
+            end
+        end,
+        Tail
+    ),
+    case Descendants of
+        [] ->
+            remove_ancestors(Tail, [Head | Acc]);
+        [{Descendant, _} | _] ->
+            remove_ancestors(update_counter(Descendant, Count, Tail), Acc)
     end;
 remove_ancestors([Error | Tail], Acc) ->
     remove_ancestors(Tail, [Error | Acc]).
 
 create_monitors(Shards) ->
-    MonRefs = lists:usort([
-        rexi_utils:server_pid(N) || #shard{node=N} <- Shards
-    ]),
+    MonRefs = lists:usort([rexi_utils:server_pid(N) || #shard{node = N} <- Shards]),
     rexi_monitor:start(MonRefs).
 
 %% verify only id and rev are used in key.
 update_counter_test() ->
-    Reply = {ok, #doc{id = <<"id">>, revs = <<"rev">>,
-                    body = <<"body">>, atts = <<"atts">>}},
-    ?assertEqual([{{<<"id">>,<<"rev">>}, {Reply, 1}}],
-        update_counter(Reply, 1, [])).
+    Reply =
+        {ok, #doc{
+            id = <<"id">>,
+            revs = <<"rev">>,
+            body = <<"body">>,
+            atts = <<"atts">>
+        }},
+    ?assertEqual(
+        [{{<<"id">>, <<"rev">>}, {Reply, 1}}],
+        update_counter(Reply, 1, [])
+    ).
 
 remove_ancestors_test() ->
     Foo1 = {ok, #doc{revs = {1, [<<"foo">>]}}},
     Foo2 = {ok, #doc{revs = {2, [<<"foo2">>, <<"foo">>]}}},
     Bar1 = {ok, #doc{revs = {1, [<<"bar">>]}}},
-    Bar2 = {not_found, {1,<<"bar">>}},
+    Bar2 = {not_found, {1, <<"bar">>}},
     ?assertEqual(
-        [kv(Bar1,1), kv(Foo1,1)],
-        remove_ancestors([kv(Bar1,1), kv(Foo1,1)], [])
+        [kv(Bar1, 1), kv(Foo1, 1)],
+        remove_ancestors([kv(Bar1, 1), kv(Foo1, 1)], [])
     ),
     ?assertEqual(
-        [kv(Bar1,1), kv(Foo2,2)],
-        remove_ancestors([kv(Bar1,1), kv(Foo1,1), kv(Foo2,1)], [])
+        [kv(Bar1, 1), kv(Foo2, 2)],
+        remove_ancestors([kv(Bar1, 1), kv(Foo1, 1), kv(Foo2, 1)], [])
     ),
     ?assertEqual(
-        [kv(Bar1,2)],
-        remove_ancestors([kv(Bar2,1), kv(Bar1,1)], [])
+        [kv(Bar1, 2)],
+        remove_ancestors([kv(Bar2, 1), kv(Bar1, 1)], [])
     ).
 
 is_replicator_db(DbName) ->
     path_ends_with(DbName, <<"_replicator">>).
 
 is_users_db(DbName) ->
-    ConfigName = list_to_binary(config:get(
-        "chttpd_auth", "authentication_db", "_users")),
+    ConfigName = list_to_binary(
+        config:get(
+            "chttpd_auth", "authentication_db", "_users"
+        )
+    ),
     DbName == ConfigName orelse path_ends_with(DbName, <<"_users">>).
 
 path_ends_with(Path, Suffix) ->
@@ -269,79 +305,54 @@ open_cluster_db(#shard{dbname = DbName, opts = Options}) ->
     end.
 
 open_cluster_db(DbName, Opts) ->
-    {SecProps} = fabric:get_security(DbName), % as admin
+    % as admin
+    {SecProps} = fabric:get_security(DbName),
     UserCtx = couch_util:get_value(user_ctx, Opts, #user_ctx{}),
     {ok, Db} = couch_db:clustered_db(DbName, UserCtx, SecProps),
     Db.
 
 %% test function
 kv(Item, Count) ->
-    {make_key(Item), {Item,Count}}.
+    {make_key(Item), {Item, Count}}.
 
-doc_id_and_rev(#doc{id=DocId, revs={RevNum, [RevHash|_]}}) ->
+doc_id_and_rev(#doc{id = DocId, revs = {RevNum, [RevHash | _]}}) ->
     {DocId, {RevNum, RevHash}}.
-
 
 is_partitioned(DbName0) when is_binary(DbName0) ->
     Shards = mem3:shards(fabric:dbname(DbName0)),
     is_partitioned(open_cluster_db(hd(Shards)));
-
 is_partitioned(Db) ->
     couch_db:is_partitioned(Db).
-
 
 validate_all_docs_args(DbName, Args) when is_binary(DbName) ->
     Shards = mem3:shards(fabric:dbname(DbName)),
     Db = open_cluster_db(hd(Shards)),
     validate_all_docs_args(Db, Args);
-
 validate_all_docs_args(Db, Args) ->
     true = couch_db:is_clustered(Db),
     couch_mrview_util:validate_all_docs_args(Db, Args).
-
 
 validate_args(DbName, DDoc, Args) when is_binary(DbName) ->
     Shards = mem3:shards(fabric:dbname(DbName)),
     Db = open_cluster_db(hd(Shards)),
     validate_args(Db, DDoc, Args);
-
 validate_args(Db, DDoc, Args) ->
     true = couch_db:is_clustered(Db),
     couch_mrview_util:validate_args(Db, DDoc, Args).
 
-
 upgrade_mrargs(#mrargs{} = Args) ->
     Args;
-
-upgrade_mrargs({mrargs,
-        ViewType,
-        Reduce,
-        PreflightFun,
-        StartKey,
-        StartKeyDocId,
-        EndKey,
-        EndKeyDocId,
-        Keys,
-        Direction,
-        Limit,
-        Skip,
-        GroupLevel,
-        Group,
-        Stale,
-        MultiGet,
-        InclusiveEnd,
-        IncludeDocs,
-        DocOptions,
-        UpdateSeq,
-        Conflicts,
-        Callback,
-        Sorted,
-        Extra}) ->
-    {Stable, Update} = case Stale of
-        ok -> {true, false};
-        update_after -> {true, lazy};
-        _ -> {false, true}
-    end,
+upgrade_mrargs(
+    {mrargs, ViewType, Reduce, PreflightFun, StartKey, StartKeyDocId, EndKey, EndKeyDocId, Keys,
+        Direction, Limit, Skip, GroupLevel, Group, Stale, MultiGet, InclusiveEnd, IncludeDocs,
+        DocOptions, UpdateSeq, Conflicts, Callback, Sorted, Extra}
+) ->
+    {Stable, Update} =
+        case Stale of
+            ok -> {true, false};
+            update_after -> {true, lazy};
+            _ -> {false, true}
+        end,
     #mrargs{
         view_type = ViewType,
         reduce = Reduce,
@@ -369,17 +380,18 @@ upgrade_mrargs({mrargs,
         extra = Extra
     }.
 
-
 worker_ranges(Workers) ->
-    Ranges = fabric_dict:fold(fun(#shard{range=[X, Y]}, _, Acc) ->
-        [{X, Y} | Acc]
-    end, [], Workers),
+    Ranges = fabric_dict:fold(
+        fun(#shard{range = [X, Y]}, _, Acc) ->
+            [{X, Y} | Acc]
+        end,
+        [],
+        Workers
+    ),
     lists:usort(Ranges).
-
 
 get_uuid_prefix_len() ->
     config:get_integer("fabric", "uuid_prefix_len", 7).
-
 
 % If we issue multiple fabric calls from the same process we have to isolate
 % them so in case of error they don't pollute the processes dictionary or the
@@ -387,7 +399,6 @@ get_uuid_prefix_len() ->
 
 isolate(Fun) ->
     isolate(Fun, infinity).
-
 
 isolate(Fun, Timeout) ->
     {Pid, Ref} = erlang:spawn_monitor(fun() -> exit(do_isolate(Fun)) end),
@@ -402,21 +413,18 @@ isolate(Fun, Timeout) ->
         erlang:error(timeout)
     end.
 
-
 % OTP_RELEASE is defined in OTP 21+ only
 -ifdef(OTP_RELEASE).
-
 
 do_isolate(Fun) ->
     try
         {'$isolres', Fun()}
-    catch Tag:Reason:Stack ->
-        {'$isolerr', Tag, Reason, Stack}
+    catch
+        Tag:Reason:Stack ->
+            {'$isolerr', Tag, Reason, Stack}
     end.
 
-
 -else.
-
 
 do_isolate(Fun) ->
     try
@@ -425,9 +433,7 @@ do_isolate(Fun) ->
         {'$isolerr', Tag, Reason, Stack}
     end.
 
-
 -endif.
-
 
 get_db_timeout_test() ->
     % Q=1, N=1

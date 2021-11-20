@@ -17,7 +17,6 @@
 
 -define(TIMEOUT, 1000).
 
-
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
@@ -32,16 +31,17 @@ teardown({_, DbName}) ->
     ok = couch_server:delete(?l2b(DbName), [?ADMIN_CTX]),
     ok.
 
-
 header_test_() ->
     {
         "CouchDB Location Header Tests",
         {
             setup,
-            fun test_util:start_couch/0, fun test_util:stop_couch/1,
+            fun test_util:start_couch/0,
+            fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun should_work_with_newlines_in_docs/1,
                     fun should_work_with_newlines_in_attachments/1
@@ -56,10 +56,14 @@ should_work_with_newlines_in_docs({Host, DbName}) ->
         ?_assertEqual(
             Url,
             begin
-                {ok, _, Headers, _} = test_request:put(Url,
-                    [{"Content-Type", "application/json"}], "{}"),
+                {ok, _, Headers, _} = test_request:put(
+                    Url,
+                    [{"Content-Type", "application/json"}],
+                    "{}"
+                ),
                 proplists:get_value("Location", Headers)
-            end)}.
+            end
+        )}.
 
 should_work_with_newlines_in_attachments({Host, DbName}) ->
     Url = Host ++ "/" ++ DbName,
@@ -75,4 +79,5 @@ should_work_with_newlines_in_attachments({Host, DbName}) ->
                 ],
                 {ok, _, Headers, _} = test_request:put(AttUrl, Headers0, Body),
                 proplists:get_value("Location", Headers)
-            end)}.
+            end
+        )}.

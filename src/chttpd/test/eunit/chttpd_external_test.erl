@@ -15,7 +15,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
 setup_mock() ->
     ok = meck:new([config, couch], [passthrough]),
     ok = meck:expect(couch_db, is_clustered, 1, false),
@@ -91,9 +90,12 @@ json_req_obj_remote_httpd_req_test_() ->
 should_convert_req_to_json_obj(HttpdReq) ->
     Expect = expect(),
     {Result} = chttpd_external:json_req_obj(HttpdReq, <<"fake">>),
-    lists:map(fun({K, V}) ->
-        {K, ?_assertEqual(couch_util:get_value(K, Expect), V)}
-    end, Result).
+    lists:map(
+        fun({K, V}) ->
+            {K, ?_assertEqual(couch_util:get_value(K, Expect), V)}
+        end,
+        Result
+    ).
 
 expect() ->
     [
@@ -110,10 +112,11 @@ expect() ->
         {<<"peer">>, <<"127.0.0.1">>},
         {<<"form">>, {[]}},
         {<<"cookie">>, {[]}},
-        {<<"userCtx">>, {[
-            {<<"db">>,<<"fake">>},
-            {<<"name">>,null},
-            {<<"roles">>,[]}
-        ]}},
+        {<<"userCtx">>,
+            {[
+                {<<"db">>, <<"fake">>},
+                {<<"name">>, null},
+                {<<"roles">>, []}
+            ]}},
         {<<"secObj">>, []}
     ].

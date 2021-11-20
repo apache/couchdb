@@ -64,13 +64,13 @@
 -include_lib("mem3/include/mem3.hrl").
 -include("couch_db_int.hrl").
 
--type subject()
-    :: #db{}
-        | #httpd{}
-        | #shard{}
-        | #ordered_shard{}
-        | string()
-        | binary().
+-type subject() ::
+    #db{}
+    | #httpd{}
+    | #shard{}
+    | #ordered_shard{}
+    | string()
+    | binary().
 
 -define(SERVICE_ID, feature_flags).
 
@@ -79,8 +79,10 @@
 enabled(Subject) ->
     Key = maybe_handle(subject_key, [Subject], fun subject_key/1),
     Handle = couch_epi:get_handle({flags, config}),
-    lists:usort(enabled(Handle, {<<"/", Key/binary>>})
-        ++ enabled(Handle, {couch_db:normalize_dbname(Key)})).
+    lists:usort(
+        enabled(Handle, {<<"/", Key/binary>>}) ++
+            enabled(Handle, {couch_db:normalize_dbname(Key)})
+    ).
 
 -spec is_enabled(FlagId :: atom(), subject()) -> boolean().
 
@@ -106,9 +108,9 @@ enabled(Handle, Key) ->
 
 subject_key(#db{name = Name}) ->
     subject_key(Name);
-subject_key(#httpd{path_parts=[Name | _Rest]}) ->
+subject_key(#httpd{path_parts = [Name | _Rest]}) ->
     subject_key(Name);
-subject_key(#httpd{path_parts=[]}) ->
+subject_key(#httpd{path_parts = []}) ->
     <<>>;
 subject_key(#shard{name = Name}) ->
     subject_key(Name);
@@ -120,9 +122,10 @@ subject_key(Name) when is_binary(Name) ->
     Name.
 
 -spec maybe_handle(
-        Function :: atom(),
-        Args :: [term()],
-        Default :: fun((Args :: [term()]) -> term())) ->
+    Function :: atom(),
+    Args :: [term()],
+    Default :: fun((Args :: [term()]) -> term())
+) ->
     term().
 
 maybe_handle(Func, Args, Default) ->

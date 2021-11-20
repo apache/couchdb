@@ -10,7 +10,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 
 -module(dreyfus_httpd_handlers).
@@ -20,10 +19,10 @@
 url_handler(<<"_search_analyze">>) -> fun dreyfus_httpd:handle_analyze_req/1;
 url_handler(_) -> no_match.
 
-db_handler(<<"_search_cleanup">>)  -> fun dreyfus_httpd:handle_cleanup_req/2;
+db_handler(<<"_search_cleanup">>) -> fun dreyfus_httpd:handle_cleanup_req/2;
 db_handler(_) -> no_match.
 
-design_handler(<<"_search">>)      -> fun dreyfus_httpd:handle_search_req/3;
+design_handler(<<"_search">>) -> fun dreyfus_httpd:handle_search_req/3;
 design_handler(<<"_search_info">>) -> fun dreyfus_httpd:handle_info_req/3;
 design_handler(<<"_search_disk_size">>) -> fun dreyfus_httpd:handle_disk_size_req/3;
 design_handler(_) -> no_match.

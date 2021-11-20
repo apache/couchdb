@@ -13,13 +13,12 @@
 -module(couch_replicator_fabric_rpc).
 
 -export([
-   docs/3
+    docs/3
 ]).
 
 -include_lib("fabric/include/fabric.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
-
 
 docs(DbName, Options, Args0) ->
     set_io_priority(DbName, Options),
@@ -30,7 +29,6 @@ docs(DbName, Options, Args0) ->
     {ok, Db} = couch_db:open_int(DbName, Options),
     Acc = {DbName, FilterStates, HealthThreshold},
     couch_mrview:query_all_docs(Db, Args, fun docs_cb/2, Acc).
-
 
 docs_cb({meta, Meta}, Acc) ->
     ok = rexi:stream2({meta, Meta}),
@@ -54,15 +52,13 @@ docs_cb(complete, Acc) ->
     ok = rexi:stream_last(complete),
     {ok, Acc}.
 
-
 set_io_priority(DbName, Options) ->
     case lists:keyfind(io_priority, 1, Options) of
-    {io_priority, Pri} ->
-        erlang:put(io_priority, Pri);
-    false ->
-        erlang:put(io_priority, {interactive, DbName})
+        {io_priority, Pri} ->
+            erlang:put(io_priority, Pri);
+        false ->
+            erlang:put(io_priority, {interactive, DbName})
     end.
-
 
 %% Get the state of the replication document. If it is found and has a terminal
 %% state then it can be filtered and either included in the results or skipped.
@@ -80,8 +76,13 @@ rep_doc_state(Shard, Id, {[_ | _]} = Doc, States, HealthThreshold) ->
         null ->
             % Fetch from local doc processor. If there, filter by state.
             % If not there, mark as undecided. Let coordinator figure it out.
-            case couch_replicator_doc_processor:doc_lookup(Shard, Id,
-                    HealthThreshold) of
+            case
+                couch_replicator_doc_processor:doc_lookup(
+                    Shard,
+                    Id,
+                    HealthThreshold
+                )
+            of
                 {ok, EtsInfo} ->
                     State = get_doc_state(EtsInfo),
                     couch_replicator_utils:filter_state(State, States, EtsInfo);
@@ -92,6 +93,5 @@ rep_doc_state(Shard, Id, {[_ | _]} = Doc, States, HealthThreshold) ->
             couch_replicator_utils:filter_state(OtherState, States, DocInfo)
     end.
 
-
-get_doc_state({Props})->
+get_doc_state({Props}) ->
     couch_util:get_value(state, Props).

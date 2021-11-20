@@ -14,27 +14,23 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
-
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
-
 
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
     Db.
 
-
 teardown_each(Db) ->
     ok = couch_server:delete(couch_db:name(Db), []).
-
 
 cpse_write_attachment(Db1) ->
     AttBin = crypto:strong_rand_bytes(32768),
 
     try
         [Att0] = cpse_util:prep_atts(Db1, [
-                {<<"ohai.txt">>, AttBin}
-            ]),
+            {<<"ohai.txt">>, AttBin}
+        ]),
 
         {stream, Stream} = couch_att:fetch(data, Att0),
         ?assertEqual(true, couch_db_engine:is_active_stream(Db1, Stream)),
@@ -61,18 +57,20 @@ cpse_write_attachment(Db1) ->
         },
 
         Doc1 = couch_db_engine:read_doc_body(Db3, Doc0),
-        Atts1 = if not is_binary(Doc1#doc.atts) -> Doc1#doc.atts; true ->
-            couch_compress:decompress(Doc1#doc.atts)
-        end,
+        Atts1 =
+            if
+                not is_binary(Doc1#doc.atts) -> Doc1#doc.atts;
+                true -> couch_compress:decompress(Doc1#doc.atts)
+            end,
 
         StreamSrc = fun(Sp) -> couch_db_engine:open_read_stream(Db3, Sp) end,
         [Att1] = [couch_att:from_disk_term(StreamSrc, T) || T <- Atts1],
         ReadBin = couch_att:to_binary(Att1),
         ?assertEqual(AttBin, ReadBin)
-    catch throw:not_supported ->
-        ok
+    catch
+        throw:not_supported ->
+            ok
     end.
-
 
 % N.B. This test may be overly specific for some theoretical
 % storage engines that don't re-initialize their
@@ -84,8 +82,8 @@ cpse_inactive_stream(Db1) ->
 
     try
         [Att0] = cpse_util:prep_atts(Db1, [
-                {<<"ohai.txt">>, AttBin}
-            ]),
+            {<<"ohai.txt">>, AttBin}
+        ]),
 
         {stream, Stream} = couch_att:fetch(data, Att0),
         ?assertEqual(true, couch_db_engine:is_active_stream(Db1, Stream)),
@@ -94,6 +92,7 @@ cpse_inactive_stream(Db1) ->
         {ok, Db2} = couch_db:reopen(Db1),
 
         ?assertEqual(false, couch_db_engine:is_active_stream(Db2, Stream))
-    catch throw:not_supported ->
-        ok
+    catch
+        throw:not_supported ->
+            ok
     end.

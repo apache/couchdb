@@ -14,7 +14,6 @@
 -behaviour(gen_server).
 -vsn(1).
 
-
 -export([
     start_link/0
 ]).
@@ -28,19 +27,15 @@
     code_change/3
 ]).
 
-
 -include("couch_event_int.hrl").
-
 
 -record(st, {
     by_pid,
     by_dbname
 }).
 
-
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, nil, []).
-
 
 init(_) ->
     {ok, ByPid} = khash:new(),
@@ -50,10 +45,8 @@ init(_) ->
         by_dbname = ByDbName
     }}.
 
-
 terminate(_Reason, _St) ->
     ok.
-
 
 handle_call({register, Pid, NewDbNames}, _From, St) ->
     case khash:get(St#st.by_pid, Pid) of
@@ -65,31 +58,27 @@ handle_call({register, Pid, NewDbNames}, _From, St) ->
             register(St, ReuseRef, Pid, NewDbNames)
     end,
     {reply, ok, St};
-
 handle_call({unregister, Pid}, _From, St) ->
-    Reply = case khash:get(St#st.by_pid, Pid) of
-        undefined ->
-            not_registered;
-        {Ref, OldDbNames} ->
-            unregister(St, Pid, OldDbNames),
-            erlang:demonitor(Ref, [flush]),
-            ok
-    end,
+    Reply =
+        case khash:get(St#st.by_pid, Pid) of
+            undefined ->
+                not_registered;
+            {Ref, OldDbNames} ->
+                unregister(St, Pid, OldDbNames),
+                erlang:demonitor(Ref, [flush]),
+                ok
+        end,
     {reply, Reply, St};
-
 handle_call(Msg, From, St) ->
     couch_log:notice("~s ignoring call ~w from ~w", [?MODULE, Msg, From]),
     {reply, ignored, St}.
 
-
 handle_cast({notify, DbName, Event}, St) ->
     notify_listeners(St#st.by_dbname, DbName, Event),
     {noreply, St};
-
 handle_cast(Msg, St) ->
     couch_log:notice("~s ignoring cast ~w", [?MODULE, Msg]),
     {noreply, St}.
-
 
 handle_info({'DOWN', Ref, process, Pid, _Reason}, St) ->
     case khash:get(St#st.by_pid, Pid) of
@@ -99,35 +88,38 @@ handle_info({'DOWN', Ref, process, Pid, _Reason}, St) ->
             ok
     end,
     {noreply, St};
-
-
 handle_info(Msg, St) ->
     couch_log:notice("~s ignoring info ~w", [?MODULE, Msg]),
     {noreply, St}.
 
-
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
-
 
 notify_listeners(ByDbName, DbName, Event) ->
     Msg = {'$couch_event', DbName, Event},
     notify_listeners(khash:get(ByDbName, all_dbs), Msg),
     notify_listeners(khash:get(ByDbName, DbName), Msg).
 
-
 notify_listeners(undefined, _) ->
     ok;
 notify_listeners(Listeners, Msg) ->
-    khash:fold(Listeners, fun(Pid, _, _) -> Pid ! Msg, nil end, nil).
-
+    khash:fold(
+        Listeners,
+        fun(Pid, _, _) ->
+            Pid ! Msg,
+            nil
+        end,
+        nil
+    ).
 
 register(St, Ref, Pid, DbNames) ->
     khash:put(St#st.by_pid, Pid, {Ref, DbNames}),
-    lists:foreach(fun(DbName) ->
-        add_listener(St#st.by_dbname, DbName, Pid)
-    end, DbNames).
-
+    lists:foreach(
+        fun(DbName) ->
+            add_listener(St#st.by_dbname, DbName, Pid)
+        end,
+        DbNames
+    ).
 
 add_listener(ByDbName, DbName, Pid) ->
     case khash:lookup(ByDbName, DbName) of
@@ -139,18 +131,20 @@ add_listener(ByDbName, DbName, Pid) ->
             khash:put(ByDbName, DbName, NewListeners)
     end.
 
-
 unregister(St, Pid, OldDbNames) ->
     ok = khash:del(St#st.by_pid, Pid),
-    lists:foreach(fun(DbName) ->
-        rem_listener(St#st.by_dbname, DbName, Pid)
-    end, OldDbNames).
-
+    lists:foreach(
+        fun(DbName) ->
+            rem_listener(St#st.by_dbname, DbName, Pid)
+        end,
+        OldDbNames
+    ).
 
 rem_listener(ByDbName, DbName, Pid) ->
     {value, Listeners} = khash:lookup(ByDbName, DbName),
     khash:del(Listeners, Pid),
     Size = khash:size(Listeners),
-    if Size > 0 -> ok; true ->
-        khash:del(ByDbName, DbName)
+    if
+        Size > 0 -> ok;
+        true -> khash:del(ByDbName, DbName)
     end.

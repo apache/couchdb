@@ -25,52 +25,64 @@ teardown(Mocks) ->
 %% ------------------------------------------------------------------
 
 dummy_setup() ->
-    couch_tests:new(?MODULE, dummy_setup,
+    couch_tests:new(
+        ?MODULE,
+        dummy_setup,
         fun(_Fixture, Ctx) -> Ctx end,
-        fun(_Fixture, Ctx) -> Ctx end).
-
+        fun(_Fixture, Ctx) -> Ctx end
+    ).
 
 setup1(Arg1) ->
-    couch_tests:new(?MODULE, setup1,
+    couch_tests:new(
+        ?MODULE,
+        setup1,
         fun(Fixture, Ctx0) ->
-           Ctx1 = couch_tests:start_applications([asn1], Ctx0),
-           couch_tests:set_state(Fixture, Ctx1, {Arg1})
+            Ctx1 = couch_tests:start_applications([asn1], Ctx0),
+            couch_tests:set_state(Fixture, Ctx1, {Arg1})
         end,
         fun(_Fixture, Ctx) ->
-           couch_tests:stop_applications([asn1], Ctx)
-        end).
+            couch_tests:stop_applications([asn1], Ctx)
+        end
+    ).
 
 setup2(Arg1, Arg2) ->
-    couch_tests:new(?MODULE, setup2,
+    couch_tests:new(
+        ?MODULE,
+        setup2,
         fun(Fixture, Ctx0) ->
-           Ctx1 = couch_tests:start_applications([public_key], Ctx0),
-           couch_tests:set_state(Fixture, Ctx1, {Arg1, Arg2})
+            Ctx1 = couch_tests:start_applications([public_key], Ctx0),
+            couch_tests:set_state(Fixture, Ctx1, {Arg1, Arg2})
         end,
         fun(_Fixture, Ctx) ->
-           Ctx
-        end).
-
+            Ctx
+        end
+    ).
 
 couch_tests_test_() ->
     {
         "couch_tests tests",
         {
-            foreach, fun setup/0, fun teardown/1,
+            foreach,
+            fun setup/0,
+            fun teardown/1,
             [
                 {"chained setup", fun chained_setup/0}
             ]
         }
     }.
 
-
 chained_setup() ->
     ?assert(meck:validate(application)),
     ?assertEqual([], history(application, start)),
-    Ctx0 = couch_tests:setup([
-        setup1(foo),
-        dummy_setup(),
-        setup2(bar, baz)
-    ], [], []),
+    Ctx0 = couch_tests:setup(
+        [
+            setup1(foo),
+            dummy_setup(),
+            setup2(bar, baz)
+        ],
+        [],
+        []
+    ),
 
     ?assertEqual([asn1, public_key], history(application, start)),
     ?assertEqual([asn1, public_key], couch_tests:get(started_apps, Ctx0)),
@@ -96,7 +108,10 @@ unmock(application) ->
 
 history(Module, Function) ->
     Self = self(),
-    [A || {Pid, {M, F, [A]}, _Result} <- meck:history(Module)
-        , Pid =:= Self
-        , M =:= Module
-        , F =:= Function].
+    [
+        A
+     || {Pid, {M, F, [A]}, _Result} <- meck:history(Module),
+        Pid =:= Self,
+        M =:= Module,
+        F =:= Function
+    ].

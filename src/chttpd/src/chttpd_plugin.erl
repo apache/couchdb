@@ -48,7 +48,8 @@ before_response(HttpReq0, Code0, Headers0, Value0) ->
 before_serve_file(Req0, Code0, Headers0, RelativePath0, DocumentRoot0) ->
     [HttpReq, Code, Headers, RelativePath, DocumentRoot] =
         with_pipe(before_serve_file, [
-            Req0, Code0, Headers0, RelativePath0, DocumentRoot0]),
+            Req0, Code0, Headers0, RelativePath0, DocumentRoot0
+        ]),
     {ok, {HttpReq, Code, Headers, RelativePath, DocumentRoot}}.
 
 %% ------------------------------------------------------------------

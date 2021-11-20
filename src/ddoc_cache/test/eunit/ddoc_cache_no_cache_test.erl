@@ -12,28 +12,24 @@
 
 -module(ddoc_cache_no_cache_test).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
-
 
 ddoc(DDocId) ->
     {ok, #doc{
         id = DDocId,
         revs = {1, [<<"deadbeefdeadbeef">>]},
-        body = {[
-            {<<"ohai">>, null}
-        ]}
+        body =
+            {[
+                {<<"ohai">>, null}
+            ]}
     }}.
-
 
 not_found(_DDocId) ->
     {not_found, missing}.
 
-
 return_error(_DDocId) ->
     {error, timeout}.
-
 
 no_cache_test_() ->
     {
@@ -76,11 +72,9 @@ no_cache_open_ok_test(_, _) ->
     Resp = ddoc_cache:open_doc(<<"foo">>, <<"bar">>),
     ?_assertEqual(ddoc(<<"bar">>), Resp).
 
-
 no_cache_open_not_found_test(_, _) ->
     Resp = ddoc_cache:open_doc(<<"foo">>, <<"baz">>),
     ?_assertEqual(not_found(<<"baz">>), Resp).
-
 
 no_cache_open_error_test(_, _) ->
     Resp = ddoc_cache:open_doc(<<"foo">>, <<"bif">>),

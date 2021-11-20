@@ -20,24 +20,32 @@
     should_log/1
 ]).
 
-
-level(debug) ->     7;
-level(info) ->      6;
-level(notice) ->    5;
-level(warn) ->      4;
-level(warning) ->   4;
-level(err) ->       3;
-level(error) ->     3;
-level(crit) ->      2;
-level(alert) ->     1;
-level(emerg) ->     0;
-level(panic) ->     0;
-
+level(debug) ->
+    7;
+level(info) ->
+    6;
+level(notice) ->
+    5;
+level(warn) ->
+    4;
+level(warning) ->
+    4;
+level(err) ->
+    3;
+level(error) ->
+    3;
+level(crit) ->
+    2;
+level(alert) ->
+    1;
+level(emerg) ->
+    0;
+level(panic) ->
+    0;
 level(I) when is_integer(I), I >= 0, I =< 7 ->
     I;
 level(_BadLevel) ->
     3.
-
 
 log(Node, Level, Format, Terms) ->
     case should_log(Level) of
@@ -59,10 +67,11 @@ log(Node, Level, String) ->
     end.
 
 should_log(Level) ->
-    AppLevel = case application:get_env(weatherreport, log_level) of
-        undefined -> info;
-        {ok, L0} -> L0
-    end,
+    AppLevel =
+        case application:get_env(weatherreport, log_level) of
+            undefined -> info;
+            {ok, L0} -> L0
+        end,
     level(AppLevel) >= level(Level).
 
 get_prefix(Node, Level) ->

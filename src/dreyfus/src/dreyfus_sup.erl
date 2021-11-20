@@ -10,7 +10,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 %% -*- erlang-indent-level: 4;indent-tabs-mode: nil -*-
 
 -module(dreyfus_sup).
@@ -25,8 +24,7 @@ init(_Args) ->
     Children = [
         child(dreyfus_index_manager)
     ],
-    {ok, {{one_for_one,10,1},
-        couch_epi:register_service(dreyfus_epi, Children)}}.
+    {ok, {{one_for_one, 10, 1}, couch_epi:register_service(dreyfus_epi, Children)}}.
 
 child(Child) ->
     {Child, {Child, start_link, []}, permanent, 1000, worker, [Child]}.

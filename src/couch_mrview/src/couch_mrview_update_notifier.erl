@@ -20,7 +20,9 @@
 -include_lib("couch/include/couch_db.hrl").
 
 start_link(Exec) ->
-    couch_event_sup:start_link(couch_mrview_update, {couch_mrview_update_notifier, make_ref()}, Exec).
+    couch_event_sup:start_link(
+        couch_mrview_update, {couch_mrview_update_notifier, make_ref()}, Exec
+    ).
 
 notify(Event) ->
     gen_event:notify(couch_mrview_update, Event).

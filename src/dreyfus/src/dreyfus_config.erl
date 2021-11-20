@@ -1,13 +1,14 @@
- -module(dreyfus_config).
+-module(dreyfus_config).
 
- -export([data/0, get/1]).
+-export([data/0, get/1]).
 
 data() ->
     try
         config:get("dreyfus_blacklist")
-    catch error:badarg ->
-        % lazy workaround to address issue with epi invocation on startup
-        []
+    catch
+        error:badarg ->
+            % lazy workaround to address issue with epi invocation on startup
+            []
     end.
 
 get(Key) ->

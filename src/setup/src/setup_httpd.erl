@@ -15,19 +15,19 @@
 
 -export([handle_setup_req/1]).
 
-handle_setup_req(#httpd{method='POST'}=Req) ->
+handle_setup_req(#httpd{method = 'POST'} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     couch_httpd:validate_ctype(Req, "application/json"),
     Setup = get_body(Req),
     couch_log:notice("Setup: ~p~n", [remove_sensitive(Setup)]),
     Action = binary_to_list(couch_util:get_value(<<"action">>, Setup, <<"missing">>)),
     case handle_action(Action, Setup) of
-    ok ->
-        chttpd:send_json(Req, 201, {[{ok, true}]});
-    {error, Message} ->
-        couch_httpd:send_error(Req, 400, <<"bad_request">>, Message)
+        ok ->
+            chttpd:send_json(Req, 201, {[{ok, true}]});
+        {error, Message} ->
+            couch_httpd:send_error(Req, 400, <<"bad_request">>, Message)
     end;
-handle_setup_req(#httpd{method='GET'}=Req) ->
+handle_setup_req(#httpd{method = 'GET'} = Req) ->
     ok = chttpd:verify_is_server_admin(Req),
     Dbs = chttpd:qs_json_value(Req, "ensure_dbs_exist", setup:cluster_system_dbs()),
     couch_log:notice("Dbs: ~p~n", [Dbs]),
@@ -58,9 +58,8 @@ handle_setup_req(#httpd{method='GET'}=Req) ->
                     end
             end
     end;
-handle_setup_req(#httpd{}=Req) ->
+handle_setup_req(#httpd{} = Req) ->
     chttpd:send_method_not_allowed(Req, "GET,POST").
-
 
 get_options(Options, Setup) ->
     ExtractValues = fun({Tag, Option}, OptionsAcc) ->
@@ -72,30 +71,35 @@ get_options(Options, Setup) ->
     lists:foldl(ExtractValues, [], Options).
 
 handle_action("enable_cluster", Setup) ->
-    Options = get_options([
-        {username, <<"username">>},
-        {password, <<"password">>},
-        {password_hash, <<"password_hash">>},
-        {bind_address, <<"bind_address">>},
-        {port, <<"port">>},
-        {remote_node, <<"remote_node">>},
-        {remote_current_user, <<"remote_current_user">>},
-        {remote_current_password, <<"remote_current_password">>},
-        {node_count, <<"node_count">>}
-    ], Setup),
+    Options = get_options(
+        [
+            {username, <<"username">>},
+            {password, <<"password">>},
+            {password_hash, <<"password_hash">>},
+            {bind_address, <<"bind_address">>},
+            {port, <<"port">>},
+            {remote_node, <<"remote_node">>},
+            {remote_current_user, <<"remote_current_user">>},
+            {remote_current_password, <<"remote_current_password">>},
+            {node_count, <<"node_count">>}
+        ],
+        Setup
+    ),
     case setup:enable_cluster(Options) of
         {error, cluster_enabled} ->
             {error, <<"Cluster is already enabled">>};
-        _ -> ok
+        _ ->
+            ok
     end;
-
-
 handle_action("finish_cluster", Setup) ->
     couch_log:notice("finish_cluster: ~p~n", [remove_sensitive(Setup)]),
 
-    Options = get_options([
-        {ensure_dbs_exist, <<"ensure_dbs_exist">>}
-    ], Setup),
+    Options = get_options(
+        [
+            {ensure_dbs_exist, <<"ensure_dbs_exist">>}
+        ],
+        Setup
+    ),
     case setup:finish_cluster(Options) of
         {error, cluster_finished} ->
             {error, <<"Cluster is already finished">>};
@@ -103,18 +107,20 @@ handle_action("finish_cluster", Setup) ->
             couch_log:notice("finish_cluster: ~p~n", [Else]),
             ok
     end;
-
 handle_action("enable_single_node", Setup) ->
     couch_log:notice("enable_single_node: ~p~n", [remove_sensitive(Setup)]),
 
-    Options = get_options([
-        {ensure_dbs_exist, <<"ensure_dbs_exist">>},
-        {username, <<"username">>},
-        {password, <<"password">>},
-        {password_hash, <<"password_hash">>},
-        {bind_address, <<"bind_address">>},
-        {port, <<"port">>}
-    ], Setup),
+    Options = get_options(
+        [
+            {ensure_dbs_exist, <<"ensure_dbs_exist">>},
+            {username, <<"username">>},
+            {password, <<"password">>},
+            {password_hash, <<"password_hash">>},
+            {bind_address, <<"bind_address">>},
+            {port, <<"port">>}
+        ],
+        Setup
+    ),
     case setup:enable_single_node(Options) of
         {error, cluster_finished} ->
             {error, <<"Cluster is already finished">>};
@@ -122,18 +128,19 @@ handle_action("enable_single_node", Setup) ->
             couch_log:notice("Else: ~p~n", [Else]),
             ok
     end;
-
-
 handle_action("add_node", Setup) ->
     couch_log:notice("add_node: ~p~n", [remove_sensitive(Setup)]),
 
-    Options = get_options([
-        {username, <<"username">>},
-        {password, <<"password">>},
-        {host, <<"host">>},
-        {port, <<"port">>},
-        {name, <<"name">>}
-    ], Setup),
+    Options = get_options(
+        [
+            {username, <<"username">>},
+            {password, <<"password">>},
+            {host, <<"host">>},
+            {port, <<"port">>},
+            {name, <<"name">>}
+        ],
+        Setup
+    ),
     case setup:add_node(Options) of
         {error, cluster_not_enabled} ->
             {error, <<"Cluster is not enabled.">>};
@@ -143,35 +150,36 @@ handle_action("add_node", Setup) ->
             {error, <<"Add node failed. Invalid admin credentials,">>};
         {error, Message} ->
             {error, Message};
-        _ -> ok
+        _ ->
+            ok
     end;
-
 handle_action("remove_node", Setup) ->
     couch_log:notice("remove_node: ~p~n", [remove_sensitive(Setup)]);
-
 handle_action("receive_cookie", Setup) ->
     couch_log:notice("receive_cookie: ~p~n", [remove_sensitive(Setup)]),
-    Options = get_options([
-       {cookie, <<"cookie">>}
-    ], Setup),
+    Options = get_options(
+        [
+            {cookie, <<"cookie">>}
+        ],
+        Setup
+    ),
     case setup:receive_cookie(Options) of
         {error, Error} ->
             {error, Error};
-        _ -> ok
+        _ ->
+            ok
     end;
-
 handle_action(_, _) ->
     couch_log:notice("invalid_action: ~n", []),
     {error, <<"Invalid Action'">>}.
 
-
 get_body(Req) ->
     case catch couch_httpd:json_body_obj(Req) of
-    {Body} ->
-        Body;
-    Else ->
-        couch_log:notice("Body Fail: ~p~n", [Else]),
-        couch_httpd:send_error(Req, 400, <<"bad_request">>, <<"Missing JSON body'">>)
+        {Body} ->
+            Body;
+        Else ->
+            couch_log:notice("Body Fail: ~p~n", [Else]),
+            couch_httpd:send_error(Req, 400, <<"bad_request">>, <<"Missing JSON body'">>)
     end.
 
 remove_sensitive(KVList) ->

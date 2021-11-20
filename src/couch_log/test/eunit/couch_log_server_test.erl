@@ -12,23 +12,16 @@
 
 -module(couch_log_server_test).
 
-
 -include("couch_log.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
-
 couch_log_server_test_() ->
-    {setup,
-        fun couch_log_test_util:start/0,
-        fun couch_log_test_util:stop/1,
-        [
-            fun check_can_reconfigure/0,
-            fun check_can_restart/0,
-            fun check_can_cast_log_entry/0,
-            fun check_logs_ignored_messages/0
-        ]
-    }.
-
+    {setup, fun couch_log_test_util:start/0, fun couch_log_test_util:stop/1, [
+        fun check_can_reconfigure/0,
+        fun check_can_restart/0,
+        fun check_can_cast_log_entry/0,
+        fun check_logs_ignored_messages/0
+    ]}.
 
 check_can_reconfigure() ->
     couch_log:error("a message", []),
@@ -43,7 +36,6 @@ check_can_reconfigure() ->
         couch_log_test_util:wait_for_config(),
         ?assertEqual('$end_of_table', couch_log_test_util:last_log_key())
     end).
-
 
 check_can_restart() ->
     Pid1 = whereis(couch_log_server),
@@ -65,7 +57,6 @@ check_can_restart() ->
     ?assertNotEqual(Pid2, Pid1),
     ?assert(is_process_alive(Pid2)).
 
-
 check_can_cast_log_entry() ->
     Entry = #log_entry{
         level = critical,
@@ -75,9 +66,9 @@ check_can_cast_log_entry() ->
         time_stamp = "2016-07-20-almost-my-birthday"
     },
     ok = gen_server:cast(couch_log_server, {log, Entry}),
-    timer:sleep(500), % totes gross
+    % totes gross
+    timer:sleep(500),
     ?assertEqual(Entry, couch_log_test_util:last_log()).
-
 
 check_logs_ignored_messages() ->
     gen_server:call(couch_log_server, a_call),
@@ -91,7 +82,8 @@ check_logs_ignored_messages() ->
     ),
 
     gen_server:cast(couch_log_server, a_cast),
-    timer:sleep(500), % yes gross
+    % yes gross
+    timer:sleep(500),
     ?assertMatch(
         #log_entry{
             level = error,
@@ -102,7 +94,8 @@ check_logs_ignored_messages() ->
     ),
 
     couch_log_server ! an_info,
-    timer:sleep(500), % still gross
+    % still gross
+    timer:sleep(500),
     ?assertMatch(
         #log_entry{
             level = error,
@@ -111,7 +104,6 @@ check_logs_ignored_messages() ->
         },
         couch_log_test_util:last_log()
     ).
-
 
 coverage_test() ->
     Resp = couch_log_server:code_change(foo, bazinga, baz),

@@ -14,24 +14,26 @@
 
 -export([run/1]).
 
-
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
-
 
 run(Db) ->
     RootDir = couch_index_util:root_dir(),
     DbName = couch_db:name(Db),
 
     {ok, DesignDocs} = couch_db:get_design_docs(Db),
-    SigFiles = lists:foldl(fun(DDocInfo, SFAcc) ->
-        {ok, DDoc} = couch_db:open_doc_int(Db, DDocInfo, [ejson_body]),
-        {ok, InitState} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
-        Sig = InitState#mrst.sig,
-        IFName = couch_mrview_util:index_file(DbName, Sig),
-        CFName = couch_mrview_util:compaction_file(DbName, Sig),
-        [IFName, CFName | SFAcc]
-    end, [], [DD || DD <- DesignDocs, DD#full_doc_info.deleted == false]),
+    SigFiles = lists:foldl(
+        fun(DDocInfo, SFAcc) ->
+            {ok, DDoc} = couch_db:open_doc_int(Db, DDocInfo, [ejson_body]),
+            {ok, InitState} = couch_mrview_util:ddoc_to_mrst(DbName, DDoc),
+            Sig = InitState#mrst.sig,
+            IFName = couch_mrview_util:index_file(DbName, Sig),
+            CFName = couch_mrview_util:compaction_file(DbName, Sig),
+            [IFName, CFName | SFAcc]
+        end,
+        [],
+        [DD || DD <- DesignDocs, DD#full_doc_info.deleted == false]
+    ),
 
     IdxDir = couch_index_util:index_dir(mrview, DbName),
     DiskFiles = filelib:wildcard(filename:join(IdxDir, "*")),
@@ -39,21 +41,28 @@ run(Db) ->
     % We need to delete files that have no ddoc.
     ToDelete = DiskFiles -- SigFiles,
 
-    lists:foreach(fun(FN) ->
-        couch_log:debug("Deleting stale view file: ~s", [FN]),
-        couch_file:delete(RootDir, FN, [sync]),
-        case couch_mrview_util:verify_view_filename(FN) of
-            true ->
-                Sig = couch_mrview_util:get_signature_from_filename(FN),
-                DocId = couch_mrview_util:get_local_purge_doc_id(Sig),
-                case couch_db:open_doc(Db, DocId, []) of
-                    {ok, LocalPurgeDoc} ->
-                        couch_db:update_doc(Db,
-                            LocalPurgeDoc#doc{deleted=true}, [?ADMIN_CTX]);
-                    {not_found, _} ->
-                        ok
-                end;
-            false -> ok
-        end
-    end, ToDelete),
+    lists:foreach(
+        fun(FN) ->
+            couch_log:debug("Deleting stale view file: ~s", [FN]),
+            couch_file:delete(RootDir, FN, [sync]),
+            case couch_mrview_util:verify_view_filename(FN) of
+                true ->
+                    Sig = couch_mrview_util:get_signature_from_filename(FN),
+                    DocId = couch_mrview_util:get_local_purge_doc_id(Sig),
+                    case couch_db:open_doc(Db, DocId, []) of
+                        {ok, LocalPurgeDoc} ->
+                            couch_db:update_doc(
+                                Db,
+                                LocalPurgeDoc#doc{deleted = true},
+                                [?ADMIN_CTX]
+                            );
+                        {not_found, _} ->
+                            ok
+                    end;
+                false ->
+                    ok
+            end
+        end,
+        ToDelete
+    ),
     ok.

@@ -16,6 +16,5 @@
     is_valid_purge_client/2
 ]).
 
-
 is_valid_purge_client(DbName, Props) ->
     mem3_rep:verify_purge_checkpoint(DbName, Props).

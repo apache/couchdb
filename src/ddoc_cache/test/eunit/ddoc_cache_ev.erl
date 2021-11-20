@@ -16,6 +16,5 @@
     event/2
 ]).
 
-
 event(Name, Arg) ->
     couch_log:error("~s :: ~s :: ~p", [?MODULE, Name, Arg]).

@@ -14,17 +14,13 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
-
 -include_lib("eunit/include/eunit.hrl").
-
 
 setup_each() ->
     cpse_util:dbname().
 
-
 teardown_each(DbName) ->
     ok = couch_server:delete(DbName, []).
-
 
 cpse_default_props(DbName) ->
     {ok, {_App, Engine, _Extension}} = application:get_env(couch, test_engine),
@@ -46,16 +42,18 @@ cpse_default_props(DbName) ->
     ?assertEqual([{Node, 0}], couch_db_engine:get_epochs(Db)),
     ?assertEqual(0, couch_db_engine:get_compacted_seq(Db)).
 
-
--define(ADMIN_ONLY_SEC_PROPS, {[
-    {<<"members">>, {[
-        {<<"roles">>, [<<"_admin">>]}
-    ]}},
-    {<<"admins">>, {[
-        {<<"roles">>, [<<"_admin">>]}
-    ]}}
-]}).
-
+-define(ADMIN_ONLY_SEC_PROPS,
+    {[
+        {<<"members">>,
+            {[
+                {<<"roles">>, [<<"_admin">>]}
+            ]}},
+        {<<"admins">>,
+            {[
+                {<<"roles">>, [<<"_admin">>]}
+            ]}}
+    ]}
+).
 
 cpse_admin_only_security(DbName) ->
     Config = [{"couchdb", "default_security", "admin_only"}],
@@ -70,15 +68,12 @@ cpse_admin_only_security(DbName) ->
     couch_log:error("~n~n~n~n~s -> ~s~n~n", [couch_db:name(Db1), couch_db:name(Db2)]),
     ?assertEqual(?ADMIN_ONLY_SEC_PROPS, couch_db:get_security(Db2)).
 
-
 cpse_set_security(DbName) ->
     SecProps = {[{<<"foo">>, <<"bar">>}]},
     check_prop_set(DbName, get_security, set_security, {[]}, SecProps).
 
-
 cpse_set_revs_limit(DbName) ->
     check_prop_set(DbName, get_revs_limit, set_revs_limit, 1000, 50).
-
 
 check_prop_set(DbName, GetFun, SetFun, Default, Value) ->
     {ok, Db0} = cpse_util:create_db(DbName),

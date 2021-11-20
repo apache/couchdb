@@ -26,7 +26,6 @@
 -define(DOCS_COUNT, 11).
 -define(TIMEOUT_EUNIT, 120).
 
-
 setup() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
@@ -61,18 +60,24 @@ large_atts_test_() ->
         "Replicate docs with large attachments",
         {
             foreachx,
-            fun setup/1, fun teardown/2,
-            [{Pair, fun should_populate_replicate_compact/2}
-             || Pair <- Pairs]
+            fun setup/1,
+            fun teardown/2,
+            [
+                {Pair, fun should_populate_replicate_compact/2}
+             || Pair <- Pairs
+            ]
         }
     }.
 
-
 should_populate_replicate_compact({From, To}, {_Ctx, {Source, Target}}) ->
-    {lists:flatten(io_lib:format("~p -> ~p", [From, To])),
-     {inorder, [should_populate_source(Source),
-                should_replicate(Source, Target),
-                should_compare_databases(Source, Target)]}}.
+    {
+        lists:flatten(io_lib:format("~p -> ~p", [From, To])),
+        {inorder, [
+            should_populate_source(Source),
+            should_replicate(Source, Target),
+            should_compare_databases(Source, Target)
+        ]}
+    }.
 
 should_populate_source({remote, Source}) ->
     should_populate_source(Source);
@@ -93,7 +98,6 @@ should_compare_databases(Source, {remote, Target}) ->
 should_compare_databases(Source, Target) ->
     {timeout, ?TIMEOUT_EUNIT, ?_test(compare_dbs(Source, Target))}.
 
-
 populate_db(DbName, DocCount) ->
     {ok, Db} = couch_db:open_int(DbName, []),
     Docs = lists:foldl(
@@ -108,7 +112,9 @@ populate_db(DbName, DocCount) ->
             },
             [Doc | Acc]
         end,
-        [], lists:seq(1, DocCount)),
+        [],
+        lists:seq(1, DocCount)
+    ),
     {ok, _} = couch_db:update_docs(Db, Docs, []),
     couch_db:close(Db).
 

@@ -16,35 +16,43 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 
--define(DDOC, {[
-    {<<"_id">>, <<"_design/filter_ddoc">>},
-    {<<"filters">>, {[
-        {<<"testfilter">>, <<"
-            function(doc, req){if (doc.class == 'mammal') return true;}
-        ">>},
-        {<<"queryfilter">>, <<"
-            function(doc, req) {
-                if (doc.class && req.query.starts) {
-                    return doc.class.indexOf(req.query.starts) === 0;
-                }
-                else {
-                    return false;
-                }
-            }
-        ">>}
-    ]}},
-    {<<"views">>, {[
-        {<<"mammals">>, {[
-            {<<"map">>, <<"
-                function(doc) {
-                    if (doc.class == 'mammal') {
-                        emit(doc._id, null);
-                    }
-                }
-            ">>}
-        ]}}
-    ]}}
-]}).
+-define(DDOC,
+    {[
+        {<<"_id">>, <<"_design/filter_ddoc">>},
+        {<<"filters">>,
+            {[
+                {<<"testfilter">>,
+                    <<"\n"
+                    "            function(doc, req){if (doc.class == 'mammal') return true;}\n"
+                    "        ">>},
+                {<<"queryfilter">>,
+                    <<"\n"
+                    "            function(doc, req) {\n"
+                    "                if (doc.class && req.query.starts) {\n"
+                    "                    return doc.class.indexOf(req.query.starts) === 0;\n"
+                    "                }\n"
+                    "                else {\n"
+                    "                    return false;\n"
+                    "                }\n"
+                    "            }\n"
+                    "        ">>}
+            ]}},
+        {<<"views">>,
+            {[
+                {<<"mammals">>,
+                    {[
+                        {<<"map">>,
+                            <<"\n"
+                            "                function(doc) {\n"
+                            "                    if (doc.class == 'mammal') {\n"
+                            "                        emit(doc._id, null);\n"
+                            "                    }\n"
+                            "                }\n"
+                            "            ">>}
+                    ]}}
+            ]}}
+    ]}
+).
 
 setup(_) ->
     Ctx = test_util:start_couch([couch_replicator]),
@@ -65,7 +73,8 @@ filtered_replication_test_() ->
         "Filtered replication tests",
         {
             foreachx,
-            fun setup/1, fun teardown/2,
+            fun setup/1,
+            fun teardown/2,
             [{Pair, fun should_succeed/2} || Pair <- Pairs]
         }
     }.
@@ -76,7 +85,8 @@ query_filtered_replication_test_() ->
         "Filtered with query replication tests",
         {
             foreachx,
-            fun setup/1, fun teardown/2,
+            fun setup/1,
+            fun teardown/2,
             [{Pair, fun should_succeed_with_query/2} || Pair <- Pairs]
         }
     }.
@@ -87,17 +97,19 @@ view_filtered_replication_test_() ->
         "Filtered with a view replication tests",
         {
             foreachx,
-            fun setup/1, fun teardown/2,
+            fun setup/1,
+            fun teardown/2,
             [{Pair, fun should_succeed_with_view/2} || Pair <- Pairs]
         }
     }.
 
 should_succeed({From, To}, {_Ctx, {Source, Target}}) ->
-    RepObject = {[
-        {<<"source">>, db_url(From, Source)},
-        {<<"target">>, db_url(To, Target)},
-        {<<"filter">>, <<"filter_ddoc/testfilter">>}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, db_url(From, Source)},
+            {<<"target">>, db_url(To, Target)},
+            {<<"filter">>, <<"filter_ddoc/testfilter">>}
+        ]},
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
     %% FilteredFun is an Erlang version of following JS function
     %% function(doc, req){if (doc.class == 'mammal') return true;}
@@ -107,22 +119,24 @@ should_succeed({From, To}, {_Ctx, {Source, Target}}) ->
     {ok, TargetDbInfo, AllReplies} = compare_dbs(Source, Target, FilterFun),
     {lists:flatten(io_lib:format("~p -> ~p", [From, To])), [
         {"Target DB has proper number of docs",
-        ?_assertEqual(1, proplists:get_value(doc_count, TargetDbInfo))},
+            ?_assertEqual(1, proplists:get_value(doc_count, TargetDbInfo))},
         {"Target DB doesn't have deleted docs",
-        ?_assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo))},
+            ?_assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo))},
         {"All the docs filtered as expected",
-        ?_assert(lists:all(fun(Valid) -> Valid end, AllReplies))}
+            ?_assert(lists:all(fun(Valid) -> Valid end, AllReplies))}
     ]}.
 
 should_succeed_with_query({From, To}, {_Ctx, {Source, Target}}) ->
-    RepObject = {[
-        {<<"source">>, db_url(From, Source)},
-        {<<"target">>, db_url(To, Target)},
-        {<<"filter">>, <<"filter_ddoc/queryfilter">>},
-        {<<"query_params">>, {[
-            {<<"starts">>, <<"a">>}
-        ]}}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, db_url(From, Source)},
+            {<<"target">>, db_url(To, Target)},
+            {<<"filter">>, <<"filter_ddoc/queryfilter">>},
+            {<<"query_params">>,
+                {[
+                    {<<"starts">>, <<"a">>}
+                ]}}
+        ]},
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
     FilterFun = fun(_DocId, {Props}) ->
         case couch_util:get_value(<<"class">>, Props) of
@@ -133,22 +147,24 @@ should_succeed_with_query({From, To}, {_Ctx, {Source, Target}}) ->
     {ok, TargetDbInfo, AllReplies} = compare_dbs(Source, Target, FilterFun),
     {lists:flatten(io_lib:format("~p -> ~p", [From, To])), [
         {"Target DB has proper number of docs",
-        ?_assertEqual(2, proplists:get_value(doc_count, TargetDbInfo))},
+            ?_assertEqual(2, proplists:get_value(doc_count, TargetDbInfo))},
         {"Target DB doesn't have deleted docs",
-        ?_assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo))},
+            ?_assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo))},
         {"All the docs filtered as expected",
-        ?_assert(lists:all(fun(Valid) -> Valid end, AllReplies))}
+            ?_assert(lists:all(fun(Valid) -> Valid end, AllReplies))}
     ]}.
 
 should_succeed_with_view({From, To}, {_Ctx, {Source, Target}}) ->
-    RepObject = {[
-        {<<"source">>, db_url(From, Source)},
-        {<<"target">>, db_url(To, Target)},
-        {<<"filter">>, <<"_view">>},
-        {<<"query_params">>, {[
-            {<<"view">>, <<"filter_ddoc/mammals">>}
-        ]}}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, db_url(From, Source)},
+            {<<"target">>, db_url(To, Target)},
+            {<<"filter">>, <<"_view">>},
+            {<<"query_params">>,
+                {[
+                    {<<"view">>, <<"filter_ddoc/mammals">>}
+                ]}}
+        ]},
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
     FilterFun = fun(_DocId, {Props}) ->
         couch_util:get_value(<<"class">>, Props) == <<"mammal">>
@@ -156,11 +172,11 @@ should_succeed_with_view({From, To}, {_Ctx, {Source, Target}}) ->
     {ok, TargetDbInfo, AllReplies} = compare_dbs(Source, Target, FilterFun),
     {lists:flatten(io_lib:format("~p -> ~p", [From, To])), [
         {"Target DB has proper number of docs",
-        ?_assertEqual(1, proplists:get_value(doc_count, TargetDbInfo))},
+            ?_assertEqual(1, proplists:get_value(doc_count, TargetDbInfo))},
         {"Target DB doesn't have deleted docs",
-        ?_assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo))},
+            ?_assertEqual(0, proplists:get_value(doc_del_count, TargetDbInfo))},
         {"All the docs filtered as expected",
-        ?_assert(lists:all(fun(Valid) -> Valid end, AllReplies))}
+            ?_assert(lists:all(fun(Valid) -> Valid end, AllReplies))}
     ]}.
 
 compare_dbs(Source, Target, FilterFun) ->
@@ -173,10 +189,10 @@ compare_dbs(Source, Target, FilterFun) ->
         case FilterFun(DocId, SourceDoc) of
             true ->
                 ValidReply = {ok, DocId, SourceDoc} == TargetReply,
-                {ok, [ValidReply|Acc]};
+                {ok, [ValidReply | Acc]};
             false ->
                 ValidReply = {not_found, missing} == TargetReply,
-                {ok, [ValidReply|Acc]}
+                {ok, [ValidReply | Acc]}
         end
     end,
     {ok, AllReplies} = couch_db:fold_docs(SourceDb, Fun, [], []),
@@ -203,30 +219,34 @@ create_db() ->
 create_docs(DbName) ->
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
     DDoc = couch_doc:from_json_obj(?DDOC),
-    Doc1 = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"doc1">>},
-        {<<"class">>, <<"mammal">>},
-        {<<"value">>, 1}
-
-    ]}),
-    Doc2 = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"doc2">>},
-        {<<"class">>, <<"amphibians">>},
-        {<<"value">>, 2}
-
-    ]}),
-    Doc3 = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"doc3">>},
-        {<<"class">>, <<"reptiles">>},
-        {<<"value">>, 3}
-
-    ]}),
-    Doc4 = couch_doc:from_json_obj({[
-        {<<"_id">>, <<"doc4">>},
-        {<<"class">>, <<"arthropods">>},
-        {<<"value">>, 2}
-
-    ]}),
+    Doc1 = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"doc1">>},
+            {<<"class">>, <<"mammal">>},
+            {<<"value">>, 1}
+        ]}
+    ),
+    Doc2 = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"doc2">>},
+            {<<"class">>, <<"amphibians">>},
+            {<<"value">>, 2}
+        ]}
+    ),
+    Doc3 = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"doc3">>},
+            {<<"class">>, <<"reptiles">>},
+            {<<"value">>, 3}
+        ]}
+    ),
+    Doc4 = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, <<"doc4">>},
+            {<<"class">>, <<"arthropods">>},
+            {<<"value">>, 2}
+        ]}
+    ),
     {ok, _} = couch_db:update_docs(Db, [DDoc, Doc1, Doc2, Doc3, Doc4]),
     couch_db:close(Db).
 

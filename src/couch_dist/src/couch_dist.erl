@@ -12,57 +12,59 @@
 
 -module(couch_dist).
 
--export([childspecs/0, listen/2, accept/1, accept_connection/5,
-    setup/5, close/1, select/1, is_node_name/1]).
+-export([
+    childspecs/0,
+    listen/2,
+    accept/1,
+    accept_connection/5,
+    setup/5,
+    close/1,
+    select/1,
+    is_node_name/1
+]).
 
 % Just for tests
 -export([no_tls/1, get_init_args/0]).
 
-
 childspecs() ->
-    {ok, [{ssl_dist_sup, {ssl_dist_sup, start_link, []},
-        permanent, infinity, supervisor, [ssl_dist_sup]}]}.
-
+    {ok, [
+        {ssl_dist_sup, {ssl_dist_sup, start_link, []}, permanent, infinity, supervisor, [
+            ssl_dist_sup
+        ]}
+    ]}.
 
 listen(Name, Host) ->
-    NodeName = case is_atom(Name) of
-        true -> atom_to_list(Name);
-        false -> Name
-    end,
+    NodeName =
+        case is_atom(Name) of
+            true -> atom_to_list(Name);
+            false -> Name
+        end,
     Mod = inet_dist(NodeName ++ "@" ++ Host),
     Mod:listen(NodeName, Host).
-
 
 accept(Listen) ->
     Mod = inet_dist(node()),
     Mod:accept(Listen).
 
-
 accept_connection(AcceptPid, DistCtrl, MyNode, Allowed, SetupTime) ->
     Mod = inet_dist(MyNode),
     Mod:accept_connection(AcceptPid, DistCtrl, MyNode, Allowed, SetupTime).
-
 
 setup(Node, Type, MyNode, LongOrShortNames, SetupTime) ->
     Mod = inet_dist(Node),
     Mod:setup(Node, Type, MyNode, LongOrShortNames, SetupTime).
 
-
 close(Socket) ->
     inet_tls_dist:close(Socket).
-
 
 select(Node) ->
     inet_tls_dist:select(Node).
 
-
 is_node_name(Node) ->
     inet_tls_dist:is_node_name(Node).
 
-
 get_init_args() ->
     init:get_argument(couch_dist).
-
 
 inet_dist(Node) ->
     case no_tls(Node) of
@@ -70,18 +72,16 @@ inet_dist(Node) ->
         false -> inet_tls_dist
     end.
 
-
 no_tls(NodeName) when is_atom(NodeName) ->
     no_tls(atom_to_list(NodeName));
-
 no_tls(NodeName) when is_list(NodeName) ->
     case ?MODULE:get_init_args() of
         {ok, Args} ->
             GlobPatterns = [V || [K, V] <- Args, K == "no_tls"],
             lists:any(fun(P) -> match(NodeName, P) end, GlobPatterns);
-        error -> false
+        error ->
+            false
     end.
-
 
 match(_NodeName, "true") ->
     true;
@@ -95,10 +95,8 @@ match(NodeName, Pattern) ->
         end,
     re:run(NodeName, RE) /= nomatch.
 
-
 to_re(GlobPattern) ->
     re:compile([$^, lists:flatmap(fun glob_re/1, GlobPattern), $$]).
-
 
 glob_re($*) ->
     ".*";

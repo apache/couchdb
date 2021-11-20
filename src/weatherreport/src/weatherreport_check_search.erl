@@ -27,10 +27,12 @@
 -module(weatherreport_check_search).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -spec description() -> string().
 description() ->

@@ -24,12 +24,11 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-
 init([]) ->
-    {ok, {
-        {one_for_one, 5, 10}, [
-            ?CHILD(couch_stats_aggregator, worker),
-            ?CHILD(couch_stats_process_tracker, worker)
-        ]
-    }}.
-
+    {ok,
+        {
+            {one_for_one, 5, 10}, [
+                ?CHILD(couch_stats_aggregator, worker),
+                ?CHILD(couch_stats_process_tracker, worker)
+            ]
+        }}.

@@ -14,7 +14,6 @@
 -behaviour(application).
 -export([start/2, stop/1]).
 
-
 start(_Type, StartArgs) ->
     rexi_sup:start_link(StartArgs).
 

@@ -25,7 +25,6 @@
     handle_info/2
 ]).
 
-
 start_link() ->
     couch_event_listener:start_link(?MODULE, nil, [all_dbs]).
 

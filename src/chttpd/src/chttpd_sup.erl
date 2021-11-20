@@ -51,13 +51,11 @@ init([]) ->
         },
         ?CHILD(chttpd, worker),
         ?CHILD(chttpd_auth_cache, worker),
-        {chttpd_auth_cache_lru,
-	 {ets_lru, start_link, [chttpd_auth_cache_lru, lru_opts()]},
-	 permanent, 5000, worker, [ets_lru]}
+        {chttpd_auth_cache_lru, {ets_lru, start_link, [chttpd_auth_cache_lru, lru_opts()]},
+            permanent, 5000, worker, [ets_lru]}
     ],
 
-    {ok, {{one_for_one, 3, 10},
-        couch_epi:register_service(chttpd_epi, Children)}}.
+    {ok, {{one_for_one, 3, 10}, couch_epi:register_service(chttpd_epi, Children)}}.
 
 handle_config_change("chttpd", "bind_address", Value, _, Settings) ->
     maybe_replace(bind_address, Value, Settings);
@@ -78,17 +76,21 @@ settings() ->
         {bind_address, config:get("chttpd", "bind_address")},
         {port, config:get("chttpd", "port")},
         {backlog, config:get_integer("chttpd", "backlog", ?DEFAULT_BACKLOG)},
-        {server_options, config:get("chttpd",
-            "server_options", ?DEFAULT_SERVER_OPTIONS)}
+        {server_options,
+            config:get(
+                "chttpd",
+                "server_options",
+                ?DEFAULT_SERVER_OPTIONS
+            )}
     ].
 
 maybe_replace(Key, Value, Settings) ->
     case couch_util:get_value(Key, Settings) of
-    Value ->
-        {ok, Settings};
-    _ ->
-        chttpd:stop(),
-        {ok, lists:keyreplace(Key, 1, Settings, {Key, Value})}
+        Value ->
+            {ok, Settings};
+        _ ->
+            chttpd:stop(),
+            {ok, lists:keyreplace(Key, 1, Settings, {Key, Value})}
     end.
 
 lru_opts() ->
@@ -105,7 +107,9 @@ append_if_set({_Key, 0}, Opts) ->
 append_if_set({Key, Value}, Opts) ->
     couch_log:error(
         "The value for `~s` should be string convertable "
-        "to integer which is >= 0 (got `~p`)", [Key, Value]),
+        "to integer which is >= 0 (got `~p`)",
+        [Key, Value]
+    ),
     Opts.
 
 notify_started() ->
@@ -115,9 +119,12 @@ notify_error(Error) ->
     couch_log:error("Error starting Apache CouchDB:~n~n    ~p~n~n", [Error]).
 
 notify_uris() ->
-    lists:foreach(fun(Uri) ->
-        couch_log:info("Apache CouchDB has started on ~s", [Uri])
-    end, get_uris()).
+    lists:foreach(
+        fun(Uri) ->
+            couch_log:info("Apache CouchDB has started on ~s", [Uri])
+        end,
+        get_uris()
+    ).
 
 write_uris() ->
     case config:get("couchdb", "uri_file", undefined) of
@@ -130,12 +137,15 @@ write_uris() ->
 
 get_uris() ->
     Ip = config:get("chttpd", "bind_address"),
-    lists:flatmap(fun(Uri) ->
-        case get_uri(Uri, Ip) of
-            undefined -> [];
-            Else -> [Else]
-        end
-    end, [chttpd, couch_httpd, https]).
+    lists:flatmap(
+        fun(Uri) ->
+            case get_uri(Uri, Ip) of
+                undefined -> [];
+                Else -> [Else]
+            end
+        end,
+        [chttpd, couch_httpd, https]
+    ).
 
 get_uri(Name, Ip) ->
     case get_port(Name) of

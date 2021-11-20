@@ -20,7 +20,7 @@
 ]).
 
 start_link() ->
-    supervisor:start_link({local,?MODULE}, ?MODULE, []).
+    supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
 %%=============================================================================
 %% supervisor callbacks

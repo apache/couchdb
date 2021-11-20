@@ -20,14 +20,15 @@
 
 group_pid({Shard, GroupId}) ->
     case couch_view_group:open_db_group(Shard, GroupId) of
-    {ok, Group} ->
-        try
-            gen_server:call(couch_view, {get_group_server, Shard, Group})
-        catch _:Error ->
-            {error, Error}
-        end;
-    Else ->
-        Else
+        {ok, Group} ->
+            try
+                gen_server:call(couch_view, {get_group_server, Shard, Group})
+            catch
+                _:Error ->
+                    {error, Error}
+            end;
+        Else ->
+            Else
     end.
 
 get(Channel, Key) ->
@@ -37,7 +38,7 @@ get(Channel, Key, Default) ->
     config:get("smoosh." ++ Channel, Key, Default).
 
 split(CSV) ->
-    re:split(CSV, "\\s*,\\s*", [{return,list}, trim]).
+    re:split(CSV, "\\s*,\\s*", [{return, list}, trim]).
 
 stringify({DbName, GroupId}) ->
     io_lib:format("~s ~s", [DbName, GroupId]);
@@ -48,14 +49,14 @@ stringify(DbName) ->
 
 ignore_db({DbName, _GroupName}) ->
     ignore_db(DbName);
-ignore_db(DbName) when is_binary(DbName)->
+ignore_db(DbName) when is_binary(DbName) ->
     ignore_db(?b2l(DbName));
 ignore_db(DbName) when is_list(DbName) ->
     case config:get("smoosh.ignore", DbName, false) of
-    "true" ->
-        true;
-    _ ->
-        false
+        "true" ->
+            true;
+        _ ->
+            false
     end;
 ignore_db(Db) ->
     ignore_db(couch_db:name(Db)).
@@ -68,12 +69,11 @@ in_allowed_window(Channel) ->
 in_allowed_window(From, To) ->
     {_, {HH, MM, _}} = calendar:universal_time(),
     case From < To of
-    true ->
-        ({HH, MM} >= From) andalso ({HH, MM} < To);
-    false ->
-        ({HH, MM} >= From) orelse ({HH, MM} < To)
+        true ->
+            ({HH, MM} >= From) andalso ({HH, MM} < To);
+        false ->
+            ({HH, MM} >= From) orelse ({HH, MM} < To)
     end.
-
 
 parse_time(undefined, Default) ->
     Default;
@@ -82,9 +82,10 @@ parse_time(String, Default) ->
         [HH, MM] ->
             try
                 {list_to_integer(HH), list_to_integer(MM)}
-            catch error:badarg ->
-                couch_log:error("Malformed compaction schedule configuration: ~s", [String]),
-                Default
+            catch
+                error:badarg ->
+                    couch_log:error("Malformed compaction schedule configuration: ~s", [String]),
+                    Default
             end;
         _Else ->
             couch_log:error("Malformed compaction schedule configuration: ~s", [String]),

@@ -12,9 +12,7 @@
 
 -module(couch_bt_engine_tests).
 
-
 -include_lib("eunit/include/eunit.hrl").
 
-
-couch_bt_engine_test_()->
+couch_bt_engine_test_() ->
     cpse_util:create_tests(couch, couch_bt_engine, "couch").

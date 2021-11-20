@@ -16,14 +16,11 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 
-
 setup_all() ->
     test_util:start_couch([couch_replicator, chttpd, mem3, fabric]).
 
-
 teardown_all(Ctx) ->
     ok = test_util:stop_couch(Ctx).
-
 
 setup() ->
     meck:unload(),
@@ -31,13 +28,11 @@ setup() ->
     Target = setup_db(),
     {Source, Target}.
 
-
 teardown({Source, Target}) ->
     meck:unload(),
     teardown_db(Source),
     teardown_db(Target),
     ok.
-
 
 error_reporting_test_() ->
     {
@@ -59,7 +54,6 @@ error_reporting_test_() ->
         }
     }.
 
-
 t_fail_bulk_docs({Source, Target}) ->
     ?_test(begin
         populate_db(Source, 1, 5),
@@ -75,7 +69,6 @@ t_fail_bulk_docs({Source, Target}) ->
 
         couch_replicator_notifier:stop(Listener)
     end).
-
 
 t_fail_changes_reader({Source, Target}) ->
     ?_test(begin
@@ -93,7 +86,6 @@ t_fail_changes_reader({Source, Target}) ->
         couch_replicator_notifier:stop(Listener)
     end).
 
-
 t_fail_revs_diff({Source, Target}) ->
     ?_test(begin
         populate_db(Source, 1, 5),
@@ -109,7 +101,6 @@ t_fail_revs_diff({Source, Target}) ->
 
         couch_replicator_notifier:stop(Listener)
     end).
-
 
 t_fail_changes_queue({Source, Target}) ->
     ?_test(begin
@@ -130,7 +121,6 @@ t_fail_changes_queue({Source, Target}) ->
         couch_replicator_notifier:stop(Listener)
     end).
 
-
 t_fail_changes_manager({Source, Target}) ->
     ?_test(begin
         populate_db(Source, 1, 5),
@@ -149,7 +139,6 @@ t_fail_changes_manager({Source, Target}) ->
         ?assertEqual({changes_manager_died, bam}, Result),
         couch_replicator_notifier:stop(Listener)
     end).
-
 
 t_fail_changes_reader_proc({Source, Target}) ->
     ?_test(begin
@@ -170,9 +159,10 @@ t_fail_changes_reader_proc({Source, Target}) ->
         couch_replicator_notifier:stop(Listener)
     end).
 
-
 mock_fail_req(Path, Return) ->
-    meck:expect(ibrowse, send_req_direct,
+    meck:expect(
+        ibrowse,
+        send_req_direct,
         fun(W, Url, Headers, Meth, Body, Opts, TOut) ->
             Args = [W, Url, Headers, Meth, Body, Opts, TOut],
             {ok, {_, _, _, _, UPath, _}} = http_uri:parse(Url),
@@ -180,18 +170,19 @@ mock_fail_req(Path, Return) ->
                 true -> Return;
                 false -> meck:passthrough(Args)
             end
-        end).
-
+        end
+    ).
 
 rep_result_listener(RepId) ->
     ReplyTo = self(),
     {ok, _Listener} = couch_replicator_notifier:start_link(
-        fun({_, RepId2, _} = Ev) when RepId2 =:= RepId ->
+        fun
+            ({_, RepId2, _} = Ev) when RepId2 =:= RepId ->
                 ReplyTo ! Ev;
             (_) ->
                 ok
-        end).
-
+        end
+    ).
 
 wait_rep_result(RepId) ->
     receive
@@ -199,18 +190,14 @@ wait_rep_result(RepId) ->
         {error, RepId, Reason} -> {error, Reason}
     end.
 
-
-
 setup_db() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
 
-
 teardown_db(DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]).
-
 
 populate_db(DbName, Start, End) ->
     {ok, Db} = couch_db:open_int(DbName, []),
@@ -220,10 +207,11 @@ populate_db(DbName, Start, End) ->
             Doc = #doc{id = Id, body = {[]}},
             [Doc | Acc]
         end,
-        [], lists:seq(Start, End)),
+        [],
+        lists:seq(Start, End)
+    ),
     {ok, _} = couch_db:update_docs(Db, Docs, []),
     ok = couch_db:close(Db).
-
 
 wait_target_in_sync(Source, Target) ->
     {ok, SourceDb} = couch_db:open_int(Source, []),
@@ -232,13 +220,14 @@ wait_target_in_sync(Source, Target) ->
     SourceDocCount = couch_util:get_value(doc_count, SourceInfo),
     wait_target_in_sync_loop(SourceDocCount, Target, 300).
 
-
 wait_target_in_sync_loop(_DocCount, _TargetName, 0) ->
-    erlang:error({assertion_failed, [
-          {module, ?MODULE}, {line, ?LINE},
-          {reason, "Could not get source and target databases in sync"}
-    ]});
-
+    erlang:error(
+        {assertion_failed, [
+            {module, ?MODULE},
+            {line, ?LINE},
+            {reason, "Could not get source and target databases in sync"}
+        ]}
+    );
 wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
     {ok, Target} = couch_db:open_int(TargetName, []),
     {ok, TargetInfo} = couch_db:get_db_info(Target),
@@ -252,19 +241,19 @@ wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft) ->
             wait_target_in_sync_loop(DocCount, TargetName, RetriesLeft - 1)
     end.
 
-
 replicate(Source, Target) ->
     SrcUrl = couch_replicator_test_helper:db_url(Source),
     TgtUrl = couch_replicator_test_helper:db_url(Target),
-    RepObject = {[
-        {<<"source">>, SrcUrl},
-        {<<"target">>, TgtUrl},
-        {<<"continuous">>, true},
-        {<<"worker_processes">>, 1},
-        {<<"retries_per_request">>, 1},
-        % Low connection timeout so _changes feed gets restarted quicker
-        {<<"connection_timeout">>, 3000}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, SrcUrl},
+            {<<"target">>, TgtUrl},
+            {<<"continuous">>, true},
+            {<<"worker_processes">>, 1},
+            {<<"retries_per_request">>, 1},
+            % Low connection timeout so _changes feed gets restarted quicker
+            {<<"connection_timeout">>, 3000}
+        ]},
     {ok, Rep} = couch_replicator_utils:parse_rep_doc(RepObject, ?ADMIN_USER),
     ok = couch_replicator_scheduler:add_job(Rep),
     couch_replicator_scheduler:reschedule(),

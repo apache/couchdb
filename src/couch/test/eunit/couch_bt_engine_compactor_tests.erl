@@ -12,14 +12,11 @@
 
 -module(couch_bt_engine_compactor_tests).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
-
 -define(DELAY, 100).
 -define(WAIT_DELAY_COUNT, 50).
-
 
 setup() ->
     DbName = ?tempdb(),
@@ -28,11 +25,9 @@ setup() ->
     create_docs(DbName),
     DbName.
 
-
 teardown(DbName) when is_binary(DbName) ->
     couch_server:delete(DbName, [?ADMIN_CTX]),
     ok.
-
 
 compaction_resume_test_() ->
     {
@@ -48,7 +43,6 @@ compaction_resume_test_() ->
             ]
         }
     }.
-
 
 compaction_resume(DbName) ->
     ?_test(begin
@@ -66,13 +60,11 @@ compaction_resume(DbName) ->
         check_db_validity(DbName)
     end).
 
-
 check_db_validity(DbName) ->
     couch_util:with_db(DbName, fun(Db) ->
         ?assertEqual({ok, 3}, couch_db:get_doc_count(Db)),
         ?assertEqual(3, couch_db:count_changes_since(Db, 0))
     end).
-
 
 with_mecked_emsort(Fun) ->
     meck:new(couch_emsort, [passthrough]),
@@ -83,34 +75,34 @@ with_mecked_emsort(Fun) ->
         meck:unload()
     end.
 
-
 create_docs(DbName) ->
     couch_util:with_db(DbName, fun(Db) ->
-        Doc1 = couch_doc:from_json_obj({[
-            {<<"_id">>, <<"doc1">>},
-            {<<"value">>, 1}
-
-        ]}),
-        Doc2 = couch_doc:from_json_obj({[
-            {<<"_id">>, <<"doc2">>},
-            {<<"value">>, 2}
-
-        ]}),
-        Doc3 = couch_doc:from_json_obj({[
-            {<<"_id">>, <<"doc3">>},
-            {<<"value">>, 3}
-
-        ]}),
+        Doc1 = couch_doc:from_json_obj(
+            {[
+                {<<"_id">>, <<"doc1">>},
+                {<<"value">>, 1}
+            ]}
+        ),
+        Doc2 = couch_doc:from_json_obj(
+            {[
+                {<<"_id">>, <<"doc2">>},
+                {<<"value">>, 2}
+            ]}
+        ),
+        Doc3 = couch_doc:from_json_obj(
+            {[
+                {<<"_id">>, <<"doc3">>},
+                {<<"value">>, 3}
+            ]}
+        ),
         {ok, _} = couch_db:update_docs(Db, [Doc1, Doc2, Doc3])
     end).
-
 
 compact_db(DbName) ->
     couch_util:with_db(DbName, fun(Db) ->
         {ok, _} = couch_db:start_compact(Db)
     end),
     wait_db_compact_done(DbName, ?WAIT_DELAY_COUNT).
-
 
 wait_db_compact_done(_DbName, 0) ->
     Failure = [
@@ -123,7 +115,10 @@ wait_db_compact_done(DbName, N) ->
     IsDone = couch_util:with_db(DbName, fun(Db) ->
         not is_pid(couch_db:get_compactor_pid(Db))
     end),
-    if IsDone -> ok; true ->
-        timer:sleep(?DELAY),
-        wait_db_compact_done(DbName, N - 1)
+    if
+        IsDone ->
+            ok;
+        true ->
+            timer:sleep(?DELAY),
+            wait_db_compact_done(DbName, N - 1)
     end.

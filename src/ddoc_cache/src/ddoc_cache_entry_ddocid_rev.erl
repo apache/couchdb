@@ -12,7 +12,6 @@
 
 -module(ddoc_cache_entry_ddocid_rev).
 
-
 -export([
     dbname/1,
     ddocid/1,
@@ -20,28 +19,21 @@
     insert/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
-
 
 dbname({DbName, _, _}) ->
     DbName.
 
-
 ddocid({_, DDocId, _}) ->
     DDocId.
-
 
 recover({DbName, DDocId, Rev}) ->
     Opts = [ejson_body, ?ADMIN_CTX],
     {ok, [Resp]} = fabric:open_revs(DbName, DDocId, [Rev], Opts),
     Resp.
 
-
 insert({DbName, DDocId, _Rev}, {ok, #doc{} = DDoc}) ->
     Key = {ddoc_cache_entry_ddocid, {DbName, DDocId}},
     spawn(fun() -> ddoc_cache_lru:insert(Key, DDoc) end);
-
 insert(_, _) ->
     ok.
-

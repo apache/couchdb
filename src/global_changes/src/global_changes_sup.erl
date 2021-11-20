@@ -13,7 +13,6 @@
 -module(global_changes_sup).
 -behavior(supervisor).
 
-
 -export([start_link/0]).
 
 -export([init/1]).
@@ -27,10 +26,10 @@
 start_link() ->
     supervisor:start_link({local, ?MODULE}, ?MODULE, []).
 
-
 init([]) ->
     {ok, {
-        {one_for_one, 5, 10}, couch_epi:register_service(global_changes_epi, [
+        {one_for_one, 5, 10},
+        couch_epi:register_service(global_changes_epi, [
             {
                 config_listener_mon,
                 {config_listener_mon, start_link, [?MODULE, nil]},
@@ -47,36 +46,35 @@ init([]) ->
                 worker,
                 [global_changes_server]
             }
-    ])}}.
+        ])
+    }}.
 
 handle_config_change("global_changes", "max_event_delay", MaxDelayStr, _, _) ->
     try list_to_integer(MaxDelayStr) of
         MaxDelay ->
             gen_server:cast(?LISTENER, {set_max_event_delay, MaxDelay})
-    catch error:badarg ->
-        ok
+    catch
+        error:badarg ->
+            ok
     end,
     {ok, nil};
-
 handle_config_change("global_changes", "max_write_delay", MaxDelayStr, _, _) ->
     try list_to_integer(MaxDelayStr) of
         MaxDelay ->
             gen_server:cast(?SERVER, {set_max_write_delay, MaxDelay})
-    catch error:badarg ->
-        ok
+    catch
+        error:badarg ->
+            ok
     end,
     {ok, nil};
-
 handle_config_change("global_changes", "update_db", "false", _, _) ->
     gen_server:cast(?LISTENER, {set_update_db, false}),
     gen_server:cast(?SERVER, {set_update_db, false}),
     {ok, nil};
-
 handle_config_change("global_changes", "update_db", _, _, _) ->
     gen_server:cast(?LISTENER, {set_update_db, true}),
     gen_server:cast(?SERVER, {set_update_db, true}),
     {ok, nil};
-
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 

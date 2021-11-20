@@ -12,9 +12,7 @@
 
 -module(global_changes_util).
 
-
 -export([get_dbname/0]).
-
 
 get_dbname() ->
     case application:get_env(global_changes, dbname) of

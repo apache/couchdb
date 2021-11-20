@@ -10,7 +10,6 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-
 -module(mem3_epi).
 
 -behaviour(couch_epi_plugin).
@@ -33,7 +32,6 @@ providers() ->
         {couch_db, mem3_plugin_couch_db},
         {chttpd_handlers, mem3_httpd_handlers}
     ].
-
 
 services() ->
     [].

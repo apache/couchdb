@@ -43,16 +43,13 @@
     do_open/1
 ]).
 
-
 -include("ddoc_cache.hrl").
-
 
 -ifndef(TEST).
 -define(ENTRY_SHUTDOWN_TIMEOUT, 5000).
 -else.
 -define(ENTRY_SHUTDOWN_TIMEOUT, 500).
 -endif.
-
 
 -record(st, {
     key,
@@ -63,27 +60,21 @@
     accessed
 }).
 
-
 dbname({Mod, Arg}) ->
     Mod:dbname(Arg).
-
 
 ddocid({Mod, Arg}) ->
     Mod:ddocid(Arg).
 
-
 recover({Mod, Arg}) ->
     Mod:recover(Arg).
-
 
 insert({Mod, Arg}, Value) ->
     Mod:insert(Arg, Value).
 
-
 start_link(Key, Default) ->
     Pid = proc_lib:spawn_link(?MODULE, init, [{Key, Default}]),
     {ok, Pid}.
-
 
 shutdown(Pid) ->
     Ref = erlang:monitor(process, Pid),
@@ -97,7 +88,6 @@ shutdown(Pid) ->
         erlang:demonitor(Ref, [flush]),
         erlang:exit({timeout, {entry_shutdown, Pid}})
     end.
-
 
 open(Pid, Key) ->
     try
@@ -118,14 +108,11 @@ open(Pid, Key) ->
             recover(Key)
     end.
 
-
 accessed(Pid) ->
     gen_server:cast(Pid, accessed).
 
-
 refresh(Pid) ->
     gen_server:cast(Pid, force_refresh).
-
 
 init({Key, undefined}) ->
     true = ets:update_element(?CACHE, Key, {#entry.pid, self()}),
@@ -137,7 +124,6 @@ init({Key, undefined}) ->
     },
     ?EVENT(started, Key),
     gen_server:enter_loop(?MODULE, [], St);
-
 init({Key, Wrapped}) ->
     Default = ddoc_cache_value:unwrap(Wrapped),
     Updates = [
@@ -158,7 +144,6 @@ init({Key, Wrapped}) ->
     ?EVENT(default_started, Key),
     gen_server:enter_loop(?MODULE, [], St, hibernate).
 
-
 terminate(_Reason, St) ->
     #st{
         key = Key,
@@ -172,29 +157,29 @@ terminate(_Reason, St) ->
     true = ets:select_delete(?CACHE, CacheMSpec) < 2,
     % We may have already deleted our LRU entry
     % during shutdown
-    if Ts == undefined -> ok; true ->
-        LruMSpec = [{{{Ts, Key, self()}}, [], [true]}],
-        true = ets:select_delete(?LRU, LruMSpec) < 2
+    if
+        Ts == undefined ->
+            ok;
+        true ->
+            LruMSpec = [{{{Ts, Key, self()}}, [], [true]}],
+            true = ets:select_delete(?LRU, LruMSpec) < 2
     end,
     % Blow away any current opener if it exists
-    if not is_pid(Pid) -> ok; true ->
-        catch exit(Pid, kill)
+    if
+        not is_pid(Pid) -> ok;
+        true -> catch exit(Pid, kill)
     end,
     ok.
-
 
 handle_call(open, From, #st{opener = Pid} = St) when is_pid(Pid) ->
     NewSt = St#st{
         waiters = [From | St#st.waiters]
     },
     {noreply, NewSt};
-
 handle_call(open, _From, St) ->
     {reply, St#st.val, St};
-
 handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
-
 
 handle_cast(accessed, St) ->
     ?EVENT(accessed, St#st.key),
@@ -203,7 +188,6 @@ handle_cast(accessed, St) ->
         accessed = St#st.accessed + 1
     },
     {noreply, update_lru(NewSt)};
-
 handle_cast(force_refresh, St) ->
     % If we had frequent design document updates
     % they could end up racing accessed events and
@@ -211,18 +195,18 @@ handle_cast(force_refresh, St) ->
     % cache. To prevent this we just make sure that
     % accessed is set to at least 1 before we
     % execute a refresh.
-    NewSt = if St#st.accessed > 0 -> St; true ->
-        St#st{accessed = 1}
-    end,
+    NewSt =
+        if
+            St#st.accessed > 0 -> St;
+            true -> St#st{accessed = 1}
+        end,
     % We remove the cache entry value so that any
     % new client comes to us for the refreshed
     % value.
     true = ets:update_element(?CACHE, St#st.key, {#entry.val, undefined}),
     handle_cast(refresh, NewSt);
-
 handle_cast(refresh, #st{accessed = 0} = St) ->
     {stop, normal, St};
-
 handle_cast(refresh, #st{opener = Ref} = St) when is_reference(Ref) ->
     #st{
         key = Key
@@ -233,7 +217,6 @@ handle_cast(refresh, #st{opener = Ref} = St) when is_reference(Ref) ->
         accessed = 0
     },
     {noreply, NewSt};
-
 handle_cast(refresh, #st{opener = Pid} = St) when is_pid(Pid) ->
     catch exit(Pid, kill),
     receive
@@ -244,14 +227,11 @@ handle_cast(refresh, #st{opener = Pid} = St) when is_pid(Pid) ->
         accessed = 0
     },
     {noreply, NewSt};
-
 handle_cast(shutdown, St) ->
     remove_from_cache(St),
     {stop, normal, St};
-
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
-
 
 handle_info({'DOWN', _, _, Pid, Resp}, #st{key = Key, opener = Pid} = St) ->
     case Resp of
@@ -275,25 +255,21 @@ handle_info({'DOWN', _, _, Pid, Resp}, #st{key = Key, opener = Pid} = St) ->
             respond(St#st.waiters, {Status, Other}),
             {stop, normal, NewSt}
     end;
-
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
-
 code_change(_, St, _) ->
     {ok, St}.
-
 
 spawn_opener(Key) ->
     {Pid, _} = erlang:spawn_monitor(?MODULE, do_open, [Key]),
     Pid.
 
-
 start_timer() ->
     TimeOut = config:get_integer(
-            "ddoc_cache", "refresh_timeout", ?REFRESH_TIMEOUT),
+        "ddoc_cache", "refresh_timeout", ?REFRESH_TIMEOUT
+    ),
     erlang:send_after(TimeOut, self(), {'$gen_cast', refresh}).
-
 
 do_open(Key) ->
     try recover(Key) of
@@ -303,25 +279,20 @@ do_open(Key) ->
         erlang:exit({open_error, Key, {T, R, S}})
     end.
 
-
 update_lru(#st{key = Key, ts = Ts} = St) ->
     remove_from_lru(Ts, Key),
     NewTs = os:timestamp(),
     true = ets:insert(?LRU, {{NewTs, Key, self()}}),
     St#st{ts = NewTs}.
 
-
 update_cache(#st{val = undefined} = St, Val) ->
     true = ets:update_element(?CACHE, St#st.key, {#entry.val, Val}),
     ?EVENT(inserted, St#st.key);
-
 update_cache(#st{val = V1} = _St, V2) when {open_ok, {ok, V2}} == V1 ->
     ?EVENT(update_noop, _St#st.key);
-
 update_cache(St, Val) ->
     true = ets:update_element(?CACHE, St#st.key, {#entry.val, Val}),
     ?EVENT(updated, {St#st.key, Val}).
-
 
 remove_from_cache(St) ->
     #st{
@@ -335,13 +306,14 @@ remove_from_cache(St) ->
     ?EVENT(removed, St#st.key),
     ok.
 
-
 remove_from_lru(Ts, Key) ->
-    if Ts == undefined -> ok; true ->
-        LruMSpec = [{{{Ts, Key, self()}}, [], [true]}],
-        1 = ets:select_delete(?LRU, LruMSpec)
+    if
+        Ts == undefined ->
+            ok;
+        true ->
+            LruMSpec = [{{{Ts, Key, self()}}, [], [true]}],
+            1 = ets:select_delete(?LRU, LruMSpec)
     end.
-
 
 drain_accessed() ->
     receive
@@ -350,7 +322,6 @@ drain_accessed() ->
     after 0 ->
         ok
     end.
-
 
 respond(Waiters, Resp) ->
     [gen_server:reply(W, Resp) || W <- Waiters].

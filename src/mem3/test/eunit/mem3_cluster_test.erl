@@ -21,7 +21,6 @@
     cluster_stable/1
 ]).
 
-
 % Mem3 cluster callbacks
 
 cluster_unstable(Server) ->
@@ -31,7 +30,6 @@ cluster_unstable(Server) ->
 cluster_stable(Server) ->
     Server ! cluster_stable,
     Server.
-
 
 mem3_cluster_test_test_() ->
     {
@@ -43,80 +41,78 @@ mem3_cluster_test_test_() ->
             t_cluster_unstable_delivered_on_nodeup(),
             t_cluster_unstable_delivered_on_nodedown(),
             t_wait_period_is_reset_after_last_change()
-         ]
+        ]
     }.
 
-
 t_cluster_stable_during_startup_period() ->
-   ?_test(begin
+    ?_test(begin
         {ok, Pid} = mem3_cluster:start_link(?MODULE, self(), 1, 2),
         register(?MODULE, Pid),
         receive
             cluster_stable ->
                 ?assert(true)
-            after 1500 ->
-                throw(timeout)
+        after 1500 ->
+            throw(timeout)
         end,
         unlink(Pid),
         exit(Pid, kill)
     end).
 
-
 t_cluster_unstable_delivered_on_nodeup() ->
-   ?_test(begin
+    ?_test(begin
         {ok, Pid} = mem3_cluster:start_link(?MODULE, self(), 1, 2),
         register(?MODULE, Pid),
         Pid ! {nodeup, node()},
         receive
             cluster_unstable ->
                 ?assert(true)
-            after 1000 ->
-                throw(timeout)
+        after 1000 ->
+            throw(timeout)
         end,
         unlink(Pid),
         exit(Pid, kill)
     end).
 
-
 t_cluster_unstable_delivered_on_nodedown() ->
-   ?_test(begin
+    ?_test(begin
         {ok, Pid} = mem3_cluster:start_link(?MODULE, self(), 1, 2),
         register(?MODULE, Pid),
         Pid ! {nodedown, node()},
         receive
             cluster_unstable ->
                 ?assert(true)
-            after 1000 ->
-                throw(timeout)
+        after 1000 ->
+            throw(timeout)
         end,
         unlink(Pid),
         exit(Pid, kill)
     end).
 
-
 t_wait_period_is_reset_after_last_change() ->
-   ?_test(begin
+    ?_test(begin
         {ok, Pid} = mem3_cluster:start_link(?MODULE, self(), 1, 1),
         register(?MODULE, Pid),
         timer:sleep(800),
-        Pid ! {nodeup, node()}, % after 800 sec send a nodeup
+        % after 800 sec send a nodeup
+        Pid ! {nodeup, node()},
         receive
             cluster_stable ->
                 ?assert(false)
-            after 400 ->
-                ?assert(true) % stability check should have been reset
+        after 400 ->
+            % stability check should have been reset
+            ?assert(true)
         end,
         timer:sleep(1000),
         receive
             cluster_stable ->
                 ?assert(true)
-            after 0 ->
-                ?assert(false) % cluster_stable arrives after enough quiet time
+        after 0 ->
+            % cluster_stable arrives after enough quiet time
+            ?assert(false)
         end,
         unlink(Pid),
         exit(Pid, kill)
     end).
-
 
 % Test helper functions
 

@@ -41,10 +41,12 @@ dreyfus_blacklist_await_test_() ->
         "dreyfus black_list_doc await tests",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun start/0,
+            fun stop/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun do_not_await_1/0
                 ]
@@ -54,16 +56,24 @@ dreyfus_blacklist_await_test_() ->
 
 do_not_await_1() ->
     ok = meck:new(dreyfus_index, [passthrough]),
-    Denied = lists:flatten([?b2l(?DBNAME), ".", "black_list_doc", ".",
-        "my_index"]),
+    Denied = lists:flatten([
+        ?b2l(?DBNAME),
+        ".",
+        "black_list_doc",
+        ".",
+        "my_index"
+    ]),
     config:set("dreyfus_blacklist", Denied, "true"),
     dreyfus_test_util:wait_config_change(Denied, "true"),
-    Index = #index{dbname=?DBNAME, name=?INDEX_NAME, ddoc_id=?DDOC_ID},
+    Index = #index{dbname = ?DBNAME, name = ?INDEX_NAME, ddoc_id = ?DDOC_ID},
     State = create_state(?DBNAME, Index, nil, nil, []),
     Msg = "Index Blocked from Updating - db: ~p, ddocid: ~p name: ~p",
     Return = wait_log_message(Msg, fun() ->
-        {noreply, _NewState} = dreyfus_index:handle_call({await, 1},
-            self(), State)
+        {noreply, _NewState} = dreyfus_index:handle_call(
+            {await, 1},
+            self(),
+            State
+        )
     end),
     ?assertEqual(Return, ok).
 

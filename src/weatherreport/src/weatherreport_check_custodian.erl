@@ -33,10 +33,12 @@
 -module(weatherreport_check_custodian).
 -behaviour(weatherreport_check).
 
--export([description/0,
-         valid/0,
-         check/1,
-         format/1]).
+-export([
+    description/0,
+    valid/0,
+    check/1,
+    format/1
+]).
 
 -include_lib("eunit/include/eunit.hrl").
 

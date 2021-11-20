@@ -12,31 +12,25 @@
 
 -module(ddoc_cache_refresh_test).
 
-
 -export([
     recover/1
 ]).
-
 
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include("ddoc_cache_test.hrl").
 
-
 recover(DbName) ->
     {ok, {DbName, rand_string()}}.
-
 
 start_couch() ->
     Ctx = ddoc_cache_tutil:start_couch(),
     meck:new(ddoc_cache_ev, [passthrough]),
     Ctx.
 
-
 stop_couch(Ctx) ->
     meck:unload(),
     ddoc_cache_tutil:stop_couch(Ctx).
-
 
 check_refresh_test_() ->
     {
@@ -52,7 +46,6 @@ check_refresh_test_() ->
             {"check_upgrade_clause", fun check_upgrade_clause/1}
         ])
     }.
-
 
 refresh_ddoc({DbName, _}) ->
     ddoc_cache_tutil:clear(),
@@ -74,7 +67,6 @@ refresh_ddoc({DbName, _}) ->
     ?assertMatch({ok, Expect}, ddoc_cache:open_doc(DbName, ?FOOBAR)),
     ?assertEqual(2, ets:info(?CACHE, size)).
 
-
 refresh_ddoc_rev({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     meck:reset(ddoc_cache_ev),
@@ -95,7 +87,6 @@ refresh_ddoc_rev({DbName, _}) ->
     ?assertMatch({ok, RevDDoc}, ddoc_cache:open_doc(DbName, ?FOOBAR, Rev)),
     ?assertEqual(2, ets:info(?CACHE, size)).
 
-
 refresh_vdu({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     meck:reset(ddoc_cache_ev),
@@ -107,7 +98,6 @@ refresh_vdu({DbName, _}) ->
     ?assertMatch({ok, []}, ddoc_cache:open_validation_funs(DbName)),
     ?assertEqual(1, ets:info(?CACHE, size)).
 
-
 refresh_custom({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     meck:reset(ddoc_cache_ev),
@@ -117,7 +107,6 @@ refresh_custom({DbName, _}) ->
     meck:wait(ddoc_cache_ev, event, [updated, '_'], 1000),
     ?assertNotEqual({ok, Resp1}, ddoc_cache:open_custom(DbName, ?MODULE)),
     ?assertEqual(1, ets:info(?CACHE, size)).
-
 
 refresh_multiple({DbName, _}) ->
     ddoc_cache_tutil:clear(),
@@ -147,7 +136,6 @@ refresh_multiple({DbName, _}) ->
     ?assertEqual({ok, DDoc}, ddoc_cache:open_doc(DbName, ?FOOBAR, Rev)),
     ?assertEqual(2, ets:info(?CACHE, size)).
 
-
 check_upgrade_clause({DbName, _}) ->
     ddoc_cache_tutil:clear(),
     meck:reset(ddoc_cache_ev),
@@ -156,17 +144,14 @@ check_upgrade_clause({DbName, _}) ->
     gen_server:cast(ddoc_cache_opener, {do_evict, DbName, [?FOOBAR]}),
     meck:wait(ddoc_cache_ev, event, [update_noop, Key], 1000).
 
-
 rand_string() ->
     Bin = crypto:strong_rand_bytes(8),
     to_hex(Bin, []).
-
 
 to_hex(<<>>, Acc) ->
     list_to_binary(lists:reverse(Acc));
 to_hex(<<C1:4, C2:4, Rest/binary>>, Acc) ->
     to_hex(Rest, [hexdig(C1), hexdig(C2) | Acc]).
-
 
 hexdig(C) when C >= 0, C =< 9 ->
     C + $0;

@@ -90,7 +90,7 @@ handle_event(UsersDb, updated, #state{users = UsersDb} = St) ->
     maybe_push_shards(St);
 handle_event(<<"shards/", _/binary>> = ShardName, updated, St) ->
     Buckets = bucket_shard(ShardName, St#state.buckets),
-    maybe_push_shards(St#state{buckets=Buckets});
+    maybe_push_shards(St#state{buckets = Buckets});
 handle_event(<<"shards/", _:18/binary, _/binary>> = ShardName, deleted, St) ->
     mem3_sync:remove_shard(ShardName),
     maybe_push_shards(St);
@@ -100,11 +100,11 @@ handle_event(_DbName, _Event, St) ->
 handle_cast({set_frequency, Frequency}, St) ->
     #state{delay = Delay, buckets = Buckets0} = St,
     Buckets1 = rebucket_shards(Delay, Frequency, Buckets0),
-    maybe_push_shards(St#state{frequency=Frequency, buckets=Buckets1});
+    maybe_push_shards(St#state{frequency = Frequency, buckets = Buckets1});
 handle_cast({set_delay, Delay}, St) ->
     #state{frequency = Frequency, buckets = Buckets0} = St,
     Buckets1 = rebucket_shards(Delay, Frequency, Buckets0),
-    maybe_push_shards(St#state{delay=Delay, buckets=Buckets1});
+    maybe_push_shards(St#state{delay = Delay, buckets = Buckets1});
 handle_cast(Msg, St) ->
     couch_log:notice("unexpected cast to mem3_sync_event_listener: ~p", [Msg]),
     maybe_push_shards(St).
@@ -134,19 +134,20 @@ set_config(Cmd, Value, Error) ->
     try list_to_integer(Value) of
         IntegerValue ->
             couch_event_listener:cast(self(), {Cmd, IntegerValue})
-    catch error:badarg ->
-        couch_log:warning("~s: ~p", [Error, Value])
+    catch
+        error:badarg ->
+            couch_log:warning("~s: ~p", [Error, Value])
     end.
 
-bucket_shard(ShardName, [B|Bs]=Buckets0) ->
+bucket_shard(ShardName, [B | Bs] = Buckets0) ->
     case waiting(ShardName, Buckets0) of
         true -> Buckets0;
-        false -> [sets:add_element(ShardName, B)|Bs]
+        false -> [sets:add_element(ShardName, B) | Bs]
     end.
 
 waiting(_, []) ->
     false;
-waiting(ShardName, [B|Bs]) ->
+waiting(ShardName, [B | Bs]) ->
     case sets:is_element(ShardName, B) of
         true -> true;
         false -> waiting(ShardName, Bs)
@@ -158,8 +159,8 @@ rebucket_shards(Frequency, Delay, Buckets0) ->
             Buckets0;
         N when N < 0 ->
             %% Reduce the number of buckets by merging the last N + 1 together
-            {ToMerge, [B|Buckets1]} = lists:split(abs(N), Buckets0),
-            [sets:union([B|ToMerge])|Buckets1];
+            {ToMerge, [B | Buckets1]} = lists:split(abs(N), Buckets0),
+            [sets:union([B | ToMerge]) | Buckets1];
         M ->
             %% Extend the number of buckets by M
             lists:duplicate(M, sets:new()) ++ Buckets0
@@ -170,42 +171,43 @@ rebucket_shards(Frequency, Delay, Buckets0) ->
 %% to maybe_push_shards/1 rather than directly. All timing coordination - i.e.,
 %% calling mem3_sync:push/2 or setting a proper timeout to ensure that pending
 %% messages aren't dropped in case no further messages arrive - is handled here.
-maybe_push_shards(#state{last_push=undefined} = St) ->
-    {ok, St#state{last_push=os:timestamp()}, St#state.frequency};
+maybe_push_shards(#state{last_push = undefined} = St) ->
+    {ok, St#state{last_push = os:timestamp()}, St#state.frequency};
 maybe_push_shards(St) ->
-    #state{frequency=Frequency, last_push=LastPush, buckets=Buckets0} = St,
+    #state{frequency = Frequency, last_push = LastPush, buckets = Buckets0} = St,
     Now = os:timestamp(),
     Delta = timer:now_diff(Now, LastPush) div 1000,
     case Delta > Frequency of
         true ->
             {Buckets1, [ToPush]} = lists:split(length(Buckets0) - 1, Buckets0),
-            Buckets2 = [sets:new()|Buckets1],
+            Buckets2 = [sets:new() | Buckets1],
             %% There's no sets:map/2!
             sets:fold(
                 fun(ShardName, _) -> push_shard(ShardName) end,
                 undefined,
                 ToPush
             ),
-            {ok, St#state{last_push=Now, buckets=Buckets2}, Frequency};
+            {ok, St#state{last_push = Now, buckets = Buckets2}, Frequency};
         false ->
             {ok, St, Frequency - Delta}
     end.
 
 push_shard(ShardName) ->
     try mem3_shards:for_shard_range(ShardName) of
-    Shards ->
-        Live = nodes(),
-        lists:foreach(
-            fun(#shard{node=N}) ->
-                case lists:member(N, Live) of
-                    true -> mem3_sync:push(ShardName, N);
-                    false -> ok
-                end
-            end,
-            Shards
-        )
-    catch error:database_does_not_exist ->
-        ok
+        Shards ->
+            Live = nodes(),
+            lists:foreach(
+                fun(#shard{node = N}) ->
+                    case lists:member(N, Live) of
+                        true -> mem3_sync:push(ShardName, N);
+                        false -> ok
+                    end
+                end,
+                Shards
+            )
+    catch
+        error:database_does_not_exist ->
+            ok
     end.
 
 subscribe_for_config() ->
@@ -320,7 +322,6 @@ should_terminate(Pid) ->
         ok
     end).
 
-
 get_state(Pid) ->
     Ref = make_ref(),
     Pid ! {get_state, Ref, self()},
@@ -329,7 +330,6 @@ get_state(Pid) ->
     after 500 ->
         timeout
     end.
-
 
 wait_state(Pid, Field, Val) when is_pid(Pid), is_integer(Field) ->
     WaitFun = fun() ->
@@ -341,7 +341,6 @@ wait_state(Pid, Field, Val) when is_pid(Pid), is_integer(Field) ->
         end
     end,
     test_util:wait(WaitFun).
-
 
 wait_config_subscribed(Pid) ->
     WaitFun = fun() ->

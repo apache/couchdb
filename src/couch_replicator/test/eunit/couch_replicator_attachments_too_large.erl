@@ -16,7 +16,6 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_replicator/src/couch_replicator.hrl").
 
-
 setup(_) ->
     Ctx = test_util:start_couch([couch_replicator]),
     Source = create_db(),
@@ -24,13 +23,11 @@ setup(_) ->
     Target = create_db(),
     {Ctx, {Source, Target}}.
 
-
 teardown(_, {Ctx, {Source, Target}}) ->
     delete_db(Source),
     delete_db(Target),
     config:delete("couchdb", "max_attachment_size"),
     ok = test_util:stop_couch(Ctx).
-
 
 attachment_too_large_replication_test_() ->
     Pairs = [{remote, remote}],
@@ -38,40 +35,41 @@ attachment_too_large_replication_test_() ->
         "Attachment size too large replication tests",
         {
             foreachx,
-            fun setup/1, fun teardown/2,
+            fun setup/1,
+            fun teardown/2,
             [{Pair, fun should_succeed/2} || Pair <- Pairs] ++
-            [{Pair, fun should_fail/2} || Pair <- Pairs]
+                [{Pair, fun should_fail/2} || Pair <- Pairs]
         }
     }.
 
-
 should_succeed({From, To}, {_Ctx, {Source, Target}}) ->
-    RepObject = {[
-        {<<"source">>, db_url(From, Source)},
-        {<<"target">>, db_url(To, Target)}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, db_url(From, Source)},
+            {<<"target">>, db_url(To, Target)}
+        ]},
     config:set("couchdb", "max_attachment_size", "1000", _Persist = false),
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
     ?_assertEqual(ok, couch_replicator_test_helper:compare_dbs(Source, Target)).
 
-
 should_fail({From, To}, {_Ctx, {Source, Target}}) ->
-    RepObject = {[
-        {<<"source">>, db_url(From, Source)},
-        {<<"target">>, db_url(To, Target)}
-    ]},
+    RepObject =
+        {[
+            {<<"source">>, db_url(From, Source)},
+            {<<"target">>, db_url(To, Target)}
+        ]},
     config:set("couchdb", "max_attachment_size", "999", _Persist = false),
     {ok, _} = couch_replicator:replicate(RepObject, ?ADMIN_USER),
-    ?_assertError({badmatch, {not_found, missing}},
-        couch_replicator_test_helper:compare_dbs(Source, Target)).
-
+    ?_assertError(
+        {badmatch, {not_found, missing}},
+        couch_replicator_test_helper:compare_dbs(Source, Target)
+    ).
 
 create_db() ->
     DbName = ?tempdb(),
     {ok, Db} = couch_db:create(DbName, [?ADMIN_CTX]),
     ok = couch_db:close(Db),
     DbName.
-
 
 create_doc_with_attachment(DbName, DocId, AttSize) ->
     {ok, Db} = couch_db:open(DbName, [?ADMIN_CTX]),
@@ -80,21 +78,20 @@ create_doc_with_attachment(DbName, DocId, AttSize) ->
     couch_db:close(Db),
     ok.
 
-
 att(Size) when is_integer(Size), Size >= 1 ->
-    [couch_att:new([
-        {name, <<"att">>},
-        {type, <<"app/binary">>},
-        {att_len, Size},
-        {data, fun(_Bytes) ->
-            << <<"x">> || _ <- lists:seq(1, Size) >>
-        end}
-    ])].
-
+    [
+        couch_att:new([
+            {name, <<"att">>},
+            {type, <<"app/binary">>},
+            {att_len, Size},
+            {data, fun(_Bytes) ->
+                <<<<"x">> || _ <- lists:seq(1, Size)>>
+            end}
+        ])
+    ].
 
 delete_db(DbName) ->
     ok = couch_server:delete(DbName, [?ADMIN_CTX]).
-
 
 db_url(remote, DbName) ->
     Addr = config:get("httpd", "bind_address", "127.0.0.1"),

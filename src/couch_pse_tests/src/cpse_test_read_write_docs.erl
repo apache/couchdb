@@ -14,19 +14,15 @@
 -compile(export_all).
 -compile(nowarn_export_all).
 
-
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
-
 
 setup_each() ->
     {ok, Db} = cpse_util:create_db(),
     Db.
 
-
 teardown_each(Db) ->
     ok = couch_server:delete(couch_db:name(Db), []).
-
 
 cpse_read_docs_from_empty_db(Db) ->
     ?assertEqual([not_found], couch_db_engine:open_docs(Db, [<<"foo">>])),
@@ -35,7 +31,6 @@ cpse_read_docs_from_empty_db(Db) ->
         couch_db_engine:open_docs(Db, [<<"a">>, <<"b">>])
     ).
 
-
 cpse_read_empty_local_docs(Db) ->
     {LocalA, LocalB} = {<<"_local/a">>, <<"_local/b">>},
     ?assertEqual([not_found], couch_db_engine:open_local_docs(Db, [LocalA])),
@@ -43,7 +38,6 @@ cpse_read_empty_local_docs(Db) ->
         [not_found, not_found],
         couch_db_engine:open_local_docs(Db, [LocalA, LocalB])
     ).
-
 
 cpse_write_one_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
@@ -79,11 +73,12 @@ cpse_write_one_doc(Db1) ->
     },
 
     Doc1 = couch_db_engine:read_doc_body(Db3, Doc0),
-    Body1 = if not is_binary(Doc1#doc.body) -> Doc1#doc.body; true ->
-        couch_compress:decompress(Doc1#doc.body)
-    end,
+    Body1 =
+        if
+            not is_binary(Doc1#doc.body) -> Doc1#doc.body;
+            true -> couch_compress:decompress(Doc1#doc.body)
+        end,
     ?assertEqual({[{<<"vsn">>, 1}]}, Body1).
-
 
 cpse_write_two_docs(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
@@ -105,7 +100,6 @@ cpse_write_two_docs(Db1) ->
 
     Resps = couch_db_engine:open_docs(Db3, [<<"foo">>, <<"bar">>]),
     ?assertEqual(false, lists:member(not_found, Resps)).
-
 
 cpse_write_three_doc_batch(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
@@ -130,7 +124,6 @@ cpse_write_three_doc_batch(Db1) ->
 
     Resps = couch_db_engine:open_docs(Db3, [<<"foo">>, <<"bar">>, <<"baz">>]),
     ?assertEqual(false, lists:member(not_found, Resps)).
-
 
 cpse_update_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
@@ -167,12 +160,13 @@ cpse_update_doc(Db1) ->
     },
 
     Doc1 = couch_db_engine:read_doc_body(Db3, Doc0),
-    Body1 = if not is_binary(Doc1#doc.body) -> Doc1#doc.body; true ->
-        couch_compress:decompress(Doc1#doc.body)
-    end,
+    Body1 =
+        if
+            not is_binary(Doc1#doc.body) -> Doc1#doc.body;
+            true -> couch_compress:decompress(Doc1#doc.body)
+        end,
 
     ?assertEqual({[{<<"vsn">>, 2}]}, Body1).
-
 
 cpse_delete_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
@@ -207,12 +201,13 @@ cpse_delete_doc(Db1) ->
     },
 
     Doc1 = couch_db_engine:read_doc_body(Db3, Doc0),
-    Body1 = if not is_binary(Doc1#doc.body) -> Doc1#doc.body; true ->
-        couch_compress:decompress(Doc1#doc.body)
-    end,
+    Body1 =
+        if
+            not is_binary(Doc1#doc.body) -> Doc1#doc.body;
+            true -> couch_compress:decompress(Doc1#doc.body)
+        end,
 
     ?assertEqual({[]}, Body1).
-
 
 cpse_write_local_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
@@ -234,7 +229,6 @@ cpse_write_local_doc(Db1) ->
     [not_found] = couch_db_engine:open_docs(Db3, [<<"_local/foo">>]),
     [#doc{} = Doc] = couch_db_engine:open_local_docs(Db3, [<<"_local/foo">>]),
     ?assertEqual({[{<<"yay">>, false}]}, Doc#doc.body).
-
 
 cpse_write_mixed_batch(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
@@ -262,7 +256,6 @@ cpse_write_mixed_batch(Db1) ->
     [not_found] = couch_db_engine:open_local_docs(Db3, [<<"bar">>]),
     [#doc{}] = couch_db_engine:open_local_docs(Db3, [<<"_local/foo">>]).
 
-
 cpse_update_local_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -285,7 +278,6 @@ cpse_update_local_doc(Db1) ->
     [#doc{} = Doc] = couch_db_engine:open_local_docs(Db3, [<<"_local/foo">>]),
     ?assertEqual({[{<<"stuff">>, null}]}, Doc#doc.body).
 
-
 cpse_delete_local_doc(Db1) ->
     ?assertEqual(0, couch_db_engine:get_doc_count(Db1)),
     ?assertEqual(0, couch_db_engine:get_del_doc_count(Db1)),
@@ -306,6 +298,6 @@ cpse_delete_local_doc(Db1) ->
 
     [not_found] = couch_db_engine:open_docs(Db3, [<<"_local/foo">>]),
     ?assertEqual(
-            [not_found],
-            couch_db_engine:open_local_docs(Db3, [<<"_local/foo">>])
-        ).
+        [not_found],
+        couch_db_engine:open_local_docs(Db3, [<<"_local/foo">>])
+    ).

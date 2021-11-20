@@ -22,35 +22,37 @@
     send_method_not_allowed/2
 ]).
 
-
 -include_lib("couch/include/couch_db.hrl").
-
 
 -define(JOBS, <<"jobs">>).
 -define(STATE, <<"state">>).
 -define(S_RUNNING, <<"running">>).
 -define(S_STOPPED, <<"stopped">>).
 
-
 % GET /_reshard
-handle_reshard_req(#httpd{method='GET', path_parts=[_]} = Req) ->
+handle_reshard_req(#httpd{method = 'GET', path_parts = [_]} = Req) ->
     reject_if_disabled(),
     State = mem3_reshard_api:get_summary(),
     send_json(Req, State);
-
-handle_reshard_req(#httpd{path_parts=[_]} = Req) ->
+handle_reshard_req(#httpd{path_parts = [_]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD");
-
 % GET /_reshard/state
-handle_reshard_req(#httpd{method='GET',
-        path_parts=[_, ?STATE]} = Req) ->
+handle_reshard_req(
+    #httpd{
+        method = 'GET',
+        path_parts = [_, ?STATE]
+    } = Req
+) ->
     reject_if_disabled(),
     {State, Reason} = mem3_reshard_api:get_shard_splitting_state(),
     send_json(Req, {[{state, State}, {reason, Reason}]});
-
 % PUT /_reshard/state
-handle_reshard_req(#httpd{method='PUT',
-        path_parts=[_, ?STATE]} = Req) ->
+handle_reshard_req(
+    #httpd{
+        method = 'PUT',
+        path_parts = [_, ?STATE]
+    } = Req
+) ->
     reject_if_disabled(),
     couch_httpd:validate_ctype(Req, "application/json"),
     {Props} = couch_httpd:json_body_obj(Req),
@@ -67,10 +69,11 @@ handle_reshard_req(#httpd{method='PUT',
                     send_json(Req, 500, JsonError)
             end;
         {?S_STOPPED, Reason} ->
-            Reason1 = case Reason =:= undefined of
-                false -> Reason;
-                true -> <<"Cluster-wide resharding stopped by the user">>
-            end,
+            Reason1 =
+                case Reason =:= undefined of
+                    false -> Reason;
+                    true -> <<"Cluster-wide resharding stopped by the user">>
+                end,
             case mem3_reshard_api:stop_shard_splitting(Reason1) of
                 {ok, JsonResult} ->
                     send_json(Req, 200, JsonResult);
@@ -80,23 +83,23 @@ handle_reshard_req(#httpd{method='PUT',
         {_, _} ->
             throw({bad_request, <<"State field not `running` or `stopped`">>})
     end;
-
-handle_reshard_req(#httpd{path_parts=[_, ?STATE]} = Req) ->
+handle_reshard_req(#httpd{path_parts = [_, ?STATE]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,PUT");
-
-handle_reshard_req(#httpd{path_parts=[_, ?STATE | _]} = _Req) ->
+handle_reshard_req(#httpd{path_parts = [_, ?STATE | _]} = _Req) ->
     throw(not_found);
-
 % GET /_reshard/jobs
-handle_reshard_req(#httpd{method='GET', path_parts=[_, ?JOBS]}=Req) ->
+handle_reshard_req(#httpd{method = 'GET', path_parts = [_, ?JOBS]} = Req) ->
     reject_if_disabled(),
     Jobs = mem3_reshard_api:get_jobs(),
     Total = length(Jobs),
     send_json(Req, {[{total_rows, Total}, {offset, 0}, {jobs, Jobs}]});
-
 % POST /_reshard/jobs {"node": "...", "shard": "..."}
-handle_reshard_req(#httpd{method = 'POST',
-        path_parts=[_, ?JOBS]} = Req) ->
+handle_reshard_req(
+    #httpd{
+        method = 'POST',
+        path_parts = [_, ?JOBS]
+    } = Req
+) ->
     reject_if_disabled(),
     couch_httpd:validate_ctype(Req, "application/json"),
     {Props} = couch_httpd:json_body_obj(Req),
@@ -111,28 +114,33 @@ handle_reshard_req(#httpd{method = 'POST',
         _ -> ok
     end,
     Oks = length([R || {ok, _, _, _} = R <- Res]),
-    Code = case {Oks, length(Res)} of
-        {Oks, Oks} -> 201;
-        {Oks, _} when Oks > 0 -> 202;
-        {0, _} -> 500
-    end,
-    EJson = lists:map(fun
-        ({ok, Id, N, S}) ->
-            {[{ok, true}, {id, Id}, {node, N}, {shard, S}]};
-        ({error, E, N, S}) ->
-            {[{error, couch_util:to_binary(E)}, {node, N}, {shard, S}]}
-    end, Res),
+    Code =
+        case {Oks, length(Res)} of
+            {Oks, Oks} -> 201;
+            {Oks, _} when Oks > 0 -> 202;
+            {0, _} -> 500
+        end,
+    EJson = lists:map(
+        fun
+            ({ok, Id, N, S}) ->
+                {[{ok, true}, {id, Id}, {node, N}, {shard, S}]};
+            ({error, E, N, S}) ->
+                {[{error, couch_util:to_binary(E)}, {node, N}, {shard, S}]}
+        end,
+        Res
+    ),
     send_json(Req, Code, EJson);
-
-handle_reshard_req(#httpd{path_parts=[_, ?JOBS]} = Req) ->
+handle_reshard_req(#httpd{path_parts = [_, ?JOBS]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,POST");
-
-handle_reshard_req(#httpd{path_parts=[_, _]}) ->
+handle_reshard_req(#httpd{path_parts = [_, _]}) ->
     throw(not_found);
-
 % GET /_reshard/jobs/$jobid
-handle_reshard_req(#httpd{method='GET',
-        path_parts=[_, ?JOBS, JobId]}=Req) ->
+handle_reshard_req(
+    #httpd{
+        method = 'GET',
+        path_parts = [_, ?JOBS, JobId]
+    } = Req
+) ->
     reject_if_disabled(),
     case mem3_reshard_api:get_job(JobId) of
         {ok, JobInfo} ->
@@ -140,10 +148,13 @@ handle_reshard_req(#httpd{method='GET',
         {error, not_found} ->
             throw(not_found)
     end;
-
 % DELETE /_reshard/jobs/$jobid
-handle_reshard_req(#httpd{method='DELETE',
-        path_parts=[_, ?JOBS, JobId]}=Req) ->
+handle_reshard_req(
+    #httpd{
+        method = 'DELETE',
+        path_parts = [_, ?JOBS, JobId]
+    } = Req
+) ->
     reject_if_disabled(),
     case mem3_reshard_api:get_job(JobId) of
         {ok, {Props}} ->
@@ -158,30 +169,36 @@ handle_reshard_req(#httpd{method='DELETE',
         {error, not_found} ->
             throw(not_found)
     end;
-
-handle_reshard_req(#httpd{path_parts=[_, ?JOBS, _]} = Req) ->
+handle_reshard_req(#httpd{path_parts = [_, ?JOBS, _]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,DELETE");
-
 % GET /_reshard/jobs/$jobid/state
-handle_reshard_req(#httpd{method='GET',
-        path_parts=[_, ?JOBS, JobId, ?STATE]} = Req) ->
+handle_reshard_req(
+    #httpd{
+        method = 'GET',
+        path_parts = [_, ?JOBS, JobId, ?STATE]
+    } = Req
+) ->
     reject_if_disabled(),
     case mem3_reshard_api:get_job(JobId) of
         {ok, {Props}} ->
             JobState = couch_util:get_value(job_state, Props),
             {SIProps} = couch_util:get_value(state_info, Props),
-            Reason = case couch_util:get_value(reason, SIProps) of
-                undefined -> null;
-                Val -> couch_util:to_binary(Val)
-            end,
+            Reason =
+                case couch_util:get_value(reason, SIProps) of
+                    undefined -> null;
+                    Val -> couch_util:to_binary(Val)
+                end,
             send_json(Req, 200, {[{state, JobState}, {reason, Reason}]});
         {error, not_found} ->
             throw(not_found)
     end;
-
 % PUT /_reshard/jobs/$jobid/state
-handle_reshard_req(#httpd{method='PUT',
-        path_parts=[_, ?JOBS, JobId, ?STATE]} = Req) ->
+handle_reshard_req(
+    #httpd{
+        method = 'PUT',
+        path_parts = [_, ?JOBS, JobId, ?STATE]
+    } = Req
+) ->
     reject_if_disabled(),
     couch_httpd:validate_ctype(Req, "application/json"),
     {Props} = couch_httpd:json_body_obj(Req),
@@ -200,10 +217,11 @@ handle_reshard_req(#httpd{method='PUT',
                     send_json(Req, 500, JsonError)
             end;
         {?S_STOPPED, Reason} ->
-            Reason1 = case Reason =:= undefined of
-                false -> Reason;
-                true -> <<"Stopped by user">>
-            end,
+            Reason1 =
+                case Reason =:= undefined of
+                    false -> Reason;
+                    true -> <<"Stopped by user">>
+                end,
             case mem3_reshard_api:stop_job(JobId, Reason1) of
                 ok ->
                     send_json(Req, 200, {[{ok, true}]});
@@ -215,10 +233,8 @@ handle_reshard_req(#httpd{method='PUT',
         {_, _} ->
             throw({bad_request, <<"State field not `running` or `stopped`">>})
     end;
-
-handle_reshard_req(#httpd{path_parts=[_, ?JOBS, _, ?STATE]} = Req) ->
+handle_reshard_req(#httpd{path_parts = [_, ?JOBS, _, ?STATE]} = Req) ->
     send_method_not_allowed(Req, "GET,HEAD,PUT").
-
 
 reject_if_disabled() ->
     case mem3_reshard:is_disabled() of
@@ -226,17 +242,13 @@ reject_if_disabled() ->
         false -> ok
     end.
 
-
 validate_type(<<"split">>) ->
     split;
-
 validate_type(_Type) ->
     throw({bad_request, <<"`job type must be `split`">>}).
 
-
 validate_node(undefined) ->
     undefined;
-
 validate_node(Node0) when is_binary(Node0) ->
     Nodes = mem3_util:live_nodes(),
     try binary_to_existing_atom(Node0, utf8) of
@@ -249,14 +261,11 @@ validate_node(Node0) when is_binary(Node0) ->
         error:badarg ->
             throw({bad_request, <<"`node` is not a valid node name">>})
     end;
-
 validate_node(_Node) ->
     throw({bad_request, <<"Invalid `node`">>}).
 
-
 validate_shard(undefined) ->
     undefined;
-
 validate_shard(Shard) when is_binary(Shard) ->
     case Shard of
         <<"shards/", _:8/binary, "-", _:8/binary, "/", _/binary>> ->
@@ -264,40 +273,35 @@ validate_shard(Shard) when is_binary(Shard) ->
         _ ->
             throw({bad_request, <<"`shard` is invalid">>})
     end;
-
 validate_shard(_Shard) ->
     throw({bad_request, <<"Invalid `shard`">>}).
 
-
 validate_db(undefined) ->
     undefined;
-
 validate_db(DbName) when is_binary(DbName) ->
     try mem3:shards(DbName) of
         [_ | _] -> DbName;
-        _ ->  throw({bad_request, <<"`No shards in `db`">>})
+        _ -> throw({bad_request, <<"`No shards in `db`">>})
     catch
         _:_ ->
             throw({bad_request, <<"Invalid `db`">>})
     end;
-
 validate_db(_bName) ->
     throw({bad_request, <<"Invalid `db`">>}).
 
-
 validate_range(undefined) ->
     undefined;
-
 validate_range(<<BBin:8/binary, "-", EBin:8/binary>>) ->
-    {B, E} = try
-        {
-            httpd_util:hexlist_to_integer(binary_to_list(BBin)),
-            httpd_util:hexlist_to_integer(binary_to_list(EBin))
-        }
-    catch
-        _:_ ->
-            invalid_range()
-    end,
+    {B, E} =
+        try
+            {
+                httpd_util:hexlist_to_integer(binary_to_list(BBin)),
+                httpd_util:hexlist_to_integer(binary_to_list(EBin))
+            }
+        catch
+            _:_ ->
+                invalid_range()
+        end,
     if
         B < 0 -> invalid_range();
         E < 0 -> invalid_range();
@@ -308,10 +312,8 @@ validate_range(<<BBin:8/binary, "-", EBin:8/binary>>) ->
     end,
     % Use a list format here to make it look the same as #shard's range
     [B, E];
-
 validate_range(_Range) ->
     invalid_range().
-
 
 invalid_range() ->
     throw({bad_request, <<"Invalid `range`">>}).

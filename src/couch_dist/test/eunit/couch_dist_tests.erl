@@ -14,7 +14,6 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
-
 no_tls_test_() ->
     {
         "test couch_dist no_tls/1",
@@ -33,10 +32,8 @@ no_tls_test_() ->
         }
     }.
 
-
 mock_get_init_args(Reply) ->
     meck:expect(couch_dist, get_init_args, fun() -> Reply end).
-
 
 no_tls_test_with_true() ->
     ?_test(
@@ -44,8 +41,8 @@ no_tls_test_with_true() ->
             mock_get_init_args({ok, [["no_tls", "true"]]}),
             ?assert(couch_dist:no_tls('abc123')),
             ?assert(couch_dist:no_tls("123abd"))
-        end).
-
+        end
+    ).
 
 no_tls_test_with_false() ->
     ?_test(
@@ -53,8 +50,8 @@ no_tls_test_with_false() ->
             mock_get_init_args({ok, [["no_tls", "false"]]}),
             ?assertNot(couch_dist:no_tls('abc123')),
             ?assertNot(couch_dist:no_tls("123abc"))
-        end).
-
+        end
+    ).
 
 no_tls_test_with_character() ->
     ?_test(
@@ -62,8 +59,8 @@ no_tls_test_with_character() ->
             mock_get_init_args({ok, [["no_tls", "node@127.0.0.1"]]}),
             ?assert(couch_dist:no_tls('node@127.0.0.1')),
             ?assert(couch_dist:no_tls("node@127.0.0.1"))
-        end).
-
+        end
+    ).
 
 no_tls_test_with_wildcard() ->
     ?_test(
@@ -74,8 +71,8 @@ no_tls_test_with_wildcard() ->
             ?assert(couch_dist:no_tls("a2")),
             ?assertNot(couch_dist:no_tls('a')),
             ?assertNot(couch_dist:no_tls("2"))
-        end).
-
+        end
+    ).
 
 no_tls_test_with_question_mark() ->
     ?_test(
@@ -85,8 +82,8 @@ no_tls_test_with_question_mark() ->
             ?assert(couch_dist:no_tls("ab2")),
             ?assertNot(couch_dist:no_tls('a2')),
             ?assertNot(couch_dist:no_tls("a"))
-        end).
-
+        end
+    ).
 
 no_tls_test_with_error() ->
     ?_test(
@@ -94,4 +91,5 @@ no_tls_test_with_error() ->
             mock_get_init_args(error),
             ?assertNot(couch_dist:no_tls('abc123')),
             ?assertNot(couch_dist:no_tls("123abc"))
-        end).
+        end
+    ).

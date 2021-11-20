@@ -17,19 +17,16 @@
 
 -define(TIMEOUT, 1000).
 
-
 setup() ->
     {ok, Db} = couch_mrview_test_util:init_db(?tempdb(), map),
     couch_mrview:query_view(Db, <<"_design/bar">>, <<"baz">>),
     {ok, Info} = couch_mrview:get_info(Db, <<"_design/bar">>),
     {Db, Info}.
 
-
 teardown({Db, _}) ->
     couch_db:close(Db),
     couch_server:delete(couch_db:name(Db), [?ADMIN_CTX]),
     ok.
-
 
 view_info_test_() ->
     {
@@ -57,49 +54,40 @@ view_info_test_() ->
         }
     }.
 
-
 sig_is_binary({_, Info}) ->
     ?_assert(is_binary(prop(signature, Info))).
-
 
 language_is_js({_, Info}) ->
     ?_assertEqual(<<"javascript">>, prop(language, Info)).
 
-
 file_size_is_non_neg_int({_, Info}) ->
     ?_assert(check_non_neg_int([sizes, file], Info)).
-
 
 active_size_is_non_neg_int({_, Info}) ->
     ?_assert(check_non_neg_int([sizes, active], Info)).
 
-
 external_size_is_non_neg_int({_, Info}) ->
     ?_assert(check_non_neg_int([sizes, external], Info)).
-
 
 active_size_less_than_file_size({_, Info}) ->
     ?_assert(prop([sizes, active], Info) < prop([sizes, file], Info)).
 
-
 update_seq_is_non_neg_int({_, Info}) ->
     ?_assert(check_non_neg_int(update_seq, Info)).
-
 
 purge_seq_is_non_neg_int({_, Info}) ->
     ?_assert(check_non_neg_int(purge_seq, Info)).
 
-
 update_opts_is_bin_list({_, Info}) ->
     Opts = prop(update_options, Info),
-    ?_assert(is_list(Opts) andalso
-            (Opts == [] orelse lists:all([is_binary(B) || B <- Opts]))).
-
+    ?_assert(
+        is_list(Opts) andalso
+            (Opts == [] orelse lists:all([is_binary(B) || B <- Opts]))
+    ).
 
 check_non_neg_int(Key, Info) ->
     Size = prop(Key, Info),
     is_integer(Size) andalso Size >= 0.
-
 
 prop(Key, {Props}) when is_list(Props) ->
     prop(Key, Props);

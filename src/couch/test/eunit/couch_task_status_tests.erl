@@ -17,27 +17,30 @@
 
 -define(TIMEOUT, 1000).
 
-
 setup() ->
     Ctx = test_util:start(?MODULE, [couch_log], [{dont_mock, [config]}]),
     {ok, TaskStatusPid} = couch_task_status:start_link(),
     TaskUpdaterPid = spawn(fun() -> loop() end),
     {TaskStatusPid, TaskUpdaterPid, Ctx}.
 
-
-teardown({TaskStatusPid, _, Ctx})->
-    test_util:stop_sync_throw(TaskStatusPid, fun() ->
-        couch_task_status:stop()
-    end, timeout_error, ?TIMEOUT),
+teardown({TaskStatusPid, _, Ctx}) ->
+    test_util:stop_sync_throw(
+        TaskStatusPid,
+        fun() ->
+            couch_task_status:stop()
+        end,
+        timeout_error,
+        ?TIMEOUT
+    ),
     test_util:stop(Ctx).
-
 
 couch_task_status_test_() ->
     {
         "CouchDB task status updates",
         {
             foreach,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun should_register_task/1,
                 fun should_set_task_startup_time/1,
@@ -51,11 +54,9 @@ couch_task_status_test_() ->
                 fun should_reset_control_update_frequency/1,
                 fun should_track_multiple_tasks/1,
                 fun should_finish_task/1
-
             ]
         }
     }.
-
 
 should_register_task({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
@@ -76,8 +77,10 @@ should_set_task_type({_, Pid, _Ctx}) ->
 
 should_not_register_multiple_tasks_for_same_pid({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
-    ?_assertEqual({add_task_error, already_registered},
-                  call(Pid, add, [{type, compaction}, {progress, 0}])).
+    ?_assertEqual(
+        {add_task_error, already_registered},
+        call(Pid, add, [{type, compaction}, {progress, 0}])
+    ).
 
 should_set_task_progress({_, Pid, _Ctx}) ->
     ok = call(Pid, add, [{type, replication}, {progress, 0}]),
@@ -92,10 +95,12 @@ should_update_time_changes_on_task_progress({_, Pid, _Ctx}) ->
     ?_assert(
         begin
             ok = call(Pid, add, [{type, replication}, {progress, 0}]),
-            ok = timer:sleep(1000),  % sleep awhile to customize update time
+            % sleep awhile to customize update time
+            ok = timer:sleep(1000),
             call(Pid, update, [{progress, 25}]),
             get_task_prop(Pid, updated_on) > get_task_prop(Pid, started_on)
-        end).
+        end
+    ).
 
 %%should_control_update_frequency({_, Pid, _Ctx}) ->
 %%    ?_assertEqual(66,
@@ -109,7 +114,8 @@ should_update_time_changes_on_task_progress({_, Pid, _Ctx}) ->
 %%        end).
 
 should_reset_control_update_frequency({_, Pid, _Ctx}) ->
-    ?_assertEqual(87,
+    ?_assertEqual(
+        87,
         begin
             ok = call(Pid, add, [{type, replication}, {progress, 0}]),
             call(Pid, update, [{progress, 50}]),
@@ -119,7 +125,8 @@ should_reset_control_update_frequency({_, Pid, _Ctx}) ->
             call(Pid, update_frequency, 0),
             call(Pid, update, [{progress, 87}]),
             get_task_prop(Pid, progress)
-        end).
+        end
+    ).
 
 should_track_multiple_tasks(_) ->
     ?_assert(run_multiple_tasks()).
@@ -129,7 +136,6 @@ should_finish_task({_, Pid, _Ctx}) ->
     ?assertEqual(1, length(couch_task_status:all())),
     ok = call(Pid, done),
     ?_assertEqual(0, length(couch_task_status:all())).
-
 
 run_multiple_tasks() ->
     Pid1 = spawn(fun() -> loop() end),
@@ -161,7 +167,6 @@ run_multiple_tasks() ->
 
     true.
 
-
 loop() ->
     receive
         {add, Props, From} ->
@@ -188,7 +193,7 @@ call(Pid, done) ->
         {'DOWN', Ref, _Type, Pid, _Info} ->
             Res
     after ?TIMEOUT ->
-            throw(timeout_error)
+        throw(timeout_error)
     end;
 call(Pid, Command) ->
     Pid ! {Command, self()},
@@ -217,17 +222,22 @@ get_task_prop(Pid, Prop) ->
                     Acc
             end
         end,
-        [], couch_task_status:all()
+        [],
+        couch_task_status:all()
     ),
     case couch_util:get_value(Prop, hd(Element), nil) of
         nil ->
-            erlang:error({assertion_failed,
-                         [{module, ?MODULE},
-                          {line, ?LINE},
-                          {reason, "Could not get property '"
-                                   ++ couch_util:to_list(Prop)
-                                   ++ "' for task "
-                                   ++ pid_to_list(Pid)}]});
+            erlang:error(
+                {assertion_failed, [
+                    {module, ?MODULE},
+                    {line, ?LINE},
+                    {reason,
+                        "Could not get property '" ++
+                            couch_util:to_list(Prop) ++
+                            "' for task " ++
+                            pid_to_list(Pid)}
+                ]}
+            );
         Value ->
             Value
     end.

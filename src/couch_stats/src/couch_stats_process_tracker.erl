@@ -28,9 +28,7 @@
     terminate/2
 ]).
 
--record(st, {
-
-}).
+-record(st, {}).
 
 -spec track(any()) -> ok.
 track(Name) ->
@@ -60,7 +58,7 @@ handle_cast(Msg, State) ->
     error_logger:error_msg("~p received unknown cast ~p", [?MODULE, Msg]),
     {noreply, State}.
 
-handle_info({'DOWN', Ref, _, _, _}=Msg, State) ->
+handle_info({'DOWN', Ref, _, _, _} = Msg, State) ->
     case ets:lookup(?MODULE, Ref) of
         [] ->
             error_logger:error_msg(

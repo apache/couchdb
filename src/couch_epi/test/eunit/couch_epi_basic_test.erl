@@ -28,15 +28,11 @@
 
 -define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
 
-
 start_link() -> ok.
-
 
 %% BEGIN couch_epi_plugin behaviour callbacks
 
-
 app() -> test_app.
-
 
 providers() ->
     [
@@ -44,47 +40,44 @@ providers() ->
         {my_service, provider2}
     ].
 
-
 services() ->
     [
         {my_service, ?MODULE}
     ].
-
 
 data_providers() ->
     [
         {{test_app, descriptions}, {static_module, ?MODULE}, [{interval, 100}]}
     ].
 
-
 data_subscriptions() ->
     [
         {test_app, descriptions}
     ].
 
-
 processes() ->
     [
         {?MODULE, [?CHILD(extra_process, worker)]},
-        {?MODULE, [{to_replace, {new, start_link, [bar]},
-            permanent, 5000, worker, [bar]}]},
-        {?MODULE, [#{id => to_replace_map,
-            start => {new, start_link, [bar]}, modules => [bar]}]}
+        {?MODULE, [{to_replace, {new, start_link, [bar]}, permanent, 5000, worker, [bar]}]},
+        {?MODULE, [
+            #{
+                id => to_replace_map,
+                start => {new, start_link, [bar]},
+                modules => [bar]
+            }
+        ]}
     ].
-
 
 notify(_Key, _OldData, _NewData) ->
     ok.
 
-
 %% END couch_epi_plugin behaviour callbacks
-
 
 parse_child_id(Id) when is_atom(Id) ->
     Id;
 parse_child_id(Id) ->
-    ["couch_epi_codechange_monitor", ServiceName, KindStr]
-        = string:tokens(Id, "|"),
+    ["couch_epi_codechange_monitor", ServiceName, KindStr] =
+        string:tokens(Id, "|"),
     Kind = list_to_atom(KindStr),
     case string:tokens(ServiceName, ":") of
         [ServiceId, Key] ->
@@ -93,7 +86,6 @@ parse_child_id(Id) ->
             {list_to_atom(Key), Kind}
     end.
 
-
 -include_lib("eunit/include/eunit.hrl").
 
 basic_test() ->
@@ -101,49 +93,75 @@ basic_test() ->
         {extra_process, [], [extra_process]},
         {to_replace, [bar], [bar]},
         {to_replace_map, [bar], [bar]},
-        {{my_service, providers},
+        {{my_service, providers}, [couch_epi_functions_gen_my_service], [
+            couch_epi_codechange_monitor,
+            couch_epi_functions_gen_my_service,
+            provider1,
+            provider2
+        ]},
+        {
+            {my_service, services},
             [couch_epi_functions_gen_my_service],
-            [couch_epi_codechange_monitor, couch_epi_functions_gen_my_service,
-                provider1, provider2]},
-        {{my_service, services},
-            [couch_epi_functions_gen_my_service],
-            lists:sort([couch_epi_codechange_monitor,
-                couch_epi_functions_gen_my_service, ?MODULE])},
-        {{{test_app, descriptions}, data_subscriptions},
+            lists:sort([
+                couch_epi_codechange_monitor,
+                couch_epi_functions_gen_my_service,
+                ?MODULE
+            ])
+        },
+        {
+            {{test_app, descriptions}, data_subscriptions},
             [couch_epi_data_gen_test_app_descriptions],
-            lists:sort([couch_epi_codechange_monitor,
-                couch_epi_data_gen_test_app_descriptions, ?MODULE])},
-        {{{test_app, descriptions}, data_providers},
+            lists:sort([
+                couch_epi_codechange_monitor,
+                couch_epi_data_gen_test_app_descriptions,
+                ?MODULE
+            ])
+        },
+        {
+            {{test_app, descriptions}, data_providers},
             [couch_epi_data_gen_test_app_descriptions],
-            lists:sort([couch_epi_codechange_monitor,
-                couch_epi_data_gen_test_app_descriptions, ?MODULE])}
+            lists:sort([
+                couch_epi_codechange_monitor,
+                couch_epi_data_gen_test_app_descriptions,
+                ?MODULE
+            ])
+        }
     ],
 
     ToReplace = [
         {to_replace, {old, start_link, [foo]}, permanent, 5000, worker, [foo]},
         #{id => to_replace_map, start => {old, start_link, [foo]}}
     ],
-    Children = lists:sort(couch_epi_sup:plugin_childspecs(
-        ?MODULE, [?MODULE], ToReplace)),
+    Children = lists:sort(
+        couch_epi_sup:plugin_childspecs(
+            ?MODULE, [?MODULE], ToReplace
+        )
+    ),
 
-    Results = lists:map(fun
-        ({Id, {_M, _F, Args}, _, _, _, Modules}) ->
-            {parse_child_id(Id), Args, lists:sort(Modules)};
-        (#{id := Id, start := {_M, _F, Args}, modules := Modules}) ->
-            {parse_child_id(Id), Args, lists:sort(Modules)}
-    end, Children),
+    Results = lists:map(
+        fun
+            ({Id, {_M, _F, Args}, _, _, _, Modules}) ->
+                {parse_child_id(Id), Args, lists:sort(Modules)};
+            (#{id := Id, start := {_M, _F, Args}, modules := Modules}) ->
+                {parse_child_id(Id), Args, lists:sort(Modules)}
+        end,
+        Children
+    ),
 
     Tests = lists:zip(lists:sort(Expected), lists:sort(Results)),
     [?assertEqual(Expect, Result) || {Expect, Result} <- Tests],
 
-    ExpectedChild = {to_replace, {new, start_link, [bar]},
-        permanent, 5000, worker, [bar]},
+    ExpectedChild = {to_replace, {new, start_link, [bar]}, permanent, 5000, worker, [bar]},
     ?assertEqual(
         ExpectedChild,
-        lists:keyfind(to_replace, 1, Children)),
+        lists:keyfind(to_replace, 1, Children)
+    ),
 
-    ExpectedMapChildSpec = #{id => to_replace_map,
-        start => {new, start_link, [bar]}, modules => [bar]},
+    ExpectedMapChildSpec = #{
+        id => to_replace_map,
+        start => {new, start_link, [bar]},
+        modules => [bar]
+    },
     [MapChildSpec] = [E || #{id := to_replace_map} = E <- Children],
     ?assertEqual(ExpectedMapChildSpec, MapChildSpec),
     ok.

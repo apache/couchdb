@@ -23,7 +23,6 @@ providers() ->
         {chttpd_handlers, dreyfus_httpd_handlers}
     ].
 
-
 services() ->
     [].
 
@@ -32,8 +31,7 @@ data_subscriptions() ->
 
 data_providers() ->
     [
-        {{dreyfus, black_list}, {callback_module, dreyfus_config},
-            [{interval, ?DATA_INTERVAL}]}
+        {{dreyfus, black_list}, {callback_module, dreyfus_config}, [{interval, ?DATA_INTERVAL}]}
     ].
 
 processes() ->
@@ -41,6 +39,9 @@ processes() ->
 
 notify(_Key, _Old, _New) ->
     Listeners = application:get_env(dreyfus, config_listeners, []),
-    lists:foreach(fun(L) ->
-        L ! dreyfus_config_change_finished
-    end, Listeners).
+    lists:foreach(
+        fun(L) ->
+            L ! dreyfus_config_change_finished
+        end,
+        Listeners
+    ).

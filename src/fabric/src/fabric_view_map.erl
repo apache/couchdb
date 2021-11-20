@@ -19,19 +19,20 @@
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("couch_mrview/include/couch_mrview.hrl").
 
-go(DbName, Options, GroupId, View, Args, Callback, Acc, VInfo)
-        when is_binary(GroupId) ->
+go(DbName, Options, GroupId, View, Args, Callback, Acc, VInfo) when
+    is_binary(GroupId)
+->
     {ok, DDoc} = fabric:open_doc(DbName, <<"_design/", GroupId/binary>>, []),
     go(DbName, Options, DDoc, View, Args, Callback, Acc, VInfo);
-
 go(Db, Options, DDoc, View, Args0, Callback, Acc, VInfo) ->
     DbName = fabric:dbname(Db),
-    Args = case Args0 of
-        #mrargs{keys = Keys, direction = rev} when is_list(Keys) ->
-            Args0#mrargs{keys = lists:reverse(Keys)};
-        #mrargs{} ->
-            Args0
-    end,
+    Args =
+        case Args0 of
+            #mrargs{keys = Keys, direction = rev} when is_list(Keys) ->
+                Args0#mrargs{keys = lists:reverse(Keys)};
+            #mrargs{} ->
+                Args0
+        end,
     {Shards, RingOpts} = fabric_view:get_shards(Db, Args),
     {CoordArgs, WorkerArgs} = fabric_view:fix_skip_and_limit(Args),
     DocIdAndRev = fabric_util:doc_id_and_rev(DDoc),
@@ -44,8 +45,15 @@ go(Db, Options, DDoc, View, Args0, Callback, Acc, VInfo) ->
     Workers0 = fabric_util:submit_jobs(Shards, fabric_rpc, map_view, RPCArgs),
     RexiMon = fabric_util:create_monitors(Workers0),
     try
-        case fabric_streams:start(Workers0, #shard.ref, StartFun, Repls,
-                RingOpts) of
+        case
+            fabric_streams:start(
+                Workers0,
+                #shard.ref,
+                StartFun,
+                Repls,
+                RingOpts
+            )
+        of
             {ok, ddoc_updated} ->
                 Callback({error, ddoc_updated}, Acc);
             {ok, Workers} ->
@@ -72,10 +80,10 @@ go(Db, Options, DDoc, View, Args0, Callback, Acc, VInfo) ->
     end.
 
 go(DbName, Workers, {map, View, _}, Args, Callback, Acc0) ->
-    #mrargs{limit = Limit, skip = Skip, keys = Keys, update_seq=UpdateSeq} = Args,
+    #mrargs{limit = Limit, skip = Skip, keys = Keys, update_seq = UpdateSeq} = Args,
     Collation = couch_util:get_value(<<"collation">>, View#mrview.options),
     State = #collector{
-        db_name=DbName,
+        db_name = DbName,
         query_args = Args,
         callback = Callback,
         counters = fabric_dict:init(Workers, 0),
@@ -85,24 +93,34 @@ go(DbName, Workers, {map, View, _}, Args, Callback, Acc0) ->
         sorted = Args#mrargs.sorted,
         collation = Collation,
         user_acc = Acc0,
-        update_seq = case UpdateSeq of true -> []; false -> nil end
+        update_seq =
+            case UpdateSeq of
+                true -> [];
+                false -> nil
+            end
     },
-    case rexi_utils:recv(Workers, #shard.ref, fun handle_message/3,
-        State, fabric_util:view_timeout(Args), 1000 * 60 * 60) of
-    {ok, NewState} ->
-        {ok, NewState#collector.user_acc};
-    {timeout, NewState} ->
-        Callback({error, timeout}, NewState#collector.user_acc);
-    {error, Resp} ->
-        {ok, Resp}
+    case
+        rexi_utils:recv(
+            Workers,
+            #shard.ref,
+            fun handle_message/3,
+            State,
+            fabric_util:view_timeout(Args),
+            1000 * 60 * 60
+        )
+    of
+        {ok, NewState} ->
+            {ok, NewState#collector.user_acc};
+        {timeout, NewState} ->
+            Callback({error, timeout}, NewState#collector.user_acc);
+        {error, Resp} ->
+            {ok, Resp}
     end.
 
 handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
     fabric_view:check_down_shards(State, NodeRef);
-
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
     fabric_view:handle_worker_exit(State, Worker, Reason);
-
 handle_message({meta, Meta0}, {Worker, From}, State) ->
     Tot = couch_util:get_value(total, Meta0, 0),
     Off = couch_util:get_value(offset, Meta0, 0),
@@ -122,47 +140,46 @@ handle_message({meta, Meta0}, {Worker, From}, State) ->
     Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
     Total = Total0 + Tot,
     Offset = Offset0 + Off,
-    UpdateSeq = case UpdateSeq0 of
-        nil -> nil;
-        _   -> [{Worker, Seq} | UpdateSeq0]
-    end,
+    UpdateSeq =
+        case UpdateSeq0 of
+            nil -> nil;
+            _ -> [{Worker, Seq} | UpdateSeq0]
+        end,
     case fabric_dict:any(0, Counters1) of
-    true ->
-        {ok, State#collector{
-            counters = Counters1,
-            total_rows = Total,
-            update_seq = UpdateSeq,
-            offset = Offset
-        }};
-    false ->
-        FinalOffset = erlang:min(Total, Offset+State#collector.skip),
-        Meta = [{total, Total}, {offset, FinalOffset}] ++
-            case UpdateSeq of
-                nil ->
-                    [];
-                _ ->
-                    [{update_seq, fabric_view_changes:pack_seqs(UpdateSeq)}]
-            end,
-        {Go, Acc} = Callback({meta, Meta}, AccIn),
-        {Go, State#collector{
-            counters = fabric_dict:decrement_all(Counters1),
-            total_rows = Total,
-            offset = FinalOffset,
-            user_acc = Acc
-        }}
+        true ->
+            {ok, State#collector{
+                counters = Counters1,
+                total_rows = Total,
+                update_seq = UpdateSeq,
+                offset = Offset
+            }};
+        false ->
+            FinalOffset = erlang:min(Total, Offset + State#collector.skip),
+            Meta =
+                [{total, Total}, {offset, FinalOffset}] ++
+                    case UpdateSeq of
+                        nil ->
+                            [];
+                        _ ->
+                            [{update_seq, fabric_view_changes:pack_seqs(UpdateSeq)}]
+                    end,
+            {Go, Acc} = Callback({meta, Meta}, AccIn),
+            {Go, State#collector{
+                counters = fabric_dict:decrement_all(Counters1),
+                total_rows = Total,
+                offset = FinalOffset,
+                user_acc = Acc
+            }}
     end;
-
-handle_message(#view_row{}, {_, _}, #collector{sorted=false, limit=0} = State) ->
-    #collector{callback=Callback} = State,
+handle_message(#view_row{}, {_, _}, #collector{sorted = false, limit = 0} = State) ->
+    #collector{callback = Callback} = State,
     {_, Acc} = Callback(complete, State#collector.user_acc),
-    {stop, State#collector{user_acc=Acc}};
-
-handle_message(#view_row{} = Row, {_,From}, #collector{sorted=false} = St) ->
-    #collector{callback=Callback, user_acc=AccIn, limit=Limit} = St,
+    {stop, State#collector{user_acc = Acc}};
+handle_message(#view_row{} = Row, {_, From}, #collector{sorted = false} = St) ->
+    #collector{callback = Callback, user_acc = AccIn, limit = Limit} = St,
     {Go, Acc} = Callback(fabric_view:transform_row(Row), AccIn),
     rexi:stream_ack(From),
-    {Go, St#collector{user_acc=Acc, limit=Limit-1}};
-
+    {Go, St#collector{user_acc = Acc, limit = Limit - 1}};
 handle_message(#view_row{} = Row, {Worker, From}, State) ->
     #collector{
         query_args = #mrargs{direction = Dir},
@@ -175,29 +192,26 @@ handle_message(#view_row{} = Row, {Worker, From}, State) ->
         Dir,
         Collation,
         KeyDict0,
-        Row#view_row{worker={Worker, From}},
+        Row#view_row{worker = {Worker, From}},
         Rows0
     ),
     Counters1 = fabric_dict:update_counter(Worker, 1, Counters0),
-    State1 = State#collector{rows=Rows, counters=Counters1, keys=KeyDict},
+    State1 = State#collector{rows = Rows, counters = Counters1, keys = KeyDict},
     fabric_view:maybe_send_row(State1);
-
 handle_message(complete, Worker, State) ->
     Counters = fabric_dict:update_counter(Worker, 1, State#collector.counters),
     fabric_view:maybe_send_row(State#collector{counters = Counters});
-
-handle_message({execution_stats, _} = Msg, {_,From}, St) ->
-    #collector{callback=Callback, user_acc=AccIn} = St,
+handle_message({execution_stats, _} = Msg, {_, From}, St) ->
+    #collector{callback = Callback, user_acc = AccIn} = St,
     {Go, Acc} = Callback(Msg, AccIn),
     rexi:stream_ack(From),
-    {Go, St#collector{user_acc=Acc}};
-
+    {Go, St#collector{user_acc = Acc}};
 handle_message(ddoc_updated, _Worker, State) ->
     {stop, State}.
 
 merge_row(Dir, Collation, undefined, Row, Rows0) ->
     Rows1 = lists:merge(
-        fun(#view_row{key=KeyA, id=IdA}, #view_row{key=KeyB, id=IdB}) ->
+        fun(#view_row{key = KeyA, id = IdA}, #view_row{key = KeyB, id = IdB}) ->
             compare(Dir, Collation, {KeyA, IdA}, {KeyB, IdB})
         end,
         [Row],
@@ -205,23 +219,27 @@ merge_row(Dir, Collation, undefined, Row, Rows0) ->
     ),
     {Rows1, undefined};
 merge_row(Dir, Collation, KeyDict0, Row, Rows0) ->
-    CmpFun = case Collation of
-        <<"raw">> ->
-            fun (A, A) -> 0;
-                (A, B) -> case A < B of
-                    true -> -1;
-                    false -> 1
-                end
-            end;
-        _ ->
-            fun couch_ejson_compare:less/2
-    end,
+    CmpFun =
+        case Collation of
+            <<"raw">> ->
+                fun
+                    (A, A) ->
+                        0;
+                    (A, B) ->
+                        case A < B of
+                            true -> -1;
+                            false -> 1
+                        end
+                end;
+            _ ->
+                fun couch_ejson_compare:less/2
+        end,
     case maybe_update_keydict(Row#view_row.key, KeyDict0, CmpFun) of
         undefined ->
             {Rows0, KeyDict0};
         KeyDict1 ->
             Rows1 = lists:merge(
-                fun(#view_row{key=A, id=IdA}, #view_row{key=B, id=IdB}) ->
+                fun(#view_row{key = A, id = IdA}, #view_row{key = B, id = IdB}) ->
                     case {Dir, CmpFun(A, B)} of
                         {fwd, 0} ->
                             IdA < IdB;
@@ -267,7 +285,7 @@ maybe_update_keydict(Key, KeyDict, CmpFun) ->
 
 key_index(_, [], _) ->
     undefined;
-key_index(KeyA, [{KeyB, Value}|KVs], CmpFun) ->
+key_index(KeyA, [{KeyB, Value} | KVs], CmpFun) ->
     case CmpFun(KeyA, KeyB) of
         0 -> Value;
         _ -> key_index(KeyA, KVs, CmpFun)

@@ -19,14 +19,12 @@
 -define(PASS, "pass").
 -define(AUTH, {basic_auth, {?USER, ?PASS}}).
 -define(CONTENT_JSON, {"Content-Type", "application/json"}).
--define(CONTENT_MULTI_RELATED, {"Content-Type",
-    "multipart/related;boundary=\"bound\""}).
-
+-define(CONTENT_MULTI_RELATED, {"Content-Type", "multipart/related;boundary=\"bound\""}).
 
 setup() ->
     Hashed = couch_passwords:hash_admin_password(?PASS),
-    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist=false),
-    ok = config:set("couchdb", "max_attachment_size", "50", _Persist=false),
+    ok = config:set("admins", ?USER, ?b2l(Hashed), _Persist = false),
+    ok = config:set("couchdb", "max_attachment_size", "50", _Persist = false),
     TmpDb = ?tempdb(),
     Addr = config:get("chttpd", "bind_address", "127.0.0.1"),
     Port = integer_to_list(mochiweb_socket_server:get(chttpd, port)),
@@ -35,12 +33,10 @@ setup() ->
     add_doc(Url, "doc1"),
     Url.
 
-
 teardown(Url) ->
     delete_db(Url),
-    ok = config:delete("admins", ?USER, _Persist=false),
+    ok = config:delete("admins", ?USER, _Persist = false),
     ok = config:delete("couchdb", "max_attachment_size").
-
 
 attachment_size_test_() ->
     {
@@ -51,7 +47,8 @@ attachment_size_test_() ->
             fun chttpd_test_util:stop_couch/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun put_inline/1,
                     fun put_simple/1,
@@ -63,14 +60,12 @@ attachment_size_test_() ->
         }
     }.
 
-
 put_inline(Url) ->
-  ?_test(begin
-      Status = put_inline(Url, "doc2", 50),
-      ?assert(Status =:= 201 orelse Status =:= 202),
-      ?assertEqual(413, put_inline(Url, "doc3", 51))
-  end).
-
+    ?_test(begin
+        Status = put_inline(Url, "doc2", 50),
+        ?assert(Status =:= 201 orelse Status =:= 202),
+        ?assertEqual(413, put_inline(Url, "doc3", 51))
+    end).
 
 put_simple(Url) ->
     ?_test(begin
@@ -85,9 +80,8 @@ put_simple(Url) ->
         ?assertEqual(413, Status2)
     end).
 
-
 put_simple_chunked(Url) ->
-     ?_test(begin
+    ?_test(begin
         Headers = [{"Content-Type", "app/binary"}],
         Rev1 = doc_rev(Url, "doc1"),
         DataFun1 = data_stream_fun(50),
@@ -98,7 +92,6 @@ put_simple_chunked(Url) ->
         Status2 = put_req_chunked(Url ++ "/doc1/att3?rev=" ++ Rev2, Headers, DataFun2),
         ?assertEqual(413, Status2)
     end).
-
 
 put_mp_related(Url) ->
     ?_test(begin
@@ -111,15 +104,13 @@ put_mp_related(Url) ->
         ?assertEqual(413, Status2)
     end).
 
-
 put_chunked_mp_related(Url) ->
     ?_test(begin
-       Headers = [?CONTENT_MULTI_RELATED],
-       Body = mp_body(50),
-       Status = put_req_chunked(Url ++ "/doc4", Headers, Body),
-       ?assert(Status =:= 201 orelse Status =:= 202)
+        Headers = [?CONTENT_MULTI_RELATED],
+        Body = mp_body(50),
+        Status = put_req_chunked(Url ++ "/doc4", Headers, Body),
+        ?assert(Status =:= 201 orelse Status =:= 202)
     end).
-
 
 % Helper functions
 
@@ -127,72 +118,69 @@ create_db(Url) ->
     Status = put_req(Url, "{}"),
     ?assert(Status =:= 201 orelse Status =:= 202).
 
-
 add_doc(Url, DocId) ->
     Status = put_req(Url ++ "/" ++ DocId, "{}"),
     ?assert(Status =:= 201 orelse Status =:= 202).
 
-
 delete_db(Url) ->
     {ok, 200, _, _} = test_request:delete(Url, [?AUTH]).
 
-
 put_inline(Url, DocId, Size) ->
-    Doc = "{\"_attachments\": {\"att1\":{"
+    Doc =
+        "{\"_attachments\": {\"att1\":{"
         "\"content_type\": \"app/binary\", "
-        "\"data\": \"" ++ data_b64(Size) ++ "\""
-        "}}}",
+        "\"data\": \"" ++ data_b64(Size) ++
+            "\""
+            "}}}",
     put_req(Url ++ "/" ++ DocId, Doc).
-
 
 mp_body(AttSize) ->
     AttData = data(AttSize),
     SizeStr = integer_to_list(AttSize),
-    string:join([
-        "--bound",
+    string:join(
+        [
+            "--bound",
 
-        "Content-Type: application/json",
+            "Content-Type: application/json",
 
-        "",
+            "",
 
-        "{\"_id\":\"doc2\", \"_attachments\":{\"att\":"
-        "{\"content_type\":\"app/binary\", \"length\":" ++ SizeStr ++ ","
-        "\"follows\":true}}}",
+            "{\"_id\":\"doc2\", \"_attachments\":{\"att\":"
+            "{\"content_type\":\"app/binary\", \"length\":" ++ SizeStr ++
+                ","
+                "\"follows\":true}}}",
 
-        "--bound",
+            "--bound",
 
-        "Content-Disposition: attachment; filename=\"att\"",
+            "Content-Disposition: attachment; filename=\"att\"",
 
-        "Content-Type: app/binary",
+            "Content-Type: app/binary",
 
-        "",
+            "",
 
-        AttData,
+            AttData,
 
-        "--bound--"
-    ], "\r\n").
-
+            "--bound--"
+        ],
+        "\r\n"
+    ).
 
 doc_rev(Url, DocId) ->
     {200, ResultProps} = get_req(Url ++ "/" ++ DocId),
     {<<"_rev">>, BinRev} = lists:keyfind(<<"_rev">>, 1, ResultProps),
     binary_to_list(BinRev).
 
-
 put_req(Url, Body) ->
     put_req(Url, [], Body).
-
 
 put_req(Url, Headers, Body) ->
     {ok, Status, _, _} = test_request:put(Url, Headers ++ [?AUTH], Body),
     Status.
 
-
 put_req_chunked(Url, Headers, Body) ->
     Opts = [{transfer_encoding, {chunked, 1}}],
     {ok, Status, _, _} = test_request:put(Url, Headers ++ [?AUTH], Body, Opts),
     Status.
-
 
 get_req(Url) ->
     {ok, Status, _, ResultBody} = test_request:get(Url, [?CONTENT_JSON, ?AUTH]),
@@ -202,15 +190,14 @@ get_req(Url) ->
 % Data streaming generator for ibrowse client. ibrowse will repeatedly call the
 % function with State and it should return {ok, Data, NewState} or eof at end.
 data_stream_fun(Size) ->
-    Fun = fun(0) -> eof; (BytesLeft) ->
-        {ok, <<"x">>, BytesLeft - 1}
+    Fun = fun
+        (0) -> eof;
+        (BytesLeft) -> {ok, <<"x">>, BytesLeft - 1}
     end,
     {Fun, Size}.
 
-
 data(Size) ->
     string:copies("x", Size).
-
 
 data_b64(Size) ->
     base64:encode_to_string(data(Size)).

@@ -29,37 +29,28 @@
     unregister/1
 ]).
 
-
 -define(SERVER, couch_event_server).
-
 
 notify(DbName, Event) ->
     gen_server:cast(?SERVER, {notify, DbName, Event}).
 
-
 listen(Module, Function, State, Options) ->
     couch_event_listener_mfa:enter_loop(Module, Function, State, Options).
-
 
 link_listener(Module, Function, State, Options) ->
     couch_event_listener_mfa:start_link(Module, Function, State, Options).
 
-
 stop_listener(Pid) ->
     couch_event_listener_mfa:stop(Pid).
-
 
 register(Pid, DbName) ->
     gen_server:call(?SERVER, {register, Pid, [DbName]}).
 
-
 register_many(Pid, DbNames) when is_list(DbNames) ->
     gen_server:call(?SERVER, {register, Pid, DbNames}).
 
-
 register_all(Pid) ->
     gen_server:call(?SERVER, {register, Pid, [all_dbs]}).
-
 
 unregister(Pid) ->
     gen_server:call(?SERVER, {unregister, Pid}).

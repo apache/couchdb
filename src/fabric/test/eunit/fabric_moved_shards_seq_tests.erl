@@ -12,14 +12,11 @@
 
 -module(fabric_moved_shards_seq_tests).
 
-
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 -include_lib("mem3/include/mem3.hrl").
 
-
 -define(TDEF(A), {atom_to_list(A), fun A/0}).
-
 
 main_test_() ->
     {
@@ -31,24 +28,24 @@ main_test_() ->
         ]
     }.
 
-
 setup() ->
     test_util:start_couch([fabric]).
-
 
 teardown(Ctx) ->
     meck:unload(),
     test_util:stop_couch(Ctx).
 
-
 t_shard_moves_avoid_sequence_rewinds() ->
     DocCnt = 30,
     DbName = ?tempdb(),
 
-    ok = fabric:create_db(DbName, [{q,1}, {n,1}]),
-    lists:foreach(fun(I) ->
-        update_doc(DbName, #doc{id = erlang:integer_to_binary(I)})
-    end, lists:seq(1, DocCnt)),
+    ok = fabric:create_db(DbName, [{q, 1}, {n, 1}]),
+    lists:foreach(
+        fun(I) ->
+            update_doc(DbName, #doc{id = erlang:integer_to_binary(I)})
+        end,
+        lists:seq(1, DocCnt)
+    ),
 
     {ok, _, Seq1, 0} = changes(DbName, #changes_args{limit = 1, since = "now"}),
     [{_, Range, {Seq, Uuid, _}}] = seq_decode(Seq1),
@@ -76,23 +73,18 @@ t_shard_moves_avoid_sequence_rewinds() ->
 
     ok = fabric:delete_db(DbName, []).
 
-
 changes_callback(start, Acc) ->
     {ok, Acc};
-
 changes_callback({change, {Change}}, Acc) ->
     CM = maps:from_list(Change),
     {ok, [CM | Acc]};
-
 changes_callback({stop, EndSeq, Pending}, Acc) ->
     {ok, Acc, EndSeq, Pending}.
-
 
 changes(DbName, #changes_args{} = Args) ->
     fabric_util:isolate(fun() ->
         fabric:changes(DbName, fun changes_callback/2, [], Args)
     end).
-
 
 update_doc(DbName, #doc{} = Doc) ->
     fabric_util:isolate(fun() ->
@@ -101,7 +93,6 @@ update_doc(DbName, #doc{} = Doc) ->
         end
     end).
 
-
 seq_decode(Seq) ->
     % This is copied from fabric_view_changes
     Pattern = "^\"?([0-9]+-)?(?<opaque>.*?)\"?$",
@@ -109,12 +100,10 @@ seq_decode(Seq) ->
     {match, Seq1} = re:run(Seq, Pattern, Options),
     binary_to_term(couch_util:decodeBase64Url(Seq1)).
 
-
 seq_encode(Unpacked) ->
     % Copied from fabric_view_changes
     Opaque = couch_util:encodeBase64Url(term_to_binary(Unpacked, [compressed])),
     ?l2b(["30", $-, Opaque]).
-
 
 mock_epochs(Epochs) ->
     % Since we made up a node name we'll have to mock epoch checking

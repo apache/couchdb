@@ -20,22 +20,17 @@
     to_disk_term/1
 ]).
 
-
 foldl({_Fd, []}, _Fun, Acc) ->
     Acc;
-
 foldl({Fd, [{Pos, _} | Rest]}, Fun, Acc) ->
     foldl({Fd, [Pos | Rest]}, Fun, Acc);
-
 foldl({Fd, [Bin | Rest]}, Fun, Acc) when is_binary(Bin) ->
     % We're processing the first bit of data
     % after we did a seek for a range fold.
     foldl({Fd, Rest}, Fun, Fun(Bin, Acc));
-
 foldl({Fd, [Pos | Rest]}, Fun, Acc) when is_integer(Pos) ->
     {ok, Bin} = couch_file:pread_binary(Fd, Pos),
     foldl({Fd, Rest}, Fun, Fun(Bin, Acc)).
-
 
 seek({Fd, [{Pos, Length} | Rest]}, Offset) ->
     case Length =< Offset of
@@ -44,7 +39,6 @@ seek({Fd, [{Pos, Length} | Rest]}, Offset) ->
         false ->
             seek({Fd, [Pos | Rest]}, Offset)
     end;
-
 seek({Fd, [Pos | Rest]}, Offset) when is_integer(Pos) ->
     {ok, Bin} = couch_file:pread_binary(Fd, Pos),
     case iolist_size(Bin) =< Offset of
@@ -55,16 +49,12 @@ seek({Fd, [Pos | Rest]}, Offset) when is_integer(Pos) ->
             {ok, {Fd, [Tail | Rest]}}
     end.
 
-
 write({Fd, Written}, Data) when is_pid(Fd) ->
     {ok, Pos, _} = couch_file:append_binary(Fd, Data),
     {ok, {Fd, [{Pos, iolist_size(Data)} | Written]}}.
 
-
 finalize({Fd, Written}) ->
     {ok, {Fd, lists:reverse(Written)}}.
 
-
 to_disk_term({_Fd, Written}) ->
     {ok, Written}.
-

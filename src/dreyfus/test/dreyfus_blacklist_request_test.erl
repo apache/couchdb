@@ -41,10 +41,12 @@ dreyfus_blacklist_request_test_() ->
         "dreyfus blacklist request tests",
         {
             setup,
-            fun start/0, fun stop/1,
+            fun start/0,
+            fun stop/1,
             {
                 foreach,
-                fun setup/0, fun teardown/1,
+                fun setup/0,
+                fun teardown/1,
                 [
                     fun deny_fabric_requests/0,
                     fun allow_fabric_request/0
@@ -61,29 +63,88 @@ deny_fabric_requests() ->
     Denied = "mydb.myddocid.myindexname",
     config:set("dreyfus_blacklist", Denied, "true"),
     dreyfus_test_util:wait_config_change(Denied, "true"),
-    ?assertThrow({bad_request, Reason}, dreyfus_fabric_search:go(<<"mydb">>,
-        <<"myddocid">>,  <<"myindexname">>, QueryArgs)),
-    ?assertThrow({bad_request, Reason}, dreyfus_fabric_group1:go(<<"mydb">>,
-        <<"myddocid">>,  <<"myindexname">>, QueryArgs)),
-    ?assertThrow({bad_request, Reason}, dreyfus_fabric_group2:go(<<"mydb">>,
-        <<"myddocid">>,  <<"myindexname">>, QueryArgs)),
-    ?assertThrow({bad_request, Reason}, dreyfus_fabric_info:go(<<"mydb">>,
-        <<"myddocid">>,  <<"myindexname">>, QueryArgs)),
-    ?assertThrow({bad_request, Reason}, dreyfus_fabric_search:go(<<"mydb">>,
-        DDoc,  <<"myindexname">>, IndexQueryArgs)),
-    ?assertThrow({bad_request, Reason}, dreyfus_fabric_group1:go(<<"mydb">>,
-        DDoc,  <<"myindexname">>, IndexQueryArgs)),
-    ?assertThrow({bad_request, Reason}, dreyfus_fabric_group2:go(<<"mydb">>,
-        DDoc,  <<"myindexname">>, IndexQueryArgs)),
-    ?assertThrow({bad_request, Reason}, dreyfus_fabric_info:go(<<"mydb">>,
-        DDoc,  <<"myindexname">>, IndexQueryArgs)).
+    ?assertThrow(
+        {bad_request, Reason},
+        dreyfus_fabric_search:go(
+            <<"mydb">>,
+            <<"myddocid">>,
+            <<"myindexname">>,
+            QueryArgs
+        )
+    ),
+    ?assertThrow(
+        {bad_request, Reason},
+        dreyfus_fabric_group1:go(
+            <<"mydb">>,
+            <<"myddocid">>,
+            <<"myindexname">>,
+            QueryArgs
+        )
+    ),
+    ?assertThrow(
+        {bad_request, Reason},
+        dreyfus_fabric_group2:go(
+            <<"mydb">>,
+            <<"myddocid">>,
+            <<"myindexname">>,
+            QueryArgs
+        )
+    ),
+    ?assertThrow(
+        {bad_request, Reason},
+        dreyfus_fabric_info:go(
+            <<"mydb">>,
+            <<"myddocid">>,
+            <<"myindexname">>,
+            QueryArgs
+        )
+    ),
+    ?assertThrow(
+        {bad_request, Reason},
+        dreyfus_fabric_search:go(
+            <<"mydb">>,
+            DDoc,
+            <<"myindexname">>,
+            IndexQueryArgs
+        )
+    ),
+    ?assertThrow(
+        {bad_request, Reason},
+        dreyfus_fabric_group1:go(
+            <<"mydb">>,
+            DDoc,
+            <<"myindexname">>,
+            IndexQueryArgs
+        )
+    ),
+    ?assertThrow(
+        {bad_request, Reason},
+        dreyfus_fabric_group2:go(
+            <<"mydb">>,
+            DDoc,
+            <<"myindexname">>,
+            IndexQueryArgs
+        )
+    ),
+    ?assertThrow(
+        {bad_request, Reason},
+        dreyfus_fabric_info:go(
+            <<"mydb">>,
+            DDoc,
+            <<"myindexname">>,
+            IndexQueryArgs
+        )
+    ).
 
 allow_fabric_request() ->
     ok = meck:new(dreyfus_fabric_search, [passthrough]),
-    ok = meck:expect(dreyfus_fabric_search, go,
-        fun(A, GroupId, B, C) when is_binary(GroupId) -> 
+    ok = meck:expect(
+        dreyfus_fabric_search,
+        go,
+        fun(A, GroupId, B, C) when is_binary(GroupId) ->
             meck:passthrough([A, GroupId, B, C])
-    end),
+        end
+    ),
     ok = meck:expect(dreyfus_fabric_search, go, fun(_, _, _, _) ->
         ok
     end),
@@ -91,6 +152,13 @@ allow_fabric_request() ->
     QueryArgs = #index_query_args{},
     config:set("dreyfus_blacklist", Denied, "true"),
     dreyfus_test_util:wait_config_change(Denied, "true"),
-    ?assertEqual(ok, dreyfus_fabric_search:go(<<"mydb">>,
-        <<"myddocid">>,  <<"indexnotthere">>, QueryArgs)),
+    ?assertEqual(
+        ok,
+        dreyfus_fabric_search:go(
+            <<"mydb">>,
+            <<"myddocid">>,
+            <<"indexnotthere">>,
+            QueryArgs
+        )
+    ),
     ok = meck:unload(dreyfus_fabric_search).
