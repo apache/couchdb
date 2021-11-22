@@ -186,6 +186,8 @@ quit(JSContext* cx, unsigned int argc, JS::Value* vp)
     JS::CallArgs args = JS::CallArgsFromVp(argc, vp);
 
     int exit_code = args[0].toInt32();;
+    JS_DestroyContext(cx);
+    JS_ShutDown();
     exit(exit_code);
 }
 
@@ -254,20 +256,7 @@ static JSSecurityCallbacks security_callbacks = {
     nullptr
 };
 
-
-int
-main(int argc, const char* argv[])
-{
-    JSContext* cx = NULL;
-    int i;
-
-    couch_args* args = couch_parse_args(argc, argv);
-
-    JS_Init();
-    cx = JS_NewContext(args->stack_size);
-    if(cx == NULL)
-        return 1;
-
+int runWithContext(JSContext* cx, couch_args* args) {
     JS_SetGlobalJitCompilerOption(cx, JSJITCOMPILER_BASELINE_ENABLE, 0);
     JS_SetGlobalJitCompilerOption(cx, JSJITCOMPILER_ION_ENABLE, 0);
 
@@ -293,7 +282,7 @@ main(int argc, const char* argv[])
     if(couch_load_funcs(cx, global, global_functions) != true)
         return 1;
 
-    for(i = 0 ; args->scripts[i] ; i++) {
+    for(int i = 0 ; args->scripts[i] ; i++) {
         const char* filename = args->scripts[i];
 
         // Compile and run
@@ -336,6 +325,26 @@ main(int argc, const char* argv[])
         // Give the GC a chance to run.
         JS_MaybeGC(cx);
     }
-
     return 0;
+}
+
+int
+main(int argc, const char* argv[])
+{
+    JSContext* cx = NULL;
+    int ret;
+
+    couch_args* args = couch_parse_args(argc, argv);
+
+    JS_Init();
+    cx = JS_NewContext(args->stack_size);
+    if(cx == NULL) {
+        JS_ShutDown();
+        return 1;
+    }
+    ret = runWithContext(cx, args);
+    JS_DestroyContext(cx);
+    JS_ShutDown();
+
+    return ret;
 }

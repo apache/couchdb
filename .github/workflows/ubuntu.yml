@@ -1,0 +1,92 @@
+name: Ubuntu build CI
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: update
+      run: sudo apt-get update
+    - name: install
+      run: sudo apt-get --no-install-recommends -y install autoconf2.13 build-essential pkg-config libcurl4-openssl-dev erlang-dev rebar elixir
+
+    - name: couch checkout
+      uses: actions/checkout@v2
+      with:
+        path: couch
+
+    - name: ICU checkout
+      uses: actions/checkout@v2
+      with:
+        repository: unicode-org/icu
+        path: icubuild
+        
+    - name: ICU4C with gcc     
+      env: 
+        PREFIX: /usr/local
+      run: |
+        cd icubuild
+        mkdir build;
+        cd build;
+        ../icu4c/source/runConfigureICU --enable-debug --disable-release Linux/gcc --prefix=$PREFIX --enable-tracing;
+        make -j2;
+        make -j2 check;
+        ( cd ../icu4c/source/test/depstest && ./depstest.py ../../../../build/ );
+        sudo make install;
+
+    - name: Cache packages
+      uses: actions/cache@v2
+      id: wgetcache
+      with:
+        key: wgetcache
+        path: |
+          firefox-91.3.0esr.source.tar.xz
+          foundationdb-clients_6.3.22-1_amd64.deb
+          foundationdb-server_6.3.22-1_amd64.deb
+
+    - name: wget moz
+      if: steps.wgetcache.outputs.cache-hit != 'true'
+      run: wget -q https://www.foundationdb.org/downloads/6.3.22/ubuntu/installers/foundationdb-server_6.3.22-1_amd64.deb https://www.foundationdb.org/downloads/6.3.22/ubuntu/installers/foundationdb-clients_6.3.22-1_amd64.deb https://download.cdn.mozilla.net/pub/firefox/releases/91.3.0esr/source/firefox-91.3.0esr.source.tar.xz
+
+    - name: build spidermonkeycheckout
+      run: |
+        tar xf firefox-91.3.0esr.source.tar.xz
+        export PKG_CONFIG_PATH=${{github.workspace}}/icu/lib/pkgconfig:$PKG_CONFIG_PATH
+        export AC_MACRODIR=${{github.workspace}}/firefox-91.3.0/build/autoconf/
+        cd firefox-91.3.0
+        export PYTHON=python3
+        export M4=m4
+        export AWK=awk
+        export CFLAGS="-I/usr/local/include"
+        export LDFLAGS="-L/usr/local/lib"
+        cd js/src
+        sh ../../build/autoconf/autoconf.sh --localdir=$PWD configure.in > configure
+        chmod +x configure
+        mkdir ${{github.workspace}}/build_OPT.OBJ
+        cd ${{github.workspace}}/build_OPT.OBJ
+        ${{github.workspace}}/firefox-91.3.0/js/src/configure --prefix=/usr/local --disable-ctypes --disable-jit --disable-jemalloc --enable-optimize --enable-hardening --with-intl-api --build-backends=RecursiveMake --with-system-icu --disable-debug --enable-gczeal
+        make
+        sudo make install
+            
+    - name: install
+      run: sudo apt-get --no-install-recommends -y install ./foundationdb-clients_6.3.22-1_amd64.deb ./foundationdb-server_6.3.22-1_amd64.deb
+        
+    - name: configure
+      run: |
+        cd couch
+        sed -i -e "s@DRV_CFLAGS -DPIC@DRV_CFLAGS -I/usr/local/include -DPIC@" src/couch/rebar.config.script
+        sed -i -e "s@DRV_LDFLAGS -lm@DRV_LDFLAGS -L/usr/local/lib -lm@" src/couch/rebar.config.script
+        sh ./configure --spidermonkey-version=91 --disable-docs
+    - name: Compile
+      run: |
+        cd couch
+        make release
+    - name: Run tests
+      run: |
+        cd couch
+        make check
