@@ -62,6 +62,9 @@ static int64_t loadEpoch = 0;
 static ErlNifMutex* collMutex = NULL;
 
 static ERL_NIF_TERM less_json_nif(ErlNifEnv*, int, const ERL_NIF_TERM []);
+static ERL_NIF_TERM compare_strings_nif(ErlNifEnv*, int, const ERL_NIF_TERM []);
+static ERL_NIF_TERM get_icu_version(ErlNifEnv*, int, const ERL_NIF_TERM []);
+static ERL_NIF_TERM get_uca_version(ErlNifEnv*, int, const ERL_NIF_TERM []);
 static int on_load(ErlNifEnv*, void**, ERL_NIF_TERM);
 static void on_unload(ErlNifEnv*, void*);
 static __inline int less_json(int, ctx_t*, ERL_NIF_TERM, ERL_NIF_TERM);
@@ -69,7 +72,8 @@ static __inline int atom_sort_order(ErlNifEnv*, ERL_NIF_TERM);
 static __inline int compare_strings(ctx_t*, ErlNifBinary, ErlNifBinary);
 static __inline int compare_lists(int, ctx_t*, ERL_NIF_TERM, ERL_NIF_TERM);
 static __inline int compare_props(int, ctx_t*, ERL_NIF_TERM, ERL_NIF_TERM);
-static __inline UCollator* get_collator();
+static __inline int is_max_utf8_marker(ErlNifBinary);
+static __inline UCollator* get_collator(void);
 
 /* Should match the <<255,255,255,255>> in:
  *  - src/mango/src/mango_idx_view.hrl#L13
@@ -78,7 +82,7 @@ static const unsigned char max_utf8_marker[]  = {255, 255, 255, 255};
 
 
 UCollator*
-get_collator()
+get_collator(void)
 {
     UErrorCode status = U_ZERO_ERROR;
 
