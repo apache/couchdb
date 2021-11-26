@@ -71,8 +71,10 @@
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
--spec init_state() -> #state{}.
-init_state() ->
+reset_state(#state{mem3_cluster_pid = Pid} = State) when is_pid(Pid) ->
+    unlink(Pid),
+    reset_state(State#state{mem3_cluster_pid = undefined});
+reset_state(State) ->
     couch_log:debug("peruser: starting on node ~p in pid ~p", [node(), self()]),
     case config:get_boolean("couch_peruser", "enable", false) of
         false ->
@@ -445,7 +447,7 @@ cluster_stable(Server) ->
 -spec init(Options :: list()) -> {ok, #state{}}.
 init([]) ->
     ok = subscribe_for_changes(),
-    {ok, init_state()}.
+    {ok, reset_state(#state{})}.
 
 handle_call(is_stable, _From, #state{cluster_stable = IsStable} = State) ->
     {reply, IsStable, State};
@@ -454,16 +456,16 @@ handle_call(_Msg, _From, State) ->
 
 handle_cast(update_config, State) when State#state.states =/= undefined ->
     exit_changes(State),
-    {noreply, init_state()};
-handle_cast(update_config, _) ->
-    {noreply, init_state()};
+    {noreply, reset_state(State)};
+handle_cast(update_config, State) ->
+    {noreply, reset_state(State)};
 handle_cast(stop, State) ->
     {stop, normal, State};
 handle_cast(cluster_unstable, State) when State#state.states =/= undefined ->
     exit_changes(State),
-    {noreply, init_state()};
-handle_cast(cluster_unstable, _) ->
-    {noreply, init_state()};
+    {noreply, reset_state(State)};
+handle_cast(cluster_unstable, State) ->
+    {noreply, reset_state(State)};
 handle_cast(cluster_stable, State) ->
     {noreply, start_listening(State)};
 handle_cast(_Msg, State) ->
