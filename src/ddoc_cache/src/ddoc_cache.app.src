@@ -14,8 +14,7 @@
     {description, "Design Document Cache"},
     {vsn, git},
     {registered, [
-        ddoc_cache_lru,
-        ddoc_cache_opener
+        ddoc_cache_lru
     ]},
     {applications, [
         kernel,
