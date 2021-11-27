@@ -30,14 +30,6 @@ init([]) ->
             5000,
             worker,
             [ddoc_cache_lru]
-        },
-        {
-            ddoc_cache_opener,
-            {ddoc_cache_opener, start_link, []},
-            permanent,
-            5000,
-            worker,
-            [ddoc_cache_opener]
         }
     ],
     {ok, {{one_for_one, 25, 1}, Children}}.
