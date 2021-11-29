@@ -16,8 +16,8 @@
 -include_lib("couch/include/couch_db.hrl").
 
 % public api.
--export([start_link/1, close/1, suspend/1, resume/1, get_status/1]).
--export([enqueue/3, last_updated/2, flush/1]).
+-export([start_link/1, close/1, suspend/1, resume/1, activate/1, get_status/1]).
+-export([enqueue/3, last_updated/2, flush/1, is_key/2, is_activated/1, persist/1]).
 
 % gen_server api.
 -export([
@@ -25,18 +25,38 @@
     handle_call/3,
     handle_cast/2,
     handle_info/2,
-    code_change/3,
     terminate/2
 ]).
 
+-define(VSN, 1).
+-define(CHECKPOINT_INTERVAL_IN_MSEC, 180000).
+
+-ifndef(TEST).
+-define(START_DELAY_IN_MSEC, 60000).
+-define(ACTIVATE_DELAY_IN_MSEC, 30000).
+-else.
+-define(START_DELAY_IN_MSEC, 0).
+-define(ACTIVATE_DELAY_IN_MSEC, 0).
+-endif.
+
 % records.
+
+% When the state is set to activated = true, the channel has completed the state
+% recovery process that occurs on (re)start and is accepting new compaction jobs.
+% Note: if activated = false and a request for a new compaction job is received,
+% smoosh will enqueue this new job after the state recovery process has finished.
+% When the state is set to paused = false, the channel is actively compacting any
+% compaction jobs that are scheduled.
+% See operator_guide.md --> State diagram.
 
 -record(state, {
     active = [],
     name,
-    waiting = smoosh_priority_queue:new(),
+    waiting,
     paused = true,
-    starting = []
+    starting = [],
+    activated = false,
+    requests = []
 }).
 
 % public functions.
@@ -48,7 +68,10 @@ suspend(ServerRef) ->
     gen_server:call(ServerRef, suspend).
 
 resume(ServerRef) ->
-    gen_server:call(ServerRef, resume).
+    gen_server:call(ServerRef, resume_and_activate).
+
+activate(ServerRef) ->
+    gen_server:call(ServerRef, activate).
 
 enqueue(ServerRef, Object, Priority) ->
     gen_server:cast(ServerRef, {enqueue, Object, Priority}).
@@ -65,32 +88,42 @@ close(ServerRef) ->
 flush(ServerRef) ->
     gen_server:call(ServerRef, flush).
 
+is_key(ServerRef, Key) ->
+    gen_server:call(ServerRef, {is_key, Key}).
+
+is_activated(ServerRef) ->
+    gen_server:call(ServerRef, is_activated).
+
+persist(ServerRef) ->
+    gen_server:call(ServerRef, persist).
+
 % gen_server functions.
 
 init(Name) ->
-    schedule_unpause(),
     erlang:send_after(60 * 1000, self(), check_window),
-    {ok, #state{name = Name}}.
+    process_flag(trap_exit, true),
+    Waiting = smoosh_priority_queue:new(Name),
+    State = #state{name = Name, waiting = Waiting, paused = true, activated = false},
+    erlang:send_after(?START_DELAY_IN_MSEC, self(), start_recovery),
+    {ok, State}.
 
-handle_call({last_updated, Object}, _From, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
+handle_call({last_updated, Object}, _From, State) ->
     LastUpdated = smoosh_priority_queue:last_updated(Object, State#state.waiting),
     {reply, LastUpdated, State};
-handle_call(suspend, _From, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
+handle_call(suspend, _From, State) ->
     #state{active = Active} = State,
     [
         catch erlang:suspend_process(Pid, [unless_suspending])
      || {_, Pid} <- Active
     ],
     {reply, ok, State#state{paused = true}};
-handle_call(resume, _From, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
+handle_call(resume_and_activate, _From, State) ->
     #state{active = Active} = State,
     [catch erlang:resume_process(Pid) || {_, Pid} <- Active],
-    {reply, ok, State#state{paused = false}};
-handle_call(status, _From, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
+    {reply, ok, State#state{paused = false, activated = true}};
+handle_call(activate, _From, State) ->
+    {reply, ok, State#state{activated = true}};
+handle_call(status, _From, State) ->
     {reply,
         {ok, [
             {active, length(State#state.active)},
@@ -98,27 +131,38 @@ handle_call(status, _From, State0) ->
             {waiting, smoosh_priority_queue:info(State#state.waiting)}
         ]},
         State};
-handle_call(close, _From, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
+handle_call(close, _From, State) ->
     {stop, normal, ok, State};
-handle_call(flush, _From, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
-    {reply, ok, State#state{waiting = smoosh_priority_queue:new()}}.
+handle_call(flush, _From, #state{waiting = Q} = State) ->
+    {reply, ok, State#state{waiting = smoosh_priority_queue:flush(Q)}};
+handle_call({is_key, Key}, _From, #state{waiting = Waiting} = State) ->
+    {reply, smoosh_priority_queue:is_key(Key, Waiting), State};
+handle_call(is_activated, _From, #state{activated = Activated} = State0) ->
+    {reply, Activated, State0};
+handle_call(persist, _From, State) ->
+    persist_queue(State),
+    {reply, ok, State}.
 
-handle_cast({enqueue, _Object, 0}, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
+handle_cast({enqueue, _Object, 0}, #state{} = State) ->
     {noreply, State};
-handle_cast({enqueue, Object, Priority}, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
-    {noreply, maybe_start_compaction(add_to_queue(Object, Priority, State))}.
+handle_cast({enqueue, Object, Priority}, #state{activated = true} = State) ->
+    {noreply, maybe_start_compaction(add_to_queue(Object, Priority, State))};
+handle_cast({enqueue, Object, Priority}, #state{activated = false, requests = Requests} = State0) ->
+    couch_log:notice(
+        "~p Channel is not activated yet. Adding ~p to requests with priority ~p.", [
+            ?MODULE,
+            Object,
+            Priority
+        ]
+    ),
+    {noreply, State0#state{requests = [{Object, Priority} | Requests]}}.
 
 % We accept noproc here due to possibly having monitored a restarted compaction
 % pid after it finished.
-handle_info({'DOWN', Ref, _, Job, Reason}, State0) when
+handle_info({'DOWN', Ref, _, Job, Reason}, State) when
     Reason == normal;
     Reason == noproc
 ->
-    {ok, State} = code_change(nil, State0, nil),
     #state{active = Active, starting = Starting} = State,
     {noreply,
         maybe_start_compaction(
@@ -127,8 +171,7 @@ handle_info({'DOWN', Ref, _, Job, Reason}, State0) when
                 starting = lists:keydelete(Ref, 1, Starting)
             }
         )};
-handle_info({'DOWN', Ref, _, Job, Reason}, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
+handle_info({'DOWN', Ref, _, Job, Reason}, State) ->
     #state{active = Active0, starting = Starting0} = State,
     case lists:keytake(Job, 2, Active0) of
         {value, {Key, _Pid}, Active1} ->
@@ -142,7 +185,8 @@ handle_info({'DOWN', Ref, _, Job, Reason}, State0) ->
             case lists:keytake(Ref, 1, Starting0) of
                 {value, {_, Key}, Starting1} ->
                     couch_log:warning("failed to start compaction of ~p: ~p", [
-                        smoosh_utils:stringify(Key), Reason
+                        smoosh_utils:stringify(Key),
+                        Reason
                     ]),
                     {ok, _} = timer:apply_after(5000, smoosh_server, enqueue, [Key]),
                     {noreply, maybe_start_compaction(State#state{starting = Starting1})};
@@ -150,8 +194,7 @@ handle_info({'DOWN', Ref, _, Job, Reason}, State0) ->
                     {noreply, State}
             end
     end;
-handle_info({Ref, {ok, Pid}}, State0) when is_reference(Ref) ->
-    {ok, State} = code_change(nil, State0, nil),
+handle_info({Ref, {ok, Pid}}, State) when is_reference(Ref) ->
     case lists:keytake(Ref, 1, State#state.starting) of
         {value, {_, Key}, Starting1} ->
             couch_log:notice(
@@ -167,8 +210,7 @@ handle_info({Ref, {ok, Pid}}, State0) when is_reference(Ref) ->
         false ->
             {noreply, State}
     end;
-handle_info(check_window, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
+handle_info(check_window, State) ->
     #state{paused = Paused, name = Name} = State,
     StrictWindow = smoosh_utils:get(Name, "strict_window", "false"),
     FinalState =
@@ -194,18 +236,113 @@ handle_info(check_window, State0) ->
         end,
     erlang:send_after(60 * 1000, self(), check_window),
     {noreply, FinalState};
-handle_info(pause, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
+handle_info(start_recovery, #state{name = Name, waiting = Waiting0} = State0) ->
+    RecActive = recover(active_file_name(Name)),
+    Waiting1 = lists:foldl(
+        fun(DbName, Acc) ->
+            case couch_db:is_compacting(DbName) of
+                true ->
+                    Priority = smoosh_server:get_priority(Name, DbName),
+                    smoosh_priority_queue:in(DbName, Priority, Priority, Acc);
+                false ->
+                    Acc
+            end
+        end,
+        Waiting0,
+        RecActive
+    ),
+    State1 = maybe_start_compaction(State0#state{paused = false, waiting = Waiting1}),
+    couch_log:notice(
+        "~p Previously active compaction jobs (if any) have been successfully recovered and restarted.",
+        [?MODULE]
+    ),
+    erlang:send_after(?ACTIVATE_DELAY_IN_MSEC, self(), activate),
+    {noreply, State1#state{paused = true}};
+handle_info(activate, State) ->
+    {noreply, activate_channel(State)};
+handle_info(persist, State) ->
+    persist_queue(State),
+    erlang:send_after(?CHECKPOINT_INTERVAL_IN_MSEC, self(), persist),
+    {noreply, State};
+handle_info(pause, State) ->
     {noreply, State#state{paused = true}};
-handle_info(unpause, State0) ->
-    {ok, State} = code_change(nil, State0, nil),
+handle_info(unpause, State) ->
     {noreply, maybe_start_compaction(State#state{paused = false})}.
 
 terminate(_Reason, _State) ->
     ok.
 
-code_change(_OldVsn, #state{} = State, _Extra) ->
-    {ok, State}.
+persist_queue(State) ->
+    write_state_to_file(State).
+
+recover(FilePath) ->
+    case do_recover(FilePath) of
+        {ok, List} ->
+            List;
+        error ->
+            []
+    end.
+
+do_recover(FilePath) ->
+    case file:read_file(FilePath) of
+        {ok, Content} ->
+            <<Vsn, Binary/binary>> = Content,
+            try parse_state(Vsn, ?VSN, Binary) of
+                Term ->
+                    couch_log:notice(
+                        "~p Successfully restored state file ~s", [?MODULE, FilePath]
+                    ),
+                    {ok, Term}
+            catch
+                error:Reason ->
+                    couch_log:error(
+                        "~p Invalid state file (~p). Deleting ~s", [?MODULE, Reason, FilePath]
+                    ),
+                    file:delete(FilePath),
+                    error
+            end;
+        {error, enoent} ->
+            couch_log:notice(
+                "~p (~p) State file ~s does not exist. Not restoring.", [?MODULE, enoent, FilePath]
+            ),
+            error;
+        {error, Reason} ->
+            couch_log:error(
+                "~p Cannot read the state file (~p). Deleting ~s", [?MODULE, Reason, FilePath]
+            ),
+            file:delete(FilePath),
+            error
+    end.
+
+parse_state(1, ?VSN, Binary) ->
+    erlang:binary_to_term(Binary, [safe]);
+parse_state(Vsn, ?VSN, _) ->
+    error({unsupported_version, Vsn}).
+
+write_state_to_file(#state{name = Name, active = Active, starting = Starting, waiting = Waiting}) ->
+    Active1 = lists:foldl(
+        fun({DbName, _}, Acc) ->
+            [DbName | Acc]
+        end,
+        [],
+        Active
+    ),
+    Starting1 = lists:foldl(
+        fun({_, DbName}, Acc) ->
+            [DbName | Acc]
+        end,
+        [],
+        Starting
+    ),
+    smoosh_utils:write_to_file(Active1, active_file_name(Name), ?VSN),
+    smoosh_utils:write_to_file(Starting1, starting_file_name(Name), ?VSN),
+    smoosh_priority_queue:write_to_file(Waiting).
+
+active_file_name(Name) ->
+    filename:join(config:get("smoosh", "state_dir", "."), Name ++ ".active").
+
+starting_file_name(Name) ->
+    filename:join(config:get("smoosh", "state_dir", "."), Name ++ ".starting").
 
 % private functions.
 
@@ -225,6 +362,37 @@ add_to_queue(Key, Priority, State) ->
             }
     end.
 
+maybe_activate(#state{activated = true} = State) ->
+    State;
+maybe_activate(State) ->
+    activate_channel(State).
+
+activate_channel(#state{name = Name, waiting = Waiting0, requests = Requests0} = State0) ->
+    RecStarting = recover(starting_file_name(Name)),
+    Starting = lists:foldl(
+        fun(DbName, Acc) ->
+            Priority = smoosh_server:get_priority(Name, DbName),
+            smoosh_priority_queue:in(DbName, Priority, Priority, Acc)
+        end,
+        Waiting0,
+        RecStarting
+    ),
+    Waiting1 = smoosh_priority_queue:recover(Starting),
+    Requests1 = lists:reverse(Requests0),
+    Waiting2 = lists:foldl(
+        fun({DbName, Priority}, Acc) ->
+            smoosh_priority_queue:in(DbName, Priority, Priority, Acc)
+        end,
+        Waiting1,
+        Requests1
+    ),
+    State1 = maybe_start_compaction(State0#state{
+        waiting = Waiting2, paused = false, activated = true, requests = []
+    }),
+    handle_info(persist, State1),
+    schedule_unpause(),
+    State1#state{paused = true}.
+
 maybe_start_compaction(#state{paused = true} = State) ->
     State;
 maybe_start_compaction(State) ->
@@ -239,7 +407,7 @@ maybe_start_compaction(State) ->
         length(State#state.active) + length(State#state.starting) < Concurrency ->
             case smoosh_priority_queue:out(State#state.waiting) of
                 false ->
-                    State;
+                    maybe_activate(State);
                 {Key, Priority, Q} ->
                     try
                         State2 =

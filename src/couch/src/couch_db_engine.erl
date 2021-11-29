@@ -662,6 +662,7 @@
     exists/2,
     delete/4,
     delete_compaction_files/4,
+    is_compacting/2,
 
     init/3,
     terminate/2,
@@ -735,6 +736,9 @@ delete_compaction_files(Engine, RootDir, DbPath, DelOpts) when
     is_list(DelOpts)
 ->
     Engine:delete_compaction_files(RootDir, DbPath, DelOpts).
+
+is_compacting(Engine, DbName) ->
+    Engine:is_compacting(DbName).
 
 init(Engine, DbPath, Options) ->
     case Engine:init(DbPath, Options) of

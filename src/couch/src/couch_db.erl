@@ -120,6 +120,7 @@
     cancel_compact/1,
     wait_for_compaction/1,
     wait_for_compaction/2,
+    is_compacting/1,
 
     dbname_suffix/1,
     normalize_dbname/1,
@@ -276,6 +277,9 @@ wait_for_compaction(#db{main_pid = Pid} = Db, Timeout) ->
         _ ->
             ok
     end.
+
+is_compacting(DbName) ->
+    couch_server:is_compacting(DbName).
 
 delete_doc(Db, Id, Revisions) ->
     DeletedDocs = [#doc{id = Id, revs = [Rev], deleted = true} || Rev <- Revisions],

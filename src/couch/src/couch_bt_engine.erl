@@ -19,6 +19,8 @@
     delete/3,
     delete_compaction_files/3,
 
+    is_compacting/1,
+
     init/2,
     terminate/2,
     handle_db_updater_call/2,
@@ -135,6 +137,14 @@ delete_compaction_files(RootDir, FilePath, DelOpts) ->
     lists:foreach(
         fun(Ext) ->
             couch_file:delete(RootDir, FilePath ++ Ext, DelOpts)
+        end,
+        [".compact", ".compact.data", ".compact.meta"]
+    ).
+
+is_compacting(DbName) ->
+    lists:any(
+        fun(Ext) ->
+            filelib:is_regular(DbName ++ Ext)
         end,
         [".compact", ".compact.data", ".compact.meta"]
     ).
