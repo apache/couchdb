@@ -46,6 +46,9 @@
 % exported but for internal use.
 -export([enqueue_request/2]).
 
+% exported for testing and debugging
+-export([get_channel/1]).
+
 -ifdef(TEST).
 -define(RELISTEN_DELAY, 50).
 -else.
@@ -60,7 +63,7 @@
     schema_channels = [],
     tab,
     event_listener,
-    waiting = dict:new()
+    waiting=maps:new()
 }).
 
 -record(channel, {
@@ -105,6 +108,10 @@ handle_db_event(DbName, {schema_updated, DDocId}, St) ->
     {ok, St};
 handle_db_event(_DbName, _Event, St) ->
     {ok, St}.
+
+% for testing and debugging only
+get_channel(ChannelName) ->
+    gen_server:call(?MODULE, {get_channel, ChannelName}).
 
 % gen_server functions.
 
@@ -175,10 +182,10 @@ handle_call(resume, _From, State) ->
             couch_log:notice("Resuming ~p", [Name]),
             smoosh_channel:resume(P)
         end,
-        0,
-        State#state.tab
-    ),
-    {reply, ok, State}.
+    {reply, ok, State};
+
+handle_call({get_channel, ChannelName}, _From, #state{tab = Tab} = State) ->
+    {reply, {ok, channel_pid(Tab, ChannelName)}, State}.
 
 handle_cast({new_db_channels, Channels}, State) ->
     [
@@ -200,12 +207,12 @@ handle_cast({new_schema_channels, Channels}, State) ->
     {noreply, create_missing_channels(State#state{view_channels = Channels})};
 handle_cast({enqueue, Object}, State) ->
     #state{waiting = Waiting} = State,
-    case dict:is_key(Object, Waiting) of
+    case maps:is_key(Object, Waiting) of
         true ->
             {noreply, State};
         false ->
             {_Pid, Ref} = spawn_monitor(?MODULE, enqueue_request, [State, Object]),
-            {noreply, State#state{waiting = dict:store(Object, Ref, Waiting)}}
+            {noreply, State#state{waiting=maps:put(Object, Ref, Waiting)}}
     end.
 
 handle_info({'EXIT', Pid, Reason}, #state{event_listener = Pid} = State) ->
@@ -222,7 +229,7 @@ handle_info({'EXIT', Pid, Reason}, State) ->
     end,
     {noreply, create_missing_channels(State)};
 handle_info({'DOWN', Ref, _, _, _}, State) ->
-    Waiting = dict:filter(
+    Waiting = maps:filter(fun(_Key, Value) -> Value =/= Ref end,
         fun(_Key, Value) -> Value =/= Ref end,
         State#state.waiting
     ),
