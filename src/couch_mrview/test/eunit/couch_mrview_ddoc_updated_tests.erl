@@ -88,7 +88,7 @@ check_indexing_stops_on_ddoc_change(Db) ->
     ?_test(begin
         DDocID = <<"_design/bar">>,
 
-        IndexesBefore = get_indexes_by_ddoc(DDocID, 1),
+        IndexesBefore = get_indexes_by_ddoc(couch_db:name(Db), DDocID, 1),
         ?assertEqual(1, length(IndexesBefore)),
         AliveBefore = lists:filter(fun erlang:is_process_alive/1, IndexesBefore),
         ?assertEqual(1, length(AliveBefore)),
@@ -127,16 +127,16 @@ check_indexing_stops_on_ddoc_change(Db) ->
         end,
 
         %% assert that previously running indexes are gone
-        IndexesAfter = get_indexes_by_ddoc(DDocID, 0),
+        IndexesAfter = get_indexes_by_ddoc(couch_db:name(Db), DDocID, 0),
         ?assertEqual(0, length(IndexesAfter)),
         AliveAfter = lists:filter(fun erlang:is_process_alive/1, IndexesBefore),
         ?assertEqual(0, length(AliveAfter))
     end).
 
-get_indexes_by_ddoc(DDocID, N) ->
+get_indexes_by_ddoc(DbName0, DDocID, N) ->
     Indexes = test_util:wait(fun() ->
         Indxs = ets:match_object(
-            couchdb_indexes_by_db, {'$1', {DDocID, '$2'}}
+            couch_index_server:by_db(DbName0), {'$1', {DDocID, '$2'}}
         ),
         case length(Indxs) == N of
             true ->
@@ -147,7 +147,7 @@ get_indexes_by_ddoc(DDocID, N) ->
     end),
     lists:foldl(
         fun({DbName, {_DDocID, Sig}}, Acc) ->
-            case ets:lookup(couchdb_indexes_by_sig, {DbName, Sig}) of
+            case ets:lookup(couch_index_server:by_sig(DbName), {DbName, Sig}) of
                 [{_, Pid}] -> [Pid | Acc];
                 _ -> Acc
             end
