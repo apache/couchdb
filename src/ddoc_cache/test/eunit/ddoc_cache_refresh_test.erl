@@ -42,8 +42,7 @@ check_refresh_test_() ->
             {"refresh_ddoc_rev", fun refresh_ddoc_rev/1},
             {"refresh_vdu", fun refresh_vdu/1},
             {"refresh_custom", fun refresh_custom/1},
-            {"refresh_multiple", fun refresh_multiple/1},
-            {"check_upgrade_clause", fun check_upgrade_clause/1}
+            {"refresh_multiple", fun refresh_multiple/1}
         ])
     }.
 
@@ -135,14 +134,6 @@ refresh_multiple({DbName, _}) ->
     ?assertEqual({ok, Updated}, ddoc_cache:open_doc(DbName, ?FOOBAR)),
     ?assertEqual({ok, DDoc}, ddoc_cache:open_doc(DbName, ?FOOBAR, Rev)),
     ?assertEqual(2, ets:info(?CACHE, size)).
-
-check_upgrade_clause({DbName, _}) ->
-    ddoc_cache_tutil:clear(),
-    meck:reset(ddoc_cache_ev),
-    {ok, _} = ddoc_cache:open_doc(DbName, ?FOOBAR),
-    [#entry{key = Key}] = ets:tab2list(?CACHE),
-    gen_server:cast(ddoc_cache_opener, {do_evict, DbName, [?FOOBAR]}),
-    meck:wait(ddoc_cache_ev, event, [update_noop, Key], 1000).
 
 rand_string() ->
     Bin = crypto:strong_rand_bytes(8),
