@@ -14,6 +14,7 @@
 
 -export([
     childspecs/0,
+    listen/1,
     listen/2,
     accept/1,
     accept_connection/5,
@@ -32,6 +33,16 @@ childspecs() ->
             ssl_dist_sup
         ]}
     ]}.
+
+listen(Name) ->
+    NodeName =
+        case is_atom(Name) of
+            true -> atom_to_list(Name);
+            false -> Name
+        end,
+    Host = get_node_host(),
+    Mod = inet_dist(NodeName ++ "@" ++ Host),
+    Mod:listen(NodeName).
 
 listen(Name, Host) ->
     NodeName =
@@ -65,6 +76,38 @@ is_node_name(Node) ->
 
 get_init_args() ->
     init:get_argument(couch_dist).
+
+get_node_host() ->
+    % Cannot use `node()` since distribution hasn't started yet. Use
+    % similar logic as erl_distribition and net_kernel to parse it
+    % from the arguments list
+    case {init:get_argument(sname), init:get_argument(name)} of
+        {{ok, [[SName]]}, _} ->
+            case split_host(SName) of
+                [$@ | Host] when length(Host) > 0 ->
+                    Host;
+                _ ->
+                    inet_db:gethostname()
+            end;
+        {error, {ok, [[Name]]}} ->
+            case split_host(Name) of
+                [$@ | Host] when length(Host) > 0 ->
+                    Host;
+                _ ->
+                    OwnHost = inet_db:gethostname(),
+                    case inet_db:res_option(domain) of
+                        Domain when is_list(Domain), length(Domain) > 0 ->
+                            OwnHost ++ "." ++ Domain;
+                        _ ->
+                            OwnHost
+                    end
+            end
+    end.
+
+split_host(Name) ->
+    % Copied from net_kernel. Modifed to return Host only
+    {_, Host} = lists:splitwith(fun(C) -> C =/= $@ end, Name),
+    Host.
 
 inet_dist(Node) ->
     case no_tls(Node) of

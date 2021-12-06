@@ -91,5 +91,5 @@
 ## Don't forget to override the paths to point to your certificate(s) and key(s)!
 ##
 #-proto_dist couch
-#-couch_dist no_tls \"clouseau@127.0.0.1\"
+#-couch_dist no_tls '"clouseau@127.0.0.1"'
 #-ssl_dist_optfile <path/to/couch_ssl_dist.conf>
