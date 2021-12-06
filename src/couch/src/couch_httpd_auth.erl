@@ -509,7 +509,7 @@ handle_session_req(#httpd{method = 'DELETE'} = Req, _AuthModule) ->
         "AuthSession",
         "",
         [{path, "/"}] ++
-            cookie_domain() ++ cookie_scheme(Req)
+            cookie_domain() ++ cookie_scheme(Req) ++ same_site()
     ),
     {Code, Headers} =
         case couch_httpd:qs_value(Req, "next", nil) of
