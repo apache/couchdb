@@ -447,7 +447,7 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
             authentication_warning(Req, UserName),
             % clear the session
             Cookie = mochiweb_cookies:cookie(
-                "AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)
+                "AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req) ++ same_site()
             ),
             {Code, Headers} =
                 case couch_httpd:qs_value(Req, "fail", nil) of
