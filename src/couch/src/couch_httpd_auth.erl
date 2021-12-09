@@ -409,8 +409,17 @@ cookie_auth_cookie(Req, User, Secret, TimeStamp) ->
     mochiweb_cookies:cookie(
         "AuthSession",
         couch_util:encodeBase64Url(SessionData ++ ":" ++ ?b2l(Hash)),
-        [{path, "/"}] ++ cookie_scheme(Req) ++ max_age() ++ cookie_domain() ++ same_site()
+        cookie_attributes(Req)
     ).
+
+clear_auth_cookie(Req) ->
+    mochiweb_cookies:cookie(
+        "AuthSession", "", cookie_attributes(Req)
+    ).
+
+cookie_attributes(Req) ->
+    Attributes = [path(), http_only(), max_age(), cookie_scheme(Req), cookie_domain(), same_site()],
+    lists:flatten(Attributes).
 
 ensure_cookie_auth_secret() ->
     case chttpd_util:get_chttpd_auth_config("secret") of
@@ -485,9 +494,7 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
         false ->
             authentication_warning(Req, UserName),
             % clear the session
-            Cookie = mochiweb_cookies:cookie(
-                "AuthSession", "", [{path, "/"}] ++ cookie_scheme(Req)
-            ),
+            Cookie = clear_auth_cookie(Req),
             {Code, Headers} =
                 case couch_httpd:qs_value(Req, "fail", nil) of
                     nil ->
@@ -544,12 +551,7 @@ handle_session_req(#httpd{method = 'GET', user_ctx = UserCtx} = Req, _AuthModule
     end;
 % logout by deleting the session
 handle_session_req(#httpd{method = 'DELETE'} = Req, _AuthModule) ->
-    Cookie = mochiweb_cookies:cookie(
-        "AuthSession",
-        "",
-        [{path, "/"}] ++
-            cookie_domain() ++ cookie_scheme(Req) ++ same_site()
-    ),
+    Cookie = clear_auth_cookie(Req),
     {Code, Headers} =
         case couch_httpd:qs_value(Req, "next", nil) of
             nil ->
@@ -616,12 +618,17 @@ make_cookie_time() ->
     {NowMS, NowS, _} = os:timestamp(),
     NowMS * 1000000 + NowS.
 
+path() ->
+    {path, "/"}.
+
+http_only() ->
+    {http_only, true}.
+
 cookie_scheme(#httpd{mochi_req = MochiReq}) ->
-    [{http_only, true}] ++
-        case MochiReq:get(scheme) of
-            http -> [];
-            https -> [{secure, true}]
-        end.
+    case MochiReq:get(scheme) of
+        http -> [];
+        https -> [{secure, true}]
+    end.
 
 max_age() ->
     case
