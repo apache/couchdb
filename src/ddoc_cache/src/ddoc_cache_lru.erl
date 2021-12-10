@@ -296,16 +296,30 @@ remove_key(St, Key) ->
     } = St,
     DbName = ddoc_cache_entry:dbname(Key),
     DDocId = ddoc_cache_entry:ddocid(Key),
-    {value, DDocIds} = khash:lookup(Dbs, DbName),
-    {value, Keys} = khash:lookup(DDocIds, DDocId),
-    khash:del(Keys, Key),
-    case khash:size(Keys) of
-        0 -> khash:del(DDocIds, DDocId);
-        _ -> ok
-    end,
-    case khash:size(DDocIds) of
-        0 -> khash:del(Dbs, DbName);
-        _ -> ok
+
+    % For non-existent ddocs, a new ddoc_cache_entry is spawned for
+    % each call to ddoc_cache:open. Multiple calls to open the same
+    % non-existent ddoc will create multiple cache entries with the
+    % same Key but different PIDs. This can result in the following
+    % khash lookups returning not_found, so handle those corner cases.
+    case khash:lookup(Dbs, DbName) of
+        {value, DDocIds} ->
+            case khash:lookup(DDocIds, DDocId) of
+                {value, Keys} ->
+                    ok = khash:del(Keys, Key),
+                    case khash:size(Keys) of
+                        0 -> khash:del(DDocIds, DDocId);
+                        _ -> ok
+                    end,
+                    case khash:size(DDocIds) of
+                        0 -> khash:del(Dbs, DbName);
+                        _ -> ok
+                    end;
+                not_found ->
+                    ok
+            end;
+        not_found ->
+            ok
     end.
 
 unlink_and_flush(Pid) ->
