@@ -103,8 +103,16 @@ check_all_indexers_exit_on_ddoc_change({_Ctx, DbName}) ->
 
         % assert that all index processes exit after ddoc updated
         ok = meck:reset(test_index),
-        couch_index_server:handle_db_event(
-            couch_db:name(DbShard), {ddoc_updated, DDocID}, {st, ""}
+        lists:foreach(
+            fun(I) ->
+                couch_index_server:handle_db_event(
+                    couch_db:name(DbShard),
+                    {ddoc_updated, DDocID},
+                    {st, "", couch_index_server:server_name(I), couch_index_server:by_sig(I),
+                        couch_index_server:by_pid(I), couch_index_server:by_db(I)}
+                )
+            end,
+            seq()
         ),
 
         ok = meck:wait(N, test_index, init, ['_', '_'], 5000),
@@ -139,8 +147,13 @@ fake_index() ->
 
 get_indexes_by_ddoc(DDocID, N) ->
     Indexes = test_util:wait(fun() ->
-        Indxs = ets:match_object(
-            couchdb_indexes_by_db, {'$1', {DDocID, '$2'}}
+        Indxs = lists:flatmap(
+            fun(I) ->
+                ets:match_object(
+                    couch_index_server:by_db(I), {'$1', {DDocID, '$2'}}
+                )
+            end,
+            seq()
         ),
         case length(Indxs) == N of
             true ->
@@ -151,7 +164,7 @@ get_indexes_by_ddoc(DDocID, N) ->
     end),
     lists:foldl(
         fun({DbName, {_DDocID, Sig}}, Acc) ->
-            case ets:lookup(couchdb_indexes_by_sig, {DbName, Sig}) of
+            case ets:lookup(couch_index_server:by_sig(DbName), {DbName, Sig}) of
                 [{_, Pid}] -> [Pid | Acc];
                 _ -> Acc
             end
@@ -159,3 +172,6 @@ get_indexes_by_ddoc(DDocID, N) ->
         [],
         Indexes
     ).
+
+seq() ->
+    lists:seq(1, couch_index_server:num_servers()).

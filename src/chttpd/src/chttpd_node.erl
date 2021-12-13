@@ -282,7 +282,8 @@ get_stats() ->
     MessageQueues0 = [
         {couch_file, {CF}},
         {couch_db_updater, {CDU}},
-        {couch_server, couch_server:aggregate_queue_len()}
+        {couch_server, couch_server:aggregate_queue_len()},
+        {index_server, couch_index_server:aggregate_queue_len()}
     ],
     MessageQueues = MessageQueues0 ++ message_queues(registered()),
     {SQ, DCQ} = run_queues(),
