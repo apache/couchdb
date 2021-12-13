@@ -51,6 +51,10 @@ pipeline {
     // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
     // be done parametrically
     LOW_ERLANG_VER = '20.3.8.26'
+
+    // erlfmt doesn't run with the lowest erlang version so we run it in a
+    // separate stage with a higher erlang version.
+    ERLFMT_ERLANG_VER = '23.3.1'
   }
 
   options {
@@ -63,6 +67,38 @@ pipeline {
   }
 
   stages {
+
+    stage('erlfmt') {
+      agent {
+        docker {
+          image "${DOCKER_IMAGE}"
+          label 'docker'
+          args "${DOCKER_ARGS}"
+          registryUrl 'https://docker.io/'
+          registryCredentialsId 'dockerhub_creds'
+        }
+      }
+      options {
+        timeout(time: 15, unit: "MINUTES")
+      }
+      steps {
+        sh '''
+          set
+          rm -rf apache-couchdb-*
+          . /usr/local/kerl/${ERLFMT_ERLANG_VER}/activate
+          ./configure --skip-deps
+          make erlfmt-check
+        '''
+      }
+      post {
+        cleanup {
+          // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
+          sh 'rm -rf ${WORKSPACE}/*'
+        }
+      }
+    } // stage erlfmt
+
+
     stage('Build Release Tarball') {
       agent {
         docker {
@@ -82,7 +118,6 @@ pipeline {
           rm -rf apache-couchdb-*
           . /usr/local/kerl/${LOW_ERLANG_VER}/activate
           ./configure
-          make erlfmt-check
           make dist
           chmod -R a+w * .
         '''
