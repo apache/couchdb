@@ -33,11 +33,12 @@ setup() ->
             {<<"_id">>, <<"_design/doc1">>},
             {<<"shows">>,
                 {[
-                    {<<"test">>,
-                        <<"function(doc, req) {\n"
+                    {<<"test">>, <<
+                        "function(doc, req) {\n"
                         "            return { json: {\n"
                         "                    requested_path: '/' + req.requested_path.join('/'),\n"
-                        "                    path: '/' + req.path.join('/')}};}">>}
+                        "                    path: '/' + req.path.join('/')}};}"
+                    >>}
                 ]}},
             {<<"rewrites">>, [
                 {[

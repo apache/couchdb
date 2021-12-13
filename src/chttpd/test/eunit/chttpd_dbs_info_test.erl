@@ -56,8 +56,11 @@ mock_timeout() ->
     meck:expect(fabric_util, request_timeout, fun() -> 0 end).
 
 mock_db_not_exist() ->
-    meck:expect(chttpd_util, get_db_info,
-        fun(_) -> {error, database_does_not_exist} end).
+    meck:expect(
+        chttpd_util,
+        get_db_info,
+        fun(_) -> {error, database_does_not_exist} end
+    ).
 
 dbs_info_test_() ->
     {
@@ -93,132 +96,162 @@ dbs_info_test_() ->
         }
     }.
 
-
 get_db_info_should_return_db_info(_) ->
     DbInfo = fabric:get_db_info("db1"),
     ?_assertEqual(DbInfo, chttpd_util:get_db_info("db1")).
 
-
 get_db_info_should_return_error_when_db_not_exist(_) ->
-    ?_assertEqual({error, database_does_not_exist},
-        chttpd_util:get_db_info("db_not_exist")).
-
+    ?_assertEqual(
+        {error, database_does_not_exist},
+        chttpd_util:get_db_info("db_not_exist")
+    ).
 
 get_db_info_should_return_error_when_time_out(_) ->
     ?_test(
         begin
             mock_timeout(),
             ?assertEqual({error, timeout}, chttpd_util:get_db_info("db1"))
-        end).
-
+        end
+    ).
 
 should_return_error_for_put_dbs_info(Url) ->
     ?_test(
         begin
-            {ok, Code, _, ResultBody} = test_request:put(Url
-            ++ "_dbs_info", [?CONTENT_JSON, ?AUTH], ""),
+            {ok, Code, _, ResultBody} = test_request:put(
+                Url ++
+                    "_dbs_info",
+                [?CONTENT_JSON, ?AUTH],
+                ""
+            ),
             {Body} = jiffy:decode(ResultBody),
             ?assertEqual(405, Code),
-            ?assertEqual(<<"method_not_allowed">>,
-                couch_util:get_value(<<"error">>, Body))
-        end).
-
+            ?assertEqual(
+                <<"method_not_allowed">>,
+                couch_util:get_value(<<"error">>, Body)
+            )
+        end
+    ).
 
 should_return_dbs_info_for_get_dbs_info(Url) ->
     ?_test(
         begin
-            {ok, _, _, ResultBody} = test_request:get(Url
-            ++ "_dbs_info", [?CONTENT_JSON, ?AUTH]),
+            {ok, _, _, ResultBody} = test_request:get(
+                Url ++
+                    "_dbs_info",
+                [?CONTENT_JSON, ?AUTH]
+            ),
             BodyJson = jiffy:decode(ResultBody),
             {Db1Data} = lists:nth(1, BodyJson),
             {Db2Data} = lists:nth(2, BodyJson),
             ?assertEqual(2, length(BodyJson)),
             ?assertEqual(<<"db1">>, couch_util:get_value(<<"key">>, Db1Data)),
             ?assertEqual(<<"db2">>, couch_util:get_value(<<"key">>, Db2Data))
-        end).
-
+        end
+    ).
 
 should_return_nothing_when_db_not_exist_for_get_dbs_info(Url) ->
     ?_test(
         begin
             mock_db_not_exist(),
-            {ok, Code, _, ResultBody} = test_request:get(Url
-            ++ "_dbs_info", [?CONTENT_JSON, ?AUTH]),
+            {ok, Code, _, ResultBody} = test_request:get(
+                Url ++
+                    "_dbs_info",
+                [?CONTENT_JSON, ?AUTH]
+            ),
             BodyJson = jiffy:decode(ResultBody),
             ?assertEqual(200, Code),
             ?assertEqual([], BodyJson)
-        end).
-
+        end
+    ).
 
 should_return_500_time_out_when_time_is_not_enough_for_get_dbs_info(Url) ->
     ?_test(
         begin
             mock_timeout(),
-            {ok, Code, _, ResultBody} = test_request:get(Url ++ "_dbs_info"
-                ++ "?buffer_response=true", [?CONTENT_JSON, ?AUTH]),
+            {ok, Code, _, ResultBody} = test_request:get(
+                Url ++ "_dbs_info" ++
+                    "?buffer_response=true",
+                [?CONTENT_JSON, ?AUTH]
+            ),
             {Body} = jiffy:decode(ResultBody),
             ?assertEqual(500, Code),
             ?assertEqual(<<"timeout">>, couch_util:get_value(<<"error">>, Body))
-        end).
-
+        end
+    ).
 
 should_return_db2_for_get_dbs_info_with_descending(Url) ->
     ?_test(
         begin
-            {ok, _, _, ResultBody} = test_request:get(Url ++ "_dbs_info"
-                ++ "?descending=true", [?CONTENT_JSON, ?AUTH]),
+            {ok, _, _, ResultBody} = test_request:get(
+                Url ++ "_dbs_info" ++
+                    "?descending=true",
+                [?CONTENT_JSON, ?AUTH]
+            ),
             BodyJson = jiffy:decode(ResultBody),
             {Db1Data} = lists:nth(1, BodyJson),
             {Db2Data} = lists:nth(2, BodyJson),
             ?assertEqual(2, length(BodyJson)),
             ?assertEqual(<<"db2">>, couch_util:get_value(<<"key">>, Db1Data)),
             ?assertEqual(<<"db1">>, couch_util:get_value(<<"key">>, Db2Data))
-        end).
-
+        end
+    ).
 
 should_return_db1_for_get_dbs_info_with_limit_1(Url) ->
     ?_test(
         begin
-            {ok, _, _, ResultBody} = test_request:get(Url ++ "_dbs_info"
-                ++ "?limit=1", [?CONTENT_JSON, ?AUTH]),
+            {ok, _, _, ResultBody} = test_request:get(
+                Url ++ "_dbs_info" ++
+                    "?limit=1",
+                [?CONTENT_JSON, ?AUTH]
+            ),
             BodyJson = jiffy:decode(ResultBody),
             {DbData} = lists:nth(1, BodyJson),
             ?assertEqual(1, length(BodyJson)),
             ?assertEqual(<<"db1">>, couch_util:get_value(<<"key">>, DbData))
-        end).
-
+        end
+    ).
 
 should_return_db2_for_get_dbs_info_with_skip_1(Url) ->
     ?_test(
         begin
-            {ok, _, _, ResultBody} = test_request:get(Url ++ "_dbs_info"
-                ++ "?skip=1", [?CONTENT_JSON, ?AUTH]),
+            {ok, _, _, ResultBody} = test_request:get(
+                Url ++ "_dbs_info" ++
+                    "?skip=1",
+                [?CONTENT_JSON, ?AUTH]
+            ),
             BodyJson = jiffy:decode(ResultBody),
             {DbData} = lists:nth(1, BodyJson),
             ?assertEqual(1, length(BodyJson)),
             ?assertEqual(<<"db2">>, couch_util:get_value(<<"key">>, DbData))
-        end).
-
+        end
+    ).
 
 should_return_dbs_info_with_correct_start_end_key(Url) ->
     ?_test(
         begin
-            {ok, _, _, ResultBody} = test_request:get(Url ++ "_dbs_info"
-                ++ "?startkey=\"db1\"&endkey=\"db2\"", [?CONTENT_JSON, ?AUTH]),
+            {ok, _, _, ResultBody} = test_request:get(
+                Url ++ "_dbs_info" ++
+                    "?startkey=\"db1\"&endkey=\"db2\"",
+                [?CONTENT_JSON, ?AUTH]
+            ),
             BodyJson = jiffy:decode(ResultBody),
             {DbData} = lists:nth(1, BodyJson),
             ?assertEqual(2, length(BodyJson)),
             ?assertEqual(<<"db1">>, couch_util:get_value(<<"key">>, DbData))
-        end).
-
+        end
+    ).
 
 should_return_empty_list_with_wrong_start_end_key(Url) ->
     ?_test(
         begin
-            {ok, _, _, ResultBody} = test_request:get(Url ++ "_dbs_info"
-                ++ "?startkey=\"db3\"&endkey=\"db4\"", [?CONTENT_JSON, ?AUTH]),
+            {ok, _, _, ResultBody} = test_request:get(
+                Url ++ "_dbs_info" ++
+                    "?startkey=\"db3\"&endkey=\"db4\"",
+                [?CONTENT_JSON, ?AUTH]
+            ),
             ?assertEqual([], jiffy:decode(ResultBody))
-        end).
+        end
+    ).
 
 should_return_dbs_info_for_single_db(Url) ->
     ?_test(begin
