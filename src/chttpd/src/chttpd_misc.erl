@@ -140,8 +140,9 @@ handle_all_dbs_info_req(Req) ->
 all_dbs_info_callback({meta, _Meta}, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "["),
     {ok, Acc#vacc{resp = Resp1}};
-all_dbs_info_callback({row, Row}, #vacc{resp = Resp0} = Acc)
-  when Acc#vacc.req#httpd.path_parts =:= [<<"_all_dbs">>] ->
+all_dbs_info_callback({row, Row}, #vacc{resp = Resp0} = Acc) when
+    Acc#vacc.req#httpd.path_parts =:= [<<"_all_dbs">>]
+->
     Prepend = couch_mrview_http:prepend_val(Acc),
     case couch_util:get_value(id, Row) of
         <<"_design", _/binary>> ->
@@ -150,8 +151,9 @@ all_dbs_info_callback({row, Row}, #vacc{resp = Resp0} = Acc)
             {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
             {ok, Acc#vacc{prepend = ",", resp = Resp1}}
     end;
-all_dbs_info_callback({row, Row}, #vacc{resp = Resp0} = Acc)
-  when Acc#vacc.req#httpd.path_parts =:= [<<"_dbs_info">>] ->
+all_dbs_info_callback({row, Row}, #vacc{resp = Resp0} = Acc) when
+    Acc#vacc.req#httpd.path_parts =:= [<<"_dbs_info">>]
+->
     Prepend = couch_mrview_http:prepend_val(Acc),
     DbName = couch_util:get_value(id, Row),
     case chttpd_util:get_db_info(DbName) of
@@ -173,7 +175,7 @@ all_dbs_info_callback({error, Reason}, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
     {ok, Acc#vacc{resp = Resp1}}.
 
-handle_dbs_info_req(#httpd{method='GET'}=Req) ->
+handle_dbs_info_req(#httpd{method = 'GET'} = Req) ->
     handle_all_dbs_info_req(Req);
 handle_dbs_info_req(#httpd{method = 'POST'} = Req) ->
     chttpd:validate_ctype(Req, "application/json"),
