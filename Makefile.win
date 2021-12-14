@@ -17,7 +17,9 @@
 include version.mk
 
 SHELL=cmd.exe
-REBAR=bin\rebar.cmd
+REBAR?=$(CURDIR)\bin\rebar.cmd
+PYTHON=python.exe
+ERLFMT?=$(CURDIR)\bin\erlfmt.cmd
 MAKE=make -f Makefile.win
 # REBAR?=$(shell where rebar.cmd)
 
@@ -76,7 +78,7 @@ DESTDIR=
 
 # Rebar options
 apps=
-skip_deps=folsom,meck,mochiweb,triq,proper,snappy,bcrypt,hyper
+skip_deps=folsom,meck,mochiweb,triq,proper,snappy,bcrypt,hyper,ibrowse,local
 suites=
 tests=
 
@@ -171,23 +173,31 @@ just-eunit: export ERL_AFLAGS = "-config $(shell echo %cd%)/rel/files/eunit.conf
 just-eunit:
 	@$(REBAR) -r eunit $(EUNIT_OPTS)
 
+erlfmt-check: export ERLFMT_PATH := $(ERLFMT)
+erlfmt-check:
+	@$(PYTHON) dev\format_check.py
+
+erlfmt-format: export ERLFMT_PATH := $(ERLFMT)
+erlfmt-format:
+	@$(PYTHON) dev\format_all.py
+
 .venv/bin/black:
-	@python.exe -m venv .venv
+	@$(PYTHON) -m venv .venv
 	@.venv\Scripts\pip3.exe install black || copy /b .venv\Scripts\black.exe +,,
 
 # Python code formatter - only runs if we're on Python 3.6 or greater
 python-black: .venv/bin/black
-	@python.exe -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
+	@$(PYTHON) -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
 		echo 'Python formatter not supported on Python < 3.6; check results on a newer platform'
-	@python.exe -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
+	@$(PYTHON) -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		.venv\Scripts\black.exe --check \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
 		build-aux dev\run src\mango\test src\docs\src\conf.py src\docs\ext .
 
 python-black-update: .venv/bin/black
-	@python.exe -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
+	@$(PYTHON) -c "import sys; exit(1 if sys.version_info < (3,6) else 0)" || \
 		echo 'Python formatter not supported on Python < 3.6; check results on a newer platform'
-	@python.exe -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
+	@$(PYTHON) -c "import sys; exit(1 if sys.version_info >= (3,6) else 0)" || \
 		.venv\Scripts\black.exe \
 		--exclude="build/|buck-out/|dist/|_build/|\.git/|\.hg/|\.mypy_cache/|\.nox/|\.tox/|\.venv/|src/rebar/pr2relnotes.py|src/fauxton" \
 		build-aux dev\run src\mango\test src\docs\src\conf.py src\docs\ext .
