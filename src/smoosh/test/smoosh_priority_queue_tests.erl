@@ -21,7 +21,8 @@ smoosh_priority_queue_test_() ->
         "smoosh priority queue test",
         {
             setup,
-            fun setup/0, fun teardown/1,
+            fun setup/0,
+            fun teardown/1,
             [
                 fun prop_inverse_test_/0,
                 fun no_halt_on_corrupted_file_test/0,
@@ -35,7 +36,8 @@ smoosh_priority_queue_test_() ->
 %% ----------
 
 %% define all tests to be able to run them individually
-prop_inverse_test_() -> ?_test(begin
+prop_inverse_test_() ->
+    ?_test(begin
         test_property(prop_inverse)
     end).
 
@@ -66,18 +68,23 @@ no_halt_on_missing_file_test() ->
 %% ----------
 
 prop_inverse() ->
-    ?FORALL(Q, queue(),
+    ?FORALL(
+        Q,
+        queue(),
         begin
             List = smoosh_priority_queue:to_list(Q),
             equal(Q, smoosh_priority_queue:from_list(List, Q))
-        end).
+        end
+    ).
 
 %% ==========
 %% Generators
 %% ----------
 
-key() -> proper_types:oneof([proper_types:binary(), {proper_types:binary(), proper_types:binary()}]).
-value() -> proper_types:oneof([proper_types:binary(), {proper_types:binary(), proper_types:binary()}]).
+key() ->
+    proper_types:oneof([proper_types:binary(), {proper_types:binary(), proper_types:binary()}]).
+value() ->
+    proper_types:oneof([proper_types:binary(), {proper_types:binary(), proper_types:binary()}]).
 priority() -> integer().
 item() -> {key(), value(), priority()}.
 
@@ -85,17 +92,25 @@ items_list() ->
     ?LET(L, list(item()), L).
 
 simple_queue() ->
-    ?LET(L, items_list(),
-        from_list(L)).
+    ?LET(
+        L,
+        items_list(),
+        from_list(L)
+    ).
 
 with_deleted() ->
-    ?LET(Q,
-        ?LET({{K0, V0, P0}, Q0}, {item(), simple_queue()},
-             smoosh_priority_queue:in(K0, V0, P0, ?CAPACITY, Q0)),
+    ?LET(
+        Q,
+        ?LET(
+            {{K0, V0, P0}, Q0},
+            {item(), simple_queue()},
+            smoosh_priority_queue:in(K0, V0, P0, ?CAPACITY, Q0)
+        ),
         frequency([
             {1, Q},
             {2, element(3, smoosh_priority_queue:out(Q))}
-        ])).
+        ])
+    ).
 
 queue() ->
     with_deleted().
@@ -113,12 +128,16 @@ test_property({Id, Property}) ->
 
 test_it(Property, Opts) ->
     case proper:quickcheck(?MODULE:Property(), Opts) of
-        true -> true;
-        Else -> erlang:error(
-            {propertyFailed, [
-                  {module, ?MODULE},
-                  {property, Property},
-                  {result, Else}]})
+        true ->
+            true;
+        Else ->
+            erlang:error(
+                {propertyFailed, [
+                    {module, ?MODULE},
+                    {property, Property},
+                    {result, Else}
+                ]}
+            )
     end.
 
 %% ================
@@ -130,9 +149,13 @@ new() ->
     smoosh_priority_queue:open(Q).
 
 from_list(List) ->
-    lists:foldl(fun({Key, Value, Priority}, Queue) ->
-       smoosh_priority_queue:in(Key, Value, Priority, ?CAPACITY, Queue)
-    end, new(), List).
+    lists:foldl(
+        fun({Key, Value, Priority}, Queue) ->
+            smoosh_priority_queue:in(Key, Value, Priority, ?CAPACITY, Queue)
+        end,
+        new(),
+        List
+    ).
 
 equal(Q1, Q2) ->
     out_all(Q1) =:= out_all(Q2).
