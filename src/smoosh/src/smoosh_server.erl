@@ -63,7 +63,7 @@
     schema_channels = [],
     tab,
     event_listener,
-    waiting=maps:new()
+    waiting = maps:new()
 }).
 
 -record(channel, {
@@ -182,8 +182,10 @@ handle_call(resume, _From, State) ->
             couch_log:notice("Resuming ~p", [Name]),
             smoosh_channel:resume(P)
         end,
+        0,
+        State#state.tab
+    ),
     {reply, ok, State};
-
 handle_call({get_channel, ChannelName}, _From, #state{tab = Tab} = State) ->
     {reply, {ok, channel_pid(Tab, ChannelName)}, State}.
 
@@ -212,7 +214,7 @@ handle_cast({enqueue, Object}, State) ->
             {noreply, State};
         false ->
             {_Pid, Ref} = spawn_monitor(?MODULE, enqueue_request, [State, Object]),
-            {noreply, State#state{waiting=maps:put(Object, Ref, Waiting)}}
+            {noreply, State#state{waiting = maps:put(Object, Ref, Waiting)}}
     end.
 
 handle_info({'EXIT', Pid, Reason}, #state{event_listener = Pid} = State) ->
@@ -229,7 +231,8 @@ handle_info({'EXIT', Pid, Reason}, State) ->
     end,
     {noreply, create_missing_channels(State)};
 handle_info({'DOWN', Ref, _, _, _}, State) ->
-    Waiting = maps:filter(fun(_Key, Value) -> Value =/= Ref end,
+    Waiting = maps:filter(
+        fun(_Key, Value) -> Value =/= Ref end,
         fun(_Key, Value) -> Value =/= Ref end,
         State#state.waiting
     ),
