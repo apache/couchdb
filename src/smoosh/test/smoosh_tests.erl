@@ -56,10 +56,9 @@ persistence_tests() ->
     {
         "Should persist queue state",
         [
-              make_test_case("ratio_dbs", Tests)
+            make_test_case("ratio_dbs", Tests)
         ]
     }.
-
 
 channels_tests() ->
     Tests = [
@@ -68,7 +67,7 @@ channels_tests() ->
     {
         "Various channels tests",
         [
-              make_test_case("ratio_dbs", Tests)
+            make_test_case("ratio_dbs", Tests)
         ]
     }.
 
@@ -100,10 +99,12 @@ grow_db_file(DbName, SizeInKb) ->
     Bytes = binary:copy(?KILOBYTE, SizeInKb),
     file:write(Fd, Bytes),
     ok = file:close(Fd),
-    Doc = couch_doc:from_json_obj({[
-        {<<"_id">>, ?l2b(?docid())},
-        {<<"value">>, ?l2b(?docid())}
-    ]}),
+    Doc = couch_doc:from_json_obj(
+        {[
+            {<<"_id">>, ?l2b(?docid())},
+            {<<"value">>, ?l2b(?docid())}
+        ]}
+    ),
     {ok, _} = couch_db:update_docs(Db, [Doc], []),
     couch_db:close(Db),
     ok.
