@@ -105,7 +105,7 @@ all: couch fauxton docs
 
 
 .PHONY: couch
-# target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
+# target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
 	@set COUCHDB_VERSION=$(COUCHDB_VERSION) && set COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) && $(REBAR) compile $(COMPILE_OPTS)
 	@copy src\couch\priv\couchjs.exe bin
