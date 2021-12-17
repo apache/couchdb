@@ -191,18 +191,13 @@ MakeDep = fun
         {AppName, ".*", {git, Url, Version}, Options}
 end.
 
-ErlOpts = case os:getenv("ERL_OPTS") of
-    false -> [];
-    Opts -> [list_to_atom(O) || O <- string:tokens(Opts, ",")]
-end.
-
 AddConfig = [
     {require_otp_vsn, "20|21|22|23|24"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},
     {lib_dirs, ["src"]},
-    {erl_opts, [{i, "../"}] ++ [{d, 'COUCHDB_ERLANG_VERSION', VerString}] ++ ErlOpts},
+    {erl_opts, [{i, "../"}, {d, 'COUCHDB_ERLANG_VERSION', VerString}]},
     {eunit_opts, [verbose, {report,{eunit_surefire,[{dir,"."}]}}]},
     {plugins, [eunit_plugin]},
     {dialyzer, [

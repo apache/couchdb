@@ -118,7 +118,7 @@ help:
 
 
 .PHONY: couch
-# target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
+# target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
 	@cp src/couch/priv/couchjs bin/
