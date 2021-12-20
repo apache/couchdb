@@ -36,10 +36,12 @@
     validate_bulk_delete/1,
     validate_partitioned/1,
 
-    default_limit/0
+    default_limit/0,
+    mr_limit/1
 ]).
 
 -include("mango.hrl").
+-include_lib("couch_mrview/include/couch_mrview.hrl").
 
 validate_idx_create({Props}) ->
     Opts = [
@@ -356,3 +358,8 @@ validate_opt(Name, [{validator, Fun} | Rest], Value) ->
 
 default_limit() ->
     config:get_integer("mango", "default_limit", 25).
+
+mr_limit(true) ->
+    config:get_integer("query_server_config", "partition_query_limit", ?MAX_VIEW_LIMIT);
+mr_limit(false) ->
+    config:get_integer("query_server_config", "query_limit", ?MAX_VIEW_LIMIT).
