@@ -439,28 +439,33 @@ validate_args(#mrst{} = State, Args0) ->
             mrverror(Msg2)
     end.
 
-apply_limit(ViewPartitioned, Args) ->
-    Options = Args#mrargs.extra,
-    IgnorePQLimit = lists:keyfind(ignore_partition_query_limit, 1, Options),
+apply_limit(ViewPartitioned, #mrargs{} = Args) ->
     LimitType =
-        case {ViewPartitioned, IgnorePQLimit} of
-            {true, false} -> "partition_query_limit";
-            {true, _} -> "query_limit";
-            {false, _} -> "query_limit"
+        case ViewPartitioned of
+            true -> "partition_query_limit";
+            false -> "query_limit"
         end,
 
-    MaxLimit = config:get_integer(
-        "query_server_config",
-        LimitType,
-        ?MAX_VIEW_LIMIT
-    ),
+    IsMangoQuery = lists:keyfind(is_mango_query, 1, Args#mrargs.extra),
+    MaxLimit =
+        case IsMangoQuery of
+            {is_mango_query, true} ->
+                ?MAX_VIEW_LIMIT;
+            false ->
+                config:get_integer(
+                    "query_server_config",
+                    LimitType,
+                    ?MAX_VIEW_LIMIT
+                )
+        end,
 
     % Set the highest limit possible if a user has not
-    % specified a limit
+    % specified a limit or if this is a mango query
     Args1 =
-        case Args#mrargs.limit == ?MAX_VIEW_LIMIT of
-            true -> Args#mrargs{limit = MaxLimit};
-            false -> Args
+        case {Args#mrargs.limit == ?MAX_VIEW_LIMIT, IsMangoQuery} of
+            {_, {is_mango_query, true}} -> Args#mrargs{limit = ?MAX_VIEW_LIMIT};
+            {true, false} -> Args#mrargs{limit = MaxLimit};
+            {false, false} -> Args
         end,
 
     if

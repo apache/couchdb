@@ -120,7 +120,7 @@ base_args(#cursor{index = Idx, selector = Selector} = Cursor) ->
         extra = [
             {callback, {?MODULE, view_cb}},
             {selector, Selector},
-            {ignore_partition_query_limit, true}
+            {is_mango_query, true}
         ]
     }.
 
