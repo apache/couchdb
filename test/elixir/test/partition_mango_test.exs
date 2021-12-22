@@ -552,7 +552,7 @@ defmodule PartitionMangoTest do
     create_partition_docs(db_name)
     create_index(db_name, ["value"])
 
-    # this is to test that we bypass partition_query_limit for mango
+    # this is to test that we enforce partition_query_limit for mango
     set_config({"query_server_config", "partition_query_limit", "1"})
 
     url = "/#{db_name}/_partition/foo/_find"
@@ -573,7 +573,7 @@ defmodule PartitionMangoTest do
 
     assert resp.status_code == 200
     partitions = get_partitions(resp)
-    assert length(partitions) == 3
+    assert length(partitions) == 1
     assert_correct_partition(partitions, "foo")
 
     %{:body => %{"bookmark" => bookmark}} = resp
@@ -595,7 +595,7 @@ defmodule PartitionMangoTest do
 
     assert resp.status_code == 200
     partitions = get_partitions(resp)
-    assert length(partitions) == 2
+    assert length(partitions) == 1
     assert_correct_partition(partitions, "foo")
   end
 
