@@ -287,17 +287,9 @@ int runWithContext(JSContext* cx, couch_args* args) {
 
         // Compile and run
         JS::CompileOptions options(cx);
-        options.setFileAndLine(filename, 1);
         JS::RootedScript script(cx);
-        FILE* fp;
 
-        fp = fopen(args->scripts[i], "r");
-        if(fp == NULL) {
-            fprintf(stderr, "Failed to read file: %s\n", filename);
-            return 3;
-        }
-        script = JS::CompileUtf8File(cx, options, fp);
-        fclose(fp);
+        script = JS::CompileUtf8Path(cx, options, filename);
         if (!script) {
             JS::RootedValue exc(cx);
             if(!JS_GetPendingException(cx, &exc)) {
