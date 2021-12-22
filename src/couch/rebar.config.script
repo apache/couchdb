@@ -155,8 +155,13 @@ end.
         };
     {unix, _} when SMVsn == "91" ->
         {
-            "-DXP_UNIX -I/usr/include/mozjs-91 -I/usr/local/include/mozjs-91 -I/opt/homebrew/include/mozjs-91/ -std=c++17 -Wno-invalid-offsetof",
-            "-L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-91 -lm"
+            "$CFLAGS -DXP_UNIX -I/usr/include/mozjs-91 -I/usr/local/include/mozjs-91 -I/opt/homebrew/include/mozjs-91/ -std=c++17 -Wno-invalid-offsetof",
+            "$LDFLAGS -L/usr/local/lib -L /opt/homebrew/lib/ -std=c++17 -lmozjs-91 -lm"
+        };
+    {win32, _} when SMVsn == "91" ->
+        {
+            "/std:c++17 /DXP_WIN",
+            "$LDFLAGS mozjs-91.lib"
         }
 end.
 
@@ -191,7 +196,7 @@ IcuDarwinEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/opt/icu4c/include -I/opt/home
 IcuBsdEnv = [{"CFLAGS", "-DXP_UNIX -I/usr/local/include"},
              {"LDFLAGS", "-L/usr/local/lib"}].
 IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
-             {"LDFLAGS", "icuin.lib icudt.lib icuuc.lib"}].
+             {"LDFLAGS", "$LDFLAGS icuin.lib icudt.lib icuuc.lib"}].
 
 ComparePath = "priv/couch_ejson_compare.so".
 CompareSrc = ["priv/couch_ejson_compare/*.c"].
