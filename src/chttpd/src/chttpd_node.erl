@@ -358,8 +358,25 @@ format_pid_stats(Mailboxes) ->
 get_distribution_stats() ->
     lists:map(
         fun({Node, Socket}) ->
-            {ok, Stats} = inet:getstat(Socket),
-            {Node, {Stats}}
+            try inet:getstat(Socket) of
+                {ok, Stats} ->
+                    {Node, {Stats}}
+            catch
+                _:_ ->
+                    {Node,
+                        {[
+                            {recv_oct, 0},
+                            {recv_cnt, 0},
+                            {recv_max, 0},
+                            {recv_avg, 0},
+                            {recv_dvi, 0},
+                            {send_oct, 0},
+                            {send_cnt, 0},
+                            {send_max, 0},
+                            {send_avg, 0},
+                            {send_pend, 0}
+                        ]}}
+            end
         end,
         erlang:system_info(dist_ctrl)
     ).
