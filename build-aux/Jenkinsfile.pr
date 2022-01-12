@@ -39,7 +39,7 @@ pipeline {
     GIT_COMMITTER_NAME = 'Jenkins User'
     GIT_COMMITTER_EMAIL = 'couchdb@apache.org'
     // Parameters for the matrix build
-    DOCKER_IMAGE = 'apache/couchdbci-debian:bullseye-erlang-all'
+    DOCKER_IMAGE = 'apache/couchdbci-debian:bullseye-erlang-all-1'
     // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
     // We need the jenkins user mapped inside of the image
     // npm config cache below deals with /home/jenkins not mapping correctly
