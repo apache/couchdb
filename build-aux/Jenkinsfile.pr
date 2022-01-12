@@ -21,7 +21,7 @@ cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
 . /usr/local/kerl/${ERLANG_VERSION}/activate
-./configure --spidermonkey-version 60
+./configure
 make check || (make build-report && false)
 '''
 
@@ -51,6 +51,9 @@ pipeline {
     // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
     // be done parametrically
     LOW_ERLANG_VER = '21.3.8.24'
+
+    // Ensure that the SpiderMonkey version is appropriate for the $DOCKER_IMAGE
+    SM_VSN = '78'
   }
 
   options {
