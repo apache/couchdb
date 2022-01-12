@@ -211,9 +211,9 @@ parse_opts() {
 
 parse_opts $@
 
-if [ "${ARCH}" = "aarch64" ] && [ "${SM_VSN}" != "1.8.5" ]
+if [ "${ARCH}" = "aarch64" ] && [ "${SM_VSN}" = "60" ]
 then
-  echo "ERROR: SpiderMonkey 60 is known broken on ARM 64 (aarch64). Use 1.8.5 instead."
+  echo "ERROR: SpiderMonkey 60 is known broken on ARM 64 (aarch64). Use another version instead."
   exit 1
 fi
 

@@ -23,7 +23,7 @@ jobs:
       uses: actions/cache@v2
       id: wgetcache
       with:
-        key: wgetcache-${{env.FIREFOX_VERSION}}-${{env.FDB_VERSION}}
+        key: wgetcache-${{env.FIREFOX_VERSION}}-${{env.FDB_VERSION}}-${{ runner.os }}
         path: |
           firefox-${{env.FIREFOX_VERSION}}esr.source.tar.xz
           foundationdb-clients_${{env.FDB_VERSION}}-1_amd64.deb
@@ -32,8 +32,8 @@ jobs:
     - name: wget moz
       if: steps.wgetcache.outputs.cache-hit != 'true'
       run: |
-        wget -nv -S https://www.foundationdb.org/downloads/${{env.FDB_VERSION}}/ubuntu/installers/foundationdb-clients_${{env.FDB_VERSION}}-1_amd64.deb
-        wget -nv -S https://www.foundationdb.org/downloads/${{env.FDB_VERSION}}/ubuntu/installers/foundationdb-server_${{env.FDB_VERSION}}-1_amd64.deb
+        wget -nv -S https://github.com/apple/foundationdb/releases/download/${{env.FDB_VERSION}}/foundationdb-clients_${{env.FDB_VERSION}}-1_amd64.deb
+        wget -nv -S https://github.com/apple/foundationdb/releases/download/${{env.FDB_VERSION}}/foundationdb-server_${{env.FDB_VERSION}}-1_amd64.deb
         wget -nv https://download.cdn.mozilla.net/pub/firefox/releases/${{env.FIREFOX_VERSION}}esr/source/firefox-${{env.FIREFOX_VERSION}}esr.source.tar.xz
 
     - name: couch checkout
