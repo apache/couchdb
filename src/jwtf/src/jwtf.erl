@@ -20,6 +20,9 @@
 -export([
     encode/3,
     decode/3,
+    decode/4,
+    decode_b64url_json/1,
+    decode_passthrough/1,
     valid_algorithms/0,
     verification_algorithm/1
 ]).
@@ -80,14 +83,18 @@ encode(Header = {HeaderProps}, Claims, Key) ->
 
 % @doc decode
 % Decodes the supplied encoded token, checking
-% for the attributes defined in Checks and calling
+% for the attributes defined in Checks, calling
 % the key store function to retrieve the key needed
-% to verify the signature
+% to verify the signature, and decoding the Payload
+% with the Decoder, defaulting to decode_b64url_json/1.
 decode(EncodedToken, Checks, KS) ->
+    decode(EncodedToken, Checks, KS, fun decode_b64url_json/1).
+
+decode(EncodedToken, Checks, KS, Decoder) ->
     try
         [Header, Payload, Signature] = split(EncodedToken),
         validate(Header, Payload, Signature, Checks, KS),
-        {ok, decode_b64url_json(Payload)}
+        {ok, Decoder(Payload)}
     catch
         throw:Error ->
             {error, Error}
@@ -290,6 +297,9 @@ split(EncodedToken) ->
         [_, _, _] = Split -> Split;
         _ -> throw({bad_request, <<"Malformed token">>})
     end.
+
+decode_passthrough(B64UrlEncoded) ->
+    B64UrlEncoded.
 
 decode_b64url_json(B64UrlEncoded) ->
     try
