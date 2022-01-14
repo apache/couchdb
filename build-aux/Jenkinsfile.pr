@@ -20,7 +20,6 @@ mkdir build
 cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
-. /usr/local/kerl/${ERLANG_VERSION}/activate
 ./configure
 make check || (make build-report && false)
 '''
@@ -39,7 +38,7 @@ pipeline {
     GIT_COMMITTER_NAME = 'Jenkins User'
     GIT_COMMITTER_EMAIL = 'couchdb@apache.org'
     // Parameters for the matrix build
-    DOCKER_IMAGE = 'apache/couchdbci-debian:bullseye-erlang-all-1'
+    DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:erlang'
     // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
     // We need the jenkins user mapped inside of the image
     // npm config cache below deals with /home/jenkins not mapping correctly
@@ -50,10 +49,7 @@ pipeline {
     // Search for ERLANG_VERSION
     // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
     // be done parametrically
-    LOW_ERLANG_VER = '21.3.8.24'
-
-    // Ensure that the SpiderMonkey version is appropriate for the $DOCKER_IMAGE
-    SM_VSN = '78'
+    MIN_ERLANG_VERSION = '21'
   }
 
   options {
@@ -69,7 +65,7 @@ pipeline {
     stage('Build Release Tarball') {
       agent {
         docker {
-          image "${DOCKER_IMAGE}"
+          image "${DOCKER_IMAGE_BASE}-${MIN_ERLANG_VERSION}"
           label 'docker'
           args "${DOCKER_ARGS}"
           registryUrl 'https://docker.io/'
@@ -83,7 +79,6 @@ pipeline {
         sh '''
           set
           rm -rf apache-couchdb-*
-          . /usr/local/kerl/${LOW_ERLANG_VER}/activate
           ./configure
           make erlfmt-check
           make dist
@@ -111,7 +106,7 @@ pipeline {
         axes {
           axis {
             name 'ERLANG_VERSION'
-            values '21.3.8.24', '22.3.4.24', '23.3.4.10', '24.2'
+            values '21', '22', '23', '24'
           }
         }
 
@@ -119,7 +114,7 @@ pipeline {
           stage('Build and Test') {
             agent {
               docker {
-                image "${DOCKER_IMAGE}"
+                image "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
                 label 'docker'
                 args "${DOCKER_ARGS}"
               }
