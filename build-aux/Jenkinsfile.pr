@@ -20,8 +20,7 @@ mkdir build
 cd build
 tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
 cd apache-couchdb-*
-. /usr/local/kerl/${ERLANG_VERSION}/activate
-./configure --spidermonkey-version 60
+./configure
 make check || (make build-report && false)
 '''
 
@@ -39,7 +38,7 @@ pipeline {
     GIT_COMMITTER_NAME = 'Jenkins User'
     GIT_COMMITTER_EMAIL = 'couchdb@apache.org'
     // Parameters for the matrix build
-    DOCKER_IMAGE = 'apache/couchdbci-debian:buster-erlang-all'
+    DOCKER_IMAGE_BASE = 'apache/couchdbci-debian:erlang'
     // https://github.com/jenkins-infra/jenkins.io/blob/master/Jenkinsfile#64
     // We need the jenkins user mapped inside of the image
     // npm config cache below deals with /home/jenkins not mapping correctly
@@ -50,11 +49,11 @@ pipeline {
     // Search for ERLANG_VERSION
     // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
     // be done parametrically
-    LOW_ERLANG_VER = '20.3.8.26'
+    LOW_ERLANG_VER = '20'
 
     // erlfmt doesn't run with the lowest erlang version so we run it in a
     // separate stage with a higher erlang version.
-    ERLFMT_ERLANG_VER = '23.3.1'
+    ERLFMT_ERLANG_VER = '23'
   }
 
   options {
@@ -71,7 +70,7 @@ pipeline {
     stage('erlfmt') {
       agent {
         docker {
-          image "${DOCKER_IMAGE}"
+          image "${DOCKER_IMAGE_BASE}-${ERLFMT_ERLANG_VER}"
           label 'docker'
           args "${DOCKER_ARGS}"
           registryUrl 'https://docker.io/'
@@ -85,7 +84,6 @@ pipeline {
         sh '''
           set
           rm -rf apache-couchdb-*
-          . /usr/local/kerl/${ERLFMT_ERLANG_VER}/activate
           ./configure --skip-deps
           make erlfmt-check
         '''
@@ -102,7 +100,7 @@ pipeline {
     stage('Build Release Tarball') {
       agent {
         docker {
-          image "${DOCKER_IMAGE}"
+          image "${DOCKER_IMAGE_BASE}-${LOW_ERLANG_VER}"
           label 'docker'
           args "${DOCKER_ARGS}"
           registryUrl 'https://docker.io/'
@@ -116,7 +114,6 @@ pipeline {
         sh '''
           set
           rm -rf apache-couchdb-*
-          . /usr/local/kerl/${LOW_ERLANG_VER}/activate
           ./configure
           make dist
           chmod -R a+w * .
@@ -143,7 +140,33 @@ pipeline {
         axes {
           axis {
             name 'ERLANG_VERSION'
-            values '20.3.8.26', '21.3.8.22', '22.3.4.17', '23.3.1'
+            values '20', '21', '22', '23', '24'
+          }
+          axis {
+            name 'SM_VSN'
+            values '60', '78'
+          }
+        }
+        excludes {
+          exclude {
+            axis {
+              name 'ERLANG_VERSION'
+              values '20'
+            }
+            axis {
+              name 'SM_VSN'
+              notValues '60'
+            }
+          }
+          exclude {
+            axis {
+              name 'ERLANG_VERSION'
+              values '21', '22', '23', '24'
+            }
+            axis {
+              name 'SM_VSN'
+              notValues '78'
+            }
           }
         }
 
@@ -151,7 +174,7 @@ pipeline {
           stage('Build and Test') {
             agent {
               docker {
-                image "${DOCKER_IMAGE}"
+                image "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
                 label 'docker'
                 args "${DOCKER_ARGS}"
               }
