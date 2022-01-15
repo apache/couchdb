@@ -64,6 +64,8 @@ pipeline {
     // npm config cache below deals with /home/jenkins not mapping correctly
     // inside the image
     DOCKER_ARGS = '-e npm_config_cache=npm-cache -e HOME=. -v=/etc/passwd:/etc/passwd -v /etc/group:/etc/group'
+
+    ERLANG_VERSION = '24.2'
   }
 
   options {
@@ -80,7 +82,7 @@ pipeline {
       agent {
         docker {
           label 'docker'
-          image 'apache/couchdbci-debian:buster-erlang-21.3.8.17-1'
+          image "apache/couchdbci-debian:erlang-${ERLANG_VERSION}"
           args "${DOCKER_ARGS}"
           registryUrl 'https://docker.io/'
           registryCredentialsId 'dockerhub_creds'
@@ -199,7 +201,7 @@ pipeline {
         stage('CentOS 7') {
           agent {
             docker {
-              image 'apache/couchdbci-centos:7-erlang-21.3.8.17-1'
+              image "apache/couchdbci-centos:7-erlang-${ERLANG_VERSION}"
               label 'docker'
               args "${DOCKER_ARGS}"
               registryUrl 'https://docker.io/'
@@ -245,7 +247,7 @@ pipeline {
         stage('CentOS 8') {
           agent {
             docker {
-              image 'apache/couchdbci-centos:8-erlang-21.3.8.17-1'
+              image "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
               label 'docker'
               args "${DOCKER_ARGS}"
               registryUrl 'https://docker.io/'
@@ -291,7 +293,7 @@ pipeline {
         stage('Ubuntu Bionic') {
           agent {
             docker {
-              image 'apache/couchdbci-ubuntu:bionic-erlang-21.3.8.17-1'
+              image "apache/couchdbci-ubuntu:bionic-erlang-${ERLANG_VERSION}"
               label 'docker'
               args "${DOCKER_ARGS}"
               registryUrl 'https://docker.io/'
@@ -336,7 +338,7 @@ pipeline {
         stage('Ubuntu Focal') {
           agent {
             docker {
-              image 'apache/couchdbci-ubuntu:focal-erlang-21.3.8.17-1'
+              image "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
               label 'docker'
               args "${DOCKER_ARGS}"
               registryUrl 'https://docker.io/'
@@ -381,7 +383,7 @@ pipeline {
         stage('Debian Stretch') {
           agent {
             docker {
-              image 'apache/couchdbci-debian:stretch-erlang-21.3.8.17-1'
+              image "apache/couchdbci-debian:stretch-erlang-${ERLANG_VERSION}"
               label 'docker'
               args "${DOCKER_ARGS}"
               registryUrl 'https://docker.io/'
@@ -426,7 +428,7 @@ pipeline {
         stage('Debian Buster amd64') {
           agent {
             docker {
-              image 'apache/couchdbci-debian:buster-erlang-21.3.8.17-1'
+              image "apache/couchdbci-debian:buster-erlang-${ERLANG_VERSION}"
               label 'docker'
               args "${DOCKER_ARGS}"
               registryUrl 'https://docker.io/'
@@ -472,7 +474,7 @@ pipeline {
           when { expression { return false } }
           agent {
             docker {
-              image 'apache/couchdbci-debian:arm64v8-buster-erlang-21.3.8.17-1'
+              image "apache/couchdbci-debian:arm64v8-buster-erlang-${ERLANG_VERSION}"
               label 'arm64v8'
               args "${DOCKER_ARGS}"
               registryUrl 'https://docker.io/'
@@ -521,7 +523,7 @@ pipeline {
 //        stage('Debian Buster ppc64le') {
 //          agent {
 //            docker {
-//              image 'apache/couchdbci-debian:ppc64le-buster-erlang-21.3.8.17-1'
+//              image "apache/couchdbci-debian:ppc64le-buster-erlang-${ERLANG_VERSION}"
 //              label 'ppc64le'
 //              args "${DOCKER_ARGS}"
 //              registryUrl 'https://docker.io/'
@@ -591,12 +593,12 @@ pipeline {
             }
             stage('Pull latest docker image') {
               steps {
-                sh "docker pull apache/couchdbci-debian:arm64v8-buster-erlang-21.3.8.17-1"
+                sh "docker pull apache/couchdbci-debian:arm64v8-buster-erlang-${ERLANG_VERSION}"
               }
             }
             stage('Build from tarball & test & packages') {
               steps {
-                withDockerContainer(image: "apache/couchdbci-debian:arm64v8-buster-erlang-21.3.8.17-1", args: "${DOCKER_ARGS}") {
+                withDockerContainer(image: "apache/couchdbci-debian:arm64v8-buster-erlang-${ERLANG_VERSION}", args: "${DOCKER_ARGS}") {
                   unstash 'tarball'
                   withEnv(['MIX_HOME='+pwd(), 'HEX_HOME='+pwd()]) {
                     sh( script: build_and_test )
@@ -636,7 +638,7 @@ pipeline {
 
       agent {
         docker {
-          image 'apache/couchdbci-debian:buster-erlang-21.3.8.17-1'
+          image "apache/couchdbci-debian:erlang-${ERLANG_VERSION}"
           label 'docker'
           args "${DOCKER_ARGS}"
           registryUrl 'https://docker.io/'
