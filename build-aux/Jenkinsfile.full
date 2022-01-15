@@ -88,6 +88,10 @@ pipeline {
           registryCredentialsId 'dockerhub_creds'
         }
       }
+      environment {
+        // TODO find a way to avoid setting this explicitly
+        sm_ver = '78'
+      }
       options {
         timeout(time: 15, unit: "MINUTES")
       }
@@ -95,7 +99,7 @@ pipeline {
         sh '''
           set
           rm -rf apache-couchdb-*
-          ./configure
+          ./configure --spidermonkey-version ${sm_ver}
           make erlfmt-check
           make dist
           chmod -R a+w * .
