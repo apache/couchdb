@@ -580,9 +580,8 @@ defmodule Couch.Test.Pagination do
 
   for descending <- [false, true] do
     for n <- [4, 9] do
-      describe "Pagination API (10 docs) : _all_docs?page_size=#{n}&descending=#{
-                 descending
-               }" do
+      describe "Pagination API (10 docs) : _all_docs" <>
+                 "?page_size=#{n}&descending=#{descending}" do
         @describetag n_docs: 10
         @describetag descending: descending
         @describetag page_size: n
@@ -613,9 +612,8 @@ defmodule Couch.Test.Pagination do
         end
       end
 
-      describe "Pagination API (10 docs) : _all_docs?page_size=#{n}&descending=#{
-                 descending
-               } : range" do
+      describe "Pagination API (10 docs) : _all_docs" <>
+                 "?page_size=#{n}&descending=#{descending} : range" do
         @describetag n_docs: 10
         @describetag descending: descending
         @describetag page_size: n
@@ -706,9 +704,8 @@ defmodule Couch.Test.Pagination do
 
   for descending <- [false, true] do
     for n <- [4, 9] do
-      describe "Pagination API (10 docs) : _all_docs?page_size=#{n}&descending=#{
-                 descending
-               } : pages" do
+      describe "Pagination API (10 docs) : _all_docs" <>
+                 "?page_size=#{n}&descending=#{descending} : pages" do
         @describetag n_docs: 10
         @describetag descending: descending
         @describetag page_size: n
@@ -752,7 +749,8 @@ defmodule Couch.Test.Pagination do
   end
 
   for n <- 10..11 do
-    describe "Pagination API (10 docs) : _all_docs?page_size=#{n}" do
+    describe "Pagination API (10 docs) : _all_docs" <>
+               "?page_size=#{n}" do
       @describetag n_docs: 10
       @describetag descending: false
       @describetag page_size: n
@@ -772,9 +770,8 @@ defmodule Couch.Test.Pagination do
 
   for descending <- [false, true] do
     for n <- [4, 9] do
-      describe "Pagination API (10 docs) : _all_docs/queries?page_size=#{n}&descending=#{
-                 descending
-               } : pages" do
+      describe "Pagination API (10 docs) : _all_docs/queries" <>
+                 "?page_size=#{n}&descending=#{descending} : pages" do
         @describetag n_docs: 10
         @describetag descending: descending
         @describetag page_size: n
@@ -908,9 +905,8 @@ defmodule Couch.Test.Pagination do
 
   for descending <- [false, true] do
     for n <- [4, 9] do
-      describe "Pagination API (10 docs) : /{db}/_design/{ddoc}/_view?page_size=#{n}&descending=#{
-                 descending
-               }" do
+      describe "Pagination API (10 docs) : /{db}/_design/{ddoc}/_view" <>
+                 "?page_size=#{n}&descending=#{descending}" do
         @describetag n_docs: 10
         @describetag descending: descending
         @describetag page_size: n
@@ -1015,7 +1011,8 @@ defmodule Couch.Test.Pagination do
   end
 
   for n <- 10..11 do
-    describe "Pagination API (10 docs) :  /{db}/_design/{ddoc}/_view?page_size=#{n}" do
+    describe "Pagination API (10 docs) :  /{db}/_design/{ddoc}/_view" <>
+               "?page_size=#{n}" do
       @describetag n_docs: 10
       @describetag descending: false
       @describetag page_size: n
@@ -1062,9 +1059,8 @@ defmodule Couch.Test.Pagination do
 
   for descending <- [false, true] do
     for n <- [4, 9] do
-      describe "Pagination API (10 docs) : /{db}/_design/{ddoc}/_view/queries?page_size=#{
-                 n
-               }&descending=#{descending} : pages" do
+      describe "Pagination API (10 docs) : /{db}/_design/{ddoc}/_view/queries" <>
+                 "?page_size=#{n}&descending=#{descending} : pages" do
         @describetag n_docs: 10
         @describetag descending: descending
         @describetag page_size: n
@@ -1224,14 +1220,12 @@ defmodule Couch.Test.Pagination do
           expected_ids_order = :ascending
 
           assert expected_key_order == ordering?(results, "key"),
-                 "expecting keys in #{expected_key_order} order, got: #{
-                   inspect(field(results, "key"))
-                 }"
+                 "expecting keys in #{expected_key_order} order, " <>
+                   "got: #{inspect(field(results, "key"))}"
 
           assert expected_ids_order == ordering?(results, "id"),
-                 "expecting ids in #{expected_ids_order} order, got: #{
-                   inspect(field(results, "id"))
-                 }"
+                 "expecting ids in #{expected_ids_order} order, " <>
+                   "got: #{inspect(field(results, "id"))}"
 
           results = List.flatten(limit_query)
           [_descendiing_query, query] = ctx.queries[:queries]
@@ -1253,14 +1247,12 @@ defmodule Couch.Test.Pagination do
             end
 
           assert expected_key_order == ordering?(results, "key"),
-                 ~s(expecting keys in #{expected_key_order} order, got: #{
-                   inspect(field(results, "key"))
-                 })
+                 "expecting keys in #{expected_key_order} order, " <>
+                   "got: #{inspect(field(results, "key"))}"
 
           assert expected_ids_order == ordering?(results, "id"),
-                 ~s(expecting keys in #{expected_ids_order} order, got: #{
-                   inspect(field(results, "id"))
-                 })
+                 "expecting keys in #{expected_ids_order} order, " <>
+                   "got: #{inspect(field(results, "id"))}"
 
           _keys = Enum.map(results, &Map.get(&1, "key"))
         end
@@ -1270,9 +1262,8 @@ defmodule Couch.Test.Pagination do
 
   for descending <- [false, true] do
     for n <- [4, 9] do
-      describe "Pagination API (10 docs) : /{db}/_design/{ddoc}/_view/queries?page_size=#{
-                 n
-               }&descending=#{descending} : pages with same key" do
+      describe "Pagination API (10 docs) : /{db}/_design/{ddoc}/_view/queries" <>
+                 "?page_size=#{n}&descending=#{descending} : pages with same key" do
         @describetag descending: descending
         @describetag n_docs: 10
         @describetag page_size: n
