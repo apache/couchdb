@@ -13,40 +13,230 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
-build_and_test = '''
-mkdir -p ${COUCHDB_IO_LOG_DIR} ${platform}
-cd ${platform}
-rm -rf build
-mkdir build
-cd build
-tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
-cd apache-couchdb-*
-./configure --spidermonkey-version ${sm_ver}
-make check || (make build-report && false)
-'''
+// Erlang version embedded in binary packages
+ERLANG_VERSION = '24.2'
 
-make_packages = '''
-cd ${platform}
-git clone https://github.com/apache/couchdb-pkg
-rm -rf couchdb
-mkdir couchdb
-cp ${WORKSPACE}/apache-couchdb-*.tar.gz couchdb
-tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz -C couchdb
-cd couchdb-pkg
-make
-'''
+// Erlang version used for rebar in release process. CouchDB will not build from
+// the release tarball on Erlang versions older than this
+MINIMUM_ERLANG_VERSION = '21'
 
-cleanup_and_save = '''
-rm -rf ${WORKSPACE}/pkgs/${platform}
-mkdir -p ${WORKSPACE}/pkgs/${platform}
-mv ${WORKSPACE}/${platform}/rpmbuild/RPMS/$(arch)/*rpm ${WORKSPACE}/pkgs/${platform} || true
-mv ${WORKSPACE}/${platform}/couchdb/*.deb ${WORKSPACE}/pkgs/${platform} || true
-'''
+// We create parallel build / test / package stages for each OS using the metadata
+// in this map. Adding a new OS should ideally only involve adding a new entry here.
+meta = [
+  'centos7': [
+    name: 'CentOS 7',
+    spidermonkey_vsn: '1.8.5',
+    image: "apache/couchdbci-centos:7-erlang-${ERLANG_VERSION}"
+  ],
 
-update_qemu = '''
-docker run --rm --privileged multiarch/qemu-user-static --reset -p yes
-'''
+  'centos8': [
+    name: 'CentOS 8',
+    spidermonkey_vsn: '60',
+    image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
+  ],
 
+  'bionic': [
+    name: 'Ubuntu 18.04',
+    spidermonkey_vsn: '1.8.5',
+    image: "apache/couchdbci-ubuntu:bionic-erlang-${ERLANG_VERSION}"
+  ],
+
+  'focal': [
+    name: 'Ubuntu 20.04',
+    spidermonkey_vsn: '68',
+    image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
+  ],
+
+  'stretch': [
+    name: 'Debian 9',
+    spidermonkey_vsn: '1.8.5',
+    image: "apache/couchdbci-debian:stretch-erlang-${ERLANG_VERSION}"
+  ],
+
+  'buster': [
+    name: 'Debian 10',
+    spidermonkey_vsn: '60',
+    image: "apache/couchdbci-debian:buster-erlang-${ERLANG_VERSION}"
+  ],
+
+  // - Removed 2020.09.15 - VMs are offline
+
+  // 'buster-arm64': [
+  //   name: 'Debian 10 ARM'
+  //   spidermonkey_vsn: '60',
+  //   image: "apache/couchdbci-debian:arm64v8-buster-erlang-${ERLANG_VERSION}",
+  //   node_label: 'arm64v8'
+  // ],
+
+  // 'buster-ppc64': [
+  //   name: 'Debian 10 POWER'
+  //   spidermonkey_vsn: '60',
+  //   image: "apache/couchdbci-debian:pp64le-buster-erlang-${ERLANG_VERSION}",
+  //   node_label: 'ppc64le'
+  // ],
+
+  'bullseye': [
+    name: 'Debian 11',
+    spidermonkey_vsn: '78',
+    image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
+  ],
+
+  'freebsd': [
+    name: 'FreeBSD',
+    spidermonkey_vsn: '1.8.5',
+    gnu_make: 'gmake'
+  ],
+
+  'macos': [
+    name: 'macOS',
+    spidermonkey_vsn: '60',
+    gnu_make: 'make'
+  ]
+]
+
+// Credit to https://stackoverflow.com/a/69222555 for this technique.
+// We can use the scripted pipeline syntax to dynamically generate stages,
+// and inject them into a map that we pass to the `parallel` step in a script.
+// While the scripting approach is very flexible, it's not able to use some
+// functionality specific to Declarative Pipelines, like the `agent` and `post`
+// directives, so you'll see alternatives like try-catch-finally used for flow
+// control and the nested `node` and `docker` blocks in the container stage to
+// configure the worker environment.
+
+// Returns a build stage suitable for non-containerized environments (currently
+// macOS and FreeBSD). Coincidentally we do not currently support automated
+// package generation on these platforms. This method in invoked when we create
+// `parallelStagesMap` below.
+def generateNativeStage(platform) {
+  return {
+    stage(platform) {
+      node(platform) {
+        timeout(time: 90, unit: "MINUTES") {
+          try {
+            // deleteDir is OK here because we're not inside of a Docker container!
+            deleteDir()
+            unstash 'tarball'
+            withEnv([
+                'HOME='+pwd(),
+                'PATH+USRLOCAL=/usr/local/bin',
+                'MAKE='+meta[platform].gnu_make
+                ]) {
+              sh( script: "mkdir -p ${COUCHDB_IO_LOG_DIR} ${platform}/build", label: 'Create build directories' )
+              sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
+              dir( "${platform}/build" ) {
+                sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn}"
+                sh '$MAKE'
+                sh '$MAKE eunit'
+                sh '$MAKE elixir-suite'
+                sh '$MAKE exunit'
+                sh '$MAKE mango-test'
+              }
+            }
+          }
+          catch (err) {
+            echo "Build failed: {$err}"
+            currentBuild.result = 'FAILURE'
+            sh 'ls -l ${WORKSPACE}'
+            withEnv([
+                'HOME='+pwd(),
+                'PATH+USRLOCAL=/usr/local/bin',
+                'MAKE='+meta[platform].gnu_make
+                ]) {
+              dir( "${platform}/build" ) {
+                sh 'ls -l'
+                sh '${MAKE} build-report'
+              }
+            }
+          }
+          finally {
+            junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+            sh 'killall -9 beam.smp || true'
+            sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR}'
+          }
+        }
+      }
+    }
+  }
+}
+
+// Returns a build stage suitable for container-based deployments. This method
+// is invoked when we create the `parallelStagesMap` in the pipeline below.
+def generateContainerStage(platform) {
+  return {
+    // Important: the stage name here must match the parallelStagesMap key for the
+    // Jenkins UI to render the pipeline stages correctly. Don't ask why. -APK
+    stage(platform) {
+      node(meta[platform].get('node_label', 'docker')) {
+        docker.withRegistry('https://docker.io/', 'dockerhub_creds') {
+          docker.image(meta[platform].image).inside("${DOCKER_ARGS}") {
+            timeout(time: 90, unit: "MINUTES") {
+              stage("${meta[platform].name} - build & test") {
+                try {
+                  sh( script: "rm -rf ${platform} apache-couchdb-*", label: 'Clean workspace' )
+                  unstash 'tarball'
+                  sh( script: "mkdir -p ${COUCHDB_IO_LOG_DIR} ${platform}/build", label: 'Create build directories' )
+                  sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
+                  dir( "${platform}/build" ) {
+                    sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn}"
+                    sh 'make'
+                    sh 'make eunit'
+                    sh 'make elixir-suite'
+                    sh 'make exunit'
+                    sh 'make mango-test'
+                  }
+                }
+                catch (err) {
+                  echo "Build failed: {$err}"
+                  currentBuild.result = 'FAILURE'
+                  sh 'ls -l ${WORKSPACE}'
+                  dir( "${platform}/build" ) {
+                    sh 'ls -l'
+                    sh 'make build-report'
+                  }
+                }
+                finally {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+                  sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR}'
+                }
+              }
+
+              stage("${meta[platform].name} - package") {
+                try {
+                  unstash 'tarball'
+                  sh( script: "mkdir -p ${platform}/couchdb", label: 'Create build directory' )
+                  sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/couchdb", label: 'Unpack release' )
+                  sh( script: "cd ${platform} && git clone https://github.com/apache/couchdb-pkg", label: 'Clone packaging helper repo' )
+                  dir( "${platform}/couchdb-pkg" ) {
+                    sh( script: 'make', label: 'Build packages' )
+                  }
+                  sh( label: 'Stage package artifacts for archival', script: """
+                    rm -rf pkgs/${platform}
+                    mkdir -p pkgs/${platform}
+                    mv ${platform}/rpmbuild/RPMS/\$(arch)/*rpm pkgs/${platform} || true
+                    mv ${platform}/couchdb/*.deb pkgs/${platform} || true
+                  """ )
+                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true, onlyIfSuccessful: true
+                }
+                catch (err) {
+                  echo "Packaging failed: {$err}"
+                  currentBuild.result = 'FAILURE'
+                  sh 'ls -l ${WORKSPACE}'
+                }
+                finally {
+                  sh 'rm -rf ${WORKSPACE}/*'
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// Finally we have the actual Pipeline. It's mostly a Declarative Pipeline,
+// except for the 'Test and Package' stage where we use the `script` step as an
+// "escape hatch" to dynamically generate a set of parallel stages to execute.
 pipeline {
 
   // no top-level agent; agents must be declared for each stage
@@ -68,8 +258,6 @@ pipeline {
 
   options {
     buildDiscarder(logRotator(numToKeepStr: '10', artifactNumToKeepStr: '10'))
-    // This fails the build immediately if any parallel step fails
-    parallelsAlwaysFailFast()
     preserveStashes(buildCount: 10)
     timeout(time: 3, unit: 'HOURS')
     timestamps()
@@ -80,29 +268,33 @@ pipeline {
       agent {
         docker {
           label 'docker'
-          image 'apache/couchdbci-debian:buster-erlang-21.3.8.17-1'
+          image "apache/couchdbci-debian:erlang-${MINIMUM_ERLANG_VERSION}"
           args "${DOCKER_ARGS}"
           registryUrl 'https://docker.io/'
           registryCredentialsId 'dockerhub_creds'
         }
       }
+      environment {
+        // TODO find a way to avoid setting this explicitly
+        spidermonkey = '78'
+      }
       options {
         timeout(time: 15, unit: "MINUTES")
       }
       steps {
-        sh '''
-          set
-          rm -rf apache-couchdb-*
-          ./configure
-          make erlfmt-check
-          make dist
-          chmod -R a+w * .
-        '''
+        sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
+        sh "./configure --spidermonkey-version ${spidermonkey}"
+        sh 'make erlfmt-check'
+        sh 'make elixir-check-formatted'
+        sh 'make dist'
       }
       post {
         success {
           stash includes: 'apache-couchdb-*.tar.gz', name: 'tarball'
           archiveArtifacts artifacts: 'apache-couchdb-*.tar.gz', fingerprint: true
+        }
+        failure {
+          sh 'ls -l ${WORKSPACE}'
         }
         cleanup {
           // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
@@ -111,457 +303,22 @@ pipeline {
       }
     } // stage Build Release Tarball
 
-    // TODO Rework once Improved Docker Pipeline Engine is released
-    // https://issues.jenkins-ci.org/browse/JENKINS-47962
-    // https://issues.jenkins-ci.org/browse/JENKINS-48050
-
     stage('Test and Package') {
-
-      options {
-        skipDefaultCheckout()
-        timeout(time: 90, unit: "MINUTES")
+      steps {
+        script {
+          // Including failFast: true in map fails the build immediately if any parallel step fails
+          parallelStagesMap = meta.collectEntries( [failFast: true] ) { key, values ->
+            if (values.image) {
+              ["${key}": generateContainerStage(key)]
+            }
+            else {
+              ["${key}": generateNativeStage(key)]
+            }
+          }
+          parallel parallelStagesMap
+        }
       }
-
-      parallel {
-
-        stage('FreeBSD') {
-          agent {
-            label 'freebsd'
-          }
-          steps {
-            // deleteDir is OK here because we're not inside of a Docker container!
-            deleteDir()
-            unstash 'tarball'
-            withEnv(['HOME='+pwd()]) {
-              sh '''
-                mkdir -p $COUCHDB_IO_LOG_DIR
-
-                # Build CouchDB from tarball & test
-                mkdir build
-                cd build
-                tar -xf $WORKSPACE/apache-couchdb-*.tar.gz
-                cd apache-couchdb-*
-                ./configure
-                gmake check || (build-aux/logfile-uploader.py && false)
-
-                # No package build for FreeBSD at this time
-              '''
-            } // withEnv
-          } // steps
-          post {
-            always {
-              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-            }
-            cleanup {
-              sh 'killall -9 beam.smp || true'
-              sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR} || true'
-            }
-          } // post
-        } // stage FreeBSD
-
-        stage('macOS') {
-          agent {
-            label 'macos'
-          }
-          steps {
-            // deleteDir is OK here because we're not inside of a Docker container!
-            deleteDir()
-            unstash 'tarball'
-            withEnv(['HOME='+pwd()]) {
-              sh '''
-                PATH=/usr/local/bin:$PATH
-                export PATH
-                mkdir -p $COUCHDB_IO_LOG_DIR
-
-                # Build CouchDB from tarball & test
-                mkdir build
-                cd build
-                tar -xzf $WORKSPACE/apache-couchdb-*.tar.gz
-                cd apache-couchdb-*
-                ./configure --spidermonkey-version 60
-                make check || (build-aux/logfile-uploader.py && false)
-
-                # No package build for macOS at this time
-              '''
-            } // withEnv
-          } // steps
-          post {
-            always {
-              junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-            }
-            cleanup {
-              sh 'killall -9 beam.smp || true'
-              sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR} || true'
-            }
-          } // post
-        } // stage macOS
-
-        stage('CentOS 7') {
-          agent {
-            docker {
-              image 'apache/couchdbci-centos:7-erlang-21.3.8.17-1'
-              label 'docker'
-              args "${DOCKER_ARGS}"
-              registryUrl 'https://docker.io/'
-              registryCredentialsId 'dockerhub_creds'
-            }
-          }
-          environment {
-            platform = 'centos7'
-            sm_ver = '1.8.5'
-          }
-          stages {
-            stage('Build from tarball & test') {
-              steps {
-                unstash 'tarball'
-                sh( script: build_and_test )
-              }
-              post {
-                always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-                }
-              }
-            }
-            stage('Build CouchDB packages') {
-              steps {
-                unstash 'tarball'
-                sh( script: make_packages )
-                sh( script: cleanup_and_save )
-              }
-              post {
-                success {
-                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
-                }
-              }
-            }
-          } // stages
-          post {
-            cleanup {
-              sh 'rm -rf ${WORKSPACE}/*'
-            }
-          } // post
-        } // stage
-
-        stage('CentOS 8') {
-          agent {
-            docker {
-              image 'apache/couchdbci-centos:8-erlang-21.3.8.17-1'
-              label 'docker'
-              args "${DOCKER_ARGS}"
-              registryUrl 'https://docker.io/'
-              registryCredentialsId 'dockerhub_creds'
-            }
-          }
-          environment {
-            platform = 'centos8'
-            sm_ver = '60'
-          }
-          stages {
-            stage('Build from tarball & test') {
-              steps {
-                unstash 'tarball'
-                sh( script: build_and_test )
-              }
-              post {
-                always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-                }
-              }
-            }
-            stage('Build CouchDB packages') {
-              steps {
-                unstash 'tarball'
-                sh( script: make_packages )
-                sh( script: cleanup_and_save )
-              }
-              post {
-                success {
-                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
-                }
-              }
-            }
-          } // stages
-          post {
-            cleanup {
-              sh 'rm -rf ${WORKSPACE}/*'
-            }
-          } // post
-        } // stage
-
-        stage('Ubuntu Bionic') {
-          agent {
-            docker {
-              image 'apache/couchdbci-ubuntu:bionic-erlang-21.3.8.17-1'
-              label 'docker'
-              args "${DOCKER_ARGS}"
-              registryUrl 'https://docker.io/'
-              registryCredentialsId 'dockerhub_creds'
-            }
-          }
-          environment {
-            platform = 'bionic'
-            sm_ver = '1.8.5'
-          }
-          stages {
-            stage('Build from tarball & test') {
-              steps {
-                unstash 'tarball'
-                sh( script: build_and_test )
-              }
-              post {
-                always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-                }
-              }
-            }
-            stage('Build CouchDB packages') {
-              steps {
-                sh( script: make_packages )
-                sh( script: cleanup_and_save )
-              }
-              post {
-                success {
-                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
-                }
-              }
-            }
-          } // stages
-          post {
-            cleanup {
-              sh 'rm -rf ${WORKSPACE}/*'
-            }
-          } // post
-        } // stage
-
-        stage('Ubuntu Focal') {
-          agent {
-            docker {
-              image 'apache/couchdbci-ubuntu:focal-erlang-21.3.8.17-1'
-              label 'docker'
-              args "${DOCKER_ARGS}"
-              registryUrl 'https://docker.io/'
-              registryCredentialsId 'dockerhub_creds'
-            }
-          }
-          environment {
-            platform = 'focal'
-            sm_ver = '68'
-          }
-          stages {
-            stage('Build from tarball & test') {
-              steps {
-                unstash 'tarball'
-                sh( script: build_and_test )
-              }
-              post {
-                always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-                }
-              }
-            }
-            stage('Build CouchDB packages') {
-              steps {
-                sh( script: make_packages )
-                sh( script: cleanup_and_save )
-              }
-              post {
-                success {
-                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
-                }
-              }
-            }
-          } // stages
-          post {
-            cleanup {
-              sh 'rm -rf ${WORKSPACE}/*'
-            }
-          } // post
-        } // stage
-
-        stage('Debian Stretch') {
-          agent {
-            docker {
-              image 'apache/couchdbci-debian:stretch-erlang-21.3.8.17-1'
-              label 'docker'
-              args "${DOCKER_ARGS}"
-              registryUrl 'https://docker.io/'
-              registryCredentialsId 'dockerhub_creds'
-            }
-          }
-          environment {
-            platform = 'stretch'
-            sm_ver = '1.8.5'
-          }
-          stages {
-            stage('Build from tarball & test') {
-              steps {
-                unstash 'tarball'
-                sh( script: build_and_test )
-              }
-              post {
-                always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-                }
-              }
-            }
-            stage('Build CouchDB packages') {
-              steps {
-                sh( script: make_packages )
-                sh( script: cleanup_and_save )
-              }
-              post {
-                success {
-                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
-                }
-              }
-            }
-          } // stages
-          post {
-            cleanup {
-              sh 'rm -rf ${WORKSPACE}/*'
-            }
-          } // post
-        } // stage
-
-        stage('Debian Buster amd64') {
-          agent {
-            docker {
-              image 'apache/couchdbci-debian:buster-erlang-21.3.8.17-1'
-              label 'docker'
-              args "${DOCKER_ARGS}"
-              registryUrl 'https://docker.io/'
-              registryCredentialsId 'dockerhub_creds'
-            }
-          }
-          environment {
-            platform = 'buster'
-            sm_ver = '60'
-          }
-          stages {
-            stage('Build from tarball & test') {
-              steps {
-                unstash 'tarball'
-                sh( script: build_and_test )
-              }
-              post {
-                always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-                }
-              }
-            }
-            stage('Build CouchDB packages') {
-              steps {
-                sh( script: make_packages )
-                sh( script: cleanup_and_save )
-              }
-              post {
-                success {
-                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
-                }
-              }
-            }
-          } // stages
-          post {
-            cleanup {
-              sh 'rm -rf ${WORKSPACE}/*'
-            }
-          } // post
-        } // stage
-
-        stage('Debian Buster arm64v8') {
-          when { expression { return false } }
-          agent {
-            docker {
-              image 'apache/couchdbci-debian:arm64v8-buster-erlang-21.3.8.17-1'
-              label 'arm64v8'
-              args "${DOCKER_ARGS}"
-              registryUrl 'https://docker.io/'
-              registryCredentialsId 'dockerhub_creds'
-            }
-          }
-          environment {
-            platform = 'buster'
-            sm_ver = '1.8.5'
-          }
-          stages {
-            stage('Build from tarball & test') {
-              steps {
-                unstash 'tarball'
-                sh( script: build_and_test )
-              }
-              post {
-                always {
-                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-                }
-              }
-            }
-            stage('Build CouchDB packages') {
-              steps {
-                sh( script: make_packages )
-                sh( script: cleanup_and_save )
-              }
-              post {
-                success {
-                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
-                }
-              }
-            }
-          } // stages
-          post {
-            cleanup {
-              sh 'rm -rf ${WORKSPACE}/*'
-            }
-          } // post
-        } // stage
-
-/*
-  - Removed 2020.09.15 - VMs are offline
-*/
-
-//        stage('Debian Buster ppc64le') {
-//          agent {
-//            docker {
-//              image 'apache/couchdbci-debian:ppc64le-buster-erlang-21.3.8.17-1'
-//              label 'ppc64le'
-//              args "${DOCKER_ARGS}"
-//              registryUrl 'https://docker.io/'
-//              registryCredentialsId 'dockerhub_creds'
-//            }
-//          }
-//          environment {
-//            platform = 'buster'
-//            sm_ver = '60'
-//          }
-//          stages {
-//            stage('Build from tarball & test') {
-//              steps {
-//                unstash 'tarball'
-//                sh( script: build_and_test )
-//              }
-//              post {
-//                always {
-//                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-//                }
-//              }
-//            }
-//            stage('Build CouchDB packages') {
-//              steps {
-//                sh( script: make_packages )
-//                sh( script: cleanup_and_save )
-//              }
-//              post {
-//                success {
-//                  archiveArtifacts artifacts: 'pkgs/**', fingerprint: true
-//                }
-//              }
-//            }
-//          } // stages
-//          post {
-//            cleanup {
-//              sh 'rm -rf ${WORKSPACE}/*'
-//            }
-//          } // post
-//        } // stage
+    }
 
 	/*
 	 * Example of how to do a qemu-based run, please leave here
@@ -586,17 +343,17 @@ pipeline {
           stages {
             stage('Install latest qemu binaries') {
               steps {
-                sh( script: update_qemu )
+                sh( script: 'docker run --rm --privileged multiarch/qemu-user-static --reset -p yes' )
               }
             }
             stage('Pull latest docker image') {
               steps {
-                sh "docker pull apache/couchdbci-debian:arm64v8-buster-erlang-21.3.8.17-1"
+                sh "docker pull apache/couchdbci-debian:arm64v8-buster-erlang-${ERLANG_VERSION}"
               }
             }
             stage('Build from tarball & test & packages') {
               steps {
-                withDockerContainer(image: "apache/couchdbci-debian:arm64v8-buster-erlang-21.3.8.17-1", args: "${DOCKER_ARGS}") {
+                withDockerContainer(image: "apache/couchdbci-debian:arm64v8-buster-erlang-${ERLANG_VERSION}", args: "${DOCKER_ARGS}") {
                   unstash 'tarball'
                   withEnv(['MIX_HOME='+pwd(), 'HEX_HOME='+pwd()]) {
                     sh( script: build_and_test )
@@ -625,9 +382,6 @@ pipeline {
         } // stage
 */
 
-      } // parallel
-    } // stage "Test and Package"
-
     stage('Publish') {
 
       when {
@@ -636,7 +390,7 @@ pipeline {
 
       agent {
         docker {
-          image 'apache/couchdbci-debian:buster-erlang-21.3.8.17-1'
+          image "apache/couchdbci-debian:erlang-${ERLANG_VERSION}"
           label 'docker'
           args "${DOCKER_ARGS}"
           registryUrl 'https://docker.io/'
@@ -678,8 +432,8 @@ pipeline {
           sh '''
             cp js/centos-7/*rpm pkgs/centos7
             cp js/centos-8/*rpm pkgs/centos8
-            cd pkgs/centos7 && createrepo --database .
-            cd ../centos8 && createrepo --database .
+            cd pkgs/centos7 && createrepo_c --database .
+            cd ../centos8 && createrepo_c --database .
           '''
 
           echo 'Building tree to upload...'
