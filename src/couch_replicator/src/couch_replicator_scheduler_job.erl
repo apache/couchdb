@@ -846,18 +846,15 @@ do_checkpoint(State) ->
             end;
         {SrcInstanceStartTime, _NewTgtInstanceStartTime} ->
             {checkpoint_commit_failure, <<
-                "Target database out of sync. "
-                "Try to increase max_dbs_open at the target's server."
+                "instance_start_time on target database has changed since last checkpoint."
             >>};
         {_NewSrcInstanceStartTime, TgtInstanceStartTime} ->
             {checkpoint_commit_failure, <<
-                "Source database out of sync. "
-                "Try to increase max_dbs_open at the source's server."
+                "instance_start_time on source database has changed since last checkpoint."
             >>};
         {_NewSrcInstanceStartTime, _NewTgtInstanceStartTime} ->
             {checkpoint_commit_failure, <<
-                "Source and target databases out of "
-                "sync. Try to increase max_dbs_open at both servers."
+                "instance_start_time on source and target database has changed since last checkpoint."
             >>}
     end.
 

@@ -19,6 +19,7 @@
 
 go(DbName) ->
     Shards = mem3:shards(DbName),
+    CreationTime = mem3:shard_creation_time(DbName),
     Workers = fabric_util:submit_jobs(Shards, get_db_info, []),
     RexiMon = fabric_util:create_monitors(Shards),
     Fun = fun handle_message/3,
@@ -28,7 +29,7 @@ go(DbName) ->
     try
         case fabric_util:recv(Workers, #shard.ref, Fun, Acc0) of
             {ok, Acc} ->
-                {ok, Acc};
+                {ok, [{instance_start_time, CreationTime} | Acc]};
             {timeout, {WorkersDict, _, _}} ->
                 DefunctWorkers = fabric_util:remove_done_workers(
                     WorkersDict,
@@ -117,7 +118,7 @@ merge_results(Info) ->
             (_K, _V, Acc) ->
                 Acc
         end,
-        [{instance_start_time, <<"0">>}],
+        [],
         Dict
     ).
 

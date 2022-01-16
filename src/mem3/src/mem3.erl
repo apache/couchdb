@@ -33,6 +33,7 @@
 -export([get_placement/1]).
 -export([ping/1, ping/2]).
 -export([db_is_current/1]).
+-export([shard_creation_time/1]).
 
 %% For mem3 use only.
 -export([name/1, node/1, range/1, engine/1]).
@@ -197,6 +198,20 @@ shard_suffix(DbName0) when is_binary(DbName0) ->
     filename:extension(binary_to_list(DbName));
 shard_suffix(Db) ->
     shard_suffix(couch_db:name(Db)).
+
+shard_creation_time(DbName0) ->
+    Shard = hd(shards(DbName0)),
+    case Shard#shard.name of
+        <<"shards/", _:8/binary, "-", _:8/binary, "/", DbName/binary>> ->
+            case filename:extension(DbName) of
+                <<".", Time/binary>> ->
+                    Time;
+                _ ->
+                    <<"0">>
+            end;
+        _ ->
+            <<"0">>
+    end.
 
 fold_shards(Fun, Acc) ->
     mem3_shards:fold(Fun, Acc).
