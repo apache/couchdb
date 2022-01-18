@@ -305,7 +305,7 @@ pipeline {
       steps {
         script {
           // Including failFast: true in map fails the build immediately if any parallel step fails
-          parallelStagesMap = meta.collectEntries( [failFast: true] ) { key, values ->
+          parallelStagesMap = meta.collectEntries( [failFast: false] ) { key, values ->
             if (values.image) {
               ["${key}": generateContainerStage(key)]
             }
