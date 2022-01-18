@@ -275,16 +275,14 @@ pipeline {
         // TODO find a way to avoid setting this explicitly
         spidermonkey = '78'
       }
-      options {
-        // TODO start this timeout _after_ the agent has been acquired if possible
-        timeout(time: 15, unit: "MINUTES")
-      }
       steps {
-        sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
-        sh "./configure --spidermonkey-version ${spidermonkey}"
-        sh 'make erlfmt-check'
-        sh 'make elixir-check-formatted'
-        sh 'make dist'
+        timeout(time: 15, unit: "MINUTES") {
+          sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
+          sh "./configure --spidermonkey-version ${spidermonkey}"
+          sh 'make erlfmt-check'
+          sh 'make elixir-check-formatted'
+          sh 'make dist'
+        }
       }
       post {
         success {
