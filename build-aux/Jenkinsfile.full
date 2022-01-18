@@ -134,8 +134,6 @@ def generateNativeStage(platform) {
             }
           }
           catch (err) {
-            echo "Build failed: {$err}"
-            currentBuild.result = 'FAILURE'
             sh 'ls -l ${WORKSPACE}'
             withEnv([
                 'HOME='+pwd(),
@@ -147,6 +145,7 @@ def generateNativeStage(platform) {
                 sh '${MAKE} build-report'
               }
             }
+            error("Build step failed with error: ${err.getMessage()}")
           }
           finally {
             junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
@@ -186,13 +185,12 @@ def generateContainerStage(platform) {
                   }
                 }
                 catch (err) {
-                  echo "Build failed: {$err}"
-                  currentBuild.result = 'FAILURE'
                   sh 'ls -l ${WORKSPACE}'
                   dir( "${platform}/build" ) {
                     sh 'ls -l'
                     sh 'make build-report'
                   }
+                  error("Build step failed with error: ${err.getMessage()}")
                 }
                 finally {
                   junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
@@ -218,9 +216,8 @@ def generateContainerStage(platform) {
                   archiveArtifacts artifacts: 'pkgs/**', fingerprint: true, onlyIfSuccessful: true
                 }
                 catch (err) {
-                  echo "Packaging failed: {$err}"
-                  currentBuild.result = 'FAILURE'
                   sh 'ls -l ${WORKSPACE}'
+                  error("Build step failed with error: ${err.getMessage()}")
                 }
                 finally {
                   sh 'rm -rf ${WORKSPACE}/*'
@@ -279,6 +276,7 @@ pipeline {
         spidermonkey = '78'
       }
       options {
+        // TODO start this timeout _after_ the agent has been acquired if possible
         timeout(time: 15, unit: "MINUTES")
       }
       steps {
