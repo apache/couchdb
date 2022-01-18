@@ -121,13 +121,27 @@ get_index_entries({IdxProps}, Doc) ->
             Values = get_index_values(Fields, Doc),
             case lists:member(not_found, Values) of
                 true -> [];
-                false -> [[Values, null]]
+                false -> case Values of
+                    [{fn, Values1}] ->
+                        io:format("----[get_index_entries] ~p~n", [Values1]),
+                        [[[V], null] || V <- Values1];
+                    _Else -> [[Values, null]]
+                end
             end
     end.
 
 get_index_values(Fields, Doc) ->
+    io:format("----[get_index_values fields] ~p~n", [Fields]),
     lists:map(
-        fun({Field, _Dir}) ->
+        fun({_Field, {[MangoFun]}}) ->
+        case mango_doc:get_field_fun(Doc, MangoFun) of
+            not_found -> not_found;
+            bad_path -> not_found;
+            Value ->
+                io:format("----[get_field_fun result] ~p~n", [Value]),
+                Value
+        end;
+        ({Field, _Dir}) ->
             case mango_doc:get_field(Doc, Field) of
                 not_found -> not_found;
                 bad_path -> not_found;

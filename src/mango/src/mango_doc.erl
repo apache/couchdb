@@ -21,6 +21,7 @@
 
     get_field/2,
     get_field/3,
+    get_field_fun/2,
     rem_field/2,
     set_field/3
 ]).
@@ -414,6 +415,20 @@ get_field(Values, [Name | Rest], Validator) when is_list(Values) ->
     end;
 get_field(_, [_ | _], _) ->
     bad_path.
+
+get_field_fun(Props, MangoFun) ->
+    {FunName, {Args}} = MangoFun,
+    case FunName of
+        <<"$explode">> -> handle_explode(Props, Args);
+        _ -> bad_path
+    end.
+
+handle_explode({Doc}, Args) ->
+    FieldName = proplists:get_value(<<"$field">>, Args),
+    Separator = proplists:get_value(<<"$separator">>, Args),
+    {_, FieldValue} = lists:keyfind(FieldName, 1, Doc),
+    R = string:split(FieldValue, Separator, all),
+    {fn, R}.
 
 rem_field(Props, Field) when is_binary(Field) ->
     {ok, Path} = mango_util:parse_field(Field),
