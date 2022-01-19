@@ -21,41 +21,28 @@ import os
 import subprocess
 import sys
 
-from format_lib import get_source_paths
+from format_lib import get_source_paths, get_erlang_version
 
-FILTERED_LINES = [
-    "Checking formatting...",
-    "[warn] Code style issues found in the above file(s). Forgot to run erlfmt?",
-    "",
-]
 
 if __name__ == "__main__":
-    failed_checks = 0
-    for item in get_source_paths():
+    if get_erlang_version() < 21:
+        print("Erlang version is < 21. Skipping format check")
+        sys.exit(0)
+
+    exit_code = 0
+
+    for path in get_source_paths():
         run_result = subprocess.run(
-            [
-                os.environ["ERLFMT_PATH"],
-                "-c",
-                "--verbose",
-                # We have some long lines and erlfmt doesn't forcefully wrap
-                # them all. We should decrease this over time
-                "--print-width=167",
-                item["raw_path"],
-            ],
+            [os.environ["ERLFMT_PATH"], "-c", path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        if run_result.returncode != 0:
-            # erlfmt sometimes returns a non-zero status code with no
-            # actual errors. This is a workaround
-            stderr_lines = [
-                line
-                for line in run_result.stderr.decode("utf-8").split("\n")
-                if line not in FILTERED_LINES
-                and not line.startswith("Formatting ")
-                and not line.startswith("[warn] ")
-            ]
-            if len(stderr_lines) > 0:
-                print("\n".join(stderr_lines), file=sys.stderr)
-                failed_checks += 1
-    sys.exit(failed_checks)
+        rc = run_result.returncode
+        if rc != 0:
+            print("\n %s error for %s" % (rc, path))
+            stderr_lines = run_result.stderr.decode("utf-8").split("\n")
+            for line in stderr_lines:
+                print("  > %s" % line, file=sys.stderr)
+            exit_code = 1
+
+    sys.exit(exit_code)
