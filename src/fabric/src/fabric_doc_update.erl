@@ -157,16 +157,17 @@ force_reply(Doc, [FirstReply | _] = Replies, {Health, W, Acc}) ->
                         false ->
                             CounterKey = [fabric, doc_update, mismatched_errors],
                             couch_stats:increment_counter(CounterKey),
-                            {error, W, [{Doc, FirstReply} | Acc]}
+                            case check_forbidden_msg(Replies, Health) of
+                                {NewHealth, forbidden, Msg} ->
+                                    {NewHealth, W, [{Doc, {forbidden, Msg}} | Acc]};
+                                false ->
+                                    {error, W, [{Doc, FirstReply} | Acc]}
+                            end
                     end;
                 [AcceptedRev | _] ->
                     CounterKey = [fabric, doc_update, write_quorum_errors],
                     couch_stats:increment_counter(CounterKey),
-                    NewHealth =
-                        case Health of
-                            ok -> accepted;
-                            _ -> Health
-                        end,
+                    NewHealth = change_health_accepted(Health),
                     {NewHealth, W, [{Doc, {accepted, AcceptedRev}} | Acc]}
             end
     end.
@@ -181,6 +182,35 @@ maybe_reply(Doc, Replies, {stop, W, Acc}) ->
         false ->
             continue
     end.
+
+% This is a corner case where
+% 1) revision tree for the document are out of sync across nodes
+% 2) update on one node extends the revision tree
+% 3) VDU forbids the document
+% 4) remaining nodes do not extend revision tree, so noreply is returned
+% If at at least one nodes forbids the update, then we reject
+% the update no matter what other nodes return.
+check_forbidden_msg(Replies, Health) ->
+    Pred = fun(R) ->
+        case R of 
+            {_, {forbidden, _}} -> 
+                true; 
+            _ -> 
+                false 
+        end 
+    end,
+    case lists:search(Pred, Replies) of
+        {value, {_, {forbidden, Msg}}} ->
+            NewHealth = change_health_accepted(Health),
+            {NewHealth, forbidden, Msg};
+        false ->
+            false
+    end.
+
+change_health_accepted(ok) ->
+    accepted;
+change_health_accepted(Health) ->
+    Health.
 
 update_quorum_met(W, Replies) ->
     Counters = lists:foldl(
@@ -255,6 +285,8 @@ validate_atomic_update(_DbName, AllDocs, true) ->
     throw({aborted, PreCommitFailures}).
 
 -ifdef(TEST).
+
+-define(NODEBUG, false).
 -include_lib("eunit/include/eunit.hrl").
 
 setup_all() ->
@@ -273,7 +305,10 @@ doc_update_test_() ->
         [
             fun doc_update1/0,
             fun doc_update2/0,
-            fun doc_update3/0
+            fun doc_update3/0,
+            fun one_forbid_test/0,
+            fun two_forbid_test/0,
+            fun extend_tree_forbid_test/0
         ]
     }.
 
@@ -399,6 +434,96 @@ doc_update3() ->
 
     {ok, {WaitingCount2, _, _, _, _} = Acc2} =
         handle_message({rexi_EXIT, 1}, lists:nth(2, Shards), Acc1),
+    ?assertEqual(WaitingCount2, 1),
+
+    {stop, Reply} =
+        handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, lists:nth(3, Shards), Acc2),
+
+    ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
+
+one_forbid_test() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+
+    Acc0 = {
+        length(Shards),
+        length(Docs),
+        list_to_integer("2"),
+        GroupedDocs,
+        dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+
+    {ok, {WaitingCount1, _, _, _, _} = Acc1} =
+        handle_message({ok, [{ok, Doc1}, {noreply, Doc2}]}, hd(Shards), Acc0),
+    ?assertEqual(WaitingCount1, 2),
+
+    {ok, {WaitingCount2, _, _, _, _} = Acc2} =
+        handle_message({ok, [{ok, Doc1}, {noreply, Doc2}]}, lists:nth(2, Shards), Acc1),
+    ?assertEqual(WaitingCount2, 1),
+
+    {stop, Reply} =
+        handle_message({ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2),
+
+    ?assertEqual({accepted, [{Doc1, {ok, Doc1}}, {Doc2,  {forbidden, <<"not allowed">>}}]}, Reply).
+
+two_forbid_test() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+
+    Acc0 = {
+        length(Shards),
+        length(Docs),
+        list_to_integer("2"),
+        GroupedDocs,
+        dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+
+    {ok, {WaitingCount1, _, _, _, _} = Acc1} =
+        handle_message({ok, [{ok, Doc1}, {noreply, Doc2}]}, hd(Shards), Acc0),
+    ?assertEqual(WaitingCount1, 2),
+
+    {ok, {WaitingCount2, _, _, _, _} = Acc2} =
+        handle_message({ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(2, Shards), Acc1),
+    ?assertEqual(WaitingCount2, 1),
+
+    {stop, Reply} =
+        handle_message({ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2),
+
+    ?assertEqual({accepted, [{Doc1, {ok, Doc1}}, {Doc2,  {forbidden, <<"not allowed">>}}]}, Reply).
+
+% This should actually never happen, because an `{ok, Doc}` message means that the revision
+% tree is extended and so the VDU should forbid the document.
+% Leaving this test here to make sure quorum rules still apply.
+extend_tree_forbid_test() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+
+    Acc0 = {
+        length(Shards),
+        length(Docs),
+        list_to_integer("2"),
+        GroupedDocs,
+        dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+
+    {ok, {WaitingCount1, _, _, _, _} = Acc1} =
+        handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, hd(Shards), Acc0),
+    ?assertEqual(WaitingCount1, 2),
+
+    {ok, {WaitingCount2, _, _, _, _} = Acc2} =
+        handle_message({ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(2, Shards), Acc1),
     ?assertEqual(WaitingCount2, 1),
 
     {stop, Reply} =
