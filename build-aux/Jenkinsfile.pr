@@ -72,18 +72,17 @@ pipeline {
           registryCredentialsId 'dockerhub_creds'
         }
       }
-      options {
-        timeout(time: 15, unit: "MINUTES")
-      }
       steps {
-        sh '''
-          set
-          rm -rf apache-couchdb-*
-          ./configure
-          make erlfmt-check
-          make dist
-          chmod -R a+w * .
-        '''
+        timeout(time: 15, unit: "MINUTES") {
+          sh '''
+            set
+            rm -rf apache-couchdb-*
+            ./configure
+            make erlfmt-check
+            make dist
+            chmod -R a+w * .
+          '''
+        }
       }
       post {
         success {
@@ -121,11 +120,12 @@ pipeline {
             }
             options {
               skipDefaultCheckout()
-              timeout(time: 90, unit: "MINUTES")
             }
             steps {
-              unstash 'tarball'
-              sh( script: build_and_test )
+              timeout(time: 90, unit: "MINUTES") {
+                unstash 'tarball'
+                sh( script: build_and_test )
+              }
             }
             post {
               always {
