@@ -103,8 +103,13 @@ basic_name_pw(Req) ->
             [Basic, Base64Value] = string:split(Header, " "),
             case string:casefold(Basic) of
                 "basic" ->
-                    try re:split(base64:decode(Base64Value), ":",
-                                    [{return, list}, {parts, 2}]) of
+                    try
+                        re:split(
+                            base64:decode(Base64Value),
+                            ":",
+                            [{return, list}, {parts, 2}]
+                        )
+                    of
                         ["_", "_"] ->
                             % special name and pass to be logged out
                             nil;
@@ -115,7 +120,7 @@ basic_name_pw(Req) ->
                     catch
                         error:function_clause ->
                             throw({
-                                bad_request, 
+                                bad_request,
                                 "Authorization header has invalid base64 value"
                             })
                     end;

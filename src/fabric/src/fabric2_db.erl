@@ -808,7 +808,9 @@ validate_docid(<<"_design/">>) ->
 validate_docid(<<"_local/">>) ->
     throw({illegal_docid, <<"Illegal document id `_local/`">>});
 validate_docid(Id) when is_binary(Id) ->
-    ConfigDocIdLength = config:get_integer("couchdb", "max_document_id_length", ?DOC_ID_LIMIT_BYTES),
+    ConfigDocIdLength = config:get_integer(
+        "couchdb", "max_document_id_length", ?DOC_ID_LIMIT_BYTES
+    ),
     DocIdLength = min(ConfigDocIdLength, ?DOC_ID_LIMIT_BYTES),
     case DocIdLength > 0 andalso byte_size(Id) > DocIdLength of
         true -> throw({illegal_docid, <<"Document id is too long">>});

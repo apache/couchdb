@@ -67,7 +67,8 @@
 -callback validate_doc_update(ddoc(), doc(), doc(), user_context(), sec_obj()) ->
     ok | {error, any()}.
 -callback filter_view(ddoc(), function_name(), [doc()]) -> {true, [result()]} | {error, any()}.
--callback filter_docs(req(), db(), ddoc(), function_name(), [doc()]) -> {true, [result()]} | {error, any()}.
+-callback filter_docs(req(), db(), ddoc(), function_name(), [doc()]) ->
+    {true, [result()]} | {error, any()}.
 
 -spec acquire_map_context(
     db_name(),

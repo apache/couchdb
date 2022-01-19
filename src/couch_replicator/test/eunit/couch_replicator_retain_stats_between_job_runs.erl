@@ -156,13 +156,15 @@ cancel(RepId, Pid) ->
     couch_replicator_test_helper:cancel(RepId, Pid).
 
 vdu() ->
-    <<"function(newDoc, oldDoc, userCtx) {\n"
-    "        if(newDoc.nope === true) {\n"
-    "            throw({forbidden: 'nope'});\n"
-    "        } else {\n"
-    "            return;\n"
-    "        }\n"
-    "    }">>.
+    <<
+        "function(newDoc, oldDoc, userCtx) {\n"
+        "        if(newDoc.nope === true) {\n"
+        "            throw({forbidden: 'nope'});\n"
+        "        } else {\n"
+        "            return;\n"
+        "        }\n"
+        "    }"
+    >>.
 
 add_vdu(DbName) ->
     DocProps = [
