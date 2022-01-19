@@ -638,7 +638,6 @@ keep_sending_changes(Args, Acc0, FirstRound, T0) ->
             end
     end.
 
-
 changes_duration() ->
     %% preserving original (3.x) configuration segment;
     case config:get("fabric", "changes_duration", "infinity") of

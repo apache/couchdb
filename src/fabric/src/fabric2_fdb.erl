@@ -2155,8 +2155,8 @@ get_info_wait_int(#info_future{} = InfoFuture) ->
 
 binary_chunk_size() ->
     ConfigBinaryChunkSize = config:get_integer(
-        "fabric", 
-        "binary_chunk_size", 
+        "fabric",
+        "binary_chunk_size",
         ?DEFAULT_BINARY_CHUNK_SIZE_BYTES
     ),
     min(ConfigBinaryChunkSize, ?DEFAULT_BINARY_CHUNK_SIZE_BYTES).

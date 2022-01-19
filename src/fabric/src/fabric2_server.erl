@@ -150,16 +150,19 @@ init(_) ->
     {ok, nil}.
 
 check_config_limits() ->
-    lists:foreach(fun({Sect, Key, Limit}) ->
-        ConfigVal = config:get_integer(Sect, Key, Limit),
-        case ConfigVal > Limit of
-            true ->
-                LogMsg = "Config value of ~p for [~s] ~s is greater than the limit: ~p",
-                couch_log:warning(LogMsg, [ConfigVal, Sect, Key, Limit]);
-            false ->
-                ok
-        end
-    end, ?CONFIG_LIMITS).
+    lists:foreach(
+        fun({Sect, Key, Limit}) ->
+            ConfigVal = config:get_integer(Sect, Key, Limit),
+            case ConfigVal > Limit of
+                true ->
+                    LogMsg = "Config value of ~p for [~s] ~s is greater than the limit: ~p",
+                    couch_log:warning(LogMsg, [ConfigVal, Sect, Key, Limit]);
+                false ->
+                    ok
+            end
+        end,
+        ?CONFIG_LIMITS
+    ).
 
 terminate(_, _St) ->
     ok.

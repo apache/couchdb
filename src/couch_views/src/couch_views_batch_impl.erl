@@ -162,12 +162,13 @@ bad_config_test_() ->
     lists:map(
         fun({Field, Error}) ->
             FieldName = atom_to_list(Field),
-            {FieldName, ?_assertError(
-                {Error, {couch_views, Field, _}},
-                with_bad_config(FieldName, fun() ->
-                    start(#mrst{}, undefined)
-                end))
-            }
+            {FieldName,
+                ?_assertError(
+                    {Error, {couch_views, Field, _}},
+                    with_bad_config(FieldName, fun() ->
+                        start(#mrst{}, undefined)
+                    end)
+                )}
         end,
         FieldErrors
     ).

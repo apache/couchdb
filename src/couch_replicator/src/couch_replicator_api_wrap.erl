@@ -1035,10 +1035,11 @@ db_from_json(#{} = DbMap) ->
         [],
         Headers0
     ),
-    Socks5 = case maps:get(<<"proxy_protocol">>, IBrowseOptions0, undefined) of
-        <<"socks5">> -> true;
-        _ -> false
-    end,
+    Socks5 =
+        case maps:get(<<"proxy_protocol">>, IBrowseOptions0, undefined) of
+            <<"socks5">> -> true;
+            _ -> false
+        end,
     IBrowseOptions = maps:fold(
         fun
             (<<"socket_options">>, #{} = SockOpts, Acc) ->

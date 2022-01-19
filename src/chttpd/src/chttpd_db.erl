@@ -1684,11 +1684,11 @@ db_attachment_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId,
         )
     ),
     #doc_query_args{
-        rev=Rev,
-        options=Options
+        rev = Rev,
+        options = Options
     } = parse_doc_query(Req),
     #doc{
-        atts=Atts
+        atts = Atts
     } = Doc = couch_doc_open(Db, DocId, Rev, Options),
     Att = get_existing_attachment(Atts, FileName),
     [Type, Enc, DiskLen, AttLen, Md5] = couch_att:fetch(
