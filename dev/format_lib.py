@@ -20,22 +20,35 @@ import pathlib
 import subprocess
 
 
+def get_erlang_version():
+    args = [
+        "erl",
+        "-eval",
+        "io:put_chars(erlang:system_info(otp_release)), halt().",
+        "-noshell",
+    ]
+    res = subprocess.run(args, stdout=subprocess.PIPE, check=True)
+    str_version = res.stdout.decode("utf-8").strip().strip('"')
+    return int(str_version)
+
+
+# Generate source paths as "directory/*.erl" wildcard patterns
+# those can be directly consumed by erlfmt and processed in parallel
+#
 def get_source_paths():
+    curdir = None
     for item in (
         subprocess.run(
-            ["git", "ls-files"],
+            ["git", "ls-files", "--", "*.erl"],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
         .stdout.decode("utf-8")
         .split("\n")
     ):
-        item_path = pathlib.Path(item)
-        if item_path.suffix != ".erl":
-            continue
-
-        result_dict = {
-            "raw_path": item,
-            "item_path": item_path,
-        }
-        yield result_dict
+        path = pathlib.Path(item)
+        if path.parent != curdir:
+            yield str(path.parent.joinpath("*.erl"))
+            curdir = path.parent
+    if curdir is not None:
+        yield str(curdir.joinpath("*.erl"))

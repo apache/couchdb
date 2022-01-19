@@ -18,13 +18,18 @@ USAGE: ERLFMT_PATH=<path_to_erlfmt> python3 dev/format_all.py
 """
 
 import os
+import sys
 import subprocess
 
-from format_lib import get_source_paths
+from format_lib import get_source_paths, get_erlang_version
 
 if __name__ == "__main__":
-    for item in get_source_paths():
+    if get_erlang_version() < 21:
+        print("Erlang version is < 21. Skipping format check")
+        sys.exit(0)
+
+    for path in get_source_paths():
         subprocess.run(
-            [os.environ["ERLFMT_PATH"], "-w", item["raw_path"]],
+            [os.environ["ERLFMT_PATH"], "-w", path],
             stdout=subprocess.PIPE,
         )
