@@ -12,17 +12,6 @@
 // WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
 // License for the specific language governing permissions and limitations under
 // the License.
-build_and_test = '''
-mkdir -p ${COUCHDB_IO_LOG_DIR} ${ERLANG_VERSION}
-cd ${ERLANG_VERSION}
-rm -rf build
-mkdir build
-cd build
-tar -xf ${WORKSPACE}/apache-couchdb-*.tar.gz
-cd apache-couchdb-*
-./configure
-make check || (make build-report && false)
-'''
 
 pipeline {
 
@@ -49,7 +38,10 @@ pipeline {
     // Search for ERLANG_VERSION
     // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
     // be done parametrically
-    MIN_ERLANG_VERSION = '21'
+    MINIMUM_ERLANG_VERSION = '21'
+
+    // Ensure that the SpiderMonkey version is appropriate for the $DOCKER_IMAGE
+    SM_VSN = '78'
   }
 
   options {
@@ -65,7 +57,7 @@ pipeline {
     stage('Build Release Tarball') {
       agent {
         docker {
-          image "${DOCKER_IMAGE_BASE}-${MIN_ERLANG_VERSION}"
+          image "${DOCKER_IMAGE_BASE}-${MINIMUM_ERLANG_VERSION}"
           label 'docker'
           args "${DOCKER_ARGS}"
           registryUrl 'https://docker.io/'
@@ -74,33 +66,25 @@ pipeline {
       }
       steps {
         timeout(time: 15, unit: "MINUTES") {
-          sh '''
-            set
-            rm -rf apache-couchdb-*
-            ./configure
-            make erlfmt-check
-            make dist
-            chmod -R a+w * .
-          '''
+          sh( script: 'rm -rf apache-couchdb-*', label: 'Clean out workspace' )
+          sh( script: './configure', label: 'Retrieve dependencies and configure build system' )
+          sh( script: 'make erlfmt-check', label: 'Verify Erlang coding style' )
+          sh( script: 'make elixir-check-formatted', label: 'Verify Elixir coding style' )
+          sh( script: 'make dist', label: 'Build self-contained release' )
         }
       }
       post {
         success {
-          stash includes: 'apache-couchdb-*.tar.gz', name: 'tarball'
+          stash includes: 'apache-couchdb-*.tar.gz', name: 'release-tarball'
         }
         cleanup {
           // UGH see https://issues.jenkins-ci.org/browse/JENKINS-41894
-          sh 'rm -rf ${WORKSPACE}/*'
+          sh( script: 'rm -rf ${WORKSPACE}/*', label: 'Clean up after ourselves' )
         }
       }
     } // stage Build Release Tarball
 
-    // TODO Rework once Improved Docker Pipeline Engine is released
-    // https://issues.jenkins-ci.org/browse/JENKINS-47962
-    // https://issues.jenkins-ci.org/browse/JENKINS-48050
-
     stage('Make Check') {
-
       matrix {
         axes {
           axis {
@@ -123,19 +107,36 @@ pipeline {
             }
             steps {
               timeout(time: 90, unit: "MINUTES") {
-                unstash 'tarball'
-                sh( script: build_and_test )
+                echo "Building CouchDB PR using Erlang ${ERLANG_VERSION} and SpiderMonkey ${SM_VSN}"
+                sh( script: "rm -rf build-${ERLANG_VERSION} apache-couchdb-*", label: 'Clean out workspace' )
+                unstash 'release-tarball'
+                sh( script: "mkdir -p ${COUCHDB_IO_LOG_DIR} build-${ERLANG_VERSION}" )
+                sh( script: "tar -xf apache-couchdb-*.tar.gz -C build-${ERLANG_VERSION} --strip-components=1", label: 'Unpack release' )
+                dir( "build-${ERLANG_VERSION}" ) {
+                  sh( script: './configure --skip-deps', label: 'Configure CouchDB build system' )
+                  sh( script: 'make', label: 'Build CouchDB' )
+                  sh( script: 'make eunit', label: 'EUnit test suite' )
+                  sh( script: 'make elixir-suite', label: 'ExUnit unit test suite' )
+                  sh( script: 'make exunit', label: 'ExUnit integration test suite' )
+                  sh( script: 'make mango-test', label: 'Python-based Mango query test suite' )
+                }
               }
             }
             post {
               always {
                 junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
               }
+              failure {
+                dir( "build-${ERLANG_VERSION}" ) {
+                  sh 'ls -l'
+                  sh 'make build-report'
+                }
+              }
               cleanup {
                 sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR}'
               }
             }
-          } // stage
+          } // stage "Build and Test"
         } // stages
       } // matrix
     } // stage "Make Check"
