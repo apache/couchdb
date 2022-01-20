@@ -1,40 +1,6 @@
-# Building with a dedicated Jenkins CI instance
+# CouchDB and Jenkins CI
 
-## History
-
-Around April 2019, once Travis CI performance became so abysmal that the
-development team couldn't tolerate it any longer. We decided to move off
-of it entirely and onto our own dedicated Jenkins instance. Performance
-was bad because:
-
-* The Travis CI VMs are severely underpowered, leading to many
-  unexpected test failures
-* The ASF wait queue for Travis was exceedingly long, with jobs
-  sometimes taking 30-45 minutes just to _launch_
-* Our test suites (all 3 of Erlang, JavaScript and Elixir) had
-  sporadic failures, requiring many re-launches of builds before
-  we could move forward
-
-We also had other reasons to want to move to a dedicated server:
-
-* Credentials on the main Jenkins instance could be reused by *anyone*
-  in the ASF
-* Credentials on the Travis CI setup should not contain credentials
-  for things such as building binaries, to ensure the best possible
-  security
-
-Other options we explored:
-
-* ASF BuildBot. This required a lot more work and couldn't guarantee
-  availability of sufficient workers.
-* Circle CI, GitHub CI, etc.: Lack of availability of alternate binary
-  platforms we've been asked to support (arm64v8, ppc64le) or alternate
-  OSes (OSX, FreeBSD, Windows), though there is some support for either
-  or both.
-
-## Cloudbees Core
-
-End of November 2019, ASF and CloudBees reached an agreement to allow
+In 2019, ASF and CloudBees reached an agreement to allow
 the Foundation to use CloudBees Core to have a farm of managed Jenkins
 masters. This allows the ASF to give larger projects their own dedicated
 Jenkins master, which can be custom configured for the project. They can
@@ -53,15 +19,15 @@ the project's exclusive use. Combined with the FreeBSD and OSX nodes the
 project already had, this will provide the necessary compute resources
 to meet the needs of the project for some time to come.
 
-# Jenkins configuration
+# Jenkins Configuration
 
 All jobs on the new Jenkins master are contained in a CouchDB folder.
 Credentials for the project are placed within this folder; this is a
 unique capability of CloudBees Core at this time.
 
-## Pull Request job configuration
+## Pull Requests
 
-Blue Ocean link: https://ci-couchdb.apache.org/blue/organizations/jenkins/jenkins-cm1%2FPullRequests/activity/
+[Blue Ocean link](https://ci-couchdb.apache.org/blue/organizations/jenkins/jenkins-cm1%2FPullRequests/activity/)
 
 To implement build-a-PR functionality in the same way that Travis
 performs builds, Jenkins offers the Multibranch Pipeline job. Here's how
@@ -106,12 +72,15 @@ it's configured for CouchDB through the GUI:
 
 [2]: https://issues.apache.org/jira/browse/INFRA-17449 explains why "Discover pull requests from forks/Trust" has been set to "Nobody."
 
-## `master` and release branch configuration
+## Full Platform Builds on `main` and release branches
 
-Our old Jenkins job (formerly `/Jenkinsfile`) is now
-`build-aux/Jenkinsfile.full`. This builds CouchDB on `master`, all of
-our release branches (`2.*`, `3.*`, etc.) as well as `jenkins-*` for
-testing.
+[![main branch status](https://ci-couchdb.apache.org/job/jenkins-cm1/job/FullPlatformMatrix/job/main/badge/icon?subject=main)](https://ci-couchdb.apache.org/blue/organizations/jenkins/jenkins-cm1%2FFullPlatformMatrix/activity?branch=main)
+[![3.x branch status](https://ci-couchdb.apache.org/job/jenkins-cm1/job/FullPlatformMatrix/job/3.x/badge/icon?subject=3.x)](https://ci-couchdb.apache.org/blue/organizations/jenkins/jenkins-cm1%2FFullPlatformMatrix/activity?branch=3.x)
+
+Our original Jenkins job (formerly `/Jenkinsfile`) is now
+`build-aux/Jenkinsfile.full`. This builds CouchDB on `main`, all of
+our release branches (`2.*`, `3.*`, etc.) as well as any branch prefixed with
+`jenkins-` for testing on a wide variety of supported operating systems.
 
 Settings are as follows:
 
@@ -145,5 +114,18 @@ Settings are as follows:
   * Max # of old items to keep: 10
 * Everything else set as defaults.
 
+## Other Resources
 
+The [apache/couchdb-ci](https://github.com/apache/couchdb-ci) repo contains the
+dockerfiles that we use to generate the container images used for our
+container-based builds. These images are hosted on Docker Hub in the following
+repos:
 
+* [apache/couchdbci-debian](https://hub.docker.com/r/apache/couchdbci-debian)
+* [apache/couchdbci-ubuntu](https://hub.docker.com/r/apache/couchdbci-ubuntu)
+* [apache/couchdbci-centos](https://hub.docker.com/r/apache/couchdbci-centos)
+
+The [apache/couchdb-pkg](https://github.com/apache/couchdb-ci) repo contains
+a set of helper scripts to build binary packages for Debian / CentOS / Ubuntu
+from the contents of a release tarball. The packaging stage of our "Full
+Platform Builds" pipeline clones this repo to produces the package artifacts.
