@@ -38,12 +38,35 @@ class IndexFunctionTests(mango.DbPerClass):
 
         create_index(
             klass.db,
-            "_design/jq-split",
-            "jq-split-json-index",
-            {"bar_words": {"$jq": '.bar | split(" ") | .[]'}},
+            "_design/jq-split-1",
+            "jq-json-index",
+            {"f1_words": {"$jq": '.f1 | split(" ") | .[]'}},
         )
-        klass.db.save_docs([{"_id": "example-doc", "bar": "a b c"}])
 
-    def test_index_by_length(self):
-        resp = self.db.find({"bar_words": "b"})
-        self.assertEqual([doc["_id"] for doc in resp], ["example-doc"])
+        create_index(
+            klass.db,
+            "_design/jq-split-2",
+            "jq-json-index",
+            {
+                "f2_words": {"$jq": '.f2 | split(" ") | .[]'},
+                "f3_words": {"$jq": '.f3 | split(" ") | .[]'},
+            },
+        )
+
+        klass.db.save_docs(
+            [
+                {"_id": "doc-1", "f1": "a b", "f2": "j k", "f3": "y z"},
+                {"_id": "doc-2", "f1": "b c", "f2": "k l", "f3": "x y"},
+            ]
+        )
+
+    def test_search_on_one_field(self):
+        resp = self.db.find({"f1_words": "a"})
+        self.assertEqual([doc["_id"] for doc in resp], ["doc-1"])
+
+        resp = self.db.find({"f1_words": "b"})
+        self.assertEqual([doc["_id"] for doc in resp], ["doc-1", "doc-2"])
+
+    def test_search_on_two_fields(self):
+        resp = self.db.find({"f2_words": "k", "f3_words": "x"})
+        self.assertEqual([doc["_id"] for doc in resp], ["doc-2"])

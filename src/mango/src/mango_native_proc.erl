@@ -118,14 +118,9 @@ get_index_entries({IdxProps}, Doc) ->
         false ->
             [];
         true ->
-            Values = get_index_values(Fields, Doc),
-            case lists:member(not_found, Values) of
-                true -> [];
-                false -> case Values of
-                    [{jq, Values1}] -> [[[V], null] || V <- Values1];
-                    _Else -> [[Values, null]]
-                end
-            end
+            Keys = flatten_keys(get_index_values(Fields, Doc)),
+            io:format("----[get_index_entries] ~p :: ~p~n", [Fields, Keys]),
+            [[Values, null] || Values <- Keys]
     end.
 
 get_index_values(Fields, Doc) ->
@@ -141,6 +136,17 @@ get_index_field_value({Field, FieldDef}, Doc) ->
         bad_path -> not_found;
         Value1 -> Value1
     end.
+
+flatten_keys([not_found | _]) ->
+    [];
+flatten_keys([{jq, Values} | Rest]) ->
+    Keys = flatten_keys(Rest),
+    [[V | K] || V <- Values, K <- Keys];
+flatten_keys([First | Rest]) ->
+    Keys = flatten_keys(Rest),
+    [[First | K] || K <- Keys];
+flatten_keys([]) ->
+    [[]].
 
 get_text_entries({IdxProps}, Doc) ->
     Selector = get_index_partial_filter_selector(IdxProps),

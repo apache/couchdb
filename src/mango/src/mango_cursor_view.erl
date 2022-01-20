@@ -236,6 +236,8 @@ choose_best_index(_DbName, IndexRanges) ->
     {SelectedIndex, SelectedIndexRanges, _} = hd(lists:sort(Cmp, IndexRanges)),
     {SelectedIndex, SelectedIndexRanges}.
 
+add_virtual_field({Props}, {[{<<"$and">>, [{[{K1, _}]}, {[{K2, _}]}]}]}, [V1, V2]) ->
+    {lists:append(Props, [{K1, V1}, {K2, V2}])};
 add_virtual_field({Props}, {[{Key, _}]}, [Value]) ->
     {lists:append(Props, [{Key, Value}])};
 add_virtual_field(Props, _, _) ->
@@ -265,7 +267,7 @@ view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
             put(mango_docs_examined, get(mango_docs_examined) + 1),
             Selector = couch_util:get_value(selector, Options),
             couch_stats:increment_counter([mango, docs_examined]),
-            io:format("----[view_cb selector] ~p~n", [Selector]),
+            io:format("----[view_cb selector] doc = ~p :: selector = ~p :: key = ~p~n", [Doc, Selector, Key]),
             Doc1 = add_virtual_field(Doc, Selector, Key),
             case mango_selector:match(Selector, Doc1) of
                 true ->
