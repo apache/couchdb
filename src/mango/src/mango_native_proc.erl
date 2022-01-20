@@ -122,34 +122,25 @@ get_index_entries({IdxProps}, Doc) ->
             case lists:member(not_found, Values) of
                 true -> [];
                 false -> case Values of
-                    [{fn, Values1}] ->
-                        io:format("----[get_index_entries] ~p~n", [Values1]),
-                        [[[V], null] || V <- Values1];
+                    [{jq, Values1}] -> [[[V], null] || V <- Values1];
                     _Else -> [[Values, null]]
                 end
             end
     end.
 
 get_index_values(Fields, Doc) ->
-    io:format("----[get_index_values fields] ~p~n", [Fields]),
-    lists:map(
-        fun({_Field, {[MangoFun]}}) ->
-        case mango_doc:get_field_fun(Doc, MangoFun) of
-            not_found -> not_found;
-            bad_path -> not_found;
-            Value ->
-                io:format("----[get_field_fun result] ~p~n", [Value]),
-                Value
-        end;
-        ({Field, _Dir}) ->
-            case mango_doc:get_field(Doc, Field) of
-                not_found -> not_found;
-                bad_path -> not_found;
-                Value -> Value
-            end
-        end,
-        Fields
-    ).
+    lists:map(fun(Field) -> get_index_field_value(Field, Doc) end, Fields).
+
+get_index_field_value({Field, FieldDef}, Doc) ->
+    Value = case FieldDef of
+        {[{<<"$jq">>, Jq}]} -> mango_doc:get_field_jq(Doc, Jq);
+        _ -> mango_doc:get_field(Doc, Field)
+    end,
+    case Value of
+        not_found -> not_found;
+        bad_path -> not_found;
+        Value1 -> Value1
+    end.
 
 get_text_entries({IdxProps}, Doc) ->
     Selector = get_index_partial_filter_selector(IdxProps),

@@ -40,7 +40,7 @@ class IndexFunctionTests(mango.DbPerClass):
             klass.db,
             "_design/jq-split",
             "jq-split-json-index",
-            {"bar_words": {"$explode": {"$field": "bar", "$separator": " "}}},
+            {"bar_words": {"$jq": '.bar | split(" ") | .[]'}},
         )
         klass.db.save_docs([{"_id": "example-doc", "bar": "a b c"}])
 
