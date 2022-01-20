@@ -282,7 +282,7 @@ doc_update1() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
     Doc2 = #doc{revs = {1, [<<"bar">>]}},
     Docs = [Doc1],
-    Docs2 = [Doc2, Doc1],
+    Docs2 = [Doc1, Doc2],
     Dict = dict:from_list([{Doc, []} || Doc <- Docs]),
     Dict2 = dict:from_list([{Doc, []} || Doc <- Docs2]),
 
@@ -350,7 +350,7 @@ doc_update1() ->
 doc_update2() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
     Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc2, Doc1],
+    Docs = [Doc1, Doc2],
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -374,14 +374,14 @@ doc_update2() ->
         handle_message({rexi_EXIT, 1}, lists:nth(3, Shards), Acc2),
 
     ?assertEqual(
-        {accepted, [{Doc1, {accepted, Doc2}}, {Doc2, {accepted, Doc1}}]},
+        {accepted, [{Doc1, {accepted, Doc1}}, {Doc2, {accepted, Doc2}}]},
         Reply
     ).
 
 doc_update3() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
     Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc2, Doc1],
+    Docs = [Doc1, Doc2],
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -404,7 +404,7 @@ doc_update3() ->
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, lists:nth(3, Shards), Acc2),
 
-    ?assertEqual({ok, [{Doc1, {ok, Doc2}}, {Doc2, {ok, Doc1}}]}, Reply).
+    ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
 
 % needed for testing to avoid having to start the mem3 application
 group_docs_by_shard_hack(_DbName, Shards, Docs) ->
