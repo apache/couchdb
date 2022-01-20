@@ -184,6 +184,12 @@ IcuWinEnv = [{"CFLAGS", "$DRV_CFLAGS /DXP_WIN"},
 ComparePath = "priv/couch_ejson_compare.so".
 CompareSrc = ["priv/couch_ejson_compare/*.c"].
 
+JqDarwinEnv = [{"CFLAGS", "-I/opt/homebrew/include"},
+               {"LDFLAGS", "-L/opt/homebrew/lib -ljq"}].
+
+JqPath = "priv/couch_jq.so".
+JqSrc = ["priv/couch_jq/*.c"].
+
 BaseSpecs = [
         %% couchjs
         {".*", CouchJSPath, CouchJSSrc, [{env, CouchJSEnv}]},
@@ -191,7 +197,9 @@ BaseSpecs = [
         {"darwin", ComparePath, CompareSrc, [{env, IcuEnv ++ IcuDarwinEnv}]},
         {"linux",  ComparePath, CompareSrc, [{env, IcuEnv}]},
         {"bsd",   ComparePath, CompareSrc, [{env, IcuEnv ++ IcuBsdEnv}]},
-        {"win32",  ComparePath, CompareSrc, [{env, IcuWinEnv}]}
+        {"win32",  ComparePath, CompareSrc, [{env, IcuWinEnv}]},
+        % jq bindings
+        {"darwin", JqPath, JqSrc, [{env, JqDarwinEnv}]}
 ].
 
 SpawnSpec = [
