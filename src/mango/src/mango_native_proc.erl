@@ -66,7 +66,8 @@ handle_call({prompt, [<<"add_fun">>, IndexInfo]}, _From, St) ->
     Indexes =
         case validate_index_info(IndexInfo) of
             true ->
-                St#st.indexes ++ [IndexInfo];
+                IndexInfo1 = precompile_jq(IndexInfo),
+                St#st.indexes ++ [IndexInfo1];
             false ->
                 couch_log:error("No Valid Indexes For: ~p", [IndexInfo]),
                 St#st.indexes
@@ -105,6 +106,27 @@ handle_info(Msg, St) ->
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
+precompile_jq({IdxProps}) ->
+    IdxProps1 = lists:map(fun(Prop) ->
+        case Prop of
+            {<<"fields">>, {Fields}} ->
+                {<<"fields">>, {precompile_jq_fields(Fields)}};
+            Else ->
+                Else
+        end
+    end, IdxProps),
+    {IdxProps1}.
+
+precompile_jq_fields(Fields) ->
+    lists:map(fun(Field) ->
+        case Field of
+            {FieldName, {[{<<"$jq">>, Jq}]}} ->
+                {FieldName, {jq, couch_jq:compile(Jq)}};
+            Else ->
+                Else
+        end
+    end, Fields).
+
 map_doc(#st{indexes = Indexes}, Doc) ->
     lists:map(fun(Idx) -> get_index_entries(Idx, Doc) end, Indexes).
 
@@ -128,7 +150,7 @@ get_index_values(Fields, Doc) ->
 
 get_index_field_value({Field, FieldDef}, Doc) ->
     Value = case FieldDef of
-        {[{<<"$jq">>, Jq}]} -> mango_doc:get_field_jq(Doc, Jq);
+        {jq, Jq} -> mango_doc:get_field_jq(Doc, Jq);
         _ -> mango_doc:get_field(Doc, Field)
     end,
     case Value of

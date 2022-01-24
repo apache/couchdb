@@ -416,16 +416,13 @@ get_field(Values, [Name | Rest], Validator) when is_list(Values) ->
 get_field(_, [_ | _], _) ->
     bad_path.
 
-get_field_jq(Props, Jq) ->
-    io:format("----[get_field_jq] ~p ~p~n", [Props, Jq]),
-    case couch_jq:compile(Jq) of
-        {ok, Program} ->
-            case couch_jq:eval(Program, Props) of
-                {ok, Results} -> {jq, Results};
-                Else -> bad_path
-            end;
+get_field_jq(Props, {ok, Program}) ->
+    case couch_jq:eval(Program, Props) of
+        {ok, Results} -> {jq, Results};
         Else -> bad_path
-    end.
+    end;
+get_field_jq(Props, _) ->
+    bad_path.
 
 rem_field(Props, Field) when is_binary(Field) ->
     {ok, Path} = mango_util:parse_field(Field),
