@@ -155,17 +155,21 @@ all_dbs_info_callback({row, Row}, #vacc{resp = Resp0} = Acc) when
     Acc#vacc.req#httpd.path_parts =:= [<<"_dbs_info">>]
 ->
     Prepend = couch_mrview_http:prepend_val(Acc),
-    DbName = couch_util:get_value(id, Row),
-    case chttpd_util:get_db_info(DbName) of
-        {ok, DbInfo} ->
-            Chunk = [Prepend, ?JSON_ENCODE({[{key, DbName}, {info, {DbInfo}}]})],
-            {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
-            {ok, Acc#vacc{prepend = ",", resp = Resp1}};
-        {error, database_does_not_exist} ->
-            {ok, Acc#vacc{resp = Resp0}};
-        {error, Reason} ->
-            {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
-            {stop, Acc#vacc{resp = Resp1}}
+    case couch_util:get_value(id, Row) of
+        <<"_design", _/binary>> ->
+            {ok, Acc};
+        DbName ->
+            case chttpd_util:get_db_info(DbName) of
+                {ok, DbInfo} ->
+                    Chunk = [Prepend, ?JSON_ENCODE({[{key, DbName}, {info, {DbInfo}}]})],
+                    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
+                    {ok, Acc#vacc{prepend = ",", resp = Resp1}};
+                {error, database_does_not_exist} ->
+                    {ok, Acc#vacc{resp = Resp0}};
+                {error, Reason} ->
+                    {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
+                    {stop, Acc#vacc{resp = Resp1}}
+            end
     end;
 all_dbs_info_callback(complete, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "]"),
