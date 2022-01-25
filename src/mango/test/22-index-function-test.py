@@ -13,44 +13,22 @@
 import mango
 
 
-def create_index(db, ddoc_id, view_id, definition):
-    db.save_docs(
-        [
-            {
-                "_id": ddoc_id,
-                "language": "query",
-                "views": {
-                    view_id: {
-                        "map": {"fields": definition, "partial_filter_selector": {}},
-                        "reduce": "_count",
-                        "options": {"def": {"fields": definition}},
-                    }
-                },
-            }
-        ]
-    )
-
-
 class IndexFunctionTests(mango.DbPerClass):
     @classmethod
     def setUpClass(klass):
         super(IndexFunctionTests, klass).setUpClass()
 
-        create_index(
-            klass.db,
-            "_design/jq-split-1",
-            "jq-json-index",
-            {"f1_words": {"$jq": '.f1 | split(" ") | .[]'}},
+        klass.db.create_index(
+            [
+                {"f1_words": {"$jq": '.f1 | split(" ") | .[]'}},
+            ]
         )
 
-        create_index(
-            klass.db,
-            "_design/jq-split-2",
-            "jq-json-index",
-            {
-                "f2_words": {"$jq": '.f2 | split(" ") | .[]'},
-                "f3_words": {"$jq": '.f3 | split(" ") | .[]'},
-            },
+        klass.db.create_index(
+            [
+                {"f2_words": {"$jq": '.f2 | split(" ") | .[]'}},
+                {"f3_words": {"$jq": '.f3 | split(" ") | .[]'}},
+            ],
         )
 
         klass.db.save_docs(
