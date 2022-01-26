@@ -143,7 +143,8 @@ t_db_create_with_config(DbName) ->
                     [{engine, EngineName}]
             end,
         ?assertEqual([{props, Props} | EngineProps], DbProps)
-    end).
+    end),
+    ok = fabric:delete_db(MDbName).
 
 test_db_doc() ->
     {[
