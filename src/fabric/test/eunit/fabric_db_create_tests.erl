@@ -32,7 +32,6 @@ setup() ->
     test_util:start_couch([fabric]).
 
 teardown(Ctx) ->
-    meck:unload(),
     test_util:stop_couch(Ctx).
 
 t_handle_shard_doc_conflict() ->
@@ -44,4 +43,7 @@ t_handle_shard_doc_conflict() ->
         [#shard{dbname = DbName}]
     ]),
     meck:expect(fabric_util, recv, 4, {error, conflict}),
-    ?assertEqual({error, file_exists}, fabric_db_create:go(DbName, [])).
+    ?assertEqual({error, file_exists}, fabric_db_create:go(DbName, [])),
+
+    meck:unload(),
+    ok = fabric:delete_db(DbName).
