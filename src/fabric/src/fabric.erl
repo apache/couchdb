@@ -326,11 +326,6 @@ update_doc(DbName, Doc, Options) ->
             {ok, NewRev};
         {accepted, [{accepted, NewRev}]} ->
             {accepted, NewRev};
-        % This is a corner case when we update one document when
-        % news_edits:false, VDU forbids updating the document,
-        % and revision trees are out of sync across nodes.
-        {accepted, [{{_Id, _Rev}, {forbidden, Msg}}]} ->
-            throw({forbidden, Msg});
         {ok, [{{_Id, _Rev}, Error}]} ->
             throw(Error);
         {ok, [Error]} ->
