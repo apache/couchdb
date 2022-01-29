@@ -28,7 +28,7 @@ Things of Note
    before we got to the next place we check for missing stubs.
 
 6. For multi-doc updates we'll need to investigate user versions on
-   version stamps within a transaction. Also this likely prevents the
+   versionstamps within a transaction. Also this likely prevents the
    ability to have multiple updates to the same doc in a single
    _bulk_docs transaction
 
