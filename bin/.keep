@@ -1,0 +1,1 @@
+The build system expects to drop `rebar`, `rebar3` and `erlfmt` in here, and doesn't try to create the directory first.
