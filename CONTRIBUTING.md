@@ -20,8 +20,8 @@ know upfront. We will assess the issue as soon as possible on a best-effort
 basis and will give you an estimate for when we have a fix and release available
 for an eventual public disclosure.
 
-The GitHub issue tracker is the preferred channel for [bug reports](#bugs),
-[features requests](#features) and [submitting pull requests](#pull-requests),
+The [GitHub issue tracker][#bugs_and_feature] is the preferred channel for [bug reports](#bug-reports),
+[features requests](#feature-requests) and [submitting pull requests](#pull-requests),
 but please respect the following restrictions:
 
 * Please **do not** use the issue tracker for personal support requests. Use
@@ -43,7 +43,7 @@ Guidelines for bug reports:
    reported.
 
 2. **Check if the issue has been fixed** &mdash; try to reproduce it using the
-   latest `master` or `next` branch in the repository.
+   latest `main` or `next` branch in the repository.
 
 3. **Isolate the problem** &mdash; ideally create a reduced test case.
 
@@ -115,8 +115,8 @@ on how to send one :)
 2. If you cloned a while ago, get the latest changes from upstream:
 
    ```bash
-   git checkout master
-   git pull upstream master
+   git checkout main
+   git pull upstream main
    ```
 
 3. Create a new topic branch (off the main project development branch) to
@@ -142,7 +142,7 @@ on how to send one :)
    ```
 
 8. [Open a Pull Request](https://help.github.com/articles/using-pull-requests/)
-    with a clear title and description.
+   with a clear title and description.
 
 
 ### For Apache CouchDB Committers
@@ -185,11 +185,11 @@ on how to send one :)
 Optionally, you can help us with these things. But don’t worry if they are too
 complicated, we can help you out and teach you as we go :)
 
-1. Update your branch to the latest changes in the upstream master branch. You
+1. Update your branch to the latest changes in the upstream main branch. You
    can do that locally with
 
    ```bash
-   git pull --rebase upstream master
+   git pull --rebase upstream main
    ```
 
    Afterwards force push your changes to your remote feature branch.
@@ -238,7 +238,7 @@ If you have commit access, please follow this process for merging patches and cu
 8. If the commit messages follow [our conventions](@commit-message-conventions)
 
    1. If the pull request fixes one or more open issues, please include the
-      text "Fixes #472" or "Fixes apache/couchdb#472". 
+      text "Fixes #472" or "Fixes apache/couchdb#472".
    2. Use the "Rebase and merge" button to merge the pull request.
    3. Done! You are awesome! Thanks so much for your help 🤗
 
@@ -247,7 +247,7 @@ If you have commit access, please follow this process for merging patches and cu
    1. Use the "squash and merge" button to clean up the commits and merge at
       the same time: ✨🎩
    2. If the pull request fixes one or more open issues, please include the
-      text "Fixes #472" or "Fixes apache/couchdb#472". 
+      text "Fixes #472" or "Fixes apache/couchdb#472".
 
 Sometimes there might be a good reason to merge changes locally. The process
 looks like this:
@@ -255,11 +255,11 @@ looks like this:
 ### Reviewing and merging changes locally
 
 ```
-git checkout master # or the main branch configured on github
+git checkout main # or the main branch configured on github
 git pull # get latest changes
 git checkout feature-branch # replace name with your branch
-git rebase master
-git checkout master
+git rebase main
+git checkout main
 git merge feature-branch # replace name with your branch
 git push
 ```
@@ -288,3 +288,4 @@ CONTRIBUTING.md template.
 [7]: http://couchdb.apache.org/bylaws.html
 [8]: http://couchdb.apache.org/#chat
 
+[#gh_issues]: https://github.com/apache/couchdb/issues
