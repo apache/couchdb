@@ -29,6 +29,7 @@
 -export([db_updated/1]).
 -export([num_servers/0, couch_server/1, couch_dbs_pid_to_name/1, couch_dbs/1]).
 -export([aggregate_queue_len/0, get_spidermonkey_version/0]).
+-export([names/0]).
 
 % config_listener api
 -export([handle_config_change/5, handle_config_terminate/3]).
@@ -994,6 +995,10 @@ aggregate_queue_len() ->
      || Name <- Names
     ],
     lists:sum([X || {_, X} <- MQs]).
+
+names() ->
+    N = couch_server:num_servers(),
+    [couch_server:couch_server(I) || I <- lists:seq(1, N)].
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
