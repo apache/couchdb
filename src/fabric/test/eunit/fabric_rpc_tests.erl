@@ -54,9 +54,16 @@ main_test_() ->
     }.
 
 setup_all() ->
-    test_util:start_couch([rexi, mem3, fabric]).
+    Ctx = test_util:start_couch([rexi, mem3, fabric]),
+    DatabaseDir = config:get("couchdb", "database_dir"),
+    Suffix = ?b2l(couch_uuids:random()),
+    test_util:with_couch_server_restart(fun() ->
+        config:set("couchdb", "database_dir", DatabaseDir ++ "/" ++ Suffix, _Persist = false)
+    end),
+    Ctx.
 
 teardown_all(Ctx) ->
+    config:delete("couchdb", "database_dir", false),
     test_util:stop_couch(Ctx).
 
 setup_no_db_or_config() ->
