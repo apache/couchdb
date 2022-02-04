@@ -135,6 +135,11 @@ merge_results(Info) ->
                 [{update_seq, lists:sum(X)} | Acc];
             (purge_seq, X, Acc) ->
                 [{purge_seq, lists:sum(X)} | Acc];
+            (collator_versions, X, Acc) ->
+                % Concatenate (undo orddict:append/3), then
+                % sort and remove duplicates.
+                Vs = lists:usort(lists:flatmap(fun(V) -> V end, X)),
+                [{collator_versions, Vs} | Acc];
             (_, _, Acc) ->
                 Acc
         end,

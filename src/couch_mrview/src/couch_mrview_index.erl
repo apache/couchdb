@@ -63,7 +63,8 @@ get(info, State) ->
         language = Lang,
         update_seq = UpdateSeq,
         purge_seq = PurgeSeq,
-        views = Views
+        views = Views,
+        view_info = ViewInfo
     } = State,
     {ok, FileSize} = couch_file:bytes(Fd),
     {ok, ExternalSize} = couch_mrview_util:calculate_external_size(Views),
@@ -72,7 +73,8 @@ get(info, State) ->
 
     UpdateOptions0 = get(update_options, State),
     UpdateOptions = [atom_to_binary(O, latin1) || O <- UpdateOptions0],
-
+    CollVsTups = couch_mrview_util:get_collator_versions(ViewInfo),
+    CollVsBins = [couch_util:version_to_binary(V) || V <- CollVsTups],
     {ok, [
         {signature, list_to_binary(couch_index_util:hexsig(Sig))},
         {language, Lang},
@@ -84,7 +86,8 @@ get(info, State) ->
             ]}},
         {update_seq, UpdateSeq},
         {purge_seq, PurgeSeq},
-        {update_options, UpdateOptions}
+        {update_options, UpdateOptions},
+        {collator_versions, CollVsBins}
     ]};
 get(Other, _) ->
     throw({unknown_index_property, Other}).
@@ -123,15 +126,15 @@ open(Db, State0) ->
                 % upgrade code for <= 2.x
                 {ok, {OldSig, Header}} ->
                     % Matching view signatures.
-                    NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
-                    ok = commit(NewSt),
+                    NewSt = init_and_upgrade_state(Db, Fd, State, Header),
                     ensure_local_purge_doc(Db, NewSt),
                     {ok, NewSt};
                 % end of upgrade code for <= 2.x
                 {ok, {Sig, Header}} ->
                     % Matching view signatures.
-                    NewSt = couch_mrview_util:init_state(Db, Fd, State, Header),
+                    NewSt = init_and_upgrade_state(Db, Fd, State, Header),
                     ensure_local_purge_doc(Db, NewSt),
+                    check_collator_versions(DbName, NewSt),
                     {ok, NewSt};
                 {ok, {WrongSig, _}} ->
                     couch_log:error(
@@ -321,3 +324,39 @@ update_local_purge_doc(Db, State, PSeq) ->
                 BaseDoc
         end,
     couch_db:update_doc(Db, Doc, []).
+
+init_and_upgrade_state(Db, Fd, State, Header) ->
+    {Commit, #mrst{} = Mrst} = couch_mrview_util:init_state(Db, Fd, State, Header),
+    case Commit of
+        true ->
+            case couch_mrview_util:commit_on_header_upgrade() of
+                true ->
+                    LogMsg = "~p : Index ~s ~s was upgraded",
+                    DbName = couch_db:name(Db),
+                    IdxName = State#mrst.idx_name,
+                    couch_log:warning(LogMsg, [?MODULE, DbName, IdxName]),
+                    ok = commit(Mrst),
+                    Mrst;
+                false ->
+                    Mrst
+            end;
+        false ->
+            Mrst
+    end.
+
+% Check if there are multiple collator versions used to build this view
+check_collator_versions(DbName, #mrst{} = Mrst) ->
+    case couch_mrview_util:compact_on_collator_upgrade() of
+        true ->
+            #mrst{view_info = ViewInfo, idx_name = IdxName} = Mrst,
+            Vers = couch_mrview_util:get_collator_versions(ViewInfo),
+            case length(Vers) >= 2 of
+                true ->
+                    Event = {index_collator_upgrade, IdxName},
+                    couch_event:notify(DbName, Event);
+                false ->
+                    ok
+            end;
+        false ->
+            ok
+    end.
