@@ -19,6 +19,7 @@
 -define(DELAY, 100).
 -define(TIMEOUT, 1000).
 -define(WAIT_DELAY_COUNT, 40).
+-define(OLD_COLLATOR_VERSION, [1, 1, 1, 1]).
 
 setup() ->
     DbName = ?tempdb(),
@@ -38,25 +39,45 @@ setup_with_docs() ->
     create_design_doc(DbName, <<"_design/foo">>, <<"bar">>),
     DbName.
 
-setup_legacy() ->
-    DbName = <<"test">>,
-    DbFileName = "test.couch",
-    OldDbFilePath = filename:join([?FIXTURESDIR, DbFileName]),
+% See src/couch/test/eunit/fixtures for fixture files
+%
+setup_legacy_2x() ->
+    % see src/couch/test/eunit/fixtures folder
+    DbName = "test",
     OldViewName = "6cf2c2f766f87b618edf6630b00f8736.view",
-    FixtureViewFilePath = filename:join([?FIXTURESDIR, OldViewName]),
     NewViewName = "a1c5929f912aca32f13446122cc6ce50.view",
+    setup_legacy(DbName, OldViewName, NewViewName).
+
+setup_legacy_3_2_1() ->
+    DbName = "db321",
+    ViewName = "15a5cb17365a99cd9ddc7327c82bbd0d.view",
+    % View signature stays the same
+    setup_legacy(DbName, ViewName, ViewName).
+
+setup_collator_test1() ->
+    DbName = "colltest1",
+    ViewName = "1f2c24bc334d701c2048f85e7438eef1.view",
+    % View signature stays the same
+    setup_legacy(DbName, ViewName, ViewName).
+
+setup_legacy(DbName, OldViewName, NewViewName) when
+    is_list(DbName), is_list(OldViewName), is_list(NewViewName)
+->
+    DbFileName = DbName ++ ".couch",
+    OldDbFilePath = filename:join([?FIXTURESDIR, DbFileName]),
+    FixtureViewFilePath = filename:join([?FIXTURESDIR, OldViewName]),
 
     DbDir = config:get("couchdb", "database_dir"),
     ViewDir = config:get("couchdb", "view_index_dir"),
     OldViewFilePath = filename:join([
         ViewDir,
-        ".test_design",
+        "." ++ DbName ++ "_design",
         "mrview",
         OldViewName
     ]),
     NewViewFilePath = filename:join([
         ViewDir,
-        ".test_design",
+        "." ++ DbName ++ "_design",
         "mrview",
         NewViewName
     ]),
@@ -76,7 +97,7 @@ setup_legacy() ->
 
     {ok, _} = file:copy(FixtureViewFilePath, OldViewFilePath),
 
-    {DbName, Files}.
+    {?l2b(DbName), Files}.
 
 teardown({DbName, _}) ->
     teardown(DbName);
@@ -161,21 +182,85 @@ backup_restore_test_() ->
         }
     }.
 
-upgrade_test_() ->
+upgrade_2x_test_() ->
     {
-        "Upgrade tests",
+        "Upgrade 2x tests",
         {
             setup,
             fun test_util:start_couch/0,
             fun test_util:stop_couch/1,
             {
                 foreach,
-                fun setup_legacy/0,
+                fun setup_legacy_2x/0,
                 fun teardown_legacy/1,
                 [
-                    fun should_upgrade_legacy_view_files/1
+                    fun should_upgrade_legacy_2x_view_files/1
                 ]
             }
+        }
+    }.
+
+upgrade_3_2_1_test_() ->
+    {
+        "Upgrade 3.2.1 tests",
+        {
+            foreach,
+            fun() ->
+                Ctx = test_util:start_couch(),
+                DbFiles = setup_legacy_3_2_1(),
+                {Ctx, DbFiles}
+            end,
+            fun({Ctx, DbFiles}) ->
+                teardown_legacy(DbFiles),
+                test_util:stop_couch(Ctx)
+            end,
+            [
+                fun should_upgrade_legacy_3_2_1_view_files/1,
+                fun can_disable_auto_commit_on_view_upgrade/1
+            ]
+        }
+    }.
+
+multiple_view_collators_test_() ->
+    {
+        "Test views with multiple collators",
+        {
+            foreach,
+            fun() ->
+                Ctx = test_util:start_couch(),
+                DbFiles = setup_collator_test1(),
+                {Ctx, DbFiles}
+            end,
+            fun({Ctx, DbFiles}) ->
+                teardown_legacy(DbFiles),
+                test_util:stop_couch(Ctx)
+            end,
+            [
+                fun can_read_views_with_old_collators/1,
+                fun can_update_views_with_old_collators/1
+            ]
+        }
+    }.
+
+autocompact_view_to_upgrade_collators_test_() ->
+    {
+        "Auto compactions triggered to update collators",
+        {
+            foreach,
+            fun() ->
+                Ctx = test_util:start_couch([smoosh]),
+                DbFiles = setup_collator_test1(),
+                {Ctx, DbFiles}
+            end,
+            fun({Ctx, DbFiles}) ->
+                teardown_legacy(DbFiles),
+                test_util:stop_couch(Ctx)
+            end,
+            [
+                fun view_collator_auto_upgrade_on_open/1,
+                fun view_collator_auto_upgrade_on_update/1,
+                fun view_collator_auto_upgrade_can_be_disabled/1
+            ]
         }
     }.
 
@@ -201,7 +286,7 @@ should_not_remember_docs_in_index_after_backup_restore(DbName) ->
         ?assertNot(has_doc("doc666", Rows1))
     end).
 
-should_upgrade_legacy_view_files({DbName, Files}) ->
+should_upgrade_legacy_2x_view_files({DbName, Files}) ->
     ?_test(begin
         [_NewDbFilePath, OldViewFilePath, NewViewFilePath] = Files,
         ok = config:set("query_server_config", "commit_freq", "0", false),
@@ -231,11 +316,258 @@ should_upgrade_legacy_view_files({DbName, Files}) ->
         % ensure new header
 
         % have to wait for awhile to upgrade the index
-        timer:sleep(2000),
+        wait_mrheader_record(NewViewFilePath, 3000),
         NewHeader = read_header(NewViewFilePath),
         ?assertMatch(#mrheader{}, NewHeader),
+
+        % assert that 2.x header was upgraded with a view_info map
+        ViewInfo = NewHeader#mrheader.view_info,
+        ?assert(is_map(ViewInfo)),
+        Ver = tuple_to_list(couch_ejson_compare:get_collator_version()),
+        ?assertMatch(#{ucol_vs := [Ver]}, ViewInfo),
+
         NewViewStatus = hd(NewHeader#mrheader.view_states),
-        ?assertEqual(3, tuple_size(NewViewStatus))
+        ?assertEqual(5, tuple_size(NewViewStatus))
+    end).
+
+should_upgrade_legacy_3_2_1_view_files({_, {DbName, Files}}) ->
+    ?_test(begin
+        [_NewDbFilePath, OldViewFilePath, NewViewFilePath] = Files,
+        ok = config:set("query_server_config", "commit_freq", "0", false),
+
+        % preliminary assert that we expect view signature and view files names
+        % to stay exactly the same
+        ?assertEqual(OldViewFilePath, NewViewFilePath),
+
+        % ensure old header
+        OldHeader = read_header(OldViewFilePath),
+        ?assertEqual(5, tuple_size(OldHeader)),
+        ?assertMatch(mrheader, element(1, OldHeader)),
+
+        % query view for expected results
+        Rows0 = query_view(DbName, "ddoc321", "view321"),
+        ?assertEqual(2, length(Rows0)),
+
+        % have to wait for a while to write to the index
+        % with [view_upgrade] commit_on_header_upgrade should happen after open
+        wait_mrheader_record(NewViewFilePath, 3000),
+        NewHeader = read_header(NewViewFilePath),
+        ?assertMatch(#mrheader{}, NewHeader),
+
+        % assert that 3.2.1 header was upgraded with a view_info map
+        ViewInfo = NewHeader#mrheader.view_info,
+        ?assert(is_map(ViewInfo)),
+        Ver = tuple_to_list(couch_ejson_compare:get_collator_version()),
+        ?assertMatch(#{ucol_vs := [Ver]}, ViewInfo),
+
+        NewViewStatus = hd(NewHeader#mrheader.view_states),
+        ?assertEqual(5, tuple_size(NewViewStatus)),
+
+        NewSig = get_signature(DbName, "ddoc321"),
+        OldSig = filename:basename(OldViewFilePath, ".view"),
+        ?assertEqual(OldSig, ?b2l(NewSig))
+    end).
+
+can_disable_auto_commit_on_view_upgrade({_, {DbName, Files}}) ->
+    ?_test(begin
+        [_NewDbFilePath, OldViewFilePath, NewViewFilePath] = Files,
+        ok = config:set("query_server_config", "commit_freq", "0", false),
+        ok = config:set(
+            "view_upgrade",
+            "commit_on_header_upgrade",
+            "false",
+            false
+        ),
+
+        % preliminary assert that we expect view signature and view files names
+        % to stay exactly the same
+        ?assertEqual(OldViewFilePath, NewViewFilePath),
+
+        % ensure old header
+        OldHeader = read_header(OldViewFilePath),
+        ?assertEqual(5, tuple_size(OldHeader)),
+        ?assertMatch(mrheader, element(1, OldHeader)),
+
+        % query view for expected results
+        Rows0 = query_view(DbName, "ddoc321", "view321"),
+        ?assertEqual(2, length(Rows0)),
+
+        % ensure old header is still there after a query as we intend not to
+        % auto-commit after header open
+        AfterQueryHeader = read_header(NewViewFilePath),
+        ?assertEqual(5, tuple_size(AfterQueryHeader)),
+        ?assertMatch(mrheader, element(1, AfterQueryHeader)),
+
+        % add 3 new documents
+        create_docs(DbName),
+
+        % query view for expected results
+        Rows1 = query_view(DbName, "ddoc321", "view321"),
+        ?assertEqual(5, length(Rows1)),
+
+        % ensure old file is still there
+        ?assert(filelib:is_regular(OldViewFilePath)),
+
+        % ensure new header
+
+        % have to wait for awhile to write to the index
+        wait_mrheader_record(NewViewFilePath, 3000),
+        NewHeader = read_header(NewViewFilePath),
+        ?assertMatch(#mrheader{}, NewHeader),
+
+        % assert that 3.2.1 header was upgraded with a view_info map
+        ViewInfo = NewHeader#mrheader.view_info,
+        ?assert(is_map(ViewInfo)),
+        Ver = tuple_to_list(couch_ejson_compare:get_collator_version()),
+        ?assertMatch(#{ucol_vs := [Ver]}, ViewInfo),
+
+        NewViewStatus = hd(NewHeader#mrheader.view_states),
+        ?assertEqual(5, tuple_size(NewViewStatus)),
+
+        NewSig = get_signature(DbName, "ddoc321"),
+        OldSig = filename:basename(OldViewFilePath, ".view"),
+        ?assertEqual(OldSig, ?b2l(NewSig))
+    end).
+
+can_read_views_with_old_collators({_, {DbName, Files}}) ->
+    ?_test(begin
+        [_NewDbFilePath, ViewFilePath, ViewFilePath] = Files,
+
+        % check that there is an old (bogus) collator version
+        Header1 = read_header(ViewFilePath),
+        ViewInfo1 = Header1#mrheader.view_info,
+        ?assert(is_map(ViewInfo1)),
+        ?assertMatch(#{ucol_vs := [?OLD_COLLATOR_VERSION]}, ViewInfo1),
+
+        % view query works with the old collator version
+        Rows0 = query_view(DbName, "colltest1ddoc", "colltest1view"),
+        ?assertEqual(2, length(Rows0))
+    end).
+
+can_update_views_with_old_collators({_, {DbName, Files}}) ->
+    ?_test(begin
+        [_NewDbFilePath, ViewFilePath, ViewFilePath] = Files,
+        ok = config:set("query_server_config", "commit_freq", "0", false),
+
+        % check that there is an old (bogus) collator version
+        Header1 = read_header(ViewFilePath),
+        ViewInfo1 = Header1#mrheader.view_info,
+        ?assert(is_map(ViewInfo1)),
+        ?assertMatch(#{ucol_vs := [?OLD_COLLATOR_VERSION]}, ViewInfo1),
+
+        create_docs(DbName),
+        Rows1 = query_view(DbName, "colltest1ddoc", "colltest1view"),
+        ?assertEqual(5, length(Rows1)),
+
+        % ensure old view file is still there
+        ?assert(filelib:is_regular(ViewFilePath)),
+
+        % should have two collator versions
+        CurVer = tuple_to_list(couch_ejson_compare:get_collator_version()),
+        ExpVersions = [?OLD_COLLATOR_VERSION, CurVer],
+        ok = wait_collator_versions(ExpVersions, ViewFilePath, 3000),
+        Header2 = read_header(ViewFilePath),
+        ViewInfo2 = Header2#mrheader.view_info,
+        ?assertMatch(#{ucol_vs := ExpVersions}, ViewInfo2)
+    end).
+
+view_collator_auto_upgrade_on_open({_, {DbName, Files}}) ->
+    ?_test(begin
+        [_NewDbFilePath, ViewFilePath, ViewFilePath] = Files,
+
+        % quick sanity check the test setup
+        Header1 = read_header(ViewFilePath),
+        ViewInfo1 = Header1#mrheader.view_info,
+        ?assertMatch(#{ucol_vs := [?OLD_COLLATOR_VERSION]}, ViewInfo1),
+
+        % make sure smoosh is active
+        smoosh:resume(),
+
+        % query the view
+        Rows = query_view(DbName, "colltest1ddoc", "colltest1view"),
+        ?assertEqual(2, length(Rows)),
+
+        CurVer = tuple_to_list(couch_ejson_compare:get_collator_version()),
+        wait_collator_versions([CurVer], ViewFilePath, 3000),
+        Header2 = read_header(ViewFilePath),
+        ViewInfo2 = Header2#mrheader.view_info,
+        ?assertMatch(#{ucol_vs := [CurVer]}, ViewInfo2),
+
+        % query the view again
+        ?assertEqual(Rows, query_view(DbName, "colltest1ddoc", "colltest1view"))
+    end).
+
+view_collator_auto_upgrade_on_update({_, {DbName, Files}}) ->
+    ?_test(begin
+        [_NewDbFilePath, ViewFilePath, ViewFilePath] = Files,
+        ok = config:set("query_server_config", "commit_freq", "0", false),
+
+        % quick sanity check the test setup
+        Header1 = read_header(ViewFilePath),
+        ViewInfo1 = Header1#mrheader.view_info,
+        ?assertMatch(#{ucol_vs := [?OLD_COLLATOR_VERSION]}, ViewInfo1),
+
+        % stop smoosh so the open/read trigger doesn't fire
+        application:stop(smoosh),
+
+        % open the view so after smoosh starts it won't trigger
+        % the open auto-update event
+        Rows0 = query_view(DbName, "colltest1ddoc", "colltest1view"),
+        ?assertEqual(2, length(Rows0)),
+
+        % update the db
+        create_docs(DbName),
+
+        % start smoosh
+        application:start(smoosh),
+        smoosh:resume(),
+
+        % query the view to trigger an index commit event
+        Rows1 = query_view(DbName, "colltest1ddoc", "colltest1view"),
+        ?assertEqual(5, length(Rows1)),
+
+        CurVer = tuple_to_list(couch_ejson_compare:get_collator_version()),
+        wait_collator_versions([CurVer], ViewFilePath, 3000),
+        Header2 = read_header(ViewFilePath),
+        ViewInfo2 = Header2#mrheader.view_info,
+        ?assertMatch(#{ucol_vs := [CurVer]}, ViewInfo2)
+    end).
+
+view_collator_auto_upgrade_can_be_disabled({_, {DbName, Files}}) ->
+    ?_test(begin
+        [_NewDbFilePath, ViewFilePath, ViewFilePath] = Files,
+        ok = config:set("query_server_config", "commit_freq", "0", false),
+        ok = config:set(
+            "view_upgrade",
+            "compact_on_collator_upgrade",
+            "false",
+            false
+        ),
+
+        % quick sanity check the test setup
+        Header1 = read_header(ViewFilePath),
+        ViewInfo1 = Header1#mrheader.view_info,
+        ?assertMatch(#{ucol_vs := [?OLD_COLLATOR_VERSION]}, ViewInfo1),
+
+        % activate smoosh
+        smoosh:resume(),
+
+        % query the view
+        Rows0 = query_view(DbName, "colltest1ddoc", "colltest1view"),
+        ?assertEqual(2, length(Rows0)),
+
+        % update the db and query again to trigger an index commit
+        create_docs(DbName),
+        Rows1 = query_view(DbName, "colltest1ddoc", "colltest1view"),
+        ?assertEqual(5, length(Rows1)),
+
+        % View header doesn't change
+        CurVer = tuple_to_list(couch_ejson_compare:get_collator_version()),
+        ExpVersions = [?OLD_COLLATOR_VERSION, CurVer],
+        wait_collator_versions(ExpVersions, ViewFilePath, 3000),
+        Header2 = read_header(ViewFilePath),
+        ViewInfo2 = Header2#mrheader.view_info,
+        ?assertMatch(#{ucol_vs := ExpVersions}, ViewInfo2)
     end).
 
 should_have_two_indexes_alive_before_deletion({DbName, _}) ->
@@ -571,6 +903,14 @@ query_view(DbName, DDoc, View, Stale) ->
     {Props} = jiffy:decode(Body),
     couch_util:get_value(<<"rows">>, Props, []).
 
+get_signature(DbName, DDoc) ->
+    Url = db_url(DbName) ++ "/_design/" ++ DDoc ++ "/_info",
+    {ok, Code, _Headers, Body} = test_request:get(Url),
+    ?assertEqual(200, Code),
+    MapBody = jiffy:decode(Body, [return_maps]),
+    #{<<"view_index">> := #{<<"signature">> := Sig}} = MapBody,
+    Sig.
+
 check_rows_value(Rows, Value) ->
     lists:foreach(
         fun({Row}) ->
@@ -750,3 +1090,28 @@ copy_tree([File | Rest], Src, Dst) ->
     FullDst = filename:join(Dst, File),
     ok = copy_tree(FullSrc, FullDst),
     copy_tree(Rest, Src, Dst).
+
+wait_mrheader_record(File, TimeoutMSec) ->
+    WaitFun = fun() ->
+        try read_header(File) of
+            #mrheader{} -> ok;
+            _Other -> wait
+        catch
+            _:_ -> wait
+        end
+    end,
+    test_util:wait(WaitFun, TimeoutMSec).
+
+wait_collator_versions(Vers, File, TimeoutMSec) ->
+    WaitFun = fun() ->
+        try read_header(File) of
+            #mrheader{view_info = #{ucol_vs := Vers}} ->
+                ok;
+            _Other ->
+                wait
+        catch
+            _:_ ->
+                wait
+        end
+    end,
+    test_util:wait(WaitFun, TimeoutMSec).
