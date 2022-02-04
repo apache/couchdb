@@ -100,6 +100,9 @@ handle_db_event(DbName, updated, St) ->
 handle_db_event(DbName, {index_commit, IdxName}, St) ->
     smoosh_server:enqueue({DbName, IdxName}),
     {ok, St};
+handle_db_event(DbName, {index_collator_upgrade, IdxName}, St) ->
+    smoosh_server:enqueue({DbName, IdxName}),
+    {ok, St};
 handle_db_event(DbName, {schema_updated, DDocId}, St) ->
     smoosh_server:enqueue({schema, DbName, DDocId}),
     {ok, St};
@@ -480,12 +483,24 @@ get_priority(Channel) ->
     smoosh_utils:get(Channel, "priority", "ratio").
 
 needs_upgrade(Props) ->
+    db_needs_upgrade(Props) orelse view_needs_upgrade(Props).
+
+db_needs_upgrade(Props) ->
     DiskVersion = couch_util:get_value(disk_format_version, Props),
     case couch_util:get_value(engine, Props) of
         couch_bt_engine ->
             (couch_bt_engine_header:latest(DiskVersion) =:= false);
         _ ->
             false
+    end.
+
+view_needs_upgrade(Props) ->
+    case couch_util:get_value(collator_versions, Props) of
+        undefined ->
+            false;
+        Versions when is_list(Versions) ->
+            Enabled = couch_mrview_util:compact_on_collator_upgrade(),
+            Enabled andalso length(Versions) >= 2
     end.
 
 -ifdef(TEST).

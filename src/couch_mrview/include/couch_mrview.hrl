@@ -29,7 +29,8 @@
     doc_acc,
     doc_queue,
     write_queue,
-    qserver=nil
+    qserver=nil,
+    view_info=#{}
 }).
 
 
@@ -49,6 +50,7 @@
     seq=0,
     purge_seq=0,
     id_btree_state=nil,
+    view_info=#{}, % replaces log btree in versions < 3.x
     view_states=nil
 }).
 
