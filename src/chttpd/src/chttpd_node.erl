@@ -41,12 +41,14 @@ handle_node_req(#httpd{path_parts = [A, <<"_local">> | Rest]} = Req) ->
 handle_node_req(#httpd{method = 'GET', path_parts = [_, _Node, <<"_versions">>]} = Req) ->
     IcuVer = couch_ejson_compare:get_icu_version(),
     UcaVer = couch_ejson_compare:get_uca_version(),
+    ColVer = couch_ejson_compare:get_collator_version(),
     send_json(Req, 200, #{
         erlang_version => ?l2b(?COUCHDB_ERLANG_VERSION),
         collation_driver => #{
             name => <<"libicu">>,
-            library_version => version_tuple_to_str(IcuVer),
-            collation_algorithm_version => version_tuple_to_str(UcaVer)
+            library_version => couch_util:version_to_binary(IcuVer),
+            collation_algorithm_version => couch_util:version_to_binary(UcaVer),
+            collator_version => couch_util:version_to_binary(ColVer)
         },
         javascript_engine => #{
             name => <<"spidermonkey">>,
@@ -381,10 +383,3 @@ run_queues() ->
             [DCQ | SQs] = lists:reverse(statistics(run_queue_lengths)),
             {lists:sum(SQs), DCQ}
     end.
-
-version_tuple_to_str(Version) when is_tuple(Version) ->
-    List1 = tuple_to_list(Version),
-    IsZero = fun(N) -> N == 0 end,
-    List2 = lists:reverse(lists:dropwhile(IsZero, lists:reverse(List1))),
-    List3 = [erlang:integer_to_list(N) || N <- List2],
-    ?l2b(lists:join(".", List3)).
