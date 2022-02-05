@@ -416,11 +416,11 @@ pipeline {
           sh '''
             git clone https://github.com/apache/couchdb-pkg
             cp js/debian-stretch/*.deb pkgs/stretch
-            reprepro -b couchdb-pkg/repo includedeb stretch pkgs/stretch/*.deb
-            reprepro -b couchdb-pkg/repo includedeb buster pkgs/buster/*.deb
             cp js/ubuntu-bionic/*.deb pkgs/bionic
-            reprepro -b couchdb-pkg/repo includedeb bionic pkgs/bionic/*.deb
-            reprepro -b couchdb-pkg/repo includedeb focal pkgs/focal/*.deb
+            for plat in stretch buster bullseye bionic focal
+            do
+              reprepro -b couchdb-pkg/repo includedeb $plat pkgs/$plat/*.deb
+            done
           '''
 
           echo 'Building CentOS repos...'
