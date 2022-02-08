@@ -167,7 +167,7 @@ force_reply(Doc, [FirstReply | _] = Replies, {Health, W, Acc}) ->
                                 {forbidden, Msg} ->
                                     {Health, W, [{Doc, {forbidden, Msg}} | Acc]};
                                 false ->
-                                    {error, W, [{Doc, {mismatched_errors, Replies}} | Acc]}
+                                    {error, W, [{Doc, FirstReply} | Acc]}
                             end
                     end;
                 [AcceptedRev | _] ->
@@ -201,13 +201,11 @@ maybe_reply(Doc, Replies, {stop, W, Acc}) ->
 % If at at least one node forbids the update, and all other replies
 % are noreply, then we reject the update
 check_forbidden_msg(Replies) ->
-    Pred = fun(R) ->
-        case R of 
-            {_, {forbidden, _}} -> 
-                true; 
-            _ ->
-                false
-        end 
+    Pred = fun
+        ({_, {forbidden, _}}) ->
+            true;
+        (_) ->
+            false
     end,
     case lists:partition(Pred, Replies) of
         {[], _} ->
@@ -568,8 +566,7 @@ other_errors_one_forbid() ->
 
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2),
-    ?assertEqual({error, [{Doc1, {ok, Doc1}}, {Doc2,  {mismatched_errors,
-        [{Doc2, {error, <<"foo">>}}, {Doc2, {error, <<"bar">>}}, {Doc2,{forbidden, <<"not allowed">>}}]}}]}, Reply).
+    ?assertEqual({error, [{Doc1, {ok, Doc1}}, {Doc2,  {Doc2, {error, <<"foo">>}}}]}, Reply).
 
 one_error_two_forbid() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
@@ -597,8 +594,7 @@ one_error_two_forbid() ->
 
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2),
-    ?assertEqual({error, [{Doc1, {ok, Doc1}}, {Doc2,  {mismatched_errors,
-        [{Doc2, {forbidden, <<"not allowed">>}}, {Doc2, {error, <<"foo">>}}, {Doc2,{forbidden, <<"not allowed">>}}]}}]}, Reply).
+    ?assertEqual({error, [{Doc1, {ok, Doc1}}, {Doc2,  {Doc2,{forbidden, <<"not allowed">>}}}]}, Reply).
 
 one_success_two_forbid() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
@@ -626,8 +622,7 @@ one_success_two_forbid() ->
 
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2),
-    ?assertEqual({error, [{Doc1, {ok, Doc1}}, {Doc2,  {mismatched_errors,
-        [{Doc2, {forbidden, <<"not allowed">>}}, {Doc2, {ok, Doc2}}, {Doc2,{forbidden, <<"not allowed">>}}]}}]}, Reply).
+    ?assertEqual({error, [{Doc1, {ok, Doc1}}, {Doc2,  {Doc2, {forbidden, <<"not allowed">>}}}]}, Reply).
 
 % needed for testing to avoid having to start the mem3 application
 group_docs_by_shard_hack(_DbName, Shards, Docs) ->
