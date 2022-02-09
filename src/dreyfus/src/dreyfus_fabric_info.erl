@@ -102,6 +102,8 @@ merge_results(Info) ->
                 [{committed_seq, lists:sum(X)} | Acc];
             (pending_seq, X, Acc) ->
                 [{pending_seq, lists:sum(X)} | Acc];
+            (signature, [X | _], Acc) ->
+                [{signature, X} | Acc];
             (_, _, Acc) ->
                 Acc
         end,
