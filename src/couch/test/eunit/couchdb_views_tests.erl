@@ -20,6 +20,7 @@
 -define(TIMEOUT, 1000).
 -define(WAIT_DELAY_COUNT, 40).
 -define(OLD_COLLATOR_VERSION, [1, 1, 1, 1]).
+-define(HEADER_WRITE_WAIT_TIMEOUT, 4500).
 
 setup() ->
     DbName = ?tempdb(),
@@ -316,7 +317,7 @@ should_upgrade_legacy_2x_view_files({DbName, Files}) ->
         % ensure new header
 
         % have to wait for awhile to upgrade the index
-        wait_mrheader_record(NewViewFilePath, 3000),
+        wait_mrheader_record(NewViewFilePath),
         NewHeader = read_header(NewViewFilePath),
         ?assertMatch(#mrheader{}, NewHeader),
 
@@ -350,7 +351,7 @@ should_upgrade_legacy_3_2_1_view_files({_, {DbName, Files}}) ->
 
         % have to wait for a while to write to the index
         % with [view_upgrade] commit_on_header_upgrade should happen after open
-        wait_mrheader_record(NewViewFilePath, 3000),
+        wait_mrheader_record(NewViewFilePath),
         NewHeader = read_header(NewViewFilePath),
         ?assertMatch(#mrheader{}, NewHeader),
 
@@ -411,7 +412,7 @@ can_disable_auto_commit_on_view_upgrade({_, {DbName, Files}}) ->
         % ensure new header
 
         % have to wait for awhile to write to the index
-        wait_mrheader_record(NewViewFilePath, 3000),
+        wait_mrheader_record(NewViewFilePath),
         NewHeader = read_header(NewViewFilePath),
         ?assertMatch(#mrheader{}, NewHeader),
 
@@ -465,7 +466,7 @@ can_update_views_with_old_collators({_, {DbName, Files}}) ->
         % should have two collator versions
         CurVer = tuple_to_list(couch_ejson_compare:get_collator_version()),
         ExpVersions = [?OLD_COLLATOR_VERSION, CurVer],
-        ok = wait_collator_versions(ExpVersions, ViewFilePath, 3000),
+        ok = wait_collator_versions(ExpVersions, ViewFilePath),
         Header2 = read_header(ViewFilePath),
         ViewInfo2 = Header2#mrheader.view_info,
         ?assertMatch(#{ucol_vs := ExpVersions}, ViewInfo2)
@@ -474,6 +475,7 @@ can_update_views_with_old_collators({_, {DbName, Files}}) ->
 view_collator_auto_upgrade_on_open({_, {DbName, Files}}) ->
     ?_test(begin
         [_NewDbFilePath, ViewFilePath, ViewFilePath] = Files,
+        ok = config:set("query_server_config", "commit_freq", "0", false),
 
         % quick sanity check the test setup
         Header1 = read_header(ViewFilePath),
@@ -488,7 +490,7 @@ view_collator_auto_upgrade_on_open({_, {DbName, Files}}) ->
         ?assertEqual(2, length(Rows)),
 
         CurVer = tuple_to_list(couch_ejson_compare:get_collator_version()),
-        wait_collator_versions([CurVer], ViewFilePath, 3000),
+        wait_collator_versions([CurVer], ViewFilePath),
         Header2 = read_header(ViewFilePath),
         ViewInfo2 = Header2#mrheader.view_info,
         ?assertMatch(#{ucol_vs := [CurVer]}, ViewInfo2),
@@ -527,7 +529,7 @@ view_collator_auto_upgrade_on_update({_, {DbName, Files}}) ->
         ?assertEqual(5, length(Rows1)),
 
         CurVer = tuple_to_list(couch_ejson_compare:get_collator_version()),
-        wait_collator_versions([CurVer], ViewFilePath, 3000),
+        wait_collator_versions([CurVer], ViewFilePath),
         Header2 = read_header(ViewFilePath),
         ViewInfo2 = Header2#mrheader.view_info,
         ?assertMatch(#{ucol_vs := [CurVer]}, ViewInfo2)
@@ -564,7 +566,7 @@ view_collator_auto_upgrade_can_be_disabled({_, {DbName, Files}}) ->
         % View header doesn't change
         CurVer = tuple_to_list(couch_ejson_compare:get_collator_version()),
         ExpVersions = [?OLD_COLLATOR_VERSION, CurVer],
-        wait_collator_versions(ExpVersions, ViewFilePath, 3000),
+        wait_collator_versions(ExpVersions, ViewFilePath),
         Header2 = read_header(ViewFilePath),
         ViewInfo2 = Header2#mrheader.view_info,
         ?assertMatch(#{ucol_vs := ExpVersions}, ViewInfo2)
@@ -1091,6 +1093,9 @@ copy_tree([File | Rest], Src, Dst) ->
     ok = copy_tree(FullSrc, FullDst),
     copy_tree(Rest, Src, Dst).
 
+wait_mrheader_record(File) ->
+    wait_mrheader_record(File, ?HEADER_WRITE_WAIT_TIMEOUT).
+
 wait_mrheader_record(File, TimeoutMSec) ->
     WaitFun = fun() ->
         try read_header(File) of
@@ -1100,7 +1105,10 @@ wait_mrheader_record(File, TimeoutMSec) ->
             _:_ -> wait
         end
     end,
-    test_util:wait(WaitFun, TimeoutMSec).
+    test_util:wait(WaitFun, TimeoutMSec, 200).
+
+wait_collator_versions(Vers, File) ->
+    wait_collator_versions(Vers, File, ?HEADER_WRITE_WAIT_TIMEOUT).
 
 wait_collator_versions(Vers, File, TimeoutMSec) ->
     WaitFun = fun() ->
@@ -1114,4 +1122,4 @@ wait_collator_versions(Vers, File, TimeoutMSec) ->
                 wait
         end
     end,
-    test_util:wait(WaitFun, TimeoutMSec).
+    test_util:wait(WaitFun, TimeoutMSec, 200).
