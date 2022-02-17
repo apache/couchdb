@@ -88,7 +88,7 @@ jobs:
         cd couch
         sed -i -e "s@DRV_CFLAGS -DPIC@DRV_CFLAGS -I/usr/local/include -DPIC@" src/couch/rebar.config.script
         sed -i -e "s@DRV_LDFLAGS -lm@DRV_LDFLAGS -L/usr/local/lib -lm@" src/couch/rebar.config.script
-        sh ./configure --spidermonkey-version=91 --disable-docs
+        sh ./configure --disable-docs
     - name: Compile
       run: |
         cd couch

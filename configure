@@ -29,8 +29,19 @@ ERLANG_MD5="false"
 SKIP_DEPS=0
 
 COUCHDB_USER="$(whoami 2>/dev/null || echo couchdb)"
-SM_VSN=${SM_VSN:-"1.8.5"}
+OS="$(uname)"
 ARCH="$(uname -m)"
+
+SM_VSN=${SM_VSN:-$([ "$OS" = "Linux" ] || echo "1.8.5")}
+# Try to detect SpiderMonkey (libmozjs) version automatically on linux
+SM_VSN=${SM_VSN:-$(/sbin/ldconfig -p | sed -n 's/.libmozjs-*\([0-9]*\).*/\1/p' | head -n 1)}
+if [ -z "$SM_VSN" ]; then
+  SM_VSN="1.8.5"
+fi
+
+if [ "$SM_VSN" = "185" ]; then
+  SM_VSN="1.8.5"
+fi
 
 . ${rootdir}/version.mk
 COUCHDB_VERSION=${vsn_major}.${vsn_minor}.${vsn_patch}
@@ -210,6 +221,14 @@ parse_opts() {
 }
 
 parse_opts $@
+
+# If SM_VSN is empty, the SpiderMonkey version could not be detected,
+# and it was not set with the CLI argument. Quit the script and warn the user.
+if [ -z "$SM_VSN" ]; then
+  echo 'ERROR: Could not detect SpiderMonkey version. Ensure SpyderMonkey is installed' \
+       'or set the version explicitly with "--spidermonkey-version".'
+  exit 1
+fi
 
 if [ "${ARCH}" = "aarch64" ] && [ "${SM_VSN}" = "60" ]
 then

@@ -25,37 +25,31 @@ MINIMUM_ERLANG_VERSION = '21'
 meta = [
   'centos7': [
     name: 'CentOS 7',
-    spidermonkey_vsn: '1.8.5',
     image: "apache/couchdbci-centos:7-erlang-${ERLANG_VERSION}"
   ],
 
   'centos8': [
     name: 'CentOS 8',
-    spidermonkey_vsn: '60',
     image: "apache/couchdbci-centos:8-erlang-${ERLANG_VERSION}"
   ],
 
   'bionic': [
     name: 'Ubuntu 18.04',
-    spidermonkey_vsn: '1.8.5',
     image: "apache/couchdbci-ubuntu:bionic-erlang-${ERLANG_VERSION}"
   ],
 
   'focal': [
     name: 'Ubuntu 20.04',
-    spidermonkey_vsn: '68',
     image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
   ],
 
   'stretch': [
     name: 'Debian 9',
-    spidermonkey_vsn: '1.8.5',
     image: "apache/couchdbci-debian:stretch-erlang-${ERLANG_VERSION}"
   ],
 
   'buster': [
     name: 'Debian 10',
-    spidermonkey_vsn: '60',
     image: "apache/couchdbci-debian:buster-erlang-${ERLANG_VERSION}"
   ],
 
@@ -63,21 +57,18 @@ meta = [
 
   // 'buster-arm64': [
   //   name: 'Debian 10 ARM'
-  //   spidermonkey_vsn: '60',
   //   image: "apache/couchdbci-debian:arm64v8-buster-erlang-${ERLANG_VERSION}",
   //   node_label: 'arm64v8'
   // ],
 
   // 'buster-ppc64': [
   //   name: 'Debian 10 POWER'
-  //   spidermonkey_vsn: '60',
   //   image: "apache/couchdbci-debian:pp64le-buster-erlang-${ERLANG_VERSION}",
   //   node_label: 'ppc64le'
   // ],
 
   'bullseye': [
     name: 'Debian 11',
-    spidermonkey_vsn: '78',
     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}"
   ],
 
@@ -119,12 +110,13 @@ def generateNativeStage(platform) {
             withEnv([
                 'HOME='+pwd(),
                 'PATH+USRLOCAL=/usr/local/bin',
-                'MAKE='+meta[platform].gnu_make
+                'MAKE='+meta[platform].gnu_make,
+                'SM_VSN='+meta[platform].spidermonkey_vsn
                 ]) {
               sh( script: "mkdir -p ${COUCHDB_IO_LOG_DIR} ${platform}/build", label: 'Create build directories' )
               sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
               dir( "${platform}/build" ) {
-                sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn}"
+                sh "./configure --skip-deps"
                 sh '$MAKE'
                 sh '$MAKE eunit'
                 sh '$MAKE elixir-suite'
@@ -176,7 +168,7 @@ def generateContainerStage(platform) {
                   sh( script: "mkdir -p ${COUCHDB_IO_LOG_DIR} ${platform}/build", label: 'Create build directories' )
                   sh( script: "tar -xf apache-couchdb-*.tar.gz -C ${platform}/build --strip-components=1", label: 'Unpack release' )
                   dir( "${platform}/build" ) {
-                    sh "./configure --skip-deps --spidermonkey-version ${meta[platform].spidermonkey_vsn}"
+                    sh "./configure --skip-deps"
                     sh 'make'
                     sh 'make eunit'
                     sh 'make elixir-suite'
@@ -271,14 +263,10 @@ pipeline {
           registryCredentialsId 'dockerhub_creds'
         }
       }
-      environment {
-        // TODO find a way to avoid setting this explicitly
-        spidermonkey = '78'
-      }
       steps {
         timeout(time: 15, unit: "MINUTES") {
           sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
-          sh "./configure --spidermonkey-version ${spidermonkey}"
+          sh "./configure"
           sh 'make erlfmt-check'
           sh 'make elixir-check-formatted'
           sh 'make dist'
