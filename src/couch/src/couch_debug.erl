@@ -421,6 +421,15 @@ id(_IdStr, _Pid, _Props) ->
 
 print_couch_index_server_processes() ->
     Info = [reductions, message_queue_len, memory],
+    Trees = lists:map(
+        fun(Name) ->
+            link_tree(whereis(Name), Info, fun(P, Props) ->
+                IdStr = process_name(P),
+                {IdStr, [{id, id(IdStr, P, Props)} | Props]}
+            end)
+        end,
+        couch_index_server:names()
+    ),
     TableSpec = [
         {50, left, name},
         {12, centre, reductions},
@@ -428,12 +437,7 @@ print_couch_index_server_processes() ->
         {14, centre, memory},
         {id}
     ],
-
-    Tree = link_tree(whereis(couch_index_server), Info, fun(P, Props) ->
-        IdStr = process_name(P),
-        {IdStr, [{id, id(IdStr, P, Props)} | Props]}
-    end),
-    print_tree(Tree, TableSpec).
+    print_trees(Trees, TableSpec).
 
 shorten_path(Path) ->
     ViewDir = list_to_binary(config:get("couchdb", "view_index_dir")),
@@ -464,9 +468,36 @@ print_tree(Tree, TableSpec) ->
     end),
     ok.
 
+print_trees(Trees, TableSpec) ->
+    io:format("~s~n", [format(TableSpec)]),
+    io:format("~s~n", [separator(TableSpec)]),
+    lists:foreach(
+        fun(Tree) ->
+            map_tree(Tree, fun(_, {Id, Props}, Pos) ->
+                io:format("~s~n", [table_row(Id, Pos * 2, Props, TableSpec)])
+            end),
+            io:format("~s~n", [space(TableSpec)])
+        end,
+        Trees
+    ),
+    ok.
+
 format(Spec) ->
     Fields = [format_value(Format) || Format <- Spec],
-    string:join(Fields, "|").
+    [$| | string:join(Fields, "|")].
+
+fill(Spec, [Char]) ->
+    fill(Spec, Char);
+fill(Spec, Char) when is_integer(Char) ->
+    Fields = [format_value(Format) || Format <- Spec],
+    Sizes = [length(F) || F <- Fields],
+    [$| | [string:join([string:chars(Char, F) || F <- Sizes], "|")]].
+
+space(Spec) ->
+    fill(Spec, " ").
+
+separator(Spec) ->
+    fill(Spec, "-").
 
 format_value({Value}) -> term2str(Value);
 format_value({Width, Align, Value}) -> string:Align(term2str(Value), Width).
@@ -486,7 +517,7 @@ term2str(Term) -> iolist_to_list(io_lib:format("~p", [Term])).
 table_row(Key, Indent, Props, [{KeyWidth, Align, _} | Spec]) ->
     Values = [bind_value(Format, Props) || Format <- Spec],
     KeyStr = string:Align(term2str(Key), KeyWidth - Indent),
-    [string:copies(" ", Indent), KeyStr, "|" | format(Values)].
+    [$|, string:copies(" ", Indent), KeyStr | format(Values)].
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
