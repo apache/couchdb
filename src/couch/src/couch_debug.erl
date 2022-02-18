@@ -31,11 +31,31 @@
     map_tree/2,
     fold_tree/3,
     linked_processes_info/2,
-    print_linked_processes/1
+    print_linked_processes/1,
+    busy/2,
+    busy/3,
+    restart/1,
+    restart_busy/2,
+    restart_busy/3,
+    restart_busy/4
 ]).
+
+-type throw(_Reason) :: no_return().
+
+-type process_name() :: atom().
+-type function_name() :: atom().
+-type busy_properties() ::
+    heap_size
+    | memory
+    | message_queue_len
+    | reductions
+    | total_heap_size.
+
+-spec help() -> [function_name()].
 
 help() ->
     [
+        busy,
         opened_files,
         opened_files_by_regexp,
         opened_files_contains,
@@ -45,11 +65,34 @@ help() ->
         map,
         fold,
         linked_processes_info,
-        print_linked_processes
+        print_linked_processes,
+        restart,
+        restart_busy
     ].
 
--spec help(Function :: atom()) -> ok.
+-spec help(Function :: function_name()) -> ok.
 %% erlfmt-ignore
+help(busy) ->
+    io:format("
+    busy(ProcessList, Threshold)
+    busy(ProcessList, Threshold, Property)
+    --------------
+
+    Iterate over given list of named processes and returns the ones with
+    a Property value greater than provided Threshold.
+
+    If Property is not specified we use message box size
+
+    Properties which can be used are listed below
+
+    - heap_size
+    - memory
+    - message_queue_len (default)
+    - reductions
+    - total_heap_size
+
+    ---
+    ", []);
 help(opened_files) ->
     io:format("
     opened_files()
@@ -91,6 +134,42 @@ help(process_name) ->
     - '$initial_call' key in process dictionary
     - process_info(Pid, initial_call)
 
+    ---
+    ", []);
+help(restart) ->
+    io:format("
+    restart(ServerName)
+    --------------
+
+    Restart a process with given ServerName and wait for
+    replacement process to start.
+    ---
+    ", []);
+help(restart_busy) ->
+    io:format("
+    restart_busy(ProcessList, Thereshold)
+    restart_busy(ProcessList, Thereshold, DelayInMsec)
+    --------------
+
+    Iterate over given list of named processes and returns the ones with
+    a Property value greater than provided Threshold.
+
+    Then it restart the identified processes.
+
+    If Property is not specified we use message box size
+
+    Properties which can be used are listed below
+
+    - heap_size
+    - memory
+    - message_queue_len (default)
+    - reductions
+    - total_heap_size
+
+    The restarts happen sequentially with a given DelayInMsec between them.
+    If DelayInMsec is not provided the default value is one second.
+    The function doesn't proceed to next process until
+    the replacement process starts.
     ---
     ", []);
 help(link_tree) ->
@@ -201,6 +280,30 @@ help(Unknown) ->
     [io:format("    - ~s~n", [Function]) || Function <- help()],
     io:format("    ---~n", []),
     ok.
+
+-spec busy(ProcessList :: [process_name()], Threshold :: pos_integer()) ->
+    [Name :: process_name()].
+
+busy(ProcessList, Threshold) when Threshold > 0 ->
+    busy(ProcessList, Threshold, message_queue_len).
+
+-spec busy(
+    ProcessList :: [process_name()], Threshold :: pos_integer(), Property :: busy_properties()
+) ->
+    [Name :: process_name()].
+
+busy(ProcessList, Threshold, Property) when Threshold > 0 ->
+    lists:filter(
+        fun(Name) ->
+            case (catch process_info(whereis(Name), Property)) of
+                {Property, Value} when is_integer(Value) andalso Value > Threshold ->
+                    true;
+                _ ->
+                    false
+            end
+        end,
+        ProcessList
+    ).
 
 -spec opened_files() ->
     [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
@@ -449,6 +552,57 @@ shorten_path(Path) ->
     ),
     <<_:Len/binary, Rest/binary>> = File,
     binary_to_list(Rest).
+
+-spec restart(Name :: process_name()) ->
+    Pid :: pid() | timeout.
+
+restart(Name) ->
+    Res = test_util:with_process_restart(Name, fun() ->
+        exit(whereis(Name), kill)
+    end),
+    case Res of
+        {Pid, true} ->
+            Pid;
+        timeout ->
+            timeout
+    end.
+
+-spec restart_busy(ProcessList :: [process_name()], Threshold :: pos_integer()) ->
+    throw({timeout, Name :: process_name()}).
+
+restart_busy(ProcessList, Threshold) ->
+    restart_busy(ProcessList, Threshold, 1000).
+
+-spec restart_busy(
+    ProcessList :: [process_name()], Thershold :: pos_integer(), DelayInMsec :: pos_integer()
+) ->
+    throw({timeout, Name :: process_name()}) | ok.
+
+restart_busy(ProcessList, Threshold, DelayInMsec) ->
+    restart_busy(ProcessList, Threshold, DelayInMsec, message_queue_len).
+
+-spec restart_busy(
+    ProcessList :: [process_name()],
+    Thershold :: pos_integer(),
+    DelayInMsec :: pos_integer(),
+    Property :: busy_properties()
+) ->
+    throw({timeout, Name :: process_name()}) | ok.
+
+restart_busy(ProcessList, Threshold, DelayInMsec, Property) when
+    Threshold > 0 andalso DelayInMsec > 0
+->
+    lists:foreach(
+        fun(Name) ->
+            case restart(Name) of
+                timeout ->
+                    throw({timeout, Name});
+                _ ->
+                    timer:sleep(DelayInMsec)
+            end
+        end,
+        busy(ProcessList, Threshold, Property)
+    ).
 
 %% Pretty print functions
 
