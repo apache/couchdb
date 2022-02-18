@@ -354,7 +354,7 @@ pull_purges(Db, Count, SrcShard, #tgt{} = Tgt0) ->
         Infos == [] ->
             ok;
         true ->
-            {ok, _} = couch_db:purge_docs(Db, Infos, [replicated_edits]),
+            {ok, _} = couch_db:purge_docs(Db, Infos, [replicated_changes]),
             Body = purge_cp_body(SrcShard, TgtShard, ThroughSeq),
             mem3_rpc:save_purge_checkpoint(TgtNode, TgtDbName, LocalPurgeId, Body)
     end,
