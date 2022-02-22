@@ -21,7 +21,7 @@ basename=`basename $0`
 
 PACKAGE_AUTHOR_NAME="The Apache Software Foundation"
 
-REBAR3_BRANCH="main"
+REBAR3_BRANCH="3.15.2"
 
 # TEST=0
 WITH_PROPER="true"
@@ -124,22 +124,6 @@ parse_opts() {
                 SKIP_DEPS=1
                 shift
                 continue
-                ;;
-
-            --rebar)
-                if [ -x "$2" ]; then
-                    version=`$2 --version 2> /dev/null | grep -o "2\.[6-9]\.[0-9]"`
-                    if [ $? -ne 0 ]; then
-                        printf 'Rebar >=2.6.0 and <3.0.0 required' >&2
-                        exit 1
-                    fi
-                    eval REBAR=$2
-                    shift 2
-                    continue
-                else
-                    printf 'ERROR: "--rebar" requires valid path to executable.\n' >&2
-                    exit 1
-                fi
                 ;;
 
             --rebar3)
@@ -290,18 +274,6 @@ cat > $rootdir/config.erl << EOF
 {spidermonkey_version, "$SM_VSN"}.
 EOF
 
-install_local_rebar() {
-    if [ ! -x "${rootdir}/bin/rebar" ]; then
-        if [ ! -d "${rootdir}/src/rebar" ]; then
-            # git clone --depth 1 https://github.com/apache/couchdb-rebar.git ${rootdir}/src/rebar
-            git clone https://github.com/apache/couchdb-rebar.git ${rootdir}/src/rebar
-        fi
-        make -C ${rootdir}/src/rebar
-        mv ${rootdir}/src/rebar/rebar ${rootdir}/bin/rebar
-        make -C ${rootdir}/src/rebar clean
-    fi
-}
-
 install_local_rebar3() {
     if [ ! -x "${rootdir}/bin/rebar3" ]; then
         if [ ! -d "${rootdir}/src/rebar3" ]; then
@@ -327,15 +299,8 @@ install_local_erlfmt() {
     fi
 }
 
-if [ -z "${REBAR}" ]; then
-    install_local_rebar
-    REBAR=${rootdir}/bin/rebar
-fi
-
-if [ -z "${REBAR3}" ] && [ "${ERLANG_VER}" != "20" ]; then
-    install_local_rebar3
-    REBAR3=${rootdir}/bin/rebar3
-fi
+install_local_rebar3
+REBAR3=${rootdir}/bin/rebar3
 
 if [ -z "${ERLFMT}" ] && [ "${ERLANG_VER}" != "20" ]; then
     install_local_erlfmt
@@ -345,7 +310,7 @@ fi
 # only update dependencies, when we are not in a release tarball
 if [ -d .git  -a $SKIP_DEPS -ne 1 ]; then
     echo "==> updating dependencies"
-    ${REBAR} get-deps update-deps
+    ${REBAR3} get-deps
 fi
 
 # External repos frequently become integrated with the primary repo,

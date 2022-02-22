@@ -128,7 +128,8 @@ src/mango/venv/
 src/jwtf/.rebar3/
 test/javascript/junit.xml
 
-/_build/
+_build/
+rebar.lock
 /src/bunt
 /src/credo/
 /src/httpotion/
