@@ -10,7 +10,8 @@
   ],
   "AttachmentMultipartTest": [
     "manages attachments multipart requests successfully",
-    "manages compressed attachments successfully"
+    "manages compressed attachments successfully",
+    "multipart attachments with new_edits=false"
   ],
   "AttachmentNamesTest": [
     "saves attachment names successfully"
