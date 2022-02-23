@@ -23,7 +23,7 @@
 
 % Sharding functions
 -export([num_servers/0, server_name/1, by_sig/1, by_pid/1, by_db/1]).
--export([aggregate_queue_len/0]).
+-export([aggregate_queue_len/0, names/0]).
 
 % Exported for callbacks
 -export([
@@ -381,6 +381,10 @@ name(BaseName, Arg) when is_binary(Arg) ->
     name(BaseName, N);
 name(BaseName, N) when is_integer(N), N > 0 ->
     list_to_atom(BaseName ++ "_" ++ integer_to_list(N)).
+
+names() ->
+    N = num_servers(),
+    [server_name(I) || I <- lists:seq(1, N)].
 
 aggregate_queue_len() ->
     N = num_servers(),
