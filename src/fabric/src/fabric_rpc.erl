@@ -638,16 +638,14 @@ make_att_readers([#doc{atts = Atts0} = Doc | Rest]) ->
     [Doc#doc{atts = Atts} | make_att_readers(Rest)].
 
 make_att_reader({follows, Parser, Ref}) ->
+    % This code will fail if the returned closure is called by a
+    % process other than the one that called make_att_reader/1 in the
+    % first place. The reason we don't put everything inside the
+    % closure is that the `hello_from_writer` message must *always* be
+    % sent to the parser, even if the closure never gets called.
+    ParserRef = erlang:monitor(process, Parser),
+    Parser ! {hello_from_writer, Ref, self()},
     fun() ->
-        ParserRef =
-            case get(mp_parser_ref) of
-                undefined ->
-                    PRef = erlang:monitor(process, Parser),
-                    put(mp_parser_ref, PRef),
-                    PRef;
-                Else ->
-                    Else
-            end,
         Parser ! {get_bytes, Ref, self()},
         receive
             {bytes, Ref, Bytes} ->

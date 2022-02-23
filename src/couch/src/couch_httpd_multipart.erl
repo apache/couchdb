@@ -104,6 +104,10 @@ mp_parse_atts(eof, {Ref, Chunks, Offset, Counters, Waiting}) ->
             receive
                 abort_parsing ->
                     ok;
+                {hello_from_writer, Ref, WriterPid} ->
+                    WriterRef = erlang:monitor(process, WriterPid),
+                    NewCounters = orddict:store(WriterPid, {WriterRef, 0}, Counters),
+                    mp_parse_atts(eof, {Ref, Chunks, Offset, NewCounters, Waiting});
                 {get_bytes, Ref, From} ->
                     C2 = update_writer(From, Counters),
                     case maybe_send_data({Ref, Chunks, Offset, C2, [From | Waiting]}) of
@@ -134,6 +138,10 @@ mp_abort_parse_atts(_, _) ->
 
 maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
     receive
+        {hello_from_writer, Ref, WriterPid} ->
+            WriterRef = erlang:monitor(process, WriterPid),
+            NewCounters = orddict:store(WriterPid, {WriterRef, 0}, Counters),
+            maybe_send_data({Ref, Chunks, Offset, NewCounters, Waiting});
         {get_bytes, Ref, From} ->
             NewCounters = update_writer(From, Counters),
             maybe_send_data({Ref, Chunks, Offset, NewCounters, [From | Waiting]})
@@ -195,6 +203,10 @@ maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
                                 NewAcc = {Ref, NewChunks, NewOffset, C2, RestWaiting},
                                 maybe_send_data(NewAcc)
                         end;
+                    {hello_from_writer, Ref, WriterPid} ->
+                        WriterRef = erlang:monitor(process, WriterPid),
+                        C2 = orddict:store(WriterPid, {WriterRef, 0}, Counters),
+                        maybe_send_data({Ref, NewChunks, NewOffset, C2, Waiting});
                     {get_bytes, Ref, X} ->
                         C2 = update_writer(X, Counters),
                         maybe_send_data({Ref, NewChunks, NewOffset, C2, [X | NewWaiting]})
@@ -206,15 +218,7 @@ maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
 
 update_writer(WriterPid, Counters) ->
     UpdateFun = fun({WriterRef, Count}) -> {WriterRef, Count + 1} end,
-    InitialValue =
-        case orddict:find(WriterPid, Counters) of
-            {ok, IV} ->
-                IV;
-            error ->
-                WriterRef = erlang:monitor(process, WriterPid),
-                {WriterRef, 1}
-        end,
-    orddict:update(WriterPid, UpdateFun, InitialValue, Counters).
+    orddict:update(WriterPid, UpdateFun, Counters).
 
 remove_writer(WriterPid, WriterRef, Counters) ->
     case orddict:find(WriterPid, Counters) of
