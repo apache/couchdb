@@ -217,8 +217,13 @@ maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
     end.
 
 update_writer(WriterPid, Counters) ->
-    UpdateFun = fun({WriterRef, Count}) -> {WriterRef, Count + 1} end,
-    orddict:update(WriterPid, UpdateFun, Counters).
+    case orddict:find(WriterPid, Counters) of
+        {ok, {WriterRef, Count}} ->
+            orddict:store(WriterPid, {WriterRef, Count + 1}, Counters);
+        error ->
+            WriterRef = erlang:monitor(process, WriterPid),
+            orddict:store(WriterPid, {WriterRef, 1}, Counters)
+    end.
 
 remove_writer(WriterPid, WriterRef, Counters) ->
     case orddict:find(WriterPid, Counters) of
