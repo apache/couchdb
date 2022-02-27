@@ -1,0 +1,57 @@
+name: Dev Environment Builder
+
+on:
+  workflow_dispatch:
+    inputs:
+      erlangVersion:
+        description: 'Erlang/OTP Version'
+        required: true
+        default: '24'
+      fdbVersion:
+        description: 'FoundationDB Client Version'
+        required: true
+        default: '6.2.28'
+      platforms:
+        description: 'Target Platforms'
+        required: true
+        default: 'linux/amd64'
+
+jobs:
+  build-and-push-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Authenticate to container registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Inspect builder
+        run: |
+          echo "Name:      ${{ steps.buildx.outputs.name }}"
+          echo "Endpoint:  ${{ steps.buildx.outputs.endpoint }}"
+          echo "Status:    ${{ steps.buildx.outputs.status }}"
+          echo "Flags:     ${{ steps.buildx.outputs.flags }}"
+          echo "Platforms: ${{ steps.buildx.outputs.platforms }}"
+
+      - name: Build and push
+        uses: docker/build-push-action@v2
+        with:
+          context: "{{defaultContext}}:.devcontainer"
+
+          push: true
+
+          platforms: ${{ github.event.inputs.platforms }}
+
+          build-args: |
+            ERLANG_VSN=${{ github.event.inputs.erlangVersion }}
+            FDB_VSN=${{ github.event.inputs.fdbVersion }}
+            NODE_VSN=14
+          tags: |
+            ghcr.io/${{ github.repository }}:devcontainer-erlang-${{ github.event.inputs.erlangVersion }}-fdb-${{ github.event.inputs.fdbVersion }}
