@@ -37,7 +37,7 @@ def generateStage(ERLANG_VERSION) {
                     'FDB_COORDINATOR=fdb',
                     'ERL_ZFLAGS="-erlfdb test_cluster_file <<\\\"/etc/foundationdb/fdb.cluster\\\">>"'
                   ]) {
-                    sh( '/usr/local/bin/create_cluster_file.bash' )
+                    sh( 'bash /usr/local/bin/create_cluster_file.bash' )
                     sh( 'cat /etc/foundationdb/fdb.cluster')
                     sh( script: "mkdir -p ${COUCHDB_IO_LOG_DIR} build-${ERLANG_VERSION}" )
                     sh( script: "tar -xf apache-couchdb-*.tar.gz -C build-${ERLANG_VERSION} --strip-components=1", label: 'Unpack release' )
