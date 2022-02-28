@@ -35,6 +35,11 @@ function create_cluster_file() {
 		echo "$FDB_CLUSTER_FILE_CONTENTS" > $FDB_CLUSTER_FILE
 	elif [[ -n $FDB_COORDINATOR ]]; then
 		coordinator_ip=$(getent hosts $FDB_COORDINATOR | awk {'print $1'})
+		x=$(getent hosts $FDB_COORDINATOR)
+		y=$(getent hosts fdb)
+		echo "Output of getent: ${x}"
+		echo "Output of getent raw: ${y}"
+		echo "coordinator_ip: ${coordinator_ip}"
 		if [[ -z "$coordinator_ip" ]]; then
 			echo "Failed to look up coordinator address for $FDB_COORDINATOR" 1>&2
 			exit 1
