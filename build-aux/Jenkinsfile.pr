@@ -37,6 +37,9 @@ def generateStage(ERLANG_VERSION) {
                     'FDB_COORDINATOR=fdb',
                     'ERL_ZFLAGS="-erlfdb test_cluster_file <<\\\"/etc/foundationdb/fdb.cluster\\\">>"'
                   ]) {
+                    sh( 'cat /etc/hosts' )
+                    sh( 'getent hosts fdb' )
+                    sh( 'getent hosts fdb | awk {\'print $1\'}' )
                     sh( 'bash /usr/local/bin/create_cluster_file.bash' )
                     sh( 'cat /etc/foundationdb/fdb.cluster')
                     sh( script: "mkdir -p ${COUCHDB_IO_LOG_DIR} build-${ERLANG_VERSION}" )
