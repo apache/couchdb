@@ -3,14 +3,10 @@ name: Dev Environment Builder
 on:
   workflow_dispatch:
     inputs:
-      erlangVersion:
-        description: 'Erlang/OTP Version'
-        required: true
-        default: '24'
       fdbVersion:
         description: 'FoundationDB Client Version'
         required: true
-        default: '6.2.28'
+        default: '6.3.23'
       platforms:
         description: 'Target Platforms'
         required: true
@@ -19,6 +15,10 @@ on:
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        erlangVersion: [20, 21, 22, 23, 24, 25]
 
     steps:
       - name: Authenticate to container registry
@@ -50,7 +50,7 @@ jobs:
           platforms: ${{ github.event.inputs.platforms }}
 
           build-args: |
-            ERLANG_VSN=${{ github.event.inputs.erlangVersion }}
+            ERLANG_VSN=${{ matrix.erlangVersion }}
             FDB_VSN=${{ github.event.inputs.fdbVersion }}
             NODE_VSN=14
           tags: |
