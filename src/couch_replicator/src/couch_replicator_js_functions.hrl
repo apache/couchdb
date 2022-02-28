@@ -58,6 +58,21 @@
             return;
         }
 
+        // Only the replicator may change these fields, though any authorised
+        // user may delete them.
+        if (oldDoc) {
+            var keys = Object.keys(newDoc)
+            for (var i = 0; i < keys.length; i++) {
+                var key = keys[i];
+                if (key.indexOf('_replication_') === 0 &&
+                    typeof(oldDoc[key]) === 'string' &&
+                    typeof(newDoc[key]) === 'string' &&
+                    oldDoc[key] != newDoc[key]) {
+                    reportError('Only the replicator may modify the ' + key + ' field.');
+                }
+            }
+        }
+
         if (newDoc._replication_state === 'failed') {
             // Skip validation in case when we update the document with the
             // failed state. In this case it might be malformed. However,
