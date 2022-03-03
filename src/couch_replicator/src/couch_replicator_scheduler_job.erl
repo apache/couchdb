@@ -344,7 +344,13 @@ handle_info(timeout, InitArgs) ->
             % Shutdown state is used to pass extra info about why start failed.
             ShutdownState = {error, Class, StackTop2, InitArgs},
             {stop, {shutdown, ShutdownReason}, ShutdownState}
-    end.
+        end;
+
+handle_info({Ref, Tuple}, State) when is_reference(Ref), is_tuple(Tuple) ->
+    % Ignore responses from timed-out or retried ibrowse calls. Aliases in
+    % Erlang 24 should help with this problem, so we should revisit this clause
+    % when we update our minimum Erlang version to >= 24.
+    {noreply, State}.
 
 terminate(
     normal,
