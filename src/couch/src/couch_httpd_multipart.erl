@@ -122,7 +122,7 @@ mp_parse_atts(eof, {Ref, Chunks, Offset, Counters, Waiting}) ->
                             NewAcc = {Ref, Chunks, Offset, C2, Waiting -- [WriterPid]},
                             mp_parse_atts(eof, NewAcc)
                     end
-            after 300000 ->
+            after att_writer_timeout() ->
                 ok
             end
     end.
@@ -198,7 +198,7 @@ maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
                     {get_bytes, Ref, X} ->
                         C2 = update_writer(X, Counters),
                         maybe_send_data({Ref, NewChunks, NewOffset, C2, [X | NewWaiting]})
-                after 300000 ->
+                after att_writer_timeout() ->
                     abort_parsing
                 end
         end
@@ -242,6 +242,9 @@ num_mp_writers() ->
         undefined -> 1;
         Count -> Count
     end.
+
+att_writer_timeout() ->
+    config:get_integer("couchdb", "attachment_writer_timeout", 300000).
 
 encode_multipart_stream(_Boundary, JsonBytes, [], WriteFun, _AttFun) ->
     WriteFun(JsonBytes);
