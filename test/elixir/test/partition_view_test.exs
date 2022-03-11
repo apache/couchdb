@@ -29,6 +29,16 @@ defmodule ViewPartitionTest do
       }
     """
 
+    red_custom = """
+        function(keys, values, rereduce) {
+            if (rereduce) {
+                return sum(values);
+            } else {
+                return values.length;
+            }
+        }
+     """
+
     query = %{:w => 3}
 
     body = %{
@@ -54,6 +64,10 @@ defmodule ViewPartitionTest do
         %{
           _id: "_design/reduce",
           views: %{some: %{map: map_fun2, reduce: "_count"}}
+        },
+        %{
+          _id: "_design/reduce_custom",
+          views: %{some: %{map: map_fun2, reduce: red_custom}}
         },
         %{
           _id: "_design/include_ddocs",
@@ -275,6 +289,32 @@ defmodule ViewPartitionTest do
     db_name = context[:db_name]
 
     url = "/#{db_name}/_partition/foo/_design/reduce/_view/some"
+    resp = Couch.get(url, query: %{reduce: true, group_level: 1})
+    assert resp.status_code == 200
+    results = get_reduce_result(resp)
+    assert results == [%{"key" => ["field"], "value" => 50}]
+
+    resp = Couch.get(url, query: %{reduce: true, group_level: 2})
+    results = get_reduce_result(resp)
+
+    assert results == [
+             %{"key" => ["field", "one"], "value" => 16},
+             %{"key" => ["field", "two"], "value" => 34}
+           ]
+
+    resp = Couch.get(url, query: %{reduce: true, group: true})
+    results = get_reduce_result(resp)
+
+    assert results == [
+             %{"key" => ["field", "one"], "value" => 16},
+             %{"key" => ["field", "two"], "value" => 34}
+           ]
+  end
+
+  test "query with custom reduce works", context do
+    db_name = context[:db_name]
+
+    url = "/#{db_name}/_partition/foo/_design/reduce_custom/_view/some"
     resp = Couch.get(url, query: %{reduce: true, group_level: 1})
     assert resp.status_code == 200
     results = get_reduce_result(resp)
