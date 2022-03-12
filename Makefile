@@ -118,7 +118,7 @@ help:
 
 
 .PHONY: couch
-# target: couch - Build CouchDB core, use ERL_OPTS to provide custom compiler's options
+# target: couch - Build CouchDB core, use ERL_COMPILER_OPTIONS to provide custom compiler's options
 couch: config.erl
 	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) compile $(COMPILE_OPTS)
 	@cp src/couch/priv/couchjs bin/
@@ -152,6 +152,7 @@ escriptize: couch
 .PHONY: check
 # target: check - Test everything
 check: all python-black
+	@$(MAKE) exunit
 	@$(MAKE) eunit
 	@$(MAKE) mango-test
 	@$(MAKE) elixir-suite
@@ -183,6 +184,7 @@ exunit: export MIX_ENV=test
 exunit: export ERL_LIBS = $(shell pwd)/src
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
 	@mix test --trace $(EXUNIT_OPTS)
 

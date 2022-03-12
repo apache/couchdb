@@ -41,7 +41,8 @@ start_couch(Options) ->
     end,
     {TmpDb, Ctx}.
 
-stop_couch({_TmpDb, Ctx}) ->
+stop_couch({TmpDb, Ctx}) ->
+    fabric:delete_db(TmpDb),
     test_util:stop_couch(Ctx).
 
 clear() ->

@@ -17,7 +17,8 @@
     less_json_ids/2,
     less_json/2,
     get_icu_version/0,
-    get_uca_version/0
+    get_uca_version/0,
+    get_collator_version/0
 ]).
 
 % For testing
@@ -62,6 +63,9 @@ get_icu_version() ->
 
 get_uca_version() ->
     erlang:nif_error(get_uca_version).
+
+get_collator_version() ->
+    erlang:nif_error(get_collator_version).
 
 less_nif(A, B) ->
     erlang:nif_error(less_nif_load_error, [A, B]).

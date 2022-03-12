@@ -144,7 +144,13 @@ force_reply(Doc, [], {_, W, Acc}) ->
 force_reply(Doc, [FirstReply | _] = Replies, {Health, W, Acc}) ->
     case update_quorum_met(W, Replies) of
         {true, Reply} ->
-            {Health, W, [{Doc, Reply} | Acc]};
+            % corner case new_edits:false and vdu: [noreply, forbidden, noreply]
+            case check_forbidden_msg(Replies) of
+                {forbidden, Msg} ->
+                    {Health, W, [{Doc, {forbidden, Msg}} | Acc]};
+                false ->
+                    {Health, W, [{Doc, Reply} | Acc]}
+            end;
         false ->
             case [Reply || {ok, Reply} <- Replies] of
                 [] ->
@@ -157,7 +163,12 @@ force_reply(Doc, [FirstReply | _] = Replies, {Health, W, Acc}) ->
                         false ->
                             CounterKey = [fabric, doc_update, mismatched_errors],
                             couch_stats:increment_counter(CounterKey),
-                            {error, W, [{Doc, FirstReply} | Acc]}
+                            case check_forbidden_msg(Replies) of
+                                {forbidden, Msg} ->
+                                    {Health, W, [{Doc, {forbidden, Msg}} | Acc]};
+                                false ->
+                                    {error, W, [{Doc, FirstReply} | Acc]}
+                            end
                     end;
                 [AcceptedRev | _] ->
                     CounterKey = [fabric, doc_update, write_quorum_errors],
@@ -180,6 +191,32 @@ maybe_reply(Doc, Replies, {stop, W, Acc}) ->
             {stop, W, [{Doc, Reply} | Acc]};
         false ->
             continue
+    end.
+
+% This is a corner case where
+% 1) revision tree for the document are out of sync across nodes
+% 2) update on one node extends the revision tree
+% 3) VDU forbids the document
+% 4) remaining nodes do not extend revision tree, so noreply is returned
+% If at at least one node forbids the update, and all other replies
+% are noreply, then we reject the update
+check_forbidden_msg(Replies) ->
+    Pred = fun
+        ({_, {forbidden, _}}) ->
+            true;
+        (_) ->
+            false
+    end,
+    case lists:partition(Pred, Replies) of
+        {[], _} ->
+            false;
+        {[{_, {forbidden, Msg}} | _], RemReplies} ->
+            case lists:all(fun(E) -> E =:= noreply end, RemReplies) of
+                true ->
+                    {forbidden, Msg};
+                false ->
+                    false
+            end
     end.
 
 update_quorum_met(W, Replies) ->
@@ -255,6 +292,7 @@ validate_atomic_update(_DbName, AllDocs, true) ->
     throw({aborted, PreCommitFailures}).
 
 -ifdef(TEST).
+
 -include_lib("eunit/include/eunit.hrl").
 
 setup_all() ->
@@ -273,7 +311,13 @@ doc_update_test_() ->
         [
             fun doc_update1/0,
             fun doc_update2/0,
-            fun doc_update3/0
+            fun doc_update3/0,
+            fun one_forbid/0,
+            fun two_forbid/0,
+            fun extend_tree_forbid/0,
+            fun other_errors_one_forbid/0,
+            fun one_error_two_forbid/0,
+            fun one_success_two_forbid/0
         ]
     }.
 
@@ -282,7 +326,7 @@ doc_update1() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
     Doc2 = #doc{revs = {1, [<<"bar">>]}},
     Docs = [Doc1],
-    Docs2 = [Doc2, Doc1],
+    Docs2 = [Doc1, Doc2],
     Dict = dict:from_list([{Doc, []} || Doc <- Docs]),
     Dict2 = dict:from_list([{Doc, []} || Doc <- Docs2]),
 
@@ -350,7 +394,7 @@ doc_update1() ->
 doc_update2() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
     Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc2, Doc1],
+    Docs = [Doc1, Doc2],
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -374,14 +418,14 @@ doc_update2() ->
         handle_message({rexi_EXIT, 1}, lists:nth(3, Shards), Acc2),
 
     ?assertEqual(
-        {accepted, [{Doc1, {accepted, Doc2}}, {Doc2, {accepted, Doc1}}]},
+        {accepted, [{Doc1, {accepted, Doc1}}, {Doc2, {accepted, Doc2}}]},
         Reply
     ).
 
 doc_update3() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
     Doc2 = #doc{revs = {1, [<<"bar">>]}},
-    Docs = [Doc2, Doc1],
+    Docs = [Doc1, Doc2],
     Shards =
         mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
     GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
@@ -404,7 +448,203 @@ doc_update3() ->
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, lists:nth(3, Shards), Acc2),
 
-    ?assertEqual({ok, [{Doc1, {ok, Doc2}}, {Doc2, {ok, Doc1}}]}, Reply).
+    ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
+
+one_forbid() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+
+    Acc0 = {
+        length(Shards),
+        length(Docs),
+        list_to_integer("2"),
+        GroupedDocs,
+        dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+
+    {ok, {WaitingCount1, _, _, _, _} = Acc1} =
+        handle_message({ok, [{ok, Doc1}, noreply]}, hd(Shards), Acc0),
+    ?assertEqual(WaitingCount1, 2),
+
+    {ok, {WaitingCount2, _, _, _, _} = Acc2} =
+        handle_message(
+            {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(2, Shards), Acc1
+        ),
+    ?assertEqual(WaitingCount2, 1),
+
+    {stop, Reply} =
+        handle_message({ok, [{ok, Doc1}, noreply]}, lists:nth(3, Shards), Acc2),
+
+    ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {forbidden, <<"not allowed">>}}]}, Reply).
+
+two_forbid() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+
+    Acc0 = {
+        length(Shards),
+        length(Docs),
+        list_to_integer("2"),
+        GroupedDocs,
+        dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+
+    {ok, {WaitingCount1, _, _, _, _} = Acc1} =
+        handle_message({ok, [{ok, Doc1}, noreply]}, hd(Shards), Acc0),
+    ?assertEqual(WaitingCount1, 2),
+
+    {ok, {WaitingCount2, _, _, _, _} = Acc2} =
+        handle_message(
+            {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(2, Shards), Acc1
+        ),
+    ?assertEqual(WaitingCount2, 1),
+
+    {stop, Reply} =
+        handle_message(
+            {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2
+        ),
+
+    ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {forbidden, <<"not allowed">>}}]}, Reply).
+
+% This should actually never happen, because an `{ok, Doc}` message means that the revision
+% tree is extended and so the VDU should forbid the document.
+% Leaving this test here to make sure quorum rules still apply.
+extend_tree_forbid() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+
+    Acc0 = {
+        length(Shards),
+        length(Docs),
+        list_to_integer("2"),
+        GroupedDocs,
+        dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+
+    {ok, {WaitingCount1, _, _, _, _} = Acc1} =
+        handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, hd(Shards), Acc0),
+    ?assertEqual(WaitingCount1, 2),
+
+    {ok, {WaitingCount2, _, _, _, _} = Acc2} =
+        handle_message(
+            {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(2, Shards), Acc1
+        ),
+    ?assertEqual(WaitingCount2, 1),
+
+    {stop, Reply} =
+        handle_message({ok, [{ok, Doc1}, {ok, Doc2}]}, lists:nth(3, Shards), Acc2),
+
+    ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {ok, Doc2}}]}, Reply).
+
+other_errors_one_forbid() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+
+    Acc0 = {
+        length(Shards),
+        length(Docs),
+        list_to_integer("2"),
+        GroupedDocs,
+        dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+
+    {ok, {WaitingCount1, _, _, _, _} = Acc1} =
+        handle_message({ok, [{ok, Doc1}, {Doc2, {error, <<"foo">>}}]}, hd(Shards), Acc0),
+    ?assertEqual(WaitingCount1, 2),
+
+    {ok, {WaitingCount2, _, _, _, _} = Acc2} =
+        handle_message({ok, [{ok, Doc1}, {Doc2, {error, <<"bar">>}}]}, lists:nth(2, Shards), Acc1),
+    ?assertEqual(WaitingCount2, 1),
+
+    {stop, Reply} =
+        handle_message(
+            {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2
+        ),
+    ?assertEqual({error, [{Doc1, {ok, Doc1}}, {Doc2, {Doc2, {error, <<"foo">>}}}]}, Reply).
+
+one_error_two_forbid() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+
+    Acc0 = {
+        length(Shards),
+        length(Docs),
+        list_to_integer("2"),
+        GroupedDocs,
+        dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+
+    {ok, {WaitingCount1, _, _, _, _} = Acc1} =
+        handle_message(
+            {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, hd(Shards), Acc0
+        ),
+    ?assertEqual(WaitingCount1, 2),
+
+    {ok, {WaitingCount2, _, _, _, _} = Acc2} =
+        handle_message({ok, [{ok, Doc1}, {Doc2, {error, <<"foo">>}}]}, lists:nth(2, Shards), Acc1),
+    ?assertEqual(WaitingCount2, 1),
+
+    {stop, Reply} =
+        handle_message(
+            {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2
+        ),
+    ?assertEqual(
+        {error, [{Doc1, {ok, Doc1}}, {Doc2, {Doc2, {forbidden, <<"not allowed">>}}}]}, Reply
+    ).
+
+one_success_two_forbid() ->
+    Doc1 = #doc{revs = {1, [<<"foo">>]}},
+    Doc2 = #doc{revs = {1, [<<"bar">>]}},
+    Docs = [Doc1, Doc2],
+    Shards =
+        mem3_util:create_partition_map("foo", 3, 1, ["node1", "node2", "node3"]),
+    GroupedDocs = group_docs_by_shard_hack(<<"foo">>, Shards, Docs),
+
+    Acc0 = {
+        length(Shards),
+        length(Docs),
+        list_to_integer("2"),
+        GroupedDocs,
+        dict:from_list([{Doc, []} || Doc <- Docs])
+    },
+
+    {ok, {WaitingCount1, _, _, _, _} = Acc1} =
+        handle_message(
+            {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, hd(Shards), Acc0
+        ),
+    ?assertEqual(WaitingCount1, 2),
+
+    {ok, {WaitingCount2, _, _, _, _} = Acc2} =
+        handle_message({ok, [{ok, Doc1}, {Doc2, {ok, Doc2}}]}, lists:nth(2, Shards), Acc1),
+    ?assertEqual(WaitingCount2, 1),
+
+    {stop, Reply} =
+        handle_message(
+            {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2
+        ),
+    ?assertEqual(
+        {error, [{Doc1, {ok, Doc1}}, {Doc2, {Doc2, {forbidden, <<"not allowed">>}}}]}, Reply
+    ).
 
 % needed for testing to avoid having to start the mem3 application
 group_docs_by_shard_hack(_DbName, Shards, Docs) ->

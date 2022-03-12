@@ -42,6 +42,7 @@
 -export([set_mqd_off_heap/1]).
 -export([set_process_priority/2]).
 -export([hmac/3]).
+-export([version_to_binary/1]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -805,3 +806,11 @@ hmac(Alg, Key, Message) ->
 
 % -ifdef(OTP_RELEASE)
 -endif.
+
+version_to_binary(Ver) when is_tuple(Ver) ->
+    version_to_binary(tuple_to_list(Ver));
+version_to_binary(Ver) when is_list(Ver) ->
+    IsZero = fun(N) -> N == 0 end,
+    Ver1 = lists:reverse(lists:dropwhile(IsZero, lists:reverse(Ver))),
+    Ver2 = [erlang:integer_to_list(N) || N <- Ver1],
+    ?l2b(lists:join(".", Ver2)).

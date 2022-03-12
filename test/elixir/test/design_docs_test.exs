@@ -251,7 +251,7 @@ defmodule DesignDocsTest do
   end
 
   @tag :with_db
-  test "test that we get correct design doc info back", context do
+  test "that we get correct design doc info back", context do
     db_name = context[:db_name]
     {:ok, _} = create_doc(db_name, @design_doc)
 
@@ -267,9 +267,18 @@ defmodule DesignDocsTest do
     for _x <- 0..1 do
       resp = Couch.get("/#{db_name}/_design/test/_info")
       assert resp.body["name"] == "test"
-      assert resp.body["view_index"]["sizes"]["file"] == prev_view_size
-      assert resp.body["view_index"]["compact_running"] == false
-      assert resp.body["view_index"]["signature"] == prev_view_sig
+      assert is_map(resp.body["view_index"])
+      view_index = resp.body["view_index"]
+      assert view_index["sizes"]["file"] == prev_view_size
+      assert view_index["compact_running"] == false
+      assert view_index["signature"] == prev_view_sig
+
+      # check collator_versions result
+      assert is_list(view_index["collator_versions"])
+      collator_versions = view_index["collator_versions"]
+      assert length(collator_versions) == 1
+      version = hd(collator_versions)
+      assert is_binary(version)
     end
   end
 

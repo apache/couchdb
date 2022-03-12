@@ -21,12 +21,13 @@
         {<<"_id">>, <<"_design/filter_ddoc">>},
         {<<"filters">>,
             {[
-                {<<"testfilter">>,
-                    <<"\n"
+                {<<"testfilter">>, <<
+                    "\n"
                     "            function(doc, req){if (doc.class == 'mammal') return true;}\n"
-                    "        ">>},
-                {<<"queryfilter">>,
-                    <<"\n"
+                    "        "
+                >>},
+                {<<"queryfilter">>, <<
+                    "\n"
                     "            function(doc, req) {\n"
                     "                if (doc.class && req.query.starts) {\n"
                     "                    return doc.class.indexOf(req.query.starts) === 0;\n"
@@ -35,20 +36,22 @@
                     "                    return false;\n"
                     "                }\n"
                     "            }\n"
-                    "        ">>}
+                    "        "
+                >>}
             ]}},
         {<<"views">>,
             {[
                 {<<"mammals">>,
                     {[
-                        {<<"map">>,
-                            <<"\n"
+                        {<<"map">>, <<
+                            "\n"
                             "                function(doc) {\n"
                             "                    if (doc.class == 'mammal') {\n"
                             "                        emit(doc._id, null);\n"
                             "                    }\n"
                             "                }\n"
-                            "            ">>}
+                            "            "
+                        >>}
                     ]}}
             ]}}
     ]}

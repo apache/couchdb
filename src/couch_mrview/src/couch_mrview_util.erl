@@ -32,6 +32,9 @@
 -export([get_view_keys/1, get_view_queries/1]).
 -export([set_view_type/3]).
 -export([set_extra/3, get_extra/2, get_extra/3]).
+-export([get_collator_versions/1]).
+-export([compact_on_collator_upgrade/0]).
+-export([commit_on_header_upgrade/0]).
 
 -define(MOD, couch_mrview_index).
 -define(GET_VIEW_RETRY_COUNT, 1).
@@ -285,6 +288,7 @@ init_state(Db, Fd, #mrst{views = Views} = State, nil) ->
         seq = 0,
         purge_seq = PurgeSeq,
         id_btree_state = nil,
+        view_info = update_collator_versions(#{}),
         view_states = [make_view_state(#mrview{}) || _ <- Views]
     },
     init_state(Db, Fd, State, Header);
@@ -293,12 +297,14 @@ init_state(Db, Fd, State, Header) ->
         language = Lang,
         views = Views
     } = State,
-    #mrheader{
+
+    {ShouldCommit, #mrheader{
         seq = Seq,
         purge_seq = PurgeSeq,
         id_btree_state = IdBtreeState,
+        view_info = ViewInfo,
         view_states = ViewStates
-    } = maybe_update_header(Header),
+    }} = maybe_update_header(Header),
 
     IdBtOpts = [
         {compression, couch_compress:get_compression_method()}
@@ -308,14 +314,15 @@ init_state(Db, Fd, State, Header) ->
     OpenViewFun = fun(St, View) -> open_view(Db, Fd, Lang, St, View) end,
     Views2 = lists:zipwith(OpenViewFun, ViewStates, Views),
 
-    State#mrst{
+    {ShouldCommit, State#mrst{
         fd = Fd,
         fd_monitor = erlang:monitor(process, Fd),
         update_seq = Seq,
         purge_seq = PurgeSeq,
         id_btree = IdBtree,
-        views = Views2
-    }.
+        views = Views2,
+        view_info = ViewInfo
+    }}.
 
 open_view(_Db, Fd, Lang, ViewState, View) ->
     ReduceFun = make_reduce_fun(Lang, View#mrview.reduce_funs),
@@ -764,14 +771,16 @@ make_header(State) ->
         update_seq = Seq,
         purge_seq = PurgeSeq,
         id_btree = IdBtree,
-        views = Views
+        views = Views,
+        view_info = ViewInfo
     } = State,
 
     #mrheader{
         seq = Seq,
         purge_seq = PurgeSeq,
         id_btree_state = get_btree_state(IdBtree),
-        view_states = [make_view_state(V) || V <- Views]
+        view_info = ViewInfo,
+        view_states = [make_disk_view_state(V) || V <- Views]
     }.
 
 index_file(DbName, Sig) ->
@@ -811,7 +820,8 @@ delete_file(FName) ->
 reset_index(Db, Fd, #mrst{sig = Sig} = State) ->
     ok = couch_file:truncate(Fd, 0),
     ok = couch_file:write_header(Fd, {Sig, nil}),
-    init_state(Db, Fd, reset_state(State), nil).
+    {_Commit, NewSt} = init_state(Db, Fd, reset_state(State), nil),
+    NewSt.
 
 reset_state(State) ->
     State#mrst{
@@ -819,7 +829,8 @@ reset_state(State) ->
         qserver = nil,
         update_seq = 0,
         id_btree = nil,
-        views = [View#mrview{btree = nil} || View <- State#mrst.views]
+        views = [View#mrview{btree = nil} || View <- State#mrst.views],
+        view_info = #{}
     }.
 
 all_docs_key_opts(#mrargs{extra = Extra} = Args) ->
@@ -1070,18 +1081,41 @@ old_view_format(View, SI, KSI) ->
         View#mrview.options
     }.
 
-maybe_update_header(#mrheader{} = Header) ->
-    Header;
-maybe_update_header(Header) when tuple_size(Header) == 6 ->
-    #mrheader{
-        seq = element(2, Header),
-        purge_seq = element(3, Header),
-        id_btree_state = element(4, Header),
-        view_states = [make_view_state(S) || S <- element(6, Header)]
-    }.
+maybe_update_header(#mrheader{view_info = Info} = Header) when is_map(Info) ->
+    % Latest (3.2.1+) version. The size of the record is the same as
+    % the <2.3.1 version. The main difference is that the LogBt field
+    % is now a map. This trick allows for easy downgrading back to
+    % version 3.2.1 and then upgrading back to 3.2.1+ if needed.
+    {false, Header#mrheader{
+        view_info = update_collator_versions(Info),
+        view_states = [make_view_state(S) || S <- Header#mrheader.view_states]
+    }};
+maybe_update_header({mrheader, Seq, PSeq, IDBt, ViewStates}) ->
+    % Versions >2.3.1 and =<3.2.1 (no view info map)
+    {true, #mrheader{
+        seq = Seq,
+        purge_seq = PSeq,
+        id_btree_state = IDBt,
+        view_info = update_collator_versions(#{}),
+        view_states = [make_view_state(S) || S <- ViewStates]
+    }};
+maybe_update_header({mrheader, Seq, PSeq, IDBt, _LogBt, ViewStates}) ->
+    % Versions <2.3.1.
+    {true, #mrheader{
+        seq = Seq,
+        purge_seq = PSeq,
+        id_btree_state = IDBt,
+        view_info = update_collator_versions(#{}),
+        view_states = [make_view_state(S) || S <- ViewStates]
+    }}.
 
 %% End of <= 2.x upgrade code.
 
+% Used for creating a new view states or reading (upgrading) from
+% disk. On disk, the state will be a 5 tuple with nil values in
+% positions 2 and 3 to allow downgrading between current version and
+% =<3.2.1 views.
+%
 make_view_state(#mrview{} = View) ->
     BTState = get_btree_state(View#mrview.btree),
     {
@@ -1089,10 +1123,34 @@ make_view_state(#mrview{} = View) ->
         View#mrview.update_seq,
         View#mrview.purge_seq
     };
-make_view_state({BTState, _SeqBTState, _KSeqBTState, UpdateSeq, PurgeSeq}) ->
+make_view_state({BTState, UpdateSeq, PurgeSeq}) ->
+    % Versions >2.x and =<3.2.1
+    {BTState, UpdateSeq, PurgeSeq};
+make_view_state({BTState, _SeqBTOrNil, _KSeqBTOrNil, UpdateSeq, PurgeSeq}) ->
+    % Current disk version and version 2.x views
     {BTState, UpdateSeq, PurgeSeq};
 make_view_state(nil) ->
     {nil, 0, 0}.
+
+% Used by make_header/1 before committing to disk. The two added nil
+% values in position 2 and 3 make the state on disk look like a 2.x
+% view, where those fields used to be SeqBTState and KSeqBTState,
+% respectively. This is to allow easy downgrading between current
+% version and >2.x and =<3.2.1 views.
+%
+make_disk_view_state(#mrview{} = View) ->
+    BTState = get_btree_state(View#mrview.btree),
+    {
+        BTState,
+        nil,
+        nil,
+        View#mrview.update_seq,
+        View#mrview.purge_seq
+    };
+make_disk_view_state({BTState, UpdateSeq, PurgeSeq}) ->
+    {BTState, nil, nil, UpdateSeq, PurgeSeq};
+make_disk_view_state(nil) ->
+    {nil, nil, nil, 0, 0}.
 
 get_key_btree_state(ViewState) ->
     element(1, ViewState).
@@ -1216,3 +1274,19 @@ kv_external_size(KVList, Reduction) ->
         ?term_size(Reduction),
         KVList
     ).
+
+update_collator_versions(#{} = ViewInfo) ->
+    Versions = maps:get(ucol_vs, ViewInfo, []),
+    Ver = tuple_to_list(couch_ejson_compare:get_collator_version()),
+    ViewInfo#{ucol_vs => lists:usort([Ver | Versions])}.
+
+get_collator_versions(#{ucol_vs := Versions}) when is_list(Versions) ->
+    Versions;
+get_collator_versions(#{}) ->
+    [].
+
+compact_on_collator_upgrade() ->
+    config:get_boolean("view_upgrade", "compact_on_collator_upgrade", true).
+
+commit_on_header_upgrade() ->
+    config:get_boolean("view_upgrade", "commit_on_header_upgrade", true).

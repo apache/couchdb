@@ -554,12 +554,13 @@ db_req(
     %% for missing databases that'd return error 404 from chttpd
     %% get_security used to prefer shards on the same node over other nodes
     fabric:get_security(DbName, [{user_ctx, Ctx}]),
+    CreationTime = mem3:shard_creation_time(DbName),
     send_json(
         Req,
         201,
         {[
             {ok, true},
-            {instance_start_time, <<"0">>}
+            {instance_start_time, CreationTime}
         ]}
     );
 db_req(#httpd{path_parts = [_, <<"_ensure_full_commit">>]} = Req, _Db) ->

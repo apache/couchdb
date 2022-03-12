@@ -33,6 +33,8 @@
 -export([wait_process/1, wait_process/2]).
 -export([wait/1, wait/2, wait/3]).
 -export([wait_value/2, wait_other_value/2]).
+-export([with_processes_restart/2, with_processes_restart/4]).
+-export([with_couch_server_restart/1]).
 
 -export([start/1, start/2, start/3, stop/1]).
 
@@ -89,6 +91,10 @@ stop_couch(#test_context{started = Apps}) ->
     stop_applications(Apps);
 stop_couch(_) ->
     stop_couch().
+
+with_couch_server_restart(Fun) ->
+    Servers = couch_server:names(),
+    test_util:with_processes_restart(Servers, Fun).
 
 start_applications(Apps) ->
     StartOrder = calculate_start_order(Apps),
@@ -245,6 +251,38 @@ wait_other_value(Fun, Value) ->
             Other -> Other
         end
     end).
+
+with_processes_restart(Processes, Fun) ->
+    with_processes_restart(Processes, Fun, 5000, 50).
+
+with_processes_restart(Names, Fun, Timeout, Delay) ->
+    Processes = lists:foldl(
+        fun(Name, Acc) ->
+            [{Name, whereis(Name)} | Acc]
+        end,
+        [],
+        Names
+    ),
+    [catch unlink(Pid) || {_, Pid} <- Processes],
+    Res = (catch Fun()),
+    {wait_start(Processes, Timeout, Delay), Res}.
+
+wait_start(Processses, TimeoutInSec, Delay) ->
+    Now = now_us(),
+    wait_start(Processses, TimeoutInSec * 1000, Delay, Now, Now, #{}).
+
+wait_start(_, Timeout, _Delay, Started, Prev, _) when Prev - Started > Timeout ->
+    timeout;
+wait_start([], Timeout, Delay, Started, _Prev, Res) ->
+    Res;
+wait_start([{Name, Pid} | Rest] = Processes, Timeout, Delay, Started, _Prev, Res) ->
+    case whereis(Name) of
+        NewPid when is_pid(NewPid) andalso NewPid =/= Pid ->
+            wait_start(Rest, Timeout, Delay, Started, now_us(), maps:put(Name, NewPid, Res));
+        _ ->
+            ok = timer:sleep(Delay),
+            wait_start(Processes, Timeout, Delay, Started, now_us(), Res)
+    end.
 
 start(Module) ->
     start(Module, [], []).

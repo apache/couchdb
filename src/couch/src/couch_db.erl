@@ -1793,15 +1793,15 @@ owner_of(Db, Seq) when not is_list(Db) ->
     owner_of(get_epochs(Db), Seq);
 owner_of([], _Seq) ->
     undefined;
-owner_of([{EpochNode, EpochSeq} | _Rest], Seq) when Seq > EpochSeq ->
+owner_of([{EpochNode, EpochSeq} | _Rest], Seq) when Seq >= EpochSeq ->
     EpochNode;
 owner_of([_ | Rest], Seq) ->
     owner_of(Rest, Seq).
 
-start_seq([{OrigNode, EpochSeq} | _], OrigNode, Seq) when Seq > EpochSeq ->
+start_seq([{OrigNode, EpochSeq} | _], OrigNode, Seq) when Seq >= EpochSeq ->
     %% OrigNode is the owner of the Seq so we can safely stream from there
     Seq;
-start_seq([{_, NewSeq}, {OrigNode, _} | _], OrigNode, Seq) when Seq > NewSeq ->
+start_seq([{_, NewSeq}, {OrigNode, _} | _], OrigNode, Seq) when Seq >= NewSeq ->
     %% We transferred this file before Seq was written on OrigNode, so we need
     %% to stream from the beginning of the next epoch. Note that it is _not_
     %% necessary for the current node to own the epoch beginning at NewSeq
@@ -2314,6 +2314,8 @@ t_calculate_start_seq_shard_move() ->
         Db = test_util:fake_db([]),
         % Sequence when shard was on node1
         ?assertEqual(2, calculate_start_seq(Db, node1, {2, <<"foo">>})),
+        % Shard moved to node2 with no other updates after the move to node2
+        ?assertEqual(10, calculate_start_seq(Db, node2, {10, <<"foo">>})),
         % Sequence from node1 after the move happened, we reset back to the
         % start of the epoch on node2 = 10
         ?assertEqual(10, calculate_start_seq(Db, node1, {16, <<"foo">>})),
@@ -2323,11 +2325,15 @@ t_calculate_start_seq_shard_move() ->
 
 is_owner_test() ->
     ?assertNot(is_owner(foo, 1, [])),
-    ?assertNot(is_owner(foo, 1, [{foo, 1}])),
+    ?assertNot(is_owner(foo, 1, [{foo, 2}])),
+    ?assert(is_owner(foo, 1, [{foo, 1}])),
     ?assert(is_owner(foo, 2, [{foo, 1}])),
     ?assert(is_owner(foo, 50, [{bar, 100}, {foo, 1}])),
     ?assert(is_owner(foo, 50, [{baz, 200}, {bar, 100}, {foo, 1}])),
     ?assert(is_owner(bar, 150, [{baz, 200}, {bar, 100}, {foo, 1}])),
+    ?assert(is_owner(bar, 100, [{baz, 200}, {bar, 100}, {foo, 1}])),
+    ?assertNot(is_owner(bar, 99, [{baz, 200}, {bar, 100}, {foo, 1}])),
+    ?assertNot(is_owner(baz, 199, [{baz, 200}, {bar, 100}, {foo, 1}])),
     ?assertError(duplicate_epoch, validate_epochs([{foo, 1}, {bar, 1}])),
     ?assertError(epoch_order, validate_epochs([{foo, 100}, {bar, 200}])).
 
