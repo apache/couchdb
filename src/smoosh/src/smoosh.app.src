@@ -10,20 +10,19 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
-{application, smoosh,
- [
-  {description, "Auto-compaction daemon"},
-  {vsn, git},
-  {registered, [smoosh_server]},
-  {applications, [
-                  kernel,
-                  stdlib,
-                  couch_log,
-                  config,
-                  couch_event,
-                  couch,
-                  mem3
-                 ]},
-  {mod, { smoosh_app, []}},
-  {env, []}
- ]}.
+{application, smoosh, [
+    {description, "Auto-compaction daemon"},
+    {vsn, git},
+    {registered, [smoosh_server]},
+    {applications, [
+        kernel,
+        stdlib,
+        couch_log,
+        config,
+        couch_event,
+        couch,
+        mem3
+    ]},
+    {mod, {smoosh_app, []}},
+    {env, []}
+]}.

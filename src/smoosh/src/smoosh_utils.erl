@@ -14,9 +14,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 -export([get/2, get/3, group_pid/1, split/1, stringify/1, ignore_db/1]).
--export([
-    in_allowed_window/1
-]).
+-export([in_allowed_window/1, write_to_file/3]).
 
 group_pid({Shard, GroupId}) ->
     case couch_view_group:open_db_group(Shard, GroupId) of
@@ -73,6 +71,33 @@ in_allowed_window(From, To) ->
             ({HH, MM} >= From) andalso ({HH, MM} < To);
         false ->
             ({HH, MM} >= From) orelse ({HH, MM} < To)
+    end.
+
+file_delete(Path) ->
+    case file:delete(Path) of
+        Ret when Ret =:= ok; Ret =:= {error, enoent} ->
+            ok;
+        Error ->
+            Error
+    end.
+
+throw_on_error(_Args, ok) ->
+    ok;
+throw_on_error(Args, {error, Reason}) ->
+    throw({error, {Reason, Args}}).
+
+write_to_file(Content, FileName, VSN) ->
+    couch_log:notice("~p Writing state to state file ~s", [?MODULE, FileName]),
+    OnDisk = <<VSN, (erlang:term_to_binary(Content, [compressed, {minor_version, 1}]))/binary>>,
+    TmpFileName = FileName ++ ".tmp",
+    try
+        throw_on_error(TmpFileName, file_delete(TmpFileName)),
+        throw_on_error(TmpFileName, file:write_file(TmpFileName, OnDisk, [sync])),
+        throw_on_error(FileName, file_delete(FileName)),
+        throw_on_error([TmpFileName, FileName], file:rename(TmpFileName, FileName))
+    catch
+        throw:Error ->
+            Error
     end.
 
 parse_time(undefined, Default) ->

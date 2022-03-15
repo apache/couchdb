@@ -107,7 +107,27 @@ However, it's the best measure we currently have.
 
 [Even more info](https://github.com/apache/couchdb-smoosh#notes-on-the-data_size-value).
 
+#### State diagram
 
+```
+stateDiagram
+    [*] --> init
+    init --> start_recovery: send_after(?START_DELAY_IN_MSEC, self(), start_recovery)
+    note right of start_recovery
+        activated = false
+        paused = true
+    end note
+    start_recovery --> activate: send_after(?ACTIVATE_DELAY_IN_MSEC, self(), activate)
+    note right of activate
+        state has been recovered
+        activated = true
+        paused = true
+    end note
+    activate --> schedule_unpause
+    schedule_unpause --> [*]: after 30 sec, paused = false and compaction of new jobs begin
+```
+
+See [here](https://mermaid.ink/img/pako:eNqNUtFKwzAU_ZVLnjbpQPCtoFK2PgzUB1sEsVKy5LaNtklJ08kY-3eTtKVsTDBPybnnnntOkiNhiiMJSWeowY2gpaZNJsGuj5tPWK0eQEhhBsTtPGTJ2uQamdqjPoTQoeQ5LQzqxWOSRq9pvomfovd8-5I_J_E6sIS6WCyDi8blICuVQdCirAyo4oIyMNyizIi99cjhHgpadziXWtp3Hje6H2FryOsOp3NNH2GSOzcfrdPtW5TGf_mfuq46n4qzMX-pUNEOdogSRgPIr6ea3f8r1NQ6vAirkPc15r30jWPuC9RT7buG4PPC3a1NxoJ5lr9YoHYOU03rJijpokn8gS-1czlKIUlAGtQNFdx-nKMblRFTYYMZCe2WU_2dkUyeLK9vubUYc2GUJqGXDwjtjUoOkpHQZZtI4-cbWadfC0TavA) for a diagram of smoosh's initial state during the recovery process.
 ### Defining a channel
 
 Defining a channel is done via normal dbcore configuration, with some

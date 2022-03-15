@@ -250,6 +250,7 @@ cat > rel/couchdb.config << EOF
 {prefix, "."}.
 {data_dir, "./data"}.
 {view_index_dir, "./data"}.
+{state_dir, "./data"}.
 {log_file, "$LOG_FILE"}.
 {fauxton_root, "./share/www"}.
 {user, "$COUCHDB_USER"}.

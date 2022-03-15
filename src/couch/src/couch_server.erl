@@ -22,6 +22,7 @@
 -export([dev_start/0, is_admin/2, has_admins/0, get_stats/0]).
 -export([close_db_if_idle/1]).
 -export([delete_compaction_files/1]).
+-export([is_compacting/1]).
 -export([exists/1]).
 -export([get_engine_extensions/0]).
 -export([get_engine_path/2]).
@@ -182,6 +183,14 @@ delete_compaction_files(DbName, DelOpts) when is_list(DbName) ->
     ok;
 delete_compaction_files(DbName, DelOpts) when is_binary(DbName) ->
     delete_compaction_files(?b2l(DbName), DelOpts).
+
+is_compacting(DbName) ->
+    lists:any(
+        fun({_, Engine}) ->
+            couch_db_engine:is_compacting(Engine, DbName)
+        end,
+        get_configured_engines()
+    ).
 
 maybe_add_sys_db_callbacks(DbName, Options) when is_binary(DbName) ->
     maybe_add_sys_db_callbacks(?b2l(DbName), Options);
