@@ -116,7 +116,7 @@ X means done, - means partially
 
 Elixir has a number of benefits which makes writing unit tests easier.
 For example it is trivial to do codegeneration of tests.
-Bellow we present a few use cases where code-generation is really helpful.
+Below we present a few use cases where code-generation is really helpful.
 
 ## How to write ExUnit tests
 

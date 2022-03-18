@@ -62,7 +62,7 @@ document are to be interpreted as described in
 [NOTE]: # (   Headers and parameters accepted )
 [NOTE]: # (   JSON in [if a PUT or POST type] )
 [NOTE]: # (   JSON out )
-[NOTE]: # (   Valid status codes and their defintions )
+[NOTE]: # (   Valid status codes and their definitions )
 [NOTE]: # (   A proposed Request and Response block )
 
 ## HTTP API deprecations

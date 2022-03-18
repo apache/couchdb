@@ -94,7 +94,7 @@ handle_call({accepted, Pid, Normal}, _From, #{} = St) ->
                 in => replicator,
                 pid => Pid
             }),
-            LogMsg = "~p : unknown acceptor processs ~p",
+            LogMsg = "~p : unknown acceptor process ~p",
             couch_log:error(LogMsg, [?MODULE, Pid]),
             {stop, {unknown_acceptor_pid, Pid}, St}
     end;

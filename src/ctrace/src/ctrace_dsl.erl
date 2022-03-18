@@ -54,7 +54,7 @@ parse_filter(OperationId, FilterDef) ->
 
 -spec validate_args(MapAST :: ast()) -> ok.
 validate_args(MapAST) ->
-    %% Unfortunatelly merl doesn't seem to support maps
+    %% Unfortunately merl doesn't seem to support maps
     %% so we had to do it manually
     lists:foldl(
         fun(AST, Bindings) ->

@@ -61,7 +61,7 @@ match_int(Selector, {Props}) ->
     match(Selector, {Props}, fun mango_json:cmp/2).
 
 % Convert each operator into a normalized version as well
-% as convert an implict operators into their explicit
+% as convert an implicit operators into their explicit
 % versions.
 norm_ops({[{<<"$and">>, Args}]}) when is_list(Args) ->
     {[{<<"$and">>, [norm_ops(A) || A <- Args]}]};
@@ -197,7 +197,7 @@ norm_ops(Value) ->
 %
 % Its important to note that we can only normalize
 % field names like this through boolean operators where
-% we can gaurantee commutativity. We can't necessarily
+% we can guarantee commutativity. We can't necessarily
 % do the same through the '$elemMatch' or '$allMatch'
 % operators but we can apply the same algorithm to its
 % arguments.

@@ -188,7 +188,7 @@ validate_args(#mrargs{} = Args, Opts) ->
         {red, exact, _} ->
             ok;
         {red, _, KeyList} when is_list(KeyList) ->
-            Msg = <<"Multi-key fetchs for reduce views must use `group=true`">>,
+            Msg = <<"Multi-key fetches for reduce views must use `group=true`">>,
             mrverror(Msg);
         _ ->
             ok

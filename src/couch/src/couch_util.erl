@@ -293,7 +293,7 @@ rand32() ->
 % given a pathname "../foo/bar/" it gives back the fully qualified
 % absolute pathname.
 abs_pathname(" " ++ Filename) ->
-    % strip leading whitspace
+    % strip leading whitespace
     abs_pathname(Filename);
 abs_pathname([$/ | _] = Filename) ->
     Filename;
@@ -315,7 +315,7 @@ abs_pathname(Filename, Dir) ->
             OutFilename
     end.
 
-% if this as an executable with arguments, seperate out the arguments
+% if this as an executable with arguments, separate out the arguments
 % ""./foo\ bar.sh -baz=blah" -> {"./foo\ bar.sh", " -baz=blah"}
 separate_cmd_args("", CmdAcc) ->
     {lists:reverse(CmdAcc), ""};
@@ -380,7 +380,7 @@ drop_dot_couch_ext(DbName) when is_binary(DbName) ->
 drop_dot_couch_ext(DbName) when is_list(DbName) ->
     binary_to_list(drop_dot_couch_ext(iolist_to_binary(DbName))).
 
-% takes a heirarchical list of dirs and removes the dots ".", double dots
+% takes a hierarchical list of dirs and removes the dots ".", double dots
 % ".." and the corresponding parent dirs.
 fix_path_list([], Acc) ->
     lists:reverse(Acc);

@@ -98,7 +98,7 @@ wait_for_job(JobId, Subscription, DDocId, UpdateSeq) ->
                     couch_jobs:remove(undefined, ?INDEX_JOB_TYPE, JobId),
                     erlang:error({ddoc_deleted, maps:get(<<"reason">>, Data)});
                 _OtherDocId ->
-                    % A different design doc wiht the same signature
+                    % A different design doc with the same signature
                     % was deleted. Resubmit this job which will overwrite
                     % the ddoc_id in the job.
                     retry

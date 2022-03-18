@@ -82,7 +82,7 @@ setup() ->
     NoAutoUpdate = {[{<<"autoupdate">>, false}]},
     {_, _} = create_doc(Db1, <<"_design/doc3">>, NoAutoUpdate),
 
-    % Db2 doesn't have any desig documents
+    % Db2 doesn't have any design documents
     {ok, Db2} = fabric2_db:create(?tempdb(), [?ADMIN_CTX]),
 
     #{db1 => Db1, db2 => Db2, ctx => Ctx, indices => Indices}.

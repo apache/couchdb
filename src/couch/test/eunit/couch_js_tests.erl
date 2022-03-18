@@ -71,7 +71,7 @@ should_roundtrip_utf8() ->
     ?assertEqual([[[<<16#C3, 16#84>>, <<16#C3, 16#9C>>]]], Result).
 
 should_roundtrip_modified_utf8() ->
-    % Mimicing the test case from the mailing list
+    % Mimicking the test case from the mailing list
     Src = <<
         "function(doc) {\n"
         "  emit(doc.value.toLowerCase(), \"",

@@ -236,7 +236,7 @@ defmodule CookieAuthTest do
         {:password, "eh, Boo-Boo?"}
       ])
 
-    # make sure we cant create duplicate users
+    # make sure we can't create duplicate users
     create_doc_expect_error(@users_db, duplicate_jchris_user_doc, 409, "conflict")
 
     # we can't create _names

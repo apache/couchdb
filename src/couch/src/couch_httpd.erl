@@ -988,7 +988,7 @@ http_respond_(#httpd{mochi_req = MochiReq}, Code, Headers, _Args, start_response
 http_respond_(#httpd{mochi_req = MochiReq}, 413, Headers, Args, Type) ->
     % Special handling for the 413 response. Make sure the socket is closed as
     % we don't know how much data was read before the error was thrown. Also
-    % drain all the data in the receive buffer to avoid connction being reset
+    % drain all the data in the receive buffer to avoid connection being reset
     % before the 413 response is parsed by the client. This is still racy, it
     % just increases the chances of 413 being detected correctly by the client
     % (rather than getting a brutal TCP reset).

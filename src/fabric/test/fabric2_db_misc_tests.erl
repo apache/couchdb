@@ -334,7 +334,7 @@ metadata_bump({DbName, _, _}) ->
         erlfdb:wait(erlfdb:get(Tx, ?METADATA_VERSION_KEY))
     end),
 
-    % Save timetamp before ensure_current/1 is called
+    % Save timestamp before ensure_current/1 is called
     TsBeforeEnsureCurrent = erlang:monotonic_time(millisecond),
 
     % Perform a random operation which calls ensure_current

@@ -31,7 +31,7 @@
 % Note for plugin developers: consider using the "auth" field in the source and
 % target objects to store credentials. In that case non-owner and non-admin
 % users will have those credentials stripped when they read the replication
-% document, which mimicks the behavior for "headers" and user and pass fields
+% document, which mimics the behavior for "headers" and user and pass fields
 % in endpoint URLs".
 
 -callback initialize(#httpdb{}) ->

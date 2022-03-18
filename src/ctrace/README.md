@@ -57,7 +57,7 @@ If a trace is disabled due to filtering then no trace data is generated.
 Code instrumentation
 --------------------
 
-The span lifecycle is controled by
+The span lifecycle is controlled by
 
 - `ctrace:start_span`
 - `ctrace:finish_span`
@@ -105,7 +105,7 @@ Instrumentation guide
   - httpd
   - internal trigger (replication or compaction jobs)
 - Start new child span when you cross layer boundaries
-- Start new child span when you cross node bounadary
+- Start new child span when you cross node boundary
 - Extend `<app>_httpd_handlers:handler_info/1` as needed to
   have operation ids. (We as community might need to work on
   naming conventions)

@@ -249,7 +249,7 @@ save_rep_doc(DbName, DbUUID, Doc) when is_binary(DbName), is_binary(DbUUID) ->
     catch
         error:database_does_not_exist ->
             {not_found, database_does_not_exist};
-        % User can accidently write a VDU which prevents _replicator from
+        % User can accidentally write a VDU which prevents _replicator from
         % updating replication documents. Avoid crashing replicator and thus
         % preventing all other replication jobs on the node from running.
         throw:{forbidden, Reason} ->

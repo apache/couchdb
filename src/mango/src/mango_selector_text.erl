@@ -303,7 +303,7 @@ get_range(max, _Arg) ->
 field_exists_query(Path) ->
     % We specify two here for :* and .* so that we don't incorrectly
     % match a path foo.name against foo.name_first (if were to just
-    % appened * isntead).
+    % append * isntead).
     Parts = [
         % We need to remove the period from the path list to indicate that it is
         % a path separator. We escape the colon because it is not used as a

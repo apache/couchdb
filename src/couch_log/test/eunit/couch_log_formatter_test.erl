@@ -811,7 +811,7 @@ coverage_test() ->
         lists:flatten(couch_log_formatter:format_trace(Trace))
     ),
 
-    % Excercising print_silly_list
+    % Exercising print_silly_list
     ?assertMatch(
         #log_entry{
             level = error,
@@ -826,7 +826,7 @@ coverage_test() ->
         )
     ),
 
-    % Excercising print_silly_list
+    % Exercising print_silly_list
     ?assertMatch(
         #log_entry{
             level = error,
