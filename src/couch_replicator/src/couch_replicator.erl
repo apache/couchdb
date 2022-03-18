@@ -258,7 +258,7 @@ start_transient_job(JobId, #{} = Rep) ->
                 Active = State =:= ?ST_PENDING orelse State =:= ?ST_RUNNING,
                 case SameRep andalso Active of
                     true ->
-                        % If a job with the same paremeters is running we don't
+                        % If a job with the same parameters is running we don't
                         % stop and just ignore the request. This is mainly for
                         % compatibility where users are able to idempotently
                         % POST the same job without it being stopped and
@@ -361,7 +361,7 @@ process_change(#{} = Db, #doc{deleted = false} = Doc) ->
                 case SameRep andalso Active of
                     true ->
                         % Document was changed but none of the parameters
-                        % relevent for the replication job have changed, so
+                        % relevant for the replication job have changed, so
                         % make it a no-op
                         ok;
                     false ->

@@ -50,7 +50,7 @@
 %% example.com = /example
 %% *.example.com = /example
 %%
-%% The first line will rewrite the rquest to display the content of the
+%% The first line will rewrite the request to display the content of the
 %% example database. This rule works only if the Host header is
 %% 'example.com' and won't work for CNAMEs. Second rule on the other hand
 %% match all CNAMES to example db. So www.example.com or db.example.com

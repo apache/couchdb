@@ -1215,7 +1215,7 @@ validate_node(#tree{} = Tree, #node{} = Node) ->
             ok
     end.
 
-%% data marshalling functions (encodes unnecesary fields as a NIL_REF)
+%% data marshalling functions (encodes unnecessary fields as a NIL_REF)
 
 encode_node(#tree{} = Tree, Key, #node{prev = undefined} = Node) ->
     encode_node(Tree, Key, Node#node{prev = []});

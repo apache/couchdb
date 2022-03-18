@@ -27,7 +27,7 @@
 %% and C. We now have two key trees, A->B and A->C. When we go to replicate a
 %% second time, the key tree must combine these two trees which gives us
 %% A->(B|C). This is how conflicts are introduced. In terms of the key tree, we
-%% say that we have two leaves (B and C) that are not deleted. The presense of
+%% say that we have two leaves (B and C) that are not deleted. The presence of
 %% the multiple leaves indicate conflict. To remove a conflict, one of the
 %% edits (B or C) can be deleted, which results in, A->(B|C->D) where D is an
 %% edit that is specially marked with the a deleted=true flag.
@@ -110,7 +110,7 @@ merge_tree([{Depth, Nodes} | Rest], {IDepth, INodes} = Tree, MergeAcc) ->
     % Its helpful to note that this whole moving into sub-branches is due
     % to how we store trees that have been stemmed. When a path is
     % stemmed so that the root node is lost, we wrap it in a tuple with
-    % the number keys that have been droped. This number is the depth
+    % the number keys that have been dropped. This number is the depth
     % value that's used throughout this module.
     case merge_at([Nodes], Depth - IDepth, [INodes]) of
         {[Merged], Result} ->

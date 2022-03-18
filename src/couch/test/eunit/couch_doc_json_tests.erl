@@ -233,7 +233,7 @@ from_json_error_cases() ->
         },
         {
             {[{<<"_rev">>, "foo-bar"}]},
-            "Error if _rev's integer expection is broken."
+            "Error if _rev's integer exception is broken."
         },
         {
             {[{<<"_revisions">>, {[{<<"start">>, true}]}}]},

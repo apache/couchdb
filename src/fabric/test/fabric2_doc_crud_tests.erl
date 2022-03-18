@@ -808,7 +808,7 @@ create_a_large_local_doc({Db, _}) ->
 
 create_2_large_local_docs({Db, _}) ->
     % Create a large doc then overwrite with a smaller one. The reason is to
-    % ensure the previous one correctly clears its range before writting the
+    % ensure the previous one correctly clears its range before writing the
     % new smaller one it its place.
     UUID = fabric2_util:uuid(),
     LDocId = <<?LOCAL_DOC_PREFIX, UUID/binary>>,

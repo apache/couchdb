@@ -5,7 +5,7 @@ This description of scheduling replicator's functionality is mainly geared to
 CouchDB developers. It dives a bit into the internal and explains how
 everything is connected together. A higher level overview is available in the
 [RFC](https://github.com/apache/couchdb-documentation/pull/581). This
-documention assumes the audience is familiar with that description as well as
+documentation assumes the audience is familiar with that description as well as
 with the [Couch Jobs
 RFC](https://github.com/apache/couchdb-documentation/blob/main/rfcs/007-background-jobs.md)
 as well as with the [Node Types

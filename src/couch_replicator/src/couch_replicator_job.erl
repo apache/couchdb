@@ -629,7 +629,7 @@ check_ownership(#{jtx := true} = JTx, Job, JobData) ->
                 ->
                     % Conflicting job is a transient job, not associated with a
                     % _replicator doc, so we let this job retry. This is also
-                    % partly done for compatibility with pervious replicator
+                    % partly done for compatibility with previous replicator
                     % behavior.
                     Error = <<"Duplicate job running: ", OtherJobId/binary>>,
                     reschedule_on_error(JTx, Job, JobData, Error),

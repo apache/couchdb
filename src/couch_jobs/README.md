@@ -17,7 +17,7 @@ This is a description of some of the modules:
    packing and unpacking, reading ranges and also managing transaction objects.
 
  * `couch_jobs_pending`: This module implements the pending jobs queue. These
-   functions could all go in `couch_jobs_fdb` but the implemention was fairly
+   functions could all go in `couch_jobs_fdb` but the implementation was fairly
    self-contained, with its own private helper functions, so it made sense to
    move to a separate module.
 

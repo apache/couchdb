@@ -96,8 +96,8 @@
     "bulk docs emits conflict error for duplicate doc `_id`s",
     "bulk docs raises conflict error for combined update & delete",
     "bulk docs raises error for `all_or_nothing` option",
-    "bulk docs raises error for invlaid `docs` parameter",
-    "bulk docs raises error for invlaid `new_edits` parameter",
+    "bulk docs raises error for invalid `docs` parameter",
+    "bulk docs raises error for invalid `new_edits` parameter",
     "bulk docs raises error for missing `docs` parameter",
     "bulk docs raises error for transaction larger than 10MB",
     "bulk docs supplies `id` if not provided in doc"
@@ -125,8 +125,8 @@
     "erlang function filtered changes",
     "function filtered changes",
     "map function filtered changes",
-    "non-existing desing doc and funcion for filtered changes",
-    "non-existing desing doc for filtered changes",
+    "non-existing design doc and function for filtered changes",
+    "non-existing design doc for filtered changes",
     "non-existing function for filtered changes"
   ],
   "CoffeeTest": [

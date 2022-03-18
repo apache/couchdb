@@ -71,7 +71,7 @@ handle_call({accepted, Pid}, _From, St) ->
             {reply, ok, spawn_acceptors(St1)};
         false ->
             ?LOG_ERROR(#{what => unknown_acceptor, pid => Pid}),
-            LogMsg = "~p : unknown acceptor processs ~p",
+            LogMsg = "~p : unknown acceptor process ~p",
             couch_log:error(LogMsg, [?MODULE, Pid]),
             {stop, {unknown_acceptor_pid, Pid}, St}
     end;

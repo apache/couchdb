@@ -191,7 +191,7 @@ null_authentication_handler(Req) ->
 %   * X-Auth-CouchDB-Token : token to authenticate the authorization (x_auth_token
 %   in couch_httpd_auth section). This token is an hmac-sha1 created from secret key
 %   and username. The secret key should be the same in the client and couchdb node. s
-%   ecret key is the secret key in couch_httpd_auth section of ini. This token is optional
+%   secret key is the secret key in couch_httpd_auth section of ini. This token is optional
 %   if value of proxy_use_secret key in couch_httpd_auth section of ini isn't true.
 %
 proxy_authentication_handler(Req) ->
