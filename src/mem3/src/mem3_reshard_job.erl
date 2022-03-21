@@ -464,6 +464,8 @@ wait_source_close_impl(#job{source = #shard{name = Name}, target = Targets}) ->
             end;
         {not_found, _} ->
             couch_log:warning("~p source already deleted ~p", [?MODULE, Name]),
+            ok;
+        {error, _} ->
             ok
     end.
 

@@ -39,26 +39,30 @@ call(Fun, DbName, DDoc, IndexName, QueryArgs0) ->
     QueryArgs = dreyfus_util:upgrade(QueryArgs0),
     erlang:put(io_priority, {search, DbName}),
     check_interactive_mode(),
-    {ok, Db} = get_or_create_db(DbName, []),
-    #index_query_args{
-        stale = Stale
-    } = QueryArgs,
-    {_LastSeq, MinSeq} = calculate_seqs(Db, Stale),
-    case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
-        {ok, Index} ->
-            case dreyfus_index_manager:get_index(DbName, Index) of
-                {ok, Pid} ->
-                    case dreyfus_index:await(Pid, MinSeq) of
-                        {ok, IndexPid, _Seq} ->
-                            Result = dreyfus_index:Fun(IndexPid, QueryArgs),
-                            rexi:reply(Result);
-                        % obsolete clauses, remove after upgrade
-                        ok ->
-                            Result = dreyfus_index:Fun(Pid, QueryArgs),
-                            rexi:reply(Result);
-                        {ok, _Seq} ->
-                            Result = dreyfus_index:Fun(Pid, QueryArgs),
-                            rexi:reply(Result);
+    case get_or_create_db(DbName, []) of
+        {ok, Db} ->
+            #index_query_args{
+                stale = Stale
+            } = QueryArgs,
+            {_LastSeq, MinSeq} = calculate_seqs(Db, Stale),
+            case dreyfus_index:design_doc_to_index(DDoc, IndexName) of
+                {ok, Index} ->
+                    case dreyfus_index_manager:get_index(DbName, Index) of
+                        {ok, Pid} ->
+                            case dreyfus_index:await(Pid, MinSeq) of
+                                {ok, IndexPid, _Seq} ->
+                                    Result = dreyfus_index:Fun(IndexPid, QueryArgs),
+                                    rexi:reply(Result);
+                                % obsolete clauses, remove after upgrade
+                                ok ->
+                                    Result = dreyfus_index:Fun(Pid, QueryArgs),
+                                    rexi:reply(Result);
+                                {ok, _Seq} ->
+                                    Result = dreyfus_index:Fun(Pid, QueryArgs),
+                                    rexi:reply(Result);
+                                Error ->
+                                    rexi:reply(Error)
+                            end;
                         Error ->
                             rexi:reply(Error)
                     end;

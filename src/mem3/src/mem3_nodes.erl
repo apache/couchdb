@@ -105,12 +105,16 @@ code_change(_OldVsn, #state{} = State, _Extra) ->
 
 initialize_nodelist() ->
     DbName = config:get("mem3", "nodes_db", "_nodes"),
-    {ok, Db} = mem3_util:ensure_exists(DbName),
-    {ok, _} = couch_db:fold_docs(Db, fun first_fold/2, Db, []),
-    insert_if_missing(Db, [node() | mem3_seeds:get_seeds()]),
-    Seq = couch_db:get_update_seq(Db),
-    couch_db:close(Db),
-    Seq.
+    case mem3_util:ensure_exists(DbName) of
+        {ok, Db} ->
+            {ok, _} = couch_db:fold_docs(Db, fun first_fold/2, Db, []),
+            insert_if_missing(Db, [node() | mem3_seeds:get_seeds()]),
+            Seq = couch_db:get_update_seq(Db),
+            couch_db:close(Db),
+            Seq;
+        {error, Reason} ->
+            erlang:error(Reason)
+    end.
 
 first_fold(#full_doc_info{id = <<"_design/", _/binary>>}, Acc) ->
     {ok, Acc};
@@ -123,15 +127,19 @@ first_fold(#full_doc_info{id = Id} = DocInfo, Db) ->
 
 listen_for_changes(Since) ->
     DbName = config:get("mem3", "nodes_db", "_nodes"),
-    {ok, Db} = mem3_util:ensure_exists(DbName),
-    Args = #changes_args{
-        feed = "continuous",
-        since = Since,
-        heartbeat = true,
-        include_docs = true
-    },
-    ChangesFun = couch_changes:handle_db_changes(Args, nil, Db),
-    ChangesFun(fun changes_callback/2).
+    case mem3_util:ensure_exists(DbName) of
+        {ok, Db} ->
+            Args = #changes_args{
+                feed = "continuous",
+                since = Since,
+                heartbeat = true,
+                include_docs = true
+            },
+            ChangesFun = couch_changes:handle_db_changes(Args, nil, Db),
+            ChangesFun(fun changes_callback/2);
+        {error, Reason} ->
+            erlang:error(Reason)
+    end.
 
 changes_callback(start, _) ->
     {ok, nil};

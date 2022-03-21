@@ -270,6 +270,8 @@ handle_message({rexi_DOWN, _, {_, NodeRef}, _}, _, State) ->
     fabric_view:check_down_shards(State, NodeRef);
 handle_message({rexi_EXIT, Reason}, Worker, State) ->
     fabric_view:handle_worker_exit(State, Worker, Reason);
+handle_message({error, Reason}, Worker, State) ->
+    fabric_view:handle_worker_exit(State, Worker, Reason);
 % Temporary upgrade clause - Case 24236
 handle_message({complete, Key}, Worker, State) when is_tuple(Key) ->
     handle_message({complete, [{seq, Key}, {pending, 0}]}, Worker, State);

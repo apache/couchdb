@@ -48,12 +48,16 @@ start_link() ->
 
 opts_for_db(DbName0) ->
     DbName = mem3:dbname(DbName0),
-    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
-    case couch_db:open_doc(Db, DbName, [ejson_body]) of
-        {ok, #doc{body = {Props}}} ->
-            mem3_util:get_shard_opts(Props);
-        {not_found, _} ->
-            erlang:error(database_does_not_exist, ?b2l(DbName))
+    case mem3_util:ensure_exists(mem3_sync:shards_db()) of
+        {ok, Db} ->
+            case couch_db:open_doc(Db, DbName, [ejson_body]) of
+                {ok, #doc{body = {Props}}} ->
+                    mem3_util:get_shard_opts(Props);
+                {not_found, _} ->
+                    erlang:error(database_does_not_exist, ?b2l(DbName))
+            end;
+        {error, Reason} ->
+            erlang:error(Reason)
     end.
 
 for_db(DbName) ->
@@ -167,14 +171,18 @@ local(DbName) ->
     lists:filter(Pred, for_db(DbName)).
 
 fold(Fun, Acc) ->
-    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
-    FAcc = {Db, Fun, Acc},
-    try
-        {ok, LastAcc} = couch_db:fold_docs(Db, fun fold_fun/2, FAcc),
-        {_Db, _UFun, UAcc} = LastAcc,
-        UAcc
-    after
-        couch_db:close(Db)
+    case mem3_util:ensure_exists(mem3_sync:shards_db()) of
+        {ok, Db} ->
+            FAcc = {Db, Fun, Acc},
+            try
+                {ok, LastAcc} = couch_db:fold_docs(Db, fun fold_fun/2, FAcc),
+                {_Db, _UFun, UAcc} = LastAcc,
+                UAcc
+            after
+                couch_db:close(Db)
+            end;
+        {error, Reason} ->
+            erlang:error(Reason)
     end.
 
 set_max_size(Size) when is_integer(Size), Size > 0 ->
@@ -335,21 +343,29 @@ fold_fun(#doc_info{} = DI, {Db, UFun, UAcc}) ->
     end.
 
 get_update_seq() ->
-    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
-    Seq = couch_db:get_update_seq(Db),
-    couch_db:close(Db),
-    Seq.
+    case mem3_util:ensure_exists(mem3_sync:shards_db()) of
+        {ok, Db} ->
+            Seq = couch_db:get_update_seq(Db),
+            couch_db:close(Db),
+            Seq;
+        {error, Reason} ->
+            erlang:error(Reason)
+    end.
 
 listen_for_changes(Since) ->
-    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
-    Args = #changes_args{
-        feed = "continuous",
-        since = Since,
-        heartbeat = true,
-        include_docs = true
-    },
-    ChangesFun = couch_changes:handle_db_changes(Args, Since, Db),
-    ChangesFun(fun changes_callback/2).
+    case mem3_util:ensure_exists(mem3_sync:shards_db()) of
+        {ok, Db} ->
+            Args = #changes_args{
+                feed = "continuous",
+                since = Since,
+                heartbeat = true,
+                include_docs = true
+            },
+            ChangesFun = couch_changes:handle_db_changes(Args, Since, Db),
+            ChangesFun(fun changes_callback/2);
+        {error, Reason} ->
+            erlang:error(Reason)
+    end.
 
 changes_callback(start, Acc) ->
     {ok, Acc};
@@ -396,11 +412,15 @@ changes_callback(timeout, _) ->
 
 load_shards_from_disk(DbName) when is_binary(DbName) ->
     couch_stats:increment_counter([mem3, shard_cache, miss]),
-    {ok, Db} = mem3_util:ensure_exists(mem3_sync:shards_db()),
-    try
-        load_shards_from_db(Db, DbName)
-    after
-        couch_db:close(Db)
+    case mem3_util:ensure_exists(mem3_sync:shards_db()) of
+        {ok, Db} ->
+            try
+                load_shards_from_db(Db, DbName)
+            after
+                couch_db:close(Db)
+            end;
+        {error, Reason} ->
+            erlang:error(Reason)
     end.
 
 load_shards_from_db(ShardDb, DbName) ->

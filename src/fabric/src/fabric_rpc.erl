@@ -152,9 +152,13 @@ all_docs(DbName, Options, Args0) ->
     case fabric_util:upgrade_mrargs(Args0) of
         #mrargs{keys = undefined} = Args ->
             set_io_priority(DbName, Options),
-            {ok, Db} = get_or_create_db(DbName, Options),
-            CB = get_view_cb(Args),
-            couch_mrview:query_all_docs(Db, Args, CB, Args)
+            case get_or_create_db(DbName, Options) of
+                {ok, Db} ->
+                    CB = get_view_cb(Args),
+                    couch_mrview:query_all_docs(Db, Args, CB, Args);
+                Error ->
+                    rexi:reply(Error)
+            end
     end.
 
 update_mrview(DbName, {DDocId, Rev}, ViewName, Args0) ->
@@ -177,9 +181,13 @@ map_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
 map_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
     Args = fabric_util:upgrade_mrargs(Args0),
-    {ok, Db} = get_or_create_db(DbName, DbOptions),
-    CB = get_view_cb(Args),
-    couch_mrview:query_view(Db, DDoc, ViewName, Args, CB, Args).
+    case get_or_create_db(DbName, DbOptions) of
+        {ok, Db} ->
+            CB = get_view_cb(Args),
+            couch_mrview:query_view(Db, DDoc, ViewName, Args, CB, Args);
+        Error ->
+            rexi:reply(Error)
+    end.
 
 %% @equiv reduce_view(DbName, DDoc, ViewName, Args0)
 reduce_view(DbName, DDocInfo, ViewName, Args0) ->
@@ -191,9 +199,13 @@ reduce_view(DbName, {DDocId, Rev}, ViewName, Args0, DbOptions) ->
 reduce_view(DbName, DDoc, ViewName, Args0, DbOptions) ->
     set_io_priority(DbName, DbOptions),
     Args = fabric_util:upgrade_mrargs(Args0),
-    {ok, Db} = get_or_create_db(DbName, DbOptions),
-    VAcc0 = #vacc{db = Db},
-    couch_mrview:query_view(Db, DDoc, ViewName, Args, fun reduce_cb/2, VAcc0).
+    case get_or_create_db(DbName, DbOptions) of
+        {ok, Db} ->
+            VAcc0 = #vacc{db = Db},
+            couch_mrview:query_view(Db, DDoc, ViewName, Args, fun reduce_cb/2, VAcc0);
+        Error ->
+            rexi:reply(Error)
+    end.
 
 create_db(DbName) ->
     create_db(DbName, []).

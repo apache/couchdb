@@ -67,7 +67,9 @@ split(Source, #{} = Targets, PickFun) when
                 couch_db:close(SourceDb)
             end;
         {not_found, _} ->
-            {error, missing_source}
+            {error, missing_source};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 copy_local_docs(Source, #{} = Targets0, PickFun) when
@@ -107,7 +109,9 @@ copy_local_docs(Source, #{} = Targets0, PickFun) when
                 couch_db:close(SourceDb)
             end;
         {not_found, _} ->
-            {error, missing_source}
+            {error, missing_source};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 cleanup_target(Source, Target) when is_binary(Source), is_binary(Target) ->
@@ -119,7 +123,9 @@ cleanup_target(Source, Target) when is_binary(Source), is_binary(Target) ->
                 couch_db:close(SourceDb)
             end;
         {not_found, _} ->
-            {error, missing_source}
+            {error, missing_source};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 % Private Functions

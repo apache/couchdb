@@ -108,6 +108,8 @@ handle_message({not_found, no_db_file} = X, Worker, Acc0) ->
     {_, _, _, GroupedDocs, _} = Acc0,
     Docs = couch_util:get_value(Worker, GroupedDocs),
     handle_message({ok, [X || _D <- Docs]}, Worker, Acc0);
+handle_message({error, Reason}, _, _) ->
+    throw({error, Reason});
 handle_message({bad_request, Msg}, _, _) ->
     throw({bad_request, Msg});
 handle_message({request_entity_too_large, Entity}, _, _) ->

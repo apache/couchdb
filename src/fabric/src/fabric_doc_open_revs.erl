@@ -76,6 +76,12 @@ handle_message({rexi_EXIT, _}, Worker, #state{workers = Workers} = State) ->
         reply_error_count = State#state.reply_error_count + 1
     },
     handle_message({ok, []}, nil, NewState);
+handle_message({error, _}, Worker, #state{workers = Workers} = State) ->
+    NewState = State#state{
+        workers = lists:delete(Worker, Workers),
+        reply_error_count = State#state.reply_error_count + 1
+    },
+    handle_message({ok, []}, nil, NewState);
 handle_message({ok, RawReplies}, Worker, State) ->
     #state{
         dbname = DbName,

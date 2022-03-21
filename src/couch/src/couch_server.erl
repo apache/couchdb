@@ -95,6 +95,8 @@ get_spidermonkey_version() -> list_to_binary(?COUCHDB_SPIDERMONKEY_VERSION).
 sup_start_link(N) ->
     gen_server:start_link({local, couch_server(N)}, couch_server, [N], []).
 
+-spec open(binary(), [term()]) ->
+    {ok, term()} | {not_found, no_db_file} | {error, term()}.
 open(DbName, Options) ->
     try
         validate_open_or_create(DbName, Options),

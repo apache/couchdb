@@ -126,7 +126,9 @@ go(#acc{source = Source, batch_count = BC} = Acc) ->
                     Else
             end;
         {not_found, no_db_file} ->
-            {error, missing_source}
+            {error, missing_source};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 make_local_id(Source, Target) ->
@@ -779,7 +781,9 @@ with_src_db(#acc{source = Source}, Fun) ->
                 couch_db:close(Db)
             end;
         {not_found, _} ->
-            error({error, missing_source})
+            error({error, missing_source});
+        {error, Reason} ->
+            error({error, Reason})
     end.
 
 is_prefix(Prefix, Subject) ->

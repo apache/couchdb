@@ -341,7 +341,11 @@ ensure_exists(DbName) ->
         {ok, Db} ->
             {ok, Db};
         file_exists ->
-            couch_db:open(DbName, [sys_db, ?ADMIN_CTX])
+            couch_db:open(DbName, [sys_db, ?ADMIN_CTX]);
+        {not_found, no_db_file} ->
+            {error, missing_source};
+        {error, Reason} ->
+            {error, Reason}
     end.
 
 is_deleted(Change) ->
@@ -602,6 +606,8 @@ get_or_create_db(DbName, Options) ->
                 error:database_does_not_exist ->
                     throw({error, missing_target})
             end;
+        {error, Reason} ->
+            throw({error, Reason});
         Else ->
             Else
     end.
@@ -619,6 +625,8 @@ get_or_create_db_int(DbName, Options) ->
                 error:database_does_not_exist ->
                     throw({error, missing_target})
             end;
+        {error, Reason} ->
+            throw({error, Reason});
         Else ->
             Else
     end.
@@ -652,6 +660,8 @@ get_shard_props(ShardName) ->
             [{props, Props} | EngineProps];
         {not_found, _} ->
             not_found;
+        {error, Reason} ->
+            {error, Reason};
         Else ->
             Else
     end.
