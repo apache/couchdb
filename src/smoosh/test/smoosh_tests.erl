@@ -3,8 +3,6 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--include("couch/src/couch_db_int.hrl").
-
 -define(KILOBYTE, binary:copy(<<"x">>, 1024)).
 
 %% ==========
@@ -96,7 +94,8 @@ should_persist_queue(ChannelType, DbName) ->
     end).
 
 grow_db_file(DbName, SizeInKb) ->
-    {ok, #db{filepath = FilePath} = Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+    {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
+    FilePath = couch_db:get_filepath(Db),
     {ok, Fd} = file:open(FilePath, [append]),
     Bytes = binary:copy(?KILOBYTE, SizeInKb),
     file:write(Fd, Bytes),
