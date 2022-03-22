@@ -3,7 +3,7 @@
 -include_lib("couch/include/couch_eunit.hrl").
 -include_lib("couch/include/couch_db.hrl").
 
--include("couch/src/couch_db_int.hrl").
+-include_lib("couch/src/couch_db_int.hrl").
 
 -define(KILOBYTE, binary:copy(<<"x">>, 1024)).
 
