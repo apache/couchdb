@@ -72,15 +72,15 @@ make_test_case(Type, Funs) ->
     {foreachx, fun setup/1, fun teardown/2, [{Type, Fun} || Fun <- Funs]}.
 
 should_enqueue(ChannelType, DbName) ->
-    ?_test(begin
+    {timeout, 20, ?_test(begin
         ok = grow_db_file(DbName, 300),
         ok = wait_enqueue(ChannelType, DbName),
         ?assert(is_enqueued(ChannelType, DbName)),
         ok
-    end).
+    end)}.
 
 should_persist_queue(ChannelType, DbName) ->
-    ?_test(begin
+    {timeout, 20, ?_test(begin
         {ok, ChannelPid} = smoosh_server:get_channel(ChannelType),
         ok = grow_db_file(DbName, 300),
         ok = wait_enqueue(ChannelType, DbName),
@@ -91,7 +91,7 @@ should_persist_queue(ChannelType, DbName) ->
         Q1 = channel_queue(ChannelType),
         ?assertEqual(Q0, Q1),
         ok
-    end).
+    end)}.
 
 grow_db_file(DbName, SizeInKb) ->
     {ok, Db} = couch_db:open_int(DbName, [?ADMIN_CTX]),
@@ -122,7 +122,7 @@ wait_enqueue(ChannelType, DbName) ->
             true ->
                 ok
         end
-    end).
+    end, 20000).
 
 channel_queue(ChannelType) ->
     Q0 = smoosh_priority_queue:new(ChannelType),
