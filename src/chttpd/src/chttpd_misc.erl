@@ -120,7 +120,8 @@ handle_all_dbs_req(Req) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 handle_all_dbs_info_req(Req) ->
-    Args = couch_mrview_http:parse_params(Req, undefined),
+    Args0 = couch_mrview_http:parse_params(Req, undefined),
+    Args1 = couch_mrview_util:set_extra(Args0, namespace, <<"_non_design">>),
     ShardDbName = config:get("mem3", "shards_db", "_dbs"),
     %% shard_db is not sharded but mem3:shards treats it as an edge case
     %% so it can be pushed thru fabric
@@ -130,7 +131,7 @@ handle_all_dbs_info_req(Req) ->
     {ok, Resp} = chttpd:etag_respond(Req, Etag, fun() ->
         {ok, Resp} = chttpd:start_delayed_json_response(Req, 200, [{"ETag", Etag}]),
         VAcc = #vacc{req = Req, resp = Resp},
-        fabric:all_docs(ShardDbName, Options, fun all_dbs_info_callback/2, VAcc, Args)
+        fabric:all_docs(ShardDbName, Options, fun all_dbs_info_callback/2, VAcc, Args1)
     end),
     case is_record(Resp, vacc) of
         true -> {ok, Resp#vacc.resp};
@@ -144,32 +145,24 @@ all_dbs_info_callback({row, Row}, #vacc{resp = Resp0} = Acc) when
     Acc#vacc.req#httpd.path_parts =:= [<<"_all_dbs">>]
 ->
     Prepend = couch_mrview_http:prepend_val(Acc),
-    case couch_util:get_value(id, Row) of
-        <<"_design", _/binary>> ->
-            {ok, Acc};
-        DbName ->
-            {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
-            {ok, Acc#vacc{prepend = ",", resp = Resp1}}
-    end;
+    DbName = couch_util:get_value(id, Row),
+    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, [Prepend, ?JSON_ENCODE(DbName)]),
+    {ok, Acc#vacc{prepend = ",", resp = Resp1}};
 all_dbs_info_callback({row, Row}, #vacc{resp = Resp0} = Acc) when
     Acc#vacc.req#httpd.path_parts =:= [<<"_dbs_info">>]
 ->
     Prepend = couch_mrview_http:prepend_val(Acc),
-    case couch_util:get_value(id, Row) of
-        <<"_design", _/binary>> ->
-            {ok, Acc};
-        DbName ->
-            case chttpd_util:get_db_info(DbName) of
-                {ok, DbInfo} ->
-                    Chunk = [Prepend, ?JSON_ENCODE({[{key, DbName}, {info, {DbInfo}}]})],
-                    {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
-                    {ok, Acc#vacc{prepend = ",", resp = Resp1}};
-                {error, database_does_not_exist} ->
-                    {ok, Acc#vacc{resp = Resp0}};
-                {error, Reason} ->
-                    {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
-                    {stop, Acc#vacc{resp = Resp1}}
-            end
+    DbName = couch_util:get_value(id, Row),
+    case chttpd_util:get_db_info(DbName) of
+        {ok, DbInfo} ->
+            Chunk = [Prepend, ?JSON_ENCODE({[{key, DbName}, {info, {DbInfo}}]})],
+            {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, Chunk),
+            {ok, Acc#vacc{prepend = ",", resp = Resp1}};
+        {error, database_does_not_exist} ->
+            {ok, Acc#vacc{resp = Resp0}};
+        {error, Reason} ->
+            {ok, Resp1} = chttpd:send_delayed_error(Resp0, Reason),
+            {stop, Acc#vacc{resp = Resp1}}
     end;
 all_dbs_info_callback(complete, #vacc{resp = Resp0} = Acc) ->
     {ok, Resp1} = chttpd:send_delayed_chunk(Resp0, "]"),

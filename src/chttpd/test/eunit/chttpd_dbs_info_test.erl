@@ -51,6 +51,14 @@ teardown({_, Db1, Db2}) ->
     delete_db(base_url(Db2)),
     ok = config:delete("admins", ?USER, _Persist = false).
 
+setup_with_shards_db_ddoc() ->
+    {Suffix, Db1, Db2} = setup(),
+    {Suffix, Db1, Db2, create_shards_db_ddoc(Suffix)}.
+
+teardown_with_shards_db_ddoc({Suffix, Db1, Db2, UrlDDoc}) ->
+    ok = delete_shards_db_ddoc(UrlDDoc),
+    teardown({Suffix, Db1, Db2}).
+
 dbs_info_test_() ->
     {
         "chttpd dbs info tests",
@@ -80,6 +88,25 @@ dbs_info_test_() ->
                     ?TDEF_FE(should_return_error_for_exceeded_keys),
                     ?TDEF_FE(should_return_error_for_missing_keys),
                     ?TDEF_FE(should_return_dbs_info_for_dbs_with_mixed_state)
+                ]
+            }
+        }
+    }.
+
+skip_limit_test_() ->
+    {
+        "chttpd skip limit tests",
+        {
+            setup,
+            fun start/0,
+            fun stop/1,
+            {
+                foreach,
+                fun setup_with_shards_db_ddoc/0,
+                fun teardown_with_shards_db_ddoc/1,
+                [
+                    ?TDEF_FE(t_dbs_info_when_shards_db_design_doc_exist),
+                    ?TDEF_FE(t_all_dbs_when_shards_db_design_doc_exist)
                 ]
             }
         }
@@ -225,6 +252,19 @@ should_return_dbs_info_for_dbs_with_mixed_state({_, Db1, _}) ->
     ?assertEqual(<<"noexisteddb">>, couch_util:get_value(<<"key">>, Db2Data)),
     ?assertEqual(undefined, couch_util:get_value(<<"info">>, Db2Data)).
 
+t_dbs_info_when_shards_db_design_doc_exist({Suffix, _, Db2, _}) ->
+    {ok, _, _, ResultBody} = test_request:get(
+        dbs_info_url("limit=1&skip=1"), [?CONTENT_JSON, ?AUTH]
+    ),
+    FilteredDbs = filter_dbs(Suffix, ResultBody),
+    ?assertEqual([Db2], FilteredDbs).
+
+t_all_dbs_when_shards_db_design_doc_exist({_, _, Db2, _}) ->
+    {ok, _, _, ResultBody} = test_request:get(
+        base_url("_all_dbs?limit=1&skip=1"), [?CONTENT_JSON, ?AUTH]
+    ),
+    ?assertEqual([?l2b(Db2)], jiffy:decode(ResultBody)).
+
 %% Utility functions
 testdb(Name, Suffix) ->
     Name ++ "-" ++ Suffix.
@@ -262,6 +302,24 @@ mock_db_not_exist() ->
         get_db_info,
         fun(_) -> {error, database_does_not_exist} end
     ).
+
+create_shards_db_ddoc(Suffix) ->
+    DDocId = ?l2b("_design/ddoc-" ++ Suffix),
+    DDoc = #{<<"_id">> => DDocId},
+    ShardsDb = "_node/_local/" ++ ?b2l(mem3_sync:shards_db()),
+    {ok, Code, _, Resp} = test_request:post(
+        base_url(ShardsDb), [?CONTENT_JSON, ?AUTH], jiffy:encode(DDoc)
+    ),
+    RespBody = jiffy:decode(Resp, [return_maps]),
+    #{<<"rev">> := Rev} = RespBody,
+    UrlDDoc = base_url(ShardsDb) ++ "/" ++ ?b2l(DDocId) ++ "?rev=" ++ ?b2l(Rev),
+    ?assert(lists:member(Code, [200, 201])),
+    UrlDDoc.
+
+delete_shards_db_ddoc(UrlDDoc) ->
+    {ok, Code, _, _} = test_request:delete(UrlDDoc, [?AUTH]),
+    ?assertEqual(Code, 200),
+    ok.
 
 filter_dbs(Suffix, ResultBody) ->
     Dbs = jiffy:decode(ResultBody, [return_maps]),
