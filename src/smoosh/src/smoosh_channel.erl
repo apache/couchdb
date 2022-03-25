@@ -240,7 +240,7 @@ handle_info(start_recovery, #state{name = Name, waiting = Waiting0} = State0) ->
     RecActive = recover(active_file_name(Name)),
     Waiting1 = lists:foldl(
         fun(DbName, Acc) ->
-            case exists(DbName) andalso couch_db:is_compacting(DbName) of
+            case couch_server:exists(DbName) andalso couch_db:is_compacting(DbName) of
                 true ->
                     Priority = smoosh_server:get_priority(Name, DbName),
                     smoosh_priority_queue:in(DbName, Priority, Priority, Acc);
@@ -371,7 +371,7 @@ activate_channel(#state{name = Name, waiting = Waiting0, requests = Requests0} =
     RecStarting = recover(starting_file_name(Name)),
     Starting = lists:foldl(
         fun(DbName, Acc) ->
-            case exists(DbName) of
+            case couch_server:exists(DbName) of
                 true ->
                     Priority = smoosh_server:get_priority(Name, DbName),
                     smoosh_priority_queue:in(DbName, Priority, Priority, Acc);
@@ -386,7 +386,7 @@ activate_channel(#state{name = Name, waiting = Waiting0, requests = Requests0} =
     Requests1 = lists:reverse(Requests0),
     Waiting2 = lists:foldl(
         fun({DbName, Priority}, Acc) ->
-            case exists(DbName) of
+            case couch_server:exists(DbName) of
                 true ->
                     smoosh_priority_queue:in(DbName, Priority, Priority, Acc);
                 false ->
@@ -547,7 +547,3 @@ cleanup_index_files(DbName, _Shard) ->
         _ ->
             ok
     end.
-
-exists(Name) ->
-    FilePath = filename:join(config:get("couchdb", "database_dir", "."), Name),
-    filelib:is_regular(FilePath).
