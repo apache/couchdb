@@ -223,7 +223,7 @@ handle_info(check_window, State) ->
                 State;
             {false, true} ->
                 % resume is always safe even if we did not previously suspend
-                {reply, ok, NewState} = handle_call(resume, nil, State),
+                {reply, ok, NewState} = handle_call(resume_and_activate, nil, State),
                 NewState;
             {true, false} ->
                 if
@@ -240,7 +240,7 @@ handle_info(start_recovery, #state{name = Name, waiting = Waiting0} = State0) ->
     RecActive = recover(active_file_name(Name)),
     Waiting1 = lists:foldl(
         fun(DbName, Acc) ->
-            case couch_db:is_compacting(DbName) of
+            case exists(DbName) andalso couch_db:is_compacting(DbName) of
                 true ->
                     Priority = smoosh_server:get_priority(Name, DbName),
                     smoosh_priority_queue:in(DbName, Priority, Priority, Acc);
@@ -371,8 +371,13 @@ activate_channel(#state{name = Name, waiting = Waiting0, requests = Requests0} =
     RecStarting = recover(starting_file_name(Name)),
     Starting = lists:foldl(
         fun(DbName, Acc) ->
-            Priority = smoosh_server:get_priority(Name, DbName),
-            smoosh_priority_queue:in(DbName, Priority, Priority, Acc)
+            case exists(DbName) of
+                true ->
+                    Priority = smoosh_server:get_priority(Name, DbName),
+                    smoosh_priority_queue:in(DbName, Priority, Priority, Acc);
+                false ->
+                    Acc
+            end
         end,
         Waiting0,
         RecStarting
@@ -537,3 +542,7 @@ cleanup_index_files(DbName, _Shard) ->
         _ ->
             ok
     end.
+
+exists(Name) ->
+    FilePath = filename:join(config:get("couchdb", "database_dir", "."), Name),
+    filelib:is_regular(FilePath).
