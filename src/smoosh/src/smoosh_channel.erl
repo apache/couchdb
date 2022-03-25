@@ -386,7 +386,12 @@ activate_channel(#state{name = Name, waiting = Waiting0, requests = Requests0} =
     Requests1 = lists:reverse(Requests0),
     Waiting2 = lists:foldl(
         fun({DbName, Priority}, Acc) ->
-            smoosh_priority_queue:in(DbName, Priority, Priority, Acc)
+            case exists(DbName) of
+                true ->
+                    smoosh_priority_queue:in(DbName, Priority, Priority, Acc);
+                false ->
+                    Acc
+            end
         end,
         Waiting1,
         Requests1
