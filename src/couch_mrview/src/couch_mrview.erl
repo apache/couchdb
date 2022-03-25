@@ -480,7 +480,11 @@ map_fold(#full_doc_info{} = FullDocInfo, OffsetReds, Acc) ->
     case couch_doc:to_doc_info(FullDocInfo) of
         #doc_info{id = Id, revs = [#rev_info{deleted = false, rev = Rev} | _]} = DI ->
             Value = {[{rev, couch_doc:rev_to_str(Rev)}]},
-            map_fold({{Id, Id}, Value}, OffsetReds, Acc#mracc{doc_info = DI});
+            NS = couch_util:get_value(namespace, Acc#mracc.args#mrargs.extra),
+            case Id of
+                <<?DESIGN_DOC_PREFIX, _/binary>> when NS =:= <<"_non_design">> -> {ok, Acc};
+                _ -> map_fold({{Id, Id}, Value}, OffsetReds, Acc#mracc{doc_info = DI})
+            end;
         #doc_info{revs = [#rev_info{deleted = true} | _]} ->
             {ok, Acc}
     end;
@@ -699,6 +703,10 @@ get_total_rows(Db, #mrargs{extra = Extra}) ->
         <<"_design">> ->
             {ok, N} = couch_db:get_design_doc_count(Db),
             N;
+        <<"_non_design">> ->
+            {ok, N} = couch_db:get_design_doc_count(Db),
+            {ok, Info} = couch_db:get_db_info(Db),
+            couch_util:get_value(doc_count, Info) - N;
         _ ->
             {ok, Info} = couch_db:get_db_info(Db),
             couch_util:get_value(doc_count, Info)
