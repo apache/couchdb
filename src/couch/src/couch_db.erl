@@ -19,6 +19,7 @@
     incref/1,
     reopen/1,
     close/1,
+    exists/1,
 
     clustered_db/2,
     clustered_db/3,
@@ -230,6 +231,9 @@ close(#db{} = Db) ->
     ok = couch_db_engine:decref(Db);
 close(?OLD_DB_REC) ->
     ok.
+
+exists(DbName) ->
+    couch_server:exists(DbName).
 
 is_idle(#db{compactor_pid = nil} = Db) ->
     monitored_by(Db) == [];
