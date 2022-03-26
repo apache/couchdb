@@ -273,7 +273,7 @@ wait_start(Processses, TimeoutInSec, Delay) ->
 
 wait_start(_, Timeout, _Delay, Started, Prev, _) when Prev - Started > Timeout ->
     timeout;
-wait_start([], Timeout, Delay, Started, _Prev, Res) ->
+wait_start([], _Timeout, _Delay, _Started, _Prev, Res) ->
     Res;
 wait_start([{Name, Pid} | Rest] = Processes, Timeout, Delay, Started, _Prev, Res) ->
     case whereis(Name) of
