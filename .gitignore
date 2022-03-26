@@ -32,7 +32,6 @@ ebin/
 erl_crash.dump
 erln8.config
 install.mk
-rebar.config
 rel/*.config
 rel/couchdb
 rel/dev*
@@ -63,7 +62,6 @@ src/ibrowse/
 src/idna/
 src/ioq/
 src/jiffy/
-src/ken/
 src/khash/
 src/meck/
 src/metrics/
@@ -74,7 +72,6 @@ src/parse_trans/
 src/proper/
 src/rebar/
 src/recon/
-src/smoosh/
 src/snappy/
 src/ssl_verify_fun/
 src/triq/
