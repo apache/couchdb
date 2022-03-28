@@ -139,7 +139,12 @@ handle_cast(start_compact, Db) ->
             % type to compact to with a new copy compactor.
             UpdateSeq = couch_db_engine:get_update_seq(Db),
             Args = [Db#db.name, UpdateSeq],
-            couch_log:info("Starting compaction for db \"~s\" at ~p", Args),
+            Level = list_to_existing_atom(
+                config:get(
+                    "couchdb", "compaction_log_level", "info"
+                )
+            ),
+            couch_log:Level("Starting compaction for db \"~s\" at ~p", Args),
             {ok, Db2} = couch_db_engine:start_compaction(Db),
             ok = couch_server:db_updated(Db2),
             {noreply, Db2, idle_limit()};

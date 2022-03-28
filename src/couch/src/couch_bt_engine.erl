@@ -644,7 +644,12 @@ finish_compaction(OldState, DbName, Options, CompactFilePath) ->
         true ->
             finish_compaction_int(OldState, NewState1);
         false ->
-            couch_log:info(
+            Level = list_to_existing_atom(
+                config:get(
+                    "couchdb", "compaction_log_level", "info"
+                )
+            ),
+            couch_log:Level(
                 "Compaction file still behind main file "
                 "(update seq=~p. compact update seq=~p). Retrying.",
                 [OldSeq, NewSeq]

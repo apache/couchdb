@@ -144,7 +144,8 @@ do_recover(FilePath) ->
             <<Vsn, Binary/binary>> = Content,
             try parse_queue(Vsn, ?VSN, Binary) of
                 Bin ->
-                    couch_log:notice(
+                    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+                    couch_log:Level(
                         "~p Successfully restored state file ~s", [?MODULE, FilePath]
                     ),
                     {ok, Bin}
@@ -157,7 +158,8 @@ do_recover(FilePath) ->
                     error
             end;
         {error, enoent} ->
-            couch_log:notice(
+            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+            couch_log:Level(
                 "~p (~p) Queue file ~s does not exist. Not restoring.", [?MODULE, enoent, FilePath]
             ),
             error;
