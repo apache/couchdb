@@ -15,6 +15,7 @@
 
 -export([get/2, get/3, group_pid/1, split/1, stringify/1, ignore_db/1]).
 -export([in_allowed_window/1, write_to_file/3]).
+-export([log_level/2]).
 
 group_pid({Shard, GroupId}) ->
     case couch_view_group:open_db_group(Shard, GroupId) of
@@ -87,7 +88,8 @@ throw_on_error(Args, {error, Reason}) ->
     throw({error, {Reason, Args}}).
 
 write_to_file(Content, FileName, VSN) ->
-    couch_log:notice("~p Writing state to state file ~s", [?MODULE, FileName]),
+    Level = log_level("compaction_log_level", "notice"),
+    couch_log:Level("~p Writing state ~s", [?MODULE, FileName]),
     OnDisk = <<VSN, (erlang:term_to_binary(Content, [compressed, {minor_version, 1}]))/binary>>,
     TmpFileName = FileName ++ ".tmp",
     try
@@ -116,3 +118,6 @@ parse_time(String, Default) ->
             couch_log:error("Malformed compaction schedule configuration: ~s", [String]),
             Default
     end.
+
+log_level(Key, Default) when is_list(Key), is_list(Default) ->
+    list_to_existing_atom(config:get("smoosh", Key, Default)).

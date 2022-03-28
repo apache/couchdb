@@ -148,7 +148,8 @@ handle_cast({enqueue, _Object, 0}, #state{} = State) ->
 handle_cast({enqueue, Object, Priority}, #state{activated = true} = State) ->
     {noreply, maybe_start_compaction(add_to_queue(Object, Priority, State))};
 handle_cast({enqueue, Object, Priority}, #state{activated = false, requests = Requests} = State0) ->
-    couch_log:notice(
+    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+    couch_log:Level(
         "~p Channel is not activated yet. Adding ~p to requests with priority ~p.", [
             ?MODULE,
             Object,
@@ -197,7 +198,8 @@ handle_info({'DOWN', Ref, _, Job, Reason}, State) ->
 handle_info({Ref, {ok, Pid}}, State) when is_reference(Ref) ->
     case lists:keytake(Ref, 1, State#state.starting) of
         {value, {_, Key}, Starting1} ->
-            couch_log:notice(
+            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+            couch_log:Level(
                 "~s: Started compaction for ~s",
                 [State#state.name, smoosh_utils:stringify(Key)]
             ),
@@ -252,7 +254,8 @@ handle_info(start_recovery, #state{name = Name, waiting = Waiting0} = State0) ->
         RecActive
     ),
     State1 = maybe_start_compaction(State0#state{paused = false, waiting = Waiting1}),
-    couch_log:notice(
+    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+    couch_log:Level(
         "~p Previously active compaction jobs (if any) have been successfully recovered and restarted.",
         [?MODULE]
     ),
@@ -289,7 +292,8 @@ do_recover(FilePath) ->
             <<Vsn, Binary/binary>> = Content,
             try parse_state(Vsn, ?VSN, Binary) of
                 Term ->
-                    couch_log:notice(
+                    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+                    couch_log:Level(
                         "~p Successfully restored state file ~s", [?MODULE, FilePath]
                     ),
                     {ok, Term}
@@ -302,7 +306,8 @@ do_recover(FilePath) ->
                     error
             end;
         {error, enoent} ->
-            couch_log:notice(
+            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+            couch_log:Level(
                 "~p (~p) State file ~s does not exist. Not restoring.", [?MODULE, enoent, FilePath]
             ),
             error;
@@ -353,7 +358,8 @@ add_to_queue(Key, Priority, State) ->
             State;
         false ->
             Capacity = list_to_integer(smoosh_utils:get(State#state.name, "capacity", "9999")),
-            couch_log:notice(
+            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+            couch_log:Level(
                 "~s: adding ~p to internal compactor queue with priority ~p",
                 [State#state.name, Key, Priority]
             ),
@@ -425,7 +431,11 @@ maybe_start_compaction(State) ->
                                 false ->
                                     State;
                                 State1 ->
-                                    couch_log:notice(
+                                    Level = smoosh_utils:log_level(
+                                        "compaction_log_level",
+                                        "notice"
+                                    ),
+                                    couch_log:Level(
                                         "~s: Starting compaction for ~s (priority ~p)",
                                         [State#state.name, smoosh_utils:stringify(Key), Priority]
                                     ),
@@ -498,7 +508,8 @@ start_compact(State, Db) ->
                     State#state{starting = [{Ref, Key} | State#state.starting]};
                 % Compaction is already running, so monitor existing compaction pid.
                 CPid ->
-                    couch_log:notice(
+                    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+                    couch_log:Level(
                         "Db ~s continuing compaction",
                         [smoosh_utils:stringify(Key)]
                     ),
@@ -520,7 +531,8 @@ maybe_remonitor_cpid(State, DbName, Reason) when is_binary(DbName) ->
             {ok, _} = timer:apply_after(5000, smoosh_server, enqueue, [DbName]),
             State;
         CPid ->
-            couch_log:notice(
+            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+            couch_log:Level(
                 "~s compaction already running. Re-monitor Pid ~p",
                 [smoosh_utils:stringify(DbName), CPid]
             ),

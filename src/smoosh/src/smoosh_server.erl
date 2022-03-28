@@ -173,7 +173,8 @@ handle_call({enqueue, Object}, _From, State) ->
 handle_call(suspend, _From, State) ->
     ets:foldl(
         fun(#channel{name = Name, pid = P}, _) ->
-            couch_log:notice("Suspending ~p", [Name]),
+            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+            couch_log:Level("Suspending ~p", [Name]),
             smoosh_channel:suspend(P)
         end,
         0,
@@ -183,7 +184,8 @@ handle_call(suspend, _From, State) ->
 handle_call(resume, _From, State) ->
     ets:foldl(
         fun(#channel{name = Name, pid = P}, _) ->
-            couch_log:notice("Resuming ~p", [Name]),
+            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+            couch_log:Level("Resuming ~p", [Name]),
             smoosh_channel:resume(P)
         end,
         0,
@@ -222,11 +224,13 @@ handle_cast({enqueue, Object}, State) ->
     end.
 
 handle_info({'EXIT', Pid, Reason}, #state{event_listener = Pid} = State) ->
-    couch_log:notice("update notifier died ~p", [Reason]),
+    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+    couch_log:Level("update notifier died ~p", [Reason]),
     {ok, Pid1} = start_event_listener(),
     {noreply, State#state{event_listener = Pid1}};
 handle_info({'EXIT', Pid, Reason}, State) ->
-    couch_log:notice("~p ~p died ~p", [?MODULE, Pid, Reason]),
+    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+    couch_log:Level("~p ~p died ~p", [?MODULE, Pid, Reason]),
     case ets:match_object(State#state.tab, #channel{pid = Pid, _ = '_'}) of
         [#channel{name = Name}] ->
             ets:delete(State#state.tab, Name);
