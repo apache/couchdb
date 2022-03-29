@@ -42,7 +42,7 @@ go(DbName, AllDocs0, Opts) ->
         {ok, {Health, Results}} when
             Health =:= ok; Health =:= accepted; Health =:= error
         ->
-            {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
+            {Health, [R || R <- reorder_results(AllDocs, Results), R =/= noreply]};
         {timeout, Acc} ->
             {_, _, W1, GroupedDocs1, DocReplDict} = Acc,
             {DefunctWorkers, _} = lists:unzip(GroupedDocs1),
@@ -52,7 +52,7 @@ go(DbName, AllDocs0, Opts) ->
                 {ok, W1, []},
                 DocReplDict
             ),
-            {Health, [R || R <- couch_util:reorder_results(AllDocs, Resp), R =/= noreply]};
+            {Health, [R || R <- reorder_results(AllDocs, Resp), R =/= noreply]};
         Else ->
             Else
     after
@@ -192,6 +192,18 @@ maybe_reply(Doc, Replies, {stop, W, Acc}) ->
         false ->
             continue
     end.
+
+reorder_results(AllDocs, Resp) when length(AllDocs) < 100 ->
+    couch_util:reorder_results(AllDocs, Resp);
+reorder_results(AllDocs, Resp) ->
+    KeyDict = dict:from_list(Resp),
+    Default = fun ({Key, Dict}) ->
+        case dict:is_key(Key, Dict) of
+            true -> dict:fetch(Key, Dict);
+            false -> undefined
+        end
+    end,
+    [Default({Key, KeyDict}) || Key <- AllDocs].
 
 % This is a corner case where
 % 1) revision tree for the document are out of sync across nodes
