@@ -434,7 +434,7 @@ maybe_start_compaction(State) ->
                         maybe_start_compaction(State2#state{waiting = Q})
                     catch
                         Class:Exception ->
-                            couch_log:notice(
+                            couch_log:warning(
                                 "~s: ~p ~p for ~s",
                                 [
                                     State#state.name,

@@ -294,7 +294,7 @@ enqueue_request(State, Object) ->
         end
     catch
         ?STACKTRACE(Class, Exception, Stack)
-        couch_log:notice("~s: ~p ~p for ~s : ~p",
+        couch_log:warning("~s: ~p ~p for ~s : ~p",
             [?MODULE, Class, Exception,
                 smoosh_utils:stringify(Object), Stack])
     end.
