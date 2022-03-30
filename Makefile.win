@@ -262,7 +262,7 @@ mango-test: devclean all
 	@cd src\mango && \
 		python.exe -m venv .venv && \
 		.venv\Scripts\pip.exe install -r requirements.txt
-	@cd src\mango && .venv\Scripts\python.exe ..\..\dev\run -n 1 --admin=testuser:testpass .venv\Scripts\nosetests
+	@cd src\mango && .venv\Scripts\python.exe ..\..\dev\run -n 1 --admin=testuser:testpass .venv\Scripts\nose2
 
 
 ################################################################################
