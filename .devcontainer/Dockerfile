@@ -1,45 +1,33 @@
-ARG FDB_VERSION
-ARG ELIXIR_VERSION
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
-# Grab fdbcli and client library from same image as server
-FROM foundationdb/foundationdb:${FDB_VERSION} as fdb
+ARG ERLANG_VSN
+FROM erlang:${ERLANG_VSN}
 
-# Debian image with Erlang + Elixir installed (we need elixir for test suite)
-FROM elixir:${ELIXIR_VERSION}
+ARG ERLANG_VSN
+ARG FDB_VSN
+ARG NODE_VSN
 
-# The FROM directive above sweeps out the ARGs so we need to re-declare here
-# in order to use it again to download the FDB client package
-ARG FDB_VERSION
+# Create Jenkins user and group for usage in CI
+RUN groupadd --gid 910 jenkins; \
+    useradd --uid 910 --gid jenkins --create-home jenkins
 
-# Install SpiderMonkey 60 and tell CouchDB to use it in configure
-ARG SM_VSN
-ENV SM_VSN=${SM_VSN:-60}
+COPY install_dependencies.sh /tmp/
 
-RUN set -ex; \
-    wget https://www.foundationdb.org/downloads/${FDB_VERSION}/ubuntu/installers/foundationdb-clients_${FDB_VERSION}-1_amd64.deb; \
-    mkdir /var/lib/foundationdb; \
-    dpkg -i foundationdb-clients_${FDB_VERSION}-1_amd64.deb
+RUN ERLANG_VSN=${ERLANG_VSN} FDB_VSN=${FDB_VSN} NODE_VSN=${NODE_VSN} /tmp/install_dependencies.sh
 
-# Use NodeSource binaries for Node.js (Fauxton dependency)
-RUN set -ex; \
-    curl -s https://deb.nodesource.com/gpgkey/nodesource.gpg.key | apt-key add -; \
-    echo "deb https://deb.nodesource.com/node_10.x buster main" | tee /etc/apt/sources.list.d/nodesource.list; \
-    echo "deb-src https://deb.nodesource.com/node_10.x buster main" | tee -a /etc/apt/sources.list.d/nodesource.list
+# Allow Jenkins to sudo
+RUN echo "jenkins ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/jenkins
 
-RUN set -ex; \
-    apt-get update; \
-    apt-get install -y --no-install-recommends \
-        dnsutils \
-        libmozjs-${SM_VSN}-dev \
-        libicu-dev \
-        python3-venv \
-        python3-pip \
-        python3-sphinx \
-        nodejs
-
-# Documentation theme
-RUN pip3 install sphinx_rtd_theme
-
-COPY --from=fdb /var/fdb/scripts/create_cluster_file.bash /usr/local/bin/
+COPY create_cluster_file.bash /usr/local/bin/
 
 CMD sleep infinity

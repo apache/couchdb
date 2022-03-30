@@ -13,6 +13,67 @@
 // License for the specific language governing permissions and limitations under
 // the License.
 
+meta = [
+  '21': [],
+  '22': [],
+  '23': [],
+  '24': [],
+  '25': []
+]
+
+def generateStage(ERLANG_VERSION) {
+  return {
+    stage(ERLANG_VERSION) {
+      node('docker') {
+        docker.image('foundationdb/foundationdb:6.3.23').withRun() { c ->
+          docker.image("ghcr.io/apache/couchdb:devcontainer-erlang-${ERLANG_VERSION}-fdb-6.3.23").inside("${DOCKER_ARGS} --link ${c.id}:fdb") {
+            timeout(time: 90, unit: "MINUTES") {
+              stage("Erlang ${ERLANG_VERSION}") {
+                try {
+                  echo "Building CouchDB PR using Erlang ${ERLANG_VERSION} and SpiderMonkey ${SM_VSN}"
+                  sh( script: "rm -rf build-${ERLANG_VERSION} apache-couchdb-*", label: 'Clean out workspace' )
+                  unstash 'release-tarball'
+                  withEnv([
+                    'FDB_COORDINATOR=fdb',
+                    'ERL_ZFLAGS="-erlfdb test_cluster_file <<\\\"/etc/foundationdb/fdb.cluster\\\">>"'
+                  ]) {
+                    sh( 'cat /etc/hosts' )
+                    sh( 'getent hosts fdb' )
+                    sh( 'getent hosts fdb | awk {\'print $1\'}' )
+                    sh( 'bash /usr/local/bin/create_cluster_file.bash' )
+                    sh( 'cat /etc/foundationdb/fdb.cluster')
+                    sh( script: "mkdir -p ${COUCHDB_IO_LOG_DIR} build-${ERLANG_VERSION}" )
+                    sh( script: "tar -xf apache-couchdb-*.tar.gz -C build-${ERLANG_VERSION} --strip-components=1", label: 'Unpack release' )
+                    dir( "build-${ERLANG_VERSION}" ) {
+                      sh( script: './configure --skip-deps', label: 'Configure CouchDB build system' )
+                      sh( script: 'make', label: 'Build CouchDB' )
+                      sh( script: 'make eunit', label: 'EUnit test suite' )
+                      sh( script: 'make elixir-suite', label: 'ExUnit unit test suite' )
+                      sh( script: 'make exunit', label: 'ExUnit integration test suite' )
+                      sh( script: 'make mango-test', label: 'Python-based Mango query test suite' )
+                    }
+                  }
+                }
+                catch (err) {
+                  dir( "build-${ERLANG_VERSION}" ) {
+                    sh 'ls -l'
+                    sh 'make build-report'
+                  }
+                  error("Build step failed with error: ${err.getMessage()}")
+                }
+                finally {
+                  junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
+                  sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR}'
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 pipeline {
 
   // no top-level agent; agents must be declared for each stage
@@ -85,60 +146,15 @@ pipeline {
     } // stage Build Release Tarball
 
     stage('Make Check') {
-      matrix {
-        axes {
-          axis {
-            name 'ERLANG_VERSION'
-            values '21', '22', '23', '24'
+      steps {
+        script {
+          // Including failFast: true in map fails the build immediately if any parallel step fails
+          parallelStagesMap = meta.collectEntries( [failFast: false] ) { key, values ->
+            ["${key}": generateStage(key)]
           }
+          parallel parallelStagesMap
         }
-
-        stages {
-          stage('Build and Test') {
-            agent {
-              docker {
-                image "${DOCKER_IMAGE_BASE}-${ERLANG_VERSION}"
-                label 'docker'
-                args "${DOCKER_ARGS}"
-              }
-            }
-            options {
-              skipDefaultCheckout()
-            }
-            steps {
-              timeout(time: 90, unit: "MINUTES") {
-                echo "Building CouchDB PR using Erlang ${ERLANG_VERSION} and SpiderMonkey ${SM_VSN}"
-                sh( script: "rm -rf build-${ERLANG_VERSION} apache-couchdb-*", label: 'Clean out workspace' )
-                unstash 'release-tarball'
-                sh( script: "mkdir -p ${COUCHDB_IO_LOG_DIR} build-${ERLANG_VERSION}" )
-                sh( script: "tar -xf apache-couchdb-*.tar.gz -C build-${ERLANG_VERSION} --strip-components=1", label: 'Unpack release' )
-                dir( "build-${ERLANG_VERSION}" ) {
-                  sh( script: './configure --skip-deps', label: 'Configure CouchDB build system' )
-                  sh( script: 'make', label: 'Build CouchDB' )
-                  sh( script: 'make eunit', label: 'EUnit test suite' )
-                  sh( script: 'make elixir-suite', label: 'ExUnit unit test suite' )
-                  sh( script: 'make exunit', label: 'ExUnit integration test suite' )
-                  sh( script: 'make mango-test', label: 'Python-based Mango query test suite' )
-                }
-              }
-            }
-            post {
-              always {
-                junit '**/.eunit/*.xml, **/_build/*/lib/couchdbtest/*.xml, **/src/mango/nosetests.xml, **/test/javascript/junit.xml'
-              }
-              failure {
-                dir( "build-${ERLANG_VERSION}" ) {
-                  sh 'ls -l'
-                  sh 'make build-report'
-                }
-              }
-              cleanup {
-                sh 'rm -rf ${WORKSPACE}/* ${COUCHDB_IO_LOG_DIR}'
-              }
-            }
-          } // stage "Build and Test"
-        } // stages
-      } // matrix
+      }
     } // stage "Make Check"
   } // stages
 } // pipeline

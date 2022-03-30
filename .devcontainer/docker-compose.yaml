@@ -1,33 +1,33 @@
 services:
   couch:
+    # Select a pre-built image hosted on GHCR
+    # image: ghcr.io/apache/couchdb:devcontainer-erlang-24-fdb-6.3.23
+
+    # Alternatively, build your own image on-demand
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        # Base image for Erlang and Elixir. Useful choices include:
-        # 1.11 -> Erlang 23, Debian Buster
-        # 1.10 -> Erlang 22, Debian Buster
-        # 1.9  -> Erlang 22, Debian Buster
-        #
-        # Older versions based on Debian Stretch will not include
-        # SpiderMonkey 60, which the Dockerfile expects to be able
-        # to install via apt-get.
-        ELIXIR_VERSION: "1.10"
+        # The Erlang version determines our base image, which means it
+        # implicitly selects versions for ICU + SpiderMonkey as well.
+        ERLANG_VSN: "24"
 
-        # SpiderMonkey version to install with apt-get
-        SM_VSN: "60"
+        # This selects the FoundationDB client version. Typically you'd
+        # want it to match the server version in fdb.image below.
+        FDB_VSN: "6.3.23"
 
-        # This should always match the value in fdb.image
-        FDB_VERSION: "6.2.28"
+        # The Fauxton UI has a Node.js build-time dependency, most of
+        # the time there's no reason to change this.
+        NODE_VSN: "14"
 
     environment:
       # This needs to match the name of the FoundationDB service below
       FDB_COORDINATOR: fdb
 
-      # The location where the Dockerfile installs the FDB cluster file
-      # retrieved from the `fdb` image. CouchDB looks for the cluster file in
-      # this location by default. If you want to install it somewhere else you
-      # you need to change "[erlfdb] cluster_file" and ERL_ZFLAGS to match.
+      # The location where the FDB cluster file is created on container
+      # startup. CouchDB looks for the cluster file in this location by
+      # default. If you want to install it somewhere else you need to
+      # change "[erlfdb] cluster_file" and ERL_ZFLAGS to match.
       FDB_CLUSTER_FILE: /usr/local/etc/foundationdb/fdb.cluster
 
       # The test suite will default to trying to start its own fdbserver
@@ -49,4 +49,5 @@ services:
     network_mode: service:fdb
 
   fdb:
-    image: foundationdb/foundationdb:6.2.28
+    # This is the version of the FDB server that will run alongside CouchDB
+    image: foundationdb/foundationdb:6.3.23
