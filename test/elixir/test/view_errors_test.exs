@@ -289,12 +289,6 @@ defmodule ViewErrorsTest do
   end
 
   defp now(:ms) do
-    case elem(:os.type(), 0) do
-      :win32 ->
-        div(:erlang.system_time(), 1_000)
-
-      _ ->
-        div(:erlang.system_time(), 1_000_000)
-    end
+    :erlang.unique_integer([:positive])
   end
 end
