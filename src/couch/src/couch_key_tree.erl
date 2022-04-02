@@ -471,7 +471,7 @@ stem(Trees, Limit) ->
         {_, Branches} = lists:foldl(fun(Tree, {Seen, TreeAcc}) ->
             {NewSeen, NewBranches} = stem_tree(Tree, Limit, Seen),
             {NewSeen, NewBranches ++ TreeAcc}
-        end, {sets:new(), []}, Trees),
+        end, {#{}, []}, Trees),
         lists:sort(Branches)
     catch throw:dupe_keys ->
         repair_tree(Trees, Limit)
@@ -522,11 +522,11 @@ stem_tree(Depth, {Key, Val, Children}, Limit, Seen0) ->
 
 
 check_key(Key, Seen) ->
-    case sets:is_element(Key, Seen) of
-        true ->
+    case Seen of
+        #{Key := true} ->
             throw(dupe_keys);
-        false ->
-            sets:add_element(Key, Seen)
+        _ ->
+            Seen#{Key => true}
     end.
 
 
