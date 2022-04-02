@@ -25,6 +25,7 @@
 -include_lib("couch/include/couch_db.hrl").
 
 start_link() ->
+    assert_no_monsters(),
     assert_admins(),
     maybe_launch_admin_annoyance_reporter(),
     write_pidfile(),
@@ -85,6 +86,25 @@ handle_config_change(_, _, _, _, _) ->
 
 handle_config_terminate(_Server, _Reason, _State) ->
     ok.
+
+assert_no_monsters() ->
+    couch_log:info("Preflight check: Checking For Monsters~n", []),
+    case erlang:get_cookie() of
+        monster ->
+            couch_log:info(
+                "~n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%~n" ++
+                    "  Monster detected ohno!, aborting startup.                      ~n" ++
+                    "  Please change the Erlang cookie in vm.args to the same         ~n" ++
+                    "  securely generated random value on all nodes of this cluster.  ~n" ++
+                    "%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%~n",
+                []
+            ),
+            % Wait a second so the log message can make it to the log
+            timer:sleep(500),
+            erlang:halt(1);
+        _ ->
+            ok
+    end.
 
 assert_admins() ->
     couch_log:info("Preflight check: Asserting Admin Account~n", []),
