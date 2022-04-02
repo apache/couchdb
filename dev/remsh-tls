@@ -25,6 +25,5 @@ fi
 
 NAME="remsh$$@$HOST"
 NODE="node$NODE@$HOST"
-COOKIE=monster
 rootdir="$(cd "${0%/*}" 2>/dev/null; echo "$PWD")"
-erl -name $NAME -remsh $NODE -setcookie $COOKIE -hidden -proto_dist inet_tls -ssl_dist_optfile "${rootdir}/couch_ssl_dist.conf"
+erl -name $NAME -remsh $NODE -hidden -proto_dist inet_tls -ssl_dist_optfile "${rootdir}/couch_ssl_dist.conf"

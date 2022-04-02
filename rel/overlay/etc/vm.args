@@ -38,9 +38,8 @@
 {{node_name}}
 
 # All nodes must share the same magic cookie for distributed Erlang to work.
-# Comment out this line if you synchronized the cookies by other means (using
-# the ~/.erlang.cookie file, for example).
--setcookie monster
+# Uncomment the following line and append a securely generated random value.
+# -setcookie
 
 # Tell kernel and SASL not to log anything
 -kernel error_logger silent

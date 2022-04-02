@@ -25,5 +25,4 @@ fi
 
 NAME="remsh$$@$HOST"
 NODE="node$NODE@$HOST"
-COOKIE=monster
-erl -name $NAME -remsh $NODE -setcookie $COOKIE -hidden
+erl -name $NAME -remsh $NODE -hidden
