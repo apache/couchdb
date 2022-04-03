@@ -61,7 +61,6 @@ src/hqueue/
 src/hyper/
 src/ibrowse/
 src/idna/
-src/ioq/
 src/jiffy/
 src/ken/
 src/khash/
