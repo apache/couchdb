@@ -40,6 +40,10 @@
     restart_busy/4
 ]).
 
+-export([
+    print_table/2
+]).
+
 -type throw(_Reason) :: no_return().
 
 -type process_name() :: atom().
@@ -66,6 +70,7 @@ help() ->
         fold,
         linked_processes_info,
         print_linked_processes,
+        print_table,
         restart,
         restart_busy
     ].
@@ -272,6 +277,30 @@ couch_index_server[<0.288.0>]                |   478240   |         0         | 
     couch_file:init/1[<0.886.22>]            |   11973    |         0         |  67984
       couch_index:init/1[<0.3520.22>]        |    4899    |         0         |  109456
         ```
+
+        ---
+    ", []);
+help(print_table) ->
+    io:format("
+        print_table(Rows, TableSpec)
+        --------------------------------
+
+        Print table of specifications.
+          - Rows: List of {Id, Props} to be printed from the TableSpec
+          - TableSpec: List of either {Value} or {Width, Align, Value}
+            where Align is either left/center/right.
+
+        ---
+    ", []);
+help(print_tree) ->
+    io:format("
+        print_tree(Tree, TableSpec)
+        --------------------------------
+
+        Print tree of specifications.
+          - Tree: Tree to be printed from the TableSpec
+          - TableSpec: List of either {Value} or {Width, Align, Value}
+            where Align is either left/center/right.
 
         ---
     ", []);
@@ -606,7 +635,7 @@ restart_busy(ProcessList, Threshold, DelayInMsec, Property) when
 
 %% Pretty print functions
 
-%% Limmitations:
+%% Limitations:
 %%   - The first column has to be specified as {Width, left, Something}
 %% The TableSpec is a list of either:
 %%   - {Value}
@@ -615,6 +644,16 @@ restart_busy(ProcessList, Threshold, DelayInMsec, Property) when
 %%  - left
 %%  - centre
 %%  - right
+print_table(Rows, TableSpec) ->
+    io:format("~s~n", [format(TableSpec)]),
+    lists:foreach(
+        fun({Id, Props}) ->
+            io:format("~s~n", [table_row(Id, 2, Props, TableSpec)])
+        end,
+        Rows
+    ),
+    ok.
+
 print_tree(Tree, TableSpec) ->
     io:format("~s~n", [format(TableSpec)]),
     map_tree(Tree, fun(_, {Id, Props}, Pos) ->
