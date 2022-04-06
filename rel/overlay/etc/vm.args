@@ -41,6 +41,9 @@
 # Uncomment the following line and append a securely generated random value.
 # -setcookie
 
+# Which interfaces should the node listen on?
+-kernel inet_dist_use_interface {127,0,0,1}
+
 # Tell kernel and SASL not to log anything
 -kernel error_logger silent
 -sasl sasl_error_logger false
