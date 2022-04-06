@@ -25,6 +25,7 @@
 
 -export([
     process_name/1,
+    get_pid/1,
     link_tree/1,
     link_tree/2,
     mapfold_tree/3,
@@ -49,6 +50,7 @@
 -type throw(_Reason) :: no_return().
 
 -type process_name() :: atom().
+-type process() :: process_name() | pid().
 -type function_name() :: atom().
 -type busy_properties() ::
     heap_size
@@ -66,6 +68,7 @@ help() ->
         opened_files_by_regexp,
         opened_files_contains,
         process_name,
+        get_pid,
         link_tree,
         mapfold,
         map,
@@ -86,7 +89,7 @@ help(busy) ->
     busy(ProcessList, Threshold, Property)
     --------------
 
-    Iterate over given list of named processes and returns the ones with
+    Iterate over given list of named processes or pids and returns the ones with
     a Property value greater than provided Threshold.
 
     If Property is not specified we use message box size
@@ -141,6 +144,16 @@ help(process_name) ->
     - process_info(Pid, registered_name)
     - '$initial_call' key in process dictionary
     - process_info(Pid, initial_call)
+
+    ---
+    ", []);
+help(get_pid) ->
+    io:format("
+    get_pid(PidOrName)
+    -----------------
+
+    Get the pid for a process name given either a name or pid. When a pid is given, it returns it as is.
+    This has the same functionality as whereis/1 except it will not crash when a pid is given.
 
     ---
     ", []);
@@ -330,21 +343,21 @@ help(Unknown) ->
     io:format("    ---~n", []),
     ok.
 
--spec busy(ProcessList :: [process_name()], Threshold :: pos_integer()) ->
+-spec busy(ProcessList :: [process()], Threshold :: pos_integer()) ->
     [Name :: process_name()].
 
 busy(ProcessList, Threshold) when Threshold > 0 ->
     busy(ProcessList, Threshold, message_queue_len).
 
 -spec busy(
-    ProcessList :: [process_name()], Threshold :: pos_integer(), Property :: busy_properties()
+    [process()], Threshold :: pos_integer(), Property :: busy_properties()
 ) ->
     [Name :: process_name()].
 
 busy(ProcessList, Threshold, Property) when Threshold > 0 ->
     lists:filter(
-        fun(Name) ->
-            case (catch process_info(whereis(Name), Property)) of
+        fun(Process) ->
+            case (catch process_info(get_pid(Process), Property)) of
                 {Property, Value} when is_integer(Value) andalso Value > Threshold ->
                     true;
                 _ ->
@@ -408,6 +421,11 @@ process_name(Pid) when is_pid(Pid) ->
     end;
 process_name(Else) ->
     iolist_to_list(io_lib:format("~p", [Else])).
+
+get_pid(Process) when is_pid(Process) ->
+    Process;
+get_pid(Process) ->
+    whereis(Process).
 
 iolist_to_list(List) ->
     binary_to_list(iolist_to_binary(List)).
@@ -671,7 +689,7 @@ restart_busy(ProcessList, Threshold) ->
     restart_busy(ProcessList, Threshold, 1000).
 
 -spec restart_busy(
-    ProcessList :: [process_name()], Thershold :: pos_integer(), DelayInMsec :: pos_integer()
+    ProcessList :: [process_name()], Threshold :: pos_integer(), DelayInMsec :: pos_integer()
 ) ->
     throw({timeout, Name :: process_name()}) | ok.
 
@@ -680,7 +698,7 @@ restart_busy(ProcessList, Threshold, DelayInMsec) ->
 
 -spec restart_busy(
     ProcessList :: [process_name()],
-    Thershold :: pos_integer(),
+    Threshold :: pos_integer(),
     DelayInMsec :: pos_integer(),
     Property :: busy_properties()
 ) ->
