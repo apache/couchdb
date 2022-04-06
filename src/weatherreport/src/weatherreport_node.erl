@@ -204,7 +204,13 @@ start_net() ->
     {Type, NodeName} = weatherreport_config:node_name(),
     ThisNode = append_node_suffix(NodeName, "_diag"),
     {ok, _} = net_kernel:start([ThisNode, Type]),
-    erlang:set_cookie(node(), weatherreport_config:cookie()).
+    case weatherreport_config:cookie() of
+        undefined ->
+            % Don't set cookie to undefined so we can pick up the ~/.erlang.cookie
+            ok;
+        Cookie when is_atom(Cookie) ->
+            erlang:set_cookie(node(), Cookie)
+    end.
 
 append_node_suffix(Name, Suffix) ->
     case string:tokens(Name, "@") of
