@@ -93,6 +93,7 @@ go(DbName, Options, QueryArgs, Callback, Acc0) ->
         case couch_util:get_value(namespace, Extra) of
             <<"_all_docs">> -> <<"_all_docs">>;
             <<"_design">> -> <<"_design">>;
+            <<"_non_design">> -> <<"_non_design">>;
             <<"_local">> -> <<"_local">>;
             _ -> <<"_all_docs">>
         end,
