@@ -38,12 +38,12 @@ defmodule ProxyAuthTest do
         :value => users_db_name
       },
       %{
-        :section => "couch_httpd_auth",
+        :section => "chttpd_auth",
         :key => "proxy_use_secret",
         :value => "true"
       },
       %{
-        :section => "couch_httpd_auth",
+        :section => "chttpd_auth",
         :key => "secret",
         :value => secret
       }
