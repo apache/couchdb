@@ -266,11 +266,11 @@ info(mango_opts, {invalid_selector_json, BadSel}) ->
         <<"invalid_selector_json">>,
         fmt("Selector must be a JSON object, not: ~w", [BadSel])
     };
-info(mango_opts, {invalid_index_name, BadName}) ->
+info(mango_opts, invalid_empty_string) ->
     {
         400,
-        <<"invalid_index_name">>,
-        fmt("Invalid index name: ~w", [BadName])
+        <<"invalid_empty_string">>,
+        <<"Index name or ddoc cannot be empty string">>
     };
 info(mango_opts, {multiple_text_operator, {invalid_selector, BadSel}}) ->
     {
