@@ -175,7 +175,7 @@ from_ddoc(Db, {Props}) ->
         _ -> ?MANGO_ERROR(invalid_query_ddoc_language)
     end,
     IdxMods =
-        case clouseau_rpc:connected() of
+        case dreyfus:available() of
             true ->
                 [mango_idx_view, mango_idx_text];
             false ->
@@ -250,7 +250,7 @@ cursor_mod(#idx{type = <<"json">>}) ->
 cursor_mod(#idx{def = all_docs, type = <<"special">>}) ->
     mango_cursor_special;
 cursor_mod(#idx{type = <<"text">>}) ->
-    case clouseau_rpc:connected() of
+    case dreyfus:available() of
         true ->
             mango_cursor_text;
         false ->
@@ -262,7 +262,7 @@ idx_mod(#idx{type = <<"json">>}) ->
 idx_mod(#idx{type = <<"special">>}) ->
     mango_idx_special;
 idx_mod(#idx{type = <<"text">>}) ->
-    case clouseau_rpc:connected() of
+    case dreyfus:available() of
         true ->
             mango_idx_text;
         false ->
@@ -289,7 +289,7 @@ get_idx_type(Opts) ->
         <<"json">> ->
             <<"json">>;
         <<"text">> ->
-            case clouseau_rpc:connected() of
+            case dreyfus:available() of
                 true ->
                     <<"text">>;
                 false ->

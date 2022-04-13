@@ -68,7 +68,7 @@ handle_welcome_req(Req, _) ->
     send_method_not_allowed(Req, "GET,HEAD").
 
 get_features() ->
-    case clouseau_rpc:connected() of
+    case dreyfus:available() of
         true ->
             [search | config:features()];
         false ->
