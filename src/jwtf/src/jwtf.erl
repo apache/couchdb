@@ -310,8 +310,8 @@ decode_b64url_json(B64UrlEncoded) ->
                 jiffy:decode(JsonEncoded)
         end
     catch
-        error:Error ->
-            throw({bad_request, Error})
+        _:_ ->
+            throw({bad_request, <<"Malformed token">>})
     end.
 
 props({Props}) ->
