@@ -144,7 +144,7 @@ delete_compaction_files(RootDir, FilePath, DelOpts) ->
 is_compacting(DbName) ->
     lists:any(
         fun(Ext) ->
-            filelib:is_regular(DbName ++ Ext)
+            filelib:is_regular(?b2l(DbName) ++ Ext)
         end,
         [".compact", ".compact.data", ".compact.meta"]
     ).
