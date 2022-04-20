@@ -30,7 +30,7 @@ var Filter = (function() {
       filter_view : function(fun, ddoc, args) {
         // recompile
         var sandbox = create_filter_sandbox();
-        var source = fun.toSource ? fun.toSource() : '(' + fun.toString() + ')';
+        var source = fun.toSource();
         fun = evalcx(source, sandbox);
 
         var results = [];
