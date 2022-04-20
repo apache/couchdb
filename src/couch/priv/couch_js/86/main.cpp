@@ -269,6 +269,8 @@ int runWithContext(JSContext* cx, couch_args* args) {
     JS_SetSecurityCallbacks(cx, &security_callbacks);
 
     JS::RealmOptions options;
+    // we need this in the query server error handling
+    options.creationOptions().setToSourceEnabled(enableToSource);
     JS::RootedObject global(cx, JS_NewGlobalObject(cx, &global_class, nullptr,
                                                    JS::FireOnNewGlobalHook, options));
     if (!global)
