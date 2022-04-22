@@ -37,13 +37,15 @@ setup() ->
     create_db(Db1, [{q, 1}, {n, 1}]),
     PartProps = [{partitioned, true}, {hash, [couch_partition, hash, []]}],
     create_db(Db2, [{q, 1}, {n, 1}, {props, PartProps}]),
-    config:set("reshard", "retry_interval_sec", "0", _Persist = false),
+    config:set("reshard", "retry_interval_sec", "0", _Persist1 = false),
+    config:set("reshard", "index_retry_interval_sec", "0", _Persist2 = false),
     #{db1 => Db1, db2 => Db2}.
 
 teardown(#{} = Dbs) ->
     mem3_reshard:reset_state(),
     maps:map(fun(_, Db) -> delete_db(Db) end, Dbs),
-    config:delete("reshard", "retry_interval_sec", _Persist = false),
+    config:delete("reshard", "index_retry_interval_sec", _Persist1 = false),
+    config:delete("reshard", "retry_interval_sec", _Persist2 = false),
     meck:unload().
 
 start_couch() ->
@@ -68,6 +70,7 @@ mem3_reshard_db_test_() ->
                     fun split_shard_with_lots_of_purges/1,
                     fun update_docs_before_topoff1/1,
                     fun indices_are_built/1,
+                    fun indices_can_be_built_with_errors/1,
                     fun split_partitioned_db/1,
                     fun split_twice/1,
                     fun couch_events_are_emitted/1,
@@ -273,6 +276,47 @@ indices_are_built(#{db1 := Db}) ->
             end
         end)}.
 
+% This test that indices are built despite intermittent errors.
+indices_can_be_built_with_errors(#{db1 := Db}) ->
+    {timeout, ?TIMEOUT,
+        ?_test(begin
+            add_test_docs(Db, #{docs => 10, mrview => 2, search => 2, geo => 2}),
+            [#shard{name = Shard}] = lists:sort(mem3:local_shards(Db)),
+            meck:expect(
+                couch_index_server,
+                get_index,
+                2,
+                meck:seq([
+                    meck:raise(error, foo_reason),
+                    meck:raise(exit, killed),
+                    meck:passthrough()
+                ])
+            ),
+            meck:expect(
+                couch_index,
+                get_state,
+                2,
+                meck:seq([
+                    meck:raise(error, bar_reason),
+                    meck:raise(exit, killed),
+                    meck:val({not_ok, other}),
+                    meck:passthrough()
+                ])
+            ),
+            {ok, JobId} = mem3_reshard:start_split_job(Shard),
+            wait_state(JobId, completed),
+            % Normally would expect 4 (2 shards x 2 mrviews), but there were 2
+            % failures in get_index/2 and 3 in get_state/3 for a total of 4 + 5 = 9
+            ?assertEqual(9, meck:num_calls(couch_index_server, get_index, 2)),
+            % Normally would be 4 calls (2 shards x 2 mrviews), but there were
+            % 3 extra failures in get_state/2 for a total of 4 + 3 = 7
+            ?assertEqual(7, meck:num_calls(couch_index, get_state, 2)),
+            Shards1 = lists:sort(mem3:local_shards(Db)),
+            ?assertEqual(2, length(Shards1)),
+            MRViewGroupInfo = get_group_info(Db, <<"_design/mrview00000">>),
+            ?assertMatch(#{<<"update_seq">> := 32}, MRViewGroupInfo)
+        end)}.
+
 mock_dreyfus_indices() ->
     meck:expect(dreyfus_index, design_doc_to_indexes, fun(Doc) ->
         #doc{body = {BodyProps}} = Doc,
@@ -284,7 +328,7 @@ mock_dreyfus_indices() ->
         end
     end),
     meck:expect(dreyfus_index_manager, get_index, fun(_, _) -> {ok, pid} end),
-    meck:expect(dreyfus_index, await, fun(_, _) -> ok end).
+    meck:expect(dreyfus_index, await, fun(_, _) -> {ok, indexpid, someseq} end).
 
 mock_hastings_indices() ->
     meck:expect(hastings_index, design_doc_to_indexes, fun(Doc) ->
@@ -297,7 +341,7 @@ mock_hastings_indices() ->
         end
     end),
     meck:expect(hastings_index_manager, get_index, fun(_, _) -> {ok, pid} end),
-    meck:expect(hastings_index, await, fun(_, _) -> ok end).
+    meck:expect(hastings_index, await, fun(_, _) -> {ok, someseq} end).
 
 % Split partitioned database
 split_partitioned_db(#{db2 := Db}) ->
@@ -504,7 +548,7 @@ retries_work(#{db1 := Db}) ->
             {ok, JobId} = mem3_reshard:start_split_job(Shard),
 
             wait_state(JobId, failed),
-            ?assertEqual(3, meck:num_calls(couch_db_split, split, 3))
+            ?assertEqual(7, meck:num_calls(couch_db_split, split, 3))
         end)}.
 
 target_reset_in_initial_copy(#{db1 := Db}) ->
