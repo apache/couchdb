@@ -408,29 +408,17 @@ topoff_impl(#job{source = #shard{} = Source, target = Targets}) ->
 build_indices(#job{} = Job) ->
     #job{
         source = #shard{name = SourceName} = Source,
-        target = Targets,
-        retries = Retries,
-        state_info = Info
+        target = Targets
     } = Job,
     check_source_exists(Source, build_indices),
     {ok, DDocs} = mem3_reshard_index:design_docs(SourceName),
     Indices = mem3_reshard_index:target_indices(DDocs, Targets),
     case mem3_reshard_index:spawn_builders(Indices) of
-        {ok, []} ->
+        [] ->
             % Skip the log spam if this is a no-op
             Job#job{workers = []};
-        {ok, Pids} ->
-            report(Job#job{workers = Pids});
-        {error, Error} ->
-            case Job#job.retries =< max_retries() of
-                true ->
-                    build_indices(Job#job{
-                        retries = Retries + 1,
-                        state_info = info_update(error, Error, Info)
-                    });
-                false ->
-                    exit(Error)
-            end
+        [_ | _] = Pids ->
+            report(Job#job{workers = Pids})
     end.
 
 copy_local_docs(#job{split_state = copy_local_docs} = Job) ->
@@ -612,7 +600,7 @@ check_targets_exist(Targets, StateName) ->
 
 -spec max_retries() -> integer().
 max_retries() ->
-    config:get_integer("reshard", "max_retries", 1).
+    config:get_integer("reshard", "max_retries", 5).
 
 -spec retry_interval_sec() -> integer().
 retry_interval_sec() ->

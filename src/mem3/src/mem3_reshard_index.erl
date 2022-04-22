@@ -15,11 +15,15 @@
 -export([
     design_docs/1,
     target_indices/2,
-    spawn_builders/1
+    spawn_builders/1,
+    build_index/2
 ]).
 
+-define(MRVIEW, mrview).
+-define(DREYFUS, dreyfus).
+-define(HASTINGS, hastings).
+
 -include_lib("mem3/include/mem3.hrl").
--include_lib("couch/include/couch_db.hrl").
 
 %% Public API
 
@@ -44,25 +48,8 @@ target_indices(Docs, Targets) ->
     lists:flatten(Indices).
 
 spawn_builders(Indices) ->
-    Results = [build_index(Index) || Index <- Indices],
-    Oks = [{ok, Pid} || {ok, Pid} <- Results, is_pid(Pid)],
-    case Results -- Oks of
-        [] ->
-            {ok, [Pid || {ok, Pid} <- Results]};
-        Error ->
-            % Do a all or nothing pattern, if some indices could not be
-            % spawned, kill the spawned ones and and return the error.
-            ErrMsg = "~p failed to spawn index builders: ~p ~p",
-            couch_log:error(ErrMsg, [?MODULE, Error, Indices]),
-            lists:foreach(
-                fun({ok, Pid}) ->
-                    catch unlink(Pid),
-                    catch exit(Pid, kill)
-                end,
-                Oks
-            ),
-            {error, Error}
-    end.
+    Retries = max_retries(),
+    [spawn_link(?MODULE, build_index, [Idx, Retries]) || Idx <- Indices].
 
 %% Private API
 
@@ -83,7 +70,7 @@ mrview_indices(DbName, Doc) ->
         Views = couch_mrview_index:get(views, MRSt),
         case Views =/= [] of
             true ->
-                [{mrview, DbName, MRSt}];
+                [{?MRVIEW, DbName, MRSt}];
             false ->
                 []
         end
@@ -97,7 +84,7 @@ mrview_indices(DbName, Doc) ->
 dreyfus_indices(DbName, Doc) ->
     try
         Indices = dreyfus_index:design_doc_to_indexes(Doc),
-        [{dreyfus, DbName, Index} || Index <- Indices]
+        [{?DREYFUS, DbName, Index} || Index <- Indices]
     catch
         Tag:Err ->
             Msg = "~p couldn't get dreyfus indices ~p ~p ~p:~p",
@@ -108,7 +95,7 @@ dreyfus_indices(DbName, Doc) ->
 hastings_indices(DbName, Doc) ->
     try
         Indices = hastings_index:design_doc_to_indexes(Doc),
-        [{hastings, DbName, Index} || Index <- Indices]
+        [{?HASTINGS, DbName, Index} || Index <- Indices]
     catch
         Tag:Err ->
             Msg = "~p couldn't get hasting indices ~p ~p ~p:~p",
@@ -116,33 +103,71 @@ hastings_indices(DbName, Doc) ->
             []
     end.
 
-build_index({mrview, DbName, MRSt}) ->
-    case couch_index_server:get_index(couch_mrview_index, MRSt) of
-        {ok, Pid} ->
-            Args = [Pid, get_update_seq(DbName)],
-            WPid = spawn_link(couch_index, get_state, Args),
-            {ok, WPid};
-        Error ->
-            Error
+build_index({?MRVIEW, _DbName, MRSt} = Ctx, Try) ->
+    await_retry(
+        couch_index_server:get_index(couch_mrview_index, MRSt),
+        fun couch_index:get_state/2,
+        Ctx,
+        Try
+    );
+build_index({?DREYFUS, DbName, DIndex} = Ctx, Try) ->
+    await_retry(
+        dreyfus_index_manager:get_index(DbName, DIndex),
+        fun dreyfus_index:await/2,
+        Ctx,
+        Try
+    );
+build_index({?HASTINGS, DbName, HIndex} = Ctx, Try) ->
+    await_retry(
+        hastings_index_manager:get_index(DbName, HIndex),
+        fun hastings_index:await/2,
+        Ctx,
+        Try
+    ).
+
+await_retry({ok, Pid}, AwaitIndex, {_, DbName, _} = Ctx, Try) ->
+    try AwaitIndex(Pid, get_update_seq(DbName)) of
+        {ok, _} -> ok;
+        {ok, _, _} -> ok;
+        AwaitError -> maybe_retry(Ctx, AwaitError, Try)
+    catch
+        _:CatchError ->
+            maybe_retry(Ctx, CatchError, Try)
     end;
-build_index({dreyfus, DbName, Index}) ->
-    case dreyfus_index_manager:get_index(DbName, Index) of
-        {ok, Pid} ->
-            Args = [Pid, get_update_seq(DbName)],
-            WPid = spawn_link(dreyfus_index, await, Args),
-            {ok, WPid};
-        Error ->
-            Error
-    end;
-build_index({hastings, DbName, Index}) ->
-    case hastings_index_manager:get_index(DbName, Index) of
-        {ok, Pid} ->
-            Args = [Pid, get_update_seq(DbName)],
-            WPid = spawn_link(hastings_index, await, Args),
-            {ok, WPid};
-        Error ->
-            Error
-    end.
+await_retry(OpenError, _AwaitIndex, Ctx, Try) ->
+    maybe_retry(Ctx, OpenError, Try).
+
+maybe_retry(Ctx, killed = Error, Try) ->
+    retry(Ctx, Error, Try);
+maybe_retry(Ctx, {killed, _} = Error, Try) ->
+    retry(Ctx, Error, Try);
+maybe_retry(Ctx, shutdown = Error, Try) ->
+    retry(Ctx, Error, Try);
+maybe_retry(Ctx, Error, 0) ->
+    fail(Ctx, Error);
+maybe_retry(Ctx, Error, Try) when is_integer(Try), Try > 0 ->
+    retry(Ctx, Error, Try - 1).
+
+retry(Ctx, Error, Try) ->
+    IndexInfo = index_info(Ctx),
+    LogMsg = "~p : error ~p when building ~p, retrying (~p)",
+    couch_log:warning(LogMsg, [?MODULE, Error, IndexInfo, Try]),
+    timer:sleep(retry_interval_sec() * 1000),
+    build_index(Ctx, Try).
+
+fail(Ctx, Error) ->
+    IndexInfo = index_info(Ctx),
+    LogMsg = "~p : error ~p when building ~p, max tries exceeded, failing",
+    couch_log:error(LogMsg, [?MODULE, Error, IndexInfo]),
+    exit({error_building_index, IndexInfo}).
+
+index_info({?MRVIEW, DbName, MRSt}) ->
+    GroupName = couch_mrview_index:get(idx_name, MRSt),
+    {DbName, GroupName};
+index_info({?DREYFUS, DbName, Index}) ->
+    {DbName, Index};
+index_info({?HASTINGS, DbName, Index}) ->
+    {DbName, Index}.
 
 has_app(App) ->
     code:lib_dir(App) /= {error, bad_name}.
@@ -151,3 +176,9 @@ get_update_seq(DbName) ->
     couch_util:with_db(DbName, fun(Db) ->
         couch_db:get_update_seq(Db)
     end).
+
+max_retries() ->
+    config:get_integer("reshard", "index_max_retries", 5).
+
+retry_interval_sec() ->
+    config:get_integer("reshard", "index_retry_interval_sec", 10).
