@@ -39,28 +39,28 @@ jwt_io_pubkey() ->
 b64_badarg_test() ->
     Encoded = <<"0.0.0">>,
     ?assertEqual(
-        {error, {bad_request, badarg}},
+        {error, {bad_request, <<"Malformed token">>}},
         jwtf:decode(Encoded, [], nil)
     ).
 
 b64_bad_block_test() ->
     Encoded = <<" aGVsbG8. aGVsbG8. aGVsbG8">>,
     ?assertEqual(
-        {error, {bad_request, {bad_block, 0}}},
+        {error, {bad_request, <<"Malformed token">>}},
         jwtf:decode(Encoded, [], nil)
     ).
 
 invalid_json_test() ->
     Encoded = <<"fQ.fQ.fQ">>,
     ?assertEqual(
-        {error, {bad_request, {1, invalid_json}}},
+        {error, {bad_request, <<"Malformed token">>}},
         jwtf:decode(Encoded, [], nil)
     ).
 
 truncated_json_test() ->
     Encoded = <<"ew.ew.ew">>,
     ?assertEqual(
-        {error, {bad_request, {2, truncated_json}}},
+        {error, {bad_request, <<"Malformed token">>}},
         jwtf:decode(Encoded, [], nil)
     ).
 

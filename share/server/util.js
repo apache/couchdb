@@ -81,8 +81,7 @@ var Couch = {
           throw [
             "error",
             "compilation_error",
-            "Module require('" +name+ "') raised error " +
-            (e.toSource ? e.toSource() : e.stack)
+            "Module require('" +name+ "') raised error " + e.toSource()
           ];
         }
         ddoc._module_cache[newModule.id] = newModule.exports;
@@ -107,7 +106,7 @@ var Couch = {
       throw([
         "error",
         "compilation_error",
-        (err.toSource ? err.toSource() : err.stack) + " (" + source + ")"
+        err.toSource() + " (" + source + ")"
       ]);
     };
     if (typeof(functionObject) == "function") {
@@ -139,7 +138,7 @@ function respond(obj) {
     print(JSON.stringify(obj));
   } catch(e) {
     log("Error converting object to JSON: " + e.toString());
-    log("error on obj: "+ (obj.toSource ? obj.toSource() : obj.toString()));
+    log("error on obj: "+ obj.toSource());
   }
 };
 

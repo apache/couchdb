@@ -133,7 +133,7 @@ var Loop = function() {
     } else if (e.name) {
       respond(["error", e.name, e]);
     } else {
-      respond(["error","unnamed_error",e.toSource ? e.toSource() : e.stack]);
+      respond(["error","unnamed_error", e.toSource()]);
     }
   };
   while (line = readline()) {

@@ -309,7 +309,7 @@ make_text_field_name([P | Rest], Type) ->
 
 validate_index_info(IndexInfo) ->
     IdxTypes =
-        case clouseau_rpc:connected() of
+        case dreyfus:available() of
             true ->
                 [mango_idx_view, mango_idx_text];
             false ->
