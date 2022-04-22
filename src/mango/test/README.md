@@ -8,13 +8,13 @@ To run these, do this in the Mango top level directory:
     $ python3 -m venv venv
     $ . venv/bin/activate
     $ pip3 install -r requirements.txt
-    $ venv/bin/nosetests
+    $ venv/bin/nose2
 
 To run an individual test suite:
-    nosetests --nocapture test/12-use-correct-index.py 
+    nose2 12-use-correct-index-test
 
 To run the tests with text index support:
-    MANGO_TEXT_INDEXES=1 nosetests --nocapture test
+    MANGO_TEXT_INDEXES=1 nose2 test
 
 
 Test configuration

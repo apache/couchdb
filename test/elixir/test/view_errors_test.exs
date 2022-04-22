@@ -274,7 +274,7 @@ defmodule ViewErrorsTest do
   end
 
   defp create_view(db_name, map_fun) do
-    ddoc_name = "_design/temp_#{now(:ms)}"
+    ddoc_name = "_design/temp_#{System.unique_integer([:positive])}"
 
     ddoc = %{
       _id: ddoc_name,
@@ -286,15 +286,5 @@ defmodule ViewErrorsTest do
 
     {:ok, _} = create_doc(db_name, ddoc)
     ddoc_name
-  end
-
-  defp now(:ms) do
-    case elem(:os.type(), 0) do
-      :win32 ->
-        div(:erlang.system_time(), 1_000)
-
-      _ ->
-        div(:erlang.system_time(), 1_000_000)
-    end
   end
 end
