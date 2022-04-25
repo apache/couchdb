@@ -47,12 +47,6 @@ meta = [
     image: "apache/couchdbci-ubuntu:focal-erlang-${ERLANG_VERSION}"
   ],
 
-  'stretch': [
-    name: 'Debian 9',
-    spidermonkey_vsn: '1.8.5',
-    image: "apache/couchdbci-debian:stretch-erlang-${ERLANG_VERSION}"
-  ],
-
   'buster': [
     name: 'Debian 10',
     spidermonkey_vsn: '60',
@@ -413,9 +407,8 @@ pipeline {
 
           sh( label: 'Build Debian repo', script: '''
             git clone https://github.com/apache/couchdb-pkg
-            cp js/debian-stretch/*.deb pkgs/stretch
             cp js/ubuntu-bionic/*.deb pkgs/bionic
-            for plat in stretch buster bullseye bionic focal
+            for plat in buster bullseye bionic focal
             do
               reprepro -b couchdb-pkg/repo includedeb $plat pkgs/$plat/*.deb
             done
