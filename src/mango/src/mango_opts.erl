@@ -27,7 +27,7 @@
     is_object/1,
     is_ok_or_false/1,
 
-    validate_idx_name/1,
+    validate_non_empty_string/1,
     validate_selector/1,
     validate_use_index/1,
     validate_bookmark/1,
@@ -56,13 +56,13 @@ validate_idx_create({Props}) ->
             {tag, name},
             {optional, true},
             {default, auto_name},
-            {validator, fun validate_idx_name/1}
+            {validator, fun validate_non_empty_string/1}
         ]},
         {<<"ddoc">>, [
             {tag, ddoc},
             {optional, true},
             {default, auto_name},
-            {validator, fun validate_idx_name/1}
+            {validator, fun validate_non_empty_string/1}
         ]},
         {<<"w">>, [
             {tag, w},
@@ -235,9 +235,11 @@ is_ok_or_false(false) ->
 is_ok_or_false(Else) ->
     ?MANGO_ERROR({invalid_ok_or_false_value, Else}).
 
-validate_idx_name(auto_name) ->
+validate_non_empty_string(<<>>) ->
+    ?MANGO_ERROR(invalid_empty_string);
+validate_non_empty_string(auto_name) ->
     {ok, auto_name};
-validate_idx_name(Else) ->
+validate_non_empty_string(Else) ->
     is_string(Else).
 
 validate_selector({Props}) ->

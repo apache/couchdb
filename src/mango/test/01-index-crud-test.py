@@ -69,7 +69,7 @@ class IndexCrudTests(mango.DbPerClass):
                 raise AssertionError("bad create index")
 
     def test_bad_names(self):
-        bad_names = [True, False, 1.5, {"foo": "bar"}, [None, False]]
+        bad_names = ["", True, False, 1.5, {"foo": "bar"}, [None, False]]
         for bn in bad_names:
             try:
                 self.db.create_index(["foo"], name=bn)
@@ -77,8 +77,12 @@ class IndexCrudTests(mango.DbPerClass):
                 self.assertEqual(e.response.status_code, 400)
             else:
                 raise AssertionError("bad create index")
+
+    def test_bad_ddocs(self):
+        bad_ddocs = ["", True, False, 1.5, {"foo": "bar"}, [None, False]]
+        for bd in bad_ddocs:
             try:
-                self.db.create_index(["foo"], ddoc=bn)
+                self.db.create_index(["foo"], ddoc=bd)
             except Exception as e:
                 self.assertEqual(e.response.status_code, 400)
             else:
