@@ -193,14 +193,16 @@ maybe_reply(Doc, Replies, {stop, W, Acc}) ->
             continue
     end.
 
+reorder_results(_, []) ->
+    erlang:error({internal_server_error, "No Responses For Document Update"});
 reorder_results(AllDocs, Resp) when length(AllDocs) < 100 ->
-    couch_util:reorder_results(AllDocs, Resp);
+    [couch_util:get_value(Doc, Resp, timeout) || Doc <- AllDocs];
 reorder_results(AllDocs, Resp) ->
     KeyDict = dict:from_list(Resp),
     Default = fun ({Key, Dict}) ->
         case dict:is_key(Key, Dict) of
             true -> dict:fetch(Key, Dict);
-            false -> undefined
+            false -> timeout
         end
     end,
     [Default({Key, KeyDict}) || Key <- AllDocs].
