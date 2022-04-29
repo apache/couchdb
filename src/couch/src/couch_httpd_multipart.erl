@@ -105,8 +105,7 @@ mp_parse_atts(eof, {Ref, Chunks, Offset, Counters, Waiting}) ->
                 abort_parsing ->
                     ok;
                 {hello_from_writer, Ref, WriterPid} ->
-                    WriterRef = erlang:monitor(process, WriterPid),
-                    NewCounters = orddict:store(WriterPid, {WriterRef, 0}, Counters),
+                    NewCounters = handle_hello(WriterPid, Counters),
                     mp_parse_atts(eof, {Ref, Chunks, Offset, NewCounters, Waiting});
                 {get_bytes, Ref, From} ->
                     C2 = update_writer(From, Counters),
@@ -139,8 +138,7 @@ mp_abort_parse_atts(_, _) ->
 maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
     receive
         {hello_from_writer, Ref, WriterPid} ->
-            WriterRef = erlang:monitor(process, WriterPid),
-            NewCounters = orddict:store(WriterPid, {WriterRef, 0}, Counters),
+            NewCounters = handle_hello(WriterPid, Counters),
             maybe_send_data({Ref, Chunks, Offset, NewCounters, Waiting});
         {get_bytes, Ref, From} ->
             NewCounters = update_writer(From, Counters),
@@ -204,8 +202,7 @@ maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
                                 maybe_send_data(NewAcc)
                         end;
                     {hello_from_writer, Ref, WriterPid} ->
-                        WriterRef = erlang:monitor(process, WriterPid),
-                        C2 = orddict:store(WriterPid, {WriterRef, 0}, Counters),
+                        C2 = handle_hello(WriterPid, Counters),
                         maybe_send_data({Ref, NewChunks, NewOffset, C2, Waiting});
                     {get_bytes, Ref, X} ->
                         C2 = update_writer(X, Counters),
@@ -215,6 +212,10 @@ maybe_send_data({Ref, Chunks, Offset, Counters, Waiting}) ->
                 end
         end
     end.
+
+handle_hello(WriterPid, Counters) ->
+    WriterRef = erlang:monitor(process, WriterPid),
+    orddict:store(WriterPid, {WriterRef, 0}, Counters).
 
 update_writer(WriterPid, Counters) ->
     case orddict:find(WriterPid, Counters) of
