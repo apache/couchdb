@@ -195,8 +195,15 @@ maybe_reply(Doc, Replies, {stop, W, Acc}) ->
 
 % this ensures that we got some response for all documents being updated
 ensure_all_responses(Health, AllDocs, Resp) ->
-    Results = [R || R <- couch_util:reorder_results(AllDocs, Resp,
-        {error, internal_server_error}), R =/= noreply],
+    Results = [
+        R
+     || R <- couch_util:reorder_results(
+            AllDocs,
+            Resp,
+            {error, internal_server_error}
+        ),
+        R =/= noreply
+    ],
     case lists:member({error, internal_server_error}, Results) of
         true ->
             {error, Results};

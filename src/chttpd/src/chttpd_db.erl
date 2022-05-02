@@ -637,7 +637,7 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_bulk_docs">>], user_ctx = Ct
                     % output the results
                     chttpd_stats:incr_writes(length(Results)),
                     DocResults = lists:zipwith(
-                    fun update_doc_result_to_json/2,
+                        fun update_doc_result_to_json/2,
                         Docs,
                         Results
                     ),
