@@ -633,6 +633,15 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_bulk_docs">>], user_ctx = Ct
                         Results
                     ),
                     send_json(Req, 202, DocResults);
+                {error, Results} ->
+                    % output the results
+                    chttpd_stats:incr_writes(length(Results)),
+                    DocResults = lists:zipwith(
+                    fun update_doc_result_to_json/2,
+                        Docs,
+                        Results
+                    ),
+                    send_json(Req, 500, DocResults);
                 {aborted, Errors} ->
                     ErrorsJson =
                         lists:map(fun update_doc_result_to_json/1, Errors),
@@ -647,7 +656,11 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_bulk_docs">>], user_ctx = Ct
                 {accepted, Errors} ->
                     chttpd_stats:incr_writes(length(Docs)),
                     ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
-                    send_json(Req, 202, ErrorsJson)
+                    send_json(Req, 202, ErrorsJson);
+                {error, Errors} ->
+                    chttpd_stats:incr_writes(length(Docs)),
+                    ErrorsJson = lists:map(fun update_doc_result_to_json/1, Errors),
+                    send_json(Req, 500, ErrorsJson)
             end;
         _ ->
             throw({bad_request, <<"`new_edits` parameter must be a boolean.">>})
@@ -1472,6 +1485,12 @@ receive_request_data(Req, LenLeft) when LenLeft > 0 ->
 receive_request_data(_Req, _) ->
     throw(<<"expected more data">>).
 
+update_doc_result_to_json({error, _} = Error) ->
+    {_Code, Err, Msg} = chttpd:error_info(Error),
+    {[
+        {error, Err},
+        {reason, Msg}
+    ]};
 update_doc_result_to_json({{Id, Rev}, Error}) ->
     {_Code, Err, Msg} = chttpd:error_info(Error),
     {[
