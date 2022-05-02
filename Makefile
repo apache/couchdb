@@ -16,7 +16,7 @@
 
 include version.mk
 
-REBAR?=$(shell echo `pwd`/bin/rebar)
+REBAR?=$(shell echo `pwd`/bin/rebar3)
 ERLFMT?=$(shell echo `pwd`/bin/erlfmt)
 
 # Handle the following scenarios:
@@ -140,8 +140,8 @@ fauxton: share/www
 .PHONY: escriptize
 # target: escriptize - Build CLI tools
 escriptize: couch
-	@$(REBAR) -r escriptize apps=weatherreport
-	@cp src/weatherreport/weatherreport bin/weatherreport
+	@$(REBAR) escriptize apps=weatherreport
+	@cp _build/default/bin/weatherreport bin/weatherreport
 
 
 ################################################################################
@@ -171,10 +171,9 @@ eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 eunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 eunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
 eunit: couch
-	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
 	@for dir in $(subdirs); do \
-            COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
-        done
+	     COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) eunit $(EUNIT_OPTS) --application=$$dir || exit 1; \
+	done
 
 
 .PHONY: exunit
@@ -185,25 +184,25 @@ exunit: export ERL_LIBS = $(shell pwd)/src
 exunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 exunit: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
 exunit: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
-exunit: couch elixir-init setup-eunit elixir-check-formatted elixir-credo
+exunit: couch elixir-init elixir-check-formatted elixir-credo
 	@mix test --trace $(EXUNIT_OPTS)
 
-setup-eunit: export BUILDDIR = $(shell pwd)
-setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
-setup-eunit:
-	@$(REBAR) setup_eunit 2> /dev/null
+# setup-eunit: export BUILDDIR = $(shell pwd)
+# setup-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+# setup-eunit:
+# 	@$(REBAR) setup_eunit 2> /dev/null
 
 just-eunit: export BUILDDIR = $(shell pwd)
 just-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 just-eunit:
-	@$(REBAR) -r eunit $(EUNIT_OPTS)
+	@$(REBAR) eunit $(EUNIT_OPTS)
 
 .PHONY: soak-eunit
 soak-eunit: export BUILDDIR = $(shell pwd)
 soak-eunit: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
 soak-eunit: couch
 	@$(REBAR) setup_eunit 2> /dev/null
-	while [ $$? -eq 0 ] ; do $(REBAR) -r eunit $(EUNIT_OPTS) ; done
+	while [ $$? -eq 0 ] ; do $(REBAR) eunit $(EUNIT_OPTS) ; done
 
 erlfmt-check:
 	ERLFMT_PATH=$(ERLFMT) python3 dev/format_check.py
@@ -339,25 +338,25 @@ weatherreport-test: devclean escriptize
 .PHONY: build-plt
 # target: build-plt - Build project-specific PLT
 build-plt:
-	@$(REBAR) -r build-plt $(DIALYZE_OPTS)
+	@$(REBAR) build-plt $(DIALYZE_OPTS)
 
 
 .PHONY: check-plt
 # target: check-plt - Check the PLT for consistency and rebuild it if it is not up-to-date
 check-plt:
-	@$(REBAR) -r check-plt $(DIALYZE_OPTS)
+	@$(REBAR) check-plt $(DIALYZE_OPTS)
 
 
 .PHONY: dialyze
 # target: dialyze - Analyze the code for discrepancies
 dialyze: .rebar
-	@$(REBAR) -r dialyze $(DIALYZE_OPTS)
+	@$(REBAR) dialyze $(DIALYZE_OPTS)
 
 
 .PHONY: introspect
 # target: introspect - Check for commits difference between rebar.config and repository
 introspect:
-	@$(REBAR) -r update-deps
+	@$(REBAR) get-deps
 	@build-aux/introspect
 
 ################################################################################
