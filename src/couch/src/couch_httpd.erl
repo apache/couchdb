@@ -411,6 +411,8 @@ handle_request_int(MochiReq, DefaultFun,
         throw:bad_accept_encoding_value ->
             couch_log:error("received invalid Accept-Encoding header", []),
             send_error(HttpReq, bad_request);
+        exit:{shutdown, Error} ->
+            exit({shutdown, Error});
         exit:normal ->
             exit(normal);
         exit:snappy_nif_not_loaded ->
