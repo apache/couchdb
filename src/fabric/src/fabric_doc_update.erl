@@ -44,7 +44,10 @@ go(DbName, AllDocs0, Opts) ->
         {ok, {Health, Results}} when
             Health =:= ok; Health =:= accepted; Health =:= error
         ->
-            {Health, [R || R <- couch_util:reorder_results(AllDocs, Results, timeout), R =/= noreply]};
+            {Health, [
+                R
+             || R <- couch_util:reorder_results(AllDocs, Results, timeout), R =/= noreply
+            ]};
         {timeout, Acc} ->
             {_, _, W1, GroupedDocs1, DocReplDict} = Acc,
             {DefunctWorkers, _} = lists:unzip(GroupedDocs1),

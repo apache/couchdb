@@ -534,14 +534,13 @@ reorder_results(Keys, SortedResults, Default) when length(Keys) < 100 ->
     [couch_util:get_value(Key, SortedResults, Default) || Key <- Keys];
 reorder_results(Keys, SortedResults, Default) ->
     KeyDict = dict:from_list(SortedResults),
-    DefaultFunc = fun ({Key, Dict}) ->
+    DefaultFunc = fun({Key, Dict}) ->
         case dict:is_key(Key, Dict) of
             true -> dict:fetch(Key, Dict);
             false -> Default
         end
     end,
     [DefaultFunc({Key, KeyDict}) || Key <- Keys].
-
 
 url_strip_password(Url) ->
     re:replace(
