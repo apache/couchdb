@@ -39,10 +39,12 @@ go(DbName, AllDocs0, Opts) ->
     Acc0 = {length(Workers), length(AllDocs), list_to_integer(W), GroupedDocs, dict:new()},
     Timeout = fabric_util:request_timeout(),
     try rexi_utils:recv(Workers, #shard.ref, fun handle_message/3, Acc0, infinity, Timeout) of
+        {ok, {_, []}} ->
+            erlang:error({internal_server_error, "No Responses For Document Update"});
         {ok, {Health, Results}} when
             Health =:= ok; Health =:= accepted; Health =:= error
         ->
-            {Health, [R || R <- reorder_results(AllDocs, Results), R =/= noreply]};
+            {Health, [R || R <- couch_util:reorder_results(AllDocs, Results, timeout), R =/= noreply]};
         {timeout, Acc} ->
             {_, _, W1, GroupedDocs1, DocReplDict} = Acc,
             {DefunctWorkers, _} = lists:unzip(GroupedDocs1),
@@ -52,7 +54,7 @@ go(DbName, AllDocs0, Opts) ->
                 {ok, W1, []},
                 DocReplDict
             ),
-            {Health, [R || R <- reorder_results(AllDocs, Resp), R =/= noreply]};
+            {Health, [R || R <- couch_util:reorder_results(AllDocs, Resp, timeout), R =/= noreply]};
         Else ->
             Else
     after
@@ -192,20 +194,6 @@ maybe_reply(Doc, Replies, {stop, W, Acc}) ->
         false ->
             continue
     end.
-
-reorder_results(_, []) ->
-    erlang:error({internal_server_error, "No Responses For Document Update"});
-reorder_results(AllDocs, Resp) when length(AllDocs) < 100 ->
-    [couch_util:get_value(Doc, Resp, timeout) || Doc <- AllDocs];
-reorder_results(AllDocs, Resp) ->
-    KeyDict = dict:from_list(Resp),
-    Default = fun ({Key, Dict}) ->
-        case dict:is_key(Key, Dict) of
-            true -> dict:fetch(Key, Dict);
-            false -> timeout
-        end
-    end,
-    [Default({Key, KeyDict}) || Key <- AllDocs].
 
 % This is a corner case where
 % 1) revision tree for the document are out of sync across nodes

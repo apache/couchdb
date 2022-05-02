@@ -24,7 +24,7 @@
 -export([json_encode/1, json_decode/1, json_decode/2]).
 -export([verify/2, simple_call/2, shutdown_sync/1]).
 -export([get_value/2, get_value/3]).
--export([reorder_results/2]).
+-export([reorder_results/2, reorder_results/3]).
 -export([url_strip_password/1]).
 -export([encode_doc_id/1]).
 -export([normalize_ddoc_id/1]).
@@ -529,6 +529,19 @@ reorder_results(Keys, SortedResults) when length(Keys) < 100 ->
 reorder_results(Keys, SortedResults) ->
     KeyDict = dict:from_list(SortedResults),
     [dict:fetch(Key, KeyDict) || Key <- Keys].
+
+reorder_results(Keys, SortedResults, Default) when length(Keys) < 100 ->
+    [couch_util:get_value(Key, SortedResults, Default) || Key <- Keys];
+reorder_results(Keys, SortedResults, Default) ->
+    KeyDict = dict:from_list(SortedResults),
+    DefaultFunc = fun ({Key, Dict}) ->
+        case dict:is_key(Key, Dict) of
+            true -> dict:fetch(Key, Dict);
+            false -> Default
+        end
+    end,
+    [DefaultFunc({Key, KeyDict}) || Key <- Keys].
+
 
 url_strip_password(Url) ->
     re:replace(
