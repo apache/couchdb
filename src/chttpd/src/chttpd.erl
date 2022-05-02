@@ -342,7 +342,7 @@ handle_request_int(MochiReq) ->
             {ok, Resp};
         #httpd_resp{status = aborted, reason = Reason} ->
             couch_log:error("Response abnormally terminated: ~p", [Reason]),
-            exit(normal)
+            exit({shutdown, Reason})
     end.
 
 before_request(HttpReq) ->
@@ -423,7 +423,7 @@ catch_error(HttpReq, exit, {mochiweb_recv_error, E}, _Stack) ->
         MochiReq:get(raw_path),
         E
     ]),
-    exit(normal);
+    exit({shutdown, E});
 catch_error(HttpReq, exit, {uri_too_long, _}, _Stack) ->
     send_error(HttpReq, request_uri_too_long);
 catch_error(HttpReq, exit, {body_too_large, _}, _Stack) ->
@@ -437,7 +437,10 @@ catch_error(HttpReq, Tag, Error, Stack) ->
     case {Tag, Error, Stack} of
         {exit, normal, [{mochiweb_request, send, _, _} | _]} ->
             % Client disconnect (R15+)
-            exit(normal);
+            exit(shutdown);
+        {exit, {shutdown, _}, [{mochiweb_request, send, _, _} | _]} ->
+            % Client disconnect (R15+)
+            exit(shutdown);
         _Else ->
             send_error(HttpReq, {Error, nil, Stack})
     end.
@@ -1135,6 +1138,8 @@ maybe_handle_error(Error) ->
             {500, couch_util:to_binary(Err), couch_util:to_binary(Reason)};
         normal ->
             exit(normal);
+        {shutdown, Err} ->
+            exit({shutdown, Err});
         Error ->
             {500, <<"unknown_error">>, couch_util:to_binary(Error)}
     end.

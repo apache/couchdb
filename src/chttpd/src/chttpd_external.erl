@@ -79,6 +79,8 @@ json_req_obj_field(<<"body">>, #httpd{req_body = undefined, mochi_req = Req}, _D
     try
         Req:recv_body(MaxSize)
     catch
+        exit:{shutdown, _} ->
+            exit({bad_request, <<"Invalid request body">>});
         exit:normal ->
             exit({bad_request, <<"Invalid request body">>})
     end;
