@@ -42,7 +42,7 @@ go(DbName, AllDocs0, Opts) ->
         {ok, {Health, Results}} when
             Health =:= ok; Health =:= accepted; Health =:= error
         ->
-            {Health, [R || R <- couch_util:reorder_results(AllDocs, Results), R =/= noreply]};
+            ensure_all_responses(Health, AllDocs, Results);
         {timeout, Acc} ->
             {_, _, W1, GroupedDocs1, DocReplDict} = Acc,
             {DefunctWorkers, _} = lists:unzip(GroupedDocs1),
@@ -52,7 +52,7 @@ go(DbName, AllDocs0, Opts) ->
                 {ok, W1, []},
                 DocReplDict
             ),
-            {Health, [R || R <- couch_util:reorder_results(AllDocs, Resp), R =/= noreply]};
+            ensure_all_responses(Health, AllDocs, Resp);
         Else ->
             Else
     after
@@ -191,6 +191,24 @@ maybe_reply(Doc, Replies, {stop, W, Acc}) ->
             {stop, W, [{Doc, Reply} | Acc]};
         false ->
             continue
+    end.
+
+% this ensures that we got some response for all documents being updated
+ensure_all_responses(Health, AllDocs, Resp) ->
+    Results = [
+        R
+     || R <- couch_util:reorder_results(
+            AllDocs,
+            Resp,
+            {error, internal_server_error}
+        ),
+        R =/= noreply
+    ],
+    case lists:member({error, internal_server_error}, Results) of
+        true ->
+            {error, Results};
+        false ->
+            {Health, Results}
     end.
 
 % This is a corner case where

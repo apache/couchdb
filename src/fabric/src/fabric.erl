@@ -827,7 +827,7 @@ setup() ->
     ok = meck:expect(
         couch_util,
         reorder_results,
-        fun(_, [{_, Res}]) ->
+        fun(_, [{_, Res}], _) ->
             [Res]
         end
     ),
