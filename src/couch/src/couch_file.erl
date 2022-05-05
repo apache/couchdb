@@ -33,7 +33,8 @@
     is_sys,
     eof = 0,
     db_monitor,
-    pread_limit = 0
+    pread_limit = 0,
+    key
 }).
 
 % public API
@@ -61,6 +62,8 @@
 %% Returns: On success, {ok, Fd}
 %%  or {error, Reason} if the file could not be opened.
 %%----------------------------------------------------------------------
+
+-define(AES_MASTER_KEY, <<0:256>>).
 
 open(Filepath) ->
     open(Filepath, []).
@@ -453,7 +456,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                                     ok = file:sync(Fd),
                                     maybe_track_open_os_files(Options),
                                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                                    {ok, #file{fd = Fd, is_sys = IsSys, pread_limit = Limit}};
+                                    init_key(#file{fd = Fd, is_sys = IsSys, pread_limit = Limit});
                                 false ->
                                     ok = file:close(Fd),
                                     init_status_error(ReturnPid, Ref, {error, eexist})
@@ -461,7 +464,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                         false ->
                             maybe_track_open_os_files(Options),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, #file{fd = Fd, is_sys = IsSys, pread_limit = Limit}}
+                            init_key(#file{fd = Fd, is_sys = IsSys, pread_limit = Limit})
                     end;
                 Error ->
                     init_status_error(ReturnPid, Ref, Error)
@@ -478,7 +481,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                             maybe_track_open_os_files(Options),
                             {ok, Eof} = file:position(Fd, eof),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, #file{fd = Fd, eof = Eof, is_sys = IsSys, pread_limit = Limit}};
+                            init_key(#file{fd = Fd, eof = Eof, is_sys = IsSys, pread_limit = Limit});
                         Error ->
                             init_status_error(ReturnPid, Ref, Error)
                     end;
@@ -581,20 +584,25 @@ handle_call({truncate, Pos}, _From, #file{fd = Fd} = File) ->
     {ok, Pos} = file:position(Fd, Pos),
     case file:truncate(Fd) of
         ok ->
-            {reply, ok, File#file{eof = Pos}};
+            case init_key(File#file{eof = Pos}) of
+                {ok, File1} ->
+                    {reply, ok, File1};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
         Error ->
             {reply, Error, File}
     end;
-handle_call({append_bin, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
+handle_call({append_bin, Bin}, _From, #file{eof = Pos} = File) ->
     Blocks = make_blocks(Pos rem ?SIZE_BLOCK, Bin),
     Size = iolist_size(Blocks),
-    case file:write(Fd, Blocks) of
+    case encrypted_write(File, Blocks) of
         ok ->
             {reply, {ok, Pos, Size}, File#file{eof = Pos + Size}};
         Error ->
             {reply, Error, reset_eof(File)}
     end;
-handle_call({append_bins, Bins}, _From, #file{fd = Fd, eof = Pos} = File) ->
+handle_call({append_bins, Bins}, _From, #file{eof = Pos} = File) ->
     {BlockResps, FinalPos} = lists:mapfoldl(
         fun(Bin, PosAcc) ->
             Blocks = make_blocks(PosAcc rem ?SIZE_BLOCK, Bin),
@@ -605,7 +613,7 @@ handle_call({append_bins, Bins}, _From, #file{fd = Fd, eof = Pos} = File) ->
         Bins
     ),
     {AllBlocks, Resps} = lists:unzip(BlockResps),
-    case file:write(Fd, AllBlocks) of
+    case encrypted_write(File, AllBlocks) of
         ok ->
             {reply, {ok, Resps}, File#file{eof = FinalPos}};
         Error ->
@@ -742,9 +750,9 @@ find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
 % 0110 UPGRADE CODE
 read_raw_iolist_int(Fd, {Pos, _Size}, Len) ->
     read_raw_iolist_int(Fd, Pos, Len);
-read_raw_iolist_int(#file{fd = Fd} = File, Pos, Len) ->
+read_raw_iolist_int(#file{} = File, Pos, Len) ->
     {Pos, TotalBytes} = get_pread_locnum(File, Pos, Len),
-    case catch file:pread(Fd, Pos, TotalBytes) of
+    case catch encrypted_pread(File, Pos, TotalBytes) of
         {ok, <<RawBin:TotalBytes/binary>>} ->
             {remove_block_prefixes(Pos rem ?SIZE_BLOCK, RawBin), Pos + TotalBytes};
         Else ->
@@ -758,15 +766,15 @@ read_raw_iolist_int(#file{fd = Fd} = File, Pos, Len) ->
             throw({file_truncate_error, Else, Filepath})
     end.
 
-% TODO: check if this is really unused
-read_multi_raw_iolists_int(#file{fd = Fd} = File, PosLens) ->
+% used in couch_bt_engine_compactor.erl via pread_terms/2
+read_multi_raw_iolists_int(#file{} = File, PosLens) ->
     LocNums = lists:map(
         fun({Pos, Len}) ->
             get_pread_locnum(File, Pos, Len)
         end,
         PosLens
     ),
-    {ok, Bins} = file:pread(Fd, LocNums),
+    {ok, Bins} = encrypted_pread(File, LocNums),
     lists:zipwith(
         fun({Pos, TotalBytes}, Bin) ->
             <<RawBin:TotalBytes/binary>> = Bin,
@@ -918,6 +926,85 @@ get_pread_limit() ->
 reset_eof(#file{} = File) ->
     {ok, Eof} = file:position(File#file.fd, eof),
     File#file{eof = Eof}.
+
+
+%% we've wiped all the data, including the wrapped key, so we need a new one.
+init_key(#file{eof = 0} = File) ->
+    Key = crypto:strong_rand_bytes(32),
+    WrappedKey = couch_keywrap:key_wrap(?AES_MASTER_KEY, Key),
+    ok = file:write(File#file.fd, WrappedKey),
+    ok = file:sync(File#file.fd),
+    {ok, File#file{eof = iolist_size(WrappedKey), key = Key}};
+
+%% we're opening an existing file and need to unwrap the key.
+init_key(#file{key = undefined} = File) ->
+    {ok, WrappedKey} = file:pread(File#file.fd, 0, 40),
+    case couch_keywrap:key_unwrap(?AES_MASTER_KEY, WrappedKey) of
+        fail ->
+            {error, cannot_unwrap_key};
+        Key when is_binary(Key) ->
+            {ok, File#file{key = Key}}
+    end;
+
+%% we're opening an existing file that contains a wrapped key
+%% which we've already unwrapped.
+init_key(#file{eof = Eof, key = Key} = File) when Eof > 40, is_binary(Key) ->
+    {ok, File}.
+
+
+%% We can encrypt any section of the file but we must make
+%% sure we align with the key stream.
+encrypted_write(#file{} = File, Data) ->
+    CipherText = encrypt(File#file.key, File#file.eof, pad(File#file.eof, Data)),
+    file:write(File#file.fd, unpad(File#file.eof, CipherText)).
+
+
+encrypted_pread(#file{} = File, LocNums) ->
+    case file:pread(File#file.fd, LocNums) of
+        {ok, DataL} ->
+            {ok, lists:zipwith(
+                   fun({Pos, _Len}, CipherText) ->
+                           PlainText = decrypt(File#file.key, Pos, pad(Pos, CipherText)),
+                           unpad(Pos, PlainText) end,
+                   LocNums,
+                   DataL)};
+        Else ->
+            Else
+    end.
+
+
+encrypted_pread(#file{} = File, Pos, Len) ->
+    case file:pread(File#file.fd, Pos, Len) of
+        {ok, CipherText} ->
+            PlainText = decrypt(File#file.key, Pos, pad(Pos, CipherText)),
+            {ok, unpad(Pos, PlainText)};
+        Else ->
+            Else
+    end.
+
+
+encrypt(Key, Pos, Data) ->
+    IV = aes_ctr_iv(Pos),
+    crypto:crypto_one_time(aes_256_ctr, Key, IV, Data, true).
+
+
+decrypt(Key, Pos, Data) ->
+    IV = aes_ctr_iv(Pos),
+    crypto:crypto_one_time(aes_256_ctr, Key, IV, Data, false).
+
+
+aes_ctr_iv(Pos) ->
+    <<(Pos div 16):128>>.
+
+
+pad(Pos, IOData) ->
+    [<<0:(Pos rem 16 * 8)>>, IOData].
+
+
+unpad(Pos, Bin) when is_binary(Bin) ->
+    <<_:(Pos rem 16 * 8), Result/binary>> = Bin,
+    Result.
+
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").
