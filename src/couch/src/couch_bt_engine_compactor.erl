@@ -54,7 +54,7 @@ start(#st{} = St, DbName, Options, Parent) ->
     couch_db_engine:trigger_on_compact(DbName),
 
     ?COMP_EVENT(init),
-    {ok, InitCompSt} = open_compaction_files(DbName, St, Options),
+    {ok, InitCompSt} = open_compaction_files(DbName, St, [{db_name, DbName} | Options]),
     ?COMP_EVENT(files_opened),
 
     Stages = [
@@ -94,8 +94,9 @@ open_compaction_files(DbName, OldSt, Options) ->
     } = OldSt,
     DataFile = DbFilePath ++ ".compact.data",
     MetaFile = DbFilePath ++ ".compact.meta",
-    {ok, DataFd, DataHdr} = open_compaction_file(DataFile),
-    {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile),
+    EncryptionOptions = couch_encryption_manager:encryption_options(Options),
+    {ok, DataFd, DataHdr} = open_compaction_file(DataFile, EncryptionOptions),
+    {ok, MetaFd, MetaHdr} = open_compaction_file(MetaFile, EncryptionOptions),
     DataHdrIsDbHdr = couch_bt_engine_header:is_header(DataHdr),
     CompSt =
         case {DataHdr, MetaHdr} of
@@ -623,15 +624,15 @@ compact_final_sync(#comp_st{new_st = St0} = CompSt) ->
         new_st = St1
     }.
 
-open_compaction_file(FilePath) ->
-    case couch_file:open(FilePath, [nologifmissing]) of
+open_compaction_file(FilePath, FileOpenOptions) ->
+    case couch_file:open(FilePath, [nologifmissing | FileOpenOptions]) of
         {ok, Fd} ->
             case couch_file:read_header(Fd) of
                 {ok, Header} -> {ok, Fd, Header};
                 no_valid_header -> {ok, Fd, nil}
             end;
         {error, enoent} ->
-            {ok, Fd} = couch_file:open(FilePath, [create]),
+            {ok, Fd} = couch_file:open(FilePath, [create | FileOpenOptions]),
             {ok, Fd, nil}
     end.
 

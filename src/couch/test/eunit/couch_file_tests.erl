@@ -551,3 +551,165 @@ fake_fsync_fd() ->
         {'$gen_call', From, sync} ->
             gen:reply(From, {error, eio})
     end.
+
+%% re-run above functions with encryption enabled
+
+encrypted_setup() ->
+    {ok, Fd} = couch_file:open(?tempfile(), [create, overwrite, {db_name, <<"foo">>}]),
+    Fd.
+
+-define(encrypted_foreach(Fs), {foreach, fun encrypted_setup/0, fun teardown/1, Fs}).
+
+encryption_read_write_test_() ->
+    {
+        "Common file read/write tests (encryption enabled)",
+        {
+            setup,
+            fun() ->
+                Ctx = test_util:start(?MODULE),
+                meck:expect(config, get, fun("encryption", "manager") -> "couch_encryption_manager_demo"; (_, _) -> undefined end),
+                Ctx
+            end,
+            fun(Ctx) ->
+                test_util:stop(Ctx)
+            end,
+            ?encrypted_foreach([
+                fun should_increase_file_size_on_write/1,
+                fun should_return_current_file_size_on_write/1,
+                fun should_write_and_read_term/1,
+                fun should_write_and_read_binary/1,
+                fun should_write_and_read_large_binary/1,
+                fun should_return_term_as_binary_for_reading_binary/1,
+                fun should_read_term_written_as_binary/1,
+                fun should_read_iolist/1,
+                fun should_fsync/1,
+                fun should_not_read_beyond_eof/1,
+                fun should_truncate/1
+            ])
+        }
+    }.
+
+encryption_pread_limit_test_() ->
+    {
+        "Read limit tests (encryption enabled)",
+        {
+            setup,
+            fun() ->
+                Ctx = test_util:start(?MODULE),
+                meck:expect(config, get, fun("encryption", "manager") -> "couch_encryption_manager_demo"; (_, _) -> undefined end),
+                config:set("couchdb", "max_pread_size", "50000"),
+                Ctx
+            end,
+            fun(Ctx) ->
+                config:delete("couchdb", "max_pread_size"),
+                test_util:stop(Ctx)
+            end,
+            ?encrypted_foreach([
+                fun should_increase_file_size_on_write/1,
+                fun should_return_current_file_size_on_write/1,
+                fun should_write_and_read_term/1,
+                fun should_write_and_read_binary/1,
+                fun should_not_read_more_than_pread_limit/1
+            ])
+        }
+    }.
+
+
+encryption_header_test_() ->
+    {
+        "File header read/write tests  (encryption enabled)",
+        {
+            setup,
+            fun() ->
+                Ctx = test_util:start(?MODULE),
+                meck:expect(config, get, fun("encryption", "manager") -> "couch_encryption_manager_demo"; (_, _) -> undefined end),
+                Ctx
+            end,
+            fun(Ctx) ->
+                test_util:stop(Ctx)
+            end,
+            [
+                ?encrypted_foreach([
+                    fun should_write_and_read_atom_header/1,
+                    fun should_write_and_read_tuple_header/1,
+                    fun should_write_and_read_second_header/1,
+                    fun should_truncate_second_header/1,
+                    fun should_produce_same_file_size_on_rewrite/1,
+                    fun should_save_headers_larger_than_block_size/1
+                ]),
+                should_recover_header_marker_corruption(),
+                should_recover_header_size_corruption(),
+                should_recover_header_md5sig_corruption(),
+                should_recover_header_data_corruption()
+            ]
+        }
+    }.
+
+%% encryption-specific tests
+
+encrypted_setup_with_path() ->
+    Path = ?tempfile(),
+    {ok, Fd} = couch_file:open(Path, [create, overwrite, {db_name, <<"foo">>}]),
+    {Path, Fd}.
+
+teardown_with_path({_Path, Fd}) ->
+    case is_process_alive(Fd) of
+        true -> ok = couch_file:close(Fd);
+        false -> ok
+    end.
+
+-define(encrypted_foreach_with_path(Fs), {foreach, fun encrypted_setup_with_path/0, fun teardown_with_path/1, Fs}).
+
+
+encryption_test_() ->
+    {
+        "couch_file encryption tests",
+        {
+            setup,
+            fun() ->
+                Ctx = test_util:start(?MODULE),
+                meck:expect(config, get, fun("encryption", "manager") -> "couch_encryption_manager_demo"; (_, _) -> undefined end),
+                Ctx
+            end,
+            fun(Ctx) ->
+                test_util:stop(Ctx)
+            end,
+            ?encrypted_foreach_with_path([
+                fun file_is_encrypted/1,
+                fun recover_from_corrupted_primary_header/1,
+                fun recover_from_corrupted_secondary_header/1,
+                fun cant_recover_if_both_headers_corrupted/1
+            ])
+        }
+    }.
+
+file_is_encrypted({_Path, Fd}) ->
+    ?_assertEqual({ok, 4096}, couch_file:bytes(Fd)).
+
+recover_from_corrupted_primary_header({Path, Fd0}) ->
+    ok = couch_file:close(Fd0),
+
+    {ok, RawFd} = file:open(Path, [read, write, raw, binary]),
+    ok = file:pwrite(RawFd, 1024, <<"bleh">>),
+    file:close(RawFd),
+
+    ?_assertMatch({ok, _Fd1}, couch_file:open(Path, [])).
+
+recover_from_corrupted_secondary_header({Path, Fd0}) ->
+    ok = couch_file:close(Fd0),
+
+    {ok, RawFd} = file:open(Path, [read, write, raw, binary]),
+    ok = file:pwrite(RawFd, 3072, <<"bleh">>),
+    file:close(RawFd),
+
+    ?_assertMatch({ok, _Fd1}, couch_file:open(Path, [])).
+
+cant_recover_if_both_headers_corrupted({Path, Fd0}) ->
+    ok = couch_file:close(Fd0),
+
+    {ok, RawFd} = file:open(Path, [read, write, raw, binary]),
+    ok = file:pwrite(RawFd, 1024, <<"bleh">>),
+    ok = file:pwrite(RawFd, 3072, <<"bleh">>),
+    file:close(RawFd),
+
+    ?_assertMatch({error, corrupted_encryption_header}, couch_file:open(Path, [])).

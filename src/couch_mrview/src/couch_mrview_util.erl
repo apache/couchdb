@@ -17,7 +17,7 @@
 -export([verify_view_filename/1, get_signature_from_filename/1]).
 -export([ddoc_to_mrst/2, init_state/4, reset_index/3]).
 -export([make_header/1]).
--export([index_file/2, compaction_file/2, open_file/1]).
+-export([index_file/2, compaction_file/2, open_file/2]).
 -export([delete_files/2, delete_index_file/2, delete_compaction_file/2]).
 -export([get_row_count/1, all_docs_reduce_to_count/1, reduce_to_count/1]).
 -export([all_docs_key_opts/1, all_docs_key_opts/2, key_opts/1, key_opts/2]).
@@ -791,10 +791,10 @@ compaction_file(DbName, Sig) ->
     FileName = couch_index_util:hexsig(Sig) ++ ".compact.view",
     couch_index_util:index_file(mrview, DbName, FileName).
 
-open_file(FName) ->
-    case couch_file:open(FName, [nologifmissing]) of
+open_file(FName, Options) ->
+    case couch_file:open(FName, [nologifmissing | Options]) of
         {ok, Fd} -> {ok, Fd};
-        {error, enoent} -> couch_file:open(FName, [create]);
+        {error, enoent} -> couch_file:open(FName, [create | Options]);
         Error -> Error
     end.
 

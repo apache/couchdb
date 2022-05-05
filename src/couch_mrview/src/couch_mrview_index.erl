@@ -120,7 +120,7 @@ open(Db, State0) ->
 
     OldSig = couch_mrview_util:maybe_update_index_file(State),
 
-    case couch_mrview_util:open_file(IndexFName) of
+    case couch_mrview_util:open_file(IndexFName, [{db_name, DbName}]) of
         {ok, Fd} ->
             case couch_file:read_header(Fd) of
                 % upgrade code for <= 2.x

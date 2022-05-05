@@ -827,14 +827,15 @@ copy_props(#st{header = Header} = St, Props) ->
         needs_commit = true
     }}.
 
-open_db_file(FilePath, Options) ->
-    case couch_file:open(FilePath, Options) of
+open_db_file(FilePath, Options0) ->
+    case couch_file:open(FilePath, Options0) of
         {ok, Fd} ->
             {ok, Fd};
         {error, enoent} ->
             % Couldn't find file. is there a compact version? This ca
             % happen (rarely) if we crashed during the file switch.
-            case couch_file:open(FilePath ++ ".compact", [nologifmissing]) of
+            Options1 = couch_encryption_manager:encryption_options(Options0),
+            case couch_file:open(FilePath ++ ".compact", [nologifmissing | Options1]) of
                 {ok, Fd} ->
                     Fmt = "Recovering from compaction file: ~s~s",
                     couch_log:info(Fmt, [FilePath, ".compact"]),
