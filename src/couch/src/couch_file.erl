@@ -23,6 +23,19 @@
 -define(IS_OLD_STATE(S), is_pid(S#file.db_monitor)).
 -define(PREFIX_SIZE, 5).
 -define(DEFAULT_READ_COUNT, 1024).
+-define(ENCRYPTED_HEADER, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15).
+
+%% Database encryption design details
+
+%% If, at couch_file creation time, encryption is enabled, couch_file
+%% generates a random 256-bit AES key and a random 128 bit
+%% initialisation vector. The currently configured aegis key manager
+%% module is asked to wrap the key and return it as a
+%% binary. couch_file stores the IV and the wrapped key in a special
+%% header block, always block 0, in the first 4 KiB of the file.  All
+%% data, including all headers except the encryption header at block
+%% 0, are encrypted using AES in Counter Mode, where the counter is
+%% calculated as IV plus the file offset, in AES block increments.
 
 -type block_id() :: non_neg_integer().
 -type location() :: non_neg_integer().
@@ -33,7 +46,10 @@
     is_sys,
     eof = 0,
     db_monitor,
-    pread_limit = 0
+    pread_limit = 0,
+    iv,
+    enc,
+    dec
 }).
 
 % public API
@@ -453,7 +469,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                                     ok = file:sync(Fd),
                                     maybe_track_open_os_files(Options),
                                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                                    {ok, #file{fd = Fd, is_sys = IsSys, pread_limit = Limit}};
+                                    init_crypto(#file{fd = Fd, is_sys = IsSys, pread_limit = Limit});
                                 false ->
                                     ok = file:close(Fd),
                                     init_status_error(ReturnPid, Ref, {error, eexist})
@@ -461,7 +477,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                         false ->
                             maybe_track_open_os_files(Options),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, #file{fd = Fd, is_sys = IsSys, pread_limit = Limit}}
+                            init_crypto(#file{fd = Fd, is_sys = IsSys, pread_limit = Limit})
                     end;
                 Error ->
                     init_status_error(ReturnPid, Ref, Error)
@@ -478,7 +494,9 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                             maybe_track_open_os_files(Options),
                             {ok, Eof} = file:position(Fd, eof),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            {ok, #file{fd = Fd, eof = Eof, is_sys = IsSys, pread_limit = Limit}};
+                            init_crypto(#file{
+                                fd = Fd, eof = Eof, is_sys = IsSys, pread_limit = Limit
+                            });
                         Error ->
                             init_status_error(ReturnPid, Ref, Error)
                     end;
@@ -581,20 +599,25 @@ handle_call({truncate, Pos}, _From, #file{fd = Fd} = File) ->
     {ok, Pos} = file:position(Fd, Pos),
     case file:truncate(Fd) of
         ok ->
-            {reply, ok, File#file{eof = Pos}};
+            case init_crypto(File#file{eof = Pos}) of
+                {ok, File1} ->
+                    {reply, ok, File1};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
         Error ->
             {reply, Error, File}
     end;
-handle_call({append_bin, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
+handle_call({append_bin, Bin}, _From, #file{eof = Pos} = File) ->
     Blocks = make_blocks(Pos rem ?SIZE_BLOCK, Bin),
     Size = iolist_size(Blocks),
-    case file:write(Fd, Blocks) of
+    case encrypted_write(File, Blocks) of
         ok ->
             {reply, {ok, Pos, Size}, File#file{eof = Pos + Size}};
         Error ->
             {reply, Error, reset_eof(File)}
     end;
-handle_call({append_bins, Bins}, _From, #file{fd = Fd, eof = Pos} = File) ->
+handle_call({append_bins, Bins}, _From, #file{eof = Pos} = File) ->
     {BlockResps, FinalPos} = lists:mapfoldl(
         fun(Bin, PosAcc) ->
             Blocks = make_blocks(PosAcc rem ?SIZE_BLOCK, Bin),
@@ -605,13 +628,13 @@ handle_call({append_bins, Bins}, _From, #file{fd = Fd, eof = Pos} = File) ->
         Bins
     ),
     {AllBlocks, Resps} = lists:unzip(BlockResps),
-    case file:write(Fd, AllBlocks) of
+    case encrypted_write(File, AllBlocks) of
         ok ->
             {reply, {ok, Resps}, File#file{eof = FinalPos}};
         Error ->
             {reply, Error, reset_eof(File)}
     end;
-handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
+handle_call({write_header, Bin}, _From, #file{eof = Pos} = File) ->
     BinSize = byte_size(Bin),
     case Pos rem ?SIZE_BLOCK of
         0 ->
@@ -620,14 +643,14 @@ handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
             Padding = <<0:(8 * (?SIZE_BLOCK - BlockOffset))>>
     end,
     FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(5, [Bin])],
-    case file:write(Fd, FinalBin) of
+    case encrypted_write(File, FinalBin) of
         ok ->
             {reply, ok, File#file{eof = Pos + iolist_size(FinalBin)}};
         Error ->
             {reply, Error, reset_eof(File)}
     end;
-handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
-    {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File}.
+handle_call(find_header, _From, #file{eof = Pos} = File) ->
+    {reply, find_header(File, Pos div ?SIZE_BLOCK), File}.
 
 handle_cast(close, Fd) ->
     {stop, normal, Fd}.
@@ -655,26 +678,26 @@ format_status(_Opt, [PDict, #file{} = File]) ->
     {_Fd, FilePath} = couch_util:get_value(couch_file_fd, PDict),
     [{data, [{"State", File}, {"InitialFilePath", FilePath}]}].
 
-find_header(Fd, Block) ->
-    case (catch load_header(Fd, Block)) of
+find_header(#file{} = File, Block) ->
+    case (catch load_header(File, Block)) of
         {ok, Bin} ->
             {ok, Bin};
         _Error ->
             ReadCount = config:get_integer(
                 "couchdb", "find_header_read_count", ?DEFAULT_READ_COUNT
             ),
-            find_header(Fd, Block - 1, ReadCount)
+            find_header(File, Block - 1, ReadCount)
     end.
 
-load_header(Fd, Block) ->
+load_header(#file{} = File, Block) ->
     {ok, <<1, HeaderLen:32/integer, RestBlock/binary>>} =
-        file:pread(Fd, Block * ?SIZE_BLOCK, ?SIZE_BLOCK),
-    load_header(Fd, Block * ?SIZE_BLOCK, HeaderLen, RestBlock).
+        encrypted_pread(File, Block * ?SIZE_BLOCK, ?SIZE_BLOCK),
+    load_header(File, Block * ?SIZE_BLOCK, HeaderLen, RestBlock).
 
-load_header(Fd, Pos, HeaderLen) ->
-    load_header(Fd, Pos, HeaderLen, <<>>).
+load_header(#file{} = File, Pos, HeaderLen) ->
+    load_header(File, Pos, HeaderLen, <<>>).
 
-load_header(Fd, Pos, HeaderLen, RestBlock) ->
+load_header(#file{} = File, Pos, HeaderLen, RestBlock) ->
     TotalBytes = calculate_total_read_len(?PREFIX_SIZE, HeaderLen),
     RawBin =
         case TotalBytes =< byte_size(RestBlock) of
@@ -684,7 +707,7 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
             false ->
                 ReadStart = Pos + ?PREFIX_SIZE + byte_size(RestBlock),
                 ReadLen = TotalBytes - byte_size(RestBlock),
-                {ok, Missing} = file:pread(Fd, ReadStart, ReadLen),
+                {ok, Missing} = encrypted_pread(File, ReadStart, ReadLen),
                 <<RestBlock/binary, Missing/binary>>
         end,
     <<Md5Sig:16/binary, HeaderBin/binary>> =
@@ -695,12 +718,12 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
 %% Read multiple block locations using a single file:pread/2.
 -spec find_header(file:fd(), block_id(), non_neg_integer()) ->
     {ok, binary()} | no_valid_header.
-find_header(_Fd, Block, _ReadCount) when Block < 0 ->
+find_header(_File, Block, _ReadCount) when Block < 0 ->
     no_valid_header;
-find_header(Fd, Block, ReadCount) ->
+find_header(#file{} = File, Block, ReadCount) ->
     FirstBlock = max(0, Block - ReadCount + 1),
     BlockLocations = [?SIZE_BLOCK * B || B <- lists:seq(FirstBlock, Block)],
-    {ok, DataL} = file:pread(Fd, [{L, ?PREFIX_SIZE} || L <- BlockLocations]),
+    {ok, DataL} = encrypted_pread(File, [{L, ?PREFIX_SIZE} || L <- BlockLocations]),
     %% Since BlockLocations are ordered from oldest to newest, we rely
     %% on lists:foldl/3 to reverse the order, making HeaderLocations
     %% correctly ordered from newest to oldest.
@@ -714,27 +737,27 @@ find_header(Fd, Block, ReadCount) ->
         [],
         lists:zip(BlockLocations, DataL)
     ),
-    case find_newest_header(Fd, HeaderLocations) of
+    case find_newest_header(File, HeaderLocations) of
         {ok, _Location, HeaderBin} ->
             {ok, HeaderBin};
         _ ->
             ok = file:advise(
-                Fd, hd(BlockLocations), ReadCount * ?SIZE_BLOCK, dont_need
+                File#file.fd, hd(BlockLocations), ReadCount * ?SIZE_BLOCK, dont_need
             ),
             NextBlock = hd(BlockLocations) div ?SIZE_BLOCK - 1,
-            find_header(Fd, NextBlock, ReadCount)
+            find_header(File, NextBlock, ReadCount)
     end.
 
 -spec find_newest_header(file:fd(), [{location(), header_size()}]) ->
     {ok, location(), binary()} | not_found.
-find_newest_header(_Fd, []) ->
+find_newest_header(_File, []) ->
     not_found;
-find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
-    case (catch load_header(Fd, Location, Size)) of
+find_newest_header(#file{} = File, [{Location, Size} | LocationSizes]) ->
+    case (catch load_header(File, Location, Size)) of
         {ok, HeaderBin} ->
             {ok, Location, HeaderBin};
         _Error ->
-            find_newest_header(Fd, LocationSizes)
+            find_newest_header(File, LocationSizes)
     end.
 
 -spec read_raw_iolist_int(#file{}, Pos :: non_neg_integer(), Len :: non_neg_integer()) ->
@@ -742,9 +765,9 @@ find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
 % 0110 UPGRADE CODE
 read_raw_iolist_int(Fd, {Pos, _Size}, Len) ->
     read_raw_iolist_int(Fd, Pos, Len);
-read_raw_iolist_int(#file{fd = Fd} = File, Pos, Len) ->
+read_raw_iolist_int(#file{} = File, Pos, Len) ->
     {Pos, TotalBytes} = get_pread_locnum(File, Pos, Len),
-    case catch file:pread(Fd, Pos, TotalBytes) of
+    case catch encrypted_pread(File, Pos, TotalBytes) of
         {ok, <<RawBin:TotalBytes/binary>>} ->
             {remove_block_prefixes(Pos rem ?SIZE_BLOCK, RawBin), Pos + TotalBytes};
         Else ->
@@ -758,15 +781,15 @@ read_raw_iolist_int(#file{fd = Fd} = File, Pos, Len) ->
             throw({file_truncate_error, Else, Filepath})
     end.
 
-% TODO: check if this is really unused
-read_multi_raw_iolists_int(#file{fd = Fd} = File, PosLens) ->
+% used in couch_bt_engine_compactor.erl via pread_terms/2
+read_multi_raw_iolists_int(#file{} = File, PosLens) ->
     LocNums = lists:map(
         fun({Pos, Len}) ->
             get_pread_locnum(File, Pos, Len)
         end,
         PosLens
     ),
-    {ok, Bins} = file:pread(Fd, LocNums),
+    {ok, Bins} = encrypted_pread(File, LocNums),
     lists:zipwith(
         fun({Pos, TotalBytes}, Bin) ->
             <<RawBin:TotalBytes/binary>> = Bin,
@@ -918,6 +941,132 @@ get_pread_limit() ->
 reset_eof(#file{} = File) ->
     {ok, Eof} = file:position(File#file.fd, eof),
     File#file{eof = Eof}.
+
+%% new file or we've wiped all the data, including the wrapped key, so we need a new one.
+init_crypto(#file{eof = 0} = File0) ->
+    DataEncryptionKey = crypto:strong_rand_bytes(32),
+    IV = crypto:strong_rand_bytes(16),
+    case aegis_key_manager:wrap_key(DataEncryptionKey) of
+        {ok, WrappedKey} ->
+            case write_encryption_header(File0, WrappedKey, IV) of
+                {ok, File1} ->
+                    ok = file:sync(File1#file.fd),
+                    {ok, init_ciphers(File1, DataEncryptionKey, IV)};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        {error, Reason} ->
+            {error, Reason}
+    end;
+%% we're opening an existing file and need to unwrap the key if file is encrypted.
+init_crypto(#file{eof = Pos, enc = undefined, dec = undefined} = File) when Pos > 0 ->
+    case read_encryption_header(File) of
+        {ok, WrappedKey, IV} ->
+            case aegis_key_manager:unwrap_key(WrappedKey) of
+                {ok, DataEncryptionKey} ->
+                    {ok, init_ciphers(File, DataEncryptionKey, IV)};
+                {error, Reason} ->
+                    {error, Reason}
+            end;
+        not_encrypted ->
+            {ok, File};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+init_ciphers(#file{} = File, DataEncryptionKey, IV) when
+    is_binary(DataEncryptionKey), is_binary(IV)
+->
+    EncState = crypto:crypto_dyn_iv_init(aes_256_ctr, DataEncryptionKey, true),
+    DecState = crypto:crypto_dyn_iv_init(aes_256_ctr, DataEncryptionKey, false),
+    File#file{iv = crypto:bytes_to_integer(IV), enc = EncState, dec = DecState}.
+
+write_encryption_header(#file{eof = 0} = File, WrappedKey, IV) when
+    byte_size(WrappedKey) < 1024, bit_size(IV) == 128
+->
+    Header = [<<?ENCRYPTED_HEADER>>, IV, <<(byte_size(WrappedKey)):16>>, WrappedKey],
+    PaddedHeader = [Header, <<0:((?SIZE_BLOCK - iolist_size(Header) - 32) * 8)>>],
+    DigestHeader = [PaddedHeader, crypto:hash(sha256, PaddedHeader)],
+    ?SIZE_BLOCK = iolist_size(DigestHeader),
+    case file:write(File#file.fd, DigestHeader) of
+        ok ->
+            {ok, File#file{eof = ?SIZE_BLOCK}};
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+read_encryption_header(#file{} = File) ->
+    case file:pread(File#file.fd, 0, ?SIZE_BLOCK) of
+        {ok,
+            <<?ENCRYPTED_HEADER, IV:16/binary, WrappedKeyLen:16, WrappedKey:(WrappedKeyLen)/binary,
+                _/binary>> = DigestHeader} ->
+            Header = binary:part(DigestHeader, 0, ?SIZE_BLOCK - 32),
+            Digest = binary:part(DigestHeader, ?SIZE_BLOCK - 32, 32),
+            case Digest == crypto:hash(sha256, Header) of
+                true ->
+                    {ok, WrappedKey, IV};
+                false ->
+                    {error, corrupted_encryption_header}
+            end;
+        {ok, _} ->
+            not_encrypted;
+        {error, Reason} ->
+            {error, Reason}
+    end.
+
+%% We can encrypt any section of the file but we must make
+%% sure we align with the key stream.
+encrypted_write(#file{enc = undefined} = File, Data) ->
+    file:write(File#file.fd, Data);
+encrypted_write(#file{} = File, Data) ->
+    CipherText = encrypt(File#file.enc, File#file.iv, File#file.eof, pad(File#file.eof, Data)),
+    file:write(File#file.fd, unpad(File#file.eof, CipherText)).
+
+encrypted_pread(#file{dec = undefined} = File, LocNums) ->
+    file:pread(File#file.fd, LocNums);
+encrypted_pread(#file{} = File, LocNums) ->
+    case file:pread(File#file.fd, LocNums) of
+        {ok, DataL} ->
+            {ok,
+                lists:zipwith(
+                    fun({Pos, _Len}, CipherText) ->
+                        PlainText = decrypt(File#file.dec, File#file.iv, Pos, pad(Pos, CipherText)),
+                        unpad(Pos, PlainText)
+                    end,
+                    LocNums,
+                    DataL
+                )};
+        Else ->
+            Else
+    end.
+
+encrypted_pread(#file{dec = undefined} = File, Pos, Len) ->
+    file:pread(File#file.fd, Pos, Len);
+encrypted_pread(#file{} = File, Pos, Len) ->
+    case file:pread(File#file.fd, Pos, Len) of
+        {ok, CipherText} ->
+            PlainText = decrypt(File#file.dec, File#file.iv, Pos, pad(Pos, CipherText)),
+            {ok, unpad(Pos, PlainText)};
+        Else ->
+            Else
+    end.
+
+encrypt(Enc, IV, Pos, Data) ->
+    crypto:crypto_dyn_iv_update(Enc, Data, aes_ctr(IV, Pos)).
+
+decrypt(Dec, IV, Pos, Data) ->
+    crypto:crypto_dyn_iv_update(Dec, Data, aes_ctr(IV, Pos)).
+
+aes_ctr(IV, Pos) ->
+    <<(IV + (Pos div 16)):128>>.
+
+pad(Pos, IOData) ->
+    [<<0:(Pos rem 16 * 8)>>, IOData].
+
+unpad(Pos, Bin) when is_binary(Bin) ->
+    Size = Pos rem 16 * 8,
+    <<_:Size, Result/binary>> = Bin,
+    Result.
 
 -ifdef(TEST).
 -include_lib("couch/include/couch_eunit.hrl").

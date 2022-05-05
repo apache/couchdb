@@ -17,7 +17,7 @@
 -export([rand32/0, implode/2]).
 -export([abs_pathname/1, abs_pathname/2, trim/1, drop_dot_couch_ext/1]).
 -export([encodeBase64Url/1, decodeBase64Url/1]).
--export([validate_utf8/1, to_hex/1, parse_term/1, dict_find/3]).
+-export([validate_utf8/1, to_hex/1, from_hex/1, parse_term/1, dict_find/3]).
 -export([get_nested_json_value/2, json_user_ctx/1]).
 -export([proplist_apply_field/2, json_apply_field/2]).
 -export([to_binary/1, to_integer/1, to_list/1, url_encode/1]).
@@ -235,6 +235,46 @@ nibble_to_hex(12) -> $c;
 nibble_to_hex(13) -> $d;
 nibble_to_hex(14) -> $e;
 nibble_to_hex(15) -> $f.
+
+from_hex(<<Hi:8, Lo:8, Rest/binary>>) ->
+    iolist_to_binary([<<(hex_to_nibble(Hi)):4, (hex_to_nibble(Lo)):4>> | from_hex(Rest)]);
+from_hex(<<>>) ->
+    [];
+from_hex(List) when is_list(List) ->
+    from_hex(list_to_binary(List)).
+
+hex_to_nibble($0) ->
+    0;
+hex_to_nibble($1) ->
+    1;
+hex_to_nibble($2) ->
+    2;
+hex_to_nibble($3) ->
+    3;
+hex_to_nibble($4) ->
+    4;
+hex_to_nibble($5) ->
+    5;
+hex_to_nibble($6) ->
+    6;
+hex_to_nibble($7) ->
+    7;
+hex_to_nibble($8) ->
+    8;
+hex_to_nibble($9) ->
+    9;
+hex_to_nibble($a) ->
+    10;
+hex_to_nibble($b) ->
+    11;
+hex_to_nibble($c) ->
+    12;
+hex_to_nibble($d) ->
+    13;
+hex_to_nibble($e) ->
+    14;
+hex_to_nibble($f) ->
+    15.
 
 parse_term(Bin) when is_binary(Bin) ->
     parse_term(binary_to_list(Bin));
