@@ -146,8 +146,8 @@ force_reply(Doc, [FirstReply | _] = Replies, {Health, W, Acc}) ->
         {true, Reply} ->
             % corner case new_edits:false and vdu: [noreply, forbidden, noreply]
             case check_forbidden_msg(Replies) of
-                {forbidden, Msg} ->
-                    {Health, W, [{Doc, {forbidden, Msg}} | Acc]};
+                {forbidden, ForbiddenReply} ->
+                    {Health, W, [{Doc, ForbiddenReply} | Acc]};
                 false ->
                     {Health, W, [{Doc, Reply} | Acc]}
             end;
@@ -164,8 +164,8 @@ force_reply(Doc, [FirstReply | _] = Replies, {Health, W, Acc}) ->
                             CounterKey = [fabric, doc_update, mismatched_errors],
                             couch_stats:increment_counter(CounterKey),
                             case check_forbidden_msg(Replies) of
-                                {forbidden, Msg} ->
-                                    {Health, W, [{Doc, {forbidden, Msg}} | Acc]};
+                                {forbidden, ForbiddenReply} ->
+                                    {Health, W, [{Doc, ForbiddenReply} | Acc]};
                                 false ->
                                     {error, W, [{Doc, FirstReply} | Acc]}
                             end
@@ -228,10 +228,10 @@ check_forbidden_msg(Replies) ->
     case lists:partition(Pred, Replies) of
         {[], _} ->
             false;
-        {[{_, {forbidden, Msg}} | _], RemReplies} ->
+        {[ForbiddenReply = {_, {forbidden, _}} | _], RemReplies} ->
             case lists:all(fun(E) -> E =:= noreply end, RemReplies) of
                 true ->
-                    {forbidden, Msg};
+                    {forbidden, ForbiddenReply};
                 false ->
                     false
             end
@@ -497,7 +497,13 @@ one_forbid() ->
     {stop, Reply} =
         handle_message({ok, [{ok, Doc1}, noreply]}, lists:nth(3, Shards), Acc2),
 
-    ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {forbidden, <<"not allowed">>}}]}, Reply).
+    ?assertEqual(
+        {ok, [
+            {Doc1, {ok, Doc1}},
+            {Doc2, {Doc2, {forbidden, <<"not allowed">>}}}
+        ]},
+        Reply
+    ).
 
 two_forbid() ->
     Doc1 = #doc{revs = {1, [<<"foo">>]}},
@@ -530,7 +536,13 @@ two_forbid() ->
             {ok, [{ok, Doc1}, {Doc2, {forbidden, <<"not allowed">>}}]}, lists:nth(3, Shards), Acc2
         ),
 
-    ?assertEqual({ok, [{Doc1, {ok, Doc1}}, {Doc2, {forbidden, <<"not allowed">>}}]}, Reply).
+    ?assertEqual(
+        {ok, [
+            {Doc1, {ok, Doc1}},
+            {Doc2, {Doc2, {forbidden, <<"not allowed">>}}}
+        ]},
+        Reply
+    ).
 
 % This should actually never happen, because an `{ok, Doc}` message means that the revision
 % tree is extended and so the VDU should forbid the document.
