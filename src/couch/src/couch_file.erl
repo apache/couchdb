@@ -941,7 +941,7 @@ init_key(#file{key = undefined} = File) ->
     {ok, WrappedKey} = file:pread(File#file.fd, 0, 40),
     case couch_keywrap:key_unwrap(?AES_MASTER_KEY, WrappedKey) of
         fail ->
-            {error, cannot_unwrap_key};
+            {ok, File#file{key = unencrypted}};
         Key when is_binary(Key) ->
             {ok, File#file{key = Key}}
     end;
@@ -954,10 +954,16 @@ init_key(#file{eof = Eof, key = Key} = File) when Eof > 40, is_binary(Key) ->
 
 %% We can encrypt any section of the file but we must make
 %% sure we align with the key stream.
+encrypted_write(#file{key = unencrypted} = File, Data) ->
+    file:write(File#file.fd, Data);
+
 encrypted_write(#file{} = File, Data) ->
     CipherText = encrypt(File#file.key, File#file.eof, pad(File#file.eof, Data)),
     file:write(File#file.fd, unpad(File#file.eof, CipherText)).
 
+
+encrypted_pread(#file{key = unencrypted} = File, LocNums) ->
+    file:pread(File#file.fd, LocNums);
 
 encrypted_pread(#file{} = File, LocNums) ->
     case file:pread(File#file.fd, LocNums) of
@@ -972,6 +978,9 @@ encrypted_pread(#file{} = File, LocNums) ->
             Else
     end.
 
+
+encrypted_pread(#file{key = unencrypted} = File, Pos, Len) ->
+    file:pread(File#file.fd, Pos, Len);
 
 encrypted_pread(#file{} = File, Pos, Len) ->
     case file:pread(File#file.fd, Pos, Len) of
