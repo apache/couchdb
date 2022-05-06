@@ -75,126 +75,23 @@ get_unhashed_admins() ->
         config:get("admins")
     ).
 
-%% Current scheme, much stronger.
--spec pbkdf2(binary(), binary(), integer()) -> binary().
-pbkdf2(Password, Salt, Iterations) when
-    is_binary(Password),
-    is_binary(Salt),
-    is_integer(Iterations),
-    Iterations > 0
-->
-    {ok, Result} = pbkdf2(Password, Salt, Iterations, ?SHA1_OUTPUT_LENGTH),
-    Result;
-pbkdf2(Password, Salt, Iterations) when
-    is_binary(Salt),
-    is_integer(Iterations),
-    Iterations > 0
-->
-    Msg = io_lib:format("Password value of '~p' is invalid.", [Password]),
-    throw({forbidden, Msg});
-pbkdf2(Password, Salt, Iterations) when
-    is_binary(Password),
-    is_integer(Iterations),
-    Iterations > 0
-->
-    Msg = io_lib:format("Salt value of '~p' is invalid.", [Salt]),
-    throw({forbidden, Msg}).
 
--spec pbkdf2(binary(), binary(), integer(), integer()) ->
-    {ok, binary()} | {error, derived_key_too_long}.
-pbkdf2(_Password, _Salt, _Iterations, DerivedLength) when
-    DerivedLength > ?MAX_DERIVED_KEY_LENGTH
-->
-    {error, derived_key_too_long};
-pbkdf2(Password, Salt, Iterations, DerivedLength) when
-    is_binary(Password),
-    is_binary(Salt),
-    is_integer(Iterations),
-    Iterations > 0,
-    is_integer(DerivedLength)
-->
-    L = ceiling(DerivedLength / ?SHA1_OUTPUT_LENGTH),
-    <<Bin:DerivedLength/binary, _/binary>> =
-        iolist_to_binary(pbkdf2(Password, Salt, Iterations, L, 1, [])),
-    {ok, ?l2b(couch_util:to_hex(Bin))}.
-
--spec pbkdf2(binary(), binary(), integer(), integer(), integer(), iolist()) ->
-    iolist().
-pbkdf2(_Password, _Salt, _Iterations, BlockCount, BlockIndex, Acc) when
-    BlockIndex > BlockCount
-->
-    lists:reverse(Acc);
-pbkdf2(Password, Salt, Iterations, BlockCount, BlockIndex, Acc) ->
-    Block = pbkdf2(Password, Salt, Iterations, BlockIndex, 1, <<>>, <<>>),
-    pbkdf2(Password, Salt, Iterations, BlockCount, BlockIndex + 1, [Block | Acc]).
-
--spec pbkdf2(
-    binary(),
-    binary(),
-    integer(),
-    integer(),
-    integer(),
-    binary(),
-    binary()
-) -> binary().
-pbkdf2(_Password, _Salt, Iterations, _BlockIndex, Iteration, _Prev, Acc) when
-    Iteration > Iterations
-->
-    Acc;
-pbkdf2(Password, Salt, Iterations, BlockIndex, 1, _Prev, _Acc) ->
-    InitialBlock = couch_util:hmac(
-        sha,
-        Password,
-        <<Salt/binary, BlockIndex:32/integer>>
-    ),
-    pbkdf2(
-        Password,
-        Salt,
-        Iterations,
-        BlockIndex,
-        2,
-        InitialBlock,
-        InitialBlock
-    );
-pbkdf2(Password, Salt, Iterations, BlockIndex, Iteration, Prev, Acc) ->
-    Next = couch_util:hmac(sha, Password, Prev),
-    pbkdf2(
-        Password,
-        Salt,
-        Iterations,
-        BlockIndex,
-        Iteration + 1,
-        Next,
-        crypto:exor(Next, Acc)
-    ).
-
-%% verify two lists for equality without short-circuits to avoid timing attacks.
--spec verify(string(), string(), integer()) -> boolean().
-verify([X | RestX], [Y | RestY], Result) ->
-    verify(RestX, RestY, (X bxor Y) bor Result);
-verify([], [], Result) ->
-    Result == 0.
-
--spec verify
-    (binary(), binary()) -> boolean();
-    (list(), list()) -> boolean().
-verify(<<X/binary>>, <<Y/binary>>) ->
-    verify(?b2l(X), ?b2l(Y));
-verify(X, Y) when is_list(X) and is_list(Y) ->
-    case length(X) == length(Y) of
-        true ->
-            verify(X, Y, 0);
-        false ->
-            false
-    end;
-verify(_X, _Y) ->
-    false.
-
--spec ceiling(number()) -> integer().
-ceiling(X) ->
-    T = erlang:trunc(X),
-    case (X - T) of
-        Neg when Neg < 0 -> T;
-        Pos when Pos > 0 -> T + 1;
-        _ -> T
+pbkdf2(Password, Salt, Iterations) ->
+    case couch_pbkdf2:pbkdf2(sha, Password, Salt, Iterations, ?SHA1_OUTPUT_LENGTH) of
+        {ok, Hash} ->
+            couch_pbkdf2:to_hex(Hash);
+        Else ->
+            Else
     end.
+
+
+pbkdf2(Password, Salt, Iterations, DerivedLength) ->
+    case couch_pbkdf2:pbkdf2(sha, Password, Salt, Iterations, DerivedLength) of
+        {ok, Hash} ->
+            couch_pbkdf2:to_hex(Hash);
+        Else ->
+            Else
+    end.
+
+verify(X, Y) ->
+    couch_pbkdf2:compare_secure(X, Y).
