@@ -64,8 +64,6 @@
 %%  or {error, Reason} if the file could not be opened.
 %%----------------------------------------------------------------------
 
--define(AES_MASTER_KEY, <<0:256>>).
-
 open(Filepath) ->
     open(Filepath, []).
 
@@ -932,7 +930,7 @@ reset_eof(#file{} = File) ->
 %% we've wiped all the data, including the wrapped key, so we need a new one.
 init_key(#file{eof = 0} = File) ->
     Key = crypto:strong_rand_bytes(32),
-    WrappedKey = couch_keywrap:key_wrap(?AES_MASTER_KEY, Key),
+    WrappedKey = couch_keywrap:key_wrap(master_key(), Key),
     Header = <<?ENCRYPTED_HEADER, WrappedKey/binary>>,
     ok = file:write(File#file.fd, Header),
     ok = file:sync(File#file.fd),
@@ -942,7 +940,7 @@ init_key(#file{eof = 0} = File) ->
 init_key(#file{key = undefined} = File) ->
     case file:pread(File#file.fd, 0, 48) of
         {ok, <<?ENCRYPTED_HEADER, WrappedKey/binary>>} ->
-            case couch_keywrap:key_unwrap(?AES_MASTER_KEY, WrappedKey) of
+            case couch_keywrap:key_unwrap(master_key(), WrappedKey) of
                 fail ->
                     {error, unwrap_failed};
                 Key when is_binary(Key) ->
@@ -1021,6 +1019,27 @@ pad(Pos, IOData) ->
 unpad(Pos, Bin) when is_binary(Bin) ->
     <<_:(Pos rem 16 * 8), Result/binary>> = Bin,
     Result.
+
+
+master_key() ->
+    couch_pbkdf2:pbkdf2(sha256, master_password(), master_salt(), 100000).
+
+
+master_password() ->
+    case config:get("couchdb", "encryption_password") of
+        undefined ->
+            undefined;
+        Password ->
+            ?l2b(Password)
+    end.
+
+master_salt() ->
+    case config:get("couchdb", "encryption_salt") of
+        undefined ->
+            undefined;
+        Salt ->
+            ?l2b(Salt)
+    end.
 
 
 -ifdef(TEST).
