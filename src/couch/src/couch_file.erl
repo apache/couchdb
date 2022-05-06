@@ -619,7 +619,7 @@ handle_call({append_bins, Bins}, _From, #file{eof = Pos} = File) ->
         Error ->
             {reply, Error, reset_eof(File)}
     end;
-handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
+handle_call({write_header, Bin}, _From, #file{eof = Pos} = File) ->
     BinSize = byte_size(Bin),
     case Pos rem ?SIZE_BLOCK of
         0 ->
@@ -628,14 +628,14 @@ handle_call({write_header, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
             Padding = <<0:(8 * (?SIZE_BLOCK - BlockOffset))>>
     end,
     FinalBin = [Padding, <<1, BinSize:32/integer>> | make_blocks(5, [Bin])],
-    case file:write(Fd, FinalBin) of
+    case encrypted_write(File, FinalBin) of
         ok ->
             {reply, ok, File#file{eof = Pos + iolist_size(FinalBin)}};
         Error ->
             {reply, Error, reset_eof(File)}
     end;
-handle_call(find_header, _From, #file{fd = Fd, eof = Pos} = File) ->
-    {reply, find_header(Fd, Pos div ?SIZE_BLOCK), File}.
+handle_call(find_header, _From, #file{eof = Pos} = File) ->
+    {reply, find_header(File, Pos div ?SIZE_BLOCK), File}.
 
 handle_cast(close, Fd) ->
     {stop, normal, Fd}.
@@ -663,26 +663,26 @@ format_status(_Opt, [PDict, #file{} = File]) ->
     {_Fd, FilePath} = couch_util:get_value(couch_file_fd, PDict),
     [{data, [{"State", File}, {"InitialFilePath", FilePath}]}].
 
-find_header(Fd, Block) ->
-    case (catch load_header(Fd, Block)) of
+find_header(#file{} = File, Block) ->
+    case (catch load_header(File, Block)) of
         {ok, Bin} ->
             {ok, Bin};
         _Error ->
             ReadCount = config:get_integer(
                 "couchdb", "find_header_read_count", ?DEFAULT_READ_COUNT
             ),
-            find_header(Fd, Block - 1, ReadCount)
+            find_header(File, Block - 1, ReadCount)
     end.
 
-load_header(Fd, Block) ->
+load_header(#file{} = File, Block) ->
     {ok, <<1, HeaderLen:32/integer, RestBlock/binary>>} =
-        file:pread(Fd, Block * ?SIZE_BLOCK, ?SIZE_BLOCK),
-    load_header(Fd, Block * ?SIZE_BLOCK, HeaderLen, RestBlock).
+        encrypted_pread(File, Block * ?SIZE_BLOCK, ?SIZE_BLOCK),
+    load_header(File, Block * ?SIZE_BLOCK, HeaderLen, RestBlock).
 
-load_header(Fd, Pos, HeaderLen) ->
-    load_header(Fd, Pos, HeaderLen, <<>>).
+load_header(#file{} = File, Pos, HeaderLen) ->
+    load_header(File, Pos, HeaderLen, <<>>).
 
-load_header(Fd, Pos, HeaderLen, RestBlock) ->
+load_header(#file{} = File, Pos, HeaderLen, RestBlock) ->
     TotalBytes = calculate_total_read_len(?PREFIX_SIZE, HeaderLen),
     RawBin =
         case TotalBytes =< byte_size(RestBlock) of
@@ -692,7 +692,7 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
             false ->
                 ReadStart = Pos + ?PREFIX_SIZE + byte_size(RestBlock),
                 ReadLen = TotalBytes - byte_size(RestBlock),
-                {ok, Missing} = file:pread(Fd, ReadStart, ReadLen),
+                {ok, Missing} = encrypted_pread(File, ReadStart, ReadLen),
                 <<RestBlock/binary, Missing/binary>>
         end,
     <<Md5Sig:16/binary, HeaderBin/binary>> =
@@ -703,12 +703,12 @@ load_header(Fd, Pos, HeaderLen, RestBlock) ->
 %% Read multiple block locations using a single file:pread/2.
 -spec find_header(file:fd(), block_id(), non_neg_integer()) ->
     {ok, binary()} | no_valid_header.
-find_header(_Fd, Block, _ReadCount) when Block < 0 ->
+find_header(_File, Block, _ReadCount) when Block < 0 ->
     no_valid_header;
-find_header(Fd, Block, ReadCount) ->
+find_header(#file{} = File, Block, ReadCount) ->
     FirstBlock = max(0, Block - ReadCount + 1),
     BlockLocations = [?SIZE_BLOCK * B || B <- lists:seq(FirstBlock, Block)],
-    {ok, DataL} = file:pread(Fd, [{L, ?PREFIX_SIZE} || L <- BlockLocations]),
+    {ok, DataL} = encrypted_pread(File, [{L, ?PREFIX_SIZE} || L <- BlockLocations]),
     %% Since BlockLocations are ordered from oldest to newest, we rely
     %% on lists:foldl/3 to reverse the order, making HeaderLocations
     %% correctly ordered from newest to oldest.
@@ -722,27 +722,27 @@ find_header(Fd, Block, ReadCount) ->
         [],
         lists:zip(BlockLocations, DataL)
     ),
-    case find_newest_header(Fd, HeaderLocations) of
+    case find_newest_header(File, HeaderLocations) of
         {ok, _Location, HeaderBin} ->
             {ok, HeaderBin};
         _ ->
             ok = file:advise(
-                Fd, hd(BlockLocations), ReadCount * ?SIZE_BLOCK, dont_need
+                File#file.fd, hd(BlockLocations), ReadCount * ?SIZE_BLOCK, dont_need
             ),
             NextBlock = hd(BlockLocations) div ?SIZE_BLOCK - 1,
-            find_header(Fd, NextBlock, ReadCount)
+            find_header(File, NextBlock, ReadCount)
     end.
 
 -spec find_newest_header(file:fd(), [{location(), header_size()}]) ->
     {ok, location(), binary()} | not_found.
-find_newest_header(_Fd, []) ->
+find_newest_header(_File, []) ->
     not_found;
-find_newest_header(Fd, [{Location, Size} | LocationSizes]) ->
-    case (catch load_header(Fd, Location, Size)) of
+find_newest_header(#file{} = File, [{Location, Size} | LocationSizes]) ->
+    case (catch load_header(File, Location, Size)) of
         {ok, HeaderBin} ->
             {ok, Location, HeaderBin};
         _Error ->
-            find_newest_header(Fd, LocationSizes)
+            find_newest_header(File, LocationSizes)
     end.
 
 -spec read_raw_iolist_int(#file{}, Pos :: non_neg_integer(), Len :: non_neg_integer()) ->
