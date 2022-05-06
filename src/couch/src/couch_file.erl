@@ -23,6 +23,7 @@
 -define(IS_OLD_STATE(S), is_pid(S#file.db_monitor)).
 -define(PREFIX_SIZE, 5).
 -define(DEFAULT_READ_COUNT, 1024).
+-define(ENCRYPTED_HEADER, 0,1,2,3,4,5,6,7).
 
 -type block_id() :: non_neg_integer().
 -type location() :: non_neg_integer().
@@ -932,23 +933,30 @@ reset_eof(#file{} = File) ->
 init_key(#file{eof = 0} = File) ->
     Key = crypto:strong_rand_bytes(32),
     WrappedKey = couch_keywrap:key_wrap(?AES_MASTER_KEY, Key),
-    ok = file:write(File#file.fd, WrappedKey),
+    Header = <<?ENCRYPTED_HEADER, WrappedKey/binary>>,
+    ok = file:write(File#file.fd, Header),
     ok = file:sync(File#file.fd),
-    {ok, File#file{eof = iolist_size(WrappedKey), key = Key}};
+    {ok, File#file{eof = iolist_size(Header), key = Key}};
 
 %% we're opening an existing file and need to unwrap the key.
 init_key(#file{key = undefined} = File) ->
-    {ok, WrappedKey} = file:pread(File#file.fd, 0, 40),
-    case couch_keywrap:key_unwrap(?AES_MASTER_KEY, WrappedKey) of
-        fail ->
+    case file:pread(File#file.fd, 0, 48) of
+        {ok, <<?ENCRYPTED_HEADER, WrappedKey/binary>>} ->
+            case couch_keywrap:key_unwrap(?AES_MASTER_KEY, WrappedKey) of
+                fail ->
+                    {error, unwrap_failed};
+                Key when is_binary(Key) ->
+                    {ok, File#file{key = Key}}
+            end;
+        {ok, _} ->
             {ok, File#file{key = unencrypted}};
-        Key when is_binary(Key) ->
-            {ok, File#file{key = Key}}
+        Else ->
+            Else
     end;
 
 %% we're opening an existing file that contains a wrapped key
 %% which we've already unwrapped.
-init_key(#file{eof = Eof, key = Key} = File) when Eof > 40, is_binary(Key) ->
+init_key(#file{eof = Eof, key = Key} = File) when Eof > 48, is_binary(Key) ->
     {ok, File}.
 
 
