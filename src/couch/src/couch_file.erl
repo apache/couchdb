@@ -35,7 +35,8 @@
     eof = 0,
     db_monitor,
     pread_limit = 0,
-    key
+    enc,
+    dec
 }).
 
 % public API
@@ -455,7 +456,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                                     ok = file:sync(Fd),
                                     maybe_track_open_os_files(Options),
                                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                                    init_key(#file{fd = Fd, is_sys = IsSys, pread_limit = Limit});
+                                    init_crypto(#file{fd = Fd, is_sys = IsSys, pread_limit = Limit});
                                 false ->
                                     ok = file:close(Fd),
                                     init_status_error(ReturnPid, Ref, {error, eexist})
@@ -463,7 +464,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                         false ->
                             maybe_track_open_os_files(Options),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            init_key(#file{fd = Fd, is_sys = IsSys, pread_limit = Limit})
+                            init_crypto(#file{fd = Fd, is_sys = IsSys, pread_limit = Limit})
                     end;
                 Error ->
                     init_status_error(ReturnPid, Ref, Error)
@@ -480,7 +481,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                             maybe_track_open_os_files(Options),
                             {ok, Eof} = file:position(Fd, eof),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            init_key(#file{fd = Fd, eof = Eof, is_sys = IsSys, pread_limit = Limit});
+                            init_crypto(#file{fd = Fd, eof = Eof, is_sys = IsSys, pread_limit = Limit});
                         Error ->
                             init_status_error(ReturnPid, Ref, Error)
                     end;
@@ -583,7 +584,7 @@ handle_call({truncate, Pos}, _From, #file{fd = Fd} = File) ->
     {ok, Pos} = file:position(Fd, Pos),
     case file:truncate(Fd) of
         ok ->
-            case init_key(File#file{eof = Pos}) of
+            case init_crypto(File#file{eof = Pos}) of
                 {ok, File1} ->
                     {reply, ok, File1};
                 {error, Reason} ->
@@ -928,47 +929,52 @@ reset_eof(#file{} = File) ->
 
 
 %% we've wiped all the data, including the wrapped key, so we need a new one.
-init_key(#file{eof = 0} = File) ->
+init_crypto(#file{eof = 0} = File) ->
     Key = crypto:strong_rand_bytes(32),
     WrappedKey = couch_keywrap:key_wrap(master_key(), Key),
     Header = <<?ENCRYPTED_HEADER, WrappedKey/binary>>,
     ok = file:write(File#file.fd, Header),
     ok = file:sync(File#file.fd),
-    {ok, File#file{eof = iolist_size(Header), key = Key}};
+    {ok, init_crypto(File#file{eof = iolist_size(Header)}, Key)};
 
 %% we're opening an existing file and need to unwrap the key.
-init_key(#file{key = undefined} = File) ->
+init_crypto(#file{enc = undefined, dec = undefined} = File) ->
     case file:pread(File#file.fd, 0, 48) of
         {ok, <<?ENCRYPTED_HEADER, WrappedKey/binary>>} ->
             case couch_keywrap:key_unwrap(master_key(), WrappedKey) of
                 fail ->
                     {error, unwrap_failed};
                 Key when is_binary(Key) ->
-                    {ok, File#file{key = Key}}
+                    {ok, init_crypto(File, Key)}
             end;
         {ok, _} ->
-            {ok, File#file{key = unencrypted}};
+            {ok, File#file{enc = unencrypted, dec = unencrypted}};
         Else ->
             Else
     end;
 
 %% we're opening an existing file that contains a wrapped key
 %% which we've already unwrapped.
-init_key(#file{eof = Eof, key = Key} = File) when Eof > 48, is_binary(Key) ->
+init_crypto(#file{eof = Eof, enc = Enc, dec = Dec} = File) when Eof > 48, Enc /= undefined, Dec /= undefined ->
     {ok, File}.
+
+init_crypto(#file{} = File, Key) ->
+    EncState = crypto:crypto_dyn_iv_init(aes_256_ctr, Key, true),
+    DecState = crypto:crypto_dyn_iv_init(aes_256_ctr, Key, false),
+    File#file{enc = EncState, dec = DecState}.
 
 
 %% We can encrypt any section of the file but we must make
 %% sure we align with the key stream.
-encrypted_write(#file{key = unencrypted} = File, Data) ->
+encrypted_write(#file{enc = unencrypted} = File, Data) ->
     file:write(File#file.fd, Data);
 
 encrypted_write(#file{} = File, Data) ->
-    CipherText = encrypt(File#file.key, File#file.eof, pad(File#file.eof, Data)),
+    CipherText = encrypt(File#file.enc, File#file.eof, pad(File#file.eof, Data)),
     file:write(File#file.fd, unpad(File#file.eof, CipherText)).
 
 
-encrypted_pread(#file{key = unencrypted} = File, LocNums) ->
+encrypted_pread(#file{dec = unencrypted} = File, LocNums) ->
     file:pread(File#file.fd, LocNums);
 
 encrypted_pread(#file{} = File, LocNums) ->
@@ -976,7 +982,7 @@ encrypted_pread(#file{} = File, LocNums) ->
         {ok, DataL} ->
             {ok, lists:zipwith(
                    fun({Pos, _Len}, CipherText) ->
-                           PlainText = decrypt(File#file.key, Pos, pad(Pos, CipherText)),
+                           PlainText = decrypt(File#file.dec, Pos, pad(Pos, CipherText)),
                            unpad(Pos, PlainText) end,
                    LocNums,
                    DataL)};
@@ -985,27 +991,27 @@ encrypted_pread(#file{} = File, LocNums) ->
     end.
 
 
-encrypted_pread(#file{key = unencrypted} = File, Pos, Len) ->
+encrypted_pread(#file{dec = unencrypted} = File, Pos, Len) ->
     file:pread(File#file.fd, Pos, Len);
 
 encrypted_pread(#file{} = File, Pos, Len) ->
     case file:pread(File#file.fd, Pos, Len) of
         {ok, CipherText} ->
-            PlainText = decrypt(File#file.key, Pos, pad(Pos, CipherText)),
+            PlainText = decrypt(File#file.dec, Pos, pad(Pos, CipherText)),
             {ok, unpad(Pos, PlainText)};
         Else ->
             Else
     end.
 
 
-encrypt(Key, Pos, Data) ->
+encrypt(Enc, Pos, Data) ->
     IV = aes_ctr_iv(Pos),
-    crypto:crypto_one_time(aes_256_ctr, Key, IV, Data, true).
+    crypto:crypto_dyn_iv_update(Enc, Data, IV).
 
 
-decrypt(Key, Pos, Data) ->
+decrypt(Dec, Pos, Data) ->
     IV = aes_ctr_iv(Pos),
-    crypto:crypto_one_time(aes_256_ctr, Key, IV, Data, false).
+    crypto:crypto_dyn_iv_update(Dec, Data, IV).
 
 
 aes_ctr_iv(Pos) ->
