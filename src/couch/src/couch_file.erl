@@ -36,7 +36,8 @@
     db_monitor,
     pread_limit = 0,
     enc,
-    dec
+    dec,
+    nonce
 }).
 
 % public API
@@ -931,21 +932,23 @@ reset_eof(#file{} = File) ->
 %% we've wiped all the data, including the wrapped key, so we need a new one.
 init_crypto(#file{eof = 0} = File) ->
     Key = crypto:strong_rand_bytes(32),
+    Nonce = crypto:strong_rand_bytes(8),
     WrappedKey = couch_keywrap:key_wrap(master_key(), Key),
     Header = <<?ENCRYPTED_HEADER, WrappedKey/binary>>,
     ok = file:write(File#file.fd, Header),
+    ok = file:write(File#file.fd, Nonce),
     ok = file:sync(File#file.fd),
-    {ok, init_crypto(File#file{eof = iolist_size(Header)}, Key)};
+    {ok, init_crypto(File#file{eof = iolist_size(Header) + byte_size(Nonce)}, Key, Nonce)};
 
 %% we're opening an existing file and need to unwrap the key.
 init_crypto(#file{enc = undefined, dec = undefined} = File) ->
-    case file:pread(File#file.fd, 0, 48) of
-        {ok, <<?ENCRYPTED_HEADER, WrappedKey/binary>>} ->
+    case file:pread(File#file.fd, 0, 56) of
+        {ok, <<?ENCRYPTED_HEADER, WrappedKey:40/binary, Nonce:8/binary>>} ->
             case couch_keywrap:key_unwrap(master_key(), WrappedKey) of
                 fail ->
                     {error, unwrap_failed};
                 Key when is_binary(Key) ->
-                    {ok, init_crypto(File, Key)}
+                    {ok, init_crypto(File, Key, Nonce)}
             end;
         {ok, _} ->
             {ok, File#file{enc = unencrypted, dec = unencrypted}};
@@ -955,13 +958,13 @@ init_crypto(#file{enc = undefined, dec = undefined} = File) ->
 
 %% we're opening an existing file that contains a wrapped key
 %% which we've already unwrapped.
-init_crypto(#file{eof = Eof, enc = Enc, dec = Dec} = File) when Eof > 48, Enc /= undefined, Dec /= undefined ->
+init_crypto(#file{eof = Eof, enc = Enc, dec = Dec} = File) when Eof > 56, Enc /= undefined, Dec /= undefined ->
     {ok, File}.
 
-init_crypto(#file{} = File, Key) ->
+init_crypto(#file{} = File, Key, Nonce) ->
     EncState = crypto:crypto_dyn_iv_init(aes_256_ctr, Key, true),
     DecState = crypto:crypto_dyn_iv_init(aes_256_ctr, Key, false),
-    File#file{enc = EncState, dec = DecState}.
+    File#file{enc = EncState, dec = DecState, nonce = Nonce}.
 
 
 %% We can encrypt any section of the file but we must make
@@ -970,7 +973,7 @@ encrypted_write(#file{enc = unencrypted} = File, Data) ->
     file:write(File#file.fd, Data);
 
 encrypted_write(#file{} = File, Data) ->
-    CipherText = encrypt(File#file.enc, File#file.eof, pad(File#file.eof, Data)),
+    CipherText = encrypt(File#file.enc, File#file.eof, File#file.nonce, pad(File#file.eof, Data)),
     file:write(File#file.fd, unpad(File#file.eof, CipherText)).
 
 
@@ -982,7 +985,7 @@ encrypted_pread(#file{} = File, LocNums) ->
         {ok, DataL} ->
             {ok, lists:zipwith(
                    fun({Pos, _Len}, CipherText) ->
-                           PlainText = decrypt(File#file.dec, Pos, pad(Pos, CipherText)),
+                           PlainText = decrypt(File#file.dec, Pos, File#file.nonce, pad(Pos, CipherText)),
                            unpad(Pos, PlainText) end,
                    LocNums,
                    DataL)};
@@ -997,25 +1000,25 @@ encrypted_pread(#file{dec = unencrypted} = File, Pos, Len) ->
 encrypted_pread(#file{} = File, Pos, Len) ->
     case file:pread(File#file.fd, Pos, Len) of
         {ok, CipherText} ->
-            PlainText = decrypt(File#file.dec, Pos, pad(Pos, CipherText)),
+            PlainText = decrypt(File#file.dec, Pos, File#file.nonce, pad(Pos, CipherText)),
             {ok, unpad(Pos, PlainText)};
         Else ->
             Else
     end.
 
 
-encrypt(Enc, Pos, Data) ->
-    IV = aes_ctr_iv(Pos),
+encrypt(Enc, Pos, Nonce, Data) ->
+    IV = aes_ctr_iv(Nonce, Pos),
     crypto:crypto_dyn_iv_update(Enc, Data, IV).
 
 
-decrypt(Dec, Pos, Data) ->
-    IV = aes_ctr_iv(Pos),
+decrypt(Dec, Pos, Nonce, Data) ->
+    IV = aes_ctr_iv(Nonce, Pos),
     crypto:crypto_dyn_iv_update(Dec, Data, IV).
 
 
-aes_ctr_iv(Pos) ->
-    <<(Pos div 16):128>>.
+aes_ctr_iv(Nonce, Pos) ->
+    <<Nonce:8/binary, (Pos div 16):64>>.
 
 
 pad(Pos, IOData) ->
