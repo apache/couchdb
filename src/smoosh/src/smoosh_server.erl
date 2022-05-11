@@ -173,7 +173,7 @@ handle_call({enqueue, Object}, _From, State) ->
 handle_call(suspend, _From, State) ->
     ets:foldl(
         fun(#channel{name = Name, pid = P}, _) ->
-            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+            Level = smoosh_utils:log_level("compaction_log_level", "debug"),
             couch_log:Level("Suspending ~p", [Name]),
             smoosh_channel:suspend(P)
         end,
@@ -184,7 +184,7 @@ handle_call(suspend, _From, State) ->
 handle_call(resume, _From, State) ->
     ets:foldl(
         fun(#channel{name = Name, pid = P}, _) ->
-            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+            Level = smoosh_utils:log_level("compaction_log_level", "debug"),
             couch_log:Level("Resuming ~p", [Name]),
             smoosh_channel:resume(P)
         end,
