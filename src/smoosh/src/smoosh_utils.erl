@@ -88,7 +88,7 @@ throw_on_error(Args, {error, Reason}) ->
     throw({error, {Reason, Args}}).
 
 write_to_file(Content, FileName, VSN) ->
-    Level = log_level("compaction_log_level", "notice"),
+    Level = log_level("compaction_log_level", "debug"),
     couch_log:Level("~p Writing state ~s", [?MODULE, FileName]),
     OnDisk = <<VSN, (erlang:term_to_binary(Content, [compressed, {minor_version, 1}]))/binary>>,
     TmpFileName = FileName ++ ".tmp",

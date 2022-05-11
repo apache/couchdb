@@ -148,7 +148,7 @@ handle_cast({enqueue, _Object, 0}, #state{} = State) ->
 handle_cast({enqueue, Object, Priority}, #state{activated = true} = State) ->
     {noreply, maybe_start_compaction(add_to_queue(Object, Priority, State))};
 handle_cast({enqueue, Object, Priority}, #state{activated = false, requests = Requests} = State0) ->
-    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+    Level = smoosh_utils:log_level("compaction_log_level", "debug"),
     couch_log:Level(
         "~p Channel is not activated yet. Adding ~p to requests with priority ~p.", [
             ?MODULE,
@@ -254,7 +254,7 @@ handle_info(start_recovery, #state{name = Name, waiting = Waiting0} = State0) ->
         RecActive
     ),
     State1 = maybe_start_compaction(State0#state{paused = false, waiting = Waiting1}),
-    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+    Level = smoosh_utils:log_level("compaction_log_level", "debug"),
     couch_log:Level(
         "~p Previously active compaction jobs (if any) have been successfully recovered and restarted.",
         [?MODULE]
@@ -292,7 +292,7 @@ do_recover(FilePath) ->
             <<Vsn, Binary/binary>> = Content,
             try parse_state(Vsn, ?VSN, Binary) of
                 Term ->
-                    Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+                    Level = smoosh_utils:log_level("compaction_log_level", "debug"),
                     couch_log:Level(
                         "~p Successfully restored state file ~s", [?MODULE, FilePath]
                     ),
@@ -306,7 +306,7 @@ do_recover(FilePath) ->
                     error
             end;
         {error, enoent} ->
-            Level = smoosh_utils:log_level("compaction_log_level", "notice"),
+            Level = smoosh_utils:log_level("compaction_log_level", "debug"),
             couch_log:Level(
                 "~p (~p) State file ~s does not exist. Not restoring.", [?MODULE, enoent, FilePath]
             ),
