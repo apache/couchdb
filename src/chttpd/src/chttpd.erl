@@ -1134,14 +1134,14 @@ maybe_handle_error(Error) ->
     case chttpd_plugin:handle_error(Error) of
         {_Code, _Reason, _Description} = Result ->
             Result;
+        {shutdown, Err} ->
+            exit({shutdown, Err});
         {Err, Reason} ->
             {500, couch_util:to_binary(Err), couch_util:to_binary(Reason)};
         normal ->
             exit(normal);
-        {shutdown, Err} ->
-            exit({shutdown, Err});
-        Error ->
-            {500, <<"unknown_error">>, couch_util:to_binary(Error)}
+        Err ->
+            {500, <<"unknown_error">>, couch_util:to_binary(Err)}
     end.
 
 error_headers(#httpd{mochi_req = MochiReq} = Req, 401 = Code, ErrorStr, ReasonStr) ->
