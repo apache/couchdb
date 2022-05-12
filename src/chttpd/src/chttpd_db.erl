@@ -1206,9 +1206,16 @@ db_doc_req(#httpd{method = 'PUT', user_ctx = Ctx} = Req, Db, DocId) ->
             ),
             Doc = couch_doc_from_req(Req, Db, DocId, Doc0),
             try
-                Result = send_updated_doc(Req, Db, DocId, Doc, RespHeaders, UpdateType),
+                {HttpCode, RespHeaders1, RespBody} = update_doc_req(
+                    Req,
+                    Db,
+                    DocId,
+                    Doc,
+                    RespHeaders,
+                    UpdateType
+                ),
                 WaitFun(),
-                Result
+                send_json(Req, HttpCode, RespHeaders1, RespBody)
             catch
                 throw:Err ->
                     % Document rejected by a validate_doc_update function.
@@ -1534,14 +1541,12 @@ send_updated_doc(Req, Db, DocId, Json) ->
 send_updated_doc(Req, Db, DocId, Doc, Headers) ->
     send_updated_doc(Req, Db, DocId, Doc, Headers, interactive_edit).
 
-send_updated_doc(
+send_updated_doc(Req, Db, DocId, Doc, Headers, Type) ->
+    {Code, Headers1, Body} = update_doc_req(Req, Db, DocId, Doc, Headers, Type),
+    send_json(Req, Code, Headers1, Body).
+
+update_doc_req(Req, Db, DocId, Doc, Headers, UpdateType) ->
     #httpd{user_ctx = Ctx} = Req,
-    Db,
-    DocId,
-    #doc{deleted = Deleted} = Doc,
-    Headers,
-    UpdateType
-) ->
     W = chttpd:qs_value(Req, "w", integer_to_list(mem3:quorum(Db))),
     Options =
         case couch_httpd:header_value(Req, "X-Couch-Full-Commit") of
@@ -1552,15 +1557,10 @@ send_updated_doc(
             _ ->
                 [UpdateType, {user_ctx, Ctx}, {w, W}]
         end,
-    {Status, {etag, Etag}, Body} = update_doc(
-        Db,
-        DocId,
-        #doc{deleted = Deleted} = Doc,
-        Options
-    ),
+    {Status, {etag, Etag}, Body} = update_doc(Db, DocId, Doc, Options),
     HttpCode = http_code_from_status(Status),
     ResponseHeaders = [{"ETag", Etag} | Headers],
-    send_json(Req, HttpCode, ResponseHeaders, Body).
+    {HttpCode, ResponseHeaders, Body}.
 
 http_code_from_status(Status) ->
     case Status of
