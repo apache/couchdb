@@ -32,6 +32,8 @@
     fold_tree/3,
     linked_processes_info/2,
     print_linked_processes/1,
+    memory_info/1,
+    memory_info/2,
     busy/2,
     busy/3,
     restart/1,
@@ -70,6 +72,7 @@ help() ->
         fold,
         linked_processes_info,
         print_linked_processes,
+        memory_info,
         print_table,
         restart,
         restart_busy
@@ -279,6 +282,23 @@ couch_index_server[<0.288.0>]                |   478240   |         0         | 
         ```
 
         ---
+    ", []);
+help(memory_info) ->
+    io:format("
+        - memory_info(ProcessList)
+        - memory_info(ProcessList, InfoKeys)
+        - memory_info(Pid, InfoKeys)
+        --------------------------------
+
+        Obtains the values for a set of optional InfoKeys for each process in ProcessList.
+          - ProcessList: List of processes
+          - InfoKeys: List of desired keys to obtain values for. The supported keys are
+            [binary, dictionary, heap_size, links, memory, message_queue_len, monitored_by,
+            monitors, stack_size, total_heap_size]
+          - Pid: Initial Pid to start from
+
+        The output is a list containing tuples of the form {Pid, ProcessName, #{InfoKey: InfoVal}}
+        for each process in ProcessList.
     ", []);
 help(print_table) ->
     io:format("
@@ -534,6 +554,54 @@ print_linked_processes(Pid) when is_pid(Pid) ->
     ],
     Tree = linked_processes_info(Pid, Info),
     print_tree(Tree, TableSpec).
+
+memory_info(ProcessList) ->
+    InfoKeys = [
+        binary,
+        dictionary,
+        heap_size,
+        links,
+        memory,
+        message_queue_len,
+        monitored_by,
+        monitors,
+        stack_size,
+        total_heap_size
+    ],
+    memory_info(ProcessList, InfoKeys).
+
+memory_info(ProcessList, InfoKeys) when is_list(ProcessList) ->
+    lists:map(
+        fun(Process) ->
+            memory_info(Process, InfoKeys)
+        end,
+        ProcessList
+    );
+memory_info(Pid, InfoKeys) ->
+    case process_info(Pid, InfoKeys) of
+        undefined ->
+            {Pid, undefined, undefined};
+        Values ->
+            DataMap = maps:from_list(
+                lists:map(
+                    fun({K, _} = I) ->
+                        {K, info_size(I)}
+                    end,
+                    Values
+                )
+            ),
+            {Pid, process_name(Pid), DataMap}
+    end.
+
+info_size(InfoKV) ->
+    case InfoKV of
+        {monitors, L} -> length(L);
+        {monitored_by, L} -> length(L);
+        {links, L} -> length(L);
+        {dictionary, L} -> length(L);
+        {binary, BinInfos} -> lists:sum([S || {_, S, _} <- BinInfos]);
+        {_, V} -> V
+    end.
 
 id("couch_file:init" ++ _, Pid, _Props) ->
     case couch_file:process_info(Pid) of
