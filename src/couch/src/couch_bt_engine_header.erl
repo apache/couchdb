@@ -34,6 +34,7 @@
     purge_tree_state/1,
     purge_seq_tree_state/1,
     purge_infos_limit/1,
+    raft_tree_state/1,
     security_ptr/1,
     revs_limit/1,
     uuid/1,
@@ -69,7 +70,8 @@
     epochs,
     compacted_seq,
     purge_infos_limit = 1000,
-    props_ptr
+    props_ptr,
+    raft_tree_state = nil
 }).
 
 -define(PARTITION_DISK_VERSION, 8).
@@ -176,6 +178,9 @@ compacted_seq(Header) ->
 
 purge_infos_limit(Header) ->
     get_field(Header, purge_infos_limit).
+
+raft_tree_state(Header) ->
+    get_field(Header, raft_tree_state).
 
 get_field(Header, Field) ->
     get_field(Header, Field, undefined).

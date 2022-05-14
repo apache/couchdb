@@ -66,6 +66,11 @@
     purge_docs/3,
     copy_purge_infos/2,
 
+    raft_lookup/2,
+    raft_insert/2,
+    raft_discard/2,
+    raft_last/1,
+
     commit_data/1,
 
     open_write_stream/2,
@@ -102,7 +107,11 @@
     purge_tree_join/2,
     purge_tree_reduce/2,
     purge_seq_tree_split/1,
-    purge_seq_tree_join/2
+    purge_seq_tree_join/2,
+
+    raft_tree_split/1,
+    raft_tree_join/2,
+    raft_tree_reduce/2
 ]).
 
 % Used by the compactor
@@ -631,6 +640,44 @@ count_changes_since(St, SinceSeq) ->
     {ok, Changes} = couch_btree:fold_reduce(BTree, FoldFun, 0, Opts),
     Changes.
 
+raft_insert(#st{} = St, Entries) when is_list(Entries) ->
+    #st{
+        raft_tree = RaftTree0
+    } = St,
+    {ok, RaftTree1} = couch_btree:add_remove(RaftTree0, Entries, []),
+    {ok, St#st{
+        raft_tree = RaftTree1,
+        needs_commit = true
+    }}.
+
+raft_lookup(#st{} = St, Indexes) ->
+    Results = couch_btree:lookup(St#st.raft_tree, Indexes),
+    lists:map(
+        fun
+            ({ok, Entry}) -> Entry;
+            (not_found) -> not_found
+        end,
+        Results
+    ).
+
+raft_discard(#st{} = St, UpTo) ->
+    #st{
+        raft_tree = RaftTree0
+    } = St,
+    {ok, {First, _Last}} = couch_btree:full_reduce(RaftTree0),
+    {FirstIndex, _FirstTerm} = First,
+    Remove = lists:seq(FirstIndex, UpTo),
+    {ok, RaftTree1} = couch_btree:add_remove(RaftTree0, [], Remove),
+    {ok, St#st{
+        raft_tree = RaftTree1,
+        needs_commit = true
+    }}.
+
+
+raft_last(#st{} = St) ->
+    {ok, {_First, Last}} = couch_btree:full_reduce(St#st.raft_tree),
+    Last.
+
 start_compaction(St, DbName, Options, Parent) ->
     Args = [St, DbName, Options, Parent],
     Pid = spawn_link(couch_bt_engine_compactor, start, Args),
@@ -799,6 +846,23 @@ purge_tree_reduce(reduce, IdRevs) ->
 purge_tree_reduce(rereduce, Reds) ->
     lists:sum(Reds).
 
+raft_tree_split({Index, Term, Value}) ->
+    {Index, {Term, Value}}.
+
+raft_tree_join(Index, {Term, Value}) ->
+    {Index, Term, Value}.
+
+
+raft_tree_reduce(reduce, []) ->
+    {{0, 0}, {0, 0}};
+raft_tree_reduce(reduce, Entries) ->
+    {MinIndex, MinTerm, _} = lists:min(Entries),
+    {MaxIndex, MaxTerm, _} = lists:max(Entries),
+    {{MinIndex, MinTerm}, {MaxIndex, MaxTerm}};
+raft_tree_reduce(rereduce, Reds) ->
+    {Mins, Maxs} = lists:unzip(Reds),
+    {lists:min(Mins), lists:max(Maxs)}.
+
 set_update_seq(#st{header = Header} = St, UpdateSeq) ->
     {ok, St#st{
         header = couch_bt_engine_header:set(Header, [
@@ -894,6 +958,13 @@ init_state(FilePath, Fd, Header0, Options) ->
         {reduce, fun ?MODULE:purge_tree_reduce/2}
     ]),
 
+    RaftTreeState = couch_bt_engine_header:raft_tree_state(Header),
+    {ok, RaftTree} = couch_btree:open(RaftTreeState, Fd, [
+        {split, fun ?MODULE:raft_tree_split/1},
+        {join, fun ?MODULE:raft_tree_join/2},
+        {reduce, fun ?MODULE:raft_tree_reduce/2}
+    ]),
+
     ok = couch_file:set_db_pid(Fd, self()),
 
     St = #st{
@@ -907,7 +978,8 @@ init_state(FilePath, Fd, Header0, Options) ->
         local_tree = LocalTree,
         compression = Compression,
         purge_tree = PurgeTree,
-        purge_seq_tree = PurgeSeqTree
+        purge_seq_tree = PurgeSeqTree,
+        raft_tree = RaftTree
     },
 
     % If this is a new database we've just created a
@@ -927,7 +999,8 @@ update_header(St, Header) ->
         {id_tree_state, couch_btree:get_state(St#st.id_tree)},
         {local_tree_state, couch_btree:get_state(St#st.local_tree)},
         {purge_tree_state, couch_btree:get_state(St#st.purge_tree)},
-        {purge_seq_tree_state, couch_btree:get_state(St#st.purge_seq_tree)}
+        {purge_seq_tree_state, couch_btree:get_state(St#st.purge_seq_tree)},
+        {raft_tree_state, couch_btree:get_state(St#st.raft_tree)}
     ]).
 
 increment_update_seq(#st{header = Header} = St) ->
@@ -1097,7 +1170,8 @@ active_size(#st{} = St, #size_info{} = SI) ->
         St#st.seq_tree,
         St#st.local_tree,
         St#st.purge_tree,
-        St#st.purge_seq_tree
+        St#st.purge_seq_tree,
+        St#st.raft_tree
     ],
     lists:foldl(
         fun(T, Acc) ->
@@ -1171,12 +1245,14 @@ fold_docs_reduce_to_count(Reds) ->
 finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     #st{
         filepath = FilePath,
-        local_tree = OldLocal
+        local_tree = OldLocal,
+        raft_tree = OldRaft
     } = OldSt,
     #st{
         filepath = CompactDataPath,
         header = Header,
-        local_tree = NewLocal1
+        local_tree = NewLocal1,
+        raft_tree = NewRaft1
     } = NewSt1,
 
     % suck up all the local docs into memory and write them to the new db
@@ -1186,13 +1262,18 @@ finish_compaction_int(#st{} = OldSt, #st{} = NewSt1) ->
     {ok, _, LocalDocs} = couch_btree:foldl(OldLocal, LoadFun, []),
     {ok, NewLocal2} = couch_btree:add(NewLocal1, LocalDocs),
 
+    % do the same for the raft log
+    {ok, _, RaftLog} = couch_btree:foldl(OldRaft, LoadFun, []),
+    {ok, NewRaft2} = couch_btree:add(NewRaft1, RaftLog),
+
     {ok, NewSt2} = commit_data(NewSt1#st{
         header = couch_bt_engine_header:set(Header, [
             {compacted_seq, get_update_seq(OldSt)},
             {revs_limit, get_revs_limit(OldSt)},
             {purge_infos_limit, get_purge_infos_limit(OldSt)}
         ]),
-        local_tree = NewLocal2
+        local_tree = NewLocal2,
+        raft_tree = NewRaft2
     }),
 
     % Rename our *.compact.data file to *.compact so that if we

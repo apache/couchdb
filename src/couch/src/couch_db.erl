@@ -114,6 +114,11 @@
     fold_purge_infos/4,
     fold_purge_infos/5,
 
+    raft_insert/2,
+    raft_lookup/2,
+    raft_discard/2,
+    raft_last/1,
+
     calculate_start_seq/3,
     owner_of/2,
 
@@ -1812,6 +1817,20 @@ fold_purge_infos(Db, StartPurgeSeq, Fun, Acc) ->
 
 fold_purge_infos(Db, StartPurgeSeq, UFun, UAcc, Opts) ->
     couch_db_engine:fold_purge_infos(Db, StartPurgeSeq, UFun, UAcc, Opts).
+
+raft_insert(#db{main_pid = Pid} = Db, Entries) ->
+    check_is_admin(Db),
+    gen_server:call(Pid, {raft_insert, Entries}, infinity).
+
+raft_lookup(Db, Indexes) ->
+    couch_db_engine:raft_lookup(Db, Indexes).
+
+raft_discard(#db{main_pid = Pid} = Db, UpTo) ->
+    check_is_admin(Db),
+    gen_server:call(Pid, {raft_discard, UpTo}, infinity).
+
+raft_last(Db) ->
+    couch_db_engine:raft_last(Db).
 
 count_changes_since(Db, SinceSeq) ->
     couch_db_engine:count_changes_since(Db, SinceSeq).
