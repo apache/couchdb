@@ -704,6 +704,11 @@
     read_doc_body/2,
     load_purge_infos/2,
 
+    raft_lookup/2,
+    raft_insert/2,
+    raft_discard/2,
+    raft_last/1,
+
     serialize_doc/2,
     write_doc_body/2,
     write_doc_infos/3,
@@ -926,6 +931,28 @@ copy_purge_infos(#db{} = Db, Purges) ->
         EngineState, Purges
     ),
     {ok, Db#db{engine = {Engine, NewSt}}}.
+
+raft_insert(#db{} = Db, Entries) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:raft_insert(
+        EngineState, Entries
+    ),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+raft_lookup(#db{} = Db, Indexes) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:raft_lookup(EngineState, Indexes).
+
+raft_discard(#db{} = Db, UpTo) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    {ok, NewSt} = Engine:raft_discard(
+        EngineState, UpTo
+    ),
+    {ok, Db#db{engine = {Engine, NewSt}}}.
+
+raft_last(#db{} = Db) ->
+    #db{engine = {Engine, EngineState}} = Db,
+    Engine:raft_last(EngineState).
 
 commit_data(#db{} = Db) ->
     #db{engine = {Engine, EngineState}} = Db,

@@ -23,5 +23,6 @@
     local_tree,
     compression,
     purge_tree,
-    purge_seq_tree
+    purge_seq_tree,
+    raft_tree
 }).
