@@ -35,6 +35,9 @@
     print_linked_processes/1,
     memory_info/1,
     memory_info/2,
+    resource_hoggers/2,
+    resource_hoggers_snapshot/1,
+    analyze_resource_hoggers/2,
     busy/2,
     busy/3,
     restart/1,
@@ -337,6 +340,63 @@ help(print_tree) ->
 
         ---
     ", []);
+help(resource_hoggers) ->
+    io:format("
+        resource_hoggers(MemoryInfo, InfoKey)
+        --------------------------------
+
+        Prints the top processes hogging resources along with the value associated with InfoKey.
+          - MemoryInfo: Data map containing values for a set of InfoKeys
+            (same structure returned by memory_info)
+          - InfoKey: Desired key to obtain value for. The supported keys are
+            binary, dictionary, heap_size, links, memory, message_queue_len, monitored_by,
+            monitors, stack_size, and total_heap_size
+
+        ---
+    ", []);
+help(resource_hoggers_snapshot) ->
+    io:format("
+        resource_hoggers_snapshot(MemoryInfo)
+        resource_hoggers_snapshot(PreviousSnapshot)
+        --------------------------------
+
+        Prints a snapshot of the top processes hogging resources.
+          - MemoryInfo: Data map containing values for a set of InfoKeys
+            (same structure returned by memory_info)
+          - PreviousSnapshot: Previous snapshot of resource hoggers
+
+        An example workflow is to call `memory_info(Pids)` and pass it as a first snapshot into 
+        `resource_hoggers_snapshot/1`. Then, periodically call `resource_hoggers_snapshot/1` and pass in
+        the previous snapshot.
+
+        Here is an example use case:
+        ```
+            S0 = couch_debug:memory_info(erlang:processes()).
+            Summary = lists:foldl(fun(I, S) -> 
+                timer:sleep(1000), 
+                io:format(\"Snapshot ~~p/10~~n\", [I]),
+                couch_debug:resource_hoggers_snapshot(S) 
+            end, S0, lists:seq(1, 10)).
+            couch_debug:analyze_resource_hoggers(Summary, 10).
+        ```
+
+        ---
+    ", []);
+help(analyze_resource_hoggers) ->
+    io:format("
+        analyze_resource_hoggers(Snapshot, TopN)
+        --------------------------------
+
+        Analyzes the TopN processes hogging resources along with the values associated with InfoKeys.
+          - Snapshot: Snapshot of resource hoggers
+          - TopN: Number of top processes to include in result
+
+        An example workflow is to call `resource_hoggers_snapshot(memory_info(Pids))` and pass this to `analyze_resource_hoggers/2`
+        along with the number of top processes to include in result, TopN. See `couch_debug:help(resource_hoggers_snapshot)` for an 
+        example and more info.
+
+        ---
+    ", []);
 help(Unknown) ->
     io:format("Unknown function: `~p`. Please try one of the following:~n", [Unknown]),
     [io:format("    - ~s~n", [Function]) || Function <- help()],
@@ -620,6 +680,103 @@ info_size(InfoKV) ->
         {binary, BinInfos} -> lists:sum([S || {_, S, _} <- BinInfos]);
         {_, V} -> V
     end.
+resource_hoggers(MemoryInfo, InfoKey) ->
+    KeyFun = fun
+        ({_Pid, _Id, undefined}) -> undefined;
+        ({_Pid, Id, DataMap}) -> {Id, [{InfoKey, maps:get(InfoKey, DataMap)}]}
+    end,
+    resource_hoggers(MemoryInfo, InfoKey, KeyFun).
+
+resource_hoggers(MemoryInfo, InfoKey, KeyFun) ->
+    HoggersData = resource_hoggers_data(MemoryInfo, InfoKey, KeyFun),
+    TableSpec = [
+        {50, centre, id},
+        {20, centre, InfoKey}
+    ],
+    print_table(HoggersData, TableSpec).
+
+resource_hoggers_data(MemoryInfo, InfoKey, KeyFun) when is_atom(InfoKey) ->
+    resource_hoggers_data(MemoryInfo, InfoKey, KeyFun, 20).
+
+resource_hoggers_data(MemoryInfo, InfoKey, KeyFun, N) when is_atom(InfoKey) and is_integer(N) ->
+    SortedTuples = resource_hoggers_data(MemoryInfo, InfoKey, KeyFun, undefined),
+    {TopN, _} = lists:split(N, SortedTuples),
+    TopN;
+resource_hoggers_data(MemoryInfo, InfoKey, KeyFun, undefined) when is_atom(InfoKey) ->
+    Tuples = lists:filtermap(
+        fun(Tuple) ->
+            case KeyFun(Tuple) of
+                undefined ->
+                    false;
+                Value ->
+                    {true, Value}
+            end
+        end,
+        MemoryInfo
+    ),
+    lists:reverse(
+        lists:sort(
+            fun({_, A}, {_, B}) ->
+                lists:keyfind(InfoKey, 1, A) < lists:keyfind(InfoKey, 1, B)
+            end,
+            Tuples
+        )
+    ).
+
+resource_hoggers_snapshot({N, MemoryInfo, InfoKeys} = _Snapshot) ->
+    Data = lists:filtermap(
+        fun({Pid, Id, Data}) ->
+            case memory_info(Pid, InfoKeys) of
+                {Pid, undefined, undefined} ->
+                    false;
+                {_, _, DataMap} ->
+                    {true, {Pid, Id, update_delta(Data, DataMap)}}
+            end
+        end,
+        MemoryInfo
+    ),
+    {N + 1, Data, InfoKeys};
+resource_hoggers_snapshot([]) ->
+    [];
+resource_hoggers_snapshot([{_Pid, _Id, Data} | _] = MemoryInfo) ->
+    resource_hoggers_snapshot({0, MemoryInfo, maps:keys(Data)}).
+
+update_delta({_, InitialDataMap}, DataMap) ->
+    update_delta(InitialDataMap, DataMap);
+update_delta(InitialDataMap, DataMap) ->
+    Delta = maps:fold(
+        fun(Key, Value, AccIn) ->
+            maps:put(Key, maps:get(Key, DataMap, Value) - Value, AccIn)
+        end,
+        maps:new(),
+        InitialDataMap
+    ),
+    {Delta, InitialDataMap}.
+
+analyze_resource_hoggers({N, Data, InfoKeys}, TopN) ->
+    io:format("Number of snapshots: ~p~n", [N]),
+    lists:map(
+        fun(InfoKey) ->
+            KeyFun = fun
+                ({_Pid, _Id, undefined}) ->
+                    undefined;
+                ({_Pid, Id, {Delta, DataMap}}) ->
+                    {Id, [
+                        {InfoKey, maps:get(InfoKey, DataMap)},
+                        {delta, maps:get(InfoKey, Delta)}
+                    ]}
+            end,
+            io:format("Top ~p by change in ~p~n", [TopN, InfoKey]),
+            HoggersData = resource_hoggers_data(Data, delta, KeyFun, TopN),
+            TableSpec = [
+                {50, centre, id},
+                {20, right, InfoKey},
+                {20, right, delta}
+            ],
+            print_table(HoggersData, TableSpec)
+        end,
+        InfoKeys
+    ).
 
 id("couch_file:init" ++ _, Pid, _Props) ->
     case couch_file:process_info(Pid) of
