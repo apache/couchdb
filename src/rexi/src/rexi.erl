@@ -21,8 +21,6 @@
 -export([stream2/1, stream2/2, stream2/3, stream_last/1, stream_last/2]).
 -export([ping/0]).
 
--include_lib("rexi/include/rexi.hrl").
-
 start() ->
     application:start(rexi).
 
