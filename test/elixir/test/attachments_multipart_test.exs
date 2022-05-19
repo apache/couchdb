@@ -260,6 +260,73 @@ defmodule AttachmentMultipartTest do
     )
   end
 
+  @tag :with_db
+  test "multipart attachments with new_edits=false", context do
+    db_name = context[:db_name]
+
+    att_data = String.duplicate("x", 100_000)
+    att_len = byte_size(att_data)
+    document = """
+    {
+      "body": "This is a body.",
+      "_attachments": {
+        "foo.txt": {
+          "follows": true,
+          "content_type": "application/test",
+          "length": #{att_len}
+        }
+      }
+    }
+    """
+
+    multipart_data =
+      "--abc123\r\n" <>
+        "content-type: application/json\r\n" <>
+        "\r\n" <>
+        document <>
+        "\r\n--abc123\r\n" <>
+        "\r\n" <>
+        att_data <>
+        "\r\n--abc123--epilogue"
+
+    resp =
+      Couch.put(
+        "/#{db_name}/multipart_replicated_changes",
+        body: multipart_data,
+        headers: ["Content-Type": "multipart/related;boundary=\"abc123\""]
+      )
+
+    assert resp.status_code in [201, 202]
+    assert resp.body["ok"] == true
+
+    rev = resp.body["rev"]
+
+    resp = Couch.get("/#{db_name}/multipart_replicated_changes/foo.txt")
+
+    assert resp.body == att_data
+
+    # https://github.com/apache/couchdb/issues/3939
+    # Repeating the request should not hang
+    Enum.each(0..10, fn _ ->
+      put_multipart_new_edits_false(db_name, rev, multipart_data)
+    end)
+  end
+
+  defp put_multipart_new_edits_false(db_name, rev, multipart_data) do
+    # Help ensure we're re-using client connections
+    ibrowse_opts = [{:max_sessions, 1}, {:max_pipeline_size, 1}]
+    resp =
+      Couch.put(
+        "/#{db_name}/multipart_replicated_changes?new_edits=false&rev=#{rev}",
+        body: multipart_data,
+        headers: ["Content-Type": "multipart/related;boundary=\"abc123\""],
+        ibrowse: ibrowse_opts
+      )
+
+    assert resp.status_code in [201, 202]
+    assert resp.body["ok"] == true
+  end
+
   defp test_multipart_att_compression(dbname) do
     doc = %{
       "_id" => "foobar"
