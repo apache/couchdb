@@ -384,20 +384,6 @@ get_priority(Channel, {Shard, GroupId}) ->
             ),
             0
     end;
-get_priority(Channel, {schema, DbName, DDocId}) ->
-    case couch_md_index_manager:get_group_pid(DbName, DDocId) of
-        {ok, Pid} ->
-            {ok, SchemaInfo} = couch_md_index:get_info(Pid),
-            DiskSize = couch_util:get_value(disk_size, SchemaInfo),
-            DataSize = couch_util:get_value(data_size, SchemaInfo),
-            get_priority(Channel, DiskSize, DataSize, false);
-        {error, Reason} ->
-            couch_log:warning(
-                "Failed to get group_pid for ~p ~p ~p: ~p",
-                [Channel, DbName, DDocId, Reason]
-            ),
-            0
-    end;
 get_priority(Channel, DbName) when is_list(DbName) ->
     get_priority(Channel, ?l2b(DbName));
 get_priority(Channel, DbName) when is_binary(DbName) ->
