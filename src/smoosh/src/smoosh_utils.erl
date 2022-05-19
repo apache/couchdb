@@ -13,22 +13,9 @@
 -module(smoosh_utils).
 -include_lib("couch/include/couch_db.hrl").
 
--export([get/2, get/3, group_pid/1, split/1, stringify/1, ignore_db/1]).
+-export([get/2, get/3, split/1, stringify/1, ignore_db/1]).
 -export([in_allowed_window/1, write_to_file/3]).
 -export([log_level/2]).
-
-group_pid({Shard, GroupId}) ->
-    case couch_view_group:open_db_group(Shard, GroupId) of
-        {ok, Group} ->
-            try
-                gen_server:call(couch_view, {get_group_server, Shard, Group})
-            catch
-                _:Error ->
-                    {error, Error}
-            end;
-        Else ->
-            Else
-    end.
 
 get(Channel, Key) ->
     ?MODULE:get(Channel, Key, undefined).

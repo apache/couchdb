@@ -460,19 +460,6 @@ maybe_start_compaction(State) ->
             State
     end.
 
-start_compact(State, {schema, DbName, GroupId}) ->
-    case smoosh_utils:ignore_db({DbName, GroupId}) of
-        false ->
-            {ok, Pid} = couch_md_index_manager:get_group_pid(
-                DbName,
-                GroupId
-            ),
-            Ref = erlang:monitor(process, Pid),
-            Pid ! {'$gen_call', {self(), Ref}, compact},
-            State#state{starting = [{Ref, {schema, DbName, GroupId}} | State#state.starting]};
-        _ ->
-            false
-    end;
 start_compact(State, DbName) when is_list(DbName) ->
     start_compact(State, ?l2b(DbName));
 start_compact(State, DbName) when is_binary(DbName) ->
