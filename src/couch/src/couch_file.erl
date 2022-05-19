@@ -39,11 +39,11 @@
 % public API
 -export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, set_db_pid/2]).
 -export([pread_term/2, pread_iolist/2, pread_binary/2]).
--export([append_binary/2, append_binary_md5/2]).
--export([append_raw_chunk/2, assemble_file_chunk/1, assemble_file_chunk/2]).
--export([append_term/2, append_term/3, append_term_md5/2, append_term_md5/3]).
--export([pread_terms/2, pread_binaries/2, pread_iolists/2]).
--export([append_terms/2, append_terms/3, append_binaries/2]).
+-export([append_binary/2]).
+-export([append_raw_chunk/2, assemble_file_chunk/2]).
+-export([append_term/2, append_term/3]).
+-export([pread_terms/2]).
+-export([append_terms/2, append_terms/3]).
 -export([write_header/2, read_header/1]).
 -export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
 -export([last_read/1]).
@@ -124,13 +124,6 @@ append_term(Fd, Term, Options) ->
     Comp = couch_util:get_value(compression, Options, ?DEFAULT_COMPRESSION),
     append_binary(Fd, couch_compress:compress(Term, Comp)).
 
-append_term_md5(Fd, Term) ->
-    append_term_md5(Fd, Term, []).
-
-append_term_md5(Fd, Term, Options) ->
-    Comp = couch_util:get_value(compression, Options, ?DEFAULT_COMPRESSION),
-    append_binary_md5(Fd, couch_compress:compress(Term, Comp)).
-
 %%----------------------------------------------------------------------
 %% Purpose: To append an Erlang binary to the end of the file.
 %% Args:    Erlang term to serialize and append to the file.
@@ -141,13 +134,6 @@ append_term_md5(Fd, Term, Options) ->
 
 append_binary(Fd, Bin) ->
     ioq:call(Fd, {append_bin, assemble_file_chunk(Bin)}, erlang:get(io_priority)).
-
-append_binary_md5(Fd, Bin) ->
-    ioq:call(
-        Fd,
-        {append_bin, assemble_file_chunk(Bin, couch_hash:md5_hash(Bin))},
-        erlang:get(io_priority)
-    ).
 
 append_raw_chunk(Fd, Chunk) ->
     ioq:call(Fd, {append_bin, Chunk}, erlang:get(io_priority)).
