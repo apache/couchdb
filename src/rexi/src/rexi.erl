@@ -80,11 +80,10 @@ kill(Node, Ref) ->
 %% No rexi_EXIT message will be sent.
 -spec kill_all([{node(), reference()}]) -> ok.
 kill_all(NodeRefs) when is_list(NodeRefs) ->
-    %% Upgrade clause. Since kill_all is a new message, nodes in a mixed
-    %% cluster won't know how to process it. In that case, the default is to send
-    %% the individual kill messages. Once all the nodes have been upgraded, can
-    %% configure the cluster to send kill_all messages.
-    case config:get_boolean("rexi", "use_kill_all", false) of
+    %% use_kill_all is available since version 3.0. When performing a rolling
+    %% cluster upgrade from 2.x, set this value to false, then revert it back
+    %% to default (true) after all nodes have been upgraded.
+    case config:get_boolean("rexi", "use_kill_all", true) of
         true ->
             PerNodeMap = lists:foldl(
                 fun({Node, Ref}, Acc) ->
