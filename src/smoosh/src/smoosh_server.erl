@@ -61,7 +61,6 @@
 -record(state, {
     db_channels = [],
     view_channels = [],
-    schema_channels = [],
     tab,
     event_listener,
     waiting = maps:new()
@@ -107,9 +106,6 @@ handle_db_event(DbName, {index_commit, IdxName}, St) ->
 handle_db_event(DbName, {index_collator_upgrade, IdxName}, St) ->
     smoosh_server:enqueue({DbName, IdxName}),
     {ok, St};
-handle_db_event(DbName, {schema_updated, DDocId}, St) ->
-    smoosh_server:enqueue({schema, DbName, DDocId}),
-    {ok, St};
 handle_db_event(_DbName, _Event, St) ->
     {ok, St}.
 
@@ -129,19 +125,11 @@ init([]) ->
     ViewChannels = smoosh_utils:split(
         config:get("smoosh", "view_channels", "upgrade_views,ratio_views,slack_views")
     ),
-    SchemaChannels = smoosh_utils:split(
-        config:get(
-            "smoosh",
-            "schema_channels",
-            "ratio_schemas,slack_schemas"
-        )
-    ),
     Tab = ets:new(channels, [{keypos, #channel.name}]),
     {ok,
         create_missing_channels(#state{
             db_channels = DbChannels,
             view_channels = ViewChannels,
-            schema_channels = SchemaChannels,
             event_listener = Pid,
             tab = Tab
         })}.
@@ -150,8 +138,6 @@ handle_config_change("smoosh", "db_channels", L, _, _) ->
     {ok, gen_server:cast(?MODULE, {new_db_channels, smoosh_utils:split(L)})};
 handle_config_change("smoosh", "view_channels", L, _, _) ->
     {ok, gen_server:cast(?MODULE, {new_view_channels, smoosh_utils:split(L)})};
-handle_config_change("smoosh", "schema_channels", L, _, _) ->
-    {ok, gen_server:cast(?MODULE, {new_schema_channels, smoosh_utils:split(L)})};
 handle_config_change(_, _, _, _, _) ->
     {ok, nil}.
 
@@ -207,12 +193,6 @@ handle_cast({new_view_channels, Channels}, State) ->
      || C <- State#state.view_channels -- Channels
     ],
     {noreply, create_missing_channels(State#state{view_channels = Channels})};
-handle_cast({new_schema_channels, Channels}, State) ->
-    [
-        smoosh_channel:close(channel_pid(State#state.tab, C))
-     || C <- State#state.schema_channels -- Channels
-    ],
-    {noreply, create_missing_channels(State#state{view_channels = Channels})};
 handle_cast({enqueue, Object}, State) ->
     #state{waiting = Waiting} = State,
     case maps:is_key(Object, Waiting) of
@@ -262,7 +242,6 @@ code_change(_OldVsn, {state, DbChannels, ViewChannels, Tab, EventListener, Waiti
     {ok, #state{
         db_channels = DbChannels,
         view_channels = ViewChannels,
-        schema_channels = [],
         tab = Tab,
         event_listener = EventListener,
         waiting = Waiting
@@ -303,8 +282,6 @@ enqueue_request(State, Object) ->
                 smoosh_utils:stringify(Object), Stack])
     end.
 
-find_channel(#state{} = State, {schema, DbName, GroupId}) ->
-    find_channel(State#state.tab, State#state.schema_channels, {schema, DbName, GroupId});
 find_channel(#state{} = State, {Shard, GroupId}) ->
     find_channel(State#state.tab, State#state.view_channels, {Shard, GroupId});
 find_channel(#state{} = State, DbName) ->
@@ -346,7 +323,6 @@ channel_pid(Tab, Channel) ->
 create_missing_channels(State) ->
     create_missing_channels(State#state.tab, State#state.db_channels),
     create_missing_channels(State#state.tab, State#state.view_channels),
-    create_missing_channels(State#state.tab, State#state.schema_channels),
     State.
 
 create_missing_channels(_Tab, []) ->
@@ -469,13 +445,9 @@ get_priority("ratio_dbs") ->
     "ratio";
 get_priority("ratio_views") ->
     "ratio";
-get_priority("ratio_schemas") ->
-    "ratio";
 get_priority("slack_dbs") ->
     "slack";
 get_priority("slack_views") ->
-    "slack";
-get_priority("slack_schemas") ->
     "slack";
 get_priority("upgrade_dbs") ->
     "upgrade";

@@ -28,8 +28,6 @@ split(CSV) ->
 
 stringify({DbName, GroupId}) ->
     io_lib:format("~s ~s", [DbName, GroupId]);
-stringify({schema, DbName, GroupId}) ->
-    io_lib:format("schema: ~s ~s", [DbName, GroupId]);
 stringify(DbName) ->
     io_lib:format("~s", [DbName]).
 
