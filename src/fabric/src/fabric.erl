@@ -69,8 +69,6 @@
     db_uuids/1
 ]).
 
--include_lib("fabric/include/fabric.hrl").
-
 -type dbname() :: (iodata() | tuple()).
 -type docid() :: iodata().
 -type revision() :: {integer(), binary()}.
