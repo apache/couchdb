@@ -972,6 +972,8 @@ init_crypto(#file{eof = 0} = File0) ->
                 {error, Reason} ->
                     {error, Reason}
             end;
+        dont_encrypt ->
+            {ok, File0};
         {error, Reason} ->
             {error, Reason}
     end;

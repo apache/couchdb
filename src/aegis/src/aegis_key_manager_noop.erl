@@ -10,27 +10,16 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(aegis_key_manager).
+-module(aegis_key_manager_noop).
+-behaviour(aegis_key_manager).
 
 -export([
     wrap_key/1,
     unwrap_key/1
 ]).
 
--type dek() :: binary().
--type wek() :: binary().
+wrap_key(_DataEncryptionKey) ->
+    dont_encrypt.
 
--callback wrap_key(DataEncryptionKey :: dek()) ->
-    {ok, WrappedKey :: wek()}
-    | dont_encrypt
-    | {error, Reason :: term()}.
-
--callback unwrap_key(WrappedKey :: wek()) ->
-    {ok, DataEncryptionKey :: dek()}
-    | {error, Reason :: term()}.
-
-wrap_key(DataEncryptionKey) ->
-    ?AEGIS_KEY_MANAGER:wrap_key(DataEncryptionKey).
-
-unwrap_key(WrappedKey) ->
-    ?AEGIS_KEY_MANAGER:unwrap_key(WrappedKey).
+unwrap_key(_DataEncryptionKey) ->
+    {error, encryption_not_supported}.
