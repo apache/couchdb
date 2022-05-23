@@ -14,6 +14,8 @@
 
 -export([block_encrypt/3, block_decrypt/3]).
 
+-include("aegis_compat.hrl").
+
 -spec block_encrypt(binary(), list(), binary()) -> {binary(), binary()}.
 block_encrypt(Key, AAD, PlainText) when
     bit_size(Key) == 256; bit_size(Key) == 512
@@ -44,13 +46,7 @@ split(Key) ->
     {K1, K2}.
 
 aes_ctr(Key, IV, Data) ->
-    Cipher = ctr_cipher(Key),
-    crypto:crypto_one_time(Cipher, Key, IV, Data, true).
-
-ctr_cipher(Key) when bit_size(Key) == 128 ->
-    aes_128_ctr;
-ctr_cipher(Key) when bit_size(Key) == 256 ->
-    aes_256_ctr.
+    ?stream_encrypt(?ctr(Key), Key, IV, Data).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

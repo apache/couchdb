@@ -19,6 +19,8 @@
     xorend/2
 ]).
 
+-include("aegis_compat.hrl").
+
 %% @doc double
 %% is the multiplication of S and 0...010 in the finite field
 %% represented using the primitive polynomial
@@ -36,10 +38,10 @@ double(<<1:1, Lo:127>>) ->
 %% threshold of 256.
 expand(Key) when bit_size(Key) == 256 ->
     %% expansion technique from Bjoern Tackmann - IBM Zurich
-    K0 = crypto:crypto_one_time(aes_256_ecb, Key, <<0:128>>, true),
-    K1 = crypto:crypto_one_time(aes_256_ecb, Key, <<1:128>>, true),
-    K2 = crypto:crypto_one_time(aes_256_ecb, Key, <<2:128>>, true),
-    K3 = crypto:crypto_one_time(aes_256_ecb, Key, <<3:128>>, true),
+    K0 = ?block_encrypt(?ecb(Key), Key, <<0:128>>),
+    K1 = ?block_encrypt(?ecb(Key), Key, <<1:128>>),
+    K2 = ?block_encrypt(?ecb(Key), Key, <<2:128>>),
+    K3 = ?block_encrypt(?ecb(Key), Key, <<3:128>>),
     <<K0/binary, K1/binary, K2/binary, K3/binary>>.
 
 %% @doc pad

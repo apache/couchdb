@@ -48,9 +48,26 @@
     db_monitor,
     pread_limit = 0,
     iv,
+    key,
     enc,
     dec
 }).
+
+-define(init_ciphers(File, DataEncryptionKey, IV), init_ciphers_20(File, DataEncryptionKey, IV)).
+-define(encrypt(File, Pos, Data), encrypt_20(File, Pos, Data)).
+-define(decrypt(File, Pos, Data), decrypt_20(File, Pos, Data)).
+-ifdef(OTP_RELEASE).
+-if(?OTP_RELEASE >= 22).
+-undef(init_ciphers).
+-define(init_ciphers(File, DataEncryptionKey, IV), init_ciphers_22(File, DataEncryptionKey, IV)).
+
+-undef(encrypt).
+-define(encrypt(File, Pos, Data), encrypt_22(File, Pos, Data)).
+
+-undef(decrypt).
+-define(decrypt(File, Pos, Data), decrypt_22(File, Pos, Data)).
+-endif.
+-endif.
 
 % public API
 -export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, set_db_pid/2]).
@@ -951,7 +968,7 @@ init_crypto(#file{eof = 0} = File0) ->
             case write_encryption_header(File0, WrappedKey, IV) of
                 {ok, File1} ->
                     ok = file:sync(File1#file.fd),
-                    {ok, init_ciphers(File1, DataEncryptionKey, IV)};
+                    {ok, ?init_ciphers(File1, DataEncryptionKey, IV)};
                 {error, Reason} ->
                     {error, Reason}
             end;
@@ -964,7 +981,7 @@ init_crypto(#file{eof = Pos, enc = undefined, dec = undefined} = File) when Pos 
         {ok, WrappedKey, IV} ->
             case aegis_key_manager:unwrap_key(WrappedKey) of
                 {ok, DataEncryptionKey} ->
-                    {ok, init_ciphers(File, DataEncryptionKey, IV)};
+                    {ok, ?init_ciphers(File, DataEncryptionKey, IV)};
                 {error, Reason} ->
                     {error, Reason}
             end;
@@ -974,7 +991,12 @@ init_crypto(#file{eof = Pos, enc = undefined, dec = undefined} = File) when Pos 
             {error, Reason}
     end.
 
-init_ciphers(#file{} = File, DataEncryptionKey, IV) when
+init_ciphers_20(#file{} = File, DataEncryptionKey, IV) when
+    is_binary(DataEncryptionKey), is_binary(IV)
+->
+    File#file{iv = crypto:bytes_to_integer(IV), key = DataEncryptionKey}.
+
+init_ciphers_22(#file{} = File, DataEncryptionKey, IV) when
     is_binary(DataEncryptionKey), is_binary(IV)
 ->
     EncState = crypto:crypto_dyn_iv_init(aes_256_ctr, DataEncryptionKey, true),
@@ -1019,7 +1041,7 @@ read_encryption_header(#file{} = File) ->
 encrypted_write(#file{enc = undefined} = File, Data) ->
     file:write(File#file.fd, Data);
 encrypted_write(#file{} = File, Data) ->
-    CipherText = encrypt(File#file.enc, File#file.iv, File#file.eof, pad(File#file.eof, Data)),
+    CipherText = ?encrypt(File, File#file.eof, pad(File#file.eof, Data)),
     file:write(File#file.fd, unpad(File#file.eof, CipherText)).
 
 encrypted_pread(#file{dec = undefined} = File, LocNums) ->
@@ -1030,7 +1052,7 @@ encrypted_pread(#file{} = File, LocNums) ->
             {ok,
                 lists:zipwith(
                     fun({Pos, _Len}, CipherText) ->
-                        PlainText = decrypt(File#file.dec, File#file.iv, Pos, pad(Pos, CipherText)),
+                        PlainText = ?decrypt(File, Pos, pad(Pos, CipherText)),
                         unpad(Pos, PlainText)
                     end,
                     LocNums,
@@ -1045,16 +1067,24 @@ encrypted_pread(#file{dec = undefined} = File, Pos, Len) ->
 encrypted_pread(#file{} = File, Pos, Len) ->
     case file:pread(File#file.fd, Pos, Len) of
         {ok, CipherText} ->
-            PlainText = decrypt(File#file.dec, File#file.iv, Pos, pad(Pos, CipherText)),
+            PlainText = ?decrypt(File, Pos, pad(Pos, CipherText)),
             {ok, unpad(Pos, PlainText)};
         Else ->
             Else
     end.
 
-encrypt(Enc, IV, Pos, Data) ->
+encrypt_20(#file{key = Key, iv = IV}, Pos, Data) ->
+    State = crypto:stream_init(aes_ctr, Key, aes_ctr(IV, Pos)),
+    crypto:stream_encrypt(State, Data).
+
+decrypt_20(#file{key = Key, iv = IV}, Pos, Data) ->
+    State = crypto:stream_init(aes_ctr, Key, aes_ctr(IV, Pos)),
+    crypto:stream_decrypt(State, Data).
+
+encrypt_22(#file{enc = Enc, iv = IV}, Pos, Data) ->
     crypto:crypto_dyn_iv_update(Enc, Data, aes_ctr(IV, Pos)).
 
-decrypt(Dec, IV, Pos, Data) ->
+decrypt_22(#file{dec = Dec, iv = IV}, Pos, Data) ->
     crypto:crypto_dyn_iv_update(Dec, Data, aes_ctr(IV, Pos)).
 
 aes_ctr(IV, Pos) ->

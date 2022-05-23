@@ -14,33 +14,29 @@
 
 -export([cmac/2]).
 
+-include("aegis_compat.hrl").
+
 cmac(Key, Message) ->
     cmac(Key, <<0:128>>, Message).
 
 cmac(Key, X, <<Last:16/binary>>) ->
     {K1, _K2} = generate_subkeys(Key),
-    crypto:crypto_one_time(cmac_cipher(Key), Key, crypto:exor(X, crypto:exor(Last, K1)), true);
+    ?block_encrypt(?ecb(Key), Key, crypto:exor(X, crypto:exor(Last, K1)));
 cmac(Key, X, <<Block:16/binary, Rest/binary>>) ->
-    cmac(Key, crypto:crypto_one_time(cmac_cipher(Key), Key, crypto:exor(X, Block), true), Rest);
+    cmac(Key, ?block_encrypt(?ecb(Key), Key, crypto:exor(X, Block)), Rest);
 cmac(Key, X, Last) ->
     {_K1, K2} = generate_subkeys(Key),
-    crypto:crypto_one_time(
-        cmac_cipher(Key),
+    ?block_encrypt(
+        ?ecb(Key),
         Key,
-        crypto:exor(X, crypto:exor(aegis_util:pad(Last), K2)),
-        true
+        crypto:exor(X, crypto:exor(aegis_util:pad(Last), K2))
     ).
 
 generate_subkeys(Key) ->
-    L = crypto:crypto_one_time(cmac_cipher(Key), Key, <<0:128>>, true),
+    L = ?block_encrypt(?ecb(Key), Key, <<0:128>>),
     K1 = aegis_util:double(L),
     K2 = aegis_util:double(K1),
     {K1, K2}.
-
-cmac_cipher(Key) when bit_size(Key) == 128 ->
-    aes_128_ecb;
-cmac_cipher(Key) when bit_size(Key) == 256 ->
-    aes_256_ecb.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
