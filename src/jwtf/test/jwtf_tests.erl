@@ -36,6 +36,8 @@ jwt_io_rsa_pubkey() ->
     [PEMEntry] = public_key:pem_decode(PublicKeyPEM),
     public_key:pem_entry_decode(PEMEntry).
 
+-ifdef(OTP_RELEASE).
+
 jwt_io_ec_pubkey() ->
     PublicKeyPEM = <<
         "-----BEGIN PUBLIC KEY-----\n"
@@ -45,6 +47,8 @@ jwt_io_ec_pubkey() ->
     >>,
     [PEMEntry] = public_key:pem_decode(PublicKeyPEM),
     public_key:pem_entry_decode(PEMEntry).
+
+-endif.
 
 b64_badarg_test() ->
     Encoded = <<"0.0.0">>,
@@ -285,6 +289,8 @@ rs256_test() ->
 
     ?assertMatch({ok, ExpectedPayload}, jwtf:decode(EncodedToken, Checks, KS)).
 
+
+-ifdef(OTP_RELEASE).
 %% jwt.io generated
 es256_test() ->
     EncodedToken = <<
@@ -305,6 +311,8 @@ es256_test() ->
         ]},
 
     ?assertMatch({ok, ExpectedPayload}, jwtf:decode(EncodedToken, Checks, KS)).
+
+-endif.
 
 encode_missing_alg_test() ->
     ?assertEqual(

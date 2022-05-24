@@ -29,6 +29,9 @@
 
 -include_lib("public_key/include/public_key.hrl").
 
+
+-ifdef(OTP_RELEASE).
+
 -define(ALGS, [
     % RSA PKCS#1 signature with SHA-256
     {<<"RS256">>, {public_key, sha256}},
@@ -41,6 +44,20 @@
     {<<"HS384">>, {hmac, sha384}},
     {<<"HS512">>, {hmac, sha512}}
 ]).
+
+-else.
+
+-define(ALGS, [
+    % RSA PKCS#1 signature with SHA-256
+    {<<"RS256">>, {public_key, sha256}},
+    {<<"RS384">>, {public_key, sha384}},
+    {<<"RS512">>, {public_key, sha512}},
+    {<<"HS256">>, {hmac, sha256}},
+    {<<"HS384">>, {hmac, sha384}},
+    {<<"HS512">>, {hmac, sha512}}
+]).
+
+-endif.
 
 -define(CHECKS, [
     alg,
