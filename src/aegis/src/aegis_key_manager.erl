@@ -13,24 +13,24 @@
 -module(aegis_key_manager).
 
 -export([
-    wrap_key/1,
-    unwrap_key/1
+    wrap_key/2,
+    unwrap_key/2
 ]).
 
 -type dek() :: binary().
 -type wek() :: binary().
 
--callback wrap_key(DataEncryptionKey :: dek()) ->
+-callback wrap_key(Filepath :: binary(), DataEncryptionKey :: dek()) ->
     {ok, WrappedKey :: wek()}
     | dont_encrypt
     | {error, Reason :: term()}.
 
--callback unwrap_key(WrappedKey :: wek()) ->
+-callback unwrap_key(Filepath :: binary(), WrappedKey :: wek()) ->
     {ok, DataEncryptionKey :: dek()}
     | {error, Reason :: term()}.
 
-wrap_key(DataEncryptionKey) ->
-    ?AEGIS_KEY_MANAGER:wrap_key(DataEncryptionKey).
+wrap_key(Filepath, DataEncryptionKey) ->
+    ?AEGIS_KEY_MANAGER:wrap_key(Filepath, DataEncryptionKey).
 
-unwrap_key(WrappedKey) ->
-    ?AEGIS_KEY_MANAGER:unwrap_key(WrappedKey).
+unwrap_key(Filepath, WrappedKey) ->
+    ?AEGIS_KEY_MANAGER:unwrap_key(Filepath, WrappedKey).

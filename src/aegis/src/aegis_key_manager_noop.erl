@@ -14,12 +14,12 @@
 -behaviour(aegis_key_manager).
 
 -export([
-    wrap_key/1,
-    unwrap_key/1
+    wrap_key/2,
+    unwrap_key/2
 ]).
 
-wrap_key(_DataEncryptionKey) ->
+wrap_key(_Filepath, _DataEncryptionKey) ->
     dont_encrypt.
 
-unwrap_key(_DataEncryptionKey) ->
+unwrap_key(_Filepath, _DataEncryptionKey) ->
     {error, encryption_not_supported}.

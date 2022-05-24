@@ -14,16 +14,18 @@
 -behaviour(aegis_key_manager).
 
 -export([
-    wrap_key/1,
-    unwrap_key/1
+    wrap_key/2,
+    unwrap_key/2
 ]).
 
-wrap_key(DataEncryptionKey) when is_binary(DataEncryptionKey) ->
+wrap_key(_Filepath, DataEncryptionKey) when is_binary(DataEncryptionKey) ->
     {ok, WrappingKeyId, WrappingKey} = current_wrapping_key(),
     WrappedKey = aegis:wrap_key(WrappingKey, [WrappingKeyId], DataEncryptionKey),
     {ok, <<(byte_size(WrappingKeyId)):8, WrappingKeyId/binary, WrappedKey/binary>>}.
 
-unwrap_key(<<WrappingKeyIdLen:8, WrappingKeyId:WrappingKeyIdLen/binary, WrappedKey/binary>>) ->
+unwrap_key(
+    _Filepath, <<WrappingKeyIdLen:8, WrappingKeyId:WrappingKeyIdLen/binary, WrappedKey/binary>>
+) ->
     case wrapping_key(WrappingKeyId) of
         {ok, WrappingKeyId, WrappingKey} ->
             case aegis:unwrap_key(WrappingKey, [WrappingKeyId], WrappedKey) of
@@ -35,7 +37,7 @@ unwrap_key(<<WrappingKeyIdLen:8, WrappingKeyId:WrappingKeyIdLen/binary, WrappedK
         {error, Reason} ->
             {error, Reason}
     end;
-unwrap_key(_) ->
+unwrap_key(_, _) ->
     {error, invalid_key}.
 
 current_wrapping_key() ->

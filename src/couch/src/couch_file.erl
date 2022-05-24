@@ -483,7 +483,9 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                                     ok = file:sync(Fd),
                                     maybe_track_open_os_files(Options),
                                     erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                                    init_crypto(#file{fd = Fd, is_sys = IsSys, pread_limit = Limit});
+                                    init_crypto(Filepath, #file{
+                                        fd = Fd, is_sys = IsSys, pread_limit = Limit
+                                    });
                                 false ->
                                     ok = file:close(Fd),
                                     init_status_error(ReturnPid, Ref, {error, eexist})
@@ -491,7 +493,9 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                         false ->
                             maybe_track_open_os_files(Options),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            init_crypto(#file{fd = Fd, is_sys = IsSys, pread_limit = Limit})
+                            init_crypto(Filepath, #file{
+                                fd = Fd, is_sys = IsSys, pread_limit = Limit
+                            })
                     end;
                 Error ->
                     init_status_error(ReturnPid, Ref, Error)
@@ -508,7 +512,7 @@ init({Filepath, Options, ReturnPid, Ref}) ->
                             maybe_track_open_os_files(Options),
                             {ok, Eof} = file:position(Fd, eof),
                             erlang:send_after(?INITIAL_WAIT, self(), maybe_close),
-                            init_crypto(#file{
+                            init_crypto(Filepath, #file{
                                 fd = Fd, eof = Eof, is_sys = IsSys, pread_limit = Limit
                             });
                         Error ->
@@ -613,7 +617,8 @@ handle_call({truncate, Pos}, _From, #file{fd = Fd} = File) ->
     {ok, Pos} = file:position(Fd, Pos),
     case file:truncate(Fd) of
         ok ->
-            case init_crypto(File#file{eof = Pos}) of
+            {_Fd, Filepath} = get(couch_file_fd),
+            case init_crypto(Filepath, File#file{eof = Pos}) of
                 {ok, File1} ->
                     {reply, ok, File1};
                 {error, Reason} ->
@@ -957,10 +962,10 @@ reset_eof(#file{} = File) ->
     File#file{eof = Eof}.
 
 %% new file or we've wiped all the data, including the wrapped key, so we need a new one.
-init_crypto(#file{eof = 0} = File0) ->
+init_crypto(Filepath, #file{eof = 0} = File0) ->
     DataEncryptionKey = crypto:strong_rand_bytes(32),
     IV = crypto:strong_rand_bytes(16),
-    case aegis_key_manager:wrap_key(DataEncryptionKey) of
+    case aegis_key_manager:wrap_key(Filepath, DataEncryptionKey) of
         {ok, WrappedKey} ->
             case write_encryption_header(File0, WrappedKey, IV) of
                 {ok, File1} ->
@@ -975,10 +980,10 @@ init_crypto(#file{eof = 0} = File0) ->
             {error, Reason}
     end;
 %% we're opening an existing file and need to unwrap the key if file is encrypted.
-init_crypto(#file{eof = Pos, key = undefined} = File) when Pos > 0 ->
+init_crypto(Filepath, #file{eof = Pos, key = undefined} = File) when Pos > 0 ->
     case read_encryption_header(File) of
         {ok, WrappedKey, IV} ->
-            case aegis_key_manager:unwrap_key(WrappedKey) of
+            case aegis_key_manager:unwrap_key(Filepath, WrappedKey) of
                 {ok, DataEncryptionKey} ->
                     {ok, init_crypto(File, DataEncryptionKey, IV)};
                 {error, Reason} ->
