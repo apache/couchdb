@@ -285,7 +285,6 @@ rs256_test() ->
 
     ?assertMatch({ok, ExpectedPayload}, jwtf:decode(EncodedToken, Checks, KS)).
 
-
 -ifdef(OTP_RELEASE).
 %% jwt.io generated
 es256_test() ->

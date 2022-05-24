@@ -29,7 +29,6 @@
 
 -include_lib("public_key/include/public_key.hrl").
 
-
 -ifdef(OTP_RELEASE).
 
 -define(ALGS, [
