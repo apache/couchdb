@@ -29,7 +29,6 @@
 
 -include_lib("public_key/include/public_key.hrl").
 
-
 -ifdef(OTP_RELEASE).
 
 -define(ALGS, [
@@ -335,12 +334,8 @@ der_to_jose(Alg, Signature) ->
     Len = rs_len(Alg),
     <<R:Len, S:Len>>.
 
-rs_len(<<"ES256">>) ->
-    256;
-rs_len(<<"ES384">>) ->
-    384;
-rs_len(<<"ES512">>) ->
-    512.
+rs_len(<<"ES", SizeBin/binary>>) ->
+    binary_to_integer(SizeBin).
 
 split(EncodedToken) ->
     case binary:split(EncodedToken, <<$.>>, [global]) of
