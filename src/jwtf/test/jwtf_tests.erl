@@ -24,13 +24,23 @@ encode(Header0, Payload0) ->
 valid_header() ->
     {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"RS256">>}]}.
 
-jwt_io_pubkey() ->
+jwt_io_rsa_pubkey() ->
     PublicKeyPEM = <<
         "-----BEGIN PUBLIC KEY-----\n"
         "MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDdlatRjRjogo3WojgGH"
         "FHYLugdUWAY9iR3fy4arWNA1KoS8kVw33cJibXr8bvwUAUparCwlvdbH6"
         "dvEOfou0/gCFQsHUfQrSDv+MuSUMAe8jzKE4qW+jK+xQU9a03GUnKHkkl"
         "e+Q0pX/g6jXZ7r1/xAK5Do2kQ+X5xK9cipRgEKwIDAQAB\n"
+        "-----END PUBLIC KEY-----\n"
+    >>,
+    [PEMEntry] = public_key:pem_decode(PublicKeyPEM),
+    public_key:pem_entry_decode(PEMEntry).
+
+jwt_io_ec_pubkey() ->
+    PublicKeyPEM = <<
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEVs/o5+uQbTjL3chynL4wXgUg2R9"
+        "q9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\n"
         "-----END PUBLIC KEY-----\n"
     >>,
     [PEMEntry] = public_key:pem_decode(PublicKeyPEM),
@@ -169,7 +179,7 @@ bad_rs256_sig_test() ->
         {[{<<"typ">>, <<"JWT">>}, {<<"alg">>, <<"RS256">>}]},
         {[]}
     ),
-    KS = fun(<<"RS256">>, undefined) -> jwt_io_pubkey() end,
+    KS = fun(<<"RS256">>, undefined) -> jwt_io_rsa_pubkey() end,
     ?assertEqual(
         {error, {bad_request, <<"Bad signature">>}},
         jwtf:decode(Encoded, [], KS)
@@ -264,7 +274,28 @@ rs256_test() ->
     >>,
 
     Checks = [sig, alg],
-    KS = fun(<<"RS256">>, undefined) -> jwt_io_pubkey() end,
+    KS = fun(<<"RS256">>, undefined) -> jwt_io_rsa_pubkey() end,
+
+    ExpectedPayload =
+        {[
+            {<<"sub">>, <<"1234567890">>},
+            {<<"name">>, <<"John Doe">>},
+            {<<"admin">>, true}
+        ]},
+
+    ?assertMatch({ok, ExpectedPayload}, jwtf:decode(EncodedToken, Checks, KS)).
+
+%% jwt.io generated
+es256_test() ->
+    EncodedToken = <<
+        "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0N"
+        "TY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWV9.1g"
+        "LptYop2guxSZHmf0ga292suPxwBdkijA1ZopCSSYLBdEl8Bg2fsxoU"
+        "cZuSGztMU9qAKV2p80NQn8czeGhHXA"
+    >>,
+
+    Checks = [sig, alg],
+    KS = fun(<<"ES256">>, undefined) -> jwt_io_ec_pubkey() end,
 
     ExpectedPayload =
         {[
@@ -292,10 +323,12 @@ encode_decode_test_() ->
 
 encode_decode(Alg) ->
     {EncodeKey, DecodeKey} =
-        case jwtf:verification_algorithm(Alg) of
-            {public_key, _Algorithm} ->
-                create_keypair();
-            {hmac, _Algorithm} ->
+        case Alg of
+            <<"RS", _/binary>> ->
+                create_rsa_keypair();
+            <<"ES", _/binary>> ->
+                create_ec_keypair();
+            <<"HS", _/binary>> ->
                 Key = <<"a-super-secret-key">>,
                 {Key, Key}
         end,
@@ -319,7 +352,7 @@ claims() ->
         {<<"exp">>, EpochSeconds + 3600}
     ]}.
 
-create_keypair() ->
+create_rsa_keypair() ->
     %% https://tools.ietf.org/html/rfc7517#appendix-C
     N = decode(<<
         "t6Q8PWSi1dkJj9hTP8hNYFlvadM7DflW9mWepOJhJ66w7nyoK1gPNqFMSQRy"
@@ -348,6 +381,41 @@ create_keypair() ->
         publicExponent = E
     },
     {RSAPrivateKey, RSAPublicKey}.
+
+create_ec_keypair() ->
+    PublicPEM = <<
+        "-----BEGIN PUBLIC KEY-----\n"
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEVs/o5+uQbTjL3chynL4wXgUg2R9"
+        "q9UU8I5mEovUf86QZ7kOBIjJwqnzD1omageEHWwHdBO6B+dFabmdT9POxg==\n"
+        "-----END PUBLIC KEY-----"
+    >>,
+    PrivatePEM = <<
+        "-----BEGIN PRIVATE KEY-----\n"
+        "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgevZzL1gdAFr88hb2"
+        "OF/2NxApJCzGCEDdfSp6VQO30hyhRANCAAQRWz+jn65BtOMvdyHKcvjBeBSDZH2r"
+        "1RTwjmYSi9R/zpBnuQ4EiMnCqfMPWiZqB4QdbAd0E7oH50VpuZ1P087G\n"
+        "-----END PRIVATE KEY-----"
+    >>,
+
+    [PublicEntry] = public_key:pem_decode(PublicPEM),
+    ECPublicKey = public_key:pem_entry_decode(PublicEntry),
+
+    [PrivateEntry] = public_key:pem_decode(PrivatePEM),
+    ECPrivateKey =
+        case public_key:pem_entry_decode(PrivateEntry) of
+            #'ECPrivateKey'{} = Key ->
+                Key;
+            {'PrivateKeyInfo', v1,
+                {'PrivateKeyInfo_privateKeyAlgorithm', ?'id-ecPublicKey',
+                    {asn1_OPENTYPE, Parameters}},
+                PrivKey, _} ->
+                EcPrivKey = public_key:der_decode('ECPrivateKey', PrivKey),
+                EcPrivKey#'ECPrivateKey'{
+                    parameters = public_key:der_decode('EcpkParameters', Parameters)
+                }
+        end,
+
+    {ECPrivateKey, ECPublicKey}.
 
 decode(Goop) ->
     crypto:bytes_to_integer(b64url:decode(Goop)).

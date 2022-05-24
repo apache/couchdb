@@ -27,6 +27,8 @@
     verification_algorithm/1
 ]).
 
+-include_lib("public_key/include/public_key.hrl").
+
 -define(ALGS, [
     % RSA PKCS#1 signature with SHA-256
     {<<"RS256">>, {public_key, sha256}},
@@ -70,7 +72,13 @@ encode(Header = {HeaderProps}, Claims, Key) ->
         SignatureOrMac =
             case verification_algorithm(Alg) of
                 {public_key, Algorithm} ->
-                    public_key:sign(Message, Algorithm, Key);
+                    Signature = public_key:sign(Message, Algorithm, Key),
+                    case Alg of
+                        <<"ES", _/binary>> ->
+                            der_to_jose(Alg, Signature);
+                        _ ->
+                            Signature
+                    end;
                 {hmac, Algorithm} ->
                     hmac(Algorithm, Key, Message)
             end,
@@ -268,12 +276,19 @@ key(Props, Checks, KS) ->
 verify(Alg, Header, Payload, SignatureOrMac0, Key) ->
     Message = <<Header/binary, $., Payload/binary>>,
     SignatureOrMac1 = b64url:decode(SignatureOrMac0),
+    SignatureOrMac2 =
+        case Alg of
+            <<"ES", _/binary>> ->
+                jose_to_der(SignatureOrMac1);
+            _ ->
+                SignatureOrMac1
+        end,
     {VerificationMethod, Algorithm} = verification_algorithm(Alg),
     case VerificationMethod of
         public_key ->
-            public_key_verify(Algorithm, Message, SignatureOrMac1, Key);
+            public_key_verify(Algorithm, Message, SignatureOrMac2, Key);
         hmac ->
-            hmac_verify(Algorithm, Message, SignatureOrMac1, Key)
+            hmac_verify(Algorithm, Message, SignatureOrMac2, Key)
     end.
 
 public_key_verify(Algorithm, Message, Signature, PublicKey) ->
@@ -291,6 +306,20 @@ hmac_verify(Algorithm, Message, HMAC, SecretKey) ->
         _ ->
             throw({bad_request, <<"Bad HMAC">>})
     end.
+
+jose_to_der(Signature) ->
+    NumLen = 8 * byte_size(Signature) div 2,
+    <<R:NumLen, S:NumLen>> = Signature,
+    SigValue = #'ECDSA-Sig-Value'{r = R, s = S},
+    public_key:der_encode('ECDSA-Sig-Value', SigValue).
+
+der_to_jose(Alg, Signature) ->
+    #'ECDSA-Sig-Value'{r = R, s = S} = public_key:der_decode('ECDSA-Sig-Value', Signature),
+    Len = rs_len(Alg),
+    <<R:Len, S:Len>>.
+
+rs_len(<<"ES", SizeBin/binary>>) ->
+    binary_to_integer(SizeBin).
 
 split(EncodedToken) ->
     case binary:split(EncodedToken, <<$.>>, [global]) of

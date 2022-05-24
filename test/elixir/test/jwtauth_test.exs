@@ -75,7 +75,7 @@ defmodule JwtAuthTest do
   test "jwt auth with EC secret", _context do
     require JwtAuthTest.EC
 
-    private_key = :public_key.generate_key({:namedCurve, :secp384r1})
+    private_key = :public_key.generate_key({:namedCurve, :secp256r1})
     point = EC.point(point: EC.private(private_key, :publicKey))
     public_key = {point, EC.private(private_key, :parameters)}
 
@@ -125,6 +125,7 @@ defmodule JwtAuthTest do
       headers: [authorization: "Bearer #{token}"]
     )
 
+    assert resp.status_code == 200
     assert resp.body["userCtx"]["name"] == "couch@apache.org"
     assert resp.body["info"]["authenticated"] == "jwt"
   end
