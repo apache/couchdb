@@ -1140,6 +1140,8 @@ maybe_handle_error(Error) ->
             {500, couch_util:to_binary(Err), couch_util:to_binary(Reason)};
         normal ->
             exit(normal);
+        shutdown ->
+            exit(shutdown);
         Err ->
             {500, <<"unknown_error">>, couch_util:to_binary(Err)}
     end.
