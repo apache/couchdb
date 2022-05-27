@@ -227,6 +227,7 @@ jwt_authentication_handler(Req) ->
             RequiredClaims = get_configured_claims(),
             case jwtf:decode(?l2b(Jwt), [alg | RequiredClaims], fun jwtf_keystore:get/2) of
                 {ok, {Claims}} ->
+                    Roles = get_roles_claim(Claims),
                     case lists:keyfind(<<"sub">>, 1, Claims) of
                         false ->
                             throw({unauthorized, <<"Token missing sub claim.">>});
@@ -234,15 +235,7 @@ jwt_authentication_handler(Req) ->
                             Req#httpd{
                                 user_ctx = #user_ctx{
                                     name = User,
-                                    roles = couch_util:get_value(
-                                        ?l2b(
-                                            config:get(
-                                                "jwt_auth", "roles_claim_name", "_couchdb.roles"
-                                            )
-                                        ),
-                                        Claims,
-                                        []
-                                    )
+                                    roles = Roles
                                 }
                             }
                     end;
@@ -251,6 +244,53 @@ jwt_authentication_handler(Req) ->
             end;
         _ ->
             Req
+    end.
+
+tokenize_json_path(Path, SliceStart, [], Result) ->
+    Result1 = Result ++ [?l2b(string:slice(Path, SliceStart))],
+    [?l2b(string:replace(X, "\\.", ".", all)) || X <- Result1];
+tokenize_json_path(Path, SliceStart, [[{Pos, _}] | T], Result) ->
+    Slice = string:slice(Path, SliceStart, Pos - SliceStart),
+    NewResult = Result ++ [?l2b(Slice)],
+    tokenize_json_path(Path, Pos + 1, T, NewResult).
+
+tokenize_json_path(Path, SplitPositions) ->
+    tokenize_json_path(Path, 0, SplitPositions, []).
+
+get_roles_claim(Claims) ->
+    RolesClaimPath = config:get(
+        "jwt_auth", "roles_claim_path"
+    ),
+    Result =
+        case RolesClaimPath of
+            undefined ->
+                couch_util:get_value(
+                    ?l2b(
+                        config:get(
+                            "jwt_auth", "roles_claim_name", "_couchdb.roles"
+                        )
+                    ),
+                    Claims,
+                    []
+                );
+            Defined when is_list(Defined) ->
+                % find all "." but no "\."
+                PathRegex = "(?<!\\\\)\\.",
+                MatchPositions =
+                    case re:run(RolesClaimPath, PathRegex, [global]) of
+                        nomatch -> [];
+                        {match, Pos} -> Pos
+                    end,
+                TokenizedJsonPath = tokenize_json_path(RolesClaimPath, MatchPositions),
+                couch_util:get_nested_json_value({Claims}, TokenizedJsonPath)
+        end,
+    case lists:all(fun erlang:is_binary/1, Result) of
+        true ->
+            Result;
+        false ->
+            throw(
+                {bad_request, <<"Malformed token">>}
+            )
     end.
 
 get_configured_claims() ->
