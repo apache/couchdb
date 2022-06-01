@@ -109,6 +109,8 @@ However, it's the best measure we currently have.
 
 #### State diagram
 
+Below is a diagram of smoosh's initial state during the recovery process.
+
 ```
 stateDiagram
     [*] --> init
@@ -127,7 +129,8 @@ stateDiagram
     schedule_unpause --> [*]: after 30 sec, paused = false and compaction of new jobs begin
 ```
 
-See [here](https://mermaid.ink/img/pako:eNqNUtFKwzAU_ZVLnjbpQPCtoFK2PgzUB1sEsVKy5LaNtklJ08kY-3eTtKVsTDBPybnnnntOkiNhiiMJSWeowY2gpaZNJsGuj5tPWK0eQEhhBsTtPGTJ2uQamdqjPoTQoeQ5LQzqxWOSRq9pvomfovd8-5I_J_E6sIS6WCyDi8blICuVQdCirAyo4oIyMNyizIi99cjhHgpadziXWtp3Hje6H2FryOsOp3NNH2GSOzcfrdPtW5TGf_mfuq46n4qzMX-pUNEOdogSRgPIr6ea3f8r1NQ6vAirkPc15r30jWPuC9RT7buG4PPC3a1NxoJ5lr9YoHYOU03rJijpokn8gS-1czlKIUlAGtQNFdx-nKMblRFTYYMZCe2WU_2dkUyeLK9vubUYc2GUJqGXDwjtjUoOkpHQZZtI4-cbWadfC0TavA) for a diagram of smoosh's initial state during the recovery process.
+![Smoosh State Recovery Process Diagram](recovery_process_diagram.jpeg)
+
 ### Defining a channel
 
 Defining a channel is done via normal dbcore configuration, with some
