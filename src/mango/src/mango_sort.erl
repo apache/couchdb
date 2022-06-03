@@ -49,20 +49,24 @@ sort_field({[{Name, <<"asc">>}]}) when is_binary(Name) ->
     {Name, <<"asc">>};
 sort_field({[{Name, <<"desc">>}]}) when is_binary(Name) ->
     {Name, <<"desc">>};
+sort_field({[{Name, {[{<<"$jq">>, Expr}]} = Jq}]}) when is_binary(Name) and is_binary(Expr) ->
+    {Name, Jq};
 sort_field({Name, BadDir}) when is_binary(Name) ->
     ?MANGO_ERROR({invalid_sort_dir, BadDir});
 sort_field(Else) ->
     ?MANGO_ERROR({invalid_sort_field, Else}).
 
 validate({Props}) ->
-    % Assert each field is in the same direction
-    % until we support mixed direction sorts.
-    Dirs = [D || {_, D} <- Props],
+    % Assert each field is in the same direction, or all fields are jq
+    % expressions, until we support mixed direction sorts.
+    Dirs = lists:map(fun(Prop) ->
+        case Prop of
+            {_, {[{<<"$jq">>, _}]}} -> jq;
+            {_, D} -> D
+        end
+    end, Props),
     case lists:usort(Dirs) of
-        [] ->
-            ok;
-        [_] ->
-            ok;
-        _ ->
-            ?MANGO_ERROR({unsupported, mixed_sort})
+        [] -> ok;
+        [_] -> ok;
+        _ -> ?MANGO_ERROR({unsupported, mixed_sort})
     end.

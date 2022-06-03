@@ -236,6 +236,13 @@ choose_best_index(_DbName, IndexRanges) ->
     {SelectedIndex, SelectedIndexRanges, _} = hd(lists:sort(Cmp, IndexRanges)),
     {SelectedIndex, SelectedIndexRanges}.
 
+add_virtual_field({Props}, {[{<<"$and">>, [{[{K1, _}]}, {[{K2, _}]}]}]}, [V1, V2]) ->
+    {lists:append(Props, [{K1, V1}, {K2, V2}])};
+add_virtual_field({Props}, {[{Key, _}]}, [Value]) ->
+    {lists:append(Props, [{Key, Value}])};
+add_virtual_field(Props, _, _) ->
+    Props.
+
 view_cb({meta, Meta}, Acc) ->
     % Map function starting
     put(mango_docs_examined, 0),
@@ -243,9 +250,10 @@ view_cb({meta, Meta}, Acc) ->
     ok = rexi:stream2({meta, Meta}),
     {ok, Acc};
 view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
+    Key = couch_util:get_value(key, Row),
     ViewRow = #view_row{
         id = couch_util:get_value(id, Row),
-        key = couch_util:get_value(key, Row),
+        key = Key,
         doc = couch_util:get_value(doc, Row)
     },
     case ViewRow#view_row.doc of
@@ -259,9 +267,12 @@ view_cb({row, Row}, #mrargs{extra = Options} = Acc) ->
             put(mango_docs_examined, get(mango_docs_examined) + 1),
             Selector = couch_util:get_value(selector, Options),
             couch_stats:increment_counter([mango, docs_examined]),
-            case mango_selector:match(Selector, Doc) of
+            io:format("----[view_cb selector] doc = ~p :: selector = ~p :: key = ~p~n", [Doc, Selector, Key]),
+            Doc1 = add_virtual_field(Doc, Selector, Key),
+            case mango_selector:match(Selector, Doc1) of
                 true ->
-                    ok = rexi:stream2(ViewRow),
+                    ViewRow1 = ViewRow#view_row{doc = Doc1},
+                    ok = rexi:stream2(ViewRow1),
                     set_mango_msg_timestamp();
                 false ->
                     maybe_send_mango_ping()

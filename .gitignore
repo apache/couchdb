@@ -47,6 +47,7 @@ src/couch/priv/couch_js/**/config.h
 src/couch/priv/couchjs
 src/couch/priv/couchspawnkillable
 src/couch/priv/couch_ejson_compare/couch_ejson_compare.d
+src/couch/priv/couch_jq/*.d
 src/couch/priv/couch_js/**/*.d
 src/couch/priv/icu_driver/couch_icu_driver.d
 src/mango/src/mango_cursor_text.nocompile

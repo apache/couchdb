@@ -66,7 +66,8 @@ handle_call({prompt, [<<"add_fun">>, IndexInfo]}, _From, St) ->
     Indexes =
         case validate_index_info(IndexInfo) of
             true ->
-                St#st.indexes ++ [IndexInfo];
+                IndexInfo1 = precompile_jq(IndexInfo),
+                St#st.indexes ++ [IndexInfo1];
             false ->
                 couch_log:error("No Valid Indexes For: ~p", [IndexInfo]),
                 St#st.indexes
@@ -105,6 +106,27 @@ handle_info(Msg, St) ->
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
+precompile_jq({IdxProps}) ->
+    IdxProps1 = lists:map(fun(Prop) ->
+        case Prop of
+            {<<"fields">>, {Fields}} ->
+                {<<"fields">>, {precompile_jq_fields(Fields)}};
+            Else ->
+                Else
+        end
+    end, IdxProps),
+    {IdxProps1}.
+
+precompile_jq_fields(Fields) ->
+    lists:map(fun(Field) ->
+        case Field of
+            {FieldName, {[{<<"$jq">>, Jq}]}} ->
+                {FieldName, {jq, couch_jq:compile(Jq)}};
+            Else ->
+                Else
+        end
+    end, Fields).
+
 map_doc(#st{indexes = Indexes}, Doc) ->
     lists:map(fun(Idx) -> get_index_entries(Idx, Doc) end, Indexes).
 
@@ -118,24 +140,35 @@ get_index_entries({IdxProps}, Doc) ->
         false ->
             [];
         true ->
-            Values = get_index_values(Fields, Doc),
-            case lists:member(not_found, Values) of
-                true -> [];
-                false -> [[Values, null]]
-            end
+            Keys = flatten_keys(get_index_values(Fields, Doc)),
+            io:format("----[get_index_entries] ~p :: ~p~n", [Fields, Keys]),
+            [[Values, null] || Values <- Keys]
     end.
 
 get_index_values(Fields, Doc) ->
-    lists:map(
-        fun({Field, _Dir}) ->
-            case mango_doc:get_field(Doc, Field) of
-                not_found -> not_found;
-                bad_path -> not_found;
-                Value -> Value
-            end
-        end,
-        Fields
-    ).
+    lists:map(fun(Field) -> get_index_field_value(Field, Doc) end, Fields).
+
+get_index_field_value({Field, FieldDef}, Doc) ->
+    Value = case FieldDef of
+        {jq, Jq} -> mango_doc:get_field_jq(Doc, Jq);
+        _ -> mango_doc:get_field(Doc, Field)
+    end,
+    case Value of
+        not_found -> not_found;
+        bad_path -> not_found;
+        Value1 -> Value1
+    end.
+
+flatten_keys([not_found | _]) ->
+    [];
+flatten_keys([{jq, Values} | Rest]) ->
+    Keys = flatten_keys(Rest),
+    [[V | K] || V <- Values, K <- Keys];
+flatten_keys([First | Rest]) ->
+    Keys = flatten_keys(Rest),
+    [[First | K] || K <- Keys];
+flatten_keys([]) ->
+    [[]].
 
 get_text_entries({IdxProps}, Doc) ->
     Selector = get_index_partial_filter_selector(IdxProps),

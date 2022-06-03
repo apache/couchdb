@@ -21,6 +21,7 @@
 
     get_field/2,
     get_field/3,
+    get_field_jq/2,
     rem_field/2,
     set_field/3
 ]).
@@ -413,6 +414,14 @@ get_field(Values, [Name | Rest], Validator) when is_list(Values) ->
             bad_path
     end;
 get_field(_, [_ | _], _) ->
+    bad_path.
+
+get_field_jq(Props, {ok, Program}) ->
+    case couch_jq:eval(Program, Props) of
+        {ok, Results} -> {jq, Results};
+        Else -> bad_path
+    end;
+get_field_jq(Props, _) ->
     bad_path.
 
 rem_field(Props, Field) when is_binary(Field) ->
