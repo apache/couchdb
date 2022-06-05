@@ -283,30 +283,7 @@ get_missing_revs(DbName, IdRevsList) ->
     get_missing_revs(DbName, IdRevsList, []).
 
 get_missing_revs(DbName, IdRevsList, Options) ->
-    % reimplement here so we get [] for Ids with no missing revs in response
-    set_io_priority(DbName, Options),
-    rexi:reply(
-        case get_or_create_db(DbName, Options) of
-            {ok, Db} ->
-                Ids = [Id1 || {Id1, _Revs} <- IdRevsList],
-                {ok,
-                    lists:zipwith(
-                        fun({Id, Revs}, FullDocInfoResult) ->
-                            case FullDocInfoResult of
-                                #full_doc_info{rev_tree = RevisionTree} = FullInfo ->
-                                    MissingRevs = couch_key_tree:find_missing(RevisionTree, Revs),
-                                    {Id, MissingRevs, possible_ancestors(FullInfo, MissingRevs)};
-                                not_found ->
-                                    {Id, Revs, []}
-                            end
-                        end,
-                        IdRevsList,
-                        couch_db:get_full_doc_infos(Db, Ids)
-                    )};
-            Error ->
-                Error
-        end
-    ).
+    with_db(DbName, Options, {couch_db, get_missing_revs, [IdRevsList]}).
 
 update_docs(DbName, Docs0, Options) ->
     {Docs1, Type} =
@@ -600,34 +577,6 @@ maybe_filtered_json_doc(Doc, Opts, {selector, _Style, {_Selector, Fields}}) when
     mango_fields:extract(couch_doc:to_json_obj(Doc, Opts), Fields);
 maybe_filtered_json_doc(Doc, Opts, _Filter) ->
     couch_doc:to_json_obj(Doc, Opts).
-
-possible_ancestors(_FullInfo, []) ->
-    [];
-possible_ancestors(FullInfo, MissingRevs) ->
-    #doc_info{revs = RevsInfo} = couch_doc:to_doc_info(FullInfo),
-    LeafRevs = [Rev || #rev_info{rev = Rev} <- RevsInfo],
-    % Find the revs that are possible parents of this rev
-    lists:foldl(
-        fun({LeafPos, LeafRevId}, Acc) ->
-            % this leaf is a "possible ancenstor" of the missing
-            % revs if this LeafPos lessthan any of the missing revs
-            case
-                lists:any(
-                    fun({MissingPos, _}) ->
-                        LeafPos < MissingPos
-                    end,
-                    MissingRevs
-                )
-            of
-                true ->
-                    [{LeafPos, LeafRevId} | Acc];
-                false ->
-                    Acc
-            end
-        end,
-        [],
-        LeafRevs
-    ).
 
 make_att_readers([]) ->
     [];

@@ -354,52 +354,21 @@ open_doc_revs(Db, Id, Revs, Options) ->
 
 % Each returned result is a list of tuples:
 % {Id, MissingRevs, PossibleAncestors}
-% if no revs are missing, it's omitted from the results.
+% if no revs are missing, MissingRevs is []
 get_missing_revs(Db, IdRevsList) ->
-    Results = get_full_doc_infos(Db, [Id1 || {Id1, _Revs} <- IdRevsList]),
-    {ok, find_missing(IdRevsList, Results)}.
-
-find_missing([], []) ->
-    [];
-find_missing([{Id, Revs} | RestIdRevs], [FullInfo | RestLookupInfo]) when
-    is_record(FullInfo, full_doc_info)
-->
-    case couch_key_tree:find_missing(FullInfo#full_doc_info.rev_tree, Revs) of
-        [] ->
-            find_missing(RestIdRevs, RestLookupInfo);
-        MissingRevs ->
-            #doc_info{revs = RevsInfo} = couch_doc:to_doc_info(FullInfo),
-            LeafRevs = [Rev || #rev_info{rev = Rev} <- RevsInfo],
-            % Find the revs that are possible parents of this rev
-            PossibleAncestors =
-                lists:foldl(
-                    fun({LeafPos, LeafRevId}, Acc) ->
-                        % this leaf is a "possible ancenstor" of the missing
-                        % revs if this LeafPos lessthan any of the missing revs
-                        case
-                            lists:any(
-                                fun({MissingPos, _}) ->
-                                    LeafPos < MissingPos
-                                end,
-                                MissingRevs
-                            )
-                        of
-                            true ->
-                                [{LeafPos, LeafRevId} | Acc];
-                            false ->
-                                Acc
-                        end
-                    end,
-                    [],
-                    LeafRevs
-                ),
-            [
-                {Id, MissingRevs, PossibleAncestors}
-                | find_missing(RestIdRevs, RestLookupInfo)
-            ]
-    end;
-find_missing([{Id, Revs} | RestIdRevs], [not_found | RestLookupInfo]) ->
-    [{Id, Revs, []} | find_missing(RestIdRevs, RestLookupInfo)].
+    FDIs = get_full_doc_infos(Db, [Id || {Id, _Revs} <- IdRevsList]),
+    Results = lists:zipwith(
+        fun
+            ({Id, Revs}, #full_doc_info{rev_tree = RevTree} = FDI) ->
+                MissingRevs = couch_key_tree:find_missing(RevTree, Revs),
+                {Id, MissingRevs, possible_ancestors(FDI, MissingRevs)};
+            ({Id, Revs}, not_found) ->
+                {Id, Revs, []}
+        end,
+        IdRevsList,
+        FDIs
+    ),
+    {ok, Results}.
 
 get_doc_info(Db, Id) ->
     case get_full_doc_info(Db, Id) of
@@ -2127,6 +2096,34 @@ set_design_doc_end_key(Options, rev) ->
                 end,
             lists:keystore(end_key_gt, 1, Options, {end_key_gt, Key2})
     end.
+
+possible_ancestors(_FullInfo, []) ->
+    [];
+possible_ancestors(FullInfo, MissingRevs) ->
+    #doc_info{revs = RevsInfo} = couch_doc:to_doc_info(FullInfo),
+    LeafRevs = [Rev || #rev_info{rev = Rev} <- RevsInfo],
+    % Find the revs that are possible parents of this rev
+    lists:foldl(
+        fun({LeafPos, LeafRevId}, Acc) ->
+            % this leaf is a "possible ancenstor" of the missing
+            % revs if this LeafPos lessthan any of the missing revs
+            case
+                lists:any(
+                    fun({MissingPos, _}) ->
+                        LeafPos < MissingPos
+                    end,
+                    MissingRevs
+                )
+            of
+                true ->
+                    [{LeafPos, LeafRevId} | Acc];
+                false ->
+                    Acc
+            end
+        end,
+        [],
+        LeafRevs
+    ).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
