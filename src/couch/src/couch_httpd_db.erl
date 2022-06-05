@@ -451,11 +451,13 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_missing_revs">>]} = Req, Db)
      || {Id, RevStrs} <- JsonDocIdRevs
     ],
     {ok, Results} = couch_db:get_missing_revs(Db, JsonDocIdRevs2),
-    Results2 = [{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs, _} <- Results],
+    % Skip docs with no missing revs, they have Revs = []
+    Results2 = [{Id, Revs} || {Id, Revs, _} <- Results, Revs =/= []],
+    Results3 = [{Id, couch_doc:revs_to_strs(Revs)} || {Id, Revs} <- Results2],
     send_json(
         Req,
         {[
-            {missing_revs, {Results2}}
+            {missing_revs, {Results3}}
         ]}
     );
 db_req(#httpd{path_parts = [_, <<"_missing_revs">>]} = Req, _Db) ->
@@ -466,7 +468,9 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_revs_diff">>]} = Req, Db) ->
     JsonDocIdRevs2 =
         [{Id, couch_doc:parse_revs(RevStrs)} || {Id, RevStrs} <- JsonDocIdRevs],
     {ok, Results} = couch_db:get_missing_revs(Db, JsonDocIdRevs2),
-    Results2 =
+    % Skip docs with no missing revs, they have Revs = []
+    Results2 = [Res || {_Id, Revs, _PAs} = Res <- Results, Revs =/= []],
+    Results3 =
         lists:map(
             fun({Id, MissingRevs, PossibleAncestors}) ->
                 {Id, {
@@ -479,9 +483,9 @@ db_req(#httpd{method = 'POST', path_parts = [_, <<"_revs_diff">>]} = Req, Db) ->
                         end
                 }}
             end,
-            Results
+            Results2
         ),
-    send_json(Req, {Results2});
+    send_json(Req, {Results3});
 db_req(#httpd{path_parts = [_, <<"_revs_diff">>]} = Req, _Db) ->
     send_method_not_allowed(Req, "POST");
 db_req(#httpd{method = 'PUT', path_parts = [_, <<"_security">>]} = Req, Db) ->
