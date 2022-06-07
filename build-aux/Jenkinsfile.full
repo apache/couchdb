@@ -381,7 +381,7 @@ pipeline {
     stage('Publish') {
 
       when {
-        expression { return env.BRANCH_NAME ==~ /main|2.*.x|3.*.x|4.*.x|jenkins-.*/ }
+        expression { return env.BRANCH_NAME ==~ /fdbmain|main|2.*.x|3.*.x|4.*.x|jenkins-.*/ }
       }
 
       agent {
