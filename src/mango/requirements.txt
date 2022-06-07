@@ -1,4 +1,0 @@
-nose2==0.11.0
-requests==2.27.1
-hypothesis==6.31.6
-
