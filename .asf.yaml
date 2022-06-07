@@ -22,11 +22,17 @@ github:
     rebase: true
     merge: true
   protected_branches:
-    main:
+    fdbmain:
       required_status_checks:
         strict: true
         contexts:
           - continuous-integration/jenkins/pr-merge
+    # comment out before switching 3.x -> main
+    # main:
+    #   required_status_checks:
+    #     strict: true
+    #     contexts:
+    #       - continuous-integration/jenkins/pr-merge
     3.x:
       required_status_checks:
         strict: true
