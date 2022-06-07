@@ -537,10 +537,10 @@ stem_tree(Depth, {Key, Val, Children}, Limit, Seen0) ->
     ),
     {FinalSeen, FinalLimitPos, FinalChildren, FinalBranches} = FinalAcc,
     case FinalLimitPos of
-        N when N > 0, length(FinalChildren) > 0 ->
+        N when N > 0, FinalChildren =/= [] ->
             FinalNode = {Key, Val, lists:reverse(FinalChildren)},
             {FinalSeen, FinalLimitPos - 1, FinalNode, FinalBranches};
-        0 when length(FinalChildren) > 0 ->
+        0 when FinalChildren =/= [] ->
             NewBranches = lists:map(
                 fun(Child) ->
                     {Depth + 1, Child}
@@ -548,7 +548,7 @@ stem_tree(Depth, {Key, Val, Children}, Limit, Seen0) ->
                 lists:reverse(FinalChildren)
             ),
             {FinalSeen, -1, NewBranches ++ FinalBranches};
-        N when N < 0, length(FinalChildren) == 0 ->
+        N when N < 0, FinalChildren =:= [] ->
             {FinalSeen, FinalLimitPos - 1, FinalBranches}
     end.
 
