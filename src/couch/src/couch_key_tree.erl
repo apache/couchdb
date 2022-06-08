@@ -209,27 +209,27 @@ merge_extend([Tree | RestA], NextB) ->
         end,
     {[Tree | Merged], Result}.
 
-find_missing(_Tree, []) ->
+find_missing(Tree, SearchKeys) ->
+    find_missing_sorted(Tree, lists:sort(SearchKeys)).
+
+find_missing_sorted(_Tree, []) ->
     [];
-find_missing([], SeachKeys) ->
-    SeachKeys;
-find_missing([{Start, {Key, Value, SubTree}} | RestTree], SeachKeys) ->
-    PossibleKeys = [{KeyPos, KeyValue} || {KeyPos, KeyValue} <- SeachKeys, KeyPos >= Start],
-    ImpossibleKeys = [{KeyPos, KeyValue} || {KeyPos, KeyValue} <- SeachKeys, KeyPos < Start],
-    Missing = find_missing_simple(Start, [{Key, Value, SubTree}], PossibleKeys),
-    find_missing(RestTree, ImpossibleKeys ++ Missing).
+find_missing_sorted([], SearchKeys) ->
+    SearchKeys;
+find_missing_sorted([{Start, {Key, Value, SubTree}} | RestTree], SearchKeys) ->
+    {Impossible, Possible} = lists:splitwith(fun({K, _}) -> K < Start end, SearchKeys),
+    Missing = find_missing_simple(Start, [{Key, Value, SubTree}], Possible),
+    find_missing_sorted(RestTree, Impossible ++ Missing).
 
 find_missing_simple(_Pos, _Tree, []) ->
     [];
-find_missing_simple(_Pos, [], SeachKeys) ->
-    SeachKeys;
-find_missing_simple(Pos, [{Key, _, SubTree} | RestTree], SeachKeys) ->
-    PossibleKeys = [{KeyPos, KeyValue} || {KeyPos, KeyValue} <- SeachKeys, KeyPos >= Pos],
-    ImpossibleKeys = [{KeyPos, KeyValue} || {KeyPos, KeyValue} <- SeachKeys, KeyPos < Pos],
-
-    SrcKeys2 = PossibleKeys -- [{Pos, Key}],
+find_missing_simple(_Pos, [], SearchKeys) ->
+    SearchKeys;
+find_missing_simple(Pos, [{Key, _, SubTree} | RestTree], SearchKeys) ->
+    {Impossible, Possible} = lists:splitwith(fun({K, _}) -> K < Pos end, SearchKeys),
+    SrcKeys2 = Possible -- [{Pos, Key}],
     SrcKeys3 = find_missing_simple(Pos + 1, SubTree, SrcKeys2),
-    ImpossibleKeys ++ find_missing_simple(Pos, RestTree, SrcKeys3).
+    Impossible ++ find_missing_simple(Pos, RestTree, SrcKeys3).
 
 filter_leafs([], _Keys, FilteredAcc, RemovedKeysAcc) ->
     {FilteredAcc, RemovedKeysAcc};
