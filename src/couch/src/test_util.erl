@@ -19,7 +19,7 @@
 
 -export([init_code_path/0]).
 -export([source_file/1, build_file/1]).
-%% -export([run/2]).
+-export([revtree_generate/4, revtree_get_revs/1, random_rev/0]).
 
 -export([start_couch/0, start_couch/1, start_couch/2, stop_couch/0, stop_couch/1]).
 -export([start_config/1, stop_config/1]).
@@ -39,6 +39,8 @@
 -export([start/1, start/2, start/3, stop/1]).
 
 -export([fake_db/1]).
+
+-export([shuffle/1]).
 
 -record(test_context, {mocked = [], started = [], module}).
 
@@ -427,3 +429,62 @@ sort_apps(Apps) ->
 
 weight_app(couch_log) -> {0.0, couch_log};
 weight_app(Else) -> {1.0, Else}.
+
+% Generate random rev trees
+%
+% Args:
+%   Depth : Max depth. This will be halfed every time we branch.
+%
+%   BranchChance : 0.0 to 1.0 chance of branching at each level.
+%
+%   WideBranches: 1/4 of the time when branching happens it will create
+%                 wide branches, this specifies the width of those branches.
+%
+% Example usage: revtree_generate(25, 0.25, 10, os:timestamp())
+
+revtree_generate(Depth, BranchChance, WideBranches, Seed) ->
+    rand:seed(exrop, Seed),
+    Rev = random_rev(),
+    {Seed, [{1, revnode(Rev, Depth, BranchChance, WideBranches)}]}.
+
+% Get all the revisions in the tree as a sorted [{Pos, Rev} ...] list
+%
+revtree_get_revs([{Pos, {_, _, _} = Node}]) when is_integer(Pos) ->
+    lists:sort(maps:keys(revs1(Pos, Node))).
+
+revnode(Rev, Depth, _, _) when Depth =< 0 ->
+    {Rev, x, []};
+revnode(Rev, Depth, BranchChance, WideBranches) ->
+    Choice = rand:uniform(),
+    {Revs, Depth1} =
+        if
+            Choice < BranchChance / 4 ->
+                {childrev(WideBranches), trunc(Depth / 2)};
+            Choice < BranchChance ->
+                {childrev(2), trunc(Depth / 2)};
+            true ->
+                {childrev(1), Depth - 1}
+        end,
+    {Rev, x, [revnode(R, Depth1, BranchChance, WideBranches) || R <- Revs]}.
+
+childrev(N) ->
+    lists:sort([random_rev() || _ <- lists:seq(1, N)]).
+
+revs1(Pos, {Rev, _Val, []}) ->
+    #{{Pos, Rev} => true};
+revs1(Pos, {Rev, _Val, Nodes}) ->
+    lists:foldl(
+        fun(N, Acc) ->
+            maps:merge(Acc, revs1(Pos + 1, N))
+        end,
+        #{{Pos, Rev} => true},
+        Nodes
+    ).
+
+random_rev() ->
+    ?l2b(couch_util:to_hex(crypto:strong_rand_bytes(16))).
+
+shuffle(List) ->
+    Paired = [{couch_rand:uniform(), I} || I <- List],
+    Sorted = lists:sort(Paired),
+    [I || {_, I} <- Sorted].
