@@ -44,7 +44,9 @@ key_tree_missing_leaves_test_() ->
         "Missing tree leaves",
         [
             should_not_find_missing_leaves(),
-            should_find_missing_leaves()
+            should_find_missing_leaves(),
+            should_not_find_missing_leaves_large_test(),
+            should_find_missing_leaves_large_test()
         ]
     }.
 
@@ -342,6 +344,27 @@ should_find_missing_leaves() ->
         )
     ].
 
+should_not_find_missing_leaves_large_test() ->
+    ?_test(begin
+        % This is to preserve determinism
+        Seed = {1647, 841737, 351137},
+        {_, Tree} = test_util:revtree_generate(1000, 0.2, 5, Seed),
+        Revs1 = test_util:revtree_get_revs(Tree),
+        Revs2 = test_util:shuffle(Revs1),
+        ?assertEqual([], couch_key_tree:find_missing(Tree, Revs2))
+    end).
+
+should_find_missing_leaves_large_test() ->
+    ?_test(begin
+        % This is to preserve determinism
+        Seed = {1647, 841737, 351137},
+        {_, Tree} = test_util:revtree_generate(1000, 0.2, 5, Seed),
+        Seq = lists:seq(1, 1000),
+        Revs1 = [{couch_rand:uniform(1000), test_util:random_rev()} || _ <- Seq],
+        Revs2 = couch_key_tree:find_missing(Tree, Revs1),
+        ?assertEqual(lists:sort(Revs1), lists:sort(Revs2))
+    end).
+
 should_have_no_effect_on_removing_no_leaves() ->
     TwoChildSibs = [{0, {"1", "foo", [{"1a", "bar", []}, {"1b", "bar", []}]}}],
     ?_assertEqual(
@@ -534,7 +557,7 @@ should_not_use_excessive_memory_when_stemming() ->
     ?_test(begin
         % This is to preserve determinism
         Seed = {1647, 841737, 351137},
-        Tree = generate_rev_tree(1000, 0.006, Seed),
+        {_, Tree} = test_util:revtree_generate(1000, 0.06, 15, Seed),
         % Without the optimization #91de482fd66f4773b3b8583039c6bcaf1c5727ec
         % stemming would consume about 18_000_000 words. With it, it consumes
         % 6_000_000. So, use 13_000_000 as a threshold.
@@ -554,23 +577,3 @@ should_not_use_excessive_memory_when_stemming() ->
             end,
         ?assertEqual(normal, Exit)
     end).
-
-generate_rev_tree(Depth, BranchChance, Seed) ->
-    rand:seed(exrop, Seed),
-    [{1, revnode(Depth, BranchChance)}].
-
-revnode(0, _) ->
-    {rev(), x, []};
-revnode(Depth, BranchChance) ->
-    case rand:uniform() < BranchChance of
-        true ->
-            {rev(), x, [
-                revnode(Depth - 1, BranchChance),
-                revnode(Depth - 1, BranchChance)
-            ]};
-        false ->
-            {rev(), x, [revnode(Depth - 1, BranchChance)]}
-    end.
-
-rev() ->
-    crypto:strong_rand_bytes(16).

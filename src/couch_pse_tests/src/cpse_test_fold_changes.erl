@@ -123,7 +123,7 @@ cpse_update_second_of_two(Db1) ->
     ?assertEqual([{<<"a">>, 1}, {<<"b">>, 3}], lists:reverse(Changes)).
 
 cpse_check_mutation_ordering(Db1) ->
-    Actions = shuffle(
+    Actions = test_util:shuffle(
         lists:map(
             fun(Seq) ->
                 {create, {docid(Seq), {[]}}}
@@ -168,11 +168,6 @@ do_mutation_ordering(Db, Seq, [{DocId, _OldSeq} | Rest], DocSeqAcc) ->
         couch_db_engine:fold_changes(NewDb, 0, fun fold_fun/2, [], []),
     ?assertEqual(Expected, lists:reverse(RevOrder)),
     do_mutation_ordering(NewDb, Seq + 1, Rest, NewAcc).
-
-shuffle(List) ->
-    Paired = [{couch_rand:uniform(), I} || I <- List],
-    Sorted = lists:sort(Paired),
-    [I || {_, I} <- Sorted].
 
 fold_fun(#full_doc_info{id = Id, update_seq = Seq}, Acc) ->
     {ok, [{Id, Seq} | Acc]}.

@@ -92,7 +92,7 @@ g_connected_intervals(Begin, End, Split) when Begin =< End ->
                     Ns = lists:seq(1, N - 1),
                     Bs = lists:usort([rand_range(Begin, End) || _ <- Ns]),
                     Es = [B - 1 || B <- Bs],
-                    shuffle(lists:zip([Begin] ++ Bs, Es ++ [End]))
+                    test_util:shuffle(lists:zip([Begin] ++ Bs, Es ++ [End]))
             end
         end
     ).
@@ -148,10 +148,6 @@ rand_range(B, B) ->
     B;
 rand_range(B, E) ->
     B + rand:uniform(E - B).
-
-shuffle(L) ->
-    Tagged = [{rand:uniform(), X} || X <- L],
-    [X || {_, X} <- lists:sort(Tagged)].
 
 endpoints(Ranges) ->
     {Begins, Ends} = lists:unzip(Ranges),
