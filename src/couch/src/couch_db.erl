@@ -2102,28 +2102,13 @@ possible_ancestors(_FullInfo, []) ->
 possible_ancestors(FullInfo, MissingRevs) ->
     #doc_info{revs = RevsInfo} = couch_doc:to_doc_info(FullInfo),
     LeafRevs = [Rev || #rev_info{rev = Rev} <- RevsInfo],
-    % Find the revs that are possible parents of this rev
-    lists:foldl(
-        fun({LeafPos, LeafRevId}, Acc) ->
-            % this leaf is a "possible ancenstor" of the missing
-            % revs if this LeafPos lessthan any of the missing revs
-            case
-                lists:any(
-                    fun({MissingPos, _}) ->
-                        LeafPos < MissingPos
-                    end,
-                    MissingRevs
-                )
-            of
-                true ->
-                    [{LeafPos, LeafRevId} | Acc];
-                false ->
-                    Acc
-            end
-        end,
-        [],
-        LeafRevs
-    ).
+    % Find the revs that are possible ancestors of this rev. A leaf is
+    % a possible ancestor if its position is less than any of the
+    % missing revs, and if it is less than any, it means it is also
+    % less than the maximum missing rev, so we just compare against
+    % that.
+    {MaxMissingPos, _} = lists:max(MissingRevs),
+    lists:filter(fun({Pos, _}) -> Pos < MaxMissingPos end, LeafRevs).
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
