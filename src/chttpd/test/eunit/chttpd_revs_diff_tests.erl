@@ -124,18 +124,23 @@ t_revs_diff_some_missing_some_not({Top, Db}) ->
     },
     {Code, Res} = req(post, Top ++ Db ++ "/_revs_diff", Body),
     ?assertEqual(200, Code),
-    ?assertEqual(
-        #{
-            ?DOC1 => #{
-                <<"missing">> => [<<"1-xyz">>, <<"2-def">>, <<"3-klm">>],
-                <<"possible_ancestors">> => [<<"2-revb">>, <<"2-revc">>]
-            },
-            ?DOC2 => #{
-                <<"missing">> => [<<"1-pqr">>]
-            }
-        },
-        Res
-    ).
+
+    ?assert(maps:is_key(?DOC1, Res)),
+    ?assert(maps:is_key(?DOC2, Res)),
+    #{?DOC1 := Doc1, ?DOC2 := Doc2} = Res,
+
+    ?assert(maps:is_key(<<"missing">>, Doc1)),
+    ?assert(maps:is_key(<<"missing">>, Doc2)),
+    #{<<"missing">> := Missing1} = Doc1,
+    #{<<"missing">> := Missing2} = Doc2,
+    ?assertEqual([<<"1-xyz">>, <<"2-def">>, <<"3-klm">>], lists:sort(Missing1)),
+    ?assertEqual([<<"1-pqr">>], Missing2),
+
+    ?assert(maps:is_key(<<"possible_ancestors">>, Doc1)),
+    ?assert(not maps:is_key(<<"possible_ancestors">>, Doc2)),
+
+    #{<<"possible_ancestors">> := PAs1} = Doc1,
+    ?assertEqual([<<"2-revb">>, <<"2-revc">>], lists:sort(PAs1)).
 
 t_empty_missing_revs({Top, Db}) ->
     {Code, Res} = req(post, Top ++ Db ++ "/_missing_revs", #{}),
