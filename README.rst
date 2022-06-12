@@ -5,8 +5,8 @@ Apache CouchDB README
 | |1| |
 +-----+
 
-.. |1| image:: https://ci-couchdb.apache.org/job/jenkins-cm1/job/FullPlatformMatrix/job/3.x/badge/icon?subject=3.x
-    :target: https://ci-couchdb.apache.org/blue/organizations/jenkins/jenkins-cm1%2FFullPlatformMatrix/activity?branch=3.x
+.. |1| image:: https://ci-couchdb.apache.org/job/jenkins-cm1/job/FullPlatformMatrix/job/main/badge/icon?subject=main
+    :target: https://ci-couchdb.apache.org/blue/organizations/jenkins/jenkins-cm1%2FFullPlatformMatrix/activity?branch=main
 
 Installation
 ------------
