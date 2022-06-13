@@ -301,7 +301,7 @@ repl(#acc{db = Db0} = Acc0) ->
     Acc1 = calculate_start_seq_multi(Acc0),
     try
         Acc3 =
-            case config:get_boolean("mem3", "replicate_purges", false) of
+            case config:get_boolean("mem3", "replicate_purges", true) of
                 true ->
                     Acc2 = pull_purges_multi(Acc1),
                     push_purges_multi(Acc2);
