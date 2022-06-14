@@ -132,7 +132,7 @@ create_reqs([], UUIDs, Reqs) ->
 create_reqs([{Id, Revs} | RestIdsRevs], UUIDs, Reqs) ->
     UUID = couch_uuids:new(),
     NewUUIDs = [UUID | UUIDs],
-    NewReqs = [{UUID, Id, Revs} | Reqs],
+    NewReqs = [{UUID, Id, lists:usort(Revs)} | Reqs],
     create_reqs(RestIdsRevs, NewUUIDs, NewReqs).
 
 group_reqs_by_shard(DbName, Reqs) ->

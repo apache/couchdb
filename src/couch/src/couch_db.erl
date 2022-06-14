@@ -397,34 +397,43 @@ when
     PurgeOption :: interactive_edit | replicated_changes,
     Reply :: {ok, []} | {ok, [Rev]}.
 purge_docs(#db{main_pid = Pid} = Db, UUIDsIdsRevs, Options) ->
-    UUIDsIdsRevs2 = [
-        {UUID, couch_util:to_binary(Id), Revs}
+    UUIDsIdsRevs1 = [
+        {UUID, couch_util:to_binary(Id), lists:usort(Revs)}
      || {UUID, Id, Revs} <- UUIDsIdsRevs
     ],
-    % Check here if any UUIDs already exist when
-    % we're not replicating purge infos
-    IsRepl = lists:member(replicated_changes, Options),
-    if
-        IsRepl ->
-            ok;
-        true ->
-            UUIDs = [UUID || {UUID, _, _} <- UUIDsIdsRevs2],
-            lists:foreach(
-                fun(Resp) ->
-                    if
-                        Resp == not_found ->
-                            ok;
-                        true ->
-                            Fmt = "Duplicate purge info UIUD: ~s",
-                            Reason = io_lib:format(Fmt, [element(2, Resp)]),
-                            throw({badreq, Reason})
-                    end
-                end,
-                get_purge_infos(Db, UUIDs)
-            )
+    % Gather any existing purges with the same UUIDs
+    UUIDs = element(1, lists:unzip3(UUIDsIdsRevs1)),
+    Old1 = get_purge_infos(Db, UUIDs),
+    Old2 = maps:from_list([{UUID, {Id, Revs}} || {_, UUID, Id, Revs} <- Old1]),
+    % Filter out all the purges which have already been processed
+    FilterCheckFun = fun({UUID, Id, Revs}) ->
+        case maps:is_key(UUID, Old2) of
+            true ->
+                #{UUID := {OldId, OldRevs}} = Old2,
+                case Id =:= OldId andalso lists:usort(Revs) =:= lists:usort(OldRevs) of
+                    true ->
+                        % Processed this request already, so filter it out
+                        false;
+                    false ->
+                        % Oops! Same UUID but somehow different Id or Revs
+                        Fmt = "Duplicate purge info UUID: ~s DocId: ~s",
+                        Reason = lists:flatten(io_lib:format(Fmt, [UUID, Id])),
+                        throw({badreq, Reason})
+                end;
+            false ->
+                % Have not seen this request yet, so we keep it
+                true
+        end
     end,
-    increment_stat(Db, [couchdb, database_purges]),
-    gen_server:call(Pid, {purge_docs, UUIDsIdsRevs2, Options}).
+    UUIDsIdsRevs2 = lists:filter(FilterCheckFun, UUIDsIdsRevs1),
+    % If all the purges are already applied, skip calling the updater
+    case UUIDsIdsRevs2 of
+        [] ->
+            {ok, []};
+        [_ | _] ->
+            increment_stat(Db, [couchdb, database_purges]),
+            gen_server:call(Pid, {purge_docs, UUIDsIdsRevs2, Options})
+    end.
 
 -spec get_purge_infos(#db{}, [UUId]) -> [PurgeInfo] when
     UUId :: binary(),
