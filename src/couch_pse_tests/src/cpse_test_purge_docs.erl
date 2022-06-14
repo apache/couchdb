@@ -427,15 +427,24 @@ cpse_purge_repeated_uuid(DbName) ->
         {purge_infos, []}
     ]),
 
+    UUID = cpse_util:uuid(),
+
     PurgeInfos = [
-        {cpse_util:uuid(), <<"foo1">>, [Rev]}
+        {UUID, <<"foo1">>, [Rev]}
     ],
 
     {ok, [{ok, PRevs1}]} = cpse_util:purge(DbName, PurgeInfos),
     ?assertEqual([Rev], PRevs1),
 
-    % Attempting to purge a repeated UUID is an error
-    ?assertThrow({badreq, _}, cpse_util:purge(DbName, PurgeInfos)),
+    % Attempting to purge a repeated UUID is a no-op, it could have
+    % been a race with the internal replicator
+    ?assertEqual({ok, []}, cpse_util:purge(DbName, PurgeInfos)),
+
+    % Purging a repeated UUID with a different Id or Revs is an error
+    DifferentId = [{UUID, <<"foo2">>, [Rev]}],
+    ?assertThrow({badreq, _}, cpse_util:purge(DbName, DifferentId)),
+    DifferentRevs = [{UUID, <<"foo1">>, [Rev, <<"another">>]}],
+    ?assertThrow({badreq, _}, cpse_util:purge(DbName, DifferentRevs)),
 
     % Although we can replicate it in
     {ok, []} = cpse_util:purge(DbName, PurgeInfos, [replicated_changes]),
