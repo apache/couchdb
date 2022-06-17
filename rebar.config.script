@@ -80,14 +80,8 @@ BadErlang = fun(Ver) ->
 end.
 
 case VerList of
-    [OldVer | _] when OldVer < 19 -> ErlangTooOld(VerString);
-
-    [19 | _] -> NotSupported(VerString);
-
-    [20 | _] = V20 when V20 < [20, 3, 8, 11] -> BadErlang(VerString);
-    [21 | _] = V21 when V21 < [21, 2, 3] -> BadErlang(VerString);
-    [22, 0, N | _] when N < 5 -> BadErlang(VerString);
-
+    % Leave example around if we have to exlude specific versions
+    % [22, 0, N | _] when N < 5 -> BadErlang(VerString);
     _ -> ok
 end.
 
@@ -192,7 +186,7 @@ MakeDep = fun
 end.
 
 AddConfig = [
-    {require_otp_vsn, "20|21|22|23|24|25"},
+    {require_otp_vsn, "23|24|25"},
     {deps_dir, "src"},
     {deps, lists:map(MakeDep, DepDescs ++ OptionalDeps)},
     {sub_dirs, SubDirs},
