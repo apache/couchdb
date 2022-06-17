@@ -49,7 +49,7 @@ pipeline {
     // Search for ERLANG_VERSION
     // see https://issues.jenkins.io/browse/JENKINS-61047 for why this cannot
     // be done parametrically
-    LOW_ERLANG_VER = '20'
+    LOW_ERLANG_VER = '23'
 
     // erlfmt doesn't run with the lowest erlang version so we run it in a
     // separate stage with a higher erlang version.
