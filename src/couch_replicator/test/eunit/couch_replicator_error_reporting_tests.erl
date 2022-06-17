@@ -165,7 +165,7 @@ mock_fail_req(Path, Return) ->
         send_req_direct,
         fun(W, Url, Headers, Meth, Body, Opts, TOut) ->
             Args = [W, Url, Headers, Meth, Body, Opts, TOut],
-            {ok, {_, _, _, _, UPath, _}} = http_uri:parse(Url),
+            #{path := UPath} = uri_string:parse(Url),
             case lists:suffix(Path, UPath) of
                 true -> Return;
                 false -> meck:passthrough(Args)
