@@ -140,7 +140,7 @@ pipeline {
         axes {
           axis {
             name 'ERLANG_VERSION'
-            values '20', '21', '22', '23', '24'
+            values '23', '24'
           }
           axis {
             name 'SM_VSN'
@@ -151,17 +151,7 @@ pipeline {
           exclude {
             axis {
               name 'ERLANG_VERSION'
-              values '20'
-            }
-            axis {
-              name 'SM_VSN'
-              notValues '60'
-            }
-          }
-          exclude {
-            axis {
-              name 'ERLANG_VERSION'
-              values '21', '22', '23', '24'
+              values '23', '24'
             }
             axis {
               name 'SM_VSN'
