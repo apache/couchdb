@@ -270,16 +270,23 @@ start_event_listener() ->
 enqueue_request(State, Object) ->
     try
         case find_channel(State, Object) of
-        false ->
-            ok;
-        {ok, Pid, Priority} ->
-            smoosh_channel:enqueue(Pid, Object, Priority)
+            false ->
+                ok;
+            {ok, Pid, Priority} ->
+                smoosh_channel:enqueue(Pid, Object, Priority)
         end
     catch
         Class:Exception:Stack ->
-        couch_log:warning("~s: ~p ~p for ~s : ~p",
-            [?MODULE, Class, Exception,
-                smoosh_utils:stringify(Object), Stack])
+            couch_log:warning(
+                "~s: ~p ~p for ~s : ~p",
+                [
+                    ?MODULE,
+                    Class,
+                    Exception,
+                    smoosh_utils:stringify(Object),
+                    Stack
+                ]
+            )
     end.
 
 find_channel(#state{} = State, {Shard, GroupId}) ->
