@@ -782,31 +782,8 @@ check_config_blacklist(Section) ->
             ok
     end.
 
--ifdef(OTP_RELEASE).
-
--if(?OTP_RELEASE >= 22).
-
-% OTP >= 22
 hmac(Alg, Key, Message) ->
     crypto:mac(hmac, Alg, Key, Message).
-
--else.
-
-% OTP >= 21, < 22
-hmac(Alg, Key, Message) ->
-    crypto:hmac(Alg, Key, Message).
-
-% -if(?OTP_RELEASE >= 22)
--endif.
-
--else.
-
-% OTP < 21
-hmac(Alg, Key, Message) ->
-    crypto:hmac(Alg, Key, Message).
-
-% -ifdef(OTP_RELEASE)
--endif.
 
 version_to_binary(Ver) when is_tuple(Ver) ->
     version_to_binary(tuple_to_list(Ver));

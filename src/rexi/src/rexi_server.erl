@@ -138,24 +138,37 @@ init_p(From, MFA) ->
     {atom(), atom(), list()},
     string() | undefined
 ) -> any().
-init_p(From, {M,F,A}, Nonce) ->
+init_p(From, {M, F, A}, Nonce) ->
     put(rexi_from, From),
-    put('$initial_call', {M,F,length(A)}),
+    put('$initial_call', {M, F, length(A)}),
     put(nonce, Nonce),
-    try apply(M, F, A) catch exit:normal -> ok; ?STACKTRACE(Class, Reason, Stack0)
-        Stack = clean_stack(Stack0),
-        {ClientPid, _ClientRef} = From,
-        couch_log:error(
-            "rexi_server: from: ~s(~p) mfa: ~s:~s/~p ~p:~p ~100p", [
-            node(ClientPid), ClientPid, M, F, length(A),
-            Class, Reason, Stack]),
-        exit(#error{
-            timestamp = os:timestamp(),
-            reason = {Class, Reason},
-            mfa = {M,F,A},
-            nonce = Nonce,
-            stack = Stack
-        })
+    try
+        apply(M, F, A)
+    catch
+        exit:normal ->
+            ok;
+        Class:Reason:Stack0 ->
+            Stack = clean_stack(Stack0),
+            {ClientPid, _ClientRef} = From,
+            couch_log:error(
+                "rexi_server: from: ~s(~p) mfa: ~s:~s/~p ~p:~p ~100p", [
+                    node(ClientPid),
+                    ClientPid,
+                    M,
+                    F,
+                    length(A),
+                    Class,
+                    Reason,
+                    Stack
+                ]
+            ),
+            exit(#error{
+                timestamp = os:timestamp(),
+                reason = {Class, Reason},
+                mfa = {M, F, A},
+                nonce = Nonce,
+                stack = Stack
+            })
     end.
 
 %% internal

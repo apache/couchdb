@@ -413,9 +413,6 @@ isolate(Fun, Timeout) ->
         erlang:error(timeout)
     end.
 
-% OTP_RELEASE is defined in OTP 21+ only
--ifdef(OTP_RELEASE).
-
 do_isolate(Fun) ->
     try
         {'$isolres', Fun()}
@@ -423,17 +420,6 @@ do_isolate(Fun) ->
         Tag:Reason:Stack ->
             {'$isolerr', Tag, Reason, Stack}
     end.
-
--else.
-
-do_isolate(Fun) ->
-    try
-        {'$isolres', Fun()}
-    catch ?STACKTRACE(Tag, Reason, Stack)
-        {'$isolerr', Tag, Reason, Stack}
-    end.
-
--endif.
 
 get_db_timeout_test() ->
     % Q=1, N=1

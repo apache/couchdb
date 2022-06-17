@@ -131,13 +131,13 @@ do_defer(Mod, Fun, Args) ->
         Resp ->
             erlang:exit({mango_defer_ok, Resp})
     catch
-        ?STACKTRACE(throw, Error, Stack)
+        throw:Error:Stack ->
             couch_log:error("Defered error: ~w~n    ~p", [{throw, Error}, Stack]),
             erlang:exit({mango_defer_throw, Error});
-        ?STACKTRACE(error, Error, Stack)
+        error:Error:Stack ->
             couch_log:error("Defered error: ~w~n    ~p", [{error, Error}, Stack]),
             erlang:exit({mango_defer_error, Error});
-        ?STACKTRACE(exit, Error, Stack)
+        exit:Error:Stack ->
             couch_log:error("Defered error: ~w~n    ~p", [{exit, Error}, Stack]),
             erlang:exit({mango_defer_exit, Error})
     end.

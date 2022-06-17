@@ -35,12 +35,12 @@ handle_req(#httpd{} = Req, Db0) ->
         Db = set_user_ctx(Req, Db0),
         handle_req_int(Req, Db)
     catch
-        ?STACKTRACE(throw, {mango_error, Module, Reason}, Stack)
+        throw:{mango_error, Module, Reason}:Stack ->
             case mango_error:info(Module, Reason) of
-            {500, ErrorStr, ReasonStr} ->
-                chttpd:send_error(Req, {ErrorStr, ReasonStr, Stack});
-            {Code, ErrorStr, ReasonStr} ->
-                chttpd:send_error(Req, Code, ErrorStr, ReasonStr)
+                {500, ErrorStr, ReasonStr} ->
+                    chttpd:send_error(Req, {ErrorStr, ReasonStr, Stack});
+                {Code, ErrorStr, ReasonStr} ->
+                    chttpd:send_error(Req, Code, ErrorStr, ReasonStr)
             end
     end.
 

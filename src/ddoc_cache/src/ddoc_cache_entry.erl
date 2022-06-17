@@ -275,8 +275,9 @@ do_open(Key) ->
     try recover(Key) of
         Resp ->
             erlang:exit({open_ok, Key, Resp})
-    catch ?STACKTRACE(T, R, S)
-        erlang:exit({open_error, Key, {T, R, S}})
+    catch
+        T:R:S ->
+            erlang:exit({open_error, Key, {T, R, S}})
     end.
 
 update_lru(#st{key = Key, ts = Ts} = St) ->

@@ -255,88 +255,80 @@ handle_cast(
 
 handle_info(shutdown, St) ->
     {stop, shutdown, St};
-
 handle_info({'EXIT', Pid, max_backoff}, State) ->
     couch_log:error("Max backoff reached child process ~p", [Pid]),
     {stop, {shutdown, max_backoff}, State};
-
 handle_info({'EXIT', Pid, {shutdown, max_backoff}}, State) ->
     couch_log:error("Max backoff reached child process ~p", [Pid]),
     {stop, {shutdown, max_backoff}, State};
-
-handle_info({'EXIT', Pid, normal}, #rep_state{changes_reader=Pid} = State) ->
+handle_info({'EXIT', Pid, normal}, #rep_state{changes_reader = Pid} = State) ->
     {noreply, State};
-
-handle_info({'EXIT', Pid, Reason0}, #rep_state{changes_reader=Pid} = State) ->
+handle_info({'EXIT', Pid, Reason0}, #rep_state{changes_reader = Pid} = State) ->
     couch_stats:increment_counter([couch_replicator, changes_reader_deaths]),
-    Reason = case Reason0 of
-        {changes_req_failed, _, _} = HttpFail ->
-            HttpFail;
-        {http_request_failed, _, _, {error, {code, Code}}} ->
-            {changes_req_failed, Code};
-        {http_request_failed, _, _, {error, Err}} ->
-            {changes_req_failed, Err};
-        Other ->
-            {changes_reader_died, Other}
-    end,
+    Reason =
+        case Reason0 of
+            {changes_req_failed, _, _} = HttpFail ->
+                HttpFail;
+            {http_request_failed, _, _, {error, {code, Code}}} ->
+                {changes_req_failed, Code};
+            {http_request_failed, _, _, {error, Err}} ->
+                {changes_req_failed, Err};
+            Other ->
+                {changes_reader_died, Other}
+        end,
     couch_log:error("ChangesReader process died with reason: ~p", [Reason]),
     {stop, {shutdown, Reason}, cancel_timer(State)};
-
 handle_info({'EXIT', Pid, normal}, #rep_state{changes_manager = Pid} = State) ->
     {noreply, State};
-
 handle_info({'EXIT', Pid, Reason}, #rep_state{changes_manager = Pid} = State) ->
     couch_stats:increment_counter([couch_replicator, changes_manager_deaths]),
     couch_log:error("ChangesManager process died with reason: ~p", [Reason]),
     {stop, {shutdown, {changes_manager_died, Reason}}, cancel_timer(State)};
-
-handle_info({'EXIT', Pid, normal}, #rep_state{changes_queue=Pid} = State) ->
+handle_info({'EXIT', Pid, normal}, #rep_state{changes_queue = Pid} = State) ->
     {noreply, State};
-
-handle_info({'EXIT', Pid, Reason}, #rep_state{changes_queue=Pid} = State) ->
+handle_info({'EXIT', Pid, Reason}, #rep_state{changes_queue = Pid} = State) ->
     couch_stats:increment_counter([couch_replicator, changes_queue_deaths]),
     couch_log:error("ChangesQueue process died with reason: ~p", [Reason]),
     {stop, {shutdown, {changes_queue_died, Reason}}, cancel_timer(State)};
-
 handle_info({'EXIT', Pid, normal}, #rep_state{workers = Workers} = State) ->
     case Workers -- [Pid] of
-    Workers ->
-        couch_log:error("unknown pid bit the dust ~p ~n",[Pid]),
-        {noreply, State#rep_state{workers = Workers}};
+        Workers ->
+            couch_log:error("unknown pid bit the dust ~p ~n", [Pid]),
+            {noreply, State#rep_state{workers = Workers}};
         %% not clear why a stop was here before
         %%{stop, {unknown_process_died, Pid, normal}, State};
-    [] ->
-        catch unlink(State#rep_state.changes_manager),
-        catch exit(State#rep_state.changes_manager, kill),
-        do_last_checkpoint(State);
-    Workers2 ->
-        {noreply, State#rep_state{workers = Workers2}}
+        [] ->
+            catch unlink(State#rep_state.changes_manager),
+            catch exit(State#rep_state.changes_manager, kill),
+            do_last_checkpoint(State);
+        Workers2 ->
+            {noreply, State#rep_state{workers = Workers2}}
     end;
-
 handle_info({'EXIT', Pid, Reason}, #rep_state{workers = Workers} = State) ->
     State2 = cancel_timer(State),
     case lists:member(Pid, Workers) of
-    false ->
-        {stop, {unknown_process_died, Pid, Reason}, State2};
-    true ->
-        couch_stats:increment_counter([couch_replicator, worker_deaths]),
-        StopReason = case Reason of
-            {shutdown, _} = Err ->
-                Err;
-            Other ->
-                couch_log:error("Worker ~p died with reason: ~p", [Pid, Reason]),
-                {worker_died, Pid, Other}
-         end,
-        {stop, StopReason, State2}
+        false ->
+            {stop, {unknown_process_died, Pid, Reason}, State2};
+        true ->
+            couch_stats:increment_counter([couch_replicator, worker_deaths]),
+            StopReason =
+                case Reason of
+                    {shutdown, _} = Err ->
+                        Err;
+                    Other ->
+                        couch_log:error("Worker ~p died with reason: ~p", [Pid, Reason]),
+                        {worker_died, Pid, Other}
+                end,
+            {stop, StopReason, State2}
     end;
-
 handle_info(timeout, InitArgs) ->
-    try do_init(InitArgs) of {ok, State} ->
-        {noreply, State}
+    try do_init(InitArgs) of
+        {ok, State} ->
+            {noreply, State}
     catch
         exit:{http_request_failed, _, _, max_backoff} ->
             {stop, {shutdown, max_backoff}, {error, InitArgs}};
-        ?STACKTRACE(Class, Error, Stack)
+        Class:Error:Stack ->
             ShutdownReason = {error, replication_start_error(Error)},
             StackTop2 = lists:sublist(Stack, 2),
             % Shutdown state is a hack as it is not really the state of the
@@ -344,8 +336,7 @@ handle_info(timeout, InitArgs) ->
             % Shutdown state is used to pass extra info about why start failed.
             ShutdownState = {error, Class, StackTop2, InitArgs},
             {stop, {shutdown, ShutdownReason}, ShutdownState}
-        end;
-
+    end;
 handle_info({Ref, Tuple}, State) when is_reference(Ref), is_tuple(Tuple) ->
     % Ignore responses from timed-out or retried ibrowse calls. Aliases in
     % Erlang 24 should help with this problem, so we should revisit this clause
