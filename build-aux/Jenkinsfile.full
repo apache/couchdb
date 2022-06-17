@@ -18,7 +18,7 @@ ERLANG_VERSION = '23'
 
 // Erlang version used for rebar in release process. CouchDB will not build from
 // the release tarball on Erlang versions older than this
-MINIMUM_ERLANG_VERSION = '20'
+MINIMUM_ERLANG_VERSION = '23'
 
 // We create parallel build / test / package stages for each OS using the metadata
 // in this map. Adding a new OS should ideally only involve adding a new entry here.
