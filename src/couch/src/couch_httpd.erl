@@ -295,8 +295,13 @@ handle_request(
         DesignUrlHandlers
     ).
 
-handle_request_int(MochiReq, DefaultFun,
-            UrlHandlers, DbUrlHandlers, DesignUrlHandlers) ->
+handle_request_int(
+    MochiReq,
+    DefaultFun,
+    UrlHandlers,
+    DbUrlHandlers,
+    DesignUrlHandlers
+) ->
     Begin = os:timestamp(),
     % for the path, use the raw path with the query string and fragment
     % removed, but URL quoting left intact
@@ -304,22 +309,25 @@ handle_request_int(MochiReq, DefaultFun,
     {"/" ++ Path, _, _} = mochiweb_util:urlsplit_path(RawUri),
 
     % get requested path
-    RequestedPath = case MochiReq:get_header_value("x-couchdb-vhost-path") of
-        undefined ->
-            case MochiReq:get_header_value("x-couchdb-requested-path") of
-                undefined -> RawUri;
-                R -> R
-            end;
-        P -> P
-    end,
+    RequestedPath =
+        case MochiReq:get_header_value("x-couchdb-vhost-path") of
+            undefined ->
+                case MochiReq:get_header_value("x-couchdb-requested-path") of
+                    undefined -> RawUri;
+                    R -> R
+                end;
+            P ->
+                P
+        end,
 
     HandlerKey =
-    case mochiweb_util:partition(Path, "/") of
-    {"", "", ""} ->
-        <<"/">>; % Special case the root url handler
-    {FirstPart, _, _} ->
-        list_to_binary(FirstPart)
-    end,
+        case mochiweb_util:partition(Path, "/") of
+            {"", "", ""} ->
+                % Special case the root url handler
+                <<"/">>;
+            {FirstPart, _, _} ->
+                list_to_binary(FirstPart)
+        end,
     couch_log:debug("~p ~s ~p from ~p~nHeaders: ~p", [
         MochiReq:get(method),
         RawUri,
@@ -329,41 +337,54 @@ handle_request_int(MochiReq, DefaultFun,
     ]),
 
     Method1 =
-    case MochiReq:get(method) of
-        % already an atom
-        Meth when is_atom(Meth) -> Meth;
-
-        % Non standard HTTP verbs aren't atoms (COPY, MOVE etc) so convert when
-        % possible (if any module references the atom, then it's existing).
-        Meth -> couch_util:to_existing_atom(Meth)
-    end,
+        case MochiReq:get(method) of
+            % already an atom
+            Meth when is_atom(Meth) -> Meth;
+            % Non standard HTTP verbs aren't atoms (COPY, MOVE etc) so convert when
+            % possible (if any module references the atom, then it's existing).
+            Meth -> couch_util:to_existing_atom(Meth)
+        end,
     increment_method_stats(Method1),
 
     % allow broken HTTP clients to fake a full method vocabulary with an X-HTTP-METHOD-OVERRIDE header
     MethodOverride = MochiReq:get_primary_header_value("X-HTTP-Method-Override"),
-    Method2 = case lists:member(MethodOverride, ["GET", "HEAD", "POST",
-                                                 "PUT", "DELETE",
-                                                 "TRACE", "CONNECT",
-                                                 "COPY"]) of
-    true ->
-        couch_log:info("MethodOverride: ~s (real method was ~s)",
-                       [MethodOverride, Method1]),
-        case Method1 of
-        'POST' -> couch_util:to_existing_atom(MethodOverride);
-        _ ->
-            % Ignore X-HTTP-Method-Override when the original verb isn't POST.
-            % I'd like to send a 406 error to the client, but that'd require a nasty refactor.
-            % throw({not_acceptable, <<"X-HTTP-Method-Override may only be used with POST requests.">>})
-            Method1
-        end;
-    _ -> Method1
-    end,
+    Method2 =
+        case
+            lists:member(MethodOverride, [
+                "GET",
+                "HEAD",
+                "POST",
+                "PUT",
+                "DELETE",
+                "TRACE",
+                "CONNECT",
+                "COPY"
+            ])
+        of
+            true ->
+                couch_log:info(
+                    "MethodOverride: ~s (real method was ~s)",
+                    [MethodOverride, Method1]
+                ),
+                case Method1 of
+                    'POST' ->
+                        couch_util:to_existing_atom(MethodOverride);
+                    _ ->
+                        % Ignore X-HTTP-Method-Override when the original verb isn't POST.
+                        % I'd like to send a 406 error to the client, but that'd require a nasty refactor.
+                        % throw({not_acceptable, <<"X-HTTP-Method-Override may only be used with POST requests.">>})
+                        Method1
+                end;
+            _ ->
+                Method1
+        end,
 
     % alias HEAD to GET as mochiweb takes care of stripping the body
-    Method = case Method2 of
-        'HEAD' -> 'GET';
-        Other -> Other
-    end,
+    Method =
+        case Method2 of
+            'HEAD' -> 'GET';
+            Other -> Other
+        end,
 
     HttpReq = #httpd{
         mochi_req = MochiReq,
@@ -383,66 +404,72 @@ handle_request_int(MochiReq, DefaultFun,
     HandlerFun = couch_util:dict_find(HandlerKey, UrlHandlers, DefaultFun),
 
     {ok, Resp} =
-    try
-        validate_host(HttpReq),
-        check_request_uri_length(RawUri),
-        case chttpd_cors:maybe_handle_preflight_request(HttpReq) of
-        not_preflight ->
-            case authenticate_request(HttpReq) of
-            #httpd{} = Req ->
-                HandlerFun(Req);
-            Response ->
-                Response
-            end;
-        Response ->
-            Response
-        end
-    catch
-        throw:{http_head_abort, Resp0} ->
-            {ok, Resp0};
-        throw:{invalid_json, S} ->
-            couch_log:error("attempted upload of invalid JSON"
-                            " (set log_level to debug to log it)", []),
-            couch_log:debug("Invalid JSON: ~p",[S]),
-            send_error(HttpReq, {bad_request, invalid_json});
-        throw:unacceptable_encoding ->
-            couch_log:error("unsupported encoding method for the response", []),
-            send_error(HttpReq, {not_acceptable, "unsupported encoding"});
-        throw:bad_accept_encoding_value ->
-            couch_log:error("received invalid Accept-Encoding header", []),
-            send_error(HttpReq, bad_request);
-        exit:{shutdown, Error} ->
-            exit({shutdown, Error});
-        exit:normal ->
-            exit(normal);
-        exit:snappy_nif_not_loaded ->
-            ErrorReason = "To access the database or view index, Apache CouchDB"
-                          " must be built with Erlang OTP R13B04 or higher.",
-            couch_log:error("~s", [ErrorReason]),
-            send_error(HttpReq, {bad_otp_release, ErrorReason});
-        exit:{body_too_large, _} ->
-            send_error(HttpReq, request_entity_too_large);
-        exit:{uri_too_long, _} ->
-            send_error(HttpReq, request_uri_too_long);
-        ?STACKTRACE(throw, Error, Stack)
-            couch_log:debug("Minor error in HTTP request: ~p",[Error]),
-            couch_log:debug("Stacktrace: ~p",[Stack]),
-            send_error(HttpReq, Error);
-        ?STACKTRACE(error, badarg, Stack)
-            couch_log:error("Badarg error in HTTP request",[]),
-            couch_log:info("Stacktrace: ~p",[Stack]),
-            send_error(HttpReq, badarg);
-        ?STACKTRACE(error, function_clause, Stack)
-            couch_log:error("function_clause error in HTTP request",[]),
-            couch_log:info("Stacktrace: ~p",[Stack]),
-            send_error(HttpReq, function_clause);
-        ?STACKTRACE(ErrorType, Error, Stack)
-            couch_log:error("Uncaught error in HTTP request: ~p",
-                            [{ErrorType, Error}]),
-            couch_log:info("Stacktrace: ~p",[Stack]),
-            send_error(HttpReq, Error)
-    end,
-    RequestTime = round(timer:now_diff(os:timestamp(), Begin)/1000),
+        try
+            validate_host(HttpReq),
+            check_request_uri_length(RawUri),
+            case chttpd_cors:maybe_handle_preflight_request(HttpReq) of
+                not_preflight ->
+                    case authenticate_request(HttpReq) of
+                        #httpd{} = Req ->
+                            HandlerFun(Req);
+                        Response ->
+                            Response
+                    end;
+                Response ->
+                    Response
+            end
+        catch
+            throw:{http_head_abort, Resp0} ->
+                {ok, Resp0};
+            throw:{invalid_json, S} ->
+                couch_log:error(
+                    "attempted upload of invalid JSON"
+                    " (set log_level to debug to log it)",
+                    []
+                ),
+                couch_log:debug("Invalid JSON: ~p", [S]),
+                send_error(HttpReq, {bad_request, invalid_json});
+            throw:unacceptable_encoding ->
+                couch_log:error("unsupported encoding method for the response", []),
+                send_error(HttpReq, {not_acceptable, "unsupported encoding"});
+            throw:bad_accept_encoding_value ->
+                couch_log:error("received invalid Accept-Encoding header", []),
+                send_error(HttpReq, bad_request);
+            exit:{shutdown, Error} ->
+                exit({shutdown, Error});
+            exit:normal ->
+                exit(normal);
+            exit:snappy_nif_not_loaded ->
+                ErrorReason =
+                    "To access the database or view index, Apache CouchDB"
+                    " must be built with Erlang OTP R13B04 or higher.",
+                couch_log:error("~s", [ErrorReason]),
+                send_error(HttpReq, {bad_otp_release, ErrorReason});
+            exit:{body_too_large, _} ->
+                send_error(HttpReq, request_entity_too_large);
+            exit:{uri_too_long, _} ->
+                send_error(HttpReq, request_uri_too_long);
+            throw:Error:Stack ->
+                couch_log:debug("Minor error in HTTP request: ~p", [Error]),
+                couch_log:debug("Stacktrace: ~p", [Stack]),
+                send_error(HttpReq, Error);
+            error:badarg:Stack ->
+                couch_log:error("Badarg error in HTTP request", []),
+                couch_log:info("Stacktrace: ~p", [Stack]),
+                send_error(HttpReq, badarg);
+            error:function_clause:Stack ->
+                couch_log:error("function_clause error in HTTP request", []),
+                couch_log:info("Stacktrace: ~p", [Stack]),
+                send_error(HttpReq, function_clause);
+            ErrorType:Error:Stack ->
+                couch_log:error(
+                    "Uncaught error in HTTP request: ~p",
+                    [{ErrorType, Error}]
+                ),
+                couch_log:info("Stacktrace: ~p", [Stack]),
+                send_error(HttpReq, Error)
+        end,
+    RequestTime = round(timer:now_diff(os:timestamp(), Begin) / 1000),
     couch_stats:update_histogram([couchdb, request_time], RequestTime),
     couch_stats:increment_counter([couchdb, httpd, requests]),
     {ok, Resp}.

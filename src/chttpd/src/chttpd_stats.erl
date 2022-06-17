@@ -48,9 +48,10 @@ report(HttpReq, HttpResp) ->
             _ ->
                 ok
         end
-    catch ?STACKTRACE(T, R, S)
-        Fmt = "Failed to report chttpd request stats: ~p:~p ~p",
-        couch_log:error(Fmt, [T, R, S])
+    catch
+        T:R:S ->
+            Fmt = "Failed to report chttpd request stats: ~p:~p ~p",
+            couch_log:error(Fmt, [T, R, S])
     end.
 
 report(HttpReq, HttpResp, St) ->

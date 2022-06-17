@@ -276,7 +276,7 @@ enqueue_request(State, Object) ->
             smoosh_channel:enqueue(Pid, Object, Priority)
         end
     catch
-        ?STACKTRACE(Class, Exception, Stack)
+        Class:Exception:Stack ->
         couch_log:warning("~s: ~p ~p for ~s : ~p",
             [?MODULE, Class, Exception,
                 smoosh_utils:stringify(Object), Stack])

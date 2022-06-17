@@ -563,7 +563,7 @@ ddoc_prompt(DDoc, FunPath, Args) ->
         proc_prompt(Proc, [<<"ddoc">>, DDocId, FunPath, Args])
     end).
 
-with_ddoc_proc(#doc{id=DDocId,revs={Start, [DiskRev|_]}}=DDoc, Fun) ->
+with_ddoc_proc(#doc{id = DDocId, revs = {Start, [DiskRev | _]}} = DDoc, Fun) ->
     Rev = couch_doc:rev_to_str({Start, DiskRev}),
     DDocKey = {DDocId, Rev},
     Proc = get_ddoc_process(DDoc, DDocKey),
@@ -571,9 +571,10 @@ with_ddoc_proc(#doc{id=DDocId,revs={Start, [DiskRev|_]}}=DDoc, Fun) ->
         Resp ->
             ok = ret_os_process(Proc),
             Resp
-    catch ?STACKTRACE(Tag, Err, Stack)
-        catch proc_stop(Proc),
-        erlang:raise(Tag, Err, Stack)
+    catch
+        Tag:Err:Stack ->
+            catch proc_stop(Proc),
+            erlang:raise(Tag, Err, Stack)
     end.
 
 proc_prompt(Proc, Args) ->

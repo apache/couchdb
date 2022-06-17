@@ -371,31 +371,8 @@ now_seconds() ->
 prop(Prop, Props) ->
     proplists:get_value(Prop, Props).
 
--ifdef(OTP_RELEASE).
-
--if(?OTP_RELEASE >= 22).
-
-% OTP >= 22
 hmac(Alg, Key, Message) ->
     crypto:mac(hmac, Alg, Key, Message).
-
--else.
-
-% OTP >= 21, < 22
-hmac(Alg, Key, Message) ->
-    crypto:hmac(Alg, Key, Message).
-
-% -if(?OTP_RELEASE >= 22)
--endif.
-
--else.
-
-% OTP < 21
-hmac(Alg, Key, Message) ->
-    crypto:hmac(Alg, Key, Message).
-
-% -ifdef(OTP_RELEASE)
--endif.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").

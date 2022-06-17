@@ -349,21 +349,29 @@ get_uuid(DbName) ->
 %% internal
 %%
 
-with_db(DbName, Options, {M,F,A}) ->
+with_db(DbName, Options, {M, F, A}) ->
     set_io_priority(DbName, Options),
     case get_or_create_db(DbName, Options) of
-    {ok, Db} ->
-        rexi:reply(try
-            apply(M, F, [Db | A])
-        catch Exception ->
-            Exception;
-        ?STACKTRACE(error, Reason, Stack)
-            couch_log:error("rpc ~p:~p/~p ~p ~p", [M, F, length(A)+1, Reason,
-                clean_stack(Stack)]),
-            {error, Reason}
-        end);
-    Error ->
-        rexi:reply(Error)
+        {ok, Db} ->
+            rexi:reply(
+                try
+                    apply(M, F, [Db | A])
+                catch
+                    Exception ->
+                        Exception;
+                    error:Reason:Stack ->
+                        couch_log:error("rpc ~p:~p/~p ~p ~p", [
+                            M,
+                            F,
+                            length(A) + 1,
+                            Reason,
+                            clean_stack(Stack)
+                        ]),
+                        {error, Reason}
+                end
+            );
+        Error ->
+            rexi:reply(Error)
     end.
 
 read_repair_filter(DbName, Docs, NodeRevs, Options) ->
