@@ -333,12 +333,12 @@ if [ -z "${REBAR}" ]; then
     REBAR=${rootdir}/bin/rebar
 fi
 
-if [ -z "${REBAR3}" ] && [ "${ERLANG_VER}" != "20" ]; then
+if [ -z "${REBAR3}" ]; then
     install_local_rebar3
     REBAR3=${rootdir}/bin/rebar3
 fi
 
-if [ -z "${ERLFMT}" ] && [ "${ERLANG_VER}" != "20" ]; then
+if [ -z "${ERLFMT}" ]; then
     install_local_erlfmt
     ERLFMT=${rootdir}/bin/erlfmt
 fi
