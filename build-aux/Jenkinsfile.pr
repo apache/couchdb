@@ -114,7 +114,7 @@ pipeline {
         sh '''
           set
           rm -rf apache-couchdb-*
-          ./configure
+          ./configure --spidermonkey-version 78
           make dist
           chmod -R a+w * .
         '''
