@@ -295,8 +295,8 @@ validate_range(<<BBin:8/binary, "-", EBin:8/binary>>) ->
     {B, E} =
         try
             {
-                httpd_util:hexlist_to_integer(binary_to_list(BBin)),
-                httpd_util:hexlist_to_integer(binary_to_list(EBin))
+                list_to_integer(binary_to_list(BBin), 16),
+                list_to_integer(binary_to_list(EBin), 16)
             }
         catch
             _:_ ->
