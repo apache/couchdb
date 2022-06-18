@@ -13,7 +13,7 @@
 -module(test_util).
 
 -include_lib("couch/include/couch_eunit.hrl").
--include("couch_db.hrl").
+-include_lib("couch/include/couch_db.hrl").
 -include("couch_db_int.hrl").
 -include("couch_bt_engine.hrl").
 
