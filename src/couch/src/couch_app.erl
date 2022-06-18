@@ -14,8 +14,6 @@
 
 -behaviour(application).
 
--include_lib("couch/include/couch_db.hrl").
-
 -export([
     start/2,
     stop/1,
