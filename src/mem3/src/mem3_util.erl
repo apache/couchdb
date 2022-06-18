@@ -221,8 +221,8 @@ build_shards_by_node(DbName, DocProps) ->
             lists:map(
                 fun(Range) ->
                     [B, E] = string:tokens(?b2l(Range), "-"),
-                    Beg = httpd_util:hexlist_to_integer(B),
-                    End = httpd_util:hexlist_to_integer(E),
+                    Beg = list_to_integer(B, 16),
+                    End = list_to_integer(E, 16),
                     name_shard(
                         #shard{
                             dbname = DbName,
@@ -247,8 +247,8 @@ build_shards_by_range(DbName, DocProps) ->
             lists:map(
                 fun({Node, Order}) ->
                     [B, E] = string:tokens(?b2l(Range), "-"),
-                    Beg = httpd_util:hexlist_to_integer(B),
-                    End = httpd_util:hexlist_to_integer(E),
+                    Beg = list_to_integer(B, 16),
+                    End = list_to_integer(E, 16),
                     name_shard(
                         #ordered_shard{
                             dbname = DbName,
