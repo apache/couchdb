@@ -673,7 +673,6 @@ raft_discard(#st{} = St, UpTo) ->
         needs_commit = true
     }}.
 
-
 raft_last(#st{} = St) ->
     {ok, {_First, Last}} = couch_btree:full_reduce(St#st.raft_tree),
     Last.
@@ -851,7 +850,6 @@ raft_tree_split({Index, Term, Value}) ->
 
 raft_tree_join(Index, {Term, Value}) ->
     {Index, Term, Value}.
-
 
 raft_tree_reduce(reduce, []) ->
     {{0, 0}, {0, 0}};

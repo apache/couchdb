@@ -176,6 +176,16 @@ eunit: couch
             COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r eunit $(EUNIT_OPTS) apps=$$dir || exit 1; \
         done
 
+.PHONY: ct
+ct: export BUILDDIR = $(shell pwd)
+ct: export ERL_AFLAGS = -config $(shell pwd)/rel/files/eunit.config
+ct: export COUCHDB_QUERY_SERVER_JAVASCRIPT = $(shell pwd)/bin/couchjs $(shell pwd)/share/server/main.js
+ct: export COUCHDB_TEST_ADMIN_PARTY_OVERRIDE=1
+ct: couch
+	@COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) setup_eunit 2> /dev/null
+	@for dir in $(subdirs); do \
+            COUCHDB_VERSION=$(COUCHDB_VERSION) COUCHDB_GIT_SHA=$(COUCHDB_GIT_SHA) $(REBAR) -r ct $(EUNIT_OPTS) apps=$$dir || exit 1; \
+        done
 
 .PHONY: exunit
 # target: exunit - Run ExUnit tests

@@ -26,8 +26,8 @@
 % public api
 
 -export([
-    start/2,
-    start_link/2,
+    start/3,
+    start_link/3,
     stop/1,
     call/2
 ]).
@@ -42,28 +42,23 @@
 
 %% public api
 
-start(Name, Cohort) ->
-    gen_statem:start({local, Name}, ?MODULE, new(Name, Cohort), []).
+start(Name, StoreModule, StoreState) ->
+    gen_statem:start({local, Name}, ?MODULE, new(Name, StoreModule, StoreState), []).
 
-start_link(Name, Cohort) ->
-    gen_statem:start_link({local, Name}, ?MODULE, new(Name, Cohort), []).
+start_link(Name, StoreModule, StoreState) ->
+    gen_statem:start_link({local, Name}, ?MODULE, new(Name, StoreModule, StoreState), []).
 
-new(Name, Cohort) ->
+new(Name, StoreModule, StoreState) ->
+    #{cohort := Cohort} = StoreState,
     Peers = peers(Cohort),
-    #{
+    maps:merge(#{
         name => Name,
-        cohort => Cohort,
-        term => 0,
-        votedFor => undefined,
+        store_module => StoreModule,
         votesGranted => #{},
         nextIndex => maps:from_list([{Peer, 1} || Peer <- Peers]),
         matchIndex => maps:from_list([{Peer, 0} || Peer <- Peers]),
-        log => couch_raft_log:new(),
-        commitIndex => 0,
-        froms => #{},
-        lastApplied => 0,
-        machine => <<0>>
-    }.
+        froms => #{}
+    }, StoreState).
 
 stop(ServerRef) ->
     gen_statem:stop(ServerRef).
@@ -80,25 +75,26 @@ callback_mode() ->
 %% erlfmt-ignore
 handle_event(cast, #{term := FutureTerm} = Msg, _State, #{term := CurrentTerm} = Data) when FutureTerm > CurrentTerm ->
     couch_log:notice("~p received message from future term ~B, moving to that term, becoming follower and clearing votedFor", [node(), FutureTerm]),
-    {next_state, follower, Data#{term => FutureTerm, votedFor => undefined}, {next_event, cast, Msg}};
+    persist({next_state, follower, Data#{term => FutureTerm, votedFor => undefined}, {next_event, cast, Msg}});
 
 handle_event(enter, _OldState, follower, Data) ->
     #{term := Term, froms := Froms} = Data,
     couch_log:notice("~p became follower in term ~B", [node(), Term]),
     Replies = [{reply, From, {error, deposed}} || From <- maps:values(Froms)],
-    {keep_state, Data#{votedFor => undefined, froms => #{}}, [restart_election_timeout() | Replies]};
+    persist({keep_state, Data#{votedFor => undefined, froms => #{}}, [restart_election_timeout() | Replies]});
 
 handle_event(enter, _OldState, candidate, Data) ->
     #{term := Term} = Data,
     couch_log:notice("~p became candidate in term ~B", [node(), Term]),
-    {keep_state, start_election(Data), restart_election_timeout()};
+    persist({keep_state, start_election(Data), restart_election_timeout()});
 
 handle_event(enter, _OldState, leader, Data) ->
-    #{log := Log, cohort := Cohort, term := Term} = Data,
+    #{store_module := StoreModule, cohort := Cohort, term := Term} = Data,
     couch_log:notice("~p became leader in term ~B", [node(), Term]),
     Peers = peers(Cohort),
+    {LastIndex, _} = StoreModule:last(Data),
     {keep_state, Data#{
-        nextIndex => maps:from_list([{Peer, couch_raft_log:index(couch_raft_log:last(Log)) + 1} || Peer <- Peers]),
+        nextIndex => maps:from_list([{Peer, LastIndex + 1} || Peer <- Peers]),
         matchIndex => maps:from_list([{Peer, 0} || Peer <- Peers])
     }, restart_heartbeat_timeout()};
 
@@ -110,10 +106,11 @@ handle_event(cast, #{type := 'RequestVoteRequest', term := Term} = Msg, _State, 
         lastLogTerm := MLastLogTerm
     } = Msg,
     #{
-        log := Log,
+        store_module := StoreModule,
         votedFor := VotedFor
     } = Data,
-    LogOk = MLastLogTerm > couch_raft_log:term(couch_raft_log:last(Log)) orelse (MLastLogTerm == couch_raft_log:term(couch_raft_log:last(Log)) andalso MLastLogIndex >= couch_raft_log:index(couch_raft_log:last(Log))),
+    {LastIndex, LastTerm} = StoreModule:last(Data),
+    LogOk = MLastLogTerm > LastTerm orelse (MLastLogTerm == LastTerm andalso MLastLogIndex >= LastIndex),
     Grant = Term == CurrentTerm andalso LogOk andalso (VotedFor == undefined orelse VotedFor == MSource),
     couch_log:notice("~p received RequestVoteRequest from ~p in term ~B when in term ~B (Grant:~p, LogOk:~p, VotedFor:~p)", [node(), MSource, Term, CurrentTerm, Grant, LogOk, VotedFor]),
     Reply = #{
@@ -125,7 +122,7 @@ handle_event(cast, #{type := 'RequestVoteRequest', term := Term} = Msg, _State, 
     cast(MSource, Reply, Data),
     if
         Grant ->
-            {keep_state, Data#{votedFor => MSource}, restart_election_timeout()};
+            persist({keep_state, Data#{votedFor => MSource}, restart_election_timeout()});
         true ->
             {keep_state_and_data, restart_election_timeout()}
     end;
@@ -158,9 +155,11 @@ handle_event(cast, #{type := 'AppendEntriesRequest', term := Term} = Msg, State,
         commitIndex := MCommitIndex
     } = Msg,
     #{
-        log := Log
+        store_module := StoreModule
     } = Data,
-    LogOk = MPrevLogIndex == 0 orelse (MPrevLogIndex > 0 andalso MPrevLogIndex =< couch_raft_log:index(couch_raft_log:last(Log)) andalso MPrevLogTerm == couch_raft_log:term(couch_raft_log:nth(MPrevLogIndex,Log))),
+    {LastIndex, _LastTerm} = StoreModule:last(Data),
+    {NthTerm, _} = StoreModule:lookup(MPrevLogIndex, Data),
+    LogOk = MPrevLogIndex == 0 orelse (MPrevLogIndex > 0 andalso MPrevLogIndex =< LastIndex andalso MPrevLogTerm == NthTerm),
     if
         Term < CurrentTerm orelse (Term == CurrentTerm andalso State == follower andalso not LogOk) ->
             Reply = #{
@@ -194,11 +193,10 @@ handle_event(cast, #{type := 'AppendEntriesRequest', term := Term} = Msg, State,
                     {keep_state, update_state_machine(Data#{commitIndex => MCommitIndex}), restart_election_timeout()};
                 true ->
                     Index = MPrevLogIndex + 1,
-                    LastLogIndex = couch_raft_log:index(couch_raft_log:last(Log)),
                     if
-                        LastLogIndex >= Index ->
-                            NthLogTerm = couch_raft_log:term(couch_raft_log:nth(Index, Log)),
-                            FirstEntryTerm = couch_raft_log:term(hd(MEntries)),
+                        LastIndex >= Index ->
+                            {NthLogTerm, _} = StoreModule:lookup(Index, Data),
+                            {FirstEntryTerm, _} = hd(MEntries),
                             if
                                 NthLogTerm == FirstEntryTerm ->
                                     Reply = #{
@@ -213,11 +211,21 @@ handle_event(cast, #{type := 'AppendEntriesRequest', term := Term} = Msg, State,
                                     {keep_state, update_state_machine(Data#{commitIndex => MCommitIndex}), restart_election_timeout()};
                                 NthLogTerm /= FirstEntryTerm ->
                                     couch_log:notice("~p received conflicting entry:~p, deleting it", [node(), MEntries]),
-                                    {keep_state, Data#{log => lists:sublist(Log, LastLogIndex - 1)}, [{next_event, cast, Msg}, restart_election_timeout()]}
+                                    case StoreModule:truncate(LastIndex - 1, Data) of
+                                        {ok, NewData} ->
+                                            {keep_state, NewData, [{next_event, cast, Msg}, restart_election_timeout()]};
+                                        {error, Reason} ->
+                                            {stop, Reason}
+                                    end
                             end;
-                        LastLogIndex == MPrevLogIndex ->
+                        LastIndex == MPrevLogIndex ->
                             couch_log:notice("~p received new entries:~p, appending it to log", [node(), MEntries]),
-                            {keep_state, Data#{log => couch_raft_log:append(Log, MEntries)}, [{next_event, cast, Msg}, restart_election_timeout()]}
+                            case StoreModule:append(MEntries, Data) of
+                                {ok, _EntryIndex, NewData} ->
+                                    {keep_state, NewData, [{next_event, cast, Msg}, restart_election_timeout()]};
+                                {error, Reason} ->
+                                    {stop, Reason}
+                            end
                     end
             end
     end;
@@ -245,10 +253,14 @@ handle_event(cast, #{type := 'AppendEntriesResponse', term := Term} = Msg, _Stat
 
 handle_event({call, From}, #{type := 'ClientRequest'} = Msg, leader, Data) ->
     #{value := Value} = Msg,
-    #{term := Term, log := Log, froms := Froms} = Data,
-    EntryIndex = couch_raft_log:index(couch_raft_log:last(Log)) + 1,
-    Entry = {EntryIndex, Term, Value},
-    {keep_state, Data#{log => couch_raft_log:append(Log, [Entry]), froms => Froms#{EntryIndex => From}}};
+    #{term := Term, store_module := StoreModule, froms := Froms} = Data,
+    Entry = {Term, Value},
+    case StoreModule:append([Entry], Data) of
+        {ok, EntryIndex, NewData} ->
+            {keep_state, NewData#{froms => Froms#{EntryIndex => From}}};
+        {error, Reason} ->
+            {stop_and_reply, Reason, {reply, From, {error, Reason}}}
+    end;
 
 handle_event({call, From}, #{type := 'ClientRequest'}, _State, _Data) ->
     {keep_state_and_data, {reply, From, {error, not_leader}}};
@@ -256,7 +268,7 @@ handle_event({call, From}, #{type := 'ClientRequest'}, _State, _Data) ->
 handle_event(state_timeout, new_election, State, Data) when State == follower; State == candidate ->
     #{term := Term} = Data,
     couch_log:notice("~p election timeout in state ~p, term ~B", [node(), State, Term]),
-    {next_state, candidate, start_election(Data), restart_election_timeout()};
+    persist({next_state, candidate, start_election(Data), restart_election_timeout()});
 
 handle_event(state_timeout, heartbeat, leader, Data) ->
     #{term := Term} = Data,
@@ -267,18 +279,22 @@ handle_event(state_timeout, heartbeat, leader, Data) ->
 handle_event(EventType, EventContent, State, Data) ->
     {stop, {unknown_event, EventType, EventContent, State, Data}}.
 
-
 send_append_entries(#{cohort := Cohort} = Data) ->
     send_append_entries(peers(Cohort), Data).
 
 send_append_entries([], _Data) ->
     ok;
 send_append_entries([Peer | Rest], Data) ->
-    #{term := Term, nextIndex := NextIndex, log := Log, commitIndex := CommitIndex} = Data,
+    #{term := Term, nextIndex := NextIndex, store_module := StoreModule, commitIndex := CommitIndex} = Data,
     PrevLogIndex = maps:get(Peer, NextIndex) - 1,
-    PrevLogTerm = if PrevLogIndex > 0 -> couch_raft_log:term(couch_raft_log:nth(PrevLogIndex, Log)); true -> 0 end,
-    LastEntry = min(couch_raft_log:index(couch_raft_log:last(Log)), PrevLogIndex + 2),
-    Entries = couch_raft_log:sublist(Log, PrevLogIndex + 1, ?BATCH_SIZE),
+    PrevLogTerm =
+        if
+            PrevLogIndex > 0 -> {NthTerm, _} = StoreModule:lookup(PrevLogIndex, Data), NthTerm;
+            true -> 0
+        end,
+    {LastIndex, _} = StoreModule:last(Data),
+    LastEntry = min(LastIndex, PrevLogIndex + 2),
+    Entries = StoreModule:range(PrevLogIndex + 1, ?BATCH_SIZE, Data),
     Msg = #{
         type => 'AppendEntriesRequest',
         term => Term,
@@ -292,9 +308,9 @@ send_append_entries([Peer | Rest], Data) ->
     send_append_entries(Rest, Data).
 
 advance_commit_index(Data) ->
-    #{matchIndex := MatchIndex, log := Log, cohort := Cohort, term := Term} = Data,
-    LastTerm = couch_raft_log:term(couch_raft_log:last(Log)),
-    LastIndexes = lists:sort([couch_raft_log:index(couch_raft_log:last(Log)) | maps:values(MatchIndex)]),
+    #{matchIndex := MatchIndex, store_module := StoreModule, cohort := Cohort, term := Term} = Data,
+    {LastIndex, LastTerm} = StoreModule:last(Data),
+    LastIndexes = lists:sort([LastIndex | maps:values(MatchIndex)]),
     NewCommitIndex = lists:nth(length(Cohort) div 2 + 1, LastIndexes),
     if
         LastTerm == Term ->
@@ -305,33 +321,37 @@ advance_commit_index(Data) ->
 
 update_state_machine(#{lastApplied := Same, commitIndex := Same} = Data) ->
     Data;
-update_state_machine(#{lastApplied := LastApplied, commitIndex := CommitIndex} = Data) when LastApplied < CommitIndex ->
-    #{log := Log, froms := Froms0, machine := Machine0} = Data,
+update_state_machine(#{lastApplied := LastApplied, commitIndex := CommitIndex} = Data0) when
+    LastApplied < CommitIndex
+->
+    #{store_module := StoreModule, froms := Froms0} = Data0,
     From = LastApplied + 1,
-    To = min(couch_raft_log:index(couch_raft_log:last(Log)), CommitIndex),
-    Fun = fun(Index, {Froms, Machine}) ->
-        Value = couch_raft_log:value(couch_raft_log:nth(Index, Log)),
-        Result = crypto:hash(sha256, <<Machine/binary, Value/binary>>),
+    {LastIndex, _} = StoreModule:last(Data0),
+    To = min(LastIndex, CommitIndex),
+    Fun = fun(Index, {Froms, Data}) ->
+        {_, Value} = StoreModule:lookup(Index, Data),
+        {Result, NewData} = StoreModule:apply(Value, Data),
         case maps:is_key(Index, Froms) of
             true ->
                 gen_statem:reply(maps:get(Index, Froms), Result),
-                {maps:remove(Index, Froms), Result};
+                {maps:remove(Index, Froms), NewData};
             false ->
-                {Froms, Result}
+                {Froms, NewData}
         end
     end,
-    {Froms1, Machine1} = lists:foldl(Fun, {Froms0, Machine0}, lists:seq(From, To)),
-    Data#{froms => Froms1, machine => Machine1, lastApplied => To}.
+    {Froms1, Data1} = lists:foldl(Fun, {Froms0, Data0}, lists:seq(From, To)),
+    Data1#{froms => Froms1, lastApplied => To}.
 
 start_election(Data) ->
-    #{term := Term, cohort := Cohort, log := Log} = Data,
+    #{term := Term, cohort := Cohort, store_module := StoreModule} = Data,
     ElectionTerm = Term + 1,
     couch_log:notice("~p starting election in term ~B", [node(), ElectionTerm]),
+    {LastLogIndex, LastLogTerm} = StoreModule:last(Data),
     RequestVote = #{
         type => 'RequestVoteRequest',
         term => ElectionTerm,
-        lastLogIndex => couch_raft_log:index(couch_raft_log:last(Log)),
-        lastLogTerm => couch_raft_log:term(couch_raft_log:last(Log)),
+        lastLogIndex => LastLogIndex,
+        lastLogTerm => LastLogTerm,
         source => node()
     },
     lists:foreach(fun(Peer) -> cast(Peer, RequestVote, Data) end, peers(Cohort)),
@@ -348,3 +368,17 @@ restart_heartbeat_timeout() ->
 
 peers(Cohort) ->
     Cohort -- [node()].
+
+persist({next_state, _NextState, NewData, _Actions} = HandleEventResult) ->
+    persist(NewData, HandleEventResult);
+persist({keep_state, NewData, _Actions} = HandleEventResult) ->
+    persist(NewData, HandleEventResult).
+
+persist(Data, HandleEventResult) ->
+    #{store_module := StoreModule} = Data,
+    case StoreModule:save_state(Data) of
+        ok ->
+            HandleEventResult;
+        {error, Reason} ->
+            {stop, Reason}
+    end.
