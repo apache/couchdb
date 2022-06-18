@@ -323,8 +323,8 @@ range(#ordered_shard{range = Range}) ->
     Range;
 range(<<"shards/", Start:8/binary, "-", End:8/binary, "/", _/binary>>) ->
     [
-        list_to_integer(binary_to_list(Start), 16),
-        list_to_integer(binary_to_list(End), 16)
+        binary_to_integer(Start, 16),
+        binary_to_integer(End, 16)
     ].
 
 allowed_nodes() ->

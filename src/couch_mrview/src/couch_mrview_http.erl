@@ -264,7 +264,7 @@ get_view_callback(_, _, true) ->
     fun view_cb/2;
 % if we are operating on the users db and we aren't
 % admin, filter the view
-get_view_callback(_DbName, _DbName, false) ->
+get_view_callback(_, _, false) ->
     fun filtered_view_cb/2;
 % non _users databases get all fields
 get_view_callback(_, _, _) ->
