@@ -267,14 +267,10 @@ pipeline {
           registryCredentialsId 'dockerhub_creds'
         }
       }
-      environment {
-        // TODO find a way to avoid setting this explicitly
-        spidermonkey = '60'
-      }
       steps {
         timeout(time: 15, unit: "MINUTES") {
           sh (script: 'rm -rf apache-couchdb-*', label: 'Clean workspace of any previous release artifacts' )
-          sh "./configure --spidermonkey-version ${spidermonkey}"
+          sh "./configure --spidermonkey-version 78"
           sh 'make erlfmt-check'
           sh 'make elixir-check-formatted'
           sh 'make dist'
