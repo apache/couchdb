@@ -81,11 +81,12 @@ meta = [
   //   gnu_make: 'gmake'
   // ],
 
-  'macos': [
-    name: 'macOS',
-    spidermonkey_vsn: '60',
-    gnu_make: 'make'
-  ]
+  /// Temporarily bypass macos builder due to rebar version issue
+  // 'macos': [
+  //   name: 'macOS',
+  //   spidermonkey_vsn: '60',
+  //   gnu_make: 'make'
+  // ]
 ]
 
 // Credit to https://stackoverflow.com/a/69222555 for this technique.
