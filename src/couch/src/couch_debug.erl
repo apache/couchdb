@@ -112,8 +112,10 @@ help(opened_files) ->
     opened_files()
     --------------
 
-    Returns list of currently opened files
-    It iterates through `erlang:ports` and filters out all ports which are not efile.
+    Returns list of currently opened couch_file files. It iterates through all
+    the processes() and returns only those which have the Fd and Path set by
+    couch_file in the process dictionary.
+
     It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
     ---
     ", []);
@@ -122,8 +124,7 @@ help(opened_files_by_regexp) ->
     opened_files_by_regexp(FileRegExp)
     ----------------------------------
 
-    Returns list of currently opened files which name match the provided regular expression.
-    It iterates through `erlang:ports()` and filter out all ports which are not efile.
+    Returns list of currently opened couch_file files which name match the provided regular expression.
     It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
     ---
     ", []);
@@ -132,8 +133,7 @@ help(opened_files_contains) ->
     opened_files_contains(SubString)
     --------------------------------
 
-    Returns list of currently opened files whose names contain the provided SubString.
-    It iterates through `erlang:ports()` and filters out all ports which are not efile.
+    Returns list of currently opened couch_file files whose names contain the provided SubString.
     It uses `process_info(Pid, dictionary)` to get info about couch_file properties.
     ---
     ", []);
@@ -428,41 +428,35 @@ busy(ProcessList, Threshold, Property) when Threshold > 0 ->
     ).
 
 -spec opened_files() ->
-    [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
+    [{CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 
 opened_files() ->
-    Info = [
-        couch_file_port_info(Port)
-     || Port <- erlang:ports(),
-        {name, "efile"} =:= erlang:port_info(Port, name)
-    ],
-    [I || I <- Info, is_tuple(I)].
-
-couch_file_port_info(Port) ->
-    {connected, Pid} = erlang:port_info(Port, connected),
-    case couch_file:process_info(Pid) of
-        {Fd, FilePath} ->
-            {Port, Pid, Fd, FilePath};
-        undefined ->
-            undefined
-    end.
+    lists:filtermap(
+        fun(Pid) ->
+            case couch_file:process_info(Pid) of
+                {Fd, FilePath} -> {true, {Pid, Fd, FilePath}};
+                undefined -> false
+            end
+        end,
+        processes()
+    ).
 
 -spec opened_files_by_regexp(FileRegExp :: iodata()) ->
-    [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
+    [{CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 opened_files_by_regexp(FileRegExp) ->
     {ok, RegExp} = re:compile(FileRegExp),
     lists:filter(
-        fun({_Port, _Pid, _Fd, Path}) ->
+        fun({_Pid, _Fd, Path}) ->
             re:run(Path, RegExp) =/= nomatch
         end,
         couch_debug:opened_files()
     ).
 
 -spec opened_files_contains(FileNameFragment :: iodata()) ->
-    [{port(), CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
+    [{CouchFilePid :: pid(), Fd :: pid() | tuple(), FilePath :: string()}].
 opened_files_contains(FileNameFragment) ->
     lists:filter(
-        fun({_Port, _Pid, _Fd, Path}) ->
+        fun({_Pid, _Fd, Path}) ->
             string:str(Path, FileNameFragment) > 0
         end,
         couch_debug:opened_files()
