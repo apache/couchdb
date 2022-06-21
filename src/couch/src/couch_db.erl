@@ -748,6 +748,8 @@ check_security(roles, [_ | _] = UserRoles, [_ | _] = Roles) ->
     not ordsets:is_disjoint(UserRolesSet, RolesSet);
 check_security(roles, _, _) ->
     false;
+check_security(names, null, _) ->
+    false;
 check_security(names, UserName, [_ | _] = Names) ->
     lists:member(UserName, Names);
 check_security(names, _, _) ->
