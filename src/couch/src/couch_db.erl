@@ -742,18 +742,18 @@ is_authorized(#user_ctx{name = UserName, roles = UserRoles}, Security) ->
         false -> check_security(names, UserName, Names)
     end.
 
-check_security(roles, [], _) ->
-    false;
-check_security(roles, UserRoles, Roles) ->
+check_security(roles, [_ | _] = UserRoles, [_ | _] = Roles) ->
     UserRolesSet = ordsets:from_list(UserRoles),
     RolesSet = ordsets:from_list(Roles),
     not ordsets:is_disjoint(UserRolesSet, RolesSet);
-check_security(names, _, []) ->
+check_security(roles, _, _) ->
     false;
 check_security(names, null, _) ->
     false;
-check_security(names, UserName, Names) ->
-    lists:member(UserName, Names).
+check_security(names, UserName, [_ | _] = Names) ->
+    lists:member(UserName, Names);
+check_security(names, _, _) ->
+    false.
 
 throw_security_error(#user_ctx{name = null} = UserCtx) ->
     Reason = <<"You are not authorized to access this db.">>,
