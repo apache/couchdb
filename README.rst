@@ -28,23 +28,23 @@ Documentation
 
 We have documentation:
 
-    http://docs.couchdb.org/
+    https://docs.couchdb.org/
 
 It includes a changelog:
 
-    http://docs.couchdb.org/en/latest/whatsnew/
+    https://docs.couchdb.org/en/latest/whatsnew/
 
 For troubleshooting or cryptic error messages, see:
 
-    http://docs.couchdb.org/en/latest/install/troubleshooting.html
+    https://docs.couchdb.org/en/latest/install/troubleshooting.html
 
 For general help, see:
 
-     http://couchdb.apache.org/#mailing-list
+     https://couchdb.apache.org/#mailing-list
      
 We also have an IRC channel:
 
-    http://webchat.freenode.net/?channels=couchdb
+    https://webchat.freenode.net/?channels=couchdb
 
 The mailing lists provide a wealth of support and knowledge for you to tap into.
 Feel free to drop by with your questions or discussion. See the official CouchDB
@@ -91,7 +91,7 @@ currently reside may have restrictions on the import, possession, use, and/or
 re-export to another country, of encryption software. BEFORE using any
 encryption software, please check your country's laws, regulations and policies
 concerning the import, possession, or use, and re-export of encryption software,
-to see if this is permitted. See <http://www.wassenaar.org/> for more
+to see if this is permitted. See <https://www.wassenaar.org/> for more
 information.
 
 The U.S. Government Department of Commerce, Bureau of Industry and Security

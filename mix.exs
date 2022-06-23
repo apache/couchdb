@@ -28,7 +28,7 @@ defmodule Mix.Tasks.Suite do
   ```
   """
   use Mix.Task
-  @shortdoc "Outputs all availabe integration tests"
+  @shortdoc "Outputs all available integration tests"
   def run(_) do
     Path.wildcard(Path.join(Mix.Project.build_path(), "/**/ebin"))
     |> Enum.filter(&File.dir?/1)

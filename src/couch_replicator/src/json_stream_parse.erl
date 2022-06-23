@@ -25,7 +25,7 @@
 % tuple is the data itself, and the second element is a function to be called
 % next to get the next chunk of data in the stream.
 %
-% The EventFun is called everytime a json element is parsed. It must produce
+% The EventFun is called every time a json element is parsed. It must produce
 % a new function to be called for the next event.
 %
 % Events happen each time a new element in the json string is parsed.

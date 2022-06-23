@@ -86,7 +86,7 @@ defmodule ChangesTest do
   end
 
   @tag :with_db
-  test "non-existing desing doc for filtered changes", context do
+  test "non-existing design doc for filtered changes", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_changes?filter=nothingtosee/bop")
     assert resp.status_code == 404
@@ -101,7 +101,7 @@ defmodule ChangesTest do
   end
 
   @tag :with_db
-  test "non-existing desing doc and funcion for filtered changes", context do
+  test "non-existing design doc and function for filtered changes", context do
     db_name = context[:db_name]
     resp = Couch.get("/#{db_name}/_changes?filter=nothingtosee/movealong")
     assert resp.status_code == 404

@@ -150,7 +150,7 @@ null_authentication_handler(Req) ->
 %
 % This handler allows creation of a userCtx object from a user authenticated remotly.
 % The client just pass specific headers to CouchDB and the handler create the userCtx.
-% Headers  name can be defined in local.ini. By thefault they are :
+% Headers  name can be defined in local.ini. By default they are :
 %
 %   * X-Auth-CouchDB-UserName : contain the username, (x_auth_username in
 %   couch_httpd_auth section)
@@ -158,8 +158,8 @@ null_authentication_handler(Req) ->
 %   comma (x_auth_roles in couch_httpd_auth section)
 %   * X-Auth-CouchDB-Token : token to authenticate the authorization (x_auth_token
 %   in couch_httpd_auth section). This token is an hmac-sha1 created from secret key
-%   and username. The secret key should be the same in the client and couchdb node. s
-%   ecret key is the secret key in couch_httpd_auth section of ini. This token is optional
+%   and username. The secret key should be the same in the client and couchdb node.
+%   Secret key is the secret key in couch_httpd_auth section of ini. This token is optional
 %   if value of proxy_use_secret key in couch_httpd_auth section of ini isn't true.
 %
 proxy_authentication_handler(Req) ->

@@ -108,13 +108,13 @@ defmodule BulkDocsTest do
   end
 
   @tag :with_db
-  test "bulk docs raises error for invlaid `docs` parameter", ctx do
+  test "bulk docs raises error for invalid `docs` parameter", ctx do
     resp = Couch.post("/#{ctx[:db_name]}/_bulk_docs", body: %{docs: "foo"})
     assert_bad_request(resp, "`docs` parameter must be an array.")
   end
 
   @tag :with_db
-  test "bulk docs raises error for invlaid `new_edits` parameter", ctx do
+  test "bulk docs raises error for invalid `new_edits` parameter", ctx do
     opts = [body: %{docs: [], new_edits: 0}]
     resp = Couch.post("/#{ctx[:db_name]}/_bulk_docs", opts)
     assert_bad_request(resp, "`new_edits` parameter must be a boolean.")

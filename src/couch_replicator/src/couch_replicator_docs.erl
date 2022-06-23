@@ -373,7 +373,7 @@ save_rep_doc(DbName, Doc) ->
     try
         couch_db:update_doc(Db, Doc, [])
     catch
-        % User can accidently write a VDU which prevents _replicator from
+        % User can accidentally write a VDU which prevents _replicator from
         % updating replication documents. Avoid crashing replicator and thus
         % preventing all other replication jobs on the node from running.
         throw:{forbidden, Reason} ->

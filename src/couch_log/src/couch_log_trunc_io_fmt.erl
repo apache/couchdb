@@ -118,7 +118,7 @@ pad_char(Fmt, Args) -> {$\s, Fmt, Args}.
 
 %% collect_cc([FormatChar], [Argument]) ->
 %%         {Control,[ControlArg],[FormatChar],[Arg]}.
-%%  Here we collect the argments for each control character.
+%%  Here we collect the arguments for each control character.
 %%  Be explicit to cause failure early.
 
 collect_cc([$w | Fmt], [A | Args]) -> {$w, [A], Fmt, Args};

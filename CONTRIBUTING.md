@@ -11,18 +11,18 @@ changes, and helping you finalize your pull requests.
 Contributions to CouchDB are governed by our [Code of Conduct][6] and a set of
 [Project Bylaws][7]. Come join us!
 
-
 ## Using the issue tracker
 
 First things first: **Do NOT report security vulnerabilities in public issues!**
-Please disclose responsibly by letting [the Apache CouchDB Security team](mailto:security@couchdb.apache.org?subject=Security)
+Please disclose responsibly by letting [the Apache CouchDB Security team][11]
 know upfront. We will assess the issue as soon as possible on a best-effort
 basis and will give you an estimate for when we have a fix and release available
 for an eventual public disclosure.
 
-The GitHub issue tracker is the preferred channel for [bug reports](#bugs),
-[features requests](#features) and [submitting pull requests](#pull-requests),
-but please respect the following restrictions:
+The [GitHub issue tracker][#gh_issues] is the preferred channel for
+[bug reports](#bug-reports), [features requests](#feature-requests)
+and [submitting pull requests](#pull-requests), but please respect
+the following restrictions:
 
 * Please **do not** use the issue tracker for personal support requests. Use
   [CouchDB Chat][8] instead. Alternately, help us to help more people by
@@ -30,7 +30,6 @@ but please respect the following restrictions:
 
 * Please **do not** derail or troll issues. Keep the discussion on topic and
   respect the opinions of others.
-
 
 ## Bug reports
 
@@ -43,7 +42,7 @@ Guidelines for bug reports:
    reported.
 
 2. **Check if the issue has been fixed** &mdash; try to reproduce it using the
-   latest `master` or `next` branch in the repository.
+   latest `main` or `next` branch in the repository.
 
 3. **Isolate the problem** &mdash; ideally create a reduced test case.
 
@@ -72,14 +71,12 @@ Example:
 > causing the bug, and potential solutions (and your opinions on their
 > merits).
 
-
 ## Feature requests
 
 Feature requests are welcome. But take a moment to find out whether your idea
 fits with the scope and aims of the project. It's up to *you* to make a strong
 case to convince the project's developers of the merits of this feature. Please
 provide as much detail and context as possible.
-
 
 ## Pull requests
 
@@ -94,13 +91,46 @@ into the project. You can talk with the community on our
 [developer mailing list][5].  We're always open to suggestions and will get
 back to you as soon as we can!
 
+### CouchDB commit message conventions
+
+A well-crafted Git commit message is the best way to communicate context about a
+change to other developers working on that project, and indeed, to your future self.
+
+Commit messages can adequately communicate why a change was made, and understanding
+that makes development and collaboration more efficient.
+
+Here's a great template of a good commit message
+
+```
+Capitalized, short (50 chars or less) summary
+
+More detailed explanatory text, if necessary.  Wrap it to about 72
+characters or so.  In some contexts, the first line is treated as the
+subject of an email and the rest of the text as the body.  The blank
+line separating the summary from the body is critical (unless you omit
+the body entirely); tools like rebase can get confused if you run the
+two together.
+
+Write your commit message in the imperative: "Fix bug" and not "Fixed bug"
+or "Fixes bug."  This convention matches up with commit messages generated
+by commands like git merge and git revert.
+
+Further paragraphs come after blank lines.
+
+- Bullet points are okay, too
+
+- Typically a hyphen or asterisk is used for the bullet, followed by a
+  single space, with blank lines in between, but conventions vary here
+
+- Use a hanging indent
+```
 
 ### For new Contributors
 
-If you never created a pull request before, welcome :tada: :smile: [Here is a great tutorial](https://egghead.io/series/how-to-contribute-to-an-open-source-project-on-github)
-on how to send one :)
+If you never created a pull request before, welcome :tada: :smile:
+[Here is a great tutorial][12] on how to send one :)
 
-1. [Fork](http://help.github.com/fork-a-repo/) the project, clone your fork,
+1. [Fork][13] the project, clone your fork,
    and configure the remotes:
 
    ```bash
@@ -115,8 +145,8 @@ on how to send one :)
 2. If you cloned a while ago, get the latest changes from upstream:
 
    ```bash
-   git checkout master
-   git pull upstream master
+   git checkout main
+   git pull upstream main
    ```
 
 3. Create a new topic branch (off the main project development branch) to
@@ -132,7 +162,7 @@ on how to send one :)
    the project’s README for more information.
 
 5. If you added or changed a feature, make sure to document it accordingly in
-   the [CouchDB documentation](https://github.com/apache/couchdb-documentation)
+   the [CouchDB documentation][14]
    repository.
 
 6. Push your topic branch up to your fork:
@@ -141,14 +171,13 @@ on how to send one :)
    git push origin <topic-branch-name>
    ```
 
-8. [Open a Pull Request](https://help.github.com/articles/using-pull-requests/)
-    with a clear title and description.
-
+8. [Open a Pull Request][15]
+   with a clear title and description.
 
 ### For Apache CouchDB Committers
 
-1. Be sure to set up [GitHub two-factor authentication](https://help.github.com/articles/about-two-factor-authentication/),
-   then [link your Apache account to your GitHub account](https://gitbox.apache.org/setup/).
+1. Be sure to set up [GitHub two-factor authentication][16],
+   then [link your Apache account to your GitHub account][17].
    You will need to wait about 30 minutes after completing this process
    for it to complete. Follow the instructions in the organisational
    invite email you receive. Alternately, you can use the Apache mirror
@@ -170,8 +199,7 @@ on how to send one :)
    the project’s README for more information.
 
 4. If you added or changed a feature, make sure to document it accordingly in
-   the [CouchDB documentation](https://github.com/apache/couchdb-documentation)
-   repository.
+   the [CouchDB documentation][14] repository.
 
 5. Push your topic branch up to our repo
 
@@ -185,21 +213,20 @@ on how to send one :)
 Optionally, you can help us with these things. But don’t worry if they are too
 complicated, we can help you out and teach you as we go :)
 
-1. Update your branch to the latest changes in the upstream master branch. You
+1. Update your branch to the latest changes in the upstream main branch. You
    can do that locally with
 
    ```bash
-   git pull --rebase upstream master
+   git pull --rebase upstream main
    ```
 
    Afterwards force push your changes to your remote feature branch.
 
 2. Once a pull request is good to go, you can tidy up your commit messages using
-   Git's [interactive rebase](https://help.github.com/articles/interactive-rebase).
+   Git's [interactive rebase][18].
 
 **IMPORTANT**: By submitting a patch, you agree to license your work under the
 Apache License, per your signed Apache CLA.
-
 
 ## Triagers
 
@@ -209,16 +236,15 @@ user and developer pain in working through our backlog.
 
 Briefly, to triage an issue, review the report, validate that it is an actual
 issue (reproducing if possible), and add one or more labels. We have a
-[summary of our label taxonomy](https://github.com/apache/couchdb/issues/499)
-for your reference.
+[summary of our label taxonomy][19] for your reference.
 
 If you are not an official committer, please reach out to our [mailing list][5]
 or [chat][8] to learn how you can assist with triaging indirectly.
 
-
 ## Maintainers
 
-If you have commit access, please follow this process for merging patches and cutting new releases.
+If you have commit access, please follow this process for merging patches and cutting
+new releases.
 
 ### Reviewing changes
 
@@ -235,10 +261,10 @@ If you have commit access, please follow this process for merging patches and cu
    Leave a comment about it so the author and others will know.
 7. Once everything looks good, add an "Approve" review. Don’t forget to say
    something nice 👏🐶💖✨
-8. If the commit messages follow [our conventions](@commit-message-conventions)
+8. If the commit messages follow [our conventions](#couchdb-commit-message-conventions)
 
    1. If the pull request fixes one or more open issues, please include the
-      text "Fixes #472" or "Fixes apache/couchdb#472". 
+      text "Fixes #472" or "Fixes apache/couchdb#472".
    2. Use the "Rebase and merge" button to merge the pull request.
    3. Done! You are awesome! Thanks so much for your help 🤗
 
@@ -247,7 +273,7 @@ If you have commit access, please follow this process for merging patches and cu
    1. Use the "squash and merge" button to clean up the commits and merge at
       the same time: ✨🎩
    2. If the pull request fixes one or more open issues, please include the
-      text "Fixes #472" or "Fixes apache/couchdb#472". 
+      text "Fixes #472" or "Fixes apache/couchdb#472".
 
 Sometimes there might be a good reason to merge changes locally. The process
 looks like this:
@@ -255,17 +281,17 @@ looks like this:
 ### Reviewing and merging changes locally
 
 ```
-git checkout master # or the main branch configured on github
+git checkout main # or the main branch configured on github
 git pull # get latest changes
 git checkout feature-branch # replace name with your branch
-git rebase master
-git checkout master
+git rebase main
+git checkout main
 git merge feature-branch # replace name with your branch
 git push
 ```
 
 When merging PRs from forked repositories, we recommend you install the
-[hub](https://github.com/github/hub) command line tools.
+[hub][#gh_hub] command line tools.
 
 This allows you to do:
 
@@ -276,15 +302,31 @@ hub checkout link-to-pull-request
 meaning that you will automatically check out the branch for the pull request,
 without needing any other steps like setting git upstreams! :sparkles:
 
-
 ## Thanks
 
-Special thanks to [Hoodie](https://github.com/hoodiehq/hoodie) for the great
+Special thanks to [Hoodie][#gh_hoodie] for the great
 CONTRIBUTING.md template.
 
-[1]: http://mail-archives.apache.org/mod_mbox/couchdb-user/
-[5]: http://mail-archives.apache.org/mod_mbox/couchdb-dev/
-[6]: http://couchdb.apache.org/conduct.html
-[7]: http://couchdb.apache.org/bylaws.html
-[8]: http://couchdb.apache.org/#chat
+A big thanks to [Robert Painsi][9] and [Bolaji Ayodeji][10] for
+some commit message conventions.
 
+[1]: https://mail-archives.apache.org/mod_mbox/couchdb-user
+[5]: https://mail-archives.apache.org/mod_mbox/couchdb-dev
+[6]: https://couchdb.apache.org/conduct.html
+[7]: https://couchdb.apache.org/bylaws.html
+[8]: https://couchdb.apache.org/#chat
+[9]: https://gist.github.com/robertpainsi/b632364184e70900af4ab688decf6f53
+[10]: https://www.freecodecamp.org/news/writing-good-commit-messages-a-practical-guide
+[11]: mailto:security@couchdb.apache.org?subject=Security
+[12]: https://egghead.io/series/how-to-contribute-to-an-open-source-project-on-github
+[13]: https://help.github.com/fork-a-repo
+[14]: https://github.com/apache/couchdb-documentation
+[15]: https://help.github.com/articles/using-pull-requests
+[16]: https://help.github.com/articles/about-two-factor-authentication
+[17]: https://gitbox.apache.org/setup
+[18]: https://help.github.com/articles/interactive-rebase
+[19]: https://github.com/apache/couchdb/issues/499
+
+[#gh_issues]: https://github.com/apache/couchdb/issues
+[#gh_hoodie]: https://github.com/hoodiehq/hoodie
+[#gh_hub]: https://hub.github.com

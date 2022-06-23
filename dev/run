@@ -541,7 +541,7 @@ def degrade_cluster(ctx):
         ctx["procs"].append(haproxy_proc)
 
 
-@log("Stoping proc {proc.pid}")
+@log("Stopping proc {proc.pid}")
 def kill_process(proc):
     if proc and proc.returncode is None:
         proc.kill()
