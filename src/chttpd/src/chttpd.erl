@@ -1110,7 +1110,7 @@ error_info({error, security_migration_updates_disabled}) ->
         "security migration."
     >>};
 error_info(all_workers_died) ->
-    {503, <<"service unvailable">>, <<
+    {503, <<"service unavailable">>, <<
         "Nodes are unable to service this "
         "request due to overloading or maintenance mode."
     >>};

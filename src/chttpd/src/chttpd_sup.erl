@@ -106,7 +106,7 @@ append_if_set({_Key, 0}, Opts) ->
     Opts;
 append_if_set({Key, Value}, Opts) ->
     couch_log:error(
-        "The value for `~s` should be string convertable "
+        "The value for `~s` should be string convertible "
         "to integer which is >= 0 (got `~p`)",
         [Key, Value]
     ),

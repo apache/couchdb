@@ -113,7 +113,7 @@ to_prom_summary(Path, Info) ->
     {n, Count} = lists:keyfind(n, 1, Value),
     Quantiles = lists:map(
         fun({Perc, Val0}) ->
-            % Prometheus uses seconds, so we need to covert milliseconds to seconds
+            % Prometheus uses seconds, so we need to convert milliseconds to seconds
             Val = Val0 / 1000,
             case Perc of
                 50 -> {[{quantile, <<"0.5">>}], Val};

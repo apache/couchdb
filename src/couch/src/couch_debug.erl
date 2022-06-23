@@ -229,8 +229,8 @@ help(mapfold_tree) ->
     It calls a user provided callback for every node of the tree.
     `Fun(Key, Value, Pos, Acc) -> {NewValue, NewAcc}`.
     Where:
-      - Key of the node (usualy Pid of a process)
-      - Value of the node (usualy information collected by link_tree)
+      - Key of the node (usually Pid of a process)
+      - Value of the node (usually information collected by link_tree)
       - Pos - depth from the root of the tree
       - Acc - user's accumulator
 
@@ -245,8 +245,8 @@ help(map_tree) ->
     It calls a user provided callback
     `Fun(Key, Value, Pos) -> NewValue`
     Where:
-      - Key of the node (usualy Pid of a process)
-      - Value of the node (usualy information collected by link_tree)
+      - Key of the node (usually Pid of a process)
+      - Value of the node (usually information collected by link_tree)
       - Pos - depth from the root of the tree
 
     ---
@@ -258,8 +258,8 @@ help(fold_tree) ->
     about the tree. It calls a user provided callback
     `Fun(Key, Value, Pos) -> NewValue`
     Where:
-      - Key of the node (usualy Pid of a process)
-      - Value of the node (usualy information collected by link_tree)
+      - Key of the node (usually Pid of a process)
+      - Value of the node (usually information collected by link_tree)
       - Pos - depth from the root of the tree
 
     ---

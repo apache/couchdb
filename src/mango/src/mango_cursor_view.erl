@@ -181,7 +181,7 @@ composite_indexes(Indexes, FieldRanges) ->
         fun(Idx, Acc) ->
             Cols = mango_idx:columns(Idx),
             Prefix = composite_prefix(Cols, FieldRanges),
-            % Calcuate the difference between the FieldRanges/Selector
+            % Calculate the difference between the FieldRanges/Selector
             % and the Prefix. We want to select the index with a prefix
             % that is as close to the FieldRanges as possible
             PrefixDifference = length(FieldRanges) - length(Prefix),

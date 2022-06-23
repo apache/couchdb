@@ -114,7 +114,7 @@ should_return_503_error_for_open_revs_post_form(Url) ->
     ErrorMessage = couch_util:get_value(<<"error">>, Json1),
     [
         ?_assertEqual(503, Code),
-        ?_assertEqual(<<"service unvailable">>, ErrorMessage)
+        ?_assertEqual(<<"service unavailable">>, ErrorMessage)
     ].
 
 mock_open_revs(RevsResp) ->

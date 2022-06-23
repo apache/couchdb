@@ -35,7 +35,7 @@
 %
 %  * If last request has an auth failure, check if request used a stale cookie
 %    In this case nothing is done, and the client is told to retry. Next time
-%    it updates its headers befor the request it should pick up the latest
+%    it updates its headers before the request it should pick up the latest
 %    cookie.
 %
 %  * If last request failed and cookie was the latest known cookie, schedule a
@@ -453,7 +453,7 @@ update_cookie(#state{epoch = Epoch} = State, Cookie, NowSec, MaxAge) ->
 next_refresh(NowSec, undefined, RefreshInterval) ->
     NowSec + RefreshInterval;
 next_refresh(NowSec, MaxAge, _) when is_integer(MaxAge) ->
-    % Apply a fudge factor to account for delays in receving the cookie
+    % Apply a fudge factor to account for delays in receiving the cookie
     % and / or time adjustments happening over a longer period of time
     NowSec + trunc(MaxAge * 0.9).
 
