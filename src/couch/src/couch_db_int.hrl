@@ -40,7 +40,8 @@
     time_seq,
 
     options = [],
-    compression
+    compression,
+    access = false
 }).
 
 
