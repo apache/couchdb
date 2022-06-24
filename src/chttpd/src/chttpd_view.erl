@@ -69,6 +69,21 @@ fabric_query_view(Db, Req, DDoc, ViewName, Args) ->
     Max = chttpd:chunked_response_buffer_size(),
     VAcc = #vacc{db = Db, req = Req, threshold = Max},
     Options = [{user_ctx, Req#httpd.user_ctx}],
+%    {ok, Resp} = fabric:query_view(Db, Options, DDoc, ViewName,
+%            fun view_cb/2, VAcc, Args),
+%    {ok, Resp#vacc.resp}.
+%    % TODO: This might just be a debugging leftover, we might be able
+%    %       to undo this by just returning {ok, Resp#vacc.resp}
+%    %       However, this *might* be here because we need to handle
+%    %       errors here now, because access might tell us to.
+%    case fabric:query_view(Db, Options, DDoc, ViewName,
+%            fun view_cb/2, VAcc, Args) of
+%        {ok, Resp} ->
+%            {ok, Resp#vacc.resp};
+%        {error, Error} ->
+%            throw(Error)
+%    end.
+
     {ok, Resp} = fabric:query_view(
         Db,
         Options,
