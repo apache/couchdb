@@ -24,6 +24,11 @@
 % 10 GiB
 -define(DEFAULT_MAX_PARTITION_SIZE, 16#280000000).
 
+-define(DEFAULT_SECURITY_OBJECT, [
+    {<<"members">>,{[{<<"roles">>,[<<"_admin">>]}]}},
+    {<<"admins">>, {[{<<"roles">>,[<<"_admin">>]}]}}
+]).
+
 -record(merge_acc, {
     revs_limit,
     replicated_changes,
@@ -36,7 +41,7 @@
 init({Engine, DbName, FilePath, Options0}) ->
     erlang:put(io_priority, {db_update, DbName}),
     update_idle_limit_from_config(),
-    DefaultSecObj = default_security_object(DbName),
+    DefaultSecObj = default_security_object(DbName, Options0),
     Options = [{default_security_object, DefaultSecObj} | Options0],
     try
         {ok, EngineState} = couch_db_engine:init(Engine, FilePath, Options),
@@ -165,7 +170,7 @@ handle_cast(Msg, #db{name = Name} = Db) ->
     {stop, Msg, Db}.
 
 handle_info(
-    {update_docs, Client, GroupedDocs, LocalDocs, ReplicatedChanges},
+    {update_docs, Client, GroupedDocs, LocalDocs, MergeConflicts, UserCtx},
     Db
 ) ->
     GroupedDocs2 = sort_and_tag_grouped_docs(Client, GroupedDocs),
@@ -181,7 +186,7 @@ handle_info(
             Clients = [Client]
     end,
     LocalDocs2 = [{Client, NRDoc} || NRDoc <- LocalDocs],
-    try update_docs_int(Db, GroupedDocs3, LocalDocs2, ReplicatedChanges) of
+    try update_docs_int(Db, GroupedDocs3, LocalDocs2, MergeConflicts, UserCtx) of
         {ok, Db2, UpdatedDDocIds} ->
             ok = couch_server:db_updated(Db2),
             case {couch_db:get_update_seq(Db), couch_db:get_update_seq(Db2)} of
@@ -260,7 +265,11 @@ sort_and_tag_grouped_docs(Client, GroupedDocs) ->
     % The merge_updates function will fail and the database can end up with
     % duplicate documents if the incoming groups are not sorted, so as a sanity
     % check we sort them again here. See COUCHDB-2735.
-    Cmp = fun([#doc{id = A} | _], [#doc{id = B} | _]) -> A < B end,
+    Cmp = fun
+        ([], []) -> false; % TODO: re-evaluate this addition, might be
+                           %       superflous now
+        ([#doc{id=A}|_], [#doc{id=B}|_]) -> A < B
+     end,
     lists:map(
         fun(DocGroup) ->
             [{Client, maybe_tag_doc(D)} || D <- DocGroup]
@@ -324,6 +333,7 @@ init_db(DbName, FilePath, EngineState, Options) ->
     BDU = couch_util:get_value(before_doc_update, Options, nil),
     ADR = couch_util:get_value(after_doc_read, Options, nil),
 
+    Access = couch_util:get_value(access, Options, false),
     NonCreateOpts = [Opt || Opt <- Options, Opt /= create],
 
     InitDb = #db{
@@ -333,7 +343,8 @@ init_db(DbName, FilePath, EngineState, Options) ->
         instance_start_time = StartTime,
         options = NonCreateOpts,
         before_doc_update = BDU,
-        after_doc_read = ADR
+        after_doc_read = ADR,
+        access = Access
     },
 
     DbProps = couch_db_engine:get_props(InitDb),
@@ -394,7 +405,8 @@ flush_trees(
                             active = WrittenSize,
                             external = ExternalSize
                         },
-                        atts = AttSizeInfo
+                        atts = AttSizeInfo,
+                        access = NewDoc#doc.access
                     },
                     {Leaf, add_sizes(Type, Leaf, SizesAcc)};
                 #leaf{} ->
@@ -478,6 +490,9 @@ doc_tag(#doc{meta = Meta}) ->
         Else -> throw({invalid_doc_tag, Else})
     end.
 
+merge_rev_trees([[]], [], Acc) ->
+    % validate_docs_access left us with no docs to merge
+    {ok, Acc};
 merge_rev_trees([], [], Acc) ->
     {ok, Acc#merge_acc{
         add_infos = lists:reverse(Acc#merge_acc.add_infos)
@@ -659,22 +674,30 @@ maybe_stem_full_doc_info(#full_doc_info{rev_tree = Tree} = Info, Limit) ->
             Info
     end.
 
-update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
+
+update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges, UserCtx) ->
     UpdateSeq = couch_db_engine:get_update_seq(Db),
     RevsLimit = couch_db_engine:get_revs_limit(Db),
 
-    Ids = [Id || [{_Client, #doc{id = Id}} | _] <- DocsList],
+    Ids = [Id || [{_Client, #doc{id=Id}}|_] <- DocsList],
+    % TODO: maybe a perf hit, instead of zip3-ing existing Accesses into
+    %       our doc lists, maybe find 404 docs differently down in
+    %       validate_docs_access (revs is [], which we can then use
+    %       to skip validation as we know it is the first doc rev)
+    Accesses = [Access || [{_Client, #doc{access=Access}}|_] <- DocsList],
+
     % lookup up the old documents, if they exist.
     OldDocLookups = couch_db_engine:open_docs(Db, Ids),
-    OldDocInfos = lists:zipwith(
+    OldDocInfos = lists:zipwith3(
         fun
-            (_Id, #full_doc_info{} = FDI) ->
+            (_Id, #full_doc_info{} = FDI, _Access) ->
                 FDI;
-            (Id, not_found) ->
-                #full_doc_info{id = Id}
+            (Id, not_found, Access) ->
+               #full_doc_info{id=Id,access=Access}
         end,
         Ids,
-        OldDocLookups
+        OldDocLookups,
+        Accesses
     ),
 
     %% Get the list of full partitions
@@ -711,7 +734,14 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
         cur_seq = UpdateSeq,
         full_partitions = FullPartitions
     },
-    {ok, AccOut} = merge_rev_trees(DocsList, OldDocInfos, AccIn),
+    % Loop over DocsList, validate_access for each OldDocInfo on Db,
+    %.  if no OldDocInfo, then send to DocsListValidated, keep OldDocsInfo
+    %   if valid, then send to DocsListValidated, OldDocsInfo
+    %.  if invalid, then send_result tagged `access`(c.f. `conflict)
+    %.    and don’t add to DLV, nor ODI
+
+    { DocsListValidated, OldDocInfosValidated } = validate_docs_access(Db, UserCtx, DocsList, OldDocInfos),
+    {ok, AccOut} = merge_rev_trees(DocsListValidated, OldDocInfosValidated, AccIn),
     #merge_acc{
         add_infos = NewFullDocInfos,
         rem_seqs = RemSeqs
@@ -721,7 +751,8 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
     % the trees, the attachments are already written to disk)
     {ok, IndexFDIs} = flush_trees(Db, NewFullDocInfos, []),
     Pairs = pair_write_info(OldDocLookups, IndexFDIs),
-    LocalDocs2 = update_local_doc_revs(LocalDocs),
+    LocalDocs1 = apply_local_docs_access(Db, LocalDocs),
+    LocalDocs2 = update_local_doc_revs(LocalDocs1),
 
     {ok, Db1} = couch_db_engine:write_doc_infos(Db, Pairs, LocalDocs2),
 
@@ -736,17 +767,86 @@ update_docs_int(Db, DocsList, LocalDocs, ReplicatedChanges) ->
         length(LocalDocs2)
     ),
 
-    % Check if we just updated any design documents, and update the validation
-    % funs if we did.
+    % Check if we just updated any non-access design documents,
+    % and update the validation funs if we did.
+    NonAccessIds = [Id || [{_Client, #doc{id=Id,access=[]}}|_] <- DocsList],
     UpdatedDDocIds = lists:flatmap(
         fun
             (<<"_design/", _/binary>> = Id) -> [Id];
             (_) -> []
         end,
-        Ids
+        NonAccessIds
     ),
 
     {ok, commit_data(Db1), UpdatedDDocIds}.
+
+% check_access(Db, UserCtx, Access) ->
+%     check_access(Db, UserCtx, couch_db:has_access_enabled(Db), Access).
+%
+% check_access(_Db, UserCtx, false, _Access) ->
+%     true;
+
+% at this point, we already validated this Db is access enabled, so do the checks right away.
+check_access(Db, UserCtx, Access) -> couch_db:check_access(Db#db{user_ctx=UserCtx}, Access).
+
+% TODO: looks like we go into validation here unconditionally and only check in
+%       check_access() whether the Db has_access_enabled(), we should do this
+%       here on the outside. Might be our perf issue.
+%       However, if it is, that means we have to speed this up as it would still
+%       be too slow for when access is enabled.
+validate_docs_access(Db, UserCtx, DocsList, OldDocInfos) ->
+    case couch_db:has_access_enabled(Db) of
+        true -> validate_docs_access_int(Db, UserCtx, DocsList, OldDocInfos);
+        _Else -> { DocsList, OldDocInfos }
+    end.
+
+validate_docs_access_int(Db, UserCtx, DocsList, OldDocInfos) ->
+    validate_docs_access(Db, UserCtx, DocsList, OldDocInfos, [], []).
+
+validate_docs_access(_Db, UserCtx, [], [], DocsListValidated, OldDocInfosValidated) ->
+    { lists:reverse(DocsListValidated), lists:reverse(OldDocInfosValidated) };
+validate_docs_access(Db, UserCtx, [Docs | DocRest], [OldInfo | OldInfoRest], DocsListValidated, OldDocInfosValidated) ->
+    % loop over Docs as {Client,  NewDoc}
+    %   validate Doc
+    %   if valid, then put back in Docs
+    %   if not, then send_result and skip
+    NewDocs = lists:foldl(fun({ Client, Doc }, Acc) ->
+        % check if we are allowed to update the doc, skip when new doc
+        OldDocMatchesAccess = case OldInfo#full_doc_info.rev_tree of
+            [] -> true;
+            _ -> check_access(Db, UserCtx, OldInfo#full_doc_info.access)
+        end,
+
+        NewDocMatchesAccess = check_access(Db, UserCtx, Doc#doc.access),
+        case OldDocMatchesAccess andalso NewDocMatchesAccess of
+            true -> % if valid, then send to DocsListValidated, OldDocsInfo
+                    % and store the access context on the new doc
+                [{Client, Doc} | Acc];
+            _Else2 -> % if invalid, then send_result tagged `access`(c.f. `conflict)
+                      % and don’t add to DLV, nor ODI
+                send_result(Client, Doc, access),
+                Acc
+        end
+    end, [], Docs),
+
+    { NewDocsListValidated, NewOldDocInfosValidated } = case length(NewDocs) of
+        0 -> % we sent out all docs as invalid access, drop the old doc info associated with it
+            { [NewDocs | DocsListValidated], OldDocInfosValidated };
+        _ ->
+            { [NewDocs | DocsListValidated], [OldInfo | OldDocInfosValidated] }
+    end,
+    validate_docs_access(Db, UserCtx, DocRest, OldInfoRest, NewDocsListValidated, NewOldDocInfosValidated).
+
+apply_local_docs_access(Db, Docs) ->
+    apply_local_docs_access1(couch_db:has_access_enabled(Db), Docs).
+
+apply_local_docs_access1(false, Docs) ->
+    Docs;
+apply_local_docs_access1(true, Docs) ->
+    lists:map(fun({Client, #doc{access = Access, body = {Body}} = Doc}) ->
+        Doc1 = Doc#doc{body = {[{<<"_access">>, Access} | Body]}},
+        {Client, Doc1}
+    end, Docs).
 
 update_local_doc_revs(Docs) ->
     lists:foldl(
@@ -763,6 +863,14 @@ update_local_doc_revs(Docs) ->
         [],
         Docs
     ).
+
+default_security_object(DbName, []) ->
+    default_security_object(DbName);
+default_security_object(DbName, Options) ->
+    case lists:member({access, true}, Options) of
+        false -> default_security_object(DbName);
+        true -> ?DEFAULT_SECURITY_OBJECT
+    end.
 
 increment_local_doc_revs(#doc{deleted = true} = Doc) ->
     {ok, Doc#doc{revs = {0, [0]}}};
@@ -928,21 +1036,14 @@ get_meta_body_size(Meta) ->
 
 default_security_object(<<"shards/", _/binary>>) ->
     case config:get("couchdb", "default_security", "admin_only") of
-        "admin_only" ->
-            [
-                {<<"members">>, {[{<<"roles">>, [<<"_admin">>]}]}},
-                {<<"admins">>, {[{<<"roles">>, [<<"_admin">>]}]}}
-            ];
+        "admin_only" -> ?DEFAULT_SECURITY_OBJECT;
         Everyone when Everyone == "everyone"; Everyone == "admin_local" ->
             []
     end;
 default_security_object(_DbName) ->
     case config:get("couchdb", "default_security", "admin_only") of
         Admin when Admin == "admin_only"; Admin == "admin_local" ->
-            [
-                {<<"members">>, {[{<<"roles">>, [<<"_admin">>]}]}},
-                {<<"admins">>, {[{<<"roles">>, [<<"_admin">>]}]}}
-            ];
+           ?DEFAULT_SECURITY_OBJECT;
         "everyone" ->
             []
     end.
