@@ -44,7 +44,7 @@ For general help, see:
      
 We also have an IRC channel:
 
-    https://webchat.freenode.net/?channels=couchdb
+    https://web.libera.chat/#couchdb
 
 The mailing lists provide a wealth of support and knowledge for you to tap into.
 Feel free to drop by with your questions or discussion. See the official CouchDB
@@ -81,7 +81,7 @@ Contributing to CouchDB
 
 You can learn more about our contributing process here:
 
-    https://github.com/apache/couchdb/blob/master/CONTRIBUTING.md
+    https://github.com/apache/couchdb/blob/main/CONTRIBUTING.md
 
 Cryptographic Software Notice
 -----------------------------
