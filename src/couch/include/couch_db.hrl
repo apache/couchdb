@@ -67,7 +67,8 @@
 -record(doc_info, {
     id = <<"">>,
     high_seq = 0,
-    revs = [] % rev_info
+    revs = [], % rev_info
+    access = []
 }).
 
 -record(size_info, {
@@ -80,7 +81,8 @@
     update_seq = 0,
     deleted = false,
     rev_tree = [],
-    sizes = #size_info{}
+    sizes = #size_info{},
+    access = []
 }).
 
 -record(httpd, {
@@ -124,7 +126,8 @@
 
     % key/value tuple of meta information, provided when using special options:
     % couch_db:open_doc(Db, Id, Options).
-    meta = []
+    meta = [],
+    access = []
 }).
 
 
@@ -210,7 +213,8 @@
     ptr,
     seq,
     sizes = #size_info{},
-    atts = []
+    atts = [],
+    access = []
 }).
 
 -record (fabric_changes_acc, {
