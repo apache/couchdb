@@ -99,6 +99,13 @@ basic_name_pw(Req) ->
             nil
     end.
 
+extract_roles(UserProps) ->
+    Roles = couch_util:get_value(<<"roles">>, UserProps, []),
+    case lists:member(<<"_admin">>, Roles) of
+        true -> Roles;
+        _ -> Roles ++ [<<"_users">>]
+    end.
+
 default_authentication_handler(Req) ->
     default_authentication_handler(Req, couch_auth_cache).
 
@@ -117,7 +124,7 @@ default_authentication_handler(Req, AuthModule) ->
                             Req#httpd{
                                 user_ctx = #user_ctx{
                                     name = UserName,
-                                    roles = couch_util:get_value(<<"roles">>, UserProps, [])
+                                    roles = extract_roles(UserProps)
                                 }
                             };
                         false ->
@@ -189,7 +196,7 @@ proxy_auth_user(Req) ->
             Roles =
                 case header_value(Req, XHeaderRoles) of
                     undefined -> [];
-                    Else -> re:split(Else, "\\s*,\\s*", [trim, {return, binary}])
+                    Else -> [<<"_users">> | re:split(Else, "\\s*,\\s*", [trim, {return, binary}])]
                 end,
             case
                 chttpd_util:get_chttpd_auth_config_boolean(
@@ -370,9 +377,7 @@ cookie_authentication_handler(#httpd{mochi_req = MochiReq} = Req, AuthModule) ->
                                             Req#httpd{
                                                 user_ctx = #user_ctx{
                                                     name = ?l2b(User),
-                                                    roles = couch_util:get_value(
-                                                        <<"roles">>, UserProps, []
-                                                    )
+                                                    roles = extract_roles(UserProps)
                                                 },
                                                 auth = {FullSecret, TimeLeft < Timeout * 0.9}
                                             };
@@ -500,7 +505,7 @@ handle_session_req(#httpd{method = 'POST', mochi_req = MochiReq} = Req, AuthModu
                 {[
                     {ok, true},
                     {name, UserName},
-                    {roles, couch_util:get_value(<<"roles">>, UserProps, [])}
+                    {roles, extract_roles(UserProps)}
                 ]}
             );
         false ->
