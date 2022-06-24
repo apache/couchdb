@@ -955,16 +955,18 @@ view_cb(Msg, Acc) ->
     couch_mrview_http:view_cb(Msg, Acc).
 
 db_doc_req(#httpd{method = 'DELETE'} = Req, Db, DocId) ->
-    % check for the existence of the doc to handle the 404 case.
-    couch_doc_open(Db, DocId, nil, []),
-    case chttpd:qs_value(Req, "rev") of
+    % fetch the old doc revision, so we can compare access control
+    % in send_update_doc() later.
+    Doc0 = couch_doc_open(Db, DocId, nil, [{user_ctx, Req#httpd.user_ctx}]),
+    Revs = chttpd:qs_value(Req, "rev"),
+    case Revs of
         undefined ->
             Body = {[{<<"_deleted">>, true}]};
         Rev ->
             Body = {[{<<"_rev">>, ?l2b(Rev)}, {<<"_deleted">>, true}]}
     end,
-    Doc = couch_doc_from_req(Req, Db, DocId, Body),
-    send_updated_doc(Req, Db, DocId, Doc);
+    Doc = Doc0#doc{revs=Revs,body=Body,deleted=true},
+    send_updated_doc(Req, Db, DocId, couch_doc_from_req(Req, Db, DocId, Doc));
 db_doc_req(#httpd{method = 'GET', mochi_req = MochiReq} = Req, Db, DocId) ->
     #doc_query_args{
         rev = Rev0,
@@ -1414,6 +1416,8 @@ receive_request_data(Req, LenLeft) when LenLeft > 0 ->
 receive_request_data(_Req, _) ->
     throw(<<"expected more data">>).
 
+update_doc_result_to_json({#doc{id=Id,revs=Rev}, access}) ->
+    update_doc_result_to_json({{Id, Rev}, access});
 update_doc_result_to_json({error, _} = Error) ->
     {_Code, Err, Msg} = chttpd:error_info(Error),
     {[
@@ -1968,6 +1972,7 @@ parse_shards_opt(Req) ->
     [
         {n, parse_shards_opt("n", Req, config:get_integer("cluster", "n", 3))},
         {q, parse_shards_opt("q", Req, config:get_integer("cluster", "q", 2))},
+        {access, parse_shards_opt_access(chttpd:qs_value(Req, "access", false))},
         {placement,
             parse_shards_opt(
                 "placement", Req, config:get("cluster", "placement")
@@ -2003,6 +2008,12 @@ parse_shards_opt(Param, Req, Default) ->
         true -> Val;
         false -> throw({bad_request, Err})
     end.
+
+parse_shards_opt_access(Value) when is_boolean(Value) ->
+    Value;
+parse_shards_opt_access(_Value) ->
+    Err = ?l2b(["The `access` value should be a boolean."]),
+    throw({bad_request, Err}).
 
 parse_engine_opt(Req) ->
     case chttpd:qs_value(Req, "engine") of

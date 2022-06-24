@@ -1031,6 +1031,8 @@ error_info({bad_request, Error, Reason}) ->
     {400, couch_util:to_binary(Error), couch_util:to_binary(Reason)};
 error_info({query_parse_error, Reason}) ->
     {400, <<"query_parse_error">>, Reason};
+error_info(access) ->
+    {403, <<"forbidden">>, <<"access">>};
 error_info(database_does_not_exist) ->
     {404, <<"not_found">>, <<"Database does not exist.">>};
 error_info(not_found) ->
