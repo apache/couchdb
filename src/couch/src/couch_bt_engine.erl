@@ -664,20 +664,22 @@ id_tree_split(#full_doc_info{} = Info) ->
         update_seq = Seq,
         deleted = Deleted,
         sizes = SizeInfo,
-        rev_tree = Tree
+        rev_tree = Tree,
+        access = Access
     } = Info,
-    {Id, {Seq, ?b2i(Deleted), split_sizes(SizeInfo), disk_tree(Tree)}}.
+    {Id, {Seq, ?b2i(Deleted), split_sizes(SizeInfo), disk_tree(Tree), split_access(Access)}}.
 
 id_tree_join(Id, {HighSeq, Deleted, DiskTree}) ->
     % Handle old formats before data_size was added
-    id_tree_join(Id, {HighSeq, Deleted, #size_info{}, DiskTree});
-id_tree_join(Id, {HighSeq, Deleted, Sizes, DiskTree}) ->
+    id_tree_join(Id, {HighSeq, Deleted, #size_info{}, DiskTree, []});
+id_tree_join(Id, {HighSeq, Deleted, Sizes, DiskTree, Access}) ->
     #full_doc_info{
         id = Id,
         update_seq = HighSeq,
         deleted = ?i2b(Deleted),
         sizes = couch_db_updater:upgrade_sizes(Sizes),
-        rev_tree = rev_tree(DiskTree)
+        rev_tree = rev_tree(DiskTree),
+        access = join_access(Access)
     }.
 
 id_tree_reduce(reduce, FullDocInfos) ->
@@ -714,19 +716,21 @@ seq_tree_split(#full_doc_info{} = Info) ->
         update_seq = Seq,
         deleted = Del,
         sizes = SizeInfo,
-        rev_tree = Tree
+        rev_tree = Tree,
+        access = Access
     } = Info,
-    {Seq, {Id, ?b2i(Del), split_sizes(SizeInfo), disk_tree(Tree)}}.
+    {Seq, {Id, ?b2i(Del), split_sizes(SizeInfo), disk_tree(Tree), split_access(Access)}}.
 
 seq_tree_join(Seq, {Id, Del, DiskTree}) when is_integer(Del) ->
-    seq_tree_join(Seq, {Id, Del, {0, 0}, DiskTree});
-seq_tree_join(Seq, {Id, Del, Sizes, DiskTree}) when is_integer(Del) ->
+    seq_tree_join(Seq, {Id, Del, {0, 0}, DiskTree, []});
+seq_tree_join(Seq, {Id, Del, Sizes, DiskTree, Access}) when is_integer(Del) ->
     #full_doc_info{
         id = Id,
         update_seq = Seq,
         deleted = ?i2b(Del),
         sizes = join_sizes(Sizes),
-        rev_tree = rev_tree(DiskTree)
+        rev_tree = rev_tree(DiskTree),
+        access = join_access(Access)
     };
 seq_tree_join(KeySeq, {Id, RevInfos, DeletedRevInfos}) ->
     % Older versions stored #doc_info records in the seq_tree.
@@ -754,6 +758,9 @@ seq_tree_reduce(reduce, DocInfos) ->
     length(DocInfos);
 seq_tree_reduce(rereduce, Reds) ->
     lists:sum(Reds).
+
+join_access(Access) -> Access.
+split_access(Access) -> Access.
 
 local_tree_split(#doc{revs = {0, [Rev]}} = Doc) when is_binary(Rev) ->
     #doc{
