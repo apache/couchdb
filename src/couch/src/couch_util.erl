@@ -46,6 +46,7 @@
 -export([verify_hash_names/2]).
 -export([get_config_hash_algorithms/0]).
 -export([remove_sensitive_data/1]).
+-export([validate_design_access/1, validate_design_access/2]).
 
 -include_lib("couch/include/couch_db.hrl").
 
@@ -867,3 +868,16 @@ remove_sensitive_data(KVList) ->
     KVList1 = lists:keyreplace(<<"password">>, 1, KVList, {<<"password">>, <<"****">>}),
     % some KVList entries are atoms, so test fo this too
     lists:keyreplace(password, 1, KVList1, {password, <<"****">>}).
+
+validate_design_access(DDoc) ->
+    validate_design_access1(DDoc, true).
+
+validate_design_access(Db, DDoc) ->
+    validate_design_access1(DDoc, couch_db:has_access_enabled(Db)).
+
+validate_design_access1(_DDoc, false) -> ok;
+validate_design_access1(DDoc, true) ->
+    is_users_ddoc(DDoc).
+
+is_users_ddoc(#doc{access=[<<"_users">>]}) -> ok;
+is_users_ddoc(_) -> throw({forbidden, <<"per-user ddoc access">>}).
