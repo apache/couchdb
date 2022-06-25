@@ -13,7 +13,7 @@
 -module(couch_mrview).
 
 -export([validate/2]).
--export([query_all_docs/2, query_all_docs/4]).
+-export([query_all_docs/2, query_all_docs/4, query_changes_access/5]).
 -export([query_view/3, query_view/4, query_view/6, get_view_index_pid/4]).
 -export([get_info/2]).
 -export([trigger_update/2, trigger_update/3]).
@@ -259,6 +259,116 @@ query_all_docs(Db, Args) ->
 query_all_docs(Db, Args, Callback, Acc) when is_list(Args) ->
     query_all_docs(Db, to_mrargs(Args), Callback, Acc);
 query_all_docs(Db, Args0, Callback, Acc) ->
+    case couch_db:has_access_enabled(Db) and not couch_db:is_admin(Db) of
+        true -> query_all_docs_access(Db, Args0, Callback, Acc);
+        false -> query_all_docs_admin(Db, Args0, Callback, Acc)
+    end.
+access_ddoc() ->
+    #doc{
+        id = <<"_design/_access">>,
+        body = {[
+            {<<"language">>,<<"_access">>},
+            {<<"options">>, {[
+                {<<"include_design">>, true}
+            ]}},
+            {<<"views">>, {[
+                {<<"_access_by_id">>, {[
+                    {<<"map">>, <<"_access/by-id-map">>},
+                    {<<"reduce">>, <<"_count">>}
+                ]}},
+                {<<"_access_by_seq">>, {[
+                    {<<"map">>, <<"_access/by-seq-map">>},
+                    {<<"reduce">>, <<"_count">>}
+                ]}}
+            ]}}
+        ]}
+    }.
+query_changes_access(Db, StartSeq, Fun, Options, Acc) ->
+    DDoc = access_ddoc(),
+    UserCtx = couch_db:get_user_ctx(Db),
+    UserName = UserCtx#user_ctx.name,
+    %% % TODO: add roles
+    Args1 = prefix_startkey_endkey(UserName, #mrargs{}, fwd),
+    Args2 = Args1#mrargs{deleted=true},
+    Args = Args2#mrargs{reduce=false},
+    %% % filter out the user-prefix from the key, so _all_docs looks normal
+    %% % this isn’t a separate function because I’m binding Callback0 and I don’t
+    %% % know the Erlang equivalent of JS’s fun.bind(this, newarg)
+    Callback = fun
+         ({meta, _}, Acc0) ->
+            {ok, Acc0}; % ignore for now
+         ({row, Props}, Acc0) ->
+            % turn row into FDI
+            Value = couch_util:get_value(value, Props),
+            [Owner, Seq] = couch_util:get_value(key, Props),
+            Rev = couch_util:get_value(rev, Value),
+            Deleted = couch_util:get_value(deleted, Value, false),
+            BodySp = couch_util:get_value(body_sp, Value),
+            [Pos, RevId] = string:split(?b2l(Rev), "-"),
+            FDI = #full_doc_info{
+                id = proplists:get_value(id, Props),
+                rev_tree = [{list_to_integer(Pos), {?l2b(RevId), #leaf{deleted=Deleted, ptr=BodySp, seq=Seq, sizes=#size_info{}}, []}}],
+                deleted = Deleted,
+                update_seq = 0,
+                sizes = #size_info{},
+                access = [Owner]
+            },
+            Fun(FDI, Acc0);
+        (_Else, Acc0) ->
+            {ok, Acc0} % ignore for now
+        end,
+    VName = <<"_access_by_seq">>,
+    query_view(Db, DDoc, VName, Args, Callback, Acc).
+
+query_all_docs_access(Db, Args0, Callback0, Acc) ->
+    % query our not yest existing, home-grown _access view.
+    % use query_view for this.
+    DDoc = access_ddoc(),
+    UserCtx = couch_db:get_user_ctx(Db),
+    UserName = UserCtx#user_ctx.name,
+    Args1 = prefix_startkey_endkey(UserName, Args0, Args0#mrargs.direction),
+    Args = Args1#mrargs{reduce=false, extra=Args1#mrargs.extra ++ [{all_docs_access, true}]},
+    Callback = fun
+        ({row, Props}, Acc0) ->
+            % filter out the user-prefix from the key, so _all_docs looks normal
+            % this isn’t a separate function because I’m binding Callback0 and I
+            % don’t know the Erlang equivalent of JS’s fun.bind(this, newarg)
+            [_User, Key] = proplists:get_value(key, Props),
+            Row0 = proplists:delete(key, Props),
+            Row = [{key, Key} | Row0],
+            Callback0({row, Row}, Acc0);
+        (Row, Acc0) ->
+            Callback0(Row, Acc0)
+        end,
+    VName = <<"_access_by_id">>,
+    query_view(Db, DDoc, VName, Args, Callback, Acc).
+
+prefix_startkey_endkey(UserName, Args, fwd) ->
+    #mrargs{start_key=StartKey, end_key=EndKey} = Args,
+    Args#mrargs {
+        start_key = case StartKey of
+            undefined -> [UserName];
+            StartKey -> [UserName, StartKey]
+        end,
+        end_key = case EndKey of
+            undefined -> [UserName, {}];
+            EndKey -> [UserName, EndKey, {}]
+        end
+    };
+
+prefix_startkey_endkey(UserName, Args, rev) ->
+    #mrargs{start_key=StartKey, end_key=EndKey} = Args,
+    Args#mrargs {
+        end_key = case StartKey of
+            undefined -> [UserName];
+            StartKey -> [UserName, StartKey]
+        end,
+        start_key = case EndKey of
+            undefined -> [UserName, {}];
+            EndKey -> [UserName, EndKey, {}]
+        end
+    }.
+query_all_docs_admin(Db, Args0, Callback, Acc) ->
     Sig = couch_util:with_db(Db, fun(WDb) ->
         {ok, Info} = couch_db:get_db_info(WDb),
         couch_index_util:hexsig(couch_hash:md5_hash(term_to_binary(Info)))
