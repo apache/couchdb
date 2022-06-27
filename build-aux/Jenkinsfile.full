@@ -60,13 +60,12 @@ meta = [
     node_label: 'arm64v8'
   ],
 
-  // Skip PPC64. The instance went away and needs to be rebuilt
-  // 'bullseye-ppc64': [
-  //   name: 'Debian 11 POWER',
-  //   spidermonkey_vsn: '78',
-  //   image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
-  //   node_label: 'ppc64le'
-  // ],
+  'bullseye-ppc64': [
+     name: 'Debian 11 POWER',
+     spidermonkey_vsn: '78',
+     image: "apache/couchdbci-debian:bullseye-erlang-${ERLANG_VERSION}",
+     node_label: 'ppc64le'
+  ],
 
   'bullseye': [
     name: 'Debian 11',
