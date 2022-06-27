@@ -61,7 +61,7 @@ defmodule Couch.Test.Suite do
   def pretty_print(tests) do
     tests = Enum.join(Enum.sort(Enum.map(tests, fn {module_name, test_names} ->
       test_names = test_names
-        |> Enum.map(fn x -> ~s("#{x}") end) |> Enum.join(",\n    ")
+        |> Enum.map_join(fn x -> ~s("#{x}") end, ",\n    ")
       ~s(  "#{module_name}": [\n    #{test_names}\n  ])
     end)), ",\n")
     "%{\n#{tests}\n}"
