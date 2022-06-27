@@ -59,7 +59,7 @@ defmodule Couch.Test.Setup.Step.Start do
     }
   end
 
-  def teardown(_setup, %___MODULE__{test_ctx: test_ctx}) do
+  def teardown(_setup, %__MODULE__{test_ctx: test_ctx}) do
     :test_util.stop_couch(test_ctx)
   end
 
