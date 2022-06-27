@@ -28,7 +28,7 @@ ddocid({_, DDocId}) ->
     DDocId.
 
 recover({DbName, DDocId}) ->
-    fabric:open_doc(DbName, DDocId, [ejson_body, ?ADMIN_CTX]).
+    fabric:open_doc(DbName, DDocId, [ejson_body, ?ADMIN_CTX, ddoc_cache]).
 
 insert({DbName, DDocId}, {ok, #doc{revs = Revs} = DDoc}) ->
     {Depth, [RevId | _]} = Revs,
