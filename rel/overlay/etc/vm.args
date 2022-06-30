@@ -48,17 +48,12 @@
 -kernel error_logger silent
 -sasl sasl_error_logger false
 
-# Use kernel poll functionality if supported by emulator
-+K true
-
-# Start a pool of asynchronous IO threads
-+A 16
+# Increase the pool of dirty IO schedulers from 10 to 16
+# Dirty IO schedulers are used for file IO.
++SDio 16
 
 # Comment this line out to enable the interactive Erlang shell on startup
 +Bd -noinput
-
-# Force use of the smp scheduler, fixes #1296
--smp enable
 
 # Set maximum SSL session lifetime to reap terminated replication readers
 -ssl session_lifetime 300
