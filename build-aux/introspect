@@ -45,13 +45,17 @@ introspect_diff(App, From, ToBranch) ->
     end.
 
 sh(App, Cmd) ->
-    Dir = lists:flatten(["src/", atom_to_list(App)]),
-    Port = open_port({spawn, lists:flatten(Cmd)},
-                     [{cd, Dir},
-                      {line, 16384},
-                      exit_status,
-                      stderr_to_stdout,
-                      use_stdio]),
+    Dir = lists:flatten(["apps/", atom_to_list(App)]),
+    Port = open_port(
+        {spawn, lists:flatten(Cmd)},
+        [
+            {cd, Dir},
+            {line, 16384},
+            exit_status,
+            stderr_to_stdout,
+            use_stdio
+        ]
+    ),
     read_port(Port).
 
 read_port(Port) ->

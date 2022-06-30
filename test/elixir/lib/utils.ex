@@ -1,12 +1,12 @@
 defmodule Couch.Test.Utils do
   require Record
   @moduledoc "Helper functions for testing"
-  @project_root "#{__DIR__}/../../../"
+  @project_root "#{__DIR__}/../../.."
   Record.defrecord :user_ctx, Record.extract(
-    :user_ctx, from: "#{@project_root}/src/couch/include/couch_db.hrl")
+    :user_ctx, from: "#{@project_root}/apps/couch/include/couch_db.hrl")
 
   Record.defrecord :doc_info, Record.extract(
-    :doc_info, from: "#{@project_root}/src/couch/include/couch_db.hrl")
+    :doc_info, from: "#{@project_root}/apps/couch/include/couch_db.hrl")
 
   def random_name(prefix) do
     time = :erlang.monotonic_time()
