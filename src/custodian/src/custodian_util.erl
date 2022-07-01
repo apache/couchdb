@@ -87,7 +87,11 @@ fold_dbs(Id, Shards, State) ->
     IsLive = fun(#shard{node = N}) -> lists:member(N, State#state.live) end,
     LiveShards = lists:filter(IsLive, Shards),
     SafeShards = lists:filter(IsSafe, Shards),
-    TargetN = mem3_util:calculate_max_n(Shards),
+    TargetN =
+        case cluster_n_is_expected_n() of
+            true -> cluster_n();
+            false -> mem3_util:calculate_max_n(Shards)
+        end,
     Acc0 = State#state.acc,
     Acc1 =
         case mem3_util:calculate_max_n(LiveShards) of
@@ -170,6 +174,9 @@ get_n_rings(N, Ranges, Rings) ->
 
 cluster_n() ->
     config:get_integer("cluster", "n", 3).
+
+cluster_n_is_expected_n() ->
+    config:get_boolean("custodian", "use_cluster_n_as_expected_n", false).
 
 maintenance_nodes(Nodes) ->
     {Modes, _} = rpc:multicall(Nodes, config, get, ["couchdb", "maintenance_mode"]),
